@@ -2467,12 +2467,12 @@ ARBOR_COLLAR_Z0 = ARBOR_Z0 + ARBOR_PIN_Z - ARBOR_COLLAR_PIN_Z
 ARBOR_COLLAR_Z = (ARBOR_COLLAR_Z0, ARBOR_COLLAR_Z0 + ARBOR_COLLAR_LEN)
 
 # Worst stack at both ends (user ruling P1-2): the rig is set with the drum's
-# back end RIG_SET_LEAF_D off g19's back face, so from the pose it advances
-# by DRUM_BACK_ADVANCE_STACK and must still cover all of g19's face (so j = 19
+# back end D off g19's back face, so from the pose it advances by
+# DRUM_BACK_ADVANCE_STACK and must still cover all of g19's face (so j = 19
 # engages >= 2.0 a fortiori); its front end retreats by DRUM_FRONT_RETREAT_STACK
-# and must stay 1.0 south of g0's front face.  Both spares join RIG_MARGINS
-# (below), and one leaf step thinner would leave j = 19 short of
-# RIG_MARGIN_SPARE (D is the thinnest setting that holds).  D is set with the
+# and must stay 1.0 south of g0's front face.  Both join RIG_MARGINS (below);
+# D and the two plays it covers are the owner's ranges (C7), so j = 19 keeps
+# its floor, not RIG_MARGIN_SPARE.  D is set with the
 # bank held south on its disc (user ruling 2026-10-20), and D follows the
 # actual g19 back face, so the bank adds nothing to j = 19; at the front g0
 # sits south by a long g0 -> g19 pitch stack (RIG.G0_FRONT_SOUTH_STACK), beside the
@@ -2538,8 +2538,8 @@ SPRING_X = PIVOT_X + SPR_PIVOT_LX  # machine anchor
 # in from that inner face.
 STRAP_Z_INNER = RIG.STRAP_Z_INNER
 # Blade inner edge, in from the strap's inner face: SPRING_BLADE_INSET keeps the
-# whole blade on the flank at every strap thickness, RIG_MARGIN_SPARE over its
-# floor (pinion_rig_layout).
+# whole blade on the flank at every strap thickness and pad leaf of its range,
+# RIG_MARGIN_SPARE over its floor (pinion_rig_layout).
 SPRING_BLADE_INSET = RIG.SPRING_BLADE_INSET
 SPRING_Z = RIG.SPRING_Z
 # _SPR_U (up the strap axis) and _SPR_N (its east normal, east = machine -x)
@@ -2571,10 +2571,10 @@ SPRING_FOOT_END_X = SPRING_X - SPR_FOOT_END_L[0]  # the free end, east
 SPRING_FOOT_TAN_X = SPRING_X - SPR_FOOT_TAN_L[0]  # the bend tangent
 
 # The foot's screw pad widens the free end forward of the strip, flush with
-# its aft edge (pinion_rig_layout): booked with that edge at the pad leaf's
-# thinnest setting, no width band reaches it.  The leaf sets z, so z alone
+# its aft edge (pinion_rig_layout): booked with that edge at the pad range's
+# thinnest leaf, no width band reaches it.  The leaf sets z, so z alone
 # is gated (Main, #859 restricted review).
-_SPR_PAD_Z_HI = RIG.SPRING_PAD_AFT_Z + RIG.FEELER_SET_ERROR
+_SPR_PAD_Z_HI = RIG.SPRING_PAD_AFT_Z + (RIG.SPRING_PAD_LEAF - RIG.SPRING_PAD_GAP[0])
 
 # --- cam engage path (ch. 25 + page001_img01; PR8) ---------------------------
 # Blind-seat integrity: nearest approach of the seat cylinder to the pivot
@@ -3021,11 +3021,13 @@ DRUM_TIP_TO_END_DISC_STACK = {
 # with the strip's aft edge flush (pinion_rig_layout).  Each term moves the
 # strip's front edge south, toward the gear.
 SPRING_TO_J19_STACK = {
-    "rig-set leaf D, thinnest setting": RIG.RIG_SET_ERROR,
+    "rig-set D, thinnest setting": RIG.RIG_SET_LEAF_D - RIG.RIG_SET_D_GAP[0],
     "MHA-DT-14 strap thickness .XX, thinnest": -printed_deviations(
         STRAP_T, STRAP_T_PLACES, unit=STRAP_UNIT
     )[0],
-    "spring pad leaf, thickest setting": RIG.FEELER_SET_ERROR,
+    "spring pad leaf, thickest of its range": (
+        RIG.SPRING_PAD_GAP[1] - RIG.SPRING_PAD_LEAF
+    ),
     "MHA-DT-24 strip width .XX, widest": printed_deviations(
         SPRING_W, SPRING_W_PLACES, unit=SPRING_UNIT
     )[1],
@@ -3036,10 +3038,13 @@ def _worst(nominal: float, *stacks: dict[str, float]) -> float:
     return nominal - sum(sum(stack.values()) for stack in stacks)
 
 
-# The novice-margin rule (Main, restricted review of #858): every rig-scope
-# margin -- the fit-up stacks, the drum's gears and end play, and each
-# clearance the rig's axial stations set against its neighbours -- stands at
-# least RIG_MARGIN_SPARE over its floor.  name -> (worst value, floor).
+# RIG_MARGIN_SPARE (pinion_rig_layout) is a coordinator's planning margin
+# (Main, restricted review of #858): every rig-scope margin -- the fit-up
+# stacks, the drum's gears and end play, and each clearance the rig's axial
+# stations set against its neighbours -- stood at least that much over its
+# floor.  The owner's fit-up ranges (2026-11-24, audit part 2 C7) override it
+# for the rows they size (Main's C7 ruling, 2026-11-24): those keep their
+# floors only.  name -> (worst value, floor).
 RIG_MARGINS = {
     "j = 19 past its full face (bank preloaded south)": (J19_FULL_FACE_MARGIN, 0.0),
     "j = 0 drum overhang slack (rig and bank terms)": (J0_SLACK_WORST, 0.0),
@@ -3060,7 +3065,7 @@ RIG_MARGINS = {
         min(min(stop.values()) for stop in ARBOR_LAND_MARGINS_AT_STOPS.values()),
         ARBOR_MIN_LAND_OVER_STRAP,
     ),
-    "back collar to the back block": (RIG.BACK_COLLAR_GAP_MIN, RIG.BACK_COLLAR_MIN_GAP),
+    "MHA-DT-17 end play between its collars": (RIG.LIFT_ROD_END_PLAY_MIN, 0.0),
     "spring blade on the back strap flank": (
         RIG.SPRING_BLADE_ON_FLANK_WORST,
         RIG.SPRING_BLADE_MIN_ON_FLANK,
@@ -3111,19 +3116,34 @@ RIG_MARGINS = {
         0.25,
     ),
 }
+OWNER_RANGED_RIG_MARGINS = frozenset(
+    {
+        "j = 19 past its full face (bank preloaded south)",
+        "lift rod seat past the front block",
+        "drum end play",
+        "MHA-DT-17 end play between its collars",
+        "spring foot pad to the back block",
+    }
+)
 _THIN = {
     name: (value, floor)
     for name, (value, floor) in RIG_MARGINS.items()
-    if value < floor + RIG.RIG_MARGIN_SPARE - 1e-9
+    if value
+    < floor + (0.0 if name in OWNER_RANGED_RIG_MARGINS else RIG.RIG_MARGIN_SPARE) - 1e-9
 }
 
 
 def rig_margin_lines() -> list[str]:
-    """One line per RIG_MARGINS row: worst value, floor and spare over the
-    floor + RIG_MARGIN_SPARE requirement, for the build log."""
+    """One line per RIG_MARGINS row: worst value, floor and what it holds over
+    the floor (+ RIG_MARGIN_SPARE where no owner range sets it), for the build
+    log."""
     return [
         f"{name}: worst {value:.3f}, floor {floor:g}, "
-        f"spare {value - floor - RIG.RIG_MARGIN_SPARE:+.3f}"
+        + (
+            f"over floor {value - floor:+.3f} (owner range)"
+            if name in OWNER_RANGED_RIG_MARGINS
+            else f"spare {value - floor - RIG.RIG_MARGIN_SPARE:+.3f}"
+        )
         for name, (value, floor) in RIG_MARGINS.items()
     ]
 

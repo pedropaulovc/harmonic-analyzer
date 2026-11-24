@@ -283,15 +283,15 @@ def test_rig_layout_sets_the_front_block_by_feeler_off_the_back_stop() -> None:
         rig.STRAP_Z_INNER, abs=1e-9
     )
     # The drum shim is its own leaf (Main, #858: the 0.25 feeler left the drum
-    # 0.05 over its end-play floor): the thinnest whose tightest set, the
-    # leaf's tolerance booked, keeps the end-play floor and the spare (#3042).
+    # 0.05 over its end-play floor), now any one leaf .010 TO .020 (owner
+    # ruling 2026-11-24, audit part 2 C7): its thinnest, the leaf's tolerance
+    # booked, keeps the end-play floor; the model sits on .019.
     import dt_pinion_arbor_geometry
 
     assert rig.DRUM_MIN_END_PLAY == dt_pinion_arbor_geometry.MIN_END_PLAY
-    floor = rig.DRUM_MIN_END_PLAY + rig.RIG_MARGIN_SPARE
-    assert rig.DRUM_END_SHIM == rig.smallest_leaf_setting(floor)
-    assert rig.DRUM_END_SHIM - rig.DRUM_END_SHIM_SET_ERROR >= floor
-    assert rig.DRUM_END_SHIM - rig.FEELER_LEAF_STEP - rig.DRUM_END_SHIM_SET_ERROR < floor
+    assert rig.DRUM_END_GAP == rig.leaf_gap(rig.SMALL_LEAF_RANGE)
+    assert rig.DRUM_END_GAP[0] >= rig.DRUM_MIN_END_PLAY
+    assert rig.SMALL_LEAF_RANGE[0] <= rig.DRUM_END_SHIM <= rig.SMALL_LEAF_RANGE[1]
     assert not hasattr(rig, "STRAP_AIR")
     assert rig.STRAP_Z_OUTER[1] - rig.STRAP_Z_INNER[1] == pytest.approx(THICKNESS)
 
@@ -396,25 +396,28 @@ def test_worst_stack_bands_are_the_printed_places() -> None:
     assert not hasattr(rig, "STACK_BAND")  # the stacks name every term
 
 
-def test_front_block_feeler_setting_is_the_ruled_band() -> None:
+def test_front_block_feeler_setting_is_the_ruled_range() -> None:
     # Codex #854 P1: the fit-up setting that makes INNER_SPAN (and so the
     # torque shaft and lift rod lengths) true is ruling (c)'s feeler between
-    # the front strap and the front block, .010 +/- 0.10 mm of set band plus
-    # its one leaf's tolerance (#3042).  The band is a
-    # named fit-up value so the MHA-DT-00 step and every worst-case gate read
-    # one source; it never closes the gap or doubles it.  The layout owns it
-    # (its worst stack sizes the shaft and rod, Codex #837) and pinion_rig_fitup
-    # re-exports it for the print.
+    # the front strap and the front block: any one leaf .010 TO .020, its
+    # leaf's tolerance booked (owner ruling 2026-11-24, audit part 2 C7; no
+    # feel band, owner P2).  The range is a named fit-up value so the MHA-DT-00
+    # step and every worst-case gate read one source; it never closes the gap.
+    # The layout owns it (its worst stack sizes the shaft and rod, Codex #837)
+    # and pinion_rig_fitup re-exports it for the print.
     import dt_feeler_leaves
     import pinion_rig_fitup as fitup
     import pinion_rig_layout as rig
 
     assert fitup.FRONT_BLOCK_FEELER is rig.FRONT_BLOCK_FEELER
-    assert fitup.FRONT_BLOCK_FEELER_BAND is rig.FRONT_BLOCK_FEELER_BAND
-    assert rig.FEELER_SET_BAND == 0.10
-    assert fitup.FRONT_BLOCK_FEELER_BAND == pytest.approx(
-        rig.FEELER_SET_BAND + dt_feeler_leaves.LEAF_TOLERANCE
+    assert fitup.SMALL_LEAF_RANGE is rig.SMALL_LEAF_RANGE
+    assert rig.FRONT_BLOCK_GAP == pytest.approx(
+        (
+            rig.SMALL_LEAF_RANGE[0] - dt_feeler_leaves.LEAF_TOLERANCE,
+            rig.SMALL_LEAF_RANGE[1] + dt_feeler_leaves.LEAF_TOLERANCE,
+        )
     )
+    assert not hasattr(rig, "FEELER_SET_BAND")
     # Main (#858): both feelers are leaves of one set, the one the shop owns
     # (owner ruling 2026-11-23, #3042): 32 blades, 31 inch sizes.
     for leaf in (fitup.FRONT_BLOCK_FEELER, fitup.DRUM_END_SHIM):
@@ -422,8 +425,7 @@ def test_front_block_feeler_setting_is_the_ruled_band() -> None:
     assert len(fitup.FEELER_GAGE_LEAVES_MM) == 31 == dt_feeler_leaves.BLADE_COUNT - 1
     assert (min(dt_feeler_leaves.LEAVES_IN), max(dt_feeler_leaves.LEAVES_IN)) == (0.0015, 0.035)
     assert "INCH" in fitup.FEELER_GAGE and "66MA" not in fitup.FEELER_GAGE
-    assert 0.0 < fitup.FRONT_BLOCK_FEELER - fitup.FRONT_BLOCK_FEELER_BAND
-    assert fitup.FRONT_BLOCK_FEELER_BAND < fitup.FRONT_BLOCK_FEELER
+    assert 0.0 < rig.FRONT_BLOCK_GAP[0]
 
 
 def test_manufactured_block_span_is_the_solid_stack_plus_one_feeler() -> None:
@@ -484,16 +486,23 @@ def test_torque_shaft_bears_the_front_block_at_the_worst_fitted_stack() -> None:
     assert rig.LENGTH_PLACES == ROD_PRECISION["RodProfile"]["RodBody"]
     # A nominal that does not print exactly moves its term by the rounding.
     assert printed_deviations(10.254, 2) == pytest.approx((-0.514, 0.506))
-    assert rig.FRONT_BLOCK_FEELER_BAND == rig.FEELER_SET_ERROR
+    assert rig.FRONT_BLOCK_GAP == rig.DRUM_END_GAP
 
     depth = dt_pinion_pivot_block_spec.BLOCK_DEPTH
     shortest_shaft = rig.TORQUE_SHAFT_LEN - xx_in
     # Straps at their printed .XX limits, the drum at its own row, the
-    # feeler and the drum shim each their set error wide, and the flush
+    # feeler and the drum shim each over their ranges, and the flush
     # setting the shaft is drilled at 0.10 proud (ruling 2).
-    set_errors = rig.FRONT_BLOCK_FEELER_BAND + rig.DRUM_END_SHIM_SET_ERROR
-    growth = 2.0 * strap_upper + rig.DRUM_LEN_BAND + set_errors
-    shrink = -2.0 * strap_lower + rig.DRUM_LEN_BAND + set_errors
+    grow = sum(gap[1] - nominal for gap, nominal in (
+        (rig.FRONT_BLOCK_GAP, rig.FRONT_BLOCK_FEELER),
+        (rig.DRUM_END_GAP, rig.DRUM_END_SHIM),
+    ))
+    close = sum(nominal - gap[0] for gap, nominal in (
+        (rig.FRONT_BLOCK_GAP, rig.FRONT_BLOCK_FEELER),
+        (rig.DRUM_END_GAP, rig.DRUM_END_SHIM),
+    ))
+    growth = 2.0 * strap_upper + rig.DRUM_LEN_BAND + grow
+    shrink = -2.0 * strap_lower + rig.DRUM_LEN_BAND + close
     longest_span = (depth + xx_in) + rig.INNER_SPAN + growth
     bearing = shortest_shaft - longest_span - rig.FLUSH_SET_ERROR
     assert bearing == pytest.approx(sum(rig.TORQUE_SHAFT_BEARING_STACK.values()))
@@ -507,8 +516,9 @@ def test_torque_shaft_bears_the_front_block_at_the_worst_fitted_stack() -> None:
     # hub rides the lift rod, which the blocks carry off the shaft axis.
     longest_shaft = rig.TORQUE_SHAFT_LEN + xx_in
     shortest_outer = 2.0 * (depth - xx_in) + rig.INNER_SPAN - shrink
-    # 2.294 on the metric leaves; the inch .010 and .019 lengthen the span.
-    assert longest_shaft - shortest_outer == pytest.approx(2.283, abs=5e-3)
+    # 2.294 on the metric leaves; the inch .010 and .019 lengthen the span
+    # (2.283), and the owner's ranges (C7) close it .029 further.
+    assert longest_shaft - shortest_outer == pytest.approx(2.312, abs=5e-3)
     hub_clear = (
         math.hypot(LIFT_BORE_SPACING, LIFT_BORE_RISE) - (HUB_OD + SHAFT_DIA) / 2.0
     )
@@ -516,13 +526,14 @@ def test_torque_shaft_bears_the_front_block_at_the_worst_fitted_stack() -> None:
 
 
 def test_spring_blade_stays_on_the_back_strap_flank_at_every_stack() -> None:
-    # The pinned cluster's end play is the feeler setting P = 0.25 +/- 0.10
-    # (option E-a); the back strap sits anywhere from hard on the back block
-    # to P forward of it, at either printed .XX thickness limit.
+    # The pinned cluster's end play is the front-block gap P, any leaf .010 TO
+    # .020 (option E-a, owner ruling C7); the back strap sits anywhere from
+    # hard on the back block to P forward of it, at either printed .XX
+    # thickness limit.
     import pinion_rig_layout as rig
     from dt_pinion_bracket_geometry import THICKNESS_LIMITS
 
-    p_max = rig.FRONT_BLOCK_FEELER + rig.FRONT_BLOCK_FEELER_BAND
+    p_max = rig.FRONT_BLOCK_GAP[1]
     blade = (rig.SPRING_Z - rig.SPRING_W / 2.0, rig.SPRING_Z + rig.SPRING_W / 2.0)
     for t in THICKNESS_LIMITS:
         for g in (0.0, p_max):

@@ -92,20 +92,34 @@ _BLOCK_XX = printed_band_mm(_rig.BLOCK_DEPTH_PLACES, unit=_rig.BLOCK_UNIT)
 _STRAP_XX = printed_band_mm(_rig.STRAP_T_PLACES, unit=_rig.STRAP_UNIT)
 _CAM_LEN_XX = printed_band_mm(CAM_LENGTH_PLACES, unit=CAM_UNIT)
 _CAM_STATION_XX = printed_band_mm(CAM_SET_SCREW_Z_PLACES, unit=CAM_UNIT)
+
+
+def _range_deviation(gap: tuple[float, float], nominal: float) -> float:
+    """A setting's larger deviation from the model's leaf over the owner's
+    range (fit audit part 2 C7, pinion_rig_layout)."""
+    return max(gap[1] - nominal, nominal - gap[0])
+
+
+_FRONT_CAM_DEVIATION = _range_deviation(_rig.FRONT_CAM_GAP, _rig.FRONT_BLOCK_FEELER)
+_BACK_CAM_DEVIATION = _range_deviation(_rig.BACK_COLLAR_GAP, _rig.BACK_COLLAR_LEAF_F)
 SCREW_STATION_TERMS: dict[str, dict[str, float]] = {
     "front": {
         "back MHA-DT-18 depth": _BLOCK_XX,
         "2X MHA-DT-14 thickness": 2.0 * _STRAP_XX,
         "MHA-DT-01 drum length": _rig.DRUM_LEN_BAND,
-        "drum end shim set error": _rig.DRUM_END_SHIM_SET_ERROR,
-        "front block feeler band": _rig.FRONT_BLOCK_FEELER_BAND,
-        "front cam leaf set error": _rig.FEELER_SET_ERROR,
+        "drum end gap, its range": _range_deviation(
+            _rig.DRUM_END_GAP, _rig.DRUM_END_SHIM
+        ),
+        "front block gap, its range": _range_deviation(
+            _rig.FRONT_BLOCK_GAP, _rig.FRONT_BLOCK_FEELER
+        ),
+        "front cam leaf, its range": _FRONT_CAM_DEVIATION,
         "MHA-DT-23 tap station": _CAM_STATION_XX,
         "rod rim flush set": _rig.FLUSH_SET_ERROR,
     },
     "back": {
         "back MHA-DT-18 depth": _BLOCK_XX,
-        "back cam leaf F set error": _rig.FEELER_SET_ERROR,
+        "back cam leaf F, its range": _BACK_CAM_DEVIATION,
         "MHA-DT-23 length": _CAM_LEN_XX,
         "MHA-DT-23 tap station": _CAM_STATION_XX,
         "rod rim flush set": _rig.FLUSH_SET_ERROR,
@@ -152,10 +166,10 @@ def _flat_edge_from_rim(key: str) -> float:
 
 FLAT_EDGE_FROM_RIM = {key: _flat_edge_from_rim(key) for key in FLAT_LEN}
 FLAT_FROM_RIM = {key: FLAT_EDGE_FROM_RIM[key] + FLAT_LEN[key] / 2.0 for key in FLAT_LEN}
-FRONT_FLAT_LEN = FLAT_LEN["front"]  # 5.588 (.22)
-BACK_FLAT_LEN = FLAT_LEN["back"]  # 4.318 (.17)
-FRONT_FLAT_EDGE_FROM_RIM = FLAT_EDGE_FROM_RIM["front"]  # 177.038 (6.97), printed
-BACK_FLAT_EDGE_FROM_RIM = FLAT_EDGE_FROM_RIM["back"]  # 14.986 (.59), printed
+FRONT_FLAT_LEN = FLAT_LEN["front"]  # 6.604 (.26)
+BACK_FLAT_LEN = FLAT_LEN["back"]  # 4.826 (.19)
+FRONT_FLAT_EDGE_FROM_RIM = FLAT_EDGE_FROM_RIM["front"]  # 176.53 (6.95), printed
+BACK_FLAT_EDGE_FROM_RIM = FLAT_EDGE_FROM_RIM["back"]  # 14.732 (.58), printed
 FRONT_FLAT_FROM_RIM = FLAT_FROM_RIM["front"]  # 179.832 (7.080), centre
 BACK_FLAT_FROM_RIM = FLAT_FROM_RIM["back"]  # 17.145 (.675), centre
 
@@ -199,12 +213,12 @@ _BLOCK_FACE_SHIFT = {
 }
 _HUB_FACE_SHIFT = {  # (front face, back face)
     "front": (
-        _BLOCK_FACE_SHIFT["front"] + _rig.FEELER_SET_ERROR,
-        _BLOCK_FACE_SHIFT["front"] + _rig.FEELER_SET_ERROR + _CAM_LEN_XX,
+        _BLOCK_FACE_SHIFT["front"] + _FRONT_CAM_DEVIATION,
+        _BLOCK_FACE_SHIFT["front"] + _FRONT_CAM_DEVIATION + _CAM_LEN_XX,
     ),
     "back": (
-        _BLOCK_FACE_SHIFT["back"] + _rig.FEELER_SET_ERROR + _CAM_LEN_XX,
-        _BLOCK_FACE_SHIFT["back"] + _rig.FEELER_SET_ERROR,
+        _BLOCK_FACE_SHIFT["back"] + _BACK_CAM_DEVIATION + _CAM_LEN_XX,
+        _BLOCK_FACE_SHIFT["back"] + _BACK_CAM_DEVIATION,
     ),
 }
 FLAT_HUB_COVER_MM = {

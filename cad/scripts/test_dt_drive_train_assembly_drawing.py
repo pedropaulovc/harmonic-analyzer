@@ -1048,25 +1048,39 @@ def test_the_tip_gap_rod_keeps_the_parked_pinion_clear_and_the_cam_in_reach() ->
 def test_every_set_feeler_the_steps_and_checks_print_has_a_leaf_row() -> None:
     """Rubric sample round 16 (#0, 3/3 runs): each feeler a step or check
     sets is a sheet 15 row citing it; check cites carry CHECK.  The table
-    stays left of the cone station table.  #3042: every row is whole inch
-    leaves of the owned set, each once, summing to the printed setting."""
+    stays left of the cone station table.  #3042: every exact row is whole
+    inch leaves of the owned set, each once, summing to the printed setting.
+    Owner ruling C7 (2026-11-24, "Yes: ranges, longer flats, no leaf
+    miking."): the rig's rows are ranges, and no leaf is miked."""
     import dt_feeler_leaves
     from cone_stack_end_play import STACK_FEELER
 
     assert drawing.FEELER_STACK_HEADER[1] == "LEAVES (IN)"
-    for setting, leaves, _cited in drawing.FEELER_STACK_ROWS:
+    ranged = {}
+    for setting, leaves, cited in drawing.FEELER_STACK_ROWS:
+        if " TO " in setting:
+            ranged[setting] = (leaves, cited)
+            continue
         sizes = [float(leaf) for leaf in leaves.split(" + ")]
         assert set(sizes) <= set(dt_feeler_leaves.LEAVES_IN), setting
         assert len(set(sizes)) == len(sizes) <= dt_feeler_leaves.MAX_STACK_LEAVES, setting
         assert sizes == sorted(sizes, reverse=True), setting
         assert math.isclose(sum(sizes), float(setting), abs_tol=1e-9), setting
+    assert ranged == {
+        ".010 TO .020": ("ANY ONE", "16B, 19, 21C"),
+        ".020 TO .040": ("ANY ONE", "19B, 21D"),
+        ".049 TO .065": ("TWO, OR 1/16 DRILL", "19A"),
+    }
+    for setting in ranged:
+        for end in setting.split(" TO "):
+            assert float(end) in dt_feeler_leaves.LEAVES_IN or float(end) > max(
+                dt_feeler_leaves.LEAVES_IN
+            ), setting
     assert "MM" not in " ".join(
         (drawing.FEELER_STACK_TITLE, *drawing.FEELER_STACK_HEADER, drawing.FEELER_TABLE_NOTE)
     )
-    # The booked leaf tolerance is checked at the bench, not assumed.
-    tolerance = drawing.inch_text(dt_feeler_leaves.LEAF_TOLERANCE, 4)
     note = " ".join(drawing.FEELER_TABLE_NOTE.split())
-    assert re.search(rf"MIC EACH LEAF\b.*WITHIN ±{re.escape(tolerance)} OF ITS ETCHED SIZE", note)
+    assert "MIC" not in note and "ETCHED SIZE" not in note
     rows = {row[0]: row[2] for row in drawing.FEELER_STACK_ROWS}
 
     def printed(setting: float) -> str:

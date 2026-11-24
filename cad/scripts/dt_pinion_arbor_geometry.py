@@ -26,7 +26,7 @@ from dt_pinion_bracket_geometry import THICKNESS_LIMITS as STRAP_T_LIMITS
 from dt_pinion_handle_geometry import ROD_DIA, ROD_DIA_BAND, ROD_SPAN
 from pinion_rig_layout import (
     DRUM_END_SHIM,
-    DRUM_END_SHIM_SET_ERROR,
+    DRUM_END_GAP,
     DRUM_LEN,
     DRUM_LEN_BAND as _DRUM_LEN_PRINTED_BAND,
     RIG_MARGIN_SPARE,
@@ -166,16 +166,16 @@ MIN_LAND_OVER_STRAP = 0.5
 DRUM_STATION_BAND = LINEAR_XX_BAND
 # User ruling 2026-09-24 (option c): the pivot blocks locate the swing
 # cluster.  Option E-a then pins both straps to the torque shaft, which is
-# match-drilled with the END_PLAY feeler as a shim at the drum's front end
+# match-drilled with the END_PLAY leaf as a shim at the drum's front end
 # (Main, restricted review of #858): the strap spacing is frozen at the drum
-# plus the shim, so the drum turns between the straps in END_PLAY +/-
-# END_PLAY_SET_ERROR of air, split any way between its two ends.  The block
+# plus the shim, so the drum turns between the straps in END_PLAY_RANGE of
+# air (any leaf of the owner's range, C7), split any way between its two ends.  The block
 # gaps are the pinned group's own end play and no longer feed the drum's air.
 # The assembly shows the drilling set-up, the drum hard on the back strap
 # (pinion_rig_layout).  The drum hard forward and hard aft are the two stops.
 STRAP_AXIAL_LOCATION = "pinned-shim-set"
 END_PLAY = DRUM_END_SHIM  # the shaft's drilling shim (pinion_rig_layout)
-END_PLAY_SET_ERROR = DRUM_END_SHIM_SET_ERROR
+END_PLAY_RANGE = DRUM_END_GAP  # (least, widest), the owner's range (C7)
 MIN_END_PLAY = 0.1  # the drum never binds between the straps
 LAND_FINISH_RUNOUT = 2.0  # the Ra 1.6 pass runs out this far past the land
 LAND_ENDS = ("front inboard", "front outboard", "back inboard", "back outboard")
@@ -186,7 +186,7 @@ def drum_total_air() -> tuple[float, float]:
     """Total axial air between the drum ends and the strap inner faces."""
     if STRAP_AXIAL_LOCATION != "pinned-shim-set":
         raise AssertionError(f"no float model for {STRAP_AXIAL_LOCATION!r}")
-    return (END_PLAY - END_PLAY_SET_ERROR, END_PLAY + END_PLAY_SET_ERROR)
+    return END_PLAY_RANGE
 
 
 def land_stations(journal_len: float) -> tuple[float, float]:
@@ -288,7 +288,7 @@ for _stop, _margins in LAND_MARGINS_AT_STOPS.items():
             f"journal land margins at {_stop}: {_margins} under "
             f"{LAND_OVER_STRAP_REQUIRED}"
         )
-if END_PLAY - END_PLAY_SET_ERROR < MIN_END_PLAY:
+if END_PLAY_RANGE[0] < MIN_END_PLAY:
     raise AssertionError("the drum can bind between the straps")
 # The back crown prints its SR.28; its sag follows and prints as a REF.
 BACK_CAP_R = 7.112  # SR.28

@@ -1043,10 +1043,7 @@ def test_drum_station_stack_derives_the_land_length_and_station_band() -> None:
     import pinion_rig_layout as rig
     from _printed_tolerance import printed_band_mm
 
-    assert (spec.END_PLAY, spec.END_PLAY_SET_ERROR) == (
-        rig.DRUM_END_SHIM,
-        rig.DRUM_END_SHIM_SET_ERROR,
-    )
+    assert (spec.END_PLAY, spec.END_PLAY_RANGE) == (rig.DRUM_END_SHIM, rig.DRUM_END_GAP)
     assert spec.LINEAR_XX_BAND == printed_band_mm(2, unit="in")
     assert spec.HEAD_LEN_BAND == printed_band_mm(2, unit="in")
     assert geometry.DRUM_LEN == rig.DRUM_LEN
@@ -1067,12 +1064,11 @@ def test_drum_station_stack_derives_the_land_length_and_station_band() -> None:
         assert set(margins) == set(spec.LAND_ENDS)
         assert min(margins.values()) >= spec.LAND_OVER_STRAP_REQUIRED - 1e-9
     # The drum never binds between the straps.
-    assert spec.END_PLAY - spec.END_PLAY_SET_ERROR >= 0.1
-    # The drum-end airs are the shim the pinned straps were drilled on.
-    assert spec.drum_total_air() == (
-        pytest.approx(spec.END_PLAY - spec.END_PLAY_SET_ERROR),
-        pytest.approx(spec.END_PLAY + spec.END_PLAY_SET_ERROR),
-    )
+    assert spec.END_PLAY_RANGE[0] >= 0.1
+    # The drum-end airs are the owner's range for the shim the pinned straps
+    # were drilled on (C7: any leaf .010 TO .020).
+    assert spec.drum_total_air() == spec.END_PLAY_RANGE
+    assert spec.END_PLAY_RANGE[0] <= spec.END_PLAY <= spec.END_PLAY_RANGE[1]
     # The lands are centred on their straps (to the printed .01 in) with the
     # drum mid-way through its play.
     air = spec.END_PLAY / 2.0
@@ -1264,24 +1260,21 @@ def test_drum_runs_in_the_shim_the_straps_were_drilled_on() -> None:
     # Main (#858, ruling 3): the E-a pins freeze the strap spacing where the
     # shaft is match-drilled, so the drum's running clearance is whatever the
     # drilling set-up leaves: the rig's shim at the drum's front end, which
-    # MHA-DT-00's SHAFT DRILL SET prints.  The drum keeps its end-play floor
-    # with RIG_MARGIN_SPARE to spare and never binds (Main, #858).  The rig's
-    # own stacks and step wording are pinned by its tests, not here.
+    # MHA-DT-00's SHAFT DRILL SET prints: any one leaf .010 TO .020 (owner
+    # ruling 2026-11-24, audit part 2 C7).  The drum keeps its end-play floor
+    # over the whole range and never binds (Main, #858); the planning spare
+    # went with the owner's range (Main's C7 ruling).  The rig's own stacks
+    # and step wording are pinned by its tests, not here.
     import pinion_rig_layout as rig
 
-    assert spec.drum_total_air() == pytest.approx(
-        (
-            rig.DRUM_END_SHIM - rig.DRUM_END_SHIM_SET_ERROR,
-            rig.DRUM_END_SHIM + rig.DRUM_END_SHIM_SET_ERROR,
-        )
-    )
+    assert spec.drum_total_air() == pytest.approx(rig.DRUM_END_GAP)
     assert spec.drum_total_air()[0] >= spec.MIN_END_PLAY
     assert rig.STRAP_Z_INNER[1] - rig.STRAP_Z_INNER[0] == pytest.approx(
         rig.DRUM_LEN + rig.DRUM_END_SHIM, abs=1e-9
     )
     assert rig.DRUM_BACK_Z == rig.STRAP_Z_INNER[1]
-    assert rig.DRUM_END_SHIM_SET_ERROR == rig.FRONT_BLOCK_FEELER_BAND
-    assert spec.drum_total_air()[0] - spec.MIN_END_PLAY >= rig.RIG_MARGIN_SPARE - 1e-9
+    assert rig.DRUM_END_GAP == rig.FRONT_BLOCK_GAP == rig.leaf_gap(rig.SMALL_LEAF_RANGE)
+    assert spec.drum_total_air()[0] - spec.MIN_END_PLAY == pytest.approx(0.1413, abs=5e-4)
     assert rig.DRUM_FRONT_Z - rig.STRAP_Z_INNER[0] == pytest.approx(rig.DRUM_END_SHIM)
 
 

@@ -1,0 +1,19 @@
+# The pinion rig's fit-up checks (tolerance-policy.md, "Checks in spec modules
+# and tests"; cad/scripts/check_register.py). Applied by pinion_rig_layout at
+# import and read by build_dt_drive_train_assembly's RIG_MARGINS. The fit-up
+# gaps are the owner's leaf ranges of 2026-11-24 (fit audit part 2 C7), each
+# set against its own block or face, so the checks are summed after the
+# setting. Fit lane DT, 2026-11-24.
+checks:
+  - id: C-01
+    check: "MHA-DT-17 is clamped between its cams"
+    kind: gap
+    reason: "both cams bear on their blocks; MHA-DT-17 binds"
+    source: "Main's C7 ruling 2026-11-24: replaces the agent floor BACK_COLLAR_MIN_GAP (0.5, #858). At zero the back MHA-DT-23 is only the rod's north stop; the least end play is the two ranges' least gaps, owner ruling 2026-11-24, fit audit part 2 C7: \"Yes: ranges, longer flats, no leaf miking.\""
+    basis: after_setting
+  - id: C-02
+    check: "at the thinnest D the drum's back end passes gear 19's back face"
+    kind: gap
+    reason: "gear 19 runs off the drum's face"
+    source: "user ruling 2026-09-25 P1-2 (j = 19 reads full face); D and the two plays are the owner's ranges, fit audit part 2 C7 (2026-11-24)"
+    basis: after_setting
