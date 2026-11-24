@@ -1,0 +1,6 @@
+necessity:
+  - id: N-01
+    feature: "foot-to-ear inside corner R.02 MAX, CLEARS HEAD OF the hold-down screw"
+    kind: gap
+    reason: "a larger corner radius lifts the hold-down screw head"
+    source: "ch_pivot_bracket_drawing_spec.CORNER_R_MAX; ch_pivot_bracket_sides.HEAD_TO_EAR_FACE_MIN (.0239 at the .XXX ear thickness)"
