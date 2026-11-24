@@ -1155,7 +1155,7 @@ feed = "hand"
 
 [[setups.operations]]
 instruction = "Before any torque: run the cap's screw in by hand with the 5 mm hex key until its head seats, counting its turns from the first bite of the thread: N. Snug, no more."
-inspection = "N {{process.saw_screw_turns_min:.1f}} or more: N × {{process.saw_screw_pitch_mm:.2f}} mm of thread holds the cap, {{process.saw_screw_engagement_min_mm:.0f}} mm (one screw diameter) or more. Fewer, or the 5 mm key does not fit (the screw's thread, key and torque are assumed, not read off the arbor): so few threads may strip at the torque below. Leave the screw snug, do not torque it, do not start the spindle; stop and tell the owner."
+inspection = "The 5 mm key fits the screw, and N {{process.saw_screw_turns_min:.1f}} or more: N × {{process.saw_screw_pitch_mm:.2f}} mm of thread holds the cap, {{process.saw_screw_engagement_min_mm:.0f}} mm (one screw diameter) or more. Fewer turns, or the key does not fit: the thread may strip at the torque below. Leave the screw snug, do not torque it, do not start the spindle; stop and tell the owner."
 gauge_checks = "other"
 feed = "hand"
 
