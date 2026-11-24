@@ -33,6 +33,9 @@ IN = 25.4
 # turner sweeps the domes; it takes convex balls up to Ø.75 in.
 BALL_TURNER = "ball-radius-turner-lms-2569"
 BALL_TURNER_MAX_DIA_IN = 0.75
+# Parameters naming the bar a plan's shop-made holder is cut from (tooling
+# stock, not the part's): pd_transgear_pin's split bush.
+HOLDER_BAR_KEYS = ("bush_dia_in",)
 STEMS = tuple(
     stem
     for stem in _process_plans.TRAVELER_STEMS
@@ -322,9 +325,17 @@ def test_every_bar_is_a_stock_record_of_its_diameter_or_flagged(stem: str) -> No
         )
         assert "no stock record" in plan["stock"]
         return
+    # A shop-made holder cut from bar on hand names its bar in stock_refs too,
+    # as the flat plans name their fixture plate there (ms_stick, pd_platen,
+    # pd_transgear_arm): pd_transgear_pin's split bush (#3500) declares its
+    # bar as bush_dia_in. Every record is the part's bar or a declared holder's,
+    # and each declared bar has its record (as test_turned_bush_process holds).
+    holders = {
+        plan["parameters"][key] for key in HOLDER_BAR_KEYS if key in plan["parameters"]
+    }
     for ref in plan["stock_refs"]:
         assert STOCK[ref]["form"] == "round_bar", ref
-        assert STOCK[ref]["dia_in"][0] == bar, ref
+    assert {STOCK[ref]["dia_in"][0] for ref in plan["stock_refs"]} == {bar} | holders
 
 
 def test_the_axle_rod_band_is_the_printed_fits_limits() -> None:

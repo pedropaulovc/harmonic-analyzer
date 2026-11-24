@@ -148,10 +148,13 @@ def _loaded_hanger_bounds() -> tuple[float, float, float]:
 
 
 def _rotating_stud_error_change_mm(angle_change: float) -> float:
-    """Fixed S position, axis zone and spacer tilt rotate with the arm."""
+    """Fixed S position, the pin's radial offset and spacer tilt rotate with
+    the arm.  The pin's offset is the slip fit's: half the bond gap at the
+    bore's front end plus the whole tilt's run-on
+    (paper_drive_arm_registration.S_AXIS_RADIAL_OFFSET_MAX_MM)."""
     import paper_drive_arm_registration as registration
 
-    projected_radius = registration.S_AXIS_ZONE_DIAMETER_MM / 2.0
+    projected_radius = registration.S_AXIS_RADIAL_OFFSET_MAX_MM
     position_radius = reducer_position_diameter_mm() / 2.0
     tilt = spacer.SEATED_FACE_TILT
     # The complete stud ends at the source groove + front land + dome.

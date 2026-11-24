@@ -1,8 +1,8 @@
 r"""Build MHA-PD-23, the transgear pin (R9-68).
 
 The plain steel pin the disc cluster runs on, one diameter from head to tip,
-bonded into the MHA-PD-18 arm from the rear (fit audit 2026-11-23, pending
-owner confirmation).  Dimensions and the derived fit facts live in
+bonded into the MHA-PD-18 arm from the rear (owner ruling 2026-11-24, fit
+audit question 4).  Dimensions and the derived fit facts live in
 ``pd_transgear_pin_spec``.
 
 Layout: one stepped revolve about local +Z on the Right plane, origin at the

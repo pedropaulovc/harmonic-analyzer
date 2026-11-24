@@ -15,7 +15,7 @@ pd-transgear-knob-bush:
     the pilot off to make the rear face, turn the hub diameter, then the
     press diameter to that reading plus the interference, the
     shoulder with its R.005 MAX root, and finish the hub face at the cut-off.
-    Press into MHA-PD-19 from face A until the shoulder seats (a .0005 feeler
+    Press into MHA-PD-19 from face A until the shoulder seats (a .002 feeler
     does not enter under the shoulder), then ream the bore .249 through
     before the plate is clamped to MHA-PD-18.
   machinist_exceptions:
@@ -23,7 +23,7 @@ pd-transgear-knob-bush:
       kind: "accept"
       where: "the bush bore's perpendicularity frame to datum A (shoulder face)"
       finding: "perpendicularity frame on a running bore (rule 5)"
-      reason: "owner ruling 2026-11-08 (Pedro), #2144 item 4.1: K stays a plain ⊥ Ø.002 A, no projected zone (rule 26). Knob axis K carried from the bore to the chain plane must stay inside the reducer's axis zone the air stacks and meshes charge, and this frame is what bounds it: Ø.002 over the shortest bore (28.47 mm) projects to 0.0747 mm at K_PROJECTED_HEIGHT_MM (41.88 mm, the 3/8 arm, #2019) against the 0.0832 mm zone (paper_drive_arm_registration.AXIS_PROJECTED_ZONE_DIAMETER_MM). The frame moved with the bore from MHA-PD-19 RV-02 to this bush under owner ruling 2026-11-20 (Pedro), #2425: \"Variant of C ; I noticed there was a missing screw and an extra pin in current design; updated: C:\\Users\\pedro\\Downloads\\TransgearArmPlate.png\""
+      reason: "owner ruling 2026-11-08 (Pedro), #2144 item 4.1: K stays a plain ⊥ Ø.002 A, no projected zone (rule 26). Knob axis K carried from the bore to the chain plane must stay inside the reducer's axis zone the air stacks and meshes charge, and this frame is what bounds it: Ø.002 over the shortest bore (28.47 mm) projects to 0.0748 mm at K_PROJECTED_HEIGHT_MM (41.94 mm, the 3/8 arm, #2019) against the 0.0832 mm zone (paper_drive_arm_registration.AXIS_PROJECTED_ZONE_DIAMETER_MM). The frame moved with the bore from MHA-PD-19 RV-02 to this bush under owner ruling 2026-11-20 (Pedro), #2425: \"Variant of C ; I noticed there was a missing screw and an extra pin in current design; updated: C:\\Users\\pedro\\Downloads\\TransgearArmPlate.png\""
     - id: "RV-03"
       kind: "minor"
       where: "the bore callout's WALL .068 MIN (press section)"

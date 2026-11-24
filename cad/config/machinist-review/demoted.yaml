@@ -3,7 +3,7 @@
 # Read only by dodo's review task: a line here rebuilds and re-reviews nothing.
 # The batch that converts a sheet deletes its line. Tracking issue: #3511.
 demoted:
-  # parts that print a REAM: 35
+  # parts that print a REAM: 36
   - ch_amplitude_bar
   - ch_channel_lever
   - ch_connecting_rod
@@ -37,6 +37,7 @@ demoted:
   - mg_magnifying_wheel
   - mg_wheel_bar
   - mg_wheel_drum
+  - pd_transgear_arm
   - pn_pen_v_block
   - sm_knife_mount
   # parts with an explicit band tighter than the title block: 27
@@ -72,7 +73,7 @@ demoted:
   - pd_transgear_knob_thrust_ring
   - sh_column_clamp_front
   - sm_gooseneck
-  # assemblies (settings not audited): 11
+  # assemblies (settings not audited): 12
   - ch_channel_assembly
   - dt_cone_gear_tl_arbor_assembly
   - dt_cone_tip_gear_tl_cutter_assembly
@@ -82,5 +83,6 @@ demoted:
   - ha_harmonic_analyzer_assembly
   - mg_magnifier_assembly
   - ms_measuring_stick_assembly
+  - pd_paper_drive_assembly
   - pn_pen_assembly
   - sm_summing_assembly
