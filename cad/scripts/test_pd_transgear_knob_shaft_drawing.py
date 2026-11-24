@@ -143,8 +143,16 @@ def test_front_core_and_journal_clear_the_straight_through_cutter() -> None:
 
 
 def test_real_d_core_thread_and_inch_g6_source() -> None:
-    assert spec.CORE_DIA == 4.8514 and spec.CORE_DIA_BAND == (0.0, -0.02032)  # .191
-    assert spec.CORE_FLAT_FROM_AXIS == 2.1336 and spec.CORE_FLAT_BAND == (0.0, -0.01524)
+    # Fit audit 2026-11-23: the core and the D-flat are made to fit MHA-PD-22
+    # by feel and print as REF; their bands are analysis only (the collar's
+    # drilled bore and pin crest less the fitted air).
+    inch = 25.4
+    assert spec.CORE_DIA == 4.8514 and spec.CORE_DIA_PLACES == 3  # .191
+    assert spec.CORE_FIT_CLEARANCE == pytest.approx((0.0005 * inch, 0.0023 * inch))
+    assert spec.CORE_DIA_BAND == pytest.approx((0.0035 * inch, -0.0023 * inch))
+    assert spec.CORE_FLAT_FROM_AXIS == 2.1336 and spec.CORE_FLAT_PLACES == 3  # .084
+    assert spec.CORE_FLAT_FIT_AIR == pytest.approx((0.0, 2.0 * spec.CORE_FLAT_FIT_STEP))
+    assert spec.CORE_FLAT_BAND == pytest.approx((0.00475 * inch, -0.00135 * inch))
     assert spec.JOURNAL_DIA == 6.3246 and spec.JOURNAL_DIA_BAND == (-0.00508, -0.0127)
     # The thread length reads from the relief's shoulder (machinist review r8).
     assert spec.THREAD == "#8-32"
@@ -476,7 +484,9 @@ def test_every_native_dimension_is_placed_once_with_model_places() -> None:
     assert spec.DRAWING_PRECISION["StudProfile"]["ThreadBlankDia"] == 3
     # #2169: the journal prints as a reference; the overall controls.
     assert spec.DRAWING_PRECISION["JournalProfile"]["JournalLength"] == 2
-    references = {"JournalLength": False, "ThreadBlankDia": True}
+    references = {
+        "JournalLength": False, "ThreadBlankDia": True, "CoreDia": True, "FlatToAxis": False,
+    }
     assert drawing.REFERENCE_DIMENSIONS == references
 
 
@@ -555,9 +565,10 @@ def test_tool_end_limits_print_as_native_detail_dimensions() -> None:
 
 def test_model_bands_and_source_linked_properties() -> None:
     bands = model_toleranced_dimensions(part)
-    assert bands[("StudProfile", "CoreDia")] == "*deviations(CORE_DIA_BAND)"
+    # Made to fit by feel, printed REF: neither carries a native tolerance.
+    assert ("StudProfile", "CoreDia") not in bands
     assert bands[("JournalProfile", "JournalDia")] == "*deviations(JOURNAL_DIA_BAND)"
-    assert bands[("CoreFlatReference", "FlatToAxis")] == "*deviations(CORE_FLAT_BAND)"
+    assert ("CoreFlatReference", "FlatToAxis") not in bands
     assert ("CoreFlatProfile", "FlatToAxis") not in bands
     assert bands[("StudProfile", "OutsideDia")] == "*deviations(OUTSIDE_DIA_BAND)"
     assert bands[("GearBlank", "FaceWidth")] == "FACE_WIDTH_BAND"
@@ -851,8 +862,8 @@ def test_tight_bands_name_their_mates_once_by_name_and_number() -> None:
     # once), each mate by its config title and number.
     links = {
         "JournalDia": (drawing.JOURNAL_FIT_NOTE, "pd-transgear-knob-bush", "RUNNING FIT IN"),
-        "CoreDia": (drawing.D_SECTION_FIT_NOTE, "pd-transgear-drive-collar", "SLIDING FIT ON"),
-        "FlatToAxis": (drawing.D_SECTION_FIT_NOTE, "pd-transgear-drive-collar", "SLIDING FIT ON"),
+        "CoreDia": (drawing.D_SECTION_FIT_NOTE, "pd-transgear-drive-collar", "MADE TO FIT"),
+        "FlatToAxis": (drawing.D_SECTION_FIT_NOTE, "pd-transgear-drive-collar", "MADE TO FIT"),
     }
     notes = dict(drawing.NOTE_TEXTS)
     printed = " ".join(drawing.NOTES.split())
