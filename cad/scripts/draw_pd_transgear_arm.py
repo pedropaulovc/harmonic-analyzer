@@ -130,7 +130,6 @@ from pd_transgear_arm_spec import (
     ISO_VIEW_SCALE,
     OVERALL_LENGTH,
     PIN_HOLE_DEPTH_BAND,
-    PIN_PRESS_INTERFERENCE,
     SPOT_FACE_DIA_BAND,
     STOCK_TEXT_PREFIX,
     STOCK_TEXT_SUFFIX,
@@ -688,9 +687,12 @@ requirement(
     },
     precision={"dia": _P["SpotFaceDia"], "floor": _P["FloorDepth"]},
 )
-# Datum C: the pin bore, Ø.1260 +.0005/.0000 REAM THRU (FRONT_KEEP
+# Datum C: the pin bore, Ø.126 REAM THRU with no band (FRONT_KEEP
 # "PinBoreDia"), 2.7093 BASIC from B, ⌖ Ø.004 A|B and ⊥ Ø.001 A (section
-# A-A); note 5: the MHA-PD-23 pin's land is turned to the measured ream.
+# A-A); note 5: the MHA-PD-23 pin is a bonded slip fit, and the callout's
+# .127 set pin is the gap's upper limit.  ``dia`` carries the geometry's
+# ANALYSIS band (what the reamer is modelled to cut) because the traveler's
+# adapter and cam.py bind a band; no step quotes it as an acceptance.
 _PIN_REAM = ((_NOTES, "PIN_BORE_CALLOUT"), (_SELF, "FRONT_KEEP"))
 requirement(
     "pin_bore",
@@ -717,9 +719,6 @@ requirement(
             GEOMETRIC_TOLERANCES_MM["perpendicularity"], ("GEOMETRIC_CONTROLS",)
         ),
         "perpendicularity_datums": ("A", ("GEOMETRIC_CONTROLS",)),
-        "diametral_interference": (
-            list(PIN_PRESS_INTERFERENCE), ("PIN_PRESS_INTERFERENCE", (_NOTES, "NOTES"))
-        ),
         "mate": ("MHA-PD-23", ((_NOTES, "NOTES"),)),
         "callout": (PIN_BORE_CALLOUT, ((_NOTES, "PIN_BORE_CALLOUT"),)),
     },

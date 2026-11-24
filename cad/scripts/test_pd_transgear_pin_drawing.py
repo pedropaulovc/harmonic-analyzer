@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import ast
+import math
 import re
 from pathlib import Path
 
@@ -119,14 +120,14 @@ def test_the_seat_root_radius_leaves_the_head_a_flat_seat() -> None:
     """Machinist review round 4: the head's seat gets its own root radius,
     well inside the .0375 step, so the head still bears on the arm's rear
     face past the ream mouth's break and its own rim break."""
-    step = (spec.HEAD_DIA - spec.PRESS_LAND_DIA_MAX) / 2.0
+    step = (spec.HEAD_DIA - spec.DIA_MAX) / 2.0
     assert 0.0 < spec.SEAT_FILLET_R < step / 4.0
     contact = (
         (spec.HEAD_DIA - printed_band_mm(2, unit=spec.UNIT)) / 2.0
         - edge_break_chamfer_mm(unit=spec.UNIT)
         - max(
             arm.PIN_BORE_DIA_MAX / 2.0 + arm.PIN_MOUTH_CHAMFER_LIMITS[1],
-            spec.PRESS_LAND_DIA_MAX / 2.0 + spec.SEAT_FILLET_R,
+            spec.DIA_MAX / 2.0 + spec.SEAT_FILLET_R,
         )
     )
     assert spec.SEAT_CONTACT_WIDTH_MIN == pytest.approx(contact)
@@ -252,11 +253,6 @@ def test_the_dome_heights_and_the_overall_print_as_references() -> None:
                 ("PinProfile", "FrontLand"),
             )
         },
-        # #2415: the press land is made to the measured ream (note 1).
-        ("PinProfile", "LandDia"): {
-            callouts.TEXT_PREFIX: "(<MOD-DIAM>",
-            callouts.TEXT_SUFFIX: ")",
-        },
         # Fit audit 2026-11-23: the shank is made to fit its mates' reamed
         # bores (note 1); its Ø is a reference.
         ("PinProfile", "ShankDia"): {
@@ -291,27 +287,46 @@ def test_notes_fit_the_sheet_limits() -> None:
     assert all(len(line) <= 70 for line in lines)
 
 
-def test_the_land_presses_and_the_shank_only_runs() -> None:
-    """#2415: the short land under the head is the only length pressed into
-    the arm's ream, at a light drive fit turned to the measured ream; the
-    journal passes the ream clear, ends inside the thinnest arm and runs in
-    its three mates.  Both Ø link note 1 (rule 4)."""
-    loosest, tightest = spec.PRESS_INTERFERENCE
-    assert 0.0 < loosest < tightest <= 0.0005 * 25.4 + 1e-9
-    assert spec.DIA_MAX < arm.PIN_BORE_DIA_MIN
-    assert spec.PRESS_LAND_DIA_MAX == pytest.approx(arm.PIN_BORE_DIA_MAX + tightest)
-    assert spec.PRESS_LAND_LENGTH_MAX < arm.THICKNESS - arm.THICKNESS_BAND
-    assert 0.0 < spec.PRESS_LAND_GRIP_MIN < spec.PRESS_LAND_LENGTH
-    for name in ("ShankDia", "LandDia"):
-        assert (
-            _below(name)
-            == callouts.SHANK_CALLOUT
-            == f"SEE NOTE {callouts.SHANK_FIT_NOTE}"
-        )
-    assert callouts.authored_by_name()["LandDia"][callouts.TEXT_PREFIX].startswith("(")
+def test_the_one_diameter_shank_is_bonded_in_the_arm_and_runs_in_its_mates() -> None:
+    """Fit audit 2026-11-23 (pending owner confirmation): the pin has one
+    diameter under its head, a slip fit bonded in the arm's ream with the
+    retaining compound the note names; nothing presses.  The gap sits inside
+    the compound's fill, the bond's derated capacity covers the ring's rated
+    thrust and twice its face drag, and the literals are the repository's."""
+    import dt_pinion_arbor_geometry as arbor
+    import sm_gooseneck_spring_joint as gooseneck
+
+    for name in ("PRESS_INTERFERENCE", "PRESS_LAND_DIA", "PRESS_LAND_LENGTH"):
+        assert not hasattr(spec, name), name
+    assert "LandDia" not in callouts.authored_by_name()
+    least, greatest = spec.BOND_GAP
+    assert (least, greatest) == pytest.approx(
+        (arm.PIN_BORE_DIA_MIN - spec.DIA_MAX, arm.PIN_BORE_DIA_MAX - spec.DIA_MIN)
+    )
+    assert 0.0 < least < greatest < spec.LOCTITE_638_GAP_MAX
+    assert spec.BOND_LENGTH_MIN == pytest.approx(
+        arm.THICKNESS
+        - arm.THICKNESS_BAND
+        - arm.PIN_MOUTH_CHAMFER_LIMITS[1]
+        - edge_break_chamfer_mm(unit=spec.UNIT)
+    )
+    assert spec.LOCTITE_638_SHEAR_MPA == arbor.LOCTITE_638_SHEAR_MPA == gooseneck.LOCTITE_638_SHEAR_MPA
+    assert spec.BOND_TORQUE_MARGIN_MIN == arbor.BOND_TORQUE_MARGIN_MIN == gooseneck.BOND_TORQUE_MARGIN_MIN
+    # The gooseneck's steel and clearance factors, with a long land's 0.5.
+    assert spec.BOND_FACTOR == pytest.approx(gooseneck.BOND_FACTOR * 0.5)
+    assert spec.BOND_AXIAL_CAPACITY_N == pytest.approx(
+        spec.LOCTITE_638_SHEAR_MPA * spec.BOND_FACTOR * math.pi * spec.DIA_MIN * spec.BOND_LENGTH_MIN
+    )
+    assert spec.BOND_AXIAL_CAPACITY_N > spec.BOND_AXIAL_DEMAND_N
+    assert spec.BOND_TORQUE_CAPACITY_NMM >= spec.BOND_TORQUE_MARGIN_MIN * spec.BOND_TORQUE_DEMAND_NMM
+    assert _below("ShankDia") == callouts.SHANK_CALLOUT == f"SEE NOTE {callouts.SHANK_FIT_NOTE}"
     assert callouts.DRAWING_NOTES.startswith(f"{callouts.SHANK_FIT_NOTE}. ")
-    assert spec.ARM_NUMBER in callouts.DRAWING_NOTES
+    notes = " ".join(line.strip() for line in callouts.DRAWING_NOTES.splitlines())
+    assert (
+        f"BONDED SLIP FIT IN {spec.ARM_NUMBER}, {spec.RETAINING_COMPOUND}: SLIDES IN BY HAND."
+    ) in notes
     assert all(number in callouts.DRAWING_NOTES for number in spec.RUNNING_MATES)
+    assert "PRESS" not in callouts.DRAWING_NOTES
     assert "GROUND" not in callouts.DRAWING_NOTES
 
 
@@ -325,7 +340,7 @@ def test_the_shank_is_made_to_fit_and_prints_no_limits() -> None:
     import pd_transgear_feed_pinion_spec as sleeve
 
     notes = " ".join(line.strip() for line in callouts.DRAWING_NOTES.splitlines())
-    shank = notes[notes.index("SHANK:") : notes.index(" 2. ")]
+    shank = notes[notes.index("SHANK:") : notes.index(" BONDED SLIP FIT")]
     assert shank == (
         "SHANK: TURN LAST TO BORES OF MHA-PD-10, MHA-PD-24, MHA-PD-25: "
         "EACH TURNS FREE, NO SHAKE; SHIM MHA-PD-VN-68 SLIDES ON."

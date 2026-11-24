@@ -135,21 +135,32 @@ K_PROJECTED_HEIGHT_MM = (
     math.ceil(1000.0 * (PLATE_MOUNT_MACHINE_Z_MM - CHAIN_PLANE_MACHINE_Z_LIMITS_MM[0]) / 25.4)
     * 25.4 / 1000.0
 )
-# The pin S's axis zone at the farthest chain plane: MHA-PD-18's plain
-# ⊥ .001 over the bore (no projected zone, rule 26), held by the press
-# land's shortest grip in the bore (#2415: only MHA-PD-23's land presses)
-# and run on from the land's front end, up to the thickest stock less the
-# shortest land behind face A, to S_PROJECTED_HEIGHT_MM (owner ruling
-# 2026-11-08 (Pedro), #2144 item 4.1).  Wider than K's
+# The pin S's axis zone at the farthest chain plane.  MHA-PD-23 is one
+# diameter, a slip fit bonded in MHA-PD-18's reamed bore (fit audit
+# 2026-11-23, pending owner confirmation; it replaces the #2415 press land):
+# its axis may lean in the bore by the bore's plain ⊥ .001 (no projected
+# zone, rule 26; owner ruling 2026-11-08 (Pedro), #2144 item 4.1) plus the
+# whole diametral gap, over the bonded length, the bore's full-diameter
+# length on the thinnest stock.  No credit is taken for the head, clamped on
+# the rear face while the bond cures.  The gap charged is the largest the
+# sheets accept, not the modelled one: MHA-PD-18's bore refuses the pin
+# set's .127 pin, against the pin's smallest modelled shank.  The lean runs
+# on from the bore's front end, the front face's largest edge break behind
+# face A, to S_PROJECTED_HEIGHT_MM.  Wider than K's
 # AXIS_PROJECTED_ZONE_DIAMETER_MM; the meshes and the platen air charge it,
 # and MHA-PD-00's collar feeler accepts the collar air it closes
-# (pd_cluster_air.ASSEMBLY_ACCEPTED_COLLAR_SOURCES).  The land's limits are
-# literals pinned by a test to pd_transgear_pin_spec, so pin edits do not
-# re-key every importer of this module.
-S_PIN_LAND_LENGTH_MIN_MM = 7.112  # .28
-S_PIN_LAND_GRIP_MIN_MM = 6.858  # .27
-S_AXIS_RUN_ON_MM = S_PROJECTED_HEIGHT_MM + ARM.THICKNESS + ARM.THICKNESS_BAND - S_PIN_LAND_LENGTH_MIN_MM
-S_AXIS_ZONE_DIAMETER_MM = ARM.PIN_BORE_PERPENDICULARITY_MM * S_AXIS_RUN_ON_MM / S_PIN_LAND_GRIP_MIN_MM
+# (pd_cluster_air.ASSEMBLY_ACCEPTED_COLLAR_SOURCES).  The pin's and the
+# bore's numbers are literals pinned by a test to pd_transgear_pin_spec and
+# pd_transgear_arm_spec, so pin edits do not re-key every importer of this
+# module.
+S_PIN_BOND_LENGTH_MIN_MM = 8.9916  # .354
+S_PIN_BOND_GAP_MAX_MM = 0.05588  # .0022: the .127 NO-GO less the .1248 shank
+S_ARM_FRONT_EDGE_BREAK_MAX_MM = 0.254  # .010, the title block's
+S_AXIS_TILT_MAX_RAD = (
+    ARM.PIN_BORE_PERPENDICULARITY_MM + S_PIN_BOND_GAP_MAX_MM
+) / S_PIN_BOND_LENGTH_MIN_MM
+S_AXIS_RUN_ON_MM = S_PROJECTED_HEIGHT_MM + S_ARM_FRONT_EDGE_BREAK_MAX_MM
+S_AXIS_ZONE_DIAMETER_MM = S_AXIS_TILT_MAX_RAD * S_AXIS_RUN_ON_MM
 # The shaft's journal runs the bush bore's whole length, hub face to stub end.
 KNOB_JOURNAL_CONTACT_START_LOCAL_Z_MM = SHAFT.PINION_REAR_Z + RING.LENGTH
 KNOB_JOURNAL_CONTACT_END_LOCAL_Z_MM = KNOB_JOURNAL_CONTACT_START_LOCAL_Z_MM + BUSH.LENGTH

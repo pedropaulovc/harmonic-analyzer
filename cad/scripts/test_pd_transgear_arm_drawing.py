@@ -365,7 +365,6 @@ def test_the_explicit_bands_are_the_spot_face_and_the_reams() -> None:
     assert model_toleranced_dimensions(part) == {
         ("SpotFaceProfile", "SpotFaceDia"): "*deviations(SPOT_FACE_DIA_BAND)",
         ("SpotFaceProfile", "FloorDepth"): "SPOT_FACE_FLOOR_TOLERANCE",
-        ("PinBoreProfile", "PinBoreDia"): "*deviations(PIN_BORE_DIA_BAND)",
         ("PinBoreRearMouthProfile", "PinMouthChamfer"): "PIN_MOUTH_CHAMFER_TOLERANCE",
     }
     assert geometry.LATCH_PIN_HEIGHT_BAND == geometry.printed_reach_mm(
@@ -431,17 +430,40 @@ def test_the_tap_callout_text_is_proved_by_its_readback(monkeypatch, persist) ->
     assert callout.text[2].endswith(arm_notes.PLATE_TAP_QUALIFIER)
 
 
-def test_only_the_pin_land_presses_in_the_bore_at_every_limit() -> None:
-    """R9-68 / #2415: the reamed bore at S holds the MHA-PD-23 pin by its
-    short land's light press at both limits, the running journal passes it
-    clear, and its ream band only cuts oversize."""
-    loosest, tightest = spec.PIN_PRESS_INTERFERENCE
-    assert 0.0 < loosest < tightest <= 0.0005 * 25.4 + 1e-9
-    assert cluster_pin.DIA_MAX < geometry.PIN_BORE_DIA_MIN
-    assert cluster_pin.PRESS_LAND_DIA_MAX - geometry.PIN_BORE_DIA_MAX == pytest.approx(tightest)
+def test_the_pin_is_bonded_in_the_bore_with_clearance_at_every_limit() -> None:
+    """Fit audit 2026-11-23 (pending owner confirmation): the reamed bore at
+    S takes the one-diameter MHA-PD-23 pin as a bonded slip fit.  The bore
+    prints the reamer's size with no band; its callout prints rule 23's bond
+    clearance and the gap's one limit, a set pin that must not enter, and
+    the note names the mate, the compound, the acceptance and why."""
+    assert not hasattr(spec, "PIN_PRESS_INTERFERENCE")
+    least, greatest = spec.PIN_BOND_GAP
+    assert (least, greatest) == pytest.approx(cluster_pin.BOND_GAP)
+    assert 0.0 < least < greatest <= spec.PIN_BOND_GAP_ACCEPTED_MAX
+    assert spec.PIN_BOND_GAP_ACCEPTED_MAX == pytest.approx(
+        spec.PIN_BORE_NO_GO_PIN_DIA - cluster_pin.DIA_MIN
+    )
+    assert spec.PIN_BOND_GAP_ACCEPTED_MAX < cluster_pin.LOCTITE_638_GAP_MAX
+    assert spec.PIN_BOND_CLEARANCE_PRINTED == (least, spec.PIN_BOND_GAP_ACCEPTED_MAX)
+    assert arm_notes.PIN_BORE_CALLOUT.split("\n") == [
+        f"REAM THRU, SEE NOTE {arm_notes.PIN_NOTE}, SHEET 2",
+        f"BONDED FIT ON {cluster_pin.PIN_NUMBER} (CLEARANCE .0010-.0022)",
+        ".127 PIN DOES NOT ENTER",
+    ]
+    note = " ".join(arm_notes.NOTES[arm_notes.PIN_NOTE - 1].split())
+    assert note == (
+        f"{arm_notes.PIN_NOTE}. PIN BORE: PIN {cluster_pin.PIN_NUMBER} BONDED WITH "
+        f"{cluster_pin.RETAINING_COMPOUND}: PIN ENTERS, NO SHAKE. "
+        f"{arm_notes.PIN_BORE_NECESSITY}."
+    )
+    # A note carries no size; the necessity answer is one line of at most
+    # six words beyond the mate's number.
+    assert not re.search(r"\d*\.\d", note.split(". ", 1)[1])
+    assert len(re.sub(r"MHA-\S+", "", arm_notes.PIN_BORE_NECESSITY).split()) <= 6
     # #2174: the rear mouth's band is its own native leg dimension's, in
     # section D-D, not callout text.
     assert "MOUTH" not in arm_notes.PIN_BORE_CALLOUT
+    # The band is analysis only: the reamer only cuts oversize.
     assert min(geometry.PIN_BORE_DIA_BAND) == 0.0 < max(geometry.PIN_BORE_DIA_BAND)
 
 
@@ -990,13 +1012,15 @@ def test_no_frame_carries_a_projected_zone_and_the_controls_are_as_ruled() -> No
         assert (control.characteristic, control.tolerance, control.datums) == ("position", ".004", ("A", "B", "C"))
         assert (control.face.contains_x_mm, control.face.contains_y_mm) == xy
     assert float(position.tolerance) * 25.4 <= geometry.REDUCER_POSITION_DIAMETER + 1e-12
-    # #2415: the axis follows the bore over the pin's press-land grip only.
+    # Fit audit 2026-11-23: the bonded pin's axis leans by the bore's tilt
+    # plus the widest accepted gap over the shortest bond.
     assert registration.S_AXIS_ZONE_DIAMETER_MM == pytest.approx(
-        float(square.tolerance) * 25.4 * registration.S_AXIS_RUN_ON_MM
-        / cluster_pin.PRESS_LAND_GRIP_MIN
+        (float(square.tolerance) * 25.4 + spec.PIN_BOND_GAP_ACCEPTED_MAX)
+        * registration.S_AXIS_RUN_ON_MM
+        / cluster_pin.BOND_LENGTH_MIN
     )
     assert registration.S_AXIS_RUN_ON_MM > registration.S_PROJECTED_HEIGHT_MM
-    assert cluster_pin.PRESS_LAND_GRIP_MIN < geometry.THICKNESS - geometry.THICKNESS_BAND
+    assert cluster_pin.BOND_LENGTH_MIN < geometry.THICKNESS - geometry.THICKNESS_BAND
     # The datums the frames name are the part's: A the front face, B the
     # pivot bore, C the pin bore.
     assert [datum.letter for datum in spec.PART_DATUMS] == ["A", "B", "C"]
