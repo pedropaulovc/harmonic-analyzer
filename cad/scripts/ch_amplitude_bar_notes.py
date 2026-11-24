@@ -13,6 +13,7 @@ from __future__ import annotations
 import math
 
 import ch_amplitude_bar_spec as bar
+import sh_vn_pivot_pin_spec as pin
 from _inch_wall_limits import WALL_FLOOR_MM
 from _printed_tolerance import printed_band_mm
 
@@ -45,10 +46,11 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # the overall length, the top notch's depth, the pin's drop and the stock
 # reference at the title block's .XX; both notch widths, both centring ledges
 # and the foot notch's depth at three places with their own bands; the reamed
-# hole at four. The hole's offset from the back face prints at three places:
-# the .XXX band (+/-.005) holds the reamed hole's wall to the far face at .079
-# on the narrowest stock (sh_vn_pivot_pin_bar_spec.joint_budget
-# hole_face_wall_min, MHA-CH-01 RV-06); at .XX it would fall to .074.
+# hole at four (the reamer's size, no band). The hole's offset from the back
+# face prints at three places: the .XXX band (+/-.005) holds the reamed
+# hole's wall to the far face at .078 on the narrowest stock, at the largest
+# hole a bonded pin is accepted in (sh_vn_pivot_pin_bar_spec.joint_budget
+# hole_face_wall_min, MHA-CH-01 RV-06); at .XX it would fall to .073.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "BarProfile": {
         "BarLength": 2,
@@ -140,20 +142,21 @@ if LEDGE_CHEEK_MIN < WALL_FLOOR_MM - 1e-9:
 def _pin_hole_wall_min() -> float:
     """The reamed pin hole's wall to the nearer depth face at the worst case:
     its offset at either end of the band its TopPinX places print, the hole
-    at its largest, on the narrowest stock; floored to three inch places. The
+    at the largest a bonded pin is accepted in (sh_vn_pivot_pin_spec.
+    BOND_HOLE_MAX), on the narrowest stock; floored to three inch places. The
     tight location exists for this wall (machinist round 1, #1293: the
     three-place location read as a size with no function)."""
     location = printed_band_mm(
         DRAWING_PRECISION["TopPinProfile"]["TopPinX"], unit=bar.UNIT
     )
-    hole_max = bar.TOP_PIN_HOLE_LIMITS[1]
+    hole_max = pin.BOND_HOLE_MAX
     near = bar.BAR_DEPTH / 2.0 - location
     far = (bar.BAR_DEPTH - bar.BAR_STOCK_UNDERSIZE) - (bar.BAR_DEPTH / 2.0 + location)
     wall = min(near, far) - hole_max / 2.0
     return _floor_inch(wall)
 
 
-# drawing-guidelines.md rule 17: the hole's wall holds the .060 floor; at .079
+# drawing-guidelines.md rule 17: the hole's wall holds the .060 floor; at .078
 # it is under the .080 target (MHA-CH-01 RV-06, owner ruling 2026-11-01).
 PIN_HOLE_WALL_MIN = _pin_hole_wall_min()
 if PIN_HOLE_WALL_MIN < WALL_FLOOR_MM:
@@ -163,20 +166,17 @@ if PIN_HOLE_WALL_MIN < WALL_FLOOR_MM:
 # sheet, rounded down): it limits the cutter's corner at an unmodelled root,
 # so it rides each notch's depth.
 ROOT_CALLOUT = "ROOTS R.015 MAX"
-# The reamed press hole's limits (.0004 apart) are narrower than the shop's
-# reamer row, so the hole is made to its pin: a matched press fit, stated
-# once in the numbered sheet note its callout links (drawing-guidelines.md
-# rules 4 and 7). The acceptance is the ANSI FN2 window the pin budget is
-# held to (sh_vn_pivot_pin_bar_spec.PRESS_INTERFERENCE_MAX), rounded inward.
-# Owner decision 2026-11-19 (#3124 item 5): this note, a first-article press
-# and the MHA-CH-00 slide-by-hand check are the hole's controls; no gauge.
+# Owner ruling 2026-11-24, fit audit question 3: the hole is reamed .0775
+# and prints the reamer's size with no band (drawing-guidelines.md rule 4,
+# form 3: reamed to the bought mate); the pin itself is the gauge, stated
+# once in the numbered sheet note its callout links (rules 4 and 7): it
+# presses in, it does not enter by hand. A pin that does enter by hand is
+# bonded at MHA-CH-00, not a scrapped bar; no gauge pins.
 TOP_PIN_NAME = "BAR PIVOT PIN"
 PIN_FIT_NOTE_NUMBER = 1
-PIN_FIT_INTERFERENCE = (".0002", ".0008")
 DRAWING_NOTES = (
-    f"{PIN_FIT_NOTE_NUMBER}. MATCHED PRESS FIT ON {TOP_PIN_NAME} {TOP_PIN_NUMBER}:"
-    f"\n    REAM {PIN_FIT_INTERFERENCE[0]}-{PIN_FIT_INTERFERENCE[1]}"
-    " UNDER THE MEASURED PIN."
+    f"{PIN_FIT_NOTE_NUMBER}. PRESS FIT ON {TOP_PIN_NAME} {TOP_PIN_NUMBER}:"
+    "\n    THE PIN DOES NOT ENTER BY HAND."
 )
 # Each line stays within ~21 characters (~55 mm at the sheet's dimension
 # font): the callouts sit between a notch's crop circle and its neighbours,
