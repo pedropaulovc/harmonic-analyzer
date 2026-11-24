@@ -272,6 +272,11 @@ INDEXED_FIT_BANDS: dict[tuple[str, str], str] = {
         "equal band indexed into the native symmetric (+/-) tolerance and the "
         "hub key pin's air to the flat"
     ),
+    ("dt_crank_drive_gear_spec", "BORE_DIA_BAND"): (
+        "the .3760 reamer's analysis band, never printed (fit audit 2026-11-23, "
+        "MHA-DT-07.bore): indexed for the modelled reamer size and the keyed "
+        "arbor's and collar-annulus walls"
+    ),
     ("dt_alignment_pinion_spec", "BASE_TANGENT_SPAN_BAND"): (
         "indexed into the span-measurement note text"
     ),
@@ -596,8 +601,10 @@ def test_band_uses_are_found() -> None:
     helpers = [u for u in BAND_USES if u.order == "upper_lower"]
     assert len(helpers) >= 50, f"band consumer scan found only {len(helpers)} helper uses"
     ids = {f"{u.module}:{u.expression}" for u in BAND_USES}
-    assert "build_dt_crank_drive_gear:BORE_DIA_BAND" in ids, (
-        "missing band consumer anchor: build_dt_crank_drive_gear:BORE_DIA_BAND"
+    # The 64T's keyway width is the anchor since its reamed bore lost its
+    # band (fit audit 2026-11-23, MHA-DT-07.bore).
+    assert "build_dt_crank_drive_gear:KEYWAY_WIDTH_BAND" in ids, (
+        "missing band consumer anchor: build_dt_crank_drive_gear:KEYWAY_WIDTH_BAND"
     )
     assert "build_dt_cone_gear_shaft:band" in ids, (
         "missing band consumer anchor: build_dt_cone_gear_shaft:band"
@@ -704,7 +711,7 @@ def test_classification_lists_are_current() -> None:
 def band_use_source_tree(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     """AST-only sources: every consumer anchor plus a rich unrelated module."""
     anchors = {
-        "build_dt_crank_drive_gear": "BORE_DIA_BAND",
+        "build_dt_crank_drive_gear": "KEYWAY_WIDTH_BAND",
         "build_dt_cone_gear_shaft": "band",
     }
     for module, expression in anchors.items():
@@ -734,7 +741,7 @@ def test_band_uses_anchor_rejects_no_match(
 @pytest.mark.parametrize(
     ("module", "expression"),
     [
-        ("build_dt_crank_drive_gear", "BORE_DIA_BAND"),
+        ("build_dt_crank_drive_gear", "KEYWAY_WIDTH_BAND"),
         ("build_dt_cone_gear_shaft", "band"),
     ],
 )
