@@ -4061,10 +4061,10 @@ def build(adapter) -> dict[str, str]:
         label="cone-tip-block-screw (MHA-DT-VN-60 up through the plate into the block foot)",
     )
     # MHA-DT-VN-69 tip dowel (rule-23 retention, owner ruling 2026-11-07;
-    # MHA-DT-00 rubric sample, PR #2248): match-drilled from under
+    # MHA-DT-00 rubric sample, PR #2248): drilled from under
     # the plate on the hold-down line, PLAT_TIP_DOWEL_LOCAL_X along the plate's
-    # local x, and pressed up to the floor of the block foot's blind .0620
-    # ream; its lower end is a slip fit in the plate's opened ream, so the
+    # local x, and bonded up to the floor of the block foot's blind 1/16
+    # hole; its lower end is a slip fit in the plate's #52 hole, so the
     # block cannot turn about MHA-DT-VN-60.  Stock frame: axis +Y, one end
     # face on y = 0.
     tip_dowel_xz = (

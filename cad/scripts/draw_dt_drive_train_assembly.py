@@ -1374,7 +1374,7 @@ def acceptance_ref(key: str) -> str:
 
 # Rule 23 (rubric sample round 13, #3): a press whose part slides in by hand
 # is a slip fit, so each pressed pin's check is followed by this one remedy,
-# the sheet 1 LOCTITE 638 note's bond (2X-2Y, 4V-4W, 4A-4B, 6A-6B, 6E-6F).
+# the sheet 1 LOCTITE 638 note's bond (4V-4W, 4A-4B, 6A-6B, 6E-6F).
 SLIP_FIT_BOND = "BOND IT IN WITH LOCTITE 638 PER THE SHEET 1 NOTE."
 # MHA-DT-29's acceptance and flush condition, as both part sheets print them.
 PIN_FIT_ACCEPTANCE, PIN_FIT_FLUSH = pinion.PIN_FIT_LINES[1].split(", ")
@@ -1564,14 +1564,17 @@ CONE_CRANK_STEPS = _note_text(
         # screw up from under the plate through its counterbored hole.
         # Rule-23 retention, owner ruling 2026-11-07 (MHA-DT-00 rubric sample,
         # PR #2248; owner question 2 option 0-A): one Ø1/16
-        # MHA-DT-VN-69 dowel, match-drilled from under the plate with the block
-        # squared and tight, pressed in the foot's blind ream and a slip fit in
-        # the plate's opened ream, stops the block turning about its one screw.
-        # The block never comes off: the dowel goes in from below.
+        # MHA-DT-VN-69 dowel, drilled from under the plate with the block
+        # squared and tight, bonded (LOCTITE 638) in the foot's blind 1/16
+        # hole and a slip fit in the plate's #52 hole (owner ruling
+        # 2026-11-24, fit audit question 11), stops the block turning about
+        # its one screw.  The block never comes off: the dowel goes in from
+        # below, coated per the sheet 1 note, the plate's hole wiped so the
+        # pair still lifts off together.
         "2P. STAND MHA-DT-21 ON MHA-DT-20, RIGHT FACE SQUARE TO ITS BACK EDGE.",
         "2Q. RUN MHA-DT-VN-60 UP THRU THE MHA-DT-20 COUNTERBORE, SNUG.",
         # Owner decision C1 keyed (2026-11-09, PR #1992): T006's pivot runs in
-        # MHA-DT-39's reamed end hole.  Its lateral error is taken up by
+        # MHA-DT-39's drilled end hole.  Its lateral error is taken up by
         # turning MHA-DT-05 on its screws' clearance (Codex P1 on #1136,
         # 9e9982c5d); its vertical error by MHA-DT-21's AxisHeight, made to
         # MHA-DT-05 (build_dt_drive_train_assembly TIP_LATERAL_CAPACITY_MM /
@@ -1582,12 +1585,10 @@ CONE_CRANK_STEPS = _note_text(
         "2S. HOLD MHA-DT-05 PUSHED TOWARD MHA-DT-21 ALONG THE SHAFT THROUGH 2U.",
         "2T. TURN MHA-DT-05 ON ITS SCREWS UNTIL THE MHA-DT-37 PIVOT RUNS FREE.",
         "2U. TIGHTEN BOTH MHA-DT-VN-61 AND MHA-DT-VN-60: THE PIVOT RUNS FREE.",
-        "2V. DRILL AND REAM UP THRU MHA-DT-20 INTO MHA-DT-21 PER BOTH CALLOUTS.",
-        "2W. PRESS MHA-DT-VN-69 UP THRU MHA-DT-20 TO THE MHA-DT-21 HOLE FLOOR.",
-        # Rule 23 (rubric sample round 13, #3): a press that goes in by hand
-        # is a slip fit, and the step says what to do then (as 4A-4B).
-        "2X. CHECK THAT MHA-DT-VN-69 DOES NOT SLIDE BY HAND.",
-        f"2Y. IF IT DOES, {SLIP_FIT_BOND}",
+        "2V. DRILL 1/16 UP THRU MHA-DT-20 INTO MHA-DT-21 PER BOTH CALLOUTS.",
+        "2W. OPEN THE MHA-DT-20 HOLE TO #52 FROM BELOW, MHA-DT-21 IN PLACE.",
+        "2X. COAT MHA-DT-VN-69 WITH LOCTITE 638 PER THE SHEET 1 NOTE.",
+        "2Y. PUSH IT UP TO THE MHA-DT-21 FLOOR: MHA-DT-20 HOLE WIPED CLEAN.",
         "2Z. CHECK THAT MHA-DT-21 DOES NOT TURN ON MHA-DT-20 BY HAND.",
         # Owner decision C1 keyed (2026-11-09, PR #1992): the end screw sets
         # MHA-DT-04's end play against MHA-DT-38 (cone_stack_end_play
@@ -2369,7 +2370,7 @@ CONSUMABLES_NOTES = _note_text(
         "UNLESS ITS STEP GIVES ANOTHER SETTING.",
         # Rule 23 (rubric d9f8b0c): one package note may carry the bond's
         # degrease, apply and cure rules; the bonds are part-spec steps.
-        # Round 13: every bond cites the note (1N, 1R, 2-2A, 2Y, 4B, 4U, 6B, 6F, 12-14), so the
+        # Round 13: every bond cites the note (1N, 1R, 2-2A, 2X, 4B, 4U, 6B, 6F, 12-14), so the
         # note names no step range; the station it sets at once is 12A's.
         "LOCTITE 638 BONDS: DEGREASE BOTH PARTS; COAT THE "
         "INSERTED PART, NEVER A BLIND SEAT; KEEP IT OFF RUNNING LANDS; SET STEP "

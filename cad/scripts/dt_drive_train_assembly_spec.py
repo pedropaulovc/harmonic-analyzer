@@ -210,8 +210,8 @@ EXPLODE_STEPS: tuple[ExplodeStep, ...] = (
     # The tip block hardware then stands clear beyond the tip: MHA-DT-39's end
     # stands about 2.1 over T006's pivot and the block's south face about 3.1
     # past MHA-DT-38, so 85 leaves about 33 between pivot and screw.
-    # MHA-DT-VN-69 (rule-23 retention, owner ruling 2026-11-07) is pressed into
-    # the block foot's blind ream, so it leaves with the block.
+    # MHA-DT-VN-69 (rule-23 retention, owner ruling 2026-11-07) is bonded into
+    # the block foot's blind 1/16 hole, so it leaves with the block.
     ExplodeStep(
         "tip block slides off",
         (

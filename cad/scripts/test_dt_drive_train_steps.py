@@ -190,7 +190,7 @@ def test_the_end_screw_sets_the_end_play_after_the_pivot_runs_free() -> None:
         "THREAD MHA-DT-39 INTO MHA-DT-21",
         "TURN MHA-DT-05 ON ITS SCREWS UNTIL THE MHA-DT-37 PIVOT RUNS FREE",
         "TIGHTEN BOTH MHA-DT-VN-61 AND MHA-DT-VN-60",
-        "DRILL AND REAM UP THRU MHA-DT-20 INTO MHA-DT-21",
+        "DRILL 1/16 UP THRU MHA-DT-20 INTO MHA-DT-21",
     )
     positions = [placed.find(phrase) for phrase in order]
     assert -1 not in positions, positions
