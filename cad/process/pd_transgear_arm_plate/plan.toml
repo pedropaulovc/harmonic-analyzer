@@ -341,9 +341,9 @@ name = "Feeler gauges"
 ref = "feeler-gauges"
 [[tools]]
 id = "pin-gauges"
-name = "Pin gauges .250, .438 and .450, TO BUY"
+name = "Pin gauges .250, .438 and .450 of the .061-.500 minus set, TO BUY"
 ref = "pin-gauges"  # A1-pin-set-061-500-combined
-description = "Class ZZ pin gauges .250, .438 and .450 (plus or minus; mike each): the countersinks' rim (.250) and K's chamfer (.450) with the calipers' depth rod; the .438 minus pin stands in K as the plug the calipers read from"
+description = "Class ZZ minus pins .250, .438 and .450 of the .061-.500 set (gauges.pin-gauges; mike each): the countersinks' rim (.250) and K's chamfer (.450) with the calipers' depth rod; the .438 stands in K as the plug the calipers read from. K's size is not read: it is reamed and not gauged, so no .4375/.4380 plus pair"
 status = "to_order"
 [[tools]]
 id = "tape"
