@@ -60,7 +60,7 @@ the only capability figure a review may use.
 | angle | ±0.25° | sine bar and gauge blocks |
 | flatness, parallelism, perpendicularity, runout | .001 per inch of feature, never under .001 total | surface plate, indicator, V-blocks |
 | position of a reamed pattern | Ø.004 | surface plate, pins, height gauge |
-| assembly gap, alignment or end play | ±.0005 | dial or test indicator, feeler gauges |
+| assembly gap, alignment or end play | as fine as the named instrument reads: one owned feeler leaf (`.0015` to `.035`) as a single limit, or a go and a no-go leaf two leaves apart; `.002` total on a `.001` dial indicator; `.0005` total on the lever test indicator | the feeler leaf or the indicator the step names; a face set on the DRO follows the located-step rows above |
 
 Unconverted millimetre sheets use the same rows at ±0.12, ±0.05, ±0.10,
 ±0.025, ±0.025, ±0.025 mm and Ø0.1 mm position.
@@ -726,7 +726,9 @@ cross-hole. Judge it at the worst case of the printed bands (the title-block
 band for its decimal places, DRILLED HOLES, or the explicit band) plus
 realistic drill wander on a deep hole, never at nominal and never by
 root-sum-square. Fix a thin wall with geometry so the bands can stay loose,
-never with a tighter band.
+never with a tighter band. This is the basis for a wall, a web and a
+ligament. It is not, by itself, the basis for a joint the assembly sets:
+rule 19 says how that is judged.
 
 ### Rule 18 — Thread engagement: 1.5D of full thread
 
@@ -751,6 +753,14 @@ this adjustment, not contradicting itself.
 Making one part to its mate (rule 4) is not this rule's adjustment and is
 not a last resort: it is how a one-off fit is made. This rule is about
 stacks of several parts.
+
+A joint that has such an adjustment, or that the assembly step sets by
+feel, is judged after its setting: the setting is not summed again as a
+term, and only what the setting cannot see is checked. A stack that
+closes only when a part band is tightened, an inspection is added or a
+limit is moved by less than the shop reads (`.001 in` on a size, one step
+of the instrument on a setting) has not closed: give it room with geometry,
+name the setting that already absorbs it, or ask the owner.
 
 ### Rule 20 — State a known shortfall as a plain fact
 
@@ -809,7 +819,14 @@ sub-assembly, never on part fabrication.
   register (rule 4) and names the indicator
   or feeler that reads it; it never needs a gauge bought for that one
   setting. A fit acceptance given as a clearance or interference range or
-  by feel is not such a setting (rule 4). A fit made
+  by feel is not such a setting (rule 4). A mesh, a play or a free-running
+  check that the step itself sets by feel or to a first bind prints no
+  backlash, shake or gap number for that quantity: the step says what is
+  felt and what must not happen (no bind through a full turn, no skipped
+  tooth). This does not remove a clearance or interference range that rule
+  4 or rule 23 requires on a made-to-fit, bonded or pressed joint. A window
+  read on an instrument is no narrower than the assembly row of "What the
+  shop holds", and wider wherever the function allows. A fit made
   at assembly
   (match-drill, ream in place, shim, adjust) names the mating parts as rule 4
   requires; an item reference is enough when the BOM supplies the item's name
