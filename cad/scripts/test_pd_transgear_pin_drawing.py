@@ -141,7 +141,7 @@ def test_the_arm_rear_mouth_clears_the_seat_root_at_every_limit() -> None:
     # minimum, so the arm models and prints one.
     low, high = arm.PIN_MOUTH_CHAMFER_LIMITS
     assert low >= spec.SEAT_FILLET_R
-    assert low < arm.PIN_MOUTH_CHAMFER < high
+    assert low == arm.PIN_MOUTH_CHAMFER < high
     assert high == pytest.approx(edge_break_chamfer_mm(unit=spec.UNIT))
 
 

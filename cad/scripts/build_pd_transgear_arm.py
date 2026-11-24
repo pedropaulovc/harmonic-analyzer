@@ -101,7 +101,6 @@ from pd_transgear_arm_geometry import (
     END_HALF_WIDTH,
     PIN_BORE_DIA,
     PIN_MOUTH_CHAMFER,
-    PIN_MOUTH_CHAMFER_TOLERANCE,
     PIN_HOLE_DEPTH,
     PIN_HOLE_POINT_LENGTH,
     PIN_HOLE_DIA,
@@ -1115,11 +1114,12 @@ def build(adapter: Any) -> dict[str, str]:
     # The pin bore prints the reamer's size with no band (fit audit
     # 2026-11-23): MHA-PD-23 is bonded in it, and its callout carries the
     # fit.
-    # The rear mouth's leg: its minimum clears the MHA-PD-23 seat fillet
-    # (pd_transgear_pin_spec), its maximum is the title block's break.
-    set_dimension_symmetric_tolerance(
-        adapter, "PinBoreRearMouthProfile", "PinMouthChamfer",
-        PIN_MOUTH_CHAMFER_TOLERANCE, display_unit=UNIT,
+    # The rear mouth's leg prints its one limit, the minimum that clears the
+    # MHA-PD-23 seat fillet (pd_transgear_pin_spec): the model value with a
+    # " MIN" suffix.  Its maximum is the title block's break.
+    _author_dimension_text(
+        adapter, "PinBoreRearMouthProfile", "PinMouthChamfer", lane=2,
+        text=MIN_SUFFIX, limit=PIN_MOUTH_CHAMFER,
     )
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     author_part_pmi(adapter, datums=PART_DATUMS, controls=GEOMETRIC_CONTROLS)

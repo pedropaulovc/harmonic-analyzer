@@ -162,6 +162,7 @@ def test_the_latch_pin_hole_depth_is_a_min_over_a_drill_point() -> None:
     assert authored == {
         "'SpotFaceDia'": {"lane": "1", "text": "COUNTERBORE_PREFIX"},
         "'PinHoleDepth'": {"lane": "2", "text": "MIN_SUFFIX", "limit": "PIN_HOLE_DEPTH"},
+        "'PinMouthChamfer'": {"lane": "2", "text": "MIN_SUFFIX", "limit": "PIN_MOUTH_CHAMFER"},
     }
     assert spec.MIN_SUFFIX == " MIN"
     assert "set_single_limit" not in Path(part.__file__).read_text(encoding="utf-8")
@@ -371,7 +372,6 @@ def test_the_explicit_bands_are_the_floor_and_the_rear_mouth() -> None:
     necessity test)."""
     assert model_toleranced_dimensions(part) == {
         ("SpotFaceProfile", "FloorDepth"): "SPOT_FACE_FLOOR_TOLERANCE",
-        ("PinBoreRearMouthProfile", "PinMouthChamfer"): "PIN_MOUTH_CHAMFER_TOLERANCE",
     }
     assert geometry.LATCH_PIN_HEIGHT_BAND == geometry.printed_reach_mm(
         geometry.PIN_HOLE_Z, spec.DRAWING_PRECISION_BY_NAME["PinHoleZ"]
@@ -480,21 +480,24 @@ def test_the_pin_is_bonded_in_the_bore_with_clearance_at_every_limit() -> None:
     assert min(geometry.PIN_BORE_DIA_BAND) == 0.0 < max(geometry.PIN_BORE_DIA_BAND)
 
 
-def test_the_rear_mouth_prints_its_modelled_band_on_its_native_leg_in_d_d() -> None:
-    """#2174 (Codjiflo on #2124): the rear mouth's .006/.010 printed as text
-    in the pin bore's callout. Its leg is the revolved profile's native
-    dimension, toleranced on the part, and the pin's root-clearance check
-    reads the limits that band prints. Section D-D cuts on the profile's
-    plane; its text stands off the line, left of the cut face, its shoulder
-    at the mouth's height, clear of the border, the plan and the title
-    block."""
+def test_the_rear_mouth_prints_its_minimum_on_its_native_leg_in_d_d() -> None:
+    """#2174 (Codjiflo on #2124): the rear mouth's leg is the revolved
+    profile's native dimension, and the pin's root-clearance check reads its
+    limits. Fit batch review r3: it prints one limit, .006 MIN (the model
+    value with a MIN suffix); its upper limit is the title block's break.
+    Section D-D cuts on the profile's plane; its text stands off the line,
+    left of the cut face, its shoulder at the mouth's height, clear of the
+    border, the plan and the title block."""
     assert spec.DRAWING_DIMENSIONS["PinBoreRearMouthProfile"] == {"PinMouthChamfer"}
     assert set(drawing.PIN_SECTION_KEEP) == {"PinMouthChamfer"}
-    tolerance = geometry.PIN_MOUTH_CHAMFER_TOLERANCE
-    assert geometry.PIN_MOUTH_CHAMFER_LIMITS == pytest.approx(
-        (geometry.PIN_MOUTH_CHAMFER - tolerance, geometry.PIN_MOUTH_CHAMFER + tolerance)
-    )
+    assert not hasattr(geometry, "PIN_MOUTH_CHAMFER_TOLERANCE")
+    assert geometry.PIN_MOUTH_CHAMFER_LIMITS[0] == geometry.PIN_MOUTH_CHAMFER
     assert geometry.PIN_MOUTH_CHAMFER_LIMITS == pytest.approx((0.1524, 0.254))
+    source = Path(part.__file__).read_text(encoding="utf-8")
+    assert (
+        'adapter, "PinBoreRearMouthProfile", "PinMouthChamfer", lane=2,\n'
+        "        text=MIN_SUFFIX, limit=PIN_MOUTH_CHAMFER,"
+    ) in source
     # Round 4: the mouth is named by the datum its face is opposite, never by
     # the undefined direction word REAR.
     assert arm_notes.PIN_MOUTH_CALLOUT.splitlines()[0] == "X 45\u00b0 MOUTH OPPOSITE DATUM A"

@@ -99,6 +99,7 @@ from pd_transgear_arm_geometry import (
     PIN_HOLE_DIA_BAND,
     PIN_HOLE_Z,
     PIN_MOUTH_CHAMFER,
+    PIN_MOUTH_CHAMFER_AIM,
     PIN_MOUTH_CHAMFER_LIMITS,
     PIN_STATION,
     PIVOT_BORE_DIA,
@@ -732,7 +733,7 @@ requirement(
     },
     precision={"dia": _P["PinBoreDia"], "station_basic": _P["PinStation"]},
 )
-# The pin bore's rear mouth (opposite datum A): .008 ±.002 X 45° (section
+# The pin bore's rear mouth (opposite datum A): .006 MIN X 45° (section
 # D-D PIN_SECTION_KEEP "PinMouthChamfer"), clearing the MHA-PD-23 seat fillet.
 requirement(
     "pin_mouth",
@@ -744,7 +745,7 @@ requirement(
             list(PIN_MOUTH_CHAMFER_LIMITS),
             ((_GEOM, "PIN_MOUTH_CHAMFER_LIMITS"), (_SELF, "PIN_SECTION_KEEP")),
         ),
-        "leg_nominal": (PIN_MOUTH_CHAMFER, ((_GEOM, "PIN_MOUTH_CHAMFER"),)),
+        "leg_nominal": (PIN_MOUTH_CHAMFER_AIM, ((_GEOM, "PIN_MOUTH_CHAMFER_AIM"),)),
         "angle_deg": (45.0, ((_NOTES, "PIN_MOUTH_CALLOUT"),)),
         "edge_of": ("pin_bore", ((_NOTES, "PIN_MOUTH_CALLOUT"),)),
         "at_face": ("rear_face", ((_NOTES, "PIN_MOUTH_CALLOUT"),)),

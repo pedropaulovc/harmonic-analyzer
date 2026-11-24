@@ -262,23 +262,22 @@ PIN_BORE_DIA_MAX = round(PIN_BORE_DIA + PIN_BORE_DIA_BAND[0], 6)
 PIN_BORE_DIA_MIN = round(PIN_BORE_DIA + PIN_BORE_DIA_BAND[1], 6)
 # The MHA-PD-23 head seats on the rear face over its R.005 MAX root: the rear
 # mouth is a 45-degree chamfer at least the root's radius on the leg, so the
-# root clears it and the head lands on the face (Codjiflo, #2124). Its upper
-# limit is the title block's chamfer break; ``pd_transgear_pin_spec`` checks
-# the clearance against the pin's root. The band is the model's (#2174): the
-# build puts it on the mouth profile's native leg dimension, which section
-# D-D imports, and the limits below are that printed dimension's.
-PIN_MOUTH_CHAMFER = 0.2032  # .008
+# root clears it and the head lands on the face (Codjiflo, #2124). The sheet
+# prints that one limit, `.006 MIN` (fit batch review r3: a two-sided ±.002
+# band was over-specification, nothing on the sheet wanting its upper
+# limit); the upper limit is the title block's chamfer break, which every
+# edge takes.  ``pd_transgear_pin_spec`` checks the clearance against the
+# pin's root.  The model value is the printed minimum (#2174: the build
+# puts " MIN" on the mouth profile's native leg dimension, which section D-D
+# imports); the traveler cuts .008.
+PIN_MOUTH_CHAMFER = 0.1524  # .006 MIN
 PIN_MOUTH_CHAMFER_PLACES = 3
-PIN_MOUTH_CHAMFER_TOLERANCE = 0.0508  # ±.002
-PIN_MOUTH_CHAMFER_LIMITS = tuple(
-    round(PIN_MOUTH_CHAMFER + deviation, 6)
-    for deviation in printed_deviations(
-        PIN_MOUTH_CHAMFER,
-        PIN_MOUTH_CHAMFER_PLACES,
-        (-PIN_MOUTH_CHAMFER_TOLERANCE, PIN_MOUTH_CHAMFER_TOLERANCE),
-        unit=UNIT,
-    )
+PIN_MOUTH_CHAMFER_LIMITS = (
+    PIN_MOUTH_CHAMFER,
+    edge_break_chamfer_mm(unit=UNIT),
 )  # .006/.010
+# What the traveler cuts: midway between the limits, .008.
+PIN_MOUTH_CHAMFER_AIM = round(sum(PIN_MOUTH_CHAMFER_LIMITS) / 2.0, 6)
 # --- Plate taps: 2 x #8-32 THROUGH; ordinary entry/exit edge breaks ---------
 PLATE_SCREW_PITCH = 15.0
 PLATE_CENTRELINE_OFFSET = -3.375  # 1-1/4 in plate's centreline from its bore
