@@ -9,8 +9,8 @@
   <line class="dims" x1="140" y1="190" x2="428.1" y2="190"/>
   <line class="leader" x1="140" y1="141" x2="140" y2="196"/>
   <line class="leader" x1="428.1" y1="114" x2="428.1" y2="196"/>
-  <text class="label" x="190" y="210">#47 5.249 from the bore (BASIC; first arm,</text>
-  <text class="label" x="190" y="226">calipers over the offcut and a #47 shank)</text>
+  <text class="label" x="190" y="210">#47 5.249 REF from the bore (5.239/.333 basic;</text>
+  <text class="label" x="190" y="226">first arm, calipers over the offcut and a #47 shank)</text>
   <text class="label" x="30" y="60">F bore: the 1/4 in ground bar offcut slides through, every arm</text>
   <!-- Hub section, 1 in = 200 px: length .278 ±.002, each end .090 over its face. -->
   <rect class="part-kept" x="500" y="150" width="80" height="55.6"/>
@@ -22,7 +22,7 @@
   <line class="leader" x1="670" y1="150" x2="740" y2="150"/>
   <line class="leader" x1="670" y1="205.6" x2="740" y2="205.6"/>
   <text class="label" x="560" y="250">hub length .276–.280, micrometer,</text>
-  <text class="label" x="560" y="266">every arm; each end .088–.092 over</text>
-  <text class="label" x="560" y="282">its strap face, first arm</text>
+  <text class="label" x="560" y="266">every arm; first arm: strap mid-plane</text>
+  <text class="label" x="560" y="282">.137–.141 from end G</text>
   <text class="label" x="20" y="315">Edges the cuts left: R.010 or .010 chamfer max; both bore mouths, both #47 mouths, the hub rims.</text>
 </svg>
