@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 import pytest
@@ -38,25 +39,36 @@ def test_every_marked_dimension_has_one_view_and_model_places() -> None:
     assert set(drawing.PROFILE_KEEP) == {"RingLength"}
 
 
-def test_the_bore_carries_its_model_band_and_the_length_the_title_block() -> None:
-    """The bore runs on the pin, so its reamed band lives on the model
-    dimension; the length only feeds the shimmed end float (#2124)."""
-    assert model_toleranced_dimensions(part) == {
-        ("RingProfile", "BoreDia"): "*deviations(BORE_DIA_BAND)",
-    }
+def test_the_bore_prints_no_band_and_the_length_the_title_block() -> None:
+    """Fit audit 2026-11-23: the reamed bore prints the reamer's size with
+    no band (the pin is turned last to it); the length only feeds the
+    shimmed end float (#2124)."""
+    assert model_toleranced_dimensions(part) == {}
+    assert spec.BORE_PLACES == 3
 
 
 def test_the_bore_runs_on_the_pin_and_names_it() -> None:
-    """drawing-guidelines.md rule 4 (tighten only for function, and name the mate): the running-fit callout names the mate and its clearance;
+    """drawing-guidelines.md rule 4 (fit audit 2026-11-23): a reamed bore
+    prints size, REAM, the mate, the acceptance by the mate and one line
+    saying what the fit protects; no band, no clearance.
     drawing-guidelines.md rule 12 (hole and slot callouts say what to do): the fit bore's process is REAM."""
     low, high = fit.BORE_DIAMETRAL_CLEARANCE
     assert 0.0 < low < high
-    assert spec.BORE_DIA == pin.DIA
+    assert spec.BORE_DIA == fit.BORE_DIA == pytest.approx(0.1260 * 25.4)
     assert spec.BORE_DIA_BAND == fit.BORE_DIA_BAND
     callout = drawing.DIMENSION_CALLOUTS["BoreDia"]
-    assert callout.splitlines()[0] == "REAM THRU"
-    assert pin.PIN_NUMBER in callout
-    assert f"{pin.inch_text(low, 4)}-{pin.inch_text(high, 4)}" in callout
+    assert callout.splitlines() == [
+        "REAM THRU, RUNNING FIT",
+        f"{pin.PIN_NUMBER} PIN ENTERS, NO SHAKE",
+        "KEEPS MHA-PD-10 END FLOAT OPEN",
+    ]
+    assert not re.search(r"\d*\.\d", callout)
+    # What the necessity answer states: cocked on the pin at the modelled
+    # fit, the bushing takes up less than the sleeve's least end float; a
+    # drilled #30's clearance (.1285 +.004/0 on the smallest pin) would not.
+    assert spec.BORE_COCK_TAKE_UP < fit.RING_FLOAT_RANGE[0]
+    drilled = (0.1285 + 0.004) * 25.4 - pin.DIA_MIN
+    assert spec.BORE_COCK_TAKE_UP * drilled / high > fit.RING_FLOAT_RANGE[0]
 
 
 def test_wall_holds_the_target_at_the_printed_worst_case() -> None:

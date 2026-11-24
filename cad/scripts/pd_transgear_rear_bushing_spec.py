@@ -24,7 +24,7 @@ import pd_transgear_pin_spec as PIN
 from _gtol_planar import PlanarFace
 from _inch_wall_limits import WALL_TARGET_MM
 from _package_units import drawing_unit
-from _printed_tolerance import printed_band_mm
+from _printed_tolerance import edge_break_chamfer_mm, printed_band_mm
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
 from pd_cluster_stack_band import STACK_NAME, STACK_SHEET
 
@@ -34,17 +34,21 @@ UNIT = drawing_unit(
 
 OD = 8.89  # .35
 OD_PLACES = 2
-BORE_DIA = PIN.DIA
-BORE_DIA_BAND = FIT.BORE_DIA_BAND  # (upper, lower), the sleeve's running band
-BORE_PLACES = 4
-# The running fit on the pin, named on the bore callout by its standard fit
-# name with the clearance the printed limits give as REF
-# (drawing-guidelines.md rule 4 (tighten only for function, and name the mate)).
+# The bore: reamed with the set's .1260 reamer, the sleeve's (one reamer,
+# one size), and printed at that size with NO band (fit audit 2026-11-23,
+# pending owner confirmation).  BORE_DIA_BAND is the ANALYSIS band the
+# reamer is modelled to cut, never printed; the wall and the cocking check
+# below read it.
+BORE_DIA = FIT.BORE_DIA  # .1260
+BORE_DIA_BAND = FIT.BORE_DIA_BAND  # (upper, lower) ANALYSIS deviations
+BORE_PLACES = 3
+# The callout: size and process, the running fit accepted by the mate (the
+# MHA-PD-23 pin is turned last to this bore), and rule 4's necessity answer
+# (BORE_COCK_TAKE_UP below).
 BORE_CALLOUT = (
-    "REAM THRU\n"
-    f"RUNNING FIT ON {PIN.PIN_NUMBER} PIN\n"
-    f"(CLEARANCE {PIN.inch_text(FIT.BORE_DIAMETRAL_CLEARANCE[0], 4)}-"
-    f"{PIN.inch_text(FIT.BORE_DIAMETRAL_CLEARANCE[1], 4)} REF)"
+    "REAM THRU, RUNNING FIT\n"
+    f"{PIN.PIN_NUMBER} PIN ENTERS, NO SHAKE\n"
+    f"KEEPS {_config.parts('pd-transgear-feed-pinion')['number']} END FLOAT OPEN"
 )
 
 WALL_NOMINAL = (OD - BORE_DIA) / 2.0
@@ -53,6 +57,30 @@ WALL_WORST = (
 ) / 2.0
 if WALL_WORST < WALL_TARGET_MM:
     raise AssertionError(f"MHA-PD-24 wall {WALL_WORST:.3f} under {WALL_TARGET_MM}")
+# What the fit protects.  With the cluster forward the bushing is loose in
+# the sleeve's end float and can cock on the pin as far as its bore lets it;
+# cocked, it takes up its largest O.D. times that angle of the float.  At
+# the modelled fit that is .0032 of the .008 least float, so it never wedges
+# between the arm's shims and the turning sleeve.  A drilled #30
+# (.1285 +.004/0, clearance to .0077 on this pin) would take up .0147, more
+# than the float: that is why the bore is reamed.  (The float is taken up
+# whole at a clearance of .0042; .002 looser than the modelled fit takes up
+# .0070.)
+BORE_COCK_SPAN_MIN = (
+    FIT.REAR_BUSHING_LENGTH
+    - FIT.REAR_BUSHING_LENGTH_BAND
+    - 2.0 * edge_break_chamfer_mm(unit=UNIT)
+)
+BORE_COCK_TAKE_UP = (
+    (OD + printed_band_mm(OD_PLACES, unit=UNIT))
+    * FIT.BORE_DIAMETRAL_CLEARANCE[1]
+    / BORE_COCK_SPAN_MIN
+)
+if BORE_COCK_TAKE_UP >= FIT.RING_FLOAT_RANGE[0]:
+    raise AssertionError(
+        f"MHA-PD-24 cocked on the pin takes up {BORE_COCK_TAKE_UP:.4f} of the "
+        f"sleeve's {FIT.RING_FLOAT_RANGE[0]} least end float"
+    )
 
 # --- Length: title block (owner ruling 2026-11-01, #2124) -----------------------
 # The shims under it set the disc's end float, so its .XXX band only moves
