@@ -56,17 +56,28 @@ RUNNING_MATES = ("MHA-PD-10", "MHA-PD-24", FRONT_BUSHING_NUMBER)
 HEAD_SEAT_MACHINE_Z = round(ARM.FRONT_FACE_MACHINE_Z + ARM.THICKNESS, 6)  # -114.888
 
 # --- Shank: the running journal ------------------------------------------------
-# The sleeve and both bushings run on it (their bores .125 REAM_SLIDE, cut by
-# the owned .1260 reamer, .0010..0017 diametral); its top stops at .1250, the
+# Made to fit (fit audit 2026-11-23, pending owner confirmation; owner
+# 2026-11-23: "why do we need single micron level tolerance x class plug
+# gauges for a hobby machining project"): the sheet prints the size as a
+# reference and the acceptance by feel, the shank turned last to the three
+# reamed running bores (the sleeve's and both bushings', the set's .1260
+# reamer) until each turns free with no shake.  It prints no limits.
+#
+# DIA_BAND is NOT a printed limit: it is the ANALYSIS band, the shank that
+# fit is modelled to produce (.0010..0017 diametral in those bores).  What
+# fails if it is .002 looser: play in the running bores cocks the sleeve and
+# the front bushing, which tilts the disc toward the MHA-PD-22 collar and
+# closes the collar-to-disc air (pd_cluster_air.COLLAR_AIR;
+# build_pd_paper_drive_assembly gates it).  Its top stops at .1250, the
 # MHA-PD-VN-68 shims' smallest bore, so no shim interferes (line-on-line at
 # the worst case; transgear_cluster_fit, codjiflo P2 on #2124).  #2415: it
 # passes the arm's .1260 ream clear, so pressing never drags it through an
 # interference; the press land below holds the pin.
 DIA = 3.175  # .125
-DIA_BAND = (0.0, -0.00508)  # (upper, lower) deviations, +.0000/-.0002 in
+DIA_BAND = (0.0, -0.00508)  # (upper, lower) ANALYSIS deviations, +.0000/-.0002 in
 DIA_MIN = round(DIA + DIA_BAND[1], 6)
 DIA_MAX = round(DIA + DIA_BAND[0], 6)
-DIA_PLACES = 4
+DIA_PLACES = 3  # prints (Ø.125), a reference
 JOURNAL_ARM_CLEARANCE_MIN = round(ARM.PIN_BORE_DIA_MIN - DIA_MAX, 6)  # .0010
 
 # --- Press land: the only length pressed into the arm (#2415) -----------------

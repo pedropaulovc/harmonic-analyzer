@@ -40,18 +40,22 @@ UNIT = drawing_unit(
 
 OD = 11.938  # .47
 OD_PLACES = 2
-BORE_DIA = PIN.DIA
-BORE_DIA_BAND = FIT.BORE_DIA_BAND  # (upper, lower), the sleeve's running band
-BORE_PLACES = 4
-# The running fit on the pin, named on the bore callout by its standard fit
-# name with the clearance the printed limits give as REF
-# (drawing-guidelines.md rule 4 (tighten only for function, and name the mate)).
-BORE_CALLOUT = (
-    "REAM THRU\n"
-    f"RUNNING FIT ON {PIN.PIN_NUMBER} PIN\n"
-    f"(CLEARANCE {PIN.inch_text(FIT.BORE_DIAMETRAL_CLEARANCE[0], 4)}-"
-    f"{PIN.inch_text(FIT.BORE_DIAMETRAL_CLEARANCE[1], 4)} REF)"
-)
+# The bore: reamed with the set's .1260 reamer, the sleeve's (one reamer,
+# one size), and printed at that size with NO band (fit audit 2026-11-23,
+# pending owner confirmation).  BORE_DIA_BAND is the ANALYSIS band the
+# reamer is modelled to cut, never printed; the walls and the air stacks
+# read it.
+BORE_DIA = FIT.BORE_DIA  # .1260
+BORE_DIA_BAND = FIT.BORE_DIA_BAND  # (upper, lower) ANALYSIS deviations
+BORE_PLACES = 3
+# The callout: size and process, then the mate and that it is turned to
+# this bore (a bare fit name is not enough).  The pair's one acceptance
+# prints on the sheet of the member made last, the pin's (MHA-PD-23 note 1;
+# machinist review r1 of the fit batch: three rows of words, and an
+# acceptance on both members).  Why the bore is reamed is in the part's
+# necessity file (owner ruling 2026-11-24: "In the part's registry file,
+# not on the sheet"; cad/config/necessity/pd-transgear-front-bushing.yaml).
+BORE_CALLOUT = f"REAM THRU\n{PIN.PIN_NUMBER} IS TURNED TO THIS BORE"
 # 45 deg, on the ring face's O.D. edge: a single MAX limit (the MHA-160
 # precedent).  Only its largest size matters: it must leave the MHA-PD-VN-61
 # ring a full bearing flat (checked below).  The part authors " MAX" as the

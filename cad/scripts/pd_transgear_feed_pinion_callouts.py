@@ -11,10 +11,10 @@ paper-drive assembly import, so rewording the sheet re-keys only this part
 and its drawing: this module reads the spec and the hub's spec for every
 value it prints.
 
-Every band tighter than its title-block row names its mate and its fit at
-its own callout (drawing-guidelines.md rule 4): a standard fit name, the
-mate's name and drawing number and the clearance as REF, or a bench
-acceptance where a clearance would be ambiguous.  The teeth (tip and span)
+Every REAM and every band tighter than its title-block row names its mate
+and its fit at its own callout (drawing-guidelines.md rule 4): a standard
+fit name on the mate's drawing number, or the mate's name and number with
+an acceptance by the mate, and what the fit protects.  The teeth (tip and span)
 serve one mesh: each links the GEAR DATA block, which names the rack once
 and the span's matched fit.  That block is the drawing's own note
 (draw_pd_transgear_feed_pinion.GEAR_DATA_NOTE): its span row cites the
@@ -30,7 +30,6 @@ from pd_cluster_stack_band import STACK_NAME
 from pd_rack_pinion_spec import inch_floor_mm, inch_text
 from pd_transgear_feed_pinion_spec import (
     BORE_DATUM,
-    BORE_DIAMETRAL_CLEARANCE,
     HUB_NUMBER,
     PIN_NUMBER,
     TEETH,
@@ -56,11 +55,22 @@ def _clearance(limits_mm: tuple[float, float]) -> str:
     return f"(CLEARANCE {inch_text(limits_mm[0], 4)}-{inch_text(limits_mm[1], 4)} REF)"
 
 
-# The reamed bore runs on the MHA-PD-23 pin's 1/8 shank.
+# The reamed bore runs on the MHA-PD-23 pin's 1/8 shank.  It prints the
+# reamer's size and no band (fit audit 2026-11-23, pending owner
+# confirmation): the pin is turned to it, and the pin's sheet carries the
+# pair's one acceptance (MHA-PD-23 note 1: each bore turns free with no
+# shake; machinist review r1 of the fit batch: an acceptance printed on
+# both members, and three rows of words under the size).  The callout is
+# the process row and two rows of words (rule 7): the mate and that it is
+# turned to this bore (a bare fit name is not enough), and rule 4's
+# necessity answer (play cocks the sleeve and tilts the MHA-PD-06 disc into
+# the drive collar: pd_cluster_air.COLLAR_AIR).  The block stays clear of
+# the gear data (test_section_values_and_bands_print_clear_of_each_other).
+COLLAR_NUMBER = _config.parts("pd-transgear-drive-collar")["number"]
 BORE_PROCESS_CALLOUT = "REAM THRU"
-BORE_FIT_CALLOUT = "\n".join(
-    (f"RUNNING FIT ON {PIN_NUMBER}", _clearance(BORE_DIAMETRAL_CLEARANCE))
-)
+BORE_NECESSITY = f"KEEPS DISC OFF {COLLAR_NUMBER}"
+BORE_MATE_CALLOUT = f"{PIN_NUMBER} IS TURNED TO THIS BORE"
+BORE_FIT_CALLOUT = "\n".join((BORE_MATE_CALLOUT, BORE_NECESSITY))
 BORE_CALLOUT = f"{BORE_PROCESS_CALLOUT}\n{BORE_FIT_CALLOUT}"
 # The tip serves the rack mesh, named once in the gear data block.  The
 # two-tooth span's .0008 band is under the milled row and still controls (it

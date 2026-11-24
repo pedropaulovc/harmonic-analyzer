@@ -1,0 +1,16 @@
+# Why the REAM and the band under the title block stay on MHA-PD-25 (owner
+# ruling 2026-11-24: "In the part's registry file, not on the sheet. The
+# sheet stays clean; the reviewer fails a tight feature that has no registry
+# reason."). Read by the machinist review only. Fit audit 2026-11-23,
+# pending owner confirmation.
+necessity:
+  - id: N-01
+    feature: "sheet 1, end view, Ø.126 REAM THRU bore, MHA-PD-23 IS TURNED TO THIS BORE"
+    kind: gap
+    reason: "cocked on the pin, MHA-PD-06 closes its air to MHA-PD-22"
+    source: "pd_cluster_air (front bushing and ring cocking on the pin)"
+  - id: N-02
+    feature: "sheet 1, side view, length .222 ±.001"
+    kind: gap
+    reason: "term of disc cluster stack: MHA-PD-22 to MHA-PD-06 clearance"
+    source: "transgear_cluster_fit.SLEEVE_REAR_FORWARD_CHAIN (LFB)"

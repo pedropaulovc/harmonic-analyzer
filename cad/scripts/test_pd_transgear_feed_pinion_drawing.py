@@ -121,14 +121,21 @@ def test_fits_take_standard_names_and_name_their_mates() -> None:
         return f"{_inch(limits[0], 4)}-{_inch(limits[1], 4)} REF"
 
     standard = ("RUNNING FIT", "SLIDING FIT", "LOCATIONAL CLEARANCE FIT")
-    for text, mate, clearance in (
-        (callouts.BORE_FIT_CALLOUT, spec.PIN_NUMBER, spec.BORE_DIAMETRAL_CLEARANCE),
-        (callouts.BOSS_CALLOUT, spec.HUB_NUMBER, hub.BOSS_CLEARANCE_LIMITS),
-    ):
-        assert any(name in text for name in standard), text
-        assert mate in text, text
-        if clearance is not None:
-            assert window(clearance) in text, text
+    # Fit audit 2026-11-23: the reamed bore prints no band and no
+    # clearance; the pair's acceptance prints once, on the pin's sheet
+    # (review-fix r1: not on both members).
+    text = callouts.BORE_CALLOUT
+    assert not any(name in text for name in standard), text
+    assert spec.PIN_NUMBER in text, text
+    assert callouts.BORE_PROCESS_CALLOUT == "REAM THRU"
+    assert callouts.BORE_FIT_CALLOUT.split("\n")[0] == f"{spec.PIN_NUMBER} IS TURNED TO THIS BORE"
+    assert "NO SHAKE" not in text
+    assert not re.search(r"\d*\.\d", callouts.BORE_CALLOUT)
+    # Rule 4's necessity answer: one line, at most six words beyond the
+    # mate's number, no size.
+    necessity = callouts.BORE_FIT_CALLOUT.split("\n")[-1]
+    assert necessity == callouts.BORE_NECESSITY == "KEEPS DISC OFF MHA-PD-22"
+    assert len(re.sub(r"MHA-\S+", "", necessity).split()) <= 6
     # #2409: the flat is no fit; it keys the hub's pin, named.
     assert hub.KEY_PIN_NUMBER in callouts.FLAT_CALLOUT
     assert not any(name in callouts.FLAT_CALLOUT for name in standard)
@@ -158,7 +165,6 @@ def test_bands_come_from_named_spec_constants() -> None:
     assert model_toleranced_dimensions(part) == {
         ("SleeveProfile", "OverallLength"): "OVERALL_LENGTH_BAND",
         ("GearBlank", "FaceWidth"): "FACE_WIDTH_BAND",
-        ("SleeveProfile", "BoreDia"): "*BORE_DEVIATIONS",
         ("SleeveProfile", "BossDia"): "*BOSS_DIA_DEVIATIONS",
         ("FlatReference", "FlatToAxis"): "FLAT_TO_AXIS_TOL",
         ("SleeveProfile", "OutsideDia"): "*OUTSIDE_DIA_DEVIATIONS",
@@ -441,18 +447,19 @@ def test_flat_volume_is_the_boss_segment() -> None:
 
 
 def test_bore_runs_on_the_pin() -> None:
+    """Fit audit 2026-11-23: the bore is the set reamer's, printed with no
+    band; the pin's shank is turned last to it by feel.  The bands here are
+    ANALYSIS numbers (what the reamer and the bought shims' bore model), and
+    the clearance they give is the stack's input, not a printed limit."""
     import pd_transgear_pin_spec as pin
 
-    assert spec.BORE_DIA == pin.DIA
-    p_upper, p_lower = pin.DIA_BAND
+    assert spec.BORE_DIA == pytest.approx(0.1260 * 25.4)
+    assert spec.BORE_PLACES == 3
+    assert not hasattr(spec, "BORE_DEVIATIONS")
     b_upper, b_lower = spec.BORE_DIA_BAND
-    clearance = (b_lower - p_upper, b_upper - p_lower)
+    clearance = (spec.BORE_DIA + b_lower - pin.DIA_MAX, spec.BORE_DIA + b_upper - pin.DIA_MIN)
     assert clearance == pytest.approx(spec.BORE_DIAMETRAL_CLEARANCE)
-    assert clearance[0] > 0.0
-    # A running fit exists only when both size bands are narrower than the
-    # clearance range they claim (tolerance-policy step 6b).
-    span = clearance[1] - clearance[0]
-    assert b_upper - b_lower < span and p_upper - p_lower < span
+    assert clearance == pytest.approx((0.0010 * 25.4, 0.0017 * 25.4))
 
 
 def test_oil_hole_lands_on_a_tooth_centre() -> None:
@@ -509,7 +516,7 @@ def test_sheet_text_names_the_right_parts() -> None:
     # #2409: the oil hole shares the key-pin hole's printed station.
     assert hub.OIL_HOLE_SLEEVE_Z == hub.KEY_PIN_SLEEVE_Z
     assert "KeyPinStation" in hub.DRAWING_PRECISION_BY_NAME
-    assert f"FIT ON {spec.PIN_NUMBER}" in callouts.BORE_FIT_CALLOUT
+    assert f"{spec.PIN_NUMBER} IS TURNED TO THIS BORE" in callouts.BORE_FIT_CALLOUT
     assert _config.parts("pd-transgear-front-bushing")["number"] == "MHA-PD-25"
 
 
@@ -547,14 +554,12 @@ _NOMINAL = {
     "ToothSpan": spec.SPAN_NOMINAL,
 }
 _DEVIATIONS = {
-    "BoreDia": spec.BORE_DEVIATIONS,
     "BossDia": spec.BOSS_DIA_DEVIATIONS,
     "OutsideDia": spec.OUTSIDE_DIA_DEVIATIONS,
 }
 # The places SolidWorks printed each stacked band's deviations in (run
 # 20261001T110844152Z): the upper above the lower, the lower beside the value.
 _DEVIATION_PLACES = {
-    "BoreDia": spec.BORE_PLACES,
     "BossDia": spec.BOSS_DIA_PLACES,
     "OutsideDia": spec.OUTSIDE_DIA_PLACES,
 }

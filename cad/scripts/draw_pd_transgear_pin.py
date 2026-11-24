@@ -1,8 +1,8 @@
 r"""Create the MHA-PD-23 transgear pin manufacturing drawing.
 
 The SLDPRT remains authoritative.  A turned pin carries no datum and no
-geometric-control frame (drawing-guidelines.md rule 5 (avoid excessive GD&T)): the turned shank keeps its native
-fit band and the press land its reference Ø, both linked by SEE NOTE 1 to
+geometric-control frame (drawing-guidelines.md rule 5 (avoid excessive GD&T)): the turned shank and the
+press land print reference Øs, both linked by SEE NOTE 1 to
 the numbered note naming their fits, and one bearing-surface finish; the
 MHA-PD-VN-61 ring groove its catalogue Ø and width bands, and every other
 size is an ordinary model dimension at its part-authored places.
@@ -67,6 +67,7 @@ from _session import run_build
 from _surface_finish import surface_finish_by_key
 import _telemetry
 import pd_transgear_arm_geometry as ARM
+import pd_transgear_feed_pinion_spec as SLEEVE
 import pd_transgear_pin_callouts as callouts
 from pd_transgear_pin_spec import (
     ARM_NUMBER,
@@ -251,6 +252,7 @@ _P = DRAWING_PRECISION_BY_NAME
 _SELF = "draw_pd_transgear_pin"
 _KEEP = (_SELF, "SIDE_KEEP")
 _NOTES = ("pd_transgear_pin_callouts", "DRAWING_NOTES")
+_SLEEVE = "pd_transgear_feed_pinion_spec"
 _TIP_ROOT = LENGTH - TIP_DOME_SAG
 part_metadata(
     model_sources=(
@@ -399,6 +401,15 @@ requirement(
     },
     precision={"dia_ref": _P["LandDia"], "length": _P["LandLength"]},
 )
+# The shank prints a reference Ø made to fit (note 1) and no band.  The
+# ``dia`` and ``diametral_clearance`` declared here are the spec's ANALYSIS
+# numbers (pd_transgear_pin_spec.DIA_BAND, the shank the fit is modelled to
+# produce, and the clearance it gives), bound only because the traveler's
+# turned_shaft adapter sizes its cuts and draws its diagrams from a band
+# (prechips has no made-to-fit form: its REF form prints the clearance and
+# its labels overrun the diagram).  No traveler step quotes them as an
+# acceptance: the acceptance is the mates tried on the journal.
+_ANALYSIS_PLACES = 4
 requirement(
     "outer",
     kind="diameter",
@@ -417,13 +428,13 @@ requirement(
             ("PRESS_LAND_LENGTH", "LENGTH", "TIP_DOME_SAG"),
         ),
         "dia": (
-            limits(DIA, _P["ShankDia"], DIA_BAND, unit=UNIT),
-            ("DIA", "DIA_BAND", "UNIT", _KEEP),
+            limits(DIA, _ANALYSIS_PLACES, DIA_BAND, unit=UNIT),
+            ("DIA", "DIA_BAND", "UNIT", _NOTES),
         ),
         "dia_nominal": (DIA, ("DIA",)),
         "diametral_clearance": (
-            list(callouts.RUNNING_CLEARANCE),
-            (("pd_transgear_pin_callouts", "RUNNING_CLEARANCE"), _NOTES),
+            list(SLEEVE.BORE_DIAMETRAL_CLEARANCE),
+            ((_SLEEVE, "BORE_DIAMETRAL_CLEARANCE"), "DIA_BAND"),
         ),
         "mates": (list(RUNNING_MATES), ("RUNNING_MATES", _NOTES)),
         "callout": (
@@ -431,7 +442,7 @@ requirement(
             (("pd_transgear_pin_callouts", "SHANK_CALLOUT"), _NOTES),
         ),
     },
-    precision={"dia": _P["ShankDia"]},
+    precision={"dia": _ANALYSIS_PLACES},
 )
 requirement(
     "groove",

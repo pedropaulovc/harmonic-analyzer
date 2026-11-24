@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import ast
+import re
 from pathlib import Path
 
 import pytest
@@ -51,19 +52,19 @@ def test_every_marked_dimension_prints_once_with_model_places() -> None:
     }
 
 
-def test_only_the_shank_the_ring_groove_and_its_station_carry_model_bands() -> None:
-    """The turned shank (running fit and arm press), the groove's catalogue
-    Ø and width, and the groove station (a disc-cluster stack term) carry
-    native bands; the head land and the tip apex's station print .XX, and
-    every other size its places under the title block."""
+def test_only_the_ring_groove_and_its_station_carry_model_bands() -> None:
+    """The groove's catalogue Ø and width, and the groove station (a
+    disc-cluster stack term) carry native bands; the shank prints a
+    reference Ø with no band (made to fit, fit audit 2026-11-23); the head
+    land and the tip apex's station print .XX, and every other size its
+    places under the title block."""
     assert model_toleranced_dimensions(part) == {
-        ("PinProfile", "ShankDia"): "*deviations(DIA_BAND)",
         ("PinProfile", "GrooveDia"): "*deviations(GROOVE_DIA_BAND)",
         ("PinProfile", "GrooveWidth"): "*deviations(GROOVE_WIDTH_BAND)",
         ("PinProfile", "GrooveStation"): "GROOVE_STATION_BAND",
     }
     assert spec.GROOVE_STATION_BAND == FIT_LENGTH_BAND_IN
-    assert spec.DRAWING_PRECISION_BY_NAME["ShankDia"] == 4
+    assert spec.DRAWING_PRECISION_BY_NAME["ShankDia"] == 3
     assert spec.DRAWING_PRECISION_BY_NAME["GrooveStation"] == 3
     assert spec.DRAWING_PRECISION_BY_NAME["TipDomeZ"] == 2
     assert spec.DRAWING_PRECISION_BY_NAME["HeadLand"] == 2
@@ -256,6 +257,12 @@ def test_the_dome_heights_and_the_overall_print_as_references() -> None:
             callouts.TEXT_PREFIX: "(<MOD-DIAM>",
             callouts.TEXT_SUFFIX: ")",
         },
+        # Fit audit 2026-11-23: the shank is made to fit its mates' reamed
+        # bores (note 1); its Ø is a reference.
+        ("PinProfile", "ShankDia"): {
+            callouts.TEXT_PREFIX: "(<MOD-DIAM>",
+            callouts.TEXT_SUFFIX: ")",
+        },
     }
     assert spec.DRAWING_PRECISION["HeadDomeProfile"]["HeadDomeSagDim"] == 2
     assert spec.DRAWING_PRECISION["TipDomeProfile"]["TipDomeSagDim"] == 2
@@ -306,10 +313,33 @@ def test_the_land_presses_and_the_shank_only_runs() -> None:
     assert spec.ARM_NUMBER in callouts.DRAWING_NOTES
     assert all(number in callouts.DRAWING_NOTES for number in spec.RUNNING_MATES)
     assert "GROUND" not in callouts.DRAWING_NOTES
-    # The shank's named running clearance is its mates' (the sleeve's bore).
+
+
+def test_the_shank_is_made_to_fit_and_prints_no_limits() -> None:
+    """Fit audit 2026-11-23 (rule 4, made to fit): the shank's sentence in
+    note 1 names the three mates and the acceptance by feel, and carries no
+    size and no reason (machinist review r1 of the fit batch, rule 7: the
+    reference size has no band to answer for; the bores' REAM callouts
+    carry the necessity answers); the modelled clearance is an analysis
+    result the stacks read, not a printed limit."""
     import pd_transgear_feed_pinion_spec as sleeve
 
-    assert callouts.RUNNING_CLEARANCE == pytest.approx(sleeve.BORE_DIAMETRAL_CLEARANCE)
+    notes = " ".join(line.strip() for line in callouts.DRAWING_NOTES.splitlines())
+    shank = notes[notes.index("SHANK:") : notes.index(" 2. ")]
+    assert shank == (
+        "SHANK: TURN LAST TO BORES OF MHA-PD-10, MHA-PD-24, MHA-PD-25: "
+        "EACH TURNS FREE, NO SHAKE; SHIM MHA-PD-VN-68 SLIDES ON."
+    )
+    assert not re.search(r"\d*\.\d", shank)
+    assert "KEEPS" not in callouts.DRAWING_NOTES
+    assert not hasattr(callouts, "SHANK_NECESSITY")
+    assert not hasattr(callouts, "RUNNING_CLEARANCE")
+    # The analysis result: the modelled shank in the reamer's modelled bore.
+    assert sleeve.BORE_DIAMETRAL_CLEARANCE == pytest.approx(
+        (0.0010 * 25.4, 0.0017 * 25.4)
+    )
+    # Its top is the bought shims' smallest bore.
+    assert spec.DIA_MAX == pytest.approx(0.1250 * 25.4)
 
 
 def test_registry_row_is_the_turned_steel_mha_179() -> None:
