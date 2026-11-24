@@ -184,13 +184,13 @@ STOCK_PROFILE_CORNERS = tuple(
 )
 
 # The crankshaft's .3125 in step and matching bore (#290, inch fit row K11:
-# the owned .3135 reamer cuts the bore). The seat keeps the through shaft's
+# the .3135 reamer cuts the bore). The seat keeps the through shaft's
 # size band and fit, while the live boss wall guard checks the standard
 # full-depth root over that bore.
 SEAT_DIA = 7.9375  # .3125
 
 # The bore over the crankshaft's seat is the part's one critical fit. It is
-# cut by the owned .3135 reamer and prints that size with no band; the
+# cut by the .3135 reamer (to order: inventory reamer-3135) and prints that size with no band; the
 # crankshaft's seat is made last, turned to this bore less the named fit
 # class's clearance (fit audit 2026-11-23, MHA-DT-10.bore; drawing-guidelines
 # rule 4). BORE_DIA_BAND is the ANALYSIS band, never printed: what the
