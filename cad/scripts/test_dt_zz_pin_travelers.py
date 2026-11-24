@@ -23,7 +23,6 @@ IN = 25.4
 # stem: (the band's record, the [parameters] keys of the band's limits and of
 # the two pin limits; None where the band is bound from the drawing).
 PLANS = {
-    "dt_cone_tip_end_screw": ("zz-pins-0630-0635", None, "go_pin_max_in", "nogo_pin_min_in"),
     "dt_cone_tip_bushing": ("zz-pins-0625-0630", None, "go_pin_max_in", "nogo_pin_min_in"),
     "dt_crank_hub": ("zz-pins-3760-3765", None, "go_pin_max_in", "nogo_pin_min_in"),
     "dt_pinion_arbor": (

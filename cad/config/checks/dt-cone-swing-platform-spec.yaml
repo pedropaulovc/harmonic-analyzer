@@ -1,0 +1,7 @@
+checks:
+  - id: C-01
+    check: "TIP_DOWEL_SLIP_CLEARANCE_MM"
+    kind: gap
+    reason: "the pin grips the plate; the block cannot lift off"
+    source: "owner ruling 2026-11-24, fit audit question 11 (restated: the pin slips in the plate's #52 hole, replacing the plate-opens-the-foot guard)"
+    basis: worst_case

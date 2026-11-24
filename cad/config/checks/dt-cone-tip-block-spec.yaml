@@ -1,0 +1,13 @@
+checks:
+  - id: C-01
+    check: "WORST_DOWEL_WEBS_MM"
+    kind: wall
+    reason: "the drilled dowel hole breaks a face or the tap"
+    source: "owner ruling 2026-11-24, fit audit question 11 (web .078 accepted; gate at rule 17's .060 floor)"
+    basis: worst_case
+  - id: C-02
+    check: "DOWEL_BOND_CLEARANCE_MM"
+    kind: joint
+    reason: "LOCTITE 638 cannot fill the gap; the dowel walks"
+    source: "cone_tip_cluster.RETAINING_COMPOUND_MAX_GAP_MM (LOCTITE 638's largest gap, drawing-guidelines.md rule 23)"
+    basis: worst_case

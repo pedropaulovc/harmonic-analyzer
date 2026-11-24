@@ -12,7 +12,6 @@ import _config
 import build_dt_vn_locating_pin as part
 import dt_vn_locating_pin_spec as spec
 from _fastener_catalog import FASTENERS
-from _fit_ream_h7 import REAM_H7
 from _mcmaster_98381a417 import DOWEL_SIZE
 from _test_stock_recipes import discovered_recipes
 from diagnostics import diag_build_98381A417 as recipe
@@ -57,11 +56,3 @@ def test_catalogue_size_and_supplier_reference() -> None:
     ref = spec.SUPPLIER_REFERENCE
     assert (ref.sku, ref.units, ref.sheet_unit) == (spec.SKU, "in", "in")
     assert (ref.diameter_mm, ref.length_mm) == (spec.DIA, spec.LENGTH)
-
-
-def test_press_hole_contract_grips_at_both_extremes() -> None:
-    assert spec.PRESS_HOLE_DIA == pytest.approx(0.0620 * _IN)
-    assert spec.PRESS_HOLE_BAND == REAM_H7
-    low, high = spec.PRESS_INTERFERENCE_MM
-    assert low == pytest.approx(0.0001 * _IN)
-    assert high == pytest.approx(0.0008 * _IN)

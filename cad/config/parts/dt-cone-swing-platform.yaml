@@ -13,7 +13,7 @@ dt-cone-swing-platform:
   # Delegated ruling 2026-11-21 (Main), owner review #2144: no MIL spec on the
   # finish; the owner ruled cold blackening (Presto Black PC9) acceptable as the
   # drawing's black oxide.
-  finish: matte black oxide, oil sealed; Ø.0630 hole bare, oiled
+  finish: matte black oxide, oil sealed; #52 hole bare, oiled
   quantity: 1
   tolerance_class: machined_block
   process: "machined from supplied steel flat bar"
@@ -34,3 +34,8 @@ dt-cone-swing-platform:
       where: "the tip-block hold-down counterbored hole's (at its C1 keyed station, HoldDownZ .654 from the pivot bore, with MHA-DT-21) and the post-mount tapped holes' native Hole Wizard callouts only: their hw-thruholedia, hw-cbdia, hw-cbdepth and hw-thrutapdrldia callout variables' decimal places, written as 3 at drawing time from draw_dt_cone_swing_platform.HOLDDOWN_CALLOUT_PRECISION and POST_MOUNT_CALLOUT_PRECISION by draw_dt_cone_swing_platform.build (ICalloutLengthVariable.Precision)"
       finding: "a drawing script writes Hole Wizard callout places at render time instead of importing part-authored places (drawing-simplicity-policy.md model ownership, rules 3 and 4)"
       reason: "Owner ruling 2026-11-08 (Pedro), #2144 item 1.2: drawing-side ICalloutLengthVariable precision is the established merged pattern (22 call sites on main, e.g. draw_ch_rocker_arm_tl_oblique_base_bar.py:876). Native experiment run 20261102T230110877Z: part-authored HW diameter precision 4 did not reach the callout (read -1). Re-scoped to the hold-down hole moved .329 south (.409 to .738 from the pivot bore) with MHA-DT-21: owner ruling 2026-11-09 via PR #1992 (https://github.com/pedropaulovc/harmonic-analyzer/pull/1992); the same hole stood .731 from the pivot bore after #2697 (.007 north, same callouts; delegated ruling 2026-11-13 (Main), precedent: this owner ruling, listed on #2144) and stands .654 since the .44 MHA-DT-21 was re-stationed under owner ruling 2026-11-20 on #2726 (\"B\"; same callouts, the platform's HoldDownZ follows the block). This accepts no other precision, band, callout or package departure."
+    - id: "RV-04"
+      kind: "minor"
+      where: "detail B, the tip-block locating dowel's #52 drilled hole's callout: WALL .078 MIN"
+      finding: "web from the #52 dowel hole to the hold-down counterbore under the .080 target (rule 17)"
+      reason: "Owner ruling 2026-11-24, fit audit question 11 (\"Cone tip: dowel drilled and bonded (web .078)\", approved as recommended): the MHA-DT-VN-69 dowel slips in a #52 drilled hole, no longer a .0630 ream. At the print worst case (dt_cone_swing_platform_checks.TIP_DOWEL_WEBS: the .228 +/-.004 station from the hold-down hole, the hole at the DRILLED HOLES row's .0675) the web to the Ø.219 counterbore is .0783, printed .078 MIN: above the .060 floor, under the .080 target. This accepts no other wall, band or callout departure."

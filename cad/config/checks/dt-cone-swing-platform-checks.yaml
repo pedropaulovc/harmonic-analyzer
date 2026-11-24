@@ -1,0 +1,7 @@
+checks:
+  - id: C-01
+    check: "TIP_DOWEL_WEBS"
+    kind: wall
+    reason: "the #52 dowel hole breaks into the hold-down counterbore"
+    source: "owner ruling 2026-11-24, fit audit question 11 (web .078 accepted; gate at rule 17's .060 floor)"
+    basis: worst_case

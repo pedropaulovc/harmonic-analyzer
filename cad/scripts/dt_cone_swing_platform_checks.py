@@ -11,7 +11,7 @@ import math
 
 import _config
 import dt_vn_cone_pivot_screw_spec as pivot_stock
-from _inch_wall_limits import WALL_TARGET_MM
+from _inch_wall_limits import WALL_FLOOR_MM, WALL_TARGET_MM
 from _package_units import drawing_unit
 from _printed_tolerance import (
     drilled_oversize_mm,
@@ -185,13 +185,13 @@ if min(HOLDDOWN_WEBS.values()) < WALL_TARGET_MM:
     )
 
 # Rule-23 retention, owner ruling 2026-11-07 (MHA-DT-00 rubric sample, PR
-# #2248): webs round the tip-block locating dowel's slip ream, at
+# #2248): webs round the tip-block locating dowel's #52 slip hole, at
 # print worst like the hold-down's.  Its station prints from the hold-down
 # hole (TipDowelX, +/-.004), so the webs to that hole's counterbore (the
 # underside) and clearance (the top) take only that band; it lies on the
 # hold-down line by relation, at the general .XX band.  Located from the
-# pivot, it also takes the hold-down's own stations.  The ream at its upper
-# limit (REAM_H7).
+# pivot, it also takes the hold-down's own stations.  The hole at its
+# drilled upper limit.
 _DOWEL_R = (TIP_DOWEL_HOLE_DIA + max(TIP_DOWEL_HOLE_BAND)) / 2.0
 _DOWEL_XZ = (TIP_DOWEL_LOCAL_X, TIP_DOWEL_LOCAL_Z)
 _DOWEL_SHIFT = math.hypot(
@@ -226,10 +226,20 @@ TIP_DOWEL_WEBS = {
 }
 for _edge in ("north edge", "east edge", "west edge"):
     TIP_DOWEL_WEBS[_edge] -= _DOWEL_SHIFT + _DOWEL_R + _XX_MM
-if min(TIP_DOWEL_WEBS.values()) < WALL_TARGET_MM:
+# Owner ruling 2026-11-24, fit audit question 11: the #52 hole leaves the
+# counterbore web at .078, under rule 17's .080 target; the owner accepts it
+# (registry wall exception), so these webs gate at the .060 floor and the
+# shortfall prints on the hole's callout (rule 20).
+if min(TIP_DOWEL_WEBS.values()) < WALL_FLOOR_MM:
     raise AssertionError(
-        f"tip-block locating dowel leaves a web under the .080 in wall target: {TIP_DOWEL_WEBS}"
+        f"tip-block locating dowel leaves a web under the .060 in wall floor: {TIP_DOWEL_WEBS}"
     )
+TIP_DOWEL_WEB_MIN_MM = min(TIP_DOWEL_WEBS.values())
+TIP_DOWEL_WEB_PRINTED_IN = (
+    math.floor(round(TIP_DOWEL_WEB_MIN_MM / 25.4 * 1000.0, 6)) / 1000.0
+)  # .078
+if TIP_DOWEL_WEB_MIN_MM >= WALL_TARGET_MM:
+    raise AssertionError("the tip dowel web meets the .080 target; drop its WALL print")
 
 
 # ASME B1.1 class-2B receiver limits, not a title-row coordinate tolerance.

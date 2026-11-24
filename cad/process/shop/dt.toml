@@ -164,27 +164,23 @@ sfm = 160
 feed = "tailstock quill by hand, slow and light, dry; withdraw with the spindle running"
 
 # --- MHA-DT-39 cone tip end screw (cad/process/dt_cone_tip_end_screw) --------
-# The bought 18-8 screw's pivot hole. LittleMachineShop "Cutting Speeds" (read
-# live 2026-11-22, lathe.toml header), Drilling & Reaming, Stainless steels
-# (Austenitic) 201-348 (18-8 is 302/304): drilling 50-55, reaming 30-35
-# ft/min; each takes the low end. The centre drill and the #53 drill ask over
-# 3000 rpm and clamp to the lathe's 2000; the .0630 reamer 1819 rpm. 18-8
-# work-hardens under a rubbing edge: a steady positive feed and cutting oil.
+# The bought 18-8 screw's pivot hole, drilled #52 (owner ruling 2026-11-24,
+# fit audit question 11). LittleMachineShop "Cutting Speeds" (read live
+# 2026-11-22, lathe.toml header), Drilling & Reaming, Stainless steels
+# (Austenitic) 201-348 (18-8 is 302/304): drilling 50-55 ft/min; it takes
+# the low end. The centre drill and the #52 drill ask over 3000 rpm and
+# clamp to the lathe's 2000. 18-8 work-hardens under a rubbing edge: a
+# steady positive feed and cutting oil.
 [settings.lathe-centre-18-8]
 tool = "centre-drills-carbide-60"
 material = "lathe-18-8"
 sfm = 50
 feed = "tailstock quill by hand, a steady positive feed, cutting oil; never dwell"
-[settings.lathe-drill-53-18-8]
-tool = "drill-53"
+[settings.lathe-drill-52-18-8]
+tool = "drill-52"
 material = "lathe-18-8"
 sfm = 50
 feed = "tailstock quill by hand, a steady positive feed, cutting oil; back fully out to clear chips, never dwell"
-[settings.lathe-ream-0630-18-8]
-tool = "reamer-0630"
-material = "lathe-18-8"
-sfm = 30
-feed = "tailstock quill by hand, steady, cutting oil; withdraw with the spindle running"
 
 # --- MHA-DT-31 crank hub (cad/process/dt_crank_hub/plan.toml) ----------------
 # Facing, turning, the L drill and parting take shop/lathe.toml's 1018 rows.

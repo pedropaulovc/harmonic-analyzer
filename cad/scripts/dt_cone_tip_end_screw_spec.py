@@ -2,17 +2,19 @@ r"""Pure-data contract for MHA-DT-39, the cone tip end screw.
 
 Owner decision C1 keyed, 2026-11-09 (PR #1992; ``cone_tip_cluster``): a stock
 McMaster 91794A559 (18-8 stainless, 1/4-28 x 3/4 slotted fillister, ASME
-B18.6.3) with ONE added operation: drill and ream Ø.0630 x .12 concentric in
-its threaded end for T006's pivot (MHA-DT-37).  It threads through MHA-DT-21,
+B18.6.3) with ONE added operation: drill #52 x .12 concentric in its
+threaded end for T006's pivot (MHA-DT-37; owner ruling 2026-11-24, fit audit
+question 11: was a .0630 ream).  It threads through MHA-DT-21,
 locked by the block's pinch slit; its end face bears on the MHA-DT-38 bushing
 and sets the shaft's end play (``cone_stack_end_play.SHAFT_END_PLAY``).  Real
 machining, so it keeps the subsystem prefix (subsystem-identities.md).
 
 The hole's wall to the thread root falls under rule 17's .080 target at the
 worst case: the minimum minor of the 1/4-28 UNF-2A thread less the largest
-reamed hole.  The owner accepts it as a minor exception (RV-01, owner ruling
-2026-11-09 via PR #1992); the sheet states the floored value as a plain fact
-on the hole's callout (rule 20).
+drilled hole.  The owner accepts it as a minor exception (RV-01, owner ruling
+2026-11-09 via PR #1992, restated for the drilled hole by owner ruling
+2026-11-24, fit audit question 11); the sheet states the floored value as a
+plain fact on the hole's callout (rule 20).
 
 Local frame: the stock fillister frame, untransformed.  Axis local Y
 (``ScrewAxis``, Front Plane ∩ Right Plane), head up, the under-head face at
@@ -30,6 +32,7 @@ import _config
 import cone_stack_end_play as end_play
 import cone_tip_cluster as tip
 import dt_cone_tip_gear_spec as tip_gear
+from _fit_deviations import deviations
 from _inch_wall_limits import WALL_FLOOR_MM, WALL_TARGET_MM
 from _mcmaster_91794a559 import (
     HEAD_DIA,
@@ -60,13 +63,14 @@ BUSHING_NUMBER = "MHA-DT-38"
 BLOCK_NUMBER = "MHA-DT-21"
 
 # --- The added operation ----------------------------------------------------
-END_HOLE_DIA = tip.END_HOLE_DIA_MM  # .0630 reamer
-END_HOLE_BAND = tip.END_HOLE_BAND  # +.0005/-.0000
+END_HOLE_DRILL = tip.END_HOLE_DRILL  # #52
+END_HOLE_DIA = tip.END_HOLE_DIA_MM  # .0635
+END_HOLE_BAND = tip.END_HOLE_BAND  # +.004/-.000, ANALYSIS (DRILLED HOLES row)
 END_HOLE_DIA_PLACES = 4
-END_HOLE_DEPTH = tip.END_HOLE_DEPTH_MM  # .12, full reamed diameter
+END_HOLE_DEPTH = tip.END_HOLE_DEPTH_MM  # .12, full drilled diameter
 END_HOLE_DEPTH_PLACES = 2
 END_HOLE_DEPTH_BAND = printed_band_mm(END_HOLE_DEPTH_PLACES, unit=UNIT)
-END_HOLE_DIA_MAX = END_HOLE_DIA + max(END_HOLE_BAND)
+END_HOLE_DIA_MAX = END_HOLE_DIA + deviations(END_HOLE_BAND)[1]
 # The stock's flat tip is chamfered 0.7 P (the family law); the hole must
 # open inside the flat.
 TIP_CHAMFER = 0.7 * PITCH
@@ -74,8 +78,8 @@ if END_HOLE_DIA_MAX / 2.0 >= SHANK_DIA / 2.0 - TIP_CHAMFER:
     raise AssertionError("MHA-DT-39 pivot hole breaks into the tip chamfer")
 
 # --- The hole's position on the thread axis ---------------------------------
-# Radial offset of the reamed hole from the 1/4-28 thread axis: the screw is
-# held on its thread in the lathe and drilled and reamed from the tailstock,
+# Radial offset of the drilled hole from the 1/4-28 thread axis: the screw is
+# held on its thread in the lathe and spotted and drilled from the tailstock,
 # so the hole runs true to the spindle and the thread runs out in the hold.
 # Basis: drawing-guidelines.md "What the shop holds", runout row (.001 per
 # inch of feature, never under .001 total indicated): .001 TIR is .0005
@@ -84,7 +88,7 @@ END_HOLE_POSITION_MM = 0.0005 * MM_PER_IN
 
 # --- Rule 17: wall from the hole to the thread root -------------------------
 # The smallest root the 2A thread allows (``_mcmaster_91794a559``'s derived
-# minimum minor) over the largest reamed hole, offset by its position error.
+# minimum minor) over the largest drilled hole, offset by its position error.
 END_HOLE_WALL_WORST = (
     THREAD_MINOR_MIN_MM - END_HOLE_DIA_MAX
 ) / 2.0 - END_HOLE_POSITION_MM
@@ -135,7 +139,7 @@ _PIVOT_FLOOR_AIR_AT_XX = (END_HOLE_DEPTH - END_HOLE_DEPTH_BAND) - (
 if _PIVOT_FLOOR_AIR_AT_XX > 1e-9:  # zero air: the pivot touches the floor
     raise AssertionError("MHA-DT-38 length holds the pivot air at .XX: print .XX")
 # Backed off to the largest end play, with the hole mouth's general edge
-# break, the shortest pivot still runs in the reamed hole.
+# break, the shortest pivot still runs in the drilled hole.
 HOLE_MOUTH_BREAK_MAX = edge_break_chamfer_mm(unit=UNIT)
 PIVOT_ENGAGEMENT_MIN = (
     PIVOT_PROUD_MIN - end_play.SHAFT_END_PLAY[1] - HOLE_MOUTH_BREAK_MAX
@@ -155,19 +159,18 @@ def inch_text(value_mm: float, places: int) -> str:
     return text[1:] if text.startswith("0.") else text
 
 
-# Below the hole's imported diameter (its model band, four places), rules 12
-# and 26: the process and the depth (PR 2 r7 machinist review: the depth
-# belongs in the callout; dt_cone_tip_block's dowel-hole form, the depth the
+# Below the hole's imported diameter (four places, no band: a drilled hole
+# prints its drill), rules 12 and 26: the drill and the depth (PR 2 r7
+# machinist review: the depth belongs in the callout; the depth the
 # model's at its drawing places).  Then rule 7's two lines of words: the fit
-# and its mate by drawing number (rule 4; the printed limits set the
-# clearance, so no REF range repeats them) and the wall shortfall as a plain
+# and its mate by drawing number (rule 4) and the wall shortfall as a plain
 # fact in rule 20's own form (RV-01; the hole's one wall is to the thread
 # root).
 END_HOLE_DEPTH_TEXT = inch_text(END_HOLE_DEPTH, END_HOLE_DEPTH_PLACES)
 END_HOLE_CALLOUT = "\n".join(
     (
-        f"REAM <HOLE-DEPTH> {END_HOLE_DEPTH_TEXT}",
-        f"RUNNING FIT ON {PIVOT_NUMBER}",
+        f"{END_HOLE_DRILL} DRILL <HOLE-DEPTH> {END_HOLE_DEPTH_TEXT}",
+        f"{PIVOT_NUMBER} RUNS FREE",
         f"WALL {inch_text(END_HOLE_WALL_PRINTED_IN * MM_PER_IN, 3)} MIN",
     )
 )
@@ -176,13 +179,13 @@ END_HOLE_CALLOUT = "\n".join(
 STOCK_NOTE = "\n".join(
     (
         f"1. MAKE FROM McMASTER-CARR {SKU}, {THREAD} X 3/4 SLOTTED FILLISTER",
-        "   HEAD SCREW; ADD THE REAMED HOLE ONLY.",
+        "   HEAD SCREW; ADD THE DRILLED HOLE ONLY.",
         "2. UNDIMENSIONED PURCHASED GEOMETRY IS REFERENCE.",
     )
 )
 
 # Model-owned drawing controls: a plain cut-extrude, its sketch circle the
-# reamed diameter (the sheet imports it) and the cut's blind depth the
+# drilled diameter (the sheet imports it) and the cut's blind depth the
 # full-diameter depth (its places set the callout's depth text).
 HOLE_FEATURE = "EndHoleProfile"
 HOLE_CUT = "EndHole"

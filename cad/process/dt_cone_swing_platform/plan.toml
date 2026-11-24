@@ -29,11 +29,12 @@
 # flat face its shoulder was measured on.
 # Setup 5, bench: deburr, inspect. Setup 6: black oxide (Presto Black PC9).
 #
-# Not made here: the Ø.0630 tip-dowel hole (MATCH-REAM THRU, note 3) is
-# made at assembly (MHA-DT-00 step 2; the feature export's made_at), after
-# blackening: the drawing's finish leaves it bare, oiled. The placeholder
-# plan's tools placed elsewhere: tools.drill-53, tools.reamer-0630 and
-# tools.pin-gauges go with that assembly step; tools.reamers-adjustable-lms-
+# Not made here: the #52 tip-dowel hole (#52 DRILL THRU, note 3; owner
+# ruling 2026-11-24, fit audit question 11) is made at assembly (MHA-DT-00
+# step 2; the feature export's made_at), after blackening: the drawing's
+# finish leaves it bare, oiled. The placeholder plan's tools placed
+# elsewhere: tools.drill-53, tools.reamer-0630 and tools.pin-gauges are no
+# longer needed (that step drills 1/16, then #52); tools.reamers-adjustable-lms-
 # 5948 is replaced by the fixed .2510 reamer (owner ruling 2026-11-24, fit
 # audit question 10; #3073: a fixed reamer); tools.endmill-7-32 is not
 # needed (the owned 1/8 in end mill interpolates the counterbore);
@@ -74,7 +75,7 @@
 # consumables.chemical-gloves-eye-protection, to_order).
 #
 # Black oxide: the drawing's finish, matte black oxide, oil sealed (the
-# Ø.0630 hole bare, oiled: made after it). Owner (Pedro), answered in person
+# #52 hole bare, oiled: made after it). Owner (Pedro), answered in person
 # 2026-11-21: "Black oxide: cold blackening in the shop with Presto Black
 # PC9 is acceptable as the drawing's black oxide." Setup 6 blackens the
 # platform with Birchwood Presto Black Steel PC9 by the maker's instructions

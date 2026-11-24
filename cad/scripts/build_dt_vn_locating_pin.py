@@ -3,12 +3,13 @@ r"""Purchased MHA-DT-VN-69 locating pin: McMaster 98381A417.
 A 1/16 x 3/8 alloy-steel dowel (``dt_vn_locating_pin_spec``); rule-23
 retention, owner ruling 2026-11-07 (MHA-DT-00 rubric sample, PR #2248).
 One, the tip-block locating dowel, locates the MHA-DT-21 cone tip block on
-the MHA-DT-20 platform: pressed to the floor of the foot's blind .0620 ream,
-a slip fit in the plate's .0630 thru ream, match-drilled at MHA-DT-00 step 2.
+the MHA-DT-20 platform: bonded (LOCTITE 638) to the floor of the foot's blind
+1/16 drilled hole, a slip fit in the plate's #52 thru hole, drilled at
+MHA-DT-00 step 2 (owner ruling 2026-11-24, fit audit question 11).
 The stock recipe ``diagnostics/diag_build_98381A417.py`` models the nominal
 cylinder, catalogue-only (no vendor model).
 
-Frame: pin axis +Y, pressed end face at y = 0 (the Top Plane), lead end at
+Frame: pin axis +Y, chamfered end face at y = 0 (the Top Plane), lead end at
 y = LENGTH.  The axis is published as ``ScrewAxis`` (Front ∩ Right), the
 stock-part mate contract the assembly keys it by.
 
