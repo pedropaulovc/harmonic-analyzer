@@ -46,8 +46,8 @@ import pd_transgear_pin_spec as PIN
 import transgear_cluster_fit as FIT
 from _printed_tolerance import edge_break_chamfer_mm, printed_band_mm
 
-# The least air the disc's rear face keeps to the platen, about .001: Main,
-# by the owner's delegation of 2026-11-24, D10 (fit-batch owner question
+# The least air the disc's rear face keeps to the platen, about .001:
+# delegated ruling 2026-11-24 (Main), D10, no precedent, #2144 (fit-batch owner question
 # Q10, option A: the 0.03 mm floor confirmed, so a worst-case disc does not
 # graze the platen).  It was set in 198518aabe (2026-10-02) under R9-68,
 # which ruled the cluster's retention, not this number.  Check register:

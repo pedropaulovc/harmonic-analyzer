@@ -171,8 +171,8 @@ over_flat_half_sum_in = 0.077
 # sizes, so a reading can sit up to .0012 off the true centre. The
 # acceptance is the sheet's .116-.120 as printed: the spec charges that
 # .0012 in every worst case that reads the centre
-# (pd_transgear_drive_collar_spec.FLAT_PIN_CENTRE_READ_BIAS; Main, by the
-# owner's delegation of 2026-11-24, D6), so a narrower window would only
+# (pd_transgear_drive_collar_spec.FLAT_PIN_CENTRE_READ_BIAS; delegated
+# ruling 2026-11-24 (Main), D6), so a narrower window would only
 # scrap parts that meet the print. A reading near a limit is taken again
 # with the pins re-seated.
 # Speeds and feeds: the shop settings (cad/process/shop/pd.toml, the

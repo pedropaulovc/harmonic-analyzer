@@ -157,8 +157,8 @@ SPRING_PRELOAD_N = (
 # limit; the factor only falls as the gap widens), 1.0 for a land no
 # longer than its diameter; over the smallest shoulder and the shortest land.
 # The margins below are therefore the margins at the #11 bore's widest gap,
-# .0085 (0.216 mm), asserted under the booked 0.25 mm (Main, by the owner's
-# delegation of 2026-11-24, D17: the #11 stands only while the drag margin
+# .0085 (0.216 mm), asserted under the booked 0.25 mm (delegated ruling
+# 2026-11-24 (Main), D17, no precedent, #2144: the #11 stands only while the drag margin
 # at the widest gap stays at 2x or more).
 LOCTITE_638_SHEAR_MPA = 25.0
 SPACER_BOND_CLEARANCE_FACTOR = 0.3

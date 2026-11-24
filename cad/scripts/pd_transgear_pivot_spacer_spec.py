@@ -60,7 +60,7 @@ OD_BAND = printed_band_mm(OD_PLACES, unit=UNIT)
 # the wall and the tilt that gap lets the ring take (below), so it prints
 # the drill and no band; BORE_DIA_BAND is the ANALYSIS band of what the
 # drill cuts (the DRILLED HOLES row), not a printed limit.  #11, not #12
-# (Main, by the owner's delegation of 2026-11-24, D17: owner question Q7b,
+# (delegated ruling 2026-11-24 (Main), D17, no precedent, #2144: owner question Q7b,
 # option C): the #12's tightest gap let the ring lean only 0.49° on the
 # shoulder, under the title block's 1° angular row that holds the drilled
 # bore, so a ring made to its sheet could fail MHA-PD-00's dry trial.

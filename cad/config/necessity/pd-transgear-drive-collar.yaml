@@ -3,8 +3,8 @@
 # not on the sheet).  The #11 drilled bore and the drive-pin offsets by trial
 # are owner ruling 2026-11-24, fit audit questions 7 and 8.  The flat-pin
 # centre's ±.002 (N-03) is not ruled; its over-pins reading's .0012 bias is
-# charged in the spec, not guarded at the bench (Main, by the owner's
-# delegation of 2026-11-24, D6).
+# charged in the spec, not guarded at the bench (delegated ruling 2026-11-24
+# (Main), D6; owner review on #2144).
 necessity:
   - id: N-01
     feature: "sheet 1, end view, Ø.0930 2X REAM THRU drive-pin holes"

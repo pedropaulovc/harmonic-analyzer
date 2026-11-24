@@ -210,7 +210,7 @@ def test_a_seeded_fault_in_the_program_is_caught(
 
 
 def test_the_flat_pin_centre_is_accepted_as_printed_and_the_spec_charges_the_bias() -> None:
-    # D6 (Main, by the owner's delegation of 2026-11-24): Op 260 accepts the
+    # D6 (delegated ruling 2026-11-24, Main): Op 260 accepts the
     # sheet's .116-.120 as read, so the spec's worst cases charge the true
     # centre that band widened by the loose pins' .0012 reading bias.
     assert SPEC.FLAT_PIN_CENTRE_READ_BIAS == pytest.approx(0.0012 * 25.4)

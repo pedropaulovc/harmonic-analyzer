@@ -111,8 +111,8 @@ def test_the_tightest_bond_gap_absorbs_the_drilled_bore_squareness() -> None:
     tightest gap over its shortest land, as far as its bore is off square to
     that face.  The sheet holds the drilled bore at the title block's
     angular row alone, so the #11's tightest gap must let the ring lean the
-    whole row: 1.14 degrees against 1 (Main, by the owner's delegation of
-    2026-11-24, D17: owner question Q7b; the #12 gave 0.49)."""
+    whole row: 1.14 degrees against 1 (delegated ruling 2026-11-24 (Main),
+    D17: owner question Q7b; the #12 gave 0.49)."""
     tilt = math.degrees(math.atan(spec.BOND_GAP[0] / spec.BOND_LAND_MIN))
     assert spec.BOND_GAP_TILT_DEG == pytest.approx(tilt)
     assert tilt == pytest.approx(
