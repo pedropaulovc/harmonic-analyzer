@@ -4,9 +4,9 @@
 # Datum B is a #30 drill at the DRILLED HOLES row (owner ruling 2026-11-24,
 # fit audit OQ19): no band, no entry. The bore's band is the owner's (owner
 # ruling 2026-11-23, tool audit Q13: "dia .4985 +.0015/0 (owner chose
-# against the agent's recommendation to keep .4720); no 12 mm reamer"); its
-# frames and the tap's are owner exceptions RV-01, RV-02 and RV-06, B's
-# perpendicularity RV-03.
+# against the agent's recommendation to keep .4720); no 12 mm reamer"),
+# recorded as owner exception RV-07; its frames and the tap's are owner
+# exceptions RV-01, RV-02 and RV-06, B's perpendicularity RV-03.
 necessity:
   - id: N-01
     feature: "sheet 1, Ø.4985 +.0015/.0000 REAM THRU knife bore, RUNNING FIT ON MHA-SM-03 TRUNNION"
