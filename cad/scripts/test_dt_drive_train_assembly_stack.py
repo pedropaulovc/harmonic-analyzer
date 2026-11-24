@@ -1004,9 +1004,9 @@ def _alignment_pinion(drive) -> None:
     assert drive.J19_FULL_FACE_MARGIN >= -1e-9, (
         f"j = 19 loses {-drive.J19_FULL_FACE_MARGIN:.3f} of its full face at the worst stack"
     )
-    assert (
-        drive.J19_FULL_FACE_MARGIN - RIG.FEELER_LEAF_STEP < RIG.RIG_MARGIN_SPARE - 1e-9
-    ), "RIG_SET_LEAF_D is more than the thinnest setting for j = 19"
+    assert RIG.RIG_SET_D_RANGE[0] <= RIG.RIG_SET_LEAF_D <= RIG.RIG_SET_D_RANGE[1], (
+        "RIG_SET_LEAF_D is outside the owner's D range (audit part 2 C7)"
+    )
     # The rig reads the bank's configured-grid datum; the independently placed
     # gear and drum must still put the drum's back end exactly D off that face.
     assert abs(drive._G19_FACE_Z[1] - RIG.G19_BACK_FACE_Z) <= 1e-9, (
@@ -1372,7 +1372,7 @@ def _full_rotation_clearances(drive) -> None:
         <= 1e-9
     ), "the lever throw plane drifted from the rig layout's"
     assert not drive._THIN, (
-        "rig margins under their floor + RIG_MARGIN_SPARE: "
+        "rig margins under their floor (+ RIG_MARGIN_SPARE where no owner range rules): "
         + "; ".join(f"{n} {v:.3f} (floor {f})" for n, (v, f) in drive._THIN.items())
     )
     # The MHA-DT-33 collar rides the arbor outboard of the front strap.  It must

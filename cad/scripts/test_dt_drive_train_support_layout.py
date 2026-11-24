@@ -435,33 +435,36 @@ def test_rod_phase_leaves_the_cams_parked_ecc_down() -> None:
 # Ruling (c) worst-case stack (user, 2026-09-24), under option E-a (Main,
 # restricted review of #858).  Both straps are pinned to the torque shaft, so
 # the strap / shaft / strap group slides between the blocks as one: its end
-# play is the front-block feeler setting, P = 0.25 +/- 0.10, split between the
-# front block gap g_f and the back block gap g_b (g_f + g_b = P).  The two
-# drum-end gaps are frozen at the shim the shaft was drilled on, not a free
-# share of P: the drum turns in DRUM_END_SHIM +/- DRUM_END_SHIM_SET_ERROR of
-# air, split between its ends.  The saved pose is the drilling set-up, g_b = 0
-# and the drum hard on the back strap.  Every quantity below is linear in the
-# gaps, so the extremes sit at the vertices swept here.
+# play is the front-block gap P, any leaf .010 TO .020 within its tolerance
+# (owner ruling 2026-11-24, audit part 2 C7), split between the front block
+# gap g_f and the back block gap g_b (g_f + g_b = P).  The two drum-end gaps
+# are frozen at the shim the shaft was drilled on, not a free share of P: the
+# drum turns in DRUM_END_GAP of air, split between its ends.  The saved pose
+# is the drilling set-up, g_b = 0 and the drum hard on the back strap.  Every
+# quantity below is linear in the gaps, so the extremes sit at the vertices
+# swept here.
 #
 # The lift rod floats axially.  Southward, the front cam collar stops on the
-# front block's inner face; it is set there with the same 0.25 feeler, so up
-# to 0.35 of play.  Northward, the lever hub does NOT bear on the front block
-# (its bore takes 8 of the rod's LEVER_SEAT_PROUD, leaving it at least the back
-# collar's largest gap plus 0.25 off the block face at the worst stack, Codex
-# #837), so the rod runs north until the back cam collar lands on the back
-# block -- at most its leaf F plus the set error (user ruling P1-1) -- and the
-# hub never stops it.  Main 2026-09-24: keep that
+# front block's inner face; it is set there on a leaf of the same range.
+# Northward, the lever hub does NOT bear on the front block (its bore takes 8
+# of the rod's LEVER_SEAT_PROUD, leaving it at least the back collar's widest
+# gap plus HUB_STOP_MARGIN off the block face at the worst stack, Codex #837),
+# so the rod runs north until the back cam collar lands on the back block --
+# at most the widest leaf of its range (user ruling P1-1, owner ruling C7) --
+# and the hub never stops it.  Main 2026-09-24: keep that
 # float, since every follower gate below holds at its true extremes.  The rod
 # is set back-flush, so its travel is measured from there against the front
 # block (pinion_rig_layout: the pose is the fit-up stack, Codex #854).
-_P_MAX = FITUP.FRONT_BLOCK_FEELER + FITUP.FRONT_BLOCK_FEELER_BAND
-_P_MIN = FITUP.FRONT_BLOCK_FEELER - FITUP.FRONT_BLOCK_FEELER_BAND
-_AIR_MAX = RIG.DRUM_END_SHIM + RIG.DRUM_END_SHIM_SET_ERROR  # the drum's end play
-_FEELER_BAND = (  # front collar set gap to the block
-    FITUP.FRONT_BLOCK_FEELER - FITUP.FRONT_BLOCK_FEELER_BAND,
-    FITUP.FRONT_BLOCK_FEELER + FITUP.FRONT_BLOCK_FEELER_BAND,
+_P_MAX = RIG.FRONT_BLOCK_GAP[1]
+_P_MIN = RIG.FRONT_BLOCK_GAP[0]
+_AIR_MAX = RIG.DRUM_END_GAP[1]  # the drum's end play
+_FEELER_BAND = RIG.FRONT_CAM_GAP  # front collar set gap to the block
+# D's deviations off the model's .053 over its range (two leaves or the shank).
+_D_DEVIATIONS = (
+    RIG.RIG_SET_D_GAP[0] - RIG.RIG_SET_LEAF_D,
+    RIG.RIG_SET_D_GAP[1] - RIG.RIG_SET_LEAF_D,
 )
-_LEAF_ERR = RIG.FEELER_SET_ERROR  # every gage leaf sets to the feeler's band
+_LEAF_TOL = RIG.leaf_gap((0.0, 0.0))[1]  # one leaf's tolerance (dt_feeler_leaves)
 
 
 def _hub_gap() -> float:
@@ -474,10 +477,11 @@ def _hub_gap() -> float:
     return hub_gap
 
 
-def _back_collar_gap(e: float) -> float:
-    """Back collar to back block as set: its back face on leaf F, to +/- e
-    (user ruling P1-1).  No strap, collar-length or by-eye term reaches it."""
-    return RIG.BACK_COLLAR_LEAF_F + e
+def _back_collar_gap(end: int) -> float:
+    """Back collar to back block as set: its back face on any leaf of its
+    range (user ruling P1-1, owner ruling C7), 0 the least, 1 the widest.  No
+    strap, collar-length or by-eye term reaches it."""
+    return RIG.BACK_COLLAR_GAP[end]
 
 
 def _strap_t_band() -> tuple[float, float]:
@@ -501,7 +505,7 @@ def test_j19_keeps_its_full_face_at_the_worst_stack() -> None:
     backs = [
         g19_back + RIG.RIG_SET_LEAF_D + d - g_b - a
         for _t in _strap_t_band()
-        for d in (-RIG.RIG_SET_ERROR, RIG.RIG_SET_ERROR)
+        for d in _D_DEVIATIONS
         for g_b in (0.0, _P_MAX)
         for a in (0.0, _AIR_MAX)
     ]
@@ -516,17 +520,26 @@ def test_j19_keeps_its_full_face_at_the_worst_stack() -> None:
         abs_tol=1e-9,
     )
     assert math.isclose(min(backs) - g19_back, drive.J19_FULL_FACE_MARGIN, abs_tol=1e-9)
-    # D is the thinnest gage setting that leaves RIG_MARGIN_SPARE with its own
-    # set band and two leaf tolerances booked: one thousandth thinner leaves
-    # j = 19 short of it.
+    # D, the two plays and their tolerances are the owner's ranges (C7): j = 19
+    # keeps its full face, its floor (RIG_MARGIN_SPARE, a planning margin, is
+    # overridden here; Main's C7 ruling).
     import dt_feeler_leaves
 
-    assert drive.J19_FULL_FACE_MARGIN >= RIG.RIG_MARGIN_SPARE - 1e-9
-    assert drive.J19_FULL_FACE_MARGIN - RIG.FEELER_LEAF_STEP < RIG.RIG_MARGIN_SPARE
+    assert drive.J19_FULL_FACE_MARGIN >= 0.0
+    assert math.isclose(
+        drive.J19_FULL_FACE_MARGIN,
+        RIG.RIG_SET_D_GAP[0] - RIG.FRONT_BLOCK_GAP[1] - RIG.DRUM_END_GAP[1],
+        abs_tol=1e-9,
+    )
+    # 0.2588 before C7
+    assert math.isclose(drive.J19_FULL_FACE_MARGIN, 0.1778, abs_tol=5e-4)
     assert RIG.RIG_SET_LEAVES == dt_feeler_leaves.leaf_stack(RIG.RIG_SET_LEAF_D)
     assert len(set(RIG.RIG_SET_LEAVES)) == len(RIG.RIG_SET_LEAVES) == 2
-    assert RIG.RIG_SET_ERROR == pytest.approx(
-        RIG.FEELER_SET_BAND + 2 * dt_feeler_leaves.LEAF_TOLERANCE
+    assert RIG.RIG_SET_D_GAP == pytest.approx(
+        (
+            RIG.RIG_SET_D_RANGE[0] - 2 * dt_feeler_leaves.LEAF_TOLERANCE,
+            RIG.RIG_SET_D_RANGE[1] + 2 * dt_feeler_leaves.LEAF_TOLERANCE,
+        )
     )
     # j = 0 at the front: the drum's front end never uncovers gear 0, even
     # with the thickest leaf D and the shortest drum (the drum hard aft, the
@@ -539,17 +552,18 @@ def test_j19_keeps_its_full_face_at_the_worst_stack() -> None:
     face_min = drive.APINION_DRUM_LEN - RIG.DRUM_LEN_BAND
     slack = min(
         (g0_front - g0_south - 1.0) - (g19_back + RIG.RIG_SET_LEAF_D + d - face_min)
-        for d in (-RIG.RIG_SET_ERROR, RIG.RIG_SET_ERROR)
+        for d in _D_DEVIATIONS
     )
     assert slack >= RIG.RIG_MARGIN_SPARE, slack
     assert math.isclose(slack, drive.J0_SLACK_WORST, abs_tol=1e-9)
     # #1038 re-pitch: the 6.06 in drum (the former 5.64 + 19 x 0.5635 = 6.0615,
     # rounded down to the .01 in grid) gave up 0.0385 of the former 3.4051;
-    # the inch leaf D and its booked stack error (#3042) take 0.1216 more.
-    assert math.isclose(slack, 3.2450, abs_tol=5e-4)
-    # Positive control: without the bank terms the row reads 3.4212 on the 3.0
+    # the inch leaf D and its booked stack error (#3042) took 0.1216 more, and
+    # D's .065 upper end (owner ruling C7) 0.2048 more.
+    assert math.isclose(slack, 3.0402, abs_tol=5e-4)
+    # Positive control: without the bank terms the row reads 3.2164 on the 3.0
     # face.
-    assert math.isclose(slack + g0_south, 3.4212, abs_tol=5e-4)
+    assert math.isclose(slack + g0_south, 3.2164, abs_tol=5e-4)
 
 
 def test_rig_set_leaf_d_derives_the_shift_and_books_the_743_terms() -> None:
@@ -561,14 +575,13 @@ def test_rig_set_leaf_d_derives_the_shift_and_books_the_743_terms() -> None:
             assert "MHA-DT-14" not in name and "strap" not in name.lower(), name
             assert "MHA-DT-12" not in name and "g19" not in name, name
     plays = sum(
-        value for name, value in RIG.DRUM_BACK_ADVANCE_STACK.items() if "leaf D" not in name
+        value for name, value in RIG.DRUM_BACK_ADVANCE_STACK.items() if "D," not in name
     )
-    assert RIG.DRUM_BACK_ADVANCE_STACK["rig-set leaf D, thinnest setting"] == RIG.RIG_SET_ERROR
-    assert RIG.RIG_SET_LEAF_D == RIG.smallest_leaf_setting(plays + RIG.RIG_MARGIN_SPARE)
-    assert (
-        RIG.RIG_SET_LEAF_D - sum(RIG.DRUM_BACK_ADVANCE_STACK.values())
-        >= RIG.RIG_MARGIN_SPARE - 1e-9
+    assert RIG.DRUM_BACK_ADVANCE_STACK["rig-set D, thinnest setting"] == pytest.approx(
+        -_D_DEVIATIONS[0]
     )
+    assert plays == pytest.approx(RIG.FRONT_BLOCK_GAP[1] + RIG.DRUM_END_GAP[1])
+    assert RIG.RIG_SET_LEAF_D - sum(RIG.DRUM_BACK_ADVANCE_STACK.values()) >= 0.0
     assert math.isclose(
         RIG.BACK_STOP_Z,
         RIG.G19_BACK_FACE_Z + RIG.RIG_SET_LEAF_D + drive.STRAP_T,
@@ -821,21 +834,22 @@ def _follower_stations() -> tuple[list[float], list[float]]:
     # c is the front collar's gap to the front block's inner face: 0 with the
     # rod hard south, up to the first north stop (back collar on the back
     # block, else the hub on the front block).  The back collar is set on its
-    # leaf at c_set with the cluster hard back, its back face F + e off the
-    # block and the pin on the strap's mid-plane t/2 inside it; the strap then
-    # moves forward by g_b and the rod north by c - c_set.
+    # leaf at c_set with the cluster hard back, its back face any leaf of its
+    # range off the block and the pin on the strap's mid-plane t/2 inside it;
+    # the strap then moves forward by g_b and the rod north by c - c_set.
     # The pinned cluster splits its end play P between the block gaps, so the
     # extremes are all of it at one block or the other (option E-a).
     front, back = [], []
     splits = [(p, 0.0) for p in (_P_MIN, _P_MAX)] + [(0.0, p) for p in (_P_MIN, _P_MAX)]
-    for (g_f, g_b), t, c_set, e in itertools.product(
+    for (g_f, g_b), t, c_set, end in itertools.product(
         splits,
         _strap_t_band(),
         _FEELER_BAND,
-        (-_LEAF_ERR, _LEAF_ERR),
+        (0, 1),
     ):
-        gap = _back_collar_gap(e)
-        assert gap >= RIG.BACK_COLLAR_MIN_GAP + RIG.RIG_MARGIN_SPARE - 1e-9, e
+        gap = _back_collar_gap(end)
+        # Main's C7 ruling: the collar's own floor is the rod's end play.
+        assert gap + _FEELER_BAND[0] >= RIG.LIFT_ROD_END_PLAY_MIN - 1e-9, end
         c_max = c_set + min(_hub_gap(), gap)
         set_station = dt_pinion_cam_geometry.CAM_LEN + gap - t / 2.0
         for c in (0.0, c_max):
@@ -850,16 +864,16 @@ def test_follower_pins_stay_on_their_collars_at_the_worst_stack() -> None:
     for stations in (front, back):
         assert min(stations) >= 1.0, stations
         assert max(stations) <= dt_pinion_cam_geometry.CAM_LEN - 1.0, stations
-    # User ruling P1-1: on its leaf the back collar's gap -- the rod's north
-    # float -- is F + e at most 1.00, so both pins keep >= 3.07 of collar on
-    # either side (the by-eye set it replaced left 1.90 and 2.75; #290's .XX
-    # strap band set the rest; 3.095 before the inch leaves' tolerance, #3042).
-    assert math.isclose(min(front), 3.077, abs_tol=5e-3)
-    assert math.isclose(min(back), 3.934, abs_tol=5e-3)  # 3.951 before #3042
-    assert math.isclose(max(back), dt_pinion_cam_geometry.CAM_LEN - 3.077, abs_tol=5e-3)
+    # User ruling P1-1, owner ruling C7: on its range the back collar's gap --
+    # the rod's north float -- is at most .040 + .0005, and both pins keep
+    # collar on either side (the by-eye set it replaced left 1.90 and 2.75;
+    # #290's .XX strap band set the rest; 3.077 / 3.934 before C7's ranges).
+    assert math.isclose(min(front), 2.896, abs_tol=5e-3)
+    assert math.isclose(min(back), 3.780, abs_tol=5e-3)
+    assert math.isclose(max(back), dt_pinion_cam_geometry.CAM_LEN - 2.896, abs_tol=5e-3)
     assert min(back) >= min(front)
     # North float at the widest setting: the back collar lands first.
-    assert _back_collar_gap(_LEAF_ERR) < _hub_gap() - RIG.HUB_STOP_MARGIN
+    assert _back_collar_gap(1) < _hub_gap() - RIG.HUB_STOP_MARGIN
     # The model's back collar sits on its leaf, its pin BACK_CAM_PIN_STATION
     # into it at the nominal strap, and the collar lands on the block only as
     # the rod's north stop.
@@ -874,10 +888,16 @@ def test_follower_pins_stay_on_their_collars_at_the_worst_stack() -> None:
         dt_pinion_cam_geometry.CAM_LEN + RIG.BACK_COLLAR_LEAF_F - drive.STRAP_T / 2.0,
         abs_tol=1e-9,
     )
-    assert (RIG.BACK_COLLAR_GAP_MIN, RIG.BACK_COLLAR_GAP_MAX) == pytest.approx(
-        (RIG.BACK_COLLAR_LEAF_F - _LEAF_ERR, RIG.BACK_COLLAR_LEAF_F + _LEAF_ERR), abs=1e-9
+    assert RIG.BACK_COLLAR_GAP == pytest.approx(
+        (RIG.LARGE_LEAF_RANGE[0] - _LEAF_TOL, RIG.LARGE_LEAF_RANGE[1] + _LEAF_TOL),
+        abs=1e-9,
     )
-    assert RIG.BACK_COLLAR_GAP_MIN >= RIG.BACK_COLLAR_MIN_GAP + RIG.RIG_MARGIN_SPARE
+    assert RIG.LARGE_LEAF_RANGE[0] <= RIG.BACK_COLLAR_LEAF_F <= RIG.LARGE_LEAF_RANGE[1]
+    assert RIG.LIFT_ROD_END_PLAY_MIN == pytest.approx(
+        RIG.FRONT_CAM_GAP[0] + RIG.BACK_COLLAR_GAP[0]
+    )
+    assert RIG.LIFT_ROD_END_PLAY_MIN > 0.0
+    assert not hasattr(RIG, "BACK_COLLAR_MIN_GAP")
     # The model front collar is flush with the strap's outer face, one feeler
     # off the block.
     assert math.isclose(
@@ -901,23 +921,23 @@ def _stack_vertices():
 
     Measured from the back block's outer face, where the shaft and rod are set
     flush: the back block's depth in its .XX band (Codex #854 P1), both straps
-    and the drum in their .X bands, and the drum shim and the feeler in their
-    ruled band (Codex #837 P1) move the front block's inner face; its own .XX
-    depth moves its outer face.  The back strap's own thickness also sets the back collar's gap, so
-    it is carried separately.
+    and the drum in their .X bands, and the drum shim and the front-block gap
+    over their ranges (owner ruling C7; Codex #837 P1) move the front block's
+    inner face; its own .XX depth moves its outer face.  The back strap's own
+    thickness also sets the back collar's gap, so it is carried separately.
     """
     import itertools
 
     t_lo, t_hi = _strap_t_band()
     d_block = (-RIG.BLOCK_DEPTH_BAND, RIG.BLOCK_DEPTH_BAND)
     inner_nominal = RIG.FRONT_BLOCK_Z0 + RIG.BLOCK_DEPTH
-    d_shim = (-RIG.DRUM_END_SHIM_SET_ERROR, RIG.DRUM_END_SHIM_SET_ERROR)
+    d_shim = tuple(end - RIG.DRUM_END_SHIM for end in RIG.DRUM_END_GAP)
     for t_f, t_b, d_drum, d_air, d_feel, d_back, d_front in itertools.product(
         (t_lo, t_hi),
         (t_lo, t_hi),
         (-RIG.DRUM_LEN_BAND, RIG.DRUM_LEN_BAND),
         d_shim,
-        (-RIG.FRONT_BLOCK_FEELER_BAND, RIG.FRONT_BLOCK_FEELER_BAND),
+        tuple(end - RIG.FRONT_BLOCK_FEELER for end in RIG.FRONT_BLOCK_GAP),
         d_block,
         d_block,
     ):
@@ -944,7 +964,7 @@ def test_worst_stack_sizes_the_torque_shaft_and_the_lift_rod() -> None:
     assert (RIG.TORQUE_SHAFT_LEN, RIG.LIFT_ROD_LEN) == pytest.approx(
         (7.71 * 25.4, 8.15 * 25.4)
     )
-    assert RIG.BACK_COLLAR_GAP_MAX == pytest.approx(RIG.BACK_COLLAR_LEAF_F + _LEAF_ERR)
+    assert RIG.BACK_COLLAR_GAP[1] == pytest.approx(RIG.LARGE_LEAF_RANGE[1] + _LEAF_TOL)
     bearing_min = math.inf
     hub_margin_min = math.inf
     nominal_inner = RIG.FRONT_BLOCK_Z0 + RIG.BLOCK_DEPTH
@@ -978,15 +998,15 @@ def test_worst_stack_sizes_the_torque_shaft_and_the_lift_rod() -> None:
             rod_front = RIG.BACK_BLOCK_OUTER_Z - (RIG.LIFT_ROD_LEN + dl)
             for bore in bores:
                 hub_gap = outer - (rod_front + bore)
-                for e in (-_LEAF_ERR, _LEAF_ERR):
-                    margin = hub_gap - _back_collar_gap(e)
+                for end in (0, 1):
+                    margin = hub_gap - _back_collar_gap(end)
                     hub_margin_min = min(hub_margin_min, margin)
     assert bearing_min >= RIG.FRONT_BLOCK_MIN_BEARING + RIG.BLOCK_BEARING_MARGIN - 1e-9
     # The sweep's minimum is the layout's named-term budget, term for term.
     assert math.isclose(
         bearing_min, sum(RIG.TORQUE_SHAFT_BEARING_STACK.values()), abs_tol=1e-9
     )
-    assert math.isclose(bearing_min, 10.114, abs_tol=5e-3)  # 10.176 before #3042
+    assert math.isclose(bearing_min, 10.035, abs_tol=5e-3)  # 10.114 before C7's ranges
     assert hub_margin_min >= RIG.HUB_STOP_MARGIN - 1e-9
     assert math.isclose(
         hub_margin_min,
@@ -996,10 +1016,12 @@ def test_worst_stack_sizes_the_torque_shaft_and_the_lift_rod() -> None:
         abs_tol=1e-9,
     )
     # The rod is sized by the seat (#290: the .XX length band left the lever's
-    # air to the shaft far more than it needs), to the .01 in above it.
-    assert math.isclose(hub_margin_min, 0.576, abs_tol=5e-3)  # 0.640 before #3042
-    assert sum(RIG.lift_rod_seat_stack(RIG.LIFT_ROD_LEN - 0.254).values()) < (
-        RIG.LEVER_SEAT_MIN + RIG.RIG_MARGIN_SPARE
+    # air to the shaft far more than it needs), to the .01 in above it; the
+    # seat's planning spare went with the owner's ranges (C7).
+    assert math.isclose(hub_margin_min, 0.470, abs_tol=5e-3)  # 0.576 before C7
+    assert (
+        sum(RIG.lift_rod_seat_stack(RIG.LIFT_ROD_LEN - 0.254).values())
+        < RIG.LEVER_SEAT_MIN
     )
 
 
@@ -1011,7 +1033,7 @@ def test_lever_station_clears_at_both_rod_extremes() -> None:
     # cluster's end play and its flush set (P2-3).  The rig sizes MHA-DT-17 so
     # the plane clears that front end, and the assembly logs the same row.
     north = RIG.LEVER_NORTH_TRAVEL_STACK
-    assert north["MHA-DT-17 floated north to the back collar"] == RIG.BACK_COLLAR_GAP_MAX
+    assert north["MHA-DT-17 floated north to the back collar"] == RIG.BACK_COLLAR_GAP[1]
     shaft = RIG.SHAFT_FRONT_SOUTH_TRAVEL_STACK
     assert math.isclose(
         sum(shaft.values()), _ROD_LEN_BAND + _P_MAX + RIG.FLUSH_SET_ERROR
@@ -1023,7 +1045,7 @@ def test_lever_station_clears_at_both_rod_extremes() -> None:
     row = drive.RIG_MARGINS["lever throw plane to the torque shaft's front end"]
     assert math.isclose(row[0], air, abs_tol=1e-9)
     assert air >= RIG.LEVER_THROW_MIN_AIR + RIG.RIG_MARGIN_SPARE - 1e-9
-    assert math.isclose(air, 2.469, abs_tol=5e-3)  # 2.487 before #3042
+    assert math.isclose(air, 2.288, abs_tol=5e-3)  # 2.469 before C7's ranges
     south = sum(RIG.LEVER_SOUTH_TRAVEL_STACK.values())
     assert drive._LEV_Z[0] - south >= drive._GRIP_HEAD_Z[1] + 0.25
     hub_lo = drive.LEVER_Z - drive.LEVER_HUB_LEN / 2.0 - drive.LEVER_CAP_SAG
@@ -1043,10 +1065,10 @@ def test_lift_rod_length_band_clears_past_the_back_block() -> None:
     # so the body ends the band plus the collar's largest gap past the block.
     # The SR crown stands CAP_SAG beyond that (Codex #855 P2), and the envelope
     # runs to the crown's apex.
-    body_end = rig.BACK_BLOCK_OUTER_Z + _ROD_LEN_BAND + rig.BACK_COLLAR_GAP_MAX
-    assert math.isclose(body_end - rig.BACK_BLOCK_OUTER_Z, 1.254, abs_tol=5e-3)
+    body_end = rig.BACK_BLOCK_OUTER_Z + _ROD_LEN_BAND + rig.BACK_COLLAR_GAP[1]
+    assert math.isclose(body_end - rig.BACK_BLOCK_OUTER_Z, 1.283, abs_tol=5e-3)
     reach = body_end + CAP_SAG
-    assert math.isclose(reach - rig.BACK_BLOCK_OUTER_Z, 2.445, abs_tol=5e-3)
+    assert math.isclose(reach - rig.BACK_BLOCK_OUTER_Z, 2.472, abs_tol=5e-3)
     band = (rig.BACK_BLOCK_OUTER_Z, reach + 0.25)
     # Occupants of that z band near the rod axis (drive_train + frame):
     # the north arbor pedestal stands on the drum axis, well west of the rod.
@@ -1090,7 +1112,7 @@ def test_pinned_torque_shaft_bears_the_back_block_at_the_worst_stack() -> None:
     assert math.isclose(
         sum(RIG.TORQUE_SHAFT_BACK_BEARING_STACK.values()), bearing, abs_tol=1e-9
     )
-    assert math.isclose(bearing, 10.455, abs_tol=5e-3)  # 10.472 before #3042
+    assert math.isclose(bearing, 10.301, abs_tol=5e-3)  # 10.455 before C7's ranges
     # The drilling station: the shaft's back end flush with that outer face.
     assert math.isclose(
         drive.PIVOT_SHAFT_Z0 + RIG.TORQUE_SHAFT_LEN,
@@ -1102,8 +1124,8 @@ def test_pinned_torque_shaft_bears_the_back_block_at_the_worst_stack() -> None:
 def test_torque_shaft_length_band_clears_both_ends() -> None:
     # MHA-DT-19 at the title-block .XX band (U27, #290), set back-flush: at the
     # shortest stack (both blocks thin, Codex #854 P1) the longest shaft's
-    # body end stands 2.29 proud of the front block, and its SR crown .05
-    # beyond that (Codex #837 P1).
+    # body end stands 2.31 proud of the front block, and its SR crown beyond
+    # that (Codex #837 P1).
     import dt_arbor_pedestal_spec as ped
     import dt_pinion_lever_geometry as lever
     import pinion_rig_layout as rig
@@ -1112,25 +1134,32 @@ def test_torque_shaft_length_band_clears_both_ends() -> None:
 
     front_end = rig.BACK_BLOCK_OUTER_Z - rig.TORQUE_SHAFT_LEN - _ROD_LEN_BAND
     # The shortest stack mirrors the named-term long stack of the front
-    # block's OUTER face (both blocks' depths, both straps, the drum and the
-    # feeler: the lift rod's budget less its nominal and the rod's own band),
-    # since every nominal in it prints exactly.
-    shrink = -sum(
-        value
-        for name, value in rig.LIFT_ROD_SEAT_STACK.items()
-        if not name.startswith(("nominal", "MHA-DT-17"))
+    # block's OUTER face (both blocks' depths, both straps, the drum: the lift
+    # rod's budget less its nominal and the rod's own band), since every
+    # nominal in it prints exactly -- except the two gaps, whose owner ranges
+    # (C7) sit unevenly about the model's leaves: those close by their
+    # narrow side.
+    gaps = ("MHA-DT-00 front block gap", "MHA-DT-19 drum end gap")
+    shrink = (
+        -sum(
+            value
+            for name, value in rig.LIFT_ROD_SEAT_STACK.items()
+            if not name.startswith(("nominal", "MHA-DT-17", *gaps))
+        )
+        + (rig.FRONT_BLOCK_FEELER - rig.FRONT_BLOCK_GAP[0])
+        + (rig.DRUM_END_SHIM - rig.DRUM_END_GAP[0])
     )
     shortest_outer = rig.FRONT_BLOCK_Z0 + shrink
     proud = shortest_outer - front_end
-    assert math.isclose(proud, 2.283, abs_tol=5e-3)  # 2.294 before #3042
-    assert math.isclose(proud + CAP_SAG, 3.553, abs_tol=5e-3)
+    assert math.isclose(proud, 2.311, abs_tol=5e-3)  # 2.283 before C7's ranges
+    assert math.isclose(proud + CAP_SAG, 3.581, abs_tol=5e-3)
     assert math.isclose(
         max(outer for _i, outer, _t in _stack_vertices()), shortest_outer, abs_tol=1e-9
     )
     # Option E-a: pinned to the straps, the shaft rides the cluster's end play
     # from its back-flush drilling station to the front stop.
-    assert math.isclose(proud + _P_MAX, 2.650, abs_tol=5e-3)  # 2.644 before #3042
-    assert math.isclose(proud + _P_MAX + CAP_SAG, 3.920, abs_tol=5e-3)
+    assert math.isclose(proud + _P_MAX, 2.832, abs_tol=5e-3)  # 2.650 before C7
+    assert math.isclose(proud + _P_MAX + CAP_SAG, 4.102, abs_tol=5e-3)
     # Its back end then sits P_MAX inside the back block, bearing
     # test_pinned_torque_shaft_bears_the_back_block_at_the_worst_stack.
     # South of the front block nothing stands on the shaft's axis at any z.
@@ -1540,9 +1569,10 @@ def test_spring_pad_east_west_placement_fits_the_preload_and_stress_window() -> 
     window = min(min(east_room), min(west_room))
     assert window == pytest.approx(0.67, abs=0.01)
     # The best named-datum stop #1037 found: a gage leaf on edge against the
-    # back block's east end, the pad screwed through its clearance hole.
+    # back block's east end, the pad screwed through its clearance hole.  The
+    # leaf is a stop, so only its tolerance enters (owner P2, 2026-11-24).
     placement = {
-        "gage leaf set error": RIG.FEELER_SET_ERROR,
+        "gage leaf tolerance": _LEAF_TOL,
         "MHA-DT-18 east end from its pivot bore, .XX": printed_deviations(
             BLOCK_EAST, 2, unit="in"
         )[1],
@@ -1563,7 +1593,7 @@ def test_spring_pad_books_its_printed_bands() -> None:
     assert not hasattr(drive, "_SPR_PAD_WEST_X")  # z only: the leaf sets z
     assert math.isclose(
         drive._SPR_PAD_Z_HI,
-        RIG.SPRING_PAD_AFT_Z + RIG.FEELER_SET_ERROR,
+        RIG.SPRING_PAD_AFT_Z + RIG.SPRING_PAD_LEAF - RIG.SPRING_PAD_GAP[0],
         abs_tol=1e-12,
     )
 
@@ -1576,12 +1606,11 @@ def test_spring_is_stationed_from_the_block_on_its_pad_leaf() -> None:
     import dt_pinion_spring_geometry as geometry
     from dt_pinion_spring_section import PAD_WIDTH, WIDTH
 
-    # Main's ruling: a stock gage leaf, one step over the thinnest that keeps
-    # the pad's air and spare (0.65 on the metric set; .026 on the inch one).
-    assert RIG.SPRING_PAD_LEAF == pytest.approx(
-        RIG.smallest_leaf_setting(RIG.SPRING_PAD_MIN_AIR + RIG.RIG_MARGIN_SPARE)
-        + RIG.FEELER_LEAF_STEP
-    )
+    # Owner ruling C7: any one leaf .020 TO .040; the model's .026 is one of
+    # them, and the thinnest keeps the pad's air (its floor; the planning
+    # spare went with the ranges, Main's C7 ruling).
+    assert RIG.LARGE_LEAF_RANGE[0] <= RIG.SPRING_PAD_LEAF <= RIG.LARGE_LEAF_RANGE[1]
+    assert RIG.SPRING_PAD_GAP == pytest.approx(RIG.BACK_COLLAR_GAP)
     aft = RIG.BACK_BLOCK_Z0 - RIG.SPRING_PAD_LEAF
     assert math.isclose(RIG.SPRING_PAD_AFT_Z, aft, abs_tol=1e-12)
     assert math.isclose(RIG.SPRING_Z + WIDTH / 2.0, aft, abs_tol=1e-12)
@@ -1592,9 +1621,10 @@ def test_spring_is_stationed_from_the_block_on_its_pad_leaf() -> None:
     assert math.isclose(drive.SPRING_Z, RIG.SPRING_Z, abs_tol=1e-12)
     inset = RIG.SPRING_Z - WIDTH / 2.0 - RIG.STRAP_Z_INNER[1]
     assert math.isclose(inset, RIG.SPRING_BLADE_INSET, abs_tol=1e-12)
-    pad = RIG.SPRING_PAD_LEAF - RIG.FEELER_SET_ERROR
+    pad = RIG.SPRING_PAD_GAP[0]
     assert pad == pytest.approx(RIG.SPRING_PAD_TO_BLOCK_WORST, abs=1e-12)
-    assert pad >= RIG.SPRING_PAD_MIN_AIR + RIG.RIG_MARGIN_SPARE - 1e-9
+    assert pad >= RIG.SPRING_PAD_MIN_AIR - 1e-9
+    assert math.isclose(pad, 0.4953, abs_tol=5e-4)  # 0.5477 before C7
 
 
 def test_spring_blade_on_flank_books_every_primitive_term() -> None:
@@ -1616,7 +1646,9 @@ def test_spring_blade_on_flank_books_every_primitive_term() -> None:
             THICKNESS, THICKNESS_PLACES, unit=STRAP_UNIT
         )[0],
         "spring pad leaf": -RIG.SPRING_PAD_LEAF,
-        "spring pad leaf set error": -RIG.FEELER_SET_ERROR,
+        "spring pad leaf, widest of its range": -(
+            RIG.SPRING_PAD_GAP[1] - RIG.SPRING_PAD_LEAF
+        ),
         "MHA-DT-24 strip width": -WIDTH,
         "MHA-DT-24 strip width .XX, widest": -printed_deviations(
             WIDTH, WIDTH_PLACES, unit=SPRING_UNIT
@@ -1672,11 +1704,13 @@ def test_spring_strip_clears_gear_j19_at_the_worst_fit_up() -> None:
     j19_back = drive.Z_DRUM0 + 19 * drive.Z_PITCH + drive.DRUM_FACE / 2.0
     terms = {
         "strip front edge, nominal": RIG.SPRING_Z - WIDTH / 2.0 - j19_back,
-        "rig-set leaf D set error": -RIG.RIG_SET_ERROR,
+        "rig-set D, thinnest of its range": _D_DEVIATIONS[0],
         "MHA-DT-14 strap thickness .XX, thinnest": printed_deviations(
             THICKNESS, THICKNESS_PLACES, unit=STRAP_UNIT
         )[0],
-        "spring pad leaf set error": -RIG.FEELER_SET_ERROR,
+        "spring pad leaf, widest of its range": -(
+            RIG.SPRING_PAD_GAP[1] - RIG.SPRING_PAD_LEAF
+        ),
         "MHA-DT-24 strip width .XX, widest": -printed_deviations(
             WIDTH, WIDTH_PLACES, unit=SPRING_UNIT
         )[1],
@@ -1764,8 +1798,8 @@ def test_every_fit_up_setting_is_a_gage_leaf_and_the_prints_name_it() -> None:
         assert leaf in FITUP.FEELER_GAGE_LEAVES_MM, name
     assert FITUP.RIG_SET_LEAVES == dt_feeler_leaves.leaf_stack(FITUP.RIG_SET_LEAF_D)
     assert set(FITUP.RIG_SET_LEAVES) <= set(FITUP.FEELER_GAGE_LEAVES_MM)
-    assert FITUP.BACK_COLLAR_LEAF_F >= RIG.smallest_leaf_setting(
-        RIG.BACK_COLLAR_MIN_GAP + RIG.RIG_MARGIN_SPARE
+    assert (
+        RIG.LARGE_LEAF_RANGE[0] <= FITUP.BACK_COLLAR_LEAF_F <= RIG.LARGE_LEAF_RANGE[1]
     )
     assert FITUP.FRONT_COLLAR_LEAF == FITUP.FRONT_BLOCK_FEELER
     # The base's rig callouts cite this step on MHA-DT-00 by key (plate-r1
@@ -1776,11 +1810,17 @@ def test_every_fit_up_setting_is_a_gage_leaf_and_the_prints_name_it() -> None:
     # The collars' set is an assembly step: nothing is cut, so MHA-DT-23's own
     # print stays free of it (drawing-guidelines.md rule 7 (notes: few, flagged, never a method), as MHA-DT-18 keeps its feeler).
     assert "LEAF" not in dt_pinion_cam_spec.DRAWING_NOTES
-    # The prints give the inch setting; the leaves are in sheet 14's table.
-    back = FITUP.inch_text(FITUP.BACK_COLLAR_LEAF_F, FITUP.FEELER_PLACES)
-    front = FITUP.inch_text(FITUP.FRONT_COLLAR_LEAF, FITUP.FEELER_PLACES)
-    assert f"BACK MHA-DT-23 {back} OFF THE BACK MHA-DT-18 ON A FEELER" in FITUP.COLLAR_SET_STEP
-    assert f"FRONT MHA-DT-23 {front} OFF THE FRONT MHA-DT-18 ON A FEELER" in FITUP.COLLAR_SET_STEP
+    # The prints give the inch range; the leaves are in sheet 15's table.
+    assert (
+        f"BACK MHA-DT-23 OFF THE BACK MHA-DT-18 ON {FITUP.ONE_LEAF_LARGE}"
+        in FITUP.COLLAR_SET_STEP
+    )
+    assert (
+        f"FRONT MHA-DT-23 OFF THE FRONT MHA-DT-18 ON {FITUP.ONE_LEAF_SMALL}"
+        in FITUP.COLLAR_SET_STEP
+    )
+    assert FITUP.ONE_LEAF_SMALL == "ANY ONE LEAF .010 TO .020"
+    assert FITUP.ONE_LEAF_LARGE == "ANY ONE LEAF .020 TO .040"
     # The fit-up module no longer claims MHA-DT-00 prints the feeler band.
     assert "MHA-DT-00 prints" not in (FITUP.__doc__ or "")
 
