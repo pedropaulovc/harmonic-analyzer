@@ -2,10 +2,10 @@ dt-cone-gear-tl-index-plate:
   title: Cone Gear Dividing Head Index Plate
   # Shop tooling: the parent MHA-DT-03 Number plus -TL-nn (subsystem-identities.md).
   # Indexes the 96T, 102T and 114T cone gears on the PM BS-0 dividing head,
-  # whose stock plates cannot. The owner measured the index pin and the stock
-  # plate on 2026-11-24 (words in dt_cone_gear_tl_index_plate_spec.py); the hub,
-  # the screws, their bolt circle and the hole-circle diameters are still best
-  # guesses (#2157).
+  # whose stock plates cannot. The owner measured the index pin, the stock
+  # plate, the hub and the plate screws on 2026-11-24 (words in
+  # dt_cone_gear_tl_index_plate_spec.py); the hole-circle diameters against the
+  # index arm's reach are still best guesses (#2157).
   number: MHA-DT-03-TL-01
   material: 6061-T651 ALUMINUM
   material_specification: 6061-T651 aluminum, owned 1/4 in plate
@@ -27,6 +27,11 @@ dt-cone-gear-tl-index-plate:
       reason: "owner ruling 2026-11-02 (Pedro): the index holes' angular spacing is the plate's function; without a position control the title block's ±1° on EQ SP would let neighbouring index holes run together, so all 132 holes are held to a position zone about their BASIC positions from the bore that pilots the plate on the BS-0 head. The zone was Ø.004 while the holes were reamed; drilled (owner ruling 2026-11-23, tool audit Q15) it is the shop's drilled-hole location from a datum bore, ±.005, Ø.014"
     - id: "RV-03"
       kind: "accept"
-      where: "face view: the bore, Ø1.500 BC and 132X index-hole callouts name BS-0 HEAD; note 1 names it in full"
+      where: "face view: the bore and 132X index-hole callouts name BS-0 HEAD; note 1 names it in full"
       finding: "mate named without a drawing number (rule 4)"
       reason: "Owner ruling 2026-11-08 (Pedro), #2144 item 1.3: the PM BS-0 dividing head is shop equipment with no project identity; the sheet names it as PM BS-0 DIVIDING HEAD (SHOP EQUIPMENT) and no new identity is created"
+    - id: "RV-04"
+      kind: "minor"
+      where: "face view, the 3X mounting-hole callout: WALL .03 MIN"
+      finding: "wall between each screw counterbore and the bore below the .060 floor (rules 17, 20)"
+      reason: "owner ruling 2026-11-24 (Pedro): \"Accept the .04 wall as an exception, same as the maker's plate.\" The head's screw pattern fixes it: the owner measured .0415 on the stock BS-0 plate (\"screw hole edge to bore edge 0.0415\"); the made plate has .0435 nominal and .037 at the worst case of the bore, counterbore and bolt-circle bands"

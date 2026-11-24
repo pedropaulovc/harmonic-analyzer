@@ -100,15 +100,19 @@ def test_pin_play_and_position_zone_stay_under_half_a_percent_of_pitch() -> None
     # The drilled-hole location the shop holds from a datum bore: ±.005.
     assert math.isclose(spec.INDEX_POSITION, 0.014 * INCH)
     assert spec.INDEX_POSITION >= math.hypot(0.005, 0.005) * 2.0 * INCH - 0.001 * INCH
-    # Half the worst play (.007) plus half the zone (.014) along the circle.
-    assert math.isclose(spec.INDEX_ERROR_TANGENTIAL_MM, 0.0105 * INCH)
+    # Owner fact 2026-11-24: "hub plate sits on 0.8245".
+    assert math.isclose(spec.HUB_CLEARANCE[0], 0.0025 * INCH)
+    assert math.isclose(spec.HUB_CLEARANCE[1], 0.0055 * INCH)
+    # Half of each along the circle: the worst pin play (.007), the position
+    # zone (.014) and the bore's clearance on the hub (.0055).
+    assert math.isclose(spec.INDEX_ERROR_TANGENTIAL_MM, 0.01325 * INCH)
     for circle, teeth in spec.RING_TEETH.items():
-        crank = math.degrees(0.0105 / (spec.RING_PCDS[circle] / INCH / 2.0))
+        crank = math.degrees(0.01325 / (spec.RING_PCDS[circle] / INCH / 2.0))
         assert math.isclose(spec.INDEX_ERROR_GEAR_DEG[teeth], crank / 40.0)
     # The 24-hole circle is the smallest radius: the worst of the three.
     assert max(spec.INDEX_ERROR_GEAR_DEG, key=spec.INDEX_ERROR_GEAR_DEG.get) == 96
-    assert math.isclose(spec.INDEX_ERROR_GEAR_DEG[96], 0.011141, abs_tol=1e-6)
-    assert max(spec.INDEX_ERROR_TOOTH_FRACTION.values()) < 0.003
+    assert math.isclose(spec.INDEX_ERROR_GEAR_DEG[96], 0.014059, abs_tol=1e-6)
+    assert max(spec.INDEX_ERROR_TOOTH_FRACTION.values()) < 0.004
 
 
 def test_the_sheet_states_the_web_shortfall_it_carries() -> None:
@@ -126,9 +130,11 @@ def test_callouts_name_counts_and_the_counterbore() -> None:
     assert spec.CALLOUTS_ABOVE[spec.PRINTED_HOLE] == "132X"
     assert spec.CALLOUTS_ABOVE["Ring57Pcd"] == "57X EQ SP ON"
     assert spec.CALLOUTS_ABOVE["MountHoleDia"] == "3X"
-    assert spec.CALLOUTS_BELOW["MountHoleDia"].split("\n")[:2] == [
+    assert spec.CALLOUTS_BELOW["MountHoleDia"].split("\n") == [
         "DRILL THRU",
-        "<HOLE-SPOT><MOD-DIAM>.35 <HOLE-DEPTH> .145",
+        "<HOLE-SPOT><MOD-DIAM>.346 <HOLE-DEPTH> .145",
+        "FOR PLATE SCREWS",
+        "WALL .03 MIN",
     ]
     marked = set().union(*spec.DRAWING_DIMENSIONS.values())
     assert set(spec.CALLOUTS_ABOVE) <= marked
@@ -147,7 +153,11 @@ def test_the_measured_stock_plate_sets_the_envelope_and_the_screw_seat() -> None
     assert spec.MOUNT_COUNT == 3
     assert 0.234 * INCH <= spec.MOUNT_HOLE_DIA <= 15.0 / 64.0 * INCH
     assert spec.MOUNT_HOLE_DIA > spec.MOUNT_SCREW_BODY_DIA
-    assert abs(spec.CBORE_DIA - 0.3455 * INCH) <= 0.01 * INCH
+    assert abs(spec.CBORE_DIA - 0.3455 * INCH) <= 0.0005 * INCH + 1e-9
+    # Owner fact 2026-11-24: "head dia 0.3235; below plate; why do you care
+    # about thread i will use the same screws with all plates".
+    assert spec.CBORE_DIA - 0.005 * INCH > spec.MOUNT_SCREW_HEAD_DIA
+    assert math.isclose(spec.HEAD_RISE, 0.038 * INCH)
     # The plate is thinner than stock; the seat under the screw head is not.
     assert spec.THICKNESS < spec.STOCK_PLATE_THICKNESS
     assert math.isclose(spec.CBORE_SEAT, 0.095 * INCH)
@@ -155,6 +165,25 @@ def test_the_measured_stock_plate_sets_the_envelope_and_the_screw_seat() -> None
     assert spec.CBORE_SEAT_MIN >= 0.080 * INCH - 1e-9
     # The pin cannot pass through: it reaches no deeper than a stock blind hole.
     assert 0.1 * INCH < spec.PIN_ENGAGEMENT_MAX < spec.THICKNESS
+
+
+def test_the_bolt_circle_is_inferred_from_the_owners_two_readings() -> None:
+    # Owner fact 2026-11-24: "screw hole outside to outside 1.4445; screw hole
+    # edge to bore edge 0.0415"; asked which edges: "Yes, both at the
+    # counterbore edges."
+    by_chord = (1.4445 - 0.3455) / math.sqrt(3.0)
+    by_bore = 0.8270 / 2.0 + 0.0415 + 0.3455 / 2.0
+    assert math.isclose(by_chord, 0.6345, abs_tol=1e-4)
+    assert math.isclose(by_bore, 0.6278, abs_tol=1e-4)
+    assert math.isclose(spec.MOUNT_PCD, 1.260 * INCH)
+    assert abs(spec.MOUNT_PCD / INCH - 32.0 / 25.4) < 0.0005
+    assert by_bore - 0.005 < spec.MOUNT_PCD / INCH / 2.0 < by_chord + 0.005
+    # Owner ruling 2026-11-24 (RV-04): "Accept the .04 wall as an exception,
+    # same as the maker's plate."
+    assert spec.CBORE_WALL not in spec.WEBS_MM
+    assert spec.CBORE_WALL_NOMINAL >= 0.0415 * INCH
+    assert math.isclose(spec.CBORE_WALL_MIN_MM, 0.037 * INCH)
+    assert spec.CBORE_WALL_CALLOUT == "WALL .03 MIN"
 
 
 def test_the_build_volume_budget_counts_every_hole() -> None:

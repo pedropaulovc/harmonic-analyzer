@@ -15,12 +15,18 @@ MEASURED on the owner's stock BS-0 plate (owner fact 2026-11-24, verbatim:
 0.1635 deep; 3x screw holes thru 15/64 countersunk 0.3455 dia depth 0.1830")
 and on its index pin (owner fact 2026-11-24, verbatim: "0.117 in dia dividing
 head pin"): the plate's OD, its bore, the maker's own pin-hole size, the
-screw holes' count, drill and countersink diameter. STILL GUESSES (#2157
-tracks them): the hub the bore pilots on, the mounting screw's thread and
-head form, its bolt circle and clocking, and the three hole-circle diameters
-against the index arm's reach. Replace each ``# GUESS (#2157)`` value with
-the measured one. The maker's manual (owner photographs 2026-11-24) gives the
-1:40 worm and the stock circles and no plate dimension.
+screw holes' count, drill and counterbore (the owner's correction, verbatim:
+"not countersunk counterbored;"). MEASURED on the head (owner fact 2026-11-24,
+verbatim: "hub plate sits on 0.8245; screw 32 tpi  byutton 0.5330 length
+0.1920 dia; screw hole outside to outside 1.4445; screw hole edge to bore edge
+0.0415"; and: "head dia 0.3235; below plate; why do you care about thread i
+will use the same screws with all plates"): the hub the bore pilots on, the
+bolt circle (inferred from the two screw-hole readings) and the head's own
+three plate screws, which this plate reuses. STILL GUESSES (#2157 tracks
+them): the bolt circle's clocking to a hole row and the three hole-circle
+diameters against the index arm's reach. Replace each ``# GUESS (#2157)``
+value with the measured one. The maker's manual (owner photographs
+2026-11-24) gives the 1:40 worm and the stock circles and no plate dimension.
 
 Thickness: the stock plate is .2770; this one is cut from the owned 1/4 in
 plate, skimmed to .24, so it sits .037 lower under the pin. The stock pin
@@ -46,8 +52,8 @@ over the pin (+.004/0) with an owned drill, no reamer (revises the 2026-11-08
 reamed-fit ruling)."). The pin is the gauge: it enters every hole. The play
 of the pin in its hole and the position zone are an indexing error at the
 crank, divided by the 40:1 worm at the gear (``INDEX_ERROR_*`` below). The
-bore pilots the plate on the head's hub: never under the stock plate's
-measured .8270 bore, +.003/0, until the hub itself is measured (#2157).
+bore pilots the plate on the head's Ø.8245 hub: never under the stock plate's
+measured .8270 bore, +.003/0, so .0025 to .0055 on the hub.
 
 Rule 17 shortfall (stated on the sheet; owner ruling 2026-11-02, RV-01 in the
 part's machinist_exceptions): #31 holes on the 57- and 51-hole circles leave
@@ -155,26 +161,49 @@ for _circle, _teeth in RING_TEETH.items():
 # Owner fact 2026-11-24 (stock plate): "3x screw holes thru 15/64 countersunk
 # 0.3455 dia depth 0.1830", corrected the same day, verbatim: "not countersunk
 # counterbored;". So the stock seat is a Ø.3455 counterbore .1830 deep in a
-# .2770 plate: .094 of plate under the screw head. The screw itself (thread,
-# head) is unmeasured (#2157).
+# .2770 plate: .094 of plate under the screw head. The plate is held by the
+# head's own three screws (owner fact 2026-11-24: "screw 32 tpi  byutton
+# 0.5330 length 0.1920 dia" and "head dia 0.3235; below plate; why do you care
+# about thread i will use the same screws with all plates"), so the plate
+# owes them three things: the stock plate's seat thickness, so they engage
+# the head as deep as they do now; a counterbore their heads enter; and heads
+# that stay clear of the sector arms.
 MOUNT_COUNT = 3
-MOUNT_PCD = 1.500 * INCH  # GUESS (#2157)
-# The largest thread a 15/64 hole passes is the candidate's body: M5.
-MOUNT_SCREW_BODY_DIA = 5.0
+# Bolt circle: 32 mm (prints Ø1.260), INFERRED from two owner readings, not
+# measured directly (owner fact 2026-11-24: "screw hole outside to outside
+# 1.4445; screw hole edge to bore edge 0.0415"; owner 2026-11-24, asked which
+# edges: "Yes, both at the counterbore edges."). Across two counterbores the
+# chord is 1.4445 - .3455 = 1.0990, R .6345 for three equally spaced; from
+# the bore edge R = .4135 + .0415 + .1728 = .6278. Their mean is Ø1.262.
+MOUNT_PCD = 1.260 * INCH
+STOCK_CBORE_TO_BORE_WALL = 0.0415 * INCH
+MOUNT_SCREW_BODY_DIA = 0.192 * INCH
+MOUNT_SCREW_HEAD_DIA = 0.3235 * INCH
 # 15/64 = .2344: printed on the three-place grid, drilled 15/64.
 MOUNT_HOLE_DRILL = "15/64"
 MOUNT_HOLE_DIA = 0.234 * INCH
 STOCK_CBORE_DIA = 0.3455 * INCH
 STOCK_CBORE_DEPTH = 0.183 * INCH
-CBORE_DIA = 0.35 * INCH  # stock .3455 on the .XX grid
-CBORE_PLACES = 2
+CBORE_DIA = 0.346 * INCH  # stock .3455 on the .XXX grid
+CBORE_PLACES = 3
 # This plate is thinner than stock: the counterbore is shallower by the same
-# amount, so the plate under the head (and the screw's reach into the head)
-# stays the stock plate's. .145 rather than .146 keeps that seat at rule 17's
-# .080 target with the thickness and depth bands both against it.
+# amount, so the plate under the head, and with it the same screws' reach
+# into the head, stays the stock plate's. .145 rather than .146 keeps that
+# seat at rule 17's .080 target with the thickness and depth bands both
+# against it. On the stock plate the heads sit below the face ("below
+# plate"); here each stands HEAD_RISE higher against the face than it does
+# on stock, so it is still below the face if it is no taller than the
+# counterbore is deep. Its height is unmeasured: the sector arms' clearance
+# over the screw heads is to be looked at once at first fitting (#2157).
 CBORE_DEPTH = 0.145 * INCH
 CBORE_DEPTH_PLACES = 3
 CBORE_SEAT = THICKNESS - CBORE_DEPTH  # .095; stock .2770 - .1830 = .094
+HEAD_RISE = STOCK_CBORE_DEPTH - CBORE_DEPTH
+if HEAD_RISE > 0.038 * INCH + 1e-9:
+    raise AssertionError("screw heads stand over .038 higher than on the stock plate")
+# Smallest three-place counterbore (-.005) over the head: .017 on diameter.
+if (CBORE_DIA - 0.005 * INCH) - MOUNT_SCREW_HEAD_DIA < 0.015 * INCH:
+    raise AssertionError("counterbore does not clear the plate screw's Ø.3235 head")
 # Seed hole at 150 degrees; the pattern adds 270 (on the vertical centreline)
 # and 30. Its row plane is the Top plane offset by the seed's +Y.
 MOUNT_SEED_DEG = 150.0
@@ -194,8 +223,14 @@ _XXX = printed_band_mm(3, unit=UNIT)
 
 if not MOUNT_SCREW_BODY_DIA < MOUNT_HOLE_DIA <= 15.0 / 64.0 * INCH:
     raise AssertionError("mounting hole is not the stock plate's 15/64 drill")
-if abs(CBORE_DIA - STOCK_CBORE_DIA) > _XX:
+if abs(CBORE_DIA - STOCK_CBORE_DIA) > 0.0005 * INCH + 1e-9:
     raise AssertionError("counterbore is not the stock plate's Ø.3455")
+for _radius in (
+    (1.4445 * INCH - STOCK_CBORE_DIA) / math.sqrt(3.0),
+    0.827 * INCH / 2.0 + STOCK_CBORE_TO_BORE_WALL + STOCK_CBORE_DIA / 2.0,
+):
+    if abs(_radius - MOUNT_PCD / 2.0) > 0.005 * INCH:
+        raise AssertionError("bolt circle disagrees with the owner's two readings")
 if abs(CBORE_SEAT - (STOCK_PLATE_THICKNESS - STOCK_CBORE_DEPTH)) > 0.0015 * INCH:
     raise AssertionError("the plate under the screw head is not the stock plate's")
 CBORE_SEAT_MIN = (THICKNESS - _XX) - (CBORE_DEPTH + _XXX)
@@ -221,7 +256,7 @@ def _pitch(circle: int) -> float:
 
 
 _INDEX_R_MAX = (INDEX_HOLE_DIA + INDEX_HOLE_DEVIATIONS[1]) / 2.0
-_CBORE_R_MAX = (CBORE_DIA + _XX) / 2.0
+_CBORE_R_MAX = (CBORE_DIA + _XXX) / 2.0
 WEBS_MM: dict[str, float] = {
     **{
         f"{n}-hole circle, between holes": _pitch(n)
@@ -248,7 +283,10 @@ WEBS_MM: dict[str, float] = {
     - (BORE_DIA + BORE_DEVIATIONS[1]) / 2.0,
 }
 # The two fine circles stand between rule 17's .060 floor and its .080 target
-# (owner ruling RV-01); every other wall meets the target.
+# (owner ruling RV-01). The wall from each counterbore to the bore is the
+# maker's own, set by the head's screw pattern, and stands under the floor
+# (owner ruling 2026-11-24, RV-04, verbatim: "Accept the .04 wall as an
+# exception, same as the maker's plate."). Every other wall meets the target.
 SHORT_WEBS = frozenset(
     {
         "57-hole circle, between holes",
@@ -256,6 +294,15 @@ SHORT_WEBS = frozenset(
         "57- to 51-hole circle",
     }
 )
+CBORE_WALL = "counterbores to bore"
+CBORE_WALL_NOMINAL = (MOUNT_PCD - CBORE_DIA - BORE_DIA) / 2.0
+# Nominal no thinner than the maker's measured wall.
+if CBORE_WALL_NOMINAL < STOCK_CBORE_TO_BORE_WALL:
+    raise AssertionError("counterbore wall is thinner than the stock plate's")
+CBORE_WALL_MIN_MM = WEBS_MM.pop(CBORE_WALL)
+CBORE_WALL_PRINTED = math.floor(CBORE_WALL_MIN_MM / INCH * 100.0) / 100.0
+if not 0.03 * INCH <= CBORE_WALL_MIN_MM < WALL_FLOOR_MM:
+    raise AssertionError("counterbore wall is not the shortfall RV-04 accepts")
 for _wall, _mm in WEBS_MM.items():
     if _wall in SHORT_WEBS:
         if not WALL_FLOOR_MM <= _mm < WALL_TARGET_MM:
@@ -279,7 +326,19 @@ if WEB_MIN_MM < RULED_WEB_MIN_MM:
 # either way: a crank angle error of that sum over the circle's radius, which
 # the worm divides at the gear. Worst case of both, per gear, in degrees at
 # the gear and as a fraction of that gear's tooth pitch.
-INDEX_ERROR_TANGENTIAL_MM = (INDEX_PIN_CLEARANCE[1] + INDEX_POSITION) / 2.0
+# The plate also stands off centre on the hub by up to half the bore's
+# clearance on it (owner fact 2026-11-24: "hub plate sits on 0.8245"), which
+# moves every hole by that much along its circle at two places a turn.
+HUB_DIA = 0.8245 * INCH
+HUB_CLEARANCE = (
+    BORE_DIA + BORE_DEVIATIONS[0] - HUB_DIA,
+    BORE_DIA + BORE_DEVIATIONS[1] - HUB_DIA,
+)
+if HUB_CLEARANCE[0] <= 0.0:
+    raise AssertionError("index plate bore does not pass the head's plate hub")
+INDEX_ERROR_TANGENTIAL_MM = (
+    INDEX_PIN_CLEARANCE[1] + INDEX_POSITION + HUB_CLEARANCE[1]
+) / 2.0
 INDEX_ERROR_GEAR_DEG: dict[int, float] = {
     teeth: math.degrees(INDEX_ERROR_TANGENTIAL_MM / (RING_PCDS[circle] / 2.0))
     / WORM_RATIO
@@ -289,8 +348,9 @@ INDEX_ERROR_TOOTH_FRACTION: dict[int, float] = {
     teeth: error / (360.0 / teeth) for teeth, error in INDEX_ERROR_GEAR_DEG.items()
 }
 # Either way of true position, each tooth space stands within half of one
-# percent of its pitch; a reamed sliding fit bought nothing a cone gear
-# needs.
+# percent of its pitch (.0003 in at the 96-tooth pitch line), so neither a
+# reamed sliding fit nor a tighter bore band buys anything a cone gear
+# needs: the bore's share is a fifth of the sum.
 INDEX_ERROR_TOOTH_FRACTION_MAX = 0.005
 if max(INDEX_ERROR_TOOTH_FRACTION.values()) > INDEX_ERROR_TOOTH_FRACTION_MAX:
     raise AssertionError("drilled index holes misplace a tooth by over 0.5 % of pitch")
@@ -388,8 +448,9 @@ CALLOUTS_ABOVE: dict[str, str] = {
     "MountHoleDia": f"{MOUNT_COUNT}X",
     "MountPcd": f"{MOUNT_COUNT}X EQ SP ON",
 }
-# Rule 20: the known web shortfall is stated as a plain fact at the holes; it
-# emits the stated shortfall of owner ruling RV-01 (machinist_exceptions).
+# Rule 20: each known shortfall is stated as a plain fact at its feature; they
+# emit the stated shortfalls of owner rulings RV-01 and RV-04
+# (machinist_exceptions).
 # Each callout is its size and process lines plus at most two lines of words
 # (rule 7); the counterbore prints with its symbol (rule 26).  A location
 # carries its value and band only (rule 7), so the mounting holes' bolt
@@ -398,11 +459,14 @@ CALLOUTS_ABOVE: dict[str, str] = {
 # centre mark's vertical line, so the pattern's clocking is the drawn 90
 # degrees, as for the index circles.
 WEB_CALLOUT = f"WEB {inch_text(WEB_MIN_PRINTED * INCH, 2)} MIN"
+CBORE_WALL_CALLOUT = f"WALL {inch_text(CBORE_WALL_PRINTED * INCH, 2)} MIN"
 CALLOUTS_BELOW: dict[str, str] = {
     PRINTED_HOLE: (
         f"{INDEX_HOLE_DRILL} DRILL THRU\n{HEAD} INDEX PIN ENTERS\n{WEB_CALLOUT}"
     ),
     "BoreDia": f"BORE THRU\nLOCATING FIT ON\n{HEAD} PLATE HUB",
-    "MountHoleDia": f"DRILL THRU\n{CBORE_CALLOUT}\nFOR {HEAD}\nPLATE SCREWS",
+    "MountHoleDia": (
+        f"DRILL THRU\n{CBORE_CALLOUT}\nFOR PLATE SCREWS\n{CBORE_WALL_CALLOUT}"
+    ),
 }
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:2"

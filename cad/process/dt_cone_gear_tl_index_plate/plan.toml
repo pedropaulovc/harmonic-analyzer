@@ -27,7 +27,7 @@ ref = "pin-gauges"  # A1-pin-set-061-250, A1-pin-set-061-500-combined
 [[tools]]
 id = "endmill-carbide-3fl-1-4"
 name = "1/4 end mill"
-ref = "endmill-carbide-3fl-1-4"  # 3X counterbore Ø.35 x .145 deep, interpolated (owner fact 2026-11-24: "not countersunk counterbored;")
+ref = "endmill-carbide-3fl-1-4"  # 3X counterbore Ø.346 x .145 deep, interpolated (owner fact 2026-11-24: "not countersunk counterbored;")
 
 [[tools]]
 id = "boring-bars-meda-6045000"

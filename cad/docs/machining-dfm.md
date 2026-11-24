@@ -1241,10 +1241,11 @@ shop-made index plate MHA-DT-03-TL-01 (`dt-cone-gear-tl-index-plate`) carries 24
 57-hole circles for them (10, 20 and 20 hole spaces a tooth). Its 132 pin holes are drilled #31
 (.120), just over the head's measured index pin (owner fact 2026-11-24: "0.117 in dia dividing head
 pin"; owner ruling 2026-11-23, tool audit Q15: drilled, no reamer). The pin's .003-.007 play in a
-hole and the Ø.014 position zone a drilled pattern holds together misplace a tooth by at most
-.0111° at the gear, 0.30 % of a 96-tooth pitch. The owner measured the stock plate on 2026-11-24:
-its OD (3.94), bore (.8270), .120 pin holes and counterbored 15/64 screw holes are on the sheet;
-the hub, the screws, their bolt circle and the hole-circle diameters are best guesses until read
+hole, the Ø.014 position zone a drilled pattern holds and the bore's .0055 on the head's Ø.8245
+hub together misplace a tooth by at most .0141° at the gear, 0.37 % of a 96-tooth pitch. The owner
+measured the stock plate and the head on 2026-11-24: OD 3.94, bore .8270, .120 pin holes,
+counterbored 15/64 screw holes on a 32 mm circle; the plate reuses the head's own screws. The
+hole-circle diameters against the index arm's reach are best guesses until read
 ([#2157](https://github.com/pedropaulovc/harmonic-analyzer/issues/2157)). Differential indexing on a
 universal head with change gears is the alternative. Those tooth counts did not change with the
 pitch, so this was already true of the old train.
