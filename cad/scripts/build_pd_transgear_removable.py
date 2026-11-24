@@ -35,8 +35,9 @@ pending exception ruling (#1377); the sheet states its printed worst case
 (``pd_transgear_removable_notes.BORE_PIN_WEB_NOTE``).
 
 Drawing marks (``draw_pd_transgear_removable``, decimal inch): ``spec.DRAWING_DIMENSIONS`` at
-``spec.DRAWING_PRECISION``, the plate thickness banded ``spec.PLATE_PRINTED_BAND``
-and each pin centre +/-``spec.PIN_LOCATION_TOL``; the outside diameter
+``spec.DRAWING_PRECISION``, the plate thickness banded ``spec.PLATE_PRINTED_BAND``;
+each pin centre is a REF target (``pd_transgear_removable_callouts.TARGET_TEXT``),
+accepted by the wheel's trial on both seats' pins; the outside diameter
 ``BlankDia`` is driven per configuration, so each configuration's view prints
 its own.  The sheet's SPROCKET DATA and notes are file properties.  The
 dimensions' callout rows (``pd_transgear_removable_callouts``) are authored
@@ -93,7 +94,7 @@ from _drawing_precision import (
 )
 from _drawing_dimension_insert import add_diametric_linear_dimension
 from _drawing_marks import apply_drawing_properties, clear_dimensions_for_drawing, mark_dimensions_for_drawing
-from _drawing_tolerances import _set_tolerance_precision, set_dimension_symmetric_tolerance
+from _drawing_tolerances import _set_tolerance_precision
 from _fit_deviations import deviations
 from _simplified_part import save_simplified_part
 from _grouped_bom_properties import apply_grouped_bom_properties
@@ -132,7 +133,6 @@ if any(abs(x) > 1e-9 for x, _y in PIN_HOLE_CENTRES):
 
 
 _TOL_LIMIT = 3  # swTolType_e.swTolLIMIT
-_TOL_SYMMETRIC = 4  # swTolType_e.swTolSYMMETRIC
 
 
 @_telemetry.traced("dim.pd_transgear_removable_text")
@@ -156,13 +156,10 @@ def author_dimension_callouts(adapter) -> None:
 
 def family_bands() -> dict[tuple[str, str], tuple[int, float, float]]:
     """``(feature, dimension) -> (tolerance type, lower, upper)`` in mm: the
-    bands the sheet prints once for T12, T18 and T24 (they share the plate
-    and the pin holes), as the build sets them below."""
-    pin = (_TOL_SYMMETRIC, -spec.PIN_LOCATION_TOL, spec.PIN_LOCATION_TOL)
+    band the sheet prints once for T12, T18 and T24 (they share the plate),
+    as the build sets it below."""
     return {
         ("BlankProfile", "BlankWidth"): (_TOL_LIMIT, *deviations(spec.PLATE_PRINTED_BAND)),
-        ("BorePinsProfile", "PinPosY"): pin,
-        ("BorePinsProfile", "PinNegY"): pin,
     }
 
 
@@ -1145,15 +1142,12 @@ def build(adapter) -> dict[str, str]:
     )
     report_mass_properties(adapter)
     # Manufacturing drawing support: supplied plate thickness stays within
-    # its printed band and each machined pin centre holds its location band.
+    # its printed band.  Each machined pin centre is a REF target with no
+    # band (the callouts module's TARGET_TEXT parenthesizes it): the wheels
+    # are accepted by dropping on both seats' pins.
     # Bore and pin-hole sizes are drilled (the title block's DRILLED HOLES
     # row governs them). The places are the part's (drawing-simplicity-policy.md `How the repository implements the guidelines`).
     _plate_limits(adapter)
-    for name in ("PinPosY", "PinNegY"):
-        set_dimension_symmetric_tolerance(
-            adapter, "BorePinsProfile", name, spec.PIN_LOCATION_TOL,
-            display_unit=spec.UNIT,
-        )
     assert_bands_in_every_configuration(adapter)
     apply_drawing_precision(adapter, spec.DRAWING_PRECISION)
     clear_dimensions_for_drawing(adapter)

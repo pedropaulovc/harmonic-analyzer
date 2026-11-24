@@ -65,9 +65,20 @@ def test_every_marked_dimension_has_one_view_and_model_places() -> None:
 
 
 def test_pin_locations_print_inside_the_shared_band() -> None:
-    """Each hole is located inside the band the shafts' pins share, so the
+    """Each hole's offset prints as a REF target (fit audit 2026-11-23); its
+    analysis scatter stays inside the band the shafts' pins share, so the
     slip clearance absorbs both parts' spacing error; the drilled sizes print
     their 3-place drill."""
+    assert callouts.TARGET_TEXT == {
+        ("BorePinsProfile", name): {callouts.TEXT_PREFIX: "(", callouts.TEXT_SUFFIX: ")"}
+        for name in ("PinPosY", "PinNegY")
+    }
+    authored = callouts.authored_text()["BorePinsProfile"]
+    assert authored["PinPosY"] == authored["PinNegY"] == {
+        callouts.TEXT_PREFIX: "(", callouts.TEXT_SUFFIX: ")"
+    }
+    # No native band on the offsets: the plate's is the only one.
+    assert set(part.family_bands()) == {("BlankProfile", "BlankWidth")}
     assert spec.DRAWING_PRECISION_BY_NAME["PinPosY"] == 4
     assert spec.DRAWING_PRECISION_BY_NAME["PinNegY"] == 4
     assert spec.DRAWING_PRECISION_BY_NAME["BoreDiaDim"] == 3
@@ -109,6 +120,19 @@ def test_web_worst_case_is_the_printed_limits() -> None:
     assert notes.BORE_PIN_WEB_WORST_IN <= web < notes.BORE_PIN_WEB_WORST_IN + 0.001
     assert 0.0 < notes.BORE_PIN_WEB_WORST_IN * 25.4 < seat_geometry.BORE_PIN_WEB
     assert notes.BORE_PIN_WEB_NOTE in notes.DRAWING_NOTES.splitlines()
+    # A wheel that binds on the pins has one hole drilled #39, the next
+    # number size: its web, re-derived the same way, prints beside the #40's.
+    assert notes.EASED_HOLE_DRILL == ("#39", 0.0995)
+    eased = web - (notes.EASED_HOLE_DRILL[1] - spec.PIN_HOLE_DIA / 25.4) / 2.0
+    assert eased == pytest.approx(0.01794, abs=1e-5)
+    assert notes.EASED_WEB_WORST_IN <= eased < notes.EASED_WEB_WORST_IN + 0.001
+    assert notes.BORE_PIN_WEB_NOTE == (
+        "BORE TO DRIVE-PIN HOLE WEB .018 MIN; .017 MIN AT A HOLE DRILLED #39."
+    )
+    # The acceptance is the trial on the pins, never a reading of the offsets.
+    assert notes.TRIAL_NOTE in notes.DRAWING_NOTES.splitlines()
+    assert "DROPS ON BOTH SEATS' PINS FREELY" in notes.TRIAL_NOTE
+    assert notes.EASED_HOLE_DRILL[0] in notes.TRIAL_NOTE
 
 
 def test_sprocket_data_lists_every_configuration() -> None:
@@ -223,9 +247,11 @@ def test_notes_specify_every_blank_and_the_operations_not_on_the_views() -> None
     assert "HUB REMOVED FLUSH" in notes.DRAWING_NOTES
 
 
-def test_notes_stay_within_four_lines_and_never_restate_the_title_block() -> None:
+def test_notes_stay_within_five_lines_and_never_restate_the_title_block() -> None:
+    # Five since the fit audit of 2026-11-23: the wheels' trial on the pins
+    # replaces the offsets' printed band and needs its one line.
     lines = notes.DRAWING_NOTES.splitlines()
-    assert len(lines) <= 4
+    assert len(lines) <= 5
     text = notes.DRAWING_NOTES.upper()
     assert "DEBUR" not in text and "+0.10" not in text
     assert "DEBUR" not in str(_config.parts("pd-transgear-removable")["finish"]).upper()

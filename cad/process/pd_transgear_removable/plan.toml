@@ -13,6 +13,14 @@ id = "drill-40"
 name = "#40 drill"
 ref = "drill-40"  # Drills #40
 
+# Fit audit 2026-11-23 (pending owner confirmation): the pin-hole offsets are
+# REF targets, each wheel accepted by dropping on both seats' pins; a wheel
+# that binds has one drive-pin hole drilled #39 (115-piece index).
+[[tools]]
+id = "drill-39"
+name = "#39 drill"
+ref = "drill-39"
+
 [[tools]]
 id = "drill-13-32"
 name = "13/32 drill"

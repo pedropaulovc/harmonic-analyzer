@@ -177,8 +177,11 @@ if type(CHAIN_LINK_COUNT) is not int or CHAIN_LINK_COUNT <= 0 or CHAIN_LINK_COUN
 # and drive-pin stack reads (seat.PLATE_BAND).
 PLATE_PLACES = 3
 PLATE_PRINTED_BAND = (0.0, -0.0762)  # (upper, lower): +.000/-.003
-# Each pin centre prints .2756 (the shared 7.0 at four places) +/-.0009, the
-# shared +/-DRIVE_PIN_OFFSET_TOL the crank seat's pins also carry.
+# Each pin centre prints .2756 (the shared 7.0 at four places) as a REF target
+# (pd_transgear_removable_callouts.TARGET_TEXT), accepted by the wheel's
+# trial on both seats' pins.  PIN_LOCATION_TOL, the shared
+# +/-DRIVE_PIN_OFFSET_TOL, is the ANALYSIS scatter about that target which
+# the web and the slip budget below are charged; this sheet does not print it.
 PIN_LOCATION_PLACES = seat.DRIVE_PIN_OFFSET_PLACES
 PIN_LOCATION_TOL = seat.DRIVE_PIN_OFFSET_TOL
 # The drills the bore and the pin holes are cut with, and their diameters (in).
@@ -245,7 +248,8 @@ for _what, _model, (_drill, _drill_in) in (
     if not _low - 1e-9 <= _drill_in * MM_PER_IN <= _high + 1e-9:
         raise AssertionError(f"the {_drill} drill does not cut the printed {_what}")
 # Slip: the smallest pin hole over the largest 3/32 dowel absorbs the pins'
-# and the holes' spacing error (each pair's two centres at opposite limits).
+# and the holes' spacing error (each pair's two centres at opposite ends of
+# their analysis scatter); the wheels' trial on the pins proves it.
 _PIN_HOLE_MIN = _printed_limits(PIN_HOLE_DIA, 3, (0.0, 0.0))[0]
 _DOWEL_MAX = seat.DRIVE_PIN_DIA + max(DOWEL_DIA_BAND_IN) * MM_PER_IN
 PIN_SLIP_CLEARANCE_MIN = _PIN_HOLE_MIN - _DOWEL_MAX  # 0.1003
