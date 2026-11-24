@@ -195,9 +195,9 @@ def test_hub_keeps_its_od_over_each_wall_floor() -> None:
     eccentricity = arm.HUB_COAXIALITY_DIA / 2.0
     required_od = bore_max + 2.0 * (arm.RULE12_WALL_FLOOR + eccentricity) + arm.LINEAR_2PL
     ceiling = math.ceil(round(required_od * 100.0, 9)) / 100.0
-    assert required_od == pytest.approx(9.9314)
+    assert required_od == pytest.approx(10.0332)
     assert arm.HUB_DIA >= arm.HUB_DIA_MIN == pytest.approx(ceiling)
-    assert arm.HUB_DIA_MIN == pytest.approx(9.94)
+    assert arm.HUB_DIA_MIN == pytest.approx(10.04)
 
 
 def test_hub_wall_covers_the_worst_printed_limits_and_eccentricity() -> None:
@@ -211,10 +211,12 @@ def test_hub_wall_covers_the_worst_printed_limits_and_eccentricity() -> None:
     bore_max = arm.PIVOT_HOLE_DIA + arm.PIVOT_HOLE_BAND[0]
     eccentricity = arm.HUB_COAXIALITY_DIA / 2.0
     assert od == pytest.approx(10.16)
-    assert bore_max == pytest.approx(6.5278)
+    # F-drilled at the DRILLED HOLES row (owner ruling 2026-11-24, fit audit
+    # question 1): .257 + .004.
+    assert bore_max == pytest.approx(6.6296)
     assert arm.HUB_COAXIALITY_DIA == pytest.approx(0.1016)
     wall = (od - printed_band - bore_max) / 2.0 - eccentricity
-    assert wall == pytest.approx(1.6383)
+    assert wall == pytest.approx(1.5874)
     # Named exception (RV-03): above the .060 floor, under the .080 target.
     assert arm.RULE12_WALL_FLOOR <= wall < WALL_TARGET_MM
     stated_wall = math.floor(wall / 25.4 * 1000 + 1e-9) / 1000 * 25.4
@@ -234,7 +236,7 @@ def test_hub_wall_covers_the_worst_printed_limits_and_eccentricity() -> None:
     # R9's inherited Ø0.50 zone is unsafe at the unchanged nominal OD.
     old_coaxiality = 0.50
     old_wall = (od - printed_band - bore_max) / 2.0 - old_coaxiality / 2.0
-    assert old_wall == pytest.approx(1.4391)
+    assert old_wall == pytest.approx(1.3882)
     assert old_wall < arm.RULE12_WALL_FLOOR
     # Omitting eccentricity recreates the old floor, which cannot meet the floor.
     old_floor = math.ceil(
