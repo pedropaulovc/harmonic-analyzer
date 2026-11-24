@@ -716,7 +716,7 @@ inspection = "Loads after the first: both witness lines on the saw (drawn below)
 gauge_checks = "other"
 
 [[setups.operations]]
-instruction = "First load, and whenever the screw has been loosened: wipe the arbor's shoulder, both faces of the saw round its hole and the cap's face clean and dry (not keyed: their friction alone drives the saw). Saw on the pilot's 1 in step, up against the shoulder, teeth cutting with M3 (clockwise seen from above); cap under it; the M8 flat-head screw from below, 5 mm hex key and torque wrench, {{process.saw_clamp_torque_nm:.0f}} N·m (15 ft·lb), holding the spindle as for the drawbar."
+instruction = "First load, and whenever the screw has been loosened: wipe the arbor's shoulder, the saw's faces round its hole and the cap's face clean and dry (friction alone drives the saw). Saw on the pilot's 1 in step, up against the shoulder, teeth cutting with M3 (clockwise from above); cap under it; its M8 screw from below, 5 mm hex key on the torque wrench: {{process.saw_clamp_torque_nm:.0f}} N·m (15 ft·lb), spindle held as for the drawbar."
 feed = "hand"
 
 [[setups.operations]]

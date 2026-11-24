@@ -29,12 +29,14 @@
 # frame (not after it). Both faces are still roughed in turns to .020 over,
 # the blanks released and reseated, then both finished.
 #
-# Speed (owner's priority): NC 43 min per load of two (about 22 min a rod),
+# Speed (owner's priority): NC 46 min per load of two (about 23 min a rod),
 # from 100 in the first draft: only the ring's zone and the shank's band are
 # pocketed (the waste beside the shank was pocketed on both faces), the skim
 # covers the fork alone and the outline takes three levels instead of five.
 # The 5/64 in corner recut and its tool change went with owner ruling
-# 2026-11-23, tool audit Q9 (2 min and one M6 a load).
+# 2026-11-23, tool audit Q9 (2 min and one M6 a load). The slot's light
+# pass and its two steps a level, for the owned arbor's friction drive, put
+# 3 min a load back (CR06 5.3 min, from 2.1).
 #
 # Workholding: the agent's recommendation (option A, the vise; owner's
 # per-part choice pending, 2026-11-21). The plate supports the two blanks'
@@ -834,7 +836,7 @@ inspection = "Loads after the first: both witness lines on the saw (drawn below)
 gauge_checks = "other"
 
 [[setups.operations]]
-instruction = "First load, and whenever the screw has been loosened: wipe the arbor's shoulder, both faces of the saw round its hole and the cap's face clean and dry (not keyed: their friction alone drives the saw). Saw on the pilot's 1 in step, up against the shoulder, teeth cutting with M3 (clockwise seen from above); cap under it; the M8 flat-head screw from below, 5 mm hex key and torque wrench, {{process.saw_clamp_torque_nm:.0f}} N·m (15 ft·lb), holding the spindle as for the drawbar."
+instruction = "First load, and whenever the screw has been loosened: wipe the arbor's shoulder, the saw's faces round its hole and the cap's face clean and dry (friction alone drives the saw). Saw on the pilot's 1 in step, up against the shoulder, teeth cutting with M3 (clockwise from above); cap under it; its M8 screw from below, 5 mm hex key on the torque wrench: {{process.saw_clamp_torque_nm:.0f}} N·m (15 ft·lb), spindle held as for the drawbar."
 feed = "hand"
 
 [[setups.operations]]
