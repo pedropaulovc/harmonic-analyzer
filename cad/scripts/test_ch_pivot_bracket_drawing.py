@@ -218,11 +218,11 @@ def test_every_banded_length_says_what_its_band_holds() -> None:
     banded = {name for _feature, name in model_toleranced_dimensions(part)}
     assert banded - {"SetScrewLocation"} <= set(drawing.DIMENSION_CALLOUTS)
     shaft = _config.parts("ch-pivot-shaft")["number"]
-    # #3114: nothing bears on an ear; its thickness rides the title block, so
-    # it carries no words (rule 7: no reason on a size with no band of its
-    # own; fit audit census, MHA-CH-08 ear thickness).
+    # #3114: nothing bears on an ear; its thickness rides the title block's
+    # .XXX, a three-place size given a function, so it names what the third
+    # place holds: the apex tap's walls (at .XX the spec's wall assert fails).
     assert shaft == "MHA-CH-05"
-    assert "EarThick" not in drawing.DIMENSION_CALLOUTS
+    assert drawing.DIMENSION_CALLOUTS["EarThick"] == "KEEPS 4-40 TAP WALLS"
     # Rule 7: the tap's station is a location, so its mate rides the tap.
     assert "SetScrewLocation" not in drawing.DIMENSION_CALLOUTS
     assert shaft in drawing.SET_SCREW_MATE
