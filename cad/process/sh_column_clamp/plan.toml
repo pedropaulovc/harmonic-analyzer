@@ -468,12 +468,12 @@ vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{process.blank_section_mm}}
 beam = { axis = "z", hold = "cantilever", extent_mm = [0, "{{process.upright_top_max_mm}}"], clamp_mm = [0, "{{process.upright_grip_mm}}"], section_mm = { x = "{{process.blank_section_mm}}", y = "{{process.blank_section_mm}}" }, vise_left = "other" }
 
 [[setups.operations]]
-instruction = "Home the mill first ($H). Repeat Setup 2's touch-off: edge finder X0 Y0 on the bar's axis (the blank was turned over), then M6 T1 and Z0 as below."
+instruction = "Before the first blank goes in: home the mill ($H), then G54 Z0 on the parallels' top, touched with the end mill on the fixed-jaw parallel. The vise holds no blank yet: beside a standing blank the spindle nose would meet its top before the tip reached the parallel."
+instruction_detailed = "Console M6 T1 (the tool setter measures it). Jog the cutter over the fixed-jaw parallel near its middle, its edge clear of the jaw. Spindle stopped, its tip just dragging a .002 feeler leaf on the parallel: G10 L20 P1 Z0.051. Raise Z to the top of its travel before loading the blank."
 feed = "hand"
 
 [[setups.operations]]
-instruction = "G54 Z0: the parallels' top, touched with the end mill on the fixed-jaw parallel beside the blank."
-instruction_detailed = "Console M6 T1 (the tool setter measures it). MDI G0 X-17.000 Y2.675: the cutter left of the blank, its edge .02 off the fixed jaw, over that jaw's parallel. Spindle stopped, its tip just dragging a .002 feeler leaf on the parallel: G10 L20 P1 Z0.051."
+instruction = "Clamp the first blank as the Holding line says. Repeat Setup 2's edge-finder touch-off: X0 Y0 on the bar's axis (the blank was turned over). Z0 stands."
 feed = "hand"
 
 [[setups.operations]]
@@ -757,7 +757,7 @@ gauge_checks = [
 ]
 
 [[setups.operations]]
-instruction = "Then unclamp that blank and check each hole's height on the surface plate."
+instruction = "First front only: unclamp it and check each hole's height on the surface plate. The fixed jaw (B against it) and the program hold this height on the later fronts."
 inspection = "Each hole from B (Y) {{cad.ear_height_min_in:.3dot}}–{{cad.ear_height_max_in:.3dot}}: the part on B on the surface plate, the height gauge over the slip-in pin less half its Ø. Outside: stop and tell the owner."
 gauge_checks = [{ gauge = "height-gauge", band_mm = "{{cad.ear_height_band_mm}}" }]
 
