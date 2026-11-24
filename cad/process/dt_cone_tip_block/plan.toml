@@ -1108,10 +1108,6 @@ gauge_checks = [{ gauge = "calipers", band_mm = [0, "{{process.saw_screw_stand_m
 feed = "hand"
 
 [[setups.operations]]
-instruction = "With a marker, one line down the cap's rim and out across the saw's face; a second, in line with it, down the arbor's body and out across the saw's other face. The cap's friction alone drives the saw: the lines show if it slips."
-feed = "hand"
-
-[[setups.operations]]
 instruction = "Before clamping: mic E to W at the TOP end and write it down (mm = in × 25.4); the saw's Z0 is set from it. Clamp the block as Holding says. Home the mill ($H)."
 feed = "hand"
 
@@ -1136,6 +1132,10 @@ feed = "hand"
 instruction = "Tip runout, spindle stopped: the .001 dial indicator on the same base, its plunger square on the saw's rim. Turn the spindle one full turn by hand, backward; take the highest and the lowest tooth. Then the indicator and its base off the mill."
 inspection = "Highest to lowest at most {{process.saw_tip_tir_max_mm:in.3dot}}. Over: back to the bench mounting, the saw a quarter turn round on the pilot; still over, stop and tell the owner."
 gauge_checks = "other"
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Both runouts accepted: with a marker, one line down the cap's rim and out across the saw's lower face; a second, in line with it, down the arbor's body and out across the saw's upper face. The cap's friction alone drives the saw: the lines show if it slips."
 feed = "hand"
 
 [[setups.operations]]

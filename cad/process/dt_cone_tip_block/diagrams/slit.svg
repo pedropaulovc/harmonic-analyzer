@@ -20,9 +20,9 @@
   <text class="label" x="560.0" y="110.0">2-3/4 x .064 saw</text>
   <line class="leader" x1="556.0" y1="106.0" x2="495.0" y2="236.5"/>
   <circle class="leader-dot" cx="495.0" cy="236.5" r="2.5"/>
-  <text class="label" x="560.0" y="150.0">TOP, .75 past jaw side</text>
-  <line class="leader" x1="556.0" y1="146.0" x2="400.0" y2="226.0"/>
-  <circle class="leader-dot" cx="400.0" cy="226.0" r="2.5"/>
+  <text class="label" x="232.0" y="92.0">TOP, .75 past jaw side</text>
+  <line class="leader" x1="372.0" y1="96.0" x2="400.0" y2="219.8"/>
+  <circle class="leader-dot" cx="400.0" cy="219.8" r="2.5"/>
   <text class="label" x="560.0" y="262.0">cap Ø1.25 x .50, its screw</text>
   <line class="leader" x1="556.0" y1="258.0" x2="471.3" y2="252.0"/>
   <circle class="leader-dot" cx="471.3" cy="252.0" r="2.5"/>
