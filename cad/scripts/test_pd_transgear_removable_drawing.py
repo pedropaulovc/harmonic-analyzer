@@ -249,11 +249,11 @@ def test_notes_specify_every_blank_and_the_operations_not_on_the_views() -> None
     assert "HUB REMOVED FLUSH" in notes.DRAWING_NOTES
 
 
-def test_notes_stay_within_five_lines_and_never_restate_the_title_block() -> None:
-    # Five since the fit audit of 2026-11-23: the wheels' trial on the pins
-    # replaces the offsets' printed band and needs its one line.
+def test_notes_stay_within_four_lines_and_never_restate_the_title_block() -> None:
+    # Rule 7's four short lines: the wheels' trial on the pins prints on the
+    # holes' own 2X callout, not in the notes.
     lines = notes.DRAWING_NOTES.splitlines()
-    assert len(lines) <= 5
+    assert len(lines) <= 4
     text = notes.DRAWING_NOTES.upper()
     assert "DEBUR" not in text and "+0.10" not in text
     assert "DEBUR" not in str(_config.parts("pd-transgear-removable")["finish"]).upper()

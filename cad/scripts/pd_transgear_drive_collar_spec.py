@@ -955,7 +955,10 @@ DRAWING_NOTES = (
     f"{inch_text(DRIVE_PIN_COLLAR_RIM_WORST, 3)} MIN.\n"
     f"{WEB_NOTE}. PERMANENT PIN {FLAT_PIN_NUMBER}: HOLE TO DRIVE-PIN HOLE "
     f"{inch_text(FLAT_PIN_WEB_WORST, 3)} MIN.\n"
-    f"{REAM_NOTE}. PRESS FIT: THE PIN IS THE GAUGE; NONE ENTERS ITS HOLE BY HAND.\n"
+    # A pin that enters by hand is not scrap: the traveler (Ops 180, 210)
+    # passes it and MHA-PD-00 steps 20B/20D bond it, so the note admits it
+    # (rule 25: the sheet and its procedures agree).
+    f"{REAM_NOTE}. PRESS FIT: THE PIN IS THE GAUGE. LOOSE PIN: BOND PER MHA-PD-00.\n"
     f"{TRIAL_NOTE}. LOCATE BY TRIAL: ALL 3 {SPROCKET_NUMBER} WHEELS DROP ON FREELY."
 )
 if max(map(len, DRAWING_NOTES.splitlines())) > FIT_UP_NOTE_WIDTH:
