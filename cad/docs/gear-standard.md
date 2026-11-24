@@ -255,7 +255,7 @@ that the arithmetic worst case keeps contact ratio 1.0 (1.037,
 hook. Easing
 past the bind is not booked: the remedy stops where the teeth just turn free,
 and the no-skip check only guards against the mesh coming loose. The builder's
-0.121–0.14 datum band remains the design proof of the modelled mesh
+0.12–0.14 datum band remains the design proof of the modelled mesh
 (`paper_drive_rack_setup`).
 
 ### Setting the cone mesh

@@ -231,19 +231,7 @@ for _profile in _PROFILE_CORNERS:
 # running backlash. Invert the actual translated-profile normal-contact law:
 # b=2(H-r)tan(a)-2s*sin(a+pi/N)/cos(a).
 RACK_BACKLASH = 0.13
-# UNRULED, HELD-OUT OWNER QUESTION (fit audit 2026-11-23 question 4, the
-# MHA-PD-23 bond; pending owner confirmation, no ruling and no exception
-# entry stands behind this number).  The low end was .12.  The bonded pin
-# may lean in its bore's gap (paper_drive_arm_registration.
-# S_AXIS_TILT_MAX_RAD), which takes the feed's opposite-flank closing from
-# .11963 to .12029 mm; .121 is the worst case as built, the least
-# three-place low end at which test_pd_feed_rack_drawing's budget still
-# closes.  It is recorded so the stack is visible, not as an accepted
-# design: nothing at assembly holds the datum backlash at .121 or over
-# (no sheet prints this band, MHA-PD-00 sets the mesh by feel, #2416).
-# If the owner does not accept it the cause is removed instead (a lean
-# limit on the bonded pin, or the press kept), and this returns to .12.
-RACK_BACKLASH_RANGE = (0.121, 0.14)
+RACK_BACKLASH_RANGE = (0.12, 0.14)
 _PA = math.radians(PRESSURE_ANGLE_DEG)
 RACK_MESH_EXTENSION = (
     RACK_BACKLASH
