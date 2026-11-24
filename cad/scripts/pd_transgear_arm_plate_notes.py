@@ -64,13 +64,18 @@ PRESS_HOLE_CALLOUT = "\n".join((
 # MHA-PD-00 view whose native S-K dimension sets the plate on the arm; the
 # order of work is that sheet's steps 13A-13E, not this note's (#1388
 # policy: the setting's value lives on the assembly sheet, not here).  The
-# mouths take the title block's edge break
+# note then says which route governs (machinist review r3, clarity, two
+# runs: the note and the frame still read as two routes): the holes are
+# reamed in place at assembly and the sheet-2 position is checked after
+# that ream, the reviewer's option (a) and what the traveler and MHA-PD-00
+# steps 13A-13E already do.  The mouths take the title block's edge break
 # (pd_transgear_arm_plate_geometry.LOCATOR_MOUTH_BREAK_MAX_MM).
 LOCATOR_NOTE_NUMBER = 1
 LOCATOR_NOTE_WIDTH = 30
 LOCATOR_NOTE = "\n".join(textwrap.wrap(
     f"{LOCATOR_NOTE_NUMBER}. "
-    f"DRILL AND REAM AT ASSEMBLY ON ARM {ARM_NUMBER}, {knob_setting_ref()}.",
+    f"DRILL AND REAM AT ASSEMBLY ON ARM {ARM_NUMBER}, {knob_setting_ref()}. "
+    "SHEET 2 POSITION IS CHECKED AFTER REAMING.",
     width=LOCATOR_NOTE_WIDTH,
     subsequent_indent="   ",
     break_on_hyphens=False,
