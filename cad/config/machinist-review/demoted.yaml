@@ -72,8 +72,8 @@ demoted:
   pd_paper_drive_assembly: fit-batch-pd
   pd_platen_bottom_guide: fit-batch-pd
   pd_platen_guide: fit-batch-pd
+  pd_rack_pinion: fit-batch-pd
   pd_support_bar: fit-batch-pd
-  pd_transgear_arm: fit-batch-pd
   pd_transgear_disc_hub: fit-batch-pd
   pd_transgear_feed_pinion: fit-batch-pd
   pd_transgear_front_bushing: fit-batch-pd

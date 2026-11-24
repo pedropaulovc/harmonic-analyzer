@@ -17,7 +17,6 @@ from pd_rack_pinion_spec import inch_ceil_mm, inch_floor_mm, inch_text
 from pd_transgear_pin_spec import (
     ARM_NUMBER,
     BOND_CLEARANCE_PRINTED,
-    FRONT_BUSHING_NUMBER,
     RETAINING_COMPOUND,
     RING_NUMBER,
     RUNNING_CLEARANCE,
@@ -94,18 +93,17 @@ RUNNING_CLEARANCE_TEXT = (
     " REF)"
 )
 SHANK_CALLOUT = f"SEE NOTE {SHANK_FIT_NOTE}\n{RUNNING_CLEARANCE_TEXT}"
-# The +/-.001 station names the stack it sets once, by drawing number (rule
-# 4): the groove's load wall holds the ring that stops the front bushing and
-# the sleeve (``transgear_cluster_fit.SLEEVE_REAR_FORWARD_CHAIN``); the end
-# float is shimmed at assembly.
-GROOVE_STATION_CALLOUT = f"SETS STACK OF MHA-PD-10 AND {FRONT_BUSHING_NUMBER}"
+# The +/-.001 groove station prints value and band only (rule 7: a location
+# dimension carries no label; final farm run on 237cdfc514): the stack it
+# sets, the ring that stops the front bushing and the sleeve
+# (``transgear_cluster_fit.SLEEVE_REAR_FORWARD_CHAIN``), is necessity N-03's
+# reason in cad/config/necessity/pd-transgear-pin.yaml.
 
 # lane -> (feature, dimension) -> text.
 CALLOUTS: dict[int, dict[tuple[str, str], str]] = {
     CALLOUT_ABOVE: {("PinProfile", "GrooveDia"): GROOVE_CALLOUT},
     CALLOUT_BELOW: {
         ("PinProfile", "ShankDia"): SHANK_CALLOUT,
-        ("PinProfile", "GrooveStation"): GROOVE_STATION_CALLOUT,
         ("PinProfile", "GrooveWidth"): GROOVE_CALLOUT,
     },
     # The root radius is a single limit, its own one-line "R.005 MAX" (a
