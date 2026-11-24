@@ -228,10 +228,12 @@ def test_printed_bands_are_the_sheets() -> None:
     assert _inch(disc_features["far_end"]["length"]) == [0.10, 0.12]
     ferrule_features = manifest("dt_crank_handle_ferrule")["features"]
     assert _inch(ferrule_features["bore"]["dia"]) == [0.298, 0.308]
-    assert ferrule_features["bore"]["process"] == "bore"
+    # Fit audit question 15: the N drill names the hole's process.
+    assert ferrule_features["bore"]["process"] == "drill"
     cup_features = manifest("dt_crank_handle_butt_cup")["features"]
     assert _inch(cup_features["pocket"]["depth"]) == [0.212, 0.222]
-    assert _inch([cup_features["pocket"]["dia_max"]]) == [0.257]
+    # The pocket's own limits, unmatched to the head (fit audit question 15).
+    assert _inch(cup_features["pocket"]["dia"]) == [0.248, 0.257]
     assert _inch(cup_features["chamfer_bore"]["leg"]) == [0.005, 0.01]
     plug_end = manifest("sm_gooseneck_end_plug")["features"]
     assert plug_end["tap"]["thread"] == "#10-24 UNC-2B"

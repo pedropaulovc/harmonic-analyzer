@@ -1,0 +1,10 @@
+# Why each band tighter than the title block stays on MHA-DT-32
+# (drawing-guidelines rule 4; owner ruling 2026-11-24: the reason lives here,
+# not on the sheet).  The shoulder turned by trial to the oak bore inside
+# .1535-.1585 is owner ruling 2026-11-24, fit audit question 14.
+necessity:
+  - id: N-01
+    feature: "sheet 1, front view, Ø.1560 ±.0025 shoulder"
+    kind: gap
+    reason: "the trial's result for any accepted MHA-DT-08 bore"
+    source: "owner ruling 2026-11-24, fit audit question 14 (DT-32 shoulder by trial, limits .1535-.1585)"

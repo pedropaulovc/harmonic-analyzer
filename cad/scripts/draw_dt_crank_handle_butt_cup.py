@@ -87,10 +87,9 @@ from dt_crank_handle_butt_cup_spec import (
     BODY_DIA,
     FLOOR_HOLE_DIA,
     OVERALL_LENGTH,
-    POCKET_CLEARANCE,
     POCKET_DEPTH,
     POCKET_DIA,
-    POCKET_DIA_MAX,
+    POCKET_DIA_BAND,
     POCKET_FLOOR_CORNER_R_BAND,
     POCKET_FLOOR_CORNER_R_MAX,
     POCKET_FLOOR_CORNER_R_TOL_TYPE,
@@ -317,20 +316,16 @@ requirement(
     "pocket",
     kind="counterbore",
     faces=(CylinderFace(POCKET_DIA), PlanarFace((1.0, 0.0, 0.0), -POCKET_DEPTH)),
-    requirements=("diametral_clearance", "dia_max", "depth", "corner_radius_max"),
+    requirements=("dia", "depth", "corner_radius_max"),
     fields={
         "axis": ([-1.0, 0.0, 0.0], ("POCKET_DIA",)),
         "at": ([0.0, 0.0, 0.0], ("POCKET_DIA",)),
         "span": ([-POCKET_DEPTH, 0.0], ("POCKET_DEPTH",)),
-        "dia_ref": (
-            POCKET_DIA,
-            ("POCKET_DIA", "REFERENCE_DIMENSIONS", (_SELF, "SECTION_KEEP")),
+        "dia": (
+            limits(POCKET_DIA, _P["PocketDia"], POCKET_DIA_BAND, unit=UNIT),
+            ("POCKET_DIA", "POCKET_DIA_BAND", "UNIT", (_SELF, "SECTION_KEEP")),
         ),
-        "dia_max": (POCKET_DIA_MAX, ("POCKET_DIA_MAX",)),
-        "diametral_clearance": (
-            list(POCKET_CLEARANCE),
-            ("POCKET_CLEARANCE", (_NOTES, "POCKET_NOTE_TEXT")),
-        ),
+        "nominal_dia": (POCKET_DIA, ("POCKET_DIA",)),
         "mate": (
             f"{SCREW_NUMBER} {SCREW_NAME} HEAD",
             (
@@ -356,7 +351,7 @@ requirement(
         "callout": (POCKET_FIT_CALLOUT, ((_NOTES, "POCKET_FIT_CALLOUT"),)),
     },
     precision={
-        "dia_ref": _P["PocketDia"],
+        "dia": _P["PocketDia"],
         "depth": _P["PocketDepth"],
         "corner_radius_max": _P["PocketFloorRadius"],
     },

@@ -384,14 +384,3 @@ range_mm = [3.9878, 4.064]
 resolution_mm = 0.00508
 [tools.zz-pins-1570-1600]
 description = "Class ZZ pins for .157-.160: GO .157 plus (single), NO-GO .160 minus (the .061-.500 box)"
-# .1610-.1635: MHA-DT-08's #20-drilled oak bore and its trial hole (owner
-# ruling 2026-11-23, tool audit Q14: "DRILL #20, read with pins"). A #20 never
-# cuts under .1610; .1635 is the largest bore the MHA-DT-32 shoulder print
-# (.1540-.1560) fits at .0050-.0075 and the handle's walls are sized at
-# (dt_crank_handle_spec.PIVOT_BORE_FIT_MAX). The bore is read with the box's
-# .161, .162 and .163 minus pins; the .1635 minus single is the NO-GO.
-[gauges.zz-pins-1610-1635]
-range_mm = [4.0894, 4.1529]
-resolution_mm = 0.00508
-[tools.zz-pins-1610-1635]
-description = "Class ZZ pins for .1610-.1635: reading pins .161, .162, .163 minus (the .061-.500 box), NO-GO .1635 minus (single)"

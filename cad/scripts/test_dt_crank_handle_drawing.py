@@ -126,8 +126,10 @@ def test_every_profile_size_is_a_model_dimension() -> None:
     assert not hasattr(spec, "DRAWING_NOTES")
     assert spec.REFERENCE_RADII == {"FlareR", "SConcaveR", "SConvexR", "DomeR"}
     assert spec.REFERENCE_RADII <= spec.DRAWING_DIMENSIONS["HandleProfile"]
-    assert drawing.PIVOT_BORE_CALLOUT.startswith("DRILL THRU, RUNNING FIT ON\n")
-    assert "MHA-DT-32 PIVOT SCREW" in drawing.PIVOT_BORE_CALLOUT
+    # Owner ruling 2026-11-24, fit audit question 14: the bore stays drilled
+    # #20, capped at the walls' .1635, and MHA-DT-32 is turned to it.
+    assert drawing.PIVOT_BORE_CALLOUT.startswith("#20 DRILL THRU, <MOD-DIAM>.1635 MAX\n")
+    assert "MHA-DT-32 SHOULDER IS\nTURNED TO THIS BORE" in drawing.PIVOT_BORE_CALLOUT
     # The fitted sizes and the small corner features print at three places,
     # the routine contour at the title block's two.
     three = {
@@ -248,12 +250,12 @@ def test_tenon_and_counterbore_are_fitted_to_the_parts_they_take() -> None:
         assert "TO SUIT" not in callout and "DIAMETRAL" not in callout
     assert drawing.SHEET_NOTES.startswith("1. ")
     assert "\n2. " in drawing.SHEET_NOTES
-    # F12 (#290): the reamed bore's running clearance on the shoulder, at
-    # the places that print it exactly.
+    # F12 (#290): the shoulder's running clearance is MHA-DT-32's acceptance
+    # (made last); the bore names it and prints no clearance of its own.
     assert callouts["PivotBoreDia"] == drawing.PIVOT_BORE_CALLOUT
     assert screw.DIAMETRAL_CLEARANCE_MIN == pytest.approx(0.0050 * IN)
     assert screw.DIAMETRAL_CLEARANCE_MAX == pytest.approx(0.0075 * IN)
-    assert "(CLEARANCE .0050-.0075)" in drawing.PIVOT_BORE_CALLOUT
+    assert "CLEARANCE" not in drawing.PIVOT_BORE_CALLOUT
     # The bonded-fit clearance alone controls the counterbore (round 1
     # f08277cd): the largest cup plus the widest glue line stays under the
     # Ø.435 the butt wall is budgeted at, so no second limit prints.
@@ -291,9 +293,13 @@ def test_tenon_and_counterbore_are_fitted_to_the_parts_they_take() -> None:
         spec.TENON_LENGTH - _XX - spec.EDGE_BREAK_MAX_MM - ferrule.SEAT_MOUTH_BREAK_MAX
     )
     assert spec.TENON_GLUE_LENGTH_MIN >= 3.5
-    # F12 (#290): the .1610 reamer's band, which the walls are judged at.
+    # F12 (#290): the #20 drilled bore as accepted, .1610 to its .1635 MAX
+    # cap, the largest of which the walls are judged at.
     assert spec.PIVOT_BORE_DIA == pytest.approx(0.161 * IN)
-    assert spec.PIVOT_BORE_BAND == pytest.approx((0.0005 * IN, 0.0))
+    assert spec.PIVOT_BORE_BAND == pytest.approx((0.0025 * IN, 0.0))
+    assert spec.PIVOT_BORE_DIA + spec.PIVOT_BORE_BAND[0] == pytest.approx(
+        spec.PIVOT_BORE_FIT_MAX
+    )
     # No run-out: the cup cures centred on the waxed MHA-DT-32 at assembly
     # (MHA-DT-08 machinist review of 2026-10-18 found 0.2 TIR over-spec).
     assert not hasattr(spec, "BORE_RUNOUT_TIR")
