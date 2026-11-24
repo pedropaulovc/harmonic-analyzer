@@ -189,7 +189,7 @@ def test_native_gdt_and_finish_present() -> None:
     assert drawing.ROD_HOLE.fields["position_dia"][0] == pytest.approx(float(printed_tolerance) * 25.4)
     assert ast.unparse(keywords["diameter"]) == "True"
     assert 'characteristic="position"' in source
-    assert "add_surface_finish(" in source
+    assert "add_surface_finish(" not in source
     assert "add_native_hole_callout(" in source
     # r743-p1s-B: both rod-pin annotations take the diameter-picked edge.
     assert "edge_xy=rod_rim" not in source
@@ -504,12 +504,13 @@ def test_part_stamps_make_critical_drawing_properties() -> None:
     assert int(spec["quantity"]) == 20
 
 
-def test_surface_finish_is_part_owned_authored_and_consumed() -> None:
-    (control,) = ch_rocker_arm_spec.SURFACE_FINISHES
-    assert control.key == "pivot_bore"
-    assert control.roughness_um == 1.6
-    assert control.face.diameter_mm == ch_rocker_arm_spec.PIVOT_HOLE_DIA
+def test_pivot_bore_carries_no_roughness_symbol() -> None:
+    """Owner ruling 2026-11-24, fit audit question 1: the pivot only rocks
+    against one side of its clearance (drawing-guidelines.md rule 6)."""
+    assert ch_rocker_arm_spec.SURFACE_FINISHES == ()
+    assert arm.SURFACE_FINISHES == ()
     assert arm.PIVOT_HOLE_DIA == ch_rocker_arm_spec.PIVOT_HOLE_DIA
+    assert "finish_ra" not in drawing.PIVOT_BORE.requirements
 
 
 def test_every_view_keep_map_is_curated_on_its_own_view() -> None:
@@ -679,24 +680,28 @@ def test_top_edge_model_band_is_unchanged_by_the_basic_drawing_override() -> Non
     assert ch_rocker_arm_notes.DRAWING_PRECISION["TopEdgeReference"]["TopAbovePivot"] == 3
 
 
-def test_pivot_bore_ream_band_rides_its_diameter_not_a_note() -> None:
-    """Codex #936 sweep (drawing-guidelines.md rule 3 (decimal places carry the tolerance)): note 6 printed "REAM +0.03/0, Ra
-    1.6" while the O6.50 printed bare. The band is now native on PivotDia and
-    the Ra is the bore's own symbol; the note keeps only REAM."""
+def test_pivot_bore_is_f_drilled_at_the_drilled_holes_row() -> None:
+    """Owner ruling 2026-11-24, fit audit question 1: the bore is drilled F,
+    .257 at the title block's DRILLED HOLES row, with no native band; the
+    callout names the drill and its mate and prints no number of its own."""
     from _drawing_contract import model_toleranced_dimensions
+    from _hole_spec import LETTER_DRILL_MM
 
-    assert model_toleranced_dimensions(arm)[("PivotHoleProfile", "PivotDia")] == (
-        "*deviations(PIVOT_HOLE_BAND)"
-    )
+    assert ch_rocker_arm_spec.PIVOT_HOLE_SPEC.size == "F"
+    assert ch_rocker_arm_spec.PIVOT_HOLE_DIA == LETTER_DRILL_MM["F"]
+    assert ("PivotHoleProfile", "PivotDia") not in model_toleranced_dimensions(arm)
+    assert ch_rocker_arm_notes.DRAWING_PRECISION["PivotHoleProfile"]["PivotDia"] == 3
     assert "PivotDia" in drawing.HUB_KEEP
+    assert drawing.PIVOT_BORE.fields["process"][0] == "F DRILL"
+    assert drawing.PIVOT_BORE.fields["drill"][0] == "F"
+    callout = ch_rocker_arm_notes.PIVOT_FIT_CALLOUT
+    assert "MHA-CH-05" in callout
+    assert "REAM" not in callout
+    assert not any(ch.isdigit() for ch in callout.replace("MHA-CH-05", ""))
     joined = " ".join(
         line.strip() for line in ch_rocker_arm_notes.DRAWING_NOTES.splitlines()
     )
-    assert "+0.03" not in joined
-    assert "Ra 1.6" not in joined
-    assert any(
-        control.key == "pivot_bore" for control in ch_rocker_arm_spec.SURFACE_FINISHES
-    )
+    assert "REAM" not in joined
 
 
 def test_no_rocker_note_carries_a_tolerance_band() -> None:
@@ -1149,8 +1154,8 @@ class _NativeQuantity:
         self.ArrowSide = 0
         self.second_arrow = (True, True)
         self.Type2 = 6 if name in {"PivotDia", "HubDia"} else 1
-        self.band = tuple(v / 1000.0 for v in ch_rocker_arm_spec.PIVOT_HOLE_BAND)
-        self.tolerance_type = 4 if name == "PivotDia" else 0
+        self.band = (0.0, 0.0)
+        self.tolerance_type = 0
         self.attached = ()
         self.dangling = False
         self.arc_conditions = {1: 2, 2: 0}

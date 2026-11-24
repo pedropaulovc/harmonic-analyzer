@@ -366,8 +366,8 @@ INDEXED_FIT_BANDS: dict[tuple[str, str], str] = {
         "pose's pivot float and the assembly's pivot air"
     ),
     ("ch_rocker_arm_spec", "PIVOT_HOLE_BAND"): (
-        "indexed into the hub's wall floor (HUB_DIA_MIN); the build also "
-        "sets it natively on PivotDia"
+        "title-block drilled-hole deviations (the F DRILL THRU row, no native "
+        "band); indexed into the hub's wall floor (HUB_DIA_MIN) and wall note"
     ),
     ("pd_transgear_knob_cup_spec", "HOLE_BAND"): (
         "title-block drilled-hole deviations (the web's #33 DRILL THRU row, no "

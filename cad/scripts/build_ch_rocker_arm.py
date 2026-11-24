@@ -108,7 +108,6 @@ from ch_rocker_arm_spec import (
     HUB_LENGTH,
     HUB_LENGTH_BAND,
     HUB_ROOT_RADIUS_MAX,
-    PIVOT_HOLE_BAND,
     PIVOT_HOLE_DIA,
     ROD_HOLE_SPEC,
     BOT_ARC_LEN,
@@ -747,12 +746,8 @@ def build(adapter) -> dict[str, str]:
     # The hub roots print as the single limit "2X R.008 MAX": both strap faces.
     _hub_root_radius_max_limit(adapter)
     set_dimension_prefix(adapter, "HubRoot", "HubRootRadius", HUB_ROOT_PREFIX)
-    # The reamed pivot bore's band rides its Ø.2560 natively (drawing-guidelines.md rule 3 (decimal places carry the tolerance));
-    # note 6 keeps only the REAM process word.
-    set_dimension_bilateral_tolerance(
-        adapter, "PivotHoleProfile", "PivotDia", *deviations(PIVOT_HOLE_BAND),
-        display_unit=UNIT,
-    )
+    # The F-drilled pivot bore prints .257 at the title block's DRILLED HOLES
+    # row (owner ruling 2026-11-24, fit audit question 1): no native band.
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():

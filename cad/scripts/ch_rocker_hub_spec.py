@@ -3,7 +3,7 @@ r"""Rocker hub (MHA-CH-12): the turned hub of the built-up rocker arm, as suppli
 PURE DATA, no SolidWorks/COM imports. MHA-CH-06 may be built up
 (``ch_rocker_arm_notes.BUILT_UP_PERMISSION_NOTE``): this hub is pressed into
 the strap MHA-CH-13 (``ch_rocker_hub_fit``), then the joined part's bore is
-reamed and its hub length faced to the MHA-CH-06 print. So this detail is
+drilled F and its hub length faced to the MHA-CH-06 print. So this detail is
 the hub as SUPPLIED to the joint: the land at its finished Ø, turned to the
 measured strap hole for the press, the bore and the length left with stock
 (drawing-guidelines.md rule 19: a supply size, finished later). The finished
@@ -40,13 +40,14 @@ UNIT = drawing_unit("parts/ch-rocker-hub", _config.parts("ch-rocker-hub"))
 # The land: the finished hub O.D., pressed in the strap's reamed hole.
 LAND_DIA = HUB_DIA
 
-# Supply bore: a letter-D drill under the finished pivot ream, leaving .010
-# diametral stock, which the title block's DRILLED HOLES +.004/0 can eat only
-# part of, so the ream always cleans up.
+# Supply bore: a letter-D drill under the joined part's F pivot bore (owner
+# ruling 2026-11-24, fit audit question 1), leaving .011 diametral stock,
+# which the title block's DRILLED HOLES +.004/0 can eat only part of, so the
+# F drill always cleans up.
 SUPPLY_BORE_DIA = 6.2484  # .246, letter D
 DRILLED_PLUS = drilled_oversize_mm(unit=UNIT)
 if not SUPPLY_BORE_DIA + DRILLED_PLUS < PIVOT_HOLE_DIA + PIVOT_HOLE_BAND[1]:
-    raise AssertionError("the largest supply bore leaves no stock for the pivot ream")
+    raise AssertionError("the largest supply bore leaves no stock for the F drill")
 
 # Supply length: the finished length's top limit plus FACE_STOCK at each end.
 # Each end is faced after the press, so this stock also takes up how far off
@@ -65,7 +66,7 @@ SUPPLY_LENGTH_TOL_TYPE = 5  # swTolType_e.swTolMIN: prints ".32 MIN"
 
 # Wall between the smallest land (the smallest hole plus the least
 # interference) and the largest supply bore: .0752 against the .060 floor
-# (under the .080 target; the joined part reams it thinner).
+# (under the .080 target; the joined part's F drill thins it).
 SUPPLY_WALL_MIN = (LAND_DIA + LAND_RANGE[0] - (SUPPLY_BORE_DIA + DRILLED_PLUS)) / 2.0
 if SUPPLY_WALL_MIN < WALL_FLOOR_MM:
     raise AssertionError(f"supply wall {SUPPLY_WALL_MIN:.3f} under the rule-17 floor")

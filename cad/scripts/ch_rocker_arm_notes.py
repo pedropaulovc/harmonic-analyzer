@@ -12,7 +12,6 @@ from __future__ import annotations
 
 import math
 
-from ch_pivot_shaft_spec import SHAFT_DIA, SHAFT_DIA_BAND
 from ch_rocker_arm_spec import (
     HUB_COAXIALITY_DIA,
     HUB_DIA,
@@ -63,8 +62,8 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # Decimal classes already authored by the part; shared with the offline
 # requirement exporter. Decimal inch (#290): the BASIC arc radii and the
 # pivot-to-edge height print the places their kinematic values need, the
-# reamed bore four and the hub length three (its +/-.002 band); the remaining
-# dimensions take the sheet's default.
+# F-drilled bore three (the DRILLED HOLES row) and the hub length three (its
+# +/-.002 band); the remaining dimensions take the sheet's default.
 DEFAULT_DRAWING_PRECISION = 2
 DRAWING_PRECISION = {
     "StrapProfile": {
@@ -72,7 +71,7 @@ DRAWING_PRECISION = {
         "TopRadius": 3,
         "BottomRadius": 3,
     },
-    "PivotHoleProfile": {"PivotDia": 4},
+    "PivotHoleProfile": {"PivotDia": 3},
     "Hub": {"HubLength": 3},
     "HubProfile": {"HubDia": DEFAULT_DRAWING_PRECISION},
     "TopEdgeReference": {"TopAbovePivot": 3},
@@ -102,7 +101,7 @@ TIP_LAND_PREFIX = "2X "
 TIP_LAND_ANGLE_PREFIX = "2X "
 
 # The minimum wall at the printed limits: the hub OD at its .XX band, the
-# reamed bore at its largest and the OD's position zone.
+# F-drilled bore at the DRILLED HOLES row's largest and the OD's position zone.
 _HUB_WALL_WORST = (
     HUB_DIA - LINEAR_2PL - (PIVOT_HOLE_DIA + PIVOT_HOLE_BAND[0])
 ) / 2.0 - HUB_COAXIALITY_DIA / 2.0
@@ -147,28 +146,12 @@ RIGHT_VIEW_SCALE = 3
 RIGHT_VIEW_NOTE = f"VIEW {VIEW_ARROW_LETTER} SCALE {RIGHT_VIEW_SCALE}:1"
 
 
-def _limits(low: float, high: float, places: int) -> str:
-    """A clearance range (mm) in inch at ``places``, rounded outward, never inward."""
-    scale = 10**places / 25.4
-    return (
-        f"{inch_text(math.floor(low * scale + 1e-9) / scale, places)}-"
-        f"{inch_text(math.ceil(high * scale - 1e-9) / scale, places)}"
-    )
-
-
-# Named mates for the two tight bands (drawing-guidelines rule 4), each with
-# its standard fit name: the reamed bore runs on the MHA-CH-05 pivot shaft
-# (its clearance range as REF); the strap slides in the MHA-CH-03 rod's fork
-# slot. View F's left margin holds rows of ~17 characters.
-PIVOT_SHAFT_CLEARANCE = (
-    PIVOT_HOLE_DIA + PIVOT_HOLE_BAND[1] - (SHAFT_DIA + SHAFT_DIA_BAND[0]),
-    PIVOT_HOLE_DIA + PIVOT_HOLE_BAND[0] - (SHAFT_DIA + SHAFT_DIA_BAND[1]),
-)
-# At the bore's own four places.
-PIVOT_FIT_CALLOUT = (
-    "RUNNING FIT ON MHA-CH-05\n"
-    f"(CLEARANCE {_limits(*PIVOT_SHAFT_CLEARANCE, DRAWING_PRECISION['PivotHoleProfile']['PivotDia'])} REF)"
-)
+# Named mates for the bore and the strap (drawing-guidelines rule 4): the
+# F-drilled bore runs on the MHA-CH-05 pivot shaft (owner ruling 2026-11-24,
+# fit audit question 1: the drill and the mate, no number); the strap slides
+# in the MHA-CH-03 rod's fork slot. View F's left margin holds rows of ~17
+# characters.
+PIVOT_FIT_CALLOUT = "RUNNING CLEARANCE ON MHA-CH-05"
 # Under the strap thickness in view F.
 STRAP_FIT_CALLOUT = "SLIDING FIT IN\nMHA-CH-03 FORK"
 # The arms float on the pivot shaft, each located by its own rod (#3114): the

@@ -40,7 +40,6 @@ from solidworks_mcp.adapters.solidworks.drawing import (
     view_name,
 )
 
-import _surface_finish
 import ch_rocker_arm_notes as rocker_notes
 import ch_rocker_arm_spec as rocker
 import _rocker_interface as rocker_interface
@@ -80,7 +79,6 @@ from _drawing_dimensions import (
 )
 from _drawing_edge_dimensions import add_edge_dimension, assert_dimension_measures
 from _drawing_edges import ViewEdge, scan_view_edges
-from _drawing_finish import add_surface_finish
 from _drawing_gdt import add_datum_feature, add_feature_control_frame, add_frame_datum_feature
 
 # The part saves TopEdgeReference hidden (#880): this form shows it in the
@@ -125,7 +123,6 @@ from _hole_spec import blind_cut_dia_mm, drill_process
 from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
 from _session import run_build
-from _surface_finish import surface_finish_by_key
 import _seat_forensics
 import _telemetry
 from ch_rocker_arm_notes import (
@@ -140,11 +137,9 @@ from ch_rocker_arm_spec import (
     GEOMETRIC_TOLERANCES_IN,
     HUB_DIA,
     PIVOT_HOLE_DIA,
-    PIVOT_HOLE_BAND,
     R_TOP,
     ROD_HOLE_SPEC,
     ROD_TIP_X,
-    SURFACE_FINISHES,
     TIP_FACE,
     TOP_ARC_LEN,
     TOP_EDGE_BAND,
@@ -197,7 +192,7 @@ part_metadata(
         "material.thickness": (rocker.ARM_THICKNESS, ("ARM_THICKNESS",)),
     },
     model_sources=("ARM_THICKNESS", "HUB_LENGTH"),
-    precision_sources=(("ch_rocker_arm_notes", "DRAWING_PRECISION"), ("ch_rocker_arm_notes", "DEFAULT_DRAWING_PRECISION"), ("ch_rocker_arm_notes", "DRAWING_NOTES"), ("_surface_finish", "ra")),
+    precision_sources=(("ch_rocker_arm_notes", "DRAWING_PRECISION"), ("ch_rocker_arm_notes", "DEFAULT_DRAWING_PRECISION"), ("ch_rocker_arm_notes", "DRAWING_NOTES")),
 )
 
 FRONT_CENTER = (0.180, 0.175)
@@ -1766,16 +1761,18 @@ PIVOT_DATUM_STANDOFF = 0.020
 PIVOT_DATUM_ANGLE = math.radians(135.0)
 PIVOT_PICK_FRACTIONS = (1.0, 0.6)
 
+# The F-drilled pivot bore (owner ruling 2026-11-24, fit audit question 1):
+# .257 at the DRILLED HOLES row, F DRILL THRU and its mate, no roughness.
 PIVOT_BORE = requirement(
     "pivot_bore", kind="hole", faces=(CylinderFace(rocker.PIVOT_HOLE_DIA),),
-    requirements=("dia", "thru", "finish_ra", "process"), fields={
+    requirements=("dia", "thru", "process"), fields={
         "at": _CENTRE, "axis": _AXIS,
         "dia": (_band(rocker.PIVOT_HOLE_DIA, _PIVOT_P, rocker.PIVOT_HOLE_BAND), ("PIVOT_HOLE_DIA", "PIVOT_HOLE_BAND")),
         "nominal_dia": (rocker.PIVOT_HOLE_DIA, ("PIVOT_HOLE_DIA",)),
+        "drill": (rocker.PIVOT_HOLE_SPEC.size, ("PIVOT_HOLE_SPEC",)),
         "thru": (True, (("draw_ch_rocker_arm", "_dress_detail_dimensions"),)),
-        "finish_ra": (_surface_finish.MACHINED_UM, ("SURFACE_FINISHES",)),
-        "process": ("ream", (("draw_ch_rocker_arm", "_dress_detail_dimensions"),)), "datum": ("A", (("draw_ch_rocker_arm", "build"),)),
-    }, precision={"dia": _PIVOT_P, "finish_ra": 1},
+        "process": (drill_process(rocker.PIVOT_HOLE_SPEC), (("draw_ch_rocker_arm", "_dress_detail_dimensions"),)), "datum": ("A", (("draw_ch_rocker_arm", "build"),)),
+    }, precision={"dia": _PIVOT_P},
 )
 
 part_metadata(
@@ -1903,26 +1900,6 @@ def _require_datum_on_bore(app: Any, tag: Any, bore_edge: Any) -> None:
         )
     if annotation.IsDangling():
         raise RuntimeError("datum A is dangling")
-
-
-# Bore finish in D's lower-right quadrant; never either hub end face.
-PIVOT_FINISH_ANGLE = math.radians(-45.0)
-PIVOT_FINISH_OFFSET = (0.012, -0.013)
-PIVOT_FINISH_CHAR_HEIGHT = 0.0025
-
-
-def _pivot_finish_placement(
-    adapter: Any, hub: Any,
-) -> tuple[tuple[float, float], tuple[float, float]]:
-    """Project the real bore rim through D's native transform."""
-    radius = PIVOT_HOLE_DIA / 2.0
-    (rim,) = _project(
-        adapter, hub,
-        [(radius * math.cos(PIVOT_FINISH_ANGLE) / 1000.0,
-          (PIVOT_MID_Y + radius * math.sin(PIVOT_FINISH_ANGLE)) / 1000.0, 0.0)],
-        label="detail D bore finish rim",
-    )
-    return rim, (rim[0] + PIVOT_FINISH_OFFSET[0], rim[1] + PIVOT_FINISH_OFFSET[1])
 
 
 # Every marked model dimension has exactly one face-view owner.
@@ -2185,7 +2162,7 @@ def _dress_arc_radii(adapter: Any, annotations: list[Any]) -> None:
 def _dress_detail_dimensions(
     adapter: Any, annotations: list[Any], *, keep: dict[str, tuple[float, float]],
 ) -> None:
-    """Read D/E imported sizes; preserve the native pivot size and ream band."""
+    """Read D/E imported sizes; the pivot size prints at the DRILLED HOLES row."""
     expected = {
         "RodTipLen": TIP_FACE,
         "TipLandAngle": _ALPHA_TOP,
@@ -2240,15 +2217,12 @@ def _dress_detail_dimensions(
         if name != "PivotDia":
             continue
         model_dimension = _early_bound(display.GetDimension2(0), "IDimension")
-        tolerance = _early_bound(model_dimension.Tolerance, "IDimensionTolerance")
-        band = (float(tolerance.GetMaxValue()), float(tolerance.GetMinValue()))
-        if not all(math.isfinite(value) for value in band) or any(
-            abs(actual - expected / 1000.0) > 1e-9
-            for actual, expected in zip(band, PIVOT_HOLE_BAND)
-        ):
-            raise RuntimeError(f"pivot bore lost its part-owned ream tolerance: {band}")
         tolerance_type = int(model_dimension.GetToleranceType())
-        # The ream band names its mate and standard fit (rule 4).
+        if tolerance_type != 0:  # swTolType_e.swTolNONE
+            raise RuntimeError(
+                f"F-drilled pivot bore carries a native band (type {tolerance_type})"
+            )
+        # The drilled bore names its mate (rule 4), no number.
         display.SetText(4, rocker_notes.PIVOT_FIT_CALLOUT)
         if str(display.GetText(4) or "") != rocker_notes.PIVOT_FIT_CALLOUT:
             raise RuntimeError("pivot bore fit callout did not persist")
@@ -2256,18 +2230,17 @@ def _dress_detail_dimensions(
         suffix = str(display.GetText(6) or "")  # native suffix definition
         callouts = (str(display.GetText(7) or ""), str(display.GetText(8) or ""))
         # Size first, then process, then depth (rule 26): the native prefix
-        # keeps its automatic diameter glyph and REAM THRU follows the limits.
-        ream_suffix = suffix.rstrip() + " REAM THRU"
-        display.SetText(2, ream_suffix)
+        # keeps its automatic diameter glyph and F DRILL THRU follows the size.
+        drill_suffix = f"{suffix.rstrip()} {drill_process(rocker.PIVOT_HOLE_SPEC)} THRU"
+        display.SetText(2, drill_suffix)
         if (
             str(display.GetText(5) or "") != prefix
-            or str(display.GetText(6) or "") != ream_suffix
+            or str(display.GetText(6) or "") != drill_suffix
             or (str(display.GetText(7) or ""), str(display.GetText(8) or "")) != callouts
             or not display.ShowDimensionValue
             or int(model_dimension.GetToleranceType()) != tolerance_type
-            or (float(tolerance.GetMaxValue()), float(tolerance.GetMinValue())) != band
         ):
-            raise RuntimeError("pivot ream/through text did not preserve its native dimension")
+            raise RuntimeError("pivot drill/through text did not preserve its native dimension")
     if remaining:
         raise RuntimeError(f"detail source dimensions missing: {sorted(remaining)}")
     if any(dimension_name(adapter, ann) == "HubDia" for ann in annotations):
@@ -2548,26 +2521,26 @@ def _require_rod_through_callout(callout: Any) -> None:
         raise RuntimeError(f"detail E rod-pin callout lost its native through condition: {native_text!r}")
 
 
-def _require_ream_clearance(
+def _require_pivot_callout_clearance(
     adapter: Any, hub: Any, notes_box: tuple[float, float, float, float],
 ) -> None:
-    """Prove actual native REAM text clears D and the seated notes by 1 mm."""
+    """Prove actual native F DRILL text clears D and the seated notes by 1 mm."""
     reader = _Reader(adapter)
-    annotations = _bound_view_annotations(hub, label="detail D REAM")
+    annotations = _bound_view_annotations(hub, label="detail D F DRILL")
     matches = [ann for ann in annotations if dimension_name(adapter, ann) == "PivotDia"]
     if len(matches) != 1:
-        raise RuntimeError("detail D: expected one native pivot REAM dimension")
+        raise RuntimeError("detail D: expected one native pivot F DRILL dimension")
     record = _dump_annotation(reader, matches[0])
     errors = reader.take_errors()
     if record is None or errors:
-        raise RuntimeError(f"detail D: cannot measure native REAM text: {errors!r}")
+        raise RuntimeError(f"detail D: cannot measure native F DRILL text: {errors!r}")
     geometry = _arc_callout_geometry(record, calibrate_sheet_advance([record]))
     crop = Box(*_detail_crop(adapter, hub, label="D"))
     notes = Box(*notes_box)
     for box in geometry.text_boxes:
         for label, obstacle in (("D crop", crop), ("seated notes", notes)):
             gap = _box_air(box, obstacle)
-            detail = f"detail D REAM: requested_xy_mm={tuple(v * 1000.0 for v in HUB_KEEP['PivotDia'])}, actual_GetPosition={record.get('pos')}, text_ink={box.format_mm()}, obstacle={label}:{obstacle.format_mm()}, actual_air_mm={gap * 1000.0:.3f}, required_air_mm=1.000"
+            detail = f"detail D F DRILL: requested_xy_mm={tuple(v * 1000.0 for v in HUB_KEEP['PivotDia'])}, actual_GetPosition={record.get('pos')}, text_ink={box.format_mm()}, obstacle={label}:{obstacle.format_mm()}, actual_air_mm={gap * 1000.0:.3f}, required_air_mm=1.000"
             _telemetry.info(detail)
             if gap < 0.001 - 1e-12:
                 raise RuntimeError(detail)
@@ -4145,17 +4118,6 @@ def build(adapter: Any) -> dict[str, str]:
         datum=PIVOT_BORE.fields["datum"][0], label="pivot bore cylindrical datum feature", shoulder=True,
     )
     _require_datum_on_bore(adapter.swApp, datum_a, pivot_bore_edge)
-    pivot_finish_rim, pivot_finish_symbol = _pivot_finish_placement(adapter, hub)
-    add_surface_finish(
-        adapter,
-        hub,
-        edge_entity=pivot_bore_edge,
-        symbol_xy=pivot_finish_symbol,
-        leader_attach_xy=pivot_finish_rim,
-        control=surface_finish_by_key(SURFACE_FINISHES, "pivot_bore"),
-        label="pivot bore finish",
-        char_height=PIVOT_FINISH_CHAR_HEIGHT,
-    )
     # The hub OD's coaxiality to A rides its own Ø10.20 in D (regate-r1 #2).
     try:
         (hub_dia,) = [ann for ann in hub_annotations if dimension_name(adapter, ann) == "HubDia"]
@@ -4243,8 +4205,8 @@ def build(adapter: Any) -> dict[str, str]:
                       ("right", right), ("iso", iso)),
             land_dimension, land_entities,
         )
-        phase = "REAM clearance"
-        _require_ream_clearance(adapter, hub, notes_box)
+        phase = "F DRILL clearance"
+        _require_pivot_callout_clearance(adapter, hub, notes_box)
         phase = "front-detail air"
         _require_front_detail_air(adapter, front, hub, end)
         phase = "radius exterior"
