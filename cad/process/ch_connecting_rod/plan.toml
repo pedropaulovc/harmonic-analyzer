@@ -868,7 +868,7 @@ tool = "dti"
 drilling = "none"
 sizing = "other"
 feed = "hand"
-instruction = "Every load (the taper never seats the arbor quite the same twice): the lever indicator on its magnetic base on the vise, its tip up against the saw's lower face 1/8 in in from the teeth. Turn the spindle one turn by hand: the needle's total swing, in mm, is A. Mark LOW afresh on the tooth that is over the tip where that face stands lowest."
+instruction = "Every load (the taper never seats the arbor quite the same twice): the lever indicator on its magnetic base on the vise, its tip up against the saw's lower face 1/8 in in from the teeth. Turn the spindle one turn by hand: the needle's total swing, in mm, is A. Wipe off any old LOW mark; mark LOW on the tooth that is over the tip where that face stands lowest."
 inspection = "A ≤ ({{process.slot_saw_swept_max_mm:in.4dot}} − t) × {{process.saw_axial_reading_per_in_mm:.1f}} mm (t .0640: {{process.slot_saw_axial_nominal_mm:.3f}} mm): the saw's wobble then keeps the slot's width and the far tine in their bands. Over: take the arbor out, wipe its shank and the taper, mount it and read again. Still over: loosen the screw, wipe, turn the saw a quarter turn on the pilot, clamp to {{process.saw_clamp_torque_nm:.0f}} N·m, draw new witness lines and read again, then the tips' swing. Over after two such tries: stop and tell the owner."
 gauge_checks = "other"
 
