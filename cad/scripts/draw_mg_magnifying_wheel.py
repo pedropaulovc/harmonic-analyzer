@@ -447,9 +447,10 @@ WIRE_NUMBER = str(_config.parts("sh-vn-music-wire")["number"])
 # centreline) through to the rim bore, clocked by its 43° from the
 # horizontal.  Each takes at most two lines of words under its process
 # (rule 7).  TIE 1's #60 names its drill (rule 12; dt_crank_pin's "#45 DRILL
-# THRU"); its #50 counter-drill, from the far (drum) side, prints whole on
-# B-B, which the callout names so the hole is not read as a plain #60.
-TIE1_CALLOUT = "#60 DRILL THRU\nWIRE TIE HOLE\nSEE SECTION B-B"
+# THRU"); its #50 counter-drill, from the far (drum) side, is named here by
+# its drill and side (machinist review r1, run 20261124T092122388Z: the whole
+# hole in one callout) and prints whole, with its depth, on B-B.
+TIE1_CALLOUT = "#60 DRILL THRU\nWIRE TIE HOLE\n#50 FAR SIDE, B-B"
 TIE2_CALLOUT = "DRILL THRU\nRADIAL WIRE TIE HOLE\nFROM GROOVE BOTTOM"
 # Each side of a centred tie block past the DRILL THRU line's half-width
 # (capitals about 2.6 mm a character), mm.

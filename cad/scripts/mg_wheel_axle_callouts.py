@@ -29,8 +29,9 @@ WHEEL = "MHA-MG-05 MAGNIFYING WHEEL"
 # govern; purchased precision stock is its fit route). Its callout names both
 # fits, each mate by number and name (drawing-guidelines.md rule 4; v49
 # machinist review), one line each (rule 7): the bond in the bar's 3/16
-# drilled bore (owner ruling 2026-11-24, fit audit question 18), whose
-# clearance prints once, on the bar's own sheet, and the wheel that runs on
+# drilled bore (owner ruling 2026-11-24, fit audit question 18; no clearance
+# prints on either sheet: the drill and stock bands leave it inside the
+# adhesive's gap), and the wheel that runs on
 # it, which is what the journal's Ra 63 uin marks (rule 6). The bond's gap
 # (the stock over the bore's drilled limits) is mg_wheel_group.BAR_BOND_GAP,
 # inside LOCTITE 638's. The wheel's bore is reamed with no band and accepted

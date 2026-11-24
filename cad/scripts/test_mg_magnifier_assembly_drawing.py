@@ -324,6 +324,7 @@ def test_the_drum_is_bonded_centred_wet_and_accepted_once_cured() -> None:
     centred = notes.STEP_TEXT["drum-centred"]
     assert centred.startswith("AT ONCE, BEFORE IT GRABS, TAP ")
     assert "INDICATOR" in centred and "V-BLOCK" in centred
+    assert "UNTIL IT READS .002 TOTAL OR LESS" in centred
     assert "24 H" in notes.STEP_TEXT["drum-bond-cured"]
     assert notes.STEP_TEXT[steps.DRUM_HELD_KEY].endswith("DOES NOT TURN OR SLIDE BY HAND.")
     assert notes.STEP_TEXT["drum-stripped"].startswith(

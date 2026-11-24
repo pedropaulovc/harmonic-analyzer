@@ -135,6 +135,8 @@ from mg_magnifying_clamp_geom import HEX_AF as CLAMP_HEX_AF
 from mg_magnifying_wheel_geom import TIE1_CDRILL_DIA, TIE1_X, TIE1_Y
 from mg_magnifying_vertical_rod_geom import ROD_DIA as VROD_DIA
 from mg_magnifying_vertical_rod_geom import SHOULDER_X as VROD_SHOULDER_X
+from mg_wheel_axle_spec import PIN_DIA as AXLE_PIN_DIA
+from mg_wheel_axle_spec import STEP_STATION as AXLE_STEP_STATION
 from mg_wheel_axle_spec import TIP_Y
 from mg_wheel_bar_geom import BAR_LENGTH, BAR_TOP_ABOVE_ROW, BORE_ROW_HEIGHT, WHEEL_BAR_X0
 
@@ -489,6 +491,18 @@ LOCKNUT_BALLOON_POINT_MM = (
     0.0,
 )
 LOCKNUT_INSTANCE = "mg-vn-wheel-axle-nut-2"
+# Machinist review r1 (run 20261124T092122388Z, 3/3): the walked axle anchor
+# landed on the plain end's rim, sunk in the bar's bore, so 12's arrow read as
+# item 1. 12 takes the shank's step edge instead, the end of the shank that
+# stands out of the bar. The axle is Rx(-90) in the assembly (local x = X,
+# y = -Z, z = +Y), so its step ring lies square to machine Z, and the fitter
+# isometric looks down (1, 1, 1): the ring point at 45 deg in the machine XY
+# plane faces it, on the shank's lit side.
+AXLE_BALLOON_POINT_MM = (
+    AXLE_PIN_DIA / 2.0 * math.cos(math.radians(45.0)),
+    AXLE_STEP_STATION,
+    AXLE_PIN_DIA / 2.0 * math.sin(math.radians(45.0)),
+)
 # Machinist review of run 20261101T025747277Z moved the wheel group's front
 # stack off the wheel (mg_magnifier_explode_spec) so 14's leader reaches the
 # back washer clear of the rim. The walked wheel anchor then landed on the
@@ -512,6 +526,7 @@ BALLOON_ANCHORS = {stem: BalloonAnchor() for stem in BOM_COMPONENTS} | {
     ),
     "mg-vn-wheel-axle-front-washer": BalloonAnchor(point_mm=FRONT_WASHER_BALLOON_POINT_MM),
     "mg-magnifying-wheel": BalloonAnchor(point_mm=WHEEL_BALLOON_POINT_MM),
+    "mg-wheel-axle": BalloonAnchor(point_mm=AXLE_BALLOON_POINT_MM),
     "mg-vn-wheel-axle-nut": BalloonAnchor(
         point_mm=LOCKNUT_BALLOON_POINT_MM, instance=LOCKNUT_INSTANCE
     ),
@@ -799,7 +814,9 @@ PRESSED = StackDetail(
     BORE_ROW_HEIGHT,
     # The BOM items it shows (machinist review r1); the rest are left out.
     # One clause a line: on one line the spacer clause ran over the border.
-    f"ITEM {notes.ITEM_NUMBERS['mg-wheel-axle']} PRESSED INTO "
+    # The axle is bonded, not pressed (fit audit question 18; machinist
+    # review r1, run 20261124T092122388Z).
+    f"ITEM {notes.ITEM_NUMBERS['mg-wheel-axle']} BONDED IN "
     f"ITEM {notes.ITEM_NUMBERS['mg-wheel-bar']},\n"
     f"ITEM {notes.ITEM_NUMBERS['mg-wheel-axle-spacer']} ON "
     f"ITEM {notes.ITEM_NUMBERS['mg-wheel-axle']},\n"
