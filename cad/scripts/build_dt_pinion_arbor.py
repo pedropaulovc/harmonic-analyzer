@@ -93,6 +93,8 @@ from dt_pinion_arbor_spec import (
 # (dt_pinion_arbor_notes), so dt_pinion_arbor_spec's other readers keep theirs.
 from dt_pinion_arbor_notes import (
     BACK_STUB_DIA_PREFIX,
+    BOND_LAND_DIA_PREFIX,
+    BOND_LAND_DIA_SUFFIX,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
     JOURNAL_DIA_PREFIX,
@@ -1160,16 +1162,9 @@ def build(adapter) -> dict[str, str]:
     # The bands are millimetres; UNIT prints them in inches.  The drum
     # station's .XX band is the title block's, so it rides no dimension.
     # Spelled out per span: _drawing_contract reads each call's literal names.
-    set_dimension_bilateral_tolerance(
-        adapter, "BondZoneReference", "BondZoneDia", *deviations(SHAFT_DIA_BAND), display_unit=UNIT
-    )
-    set_dimension_bilateral_tolerance(
-        adapter,
-        "BackBondReference",
-        "BackBondDia",
-        *deviations(SHAFT_DIA_BAND),
-        display_unit=UNIT,
-    )
+    # The two MHA-DT-01 bond lands carry no band: they are made to fit the
+    # drilled drum bore (owner ruling 2026-11-24, fit audit question 13;
+    # delegated ruling 2026-11-24 (FitLaneDT)), REF sizes below.
     set_dimension_bilateral_tolerance(
         adapter, "BackStubReference", "BackStubDia", *deviations(SHAFT_DIA_BAND), display_unit=UNIT
     )
@@ -1195,9 +1190,20 @@ def build(adapter) -> dict[str, str]:
     _set_dimension_suffix(
         adapter, "BackJournalReference", "BackJournalDia", JOURNAL_DIA_SUFFIX
     )
-    # Each MHA-DT-01 bond land carries its own size (dt_pinion_arbor_notes).
-    set_dimension_prefix(adapter, "BondZoneReference", "BondZoneDia", "<MOD-DIAM>")
-    set_dimension_prefix(adapter, "BackBondReference", "BackBondDia", "<MOD-DIAM>")
+    # Each MHA-DT-01 bond land carries its own size (dt_pinion_arbor_notes),
+    # a REFERENCE: the lands are turned to the drilled drum bore (note 3).
+    set_dimension_prefix(
+        adapter, "BondZoneReference", "BondZoneDia", BOND_LAND_DIA_PREFIX
+    )
+    _set_dimension_suffix(
+        adapter, "BondZoneReference", "BondZoneDia", BOND_LAND_DIA_SUFFIX
+    )
+    set_dimension_prefix(
+        adapter, "BackBondReference", "BackBondDia", BOND_LAND_DIA_PREFIX
+    )
+    _set_dimension_suffix(
+        adapter, "BackBondReference", "BackBondDia", BOND_LAND_DIA_SUFFIX
+    )
     set_dimension_prefix(adapter, "BondReliefProfile", "BondReliefDia", "<MOD-DIAM>")
     # One size for both spans outside the journals (dt_pinion_arbor_notes).
     set_dimension_prefix(adapter, "BackStubReference", "BackStubDia", BACK_STUB_DIA_PREFIX)

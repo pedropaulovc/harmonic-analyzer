@@ -409,12 +409,6 @@ def build(adapter: Any) -> dict[str, str]:
     annotations = [*front_annotations, *right_annotations]
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
-    _assert_tolerance_places(
-        adapter,
-        front_annotations,
-        "ArborBoreDia",
-        DRAWING_PRECISION_BY_NAME["ArborBoreDia"],
-    )
     # The inch tip band (+.000/-.004) prints at the nominal's three places.
     _assert_tolerance_places(
         adapter,

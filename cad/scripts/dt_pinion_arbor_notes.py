@@ -48,6 +48,12 @@ if not (
 # MHA-DT-14 bores (owner ruling 2026-11-24, fit audit question 12).
 JOURNAL_DIA_PREFIX = "2X (<MOD-DIAM>"
 JOURNAL_DIA_SUFFIX = ")"
+# Each bond land's size is a REFERENCE too, "(Ø.3125)": the lands are turned
+# last to the 5/16 drilled MHA-DT-01 bore (owner ruling 2026-11-24, fit audit
+# question 13; made to fit: delegated ruling 2026-11-24 (FitLaneDT)); note 3
+# prints the acceptance.
+BOND_LAND_DIA_PREFIX = "(<MOD-DIAM>"
+BOND_LAND_DIA_SUFFIX = ")"
 _NEW_SPANS = (
     (
         "BackBondReference",
@@ -66,7 +72,8 @@ SPAN_REFERENCES = (
     ),
     *_NEW_SPANS,
 )
-# Four places, as the bond zone: the -.0004/-.0038 band prints exactly.
+# Four places, as the bond lands' .3125: the spans' -.0004/-.0038 band prints
+# exactly.
 _SPAN_PLACES = spec.DRAWING_PRECISION["BondZoneReference"]["BondZoneDia"]
 
 DRAWING_DIMENSIONS: dict[str, set[str]] = {

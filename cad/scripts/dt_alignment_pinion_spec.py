@@ -13,7 +13,6 @@ import _config
 import dt_cylinder_gear_spec as drum
 
 from _fit_deviations import deviations
-from _fit_ream_slide import REAM_SLIDE
 from _gear_fit_limits import gear_tip_band_mm
 from _package_units import drawing_unit
 from _printed_tolerance import printed_deviations
@@ -109,15 +108,18 @@ ENGAGED_CENTER_RADIAL_STACK_MM = float(
 # leave the cut flanks.
 TOOTH_FORM = TOOTH_FORM_NOTE
 
-BORE_DIA = 7.9375  # 5/16 arbor through-bore (build_dt_pinion_arbor.py)
+BORE_DIA = 7.9375  # 5/16 drill, through (build_dt_pinion_arbor.py)
 # Slip fit bonded with Loctite 638, not a press: a press over the full drum
 # bore is a seizing risk for a novice (U27, U6 precedent).  The bore is
-# REAM_SLIDE, cut by the owned .3135 over reamer.  The drum sits on
-# MHA-DT-22's bond zone, not its journal lands (U39: 5/16 -.0004/-.0038 in),
-# so the diametral clearance runs from .0014 in (the drum slides on by hand)
-# up to the drum's upper deviation minus the arbor's lower one (.0053 in),
-# inside the 0.25 mm bond gap the 638 technical data sheet allows.
-ARBOR_BORE_BAND = REAM_SLIDE  # (upper, lower) deviations
+# drilled 5/16 from both ends (owner ruling 2026-11-24, fit audit question
+# 13), and MHA-DT-22's two bond lands are turned last to it, so the drum
+# slides on by hand (delegated ruling 2026-11-24 (FitLaneDT): the lands are
+# made to fit, form 2; MHA-DT-22's note 3 prints the acceptance and the
+# clearance, this sheet names the arbor as turned to the bore).
+# ARBOR_BORE_BAND is NOT a printed limit: it is the ANALYSIS band, what the
+# drill is modelled to cut (the DRILLED HOLES row's +.004/0, .3125-.3165),
+# which MHA-DT-22's bond-gap stack reads.
+ARBOR_BORE_BAND = (0.1016, 0.0)  # ANALYSIS (upper, lower) deviations
 RETAINING_COMPOUND = "LOCTITE 638"
 RETAINING_COMPOUND_MAX_GAP_MM = 0.25
 # Prints .XX (6.06): the pinion-rig end-play budget reads its band
@@ -128,7 +130,7 @@ FACE_WIDTH = 153.924  # 6.06 in; located from the back end (drawing note)
 # stock-form support, coverage/no-gap, backlash, air and TE must pay both
 # printed tip corners and the retained tangent-span/fit bands independently.
 
-# Only the reamed bore carries a roughness symbol.  The two end faces bear on
+# Only the bore carries a roughness symbol.  The two end faces bear on
 # the MHA-DT-14 straps' inner faces when the drum floats hard forward or hard
 # aft, but no friction or end-play budget derives a grade from that slow,
 # hand-cranked contact.  So they take the title-block finish, the loosest
@@ -158,7 +160,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "GearBlank": {"FaceWidth": 2},
     OUTSIDE_DIA_REFERENCE: {"OutsideDia": OUTSIDE_DIA_PLACES},
-    # Four places print the 5/16 bore (.3125) and its REAM_SLIDE band.
+    # Four places print the 5/16 drill's size (.3125), named in its callout.
     "ArborBoreProfile": {"ArborBoreDia": 4},
 }
 DRAWING_PRECISION_BY_NAME = {
@@ -294,13 +296,15 @@ GEAR_DATA = gear_data_note(
 # The tip band's mate rides its callout (rule 4).
 OUTSIDE_DIA_CALLOUT = f"MESHES WITH\n{MESH_MATE}"
 
-# drawing-guidelines.md rule 7 (notes: few, flagged, never a method): notes never carry a dimension.  MHA-DT-22 owns its bond-zone band
-# natively (BondZoneDia).  The reamed bore names its fit and its mate by
-# number and name (rule 4), from the part registry; the hand slide is this
-# part's matched-fit acceptance, in plain words (rule 26), so it rides the
-# bore's callout, not a general note (Codex P2 on #832).
+# drawing-guidelines.md rule 7 (notes: few, flagged, never a method): notes never carry a dimension.  The drilled
+# bore names its drill and its mate by number (rule 4, form 2): MHA-DT-22's
+# bond lands are turned last to this bore, so the acceptance (the drum slides
+# on by hand) and the bond clearance print once, on MHA-DT-22's sheet (its
+# note 3), and this sheet only says the arbor is turned to the bore (owner
+# ruling 2026-11-24, fit audit question 13; the made-to-fit lands are a
+# delegated ruling 2026-11-24 (FitLaneDT)).
 _ARBOR = _config.parts("dt-pinion-arbor")
-ARBOR_BORE_CALLOUT = f"REAM THRU\nSLIDING FIT ON ARBOR {_ARBOR['number']}\nSLIDES ON BY HAND"
+ARBOR_BORE_CALLOUT = f"5/16 DRILL THRU\n{_ARBOR['number']} IS TURNED\nTO THIS BORE"
 # drawing-guidelines.md rule 7 (notes: few, flagged, never a method): the bond to MHA-DT-22 is an assembly step (dt_pinion_arbor_spec
 # ASSEMBLY_STEP owns the drum joint), not a part note.  The one note is a
 # do-not-cut requirement, so it is leadered to the teeth on the side view and

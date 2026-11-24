@@ -356,6 +356,20 @@ INDEXED_FIT_BANDS: dict[tuple[str, str], str] = {
         "wall and pin-end-depth stacks (not printed on the bore)"
     ),
     ("dt_pinion_arbor_geometry", "DRUM_LEN_BAND"): "indexed into the drum-length limits",
+    ("dt_pinion_arbor_geometry", "BOND_LAND_DIA_BAND"): (
+        "the MHA-DT-01 bond lands' ANALYSIS band (no native band; the lands "
+        "are turned to the 5/16 drilled drum bore, fit audit question 13), "
+        "indexed for the bond gap's BOND_GAP_MAX"
+    ),
+    ("dt_pinion_arbor_geometry", "DRUM_BORE_BAND"): (
+        "the 5/16 drilled MHA-DT-01 bore's ANALYSIS band, the title block's "
+        "drilled-hole row, indexed for the bond gap and the relief air"
+    ),
+    ("dt_alignment_pinion_spec", "ARBOR_BORE_BAND"): (
+        "the 5/16 drilled drum bore's ANALYSIS band, the title block's "
+        "drilled-hole row (no native band; MHA-DT-22's bond lands are made to "
+        "fit it, fit audit question 13)"
+    ),
     ("dt_pinion_bracket_spec", "ARBOR_BORE_BAND"): (
         "the 5/16 drilled strap bore's ANALYSIS band, the title block's "
         "drilled-hole row (no native band; the MHA-DT-22 journals are made to "
