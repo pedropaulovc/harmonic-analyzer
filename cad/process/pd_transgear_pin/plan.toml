@@ -111,7 +111,7 @@ chuck_grip_in = 0.75
 face_allowance_in = 0.22
 centre_stub_in = 0.2
 centre_stub_mm = 5.08
-# The head is parted .010 long and faced to its thickness in Setup 2.
+# The head is parted .010 long and faced to its thickness in Setup 3.
 regrip_allowance_in = 0.01
 # Parting kerf: the P1 blade's width plus .0125 (authored), for wander.
 part_kerf_in = 0.075
@@ -121,7 +121,7 @@ blade_width_in = 0.0625
 parts_per_pull = 1
 # The parting blade's clearance to the jaw fronts.
 jaw_clearance_in = 0.1
-# The stub is cut .005 beyond the tip's station from the seat; Setup 3 faces
+# The stub is cut .005 beyond the tip's station from the seat; Setup 4 faces
 # the tip back to the station.
 tip_cut_in = 2.085
 # Turned round in the split bush, the pin stands this far out of the bush's
@@ -359,6 +359,7 @@ instruction = "Sharp-nose tool: touch it on the stub's faced end and set DRO Z t
 settings = "lathe-sharp-nose-1018"
 cut_diameter_mm = "{{cad.step_head_dia_mm}}"
 inspection = "The seat faced clean out to the head's rim, by eye: no step, the corner sharp to the tool's nose."
+gauge_checks = "other"
 
 [[setups.operations]]
 cut_kind = "other"
@@ -421,7 +422,7 @@ speed_kind = "spindle"
 tool = "blade"
 drilling = "none"
 sizing = "other"
-instruction = "Lower the blade to about Ø.16, clear of the journal; bring the blade's chuck-side face onto the seat face and set DRO Z there to 0: the DRO then reads the blade's chuck-side face. Cut in with that face at Z+{{process.tip_cut_in:.3dot}} to about Ø.04, the centre still in; withdraw the tailstock and finish the cut. The stub drops off; Setup 3 faces the tip to its station. Spindle stopped, stone the burr off the cut end and the groove's two edges."
+instruction = "Lower the blade to about Ø.16, clear of the journal; bring the blade's chuck-side face onto the seat face and set DRO Z there to 0: the DRO then reads the blade's chuck-side face. Cut in with that face at Z+{{process.tip_cut_in:.3dot}} to about Ø.04, the centre still in; withdraw the tailstock and finish the cut. The stub drops off; Setup 4 faces the tip to its station. Spindle stopped, stone the burr off the cut end and the groove's two edges."
 settings = "lathe-part-1018"
 cut_diameter_mm = "{{cad.outer_dia_mm}}"
 
@@ -463,7 +464,8 @@ tool = "ar"
 drilling = "none"
 sizing = "other"
 instruction = "Face the piece's end square in a light skim. Spindle stopped, file a nick on its rim in line with jaw 1: the bush goes back into the chuck with the nick at jaw 1 every time."
-settings = "lathe-ar-c360"
+rpm = 1200
+feed = "by hand, a light skim, dry"
 cut_diameter_mm = "{{process.bush_dia_mm}}"
 
 [[setups.operations]]
@@ -473,7 +475,8 @@ tool = "centre-drill"
 drilling = "none"
 sizing = "other"
 instruction = "Spot the centre from the tailstock with the size 1 centre drill, only the point's cone, about Ø.08 across: under the #31 drill, so the drill removes it."
-settings = "lathe-centre-c360"
+rpm = 2000
+feed = "tailstock quill by hand"
 cut_diameter_mm = 2.0
 
 [[setups.operations]]
@@ -483,10 +486,11 @@ tool = "drill-31"
 drilling = "twist_drill"
 sizing = "other"
 instruction = "Drill #31 right through the piece from the tailstock, pecking: about .12 a peck, the drill drawn clear of the hole each time to shed its chips."
-settings = "lathe-drill-31-c360"
+rpm = 2000
+feed = "tailstock quill by hand, light and steady, dry"
 cut_diameter_mm = 3.048
 hole_depth_mm = "{{process.bush_length_mm}}"
-peck = "full_retract"
+peck = { step_mm = 3.048, retract = "full" }
 
 [[setups.operations]]
 cut_kind = "other"
@@ -495,12 +499,16 @@ tool = "reamer"
 drilling = "none"
 sizing = "other"
 instruction = "Ream .1260 right through from the tailstock, spindle running, in one slow feed; withdraw with the spindle still running."
-settings = "lathe-ream-1260-c360"
+rpm = 600
+feed = "tailstock quill by hand, slow and light, dry; withdraw with the spindle running"
 cut_diameter_mm = 3.2004
 
 [[setups.operations]]
 cut_kind = "other"
+speed_kind = "other"
 tool = "hacksaw"
+drilling = "none"
+sizing = "other"
 instruction = "Take the piece out. In the bench vise, saw one slit along its whole length with the junior hacksaw, through one wall into the hole, a third of the way round from the nick (between two jaws). Break the slit's edges with the smooth file and push the reamer through the hole by hand to clear the burr. Wipe the hole clean."
 inspection = "The pin's journal slides through the bush by hand, tip first, with no burr dragging on it."
 gauge_checks = "other"
@@ -515,7 +523,9 @@ machine_ref = "pm-1127vf-lb"
 holding = "The pin's shank in the split bush, the head out {{cad.outer_stickout_datum_mm:in.2dot}} in from the bush's front face; the bush in the 3-jaw on {{process.bush_grip_in:.2dot}} in, its nick at jaw 1, the jaws closed until the pin cannot be turned by hand. The rest of the pin runs on through the bush into the chuck. The jaws never touch the pin."
 datum = "DRO Z0 the head's faced end (Op 270, the AR tool); the dome's steps (Op 290) are read from it."
 diagram = { file = "diagrams/head.svg", alt = "The pin turned round, its shank held in the split bush in the jaws, the head out: the head faced and its R.18 dome stepped from the table and filed." }
-lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{process.bush_dia_mm}}", stock_diameter_mm = "{{cad.outer_dia_mm}}", stickout_mm = "{{cad.outer_stickout_datum_mm}}", minimum_diameter_mm = "{{cad.outer_dia_mm}}", support = "none" }
+# The jaws hold the bush (grip and stock its Ø.50); the pin's shank is the
+# least diameter the stick-out is screened on.
+lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{process.bush_dia_mm}}", stock_diameter_mm = "{{process.bush_dia_mm}}", stickout_mm = "{{cad.outer_stickout_datum_mm}}", minimum_diameter_mm = "{{cad.outer_dia_mm}}", support = "none" }
 
 [[setups.operations]]
 cut_kind = "other"
@@ -577,7 +587,7 @@ machine_ref = "pm-1127vf-lb"
 holding = "Take the bush out and the pin out of it; thread the pin tip first through the bush from behind (the head will not pass through it), the tip out {{cad.outer_stickout_far_mm:in.2dot}} in from the bush's front face, the groove clear of the bush. The bush back in the 3-jaw on {{process.bush_grip_in:.2dot}} in, its nick at jaw 1, the jaws closed until the pin cannot be turned by hand; the head hangs behind the bush inside the chuck. The jaws never touch the pin."
 datum = "DRO Z0 the tip's faced end (Op 330, the AR tool); the dome's steps (Op 350) are read from it."
 diagram = { file = "diagrams/tip.svg", alt = "The pin turned round again, its journal held in the split bush in the jaws, the tip out: the tip faced and its R.07 dome stepped from the table and filed." }
-lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{process.bush_dia_mm}}", stock_diameter_mm = "{{cad.outer_dia_mm}}", stickout_mm = "{{cad.outer_stickout_far_mm}}", minimum_diameter_mm = "{{cad.groove_dia_min_mm}}", support = "none" }
+lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{process.bush_dia_mm}}", stock_diameter_mm = "{{process.bush_dia_mm}}", stickout_mm = "{{cad.outer_stickout_far_mm}}", minimum_diameter_mm = "{{cad.groove_dia_min_mm}}", support = "none" }
 
 [[setups.operations]]
 cut_kind = "other"

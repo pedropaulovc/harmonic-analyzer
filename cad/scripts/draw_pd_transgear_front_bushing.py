@@ -248,7 +248,11 @@ requirement(
     "bore",
     kind="hole",
     faces=(CylinderFace(BORE_DIA),),
-    requirements=("thru", "mate"),
+    # ``dia`` stays a traveler requirement, as MHA-PD-18's pin bore keeps
+    # it: prechips' turned-bush adapter refuses a bore without one
+    # ("bore.dia: missing drawing requirement"; the fit stack had dropped
+    # it with the printed band, so the traveler no longer rendered).
+    requirements=("dia", "thru", "mate"),
     fields={
         "axis": ([0.0, 0.0, 1.0], ("BORE_DIA",)),
         "at": ([0.0, 0.0, 0.0], ("BORE_DIA",)),
