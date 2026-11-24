@@ -740,8 +740,8 @@ instruction = "The long-reach 1/8 in end mill in its 1/8 in collet, at least {{p
 feed = "hand"
 
 [[setups.operations]]
-instruction = "First part only: prove FK06_crown_cbore in air, Z0 raised 1.000 in, through every M6. Then Z0 back."
-instruction_detailed = "First part only: send $# and note the G54 line's Z. G10 L2 P1 Z(that Z + 25.400) raises Z0 1.000 in. Run FK06_crown_cbore through every M6, watching each move. G10 L2 P1 Z(the noted Z) puts Z0 back."
+instruction = "First part only: prove FK06_crown_cbore and FK08_cbore_recut in air, Z0 raised 1.000 in, through every M6. Then Z0 back."
+instruction_detailed = "First part only: send $# and note the G54 line's Z. G10 L2 P1 Z(that Z + 25.400) raises Z0 1.000 in. Run FK06_crown_cbore through every M6, watching each move. Then run FK08_cbore_recut (the counterbore remedy's file, run only if the counterbore is small or shallow) the same way: the collet nose clears the crown and the long-reach cutter clears the jaws. G10 L2 P1 Z(the noted Z) puts Z0 back."
 feed = "hand"
 
 [[setups.operations]]
