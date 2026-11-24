@@ -294,9 +294,10 @@ def test_q9_corners_hold_every_margin_at_their_greatest_radius() -> None:
     assert rod.SHANK_MID_Z == pytest.approx(-(rod.SHANK_NEAR_X + rod.SHANK_FAR_X) / 2.0)
     assert min(spec.SHANK_INSIDE_RING_MIN) == pytest.approx(_in(0.001))
     # The arm: over the slot floor by its least clearance, the floor over the
-    # root step by the least bridge: 4.876 mm over the step corners.
+    # root step by the least bridge: 4.800 mm over the step corners (the pin
+    # hole off by half its Ø.014 position zone).
     arm_gap = pin.BUDGET["crotch_clearance_min"] + pin.BUDGET["bridge_min"]
-    assert arm_gap == pytest.approx(4.876, abs=1e-3)
+    assert arm_gap == pytest.approx(4.800, abs=1e-3)
     assert arm_gap > pin.CROTCH_CLEARANCE_MIN
 
 
@@ -1027,5 +1028,5 @@ def test_rod_feature_bands_are_the_printed_ones() -> None:
     assert bore["dia"] == pytest.approx([_in(1.213), _in(1.216)])
     assert bore["datum"] == "A" and bore["finish_ra"] == pytest.approx(1.6)
     assert pin["dia"] == pytest.approx([_in(0.0775), _in(0.0779)])
-    assert pin["position_dia"] == pytest.approx(_in(0.008))
+    assert pin["position_dia"] == pytest.approx(_in(0.014))
     assert pin["callout"] == drawing.FRONT_CALLOUTS["PinHoleDia"]

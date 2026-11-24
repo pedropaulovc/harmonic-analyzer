@@ -117,11 +117,14 @@ def test_worst_case_joint_budget() -> None:
     assert b["tine_min"] == pytest.approx(1.651, abs=1e-6)
     assert b["tine_bearing_land_min"] == b["tine_min"]
     assert b["tine_bearing_land_min"] >= pin.RULE12_WALL_FLOOR
+    # At the largest hole a bonded pin is accepted in (.079), the hole off
+    # by half its Ø.014 position zone: .1435.
+    assert b["crown_wall_min"] == pytest.approx(0.1435 * 25.4, abs=1e-6)
     assert b["crown_wall_min"] >= pin.RULE12_WALL_TARGET
+    assert b["bond_gap_max"] == pytest.approx(0.000875 * 25.4, abs=1e-6)
     assert b["crotch_clearance_min"] >= pin.CROTCH_CLEARANCE_MIN
     assert b["bridge_min"] == pytest.approx(2.794, abs=1e-6)
     assert b["bridge_min"] >= pin.BRIDGE_TARGET
-    assert b["bond_gap_max"] == pytest.approx(0.000875 * 25.4, abs=1e-6)
     # Dressing stock: the shortest supplied 5/16 pin (.3025 under the assumed
     # +/-.010 grade) over the thickest .246 fork, .02825 at each end.
     assert b["length_excess_min"] == pytest.approx(1.4351, abs=1e-6)

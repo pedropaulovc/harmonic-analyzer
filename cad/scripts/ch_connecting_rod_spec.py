@@ -200,9 +200,12 @@ SURFACE_FINISHES = (
 
 
 # Manufacturing GD&T limits: the sheet prints the inch text, the budgets read
-# the derived millimetre zone.
+# the derived millimetre zone. The pin hole's zone is the circle round the
+# title block's square ±.005 location (Ø.014): nothing in the joint budgets
+# fails at it (delegated ruling 2026-11-24, FitLaneCH; precedent: rule 4, no
+# failure at .002 loose; was Ø.008).
 GEOMETRIC_TOLERANCES_IN: dict[str, str] = {
-    "rocker pin hole position": ".008",
+    "rocker pin hole position": ".014",
 }
 GEOMETRIC_TOLERANCES_MM: dict[str, float] = {
     key: float(value) * 25.4 for key, value in GEOMETRIC_TOLERANCES_IN.items()
