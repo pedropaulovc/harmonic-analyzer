@@ -867,7 +867,11 @@ def context(
     bore_d = _mid(g["bore"])
     bore_finish = p["bore_finish_mm"]
     rough_rr = (bore_d - 2 * bore_finish - em) / 2
-    finish_rr = (bore_d - em) / 2
+    # The finish laps' half-circle lead arcs are centred half the finish
+    # radius out: on an even thousandth of a mm that centre lands on the
+    # posted .001 grid (an odd one leaves the lead-out's end .001 off the
+    # bore's centre).
+    finish_rr = round((bore_d - em) / 2 * 500.0) / 500.0
     _agree(plan, "bore_rough_radius_mm", rough_rr)
     _agree(plan, "bore_finish_radius_mm", finish_rr)
     if rough_rr - r > r:

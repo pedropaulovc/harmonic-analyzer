@@ -44,7 +44,9 @@ _HOME_CAM_XY = (
 )
 CENTER_DISTANCE = math.dist(_HOME_PIN_XY, _HOME_CAM_XY)
 RING_BORE_DIA = 30.8102  # 1.213: strap bore riding the eccentric cam
-RING_BORE_DIA_BAND = (0.0762, 0.0)  # +.003/.000 running bore; (upper, lower)
+# +.005/.000 running bore (owner ruling 2026-11-21: "CH-03 strap bore +.003
+# -> +.005 only batched with the next CH-03 spec change"); (upper, lower).
+RING_BORE_DIA_BAND = (0.127, 0.0)
 # The bore runs on the cylinder gear's integral eccentric cam (MHA-DT-12):
 # (least, most) diametral clearance over both printed bands.
 STRAP_DIAMETRAL_CLEARANCE = (

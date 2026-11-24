@@ -29,3 +29,8 @@ necessity:
     kind: gap
     reason: "shank face stands proud of ring, rubs tooth disc"
     source: "ch_connecting_rod_spec: 'a shank face can stand proud of its ring face' at ±.003 (SHANK_INSIDE_RING_MIN)"
+  - id: N-06
+    feature: "sheet 1, front view, Ø1.213 +.005/0 strap bore (datum A), RUNNING FIT ON MHA-DT-12 (CLEARANCE .008-.015)"
+    kind: trace
+    reason: "bore play is lost motion in the channel's stroke"
+    source: "owner ruling 2026-11-21 (+.003 -> +.005 with the next MHA-CH-03 change); error_budget lost_motion: .015 most = 4.4 % of the 8.64 mm throw at a load sign change, .017 (4.9 %) at +.007"
