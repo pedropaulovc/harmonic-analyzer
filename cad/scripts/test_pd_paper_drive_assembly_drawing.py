@@ -1919,7 +1919,8 @@ def test_the_rear_cup_is_faced_bonded_and_screwed_and_the_nut_seats_on_the_faced
         f"{s('knob-stack-fitted', 14)}-{s('knob-stack-fitted', 15)}."
     )
     every = drawing._step_text(operating_domain=_unit_operating_domain())
-    assert sum(cited in row for rows in every.values() for row in rows) == 2
+    # Steps 28 and 33, and the rear-faced collar's renewal (29).
+    assert sum(cited in row for rows in every.values() for row in rows) == 3
     assert sum("250\u00b0C" in row for rows in every.values() for row in rows) == 1
     for word in ("MATCH-DRILL", "PIN (PRESS FIT)", "FEELER AT THE PLATE"):
         assert word not in knob, word
@@ -3494,12 +3495,42 @@ def test_the_hub_key_pin_and_collar_flat_pin_are_fitted_and_kept() -> None:
     loose = [row for row in pressed if "SLIDES IN BY HAND" in row]
     assert len(loose) == 1
     assert all("BOND" not in row for row in pressed)
-    assert all("MAKE A NEW" in row for row in loose)
     wheel = _number("pd-transgear-removable")
     trial = next(row for row in pressed if row.startswith("CHECK: EACH OF THE"))
     assert f"EACH OF THE 3 {wheel} WHEELS DROPS ON" in trial
-    remedy = pressed[pressed.index(trial) + 1]
-    assert remedy.startswith("IF ONE WHEEL BINDS, RENEW IT; IF ALL DO, MAKE A NEW ")
+    at = pressed.index(trial)
+    assert pressed[at + 1] == "IF ONE WHEEL BINDS, RENEW IT."
+    step = steps.step_number("collar-pins-pressed")
+    assert pressed[at + 2] == f"IF NO WHEEL BINDS, GO TO STEP {step + 1}."
+    # Every collar renewal re-fits or renews MHA-PD-08, whose core and
+    # D-flat were made to the old collar (Codjiflo P2 on #3485): one block
+    # of single actions, which the four remedies cite.
+    shaft_no = _number("pd-transgear-knob-shaft")
+    block = pressed[at + 3 :]
+    assert len(block) == 5
+    assert block[0].endswith(f"MAKE A NEW {_number('pd-transgear-drive-collar')} COLLAR.")
+    assert block[1].startswith(f"CHECK: THE NEW COLLAR SLIDES ON THE {shaft_no} SHAFT'S CORE")
+    assert "NO SHAKE" in block[1] and "PIN ON THE D-FLAT" in block[1]
+    assert block[2].startswith("IF IT BINDS, CUT THE SHAFT'S CORE AND D-FLAT TO THE NEW COLLAR")
+    assert block[3] == f"IF IT SHAKES, MAKE A NEW {shaft_no} SHAFT TO THE NEW COLLAR."
+    assert block[4] == f"REPEAT FROM {step}A WITH THE NEW COLLAR."
+    letters = drawing.SUB_STEP_LETTERS
+    cite = f"RENEW THE COLLAR PER {step}{letters[at + 3]}-{step}{letters[len(pressed) - 1]}."
+    assert loose[0].endswith(cite)
+    assert pressed[pressed.index(check) + 1].endswith(cite)
+    assert texts["pilot-faced-to-fit"][-1].endswith(cite)
+    assert not any(
+        "MAKE A NEW" in row and "COLLAR AND REPEAT" in row
+        for rows in texts.values()
+        for row in rows
+    )
+    rear = texts["collar-rear-faced-to-fit"]
+    new = next(i for i, row in enumerate(rear) if row.endswith("MAKE A NEW " + block[0].split("MAKE A NEW ")[1]))
+    assert rear[new + 1] == f"CHECK THE NEW COLLAR ON THE SHAFT AS {step}{letters[at + 4]}."
+    assert all(row.startswith("IF IT BINDS OR SHAKES, ") for row in rear[new + 2 : new + 5])
+    assert "CUP OFF AS" in rear[new + 2] and "SHAFT OUT FORWARD" in rear[new + 3]
+    assert rear[new + 4].endswith(f"DO {step}{letters[at + 5]}-{step}{letters[at + 6]}.")
+    assert rear[-1].startswith(f"REPEAT FROM STEP {step} WITH THE NEW COLLAR")
     assert all("RE-DRILL" not in row for row in pressed)
     # The pin rides the collar off the shaft, then (drawn apart only) leaves
     # its blind ream the way it went in, rearward out of the open end, before
