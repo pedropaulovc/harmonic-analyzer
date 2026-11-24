@@ -13,8 +13,8 @@ necessity:
   - id: N-02
     feature: "sheet 1, side view, .232 ±.001 pinion face width"
     kind: gap
-    reason: "sets the disc cluster stack with MHA-PD-15 and MHA-PD-28"
-    source: "pd_transgear_knob_shaft_spec.FACE_WIDTH_BAND (FIT_LENGTH_BAND_IN)"
+    reason: "with MHA-PD-15 and MHA-PD-28, sets the MHA-PD-16 pilot's float"
+    source: "pd_transgear_knob_shaft_spec.FACE_WIDTH_BAND (FIT_LENGTH_BAND_IN); at ±.003 pd_transgear_knob_cup_spec raises: MHA-PD-16's supplied pilot is shallower than the float needs. The collar air no longer needs it after fit audit question 5 (0.1688 mm at ±.003 against 0.1016)"
   - id: N-03
     feature: "sheet 1, detail B, Ø.155/.150 front neck"
     kind: gap

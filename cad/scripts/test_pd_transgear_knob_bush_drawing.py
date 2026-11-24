@@ -8,6 +8,7 @@ import tomllib
 from pathlib import Path
 
 import pytest
+import yaml
 
 import _config
 import _printed_tolerance
@@ -233,31 +234,57 @@ def test_each_tight_callout_names_its_mate_by_drawing_number() -> None:
         assert ".238" not in "".join(callouts.values())
 
 
-def test_the_tight_lengths_fail_their_stacks_at_the_title_block_band() -> None:
+def test_the_overall_length_fails_the_pilot_stack_at_the_title_block_band() -> None:
     """Rule 4's necessity test, re-derived (fit audit 2026-11-23): with the
-    hub station at the title block's ±.005 the collar's statistical air
-    falls under its floor; with the length looser than ±.002 by more than
-    .001 the cup's supplied pilot cannot set the end float."""
-    import pd_cluster_air as air
+    length looser than ±.002 by more than .001 the cup's supplied pilot
+    cannot set the end float."""
     import pd_transgear_knob_cup_spec as cup
 
     title_block = _printed_tolerance.printed_band_mm(3, unit=BUSH.UNIT)
-    assert BUSH.HUB_LENGTH_BAND < BUSH.LENGTH_BAND < title_block
-    label = "MHA-PD-28 hub face station"
-    terms = dict(air.COLLAR_AIR.terms)
-    assert terms[label] == BUSH.HUB_LENGTH_BAND
-    assert air.COLLAR_AIR.air_mm("statistical") >= air.COLLAR_AIR_MIN
-    loose = air.AirStack(
-        air.COLLAR_AIR.name,
-        air.COLLAR_AIR.nominal_mm,
-        terms | {label: title_block},
-        air.COLLAR_AIR_MIN,
-    )
-    assert loose.air_mm("statistical") < air.COLLAR_AIR_MIN
+    assert BUSH.LENGTH_BAND < title_block
     # What the cup's supplied pilot leaves over the stand-out's stack, of
     # which this length's band is one term.
     spare = min(cup.FACING_REMOVAL)
     assert 0.0 <= spare < title_block - BUSH.LENGTH_BAND
+
+
+def test_the_hub_station_no_longer_closes_the_collar_air_after_question_5() -> None:
+    """With the disc cluster .005 back (owner ruling 2026-11-24, fit audit
+    question 5) the collar's statistical air holds its floor with the hub
+    station .002 looser (rule 4's test) and at the title block's ±.005, so
+    the collar air no longer answers for the ±.001 the sheet still prints:
+    register N-02 says so, and the loosening is an open follow-up."""
+    import pd_cluster_air as air
+
+    title_block = _printed_tolerance.printed_band_mm(3, unit=BUSH.UNIT)
+    label = "MHA-PD-28 hub face station"
+    terms = dict(air.COLLAR_AIR.terms)
+    assert terms[label] == BUSH.HUB_LENGTH_BAND < title_block
+
+    def collar_air(band: float) -> float:
+        stack = air.AirStack(
+            air.COLLAR_AIR.name,
+            air.COLLAR_AIR.nominal_mm,
+            terms | {label: band},
+            air.COLLAR_AIR_MIN,
+        )
+        return stack.air_mm("statistical")
+
+    printed = collar_air(BUSH.HUB_LENGTH_BAND)
+    loose = collar_air(BUSH.HUB_LENGTH_BAND + 0.002 * 25.4)
+    at_title_block = collar_air(title_block)
+    assert printed == pytest.approx(air.COLLAR_AIR.air_mm("statistical"))
+    assert (printed, loose, at_title_block) == pytest.approx(
+        (0.1880, 0.1688, 0.1366), abs=5e-4
+    )
+    assert air.COLLAR_AIR_MIN < at_title_block < loose < printed
+    registry = yaml.safe_load(
+        (_config.CONFIG_DIR / "necessity" / "pd-transgear-knob-bush.yaml").read_text(
+            encoding="utf-8"
+        )
+    )["necessity"]
+    (entry,) = (row for row in registry if row["id"] == "N-02")
+    assert "no longer required after fit audit question 5" in entry["source"]
 
 
 def _worst_walls_in() -> dict[str, float]:

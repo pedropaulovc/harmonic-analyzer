@@ -138,7 +138,14 @@ def test_the_journal_is_polished_to_the_shims_bore_and_accepted_on_its_mates(
     low, high = (d / IN for d in features["outer"]["dia"])
     assert parameters["polish_stop_in"] == pytest.approx(high)
     assert parameters["polish_dia_min_in"] > parameters["polish_stop_in"]
-    assert parameters["polish_dia_max_in"] - low <= 0.0006 + 1e-9
+    # The polish takes off no more than .0004: the finish-turned window's top
+    # over the stop (it was checked against the analysis band's bottom, which
+    # fit audit owner question 5 moves from .1248 to .1245 without changing
+    # the turning).
+    assert (
+        parameters["polish_dia_max_in"] - parameters["polish_stop_in"] <= 0.0004 + 1e-9
+    )
+    assert low < parameters["polish_stop_in"]
     for end in ("min", "max"):
         assert parameters[f"polish_dia_{end}_mm"] == pytest.approx(
             parameters[f"polish_dia_{end}_in"] * IN

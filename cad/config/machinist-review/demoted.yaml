@@ -74,6 +74,10 @@ demoted:
   pd_platen_guide: fit-batch-pd
   pd_support_bar: fit-batch-pd
   pd_transgear_arm: fit-batch-pd
+  pd_transgear_disc_hub: fit-batch-pd
+  pd_transgear_feed_pinion: fit-batch-pd
+  pd_transgear_front_bushing: fit-batch-pd
+  pd_transgear_knob_bush: fit-batch-pd
   pd_transgear_knob_thrust_ring: fit-batch-pd
   pn_pen_assembly: fit-batch-pn
   pn_pen_hanger: fit-batch-pn

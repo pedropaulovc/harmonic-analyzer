@@ -8,9 +8,3 @@ pd-transgear-rear-bushing:
   tolerance_class: machined_block
   process: "turned from bar (brass): drill and ream the bore, face both ends"
   drawing_unit: in
-  machinist_exceptions:
-    - id: "RV-01"
-      kind: "accept"
-      where: "the Ø.126 REAM THRU bore (MHA-PD-23 IS TURNED TO THIS BORE)"
-      finding: "REAM fails rule 4's necessity test: .002 loose, the cocked bushing takes up .0070 of the .0080 least end float"
-      reason: "delegated ruling 2026-11-24, no precedent (fit audit 2026-11-23, pending owner confirmation; https://github.com/pedropaulovc/harmonic-analyzer/issues/2144): the one MHA-PD-23 pin is turned last to this bore, the MHA-PD-10 and MHA-PD-25 bores and the MHA-PD-18 bore, all cut by the one .1260 reamer and printed with no band; the next form down, a drilled #30 at the DRILLED HOLES row, lets the bushing take up .0147, more than the float"
