@@ -182,27 +182,22 @@ DETAIL_KEEP = {
     name: (DETAIL_CENTER[0] - z * _DS, DETAIL_CENTER[1] + y * _DS)
     for name, (z, y) in DETAIL_TEXT_MODEL_MM.items()
 }
-# The hub bore's band is narrower than the shop table's turned-diameter row,
-# so its callout names the fit route: a sliding fit made to the measured
-# MHA-DT-17 rod, with the diametral clearance the two parts' printed limits
-# give as REF (drawing-guidelines.md rule 4).  Its blind depth rides the
+# Fit audit F23 (owner ruling 2026-11-24, its recommended form ".2510 REAM
+# depth .32 FLAT BOTTOM; MHA-DT-17 ROD ENTERS BY HAND"): the hub bore prints
+# the .2510 reamer's size with no band and no clearance row; the rod is its
+# gauge (BORE_CLEARANCE_IN is the analysis).  Its blind depth rides the
 # callout as REF; DETAIL B's .32 from B controls the floor (rule 26).
 _MM_PER_IN = 25.4
-if BORE != ROD_DIA:
-    raise AssertionError("the hub bore and the lift rod share one nominal")
+if round(BORE / _MM_PER_IN, 4) != 0.2510:
+    raise AssertionError("the hub bore is the .2510 reamer's size")
 BORE_CLEARANCE_IN = (
-    (BORE_BAND[1] - ROD_DIA_BAND[0]) / _MM_PER_IN,
-    (BORE_BAND[0] - ROD_DIA_BAND[1]) / _MM_PER_IN,
+    round((BORE + BORE_BAND[1] - (ROD_DIA + ROD_DIA_BAND[0])) / _MM_PER_IN, 6),
+    round((BORE + BORE_BAND[0] - (ROD_DIA + ROD_DIA_BAND[1])) / _MM_PER_IN, 6),
 )
 _BORE_DEPTH_TEXT = f"{BORE_DEPTH / _MM_PER_IN:.{BORE_DEPTH_PLACES}f}".removeprefix("0")
-HUB_BORE_CALLOUT = "\n".join(
-    (
-        f"BORE OR REAM <HOLE-DEPTH> ({_BORE_DEPTH_TEXT}) FLAT BOTTOM",
-        f"FIT TO MEASURED {LIFT_ROD_NUMBER} ROD,",
-        "SLIDING FIT (CLEARANCE "
-        + "-".join(f"{value:.4f}".removeprefix("0") for value in BORE_CLEARANCE_IN)
-        + ")",
-    )
+HUB_BORE_CALLOUT = (
+    f"REAM <HOLE-DEPTH> ({_BORE_DEPTH_TEXT}) FLAT BOTTOM;\n"
+    f"{LIFT_ROD_NUMBER} ROD ENTERS BY HAND"
 )
 # Location and length dimensions carry their value only (rule 7).
 DIMENSION_CALLOUTS = {
@@ -618,9 +613,11 @@ requirement(
     },
     precision={"dia": _P["RodDia"], "length": _P["RodTipY"], "station": _P["GripFromB"]},
 )
-# The blind bore, Ø.2500 +.0015/+.0010 (FRONT_KEEP "HubBore"), bored or
-# reamed to the measured MHA-DT-17 rod; its flat floor .32 from B (DETAIL_KEEP
-# "BoreDepthFromB"; the callout repeats it as (.32) REF).
+# The blind bore, Ø.2510 (FRONT_KEEP "HubBore"), the .2510 reamer's size with
+# no band, the MHA-DT-17 rod entering by hand its acceptance (fit audit F23;
+# ``dia`` and the clearance are the reamer's ANALYSIS band); its flat floor
+# .32 from B (DETAIL_KEEP "BoreDepthFromB"; the callout repeats it as (.32)
+# REF).
 requirement(
     "bore",
     kind="hole",
@@ -645,9 +642,9 @@ requirement(
         "depth_from": ("mouth_face_b", _DETAIL),
         "depth_callout": (f"({_BORE_DEPTH_TEXT})", ((_SELF, "HUB_BORE_CALLOUT"),)),
         "flat_bottom": (True, ((_SELF, "HUB_BORE_CALLOUT"),)),
-        "process": ("bore_or_ream", ((_SELF, "HUB_BORE_CALLOUT"),)),
+        "process": ("ream", ((_SELF, "HUB_BORE_CALLOUT"),)),
         "mate": (LIFT_ROD_NUMBER, ("LIFT_ROD_NUMBER", (_SELF, "HUB_BORE_CALLOUT"))),
-        "fit": ("sliding, fit to measured rod", ((_SELF, "HUB_BORE_CALLOUT"),)),
+        "fit": ("rod enters by hand", ((_SELF, "HUB_BORE_CALLOUT"),)),
         "clearance": (
             [value * _MM_PER_IN for value in BORE_CLEARANCE_IN],
             ((_SELF, "BORE_CLEARANCE_IN"),),

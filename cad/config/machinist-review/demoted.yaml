@@ -43,7 +43,6 @@ demoted:
   dt_pinion_arbor_collar: fit-batch-dt
   dt_pinion_bracket: fit-batch-dt
   dt_pinion_cam_pin: fit-batch-dt
-  dt_pinion_lever: fit-batch-dt
   dt_pinion_lever_pin: fit-batch-dt
   dt_pinion_lift_rod: fit-batch-dt
   dt_pinion_pivot_block: fit-batch-dt
