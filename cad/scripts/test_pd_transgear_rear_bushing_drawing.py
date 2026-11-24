@@ -11,6 +11,7 @@ import _config
 import build_pd_transgear_rear_bushing as part
 import draw_pd_transgear_rear_bushing as drawing
 import transgear_cluster_fit as fit
+import pd_transgear_pin_callouts as pin_callouts
 import pd_transgear_pin_spec as pin
 import pd_transgear_rear_bushing_spec as spec
 from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dimensions
@@ -49,8 +50,9 @@ def test_the_bore_prints_no_band_and_the_length_the_title_block() -> None:
 
 def test_the_bore_runs_on_the_pin_and_names_it() -> None:
     """drawing-guidelines.md rule 4 (fit audit 2026-11-23): a reamed bore
-    prints size, REAM, the mate, the acceptance by the mate and one line
-    saying what the fit protects; no band, no clearance.
+    prints size, REAM, the fit on its mate and one line saying what the fit
+    protects; no band, no clearance.  The acceptance prints once, on the
+    pin's sheet (rule 7: at most two rows of words under size and process).
     drawing-guidelines.md rule 12 (hole and slot callouts say what to do): the fit bore's process is REAM."""
     low, high = fit.BORE_DIAMETRAL_CLEARANCE
     assert 0.0 < low < high
@@ -58,11 +60,15 @@ def test_the_bore_runs_on_the_pin_and_names_it() -> None:
     assert spec.BORE_DIA_BAND == fit.BORE_DIA_BAND
     callout = drawing.DIMENSION_CALLOUTS["BoreDia"]
     assert callout.splitlines() == [
-        "REAM THRU, RUNNING FIT",
-        f"{pin.PIN_NUMBER} PIN ENTERS, NO SHAKE",
-        "KEEPS MHA-PD-10 END FLOAT OPEN",
+        "REAM THRU",
+        f"RUNNING FIT ON {pin.PIN_NUMBER}",
+        "COCKING CLOSES MHA-PD-10 END FLOAT",
     ]
     assert not re.search(r"\d*\.\d", callout)
+    assert len(re.sub(r"MHA-\S+", "", callout.splitlines()[-1]).split()) <= 6
+    assert "NO SHAKE" not in callout
+    assert _config.parts("pd-transgear-rear-bushing")["number"] in pin.RUNNING_MATES
+    assert "NO SHAKE" in pin_callouts.SHANK_ACCEPTANCE
     # What the necessity answer states: cocked on the pin at the modelled
     # fit, the bushing takes up less than the sleeve's least end float; a
     # drilled #30's clearance (.1285 +.004/0 on the smallest pin) would not.

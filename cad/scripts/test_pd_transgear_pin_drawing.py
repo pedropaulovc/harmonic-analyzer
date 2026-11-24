@@ -332,8 +332,10 @@ def test_the_one_diameter_shank_is_bonded_in_the_arm_and_runs_in_its_mates() -> 
 
 def test_the_shank_is_made_to_fit_and_prints_no_limits() -> None:
     """Fit audit 2026-11-23 (rule 4, made to fit): the shank's sentence in
-    note 1 names the three mates, the acceptance by feel and what the fit
-    protects, and carries no size; the modelled clearance is an analysis
+    note 1 names the three mates and the acceptance by feel, and carries no
+    size and no reason (machinist review r1 of the fit batch, rule 7: the
+    reference size has no band to answer for; the bores' REAM callouts
+    carry the necessity answers); the modelled clearance is an analysis
     result the stacks read, not a printed limit."""
     import pd_transgear_feed_pinion_spec as sleeve
 
@@ -341,12 +343,11 @@ def test_the_shank_is_made_to_fit_and_prints_no_limits() -> None:
     shank = notes[notes.index("SHANK:") : notes.index(" BONDED SLIP FIT")]
     assert shank == (
         "SHANK: TURN LAST TO BORES OF MHA-PD-10, MHA-PD-24, MHA-PD-25: "
-        "EACH TURNS FREE, NO SHAKE; SHIM MHA-PD-VN-68 SLIDES ON. "
-        "KEEPS DISC OFF MHA-PD-22."
+        "EACH TURNS FREE, NO SHAKE; SHIM MHA-PD-VN-68 SLIDES ON."
     )
     assert not re.search(r"\d*\.\d", shank)
-    # The necessity answer: at most six words beyond the mates' numbers.
-    assert len(re.sub(r"MHA-\S+", "", callouts.SHANK_NECESSITY).split()) <= 6
+    assert "KEEPS" not in callouts.DRAWING_NOTES
+    assert not hasattr(callouts, "SHANK_NECESSITY")
     assert not hasattr(callouts, "RUNNING_CLEARANCE")
     # The analysis result: the modelled shank in the reamer's modelled bore.
     assert sleeve.BORE_DIAMETRAL_CLEARANCE == pytest.approx(

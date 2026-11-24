@@ -42,13 +42,16 @@ OD_PLACES = 2
 BORE_DIA = FIT.BORE_DIA  # .1260
 BORE_DIA_BAND = FIT.BORE_DIA_BAND  # (upper, lower) ANALYSIS deviations
 BORE_PLACES = 3
-# The callout: size and process, the running fit accepted by the mate (the
-# MHA-PD-23 pin is turned last to this bore), and rule 4's necessity answer
-# (BORE_COCK_TAKE_UP below).
+# The callout: size and process, then two rows of words (rule 7): the
+# running fit on its mate and rule 4's necessity answer, which says how a
+# loose bore closes an axial float (BORE_COCK_TAKE_UP below; machinist
+# review r1 of the fit batch read "KEEPS MHA-PD-10 END FLOAT OPEN" as the
+# length's job).  The pair's one acceptance prints on the pin's sheet,
+# which is turned last to this bore (MHA-PD-23 note 1).
 BORE_CALLOUT = (
-    "REAM THRU, RUNNING FIT\n"
-    f"{PIN.PIN_NUMBER} PIN ENTERS, NO SHAKE\n"
-    f"KEEPS {_config.parts('pd-transgear-feed-pinion')['number']} END FLOAT OPEN"
+    "REAM THRU\n"
+    f"RUNNING FIT ON {PIN.PIN_NUMBER}\n"
+    f"COCKING CLOSES {_config.parts('pd-transgear-feed-pinion')['number']} END FLOAT"
 )
 
 WALL_NOMINAL = (OD - BORE_DIA) / 2.0
@@ -60,12 +63,12 @@ if WALL_WORST < WALL_TARGET_MM:
 # What the fit protects.  With the cluster forward the bushing is loose in
 # the sleeve's end float and can cock on the pin as far as its bore lets it;
 # cocked, it takes up its largest O.D. times that angle of the float.  At
-# the modelled fit that is .0032 of the .008 least float, so it never wedges
-# between the arm's shims and the turning sleeve.  A drilled #30
-# (.1285 +.004/0, clearance to .0077 on this pin) would take up .0147, more
-# than the float: that is why the bore is reamed.  (The float is taken up
-# whole at a clearance of .0042; .002 looser than the modelled fit takes up
-# .0070.)
+# the modelled fit (clearance to .0017) that is .0032 of the .008 least
+# float, so it never wedges between the arm's shims and the turning sleeve.
+# A drilled #30 (.1285 +.004/0, clearance to .0077 on this pin) would take
+# up .0147, more than the float: that is why the bore is reamed.  (The
+# float is taken up whole at a clearance of .0042; .002 looser than the
+# modelled fit, .0037, takes up .0070.)
 BORE_COCK_SPAN_MIN = (
     FIT.REAR_BUSHING_LENGTH
     - FIT.REAR_BUSHING_LENGTH_BAND

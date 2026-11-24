@@ -28,26 +28,25 @@ from pd_transgear_pin_spec import (
 # NOTE 1, gives the shank's two fits (fit audit 2026-11-23, pending owner
 # confirmation; rule 4, made to fit): it is turned last to its three mates'
 # reamed bores and accepted by feel, a bought shim sliding on (the shims'
-# smallest bore is the shank's ceiling), with rule 4's necessity answer on
-# its own sentence (play in those bores tilts the disc into the drive
-# collar: pd_cluster_air.COLLAR_AIR); and it is a bonded slip fit in the
-# arm, accepted by sliding in by hand.  A note carries no size: the arm's
+# smallest bore is the shank's ceiling); and it is a bonded slip fit in the
+# arm, accepted by sliding in by hand.  This is the running pairs' one
+# acceptance: the three bores print their REAM, the fit and what it
+# protects, and no acceptance of their own.  The note gives no reason: a
+# reference size made to its mates carries no band to answer for, and
+# machinist review r1 of the fit batch read "KEEPS DISC OFF MHA-PD-22"
+# here as design rationale (rule 7); the bores' callouts answer rule 4's
+# necessity test for their REAMs.  A note carries no size: the arm's
 # sheet bounds the bond's gap at its bore.  The ring groove's Ø and width
 # name their ring once, in note 2 (rule 4).  Kept here, not in the widely
 # imported spec, so the wording re-keys only this part.
 SHANK_FIT_NOTE = 1
 RING_GROOVE_NOTE = 2
 SHIM_NUMBER = _config.parts("pd-vn-transgear-cluster-shim")["number"]
-COLLAR_NUMBER = _config.parts("pd-transgear-drive-collar")["number"]
 SHANK_ACCEPTANCE = "EACH TURNS FREE, NO SHAKE"
-# "DISC" is the MHA-PD-06 rack pinion disc the cluster carries (the wording
-# MHA-PD-10's bore callout prints).
-SHANK_NECESSITY = f"KEEPS DISC OFF {COLLAR_NUMBER}"
 BOND_ACCEPTANCE = "SLIDES IN BY HAND"
 DRAWING_NOTES = "\n".join((
     f"{SHANK_FIT_NOTE}. SHANK: TURN LAST TO BORES OF {', '.join(RUNNING_MATES)}:",
     f"    {SHANK_ACCEPTANCE}; SHIM {SHIM_NUMBER} SLIDES ON.",
-    f"    {SHANK_NECESSITY}.",
     f"    BONDED SLIP FIT IN {ARM_NUMBER}, {RETAINING_COMPOUND}: {BOND_ACCEPTANCE}.",
     f"{RING_GROOVE_NOTE}. RING GROOVE Ø AND WIDTH: FOR RING {RING_NUMBER}",
     f"    (McMASTER {RING.SKU}).",
