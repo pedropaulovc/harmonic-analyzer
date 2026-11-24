@@ -77,8 +77,9 @@
 # (it does not enter by hand); no special Class ZZ pins and no miking of the
 # pin or the reamer. A hole the pin enters by hand is not a scrapped rod:
 # tagged SLIP, MHA-CH-00 bonds its pin, if the .079 pin of the .061-.500 set
-# (gauges.pin-gauges, on order) does not enter it (the largest hole bonded;
-# delegated ruling 2026-11-24, no precedent).
+# (gauges.pin-gauges, on order) does not enter it (the largest hole bonded:
+# rule 4's single limit read with one pin of the set,
+# sh_vn_pivot_pin_spec.BOND_HOLE_MAX).
 # The drawing's finish, matte black oxide (owner ruling 2026-11-20, #2348;
 # all over, no masking), is done in the shop. The sheet prints it per
 # MIL-DTL-13924 Class 1 until #3318 lands: that PR makes the callout a

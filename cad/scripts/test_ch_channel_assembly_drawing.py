@@ -1351,8 +1351,8 @@ def test_a_feeler_leaf_passes_between_every_pair_of_bars() -> None:
     leaf = gaps["leaf"]
     least = min(v for k, v in gaps.items() if k not in ("leaf", "mid_span"))
     assert pin.RUNNING_FLOOR <= leaf <= least
-    # The top notch at the .XXX row's width (+.010/0, delegated ruling
-    # 2026-11-24) leaves the bowed mid-span .0045: the leaf floors to .004,
+    # The top notch at the .XXX row's width (+.010/0, rule 4's row width)
+    # leaves the bowed mid-span .0045: the leaf floors to .004,
     # a leaf of the owned feeler set (gauges.feeler-gauges, .003-.026 by .001).
     assert leaf == pytest.approx(0.004 * 25.4)
     body = _step_body("bars-gapped")
