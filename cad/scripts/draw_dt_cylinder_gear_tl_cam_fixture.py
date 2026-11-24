@@ -6,7 +6,7 @@ stub at the cam throw and a blind press ream for the clock pin. One sheet:
 the face view carries both reams and their stations from the register axis
 (centre-marked), every value outside the disc; the edge view the register's
 diameter beside the thickness (rule 11); a small shaded isometric. No
-numbered note: each REAM callout names its pin and what its stations set.
+numbered note: each REAM callout names its pressed pin and the press fit.
 
 Run only through the supervised farm launcher:
 ``drawing:dt_cylinder_gear_tl_cam_fixture``.

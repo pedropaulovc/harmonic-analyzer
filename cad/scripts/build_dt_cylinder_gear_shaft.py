@@ -56,8 +56,6 @@ from _drawing_marks import (
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
 )
-from _drawing_tolerances import set_dimension_bilateral_tolerance
-from _fit_deviations import deviations
 from _part_pmi import author_part_pmi
 from cylinder_bank_layout import ARBOR_DOME_HEIGHT, ARBOR_LENGTH
 from dt_cylinder_gear_shaft_notes import DRAWING_NOTES
@@ -67,9 +65,7 @@ from dt_cylinder_gear_shaft_spec import (
     ISOMETRIC_VIEW_NOTE,
     REFERENCE_SKETCHES,
     SHAFT_DIA,
-    SHAFT_DIA_BAND,
     SURFACE_FINISHES,
-    UNIT,
 )
 
 PART_NAME = "dt-cylinder-gear-shaft"
@@ -293,13 +289,9 @@ def build(adapter) -> dict[str, str]:
 
     apply_material(adapter, MATERIAL)
     report_mass_properties(adapter)
-    set_dimension_bilateral_tolerance(
-        adapter,
-        "ShaftProfile",
-        "ShaftDia",
-        *deviations(SHAFT_DIA_BAND),
-        display_unit=UNIT,
-    )
+    # The O.D. is 3/8 ground stock as supplied, never cut: it prints the
+    # stock, not limits of size (drawing-guidelines rule 4).  SHAFT_DIA_BAND
+    # stays the stock's catalogue band for the stacks.
     # Decimal places belong to the model dimension, not to the sheet: the
     # drawing imports these and only asserts they survived.
     apply_drawing_precision(adapter, DRAWING_PRECISION)
