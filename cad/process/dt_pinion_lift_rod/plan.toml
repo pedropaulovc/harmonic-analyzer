@@ -124,7 +124,7 @@ flat_depth_mm = 0.3048
 # .021 mm past the model's SR.19 apex; cam.py checks them.
 flat_back_from_mm = 16.199
 flat_back_to_mm = 20.517
-flat_front_from_mm = 178.251
+flat_front_from_mm = 177.997
 flat_front_to_mm = 183.839
 
 [[tools]]

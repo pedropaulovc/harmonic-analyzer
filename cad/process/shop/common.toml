@@ -763,9 +763,10 @@ diameter_mm = 6.35
 description = "27/64 (.4219 in) drill, 115-piece index"
 diameter_mm = 10.715625
 # The owned Pittsburgh SAE/metric 32-piece feeler set (inventory
-# gauges.feeler-gauges, owner 2026-11-19), Harbor Freight 63665: leaves
-# .0015-.035 in (.0015, .002, .0025, .003-.026 by .001, .028, .030, .032,
-# .035; harborfreight.com/saemetric-feeler-gauge-32-piece-63665.html, read
+# gauges.feeler-gauges, owner 2026-11-19), Harbor Freight 63665 (also sold as
+# 32214): 32 blades in 31 sizes, the .010 twice, leaves .0015-.035 in (.0015,
+# .002, .0025, .003-.026 by .001, .028, .030, .032, .035;
+# harborfreight.com/saemetric-feeler-gauge-32-piece-63665.html, read
 # 2026-11-23) = 0.0381-0.889 mm; resolution its .001 in = 0.0254 mm steps.
 [gauges.feeler-gauges]
 range_mm = [0.0381, 0.889]
