@@ -397,24 +397,19 @@ SECTION_CENTERLINE_OVERRUN_MM = 1.0
 _SECTION_REACH_MM = _HUB_R_MM + SECTION_CENTERLINE_OVERRUN_MM
 # The chord hole's dimensions, imported from its station-plane profile,
 # print left of the section, in the air between the flange thickness's
-# block and the ring: the stop's text inline on its dimension line between
-# the hub axis's and the stop's extension lines, its function beside the
-# value on one row (ending 2 mm short of the ring, its dimension line right
-# of the ream's callout: r4 review, a line 6 mm further left struck the
-# pin's number; the section stands 3.5 mm further right for it); the
-# ream's size and fit
-# beside the ream, under the Ø1.05's lower extension line (y .125), the
-# knockout's beside the knockout, both left of the stop's line so their
-# dimension lines run straight across the hole; the chord offset above the
-# ring, its text right of the hub axis's extension line and clear of the
-# chord hole's (r5 review: a line ran into the .17).
+# block and the ring: the ream's size, depth and fit beside the ream,
+# four rows under the Ø1.05's lower extension line (y .125), the
+# knockout's beside the knockout, their dimension lines running straight
+# across the hole; the chord offset above the ring, its text right of the
+# hub axis's extension line and clear of the chord hole's (r5 review: a
+# line ran into the .17).  The ream's stop prints as the depth in its
+# callout, not as a dimension on the view.
 SECTION_KEEP = {
     "KeyPinChord": (
         SECTION_CENTER[0] + 0.019,
         _section_xy(_SECTION_REACH_MM, 0.0)[1] + 0.004,
     ),
-    "KeyPinStop": (0.335, _section_xy(-KEY_PIN_STOP / 2.0, 0.0)[1]),
-    "KeyPinDia": (0.3125, SECTION_CENTER[1] + 0.0065),
+    "KeyPinDia": (0.313, SECTION_CENTER[1] + 0.004),
     "KeyPinDrillDia": (
         0.315,
         _section_xy(-(KEY_PIN_STOP + _SECTION_REACH_MM) / 2.0, 0.0)[1],
@@ -424,12 +419,8 @@ SECTION_CALLOUTS_BELOW = {
     "KeyPinDia": KEY_PIN_CALLOUT_BELOW,
     "KeyPinDrillDia": KEY_PIN_DRILL_CALLOUT_BELOW,
 }
-# REAM stands beside the ream's size and the stop's function beside the
-# stop, each on the value's own row.
-SECTION_SUFFIXES = {
-    "KeyPinDia": KEY_PIN_SUFFIX,
-    "KeyPinStop": _spec.KEY_PIN_STOP_SUFFIX,
-}
+# REAM stands beside the ream's size, on the value's own row.
+SECTION_SUFFIXES = {"KeyPinDia": KEY_PIN_SUFFIX}
 # Centrelines across the cut, each ending 1 mm past the O.D. where it crosses
 # it: the bore's two, the horizontal one the oil hole's axis, and the chord
 # hole's axis.  The section arrives centre-marked, the mark's arms running
@@ -482,7 +473,9 @@ _PLUS_MINUS = {
 }
 # The chord ream enters the hub body's O.D. where its axis meets it (+X).
 KEY_PIN_ENTRY_X = math.sqrt((HUB_DIA / 2.0) ** 2 - KEY_PIN_CHORD_OFFSET**2)
-KEY_PIN_STOP_LIMITS = limits(KEY_PIN_STOP, _P["KeyPinStop"], unit=_UNIT)
+KEY_PIN_STOP_LIMITS = limits(
+    KEY_PIN_STOP, _spec.KEY_PIN_LOCATION_PLACES, unit=_UNIT
+)
 part_metadata(
     model_sources=(
         (_GEOM, "SPIGOT_LENGTH"),
@@ -806,7 +799,7 @@ requirement(
         "chord_axis": ("y", ("__frame__",)),
         "stop": (
             KEY_PIN_STOP_LIMITS,
-            ("KEY_PIN_STOP", (_GEOM, "UNIT"), (_SELF, "SECTION_KEEP")),
+            ("KEY_PIN_STOP", (_GEOM, "UNIT"), "KEY_PIN_DEPTH_TEXT"),
         ),
         "stop_nominal": (KEY_PIN_STOP, ("KEY_PIN_STOP",)),
         "stop_x": (-KEY_PIN_STOP, ("KEY_PIN_STOP_X",)),
@@ -831,8 +824,8 @@ requirement(
     precision={
         "dia": _P["KeyPinDia"],
         "chord": _P["KeyPinChord"],
-        "stop": _P["KeyPinStop"],
-        "depth": _P["KeyPinStop"],
+        "stop": _spec.KEY_PIN_LOCATION_PLACES,
+        "depth": _spec.KEY_PIN_LOCATION_PLACES,
         "station": _P["KeyPinStation"],
     },
 )
@@ -1298,9 +1291,10 @@ def _precision_of(keep: dict[str, tuple[float, float]]) -> dict[str, int]:
 
 @_telemetry.traced("drawing.disc_hub.key_pin_dimensions")
 def _key_pin_dimensions(adapter: Any, section: Any) -> None:
-    """The chord hole in A-A: the model's marked ream and knockout sizes,
-    chord offset and stop, their authored places proven, REAM beside the
-    ream's size, its pin and the knockout's drill callouts under them."""
+    """The chord hole in A-A: the model's marked ream and knockout sizes
+    and chord offset, their authored places proven, REAM beside the
+    ream's size, its depth, pin and the knockout's drill callouts under
+    them."""
     annotations = curate_view_dimensions(
         adapter,
         section,

@@ -698,21 +698,23 @@ OIL_HOLE_CALLOUT_BELOW = "\n".join(
 )
 # The chord hole prints in section A-A, cut through its station: the
 # reamer's size with no band and REAM beside it (the value's own row: the
-# air left of the ring holds two rows of sixteen characters under it), then
-# the pin and the link to its fit note: the press fit and its acceptance by
-# the pin (why the hole is reamed and its offset held to +/-.002 is the
-# registry's); the #56 knockout drilled through; the chord's offset from
-# the hub axis, a location that carries its value and band only (rule 7);
-# and the ream's stop from the hub axis, a three-place size at the title
-# block's band that says what it does beside its value (rule 3; machinist
-# review 2026-11-24, three runs: a bare .160 stated no function): the pin
-# ends on it, inside the hub's O.D. (PIN END is as wide as the air takes
-# with the dimension line clear of the ream's callout: r4 review, the line
-# of a longer text struck it).
+# air left of the ring holds rows of sixteen characters under it), then
+# the ream's depth, its stop past the hub axis, at the title block's
+# three-place band (rule 26: a hole reads size, process, depth, and the
+# depth is never left to a view; reviews 2026-11-24: a .160 dimension on
+# the view was gated bare for stating no function, then for the depth
+# missing from the callout, and faulted for the function words beside it),
+# then the pin and the link to its fit note: the press fit and its
+# acceptance by the pin (why the hole is reamed and its offset held to
+# +/-.002 is the registry's); the #56 knockout drilled through; the
+# chord's offset from the hub axis, a location that carries its value and
+# band only (rule 7).
 KEY_PIN_SUFFIX = " REAM"
-KEY_PIN_STOP_SUFFIX = " PIN END"
+KEY_PIN_DEPTH_TEXT = (
+    f"TO {inch_text(KEY_PIN_STOP, KEY_PIN_LOCATION_PLACES)} PAST AXIS"
+)
 KEY_PIN_CALLOUT_BELOW = "\n".join(
-    (f"PIN {KEY_PIN_NUMBER}", f"SEE NOTE {KEY_PIN_NOTE}")
+    (KEY_PIN_DEPTH_TEXT, f"PIN {KEY_PIN_NUMBER}", f"SEE NOTE {KEY_PIN_NOTE}")
 )
 KEY_PIN_NOTE_TEXT = f"PRESS FIT ON {KEY_PIN_NUMBER}: THE PIN PRESSES IN."
 # The numbered notes, in order.
@@ -750,7 +752,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "BoreProfile": {"BoreDia"},
     "ScrewHoleProfile": {"BoltCircleDia", "ScrewHoleDia"},
     "OilHoleProfile": {"OilHoleDia"},
-    "KeyPinProfile": {"KeyPinDia", "KeyPinDrillDia", "KeyPinChord", "KeyPinStop"},
+    "KeyPinProfile": {"KeyPinDia", "KeyPinDrillDia", "KeyPinChord"},
     "KeyPinReference": {"KeyPinStation"},
 }
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
@@ -772,7 +774,6 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
         "KeyPinDia": KEY_PIN_HOLE_PLACES,
         "KeyPinDrillDia": KEY_PIN_DRILL_PLACES,
         "KeyPinChord": KEY_PIN_LOCATION_PLACES,
-        "KeyPinStop": KEY_PIN_LOCATION_PLACES,
     },
     "KeyPinReference": {"KeyPinStation": KEY_PIN_STATION_PLACES},
 }

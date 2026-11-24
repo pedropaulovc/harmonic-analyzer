@@ -96,11 +96,10 @@ def test_the_sheet_prints_the_overall_and_the_flange_never_the_hub_body() -> Non
         "SpigotLength",
         "KeyPinStation",
         "KeyPinChord",
-        "KeyPinStop",
     }
     assert _places("KeyPinStation") == 2
     assert _places("KeyPinDia") == _places("KeyPinDrillDia") == 4
-    assert _places("KeyPinChord") == _places("KeyPinStop") == 3
+    assert _places("KeyPinChord") == spec.KEY_PIN_LOCATION_PLACES == 3
     assert spec.REFERENCE_DIMENSIONS == frozenset({"SpigotDia"})
     assert {"HubLength", "SpigotLength", "KeyPinStation"} < set(drawing.SIDE_KEEP)
     assert set(drawing.SECTION_KEEP) == spec.DRAWING_DIMENSIONS["KeyPinProfile"]
@@ -302,7 +301,7 @@ def test_the_key_pin_keys_the_hub_on_the_sleeve_flat() -> None:
     assert spec.KEY_PIN_CHORD_BAND == pytest.approx(band)
     chord = (spec.KEY_PIN_CHORD_OFFSET - band, spec.KEY_PIN_CHORD_OFFSET + band)
     stop = (spec.KEY_PIN_STOP - _row(3), spec.KEY_PIN_STOP + _row(3))
-    assert _places("KeyPinStop") == 3
+    assert spec.KEY_PIN_LOCATION_PLACES == 3
     assert chord == pytest.approx((0.172 * IN, 0.176 * IN))
     assert stop == pytest.approx((0.155 * IN, 0.165 * IN))
     assert spec.KEY_PIN_CHORD_RANGE == pytest.approx(chord)
@@ -905,7 +904,6 @@ _NOMINAL = {
     "KeyPinDia": spec.KEY_PIN_HOLE_DIA,
     "KeyPinDrillDia": spec.KEY_PIN_DRILL_DIA,
     "KeyPinChord": spec.KEY_PIN_CHORD_OFFSET,
-    "KeyPinStop": spec.KEY_PIN_STOP,
 }
 # The reamed bore and key-pin hole print their reamers' sizes and no band;
 # the spigot prints in parentheses with none.
@@ -1108,23 +1106,22 @@ def test_section_letters_stand_clear_of_the_flange_and_its_dimensions() -> None:
 
 
 def test_the_chord_hole_dimensions_print_left_of_the_ring() -> None:
-    """The ream's size and fit (two lines of words: the pin and the link to
-    its fit note, rules 4 and 7) and the knockout's stand left of the ring, each dimension line at
-    its text's height crossing its own run of the hole; the stop's text
-    stands inline between the hub axis's and the stop's extension lines, the
-    chord's above the ring right of the axis's extension line."""
+    """The ream's size, depth and fit (the stop as the hole's depth, rule
+    26, then the pin and the link to its fit note, rules 4 and 7) and the
+    knockout's stand left of the ring, each dimension line at its text's
+    height crossing its own run of the hole; the chord's above the ring
+    right of the axis's extension line."""
     callout = drawing.SECTION_CALLOUTS_BELOW["KeyPinDia"]
     # Fit audit 2026-11-23 (rule 4): the reamed hole prints the reamer's
     # size with REAM beside it and no band, its pin (the gauge) and the link
     # to its note: the press fit, the acceptance by the pin and what the
     # ream and its offset protect, with no dimension in the answer.
-    # Rule 3: the stop, a three-place size at the title block's band, says
-    # what it does beside its value.
-    assert drawing.SECTION_SUFFIXES == {
-        "KeyPinDia": " REAM",
-        "KeyPinStop": " PIN END",
-    }
+    # Rule 26: the ream's stop prints as the depth in its callout, never as
+    # a dimension left to the view.
+    assert drawing.SECTION_SUFFIXES == {"KeyPinDia": " REAM"}
+    assert "KeyPinStop" not in drawing.SECTION_KEEP
     assert callout.splitlines() == [
+        "TO .160 PAST AXIS",
         f"PIN {spec.KEY_PIN_NUMBER}",
         f"SEE NOTE {spec.KEY_PIN_NOTE}",
     ]
@@ -1148,9 +1145,6 @@ def test_the_chord_hole_dimensions_print_left_of_the_ring() -> None:
     # The ream's line crosses the ream, the knockout's the knockout.
     assert stop_y < keep["KeyPinDia"][1] < xy(reach, 0.0)[1]
     assert xy(-reach, 0.0)[1] < keep["KeyPinDrillDia"][1] < stop_y
-    # The stop's text between its extension lines, left of the ring.
-    assert stop_y < keep["KeyPinStop"][1] < centre[1]
-    assert boxes["KeyPinStop"].xmax <= ring_left - 0.002
     # Both sizes left of the ring, clear of it.
     for name in ("KeyPinDia", "KeyPinDrillDia"):
         assert boxes[name].xmax <= ring_left - 0.010, name
