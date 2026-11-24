@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 400" font-family="sans-serif" font-size="13">
-  <!-- Setup 5: lying, I up, seat to the right (X0); FK04 profiles the crown and drills and reams the bore on its centre, above the jaw tops. 1 in = 139.7 px. -->
+  <!-- Setup 5: lying, I up, seat to the right (X0); FK04 profiles the crown and spots, D drills and F drills the bore on its centre, above the jaw tops. 1 in = 139.7 px. -->
   <rect class="paper" x="0" y="0" width="760" height="400"/>
   <text class="title" x="20" y="20">Setup 5 (FK04_crown_bore): the crown and the bore, I up</text>
   <text class="label" x="20" y="45">From above (the fixed jaw at the top, the seat at the right):</text>
@@ -19,7 +19,7 @@
   <line class="leader" x1="281.4" y1="118.4" x2="490" y2="130.7"/>
   <circle class="leader-dot" cx="281.4" cy="118.4" r="2"/>
   <text class="label" x="490" y="134.7">bore on the crown's centre:</text>
-  <text class="label" x="490" y="150.7">spot, D drill, ream .2560</text>
+  <text class="label" x="490" y="150.7">spot, D drill, F drill .257</text>
   <line class="leader" x1="254.25" y1="145.55" x2="490" y2="187.41"/>
   <circle class="leader-dot" cx="254.25" cy="145.55" r="2"/>
   <text class="label" x="490" y="191.41">crown R{{cad.crown_radius_in:.3dot}}: climb (G2),</text>
