@@ -398,10 +398,11 @@ INDEXED_FIT_BANDS: dict[tuple[str, str], str] = {
         "interference against the arm's blind hole"
     ),
     ("pd_rack_pinion_spec", "CENTRE_DISTANCE_SET_BAND"): (
-        "the reducer's S-K set band at assembly (+x/-0 fine-pitch centre "
-        "allowance), on MHA-PD-00 DETAIL K's S-K setting (the arm and plate "
-        "sheets point at that view and print no value), read by "
-        "paper_drive_arm_registration; no fit"
+        "the reducer's fine-pitch set band (+.002/-0 centre allowance): the "
+        "window the mesh gates are read over and the DRO's mid-band aim for K "
+        "(pd_paper_drive_knob_setting_spec); DETAIL K prints the trial band's "
+        "limits, which paper_drive_arm_registration reads (owner ruling "
+        "2026-11-24, audit part 2 question C1); no fit"
     ),
     ("pd_rack_pinion_spec", "CENTRE_DISTANCE_TRIAL_BAND"): (
         "MHA-PD-00 DETAIL K's S to N limits (+.002/-.001): the set band opened "

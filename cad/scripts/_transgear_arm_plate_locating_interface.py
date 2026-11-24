@@ -11,8 +11,10 @@ reamer's size with no band and accepted with the dowel itself: it does not
 enter the arm's hole by hand and slides into the plate's with no shake.
 What fails if either is .002 loose: the plate no longer returns to the
 knob-axis setting of MHA-PD-00 step 12, which sets the reducer mesh's
-centre distance (pd_rack_pinion_spec.CENTRE_DISTANCE_SET_BAND; the yaw of
-the two-hole registration carries the slip to K about 2.4 times over).
+centre distance inside DETAIL K's limits
+(pd_rack_pinion_spec.CENTRE_DISTANCE_TRIAL_BAND, the set band and the trial
+move's -.001; the yaw of the two-hole registration carries the slip to K
+about 2.4 times over).
 """
 
 from __future__ import annotations

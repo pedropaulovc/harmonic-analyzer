@@ -2642,8 +2642,11 @@ def _step_text(
             f"SET THE TABLE TO {KNOB_SETTING_VIEW_NAME}'S "
             f"(SHEET {SHEET_NAMES.index(KNOB_SETTING_SHEET) + 1}) ALONG AND ACROSS "
             "FROM S.",
-            f"TAP THE PLATE UNTIL KNOB BORE {KNOB_BORE_LETTER} READS TRUE PER "
-            f"{s('arm-plate-located', 2)} (SHEET {SHEET_NAMES.index(KNOB_SETTING_SHEET) + 1}).",
+            # The clamps are slackened here, so every return to 12F (12H's
+            # re-tap, the trial move, a part's retrial) frees the plate first.
+            f"SLACKEN THE CLAMPS AND TAP THE PLATE UNTIL KNOB BORE {KNOB_BORE_LETTER} "
+            f"READS TRUE PER {s('arm-plate-located', 2)} "
+            f"(SHEET {SHEET_NAMES.index(KNOB_SETTING_SHEET) + 1}).",
             "TIGHTEN THE CLAMPS.",
             # Named in full: the continued column on the next sheet has no
             # DETAIL K key (integration review, run 20261109T062834910Z).
@@ -2665,15 +2668,18 @@ def _step_text(
             reducer_dial_check("SHAFT"),
             "LIFT OFF THE SHAFT, THE RING, THE CLUSTER AND THE BUSHING.",
             # The trial counts only if nothing moved under it: S still at the
-            # DRO's zero and N still true at its settings.  Pointed back like
-            # 12H, with both bores named: the step can pack onto a sheet without
-            # the DETAIL K key (machinist review on 0a4408f590). The arm's
-            # number is left to 12C so the steps fit their sheets (C1 restack).
+            # DRO's zero and N still true at the table's setting, DETAIL K's
+            # or as the trial move left it (codjiflo r2 on #3539: read
+            # against DETAIL K alone, a moved plate failed here and undid the
+            # move).  Pointed
+            # back like 12H, with both bores named: the step can pack onto a
+            # sheet without the DETAIL K key (machinist review on 0a4408f590).
+            # The arm's number is left to 12C so the steps fit their sheets
+            # (C1 restack).
             f"CHECK: RE-INDICATED PER {s('arm-plate-located', 2)} "
             f"(SHEET {SHEET_NAMES.index(KNOB_SETTING_SHEET) + 1}), "
             "PIN BORE S READS TRUE AT THE DRO'S ZERO AND "
-            f"{bush} KNOB BORE {KNOB_BORE_LETTER} AT ITS "
-            "SETTINGS.",
+            f"KNOB BORE {KNOB_BORE_LETTER} AT THE TABLE'S SETTING.",
             f"IF NOT, REPEAT FROM {s('arm-plate-located', 2)}.",
             # The trial may move the plate once, within DETAIL K's S to N
             # limits, before a part is blamed: owner ruling 2026-11-24, audit
@@ -2690,17 +2696,21 @@ def _step_text(
             # charges; only when all are inside is the arm renewed (codjiflo
             # P2 on 176fad0). The restart follows the part (codjiflo P2 on
             # ab2fdaf): a new plate is set to DETAIL K again, a new disc or
-            # sleeve is centred again, a new shaft only re-meshes; one
-            # sub-step per part (machinist review on 36242bf: one action per
-            # step).
+            # sleeve is centred again; one sub-step per part (machinist
+            # review on 36242bf: one action per step).  A new disc, sleeve or
+            # shaft is tried with the table back at DETAIL K's setting, not
+            # at a move made for the part it replaces (codjiflo r2 on
+            # #3539), so each repeats from the table's setting (the tap
+            # sub-step slackens the clamps first).  With the dial check's
+            # floor gone (C2), "no shake" fails it low and moves away from S,
+            # as a tight spot does.
             f"IF {s('arm-plate-located', 11)} AND {s('arm-plate-located', 12)} "
             f"PASSED, GO TO STEP {steps.step_number('arm-plate-fitted')}.",
-            f"IF ONLY {s('arm-plate-located', 11)} OR ONLY "
-            f"{s('arm-plate-located', 12)} FAILED AND THE TABLE IS STILL AT "
-            f"{KNOB_SETTING_VIEW_NAME}'S SETTING, SLACKEN THE CLAMPS, MOVE THE TABLE "
-            f"{KNOB_TRIAL_MOVE_TEXT}, AWAY FROM S FOR A TIGHT SPOT, TOWARD S FOR "
-            f"SHAKE OVER {steps.inch_text(REDUCER_SHAKE_MAX_MM, 3)}, AND REPEAT FROM "
-            f"{s('arm-plate-located', 5)}.",
+            f"IF {s('arm-plate-located', 11)} OR {s('arm-plate-located', 12)} ALONE "
+            f"FAILED AT {KNOB_SETTING_VIEW_NAME}'S SETTING, MOVE THE TABLE "
+            f"{KNOB_TRIAL_MOVE_TEXT}, AWAY FROM S FOR A TIGHT SPOT OR NO SHAKE, "
+            f"TOWARD S FOR SHAKE OVER {steps.inch_text(REDUCER_SHAKE_MAX_MM, 3)}, "
+            f"THEN FROM {s('arm-plate-located', 5)}.",
             f"IF NOT, INSPECT THE {n['pd-transgear-knob-shaft']} PINION, "
             f"{n['pd-rack-pinion']} DISC, {n['pd-transgear-knob-shaft']} JOURNAL AND "
             f"{bush} AND {n['pd-transgear-feed-pinion']} "
@@ -2715,7 +2725,7 @@ def _step_text(
             "REPLACE A DISC FOUND OUTSIDE THROUGH "
             f"{s('disc-cluster-assembled', 2)}-{s('disc-taps-transferred', 17)} ON THE "
             f"SAME HUB, ITS {hub_pin} PIN RIDING THE FLAT, AND REPEAT FROM "
-            f"{s('arm-plate-located', 9)}.",
+            f"{s('arm-plate-located', 4)}.",
             # The disc is screwed to the hub by then, so it is slackened before
             # it is centred again (codjiflo P3 on 593f4ee). One sub-step, as
             # the disc's (C1's move took the letter the slide-off had).
@@ -2727,9 +2737,9 @@ def _step_text(
             f"{s('disc-taps-transferred', 2)}, {s('disc-taps-transferred', 9)} AND "
             f"{s('disc-taps-transferred', 12)}-{s('disc-taps-transferred', 17)} ON A NEW "
             "ONE, THEN FROM "
-            f"{s('arm-plate-located', 9)}.",
+            f"{s('arm-plate-located', 4)}.",
             f"REPLACE A {n['pd-transgear-knob-shaft']} FOUND OUTSIDE AND REPEAT FROM "
-            f"{s('arm-plate-located', 9)}.",
+            f"{s('arm-plate-located', 4)}.",
             "IF ALL ARE INSIDE, UNCLAMP AND REPEAT FROM STEP "
             f"{steps.step_number('latch-pin-pressed')} WITH A NEW "
             f"{n['pd-transgear-arm']} ARM, {n['pd-transgear-pin']} PIN AND "

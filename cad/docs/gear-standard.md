@@ -180,14 +180,17 @@ opened by both tooth-space runouts). These are
 `pd_rack_pinion_spec.CENTRE_DISTANCE`. The gates alone would allow
 43.737–43.851, and 43.794 is that window's midpoint. The arm and plate are
 match-drilled with that centre set to the standard fine-pitch band, nominal
-+0.050/-0 (`CENTRE_DISTANCE_WINDOW`; catalogue practice is +0.002 in / -0).
-+0.050 is the radius of K's drawn setting circle about S
-(`stock_form_quality.reducer_k_setting_diameter_mm`, Ø0.10). The plate's
-B-referenced hole frames take that circle; S and the arm's patterns keep the
-Ø0.050 reducer position zone. Both ends of the band meet the full design
-floors (`paper_drive_mesh_check.reducer_band_meshes`): CR 1.305 and 1.214 at
-the runout extreme at the nominal end, 1.214 and 1.123 at the far end, 43.844
-(owner ruling on #2034 and #2011: 43.794 +0.050/-0, aim mid-band).
+to +.002 in (+0.0508/-0, `CENTRE_DISTANCE_WINDOW`; catalogue practice is
++0.002 in / -0), aimed mid-band. +0.050 is the radius of K's drawn setting
+circle about S (`stock_form_quality.reducer_k_setting_diameter_mm`, Ø0.10).
+The plate's B-referenced hole frames take that circle; S and the arm's
+patterns keep the Ø0.050 reducer position zone. With the 15T's tips at
++0/-.0015 (owner ruling 2026-11-24, audit part 2 question C3), the gates
+over the band are 1.2 at the nominal centre and 1.1 at the runout extreme,
+read at three places (`paper_drive_mesh_check.reducer_band_meshes`): CR 1.284
+and 1.191 at the runout extreme at the nominal end, 1.191 and 1.0997 (reads
+1.100) at the far end, 43.845 (owner ruling on #2034 and #2011 for the band
+and its mid-band aim; C3 for the gates).
 MHA-PD-00's arm-plate-located step jig-bores it on the mill DRO after the
 MHA-PD-23 pin is pressed: the arm trammed front up on its pivot bore and the
 pin's shank in bore S, at the height the disc runs (the mesh's own plane), K set at mid-band
@@ -200,13 +203,19 @@ ruling 2026-11-24, audit part 2 question C2; no floor prints), has for its ceili
 runout and the two running fits can give (`draw_pd_paper_drive_assembly.REDUCER_SHAKE_MAX_MM`; #2510):
 the band's backlash at the loosest centre the two running fits allow, read
 at the tip and rounded up to the indicator's division. The 1 um lever indicator's 0.14 mm range is too
-short for it (#2888). The trial only
-reads the setting; it never moves K, so the band stays the limit. The pilots
-are drilled after it passes, and the doweled plate is read the same way again
-before anything on the arm is made permanent. The band and the coordinates are
-the assembly's own model dimensions (`pd_paper_drive_knob_setting_spec`, the
-hidden `KnobSettingReference` sketch), printed in sheet 6's DETAIL K: the S-K
-centre distance toleranced 43.794 +0.050/-0, the two DRO coordinates as
+short for it (#2888). The trial may move the plate once before a part is
+blamed (owner ruling 2026-11-24, audit part 2 question C1: "Yes, the trial
+may move the plate within those limits."): .001 away from S for a tight
+spot or no shake, .001 toward S for a shake over .008, never above +.002 nor
+below -.001 of DETAIL K (`CENTRE_DISTANCE_TRIAL_WINDOW`, 43.769 to 43.845;
+`paper_drive_mesh_check.reducer_trial_low_mesh` holds CR 1.331 and 1.238 at
+the low end). A part replaced after a move is tried again from DETAIL K's
+setting. The pilots are drilled after the trial passes, and the doweled plate
+is read the same way again before anything on the arm is made permanent.
+The limits and the coordinates are the assembly's own model dimensions
+(`pd_paper_drive_knob_setting_spec`, the hidden `KnobSettingReference`
+sketch), printed in sheet 6's DETAIL K: the S-K centre distance toleranced
+43.794 +.002/-.001 in (`CENTRE_TOLERANCE_MM`), the two DRO coordinates as
 references.
 
 The paper feed mesh (12T feed pinion on the purchased rack) is set by feel at

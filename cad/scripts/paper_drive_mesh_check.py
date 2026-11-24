@@ -30,11 +30,11 @@ extreme the one gate over the set band, then "Print +0/-.0015 as ruled; the
 gate is read at three places (1.100 passes)." At the band's top with the
 smallest tips the runout extreme gives 1.0997, which reads 1.100.
 
-The reducer's centre takes the ordinary fine-pitch set band, nominal
-+0.050/-0 (pd_rack_pinion_spec.CENTRE_DISTANCE_WINDOW). Both ends meet
-both tiers: the far end, 43.844, a stock 15T:150T pair at the stock 0.05
-TIR, gives CR 1.214 at the set centre and 1.123 at the runout extreme
-(owner ruling on #2034 x #2011: 43.794 +0.050/-0 at the full floors).
+The reducer's centre takes the ordinary fine-pitch set band, nominal to
++.002 in (pd_rack_pinion_spec.CENTRE_DISTANCE_WINDOW; owner ruling on #2034
+x #2011). With C3's tips the nominal end gives CR 1.284 at the set centre
+and 1.191 at the runout extreme; the far end, 43.845, gives 1.191 and
+1.0997 (reads 1.100), the 1.1 gate's edge.
 MHA-PD-00's trial mesh may move the plate .001 in below the nominal
 (pd_rack_pinion_spec.CENTRE_DISTANCE_TRIAL_WINDOW; owner ruling 2026-11-24,
 audit part 2 question C1): reducer_trial_low_mesh holds every gate there.

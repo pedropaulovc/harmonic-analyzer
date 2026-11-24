@@ -2922,15 +2922,24 @@ def test_every_failure_branch_has_a_pass_exit() -> None:
         f"{steps.step_number('arm-plate-fitted')}."
     )
     # Owner ruling 2026-11-24, audit part 2 question C1: one trial move of
-    # the table before a part is inspected.
+    # the table before a part is inspected.  With C2's floor gone the dial
+    # check also fails with no shake, which moves away from S as a tight
+    # spot does (Codjiflo r2 on #3539).
     assert located[17] == (
-        f"IF ONLY {s('arm-plate-located', 11)} OR ONLY {s('arm-plate-located', 12)} "
-        f"FAILED AND THE TABLE IS STILL AT {drawing.KNOB_SETTING_VIEW_NAME}'S SETTING, "
-        f"SLACKEN THE CLAMPS, MOVE THE TABLE {drawing.KNOB_TRIAL_MOVE_TEXT}, AWAY FROM "
-        "S FOR A TIGHT SPOT, TOWARD S FOR SHAKE OVER .008, AND REPEAT FROM "
+        f"IF {s('arm-plate-located', 11)} OR {s('arm-plate-located', 12)} ALONE "
+        f"FAILED AT {drawing.KNOB_SETTING_VIEW_NAME}'S SETTING, "
+        f"MOVE THE TABLE {drawing.KNOB_TRIAL_MOVE_TEXT}, AWAY FROM "
+        "S FOR A TIGHT SPOT OR NO SHAKE, TOWARD S FOR SHAKE OVER .008, THEN FROM "
         f"{s('arm-plate-located', 5)}."
     )
-    assert located[5].startswith("TAP THE PLATE UNTIL KNOB BORE")
+    # The re-indication reads N at the table's setting, DETAIL K's or as
+    # moved, so a moved plate reaches the pass exit (Codjiflo r2 on #3539).
+    assert located[14].endswith(
+        f"KNOB BORE {drawing.KNOB_BORE_LETTER} AT THE TABLE'S SETTING."
+    )
+    # Every return to the tap (12H's re-tap, the move, a part's retrial)
+    # frees the plate first.
+    assert located[5].startswith("SLACKEN THE CLAMPS AND TAP THE PLATE UNTIL KNOB BORE")
     assert located[18].startswith("IF NOT, INSPECT THE ")
 
 
@@ -3384,7 +3393,7 @@ def test_the_reducer_mesh_is_tried_before_the_plate_is_doweled() -> None:
     assert located.rindex("TAP THE PLATE") < trial
     recheck = located[lifted:]
     assert "S READS TRUE AT THE DRO'S ZERO" in recheck
-    assert f"KNOB BORE {drawing.KNOB_BORE_LETTER} AT ITS SETTINGS" in recheck
+    assert f"KNOB BORE {drawing.KNOB_BORE_LETTER} AT THE TABLE'S SETTING" in recheck
     assert "CLAMP THE ARM FRONT UP ON PARALLELS ON THE MILL TABLE" in located
     # The setting is made where the mesh is: S is indicated at the disc's height.
     assert "PIN BORE S, AT THE HEIGHT THE DISC WILL RUN" in located
@@ -3406,9 +3415,16 @@ def test_the_reducer_mesh_is_tried_before_the_plate_is_doweled() -> None:
         f"MOVE THE TABLE {drawing.KNOB_TRIAL_MOVE_TEXT}"
     ) < located.index("IF NOT, INSPECT")
     # The restart follows the part, one sub-step each: a new plate is set
-    # again from 12A, a new disc or sleeve is centred again before the trial
-    # is repeated, a new shaft only re-meshes.
-    trial = drawing.sub_step("arm-plate-located", 9)
+    # again from 12A, a new disc or sleeve is centred again; a new disc,
+    # sleeve or shaft is tried with the table back at DETAIL K's setting,
+    # never at a move made for the part it replaced (Codjiflo r2 on #3539).
+    retrial = f"REPEAT FROM {drawing.sub_step('arm-plate-located', 4)}."
+    located_texts = drawing._step_text(operating_domain=_unit_operating_domain())[
+        "arm-plate-located"
+    ]
+    assert located_texts[4].startswith(
+        f"SET THE TABLE TO {drawing.KNOB_SETTING_VIEW_NAME}'S "
+    )
     for remedy in (
         f"REPLACE A {_number('pd-transgear-knob-bush')} BUSH FOUND OUTSIDE WITH A NEW BUSH AND "
         f"{_number('pd-transgear-arm-plate')} PLATE PER {drawing.sub_step('pin-pressed', 9)}-"
@@ -3417,8 +3433,7 @@ def test_the_reducer_mesh_is_tried_before_the_plate_is_doweled() -> None:
         "REPLACE A DISC FOUND OUTSIDE THROUGH "
         f"{drawing.sub_step('disc-cluster-assembled', 2)}-"
         f"{drawing.sub_step('disc-taps-transferred', 17)} ON THE SAME HUB, ITS "
-        f"{_number('pd-vn-transgear-hub-key-pin')} PIN RIDING THE FLAT, "
-        f"AND REPEAT FROM {trial}.",
+        f"{_number('pd-vn-transgear-hub-key-pin')} PIN RIDING THE FLAT, AND {retrial}",
         f"REPLACE A {_number('pd-transgear-feed-pinion')} FOUND OUTSIDE: SLIDE THE HUB "
         "AND DISC OFF IT AS ONE, THE PIN RIDING THE FLAT, THE DISC SCREWS "
         "SLACKENED, REPEAT "
@@ -3428,8 +3443,9 @@ def test_the_reducer_mesh_is_tried_before_the_plate_is_doweled() -> None:
         f"{drawing.sub_step('disc-taps-transferred', 2)}, "
         f"{drawing.sub_step('disc-taps-transferred', 9)} AND "
         f"{drawing.sub_step('disc-taps-transferred', 12)}-"
-        f"{drawing.sub_step('disc-taps-transferred', 17)} ON A NEW ONE, THEN FROM {trial}.",
-        f"REPLACE A {_number('pd-transgear-knob-shaft')} FOUND OUTSIDE AND REPEAT FROM {trial}.",
+        f"{drawing.sub_step('disc-taps-transferred', 17)} ON A NEW ONE, THEN FROM "
+        f"{drawing.sub_step('arm-plate-located', 4)}.",
+        f"REPLACE A {_number('pd-transgear-knob-shaft')} FOUND OUTSIDE AND {retrial}",
     ):
         assert remedy in located
     assert f"IF ALL ARE INSIDE, UNCLAMP AND REPEAT FROM STEP {steps.step_number('latch-pin-pressed')}" in located
