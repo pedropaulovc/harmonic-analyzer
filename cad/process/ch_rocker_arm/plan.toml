@@ -18,11 +18,6 @@ id = "drill-f"
 name = "F drill"
 ref = "jig-drill-f"  # owner ruling 2026-11-24, fit audit question 1: the pivot bore F-drilled, no reamer or pin gauges
 
-[[tools]]
-id = "arbor-press"
-name = "Arbor press"
-ref = "arbor-press"  # drawing cross-check 2026-11-19: hub MHA-CH-12 pressed into strap MHA-CH-13
-
 [[setups]]
 machine_kind = "other"
 machine = "To be written"

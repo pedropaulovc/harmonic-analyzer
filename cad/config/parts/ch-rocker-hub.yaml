@@ -12,10 +12,10 @@ ch-rocker-hub:
   quantity: 20
   tolerance_class: machined_block
   drawing_unit: in
-  process: "turned from 1018 round: land turned to the measured MHA-CH-13 hole for its press, bore drilled and length parted off long; pressed into MHA-CH-13, then bore and length finished on MHA-CH-06"
+  process: "turned from 1018 round: land turned to slide into the MHA-CH-13 hole, bore drilled and length parted off long; bonded into MHA-CH-13 with LOCTITE 638, then bore and length finished on MHA-CH-06"
   machinist_exceptions:
     - id: "RV-01"
       kind: "minor"
-      where: "face view, the \u00d8.246 supply bore callout: WALL .075 MIN"
-      finding: "wall from the largest supply bore to the smallest press-fit land below the .080 target (rule 17)"
-      reason: "Owner ruling 2026-11-01: thin walls above the .060 floor but under the .080 target, with no geometry escape, are accepted as package-specific minor exceptions. .075 MIN between the \u00d8.4004 least land (the smallest reamed MHA-CH-13 hole plus the least .0004 interference) and the \u00d8.250 largest letter-D drill (DRILLED HOLES +.004) stays above the .060 floor; the bore is a supply size reamed to its finished size after joining (MHA-CH-06), and the letter-D drill leaves the stock the ream needs"
+      where: "face view, the \u00d8.246 supply bore callout: WALL .073 MIN"
+      finding: "wall from the largest supply bore to the smallest bonded land below the .080 target (rule 17)"
+      reason: "Owner ruling 2026-11-01: thin walls above the .060 floor but under the .080 target, with no geometry escape, are accepted as package-specific minor exceptions. Restated for owner ruling 2026-11-24, fit audit question 2 (the hub bonded with .0005-.0030 clearance instead of pressed): .073 MIN between the \u00d8.3970 least land (the smallest reamed MHA-CH-13 hole, .4000, less the greatest .0030 clearance) and the \u00d8.250 largest letter-D drill (DRILLED HOLES +.004) stays above the .060 floor; the bore is a supply size drilled F to its finished size after joining (MHA-CH-06), and the letter-D drill leaves the stock the F drill needs"
