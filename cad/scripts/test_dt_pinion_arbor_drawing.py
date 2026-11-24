@@ -132,12 +132,10 @@ def test_integral_head_owns_the_crossrod_interface() -> None:
     assert spec.NECK_LEN == pytest.approx(spec.NECK_END_Z - spec.HEAD_REAR_Z)
     callout = drawing.DIMENSION_CALLOUTS["CrossHoleDia"]
     assert callout is drawing.CROSS_HOLE_CALLOUT
-    # Rule 4: a bonded fit names its mate by number and its LOCTITE grade;
-    # rule 23: with the clearance its limits give, in two rows (rule 7).
-    assert (
-        callout
-        == "REAM THRU, BONDED FIT ON MHA-DT-15,\nLOCTITE 638 (CLEARANCE .0010-.0070)"
-    )
+    # Fit audit F14 (owner ruling 2026-11-24, recommended form): the reamed
+    # hole prints no band; the rod entering by hand is its acceptance and
+    # the compound is named (rule 4 v2), in two rows (rule 7).
+    assert callout == "REAM THRU; MHA-DT-15 ROD ENTERS\nBY HAND; BOND LOCTITE 638"
     # Machinist review r1 of #1685 (blocker): the band names its mate, and
     # every mate a callout names is the registry's part number.
     import _config
@@ -153,18 +151,15 @@ def test_integral_head_owns_the_crossrod_interface() -> None:
 
 def test_crossrod_is_a_bonded_slip_fit_not_a_press() -> None:
     """R1 (U27 precedent): as-received bar cannot make a press, so the rod is
-    bonded.  #2106 final review (Main ruling): the hole's band is the joint's
-    function, .250 +.005/+.001: the largest 1/4 rod enters with .001, the
-    loosest pair stays inside Loctite 638's gap, and the owned .2510 over
-    reamer still cuts inside it."""
-    assert spec.CROSS_HOLE_DIA == pytest.approx(6.35)
-    assert spec.CROSS_HOLE_DIA_BAND == pytest.approx((0.127, 0.0254))
-    assert spec.DRAWING_PRECISION["CrossHoleProfile"]["CrossHoleDia"] == 3
-    assert crossrod.ROD_DIA == pytest.approx(spec.CROSS_HOLE_DIA)  # line to line
-    assert (
-        model_toleranced_dimensions(part)[("CrossHoleProfile", "CrossHoleDia")]
-        == "*deviations(CROSS_HOLE_DIA_BAND)"
-    )
+    bonded.  Fit audit F14: the hole is the owned .2510 reamer's size with no
+    printed band; its ANALYSIS band (.2510-.2515) still lets the largest 1/4
+    rod enter with .001 and keeps the loosest pair inside Loctite 638's gap."""
+    reamer = geometry.OWNED_CROSS_HOLE_REAMER_MM
+    assert spec.CROSS_HOLE_DIA == pytest.approx(reamer) == pytest.approx(6.3754)
+    assert spec.CROSS_HOLE_DIA_BAND == pytest.approx((0.0127, 0.0))
+    assert spec.DRAWING_PRECISION["CrossHoleProfile"]["CrossHoleDia"] == 4
+    assert crossrod.ROD_DIA == pytest.approx(6.35)
+    assert ("CrossHoleProfile", "CrossHoleDia") not in model_toleranced_dimensions(part)
     tightest = (spec.CROSS_HOLE_DIA + spec.CROSS_HOLE_DIA_BAND[1]) - (
         crossrod.ROD_DIA + rod_geometry.ROD_DIA_BAND[0]
     )
@@ -174,21 +169,13 @@ def test_crossrod_is_a_bonded_slip_fit_not_a_press() -> None:
     assert spec.CROSSROD_MIN_CLEARANCE == pytest.approx(tightest)
     assert spec.CROSSROD_MAX_CLEARANCE == pytest.approx(loosest)
     assert tightest == pytest.approx(0.0254)  # .001 in: the rod always enters
-    assert loosest == pytest.approx(0.1778)  # .007 in
+    assert loosest == pytest.approx(0.0889)  # .0035 in
     assert loosest <= spec.RETAINING_COMPOUND_MAX_GAP_MM
-    reamer = geometry.OWNED_CROSS_HOLE_REAMER_MM
-    assert (
-        spec.CROSS_HOLE_DIA + spec.CROSS_HOLE_DIA_BAND[1]
-        <= reamer
-        <= spec.CROSS_HOLE_DIA + spec.CROSS_HOLE_DIA_BAND[0]
-    )
-    # The callout names the function, the mate, the compound and the
-    # clearance the limits give (rule 23).
-    assert drawing.CROSS_HOLE_CALLOUT.endswith("(CLEARANCE .0010-.0070)")
     assert "INTO MHA-DT-22 HEAD WITH LOCTITE 638" in crossrod.ASSEMBLY_STEP
+    for retired in ("MATCH-REAM", "PRESS", "INTERNAL SHOULDERS SHARP", "CLEARANCE"):
+        assert retired not in drawing.CROSS_HOLE_CALLOUT
     for retired in ("MATCH-REAM", "PRESS", "INTERNAL SHOULDERS SHARP"):
         assert retired not in spec.DRAWING_NOTES
-        assert retired not in drawing.CROSS_HOLE_CALLOUT
 
 
 def test_only_the_two_journal_lands_carry_the_finish_and_no_band() -> None:
@@ -201,7 +188,6 @@ def test_only_the_two_journal_lands_carry_the_finish_and_no_band() -> None:
     assert spec.SHAFT_DIA_BAND == (-0.01016, -0.09652)
     assert model_toleranced_dimensions(part) == {
         ("BackStubReference", "BackStubDia"): "*deviations(SHAFT_DIA_BAND)",
-        ("CrossHoleProfile", "CrossHoleDia"): "*deviations(CROSS_HOLE_DIA_BAND)",
         ("PinHoleProfile", "PinHoleDia"): "*deviations(PIN_HOLE_DIA_BAND)",
     }
     lands = {

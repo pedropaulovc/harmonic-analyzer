@@ -111,14 +111,6 @@ def test_the_bench_gauges_read_inside_the_drawings_bands():
     f = _features()["features"]
     for hole, go, nogo, side_min, side_max, sign in (
         (
-            "cross_hole",
-            "cross_go_pin_in",
-            "cross_nogo_pin_in",
-            "cross_near_side_min_in",
-            "cross_near_side_max_in",
-            -1,
-        ),
-        (
             "pin_hole",
             "pin_go_pin_in",
             "pin_nogo_pin_in",

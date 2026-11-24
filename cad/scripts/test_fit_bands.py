@@ -365,6 +365,11 @@ INDEXED_FIT_BANDS: dict[tuple[str, str], str] = {
         "the 5/16 drilled MHA-DT-01 bore's ANALYSIS band, the title block's "
         "drilled-hole row, indexed for the bond gap and the relief air"
     ),
+    ("dt_pinion_arbor_geometry", "CROSS_HOLE_DIA_BAND"): (
+        "the .2510 reamed crossrod hole's ANALYSIS band (no native band; the "
+        "MHA-DT-15 rod is its gauge, fit audit F14), indexed for the bond's "
+        "CROSSROD_MIN/MAX_CLEARANCE and the head webs"
+    ),
     ("dt_alignment_pinion_spec", "ARBOR_BORE_BAND"): (
         "the 5/16 drilled drum bore's ANALYSIS band, the title block's "
         "drilled-hole row (no native band; MHA-DT-22's bond lands are made to "

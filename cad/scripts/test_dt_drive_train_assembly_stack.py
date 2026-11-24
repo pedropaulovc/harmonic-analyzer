@@ -1464,12 +1464,13 @@ def _pinion_arbor_and_rig_fasteners(drive) -> None:
         and abs(drum_station_setting.DRUM_FRONT_END_Z - drive.APINION_Z_FRONT) <= 1e-9
         and abs(drum_station_setting.AXIS_Y - drive.APINION_Y) <= 1e-9
     ), "the drum-station setting leg left the placed arbor head and drum"
-    # R1: the crossrod is a bonded slip fit, modelled line to line.  Its printed
-    # limits (rod enters, gap inside Loctite 638) are dt_pinion_arbor_spec's asserts;
-    # the assembly only needs the shared nominal it places both parts at.
-    assert (
-        abs(drive.HANDLE_ROD_DIA - dt_pinion_arbor_geometry.CROSS_HOLE_DIA) <= 1e-9
-    ), "grip crossrod and head hole no longer share a nominal"
+    # R1: the crossrod is a bonded slip fit.  Fit audit F14: the head hole is
+    # the .2510 reamer's size on the 1/4 rod; the bond's limits (rod enters,
+    # gap inside Loctite 638) are dt_pinion_arbor_geometry's asserts.
+    assert abs(drive.HANDLE_ROD_DIA - 6.35) <= 1e-9, "grip crossrod left 1/4 in"
+    assert abs(dt_pinion_arbor_geometry.CROSS_HOLE_DIA - 0.2510 * 25.4) <= 1e-9, (
+        "the head hole is no longer the .2510 reamer"
+    )
     # Fit audit F16: the strap pivot bore is the .2510 reamer's size on the
     # 1/4 in MHA-DT-19 shaft, whose nominal the strap pin's ligament reads
     # from the bracket geometry (lockstep).
