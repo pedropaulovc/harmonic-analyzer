@@ -65,12 +65,8 @@ from _drawing_marks import (
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
 )
-from _drawing_tolerances import (
-    set_dimension_basic_tolerance,
-    set_dimension_bilateral_tolerance,
-)
+from _drawing_tolerances import set_dimension_basic_tolerance
 from _document_units import apply_package_model_units
-from _fit_deviations import deviations
 from _part_pmi import author_part_pmi
 from _part_properties import part_drawing_unit
 from _saved_part_guard import require_saved_drawing_properties
@@ -97,7 +93,6 @@ from pd_transgear_arm_plate_geometry import (
     TOP_RIGHT,
     WIDTH,
     section_area_moments,
-    UNIT,
 )
 from pd_transgear_arm_plate_spec import (
     BASIC_REDUCER_DIMENSIONS,
