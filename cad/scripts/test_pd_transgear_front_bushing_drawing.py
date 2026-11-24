@@ -146,8 +146,11 @@ def test_the_unchanged_bushing_bears_on_the_smaller_d_flat_sleeve_nose() -> None
 
 
 def test_the_length_is_a_term_of_the_disc_cluster_stack() -> None:
-    """#2124: it sets the collar air, so it prints +/-.001 at 3 places, named
-    on the stack; the shims, not this length, set the end float."""
+    """#2124: it prints +/-.001 at 3 places, named on the disc cluster's
+    stack.  Since fit audit question 5 (owner ruling 2026-11-24) the band
+    serves the sleeve's unshimmed float at the ring, not the collar air, and
+    the callout names that gap, as necessity N-02 does (rule 25; Codjiflo r2
+    on #3506)."""
     assert spec.LENGTH == fit.FRONT_BUSHING_LENGTH
     assert spec.LENGTH_BAND == fit.LENGTH_BAND == FIT_LENGTH_BAND_IN
     assert spec.LENGTH_PLACES == fit.LENGTH_PLACES == 3
@@ -155,7 +158,13 @@ def test_the_length_is_a_term_of_the_disc_cluster_stack() -> None:
     assert "RingLength" not in spec.REFERENCE_DIMENSIONS
     callout = drawing.DIMENSION_CALLOUTS["RingLength"]
     assert callout == spec.LENGTH_CALLOUT
-    assert STACK_NAME in callout
+    assert callout == f"{STACK_NAME}:\nMHA-PD-VN-61 RING GAP"
+    assert "CLEARANCE" not in callout
+    # Looser (±.003, the title block's row), the unshimmed ring gap's low
+    # end closes under the float floor: N-02's 0.1778 against 0.2032.
+    loosened = fit.UNSHIMMED_FLOAT_RANGE[0] - (0.003 - 0.001) * 25.4
+    assert loosened == pytest.approx(0.1778, abs=1e-4)
+    assert fit.UNSHIMMED_FLOAT_RANGE[0] >= fit.END_FLOAT_MIN > loosened
 
 
 def test_the_bore_and_both_end_faces_run_machined() -> None:

@@ -386,12 +386,15 @@ def test_the_shank_is_made_to_fit_and_prints_no_limits() -> None:
         "(RUNNING CLEARANCE .0010-.0025 REF)",
     ]
     assert callouts.RUNNING_CLEARANCE_TEXT == callouts.SHANK_CALLOUT.split("\n")[1]
-    # Codjiflo on #3506: the callout's module imports no mate's spec, so a
-    # sleeve edit does not re-key this part.
+    # Codjiflo on #3506 and its round 2: neither the callout's module nor
+    # the drawing script imports a mate's spec, so a sleeve edit does not
+    # re-key this part; the requirement reads the pin's own clearance.
     assert not hasattr(callouts, "SLEEVE")
-    assert "pd_transgear_feed_pinion_spec" not in Path(callouts.__file__).read_text(
-        encoding="utf-8"
-    )
+    assert not hasattr(drawing, "SLEEVE")
+    for module in (callouts, drawing):
+        assert "pd_transgear_feed_pinion_spec" not in Path(module.__file__).read_text(
+            encoding="utf-8"
+        )
     # Printed on the pin only: none of the three bores repeats the range.
     import pd_transgear_feed_pinion_callouts as sleeve_callouts
     import pd_transgear_front_bushing_spec as front_bushing

@@ -74,8 +74,10 @@ HUB_LENGTH = 13.6906  # .539
 # cluster sits .005 further back than #2124 put it (front bushing .222 to
 # .227, rear .214 to .209), moving spare platen-side air to the collar side
 # so the pin's running fit may be a range .0015 wide, .0010-.0025 (pin
-# +0/-.0005, reamed bores on size to .0010 over).  Collar air statistical
-# .0045 to .0078 against .004; platen air .0212 to .0145 against .0012.
+# +0/-.0005, reamed bores on size to .0010 over).  At this setting the
+# collar air reads .0074 statistical against .004 (pd_cluster_air.COLLAR_AIR)
+# and the disc-to-platen air .0083 against .0012
+# (build_pd_paper_drive_assembly.PLATEN_AIR).
 # The looser pin widens the feed pinion's lateral offset band, so MHA-PD-00
 # step 24C's engaged feed (and its settings row) moves from .165 TO 10.445
 # to .166 TO 10.444 (4.19-265.31 to 4.20-265.30 mm, derived by

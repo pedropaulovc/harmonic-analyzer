@@ -89,16 +89,18 @@ if HUB_FACE_OVERLAP_WORST < HUB_FACE_OVERLAP_MIN:
     )
 
 # --- Length: +/-.001 (owner ruling 2026-11-01, #2124) ----------------------------
-# With the cluster forward it sets F to the disc's front face (m), so the
-# drive collar's air to the disc: a term of the disc cluster's stack.
+# It is a term of the sleeve's float at the MHA-PD-VN-61 ring
+# (transgear_cluster_fit.RING_FLOAT_CHAIN): looser, the unshimmed ring gap
+# closes under END_FLOAT_MIN.  Since fit audit question 5 (owner ruling
+# 2026-11-24) the collar air no longer needs it (necessity N-02).
 LENGTH = FIT.FRONT_BUSHING_LENGTH  # .227
 LENGTH_BAND = FIT.LENGTH_BAND
 LENGTH_PLACES = FIT.LENGTH_PLACES
-# Rule 4: the band names the stack it serves, by the drawing numbers of the
-# drive collar and the disc whose clearance it sets.
-COLLAR_NUMBER = _config.parts("pd-transgear-drive-collar")["number"]
-DISC_NUMBER = _config.parts("pd-rack-pinion")["number"]
-LENGTH_CALLOUT = f"{STACK_NAME}:\n{COLLAR_NUMBER} TO {DISC_NUMBER} CLEARANCE"
+# Rule 4: the band names the stack it serves, the gap at the ring (rule 25:
+# the sheet and N-02 say the same; Codjiflo r2 on #3506).  Its second line
+# is shorter than the clearance line it replaces, so it fits where that
+# stood.
+LENGTH_CALLOUT = f"{STACK_NAME}:\n{PIN.RING_NUMBER} RING GAP"
 
 # drawing-guidelines.md rule 6 (roughness symbols only where a surface runs, slides or locates): the bore runs on the pin and both faces bear, so all three carry
 # the machined grade, the bore as the sleeve's bore on the same pin does.
