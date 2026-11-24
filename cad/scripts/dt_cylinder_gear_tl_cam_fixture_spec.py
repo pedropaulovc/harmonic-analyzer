@@ -695,13 +695,15 @@ for _name, _value in DRAWING_VALUES_BY_NAME.items():
     if abs(_inches - round(_inches, _places)) > 1e-9:
         raise AssertionError(f"cam fixture {_name} {_inches} in is off its grid")
 # The explicit bands the model carries: each hole coordinate from the
-# register axis and each press ream.
+# register axis.  The two press reams print the reamer's size and no band
+# (fit audit 2026-11-23, MHA-DT-12-TL-01.stub_hole and .clock_pin_hole;
+# drawing-guidelines rule 4, form 3): the bought pin is the gauge.
+# STUB_HOLE_DEVIATIONS and PIN_HOLE_DEVIATIONS stay the analysis bands
+# (REAM_H7, what the reamer cuts) that the press and wall checks consume.
 MODEL_BANDS_MM: dict[tuple[str, str], tuple[float, float]] = {
     ("StubHoleProfile", "StubOffset"): POSITION_DEVIATIONS,
     ("PinHoleProfile", "PinX"): POSITION_DEVIATIONS,
     ("PinHoleProfile", "PinY"): POSITION_DEVIATIONS,
-    ("StubHoleProfile", "StubHoleDia"): STUB_HOLE_DEVIATIONS,
-    ("PinHoleProfile", "PinHoleDia"): PIN_HOLE_DEVIATIONS,
 }
 
 
@@ -712,12 +714,13 @@ def inch_text(value_mm: float, places: int) -> str:
 
 
 # Each REAM callout names its pressed pin by its short form (a member of this
-# sheet's MHA-DT-12-TL-00 kit) and, once, what it does for the gear: the stub
-# locates the bore (TL-00 sets the throw by gauge blocks, so the stub's station
-# drops out of it) and the pin sets the phase (rules 4, 7 and 25); the
-# location dimensions carry value and band only. The clock pin's blind press
-# is permanent: no knockout behind a .0375 pin (rule 16's permanent pair).
-# Rows short enough to stand between the register and the edge view.
+# sheet's MHA-DT-12-TL-00 kit), the fit and its acceptance; why each stays
+# reamed and why each station keeps its +/-.002 is in the necessity register
+# (cad/config/necessity/dt-cylinder-gear-tl-cam-fixture.yaml), not on the
+# sheet (rule 4).  The location dimensions carry value and band only. The
+# clock pin's blind press is permanent: no knockout behind a .0375 pin
+# (rule 16's permanent pair).  Rows short enough to stand between the
+# register and the edge view.
 STUB_NUMBER = str(_config.parts("dt-cylinder-gear-tl-vn-cam-stub")["number"])
 CLOCK_PIN_NUMBER = str(_config.parts("dt-cylinder-gear-tl-vn-cam-clock-pin")["number"])
 GEAR_NUMBER = str(_config.parts("dt-cylinder-gear")["number"])
@@ -734,13 +737,11 @@ def kit_short_form(number: str) -> str:
 PIN_HOLE_DEPTH_TEXT = inch_text(PIN_HOLE_DEPTH, PIN_HOLE_DEPTH_PLACES)
 CALLOUTS_BELOW: dict[str, str] = {
     "StubHoleDia": (
-        f"REAM THRU\nPRESS FIT ON {kit_short_form(STUB_NUMBER)}\n"
-        f"LOCATES {GEAR_NUMBER} BORE"
+        f"REAM THRU\nPRESS FIT ON {kit_short_form(STUB_NUMBER)},\nDOES NOT TURN BY HAND"
     ),
     "PinHoleDia": (
         f"REAM <HOLE-DEPTH> {PIN_HOLE_DEPTH_TEXT}\n"
-        f"PRESS FIT ON {kit_short_form(CLOCK_PIN_NUMBER)}, PERMANENT PAIR\n"
-        f"SETS {GEAR_NUMBER} CAM PHASE"
+        f"PRESS FIT ON {kit_short_form(CLOCK_PIN_NUMBER)}, PERMANENT PAIR"
     ),
 }
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:2"

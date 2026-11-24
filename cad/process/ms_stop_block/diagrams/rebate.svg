@@ -10,7 +10,7 @@
   <line class="active-face" x1="92.5" y1="212.8" x2="113.1" y2="212.8"/>
   <rect class="cutter" x="76.7" y="70.0" width="34.9" height="96.4"/>
   <text class="label" x="50.0" y="62.0">1/8 in end mill (then the 1/16)</text>
-  <text class="label" x="50.0" y="292.1">Section along the rebate</text>
+  <text class="label" x="50.0" y="292.1">Section across the rebate</text>
   <text class="label" x="50.0" y="308.1">(looking toward the fixed jaw)</text>
   <text class="label" x="225.0" y="100.0">TOP face: X0</text>
   <line class="leader" x1="221.0" y1="96.0" x2="50.0" y2="150.0"/>

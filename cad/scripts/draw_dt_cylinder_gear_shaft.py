@@ -151,6 +151,15 @@ requirement(
     },
     precision={"height": _P["DomeHeight"], "supply_length": 1},
 )
+# The O.D. prints REF (the bought ground stock). Its feature still carries a
+# band, because the traveler's as-supplied O.D. (plan process.
+# as_supplied_outer) reads a banded diameter: prechips 0.11.47 refuses a bare
+# reference ("'outer' is not a banded diameter", head 4bff0cce54). The band
+# is no sheet text: it is the purchase requirement for the stock, "3/8 in SAE
+# 1018 or 1045 precision-ground round whose stated diameter tolerance lies
+# inside +.0000/-.0008" (cad/config/shop-equipment/stock-to-order.toml,
+# issue #2346 owner ruling 2026-11-20; no SKU selected yet), carried by
+# SHAFT_DIA_BAND (= _fit_shaft_h.SHAFT_H).
 requirement(
     "outer",
     kind="diameter",
@@ -466,7 +475,19 @@ def build(adapter: Any) -> dict[str, str]:
         raise RuntimeError("profile view does not carry exactly one dome radius")
     _set_spherical_reference(adapter, radius_annotations[0], label="arbor dome radius")
     # Above the value: the Ø's dimension line runs down to the bar, so the
-    # below lane would sit on it.
+    # below lane would sit on it.  The O.D. is bought ground stock, never cut:
+    # it prints as REFERENCE beside the stock it is (rule 4: the stock, not
+    # limits of size).
+    shaft_annotations = [
+        annotation
+        for annotation in profile_annotations
+        if dimension_name(adapter, annotation) == "ShaftDia"
+    ]
+    if len(shaft_annotations) != 1:
+        raise RuntimeError("profile view does not carry exactly one arbor diameter")
+    set_reference_dimension(
+        adapter, shaft_annotations[0], label="arbor diameter", diameter=True
+    )
     set_dimension_callouts(
         adapter, profile_annotations, {"ShaftDia": SHAFT_DIA_CALLOUT}, location="above"
     )

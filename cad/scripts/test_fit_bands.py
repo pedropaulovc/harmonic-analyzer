@@ -344,6 +344,13 @@ INDEXED_FIT_BANDS: dict[tuple[str, str], str] = {
     ("dt_cylinder_gear_spec", "WHOLE_DEPTH_BAND"): (
         "indexed into the cylinder gear-data whole-depth limits"
     ),
+    # Fit audit 2026-11-23 (drawing-guidelines rule 4): an analysis band, not
+    # a printed limit.
+    ("dt_cylinder_gear_spec", "BORE_DIA_BAND"): (
+        "analysis band of the .3760 reamed bore, which prints the reamer's "
+        "size and no band: indexed for the running clearance on MHA-DT-13, "
+        "the cam wall, the cone tip's air and the cam fixture's stub float"
+    ),
     ("ch_connecting_rod_spec", "SHANK_THICKNESS_BAND"): (
         "the shank's .13 thickness at the title block's .XX (#3114), "
         "indexed by ch_connecting_rod_spec to keep each shank face inside "

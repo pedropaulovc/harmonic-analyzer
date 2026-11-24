@@ -419,11 +419,11 @@ cite = ["Online Metals order 1021751700 confirmation (PO harmonic-analyzer-02, 2
 [stock.c360-flat-1-4x6]
 form = "flat_bar"
 material = "C360 brass"
-note = "To order: brass flat bar C360 0.250 x 6.000 in, 1 piece x 11.000 in. Allocation: pd-platen (MHA-PD-02). Not owned: the Metal Supermarkets order (invoice EC234347, $168.60) was refunded for want of stock (owner 2026-11-23). Sources read live 2026-11-23: no 1/4 x 6 in C360 bar could be bought online at OnlineMetals (pid 20203 loads without a length option), McMaster-Carr, Speedy Metals or Midwest Steel; Metal Supermarkets' Kent store page still listed SKU BF360/2506 at $168.60 for 11 in, against the refund. Thicker 6 in wide bar exists (OnlineMetals pid 20986, 3/8 x 6, 12 in, $321.60) but is not this row's size. No supplier chosen."
+note = "To order: brass flat bar C360 0.250 x 6.000 in, 1 piece x 11.000 in. Allocation: pd-platen (MHA-PD-02). Not owned: the Metal Supermarkets order (invoice EC234347, $168.60) was refunded for want of stock (owner 2026-11-23). Sources read live 2026-11-23: no 1/4 x 6 in C360 bar could be bought online at OnlineMetals (pid 20203 loads without a length option), McMaster-Carr, Speedy Metals or Midwest Steel; Metal Supermarkets' Kent, Everett and Portland pages still listed SKU BF360/2506 at $168.60 for 11 in with no stock count, against the refund. Carted instead, not this row's size (owner 2026-11-24 pointed at it): McMaster-Carr 8954K19, 3/8 x 6 in x 1 ft, $193.41, thickness -0.009/+0.009 in, width -0.02/+0.02 in, H02, ASTM B16. The platen plan (blank .250 thick, 10.95-11.10 long) and this row's section and length are NOT yet changed for it: a 3/8 bar means .223 in to face off instead of .098 and a 12 in piece sawn to 11."
 section_mm = [152.4, 6.35]
 length_mm = 279.4
 status = "to_order"
-cite = ["Metal Supermarkets Kent invoice EC234347, date ordered 03 Nov 2026, line Brass Flat Bar C360 0.250 X 6.000, qty 1 @ 11.000 in (refunded)", "Owner (Pedro) 2026-11-23: \"brass platen was ordered previously on metalssupermarket but they refunded it because they couldnt find stock so needs to be added to cart again\""]
+cite = ["Metal Supermarkets Kent invoice EC234347, date ordered 03 Nov 2026, line Brass Flat Bar C360 0.250 X 6.000, qty 1 @ 11.000 in (refunded)", "Owner (Pedro) 2026-11-23: \"brass platen was ordered previously on metalssupermarket but they refunded it because they couldnt find stock so needs to be added to cart again\"", "Owner (Pedro) 2026-11-24: \"https://www.mcmaster.com/8954K19-8954K256/ seems cheaper than onlinemetals and speedy metals\"", "https://www.mcmaster.com/8954K19/ read live 2026-11-24: Ultra-Machinable 360 Brass Bar, 3/8 in thick, 6 in wide, 1 ft, $193.41 each (same as 8954K256)"]
 
 [stock.1020-dom-tube-1x0120]
 form = "round_tube"
@@ -561,7 +561,7 @@ cite = ["McMaster-Carr packing list, PO 1103PCAMPOS (8227120-01, 11/03/2026), li
 [stock.c260-sheet-032-6x6]
 form = "sheet"
 material = "260 brass, ultra-formable"
-note = "Bought (McMaster-Carr PO 1103PCAMPOS, packing list line 78): 8956K425 ultra-formable 260 brass sheet, 6 x 6 in, .0320 in thick, 1 each. The packing list names MHA-PD-03 pd-platen-clip. Not reconciled with stock.c260-h02-strip-032x2, the H02 strip the platen-clip plan asks for: the temper is not on the packing list and the form differs."
+note = "Bought (McMaster-Carr PO 1103PCAMPOS, packing list line 78): 8956K425 ultra-formable 260 brass sheet, 6 x 6 in, .0320 in thick, 1 each. The packing list names MHA-PD-03 pd-platen-clip. Owner ruling 2026-11-24: \"Use the sheet; buy strip only if the hook takes a set.\": this sheet makes the MHA-PD-14 latch hook first (the temper trial) and the MHA-PD-03 platen clips, in place of the H02 strip (stock.c260-h02-strip-032x2), whose temper this sheet's packing list does not state. The plans' stock lines are not yet changed."
 section_mm = [152.4, 0.8128]
 length_mm = 152.4
 status = "on_hand"

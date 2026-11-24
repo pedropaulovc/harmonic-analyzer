@@ -83,6 +83,58 @@ chain; a limit that cannot cite each step is a habit, not a requirement.
 7. **Verify on the assembled machine** with the trials in the last section; the model is a
    prediction until a trial confirms it.
 
+### Checks in spec modules and tests
+
+A numeric check in a spec, geometry or stack module or in a test (a floor, a limit, a budget, a
+guard that raises) is a design criterion, and it follows the chain above like a drawing limit.
+Its entry in the check register, `cad/config/checks/<dashed-module-stem>.yaml`
+(`cad/scripts/check_register.py`), says:
+
+1. **What fails on this machine** just past the limit: a named part binds, unmeshes, breaks
+   through, bottoms or cannot be assembled. "The budget does not close" and "the band is left"
+   are not failures.
+2. **What sets the number**: an owner ruling (issue or PR and date), a supplier's published
+   figure, a standard and its clause, or the module that computes it. A round number with none
+   of these is a guess: say so, and ask before it gates anything.
+3. **Its basis**, one of three (owner ruling 2026-11-24, which adds the second class to the
+   worst-case ruling of 2026-09-23 and confirms the delegated root-sum-square ruling of
+   2026-11-11: "A. Yes; what is left after the setting may be combined by root sum square, with
+   the plain sum printed beside it; runouts of gears turning at different speeds still add."):
+   - *Worst case of the printed bands* (`worst_case`): for a wall, a thread engagement, and a
+     gap, clearance or alignment between parts that nothing sets, fits or adjusts at assembly
+     (guidelines rules 17 to 19).
+   - *After the setting* (`after_setting`): for a joint the fitter sets, fits or adjusts at
+     assembly (on a feeler or an indicator, by feel, to a first bind, shimmed, slotted, made to
+     its mate, match-drilled). The check is that the adjustment covers the worst case of the
+     stack that feeds it (rule 19), and that what the setting cannot see (an index error along
+     a rack, runout over a turn) leaves the function. The sizes of those residual errors are
+     independent and may take a root sum square, with the arithmetic sum reported beside it.
+     Their phases are not: two runouts on gears that turn at different speeds meet at their
+     worst every few turns, so once the sizes are taken, the runouts add. The setting itself is
+     not a term: a mesh set by feel is not also summed against a backlash band.
+   - *Measured or made to measure* (`measured`): one machine is built, so a part made to its
+     measured mate, a length cut to a measured stack and a bought part measured at receipt
+     enter at what was measured, not at a limit. A bought part's unpublished property (form,
+     lead, index beyond the catalogue figure) is a term only if a step measures it with a tool
+     the shop owns; otherwise the check does not depend on it.
+
+**No term is the remainder.** A budget whose last term was sized to "take the rest" has no
+margin by construction and tells the builder nothing. A term is what the process, the supplier
+or an instrument gives.
+
+**A margin is stated in the unit and to the place the shop reads it**: `.001 in` for a size,
+`.0005 in` for an indicator reading, 0.01 mm on a millimetre package. A check that passes or
+fails by less than that is not evidence either way. It is never closed by tightening a part,
+adding a band, an inspection, a gauge or a term, or by moving its own limit by a digit:
+re-derive its basis, or give the design real room with geometry, or ask the owner.
+`math.nextafter` and `1e-9` guard a floating-point comparison; they are never a margin and
+never part of a limit.
+
+**A check may be relaxed or removed** by its author when its basis is wrong, with the reason in
+the PR: the joint is set at assembly, the limit was a round number, the failure it names cannot
+happen. The owner-ruled thresholds (the wall floor, 1.5D engagement, a ruling quoted beside the
+constant) change only by an owner ruling.
+
 ### Drive-train gear tips and standard mesh checks
 
 Gear tips take `fits.gear_tip` in `tolerances/gear_tip.yaml` (read through
@@ -604,7 +656,9 @@ leaves its targets.
 ## Current analytic clearance assertions (kept, being migrated)
 
 The build scripts already assert clearance margins analytically (and raise on violation) — these
-are the concrete realizations of the classes above, being lifted into `tolerances/`:
+are the concrete realizations of the classes above, being lifted into `tolerances/`. A raising
+guard is a check in the sense of "Checks in spec modules and tests" and has its entry in the
+check register; one that cannot give the three answers is removed, not kept because it passes:
 
 - spring-eye threading margins into the lever hole / under the tab;
 - oblique cone↔drum mesh set point (edge slack, `cone_set_stack`). The engaged cone centre is

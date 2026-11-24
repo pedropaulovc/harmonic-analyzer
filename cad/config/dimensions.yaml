@@ -506,7 +506,7 @@ sections:
         - measured
         - med
       - - Cam bore
-        - 9.5504 mm model nominal, reamed .3760 +.0005/.0000 in to run on the finished Ø9.525 mm arbor
+        - 9.5504 mm model nominal; the sheet prints the .3760 reamer with no band (MHA-DT-13 ENTERS, NO SHAKE; fit audit 2026-11-23, rule 4 form 3), the analysis band +.0005/.0000 in on the finished Ø9.525 mm arbor
         - —
         - 'dt_cylinder_gear_spec: the shaft nominal plus the configured .375 REAM_SLIDE upper limit, a 0.0254–0.0584 mm diametral running clearance on the arbor. The historical legacy plain-bore 9.5 mm / 3/8 in record remains evidence only; no keyway (M6.2 refutation below).'
         - derived from matched fit

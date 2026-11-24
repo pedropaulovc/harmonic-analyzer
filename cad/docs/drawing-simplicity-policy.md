@@ -230,6 +230,9 @@ their sheet re-keys for another reason or the review leaf is force-refreshed.
   fit. A shaft turned to its hole, a pin bonded in a drilled hole and a hole
   reamed to the bought shaft are how this machine's fits are made (owner
   direction 2026-11-23: "can the holes not be reamed in the first place").
+  Where the owner has already accepted a setting at a joint (a shim, a
+  feeler-set gap, a mesh set by feel), the checks of that joint are written
+  after the setting; keeping a worst-case sum beside it double-pays.
 - **The necessity answer lives in a register, not on the sheet.** Rule 4's
   answer for a REAM or tight band is an entry in
   `cad/config/necessity/<dashed-drawing-stem>.yaml` (`id`, `feature`, `kind`,
@@ -253,6 +256,16 @@ their sheet re-keys for another reason or the review leaf is force-refreshed.
   reamer's band" and a fit-table row are not reasons. `error_budget.yaml`
   already says it: a limit tighter than its allowable "is a fit, process or
   capability choice, not a benchmark requirement".
+- **A check carries its necessity too.** A floor, budget or guard in a
+  spec module or a test has an entry in `cad/config/checks/<module>.yaml`
+  that says what fails past it, what sets its number and on which basis it
+  is summed (`tolerance-policy.md`, "Checks in spec modules and tests").
+  Like the necessity register it is read by review alone and rebuilds
+  nothing. A joint set or fitted at assembly is checked after its setting,
+  not at the worst case of every band (owner ruling 2026-11-24). A check
+  that closes by less than the shop reads goes to the owner; it is never
+  closed with a tighter part, another inspection or a limit moved by a
+  digit.
 - **No tool or gauge is bought for one feature without an owner ruling.** A
   plan that names a reamer outside the standard set, a plug gauge or a pin
   pair for one band is a signal that the drawing is wrong: change the
@@ -325,10 +338,14 @@ frames and no datums. A new entry needs a user ruling or a delegated ruling
 
 ## Named exceptions
 
-A shortfall against rules 17–19 (or another numeric rule) is acceptable only
+A shortfall against rules 17–19 is acceptable only
 by a ruling declared as a `machinist_exceptions` entry (kind `minor`) under
-the package's own key in its config YAML. The thresholds are never loosened to
-admit a shortfall. Each entry is specific to the part it names.
+the package's own key in its config YAML. The wall floor, the 1.5D
+engagement and rule 19's stack are never loosened to admit a shortfall. A
+check an author wrote into a spec module or a test is not such a threshold:
+when its basis is wrong it is re-derived, and the PR says why
+(`tolerance-policy.md`, "Checks in spec modules and tests"). Each entry is
+specific to the part it names.
 
 A ruling is either the owner's own or delegated. A delegated ruling is made by
 the agent coordinating the work when the owner is unavailable, and it must
