@@ -309,7 +309,7 @@ def test_retained_walls_and_axial_stations_need_no_new_waiver():
     # The .250 +.004/0 pilot (the DRILLED HOLES row) bonded on the journal
     # modelled .2485-.2488: .0012-.0055, inside LOCTITE 641's .0059 fill.
     assert min(cup.BORE_JOURNAL_CLEARANCE) == pytest.approx(0.03048)
-    assert max(cup.BORE_JOURNAL_CLEARANCE) == pytest.approx(0.1397)
+    assert max(cup.BORE_JOURNAL_CLEARANCE) == pytest.approx(0.1143)
     assert max(cup.BORE_JOURNAL_CLEARANCE) <= cup.LOCTITE_641_GAP_MAX
     assert ring.LENGTH == 6.7818  # .267, the 3/8 arm (#2019)
     assert bush.HUB_LENGTH == pytest.approx(20.5486)  # .809
