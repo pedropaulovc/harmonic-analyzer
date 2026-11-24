@@ -11,6 +11,7 @@ import pytest
 import _config
 from _inch_wall_limits import WALL_TARGET_MM
 from _printed_tolerance import (
+    angular_band_deg,
     drilled_oversize_mm,
     edge_break_chamfer_mm,
     edge_break_radius_mm,
@@ -59,7 +60,7 @@ def test_every_marked_dimension_has_one_view_and_model_places() -> None:
 def test_the_length_carries_its_band_on_the_model_and_the_bore_none() -> None:
     """The length's band is a native model tolerance from the spec (policy
     drawing-simplicity-policy.md `How the repository implements the guidelines`): ±.001, the shop's row for a turned length.  The O.D. prints at .XX and the title block's row governs it;
-    the bore is a #12 drill under the DRILLED HOLES row: restating either row
+    the bore is a #11 drill under the DRILLED HOLES row: restating either row
     on the dimension is what drawing-guidelines.md rule 2 (the title block is the general specification) forbids."""
     assert model_toleranced_dimensions(part) == {
         ("Ring", "RingLength"): "LENGTH_TOLERANCE",
@@ -70,9 +71,9 @@ def test_the_length_carries_its_band_on_the_model_and_the_bore_none() -> None:
     # The analysis band is what the drill cuts: never under size, up to the
     # DRILLED HOLES row's growth.
     drilled_growth = drilled_oversize_mm(unit=spec.UNIT)
-    assert spec.BORE_DRILL == "#12" and spec.BORE_DIA == pytest.approx(0.189 * 25.4)
+    assert spec.BORE_DRILL == "#11" and spec.BORE_DIA == pytest.approx(0.191 * 25.4)
     assert spec.BORE_DIA_BAND == pytest.approx((drilled_growth, 0.0))
-    assert (spec.BORE_DIA_MIN, spec.BORE_DIA_MAX) == pytest.approx((4.8006, 4.9022))
+    assert (spec.BORE_DIA_MIN, spec.BORE_DIA_MAX) == pytest.approx((4.8514, 4.953))
 
 
 def test_the_bore_is_a_bonded_slip_fit_on_the_shoulder_at_every_limit() -> None:
@@ -91,7 +92,7 @@ def test_the_bore_is_a_bonded_slip_fit_on_the_shoulder_at_every_limit() -> None:
     tightest = spec.BORE_DIA_MIN - shoulder_max
     loosest = spec.BORE_DIA_MAX - shoulder_min
     assert spec.BOND_GAP == pytest.approx((tightest, loosest))
-    assert (tightest, loosest) == pytest.approx((0.0015 * 25.4, 0.0065 * 25.4), abs=1e-6)
+    assert (tightest, loosest) == pytest.approx((0.0035 * 25.4, 0.0085 * 25.4), abs=1e-6)
     assert (
         spec.LOCTITE_638_GAP_MAX
         == sm_gooseneck_spring_joint.LOCTITE_638_GAP_MAX
@@ -108,18 +109,17 @@ def test_the_tightest_bond_gap_absorbs_the_drilled_bore_squareness() -> None:
     """Codjiflo r2 on #3487: the front face cures in one plane with the
     shoulder's end only if the ring can tilt on the shoulder, inside its
     tightest gap over its shortest land, as far as its bore is off square to
-    that face.  The sheet holds the drilled bore at the angular row alone,
-    so MHA-PD-00's dry trial (the spacer as made shows no daylight on the
-    plate, the screw held down on it) accepts each ring; the tailstock
-    drill's run-off the repo charges elsewhere (the arm's 0.3 degrees) sits
-    inside that tilt, so the trial is not expected to reject a sound ring."""
-    import pd_transgear_arm_geometry as arm
-
-    tilt = spec.BOND_GAP[0] / spec.BOND_LAND_MIN
-    assert tilt == pytest.approx(0.0381 / (5.0 - 0.0254 - 2 * 0.254), rel=1e-3)
-    run_off = math.tan(math.radians(arm.DRILL_RUN_OFF_DEG))
-    assert run_off < tilt
-    assert tilt - run_off > 0.003  # rad: 0.0085 against 0.0052
+    that face.  The sheet holds the drilled bore at the title block's
+    angular row alone, so the #11's tightest gap must let the ring lean the
+    whole row: 1.14 degrees against 1 (Main, by the owner's delegation of
+    2026-11-24, D17: owner question Q7b; the #12 gave 0.49)."""
+    tilt = math.degrees(math.atan(spec.BOND_GAP[0] / spec.BOND_LAND_MIN))
+    assert spec.BOND_GAP_TILT_DEG == pytest.approx(tilt)
+    assert tilt == pytest.approx(
+        math.degrees(math.atan(0.0889 / (5.0 - 0.0254 - 2 * 0.254))), rel=1e-3
+    )
+    assert tilt == pytest.approx(1.14, abs=0.005)
+    assert tilt >= angular_band_deg(unit=spec.UNIT) == 1.0
 
 
 def test_wall_holds_the_target_at_the_full_worst_case() -> None:
@@ -140,7 +140,7 @@ def test_wall_holds_the_target_at_the_full_worst_case() -> None:
         - spec.OD_RUNOUT / 2.0
         - 2.0 * setback
     )
-    assert spec.WALL_WORST == pytest.approx(worst) == pytest.approx(0.0905 * 25.4)
+    assert spec.WALL_WORST == pytest.approx(worst) == pytest.approx(0.0895 * 25.4)
     assert spec.WALL_WORST >= spec.WALL_TARGET == WALL_TARGET_MM
 
 
@@ -163,7 +163,7 @@ def test_a_larger_permitted_radius_break_charges_the_wall(monkeypatch) -> None:
         "_pivot_spacer_spec_probe", spec.__file__
     )
     probe = importlib.util.module_from_spec(probe_spec)
-    with pytest.raises(AssertionError, match=r"MHA-PD-20 wall 1\.791 < the 2\.032"):
+    with pytest.raises(AssertionError, match=r"MHA-PD-20 wall 1\.765 < the 2\.032"):
         probe_spec.loader.exec_module(probe)
     assert spec.EDGE_BREAK == pytest.approx(0.254)
 
@@ -446,7 +446,7 @@ def test_the_bore_callout_names_the_drill_and_the_bonded_seat() -> None:
     assert "BoreDia" in drawing.END_KEEP and "RingLength" in drawing.PROFILE_KEEP
     text = drawing.DIMENSION_CALLOUTS["BoreDia"]
     rows = text.split("\n")
-    assert rows[0] == "#12 DRILL THRU" and len(rows) == 3
+    assert rows[0] == "#11 DRILL THRU" and len(rows) == 3
     screw = _config.parts("pd-vn-transgear-pivot-screw")["number"]
     assert rows[1] == f"BONDED FIT ON {screw}"
     assert "REAM" not in text and "PRESS" not in text and "DIAMETRAL" not in text

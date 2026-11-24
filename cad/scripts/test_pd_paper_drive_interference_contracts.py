@@ -83,7 +83,7 @@ def test_hanger_screw_rows_follow_the_arm_plate_and_bar() -> None:
             pivot_screw.FITTED_THREAD_LEN - NECK_FLAT_END,
         )
     )
-    # The spacer's #12 drilled bore clears the shoulder (a bonded slip fit,
+    # The spacer's #11 drilled bore clears the shoulder (a bonded slip fit,
     # fit audit 2026-11-23): no allowed-interference row.
     assert spacer.BOND_GAP[0] > 0.0
     assert (
