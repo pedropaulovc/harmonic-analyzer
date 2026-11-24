@@ -59,7 +59,13 @@ credibility rests on:
    `check:recipe` fails if a COM leaf closure does) and take the least
    demanding form (drilled, made to fit, reamed to the bought mate, and only
    last a printed band); no reamer or gauge is bought for one feature
-   without an owner ruling. Drawing review is
+   without an owner ruling. A check in a spec module or a test is held to
+   the same test: its entry in `cad/config/checks/<module>.yaml` names what
+   fails, what sets its number and its basis
+   (`cad/docs/tolerance-policy.md`, "Checks in spec modules and tests"); a
+   joint set at assembly is checked after its setting; a check is never
+   closed by tightening a part or by a margin smaller than the shop reads.
+   Drawing review is
    the last DFM backstop: a finding that exposes a plausible model omission,
    contradiction, or unmanufacturable feature must be reconciled against the
    source CAD and primary evidence, not papered over on the sheet. Escalate a
@@ -1282,8 +1288,10 @@ Assembly data splits by consumer: `<stem>_assembly_spec.py` (reaches the .SLDASM
 Keep fit-up wording in the assembly sheet too: for example,
 `dt_drive_train_assembly_sheet.py` derives its lever-pin drill fraction from
 `dt_pinion_lever_geometry.PIN_HOLE_DIA` with `_inch_fraction.inch_fraction`.
-Test fit-up behavior through physical clearance floors, worst-service readings,
-feature-specific cut decisions and limits, sequence, and available sheet space.
+Test fit-up behavior through what the fit-up must do: the adjustment covers
+the stack that feeds it, the function holds after the setting, the
+sequence is possible and the sheet has the space. Do not add a floor for a
+quantity the fitter sets.
 Do not pin the narration or exact note wording.
 Identity changes can make a 70-character line wider in the drawing font.
 Use receiver-headed, indented paragraphs for meaningful native-field clearance;
