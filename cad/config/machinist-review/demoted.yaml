@@ -22,6 +22,7 @@ demoted:
   dt_cone_gear_tl_phasing_comb: fit-batch-dt
   dt_cone_tip_gear_tl_cutter_assembly: fit-batch-dt
   dt_drive_train_assembly: fit-batch-dt
+  dt_pinion_arbor: fit-batch-dt  # review cap, FIX after round 2: #3564
   fr_frame_assembly: fit-batch-fr
   fr_top_frame: fit-batch-fr
   ha_harmonic_analyzer_assembly: fit-batch-ha
