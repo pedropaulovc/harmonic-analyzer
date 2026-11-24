@@ -88,7 +88,6 @@ from pd_transgear_feed_pinion_spec import (
     BORE_DEVIATIONS,
     BORE_DIA,
     BOSS_DIA,
-    BOSS_DIA_DEVIATIONS,
     CUTTER_DIA_MAX,
     CUTTER_RUNOUT_DEVIATIONS,
     CUTTER_RUNOUT_MAX,
@@ -856,9 +855,6 @@ def build(adapter) -> dict[str, str]:
     )
     set_dimension_bilateral_tolerance(
         adapter, "SleeveProfile", "BoreDia", *BORE_DEVIATIONS, display_unit=UNIT
-    )
-    set_dimension_bilateral_tolerance(
-        adapter, "SleeveProfile", "BossDia", *BOSS_DIA_DEVIATIONS, display_unit=UNIT
     )
     set_dimension_symmetric_tolerance(
         adapter,
