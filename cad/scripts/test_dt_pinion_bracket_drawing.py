@@ -369,7 +369,12 @@ def test_fitted_bores_name_their_mates_and_fits() -> None:
 
     assert dt_pinion_bracket_spec.PIN_SEAT_WEB_WORST >= WALL_TARGET_MM
     exceptions = load_exceptions(_config.CONFIG_DIR, "dt_pinion_bracket", "part")
-    assert [(e.id, e.kind) for e in exceptions] == [("RV-01", "accept"), ("RV-02", "accept")]
+    # RV-03: the seat's +.003/0 band, the owner's (tool audit Q8, fit audit F18).
+    assert [(e.id, e.kind) for e in exceptions] == [
+        ("RV-01", "accept"),
+        ("RV-02", "accept"),
+        ("RV-03", "accept"),
+    ]
     assert all("WALL" not in e.finding.upper() for e in exceptions)
     # The (43.0) stands left of the flank, so no leader to the follower seat
     # (callouts right of the view) crosses its dimension line.
