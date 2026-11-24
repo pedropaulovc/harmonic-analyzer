@@ -38,6 +38,7 @@ demoted:
   - mg_wheel_bar
   - mg_wheel_drum
   - pd_rack_pinion
+  - pd_transgear_arm
   - pd_transgear_arm_plate
   - pd_transgear_disc_hub
   - pd_transgear_drive_collar
