@@ -352,7 +352,10 @@ top_saw_radial_tir_max_mm = 0.4064
 # along X past the ends, along Y over the bar. T1 (its collet and its 2 in
 # projection: 2.25 from the nose) is longer than the arbor
 # (saw_arbor_length_mm), so its tip parks 5 mm over the bars' top and the
-# arbor, swapped in for it, hangs higher still.
+# arbor, swapped in for it, hangs higher still. An R8 shank goes up into
+# the spindle from below, so for every change of the arbor the builder jogs
+# Z only, up, until the saw on it clears the bars; X and Y stay, and Z0 is
+# touched again from the saw.
 saw_touch_x_mm = 31.925
 saw_touch_y_mm = -3.1623
 saw_park_z_mm = 11.35
@@ -726,7 +729,7 @@ tool = "saw-arbor"
 drilling = "none"
 sizing = "other"
 feed = "hand"
-instruction = "Spindle stopped (M5), the head where CA01_foot_end parked it: do not jog X or Y. Take out the collet and end mill. Wipe the owned R8 stepped saw arbor's shank and the spindle's taper clean and mount the arbor (drawbar tight). Do not move the bars. Loads after the first: the saw is still clamped on it."
+instruction = "Spindle stopped (M5), the head where CA01_foot_end parked it: do not jog X or Y. Jog Z only, up, until the arbor can go up into the spindle with its saw clear above the bars. Take out the collet and end mill. Wipe the R8 stepped saw arbor's shank and the spindle's taper clean and mount the arbor (drawbar tight). Do not move the bars. Loads after the first: the saw is still clamped on it."
 inspection = "Loads after the first: both witness lines on the saw (drawn below) unbroken. A line broken: the saw has turned on the arbor: stop and tell the owner."
 gauge_checks = "other"
 
@@ -818,7 +821,11 @@ inspection = "Depth {{cad.foot_notch_depth_min_in:.3dot}}–{{cad.foot_notch_dep
 gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.foot_notch_depth_band_mm}}" }]
 
 [[setups.operations]]
-instruction = "After every load, the fifth included: spindle stopped (M5), lift the arbor out with the saw still clamped on it (the screw untouched), back to the collet; unclamp the load, the riser left in place. Clamp the next four and repeat this setup from the seat sweep, skipping the riser's and the first-load ops: 5 loads for the 20 bars. The X0 each load's foot notch is cut from is the end CA01 faced in that same clamping."
+instruction = "After every load, the fifth included: spindle stopped (M5). Jog Z only, up (X and Y untouched), until the clamped saw clears the bars and the arbor can drop out of the spindle. Lift the arbor out with the saw still clamped on it (the screw untouched); back to the collet."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Unclamp the load, the riser left in place. Clamp the next four and repeat this setup from the seat sweep, skipping the riser's and the first-load ops: 5 loads for the 20 bars. The X0 each load's foot notch is cut from is the end CA01 faced in that same clamping."
 feed = "hand"
 
 [[setups]]
@@ -933,7 +940,7 @@ tool = "saw-arbor"
 drilling = "none"
 sizing = "other"
 feed = "hand"
-instruction = "Spindle stopped (M5), the head where CA03_top_end parked it: do not jog X or Y. Take out the collet and end mill. Wipe the saw arbor's shank and the spindle's taper clean and mount the arbor (drawbar tight), the saw still clamped on it as checked in Setup 3, teeth cutting with M3. Do not move the bars."
+instruction = "Spindle stopped (M5), the head where CA03_top_end parked it: do not jog X or Y. Jog Z only, up, until the arbor can go up into the spindle with its saw clear above the bars. Take out the collet and end mill. Wipe the saw arbor's shank and the spindle's taper clean and mount the arbor (drawbar tight), the saw still clamped on it as checked in Setup 3, teeth cutting with M3. Do not move the bars."
 inspection = "Both witness lines unbroken and the screw untouched since Setup 3: its t, its D and its tips' swing R stand for the top notch too (its {{cad.top_notch_width_min_in:.3dot}}–{{cad.top_notch_width_max_in:.3dot}} width and {{cad.top_notch_depth_min_in:.2f}}–{{cad.top_notch_depth_max_in:.2f}} depth allow at least as much). Otherwise: do Setup 3's first-load saw ops again here, from the miking, to the same limits."
 gauge_checks = "other"
 
@@ -1003,7 +1010,7 @@ inspection = "Depth {{cad.top_notch_depth_min_in:.2f}}–{{cad.top_notch_depth_m
 gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.top_notch_depth_band_mm}}" }]
 
 [[setups.operations]]
-instruction = "Swap to the drill chuck. Set each CA05 tool out of the chuck by at least: #1 centre drill {{process.spot_projection_mm:in.2dot}}, #49 {{process.drill_projection_mm:in.2f}}, reamer {{process.ream_projection_mm:in.2f}} (the calipers' depth rod), so the chuck's nose stays above the jaw tops at its deepest cut."
+instruction = "Jog Z only, up (X and Y untouched), until the clamped saw clears the bars and the arbor can drop out of the spindle. Lift it out, the saw still clamped on it (the screw untouched), and swap to the drill chuck. Set each CA05 tool out of the chuck by at least: #1 centre drill {{process.spot_projection_mm:in.2dot}}, #49 {{process.drill_projection_mm:in.2f}}, reamer {{process.ream_projection_mm:in.2f}} (the calipers' depth rod), so the chuck's nose stays above the jaw tops at its deepest cut."
 feed = "hand"
 
 [[setups.operations]]

@@ -357,7 +357,10 @@ slot_saw_radial_tir_max_mm = 0.4064
 # T1 parked over it: up to saw_park_z_mm, along X past the crowns, along Y
 # over the fork; there the arbor, swapped in for T1 (its lowest point no
 # more than saw_arbor_length_mm from the nose, T1 its collet and its 1.12 in
-# projection out), hangs 5 mm over the stock top.
+# projection out), hangs 5 mm over the stock top. An R8 shank goes up into
+# the spindle from below, so for every change of the arbor the builder jogs
+# Z only, up, until the saw on it clears the blanks; X and Y stay, and Z0
+# is touched again from the saw.
 saw_touch_x_mm = 218.744
 saw_touch_y_mm = -25.4
 saw_park_z_mm = 18.258
@@ -858,7 +861,7 @@ tool = "saw-arbor"
 drilling = "none"
 sizing = "other"
 feed = "hand"
-instruction = "Spindle stopped (M5), the head where CR05_bore left it (T1 in line with the fork against the fixed jaw, past its crown, clear above it): do not jog X or Y. Take out the collet and T1. Wipe the owned R8 stepped saw arbor's shank and the spindle's taper clean and mount the arbor (drawbar tight). Do not move the blanks. Loads after the first: the saw is still clamped on it."
+instruction = "Spindle stopped (M5), the head where CR05_bore left it: do not jog X or Y. Jog Z only, up, until the arbor can go up into the spindle with its saw clear above the blanks. Take out the collet and T1. Wipe the R8 stepped saw arbor's shank and the spindle's taper clean and mount the arbor (drawbar tight). Do not move the blanks. Loads after the first: the saw is still clamped on it."
 inspection = "Loads after the first: both witness lines on the saw (drawn below) unbroken. A line broken: the saw has turned on the arbor: stop and tell the owner."
 gauge_checks = "other"
 
@@ -947,7 +950,11 @@ gauge_checks = [
 ]
 
 [[setups.operations]]
-instruction = "Lift the arbor out, the saw still clamped on it (the screw untouched), and swap to the drill chuck. G54 Z0 again with T3, the #1 centre drill: console M6 T3, spindle stopped, its tip on a .002 leaf on the fork's F face of the blank against the fixed jaw ({{process.fork_thickness_mm:in.4dot}} above the plate), G10 L20 P1 Z{{process.fork_touch_z_mm:.3f}} (the fork's {{process.fork_thickness_mm:.3f}} plus the leaf). First load only: prove CR07_pin in air, Z0 raised 1.000 in, through each M6; then Z0 back."
+instruction = "Jog Z only, up (X and Y untouched), until the clamped saw clears the blanks and the arbor can drop out of the spindle. Lift the arbor out, the saw still clamped on it (the screw untouched), and swap to the drill chuck."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "G54 Z0 again with T3, the #1 centre drill: console M6 T3, spindle stopped, its tip on a .002 leaf on the fork's F face of the blank against the fixed jaw ({{process.fork_thickness_mm:in.4dot}} above the plate), G10 L20 P1 Z{{process.fork_touch_z_mm:.3f}} (the fork's {{process.fork_thickness_mm:.3f}} plus the leaf). First load only: prove CR07_pin in air, Z0 raised 1.000 in, through each M6; then Z0 back."
 feed = "hand"
 
 [[setups.operations]]
