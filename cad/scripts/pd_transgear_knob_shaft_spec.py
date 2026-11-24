@@ -499,9 +499,9 @@ RELIEF_AREA_RATIO_MIN = RELIEF_AREA_MIN / THREAD_STRESS_AREA
 # --- Journal: .249, turned to the MHA-PD-28 bush's .249 reamed bore ----------
 # #290 fit D8 (owner ruling 2026-10-30: 6 mm -> .249): the bush (reamed after
 # it is pressed into the arm plate) takes the .2490 reamer (reamer-2490, to
-# order: not on hand); the cup's pilot is an end-milled bonded seat.  Fit
-# audit 2026-11-23, pending owner confirmation (drawing-guidelines rule 4,
-# made to fit): the journal is turned last to the bush's bore and tried in
+# order: not on hand); the cup's pilot is an end-milled bonded seat.
+# Drawing-guidelines rule 4, form 2 (made to fit): the journal is turned
+# last to the bush's bore and tried in
 # it, and prints REF.  JOURNAL_DIA_BAND is the ANALYSIS band, the modelled
 # result of that fitting, not printed limits: a journal .002 looser trebles
 # its shake in the bore, which the reducer mesh's backlash and the collar

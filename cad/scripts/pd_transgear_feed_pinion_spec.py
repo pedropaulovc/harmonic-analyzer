@@ -257,8 +257,8 @@ OVERALL_LENGTH = 27.3558  # 1.077
 OVERALL_LENGTH_BAND = FIT_LENGTH_BAND_IN
 
 # --- diameters -----------------------------------------------------------------
-# The boss is the hub's sliding fit, made to fit (fit audit 2026-11-23,
-# pending owner confirmation; drawing-guidelines.md rule 4): the hub's bore
+# The boss is the hub's sliding fit, made to fit (drawing-guidelines.md
+# rule 4, form 2): the hub's bore
 # is reamed with the .3135 reamer and the boss is turned LAST to that bore
 # until the hub slides on by hand with no rock, so its size prints REF, at
 # three places and with no limits.  BOSS_DIA_BAND is the ANALYSIS band, the
@@ -339,8 +339,9 @@ for _limit in (FLAT_END_MIN, FLAT_END_STATION):
         raise AssertionError("a flat end limit does not print at its places")
 
 # The bore the sleeve runs on the MHA-PD-23 pin with: reamed with the set's
-# .1260 reamer and printed at that size with NO band (fit audit 2026-11-23,
-# pending owner confirmation); the pin's shank is turned last to it, and the
+# .1260 reamer and printed at that size with NO band (rule 4, form 2; the
+# modelled cut, +.001, is the owner's ruling of 2026-11-24 on fit audit
+# question 5); the pin's shank is turned last to it, and the
 # acceptance is the pin entering with no shake.  What fails if the fit is
 # .002 looser: the sleeve cocks on the pin and tilts the MHA-PD-06 disc into
 # the MHA-PD-22 collar (pd_cluster_air.COLLAR_AIR, "sleeve cocking on the

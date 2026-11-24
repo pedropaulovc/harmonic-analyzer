@@ -319,8 +319,8 @@ FACE_WIDTH_PLACES = 3
 # #2144 item 3.1 (Q-PD06-1 option B: a clearance bore, disc set central at
 # assembly); the bore moved from .504 to the .501 reamer and the spigot from
 # .501 to .498 (#2412).
-# The sheet prints the reamer's size and no band (fit audit 2026-11-23,
-# pending owner confirmation; drawing-guidelines.md rule 4): the hub's
+# The sheet prints the reamer's size and no band (drawing-guidelines.md
+# rule 4, form 2): the hub's
 # spigot is turned to it (MHA-PD-17 note 4 prints the clearance, the
 # acceptance, once).  BORE_BAND is the ANALYSIS band, what
 # the reamer is taken to cut in the .118 sheet, never a printed limit; it
@@ -342,8 +342,8 @@ FACE_WIDTH_MAX = FACE_WIDTH + _BAND[FACE_WIDTH_PLACES]
 BORE_DIA_MIN = BORE_DIA + BORE_BAND[1]
 BORE_DIA_MAX = BORE_DIA + BORE_BAND[0]
 
-# The hub's spigot is made to this bore (fit audit 2026-11-23, pending owner
-# confirmation; rule 4, made to fit): MHA-PD-17 prints its size REF and the
+# The hub's spigot is made to this bore (drawing-guidelines rule 4, form
+# 2, made to fit): MHA-PD-17 prints its size REF and the
 # diametral clearance in this bore, the (least, greatest) the disc is
 # centred in at assembly and that bounds how far the disc can sit off the
 # hub's axis while the taps are spotted through the flange.  The spigot's

@@ -333,8 +333,8 @@ def test_the_rear_break_lifts_the_pin_crest_off_the_root_corner() -> None:
 
 
 def test_the_rear_break_ends_inside_the_neck() -> None:
-    # The break takes the title block's ±.005 (fit audit 2026-11-23, pending
-    # owner confirmation).  Its .013 leg at 44°, the widest and shallowest,
+    # The break takes the title block's ±.005 (rule 4: nothing fails at the
+    # title block).  Its .013 leg at 44°, the widest and shallowest,
     # ends .0135 in: inside the neck's widest .021, so the bore's support on
     # the core, counted from that width, is whole.
     assert spec.REAR_BREAK == pytest.approx(0.008 * 25.4)

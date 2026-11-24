@@ -81,8 +81,8 @@ MESH_CALLOUT = "SEE GEAR DATA"
 # 1.5D.
 FACE_WIDTH_CALLOUT = f"SETS {SCREW_NUMBER}\nENGAGEMENT"
 
-# Rule 4: the bore's mate, made to this bore (fit audit 2026-11-23, pending
-# owner confirmation: the MHA-PD-17 spigot prints REF and the clearance,
+# Rule 4, form 2: the bore's mate is made to this bore (the MHA-PD-17
+# spigot prints REF and the clearance,
 # the pair's one acceptance).  What the ream protects is the register's
 # (cad/config/necessity/pd-rack-pinion.yaml; owner ruling 2026-11-24: the
 # reason is not printed on the sheet).

@@ -16,9 +16,9 @@ stub's, the Ø the cup's front face meets (owner: "pd-16 diameter should also
 be reduced to match new knob bush").
 
 Decimal inch (#290): the pilot is .250 REF, a bonded seat made to fit the
-journal (fit audit 2026-11-23, pending owner confirmation); sheet note 2
-prints its diametral clearance on the journal (PILOT_CLEARANCE), which stays
-inside LOCTITE 641's fill.
+MHA-PD-08 journal (drawing-guidelines rule 4, form 2): sheet note 2 prints
+its diametral clearance on the journal (PILOT_CLEARANCE), the requirement,
+which stays inside LOCTITE 641's fill.
 
 Part frame: axis local +Y through the origin (``Axis1``); the front face
 (the running face, as turned) is the Top Plane, y = 0; the pilot's floor
@@ -65,8 +65,8 @@ LENGTH = 9.144  # .36 as turned (SUPPLY)
 # for the fitted float, so after a B pilot drill the owned 1/4 HSS 2-flute
 # centre-cutting square end mill (tools-cutting endmill-hss-2fl-1-4,
 # McMaster 3051A51) is plunged from the tailstock.  The pilot is a bonded
-# seat made to fit its mate (fit audit 2026-11-23, pending owner
-# confirmation; drawing-guidelines.md rule 4, form 2; owner, 2026-11-23:
+# seat made to fit its mate (drawing-guidelines.md rule 4, form 2; owner,
+# 2026-11-23:
 # "why do we need single micron level tolerance x class plug gauges for a
 # hobby machining project"): its size prints REF with no limits and
 # PILOT_CLEARANCE, the diametral clearance on the MHA-PD-08 journal, is the

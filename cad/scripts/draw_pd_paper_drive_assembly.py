@@ -631,7 +631,9 @@ KNOB_SETTING_TRUE = (
 # (pd_paper_drive_knob_setting_spec): one toward S for a shake over the
 # ceiling; away from S only where the limit leaves the mill a settable move
 # after TRUE's error (from the mid-band aim it leaves .00028, so none prints
-# and a pair that runs tight takes the inspection exit).
+# and a pair that runs tight takes the inspection exit).  The move is a
+# table setting, so it is a setting-table row the step cites, never step
+# text (rule 22; codjiflo r2 on #3539).
 def _knob_move_text(move: tuple[float, float]) -> str:
     return f"{steps.inch_text(move[0], 4)} ALONG AND {steps.inch_text(move[1], 4)} ACROSS"
 
@@ -2215,6 +2217,7 @@ SETTING_ROW_KEYS = (
     "bush-seated",
     "bush-reamed",
     "reducer-shake",
+    "trial-move",
     "plate-screw-tips",
     "pivot-tip",
     "disc-screw-tips",
@@ -2265,7 +2268,7 @@ def _step_text(
     # closes the collar-to-disc air (pd_transgear_knob_bush_geometry).
     bush_seat_feeler = steps.inch_text(knob_bush.SHOULDER_SEAT_GAP_MAX, 3)
     # The bore prints the reamer's size and no band; the journal is turned
-    # to it (fit audit 2026-11-23, pending owner confirmation).
+    # to it (drawing-guidelines rule 4, form 2).
     bush_ream = steps.inch_text(knob_bush.BORE_DIA, 4)
     bush_made = f"{sub_step('pin-pressed', 9)}-{sub_step('pin-pressed', 14)}"
     lock_gap = LOCK_GAP_WINDOW
@@ -2708,14 +2711,15 @@ def _step_text(
             (
                 f"IF ONLY {s('arm-plate-located', 12)} FAILED, ON SHAKE OVER "
                 f"{steps.inch_text(REDUCER_SHAKE_MAX_MM, 3)}, AT {KNOB_SETTING_VIEW_NAME}'S "
-                f"SETTING, MOVE THE TABLE {KNOB_TRIAL_MOVE_TEXT} TOWARD S, THEN FROM "
-                f"{s('arm-plate-located', 5)}."
+                f"SETTING, MOVE THE TABLE TOWARD S BY THE TRIAL MOVE "
+                f"{row_cite('trial-move')}, THEN FROM {s('arm-plate-located', 5)}."
                 if KNOB_TRIAL_AWAY_MOVE_TEXT is None
                 # With the C2 floor gone, "no shake" fails the dial check
                 # low and moves away from S, as a tight spot does.
                 else f"IF {s('arm-plate-located', 11)} OR {s('arm-plate-located', 12)} "
                 f"ALONE FAILED AT {KNOB_SETTING_VIEW_NAME}'S SETTING, MOVE THE TABLE "
-                f"{KNOB_TRIAL_MOVE_TEXT}, AWAY FROM S FOR A TIGHT SPOT OR NO SHAKE, "
+                f"BY THE TRIAL MOVE {row_cite('trial-move')}, AWAY FROM S FOR A TIGHT "
+                "SPOT OR NO SHAKE, "
                 f"TOWARD S FOR SHAKE OVER {steps.inch_text(REDUCER_SHAKE_MAX_MM, 3)}, "
                 f"THEN FROM {s('arm-plate-located', 5)}."
             ),
@@ -3734,6 +3738,17 @@ def setting_table_rows(
             "DISC SHAKE AT THE TIP OF THE TOOTH IN MESH",
             f"THE NEEDLE MOVES, {steps.inch_max_text(REDUCER_SHAKE_MAX_MM, 3)}",
             f"DIAL INDICATOR, {REDUCER_DIAL_STATIONS} PLACES",
+        ),
+        # The located step's one move of the table (owner ruling 2026-11-24,
+        # audit part 2 question C1), whole DRO counts derived in
+        # pd_paper_drive_knob_setting_spec.
+        "trial-move": (
+            s("arm-plate-located", 17),
+            f"TABLE MOVED TOWARD S FROM {KNOB_SETTING_VIEW_NAME}'S SETTING"
+            if KNOB_TRIAL_AWAY_MOVE_TEXT is None
+            else f"TABLE MOVED AWAY OR TOWARD S FROM {KNOB_SETTING_VIEW_NAME}'S SETTING",
+            KNOB_TRIAL_MOVE_TEXT,
+            "DRO",
         ),
         "plate-screw-tips": (
             s("arm-plate-screws-cut", 1),

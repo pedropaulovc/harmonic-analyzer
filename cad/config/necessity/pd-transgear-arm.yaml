@@ -1,8 +1,9 @@
 # Why each REAM and each band under the title block stays on MHA-PD-18
 # (owner ruling 2026-11-24: "In the part's registry file, not on the sheet.
 # The sheet stays clean; the reviewer fails a tight feature that has no
-# registry reason."). Read by the machinist review only. Fit audit
-# 2026-11-23, pending owner confirmation.
+# registry reason."). Read by the machinist review only. The forms are
+# rule 4's; the pin bore (owner ruling 2026-11-24, fit audit question 4), the
+# #9 pivot (question 6) and the dowel holes (question 9) are as he approved.
 necessity:
   - id: N-01
     feature: "sheet 1, front view, Ø.126 REAM THRU pin bore (datum C), MHA-PD-23 BONDED, TURNED TO THIS BORE"

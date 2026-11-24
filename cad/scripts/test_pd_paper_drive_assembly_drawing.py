@@ -2952,13 +2952,24 @@ def test_every_failure_branch_has_a_pass_exit() -> None:
     # Owner ruling 2026-11-24, audit part 2 question C1: the trial's move
     # before a part is inspected, toward S only (no away move is left inside
     # the limits once TRUE's error is charged); a tight spot or no shake
-    # takes the inspection (Codjiflo r2 on #3539).
+    # takes the inspection (Codjiflo r2 on #3539). The move itself is the
+    # setting table's row, cited, never typed into the step (rule 22;
+    # codjiflo r2 on #3539).
     assert located[17] == (
         f"IF ONLY {s('arm-plate-located', 12)} FAILED, ON SHAKE OVER .008, AT "
-        f"{drawing.KNOB_SETTING_VIEW_NAME}'S SETTING, MOVE THE TABLE "
-        f"{drawing.KNOB_TRIAL_MOVE_TEXT} TOWARD S, THEN FROM {s('arm-plate-located', 5)}."
+        f"{drawing.KNOB_SETTING_VIEW_NAME}'S SETTING, MOVE THE TABLE TOWARD S BY THE "
+        f"TRIAL MOVE {drawing.row_cite('trial-move')}, THEN FROM {s('arm-plate-located', 5)}."
     )
     assert "AWAY FROM S" not in located[17]
+    assert drawing.KNOB_TRIAL_MOVE_TEXT not in located[17]
+    rows = drawing.setting_table_rows(operating_domain=_unit_operating_domain())
+    (move_row,) = [row for row in rows if row[1] == s("arm-plate-located", 17)]
+    assert move_row[0] == str(drawing.SETTING_ROW["trial-move"])
+    assert move_row[2] == (
+        f"TABLE MOVED TOWARD S FROM {drawing.KNOB_SETTING_VIEW_NAME}'S SETTING"
+    )
+    assert move_row[3] == drawing.KNOB_TRIAL_MOVE_TEXT
+    assert move_row[4] == "DRO"
     # The re-indication reads N at the table's setting, DETAIL K's or as
     # moved, so a moved plate reaches the pass exit (Codjiflo r2 on #3539).
     assert located[14].endswith(
@@ -3439,7 +3450,7 @@ def test_the_reducer_mesh_is_tried_before_the_plate_is_doweled() -> None:
         f"{steps.step_number('arm-plate-fitted')}." in located
     )
     assert located.index("PASSED, GO TO STEP") < located.index(
-        f"MOVE THE TABLE {drawing.KNOB_TRIAL_MOVE_TEXT}"
+        f"MOVE THE TABLE TOWARD S BY THE TRIAL MOVE {drawing.row_cite('trial-move')}"
     ) < located.index("IF NOT, INSPECT")
     # The restart follows the part, one sub-step each: a new plate is set
     # again from 12A, a new disc or sleeve is centred again; a new disc,

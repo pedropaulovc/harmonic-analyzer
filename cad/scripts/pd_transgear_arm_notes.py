@@ -57,10 +57,11 @@ def see_note(number: int) -> str:
 
 NOTES = (
     # A drilled hole at the DRILLED HOLES row: the note names its mate and
-    # prints no numbers (fit audit 2026-11-23, pending owner confirmation).
+    # prints no numbers (owner ruling 2026-11-24, fit audit question 6).
     f"{PIVOT_NOTE}. PIVOT BORE: RUNNING CLEARANCE ON PIVOT SCREW {_PIVOT_SCREW['number']}"
     " SHOULDER.",
-    # Notes 2 and 3 (fit audit 2026-11-23, pending owner confirmation): a
+    # Notes 2 and 3 (rule 4, form 3; the 1/8 dowels are the owner's ruling of
+    # 2026-11-24 on fit audit question 9): a
     # hole reamed to a bought dowel prints its set reamer's size and no band;
     # the dowel tried in it is the gauge.  What fails if the hole is loose
     # (the plate must come back to the reducer mesh setting; the latch's
