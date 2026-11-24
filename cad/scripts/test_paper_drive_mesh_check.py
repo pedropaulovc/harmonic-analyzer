@@ -3,6 +3,7 @@ cross-check of the translated feed-pinion form against the straight rack."""
 
 from __future__ import annotations
 
+from dataclasses import replace
 import math
 
 import pytest
@@ -35,27 +36,36 @@ def test_reducer_centre_band_is_plus_only_inside_the_gate_window() -> None:
     # Both ends of the set band hold the contact-ratio floors.
     assert all(check.failures() == [] for check in mesh.reducer_band_meshes())
     # The gate window around the set band, each edge where its gate bites.
-    usable_low, usable_high = 43.735, 43.845
+    # Above, since the owner's C3 ruling (2026-11-24, 15T tip +0/-.0015) the
+    # runout extreme's 1.1, read at three places, bites at the band's top.
+    usable_low = 43.735
     assert mesh.reducer_mesh(usable_low).failures() == []
     assert mesh.reducer_mesh(usable_low - 0.001).failures() != []
-    assert mesh.reducer_mesh(usable_high).failures() == []
-    assert mesh.reducer_mesh(usable_high + 0.001).contact_ratio_min < mesh.CONTACT_RATIO_FLOOR
-    assert usable_low < low < high < usable_high
+    top_only = replace(mesh.reducer_mesh(high + 0.001), contact_ratio_floor=None)
+    assert top_only.failures() != []
+    assert top_only.failures()[0].startswith("runout-extreme contact ratio")
+    assert usable_low < low < high
     assert disc.CENTRE_DISTANCE_SET_TEXT == "43.794 +0.051/-0"
 
 
 def test_reducer_band_ends_both_pass_the_design_floors() -> None:
     nominal, top = mesh.reducer_band_meshes()
     assert nominal.failures() == [] and top.failures() == []
-    assert nominal.contact_ratio_min == pytest.approx(1.2945, abs=5e-4)
-    assert nominal.runout_contact_ratio_min == pytest.approx(1.2018, abs=5e-4)
+    # Owner ruling 2026-11-24, audit part 2 question C3: the 15T tip at
+    # +0/-.0015, 1.2 checked at the nominal centre, the runout extreme's 1.1
+    # the one gate at the top, read at three places.
+    assert nominal.contact_ratio_min == pytest.approx(1.2840, abs=5e-4)
+    assert nominal.contact_ratio_floor == mesh.CONTACT_RATIO_FLOOR
+    assert nominal.runout_contact_ratio_min == pytest.approx(1.1915, abs=5e-4)
     # K's setting radius is .002 in exactly (0.0508), the band's top.
-    assert top.contact_ratio_min == pytest.approx(1.2018, abs=5e-4)
-    # F3's .002 tooth-space TIR with K's .002 setting radius: 1.110 at the
-    # band's top, on the 1.10 floor.
-    assert top.runout_contact_ratio_min == pytest.approx(1.1100, abs=5e-4)
-    assert top.contact_ratio_min >= mesh.CONTACT_RATIO_FLOOR
-    assert top.runout_contact_ratio_min >= mesh.RUNOUT_CONTACT_RATIO_FLOOR
+    assert top.contact_ratio_min == pytest.approx(1.1915, abs=5e-4)
+    assert top.contact_ratio_floor is None
+    # F3's .002 tooth-space TIR with K's .002 setting radius: 1.0997 at the
+    # band's top, which reads 1.100 at three places, on the 1.10 floor.
+    assert top.runout_contact_ratio_min == pytest.approx(1.0997, abs=1e-4)
+    assert round(top.runout_contact_ratio_min, 3) == mesh.RUNOUT_CONTACT_RATIO_FLOOR
+    # A corner that reads 1.099 fails.
+    assert replace(top, runout_contact_ratio_min=1.0994).failures() != []
     assert top.backlash_mm[0] > nominal.backlash_mm[0] > 0.0
     assert top.label.endswith("at +0.051")
 
@@ -101,7 +111,9 @@ def test_runout_tier_fails_on_its_own() -> None:
     # once the loose extreme drops below its floor.
     tips = _min_tips()
     shift = mesh.reducer_runout_shift_mm()
-    while mesh.reducer_contact_ratio(disc.CENTRE_DISTANCE + shift, *tips) >= mesh.RUNOUT_CONTACT_RATIO_FLOOR:
+    while round(mesh.reducer_contact_ratio(disc.CENTRE_DISTANCE + shift, *tips), 3) >= (
+        mesh.RUNOUT_CONTACT_RATIO_FLOOR
+    ):
         shift += 0.001
     good = mesh.reducer_mesh()
     bad = mesh.MeshCheck(

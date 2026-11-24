@@ -798,8 +798,9 @@ def test_the_round_bore_clears_the_root_corner_and_bears_on_the_whole_core(monke
     # its break, the bore's tilt at F and the gear's runout.
     assert spec.FRONT_BEARING_INNER_RADIUS_MAX > spec.BORE_DIA / 2.0 + max(spec.REAR_BREAK_LIMITS)
     # The largest drilled bore (.195) and the .013 break start the annulus
-    # further out than the former .1925 ream and .010 break did.
-    assert spec.FRONT_BEARING_AREA_MIN == pytest.approx(20.99, abs=0.01)
+    # further out than the former .1925 ream and .010 break did; the 15T
+    # tip's -.0015 (C3) trims it from 20.99.
+    assert spec.FRONT_BEARING_AREA_MIN == pytest.approx(20.94, abs=0.01)
     # Negative control: a neck narrower than the mouth's break would leave
     # the break on the core, shortening the bore's support.
     monkeypatch.setattr(shaft, "FRONT_RELIEF_WIDTH_MAX", spec.REAR_BREAK_DEPTH_MAX / 2.0)
