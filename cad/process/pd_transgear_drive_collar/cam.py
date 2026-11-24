@@ -16,7 +16,7 @@ geometry (it sets the spot depths), the twist drills' 118° point, the
 approach, safe and clearance heights and the vise jaws' depth (keep-out
 shapes only).
 
-Route (plan text in ``plan.toml``): the collar is turned, its bore reamed
+Route (plan text in ``plan.toml``): the collar is turned, its bore drilled #11
 and the body parted off long on the lathe (no NC). It then stands in the
 vise seat face down on two stacked parallels, the pilot hanging between
 them, rear face up: CM01 spots, drills #43 and reams the 2X .0930 dowel
@@ -260,7 +260,7 @@ def _geometry(features: dict[str, Any]) -> dict[str, Any]:
             )
         low, high = hole["offset"]
         if not low <= abs(hole["at"][1]) <= high:
-            raise ValueError(f"{name}: its centre lies outside its printed offset")
+            raise ValueError(f"{name}: its centre lies outside its exported offset")
         dowels.append((hole["at"][1], hole["dia"], (low, high)))
     flat = f["flat_pin_hole"]
     if (
@@ -329,6 +329,10 @@ def context(
         )
     radius = g["outer_dia"] / 2
 
+    # The exported limits of the reamed sizes and the dowel centres are the
+    # spec's ANALYSIS bands (the sheet prints neither: the pins are the
+    # holes' gauges and the wheels' trial accepts the centres); they bound
+    # this recipe's own consistency checks only.
     # Tools: each drill under its reamer, each reamer inside its band, each
     # spot under its drill.
     d43 = _shop_tool(plan, shop, "drill-43")["diameter_mm"]

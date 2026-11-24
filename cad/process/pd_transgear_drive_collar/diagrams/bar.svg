@@ -1,7 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 400" font-family="sans-serif" font-size="13">
   <!-- Setup 1, section through the axis, 200 px to the inch: the 7/8 in bar .80 out of the 3-jaw (jaw fronts at x 150); Z0 the faced pilot end at x 310. Styles: prechips.palette. -->
   <rect class="paper" x="0" y="0" width="760" height="400"/>
-  <text class="title" x="20" y="22">Setup 1: the 7/8 bar in the 3-jaw; Z0 the pilot's faced end; outside and pilot turned, bore reamed, collar parted off</text>
+  <text class="title" x="20" y="22">Setup 1: the 7/8 bar in the 3-jaw; Z0 the pilot's faced end; outside and pilot turned, bore drilled #11, collar parted off</text>
   <rect class="fixture-vise" x="30" y="70" width="80" height="260"/>
   <rect class="clamp" x="110" y="82" width="40" height="30"/>
   <rect class="clamp" x="110" y="288" width="40" height="30"/>
@@ -17,15 +17,15 @@
   <line class="active-face" x1="310" y1="161" x2="310" y2="239"/>
   <rect class="cutter" x="209" y="300" width="13" height="60"/>
   <line class="leader" x1="310" y1="180" x2="420" y2="170"/>
-  <text class="label" x="424" y="174">Z0: the pilot's front face, faced in Op 50</text>
+  <text class="label" x="424" y="174">Z0: the pilot's front face, faced in Op 10</text>
   <line class="leader" x1="250" y1="131" x2="300" y2="64"/>
   <text class="label" x="304" y="60">outside Ø{{cad.outer_dia_min_in:.3dot}}–{{cad.outer_dia_max_in:.3dot}}, back past the parting line</text>
   <line class="leader" x1="296" y1="161" x2="420" y2="110"/>
   <text class="label" x="424" y="106">pilot Ø{{cad.pilot_dia_min_in:.2dot}}–{{cad.pilot_dia_max_in:.2dot}}, {{process.pilot_supply_in:.3dot}} long</text>
   <line class="leader" x1="282" y1="140" x2="420" y2="134"/>
-  <text class="label" x="424" y="138">seat face, faced square in Op 70</text>
+  <text class="label" x="424" y="138">seat face, faced square in Op 30</text>
   <line class="leader" x1="260" y1="210" x2="420" y2="230"/>
-  <text class="label" x="424" y="234">bore .1920 reamed through, past the parting line</text>
+  <text class="label" x="424" y="234">bore drilled #11 through, past the parting line</text>
   <line class="leader" x1="222" y1="360" x2="250" y2="378"/>
   <text class="label" x="254" y="382">blade's tailstock-side face at Z-{{process.part_off_in:.3dot}}: the body {{process.body_supply_in:.3dot}} long</text>
   <text class="label" x="30" y="350">3-jaw</text>
