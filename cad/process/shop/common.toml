@@ -376,12 +376,16 @@ plate_holes = { A = [15, 16, 17, 18, 19, 20], B = [21, 23, 27, 29, 31, 33], C = 
 [workholding.chuck-3jaw-5-bs0]
 kind = "chuck"
 
-# HA: fixtures.chuck-3jaw-6-d1-4, the PM-1127's standard 6 in 3-jaw (45952b66bc
-# inventory: body Ø158 x 72, #1413 placeholders). Grip range: prechips v0.10
-# examples/shop.toml workholding.chuck-3jaw-6.
+# HA: fixtures.chuck-3jaw-6, the PM-1127's standard 6 in 3-jaw (45952b66bc
+# inventory: body Ø158 x 72, #1413 placeholders). Grip range: least grip
+# measured by the owner 2026-11-24, verbatim "3 jaw min 0.1750" (4.445 mm);
+# the 140 mm top is still the prechips v0.10 example shop's (not measured).
+# Holds under 4.445 mm opt out with lathe_hold = "other" until rewritten:
+# dt_crank_pinion_pin (#3498), dt_pinion_cam_pin (#3499), pd_transgear_pin's
+# regrips (#3500).
 [workholding.chuck-3jaw-6]
 kind = "chuck"
-grip_range_mm = [3.0, 140.0]
+grip_range_mm = [4.445, 140.0]
 body_diameter_mm = 158.0
 body_length_mm = 72.0
 

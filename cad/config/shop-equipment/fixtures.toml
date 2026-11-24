@@ -102,18 +102,14 @@ cite = ["Owner (Pedro) 2026-11-17: \"already have follow and steady rests for th
 
 # The lathe's 6 in 3-jaw, supplied with it (PM-1127VF-LB Operator's Manual
 # 2015, "Chuck": "comes equiped with a 6" 3-jaw chuck"). Its least grip,
-# owner 2026-11-24, verbatim: "3 jaw min 0.1750" (.1750 in = 4.445 mm). Its
-# prechips record is cad/process/shop/common.toml workholding.chuck-3jaw-6,
-# whose grip_range_mm is still the prechips example shop's [3.0, 140.0]:
-# three plans grip under 4.445 mm in it (dt_crank_pinion_pin on the 1/8 rod,
-# dt_pinion_cam_pin on the 5/32 rod, pd_transgear_pin's two regrips on its
-# .126 land and journal), so the measured minimum goes there with their
-# rewrite, not before. Its maximum opening and body sizes are not measured.
+# owner 2026-11-24, verbatim: "3 jaw min 0.1750" (.1750 in = 4.445 mm), is
+# its prechips record's grip_range_mm (cad/process/shop/common.toml
+# workholding.chuck-3jaw-6); this record holds ownership and the citations.
+# Its maximum opening and body sizes are not measured.
 [fixtures.chuck-3jaw-6]
 name = "6 in 3-jaw chuck for the PM-1127VF-LB lathe (supplied with it)"
 kind = "chuck"
 status = "on_hand"
-min_grip_dia_mm = 4.445
 cite = [
   "PM-1127VF-LB Operator's Manual (2015), \"Chuck\", read 2026-11-21 (https://archive.org/download/pm-1440-gs-v-3-2020-10/Precision%20Matthews/PM-1127VF-LB-Manual-2015.pdf): \"PM-1127VF-LB comes equiped with a 6\" 3-jaw chuck, a 6\" 4-jaw chuck and a 9\" faceplate\"",
   "Owner (Pedro) 2026-11-24, relayed by Main, verbatim: \"3 jaw min 0.1750\"",
