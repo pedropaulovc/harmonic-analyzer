@@ -694,10 +694,17 @@ if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
 # Read-only restatements: the overall is Depth + DomeHeight, and a spherical
 # cap of DomeHeight on the Ø.375 end already fixes its radius.  The 16T pin's
 # cross-hole is reamed to fit the pin at assembly, so its Ø is the pin's REF
-# (as on the 16T's own sheet).
-REFERENCE_DIMENSIONS = frozenset({"OverallLength", "DomeSphereRadius", "PinionPinHoleDia"})
+# (as on the 16T's own sheet).  The shank, the 2X journals and the 16T seat
+# are each turned to their mate's bore less the running clearance (note 3;
+# fit audit 2026-11-23, MHA-DT-31.bore__MHA-DT-11.hub_shaft, MHA-DT-11.journals
+# and MHA-DT-10.bore__MHA-DT-11.pinion_seat), so each nominal is a REF; the
+# bands above stay as the analysis bands of the accepted fits.
+_FIT_REFERENCES = frozenset({"ShaftDiaDim", "JournalDiaDim", "PinionSeatDiaDim"})
+REFERENCE_DIMENSIONS = frozenset(
+    {"OverallLength", "DomeSphereRadius", "PinionPinHoleDia"} | _FIT_REFERENCES
+)
 SPHERICAL_DIMENSIONS = frozenset({"DomeSphereRadius"})
-DIAMETER_REFERENCES = frozenset({"PinionPinHoleDia"})
+DIAMETER_REFERENCES = frozenset({"PinionPinHoleDia"} | _FIT_REFERENCES)
 
 # The native cross-hole callout's process prefix: the drill reads first; the
 # taper-ream prose under it lives in dt_crankshaft_notes (drawing-only).

@@ -70,7 +70,6 @@ from dt_crankshaft_spec import (
     DRIVE_PIN_DEPTH,
     DRIVE_PIN_DEPTH_TOL,
     DRIVE_PIN_FLOOR,
-    DRIVE_PIN_HOLE_BAND,
     DRIVE_PIN_HOLE_DIA,
     DRIVE_PIN_KNOCKOUT_DIA,
     DRIVE_PIN_KNOCKOUT_LENGTH,
@@ -83,7 +82,6 @@ from dt_crankshaft_spec import (
     HOLE_CALLOUT_PRECISION,
     ISOMETRIC_VIEW_NOTE,
     JOURNAL_DIA,
-    JOURNAL_DIA_BAND,
     JOURNAL_START,
     JOURNAL_LENGTH,
     RELIEF_DIA,
@@ -93,13 +91,11 @@ from dt_crankshaft_spec import (
     PIN_HOLE_SPEC,
     PIN_HOLE_HEIGHT,
     PINION_SEAT_DIA,
-    PINION_SEAT_DIA_BAND,
     NECK_DIA_PLACES,
     NECK_DIA_TOL,
     SEAT_COLLAR,
     SEAT_STEP,
     SHAFT_DIA,
-    SHAFT_DIA_BAND,
     SHAFT_DOME_HEIGHT,
     SHAFT_FIDUCIAL_RADIUS,
     SEAT_PINION,
@@ -1045,19 +1041,11 @@ def build(adapter) -> dict[str, str]:
             FIDUCIAL_MODEL_Z,
         ),
     )
-    set_dimension_bilateral_tolerance(
-        adapter, "ShaftProfile", "ShaftDiaDim", *deviations(SHAFT_DIA_BAND), display_unit=UNIT
-    )
-    set_dimension_bilateral_tolerance(
-        adapter, "JournalProfile", "JournalDiaDim", *deviations(JOURNAL_DIA_BAND), display_unit=UNIT
-    )
-    set_dimension_bilateral_tolerance(
-        adapter,
-        "PinionSeatProfile",
-        "PinionSeatDiaDim",
-        *deviations(PINION_SEAT_DIA_BAND),
-        display_unit=UNIT,
-    )
+    # The shank, the 2X journals and the 16T seat carry no native band: each
+    # is turned to its mate's bore less the running clearance, so it prints
+    # as a REF under its fit callout (fit audit 2026-11-23,
+    # MHA-DT-31.bore__MHA-DT-11.hub_shaft, MHA-DT-11.journals and
+    # MHA-DT-10.bore__MHA-DT-11.pinion_seat).
     # Both bare necks (2X): the core's .375 at an explicit loose ±.010.
     set_dimension_symmetric_tolerance(
         adapter, "PinionSeatProfile", "NeckDiaDim", NECK_DIA_TOL,
@@ -1069,22 +1057,16 @@ def build(adapter) -> dict[str, str]:
         adapter, "Shaft", "Depth", *deviations(SHAFT_LENGTH_BAND), display_unit=UNIT
     )
     # The seat collar's functional bands (dt_crankshaft_spec, drawing-guidelines.md rule 4 (tighten only for function, and name the mate)): the seat
-    # spigot's diameter, and the drive-pin holes' location, press size and
-    # depth.  The two far-end collar stations print at three places under
-    # the title block's .XXX band (#2314).
+    # spigot's diameter, and the drive-pin holes' location and depth; the
+    # holes are the .0930 reamer's, no band (fit audit 2026-11-23,
+    # MHA-DT-11.drive_pin_holes).  The two far-end collar stations print at
+    # three places under the title block's .XXX band (#2314).
     set_dimension_bilateral_tolerance(
         adapter, "SpigotProfile", "SpigotDiaDim", *deviations(SPIGOT_DIA_BAND), display_unit=UNIT
     )
     for index in (1, 2):
         set_dimension_symmetric_tolerance(
             adapter, "DrivePinProfile", f"DrivePinOffset{index}", DRIVE_PIN_OFFSET_TOL,
-            display_unit=UNIT,
-        )
-        set_dimension_bilateral_tolerance(
-            adapter,
-            "DrivePinProfile",
-            f"DrivePinHoleDia{index}",
-            *deviations(DRIVE_PIN_HOLE_BAND),
             display_unit=UNIT,
         )
     set_dimension_symmetric_tolerance(
