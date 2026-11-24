@@ -378,7 +378,8 @@ def test_fitup_exports_for_the_top_frame() -> None:
 
     spec = ch_fulcrum_keeper_spec
     # MHA-CH-00 prints the lug centre (.114 ±.004) at these places, and the
-    # frame's stacks charge that printed value (rulings.md D15).
+    # frame's stacks charge that printed value (delegated ruling 2026-11-24
+    # (Main), precedent: owner ruling 2026-11-01, #2144 (rulings.md D15)).
     import ch_channel_assembly_spec as asm
 
     assert spec.KEEPER_FITUP_PLACES == 3

@@ -3,7 +3,7 @@ necessity:
     feature: "hub length .300 +.001/.000, SETS PITCH OF 20X STACK ON MHA-CH-04"
     kind: gap
     reason: "the hub stack sets the rear keeper over shaft flats"
-    source: "ch_fulcrum_shaft_spec.FLAT_STATION_WINDOW_MM: .474 mm at this band, -2.066 at the title block's ±.005 (no shaft station seats both set-screw cups; -1.041 at +.005/.000), the rear keeper set to the stack over a .020 leaf (owner ruling 2026-11-24, fit audit part 2, C10; ch_keeper_fitup.LEVER_HUB_LENGTH_MM); build_fr_top_frame.KEEPER_FOOT_PRINTED_BOSS_MARGINS also goes to -.660 mm at +.005 (1.372 at this band). Main, by the owner's delegation of 2026-11-24 (rulings.md D16)"
+    source: "ch_fulcrum_shaft_spec.FLAT_STATION_WINDOW_MM: .474 mm at this band, -2.066 at the title block's ±.005 (no shaft station seats both set-screw cups; -1.041 at +.005/.000), the rear keeper set to the stack over a .020 leaf (owner ruling 2026-11-24, fit audit part 2, C10; ch_keeper_fitup.LEVER_HUB_LENGTH_MM); build_fr_top_frame.KEEPER_FOOT_PRINTED_BOSS_MARGINS also goes to -.660 mm at +.005 (1.372 at this band). Delegated ruling 2026-11-24 (Main), no precedent, #2144 (rulings.md D16)"
   - id: N-02
     feature: "plate thickness .118 +/-.002, in the MHA-CH-01 top notch"
     kind: gap

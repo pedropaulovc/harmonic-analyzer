@@ -1429,7 +1429,9 @@ def test_transferred_keeper_receiver_keeps_real_normal_wall_at_printed_bands() -
     # leaning at least the 2° an added family may print.
     assert part.KEEPER_TAP_X == part.COLUMN_X + keeper.KEEPER_FITUP_X_FROM_WEB_MM
     assert part.KEEPER_MAX_TRANSVERSE_OFFSET == pytest.approx(0.254)
-    # The lug centre at MHA-CH-00's printed .114 ±.004 (rulings.md D15).
+    # The lug centre at MHA-CH-00's printed .114 ±.004 (delegated ruling
+    # 2026-11-24 (Main), precedent: owner ruling 2026-11-01, #2144
+    # (rulings.md D15)).
     assert part.KEEPER_MAX_WEB_CENTRE_OFFSET == pytest.approx(4.0132)
     assert part.KEEPER_MIN_WEB_HALF_WIDTH == pytest.approx(6.962586831553313)
     assert part.KEEPER_MIN_ROOT_RADIUS == pytest.approx(2.286)
@@ -1443,8 +1445,9 @@ def test_transferred_keeper_receiver_keeps_real_normal_wall_at_printed_bands() -
     )
     assert part.KEEPER_TAP_THREAD_WALL_MARGIN == pytest.approx(2.202189533594047)
     assert part.KEEPER_TAP_DRILL_WALL_MARGIN == pytest.approx(1.9484089915363136)
-    # Main, by the owner's delegation of 2026-11-24 (rulings.md D15): .0767
-    # accepted under the .080 target at .076 (RV-14), over the .060 floor.
+    # Delegated ruling 2026-11-24 (Main), precedent: owner ruling 2026-11-01,
+    # #2144 (rulings.md D15): .0767 accepted under the .080 target at .076
+    # (RV-14), over the .060 floor.
     held = min(part.KEEPER_TAP_THREAD_WALL_MARGIN, part.KEEPER_TAP_DRILL_WALL_MARGIN)
     assert spec.KEEPER_TAP_WALL_ACCEPTED_MM <= held < WALL_TARGET_MM
     assert spec.KEEPER_TAP_WALL_ACCEPTED_MM > part.WALL_FLOOR_MM
@@ -3081,8 +3084,9 @@ def test_one_draft_angle_prints_for_each_band_on_sheet_sevens_elevation() -> Non
     # callout two lines of words, so the faces share the first (machinist
     # reviews of 518e3d01e1 and 7dfc6b6c5f).  The taken-out band is the title
     # block's own and gives no reason.  The wall's text is the wall accepted
-    # under the package's thin-wall target (Main, by the owner's delegation
-    # of 2026-11-24, rulings.md D15; RV-14), composed in a module only the
+    # under the package's thin-wall target (delegated ruling 2026-11-24
+    # (Main), precedent: owner ruling 2026-11-01, #2144 (rulings.md D15);
+    # RV-14), composed in a module only the
     # drawing imports (the drawing itself owns no stated limit,
     # test_drawing_specification_purity; a library module reads no builder,
     # test_buildgraph), and the builder
@@ -5583,7 +5587,9 @@ def test_keeper_feet_stay_on_the_faced_rail_top_and_keep_their_ligaments() -> No
     )
     half_foot = part._keeper_printed(keeper.KEEPER_WIDTH, foot_places, 1.0) / 2.0
     max_chamfer = spec.printed_limit(part.EDGE_CHAMFER, chamfer_places, 1.0)
-    # The lug centre at MHA-CH-00's printed .114 ±.004 (rulings.md D15).
+    # The lug centre at MHA-CH-00's printed .114 ±.004 (delegated ruling
+    # 2026-11-24 (Main), precedent: owner ruling 2026-11-01, #2144
+    # (rulings.md D15)).
     assert (half_flange, median, offset, half_foot, max_chamfer) == pytest.approx(
         (16.764, 1.143, 2.9972, 7.112, 1.778)
     )
@@ -5612,9 +5618,10 @@ def test_keeper_tap_drill_wall_is_accepted_under_the_target_as_rv14() -> None:
     # Owner rulings D3/D4 (#2333): with the web's median ±.03 to the socket
     # axes and its faces at the 2° minimum an added family may print, and the
     # lug centre at MHA-CH-00's printed .114 ±.004, the keeper taps' drill
-    # wall is .0767, under the .080 target. Main, by the owner's delegation
-    # of 2026-11-24 (rulings.md D15), accepts it at .076 as the minor entry
-    # RV-14; RV-08 stays retired and no sheet note returns.
+    # wall is .0767, under the .080 target. Delegated ruling 2026-11-24
+    # (Main), precedent: owner ruling 2026-11-01, #2144 (rulings.md D15),
+    # accepts it at .076 as the minor entry RV-14; RV-08 stays retired and no
+    # sheet note returns.
     assert 0.076 * spec.IN <= part.KEEPER_TAP_DRILL_WALL_MARGIN < 0.077 * spec.IN
     assert spec.KEEPER_TAP_WALL_ACCEPTED_MM == pytest.approx(0.076 * spec.IN)
     assert (
