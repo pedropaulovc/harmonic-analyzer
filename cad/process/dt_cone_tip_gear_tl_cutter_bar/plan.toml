@@ -15,14 +15,9 @@ name = "#43 drill"
 ref = "jig-drill-43"  # Drills #43
 
 [[tools]]
-id = "drill-32"
-name = "#32 drill"
-ref = "drill-32"  # Drills #32
-
-[[tools]]
-id = "reamer-1260"
-name = ".1260 reamer"
-ref = "reamer-1260"  # B-reamer-.1260; cross hole .1260 REAM THRU, no band, the bit slides in (fit audit 2026-11-23)
+id = "drill-30"
+name = "#30 drill"
+ref = "riser-drill-30"  # cross hole #30 DRILL THRU, the set screw bears the bit on one side (machinist review r1, farm run 20261124T110807008Z)
 
 [[tools]]
 id = "jig-tap-4-40-plug"

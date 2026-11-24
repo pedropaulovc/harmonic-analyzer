@@ -97,6 +97,7 @@ from dt_cone_gear_shaft_spec import (
     DRAWING_REFERENCE_PRECISION,
     KEYED_LAND,
     KEYSEAT_MATE_SUFFIXES,
+    KEYSEAT_REFERENCES,
     LAND_NOTE,
     JOURNAL_DIA,
     MADE_TO_FIT_DIAMETERS,
@@ -972,6 +973,15 @@ def _add_d_sections(adapter: Any, side: Any, sign: int) -> list[PlacedSection]:
             (section.centre[0], face[1] - SECTION_CAPTION_GAP),
             label=f"section {section.label} caption",
         )
+        # The keyseat width prints as a reference (machinist review r1, farm
+        # run 20261124T110807008Z); its suffix below closes the parenthesis.
+        for name, dimension in zip(names, kept):
+            if name in KEYSEAT_REFERENCES:
+                set_reference_dimension(
+                    adapter,
+                    dimension,
+                    label=f"section {section.label} {name} reference",
+                )
         _set_dimension_suffixes(
             adapter,
             kept,

@@ -134,7 +134,6 @@ def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
         | set(drawing.TOP_KEEP)
         | set(drawing.SECTION_KEEP)
         | set(drawing.JOURNAL_KEEP)
-        | set(drawing.DETAIL_KEEP)
     )
     assert kept == marked
     assert marked == {
@@ -156,13 +155,12 @@ def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
         "JournalBoreDia",
         "CrankBossStartZ",
         "InclineAngle",
-        "JournalRimBreak",
     }
     # No dimension may be placed twice: two views that both carry a value are
     # two chances for the sheet to contradict itself.
     assert len(drawing.FRONT_KEEP) + len(drawing.TOP_KEEP) + len(
         drawing.SECTION_KEEP
-    ) + len(drawing.JOURNAL_KEEP) + len(drawing.DETAIL_KEEP) == len(kept)
+    ) + len(drawing.JOURNAL_KEEP) == len(kept)
 
 
 def test_mounting_hole_callouts_cite_their_split_helper_owner() -> None:
@@ -281,9 +279,8 @@ def test_part_owns_every_printed_decimal_place() -> None:
     )
     assert "draw_dt_cone_pivot_post.py" in PRECISION_MIGRATED_DRAWINGS
     # The bores earn extra places for their limits, the harvested 1.654 boss
-    # length and the closures print .XXX, the rims' break its .004 MAX, and
-    # the basic plan angle prints the model's exact value (#906, it feeds the
-    # frame).
+    # length and the closures print .XXX, and the basic plan angle prints the
+    # model's exact value (#906, it feeds the frame).
     assert {
         name for name, places in spec.DRAWING_PRECISION_BY_NAME.items() if places >= 3
     } == {
@@ -296,7 +293,6 @@ def test_part_owns_every_printed_decimal_place() -> None:
         "CrankAboveCone",
         "ConeBossNorthZ",
         "CrankBossStartZ",
-        "JournalRimBreak",
     }
 
 
@@ -508,16 +504,13 @@ def test_journal_rims_print_the_thrust_ring_break() -> None:
 
     break_max = shaft.THRUST_EDGE_BREAK_MAX
     assert spec.JOURNAL_RIM_BREAK == pytest.approx(break_max, abs=1e-12)
-    assert spec.JOURNAL_RIM_BREAK_BAND == (0.0, -spec.JOURNAL_RIM_BREAK)
     # R5 fix attempts 1 and 2 printed the break as text, at the bore's
-    # callout and in note 2; both readings asked which edges.  The part
-    # models it on both rims and the sheet prints its leg natively in detail
-    # D, saying which rims and why under the value; no note carries it.
-    assert spec.DRAWING_DIMENSIONS["JournalRimBreakReference"] == {"JournalRimBreak"}
-    assert spec.DRAWING_PRECISION["JournalRimBreakReference"] == {"JournalRimBreak": 3}
-    assert drawing.DIMENSION_CALLOUTS["JournalRimBreak"] == (
-        "BOTH BORE RIMS\nKEEPS MHA-DT-04 BEARING AREA"
-    )
+    # callout and in note 2; both readings asked which edges.  Machinist
+    # review r1 (farm run 20261124T110807008Z) refused the 20:1 detail D
+    # that then carried it: the sheet prints it as a leader note on Section
+    # A-A's far rim, saying which rims; no numbered note carries it.
+    assert "JournalRimBreak" not in set().union(*spec.DRAWING_DIMENSIONS.values())
+    assert drawing.JOURNAL_RIM_BREAK_NOTE == "BREAK .004 MAX\nBOTH BORE RIMS"
     assert drawing.DIMENSION_CALLOUTS["JournalBoreDia"] == "REAM THRU, SEE NOTE 2"
     assert "BREAK" not in drawing.SHEET_NOTES
     assert shaft.inch_text(break_max, 3) not in drawing.SHEET_NOTES
@@ -539,8 +532,8 @@ def test_journal_rims_print_the_thrust_ring_break() -> None:
 
 def test_both_journal_rims_are_broken_in_the_model() -> None:
     """The chamfer takes both rims, one pick at each boss end on the rim
-    circle, and comes off the analytic volume; the printed leg's reference
-    line runs from the far rim's sharp along the far face."""
+    circle, and comes off the analytic volume; the sheet's rim-break leader
+    lands on the far rim's sharp."""
     import math
 
     assert len(part.JOURNAL_RIM_POINTS) == 2
@@ -561,40 +554,31 @@ def test_both_journal_rims_are_broken_in_the_model() -> None:
         * spec.JOURNAL_RIM_BREAK**2
         * (spec.BORE_DIA / 2.0 + spec.JOURNAL_RIM_BREAK / 3.0)
     )
-    assert "JournalRimBreakReference" in part.REFERENCE_SKETCHES
-    leg = [
-        b - a for a, b in zip(part.JOURNAL_RIM_CORNER_MM, part.JOURNAL_RIM_BREAK_END_MM)
+    assert "JournalRimBreakReference" not in part.REFERENCE_SKETCHES
+    # The leader's tip: the far rim's sharp, on the bore wall at the far face.
+    offset = [
+        p - b for p, b in zip(drawing.RIM_CORNER_MM, (0.0, spec.BORE_HEIGHT, 0.0))
     ]
-    assert math.hypot(*leg) == pytest.approx(spec.JOURNAL_RIM_BREAK, abs=1e-12)
-    assert sum(component * a for component, a in zip(leg, axis)) == pytest.approx(
-        0.0, abs=1e-12
+    along = sum(o * a for o, a in zip(offset, axis))
+    assert along == pytest.approx(spec.CONE_BOSS_LENGTH / 2.0, abs=1e-9)
+    assert math.sqrt(sum(o * o for o in offset) - along**2) == pytest.approx(
+        spec.BORE_DIA / 2.0, abs=1e-9
     )
-    # The sheet's detail D looks at the very sharp the part's leg starts from.
-    assert drawing.RIM_CORNER_MM == pytest.approx(part.JOURNAL_RIM_CORNER_MM, abs=1e-12)
 
 
-def test_rim_break_detail_stands_in_free_sheet_space() -> None:
-    """Detail D (20:1 of Section A-A) and its break's block stand in the open
-    sheet over the title block, clear of View C's datum A tag and the
-    isometric; its letter is no datum's or view's."""
-    region, keep_outs = _landscape_sheet()
-    title_block = dict(keep_outs)["title-block"]
-    letters = {datum.letter for datum in spec.PART_DATUMS}
-    assert drawing.RIM_DETAIL_LETTER not in letters | {"A", drawing.JOURNAL_VIEW_LETTER}
-    assert drawing.RIM_DETAIL_SCALE == (20, 1)
-    cx, cy = drawing.RIM_DETAIL_CENTER
-    r = drawing.RIM_DETAIL_CROP_RADIUS
-    assert r == pytest.approx(drawing.RIM_DETAIL_RADIUS_MM * 0.020)
-    assert cy - r >= title_block.ymax + 0.010
-    assert cx - r > drawing.DATUM_A_TAG_XY[0] + 0.015
-    assert cy + r < drawing.ISO_CENTER[1] - 0.030
-    keep_x, keep_y = drawing.DETAIL_KEEP["JournalRimBreak"]
-    block_left = keep_x - drawing.JOURNAL_RIM_BREAK_TEXT_WIDTH / 2.0
-    assert block_left >= cx + r + 0.004 - 1e-12
-    assert keep_x + drawing.JOURNAL_RIM_BREAK_TEXT_WIDTH / 2.0 <= region.xmax - 0.005
-    assert keep_y - 0.010 > title_block.ymax
-    # The label hangs from its top over the circle.
-    assert drawing.RIM_DETAIL_LABEL_XY[1] - 0.0135 >= cy + r
+def test_rim_break_note_stands_in_free_sheet_space() -> None:
+    """The leader note stands right of and under the far rim, on that run's
+    measured render: under the 1.654's lower extension line, over the
+    SECTION A-A caption (top 0.1928) and left of the isometric (0.3488)."""
+    sharp = (0.3048, 0.2107)
+    dx, dy = drawing.RIM_BREAK_NOTE_OFFSET
+    left, top = sharp[0] + dx, sharp[1] + dy
+    rows = drawing.JOURNAL_RIM_BREAK_NOTE.splitlines()
+    assert len(rows) == 2
+    assert max(map(len, rows)) * 0.00255 <= drawing.RIM_BREAK_NOTE_WIDTH
+    assert left + drawing.RIM_BREAK_NOTE_WIDTH <= 0.3488 - 0.004
+    assert top - len(rows) * 0.0054 >= 0.1928 + 0.003
+    assert dx > 0.0 and dy < 0.0
 
 
 def test_collar_thrust_face_adds_no_setup_note() -> None:
@@ -856,7 +840,8 @@ def test_thrust_face_station_flags_note_2_which_names_the_collar() -> None:
     assert drawing._NORTH_BOSS_FINISH_OFFSET == (-0.006, 0.008)
     assert "MHA-DT-04" in _note(2)
     # R5 fix attempt 1 (blocker): a bare COLLAR named no mate, so the collar
-    # is named by number; the rims' break left the note for detail D.
+    # is named by number; the rims' break left the note for Section A-A's
+    # leader note.
     line = drawing.SHEET_NOTES.splitlines()[2]
     assert line == "   MHA-DT-04 COLLAR RUNS ON .827 FACE."
     # Above the upper extension line, below the sheet border.
@@ -910,7 +895,6 @@ def test_the_post_saves_every_reference_sketch_hidden() -> None:
         "CrankBossStationReference",
         "ConeBossStationReference",
         "BoreSpacingReference",
-        "JournalRimBreakReference",
     }
 
 

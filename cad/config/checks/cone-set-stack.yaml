@@ -6,9 +6,12 @@
 # spread, combined by root sum square with the plain sum reported. The bonded
 # gears' runouts are booked at their wet tap-true limits (MHA-DT-00 1S, 2B);
 # after cure they are a record, and a gear that hesitates in check 4R's run
-# is stripped and re-bonded (owner ruling 2026-11-24, audit part 2 C5). Fit
-# batch DT, 2026-11-24: statement and per-station table in the batch's
-# cone-set-check.md.
+# is stripped and re-bonded (owner ruling 2026-11-24, audit part 2 C5). That
+# is also the bench answer where the plain sum printed beside the passing
+# root sum square falls under 1.0 (T012 and T030-T054; T030 0.9550): the
+# 80-turn run of MHA-DT-00 check 4R finds a gear that hesitates, and that
+# gear is stripped and re-bonded. Fit batch DT, 2026-11-24: statement and
+# per-station table in the batch's cone-set-check.md.
 checks:
   - id: C-01
     check: "NOMINAL_CONTACT_RATIO_MIN"

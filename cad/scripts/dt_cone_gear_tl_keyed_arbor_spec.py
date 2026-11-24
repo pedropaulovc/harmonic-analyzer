@@ -41,6 +41,7 @@ from dataclasses import dataclass
 
 import _config
 import cone_land_key
+import cone_tip_cluster
 import dt_cone_gear_spec as cone
 import dt_crank_drive_gear_spec as crank
 from _inch_wall_limits import WALL_FLOOR_MM
@@ -148,12 +149,18 @@ PLAY_SHARE = 2.0 / 3.0
 # three places (the supply size, line to line with the smallest bore) and its
 # flag note states the fit (rule 4): a sliding fit matched to the keyed
 # bores, diametral clearance from line to line up to the share, floored onto
-# the .0001 grid, in every bore.
+# the plain .001 inch step (rule 4, "Bands are written in inch steps"; the
+# .0013 the .0001 grid gave read as converted mm: machinist review r1, farm
+# run 20261124T110807008Z), in every bore. Necessity register N-01 (mesh):
+# cone_set_stack books this play inside the gears' .002 TIR, and a seat at
+# the title block (.004 play) takes T030's contact ratio to 0.82 against
+# NOMINAL_CONTACT_RATIO_MIN 1.0 (drawing-guidelines rule 4, form 2;
+# cone_set_stack C-01 at .004 play gives CR 0.82).
 SEAT_PLACES = 3
 SEAT_DIA = BORE_MIN_MM
 SEAT_CLEARANCE_MM = (
     0.0,
-    inch_grid_mm(PLAY_SHARE * TOOTH_RUNOUT_TIR_MM, 4, math.floor),
+    inch_grid_mm(PLAY_SHARE * TOOTH_RUNOUT_TIR_MM, 3, math.floor),
 )
 # The smallest seat the fit admits: the largest bore less the clearance.
 SEAT_DIA_MIN = BORE_MAX_MM - SEAT_CLEARANCE_MM[1]
@@ -661,10 +668,17 @@ for _name, _value in DRAWING_VALUES_BY_NAME.items():
     if abs(inch_grid_mm(_value, _places) - _value) > 1e-9:
         raise AssertionError(f"{_name} {_value} mm is off its .{'X' * _places} grid")
 # The bands tighter than the title block, set on the model's own dimension:
-# (feature, dimension) -> (upper, lower) band, mm. The keyseat's are
-# cone_land_key's, for its key; the seat has none (its fit is note 1's).
+# (feature, dimension) -> (upper, lower) band, mm. The keyseat's S keeps
+# cone_land_key's band: at the title block's +.005 the key's top meets a
+# blank's keyway top (KEY_TOP_CLEARANCE_MIN, necessity register N-02, gap).
+# The keyseat width prints (.0625) REF: the key is bonded, so its side play
+# never reaches the blank (above), and note 1's key trial governs a cut by
+# one pass of a standard 1/16 end mill, cone_land_key's KEYSEAT_WIDTH_BAND
+# staying the analysis band of that cut (machinist review r1, farm run
+# 20261124T110807008Z; drawing-guidelines rule 4, form 3: the bonded key is
+# the gauge, its .000-.004 clearance inside LOCTITE 638's .0098 gap). The seat
+# has none (its fit is note 1's).
 MODEL_BANDS_MM: dict[tuple[str, str], tuple[float, float]] = {
-    (KEYSEAT_SKETCH, "KeyseatWidth"): KEYSEAT_WIDTH_BAND,
     (KEYSEAT_SKETCH, "KeyseatS"): KEYSEAT_S_BAND,
 }
 
@@ -685,9 +699,18 @@ KEY_NUMBER = str(_config.parts("dt-cone-gear-tl-arbor-key")["number"])
 KEY_BOND = "LOCTITE 638"
 SEAT_NOTE_NUMBER = 1
 SEAT_NOTE_FLAG = f"SEE NOTE {SEAT_NOTE_NUMBER}"
-SEAT_CLEARANCE_TEXT = "-".join(
-    inch_text(value, 4) if value > 1e-9 else ".0000" for value in SEAT_CLEARANCE_MM
-)
+SEAT_CLEARANCE_TEXT = "-".join(inch_text(value, 3) for value in SEAT_CLEARANCE_MM)
+# The bonded key's side clearance in the end mill's cut (rule 23: a bonded
+# fit prints its clearance, inside the compound's gap).
+KEY_CLEARANCE_MM = cone_land_key.KEYSEAT_SIDE_CLEARANCE_MM
+if KEY_BOND != cone_tip_cluster.RETAINING_COMPOUND or not (
+    0.0
+    <= KEY_CLEARANCE_MM[0]
+    < KEY_CLEARANCE_MM[1]
+    <= cone_tip_cluster.RETAINING_COMPOUND_MAX_GAP_MM
+):
+    raise AssertionError("the arbor key's clearance leaves LOCTITE 638's gap")
+KEY_CLEARANCE_TEXT = "-".join(inch_text(value, 3) for value in KEY_CLEARANCE_MM)
 NOTE_LINE_CHARS = 72
 CONE_NUMBER = str(_config.parts("dt-cone-gear")["number"])
 CRANK_NUMBER = str(_config.parts("dt-crank-drive-gear")["number"])
@@ -706,7 +729,8 @@ SHEET_NOTES = "\n".join(
             subsequent_indent="   ",
             break_on_hyphens=False,
         ),
-        f"   KEYSEAT: KEY {KEY_NUMBER} BONDED WITH {KEY_BOND}.",
+        f"   KEYSEAT: KEY {KEY_NUMBER} SLIDES IN, BONDED WITH {KEY_BOND},",
+        f"   CLEARANCE {KEY_CLEARANCE_TEXT}.",
     )
 )
 if max(map(len, SHEET_NOTES.splitlines())) > NOTE_LINE_CHARS:
@@ -730,12 +754,15 @@ CALLOUTS_BELOW: dict[str, str] = {
         f"CENTRE HOLE\nHOLDS WALL {inch_text(TAIL_CENTRE_WALL_TEXT * INCH, 3)} MIN"
     ),
 }
+# The keyseat width is a reference (MODEL_BANDS_MM above): parenthesized.
 DIMENSION_PREFIXES: dict[str, str] = {
     "HeadCentreDia": CENTRE_PREFIX,
     "TailCentreDia": CENTRE_PREFIX,
+    "KeyseatWidth": "(",
 }
 DIMENSION_SUFFIXES: dict[str, str] = {
     "HeadCentreDia": CENTRE_SUFFIX,
     "TailCentreDia": CENTRE_SUFFIX,
+    "KeyseatWidth": ")",
 }
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:1"

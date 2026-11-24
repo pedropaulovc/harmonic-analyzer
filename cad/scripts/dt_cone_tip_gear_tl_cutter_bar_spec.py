@@ -2,7 +2,7 @@ r"""MHA-DT-37-TL-02: the DT6-FORM1 fly-cutter bar, dimensional contract.
 
 PURE DATA, no SolidWorks/COM and no drawing imports.  Shop tooling
 (cad/docs/subsystem-identities.md): a 3/8 cold-finished round, held in the
-PM-30MV's 3/8 R8 collet, with a reamed cross hole square to its axis for the
+PM-30MV's 3/8 R8 collet, with a drilled cross hole square to its axis for the
 MHA-DT-37-TL-01 bit and a #4-40 tap from its cutting end onto the bit for the
 bought set screw MHA-SH-VN-54 (fixture MHA-DT-37-TL-00, issue #2358).
 
@@ -17,9 +17,9 @@ from __future__ import annotations
 import _config
 import sh_vn_arbor_set_screw_spec as set_screw
 from _fit_deviations import deviations
-from _fit_ream_h7 import REAM_H7
 from _hole_spec import TAP_DRILL_MM, THREAD_MAJOR_MM, HoleSpec
 from _package_units import drawing_unit
+from _printed_tolerance import drilled_oversize_mm, drilled_undersize_mm
 from dt_cone_tip_gear_tl_form_cutter_spec import (
     BIT_DIA_LIMITS,
     BIT_RADIUS,
@@ -45,14 +45,19 @@ BAR_RADIUS = BAR_DIA / 2.0
 BAR_LENGTH = 44.45  # 1.75
 BAR_LENGTH_PLACES = 2
 
-# --- The cross hole: reamed slip fit on the 1/8 drill rod bit ----------------
-# A .1260 reamer over the drill rod's .1245-.1255 leaves .0005-.0020 of slip.
-# The hole prints the reamer's size with no band: the bought bit is its gauge
-# (rule 4 form 3; fit audit 2026-11-23 part 2 batch plan 3b: it stays reamed
-# with the set's .1260). CROSS_HOLE_BAND is the reamer's analysis spread.
-CROSS_HOLE_DIA = 3.2004  # .1260
+# --- The cross hole: a #30 drilled clearance for the 1/8 drill rod bit -------
+# The set screw bears the bit against one side of the hole, so the hole's
+# slip never reaches the cut (rule 4: a screw that takes the play out fails
+# the necessity test). The REAM with the set's .1260 had no register entry
+# of an honest kind (its N-01, 'mesh', named a cut-form slip no mesh check
+# books), so the hole is drilled at DRILLED HOLES (rule 4 form 1; the fit
+# audit 2026-11-23 judged fit, '#30 drill'): machinist review r1, farm run
+# 20261124T110807008Z; drawing-guidelines rule 4, form 1: a screw that takes
+# the play out fails the necessity test.
+CROSS_HOLE_DRILL = "#30"
+CROSS_HOLE_DIA = 3.2639  # .1285, the #30 drill
 CROSS_HOLE_PLACES = 4
-CROSS_HOLE_BAND = REAM_H7  # (upper, lower): +.0005/.0000
+CROSS_HOLE_BAND = (drilled_oversize_mm(unit=UNIT), -drilled_undersize_mm(unit=UNIT))
 _lower, _upper = deviations(CROSS_HOLE_BAND)
 CROSS_HOLE_LIMITS = (CROSS_HOLE_DIA + _lower, CROSS_HOLE_DIA + _upper)
 SLIP_CLEARANCE = (
@@ -60,7 +65,7 @@ SLIP_CLEARANCE = (
     CROSS_HOLE_LIMITS[1] - BIT_DIA_LIMITS[0],
 )
 if SLIP_CLEARANCE[0] <= 0.0:
-    raise AssertionError("the largest bit must slide into the smallest reamed hole")
+    raise AssertionError("the largest bit must slide into the smallest drilled hole")
 # From the cutting end face to the hole's axis, .XX: the set screw seats on
 # the bit near flush with that face (the 1/4 screw over the bit's radius).
 CROSS_HOLE_STATION = 7.874  # .31
@@ -150,8 +155,8 @@ DRAWING_PRECISION_BY_NAME: dict[str, int] = {
 }
 # The tap callout's drill prints at the title block's three places.
 HOLE_CALLOUT_PRECISION = 3
-# Rule 4 form 3: the reamer's size, REAM, and the bought bit as the gauge.
+# Rule 4 form 1: the named drill at DRILLED HOLES, the bit it passes named.
 DIMENSION_CALLOUTS: dict[str, str] = {
     "BarDia": "STOCK OK",
-    "CrossHoleDia": f"REAM THRU\n{BIT_NUMBER} ENTERS,\nNO SHAKE",
+    "CrossHoleDia": f"{CROSS_HOLE_DRILL} DRILL THRU\nFOR {BIT_NUMBER}",
 }

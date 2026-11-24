@@ -63,6 +63,7 @@ from _drawing_dimension_import import _INSERT_DIMS_MARKED, delete_unnamed_import
 from _drawing_dimensions import (
     assert_imported_precision,
     set_dimension_callouts,
+    set_reference_dimension,
 )
 from _drawing_edges import visible_view_entities
 import _drawing_hidden_sketches as hidden_sketches
@@ -279,10 +280,14 @@ DIMENSION_CALLOUTS = {
     # under the value.
     "BoreCutDia": f"REAM THRU\n{BORE_NOTE_FLAG}",
     # The keyed bore (T030..T120) is round, so it takes the fit bore's REAM
-    # (rule 7); its keyway's width band is the requirement, with no process
-    # word.  T reads from its witnesses (keyway top, far side of the bore):
-    # a size carries its value, band and flag (machinist review of the
-    # C1-keyed sheets dropped KEYWAY TO FAR SIDE).
+    # (rule 7).  The keyway's width prints (.0625) REF: the standard 1/16 A
+    # broach cuts it and the bought key MHA-DT-VN-71 is the gauge (note 1;
+    # drawing-guidelines rule 4, form 3: error_budget closes at a .010 key
+    # play, scatter MAE .2243 against .2195 at the broach's .004, machinist
+    # review r1, farm run 20261124T110807008Z).  T reads from its witnesses
+    # (keyway top, far side of the bore): a size carries its value, band and
+    # flag (machinist review of the C1-keyed sheets dropped KEYWAY TO FAR
+    # SIDE).
     "KeyedBoreDia": f"REAM THRU\n{BORE_NOTE_FLAG}",
     "KeywayWidth": BORE_NOTE_FLAG,
     "KeywayT": BORE_NOTE_FLAG,
@@ -378,7 +383,7 @@ def sheet_notes(teeth: int) -> str:
         fit: tuple[str, ...] = (
             f"{BORE_NOTE_NUMBER}. SLIDING FIT: {SHAFT_NAME} {SHAFT_MATE} {_land_text(teeth)} "
             "IS TURNED TO THIS BORE;",
-            f"   KEY {KEY_MATE} SLIDES IN THE KEYWAY.",
+            f"   KEYWAY: 1/16 BROACH; KEY {KEY_MATE} SLIDES IN, NO ROCK.",
         )
     else:
         fit = (bonded_fit_note(teeth),)
@@ -1316,6 +1321,21 @@ def build(adapter: Any) -> dict[str, str]:
                 dimensions_by_feature=DRAWING_DIMENSIONS,
             )
             _crop_bore_view(adapter, bore_view, configuration, teeth, set(bore_keep))
+            # The keyway width is REF; note 1's broach and key trial govern
+            # (machinist review r1, farm run 20261124T110807008Z).
+            width = [
+                item
+                for item in bore_annotations
+                if dimension_name(adapter, item) == "KeywayWidth"
+            ]
+            if len(width) != (1 if keyed(teeth) else 0):
+                raise RuntimeError(
+                    f"{configuration}: expected one KeywayWidth, found {len(width)}"
+                )
+            for item in width:
+                set_reference_dimension(
+                    adapter, item, label=f"{configuration} keyway width reference"
+                )
         # The part saves its authoring sketches hidden; the front view shows
         # the tooth and floor ones again for their dimensions, the side view
         # the tip-diameter witness (the iso view shows the part as saved).

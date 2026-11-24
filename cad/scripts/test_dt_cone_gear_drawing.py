@@ -194,9 +194,11 @@ def test_bore_bands_are_the_current_derived_seat_fit_bands() -> None:
         assert spec.bore_dia_mm(teeth) + upper == pytest.approx(land_dia + spec.BORE_DIA_BAND[0])
     assert spec.bore_dia_mm(24) == pytest.approx(0.2510 * 25.4)
     assert spec.bore_dia_mm(30) == pytest.approx(0.3760 * 25.4)
-    # The keyway takes cone_land_key's bands: the milled-width row's
-    # +.0020/-.0000 width and +/-.003 on T (the one-pass broach's reach, no
-    # tighter than the milled-step row), plain inch steps.
+    # The keyway takes cone_land_key's bands: the 1/16 A broach's
+    # +.0020/-.0000 width (its analysis band; the sheet prints (.0625) REF,
+    # machinist review r1, farm run 20261124T110807008Z) and +/-.003 on T (the
+    # one-pass broach's reach, no tighter than the milled-step row), plain
+    # inch steps.
     assert cone_land_key.KEYWAY_WIDTH_BAND == (0.0508, 0.0)
     assert cone_land_key.KEYWAY_T_BAND == (0.0762, -0.0762)
     assert spec.KEYWAY_HALF_WIDTH_MM == cone_land_key.KEYWAY_WIDTH_MM / 2.0
@@ -407,7 +409,9 @@ def test_numbered_notes_state_the_bore_fit_from_both_parts_limits() -> None:
             assert lines[0] == (
                 f"1. SLIDING FIT: {shaft} MHA-DT-04 {dia} IS TURNED TO THIS BORE;"
             )
-            assert lines[1] == f"   KEY {drawing.KEY_MATE} SLIDES IN THE KEYWAY."
+            assert lines[1] == (
+                f"   KEYWAY: 1/16 BROACH; KEY {drawing.KEY_MATE} SLIDES IN, NO ROCK."
+            )
             assert "CLEARANCE" not in text
             assert "MEASURED" not in text
             notes_from = 2

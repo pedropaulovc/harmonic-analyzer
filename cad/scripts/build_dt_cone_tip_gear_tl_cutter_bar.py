@@ -1,7 +1,7 @@
 r"""Reproduction script: the DT6-FORM1 fly-cutter bar (MHA-DT-37-TL-02).
 
 Shop tooling, issue #2358 (``dt_cone_tip_gear_tl_cutter_bar_spec`` owns every
-number): 3/8 cold-finished round, the reamed cross hole for the
+number): 3/8 cold-finished round, the drilled cross hole for the
 MHA-DT-37-TL-01 bit square to its axis, and the #4-40 tap up the axis from
 the cutting end to the cross hole for the MHA-SH-VN-54 set screw.
 

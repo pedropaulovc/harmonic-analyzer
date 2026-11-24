@@ -116,14 +116,23 @@ def test_the_keyseat_section_flags_the_land_note(monkeypatch):
         "_set_dimension_suffixes",
         lambda _a, dimensions, texts: suffixes.append((tuple(dimensions), texts)),
     )
+    references = []
+    monkeypatch.setattr(
+        drawing,
+        "set_reference_dimension",
+        lambda _a, dimension, *, label: references.append(dimension),
+    )
     placed = drawing._add_d_sections(object(), object(), 1)
     assert len(placed) == len(drawing.D_SECTIONS) == 1
     assert placed[0].dimensions == ("Sec1KeyseatS", "Sec1KeyseatWidth")
     flag = f"NOTE {dt_cone_gear_shaft_spec.LAND_NOTE}"
+    # The width prints (.0625) REF and closes its parenthesis before the flag
+    # (machinist review r1, farm run 20261124T110807008Z).
+    assert references == ["Sec1KeyseatWidth"]
     assert suffixes == [
         (
             ("Sec1KeyseatS", "Sec1KeyseatWidth"),
-            {"Sec1KeyseatWidth": f" {flag}"},
+            {"Sec1KeyseatWidth": f") {flag}"},
         )
     ]
     assert callouts == [(("Sec1KeyseatS",), {"Sec1KeyseatS": flag}, "above")]

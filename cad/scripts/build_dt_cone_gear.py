@@ -1126,12 +1126,11 @@ def build(adapter) -> dict[str, str]:
     # The bores print their reamer's size with no band (drawing-guidelines
     # rule 4; fit audit 2026-11-23): MHA-DT-04's lands and MHA-DT-37's spigot
     # are turned to them, and note 1 names that mate.  Their places are
-    # DRAWING_PRECISION's (apply_drawing_precision below).
-    set_dimension_bilateral_tolerance(
-        adapter, KEYED_BORE_SKETCH, "KeywayWidth",
-        *deviations(cone_land_key.KEYWAY_WIDTH_BAND),
-        places=places["KeywayWidth"], display_unit=UNIT,
-    )
+    # DRAWING_PRECISION's (apply_drawing_precision below).  The keyway width
+    # carries no band either: the 1/16 A broach cuts it and the bought key is
+    # the gauge (rule 4, form 3; machinist review r1, farm run
+    # 20261124T110807008Z); cone_land_key.KEYWAY_WIDTH_BAND stays the
+    # broach's analysis band.
     _set_keyway_t_limits(adapter, places["KeywayT"])
     set_dimension_bilateral_tolerance(
         adapter,

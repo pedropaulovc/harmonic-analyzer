@@ -119,11 +119,15 @@ BORE_DIA = 11.1379  # .4385 in
 # cone-shaft spec derives that largest break (THRUST_EDGE_BREAK_MAX); it
 # imports this spec, so the value is restated here and the post's sheet
 # asserts the two agree.  The model breaks both rims AT the maximum, a
-# 45-degree chamfer, and prints its leg as the single limit .004 MAX on a
-# dimension whose extension lines touch the rim (the title block's .010
-# would take the ring under its floor).
+# 45-degree chamfer, and the sheet prints it as a leader note on the far rim
+# in Section A-A, BREAK .004 MAX / BOTH BORE RIMS (the title block's .010
+# would take the ring under its floor; machinist review r1, farm run
+# 20261124T110807008Z: a 20:1 detail for one break was over-specification).
 JOURNAL_RIM_BREAK = 0.1016  # .004 MAX
-JOURNAL_RIM_BREAK_BAND = (0.0, -JOURNAL_RIM_BREAK)
+# The sheet's leader note on that rim: the single limit and which rims.
+JOURNAL_RIM_BREAK_NOTE = (
+    f"BREAK .{round(JOURNAL_RIM_BREAK / 25.4 * 1000.0):03d} MAX\nBOTH BORE RIMS"
+)
 # The harvested 1.654 face-to-face: MHA-DT-04's bearing length, which the
 # cone shaft's stations and the gear stack close on.  It is its own value, not
 # the body's Ø.
@@ -467,7 +471,6 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "CrankBossStationReference": {"CrankBossStartZ"},
     "ConeBossStationReference": {"ConeBossNorthZ"},
     "BoreSpacingReference": {"CrankAboveCone"},
-    "JournalRimBreakReference": {"JournalRimBreak"},
 }
 
 # Decimal places are product definition: they select the title-block general
@@ -490,8 +493,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # printed to .001.  The basic plan angle feeds the retained crank-bore angularity frame;
 # its four places spell the configured geometry, not a tighter general
 # angular band.  The two reamed running bores take four, the places their
-# size limits are written in.  The journal rims' break prints its .004 MAX
-# to three places.
+# size limits are written in.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "MainBodyProfile": {"MainBodyDia": 2},
     "MainBody": {"MainBodyHt": 2},
@@ -510,7 +512,6 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "CrankBossStationReference": {"CrankBossStartZ": 3},
     "ConeBossStationReference": {"ConeBossNorthZ": 3},
     "BoreSpacingReference": {"CrankAboveCone": 3},
-    "JournalRimBreakReference": {"JournalRimBreak": 3},
 }
 
 _PRECISION_NAMES = [

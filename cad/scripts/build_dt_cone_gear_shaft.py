@@ -351,15 +351,17 @@ def build(adapter) -> dict[str, str]:
 
     apply_material(adapter, MATERIAL)
     report_mass_properties(adapter)
-    # The keyseat carries its band on the MODEL dimension, so SolidWorks
-    # renders the limits and re-renders them on a unit change.  The three
-    # turned diameters are made last to their mates and print as references,
-    # and the socket prints its reamer's size: none carries a band (fit
-    # audit 2026-11-23; SECTION_DIA_BANDS stay the stacks' analysis bands).
-    for name, band in (
-        ("Sec1KeyseatWidth", cone_land_key.KEYSEAT_WIDTH_BAND),
-        ("Sec1KeyseatS", cone_land_key.KEYSEAT_S_BAND),
-    ):
+    # The keyseat's S carries its band on the MODEL dimension, so SolidWorks
+    # renders the limits and re-renders them on a unit change.  The keyseat
+    # width prints (.0625) REF: one pass of a standard 1/16 end mill, key
+    # MHA-DT-VN-71 sliding in (note 1) is its requirement, and
+    # KEYSEAT_WIDTH_BAND stays that cut's analysis band (machinist review r1,
+    # farm run 20261124T110807008Z: band and acceptance on one feature).  The
+    # three turned diameters are made last to their mates and print as
+    # references, and the socket prints its reamer's size: none carries a
+    # band (fit audit 2026-11-23; SECTION_DIA_BANDS stay the stacks'
+    # analysis bands).
+    for name, band in (("Sec1KeyseatS", cone_land_key.KEYSEAT_S_BAND),):
         set_dimension_bilateral_tolerance(
             adapter,
             "Sec1KeyseatProfile",

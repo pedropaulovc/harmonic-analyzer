@@ -141,12 +141,18 @@ PLAY_SHARE = 2.0 / 3.0
 # The seat prints at the title block's three places (line to line with the
 # bore's low limit) and its flag note states the fit (rule 4): a sliding fit
 # matched to T024's bore, diametral clearance from line to line up to the
-# share, floored onto the .0001 grid.
+# share, floored onto the plain .001 inch step, as the keyed arbor's (the
+# .0013 the .0001 grid gave read as converted mm: machinist review r1, farm
+# run 20261124T110807008Z). Necessity register N-01 (mesh): cone_set_stack
+# books this play inside T024's .002 TIR, and a seat at the title block
+# (.004 play) takes T024's contact ratio to 0.92 against
+# NOMINAL_CONTACT_RATIO_MIN 1.0 (drawing-guidelines rule 4, form 2;
+# cone_set_stack C-01 at .004 play gives T024 CR 0.92).
 SEAT_PLACES = 3
 SEAT_DIA = BORE_MIN_MM
 SEAT_CLEARANCE_MM = (
     0.0,
-    inch_grid_mm(PLAY_SHARE * TOOTH_RUNOUT_TIR_MM, 4, math.floor),
+    inch_grid_mm(PLAY_SHARE * TOOTH_RUNOUT_TIR_MM, 3, math.floor),
 )
 # The smallest seat the fit admits: the largest bore less the clearance.
 SEAT_DIA_MIN = BORE_MAX_MM - SEAT_CLEARANCE_MM[1]
@@ -499,9 +505,7 @@ for _name, _value in DRAWING_VALUES_BY_NAME.items():
 # note): here the one configuration MHA-DT-03-T024.
 SEAT_NOTE_NUMBER = 1
 SEAT_NOTE_FLAG = f"SEE NOTE {SEAT_NOTE_NUMBER}"
-SEAT_CLEARANCE_TEXT = "-".join(
-    inch_text(value, 4) if value > 1e-9 else ".0000" for value in SEAT_CLEARANCE_MM
-)
+SEAT_CLEARANCE_TEXT = "-".join(inch_text(value, 3) for value in SEAT_CLEARANCE_MM)
 NOTE_LINE_CHARS = 72
 CONE_NUMBER = _CONE_NUMBER
 SEAT_MATE_TEXT = f"CONE GEAR {BLANK.number}"

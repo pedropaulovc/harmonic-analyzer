@@ -217,9 +217,11 @@ BOND_NOTE = 2
 LAND_FLAG = f"SEE NOTE {LAND_NOTE}"
 BOND_FLAG = f"SEE NOTE {BOND_NOTE}"
 MADE_TO_FIT_DIAMETERS = ("Sec0Dia", "Sec1Dia", "Sec2Dia")
+# Two rows, one of words (machinist review r1, farm run 20261124T110807008Z,
+# r2: three rows of words under the callout broke rule 7); the reference
+# size already says the journal is made to its bore.
 JOURNAL_FIT_CALLOUT = (
-    "RUNNING FIT, TURNED\n"
-    "TO MHA-DT-05 BORE\n"
+    "RUNNING FIT TO MHA-DT-05\n"
     f"(CLEARANCE {inch_text(JOURNAL_DIAMETRAL_CLEARANCE_MM[0], 4)}"
     f"-{inch_text(JOURNAL_DIAMETRAL_CLEARANCE_MM[1], 4)})"
 )
@@ -229,8 +231,13 @@ SEAT_MATE_CALLOUTS = {
 }
 # A reference diameter closes its parenthesis before the flag.
 SEAT_MATE_SUFFIXES = {"Sec2Dia": f") {BOND_FLAG}"}
-# The keyseat width is centred on its section; it carries the bare flag.
-KEYSEAT_MATE_SUFFIXES = {"Sec1KeyseatWidth": f" NOTE {LAND_NOTE}"}
+# The keyseat width is centred on its section.  It prints (.0625) REF, cut
+# by one pass of a standard 1/16 end mill: note 1's key trial is its
+# requirement (machinist review r1, farm run 20261124T110807008Z: a band and
+# an acceptance on one feature).  The reference closes its parenthesis
+# before the bare flag.
+KEYSEAT_MATE_SUFFIXES = {"Sec1KeyseatWidth": f") NOTE {LAND_NOTE}"}
+KEYSEAT_REFERENCES = ("Sec1KeyseatWidth",)
 
 # Station layout.  Every cone gear station was laid out on a 6.5 reference
 # face one exact-tracking seat pitch (dt_cone_gear_spec.SEAT_PITCH) from the next;

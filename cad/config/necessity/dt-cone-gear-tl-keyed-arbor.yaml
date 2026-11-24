@@ -1,0 +1,32 @@
+# Why each fit range and each band under the title block stays on
+# MHA-DT-03-TL-03, the keyed tooth-cutting arbor (drawing-guidelines rule 4;
+# owner ruling 2026-11-24: "In the part's registry file, not on the sheet.").
+# Read by the machinist review only. The keyseat width prints (.0625) REF:
+# the key MHA-DT-03-TL-06 is bonded with LOCTITE 638, so its side play never
+# reaches the blank, and note 1's key trial governs (no entry). Machinist
+# review r1 (farm run 20261124T110807008Z); drawing-guidelines rule 4, form 3
+# for the width (the bonded key is the gauge; its .000-.004 clearance sits
+# inside LOCTITE 638's .0098 gap) and form 2 for the seat (N-01 below).
+#
+# N-01: the seat's play is the blank's offset on the arbor, so the cut teeth
+# run that play TIR about the gear's bore. cone_set_stack books every cone's
+# tooth runout at the gear sheets' .002 TIR (tooth_cutting_runout_tir_mm) and
+# C-01 gates the contact ratio on it; the seat takes at most two thirds of
+# that .002 (dt_cone_gear_tl_keyed_arbor_spec.PLAY_SHARE). A seat at the
+# title block's band plays .004: T030 then runs at contact ratio 0.82 against
+# the 1.0 floor (T120 0.92), probe 2026-11-24 with cone_set_stack's runout
+# raised by the extra play.
+# N-02: S's upper limit sets the key's top; at the title block's +.005 it
+# stands .0035 above a blank's keyway top (cone_land_key's T at its minimum),
+# so the blank no longer slides over the key (floor .0015, as MHA-DT-04's S).
+necessity:
+  - id: N-01
+    feature: "sheet 1, front view, Ø.376 seat (SEE NOTE 1), CLEARANCE .000-.001 IN EACH BORE"
+    kind: mesh
+    reason: "seat play becomes the cut teeth's runout"
+    source: "cone_set_stack.NOMINAL_CONTACT_RATIO_MIN"
+  - id: N-02
+    feature: "sheet 1, left end view, keyseat S .3355 +.0000/-.0040 (SEE NOTE 1)"
+    kind: gap
+    reason: "keeps the key's top clear of the blanks' keyways"
+    source: "cone_land_key KEY_TOP_RADIAL_CLEARANCE_FLOOR_MM (.0015), read as KEY_TOP_CLEARANCE_MIN"

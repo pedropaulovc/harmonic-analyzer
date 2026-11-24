@@ -1,0 +1,20 @@
+# Why the seat's fit range stays on MHA-DT-03-TL-07, the round tooth-cutting
+# arbor for T024 (drawing-guidelines rule 4; owner ruling 2026-11-24: "In the
+# part's registry file, not on the sheet."). Read by the machinist review
+# only. Machinist review r1 (farm run 20261124T110807008Z); drawing-guidelines
+# rule 4, form 2, as the keyed arbor's N-01.
+#
+# N-01: the seat's play is the blank's offset on the arbor, so T024's cut
+# teeth run that play TIR about its bore. cone_set_stack books T024's tooth
+# runout at the cone sheet's .002 TIR (tooth_cutting_runout_tir_mm) and C-01
+# gates the contact ratio on it; the seat takes at most two thirds of that
+# .002 (dt_cone_gear_tl_round_arbor_spec.PLAY_SHARE). A seat at the title
+# block's band plays .004: T024 then runs at contact ratio 0.92 against the
+# 1.0 floor, probe 2026-11-24 with cone_set_stack's runout raised by the
+# extra play.
+necessity:
+  - id: N-01
+    feature: "sheet 1, side view, Ø.251 seat (SEE NOTE 1), CLEARANCE .000-.001"
+    kind: mesh
+    reason: "seat play becomes the cut teeth's runout"
+    source: "cone_set_stack.NOMINAL_CONTACT_RATIO_MIN"

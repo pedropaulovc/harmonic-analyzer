@@ -6,6 +6,14 @@
 # (MHA-DT-04's land, MHA-DT-37's spigot) is turned to it last (form 2). Gear
 # tooth data (tip, tooth thickness, root envelope, runouts, over pins) keep
 # the gear data block's rules. Fit batch DT, 2026-11-24.
+#
+# N-04 (keyway width .0625 +.0020/-.0000, trace, error_budget cone_key_play)
+# is withdrawn: the budget closes without the band (cone_key_play at a .010
+# key play: scatter MAE .2243 % against .2195 % at .004; it closes at both),
+# so no check fails without it. The width prints (.0625) REF, the standard
+# 1/16 A broach cuts it and the bought key MHA-DT-VN-71 is the gauge, note 1
+# (drawing-guidelines rule 4, form 3; machinist review r1, farm run
+# 20261124T110807008Z). N-05 and N-06 keep their ids.
 necessity:
   - id: N-01
     feature: "sheets T030-T120, DETAIL A, Ø.3760 REAM THRU keyed bore (SEE NOTE 1)"
@@ -22,11 +30,6 @@ necessity:
     kind: mesh
     reason: "tooth-space runout to the bore needs a true bore"
     source: "owner ruling 2026-11-21, #3219 option D: .0015 TIR tooth-space runout to the bore, bore reamed in the OD's chucking"
-  - id: N-04
-    feature: "sheets T030-T120, DETAIL A, keyway width .0625 +.0020/-.0000 (SEE NOTE 1)"
-    kind: trace
-    reason: "key side play turns the gear off its channel's phase"
-    source: "error_budget cone_key_play; the 1/16 A broach cuts this width in one pass, key MHA-DT-VN-71 slides in"
   - id: N-05
     feature: "sheets T030-T120, DETAIL A, keyway T .4055/.3995 (SEE NOTE 1)"
     kind: gap

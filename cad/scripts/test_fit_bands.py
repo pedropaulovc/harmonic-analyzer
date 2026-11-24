@@ -50,10 +50,10 @@ _SETTER = "set_dimension_bilateral_tolerance"
 # the imported module) must say here which module-level expression build()
 # derives it from. "each" checks a tuple of bands; "values" checks a band mapping.
 LOCAL_BAND_SOURCES: dict[tuple[str, str], tuple[str, str]] = {
-    # for name, band in (keyseat width, keyseat S): ... deviations(band); the
-    # turned diameters are REF (fit batch DT, 2026-11-24)
+    # for name, band in ((keyseat S,),): ... deviations(band); the keyseat
+    # width and the turned diameters are REF (fit batch DT, 2026-11-24)
     ("build_dt_cone_gear_shaft", "band"): (
-        "(cone_land_key.KEYSEAT_WIDTH_BAND, cone_land_key.KEYSEAT_S_BAND)",
+        "(cone_land_key.KEYSEAT_S_BAND,)",
         "each",
     ),
     # def gear_tip_band_mm(grade): band = ...; deviations(band)
@@ -93,7 +93,6 @@ LOCAL_BAND_SOURCES: dict[tuple[str, str], tuple[str, str]] = {
         " __import__('dt_pinion_cam_spec').THIN_WALL_MIN_BAND,"
         " __import__('pn_pen_rod_spec').TAP_WALL_MIN_BAND,"
         " __import__('dt_crank_handle_pivot_screw_spec').TIP_CHAMFER_BAND,"
-        " __import__('dt_cone_pivot_post_spec').JOURNAL_RIM_BREAK_BAND,"
         " __import__('pd_transgear_arm_spec').PIN_HOLE_DEPTH_BAND,"
         " __import__('fr_top_frame_spec').HANGER_PIN_HOLE_DEPTH_BAND)",
         "each",
@@ -310,6 +309,16 @@ INDEXED_FIT_BANDS: dict[tuple[str, str], str] = {
     ("dt_cone_tip_gear_spec", "PIVOT_DIA_BAND"): (
         "the pivot's analysis band (it prints REF, turned last to its holes), "
         "indexed for the bond and running clearances"
+    ),
+    # Machinist review r1 (farm run 20261124T110807008Z): the 1/16 key's
+    # widths print REF, the key is the gauge (rule 4, form 3).
+    ("dt_crank_drive_gear_spec", "KEYWAY_WIDTH_BAND"): (
+        "the 1/16 A broach's analysis band (cone_land_key.KEYWAY_WIDTH_BAND; the "
+        "width prints REF), indexed for the keyway walls and side clearance"
+    ),
+    ("dt_cone_gear_tl_keyed_arbor_spec", "KEYSEAT_WIDTH_BAND"): (
+        "the 1/16 end mill's analysis band (cone_land_key.KEYSEAT_WIDTH_BAND; the "
+        "width prints REF, the key bonded), indexed for the keyseat's corner reach"
     ),
     ("pn_pen_hanger_spec", "STRAP_T_STOCK_BAND"): (
         "the 3 mm strap stock's supplied thickness band, indexed for the "
