@@ -79,6 +79,56 @@ def test_latest_release_renders_pro_then_hobby_then_prints_hobby_pdf(process, mo
     assert pdf.read_bytes() == b"%PDF-1.4 " + hobby.resolve().as_uri().encode()
 
 
+_FAMILY = '''title = "Smoke pair"
+[[parts]]
+id = "left"
+file = "../../out/features/smoke_left/features.toml"
+[[parts]]
+id = "right"
+file = "../../out/features/smoke_right/features.toml"
+'''
+
+
+def test_family_plan_adds_a_placeholder_pdf_per_part_pointing_to_the_shared_one(
+    process, monkeypatch
+):
+    # Owner ruling 2026-11-24: a release ships "a placeholder pdf per part
+    # that points to shared one".
+    out, author = process
+    author("smoke_pair")
+    plans.plan_path("smoke_pair").write_text(_FAMILY, encoding="utf-8")
+    assert plans.family_parts("smoke_pair") == {"left": "smoke_left", "right": "smoke_right"}
+    assert plans.part_stems("smoke_pair") == ("smoke_left", "smoke_right")
+    calls = _uv_stub(monkeypatch)
+    assert wrapper.main(["smoke_pair", "--out", str(out)]) == 0
+    _probe, pro, hobby, left, right, *printing = calls
+    directory = plans.traveler_dir("smoke_pair", out)
+    shared = "smoke-pair-traveler.pdf"
+    for part_id, slug, cmd in (("left", "smoke-left", left), ("right", "smoke-right", right)):
+        # The same plan and checks as the shipped sheet, then the pointer page.
+        assert cmd[: len(hobby) - 1] == hobby[:-1]
+        assert cmd[len(hobby) - 1 :] == [
+            str(directory / f"{slug}-traveler.html"),
+            "--placeholder", part_id, "--shared-file", shared,
+        ]
+    assert [Path(cmd[-1].removeprefix("file:///")).name for cmd in printing] == [
+        "traveler-hobby.html", "smoke-left-traveler.html", "smoke-right-traveler.html",
+    ]
+    pdfs = plans.traveler_pdf_paths("smoke_pair", out)
+    assert [pdf.name for pdf in pdfs] == [
+        shared, "smoke-left-traveler.pdf", "smoke-right-traveler.pdf",
+    ]
+    assert all(pdf.read_bytes().startswith(b"%PDF-1.4 ") for pdf in pdfs)
+    assert set(plans.traveler_outputs("smoke_pair", out)) == {
+        *plans.traveler_paths("smoke_pair", out), *pdfs,
+        directory / "smoke-left-traveler.html", directory / "smoke-right-traveler.html",
+    }
+    # A print that fails on any of them leaves no sheet at all.
+    _uv_stub(monkeypatch, printed=False)
+    assert wrapper.main(["smoke_pair", "--out", str(out)]) == 1
+    assert not any(path.exists() for path in plans.traveler_outputs("smoke_pair", out))
+
+
 def test_latest_version_reads_the_probe_output(monkeypatch):
     def run(cmd, **kwargs):
         assert cmd[:7] == [_UV, "tool", "run", "--from", "prechips@latest", "python", "-c"]

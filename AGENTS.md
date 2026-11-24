@@ -520,7 +520,12 @@ produces the drawing PDFs also produces the traveler PDFs; `build_bare` runs
 none. `release` runs every one too
 and ships each part's hobby sheet as `travelers/<slug>-traveler.pdf` in the
 bundle (owner ruling 2026-11-14, superseding the 2026-11-11 ruling that releases
-carry no travelers). prechips still stays out of `uv.lock`
+carry no travelers). A family plan (one `cad/process/<family>/plan.toml` for
+near-twin parts made on shared setups; `sh_column_clamp` serves both column
+clamp halves, owner rulings 2026-11-24) enrols its family stem: its task
+renders the shared sheet once and a one-page placeholder
+`<part slug>-traveler.pdf` per part that points to it, and a release ships
+all of them (`cad/process/README.md`, Family plans). prechips still stays out of `uv.lock`
 ([#2502](https://github.com/pedropaulovc/harmonic-analyzer/issues/2502): every
 prechips release changed the lock, which until #2882 re-keyed every `check:machinist_review:*`).
 The plans, the shop directory `cad/process/shop/` and the setup pictures stay in HA. The task runs
@@ -578,7 +583,10 @@ like `prechips:<stem>` and `gallery`: no farm worker has FreeCAD, so the
 submitter needs FreeCAD 1.1+ and the task fails loud without it. `release`
 ships each part's outputs under `nc/<stem>/` beside
 `travelers/<slug>-traveler.pdf`, and the cut fails if any is missing or
-stale. Its recipe,
+stale. A family plan has one recipe: it posts the programs its parts share
+once, with each part's own, into the one `nc/<family stem>/` under one
+manifest that binds every part's feature bundle, and one T number names one
+tool in every file. Its recipe,
 `cad/process/<stem>/cam.py`, derives every part dimension, cut step, cutter
 diameter, speed and feed from the part's `features.toml`, its `plan.toml` and
 the shop directory; constants that neither record carries are named in

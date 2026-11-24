@@ -328,7 +328,13 @@ is in a leaf's cache key (AGENTS.md, "Fine-grained config deps"). See
 `_process_plans.TRAVELER_STEMS`, derived from the plan files, lists the parts
 with a `prechips:<stem>` task: every `cad/process/<stem>/plan.toml` whose
 `revision` is not `"placeholder"` (a plan that cannot be read fails task
-loading, naming it). Parts are enrolled by the CNC migration (owner ruling
+loading, naming it). A stem is a part's, or a family's: a family plan binds
+several parts' manifests under prechips `[[parts]]`
+(`_process_plans.family_parts`; `sh_column_clamp` serves both column clamp
+halves, owner rulings 2026-11-24), its task depends on every part's
+`package:manifest:<part>` and writes, beside the shared sheets, a one-page
+placeholder `<part slug>-traveler.pdf` per part that points to the shared
+one (`cad/process/README.md`, Family plans). Parts are enrolled by the CNC migration (owner ruling
 2026-11-17): the machine premise is a CNC mill, the CNC-converted PM-30MV, and
 a manual lathe, the PM-1127VF-LB, so a milled part's hobby sheet is the CNC
 setup sheet for its NC programs. The oblique trammel jig's eight parts, the
@@ -462,7 +468,10 @@ requirements needs a prechips adapter release before its traveler passes again.
 ## NC programs
 
 `_cam_programs.CAM_STEMS`, derived from the recipe files, lists the parts
-milled on the CNC mill (each needs an enrolled plan); each has a
+milled on the CNC mill (each needs an enrolled plan; a family plan's one
+recipe posts every part's programs, the shared ones once, into the family's
+`cad/out/nc/<family stem>/` under one manifest binding each part's bundle as
+`features/<part stem>` and `step/<part stem>`); each has a
 `cad/process/<stem>/cam.py` CAM recipe and a `cam:<stem>` task that posts its
 G-code with headless FreeCAD CAM (`cad/scripts/cam_nc.py`, FreeCAD 1.1 or
 later). `build` and `release` run every enrolled one and `build_bare` runs
@@ -486,7 +495,9 @@ Releases ship every enrolled part's hobby traveler as a PDF (owner ruling
 depends on every `prechips:<stem>` and `cam:<stem>` task, so it re-renders the
 travelers with the then-latest prechips and re-posts any stale programs;
 `doit -s release` clears those dependencies and renders nothing.
-`cut_release.py` copies each `cad/out/travelers/<stem>/<slug>-traveler.pdf` to
+`cut_release.py` copies each `cad/out/travelers/<stem>/<slug>-traveler.pdf` (a
+family's shared sheet and each of its parts' placeholders,
+`_process_plans.traveler_pdf_paths`) to
 the bundle's `travelers/<slug>-traveler.pdf` and every `cam:<stem>` output to
 `nc/<stem>/`, where `SHA256SUMS.txt` hashes them like every other staged
 file, and names both directories in the release notes. A missing or empty PDF,

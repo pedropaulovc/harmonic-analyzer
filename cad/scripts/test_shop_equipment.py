@@ -81,9 +81,17 @@ def test_every_hand_tap_stop_leaves_room_for_the_tap_guide() -> None:
         ):
             continue
         holders.append(path.parent.name)
-        parameters = plan["parameters"]
-        room = parameters["tap_stack_max_mm"] - guide_mm
-        assert 0 <= room - parameters["tap_wrench_reach_max_mm"] < 0.254, (
-            path.parent.name
-        )
+        # A family plan (cad/process/README.md) keeps the tapped part's
+        # numbers in that part's own table, laid over the plan's.
+        tables = [
+            plan["parameters"] | part.get("parameters", {})
+            for part in plan.get("parts", [{}])
+        ]
+        tapped = [table for table in tables if "tap_stack_max_mm" in table]
+        assert tapped, path.parent.name
+        for parameters in tapped:
+            room = parameters["tap_stack_max_mm"] - guide_mm
+            assert 0 <= room - parameters["tap_wrench_reach_max_mm"] < 0.254, (
+                path.parent.name
+            )
     assert len(holders) >= 10, holders

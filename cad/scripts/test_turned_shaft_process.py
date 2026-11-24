@@ -39,9 +39,10 @@ HOLDER_BAR_KEYS = ("bush_dia_in",)
 STEMS = tuple(
     stem
     for stem in _process_plans.TRAVELER_STEMS
-    if tomllib.loads(_process_plans.plan_path(stem).read_text(encoding="utf-8"))[
-        "cad"
-    ].get("adapter")
+    if tomllib.loads(_process_plans.plan_path(stem).read_text(encoding="utf-8"))
+    # A family plan binds its parts under [[parts]] and has no [cad].
+    .get("cad", {})
+    .get("adapter")
     == "turned_shaft"
 )
 

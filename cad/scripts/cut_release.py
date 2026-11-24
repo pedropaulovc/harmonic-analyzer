@@ -108,7 +108,12 @@ import _cam_programs
 import _config
 from _buildgraph import module_deps_of, script_for
 from _drawing_registry import DRAWINGS
-from _process_plans import TRAVELER_STEMS, traveler_pdf_path
+from _process_plans import (
+    TRAVELER_STEMS,
+    part_stems,
+    traveler_pdf_name,
+    traveler_pdf_paths,
+)
 from _release_artwork import ARTWORK_DIR, NOTED_ARTWORK
 from _release_drawing_diff import extract_release_pdfs, previous_published_release
 from export_models import stage_release_neutral
@@ -768,14 +773,37 @@ def stage_drawings(stage: Path) -> dict[str, str]:
     return staged
 
 
-def stage_travelers(stage: Path) -> list[str]:
-    """Copy each enrolled part's hobby traveler PDF to ``travelers/<slug>-traveler.pdf``.
+def _traveler_part_count(staged: list[str]) -> int:
+    """Parts with a staged traveler: a family's shared sheet is no part's
+    own, each of its placeholders is one part's."""
+    shared = {
+        f"travelers/{traveler_pdf_name(stem)}"
+        for stem in TRAVELER_STEMS
+        if part_stems(stem) != (stem,)
+    }
+    return len(set(staged) - shared)
 
-    The PDF is the output of ``prechips:<stem>``. A full ``doit release`` runs
-    those tasks first, but ``doit -s release`` does not, so a missing, empty or
-    stale PDF fails the cut: stale means older than the part's
-    ``features/<stem>/features.toml``, the manifest it was rendered from (the
-    same mtime refusal ``stage_comparisons`` applies to the gallery).
+
+def _nc_part_count(staged: list[str]) -> int:
+    """Parts with staged NC programs: a family's one ``nc/<family stem>/``
+    counts each part it serves."""
+    return sum(len(part_stems(stem)) for stem in {path.split("/")[1] for path in staged})
+
+
+def stage_travelers(stage: Path) -> list[str]:
+    """Copy each enrolled plan's hobby traveler PDF to ``travelers/<slug>-traveler.pdf``.
+
+    A family plan (one plan for several parts) ships its shared sheet once,
+    under the family's slug, and beside it each part's one-page placeholder
+    under the part's own ``<part slug>-traveler.pdf``, which points to the
+    shared one: every enrolled part has a PDF under its name.
+
+    The PDFs are the outputs of ``prechips:<stem>``. A full ``doit release``
+    runs those tasks first, but ``doit -s release`` does not, so a missing,
+    empty or stale PDF fails the cut: stale means older than a
+    ``features/<part>/features.toml`` it was rendered from, the plan's own
+    part's or any of a family's (the same mtime refusal ``stage_comparisons``
+    applies to the gallery).
     """
     from export_features import bundle_paths
 
@@ -783,26 +811,33 @@ def stage_travelers(stage: Path) -> list[str]:
     destination_dir = stage / "travelers"
     staged: list[str] = []
     for stem in TRAVELER_STEMS:
-        source = traveler_pdf_path(stem, out)
         rerun = f"run `doit -s prechips:{stem}`"
-        if not source.is_file() or source.stat().st_size == 0:
-            raise RuntimeError(f"required traveler is missing: {source} ({rerun})")
-        manifest, _step = bundle_paths(stem, out)
-        if not manifest.is_file():
-            raise RuntimeError(f"traveler {source.name} has no feature manifest at {manifest}")
-        if source.stat().st_mtime < manifest.stat().st_mtime:
-            raise RuntimeError(
-                f"traveler is stale: {source} is older than its manifest {manifest} ({rerun})"
-            )
-        destination_dir.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(source, destination_dir / source.name)
-        staged.append(f"travelers/{source.name}")
+        manifests = [bundle_paths(part, out)[0] for part in part_stems(stem)]
+        for source in traveler_pdf_paths(stem, out):
+            if not source.is_file() or source.stat().st_size == 0:
+                raise RuntimeError(f"required traveler is missing: {source} ({rerun})")
+            for manifest in manifests:
+                if not manifest.is_file():
+                    raise RuntimeError(
+                        f"traveler {source.name} has no feature manifest at {manifest}"
+                    )
+                if source.stat().st_mtime < manifest.stat().st_mtime:
+                    raise RuntimeError(
+                        f"traveler is stale: {source} is older than its manifest "
+                        f"{manifest} ({rerun})"
+                    )
+            destination_dir.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(source, destination_dir / source.name)
+            staged.append(f"travelers/{source.name}")
     return staged
 
 
 def stage_nc_programs(stage: Path) -> list[str]:
     """Copy each enrolled part's ``cam:<stem>`` outputs to ``nc/<stem>/``: every
-    program's ``.nc``, ``cycle_times.json`` and the CAM ``manifest.json``.
+    program's ``.nc``, ``cycle_times.json`` and the CAM ``manifest.json``. A
+    family's programs (one recipe for several parts) ship once, under the
+    family's ``nc/<family stem>/``, with the one manifest that binds every
+    part's feature bundle.
 
     A full ``doit release`` runs those tasks first, but ``doit -s release`` does
     not, so a missing or empty output fails the cut, and so does a stale set:
@@ -1358,13 +1393,13 @@ def release_notes(version: str, facts: dict[str, Any]) -> str:
         f"({facts['pngs']} images)\n"
         + (
             f"- `travelers/` -- hobby process travelers as `<slug>-traveler.pdf` "
-            f"({len(facts['travelers'])} parts), rendered by prechips\n"
+            f"({_traveler_part_count(facts['travelers'])} parts), rendered by prechips\n"
             if facts.get("travelers")
             else ""
         )
         + (
             "- `nc/` -- CNC mill G-code for "
-            f"{len({path.split('/')[1] for path in facts['nc']})} parts as "
+            f"{_nc_part_count(facts['nc'])} parts as "
             "`nc/<stem>/<program>.nc`, with `cycle_times.json` and the CAM "
             "`manifest.json`, posted by headless FreeCAD CAM\n"
             if facts.get("nc")

@@ -7,7 +7,8 @@ This directory holds the inputs to the `prechips:<stem>` travelers and the
 cad/process/
   shop/common.toml          prechips shop directory: records several families share
   shop/<prefix>.toml        records only one subsystem family's plans name
-  <stem>/plan.toml          one prechips plan per part (enrolled or placeholder)
+  <stem>/plan.toml          one prechips plan per part (enrolled or placeholder),
+                            or one family plan for several parts (see Family plans)
   placeholder-profile.toml  no-check prechips profile for the placeholder plans
   <stem>/diagrams/*.svg     optional setup diagrams the plan names
   <stem>/cam.py             CAM recipe of a part milled on the CNC mill
@@ -109,7 +110,65 @@ over the placeholder (the `[cad]` binding, stock and setups, and a `revision`
 bound from `{{cad.revision}}`), and, for a milled part, adding its `cam.py`.
 The files are the enrolment: `_process_plans.TRAVELER_STEMS` is every plan
 whose `revision` is not `"placeholder"` and `_cam_programs.CAM_STEMS` every
-part with a `cam.py` (each needs an enrolled plan); no list is edited.
+part with a `cam.py` (each needs an enrolled plan); no list is edited. A
+family plan enrols its family stem for every part it binds (below).
+
+## Family plans: one traveler for near-twin parts
+
+Owner rulings 2026-11-24, after the column clamp trial (2026-11-22: "theres
+too much repetition bw front and back clamps"): "Adopt it: delete the two
+single plans; one plan serves both parts."; "One shared CC01-04 set."; a
+release ships "a placeholder pdf per part that points to shared one";
+"Renumber, so T3 means one drill everywhere on the sheet."; "Rename the marks
+(fronts F1-F3 stay; backs become K1-K3)."
+
+A family plan is one `<family>/plan.toml` for parts that are cut from one
+blank on one route and share setups. `sh_column_clamp/` is the first: it
+serves MHA-SH-01 (`sh_column_clamp_front`) and MHA-SH-02
+(`sh_column_clamp_back`), and neither part has a directory of its own here.
+The contract:
+
+- **Plan.** prechips `[[parts]]` binds each part's feature manifest under an
+  id (`front`, `back`). A setup or operation with `part = "<id>"` binds that
+  part's drawing values; the rest bind only values every part gives alike
+  (prechips refuses the others), so a shared setup cannot print a number true
+  of one part only. Each tool the mill runs has a `number`, its T number in
+  every program; each setup lists its `programs`; a setup that prints one
+  part's values but holds several lists them in `serves`.
+- **Enrolment.** The family's stem is the enrolled stem
+  (`TRAVELER_STEMS`, `CAM_STEMS`, `prechips:sh_column_clamp`,
+  `cam:sh_column_clamp`). `_process_plans.family_parts(stem)` gives its parts,
+  `part_stems(stem)` the parts any plan serves, and `part_view(plan, id)` one
+  part's reading of the plan (shared parameters under its own; the setups and
+  operations that name it or none, and the setups that list it in `serves`). A part served by two enrolled plans fails task loading.
+- **Travelers.** `prechips:<family>` writes the shared sheets
+  (`traveler.html`, `traveler-hobby.html`, `<family slug>-traveler.pdf`) and,
+  for each part, a one-page placeholder `<part slug>-traveler.pdf` beside
+  them (prechips `--placeholder <id>`): the part's number and name, the shared
+  traveler's title and file name, the revision, and the shared setups and
+  programs that part goes through. It carries no instructions, so it cannot
+  drift from the shared sheet. A release ships the shared PDF once and each
+  placeholder under its part's name, so every enrolled part still has
+  `travelers/<part slug>-traveler.pdf`.
+- **NC: one recipe, one program set, one manifest.** `<family>/cam.py` posts
+  every program of the family once into `cad/out/nc/<family>/` (a release:
+  `nc/<family>/`): the programs every blank runs (`CC01`-`CC04`), then each
+  part's own (`CF*`, `CB*`). Its `context` is given each part's features, plan
+  view and STEP by id, derives the shared programs from every part and
+  refuses to post unless they agree move for move and check for check. The
+  one `manifest.json` records every part's bundle (`features/<part stem>`,
+  `step/<part stem>`), so a change to either drawing re-posts the set and a
+  stale set fails the cut. No part has an `nc/` directory or manifest of its
+  own; its placeholder names the family's programs.
+- **Stock list.** `stock_bom.py` still reads one line per registry part: a
+  family's part lists the plan's stock and the tools and gauges of the setups
+  and operations it goes through.
+- **Review.** The shared sheet is reviewed once, with every part's drawing as
+  a companion; a placeholder is checked against it by reading.
+
+Write a family plan only for parts that pass through shared setups. Near-twin
+text between parts that never share a setup (the enamel recipe, the touch-off
+wording) is not a family.
 
 ## Shop records
 
