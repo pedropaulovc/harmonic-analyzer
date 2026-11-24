@@ -250,7 +250,17 @@ NOTE_TEXTS = (
         "TURN TO MEASURED "
         f"BORE (CLEARANCE {_fit_range_text(*JOURNAL_CLEARANCE_MM)}).",
     ),
-    (D_SECTION_FIT_NOTE, f"SLIDING FIT ON {_COLLAR}: SLIDES IN BY HAND."),
+    # Made to fit (fit audit 2026-11-23, pending owner confirmation): the
+    # collar's bore is drilled and its pin pressed first; the core's Ø and
+    # the flat's distance print as REF and link this note, whose two fits by
+    # feel are the requirement, each with what it protects (rule 4).
+    (
+        D_SECTION_FIT_NOTE,
+        f"MADE TO FIT {_COLLAR}: TURN THE CORE TO SLIDE IN ITS BORE BY HAND, "
+        f"NO SHAKE (CENTRES CHAIN WHEEL {_config.parts('pd-transgear-removable')['number']}); "
+        "THEN MILL THE D-FLAT LAST UNTIL THE COLLAR, ITS PIN PRESSED, SLIDES ON "
+        "BY HAND (KEEPS PIN CREST CLEAR, LEAST PLAY).",
+    ),
     (STATIONS_NOTE, f"D-FLAT SEAT UNDER {_COLLAR}."),
     (NECK_NOTE, f"NECK AND D-FLAT END UNDER {_COLLAR}."),
     (THREAD_NOTE, f"FULL THREAD FOR {_mate_name(_config.parts('pd-transgear-thumbnut'))}."),
@@ -488,9 +498,15 @@ if OVERALL_TEXT_RIGHT > PINION_REAR_X - 0.005:
 if OVERALL_TEXT_LEFT < REAR_X + 0.005:
     raise AssertionError("the overall's text runs over the rear witness line")
 # Reference sizes (parenthesized): the journal (the rest of the controlled
-# overall), and the thread blank the #8-32 UNC-2A class governs.  Name ->
-# diameter glyph.
-REFERENCE_DIMENSIONS = {"JournalLength": False, "ThreadBlankDia": True}
+# overall), the thread blank the #8-32 UNC-2A class governs, and the D-core's
+# Ø and its flat's distance from the axis, both made to fit MHA-PD-22
+# (note 2).  Name -> diameter glyph.
+REFERENCE_DIMENSIONS = {
+    "JournalLength": False,
+    "ThreadBlankDia": True,
+    "CoreDia": True,
+    "FlatToAxis": False,
+}
 
 # The thread callout lands on the edge where the thread blank meets the tip
 # chamfer and stands up and left, clear of the tooth-tip Ø over the pinion.

@@ -253,6 +253,19 @@ NOT_FIT_BANDS: dict[tuple[str, str], str] = {
 # to print or derive limits. An inverted one prints wrong limits, so they get
 # the same check as a helper-fed band.
 INDEXED_FIT_BANDS: dict[tuple[str, str], str] = {
+    # Fit audit 2026-11-23: MHA-PD-08's core and D-flat are made to fit
+    # MHA-PD-22 by feel and print as REF with no band; these are the ANALYSIS
+    # bands the collar's stacks index (the drilled bore's DRILLED HOLES row
+    # less the fitted air), tied to each other by the collar spec's asserts.
+    ("pd_transgear_drive_collar_spec", "BORE_DIA_BAND"): (
+        "DRILLED HOLES row of the #11 bore, indexed for the walls and the core's analysis band"
+    ),
+    ("pd_transgear_knob_shaft_spec", "CORE_DIA_BAND"): (
+        "analysis band of the core turned to fit the drilled bore, indexed for the stacks"
+    ),
+    ("pd_transgear_knob_shaft_spec", "CORE_FLAT_BAND"): (
+        "analysis band of the D-flat milled to fit the pressed pin's crest, indexed for the stacks"
+    ),
     # #2144 item 11.4: McMaster 91829A566 catalogue bands, indexed
     # into MIN/MAX limits that sm_gooseneck_spring_joint charges; the sheets
     # print them as untoleranced REF.
