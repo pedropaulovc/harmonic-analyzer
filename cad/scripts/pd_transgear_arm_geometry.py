@@ -353,10 +353,11 @@ PIN_HOLE_Z = THICKNESS / 2.0  # mid-thickness, on y = 0
 # The latch pin's axis in the machine frame; the hook's hole is drilled on it.
 PIN_MACHINE_Z = FRONT_FACE_MACHINE_Z + PIN_HOLE_Z  # -119.6505
 
-# The end-face latch hole's height is an ordinary .XXX row: the title block
-# governs it, with no tightened band (coordinator ruling (a), #2019).  It
-# prints .188 for the 3/16 model.
-LATCH_PIN_HEIGHT_PLACES = 3
+# The end-face latch hole's height is an ordinary title-block row with no
+# tightened band (coordinator ruling (a), #2019).  It prints .19 for the
+# 3/16 model: fit batch review r4 found the third place of .188 had no
+# function on the sheet (rule 3), and the walls below hold at the .XX row.
+LATCH_PIN_HEIGHT_PLACES = 2
 LATCH_PIN_HEIGHT_BAND = printed_reach_mm(PIN_HOLE_Z, LATCH_PIN_HEIGHT_PLACES)
 REDUCER_POSITION_DIAMETER = reducer_position_diameter_mm()
 REDUCER_POSITION_RADIUS = REDUCER_POSITION_DIAMETER / 2.0

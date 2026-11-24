@@ -1326,7 +1326,7 @@ def test_arm_feature_bands_are_the_printed_ones() -> None:
     latch = features["latch_pin_hole"]
     assert latch["dia"] == pytest.approx([_in(0.1240), _in(0.1245)])
     assert latch["depth"][0] == pytest.approx(_in(0.38)) and latch["depth_printed"] == "MIN"
-    assert latch["height"] == pytest.approx([_in(0.183), _in(0.193)])
+    assert latch["height"] == pytest.approx([_in(0.18), _in(0.20)])
     dowels = features["dowel_holes"]
     assert dowels["dia"] == pytest.approx([_in(0.1240), _in(0.1245)])
     assert dowels["made_at"] == "assembly" and dowels["count"] == 2
