@@ -47,8 +47,9 @@ drawings"), plus the shop's process equipment:
   pin pair or a reamer bought for one band on its own account: a band that
   seems to need one is a drawing defect (drawing rule 4), raised against the
   drawing, not answered with a purchase. Where the part drawing still prints
-  such a band, the traveler checks it as printed, with pin gauges or a named
-  GO / NO-GO pair (rule T11), and the review summary reports the band as a
+  such a band, the traveler checks it as printed, with pin gauges where
+  their step resolves the band and otherwise a named GO / NO-GO pair (rule
+  T11), and the review summary reports the band as a
   drawing defect. A CMM, optical
   comparator, air gauge, bore micrometer, small-hole gauge or production
   metrology lab is not in the shop.
@@ -342,8 +343,9 @@ defect** (`over_specification`, rule T15) just as a broken check is:
   micrometer repeats to about `.0005 in`, so it does not accept a bore band of
   `.0005 in` or similar. Where the drawing prints no band on the bore, it is
   accepted with its mate (T0). Where the drawing still prints such a band,
-  the traveler checks it with pin gauges or a named GO / NO-GO plug gauge
-  pair, and the review summary reports the band as a drawing defect.
+  the traveler checks it with pin gauges where their `.001 in` step resolves
+  the band, and otherwise with a named GO / NO-GO plug gauge pair, and the
+  review summary reports the band as a drawing defect.
   Calipers on a `.001 in` band are the same defect.
 
 ### Rule T12 — Operations read cleanly at the machine

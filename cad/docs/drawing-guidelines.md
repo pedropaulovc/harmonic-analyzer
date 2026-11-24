@@ -229,8 +229,10 @@ made to their mate.
   the first form in this order that does the job. A later form where an
   earlier one serves is over-specification.
   1. **Drilled.** A named drill at DRILLED HOLES. It serves every
-     pass-through, every bonded seat (the bond's gap takes the band, rule
-     23), every joint match-drilled, pinned or adjusted at assembly, and
+     pass-through, every bonded seat whose drilled clearance stays inside
+     its grade's gap (it prints that clearance, rule 23; one that would not
+     is made to fit in form 2), every joint match-drilled, pinned or
+     adjusted at assembly, and
      every pivot or slide held against one side that only rocks or shifts.
      It does not serve a bore that a journal turns in through whole turns
      where the bore's roundness reaches the trace: that bore is reamed for
@@ -777,10 +779,12 @@ sub-assembly, never on part fabrication.
   its native dimension, with a setting diagram or setting table (reference,
   target, range and check in columns) where a view alone cannot carry it.
   A retention or fit acceptance that is a measurable value (a check with a
-  number) is such a setting and prints here. A setting finer than `.XXX`,
-  or banded tighter than its title-block row, passes rule 4's necessity
-  test and names the indicator or feeler that reads it; it never needs a
-  gauge bought for that one setting. A fit made
+  number) is such a setting and prints here. A gap, endshake, travel, press
+  depth or alignment set finer than `.XXX`, or banded tighter than its
+  title-block row, passes rule 4's necessity test and names the indicator
+  or feeler that reads it; it never needs a gauge bought for that one
+  setting. A fit acceptance given as a clearance or interference range or
+  by feel is not such a setting (rule 4). A fit made
   at assembly
   (match-drill, ream in place, shim, adjust) names the mating parts as rule 4
   requires; an item reference is enough when the BOM supplies the item's name
