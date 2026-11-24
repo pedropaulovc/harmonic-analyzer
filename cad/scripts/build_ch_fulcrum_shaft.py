@@ -57,9 +57,7 @@ from _drawing_marks import (
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
 )
-from _drawing_tolerances import set_dimension_bilateral_tolerance
 from _drawing_prefix import set_dimension_prefix
-from _fit_deviations import deviations
 from _part_pmi import author_part_pmi
 from ch_fulcrum_shaft_notes import DRAWING_NOTES, ISO_VIEW_NOTE
 from ch_fulcrum_shaft_spec import (
@@ -75,11 +73,9 @@ from ch_fulcrum_shaft_spec import (
     FLAT_LENGTH,
     FLAT_PITCH,
     SHAFT_DIA,
-    SHAFT_DIA_BAND,
     SHAFT_LENGTH,
     SHAFT_R,
     SURFACE_FINISHES,
-    UNIT,
 )
 
 PART_NAME = "ch-fulcrum-shaft"
@@ -440,14 +436,8 @@ def build(adapter) -> dict[str, str]:
 
     apply_material(adapter, MATERIAL)
     report_mass_properties(adapter)
-    # The band is millimetres; UNIT prints it in inches.
-    set_dimension_bilateral_tolerance(
-        adapter,
-        "ShaftProfile",
-        "ShaftDia",
-        *deviations(SHAFT_DIA_BAND),
-        display_unit=UNIT,
-    )
+    # ShaftDia carries no band: the bought ground rod prints as its stock
+    # (draw_ch_fulcrum_shaft, drawing-guidelines.md rule 4).
     # Decimal places belong to the model dimension, not to the sheet.
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     for (feature_name, dimension_name), prefix in DIMENSION_PREFIXES.items():
@@ -455,7 +445,6 @@ def build(adapter) -> dict[str, str]:
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
-    # The bearing O.D.'s roughness lives on the MODEL as a plain annotation.
     author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)
     apply_drawing_properties(
         adapter,

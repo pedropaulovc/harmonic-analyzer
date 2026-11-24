@@ -209,7 +209,11 @@ def test_printed_bands_are_the_sheets() -> None:
     manifest = export_features.requirement_manifest
 
     shaft = manifest("ch_fulcrum_shaft")["features"]
-    assert _inch(shaft["outer"]["dia"]) == [0.2492, 0.25]
+    # The bought 1/4 ground rod prints as its stock (drawing-guidelines.md
+    # rule 4): a REF fraction, no band.
+    assert shaft["outer"]["requirements"] == ["stock"]
+    assert shaft["outer"]["dia_ref"] == pytest.approx(0.25 * IN)
+    assert "dia" not in shaft["outer"]
     assert _inch(shaft["far_end"]["length"]) == [7.0, 7.02]
     assert _inch(shaft["flat_datum"]["station"]) == [0.23, 0.25]
     assert _inch(shaft["flat_far"]["station"]) == [6.59, 6.61]
@@ -218,7 +222,8 @@ def test_printed_bands_are_the_sheets() -> None:
     assert shaft["far_end"]["radius_ref"] == pytest.approx(0.125 * IN)
 
     rocker = manifest("ch_pivot_shaft")["features"]
-    assert _inch(rocker["outer"]["dia"]) == [0.2492, 0.25]
+    assert rocker["outer"]["requirements"] == ["stock"]
+    assert rocker["outer"]["dia_ref"] == pytest.approx(0.25 * IN)
     assert _inch(rocker["far_end"]["length"]) == [6.84, 6.86]
     assert _inch(rocker["datum_end"]["height"]) == [0.05, 0.07]
     for side in ("north", "south"):

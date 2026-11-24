@@ -44,14 +44,20 @@ from _fit_shaft_h import SHAFT_H
 from _gtol_cylinder import CylinderFace
 from _package_units import drawing_unit
 from _printed_tolerance import printed_band_mm
-from _surface_finish import MACHINED_UM, SurfaceFinishControl
+from _surface_finish import SurfaceFinishControl
 from ch_pivot_bracket_spec import EAR_T, SET_SCREW_POINT_DIA
 
 UNIT = drawing_unit("parts/ch-pivot-shaft", _config.parts("ch-pivot-shaft"))
 MM_PER_IN = 25.4
 
 SHAFT_DIA = 0.25 * MM_PER_IN
+# The bought 1/4 ground rod's catalogue band (stock 1018-ground-round-1-4:
+# its stated tolerance lies inside +.0000/-.0008). The sheet prints the
+# stock, 1/4 REF GROUND ROD, AS SUPPLIED, not limits (drawing-guidelines.md
+# rule 4: a diameter bought to size and never cut); this band stays the
+# analysis band the clearances are taken at.
 SHAFT_DIA_BAND = SHAFT_H
+SHAFT_DIA_FRACTION_DENOMINATOR = 4
 DOME_HEIGHT = 1.524  # .06: both ends, like the cylinder arbor's (user, #743 Q4)
 DOME_SPHERE_RADIUS = ((SHAFT_DIA / 2.0) ** 2 + DOME_HEIGHT**2) / (2.0 * DOME_HEIGHT)
 if not 0.0 < DOME_HEIGHT <= SHAFT_DIA / 2.0:
@@ -106,17 +112,12 @@ FLAT_LENGTH_RANGE = (FLAT_LENGTH - LINEAR_2PL, FLAT_LENGTH + LINEAR_2PL)
 # Probe station (part z, mm) that names the O.250 face: the body clear of the
 # north flat.
 BODY_PROBE_Z_MM = -(EAR_T + 10.0)
+BEARING_FACE = CylinderFace(SHAFT_DIA, contains_z_mm=BODY_PROBE_Z_MM)
 
-# drawing-guidelines.md rule 5 (avoid excessive GD&T): a shaft carries no frames and no datums. drawing-guidelines.md rule 6 (roughness symbols only where a surface runs, slides or locates): roughness only on
-# the running face -- the round the 20 hubs rock on and the two ears journal.
-SURFACE_FINISHES = (
-    SurfaceFinishControl(
-        "pivot_bearing",
-        MACHINED_UM,
-        CylinderFace(SHAFT_DIA, contains_z_mm=BODY_PROBE_Z_MM),
-        display_unit=UNIT,
-    ),
-)
+# drawing-guidelines.md rule 5 (avoid excessive GD&T): a shaft carries no
+# frames and no datums. No roughness symbol: the O.D. is the ground rod as
+# supplied, never cut (rule 4 prints the stock; rule 6).
+SURFACE_FINISHES: tuple[SurfaceFinishControl, ...] = ()
 
 # The diameter lives on the revolved half-profile, the dome height and its
 # sphere radius on the north crown's own profile (the south crown is driven by
@@ -132,12 +133,14 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "FlatProfile": {"OverallLength", "FlatLength", "FlatAF", "FlatStation"},
 }
 
-# Decimal places are the tolerance (drawing-guidelines.md rule 3 (decimal places carry the tolerance)). The O.D. carries the
-# running band at four places (.2500 +.0000/-.0008). The dome height and its
+# Decimal places are the tolerance (drawing-guidelines.md rule 3 (decimal places carry the tolerance)). The O.D. is the
+# bought rod's fraction reference (1/4, AS SUPPLIED; the supplier's band
+# governs, rule 4), at three places as the fleet's other as-bought
+# fractions are (dt_crank_pinion_pin_spec). The dome height and its
 # reference radius print at .XX; the overall length, the stations and the
 # flat's length and across-flat hold each cup on its flat at .XX.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
-    "ShaftProfile": {"ShaftDia": 4},
+    "ShaftProfile": {"ShaftDia": 3},
     "NorthCapProfile": {"DomeHeight": 2, "Radius": 2},
     "FlatProfile": {
         "OverallLength": 2,
