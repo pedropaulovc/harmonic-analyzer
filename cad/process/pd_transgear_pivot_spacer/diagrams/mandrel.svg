@@ -25,7 +25,7 @@
   <line class="leader" x1="339" y1="130" x2="420" y2="70"/>
   <text class="datum-label" x="424" y="66">Z0: the rear (bearing) face, faced to length</text>
   <line class="leader" x1="260" y1="118" x2="300" y2="50"/>
-  <text class="label" x="304" y="46">shoulder, faced in Op 90: DRO Z-{{cad.length_in:.3dot}}</text>
+  <text class="label" x="304" y="46">shoulder, faced in Op 100: DRO Z-{{cad.length_in:.3dot}}</text>
   <line class="leader" x1="240" y1="128" x2="160" y2="50"/>
   <text class="label" x="20" y="46">body Ø{{process.mandrel_body_dia_in:.2dot}}, {{process.mandrel_body_length_in:.2dot}} long</text>
   <line class="leader" x1="305" y1="215" x2="430" y2="232"/>
@@ -38,6 +38,6 @@
   <text class="label" x="434" y="320">its rim overhangs the body all round</text>
   <text class="label" x="390" y="346">AR</text>
   <text class="label" x="20" y="352">3-jaw, not opened since Setup 1</text>
-  <text class="label" x="20" y="384">Op 120: the spacer pushed on once, its front face (faced in Setup 1) to the shoulder.</text>
-  <text class="label" x="20" y="402">Op 130: pushed off by the blade's face on the overhanging rim, a strip of paper between.</text>
+  <text class="label" x="20" y="384">Op 140: the spacer pushed on once, its front face (faced in Setup 1) to the shoulder.</text>
+  <text class="label" x="20" y="402">Op 160: pushed off by the blade's face on the overhanging rim, a strip of paper between.</text>
 </svg>

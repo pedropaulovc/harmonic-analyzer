@@ -3,15 +3,17 @@ r"""Transgear pivot spacer (MHA-PD-20) dimensional contract.
 PURE DATA, no SolidWorks/COM imports.  A turned brass ring on the MHA-PD-VN-57
 shoulder screw between the MHA-PD-07 support bar's back face and the MHA-PD-18
 arm's front face (contract §3.4).  Its length sets the MHA-PD-VN-63 spring's
-room with the arm's spot-face floor and the screw's shoulder, so it prints
-±.002; it is fitted as made, never faced (R9-6).  It is a bonded slip fit
+room with the arm's spot-face floor and the screw's shoulder, and the
+spread of its limits is all that bounds its two faces' taper, which tilts
+the hanger, so it prints ±.001; it is fitted as made, never faced (R9-6).
+It is a bonded slip fit
 (LOCTITE 638) on the shoulder, a #12 drilled hole, cured with its front face
 and the shoulder's end down together on a flat plate, so screw and spacer
 seat on the bar as one body and the ring cannot index its wedge; the
 screw's one MHA-PD-VN-63 curved disc spring preloads the arm onto the rear
 face.  The hanger's out-of-plane tilt is then the rear face's parallelism
-to the front face (datum B) over the face the arm seats on: the sheet
-carries that one frame.  The sheet is in inches (#290).
+to the front face over the face the arm seats on; the sheet carries no
+frame for it (rule 5).  The sheet is in inches (#290).
 
 Local frame: lathe axis +Z, origin on the axis at the face that bears on the
 bar (the FRONT face, machine z -129.4); the rear face (on the arm) at
@@ -35,7 +37,7 @@ from _printed_tolerance import (
     printed_band_mm,
     printed_deviations,
 )
-from _surface_finish import MACHINED_UM, SEAT_UM, SurfaceFinishControl
+from _surface_finish import MACHINED_UM, SurfaceFinishControl
 
 UNIT = drawing_unit(
     "parts/pd-transgear-pivot-spacer", _config.parts("pd-transgear-pivot-spacer")
@@ -67,12 +69,18 @@ BORE_DIA_MIN = round(BORE_DIA + BORE_DIA_BAND[1], 6)
 BORE_CALLOUT = f"{BORE_DRILL} DRILL THRU"
 # 5.0: the bar grew 0.5 rearward under the arm (user ruling 2026-10-15), so
 # the ring gives it up and the hanger stays put.  It keeps 5.0 (#290: it
-# sets the arm's Z, the chain plane's datum) and prints .197 ±.002 on the
+# sets the arm's Z, the chain plane's datum) and prints .197 on the
 # .001 grid (machinist review: a fourth place was a soft-converted 5 mm); the
 # spring room (transgear_hanger_joints) is judged at that print's reach.
+# ±.001 (it was ±.002 under a parallelism frame): with no frame (below) the
+# band's whole spread is the faces' taper, and at ±.002 that taper closes
+# the MHA-PD-06 disc's statistical air to the platen under its floor
+# (build_pd_paper_drive_assembly PLATEN_AIR; test_pd_transgear_pivot_spacer_drawing
+# computes both).  ±.001 is the shop's row for a turned length.
+# Fit audit 2026-11-23, pending owner confirmation.
 LENGTH = 5.0
 LENGTH_PLACES = 3
-LENGTH_TOLERANCE = 0.0508  # ±.002
+LENGTH_TOLERANCE = 0.0254  # ±.001
 LENGTH_BAND = max(
     abs(deviation)
     for deviation in printed_deviations(
@@ -100,20 +108,21 @@ SEAT_OFFSET_MAX = BOND_GAP[1] / 2.0
 
 # --- geometric control --------------------------------------------------------
 # The ring is bonded on the shoulder with its front face and the shoulder's
-# end down together on a flat plate (MHA-PD-00), so the front face (datum B)
-# lies in the plane that seats on the bar and the bore plays no part in the
-# arm's attitude: the arm, seated on the rear face, tilts to the bar by the
-# rear face's parallelism to B over the smallest flat it seats on
-# (FACE_PARALLELISM_ZONE_DIA).  One frame at the shop row, .001, where two
-# perpendicularity frames to a reamed bore stood (fit audit 2026-11-23,
-# pending owner confirmation; it replaces #2144 item 4.4's mandrel facing):
-# every hanger-tilt stack passes at it.  The O.D.'s circular runout to the
+# end down together on a flat plate (MHA-PD-00), so the front face lies in
+# the plane that seats on the bar and the bore plays no part in the arm's
+# attitude: the arm, seated on the rear face, tilts to the bar by the rear
+# face's parallelism to the front over the smallest flat it seats on
+# (FACE_PARALLELISM_ZONE_DIA).  No frame prints it (machinist review
+# 20261124T013305458Z, rule 5: a face-to-face frame on a spacer is
+# over-specification; it replaced #2144 item 4.4's mandrel facing): the
+# length's printed limits hold at every place round the rim, so the faces
+# cannot be out of parallel by more than the band's whole spread
+# (REAR_FACE_PARALLELISM below), and every hanger-tilt stack is judged at
+# that.  The O.D.'s circular runout to the
 # bore (datum A) bounds the bore's offset in the bar the shop may chuck as
 # supplied (coordinator ruling, #2014): it is what the wall below charges.
 BORE_DATUM = "A"
-SEAT_DATUM = "B"
 GEOMETRIC_TOLERANCES_IN: dict[str, str] = {
-    "rear face parallelism to front face": ".001",
     "o.d. circular runout to bore": ".016",
 }
 GEOMETRIC_TOLERANCES_MM: dict[str, float] = {
@@ -137,7 +146,9 @@ if WALL_WORST < WALL_TARGET:
     raise AssertionError(
         f"MHA-PD-20 wall {WALL_WORST:.3f} < the {WALL_TARGET} target at the worst case"
     )
-REAR_FACE_PARALLELISM = GEOMETRIC_TOLERANCES_MM["rear face parallelism to front face"]
+# The faces' greatest out-of-parallel: the printed length's high limit at
+# one place of the rim and its low limit opposite.
+REAR_FACE_PARALLELISM = 2.0 * LENGTH_TOLERANCE
 # The arm seats on the face's flat: the smallest O.D. less the title block's
 # break on its rim (the same break the wall charges above).
 FACE_PARALLELISM_ZONE_DIA = OD - OD_BAND - 2.0 * EDGE_BREAK
@@ -180,13 +191,11 @@ ISOMETRIC_VIEW_NOTE = (
 # drawing-guidelines.md rule 6 (roughness symbols only where a surface runs,
 # slides or locates): the arm swings on the shoulder against the rear face, so
 # the rear face runs (MACHINED, labelled as the arm's bearing face on the
-# sheet); the front face is the one static seat that locates the ring on the
-# bar (SEAT).  Resolved on the exact native faces by outward normal and offset
+# sheet).  The front face seats on the bar under the screw's clamp and
+# carries no symbol (machinist review 20261124T013305458Z): a turned face
+# serves.  Resolved on the exact native face by outward normal and offset
 # in the part frame.  The bonded bore carries no symbol.
 SURFACE_FINISHES = (
-    SurfaceFinishControl(
-        "front_face", SEAT_UM, PlanarFace((0.0, 0.0, -1.0), 0.0), display_unit=UNIT
-    ),
     SurfaceFinishControl(
         "rear_face",
         MACHINED_UM,
