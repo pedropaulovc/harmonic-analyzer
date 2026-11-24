@@ -40,8 +40,11 @@
 # 2026-11-24), horizontal on the vertical spindle. The saw centres on the
 # arbor's spring-loaded 1 in pilot step, seats against the arbor body's
 # shoulder on its upper (spindle) side and is clamped from below by the cap
-# and its M8 countersunk screw (5 mm key, 20 N·m: the record's
-# clamp_torque_nm). The arbor is not keyed: the cap's friction drives the
+# and its countersunk screw. The record's thread (M8 x 1.25), key (5 mm) and
+# clamp torque (20 N·m) are inferred, not read off the arbor
+# (screw_thread_inferred, screw_key_mm_inferred, clamp_torque_nm_inferred),
+# and the thread's engagement is to measure: Setup 10 counts it, before the
+# screw is torqued. The arbor is not keyed: the cap's friction drives the
 # saw. So the passes run conventional (a climb cut would let the teeth grab
 # and slip it), a marker line is drawn across cap, saw and shoulder before
 # the first pass, and that pass is a light one (half a step) with a stop
@@ -270,16 +273,27 @@ saw_arbor_cap_dia_mm = 31.75
 saw_arbor_cap_thickness_mm = 12.7
 saw_arbor_screw_head_dia_mm = 15.8242
 saw_arbor_nose_to_cap_mm = 35.56
-# The drive (record keyed = false): the cap's screw, M8 x 1.25, 5 mm key, at
-# saw_clamp_torque_nm (the record's clamp_torque_nm) clamps the saw between
-# the shoulder and the cap with about 11 kN (the record's cited table: 13.2
-# kN at 23 N·m, friction .14). One face's friction on the ring between the
-# 1 in pilot and the 1.25 cap (mean radius 14.35 mm) carries .14 × 11 kN ×
-# 14.35 mm = 22.1 N·m (saw_drive_torque_max_nm); the other face and the
-# screw are the reserve. The heaviest pass here, .170 into TOP at the kerf's
-# .068 ceiling, takes 8.1 N·m by the handbook's milling power, and the light
-# first pass 4.1 N·m (cam.py checks the heaviest against the drive).
+# The drive (record keyed = false): the cap's screw at saw_clamp_torque_nm
+# (the record's clamp_torque_nm_inferred, for the M8 x 1.25 thread it infers)
+# clamps the saw between the shoulder and the cap with about 11 kN (the
+# record's cited table: 13.2 kN at 23 N·m, friction .14). One face's friction
+# on the ring between the 1 in pilot and the 1.25 cap (mean radius 14.35 mm)
+# carries .14 × 11 kN × 14.35 mm = 22.1 N·m (saw_drive_torque_max_nm); the
+# other face and the screw are the reserve. The heaviest pass here, .170 into
+# TOP at the kerf's .068 ceiling, takes 8.1 N·m by the handbook's milling
+# power, and the light first pass 4.1 N·m (cam.py checks the heaviest against
+# the drive). All of it rests on that inferred torque, and the torque on the
+# screw's engagement, which is not on record (screw_engagement_in =
+# "to_measure": a .635 screw through the .50 cap may hold by as little as
+# .135 in, .43 D, and strip near the 11 kN). So Setup 10 counts the
+# engagement before the screw is torqued: turns from the thread's first bite
+# to seated × saw_screw_pitch_mm, at least saw_screw_engagement_min_mm (1 D
+# of the inferred M8), which is saw_screw_turns_min turns (cam.py). Under
+# it, or the 5 mm key not fitting: no torque, and the owner is told.
 saw_clamp_torque_nm = 20.0
+saw_screw_pitch_mm = 1.25
+saw_screw_engagement_min_mm = 8.0
+saw_screw_turns_min = 6.4
 saw_clamp_preload_kn = 11.0
 saw_drive_friction = 0.14
 saw_drive_torque_max_nm = 22.1
@@ -431,7 +445,7 @@ name = "2-3/4 in × .064 HSS slitting saw, 72 teeth, 1 in hole"
 ref = "slitting-saw-2-75-064"
 [[tools]]
 id = "arbor"
-name = "R8 stepped saw arbor: 1 in pilot step, Ø1.25 × .50 cap, M8 screw (5 mm key)"
+name = "R8 stepped saw arbor: 1 in pilot step, Ø1.25 × .50 cap and its flat-head screw, not keyed"
 ref = "saw-arbor-r8-stepped"
 [[tools]]
 id = "tap-4-40"
@@ -1132,8 +1146,20 @@ gauge_checks = [{ gauge = "micrometers", band_mm = ["{{process.blade_min_mm}}", 
 feed = "hand"
 
 [[setups.operations]]
-instruction = "At the bench, the arbor's shank upright in the soft-jawed vise, pilot step up: wipe the shoulder, both faces of the saw and the cap clean and dry. The saw onto the 1 in pilot step, flat on the shoulder, its teeth leaning clockwise seen from the shank end (they cut with M3). The cap on it; its screw to {{process.saw_clamp_torque_nm:g}} N·m with the 5 mm key."
-inspection = "The saw flat on the shoulder and the cap flat on the saw, no gap. A straightedge across the cap's face: the screw's head under it or flush; proud, at most {{process.saw_screw_stand_max_mm:in.2dot}} by the calipers' depth rod. Outside: stop and tell the owner."
+instruction = "At the bench, the arbor's shank upright in the soft-jawed vise, pilot step up: wipe the shoulder, both faces of the saw and the cap clean and dry. The saw onto the 1 in pilot step, flat on the shoulder, its teeth leaning clockwise seen from the shank end (they cut with M3). The cap on it."
+inspection = "The saw flat on the shoulder and the cap flat on the saw, no gap."
+gauge_checks = "other"
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Before any torque: run the cap's screw in by hand with the 5 mm hex key, counting the turns from the thread's first bite until its head seats. Snug, no more."
+inspection = "The 5 mm key fits the socket, and the count is {{process.saw_screw_turns_min:g}} turns or more ({{process.saw_screw_engagement_min_mm:g}} mm of thread at {{process.saw_screw_pitch_mm:g}} mm a turn: the screw's full diameter engaged). The screw's thread, key and torque are assumed, not read off the arbor: with fewer turns, or another key fitting, the torque below may strip it. Then leave it snug, stop and tell the owner."
+gauge_checks = "other"
+feed = "hand"
+
+[[setups.operations]]
+instruction = "The count accepted: tighten the screw to {{process.saw_clamp_torque_nm:g}} N·m (15 ft·lb), the 5 mm hex key on the torque wrench."
+inspection = "A straightedge across the cap's face: the screw's head under it or flush; proud, at most {{process.saw_screw_stand_max_mm:in.2dot}} by the calipers' depth rod. Outside: stop and tell the owner."
 gauge_checks = [{ gauge = "calipers", band_mm = [0, "{{process.saw_screw_stand_max_mm}}"] }]
 feed = "hand"
 
@@ -1159,14 +1185,18 @@ gauge_checks = [{ gauge = "calipers", band_mm = ["{{process.saw_nose_above_min_m
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Side runout, at every mounting of the arbor in the spindle (the taper never seats it quite the same twice), spindle stopped: the lever indicator's magnetic base on the mill's head, its stylus on the saw's upper face 1/8 in in from the teeth. One full turn by hand, backward (anticlockwise seen from above). Wipe off any old LOW mark; mark LOW on the tooth under the stylus where the face stands lowest."
-inspection = "The needle's swing plus the saw's thickness written down: at most {{process.kerf_max_mm:in.3dot}} ({{process.saw_side_tir_nominal_mm:in.3dot}}, 0.10 mm, of swing for a .064 saw). Over: take the arbor out, wipe its shank and the taper, mount it and read again. Still over: back to the bench mounting, the saw a quarter turn round on the pilot, then both runouts again. Over after two such tries: stop and tell the owner."
+instruction = "Side runout, at every mounting of the arbor in the spindle (the taper never seats it quite the same twice), spindle stopped: the lever indicator's magnetic base on the mill's head, its stylus on the saw's upper face 1/8 in in from the teeth. One full turn by hand, backward (anticlockwise seen from above)."
+inspection = "The needle's swing plus the saw's thickness written down: at most {{process.kerf_max_mm:in.3dot}} ({{process.saw_side_tir_nominal_mm:in.3dot}}, 0.10 mm, of swing for a .064 saw). Over: take the arbor out, wipe its shank and the taper, mount it and read again. Still over: at the bench, loosen the screw, wipe, turn the saw a quarter turn round on the pilot and tighten to {{process.saw_clamp_torque_nm:g}} N·m; then both runouts again. Over after two such tries: stop and tell the owner."
 gauge_checks = [{ gauge = "dti", band_mm = [0, "{{process.saw_side_tir_nominal_mm}}"] }]
 feed = "hand"
 
 [[setups.operations]]
+instruction = "The lever indicator still on the saw's face: wipe off any old LOW mark, then mark LOW on the tooth under the stylus where the face stands lowest. The Z0 touch-off is made under that tooth."
+feed = "hand"
+
+[[setups.operations]]
 instruction = "Tip runout, every time the saw has been clamped on the arbor, spindle stopped: the .001 dial indicator on the same base, its plunger square on the saw's rim. One full turn by hand, backward; take the highest and the lowest tooth. Then the indicator and its base off the mill."
-inspection = "Highest to lowest at most {{process.saw_tip_tir_max_mm:in.3dot}}. Over: back to the bench mounting, the saw a quarter turn round on the pilot, then both runouts again. Over after two such tries: stop and tell the owner."
+inspection = "Highest to lowest at most {{process.saw_tip_tir_max_mm:in.3dot}}. Over: at the bench, loosen the screw, wipe, turn the saw a quarter turn round on the pilot and tighten to {{process.saw_clamp_torque_nm:g}} N·m; then both runouts again. Over after two such tries: stop and tell the owner."
 gauge_checks = "other"
 feed = "hand"
 

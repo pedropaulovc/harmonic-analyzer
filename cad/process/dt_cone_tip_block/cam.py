@@ -946,6 +946,15 @@ def context(
         raise ValueError(
             "process.saw_nose_above_min_mm is over what the arbor's record gives"
         )
+    # The clamp torque is the record's inferred one, and the screw's
+    # engagement is not on record: the traveler counts it before the screw is
+    # torqued, saw_screw_turns_min turns of saw_screw_pitch_mm for
+    # saw_screw_engagement_min_mm of thread. The drive below rests on it.
+    _agree(
+        plan,
+        "saw_screw_turns_min",
+        p["saw_screw_engagement_min_mm"] / p["saw_screw_pitch_mm"],
+    )
     # The friction drive (the arbor is not keyed): one face's friction torque
     # on the clamp ring between the pilot (the saw's hole) and the narrower
     # of the body and the cap, at the plan's preload and friction; the other
