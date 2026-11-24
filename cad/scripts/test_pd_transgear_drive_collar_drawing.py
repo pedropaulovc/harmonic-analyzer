@@ -492,7 +492,7 @@ def test_every_tight_band_names_its_registered_mate_at_its_callout() -> None:
         assert sum(needle in row["feature"] for row in registry) == 1, needle
     # Their acceptance is the pins themselves and the wheels' trial (notes).
     ream_note = spec.DRAWING_NOTES.splitlines()[spec.REAM_NOTE - 1]
-    assert ream_note == "3. PRESS FIT: THE PIN IS THE GAUGE; NONE ENTERS ITS HOLE BY HAND."
+    assert ream_note == "3. PRESS FIT: THE PIN IS THE GAUGE. LOOSE PIN: BOND PER MHA-PD-00."
     assert f"ALL 3 {spec.SPROCKET_NUMBER} WHEELS DROP ON FREELY" in spec.DRAWING_NOTES
     # The rear break's leg and angle share one line; its mate rows name the
     # shaft corner it clears, short enough to hang left of its dimension line.
