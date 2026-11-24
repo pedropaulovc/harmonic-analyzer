@@ -1113,7 +1113,6 @@ def _feeler_stack_rows() -> tuple[tuple[str, str, str], ...]:
         (FITUP.FRONT_COLLAR_LEAF, _step_ref("cam-collars-set", "C")),
         (FITUP.BACK_COLLAR_LEAF_F, _step_ref("cam-collars-set", "D")),
         (bank.BANK_SPRING_SET, _step_ref("cylinder-bank-located", "D")),
-        (TIP_GAP.TIP_GAP_FEELER, f"{_step_ref('rig-located', 'E')}, CHECK 7"),
         # Rubric sample round 16 (#0, 3/3 runs): the crank fit-up feeler.  The
         # cone swing is set by feel (owner direction 2026-11-11, #2365): it
         # takes no leaves.
@@ -2063,9 +2062,9 @@ def rig_steps(*, pivot_blocks: int, cams: int, slotted: int) -> str:
         ),
         # U28 corollary (Main 2026-09-23): the rig's left-right locate is its
         # parked tip gap, on the level line of centres, where block travel
-        # equals gap change; the feeler is the bench rest gap, the pins on
-        # the cams (pinion_rig_tip_gap).  RIG SET, next, sets it along the
-        # bank.
+        # equals gap change, the pins on the cams.  Owner ruling 2026-11-24,
+        # audit part 2 C8 ("Yes, a 3/32 rod."): a 3/32 rod tip to tip
+        # (pinion_rig_tip_gap).  RIG SET, next, sets it along the bank.
         # Rubric sample round 9 (rule 22): the locate is one action a line.
         (
             "rig-located",
@@ -2077,7 +2076,7 @@ def rig_steps(*, pivot_blocks: int, cams: int, slotted: int) -> str:
             "PARK MHA-DT-16: THE MHA-DT-25 PINS ON THE CAMS UNDER THE SPRING.\n"
             "TURN MHA-DT-01 SO A TOOTH TIP FACES A MHA-DT-12 TOOTH TIP ON THE LEVEL "
             "LINE OF CENTRES.\n"
-            f"SLIDE THE RIG IN UNTIL A {TIP_GAP.TIP_GAP_FEELER_TEXT} IS SNUG "
+            f"SLIDE THE RIG IN UNTIL A {TIP_GAP.TIP_GAP_ROD_TEXT} IS SNUG "
             f"BETWEEN THE TIPS ({acceptance_ref('tip-gap')}).\n"
             f"SET THE TIP GAP AS {steps.step_number('rig-located')}D-"
             # Round 15 (#2, rule 26): the stations by gear (sheet 8's key).
@@ -2322,7 +2321,10 @@ CHECKS = _note_text(
         f"{PLATEN_NUMBER} FEEDS AWAY FROM THE CRANK, AND MHA-DT-12 RUN CLOCKWISE.",
         "5A. SWING THE CONE SET CLEAR AS 4A.",
         "5B. TURN EACH MHA-DT-12 BY HAND UNTIL ITS NOTCH POINTS STRAIGHT UP.",
-        "5C. TURN MHA-DT-16 TO ENGAGE MHA-DT-01.",
+        # Owner ruling C8: nothing stops the lever, so the fitter turns it
+        # until the teeth seat (pinion_rig_tip_gap: the cam still reaches past
+        # the standard centre on the 3/32 rod).
+        "5C. TURN MHA-DT-16 UNTIL THE TEETH SEAT, NO FORCE.",
         "5D. COSINES: TURN MHA-DT-01 BY MHA-DT-15 UNTIL ALL NOTCHES POINT STRAIGHT "
         "UP, THE MHA-DT-12 FINISHING CLOCKWISE TO TAKE UP PLAY.",
         "5E. SINES: AS 5D, BUT STOP ALL NOTCHES LEVEL ON THE MHA-DT-01 SIDE "
@@ -2334,7 +2336,7 @@ CHECKS = _note_text(
         "5G. RE-SET THE CONE SET SWING AS 4M-4T.",
         "5H. TURN THE CRANK ON UNTIL EVERY NOTCH IS BACK AS 5D OR 5E.",
         "6. PARKED, MHA-DT-24 HOLDS MHA-DT-01 CLEAR OF EVERY MHA-DT-12.",
-        f"7. PARKED, PINS ON THE CAMS: A {TIP_GAP.TIP_GAP_SETTING_TEXT} FEELER IS SNUG TIP TO TIP",
+        f"7. PARKED, PINS ON THE CAMS: A {TIP_GAP.TIP_GAP_ROD_TEXT} IS SNUG TIP TO TIP",
         f"   AT GEAR 0 AND AT GEAR 19 ({acceptance_ref('tip-gap')}, SET AT SHEET",
         f"   {CONTINUATION_SHEET}, STEP {steps.step_number('rig-located')}E).",
         "7A. IF ONE IS OUT, EASE THE MHA-DT-VN-57 SCREWS.",

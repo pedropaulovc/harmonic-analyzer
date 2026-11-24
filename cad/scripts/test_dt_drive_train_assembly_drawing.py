@@ -899,23 +899,24 @@ def test_rig_is_located_by_its_parked_tip_gap() -> None:
     import dt_drive_train_steps as steps
     import pinion_rig_tip_gap as tip_gap
 
-    feeler = f"{tip_gap.TIP_GAP_SETTING_TEXT} FEELER"
+    rod = f"A {tip_gap.TIP_GAP_ROD_TEXT} IS SNUG"
     cite = f"({drawing.acceptance_ref('tip-gap')})"
     located = _rig_step_body("rig-located")
-    for phrase in ("UNDRILLED SEATS", tip_gap.TIP_GAP_FEELER_TEXT, cite):
+    for phrase in ("UNDRILLED SEATS", rod, cite):
         assert phrase in located, phrase
     check = _flat(drawing.CHECKS)
-    assert feeler in check
+    assert f"{rod} TIP TO TIP" in check
     assert (
         f"AT GEAR 19 ({drawing.acceptance_ref('tip-gap')}, SET AT SHEET "
         f"{drawing.CONTINUATION_SHEET}, STEP {steps.step_number('rig-located')}E)"
     ) in check
-    # The inch acceptance rounds inward, inside the spec's window, and prints
-    # as the steps' sheet 16 row (R5 machinist review, rule 22).
-    printed = re.fullmatch(r"(\.\d{3})-(\.\d{3})", _accept_cell("tip-gap"))
-    assert printed is not None
-    low, high = (float(value) * 25.4 for value in printed.groups())
-    assert tip_gap.TIP_GAP_ACCEPT[0] - 1e-9 <= low < high <= tip_gap.TIP_GAP_ACCEPT[1] + 1e-9
+    # Owner ruling C8 (audit part 2): one rod, no window, and the lever is
+    # turned until the teeth seat; the row names the rod (R5, rule 22).
+    assert _accept_cell("tip-gap") == "SNUG TIP TO TIP"
+    number = str(drawing.ACCEPTANCE_ROW_NUMBERS["tip-gap"])
+    (row,) = (row for row in drawing.ACCEPTANCE_TABLE_ROWS if row[0] == number)
+    assert row[-1] == tip_gap.TIP_GAP_ROD_TEXT
+    assert "5C. TURN MHA-DT-16 UNTIL THE TEETH SEAT, NO FORCE." in check
     assert f"SEE SHEET {drawing.CHECKS_SHEET}" in drawing.ASSEMBLED_HEADING
     fields = {field.label: field for field in drawing.package_note_fields(_drawing_facts())}
     assert "pinion rig sequence" in dict(fields[f"sheet {drawing.FIT_SHEET} left note field"].blocks)
@@ -1001,46 +1002,26 @@ def test_lever_pin_step_states_existing_drill_size_and_slip_fit() -> None:
     assert "REAM" not in step
 
 
-def test_the_tip_gap_feeler_is_the_rest_gap_in_gage_leaves() -> None:
-    """Main's TbPB ruling (Q1 b): the rig's east-west feeler is the bench
-    rest gap (pins on the cams), to the gage's thousandth, made up only of
-    the owned inch feeler gauge's leaves, each once; nothing on it is typed."""
-    import dt_feeler_leaves
-    import pinion_rig_fitup as fitup
-    import pinion_rig_layout as rig
+def test_the_tip_gap_rod_keeps_the_parked_pinion_clear_and_the_cam_in_reach() -> None:
+    """Owner ruling C8 (audit part 2, "Yes, a 3/32 rod."): the rig's east-west
+    locate is a 3/32 rod at the bench rest gap (pins on the cams); the rod
+    leaves the parked pinion clear of every cylinder gear and the cam still
+    swings it past the standard centre, where 5C seats the teeth."""
+    import dt_cylinder_gear_spec as cylinder_gear
     import pinion_rig_tip_gap as tip_gap
 
     # The model parks the pins a design air above the cams; the spring takes
     # it up on the bench, so the rest gap is wider than the model's.
     assert tip_gap.REST_TIP_GAP > tip_gap.MODEL_TIP_GAP
-    assert abs(tip_gap.TIP_GAP_FEELER - tip_gap.REST_TIP_GAP) <= rig.FEELER_LEAF_STEP / 2.0
-    assert set(tip_gap.TIP_GAP_LEAVES) <= set(fitup.FEELER_GAGE_LEAVES_MM)
-    assert len(set(tip_gap.TIP_GAP_LEAVES)) == len(tip_gap.TIP_GAP_LEAVES)
-    assert math.isclose(sum(tip_gap.TIP_GAP_LEAVES), tip_gap.TIP_GAP_FEELER, abs_tol=1e-9)
-    # The stack's own error and the rounding stay inside check 7's acceptance.
-    assert tip_gap.TIP_GAP_STACK_ERROR == pytest.approx(
-        len(tip_gap.TIP_GAP_LEAVES) * dt_feeler_leaves.LEAF_TOLERANCE
+    assert tip_gap.TIP_GAP_ROD == pytest.approx(3.0 / 32.0 * 25.4)
+    spread = (cylinder_gear.OUTSIDE_DIA_BAND[0] - cylinder_gear.OUTSIDE_DIA_BAND[1]) / 2.0
+    assert tip_gap.PARKED_TIP_CLEARANCE_MIN == pytest.approx(
+        tip_gap.TIP_GAP_ROD - tip_gap.TIP_GAP_ROD_TOLERANCE - spread
     )
-    assert (
-        abs(tip_gap.TIP_GAP_FEELER - tip_gap.REST_TIP_GAP) + tip_gap.TIP_GAP_STACK_ERROR
-        <= tip_gap.TIP_GAP_ACCEPT_BAND
-    )
-    assert tip_gap.TIP_GAP_ACCEPT == pytest.approx(
-        (
-            tip_gap.TIP_GAP_FEELER - tip_gap.TIP_GAP_ACCEPT_BAND,
-            tip_gap.TIP_GAP_FEELER + tip_gap.TIP_GAP_ACCEPT_BAND,
-        )
-    )
-    # The inch sheet prints the setting to the thousandth; the feeler stack
-    # table (sheet 15) lists the leaves by their etched inch size.
-    printed = re.search(r"^(\.\d{3}) FEELER$", tip_gap.TIP_GAP_FEELER_TEXT)
-    assert printed is not None
-    assert float(printed.group(1)) * 25.4 == pytest.approx(tip_gap.TIP_GAP_FEELER, abs=1e-9)
-    (row,) = (row for row in drawing.FEELER_STACK_ROWS if row[0] == printed.group(1))
-    leaves = [float(leaf) for leaf in row[1].split(" + ")]
-    assert math.isclose(sum(leaves), float(printed.group(1)), abs_tol=1e-9)
-    assert set(leaves) <= set(dt_feeler_leaves.LEAVES_IN)
-    assert "CHECK 7" in row[2]
+    assert tip_gap.PARKED_TIP_CLEARANCE_MIN > 2.0
+    assert tip_gap.CAM_REACH_AT_STANDARD_CENTRE_MIN > 1.0
+    # No leaf makes up the locate any more.
+    assert not any("CHECK 7" in row[2] for row in drawing.FEELER_STACK_ROWS)
 
 
 def test_every_set_feeler_the_steps_and_checks_print_has_a_leaf_row() -> None:
