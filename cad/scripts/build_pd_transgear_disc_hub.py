@@ -84,7 +84,6 @@ from pd_transgear_disc_hub_geometry import (
     screw_centres,
 )
 from pd_transgear_disc_hub_spec import (
-    BORE_DEVIATIONS,
     BORE_DIA,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
@@ -97,7 +96,6 @@ from pd_transgear_disc_hub_spec import (
     HUB_LENGTH_BAND,
     KEY_PIN_CHORD_OFFSET,
     KEY_PIN_DRILL_DIA,
-    KEY_PIN_HOLE_DEVIATIONS,
     KEY_PIN_HOLE_DIA,
     KEY_PIN_LOCATION_BAND,
     KEY_PIN_STATION,
@@ -782,23 +780,13 @@ def build(adapter) -> dict[str, str]:
 
     apply_material(adapter, MATERIAL)
     report_mass_properties(adapter)
-    # The bore carries its reamed band, the sliding fit on the sleeve's boss;
-    # the key-pin ream its REAM_H7 band, the pin's press, and its chord and
-    # stop the reamed hole's location band; the spigot carries
+    # The bore and the key-pin ream print their reamers' sizes and no band
+    # (drawing-guidelines.md rule 4: the mate is the gauge); the key pin's
+    # chord and stop carry the reamed hole's location band; the spigot carries
     # its turned-row band, clear of the disc's bore.  The overall and spigot
     # lengths carry the disc cluster stack's printed band.  Every other size
     # is governed by its places, the holes by the title block's DRILLED HOLES
     # row (the spec's DRAWING_PRECISION).  All print in inches.
-    set_dimension_bilateral_tolerance(
-        adapter, "BoreProfile", "BoreDia", *BORE_DEVIATIONS, display_unit=UNIT
-    )
-    set_dimension_bilateral_tolerance(
-        adapter,
-        "KeyPinProfile",
-        "KeyPinDia",
-        *KEY_PIN_HOLE_DEVIATIONS,
-        display_unit=UNIT,
-    )
     set_dimension_symmetric_tolerance(
         adapter,
         "KeyPinProfile",

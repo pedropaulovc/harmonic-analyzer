@@ -1,9 +1,9 @@
 r"""MHA-PD-17 transgear-disc-hub: the brass hub and flange in front of the reducer disc.
 
-The turned Ø.540 hub has a plain round .313 +.0010/+.0005 bore,
-reamed through (the shop's .3135 over reamer), a sliding fit on the pinion
-sleeve's (MHA-PD-10) .313 +.0005/.0000 boss, with a Ø1.05 × .094 flange and
-a Ø.498 +.000/-.001 rear spigot.  The spigot passes the reducer disc's
+The turned Ø.540 hub has a plain round bore reamed through with the .3135
+over reamer, no band printed; the pinion sleeve's (MHA-PD-10) boss is turned
+last to it, a sliding fit by feel, with a Ø1.05 × .094 flange and
+a Ø.498 +.000/-.002 rear spigot.  The spigot passes the reducer disc's
 (MHA-PD-06) bore, which it clears (the disc is centred at assembly), and its
 end seats on the sleeve's step face (the 12T's tooth ends); the flange's rear
 face clamps the disc's front face, the spigot's length ahead of the step.
@@ -159,14 +159,21 @@ HUB_BODY_LENGTH = HUB_LENGTH - SPIGOT_LENGTH - FLANGE_THICK
 HUB_FRONT_Z = SPIGOT_LENGTH - HUB_LENGTH
 
 # --- bore on the sleeve's boss (MHA-PD-10) ------------------------------------
-# Plain round, reamed through: .313 +.0010/+.0005 (.3135-.3140), the shop's
-# owned .3135 over reamer (``_fit_ream_slide``), a sliding fit on the boss's
-# +.0005/.0000 band.  The hub does not drive through its bore: the key pin
+# Plain round, reamed through with the .3135 over reamer (tools.reamer-3135,
+# to order, not owned), and printed as that size with no band (fit audit
+# 2026-11-23, pending owner confirmation; drawing-guidelines.md rule 4, made
+# to fit): the sleeve's boss is turned last to this bore until the hub slides
+# on by hand with no rock, so the hub itself is the gauge and no pin is
+# bought for it.  BORE_BAND is the ANALYSIS band, what the reamer is taken
+# to cut (.3135-.3140, the old printed +.0010/+.0005 on .313), never a
+# printed limit.  What fails if the fit is .002 looser: the hub's rock on
+# the boss (ROCK_ANGLE_MAX below) triples and the MHA-PD-22 collar to
+# MHA-PD-06 disc air closes (pd_cluster_air.COLLAR_AIR charges it at the
+# collar rim).  The hub does not drive through its bore: the key pin
 # (below) keys it on the sleeve's flat.
-BORE_DIA = SLEEVE.BOSS_DIA
+BORE_DIA = 7.9629  # .3135, the reamer's size
 BORE_PLACES = 4
-BORE_BAND = (0.0254, 0.0127)  # (upper, lower) deviations: +.0010/+.0005
-BORE_DEVIATIONS = deviations(BORE_BAND)
+BORE_BAND = (0.0127, 0.0)  # analysis (upper, lower) deviations: +.0005/0
 # The spigot's root at the flange stays sharp so the disc's front face
 # seats on the flange: the disc's bore chamfer clears it.  The hub body's
 # root takes the title block's inside corner; the #0-80 heads stand clear
@@ -177,10 +184,12 @@ if DISC.BORE_FRONT_CHAMFER_LIMITS[0] < CORNER_RADIUS_MAX:
 INSIDE_CORNER_RADIUS_MAX = inside_corner_radius_mm(unit=UNIT)
 
 # (least, greatest) diametral clearance of the round bore on the sleeve's
-# boss: each part is made to its own sheet, so it may not bind at any
-# printed limit pair.
-if BORE_DIA != SLEEVE.BOSS_DIA:
-    raise AssertionError("the hub's bore is not the sleeve's boss size")
+# boss: the MODELLED result of the fit by feel (the boss's analysis band
+# under the reamer's), which the stacks consume.  The acceptance "slides on
+# by hand, no rock" has to deliver a clearance inside it: no bind, and no
+# more than BOSS_CLEARANCE.
+if not math.isclose(BORE_DIA, SLEEVE.BOSS_DIA + SLEEVE.BOSS_DIA_BAND[0]):
+    raise AssertionError("the hub's reamer is not the sleeve boss's largest size")
 BOSS_CLEARANCE_LIMITS = (
     round(BORE_DIA + BORE_BAND[1] - (SLEEVE.BOSS_DIA + SLEEVE.BOSS_DIA_BAND[0]), 6),
     round(BORE_DIA + BORE_BAND[0] - (SLEEVE.BOSS_DIA + SLEEVE.BOSS_DIA_BAND[1]), 6),
@@ -332,7 +341,7 @@ _BAND = {places: printed_band_mm(places, unit=UNIT) for places in (1, 2, 3)}
 # One 1/16 x 5/16 hardened alloy dowel on a chord of the hub body, parallel
 # to local X, on the -Y side the sleeve's D-flat faces in the hub's frame
 # (#2409, codjiflo round 2).  The chord hole is drilled #56 through, then
-# reamed .0615 REAM_H7 from the +X side to a stop short of the -X O.D.: the
+# reamed .0615 from the +X side to a stop short of the -X O.D.: the
 # pin is pressed in from +X until it bottoms on the step (a positive stop),
 # and is knocked out through the #56 from -X (rule 16).  The chord breaks into
 # the bore over the flat, so the pin's SIDE lies along the flat across the
@@ -345,9 +354,16 @@ _BAND = {places: printed_band_mm(places, unit=UNIT) for places in (1, 2, 3)}
 # "centred" is missing), and .174 from the hub axis at the reamed-hole
 # location band, as is its stop.
 KEY_PIN_NUMBER = _config.parts("pd-vn-transgear-hub-key-pin")["number"]
+# The ream prints the reamer's size and no band (fit audit 2026-11-23,
+# pending owner confirmation; drawing-guidelines.md rule 4, reamed to the
+# bought mate): the MHA-PD-VN-69 dowel is the gauge (it does not enter by
+# hand, it presses in).  KEY_PIN_HOLE_BAND is the ANALYSIS band, what the
+# reamer is taken to cut, never a printed limit.  What fails if the hole is
+# .002 looser, or drilled: the wall over it to the hub's O.D.
+# (KEY_PIN_WALL_WORST below, .0005 over the floor) falls under the floor,
+# and the dowel's press, which holds it with no bond, is lost.
 KEY_PIN_HOLE_DIA = KEY_PIN.PRESS_HOLE_DIA  # .0615
-KEY_PIN_HOLE_BAND = KEY_PIN.PRESS_HOLE_BAND  # REAM_H7, +.0005/.0000
-KEY_PIN_HOLE_DEVIATIONS = deviations(KEY_PIN_HOLE_BAND)
+KEY_PIN_HOLE_BAND = KEY_PIN.PRESS_HOLE_BAND  # analysis: REAM_H7, +.0005/.0000
 KEY_PIN_HOLE_PLACES = 4
 KEY_PIN_INTERFERENCE = KEY_PIN.PRESS_INTERFERENCE_MM  # (.0006, .0013) in
 KEY_PIN_DRILL_DIA = 1.1811  # .0465, a #56 drill: the knockout, through
@@ -620,13 +636,15 @@ HUB_DIA_CALLOUT_BELOW = "\n".join(
         "TO PIN REAM",
     )
 )
-# The bore is reamed through and slides on the sleeve's boss: the process,
-# the fit by its standard name and its mate (rules 4 and 12), then the least
-# finished wall over it (rule 20).
+# The bore is reamed through and the sleeve's boss turned to it: the
+# process, the fit by its standard name and its mate (rules 4 and 12), what
+# the fit protects (rule 4's necessity answer: the hub's rock closes the
+# collar's gap to the disc), then the least finished wall over it (rule 20).
+BORE_NECESSITY = f"KEEPS {COLLAR_NUMBER} GAP"
 BORE_CALLOUT_BELOW = "\n".join(
     (
         "REAM THRU",
-        f"SLIDING FIT ON {SLEEVE_NUMBER}",
+        f"SLIDING FIT ON {SLEEVE_NUMBER}, {BORE_NECESSITY}",
         BORE_WALL_TEXT,
     )
 )
@@ -639,14 +657,17 @@ SPIGOT_LENGTH_CALLOUT = f"SEE NOTE {STACK_NOTE}"
 # The flange's .XXX thickness sets the disc screws' reach (the cut window
 # in pd_transgear_disc_screw_spec reads it).
 FLANGE_THICK_CALLOUT = f"SETS {SCREW_NAME}\n{SCREW_NUMBER} REACH"
-# The spigot slides into the disc's bore at assembly (the disc is then
-# centred and its taps transferred); its turned-row band keeps it clear at
-# the bore's least size.  The callout names the fit by its standard name
-# (rule 4) and the sharp root the disc's face seats past: two lines of words
-# (rule 7), so the clearance the limits give is not repeated as REF.
+# The spigot enters the disc's bore at assembly (the disc is then centred
+# and its taps transferred); its turned-row band keeps it clear of the
+# reamed bore and bounds the disc's float, which the disc's tap-to-bore web
+# pays (pd_rack_pinion_spec.TAP_TO_BORE_WALL_FINISHED).  The callout names
+# the mate it clears, what the band protects (rule 4's necessity answer)
+# and the sharp root the disc's face seats past.
+SPIGOT_NECESSITY = "KEEPS DISC TAP WALL"
 SPIGOT_CALLOUT_BELOW = "\n".join(
     (
-        f"SLIDING FIT IN {DISC_NUMBER}",
+        f"CLEARS {DISC_NUMBER} BORE",
+        SPIGOT_NECESSITY,
         f"SPIGOT ROOT R{inch_text(CORNER_RADIUS_MAX, 3)} MAX",
     )
 )
@@ -664,12 +685,18 @@ OIL_HOLE_CALLOUT_BELOW = "\n".join(
         "INTO BORE",
     )
 )
-# The chord hole prints in section A-A, cut through its station: the ream's
-# size with its REAM_H7 band from the model, said reamed and naming the
-# press fit's pin (rules 4 and 12); the #56 knockout drilled through; the
-# chord's offset and the ream's stop from the hub axis at the reamed-hole
-# location band, locations that carry their value and band only (rule 7).
-KEY_PIN_CALLOUT_BELOW = "\n".join(("REAM, PRESS FIT", f"PIN {KEY_PIN_NUMBER}"))
+# The chord hole prints in section A-A, cut through its station: the
+# reamer's size with no band and REAM beside it (the value's own row: the
+# air left of the ring holds two rows of sixteen characters under it), then
+# the press fit's pin (rules 4 and 12) and what the ream is for (rule 4's
+# necessity answer: the dowel holds by its press alone, with no bond; the
+# wall the ream also keeps is stated at the hub's O.D.); the #56 knockout
+# drilled through; the chord's offset and the ream's stop from the hub axis
+# at the reamed-hole location band, locations that carry their value and
+# band only (rule 7).
+KEY_PIN_SUFFIX = " REAM"
+KEY_PIN_NECESSITY = "PRESS, NO BOND"
+KEY_PIN_CALLOUT_BELOW = "\n".join((f"PIN {KEY_PIN_NUMBER}", KEY_PIN_NECESSITY))
 KEY_PIN_DRILL_CALLOUT_BELOW = "#56 DRILL THRU"
 
 # The key-pin hole's station lives on a hidden reference sketch: one

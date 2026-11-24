@@ -257,13 +257,19 @@ OVERALL_LENGTH = 27.3558  # 1.077
 OVERALL_LENGTH_BAND = FIT_LENGTH_BAND_IN
 
 # --- diameters -----------------------------------------------------------------
-# The boss is the hub's locating fit: turned .313 +.0005/.0000 under the
-# hub's .313 +.0010/+.0005 bore, .0000-.0010 diametral clearance, the
-# locational feel of the old H7/h6 pair (InchPd ruling, fit doc F12 note;
-# pd_transgear_disc_hub_spec consumes this diameter and checks the pair).
-BOSS_DIA = 7.9502  # .313
-BOSS_DIA_BAND = (0.0127, 0.0)  # (upper, lower) deviations: +.0005/.0000
-BOSS_DIA_PLACES = 4
+# The boss is the hub's sliding fit, made to fit (fit audit 2026-11-23,
+# pending owner confirmation; drawing-guidelines.md rule 4): the hub's bore
+# is reamed with the .3135 reamer and the boss is turned LAST to that bore
+# until the hub slides on by hand with no rock, so its size prints REF, at
+# three places and with no limits.  BOSS_DIA_BAND is the ANALYSIS band, the
+# modelled result of that fit under the reamer's (.0000-.0010 diametral
+# clearance, pd_transgear_disc_hub_spec.BOSS_CLEARANCE_LIMITS, which the
+# stacks consume), never a printed limit; it was a printed +.0005/.0000.
+# What fails if the boss is .002 smaller: the hub's rock on it triples and
+# closes the MHA-PD-22 collar's air to the disc (pd_cluster_air.COLLAR_AIR).
+BOSS_DIA = 7.9502  # .313 REF
+BOSS_DIA_BAND = (0.0127, 0.0)  # analysis (upper, lower) deviations: +.0005/.0000
+BOSS_DIA_PLACES = 3
 
 # --- the step face: the hub's seat ----------------------------------------------
 # The hub's spigot bears on the step face's tooth ends, so the face is held
@@ -630,7 +636,6 @@ for _feature, _dimensions in DRAWING_PRECISION.items():
 
 # The bands the build applies, by dimension (``(lower, upper)`` deviations).
 STATION_DEVIATIONS = (-STATION_TOL, STATION_TOL)
-BOSS_DIA_DEVIATIONS = deviations(BOSS_DIA_BAND)
 OUTSIDE_DIA_DEVIATIONS = deviations(OUTSIDE_DIA_BAND)
 # The root witness's nominal IS the printed physical MIN limit.
 ROOT_DIA_DEVIATIONS = (0.0, 0.0)
