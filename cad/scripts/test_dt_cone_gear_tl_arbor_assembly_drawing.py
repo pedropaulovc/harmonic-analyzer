@@ -376,12 +376,14 @@ def _off_pitches(angle: float, target: float, pitch: float) -> float:
     return abs(turns - round(turns)) * pitch
 
 
-def _printed_index_deg(teeth: int) -> tuple[float, str]:
-    """A blank's printed first index (degrees) and its direction cell."""
+def _printed_index_deg(teeth: int) -> tuple[float, str, bool]:
+    """A blank's printed first index (degrees), its direction cell and
+    whether the angle prints as REF."""
     (row,) = (row for row in spec.SETUP_TABLE_ROWS if row[1] == str(teeth))
     angle, direction = row[3], row[4]
-    assert re.fullmatch(r"\d+\.\d\d°", angle), angle
-    return float(angle.removesuffix("°")), direction
+    match = re.fullmatch(r"(\d+\.\d\d)°( REF)?", angle)
+    assert match, angle
+    return float(match[1]), direction, match[2] is not None
 
 
 def test_the_table_indexes_each_cone_blank_so_a_tooth_centres_on_the_key() -> None:
@@ -396,8 +398,8 @@ def test_the_table_indexes_each_cone_blank_so_a_tooth_centres_on_the_key() -> No
         low, high = _cone_gap_span_rad(teeth)
         assert 0.0 < low < high < pitch, teeth  # the keyway lies in a tooth
         bisector = (low + high) / 2.0
-        printed, words = _printed_index_deg(teeth)
-        assert words == "EITHER WAY", teeth
+        printed, words, ref = _printed_index_deg(teeth)
+        assert words == "EITHER WAY" and not ref, teeth
         assert printed == pytest.approx(
             spec.CONE_FIRST_INDEX_PITCHES * 360.0 / teeth, abs=0.005
         )
@@ -417,16 +419,16 @@ def _midface_gap_rad(space: StraightGash) -> float:
     return math.atan2(y, x)
 
 
-def test_the_table_indexes_the_64t_so_its_mid_face_tooth_centres_on_the_key() -> None:
+def test_the_table_gives_the_64t_index_as_ref_matching_the_model() -> None:
     """The 64T's space is straight and inclined: its cutter plane crosses the
     axis at TOOTH_SPACE_CROSSING from the chamfered (z = 0) face, and the
-    model centres a tooth on the keyway at mid-face. The key on the cutter's
-    radius sets the space's crossing radial on the key; the table's index
-    then turns the blank so the cut space is the model's, inside the arbor's
-    setting allowance, where half a pitch is not. The index plus the space's
-    drift from the crossing to mid-face is half a pitch: the tooth sits on
-    the key at mid-face, the station the table's title names, not at the
-    crossing."""
+    model centres a tooth on the keyway at mid-face. The table's REF index,
+    turned in the model's sense, cuts the model's space inside the arbor's
+    setting allowance, where half a pitch is not; the index plus the space's
+    drift from the crossing to mid-face is half a pitch, the station the
+    table's title names. Nothing reads the 64T's clock on the key (the 16T is
+    match-drilled wherever it meshes, MHA-DT-00 4S: fit audit part 2, B13),
+    so the row prints the angle as REF and says any index serves."""
     pitch = 2.0 * math.pi / crank.TEETH
     allowance = math.radians(arbor.KEY_SETTING_ALLOWANCE_DEG)
     model = _midface_gap_rad(crank.TOOTH_SPACE)
@@ -437,7 +439,8 @@ def test_the_table_indexes_the_64t_so_its_mid_face_tooth_centres_on_the_key() ->
     drift = model - crank.TOOTH_SPACE.azimuth_rad
     assert math.degrees(drift) == pytest.approx(spec.CRANK_MIDFACE_DRIFT_DEG, abs=1e-9)
     assert drift > allowance  # the crossing is no station for the tooth
-    printed, words = _printed_index_deg(crank.TEETH)
+    printed, words, ref = _printed_index_deg(crank.TEETH)
+    assert ref and words == spec.CRANK_ANY_INDEX
     assert printed == spec.CRANK_FIRST_INDEX_DEG
     assert printed + spec.CRANK_MIDFACE_DRIFT_DEG == pytest.approx(
         180.0 / crank.TEETH, abs=0.005
@@ -452,8 +455,7 @@ def test_the_table_indexes_the_64t_so_its_mid_face_tooth_centres_on_the_key() ->
     sense = {
         "CCW FROM CHAMFERED FACE": 1.0,
         "CW FROM CHAMFERED FACE": -1.0,
-    }[words]
-    assert words == spec.CRANK_FIRST_INDEX_SENSE
+    }[spec.CRANK_FIRST_INDEX_SENSE]
     cut = replace(crank.TOOTH_SPACE, azimuth_rad=sense * math.radians(printed))
     assert _off_pitches(_midface_gap_rad(cut), model, pitch) < allowance
     half = replace(crank.TOOTH_SPACE, azimuth_rad=pitch / 2.0)

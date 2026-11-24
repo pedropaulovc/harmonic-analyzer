@@ -151,7 +151,7 @@ a feel set leaves (`cone_set_stack`, `dt_mesh_checks`,
   gear binds.
 - The crank pair has a fixed centre. It must reach a contact ratio of at least
   1.0 at the nominal centre (1.088), and it is accepted by hand at assembly:
-  MHA-DT-00 step 4N turns MHA-DT-07 a full revolution before the 16T is
+  MHA-DT-00 step 4J turns MHA-DT-07 a full revolution before the 16T is
   pinned, and if the teeth bind the 16T is recut, every tooth gap .004 in
   wider with the cutter moved sideways at the same depth (delegated ruling
   2026-11-17 on

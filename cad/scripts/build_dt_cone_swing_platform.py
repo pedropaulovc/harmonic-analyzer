@@ -139,7 +139,6 @@ from dt_cone_swing_platform_spec import (
     HOLDDOWN_HOLE_SPEC,
     HOLDDOWN_LOCAL_X,
     HOLDDOWN_LOCAL_Z,
-    HOLDDOWN_STATION_TOL_MM,
     PIVOT_BEARING_RELIEF_DEPTH,
     PIVOT_BEARING_RELIEF_DIAMETER,
     PIVOT_RELIEF_FIT_REQUIREMENT,
@@ -984,17 +983,11 @@ def build(adapter) -> dict[str, str]:
     # Decimal places for imported model dimensions live on the PART.  The
     # Hole Wizard owns the pivot-hole precision and native size callout.
     apply_drawing_precision(adapter, DRAWING_PRECISION)
-    # The tip-block stacks run through the hold-down stations and the post
-    # taps at +/-.005.  HoldDownZ and the post-tap stations print .XXX, whose
-    # title-block grade is that band (DRAWING_PRECISION); HoldDownX prints
-    # .XX, so it alone carries the band explicitly.
-    set_dimension_symmetric_tolerance(
-        adapter,
-        "HoldDownHole",
-        "HoldDownX",
-        HOLDDOWN_STATION_TOL_MM,
-        display_unit=UNIT,
-    )
+    # HoldDownZ and the post-tap stations print .XXX at the title block's
+    # +/-.005 (DRAWING_PRECISION); HoldDownX prints .XX at the title block's
+    # +/-.01 (machinist review r1, farm run 20261124T125542720Z: no stack
+    # needs its former +/-.005; dt_cone_swing_platform_spec.
+    # HOLDDOWN_LATERAL_TOL_MM).
     # The tip-block locating dowel's station carries the hold-down's band
     # (the webs to its counterbore here and to MHA-DT-21's +X face close on
     # it); the #52 hole prints its drill, no band.

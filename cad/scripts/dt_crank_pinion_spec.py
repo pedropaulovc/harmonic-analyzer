@@ -37,7 +37,7 @@ from _hole_spec import FRACTIONAL_DRILL_MM, HoleSpec
 from _inch_wall_limits import WALL_TARGET_MM
 from _package_units import drawing_unit
 from _printed_tolerance import drilled_oversize_mm, printed_band_mm, printed_deviations
-from dt_crank_drive_gear_spec import floor_inch_mm, inch_text
+from dt_crank_drive_gear_spec import floor_inch_mm
 from _surface_finish import SurfaceFinishControl
 from stock_form_cutter import (
     StockFormProfile,
@@ -229,7 +229,7 @@ FACE_WIDTH_BAND = (
 FACE_WIDTH_LIMITS = deviations(FACE_WIDTH_BAND)  # (lower, upper)
 # Full-OD shoulder: OutsideDia over SHOULDER_LENGTH from the south face,
 # with its +.000/-.010 band. The assembly retains the 0.25-mm T120
-# air floor, all axis/fit offsets, the fit-up feeler and the row contact gate.
+# air floor, all axis/fit offsets and the row contact gate.
 # The toothed south face is set directly off the restored MHA-DT-05 north
 # boss face with the assembly step-4 feeler. There is no spot-face retreat
 # or eccentric sleeve in this stack.
@@ -258,14 +258,11 @@ T120_SHOULDER_AIR_WORST = math.inf
 # at the title block's +/-.005 (fit audit 2026-11-23; 1.6890 at the former
 # +/-.004), floored to 1.67; the ordinary floor is 0.25.
 T120_TURNED_BAND_RADIAL_WORST = 1.67
-# The independent fit-up feeler check remains: MHA-DT-10 and T120 are
-# pushed toward each other to take up every running play. A band that stops
-# the feeler is turned down, never under TURNED_DIA_FITUP_MIN; a shoulder
-# that stops it is faced back, never under its printed short limit. The
-# assembly proves the fit-up limits clear the feeler and retain engagement.
-T120_FITUP_FEELER_MM = 0.1016  # .004, one inch feeler leaf (#3042; was 0.10)
-TURNED_DIA_FITUP_MIN = 18.2372  # .718
-SHOULDER_LENGTH_FITUP_MIN = SHOULDER_LENGTH + SHOULDER_LENGTH_LIMITS[0]
+# Fit audit 2026-11-23 part 2, B9: at these worst cases MHA-DT-00 checks the
+# pair by a look for daylight through one turn (dt_drive_train_assembly_sheet
+# T120_DAYLIGHT_CHECK); the .004 feeler and its fit-up cuts (band turned down
+# to .718, shoulder faced back) are gone, so the band and shoulder stay at
+# their printed limits.
 
 # --- Hub boss + retention pin (ch. 12 p. 19, page002_img02 / img06) ---------
 #
@@ -417,7 +414,6 @@ for _name, _value, _places in (
     ("OVERALL_LENGTH", OVERALL_LENGTH, OVERALL_LENGTH_PLACES),
     ("SHOULDER_LENGTH", SHOULDER_LENGTH, SHOULDER_LENGTH_PLACES),
     ("TURNED_DIA", TURNED_DIA, TURNED_DIA_PLACES),
-    ("TURNED_DIA_FITUP_MIN", TURNED_DIA_FITUP_MIN, TURNED_DIA_PLACES),
 ):
     if not prints_exactly(_value, _places):
         raise AssertionError(f"{_name} {_value!r} does not print exactly at {_places} places")
@@ -431,9 +427,6 @@ if not (
     and TURNED_DIA + TURNED_DIA_TOLERANCE_MM < OUTSIDE_DIA - OUTSIDE_DIA_TOLERANCE_MM
 ):
     raise AssertionError("the 16T turned band must lie between the root and the tip")
-# The fit-up turn-down leaves stub teeth: above the pitch circle, below the band.
-if not PITCH_DIA < TURNED_DIA_FITUP_MIN < TURNED_DIA - TURNED_DIA_TOLERANCE_MM:
-    raise AssertionError("the 16T fit-up turn-down must stay over the pitch circle")
 PIN_STATION = FACE_WIDTH + BOSS_LENGTH / 2.0
 PIN_AXIAL_LIGAMENT_WORST = pin_axial_ligament_worst(BOSS_LENGTH)
 if PIN_AXIAL_LIGAMENT_WORST < PIN_EDGE_MIN_WORST - 1e-9:
@@ -689,34 +682,6 @@ for _feature, _dimensions in DRAWING_PRECISION.items():
             f"{_feature}: precision authored for unmarked dimensions {_unmarked}"
         )
 
-
-
-# The drive-train fit-up may turn the band down past its printed band (the
-# T120 feeler check, MHA-DT-00's crank step), and only when the band itself
-# fails that check (a shoulder failure is the shoulder's to correct); the
-# sheet permits it only as that check directs and states the floor, so the
-# part stays conforming after the fit-up cut.  Codex P1 on #1154 (review 3).
-# The worst-case clearances to T120 are a design-check result, so only the
-# assembly's crank step prints them (T120_FITUP_ASSEMBLY_CHECK).  The sheet
-# names the check, not its step number: a part never reads the step registry
-# (Main's TbPB ruling 2; test_part_isolation).  The allowance rides the
-# turned diameter's own callout, so it cannot be read against the tip
-# diameter (machinist review r1 of #1652), and says who turns it, when and
-# on what result (r2: "MAY TURN" named neither).
-T120_SHOULDER_CLEARANCE_TEXT = (
-    "NO AXIAL OVERLAP"
-    if T120_SHOULDER_AIR_WORST == math.inf
-    else f"{T120_SHOULDER_AIR_WORST:.2f}"
-)
-TURNED_DIA_FITUP_CALLOUT = "\n".join(
-    (
-        f"{CONE_GEAR_NUMBER} T120 CLR",
-        "IF MHA-DT-00 T120",
-        "FEELER CHECK FAILS,",
-        "TURN AT ASSY TO CLEAR,",
-        f"Ø{inch_text(TURNED_DIA_FITUP_MIN, TURNED_DIA_PLACES)} MIN",
-    )
-)
 # Section A-A cuts through a tooth, so the band reads as a solid ring and the
 # spaces seem to stop against it (machinist review of the stack build). They
 # do not: the band is the teeth turned down, and the spaces run the whole face
@@ -729,27 +694,3 @@ TOOTH_RUNOUT_NOTE = (
 if not BOSS_DIA <= ROOT_DIA_MIN:
     raise AssertionError("the 16T boss must be turned to the root for the cutter runout")
 DRAWING_NOTES = TOOTH_RUNOUT_NOTE
-# The MHA-DT-00 crank step's T120 check (user, 2026-09-30, #1154), printed by
-# draw_dt_drive_train_assembly: the pinion on its seat feeler, MHA-DT-10 and T120
-# pushed toward each other (taking up every running play), turned by hand and
-# read all round before the step's free-running revolution (it may rub until
-# the check closes: Codex P2 on #1154, review 3).  Each cut answers its own
-# reading only (build_dt_drive_train_assembly.t120_fitup_cuts).  Either fit-up
-# limit passes the feeler at every corner (build_dt_drive_train_assembly asserts
-# it), so the check always closes.  Its last line is short: the step carries
-# on after it on the same line.
-T120_FITUP_PUSHED = (PINION_NUMBER, "T120")
-T120_FITUP_ASSEMBLY_CHECK = "\n".join(
-    (
-        f"   WORST-CASE T120 CLEARANCE: TURNED BAND {T120_TURNED_BAND_RADIAL_WORST:.2f}, "
-        f"SHOULDER {T120_SHOULDER_CLEARANCE_TEXT}. PUSH",
-        f"   {T120_FITUP_PUSHED[0]} AND {T120_FITUP_PUSHED[1]} TOWARD EACH OTHER; "
-        "TURN MHA-DT-07 SLOWLY BY HAND,",
-        f"   READING A {T120_FITUP_FEELER_MM:.2f} FEELER ALL ROUND. BAND TO T120 TIPS: "
-        "IF THE FEELER",
-        "   STOPS, TURN BAND DOWN, "
-        f"Ø{TURNED_DIA_FITUP_MIN:.2f} MIN. SHOULDER TO T120 SOUTH FACE: IF",
-        "   THE FEELER STOPS, FACE SHOULDER BACK, "
-        f"{SHOULDER_LENGTH_FITUP_MIN:.2f} MIN. RESET, RECHECK.",
-    )
-)

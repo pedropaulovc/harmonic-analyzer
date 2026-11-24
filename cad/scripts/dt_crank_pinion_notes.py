@@ -20,17 +20,16 @@ CONE_GEAR_120T = f"120T CONE GEAR {spec.CONE_GEAR_NUMBER}"
 # The sheet's numbered notes (DRAWING_NOTES, below), each linked by "SEE NOTE
 # n" from every dimension it serves (drawing-guidelines.md rule 7).
 MESH_NOTE_NUMBER = 1
-TURNED_DIA_NOTE_NUMBER = 2
-BORE_FIT_NOTE_NUMBER = 3
-PIN_FIT_NOTE_NUMBER = 4
+BORE_FIT_NOTE_NUMBER = 2
+PIN_FIT_NOTE_NUMBER = 3
 # The pin hole's callout hangs under its reference Ø: the process with its
 # mate, then the link (rule 26: size, process; rule 7: at most two lines of
-# words). The pin's fit and acceptance are note 4; the flush ends are
+# words). The pin's fit and acceptance are note 3; the flush ends are
 # MHA-DT-00 step 4's (an assembly instruction on a part sheet, rule 7). The
 # spec's PIN_FIT_LINES still feed that step and the crankshaft's property.
 # The cross hole runs through both walls of the boss and the shaft, so the
 # process row says THRU (rules 9 and 26; fan-out r3: no depth read); matched
-# with the crankshaft, it is drilled at assembly, which note 4 and MHA-DT-00's
+# with the crankshaft, it is drilled at assembly, which note 3 and MHA-DT-00's
 # pin step carry.
 PIN_HOLE_CALLOUT = "\n".join(
     (
@@ -38,30 +37,23 @@ PIN_HOLE_CALLOUT = "\n".join(
         f"SEE NOTE {PIN_FIT_NOTE_NUMBER}",
     )
 )
-# Four short lines (drawing-guidelines.md rule 7). Note 1 names the two
-# mates the tip diameter and the banded shoulder and face-width lengths
-# serve, once (rule 4: a mate serving several features is named once):
-# their short limits keep full tips in the 64T mesh, their long ones the
-# 120T gear's clearance (build_dt_drive_train_assembly proves both). Note 2
-# is the size the turned band is fitted to at assembly with the check that
-# sets it (rule 19), linked from the turned diameter alone so it cannot be
-# read against the tip diameter (machinist review r1 of #1652); the supply
-# size stays on that diameter only (fan-out r4 fbaa9035a1, rule 7: a linked
-# note does not repeat the feature's controlling value); it
-# names the check, never its step number (a part never reads the step
-# registry). Note 3 names the mate made to the reamed bore, which carries the
-# fit's acceptance on its own sheet (fit audit 2026-11-23, MHA-DT-10.bore:
-# the acceptance prints once, on the member made last); the bore slides
-# onto the crankshaft to its seat feeler and is then pinned, so it neither
-# runs nor presses. Note 4 is the pin's fit and its acceptance (rule 4: a
-# matched fit states one).
+# Three short lines (drawing-guidelines.md rule 7). Note 1 names the two
+# mates the tip diameter, the turned band and the banded shoulder and
+# face-width lengths serve, once (rule 4: a mate serving several features is
+# named once): their short limits keep full tips in the 64T mesh, their long
+# ones the 120T gear's clearance (build_dt_drive_train_assembly proves both).
+# The turned band's fit-up note is gone (fit audit 2026-11-23 part 2, B9: the
+# band keeps 1.67 mm to T120 at print worst, so MHA-DT-00 looks for daylight
+# and no assembly cut remains to permit). Note 2 names the mate made to the
+# reamed bore, which carries the fit's acceptance on its own sheet (fit audit
+# 2026-11-23, MHA-DT-10.bore: the acceptance prints once, on the member made
+# last); the bore slides onto the crankshaft to its seat feeler and is then
+# pinned, so it neither runs nor presses. Note 3 is the pin's fit and its
+# acceptance (rule 4: a matched fit states one).
 DRAWING_NOTES = "\n".join(
     (
         f"{MESH_NOTE_NUMBER}. MESH WITH CRANK DRIVE GEAR {spec.MESH_GEAR_NUMBER}; "
         f"CLEARANCE TO {CONE_GEAR_120T}.",
-        f"{TURNED_DIA_NOTE_NUMBER}. FITTED AT ASSEMBLY TO "
-        f"Ø{inch_text(spec.TURNED_DIA_FITUP_MIN, spec.TURNED_DIA_PLACES)} "
-        f"MIN TO PASS MHA-DT-00 FEELER CHECK TO 120T GEAR {spec.CONE_GEAR_NUMBER}.",
         f"{BORE_FIT_NOTE_NUMBER}. CRANKSHAFT {spec.CRANKSHAFT_NUMBER} SEAT IS TURNED "
         "TO THIS BORE.",
         f"{PIN_FIT_NOTE_NUMBER}. DRIVE FIT ON PIN {spec.PIN_NUMBER}; NOT REMOVABLE BY HAND.",

@@ -41,6 +41,7 @@ from dt_pinion_bracket_geometry import (
     UNIT as UNIT,
     WIDTH as WIDTH,
 )
+import dt_pinion_cam_pin_spec as _cam_pin
 import dt_vn_pinion_strap_pin_spec as _strap_pin
 
 # --- Tolerance bands.  Only the follower seat and the cross hole print one:
@@ -129,13 +130,23 @@ if min(PIN_SEAT_WEB_WORST, PIN_SEAT_NEAR_WEB_WORST) < WALL_TARGET_MM:
 PIN_SEAT_FLOOR_CORNER_R_MAX = 0.2032  # .008
 # The seat's size callout: its REF depth and flat floor (rule 26: never
 # deferred to a view; Section B-B's .16 controls the floor), the bonded mate
-# (rule 4), then the floor-corner allowance.  No cutter is named (tool audit
-# Q8 drops the REAM; MHA-PD-16's pilot precedent: "FLAT BOTTOM END MILL"
-# named a tool, not a requirement).
+# (rule 4), the bond's diametral clearance (rule 23), then the floor-corner
+# allowance.  No cutter is named (tool audit Q8 drops the REAM; MHA-PD-16's
+# pilot precedent: "FLAT BOTTOM END MILL" named a tool, not a requirement).
+# The clearance is the MHA-DT-25 5/32 drill rod's catalogue band in this
+# seat's +.003/0 (dt_pinion_cam_pin_spec.BOND_CLEARANCE_MIN/MAX, inside
+# LOCTITE 638's gap there); the seat band is the requirement, so the range
+# prints as REF.  Machinist review r2 (farm run 20261124T125542720Z, blocker):
+# the callout named the bond but not its clearance.
+_BOND_CLEARANCE_TEXT = "-".join(
+    f"{value / 25.4:.4f}".lstrip("0")
+    for value in (_cam_pin.BOND_CLEARANCE_MIN, _cam_pin.BOND_CLEARANCE_MAX)
+)
 PIN_SEAT_CALLOUT = "\n".join(
     (
         f"<HOLE-DEPTH> ({PIN_SEAT / 25.4:.2f}) FLAT BOTTOM".replace("(0.", "(."),
         "BONDED FIT ON MHA-DT-25",
+        f"(CLEARANCE {_BOND_CLEARANCE_TEXT})",
         f"FLOOR CORNERS R{PIN_SEAT_FLOOR_CORNER_R_MAX / 25.4:.3f} MAX".replace(
             "R0.", "R."
         ),

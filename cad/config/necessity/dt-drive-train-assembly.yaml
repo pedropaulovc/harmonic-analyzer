@@ -1,0 +1,10 @@
+# MHA-DT-00 drive train assembly: why each setting tighter than the title
+# block stays (drawing-guidelines.md rule 4; owner ruling 2026-11-24: the
+# reason lives here, not on the sheet). Read by the machinist review only.
+# Fit batch DT, 2026-11-24.
+necessity:
+  - id: N-01
+    feature: "sheet 15, setting table row 2 (steps 8Q-8R): front MHA-DT-02 inner face, DRO Y W + 8.612 TO W + 8.619, W the MHA-DT-26 thickness as miked"
+    kind: gap
+    reason: "sets the bank datum; end rocker arms reach their ears"
+    source: "Main, by the owner's delegation of 2026-11-24 (D3): \"C9/8R: 8Q/8R stay as tight as today; the look is added. ('relax the rest' does not apply to 8R: it fails the channel axial budget.)\" The bank's south datum chain, cylinder_bank_layout DATUM_CHAIN_STACK (DRO locate 0.10 plus the miked disc 0.013 = 0.113 mm), feeds test_channel_axial_budget, which has 0.028 mm headroom (north end-arm follow 0.8353 against END_ARM_FOLLOW_MAX 0.8636); every relaxed option (0.267 to 0.508 mm) fails it. Sketch fit-audit-2026-11-23/batch-dt/cone/C9-8R-datum-chain.png."
