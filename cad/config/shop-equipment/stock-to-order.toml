@@ -195,6 +195,11 @@ cite = ["https://github.com/pedropaulovc/harmonic-analyzer/issues/2359", "cad/co
 # treatment for now; pd-latch-hook should be changed to not require heat
 # treatment", then the half-hard brass strip below) and MHA-PD-03 platen
 # clip (cad/process/pd_platen_clip/plan.toml).
+# Owner ruling 2026-11-24 (form): "Use the sheet; buy strip only if the hook
+# takes a set." The on-hand .032 x 6 x 6 in sheet (stock-bought.toml
+# c260-sheet-032-6x6) is used first, the latch hook cut first as the temper
+# trial; this strip is NOT bought unless that hook takes a set. The row stays
+# because the platen-clip plan's stock line still names it.
 [stock.c260-h02-strip-032x2]
 form = "strip"
 material = "C26000 cartridge brass, H02 half hard, ASTM B36"

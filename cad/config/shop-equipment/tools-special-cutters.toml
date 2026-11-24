@@ -54,21 +54,22 @@ note = "Not owned: to buy. drawing cross-check 2026-11-19: MHA-PD-13 STRAIGHT KN
 [tools.lathe-tool-sharp-nose]
 sku = "1965"
 source = "https://littlemachineshop.com/products/tool-bits-1-4-presharpened-individual-tool-bits"
-purchase = "LittleMachineShop 1965, Tool Bit 1/4 in Right Hand Presharpened (HSS), $7.95, available (read live 2026-11-22); its nose is stoned to R.004 or less in the shop. No stock insert for the owned TCMT-21.51 holders reads R.004: LittleMachineShop's TCMT-21.50 (3416) states R.008."
+purchase = "LittleMachineShop 1965, Tool Bit 1/4 in Right Hand Presharpened (HSS), $7.95, available (read live 2026-11-22); two in the cart: one whose nose is stoned to R.004 or less in the shop, one ground into the .020 groover (tools.grooving-tool-020; owner 2026-11-24: \"also buy the $7.95 pre-sharpened HSS bit\"). No stock insert for the owned TCMT-21.51 holders reads R.004: LittleMachineShop's TCMT-21.50 (3416) states R.008."
 kind = "turning_tool"
 status = "to_order"
 note = "Not owned: to buy. drawing cross-check 2026-11-19: MHA-PD-08 R.004 max. corners, .016 neck; MHA-PD-17 SPIGOT ROOT R.004 MAX; MHA-PD-23 R.005 MAX land-to-head corner; MHA-PN-04 R.008 max. shoulder."
 
 [tools.grooving-tool-020]
 kind = "grooving_tool"
-status = "to_order"
-note = "Not owned: to buy. drawing cross-check 2026-11-19: MHA-PD-23 .020 +.002/.000 ring groove; MHA-MG-04 thread relief, corners R.008 max.; MHA-MG-07 thread relief, corners R.008 max.."
+status = "to_make"
+supply = "shop_made"
+note = "Not owned: to make. Owner ruling 2026-11-24: \"Grind it\", from the pre-sharpened HSS bit he also asked for (tools.lathe-tool-sharp-nose, LittleMachineShop 1965), on the owned bench grinder (tools.bench-grinder-duracraft-60650). No insert or holder is bought. drawing cross-check 2026-11-19: MHA-PD-23 .020 +.002/.000 ring groove; MHA-MG-04 thread relief, corners R.008 max.; MHA-MG-07 thread relief, corners R.008 max.."
 
 [tools.form-tool-r024]
 kind = "form_tool"
 status = "to_make"
 supply = "shop_made"
-note = "Not owned: to make. Owner ruling 2026-11-24: \"Grind it by hand from an HSS blank.\" An R.024 full-radius groover, about .048 in wide, ground from an M2 blank (tools.tool-bit-blanks-m2-1-4) on the owned bench grinder (tools.bench-grinder-duracraft-60650): the MHA-MG-05 R.024 rim wire groove and the MHA-MG-06 groove (mg_output_fixture plan: \"the one groover MHA-MG-05's rim groove names\"; that plan's header still says to order). Check of the ground form (the coordinator's delegated method, 2026-11-24; not an owner ruling): mike the tool's width, .040-.058 in with a full radius, which is R.020-.029: the overlap of MHA-MG-05's R.019-.029 and MHA-MG-06's R.020 minimum (gauges.micrometers, owned), and sight the nose against the shank of the owned 3/64 in drill (tools.drill-3-64, .0469) held behind it against the light. No radius gauge on record reaches R.024 (gauges.radius-gauges starts at 1/32 in)."
+note = "Not owned: to make. Owner ruling 2026-11-24: \"Grind it by hand from an HSS blank.\" An R.024 full-radius groover, about .048 in wide, ground from an owned HSS blank (tools.hss-tool-bit-blanks) on the owned bench grinder (tools.bench-grinder-duracraft-60650): the MHA-MG-05 R.024 rim wire groove and the MHA-MG-06 groove (mg_output_fixture plan: \"the one groover MHA-MG-05's rim groove names\"; that plan's header still says to order). Check of the ground form (the coordinator's delegated method, 2026-11-24; not an owner ruling): mike the tool's width, .040-.058 in with a full radius, which is R.020-.029: the overlap of MHA-MG-05's R.019-.029 and MHA-MG-06's R.020 minimum (gauges.micrometers, owned), and sight the nose against the shank of the owned 3/64 in drill (tools.drill-3-64, .0469) held behind it against the light. No radius gauge on record reaches R.024 (gauges.radius-gauges starts at 1/32 in)."
 
 [tools.needle-files-swiss]
 make = "TTC"

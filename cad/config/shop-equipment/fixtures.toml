@@ -468,7 +468,12 @@ note = "Not made: shop-made from the clip's own strip in the clip's traveler (ca
 
 # MHA-DT-20 cone swing platform (cad/process/dt_cone_swing_platform), Setup
 # 4: the blank screwed to the 1/2 in spoil plate while its outline is cut.
-# To buy: not owned, no vendor or SKU asserted.
+# Owner ruling 2026-11-24 (form), fixture screws: "Yes." to the proposal that
+# owned screws stand in where they serve and the three missing singles are
+# bought at a hardware store, not as McMaster packs. For this fixture: the
+# owned 1/4-20 x 7/8 socket head screws (hardware 91251A541, PO 1103PCAMPOS
+# line 4) serve the 3/4 pair with 1/8 in of washers under each head; the
+# #4-40 x 1/2 and the #10-24 x 1/2 are two of the three singles to buy.
 [fixtures.dt-platform-hold-down-screws]
 name = "Alloy steel socket head cap screws: two 1/4-20 x 3/4, one #4-40 x 1/2, one #10-24 x 1/2"
 kind = "fastener"
@@ -507,6 +512,10 @@ supply = "shop_made"
 purchase = "Make from the 1 in 1018 CF bar on hand (stock.1018-round-1), 4.75 in long: turn 2.00 in of one end to Ø.750 for the AXA No. 4 heavy-duty boring holder (tools.qctp-axa-lms-2280), face both ends square, and drill 3/8 from the shank's end 1.90 deep (the pinion seat's clearance). On the mill: drill #21 and tap 10-32 radially into the Ø1.0 head 1.25 in from its front face, .50 deep. Its .4385 bore is not made here: the dt_crankshaft traveler bores it in place on the lathe, the jig in the No. 4 holder on the tool post, each cutter in the 3-jaw and the carriage feeding the jig (centre drill, 27/64 drill, the .4385 reamer 2.95 deep into the 3/8 hole), so the bore lies on the spindle axis and along the carriage travel by construction. The holder stays on the tool post until the crankshaft's holes are done."
 note = "Workholding for the MHA-DT-11 drive-pin holes (dt_crankshaft plan). The crankshaft goes in far end first: its two Ø.4375 journals (.4367-.4375) and the Ø.375 inboard neck in the .4385 bore (owner ruling 2026-11-23, tool audit Q11), the Ø.3125 pinion seat in the 3/8 hole; a 10-32 set screw on a brass pad bears down on the Ø.41 relief and seats both journals on the bore's bottom; a 1/8 in spacer between the spigot's rear face and the jig face while clamping, then withdrawn, leaves the gap the #54 knockouts break into."
 
+# Owner ruling 2026-11-24 (form), fixture screws: "Yes." The owned #4-40 x 5/8
+# stainless fillister slotted screw (hardware 91794A112, PO 1103PCAMPOS line
+# 23) stands in for the #4-40 x 5/8 socket head; the #10-32 x 5/8 is the third
+# single bought at a hardware store. No McMaster pack is bought.
 [fixtures.pd-arm-sub-plate-screws]
 name = "Socket head cap screws, #10-32 x 5/8 and #4-40 x 5/8, alloy steel black oxide, one each"
 kind = "fixture"
