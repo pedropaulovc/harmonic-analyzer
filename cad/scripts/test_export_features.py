@@ -448,7 +448,8 @@ def test_unknown_requirements_and_references_do_not_acquire_acceptance_bands() -
     assert "length" not in shaft["features"]["outer"]["requirements"]
     assert shaft["datums"] == {}
     assert set(shaft["features"]) == {"outer", "flat_north", "flat_south", "datum_end", "far_end"}
-    assert shaft["features"]["outer"]["requirements"] == ["dia", "finish_ra"]
+    # The bought rod prints as its stock (drawing-guidelines.md rule 4).
+    assert shaft["features"]["outer"]["requirements"] == ["stock"]
 
 
 def test_rocker_profile_zones_export_the_printed_frames_and_govern_their_own_basics() -> None:
@@ -666,7 +667,7 @@ def test_shaft_axial_extents_tile_the_turned_axis() -> None:
     assert [low, high] == pytest.approx([-bank.PIVOT_SHAFT_LENGTH, 0.0])
     assert low < selectors["outer"][0].contains_z_mm < high
     # Each dome runs from the O.D.'s end circle to its apex, the end's plane.
-    radius_od = features["outer"]["dia_nominal"] / 2
+    radius_od = features["outer"]["dia_ref"] / 2
     for name, root in (("datum_end", high), ("far_end", low)):
         sphere = selectors[name][0]
         radius, centre = sphere.diameter_mm / 2, sphere.center_mm[2]
