@@ -37,15 +37,17 @@
 # acceptance), and the
 # two fixture screws (#10-32 x 5/8 and #4-40 x 5/8 socket head cap screws).
 # The pivot bore is the #9 drill's hole (fit audit 2026-11-23, pending owner
-# confirmation): no reamer; the .194 set pin entering is its one check.
+# confirmation): no reamer; the drawing's DRILLED HOLES row, .196 +.004/0,
+# is checked with two set pins: .196 enters, .201 does not.
 #
 # The latch-pin hole (fit audit 2026-11-23, pending owner confirmation; the
 # owner on the audit: "can the holes not be reamed in the first place"):
 # reamed with the over/under set's .1240 reamer and accepted with its own
 # MHA-PD-VN-58 dowel, which does not enter by hand; no Class ZZ pins, no pin
-# or reamer miking and no trial hole. A dowel that does slide in is not a
-# scrapped arm: MHA-PD-00 step 10B bonds it. Its depth is the reamer's quill
-# reading. Tool audit
+# or reamer miking and no trial hole. A dowel that does slide in fails the
+# sheet's note 3: the arm stops and the owner is told (traveler review t2:
+# passing it on to a bond was an acceptance the drawing does not print).
+# Its depth is the reamer's quill reading. Tool audit
 # 2026-11-23 (row india-stone-ib8): the stone is the owned two-grit stone's
 # 320 face (McMaster-Carr 4506A2), as ch_rocker_strap words it.
 #
@@ -57,7 +59,7 @@ part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
 material = "AISI 1018 cold-finished steel, 3/8 x 1 in flat, precision ground (drawing: {{cad.material_spec}})"
 stock = "{{process.blank_z_in:fraction}} x {{process.blank_y_in:.0f}} in precision-ground 1018 flat (Online Metals 12095), one 12 in length: one blank {{process.blank_length_min_mm:in.2f}}–{{process.blank_length_max_mm:in.2f}} in. Sub-plate: a 3.0 in piece sawn off the end of the 1/2 x 6 in 6061 flat."
-note = "Inches unless mm; G-code and console entries in mm (the files and the controller run G21). The bar is bought precision ground (Online Metals 12095, ±.001 thick), so face A (the front) and the rear face stay as supplied and are never machined; mark A in Setup 1 and keep it readable. Speeds on the PM-30MV low belt (100–2800 rpm): no belt change. Home the mill ($H) at the start of every mill setup; each M6 is measured on the tool setter against G54 Z0; pick G54 up again after any E-stop, reset or vise move. Prove each CNC file in air before its first cut. The 2X Ø.0930 dowel holes and the 2X 8-32 tapped holes' match work are made at assembly (MHA-PD-00), not here."
+note = "Inches unless mm; G-code and console entries in mm (the files and the controller run G21). The bar is bought precision ground (Online Metals 12095, ±.001 thick), so face A (the front) and the rear face stay as supplied and are never machined; mark A in Setup 1 and keep it readable. Speeds on the PM-30MV low belt (100–2800 rpm): no belt change. Home the mill ($H) at the start of every mill setup; each M6 is measured on the tool setter against G54 Z0; pick G54 up again after any E-stop, reset or vise move. Prove each CNC file in air before its first cut. The 2X Ø.1240 dowel holes and the 2X 8-32 tapped holes' match work are made at assembly (MHA-PD-00), not here."
 shop = "../shop"
 stock_refs = ["1018-ground-flat-3-8x1", "6061-flat-1-2x6-54in"]
 material_key = "rocker-1018-cold-finished"
@@ -246,7 +248,7 @@ name = "Two-grit sharpening stone (320 face)"
 ref = "sharpening-stone-two-grit"
 [[tools]]
 id = "pin-gauges"
-name = "Pin gauges: the .194 minus (GO) and the pins beside it; .126 and .127 for the pin bore"
+name = "Pin gauges: .196 and .201 for the pivot bore and the pins beside them; .126 and .127 for the pin bore"
 ref = "pin-gauges"
 
 # --- Setup 1 ------------------------------------------------------------------
@@ -404,7 +406,7 @@ milling_cuts = [
 
 [[setups.operations]]
 instruction = "Still clamped, blow out the chips: the pivot bore."
-inspection = "Pivot bore: the .194 minus pin enters (GO). GO fails: stop and tell the owner."
+inspection = "Pivot bore (drawing: Ø.196, DRILLED HOLES +.004/0): the .196 pin enters by hand and the .201 pin does not. Either fails: stop and tell the owner."
 gauge_checks = "other"
 
 [[setups.operations]]
@@ -597,7 +599,7 @@ cut_diameter_mm = 3.1496
 [[setups.operations]]
 cut_kind = "other"
 instruction = "Still chucked, blow out the hole and wipe it dry. Offer an MHA-PD-VN-58 dowel (the 1/8 x 7/8 latch pin, clean and dry) to the hole by hand, chamfered end first; take it away again."
-inspection = "The dowel does not enter by hand past its chamfer (sheet note 3: press fit, does not enter by hand). If it slides in: do not scrap the arm; write SLIP on its tag (MHA-PD-00 step 10B bonds the dowel). Depth, at least {{cad.latch_pin_hole_depth_min_in:.2f}} at full diameter: the reamer's quill reading in the op before ({{process.latch_ream_depth_mm:in.3dot}} plus its .020 chamfer); a short reading: ream again to the reading before unchucking."
+inspection = "The dowel does not enter by hand past its chamfer (sheet note 3: press fit, does not enter by hand). If it slides in: stop, set the arm aside and tell the owner. Depth, at least {{cad.latch_pin_hole_depth_min_in:.2f}} at full diameter: the reamer's quill reading in the op before ({{process.latch_ream_depth_mm:in.3dot}} plus its .020 chamfer); a short reading: ream again to the reading before unchucking."
 gauge_checks = "other"
 feed = "hand"
 
@@ -622,7 +624,7 @@ feed = "hand"
 
 [[setups.operations]]
 instruction = "Inspect the pivot round and the latch hole's height."
-inspection = "Pivot round R{{cad.pivot_end_radius_min_in:.2f}}–{{cad.pivot_end_radius_max_in:.2f}} (the calipers from the pivot bore's wall to the round's far point, plus half the bore); latch-pin hole {{cad.latch_pin_hole_height_min_in:.3dot}}–{{cad.latch_pin_hole_height_max_in:.3dot}} from face A to its centre (the calipers to the hole's edge plus half the hole). Outside: set it aside and tell the owner."
+inspection = "Pivot round R{{cad.pivot_end_radius_min_in:.2f}}–{{cad.pivot_end_radius_max_in:.2f}} (the calipers from the pivot bore's wall to the round's far point, plus half the bore); latch-pin hole {{cad.latch_pin_hole_height_min_in:.2dot}}–{{cad.latch_pin_hole_height_max_in:.2dot}} from face A to its centre (the calipers to the hole's edge plus half the hole). Outside: set it aside and tell the owner."
 gauge_checks = [
   { gauge = "calipers", band_mm = "{{cad.pivot_end_radius_band_mm}}" },
   { gauge = "calipers", band_mm = "{{cad.latch_pin_hole_height_band_mm}}" },
@@ -630,7 +632,7 @@ gauge_checks = [
 
 [[setups.operations]]
 instruction = "Re-gauge both bores after deburring, then their spacing. Not gauged, held by AR01's one clamping from one G54 with face A on the parallels: C's Y position and its squareness to A."
-inspection = "The pivot's GO pin and the pin bore's .127 pin as in Setup 2; spacing B to C: the largest set pin that enters B and the set's .126 pin in C, the calipers over both less half of each, {{cad.pin_bore_x_mm:in.4dot}} ±.002. Outside: set it aside and tell the owner."
+inspection = "The pivot bore's .196 and .201 pins and the pin bore's .127 pin as in Setup 2; spacing B to C: the largest set pin that enters B and the set's .126 pin in C, the calipers over both less half of each, {{cad.pin_bore_x_mm:in.4dot}} ±.002. Outside: set it aside and tell the owner."
 gauge_checks = "other"
 
 # --- Setup 6 ------------------------------------------------------------------

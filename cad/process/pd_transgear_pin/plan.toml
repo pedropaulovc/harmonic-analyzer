@@ -374,11 +374,11 @@ speed_kind = "spindle"
 tool = "sharp"
 drilling = "none"
 sizing = "other"
-instruction = "Finish the journal from Z+{{process.turn_start_z_mm:in.3dot}} in the stub to the seat to Ø{{process.polish_dia_min_in:.4dot}}–{{process.polish_dia_max_in:.4dot}}, miking at both ends and the middle between passes (spindle stopped), in passes of {{process.finish_radial_doc_mm:in.4dot}} or less on the radius, the last no deeper than half of (the miked Ø less the middle of that band); spring passes allowed: what is left over {{process.polish_stop_in:.4dot}} is for polishing."
+instruction = "Finish the journal from Z+{{process.turn_start_z_mm:in.3dot}} in the stub to the seat, leaving stock for polishing: stop at Ø{{process.polish_dia_max_in:.4dot}} or just under, miking at both ends and the middle between passes (spindle stopped), in passes of {{process.finish_radial_doc_mm:in.4dot}} or less on the radius, the last no deeper than half of what the mike reads over {{process.polish_dia_min_in:.4dot}}; spring passes allowed."
 settings = "lathe-sharp-nose-1018"
 cut_diameter_mm = "{{cad.outer_dia_mm}}"
-inspection = "Journal Ø{{process.polish_dia_min_in:.4dot}}–{{process.polish_dia_max_in:.4dot}}."
-gauge_checks = [{ gauge = "micrometers", band_mm = ["{{process.polish_dia_min_mm}}", "{{process.polish_dia_max_mm}}"] }]
+inspection = "Stock left for polishing, not an acceptance. A station over {{process.polish_dia_max_in:.4dot}}: one more light pass. Every station {{process.polish_stop_in:.4dot}} to {{process.polish_dia_max_in:.4dot}}: go on to Op 130. A station already under {{process.polish_stop_in:.4dot}}: skip Op 130 and try the mates in Op 190."
+gauge_checks = "other"
 
 [[setups.operations]]
 cut_kind = "other"
@@ -428,13 +428,23 @@ cut_diameter_mm = "{{cad.outer_dia_mm}}"
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Spindle stopped, the pin still on the bar: wipe the journal and the bores of {{cad.outer_mates}} and the MHA-PD-18 arm clean, a drop of oil on the journal. Slide each of {{cad.outer_mates}} in turn onto the journal by hand, up to the seat, never forced, and turn it; rock it across the pin at both ends of the journal. Then slide one MHA-PD-VN-68 shim along the journal up to the seat. Then slide the arm's pin bore over the journal up to the seat. Wipe the oil off the pin and out of the arm's bore afterwards: it is bonded there."
+instruction = "Spindle stopped, the pin still on the bar. Wipe the journal and the bores clean; a drop of oil on the journal. By hand, never forced, slide on up to the seat, one at a time: each of {{cad.outer_mates}} (turn it, and rock it at both ends of the journal), one MHA-PD-VN-68 shim, then the MHA-PD-18 pin bore. Wipe the oil off the pin and out of the MHA-PD-18 bore: it is bonded there."
 inspection = "Drawing note 1: each mate enters by hand, turns free along the whole journal, and has no shake you can feel when rocked; the shim slides on; the arm slides on by hand up to the seat. No reading accepts the journal: the mates do."
 gauge_checks = "other"
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "A mate, the shim or the arm that will not enter, or binds along the journal: spindle at 600 rpm, a few light strokes of the 400-grit cloth on the file where it binds, the lightest pressure (the centre is gone), and try all of them again. After any such strokes, spindle stopped, mike the journal again at both ends and the middle and turn the chuck by hand watching the tip against the tool's point: a station that now reads more than .0003 under the other two, or a tip that wobbles more than you can just see, is a tapered or bent journal; scrap it as below. One mate alone shaking while the others turn free: its bore is the odd one; set that mate aside, tell the owner, and go on. Every mate shaking: the journal is small; cut the piece off, scrap it, and start again from Op 40, the blank rechucked as in Setup 1's Holding."
+instruction = "Only if a mate, the shim or MHA-PD-18 will not enter, or binds along the journal in Op 190: spindle at 600 rpm, a few light strokes of the 400-grit cloth on the file where it binds, the lightest pressure (the centre is gone). Then Op 210."
+
+[[setups.operations]]
+cut_kind = "other"
+instruction = "After any strokes in Op 200: spindle stopped, mike the journal at both ends and the middle, then turn the chuck by hand and watch the tip against the tool's point."
+inspection = "The three stations read within .0003 of each other and the tip does not wobble to the eye: repeat Op 190. Otherwise Op 220."
+gauge_checks = "other"
+
+[[setups.operations]]
+cut_kind = "other"
+instruction = "Op 210 fails (the journal is tapered or bent), or every mate shakes in Op 190 (the journal is small): cut the piece off, scrap it, and start again from Op 40, the blank rechucked as in Setup 1's Holding. One mate alone shakes while the others turn free: its bore is the odd one; set that mate aside, tell the owner, and go on."
 
 [[setups.operations]]
 cut_kind = "other"
@@ -442,7 +452,7 @@ speed_kind = "spindle"
 tool = "blade"
 drilling = "none"
 sizing = "other"
-instruction = "Set a tray on the ways under the cut, clear of the chuck and saddle. Touch the blade's chuck-side face on the cut tip end and set DRO Z to the blade's width (miked, {{process.blade_width_in:.4dot}} nominal): the DRO then reads the blade's tailstock-side face. Part off with that face at Z-{{cad.part_off_in:.3dot}}: the head about .005 long, faced in Op 270. Pick the pin out of the tray with the spindle stopped."
+instruction = "Set a tray on the ways under the cut, clear of the chuck and saddle. Touch the blade's chuck-side face on the cut tip end and set DRO Z to the blade's width (miked, {{process.blade_width_in:.4dot}} nominal): the DRO then reads the blade's tailstock-side face. Part off with that face at Z-{{cad.part_off_in:.3dot}}: the head about .005 long, faced in Op 290. Pick the pin out of the tray with the spindle stopped."
 settings = "lathe-part-1018"
 cut_diameter_mm = "{{cad.step_head_dia_mm}}"
 
@@ -521,7 +531,7 @@ machine = "PM-1127VF-LB lathe"
 indexing = "none"
 machine_ref = "pm-1127vf-lb"
 holding = "The pin's shank in the split bush, the head out {{cad.outer_stickout_datum_mm:in.2dot}} in from the bush's front face; the bush in the 3-jaw on {{process.bush_grip_in:.2dot}} in, its nick at jaw 1, the jaws closed until the pin cannot be turned by hand. The rest of the pin runs on through the bush into the chuck. The jaws never touch the pin."
-datum = "DRO Z0 the head's faced end (Op 270, the AR tool); the dome's steps (Op 290) are read from it."
+datum = "DRO Z0 the head's faced end (Op 290, the AR tool); the dome's steps (Op 310) are read from it."
 diagram = { file = "diagrams/head.svg", alt = "The pin turned round, its shank held in the split bush in the jaws, the head out: the head faced and its R.18 dome stepped from the table and filed." }
 # The jaws hold the bush (grip and stock its Ø.50); the pin's shank is the
 # least diameter the stick-out is screened on.
@@ -536,7 +546,7 @@ sizing = "other"
 instruction = "Face the head's parted end square in light skims, to the centre with no pip, about .005 off. Between skims, spindle stopped, read the head with the calipers from the seat face (one jaw beside the shank) to the faced end. Set DRO Z0 on the faced end."
 settings = "lathe-ar-1018"
 cut_diameter_mm = "{{cad.step_head_dia_mm}}"
-inspection = "Head {{process.head_face_min_in:.3dot}}–{{process.head_face_max_in:.3dot}} thick, seat face to faced end: the dome then leaves the {{cad.shoulder_min_in:.2dot}}–{{cad.shoulder_max_in:.2dot}} head land for any head Ø in {{cad.step_head_dia_min_in:.2dot}}–{{cad.step_head_dia_max_in:.2dot}} and any dome Op 310 passes."
+inspection = "Head {{process.head_face_min_in:.3dot}}–{{process.head_face_max_in:.3dot}} thick, seat face to faced end: the dome then leaves the {{cad.shoulder_min_in:.2dot}}–{{cad.shoulder_max_in:.2dot}} head land for any head Ø in {{cad.step_head_dia_min_in:.2dot}}–{{cad.step_head_dia_max_in:.2dot}} and any dome Op 330 passes."
 gauge_checks = [{ gauge = "calipers", band_mm = ["{{process.head_face_min_mm}}", "{{process.head_face_max_mm}}"] }]
 
 [[setups.operations]]
@@ -585,7 +595,7 @@ machine = "PM-1127VF-LB lathe"
 indexing = "none"
 machine_ref = "pm-1127vf-lb"
 holding = "Take the bush out and the pin out of it; thread the pin tip first through the bush from behind (the head will not pass through it), the tip out {{cad.outer_stickout_far_mm:in.2dot}} in from the bush's front face, the groove clear of the bush. The bush back in the 3-jaw on {{process.bush_grip_in:.2dot}} in, its nick at jaw 1, the jaws closed until the pin cannot be turned by hand; the head hangs behind the bush inside the chuck. The jaws never touch the pin."
-datum = "DRO Z0 the tip's faced end (Op 330, the AR tool); the dome's steps (Op 350) are read from it."
+datum = "DRO Z0 the tip's faced end (Op 350, the AR tool); the dome's steps (Op 370) are read from it."
 diagram = { file = "diagrams/tip.svg", alt = "The pin turned round again, its journal held in the split bush in the jaws, the tip out: the tip faced and its R.07 dome stepped from the table and filed." }
 lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{process.bush_dia_mm}}", stock_diameter_mm = "{{process.bush_dia_mm}}", stickout_mm = "{{cad.outer_stickout_far_mm}}", minimum_diameter_mm = "{{cad.groove_dia_min_mm}}", support = "none" }
 
@@ -662,4 +672,4 @@ gauge_checks = "other"
 instruction = "A mark you can feel, or a mate that binds or shakes: scrap the pin and make another from Op 40, the blank rechucked as in Setup 1's Holding."
 
 [[setups.operations]]
-instruction = "Wipe the pin with machine oil (FINISH: oiled; MHA-PD-00 degreases it before the bond). Keep it with the MHA-PD-18 arm, the sleeve and both bushings it was fitted to."
+instruction = "Wipe the pin with machine oil (FINISH: oiled; MHA-PD-00 degreases it before the bond). Keep it with MHA-PD-18, MHA-PD-10, MHA-PD-24 and MHA-PD-25, the parts it was fitted to."
