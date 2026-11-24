@@ -57,7 +57,8 @@ def test_shaft_band_runs_in_the_bracket_bores() -> None:
     lower, upper = _fit_deviations.deviations(spec.SHAFT_DIA_BAND)
     clearance_min = ch_pivot_bracket_spec.BORE_DIA - (spec.SHAFT_DIA + upper)
     clearance_max = ch_pivot_bracket_spec.BORE_DIA - (spec.SHAFT_DIA + lower)
-    assert round(clearance_min, 2) == 0.15
+    # .0070 in: the F-drilled bracket bore (fit audit question 1; .0060 at .256).
+    assert round(clearance_min, 3) == 0.178
     assert clearance_max > clearance_min
 
 

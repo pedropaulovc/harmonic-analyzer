@@ -17,7 +17,6 @@ ZZ_TOL_MM = 0.0002 * 25.4
 
 # (plan stem, the bore's feature key, the plan's gauge record)
 BORES = [
-    ("ch_pivot_bracket", "bore", "zz-pins-2560-2600"),
     ("mg_wheel_bar", "axle_bore", "zz-pins-1865-1870"),
     ("mg_wheel_drum", "bore", "zz-pins-4990-4995"),
     ("sm_knife_mount", "knife_bore", "zz-pins-4985-5000"),
