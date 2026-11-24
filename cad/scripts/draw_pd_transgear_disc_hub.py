@@ -398,7 +398,10 @@ _SECTION_REACH_MM = _HUB_R_MM + SECTION_CENTERLINE_OVERRUN_MM
 # The chord hole's dimensions, imported from its station-plane profile,
 # print left of the section, in the air between the flange thickness's
 # block and the ring: the stop's text inline on its dimension line between
-# the hub axis's and the stop's extension lines; the ream's size and fit
+# the hub axis's and the stop's extension lines, its function beside the
+# value on one row (38 mm wide, ending 2 mm short of the ring and starting
+# right of the knockout's size, in the 11 mm between the ream's shelf and
+# the knockout's row); the ream's size and fit
 # beside the ream, under the Ø1.05's lower extension line (y .125), the
 # knockout's beside the knockout, both left of the stop's line so their
 # dimension lines run straight across the hole; the chord offset above the
@@ -409,7 +412,7 @@ SECTION_KEEP = {
         SECTION_CENTER[0] + 0.019,
         _section_xy(_SECTION_REACH_MM, 0.0)[1] + 0.004,
     ),
-    "KeyPinStop": (0.335, _section_xy(-KEY_PIN_STOP / 2.0, 0.0)[1]),
+    "KeyPinStop": (0.3285, _section_xy(-KEY_PIN_STOP / 2.0, 0.0)[1]),
     "KeyPinDia": (0.3125, SECTION_CENTER[1] + 0.0065),
     "KeyPinDrillDia": (
         0.315,
@@ -420,8 +423,12 @@ SECTION_CALLOUTS_BELOW = {
     "KeyPinDia": KEY_PIN_CALLOUT_BELOW,
     "KeyPinDrillDia": KEY_PIN_DRILL_CALLOUT_BELOW,
 }
-# REAM stands beside the ream's size, on the value's own row.
-SECTION_SUFFIXES = {"KeyPinDia": KEY_PIN_SUFFIX}
+# REAM stands beside the ream's size and the stop's function beside the
+# stop, each on the value's own row.
+SECTION_SUFFIXES = {
+    "KeyPinDia": KEY_PIN_SUFFIX,
+    "KeyPinStop": _spec.KEY_PIN_STOP_SUFFIX,
+}
 # Centrelines across the cut, each ending 1 mm past the O.D. where it crosses
 # it: the bore's two, the horizontal one the oil hole's axis, and the chord
 # hole's axis.  The section arrives centre-marked, the mark's arms running

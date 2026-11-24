@@ -701,10 +701,14 @@ OIL_HOLE_CALLOUT_BELOW = "\n".join(
 # air left of the ring holds two rows of sixteen characters under it), then
 # the pin and the link to its fit note: the press fit and its acceptance by
 # the pin (why the hole is reamed and its offset held to +/-.002 is the
-# registry's); the #56 knockout drilled through; the chord's offset and the
-# ream's stop from the hub axis, locations that carry their value and band
-# only (rule 7).
+# registry's); the #56 knockout drilled through; the chord's offset from
+# the hub axis, a location that carries its value and band only (rule 7);
+# and the ream's stop from the hub axis, a three-place size at the title
+# block's band that says what it does beside its value (rule 3; machinist
+# review 2026-11-24, three runs: a bare .160 stated no function): the pin
+# seats on it, its end inside the hub's O.D.
 KEY_PIN_SUFFIX = " REAM"
+KEY_PIN_STOP_SUFFIX = " SEATS PIN"
 KEY_PIN_CALLOUT_BELOW = "\n".join(
     (f"PIN {KEY_PIN_NUMBER}", f"SEE NOTE {KEY_PIN_NOTE}")
 )

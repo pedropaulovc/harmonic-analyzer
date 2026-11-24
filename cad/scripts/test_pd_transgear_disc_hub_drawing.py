@@ -1118,7 +1118,12 @@ def test_the_chord_hole_dimensions_print_left_of_the_ring() -> None:
     # size with REAM beside it and no band, its pin (the gauge) and the link
     # to its note: the press fit, the acceptance by the pin and what the
     # ream and its offset protect, with no dimension in the answer.
-    assert drawing.SECTION_SUFFIXES == {"KeyPinDia": " REAM"}
+    # Rule 3: the stop, a three-place size at the title block's band, says
+    # what it does beside its value.
+    assert drawing.SECTION_SUFFIXES == {
+        "KeyPinDia": " REAM",
+        "KeyPinStop": " SEATS PIN",
+    }
     assert callout.splitlines() == [
         f"PIN {spec.KEY_PIN_NUMBER}",
         f"SEE NOTE {spec.KEY_PIN_NOTE}",
