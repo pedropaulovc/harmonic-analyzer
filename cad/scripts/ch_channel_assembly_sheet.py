@@ -168,7 +168,7 @@ SETTINGS = (
     (
         "rear-keeper-to-stack",
         None,
-        "REAR LUG TO LAST HUB",
+        "LEFT LUG TO LAST HUB",
         _inch(REAR_KEEPER_LEAF_MM),
         "FEELER LEAF",
     ),
