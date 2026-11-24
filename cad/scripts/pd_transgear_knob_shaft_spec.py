@@ -493,12 +493,19 @@ THREAD_STRESS_AREA = math.pi / 4.0 * (THREAD_MAJOR - 0.9743 * THREAD_PITCH) ** 2
 RELIEF_AREA_MIN = math.pi / 4.0 * RELIEF_DIA_MIN**2
 RELIEF_AREA_RATIO_MIN = RELIEF_AREA_MIN / THREAD_STRESS_AREA
 
-# --- Journal: .249 g6 in the MHA-PD-28 bush's matching .249 reamed bore ------
+# --- Journal: .249, turned to the MHA-PD-28 bush's .249 reamed bore ----------
 # #290 fit D8 (owner ruling 2026-10-30: 6 mm -> .249): the bush (reamed after
-# it is pressed into the arm plate) and the cup's pilot take the owned .2490
-# reamer.
+# it is pressed into the arm plate) takes the .2490 reamer (reamer-2490, to
+# order: not on hand); the cup's pilot is an end-milled bonded seat.  Fit
+# audit 2026-11-23, pending owner confirmation (drawing-guidelines rule 4,
+# made to fit): the journal is turned last to the bush's bore and tried in
+# it, and prints REF.  JOURNAL_DIA_BAND is the ANALYSIS band, the modelled
+# result of that fitting, not printed limits: a journal .002 looser trebles
+# its shake in the bore, which the reducer mesh's backlash and the collar
+# air's tilt term (pd_cluster_air) pay, and opens the cup's bond gap past
+# LOCTITE 641's limit (pd_transgear_knob_cup_spec).
 JOURNAL_DIA = 6.3246  # .249
-JOURNAL_DIA_BAND = SHAFT_G6_3_TO_6_MM  # -.0002/-.0005
+JOURNAL_DIA_BAND = SHAFT_G6_3_TO_6_MM  # analysis: -.0002/-.0005
 JOURNAL_DIA_PLACES = 4
 # The cup's front face, from the pinion's rear face (R9-25): the thrust ring +
 # the bush's hub face to rear face + the .008 end float, the cup running that

@@ -57,12 +57,8 @@ from _drawing_marks import (
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
 )
-from _drawing_tolerances import (
-    set_dimension_bilateral_tolerance,
-    set_dimension_symmetric_tolerance,
-)
+from _drawing_tolerances import set_dimension_symmetric_tolerance
 from _document_units import apply_package_model_units
-from _fit_deviations import deviations
 from _part_pmi import author_part_pmi
 from _part_properties import part_drawing_unit
 from pd_transgear_knob_bush_geometry import (
@@ -76,7 +72,6 @@ from pd_transgear_knob_bush_geometry import (
     SHOULDER_ROOT_R_MAX_MM,
 )
 from pd_transgear_knob_bush_spec import (
-    BORE_BAND,
     DIMENSION_CALLOUTS,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
@@ -336,17 +331,11 @@ def build(adapter) -> dict[str, str]:
 
     apply_material(adapter, MATERIAL)
     report_mass_properties(adapter)
-    # The H7 running bore carries its fit band; the hub station and the
-    # overall length their stack bands.  The press Ø is made to the plate's
-    # measured hole: a reference, no model band.  The hub Ø is governed by
-    # its places (the spec's DRAWING_PRECISION): no model band.
-    set_dimension_bilateral_tolerance(
-        adapter,
-        "BoreSketch",
-        "BoreDia",
-        *deviations(BORE_BAND),
-        display_unit=UNIT,
-    )
+    # The hub station and the overall length carry their stack bands.  The
+    # press Ø is made to the plate's measured hole: a reference, no model
+    # band.  The reamed running bore prints the reamer's size and no band
+    # (rule 4); the hub Ø is governed by its places (the spec's
+    # DRAWING_PRECISION): no model band.
     _press_dia_reference(adapter)
     set_dimension_symmetric_tolerance(
         adapter, "BushProfile", "HubLength", HUB_LENGTH_BAND, display_unit=UNIT

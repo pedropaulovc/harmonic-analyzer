@@ -106,18 +106,6 @@ KINK_TANGENT_RIGHT = (-KINK_TANGENT[0], KINK_TANGENT[1])
 PRESS_HOLE_DIA = BUSH.PRESS_DIA
 PRESS_HOLE_LIMITS = (min(BUSH.PRESS_HOLE_BAND), max(BUSH.PRESS_HOLE_BAND))
 PRESS_HOLE_PLACES = 4
-# The bush's traveler leaves a slip pilot on its press step's rear end
-# (BUSH.PILOT_LENGTH_MAX_MM): with the shoulder seated on face A it lies
-# wholly behind the thickest plate, so the whole hole grips the press.
-_STUB_BEHIND_PLATE_MIN_MM = (
-    BUSH.STUB_LENGTH
-    - BUSH.LENGTH_BAND
-    - BUSH.HUB_LENGTH_BAND
-    - THICKNESS_OVER_ARM
-    - THICKNESS_OVER_ARM_BAND
-)
-if BUSH.PILOT_LENGTH_MAX_MM > _STUB_BEHIND_PLATE_MIN_MM:
-    raise AssertionError("MHA-PD-28's pilot reaches into MHA-PD-19's press hole")
 # Face A's mouth is chamfered .015 X 45° (#2425): the lead-in for pressing
 # MHA-PD-28 from face A, and room for the bush's shoulder-root radius so the
 # shoulder seats flat on face A.  The bush geometry owns its size and limits

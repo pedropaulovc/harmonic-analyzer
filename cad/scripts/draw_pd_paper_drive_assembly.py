@@ -2222,10 +2222,9 @@ def _step_text(
     # last sub-steps); a plate or bush renewed later is made again by them.
     bush = n["pd-transgear-knob-bush"]
     bush_seat_feeler = steps.inch_text(knob_bush.SHOULDER_SEAT_GAP_MAX, 4)
-    # BORE_DIA_LIMITS are the H7 deviations about the .249 nominal.
-    bush_ream = steps.inch_window(
-        tuple(knob_bush.BORE_DIA + limit for limit in knob_bush.BORE_DIA_LIMITS), 4
-    )
+    # The bore prints the reamer's size and no band; the journal is turned
+    # to it (fit audit 2026-11-23, pending owner confirmation).
+    bush_ream = steps.inch_text(knob_bush.BORE_DIA, 4)
     bush_made = f"{sub_step('pin-pressed', 2)}-{sub_step('pin-pressed', 7)}"
     lock_gap = LOCK_GAP_WINDOW
     lock_gap_min, lock_gap_max = lock_gap.split(" TO ")
@@ -2538,7 +2537,7 @@ def _step_text(
             f"IF IT STILL ENTERS, REPEAT FROM {s('pin-pressed', 2)} WITH A NEW "
             f"{n['pd-transgear-arm-plate']} PLATE AND {bush} BUSH.",
             f"REAM THE BUSH'S BORE \u00d8{bush_ream} THRU, A RUNNING FIT ON THE "
-            f"{n['pd-transgear-knob-shaft']} JOURNAL, CHECKED WITH PIN GAUGES "
+            f"{n['pd-transgear-knob-shaft']} JOURNAL, WHICH IS TURNED TO IT "
             f"{row_cite('bush-reamed')}.",
         ),
         # #2417: the pin is already pressed (its shank, not its head, is S),
@@ -3592,11 +3591,8 @@ def setting_table_rows(
         "bush-reamed": (
             s("pin-pressed", 7),
             f"{n['pd-transgear-knob-bush']} BORE, REAMED IN THE PLATE",
-            "\u00d8"
-            + steps.inch_window(
-                tuple(knob_bush.BORE_DIA + limit for limit in knob_bush.BORE_DIA_LIMITS), 4
-            ),
-            "PIN GAUGES",
+            "TURNS FREE, NO SHAKE",
+            f"{n['pd-transgear-knob-shaft']} JOURNAL",
         ),
         "reducer-shake": (
             f"{s('arm-plate-located', 12)}, {s('arm-plate-fitted', 20)}, "

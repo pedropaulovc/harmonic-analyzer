@@ -8,10 +8,13 @@ printed here is read from it.
 
 drawing-guidelines.md rule 7: a callout carries its size and process lines
 plus at most two lines of words; anything longer is a numbered note its
-callout links by ``SEE NOTE n``.  Rule 4: the bore's fit takes a standard
-fit name, the mate's drawing number and the resulting clearance as REF; one
-feature with several tight dimensions (the teeth: span and tip) names its
-mate once, in the GEAR DATA block both dimensions link.
+callout links by ``SEE NOTE n``.  Rule 4: the reamed bore prints no band;
+its note names the mate, says that mate is turned to this bore (the
+acceptance, a clearance, prints once, on MHA-PD-17, made last) and what the
+ream protects (the
+necessity answer); one feature with several tight dimensions (the teeth:
+span and tip) names its mate once, in the GEAR DATA block both dimensions
+link.
 """
 
 from __future__ import annotations
@@ -31,7 +34,6 @@ from pd_rack_pinion_spec import (
     MOUTH_BREAK_MAX,
     PITCH_DIA,
     PRESSURE_ANGLE_DEG,
-    SPIGOT_DIAMETRAL_CLEARANCE,
     TAP_WALL_TEXT,
     TEETH,
     WHOLE_DEPTH,
@@ -45,7 +47,7 @@ SCREW_NUMBER = "MHA-SH-VN-59"
 BORE_NOTE = 1
 TAP_NOTE = 2
 
-# The reamed bore: process then depth under its native limits (rule 26:
+# The reamed bore: process then depth under its native size (rule 26:
 # size, process, depth), and its fit in its note.
 BORE_CALLOUT = f"REAM THRU\nSEE NOTE {BORE_NOTE}"
 # The bore's front-edge chamfer is a feature, not the title block's edge
@@ -85,12 +87,15 @@ MESH_CALLOUT = "SEE GEAR DATA"
 # 1.5D.
 FACE_WIDTH_CALLOUT = f"SETS {SCREW_NUMBER}\nENGAGEMENT"
 
-_CLEARANCE = "-".join(inch_text(value, 4) for value in SPIGOT_DIAMETRAL_CLEARANCE)
+# Rule 4: the bore's mate, made to this bore (fit audit 2026-11-23, pending
+# owner confirmation: the MHA-PD-17 spigot prints REF and the clearance,
+# the pair's one acceptance).  What the ream protects is the register's
+# (cad/config/necessity/pd-rack-pinion.yaml; owner ruling 2026-11-24: the
+# reason is not printed on the sheet).
 # Rule 20: the tap-to-bore web's stated shortfall (RV-03) ends the tap note.
 DRAWING_NOTES = "\n".join(
     (
-        f"{BORE_NOTE}. LOCATIONAL CLEARANCE FIT ON {HUB_NUMBER} SPIGOT",
-        f"   (CLEARANCE {_CLEARANCE} REF).",
+        f"{BORE_NOTE}. {HUB_NUMBER} SPIGOT IS TURNED TO THIS BORE.",
         f"{TAP_NOTE}. MATCH-DRILL AT ASSEMBLY WITH {HUB_NUMBER}: SPOT THRU ITS FLANGE",
         f"   HOLES, THEN DRILL AND TAP; MATCH-MARK BOTH. {TAP_WALL_TEXT}.",
     )

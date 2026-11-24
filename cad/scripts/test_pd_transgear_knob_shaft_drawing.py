@@ -483,10 +483,12 @@ def test_every_native_dimension_is_placed_once_with_model_places() -> None:
     detail = {"FrontReliefDia", "FrontReliefWidth", "FrontCornerRadius"}
     assert set(drawing.DETAIL_KEEP) == detail | {"FlatEnd", "FlatToolRadius"}
     assert spec.DRAWING_PRECISION["StudProfile"]["ThreadBlankDia"] == 3
-    # The journal's length controls; the overall prints as a reference.
+    # The journal's length controls; the overall prints as a reference.  The
+    # journal's Ø is made to fit the bush's reamed bore (rule 4): REF.
     assert spec.DRAWING_PRECISION["JournalProfile"]["JournalLength"] == 2
     references = {
         "OverallLength": False,
+        "JournalDia": True,
         "ThreadBlankDia": True,
         "CoreDia": True,
         "FlatToAxis": False,
@@ -569,9 +571,9 @@ def test_tool_end_limits_print_as_native_detail_dimensions() -> None:
 
 def test_model_bands_and_source_linked_properties() -> None:
     bands = model_toleranced_dimensions(part)
-    # Made to fit by feel, printed REF: neither carries a native tolerance.
+    # Made to fit by feel, printed REF: none carries a native tolerance.
     assert ("StudProfile", "CoreDia") not in bands
-    assert bands[("JournalProfile", "JournalDia")] == "*deviations(JOURNAL_DIA_BAND)"
+    assert ("JournalProfile", "JournalDia") not in bands
     assert ("CoreFlatReference", "FlatToAxis") not in bands
     assert ("CoreFlatProfile", "FlatToAxis") not in bands
     assert bands[("StudProfile", "OutsideDia")] == "*deviations(OUTSIDE_DIA_BAND)"
@@ -888,13 +890,18 @@ def test_tight_bands_name_their_mates_once_by_name_and_number() -> None:
     # and the stations note names what its lengths set under it.
     assert sum("MHA-PD-22" in text for _number, text in drawing.NOTE_TEXTS) == 3
     assert all(len(line) <= drawing.NOTES_LINE_CHARS_MAX for line in drawing.NOTES.splitlines())
-    # The journal's matched fit states its clearance from both parts' limits.
+    # The journal is made to fit: its note says how it is accepted (by feel
+    # in the bush's reamed bore), with no number and no reason;
+    # the clearance the analysis bands give is consumed by the stacks only.
     low, high = drawing.JOURNAL_CLEARANCE_MM
     assert low == pytest.approx(
         bush.BORE_DIA + min(bush.BORE_DIA_LIMITS) - spec.JOURNAL_DIA - max(spec.JOURNAL_DIA_BAND)
     )
     assert 0.0 < low < high
-    assert f"(CLEARANCE {drawing._fit_range_text(low, high)})" in printed
+    journal_note = notes[drawing.JOURNAL_FIT_NOTE]
+    assert journal_note.endswith(": TURN TO ITS REAMED BORE, TURNS FREE WITH NO SHAKE.")
+    assert not any(ch.isdigit() for ch in journal_note.split(":", 1)[1])
+    assert "CLEARANCE" not in printed.split("2. ")[0]
     # The relief's plain clearance names its mate by number.
     assert _config.parts("pd-transgear-thumbnut")["number"] in above["ReliefDia"]
     # The mesh mate is the gear data block's alone; the tooth tips and the

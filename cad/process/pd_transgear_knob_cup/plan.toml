@@ -7,8 +7,10 @@
 # turn the outside to .44 back past the parting line, spot, drill #33 through
 # the web and past the pocket floor, drill B short of the pilot floor, then
 # plunge the 1/4 end mill from the tailstock to the pilot depth (owner route,
-# #2425: the pilot's .250 +.001/0 is the end mill's own size, its square
-# corner the floor's R.005 MAX), part off .02 long. Setup 2, the cup turned
+# #2425: the 1/4 end mill's square corner is the floor's R.005 MAX; the
+# pilot is a bonded seat made to fit the MHA-PD-08 journal, its size REF
+# and its clearance on the journal the requirement, sheet note 2, fit audit
+# 2026-11-23, pending owner confirmation), part off .02 long. Setup 2, the cup turned
 # round on its outside over a shim wrap: face the rear to length from the
 # miked length, plunge the 3/16 end mill for the head pocket. Bench: deburr,
 # check, oil.
@@ -20,15 +22,21 @@
 #
 # Not on hand (cad/config/shop-equipment/gauges.toml pin-gauges, to order;
 # owner 2026-11-21: "ill buy pin gauges"): the .113 and .117 pins for the web
-# hole; and (gauges.toml plug-gauges-2500-2510, to order) the .2500 GO /
-# .2510 NO-GO Class X pair for the pilot's .001 band, which a minus pin
-# used as GO would pass under size.
+# hole and the .250-.254 pins for the pilot. The pilot is accepted on its
+# mate (traveler-guidelines T0; traveler review 2026-11-24, three runs: two
+# fixed pins pass and reject pilots the sheet's clearance does not): the
+# finished MHA-PD-08 journal's end is miked as J and enters to the floor,
+# P is the largest .001-step pin that enters, and P less J is .0005-.004.
+# The pilot lies between P and P + .001, so its clearance on the journal is
+# inside the sheet's .0005-.005 and LOCTITE 641's fill
+# (pd_transgear_knob_cup_spec PILOT_CLEARANCE, LOCTITE_641_GAP_MAX). No
+# plug gauge pair.
 title = "Transgear Knob Cup"
 part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
 material = "C36000 free-machining brass round bar, 7/8 in (drawing: {{cad.material_name}})"
 stock = "Lot: {{process.quantity:d}} cup. Ø{{process.bar_dia_in:.3dot}} bar, on hand; the cup takes about {{process.bar_use_in:.2dot}} in of it."
-note = "Inches unless mm. Lathe PM-1127VF-LB (70–380 and 380–2000 rpm); brass cut dry. Left for MHA-PD-00 step 22, not made here: facing the front face to the fitted pilot depth and the pilot's bond on MHA-PD-08. To order (not on hand): the .2500 GO / .2510 NO-GO plug gauge pair for the pilot and the .113 and .117 pins (pin-gauge sets) for the web hole."
+note = "Inches unless mm. Lathe PM-1127VF-LB (70–380 and 380–2000 rpm); brass cut dry. Make MHA-PD-08 first: Op 70 accepts the pilot on its finished journal. Left for MHA-PD-00 step 22, not made here: facing the front face to the fitted pilot depth and the pilot's bond on MHA-PD-08. To order (not on hand): the .113, .117 and .250–.254 pins (pin-gauge sets)."
 shop = "../shop"
 stock_refs = ["c360-round-7-8"]
 material_key = "lathe-c360"
@@ -71,6 +79,13 @@ web_drill_depth_in = 0.3
 # long) then ends inside the #33 hole, above the pilot floor, so the end mill
 # cuts the floor flat across its whole face.
 pilot_drill_depth_in = 0.08
+# The 1/4 end mill's size, the pilot's REF size on the sheet.
+pilot_cutter_dia_mm = 6.35
+# The smallest pin tried in the pilot, the 1/4 end mill's size, and the
+# most the largest entering pin may stand over the miked journal: the
+# sheet's clearance maximum less the set's .001 step (the header above).
+pilot_go_pin_in = 0.25
+pilot_pin_over_journal_max_in = 0.004
 # Setup 2: how much of the outside the jaws take, from the front face.
 regrip_grip_in = 0.18
 # The feeler leaf the AR's tip is touched through in Setup 2 (the shop's
@@ -99,7 +114,7 @@ ref = "drill-b"
 
 [[tools]]
 id = "endmill-1-4"
-name = "1/4 two-flute end mill (both pieces on hand)"
+name = "1/4 two-flute end mill"
 ref = "endmill-hss-2fl-1-4"
 
 [[tools]]
@@ -119,14 +134,8 @@ ref = "feeler-gauges"
 
 [[tools]]
 id = "pins"
-name = "Pin gauges .113 and .117"
+name = "Pin gauges .113, .117 and .250–.254"
 ref = "pin-gauges"
-status = "to_order"
-
-[[tools]]
-id = "plugs"
-name = "Plug gauges .2500 GO, .2510 NO-GO"
-ref = "plug-gauges-2500-2510"
 status = "to_order"
 
 [[tools]]
@@ -136,7 +145,7 @@ ref = "jig-files"
 
 [[tools]]
 id = "deburr"
-name = "Deburring countersink"
+name = "Deburring scraper"
 ref = "deburring-set"
 
 [[setups]]
@@ -213,31 +222,19 @@ peck = "none"
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Mike the 1/4 end mill across its two flutes, near the end: it must read .2500–.2505 (the pilot's band less the tailstock chuck's runout)."
-inspection = "End mill .2500–.2505 across the flutes, micrometer."
-gauge_checks = "other"
-feed = "hand"
-
-[[setups.operations]]
-cut_kind = "other"
-instruction = "End mill under .2500 or over .2505 in Op 70: mike the shop's second 1/4 end mill (the same McMaster 3051A51, both pieces on hand) the same way. Both outside: stop and report; the pilot cannot be cut to the drawing with them."
-feed = "hand"
-
-[[setups.operations]]
-cut_kind = "other"
 speed_kind = "spindle"
 tool = "endmill-1-4"
 drilling = "none"
-sizing = { kind = "band", band_mm = "{{cad.pilot_dia_band_mm}}" }
+sizing = "other"
 instruction = "The pilot: the end mill in the tailstock drill chuck, short. Feed it until its end just touches the faced end and zero the quill scale there. Plunge slowly to {{cad.pilot_depth_in:.3dot}}, backing out to clear chips every .03: its square corner leaves the floor's R{{cad.pilot_corner_radius_max_mm:in.3dot}} MAX and its end the flat floor."
 settings = "lathe-plunge-1-4-c360"
-cut_diameter_mm = "{{cad.pilot_dia_mm}}"
-inspection = "Pilot Ø{{cad.pilot_dia_min_in:.4dot}}–{{cad.pilot_dia_max_in:.4dot}}: the {{cad.pilot_dia_min_in:.4dot}} GO plug enters to the floor, the {{cad.pilot_dia_max_in:.4dot}} NO-GO plug does not. Depth {{cad.pilot_depth_min_in:.3dot}}–{{cad.pilot_depth_max_in:.3dot}} from the faced end, calipers' depth rod beside the #33 hole (a supply size); write it down."
-gauge_checks = [{ gauge = "plug-gauges-2500-2510", band_mm = "{{cad.pilot_dia_band_mm}}" }, { gauge = "calipers", band_mm = "{{cad.pilot_depth_band_mm}}" }]
+cut_diameter_mm = "{{process.pilot_cutter_dia_mm}}"
+inspection = "The pilot is accepted on its mate (drawing note 2: clearance {{cad.pilot_diametral_clearance_min_in:.4dot}}–{{cad.pilot_diametral_clearance_max_in:.3dot}} on the {{cad.pilot_mate}} journal). Mike the finished {{cad.pilot_mate}} journal's end: J. The journal's end enters to the floor. Try the pins from {{process.pilot_go_pin_in:.3dot}} up: P is the largest that enters. P less J is {{cad.pilot_diametral_clearance_min_in:.4dot}}–{{process.pilot_pin_over_journal_max_in:.3dot}} (the pilot is under P plus .001); write J and P down. Depth {{cad.pilot_depth_min_in:.3dot}}–{{cad.pilot_depth_max_in:.3dot}} from the faced end, calipers' depth rod beside the #33 hole (a supply size); write it down."
+gauge_checks = [{ gauge = "pin-gauges", band_mm = [6.35, 6.4516] }, { gauge = "micrometers", band_mm = [0.0127, 0.1016] }, { gauge = "calipers", band_mm = "{{cad.pilot_depth_band_mm}}" }]
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Pilot short of {{cad.pilot_depth_min_in:.3dot}} in Op 90: plunge on. Over {{cad.pilot_depth_max_in:.3dot}}, the GO plug tight, or the NO-GO plug entering: part the turned length off as scrap and start again at Op 10."
+instruction = "Pilot short of {{cad.pilot_depth_min_in:.3dot}} in Op 70: plunge on. Over {{cad.pilot_depth_max_in:.3dot}}, the journal not entering, or P less J outside {{cad.pilot_diametral_clearance_min_in:.4dot}}–{{process.pilot_pin_over_journal_max_in:.3dot}}: part the turned length off as scrap and start again at Op 10."
 feed = "hand"
 
 [[setups.operations]]
@@ -257,7 +254,7 @@ machine = "PM-1127VF-LB lathe"
 indexing = "none"
 machine_ref = "pm-1127vf-lb"
 holding = "3-jaw over a shim wrap of brass shim, {{process.regrip_grip_in:.2dot}} in of the outside in the jaws from the front face (a pencil line that far from it at the jaw fronts), the wrap cut no wider than that, closed lightly (the pilot's wall is about .095); the parted end about .20 in out. Nothing seats the cup axially."
-datum = "Z0 (carriage DRO): the rear face, {{cad.rear_face_length_in:.2dot}} from the front face, preset from the length miked in Op 120 through a {{process.touch_leaf_in:.3dot}} feeler leaf. The pocket's depth runs from it by the tailstock quill scale."
+datum = "Z0 (carriage DRO): the rear face, {{cad.rear_face_length_in:.2dot}} from the front face, preset from the length miked in Op 100 through a {{process.touch_leaf_in:.3dot}} feeler leaf. The pocket's depth runs from it by the tailstock quill scale."
 diagram = { file = "diagrams/regrip.svg", alt = "The cup turned round, its front end in the jaws over a shim wrap: the parted end faced to length, the 3/16 end mill plunged from the tailstock for the head pocket over the #33 hole." }
 lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{cad.outside_dia_mm}}", stock_diameter_mm = "{{cad.outside_dia_mm}}", stickout_mm = 5.08, minimum_diameter_mm = "{{cad.outside_dia_mm}}", support = "none" }
 
@@ -275,7 +272,7 @@ gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.rear_face_length_band_
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Over {{cad.rear_face_length_max_in:.2dot}} in Op 120: chuck it again as Op 120 and repeat it from that reading. Under {{cad.rear_face_length_min_in:.2dot}}: scrapped, not reworked; make another from Setup 1."
+instruction = "Over {{cad.rear_face_length_max_in:.2dot}} in Op 100: chuck it again as Op 100 and repeat it from that reading. Under {{cad.rear_face_length_min_in:.2dot}}: scrapped, not reworked; make another from Setup 1."
 feed = "hand"
 
 [[setups.operations]]
@@ -284,7 +281,7 @@ speed_kind = "spindle"
 tool = "endmill-3-16"
 drilling = "none"
 sizing = { kind = "band", band_mm = "{{cad.pocket_dia_band_mm}}" }
-instruction = "Chuck it again as Op 120. The head pocket: the 3/16 end mill in the tailstock drill chuck, short. Feed it until its end just touches the rear face and zero the quill scale there. Plunge slowly to {{cad.pocket_depth_in:.3dot}}, backing out to clear chips every .03, centred on the #33 hole: its square corner leaves the floor's R{{cad.pocket_corner_radius_max_mm:in.3dot}} MAX."
+instruction = "Chuck it again as Op 100. The head pocket: the 3/16 end mill in the tailstock drill chuck, short. Feed it until its end just touches the rear face and zero the quill scale there. Plunge slowly to {{cad.pocket_depth_in:.3dot}}, backing out to clear chips every .03, centred on the #33 hole: its square corner leaves the floor's R{{cad.pocket_corner_radius_max_mm:in.3dot}} MAX."
 settings = "lathe-plunge-3-16-c360"
 cut_diameter_mm = 4.7625
 inspection = "Pocket Ø{{cad.pocket_dia_min_in:.2dot}}–{{cad.pocket_dia_max_in:.2dot}}, calipers; depth {{cad.pocket_depth_min_in:.3dot}}–{{cad.pocket_depth_max_in:.3dot}} from the rear face, calipers' depth rod beside the #33 hole. The length, the pilot depth and the pocket depth inside their bands hold the drawing's {{cad.pocket_callout}}."
@@ -292,7 +289,7 @@ gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.pocket_dia_band_mm}}" }, 
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Pocket short of {{cad.pocket_depth_min_in:.3dot}} in Op 140: plunge on and read it again. Over {{cad.pocket_depth_max_in:.3dot}}: scrapped, not reworked; make another from Setup 1."
+instruction = "Pocket short of {{cad.pocket_depth_min_in:.3dot}} in Op 120: plunge on and read it again. Over {{cad.pocket_depth_max_in:.3dot}}: scrapped, not reworked; make another from Setup 1."
 feed = "hand"
 
 [[setups]]
@@ -318,7 +315,7 @@ speed_kind = "other"
 tool = "deburr"
 drilling = "none"
 sizing = "other"
-instruction = "Break both ends of the #33 hole with a light twist of the countersink by hand, no burr standing on either floor."
+instruction = "Break both ends of the #33 hole with the deburring set's scraper blade, reached down the pilot and the pocket without touching their mouths: no burr standing on either floor."
 feed = "hand"
 
 [[setups.operations]]
@@ -328,13 +325,13 @@ gauge_checks = [{ gauge = "pin-gauges", band_mm = "{{cad.web_hole_dia_band_mm}}"
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Pilot again, after Setup 2's jaws held it: the {{cad.pilot_dia_min_in:.4dot}} GO plug enters to the floor, the {{cad.pilot_dia_max_in:.4dot}} NO-GO plug does not, each tried at three places round the mouth (a jaw-pressed wall closes the pilot)."
-inspection = "Pilot Ø{{cad.pilot_dia_min_in:.4dot}}–{{cad.pilot_dia_max_in:.4dot}} (the bond gap on {{cad.pilot_mate}})."
-gauge_checks = [{ gauge = "plug-gauges-2500-2510", band_mm = "{{cad.pilot_dia_band_mm}}" }]
+instruction = "Pilot again, after Setup 2's jaws held it: the {{cad.pilot_mate}} journal's end still enters to the floor, tried at three places round the mouth (a jaw-pressed wall closes the pilot)."
+inspection = "The journal's end enters to the floor at all three places and pin P of Op 70 still enters."
+gauge_checks = [{ gauge = "pin-gauges", band_mm = [6.35, 6.4516] }]
 feed = "hand"
 
 [[setups.operations]]
-instruction = "A cup failing Op 180 or Op 190 is scrapped, not reworked: make another from Setup 1."
+instruction = "A cup failing Op 160 or Op 170 is scrapped, not reworked: make another from Setup 1."
 feed = "hand"
 
 [[setups.operations]]

@@ -15,7 +15,9 @@ journal end seats on the pilot's floor.  The cup's O.D. is the bush's rear
 stub's, the Ø the cup's front face meets (owner: "pd-16 diameter should also
 be reduced to match new knob bush").
 
-Decimal inch (#290): the pilot is .250 +.001/0, the end mill's own Ø band.
+Decimal inch (#290): the pilot is .250 +.004/0, the DRILLED HOLES row (fit
+audit 2026-11-23, pending owner confirmation): a bonded seat's gap takes the
+band, and the gap stays inside LOCTITE 641's fill.
 
 Part frame: axis local +Y through the origin (``Axis1``); the front face
 (the running face, as turned) is the Top Plane, y = 0; the pilot's floor
@@ -43,7 +45,6 @@ from pd_transgear_knob_shaft_spec import (
     END_FLOAT_SET_TOL,
     JOURNAL_DIA,
     JOURNAL_DIA_BAND,
-    JOURNAL_DIA_MIN,
     JOURNAL_STANDOUT,
     JOURNAL_STANDOUT_BAND,
     REAR_CHAMFER_MIN as SHAFT_REAR_CHAMFER_MIN,
@@ -62,10 +63,24 @@ LENGTH = 9.144  # .36 as turned (SUPPLY)
 # lead and the drill's cone), and the journal end must seat flat on the web
 # for the fitted float, so after a B pilot drill the owned 1/4 HSS 2-flute
 # centre-cutting square end mill (tools-cutting endmill-hss-2fl-1-4,
-# McMaster 3051A51: Ø tolerance -.000/+.001, read live 2026-11-20 by
-# T20Pdplate) is plunged from the tailstock; the band is the tool's own.
-BORE_DIA = 6.35  # .250
-BORE_BAND = (0.0254, 0.0)  # (upper, lower) deviations: +.001/-.000
+# McMaster 3051A51) is plunged from the tailstock.  The pilot is a bonded
+# seat made to fit its mate (fit audit 2026-11-23, pending owner
+# confirmation; drawing-guidelines.md rule 4, form 2; owner, 2026-11-23:
+# "why do we need single micron level tolerance x class plug gauges for a
+# hobby machining project"): its size prints REF with no limits and
+# PILOT_CLEARANCE, the diametral clearance on the MHA-PD-08 journal, is the
+# printed requirement (machinist review 2026-11-24, two runs: the printed
+# +.004/0, with no drill named, read as a tight band whose only reason was
+# a fit name).  It was the end mill's own +.001/0, gauged by a Class X plug
+# pair.  What fails if the clearance is greater: the bond gap on the
+# journal passes LOCTITE 641's fill (LOCTITE_641_GAP_MAX below); if it is
+# less the journal does not enter with the compound on it.  BORE_BAND is
+# the ANALYSIS band, what the 1/4 end mill is taken to cut (the .250 pin of
+# the .001-step set enters, the .253 pin does not), never a printed limit;
+# the ring round the pilot keeps the wall target (PILOT_WALL_WORST).
+BORE_DIA = 6.35  # .250 REF
+BORE_BAND = (0.0762, 0.0)  # analysis (upper, lower) deviations: +.003/0
+PILOT_CLEARANCE = (0.0127, 0.127)  # printed (least, greatest) diametral: .0005-.005
 PILOT_DEPTH = 3.8608  # .152 as turned (SUPPLY)
 # The web's #33 drill and the rear pocket the screw head sinks in, cut flat
 # with a 3/16 end mill after the drill.  The pocket only clears the head, so
@@ -121,27 +136,51 @@ BORE_MAX = BORE_DIA + max(BORE_BAND)
 
 # --- The bonded pilot: the journal end, LOCTITE 641 -----------------------------
 # drawing-guidelines.md rule 23: a bonded fit is a fit; the sheet prints the
-# pilot's limits, names MHA-PD-08 and states the diametral clearance, which
-# must lie inside the grade's gap fill.  Henkel's LOCTITE 641 product page
+# pilot's size REF, names MHA-PD-08 and states the diametral clearance,
+# PILOT_CLEARANCE, which must lie inside the grade's gap fill.  The journal
+# is itself made to fit: turned to the MHA-PD-28 bush's reamed bore, REF on
+# its own sheet, so its size follows that bore.  The journal this pilot can
+# meet is therefore the bush bore's analysis band less the running
+# clearance the shaft's model gives the pair (Codjiflo on #3493: the range
+# rested on the journal's own g6 band, which a journal fitted to a bore at
+# the top of its band leaves, .2492 in a .2495 bore).  The traveler accepts
+# the pilot with the journal itself and two pins of the
+# .001-step set.  Henkel's LOCTITE 641 product page
 # (https://next.henkel-adhesives.com/us/en/products/industrial-adhesives/central-pdp.html/loctite-641/BP000000153498.html,
 # read 2026-11-20) gives "Gap fill: 0.15 mm"; its TDS (May 2004,
 # https://datasheets.tdx.henkel.com/LOCTITE-641-en_GL.pdf) charts full cure
 # on steel pins and collars at 0.05-0.2 mm gaps.  641 is the removable grade
 # (rule 23: "641 where the part must come out").
 LOCTITE_641_GAP_MAX = 0.15
+_JOURNAL_RUNNING_CLEARANCE = (
+    min(BUSH.BORE_DIA_LIMITS) - max(JOURNAL_DIA_BAND),
+    max(BUSH.BORE_DIA_LIMITS) - min(JOURNAL_DIA_BAND),
+)
+# (least, greatest) journal as fitted to the bush's bore: .2480-.2493.
+JOURNAL_FITTED = (
+    BUSH.BORE_DIA + min(BUSH.BORE_DIA_LIMITS) - max(_JOURNAL_RUNNING_CLEARANCE),
+    BUSH.BORE_DIA + max(BUSH.BORE_DIA_LIMITS) - min(_JOURNAL_RUNNING_CLEARANCE),
+)
 BORE_JOURNAL_CLEARANCE = (
-    BORE_DIA + min(BORE_BAND) - (JOURNAL_DIA + max(JOURNAL_DIA_BAND)),
-    BORE_MAX - JOURNAL_DIA_MIN,
+    BORE_DIA + min(BORE_BAND) - max(JOURNAL_FITTED),
+    BORE_MAX - min(JOURNAL_FITTED),
 )
 if min(BORE_JOURNAL_CLEARANCE) <= 0.0:
     raise AssertionError("MHA-PD-16's pilot bore binds on the journal")
-if max(BORE_JOURNAL_CLEARANCE) > LOCTITE_641_GAP_MAX:
+if max(PILOT_CLEARANCE) > LOCTITE_641_GAP_MAX:
     raise AssertionError("MHA-PD-16's pilot clearance passes LOCTITE 641's gap fill")
-# The pilot callout's diametral clearance, rounded outward onto the inch grid.
+if not (
+    min(PILOT_CLEARANCE) <= min(BORE_JOURNAL_CLEARANCE) + 1e-9
+    and max(BORE_JOURNAL_CLEARANCE) <= max(PILOT_CLEARANCE) + 1e-9
+):
+    raise AssertionError("MHA-PD-16's modelled pilot leaves its printed clearance")
+# The pilot note's diametral clearance, the printed requirement: its least
+# at four places (half a thousandth), its greatest at three.
 BORE_CLEARANCE_TEXT = (
-    f"{inch_text(inch_floor_mm(min(BORE_JOURNAL_CLEARANCE), 4), 4)}-"
-    f"{inch_text(inch_ceil_mm(max(BORE_JOURNAL_CLEARANCE), 4), 4)}"
+    f"{inch_text(min(PILOT_CLEARANCE), 4)}-{inch_text(max(PILOT_CLEARANCE), 3)}"
 )
+# The pilot's Ø prints in parentheses (REF): the fit is the requirement.
+REFERENCE_DIMENSIONS: frozenset[str] = frozenset({"BoreDia"})
 
 # --- The float, set at fit-up (drawing-guidelines.md rule 19) ------------------
 # The journal end seats on the pilot's floor, so the fitted pilot depth is

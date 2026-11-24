@@ -1,0 +1,16 @@
+# MHA-PD-06 rack pinion disc: why each REAM and each band tighter than the
+# title block stays (drawing-guidelines.md rule 4; owner ruling 2026-11-24:
+# the reason lives here, not on the sheet). Read by the machinist review only.
+# Fit audit 2026-11-23, pending owner confirmation. The outside diameter's
+# band and the tooth-space runout are gear data (rule 7), exempt from the
+# test; the taps' BREAK EDGES .004 MAX is a single limit.
+# The bore stays reamed although its mate is made to it: a 1/2 drilled hole
+# (+.004/0) leaves the MHA-PD-17 spigot, turned to it at .003-.005, a wall
+# of .0705 over that hub's bore, under the .071 the owner confirmed there
+# (MHA-PD-17 RV-02), and this disc's tap web .0635 (RV-03).
+necessity:
+  - id: N-01
+    feature: "sheet 1, Ø.501 REAM THRU bore (note 1: the MHA-PD-17 spigot is turned to it)"
+    kind: gap
+    reason: "a drilled hole thins the MHA-PD-17 spigot wall under .071"
+    source: "pd_rack_pinion_spec.BORE_BAND; pd_transgear_disc_hub_spec.BORE_WALLS_FINISHED; machinist_exceptions RV-03, pd-transgear-disc-hub RV-02"
