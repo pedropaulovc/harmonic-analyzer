@@ -1,0 +1,18 @@
+# Why each band under the title block stays on MHA-SH-02 (owner ruling
+# 2026-11-24: "In the part's registry file, not on the sheet. The sheet stays
+# clean; the reviewer fails a tight feature that has no registry reason.").
+# Read by the machinist review only. Each band was re-derived .002 looser on
+# the spec chain (fit audit 2026-11-23, lane 2). The bore's DIAMETRAL
+# CLEARANCE .004-.012 is a made-to-fit acceptance on the miked column, not a
+# size band; the grip offset takes the title block's .XXX.
+necessity:
+  - id: N-01
+    feature: "sheet 1, split-face view, 2X #8-32 tap station .689 ±.004 from the bore axis"
+    kind: gap
+    reason: "#8 screw line from MHA-SH-01 holes closes past ruled shortfall"
+    source: "owner ruling 2026-11-08 (Pedro), #2144 item 12.3 (kept; RV-02); sh_column_clamp_fit: at ±.005 the screw-line shortfall is 0.090 mm against the ruled 0.053 (sh-column-clamp-front RV-02)"
+  - id: N-02
+    feature: "sheet 1, split-face view, 2X #8-32 tap height .315 ±.004"
+    kind: gap
+    reason: "#8 screw line from MHA-SH-01 holes closes past ruled shortfall"
+    source: "owner ruling 2026-11-08 (Pedro), #2144 item 12.3 (kept; RV-02); sh_column_clamp_fit: at ±.005 the screw-line shortfall is 0.090 mm against the ruled 0.053 (sh-column-clamp-front RV-02)"
