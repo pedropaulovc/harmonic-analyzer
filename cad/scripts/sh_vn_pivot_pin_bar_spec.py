@@ -60,7 +60,7 @@ PIN_INSTALLED_LENGTH = _bar.BAR_WIDTH  # dressed flush with both bar faces
 # stock both dressed ends share.
 PIN_LENGTH_LIMITS = _pin.PIN_LENGTH_LIMITS
 # Dressed ends stand nothing proud of the bar faces: at the .300 pitch the
-# top-notch stack below leaves 0.6858 against the 0.10 running floor (#1038;
+# top-notch stack below leaves 0.6096 against the 0.10 running floor (#1038;
 # owner rulings 2026-10-15 option 2 and 2026-11-11).
 PIN_END_PROUD_MAX = 0.0
 
@@ -226,6 +226,6 @@ if PIN_INSTALLED_LENGTH != _bar.BAR_WIDTH:
     raise AssertionError("the installed pin must be flush with both bar faces")
 if _bar.LEVER_THICKNESS != _lever.LEVER_THICKNESS:
     raise AssertionError("the bar's restated lever thickness drifted")
-# Re-run at the .300 pitch (#1038 re-pitch): neighbour_clearance_min 0.6858.
+# Re-run at the .300 pitch (#1038 re-pitch): neighbour_clearance_min 0.6096.
 if not math.isclose(_lever.HUB_LENGTH, 7.62):
     raise AssertionError("the station pitch moved; re-run the #1038 gap budget")

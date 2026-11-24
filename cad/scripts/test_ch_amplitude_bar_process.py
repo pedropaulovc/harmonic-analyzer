@@ -118,7 +118,7 @@ def test_context_numbers_the_tools_and_places_the_cuts(ctx) -> None:
     }
     assert levels == {
         "foot_notch": ["G1 Z1.854 F{feed}", "G1 Z2.946 F{feed}"],
-        "top_notch": ["G1 Z1.600 F{feed}", "G1 Z3.213 F{feed}"],
+        "top_notch": ["G1 Z1.600 F{feed}", "G1 Z3.226 F{feed}"],
     }
     # Four pin holes .25 in from the top end, one per bar, a pitch apart.
     holes = next(
