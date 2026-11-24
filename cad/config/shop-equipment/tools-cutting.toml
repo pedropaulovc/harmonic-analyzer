@@ -480,17 +480,21 @@ cite = ["McMaster-Carr packing list, PO 0803PCAMPOS (1616317-01, 08/04/2025), li
 
 # The small Malco in the owner's photo (owner-photos/saws-arbors-2026-11-24.jpg
 # in the cnc triage folder; etched "MALCO ... COMPANY" and ".032") is this
-# saw. Its hole: the packing list says 3/8; the owner said 2026-11-24 "the
-# small ones 0.315" without naming which saws, so the hole is not recorded
-# until he reads this one (asked).
+# record's saw. Its hole, measured by the owner 2026-11-24: "malco 0.315 in
+# hole". The McMaster 3044A23 packing-list line says 3/8 in: either McMaster
+# shipped a .315 (8 mm) hole saw under that line or the owned saw is a
+# different one; the owner's measurement is the record.
 [tools.slitting-saw-1-032]
-name = "Smooth-finish slitting saw, 1 in diameter, .032 in thick, 3/8 in arbor hole"
+name = "Malco smooth-finish slitting saw, 1 in diameter, .032 in thick, .315 in hole"
 kind = "slitting_saw"
+make = "Malco"
 sku = "3044A23"
 status = "on_hand"
 pieces = 1
-cite = ["McMaster-Carr packing list, PO 0803PCAMPOS (1616317-01, 08/04/2025), line 15: \"Smooth-Finish Slitting Saw, 0.032\" Thick, 1\" Diameter with 3/8\" Arbor Hole\", 1 each", "Owner (Pedro) 2026-11-17: \"add to inventory ... already owned\"", "Owner (Pedro) 2026-11-24, verbatim: \"the larger slitting saws have 1in bore diam, the small ones 0.315\"; photo C:/farm-runs/triage-2026-11-19/owner-photos/saws-arbors-2026-11-24.jpg"]
-note = "Owner confirmed on hand 2026-11-19 (McMaster 3044A23, $14.06). Hole: 3/8 per the packing list, .315 per the owner's 2026-11-24 words if they cover this saw; to confirm. Neither fits the owned stepped arbors, whose smallest step is 1/2."
+thickness_in = 0.032
+bore_in = 0.315
+cite = ["McMaster-Carr packing list, PO 0803PCAMPOS (1616317-01, 08/04/2025), line 15: \"Smooth-Finish Slitting Saw, 0.032\" Thick, 1\" Diameter with 3/8\" Arbor Hole\", 1 each", "Owner (Pedro) 2026-11-17: \"add to inventory ... already owned\"", "Owner (Pedro) 2026-11-24, verbatim: \"the larger slitting saws have 1in bore diam, the small ones 0.315\"; \"malco 0.315 in hole\"; photo C:/farm-runs/triage-2026-11-19/owner-photos/saws-arbors-2026-11-24.jpg"]
+note = "Owner confirmed on hand 2026-11-19 (McMaster 3044A23, $14.06). Hole .315, measured by the owner 2026-11-24 (the packing list's 3/8 conflicts; his measurement governs). Fits neither owned stepped arbor (smallest step 1/2)."
 
 # The owned Malco .064 (photo: etched "MALCO SAW COMPANY CRANSTON RI USA" and
 # ".064"; a keyway in its hole). Its hole is 1 in (owner 2026-11-24, verbatim:
@@ -571,12 +575,16 @@ note = "On hand, three. Diameter, thickness and maximum rpm not recorded (not et
 # holds whatever the screw's class (not read). The drive is the cap's
 # friction only (not keyed): about 11 kN of preload on two faces of the saw.
 # Its axial place is the shoulder and cap; its centring is a sliding fit,
-# so runout is read on every mounting. Not yet measured (asked 2026-11-24):
-# the screw head's stand past the cap face (a countersunk head normally sits
-# flush or under; not stated), the body's diameter above the saw, the
-# installed length from the spindle nose, runout. A plan that rests a
-# clearance on one of those names it as a bounded assumption and stops to
-# measure it before the spindle starts. The R8 one is the
+# so runout is read on every mounting. Measured by the owner 2026-11-24:
+# "sticks 1.4 in below spindle; 1.25 dia" (the arbor installed; its body
+# above the saw 1.25 across, the same as the cap). Whether the 1.4 runs to
+# the shoulder the saw seats on or to the cap's lower face is not stated
+# (asked): a plan takes the reading that is worse for it (lowest point 1.4 +
+# the saw + .50 cap below the nose for clearance under it) or stops to
+# measure. Not yet measured: the screw head's stand past the cap face (a
+# countersunk head normally sits flush or under; not stated) and runout. A
+# plan that rests a clearance on one of those names it as a bounded
+# assumption and stops to measure it before the spindle starts. The R8 one is the
 # mill's saw arbor: drawn up on the spindle taper it is stiffer and nearer
 # the nose than the 1/2 in shank one in a collet (a .5 in shank is about a
 # thirteenth as stiff in bending as the .95 in R8 shank, d^4, and a collet
@@ -594,12 +602,13 @@ cap_thickness_in = 0.5
 screw_head_dia_in = 0.623
 screw_length_in = 0.635
 screw_head_past_cap_in = "to_measure"
-body_dia_above_saw_in = "to_measure"
-spindle_nose_to_saw_in = "to_measure"
+body_dia_above_saw_in = 1.25
+# "sticks 1.4 in below spindle": to the shoulder or to the cap's face, not stated.
+below_spindle_nose_in = 1.4
 screw_thread = "M8 x 1.25"
 screw_key_mm = 5
 clamp_torque_nm = 20.0
-cite = ["Owner (Pedro) 2026-11-24 photo C:/farm-runs/triage-2026-11-19/owner-photos/saws-arbors-2026-11-24.jpg", "Owner (Pedro) 2026-11-24, verbatim: \"both are designed for saws with bores of 1 7/8 3/4 5/8 1/2 ; they are not keyed\"; \"caps are 1/2 in each ; both arbors steps are spring loaded so they fit 1 in bores\"; \"1/2 thickness 1.25 dia\"; \"screw are standdard hex countersunk 0.635 len; 0.623 dia\"; \"thread gauge says 1 . 25 not sure how to interpret\"", "Fuller Fasteners, DIN 7991 Specifications, M8 dk 15.57-16.00 mm, read 2026-11-24: https://fullerfasteners.com/tech/din-7991-specifications-hex-socket-countersunk-head-cap-screws/", "Engineers Edge, Countersunk Screws Torque Table Metric, ISO (friction .14), M8: class 8.8 13.20 kN / 23 N·m, class 10.9 18.90 kN / 28.3 N·m, read 2026-11-24: https://www.engineersedge.com/hardware/countersunk_screws_torque_table_13477.htm"]
+cite = ["Owner (Pedro) 2026-11-24 photo C:/farm-runs/triage-2026-11-19/owner-photos/saws-arbors-2026-11-24.jpg", "Owner (Pedro) 2026-11-24, verbatim: \"both are designed for saws with bores of 1 7/8 3/4 5/8 1/2 ; they are not keyed\"; \"caps are 1/2 in each ; both arbors steps are spring loaded so they fit 1 in bores\"; \"1/2 thickness 1.25 dia\"; \"screw are standdard hex countersunk 0.635 len; 0.623 dia\"; \"thread gauge says 1 . 25 not sure how to interpret\"; \"sticks 1.4 in below spindle; 1.25 dia\"", "Fuller Fasteners, DIN 7991 Specifications, M8 dk 15.57-16.00 mm, read 2026-11-24: https://fullerfasteners.com/tech/din-7991-specifications-hex-socket-countersunk-head-cap-screws/", "Engineers Edge, Countersunk Screws Torque Table Metric, ISO (friction .14), M8: class 8.8 13.20 kN / 23 N·m, class 10.9 18.90 kN / 28.3 N·m, read 2026-11-24: https://www.engineersedge.com/hardware/countersunk_screws_torque_table_13477.htm"]
 note = "On hand (owner, 2026-11-24). Carries the 1 in-hole slitting saws (2-3/4 x .064 and the 3 in saws) on the PM-30MV; replaces the TTC 67-600-016 for the saw work."
 
 [tools.saw-arbor-1-2-shank-stepped]
