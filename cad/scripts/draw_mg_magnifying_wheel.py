@@ -96,6 +96,7 @@ from mg_magnifying_wheel_geom import (
     SPOKE_TIP_WIDTH,
     SPOKE_X0,
     TIE1_CDRILL_DEPTH,
+    TIE1_CDRILL_DIA,
     TIE1_X,
     TIE1_Y,
 )
@@ -447,15 +448,27 @@ WIRE_NUMBER = str(_config.parts("sh-vn-music-wire")["number"])
 # centreline) through to the rim bore, clocked by its 43° from the
 # horizontal.  Each takes at most two lines of words under its process
 # (rule 7).  TIE 1's #60 names its drill (rule 12; dt_crank_pin's "#45 DRILL
-# THRU"); its #50 counter-drill, from the far (drum) side, is named here by
-# its drill and side (machinist review r1, run 20261124T092122388Z: the whole
-# hole in one callout) and prints whole, with its depth, on B-B.
-TIE1_CALLOUT = "#60 DRILL THRU\nWIRE TIE HOLE\n#50 FAR SIDE, B-B"
+# THRU"); its #50 counter-drill, from the far (drum) side, follows it in the
+# same callout with B-B's own values read from the geometry (machinist review
+# r1 and r2, runs 20261124T092122388Z and 20261124T094658536Z: the whole
+# stepped hole in one callout, at the front view, Y14.5 hole order); B-B
+# stays as the section that shows the step's shape.
+_TIE1_CDRILL_LINE = (
+    f"<MOD-DIAM>{TIE1_CDRILL_DIA / 25.4:.3f} #50 DRILL <HOLE-DEPTH> "
+    f"{TIE1_CDRILL_DEPTH / 25.4:.2f} FAR SIDE"
+).replace(">0.", ">.").replace(" 0.", " .")
+TIE1_CALLOUT = f"#60 DRILL THRU\n{_TIE1_CDRILL_LINE}\nWIRE TIE HOLE"
 TIE2_CALLOUT = "DRILL THRU\nRADIAL WIRE TIE HOLE\nFROM GROOVE BOTTOM"
 # Each side of a centred tie block past the DRILL THRU line's half-width
-# (capitals about 2.6 mm a character), mm.
+# (capitals about 2.6 mm a character; each text token prints one glyph), mm.
 _TIE_BLOCK_WIDEN = (
-    (max(len(line) for line in TIE1_CALLOUT.splitlines()) - len("DRILL THRU"))
+    (
+        max(
+            len(line.replace("<MOD-DIAM>", "Ø").replace("<HOLE-DEPTH>", "v"))
+            for line in TIE1_CALLOUT.splitlines()
+        )
+        - len("DRILL THRU")
+    )
     * 2.6
     / 2.0
 )

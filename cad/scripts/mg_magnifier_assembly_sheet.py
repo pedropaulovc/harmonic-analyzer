@@ -382,16 +382,14 @@ STEP_TEXT = {
     # tap-true of #3292 on MHA-DT-00): the wheel turns on its own axle, held
     # on an owned V-block, under an owned dial indicator on its magnetic
     # base. Delegated ruling 2026-11-24 (FitLaneCH.SmallSubsys), precedent
-    # MHA-DT-00 1S: the setup. Its acceptance is the shop table's row for
-    # that instrument (owner ruling 2026-11-24, fit audit part 2, P2: ".002
-    # total on the .001 dial indicator"; machinist review r1, run
-    # 20261124T092122388Z, asked for a reading): .002 total is .001 off
-    # centre, inside the .00125 the audit's second pass found harmless.
-    # Delegated ruling 2026-11-24 (FitLaneCH), precedent P2.
+    # MHA-DT-00 1S: the setup. The approved form (fit audit question 17:
+    # "centred on an indicator while wet") carries no reading, so none is
+    # added: the drum is tapped until the needle swings least, which tells
+    # the builder when he is done (machinist review r1, run
+    # 20261124T092122388Z) without a new instrument limit.
     "drum-centred": (
-        f"AT ONCE, BEFORE IT GRABS, TAP {_DRUM} TRUE TO AN INDICATOR ON ITS RIM "
-        f"UNTIL IT READS .002 TOTAL OR LESS, {_WHEEL} TURNING ON {_AXLE} CLAMPED "
-        "ON A V-BLOCK."
+        f"AT ONCE, BEFORE IT GRABS, TAP {_DRUM} ON ITS RIM UNTIL AN INDICATOR ON "
+        f"THE RIM SWINGS LEAST, {_WHEEL} TURNING ON {_AXLE} CLAMPED ON A V-BLOCK."
     ),
     "drum-bond-cured": f"LEAVE {_DRUM} UNDISTURBED 24 H TO CURE.",
     _steps.DRUM_HELD_KEY: f"CHECK {_DRUM} DOES NOT TURN OR SLIDE BY HAND.",

@@ -256,7 +256,9 @@ def test_tie1_section_b_b_cuts_through_tie1_clear_of_the_spigot() -> None:
     )
     # The counter-drill's Ø reads the whole callout: size, process, depth REF.
     assert drawing.TIE1_SECTION_SUFFIX == " #50 DRILL <HOLE-DEPTH> (.32)"
-    assert drawing.TIE1_CALLOUT.splitlines()[-1] == "#50 FAR SIDE, B-B"
+    assert drawing.TIE1_CALLOUT.splitlines()[1] == (
+        "<MOD-DIAM>.070 #50 DRILL <HOLE-DEPTH> .32 FAR SIDE"
+    )
     precision = mg_magnifying_wheel_spec.DRAWING_PRECISION["Tie1CdrillProfile"]
     assert precision == {"Tie1CdrillDia": 3, "Tie1CdrillDepth": 2}
     assert drawing.TIE1_SECTION_SCALE == (2, 1)
@@ -382,7 +384,7 @@ def test_linked_notes_specify_the_fits_the_ties_and_the_angle_the_spokes() -> No
     # HOLE, no coined label), size before process, at most two lines of
     # words (rule 7): no project label, so no key.
     assert drawing.DIMENSION_CALLOUTS["Tie1HoleDia"] == (
-        "#60 DRILL THRU\nWIRE TIE HOLE\n#50 FAR SIDE, B-B"
+        "#60 DRILL THRU\n<MOD-DIAM>.070 #50 DRILL <HOLE-DEPTH> .32 FAR SIDE\nWIRE TIE HOLE"
     )
     # TIE 2 states where it runs: radial, from the groove's bottom.
     assert drawing.DIMENSION_CALLOUTS["Tie2HoleDia"] == (
