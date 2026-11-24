@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 470" font-family="sans-serif" font-size="12">
+  <!-- Setup 2. Plan (top): 1 in = 55 px, X0 Y0 the hub's axis at (380, 130),
+       +Y up the page (the back). Section (bottom): through the hub's axis,
+       seen from the front, 1 in = 200 px, Z0 the strap's top at y 330. -->
+  <rect class="paper" x="0" y="0" width="760" height="470"/>
+  <text class="title" x="20" y="18">Setup 2: face A up; face the hub's top end (datum G's) to .090 over the strap</text>
+  <text class="label" x="20" y="38">Plan</text>
+  <!-- Gap blocks (2 in up, 3 in along X, inner ends .500 apart) and the tip block. -->
+  <rect class="fixture-support" x="201.3" y="102.5" width="164.95" height="55"/>
+  <rect class="fixture-support" x="393.75" y="102.5" width="164.95" height="55"/>
+  <rect class="fixture-support" x="675.6" y="73" width="74.4" height="55"/>
+  <!-- Strap MHA-CH-13 (arc, tips up toward +Y), hub, bore. -->
+  <path class="part-kept" d="M63.9 83.0 A1731.5 1731.5 0 0 0 696.1 83.0 L696.1 118.2 A1766.2 1766.2 0 0 1 63.9 118.2 Z"/>
+  <circle class="part-kept" cx="380" cy="130" r="11"/>
+  <circle class="hidden" cx="380" cy="130" r="6.8"/>
+  <!-- Step clamps from the back, toes on the strap over each gap block. -->
+  <rect class="clamp" x="231.7" y="44" width="21.6" height="74"/>
+  <rect class="clamp" x="506.7" y="44" width="21.6" height="74"/>
+  <text class="label" x="150" y="62">step clamp</text>
+  <text class="label" x="534" y="62">step clamp, X +2.50</text>
+  <text class="label" x="205" y="172">gap block</text>
+  <text class="label" x="470" y="172">gap block</text>
+  <text class="label" x="632" y="148">tip block</text>
+  <!-- The two passes along X at Y +r and -r. -->
+  <line class="arrow" x1="350" y1="119" x2="410" y2="119"/>
+  <line class="arrow" x1="410" y1="141" x2="350" y2="141"/>
+  <line class="leader" x1="410" y1="119" x2="440" y2="40"/>
+  <text class="label" x="444" y="40">cutter path: Y +.200 along +X, then Y −.200 along −X</text>
+  <text class="label" x="20" y="200">X0 Y0: edge finder on the hub's top end, both sides each way. The arm may lie either end to the right.</text>
+  <text class="label" x="20" y="232">Section through the hub</text>
+  <!-- Gap blocks (broken: 2 in tall) under the strap. -->
+  <rect class="fixture-support" x="150" y="349.6" width="180" height="70"/>
+  <rect class="fixture-support" x="430" y="349.6" width="180" height="70"/>
+  <text class="label" x="160" y="440">gap blocks, 2 in up (broken), .500 apart</text>
+  <!-- Strap, .098 thick; hub Ø.40 through it, its lower end in the gap. -->
+  <rect class="part-kept" x="120" y="330" width="220" height="19.6"/>
+  <rect class="part-kept" x="420" y="330" width="220" height="19.6"/>
+  <rect class="part-kept" x="340" y="312" width="80" height="64.7"/>
+  <rect class="part-removed" x="340" y="302.9" width="80" height="9.1"/>
+  <line class="hidden" x1="355.4" y1="302.9" x2="355.4" y2="376.7"/>
+  <line class="hidden" x1="404.6" y1="302.9" x2="404.6" y2="376.7"/>
+  <!-- The 1/2 in end mill at the end's height. -->
+  <rect class="cutter" x="330" y="236" width="100" height="76"/>
+  <text class="label-on-clamp" x="345" y="278">1/2 in EM</text>
+  <!-- .090 from the strap's top (Z0) to the faced end. -->
+  <line class="dims" x1="455" y1="312" x2="455" y2="330"/>
+  <line class="leader" x1="420" y1="312" x2="470" y2="312"/>
+  <text class="label" x="475" y="316">.090 over the strap (Z0 its top)</text>
+  <text class="label" x="475" y="300">removed: .0115–.0455</text>
+  <text class="label" x="20" y="300">strap MHA-CH-13</text>
+  <text class="label" x="20" y="386">hub MHA-CH-12 (D bore hidden)</text>
+  <line class="leader" x1="200" y1="382" x2="340" y2="360"/>
+</svg>
