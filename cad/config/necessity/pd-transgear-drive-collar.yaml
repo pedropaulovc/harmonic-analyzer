@@ -8,7 +8,7 @@ necessity:
     feature: "sheet 1, end view, Ø.0930 2X REAM THRU drive-pin holes"
     kind: gap
     reason: "a loose dowel spends the MHA-PD-09 wheels' hole slip"
-    source: "pd_transgear_drive_collar_spec.PIN_HOLE_DIA, _sprocket_seat_geometry slip budget (.0039 min); bought dowel MHA-PD-VN-54; a 3/32 drill leaves the rim .017, under RV-01's .019"
+    source: "pd_transgear_drive_collar_spec.PIN_HOLE_DIA, _sprocket_seat_geometry slip budget (.0039 min); bought dowel MHA-PD-VN-54; a 3/32 drill leaves the rim .016, under RV-01's .018"
   - id: N-02
     feature: "sheet 1, section A-A, Ø.0615 REAM blind flat-pin hole"
     kind: gap

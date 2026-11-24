@@ -378,7 +378,7 @@ def test_the_knob_reversal_play_costs_a_fraction_of_a_millimetre_of_paper() -> N
 def test_the_flat_pin_ream_keeps_its_walls_and_stays_in_the_body() -> None:
     # The web to the -Y drive-pin hole is the one shortfall: over the floor,
     # printed as a MIN note; the O.D. and pilot-shoulder walls meet target.
-    assert spec.FLAT_PIN_WEB_WORST == pytest.approx(0.076 * 25.4)
+    assert spec.FLAT_PIN_WEB_WORST == pytest.approx(0.075 * 25.4)
     assert spec.WALL_FLOOR <= spec.FLAT_PIN_WEB_WORST < spec.WALL_TARGET_MM
     assert f"{_in(spec.FLAT_PIN_WEB_WORST)} MIN" in spec.DRAWING_NOTES
     assert spec.FLAT_PIN_OD_WALL_WORST >= spec.WALL_TARGET_MM
@@ -513,10 +513,29 @@ def test_every_tight_band_names_its_registered_mate_at_its_callout() -> None:
     assert all(
         len(text.splitlines()) <= 3 for text in drawing.DIMENSION_CALLOUTS_BELOW.values()
     )
-    # The offsets print as REF targets; PIN_OFFSET_TOL is the analysis scatter
-    # the walls and the wheels' slip are charged, the sprocket's own.
+    # The offsets print as REF targets.  PIN_OFFSET_TOL is the spacing
+    # analysis the wheels' slip is charged (what the trial accepts), the
+    # sprocket's own; the walls are charged PIN_CENTRE_SHIFT_MAX, the shop's
+    # reamed-hole location row, which the trial does not bound (Codjiflo P1
+    # on #3485).
     assert spec.PIN_OFFSET_TOL <= removable.DRIVE_PIN_OFFSET_TOL
     assert spec.PIN_OFFSET_TOL < printed_band_mm(3, unit=spec.UNIT)
+    assert spec.PIN_CENTRE_SHIFT_MAX == pytest.approx(0.002 * 25.4)
+    assert spec.PIN_OFFSET_TOL < spec.PIN_CENTRE_SHIFT_MAX
+    import pd_transgear_removable_spec as wheel
+
+    assert wheel.PIN_CENTRE_SHIFT_MAX == pytest.approx(0.005 * 25.4)
+    # No wall reads the spacing analysis: each moves by the whole shift.
+    hole_r = (spec.PIN_HOLE_DIA + max(spec.PIN_HOLE_BAND)) / 2.0
+    inner = spec.PIN_CIRCLE_RADIUS - spec.PIN_CENTRE_SHIFT_MAX - hole_r
+    assert spec.PIN_HOLE_INNER_R_MIN == pytest.approx(inner)
+    assert spec.BORE_PIN_WALL_WORST == pytest.approx(
+        inner - (spec.BORE_DIA + max(spec.BORE_DIA_BAND)) / 2.0
+    )
+    rim = (spec.OD + min(spec.OD_BAND)) / 2.0 - (
+        spec.PIN_CIRCLE_RADIUS + spec.PIN_CENTRE_SHIFT_MAX + hole_r
+    )
+    assert spec.DRIVE_PIN_COLLAR_RIM_WORST <= rim < spec.DRIVE_PIN_COLLAR_RIM_WORST + 0.0254
 
 
 def test_drive_pin_rim_is_the_seat_shortfall() -> None:
@@ -525,7 +544,7 @@ def test_drive_pin_rim_is_the_seat_shortfall() -> None:
     # The O.D. keeps only the spigot's maximum; its minimum is held to -.004
     # to keep the rim (owner ruling 2026-11-01).
     assert spec.OD_BAND == pytest.approx((max(removable.SPIGOT_DIA_BAND), -0.1016))
-    assert spec.DRIVE_PIN_COLLAR_RIM_WORST == pytest.approx(0.4826)  # .019
+    assert spec.DRIVE_PIN_COLLAR_RIM_WORST == pytest.approx(0.4572)  # .018
     assert spec.DRIVE_PIN_COLLAR_RIM_WORST > 0.0
 
 
@@ -540,14 +559,14 @@ def test_pilot_wall_worst_and_the_one_decimal_control() -> None:
 
 def test_drive_pin_holes_clear_the_bore_and_the_pilot() -> None:
     # The unchanged dowel circle clears the bore and pilot.
-    assert spec.BORE_PIN_WALL_WORST == pytest.approx(3.31319)  # .1304
+    assert spec.BORE_PIN_WALL_WORST == pytest.approx(3.28525)  # .1293
     assert spec.BORE_PIN_WALL_WORST >= spec.WALL_FLOOR
-    assert spec.PIN_HOLE_INNER_R_MIN == pytest.approx(5.78969)
+    assert spec.PIN_HOLE_INNER_R_MIN == pytest.approx(5.76175)
     assert spec.PIN_HOLE_INNER_R_MIN > spec.PILOT_R_MAX
     # Negative controls: holes on a 6.0 radius break into the pilot; on the
     # pilot's own 5.0 radius they leave 0.605 to the bore.
-    assert 6.0 - 0.025 - 1.19 < spec.PILOT_R_MAX
-    assert 4.0 - 0.025 - 1.19 - (spec.BORE_DIA + max(spec.BORE_DIA_BAND)) / 2.0 < spec.WALL_FLOOR
+    assert 6.0 - 0.051 - 1.19 < spec.PILOT_R_MAX
+    assert 4.0 - 0.051 - 1.19 - (spec.BORE_DIA + max(spec.BORE_DIA_BAND)) / 2.0 < spec.WALL_FLOOR
 
 
 def test_bore_slides_on_the_core_and_the_pilot_in_the_wheel() -> None:
@@ -870,9 +889,10 @@ def test_collar_feature_bands_are_the_printed_ones() -> None:
         dowel = features[name]
         # ANALYSIS bands, bound only because the adapter requires limits: the
         # sheet prints neither (the dowel is the gauge, the offset a REF
-        # target tried with the wheels).
+        # target tried with the wheels).  The offset's is the shop's
+        # reamed-hole location row, what the walls are charged.
         assert dowel["dia"] == pytest.approx([_in(0.0930), _in(0.0935)])
-        offset = [_in(0.2756 - 0.0009), _in(0.2756 + 0.0009)]
+        offset = [_in(0.2756 - 0.002), _in(0.2756 + 0.002)]
         assert dowel["offset"] == pytest.approx(offset, abs=2e-3)
         assert dowel["at"] == pytest.approx([0.0, sign * spec.PIN_CIRCLE_RADIUS, 0.0])
         assert dowel["thru"] is True and dowel["process"] == "ream"

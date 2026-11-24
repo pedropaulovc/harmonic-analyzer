@@ -181,13 +181,22 @@ if type(CHAIN_LINK_COUNT) is not int or CHAIN_LINK_COUNT <= 0 or CHAIN_LINK_COUN
 PLATE_PLACES = 3
 # Each pin centre prints .276 (the shared 7.0 at three places, on the inch
 # grid) as a REF target (pd_transgear_removable_callouts.TARGET_TEXT),
-# accepted by the wheel's trial on both seats' pins.  PIN_LOCATION_TOL, the
-# shared +/-DRIVE_PIN_OFFSET_TOL, is the ANALYSIS scatter about that target
-# which the web and the slip budget below are charged; this sheet does not
-# print it.  The title block's ±.005 cannot control the centres: charged to
-# the web it leaves .014, under the .018 RV-01 covers.
+# accepted by the wheel's trial on both seats' pins (owner ruling
+# 2026-11-24, fit audit question 8).  Two errors of the centres are charged
+# apart (Codjiflo P1 on #3485):
+# - PIN_LOCATION_TOL, the shared +/-DRIVE_PIN_OFFSET_TOL: the holes' SPACING
+#   error against the pins, which the trial accepts; the slip budget below
+#   alone reads it.
+# - PIN_CENTRE_SHIFT_MAX: how far either centre may lie from its target
+#   toward the bore.  The trial does not bound it (both holes and both pins
+#   shifted the same way still drop on, and the bore has .003 to .015 radial
+#   air round the seats' pilots), so it is the shop's declared capability
+#   for the process (drawing-guidelines.md, What the shop holds: "location
+#   of a drilled hole from a datum edge or bore ±.005").  The web is charged
+#   it (pd_transgear_removable_notes).
 PIN_LOCATION_PLACES = 3
 PIN_LOCATION_TOL = seat.DRIVE_PIN_OFFSET_TOL
+PIN_CENTRE_SHIFT_MAX = 0.127  # ±.005, the shop's drilled-hole location row
 # The drills the bore and the pin holes are cut with, and their diameters (in).
 BORE_DRILL = ("13/32", 13.0 / 32.0)
 PIN_HOLE_DRILL = ("#40", 0.098)
