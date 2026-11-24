@@ -102,11 +102,9 @@ ACCEPTANCES = (
         _step_ref("post-and-tip-block", "K"),
         "EACH MHA-DT-VN-61 CUT END TO THE MHA-DT-20 UNDERSIDE",
         f"FLUSH TO {POST_SCREW_SHORT_TEXT} SHORT",
-        # Owner ruling 2026-11-23, tool audit Q4: "Print CALIPER DEPTH ROD;
-        # no depth micrometer". The owned calipers read .0005 (shop
-        # gauges.calipers) inside each of these four windows (.005, .008,
-        # .040 wide).
-        "CALIPER DEPTH ROD",
+        # Owner ruling 2026-11-24, fit audit part 2 S2: "Flush to .015 short
+        # by straightedge: 0.84 D MIN" ("all approved (ticked)").
+        "STRAIGHTEDGE",
     ),
     (
         "shaft-end-play",
@@ -134,6 +132,9 @@ ACCEPTANCES = (
         _step_ref("cylinder-bank-located", "T"),
         "EACH MHA-DT-13 DOME PROUD OF ITS MHA-DT-02 OUTER FACE",
         inch_text(bank.ARBOR_DOME_HEIGHT, 2),
+        # Owner ruling 2026-11-23, tool audit Q4: "Print CALIPER DEPTH ROD;
+        # no depth micrometer". The owned calipers read .0005 (shop
+        # gauges.calipers) inside each of the windows this column names.
         "CALIPER DEPTH ROD",
     ),
     (

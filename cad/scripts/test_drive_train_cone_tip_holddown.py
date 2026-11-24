@@ -18,10 +18,11 @@ import math
 import pytest
 
 
-def test_post_fillisters_engage_the_plate_tap_at_least_087d() -> None:
+def test_post_fillisters_engage_the_plate_tap_at_least_084d() -> None:
     """I22: each MHA-DT-VN-61 seats on the post's counterbore floor and runs into
     the MHA-DT-20 tap by its cut length past the post's grip -- never proud of
-    the plate underside, and 0.87D of thread after the tap's edge break."""
+    the plate underside, and 0.84D of thread after the tap's edge break (owner
+    ruling 2026-11-24, fit audit part 2 S2)."""
     import build_dt_drive_train_assembly as bdt
     import dt_cone_swing_platform_spec as platform
     import dt_vn_post_mount_screw_spec as screw
@@ -32,8 +33,8 @@ def test_post_fillisters_engage_the_plate_tap_at_least_087d() -> None:
     )
     assert bdt.POST_SCREW_INTO_PLATE <= platform.PLATE_THICKNESS
     thread = bdt.POST_SCREW_INTO_PLATE - 2.0 * platform.POST_MOUNT_TAP_EDGE_BREAK
-    assert thread >= 0.87 * platform.POST_MOUNT_THREAD_DIA
-    assert platform.POST_MOUNT_ENGAGEMENT_WORST_DIAMETERS >= 0.87
+    assert thread >= 0.84 * platform.POST_MOUNT_THREAD_DIA
+    assert platform.POST_MOUNT_ENGAGEMENT_WORST_DIAMETERS >= 0.84
 
 
 

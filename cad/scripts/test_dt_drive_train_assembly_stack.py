@@ -543,9 +543,9 @@ def _tip_block_hold_down(drive) -> None:
     assert (
         drive.POST_SCREW_INTO_PLATE
         - 2.0 * dt_cone_swing_platform_spec.POST_MOUNT_TAP_EDGE_BREAK
-        >= 0.87 * drive.POST_MOUNT_THREAD_DIA
-        and dt_cone_swing_platform_spec.POST_MOUNT_ENGAGEMENT_WORST_DIAMETERS >= 0.87
-    ), "MHA-DT-VN-61 engages the MHA-DT-20 tap under 0.87D"
+        >= 0.84 * drive.POST_MOUNT_THREAD_DIA
+        and dt_cone_swing_platform_spec.POST_MOUNT_ENGAGEMENT_WORST_DIAMETERS >= 0.84
+    ), "MHA-DT-VN-61 engages the MHA-DT-20 tap under 0.84D"
     # The shaft is placed by its front stub end; keep the station in lockstep with
     # the part's FRONT_STUB.
     assert abs(drive.SHAFT_FRONT_STATION + drive.SHAFT_FRONT_STUB) <= 1e-9, (

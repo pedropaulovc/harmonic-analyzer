@@ -606,10 +606,10 @@ def test_post_screw_engagement_note_states_the_computed_exception() -> None:
 
     U37 accepts short engagement for the 1/4-20 post screws. The printed worst
     case is the thinnest stock plate (U41 band), less the title block's .010
-    tap-entry break and, at the underside, the .005 cut-to-fit allowance plus
+    tap-entry break and, at the underside, the .015 cut-to-fit allowance plus
     the screw's .010 cut-end break (it outreaches the tap's .010 exit break),
-    floored, never under the drawing-guidelines.md rule 18 (thread engagement)
-    audit's E7 floor of 0.87D.
+    floored, never under the owner's 0.84D floor (owner ruling 2026-11-24, fit
+    audit part 2 S2).
     """
     # To the micron, as the spec rounds it, so a float sum a hair under an
     # exact hundredth does not floor one place low.
@@ -624,7 +624,7 @@ def test_post_screw_engagement_note_states_the_computed_exception() -> None:
     assert spec.POST_MOUNT_ENGAGEMENT_WORST == pytest.approx(worst)
     diameters = worst / (0.25 * 25.4)
     printed = math.floor(diameters * 100.0) / 100.0
-    assert printed <= diameters and printed >= 0.87
+    assert printed <= diameters and printed >= 0.84
     assert spec.POST_MOUNT_ENGAGEMENT_PRINTED == printed
     assert spec.POST_MOUNT_ENGAGEMENT_NOTE == (
         f"1/4-20 THREAD ENGAGEMENT {printed:.2f}D MIN."
