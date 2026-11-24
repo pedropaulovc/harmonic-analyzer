@@ -3509,9 +3509,13 @@ _MACHINIST_REVIEW_DEMOTIONS = CONFIG_DIR / "machinist-review" / "demoted.yaml"
 
 def _demoted_reviews() -> frozenset[str]:
     """Drawings declared ``ENFORCE`` that run at ``LEARN`` until a batch
-    converts their fits (``cad/config/machinist-review/demoted.yaml``; owner
-    ruling 2026-11-24: "Merge the policy now and demote the failing sheets to
+    converts their fits (``cad/config/machinist-review/demoted.yaml``, a
+    mapping of drawing stem to the batch that removes the line; owner ruling
+    2026-11-24: "Merge the policy now and demote the failing sheets to
     warn-only ... restoring enforcement per batch").
+
+    Temporary (tracking issue #3511): an empty list fails the graph load, so
+    the batch that deletes the last line deletes the file.
 
     The list lives here and not in the draw scripts because a draw script is
     its drawing's recipe input: editing the declaration rebuilds the sheet in
@@ -3522,17 +3526,22 @@ def _demoted_reviews() -> frozenset[str]:
     if not _MACHINIST_REVIEW_DEMOTIONS.is_file():
         return frozenset()
     doc = yaml.safe_load(_MACHINIST_REVIEW_DEMOTIONS.read_text(encoding="utf-8"))
-    stems = doc.get("demoted") if isinstance(doc, dict) and set(doc) == {"demoted"} else None
+    demoted = doc.get("demoted") if isinstance(doc, dict) and set(doc) == {"demoted"} else None
     if (
-        not isinstance(stems, list)
-        or not all(isinstance(stem, str) for stem in stems)
-        or len(set(stems)) != len(stems)
+        not isinstance(demoted, dict)
+        or not demoted
+        or not all(
+            isinstance(item, str) and item.strip()
+            for pair in demoted.items()
+            for item in pair
+        )
     ):
         raise ValueError(
             f"{_MACHINIST_REVIEW_DEMOTIONS}: must hold one key 'demoted', a "
-            "list of distinct drawing stems"
+            "non-empty mapping of drawing stem to the batch that removes it; "
+            "delete the file when no sheet is left"
         )
-    return frozenset(stems)
+    return frozenset(demoted)
 
 
 @functools.cache

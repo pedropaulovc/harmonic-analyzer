@@ -76,10 +76,15 @@ def dodo(loaded_dodo, monkeypatch):
 
 
 def test_repository_demotion_list_names_only_enforced_drawings(loaded_dodo):
+    """The list is temporary (tracking issue #3511): while the file exists it
+    is non-empty (the loader rejects an empty one) and every line names a
+    drawing whose script declares ENFORCE (the graph load rejects any other)."""
     loaded_dodo._reviewed_drawings.cache_clear()
     modes = dict(loaded_dodo._reviewed_drawings())
     loaded_dodo._reviewed_drawings.cache_clear()
-    for stem in loaded_dodo._demoted_reviews():
+    demoted = loaded_dodo._demoted_reviews()
+    assert bool(demoted) == loaded_dodo._MACHINIST_REVIEW_DEMOTIONS.is_file()
+    for stem in demoted:
         assert modes[stem] is loaded_dodo.MachinistReviewMode.LEARN
 
 
@@ -582,7 +587,7 @@ def test_demotion_list_runs_an_enforced_drawing_at_learn(inputs, monkeypatch, tm
 
     assert modes() == {"probe": dodo.MachinistReviewMode.ENFORCE}
     key = _review_key(dodo)
-    demotions.write_text("demoted:\n  - probe\n")
+    demotions.write_text("demoted:\n  probe: fit-batch-probe\n")
     assert modes() == {"probe": dodo.MachinistReviewMode.LEARN}
     # Neither the verdict key nor any file dependency sees the list.
     assert _review_key(dodo) == key
@@ -591,9 +596,11 @@ def test_demotion_list_runs_an_enforced_drawing_at_learn(inputs, monkeypatch, tm
     inputs.draw.write_text("MACHINIST_REVIEW = MachinistReviewMode.LEARN\n")
     with pytest.raises(ValueError, match="not a drawing declared ENFORCE"):
         modes()
-    demotions.write_text("demoted: probe\n")
-    with pytest.raises(ValueError, match="list of distinct drawing stems"):
-        modes()
+    # An empty list means the conversion is done: the file has to go.
+    for text in ("demoted: {}\n", "demoted:\n  - probe\n", "demoted:\n  probe:\n"):
+        demotions.write_text(text)
+        with pytest.raises(ValueError, match="delete the file when no sheet is left"):
+            modes()
 
 
 def test_mode_and_input_set_changes_invalidate_doit_but_not_the_verdict_key(

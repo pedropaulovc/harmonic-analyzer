@@ -50,8 +50,13 @@ credibility rests on:
    built once: every size starts at the title block and every hole drilled.
    A REAM, a band tighter than the title block, a printed interference or a
    gauge bought for one size must pass guidelines rule 4's necessity test
-   (the package's necessity register, `cad/config/necessity/<drawing>.yaml`,
-   says what fails if it is `.002 in` loose; the sheet does not) and take the least
+   (the package's necessity register says what fails if it is `.002 in`
+   loose; the sheet does not. The register is part of the part's registry,
+   in its own file `cad/config/necessity/<drawing>.yaml` beside
+   `cad/config/parts/<part>.yaml`: the parts row is a cache-key input of the
+   part and drawing COM leaves, the register is read by the machinist review
+   alone, so a reason never rebuilds a part. No recipe may read it;
+   `check:recipe` fails if a COM leaf closure does) and take the least
    demanding form (drilled, made to fit, reamed to the bought mate, and only
    last a printed band); no reamer or gauge is bought for one feature
    without an owner ruling. Drawing review is
@@ -229,6 +234,15 @@ individual PR or stack does not need a successful full `build` before merging.
    explicit `MachinistReviewMode.OFF`) creates no review task, so no model
    tokens are spent until a drawing stabilizes and opts in. The declaration is read by AST,
    never by importing the drawing, and mode changes reuse the same cached verdict.
+   **Temporary, for the fit conversion (tracking issue #3511):** a drawing
+   listed in `cad/config/machinist-review/demoted.yaml` (stem: the batch that
+   removes the line) runs at `LEARN` though its script declares `ENFORCE`.
+   Only dodo's review task reads the list, so a line rebuilds and re-reviews
+   nothing; flipping the declaration instead would rebuild the drawing,
+   because the draw script is its recipe input. The batch that brings a sheet
+   to `SHIP` deletes its line, and the last one deletes the file: an empty
+   list, or a line for a drawing that does not declare `ENFORCE`, fails the
+   graph load. Do not add a sheet to it without an owner ruling.
    `FIX` is cached before enforcement, so a rerun cannot roll the reviewers again;
    provider errors are not cached. An explicitly forced refresh that produces no
    cacheable verdict fails even in LEARN mode: it could not publish the requested

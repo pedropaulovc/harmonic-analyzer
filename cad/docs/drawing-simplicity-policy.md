@@ -236,12 +236,14 @@ their sheet re-keys for another reason or the review leaf is force-refreshed.
   `reason`, optional `source`; `cad/scripts/machinist_necessity.py`). Owner
   ruling 2026-11-24: "In the part's registry file, not on the sheet. The
   sheet stays clean; the reviewer fails a tight feature that has no registry
-  reason." The register is a sibling of `cad/config/parts/<dashed>.yaml` and
+  reason." The register is part of the part's registry, kept as a sibling of
+  `cad/config/parts/<dashed>.yaml` and
   of the assembly contract rather than a key inside them, because both are
   content-hashed inputs of the package's SolidWorks leaves: a reason written
   there would rebuild the part and its drawing. Only the review reads the
   register, so adding or editing an entry re-reviews that one package and
-  rebuilds nothing. An entry is a claim about the machine: code review
+  rebuilds nothing; no recipe may read it, and `check:recipe` fails if a COM
+  leaf closure does. An entry is a claim about the machine: code review
   checks it against the spec module or ruling it cites.
 - **A spec constant that bands a fit carries its necessity.** A `*_BAND`,
   `*_LIMITS` or fit class narrower than the title block states, in the
@@ -259,15 +261,19 @@ their sheet re-keys for another reason or the review leaf is force-refreshed.
   ruling**, the owner's or a delegated one, declared as a
   `machinist_exceptions` entry (kind `accept`) under the package's own key
   in the form "Named exceptions" gives. The sheet prints no argument for it.
-- **Sheets held at warn-only during the conversion.** A drawing listed in
-  `cad/config/machinist-review/demoted.yaml` runs its review at `LEARN`
+- **Sheets held at warn-only during the conversion (temporary).** A drawing
+  listed in `cad/config/machinist-review/demoted.yaml` (stem: the batch that
+  removes the line) runs its review at `LEARN`
   though its script declares `ENFORCE` (owner ruling 2026-11-24: "Merge the
   policy now and demote the failing sheets to warn-only ... restoring
   enforcement per batch"; "better to be able to cut releases with known
   issues than to hold unreleased code"). The list is read by the review task
-  alone, so adding or deleting a line rebuilds and re-reviews nothing. The
-  batch that converts a sheet deletes its line; the list is empty when the
-  conversion is done (tracking issue #3511).
+  alone, so adding or deleting a line rebuilds and re-reviews nothing;
+  flipping the declaration in the draw script would rebuild the drawing. The
+  batch that brings a sheet to SHIP deletes its line, and the batch that
+  deletes the last line deletes the file: an empty list fails the graph
+  load, as does a line for a drawing that does not declare `ENFORCE`
+  (tracking issue #3511). No sheet is added without an owner ruling.
 - **Thread engagement (rule 18)** is owned by the CAD: the build's seat-fit
   and stack asserts enforce it. Through-tapped receivers use actual retained
   material and external full-form overlap, not blind drilling depths or raw

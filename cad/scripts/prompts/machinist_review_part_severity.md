@@ -52,6 +52,12 @@ blocker.
 
 Necessity standard — apply rule 4's test before the shop table, and apply it
 to the NECESSITY REGISTER in the package input, not to words on the sheet.
+A band is narrower than its row only by total width: add its two limits
+(`+.000 / -.004` is .004 wide, `±.5°` is 1° wide) and compare with the total
+of the title-block row for its decimal places as this sheet's title block
+prints it (`.XXX ±.005` is .010 wide, `.XX ±.01` is .020 wide, `±1°` is 2°
+wide). State both totals in the finding. A band as wide as its row or wider
+is never filed under this standard, however its limits are split.
 For each REAM and each explicit band narrower than its title-block row,
 quote the callout and the id of the entry that covers it, or say that none
 does. An entry covers a feature when its feature text identifies that

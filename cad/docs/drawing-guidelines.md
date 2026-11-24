@@ -203,7 +203,12 @@ made to their mate.
   fails on this one machine if it is `.002 in` loose?* The feature passes
   only when the answer is one of the kinds below and the package's necessity
   register carries an entry for it: the feature it covers, the kind, and the
-  reason in a few words (`cad/config/necessity/<drawing>.yaml`). The sheet
+  reason in a few words. The register is part of the part's registry: it is
+  the file `cad/config/necessity/<drawing>.yaml` beside the part's row
+  `cad/config/parts/<part>.yaml`, kept separate because the row is a
+  cache-key input of the part's and the drawing's SolidWorks builds and the
+  register is read by the review alone, so a reason can be added or
+  corrected without rebuilding either. The sheet
   prints none of it (owner ruling 2026-11-24: "In the part's registry file,
   not on the sheet. The sheet stays clean; the reviewer fails a tight feature
   that has no registry reason."). The kinds, with reasons as an entry gives
@@ -298,6 +303,11 @@ made to their mate.
   prints no argument for it.
 - **Every fit names its mate; the register says what a band protects.** A tight band is
   an explicit band narrower than the title-block band for its decimal places,
+  compared by total width (rule 4, "Read a band as its total width"):
+  `+.000 / -.004` is `.004` wide against the `.XXX` row's `.010`, `+.000 /
+  -.016` is `.016` against the `.XX` row's `.020`, and `±.5°` is `1°`
+  against the angle row's `2°`. A band as wide as its row or wider is not a
+  tight band and is never filed as one, however its limits are split;
   or any REAM callout (REAM marks a fit bore even when it prints no band). A
   three-place size given a function, printed at its title-block band, names
   its mate as below but is not a tight band, and the necessity test does not
