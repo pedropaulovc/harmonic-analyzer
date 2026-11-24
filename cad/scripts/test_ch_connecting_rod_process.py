@@ -187,7 +187,12 @@ def test_the_saw_runs_on_the_owned_arbor_as_its_record_gives_it() -> None:
         ("saw_arbor_nose_to_cap_mm", "below_spindle_nose_in"),
     ):
         assert p[key] == pytest.approx(record[field] * 25.4, abs=1e-4), key
-    assert p["saw_clamp_torque_nm"] == record["clamp_torque_nm"]
+    # The thread and the clamp torque are the record's inferred ones.
+    assert p["saw_clamp_torque_nm"] == record["clamp_torque_nm_inferred"]
+    assert (
+        f"M{p['saw_screw_dia_mm']:g} x {p['saw_screw_pitch_mm']:g}"
+        == record["screw_thread_inferred"]
+    )
     assert p["saw_bore_mm"] == pytest.approx(
         inventory["slitting-saw-2-75-064"]["bore_in"] * 25.4
     )
@@ -315,6 +320,8 @@ def test_the_eighth_cutter_leaves_the_shank_corners_inside_their_limits() -> Non
         ({"saw_arbor_length_mm": 76.2}, "saw_arbor_length_mm"),
         ({"saw_park_z_mm": 40.61}, "saw_park_z_mm"),
         ({"saw_clamp_preload_kn": 2.0}, "saw_drive_torque_max_nm"),
+        ({"saw_screw_turns_min": 6.0}, "saw_screw_turns_min"),
+        ({"saw_screw_engagement_min_mm": 4.0}, "under one screw diameter"),
         # The slot's whole depth in one step, as before the owned arbor.
         (
             {"slot_step_max_mm": 15.0, "slot_step_mm": 14.732, "slot_light_mm": 7.366},

@@ -757,6 +757,22 @@ def context(
     ring = _ring_radius(p["saw_bore_mm"] / 2, min(body_r, cap_r))
     drive = p["saw_drive_friction"] * p["saw_clamp_preload_kn"] * ring
     _agree(plan, "saw_drive_torque_max_nm", drive, 0.05)
+    # That preload is the INFERRED clamp torque's (record
+    # clamp_torque_nm_inferred) and stands only on enough thread: the screw's
+    # engagement is not measured. A first-load stop counts its turns from
+    # first bite to seated before it is torqued; under one diameter of
+    # thread (to the half turn) the screw is left snug and the saw not run.
+    if p["saw_screw_engagement_min_mm"] < p["saw_screw_dia_mm"]:
+        raise ValueError(
+            "process.saw_screw_engagement_min_mm is under one screw diameter"
+        )
+    _agree(
+        plan,
+        "saw_screw_turns_min",
+        math.ceil(2 * p["saw_screw_engagement_min_mm"] / p["saw_screw_pitch_mm"] - 1e-9)
+        / 2,
+        1e-9,
+    )
     # The heaviest saw pass (the deepest bite, at the saw's full width) takes
     # less spindle torque, by the handbook's power at this feed per tooth,
     # than the friction drive carries: what slot_step_max_mm is for.
