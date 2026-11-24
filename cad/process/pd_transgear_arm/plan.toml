@@ -29,7 +29,7 @@
 # To order (not owned): the 12095 bar (stock.1018-ground-flat-3-8x1, one
 # 12 in length), the pin-gauge set for the pin
 # bore's one check (pin-gauges: its .127 pin must not enter, the upper end
-# of the drawing's bond clearance on the smallest MHA-PD-23 shank; fit audit
+# of the bond clearance MHA-PD-23's drawing prints, on its smallest shank; fit audit
 # 2026-11-23, pending owner confirmation: the bore prints the .1260 reamer's
 # size with no band and the MHA-PD-23 pin is bonded in it, so the Class X
 # .1260/.1265 pair is gone from this plan; cad.pin_bore_dia_band_mm is the
@@ -409,7 +409,7 @@ gauge_checks = "other"
 
 [[setups.operations]]
 instruction = "The pin bore."
-inspection = "Pin bore (drawing: Ø.126 REAM THRU, BONDED FIT ON MHA-PD-23, CLEARANCE .0010-.0022): the pin-gauge set's .127 pin does not enter from either face, by hand, never forced (the clearance's upper end). The MHA-PD-23 pin is fitted to this bore on its own traveler. Its rear mouth shows an even ring of break all round; the break's .008 ±.002 size is not gauged: held by T7's programmed depth in op 130. The .127 pin enters: stop and tell the owner."
+inspection = "Pin bore (drawing: Ø.126 REAM THRU, MHA-PD-23 IS TURNED TO THIS BORE): the pin-gauge set's .127 pin does not enter from either face, by hand, never forced (the upper end of the bond clearance on MHA-PD-23's drawing). The MHA-PD-23 pin is fitted to this bore on its own traveler. Its rear mouth shows an even ring of break all round; the break's .008 ±.002 size is not gauged: held by T7's programmed depth in op 130. The .127 pin enters: stop and tell the owner."
 gauge_checks = "other"
 
 [[setups.operations]]

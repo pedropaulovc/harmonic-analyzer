@@ -3,10 +3,11 @@
 # diameter under its head (fit audit 2026-11-23, pending owner confirmation;
 # it replaces the #2415 press land and its six Class X plugs): a slip fit
 # bonded in the MHA-PD-18 arm's reamed bore with LOCTITE 638 at assembly
-# (MHA-PD-00), drawing note 1: SLIDES IN BY HAND. Nothing is turned to a
-# reading. Op 20 tries the pin-gauge set's .127 pin in the arm's bore (the
-# arm drawing's one limit: it must not enter); Op 190 tries the arm on the
-# shank with the three running mates.
+# (MHA-PD-00), drawing note 1: CLEARANCE .0010-.0022, SLIDES IN BY HAND.
+# Nothing is turned to a reading. Op 20 tries the pin-gauge set's .127 pin
+# in the arm's bore (the clearance's upper end on the smallest shank: it
+# must not enter); Op 190 tries the arm on the shank with the three running
+# mates.
 #
 # The journal is made to fit (fit audit 2026-11-23, pending owner
 # confirmation): the drawing prints its Ø as a reference and note 1's
@@ -285,12 +286,12 @@ instruction = "Before turning, have at the lathe the reamed MHA-PD-18 arm, the r
 [[setups.operations]]
 cut_kind = "other"
 instruction = "Try the pin-gauge set's .127 pin in the arm's pin bore from each face, by hand and clean, never forced."
-inspection = "MHA-PD-18's drawing: the .127 pin does not enter the pin bore."
+inspection = "Drawing note 1, the bond's clearance in MHA-PD-18 (.0010-.0022), its upper end: the .127 pin does not enter the pin bore."
 gauge_checks = "other"
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "The .127 pin enters the arm's pin bore: that bore is over its drawing's limit and the bonded pin would lean in it. Stop: make no pin for that arm and tell the owner."
+instruction = "The .127 pin enters the arm's pin bore: that bore is over the bond's clearance and the bonded pin would lean in it. Stop: make no pin for that arm and tell the owner."
 
 [[setups.operations]]
 cut_kind = "other"

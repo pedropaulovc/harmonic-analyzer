@@ -249,12 +249,14 @@ FRONT_KEEP = {
     "PivotBoreDia": (0.060, _front_y(PIVOT_END_R) + 0.021),
     # The pin bore's Ø and its callout lines stand below right of the arm,
     # right of the station stack; the upper band holds the tap and locator
-    # callouts.  SOLIDWORKS centres the block on this point: its widest row,
-    # the bonded fit's 46 characters (~117 mm), begins 4 mm right of the pin
-    # station's extension line, which drops through this band to the 2.7093
-    # row (fit batch review r1: centred 56 mm right, the line struck the
-    # "O" of BONDED), and ends 20 mm left of section B-B.
-    "PinBoreDia": (_front_x(PIN_STATION) + 0.063, _UNDER_FRONT - 0.024),
+    # callouts.  SOLIDWORKS centres the block on this point, midway between
+    # the pin station's extension line, which drops through this band to
+    # the 2.7093 row, and the 5.07 row's at the square end, 120 mm apart:
+    # its widest row, the necessity answer's 39 characters (~102 mm at the
+    # 2.61 mm a character run 20261124T030945233Z printed), stands 9 mm
+    # off each (fit batch reviews: r1's 47-character row struck the first
+    # line, r2's 46-character row, moved right, the second).
+    "PinBoreDia": (_front_x(PIN_STATION) + 0.060, _UNDER_FRONT - 0.024),
     "EndWidth": (_front_x(TIP_STATION) + 0.0115, FRONT_CENTER[1]),
     # Mid-line, or further left: it keeps 12 mm between its centre and the
     # lower 6.850's box, which hangs left of tap 1 (since #2034 moved K, tap 1

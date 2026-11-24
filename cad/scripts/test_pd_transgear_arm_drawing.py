@@ -440,10 +440,11 @@ def test_the_tap_callout_text_is_proved_by_its_readback(monkeypatch, persist) ->
 
 def test_the_pin_is_bonded_in_the_bore_with_clearance_at_every_limit() -> None:
     """Fit audit 2026-11-23 (pending owner confirmation): the reamed bore at
-    S takes the one-diameter MHA-PD-23 pin as a bonded slip fit.  The bore
-    prints the reamer's size with no band; its callout prints rule 23's bond
-    clearance and the gap's one limit, a set pin that must not enter, and
-    the note names the mate, the compound, the acceptance and why."""
+    S takes the one-diameter MHA-PD-23 pin, bonded.  The bore prints the
+    reamer's size with no band and says the pin is turned to it; the pin,
+    made last, prints rule 23's clearance and the trial on its own sheet
+    (fit batch review r2).  The set pin that bounds the gap is the
+    traveler's."""
     assert not hasattr(spec, "PIN_PRESS_INTERFERENCE")
     least, greatest = spec.PIN_BOND_GAP
     assert (least, greatest) == pytest.approx(cluster_pin.BOND_GAP)
@@ -455,9 +456,17 @@ def test_the_pin_is_bonded_in_the_bore_with_clearance_at_every_limit() -> None:
     assert spec.PIN_BOND_CLEARANCE_PRINTED == (least, spec.PIN_BOND_GAP_ACCEPTED_MAX)
     assert arm_notes.PIN_BORE_CALLOUT.split("\n") == [
         "REAM THRU",
-        f"BONDED FIT ON {cluster_pin.PIN_NUMBER}, CLEARANCE .0010-.0022",
+        f"{cluster_pin.PIN_NUMBER} IS TURNED TO THIS BORE",
         "KEEPS PIN SQUARE TO MHA-PD-26 RACK MESH",
     ]
+    assert "CLEARANCE" not in arm_notes.PIN_BORE_CALLOUT
+    # The pin station's extension line stands left of the text and the
+    # square end's right of it (r1 and r2 each struck a row), at the
+    # 2.61 mm a character r2's sheet printed.
+    text_x = drawing.FRONT_KEEP["PinBoreDia"][0]
+    half = max(map(len, arm_notes.PIN_BORE_CALLOUT.split("\n"))) * 0.00261 / 2.0
+    assert text_x - half > drawing._front_x(geometry.PIN_STATION) + 0.005
+    assert text_x + half < drawing._front_x(geometry.TIP_STATION) - 0.005
     assert not hasattr(arm_notes, "PIN_NOTE")
     assert "PIN BORE" not in arm_notes.NOTES_TEXT
     assert cluster_pin.RETAINING_COMPOUND not in arm_notes.NOTES_TEXT

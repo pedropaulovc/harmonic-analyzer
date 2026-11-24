@@ -17,21 +17,8 @@ from pd_transgear_arm_geometry import (
     PIN_HOLE_DEPTH_PLACES,
     PIVOT_BORE_DRILL,
 )
-from pd_rack_pinion_spec import inch_ceil_mm, inch_floor_mm, inch_text
-from pd_transgear_arm_spec import (
-    LATCH_PIN_NUMBER,
-    PIN_BOND_CLEARANCE_PRINTED,
-)
-
-
-def _inch_range(limits: tuple[float, float], places: int = 4) -> str:
-    """A clearance or interference range in inches, widened outward to
-    ``places`` so it holds every part the two bands accept."""
-    return (
-        f"{inch_text(inch_floor_mm(min(limits), places), places)}-"
-        f"{inch_text(inch_ceil_mm(max(limits), places), places)}"
-    )
-
+from pd_rack_pinion_spec import inch_text
+from pd_transgear_arm_spec import LATCH_PIN_NUMBER
 
 # Each fit callout keeps its size, its process and its mate; a fit whose
 # acceptance and reason do not fit two lines of words stands once in a
@@ -97,20 +84,16 @@ DRAWING_NOTES = NOTES_TEXT
 
 PIVOT_BORE_CALLOUT = f"{PIVOT_BORE_DRILL} DRILL THRU, {see_note(PIVOT_NOTE)}"
 # The pin bore's callout (fit audit 2026-11-23, pending owner confirmation:
-# the one-diameter pin is a slip fit bonded in the reamed bore): size and
-# process, then two lines of words, the fit and rule 4's necessity answer.
-# The fit line names the mate and rule 23's bond clearance as the
-# requirement (the least the reamer and the pin model, the most the
-# traveler's .127 set pin accepts: pd_transgear_arm_spec.
-# PIN_BOND_CLEARANCE_PRINTED).  It is stated once, here: the grade and the
-# method stand in MHA-PD-00's pin step and on MHA-PD-23's note 1, and the
-# set pin that checks the range is the traveler's (fit batch review r1: a
-# linked note 5 repeated the mate and the bond with a second acceptance,
-# and the callout carried the .127 check as a third line).
-PIN_BORE_BOND_TEXT = (
-    f"BONDED FIT ON {PIN.PIN_NUMBER}, CLEARANCE {_inch_range(PIN_BOND_CLEARANCE_PRINTED)}"
-)
-PIN_BORE_CALLOUT = f"REAM THRU\n{PIN_BORE_BOND_TEXT}\n{PIN_BORE_NECESSITY}"
+# the one-diameter pin is bonded in the reamed bore): size and process,
+# then two lines of words.  The first names the mate and says it is made
+# to this bore: MHA-PD-23 is turned last, so its sheet carries the bond's
+# clearance and the trial, once (fit batch review r2: with the range here
+# the pin's sheet printed none; r1: a linked note 5 repeated the mate and
+# the bond with a second acceptance).  The second is rule 4's necessity
+# answer for the REAM.  The grade and the method stand in MHA-PD-00's pin
+# step, and the set pin that checks the bore is the traveler's.
+PIN_BORE_MATE_TEXT = f"{PIN.PIN_NUMBER} IS TURNED TO THIS BORE"
+PIN_BORE_CALLOUT = f"REAM THRU\n{PIN_BORE_MATE_TEXT}\n{PIN_BORE_NECESSITY}"
 # Note 2 names the dowel and its press; the callout links it (round 2: the
 # dowel named on both was named twice for one pattern).
 LOCATOR_CALLOUT_TEXT = f"2X REAM THRU, {see_note(LOCATOR_NOTE)}"
