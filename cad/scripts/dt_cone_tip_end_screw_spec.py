@@ -162,15 +162,17 @@ def inch_text(value_mm: float, places: int) -> str:
 # Below the hole's imported diameter (four places, no band: a drilled hole
 # prints its drill), rules 12 and 26: the drill and the depth (PR 2 r7
 # machinist review: the depth belongs in the callout; the depth the
-# model's at its drawing places).  Then rule 7's two lines of words: the fit
-# and its mate by drawing number (rule 4) and the wall shortfall as a plain
-# fact in rule 20's own form (RV-01; the hole's one wall is to the thread
-# root).
+# model's at its drawing places).  Then rule 7's two lines of words: the
+# mate by drawing number, turned to this hole (FitLaneDT 2026-11-24: "RUNS
+# FREE" stated a fit the hole does not set; the reamed MHA-DT-38 bushing
+# sizes the pivot) and the wall shortfall as a plain fact in rule 20's own
+# form (RV-01; the hole's one wall is to the thread root).
 END_HOLE_DEPTH_TEXT = inch_text(END_HOLE_DEPTH, END_HOLE_DEPTH_PLACES)
 END_HOLE_CALLOUT = "\n".join(
     (
         f"{END_HOLE_DRILL} DRILL <HOLE-DEPTH> {END_HOLE_DEPTH_TEXT}",
-        f"{PIVOT_NUMBER} RUNS FREE",
+        f"{PIVOT_NUMBER} PIVOT IS",
+        "TURNED TO THIS HOLE",
         f"WALL {inch_text(END_HOLE_WALL_PRINTED_IN * MM_PER_IN, 3)} MIN",
     )
 )

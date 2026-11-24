@@ -102,11 +102,13 @@ def test_pivot_never_bottoms_and_always_runs_in_the_hole() -> None:
 def test_hole_callout_is_process_depth_then_two_lines_of_words() -> None:
     # Rules 12 and 26 (PR 2 r7 machinist review): under the imported
     # untoleranced diameter, the drill and the model's depth at its places;
-    # rule 7: two lines of words.
+    # rule 7: two lines of words (the pivot's wraps to two rows to stay
+    # inside CALLOUT_HALF_WIDTH).
     assert spec.END_HOLE_DEPTH_TEXT == ".12"
     assert spec.END_HOLE_CALLOUT.splitlines() == [
         "#52 DRILL <HOLE-DEPTH> .12",
-        "MHA-DT-37 RUNS FREE",
+        "MHA-DT-37 PIVOT IS",
+        "TURNED TO THIS HOLE",
         "WALL .065 MIN",
     ]
     assert "91794A559" in spec.STOCK_NOTE
