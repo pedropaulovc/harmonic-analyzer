@@ -529,11 +529,3 @@ source = "https://www.mscdirect.com/product/details/88915707"
 purchase = "MSC 88915707 (.1570 plus, $4.48): Vermont Gage Class ZZ steel plug gage, 2 in long (read live 2026-11-23)."
 note = "MHA-DT-14 follower seat (Q8). GO: ZZ .1570 plus single. NO-GO: the .160 minus pin of the sets (gauges.pin-gauges). Each pin is miked before first use and its size written on its tag."
 
-[gauges.zz-pins-1610-1635]
-name = "Class ZZ pins for the .1610-.1635 band"
-kind = "gauge_pin"
-make = "Vermont Gage"
-status = "to_order"
-source = "https://www.mscdirect.com/product/details/89016356"
-purchase = "MSC 89016356 (.1635 minus, $4.48): Vermont Gage Class ZZ steel plug gage, 2 in long (read live 2026-11-23)."
-note = "MHA-DT-08 oak handle bore, drilled #20, and its trial hole (Q14). Reading pins: the .161, .162 and .163 minus pins of the sets (gauges.pin-gauges). NO-GO: ZZ .1635 minus single. Each pin is miked before first use and its size written on its tag."

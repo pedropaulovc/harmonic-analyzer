@@ -440,11 +440,6 @@ kind = "reamer"
 status = "to_order"
 note = "Not owned: to buy. drawing cross-check 2026-11-19: MHA-SM-02 Ø.1280 ±.0007 REAM (.37), ending in a drill point (#3124)."
 
-[tools.reamer-1562]
-kind = "reamer"
-status = "to_order"
-note = "Not owned: to buy. drawing cross-check 2026-11-19: MHA-DT-31 (Ø.156) REAM .17 at assembly with MHA-DT-06; MHA-DT-06 (Ø.156) REAM .17 for dowel MHA-DT-VN-59."
-
 [tools.reamer-1570]
 make = "Alvord-Polk"
 sku = "8930A35"
