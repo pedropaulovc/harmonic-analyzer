@@ -2051,7 +2051,7 @@ requirement(
         "lateral": _P["PassageCenter"],
     },
 )
-# The pinch slit .05 wide down the top on the adjuster's plane, SLOT INTO
+# The pinch slit .06 wide down the top on the adjuster's plane, SLOT INTO
 # BORE (FRONT_KEEP "SlitW"): its floor lies inside the tap drill, so only
 # its width and extent print.
 requirement(
