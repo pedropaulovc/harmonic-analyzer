@@ -6,7 +6,7 @@ PURE DATA, no SolidWorks/COM and no drawing imports. Shop tooling (owner ask
 strip, its fence and end stop milled integral with it (the top is milled down
 round them). Four Mitee-Bite Pitbull edge clamps MHA-CH-13-TL-VN-50 sit in
 pockets with #4-40 taps; the hub plug MHA-CH-13-TL-02 sits in the hub
-counterbore, and the 1/4-20 hub screw MHA-CH-13-TL-VN-51 runs into the tap
+counterbore, and the #10-32 hub screw MHA-CH-13-TL-VN-51 runs into the tap
 under it (owner ruling 2026-11-17).
 
 Model frame = the strap programs' G54 (``cad/process/ch_rocker_strap``):
@@ -134,10 +134,11 @@ HUB_LOCATION_TOL = 0.0508  # +/-.002
 HUB_CBORE_DIA = 12.7  # .500
 HUB_CBORE_DEPTH = 4.699  # .185 from Z0
 COUNTERBORE_FLOOR_Z = PLATE_TOP_Z - HUB_CBORE_DEPTH
-# Owner ruling 2026-11-17: a 1/4-20 hub screw, its tap through the plate from
-# the counterbore floor.
-HUB_TAP_THREAD = "1/4-20"
-HUB_TAP_DRILL = TAP_DRILL_MM[HUB_TAP_THREAD]  # #7, .201
+# Owner ruling 2026-11-23: "change the screw to #10-32. The sub-plate's
+# tapped hole becomes #10-32" (reversing 2026-11-17's "Use a 1/4-20 hub
+# screw"), its tap through the plate from the counterbore floor.
+HUB_TAP_THREAD = "#10-32"
+HUB_TAP_DRILL = TAP_DRILL_MM[HUB_TAP_THREAD]  # #21, .159
 # The counterbore and its drill are ONE Hole Wizard counterbore (the fleet's
 # counterbored holes: draw_ch_fulcrum_keeper), whose native callout prints
 # the drill, the counterbore's Ø and its depth together (drawing-guidelines:
@@ -146,16 +147,16 @@ HUB_TAP_DRILL = TAP_DRILL_MM[HUB_TAP_THREAD]  # #7, .201
 # callout's thread row names it (HUB_THREAD_ROW).
 HUB_HOLE_SPEC = HoleSpec(
     "counterbore_socket",
-    "1/4",
+    "#10",
     overrides_mm={
         "HoleDiameter": HUB_TAP_DRILL,
         "CounterBoreDiameter": HUB_CBORE_DIA,
         "CounterBoreDepth": HUB_CBORE_DEPTH,
     },
 )
-HUB_THREAD_ROW = f"{HUB_TAP_THREAD} UNC"
+HUB_THREAD_ROW = f"{HUB_TAP_THREAD.removeprefix('#')} UNF"
 # The cosmetic thread's own label, SolidWorks' form for a wizard tap's
-# thread ("1/4-20 Tapped Hole"), which the drawing's sweep deletes as it does
+# thread ("#10-32 Tapped Hole"), which the drawing's sweep deletes as it does
 # the clamp taps'.
 HUB_THREAD_LABEL = f"{HUB_TAP_THREAD} Tapped Hole"
 
@@ -262,9 +263,10 @@ HUB_THREAD_LENGTH_MIN = (
     HUB_THREAD_LENGTH - XX - XXX - XXX - 2.0 * TAP_MOUTH_BREAK
 )  # 4.8514, .191
 HUB_THREAD_MAJOR = THREAD_MAJOR_MM[HUB_TAP_THREAD]
-HUB_THREAD_REQUIRED = 1.5 * HUB_THREAD_MAJOR  # .375
+HUB_THREAD_REQUIRED = 1.5 * HUB_THREAD_MAJOR  # .285
 # Owner ruling 2026-11-17 (registry RV-01) accepts the .23 in of thread in
-# the plate: .21 of full thread nominal (.84D), .19 at the worst case (.76D).
+# the plate; under the #10-32 of 2026-11-23 it is .21 of full thread nominal
+# (1.11D), .19 at the worst case (1.01D; the 1/4-20 had .76D).
 # The sheet states the worst case as a plain fact (rule 20), on the tap's
 # callout.
 HUB_ENGAGEMENT_DIAMETERS = HUB_THREAD_LENGTH_MIN / HUB_THREAD_MAJOR
@@ -351,7 +353,7 @@ V_FINISHED = (
 # PlateTopProfile/PlateTop the Z0 floor milled down round the fence and stop,
 # NotchProfile/FenceNotches and NotchCorners, PocketProfile/ClampPockets and
 # PocketCorners, the wizard taps ClampTaps and the wizard counterbore
-# HubHole (its 1/4-20 cosmetic thread HubThread). The faced top is the
+# HubHole (its #10-32 cosmetic thread HubThread). The faced top is the
 # reference plane FacedTopPlane, FENCE_HEIGHT
 # above the Front Plane (Z0).
 FACED_TOP_PLANE = "FacedTopPlane"

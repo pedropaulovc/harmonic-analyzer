@@ -14,9 +14,9 @@
 # chuck is on hand (cad/config/shop-equipment/fixtures.chuck-4jaw-6), and the
 # tailstock is MT3, which the owner's MT3 dead centre fits
 # (tools.dead-centre-mt3). The 4-jaw's body is Ø160 mm and its jaws open to
-# 140 mm (owner, measured 2026-11-22; fixtures.chuck-4jaw-6), but its least
-# grip is not measured, so workholding.chuck-4jaw-6 declares no grip range
-# and Setup 2 opts out of the lathe-holding screen (lathe_hold = "other");
+# 140 mm (owner, measured 2026-11-22; fixtures.chuck-4jaw-6); its least grip
+# is .2865 in (owner 2026-11-24; workholding.chuck-4jaw-6 grip_range_mm), and
+# Setup 2 opts out of the lathe-holding screen (lathe_hold = "other");
 # the 2-1/2 in square blank, about 3.54 in (90 mm) across its corners, is
 # well inside the 140 mm opening.
 #

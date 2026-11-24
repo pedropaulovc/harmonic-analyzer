@@ -135,7 +135,9 @@ machine_ref = "pm-1127vf-lb"
 holding = "3-jaw over a brass shim wrap on the ground O.D., {{process.end_stickout_in:.2dot}} in out of the jaw fronts."
 datum = "Z0 (carriage DRO) end A, faced in Op 40."
 diagram = { file = "diagrams/end-a.svg", alt = "A blank in the 3-jaw, end A out: faced square." }
-lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{cad.stock_dia_mm}}", stock_diameter_mm = "{{cad.stock_dia_mm}}", stickout_mm = "{{cad.end_stickout_mm}}", minimum_diameter_mm = "{{cad.stock_dia_mm}}", support = "none" }
+# The 5/32 rod is under the 3-jaw's .1750 least grip (owner 2026-11-24;
+# workholding.chuck-3jaw-6): this hold is impossible as written, #3499.
+lathe_hold = "other"
 
 [[setups.operations]]
 cut_kind = "other"
@@ -156,7 +158,8 @@ machine_ref = "pm-1127vf-lb"
 holding = "3-jaw over the brass shim wrap on the trial offcut, {{process.end_stickout_in:.2dot}} in out of the jaw fronts."
 datum = "Z0 (carriage DRO) the offcut's end, faced in Op 50, touched with the ball turner's tip in Op 80."
 diagram = { file = "diagrams/trial.svg", alt = "The trial offcut in the 3-jaw over the shim wrap, its end faced; the ball turner's pivot on the axis one radius behind the faced end, its bit swept from the apex toward you." }
-lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{cad.stock_dia_mm}}", stock_diameter_mm = "{{cad.stock_dia_mm}}", stickout_mm = "{{cad.end_stickout_mm}}", minimum_diameter_mm = "{{cad.stock_dia_mm}}", support = "none" }
+# Under the 3-jaw's .1750 least grip, as above: #3499.
+lathe_hold = "other"
 
 [[setups.operations]]
 cut_kind = "other"
@@ -217,7 +220,8 @@ machine_ref = "pm-1127vf-lb"
 holding = "Turned round: 3-jaw over the shim wrap, end B {{process.end_stickout_in:.2dot}} in out, end A toward the chuck."
 datum = "End B's length is read by micrometer across both faces (Op 150). For the crown the DRO Z is zeroed where the ball turner's tip touches end B's faced end (Op 170)."
 diagram = { file = "diagrams/end-b.svg", alt = "The blank turned round, end B out: faced to length, then crowned by the ball turner swept about its pivot on the axis." }
-lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{cad.stock_dia_mm}}", stock_diameter_mm = "{{cad.stock_dia_mm}}", stickout_mm = "{{cad.end_stickout_mm}}", minimum_diameter_mm = "{{cad.stock_dia_mm}}", support = "none" }
+# Under the 3-jaw's .1750 least grip, as above: #3499.
+lathe_hold = "other"
 
 [[setups.operations]]
 cut_kind = "other"

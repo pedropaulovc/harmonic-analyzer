@@ -124,17 +124,21 @@ sawn_end_a_mm = -1.524
 length_dro_min_mm = 452.12
 length_dro_max_mm = 457.2
 # The top skim: the 1/2 in carbide end mill (shop endmill-carbide-3fl-1-2),
-# equal levels no deeper than .003 and three equal passes across the 3/8
-# edge no wider than 3.4 mm (.134 in): the measured face envelope, shop
-# settings.em-half-carbide-1018-v5-face (dechatter v5, 2370 rpm stable at
-# 1.27 mm deep and 3.0-3.4 mm wide, conventional; the zigzag's return passes
-# climb, and that half is not measured), and no wider than prechips allows
-# (the bar's ends, 5.8 in out past the jaws, bend sideways under more).
+# equal levels no deeper than .0025 (four from the widest bar) and two
+# equal passes across the 3/8 edge, each 5.0125 mm (.197 in: 9.525 +
+# cam.py's 0.5 overhang, in two), inside the measured face envelope, shop
+# settings.em-half-carbide-1018-3439-face (dechatter session of 2026-11-23,
+# #3439: stable to 6.4 mm wide at up to 1.27 mm deep, 2420-2490 rpm in the
+# cut, conventional; the zigzag's return passes
+# climb, and that half is not measured), and no heavier than prechips allows
+# (the bar's ends, 5.8 in out past the jaws, bend sideways under more: at
+# this width a .003 level is over the finish limit, so four levels of two
+# passes replace the three of three that 3.4 mm wide took).
 # cam.py starts each level with the cutter over the edge, so no pass takes
 # more than the stepover.
 face_cutter_dia_mm = 12.7
-face_stepover_max_mm = 3.4
-face_step_max_mm = 0.0762
+face_stepover_max_mm = 5.0125
+face_step_max_mm = 0.0635
 # END A: the same cutter's side, one level from the front face to .020 under
 # the thickest bar's back face (end_axial_doc_mm, cam.py checks it), in
 # equal radial steps no deeper than .030, one-way conventional passes across
@@ -252,15 +256,15 @@ z_touch_lying_y_mm = -12.6111
 # spindle nose to tip.
 r8_collet_gauge_mm = 6.3         # HA: holders.r8-collets-lms-4860.gauge_len_mm.
 drill_chuck_gauge_mm = 95.0      # Archive holders.drill-chuck-r8.gauge_len_mm.
-# 1/2 in end mill, 3 in overall: set 1.10 in out of the collet, the
-# stick-out its measured settings were cut at
-# (cad/config/shop-equipment/measured-cuts.toml; owner, Pedro, 2026-11-22:
-# "stickout is recorded as 30mm but is actually 27.94"); cam.py checks the
+# 1/2 in end mill, 3 in overall: set 1.12 in (28.45 mm) out of the collet
+# (owner, Pedro, 2026-11-24: "28.45"), the longer end of the stick-out the
+# measured face setting allows (cad/config/shop-equipment/
+# measured-cuts.toml: 27.94 to 28.45 mm); cam.py checks the
 # collet's nose clears the bar at END A's cut. The 1/8 in end mill, 1-1/2
 # overall, 1/2 in of flute: at least .55 out, so the collet's nose stays .15
 # above the bar at the slots' bottom, and at most .75, half its length left
 # in the collet; the chamfer mill at least .50 out.
-half_mill_projection_mm = 27.94
+half_mill_projection_mm = 28.45
 eighth_mill_projection_min_mm = 13.97
 eighth_mill_projection_max_mm = 19.05
 chamfer_projection_min_mm = 12.7
@@ -391,7 +395,7 @@ indexing = "none"
 machine_ref = "pm-30mv"
 holding = "One 1 in parallel of the set ({{process.parallel_thickness_mm:in.3dot}} thick) against each jaw; the jaws' faces and the blank wiped clean (F stays as supplied). The blank on edge on them, T up, the bottom edge down, the back face against the FIXED jaw, F toward the moving jaw, END A to the RIGHT, the sawn END A {{process.top_out_mm:in.2f}} in (5 13/16) out past the jaws' right side (the rule); the far end stands about as far out past their left side. Tap it down onto both parallels while closing the vise. The lower {{process.top_grip_mm:in.3dot}} of its width is in the jaws."
 datum = "Program SB02_top. G54: X0 {{process.end_a_skim_mm:in.3dot}} left of the sawn END A (where Setup 3 mills it), +X to the right, so the bar runs toward −X; Y0 the fixed jaw's face (the back face), +Y toward it; Z0 the parallels' top (the bottom edge), set from the miked width. The file starts with an M6 for the end mill; tool lengths from the tool setter."
-diagram = { file = "diagrams/top.svg", alt = "The blank on edge on a 1 in parallel at each jaw, the back face at the fixed jaw; the 1/2 in end mill skims T in three passes along the bar. In plan the blank stands 5.8 in out past the jaws at both ends, END A at the right." }
+diagram = { file = "diagrams/top.svg", alt = "The blank on edge on a 1 in parallel at each jaw, the back face at the fixed jaw; the 1/2 in end mill skims T in two passes along the bar. In plan the blank stands 5.8 in out past the jaws at both ends, END A at the right." }
 envelope = { x_span_mm = ["{{process.blank_length_max_mm}}", "{{process.face_cutter_dia_mm}}", 5.08], y_span_mm = ["{{process.blank_thickness_mm}}", "{{process.face_cutter_dia_mm}}"], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.top_riser_height_mm}}", "{{process.bar_width_max_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.top_riser_height_mm}}", "{{process.height_target_mm}}"], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_mm}}"] }
 vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{process.blank_thickness_mm}}", along_jaws_mm = "{{process.blank_length_max_mm}}", part_height_mm = "{{process.bar_width_max_mm}}", parallel_height_mm = "{{process.top_riser_height_mm}}", overhang_mm = ["rest", "{{process.top_out_mm}}"], jaw_offset = "centred", fixed_jaw_face = "as_bought", moving_jaw_face = "as_bought", moving_jaw_contact = "flat" }
 beam = { axis = "x", hold = "cantilever", extent_mm = ["{{process.sawn_end_a_mm}}", "{{process.bar_length_max_mm}}"], clamp_mm = ["{{process.pickup_out_mm}}", "{{process.b_clamp_end_mm}}"], section_mm = { y = "{{cad.back_face_depth_mm}}", z = "{{process.height_target_mm}}" }, vise_left = "end" }
@@ -421,8 +425,8 @@ speed_kind = "spindle"
 tool = "em-half"
 drilling = "none"
 sizing = "other"
-instruction = "Paint T with marking fluid. Run SB02_top (M6 T1, 1/2 in end mill; set 2370): skim T down to Z {{process.height_target_mm:in.4dot}} in levels no deeper than {{process.face_step_max_mm:in.3dot}} from {{process.bar_width_max_mm:in.3dot}} (the widest bar: a narrower one cuts air first), three passes along the bar per level, each no wider than {{process.face_stepover_max_mm:in.3dot}}. Unclamp."
-settings = "em-half-carbide-1018-v5-face"
+instruction = "Paint T with marking fluid. Run SB02_top (M6 T1, 1/2 in end mill; set 2450: the display rests near 2485, not 2380): skim T down to Z {{process.height_target_mm:in.4dot}} in levels no deeper than {{process.face_step_max_mm:in.4dot}} from {{process.bar_width_max_mm:in.3dot}} (the widest bar: a narrower one cuts air first), two passes along the bar per level, each no wider than {{process.face_stepover_max_mm:in.3dot}}. Unclamp."
+settings = "em-half-carbide-1018-3439-face"
 inspection = "Height, T to the bottom edge, {{cad.bottom_face_height_min_in:.3dot}}–{{cad.bottom_face_height_max_in:.3dot}}, miked at both ends and the middle; T bright from end to end, no marking fluid left (the top face, {{cad.top_face_finish_ra_uin:d}} µin Ra: the end mill's cut)."
 gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.bottom_face_height_band_mm}}" }]
 milling_cuts = [
@@ -489,7 +493,7 @@ speed_kind = "spindle"
 tool = "em-half"
 drilling = "none"
 sizing = "other"
-instruction = "Run SB03_end_a (M6 T1; set 2650): END A with the cutter's side, from F to {{process.end_past_mm:in.3dot}} under the back face, in passes no deeper than {{process.end_step_max_mm:in.3dot}}, each across the bar one way (+Y: the bar on the pass's left, conventional with M3), to X0."
+instruction = "Run SB03_end_a (M6 T1; set 2650): END A with the cutter's side, from F to {{process.end_past_mm:in.3dot}} under the back face, the full depth at once, in side passes no wider than {{process.end_step_max_mm:in.3dot}} into the end, each across the bar one way (+Y: the bar on the pass's left, conventional with M3), to X0."
 settings = "endmill-carbide-3fl-1-2-1018-cf"
 milling_cuts = [
   { name = "end a", kind = "side", phase = "finish", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", axial_doc_mm = "{{process.end_axial_doc_mm}}", radial_woc_mm = "{{process.end_step_max_mm}}", stations_mm = "{{process.sawn_end_a_mm}}" },

@@ -63,7 +63,7 @@ recipes:
 | 91255A106 | — (a former `pd-vn-guide-lock-screw`; diagnostic recipe removed 2026-11-16, #2886) | Black-Oxide Alloy Steel Button Head Hex Drive Screw |
 | 91255A148 | — (a former `dt-vn-cone-tip-block-screw`; diagnostic recipe removed 2026-11-16, #2886) | Black-Oxide Alloy Steel Button Head Hex Drive Screw |
 | 91255A150 | — (retired TL-VN-65, 2026-11-06; the KP08 screws are now 91251A196, TL-VN-62; diagnostic recipe removed) | Black-Oxide Alloy Steel Button Head Hex Drive Screw |
-| 91255A539 | `ch-rocker-strap-tl-vn-hub-screw` (MHA-CH-13-TL-VN-51; tier 1; vendor STEP probed, not kept) | Black-Oxide Button Head Hex-Drive Screw |
+| 91255A267 | `ch-rocker-strap-tl-vn-hub-screw` (MHA-CH-13-TL-VN-51; tier 1; vendor STEP probed, not kept) | Black-Oxide Button Head Hex-Drive Screw |
 | 91251A150 | — (retired TL-VN-65 source, 2026-11-04; now 91255A150, whose larger head covers the uxcell KP08's Ø5 hole; diagnostic recipe removed) | Black-Oxide Alloy Steel Socket Head Screw |
 | 91290A168 | — (retired TL-VN-64, 2026-11-17: oblique jig deleted; spec and diagnostic removed) | Socket Head Screw |
 | 91355A581 | — (retired TL-VN-66 source, 2026-11-04: TL-VN-66 retired; the TL-VN-84 kit's feed nut uses TL-VN-67's 91771A112; diagnostic recipe removed) | Black-Oxide Flanged Button Head Hex-Drive Screw, Alloy Steel |
@@ -100,7 +100,7 @@ recipes:
 | 94355A213 | — (the set screw of `dt-vn-cone-tip-collar`, MHA-DT-VN-54, fitted as supplied; retired with the collar 2026-11-09, owner decision C1 keyed, PR #1992) | 18-8 Stainless Steel Flat-Tip Set Screw, #2-56 x 5/16" |
 | 92865A585 | — (former `vn-hex-bolt`, MHA-VN-008 retired; diagnostic recipe removed 2026-11-16, #2886) | Medium-Strength Grade 5 Steel Hex Head Screw |
 | 92916A250 | `mg-vn-wheel-axle-front-washer` (catalogue-only; no vendor model) | Brass Washer for Number 4 Screw Size |
-| 96659A104 | `sm-vn-knife-hanger-washer` (MHA-SM-VN-54; catalogue-only, no vendor model) | 18-8 Stainless Steel SAE Washer for Number 10 Screw Size |
+| 96659A104 | `sm-vn-knife-hanger-washer` (MHA-SM-VN-54; catalogue-only, no vendor model); `ch-rocker-strap-tl-vn-hub-washer` (MHA-CH-13-TL-VN-52; shop fixture; one washer selected by measurement; tier 1) | 18-8 Stainless Steel SAE Washer for Number 10 Screw Size |
 | 92916A480 | `mg-vn-wheel-axle-back-washer` (catalogue-only; no vendor model) | Brass Washer for Number 10 Screw Size |
 | 93075A194 | — (`pn-vn-hanger-screw` until the 2026-10-14 through-strap nut stack; diagnostic recipe removed 2026-11-16, #2886) | Low-Strength Zinc-Plated Steel Hex Head Screw |
 | 93075A199 | `pn-vn-hanger-screw` | Low-Strength Zinc-Plated Steel Hex Head Screw |
@@ -1055,24 +1055,38 @@ Catalog specifications checked on September 10, 2026:
   minimum key engagement, 0.055 in, and a plain cylindrical head. It is
   catalogue-only: no vendor model is downloaded or kept here, so it has no
   replica gate, and its standalone diagnostic is a catalog-only run.
-- [91255A539](https://www.mcmaster.com/91255A539/) (`ch-rocker-strap-tl-vn-hub-screw`,
+- [91255A267](https://www.mcmaster.com/91255A267/) (`ch-rocker-strap-tl-vn-hub-screw`,
   MHA-CH-13-TL-VN-51) snugs the rocker-strap blank's hub on the sub-plate
-  MHA-CH-13-TL-01 through the hub washer (owner ruling 2026-11-17, replacing
-  a 5/16-18 screw). Read live on 2026-11-17: black-oxide button head hex
-  drive screw, alloy steel, 1/4-20 UNC class 3A, right hand, 5/8 in under
-  the head, fully threaded, flat tip, head Ø0.437 in × 0.132 in, 5/32 in
-  hex drive, 140 ksi, Rockwell C39, ASME B18.3 and ASTM F835; $11.55 per
-  pack of 50. The product page's STEP
-  (`91255A539_Button Head Hex Drive Screw.STEP`, SHA-256
-  `e5ad67ac57f6a19f305dbff32b7193b726915b749f5ad85caa698b9f125d7667`) was
-  probed headless with FreeCAD 1.1 and not kept: spherical dome R 6.13936
-  about a centre 2.12203 below the bearing face, socket 1.844 deep, 45°
-  tip chamfer to Ø4.445; 592.448 mm³ with its thread. `_mcmaster_91255a539.py`
-  records those values and `diag_build_91255A539.py` models the head with a
-  plain shank at the major; the model contains the vendor solid to
-  0.19 mm³. Tier 1: a HARDWARE.md row, no sheet. Rejected: 91255A583
-  (5/16-18 × 1 in, the unverified first candidate) and 91255A580 (5/16-18
-  × 5/8 in, the pre-ruling size).
+  MHA-CH-13-TL-01 through the hub washer MHA-CH-13-TL-VN-52 (owner ruling
+  2026-11-23: "change the screw to #10-32", reversing 2026-11-17's "Use a
+  1/4-20 hub screw" and its 91255A539). Read live on 2026-11-23:
+  black-oxide button head hex drive screw, alloy steel, 10-32 UNF class 3A,
+  5/8 in under the head, head Ø0.361 in × 0.101 in, 1/8 in hex drive,
+  120,000 psi, Rockwell C39, ASME B18.3 and ASTM F835; $13.21 per pack of
+  50. ASME B18.3-2012 gives the #10 button head Ø.347–.361 × .091–.101;
+  ASME B1.1 the 10-32 UNF-3A major .1840–.1900. The product page's STEP
+  (`91255A267_Button Head Hex Drive Screw.STEP`, SHA-256
+  `c8bab71d98b100074f8aaf96c1a2cba971042577e12eab53b0292ccb6e41ddf6`) was
+  probed headless with FreeCAD 1.1 and not kept: spherical dome R 5.26903
+  about a centre 2.21196 below the bearing face, socket 1.411 deep, 45°
+  tip chamfer 0.5953; 340.1527 mm³ with its thread. `_mcmaster_91255a267.py`
+  records those values and `diag_build_91255A267.py` models the head with a
+  plain shank at the major (395.36 mm³). Tier 1: a HARDWARE.md row, no
+  sheet. Retired with the 1/4-20 screw: 91255A539 (1/4-20 × 5/8 in, head
+  Ø0.437 × 0.132 in); rejected before it: 91255A583 (5/16-18 × 1 in) and
+  91255A580 (5/16-18 × 5/8 in).
+- The same [96659A104](https://www.mcmaster.com/96659A104/) washer is
+  `ch-rocker-strap-tl-vn-hub-washer`, **MHA-CH-13-TL-VN-52**, one, under
+  that screw's head (owner ruling 2026-11-23: "The washer is then a #10 SAE
+  washer you already own (McMaster 96659A104, .219 x .500, pack of 100 from
+  PO 1103PCAMPOS), used as supplied."). Read live again on 2026-11-23: ID
+  .219, OD .500, thickness .036–.065, ASME B18.21.1, $10.56 per 100. One
+  washer is picked by measurement and kept with the fixture (owner ruling
+  2026-11-23: "OD .505 or under and bore .220 or under"), so on the
+  smallest 3A screw (major .1840) it reaches at most 7.27 mm from the hub
+  centre pushed fully aside, inside the outline program's 7.358 mm
+  keep-out (`ch_rocker_strap_tl_vn_hub_washer_spec.py`). It reuses this
+  SKU's recipe (`diag_build_96659A104.py`).
 - [91251A157](https://www.mcmaster.com/91251A157/) formerly supplied
   `sm-vn-knife-hanger-stud`, MHA-SM-VN-52, two, in the superseded #6-32 route.
   Each screw dropped through the MHA-FR-02 crossbar counterbore and seated

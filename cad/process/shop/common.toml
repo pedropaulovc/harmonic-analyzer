@@ -376,12 +376,16 @@ plate_holes = { A = [15, 16, 17, 18, 19, 20], B = [21, 23, 27, 29, 31, 33], C = 
 [workholding.chuck-3jaw-5-bs0]
 kind = "chuck"
 
-# HA: fixtures.chuck-3jaw-6-d1-4, the PM-1127's standard 6 in 3-jaw (45952b66bc
-# inventory: body Ø158 x 72, #1413 placeholders). Grip range: prechips v0.10
-# examples/shop.toml workholding.chuck-3jaw-6.
+# HA: fixtures.chuck-3jaw-6, the PM-1127's standard 6 in 3-jaw (45952b66bc
+# inventory: body Ø158 x 72, #1413 placeholders). Grip range: least grip
+# measured by the owner 2026-11-24, verbatim "3 jaw min 0.1750" (4.445 mm);
+# the 140 mm top is still the prechips v0.10 example shop's (not measured).
+# Holds under 4.445 mm opt out with lathe_hold = "other" until rewritten:
+# dt_crank_pinion_pin (#3498), dt_pinion_cam_pin (#3499), pd_transgear_pin's
+# regrips (#3500).
 [workholding.chuck-3jaw-6]
 kind = "chuck"
-grip_range_mm = [3.0, 140.0]
+grip_range_mm = [4.445, 140.0]
 body_diameter_mm = 158.0
 body_length_mm = 72.0
 
@@ -396,12 +400,15 @@ body_length_mm = 72.0
 # 2026-11-21: "Removable / Reversible Jaws for ID and OD Work", shipping box
 # 8 x 8 x 8 in only) give no sizes. The owner measured it 2026-11-22: "i
 # measured the 4 jaw chuck; 160mm diameter ; max jaw opening 140mm":
-# body_diameter_mm below. No grip range is declared (prechips needs its
-# minimum too, not measured; the 140 mm maximum opening is
-# cad/config/shop-equipment/fixtures.toml, same key), so a plan holding work
-# in it sets lathe_hold = "other".
+# body_diameter_mm below. Grip range: the owner's least grip 2026-11-24,
+# verbatim "0.2865 in min dia for 4 jaw" (7.2771 mm), to the 140 mm maximum
+# opening (cad/config/shop-equipment/fixtures.toml, same key, cites both).
+# Plans holding work in it still set lathe_hold = "other" (independent jaws
+# dialled in by hand); pn_pen_rod and dt_cone_tip_end_screw grip under the
+# least grip (#3495, #3496).
 [workholding.chuck-4jaw-6]
 kind = "chuck"
+grip_range_mm = [7.2771, 140.0]
 body_diameter_mm = 160.0
 
 # --- 3-flute uncoated carbide square end mills (McMaster 88815) ---
@@ -497,18 +504,28 @@ feed_unit = "in/min"
 # and -v6.html. Stick-out 27.94 mm (1.100 in), the owner's measurement; both
 # reports' setup field reads 30.0, the value entered before the cut (owner,
 # Pedro, 2026-11-22: "stickout is recorded as 30mm but is actually 27.94").
-# The reports are his recorded data and stay as written. The work: a
+# The reports are his recorded data and stay as written. The travelers set
+# 28.45 mm (1.12 in), which the session of 2026-11-23 cut at (owner, Pedro,
+# 2026-11-24: "28.45"); each record's band, and what was and was not cut at
+# 28.45, is in measured-cuts.toml. The work: a
 # 126 x 13 x 73 mm 1018 plate upright in the vise, about 30 mm above the jaws
 # (the reports' setup text). Valid only for that tool assembly, and only inside
 # each record's depth and width; those limits and the stick-out are data in
 # cad/config/shop-equipment/measured-cuts.toml (prechips refuses any other key
 # on a setting), and test_measured_cuts.py refuses a plan cut outside them.
 # NOT tested, so the chart record above still carries them: any cut deeper
-# than 6.6 mm (the 10.54 mm side finishing); any cut wider than 3.4 mm at
-# 1.27 mm deep or wider than 3.0 mm deeper (the 12.7 mm full-width passes,
-# the .200 in facing stepover); climb milling; slotting; any other stick-out,
-# holder or material. 3.2 mm deep had one pass, which chattered; v6 planned a
-# 1.27 mm re-check and did not run it.
+# than 6.6 mm (the 10.54 mm side finishing); any cut wider than 6.4 mm at
+# 1.27 mm deep (7.6 mm chattered) or wider than 3.0 mm deeper (the 12.7 mm
+# full-width passes); climb milling; slotting; any other holder or material.
+# 3.2 mm deep had one pass, which chattered; v6 planned a 1.27 mm re-check and
+# did not run it.
+# Full width at shallow depth (#3428) is still NOT measured. The session of
+# 2026-11-23 (cad/process/dechatter/2026-11-23-pm30mv-em-half-carbide-1018-
+# issue3428-v1.html, 0.75 mm deep, setup stick-out 28.4 mm) ran one round on
+# stock 11 mm wide, narrower than the cutter: 1.3 mm wide stable at 2380 (asked
+# 2300 and 2420), 2600, 2690 and 2800 rpm as heard, 2.5 mm stable at 2375; its
+# second round (4.6 and 6.2 mm) was planned and not cut. Nothing wider than
+# 2.5 mm, so it adds no setting.
 # Speed: 2800 rpm chattered at both depths (1.8 mm wide at 1.27 deep, 1.3 mm
 # wide at 6.6 deep) and no speed between 2400 and 2800 was cut, so the chart's
 # 2650 is unmeasured, between the stable 2400 and the chattering 2800.
@@ -536,10 +553,40 @@ feed_unit = "in/min"
 # untested, not known bad. The chip-load sweep at 2370 rpm 3.4 mm cut 0.043
 # and 0.062 mm/tooth, both stable, below the 0.071 the round before held;
 # nothing above 0.071 was cut. 2370 × 3 × .0028 = 19.9 in/min.
+# The speeds above are the ones v5 asked for. As heard (the v5 session's
+# results.json), every pass asked 2300 to 2370 ran at 2375-2381 but the 2.4 mm
+# one, which ran at 2270. The next session heard 3.4 mm chatter at 2272
+# (settings.em-half-carbide-1018-3439-face), so this record's speed has
+# chatter one step of the dial below it: new plans use that record.
 [settings.em-half-carbide-1018-v5-face]
 tool = "endmill-carbide-3fl-1-2"
 material = "rocker-1018-cold-finished"
 rpm = 2370
+chip_load_mm_per_tooth = 0.07112
+flutes = 3
+feed_unit = "in/min"
+# Face, up to 1.27 mm (.050 in) deep and 6.4 mm wide (#3439): session
+# 1018-3.4mm-3fl-issue3439-v1, 2026-11-23, dechatter 0.5.0, same cutter and
+# collet, conventional, .0028 in (.071 mm)/tooth, 1.27 mm deep; the passes,
+# the speeds heard and why the limit is 6.4 mm and not the report's 7.1 are
+# beside measured_cuts.em-half-carbide-1018-3439-face (cad/config/
+# shop-equipment/measured-cuts.toml). Set 2450: asked for 2450, the spindle
+# ran 2486-2488 before the cut and 2455 in the 6.4 mm pass. The limit holds
+# for 2420-2490 rpm in the cut (2450-2490 before it); 3.4 mm chattered at 2272
+# and at 2582, so the stable band is about 100 rpm either side of 2480 at
+# most, and across four sessions the dial landed up to 80 rpm from the speed
+# asked. Up to 4.6 mm wide a spindle found near 2380 is also measured stable;
+# wider, bring it up to 2450-2490 first. 2450 × 3 × .0028 = 20.6 in/min.
+# The spindle rests only on stops 107.7 rpm apart (cad/config/shop-equipment/
+# machines.toml, machines.pm-30mv) and the head's display is a tachometer: the
+# travelers say "set 2450: the display rests near 2485, not 2380"
+# (measured_cuts' display_rest_rpm; 2380 is one stop low, 2590 one stop high,
+# where 3.4 mm chattered). rpm stays 2450: it is the speed in the cut, which
+# the feed is computed for.
+[settings.em-half-carbide-1018-3439-face]
+tool = "endmill-carbide-3fl-1-2"
+material = "rocker-1018-cold-finished"
+rpm = 2450
 chip_load_mm_per_tooth = 0.07112
 flutes = 3
 feed_unit = "in/min"
@@ -579,12 +626,14 @@ feed_unit = "in/min"
 range_mm = [6.5278, 6.6294]
 resolution_mm = 0.00254
 
-# --- MHA-CH-13-TL-01 rocker-strap sub-plate (cad/process/ch_rocker_strap_tl_sub_plate/plan.toml) ---
+# --- 1/4-20 tapping (fr, dt, mg plans) and the MHA-CH-13-TL-02 hub plug's bore ---
 
-# The 1/4-20 hub tap's drill: #7 (.201 in) is a member of the owned 115-piece
+# The 1/4-20 tap's drill: #7 (.201 in) is a member of the owned 115-piece
 # index (number drills #1-#60 among its 115, as jig-drill-11-32); nominal ×
 # 25.4. The 1/4-20 tap is owned (cad/config/shop-equipment/
-# tools.jig-tap-1-4-20-plug).
+# tools.jig-tap-1-4-20-plug). The rocker-strap sub-plate's hub hole no longer
+# uses either (owner ruling 2026-11-23: #10-32, drill-21 and tap-10-32-plug);
+# its hub plug's bore is the #7 drill.
 [tools.jig-drill-7]
 description = "#7 (.201 in) drill, 115-piece index"
 diameter_mm = 5.1054
@@ -680,6 +729,8 @@ description = "#2-56 UNC plug hand tap (OSG 1011008)"
 description = "Bottoming hand tap #4-40 UNC, HSS"
 [tools.gear-cutter-arbor-1]  # F-arbor-1in-R8
 description = "1 in R8 stub arbor"
+[tools.saw-arbor-r8-stepped]  # inventory tools.saw-arbor-r8-stepped
+description = "R8 stepped slitting-saw arbor (no maker marking), spring-loaded pilot steps 1, 7/8, 3/4, 5/8, 1/2 in, not keyed; 1.25 x .50 cap; M8 x 1.25 countersunk hex-socket clamp screw, 5 mm key"
 [tools.gear-cutter-arbor-7-8]  # F-arbor-7-8
 description = "7/8 stub arbor, 3/4 straight shank"
 [tools.gear-cutters-48dp-20pa]  # F-gear-cutter-10-289-481 to -488
@@ -710,7 +761,7 @@ description = "Steel rule, 48 in, finest graduation 1/64 in (Insize 7110-1200)"
 [tools.transfer-punches]  # F-transfer-punches-fractional
 description = "Transfer punch set, fractional 3/32-1/2 by 64ths"
 [tools.v-blocks]  # F-v-blocks
-description = "Matched V-block pair with clamps"
+description = "V-blocks, two, 1.5 x 2 in, with two clamps (owner 2026-11-24; matched or not: not stated)"
 
 # --- Drawing cross-check additions (2026-11-19) -------------------------------
 # Tools the v50 drawings call for that the quote workbook left out, from the

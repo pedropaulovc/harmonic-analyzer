@@ -68,7 +68,9 @@ machine_ref = "pm-1127vf-lb"
 holding = "3-jaw over a brass shim wrap on the Ø{{process.stock_dia_in:.3dot}} rod (the jaws close on the pin's as-supplied O.D.), {{cad.outer_stickout_datum_mm:in.2dot}} in out of the jaw fronts; the rest of the 3 in piece runs back through the jaws into the spindle bore."
 datum = "Z0 (carriage DRO) the rod end faced in Op 10."
 diagram = { file = "diagrams/bar.svg", alt = "The 1/8 in drill rod in the 3-jaw over a shim wrap with little out: its end faced square." }
-lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{cad.outer_dia_mm}}", stock_diameter_mm = "{{cad.outer_dia_mm}}", stickout_mm = "{{cad.outer_stickout_datum_mm}}", minimum_diameter_mm = "{{cad.outer_dia_mm}}", support = "none" }
+# The 1/8 rod is under the 3-jaw's .1750 least grip (owner 2026-11-24;
+# workholding.chuck-3jaw-6): this hold is impossible as written, #3498.
+lathe_hold = "other"
 
 [[setups.operations]]
 cut_kind = "other"
@@ -108,7 +110,8 @@ machine_ref = "pm-1127vf-lb"
 holding = "3-jaw over a brass shim wrap on the piece turned round, the faced end {{process.regrip_grip_in:.2dot}} in in the jaws; the sawn end {{cad.outer_stickout_far_mm:in.2dot}} in out."
 datum = "The Op 10 face, in the jaws: the length is measured across both faces."
 diagram = { file = "diagrams/second-end.svg", alt = "The piece turned round, the faced end in the jaws over a shim wrap: the sawn end faced to the pin's length." }
-lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{cad.outer_dia_mm}}", stock_diameter_mm = "{{cad.outer_dia_mm}}", stickout_mm = "{{cad.outer_stickout_far_mm}}", minimum_diameter_mm = "{{cad.outer_dia_mm}}", support = "none" }
+# Under the 3-jaw's .1750 least grip, as the first lathe setup: #3498.
+lathe_hold = "other"
 
 [[setups.operations]]
 cut_kind = "other"

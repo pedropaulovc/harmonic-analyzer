@@ -170,14 +170,29 @@ they need from their process plans. They hold:
 
 - `measured_cuts.<setting>`: the envelope a measured cutting setting (a
   `shop/` `settings.<setting>` record from a dechatter report under
-  `dechatter/`) is valid inside: the tool assembly's measured stick-out and the
+  `dechatter/`) is valid inside: the tool assembly's stick-out (`stickout_mm`; a
+  record may allow a band with `stickout_min_mm` and `stickout_max_mm`, the
+  reason beside it: the three 1/2 in carbide records allow 27.94 to 28.45 mm,
+  and the plans pin the 28.45 the owner ruled on 2026-11-24) and the
   plan parameter that pins it, the deepest and the widest cut found stable.
   prechips refuses any other key on a setting, so the limits are data here;
   `test_measured_cuts.py` checks each against its report and refuses a plan
-  operation that names the setting with another stick-out, or a
-  `milling_cuts` entry deeper or wider than measured. The cut direction the
+  operation that names the setting with a stick-out the record does not
+  allow, or a
+  `milling_cuts` entry deeper or wider than measured. The spindle is set by
+  hand and a report prints the speed it asked for; the speed the spindle ran
+  is in the session's results file beside the report (`results`,
+  `spindle_hz` × 60), and a record may carry the band of heard speeds its
+  limit holds in (`speed_in_cut_rpm`, `speed_no_load_rpm`), which the test
+  checks against that file. The cut direction the
   passes ran (`direction`) is recorded and NOT checked: a cut has no direction
   field, so a climb pass on a measured setting is not refused;
+- the PM-30MV's spindle speed stops (`machines.pm-30mv`:
+  `spindle_speed_step_rpm`, `spindle_speed_steps`, the resting speeds
+  observed, and how the head's display reads against the heard speed): the
+  spindle rests only every 107.7 rpm, so a measured face record names the
+  stop to bring the display to (`measured_cuts.<setting>.display_rest_rpm`)
+  and the plans print it beside the speed asked for;
 - ownership-only records, under the shop key, for the PM-30MV mill, the
   PM-1127VF-LB lathe, the calipers, the DRO scales and the clamp bore's and
   stop plate's drill shanks read as gauges (`machines.*`, `gauges.calipers`,

@@ -91,14 +91,19 @@ bottom_skim_mm = 0.508
 mating_skim_mm = 0.508
 face_step_max_mm = 1.27
 # Facing: the 1/2 in carbide end mill (shop endmill-carbide-3fl-1-2) on the
-# owner's measured face setting, shop settings.em-half-carbide-1018-v5-face
-# (dechatter v5, 2026-11-22: stable at 2370 rpm up to 1.27 deep and 3.4 mm
-# wide, cad/config/shop-equipment/measured-cuts.toml): every face level no
-# deeper than face_step_max_mm and equal passes across the face no wider
-# than that record's 3.4 mm, the first with the cutter over the edge so it
-# too takes one pass's width (cam.py checks both).
+# owner's measured face setting, shop settings.em-half-carbide-1018-3439-face
+# (dechatter session of 2026-11-23, #3439: stable to 6.4 mm wide at up to
+# 1.27 mm deep, 2420-2490 rpm in the cut; cad/config/shop-equipment/
+# measured-cuts.toml): every face level no deeper than face_step_max_mm and
+# equal passes across the face no wider than that record's 6.4 mm, the
+# first with the cutter over the edge so it too takes one pass's width
+# (cam.py checks both). The 3/4 in faces take four passes of 4.89 mm (19.05
+# + the 0.5 overhang; three would need 6.52, over the limit), the .630 faces
+# three of 5.50 mm (two would need 8.25). Every measured pass was
+# conventional and the faces zigzag (owner ruling 2026-11-16), so every
+# other pass climbs: that half is not measured.
 face_cutter_dia_mm = 12.7
-face_stepover_max_mm = 3.4
+face_stepover_max_mm = 6.4
 # The grip offset CB11 faces off the mating face in one level: the drawing's
 # .020 (MHA-SH-02 NOTE 1), restated here so the measured envelope can read
 # the cut's depth; cam.py checks it equals the export's grip offset.
@@ -191,12 +196,13 @@ drill_chuck_gauge_mm = 95.0      # Archive holders.drill-chuck-r8.gauge_len_mm.
 # so the collet's face clears the 1-2-3 block and the fixed jaw with the
 # cutter 1.0 mm below the pair (cam.py checks it).
 bore_mill_projection_min_mm = 31.75
-# 1/2 in end mill, 3 in overall: set 1.100 in out of the collet for every
-# face (Setups 2-7 and 10), the stick-out the face setting was measured at
-# (cad/config/shop-equipment/measured-cuts.toml; owner, Pedro, 2026-11-22:
-# "stickout is recorded as 30mm but is actually 27.94"). Setup 10 resets it
+# 1/2 in end mill, 3 in overall: set 1.12 in (28.45 mm) out of the collet
+# for every face (Setups 2-7 and 10) (owner, Pedro, 2026-11-24: "28.45"),
+# the longer end of the stick-out the measured face setting allows
+# (cad/config/shop-equipment/measured-cuts.toml: 27.94 to 28.45 mm). Setup
+# 10 resets it
 # from the bore's longer set.
-half_mill_projection_mm = 27.94
+half_mill_projection_mm = 28.45
 # ASME B94.11M jobber length, overall, of the #2 combined drill and
 # countersink, 1-7/8 in. Bounded by its whole length below the chuck.
 centre_drill_oal_mm = 47.625
@@ -262,8 +268,12 @@ drilling = "none"
 sizing = "other"
 instruction = "Saw {{process.quantity:d}} blanks {{process.blank_length_min_in:.2f}}–{{process.blank_length_max_in:.2f}} in long off the 3/4 in square 1018 bar, the bar flat in the saw's vise (MHA-SH-01's traveler saws its three the same way). File the burr off both ends and the four long edges so each blank seats flat on the parallels. Number each blank 1, 2, 3 on a cold-finished long face with marking fluid (the sawn ends are faced off)."
 feed = "hand"
-inspection = "Each blank {{process.blank_length_min_in:.2f}}–{{process.blank_length_max_in:.2f}} long, calipers. Outside: shorter, scrap it; longer, saw it again. Every program assumes this blank."
+inspection = "Each blank {{process.blank_length_min_in:.2f}}–{{process.blank_length_max_in:.2f}} long, calipers. Shorter: scrap it. Every program assumes this blank."
 gauge_checks = [{ gauge = "calipers", band_mm = ["{{cad.blank_length_min_mm}}", "{{cad.blank_length_max_mm}}"] }]
+
+[[setups.operations]]
+instruction = "Only if a blank is longer: saw it again and check its length again."
+feed = "hand"
 
 [[setups]]
 machine_kind = "other"
@@ -277,6 +287,10 @@ diagram = { file = "diagrams/first-end.svg", alt = "The blank upright on two 1 i
 envelope = { x_span_mm = ["{{process.blank_section_mm}}", "{{process.face_cutter_dia_mm}}", "{{process.face_cutter_dia_mm}}", 5.08], y_span_mm = ["{{process.blank_section_mm}}", "{{process.face_cutter_dia_mm}}"], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{cad.blank_length_max_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{process.upright_top_max_mm}}"], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_mm}}"] }
 vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{process.blank_section_mm}}", along_jaws_mm = "{{process.blank_section_mm}}", part_height_mm = "{{cad.blank_length_max_mm}}", parallel_height_mm = "{{process.parallel_height_mm}}", overhang_mm = ["{{process.vise_upright_inset_mm}}", "rest"], jaw_offset = "centred", fixed_jaw_face = "as_bought", moving_jaw_face = "as_bought", moving_jaw_contact = "flat" }
 beam = { axis = "z", hold = "cantilever", extent_mm = [0, "{{cad.blank_length_max_mm}}"], clamp_mm = [0, "{{process.upright_grip_mm}}"], section_mm = { x = "{{process.blank_section_mm}}", y = "{{process.blank_section_mm}}" }, vise_left = "other" }
+
+[[setups.operations]]
+instruction = "Before clamping: mic the blank's section across the two faces the jaws will grip; write it down in mm (in × 25.4). The Y touch-off below uses it."
+feed = "hand"
 
 [[setups.operations]]
 instruction = "Home the mill first ($H). G54 X0 Y0 the bar's axis: edge finder (900 rpm) on the left and right faces and on the fixed jaw."
@@ -298,8 +312,8 @@ speed_kind = "spindle"
 tool = "em-half"
 drilling = "none"
 sizing = "other"
-instruction = "Run CB01_first_end (M6 T1, 1/2 in end mill; set 2370): face the first end at Z0, {{process.end_skim_mm:in.3dot}} off the high point, in passes no wider than {{process.face_stepover_max_mm:in.3dot}}. A sawn patch left: send $#, note the G54 line's Z, G10 L2 P1 Z(that Z − 0.254) (Z0 .010 lower) and run it again."
-settings = "em-half-carbide-1018-v5-face"
+instruction = "Run CB01_first_end (M6 T1, 1/2 in end mill; set 2450: the display rests near 2485, not 2380): face the first end at Z0, {{process.end_skim_mm:in.3dot}} off the high point, in passes no wider than {{process.face_stepover_max_mm:in.3dot}}. A sawn patch left: send $#, note the G54 line's Z, G10 L2 P1 Z(that Z − 0.254) (Z0 .010 lower) and run it again."
+settings = "em-half-carbide-1018-3439-face"
 milling_cuts = [
   { name = "first end", kind = "end", phase = "finish", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", axial_doc_mm = "{{process.end_skim_mm}}", radial_woc_mm = "{{process.face_stepover_max_mm}}", stations_mm = "{{process.upright_top_max_mm}}" },
 ]
@@ -335,8 +349,8 @@ speed_kind = "spindle"
 tool = "em-half"
 drilling = "none"
 sizing = "other"
-instruction = "Run CB02_length (M6 T1; set 2370): face the sawn end down to Z {{cad.width_mm:in.4dot}} in equal levels no deeper than {{process.face_step_max_mm:in.3dot}} from {{process.upright_top_max_mm:in.3dot}} (the longest blank: a shorter one cuts air first). Then, still clamped, check the width."
-settings = "em-half-carbide-1018-v5-face"
+instruction = "Run CB02_length (M6 T1; 2450, display near 2485): face the sawn end down to Z {{cad.width_mm:in.4dot}} in equal levels no deeper than {{process.face_step_max_mm:in.3dot}} from {{process.upright_top_max_mm:in.3dot}} (the longest blank: a shorter one cuts air first). Then, still clamped, check the width."
+settings = "em-half-carbide-1018-3439-face"
 inspection = "Width {{cad.width_min_in:.3dot}}–{{cad.width_max_in:.3dot}}: the calipers' depth rod from the faced top to the fixed-jaw parallel beside the blank, at two corners."
 gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.width_band_mm}}" }]
 milling_cuts = [
@@ -380,8 +394,8 @@ speed_kind = "spindle"
 tool = "em-half"
 drilling = "none"
 sizing = "other"
-instruction = "Run CB03_bottom (M6 T1; set 2370): skim the top face {{process.bottom_skim_mm:in.3dot}} at Z {{process.blank_section_mm:in.3dot}} less the skim. A cold-finished patch left: send $#, note the G54 line's Z, G10 L2 P1 Z(that Z − 0.254) (Z0 .010 lower) and run it again. Unclamp; mark this face B (blue marking fluid and a scribed B) and the blank's number on it, and scribe N on the left end: the near side the stations and the bore count from."
-settings = "em-half-carbide-1018-v5-face"
+instruction = "Run CB03_bottom (M6 T1; 2450, display near 2485): skim the top face {{process.bottom_skim_mm:in.3dot}} at Z {{process.blank_section_mm:in.3dot}} less the skim. A cold-finished patch left: send $#, note the G54 line's Z, G10 L2 P1 Z(that Z − 0.254) (Z0 .010 lower) and run it again. Unclamp; mark this face B (blue marking fluid and a scribed B) and the blank's number on it, and scribe N on the left end: the near side the stations and the bore count from."
+settings = "em-half-carbide-1018-3439-face"
 milling_cuts = [
   { name = "bottom face", kind = "end", phase = "finish", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", axial_doc_mm = "{{process.bottom_skim_mm}}", radial_woc_mm = "{{process.face_stepover_max_mm}}", traverse_mm = [0, "{{cad.width_mm}}"] },
 ]
@@ -412,8 +426,8 @@ speed_kind = "spindle"
 tool = "em-half"
 drilling = "none"
 sizing = "other"
-instruction = "Run CB04_height (M6 T1; set 2370): face the top down to Z {{cad.height_mm:in.4dot}} in equal levels no deeper than {{process.face_step_max_mm:in.3dot}}. Unclamp; mic the height."
-settings = "em-half-carbide-1018-v5-face"
+instruction = "Run CB04_height (M6 T1; 2450, display near 2485): face the top down to Z {{cad.height_mm:in.4dot}} in equal levels no deeper than {{process.face_step_max_mm:in.3dot}}. Unclamp; mic the height."
+settings = "em-half-carbide-1018-3439-face"
 inspection = "Height {{cad.height_min_in:.3dot}}–{{cad.height_max_in:.3dot}}, B to the top, miked at both ends."
 gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.height_band_mm}}" }]
 milling_cuts = [
@@ -456,8 +470,8 @@ speed_kind = "spindle"
 tool = "em-half"
 drilling = "none"
 sizing = "other"
-instruction = "Run CB05_mating (M6 T1; set 2370): skim the face up {{process.mating_skim_mm:in.3dot}}. A cold-finished patch left: send $#, note the G54 line's Z, G10 L2 P1 Z(that Z − 0.254) (Z0 .010 lower) and run it again. This is the mating face: it seats on the front in the pair, so keep it free of dings."
-settings = "em-half-carbide-1018-v5-face"
+instruction = "Run CB05_mating (M6 T1; 2450, display near 2485): skim the face up {{process.mating_skim_mm:in.3dot}}. A cold-finished patch left: send $#, note the G54 line's Z, G10 L2 P1 Z(that Z − 0.254) (Z0 .010 lower) and run it again. This is the mating face: it seats on the front in the pair, so keep it free of dings."
+settings = "em-half-carbide-1018-3439-face"
 milling_cuts = [
   { name = "mating face", kind = "end", phase = "finish", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", axial_doc_mm = "{{process.mating_skim_mm}}", radial_woc_mm = "{{process.face_stepover_max_mm}}", traverse_mm = [0, "{{cad.width_mm}}"] },
 ]
@@ -494,8 +508,8 @@ speed_kind = "spindle"
 tool = "em-half"
 drilling = "none"
 sizing = "other"
-instruction = "Run CB06_back_drill (M6 T1; set 2370): face the outside face down to Z {{cad.pre_face_depth_mm:in.4dot}} in equal levels no deeper than {{process.face_step_max_mm:in.3dot}}. At the M6 T2 stop, still clamped: check the depth."
-settings = "em-half-carbide-1018-v5-face"
+instruction = "Run CB06_back_drill (M6 T1; 2450, display near 2485): face the outside face down to Z {{cad.pre_face_depth_mm:in.4dot}} in equal levels no deeper than {{process.face_step_max_mm:in.3dot}}. At the M6 T2 stop, still clamped: check the depth."
+settings = "em-half-carbide-1018-3439-face"
 inspection = "Pre-face depth {{cad.pre_face_depth_min_in:.3dot}}–{{cad.pre_face_depth_max_in:.3dot}} at the M6 T2 stop: the calipers' depth rod from the outside face to the fixed-jaw stack's top beside the part, at both ends."
 gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.pre_face_depth_band_mm}}" }]
 milling_cuts = [
@@ -577,8 +591,12 @@ feed = "hand"
 
 [[setups.operations]]
 instruction = "Jog Z up clear, send G21, back the tap out by hand and blow the hole out."
-inspection = "One of the pair's MHA-SH-VN-53 screws runs through the thread by hand. Binds: run the tap through again under the tap guide; still binds: stop and tell the owner."
+inspection = "One of the pair's MHA-SH-VN-53 screws runs through the thread by hand."
 gauge_checks = "other"
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Only if the screw binds: run the tap through again under the tap guide and try the screw again. Still binds: stop and tell the owner."
 feed = "hand"
 
 [[setups.operations]]
@@ -606,13 +624,17 @@ drilling = "none"
 sizing = "other"
 instruction = "Deburr the drill and tap exits on the mating face flush (scraper from the deburring set; no countersink), then break every edge, R{{cad.edge_break_in:.3dot}} or chamfer {{cad.chamfer_max_in:.3dot}} max. The mating face must lie flat on the front's: stone it lightly on a flat stone and wipe it. Keep N and B readable. Wash off the oil."
 feed = "hand"
-inspection = "Mating face down on the surface plate: it does not rock and no burr stands proud (rocks: stone it again)."
+inspection = "Mating face down on the surface plate: it does not rock and no burr stands proud."
 gauge_checks = "other"
+
+[[setups.operations]]
+instruction = "Only if it rocks or a burr stands proud: stone it again and check it again."
+feed = "hand"
 
 [[setups.operations]]
 instruction = "Mic the pre-face depth, mating face to outside face, at the N end and at the far end; write both readings, labelled N and far, on this traveler (Setups 9 and 10 use them)."
 feed = "hand"
-inspection = "Pre-face depth {{cad.pre_face_depth_min_in:.3dot}}–{{cad.pre_face_depth_max_in:.3dot}} at both ends."
+inspection = "Pre-face depth {{cad.pre_face_depth_min_in:.3dot}}–{{cad.pre_face_depth_max_in:.3dot}} at both ends. Outside: stop and tell the owner."
 gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.pre_face_depth_band_mm}}" }]
 
 [[setups]]
@@ -631,8 +653,12 @@ beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{cad.width_mm}}"], c
 [[setups.operations]]
 instruction = "On the bench: bolt this back to a front from MHA-SH-01's traveler (its Setup 8 done), mating face to mating face, with the pair's own two MHA-SH-VN-53 screws (90280A201 #8-32 × 1-1/4 narrow fillisters; none in hand: stop, no substitute) through the front's ear holes into this back's taps, heads on the front's outside face."
 instruction_detailed = "On the surface plate: both halves on their B faces, N ends together against the side of a 1-2-3 block; snug the screws, then tighten them. The screw tips stop at least {{cad.screw_short_in:.3dot}} short of the back's outside face."
-inspection = "N ends flush (a fingernail across them finds no step) and both B faces flat on the plate (no rock); each screw tip at least {{cad.screw_short_in:.3dot}} below the back's outside face (the calipers' depth rod down each tapped hole). Else loosen, reseat and tighten again; a tip proud: stop and tell the owner."
+inspection = "N ends flush (a fingernail across them finds no step) and both B faces flat on the plate (no rock); each screw tip at least {{cad.screw_short_in:.3dot}} below the back's outside face (the calipers' depth rod down each tapped hole). A tip proud: stop and tell the owner."
 gauge_checks = "other"
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Only if the N ends step or a B face rocks: loosen the screws, reseat the halves and tighten again; check again."
 feed = "hand"
 
 [[setups.operations]]
@@ -654,7 +680,7 @@ instruction = "First pair only: prove CB09_pair_bore in air, Z0 raised 1.000 in;
 feed = "hand"
 
 # CB09 runs outside the measured envelope of the 1/2 in end mill (shop
-# settings.em-half-carbide-1018-v5-face/-v6-deep): the rough helix cuts the
+# settings.em-half-carbide-1018-3439-face/-v6-deep): the rough helix cuts the
 # cutter's full width, the finish a 17.0 mm deep wall. Owner ruling (Pedro,
 # 2026-11-22), no re-cut: for full-width passes "same log new dechatter
 # issues to try full radial depth but shallow axial" (#3428); for deep walls
@@ -739,8 +765,8 @@ speed_kind = "spindle"
 tool = "em-half"
 drilling = "none"
 sizing = "other"
-instruction = "Run CB11_face_off (M6 T1; set 2370): face the mating face down {{cad.grip_offset_mm:in.3dot}} at Z −{{cad.grip_offset_mm:in.3dot}} in one level, across the half bore. Unclamp; mic the depth, mating face to outside face, at both ends."
-settings = "em-half-carbide-1018-v5-face"
+instruction = "Run CB11_face_off (M6 T1; 2450, display near 2485): face the mating face down {{cad.grip_offset_mm:in.3dot}} at Z −{{cad.grip_offset_mm:in.3dot}} in one level, across the half bore. Unclamp; mic the depth, mating face to outside face, at both ends."
+settings = "em-half-carbide-1018-3439-face"
 inspection = "Depth {{cad.depth_min_in:.3dot}}–{{cad.depth_max_in:.3dot}}, miked at the N end and the far end; and at each end the grip offset, that end's recorded pre-face depth less its reading here, {{cad.grip_offset_min_in:.3dot}}–{{cad.grip_offset_max_in:.3dot}}."
 gauge_checks = [
   { gauge = "micrometers", band_mm = "{{cad.depth_band_mm}}" },

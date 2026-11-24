@@ -310,13 +310,6 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         layout=DrawingLayout.LANDSCAPE,
     ),
     DrawingSpec(
-        name="ch_rocker_strap_tl_hub_washer",
-        part="ch_rocker_strap_tl_hub_washer",
-        artifact_stem="ch-rocker-strap-tl-hub-washer",
-        script_name="draw_ch_rocker_strap_tl_hub_washer.py",
-        layout=DrawingLayout.LANDSCAPE,
-    ),
-    DrawingSpec(
         name="ch_rocker_strap_tl_vn_edge_clamp",
         part="ch_rocker_strap_tl_vn_edge_clamp",
         artifact_stem="ch-rocker-strap-tl-vn-edge-clamp",
