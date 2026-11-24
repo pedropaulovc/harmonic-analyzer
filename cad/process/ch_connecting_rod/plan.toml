@@ -363,7 +363,7 @@ slot_saw_radial_tir_max_mm = 0.4064
 # is touched again from the saw.
 saw_touch_x_mm = 218.744
 saw_touch_y_mm = -25.4
-saw_park_z_mm = 18.258
+saw_park_z_mm = 17.748
 # The saw's and T3's Z0 touch-offs on the fork's F face: the fork's
 # thickness plus the .002 leaf under the tool (cam.py checks it).
 fork_touch_z_mm = 6.147
