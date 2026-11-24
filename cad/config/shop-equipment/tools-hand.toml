@@ -120,6 +120,27 @@ kind = "torque_screwdriver"
 status = "to_order"
 note = "Not owned: to buy. MHA-CH-13 Setups 2-4: the TL-VN-50 edge clamps at 6 in-lb. A driver whose range includes 6 in-lb (e.g. 2.5-11.5 in-lb) serves; the 15.6 in-lb clamp maximum is never a setting."
 
+# The stepped saw arbor's M8 clamp screw is set to 20 N·m
+# (tools.saw-arbor-r8-stepped clamp_torque_nm): the saw plans check the
+# arbor's friction drive against the preload that torque gives, so it is set
+# with a wrench, not by feel. Codjiflo's review of #3503 found neither a
+# wrench of that range nor a metric key on record; the owner then answered
+# that he owns both. Only that is recorded: no make, and no range beyond
+# 20 N·m.
+[tools.torque-wrench]
+name = "Torque wrench covering 20 N·m"
+kind = "torque_wrench"
+status = "on_hand"
+cite = ["Owner (Pedro) 2026-11-24, asked whether he owns a 5 mm hex key and a torque wrench covering 20 N·m, verbatim: \"I own both.\""]
+note = "On hand (owner, 2026-11-24). Sets the stepped saw arbor's M8 clamp screw to 20 N·m (15 ft·lb)."
+
+[tools.hex-key-5mm]
+name = "5 mm hex key"
+kind = "hex_key"
+status = "on_hand"
+cite = ["Owner (Pedro) 2026-11-24, asked whether he owns a 5 mm hex key and a torque wrench covering 20 N·m, verbatim: \"I own both.\""]
+note = "On hand (owner, 2026-11-24). Turns the stepped saw arbor's M8 x 1.25 countersunk clamp screw."
+
 [tools.pliers]
 name = "Pliers"
 kind = "pliers"
