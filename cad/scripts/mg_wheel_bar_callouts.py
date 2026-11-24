@@ -35,7 +35,8 @@ def _wall_row(bore: str) -> str:
 # (.1875 + .004 - .1873), not a converted millimetre value; machinist review
 # r2 (run 20261124T094658536Z) gated its absence.
 AXLE_BORE_CALLOUT = (
-    "3/16 DRILL THRU\nBONDED ON MHA-MG-07 (CLEARANCE .0042 MAX)\n" + _wall_row("axle bore")
+    "3/16 DRILL THRU\nBONDED ON MHA-MG-07 (CLEARANCE .0042 MAX)\n"
+    + _wall_row("axle bore")
 )
 # The depth's .XXX is a three-place size given a function: it sets the stack
 # that places the pressed axle's end under the back face, so it names that
