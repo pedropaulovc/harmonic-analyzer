@@ -2735,6 +2735,11 @@ SPRING_TO_LIFT_ROD = (
 # point A: the .300 in channel grid's 153.924 drum, the 236.83 arbor and the
 # 7.71 pivot shaft): weight volume +2676 mm^3, mass +22.1 g (+4.8%), the
 # moments rose 5.33% parked and 5.27% engaged.
+# Corrected 2026-11-24 without a re-measure (fit audit question 12, F16): the
+# strap pivot bore moved to the .2510 reamer's 6.3754, removing a ring
+# coaxial with the swing axis, 2.3213 mm^3 per strap (analytic: pi/4 x
+# (6.3754^2 - 6.35^2) x 9.144): its moment about that axis is zero, so the
+# moments stand; the strap volume and the mass (-0.036 g) follow.
 # Install the measured basis AND frozen fingerprint together (DEVELOPING.md).
 SWING_GRAVITY_NMM = (14.980239335725214, 25.47546406056267)
 SWING_GRAVITY_CORNER_NMM = (15.284948898840918, 25.98774126443521)
@@ -2746,12 +2751,12 @@ SWING_GRAVITY_BASIS = {
     "dt-alignment-pinion": (1, 26128.94294339178, 8500.0),
     "dt-pinion-arbor": (1, 13457.368170365333, 7800.0),
     "dt-pinion-pivot-shaft": (1, 6219.3351191767015, 7800.0),
-    "dt-pinion-bracket": (2, 4644.392411286894, 7800.0),
+    "dt-pinion-bracket": (2, 4642.071111359271, 7800.0),
     "dt-pinion-arbor-collar": (1, 2113.391953300099, 7800.0),
     "dt-pinion-handle": (1, 2059.2591950522306, 7800.0),
     "dt-pinion-cam-pin": (2, 253.14809801839277, 7800.0),
 }
-SWING_GRAVITY_MASS_G = 484.52261157956855
+SWING_GRAVITY_MASS_G = 484.48639930069766
 # Frozen governing dimensions of the accepted native-STL calibration, never
 # live config aliases.
 SWING_GRAVITY_FINGERPRINT = {
@@ -2776,7 +2781,7 @@ SWING_GRAVITY_FINGERPRINT = {
         "WIDTH": 15.0,
         "C2C": 28.0,
         "THICKNESS": 9.144,
-        "PIVOT_BORE": 6.35,
+        "PIVOT_BORE": 6.3754,
         "ARBOR_BORE": 7.9375,
         "PIN_BORE": 3.9878,
         "PIN_SEAT": 4.064,
