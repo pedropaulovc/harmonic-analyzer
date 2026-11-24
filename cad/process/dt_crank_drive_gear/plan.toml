@@ -30,11 +30,6 @@ name = "1/16 A keyway broach"
 ref = "keyway-broach-1-16-a"  # F-keyway-broach
 
 [[tools]]
-id = "pin-gauges"
-name = "Pin gauges .011-.500"
-ref = "pin-gauges"  # A1-pin-set-011-060
-
-[[tools]]
 id = "arbor-press"
 name = "Arbor press"
 ref = "arbor-press"  # F-arbor-press
@@ -47,7 +42,7 @@ ref = "jig-drill-23-64"  # drawing cross-check 2026-11-19: pre-drill for the .37
 [[tools]]
 id = "reamer-0376"
 name = ".3760 reamer"
-ref = "reamer-0376"  # drawing cross-check 2026-11-19: .3750/.3760 class REAM THRU
+ref = "reamer-0376"  # Ø.3760 REAM THRU, no band; MHA-DT-04's land is turned to it (fit audit 2026-11-23)
 
 [[setups]]
 machine_kind = "other"

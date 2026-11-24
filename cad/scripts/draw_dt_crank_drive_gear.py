@@ -197,18 +197,22 @@ SECTION_KEEP = {
 # text-unmatched), while the native below lane prints on every sheet.
 FACE_WIDTH_CALLOUT = "SETS CONE GEAR STACK\nON MHA-DT-04"
 
-# Native bands on the bore and keyway dimensions set the fitted clearances:
-# the fleet gear-seat fit (gear_seat_fit) on MHA-DT-04's land 1, .0008 wide
-# on the round, and cone_land_key's width and T for the MHA-DT-VN-71 key.
-# The round's fit route is a matched fit to the finished land with its
-# acceptance (drawing-guidelines.md rule 4), named once in numbered note 1
-# that the bore and keyway dimensions link (rule 4: one feature with several
-# tight dimensions names its mate once). The round bore's callout carries
-# REAM, rule 12's process for a fit bore (no flat left for a reamer to cut
-# away, so dt-crank-drive-gear.yaml RV-01 is retired); the keyway's bands
-# are its requirement and print no process. The mate's name lives here, not beside its number in
+# The round bore comes off the owned .3760 over reamer and prints its size
+# with no band (fit audit 2026-11-23, MHA-DT-07.bore; drawing-guidelines rule
+# 4: a reamed hole's mate is the gauge); the keyway keeps cone_land_key's
+# width and T bands for the MHA-DT-VN-71 key. The fit is named once, in
+# numbered note 1 that the bore and keyway dimensions link (rule 4: one
+# feature with several tight dimensions names its mate once): MHA-DT-04's
+# land is the member made last and is turned to the reamed bore, not the
+# bore to the land (the note had it backwards: a fixed reamer cannot be
+# made to a measured land). The round bore's callout carries REAM, rule 12's
+# process for a fit bore (no flat left for a reamer to cut away, so
+# dt-crank-drive-gear.yaml RV-01 is retired); the keyway's bands are its
+# requirement and print no process. Why the ream and the keyway bands stay
+# is in cad/config/necessity/dt-crank-drive-gear.yaml, not on the sheet.
+# The mate's name lives here, not beside its number in
 # crank_drive_gear_notes, which is in the part's rebuild closure;
-# test_crank_drive_gear_drawing checks it against the registry.
+# test_dt_crank_drive_gear_drawing checks it against the registry.
 SHAFT_MATE_NAME = "CONE GEAR SHAFT"
 KEY_MATE_NAME = "KEY"
 BORE_FIT_NOTE_NUMBER = 1
@@ -226,8 +230,8 @@ _KEYWAY_FIT = "-".join(
 BORE_FIT_NOTE = "\n".join(
     (
         f"{BORE_FIT_NOTE_NUMBER}. SLIDING FIT ON THE KEYED LAND OF {SHAFT_MATE_NAME}",
-        f"   {SHAFT_MATE_NUMBER} AND {KEY_MATE_NAME} {KEY_MATE_NUMBER}: BORE MADE TO THE",
-        f"   MEASURED LAND (CLEARANCE {_ROUND_FIT} ON \u00d8,",
+        f"   {SHAFT_MATE_NUMBER} AND {KEY_MATE_NAME} {KEY_MATE_NUMBER}: THE LAND IS",
+        f"   TURNED TO THE BORE (CLEARANCE {_ROUND_FIT} ON \u00d8,",
         f"   {_KEYWAY_FIT} KEYWAY TO KEY); SLIDES ON, NO ROCK.",
     )
 )
