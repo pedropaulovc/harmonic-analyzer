@@ -388,7 +388,7 @@ status = "on_hand"
 wheel_dia_in = 6.0
 arbor_in = 0.5
 rpm = 3450
-note = "Owner photo 2026-11-14 of the nameplate: ALL BALL BEARING BENCH GRINDER, MODEL 60650, 1/2 H.P., 3.5 AMPS, 115 VAC, 60 HZ, 3450 RPM, SINGLE PH., 6 in DIAMETER WHEEL, 1/2 in ARBOR, MFG DATE 1986. Grinds the hand-ground HSS lathe bits (tools.form-tool-r024). Its guards take a 3/4 in wide wheel (owner 2026-11-24)."
+note = "Owner photo 2026-11-14 of the nameplate: ALL BALL BEARING BENCH GRINDER, MODEL 60650, 1/2 H.P., 3.5 AMPS, 115 VAC, 60 HZ, 3450 RPM, SINGLE PH., 6 in DIAMETER WHEEL, 1/2 in ARBOR, MFG DATE 1986. For the hand-ground HSS lathe bits (tools.form-tool-r024). Its guards take a 3/4 in wide wheel (relayed by the coordinator 2026-11-24 as the owner's reading; his words are not on record). The photo shows a crack in the base casting beside the switch plate: to inspect before a new wheel is run."
 cite = ["Owner (Pedro) photo bench-grinder-2026-11-14.jpg, nameplate read 2026-11-24", "Owner (Pedro) 2026-11-24: \"i want to learn how to grind tool bits ; include grinding wheel in shopping cart ; bench grinder\""]
 
 # The tool-bit grinding kit for that grinder (owner 2026-11-24, same words).

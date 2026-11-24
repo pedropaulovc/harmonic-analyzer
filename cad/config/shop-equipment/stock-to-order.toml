@@ -150,7 +150,7 @@ cite = ["OnlineMetals 1018 cold-finish round, read live 2026-11-12", "https://gi
 [stock.4140-ht-flat-5-8x1-1-4]
 form = "flat_bar"
 material = "4140/4142 HT alloy steel, pre-hardened 27-32 HRC as supplied"
-note = "To order: McMaster-Carr 8892K683, 5/8 x 1-1/4 in hardened 4140/4142 bar, 1 ft (the shortest length sold; 6 in are needed), $64.98, with its digital material certificate (the traveler checks grade and hardness on it). The page lists Rockwell C27; owner ruling 2026-11-24: \"Accept C27; widen the record to C27-32.\" Allocation: the two MHA-SM-02 knife mounts (each 1.00 x 1.17 x .55 finished, cut from the bar with facing stock) and one trial coupon for the .4990 reamer (tools.reamer-4990). No heat treatment in the shop; both fits and the tap are cut in the supplied condition. Not owned."
+note = "To order: McMaster-Carr 8892K683, 5/8 x 1-1/4 in hardened 4140/4142 bar, 1 ft (the shortest length sold; 6 in are needed), $64.98, with its digital material certificate. The page lists Rockwell C27; owner ruling 2026-11-24: \"Accept C27; widen the record to C27-32.\" NOT YET USABLE AS RECORDED: the MHA-SM-02 drawing's finish row, the traveler's bar-tag check (cad/process/sm_knife_mount/plan.toml, which stops on any other hardness) and cad/process/shop/sm.toml still require 28-32 HRC; issue #3516 changes them to 27-32. Until it lands a C27 bar fails the traveler's check. Allocation: the two MHA-SM-02 knife mounts (each 1.00 x 1.17 x .55 finished, cut from the bar with facing stock) and one trial coupon for the .4990 reamer (tools.reamer-4990). No heat treatment in the shop; both fits and the tap are cut in the supplied condition. Not owned."
 section_mm = [31.75, 15.875]
 length_mm = 152.4
 status = "to_order"
