@@ -1,8 +1,8 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 330" font-family="sans-serif" font-size="13">
   <rect class="paper" x="0" y="0" width="760" height="330"/>
-  <text class="title" x="20" y="22">Setup 4 (section through the hub, 2.5:1): bond the hub into the strap (LOCTITE 638); 24 h cure</text>
-  <!-- Surface plate: its top is the datum the hub stands on. -->
-  <rect class="fixture-support" x="20" y="240" width="720" height="40"/>
+  <text class="title" x="20" y="22">Setup 4 (section through the hub, 2.5:1): bond the hub into its own strap (LOCTITE 638); 24 h cure</text>
+  <!-- Surface plate: its top is the datum the hub stands on (drawn in the table fill). -->
+  <rect class="fixture-table" x="20" y="240" width="720" height="40"/>
   <text x="30" y="300">Surface plate</text>
   <!-- Paper square under the hub (keeps the 638 off the plate). -->
   <rect class="fixture-support" x="315" y="238" width="130" height="2" fill="none"/>
@@ -19,10 +19,15 @@
   <rect class="part-kept" x="330" y="153" width="100" height="85"/>
   <line class="hidden" x1="349.25" y1="153" x2="349.25" y2="238" stroke-dasharray="4 3"/>
   <line class="hidden" x1="410.75" y1="153" x2="410.75" y2="238" stroke-dasharray="4 3"/>
-  <text x="440" y="140">hub MHA-CH-12 (D bore, hidden)</text>
+  <text class="label" x="440" y="140">hub MHA-CH-12 (D bore, hidden)</text>
+  <line class="leader" x1="438" y1="137" x2="424" y2="156"/>
+  <circle class="leader-dot" cx="424" cy="156" r="2"/>
   <!-- LOCTITE 638 film: the middle of the land, inside the strap's hole. -->
   <rect class="part-removed" x="327" y="187" width="3" height="21"/>
   <rect class="part-removed" x="430" y="187" width="3" height="21"/>
-  <text x="440" y="232">638 on the land's middle only; none on the ends or in the bore</text>
+  <text class="label" x="40" y="104">638 on the land's middle only;</text>
+  <text class="label" x="40" y="120">none on the ends or in the bore</text>
+  <line class="leader" x1="250" y1="115" x2="328.5" y2="197"/>
+  <circle class="leader-dot" cx="328.5" cy="197" r="2"/>
   <text x="20" y="322">H = (hub length − .098)/2; the hub stands square on the plate, the blocks hold the strap parallel to it.</text>
 </svg>
