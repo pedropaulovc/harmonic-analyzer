@@ -255,8 +255,8 @@ FULL_DETAIL_SHEET = 12
 CHECKS_SHEET = 13
 # Step 9D sets the spring gap beside MHA-DT-VN-68 on sheet 14's Detail A.
 BANK_SETTINGS_SHEET = 14
-# The DRO targets, feeler stacks, pedestal recheck record and the cone
-# station table: the sheet the steps and checks read their numbers from.
+# The DRO targets, feeler stacks and the cone station table: the sheet the
+# steps and checks read their numbers from.
 SETTING_SHEET = 15
 # Every other measurable fit and acceptance the steps and checks make (end
 # plays, stack, proud, flush and pin-depth limits, the spring-foot station,
@@ -683,11 +683,11 @@ SEQUENCE_LEFT_FIELD = (
     NOTE_FIELD_LEFT[2],
     SEQUENCE_ISO_CENTER[1] + REFERENCE_ISO_HALF_OUTLINE + SEQUENCE_ISO_GAP,
 )
-# Sheet 15: the setting, pedestal recheck and feeler stack tables stack down
-# the left from SETTING_TABLE_TOP (SETTING_TABLE_LEFT); the cone station
-# table prints right of the narrow feeler stack table, under the pedestal
-# recheck table (round 1 measured those at x 147.6 mm and y 178.1 mm) and
-# clear left of the reference view (x 361 mm up).
+# Sheet 15: the setting and feeler stack tables stack down the left from
+# SETTING_TABLE_TOP (SETTING_TABLE_LEFT); the cone station table prints right
+# of the narrow feeler stack table (round 1 measured that at x 147.6 mm and y
+# 178.1 mm) and clear left of the reference view (x 361 mm up).  The pedestal
+# recheck table between them went with owner ruling C6 (2026-11-24).
 # Owner ruling 2026-11-08 (Pedro): the field holds the code key, two lines
 # more than the station table it carries (bottom 117 -> 110 mm), and the
 # phasing comb's line (machinist review of bd81283964: bottom 110 -> 105.5 mm,
@@ -1026,9 +1026,9 @@ STACK_WINDOW = inch_window(
 # but it owns the Mitutoyo 81-piece inch gauge blocks and a test indicator
 # (cad/config/shop-equipment/): the indicator is zeroed on a wrung stack of the
 # bank's nominal length standing on the stop gear 0's cam face sits on, and
-# the stack is the blocks plus its reading at gear 19 (as check 4G adds an
-# indicator reading to a recorded value).  The blocks print at the model leg's own
-# places (dt_cylinder_bank_setting_spec.PLACES; Codjiflo review of #2532).
+# the stack is the blocks plus its reading at gear 19.  The blocks print at
+# the model leg's own places (dt_cylinder_bank_setting_spec.PLACES; Codjiflo
+# review of #2532).
 STACK_GAUGE_BLOCKS = inch_text(_STACK_LENGTH, bank_settings.PLACES)
 # Step 9D's spring gap is set on a stack of the inch feeler gauge's leaves
 # (v47 machinist review: the blade was never identified); the steps print the
@@ -1137,57 +1137,6 @@ def _feeler_stack_rows() -> tuple[tuple[str, str, str], ...]:
 
 
 FEELER_STACK_ROWS = _feeler_stack_rows()
-
-# Check 4 re-reads the pedestals after the cone swing's shims: each recorded
-# DRO value plus its indicator reading must stay in its setting-table range.
-# Its REMEDY column is check 4J's remedy: delegated ruling 2026-11-12
-# (Repitch1038, #2144), no precedent; #1038 re-pitch, on machinist review of
-# the point A sheet (4J named no part).  One end's bind point is that end's
-# gear pair plus its pedestal's bore height (a common-mode cone-axis error
-# would move both ends).  Y is never adjusted in 4E: by then MHA-DT-13 ties
-# both pedestals into one frame, so a Y out means the frame slid while
-# MHA-DT-VN-62 was eased, and the front one is tapped back to the Y
-# indicator's 4B zero.  A remedy names the part it remakes: the one its
-# measurement finds out of print (machinist review r7/r8 of PR #2640: "ONE OUT"
-# named none).
-PEDESTAL_RECHECK_TITLE = "PEDESTAL RECHECK (CHECK 4) - FILL IN"
-PEDESTAL_RECHECK_HEADER = (
-    "PEDESTAL, AXIS", "STEP", "DRO VALUE", "INDICATOR", "SUM", "ACCEPT", "REMEDY"
-)
-PEDESTAL_RECHECK_ROWS = (
-    (
-        "FRONT MHA-DT-02, X",
-        _step_ref("cylinder-stack-accepted", "Z"),
-        "", "", "",
-        BANK_X_LIMITS,
-        "MIC GEAR 0 + T120 TIPS, BORE HEIGHT; REMAKE ANY OUT OF PRINT",
-    ),
-    (
-        "BACK MHA-DT-02, X",
-        _step_ref("cylinder-bank-located", "Q"),
-        "", "", "",
-        BANK_X_LIMITS,
-        "MIC GEAR 19 + MHA-DT-37 TIPS, BORE HEIGHT; REMAKE ANY OUT OF PRINT",
-    ),
-    (
-        "FRONT MHA-DT-02, Y",
-        _step_ref("cylinder-stack-accepted", "Z"),
-        "", "", "",
-        FRONT_STRAP_Y_WINDOW,
-        "OFF ITS Y ZERO: TAP IT BACK IN Y TO THE INDICATOR ZERO",
-    ),
-    # Both X ends' parts in print: the remaining one-end causes are the
-    # cone-line seats on the swing platform (DtFeel2365, check 4's author;
-    # the stack past them is #2587's).  The row is the X rows' remedy carried
-    # on, so it records nothing: its label is its trigger (machinist review
-    # r7/r8 of PR #2640: "X, ALL IN PRINT" read as a row with no trigger;
-    # #2672 review: "X, PARTS IN PRINT" still named no condition).
-    (
-        "X OUT AFTER REMEDY",
-        "-", "-", "-", "-", "-",
-        "MIC MHA-DT-05 + MHA-DT-21 SEATS ON MHA-DT-20; REMAKE ANY OUT",
-    ),
-)
 
 # Step 7's bond and release agents, named so the fitter buys the right ones.
 HANDLE_EPOXY = "30-MINUTE EPOXY"
@@ -1771,7 +1720,7 @@ CONE_CRANK_STEPS = _note_text(
 # spring directly on gear 19.  A thick front disc moves its strap to the
 # front, hence W in the front strap's Y; the back pedestal is then set from
 # the actual accepted stack on the spring-gap feeler.  The front pedestal's
-# location and seat run as 8K-8Z, so step 9D is the spring-gap set (setting
+# location and clamp run as 8K-8T, so step 9D is the spring-gap set (setting
 # table row 4, sheet 14 DETAIL A).  Every DRO target is
 # a SETTING_TABLE row on sheet 15.
 # The DRO zero every later bank and back-ear setting reads from.
@@ -1808,17 +1757,13 @@ BANK_STEPS = _note_text(
         f"8Q. MIC MHA-DT-26: ITS THICKNESS IS W (SETTING TABLE ROW 2, SHEET {SETTING_SHEET}).",
         "8R. SET THE FRONT MHA-DT-02 INNER FACE TO ITS Y (SETTING TABLE ROW 2).",
         "8S. SET THE MANDREL CENTRE TO ITS X (ROW 3), EDGE-FOUND BOTH SIDES.",
-        # The seat's drill, tap and depth are the MHA-FR-01 transfer callout's,
-        # so the step names the print, never a copy (as the rig's seats do).
-        "8T. SPOT MHA-FR-01 THROUGH THE FOOT HOLE WITH AN 11/64 TRANSFER PUNCH.",
-        "8U. LIFT THE FRONT MHA-DT-02 OFF.",
-        "8V. DRILL AND TAP THE SEAT PER MHA-FR-01 (PLUG, THEN BOTTOMING TAP).",
-        "8W. BLOW OUT THE CHIPS.",
-        # Check 4 re-reads both coordinates after the cone swing's radial
-        # shims move the pedestals.
-        "8X. REFIT THE FRONT MHA-DT-02 AT X AND Y.",
-        "8Y. TIGHTEN MHA-DT-VN-62.",
-        "8Z. WRITE THE DRO X AND Y IN THE PEDESTAL RECHECK TABLE.",
+        # Owner ruling 2026-11-24, fit audit part 2 C6 ("Yes: set by feel,
+        # spot the holes after, tripwire .015."): the pedestal is clamped at
+        # its DRO X and Y here, and its MHA-FR-01 seat is spotted through the
+        # foot hole only after check 4E has tapped it to its binds (check 4J,
+        # per the MHA-FR-01 transfer callout), so the foot's travel never has
+        # to cover the cone pivot seat's error.
+        "8T. CLAMP THE FRONT MHA-DT-02 TO MHA-FR-01 THERE.",
         "9. FROM THE BACK, LOAD THE MICED MHA-DT-26, THEN GEARS 0 TO 19 CAM SIDE",
         "   FRONT WITH THEIR PAIRS HANGING, THEN MHA-DT-VN-68.",
         # One action with its stop condition, not a check and its remedy.
@@ -1831,38 +1776,30 @@ BANK_STEPS = _note_text(
         "   BESIDE MHA-DT-VN-68, BETWEEN ITS INNER FACE AND GEAR 19'S BACK FACE (SHEET",
         f"   {BANK_SETTINGS_SHEET}, DETAIL A), IS LIGHTLY PINCHED.",
         "9E. SET ITS X (SETTING TABLE ROW 3).",
-        "9F. SPOT ITS FOOT HOLE AS 8T.",
-        # Lift it off before drilling: the mandrel covers that foot's hole.
-        "9G. SLIDE THE BACK MHA-DT-02 OFF.",
-        "9H. LIFT THE MANDREL AND ITS HANGING PAIRS ONTO V-BLOCKS OFF THE BASE.",
-        "9J. DRILL AND TAP THE BACK SEAT AS 8V.",
-        "9K. BLOW OUT ITS CHIPS.",
-        "9L. PUT THE MANDREL BACK THROUGH THE FRONT MHA-DT-02 AS 9B-9C.",
-        "9M. REFIT THE BACK MHA-DT-02 AT THE 9D FEELER AND THE 9E X.",
-        "9N. TIGHTEN MHA-DT-VN-62.",
-        "9P. REMOVE THE FEELER.",
-        "9Q. WRITE THE DRO X IN THE PEDESTAL RECHECK TABLE.",
+        # C6: clamped, not screwed, until check 4J (8T).
+        "9F. CLAMP IT TO MHA-FR-01.",
+        "9G. REMOVE THE FEELER.",
         # The MHA-FR-01 pivot seat is not cut here on the DRO: step 23
         # transfers it from the MHA-DT-20 pivot bore.
-        "9R. MEASURE MHA-DT-02 OUTER FACE TO OUTER FACE.",
+        "9H. MEASURE MHA-DT-02 OUTER FACE TO OUTER FACE.",
         # Round 11: the length plainly, both domes counted.
-        f"9S. TURN MHA-DT-13 TO THE 9R SPAN + {inch_text(2.0 * bank.ARBOR_DOME_HEIGHT, 2)} "
+        f"9J. TURN MHA-DT-13 TO THE 9H SPAN + {inch_text(2.0 * bank.ARBOR_DOME_HEIGHT, 2)} "
         f"({inch_text(bank.ARBOR_DOME_HEIGHT, 2)} DOME EACH END).",
         # The arbor and the setting mandrel are both 3/8 (dt_cylinder_gear_shaft_
         # spec SHAFT_DIA): pushed in end to end, the arbor drives the mandrel
         # out the front and every gear passes onto it in place (machinist
         # review r7/r8 of PR #2640: no step removed the mandrel).
-        "9T. PUSH MHA-DT-13 IN FROM THE BACK UNTIL EACH DOME STANDS PROUD "
+        "9K. PUSH MHA-DT-13 IN FROM THE BACK UNTIL EACH DOME STANDS PROUD "
         f"({acceptance_ref('arbor-dome')}): IT DRIVES THE MANDREL OUT THE FRONT AND THE GEARS "
         "PASS ONTO IT.",
-        "9U. SPOT MHA-DT-13 THROUGH EACH MHA-DT-02 SET-SCREW TAP WITH A #43 DRILL, .02 DEEP.",
-        "9V. BLOW OUT THE CHIPS.",
-        "9W. RUN THE FRONT MHA-SH-VN-54 IN TIGHT, THEN THE BACK ONE.",
-        "9X. CHECK THAT EACH GEAR TURNS FREE BY HAND.",
+        "9L. SPOT MHA-DT-13 THROUGH EACH MHA-DT-02 SET-SCREW TAP WITH A #43 DRILL, .02 DEEP.",
+        "9M. BLOW OUT THE CHIPS.",
+        "9N. RUN THE FRONT MHA-SH-VN-54 IN TIGHT, THEN THE BACK ONE.",
+        "9P. CHECK THAT EACH GEAR TURNS FREE BY HAND.",
         # Rule 23 (rubric sample round 12, #0): MHA-DT-13, set in both crowns
-        # (9W), ties the two pedestals into one frame on two screws; the
+        # (9N), ties the two pedestals into one frame on two screws; the
         # bench check covers all three.
-        "9Y. CHECK BY HAND THAT MHA-DT-13 AND BOTH MHA-DT-02 DO NOT MOVE.",
+        "9Q. CHECK BY HAND THAT MHA-DT-13 AND BOTH MHA-DT-02 DO NOT MOVE.",
         # #936 P1 b, option A (user ruling 2026-09-26): the back MHA-CH-08 ear
         # is DRO-located (rocker_bank_layout.NORTH_EAR_LOCATE_BAND) on the
         # DRO zero, so the cams and the rocker stations share one datum.
@@ -2084,7 +2021,7 @@ def rig_steps(*, pivot_blocks: int, cams: int, slotted: int) -> str:
         ("rig-set", f"{_RIG_SET_STEP}\nCLAMP BOTH MHA-DT-18."),
         # The seats' drill, tap and depth are the MHA-FR-01 transfer callouts'
         # (build_harmonic_base), so the sheet names the print, never a copy.
-        # Rubric sample round 13 (#0, rule 22): as the bank does at 8U-8X, the
+        # Rubric sample round 13 (#0, rule 22): as the bank did at 8U-8X, the
         # rig and spring come off for the drilling, go back at their 18-19
         # settings, and those settings are rechecked once screwed down.  The
         # 7A-7E reset eases only the MHA-DT-VN-57 rig screws, which cannot move
@@ -2249,20 +2186,28 @@ CHECKS = _note_text(
         "4. CONE SWING SET: LOOSEN MHA-DT-VN-51.",
         "4A. SWING THE CONE SET ON MHA-DT-VN-52 OUT TO THE MHA-SH-VN-52 STOP.",
         "4B. ZERO DIAL INDICATORS: EACH MHA-DT-02 IN X, THE FRONT ONE IN Y.",
-        "4C. EASE MHA-DT-VN-62 UNTIL EACH MHA-DT-02 MOVES UNDER LIGHT TAPS.",
+        # Owner ruling 2026-11-24, fit audit part 2 C6 ("Yes: set by feel,
+        # spot the holes after, tripwire .015."): no DRO recheck.  Each
+        # pedestal stands clamped (8T, 9F) until its seat is spotted through
+        # its foot hole after 4E and drilled and tapped there (4J, the
+        # MHA-FR-01 "TRANSFER FROM MHA-DT-02 AT ASSEMBLY" callout); on a redo
+        # (4V) the eased hold-down is MHA-DT-VN-62.  The X indicators, zeroed
+        # at the DRO X (4B), read how far 4E moved each pedestal: following
+        # the transfer-punched cone pivot seat takes at most its whole error
+        # (0.249 mm, cone_set_stack) plus the DRO set band (0.10), 0.349 mm,
+        # under the .015 (0.381) tripwire, which sends the fitter to that seat
+        # (step 23E-23H).  Y is never adjusted in 4E: the front pedestal is
+        # clamped back at its Y zero.
+        "4C. EASE EACH MHA-DT-02'S HOLD-DOWN UNTIL IT MOVES UNDER LIGHT TAPS.",
         "4D. HOLD THE CONE SET SWUNG IN AT THE FIRST BIND.",
         "4E. TAP EACH MHA-DT-02 IN OR OUT UNTIL THE GEARS AT ITS END JUST BIND.",
-        "4F. TIGHTEN MHA-DT-VN-62.",
-        "4G. FILL IN THE PEDESTAL RECHECK TABLE (SHEET "
-        f"{SETTING_SHEET}): EACH DRO VALUE PLUS ITS INDICATOR READING MUST BE IN "
-        "ITS ACCEPT RANGE.",
-        # A pedestal outside its range after 4E means a part is out of print:
-        # resetting it by indicator would take that end off its binds, so
-        # the part is corrected and the alignment redone (Codjiflo r2, #2557);
-        # the recheck table's REMEDY cell names the part (#1038 re-pitch).
-        "4H. IF A PEDESTAL IS OUT, SWING THE CONE SET OUT.",
-        f"4J. DO THAT ROW'S REMEDY (SHEET {SETTING_SHEET}).",
-        "4K. REDO 4C-4G.",
+        "4F. CLAMP EACH MHA-DT-02 TO MHA-FR-01 THERE, THE FRONT ONE AT ITS Y ZERO.",
+        "4G. NEITHER X INDICATOR READS OVER .015.",
+        f"4H. IF ONE DOES, RECHECK THE STEP {_step_ref('other-base-mounting', 'E')}-"
+        f"{_step_ref('other-base-mounting', 'H')} PIVOT SEAT BEFORE GOING ON.",
+        "4J. DRILL AND TAP EACH UNDRILLED SEAT PER MHA-FR-01 THRU ITS MHA-DT-02 FOOT "
+        "HOLE, ON AN 11/64 TRANSFER-PUNCH SPOT.",
+        "4K. SCREW EACH MHA-DT-02 DOWN WITH MHA-DT-VN-62 IN PLACE OF ITS CLAMP.",
         "4L. SWING THE CONE SET OUT.",
         "4M. SWING IN UNTIL A GEAR JUST BINDS.",
         f"4N. EASE OUT IN SMALL STEPS UNTIL {CONE_TURN_CRANK_TURNS} CRANK TURNS RUN FREE.",
@@ -2459,7 +2404,7 @@ _CRANK_CONTINUED_HEADING = f"ASSEMBLY SEQUENCE CONT. - CRANK {CODE_KEY_POINTER}"
 )
 _BANK_CONTINUED_HEADING = "ASSEMBLY SEQUENCE CONT. - CYLINDER BANK"
 BANK_CONTINUED_FROM = str(steps.step_number("cylinder-bank-located"))
-BANK_LAST_FROM = f"{steps.step_number('cylinder-bank-located')}U"
+BANK_LAST_FROM = f"{steps.step_number('cylinder-bank-located')}L"
 BANK_PRIMARY, BANK_CONTINUED, BANK_LAST = _split_sequence_chain(
     BANK_STEPS,
     (BANK_CONTINUED_FROM, _BANK_CONTINUED_HEADING),
@@ -2467,8 +2412,9 @@ BANK_PRIMARY, BANK_CONTINUED, BANK_LAST = _split_sequence_chain(
 )
 # Rounds 19-20: step 23's pivot-seat transfer moved each rig split on; #2470
 # moved step 6 to sheet 8, so the bank and rig splits moved on to refill
-# sheets 9-11.  Machinist review r8 of PR #2640 lengthened 9T and step 20,
-# so the splits moved back (9U, 16, 18D, 23).  Step 18E stays on
+# sheets 9-11.  Machinist review r8 of PR #2640 lengthened 9T (now 9K) and
+# step 20, so the splits moved back (9U, now 9L after C6; 16, 18D, 23).  Step
+# 18E stays on
 # CONTINUATION_SHEET, where the checks' tip-gap reset cites it.
 RIG_SPLITS = (
     (str(steps.step_number("straps-pinned-to-torque-shaft")), RIG_SEQUENCE_HEADING),
@@ -3465,8 +3411,8 @@ def table_box_violations(
 
 
 def _place_setting_sheet(adapter: Any, facts: SourceFacts) -> list[str]:
-    """The setting, pedestal recheck and feeler stack tables, then the cone
-    station table beside them."""
+    """The setting and feeler stack tables, then the cone station table
+    beside them."""
     _activate_sheet(adapter, SHEET_NAMES[SETTING_SHEET - 1])
     _heading(adapter, SETTING_SHEET)
     _reference_iso(adapter, caption="FINISHED ASSEMBLY", label="setting reference isometric")
@@ -3474,12 +3420,6 @@ def _place_setting_sheet(adapter: Any, facts: SourceFacts) -> list[str]:
     top = SETTING_TABLE_TOP
     for title, header, rows, label in (
         (SETTING_TABLE_TITLE, SETTING_TABLE_HEADER, SETTING_TABLE_ROWS, "setting table"),
-        (
-            PEDESTAL_RECHECK_TITLE,
-            PEDESTAL_RECHECK_HEADER,
-            PEDESTAL_RECHECK_ROWS,
-            "pedestal recheck table",
-        ),
         (FEELER_STACK_TITLE, FEELER_STACK_HEADER, FEELER_STACK_ROWS, "feeler stack table"),
     ):
         box = insert_general_table(

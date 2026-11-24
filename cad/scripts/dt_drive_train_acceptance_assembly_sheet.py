@@ -128,7 +128,7 @@ ACCEPTANCES = (
     ),
     (
         "arbor-dome",
-        _step_ref("cylinder-bank-located", "T"),
+        _step_ref("cylinder-bank-located", "K"),
         "EACH MHA-DT-13 DOME PROUD OF ITS MHA-DT-02 OUTER FACE",
         inch_text(bank.ARBOR_DOME_HEIGHT, 2),
         # Owner ruling 2026-11-23, tool audit Q4: "Print CALIPER DEPTH ROD;
