@@ -1,0 +1,14 @@
+# MHA-SM-03 summing lever: why each band tighter than the title block stays
+# (drawing-guidelines.md rule 4; owner ruling 2026-11-24: the reason lives
+# here, not on the sheet). Read by the machinist review only.
+# The flanks' 122.4 ±0.5° to the side faces (owner ruling T1, 2026-10-17,
+# code review C09) is owner-ruled; with the Ø.4985 bore it protects no
+# floor (worst rock 8.53°, 8.15° at ±1°, floor 5.0), so issue #3535 puts the
+# title block's ±1° to the owner and the sheet stays in demoted.yaml until
+# he answers. R.004 MAX and R.040 MAX are single limits.
+necessity:
+  - id: N-01
+    feature: "DETAIL D, both stubs, knife ridge .159 ±.002 from each side face"
+    kind: trace
+    reason: "ridge offset skews the knife line; hook arms differ"
+    source: "fit audit 2026-11-23 MHA-SM-03.ridge_from_side (keep as is): hook-arm spread 0.0815 mm over the 144.78 mm hole column at ±.002, 0.2038 at ±.005 (sm_summing_lever_spec RIDGE_FROM_SIDE_TOL)"
