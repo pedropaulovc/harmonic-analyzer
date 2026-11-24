@@ -220,7 +220,7 @@ def test_no_frame_relates_the_faces_and_the_length_band_bounds_their_taper() -> 
 
 
 def test_the_looser_length_band_would_close_the_disc_to_platen_air() -> None:
-    """The necessity answer the length prints: at the ±.002 the sheet carried
+    """The necessity answer the length's register entry gives: at the ±.002 the sheet carried
     under its parallelism frame, the taper alone (the band's spread over the
     seat flat, levered to the disc's rim) takes the MHA-PD-06 disc's
     statistical air to the MHA-PD-02 platen under its floor; at ±.001 the
@@ -300,8 +300,7 @@ def _callout_block(text: str, anchor: tuple[float, float]) -> Box:
 
 def _length_text_box() -> Box:
     return _callout_block(
-        f"{spec.LENGTH:.3f} ±{spec.LENGTH_BAND:.2f}\n"
-        f"{drawing.DIMENSION_CALLOUTS['RingLength']}",
+        f"{spec.LENGTH:.3f} ±{spec.LENGTH_BAND:.2f}",
         drawing.LENGTH_TEXT_XY,
     )
 
@@ -412,7 +411,7 @@ def test_the_bore_callout_names_the_drill_and_the_bonded_seat() -> None:
     rides the end-view diameter, the hole's defining view, names the bonded
     seat on the screw, and gives the clearance both limits produce (rule
     23), in two lines of words (rule 7)."""
-    assert set(drawing.DIMENSION_CALLOUTS) == {"BoreDia", "RingLength"}
+    assert set(drawing.DIMENSION_CALLOUTS) == {"BoreDia"}
     assert "BoreDia" in drawing.END_KEEP and "RingLength" in drawing.PROFILE_KEEP
     text = drawing.DIMENSION_CALLOUTS["BoreDia"]
     rows = text.split("\n")
@@ -430,16 +429,19 @@ def test_the_bore_callout_names_the_drill_and_the_bonded_seat() -> None:
     assert high - low >= 0.001 * 25.4
 
 
-def test_the_length_band_prints_its_one_necessity_answer() -> None:
-    """Rule 4: a tight band prints what fails if it is looser, in one reason
-    of at most six words beyond the mates' numbers with no dimension in it
-    (rule 7): the MHA-PD-06 disc's air to the MHA-PD-02 platen."""
-    callout = " ".join(drawing.DIMENSION_CALLOUTS["RingLength"].split())
-    disc = _config.parts("pd-rack-pinion")["number"]
-    platen = _config.parts("pd-platen")["number"]
-    assert callout == f"KEEPS {disc} CLEAR OF {platen}"
-    words = [word for word in callout.split() if not word.startswith("MHA-")]
-    assert len(words) <= 6 and not re.search(r"\d", " ".join(words))
+def test_the_length_band_answers_necessity_in_the_register_not_on_the_sheet() -> None:
+    """Rule 4 (owner ruling 2026-11-24: "In the part's registry file, not on
+    the sheet."): the ±.001 length prints no reason; the package's necessity
+    register carries its one entry, a gap."""
+    import machinist_necessity
+
+    assert "RingLength" not in drawing.DIMENSION_CALLOUTS
+    (entry,) = machinist_necessity.load_necessity(
+        Path(_config.__file__).resolve().parents[1] / "config",
+        "pd_transgear_pivot_spacer",
+    )
+    assert entry.kind == "gap"
+    assert "±.001" in entry.feature
 
 
 # The rows run 20261027T121009040Z-eda67c82 printed (layout audit: each

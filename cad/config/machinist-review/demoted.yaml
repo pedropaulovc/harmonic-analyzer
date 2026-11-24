@@ -45,7 +45,6 @@ demoted:
   - pd_transgear_feed_pinion
   - pd_transgear_front_bushing
   - pd_transgear_knob_bush
-  - pd_transgear_pivot_spacer
   - pd_transgear_rear_bushing
   - pn_pen_v_block
   - sm_knife_mount
@@ -96,6 +95,5 @@ demoted:
   - ha_harmonic_analyzer_assembly
   - mg_magnifier_assembly
   - ms_measuring_stick_assembly
-  - pd_paper_drive_assembly
   - pn_pen_assembly
   - sm_summing_assembly

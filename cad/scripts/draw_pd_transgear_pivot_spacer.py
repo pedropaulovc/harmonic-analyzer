@@ -135,10 +135,10 @@ END_KEEP = {
     "BoreDia": (0.050, 0.222),
     "RingOd": (0.045, 0.120),  # donor: moved onto the profile
 }
-# Rule 23 / rule 4: the bonded seat and the banded length name their mates
-# (pd_transgear_pivot_spacer_callouts).  The part authors both
-# below-callouts on its source dimensions; the sheet imports them and only
-# reads them back (#1942).
+# Rule 23: the bonded seat names its mate
+# (pd_transgear_pivot_spacer_callouts).  The part authors the
+# below-callout on its source dimension; the sheet imports it and only
+# reads it back (#1942).
 DIMENSION_CALLOUTS = {
     name: lanes[callouts.CALLOUT_BELOW]
     for name, lanes in callouts.authored_by_name().items()
@@ -147,8 +147,7 @@ DIMENSION_CALLOUTS = {
 PROFILE_KEEP = {
     "RingLength": (PROFILE_CENTER[0], _PROFILE_BOTTOM - 0.022),
 }
-# The length's text and its callout are wider than the 25 between its
-# extension lines, so they stand offset right of the front face's extension
+# The length's text stands offset right of the front face's extension
 # line, level with the dimension line and under the O.D.'s lower extension
 # line (clarity, review 2026-10-23: text struck by both extension lines).
 LENGTH_TEXT_XY = (_PROFILE_FRONT_X + 0.032, PROFILE_KEEP["RingLength"][1])
@@ -257,7 +256,6 @@ requirement(
         ),
         "length_nominal": (LENGTH, ("LENGTH",)),
         "length_from": ("datum_end", ((_SELF, "PROFILE_KEEP"),)),
-        "callout": (callouts.LENGTH_CALLOUT, ((_CALLOUTS, "LENGTH_CALLOUT"),)),
     },
     precision={"length": _P["RingLength"]},
 )

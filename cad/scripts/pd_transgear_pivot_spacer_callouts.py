@@ -23,15 +23,10 @@ CALLOUT_BELOW = 4  # swDimensionTextCalloutBelow
 # gap; the grade and the cure are MHA-PD-00's step.  A drilled hole at the
 # DRILLED HOLES row is no tight band, so it prints no necessity answer
 # (rule 4).  Two lines of words under the drill's row (rule 7).
-# The length's ±.001 is a tight band, so it prints its one answer to rule
-# 4's necessity test: with no parallelism frame its spread is the faces'
-# taper, which tilts the hanger and, looser, closes the MHA-PD-06 disc's air
-# to the MHA-PD-02 platen (pd_transgear_pivot_spacer_spec LENGTH_TOLERANCE;
-# build_pd_paper_drive_assembly PLATEN_AIR).  One reason in three words,
-# set on two rows to stand inside the lane beside the dimension.
+# The length's ±.001 is a tight band; its answer to rule 4's necessity test
+# is not printed (owner ruling 2026-11-24: "In the part's registry file, not
+# on the sheet."): cad/config/necessity/pd-transgear-pivot-spacer.yaml N-01.
 SCREW_NUMBER = _config.parts("pd-vn-transgear-pivot-screw")["number"]
-DISC_NUMBER = _config.parts("pd-rack-pinion")["number"]
-PLATEN_NUMBER = _config.parts("pd-platen")["number"]
 _BOND_GAP_IN = (
     math.floor(BOND_GAP[0] / 25.4 * 1e4 + 1e-6) / 1e4,
     math.ceil(BOND_GAP[1] / 25.4 * 1e4 - 1e-6) / 1e4,
@@ -41,13 +36,11 @@ BOND_CALLOUT = (
     + f"{_BOND_GAP_IN[0]:.4f}-{_BOND_GAP_IN[1]:.4f}".replace("0.", ".")
     + ")"
 )
-LENGTH_CALLOUT = f"KEEPS {DISC_NUMBER}\nCLEAR OF {PLATEN_NUMBER}"
 
 # lane -> (feature, dimension) -> text.
 CALLOUTS: dict[int, dict[tuple[str, str], str]] = {
     CALLOUT_BELOW: {
         ("RingProfile", "BoreDia"): f"{BORE_CALLOUT}\n{BOND_CALLOUT}",
-        ("Ring", "RingLength"): LENGTH_CALLOUT,
     },
 }
 
