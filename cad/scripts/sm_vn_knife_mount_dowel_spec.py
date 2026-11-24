@@ -50,7 +50,7 @@ from _mcmaster_98381a473 import (
 from _package_units import drawing_unit
 from _fit_ream_h7 import REAM_H7
 from _hole_spec import DRILL_POINT_H
-from _printed_tolerance import printed_band_mm
+from _printed_tolerance import drilled_oversize_mm, printed_band_mm
 from _supplier_pin_data import SupplierPinReference
 
 # The knife mount's slip hole and its depth print on its sheet, in
@@ -109,7 +109,8 @@ MOUNTS = 2
 QUANTITY = PER_MOUNT * MOUNTS
 # 7.632 for the #10-24 hex bolt that replaced the #6-32 screw (the user's
 # knife-hanger regression fix): the crossbar's then Ø6.045 #10 loose clearance
-# hole (since a C drill Ø6.147, owner ruling 2026-11-06), drilled from the
+# hole (later a C drill Ø6.147, owner ruling 2026-11-06; an E drill Ø6.350
+# since owner ruling 2026-11-24, fit audit OQ19), drilled from the
 # underside under a then shallow top spotface, and its then
 # slot, shortened to 3.95, each kept 2.0 of wall at the print-worst plus
 # drill drift, inside to the hole and outside to the 25 crossbar's face.
@@ -184,24 +185,28 @@ if PRESS_POINT_CLEARANCE_MIN <= 0.0:
     )
 
 # --- The slip: the knife mount's round hole (datum B) -----------------------
-# A slip on the pin's catalogue diameter at 0.02..0.10 diametral clearance
-# (the dt_pinion_cam_spec slip band), reamed (a purchased .1280 chucking
-# reamer) to an explicit .1280 +/-.0007 band: .0020..0.0036 in
-# (0.0508..0.0914).  The band's maximum, .1287 (3.269), keeps the loosest
-# slip (and the bolt-float and web stacks it feeds) under main's 3.270; the
-# tightest slip, .0020, keeps the pin-to-hole tilt proof's angular margin
-# (codjiflo round 6).
-# Cut soft in the O1 block: hardening's growth (<= .0001 in on this size,
-# owner ruling 2026-10-24, H3) stays inside the band.
-SLIP_HOLE_DIA = 3.2512  # .1280
-SLIP_HOLE_DIA_BAND = (0.01778, -0.01778)  # +/-.0007
+# Owner ruling 2026-11-24, fit audit OQ19 (APPROVED as recommended, option
+# A): the hole is a #30 drill (.1285 = 3.2639) at the title block's DRILLED
+# HOLES row (+.004/0), no reamer: .0032-.0074 in (0.0812-0.1880) on the
+# pin's catalogue diameter.  The former 0.02-0.10 window was the pinion
+# cam's slip band copied over; nothing in this joint reads it.  What the
+# slip must do: its minimum lets the pin enter the hole (> 0) and is the
+# tilt proof's angular room (``build_sm_summing_assembly``
+# KNIFE_DOWEL_TILT_ALLOWED_DEG); its maximum is the block's shift on the
+# pin, charged where it binds -- the hanger bolt's float and the rear
+# mount's yaw range (``build_sm_summing_assembly`` HANGER_SCREW_FLOAT_SPARE,
+# KNIFE_REAR_YAW_RANGE_DEG) and the washer's bearing width
+# (``build_fr_top_frame``) -- each with its own guard.
+SLIP_HOLE_DRILL = "#30"
+SLIP_HOLE_DIA = 3.2639  # .1285
+SLIP_HOLE_DIA_BAND = (drilled_oversize_mm(unit=_MOUNT_UNIT), 0.0)  # title block
 SLIP_HOLE_DIA_PLACES = 4
 SLIP_CLEARANCE_MIN = round(SLIP_HOLE_DIA + SLIP_HOLE_DIA_BAND[1] - DIA_MAX, 6)
 SLIP_CLEARANCE_MAX = round(SLIP_HOLE_DIA + SLIP_HOLE_DIA_BAND[0] - DIA_MIN, 6)
-if SLIP_CLEARANCE_MIN < 0.02 or SLIP_CLEARANCE_MAX > 0.10:
+if SLIP_CLEARANCE_MIN <= 0.0:
     raise AssertionError(
-        f"knife-mount dowel slip clearance {SLIP_CLEARANCE_MIN}-"
-        f"{SLIP_CLEARANCE_MAX} is outside 0.02-0.10"
+        f"the {SLIP_HOLE_DRILL} hole ({SLIP_HOLE_DIA:.4f}) does not clear"
+        f" MHA-SM-VN-53's largest diameter ({DIA_MAX:.4f})"
     )
 # The block's round hole, blind from its top seat to a drill point (owner
 # decision 2026-11-19, #3124 item 4), its full-diameter depth printed .XX:

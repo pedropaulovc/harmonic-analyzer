@@ -10,7 +10,7 @@ and the bore are real edges, so
 the block dimensions ride the auto-imported profile marks (block + bore) with the
 depth added across the right-view section.  The MHA-SM-VN-53 dowel presses
 into the crossbar and slips into this block (owner ruling 2026-10-24,
-T+H3): its round slip hole, datum B, prints its reamed Ø, band and mate and
+T+H3): its round slip hole, datum B, prints its #30 drill and mate and
 a ⊥Ø0.015 frame to A that carries B, located on the +X side and front faces
 at general tolerance, in the top view.  Owner ruling 2026-11-08 (Pedro),
 #2144 item 11.3 (scheme S1): datum C, the -X slot and its frames are
@@ -92,7 +92,7 @@ from _hole_spec import blind_cut_dia_mm
 from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
 from _session import run_build
-from _printed_limits import limits
+from _printed_limits import drilled_limits, limits
 from _surface_finish import surface_finish_by_key
 import _telemetry
 from build_sm_knife_mount import BORE_CENTRE_DEPTH
@@ -110,10 +110,10 @@ from sm_knife_mount_spec import (
     PIN_HOLE_DEPTH,
     PIN_HOLE_DEPTH_PLACES,
     PIN_HOLE_DIA,
+    PIN_HOLE_DRILL,
     PIN_HOLE_POINT_H,
     PIN_HOLE_SIDE_DISTANCE,
     PIN_HOLE_X,
-    PIN_SLIP_PRINTED,
     R_BORE,
     STUD_TAP_DIA,
     STUD_TAP_DRILL_DEPTH,
@@ -290,15 +290,18 @@ TOP_HALF_Z = SUPPORT_Z_THICK / 2.0 * SHEET_SCALE[0] / 1000.0
 # near end radially for the hole's centre (farm run 20261014T010316127Z: a
 # shoulder at (146.4, 222.2) mm landed the arrow at -38.6 deg).  The dda9a33a8
 # render measured a 5-row label at 84.5 mm wide, its shoulder 1.6 mm past it
-# and 12.86 mm under the text position; four rows stand a half row (~2.1 mm)
-# less.  The widest row was "REAM ↧ (.37) FLAT BOTTOM", 24 characters at
-# ~2.52 mm (60 mm); with FLAT BOTTOM gone (owner decision 2026-11-19, #3124
-# item 4) the fit row, "MHA-SM-VN-53 SLIDING FIT", keeps the 24 characters.  The shoulder starts 22 mm under the hole row, so the
-# leader rises at ~-58 deg into the hole across the front-face edge inside
-# the block (x 139.1 mm), under the B row's 7.0 and its witness line.
-PIN_CALLOUT_HALF_WIDTH = 0.030
+# and 12.86 mm under the text position; each row fewer stands a half row
+# (~2.1 mm) less.  The widest row was "REAM ↧ (.37) FLAT BOTTOM", 24
+# characters at ~2.52 mm (60 mm); with B drilled #30 (owner ruling
+# 2026-11-24, fit audit OQ19) the label is three rows, the Ø and "#30 DRILL
+# ↧ (.37)" over "MHA-SM-VN-53 DOWEL", 18 characters (45 mm), its shoulder
+# ~8.6 mm under the text position.  The shoulder starts 22 mm under the hole
+# row, so the leader rises at ~-58 deg into the hole across the front-face
+# edge inside the block (x 139.1 mm), under the B row's 7.0 and its witness
+# line.
+PIN_CALLOUT_HALF_WIDTH = 0.0227
 PIN_CALLOUT_SHOULDER_OVERHANG = 0.0016
-PIN_CALLOUT_SHOULDER_DROP = 0.0105
+PIN_CALLOUT_SHOULDER_DROP = 0.0086
 PIN_CALLOUT_SHOULDER_START = (_sheet_x(BLK_HALF_X) + 0.0165, TOP_CENTER[1] - 0.036)
 # B's face locations (blind machinist review, 2026-10-09), both in the top
 # view: its axis from the +X side face, a row above the view (under
@@ -337,25 +340,22 @@ TOP_KEEP = {
 # trunnion, whose top ridge rocks on the bore's crown.  The mate's number is
 # drawing text only, read here, not in sm_knife_mount_spec: the spec is in
 # MHA-FR-02's and the frame assembly's import closure, which must not key on
-# the lever's registry row.  Datum B's slip hole is a matched fit on the
-# MHA-SM-VN-53 dowel (fan-out policy 1: its ±.0007 band sits under the shop
-# rows, so it names the dowel and its standard fit, with the slip clearance
-# as its acceptance; machinist review 20261107T102825912Z; round 2,
-# 20261107T110808280Z: "TO SUIT" is a rule-26 private phrase); B's ream
-# states its depth as REF, which the section's floor depth controls (rule
+# the lever's registry row.  Datum B's slip hole is a #30 drill (owner
+# ruling 2026-11-24, fit audit OQ19: no reamer, the title block's DRILLED
+# HOLES row accepts it), named with the MHA-SM-VN-53 dowel it takes, the
+# Q20 precedent's "#30 DRILL THRU / MHA-PN-04 PIVOT" (draw_pn_pen_v_block);
+# its depth prints as REF, which the section's floor depth controls (rule
 # 26: a depth is never deferred to a view).  These rows are drawing text,
 # so the frame's import closure keeps its key.
 LEVER_NUMBER = str(_config.parts("sm-summing-lever")["number"])
-# The bore is reamed to size in the supplied 28-32 HRC condition, like
-# datum B (Owner ruling 2026-11-10 (Pedro), #2334 option B1): the .4990
-# chucking reamer (owner ruling 2026-11-23, tool audit Q13: "no 12 mm
-# reamer"; .4991-.4995) cuts inside the +.0015/0 band.
+# The bore is reamed to size in the supplied 28-32 HRC condition (Owner
+# ruling 2026-11-10 (Pedro), #2334 option B1): the .4990 chucking reamer
+# (owner ruling 2026-11-23, tool audit Q13: "no 12 mm reamer"; .4991-.4995)
+# cuts inside the +.0015/0 band.
 BORE_CALLOUT = "\n".join(("REAM THRU", "RUNNING FIT ON", f"{LEVER_NUMBER} TRUNNION"))
-_SLIP_FIT = f"{DOWEL_NUMBER} SLIDING FIT"
-_SLIP_CLEARANCE = "CLEARANCE {:.4f}-{:.4f}".format(*PIN_SLIP_PRINTED).replace("0.", ".")
 _PIN_DEPTH_REF = f"{PIN_HOLE_DEPTH / DOWEL.MM_PER_IN:.{PIN_HOLE_DEPTH_PLACES}f}".lstrip("0")
 PIN_HOLE_CALLOUT = "\n".join(
-    (f"REAM <HOLE-DEPTH> ({_PIN_DEPTH_REF})", _SLIP_FIT, _SLIP_CLEARANCE)
+    (f"{PIN_HOLE_DRILL} DRILL <HOLE-DEPTH> ({_PIN_DEPTH_REF})", f"{DOWEL_NUMBER} DOWEL")
 )
 DIMENSION_CALLOUTS = {
     "BoreDia": BORE_CALLOUT,
@@ -735,12 +735,12 @@ requirement(
         "parallelism": 3,
     },
 )
-# Datum B, the MHA-SM-VN-53 dowel's slip hole: Ø.1280 +-.0007 REAM to the
-# full diameter's .37 (SECTION_KEEP "PinHoleDepth", the title block's .XX)
-# over a drill point, SLIDING FIT, CLEARANCE .0020-.0036 (TOP_KEEP
-# "PinHoleDia", PIN_HOLE_CALLOUT); ⊥Ø.001|A (PIN_FRAME_XY); its axis .20
-# from the +X side (PIN_SIDE_TEXT_XY) and .275 +-.010 from the front face
-# (TOP_KEEP "HoleRowFace").
+# Datum B, the MHA-SM-VN-53 dowel's slip hole: Ø.1285 #30 DRILL to the full
+# diameter's .37 (SECTION_KEEP "PinHoleDepth", the title block's .XX) over a
+# drill point, the DRILLED HOLES row .1285-.1325 (TOP_KEEP "PinHoleDia",
+# PIN_HOLE_CALLOUT); ⊥Ø.001|A (PIN_FRAME_XY); its axis .20 from the +X side
+# (PIN_SIDE_TEXT_XY) and .275 +-.010 from the front face (TOP_KEEP
+# "HoleRowFace").
 requirement(
     "dowel_hole",
     kind="hole",
@@ -750,7 +750,7 @@ requirement(
         "at": ([PIN_HOLE_X, BLK_TOP, 0.0], ("PIN_HOLE_X", "BLK_TOP")),
         "axis": ((0.0, -1.0, 0.0), ("__frame__", "BLK_TOP")),
         "dia": (
-            limits(PIN_HOLE_DIA, _P["PinHoleDia"], KM.PIN_HOLE_DIA_BAND, unit=UNIT),
+            drilled_limits(PIN_HOLE_DIA, _P["PinHoleDia"], unit=UNIT),
             ("PIN_HOLE_DIA", "PIN_HOLE_DIA_BAND", "UNIT", *_TOP_KEEP),
         ),
         "nominal_dia": (PIN_HOLE_DIA, ("PIN_HOLE_DIA",)),
@@ -760,13 +760,9 @@ requirement(
         ),
         "depth_nominal": (PIN_HOLE_DEPTH, ("PIN_HOLE_DEPTH",)),
         "drill_point": (True, ((_DOWEL, "SLIP_DEPTH"), ("build_sm_knife_mount", "cut_pin_hole_point"))),
-        "process": ("ream", ((_SELF, "PIN_HOLE_CALLOUT"),)),
+        "process": ("drill", ((_SELF, "PIN_HOLE_CALLOUT"),)),
         "callout": (DIMENSION_CALLOUTS["PinHoleDia"], ((_SELF, "DIMENSION_CALLOUTS"),)),
         "mates": (DOWEL_NUMBER, ("DOWEL_NUMBER",)),
-        "clearance": (
-            [value * DOWEL.MM_PER_IN for value in PIN_SLIP_PRINTED],
-            ("PIN_SLIP_PRINTED", (_DOWEL, "SLIP_CLEARANCE_MIN"), (_DOWEL, "SLIP_CLEARANCE_MAX")),
-        ),
         "datum": ("B", ((_SELF, "PIN_DATUM_B_XY"),)),
         "perpendicularity": (
             KM.DOWEL_HOLE_PERPENDICULARITY_TOL,
@@ -1667,7 +1663,7 @@ def build(adapter: Any) -> dict[str, str]:
         datums=("A",),
         label="knife-bore parallelism",
     )
-    # The #10-24 tap: ⌖Ø.005|A|B|C▷, the bolt axis the crossbar's C-drill
+    # The #10-24 tap: ⌖Ø.005|A|B|C▷, the bolt axis the crossbar's E-drill
     # hole floats round (build_sm_summing_assembly's knife-hanger stack),
     # its turn about B clocked by the bore, C's simulator free to centre.
     add_feature_control_frame(

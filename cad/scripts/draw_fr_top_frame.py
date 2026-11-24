@@ -387,7 +387,7 @@ ARROW_HALF_WIDTH = 0.000381
 # Sheet 3's top band, right of the 182.0 extension line and above the top
 # rail.  R4 printed the four-row callout's +0.130 stack on the 266.7
 # border and the position frame over the upper-right boss.  The one
-# C DRILL THRU row centres lower, clear of the boss; the frame (top-left corner
+# E DRILL THRU row centres lower, clear of the boss; the frame (top-left corner
 # here) stands above it, its 5.5 mm box and one qualifier row ending about
 # 11 mm under frame_xy.
 HANGER_CALLOUT_XY = (0.262, 0.238)
@@ -1905,7 +1905,7 @@ def _insert_crossbar_median(adapter: Any, view: Any, sides: tuple[Any, Any]) -> 
 
 
 # The plain wizard's native row prints the size and its one extent token;
-# the hole is a letter drill (owner ruling 2026-11-06: 2X C DRILL Ø.242
+# the hole is a letter drill (owner ruling 2026-11-24, fit audit OQ19: 2X E DRILL Ø.250
 # THRU), so the drill's letter leads the row and the extent reads THRU.
 # The diameter stays the Hole Wizard variable carrying the model's size.
 HANGER_HOLE_PROCESS_TEXT = f"{HANGER_HOLE_DRILL} DRILL "
@@ -4968,7 +4968,7 @@ def build(adapter: Any) -> dict[str, str]:
     )
     _finish_leader_tail(socket_finish, label="tube socket bore")
     # The plain wizard's clearance rim at the finished top identifies the
-    # whole through-hole feature; its native row reads C DRILL ... THRU.
+    # whole through-hole feature; its native row reads E DRILL ... THRU.
     stud_edge = model_point_in_view(
         adapter,
         detail_top,
@@ -4986,7 +4986,7 @@ def build(adapter: Any) -> dict[str, str]:
         # Right of the 182.0 row's end, so the leader reaches the hole past
         # that row instead of across it (codex round 5).
         callout_xy=HANGER_CALLOUT_XY,
-        label="2X C drill hanger clearance holes",
+        label="2X E drill hanger clearance holes",
     )
     _set_hanger_hole_callout(hanger_callout)
     # Linear position to D centres each bolt axis within ±.005 (owner ruling

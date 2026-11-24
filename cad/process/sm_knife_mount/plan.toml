@@ -8,8 +8,9 @@
 # file per setup: KM01 skims a broad face to the back face K; KM02 faces the
 # other to the depth (front face F); KM03 skims the bar edge U; KM04 skims the
 # S end (the +X side, datum B's side); KM05 faces the N end to the width;
-# KM06 faces the top seat A to the height, spots, drills #31 and reams the
-# .1280 datum-B hole, and drills the #25 tap drill, all from one setup (B ⊥ A
+# KM06 faces the top seat A to the height, spots, drills datum B #30 (owner
+# ruling 2026-11-24, fit audit OQ19: no reamer, no plug gauges), and drills
+# the #25 tap drill, all from one setup (B ⊥ A
 # and the tap's position to B come from it); KM07 brings the Fisher tap guide
 # over the tap hole for the #10-24 plug, then bottoming, taps by hand
 # (FluidNC cannot rigid-tap; owner ruling 2026-11-17); KM08 lies the block on
@@ -36,7 +37,7 @@ part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
 material = "4140/4142 HT alloy steel, pre-hardened 28-32 HRC, 5/8 × 1-1/4 in flat (drawing: {{cad.material_spec}})"
 stock = "5/8 × 1-1/4 in flat bar, 6 in; {{process.quantity:d}} blanks and 1 trial coupon, each {{process.blank_length_min_in:.2f}}–{{process.blank_length_max_in:.2f}} in."
-note = "Inches unless mm; G-code and console entries in mm (the files and the controller run G21). Finished {{cad.minus_x_side_width_min_in:.3dot}}–{{cad.minus_x_side_width_max_in:.3dot}} wide (S end to N end), {{cad.bottom_face_height_min_in:.3dot}}–{{cad.bottom_face_height_max_in:.3dot}} high (underside U to the top seat A), {{cad.back_face_depth_min_in:.3dot}}–{{cad.back_face_depth_max_in:.3dot}} deep (back face K to front face F). The bar is pre-hardened (28-32 HRC): every speed here is about half the 1018 jobs'; do not raise them. Speeds on the PM-30MV low belt (100–2800 rpm): no belt change. Home the mill ($H) and touch off G54 at the start of every mill setup: a FluidNC reset loses home. After any controller reset, stall or E-stop, home and touch off again before Cycle Start. Every file is proved in air on the first blank. Marks: A the top seat (datum A), U the underside, F the front face, K the back face, S the end nearest the small hole (datum B), N the other end. Not on hand, to buy before the job: the bar, the .4990 and .1280 reamers and the Class ZZ pins (.4985 plus, .500 minus, .1275 minus, .1285 plus)."
+note = "Inches unless mm; G-code and console entries in mm (the files and the controller run G21). Finished {{cad.minus_x_side_width_min_in:.3dot}}–{{cad.minus_x_side_width_max_in:.3dot}} wide (S end to N end), {{cad.bottom_face_height_min_in:.3dot}}–{{cad.bottom_face_height_max_in:.3dot}} high (underside U to the top seat A), {{cad.back_face_depth_min_in:.3dot}}–{{cad.back_face_depth_max_in:.3dot}} deep (back face K to front face F). The bar is pre-hardened (28-32 HRC): every speed here is about half the 1018 jobs'; do not raise them. Speeds on the PM-30MV low belt (100–2800 rpm): no belt change. Home the mill ($H) and touch off G54 at the start of every mill setup: a FluidNC reset loses home. After any controller reset, stall or E-stop, home and touch off again before Cycle Start. Every file is proved in air on the first blank. Marks: A the top seat (datum A), U the underside, F the front face, K the back face, S the end nearest the small hole (datum B), N the other end. Not on hand, to buy before the job: the bar, the .4990 reamer, the Class ZZ pins (.4985 plus, .500 minus) and the minus and plus pin-gauge sets."
 shop = "../shop"
 stock_refs = ["4140-ht-flat-5-8x1-1-4"]
 material_key = "4140-ht-28-32-hrc"
@@ -91,28 +92,23 @@ face_stepover_max_mm = 5.08
 front_top_max_mm = 16.51
 top_top_max_mm = 34.29
 end_top_max_mm = 28.448
-# Holes. Spots Ø.100 with the #2 centre drill, under the #31 and the #25 (no
-# chamfer at the mouths). Datum B: the .1280 reamer's tip .010 past the
-# drawing's .37 depth (its 45° lead leaves the full diameter .36-.38 deep for
-# any lead up to .020); the #31's full diameter 1.0 mm past the reamer's tip.
+# Holes. Spots Ø.100 with the #2 centre drill, under the #30 and the #25 (no
+# chamfer at the mouths). Datum B: the #30's full diameter at the drawing's
+# .37 depth (.36-.38), the DRILLED HOLES row its size (owner ruling
+# 2026-11-24, fit audit OQ19).
 # The #25 tap drill: its full diameter at the drawing's .438 depth. The knife
 # bore (Ø.4985 +.0015/0, owner ruling 2026-11-23, tool audit Q13: "dia .4985
 # +.0015/0 (owner chose against the agent's recommendation to keep .4720); no
 # 12 mm reamer"): the #25 pilot's and the owned 31/64 drill's full diameters
 # 1.0 mm past K into the gap between the stacks; the .4990 reamer's tip 2.0
 # mm past K, above the 31/64 drill's. Pecks of about one diameter with full
-# retracts (#31 L/D 3.8, #25 L/D 3.2 blind and 4.2 through); the 31/64 drill,
+# retracts (#30 L/D 3.2, #25 L/D 3.2 blind and 4.2 through); the 31/64 drill,
 # L/D 1.1 after the pilot, in one feed.
 spot_dia_mm = 2.54
 dowel_peck_mm = 3.048
 tap_peck_mm = 3.556
 drill_past_mm = 1.0
-dowel_ream_past_mm = 0.254
-dowel_ream_tip_height_mm = 20.066      # The height less the depth less the .010; cam.py checks it.
-dowel_ream_r_plane_mm = 30.718        # B's re-ream MDI: the height plus 1.0 (cam.py SAFE_MM); cam.py checks it.
-dowel_ream_clear_mm = 34.718          # The height plus 5.0 (cam.py CLEAR_MM); cam.py checks it.
-dowel_ream_feed_mm_min = 38.1         # The .1280 reamer's setting (750 × 2 × .0254); cam.py checks it.
-dowel_drill_tip_height_mm = 18.15      # Less 1.0 and the #31's 118° point (.916); cam.py checks it.
+dowel_drill_tip_height_mm = 19.339     # The height less the depth and the #30's 118° point (.981); cam.py checks it.
 tap_drill_tip_height_mm = 17.452       # The height less .438 and the #25's point (1.141); cam.py checks it.
 pilot_tip_height_mm = -2.141           # 1.0 + the #25's point; cam.py checks it.
 bore_drill_tip_height_mm = -4.696      # 1.0 + the 31/64 drill's point (3.696); cam.py checks it.
@@ -127,35 +123,33 @@ tap_x_mm = 12.7
 # KM08 stations: the bore .824 BASIC from A (X) and .500 from S (Y, datum B's
 # side station plus its .300 BASIC). cam.py checks them.
 bore_y_mm = 12.7
-# Position checks, on the height gauge over the GO pins (the Class ZZ pins
-# Setups 6 and 8 mike): each reading's error is the pins' play (each pin
-# rests on its hole's low side) plus the gauge's .001 count: from A, the
-# bore's (.5000 − .4985)/2 and half a count, .00125; from B, the difference
-# of two readings, that plus B's (.1287 − .1273)/2 and a full count, .00245. Each reading must lie within the zone's
+# Position checks, on the height gauge over pins: the bore's GO pin (the
+# Class ZZ pin Setup 8 mikes) and, in B, the largest pin of the .001-step
+# pin-gauge sets that enters it (gauges.pin-gauges; its size written
+# here). Each reading's error is the pins' play (each pin rests on its
+# hole's low side) plus the gauge's .001 count: from A, the bore's
+# (.5000 − .4985)/2 and half a count, .00125; from B, the difference of two
+# readings, that plus half B's pin step (.0005) and a full count, .00225.
+# Each reading must lie within the zone's
 # radius (.004) less its error of its BASIC (the bands below: outside one, no
 # bore can be in the zone); then the radial test, with each axis's error
 # added, accepts the bore. The tap's B-to-tap spacing ±.010 over the pins, a
 # gross check only (the program holds its Ø.005 position; the band clears
 # the pins' play in their holes). cam.py checks them.
+b_pin_step_mm = 0.0254
 bore_err_a_mm = 0.0318
-bore_err_b_mm = 0.0623
+bore_err_b_mm = 0.0572
 bore_from_a_min_mm = 20.8598
 bore_from_a_max_mm = 20.9994
-bore_from_b_min_mm = 7.5806
-bore_from_b_max_mm = 7.6594
+bore_from_b_min_mm = 7.5756
+bore_from_b_max_mm = 7.6644
 # Each Class ZZ pin's acceptable reading, one ZZ tolerance (.0002) wide (the
 # ToolTravelers pattern, test_zz_pin_windows). The knife bore: GO .4985 plus
 # from the band's low end up, NO-GO .500 minus from its high end down.
-# Datum B: GO .1275 minus, NO-GO .1285 plus, each inside the .1273-.1287
-# band (owner ruling 2026-11-23, tool audit Q1: ZZ singles per the record).
 go_pin_min_mm = 12.6619
 go_pin_max_mm = 12.667
 nogo_pin_min_mm = 12.6949
 nogo_pin_max_mm = 12.7
-dowel_go_pin_min_mm = 3.2334
-dowel_go_pin_max_mm = 3.2385
-dowel_nogo_pin_min_mm = 3.2639
-dowel_nogo_pin_max_mm = 3.269
 tap_from_b_min_mm = 7.366
 tap_from_b_max_mm = 7.874
 # KM07's tap reference station on A, from S: midway on the solid land between
@@ -228,16 +222,12 @@ ref = "endmill-carbide-3fl-1-2"
 id = "spot"
 name = "#2 centre drill"
 ref = "jig-spot"
+# The owned #30 from the 115-piece index (riser-drill-30; owner ruling
+# 2026-11-24, fit audit OQ19): datum B is drilled, no reamer.
 [[tools]]
-id = "drill-31"
-name = "#31 drill"
-ref = "drill-31"
-# Not owned (cad/config/shop-equipment/ tools.reamer-1280, to_order).
-[[tools]]
-id = "reamer-1280"
-name = ".1280 reamer"
-ref = "reamer-1280"
-status = "to_order"
+id = "drill-30"
+name = "#30 drill"
+ref = "riser-drill-30"
 [[tools]]
 id = "drill-25"
 name = "#25 drill"
@@ -290,10 +280,12 @@ id = "pins-4985"
 name = "Class ZZ pins: .4985 plus (GO) and .500 minus (NO-GO)"
 ref = "zz-pins-4985-5000"
 status = "to_order"
+# Datum B's stand-in for the position checks: the largest pin of the
+# .001-step sets that enters the #30 hole (to order with the sets).
 [[tools]]
-id = "pins-1273"
-name = "Class ZZ pins: .1275 minus (GO) and .1285 plus (NO-GO)"
-ref = "zz-pins-1273-1287"
+id = "pin-gauges"
+name = "Pin gauge sets, .061-.250 minus and plus"
+ref = "pin-gauges"
 status = "to_order"
 
 [[setups]]
@@ -592,34 +584,20 @@ feed = "hand"
 
 [[setups]]
 machine_kind = "other"
-title = "Top seat A to the height; datum B reamed, the #10-24 drilled and tapped"
+title = "Top seat A to the height; datum B drilled, the #10-24 drilled and tapped"
 machine = "PM-30MV CNC (FluidNC, CNCjs with the electronic tool setter) / vise, swivel off"
 indexing = "none"
 machine_ref = "pm-30mv"
 holding = "A 1 in parallel against each jaw. The blank on edge on them, U DOWN, gripped across F (against the FIXED jaw) and K, S at the LEFT. Centred on the jaws; tap it down onto both parallels while closing the vise. The lower {{process.edge_grip_mm:in.2dot}} of it is in the jaws. Both holes are blind: nothing reaches the parallels."
 datum = "Programs KM06_top_holes and KM07_stud_tap. G54: X0 the S end (the left), Y0 the fixed jaw's face (F), Z0 the parallels' top (U); +Y toward the fixed jaw. Datum B at X {{cad.dowel_hole_side_mm:.3f}}, Y −{{cad.dowel_hole_row_mm:.3f}}; the #10-24 at X {{process.tap_x_mm:.3f}}, Y −{{cad.dowel_hole_row_mm:.3f}} mm; the top at Z {{cad.bottom_face_height_mm:.3f}}. Tool lengths from the tool setter at each M6; every file starts with an M6 for its first tool, and at every M6 stop the file has stopped the spindle and lifted the tool above the part."
-diagram = { file = "diagrams/top.svg", alt = "The blank on edge on two 1 in parallels, U down, F against the fixed jaw, S at the left; the 1/2 in end mill faces the top seat A to the height, then the centre drill, the #31 drill and the .1280 reamer make datum B and the #25 drill the tap hole, both blind." }
+diagram = { file = "diagrams/top.svg", alt = "The blank on edge on two 1 in parallels, U down, F against the fixed jaw, S at the left; the 1/2 in end mill faces the top seat A to the height, then the centre drill and the #30 drill make datum B and the #25 drill the tap hole, both blind." }
 envelope = { x_span_mm = ["{{cad.minus_x_side_width_mm}}", "{{process.face_cutter_dia_mm}}", "{{process.face_cutter_dia_mm}}", 5.08], y_span_mm = ["{{cad.back_face_depth_mm}}", "{{process.face_cutter_dia_mm}}"], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{process.top_top_max_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{process.tap_drill_tip_height_mm}}"], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.tap_stack_max_mm}}"], shortest_tool_mm = ["{{process.drill_chuck_gauge_mm}}", "{{process.centre_drill_oal_mm}}"] }
 vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{cad.back_face_depth_mm}}", along_jaws_mm = "{{cad.minus_x_side_width_mm}}", part_height_mm = "{{process.top_top_max_mm}}", parallel_height_mm = "{{process.parallel_height_mm}}", overhang_mm = ["{{process.vise_top_inset_mm}}", "rest"], jaw_offset = "centred", fixed_jaw_face = "machined", moving_jaw_face = "machined", moving_jaw_contact = "flat" }
 beam = { axis = "z", hold = "cantilever", extent_mm = [0, "{{process.top_top_max_mm}}"], clamp_mm = [0, "{{process.edge_grip_mm}}"], section_mm = { x = "{{cad.minus_x_side_width_mm}}", y = "{{cad.back_face_depth_mm}}" }, vise_left = "other" }
 
 [[setups.operations]]
-speed_kind = "other"
-tool = "pins-1273"
-drilling = "none"
-sizing = "other"
-instruction = "Before the first blank, at the bench: mike the GO pin (.1275 minus), the NO-GO pin (.1285 plus) and the .1280 reamer (across two opposite margins at its front) on the .0001 micrometer, each to ±.00005. Write the three readings on this sheet and each pin's reading on its tag. A pin outside its range is not used."
-feed = "hand"
-inspection = "GO reads {{process.dowel_go_pin_min_mm:in.4dot}}–{{process.dowel_go_pin_max_mm:in.4dot}}, NO-GO {{process.dowel_nogo_pin_min_mm:in.4dot}}–{{process.dowel_nogo_pin_max_mm:in.4dot}}. B is accepted between the two readings (GO reading ≤ hole < NO-GO reading): with both pins at their limits only {{process.dowel_go_pin_max_mm:in.4dot}}–{{process.dowel_nogo_pin_min_mm:in.4dot}} is sure to pass, so a good hole within .0002 of a limit may be refused."
-gauge_checks = [{ gauge = "micrometers", band_mm = ["{{process.dowel_go_pin_min_mm}}", "{{process.dowel_go_pin_max_mm}}"] }, { gauge = "micrometers", band_mm = ["{{process.dowel_nogo_pin_min_mm}}", "{{process.dowel_nogo_pin_max_mm}}"] }]
-
-[[setups.operations]]
-instruction = "If the .1280 reamer reads under the GO pin's reading, its holes would be refused: stop and tell the owner before reaming any blank."
-feed = "hand"
-
-[[setups.operations]]
-instruction = "Start only with the .1280 reamer and the .1275/.1285 Class ZZ pins in hand (all to buy). Home the mill first ($H). G54 X0 the S end (left), Y0 the fixed jaw's face (F): edge finder (900 rpm)."
-instruction_detailed = "Start only with the .1280 reamer and the .1275/.1285 Class ZZ pins in hand (all to buy). Home the mill first ($H). Edge finder (900 rpm): on the fixed jaw's face beside the blank, G10 L20 P1 Y-2.540; its tip .10 below the blank's top, on S from the left, G10 L20 P1 X-2.540. S places datum B and the tap: edge-find it carefully."
+instruction = "Home the mill first ($H). G54 X0 the S end (left), Y0 the fixed jaw's face (F): edge finder (900 rpm)."
+instruction_detailed = "Home the mill first ($H). Edge finder (900 rpm): on the fixed jaw's face beside the blank, G10 L20 P1 Y-2.540; its tip .10 below the blank's top, on S from the left, G10 L20 P1 X-2.540. S places datum B and the tap: edge-find it carefully."
 feed = "hand"
 
 [[setups.operations]]
@@ -661,29 +639,15 @@ milling_cuts = [
 
 [[setups.operations]]
 speed_kind = "spindle"
-tool = "drill-31"
+tool = "drill-30"
 drilling = "twist_drill"
 sizing = "other"
-instruction = "Same file, M6 T3: #31 drill datum B, pecks of {{process.dowel_peck_mm:in.3dot}} with full retract, its full diameter {{process.drill_past_mm:in.3dot}} past the reamer's tip; set 1100. Cutting oil. It leaves .008 on the diameter for the reamer."
-settings = "drill-31-4140-ht"
+instruction = "Same file, M6 T3: #30 drill datum B, pecks of {{process.dowel_peck_mm:in.3dot}} with full retract, its full diameter to the drawing's {{cad.dowel_hole_depth_in:.2dot}} ({{cad.dowel_hole_depth_min_in:.3dot}}–{{cad.dowel_hole_depth_max_in:.3dot}}); set 1050. Cutting oil. The drill is B's finished size (the title block's DRILLED HOLES row)."
+settings = "riser-drill-30-4140-ht"
 hole_depth_mm = "{{cad.dowel_hole_depth_mm}}"
 peck = { step_mm = 3.048, retract = "full" }
 milling_cuts = [
-  { name = "dowel drill", kind = "drill", phase = "rough", cutter_dia_mm = 3.048, flutes = 2, stations_mm = "{{cad.bottom_face_height_mm}}" },
-]
-
-[[setups.operations]]
-speed_kind = "spindle"
-tool = "reamer-1280"
-drilling = "none"
-sizing = { kind = "band", band_mm = "{{cad.dowel_hole_dia_band_mm}}" }
-instruction = "Same file, M6 T4 (spindle off, retracted): ream datum B, .1280 reamer in the drill chuck, its tip {{process.dowel_ream_past_mm:in.3dot}} past the {{cad.dowel_hole_depth_in:.2dot}} depth; set 750. Cutting oil. The file feeds the reamer in and feeds it back out, spindle running: no rapid leaves the hole."
-settings = "reamer-1280-4140-ht"
-# No reamer kind: its thrust is analysed as a two-lip twist drill's at the
-# reamer Ø and the same feed (flutes = 2 is that model's, not the reamer's),
-# far above what a .008 in ream allowance takes.
-milling_cuts = [
-  { name = "dowel ream", kind = "drill", phase = "finish", cutter_dia_mm = 3.2512, flutes = 2, stations_mm = "{{cad.bottom_face_height_mm}}" },
+  { name = "dowel drill", kind = "drill", phase = "finish", cutter_dia_mm = 3.2639, flutes = 2, stations_mm = "{{cad.bottom_face_height_mm}}" },
 ]
 
 [[setups.operations]]
@@ -691,7 +655,7 @@ speed_kind = "spindle"
 tool = "drill-25"
 drilling = "twist_drill"
 sizing = { kind = "tap_drill", tap = "tap-bottom" }
-instruction = "Same file, M6 T5: #25 drill the tap hole, pecks of {{process.tap_peck_mm:in.3dot}} with full retract, its full diameter to the drawing's {{cad.stud_tap_drill_depth_in:.3dot}} ({{cad.stud_tap_drill_depth_min_in:.3dot}}–{{cad.stud_tap_drill_depth_max_in:.3dot}}); set 900. Cutting oil."
+instruction = "Same file, M6 T4: #25 drill the tap hole, pecks of {{process.tap_peck_mm:in.3dot}} with full retract, its full diameter to the drawing's {{cad.stud_tap_drill_depth_in:.3dot}} ({{cad.stud_tap_drill_depth_min_in:.3dot}}–{{cad.stud_tap_drill_depth_max_in:.3dot}}); set 900. Cutting oil."
 settings = "drill-25-4140-ht"
 hole_depth_mm = "{{cad.stud_tap_drill_depth_mm}}"
 peck = { step_mm = 3.556, retract = "full" }
@@ -701,28 +665,19 @@ milling_cuts = [
 ]
 
 [[setups.operations]]
-instruction = "Still clamped, every blank: blow both holes out. Datum B's size: the GO pin (.1275 minus) enters to the bottom, the NO-GO pin (.1285 plus) does not enter. Its depth: the GO standing in B, its length less what stands above A (calipers)."
-inspection = "B: GO enters, NO-GO does not; depth {{cad.dowel_hole_depth_min_in:.3dot}}–{{cad.dowel_hole_depth_max_in:.3dot}}. NO-GO enters (no cut remedies an oversize hole): reject the blank, it is scrap. Depth outside: stop and tell the owner."
+instruction = "Still clamped, every blank: blow both holes out. Datum B's depth: the #30 drill's shank end down in B, its length less what stands above A (calipers). Its size is the drill's (the title block's DRILLED HOLES row): no gauge."
+inspection = "B depth {{cad.dowel_hole_depth_min_in:.3dot}}–{{cad.dowel_hole_depth_max_in:.3dot}}. Outside: stop and tell the owner."
 gauge_checks = [
-  { gauge = "zz-pins-1273-1287", band_mm = "{{cad.dowel_hole_dia_band_mm}}" },
   { gauge = "calipers", band_mm = "{{cad.dowel_hole_depth_band_mm}}" },
 ]
 feed = "hand"
 
 [[setups.operations]]
-instruction = "GO refused (B under the GO pin's reading): clear the chips and oil B. Console M6 T4 (spindle off; the .1280 reamer in the drill chuck; the tool setter measures it); set 750; cutting oil."
+instruction = "Datum B's pin, every blank: the largest pin of the minus and plus pin-gauge sets that enters B to the bottom. Write its size on this sheet beside the blank's number; it stands in B for every check below and for Setup 9's bore from B."
 feed = "hand"
 
 [[setups.operations]]
-instruction = "One more pass with the same reamer, by MDI:\n1. M3 S750, G0 Z{{process.dowel_ream_r_plane_mm:.3f}}\n2. G0 X{{cad.dowel_hole_side_mm:.3f}} Y-{{cad.dowel_hole_row_mm:.3f}}\n3. G1 Z{{process.dowel_ream_tip_height_mm:.3f}} F{{process.dowel_ream_feed_mm_min:.2f}}, G1 Z{{process.dowel_ream_r_plane_mm:.3f}}\n4. G0 Z{{process.dowel_ream_clear_mm:.3f}}, M5"
-feed = "hand"
-
-[[setups.operations]]
-instruction = "After the re-ream: blow B out and gauge it again. GO enters and NO-GO does not: go on. GO still refused: reject the blank (scrap); stop and tell the owner."
-feed = "hand"
-
-[[setups.operations]]
-instruction = "Datum B's stations, the GO standing in B: calipers outside from S over the GO, less half the GO pin's written reading; then from F the same way. Write each blank's B-from-S reading on this sheet beside its number: Setup 8 places the bore .300 from it. B's squareness to A (the drawing's ⊥) is held by this setup, not measured: A is faced and B reamed in the one clamping."
+instruction = "Datum B's stations, B's pin standing in B: calipers outside from S over the pin, less half the pin's written size; then from F the same way. Write each blank's B-from-S reading on this sheet beside its number: Setup 8 places the bore .300 from it. B's squareness to A (the drawing's ⊥) is held by this setup, not measured: A is faced and B drilled in the one clamping."
 inspection = "B from S {{cad.dowel_hole_side_min_in:.3dot}}–{{cad.dowel_hole_side_max_in:.3dot}}, from F {{cad.dowel_hole_row_min_in:.3dot}}–{{cad.dowel_hole_row_max_in:.3dot}}. Outside either: stop and tell the owner."
 gauge_checks = [
   { gauge = "calipers", band_mm = "{{cad.dowel_hole_side_band_mm}}" },
@@ -731,7 +686,7 @@ gauge_checks = [
 feed = "hand"
 
 [[setups.operations]]
-instruction = "The tap drill, every blank: the #25 drill's shank end down in it, its length less what stands above A (calipers). The first blank only, its spacing to B: calipers outside over the GO in B and the #25 shank, less half the sum of the GO pin's written reading and .1495. The tap's position (the drawing's Ø.005 to A|B|C) is held by the program, B and the tap drilled in this one clamping: the spacing catches a gross error only."
+instruction = "The tap drill, every blank: the #25 drill's shank end down in it, its length less what stands above A (calipers). The first blank only, its spacing to B: calipers outside over B's pin and the #25 shank, less half the sum of the pin's written size and .1495. The tap's position (the drawing's Ø.005 to A|B|C) is held by the program, B and the tap drilled in this one clamping: the spacing catches a gross error only."
 inspection = "Tap drill full Ø depth {{cad.stud_tap_drill_depth_min_in:.3dot}}–{{cad.stud_tap_drill_depth_max_in:.3dot}}; on the first blank, B to the tap hole {{process.tap_from_b_min_mm:in.4dot}}–{{process.tap_from_b_max_mm:in.4dot}}. Outside either: stop and tell the owner."
 gauge_checks = [
   { gauge = "calipers", band_mm = "{{cad.stud_tap_drill_depth_band_mm}}" },
@@ -754,7 +709,7 @@ speed_kind = "other"
 tool = "tap-guide"
 drilling = "none"
 sizing = "other"
-instruction = "Run KM07_stud_tap: M6 T8, the tap guide in the 1/2 in collet, pointed end out (the tool setter measures it), spindle off; the file ends Idle at the machine top over the tap hole."
+instruction = "Run KM07_stud_tap: M6 T7, the tap guide in the 1/2 in collet, pointed end out (the tool setter measures it), spindle off; the file ends Idle at the machine top over the tap hole."
 diagram = { file = "diagrams/tap.svg", alt = "The block on edge in the vise, A up; the #10-24 tap in the T-handle wrench in the tap hole, the tap guide in the spindle, its spring point in the wrench's centre hole; the plug tap's point to go {{process.plug_tap_point_mm:in.3dot}} below A, then the bottoming tap's to {{cad.stud_tap_thread_depth_in:.3dot}} plus its chamfer c." }
 
 [[setups.operations]]
@@ -847,7 +802,7 @@ speed_kind = "spindle"
 tool = "drill-25"
 drilling = "twist_drill"
 sizing = "other"
-instruction = "Same file, M6 T5: #25 pilot through, pecks of {{process.tap_peck_mm:in.3dot}} with full retract, its full diameter {{process.drill_past_mm:in.3dot}} past K into the gap between the stacks; set 900. Cutting oil. It takes the 31/64 drill's chisel edge out of the cut."
+instruction = "Same file, M6 T4: #25 pilot through, pecks of {{process.tap_peck_mm:in.3dot}} with full retract, its full diameter {{process.drill_past_mm:in.3dot}} past K into the gap between the stacks; set 900. Cutting oil. It takes the 31/64 drill's chisel edge out of the cut."
 settings = "drill-25-4140-ht"
 hole_depth_mm = "{{cad.back_face_depth_mm}}"
 peck = { step_mm = 3.556, retract = "full" }
@@ -860,7 +815,7 @@ speed_kind = "spindle"
 tool = "drill-31-64"
 drilling = "twist_drill"
 sizing = "other"
-instruction = "Same file, M6 T6: 31/64 drill through in one feed, its full diameter {{process.drill_past_mm:in.3dot}} past K; set 275. Cutting oil. It leaves about .015 on the diameter for the reamer."
+instruction = "Same file, M6 T5: 31/64 drill through in one feed, its full diameter {{process.drill_past_mm:in.3dot}} past K; set 275. Cutting oil. It leaves about .015 on the diameter for the reamer."
 settings = "drill-31-64-4140-ht"
 hole_depth_mm = "{{cad.back_face_depth_mm}}"
 peck = "none"
@@ -873,7 +828,7 @@ speed_kind = "spindle"
 tool = "reamer-4990"
 drilling = "none"
 sizing = { kind = "band", band_mm = "{{cad.knife_bore_dia_band_mm}}" }
-instruction = "Same file, M6 T7 (spindle off, retracted): ream the bore through, the .4990 reamer in the 7/16 collet {{process.reamer_projection_mm:in.2f}} in out; set 190. Cutting oil, plenty. The file feeds the reamer in and feeds it back out, spindle running: no rapid leaves the bore. Leave the block clamped for the check."
+instruction = "Same file, M6 T6 (spindle off, retracted): ream the bore through, the .4990 reamer in the 7/16 collet {{process.reamer_projection_mm:in.2f}} in out; set 190. Cutting oil, plenty. The file feeds the reamer in and feeds it back out, spindle running: no rapid leaves the bore. Leave the block clamped for the check."
 settings = "reamer-4990-4140-ht"
 inspection = "Still clamped: the bore Ø{{cad.knife_bore_dia_min_in:.4dot}}–{{cad.knife_bore_dia_max_in:.4dot}} through: the GO pin (.4985 plus) enters its whole length, the NO-GO pin (.500 minus) does not enter. As reamed (the drawing's finish mark on the bore): no tears or chatter marks."
 gauge_checks = [{ gauge = "zz-pins-4985-5000", band_mm = "{{cad.knife_bore_dia_band_mm}}" }]
@@ -888,7 +843,7 @@ instruction = "The coupon T: GO enters and NO-GO does not: unclamp it; blanks 1 
 feed = "hand"
 
 [[setups.operations]]
-instruction = "T7, the .4990 reamer, still in the 7/16 collet, its tool length active; set 190 by hand; cutting oil. Then MDI:\n1. M3 S190, G0 Z{{process.bore_ream_r_plane_mm:.3f}}\n2. G0 X{{cad.knife_bore_basic_from_a:.3f}} Y-{{process.bore_y_mm:.3f}}\n3. G1 Z{{process.bore_ream_tip_height_mm:.3f}} F{{process.bore_ream_feed_mm_min:.2f}}, G1 Z{{process.bore_ream_r_plane_mm:.3f}}\n4. G0 Z{{process.bore_ream_clear_mm:.3f}}, G0 X-8.000 Y-6.850 (off the block, left of A), M5"
+instruction = "T6, the .4990 reamer, still in the 7/16 collet, its tool length active; set 190 by hand; cutting oil. Then MDI:\n1. M3 S190, G0 Z{{process.bore_ream_r_plane_mm:.3f}}\n2. G0 X{{cad.knife_bore_basic_from_a:.3f}} Y-{{process.bore_y_mm:.3f}}\n3. G1 Z{{process.bore_ream_tip_height_mm:.3f}} F{{process.bore_ream_feed_mm_min:.2f}}, G1 Z{{process.bore_ream_r_plane_mm:.3f}}\n4. G0 Z{{process.bore_ream_clear_mm:.3f}}, G0 X-8.000 Y-6.850 (off the block, left of A), M5"
 feed = "hand"
 
 [[setups.operations]]
@@ -914,7 +869,7 @@ instruction = "Deburr every edge and the mouths of the three holes, R{{cad.edge_
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Bore from A: the GO out of B; the block A down on the surface plate, the bore's GO pin through the bore; the height gauge on top of the GO where it stands out past F, less half the GO pin's written reading."
+instruction = "Bore from A: B's pin out of B; the block A down on the surface plate, the bore's GO pin through the bore; the height gauge on top of the GO where it stands out past F, less half the GO pin's written reading."
 inspection = "Bore from A {{process.bore_from_a_min_mm:in.4dot}}–{{process.bore_from_a_max_mm:in.4dot}}: note it for the radial test. Outside: these gauges cannot show the bore in its zone; stop and tell the owner (a finer check decides; do not scrap it)."
 gauge_checks = [
   { gauge = "height-gauge", band_mm = ["{{process.bore_from_a_min_mm}}", "{{process.bore_from_a_max_mm}}"] },
@@ -922,7 +877,7 @@ gauge_checks = [
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Bore from B: the block stood on S on the surface plate, the bore's GO pin through the bore and B's GO pin in B, both standing out sideways. Height gauge on top of each GO less half that pin's written reading: the bore's reading less B's is the bore from B."
+instruction = "Bore from B: the block stood on S on the surface plate, the bore's GO pin through the bore and B's pin (its size written at Setup 7) in B, both standing out sideways. Height gauge on top of each pin less half that pin's written size: the bore's reading less B's is the bore from B."
 inspection = "Bore from B {{process.bore_from_b_min_mm:in.4dot}}–{{process.bore_from_b_max_mm:in.4dot}}: note it for the radial test. Outside: these gauges cannot show the bore in its zone; stop and tell the owner (a finer check decides; do not scrap it)."
 gauge_checks = [
   { gauge = "height-gauge", band_mm = ["{{process.bore_from_b_min_mm}}", "{{process.bore_from_b_max_mm}}"] },

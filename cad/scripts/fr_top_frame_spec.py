@@ -308,16 +308,19 @@ _XX = printed_band_mm(2, unit=UNIT)
 _XXX = printed_band_mm(3, unit=UNIT)
 # The title block's DRILLED HOLES row: a drilled hole cuts up to this oversize.
 DRILL_OVERSIZE = drilled_oversize_mm(unit=UNIT)
-# Owner ruling 2026-11-06: the #10 hanger holes are a letter C drill, .242
-# in = 6.1468 mm, the next drill over the ASME B18.2.8 Table 2 #10 loose
-# .238: the larger hole's float takes the ream/tap stack and the gauge
-# bar's yaw with margin (``build_sm_summing_assembly.HANGER_SCREW_FLOAT_SPARE``
-# and ``KNIFE_REAR_YAW_RANGE_DEG``).  The drawing prints the letter
-# (HANGER_HOLE_DRILL) as "C DRILL".
-HANGER_HOLE_DRILL = "C"
-HANGER_CLEARANCE_DIA = 0.242 * IN  # 6.1468
+# Owner ruling 2026-11-06 made the #10 hanger holes a letter C drill (.242),
+# the next drill over the ASME B18.2.8 Table 2 #10 loose .238.  Owner ruling
+# 2026-11-24, fit audit OQ19 (APPROVED as recommended, option A): with
+# MHA-SM-02's slip hole drilled #30, they are a letter E drill, .250 in =
+# 6.35 mm, whose larger float takes the drilled slip, the tap stack and the
+# gauge bar's yaw (``build_sm_summing_assembly.HANGER_SCREW_FLOAT_SPARE``
+# and ``KNIFE_REAR_YAW_RANGE_DEG``); the washer's bearing width
+# (``build_fr_top_frame``) stays positive under the larger hole.  The
+# drawing prints the letter (HANGER_HOLE_DRILL) as "E DRILL".
+HANGER_HOLE_DRILL = "E"
+HANGER_CLEARANCE_DIA = 0.250 * IN  # 6.35
 if HANGER_CLEARANCE_DIA <= CLEARANCE_MM[("#10", "loose")]:
-    raise AssertionError("the C drill hanger hole must clear past the #10 loose row")
+    raise AssertionError("the E drill hanger hole must clear past the #10 loose row")
 HANGER_CLEARANCE_DIA_PLACES = 3
 # The title block's DRILLED HOLES row is the acceptance (+.004/0): it never
 # undersizes the drill, so the callout restates no band (machinist review:
@@ -338,7 +341,7 @@ HANGER_GRIP = RING_HEIGHT
 HANGER_GRIP_PLACES = 3
 HANGER_GRIP_TOL = printed_band_mm(HANGER_GRIP_PLACES, unit=UNIT)  # 0.127, title block .XXX
 # A plain native Hole Wizard #10 clearance row, drilled through from the
-# faced underside, its cut pinned to the C drill: _holes.wizard_holes writes
+# faced underside, its cut pinned to the E drill: _holes.wizard_holes writes
 # HoleDiameter and ThruHoleDiameter from the override (and skips its pinned
 # loose-fit edit), and the build reads the exact cut diameter back.
 HANGER_HOLE_SPEC = HoleSpec(
@@ -495,7 +498,7 @@ HANGER_PRESS_HOLE_PERPENDICULARITY_TOL = float(
 # location band (the ream's .XXX station, +/-.005 each way).
 if not HANGER_PRESS_HOLE_PERPENDICULARITY_TOL < 2.0 * HANGER_PIN_X_TOL:
     raise AssertionError("the reams' perpendicularity must refine their location")
-# The drilled #10 hole's float about the bolt shank is 0.6604 radial.
+# The drilled #10 hole's float about the bolt shank is 0.762 radial (E drill).
 # The assembly proves the tap/dowel mismatch plus underside-entry drill
 # drift stays inside that float.
 HANGER_SCREW_FLOAT = (HANGER_CLEARANCE_DIA - HANGER_SCREW.SHANK_DIA) / 2.0

@@ -38,7 +38,7 @@ rescaled onto the model column grid, and ch19 close-ups (webbing, hub, screw):
   faced underside 999.6932 is the knife-mount seat plane), with 18.034 (.71)
   plan gussets at all four rail
   junctions and, at z 3.088 - 93.41 (front; #1038, the summing plate's .25
-  front extension) and 3.088 + 87.06 (rear), a plain #10 through-hole (C drill) per
+  front extension) and 3.088 + 87.06 (rear), a plain #10 through-hole (E drill) per
   knife mount. The cut-to-length #10-24 hex bolt bears on a 96659A104
   washer on the faced top; each unchanged 98381A473 dowel presses into a
   blind underside ream, its full diameter .50 MIN over a 118 deg drill point
@@ -131,7 +131,7 @@ polygon) -> crossbar T pockets -> flange corner crops -> corner bosses
 (up/down pair from the faced top) -> hub V-gusset plate and its ramp cuts
 -> hub boss -> set-screw boss and spot face -> counterbores -> column
 bores -> gooseneck
-bore -> wizard holes (#10 C-drill hanger clearance holes) -> dowel reams ->
+bore -> wizard holes (#10 E-drill hanger clearance holes) -> dowel reams ->
 dowel knockouts (wizard) -> wizard
 holes (side-screw taps, set-screw tap, keeper taps) -> internal T-root
 fillets (R.12) -> external top-rim breaks (1/16 in) -> .02 bore top lead-ins ->
@@ -1118,7 +1118,15 @@ HANGER_WASHER_OUTER_END_WALL = min(
         for station in (STUD_Z_FRONT, STUD_Z_REAR)
     ),
 )
-# Pure full-annulus contact geometry, not a preload/material strength claim.
+# The washer's bearing width: its narrowest land on the faced top, from the
+# #10 hole's far edge out to its own rim, with its centre off the hole's by
+# HANGER_WASHER_OFFSET_MAX.  At zero the rim reaches the hole's edge on that
+# side, so the washer no longer bears on the frame all round the hole and
+# the bolt's clamp loses its seat there.  Pure contact geometry, not a
+# preload/material strength claim.  Owner ruling 2026-11-24 (fit audit
+# part 2, C12, option A per Main): this is the washer's criterion; the
+# former unbroken ring inside the knockouts is not one (the knockout mouths
+# under the washer are pin holes in its land, not a lost seat).
 HANGER_WASHER_BEARING_MIN = (
     HANGER_WASHER_CONCENTRIC_ANNULUS_MIN - HANGER_WASHER_OFFSET_MAX
 )
@@ -1129,7 +1137,7 @@ for _label, _value, _minimum in (
         0.0,
     ),
     ("washer to outer rail ends", HANGER_WASHER_OUTER_END_WALL, WALL_TARGET_MM),
-    ("washer continuous bearing annulus", HANGER_WASHER_BEARING_MIN, 0.0),
+    ("washer bearing width round the hole", HANGER_WASHER_BEARING_MIN, 0.0),
 ):
     if _value < _minimum:
         raise AssertionError(f"knife-hanger {_label}: {_value:.3f} below {_minimum:g}")
@@ -1168,19 +1176,8 @@ KNOCKOUT_SCREW_WALL = (
 # top-rim break at its printed worst leg (the washer stack's bar reach).
 KNOCKOUT_TOP_BREAK_LAND = KNOCKOUT_BAR_WALL - EDGE_BREAK_PRINTED_MAX
 # The knockout exits under the MHA-SM-VN-54 washer (its reach from the bolt
-# axis covers the 7.62 station), so the washer bears on a continuous ring
-# INSIDE the knockouts: round the washer's own centre, from the farther of
-# its bore and the #10 hole's far edge out to the nearer of its rim and the
-# nearest knockout's near edge.  The washer centre wanders from both the
-# hole and the nominal axis by HANGER_WASHER_OFFSET_MAX; the knockouts stand
-# at their station limits from that axis.
-HANGER_WASHER_KNOCKOUT_RING_MIN = min(
-    HANGER_WASHER.OD_MIN / 2.0,
-    _KNOCKOUT_NEAR_AXIS_MIN - _KNOCKOUT_MAX_R - HANGER_WASHER_OFFSET_MAX,
-) - max(
-    HANGER_WASHER.ID_MAX / 2.0,
-    _CLEARANCE_MAX_R + HANGER_WASHER_OFFSET_MAX,
-)
+# axis covers the 7.62 station); the washer's seat is its bearing width
+# above (C12).
 for _label, _value in (
     ("knockout wall to the crossbar side face", KNOCKOUT_BAR_WALL),
     ("knockout wall to the screw clearance hole", KNOCKOUT_SCREW_WALL),
@@ -1191,7 +1188,6 @@ for _label, _value in (
         )
 for _label, _value in (
     ("knockout land inside the crossbar top-rim break", KNOCKOUT_TOP_BREAK_LAND),
-    ("washer bearing ring inside the knockouts", HANGER_WASHER_KNOCKOUT_RING_MIN),
 ):
     if _value <= 0.0:
         raise AssertionError(
@@ -4451,7 +4447,7 @@ def build(adapter) -> dict[str, str]:
     v_gn = math.pi * (GOOSENECK_BORE_DIA / 2.0) ** 2 * (RING_HEIGHT + HUB_BOSS_DROP)
     volume = volume_check(adapter, "gooseneck bore", volume - v_gn, 60.0)
 
-    # 12. Native #10 plain clearance holes pinned to the C drill, both stations in one
+    # 12. Native #10 plain clearance holes pinned to the E drill, both stations in one
     #     underside-entry wizard feature (the shop drills them from the
     #     underside, so drift grows toward the faced top; HANGER_HOLE_SPEC).
     #     The washers bear on the faced top plane round each hole.

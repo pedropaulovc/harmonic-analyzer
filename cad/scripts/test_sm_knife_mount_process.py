@@ -104,12 +104,11 @@ def test_context_numbers_the_tools_and_places_the_holes_from_the_model(context) 
     assert context["numbers"] == {
         "em-half": 1,
         "spot": 2,
-        "drill-31": 3,
-        "reamer-1280": 4,
-        "drill-25": 5,
-        "drill-31-64": 6,
-        "reamer-4990": 7,
-        "tap-guide": 8,
+        "drill-30": 3,
+        "drill-25": 4,
+        "drill-31-64": 5,
+        "reamer-4990": 6,
+        "tap-guide": 7,
     }
     assert RECIPE.LOAD_FIRST_TOOL == tuple(name for name, _ops in RECIPE.PROGRAMS)
     f = FEATURES["features"]
@@ -162,12 +161,11 @@ def test_every_cut_runs_at_a_cited_4140_ht_setting() -> None:
         ("blank_width_min_in", 1.17, "narrowest bar"),
         ("blank_length_min_in", 1.02, "shortest blank"),
         ("dowel_drill_tip_height_mm", 19.0, "dowel_drill_tip_height_mm"),
-        ("dowel_ream_tip_height_mm", 20.5, "dowel_ream_tip_height_mm"),
-        ("dowel_ream_past_mm", 0.4, "outside its depth"),
         ("tap_drill_tip_height_mm", 18.0, "tap_drill_tip_height_mm"),
         ("bore_drill_tip_height_mm", -3.0, "bore_drill_tip_height_mm"),
         ("bore_ream_tip_height_mm", -5.0, ".4990 reamer tip"),
-        ("spot_dia_mm", 3.5, "rising order"),
+        ("spot_dia_mm", 3.5, "not under the #30"),
+        ("b_pin_step_mm", 0.0508, "bore_err_b_mm"),
         ("tap_x_mm", 12.0, "tap_x_mm"),
         ("bore_y_mm", 12.0, "bore_y_mm"),
         ("bore_from_a_max_mm", 20.701, "bore_from_a_max_mm"),
@@ -266,7 +264,7 @@ def test_a_seeded_fault_in_a_program_is_caught(
     assert check in {finding.check for finding in _findings(seeded, tmp_path)}
 
 
-@pytest.mark.parametrize("key", ["dowel_ream", "bore_ream"])
+@pytest.mark.parametrize("key", ["bore_ream"])
 def test_a_reamer_rapided_out_of_its_hole_is_caught(context, tmp_path, key) -> None:
     lines = next(op[2] for job in context["jobs"] for op in job["ops"] if op[0] == key)
     out_line = [line for line in lines if line.startswith("G1 Z")][-1]

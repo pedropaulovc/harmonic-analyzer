@@ -387,15 +387,6 @@ source = "https://www.mscdirect.com/product/details/88912407"
 purchase = "MSC 88912407 (.1240 plus, $4.48); MSC 89012454 (.1245 minus, $4.48): Vermont Gage Class ZZ steel plug gages, 2 in long, in stock."
 note = "MHA-PD-18. GO: ZZ .1240 plus single. NO-GO: ZZ .1245 minus single. Each pin is miked before first use and its size written on its tag."
 
-[gauges.zz-pins-1273-1287]
-name = "Class ZZ pins for the .1273-.1287 band"
-kind = "plug_gauge_pair"
-make = "Vermont Gage"
-status = "to_order"
-source = "https://www.mscdirect.com/product/details/89012751"
-purchase = "MSC 89012751 (.1275 minus, $4.48); MSC 88912852 (.1285 plus, $4.48): Vermont Gage Class ZZ steel plug gages, 2 in long, in stock."
-note = "MHA-SM-02. GO: ZZ .1275 minus single. NO-GO: ZZ .1285 plus single. Each pin is miked before first use and its size written on its tag."
-
 [gauges.zz-pins-1920-1925]
 name = "Class ZZ pins for the .1920-.1925 band"
 kind = "plug_gauge_pair"

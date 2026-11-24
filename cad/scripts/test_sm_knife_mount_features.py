@@ -147,13 +147,14 @@ def test_mount_feature_bands_are_the_printed_ones() -> None:
     assert bore["parallelism_datums"] == ["A"]
 
     pin = features["dowel_hole"]
-    # Ø.1280 ±.0007 REAM ↧ (.37), SLIDING FIT, CLEARANCE .0020-.0036; ⊥Ø.001|A.
-    assert pin["dia"] == pytest.approx([_in(0.1273), _in(0.1287)])
+    # Ø.1285 #30 DRILL ↧ (.37), MHA-SM-VN-53 DOWEL (owner ruling 2026-11-24,
+    # fit audit OQ19: the DRILLED HOLES row, .1285-.1325); ⊥Ø.001|A.
+    assert pin["dia"] == pytest.approx([_in(0.1285), _in(0.1325)])
     assert pin["depth"] == pytest.approx([_in(0.36), _in(0.38)])
-    assert pin["process"] == "ream" and pin["drill_point"] is True
+    assert pin["process"] == "drill" and pin["drill_point"] is True
     assert pin["callout"] == drawing.DIMENSION_CALLOUTS["PinHoleDia"]
     assert pin["mates"] == drawing.DOWEL_NUMBER
-    assert pin["clearance"] == pytest.approx([_in(0.0020), _in(0.0036)])
+    assert "clearance" not in pin
     assert pin["datum"] == "B"
     assert pin["perpendicularity"] == pytest.approx(_in(0.001))
     assert pin["side"] == pytest.approx([_in(0.19), _in(0.21)])

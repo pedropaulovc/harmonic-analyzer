@@ -28,9 +28,6 @@ description = "Digital angle gauge"
 # drawing cross-check of the placeholder plans (2026-11-19) and the owner's
 # rulings of that day. The comment cites the drawing callout or the inventory
 # record that holds the tool's ownership.
-[tools.reamer-1280]  # MHA-SM-02 Ø.1280 ±.0007 REAM (.37), drill point
-description = ".1280 in HSS chucking reamer"
-diameter_mm = 3.2512
 [tools.sm-gooseneck-bend-form]  # inventory fixtures.sm-gooseneck-bend-form
 description = "Shop-made two-plate 6061 bend form for the MHA-SM-01 gooseneck tube: a closed half-round channel holding the tail, a quarter cove round the R3 arc"
 
@@ -105,9 +102,8 @@ feed_unit = "in/min"
 # (PDF1381/p1060): under 1/8 in .001-.003 in/rev, 1/8-1/4 in .002-.006,
 # 1/4-1/2 in .004-.010, "the lower values ... for hard materials"; each tool
 # takes the low end of its size's range, or half of it (the centre drill, its
-# 3/16 body in the 1/8-1/4 range; the #31 takes its under-1/8 range's low
-# end). The reamers take
-# the drilling feed of their own size range (author's choice; the handbook
+# 3/16 body in the 1/8-1/4 range). The reamer takes the drilling feed of its
+# own size range (author's choice; the handbook
 # gives no reaming feed in that table). Per-tooth figures are per lip of a
 # two-lip drill: rpm × 2 × chip load is the feed per minute.
 # #2 centre drill, its 3/16 body: 35 × 3.82 / .1875 = 713, set 700; .001 in/rev.
@@ -118,12 +114,13 @@ rpm = 700
 chip_load_mm_per_tooth = 0.0127  # .0005 in/lip; 700 × 2 × .0005 = .7 in/min
 flutes = 2
 feed_unit = "in/min"
-# #31 (.120): 35 × 3.82 / .120 = 1114, set 1100; .001 in/rev.
-[settings.drill-31-4140-ht]
-tool = "drill-31"
+# #30 (.1285, MHA-SM-02 datum B, owner ruling 2026-11-24, fit audit OQ19):
+# 35 × 3.82 / .1285 = 1040, set 1050; .002 in/rev (1/8-1/4 in).
+[settings.riser-drill-30-4140-ht]
+tool = "riser-drill-30"
 material = "4140-ht-28-32-hrc"
-rpm = 1100
-chip_load_mm_per_tooth = 0.0127  # .0005 in/lip; 1100 × 2 × .0005 = 1.1 in/min
+rpm = 1050
+chip_load_mm_per_tooth = 0.0254  # .001 in/lip; 1050 × 2 × .001 = 2.1 in/min
 flutes = 2
 feed_unit = "in/min"
 # #25 (.1495): 35 × 3.82 / .1495 = 894, set 900; .002 in/rev.
@@ -132,14 +129,6 @@ tool = "drill-25"
 material = "4140-ht-28-32-hrc"
 rpm = 900
 chip_load_mm_per_tooth = 0.0254  # .001 in/lip; 900 × 2 × .001 = 1.8 in/min
-flutes = 2
-feed_unit = "in/min"
-# .1280 reamer: 25 × 3.82 / .128 = 746, set 750; .002 in/rev (1/8-1/4 in).
-[settings.reamer-1280-4140-ht]
-tool = "reamer-1280"
-material = "4140-ht-28-32-hrc"
-rpm = 750
-chip_load_mm_per_tooth = 0.0254  # .001 in/lip; 750 × 2 × .001 = 1.5 in/min
 flutes = 2
 feed_unit = "in/min"
 # The knife bore at Ø.4985 +.0015/0 (owner ruling 2026-11-23, tool audit Q13:
@@ -165,25 +154,19 @@ chip_load_mm_per_tooth = 0.0508  # .002 in/lip; 190 × 2 × .002 = .76 in/min
 flutes = 2
 feed_unit = "in/min"
 
-# The knife mount's reamed holes gauged with Class ZZ pins (owner ruling
+# The knife mount's reamed bore gauged with Class ZZ pins (owner ruling
 # 2026-11-23, tool audit Q1, verbatim: "ZZ singles per the record: 29 pins
 # (17 plus GO, 12 minus NO-GO), about $130. Accept that good holes near a
 # limit may be refused; the traveler mikes each pin so the real window is
 # known per pin."). The knife bore .4985-.5000: GO a plus .4985 single
 # (.4985-.4987), NO-GO the .500 minus pin of the .061-.500 box
-# (.4998-.5000). Datum B .1273-.1287: GO a .1275 minus single (.1273-.1275),
-# NO-GO a .1285 plus single (.1285-.1287), the half-thousandth singles whose
-# true sizes are the band's ends. Each pin's resolution is its ZZ tolerance,
-# .0002 in = 0.00508 mm; the traveler mikes each pin and accepts a hole
-# between the two readings.
+# (.4998-.5000). Each pin's resolution is its ZZ tolerance, .0002 in =
+# 0.00508 mm; the traveler mikes each pin and accepts a hole between the two
+# readings. Datum B is drilled #30 (owner ruling 2026-11-24, fit audit
+# OQ19): its .1275/.1285 pins are retired.
 [gauges.zz-pins-4985-5000]
 range_mm = [12.6619, 12.7]
 resolution_mm = 0.00508
 [tools.zz-pins-4985-5000]
 description = "Class ZZ pins for .4985-.5000: GO .4985 plus (single), NO-GO .500 minus (the .061-.500 box)"
-[gauges.zz-pins-1273-1287]
-range_mm = [3.23342, 3.26898]
-resolution_mm = 0.00508
-[tools.zz-pins-1273-1287]
-description = "Class ZZ pins for .1273-.1287: GO .1275 minus (single), NO-GO .1285 plus (single)"
 

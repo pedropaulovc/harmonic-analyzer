@@ -283,6 +283,17 @@ INDEXED_FIT_BANDS: dict[tuple[str, str], str] = {
         "no native band); indexed for the step clearance, the neck break's wall "
         "and the set screw's reach to the pivot's groove"
     ),
+    # Owner ruling 2026-11-24, fit audit OQ19 (A): MHA-SM-02 datum B is a #30
+    # drill; its band is an analysis band, not a printed limit.
+    ("sm_vn_knife_mount_dowel_spec", "SLIP_HOLE_DIA_BAND"): (
+        "title-block drilled-hole deviations (the #30 DRILL callout's row, no "
+        "native band); indexed for the dowel's slip, the tilt allowance and "
+        "the knife-hanger bolt float"
+    ),
+    ("sm_knife_mount_spec", "PIN_HOLE_DIA_BAND"): (
+        "the dowel spec's #30 drilled-hole deviations, re-exported; indexed "
+        "for the block's webs round datum B"
+    ),
     ("pd_transgear_feed_pinion_spec", "FLAT_TO_AXIS_BAND"): (
         "equal band indexed into the native symmetric (+/-) tolerance and the "
         "hub key pin's air to the flat"
