@@ -782,7 +782,7 @@ beam = { axis = "z", hold = "cantilever", extent_mm = [0, "{{cad.crown_overall_h
 
 [[setups.operations]]
 instruction = "Home the mill first ($H). Before each part goes in, G54 Z0: the parallels' top (the seat), touched with the 1/2 in end mill on the fixed-jaw parallel, the jaws open."
-instruction_detailed = "Home the mill first ($H). Before each part goes in, the parallels in place and the jaws open: console M6 T1 (the tool setter measures it). Jog it over the fixed-jaw parallel, its edge clear of the jaw. Spindle stopped, its tip just dragging a .002 feeler leaf on that parallel: G10 L20 P1 Z0.051. Raise Z. FK06_crown_cbore's M6s then measure its tools against it. Not with the part in: the collet would meet the crown before the tip reached the parallel."
+instruction_detailed = "Home the mill first ($H). Before each part goes in, the jaws open: console M6 T1. Jog it over the fixed-jaw parallel, clear of the jaw. Spindle stopped, its tip just dragging a .002 feeler leaf on that parallel: G10 L20 P1 Z0.051. Raise Z. FK06_crown_cbore's M6s then measure its tools against it. Not with the part in: the collet would meet the crown first."
 feed = "hand"
 
 [[setups.operations]]
