@@ -290,13 +290,13 @@ upright_top_max_mm = 34.544
 # spindle nose to tip.
 r8_collet_gauge_mm = 6.3         # HA: holders.r8-collets-lms-4860.gauge_len_mm.
 drill_chuck_gauge_mm = 95.0      # Archive holders.drill-chuck-r8.gauge_len_mm.
-# The 1/2 in end mill, 3 in overall, 1.10 in out of the R8 collet: the
-# shorter end of the stick-out the measured face setting allows
-# (cad/config/shop-equipment/measured-cuts.toml: 27.94 to 28.448 mm; owner,
-# Pedro, 2026-11-22: "stickout is recorded as 30mm but is actually 27.94").
+# The 1/2 in end mill, 3 in overall, 1.12 in (28.45 mm) out of the R8
+# collet (owner, Pedro, 2026-11-24: "28.45"): the longer end of the
+# stick-out the measured face setting allows (cad/config/shop-equipment/
+# measured-cuts.toml: 27.94 to 28.45 mm).
 # cam.py checks its
 # collet nose clears the stock at every program's deepest cut.
-half_mill_projection_mm = 27.94
+half_mill_projection_mm = 28.45
 # Overall lengths: jobber #41 2-1/8 in, D 4 in, 1/16 1-7/8 in (ASME B94.11M);
 # the #2 combined drill and countersink 1-7/8 in; a 1/4 in class chucking
 # reamer 6 in; the long-reach 1/8 in end mill 2-1/2 in. Bounded by their
@@ -431,7 +431,7 @@ speed_kind = "spindle"
 tool = "em-half"
 drilling = "none"
 sizing = "other"
-instruction = "Run FK01_far (M6 T1, 1/2 in end mill; set 2450): skim the top face {{process.west_skim_mm:in.3dot}}, in passes no wider than {{process.lying_stepover_mm:in.3dot}}."
+instruction = "Run FK01_far (M6 T1, 1/2 in end mill; set 2450: the display rests near 2485, not 2380): skim the top face {{process.west_skim_mm:in.3dot}}, in passes no wider than {{process.lying_stepover_mm:in.3dot}}."
 inspection = "Still clamped: the whole top face cut, no cold-finished patch left."
 gauge_checks = "other"
 settings = "em-half-carbide-1018-3439-face"
@@ -473,7 +473,7 @@ speed_kind = "spindle"
 tool = "em-half"
 drilling = "none"
 sizing = "other"
-instruction = "Run FK02_width (M6 T1; set 2450): face the top down to Z {{cad.far_side_width_mm:in.4dot}} in equal levels no deeper than {{process.face_step_max_mm:in.3dot}}. Unclamp; mic the width. Mark this face N."
+instruction = "Run FK02_width (M6 T1; 2450, display near 2485): face the top down to Z {{cad.far_side_width_mm:in.4dot}} in equal levels no deeper than {{process.face_step_max_mm:in.3dot}}. Unclamp; mic the width. Mark this face N."
 settings = "em-half-carbide-1018-3439-face"
 inspection = "Width {{cad.far_side_width_min_in:.3dot}}–{{cad.far_side_width_max_in:.3dot}}, F to N, miked at both ends."
 gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.far_side_width_band_mm}}" }]
@@ -518,7 +518,7 @@ speed_kind = "spindle"
 tool = "em-half"
 drilling = "none"
 sizing = "other"
-instruction = "Run FK03_seat (M6 T1, 1/2 in end mill; set 2450): face the seat at Z0, {{process.seat_skim_mm:in.3dot}} off the high point, in passes no wider than {{process.seat_stepover_mm:in.3dot}}; the file then stops at its M6 T2."
+instruction = "Run FK03_seat (M6 T1, 1/2 in end mill; 2450, display near 2485): face the seat at Z0, {{process.seat_skim_mm:in.3dot}} off the high point, in passes no wider than {{process.seat_stepover_mm:in.3dot}}; the file then stops at its M6 T2."
 inspection = "At the M6 T2 stop: the whole end faced, no sawn patch left."
 gauge_checks = "other"
 settings = "em-half-carbide-1018-3439-face"

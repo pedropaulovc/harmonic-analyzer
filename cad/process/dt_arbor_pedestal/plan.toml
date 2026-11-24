@@ -258,12 +258,12 @@ step_prove_raise_mm = 40.64
 # spindle nose to tip.
 r8_collet_gauge_mm = 6.3         # HA: holders.r8-collets-lms-4860.gauge_len_mm.
 drill_chuck_gauge_mm = 95.0      # Archive holders.drill-chuck-r8.gauge_len_mm.
-# 1/2 in end mill, 3 in overall: set 1.100 in out of the collet, the stick-out
-# its measured settings allow (cad/config/shop-equipment/measured-cuts.toml:
-# the deep one 27.94 mm, the face one 27.94 to 28.448;
-# owner, Pedro, 2026-11-22: "stickout is recorded as 30mm but is actually
-# 27.94").
-half_mill_projection_mm = 27.94
+# 1/2 in end mill, 3 in overall: set 1.12 in (28.45 mm) out of the collet
+# (owner, Pedro, 2026-11-24: "28.45"), the longer end of the stick-out its
+# measured settings allow (cad/config/shop-equipment/measured-cuts.toml:
+# 27.94 to 28.45 mm). The deep one was measured at 27.94 only: 28.45 is the
+# owner's ruling for it, not a cut, and a longer tool is the less stiff case.
+half_mill_projection_mm = 28.45
 # Overall lengths: jobber #15 3-1/2 in, 23/64 4-7/8 in (ASME B94.11M); the
 # #2 combined drill and countersink 1-7/8 in. Bounded by their whole length
 # below the chuck.
@@ -424,7 +424,7 @@ speed_kind = "spindle"
 tool = "em-half"
 drilling = "none"
 sizing = "other"
-instruction = "Run PA01_width (M6 T1, 1/2 in end mill; set 2450): face the top down to Z {{cad.east_side_width_mm:in.4dot}} in equal levels no deeper than {{process.face_step_max_mm:in.3dot}}, in passes no wider than {{process.face_stepover_max_mm:in.3dot}}. Unclamp; mic the width. Mark this face E."
+instruction = "Run PA01_width (M6 T1, 1/2 in end mill; set 2450: the display rests near 2485, not 2380): face the top down to Z {{cad.east_side_width_mm:in.4dot}} in equal levels no deeper than {{process.face_step_max_mm:in.3dot}}, in passes no wider than {{process.face_stepover_max_mm:in.3dot}}. Unclamp; mic the width. Mark this face E."
 settings = "em-half-carbide-1018-3439-face"
 inspection = "Width {{cad.east_side_width_min_in:.3dot}}–{{cad.east_side_width_max_in:.3dot}}, W to E, miked at both ends."
 gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.east_side_width_band_mm}}" }]
@@ -473,7 +473,7 @@ speed_kind = "spindle"
 tool = "em-half"
 drilling = "none"
 sizing = "other"
-instruction = "Run PA02_depth (M6 T1; set 2450): face the top down to Z {{process.depth_top_mm:in.4dot}} ({{cad.near_end_depth_mm:in.3dot}} plus the far face's {{process.far_face_stock_mm:in.3dot}}, faced off in Setup 7) in equal levels no deeper than {{process.face_step_max_mm:in.3dot}}. Unclamp; mic F to the near end. Mark this face N."
+instruction = "Run PA02_depth (M6 T1; 2450, display near 2485): face the top down to Z {{process.depth_top_mm:in.4dot}} ({{cad.near_end_depth_mm:in.3dot}} plus the far face's {{process.far_face_stock_mm:in.3dot}}, faced off in Setup 7) in equal levels no deeper than {{process.face_step_max_mm:in.3dot}}. Unclamp; mic F to the near end. Mark this face N."
 settings = "em-half-carbide-1018-3439-face"
 inspection = "F to N {{process.depth_top_min_mm:in.4dot}}–{{process.depth_top_max_mm:in.4dot}}, miked at both ends: the step's floor in Setup 5 is cut from F, the far face in Setup 7 from N, so this sets the strap."
 gauge_checks = [{ gauge = "micrometers", band_mm = ["{{process.depth_top_min_mm}}", "{{process.depth_top_max_mm}}"] }]
@@ -522,7 +522,7 @@ speed_kind = "spindle"
 tool = "em-half"
 drilling = "none"
 sizing = "other"
-instruction = "Run PA03_seat (M6 T1, 1/2 in end mill; set 2450): face the seat at Z0, {{process.seat_skim_mm:in.3dot}} off the high point, in passes no wider than {{process.face_stepover_max_mm:in.3dot}}. At the M6 T2 stop look at the seat."
+instruction = "Run PA03_seat (M6 T1, 1/2 in end mill; 2450, display near 2485): face the seat at Z0, {{process.seat_skim_mm:in.3dot}} off the high point, in passes no wider than {{process.face_stepover_max_mm:in.3dot}}. At the M6 T2 stop look at the seat."
 settings = "em-half-carbide-1018-3439-face"
 inspection = "At the M6 T2 stop: the whole end faced, Ra {{cad.foot_seat_finish_ra}} µm or finer: an even end-mill finish, no tears, no sawn patch."
 gauge_checks = "other"
@@ -763,7 +763,7 @@ speed_kind = "spindle"
 tool = "em-half"
 drilling = "none"
 sizing = "other"
-instruction = "Run PA05_top_apex (M6 T1; set 2450): face the strap's top end down to Z {{cad.envelope_y_mm:in.4dot}} (the crown's apex height) in equal levels no deeper than {{process.face_step_max_mm:in.3dot}}."
+instruction = "Run PA05_top_apex (M6 T1; 2450, display near 2485): face the strap's top end down to Z {{cad.envelope_y_mm:in.4dot}} (the crown's apex height) in equal levels no deeper than {{process.face_step_max_mm:in.3dot}}."
 settings = "em-half-carbide-1018-3439-face"
 milling_cuts = [
   { name = "top", kind = "end", phase = "finish", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", axial_doc_mm = "{{process.face_step_max_mm}}", radial_woc_mm = "{{process.face_stepover_max_mm}}", stations_mm = "{{process.upright_top_max_mm}}" },

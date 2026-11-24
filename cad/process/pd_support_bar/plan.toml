@@ -256,16 +256,15 @@ z_touch_lying_y_mm = -12.6111
 # spindle nose to tip.
 r8_collet_gauge_mm = 6.3         # HA: holders.r8-collets-lms-4860.gauge_len_mm.
 drill_chuck_gauge_mm = 95.0      # Archive holders.drill-chuck-r8.gauge_len_mm.
-# 1/2 in end mill, 3 in overall: set 1.10 in out of the collet, the
-# shorter end of the stick-out the measured face setting allows
-# (cad/config/shop-equipment/measured-cuts.toml: 27.94 to 28.448 mm; owner,
-# Pedro, 2026-11-22:
-# "stickout is recorded as 30mm but is actually 27.94"); cam.py checks the
+# 1/2 in end mill, 3 in overall: set 1.12 in (28.45 mm) out of the collet
+# (owner, Pedro, 2026-11-24: "28.45"), the longer end of the stick-out the
+# measured face setting allows (cad/config/shop-equipment/
+# measured-cuts.toml: 27.94 to 28.45 mm); cam.py checks the
 # collet's nose clears the bar at END A's cut. The 1/8 in end mill, 1-1/2
 # overall, 1/2 in of flute: at least .55 out, so the collet's nose stays .15
 # above the bar at the slots' bottom, and at most .75, half its length left
 # in the collet; the chamfer mill at least .50 out.
-half_mill_projection_mm = 27.94
+half_mill_projection_mm = 28.45
 eighth_mill_projection_min_mm = 13.97
 eighth_mill_projection_max_mm = 19.05
 chamfer_projection_min_mm = 12.7
@@ -426,7 +425,7 @@ speed_kind = "spindle"
 tool = "em-half"
 drilling = "none"
 sizing = "other"
-instruction = "Paint T with marking fluid. Run SB02_top (M6 T1, 1/2 in end mill; set 2450): skim T down to Z {{process.height_target_mm:in.4dot}} in levels no deeper than {{process.face_step_max_mm:in.4dot}} from {{process.bar_width_max_mm:in.3dot}} (the widest bar: a narrower one cuts air first), two passes along the bar per level, each no wider than {{process.face_stepover_max_mm:in.3dot}}. Unclamp."
+instruction = "Paint T with marking fluid. Run SB02_top (M6 T1, 1/2 in end mill; set 2450: the display rests near 2485, not 2380): skim T down to Z {{process.height_target_mm:in.4dot}} in levels no deeper than {{process.face_step_max_mm:in.4dot}} from {{process.bar_width_max_mm:in.3dot}} (the widest bar: a narrower one cuts air first), two passes along the bar per level, each no wider than {{process.face_stepover_max_mm:in.3dot}}. Unclamp."
 settings = "em-half-carbide-1018-3439-face"
 inspection = "Height, T to the bottom edge, {{cad.bottom_face_height_min_in:.3dot}}–{{cad.bottom_face_height_max_in:.3dot}}, miked at both ends and the middle; T bright from end to end, no marking fluid left (the top face, {{cad.top_face_finish_ra_uin:d}} µin Ra: the end mill's cut)."
 gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.bottom_face_height_band_mm}}" }]
