@@ -200,17 +200,18 @@ note = "1/4-20 tapped holes: the dt_cone_swing_platform, fr_harmonic_base, fr_to
 
 # --- MHA-CH-13 rocker strap on the CNC (cad/process/ch_rocker_strap) ---------
 
-# Hub-hole reamer for MHA-CH-13: Ø.4000 +.0005/0 REAM THRU, a press fit on
-# MHA-CH-12. To purchase: not owned; no make, price or stock read. Cutting
+# Hub-hole reamer for MHA-CH-13: Ø.400 REAM THRU, no band; MHA-CH-12 is
+# turned to slide into it and bonded (owner ruling 2026-11-24, fit audit
+# question 2). To purchase: not owned; no make, price or stock read. Cutting
 # band as tools.reamer-2550: the stated 0/+.0002, so it cuts .4000-.4002,
-# inside the bore's .4000-.4005 band (#3083 row 3); gauge the first hole
-# before the lot. Its sizing data is cad/process/shop/ tools.reamer-4000.
+# inside the .4000-.4005 the specs take it to cut (ch_rocker_hub_fit). Its
+# sizing data is cad/process/shop/ tools.reamer-4000.
 [tools.reamer-4000]
 name = ".4000 in HSS straight-flute chucking reamer"
 kind = "reamer"
 status = "to_order"
 purchase = "One .4000 in (decimal size) HSS straight-flute straight-shank chucking reamer; stated cutting band 0/+.0002 (.4000-.4002)."
-note = "Cuts the MHA-CH-13 hub hole in 1018 after a 25/64 drill, 400 rpm, cutting oil, fed in and out. Checked with the go/no-go pair gauges.plug-gauges-4000-4005 (first hole before the lot, then every part): the shop owns no pin gauges (owner 2026-11-17), and the owned Starrett telescoping gauges read on the micrometer repeat to about the whole .0005 in band. Not owned: to buy."
+note = "Cuts the MHA-CH-13 hub hole in 1018 after a 25/64 drill, 400 rpm, cutting oil, fed in and out. Checked by a .400 minus pin of the pin-gauge set entering, then by the MHA-CH-12 land sliding in (cad/process/ch_rocker_hub). Not owned: to buy."
 
 # --- Owner inventory 2026-11-17: Zoro order, shop photos, reamers ----------
 

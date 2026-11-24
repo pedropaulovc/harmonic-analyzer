@@ -235,30 +235,11 @@ status = "on_hand"
 pieces = 1
 cite = ["McMaster-Carr packing list, PO 0803PCAMPOS (1616317-01, 08/04/2025), line 51: \"Precision Lathe Alignment Bar\", 1 each", "Owner (Pedro) 2026-11-17: \"add to inventory ... already owned\""]
 
-# --- MHA-CH-13 rocker strap on the CNC (cad/process/ch_rocker_strap) ---------
-
-# Hub-hole acceptance for MHA-CH-13, Ø.4000-.4005 (codjiflo PR #3049): a
-# fixed-limit pair, .4000 GO and .4005 NO-GO. Vermont Gage's standard Class X
-# pin/plug gages: .004-1.000 in by .0001 in, tolerance .000040 in up to
-# .8250 in, GO plus and NO-GO minus, so a GO that enters proves the hole at or
-# over .4000 and a NO-GO that does not proves it at or under .4005. The pair
-# gives up .00008 in (16 %) of the .0005 in band; Vermont's 10 % rule would
-# take class XX (.000020 in, a quoted custom gage). Range and tolerance:
-# cad/process/shop/ gauges.plug-gauges-4000-4005.
-[gauges.plug-gauges-4000-4005]
-name = "Plug gauge pair, .4000 GO and .4005 NO-GO, Class X"
-kind = "plug_gauge_pair"
-make = "Vermont Gage"
-status = "to_order"
-purchase = "Two Vermont Gage standard Class X steel pin/plug gages, .4000 in GO (plus tolerance) and .4005 in NO-GO (minus tolerance), each +/- .000040 in; no part number, price or stock read."
-note = "Not owned: to buy. MHA-CH-13 Setup 4 (RS03, after the ream): the first hole gauged before the lot, then every hole; GO enters, NO-GO does not."
-cite = ["Vermont Gage, Standard Class X pin/plug gages (read 2026-11-17): range .004-1.000 in, increments .0001 in, tolerance +/- .000040 in up to .8250 in, Go: plus tolerance, NoGo: minus tolerance: https://www.vermontgage.com/gaging-products/standard-pin-gages-and-sets/class-x-standard-pin-plug-gages", "Vermont Gage, Gage Tolerance Selection (read 2026-11-17): the 10% rule, GO at the hole's minimum with the tolerance plus, NO-GO at its maximum with the tolerance minus; ASME B89.1.5 chart, .010-.825 in: XX .000020, X .000040 in: https://vermontgage.com/support/detail/gage-tolerance-selection"]
-
 # --- MHA-PN-05 pen V block (cad/process/pn_pen_v_block) ----------------------
 
-# Pivot-bore acceptance for MHA-PN-05, Ø.1260-.1265 REAM THRU: the same
-# fixed-limit pattern as gauges.plug-gauges-4000-4005 (Vermont Gage standard
-# Class X, .000040 in, GO plus and NO-GO minus). The pin-gauge sets to buy
+# Pivot-bore acceptance for MHA-PN-05, Ø.1260-.1265 REAM THRU: a fixed-limit
+# pair (Vermont Gage standard Class X, .000040 in, GO plus and NO-GO minus).
+# The pin-gauge sets to buy
 # (gauges.pin-gauges) step by .001 in and hold no .1265. Range and
 # tolerance: cad/process/shop/ gauges.plug-gauges-1260-1265.
 [gauges.plug-gauges-1260-1265]
@@ -384,19 +365,6 @@ status = "to_order"
 source = "https://www.mscdirect.com/product/details/88949904"
 purchase = "MSC 88949904 (.4990 plus, $4.48); MSC 89049951 (.4995 minus, $4.48): Vermont Gage Class ZZ steel plug gages, 2 in long, in stock."
 note = "MHA-MG-10. GO: ZZ .4990 plus single. NO-GO: ZZ .4995 minus single. Each pin is miked before first use and its size written on its tag."
-
-# --- MHA-CH-12 hub land reading steps (owner ruling 2026-11-23, tool audit Q2) ---
-# Owner chose four reading pins, .4000, .4002, .4004 and .4005: the two steps
-# below with the .4000/.4005 pair (gauges.plug-gauges-4000-4005). It replaces
-# gauges.plug-gauges-4001-4004 once the MHA-CH-12 plan names it.
-[gauges.plug-gauges-4002-4004]
-name = "Plug gauges .4002 and .4004, Class X"
-kind = "plug_gauge_pair"
-make = "Vermont Gage"
-status = "to_order"
-source = "https://www.mscdirect.com/product/details/85872265"
-purchase = "MSC 85872265 (.4002 plus, $20.64); MSC 82164948 (.4004 plus, $20.64): Vermont Gage Class X plus pin gages, 2 in long (read live 2026-11-23)."
-note = "Not owned: to buy. MHA-CH-12: the largest of the four pins .4000, .4002, .4004, .4005 that enters each MHA-CH-13 hub hole is that hole's reading."
 
 # --- Bands the 2026-11-23 rulings re-cut (tool audit Q7, Q8, Q11, Q13, Q14) ---
 # Same policy as the zz-pins records above: a plus single is the GO; where the

@@ -95,26 +95,6 @@ resolution_mm = 0.0254
 range_mm = [7.9375, 53.975]
 resolution_mm = 0.00254
 
-# The MHA-CH-13 hub-hole go/no-go pair (cad/config/shop-equipment/
-# gauges.plug-gauges-4000-4005, to buy): GO .4000 and NO-GO .4005 in =
-# 10.16 and 10.1727 mm. A fixed-limit pair reads no scale; its resolution is
-# each member's Class X tolerance, .000040 in = 0.001016 mm.
-[gauges.plug-gauges-4000-4005]
-range_mm = [10.16, 10.1727]
-resolution_mm = 0.001016
-
-# The MHA-CH-13 hub hole read with two Class X steps, .4002 and .4004, between
-# the hub pair above (owner ruling 2026-11-23, tool audit Q2, verbatim: "B.
-# Four reading pins (.4000, .4002, .4004, .4005)."). It replaces the four
-# .4001-.4004 steps the hub hole was first read with. Range:
-# the two pins, .4002-.4004 in = 10.16508-10.17016 mm; resolution: the
-# reading's step, .0002 in = 0.00508 mm (the last step, .4004 to the pair's
-# .4005, is .0001). Not owned: to buy. Its inventory record
-# (cad/config/shop-equipment/, same key) is ShopSourcing's to add.
-[gauges.plug-gauges-4002-4004]
-range_mm = [10.16508, 10.17016]
-resolution_mm = 0.00508
-
 # Class ZZ go/no-go pins for the reamed bands (owner ruling 2026-11-23, tool
 # audit Q1, verbatim: "ZZ singles per the record: 29 pins (17 plus GO, 12
 # minus NO-GO), about $130. Accept that good holes near a limit may be
