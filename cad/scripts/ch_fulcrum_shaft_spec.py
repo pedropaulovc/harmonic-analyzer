@@ -2,7 +2,7 @@ r"""Pure-data dimensional contract shared by the fulcrum shaft, its drawing and
 the channel assembly that places it.
 
 The plain Ø.250 steel shaft the top levers rock on. It runs full length at
-one diameter (no journals, shoulders or steps) through the reamed bores of the
+one diameter (no journals, shoulders or steps) through the F-drilled bores of the
 two end keepers (MHA-CH-07, ``ch_fulcrum_keeper_spec``); each end stands
 END_PROUD past its keeper lug's outer face and finishes in a hemispherical
 dome (the bright dome of the ch. 17 p. 40 photo). One set-screw flat per end,
@@ -293,7 +293,7 @@ if FLAT_STATION_WINDOW_MM <= 0.0:
         f"({FLAT_STATION_WINDOW_MM:.3f})"
     )
 
-# --- The keepers' bores, each reamed alone on its own keeper
+# --- The keepers' bores, each F-drilled alone on its own keeper
 # (ch_fulcrum_keeper_spec): the straight shaft through both spends
 # BORE_ALIGNMENT_ALLOWANCE_MM of each bore's clearance on the two bore
 # heights' bands, each bore's tilt and the rail seats under the feet, and
@@ -304,7 +304,7 @@ ALIGNED_MIN_CLEARANCE_MM = (
     - SHAFT_DIA
     - SHAFT_DIA_BAND[0]
     - BORE_ALIGNMENT_ALLOWANCE_MM
-)  # 0.0598 (0.0344 at the former .2550 bore; owner ruling 2026-11-23, tool audit Q7)
+)  # 0.0854 (0.0598 at the former .2560 ream; owner ruling 2026-11-24, fit audit question 1)
 if ALIGNED_MIN_CLEARANCE_MM < BORE_RUNNING_MIN_CLEARANCE_MM:
     raise AssertionError(
         f"the keeper bores keep {ALIGNED_MIN_CLEARANCE_MM:.4f} on the shaft "
