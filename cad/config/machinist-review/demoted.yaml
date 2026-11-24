@@ -43,7 +43,6 @@ demoted:
   dt_crankshaft: fit-batch-dt
   dt_cylinder_gear: fit-batch-dt
   dt_cylinder_gear_tl_cam_fixture: fit-batch-dt
-  dt_cylinder_gear_tl_cam_turning_assembly: fit-batch-dt
   dt_drive_train_assembly: fit-batch-dt
   dt_pinion_arbor: fit-batch-dt
   dt_pinion_arbor_collar: fit-batch-dt
