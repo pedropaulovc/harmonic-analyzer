@@ -284,6 +284,12 @@ INDEXED_FIT_BANDS: dict[tuple[str, str], str] = {
         "no native band); indexed for the drum's worst wall and the spigot's "
         "least size under the bond clearance (SPIGOT_DIA_MIN)"
     ),
+    # Owner ruling 2026-11-24, fit audit question 18: likewise.
+    ("mg_wheel_bar_geom", "AXLE_BORE_BAND"): (
+        "title-block drilled-hole deviations (the 3/16 DRILL THRU callout's row, "
+        "no native band); indexed for the bar's row walls and the axle's bond "
+        "gap (mg_wheel_group.BAR_BOND_GAP)"
+    ),
     ("pd_transgear_feed_pinion_spec", "FLAT_TO_AXIS_BAND"): (
         "equal band indexed into the native symmetric (+/-) tolerance and the "
         "hub key pin's air to the flat"

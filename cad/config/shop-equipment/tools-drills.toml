@@ -146,11 +146,6 @@ kind = "drill"
 status = "on_hand"
 note = "quotes-2026-11-17-rev3.xlsx Drills #20: owned in 115-pc index (quality unverified); not on the buy list."
 
-[tools.drill-17]
-kind = "drill"
-status = "on_hand"
-note = "quotes-2026-11-17-rev3.xlsx Drills #17: owned in 115-pc index (quality unverified); not on the buy list."
-
 [tools.drill-16]
 kind = "drill"
 status = "on_hand"
@@ -280,6 +275,11 @@ note = "quotes-2026-11-17-rev3.xlsx Drills 31/64: owned in 115-pc index (quality
 kind = "drill"
 status = "on_hand"
 note = "The 1/2 of the owned 115-piece index (1/16-1/2 by 64ths, as the 31/64 above). MHA-MG-10 1/2 DRILL THRU (owner ruling 2026-11-24, fit audit question 17)."
+
+[tools.drill-3-16]
+kind = "drill"
+status = "on_hand"
+note = "The 3/16 of the owned 115-piece index (1/16-1/2 by 64ths). MHA-MG-08 3/16 DRILL THRU (owner ruling 2026-11-24, fit audit question 18)."
 
 [tools.drill-33-64]
 kind = "drill"

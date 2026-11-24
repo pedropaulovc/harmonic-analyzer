@@ -162,35 +162,22 @@ diameter_mm = 1.016
 [tools.drill-37]  # Drills #37
 description = "#37 (.1040 in) drill, 115-piece index"
 diameter_mm = 2.6416
-[tools.drill-17]  # Drills #17
-description = "#17 (.1730 in) drill, 115-piece index"
-diameter_mm = 4.3942
 [tools.drill-16]  # Drills #16
 description = "#16 (.1770 in) drill, 115-piece index"
 diameter_mm = 4.4958
 [tools.drill-10]  # Drills #10
 description = "#10 (.1935 in) drill, 115-piece index"
 diameter_mm = 4.9149
-[tools.reamer-1865]  # B-reamer-.1865
-description = ".1865 in HSS chucking reamer"
-diameter_mm = 4.7371
 [tools.reamer-1885]  # B-reamer-.1885
 description = ".1885 in HSS chucking reamer"
 diameter_mm = 4.7879
 
 # --- MHA-MG-08 wheel bar (cad/process/mg_wheel_bar/plan.toml) ---
-# The axle bore's Class ZZ pins (owner ruling 2026-11-23, tool audit Q1,
-# re-answered: "ZZ singles per the record"). They replace the
-# Class X .1865/.1870 pair the bore was first gauged with. Ø.1865
-# +.0005/.0000: GO a .1865 plus single (.1865-.1867), NO-GO the .187 minus
-# pin of the .061-.500 minus box (gauges.pin-gauges; .1868-.1870). Range: the
-# band, 4.7371-4.7498 mm; resolution: one pin's Class ZZ tolerance, .0002 in
-# = 0.00508 mm.
-[gauges.zz-pins-1865-1870]
-range_mm = [4.7371, 4.7498]
-resolution_mm = 0.00508
-[tools.zz-pins-1865-1870]
-description = "Class ZZ pins for .1865-.1870: GO .1865 plus (single), NO-GO .187 minus (the .061-.500 box)"
+# The axle bore's drill (owner ruling 2026-11-24, fit audit question 18: the
+# axle is bonded in a 3/16 drilled bore; no reamer, no Class ZZ pins).
+[tools.drill-3-16]  # Drills 3/16; MHA-MG-08 3/16 DRILL THRU
+description = "3/16 (.1875 in) drill, 115-piece index"
+diameter_mm = 4.7625
 
 # --- Drawing cross-check additions (2026-11-19) -------------------------------
 # Tools the v50 drawings call for that the quote workbook left out, from the

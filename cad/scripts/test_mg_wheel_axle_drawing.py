@@ -183,7 +183,7 @@ def test_journal_finish_and_no_gdt() -> None:
     # v49 machinist review (rule 4): each fit names its mate by number and
     # name, one line each.
     assert callouts.callout_rows(callouts.PIN_DIA_CALLOUT) == (
-        "PRESS FIT IN MHA-MG-08 WHEEL BAR (INTERFERENCE .0003-.0012)",
+        "BONDED IN MHA-MG-08 WHEEL BAR",
         "RUNNING FIT IN MHA-MG-05 MAGNIFYING WHEEL (CLEARANCE .0008-.0017)",
     )
 
@@ -192,11 +192,12 @@ def test_thread_callout_and_no_general_notes() -> None:
     assert spec.THREAD_CALLOUT == "#4-40 UNC"
     assert not hasattr(spec, "DRAWING_NOTES")
     # The stock Ø is an untoleranced REF (the supplier's limits govern) that
-    # states both fits: the press into the bar's reamed bore and the wheel
-    # running on the shank, each matching the wheel group's proofs.
+    # states both fits: the bond in the bar's drilled bore (its clearance on
+    # the bar's sheet) and the wheel running on the shank, matching the wheel
+    # group's proofs.
     words = " ".join(callouts.PIN_DIA_CALLOUT.split())
     assert ".1873" not in words and "STOCK" not in words
-    assert callouts.PRESS_LIMITS == pytest.approx(group.BAR_PRESS)
+    assert "INTERFERENCE" not in words
     assert callouts.RUNNING_CLEARANCE_TEXT == "-".join(
         f"{value / 25.4:.4f}".lstrip("0") for value in group.HUB_RUNNING
     )
@@ -274,15 +275,16 @@ def test_wheel_group_stack_fits_the_pin() -> None:
     )
 
 
-def test_pin_fits_are_press_in_the_bar_and_running_in_the_wheel() -> None:
-    assert min(group.BAR_PRESS) > 0.0
+def test_pin_fits_are_bonded_in_the_bar_and_running_in_the_wheel() -> None:
     assert min(group.HUB_RUNNING) > 0.0
-    # M1: the .1865 reamed bore (+.0005/0) on the drill rod's +/-.0002.
-    assert group.BAR_PRESS == pytest.approx((0.0003 * 25.4, 0.0012 * 25.4))
+    # Owner ruling 2026-11-24, fit audit question 18: the 3/16 drill's
+    # DRILLED HOLES row (+.004/0) on the drill rod's +/-.0002, inside
+    # LOCTITE 638's gap.
+    assert group.BAR_BOND_GAP == pytest.approx((-0.0002 * 25.4, 0.0042 * 25.4))
+    assert group.BAR_BOND_GAP[1] <= mg_magnifying_wheel_geom.LOCTITE_638_GAP_MAX
     assert mg_magnifying_wheel_geom.BORE_DIA > spec.PIN_DIA + spec.PIN_DIA_TOL
-    assert mg_wheel_bar_geom.AXLE_BORE_DIA + mg_wheel_bar_geom.AXLE_BORE_BAND[0] < (
-        spec.PIN_DIA - spec.PIN_DIA_TOL
-    )
+    assert mg_wheel_bar_geom.AXLE_BORE_DRILL == "3/16"
+    assert mg_wheel_bar_geom.AXLE_BORE_DIA == pytest.approx(0.1875 * 25.4)
 
 
 def test_pen_travel_literals_match_their_source_modules() -> None:

@@ -344,11 +344,6 @@ kind = "reamer"
 status = "to_order"
 note = "quotes-2026-11-17-rev3.xlsx B-reamer-.1260: recommended Shars 404-7564."
 
-[tools.reamer-1865]
-kind = "reamer"
-status = "to_order"
-note = "quotes-2026-11-17-rev3.xlsx B-reamer-.1865: recommended Shars 404-7565."
-
 [tools.reamer-1885]
 kind = "reamer"
 status = "to_order"

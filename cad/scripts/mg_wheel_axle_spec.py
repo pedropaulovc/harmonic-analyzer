@@ -1,6 +1,6 @@
 r"""Pure-data dimensional contract shared by the wheel axle and its drawing.
 
-A plain pin from 3/16 drill rod, pressed into the mg-wheel-bar's reamed bore
+A plain pin from 3/16 drill rod, bonded in the mg-wheel-bar's 3/16 drilled bore
 with the spacer (MHA-MG-11) on its shank against the bar's FRONT face, until
 its shank-to-thread step stands a gauge length past the spacer's outer face;
 the back end then lands near the back face (eight-views-6 shows only a point
@@ -222,14 +222,6 @@ for (_feature, _name), (_low, _high) in LIMIT_PAIRS.items():
 # The overall is the shank, the thread and the dome summed: a reference.
 REFERENCE_DIMENSIONS = frozenset({"PinLength"})
 
-# The bar's reamed bore the pin presses into, its limits printed to four
-# places on the pin's own Ø callout (drawing-guidelines.md rule 7 (notes: few, flagged, never a method); mg_wheel_group.BAR_PRESS
-# proves the interference at both corners).
-BAR_BORE_LIMITS = (
-    _bar.AXLE_BORE_DIA + _bar.AXLE_BORE_BAND[1],
-    _bar.AXLE_BORE_DIA + _bar.AXLE_BORE_BAND[0],
-)
-BAR_BORE_PLACES = _bar.AXLE_BORE_PLACES
 # drawing-guidelines.md rule 7 (notes: few, flagged, never a method): no general notes. The press to
 # the gauge is MHA-MG-00's step and AXLE AS PRESSED detail
 # (mg_magnifier_assembly_spec); every requirement here rides its own callout
