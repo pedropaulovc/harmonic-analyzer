@@ -120,10 +120,14 @@ def test_the_first_arm_checks_hold_the_drawings_position_zones() -> None:
         SHOP["tools"]["drill-d"]["diameter_mm"], abs=0.01
     )
     zones = ch_rocker_arm_spec.GEOMETRIC_TOLERANCES_IN
-    # The bore's centre within the limit each way stays inside half the hub
-    # OD's position zone with room for the edge finder's reading.
-    radial = p["bore_centre_max_in"] * 2**0.5
-    assert radial < float(zones["hub OD position to bore"]) / 2 - 0.0005
+    # The bore's radial offset from the hub's outside, read on the mm DRO,
+    # at most half the hub OD's position zone.
+    half_zone_mm = float(zones["hub OD position to bore"]) / 2 * IN
+    assert p["bore_offset_max_mm"] <= half_zone_mm
+    assert p["bore_offset_max_mm"] > half_zone_mm - 0.01
+    assert p["edge_finder_dia_mm"] == pytest.approx(0.2 * IN)
+    bore = FEATURES["features"]["pivot_bore"]["dia"]
+    assert [p["bore_dro_min_mm"], p["bore_dro_max_mm"]] == pytest.approx(bore)
     # The strap's mid-plane from end G: the hub's half within its zone.
     half = ch_rocker_arm_spec.HUB_LENGTH / 2 / IN
     zone = float(zones["strap position to hub"])
