@@ -89,7 +89,7 @@ NOTES = (
     "   DOES NOT ENTER BY HAND. HOLDS LATCH STOP, NO OTHER FASTENER.",
     f"{SPRING_NOTE}. COUNTERBORE Ø AND FLOOR: SEAT AND PRELOAD\n"
     f"   PIVOT SPRING {_SPRING['number']}.",
-    # Fit audit 2026-11-23 (pending owner confirmation): the one-diameter pin
+    # Owner ruling 2026-11-24, fit audit question 4: the one-diameter pin
     # is a slip fit bonded in the bore.  The note names the mate, the grade
     # and the acceptance by the mate, then rule 4's necessity answer
     # (PIN_BORE_NECESSITY).  A note carries no size: rule 23's bond

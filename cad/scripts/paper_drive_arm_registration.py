@@ -136,8 +136,9 @@ K_PROJECTED_HEIGHT_MM = (
     * 25.4 / 1000.0
 )
 # The pin S's axis zone at the farthest chain plane.  MHA-PD-23 is one
-# diameter, a slip fit bonded in MHA-PD-18's reamed bore (fit audit
-# 2026-11-23, pending owner confirmation; it replaces the #2415 press land):
+# diameter, a slip fit bonded in MHA-PD-18's reamed bore (owner ruling
+# 2026-11-24, fit audit question 4: "pin MHA-PD-23 bonded, no lean check";
+# it replaces the #2415 press land):
 # its axis may lean in the bore by the bore's plain ⊥ .001 (no projected
 # zone, rule 26; owner ruling 2026-11-08 (Pedro), #2144 item 4.1) plus the
 # whole diametral gap, over the bonded length, the bore's full-diameter
@@ -155,7 +156,7 @@ K_PROJECTED_HEIGHT_MM = (
 #   S_PROJECTED_HEIGHT_MM.  It is what a tilt consumer divides by the
 #   height: the disc's tilt in the airs (pd_cluster_air.S_ZONE_TILT) and in
 #   the meshes (paper_drive_geom.reducer_axis_tilt_maxima_rad, which the
-#   feed rack's opposite-flank closing reads).  Wider than K's
+#   feed's lateral deviation reads).  Wider than K's
 #   AXIS_PROJECTED_ZONE_DIAMETER_MM; MHA-PD-00's collar feeler accepts the
 #   collar air it closes (pd_cluster_air.ASSEMBLY_ACCEPTED_COLLAR_SOURCES).
 # - the OFFSET, S_AXIS_RADIAL_OFFSET_MAX_MM: where the pin's axis stands at

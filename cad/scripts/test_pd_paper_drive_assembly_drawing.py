@@ -1783,7 +1783,7 @@ def test_the_knob_bush_is_pressed_and_reamed_before_the_plate_is_set() -> None:
     texts = drawing._step_text(operating_domain=_unit_operating_domain())["pin-pressed"]
     bush = _number("pd-transgear-knob-bush")
     plate = _number("pd-transgear-arm-plate")
-    # Fit audit 2026-11-23 (pending owner confirmation): the pin is bonded
+    # Owner ruling 2026-11-24, fit audit question 4: the pin is bonded
     # first, one action per sub-step, its check and remedy apart (rule 22).
     assert drawing.PIN_BOND_COMPOUND == cluster_pin.RETAINING_COMPOUND
     bond = drawing.PIN_BOND_SUB_STEP

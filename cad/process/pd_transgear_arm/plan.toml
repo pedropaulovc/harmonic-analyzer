@@ -28,8 +28,8 @@
 #
 # To order (not owned): the 12095 bar (stock.1018-ground-flat-3-8x1, one
 # 12 in length), the pin-gauge set for the pin
-# bore's one check (pin-gauges: its .127 pin must not enter; fit audit
-# 2026-11-23, pending owner confirmation: the bore prints the .1260 reamer's
+# bore's one check (pin-gauges: its .127 pin must not enter; owner ruling
+# 2026-11-24, fit audit question 4: the bore prints the .1260 reamer's
 # size with no band and the MHA-PD-23 pin is bonded in it, so the Class X
 # .1260/.1265 pair is gone from this plan; cad.pin_bore_dia_band_mm is the
 # drawing module's ANALYSIS band, which sizes the reaming op and is no

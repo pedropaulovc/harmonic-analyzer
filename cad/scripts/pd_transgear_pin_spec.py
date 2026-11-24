@@ -3,7 +3,7 @@ r"""Pure-data contract for MHA-PD-23, the transgear pin (R9-68).
 The plain steel pin the disc cluster runs on: one diameter from head to tip.
 Its shank slides through the MHA-PD-18 arm's reamed hole at S from the rear
 until the domed head seats on the arm's rear face, and is bonded there with
-LOCTITE 638 (fit audit 2026-11-23, pending owner confirmation; it replaces
+LOCTITE 638 (owner ruling 2026-11-24, fit audit question 4; it replaces
 the #2415 press land).  Forward of the arm the same shank carries, rear to
 front, the MHA-PD-24 rear bushing, the MHA-PD-10 sleeve (with the disc, hub
 and screws on it), the MHA-PD-25 front bushing and, in the groove near its

@@ -160,7 +160,7 @@ def test_native_controls_reference_actual_bores_and_reach_the_real_chain_plane()
     assert arm_control.projected_zone_height_mm is None
     assert arm_control.characteristic == "perpendicularity"
     assert arm_control.tolerance == ".001" and arm_control.datums == ("A",)
-    # Fit audit 2026-11-23 (pending owner confirmation): the one-diameter pin
+    # Owner ruling 2026-11-24, fit audit question 4: the one-diameter pin
     # is bonded in the bore, so its axis may lean by the bore's own tilt plus
     # the widest gap the arm sheet's NO-GO accepts, over the shortest bond,
     # and runs on from the arm's broken front edge to the chain plane.

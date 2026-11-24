@@ -1874,8 +1874,8 @@ PIVOT_SPACER_BOND_SUB_STEP = 6
 PIVOT_SPACER_BOND_CURE_H = 24
 # The same grade bonds the MHA-PD-23 pin in the arm (the next bullet), so
 # the two cures and grades are pinned equal by test.
-# Rule 23's bond bullet for the MHA-PD-23 pin in the arm (fit audit
-# 2026-11-23, pending owner confirmation): the grade the pin's sheet names
+# Rule 23's bond bullet for the MHA-PD-23 pin in the arm (owner ruling
+# 2026-11-24, fit audit question 4): the grade the pin's sheet names
 # (pd_transgear_pin_spec.RETAINING_COMPOUND, pinned by test), the sub-step
 # that coats the pin, and the cure before the cluster is fitted on it
 # (Henkel's LOCTITE 638 TDS states its strength at 24 h, 22 °C).
@@ -2522,7 +2522,7 @@ def _step_text(
             f"{n['pd-vn-transgear-latch-pin']} DOWEL AND REPEAT FROM STEP "
             f"{steps.step_number('latch-pin-pressed')}.",
         ),
-        # Fit audit 2026-11-23 (pending owner confirmation): the one-diameter
+        # Owner ruling 2026-11-24, fit audit question 4: the one-diameter
         # MHA-PD-23 pin is a slip fit bonded in the arm's reamed hole (rule
         # 23's bond bullet: degrease, coat the pin, seat, keep the compound
         # off the running shank and the rear bushing's seat on the arm's

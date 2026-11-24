@@ -220,8 +220,8 @@ PIVOT_SHOULDER_END_SQUARENESS_ALLOWED = (
 
 # --- Pin at S: REAM THROUGH, the bore the MHA-PD-23 pin is bonded in ---------
 # The one-diameter MHA-PD-23 pin slips in from the rear until its head seats
-# on the rear face and is bonded there (fit audit 2026-11-23, pending owner
-# confirmation; it replaces the #2415 press), so the hole is reamed square
+# on the rear face and is bonded there (owner ruling 2026-11-24, fit audit
+# question 4; it replaces the #2415 press), so the hole is reamed square
 # through the ground faces.  The bond's gap is asserted in
 # pd_transgear_arm_spec, which imports both: the pin spec imports this
 # module.

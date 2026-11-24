@@ -172,7 +172,7 @@ STOCK_TEXT_PREFIX = f"{STOCK_THICKNESS_IN} ("
 STOCK_TEXT_SUFFIX = ") GROUND STOCK REF"
 
 # --- The MHA-PD-23 pin's bonded slip fit in the reamed bore at S (R9-68) -------
-# Fit audit 2026-11-23 (pending owner confirmation): the pin is one diameter
+# Owner ruling 2026-11-24, fit audit question 4: the pin is one diameter
 # and is bonded in the bore with LOCTITE 638; nothing presses.  The pin spec
 # owns the bond (it imports the arm geometry, so the geometry cannot import
 # it back).  The bore stays REAMED and prints the reamer's size with no

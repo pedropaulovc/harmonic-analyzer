@@ -288,7 +288,7 @@ def test_notes_fit_the_sheet_limits() -> None:
 
 
 def test_the_one_diameter_shank_is_bonded_in_the_arm_and_runs_in_its_mates() -> None:
-    """Fit audit 2026-11-23 (pending owner confirmation): the pin has one
+    """Owner ruling 2026-11-24, fit audit question 4: the pin has one
     diameter under its head, a slip fit bonded in the arm's ream with the
     retaining compound the note names; nothing presses.  The gap sits inside
     the compound's fill, the bond's derated capacity covers the ring's rated

@@ -57,7 +57,7 @@ def test_the_pin_is_enrolled_on_turned_shaft(plan: dict) -> None:
 def test_the_arm_is_tried_on_the_shank_and_nothing_is_turned_to_a_reading(
     plan: dict, parameters: dict, features: dict
 ) -> None:
-    """Fit audit 2026-11-23 (pending owner confirmation): the pin is one
+    """Owner ruling 2026-11-24, fit audit question 4: the pin is one
     diameter, bonded in the arm. No land, no ream reading, no Class X plugs:
     the arm's one limit is its .127 set pin, and the arm slides on by hand."""
     assert "step_land" not in features

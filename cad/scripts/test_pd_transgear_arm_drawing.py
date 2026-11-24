@@ -431,7 +431,7 @@ def test_the_tap_callout_text_is_proved_by_its_readback(monkeypatch, persist) ->
 
 
 def test_the_pin_is_bonded_in_the_bore_with_clearance_at_every_limit() -> None:
-    """Fit audit 2026-11-23 (pending owner confirmation): the reamed bore at
+    """Owner ruling 2026-11-24, fit audit question 4: the reamed bore at
     S takes the one-diameter MHA-PD-23 pin as a bonded slip fit.  The bore
     prints the reamer's size with no band; its callout prints rule 23's bond
     clearance and the gap's one limit, a set pin that must not enter, and

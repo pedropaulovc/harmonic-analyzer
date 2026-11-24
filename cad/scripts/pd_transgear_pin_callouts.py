@@ -25,8 +25,8 @@ from pd_transgear_pin_spec import (
 # The sheet's notes, the part's Manufacturing Notes property.  The bond into
 # the arm is the MHA-PD-00 assembly's pin step; the part sheet gives the fit
 # (rule 23).  Numbered note 1, linked from the shank's reference Ø by SEE
-# NOTE 1, gives the shank's two fits (fit audit 2026-11-23, pending owner
-# confirmation; rule 4, made to fit): it is turned last to its three mates'
+# NOTE 1, gives the shank's two fits (the bond: owner ruling 2026-11-24, fit
+# audit question 4; rule 4, made to fit): it is turned last to its three mates'
 # reamed bores and accepted by feel, a bought shim sliding on (the shims'
 # smallest bore is the shank's ceiling), with rule 4's necessity answer on
 # its own sentence (play in those bores tilts the disc into the drive
