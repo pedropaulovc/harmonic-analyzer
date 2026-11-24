@@ -1641,7 +1641,9 @@ CONE_CRANK_STEPS = _note_text(
         # proud of the 16T by dt_crankshaft_spec.SHAFT_END_PROUD_RANGE at
         # every accepted part set; it is left as it comes, not faced.  These
         # print in step 4 itself (rubric sample round 4: the separate crank end
-        # fit block repeated the step and crowded sheet 10).
+        # fit block repeated the step and crowded sheet 10).  Owner ruling
+        # 2026-11-24, audit part 2 S5: 4Y checks only that the end is not
+        # below the 16T's face, by straightedge (no depth-rod window).
         "4E. HOLD MHA-DT-11'S COLLAR HARD ON THE MHA-DT-05 BOSS, NO WASHER.",
         f"4F. SET MHA-DT-10 {inch_text(PINION_SEAT_FEELER, FEELER_PLACES)} OFF THE BOSS BACK FACE "
         "WITH A FEELER.",
@@ -1675,8 +1677,7 @@ CONE_CRANK_STEPS = _note_text(
         f"4V. CHECK THAT {pinion.PIN_NUMBER} IS {PIN_FIT_ACCEPTANCE}.",
         f"4W. IF IT IS, {SLIP_FIT_BOND}",
         "4X. TURN MHA-DT-07 ONE FULL REVOLUTION AGAIN: NO BINDING.",
-        "4Y. CHECK MHA-DT-11'S END STANDS PROUD OF MHA-DT-10 "
-        f"({acceptance_ref('crank-end-proud')}).",
+        "4Y. CHECK MHA-DT-11'S END IS NOT BELOW MHA-DT-10 (STRAIGHTEDGE).",
         "4Z. DO NOT FACE THAT END.",
         f"5. SLIDE {CRANK_CHAIN_WHEEL} ON MHA-DT-11, HOLES OVER THE 2X MHA-DT-VN-67.",
         # U33 (user, 2026-09-23): crank hub MHA-DT-31 pressed into the arm and
