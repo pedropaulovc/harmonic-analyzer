@@ -107,26 +107,41 @@ def test_every_printed_dimension_has_the_parts_places() -> None:
 
 def test_callouts_and_notes_name_every_mate_once() -> None:
     callouts = notes.DIMENSION_CALLOUTS
-    assert all(len(text.splitlines()) <= 2 for text in callouts.values())
+    # Two lines of words at most, beside one parenthesized row (rule 7).
+    assert all(
+        len([row for row in text.splitlines() if not row.startswith("(")]) <= 2
+        for text in callouts.values()
+    )
     spigot = callouts["SpigotDia"]
     for mate in ("MHA-DT-04", "MHA-DT-03-T012", "MHA-DT-03-T018"):
         assert mate in spigot
-    # Rule 26's fit name: the bond with its compound, the one MHA-DT-04 prints.
-    assert spigot.startswith(f"BONDED FIT, {cluster.RETAINING_COMPOUND}, IN")
+    # Rule 26's fit name: the bond with its compound, the one MHA-DT-04 prints;
+    # the spigot is turned last to its holes and prints the bond's clearance
+    # (rule 4, form 2; rule 23).
+    assert spigot.startswith(f"BONDED FIT, {cluster.RETAINING_COMPOUND}, TURNED TO")
+    low, high = cluster.SPIGOT_BOND_CLEARANCE_MM
+    assert spigot.splitlines()[-1] == (
+        f"(CLEARANCE {spec.inch_text(low, 4)}-{spec.inch_text(high, 4)})"
+    )
+    assert notes.MADE_TO_FIT_STEMS == ("SpigotDia", "PivotDia")
     pivot = callouts["PivotDia"]
     assert pivot == f"BONDED AND RUNNING FIT\n{notes.PIVOT_NOTE_FLAG}"
     sheet = notes.sheet_notes().splitlines()
     assert len(sheet) <= 6
-    # One banded pivot diameter: bonded in the bushing, its end running in the
-    # end screw's hole; both mates by number and name.
-    pivot_note = " ".join(sheet[:2])
+    # One reference pivot diameter: bonded in the bushing, its end running in
+    # the end screw's hole, turned last to both; both mates by number and
+    # name, and both clearances.
+    pivot_note = " ".join(" ".join(sheet[:3]).split())
     assert sheet[0].startswith(
         f"{notes.PIVOT_NOTE_NUMBER}. PIVOT: BONDED FIT, "
         f"{cluster.RETAINING_COMPOUND}, IN MHA-DT-38"
     )
     assert "MHA-DT-39 CONE TIP END SCREW" in pivot_note
+    assert "TURNED LAST TO SLIDE IN BOTH" in pivot_note
+    for clearance in (cluster.BUSHING_BOND_CLEARANCE_MM, cluster.PIVOT_RUNNING_CLEARANCE_MM):
+        assert f"{spec.inch_text(clearance[0], 4)}-{spec.inch_text(clearance[1], 4)}" in pivot_note
     assert "MEASURED" not in pivot_note
-    assert sheet[2].startswith(f"{notes.TEETH_NOTE_NUMBER}. TEETH MESH WITH MHA-DT-12")
+    assert sheet[3].startswith(f"{notes.TEETH_NOTE_NUMBER}. TEETH MESH WITH MHA-DT-12")
     assert sheet[-1] == "3. CENTRES OK."
     # The width says at the dimension that it is the cone's seat pitch on its
     # shaft (rule 3's pitch-geometry exemption); each line is shorter than the

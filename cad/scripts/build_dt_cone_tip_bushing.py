@@ -32,9 +32,7 @@ from _drawing_marks import (
     mark_dimensions_for_drawing,
 )
 from _drawing_precision import apply_drawing_precision
-from _drawing_tolerances import set_dimension_bilateral_tolerance
 from _feature_tree import name_last_feature
-from _fit_deviations import deviations
 from _part_checks import bbox_extent_check, report_mass_properties, volume_check
 from _part_properties import part_drawing_unit
 from _part_save import save_part_and_images
@@ -49,14 +47,12 @@ from _sketch import (
 from _visibility import blank_reference_geometry
 from dt_cone_tip_bushing_spec import (
     BORE_DIA,
-    BORE_DIA_BAND,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
     END_CHAMFER,
     ISOMETRIC_VIEW_NOTE,
     LENGTH,
     OUTER_DIA,
-    UNIT,
 )
 
 PART_NAME = "dt-cone-tip-bushing"
@@ -214,15 +210,9 @@ def build(adapter) -> dict[str, str]:
 
     apply_material(adapter, MATERIAL)
     report_mass_properties(adapter)
-    # The bore is reamed for the press on the pivot: its band lives on the
-    # model dimension.  OD and length take the title block's .XXX.
-    set_dimension_bilateral_tolerance(
-        adapter,
-        "BushingProfile",
-        "BoreDia",
-        *deviations(BORE_DIA_BAND),
-        display_unit=UNIT,
-    )
+    # The bore prints the .0625 reamer's size with no band: MHA-DT-37's pivot
+    # is turned last to it (fit audit 2026-11-23, F10).  OD and length take
+    # the title block's .XXX.
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
