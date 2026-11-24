@@ -17,8 +17,9 @@ shapes only) and the fixture screws' heads (keep-out shapes only).
 
 Route (``plan.toml``): the arm is cut from one blank of 3/8 x 1 ground flat,
 its faces as supplied. AR01 (Setup 2): the blank lies front face (datum A) down
-on 1 in parallels, gripped by its edges; spot, drill and ream the pivot bore
-and the pin bore through, plunge the rear spot face with the 1/2 in end mill,
+on 1 in parallels, gripped by its edges; spot and drill the pivot bore (#14,
+then #9 to size), spot, drill and ream
+the pin bore through, plunge the rear spot face with the 1/2 in end mill,
 chamfer the pin bore's rear mouth. Setup 3: a 1/2 in 6061 plate in the vise;
 AR02 drills it for a #10-32 and a #4-40 screw under the two bores, AR03 and
 AR04 stop for the hand taps; the arm is screwed down through its bores and
@@ -52,7 +53,7 @@ PROGRAMS: tuple[tuple[str, tuple[Any, ...]], ...] = (
             ("pivot_drill",),
             ("pin_drill",),
             ("spot_face",),
-            ("pivot_ream",),
+            ("pivot_drill_9",),
             ("pin_ream",),
             ("pin_mouth",),
         ),
@@ -71,7 +72,7 @@ CAM_TOOLS = (
     "drill-14",
     "drill-32",
     "em-half",
-    "reamer-1940",
+    "drill-9",
     "reamer-1260",
     "chamfer",
     "drill-21",
@@ -277,17 +278,20 @@ def _geometry(features: dict[str, Any]) -> dict[str, Any]:
     thickness = float(rear["plane"]["value"])
     thickness_band = [float(v) for v in rear["thickness_stock"]]
     pivot, pin = f["pivot_bore"], f["pin_bore"]
-    for name, hole in (("pivot_bore", pivot), ("pin_bore", pin)):
+    for name, hole, process in (
+        ("pivot_bore", pivot, "drill"),
+        ("pin_bore", pin, "ream"),
+    ):
         if hole["axis"] != [0.0, 0.0, -1.0] or not math.isclose(
             hole["at"][2], thickness
         ):
             raise ValueError(f"{name} does not run down from the rear face")
         if (
             hole["at"][1] != 0.0
-            or hole.get("process") != "ream"
+            or hole.get("process") != process
             or hole.get("thru") is not True
         ):
-            raise ValueError(f"{name} is not a through ream on the centreline")
+            raise ValueError(f"{name} is not a through {process} on the centreline")
     if pivot["at"][:2] != [0.0, 0.0]:
         raise ValueError("pivot_bore is not on the model origin")
     station = float(pin["at"][0])
@@ -451,16 +455,22 @@ def context(
     def dia(tool: str) -> float:
         return float(_shop_tool(plan, shop, tool)["diameter_mm"])
 
-    d14, d32, d21, d43 = (
+    d14, d9, d32, d21, d43 = (
         dia("drill-14"),
+        dia("drill-9"),
         dia("drill-32"),
         dia("drill-21"),
         dia("drill-43"),
     )
     em2, em4, chamfer_dia = dia("em-half"), dia("em-quarter"), dia("chamfer")
-    r194, r126, r124 = dia("reamer-1940"), dia("reamer-1260"), dia("reamer-1240")
+    r126, r124 = dia("reamer-1260"), dia("reamer-1240")
+    # The pivot bore is the #9 drill's hole (the drawing's DRILL THRU): the
+    # drill's size is the band's low limit, and the #14 goes first under it.
+    if not g["pivot_dia"][0] - 1e-6 <= d9 <= g["pivot_dia"][1]:
+        raise ValueError(f"the Ø{d9:.4f} drill is outside pivot_bore's band")
+    if d14 >= d9:
+        raise ValueError("the #14 is not under the pivot bore's #9 drill")
     for name, reamer, band in (
-        ("pivot_bore", r194, g["pivot_dia"]),
         ("pin_bore", r126, g["pin_dia"]),
         ("latch_pin_hole", r124, g["latch_dia"]),
     ):
@@ -469,7 +479,6 @@ def context(
                 f"the Ø{reamer:.4f} reamer is outside {name}'s band {band}"
             )
     for drill, reamer, what in (
-        (d14, r194, "#14"),
         (d32, r126, "#32"),
         (d32, r124, "#32"),
     ):
@@ -519,15 +528,17 @@ def context(
     spot_depth = _spot_depth(spot_dia)
     past = p["drill_past_mm"]
     tip_14 = -(past + _point(d14))
+    tip_9 = -(past + _point(d9))
     tip_32 = -(past + _point(d32))
     _agree(plan, "drill_14_tip_mm", tip_14)
+    _agree(plan, "drill_9_tip_mm", tip_9)
     _agree(plan, "drill_32_tip_mm", tip_32)
     ream_tip = -p["ream_past_mm"]
     # The parallels stand under the blank's edges: every drill and reamer
     # passes between them.
     gap = width / 2 - p["parallel_thickness_mm"]
-    if max(d14, r194) / 2 >= gap:
-        raise ValueError("a drill or reamer through the pivot reaches the parallels")
+    if max(d14, d9) / 2 >= gap:
+        raise ValueError("a drill through the pivot reaches the parallels")
     floor = g["floor_nominal"]
     if not g["floor"][0] <= floor <= g["floor"][1]:
         raise ValueError("the spot face's floor target is outside its band")
@@ -669,7 +680,7 @@ def context(
             "pivot drill",
             "pin drill",
             "spot face",
-            "pivot ream",
+            "pivot drill 9",
             "pin ream",
             "pin mouth",
             "plate spot",
@@ -798,15 +809,21 @@ def context(
             ],
         },
         {
-            **tool("reamer-1940", "pivot ream", dia=r194, shape="reamer"),
+            **tool(
+                "drill-9",
+                "pivot drill 9",
+                dia=d9,
+                shape="drill",
+                tip_angle=DRILL_POINT_DEG,
+            ),
             "frame": "holes",
-            "label": "pivot ream",
+            "label": "pivot drill 9",
             "stock": holes_stock,
             "ops": [
                 [
-                    "pivot_ream",
-                    "ream the pivot .1940 through",
-                    _plunge(xy_pivot, t_max, ream_tip, clear_holes),
+                    "pivot_drill_9",
+                    "drill the pivot #9 through to size",
+                    _plunge(xy_pivot, t_max, tip_9, clear_holes),
                 ]
             ],
         },
@@ -1006,7 +1023,7 @@ def context(
         "drill-14",
         "drill-32",
         "em-half",
-        "reamer-1940",
+        "drill-9",
         "reamer-1260",
         "chamfer",
     ]
@@ -1015,7 +1032,7 @@ def context(
         "pivot drill",
         "pin drill",
         "spot face",
-        "pivot ream",
+        "pivot drill 9",
         "pin ream",
         "pin mouth",
     ]
@@ -1027,7 +1044,7 @@ def context(
         ],
         [name, "spindle", {"rpm": [[speeds[c][0]] for c in cuts]}],
         [name, "pauses", {"z_top": jaw_top, "count": 0}],
-        [name, "depth", {"z_min": _r(min(tip_14, tip_32))}],
+        [name, "depth", {"z_min": _r(min(tip_14, tip_9, tip_32))}],
     ]
     sections = (
         hole_checks(
@@ -1036,7 +1053,7 @@ def context(
         hole_checks(t_max, [xy_pivot], tip_14, d14 / 2, keep_holes),
         hole_checks(t_max, [xy_pin], tip_32, d32 / 2, keep_holes),
         hole_checks(t_max, [xy_pivot], floor, em2 / 2, keep_holes, ream=True),
-        hole_checks(t_max, [xy_pivot], ream_tip, r194 / 2, keep_holes, ream=True),
+        hole_checks(t_max, [xy_pivot], tip_9, d9 / 2, keep_holes, ream=True),
         hole_checks(t_max, [xy_pin], ream_tip, r126 / 2, keep_holes, ream=True),
         hole_checks(
             t_max, [xy_pin], chamfer_tip, chamfer_dia / 2, keep_holes, ream=True
