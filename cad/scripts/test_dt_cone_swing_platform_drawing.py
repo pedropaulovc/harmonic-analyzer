@@ -1107,9 +1107,10 @@ def test_holddown_hole_is_the_ruled_counterbore_for_the_tip_block_screw() -> Non
     assert block.FOOT_TAP_OFFSET_X == spec.HOLDDOWN_LOCAL_X
 
 
-def test_holddown_x_is_a_banded_dimension_hanging_right_of_detail_b() -> None:
+def test_holddown_x_is_a_title_block_dimension_hanging_right_of_detail_b() -> None:
     """User ruling 2026-09-29: the hole's lateral station prints as HoldDownX
-    at .XX with +/-0.10, in detail B.  Its 2 mm span cannot hold the text,
+    at .XX, in detail B, at the title block's band since machinist review r1
+    (farm run 20261124T125542720Z: no stack needs a tighter one).  Its 2 mm span cannot hold the text,
     and inside the circle the text either ran out through the outline (run
     20260930T030604208Z) or under the plate's east edge (run
     20260930T041147948Z), so it hangs sheet-right OUTSIDE the circle (user
@@ -1120,10 +1121,11 @@ def test_holddown_x_is_a_banded_dimension_hanging_right_of_detail_b() -> None:
         "HoldDownZ": 3,
     }
     assert spec.HOLDDOWN_STATION_TOL_MM == 0.127  # the +/-.005 drilled-hole row
-    # HoldDownX's .XX carries the band; HoldDownZ and the post-tap stations
-    # print .XXX, whose title-block grade is the band (rule 2, C1 keyed r9).
+    assert spec.HOLDDOWN_LATERAL_TOL_MM == printed_band_mm(2, unit=spec.UNIT)
+    # Neither station carries a band of its own: HoldDownX takes the .XX row,
+    # HoldDownZ and the post-tap stations the .XXX row (rule 2, C1 keyed r9).
     banded = model_toleranced_dimensions(part)
-    assert banded[("HoldDownHole", "HoldDownX")] == "HOLDDOWN_STATION_TOL_MM"
+    assert ("HoldDownHole", "HoldDownX") not in banded
     assert ("HoldDownHole", "HoldDownZ") not in banded
     assert not any(feature == "PostMountHoles" for feature, _ in banded)
     assert (
@@ -1409,13 +1411,13 @@ def test_tip_dowel_stays_chained_for_the_stack() -> None:
     web = checks.TIP_DOWEL_WEBS["hold-down counterbore (underside)"]
     assert web >= WALL_FLOOR_MM
     from_pivot_band = (
-        spec.TIP_DOWEL_STATION_TOL_MM + spec.HOLDDOWN_STATION_TOL_MM + spec.TIP_HOLDDOWN_SCREW_FLOAT_MM
+        spec.TIP_DOWEL_STATION_TOL_MM + spec.HOLDDOWN_LATERAL_TOL_MM + spec.TIP_HOLDDOWN_SCREW_FLOAT_MM
     )
     plus_x = block.WORST_DOWEL_WEBS_MM["+X face"]
     assert plus_x >= WALL_FLOOR_MM
     # From the pivot both webs fall under the .078 the owner accepted (fit
     # audit question 11).
-    assert web - spec.HOLDDOWN_STATION_TOL_MM < checks.TIP_DOWEL_WEB_PRINTED_IN * 25.4
+    assert web - spec.HOLDDOWN_LATERAL_TOL_MM < checks.TIP_DOWEL_WEB_PRINTED_IN * 25.4
     assert plus_x - (from_pivot_band - block.DOWEL_X_TOL_MM) < block.DOWEL_WEB_PRINTED_IN * 25.4
 
 
@@ -2220,7 +2222,8 @@ def test_platform_feature_bands_are_the_printed_ones() -> None:
     assert hold["cbore_dia"] == pytest.approx([_in(0.214), _in(0.224)], abs=1e-3)
     assert hold["cbore_depth"] == pytest.approx([_in(0.133), _in(0.143)], abs=1e-3)
     assert hold["cbore_depth_from"] == "underside"
-    assert hold["x_from_pivot"] == pytest.approx([_in(0.035), _in(0.045)], abs=1e-3)
+    # .04 at the title block's .XX (machinist review r1, 20261124T125542720Z).
+    assert hold["x_from_pivot"] == pytest.approx([_in(0.03), _in(0.05)], abs=1e-3)
     station = -spec.HOLDDOWN_LOCAL_Z
     assert hold["z_from_pivot"] == pytest.approx([station - _in(0.005), station + _in(0.005)])
     dowel = features["tip_dowel"]

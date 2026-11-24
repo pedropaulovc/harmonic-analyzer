@@ -768,6 +768,7 @@ from dt_cone_swing_platform_checks import manufactured_p1_stop_enclosure  # noqa
 from dt_cone_swing_platform_spec import (  # noqa: E402
     HOLDDOWN_CBORE_DEPTH as PLAT_HOLDDOWN_CBORE_DEPTH,
     HOLDDOWN_CLEARANCE_DIA as PLAT_HOLDDOWN_CLEARANCE_DIA,
+    HOLDDOWN_LATERAL_TOL_MM as PLAT_HOLDDOWN_LATERAL_TOL_MM,
     HOLDDOWN_LOCAL_X as PLAT_HOLDDOWN_LOCAL_X,
     HOLDDOWN_STATION_TOL_MM as PLAT_HOLDDOWN_STATION_TOL_MM,
     POST_MOUNT_SPEC,
@@ -1205,8 +1206,9 @@ def tip_block_print_worst_containment_mm(half_widths: dict[str, float]) -> float
 # The block is located by its foot tap on MHA-DT-VN-60 in the platform's hold-down
 # hole, not slid to the shaft at fit-up, so every station it used to take up
 # closes by print tolerance.  The screw floats in its drilled close-clearance
-# hole; the hole's two stations from the pivot bore (HoldDownX, HoldDownZ)
-# and the tap's two stations carry explicit +/-0.10 bands.
+# hole; the hole's stations from the pivot bore print at the title block
+# (HoldDownZ .XXX, HoldDownX .XX) and the tap's two stations carry their own
+# bands.
 _DRILLED_HOLE_PLUS_MM = drilled_oversize_mm(unit=PLAT_UNIT)
 HOLDDOWN_SCREW_FLOAT_MM = (
     PLAT_HOLDDOWN_CLEARANCE_DIA + _DRILLED_HOLE_PLUS_MM - HOLDDOWN_SHANK_DIA
@@ -1218,7 +1220,7 @@ TIP_NORTH_FACE_BAND_MM = (
 )
 # The tap's lateral station about its nominal PLAT_HOLDDOWN_LOCAL_X.
 TIP_TAP_LATERAL_BAND_MM = (
-    PLAT_HOLDDOWN_STATION_TOL_MM + HOLDDOWN_SCREW_FLOAT_MM + TIP_FOOT_TAP_X_TOL_MM
+    PLAT_HOLDDOWN_LATERAL_TOL_MM + HOLDDOWN_SCREW_FLOAT_MM + TIP_FOOT_TAP_X_TOL_MM
 )
 # Each side face's worst distance from the plate centreline: the tap stands
 # at PLAT_HOLDDOWN_LOCAL_X, the -X face FootTapX to its -X side, and the +X

@@ -2573,7 +2573,6 @@ _SE_START_X = _geo.SE_CHAMFER_RUN - _geo.EAST_HALF_S
 _NOTCH_N = (_geo.SLOT_TZ, 0.0, -_geo.SLOT_TX)
 _NOTCH_MID = _NOTCH_N[0] * _geo.SLOT_E_X + _NOTCH_N[2] * _geo.SLOT_E_Z
 _RELIEF_HALF = _sp.PIVOT_BEARING_RELIEF_DIAMETER / 2.0
-_HOLDDOWN_BAND = (_sp.HOLDDOWN_STATION_TOL_MM, -_sp.HOLDDOWN_STATION_TOL_MM)
 _DOWEL_BAND = (_sp.TIP_DOWEL_STATION_TOL_MM, -_sp.TIP_DOWEL_STATION_TOL_MM)
 
 part_metadata(
@@ -2882,8 +2881,8 @@ for _name, _xz, _x_dim, _z_dim, _xz_name in (
     )
 # The tip-block hold-down: Ø.120 DRILL THRU, Ø.219 counterbore .138 deep
 # FROM UNDERSIDE (HOLDDOWN_CALLOUT_PRECISION, three places), located from
-# the pivot along (.XXX) and .04 across at its own ±.005
-# (HOLDDOWN_STATION_TOL_MM, detail B).
+# the pivot along (.XXX) and .04 across, both at the title block
+# (HOLDDOWN_STATION_TOL_MM, HOLDDOWN_LATERAL_TOL_MM, detail B).
 requirement(
     "holddown",
     kind="hole",
@@ -2923,8 +2922,8 @@ requirement(
         "cbore_depth_nominal": (_sp.HOLDDOWN_CBORE_DEPTH, ("HOLDDOWN_CBORE_DEPTH",)),
         "cbore_depth_from": ("underside", ((_DSPEC, "HOLDDOWN_CALLOUT_BELOW"),)),
         "x_from_pivot": (
-            limits(-HOLDDOWN_LOCAL_X, _P["HoldDownX"], _HOLDDOWN_BAND),
-            ("HOLDDOWN_LOCAL_X", "HOLDDOWN_STATION_TOL_MM", (_SELF, "DETAIL_KEEP")),
+            limits(-HOLDDOWN_LOCAL_X, _P["HoldDownX"], unit=UNIT),
+            ("HOLDDOWN_LOCAL_X", "HOLDDOWN_LATERAL_TOL_MM", _UNIT, (_SELF, "DETAIL_KEEP")),
         ),
         "x_from_pivot_nominal": (-HOLDDOWN_LOCAL_X, ("HOLDDOWN_LOCAL_X",)),
         "x_from_pivot_from": ("pivot_bore", ((_SELF, "DETAIL_KEEP"),)),

@@ -288,7 +288,7 @@ POST_END_TERMS_MM = {
     "post running journal fit": _JOURNAL_FLOAT,
 }
 TIP_END_TERMS_MM = {
-    "tip platform hold-down station": plate.HOLDDOWN_STATION_TOL_MM,
+    "tip platform hold-down station": plate.HOLDDOWN_LATERAL_TOL_MM,
     "tip hold-down screw clearance": _TIP_FLOAT,
     "tip block foot tap station": tip.FOOT_TAP_X_TOL_MM,
     "tip passage centre": tip.printed_band_mm(tip.PASSAGE_CENTER_PLACES),
@@ -309,7 +309,7 @@ BLOCK_AXIAL_TERMS_MM = {
 # ... and across it in plan (the same stations; its width band only brings
 # the +X face in).
 BLOCK_LATERAL_TERMS_MM = {
-    "tip platform hold-down station": plate.HOLDDOWN_STATION_TOL_MM,
+    "tip platform hold-down station": plate.HOLDDOWN_LATERAL_TOL_MM,
     "tip hold-down screw clearance": _TIP_FLOAT,
     "tip block foot tap station": tip.FOOT_TAP_X_TOL_MM,
 }

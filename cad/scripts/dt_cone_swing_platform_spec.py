@@ -244,27 +244,28 @@ HOLDDOWN_LOCAL_Z = -dt_cone_tip_block_spec.TIP_BLOCK_PIVOT_OFFSET
 # to -x of its adjuster axis (dt_cone_tip_block_spec.FOOT_TAP_OFFSET_X), so the
 # block body still stands centred on the cone line.  The offset exists only
 # so the hole's lateral station is a real dimension (HoldDownX): on the line
-# it was a zero-valued placement, which a sketch can hold only as a relation,
-# and so it printed at the general .XX band the tip block's containment and
-# lateral stacks cannot absorb (user ruling 2026-09-29: HoldDownX +/-0.10
-# from the pivot bore, now +/-.004).  -x (east) rather than +x because it
+# it was a zero-valued placement, which a sketch can hold only as a relation
+# (user ruling 2026-09-29).  -x (east) rather than +x because it
 # leaves the larger webs on both parts: the hole's web to the narrow west edge
 # grows on that side, and the block's foot tap moves off its +X side, where
 # the width's band sits.
 HOLDDOWN_LOCAL_X = -1.016  # -.04
-# The band on both printed stations from the pivot bore (HoldDownX,
-# HoldDownZ): the block's lateral and axial stacks need it rather than the
-# general .XX grade.  HoldDownZ prints .XXX, whose title-block grade is this
-# band; HoldDownX prints .XX and carries it explicitly (a .XXX restating
-# the title block is over-specification, rule 2: C1 keyed r9 machinist
-# review).  The shop's +/-.005 drilled-hole row (delegated ruling
-# 2026-11-07 (Main), no precedent; owner review #2144: was +/-.004 with a
-# spot from MHA-DT-21; a sheet cannot print an imported banded station as
-# REF, so the band went to the row).  build_dt_drive_train_assembly proves
-# the pivot-head air, the tip lateral take-up, the end screw's embed window
-# (C1 keyed, 2026-11-09) and the hold-down webs at +/-.005, with the post
-# taps also at +/-.005.
+# HoldDownZ, the hole's station along the cone axis, prints .XXX at the
+# shop's +/-.005 drilled-hole row (delegated ruling 2026-11-07 (Main), no
+# precedent; owner review #2144: was +/-.004 with a spot from MHA-DT-21; a
+# sheet cannot print an imported banded station as REF, so the band went to
+# the row).
 HOLDDOWN_STATION_TOL_MM = 0.127  # +/-.005
+# HoldDownX, the lateral station, prints .XX at the title block's band.  It
+# carried +/-.005 until machinist review r1 (farm run 20261124T125542720Z,
+# over-specification, gating) found no register entry for it, and none is
+# owed: re-derived 2026-11-24 with both stations at +/-.010, every check that
+# reads them still holds (the tip block's containment on the plate 0.764 mm
+# against 0.50, the hold-down and tip-dowel webs over .080, the end screw's
+# embed window, the tip lateral take-up, the pivot-head air), and the cone
+# tip's air to gear 19 no longer reads them (step 23's look erases the parts
+# frozen before it; owner ruling 2026-11-24, audit part 2 C9).
+HOLDDOWN_LATERAL_TOL_MM = printed_band_mm(2, unit=UNIT)  # +/-.01
 # The same stacks run through the post-mount taps, whose placement dimensions
 # (PostMountWestX/WestZ/EastX/EastZ) print .XXX, so the title-block grade is
 # this band: the shop's +/-.005 drilled-hole row. Owner ruling 2026-11-08 (Pedro), #2144 item 9.1
