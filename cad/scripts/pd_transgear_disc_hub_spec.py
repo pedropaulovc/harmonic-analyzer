@@ -650,11 +650,10 @@ HUB_DIA_CALLOUT_BELOW = "\n".join(
 )
 # The bore is reamed through and the sleeve's boss turned to it: the
 # process, the link to its fit note, then the least finished wall over it
-# (rule 20).  The note names the mate, the acceptance by that mate (rule 4,
-# made to fit: the boss slides in with no shake) and what the fit protects
-# (rule 4's necessity answer: the hub's rock closes the collar's gap to the
-# disc).
-BORE_NECESSITY = f"KEEPS {COLLAR_NUMBER} GAP"
+# (rule 20).  The note names the mate made to this bore (rule 4, made to
+# fit; the acceptance prints once, on the sleeve's sheet).  Why the bore is
+# reamed is the registry's (cad/config/necessity/pd-transgear-disc-hub.yaml,
+# owner ruling 2026-11-24: the reason is not printed on the sheet).
 BORE_CALLOUT_BELOW = "\n".join(
     (
         "REAM THRU",
@@ -662,10 +661,7 @@ BORE_CALLOUT_BELOW = "\n".join(
         BORE_WALL_TEXT,
     )
 )
-BORE_NOTE_TEXT = (
-    f"{SLEEVE_NUMBER} IS TURNED TO THIS BORE. "
-    f"{BORE_NECESSITY}."
-)
+BORE_NOTE_TEXT = f"{SLEEVE_NUMBER} IS TURNED TO THIS BORE."
 # The overall and the spigot's length both print the disc cluster's band and
 # serve one stack (rule 4): one note, named once, linked from both.
 STACK_TEXT = f"{STACK_NAME}: SETS {COLLAR_NUMBER} TO {DISC_NUMBER} CLEARANCE."
@@ -676,19 +672,16 @@ SPIGOT_LENGTH_CALLOUT = f"SEE NOTE {STACK_NOTE}"
 FLANGE_THICK_CALLOUT = f"SETS {SCREW_NAME}\n{SCREW_NUMBER} REACH"
 # The spigot is made to the disc's reamed bore (rule 4, made to fit): its
 # size prints REF and its callout says what it is turned to; its note gives
-# the requirement, the diametral clearance in that bore, what the clearance
-# protects (rule 4's necessity answer: the disc's float while its taps are
-# spotted spends their web to its bore) and the sharp root, with the disc's
-# bore chamfer it clears so the disc's face seats on the flange.
-SPIGOT_NECESSITY = "KEEPS ITS TAP WALL"
+# the requirement, the diametral clearance in that bore.  Its sharp root is
+# a single limit on the edge view, on a leader to the corner (rule 16;
+# machinist review 2026-11-24, three runs: in the note it was linked to the
+# fit, not to the corner).  The reasons are the registry's.
 SPIGOT_CALLOUT_BELOW = "\n".join(
     (f"TURN TO {DISC_NUMBER} BORE", f"SEE NOTE {SPIGOT_NOTE}")
 )
 SPIGOT_CLEARANCE_TEXT = "-".join(inch_text(value, 3) for value in SPIGOT_CLEARANCE)
-SPIGOT_NOTE_TEXT = (
-    f"CLEARANCE {SPIGOT_CLEARANCE_TEXT} IN {DISC_NUMBER} BORE. {SPIGOT_NECESSITY}. "
-    f"ROOT R{inch_text(CORNER_RADIUS_MAX, 3)} MAX CLEARS ITS CHAMFER."
-)
+SPIGOT_NOTE_TEXT = f"CLEARANCE {SPIGOT_CLEARANCE_TEXT} IN {DISC_NUMBER} BORE."
+SPIGOT_ROOT_CALLOUT = f"R{inch_text(CORNER_RADIUS_MAX, 3)} MAX"
 
 # Callouts the sheet hangs on the native dimensions.  The holes are drilled
 # (the title block's DRILLED HOLES row governs their sizes); the three screw
@@ -706,21 +699,16 @@ OIL_HOLE_CALLOUT_BELOW = "\n".join(
 # The chord hole prints in section A-A, cut through its station: the
 # reamer's size with no band and REAM beside it (the value's own row: the
 # air left of the ring holds two rows of sixteen characters under it), then
-# the pin and the link to its fit note: the press fit, its acceptance by
-# the pin and what the ream and its .174 +/-.002 offset protect (rule 4's
-# necessity answer: the pin's side keeps its air to the sleeve's flat, so
-# the hub slides on; the wall the ream also keeps is stated at the hub's
-# O.D.); the #56 knockout drilled through; the chord's offset and the
+# the pin and the link to its fit note: the press fit and its acceptance by
+# the pin (why the hole is reamed and its offset held to +/-.002 is the
+# registry's); the #56 knockout drilled through; the chord's offset and the
 # ream's stop from the hub axis, locations that carry their value and band
 # only (rule 7).
 KEY_PIN_SUFFIX = " REAM"
-KEY_PIN_NECESSITY = f"KEEPS GAP TO {SLEEVE_NUMBER} FLAT"
 KEY_PIN_CALLOUT_BELOW = "\n".join(
     (f"PIN {KEY_PIN_NUMBER}", f"SEE NOTE {KEY_PIN_NOTE}")
 )
-KEY_PIN_NOTE_TEXT = (
-    f"PRESS FIT ON {KEY_PIN_NUMBER}: THE PIN PRESSES IN. {KEY_PIN_NECESSITY}."
-)
+KEY_PIN_NOTE_TEXT = f"PRESS FIT ON {KEY_PIN_NUMBER}: THE PIN PRESSES IN."
 # The numbered notes, in order.
 NOTE_TEXTS = {
     STACK_NOTE: STACK_TEXT,

@@ -1,0 +1,11 @@
+# MHA-PD-16 transgear knob cup: why each REAM and each band tighter than the
+# title block stays (drawing-guidelines.md rule 4; owner ruling 2026-11-24:
+# the reason lives here, not on the sheet). Read by the machinist review only.
+# Fit audit 2026-11-23, pending owner confirmation. The two floor corners'
+# R MAX are single limits; each names the mate it seats.
+necessity:
+  - id: N-01
+    feature: "sheet 1, SECTION A-A, (Ø.250) pilot bored to MHA-PD-08, clearance .001-.005 (note 2)"
+    kind: joint
+    reason: "the bond gap must stay inside LOCTITE 641's fill"
+    source: "pd_transgear_knob_cup_spec.PILOT_CLEARANCE, LOCTITE_641_GAP_MAX"

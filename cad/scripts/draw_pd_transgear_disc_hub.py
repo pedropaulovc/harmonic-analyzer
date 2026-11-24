@@ -61,6 +61,7 @@ from _drawing_dimensions import (
 from _drawing_edges import ViewEdge, ViewEdges, scan_view_edges
 from _drawing_gdt import add_datum_feature, add_feature_control_frame
 from _drawing_hidden_sketches import curate_view_dimensions
+from _drawing_leader_notes import add_leader_note
 from _drawing_leaders import set_near_side_diameter
 from _drawing_projection import model_point_in_view, model_points_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -163,6 +164,15 @@ _SPIGOT_R = SPIGOT_DIA / 2.0 * _S
 # the spigot's), one line each; top-left anchored in the empty field above
 # the face view, left of the overall's callout.
 _NOTE_WIDTH = 96
+# The spigot's root corner, its largest radius on a leader to the corner
+# itself (rule 16): the lower corner on the edge view, where the flange's
+# rear face meets the spigot.  The row stands in the air under the spigot
+# Ø's lower extension line and over the flange face's perpendicularity
+# frame (12 mm apart on the render of run 20261124T033556296Z), right of
+# the corner: top-left anchored, 3.6 mm under the extension line, 24 mm
+# wide, ending 6 mm short of the frame's right end.
+SPIGOT_ROOT_XY = (_side_x(0.0), AXIS_Y - _SPIGOT_R)
+SPIGOT_ROOT_TEXT_XY = (SPIGOT_ROOT_XY[0] + 0.0143, SPIGOT_ROOT_XY[1] - 0.0036)
 
 
 def _numbered(number: int, text: str) -> str:
@@ -622,7 +632,7 @@ requirement(
         "length_callout": (SPIGOT_LENGTH_CALLOUT, ("SPIGOT_LENGTH_CALLOUT",)),
         "root_radius_max": (
             _spec.CORNER_RADIUS_MAX,
-            ("CORNER_RADIUS_MAX", "SPIGOT_NOTE_TEXT"),
+            ("CORNER_RADIUS_MAX", "SPIGOT_ROOT_CALLOUT", (_SELF, "SPIGOT_ROOT_XY")),
         ),
         "mate": ("MHA-PD-06", ("DISC_NUMBER", "SPIGOT_CALLOUT_BELOW")),
         "fit": ("clearance", ("SPIGOT_NOTE_TEXT",)),
@@ -1643,6 +1653,15 @@ def build(adapter: Any) -> dict[str, str]:
             datums=(BORE_DATUM,),
             label=frame.label,
         )
+    # The spigot root's single limit, on a leader to the corner (rule 16).
+    add_leader_note(
+        adapter,
+        _spec.SPIGOT_ROOT_CALLOUT,
+        text_xy=SPIGOT_ROOT_TEXT_XY,
+        attach_xy=SPIGOT_ROOT_XY,
+        view=side,
+        label="spigot root radius",
+    )
     # The stack note the overall's and the spigot length's callouts link.
     if add_note(adapter, NOTES_TEXT, *NOTES_XY) is None:
         raise RuntimeError("failed to add the disc hub's stack note")

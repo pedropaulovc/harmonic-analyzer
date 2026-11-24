@@ -208,11 +208,8 @@ def test_the_round_bore_is_reamed_and_the_sleeve_boss_made_to_it() -> None:
     assert spec.BOSS_CLEARANCE == spec.BOSS_CLEARANCE_LIMITS[1]
     callout = drawing.DIMENSION_CALLOUTS_BELOW["BoreDia"].splitlines()
     assert callout == ["REAM THRU", f"SEE NOTE {spec.BORE_NOTE}", spec.BORE_WALL_TEXT]
-    assert spec.BORE_NECESSITY == f"KEEPS {spec.COLLAR_NUMBER} GAP"
-    assert spec.BORE_NOTE_TEXT == (
-        f"{spec.SLEEVE_NUMBER} IS TURNED TO THIS BORE. "
-        f"KEEPS {spec.COLLAR_NUMBER} GAP."
-    )
+    # Owner ruling 2026-11-24: the reason is the registry's, not the sheet's.
+    assert spec.BORE_NOTE_TEXT == f"{spec.SLEEVE_NUMBER} IS TURNED TO THIS BORE."
     assert not re.search(r"\.\d", spec.BORE_NOTE_TEXT)
     assert f"{spec.BORE_NOTE}. {spec.BORE_NOTE_TEXT}" in drawing.NOTES_TEXT
 
@@ -422,10 +419,18 @@ def test_the_spigot_seats_on_the_step_square_and_clear_of_the_disc() -> None:
         f"TURN TO {spec.DISC_NUMBER} BORE",
         f"SEE NOTE {spec.SPIGOT_NOTE}",
     ]
-    assert spec.SPIGOT_NOTE_TEXT == (
-        f"CLEARANCE .003-.005 IN {spec.DISC_NUMBER} BORE. KEEPS ITS TAP WALL. "
-        "ROOT R.004 MAX CLEARS ITS CHAMFER."
+    assert spec.SPIGOT_NOTE_TEXT == f"CLEARANCE .003-.005 IN {spec.DISC_NUMBER} BORE."
+    # Rule 16: the root's single limit on a leader to the corner itself, in
+    # the air under the spigot and over the flange face's frame.
+    assert spec.SPIGOT_ROOT_CALLOUT == "R.004 MAX"
+    assert "ROOT" not in drawing.NOTES_TEXT
+    corner = drawing.SPIGOT_ROOT_XY
+    assert corner == pytest.approx(
+        (drawing._side_x(0.0), drawing.AXIS_Y - spec.SPIGOT_DIA / 2.0 * drawing._S)
     )
+    text = drawing.SPIGOT_ROOT_TEXT_XY
+    assert text[0] > corner[0] + 0.010
+    assert corner[1] - 0.009 < text[1] < corner[1] - 0.003
     assert f"{spec.SPIGOT_NOTE}. {spec.SPIGOT_NOTE_TEXT}" in drawing.NOTES_TEXT
     # The common seat annulus at the actual partial-depth cutter end, with
     # every printed radial/tip/step/full-depth corner bounded by its owner.
@@ -1119,11 +1124,9 @@ def test_the_chord_hole_dimensions_print_left_of_the_ring() -> None:
         f"SEE NOTE {spec.KEY_PIN_NOTE}",
     ]
     assert spec.KEY_PIN_NOTE_TEXT == (
-        f"PRESS FIT ON {spec.KEY_PIN_NUMBER}: THE PIN PRESSES IN. "
-        f"KEEPS GAP TO {spec.SLEEVE_NUMBER} FLAT."
+        f"PRESS FIT ON {spec.KEY_PIN_NUMBER}: THE PIN PRESSES IN."
     )
     assert not re.search(r"\.\d", spec.KEY_PIN_NOTE_TEXT)
-    assert len(spec.KEY_PIN_NECESSITY.replace(spec.SLEEVE_NUMBER, "").split()) <= 6
     assert f"{spec.KEY_PIN_NOTE}. {spec.KEY_PIN_NOTE_TEXT}" in drawing.NOTES_TEXT
     assert spec.KEY_PIN_HOLE_BAND == pytest.approx((0.0005 * IN, 0.0))  # analysis
     assert len(drawing.SECTION_CALLOUTS_BELOW["KeyPinDrillDia"].splitlines()) <= 2
