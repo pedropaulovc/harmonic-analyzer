@@ -60,7 +60,6 @@ from dt_pinion_arbor_spec import (
     BOND_RELIEF_LEN,
     BOND_RELIEF_Z,
     CROSS_HOLE_DIA,
-    CROSS_HOLE_DIA_BAND,
     CROSS_HOLE_STATION,
     DRAWING_NOTES,
     DRUM_STATION,
@@ -1164,16 +1163,11 @@ def build(adapter) -> dict[str, str]:
     # Spelled out per span: _drawing_contract reads each call's literal names.
     # The two MHA-DT-01 bond lands carry no band: they are made to fit the
     # drilled drum bore (owner ruling 2026-11-24, fit audit question 13;
-    # delegated ruling 2026-11-24 (FitLaneDT)), REF sizes below.
+    # delegated ruling 2026-11-24 (FitLaneDT)), REF sizes below.  The
+    # crossrod hole prints the .2510 reamer's size and no band (fit audit
+    # F14).
     set_dimension_bilateral_tolerance(
         adapter, "BackStubReference", "BackStubDia", *deviations(SHAFT_DIA_BAND), display_unit=UNIT
-    )
-    set_dimension_bilateral_tolerance(
-        adapter,
-        "CrossHoleProfile",
-        "CrossHoleDia",
-        *deviations(CROSS_HOLE_DIA_BAND),
-        display_unit=UNIT,
     )
     set_dimension_bilateral_tolerance(
         adapter,

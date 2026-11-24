@@ -1,0 +1,14 @@
+# MHA-DT-22 pinion arbor: why each REAM and each band tighter than the title
+# block stays (drawing-guidelines.md rule 4; owner ruling 2026-11-24: the
+# reason lives here, not on the sheet). Read by the machinist review only.
+# The crossrod hole is reamed with the owned .2510 reamer and prints no band;
+# the MHA-DT-15 rod entering by hand is its acceptance (fit audit F14, owner
+# ruling 2026-11-24). A 1/4 drill can cut under the largest 1/4 rod (.250),
+# so the rod may refuse it; an F drill (.257-.261) leaves up to .013 of gap on
+# the smallest rod (.248), past Loctite 638's 0.25 mm (.0098) gap limit.
+necessity:
+  - id: N-01
+    feature: "Ø.2510 REAM THRU crossrod hole (MHA-DT-15 ROD ENTERS BY HAND)"
+    kind: gap
+    reason: "F drill's gap exceeds Loctite 638's limit; 1/4 refuses rod"
+    source: "fit audit F14"

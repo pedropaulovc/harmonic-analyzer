@@ -94,8 +94,6 @@ from dt_pinion_arbor_spec import (
     BOND_RELIEF_LEN,
     BOND_RELIEF_Z,
     BOND_ZONE_DIA_Z,
-    CROSSROD_MAX_CLEARANCE,
-    CROSSROD_MIN_CLEARANCE,
     CROSSROD_NUMBER,
     DRUM_NUMBER,
     FRONT_JOURNAL_Z,
@@ -175,12 +173,14 @@ SPAN_CALLOUT = "SEE NOTE 2"
 # inside the grade's gap (farm run 20261117T130901535Z r2, two blockers):
 # the lands' in the drilled MHA-DT-01 bore on note 3, the fit's own range
 # (BOND_FIT_CLEARANCE: the lands are turned to the measured bore, not limits
-# on both members), and the head cross bore's on the MHA-DT-15 crossrod at
-# its own callout, in two wider rows (rule 7 holds the notes block to four).
+# on both members).  The head cross bore is reamed .2510 with no band, the
+# MHA-DT-15 rod entering by hand its acceptance (owner ruling 2026-11-24,
+# fit audit F14, its recommended form): the reamer and the bought rod hold
+# the bond gap (dt_pinion_arbor_geometry.CROSSROD_MAX_CLEARANCE under
+# Loctite 638's limit), so the callout names the rod and the compound only.
 BOND_CLEARANCE = BOND_FIT_CLEARANCE
 CROSS_HOLE_CALLOUT = (
-    f"REAM THRU, BONDED FIT ON {CROSSROD_NUMBER},\n{RETAINING_COMPOUND} (CLEARANCE "
-    f"{_inch(CROSSROD_MIN_CLEARANCE)}-{_inch(CROSSROD_MAX_CLEARANCE)})"
+    f"REAM THRU; {CROSSROD_NUMBER} ROD ENTERS\nBY HAND; BOND {RETAINING_COMPOUND}"
 )
 # Rule 7: the notes block stays at four short rows; the widest (66
 # characters, ~172 mm) ends ~24 mm left of the title block (x 0.216).
@@ -468,12 +468,14 @@ requirement(
     precision={"radius": _P["BackCapR"], "rim_station": _P["BackRimFromHeadRear"]},
 )
 # The head's reamed crossrod hole along model Y, a .XX station from the head
-# rear face, bonded on MHA-DT-15 (its own +.005/+.001 band).
+# rear face, bonded on MHA-DT-15: the .2510 reamer's size and no band (fit
+# audit F14).  ``dia`` (the reamer's ANALYSIS band) stays a traveler
+# requirement, as MHA-DT-14's pivot bore keeps it.
 requirement(
     "cross_hole",
     kind="hole",
     faces=(CylinderFace(CROSS_HOLE_DIA),),
-    requirements=("dia", "thru", "station"),
+    requirements=("dia", "thru", "process", "mates", "station"),
     fields={
         "at": (
             [0.0, -HEAD_DIA / 2.0, HEAD_CENTER_Z],

@@ -300,33 +300,24 @@ NECK_END_Z = HEAD_REAR_Z + NECK_LEN
 EXPOSED_SHAFT_LEN = SHAFT_LEN - NECK_END_Z
 # R1 (U27 precedent, Main 2026-09-24): as-received bar cannot make a press, so
 # MHA-DT-15 is bonded in with Loctite 638.  #290 (owner ruling): the crossrod
-# is 1/4 bar; the model carries rod and hole at the .250 nominal (line to
-# line).  #2106 final review (Main ruling): the bonded hole's band comes from
-# the joint's function, not from a reamer: its lower limit lets the largest
-# catalogue rod (ROD_DIA_BAND, ASTM A108 1/4 cold-finished) enter with
-# CROSSROD_ENTRY_CLEARANCE, and its upper limit keeps the loosest pair inside
-# Loctite 638's diametral gap ceiling (TDS: 0.25 mm max gap).  Printed
-# .250 +.005/+.001 at three places.
-CROSS_HOLE_DIA = 6.35  # .250
-CROSS_HOLE_DIA_PLACES = 3
+# is 1/4 bar.  Fit audit F14 (owner ruling 2026-11-24): the hole is reamed
+# with the owned .2510 reamer (inventory tools.reamers "0.2510in") and prints
+# no band, the rod entering by hand its acceptance (".2510 REAM THRU; MHA-DT-15
+# ROD ENTERS BY HAND; BOND LOCTITE 638").  The model nominal is the reamer's
+# size; CROSS_HOLE_DIA_BAND is the ANALYSIS band (what the reamer is modelled
+# to cut, .2510-.2515), not a printed limit.  The bond's two ends still hold:
+# the largest catalogue rod (ROD_DIA_BAND, ASTM A108 1/4 cold-finished)
+# enters with CROSSROD_ENTRY_CLEARANCE, and the loosest pair stays inside
+# Loctite 638's diametral gap ceiling (TDS: 0.25 mm max gap).  A 1/4 drill
+# can cut under the largest rod and an F drill's .261 overruns the gap: the
+# necessity register's N-01.
+OWNED_CROSS_HOLE_REAMER_MM = 0.2510 * 25.4
+CROSS_HOLE_DIA = OWNED_CROSS_HOLE_REAMER_MM  # 6.3754, .2510 reamer
+CROSS_HOLE_DIA_PLACES = 4
 CROSSROD_ENTRY_CLEARANCE = 0.0254  # .001 in over the largest rod
-CROSS_HOLE_DIA_BAND = (
-    0.127,  # +.005 in
-    round(ROD_DIA + ROD_DIA_BAND[0] + CROSSROD_ENTRY_CLEARANCE - CROSS_HOLE_DIA, 9),
-)  # (upper, lower) deviations: +.005/+.001
+CROSS_HOLE_DIA_BAND = (0.0127, 0.0)  # ANALYSIS (upper, lower) deviations
 RETAINING_COMPOUND = "LOCTITE 638"
 RETAINING_COMPOUND_MAX_GAP_MM = 0.25  # 638 TDS diametral gap limit
-# The owned .2510 over reamer (inventory tools.reamers "0.2510in") still cuts
-# the hole inside its limits.
-OWNED_CROSS_HOLE_REAMER_MM = 0.2510 * 25.4
-if not (
-    CROSS_HOLE_DIA + CROSS_HOLE_DIA_BAND[1]
-    <= OWNED_CROSS_HOLE_REAMER_MM
-    <= CROSS_HOLE_DIA + CROSS_HOLE_DIA_BAND[0]
-):
-    raise AssertionError(
-        "the owned .2510 reamer no longer cuts the crossrod hole in band"
-    )
 OVERALL_LEN = SHAFT_LEN + BACK_CAP_SAG - (HEAD_FRONT_Z - HEAD_CAP_SAG)
 BACK_RIM_FROM_HEAD_REAR = SHAFT_LEN - HEAD_REAR_Z
 FRONT_JOURNAL_Z = HEAD_REAR_Z + FRONT_JOURNAL_FROM_HEAD_REAR
