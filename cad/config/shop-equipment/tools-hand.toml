@@ -94,15 +94,18 @@ make = "TEKTON"
 sku = "WCB90302"
 status = "on_hand"
 
-# The only use found is the pen stud's nut, 5/32 in across flats
-# (pn_pen_assembly_sheet.STUD_NUT_WRENCH, _mcmaster_92671a115.ACROSS_FLATS);
-# SAE ignition sets on sale start at 7/32 in (#3083 row 25, owner ruling
-# 2026-11-20), so the tool to buy is a single 5/32 in open-end wrench.
+# Its use is the pen rod's jam nut: the MHA-PN-00 sheet's step reads "... THE
+# JAM NUT DOWN ON THE ROD TOP (5/32 WRENCH)." (ha_assembly_package's tool row
+# and test_every_tool_a_sheet_names_has_a_row read it). Owner ruling
+# 2026-11-24 (form): "Yes, I own one: record it on hand, buy nothing." (His
+# earlier "Retire both." the same day was asked on the wrong premise that
+# nothing uses it.)
 [tools.ignition-wrenches]
 name = "Open-end wrench, 5/32 in (ignition size)"
 kind = "wrench"
-status = "to_order"
+status = "on_hand"
 size_in = "5/32"
+cite = ["Owner ruling 2026-11-24 (Pedro): \"Yes, I own one: record it on hand, buy nothing.\""]
 
 [tools.hex-keys-bondhus-10937]
 name = "Bondhus 10937 ball-end hex key set, 0.050-3/8 in (archived inventory)"
@@ -357,3 +360,77 @@ status = "to_order"
 purchase = "LittleMachineShop 4832, $49.95, in stock (listing read live 2026-11-23)"
 note = "Not owned: to buy (owner, Pedro, 2026-11-23: \"also add mill tramming tool\", then \"swap the Pro Tram for an indicator arm\"). Sweep-trams the PM-30MV head with the owned dial test indicator (gauges.dti) from the owned 3/8 or 1/2 in R8 collet (holders.r8-collets-south-bend-sb1280). The listing: hardened clamping post of three diameters, 1/4, 3/8 and 1/2 in; for test indicators with dovetails or 1/4 in posts; reaches anywhere within an 8 in diameter; fine-adjusts about 3/8 in. The owned indicator's mount is not on record. No plan names this tool. The Edge Technology Pro Tram 01-000 it replaces read $149.95 at Penn Tool the same day (Edge Technology direct $116.99, search summary, page not opened)."
 cite = ["https://littlemachineshop.com/products/test-indicator-holder-universal read live 2026-11-23: Zero Set Test Indicator Holder, Universal, SKU 4832, $49.95, available; 'The hardened clamping post consists of three O.D.'s - 1/4, 3/8 & 1/2\"'; 'reaches anywhere within a 8\" diameter and fine-adjusts about 3/8\" with knob'", "https://www.penntoolco.com/edge-pro-tram-system-01-000-1-2-shank/ read live 2026-11-23: Edge Pro Tram System 01-000, 1/2 in shank, $149.95"]
+
+# Added to the LittleMachineShop cart by the owner. Owner ruling 2026-11-24
+# (form): "Yes, mine: keep it and record it." No plan names it.
+[tools.centre-square-set-lms-6687]
+name = "Machinists center square set, 1-1/2 and 3 in, plus scriber"
+kind = "centre_square"
+make = "LittleMachineShop"
+sku = "6687"
+status = "to_order"
+purchase = "LittleMachineShop 6687, $29.95, in stock (listing read live 2026-11-24); in the owner's cart."
+cite = ["https://littlemachineshop.com/products/machinists-center-square-set-1-1-2-inch-and-3-inch-plus-scriber read live 2026-11-24: Machinists Center Square Set, 1 1/2\" & 3\", Plus Scriber, SKU 6687, $29.95, in stock", "Owner ruling 2026-11-24 (Pedro): \"Yes, mine: keep it and record it.\""]
+
+# The owner's bench grinder, from his photo of its nameplate (C:/farm-runs/
+# triage-2026-11-19/owner-photos/bench-grinder-2026-11-14.jpg): a grey wheel
+# on the left spindle, a wire wheel on the right. The guards take a 3/4 in
+# wide wheel (owner 2026-11-24, relayed by the coordinator; not his verbatim
+# words). The photo shows a crack in the
+# base casting beside the switch plate. Owner 2026-11-24: "i want to learn how
+# to grind tool bits ; include grinding wheel in shopping cart ; bench grinder".
+[tools.bench-grinder-duracraft-60650]
+name = "Duracraft 60650 bench grinder, 1/2 HP, 3450 rpm, 6 in wheels, 1/2 in arbor"
+kind = "bench_grinder"
+make = "Duracraft"
+sku = "60650"
+status = "on_hand"
+wheel_dia_in = 6.0
+arbor_in = 0.5
+rpm = 3450
+note = "Owner photo 2026-11-14 of the nameplate: ALL BALL BEARING BENCH GRINDER, MODEL 60650, 1/2 H.P., 3.5 AMPS, 115 VAC, 60 HZ, 3450 RPM, SINGLE PH., 6 in DIAMETER WHEEL, 1/2 in ARBOR, MFG DATE 1986. For the hand-ground HSS lathe bits (tools.form-tool-r024). Its guards take a 3/4 in wide wheel (relayed by the coordinator 2026-11-24 as the owner's reading; his words are not on record). The photo shows a crack in the base casting beside the switch plate: to inspect before a new wheel is run."
+cite = ["Owner (Pedro) photo bench-grinder-2026-11-14.jpg, nameplate read 2026-11-24", "Owner (Pedro) 2026-11-24: \"i want to learn how to grind tool bits ; include grinding wheel in shopping cart ; bench grinder\""]
+
+# The tool-bit grinding kit for that grinder (owner 2026-11-24, same words).
+# All four are in guest carts, none ordered. The wheel's page says a bushing
+# is included without giving its size, so the 1 in to 1/2 in reducer is
+# carted with it.
+[tools.grinding-wheel-white-6x3-4]
+name = "Norton bench grinding wheel, white aluminium oxide, 60 grit, 6 x 3/4 in, 1 in hole"
+kind = "grinding_wheel"
+make = "Norton"
+sku = "07554629"
+status = "to_order"
+purchase = "MSC 07554629, $56.86, in stock; with MSC 01942101 wheel reducer bushing 1 in OD (to the 1/2 in arbor), $2.47, in stock (both read live 2026-11-23)."
+note = "Not owned: to buy. For HSS tool bits on tools.bench-grinder-duracraft-60650 (3450 rpm). The page: \"Maximum RPM: 4140\", \"Bushing Included: Yes\" (sizes not listed). Softer and cheaper alternative read the same day: Pferd HSS bench wheel, grade I, 6 x 3/4 x 1-1/4 in, MSC 66866278, $27.72, \"Maximum RPM: 4500\", ships from the supplier."
+cite = ["https://www.mscdirect.com/product/details/07554629 read live 2026-11-23", "https://www.mscdirect.com/product/details/01942101 read live 2026-11-23", "Owner (Pedro) 2026-11-24: \"i want to learn how to grind tool bits ; include grinding wheel in shopping cart ; bench grinder\""]
+
+[tools.wheel-dresser-diamond]
+name = "Handheld single-point diamond grinding wheel dresser, for 4 to 6 in wheels"
+kind = "wheel_dresser"
+make = "McMaster-Carr"
+sku = "4542A1"
+status = "to_order"
+purchase = "McMaster-Carr 4542A1, $44.44 (read live 2026-11-23)."
+note = "Not owned: to buy. Trues and opens the white wheel. Cheaper alternative read the same day: LittleMachineShop 3191, $22.95, shank and carat not on its page."
+cite = ["https://www.mcmaster.com/4542A1/ read live 2026-11-23"]
+
+[tools.tool-bit-blanks-m2-1-4]
+name = "M2 HSS square tool bit blanks, 1/4 x 1/4 x 2-1/2 in"
+kind = "tool_bit_blank"
+sku = "02603165"
+status = "to_order"
+pieces = 3
+purchase = "MSC 02603165, $5.32 each, in stock (read live 2026-11-23); three carted."
+note = "Not owned: to buy. The blanks the hand-ground bits are made from: the R.024 full-radius groover (tools.form-tool-r024) and practice pieces. 5/16 in M2 is MSC 02603207, $7.80; M35 cobalt 1/4 in is MSC 02604163, $9.09."
+cite = ["https://www.mscdirect.com/product/details/02603165 read live 2026-11-23", "Owner ruling 2026-11-24 (Pedro): \"Grind it by hand from an HSS blank.\""]
+
+[tools.slip-stone-240]
+name = "Aluminium-oxide polishing stone, contoured, 240 grit, 4 x 1 in"
+kind = "sharpening_stone"
+make = "McMaster-Carr"
+sku = "4620A22"
+status = "to_order"
+purchase = "McMaster-Carr 4620A22, $18.27 (read live 2026-11-23)."
+note = "Not owned: to buy. Stones the ground edge of a hand-ground bit."
+cite = ["https://www.mcmaster.com/4620A22/ read live 2026-11-23"]
