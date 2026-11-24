@@ -15,7 +15,6 @@ from _drawing_contract import (
     model_toleranced_dimensions,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
-from _fit_ream_slide import REAM_SLIDE
 from _hole_spec import blind_cut_dia_mm
 from _printed_tolerance import printed_band_mm, printed_deviations
 
@@ -79,14 +78,13 @@ def test_surface_finish_is_part_owned_and_consumed_by_key() -> None:
     # in the lift bore.
     pivot, lift = dt_pinion_pivot_block_spec.SURFACE_FINISHES
     assert (pivot.key, lift.key) == ("pivot_bore", "lift_bore")
-    for control in (pivot, lift):
-        assert control.roughness_um == 1.6
-        assert control.face.diameter_mm == dt_pinion_pivot_block_spec.BORE_DIA
-    assert pivot.face.contains_y_mm == -dt_pinion_pivot_block_spec.BORE_DIA / 2.0
+    assert pivot.roughness_um == lift.roughness_um == 1.6
+    assert pivot.face.diameter_mm == dt_pinion_pivot_block_spec.PIVOT_BORE_DIA
+    assert lift.face.diameter_mm == dt_pinion_pivot_block_spec.LIFT_BORE_DIA
     # The lift selector's station lies outside the pivot bore's x-span.
     lift_x = lift.face.contains_x_mm
     assert lift_x == -dt_pinion_pivot_block_spec.LIFT_BORE_SPACING
-    assert abs(lift_x) > dt_pinion_pivot_block_spec.BORE_DIA / 2.0
+    assert abs(lift_x) > dt_pinion_pivot_block_spec.PIVOT_BORE_DIA / 2.0
 
 
 def test_required_drawing_paths() -> None:
@@ -123,24 +121,29 @@ def test_sheet_runs_at_3_to_1_with_2_to_1_isometric() -> None:
     assert dt_pinion_pivot_block_spec.ISOMETRIC_VIEW_NOTE == "ISOMETRIC VIEW SCALE 2:1"
 
 
-def test_each_ream_callout_names_its_running_mate() -> None:
-    # Machinist review r1 (#1014): the mate and fit ride each bore's own
-    # callout (drawing-guidelines.md rule 4 (tighten only for function, and
-    # name the mate)), named exactly as the mate's title block reads.
-    # Size, process, then at most two rows of words (rule 7).
+def test_each_bore_callout_names_its_mate_and_acceptance() -> None:
+    # Machinist review r1 (#1014): the mate rides each bore's own callout
+    # (drawing-guidelines.md rule 4 (tighten only for function, and name the
+    # mate)), by its drawing number.  Size, process, then at most two rows of
+    # words (rule 7).  The pivot bore takes the .2510 reamer, the shaft its
+    # gauge (owner ruling 2026-11-24, fit audit question 12, option B); the
+    # lift bore is drilled F (fit audit F26).
     callouts = drawing.DIMENSION_CALLOUTS
-    for name, part in (
-        ("PivotBoreDia", "dt-pinion-pivot-shaft"),
-        ("LiftBoreDia", "dt-pinion-lift-rod"),
-    ):
-        number = str(_config.parts(part)["number"])
-        lines = callouts[name].splitlines()
-        assert lines[0] == "REAM THRU"
-        assert lines[1] == f"RUNNING FIT ON {number}"
-        assert len(lines) <= 3
-    # R2 (converged-r7): REAM_SLIDE, one fit per shaft with MHA-DT-14; the
-    # stock 1/4 in reamer wording went with the line-to-line band.
-    assert dt_pinion_pivot_block_spec.BORE_DIA_BAND == REAM_SLIDE
+    shaft = str(_config.parts("dt-pinion-pivot-shaft")["number"])
+    rod = str(_config.parts("dt-pinion-lift-rod")["number"])
+    assert callouts["PivotBoreDia"].splitlines() == [
+        "REAM THRU",
+        f"{shaft} ENTERS,",
+        "TURNS BY HAND",
+    ]
+    assert callouts["LiftBoreDia"].splitlines()[:2] == [
+        "F DRILL THRU",
+        f"{rod} TURNS FREELY",
+    ]
+    assert dt_pinion_pivot_block_spec.PIVOT_BORE_DIA == pytest.approx(0.2510 * 25.4)
+    assert dt_pinion_pivot_block_spec.PIVOT_BORE_BAND == pytest.approx((0.0127, 0.0))
+    assert dt_pinion_pivot_block_spec.LIFT_BORE_DIA == pytest.approx(0.257 * 25.4)
+    assert dt_pinion_pivot_block_spec.LIFT_BORE_BAND == pytest.approx((0.1016, 0.0))
     assert "1/4 IN" not in callouts["PivotBoreDia"]
 
 
@@ -195,12 +198,10 @@ def test_front_view_locations_start_at_the_pivot_bore() -> None:
 def test_hole_states_are_annotated() -> None:
     callouts = drawing.DIMENSION_CALLOUTS
     assert callouts["PivotBoreDia"].startswith("REAM THRU")
-    assert callouts["LiftBoreDia"].startswith("REAM THRU")
+    assert callouts["LiftBoreDia"].startswith("F DRILL THRU")
     assert "+0.05/-0.00" not in "\n".join(callouts.values())
-    assert model_toleranced_dimensions(block) == {
-        ("BlockProfile", "PivotBoreDia"): "*deviations(BORE_DIA_BAND)",
-        ("BlockProfile", "LiftBoreDia"): "*deviations(BORE_DIA_BAND)",
-    }
+    # Neither bore carries a model band (a reamed and a drilled hole).
+    assert model_toleranced_dimensions(block) == {}
 
 
 def test_block_carries_no_gdt_only_its_running_bore_finish() -> None:
@@ -252,8 +253,8 @@ def test_views_carry_no_hidden_lines() -> None:
     # The Ra leader must leave the block through its top face, left of the
     # corner where BlockHeight's extension line starts.
     rim = (
-        drawing._front_x(0.0) + drawing.BORE_R_SHEET * 0.866,
-        drawing._front_y(0.0) + drawing.BORE_R_SHEET * 0.5,
+        drawing._front_x(0.0) + drawing.PIVOT_BORE_R_SHEET * 0.866,
+        drawing._front_y(0.0) + drawing.PIVOT_BORE_R_SHEET * 0.5,
     )
     top_y = drawing._front_y(
         dt_pinion_pivot_block_spec.BLOCK_HEIGHT - dt_pinion_pivot_block_spec.BORE_UP

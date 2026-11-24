@@ -20,25 +20,14 @@ import _process_plans
 
 IN = 25.4
 
-# stem: (the band's record, the [parameters] keys of the band's limits and of
-# the two pin limits; None where the band is bound from the drawing).
+# stem: (the band's record, the [parameters] keys of the two pin limits; the
+# band is bound from the drawing).
 PLANS = {
-    "dt_cone_tip_bushing": ("zz-pins-0625-0630", None, "go_pin_max_in", "nogo_pin_min_in"),
-    "dt_crank_hub": ("zz-pins-3760-3765", None, "go_pin_max_in", "nogo_pin_min_in"),
-    "dt_pinion_arbor": (
-        "zz-pins-3135-3140",
-        ("strap_bore_min_in", "strap_bore_max_in"),
-        "strap_go_pin_max_in",
-        "strap_nogo_pin_min_in",
-    ),
-    "dt_pinion_cam": ("zz-pins-2510-2515", None, "go_pin_max_in", "nogo_pin_min_in"),
-    "dt_pinion_pivot_block": ("zz-pins-2510-2515", None, "go_pin_max_in", "nogo_pin_min_in"),
-    "dt_arbor_pedestal": ("zz-pins-3760-3765", None, "go_pin_max_in", "nogo_pin_min_in"),
+    "dt_cone_tip_bushing": ("zz-pins-0625-0630", "go_pin_max_in", "nogo_pin_min_in"),
+    "dt_crank_hub": ("zz-pins-3760-3765", "go_pin_max_in", "nogo_pin_min_in"),
+    "dt_pinion_cam": ("zz-pins-2510-2515", "go_pin_max_in", "nogo_pin_min_in"),
+    "dt_arbor_pedestal": ("zz-pins-3760-3765", "go_pin_max_in", "nogo_pin_min_in"),
 }
-
-# Plans that gauge a mating part's bores with the pins and ream none of the
-# band themselves (their reamer cuts another hole).
-REGAUGE_ONLY = {"dt_pinion_arbor"}
 
 
 def _plan(stem: str) -> dict:
@@ -68,15 +57,12 @@ def test_the_plan_lists_the_bands_zz_pins_and_no_class_x_pair(stem):
 
 @pytest.mark.parametrize("stem", sorted(PLANS))
 def test_the_printed_window_is_the_band_less_one_zz_tolerance(stem):
-    record, band_keys, go_key, nogo_key = PLANS[stem]
+    record, go_key, nogo_key = PLANS[stem]
     p = _plan(stem)["parameters"]
     gauge = _process_plans.load_shop()["gauges"][record]
     low, high = (v / IN for v in gauge["range_mm"])
     tol = gauge["resolution_mm"] / IN
     assert tol == pytest.approx(0.0002, abs=1e-6)
-    if band_keys:
-        assert p[band_keys[0]] == pytest.approx(low, abs=1e-5)
-        assert p[band_keys[1]] == pytest.approx(high, abs=1e-5)
     assert p[go_key] == pytest.approx(low + tol, abs=1e-5)
     assert p[nogo_key] == pytest.approx(high - tol, abs=1e-5)
 
@@ -93,4 +79,4 @@ def test_the_pins_are_miked_before_they_gauge_or_the_reamer_cuts(stem):
     gauged = min(i for i, op in enumerate(ops) if record in _gauges(op))
     reamed = [i for i, op in enumerate(ops) if op.get("tool") == "reamer"]
     assert miked < gauged
-    assert stem in REGAUGE_ONLY or not reamed or miked < min(reamed)
+    assert not reamed or miked < min(reamed)

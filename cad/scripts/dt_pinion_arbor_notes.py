@@ -43,8 +43,11 @@ if not (
     raise AssertionError("the back bond land's witness must lie on that land")
 # One size for both journal lands, on the back land (#1038 sheet decision,
 # not a ruling: under the shaft the front land's block had no open space
-# between its 2.61 and 1.82 station witnesses).  Note 1 names them.
-JOURNAL_DIA_PREFIX = "2X <MOD-DIAM>"
+# between its 2.61 and 1.82 station witnesses).  Note 1 names them.  The
+# size is a REFERENCE, "2X (Ø.3125)": the journals are made to fit the
+# MHA-DT-14 bores (owner ruling 2026-11-24, fit audit question 12).
+JOURNAL_DIA_PREFIX = "2X (<MOD-DIAM>"
+JOURNAL_DIA_SUFFIX = ")"
 _NEW_SPANS = (
     (
         "BackBondReference",

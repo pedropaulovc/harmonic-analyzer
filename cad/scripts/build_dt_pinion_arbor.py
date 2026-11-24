@@ -35,7 +35,7 @@ from _sketch import (
 )
 from _sketch_circle import define_circle
 from _drawing_dimension_insert import add_diametric_linear_dimension
-from _drawing_precision import apply_drawing_precision
+from _drawing_precision import _named_dimension, apply_drawing_precision
 from _drawing_marks import apply_drawing_properties, clear_dimensions_for_drawing, mark_dimensions_for_drawing
 from _drawing_tolerances import set_dimension_bilateral_tolerance
 from _drawing_prefix import set_dimension_prefix
@@ -76,7 +76,6 @@ from dt_pinion_arbor_spec import (
     HEAD_LEN,
     HEAD_REAR_Z,
     ISOMETRIC_VIEW_NOTE,
-    JOURNAL_DIA_BAND,
     JOURNAL_LEN,
     NECK_DIA,
     NECK_END_Z,
@@ -97,6 +96,7 @@ from dt_pinion_arbor_notes import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
     JOURNAL_DIA_PREFIX,
+    JOURNAL_DIA_SUFFIX,
     REFERENCE_SKETCHES,
     SPAN_REFERENCES,
 )
@@ -739,6 +739,19 @@ def _add_bond_relief(adapter) -> list[tuple[str, str]]:
     return drive_jobs
 
 
+def _set_dimension_suffix(
+    adapter, feature_name: str, dimension_name: str, suffix: str
+) -> None:
+    """Set and verify a model display dimension's native suffix text (the
+    journals' REF bracket; ``_drawing_prefix`` sets only the prefix)."""
+    display, _ = _named_dimension(adapter, feature_name, dimension_name)
+    display = _early_bound(display, "IDisplayDimension")
+    display.SetText(2, suffix)  # swDimensionTextParts_e.swDimensionTextSuffix
+    if str(display.GetText(2) or "") != suffix:
+        raise RuntimeError(
+            f"{dimension_name}@{feature_name}: suffix did not persist as {suffix!r}"
+        )
+
 
 def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import ExtrusionParameters, RevolveParameters
@@ -1174,16 +1187,13 @@ def build(adapter) -> dict[str, str]:
         *deviations(PIN_HOLE_DIA_BAND),
         display_unit=UNIT,
     )
-    set_dimension_bilateral_tolerance(
-        adapter,
-        "BackJournalReference",
-        "BackJournalDia",
-        *deviations(JOURNAL_DIA_BAND),
-        display_unit=UNIT,
-    )
-    # One size for both journal lands (dt_pinion_arbor_notes).
+    # One size for both journal lands, a REFERENCE: they are made to fit the
+    # MHA-DT-14 bores, so the size carries no band (dt_pinion_arbor_notes).
     set_dimension_prefix(
         adapter, "BackJournalReference", "BackJournalDia", JOURNAL_DIA_PREFIX
+    )
+    _set_dimension_suffix(
+        adapter, "BackJournalReference", "BackJournalDia", JOURNAL_DIA_SUFFIX
     )
     # Each MHA-DT-01 bond land carries its own size (dt_pinion_arbor_notes).
     set_dimension_prefix(adapter, "BondZoneReference", "BondZoneDia", "<MOD-DIAM>")

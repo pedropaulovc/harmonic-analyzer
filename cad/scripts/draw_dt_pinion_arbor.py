@@ -122,7 +122,6 @@ from dt_pinion_arbor_notes import (
     DRAWING_PRECISION_BY_NAME,
     SPAN_WITNESS_LEN,
 )
-from _fit_ream_slide import REAM_SLIDE
 from dt_pinion_arbor_collar_spec import (
     BORE as COLLAR_BORE,
     BORE_BAND as COLLAR_BORE_BAND,
@@ -132,7 +131,7 @@ from dt_alignment_pinion_spec import (
     ARBOR_BORE_BAND as DRUM_BORE_BAND,
     BORE_DIA as DRUM_BORE,
 )
-from dt_pinion_bracket_geometry import ARBOR_BORE as STRAP_BORE
+from dt_pinion_arbor_geometry import JOURNAL_FIT_CLEARANCE
 
 
 def _inch(value_mm: float) -> str:
@@ -141,16 +140,13 @@ def _inch(value_mm: float) -> str:
 
 # Rule 4: each fit by its standard name; rule 7: a callout's words in two
 # rows at most, the rest in the numbered note it flags (SEE NOTE n).
-# The journals' .0008-wide band is narrower than the turned row, so it names
-# its matched-fit route (coordinator policy 1): running in the MHA-DT-14
-# REAM_SLIDE bore, turned to the measured bore, the clearance its limits and
-# the bore's give.  The fit's name is in note 1 only: machinist review of
-# 2f918b81c8 (3 of 3 runs, over-specification) read RUNNING FIT on the
-# callout and again in the note it links as the fit stated twice.
-JOURNAL_CLEARANCE = (
-    STRAP_BORE + REAM_SLIDE[1] - (SHAFT_DIA + JOURNAL_DIA_BAND[0]),
-    STRAP_BORE + REAM_SLIDE[0] - (SHAFT_DIA + JOURNAL_DIA_BAND[1]),
-)
+# The journals are made to fit (owner ruling 2026-11-24, fit audit question
+# 12): the size prints REF and note 1 the acceptance, turned last to the
+# 5/16 drilled MHA-DT-14 bores at .001-.003 clearance with the drum still
+# sliding over the back one; the MHA-DT-14 sheet names this part as turned
+# to its bore.  The clearance is the fit's own (JOURNAL_FIT_CLEARANCE), not
+# limits on both members of the pair.
+JOURNAL_CLEARANCE = JOURNAL_FIT_CLEARANCE
 JOURNAL_CALLOUT = "SEE NOTE 1"
 # Every Ø5/16 span's size is on the view (round 3 of fan-out dt-fab-3).  The
 # drum's two bond lands either side of the relief (#2360; the drum, 2.40-8.04
@@ -168,7 +164,6 @@ JOURNAL_CALLOUT = "SEE NOTE 1"
 # The title block's .XX or .XXX on the back stub (Ø.32 or Ø.317 max) would
 # stop the collar (bore .3125 min) and the drum (.3135 min) passing it, so it
 # keeps the band.
-STRAP_NAME = "PINION BRACKET STRAP"
 COLLAR_CLEARANCE = (
     COLLAR_BORE + COLLAR_BORE_BAND[1] - (SHAFT_DIA + SHAFT_DIA_BAND[0]),
     COLLAR_BORE + COLLAR_BORE_BAND[0] - (SHAFT_DIA + SHAFT_DIA_BAND[1]),
@@ -201,9 +196,9 @@ CROSS_HOLE_CALLOUT = (
 # 1 and 26: "PIN-HOLE SPAN AND BACK-END SPAN" named them in words only).
 # Note 2 names its mate by number only, to keep it to one row.
 SHEET_NOTES = (
-    f"1. JOURNALS (2X): RUNNING FIT IN {STRAP_NUMBER} {STRAP_NAME},\n"
-    f"   TURN TO MEASURED BORE (CLEARANCE {_inch(JOURNAL_CLEARANCE[0])}-"
-    f"{_inch(JOURNAL_CLEARANCE[1])}).\n"
+    f"1. JOURNALS (2X): TURN LAST TO THE MEASURED BORES OF {STRAP_NUMBER},\n"
+    f"   CLEARANCE {_inch(JOURNAL_CLEARANCE[0])}-{_inch(JOURNAL_CLEARANCE[1])}; "
+    f"{DRUM_NUMBER} SLIDES OVER THE BACK ONE.\n"
     f"2. SPANS (2X): SLIDING FIT IN {COLLAR_NUMBER} (CLEARANCE "
     f"{_inch(COLLAR_CLEARANCE[0])}-{_inch(COLLAR_CLEARANCE[1])}).\n"
     f"3. LANDS BONDED IN {DRUM_NUMBER}, {RETAINING_COMPOUND} (CLEARANCE "
@@ -331,13 +326,14 @@ requirement(
     },
     precision={"dia": _P["BondZoneDia"]},
 )
-# The two journals: note 1's running fit in the MHA-DT-14 strap bores, turned
-# to the measured bore; each end a .XX station from the head rear face.
+# The two journals: note 1's made-to-fit acceptance in the MHA-DT-14 strap
+# bores (the clearance is the requirement; ``dia`` is the ANALYSIS band, the
+# REF size's modelled result); each end a .XX station from the head rear face.
 requirement(
     "front_journal",
     kind="journal",
     faces=(surface_finish_by_key(SURFACE_FINISHES, "front_journal").face,),
-    requirements=("dia", "station", "end_station", "finish_ra"),
+    requirements=("diametral_clearance", "station", "end_station", "finish_ra"),
     fields={
         "at": ([0.0, 0.0, FRONT_JOURNAL_Z], ((_GEOM, "FRONT_JOURNAL_Z"),)),
         "axis": ([0.0, 0.0, 1.0], (_FRAME,)),
@@ -381,7 +377,7 @@ requirement(
     "back_journal",
     kind="journal",
     faces=(surface_finish_by_key(SURFACE_FINISHES, "back_journal").face,),
-    requirements=("dia", "station", "end_station", "finish_ra"),
+    requirements=("diametral_clearance", "station", "end_station", "finish_ra"),
     fields={
         "at": ([0.0, 0.0, BACK_JOURNAL_Z], ((_GEOM, "BACK_JOURNAL_Z"),)),
         "axis": ([0.0, 0.0, 1.0], (_FRAME,)),

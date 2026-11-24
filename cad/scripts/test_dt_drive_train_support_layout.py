@@ -1338,7 +1338,7 @@ def test_set_pin_never_stands_proud_and_keeps_its_webs() -> None:
     # hole's centre sits on the pivot-axis line MHA-DT-14's flank view draws
     # (an implied zero, #1007 r1; Codex P1 on #1663), so it can run off the
     # shaft axis by the implied zero's grade (.XX, .010).
-    shaft_min = pin.PIVOT_BORE + _fit_shaft_h.SHAFT_H[1]
+    shaft_min = pin.PIVOT_SHAFT_DIA + _fit_shaft_h.SHAFT_H[1]
     assert math.isclose(shaft_min, 6.32968, abs_tol=1e-9)
     assert math.isclose(pin.SHAFT_LIGAMENT_CENTRED, (6.32968 - 1.651) / 2.0)
     places = pin.IMPLIED_ZERO_PLACES
@@ -1463,7 +1463,9 @@ def test_torque_shaft_is_phased_to_the_straps_and_swings_with_them() -> None:
     assert math.isclose(abs(dot), 1.0, abs_tol=1e-12)
     assert drive.TORQUE_SHAFT_ROWS[2] == [0.0, 0.0, 1.0]
     assert "dt-pinion-pivot-shaft" in allowed_free_stems("dt-drive-train")
-    assert SHAFT_DIA == drive.STRAP_PIVOT_BORE
+    # Fit audit F16: the strap bore is the .2510 reamer's size on the 1/4 in
+    # shaft (.001 over nominal; the shaft is its gauge).
+    assert drive.STRAP_PIVOT_BORE - SHAFT_DIA == pytest.approx(0.0254)
 
 
 def test_drive_train_reads_no_arbor_drawing_contract() -> None:

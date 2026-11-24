@@ -11,7 +11,6 @@ import pytest
 
 import _sketch
 
-import _fit_ream_slide
 import build_dt_pinion_arbor as part
 import draw_dt_pinion_arbor as drawing
 import dt_pinion_arbor_geometry as geometry
@@ -192,8 +191,11 @@ def test_crossrod_is_a_bonded_slip_fit_not_a_press() -> None:
         assert retired not in drawing.CROSS_HOLE_CALLOUT
 
 
-def test_only_the_two_journal_lands_carry_the_running_band_and_finish() -> None:
-    assert spec.JOURNAL_DIA_BAND == (-0.01016, -0.03048)
+def test_only_the_two_journal_lands_carry_the_finish_and_no_band() -> None:
+    # Owner ruling 2026-11-24, fit audit question 12: the journals are made to
+    # fit the drilled MHA-DT-14 bores, so their size is a REF with no band; the
+    # analysis band spans what the fit turns over the drilled range.
+    assert spec.JOURNAL_DIA_BAND == (-0.01016, -0.0762)
     assert spec.SHAFT_DIA_BAND == (-0.01016, -0.09652)
     assert model_toleranced_dimensions(part) == {
         ("BondZoneReference", "BondZoneDia"): "*deviations(SHAFT_DIA_BAND)",
@@ -201,7 +203,6 @@ def test_only_the_two_journal_lands_carry_the_running_band_and_finish() -> None:
         ("BackStubReference", "BackStubDia"): "*deviations(SHAFT_DIA_BAND)",
         ("CrossHoleProfile", "CrossHoleDia"): "*deviations(CROSS_HOLE_DIA_BAND)",
         ("PinHoleProfile", "PinHoleDia"): "*deviations(PIN_HOLE_DIA_BAND)",
-        ("BackJournalReference", "BackJournalDia"): "*deviations(JOURNAL_DIA_BAND)",
     }
     lands = {
         "front_journal": spec.FRONT_JOURNAL_Z,
@@ -216,21 +217,19 @@ def test_only_the_two_journal_lands_carry_the_running_band_and_finish() -> None:
     assert set(drawing.JOURNAL_FINISHES) == set(lands)
     for key, (station_z, _symbol_xy, _flank) in drawing.JOURNAL_FINISHES.items():
         assert lands[key] < station_z < lands[key] + spec.JOURNAL_LEN
-    # The journals' .0008 band is narrower than the turned row, so the
-    # callout flags note 1: the running fit, the matched route (turn to the
-    # measured MHA-DT-14 bore) and the clearance the limits give.  The fit is
-    # named once, in the note (machinist review of 2f918b81c8).
+    # The callout flags note 1: the made-to-fit acceptance (turned last to the
+    # measured MHA-DT-14 bores, the clearance, the drum still sliding over).
     assert drawing.JOURNAL_CALLOUT == "SEE NOTE 1"
     # #1038 sheet decision: one 2X diameter on the back land sizes both lands; the
-    # front land prints only its two stations.
+    # front land prints only its two stations.  The size is a REFERENCE.
     assert drawing.DIMENSION_CALLOUTS["BackJournalDia"] is drawing.JOURNAL_CALLOUT
-    assert sheet.JOURNAL_DIA_PREFIX == "2X <MOD-DIAM>"
+    assert (sheet.JOURNAL_DIA_PREFIX, sheet.JOURNAL_DIA_SUFFIX) == ("2X (<MOD-DIAM>", ")")
     assert "FrontJournalDia" not in sheet.DRAWING_PRECISION_BY_NAME
     assert "FrontJournalDia" not in drawing.DIMENSION_CALLOUTS
     note_1 = " ".join(drawing.SHEET_NOTES.split("\n2. ")[0].split())
     assert note_1 == (
-        "1. JOURNALS (2X): RUNNING FIT IN MHA-DT-14 PINION BRACKET STRAP, "
-        "TURN TO MEASURED BORE (CLEARANCE .0014-.0027)."
+        "1. JOURNALS (2X): TURN LAST TO THE MEASURED BORES OF MHA-DT-14, "
+        "CLEARANCE .0010-.0030; MHA-DT-01 SLIDES OVER THE BACK ONE."
     )
     # Rule 7: four short rows at most, left of the title block (x 0.216).
     rows = drawing.SHEET_NOTES.replace("<MOD-DIAM>", "Ø").splitlines()
@@ -263,10 +262,16 @@ def test_journal_and_bond_zone_bands_leave_the_intended_fits() -> None:
 
     journal_upper, journal_lower = spec.JOURNAL_DIA_BAND
     strap_upper, strap_lower = strap.ARBOR_BORE_BAND
-    # Running fit of each land in its MHA-DT-14 REAM_SLIDE bore.
-    assert strap.ARBOR_BORE_BAND is _fit_ream_slide.REAM_SLIDE
-    assert strap_lower - journal_upper == pytest.approx(0.03556)
-    assert strap_upper - journal_lower == pytest.approx(0.06858)
+    # Owner ruling 2026-11-24, fit audit question 12: the strap bores are
+    # drilled 5/16 (the DRILLED HOLES row is their analysis band) and the
+    # journals are turned to them at .001-.003; the journals' analysis band
+    # runs from the smallest bore less the loosest clearance up to .0004
+    # under 5/16, so the drum still passes.
+    assert strap.ARBOR_BORE_BAND == pytest.approx((0.1016, 0.0))
+    assert drawing.JOURNAL_CLEARANCE == pytest.approx((0.0254, 0.0762))
+    assert journal_lower == pytest.approx(strap_lower - drawing.JOURNAL_CLEARANCE[1])
+    assert journal_upper == pytest.approx(-0.01016)
+    assert strap_lower - journal_upper > 0.0
     # Every bore slides on from the back crown, so no zone may exceed 5/16.
     # The drum's REAM_SLIDE bore clears the bond zone by 0.03556 for a
     # guaranteed slide, and the worst gap stays inside Loctite 638's 0.25.
@@ -939,13 +944,14 @@ def test_bond_zone_diameter_is_a_flank_dimension_on_the_drum() -> None:
     assert spec.DRAWING_DIMENSIONS["BondZoneReference"] == {"BondZoneDia"}
     assert drawing.DIMENSION_CALLOUTS["BondZoneDia"] is drawing.BOND_CALLOUT
     # The bonded fit, its mate and its grade print once, on note 3, which
-    # both bond lands' callouts link (#1038 r11 machinist review, rule 26).
+    # both bond lands' callouts link (#1038 r11 machinist review, rule 26);
+    # note 1 names the drum only as the journals' slide-over acceptance.
     words = drawing.SHEET_NOTES.split("\n3. ")[1].split()
     assert "BONDED" in words and "MHA-DT-01," in words and "638" in words
-    assert drawing.SHEET_NOTES.count("MHA-DT-01") == 1
+    assert "BONDED" not in drawing.SHEET_NOTES.split("\n2. ")[0]
     import _config
 
-    assert _config.parts("dt-pinion-bracket")["title"].upper() == drawing.STRAP_NAME
+    assert _config.parts("dt-pinion-bracket")["number"] == drawing.STRAP_NUMBER
     assert _config.parts("dt-pinion-arbor-collar")["number"] == drawing.COLLAR_NUMBER
     # Machinist review r3 of #1685 (blocker): the drum station falls on the
     # front land; each drum end rests on its land at every printed limit.

@@ -1470,9 +1470,19 @@ def _pinion_arbor_and_rig_fasteners(drive) -> None:
     assert (
         abs(drive.HANDLE_ROD_DIA - dt_pinion_arbor_geometry.CROSS_HOLE_DIA) <= 1e-9
     ), "grip crossrod and head hole no longer share a nominal"
-    assert abs(drive.STRAP_PIVOT_BORE - 6.35) <= 1e-9, (
-        "strap pivot bore no longer rides the O6.35 shaft"
+    # Fit audit F16: the strap pivot bore is the .2510 reamer's size on the
+    # 1/4 in MHA-DT-19 shaft, whose nominal the strap pin's ligament reads
+    # from the bracket geometry (lockstep).
+    import dt_pinion_pivot_shaft_spec
+
+    assert abs(drive.STRAP_PIVOT_BORE - 0.2510 * 25.4) <= 1e-9, (
+        "strap pivot bore is no longer the .2510 reamer"
     )
+    assert (
+        dt_pinion_bracket_geometry.PIVOT_SHAFT_DIA
+        == dt_pinion_pivot_shaft_spec.SHAFT_DIA
+        == 6.35
+    ), "the strap pin's shaft nominal left the MHA-DT-19 shaft"
     assert (
         drive.BLOCK_SCREW_HALF + dt_vn_slotted_screw_spec.HEAD_DIA / 2.0
         <= min(drive.BLOCK_EAST, drive.BLOCK_WIDTH - drive.BLOCK_EAST) - 0.25
