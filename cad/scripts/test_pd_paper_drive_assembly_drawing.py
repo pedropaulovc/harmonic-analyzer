@@ -3477,19 +3477,17 @@ def test_the_hub_key_pin_and_collar_flat_pin_are_fitted_and_kept() -> None:
         for row in pressed
     )
     assert len(pressed) <= len(drawing.SUB_STEP_LETTERS)
-    # Fit audit 2026-11-23: a dowel or the pin that slides in by hand is
-    # bonded per the sheet's bond note, never a new collar; the three wheels
-    # are then tried on the dowels, the drive-pin offsets' acceptance; a
-    # wheel that binds is renewed, no easing drill printed.
-
+    # A dowel or the pin that slides in by hand is rule 23's slip fit: the
+    # collar is renewed, never bonded (the reamed holes print no band, so no
+    # bonded clearance could be stated: Codjiflo P2 on #3485).  The three
+    # wheels are then tried on the dowels, the drive-pin offsets'
+    # acceptance; a wheel that binds is renewed, no easing drill printed.
     loose = [row for row in pressed if "SLIDES IN BY HAND" in row]
     assert len(loose) == 2
-    assert all("BOND IT PER THE" in row and "BOND NOTE" in row for row in loose)
-    assert all("MAKE A NEW" not in row for row in loose)
-    assert "DETAIL H" in loose[0] and "WIPE ITS PROUD END CLEAN" in loose[0]
-    assert "WIPE THE COLLAR'S BORE CLEAN" in loose[1]
+    assert all("BOND" not in row for row in pressed)
+    assert all("MAKE A NEW" in row for row in loose)
     wheel = _number("pd-transgear-removable")
-    trial = next(row for row in pressed if row.startswith("CHECK, ANY BOND CURED"))
+    trial = next(row for row in pressed if row.startswith("CHECK: EACH OF THE"))
     assert f"EACH OF THE 3 {wheel} WHEELS DROPS ON" in trial
     remedy = pressed[pressed.index(trial) + 1]
     assert remedy.startswith("IF ONE WHEEL BINDS, RENEW IT; IF ALL DO, MAKE A NEW ")

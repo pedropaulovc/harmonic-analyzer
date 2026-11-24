@@ -2994,27 +2994,26 @@ def _step_text(
             f"{n['pd-vn-transgear-knob-drive-pin']} DOWELS INTO THE "
             f"{n['pd-transgear-drive-collar']} COLLAR TO A STOP, {drive_window} "
             f"PROUD OF ITS FRONT {detail_cite('collar-pins-pressed')}.",
-            # Fit audit 2026-11-23 (pending owner confirmation): the collar's
-            # pin holes are reamed to the bought dowels, which are their
-            # gauges, so a dowel that slides in by hand is bonded per DETAIL
-            # H's bond note (degrease, the compound on the dowel, the cure)
-            # at this step's own proud, never answered with a new collar; the
-            # proud end the wheels slide on and the bore the shaft slides in
-            # are wiped clean of compound (rule 23).  The reamed hole still
-            # holds the loose dowel square.  The drive-pin offsets are REF
-            # targets on MHA-PD-22 and MHA-PD-09: their acceptance is this
-            # trial of the three wheels.  No easing drill is printed (a hole
-            # re-drilled #39 would leave MHA-PD-09 a web its RV-01 does not
-            # cover: an open owner question of the fit audit); a wheel that
-            # binds is renewed.
-            "IF A DOWEL SLIDES IN BY HAND, BOND IT PER THE BOND NOTE AT "
-            f"{detail_cite('arm-plate-fitted')[1:-1]}, BUT TO "
-            f"{s('collar-pins-pressed', 0)}'S PROUD; WIPE ITS PROUD END CLEAN.",
+            # The collar's pin holes are reamed to the bought dowels, which
+            # are their gauges and print no band, so a dowel or pin that
+            # slides in by hand is in a hole of unknown size: no bonded
+            # clearance can be printed for it (rule 23), and the looseness
+            # is what the reams exist to prevent (MHA-PD-22's necessity
+            # register, N-01 and N-02).  The collar is renewed, rule 23's
+            # press remedy (Codjiflo P2 on #3485: the bond salvage printed
+            # no clearance).  The drive-pin offsets are REF targets on
+            # MHA-PD-22 and MHA-PD-09: their acceptance is this trial of the
+            # three wheels (owner ruling 2026-11-24, fit audit question 8).
+            # No easing drill is printed; a wheel that binds is renewed.
+            _press_remedy(
+                "DOWEL", f"{n['pd-transgear-drive-collar']} COLLAR", "collar-pins-pressed"
+            ),
             f"PRESS THE {n['pd-vn-transgear-collar-flat-pin']} PIN INTO THE COLLAR'S "
             "REAR BLIND HOLE TO THE BOTTOM; COLLAR AND PIN ARE ONE PERMANENT UNIT.",
-            "IF THE PIN SLIDES IN BY HAND, BOND IT PER THE SAME BOND NOTE, TO THE "
-            "BOTTOM; WIPE THE COLLAR'S BORE CLEAN.",
-            f"CHECK, ANY BOND CURED: EACH OF THE {len(sprocket.CONFIGS)} "
+            _press_remedy(
+                "PIN", f"{n['pd-transgear-drive-collar']} COLLAR", "collar-pins-pressed"
+            ),
+            f"CHECK: EACH OF THE {len(sprocket.CONFIGS)} "
             f"{n['pd-transgear-removable']} WHEELS DROPS ON THE COLLAR'S DOWELS "
             "FREELY AND LIFTS OFF.",
             "IF ONE WHEEL BINDS, RENEW IT; IF ALL DO, MAKE A NEW "
