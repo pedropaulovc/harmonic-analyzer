@@ -647,7 +647,13 @@ TIP_END_RECESS_LIMITS_MM = (
 _FACE_WIDTH_LIMITS = _limits(CONE_GEAR_FACE_WIDTH, CONE_GEAR_FACE_WIDTH_BAND)
 # T024's bonded length on land 2 at its least.
 T024_BOND_LENGTH_MIN_MM = _FACE_WIDTH_LIMITS[0] - TIP_END_RECESS_LIMITS_MM[1]
-if TIP_END_RECESS_LIMITS_MM[0] <= 0.0 or T024_BOND_LENGTH_MIN_MM <= 0.0:
+# The least the shaft end stands inside T024's bore (Main, by the owner's
+# delegation of 2026-11-24, D4: the 1R leaf range's thin end keeps it).
+TIP_END_RECESS_FLOOR_MM = 0.03
+if (
+    TIP_END_RECESS_LIMITS_MM[0] < TIP_END_RECESS_FLOOR_MM
+    or T024_BOND_LENGTH_MIN_MM <= 0.0
+):
     raise AssertionError(
         f"the shaft end leaves T024's bore: recess {TIP_END_RECESS_LIMITS_MM}, "
         f"bond length {T024_BOND_LENGTH_MIN_MM:.4f} mm"

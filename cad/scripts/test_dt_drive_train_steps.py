@@ -103,7 +103,8 @@ def test_the_cone_stack_step_prints_measured_limits() -> None:
 def test_the_tip_is_measured_dry_then_bonded_on_the_feeler_in_two_cures() -> None:
     """Owner decision C1 keyed (2026-11-09, PR #1992): the stack is measured
     dry, MHA-DT-38 is bonded on the loose MHA-DT-37 (owner ruling
-    2026-11-20, #2469), and only then is T024 bonded one STACK_FEELER off
+    2026-11-20, #2469), and only then is T024 bonded on one leaf of
+    STACK_FEELER_RANGE (D4, Main, 2026-11-24) off
     T030 with the bonded gears phased to T030 by the MHA-DT-03-TL-02 phasing
     comb, T030's blade beside the key (owner rulings 2026-11-09 and
     2026-11-10).  #2470: T024's joint is degreased, the faces its squeeze-out
@@ -115,7 +116,10 @@ def test_the_tip_is_measured_dry_then_bonded_on_the_feeler_in_two_cures() -> Non
     the comb's check.  Each failed acceptance parts its bonds, cleans the
     film out and redoes the round, the second from MHA-DT-38's bond, which
     the heat undoes."""
-    feeler = sheet.inch_text(cone_stack_end_play.STACK_FEELER, sheet.FEELER_PLACES)
+    feeler = " TO ".join(
+        sheet.inch_text(end, sheet.FEELER_PLACES)
+        for end in cone_stack_end_play.STACK_FEELER_RANGE
+    )
     comb = "CLIP MHA-DT-03-TL-02"
 
     def in_order(text: str, phrases: tuple[str, ...]) -> list[int]:
@@ -139,7 +143,7 @@ def test_the_tip_is_measured_dry_then_bonded_on_the_feeler_in_two_cures() -> Non
             "BOND MHA-DT-38 ON THE MHA-DT-37 PIVOT",
             "DEGREASE T024",
             "PASTE WAX",
-            f"BOND T024 ON THE LAND, {feeler} FEELER ON T030",
+            f"BOND T024 ON ONE LEAF {feeler} ON T030",
             comb,
             "ONCE THE BOND GRABS",
             "24 H CURE",

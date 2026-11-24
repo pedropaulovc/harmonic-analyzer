@@ -398,8 +398,8 @@ sections:
 
       Notes: all 20 gears rotate together on one shaft (owner decision C1
       keyed, 2026-11-09, PR #1992): the 64T and T030–T120 are keyed on land 1;
-      T024 is bonded with LOCTITE 638 on round land 2, one .019 in (0.483 mm) feeler leaf off
-      T030, for 0.37–0.60 mm stack float (#3042); T018 and T012 are bonded on the
+      T024 is bonded with LOCTITE 638 on round land 2, any one feeler leaf .015 to .020 in off
+      T030 (modelled .019 in, 0.483 mm), for 0.37–0.52 mm stack float (#3042; D4, Main, 2026-11-24); T018 and T012 are bonded on the
       integral spigot of T006 (MHA-DT-37), whose spigot is bonded in the
       shaft's end socket. Their 7.4528 ±0.051 faces touch from the
       collar-supported 64T to T030 and from T024 to T006. The MHA-DT-38

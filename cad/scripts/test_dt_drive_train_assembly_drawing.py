@@ -1053,7 +1053,6 @@ def test_every_set_feeler_the_steps_and_checks_print_has_a_leaf_row() -> None:
     Owner ruling C7 (2026-11-24, "Yes: ranges, longer flats, no leaf
     miking."): the rig's rows are ranges, and no leaf is miked."""
     import dt_feeler_leaves
-    from cone_stack_end_play import STACK_FEELER
 
     assert drawing.FEELER_STACK_HEADER[1] == "LEAVES (IN)"
     ranged = {}
@@ -1068,6 +1067,8 @@ def test_every_set_feeler_the_steps_and_checks_print_has_a_leaf_row() -> None:
         assert math.isclose(sum(sizes), float(setting), abs_tol=1e-9), setting
     assert ranged == {
         ".010 TO .020": ("ANY ONE", "16B, 19, 21C"),
+        # D4 (Main, by the owner's delegation of 2026-11-24): T024 off T030.
+        ".015 TO .020": ("ANY ONE", "1R"),
         ".020 TO .040": ("ANY ONE", "19B, 21D"),
         ".049 TO .065": ("TWO, OR 1/16 DRILL", "19A"),
     }
@@ -1087,7 +1088,6 @@ def test_every_set_feeler_the_steps_and_checks_print_has_a_leaf_row() -> None:
         return drawing.inch_text(setting, drawing.FEELER_PLACES)
 
     assert "4H, 4J" in rows[printed(drawing.pinion.T120_FITUP_FEELER_MM)]
-    assert "1R" in rows[printed(STACK_FEELER)]
     assert "4F" in rows[printed(drawing.pinion.SEAT_FEELER_MM)]
     # The cone swing is set by feel (#2365): no row cites check 4.
     assert not any("CHECK 4" in cited for cited in rows.values())

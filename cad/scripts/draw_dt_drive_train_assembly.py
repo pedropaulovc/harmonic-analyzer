@@ -99,7 +99,7 @@ from _simplified_names import simplified_name
 import _telemetry
 from ch_channel_assembly_steps import NORTH_BRACKET_SET_KEY, RODS_PINNED_REF
 import cone_line
-from cone_stack_end_play import STACK_FEELER
+from cone_stack_end_play import STACK_FEELER_RANGE
 import cylinder_bank_layout as bank
 import dt_cylinder_bank_setting_spec as bank_settings
 from dt_cone_gear_spec import CONE_TEETH, ROUND_BORE_TEETH
@@ -1109,8 +1109,8 @@ def _range_text(leaf_range: tuple[float, float]) -> str:
 
 def _feeler_stack_rows() -> tuple[tuple[str, str, str], ...]:
     exact = (
-        # Rubric sample round 13 (#4): the cone set's feelers are leaves too.
-        (STACK_FEELER, _step_ref("cone-gears-stacked", "R")),
+        # Rubric sample round 13 (#4): the cone set's feelers are leaves too;
+        # T024's is a range since D4 (below).
         (PINION_SEAT_FEELER, _step_ref("crank-mesh-checked", "F")),
         (bank.BANK_SPRING_SET, _step_ref("cylinder-bank-located", "D")),
         # Rubric sample round 16 (#0, 3/3 runs): the crank fit-up feeler.  The
@@ -1122,6 +1122,8 @@ def _feeler_stack_rows() -> tuple[tuple[str, str, str], ...]:
         ),
     )
     ranged = (
+        # D4 (Main, by the owner's delegation of 2026-11-24): T024 off T030.
+        (STACK_FEELER_RANGE, "ANY ONE", _step_ref("cone-gears-stacked", "R")),
         (
             FITUP.SMALL_LEAF_RANGE,
             "ANY ONE",
@@ -1414,10 +1416,10 @@ CONE_CRANK_STEPS = _note_text(
         # first so no solvent carries the wax onto the land (Codjiflo review
         # of PR #2531), and the wax comes off once T024 has cured (as 7E).
         "1P. DEGREASE T024'S BORE AND ITS MHA-DT-04 LAND.",
-        f"1Q. COAT T030'S BACK FACE, THE KEY'S BACK END, THE {inch_text(STACK_FEELER, FEELER_PLACES)} FEELER AND THE {PHASING_COMB} BLADES WITH {HANDLE_RELEASE}, NONE ON THE LAND.",
+        f"1Q. COAT T030'S BACK FACE, THE KEY'S BACK END, THE FEELER LEAF AND THE {PHASING_COMB} BLADES WITH {HANDLE_RELEASE}, NONE ON THE LAND.",
         # T024 pressed onto the feeler on T030 closes the keyed stack onto the
         # collar, so the feeler sets the stack float (cone_stack_end_play).
-        f"1R. BOND T024 ON THE LAND, {inch_text(STACK_FEELER, FEELER_PLACES)} FEELER ON T030, PER THE SHEET 1 NOTE.",
+        f"1R. BOND T024 ON ONE LEAF {_range_text(STACK_FEELER_RANGE)} ON T030, PER THE SHEET 1 NOTE.",
         # #3292 (owner ruling 2026-11-21, options 2 + 4): a bonded slip fit
         # cures wherever it sits in its clearance, so T024 is centred while
         # the 638 is wet and recorded after cure on its tooth runout about
