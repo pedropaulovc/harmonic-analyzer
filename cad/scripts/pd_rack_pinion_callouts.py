@@ -89,13 +89,13 @@ FACE_WIDTH_CALLOUT = f"SETS {SCREW_NUMBER}\nENGAGEMENT"
 
 # Rule 4: the bore's mate, made to this bore (fit audit 2026-11-23, pending
 # owner confirmation: the MHA-PD-17 spigot prints REF and the clearance,
-# the pair's one acceptance) and what the ream protects: a looser hole
-# spends the taps' web of note 2 (RV-03).
+# the pair's one acceptance).  What the ream protects is the register's
+# (cad/config/necessity/pd-rack-pinion.yaml; owner ruling 2026-11-24: the
+# reason is not printed on the sheet).
 # Rule 20: the tap-to-bore web's stated shortfall (RV-03) ends the tap note.
 DRAWING_NOTES = "\n".join(
     (
         f"{BORE_NOTE}. {HUB_NUMBER} SPIGOT IS TURNED TO THIS BORE.",
-        f"   KEEPS THE NOTE {TAP_NOTE} TAP WALL.",
         f"{TAP_NOTE}. MATCH-DRILL AT ASSEMBLY WITH {HUB_NUMBER}: SPOT THRU ITS FLANGE",
         f"   HOLES, THEN DRILL AND TAP; MATCH-MARK BOTH. {TAP_WALL_TEXT}.",
     )

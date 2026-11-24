@@ -148,9 +148,9 @@ BUSH_NUMBER = _config.parts("pd-transgear-knob-bush")["number"]
 # is made to fit its mate (rule 4, form 2): its size prints REF, the callout
 # says what it is bored to and links note 2, which names the fit and its
 # clearance (inside LOCTITE 641's gap fill; the spec asserts it); the method
-# is the assembly step's and the reason the registry's
-# (cad/config/necessity/pd-transgear-knob-cup.yaml; owner ruling
-# 2026-11-24: the reason is not printed on the sheet).  No
+# is the assembly step's.  A made-to-fit seat is no tight band, so the
+# sheet has no necessity register (owner ruling 2026-11-24: no reason is
+# printed on the sheet either).  No
 # process row: the section draws the pilot's flat floor and R.005 MAX limits
 # its corner, so "FLAT BOTTOM END MILL" named a tool, not a requirement
 # (rule 7; machinist review r10, three runs).  Two lines of words, each

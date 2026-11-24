@@ -188,8 +188,8 @@ def test_the_bore_clears_the_hub_spigot_for_centring_at_every_limit() -> None:
     what the reamer is taken to cut) and the MHA-PD-17 hub's spigot, turned
     to it at the clearance that hub prints, never bind and leave at least
     the clearance MHA-PD-00 centres the disc in; the fit note names the
-    spigot, says it is turned to this bore and what the ream protects, with
-    no number in it."""
+    spigot and says it is turned to this bore, with no number in it and no
+    reason (the register's, owner ruling 2026-11-24)."""
     import build_pd_transgear_disc_hub as hub_part
     import pd_transgear_disc_hub_spec as hub
 
@@ -222,10 +222,8 @@ def test_the_bore_clears_the_hub_spigot_for_centring_at_every_limit() -> None:
     note = callouts.DRAWING_NOTES.split(f"\n{callouts.TAP_NOTE}. ")[0]
     assert note == (
         f"{callouts.BORE_NOTE}. {spec.HUB_NUMBER} SPIGOT IS TURNED TO THIS BORE."
-        f"\n   KEEPS THE NOTE {callouts.TAP_NOTE} TAP WALL."
     )
-    # Rule 4: the necessity answer carries no dimension, and no band or
-    # clearance range prints for a reamed hole.
+    # Rule 4: no band or clearance range prints for a reamed hole.
     assert not re.search(r"\.\d", note)
     for banned in ("DIA CLR", "DIAMETRAL", "GOVERN", "CLEARANCE ."):
         assert banned not in note
@@ -342,9 +340,10 @@ def test_bore_callout_links_its_fit_note() -> None:
     assert f"SEE NOTE {callouts.BORE_NOTE}" in lines
     bore_note = callouts.DRAWING_NOTES.split(f"\n{callouts.TAP_NOTE}. ")[0]
     assert bore_note.startswith(f"{callouts.BORE_NOTE}. ")
-    # The note is the fit and its mate only: the chamfer is sized on detail B.
+    # The note is the fit and its mate only, one line: the chamfer is sized
+    # on detail B and the reason is the register's.
     assert "CHAMFER" not in callouts.DRAWING_NOTES
-    assert len(bore_note.splitlines()) == 2
+    assert len(bore_note.splitlines()) == 1
 
 
 def test_sheet_gear_data_names_the_mesh_once_with_its_backlash_acceptance() -> None:
