@@ -9,20 +9,24 @@
 # arm face, which only seats on the MHA-PD-VN-68 shims (the length's .XXX
 # band moves only the shim count, owner ruling 2026-11-01, #2124).
 # Bench: file the parting burr off the arm face flat, break the edges and the
-# bore's ends, mike the length and check the bore with the .1260 GO /
-# .1265 NO-GO plug gauge pair (the band's ends).
+# bore's ends, mike the length. The drawing prints the bore as the reamer's
+# size with no band (fit audit 2026-11-23, pending owner confirmation): its
+# fit is accepted on the MHA-PD-23 pin, which is turned last to this bore and
+# tried in it on the pin's own traveler. Here the bore gets one check, the
+# pin-gauge set's .127 pin, which must not enter: a bell-mouthed or oversize
+# ream is found before the pin is made to it. cad.bore_dia_band_mm is the
+# drawing module's ANALYSIS band (what the reamer is modelled to cut); it
+# sizes the reaming op and is no acceptance.
 #
 # Not on hand (cad/config/shop-equipment/, to order): the .1260 chucking
-# reamer (tools-reamers-taps.toml reamer-1260) and the .1260 GO / .1265 NO-GO
-# Class X plug gauge pair (gauges.toml plug-gauges-1260-1265): the band is
-# .0005, under the pin-gauge sets' .001 step. Both serve MHA-PD-25 and
-# MHA-PN-05 too.
+# reamer (tools-reamers-taps.toml reamer-1260; it serves MHA-PD-25 and
+# MHA-PN-05 too) and the pin-gauge set (gauges.toml pin-gauges).
 title = "Transgear Rear Bushing"
 part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
 material = "C36000 free-machining brass round bar, 1/2 in"
 stock = "Lot: {{process.quantity:d}} bushing. Ø{{process.stock_dia_in:.3dot}} bar, on hand: saw a {{process.bar_length_in:g}} in piece off it for the lathe, never the whole bar (it would run out past the spindle's rear end); the bushing takes {{cad.pitch_in:.2dot}} in of it."
-note = "Inches unless mm. Lathe PM-1127VF-LB (70–380 and 380–2000 rpm); brass cut dry. To order (not on hand): the .1260 chucking reamer and the .1260 GO / .1265 NO-GO plug gauge pair for the bore check."
+note = "Inches unless mm. Lathe PM-1127VF-LB (70–380 and 380–2000 rpm); brass cut dry. To order (not on hand): the .1260 chucking reamer and the pin-gauge set. The bore's fit is accepted on the MHA-PD-23 pin, which is turned last to this bushing: keep the bushing with its pin's arm and sleeve."
 shop = "../shop"
 stock_refs = ["c360-round-1-2"]
 material_key = "lathe-c360"
@@ -94,9 +98,9 @@ name = "Deburring countersink"
 ref = "deburring-set"
 
 [[tools]]
-id = "plugs"
-name = "Plug gauges .1260 GO, .1265 NO-GO"
-ref = "plug-gauges-1260-1265"
+id = "pins"
+name = "Pin gauge set, the .127 pin"
+ref = "pin-gauges"
 status = "to_order"
 
 [[setups]]
@@ -218,9 +222,9 @@ gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.length_band_mm}}" }]
 feed = "hand"
 
 [[setups.operations]]
-instruction = "The {{cad.bore_dia_min_in:.4dot}} GO plug enters the bore from both ends and the {{cad.bore_dia_max_in:.4dot}} NO-GO plug enters from neither."
-inspection = "Bore Ø{{cad.bore_dia_min_in:.4dot}}–{{cad.bore_dia_max_in:.4dot}}."
-gauge_checks = [{ gauge = "plug-gauges-1260-1265", band_mm = "{{cad.bore_dia_band_mm}}" }]
+instruction = "Try the pin-gauge set's .127 pin in the bore from each end, by hand and clean, never forced: it must not enter."
+inspection = "The .127 pin enters from neither end. The running fit itself is accepted on the MHA-PD-23 pin (its traveler: the pin enters and turns free, no shake)."
+gauge_checks = "other"
 feed = "hand"
 
 [[setups.operations]]
