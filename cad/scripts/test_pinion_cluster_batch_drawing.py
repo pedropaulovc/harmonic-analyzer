@@ -952,9 +952,10 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
     # pin's Ø.234), so still less taper stands over the #14 and #9 pilots.
     assert 66.6 < crank_allowed[hub_pair] < 67.4
     assert 21.3 < crank_allowed[shaft_pair] < 21.9
-    # MHA-SH-VN-58: each 5/64 BarPin pressed into its bar's Ø1.97358 ream
-    # through both top-notch cheeks (6.35 bar less the .124 notch), and each
-    # RodPin into its rod's Ø1.97358 fork ream through both tines (.240 fork
+    # MHA-SH-VN-58: each 5/64 BarPin pressed into its bar's Ø1.9685 ream (the
+    # .0775 reamer, printed with no band) through both top-notch cheeks (6.35
+    # bar less the .124 notch), and each RodPin into its rod's Ø1.9685 fork
+    # ream through both tines (.240 fork
     # less the .106 slot); channel n's RodPin (instance 2n - 1) and BarPin
     # (2n) with channel n's rod or bar only. MHA-CH-VN-53: each #4-40 apex set screw's
     # thread in its MHA-CH-08 ear's tap, over the 9.80 apex (R8 arch lifted
@@ -968,13 +969,13 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
             **{
                 frozenset(
                     (f"sh-vn-pivot-pin-{2 * n}", f"ch-amplitude-bar-{n}")
-                ): _annulus_limit(1.984375, 1.97358, 6.35 - 3.1496)
+                ): _annulus_limit(1.984375, 1.9685, 6.35 - 3.1496)
                 for n in range(1, 21)
             },
             **{
                 frozenset(
                     (f"sh-vn-pivot-pin-{2 * n - 1}", f"ch-connecting-rod-{n}")
-                ): _annulus_limit(1.984375, 1.97358, 6.096 - 2.6924)
+                ): _annulus_limit(1.984375, 1.9685, 6.096 - 2.6924)
                 for n in range(1, 21)
             },
             **{

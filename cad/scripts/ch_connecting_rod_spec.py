@@ -142,16 +142,18 @@ FORK_BASE_BELOW_PIN = 18.034 - FORK_WIDTH / 2.0  # ForkBossLength .71
 # The MHA-SH-VN-58 rod pivot pin presses into this hole through both tines and
 # runs in the arm's #47 rod hole (user ruling 2026-10-09, PR #1292 review F1,
 # press fit as the bar pin; sh_vn_pivot_pin_rod_spec holds the fit budget).
-# Reamed .0775-.0779 in under the 5/64 dowel, the limits the pin budget holds,
-# printed as the two limits (swTolLIMIT), so no deviation step reads as a
-# converted millimetre value (owner decision 2026-11-19, #3124 item 5, and its
-# limit-form follow-up the same day); the model sits mid-band. No countersink:
-# the reamed hole runs straight through each tine, so the tine's whole
-# thickness is the pin's land.
-PIN_HOLE_LIMITS = (1.9685, 1.97866)  # .0775-.0779 in, reamed; native
-PIN_HOLE_DIA = 1.97358  # .0777 in
-if abs(PIN_HOLE_DIA - sum(PIN_HOLE_LIMITS) / 2.0) > 1e-9:
-    raise AssertionError("the pin hole's model must sit mid-band")
+# Owner ruling 2026-11-24, fit audit question 3: reamed with the .0775 reamer
+# and printed with no band, the pin itself the gauge (it presses in, it does
+# not enter by hand); a pin that enters by hand is bonded at MHA-CH-00. The
+# model sits at the reamer's size, which the sheet prints; PIN_HOLE_LIMITS is
+# the ANALYSIS band, what the reamer is modelled to cut
+# (sh_vn_pivot_pin_spec.HOLE_REAMED_LIMITS), not a printed limit. No
+# countersink: the reamed hole runs straight through each tine, so the
+# tine's whole thickness is the pin's land.
+PIN_HOLE_LIMITS = (1.9685, 1.97866)  # .0775-.0779 in, the reamer's cut
+PIN_HOLE_DIA = 1.9685  # .0775 in, the reamer
+if PIN_HOLE_DIA != PIN_HOLE_LIMITS[0]:
+    raise AssertionError("the pin hole's model must be its reamer's size")
 # Every other inside corner a radius this size can seat in -- the slot
 # floor's two and the two ledges where the shank's faces meet the fork's root
 # step -- is one modelled fillet, inside the title block's INSIDE CORNERS

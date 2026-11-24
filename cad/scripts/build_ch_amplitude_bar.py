@@ -63,7 +63,6 @@ from _drawing_precision import apply_drawing_precision
 from _drawing_marks import apply_drawing_properties, clear_dimensions_for_drawing, mark_dimensions_for_drawing
 from _drawing_tolerances import set_dimension_bilateral_tolerance, set_dimension_symmetric_tolerance
 from _fit_deviations import deviations
-from _limit_tolerance import set_limits
 from _part_pmi import author_part_pmi
 from _saved_part_guard import require_saved_drawing_properties
 from _visibility import blank_reference_geometry
@@ -81,7 +80,6 @@ from ch_amplitude_bar_spec import (
     TOP_NOTCH_WIDTH,
     TOP_NOTCH_WIDTH_BAND,
     TOP_PIN_HOLE_DIA,
-    TOP_PIN_HOLE_LIMITS,
     UNIT,
 )
 
@@ -430,17 +428,10 @@ def build(adapter) -> dict[str, str]:
         NOTCH_OFFSET_TOLERANCE_MM,
         display_unit=UNIT,
     )
-    # The reamed press hole prints its two limits natively on its diameter
-    # (swTolLIMIT), in the top end's right side view: Ø.0779/.0775 at the
-    # four places DRAWING_PRECISION gives TopPinDia.
-    set_limits(
-        adapter,
-        "TopPinProfile",
-        "TopPinDia",
-        limits=TOP_PIN_HOLE_LIMITS,
-        places=DRAWING_PRECISION["TopPinProfile"]["TopPinDia"],
-        display_unit=UNIT,
-    )
+    # The reamed press hole prints the .0775 reamer's size and no band (owner
+    # ruling 2026-11-24, fit audit question 3), in the top end's right side
+    # view at the four places DRAWING_PRECISION gives TopPinDia: the pin is
+    # its gauge (note 1).
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():

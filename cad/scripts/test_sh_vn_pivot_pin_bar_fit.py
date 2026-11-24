@@ -17,6 +17,7 @@ import _config
 import ch_amplitude_bar_spec as bar
 import sh_vn_pivot_pin_bar_spec as pin
 import ch_channel_lever_spec as lever
+import sh_vn_pivot_pin_spec as pin_family
 import rocker_bank_layout as bank
 from _hole_spec import NUMBER_DRILL_MM
 
@@ -64,8 +65,9 @@ def test_the_pin_is_flush_with_the_bar_and_runs_in_the_lever() -> None:
 
 def test_worst_case_joint_budget() -> None:
     b = pin.BUDGET
-    # Press in the reamed cheeks: real at both band extremes, inside FN2 by
-    # limits alone (the loosest pin still presses at FN2's minimum).
+    # The press on the reamer's modelled cut (.0775-.0779, the ANALYSIS band:
+    # owner ruling 2026-11-24, fit audit question 3 prints no band), inside
+    # FN2 (the loosest pin still presses at FN2's minimum).
     assert b["interference_min"] == pytest.approx(0.005715, abs=1e-6)
     assert b["interference_max"] == pytest.approx(0.020955, abs=1e-6)
     assert 0.0 < b["interference_min"] < b["interference_max"]
@@ -82,10 +84,16 @@ def test_worst_case_joint_budget() -> None:
     # the full relative swing.
     assert b["notch_roof_clearance_min"] == pytest.approx(1.7405, abs=1e-4)
     assert b["notch_roof_clearance_min"] >= pin.RUNNING_FLOOR
-    # The far face, the offset at its long limit on the narrowest stock: .079,
-    # under the .080 target and over the .060 floor (MHA-CH-01 RV-06).
-    assert b["hole_face_wall_min"] == pytest.approx(2.00787, abs=1e-6)
+    # The far face, the offset at its long limit on the narrowest stock, at
+    # the largest hole a bonded pin is accepted in (the set's .079 pin does
+    # not enter): .0785, printed .078 MIN, under the .080 target and over the
+    # .060 floor (MHA-CH-01 RV-06).
+    assert b["hole_face_wall_min"] == pytest.approx(0.0785 * 25.4, abs=1e-6)
     assert pin.RULE12_WALL_FLOOR <= b["hole_face_wall_min"] < pin.RULE12_WALL_TARGET
+    # A pin that entered by hand, bonded: .000875 at most, inside LOCTITE
+    # 641's 0.15 mm gap fill.
+    assert b["bond_gap_max"] == pytest.approx(0.000875 * 25.4, abs=1e-6)
+    assert b["bond_gap_max"] <= pin_family.LOCTITE_641_GAP_MAX
     # The supplied 5/16 pin under the assumed +/-.010 length grade: the
     # shortest over the widest bar leaves .02625 to dress at each end.
     assert b["length_excess_min"] == pytest.approx(1.3335, abs=1e-6)

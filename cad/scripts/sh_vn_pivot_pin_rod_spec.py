@@ -16,7 +16,10 @@ into the amplitude bar. Press-fit retention is the user's ruling (2026-10-09,
 PR #1292 review F1): a 90-degree Ø3.2 countersink sunk into each tine for a
 peened end left 0.92 of bearing land under the pin, below drawing-guidelines.md rule 17 (walls and webs)'s 1.5 floor, so the
 ruling reverses the #746 reconstruction choice of peening. A pressed pin
-drives out with a punch.
+drives out with a punch. Owner ruling 2026-11-24, fit audit question 3: the
+tine holes are reamed .0775 with no band and the pin is their gauge; a pin
+that enters by hand is bonded with LOCTITE 641 at MHA-CH-00, on the tine it
+ends in only, and comes out hot (the removable grade) for channel service.
 
 Frame (part): pin axis = part Z, axial mid-plane = Front Plane (z = 0); the
 member is the INSTALLED pin -- a Ø PIN_DIA cylinder FORK_THICKNESS long, flush
@@ -56,9 +59,15 @@ PIN_LENGTH_LIMITS = _pin.PIN_LENGTH_LIMITS
 PIN_END_PROUD_MAX = 0.0
 
 # --- The fork's reamed press hole (the rod spec owns it; restated here so the
-# budget reads one place). ---
+# budget reads one place): the reamer's size, which the sheet prints, and the
+# ANALYSIS band the reamer is modelled to cut. ---
 ROD_HOLE_DIA = _rod.PIN_HOLE_DIA
 ROD_HOLE_LIMITS = _rod.PIN_HOLE_LIMITS
+if ROD_HOLE_LIMITS != _pin.HOLE_REAMED_LIMITS:
+    raise AssertionError("the rod's restated reamer cut drifted from the pin's")
+# The largest hole accepted: one the pin entered by hand, bonded, that the
+# set's .079 pin does not enter (sh_vn_pivot_pin_spec.BOND_HOLE_MAX).
+ROD_HOLE_ACCEPTED_MAX = _pin.BOND_HOLE_MAX
 
 # --- The joint's limits (the budget test_sh_vn_pivot_pin_rod_fit holds). ---
 # The press the tines take: ANSI B4.1-1967 (R1987) FN2 "medium drive fit,
@@ -119,7 +128,8 @@ def joint_budget() -> dict[str, float]:
     """Worst-case values of every fit the joint must hold (all mm).
 
     Every term is at the worst case of its printed band (drawing-guidelines.md rule 17 (walls and webs)):
-    the purchased pin's 0/+.0002 in, the reamed tine hole .0775-.0779, the
+    the purchased pin's 0/+.0002 in, the reamer's modelled cut .0775-.0779
+    (for the crown wall, the largest hole accepted bonded), the
     arm's #47 hole at its sheet's DRILLED HOLES row, the arm strap and its
     symmetry to its hub (STRAP_HUB_SYMMETRY), each tine .067 +/-.002, the slot
     .106 +/-.002 (so the fork over the tines, their reference sum, spans
@@ -205,7 +215,12 @@ def joint_budget() -> dict[str, float]:
         "bridge_min": (
             _rod.FORK_BASE_BELOW_PIN - _rod.FORK_CROTCH_BELOW_PIN - 2.0 * ROD_LINEAR_2PL
         ),
-        "crown_wall_min": _rod.FORK_CROWN_RADIUS - crown_loss - hole_max / 2.0,
+        "crown_wall_min": (
+            _rod.FORK_CROWN_RADIUS - crown_loss - ROD_HOLE_ACCEPTED_MAX / 2.0
+        ),
+        # A pin that entered by hand, bonded: the diametral gap the
+        # compound fills, at the largest hole accepted.
+        "bond_gap_max": ROD_HOLE_ACCEPTED_MAX - pin_min,
         # The shortest supplied pin over the thickest fork: the dressing stock
         # both ends share, and each end's share with the pin pressed centred.
         "length_excess_min": PIN_LENGTH_LIMITS[0] - w_max,
@@ -236,6 +251,8 @@ if BUDGET["bridge_min"] < BRIDGE_TARGET - 1e-9:
     raise AssertionError("fork bridge below the slot under the .080 in target")
 if BUDGET["crown_wall_min"] < RULE12_WALL_TARGET - 1e-9:
     raise AssertionError("reamed hole to fork crown under the drawing-guidelines.md rule 17 (walls and webs) target")
+if BUDGET["bond_gap_max"] > _pin.LOCTITE_641_GAP_MAX:
+    raise AssertionError("a bonded rod pin's gap passes LOCTITE 641's gap fill")
 if BUDGET["length_excess_min"] <= 0.0:
     raise AssertionError("the shortest supplied pin cannot dress flush at both tines")
 if BUDGET["dress_stock_per_end_min"] < 0.0:

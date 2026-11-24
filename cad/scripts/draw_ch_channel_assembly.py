@@ -1078,17 +1078,22 @@ def _fitup_text() -> dict[str, str]:
         "rod-arms-swing": (
             f"CHECK EACH {arm} SWINGS FREE ON ITS PIN BY ITS OWN WEIGHT."
         ),
-        # A press whose part slides in by hand is a slip fit (rule 23). The pin
-        # is bought (sh_vn_pivot_pin_rod_spec), so the press-fit ruling is kept
-        # by a new rod, its fork hole reamed to the measured pin. One action a
-        # step (rule 22): "THAT" ties each later step to the condition.
-        "rod-pin-pressed-out": (
-            f"IF AN {pin} SLID IN BY HAND, ITS FORK HOLE IS OVER SIZE: PRESS "
-            "THAT PIN OUT."
+        # A press whose pin slides in by hand is bonded with LOCTITE 641, not
+        # a replaced rod (owner ruling 2026-11-24, fit audit question 3): the
+        # pin bond note on the detail sheet says how (one end only, the
+        # compound kept off the arm), and the bond is checked once cured.
+        # One action a step (rule 22): "THAT" ties each later step to the
+        # condition.
+        "rod-pin-bonded": (
+            f"IF AN {pin} SLID IN BY HAND, BOND IT PER THE PIN BOND NOTE "
+            f"(SHEET {SHEET_NAMES.index(DETAIL_SHEET) + 1})."
         ),
-        "rod-replaced": f"REPLACE THAT {rod}.",
+        "rod-pin-bond-checked": (
+            f"CURED, CHECK THAT {pin} DOES NOT SLIDE BY HAND AND ITS {arm} "
+            "SWINGS FREE BY ITS OWN WEIGHT."
+        ),
         "rod-pin-return": (
-            f"RETURN TO STEP {n(steps.RODS_PINNED_KEY)} WITH THE NEW {rod}."
+            f"RETURN TO STEP {n('rod-pin-bonded')} IF {pin} SLIDES OR {arm} BINDS."
         ),
         # The fitter leaves this list after the rod pins for the drive train's
         # cylinder stack through its north-bracket set, then comes back here
@@ -1269,12 +1274,17 @@ def _fitup_text() -> dict[str, str]:
         ),
         "bar-pins-held": f"CHECK EACH {bar_pin} DOES NOT SLIDE IN ITS BAR BY HAND.",
         "bars-swing": f"CHECK EACH {bar} SWINGS FREE ON ITS PIN UNDER ITS OWN WEIGHT.",
-        "bar-pin-pressed-out": (
-            f"IF AN {bar_pin} SLID IN BY HAND, ITS CHEEK HOLE IS OVER SIZE: PRESS "
-            "THAT PIN OUT."
+        "bar-pin-bonded": (
+            f"IF AN {bar_pin} SLID IN BY HAND, BOND IT PER THE PIN BOND NOTE "
+            f"(SHEET {SHEET_NAMES.index(DETAIL_SHEET) + 1})."
         ),
-        "bar-replaced": f"REPLACE THAT {bar}.",
-        "bar-pin-return": f"RETURN TO STEP {n('bars-straight')} WITH THE NEW {bar}.",
+        "bar-pin-bond-checked": (
+            f"CURED, CHECK THAT {bar_pin} DOES NOT SLIDE BY HAND AND ITS {bar} "
+            "SWINGS FREE BY ITS OWN WEIGHT."
+        ),
+        "bar-pin-return": (
+            f"RETURN TO STEP {n('bar-pin-bonded')} IF {bar_pin} SLIDES OR {bar} BINDS."
+        ),
         "fulcrum-shaft-withdrawn": (
             f"DRAW {fulcrum_shaft} OUT OF BOTH {keeper} TO THE LEFT ({lever_view})."
         ),
@@ -1328,6 +1338,65 @@ FITUP_NOTES = flow_steps(
     "ROCKER BANK FIT-UP", steps.ROCKER_SEQUENCE, FITUP_TEXT, ROCKER_COLUMNS
 ) + flow_steps("LEVER BANK FIT-UP", steps.LEVER_SEQUENCE, FITUP_TEXT, LEVER_COLUMNS)
 FITUP_STEPS = "\n".join(text for _column, text in FITUP_NOTES)
+
+
+def _pin_bond_note() -> str:
+    """The pin bond the rod-pin-bonded and bar-pin-bonded steps point to.
+
+    Owner ruling 2026-11-24, fit audit question 3: a pivot pin that enters
+    its reamed fork or bar hole by hand is bonded with LOCTITE 641 instead of
+    its rod or bar being replaced. Rule 23 (and part 1's second pass on the
+    audit): degrease, the compound kept off the running joint beside it, the
+    pin held square while it cures, and the cure before load. The pin runs in
+    the arm or lever between the two tines or cheeks, .002-.0075 off each
+    face, so only the trailing end is coated, no further in than half the
+    tine or cheek it stops in: the hole's mouth scrapes the excess outboard,
+    and nothing coated ever passes the arm or lever. The far hole holds the
+    pin square, and the cure lies coated end down so nothing runs inward. A
+    pin bonded in 641 (the removable grade) comes out with heat. As a note,
+    the bond stays one action of its step (the MHA-PD-00 bond note's form).
+    """
+    pin, bar_pin = item(explode.ROD_PIN), item(explode.BAR_PIN)
+    arm, lever = item("ch-rocker-arm"), item("ch-channel-lever")
+    lines = (
+        f"PIN BOND (STEPS {steps.step_number('rod-pin-bonded')} AND "
+        f"{steps.step_number('bar-pin-bonded')}): AN {pin} OR {bar_pin} THAT "
+        "SLID IN BY HAND.",
+        "1. PUSH IT OUT, HEATING THE TINES OR CHEEKS IF IT WAS BONDED.",
+        "2. DEGREASE THE PIN AND BOTH HOLES IT SLID IN.",
+        "3. COAT ONE END WITH LOCTITE 641, NO FURTHER IN THAN HALF THE "
+        "TINE OR CHEEK IT STOPS IN; NONE ON THE MIDDLE.",
+        "4. AT ONCE PUSH IT BACK, COATED END LAST, FLUSH WITH BOTH FACES: "
+        f"THE COMPOUND STAYS OFF THE {arm} OR {lever} BETWEEN THEM.",
+        "5. WIPE THAT FACE. CURE 24 H, COATED END DOWN, THE FAR HOLE "
+        "HOLDING THE PIN SQUARE.",
+    )
+    wrapped: list[str] = []
+    for line in lines:
+        wrapped += textwrap.wrap(
+            _REFERENCE_SPACE.sub(rf"\1{_UNBROKEN_SPACE}", line),
+            width=STEPS_LINE_WIDTH,
+            subsequent_indent="   ",
+            break_on_hyphens=False,
+        )
+    return "\n".join(line.replace(_UNBROKEN_SPACE, " ") for line in wrapped)
+
+
+# The note stands at the top of the detail sheet's right half, over detail
+# A's hub label (its text top 0.033 above the detail's centre), which it
+# clears by at least a line.
+PIN_BOND_NOTE = _pin_bond_note()
+PIN_BOND_NOTE_XY = (STEPS_RIGHT_X, STEPS_TOP_Y)
+_PIN_BOND_NOTE_FOOT = (
+    PIN_BOND_NOTE_XY[1] - len(PIN_BOND_NOTE.splitlines()) * NOTE_LINE_PITCH
+)
+if _PIN_BOND_NOTE_FOOT < SOUTH_END.centre[1] + 0.033 + NOTE_LINE_PITCH:
+    raise AssertionError("the pin bond note runs into detail A's hub label")
+if (
+    PIN_BOND_NOTE_XY[0] + STEPS_LINE_WIDTH * NOTE_CHAR_WIDTH
+    > _TEMPLATE.width_m - BORDER
+):
+    raise AssertionError("the pin bond note runs past the right border")
 
 
 def _activate_sheet(adapter: Any, name: str) -> Any:
@@ -2288,6 +2357,9 @@ def _place_fitup_sheets(adapter: Any) -> Callable[[], None]:
         adapter, SOUTH_END, {}, pointers=DETAIL_POINTERS
     )
     _place_steps(adapter, DETAIL_SHEET)
+    _add_note_block(
+        adapter, DETAIL_SHEET, PIN_BOND_NOTE, PIN_BOND_NOTE_XY, label="pin bond note"
+    )
 
     _activate_sheet(adapter, SHEET_NAMES[4])
     annotations += _dimensioned_bank(adapter, LEVER_BANK, LUG_KEEP)
