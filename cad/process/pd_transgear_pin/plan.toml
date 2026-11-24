@@ -377,18 +377,18 @@ sizing = "other"
 instruction = "Finish the journal from Z+{{process.turn_start_z_mm:in.3dot}} in the stub to the seat, leaving stock for polishing: stop at Ø{{process.polish_dia_max_in:.4dot}} or just under, miking at both ends and the middle between passes (spindle stopped), in passes of {{process.finish_radial_doc_mm:in.4dot}} or less on the radius, the last no deeper than half of what the mike reads over {{process.polish_dia_min_in:.4dot}}; spring passes allowed."
 settings = "lathe-sharp-nose-1018"
 cut_diameter_mm = "{{cad.outer_dia_mm}}"
-inspection = "Stock left for polishing, not an acceptance. A station over {{process.polish_dia_max_in:.4dot}}: one more light pass. Every station {{process.polish_stop_in:.4dot}} to {{process.polish_dia_max_in:.4dot}}: go on to Op 130. A station already under {{process.polish_stop_in:.4dot}}: skip Op 130 and try the mates in Op 190."
+inspection = "Stock left for polishing, not an acceptance. A station over {{process.polish_dia_max_in:.4dot}}: one more light pass. Every station {{process.polish_stop_in:.4dot}} to {{process.polish_dia_max_in:.4dot}}: go on to Op 130. A station already .1248 to {{process.polish_stop_in:.4dot}}: do not polish there in Op 130. A station under .1248: scrap, start again from Op 40."
 gauge_checks = "other"
 
 [[setups.operations]]
 cut_kind = "other"
 instruction = "Polish the journal (Ra 63 or finer): spindle about 600 rpm, 400-grit abrasive cloth backed by a flat file, stroked steadily along the journal from the seat to the stub, never wrapped round the work; keep it off the seat's face. Every few strokes stop the spindle and mike it at three stations: by the seat, the middle and by the tip. Stop when every station first reads {{process.polish_stop_in:.4dot}} or just under: the mates are tried in Op 190."
-inspection = "No station reads over {{process.polish_stop_in:.4dot}} (the MHA-PD-VN-68 shims' bore); the three stations read alike, no taper you can mike. The fit itself is accepted in Op 190, on the mates."
+inspection = "No station reads over {{process.polish_stop_in:.4dot}} (the MHA-PD-VN-68 shims' bore) or under .1248 (drawing note 1: the bond's clearance in MHA-PD-18 stays at or under .0022 in a bore the .127 pin does not enter); the three stations read alike, no taper you can mike. The running fit itself is accepted in Op 190, on the mates."
 gauge_checks = "other"
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "A station still over {{process.polish_stop_in:.4dot}}: polish there alone. Do not polish on past the first reading at or under it: a journal polished small shakes in its mates in Op 190 and is scrap."
+instruction = "A station still over {{process.polish_stop_in:.4dot}}: polish there alone. Do not polish on past the first reading at or under it. A station under .1248: the journal is scrap; start again from Op 40, the blank rechucked as in Setup 1's Holding."
 
 [[setups.operations]]
 cut_kind = "other"
@@ -439,7 +439,7 @@ instruction = "Only if a mate, the shim or MHA-PD-18 will not enter, or binds al
 [[setups.operations]]
 cut_kind = "other"
 instruction = "After any strokes in Op 200: spindle stopped, mike the journal at both ends and the middle, then turn the chuck by hand and watch the tip against the tool's point."
-inspection = "The three stations read within .0003 of each other and the tip does not wobble to the eye: repeat Op 190. Otherwise Op 220."
+inspection = "No station reads under .1248, the three read within .0003 of each other, and the tip does not wobble to the eye: repeat Op 190. Otherwise Op 220."
 gauge_checks = "other"
 
 [[setups.operations]]
@@ -664,12 +664,12 @@ diagram = { file = "diagrams/inspect.svg", alt = "The finished pin: the R.18 hea
 instruction = "With a fine stone, break the head's two outer edges and the tip dome's root edge R{{cad.edge_break_in:.3dot}} or chamfer {{cad.chamfer_max_in:.3dot}} max. Stone only the burr off the groove's two edges, the load wall's edge left square; leave the seat's inside corner and the shank untouched."
 
 [[setups.operations]]
-instruction = "Look over the shank where the bush held it, then try {{cad.outer_mates}} and the MHA-PD-18 arm on it once more, as in Op 190."
-inspection = "No mark or nick you can feel; each mate still enters, turns free and has no shake; the arm slides on by hand up to the seat."
+instruction = "Look over the shank where the bush held it, then try on it once more, as in Op 190, each of {{cad.outer_mates}} that was not set aside in Op 220, and MHA-PD-18."
+inspection = "No mark or nick you can feel; each mate tried still enters, turns free and has no shake; the arm slides on by hand up to the seat."
 gauge_checks = "other"
 
 [[setups.operations]]
-instruction = "A mark you can feel, or a mate that binds or shakes: scrap the pin and make another from Op 40, the blank rechucked as in Setup 1's Holding."
+instruction = "A mark you can feel, or a mate tried in Op 420 that binds or shakes: scrap the pin and make another from Op 40, the blank rechucked as in Setup 1's Holding."
 
 [[setups.operations]]
 instruction = "Wipe the pin with machine oil (FINISH: oiled; MHA-PD-00 degreases it before the bond). Keep it with MHA-PD-18, MHA-PD-10, MHA-PD-24 and MHA-PD-25, the parts it was fitted to."
