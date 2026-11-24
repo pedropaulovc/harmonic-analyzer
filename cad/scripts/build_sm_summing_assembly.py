@@ -261,9 +261,10 @@ _KNIFE_STATION_SPACING = top_frame.STUD_Z_REAR - top_frame.STUD_Z_FRONT  # 180.4
 KNIFE_BAR_YAW_DEG = math.degrees(
     math.atan(2.0 * KNIFE_BORE_LINE_OFFSET / _KNIFE_STATION_SPACING)
 )  # 0.263
-# The bar's own diametral clearance in each bore (the gauge bar's matched
-# fit, .0041 max) lets each block turn on the bar by that clearance over its
-# shortest bore: atan(0.1041 / 13.716) = 0.435 deg (owner review of #2334
+# The bar's own diametral clearance in each bore (at most .5000 - .4960 =
+# .0040, the bar's DIA .496 MIN of fit audit S6 in the largest bore) lets
+# each block turn on the bar by that clearance over its shortest bore:
+# atan(0.1016 / 13.716) = 0.424 deg (owner review of #2334
 # asked that the hanger stack count it; it was left out before).  The tap,
 # clocked to the bore, turns with the block by the bar line's yaw plus this
 # play, and the re-hung rear mount must swing as far to follow the front.
@@ -271,8 +272,8 @@ KNIFE_BAR_CLEARANCE = 2.0 * knife_mount.BORE_R_MAX - knife_mount.KNIFE_GAUGE_BAR
 _KNIFE_BLOCK_DEPTH_MIN = knife_mount.SUPPORT_Z_THICK - knife_mount.BLOCK_SIZE_TOL
 KNIFE_BAR_PLAY_YAW_DEG = math.degrees(
     math.atan(KNIFE_BAR_CLEARANCE / _KNIFE_BLOCK_DEPTH_MIN)
-)  # 0.435
-KNIFE_TAP_YAW_DEG = KNIFE_BAR_YAW_DEG + KNIFE_BAR_PLAY_YAW_DEG  # 0.698
+)  # 0.424
+KNIFE_TAP_YAW_DEG = KNIFE_BAR_YAW_DEG + KNIFE_BAR_PLAY_YAW_DEG  # 0.718
 KNIFE_BAR_YAW_SHIFT = knife_mount.PIN_HOLE_X * math.tan(math.radians(KNIFE_TAP_YAW_DEG))
 HANGER_SCREW_MISMATCH_X = KNIFE_BLOCK_SHIFT
 HANGER_SCREW_MISMATCH_Z = KNIFE_BLOCK_SHIFT + KNIFE_BAR_YAW_SHIFT
@@ -281,7 +282,7 @@ HANGER_SCREW_MISMATCH = math.hypot(HANGER_SCREW_MISMATCH_X, HANGER_SCREW_MISMATC
 # crossbar body to the hole's top end at the faced top, at the longest
 # printed grip: tan(0.3 deg) * (36.50 + 0.13) = 0.1918. The #10 E drill
 # hole's 0.762 radial float covers this plus the station mismatch,
-# 0.4936, with 0.0766 spare (HANGER_SCREW_FLOAT_SPARE).
+# 0.4924, with 0.0778 spare (HANGER_SCREW_FLOAT_SPARE).
 HANGER_SCREW_DRIFT = top_frame.DRILL_DRIFT_PER_MM * (
     top_frame.HANGER_GRIP + top_frame.HANGER_GRIP_TOL
 )
@@ -307,12 +308,13 @@ KNIFE_REAR_YAW_RANGE_DEG = math.degrees(
 # (absorb stacks), and the 2026-10-09 ruling: >=5.0 deg).  Owner ruling
 # 2026-11-08 (Pedro), #2144 item 11.3: the part no longer sets the bore's
 # yaw.  The gauge bar sets the front mount's bore, so its far-end offset t
-# is the bar's diametral clearance in the largest bore, .5000 - (.4985 -
-# .0026) = .0041 (0.1041), and the lever's ridge, spanning both bores, adds
-# its yaw over the shortest mouth-to-mouth run (codjiflo, PR #1978): that
-# clearance walked across the deepest .XX block, 14.224 * 0.1041 / 166.2 =
-# 0.0089.  t 0.113 leaves about 8.51 deg in the smallest Ø.4985 bore (owner
-# ruling 2026-11-23, tool audit Q13; 7.12 deg in the former Ø.4720).  The bore's ∥.002|A is its
+# is the bar's diametral clearance in the largest bore, .5000 - .4960 =
+# .0040 (0.1016, the bar's DIA .496 MIN, fit audit S6), and the lever's
+# ridge, spanning both bores, adds its yaw over the shortest mouth-to-mouth
+# run (codjiflo, PR #1978): that clearance walked across the deepest .XX
+# block, 14.224 * 0.1016 / 166.2 = 0.0087.  t 0.110 leaves about 8.53 deg in
+# the smallest Ø.4985 bore (owner ruling 2026-11-23, tool audit Q13; 7.12
+# deg in the former Ø.4720).  The bore's ∥.002|A is its
 # pitch, which the lateral rock model (free_rock_deg) does not read.  The
 # rear mount's yaw is accepted by the rock gauge itself
 # (sm_summing_assembly_spec.BOSS_ROCK_TRAVEL, sheet check 2): the fitter
@@ -335,7 +337,8 @@ KNIFE_RIDGE_YAW_OFFSET = (
 )
 # The clearance two conforming bores demand of one straight bar (Owner
 # ruling 2026-11-20 (Pedro), #2499: "Follow recommendations unless noted
-# otherwise"): the printed fit's minimum must cover it.  Each bore's axis
+# otherwise"; since fit audit S6 a recorded corner, not a printed minimum).
+# Each bore's axis
 # lies in its ⌖Ø.008|A|B cylinder over its full length and rises at most
 # its ∥.002|A over that length (the yaw the bar sets is free, so only the
 # vertical plane binds).  Worst case one bore rises the whole ∥ with its
@@ -348,19 +351,28 @@ KNIFE_RIDGE_YAW_OFFSET = (
 # offset helps.  The pitch of the other bore, or less pitch on this one,
 # needs less (d/d∥ = 1 - L / 2S > 0).  Both datum-A seats are taken as one
 # plane, the two ends of MHA-FR-02's one faced underside, which carries no
-# form zone; a relative seat pitch would add itself over L, and the
-# rounding below leaves .00005 for it (#3157).
+# form zone; a relative seat pitch would add itself over L (#3157).
 KNIFE_BAR_FIT_NEED = (
     knife_mount.KNIFE_BORE_PARALLELISM_TOL
     + _KNIFE_BLOCK_DEPTH_MAX
     * (knife_mount.KNIFE_BORE_POSITION_TOL - knife_mount.KNIFE_BORE_PARALLELISM_TOL / 2.0)
     / _KNIFE_STATION_SPACING
 )  # 0.0648 (.00255)
-# The printed minimum is that need rounded up to the .0001 step.
-KNIFE_BAR_FIT_STEP_IN = 0.0001
-KNIFE_BAR_FIT_MIN_IN = (
-    math.ceil(KNIFE_BAR_FIT_NEED / 25.4 / KNIFE_BAR_FIT_STEP_IN - 1e-9) * KNIFE_BAR_FIT_STEP_IN
-)  # .0026
+# Owner ruling 2026-11-24, fit audit S6: "TURN THE BAR UNTIL IT SLIDES
+# THROUGH BOTH MOUNTS; DIA .496 MIN".  The trial makes the bar pass the
+# pair it is made to; the floor caps its play, which must stay within the
+# .0041 every stack was proven at under #2499.  The corner: a straight bar
+# through the smallest conforming pair is at most .4985 - .00255 = .49595,
+# .00005 under the floor -- below the shop's .001 reading unit (policy
+# #3518: such a margin is evidence neither way; the .4990 reamer's own
+# .4991 least bore leaves +.00055), so the trial governs (delegated ruling
+# 2026-11-24, FitLaneCH).  The guard keeps that corner under the reading
+# unit.
+KNIFE_BAR_PLAY_PROVEN_IN = 0.0041
+KNIFE_BAR_READING_UNIT_IN = 0.001
+KNIFE_BAR_CORNER_SHORTFALL_IN = knife_mount.KNIFE_GAUGE_BAR_DIA_MIN_IN - (
+    2.0 * knife_mount.BORE_R_MIN - KNIFE_BAR_FIT_NEED
+) / 25.4  # +.00005
 KNIFE_BORE_FAR_END_OFFSET = KNIFE_BAR_CLEARANCE + KNIFE_RIDGE_YAW_OFFSET
 KNIFE_FREE_ROCK_WORST_DEG = knife_mount.free_rock_deg(
     KNIFE_BORE_FAR_END_OFFSET,
@@ -540,42 +552,26 @@ def _assert_knife_hanger_stack() -> None:
             f"its dowel inside the bolt float, under the {KNIFE_TAP_YAW_DEG:.3f} deg "
             "the gauge bar's line and play can ask of it"
         )
-    # One bar fits both bores of any conforming pair: the fit's band is at
-    # least the bore band, so the largest bore less the maximum never
-    # passes the smallest less the minimum.
-    _fit_band = (
-        max(knife_mount.KNIFE_GAUGE_BAR_CLEARANCE_IN)
-        - min(knife_mount.KNIFE_GAUGE_BAR_CLEARANCE_IN)
-    ) * 25.4
-    if _fit_band < max(knife_mount.BORE_DIA_BAND) - 1e-9:
-        raise RuntimeError(
-            f"the gauge bar's {_fit_band:.4f} fit band is narrower than the "
-            f"{max(knife_mount.BORE_DIA_BAND):.4f} bore band: no one bar fits "
-            "both bores of every conforming pair"
-        )
     if KNIFE_GAUGE_BAR_LENGTH <= KNIFE_MOUNT_OUTER_SPAN_MAX:
         raise RuntimeError(
             f"the {KNIFE_GAUGE_BAR_LENGTH:.1f} gauge bar does not span both knife "
             f"mounts' outer faces ({KNIFE_MOUNT_OUTER_SPAN_MAX:.2f})"
         )
-    # The printed matched fit is the clearance the rock budget charges.
-    if abs(max(knife_mount.KNIFE_GAUGE_BAR_CLEARANCE_IN) * 25.4 - KNIFE_BAR_CLEARANCE) > 1e-9:
+    # The bar's floor caps its play under the play every stack was proven at.
+    if KNIFE_BAR_CLEARANCE > KNIFE_BAR_PLAY_PROVEN_IN * 25.4 + 1e-9:
         raise RuntimeError(
-            f"the gauge bar's printed {max(knife_mount.KNIFE_GAUGE_BAR_CLEARANCE_IN):.4f} max "
-            f"clearance is not the {KNIFE_BAR_CLEARANCE:.4f} the rock budget charges"
+            f"the gauge bar's DIA {knife_mount.KNIFE_GAUGE_BAR_DIA_MIN_IN:.4f} MIN "
+            f"leaves {KNIFE_BAR_CLEARANCE / 25.4:.4f} play in the largest bore, over "
+            f"the {KNIFE_BAR_PLAY_PROVEN_IN:.4f} the stacks were proven at"
         )
-    # Its minimum passes two conforming bores: the need rounded up to the
-    # .0001 step (owner ruling 2026-11-20, #2499).
-    _fit_min_in = min(knife_mount.KNIFE_GAUGE_BAR_CLEARANCE_IN)
-    if (
-        _fit_min_in * 25.4 < KNIFE_BAR_FIT_NEED - 1e-9
-        or abs(_fit_min_in - KNIFE_BAR_FIT_MIN_IN) > 1e-9
-    ):
+    # The trial governs only while the corner pair's shortfall under the
+    # floor stays below the shop's reading unit (fit audit S6).
+    if KNIFE_BAR_CORNER_SHORTFALL_IN >= KNIFE_BAR_READING_UNIT_IN:
         raise RuntimeError(
-            f"the gauge bar's printed {_fit_min_in:.4f} min clearance is not "
-            f"{KNIFE_BAR_FIT_MIN_IN:.4f}, the {KNIFE_BAR_FIT_NEED / 25.4:.5f} two "
-            "conforming bores need (∥ pitch plus ⌖ height over the stations) "
-            "rounded up to the .0001 step"
+            f"the gauge bar's DIA {knife_mount.KNIFE_GAUGE_BAR_DIA_MIN_IN:.4f} MIN "
+            f"stands {KNIFE_BAR_CORNER_SHORTFALL_IN:.5f} over the largest straight "
+            "bar two conforming bores pass (∥ pitch plus ⌖ height over the "
+            f"stations), a reading unit ({KNIFE_BAR_READING_UNIT_IN:.3f}) or more"
         )
     if KNIFE_FREE_ROCK_WORST_DEG < KNIFE_FREE_ROCK_FLOOR_DEG:
         raise RuntimeError(

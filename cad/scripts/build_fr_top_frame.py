@@ -1065,8 +1065,8 @@ _HANGER_BORE_LINE_OFFSET = (
     + _KNIFE_DOWEL_HOLE_PERP / 2.0
     + KNIFE_MOUNT.KNIFE_BORE_POSITION_TOL / 2.0
 )  # 0.4140, each station
-# The bar's own diametral clearance in each bore, the gauge bar's .0041
-# maximum (owner ruling 2026-11-20 (Pedro), #2499), turns each block on it a
+# The bar's own diametral clearance in each bore, at most .0040 at the gauge
+# bar's DIA .496 MIN (owner ruling 2026-11-24, fit audit S6), turns each block on it a
 # further atan(clearance / shortest bore) (build_sm_summing_assembly
 # KNIFE_BAR_PLAY_YAW_DEG, owner review of #2334); the tap turns with it.
 _HANGER_BAR_PLAY_YAW = math.atan(
@@ -1076,7 +1076,7 @@ _HANGER_BAR_PLAY_YAW = math.atan(
 HANGER_BAR_YAW_SHIFT = HANGER_PIN_X * math.tan(
     math.atan(2.0 * _HANGER_BORE_LINE_OFFSET / (STUD_Z_REAR - STUD_Z_FRONT))
     + _HANGER_BAR_PLAY_YAW
-)  # 0.0928
+)  # 0.0955
 HANGER_SEAT_BOLT_MISMATCH = math.hypot(
     _HANGER_BLOCK_SHIFT, _HANGER_BLOCK_SHIFT + HANGER_BAR_YAW_SHIFT
 )
