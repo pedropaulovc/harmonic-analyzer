@@ -325,7 +325,7 @@ feed = "hand"
 
 [[setups.operations]]
 steps = [
-  { kind = "action", text = "First arm only: prove RA01 and RA02 in air. Console M6 T1; on the .200 block: G10 L20 P1 Z-20.320 (Z0 1.000 in high). Run each file single block through its first moves, then M6 T1 and G10 L20 P1 Z5.080 on the block again." },
+  { kind = "action", text = "First arm only: prove RA01 and RA02 in air. Console M6 T1; on the .200 block: G10 L20 P1 Z-20.320 (Z0 1.000 in high). Run each file single block from start to end, through every M6 and RA02's moves out to the #47 at X {{cad.rod_hole_from_bore_x_in:.4dot}}, between the right clamp and the tip block; then M6 T1 and G10 L20 P1 Z5.080 on the block again." },
   { kind = "check", text = "Steel rule from the strap: every clamp's top, nut included, {{process.clamp_top_max_mm:in.2f}} in or less above the strap." },
   { kind = "stop", text = "Over: lower the clamp on its step block and check again; nothing runs until it is." },
 ]
@@ -347,7 +347,7 @@ gauge_checks = "other"
 [[setups.operations]]
 steps = [
   { kind = "stop", text = "An unfaced patch: the strap sits further off the hub's middle than the end's stock allows; stop and tell the owner, do not face deeper." },
-  { kind = "action", text = "Unclamp; the arm goes on to Setup 3. The next arm in, from Op 90." },
+  { kind = "action", text = "Unclamp and set the arm aside for Setup 3. The next arm in, from Op 100; Setup 3 starts when every arm of the lot has its first end faced." },
 ]
 feed = "hand"
 
@@ -383,7 +383,7 @@ steps = [
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Clamp both clamps snug. The strap's right tip lies on the tip block, no light under it. T1 on the .200 block over the left block: G10 L20 P1 Z5.080."
+instruction = "Clamp both clamps snug. The strap's right tip lies on the tip block, no light under it. Console M6 T1 (the 1/2 in end mill, {{process.half_mill_projection_mm:in.2f}} in out of the collet, measured on the tool setter); T1 on the .200 block over the left block: G10 L20 P1 Z5.080."
 feed = "hand"
 
 [[setups.operations]]
@@ -443,7 +443,7 @@ milling_cuts = [
 
 [[setups.operations]]
 steps = [
-  { kind = "action", text = "First arm only, at the file's end, still clamped: the .200 edge finder down into the F bore, below the hub's top end; touch the bore's wall at +X and −X, then +Y and −Y, and read the G54 DRO at each touch." },
+  { kind = "action", text = "First arm only, at the file's end, still clamped, spindle stopped: take out the #47 and put the .200 edge finder in, at 969. Run it down into the F bore, below the hub's top end; touch the bore's wall at +X and −X, then +Y and −Y, and read the G54 DRO at each touch." },
   { kind = "check", text = "The bore's centre (the mean of each pair) within {{process.bore_centre_max_in:.3dot}} of X0 and of Y0: the hub's Ø.40 within its Ø.004 position to the bore (A). The bore's Ø (each pair's span plus {{process.edge_finder_dia_in:.3dot}}) {{cad.bore_dia_min_in:.4dot}}–{{cad.bore_dia_max_in:.4dot}}." },
   { kind = "stop", text = "Either out: stop before the next arm, find X0 Y0 on the hub again and read the bore again; still out, tell the owner." },
   { kind = "action", text = "Every arm: unclamp, the arm to the bench." },

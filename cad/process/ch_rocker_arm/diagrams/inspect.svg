@@ -9,20 +9,30 @@
   <line class="dims" x1="140" y1="190" x2="428.1" y2="190"/>
   <line class="leader" x1="140" y1="141" x2="140" y2="196"/>
   <line class="leader" x1="428.1" y1="114" x2="428.1" y2="196"/>
-  <text class="label" x="190" y="210">#47 5.249 REF from the bore (5.239/.333 basic;</text>
-  <text class="label" x="190" y="226">first arm, calipers over the offcut and a #47 shank)</text>
+  <text class="label" x="150" y="210">#47 5.249 REF from the bore (5.239/.333 basic;</text>
+  <text class="label" x="150" y="226">first arm, calipers over offcut and #47 shank)</text>
   <text class="label" x="30" y="60">F bore: the 1/4 in ground bar offcut slides through, every arm</text>
-  <!-- Hub section, 1 in = 200 px: length .278 ±.002, each end .090 over its face. -->
-  <rect class="part-kept" x="500" y="150" width="80" height="55.6"/>
-  <rect class="part-kept" x="590" y="150" width="80" height="55.6"/>
-  <rect class="part-kept" x="480" y="168" width="20" height="19.6"/>
-  <rect class="part-kept" x="670" y="168" width="70" height="19.6"/>
-  <rect class="holes" x="580" y="150" width="10" height="55.6"/>
-  <line class="dims" x1="700" y1="150" x2="700" y2="205.6"/>
-  <line class="leader" x1="670" y1="150" x2="740" y2="150"/>
-  <line class="leader" x1="670" y1="205.6" x2="740" y2="205.6"/>
-  <text class="label" x="560" y="250">hub length .276–.280, micrometer,</text>
-  <text class="label" x="560" y="266">every arm; first arm: strap mid-plane</text>
-  <text class="label" x="560" y="282">.137–.141 from end G</text>
+  <!-- Hub section, 1 in = 200 px: Ø.40 hub, Ø.257 bore, length .278, the
+       .098 strap at the hub's middle; end G at the bottom. -->
+  <rect class="part-kept" x="560" y="150" width="14.3" height="55.6"/>
+  <rect class="part-kept" x="625.7" y="150" width="14.3" height="55.6"/>
+  <rect class="part-kept" x="480" y="168" width="80" height="19.6"/>
+  <rect class="part-kept" x="640" y="168" width="100" height="19.6"/>
+  <rect class="holes" x="574.3" y="150" width="51.4" height="55.6"/>
+  <g class="dims">
+    <line x1="560" y1="150" x2="462" y2="150"/>
+    <line x1="560" y1="205.6" x2="462" y2="205.6"/>
+    <line x1="470" y1="150" x2="470" y2="205.6" marker-start="url(#prechips-arr)" marker-end="url(#prechips-arr)"/>
+    <line x1="640" y1="205.6" x2="756" y2="205.6"/>
+    <line x1="740" y1="177.8" x2="756" y2="177.8"/>
+    <line x1="750" y1="177.8" x2="750" y2="205.6" marker-start="url(#prechips-arr)" marker-end="url(#prechips-arr)"/>
+  </g>
+  <text class="label" x="660" y="222">end G</text>
+  <line class="leader" x1="440" y1="246" x2="468" y2="190"/>
+  <text class="label" x="300" y="258">hub length .276–.280,</text>
+  <text class="label" x="300" y="274">micrometer, every arm</text>
+  <line class="leader" x1="700" y1="246" x2="748" y2="195"/>
+  <text class="label" x="540" y="258">strap mid-plane from end G</text>
+  <text class="label" x="540" y="274">.137–.141, first arm</text>
   <text class="label" x="20" y="315">Edges the cuts left: R.010 or .010 chamfer max; both bore mouths, both #47 mouths, the hub rims.</text>
 </svg>
