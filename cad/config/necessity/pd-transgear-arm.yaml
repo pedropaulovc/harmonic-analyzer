@@ -8,7 +8,7 @@ necessity:
     feature: "sheet 1, front view, Ø.126 REAM THRU pin bore (datum C), MHA-PD-23 IS TURNED TO THIS BORE"
     kind: mesh
     reason: "keeps bonded pin MHA-PD-23 square to MHA-PD-26 rack mesh"
-    source: "paper_drive_arm_registration.S_AXIS_TILT_MAX_RAD; test_pd_feed_rack_drawing opposite-flank budget"
+    source: "owner ruling 2026-11-24, fit audit question 4 (MHA-PD-23 bonded, no lean check); paper_drive_arm_registration.S_AXIS_TILT_MAX_RAD"
   - id: N-02
     feature: "sheet 1, front view, 2X Ø.1240 REAM THRU dowel holes (note 2)"
     kind: joint
