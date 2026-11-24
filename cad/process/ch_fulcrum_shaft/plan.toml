@@ -1,8 +1,8 @@
 # Fulcrum shaft MHA-CH-04, one off. The ends are turned on the manual
 # PM-1127VF-LB (owner ruling 2026-11-21: turned parts get lathe travelers, no
 # NC); the two set-screw flats are milled on the CNC PM-30MV (NC: cam.py).
-# Route chosen for speed: the O.D. is 1/4 ground stock as supplied (1/4
-# GROUND STOCK OK; owner ruling 2026-11-20, #2346: a ground-stock shaft is
+# Route chosen for speed: the O.D. is 1/4 ground stock as supplied (1/4 REF,
+# GROUND ROD, AS SUPPLIED on the sheet; owner ruling 2026-11-20, #2346: a ground-stock shaft is
 # cut to length, faced and has its features added, never turned on its
 # fitted diameter). Saw a blank a little long; in the 3-jaw over a shim wrap,
 # a short stick-out, the rest of the bar back in the spindle bore: face end A;
@@ -57,7 +57,6 @@ quantity = 1
 stock_dia_in = 0.25
 # Sawn a little over the faced length: about .03 in to face off each end.
 blank_length_in = 7.07
-as_supplied_outer = 1
 # Out of the jaw fronts while an end is faced and domed: under 4 × Ø.
 end_stickout_in = 0.5
 # The radius the ball turner is set to (process key named for the form tool
@@ -158,12 +157,9 @@ beam = "other"
 diagram = { file = "diagrams/saw.svg", alt = "The 1/4 in ground bar on the saw: one blank sawn a little over the faced length." }
 
 [[setups.operations]]
-instruction = "Mike the bar over the length you will cut, at both ends and the middle: every reading {{cad.outer_dia_min_in:.4dot}}–{{cad.outer_dia_max_in:.4dot}} (the O.D. is left as supplied)."
-inspection = "Bar Ø{{cad.outer_dia_min_in:.4dot}}–{{cad.outer_dia_max_in:.4dot}}."
-gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.outer_dia_band_mm}}" }]
-
-[[setups.operations]]
-instruction = "A reading outside the band: mark that length scrap and mike the next length of the bar."
+instruction = "Check the bar's tag: 1/4 in 1018 precision-ground round (stock 1018-ground-round-1-4), the O.D. used as supplied. Cut from a length free of dents and rust."
+inspection = "Bar tagged 1/4 in precision-ground; no dent or rust on the length cut."
+gauge_checks = "other"
 
 [[setups.operations]]
 speed_kind = "other"
@@ -469,12 +465,12 @@ inspection = "Datum flat from the datum tip {{cad.flat_datum_station_min_in:.2do
 gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.flat_datum_station_band_mm}}" }, { gauge = "calipers", band_mm = "{{cad.flat_datum_length_band_mm}}" }]
 
 [[setups.operations]]
-instruction = "Mike the O.D. at both ends and the middle: the jaws must not have marked it."
-inspection = "O.D. Ø{{cad.outer_dia_min_in:.4dot}}–{{cad.outer_dia_max_in:.4dot}}."
-gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.outer_dia_band_mm}}" }]
+instruction = "Look along the O.D. at both ends and the middle: the jaws must not have marked it."
+inspection = "No jaw mark on the O.D."
+gauge_checks = "other"
 
 [[setups.operations]]
-instruction = "A flat out of station or length, or a jaw-marked O.D. under {{cad.outer_dia_min_in:.4dot}}: scrap the shaft and make another from Setup 1."
+instruction = "A flat out of station or length, or a jaw-marked O.D.: scrap the shaft and make another from Setup 1."
 
 [[setups.operations]]
 instruction = "Wipe the shaft with machine oil."

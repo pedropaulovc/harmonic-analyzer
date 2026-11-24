@@ -21,7 +21,6 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_dimensions import set_dimension_callouts
-from _drawing_finish import add_surface_finish
 from _drawing_hidden_sketches import curate_view_dimensions
 from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -30,7 +29,6 @@ from _drawing_view_display import set_hidden_lines_removed
 from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
 from _session import run_build
-from _surface_finish import surface_finish_by_key
 import _telemetry
 from ch_fulcrum_shaft_notes import ACROSS_FLAT_CALLOUT, SHAFT_DIA_CALLOUT
 from ch_fulcrum_shaft_spec import (
@@ -45,9 +43,8 @@ from ch_fulcrum_shaft_spec import (
     FLAT_LENGTH,
     FLAT_PITCH,
     SHAFT_DIA,
-    SHAFT_DIA_BAND,
+    SHAFT_DIA_FRACTION_DENOMINATOR,
     SHAFT_LENGTH,
-    SURFACE_FINISHES,
     UNIT,
 )
 from _feature_requirements import part_metadata, requirement
@@ -55,6 +52,7 @@ from _gtol_cylinder import CylinderFace
 from _gtol_planar import PlanarFace
 from _gtol_sphere import SphereFace
 from _printed_limits import limits
+from _supplier_dimensions import supplier_reference_dimension
 
 # Feature-export declarations (export_features; cad/docs/pipeline/
 # features-travelers.md): what this sheet prints, in the part frame
@@ -111,23 +109,23 @@ requirement(
     },
     precision={"length": _SHAFT["OverallLength"]},
 )
+# The O.D.: the bought 1/4 ground rod as supplied, a fraction reference with
+# its stock line (drawing-guidelines.md rule 4); its catalogue band is the
+# spec's analysis band, not printed.
 requirement(
     "outer",
     kind="diameter",
     faces=(CylinderFace(SHAFT_DIA),),
-    requirements=("dia",),
+    requirements=("stock",),
     fields={
         "axis": ([0.0, 0.0, 1.0], ("SHAFT_DIA",)),
         "at": ([0.0, 0.0, 0.0], ("SHAFT_DIA",)),
         "span": ([-CYLINDER_HALF, CYLINDER_HALF], ("CYLINDER_HALF",)),
-        "dia": (
-            limits(SHAFT_DIA, _SHAFT["ShaftDia"], SHAFT_DIA_BAND, unit=UNIT),
-            ("SHAFT_DIA", "SHAFT_DIA_BAND", "UNIT"),
-        ),
-        "dia_nominal": (SHAFT_DIA, ("SHAFT_DIA",)),
+        "dia_ref": (SHAFT_DIA, ("SHAFT_DIA", "SHAFT_DIA_FRACTION_DENOMINATOR")),
+        "stock": (SHAFT_DIA_CALLOUT, ((_NOTES, "SHAFT_DIA_CALLOUT"),)),
         "callout": (SHAFT_DIA_CALLOUT, ((_NOTES, "SHAFT_DIA_CALLOUT"),)),
     },
-    precision={"dia": _SHAFT["ShaftDia"]},
+    precision={"dia_ref": _SHAFT["ShaftDia"]},
 )
 # (feature, flat centre z, its station from the datum tip, the station's
 # printed dimension and spec name)
@@ -231,16 +229,6 @@ _ROW_2 = AXIS_Y + 0.026
 _ROW_3 = AXIS_Y + 0.038
 _SHAFT_BOTTOM_Y = AXIS_Y - _on_sheet(SHAFT_DIA / 2.0)
 _SHAFT_TOP_Y = AXIS_Y + _on_sheet(SHAFT_DIA / 2.0)
-# The bearing O.D.'s roughness rides the side view's upper silhouette right
-# of centre (as draw_ch_pivot_shaft's does), its symbol in the band between
-# the shaft and the second dimension row; the first row's dimensions stand
-# only at the ends. On the inch part a symbol on the lower silhouette
-# re-attached to another face (two farm leaves, same_entity=False).
-FINISH_EDGE = (RIGHT_CENTER[0] + 0.060, _SHAFT_TOP_Y)
-FINISH_SYMBOL = (RIGHT_CENTER[0] + 0.075, AXIS_Y + 0.012)
-# The fleet's routine finish height, not the dimension height (r1: the
-# symbol was drawn far larger than the other annotation text).
-FINISH_CHAR_HEIGHT = 0.0025
 # The Ø block hangs left of its own vertical dimension line and SOLIDWORKS
 # sets the widest row's last glyph against that line: the v46 re-render
 # struck the final E of "DIAMETRAL CLEARANCE" (machinist review, rule 14).
@@ -258,10 +246,9 @@ RIGHT_KEEP = {
     "FlatLength": (_RIGHT_FLAT_INNER_X - 0.0105, _ROW_1),
     "FlatBaseline": (RIGHT_CENTER[0] - 0.020, _ROW_2),
     "OverallLength": (RIGHT_CENTER[0], _ROW_3),
-    # Under the shaft: the limit Ø with its fit callout at mid-length (the
-    # callout block hangs left of its dimension line, ~75 mm wide; r1 had it
-    # over the dome radius). Its stacked limits reach ~7 mm above the
-    # anchor, so 0.022 keeps the upper limit ~3 mm below the silhouette (r1
+    # Under the shaft: the stock Ø with its line under it at mid-length (the
+    # callout block hangs left of its dimension line; r1 had it over the
+    # dome radius). 0.022 keeps the text ~3 mm below the silhouette (r1
     # printed it inside the outline). The dome's reference radius sits
     # under the left dome.
     "ShaftDia": (RIGHT_CENTER[0], AXIS_Y - 0.022),
@@ -352,26 +339,28 @@ def build(adapter: Any) -> dict[str, str]:
         view_label="right",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
-    # Rule 4: each three-place size names the mate and fit it serves.
+    # Rule 4: the three-place across-flat size names what it sets.
     set_dimension_callouts(
-        adapter,
-        curated,
-        {"ShaftDia": SHAFT_DIA_CALLOUT_ROWS, "AcrossFlat": ACROSS_FLAT_CALLOUT_ROWS},
+        adapter, curated, {"AcrossFlat": ACROSS_FLAT_CALLOUT_ROWS}
     )
     _set_dome_reference(adapter, curated)
-
-    # The bearing O.D.'s roughness, on the cylinder's own silhouette line
-    # (a revolve's flank is a SILHOUETTE edge), not on an end-view circle
-    # that is the dome and the cylinder at once (machinist review r1).
-    add_surface_finish(
+    # The bought rod's diameter: an untoleranced fraction reference with its
+    # stock line (rule 4), as draw_dt_crank_pinion_pin prints its rod.
+    (shaft_dia,) = (
+        annotation
+        for annotation in curated
+        if dimension_name(adapter, annotation) == "ShaftDia"
+    )
+    supplier_reference_dimension(
         adapter,
-        right,
-        edge_xy=FINISH_EDGE,
-        entity_type="SILHOUETTE",
-        symbol_xy=FINISH_SYMBOL,
-        control=surface_finish_by_key(SURFACE_FINISHES, "bearing"),
-        label="fulcrum bearing finish",
-        char_height=FINISH_CHAR_HEIGHT,
+        _early_bound(shaft_dia, "IAnnotation").GetSpecificAnnotation(),
+        label="fulcrum shaft rod diameter",
+        units="in",
+        precision=_SHAFT["ShaftDia"],
+        expected_mm=SHAFT_DIA,
+        presentation="diameter",
+        fraction_denominator=SHAFT_DIA_FRACTION_DENOMINATOR,
+        callout=SHAFT_DIA_CALLOUT_ROWS,
     )
 
     # 0.020: the note is left-aligned on its anchor, so the ink starts here. The
