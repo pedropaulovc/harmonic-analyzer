@@ -381,9 +381,9 @@ STEP_TEXT = {
     # centred while wet (fit audit question 17, as the cone gears' wet
     # tap-true of #3292 on MHA-DT-00): the wheel turns on its own axle, held
     # on an owned V-block, under an owned dial indicator on its magnetic
-    # base. Delegated ruling 2026-11-24 (FitLaneCH.SmallSubsys), precedent
-    # MHA-DT-00 1S: the setup. The approved form (fit audit question 17:
-    # "centred on an indicator while wet") carries no reading, so none is
+    # base, the setup of MHA-DT-00's wet tap-true. The approved form (fit
+    # audit question 17: "centred on an indicator while wet") carries no
+    # reading, so none is
     # added: the drum is tapped until the needle swings least, which tells
     # the builder when he is done (machinist review r1, run
     # 20261124T092122388Z) without a new instrument limit.
@@ -532,9 +532,8 @@ STEP_TEXT = {
     # trial accepted at the go leaf's endshake, so the set endshake can only
     # lower the thread end (by up to mg_wheel_group.TRIAL_ENDSHAKE_DROP) and
     # never past the high limit: a short final reading closes the endshake
-    # back to the go leaf, where it reads what the trial read (delegated
-    # ruling 2026-11-24, FitLaneCH.SmallSubsys; precedent: the #3344 trial
-    # over the go leaf).
+    # back to the go leaf, where it reads what the trial read (the drop is
+    # bounded by mg_wheel_group.TRIAL_ENDSHAKE_DROP, so no new limit).
     "axle-endshake-closed": (
         f"IF IT FALLS SHORT, RETURN TO {_step(_steps.ENDSHAKE_SET_KEY)} WITH THE "
         f"SECOND NUT BACKED OFF AND THE ENDSHAKE CLOSED TO THE {ENDSHAKE_GO_TEXT} "

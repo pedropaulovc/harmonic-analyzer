@@ -67,9 +67,8 @@ STEPS: tuple[tuple[str, ...], ...] = (
     (SPACER_FITTED_KEY,),
     # Owner ruling 2026-11-24, fit audit part 2, C11 ("Yes, set to the trial
     # stack") with fit audit question 18 (the axle is bonded): a cured bond
-    # cannot be re-pressed, so the trial runs dry before the bond (delegated
-    # ruling 2026-11-24, FitLaneCH.SmallSubsys, accepted by FitLaneCH;
-    # precedent: the owner's C11 "press to the trial"). The axle goes in with
+    # cannot be re-pressed, so C11's trial stack can only be set dry, before
+    # the bond. The axle goes in with
     # its plain end flush on the surface plate, the expected setting; the
     # trial accepts on C11's three things to see: the first nut on thread,
     # the thread end inside DETAIL B and (the flush start, never pushed
