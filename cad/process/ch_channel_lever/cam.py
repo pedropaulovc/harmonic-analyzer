@@ -19,7 +19,8 @@ side across the jaws on a faced 1/2 in aluminium spoil plate on 1 in
 parallels. Side B up: CL01 faces B to the hub's thickness, CL02 pockets B
 down to the plate's near face (the 1/2 in end mill's slot and its arc round
 the hub, then the 1/8 in end mill's rings into the bar-to-hub roots), CL03
-spots, drills and reams the fulcrum bore, CL04 spots and drills the #47 and
+spots and drills the fulcrum bore D, then opens it F (owner ruling 2026-11-24,
+fit audit question 1: no reamer), CL04 spots and drills the #47 and
 #21 holes. Turned over, side A up: CL05 pockets A to the plate's far face,
 CL06 cuts the outline on seven tabs with the 1/8 in end mill, which leaves
 the two bar-to-hub roots at its own radius, R.0625, inside the drawing's
@@ -53,7 +54,7 @@ COMMENT = "MHA-CH-02 channel lever, four per load"
 PROGRAMS: tuple[tuple[str, tuple[Any, ...]], ...] = (
     ("CL01_face_b", ("face_b",)),
     ("CL02_pocket_b", (("pocket_b",), ("rings_b",))),
-    ("CL03_bore", (("bore_spot",), ("bore_drill",), ("bore_ream",))),
+    ("CL03_bore", (("bore_spot",), ("bore_drill",), ("bore_open",))),
     ("CL04_holes", (("holes_spot",), ("drill_47",), ("drill_21",))),
     ("CL05_pocket_a", (("pocket_a",), ("rings_a",))),
     ("CL06_outline", ("outline",)),
@@ -75,7 +76,7 @@ CAM_TOOLS = (
     "drill-47",
     "drill-21",
     "drill-d",
-    "reamer-2560",
+    "drill-f",
 )
 IN = 25.4
 # ANSI #1 combined drill and countersink, 60° included (McMaster 2925A11,
@@ -263,19 +264,6 @@ def _pecked(
         lines.append(f"G1 Z{z:.3f} F{{feed}}")
         previous = z
     return lines + [f"G0 Z{r_plane:.3f}", f"G0 Z{clear:.3f}"]
-
-
-def _reamed(xy: tuple[float, float], top: float, tip: float, clear: float) -> list[str]:
-    """Ream from the R plane to ``tip`` and back out, both at feed."""
-    clear, r_plane = _r(clear), _r(top + SAFE_MM)
-    return [
-        f"G0 Z{clear:.3f}",
-        f"G0 {_xy(*xy)}",
-        f"G0 Z{r_plane:.3f}",
-        f"G1 Z{_r(tip):.3f} F{{feed}}",
-        f"G1 Z{r_plane:.3f} F{{feed}}",
-        f"G0 Z{clear:.3f}",
-    ]
 
 
 def _geometry(features: dict[str, Any]) -> dict[str, Any]:
@@ -611,17 +599,17 @@ def context(
     ring_levels_b = _levels(hub_t, floor_b, p["ring_level_max_mm"])
     ring_levels_a = _levels(hub_t, floor_a, p["ring_level_max_mm"])
 
-    # Holes: spot under each drill, drill through into the spoil plate,
-    # ream the bore.
+    # Holes: spot under each drill, drill through into the spoil plate; the F
+    # drill opens each D bore to the drawing's drill size.
     tools = {
         k: _shop_tool(plan, shop, k)["diameter_mm"] for k in CAM_TOOLS if k != "spot"
     }
     holes = g["holes"]
     bore = holes["fulcrum_bore"]["dia"]
-    if not bore[0] - 1e-3 <= tools["reamer-2560"] <= bore[1]:
-        raise ValueError("the reamer is outside the bore's band")
-    if not tools["drill-d"] < tools["reamer-2560"]:
-        raise ValueError("the D drill is not under the reamer")
+    if not bore[0] - 1e-3 <= tools["drill-f"] <= bore[1]:
+        raise ValueError("the F drill is outside the bore's band")
+    if not tools["drill-d"] < tools["drill-f"]:
+        raise ValueError("the D drill is not under the F drill")
     for key, hole in (("drill-47", "bar_pin_hole"), ("drill-21", "spring_hole")):
         band = holes[hole]["dia"]
         if not band[0] - 1e-3 <= tools[key] <= band[1]:
@@ -631,10 +619,13 @@ def context(
         raise ValueError("the spot is not under the #47: it would chamfer the hole")
     spot_depth = _spot_depth(spot_dia)
     past = p["drill_past_mm"]
-    tips = {k: -(past + _point(tools[k])) for k in ("drill-47", "drill-21", "drill-d")}
+    tips = {
+        k: -(past + _point(tools[k]))
+        for k in ("drill-47", "drill-21", "drill-d", "drill-f")
+    }
     _agree(plan, "drill_d_tip_mm", tips["drill-d"])
-    ream_tip = -p["ream_past_mm"]
-    if plate_t_min < -tips["drill-d"] + 3.0:
+    _agree(plan, "drill_f_tip_mm", tips["drill-f"])
+    if plate_t_min < -min(tips.values()) + 3.0:
         raise ValueError(
             "the drills' points come within 3 mm of the spoil plate's bottom"
         )
@@ -643,7 +634,7 @@ def context(
         for key, cut in (
             ("bore_spot", "bore spot"),
             ("bore_drill", "bore drill"),
-            ("bore_ream", "bore ream"),
+            ("bore_open", "bore open"),
             ("holes_spot", "holes spot"),
             ("drill_47", "pin hole drill"),
             ("drill_21", "spring hole drill"),
@@ -656,6 +647,7 @@ def context(
         )
         for key, cut in (
             ("bore_drill", "bore drill"),
+            ("bore_open", "bore open"),
             ("drill_47", "pin hole drill"),
             ("drill_21", "spring hole drill"),
         )
@@ -893,7 +885,7 @@ def context(
     sp_rpm, sp_feed = speeds["bore_spot"]
     hs_rpm, hs_feed = speeds["holes_spot"]
     bd_rpm, bd_feed = speeds["bore_drill"]
-    br_rpm, br_feed = speeds["bore_ream"]
+    bo_rpm, bo_feed = speeds["bore_open"]
     d47_rpm, d47_feed = speeds["drill_47"]
     d21_rpm, d21_feed = speeds["drill_21"]
     centre = CENTRE_DRILL["point_deg"]
@@ -979,17 +971,24 @@ def context(
             tip=DRILL_POINT_DEG,
         ),
         job(
-            "bore_ream",
-            "ream the bores",
-            "reamer-2560",
-            tools["reamer-2560"],
-            "reamer",
-            br_rpm,
-            br_feed,
-            br_feed,
+            "bore_open",
+            "open the bores F",
+            "drill-f",
+            tools["drill-f"],
+            "drill",
+            bo_rpm,
+            bo_feed,
+            bo_feed,
             "b",
             stock,
-            [ln for xy in bore_xy for ln in _reamed(xy, hub_t, ream_tip, clear)],
+            [
+                ln
+                for xy in bore_xy
+                for ln in _pecked(
+                    xy, hub_t, tips["drill-f"], pecks["bore_open"], clear
+                )
+            ],
+            tip=DRILL_POINT_DEG,
         ),
         job(
             "holes_spot",
@@ -1221,7 +1220,7 @@ def context(
                     bore_xy,
                 ),
                 ("drill-d", bd_rpm, tips["drill-d"], tools["drill-d"] / 2, bore_xy),
-                ("reamer-2560", br_rpm, ream_tip, tools["reamer-2560"] / 2, bore_xy),
+                ("drill-f", bo_rpm, tips["drill-f"], tools["drill-f"] / 2, bore_xy),
             ),
         ),
         (
@@ -1266,8 +1265,6 @@ def context(
                     ("keep_out", {"radius": radius, "boxes": jaws}),
                 )
             ]
-            if tool == "reamer-2560":
-                expect.append([f"{name}@{k}", "feed_out", {"z_top": hub_t}])
     name = "CL06_outline"
     expect += common(name, hub_t, [tn["em-eighth"]], [e8_rpm], out_levels[-1])
     expect += [

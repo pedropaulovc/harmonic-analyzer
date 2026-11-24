@@ -91,7 +91,7 @@
 <text class="label" x="430.0" y="439.0">two 1/8 in rings ±55°</text>
 <path class="leader" d="M426.0 453.0 L218.6 470.5"/>
 <circle class="leader-dot" cx="218.6" cy="470.5" r="2"/>
-<text class="label" x="430.0" y="457.0">arc round the hub ±26° (1/2 in)</text>
+<text class="label" x="430.0" y="457.0">arc round the hub ±25° (1/2 in)</text>
 <path class="leader" d="M426.0 471.0 L350.8 474.3"/>
 <circle class="leader-dot" cx="350.8" cy="474.3" r="2"/>
 <text class="label" x="430.0" y="475.0">1/2 in slot on the centre line</text>

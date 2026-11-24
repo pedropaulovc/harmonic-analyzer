@@ -4,7 +4,7 @@ The SLDPRT remains authoritative.  Every size, location and band prints from
 its native model dimension (``ch_channel_lever_notes.DRAWING_DIMENSIONS``, at
 the places the part authors); this recipe supplies only the views, the
 placement of those dimensions, the function each tight band serves, the hole
-callouts, the bore's roughness and one reference overall length.
+callouts and one reference overall length.
 Sheet/template and export behaviour lives in ``_drawing_common``.
 
 The lever is a long thin third-class lever (7.29 in over the hub, .37 in
@@ -22,7 +22,6 @@ Run with SolidWorks open::
 from __future__ import annotations
 
 import argparse
-import math
 import sys
 from typing import Any
 
@@ -57,7 +56,6 @@ from _drawing_dimensions import (
 )
 from _drawing_edge_dimensions import add_edge_dimension, assert_dimension_measures
 from _drawing_edges import scan_view_edges
-from _drawing_finish import add_surface_finish
 from _drawing_hole_callout import add_native_hole_callout, set_hole_callout_precision
 from _drawing_leaders import set_near_side_diameter
 from _drawing_notes import add_property_linked_note
@@ -73,7 +71,6 @@ from _hole_spec import blind_cut_dia_mm, drill_process
 from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
 from _session import run_build
-from _surface_finish import MACHINED_UM, surface_finish_by_key
 import _telemetry
 from ch_channel_lever_notes import (
     DRAWING_DIMENSIONS,
@@ -94,10 +91,10 @@ from ch_channel_lever_spec import (
     LEVER_THICKNESS_TOLERANCE,
     PIVOT_HOLE_BAND,
     PIVOT_HOLE_DIA,
+    PIVOT_HOLE_SPEC,
     PLATE_OFFSET,
     PLATE_OFFSET_TOLERANCE,
     SPRING_EYE_HOLE_SPEC,
-    SURFACE_FINISHES,
     TAPER_START_X,
     TIP_ARC_CX,
     TIP_END_X,
@@ -106,7 +103,6 @@ from ch_channel_lever_spec import (
     UNIT,
     taper_tangent_point,
 )
-from ch_fulcrum_shaft_spec import SHAFT_DIA, SHAFT_DIA_BAND
 
 # Cached machinist review leaf: a FIX or ERROR verdict fails the build.
 MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
@@ -229,26 +225,16 @@ BAR_NUMBER = _config.parts("ch-amplitude-bar")["number"]
 PIN_NUMBER = _config.parts("sh-vn-pivot-pin")["number"]
 SPRING_NUMBER = _config.parts("ch-vn-channel-spring-installed")["number"]
 STATIONS = _config.machine("channels", "count")
-_CLEARANCE_LEAST = (PIVOT_HOLE_DIA + PIVOT_HOLE_BAND[1]) - (SHAFT_DIA + SHAFT_DIA_BAND[0])
-_CLEARANCE_MOST = (PIVOT_HOLE_DIA + PIVOT_HOLE_BAND[0]) - (SHAFT_DIA + SHAFT_DIA_BAND[1])
-
-
-def _inch(value_mm: float) -> str:
-    """Four-place inch text, no leading zero (.0060)."""
-    return f"{value_mm / 25.4:.4f}".removeprefix("0")
-
 
 # The bar-to-hub roots print their own 2X R.065 (owner ruling 2026-11-23,
 # tool audit Q9: over the title block's INSIDE CORNERS R.040 MAX), so the
 # radius names why nothing needs them small. A hole location carries its
 # value and band only (rule 7): each drilled hole's mate rides its own hole
-# callout. The fulcrum bore names its standard fit and the clearance range
-# as REF (rule 4).
+# callout. The fulcrum bore is drilled F at the DRILLED HOLES row (owner
+# ruling 2026-11-24, fit audit question 1): its callout names the drill and
+# the shaft it runs on, and prints no number of its own (rule 4, form 1).
 FRONT_CALLOUTS = {
-    "FulcrumDia": (
-        f"REAM THRU\nRUNNING FIT ON {SHAFT_NUMBER}\n"
-        f"(CLEARANCE {_inch(_CLEARANCE_LEAST)}-{_inch(_CLEARANCE_MOST)} REF)"
-    ),
+    "FulcrumDia": f"{drill_process(PIVOT_HOLE_SPEC)} THRU\nRUNNING CLEARANCE ON {SHAFT_NUMBER}",
     # The taper is drawn and dimensioned, not narrated (#3113 r4 review): the
     # .37 sits on the kink and the kink has its own location. The radius
     # prints three places for the #21 hole's wall, so it states that wall
@@ -292,7 +278,7 @@ TOP_CALLOUTS = {
 FRONT_KEEP = {
     # Left of the hub, just above its axis: the near-side leader stops on the
     # left rim, clear of the overall length's extension line below the hub
-    # and of the REAM leader, which lands from the upper right.
+    # and of the drill leader, which lands from the upper right.
     "HubDia": (0.033, 0.165),
     "FulcrumDia": (0.050, 0.190),
     # Above the bar on the taper start it measures, so its extension lines are
@@ -309,9 +295,9 @@ FRONT_KEEP = {
     # The taper start's row between the bar-pin and spring-hole rows.
     "TaperStartX": (_sheet_x(TAPER_START_X / 2.0), 0.115),
     "SpringCx": (_sheet_x(LEVER_SPRING_X / 2.0 + 25.0), 0.104),
-    # The root corners' 2X R.065 below the bar, right of the bore's Ra and
+    # The root corners' 2X R.065 below the bar, right of the hub and
     # above the 5.000 row, its leader up-left to the bottom root (the
-    # fillet's first edge, build_ch_channel_lever): the REAM leader runs
+    # fillet's first edge, build_ch_channel_lever): the drill leader runs
     # through the top root, so the bottom one carries the radius.
     "RootCornerR": (0.143, 0.1405),
 }
@@ -331,12 +317,8 @@ TOP_KEEP = {
 OVERALL_TEXT_XY = (FRONT_CENTER[0], 0.082)
 BAR_PIN_CALLOUT_XY = (0.170, 0.188)
 SPRING_CALLOUT_XY = (0.240, 0.188)
-# Below-right of the hub, under the root radius's leader (the bore's rim
-# point, in build, keeps its leader clear of the bottom root).
-BORE_FINISH_SYMBOL = (0.080, 0.133)
 # Lower left, below the overall length and clear of the title block.
 PLATE_OFFSET_NOTE_XY = (0.020, 0.055)
-FINISH_CHAR_HEIGHT = 0.0025
 
 # Feature-export declarations (export_features; cad/docs/pipeline/
 # features-travelers.md): what this sheet prints, in the part frame (the build
@@ -458,7 +440,7 @@ requirement(
     },
     precision={"thickness": _P["LeverThick"]},
 )
-# The hub's turned-looking round, .47 at the title block's .XX (FRONT_KEEP
+# The hub's turned-looking round, .48 at the title block's .XX (FRONT_KEEP
 # "HubDia"), concentric with the fulcrum bore; the plate splits it.
 requirement(
     "hub",
@@ -549,14 +531,14 @@ requirement(
         "root_corner_r": _P["RootCornerR"],
     },
 )
-# The reamed fulcrum bore (FRONT_KEEP "FulcrumDia", +.0010/.0000, Ra) and the
-# two drilled holes on the bar's axis, each located from the bore at .XXX with
-# its native Hole Wizard callout and the mate under it (HOLE_MATES).
+# The F-drilled fulcrum bore (FRONT_KEEP "FulcrumDia", the DRILLED HOLES row)
+# and the two drilled holes on the bar's axis, each located from the bore at
+# .XXX with its native Hole Wizard callout and the mate under it (HOLE_MATES).
 requirement(
     "fulcrum_bore",
     kind="hole",
-    faces=(surface_finish_by_key(SURFACE_FINISHES, "fulcrum_bore").face,),
-    requirements=("dia", "thru", "finish_ra", "process"),
+    faces=(CylinderFace(PIVOT_HOLE_DIA),),
+    requirements=("dia", "thru", "process"),
     fields={
         "at": ([0.0, 0.0, 0.0], (*_FRAME,)),
         "axis": (_Z, (*_FRAME,)),
@@ -565,12 +547,12 @@ requirement(
             ((_SPEC, "PIVOT_HOLE_DIA"), (_SPEC, "PIVOT_HOLE_BAND"), (_SELF, "FRONT_KEEP")),
         ),
         "nominal_dia": (PIVOT_HOLE_DIA, ((_SPEC, "PIVOT_HOLE_DIA"),)),
+        "drill": (PIVOT_HOLE_SPEC.size, ((_SPEC, "PIVOT_HOLE_SPEC"),)),
         "thru": (True, ((_SELF, "FRONT_CALLOUTS"),)),
-        "process": ("ream", ((_SELF, "FRONT_CALLOUTS"),)),
-        "finish_ra": (MACHINED_UM, ((_SPEC, "SURFACE_FINISHES"),)),
+        "process": (drill_process(PIVOT_HOLE_SPEC), ((_SELF, "FRONT_CALLOUTS"),)),
         "callout": (FRONT_CALLOUTS["FulcrumDia"], ((_SELF, "FRONT_CALLOUTS"),)),
     },
-    precision={"dia": _P["FulcrumDia"], "finish_ra": 1},
+    precision={"dia": _P["FulcrumDia"]},
 )
 for _name, _label, _spec, _x, _location, _callout_xy, _sources in (
     (
@@ -687,7 +669,7 @@ def build(adapter: Any) -> dict[str, str]:
     )
 
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=(1, 1))
-    # The integral Ø.47 x .300 fulcrum hub hides the whole plate section
+    # The integral Ø.48 x .300 fulcrum hub hides the whole plate section
     # in an end view, so the plate thickness and the hub length read here.
     top = place_view(adapter, str(SOURCE), "*Top", *TOP_CENTER, scale=(1, 1))
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=ISO_SCALE)
@@ -731,8 +713,8 @@ def build(adapter: Any) -> dict[str, str]:
             **DRAWING_PRECISION["PlateOffsetReference"],
         },
     )
-    # Native, the Ø.47 line runs rim to rim through the hub centre and
-    # crosses the REAM leader there (review r3): one arrow on the near rim.
+    # Native, the Ø.48 line runs rim to rim through the hub centre and
+    # crosses the drill leader there (review r3): one arrow on the near rim.
     hub_dia = [a for a in front_annotations if dimension_name(adapter, a) == "HubDia"]
     if len(hub_dia) != 1:
         raise RuntimeError(f"expected one HubDia dimension, found {len(hub_dia)}")
@@ -825,31 +807,6 @@ def build(adapter: Any) -> dict[str, str]:
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to front view")
     _add_bar_centerlines(adapter, front)
-
-    # The reamed fulcrum bore is the one running surface (rule 6): Ra on its
-    # rim at 255 degrees, the symbol below-right of the hub: right of the
-    # REAM leader's arrow (225 degrees through the bore), its leader clear of
-    # the bottom root and the root radius's leader above it.
-    bore_rim = model_point_in_view(
-        adapter,
-        front,
-        (
-            PIVOT_HOLE_DIA / 2000.0 * math.cos(math.radians(255.0)),
-            PIVOT_HOLE_DIA / 2000.0 * math.sin(math.radians(255.0)),
-            0.0,
-        ),
-        label="fulcrum bore rim",
-    )
-    add_surface_finish(
-        adapter,
-        front,
-        edge_xy=bore_rim,
-        symbol_xy=BORE_FINISH_SYMBOL,
-        control=surface_finish_by_key(SURFACE_FINISHES, "fulcrum_bore"),
-        label="fulcrum bore finish",
-        char_height=FINISH_CHAR_HEIGHT,
-    )
-
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
     if add_note(adapter, PLATE_OFFSET_NOTE, *PLATE_OFFSET_NOTE_XY) is None:
         raise RuntimeError("failed to create the plate-offset note")
