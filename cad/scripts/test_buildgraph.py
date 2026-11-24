@@ -146,7 +146,7 @@ _INSERTED_SOURCES = {
     "dt_cone_gear_tl_arbor": "dt_cone_gear_tl_keyed_arbor dt_cone_gear_tl_arbor_collar "
     "dt_cone_gear_tl_arbor_key dt_cone_gear_tl_vn_arbor_nut",
     "ch_rocker_strap_tl_fixture": "ch_rocker_strap_tl_sub_plate ch_rocker_strap_tl_hub_plug "
-    "ch_rocker_strap_tl_hub_washer ch_rocker_strap_tl_vn_edge_clamp "
+    "ch_rocker_strap_tl_vn_hub_washer ch_rocker_strap_tl_vn_edge_clamp "
     "ch_rocker_strap_tl_vn_hub_screw",
     "dt_cylinder_gear_tl_cam_turning": "dt_cylinder_gear_tl_cam_fixture "
     "dt_cylinder_gear_tl_vn_cam_stub dt_cylinder_gear_tl_vn_cam_clock_pin "

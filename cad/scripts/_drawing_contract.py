@@ -105,7 +105,6 @@ PRECISION_MIGRATED_DRAWINGS = frozenset(
         "draw_ch_rocker_strap.py",
         "draw_ch_rocker_strap_tl_sub_plate.py",
         "draw_ch_rocker_strap_tl_hub_plug.py",
-        "draw_ch_rocker_strap_tl_hub_washer.py",
         "draw_ch_rocker_strap_tl_vn_edge_clamp.py",
         "draw_sm_vn_gooseneck_shoulder_screw.py",
         "draw_sm_gooseneck_end_plug.py",

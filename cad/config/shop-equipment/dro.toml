@@ -29,12 +29,18 @@ cite = [
 # --- measuring equipment on the lathe ------------------------------------
 
 # The PM-1127VF-LB's DRO. Owner (Pedro), answered in person 2026-11-21 (cnc
-# rulings record, second ask): 5 micron. Its make and axes are unrecorded, and
-# no plan reads it as a gauge yet, so it has no cad/process/shop/ gauges
-# record (a plan that does adds one with its range and the 5 um resolution).
+# rulings record, second ask): 5 micron. Its axes, owner 2026-11-24: the
+# carriage (Z) and the cross slide (X), not the compound. So a compound move
+# never shows on the DRO: a plan reads the compound on its own dial and sets
+# its angle by indicator or its swivel scale, and returns it to its zero
+# before trusting a DRO reading. Its make is unrecorded. Plans read the two
+# axes as gauges through cad/process/shop/ gauges.lathe-z-dro and
+# gauges.lathe-x-dro.
 [dro.pm-1127vf-lb]
 status = "on_hand"
-note = "5 um (0.005 mm) resolution, owner-stated; make, axes and scale lengths not recorded."
+axes = ["carriage (Z)", "cross slide (X)"]
+note = "5 um (0.005 mm) resolution, owner-stated; reads the carriage and the cross slide, not the compound (owner 2026-11-24); make and scale lengths not recorded."
 cite = [
   "Owner (Pedro) 2026-11-21, answered in person: \"there is a 5 micron dro but recheck part geometry ; i was not expecting such tight tolerances\"",
+  "Owner (Pedro) 2026-11-24, relayed by Main, verbatim: \"dro main slide and cross sline not compound\"",
 ]

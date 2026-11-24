@@ -1,0 +1,20 @@
+ch-rocker-strap-tl-vn-hub-washer:
+  title: Rocker Strap Hub Washer
+  # Shop tooling: the parent MHA-CH-13 Number plus -TL-VN-nn (subsystem-identities.md).
+  # Owner ruling 2026-11-23: the #10 SAE washer under the #10-32 hub screw's
+  # head, one picked by measurement (OD .505 or under, bore .220 or under)
+  # from the owned pack of 100 (PO 1103PCAMPOS, bought as MHA-SM-VN-54) and
+  # kept with the fixture. It replaces the turned MHA-CH-13-TL-03 (retired).
+  number: MHA-CH-13-TL-VN-52
+  stock_name: 18-8 Stainless Steel SAE No. 10 Flat Washer
+  supplier: McMaster-Carr
+  supplier_skus: ["96659A104"]
+  material: AISI 304
+  material_specification: "18-8 stainless steel SAE washer for No. 10 screw, ASME B18.21.1, 0.219 ID x 0.500 OD x 0.036-0.065; McMaster-Carr 96659A104"
+  finish: AS SUPPLIED
+  # https://www.mcmaster.com/96659A104/ read live 2026-11-23: $10.56 per pack of 100.
+  quantity: 1
+  tolerance_class: machined_block
+  fit_class: fastener_clearance
+  process: purchased
+  drawing_unit: in

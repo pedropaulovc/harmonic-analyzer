@@ -2,10 +2,11 @@
 
 ``cad/config/shop-equipment/measured-cuts.toml`` keys each record by the
 prechips setting it bounds (``cad/process/shop/`` ``settings.<key>``): the
-tool assembly's measured stick-out, the plan parameter that pins it, and the
-deepest and widest cut the dechatter report found stable. ``problems`` reads a
-plan as authored and names every operation that uses such a setting outside
-its envelope.
+tool assembly's stick-out (and, where the record allows a shorter or a longer
+one, ``stickout_min_mm`` and ``stickout_max_mm``), the plan parameter that
+pins it, and the deepest and widest cut the dechatter report found stable. ``problems`` reads a plan as
+authored and names every operation that uses such a setting outside its
+envelope.
 """
 
 from __future__ import annotations
@@ -49,10 +50,18 @@ def problems(plan: dict[str, Any], measured: dict[str, dict[str, Any]]) -> list[
             record = measured[key]
             where = f"setups[{setup_index}].operations[{op_index}] ({key})"
             pin = record["stickout_parameter"]
-            if _number(parameters, parameters.get(pin)) != record["stickout_mm"]:
+            stickout = _number(parameters, parameters.get(pin))
+            shortest = record.get("stickout_min_mm", record["stickout_mm"])
+            longest = record.get("stickout_max_mm", record["stickout_mm"])
+            if stickout is None or not shortest <= stickout <= longest:
+                allowed = (
+                    f"{longest:g}"
+                    if shortest == longest
+                    else f"{shortest:g} to {longest:g}"
+                )
                 found.append(
                     f"{where}: parameters.{pin} is {parameters.get(pin)!r}, "
-                    f"measured at {record['stickout_mm']:g} mm stick-out"
+                    f"the record allows {allowed} mm stick-out"
                 )
             cuts = operation.get("milling_cuts", [])
             if not cuts:

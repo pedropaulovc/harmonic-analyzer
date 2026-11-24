@@ -64,7 +64,8 @@ _STOCK_REQUIREMENTS = {
     "fr-vn-tube-frame-cap": (("9275K141",), "MHA-FR-VN-54", 4),
     "dt-cone-gear-tl-vn-arbor-nut": (("95462A505",), "MHA-DT-03-TL-VN-50", 1),
     "ch-rocker-strap-tl-vn-edge-clamp": (("26000",), "MHA-CH-13-TL-VN-50", 4),
-    "ch-rocker-strap-tl-vn-hub-screw": (("91255A539",), "MHA-CH-13-TL-VN-51", 1),
+    "ch-rocker-strap-tl-vn-hub-screw": (("91255A267",), "MHA-CH-13-TL-VN-51", 1),
+    "ch-rocker-strap-tl-vn-hub-washer": (("96659A104",), "MHA-CH-13-TL-VN-52", 1),
 }
 # The post-mount screw's 1/4-20 x 4 in stock is sourced from MSC; the strap
 # fixture's edge clamp from Mitee-Bite.

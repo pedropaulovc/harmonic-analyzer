@@ -194,7 +194,6 @@ def test_the_turned_parts_are_covered() -> None:
     assert set(PLANS) >= {
         "ch_rocker_hub",
         "ch_rocker_strap_tl_hub_plug",
-        "ch_rocker_strap_tl_hub_washer",
         "dt_cone_gear_tl_arbor_collar",
         "dt_crank_handle_butt_cup",
         "dt_crank_handle_ferrule",

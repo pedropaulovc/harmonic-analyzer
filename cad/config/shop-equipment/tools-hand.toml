@@ -278,3 +278,13 @@ name = "Aviation snips, straight cut"
 kind = "snips"
 status = "to_order"
 note = "Not owned: to buy (the shop records no snips or sheet shear). Cuts the MHA-DT-03-TL-02 comb's blank off the .020 brass sheet; any straight-cut aviation snips rated for 18 ga mild steel serve on .020 brass."
+
+[tools.tramming-indicator-holder]
+name = "Zero Set universal test indicator holder, stepped 1/4-3/8-1/2 in post"
+kind = "indicator_holder"
+make = "LittleMachineShop"
+sku = "4832"
+status = "to_order"
+purchase = "LittleMachineShop 4832, $49.95, in stock (listing read live 2026-11-23)"
+note = "Not owned: to buy (owner, Pedro, 2026-11-23: \"also add mill tramming tool\", then \"swap the Pro Tram for an indicator arm\"). Sweep-trams the PM-30MV head with the owned dial test indicator (gauges.dti) from the owned 3/8 or 1/2 in R8 collet (holders.r8-collets-south-bend-sb1280). The listing: hardened clamping post of three diameters, 1/4, 3/8 and 1/2 in; for test indicators with dovetails or 1/4 in posts; reaches anywhere within an 8 in diameter; fine-adjusts about 3/8 in. The owned indicator's mount is not on record. No plan names this tool. The Edge Technology Pro Tram 01-000 it replaces read $149.95 at Penn Tool the same day (Edge Technology direct $116.99, search summary, page not opened)."
+cite = ["https://littlemachineshop.com/products/test-indicator-holder-universal read live 2026-11-23: Zero Set Test Indicator Holder, Universal, SKU 4832, $49.95, available; 'The hardened clamping post consists of three O.D.'s - 1/4, 3/8 & 1/2\"'; 'reaches anywhere within a 8\" diameter and fine-adjusts about 3/8\" with knob'", "https://www.penntoolco.com/edge-pro-tram-system-01-000-1-2-shank/ read live 2026-11-23: Edge Pro Tram System 01-000, 1/2 in shank, $149.95"]

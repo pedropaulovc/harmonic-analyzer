@@ -110,14 +110,14 @@ bottom_skim_mm = 1.016
 east_skim_mm = 2.54
 face_step_max_mm = 1.27
 # Facing: the 1/2 in carbide end mill (shop endmill-carbide-3fl-1-2) at the
-# measured setting em-half-carbide-1018-v5-face (shop common.toml; cad/config/
-# shop-equipment/measured-cuts.toml: stable to 1.27 mm deep and 3.4 mm wide,
-# conventional, at half_mill_projection_mm out of the collet), equal passes
-# across the face no wider than its 3.4 mm, the first engaging one stepover
-# and the last overhanging the far edge; the zigzag climbs on every other
-# pass, which the report did not measure.
+# measured setting em-half-carbide-1018-3439-face (shop common.toml; cad/
+# config/shop-equipment/measured-cuts.toml, #3439: stable to 1.27 mm deep and
+# 6.4 mm wide, conventional, 2420-2490 rpm in the cut), equal passes across
+# the face no wider than .250 in (half the cutter, inside its 6.4 mm), the
+# first engaging one stepover and the last overhanging the far edge; the
+# zigzag climbs on every other pass, which the session did not measure.
 face_cutter_dia_mm = 12.7
-face_stepover_max_mm = 3.4
+face_stepover_max_mm = 6.35
 # Stock tops the programs start from (cam.py checks them): PB02 the longest
 # blank less the B skim; PB04 the widest bar less the E skim; PB05 the
 # thickest bar.
@@ -183,11 +183,11 @@ vise_lying_inset_mm = -66.76
 # spindle nose to tip.
 r8_collet_gauge_mm = 6.3         # HA: holders.r8-collets-lms-4860.gauge_len_mm.
 drill_chuck_gauge_mm = 95.0      # Archive holders.drill-chuck-r8.gauge_len_mm.
-# 1/2 in end mill, 3 in overall: set 1.100 in out of the collet, the stick-out
-# its measured setting holds at (cad/config/shop-equipment/measured-cuts.toml;
-# owner, Pedro, 2026-11-22: "stickout is recorded as 30mm but is actually
-# 27.94").
-half_mill_projection_mm = 27.94
+# 1/2 in end mill, 3 in overall: set 1.12 in (28.45 mm) out of the collet
+# (owner, Pedro, 2026-11-24: "28.45"), the longer end of the stick-out its
+# measured setting allows (cad/config/shop-equipment/measured-cuts.toml:
+# 27.94 to 28.45 mm).
+half_mill_projection_mm = 28.45
 # ASME B94.11M jobber lengths, overall: #9 3-1/2 in, C 3-7/8 in; the #2
 # combined drill and countersink 1-7/8 in; ANSI B94.2 1/4 in chucking reamer
 # 6 in. Bounded by their whole length below the chuck.
@@ -316,8 +316,8 @@ speed_kind = "spindle"
 tool = "em-half"
 drilling = "none"
 sizing = "other"
-instruction = "Run PB01_bottom (M6 T1, 1/2 in end mill; set 2370): skim the sawn top at Z0, {{process.bottom_skim_mm:in.3dot}} off its high point, in passes no wider than {{process.face_stepover_max_mm:in.3dot}}."
-settings = "em-half-carbide-1018-v5-face"
+instruction = "Run PB01_bottom (M6 T1, 1/2 in end mill; set 2450: the display rests near 2485, not 2380): skim the sawn top at Z0, {{process.bottom_skim_mm:in.3dot}} off its high point, in passes no wider than {{process.face_stepover_max_mm:in.3dot}}."
+settings = "em-half-carbide-1018-3439-face"
 milling_cuts = [
   { name = "bottom face", kind = "end", phase = "finish", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", axial_doc_mm = "{{process.bottom_skim_mm}}", radial_woc_mm = "{{process.face_stepover_max_mm}}", traverse_mm = [0, "{{process.blank_width_max_mm}}"] },
 ]
@@ -364,8 +364,8 @@ speed_kind = "spindle"
 tool = "em-half"
 drilling = "none"
 sizing = "other"
-instruction = "Run PB02_top_holds (M6 T1; set 2370): face the top down to Z {{cad.top_face_height_mm:in.4dot}} in equal levels no deeper than {{process.face_step_max_mm:in.3dot}} from {{process.edge_top_max_mm:in.3dot}} (the longest blank: a shorter one cuts air first). At the M6 T2 stop, still clamped: check the height."
-settings = "em-half-carbide-1018-v5-face"
+instruction = "Run PB02_top_holds (M6 T1; 2450, display near 2485): face the top down to Z {{cad.top_face_height_mm:in.4dot}} in equal levels no deeper than {{process.face_step_max_mm:in.3dot}} from {{process.edge_top_max_mm:in.3dot}} (the longest blank: a shorter one cuts air first). At the M6 T2 stop, still clamped: check the height."
+settings = "em-half-carbide-1018-3439-face"
 inspection = "Height {{cad.top_face_height_min_in:.3dot}}–{{cad.top_face_height_max_in:.3dot}} at the M6 T2 stop: the calipers' depth rod from the faced top to the fixed-jaw parallel's top beside the blank, at both ends of the top. No sawn patch left anywhere on the top, by eye."
 gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.top_face_height_band_mm}}" }]
 milling_cuts = [
@@ -438,8 +438,8 @@ speed_kind = "spindle"
 tool = "em-half"
 drilling = "none"
 sizing = "other"
-instruction = "Run PB03_east_end (M6 T1; set 2370): face E down to Z0 in equal levels no deeper than {{process.face_step_max_mm:in.3dot}}."
-settings = "em-half-carbide-1018-v5-face"
+instruction = "Run PB03_east_end (M6 T1; 2450, display near 2485): face E down to Z0 in equal levels no deeper than {{process.face_step_max_mm:in.3dot}}."
+settings = "em-half-carbide-1018-3439-face"
 milling_cuts = [
   { name = "east end", kind = "end", phase = "finish", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", axial_doc_mm = "{{process.face_step_max_mm}}", radial_woc_mm = "{{process.face_stepover_max_mm}}", stations_mm = "{{process.blank_width_max_mm}}" },
 ]
@@ -485,8 +485,8 @@ speed_kind = "spindle"
 tool = "em-half"
 drilling = "none"
 sizing = "other"
-instruction = "Run PB04_width (M6 T1; set 2370): face the west bar edge down to Z {{cad.east_end_width_mm:in.4dot}} in equal levels no deeper than {{process.face_step_max_mm:in.3dot}} from {{process.upright_top_max_mm:in.3dot}} (the widest bar: a narrower one cuts air first). Then, still clamped, check the width."
-settings = "em-half-carbide-1018-v5-face"
+instruction = "Run PB04_width (M6 T1; 2450, display near 2485): face the west bar edge down to Z {{cad.east_end_width_mm:in.4dot}} in equal levels no deeper than {{process.face_step_max_mm:in.3dot}} from {{process.upright_top_max_mm:in.3dot}} (the widest bar: a narrower one cuts air first). Then, still clamped, check the width."
+settings = "em-half-carbide-1018-3439-face"
 inspection = "Width {{cad.east_end_width_min_in:.3dot}}–{{cad.east_end_width_max_in:.3dot}}: the calipers' depth rod from the faced west end to the fixed-jaw parallel's top beside the block, at both sides of the end."
 gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.east_end_width_band_mm}}" }]
 milling_cuts = [
@@ -557,8 +557,8 @@ speed_kind = "spindle"
 tool = "em-half"
 drilling = "none"
 sizing = "other"
-instruction = "Run PB05_front_bores (M6 T1; set 2370): face the front face down to Z {{cad.front_face_depth_mm:in.4dot}} in equal levels no deeper than {{process.face_step_max_mm:in.3dot}} from {{process.front_top_max_mm:in.3dot}}. At the M6 T2 stop, still clamped: check the depth."
-settings = "em-half-carbide-1018-v5-face"
+instruction = "Run PB05_front_bores (M6 T1; 2450, display near 2485): face the front face down to Z {{cad.front_face_depth_mm:in.4dot}} in equal levels no deeper than {{process.face_step_max_mm:in.3dot}} from {{process.front_top_max_mm:in.3dot}}. At the M6 T2 stop, still clamped: check the depth."
+settings = "em-half-carbide-1018-3439-face"
 inspection = "Depth {{cad.front_face_depth_min_in:.3dot}}–{{cad.front_face_depth_max_in:.3dot}} at the M6 T2 stop: the calipers' depth rod from the front face to the fixed-jaw stack's top beside the block, at both ends."
 gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.front_face_depth_band_mm}}" }]
 milling_cuts = [

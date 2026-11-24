@@ -3,10 +3,15 @@ r"""Pure-data contract for the rocker-strap sub-plate fixture (MHA-CH-13-TL-00).
 PURE DATA, no SolidWorks/COM and no drawing imports. A shop fixture (owner
 ask 2026-11-17): the sub-plate MHA-CH-13-TL-01 with its fence and end stop
 milled integral, the hub plug MHA-CH-13-TL-02 in its counterbore, the hub
-washer MHA-CH-13-TL-03, four Mitee-Bite Pitbull 26000 edge clamps
-MHA-CH-13-TL-VN-50 (each with its supplied #4-40 screw) in their pockets and
-the 1/4-20 x 5/8 button-head hub screw MHA-CH-13-TL-VN-51. The ``_tl_``
-stem keeps the kit out of every machine assembly and BOM
+washer MHA-CH-13-TL-VN-52 (a #10 SAE washer picked by measurement from the
+owned pack), four Mitee-Bite Pitbull 26000 edge clamps MHA-CH-13-TL-VN-50
+(each with its supplied #4-40 screw) in their pockets and the #10-32 x 5/8
+button-head hub screw MHA-CH-13-TL-VN-51 (owner rulings 2026-11-23:
+"change the screw to #10-32 ... The washer is then a #10 SAE washer you
+already own ... The made washer, its drawing and its lathe traveler are
+deleted."; "Pick one washer from the pack of 100 by measurement and keep
+it with the fixture"; reversing 2026-11-17's "Use a 1/4-20 hub screw").
+The ``_tl_`` stem keeps the kit out of every machine assembly and BOM
 (``_buildgraph.is_shop_fixture``). The strap blank and its tape are not kit
 items; the plan view shows the blank in phantom where it lies.
 
@@ -28,10 +33,10 @@ import textwrap
 
 import _config
 import ch_rocker_strap_tl_hub_plug_spec as plug
-import ch_rocker_strap_tl_hub_washer_spec as washer
 import ch_rocker_strap_tl_sub_plate_spec as plate
 import ch_rocker_strap_tl_vn_edge_clamp_spec as clamp
-import _mcmaster_91255a539 as hub_screw
+import ch_rocker_strap_tl_vn_hub_washer_spec as washer
+import _mcmaster_91255a267 as hub_screw
 from _assembly_contract import assembly_contract
 
 ASM_NAME = "ch-rocker-strap-tl-fixture"
@@ -42,7 +47,7 @@ INCH = 25.4
 
 PLATE = "ch-rocker-strap-tl-sub-plate"
 PLUG = "ch-rocker-strap-tl-hub-plug"
-WASHER = "ch-rocker-strap-tl-hub-washer"
+WASHER = "ch-rocker-strap-tl-vn-hub-washer"
 CLAMP = "ch-rocker-strap-tl-vn-edge-clamp"
 SCREW = "ch-rocker-strap-tl-vn-hub-screw"
 
@@ -68,8 +73,8 @@ TAPE_MAX = 0.33
 STRAP_THICKNESS = 2.4892
 BLANK_TOP_Z = TAPE + STRAP_THICKNESS
 
-# --- The hub screw (MHA-CH-13-TL-VN-51; owner ruling 2026-11-17: 1/4-20) -------
-HUB_SCREW_THREAD = "1/4-20 UNC X 5/8"
+# --- The hub screw (MHA-CH-13-TL-VN-51; owner ruling 2026-11-23: #10-32) -------
+HUB_SCREW_THREAD = "#10-32 UNF X 5/8"
 (HUB_SCREW_SKU,) = _config.parts("ch-rocker-strap-tl-vn-hub-screw")["supplier_skus"]
 HUB_SCREW_HEAD_DIA = hub_screw.HEAD_DIA
 HUB_SCREW_HEAD_HEIGHT = hub_screw.HEAD_HEIGHT
@@ -138,14 +143,27 @@ def numbered(steps: tuple[str, ...], start: int = 1) -> tuple[str, ...]:
 
 
 # --- The parts list and the screw schedule ------------------------------------
-# Literal rows, so the sheet re-keys only on its own two vendor parts.
+# Literal rows, so the sheet re-keys only on its own vendor parts.
 CLAMP_NUMBER = str(_config.parts("ch-rocker-strap-tl-vn-edge-clamp")["number"])
 SCREW_NUMBER = str(_config.parts("ch-rocker-strap-tl-vn-hub-screw")["number"])
 (CLAMP_SKU,) = _config.parts("ch-rocker-strap-tl-vn-edge-clamp")["supplier_skus"]
+(WASHER_SKU,) = _config.parts("ch-rocker-strap-tl-vn-hub-washer")["supplier_skus"]
+if WASHER_SKU != washer.SKU:
+    raise AssertionError("the washer's registry row and its catalogue disagree")
+# The washer's selection (owner ruling 2026-11-23: "OD .505 or under and
+# bore .220 or under"), checked once on sheet 1: the OD by micrometer, the
+# bore by the pin gauge of its limit, which must not enter (so the bore is
+# under the .220 the reach is worked at). The two limits are typed into the
+# step, as the clamp torque and the fence reading are: they select a bought
+# part at fitting, and no model dimension can carry a selection limit (the
+# washer is modelled at its catalogue nominal).
+WASHER_BORE_NO_GO = washer.SELECT_BORE_MAX
+WASHER_OD_TEXT = washer.SELECT_OD_TEXT
+WASHER_BORE_NO_GO_TEXT = washer.inch_text(WASHER_BORE_NO_GO, 3)
 BOM_DESCRIPTIONS: dict[str, str] = {
     PLATE: "STRAP SUB-PLATE, FENCE AND END STOP INTEGRAL",
     PLUG: "HUB PLUG",
-    WASHER: "HUB WASHER",
+    WASHER: f"SAE WASHER NO. 10, McMASTER-CARR {WASHER_SKU}, SELECTED",
     CLAMP: f"EDGE CLAMP, MITEE-BITE {CLAMP_SKU}, WITH ITS SCREW",
     SCREW: f"BUTTON HEAD SCREW {HUB_SCREW_THREAD}, McMASTER-CARR {HUB_SCREW_SKU}",
 }
@@ -197,20 +215,28 @@ _STEPS += (
     f"SET EACH ITEM {_C} IN ITS POCKET, CLAMPING EDGE TOWARD THE FENCE, BACK "
     "FACE ON THE POCKET WALL FARTHEST FROM THE FENCE.",
     f"RUN EACH ITEM {_C} SCREW IN FINGER TIGHT.",
+    f"CHECK: ITEM {_W} MIKES {WASHER_OD_TEXT} OR UNDER ON ITS OUTSIDE DIAMETER AND "
+    f"A {WASHER_BORE_NO_GO_TEXT} PIN GAUGE DOES NOT ENTER ITS BORE.",
+)
+_WASHER_CHECK = len(_STEPS)
+_STEPS += (
+    f"IF STEP {_WASHER_CHECK} FAILS, TAKE ANOTHER ITEM {_W} FROM ITS PACK AND "
+    f"REPEAT STEP {_WASHER_CHECK}.",
+    f"MARK ITEM {_W}: IT STAYS WITH THE FIXTURE.",
 )
 ASSEMBLY_STEPS = "\n".join(
     ("FITTING STEPS, ONCE (EACH BLANK: SHEET 2)", *numbered(_STEPS))
 )
 
 _CLAMPED: tuple[str, ...] = (
-    "SEAT THE BLANK ON THE PLATE AGAINST THE FENCE AND END STOP.",
+    "SEAT THE BLANK ON THE PLATE AGAINST FENCE AND END STOP.",
     f"TIGHTEN EVERY ITEM {_C} SCREW TO {CLAMP_TORQUE_IN_LB:g} IN-LB (SCREW SCHEDULE).",
     "CHECK: THE BLANK DOES NOT MOVE BY HAND.",
 )
 _FIRST = len(_STEPS) + 1
 _CLAMP_CHECK = _FIRST + len(_CLAMPED) - 1
 _CLAMPED += (
-    f"IF STEP {_CLAMP_CHECK} FAILS, RESEAT THE BLANK AND REPEAT FROM STEP {_FIRST}.",
+    f"IF STEP {_CLAMP_CHECK} FAILS, RESEAT THE BLANK; REPEAT FROM STEP {_FIRST}.",
 )
 # The bond steps follow the traveler's (cad/process/ch_rocker_strap/plan.toml,
 # setup 5; owner rulings 2026-11-23: blue painter's tape on both faces, CA
@@ -241,7 +267,7 @@ _TAPED += (
     f"{_TAPE_FIRST + 1}.",
     "CHECK: THE BLANK DOES NOT MOVE UNDER A HARD HAND PUSH.",
     f"IF STEP {_PUSH_CHECK} FAILS, PEEL, CLEAN AND REPEAT FROM STEP {_TAPE_FIRST + 1}.",
-    f"PUT ITEM {_W} ON THE BLANK OVER ITS HUB HOLE.",
+    f"PUT ITEM {_W} ON THE BLANK, CENTRED OVER ITS HUB HOLE.",
     f"RUN ITEM {_S} THROUGH ITEM {_W} INTO ITEM {_P}, SNUG.",
 )
 BLANK_STEPS = "\n".join(

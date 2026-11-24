@@ -112,14 +112,18 @@ right_end_station_mm = 235.204
 length_dro_min_mm = 233.68
 length_dro_max_mm = 238.76
 # Facing: the 1/2 in carbide end mill (shop endmill-carbide-3fl-1-2), equal
-# levels no deeper than .050 and equal passes across the face no wider than
-# 3.4 mm (.134 in): the measured face envelope, shop
-# settings.em-half-carbide-1018-v5-face (dechatter v5, 2370 rpm stable at
-# 1.27 mm deep and 3.0-3.4 mm wide, conventional; the zigzag's return passes
-# climb, and that half is not measured). cam.py starts each level with the
+# levels no deeper than .050 and two equal passes across the 3/8 edge, each
+# 5.0125 mm (.197 in: 9.525 + cam.py's 0.5 overhang, in two; one would need
+# 10.0), inside the measured face envelope, shop
+# settings.em-half-carbide-1018-3439-face (dechatter session of 2026-11-23,
+# #3439: stable to 6.4 mm wide at up to 1.27 mm deep, 2420-2490 rpm in the
+# cut, conventional; the zigzag's return passes climb, and that half is not
+# measured). The width declared is the passes' own, not the record's 6.4:
+# at 6.4 prechips' bending estimate of WB05's free end is over the finish
+# limit. cam.py starts each level with the
 # cutter over the edge, so no pass takes more than the stepover.
 face_cutter_dia_mm = 12.7
-face_stepover_max_mm = 3.4
+face_stepover_max_mm = 5.0125
 face_step_max_mm = 1.27
 # Ends: the same cutter's side, one level from the thickest bar's back face
 # to .020 under the front face (end_axial_doc_mm, cam.py checks it), in
@@ -200,12 +204,12 @@ z_touch_right_x_mm = 142.6591
 # spindle nose to tip.
 r8_collet_gauge_mm = 6.3         # HA: holders.r8-collets-lms-4860.gauge_len_mm.
 drill_chuck_gauge_mm = 95.0      # Archive holders.drill-chuck-r8.gauge_len_mm.
-# 1/2 in end mill, 3 in overall: set 1.10 in out of the collet, the
-# stick-out its measured settings were cut at
-# (cad/config/shop-equipment/measured-cuts.toml; owner, Pedro, 2026-11-22:
-# "stickout is recorded as 30mm but is actually 27.94"). cam.py checks the
+# 1/2 in end mill, 3 in overall: set 1.12 in (28.45 mm) out of the collet
+# (owner, Pedro, 2026-11-24: "28.45"), the longer end of the stick-out the
+# measured face setting allows (cad/config/shop-equipment/
+# measured-cuts.toml: 27.94 to 28.45 mm). cam.py checks the
 # collet's nose clears the bar at the deepest end-mill cut.
-half_mill_projection_mm = 27.94
+half_mill_projection_mm = 28.45
 # ANSI B94.2 straight-shank chucking reamer, .1865: 4-1/2 in overall,
 # bounded by its whole length below the chuck; the #2 centre drill 1-7/8 in;
 # the #9 jobber drill 3-1/2 in.
@@ -334,8 +338,8 @@ speed_kind = "spindle"
 tool = "em-half"
 drilling = "none"
 sizing = "other"
-instruction = "Run WB02_top (M6 T1, 1/2 in end mill; set 2370): face edge A down to Z {{process.top_width_mm:in.4dot}} in equal levels no deeper than {{process.face_step_max_mm:in.3dot}} from {{process.bar_width_max_mm:in.3dot}} (the widest bar: a narrower one cuts air first), in passes along the bar no wider than {{process.face_stepover_max_mm:in.3dot}}. Unclamp; mark the new face T (the top face) with marking fluid."
-settings = "em-half-carbide-1018-v5-face"
+instruction = "Run WB02_top (M6 T1, 1/2 in end mill; set 2450: the display rests near 2485, not 2380): face edge A down to Z {{process.top_width_mm:in.4dot}} in equal levels no deeper than {{process.face_step_max_mm:in.3dot}} from {{process.bar_width_max_mm:in.3dot}} (the widest bar: a narrower one cuts air first), in passes along the bar no wider than {{process.face_stepover_max_mm:in.3dot}}. Unclamp; mark the new face T (the top face) with marking fluid."
+settings = "em-half-carbide-1018-3439-face"
 inspection = "Width B to T {{process.top_width_mm:in.3dot}}, miked at both ends and the middle: within .005 of it (the height is cut to size in Setup 5). Over: the next op. Under: stop and tell the owner."
 gauge_checks = "other"
 milling_cuts = [
@@ -418,7 +422,7 @@ speed_kind = "spindle"
 tool = "em-half"
 drilling = "none"
 sizing = "other"
-instruction = "Run WB03_left (M6 T1; set 2650): the left end with the cutter's side, from the back face to {{process.end_past_mm:in.3dot}} under F, in passes no deeper than {{process.end_step_max_mm:in.3dot}}, each across the bar one way (−Y: the bar on the pass's left, conventional with M3), to X0."
+instruction = "Run WB03_left (M6 T1; set 2650): the left end with the cutter's side, from the back face to {{process.end_past_mm:in.3dot}} under F, the full depth at once, in side passes no wider than {{process.end_step_max_mm:in.3dot}} into the end, each across the bar one way (−Y: the bar on the pass's left, conventional with M3), to X0."
 settings = "endmill-carbide-3fl-1-2-1018-cf"
 milling_cuts = [
   { name = "left end", kind = "side", phase = "finish", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", axial_doc_mm = "{{process.end_axial_doc_mm}}", radial_woc_mm = "{{process.end_step_max_mm}}", stations_mm = "{{process.left_end_skim_mm}}" },
@@ -545,7 +549,7 @@ speed_kind = "spindle"
 tool = "em-half"
 drilling = "none"
 sizing = "other"
-instruction = "Run WB04_right (M6 T1; set 2650): the right end with the cutter's side, from the back face to {{process.end_past_mm:in.3dot}} under F, in passes no deeper than {{process.end_step_max_mm:in.3dot}}, each across the bar one way (+Y: the bar on the pass's left, conventional with M3), to X {{process.length_target_mm:in.3f}} in."
+instruction = "Run WB04_right (M6 T1; set 2650): the right end with the cutter's side, from the back face to {{process.end_past_mm:in.3dot}} under F, the full depth at once, in side passes no wider than {{process.end_step_max_mm:in.3dot}} into the end, each across the bar one way (+Y: the bar on the pass's left, conventional with M3), to X {{process.length_target_mm:in.3f}} in."
 settings = "endmill-carbide-3fl-1-2-1018-cf"
 milling_cuts = [
   { name = "right end", kind = "side", phase = "finish", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", axial_doc_mm = "{{process.end_axial_doc_mm}}", radial_woc_mm = "{{process.end_step_max_mm}}", stations_mm = "{{process.right_end_station_mm}}" },
@@ -625,8 +629,8 @@ speed_kind = "spindle"
 tool = "em-half"
 drilling = "none"
 sizing = "other"
-instruction = "Run WB05_height (M6 T1; set 2370): face edge B down to Z {{process.height_target_mm:in.4dot}} in equal levels no deeper than {{process.face_step_max_mm:in.3dot}} from {{process.top_width_mm:in.3dot}}, in passes along the bar no wider than {{process.face_stepover_max_mm:in.3dot}}. Unclamp; mic the height."
-settings = "em-half-carbide-1018-v5-face"
+instruction = "Run WB05_height (M6 T1; 2450, display near 2485): face edge B down to Z {{process.height_target_mm:in.4dot}} in equal levels no deeper than {{process.face_step_max_mm:in.3dot}} from {{process.top_width_mm:in.3dot}}, in passes along the bar no wider than {{process.face_stepover_max_mm:in.3dot}}. Unclamp; mic the height."
+settings = "em-half-carbide-1018-3439-face"
 inspection = "Height {{cad.bottom_face_height_min_in:.3dot}}–{{cad.bottom_face_height_max_in:.3dot}}, T to the bottom face, miked at both ends and the middle."
 gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.bottom_face_height_band_mm}}" }]
 milling_cuts = [
@@ -672,7 +676,7 @@ inspection = "{{cad.clamp_hole_1_height_min_in:.3dot}}–{{cad.clamp_hole_1_heig
 gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.clamp_hole_1_height_band_mm}}" }]
 
 [[setups.operations]]
-instruction = "The clamp holes' stations from the left end, on the surface plate: stand the bar on its LEFT end, F against the side of a 1-2-3 block, the .196 pin in each clamp hole in turn; the height gauge on the top of the pin, less half its Ø (.098)."
+instruction = "The clamp holes' stations from the left end, on the surface plate: stand the bar on its LEFT end, F held flat by hand against the side of a 1-2-3 block stood on end, the .196 pin in each clamp hole in turn; the height gauge on the top of the pin, less half its Ø (.098)."
 inspection = "Clamp hole 1 {{cad.clamp_hole_1_station_min_in:.3dot}}–{{cad.clamp_hole_1_station_max_in:.3dot}} and clamp hole 2 {{cad.clamp_hole_2_station_min_in:.3dot}}–{{cad.clamp_hole_2_station_max_in:.3dot}} from the left end. The hanger hole: the program's station from the same X0, its ±.010 band wider. Outside: stop and tell the owner."
 gauge_checks = [
   { gauge = "height-gauge", band_mm = "{{cad.clamp_hole_1_station_band_mm}}" },

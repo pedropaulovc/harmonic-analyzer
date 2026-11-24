@@ -107,15 +107,18 @@ parallel_clear_min_mm = 1.0
 # The bridge left at each arbor end's apex: 3 mm wide, the full thickness.
 bridge_width_mm = 3.0
 # Facing: the 1/2 in carbide end mill (shop endmill-carbide-3fl-1-2) at the
-# measured setting em-half-carbide-1018-v5-face (shop common.toml; cad/config/
-# shop-equipment/measured-cuts.toml: stable to 1.27 mm deep and 3.4 mm wide,
-# conventional, at half_mill_projection_mm out of the collet), equal passes
-# no wider than its 3.4 mm, the first engaging one stepover and the last
-# overhanging the far edge; the zigzag climbs on every other pass, which the
-# report did not measure. Face B comes down to the thickness from the bar's
+# measured setting em-half-carbide-1018-3439-face (shop common.toml;
+# cad/config/shop-equipment/measured-cuts.toml: dechatter session of
+# 2026-11-23, #3439, stable to 1.27 mm deep and 6.4 mm wide at 2420-2490 rpm
+# in the cut, conventional, half_mill_projection_mm out of the collet being
+# the longer end of the stick-out it allows), equal passes no wider than its
+# 6.4 mm, the first engaging one stepover and the last overhanging the far
+# edge: six of 5.375 mm across the 1-1/4 in bar (five would need 6.45, over
+# the limit); the zigzag climbs on every other pass, which the session did
+# not measure. Face B comes down to the thickness from the bar's
 # 3/8 in in one level (cam.py checks the skim).
 face_cutter_dia_mm = 12.7
-face_stepover_max_mm = 3.4
+face_stepover_max_mm = 6.4
 face_b_skim_mm = 0.381
 # Bores: spot Ø.118 with the trade-size 1 carbide centre drill (1/8 body),
 # under the C and N drills (no chamfer at the mouth); each drill through, its
@@ -216,12 +219,13 @@ strap_width_mm = 15.0
 # Machine-capacity inputs (mm): tool lengths from spindle nose to tip.
 r8_collet_gauge_mm = 6.3         # HA: holders.r8-collets-lms-4860.gauge_len_mm.
 drill_chuck_gauge_mm = 95.0      # Archive holders.drill-chuck-r8.gauge_len_mm.
-# 1/2 in end mill, 3 in overall: set 1.100 in out of the collet, the stick-out
-# its measured setting holds at (cad/config/shop-equipment/measured-cuts.toml;
-# owner, Pedro, 2026-11-22: "stickout is recorded as 30mm but is actually
-# 27.94"); the 1/8 in end mill, 1-1/2 in overall: at least 5/8 in out (its
+# 1/2 in end mill, 3 in overall: set 1.12 in (28.45 mm) out of the collet
+# (owner, Pedro, 2026-11-24: "28.45"), the longer end of the stick-out its
+# measured setting allows (cad/config/shop-equipment/measured-cuts.toml:
+# 27.94 to 28.45 mm); the 1/8 in end mill, 1-1/2 in overall: at least 5/8 in
+# out (its
 # 1/2 in flutes clear).
-half_mill_projection_mm = 27.94
+half_mill_projection_mm = 28.45
 eighth_mill_projection_min_mm = 15.875
 # ANSI B94.2 straight-shank chucking reamers, 6 in overall at .2510 and
 # .3135; the #26 jobber drill 2-7/8 in (ASME B94.11M), PB04's longest tool;
@@ -384,8 +388,8 @@ speed_kind = "spindle"
 tool = "em-half"
 drilling = "none"
 sizing = "other"
-instruction = "Run PB02_flat (M6 T1, 1/2 in end mill; set 2370): face B down to Z {{cad.broad_face_b_thickness_mm:in.4dot}} in one level ({{process.face_b_skim_mm:in.3dot}} off the 3/8 in bar), in passes across the blank no wider than {{process.face_stepover_max_mm:in.3dot}}. At the M6 T2 stop, still clamped: check the thickness."
-settings = "em-half-carbide-1018-v5-face"
+instruction = "Run PB02_flat (M6 T1, 1/2 in end mill; set 2450: the display rests near 2485, not 2380): face B down to Z {{cad.broad_face_b_thickness_mm:in.4dot}} in one level ({{process.face_b_skim_mm:in.3dot}} off the 3/8 in bar), in passes across the blank no wider than {{process.face_stepover_max_mm:in.3dot}}. At the M6 T2 stop, still clamped: check the thickness."
+settings = "em-half-carbide-1018-3439-face"
 inspection = "Thickness {{cad.broad_face_b_thickness_min_in:.3dot}}–{{cad.broad_face_b_thickness_max_in:.3dot}} at the M6 T2 stop: the 0–1 in micrometer at each end, between the jaws, its anvil under the blank where it overhangs the parallels."
 gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.broad_face_b_thickness_band_mm}}" }]
 milling_cuts = [
