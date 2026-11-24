@@ -3,14 +3,14 @@
 # not on the sheet).  The #11 drilled bore and the drive-pin offsets by trial
 # are owner ruling 2026-11-24, fit audit questions 7 and 8.  The flat-pin
 # centre's ±.002 (N-03) is not ruled; its over-pins reading's .0012 bias is
-# charged in the spec, not guarded at the bench (Main, by the owner's
-# delegation of 2026-11-24, D6).
+# charged in the spec, not guarded at the bench (delegated ruling 2026-11-24
+# (Main), D6; owner review on #2144).
 necessity:
   - id: N-01
     feature: "sheet 1, end view, Ø.0930 2X REAM THRU drive-pin holes"
     kind: gap
     reason: "a loose dowel spends the MHA-PD-09 wheels' hole slip"
-    source: "pd_transgear_drive_collar_spec.PIN_HOLE_DIA, _sprocket_seat_geometry slip budget (.0039 min); bought dowel MHA-PD-VN-54; a 3/32 drill leaves the rim .016, under RV-01's .018. The reamer stays Ø.0930, off rule 4 form 3's grid (Main, by the owner's delegation of 2026-11-24, D9: \"goes to the nearest grid size or drill that passes every check on the lane's tree; if none passes, the reamer stays on a necessity entry\"): none passes. The hole is the shared #25 seat's (_sprocket_seat_geometry.DRIVE_PIN_HOLE_DIA, the MHA-DT-11 crank seat's too). Changed on this collar alone, every candidate fails pd_transgear_drive_collar_spec's 'the collar rim is not the seat interface's rim'. Changed in the shared seat: the .0928 reamer (3/32 less .001) presses the dowel .0006-.0013, outside #290 row D14's .00035-.00105 (dt_crankshaft_spec 'the drive-pin press ... left the D14 window'); the 3/32 reamer (.0938) presses -.0004 to +.0003 and the .0948 -.0014 to -.0007, the #42 drill -.00365 to +.00055 and the 3/32 drill -.0039 to +.0003 ('the drive-pin hole band loses the press at its upper limit'; the rim falls to .017 or .016 under D7's .018); the #43 drill presses .00085-.00505 (D14). Trial: fit-audit-2026-11-23/batch-pd/delegated/d9_reamer_trial.txt. The .0930 reamer is bought for MHA-DT-11 anyway (tools.reamer-0930)"
+    source: "pd_transgear_drive_collar_spec.PIN_HOLE_DIA, _sprocket_seat_geometry slip budget (.0039 min); bought dowel MHA-PD-VN-54; a 3/32 drill leaves the rim .016, under RV-01's .018. The reamer stays Ø.0930, off rule 4 form 3's grid (delegated ruling 2026-11-24 (Main), D9, no precedent; owner review on #2144, https://github.com/pedropaulovc/harmonic-analyzer/issues/2144#issuecomment-7139937225: \"goes to the nearest grid size or drill that passes every check on the lane's tree; if none passes, the reamer stays on a necessity entry\"): none passes. The hole is the shared #25 seat's (_sprocket_seat_geometry.DRIVE_PIN_HOLE_DIA, the MHA-DT-11 crank seat's too). Changed on this collar alone, every candidate fails pd_transgear_drive_collar_spec's 'the collar rim is not the seat interface's rim'. Changed in the shared seat: the .0928 reamer (3/32 less .001) presses the dowel .0006-.0013, outside #290 row D14's .00035-.00105 (dt_crankshaft_spec 'the drive-pin press ... left the D14 window'); the 3/32 reamer (.0938) presses -.0004 to +.0003 and the .0948 -.0014 to -.0007, the #42 drill -.00365 to +.00055 and the 3/32 drill -.0039 to +.0003 ('the drive-pin hole band loses the press at its upper limit'; the rim falls to .017 or .016 under D7's .018); the #43 drill presses .00085-.00505 (D14). Trial: fit-audit-2026-11-23/batch-pd/delegated/d9_reamer_trial.txt. The .0930 reamer is bought for MHA-DT-11 anyway (tools.reamer-0930)"
   - id: N-02
     feature: "sheet 1, section A-A, Ø.0615 REAM blind flat-pin hole"
     kind: gap

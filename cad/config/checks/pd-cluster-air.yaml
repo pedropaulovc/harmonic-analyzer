@@ -7,5 +7,5 @@ checks:
     check: "PLATEN_AIR_MIN"
     kind: gap
     reason: "the MHA-PD-06 disc grazes the MHA-PD-02 platen"
-    source: "Main, by the owner's delegation of 2026-11-24, D10 (fit-batch owner question Q10, option A: 0.03 mm confirmed); first set in 198518aabe (2026-10-02)"
+    source: "delegated ruling 2026-11-24 (Main), D10 (fit-batch owner question Q10, option A: 0.03 mm confirmed), no precedent; owner review on #2144 (https://github.com/pedropaulovc/harmonic-analyzer/issues/2144#issuecomment-7139937225); first set in 198518aabe (2026-10-02)"
     basis: after_setting

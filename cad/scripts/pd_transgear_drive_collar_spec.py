@@ -382,7 +382,7 @@ FLAT_PIN_LENGTH = min(FLAT_PIN_STOCK_LENGTH, LENGTH - FLAT_PIN_FLOOR)
 # sit up to FLAT_PIN_CENTRE_READ_BIAS off the true centre, and re-seating the
 # pins does not remove it.  The traveler accepts the printed .116-.120 as
 # read; every worst case here charges the true centre that band widened by
-# the bias each side (Main, by the owner's delegation of 2026-11-24, D6: the
+# the bias each side (delegated ruling 2026-11-24 (Main), D6: the
 # shoulder wall this leaves, FLAT_PIN_SHOULDER_WALL_WORST, accepted at
 # FLAT_PIN_SHOULDER_WALL_ACCEPTED under the .080 target).
 FLAT_PIN_CENTRE_READ_BIAS = 0.03048  # .0012
@@ -618,8 +618,8 @@ FLAT_PIN_SHOULDER_WALL_WORST = math.hypot(
     _PILOT_R_MIN - _FLAT_PIN_HOLE_OUTER_R_MAX, min(FLAT_PIN_FLOOR_LIMITS)
 )  # .0796
 # Under the .080 target once the reading bias is charged, over the .060
-# floor: accepted at .079 MIN (Main, by the owner's delegation of
-# 2026-11-24, D6), printed as note SHOULDER_NOTE (rule 20) and registry
+# floor: accepted at .079 MIN (delegated ruling 2026-11-24 (Main), D6,
+# following the owner's 2026-11-01 thin-wall ruling), printed as note SHOULDER_NOTE (rule 20) and registry
 # exception RV-06.
 FLAT_PIN_SHOULDER_WALL_ACCEPTED = 2.0066  # .079
 FLAT_PIN_SHOULDER_WALL_PRINTED = floor_inch(FLAT_PIN_SHOULDER_WALL_WORST)

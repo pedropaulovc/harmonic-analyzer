@@ -139,7 +139,7 @@ def test_the_spacer_bond_carries_the_spring_drag_and_push() -> None:
 
 
 def test_the_spacer_bond_margin_is_taken_at_the_widest_gap(monkeypatch) -> None:
-    """Main, by the owner's delegation of 2026-11-24, D17: the #11 bore stands
+    """Delegated ruling 2026-11-24 (Main), D17: the #11 bore stands
     only while the drag margin at its widest gap, .0085, stays at 2x or
     more.  The 0.3 clearance factor is booked at 0.25 mm, so the margins are
     those at any gap up to it; a gap past it is refused."""

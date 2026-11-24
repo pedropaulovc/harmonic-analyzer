@@ -2946,8 +2946,8 @@ def _step_text(
             # press, the screw pushed out of the spacer (the LOCTITE 638 bond
             # shears at about 199 N, transgear_hanger_joints
             # .SPACER_BOND_SHEAR_N) with no heat near the arm's other bonds;
-            # screw and spacer are renewed anyway (Main, by the owner's
-            # delegation of 2026-11-24, D10: owner question Q7a, option B).
+            # screw and spacer are renewed anyway (delegated ruling 2026-11-24
+            # (Main), D10: owner question Q7a, option B; no precedent, #2144).
             # In this sub-step, not a new one: the steps fill STEP_SLOTS.
             "IF NOT YET RENEWED, PUSH THE SCREW OUT OF THE SPACER, ARM REAR FACE "
             f"DOWN ON THE ARBOR PRESS, AND REPEAT FROM {s('arm-plate-screws-cut', 6)} "
