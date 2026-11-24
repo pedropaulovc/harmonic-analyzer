@@ -75,7 +75,9 @@ def test_the_outside_diameter_is_a_native_reference_sketch_dimension() -> None:
 
 def test_the_face_width_is_a_named_driven_blank_dimension() -> None:
     assert spec.FACE_WIDTH == part.FACE_WIDTH
-    assert spec.BORE_DIA == pytest.approx(part.BORE_DIAMETER)
+    # The bore is modelled at the reamer's size, the spec's land nominal plus
+    # the analysis band's low end (see the reamer-size test below).
+    assert spec.BORE_DIA + min(spec.BORE_DIA_BAND) == pytest.approx(part.BORE_DIAMETER)
 
 
 def test_precision_is_authored_on_the_part_and_only_read_by_the_sheet() -> None:
@@ -99,6 +101,15 @@ def test_bore_band_fits_the_keyed_land_at_every_limit() -> None:
         "KeywayWidth": cone_land_key.KEYWAY_PLACES,
         "KeywayT": cone_land_key.KEYWAY_PLACES,
     }
+
+
+def test_bore_is_modelled_at_the_reamer_size_with_no_band() -> None:
+    # Fit audit 2026-11-23, MHA-DT-07.bore: the owned .3760 over reamer cuts
+    # the bore; the sheet prints its size, no band, and the land is the gauge.
+    assert part.BORE_DIAMETER == pytest.approx(0.3760 * 25.4)
+    assert part.BORE_DIAMETER == pytest.approx(spec.BORE_DIA + min(spec.BORE_DIA_BAND))
+    source = Path(part.__file__).read_text(encoding="utf-8")
+    assert '"BoreProfile", "BoreDia", *deviations' not in source
 
 
 def test_keyway_takes_the_key_and_leaves_the_web_target() -> None:
@@ -492,11 +503,11 @@ def test_notes_do_not_substitute_for_native_fit_dimensions() -> None:
 
 
 def test_bore_and_keyway_dimensions_link_one_matched_fit_note() -> None:
-    # The round band (.0008 wide) is narrower than the turned-diameter row, so
-    # the fit route is a matched fit to the measured keyed land of MHA-DT-04
-    # with an acceptance (rule 4). One feature, several tight dimensions: the
-    # mates print once, in note 1, and every bore and keyway dimension links
-    # it. The round bore takes rule 12's REAM now no flat is left to cut away.
+    # The bore is reamed (no band) and the keyway's bands are cone_land_key's;
+    # the fit route is MHA-DT-04's keyed land turned to the reamed bore, with
+    # an acceptance (rule 4; fit audit 2026-11-23: "BORE MADE TO THE MEASURED
+    # LAND" had it backwards). One feature, several dimensions: the mates
+    # print once, in note 1, and every bore and keyway dimension links it.
     link = f"SEE NOTE {drawing.BORE_FIT_NOTE_NUMBER}"
     assert drawing.DIMENSION_CALLOUTS["BoreDia"] == f"REAM THRU\n{link}"
     # The keyway's width and T print the bare flag, as the keyed cone gears'
@@ -533,6 +544,8 @@ def test_bore_and_keyway_dimensions_link_one_matched_fit_note() -> None:
     )
     assert reference in note
     assert note.endswith("SLIDES ON, NO ROCK.")
+    assert "THE LAND IS TURNED TO THE BORE" in note
+    assert "BORE MADE TO" not in note
     # Every line ends left of the keyway width's text above the block.
     assert max(len(line) for line in drawing.SHEET_NOTES.splitlines()) <= 51
     assert "FLAT" not in drawing.SHEET_NOTES
@@ -665,7 +678,7 @@ def test_dimension_text_lands_clear_of_the_views_and_the_title_block() -> None:
     note_lines = drawing.SHEET_NOTES.splitlines()
     notes_right = notes_left + _NOTE_CHAR_DEFAULT * max(len(line) for line in note_lines)
     notes_bottom = notes_top - _NOTE_PITCH_DEFAULT * len(note_lines)
-    bore = _text_box(drawing.FRONT_KEEP["BoreDia"], drawing.BORE_CALLOUT, "9.525 +0.046")
+    bore = _text_box(drawing.FRONT_KEEP["BoreDia"], drawing.BORE_CALLOUT, "9.550")
     assert notes_top < bore[1] - 0.003
     assert notes_top < drawing.FRONT_CENTER[1] - half_od - 0.005
     assert notes_left > 0.0127 and notes_bottom > 0.0127 + 0.003
