@@ -112,8 +112,3 @@ machinist_exceptions:
     where: "step 9, 9C and 9N, and setting table row 6: the MHA-PD-06 disc centred on its O.D., then its tooth-space runout read with the Ø.040 pin in 12 spaces about evenly round it"
     finding: "tooth-space runout sampled at 12 of the 150 spaces, not read in every space (MHA-PD-06 RV-02)"
     reason: "Owner ruling 2026-11-20 (Pedro), #2665, in his words: \"Follow recommendations unless noted otherwise\"; the recommendation he accepted: \"12 spaces plus the OD check; once-a-turn runout is caught by any evenly spaced sample.\" The O.D. is cut on the same arbor as the teeth"
-  - id: "PD-00-collar-pin-bond"
-    kind: "accept"
-    where: "step 20 (20B, 20D) and the bond note under DETAIL H (sheet 13): an MHA-PD-VN-54 dowel or the MHA-PD-VN-70 pin that slides into the MHA-PD-22 collar's reamed hole by hand bonded with LOCTITE 638, the dowel at 20A's proud, the pin at the bottom"
-    finding: "a slipping press fit salvaged instead of renewing the collar (rule 23: a slip fit is a new part)"
-    reason: "Fit audit 2026-11-23, pending owner confirmation (owner, 2026-11-23: \"can the holes not be reamed in the first place\"; \"the drawing simplicity policy should have caught this type of overengineering\"): the collar's pin holes are reamed to the bought dowels with no band, the dowel as the gauge, so a hole a few tenths over is bonded per the sheet's existing bond note rather than answered with a new collar. The reamed hole still locates the dowel; the three MHA-PD-09 wheels are then tried on the pins (20E) and the flat pin is captive between its floor, the shaft's D-flat and the 15T's front face"

@@ -97,14 +97,16 @@ from pd_transgear_drive_collar_spec import (
     PILOT_SUPPLY_NOTE,
     PIN_CIRCLE_RADIUS,
     PIN_HOLE_BAND,
+    PIN_HOLE_CALLOUT,
     PIN_HOLE_DIA,
-    PIN_OFFSET_TOL,
+    PIN_CENTRE_SHIFT_MAX,
     REAR_BREAK,
     REAR_BREAK_CALLOUT,
     REAR_BREAK_LIMITS,
     REAR_BREAK_SUFFIX,
     SHAFT_NUMBER,
     SPROCKET_NUMBER,
+    TRIAL_NOTE,
     UNIT,
 )
 
@@ -151,7 +153,7 @@ _PILOT_X = _SEAT_X + PILOT_LENGTH * _S / 1000.0
 # section line A's arrow, its mate lines hanging toward the bore; the
 # dimensioned (+Y) pin hole's up and left of that hole, outside the part.
 # Each pin location reads left of the view, its text toward the outer witness
-# so its mate lines stay between the witnesses and clear of the rim. The -Y
+# so its note link stays between the witnesses and clear of the rim. The -Y
 # text's top line stands clear under the axis, where the +Y dimension line
 # starts (run 20261031T205208603Z: that line struck it).  The bore's leader
 # from up and right leaves the bore lower left, clear of the flat pin's hole
@@ -269,20 +271,20 @@ _FLAT_PIN_ROWS = "\n".join(
     f"{row}{_INK_AIR}" for row in FLAT_PIN_HOLE_CALLOUT.splitlines()
 )
 # Rule 7: a callout carries its size and process lines plus at most two lines
-# of words, and a location dimension carries only its value.  The dowel
-# pattern names the dowel, the fit and, in one line, what the press protects
-# (rule 4: a floating pin would spend the wheels' slip in their holes) once,
-# on its 2X callout; general notes 3 and 4 make the dowels the reamed holes'
-# gauges and the wheels the REF offsets' acceptance.  Each mate is named by
-# drawing number: the drilled bore's shaft, whose D-core is turned to it, the
-# flat pin pressed in its ream for good, the two one permanent pair, and the
-# rear break clearing the shaft's root corner.
+# of words, and a location dimension carries only its value and its note
+# link.  The dowel pattern names the dowel and the fit once, on its 2X
+# callout; general note REAM_NOTE, which both ream callouts link, makes the
+# pins the reamed holes' gauges and note TRIAL_NOTE, which both REF offsets
+# link, the wheels their acceptance.  Each mate is named by drawing number:
+# the drilled bore's shaft, whose D-core is turned to it, the flat pin
+# pressed in its ream for good, and the rear break clearing the shaft's root
+# corner.  No callout prints why its size is tight: that is the necessity
+# registry's (cad/config/necessity/pd-transgear-drive-collar.yaml).
 DIMENSION_CALLOUTS_BELOW = {
     "BoreDia": BORE_CALLOUT,
-    "PinPosDia": (
-        f"2X REAM THRU\nPRESS FIT, DOWEL {DOWEL_NUMBER}\n"
-        f"KEEPS SLIP IN {SPROCKET_NUMBER} HOLES"
-    ),
+    "PinPosDia": PIN_HOLE_CALLOUT,
+    "PinPosY": f"SEE NOTE {TRIAL_NOTE}",
+    "PinNegY": f"SEE NOTE {TRIAL_NOTE}",
     "PilotDia": f"CLEARS BORE\nOF {SPROCKET_NUMBER}",
     "CollarDia": f"CLEARS CHAIN {CHAIN_NUMBER}\nON 12-TOOTH {SPROCKET_NUMBER}",
     "PilotLength": f"SEE NOTE {PILOT_NOTE}",
@@ -312,7 +314,7 @@ NOTES_TEXT = f"{property_link('Manufacturing Notes')}\n{FIT_NOTES}"
 # the spec's ANALYSIS bands (what the drill and the reamers are taken to cut
 # and the scatter about the REF targets), bound for the traveler adapter
 # only: the sheet prints none of them, and the acceptances are the mates
-# (notes 3 and 4, MHA-PD-08 note 2).  The 2X dowel reams
+# (notes REAM_NOTE and TRIAL_NOTE, the bore's callout).  The 2X dowel reams
 # run through the body beside the pilot, entered here from the seat face;
 # the flat pin's ream is blind from the rear face, its floor stationed from
 # the seat face (.08, the controlling dimension; the (.163) depth is its
@@ -485,10 +487,10 @@ for _name, _sign, _station in (
                 limits(
                     PIN_CIRCLE_RADIUS,
                     _P[_station],
-                    (PIN_OFFSET_TOL, -PIN_OFFSET_TOL),
+                    (PIN_CENTRE_SHIFT_MAX, -PIN_CENTRE_SHIFT_MAX),
                     unit=UNIT,
                 ),
-                ("PIN_CIRCLE_RADIUS", "PIN_OFFSET_TOL", "UNIT", (_SELF, "END_KEEP")),
+                ("PIN_CIRCLE_RADIUS", "PIN_CENTRE_SHIFT_MAX", "UNIT", (_SELF, "END_KEEP")),
             ),
             "offset_nominal": (PIN_CIRCLE_RADIUS, ("PIN_CIRCLE_RADIUS",)),
             "offset_from": ("bore", ((_SELF, "END_KEEP"),)),
