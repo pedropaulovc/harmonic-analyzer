@@ -93,7 +93,7 @@ MANUFACTURING_NOTES_XY = (0.018, 0.060)
 # stack into one vertical chain right of the teeth.  Each one's text sits
 # beyond its own hole, above the chain for +Y and below it for -Y: printed
 # inside the chain, each text was struck by the other's outside arrow tail.
-# The locations carry only value and band (rule 7); the 2X pin-hole callout
+# The locations carry only their REF target value (rule 7); the 2X pin-hole callout
 # names the pins' parts, its widest row 23 characters, so it stands 10 mm
 # further right than the one-row DRILL THRU did, inside the left border.
 _PIN_CHAIN_X = FRONT_CENTER[0] + 0.070
