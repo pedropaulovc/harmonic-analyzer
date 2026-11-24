@@ -67,14 +67,18 @@ the reamed bores and their lands (gear_seat_fit, dt_cylinder_gear_spec):
 turning land 1 last to the reamed gears narrows them, and the check does not
 count on it.
 
-The bonded gears and the pivot are each tapped true on an indicator while
-the LOCTITE 638 is wet (#3292, #2473) to their sheet 16 limit, the value
-booked as their reading below. After cure the readings are a record only
-(owner ruling 2026-11-24, audit part 2 C5: "B. Keep the wet tap-true steps;
-the after-cure readings become a record only; strip and re-bond only if a
-gear hesitates in the 80-turn running check."): what the compound does as it
-cures is not booked, and MHA-DT-00 check 4R's running turns are its
-acceptance.
+T024 and MHA-DT-37's pivot are each tapped true on an indicator while the
+LOCTITE 638 is wet (#3292, #2473) to their sheet 16 limit, the value booked
+as their reading below; T012 and T018 are not set, and their booked .0030 is
+the analysis figure that check 4R's running test alone accepts. After cure
+the readings are a record only (owner ruling 2026-11-24, audit part 2 C5:
+"B. Keep the wet tap-true steps; the after-cure readings become a record
+only; strip and re-bond only if a gear hesitates in the 80-turn running
+check."): what the compound does as it cures is not booked, and MHA-DT-00
+check 4R's running turns are its acceptance. A bonded gear that hesitates
+there is stripped and re-bonded (2G); a keyed one, not bonded, is checked
+to its sheet, remade if it fails, and the cone redone (3H-3L; delegated
+ruling 2026-11-24 (Main), no precedent; owner review #2144).
 
 The journal's axis is not the running axis (#2473, cone_running_axis):
 MHA-DT-37's spigot cures off-centre and tilted in MHA-DT-04's socket, so its
@@ -175,15 +179,16 @@ LAND_2_ASSEMBLED_RUNOUT_TIR_MM = 0.0045 * 25.4
 # "pivot .0020 TIR MAX, booked at the least spigot engagement (worst case)".
 # Since C5 (2026-11-24) it is the wet tap-true's limit; after cure, a record.
 PIVOT_RUNOUT_TIR_MM = 0.0020 * 25.4
-# T012 and T018, read in the pivot's setup (MHA-DT-00 sheet 16).
-# The pivot's reading does not see MHA-DT-04's socket standing off its
-# journal, which tilts MHA-DT-37 with the pivot true (Codjiflo review of
-# #3374: .00034 in TIR of it took T012 under the gate). Owner ruling
+# T012 and T018, recorded in the pivot's setup (MHA-DT-00 sheet 16, RECORD
+# EACH SPACE). The pivot's reading does not see MHA-DT-04's socket standing
+# off its journal, which tilts MHA-DT-37 with the pivot true (Codjiflo review
+# of #3374: .00034 in TIR of it took T012 under the gate). Owner ruling
 # 2026-11-22 (Pedro), #2473: "Add an after-cure reading of the 12- and
 # 18-tooth gears in the same setup: Ø.040 pin in each tooth space, shaft on
 # end on the V-block, .0030 TIR MAX (as the 24-tooth already has)". Since C5
-# (2026-11-24) the after-cure reading is a record; the limit is booked as the
-# wet setting's.
+# (2026-11-24) that reading is a record, and no step sets or checks T012 or
+# T018 to .0030 (1S taps only T024, 2B only the pivot): the .0030 is the
+# booked analysis figure, accepted only by check 4R's running test.
 SPIGOT_ASSEMBLED_RUNOUT_TIR_MM = 0.0030 * 25.4
 # Read about MHA-DT-04's journal: gear -> its TIR limit.
 ASSEMBLED_RUNOUT_TIR_MM = {

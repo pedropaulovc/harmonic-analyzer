@@ -169,7 +169,7 @@ def test_the_tip_is_measured_dry_then_bonded_on_the_feeler_in_two_cures() -> Non
             "ONCE THE BONDS GRAB, MHA-DT-37 HELD HOME",
             "RECORD THE RUNOUT ABOUT MHA-DT-04 OF THE MHA-DT-37 PIVOT",
             "CLIPS OVER ALL FIVE GEARS",
-            "IF IT FAILS, OR A GEAR HESITATES IN CHECK 4R, AT 250 DEG C",
+            "IF IT FAILS, OR A BONDED GEAR HESITATES IN CHECK 4R, AT 250 DEG C",
             "SPIGOT, PIVOT",
             "REDO FROM 1L.",
             "ALIGN THE MHA-DT-05 COUNTERBORES",
@@ -230,15 +230,17 @@ def test_the_printed_shaft_end_play_is_the_band_the_stacks_book() -> None:
     """The end screw's embed and the bushing air book
     cone_stack_end_play.SHAFT_END_PLAY; the sheet prints that band, rounded
     inward to the thousandth, as step 3C's sheet 16 row.  Fit audit part 2,
-    B10: the play is felt by hand once the pinch screw is tight, the dial
-    indicator only breaking a doubt, because step 3A's 1/8 turn of the 1/4-28
-    end screw leaves a play inside that band."""
+    B10, and Main 2026-11-24 on Codjiflo round 1 of #3550: the sheet prints
+    the window or the feel, not both; the embed and the air need the window,
+    which a hand cannot read, so 3C measures it on the dial indicator, and
+    step 3A's 1/8 turn of the 1/4-28 end screw leaves a play inside it."""
     body = _step_body("end-play-set")
-    assert "FEEL THE MHA-DT-04 END PLAY AT THE SHAFT END (" in body
+    assert "MEASURE THE MHA-DT-04 END PLAY AT THE SHAFT END (" in body
+    assert "FEEL" not in body
     number = str(drawing.ACCEPTANCE_ROW_NUMBERS["shaft-end-play"])
     (row,) = (row for row in drawing.ACCEPTANCE_TABLE_ROWS if row[0] == number)
-    assert row[drawing.ACCEPTANCE_TABLE_HEADER.index("SETTING")].endswith(", BY FEEL")
-    assert row[drawing.ACCEPTANCE_TABLE_HEADER.index("CHECK WITH")] == "DIAL IF IN DOUBT"
+    assert row[drawing.ACCEPTANCE_TABLE_HEADER.index("SETTING")] == "MHA-DT-04 END PLAY AT THE SHAFT END"
+    assert row[drawing.ACCEPTANCE_TABLE_HEADER.index("CHECK WITH")] == "DIAL INDICATOR"
     match = re.fullmatch(r"(\.\d{3})-(\.\d{3})", _accept("shaft-end-play", cites=body))
     assert match is not None
     low, high = (float(value) * 25.4 for value in match.groups())

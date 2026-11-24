@@ -22,7 +22,12 @@ demoted:
   dt_cone_gear_tl_phasing_comb: fit-batch-dt
   dt_cone_tip_gear_tl_cutter_assembly: fit-batch-dt
   dt_drive_train_assembly: fit-batch-dt
-  dt_pinion_arbor: fit-batch-dt  # review cap, FIX after round 2: #3564
+  # dt_pinion_arbor was on this list from the owner's 2026-11-24 conversion
+  # ruling ("Merge the policy now and demote the failing sheets to warn-only
+  # (about 90 drawing rebuilds), restoring enforcement per batch."; PR #3513
+  # "Approve."); fit batch DT took it off, and its review stopped at FIX
+  # after round 2 (the review cap), so it keeps its place: #3564.
+  dt_pinion_arbor: fit-batch-dt
   fr_frame_assembly: fit-batch-fr
   fr_top_frame: fit-batch-fr
   ha_harmonic_analyzer_assembly: fit-batch-ha

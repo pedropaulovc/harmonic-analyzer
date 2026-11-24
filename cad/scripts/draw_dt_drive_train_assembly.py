@@ -1116,7 +1116,7 @@ def _feeler_stack_rows() -> tuple[tuple[str, str, str], ...]:
         # neither takes leaves.
     )
     ranged = (
-        # D4 (Main, by the owner's delegation of 2026-11-24): T024 off T030.
+        # D4 (delegated ruling 2026-11-24 (Main), no precedent; #2144): T024 off T030.
         (STACK_FEELER_RANGE, "ANY ONE", _step_ref("cone-gears-stacked", "R")),
         (
             FITUP.SMALL_LEAF_RANGE,
@@ -1448,9 +1448,9 @@ CONE_CRANK_STEPS = _note_text(
         # steps; the after-cure readings become a record only; strip and
         # re-bond only if a gear hesitates in the 80-turn running check."  So
         # 1W records, before the comb check, so the remedy follows that check
-        # alone (rule 22); a gear that hesitates in check 4R is stripped by
-        # 2G.  Step 1 has one letter left for the clean, which names the redo
-        # it prepares.
+        # alone (rule 22); a bonded gear that hesitates in check 4R is
+        # stripped by 2G, a keyed one checked at 3H-3L.  Step 1 has one letter
+        # left for the clean, which names the redo it prepares.
         f"1W. RECORD T024'S TOOTH RUNOUT ABOUT MHA-DT-04 ({acceptance_ref('t024-runout')}).",
         f"1X. CHECK THAT {PHASING_COMB} CLIPS OVER T030 AND T024, BOTH ARMS ON T036.",
         "1Y. IF IT FAILS, TAKE T024 OFF AT 250 DEG C.",
@@ -1488,8 +1488,8 @@ CONE_CRANK_STEPS = _note_text(
         # (#2473, owner ruling 2026-11-22: the pivot's reading does not see
         # MHA-DT-04's socket standing off its journal).  Owner ruling
         # 2026-11-24, audit part 2 C5: the readings are a record only; the
-        # tip is stripped and re-bonded only if a gear hesitates in check
-        # 4R's run, so 2G names that run beside the comb check it follows.
+        # tip is stripped and re-bonded only if a bonded gear hesitates in
+        # check 4R's run, so 2G names that run beside the comb check it follows.
         f"2E. ONCE CURED, RECORD THE RUNOUT ABOUT MHA-DT-04 OF THE MHA-DT-37 PIVOT ({acceptance_ref('pivot-runout')})"
         f" AND OF T012'S AND T018'S TEETH ({acceptance_ref('spigot-gear-runout')}).",
         # The cured tip is accepted on the comb before the post is assembled,
@@ -1500,7 +1500,11 @@ CONE_CRANK_STEPS = _note_text(
         # machinist review of PR #2557 named the parts and the restart).  The
         # clean names the redo it prepares, as 1Z does.
         f"2F. CHECK THAT {PHASING_COMB} CLIPS OVER ALL FIVE GEARS, BOTH ARMS ON T036.",
-        "2G. IF IT FAILS, OR A GEAR HESITATES IN CHECK 4R, AT 250 DEG C TAKE MHA-DT-37, T018, T012, T024 AND MHA-DT-38 OFF.",
+        # Codjiflo round 1 on #3550, delegated ruling 2026-11-24 (Main), no
+        # precedent; owner review #2144: stripping the tip helps only the
+        # bonded gears it parts; a keyed gear (T030-T054 on land 1, not
+        # bonded) that hesitates is taken off after this and checked at 3H-3L.
+        "2G. IF IT FAILS, OR A BONDED GEAR HESITATES IN CHECK 4R, AT 250 DEG C TAKE MHA-DT-37, T018, T012, T024 AND MHA-DT-38 OFF.",
         "2H. CLEAN THE CURED 638 OFF EVERY PARTED FACE: SPIGOT, PIVOT, LAND, BORES, SOCKET, FOR A REDO FROM 1L.",
         # U37c cut-to-fit acceptance survives the taller post and longer stock:
         # MHA-DT-VN-61's registry/spec own the selected screw and reference length.
@@ -1569,13 +1573,20 @@ CONE_CRANK_STEPS = _note_text(
         # the step states no engagement shortfall (DT-07 retired).
         "3A. BACK MHA-DT-39 OFF 1/8 TURN.",
         "3B. TIGHTEN MHA-DT-VN-56 ACROSS THE SLIT.",
-        # Fit audit 2026-11-23 part 2, B10 (drawing-guidelines rule 4, form 2:
-        # an acceptance by feel; no owner ruling touched): C1's turn-set (3,
-        # 3A) leaves 1/8 turn, .0045, inside the .002-.009 band, so the end
-        # play is felt once the pinch screw is tight, and the sheet 16 row's
-        # dial indicator (owner ruling P2: .002 total on the .001 dial; the
-        # band is .007) only breaks a doubt.
-        "3C. FEEL THE MHA-DT-04 END PLAY AT THE SHAFT END "
+        # Fit audit 2026-11-23 part 2, B10 (drawing-guidelines rule 4, form 2;
+        # Main 2026-11-24 on Codjiflo round 1 of #3550: print the feel or the
+        # window, not both).  The window is needed by checks: the end screw's
+        # embed (dt_cone_tip_block_spec END_SCREW_EMBED band) and its pivot's
+        # proud length (dt_cone_tip_end_screw_spec) and the journal's free end
+        # (dt_cone_gear_shaft_spec) book SHAFT_END_PLAY[1], 0.25 mm (.009 in
+        # printed), and the bushing air (dt_cone_tip_air) books
+        # SHAFT_END_PLAY[0], 0.05 mm (.002).  "Turns free, no felt shuttle"
+        # bounds neither: a hand cannot tell .009 from .012, nor .002 from
+        # .001.  So 3C reads the play on the dial indicator against the sheet
+        # 16 row's window (owner ruling P2: .002 total on the .001 dial; the
+        # band is .007); C1's turn-set (3, 3A: 1/8 turn of 1/4-28, .0045)
+        # lands inside it.
+        "3C. MEASURE THE MHA-DT-04 END PLAY AT THE SHAFT END "
         f"({acceptance_ref('shaft-end-play')}).",
         "3D. IF THE END PLAY IS OUT, LOOSEN MHA-DT-VN-56.",
         # Attempt 1 review (clarity, rule 22): the redo says which way
@@ -1591,6 +1602,22 @@ CONE_CRANK_STEPS = _note_text(
         # screws' float, indicates the end play again (3C-3F).  It lives here,
         # among the steps it cites, so check 4V can name it by one STEP head.
         "3G. IF A MHA-DT-VN-61 IS EVER LOOSENED, REDO 2M, 2S-2U, THEN 3C-3F.",
+        # Codjiflo round 1 on #3550, delegated ruling 2026-11-24 (Main), no
+        # precedent; owner review #2144: a keyed gear (T030-T054) that
+        # hesitates in check 4R is not bonded, so 2G's strip cannot help it.
+        # What opens its centre past the set (cone_set_stack.after_set_terms_mm)
+        # is its own tooth runout about its bore and its float on land 1,
+        # both its MHA-DT-03 sheet's (bore reamed .3760, tooth runout) and
+        # MHA-DT-04 note 1's (each slides on, no shake); the key only clocks
+        # it.  It comes off only past T024 and the tip, so 2G-2H part them
+        # first; the redo from 1B re-stacks, re-bonds and re-taps the tip.
+        # Steps 1 and 2 have no letter left, so the remedy lives here beside
+        # 3G, check 4V's remedy; 3J-3L are conditioned on 3H's taking off as
+        # 4L is on its recut.
+        "3H. IF A KEYED GEAR HESITATES IN CHECK 4R, TAKE IT OFF MHA-DT-04 AFTER 2G-2H.",
+        "3J. CHECK A GEAR TAKEN OFF: BORE AND TEETH TO ITS MHA-DT-03 SHEET, NO SHAKE ON MHA-DT-04.",
+        "3K. IF IT FAILS, REMAKE IT TO THAT SHEET.",
+        "3L. AFTER 3H, REDO FROM 1B.",
         # User ruling 2026-09-28: the crank journal runs directly in the post;
         # the centres are fixed, and the only mesh requirement is no binding.
         # Delegated ruling 2026-11-17 on #2481 (option B; precedent #2365 and
@@ -2110,9 +2137,14 @@ def rig_steps(*, pivot_blocks: int, cams: int, slotted: int) -> str:
         # owner's by-feel direction of 2026-11-11 (#2365).  #1038 re-pitch,
         # on machinist review of point A ("WHERE NO GEAR BINDS" gave no pose
         # and no check).  Owner ruling 2026-11-24, audit part 2 C9 ("Yes: add
-        # the look and relax the rest."): at that pose, before the clamp, the
-        # bushing's air to gear 19 is looked at with a 3/64 drill shank;
-        # dt_cone_tip_air gates the bushing on it (AFTER_SET_SOURCES).
+        # the look and relax the rest."), its wording changed by delegated
+        # ruling 2026-11-24 (Main), no precedent; owner review #2144 (D18): at
+        # that pose, before the clamp, the bushing's air to gear 19 is looked
+        # at with a .020 feeler leaf, which every build with its parts in
+        # print passes (0.730 mm least, dt_cone_tip_air.look_in_print_air_mm);
+        # the 3/64 drill shank (1.191 mm) rejected some.  The bushing keeps
+        # the full arithmetic stack.  The remedy is its own line (rule 22):
+        # the parts whose print errors close that air before the look.
         (
             "other-base-mounting",
             "CONE SET ON THE BASE: SLIDE MHA-DT-20 UNTIL GEARS 0 AND 19 SIT FULLY ON THEIR "
@@ -2120,7 +2152,9 @@ def rig_steps(*, pivot_blocks: int, cams: int, slotted: int) -> str:
             "SWING IT IN UNTIL THE GEARS AT BOTH ENDS JUST BIND.\n"
             f"EASE IT OUT SQUARE IN SMALL STEPS UNTIL {CONE_TURN_CRANK_TURNS} CRANK TURNS "
             "RUN FREE.\n"
-            "A 3/64 DRILL SHANK PASSES BETWEEN MHA-DT-38 AND GEAR 19.\n"
+            "A .020 FEELER LEAF PASSES BETWEEN MHA-DT-38 AND GEAR 19.\n"
+            "IF IT DOES NOT, MEASURE MHA-DT-04, MHA-DT-05, MHA-DT-20, MHA-DT-21 AND "
+            "MHA-DT-38 AGAINST THEIR PRINTS.\n"
             "CLAMP MHA-DT-20 TO MHA-FR-01.\n"
             "TRANSFER-PUNCH MHA-FR-01 THRU THE MHA-DT-20 PIVOT BORE.\n"
             "LIFT MHA-DT-20 OFF.\n"
@@ -2216,17 +2250,25 @@ CHECKS = _note_text(
         # the transfer-punched cone pivot seat takes at most its whole error
         # (0.249 mm, cone_set_stack) plus the DRO set band (0.10), 0.349 mm,
         # under the .015 (0.381) tripwire, which sends the fitter to that seat
-        # (step 23E-23H).  Y is never adjusted in 4E: the front pedestal is
+        # (step 23F-23J).  Y is never adjusted in 4E: the front pedestal is
         # clamped back at its Y zero.
         "4C. EASE EACH MHA-DT-02'S HOLD-DOWN UNTIL IT MOVES UNDER LIGHT TAPS.",
         "4D. HOLD THE CONE SET SWUNG IN AT THE FIRST BIND.",
         "4E. TAP EACH MHA-DT-02 IN OR OUT UNTIL THE GEARS AT ITS END JUST BIND.",
         "4F. CLAMP EACH MHA-DT-02 TO MHA-FR-01 THERE, THE FRONT ONE AT ITS Y ZERO.",
         "4G. NEITHER X INDICATOR READS OVER .015.",
-        f"4H. IF ONE DOES, RECHECK THE STEP {_step_ref('other-base-mounting', 'E')}-"
-        f"{_step_ref('other-base-mounting', 'H')} PIVOT SEAT BEFORE GOING ON.",
+        f"4H. IF ONE DOES, RECHECK THE STEP {_step_ref('other-base-mounting', 'F')}-"
+        f"{_step_ref('other-base-mounting', 'J')} PIVOT SEAT BEFORE GOING ON.",
+        # Codjiflo round 1 on #3550, delegated ruling 2026-11-24 (Main), no
+        # precedent; owner review #2144: drilling and tapping the blind seat
+        # through the foot hole leaves chips in it and on the foot; one left
+        # under the foot when 4K swaps the clamp for the screw tilts the
+        # pedestal after 4G's tripwire was read, and one in the blind hole
+        # can bottom MHA-DT-VN-62.  The 4A-4Z letters are full, so the seat
+        # is finished blown out, clamp still on, as 4J's own stop (rule 23),
+        # in its second line's spare characters.
         "4J. DRILL AND TAP EACH UNDRILLED SEAT PER MHA-FR-01 THRU ITS MHA-DT-02 FOOT "
-        "HOLE, ON AN 11/64 TRANSFER-PUNCH SPOT.",
+        "HOLE, ON AN 11/64 TRANSFER-PUNCH SPOT: BLOWN FREE OF CHIPS.",
         "4K. SCREW EACH MHA-DT-02 DOWN WITH MHA-DT-VN-62 IN PLACE OF ITS CLAMP.",
         "4L. SWING THE CONE SET OUT.",
         "4M. SWING IN UNTIL A GEAR JUST BINDS.",
@@ -2235,15 +2277,19 @@ CHECKS = _note_text(
         # Rule 23 (rubric sample round 5): the adjustable clamp's acceptance.
         "4Q. PUSH THE CONE SET BY HAND: IT DOES NOT SWING.",
         # Owner ruling 2026-11-24, audit part 2 C5: the bonded gears'
-        # after-cure readings are a record; a gear that hesitates in this run
-        # is what strips and re-bonds the tip (step 2G, which 4S names in the
-        # one line the field has: 69 of 70 characters).
+        # after-cure readings are a record; a bonded gear that hesitates in
+        # this run is what strips and re-bonds the tip (step 2G).  A keyed one
+        # is not bonded, so 4S sends it to step 3H (Codjiflo round 1 on #3550,
+        # delegated ruling 2026-11-24 (Main), no precedent; owner review
+        # #2144); the two routes take 4S to two lines, the sheet 13 left
+        # field's one spare line.
         f"4R. TURN THE CRANK {CHECK_RUN_CRANK_TURNS} TURNS: THE GEARS MUST NEVER BIND "
         "OR HESITATE (A GEAR OUTSIDE THE TWO 4E BINDS MAY SHAKE).",
         # Rubric sample round 9 (rule 22): the check, its remedy, the hold and
         # the redo are one step each.
         "4S. IF ONE BINDS, LOOSEN MHA-DT-VN-51 THERE "
-        f"(ONE HESITATES: STEP {_step_ref('post-and-tip-block', 'G')}).",
+        f"(A BONDED GEAR HESITATES: STEP {_step_ref('post-and-tip-block', 'G')}, "
+        f"A KEYED ONE: STEP {_step_ref('end-play-set', 'H')}).",
         "4T. REDO 4N-4R.",
         # Owner ruling 2026-11-20 (Pedro, #1177: no blind plate hole, so no
         # post dowel; #3085 option B): only the two MHA-DT-VN-61 screws'
@@ -2258,10 +2304,10 @@ CHECKS = _note_text(
         # is a remedy that follows its check.
         "4U. MHA-DT-02 AND MHA-DT-VN-61 STAY AS SET FROM HERE ON.",
         f"4V. IF ONE LOOSENS, REDO CHECKS 4-7 (A SCREW: STEP {_step_ref('end-play-set', 'G')} FIRST).",
-        f"4W. VERIFY MHA-DT-VN-52'S STEP {_step_ref('other-base-mounting', 'K')} TURNS "
+        f"4W. VERIFY MHA-DT-VN-52'S STEP {_step_ref('other-base-mounting', 'L')} TURNS "
         f"({acceptance_ref('pivot-screw-engagement')}).",
         "4X. CHECK THAT MHA-DT-20 AND THE MHA-DT-VN-52 SHOULDER STAY SEATED.",
-        f"4Y. VERIFY MHA-SH-VN-52'S STEP {_step_ref('other-base-mounting', 'N')} TURNS "
+        f"4Y. VERIFY MHA-SH-VN-52'S STEP {_step_ref('other-base-mounting', 'P')} TURNS "
         f"({acceptance_ref('stop-screw-engagement')}).",
         "4Z. CHECK THAT ITS HEAD IS FULLY SEATED.",
         # Rubric sample round 2: the notch's reference, the running direction

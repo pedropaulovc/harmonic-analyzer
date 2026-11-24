@@ -3,15 +3,21 @@
 # dt_mesh_checks.cone_check and test_standard_mesh_checks; the centres are
 # cone_set_stack's: the set's highest first bind, then the running runout
 # (cone and drum added), the keyed gear's seat float and the drum floats'
-# spread, combined by root sum square with the plain sum reported. The bonded
-# gears' runouts are booked at their wet tap-true limits (MHA-DT-00 1S, 2B);
-# after cure they are a record, and a gear that hesitates in check 4R's run
-# is stripped and re-bonded (owner ruling 2026-11-24, audit part 2 C5). That
-# is also the bench answer where the plain sum printed beside the passing
-# root sum square falls under 1.0 (T012 and T030-T054; T030 0.9550): the
-# 80-turn run of MHA-DT-00 check 4R finds a gear that hesitates, and that
-# gear is stripped and re-bonded. Fit batch DT, 2026-11-24: statement and
-# per-station table in the batch's cone-set-check.md.
+# spread, combined by root sum square with the plain sum reported. T024's
+# runout and the MHA-DT-37 pivot's are booked at their wet tap-true limits
+# (MHA-DT-00 1S, 2B); T012's and T018's .0030 is the booked analysis figure
+# (owner ruling 2026-11-22, #2473): no step sets or checks them to it (2E
+# records each space), and only check 4R's running test accepts them. After
+# cure every reading is a record (owner ruling 2026-11-24, audit part 2 C5).
+# A gear that hesitates in check 4R's run is the bench answer, also where the
+# plain sum printed beside the passing root sum square falls under 1.0 (T012
+# and T030-T054; T030 0.9550): a bonded gear (T012, T018, T024, MHA-DT-37,
+# MHA-DT-38) is stripped and re-bonded (MHA-DT-00 2G); a keyed one
+# (T030-T054, not bonded) is taken off and checked to its MHA-DT-03 sheet and
+# for shake on land 1, remade if it fails, and the cone redone from 1B
+# (MHA-DT-00 3H-3L; delegated ruling 2026-11-24 (Main), no precedent; owner
+# review #2144). Fit batch DT, 2026-11-24: statement and per-station table
+# in the batch's cone-set-check.md.
 checks:
   - id: C-01
     check: "NOMINAL_CONTACT_RATIO_MIN"

@@ -2,9 +2,9 @@
 # (drawing-guidelines rule 4; owner ruling 2026-11-24: the reason lives here,
 # not on the sheet).  The #20 drilled bore with the MHA-DT-32 shoulder turned
 # to it is owner ruling 2026-11-24, fit audit question 14.  Its .1635 MAX cap
-# under the drill's DRILLED HOLES .165 is kept by N-01 below: Main, by the
-# owner's delegation of 2026-11-24, ruled to keep the single limit as it is
-# (no exception, no geometry change), on this entry naming the tenon wall
+# under the drill's DRILLED HOLES .165 is kept by N-01 below: delegated
+# ruling 2026-11-24 (Main), no precedent; owner review #2144: keep the single
+# limit as it is (no exception, no geometry change), on this entry naming the tenon wall
 # check.  Re-derived 2026-11-24: the smallest tenon (.292) over the bore with
 # .004 eccentricity leaves .06025 at .1635, .0600 at .164 and .0595 at .165
 # (dt_crank_handle_spec.TENON_STRAIGHT_WALL_MIN against TENON_WALL_FLOOR_MM,
@@ -16,4 +16,4 @@ necessity:
     feature: "sheet 1, section A-A, #20 DRILL THRU pivot bore, Ø.1635 MAX"
     kind: gap
     reason: "a larger bore leaves the tenon wall under .060"
-    source: "Main, by the owner's delegation of 2026-11-24 (keep the existing .1635 MAX); check dt_crank_handle_spec TENON_WALL_FLOOR_MM (rule 17's .060 floor): at the .165 DRILLED HOLES limit the tenon wall is .0595"
+    source: "dt_crank_handle_spec.TENON_WALL_FLOOR_MM"

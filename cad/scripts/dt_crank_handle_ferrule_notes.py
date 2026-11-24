@@ -56,8 +56,9 @@ ARM_FACE_WALL_MIN = _floor_3pl(FERRULE_ARM_FACE_WALL_MIN)
 # as a contradiction (machinist review r2/r3, farm run 20261124T110807008Z).
 # The shop's index has no drill at .303; the traveler's N drill cuts inside
 # the .298-.308 row, which the tenon walls are judged at (Ø.302 printed would
-# leave the smallest tenon's wall under .060).  Main, by the owner's
-# delegation of 2026-11-24, ruling D5: option (c), Ø.303 ±.005 "DRILL THRU",
+# leave the smallest tenon's wall under .060).  D5, delegated ruling
+# 2026-11-24 (Main), no precedent; owner review #2144: option (c), Ø.303
+# ±.005 "DRILL THRU",
 # the traveler uses the N drill (Q-ferrule-n-drill answered).  No "BORE":
 # owner ruling 2026-11-24, fit audit question 15 ("BORE" had promised a
 # boring bar no traveler uses).

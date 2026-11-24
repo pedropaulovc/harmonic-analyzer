@@ -22,8 +22,9 @@ from dt_crank_drive_gear_spec import inch_text
 # outside the part's rebuild closure (test_dt_crank_drive_gear_drawing checks
 # the copy against the stack offline).
 # The pinion's face at the title block's .XX row (machinist review r1, farm
-# run 20261124T110807008Z) moved the stack's range by .00001 in.  D4 (Main,
-# by the owner's delegation of 2026-11-24: T024 on a .015-.020 leaf, the
+# run 20261124T110807008Z) moved the stack's range by .00001 in.  D4
+# (delegated ruling 2026-11-24 (Main), no precedent; owner review #2144:
+# T024 on a .015-.020 leaf, the
 # creep term dropped) shrinks the cone set's north float 0.845 -> 0.771 mm,
 # so the widest backlash falls to 0.957428 mm: it prints .0035 TO .0376
 # (accept_limits_text rounds inward).

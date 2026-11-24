@@ -647,8 +647,9 @@ TIP_END_RECESS_LIMITS_MM = (
 _FACE_WIDTH_LIMITS = _limits(CONE_GEAR_FACE_WIDTH, CONE_GEAR_FACE_WIDTH_BAND)
 # T024's bonded length on land 2 at its least.
 T024_BOND_LENGTH_MIN_MM = _FACE_WIDTH_LIMITS[0] - TIP_END_RECESS_LIMITS_MM[1]
-# The least the shaft end stands inside T024's bore (Main, by the owner's
-# delegation of 2026-11-24, D4: the 1R leaf range's thin end keeps it).
+# The least the shaft end stands inside T024's bore (D4, delegated ruling
+# 2026-11-24 (Main), no precedent; owner review #2144: the 1R leaf range's
+# thin end keeps it).
 TIP_END_RECESS_FLOOR_MM = 0.03
 if (
     TIP_END_RECESS_LIMITS_MM[0] < TIP_END_RECESS_FLOOR_MM

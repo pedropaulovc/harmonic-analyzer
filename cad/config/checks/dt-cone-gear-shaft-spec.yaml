@@ -1,0 +1,10 @@
+# The cone gear shaft's numeric checks (tolerance-policy.md, "Checks in spec
+# modules and tests"; cad/scripts/check_register.py). Fit batch DT,
+# 2026-11-24.
+checks:
+  - id: C-01
+    check: "TIP_END_RECESS_FLOOR_MM"
+    kind: gap
+    reason: "the shaft end stands past T024's north face"
+    source: "D4, delegated ruling 2026-11-24 (Main), no precedent; owner review #2144 (audit part 2 C7 row 1R): the 1R range's thin end keeps at least 0.03 mm of the shaft end inside T024's bore"
+    basis: worst_case

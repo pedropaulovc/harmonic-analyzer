@@ -442,7 +442,8 @@ if set(DRAWING_PRECISION) != set(DRAWING_DIMENSIONS) or any(
 # and never cut, so it prints the stock as a reference, not the supplier's
 # limits (STOCK_DIMENSIONS); BIT_DIA_TOL stays the analysis band the bar's
 # slip and the flat's offset book.  Rule 7: words, no method.  The bar's
-# cross hole carries the slip acceptance.  The flat's length and depth print
+# cross hole is a #30 drill (FOR MHA-DT-37-TL-01) with no slip acceptance:
+# the set screw takes the play out.  The flat's length and depth print
 # bare: the depth dimension is the flat.
 STOCK_DIMENSIONS = frozenset({"BitDia"})
 DIMENSION_CALLOUTS: dict[str, str] = {

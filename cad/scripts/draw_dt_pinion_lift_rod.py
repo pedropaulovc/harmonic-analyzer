@@ -2,7 +2,7 @@ r"""Create the curated machinist drawing for the pinion lift rod.
 
 A plain 1/4 in bearing rod, crowned at its back end, with the MHA-DT-30 pin hole
 match-drilled at assembly near its flat front end (U36).  The 1:1 side view
-carries everything the lathe needs -- the bearing diameter and its mate, the
+carries everything the lathe needs -- the stock diameter (REF) and its mate, the
 body length, the crown and the (overall) -- plus the bearing finish; a 5:1
 detail of the front end carries the pin hole and its station from the front
 face.  VIEW B, the rod turned square to its two set-screw flats' plane
@@ -86,6 +86,7 @@ from dt_pinion_lift_rod_spec import (
     ROD_DIA_BAND,
     ROD_DIA_CALLOUT,
     ROD_LEN,
+    STOCK_DIMENSIONS,
     SURFACE_FINISHES,
     UNIT,
 )
@@ -181,6 +182,10 @@ requirement(
     },
     precision={"radius": _P["CapR"], "body_length": _P["RodBody"]},
 )
+# The O.D. prints REF (the bought 1/4 ground rod, STOCK_DIMENSIONS).  Its
+# feature still carries ROD_DIA_BAND, the stock's as-supplied band: the
+# traveler's as-supplied O.D. (plan process.as_supplied_outer) reads a banded
+# diameter (draw_dt_cylinder_gear_shaft's outer, the same route).
 requirement(
     "outer",
     kind="diameter",
@@ -516,9 +521,13 @@ def _front_end_detail(adapter: Any, side: Any) -> Any:
 
 
 def _show_as_reference(
-    adapter: Any, annotations: list[Any], names: frozenset[str]
+    adapter: Any,
+    annotations: list[Any],
+    names: frozenset[str],
+    *,
+    diameter: bool = False,
 ) -> None:
-    """Parenthesize each named linear dimension: (199.5), a reference.
+    """Parenthesize each named dimension: (199.5) or (Ø.2500), a reference.
 
     Through the prefix/suffix channel: ShowParenthesis read back True on the
     r2 sheet yet printed a bare 199.5.  Each name must be on the view once.
@@ -529,7 +538,9 @@ def _show_as_reference(
             raise RuntimeError(
                 f"expected one {name} on the side view, found {len(found)}"
             )
-        set_reference_dimension(adapter, found[0], label=f"MHA-DT-17 {name}")
+        set_reference_dimension(
+            adapter, found[0], label=f"MHA-DT-17 {name}", diameter=diameter
+        )
 
 
 def _view_b_arrow(adapter: Any, end: Any) -> None:
@@ -661,6 +672,8 @@ def build(adapter: Any) -> dict[str, str]:
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
     _show_as_reference(adapter, right_annotations, DRAWING_REFERENCE_DIMENSIONS)
+    # The ground rod's as-bought O.D. prints REF: "(Ø.2500)" (rule 4).
+    _show_as_reference(adapter, right_annotations, STOCK_DIMENSIONS, diameter=True)
     if not auto_center_marks(adapter, detail, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to the pin hole")
 

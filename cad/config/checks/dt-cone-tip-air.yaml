@@ -1,15 +1,21 @@
 # The cone tip's air to the bank's G19 (tolerance-policy.md, "Checks in spec
 # modules and tests"; cad/scripts/check_register.py). Applied by
 # dt_cone_tip_air.full_sweep_proof and test_drive_train_cone_tip_holddown.
-# The bushing is gated after MHA-DT-00 step 23's look (A 3/64 DRILL SHANK
-# PASSES BETWEEN MHA-DT-38 AND GEAR 19): the shank, plus the swing's nominal
-# gain over the working pose, less the eight sources that act after the look
-# and the interval arc. The screw end and the block keep the full sweep. Fit
-# batch DT, 2026-11-24.
+# Every tier, the bushing's too, is gated on the full arithmetic stack over
+# the P1 sweep (the bushing clears by 0.024 mm). MHA-DT-00 step 23's look (A
+# .020 FEELER LEAF PASSES BETWEEN MHA-DT-38 AND GEAR 19) must pass every build
+# whose parts are in print: 0.730 mm least air at the working pose against the
+# 0.508 mm leaf. Fit batch DT, 2026-11-24.
 checks:
   - id: C-01
-    check: "AFTER_SET_SOURCES"
+    check: "can reach G19"
     kind: gap
     reason: "the bushing rubs gear 19's face as the cone turns"
-    source: "owner ruling 2026-11-24, audit part 2 C9: \"Yes: add the look and relax the rest.\"; terms per SkepticDT2 j04 DTR.tip_air_g19"
-    basis: after_setting
+    source: "owner ruling 2026-11-24, audit part 2 C9: \"Yes: add the look and relax the rest.\"; delegated ruling 2026-11-24 (Main), no precedent; owner review #2144 (D18): the bushing is gated on the full arithmetic stack; terms per SkepticDT2 j04 DTR.tip_air_g19"
+    basis: worst_case
+  - id: C-02
+    check: "step 23's look rejects an in-print build"
+    kind: gap
+    reason: "step 23's leaf rejects a build with parts in print"
+    source: "delegated ruling 2026-11-24 (Main), no precedent; owner review #2144 (D18): the look is a .020 feeler leaf (LOOK_LEAF_MM, 0.508 mm), not the 3/64 drill shank (1.191 mm); dt_cone_tip_air.look_in_print_air_mm gives 0.730 mm at the working pose"
+    basis: worst_case

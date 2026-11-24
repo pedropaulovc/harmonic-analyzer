@@ -33,6 +33,12 @@ ROD_LEN = LIFT_ROD_LEN
 # from it on the 1/4 in diameter (1.19, the old 1.2).
 CAP_R = 4.826  # .19
 CAP_SAG = CAP_R - math.sqrt(CAP_R**2 - ROD_DIA**2 / 4.0)
+# The as-supplied band of the 1/4 ground rod the O.D. is bought as
+# (stock-to-order.toml 1018-ground-round-1-4: stated tolerance inside
+# +.0000/-.0008), never cut and printed REF (ROD_DIA_CALLOUT).  An analysis
+# band only: the cams' .2510 reamed bores book their slip against it (fit
+# audit F19, dt_pinion_cam_spec.SLIP_CLEARANCE_MAX), and so do the MHA-DT-16
+# hub bore's clearance (draw_dt_pinion_lever) and the flats here.
 ROD_DIA_BAND = SHAFT_H
 
 LEVER_NUMBER = "MHA-DT-16"
@@ -314,7 +320,8 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 DRAWING_REFERENCE_DIMENSIONS = frozenset({"RodOverall"})
 
 # Decimal places ARE the tolerance statement (drawing-simplicity-policy.md `How the repository implements the guidelines`); the part authors
-# them and the drawing reads them back.  Four on the banded bearing diameter;
+# them and the drawing reads them back.  Four on the stock diameter, printed
+# REF as the rod's own .2500;
 # three on the drilled pin hole, which takes the title block's DRILLED HOLES
 # row (.064, +.004/0); two on the length the rig's stacks read, the crown, the
 # reference overall and the pin station, which the lever's mid-engagement
@@ -344,17 +351,20 @@ if len(DRAWING_PRECISION_BY_NAME) != len(_PRECISION_NAMES):
 if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
     raise AssertionError("every marked dimension must state its decimal places")
 
-# drawing-guidelines.md rule 4 (tighten only for function, and name the mate):
-# the rod turns freely in the two MHA-DT-18 lift bores (fit audit F26: the F
-# drill, "MHA-DT-17 TURNS FREELY").  The h band stays for the two MHA-DT-23
-# cams' and the MHA-DT-16 hub's .2510 reamed bores the rod slides into by
-# hand (fit audit F19, F23); the reason is in cad/config/necessity/
-# dt-pinion-lift-rod.yaml.  Ground 1/4 in shafting already holds it, so the
-# stock is good enough as supplied.
+# drawing-guidelines.md rule 4 (form 4's last sentence): the O.D. is 1/4
+# ground rod bought to size and never cut, so it prints the stock as a
+# reference, "(Ø.2500)", not limits of size (STOCK_DIMENSIONS; Codjiflo #3550
+# r1).  ROD_DIA_BAND stays the analysis band the cams' slip books.  The mate
+# that asks anything of it is the two MHA-DT-23 cams, whose .2510 reamed
+# bores it slides into by hand (fit audit F19; their sheet prints that
+# acceptance).  The MHA-DT-18 lift bores (fit audit F26) and the MHA-DT-16
+# hub's bore (fit audit F23) are F drills, .257, with no band, so they ask
+# nothing of it.  Two lines: below the value, where a callout prints.
+STOCK_DIMENSIONS = frozenset({"RodDia"})
 ROD_DIA_CALLOUT = "\n".join(
     (
-        f"TURNS FREELY IN {PIVOT_BLOCK_NUMBER} LIFT BORES,",
-        "1/4 IN GROUND STOCK OK",
+        "1/4 GROUND ROD, AS SUPPLIED",
+        f"SLIDES IN 2X {CAM_NUMBER}",
     )
 )
 

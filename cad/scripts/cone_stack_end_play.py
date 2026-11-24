@@ -34,7 +34,8 @@ import dt_feeler_leaves as _leaves
 
 MIN_END_PLAY = 0.10  # running floor: the stack never clamped on the shaft
 MARGIN_SPARE = 0.25  # novice spare over every floor (pinion_rig_layout rule)
-# Main, by the owner's delegation of 2026-11-24 (D4, audit part 2 C7 row 1R):
+# D4, delegated ruling 2026-11-24 (Main), no precedent; owner review #2144
+# (audit part 2 C7 row 1R):
 # "print the widest leaf range whose thin end keeps at least 0.03 mm of the
 # shaft end inside T024's bore with the baseless creep term dropped".  The
 # 0.10 mm "T024 can creep on its land before the 638 fixes" term (3cdf40acf1)

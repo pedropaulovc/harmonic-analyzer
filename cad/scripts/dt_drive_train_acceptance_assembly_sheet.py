@@ -108,11 +108,12 @@ ACCEPTANCES = (
     (
         "shaft-end-play",
         _step_ref("end-play-set", "C"),
-        # Fit audit 2026-11-23 part 2, B10: felt by hand once MHA-DT-VN-56 is
-        # tight (step 3C); the dial indicator only breaks a doubt.
-        "MHA-DT-04 END PLAY AT THE SHAFT END, BY FEEL",
+        # Fit audit 2026-11-23 part 2, B10; Main 2026-11-24 on Codjiflo
+        # round 1 of #3550: the window, which the end screw's embed and the
+        # bushing air book (step 3C's comment), is read on the dial, not felt.
+        "MHA-DT-04 END PLAY AT THE SHAFT END",
         inch_window(SHAFT_END_PLAY, 3),
-        "DIAL IF IN DOUBT",
+        "DIAL INDICATOR",
     ),
     (
         "ring-butt-gap",
@@ -190,14 +191,14 @@ ACCEPTANCES = (
         "CHECK 4W",
         "MHA-DT-VN-52 TURNS, FIRST BITE TO SHOULDER SEATED",
         f"{PIVOT_SCREW_TURNS} MIN",
-        f"COUNTED AT {_step_ref('other-base-mounting', 'K')}",
+        f"COUNTED AT {_step_ref('other-base-mounting', 'L')}",
     ),
     (
         "stop-screw-engagement",
         "CHECK 4Y",
         "MHA-SH-VN-52 SWING STOP TURNS, FIRST BITE TO SEATED",
         f"{STOP_SCREW_TURNS} MIN",
-        f"COUNTED AT {_step_ref('other-base-mounting', 'N')}",
+        f"COUNTED AT {_step_ref('other-base-mounting', 'P')}",
     ),
     # #3292 (owner ruling 2026-11-21, options 2 + 4): T024 is centred to this
     # row while its bond is wet (1S); after cure it is recorded (1W: owner

@@ -1,0 +1,11 @@
+# The rocker bank's end-arm allowance (tolerance-policy.md, "Checks in spec
+# modules and tests"; cad/scripts/check_register.py). Cited by
+# necessity/dt-drive-train-assembly.yaml N-01 (MHA-DT-00 8Q/8R, D3). Fit
+# batch DT, 2026-11-24.
+checks:
+  - id: C-01
+    check: "END_ARM_FOLLOW_MAX"
+    kind: gap
+    reason: "an end rocker arm's hub reaches its ear"
+    source: "rocker_bank_layout (the allowance this layout declares; test_channel_axial_budget holds both end stations' stacks inside it); kept tight at MHA-DT-00 8Q/8R by D3, delegated ruling 2026-11-24 (Main), no precedent; owner review #2144"
+    basis: worst_case
