@@ -17,7 +17,6 @@ ZZ_TOL_MM = 0.0002 * 25.4
 
 # (plan stem, the bore's feature key, the plan's gauge record)
 BORES = [
-
     ("sm_knife_mount", "knife_bore", "zz-pins-4985-5000"),
 ]
 
@@ -48,6 +47,9 @@ def test_the_knife_mount_datum_b_takes_no_zz_pins() -> None:
     plan = tomllib.loads(
         _process_plans.plan_path("sm_knife_mount").read_text(encoding="utf-8")
     )
-    assert not any(key.startswith("dowel_go") or key.startswith("dowel_nogo") for key in plan["parameters"])
+    assert not any(
+        key.startswith("dowel_go") or key.startswith("dowel_nogo")
+        for key in plan["parameters"]
+    )
     assert "zz-pins-1273-1287" not in _process_plans.load_shop()["gauges"]
     assert not any(tool.get("ref") == "zz-pins-1273-1287" for tool in plan["tools"])
