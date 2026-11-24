@@ -9,15 +9,13 @@ pd-transgear-knob-bush:
   drawing_unit: in
   process: >-
     Turned from the bought 5/8 in 1018 CF round bar, in one chucking with the
-    .238 (letter B) drill through: face the bar's end, read the measured
-    MHA-PD-19 hole by the pilot method (a short pilot on the bar's end
-    turned until the plate's reamed hole just slides on, and miked), face
-    the pilot off to make the rear face, turn the hub diameter, then the
-    press diameter to that reading plus the interference, the
+    .238 (letter B) drill through: face the bar's end (the rear face), turn
+    the hub diameter, then the stub diameter to its .4360-.4380, the
     shoulder with its R.005 MAX root, and finish the hub face at the cut-off.
-    Press into MHA-PD-19 from face A until the shoulder seats (a .002 feeler
-    does not enter under the shoulder), then ream the bore .249 through
-    before the plate is clamped to MHA-PD-18.
+    Bond into MHA-PD-19's reamed hole from face A with LOCTITE 638 (clearance
+    .0005-.0030), the shoulder clamped on face A (a .002 feeler does not
+    enter under it), cure 24 h, then ream the bore .249 through before the
+    plate is clamped to MHA-PD-18.
   machinist_exceptions:
     - id: "RV-02"
       kind: "accept"
@@ -26,11 +24,6 @@ pd-transgear-knob-bush:
       reason: "owner ruling 2026-11-08 (Pedro), #2144 item 4.1: K stays a plain ⊥ Ø.002 A, no projected zone (rule 26). Knob axis K carried from the bore to the chain plane must stay inside the reducer's axis zone the air stacks and meshes charge, and this frame is what bounds it: Ø.002 over the shortest bore (28.47 mm) projects to 0.0748 mm at K_PROJECTED_HEIGHT_MM (41.94 mm, the 3/8 arm, #2019) against the 0.0832 mm zone (paper_drive_arm_registration.AXIS_PROJECTED_ZONE_DIAMETER_MM). The frame moved with the bore from MHA-PD-19 RV-02 to this bush under owner ruling 2026-11-20 (Pedro), #2425: \"Variant of C ; I noticed there was a missing screw and an extra pin in current design; updated: C:\\Users\\pedro\\Downloads\\TransgearArmPlate.png\""
     - id: "RV-03"
       kind: "minor"
-      where: "the bore callout's WALL .068 MIN (press section)"
-      finding: "press-section wall below the .080 in target (rules 17, 20)"
-      reason: "Owner ruling 2026-11-01: thin walls above the .060 floor but under the .080 target, with no geometry escape, are accepted as package-specific minor exceptions. .068 MIN at the worst modelled limits (the press section at its thinnest, .4390, the least interference over the smallest hole the .4385 reamer is modelled to cut; the reamed bore at its .2495 upper limit, the title block's .010 edge break on both rims, and 0.3° drill run-off over the bore's longest 1.145) stays above the .060 floor (pd_transgear_knob_bush_geometry.WALLS); a wall between the floor and the target is advisory (rule 20). No geometry escape: the press in the plate and the Ø.249 journal bore are the owner's #2425 choices (there the press was Ø.4375 FN2; Ø.4385 REF is the size of the over/under set's reamer that cuts the plate's hole, which prints no band under rule 4, form 2, and it thickens this wall by .0005), and the stub must pass the press hole, since the bush is pressed stub-first from face A"
-    - id: "RV-04"
-      kind: "accept"
-      where: "the stub's (Ø.4385) PRESS FIT IN MHA-PD-19 with its printed INTERFERENCE .0005-.0016, and the bore's REAM THRU AFTER PRESSING"
-      finding: "press with a printed interference where a bonded slip fit would hold (rules 4, 23)"
-      reason: "Owner ruling 2026-11-20 (Pedro), #2425, recorded there as: \"Flat .197 plate with the pressed flanged bush; hub-as-shoulder, Ø.4375 FN2 press with the bore reamed after pressing, and the .008 ±.002 end float set at fit-up are accepted.\" The interference printed is that FN2 fit's (.0005-.0016, ANSI B4.1 for 0.40-0.56 in), made to the measured hole (pd_transgear_knob_bush_geometry.PRESS_INTERFERENCE). The one difference from that ruling is the reference size, Ø.4385 for Ø.4375: the 7/16 over reamer of the over/under set that cuts MHA-PD-19's hole (owner 2026-11-24 on the Shars set: \"Yes, order Shars on or after 26 November.\"), a standard size under rule 4; the hole prints no band and this step is turned to it (rule 4, form 2). A LOCTITE-bonded slip fit in its place would reverse #2425 and is put to the owner as an open question, not decided here."
+      where: "the bore callout's WALL .067 MIN (stub section)"
+      finding: "stub-section wall below the .080 in target (rules 17, 20)"
+      reason: "Owner ruling 2026-11-01: thin walls above the .060 floor but under the .080 target, with no geometry escape, are accepted as package-specific minor exceptions. .067 MIN (.0673) at the worst modelled limits (the stub at its thinnest, .4360, the low limit of its .4370 ±.0010; the reamed bore at its .2495 upper limit, the title block's .010 edge break on both rims, and 0.3° drill run-off over the bore's longest 1.145) stays above the .060 floor (pd_transgear_knob_bush_geometry.WALLS); a wall between the floor and the target is advisory (rule 20). No geometry escape: the stub must pass MHA-PD-19's .4385 reamed hole with the bond's clearance (owner question Q8b, option B, held for the owner: the bonded stub; it was .068 under the press turned to the measured hole), and the Ø.249 journal bore is the owner's #2425 choice"

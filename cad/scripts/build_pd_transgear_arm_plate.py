@@ -1,7 +1,7 @@
 r"""Reproduction script: transgear arm plate (MHA-PD-19; ch. 23; 1 used).
 
 The flat steel plate screwed across the MHA-PD-18 arm by two MHA-PD-VN-56
-oval-head screws: it holds the MHA-PD-28 knob bush, pressed into its hole on
+oval-head screws: it holds the MHA-PD-28 knob bush, bonded into its hole on
 axis K, which carries the knob shaft's running bore and both thrust faces
 (``pd_transgear_arm_plate_geometry``; the sheet's contract is
 ``pd_transgear_arm_plate_spec``).

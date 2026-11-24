@@ -2,7 +2,7 @@ r"""MHA-PD-15 transgear-knob-thrust-ring: the loose brass ring in front of the b
 
 PURE DATA, no SolidWorks/COM calls and no ``build_*`` module in its import
 closure.  The ring rides the knob shaft's (MHA-PD-08) Ø.249 journal between the
-pinion's rear face and the hub face of the MHA-PD-28 bush pressed in the arm
+pinion's rear face and the hub face of the MHA-PD-28 bush bonded in the arm
 plate.  It is loose: located by the journal, it rotates with the shaft or not.
 Its length is the FORWARD stop of the knob's end-float pair (the cup behind
 the bush's rear face is the other), so it carries an explicit band; it is not

@@ -7,8 +7,8 @@ widened to 1-1/2 in so the outline can stand symmetric about K (the 1-1/4 in
 bar centred on K leaves the -X countersink under the wall target).  Since
 #2425 (owner ruling 2026-11-20 (Pedro)) it is a flat .197 plate: the knob
 shaft's running bore, the thrust ring's hub face and the cup's thrust face
-are the MHA-PD-28 bush's (``pd_transgear_knob_bush_geometry``), pressed
-into the plate's Ø.4385 reamed hole on axis K from face A, its shoulder seated
+are the MHA-PD-28 bush's (``pd_transgear_knob_bush_geometry``), bonded
+in the plate's Ø.4385 reamed hole on axis K from face A, its shoulder seated
 on face A.  Two matched stock dowels locate; screws clamp.
 
 Local frame (same axes as the arm, so the assembly places both with one
@@ -95,19 +95,19 @@ _TANGENT_ANGLE = math.atan2(KINK[1], KINK[0]) + math.acos(END_R / _KINK_DIST)
 KINK_TANGENT = (END_R * math.cos(_TANGENT_ANGLE), END_R * math.sin(_TANGENT_ANGLE))
 KINK_TANGENT_RIGHT = (-KINK_TANGENT[0], KINK_TANGENT[1])
 
-# --- Press hole for the MHA-PD-28 knob bush on K ----------------------------
+# --- Hole K for the MHA-PD-28 knob bush ---------------------------------------
 # The bush carries the knob shaft's running bore, the thrust ring's hub face
-# and the cup's thrust face; the plate only grips it.  The hole is cut by
-# the .4385 set reamer and prints that size with no band; the bush's press
-# step is turned to it as measured (pd_transgear_knob_bush_geometry), both
-# modelled line to line as the repo's other presses are.  ANALYSIS limits
+# and the cup's thrust face; the plate only holds it.  The hole is cut by
+# the .4385 set reamer and prints that size with no band; the bush's stub
+# is a slip fit bonded in it (pd_transgear_knob_bush_geometry; owner
+# question Q8b, held for the owner).  The hole keeps its PRESS_HOLE_* names.  ANALYSIS limits
 # (lower, upper) deviations, what the reamer is modelled to cut:
 # +.0000/+.0005.
-PRESS_HOLE_DIA = BUSH.PRESS_DIA
+PRESS_HOLE_DIA = BUSH.PRESS_HOLE_DIA
 PRESS_HOLE_LIMITS = (min(BUSH.PRESS_HOLE_BAND), max(BUSH.PRESS_HOLE_BAND))
 PRESS_HOLE_PLACES = 4
-# Face A's mouth is chamfered .015 X 45° (#2425): the lead-in for pressing
-# MHA-PD-28 from face A, and room for the bush's shoulder-root radius so the
+# Face A's mouth is chamfered .015 X 45° (#2425): the lead-in for the
+# MHA-PD-28 stub from face A, and room for the bush's shoulder-root radius so the
 # shoulder seats flat on face A.  The bush geometry owns its size and limits
 # (it asserts the root clearance); the rear mouth keeps the title block's
 # break.

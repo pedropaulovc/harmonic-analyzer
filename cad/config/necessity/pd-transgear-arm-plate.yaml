@@ -1,9 +1,9 @@
 necessity:
   - id: N-01
-    feature: "sheet 1, rear view, Ø.4385 REAM THRU press hole for MHA-PD-28 (datum B)"
+    feature: "sheet 1, rear view, Ø.4385 REAM THRU, BONDED FIT hole for MHA-PD-28 (datum B)"
     kind: joint
-    reason: "press, alone holds knob axis K; no bond, pin, screw"
-    source: "pd_transgear_knob_bush_geometry.PRESS_INTERFERENCE; owner ruling 2026-11-20, #2425 (registry RV-02)"
+    reason: "the bond gap: a drilled hole jams the stub"
+    source: "pd_transgear_knob_bush_geometry.BOND_CLEARANCE: the stub's .4370 ±.0010 in this reamed hole gives .0005-.0030; a 7/16 drilled hole (.4375 +.004/0) gives -.0005 to .0055. Owner question Q8b, option B, held for the owner (registry RV-02)"
   - id: N-02
     feature: "sheet 1, rear view, 2X Ø.1260 REAM THRU locating holes for the MHA-PD-VN-64 dowels"
     kind: mesh

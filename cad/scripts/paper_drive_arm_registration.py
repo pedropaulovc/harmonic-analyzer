@@ -106,9 +106,10 @@ def gear_plane_k_loaded_normal_change_bound_mm() -> float:
 ARM_FRONT_MACHINE_Z_MM = ARM.FRONT_FACE_MACHINE_Z
 ARM_REAR_MACHINE_Z_MM = ARM_FRONT_MACHINE_Z_MM + ARM.THICKNESS
 PLATE_MOUNT_MACHINE_Z_MM = ARM_REAR_MACHINE_Z_MM
-# K's journal is the MHA-PD-28 bush pressed into the flat plate from face A
-# (#2425): its hub face stands HUB_LENGTH forward of the shoulder, which a
-# full press seats on face A to within SHOULDER_SEAT_GAP_MAX.
+# K's journal is the MHA-PD-28 bush bonded in the flat plate from face A
+# (#2425; owner question Q8b, held for the owner): its hub face stands HUB_LENGTH forward of
+# the shoulder, which, clamped while the bond cures, seats on face A to
+# within SHOULDER_SEAT_GAP_MAX.
 KNOB_F_MACHINE_Z_MM = ARM_REAR_MACHINE_Z_MM - (
     BUSH.HUB_LENGTH + RING.LENGTH + SHAFT.FACE_WIDTH
 )

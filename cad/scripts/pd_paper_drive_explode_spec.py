@@ -161,7 +161,7 @@ TRANSGEAR_STEPS: tuple[ExplodeStep, ...] = (
     # r1/r3: the pinion was drawn partly inside ring 38).  The ring stops
     # well short of the bush's hub, thrown 58 mm rearward with the plate below.
     ExplodeStep("thrust ring rearward", ("pd-transgear-knob-thrust-ring",), "z", 12.0),
-    # The plate off the arm's rear face with its pressed MHA-PD-28 bush (pressed
+    # The plate off the arm's rear face with its bonded MHA-PD-28 bush (bonded
     # and reamed before the plate goes on the arm), its screws behind it and
     # the two locating dowels drawn out of the arm between them.  At 16 mm the
     # isometric drew the plate on the arm's top edge with the dowels hidden

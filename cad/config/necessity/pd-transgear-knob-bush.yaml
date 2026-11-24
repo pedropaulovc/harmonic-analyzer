@@ -1,6 +1,6 @@
 necessity:
   - id: N-01
-    feature: "sheet 1, end view, Ø.2490 REAM THRU AFTER PRESSING IN MHA-PD-19, the knob shaft's running bore"
+    feature: "sheet 1, end view, Ø.2490 REAM THRU AFTER BONDING IN MHA-PD-19, the knob shaft's running bore"
     kind: mesh
     reason: "play here shifts MHA-PD-08's pinion in the reducer mesh"
     source: "pd_transgear_knob_shaft_spec (MHA-PD-08 has an integral 48DP pinion on this journal); pd_transgear_knob_bush_geometry.BORE_DIA_LIMITS; paper_drive_arm_registration.AXIS_PROJECTED_ZONE_DIAMETER_MM"
@@ -15,7 +15,7 @@ necessity:
     reason: "stack term of the knob shaft's end float at MHA-PD-16"
     source: "pd_transgear_knob_cup_spec.FACING_REMOVAL: .001 spare at ±.002, none at ±.003, negative at ±.005"
   - id: N-04
-    feature: "sheet 1, section A-A, (Ø.4385) press step, INTERFERENCE .0005-.0016"
+    feature: "sheet 1, section A-A, Ø.4370 ±.0010 stub, BONDED FIT IN MHA-PD-19 (CLEARANCE .0005-.0030)"
     kind: joint
-    reason: "press, alone holds knob axis K; no bond, pin, screw"
-    source: "pd_transgear_knob_bush_geometry.PRESS_INTERFERENCE; owner ruling 2026-11-20, #2425 (registry RV-04)"
+    reason: "only the bond holds the bush on knob axis K"
+    source: "pd_transgear_knob_bush_geometry.BOND_CLEARANCE over the .4385 reamed hole (PRESS_HOLE_BAND): at the title block's three places (.437 ±.005) the largest stub (.442) does not enter the hole and the smallest leaves .0065; ±.001 is the shop's turned row. Owner question Q8b, option B, held for the owner"

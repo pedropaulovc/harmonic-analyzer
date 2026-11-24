@@ -1,16 +1,16 @@
 r"""Reproduction script: transgear knob bush (MHA-PD-28; ch. 23; 1 used).
 
-The turned steel bush pressed into the MHA-PD-19 arm plate (owner ruling
-2026-11-20 (Pedro), #2425): its hub stands in front of face A as the
-shoulder, the MHA-PD-15 thrust ring's seat; its press, turned to the
-plate's measured hole, runs through the
-plate and on to the rear face, the MHA-PD-16 cup's thrust face; its bore is
-reamed through after pressing for the MHA-PD-08 knob shaft's journal
-(``pd_transgear_knob_bush_geometry``).
+The turned steel bush bonded in the MHA-PD-19 arm plate (owner ruling
+2026-11-20 (Pedro), #2425; bonded, not pressed: owner question Q8b, held
+for the owner): its hub stands in front
+of face A as the shoulder, the MHA-PD-15 thrust ring's seat; its stub runs
+through the plate's reamed hole and on to the rear face, the MHA-PD-16
+cup's thrust face; its bore is reamed through after bonding for the
+MHA-PD-08 knob shaft's journal (``pd_transgear_knob_bush_geometry``).
 
 Layout: one turned half-section on the Front plane, revolved about local +Y:
 rear face, the axis, hub face, hub Ø, shoulder, the shoulder root's
-tangent arc and the press Ø, so both diameters, both lengths and the root's
+tangent arc and the stub Ø, so both diameters, both lengths and the root's
 radius are its driving dimensions and all print on the drawing's axial
 section (a fillet feature's radius does not import there: farm r3).  The
 reamed bore is a Top-plane circle cut through, so its Ø prints on the face
@@ -68,8 +68,9 @@ from pd_transgear_knob_bush_geometry import (
     HUB_LENGTH_BAND,
     LENGTH,
     LENGTH_BAND,
-    PRESS_DIA,
     SHOULDER_ROOT_R_MAX_MM,
+    STUB_DIA,
+    STUB_DIA_TOLERANCE,
 )
 from pd_transgear_knob_bush_spec import (
     DIMENSION_CALLOUTS,
@@ -77,8 +78,6 @@ from pd_transgear_knob_bush_spec import (
     DRAWING_PRECISION,
     GEOMETRIC_CONTROLS,
     PART_DATUMS,
-    PRESS_DIA_TEXT_PREFIX,
-    PRESS_DIA_TEXT_SUFFIX,
     SHOULDER_ROOT_SUFFIX,
     SHOULDER_ROOT_TOL_TYPE,
     SURFACE_FINISHES,
@@ -89,21 +88,21 @@ PART_NAME = "pd-transgear-knob-bush"
 MATERIAL = "Plain Carbon Steel"  # AISI 1018; see _appearance.apply_material
 
 HUB_R = HUB_DIA / 2.0
-PRESS_R = PRESS_DIA / 2.0
+STUB_R = STUB_DIA / 2.0
 BORE_R = BORE_DIA / 2.0
-V_TURNED = math.pi * (HUB_R**2 * HUB_LENGTH + PRESS_R**2 * (LENGTH - HUB_LENGTH))
+V_TURNED = math.pi * (HUB_R**2 * HUB_LENGTH + STUB_R**2 * (LENGTH - HUB_LENGTH))
 V_BUSH = V_TURNED - math.pi * BORE_R**2 * LENGTH
 # The bore's mid-plane cut from the hub face (the Top plane): half of it
 # reaches past the rear face, the other half cuts air.
 BORE_CUT_DEPTH = 2.0 * (LENGTH + 1.0)
-# The root arc fills the square outside a quarter disk beside the press:
-# section r^2(1 - pi/4), its first moment about the press line r^3(5/6 - pi/4)
+# The root arc fills the square outside a quarter disk beside the stub:
+# section r^2(1 - pi/4), its first moment about the stub line r^3(5/6 - pi/4)
 # (Pappus, as build_dt_crank_handle_butt_cup's pocket corner).
 V_ROOT = (
     2.0
     * math.pi
     * (
-        PRESS_R * SHOULDER_ROOT_R_MAX_MM**2 * (1.0 - math.pi / 4.0)
+        STUB_R * SHOULDER_ROOT_R_MAX_MM**2 * (1.0 - math.pi / 4.0)
         + SHOULDER_ROOT_R_MAX_MM**3 * (5.0 / 6.0 - math.pi / 4.0)
     )
 )
@@ -142,25 +141,6 @@ def _shoulder_root_max_limit(adapter) -> None:
         raise RuntimeError("ShoulderR: the MAX single limit did not persist")
 
 
-@_telemetry.traced("part.knob_bush.press_dia_reference")
-def _press_dia_reference(adapter) -> None:
-    """PressDia as the reference "(Ø.4385)": the step is turned to the
-    plate's measured hole, so it carries no native tolerance and prints in
-    parentheses (build_pd_transgear_pin's press land)."""
-    display, dimension = _named_dimension(adapter, "BushProfile", "PressDia")
-    tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
-    tolerance.Type = 0  # swTolType_e.swTolNONE
-    display = _early_bound(display, "IDisplayDimension")
-    display.SetText(1, PRESS_DIA_TEXT_PREFIX)  # swDimensionTextPrefix
-    display.SetText(2, PRESS_DIA_TEXT_SUFFIX)  # swDimensionTextSuffix
-    if (
-        int(tolerance.Type) != 0
-        or str(display.GetText(1) or "") != PRESS_DIA_TEXT_PREFIX
-        or str(display.GetText(2) or "") != PRESS_DIA_TEXT_SUFFIX
-    ):
-        raise RuntimeError("PressDia: the reference form did not persist")
-
-
 def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import ExtrusionParameters, RevolveParameters
 
@@ -174,7 +154,7 @@ def build(adapter) -> dict[str, str]:
     for name, value in (
         ("HubDia", HUB_DIA),
         ("HubLength", HUB_LENGTH),
-        ("PressDia", PRESS_DIA),
+        ("StubDia", STUB_DIA),
         ("BushLength", LENGTH),
         ("BoreDia", BORE_DIA),
         ("ShoulderR", SHOULDER_ROOT_R_MAX_MM),
@@ -185,19 +165,19 @@ def build(adapter) -> dict[str, str]:
 
     # Turned half-section about local +Y: rear face, the axis, hub face, hub
     # Ø, shoulder, then the root's tangent arc (concave, centred off the
-    # part, beyond the shoulder and the press) and the press Ø back to the
+    # part, beyond the shoulder and the stub) and the stub Ø back to the
     # rear face, so every outside diameter and the root radius are profile
     # dimensions that print on the axial section (rule 11).
     root_r = SHOULDER_ROOT_R_MAX_MM
-    root_center = (PRESS_R + root_r, HUB_LENGTH + root_r)
-    root_on_press = (PRESS_R, HUB_LENGTH + root_r)
-    root_on_shoulder = (PRESS_R + root_r, HUB_LENGTH)
+    root_center = (STUB_R + root_r, HUB_LENGTH + root_r)
+    root_on_stub = (STUB_R, HUB_LENGTH + root_r)
+    root_on_shoulder = (STUB_R + root_r, HUB_LENGTH)
     profile = SketchDims()
     check("create_sketch bush profile", adapter.create_sketch("Front"))
     set_sketch_direct_db(adapter, True)
     axis = check("bush axis", adapter.add_centerline(0.0, 0.0, 0.0, LENGTH))
     points = [
-        (PRESS_R, LENGTH),
+        (STUB_R, LENGTH),
         (0.0, LENGTH),
         (0.0, 0.0),
         (HUB_R, 0.0),
@@ -205,19 +185,19 @@ def build(adapter) -> dict[str, str]:
         root_on_shoulder,
     ]
     lines = add_line_chain(adapter, points, close=False)
-    # add_arc is CCW: from the press tangent (180 deg about the centre) to
+    # add_arc is CCW: from the stub tangent (180 deg about the centre) to
     # the shoulder tangent (270 deg) is the 90-degree arc, opposite the
     # chain's traversal (build_dt_crank_handle_butt_cup's floor round).
     root_arc = check(
         "shoulder root arc",
-        adapter.add_arc(*root_center, *root_on_press, *root_on_shoulder),
+        adapter.add_arc(*root_center, *root_on_stub, *root_on_shoulder),
     )
-    (press,) = add_line_chain(adapter, [root_on_press, points[0]], close=False)
+    (stub,) = add_line_chain(adapter, [root_on_stub, points[0]], close=False)
     set_sketch_direct_db(adapter, False)
     rear_face, axis_edge, hub_face, hub_od, shoulder = lines
     for line, (u0, v0), (u1, v1) in (
         *zip(lines, points, points[1:], strict=False),
-        (press, root_on_press, points[0]),
+        (stub, root_on_stub, points[0]),
     ):
         relation = "horizontal" if v0 == v1 else "vertical"
         check(
@@ -243,11 +223,11 @@ def build(adapter) -> dict[str, str]:
     add_diametric_linear_dimension(
         adapter,
         axis,
-        press,
-        (PRESS_R + 4.0, (HUB_LENGTH + LENGTH) / 2.0),
-        "PressDia",
+        stub,
+        (STUB_R + 4.0, (HUB_LENGTH + LENGTH) / 2.0),
+        "StubDia",
     )
-    profile.record("PressDia", '"PressDia"')
+    profile.record("StubDia", '"StubDia"')
     # The overall length between the faces' outer corners, so its extension
     # lines rise from the part's outline, not across the cut bore.
     dimension_between(
@@ -270,7 +250,7 @@ def build(adapter) -> dict[str, str]:
     profile.record("ShoulderR", '"ShoulderR"')
     for first, second, label in (
         (shoulder, root_arc, "shoulder"),
-        (root_arc, press, "press"),
+        (root_arc, stub, "stub"),
     ):
         check(
             f"shoulder root tangent to the {label}",
@@ -331,12 +311,14 @@ def build(adapter) -> dict[str, str]:
 
     apply_material(adapter, MATERIAL)
     report_mass_properties(adapter)
-    # The hub station and the overall length carry their stack bands.  The
-    # press Ø is made to the plate's measured hole: a reference, no model
-    # band.  The reamed running bore prints the reamer's size and no band
-    # (rule 4); the hub Ø is governed by its places (the spec's
-    # DRAWING_PRECISION): no model band.
-    _press_dia_reference(adapter)
+    # The hub station, the overall length and the stub Ø (the shop's turned
+    # row, a slip fit bonded in the plate's reamed hole: owner question Q8b,
+    # held for the owner) carry their bands.  The reamed running bore prints the reamer's
+    # size and no band (rule 4); the hub Ø is governed by its places (the
+    # spec's DRAWING_PRECISION): no model band.
+    set_dimension_symmetric_tolerance(
+        adapter, "BushProfile", "StubDia", STUB_DIA_TOLERANCE, display_unit=UNIT
+    )
     set_dimension_symmetric_tolerance(
         adapter, "BushProfile", "HubLength", HUB_LENGTH_BAND, display_unit=UNIT
     )

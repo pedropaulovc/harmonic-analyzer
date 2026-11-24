@@ -307,10 +307,10 @@ def test_pressed_and_slip_joints_without_a_row_do_not_overlap() -> None:
     # The modelled pin stands on the hook hole's axis offset by the bearing lift.
     assert hook.PIN_BEARING_LIFT + latch_pin.DIA / 2.0 <= hook.PIN_HOLE_DIA / 2.0
     assert drive_pin.DIA <= removable.PIN_HOLE_DIA
-    # #2425: the MHA-PD-28 bush's press in the plate is modelled line to
-    # line (the step is turned to the measured hole), and the journal runs
-    # in its reamed bore.
-    assert bush.PRESS_DIA == plate.PRESS_HOLE_DIA
+    # The MHA-PD-28 bush's stub is a slip fit bonded in the plate's reamed
+    # hole (owner question Q8b, held for the owner): modelled clear of it at nominal, and
+    # the journal runs in its reamed bore.
+    assert bush.STUB_DIA < plate.PRESS_HOLE_DIA
     assert shaft.JOURNAL_DIA <= bush.BORE_DIA
     allowed = _allowed()
     for other in ("pd-transgear-arm-plate-1", "pd-transgear-knob-shaft-1"):

@@ -456,11 +456,6 @@ INDEXED_FIT_BANDS: dict[tuple[str, str], str] = {
         "MHA-PD-08 journal at the printed clearance: indexed for the bond "
         "gap and the pilot wall"
     ),
-    ("pd_transgear_knob_bush_geometry", "PRESS_DIA_BAND"): (
-        "analysis band of the press diameter, which prints its interference "
-        "to the measured MHA-PD-19 hole and no band: indexed for the plate "
-        "stub's envelope and the press-to-bore wall"
-    ),
 }
 
 KNOWN_BAD: dict[str, pytest.MarkDecorator] = {}

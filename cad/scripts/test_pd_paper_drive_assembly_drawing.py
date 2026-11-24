@@ -1825,11 +1825,12 @@ def test_one_disc_cycle_reference_travel_is_one_feed_revolution() -> None:
     ) == pytest.approx(math.pi * feed_pinion.PITCH_DIA)
 
 
-def test_the_knob_bush_is_pressed_and_reamed_before_the_plate_is_set() -> None:
-    """#2425 (owner ruling 2026-11-20): the MHA-PD-28 bush is pressed into
+def test_the_knob_bush_is_bonded_and_reamed_before_the_plate_is_set() -> None:
+    """#2425 (owner ruling 2026-11-20): the MHA-PD-28 bush goes into
     MHA-PD-19 from face A to its shoulder, accepted on its own feeler, and
-    reamed through after the press, before the plate goes on the arm; its
-    bore is DETAIL K's knob bore N."""
+    is reamed through once fixed, before the plate goes on the arm; its
+    bore is DETAIL K's knob bore N.  It is bonded with LOCTITE 638 (owner
+    question Q8b, option B, held for the owner)."""
     texts = drawing._step_text(operating_domain=_unit_operating_domain())["pin-pressed"]
     bush = _number("pd-transgear-knob-bush")
     plate = _number("pd-transgear-arm-plate")
@@ -1860,8 +1861,10 @@ def test_the_knob_bush_is_pressed_and_reamed_before_the_plate_is_set() -> None:
         + f"; CURE {drawing.PIN_BOND_CURE_H} H."
     ) in note
     assert (drawing.sub_step("pin-pressed", bond), drawing.sub_step(
+        "pin-pressed", drawing.BUSH_BOND_SUB_STEP
+    ), drawing.sub_step(
         "hanger-pivoted", drawing.PIVOT_SPACER_BOND_SUB_STEP
-    )) == ("11B", "15G")
+    )) == ("11B", "11L", "15G")
     assert (
         drawing.PIN_BOND_CURE_H
         == drawing.PIVOT_SPACER_BOND_CURE_H
@@ -1876,54 +1879,63 @@ def test_the_knob_bush_is_pressed_and_reamed_before_the_plate_is_set() -> None:
         for index, row in enumerate(rows)
         if "LOCTITE" in row or "BOND IT PER THE BOND NOTE" in row
     } == set(re.findall(r"\b\d+[A-Z]\b", note[note.index("LOCTITE") :]))
+    # The bush's bond: the pin's bullets (rule 23), one action a sub-step.
     assert texts[9] == (
-        f"PRESS THE {bush} BUSH, STUB FIRST, INTO THE {plate} PLATE FROM ITS FRONT "
-        f"FACE (FACE A ON {plate}) UNTIL ITS SHOULDER SEATS."
+        f"DEGREASE THE {bush} BUSH'S STUB AND THE {plate} PLATE'S REAMED HOLE."
     )
-    # Turned to the measured hole, a bush that slips is undersize (#2425);
-    # one action per sub-step (machinist review r10).
-    assert texts[10] == (
-        f"IF IT SLIDES IN BY HAND, REPEAT {drawing.sub_step('pin-pressed', 9)} WITH A "
-        f"NEW {bush} BUSH TURNED TO THE PLATE'S MEASURED HOLE."
+    assert texts[drawing.BUSH_BOND_SUB_STEP] == (
+        f"COAT THE STUB, NOT THE HOLE, WITH {drawing.PIN_BOND_COMPOUND}."
     )
+    assert texts[11] == (
+        f"PUSH THE BUSH, STUB FIRST, INTO THE PLATE FROM ITS FRONT FACE (FACE A ON "
+        f"{plate}), TURNING IT, UNTIL ITS SHOULDER SEATS."
+    )
+    assert texts[12] == (
+        "WIPE ALL COMPOUND OFF FACE A AND OFF THE STUB AND THE PLATE BEHIND IT."
+    )
+    assert texts[13] == "CLAMP THE SHOULDER ON FACE A."
     # A leaf of the shop's set at three places, the coarsest that closes the
     # collar-to-disc air (machinist review 20261124T013305458Z, rule 4).
     feeler = disc.inch_text(knob_bush.SHOULDER_SEAT_GAP_MAX, 3)
     assert feeler == ".002"
     # Both acceptances cite their setting-table rows (machinist review r13).
-    assert texts[11] == (
+    assert texts[14] == (
         f"CHECK: A {feeler} FEELER DOES NOT ENTER UNDER THE SHOULDER "
         f"{drawing.row_cite('bush-seated')}."
     )
     # A check and its remedy are separate sub-steps (rule 22).
-    # A first failure is pressed home and checked again; a second renews the
+    # A first failure is clamped home and checked again; a second renews the
     # pair (codjiflo review round 2).
-    assert texts[12] == (
-        f"IF IT ENTERS, PRESS AGAIN TO THE SHOULDER AND REPEAT "
-        f"{drawing.sub_step('pin-pressed', 11)}."
+    assert texts[15] == (
+        f"IF IT ENTERS, CLAMP THE SHOULDER AGAIN AND REPEAT "
+        f"{drawing.sub_step('pin-pressed', 14)}."
     )
-    assert texts[13] == (
+    assert texts[16] == (
         f"IF IT STILL ENTERS, REPEAT FROM {drawing.sub_step('pin-pressed', 9)} WITH A "
         f"NEW {plate} PLATE AND {bush} BUSH."
     )
+    assert texts[17] == (
+        f"LET THE BOND CURE {drawing.PIN_BOND_CURE_H} H BEFORE THE BORE IS REAMED."
+    )
+    assert not any("PRESS" in text for text in texts[9:])
     # The in-place ream names its mate and fit; it prints the reamer's size
     # and no band, and the journal is turned to the bore (rule 4, fit audit
     # 2026-11-23).
-    assert texts[14].endswith(
+    assert texts[18].endswith(
         f"THRU, A RUNNING FIT ON THE {_number('pd-transgear-knob-shaft')} JOURNAL, "
         f"WHICH IS TURNED TO IT {drawing.row_cite('bush-reamed')}."
     )
     ream = steps.inch_text(knob_bush.BORE_DIA, 4)
     assert ream == ".2490"
-    assert texts[14].startswith(f"REAM THE BUSH'S BORE \u00d8{ream} THRU, ")
-    assert len(texts) == 15
+    assert texts[18].startswith(f"REAM THE BUSH'S BORE \u00d8{ream} THRU, ")
+    assert len(texts) == 19
     assert steps.step_number("pin-pressed") < steps.step_number("arm-plate-located")
     located = _step_body("arm-plate-located")
     assert f"{bush} KNOB BORE {drawing.KNOB_BORE_LETTER} IS STILL TRUE" in located
     assert f"INTO THE {bush} BUSH FROM THE FRONT" in located
     assert drawing.KNOB_SETTING_LEGEND[drawing.KNOB_BORE_LETTER] == f"{bush} KNOB BORE"
     assert "pd-transgear-knob-bush-1" in drawing.KNOB_SETTING_INSTANCES
-    # Every later renewal of the plate renews its pressed bush.
+    # Every later renewal of the plate renews its bonded bush.
     for key in ("arm-plate-fitted", "hanger-pivoted", "fitup-mesh-remedied"):
         body = _step_body(key)
         assert body.count(f"{plate} PLATE,") == body.count(f"{plate} PLATE, {bush} BUSH,"), key
@@ -3468,7 +3480,7 @@ def test_the_reducer_mesh_is_tried_before_the_plate_is_doweled() -> None:
     for remedy in (
         f"REPLACE A {_number('pd-transgear-knob-bush')} BUSH FOUND OUTSIDE WITH A NEW BUSH AND "
         f"{_number('pd-transgear-arm-plate')} PLATE PER {drawing.sub_step('pin-pressed', 9)}-"
-        f"{drawing.sub_step('pin-pressed', 14)} AND REPEAT FROM "
+        f"{drawing.sub_step('pin-pressed', 18)} AND REPEAT FROM "
         f"{drawing.sub_step('arm-plate-located', 0)}.",
         "REPLACE A DISC FOUND OUTSIDE THROUGH "
         f"{drawing.sub_step('disc-cluster-assembled', 2)}-"

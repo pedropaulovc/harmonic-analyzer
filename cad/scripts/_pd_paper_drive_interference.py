@@ -43,9 +43,9 @@ _RING_PRONG_SHARE = 3.0 * math.atan(0.75) / (2.0 * math.pi)
 # pin bonded in the arm's Ø3.2004 ream (a slip fit, fit audit 2026-11-23:
 # nothing presses), the sleeve and both
 # bushings on the MHA-PD-23 pin (Ø3.175 in Ø3.2004), the disc bore on the boss (Ø9), the
-# knob journal in the MHA-PD-28 bush's bore (Ø6.3246), the bush pressed in
-# the plate's ream (both modelled line to line at Ø11.1379; owner ruling
-# 2026-11-20, #2425), the drive collar's drilled round bore on the core made
+# knob journal in the MHA-PD-28 bush's bore (Ø6.3246), the bush's stub
+# (Ø11.0998) bonded in the plate's ream (Ø11.1379; owner ruling 2026-11-20,
+# #2425; owner question Q8b, held for the owner), the drive collar's drilled round bore on the core made
 # to fit it (both modelled line to line at Ø4.8514, the #11 drill; fit audit
 # 2026-11-23), the MHA-PD-VN-70 pin's crest clear of the core's flat
 # and its faced rear end flush on F, the MHA-PD-VN-54 dowels in the T24's Ø2.5

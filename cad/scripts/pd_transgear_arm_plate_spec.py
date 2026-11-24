@@ -11,7 +11,7 @@ Part frame (``pd_transgear_arm_plate_geometry``): origin on the press-hole
 axis K on face A (the Front Plane, which seats on the MHA-PD-18 arm's rear
 face); +X and +Y are the arm's axes, the long axis runs along -Y from the
 screws to the end round about K; +Z to the rear.  The flat plate spans
-z 0..THICKNESS_OVER_ARM; the MHA-PD-28 bush pressed into the hole on K
+z 0..THICKNESS_OVER_ARM; the MHA-PD-28 bush bonded in the hole on K
 carries the knob bearing (#2425).
 
 [INFERENCE] the -X edge's kink station (``KINK``, read off the book's
@@ -71,7 +71,7 @@ for _label, _places, _band in (
         )
 
 # ANALYSIS band, (upper, lower) deviations, not a printed limit: what the
-# .4385 set reamer is modelled to cut for the MHA-PD-28 bush's press
+# .4385 set reamer is modelled to cut for the MHA-PD-28 bush's bonded stub
 # (pd_transgear_knob_bush_geometry); the sheet prints the size and no band.
 PRESS_HOLE_BAND = PLATE.BUSH.PRESS_HOLE_BAND
 BASIC_REDUCER_DIMENSIONS = (
@@ -82,7 +82,7 @@ BASIC_REDUCER_DIMENSIONS = (
 BASIC_REDUCER_DIMENSIONS += tuple(
     ("LocatorProfile", name) for name in ("LocatorX1", "LocatorY1", "LocatorX2", "LocatorY2")
 )
-# B is the press hole: the bush pressed in it carries K, and every pattern
+# B is the press hole: the bush bonded in it carries K, and every pattern
 # frame is measured from it.
 PART_DATUMS = (
     PartDatum("A", PlanarFace((0.0, 0.0, -1.0), 0.0)),
@@ -103,7 +103,7 @@ PART_DATUMS = (
 # assembly, so they are the joint's master
 # (pd_transgear_arm_plate_geometry.SCREW_HOLE_POSITION_DIAMETER_MM).  K's
 # tilt is the bush bore's own frame (pd_transgear_knob_bush_spec): the bore
-# is reamed after pressing, so the press hole carries none.
+# is reamed after bonding, so the press hole carries none.
 GEOMETRIC_TOLERANCES_IN = {"locator_position": ".004", "screw_position": ".014"}
 GEOMETRIC_TOLERANCES_MM = {key: float(value) * 25.4 for key, value in GEOMETRIC_TOLERANCES_IN.items()}
 if (
@@ -145,11 +145,11 @@ ARM_NUMBER = "MHA-PD-18"
 DOWEL_NUMBER = "MHA-PD-VN-64"
 
 # No face carries a roughness symbol (drawing-guidelines.md rule 6): the
-# press hole is a pressed bore, face A a clamp face, and the knob's running
+# press hole holds a bonded stub, face A a clamp face, and the knob's running
 # bore and thrust faces are the MHA-PD-28 bush's.
 # The press hole is a fit: REAM is the requirement (drawing-guidelines.md
 # rule 12 (hole and slot callouts say what to do)), and its callout names
-# the bush and what the press protects (rule 4).  The screw holes are clearance, drilled; both
+# the bush and what the bond protects (rule 4).  The screw holes are clearance, drilled; both
 # countersinks take the oval heads, each coaxial with its drilled hole: the
 # seat and wall budgets bound both axes inside the plate by the hole's zone
 # and the drill's run-off

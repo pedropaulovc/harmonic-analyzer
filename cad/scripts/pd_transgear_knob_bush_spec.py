@@ -2,7 +2,7 @@ r"""MHA-PD-28 transgear-knob-bush: the drawing contract of the turned steel bush
 
 PURE DATA, no SolidWorks/COM calls and no ``build_*`` module in its import
 closure.  Every number is ``pd_transgear_knob_bush_geometry``'s (the numbers
-authority the bush, the plate it is pressed in, the knob-shaft stack and the
+authority the bush, the plate it is bonded in, the knob-shaft stack and the
 paper-drive assembly share); this module adds only what the sheet needs: the
 printed places, the datum and the bore's frame, the finishes and the
 printed callout text.
@@ -123,8 +123,8 @@ FINISH_CAPTIONS = {
 
 # --- Callouts -----------------------------------------------------------------
 # The bore is a fit reamed in place (rule 12 process, rule 4 route): REAM
-# after pressing, at the reamer's size with no band, then the pointer to the
-# sheet's one numbered note and the press section's wall, under the .080
+# after bonding, at the reamer's size with no band, then the pointer to the
+# sheet's one numbered note and the stub section's wall, under the .080
 # target, stated as a plain fact (rule 20).  Under the size and process a
 # callout carries at most two lines of words (rule 7), so the fit statement
 # stands in the note: the knob shaft is turned to this bore (guidelines v2:
@@ -148,27 +148,23 @@ BORE_NOTE = "\n".join(
     )
 )
 BORE_CALLOUT = (
-    f"REAM THRU AFTER PRESSING IN {PLATE_NUMBER}\n"
+    f"REAM THRU AFTER BONDING IN {PLATE_NUMBER}\n"
     f"SEE NOTE {BORE_NOTE_NUMBER}\n"
     f"{WALL_TEXT}"
 )
-# Made to fit (rule 4, form 2): the press step is turned last to MHA-PD-19's
-# hole as measured, so its size prints REF and the interference range
-# (.0011 wide) is the requirement (the MHA-CH-12 press land's form,
-# ch_rocker_hub_notes.LAND_CALLOUT).  What the press protects is in the
-# necessity register (N-04).  The press itself, where rule 4 would take a
-# bonded slip fit, is the registry row's RV-04.  Neither line is longer than
-# the 48 characters the block's place was set for.
-PRESS_CALLOUT = (
-    f"PRESS FIT IN {PLATE_NUMBER}\n"
-    "TURN TO MEASURED HOLE (INTERFERENCE "
-    f"{_inch(BUSH.PRESS_INTERFERENCE[0], 4, math.floor)}-"
-    f"{_inch(BUSH.PRESS_INTERFERENCE[1], 4, math.ceil)})"
+# The stub is a slip fit bonded in MHA-PD-19's reamed hole (owner question
+# Q8b, option B, held for the owner): its
+# Ø prints the shop's turned row, ±.001, as a native model tolerance, and
+# the callout names the bonded seat and gives the clearance both limits
+# produce (rule 23; the MHA-PD-20 spacer's form,
+# pd_transgear_pivot_spacer_callouts.BOND_CALLOUT).  What the bond protects
+# is in the necessity register (N-04).
+STUB_CALLOUT = (
+    f"BONDED FIT IN {PLATE_NUMBER}\n"
+    "(CLEARANCE "
+    f"{_inch(BUSH.BOND_CLEARANCE[0], 4, math.floor)}-"
+    f"{_inch(BUSH.BOND_CLEARANCE[1], 4, math.ceil)})"
 )
-# The press Ø prints as a reference, in parentheses (the MHA-PD-23 press
-# land's form, pd_transgear_pin_callouts.DIMENSION_TEXT).
-PRESS_DIA_TEXT_PREFIX = "(<MOD-DIAM>"
-PRESS_DIA_TEXT_SUFFIX = ")"
 # The hub face's station from the shoulder (face A) is the first term of
 # the disc cluster's stack (F, transgear_cluster_fit), and the stack's air
 # between the MHA-PD-22 drive collar and the MHA-PD-06 disc is what closes
@@ -189,7 +185,7 @@ PRESS_DIA_TEXT_SUFFIX = ")"
 DIMENSION_CALLOUTS: dict[str, dict[str, str]] = {
     "BoreSketch": {"BoreDia": BORE_CALLOUT},
     "BushProfile": {
-        "PressDia": PRESS_CALLOUT,
+        "StubDia": STUB_CALLOUT,
     },
 }
 # The shoulder root, a sketch arc in the turned profile so its radius imports
@@ -211,7 +207,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "BoreSketch": {"BoreDia"},
     "BushProfile": {
         "HubDia",
-        "PressDia",
+        "StubDia",
         "HubLength",
         "BushLength",
         "ShoulderR",
@@ -221,7 +217,7 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "BoreSketch": {"BoreDia": BUSH.BORE_PLACES},
     "BushProfile": {
         "HubDia": BUSH.HUB_DIA_PLACES,
-        "PressDia": BUSH.PRESS_DIA_PLACES,
+        "StubDia": BUSH.STUB_DIA_PLACES,
         "HubLength": BUSH.HUB_LENGTH_PLACES,
         "BushLength": BUSH.LENGTH_PLACES,
         "ShoulderR": BUSH.SHOULDER_ROOT_R_PLACES,

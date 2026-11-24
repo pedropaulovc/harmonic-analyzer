@@ -121,7 +121,7 @@ def test_the_explicit_bands_are_the_press_hole_and_the_hole_positions() -> None:
     assert (lower, upper) == geometry.PRESS_HOLE_LIMITS
     assert (upper, lower) == bush.PRESS_HOLE_BAND
     assert (lower, upper) == pytest.approx((0.0, 0.0005 * 25.4))
-    assert geometry.PRESS_HOLE_DIA == bush.PRESS_DIA == pytest.approx(0.4385 * 25.4)
+    assert geometry.PRESS_HOLE_DIA == bush.PRESS_HOLE_DIA == pytest.approx(0.4385 * 25.4)
     assert geometry.LOCATOR_HOLE_DIA_MM == pytest.approx(0.1260 * 25.4)
 
 
@@ -732,7 +732,7 @@ def test_the_callouts_name_each_fit_and_the_matched_pair() -> None:
 
     press = drawing.PLAN_CALLOUTS["PressHoleDia"]
     assert press is notes.PRESS_HOLE_CALLOUT
-    assert press.splitlines()[0] == "REAM THRU, PRESS FIT"
+    assert press.splitlines()[0] == "REAM THRU, BONDED FIT"
     # Reamed with the set reamer: no band, no interference range; the fit
     # rides on the process line and the two lines of words give the
     # three-place chamfer its function (rule 3) and say the mate is turned
@@ -740,7 +740,7 @@ def test_the_callouts_name_each_fit_and_the_matched_pair() -> None:
     # MHA-PD-28).  No necessity reason is printed: it is in the register.
     assert press.splitlines()[2:] == [
         f"CLEARS {numbers['BUSH_NUMBER']} SHOULDER ROOT",
-        f"{numbers['BUSH_NUMBER']} IS TURNED TO THIS BORE",
+        f"{numbers['BUSH_NUMBER']} IS BONDED IN THIS BORE",
     ]
     for word in ("HOLDS", "KEEPS", "SETS", "FASTENER"):
         assert word not in press, word
@@ -748,7 +748,7 @@ def test_the_callouts_name_each_fit_and_the_matched_pair() -> None:
     # still leaves a shoulder land; no two-place value fits inside it.
     low = bush.SHOULDER_ROOT_R_MAX_MM / 25.4
     high = (
-        (bush.HUB_DIA / 25.4 - 0.01) - (bush.PRESS_DIA + max(bush.PRESS_HOLE_BAND)) / 25.4
+        (bush.HUB_DIA / 25.4 - 0.01) - (bush.PRESS_HOLE_DIA + max(bush.PRESS_HOLE_BAND)) / 25.4
     ) / 2.0 - 0.010
     assert low == pytest.approx(0.005) and high == pytest.approx(0.0255, abs=1e-4)
     for nominal in (0.01, 0.02):

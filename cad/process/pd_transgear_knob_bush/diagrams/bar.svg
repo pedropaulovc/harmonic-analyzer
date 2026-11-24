@@ -1,7 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 400" font-family="sans-serif" font-size="13">
-  <!-- Setup 2, drawn by hand: the turned-bush template's label row does not fit across the picture once the press diameter is labelled as a fit to its measured mate, and leaving the hub's label out also left its turned band undrawn (traveler review r3). Bush at about 240 px per inch; the bar's stub in the chuck is shortened. -->
+  <!-- Setup 1, drawn by hand: the turned-bush template's label row does not fit across the picture with both diameters' bands labelled, and leaving the hub's label out also left its turned band undrawn (traveler review r3). Bush at about 240 px per inch; the bar's stub in the chuck is shortened. -->
   <rect class="paper" x="0" y="0" width="760" height="400"/>
-  <text class="title" x="20" y="20">Setup 2: the bar in the 3-jaw, rear end out, seen from the operator's side (not to scale)</text>
+  <text class="title" x="20" y="20">Setup 1: the bar in the 3-jaw, rear end out, seen from the operator's side (not to scale)</text>
   <rect class="fixture-vise" x="30" y="80" width="130" height="240"/>
   <rect class="part-rest" x="160" y="125" width="90" height="150"/>
   <rect class="part-removed" x="250" y="125" width="14" height="150"/>
@@ -23,8 +23,8 @@
   <text class="label" x="168" y="112">Ø{{process.stock_dia_in:.3dot}} bar</text>
   <text class="label" x="232" y="56">turn the hub Ø{{cad.outer_dia_min_in:.3dot}}–{{cad.outer_dia_max_in:.3dot}}</text>
   <line class="leader" x1="330" y1="62" x2="352" y2="135"/>
-  <text class="label" x="430" y="80">turn the press diameter to PILOT</text>
-  <text class="label" x="430" y="96">plus {{process.press_over_pilot_min_in:.4dot}}–{{cad.step_interference_max_in:.4dot}}</text>
+  <text class="label" x="430" y="80">turn the stub</text>
+  <text class="label" x="430" y="96">Ø{{cad.step_dia_min_in:.4dot}}–{{cad.step_dia_max_in:.4dot}}</text>
   <line class="leader" x1="470" y1="102" x2="492" y2="146"/>
   <text class="datum-label" x="548" y="130">Z0, the rear face</text>
   <text class="label" x="574" y="176">tailstock: centre drill,</text>

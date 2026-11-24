@@ -2,7 +2,7 @@ r"""Create the manufacturing drawing for the transgear knob bush (MHA-PD-28).
 
 Section A-A is the lathe view (drawing-guidelines.md rule 11): it cuts the
 bush on its axis through the Front plane, the plane of the turned profile,
-and lies axis-horizontal with the hub face on the left, so the hub and press
+and lies axis-horizontal with the hub face on the left, so the hub and stub
 diameters, the hub station and the overall length (both from the hub face)
 and the shoulder root print together on solid cut edges.  Datum A tags the
 shoulder face there, and both thrust faces carry their finish under a
@@ -60,15 +60,16 @@ from _gtol_cylinder import CylinderFace
 from _gtol_planar import PlanarFace
 from _printed_limits import limits
 from pd_transgear_knob_bush_geometry import (
+    BOND_CLEARANCE,
     BORE_DIA,
     HUB_DIA,
     HUB_LENGTH,
     HUB_LENGTH_BAND,
     LENGTH,
     LENGTH_BAND,
-    PRESS_DIA,
-    PRESS_INTERFERENCE,
     SHOULDER_ROOT_R_MAX_MM,
+    STUB_DIA,
+    STUB_DIA_TOLERANCE,
     UNIT,
     WALL_STATED_MIN,
 )
@@ -84,7 +85,7 @@ from pd_transgear_knob_bush_spec import (
     GEOMETRIC_TOLERANCES_MM,
     PART_DATUMS,
     PLATE_NUMBER,
-    PRESS_CALLOUT,
+    STUB_CALLOUT,
     SURFACE_FINISHES,
 )
 
@@ -116,10 +117,10 @@ SECTION_CENTER = (0.200, 0.170)
 ISO_CENTER = (0.110, 0.064)
 # The isometric's extent, read off r6: 39.6 x 92.2 mm about its centre.
 ISO_SIZE_M = (0.0396, 0.0922)
-# Half the bush's hub, press and bore Ø and its length on the sheet, and the
+# Half the bush's hub, stub and bore Ø and its length on the sheet, and the
 # cutting line's overrun past the hub.
 HALF_HUB = HUB_DIA * _S / 2000.0
-HALF_PRESS = PRESS_DIA * _S / 2000.0
+HALF_STUB = STUB_DIA * _S / 2000.0
 HALF_BORE = BORE_DIA * _S / 2000.0
 HALF_LENGTH = LENGTH * _S / 2000.0
 SECTION_LINE_OVERRUN = 0.005
@@ -146,15 +147,15 @@ CAPTION_XY = (SECTION_CENTER[0], SECTION_CENTER[1] - HALF_HUB - 0.045)
 # line (farm r6: the bore's, nested inside the hub's, crossed it; the bore
 # now prints on the face view).  Left of the hub face the hub Ø, far enough
 # out that the hub face's finish and caption stand between it and the part;
-# right of the rear face the press Ø, its block beyond the rear face's
+# right of the rear face the stub Ø, its block beyond the rear face's
 # finish and caption; its arrows stand outside its extension lines
-# (``_press_arrows_outside``).  Above: the hub station, then the overall
+# (``_stub_arrows_outside``).  Above: the hub station, then the overall
 # length over it.  The root radius' leader runs through the arc's centre, which lies
 # outside the part above and right of the upper root (r9: with the text
 # below the part it ran 37 mm through both walls and the bore to reach it).
 # Its text (24.8 mm) stands just right of the overall's rear extension line,
-# over the press Ø's upper extension line, so the leader rises 13 degrees
-# from the root clear over the press Ø and crosses only that one extension
+# over the stub Ø's upper extension line, so the leader rises 13 degrees
+# from the root clear over the stub Ø and crosses only that one extension
 # line (rule 14).
 SECTION_KEEP = {
     "HubDia": (HUB_FACE_X - 0.060, SECTION_CENTER[1]),
@@ -163,8 +164,8 @@ SECTION_KEEP = {
         SECTION_CENTER[1] + HALF_HUB + 0.022,
     ),
     "BushLength": (SECTION_CENTER[0], SECTION_CENTER[1] + HALF_HUB + 0.050),
-    "PressDia": (REAR_FACE_X + 0.108, SECTION_CENTER[1]),
-    "ShoulderR": (REAR_FACE_X + 0.0175, SECTION_CENTER[1] + HALF_PRESS + 0.0085),
+    "StubDia": (REAR_FACE_X + 0.108, SECTION_CENTER[1]),
+    "ShoulderR": (REAR_FACE_X + 0.0175, SECTION_CENTER[1] + HALF_STUB + 0.0085),
 }
 # The face view's bore Ø: its block centred above the view and right of the
 # bore's centre, so SolidWorks runs the leader from the shelf's LEFT end
@@ -181,7 +182,7 @@ BORE_BLOCK_SIZE_M = (0.096, 0.025)
 BORE_BLOCK_LINE_MAX = 37
 # The bore's numbered note (its top-left corner): in the open sheet right of
 # the SECTION caption and above the title block (its top at 0.066), under
-# the press Ø's lower arrow (r1: its tail ends at 0.148).  At most
+# the stub Ø's lower arrow (r1: its tail ends at 0.148).  At most
 # BORE_NOTE_WIDTH characters a line, about 2.85 mm each, ends left of the
 # right border.
 BORE_NOTE_XY = (0.290, 0.110)
@@ -200,13 +201,13 @@ CAPTION_SIZE_M = (0.0375, 0.0081)
 # between the bore and its outer Ø.  Its symbol stands just above the pick's
 # height outboard of the face, inside that end's diameter's extension lines,
 # the leader falling to the face under the symbol; the caption over the
-# symbol.  Nothing crosses the hub Ø's or press Ø's extension lines (r6: the
+# symbol.  Nothing crosses the hub Ø's or stub Ø's extension lines (r6: the
 # symbols above the part had their leaders and captions on them and on the
 # lengths' extension lines).
 _HUB_PICK = (HUB_FACE_X, SECTION_CENTER[1] - (BORE_DIA + HUB_DIA) / 4.0 * _S / 1000.0)
 _REAR_PICK = (
     REAR_FACE_X,
-    SECTION_CENTER[1] - (BORE_DIA + PRESS_DIA) / 4.0 * _S / 1000.0,
+    SECTION_CENTER[1] - (BORE_DIA + STUB_DIA) / 4.0 * _S / 1000.0,
 )
 _HUB_SYMBOL = (_HUB_PICK[0] - 0.0205, _HUB_PICK[1] + 0.0037)
 _REAR_SYMBOL = (_REAR_PICK[0] + 0.005, _REAR_PICK[1] + 0.0036)
@@ -261,12 +262,13 @@ SECTION_POSITION_TOL_M = 1e-4
 # ring's thrust face, at y = 0 is the datum end the lengths run from; the
 # shoulder (datum A) at y = HUB_LENGTH; the rear face, the MHA-PD-16 cup's
 # thrust face, at y = LENGTH). The hub takes the title block's .XX row; the
-# press prints (Ø.4385) REF, turned to the measured MHA-PD-19 hole for the
-# stated interference (its callout; declared as that reference and the
-# interference, the MHA-CH-12 land's form, so the traveler's pictures print
-# the fit to the measured mate and no analysis band: traveler review r2);
+# stub its Ø.4370 ±.0010 (the shop's turned row, a native model band), a
+# slip fit bonded in MHA-PD-19's reamed hole with the clearance its callout
+# prints (declared as the band and the clearance on that mate, the
+# crank handle butt cup body's form, draw_dt_crank_handle_butt_cup; owner
+# question Q8b, held for the owner);
 # the shoulder's station its ±.001 and its root the printed R.005 MAX; the
-# length its ±.002; the bore its H7 band, reamed through after pressing in
+# length its ±.002; the bore its H7 band, reamed through after bonding in
 # MHA-PD-19 (MHA-PD-00), square to A, under the stated wall. Each ``span``
 # is a diameter's model-Y extent. The sheet's one numbered note is the
 # bore's fit statement.  The declarations print nothing.
@@ -279,7 +281,7 @@ part_metadata(
         (_GEOM, "LENGTH"),
         (_GEOM, "HUB_LENGTH"),
         (_GEOM, "HUB_DIA"),
-        (_GEOM, "PRESS_DIA"),
+        (_GEOM, "STUB_DIA"),
         (_GEOM, "BORE_DIA"),
     ),
     precision_sources=("DRAWING_PRECISION", "DRAWING_PRECISION_BY_NAME"),
@@ -368,26 +370,34 @@ requirement(
 requirement(
     "step",
     kind="diameter",
-    faces=(CylinderFace(PRESS_DIA),),
-    requirements=("diametral_interference",),
+    faces=(CylinderFace(STUB_DIA),),
+    requirements=("dia", "diametral_clearance"),
     fields={
         "axis": ([0.0, 1.0, 0.0], ("__frame__",)),
         "at": ([0.0, 0.0, 0.0], ("__frame__",)),
         "span": ([HUB_LENGTH, LENGTH], ((_GEOM, "HUB_LENGTH"), (_GEOM, "LENGTH"))),
-        "dia_ref": (
-            PRESS_DIA,
-            ((_GEOM, "PRESS_DIA"), "PRESS_DIA_TEXT_PREFIX", (_SELF, "SECTION_KEEP")),
+        "dia": (
+            limits(
+                STUB_DIA,
+                _P["StubDia"],
+                (STUB_DIA_TOLERANCE, -STUB_DIA_TOLERANCE),
+                unit=UNIT,
+            ),
+            (
+                (_GEOM, "STUB_DIA"),
+                (_GEOM, "STUB_DIA_TOLERANCE"),
+                (_SELF, "SECTION_KEEP"),
+            ),
         ),
-        "diametral_interference": (
-            list(PRESS_INTERFERENCE),
-            ((_GEOM, "PRESS_INTERFERENCE"), "PRESS_CALLOUT"),
+        "dia_nominal": (STUB_DIA, ((_GEOM, "STUB_DIA"),)),
+        "diametral_clearance": (
+            list(BOND_CLEARANCE),
+            ((_GEOM, "BOND_CLEARANCE"), "STUB_CALLOUT"),
         ),
-        "mate": (f"{PLATE_NUMBER} HOLE", ("PLATE_NUMBER", "PRESS_CALLOUT")),
-        "mate_nominal_dia": (PRESS_DIA, ((_GEOM, "PRESS_DIA"),)),
-        "turn_to_measured_mate": (True, ("PRESS_CALLOUT",)),
-        "callout": (PRESS_CALLOUT, ("PRESS_CALLOUT",)),
+        "mate": (f"{PLATE_NUMBER} HOLE", ("PLATE_NUMBER", "STUB_CALLOUT")),
+        "callout": (STUB_CALLOUT, ("STUB_CALLOUT",)),
     },
-    precision={"dia_ref": _P["PressDia"]},
+    precision={"dia": _P["StubDia"]},
 )
 requirement(
     "bore",
@@ -597,26 +607,26 @@ def caption_without_scale(linked_text: str) -> str:
     return kept[0]
 
 
-def _press_arrows_outside(adapter: Any, annotations: list[Any]) -> None:
-    """Stand the press Ø's arrows outside its extension lines.
+def _stub_arrows_outside(adapter: Any, annotations: list[Any]) -> None:
+    """Stand the stub Ø's arrows outside its extension lines.
 
-    Its block (stacked limits over two callout rows, 22 mm) is taller than
+    Its block (the toleranced size over two callout rows) is taller than
     the 19.6 mm the two inside arrows' shafts leave of the 33.3 mm between
     the lines: r10's lower shaft ran through the "(" of the last row.
     Outside, no line runs between the extension lines (MHA-PD-16's pilot Ø).
     """
     matches = [
-        item for item in annotations if dimension_name(adapter, item) == "PressDia"
+        item for item in annotations if dimension_name(adapter, item) == "StubDia"
     ]
     if len(matches) != 1:
-        raise RuntimeError(f"expected one PressDia dimension, found {len(matches)}")
+        raise RuntimeError(f"expected one StubDia dimension, found {len(matches)}")
     display = _early_bound(
         _early_bound(matches[0], "IAnnotation").GetSpecificAnnotation(),
         "IDisplayDimension",
     )
     display.ArrowSide = _ARROWS_OUTSIDE
     if int(display.ArrowSide) != _ARROWS_OUTSIDE:
-        raise RuntimeError("the press Ø's arrows did not move outside")
+        raise RuntimeError("the stub Ø's arrows did not move outside")
 
 
 @_telemetry.traced("drawing.pd_transgear_knob_bush.callouts")
@@ -722,7 +732,7 @@ def build(adapter: Any) -> dict[str, str]:
     annotations = [*section_annotations, *face_annotations]
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
     _assert_dimension_callouts(adapter, annotations)
-    _press_arrows_outside(adapter, section_annotations)
+    _stub_arrows_outside(adapter, section_annotations)
     create_section_axis_centerline(
         adapter, section, length_mm=LENGTH, label="knob bush axis"
     )

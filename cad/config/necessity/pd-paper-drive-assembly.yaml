@@ -74,12 +74,12 @@ necessity:
     reason: "pins drive the wheel's full plate under the thumbnut"
     source: "pd_vn_transgear_knob_drive_pin_spec.PROUD_RANGE, PROUD_SET_TOL; reason read from the spec by the spacer fix agent, for the collar family to confirm"
   - id: N-15
-    feature: "step 11Q and setting table row 8, MHA-PD-28 bore REAM Ø.2490 THRU, running fit on the MHA-PD-08 journal"
+    feature: "step 11U and setting table row 8, MHA-PD-28 bore REAM Ø.2490 THRU, running fit on the MHA-PD-08 journal"
     kind: mesh
     reason: "journal play opens the reducer mesh's centre distance"
     source: "pd_transgear_knob_bush_geometry.BORE_DIA; the journal is turned to the reamed bore (rule 4 form 2)"
   - id: N-16
-    feature: "step 11M and setting table row 7, MHA-PD-28 shoulder on MHA-PD-19: .002 FEELER DOES NOT ENTER"
+    feature: "step 11Q and setting table row 7, MHA-PD-28 shoulder on MHA-PD-19: .002 FEELER DOES NOT ENTER"
     kind: gap
     reason: "an open seat closes the collar-to-disc air"
     source: "no longer required after fit audit question 5; loosening tracked in issue (pending). pd_transgear_knob_bush_geometry.SHOULDER_SEAT_GAP_MAX: at .004 (.002 looser) the MHA-PD-22 to MHA-PD-06 statistical air is 0.1601 mm against its 0.1016 floor (0.1880 at .002); loosening moves no gate, only paper_drive_arm_registration.S_/K_PROJECTED_HEIGHT_MM (printed on MHA-PD-18/19) by .002"

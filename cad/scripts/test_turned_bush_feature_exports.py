@@ -146,7 +146,7 @@ _FACES: dict[tuple[str, str | None], dict[str, FaceGeometry]] = {
         "shoulder": _plane(_Y, knob_bush.HUB_LENGTH),
         "far_end": _plane(_Y, knob_bush.LENGTH),
         "outer": _cylinder(knob_bush.HUB_DIA, _Y),
-        "step": _cylinder(knob_bush.PRESS_DIA, _Y),
+        "step": _cylinder(knob_bush.STUB_DIA, _Y),
         "bore": _cylinder(knob_bush.BORE_DIA, _Y),
     },
 }
@@ -262,20 +262,20 @@ def test_the_paper_drive_bushes_print_the_sheets_bands() -> None:
 
     bush = manifest("pd_transgear_knob_bush")["features"]
     assert _inch(bush["outer"]["dia"]) == [0.51, 0.53]
-    # Made to the plate's measured hole: the export declares the (Ø.4385)
-    # reference and the interference, no diameter band, so the traveler's
-    # pictures print the fit to the measured mate (traveler review r2).
-    assert "dia" not in bush["step"]
-    assert _inch([bush["step"]["dia_ref"]]) == [0.4385]
-    assert _inch(bush["step"]["diametral_interference"]) == [0.0005, 0.0016]
+    # Bonded in the plate's reamed hole (owner question Q8b, held): the export
+    # declares the stub's ±.001 band and its clearance on that mate.
+    assert _inch(bush["step"]["dia"]) == [0.436, 0.438]
+    assert _inch(bush["step"]["diametral_clearance"]) == [0.0005, 0.003]
+    assert "diametral_interference" not in bush["step"]
+    assert "turn_to_measured_mate" not in bush["step"]
     assert _inch(bush["shoulder"]["station"]) == [0.808, 0.81]
     assert _inch([bush["shoulder"]["root_radius_max"]]) == [0.005]
     assert _inch(bush["far_end"]["length"]) == [1.141, 1.145]
-    # Reamed through after pressing, at MHA-PD-00: the bush's own traveler
+    # Reamed through after bonding, at MHA-PD-00: the bush's own traveler
     # leaves its drilled hole for that ream.
     assert _inch(bush["bore"]["dia"]) == [0.249, 0.2495]
     assert bush["bore"]["made_at"] == "assembly"
-    assert _inch([bush["bore"]["wall_min"]]) == [0.068]
+    assert _inch([bush["bore"]["wall_min"]]) == [0.067]
 
 
 def test_manifest_notes_are_the_printed_notes() -> None:

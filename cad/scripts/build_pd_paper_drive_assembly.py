@@ -43,7 +43,7 @@ real receiving and loaded-inspection data remain separately required.
   arm carries the feed sleeve (12T 32DP PA20), the 150T disc and its brass hub,
   whose plain bore slides on the sleeve's boss and whose pressed MHA-PD-VN-69
   chord key pin lies over the sleeve's flat, closed by the hub cap. The arm plate, screwed to
-  the arm, carries the pressed MHA-PD-28 bush that bores the knob shaft, whose integral 15T
+  the arm, carries the bonded MHA-PD-28 bush that bores the knob shaft, whose integral 15T
   meshes the disc; the thrust ring and the knob cup (its front faced at fit-up to the
   float, bonded on the journal and held by the MHA-PD-VN-71 screw into the journal's tap)
   set its end float. On the shaft's front D-core the drive collar (pressed drive pins; a
@@ -462,7 +462,7 @@ ARM_Z0 = ARM.FRONT_FACE_MACHINE_Z  # -124.4: arm front face on the spacer
 PIVOT_SCREW_Z0 = BAR_BACK_Z + PIVOT_SCREW.SHOULDER_LEN  # under the head
 PIVOT_SPRING_Z0 = ARM_Z0 + ARM.SPOT_FACE_FLOOR_FROM_FRONT  # the spot-face floor
 # Arm plate (rows Rz(theta): local X along U): its face A on the arm's rear
-# face; the pressed bush's hub forward to the thrust ring, its stub rearward.
+# face; the bonded bush's hub forward to the thrust ring, its stub rearward.
 PLATE_Z0 = ARM_Z0 + ARM.THICKNESS  # -114.888
 PLATE_SCREW_XY = tuple(_on_arm(station) for station in ARM.PLATE_TAP_STATIONS)
 PLATE_SCREW_Z0 = PLATE_Z0 + ARM_PLATE.REAR_FACE_Z  # -109.884: oval heads flush
@@ -575,7 +575,7 @@ CHAIN_PULLEY_DIA = {
 }
 
 # Knob stack on K (front -> back): thumbnut | knob wheel | drive collar | the
-# shaft's 15T | thrust ring | bush hub | plate (bush press) | bush stub | knob
+# shaft's 15T | thrust ring | bush hub | plate (bush stub) | bush stub | knob
 # cup | cup screw.
 # The front collar seat is the wheel's rear; the knob train stands on the
 # arm chain's F (transgear_cluster_fit.F_Z), and the collar's rear is faced
@@ -597,7 +597,7 @@ KNOB_COLLAR_FRONT_GAP = KNOB_COLLAR_Z0 - KNOB_COLLAR_SEAT_Z
 KNOB_DRIVE_PIN_TIP_Z = KNOB_COLLAR_Z0 - COLLAR.DRIVE_PIN_PROUD
 KNOB_DRIVE_PIN_Z0 = KNOB_DRIVE_PIN_TIP_Z + KNOB_PIN.LENGTH  # -151.9206
 # Behind the 15T (all Rx+90, local +Y rearward): the thrust ring to the
-# MHA-PD-28 bush's hub face, the bush pressed in the plate with its shoulder
+# MHA-PD-28 bush's hub face, the bush bonded in the plate with its shoulder
 # on face A (owner ruling 2026-11-20, #2425), and the knob cup on the
 # journal's rear end END_FLOAT behind the bush's rear face (the cup's front is
 # faced to it at fit-up), held by the MHA-PD-VN-71 #2-56 fillister on the axis:
@@ -1388,9 +1388,9 @@ def _latch_hook_sections() -> list[tuple[str, tuple[float, float, float, float]]
 # the platen rides its front face, so the thinnest bar carries the whole lock
 # stack rearward toward the hanger, and the deepest rail and thickest sheet
 # stand the pan heads further back again. The arm sits on the shortest
-# spacer, its flat plate's face A on the thinnest arm stock, and the pressed
-# bush's hub face that far forward again by its longest hub and the press's
-# shoulder seat gap. Deviations are (lower, upper) from the model, read from
+# spacer, its flat plate's face A on the thinnest arm stock, and the bonded
+# bush's hub face that far forward again by its longest hub and the
+# shoulder's seat gap. Deviations are (lower, upper) from the model, read from
 # the specs the parts author on their model dimensions, so the sheets and the
 # sweep agree.
 # Unmodelled contributor (R9-61): the platen's y against the top rail (which
@@ -1545,12 +1545,14 @@ def _assert_lock_station_sweep() -> None:
     )
     # The arm's front face on the shortest spacer; the flat plate's face A on
     # the thinnest arm stock. The bush's hub face stands its longest hub, and
-    # the shoulder's largest seat gap, forward of face A.
+    # the shoulder's largest seat gap, forward of face A. The bush is bonded
+    # in the plate's hole, so it may cure off the hole's axis by half the
+    # bond's greatest clearance (BUSH.SEAT_OFFSET_MAX), as the spacer above.
     arm_forward = -_SPACER_LENGTH_DEV[0]
     plate_forward = arm_forward + ARM.THICKNESS_BAND
     bush_hub_forward = plate_forward + BUSH.HUB_LENGTH_BAND + BUSH.SHOULDER_SEAT_GAP_MAX
-    bush_hub_r = (BUSH.HUB_DIA + _BUSH_HUB_DIA_DEV[1]) / 2.0
-    bush_stub_r = (BUSH.PRESS_DIA + max(BUSH.PRESS_DIA_BAND)) / 2.0
+    bush_hub_r = (BUSH.HUB_DIA + _BUSH_HUB_DIA_DEV[1]) / 2.0 + BUSH.SEAT_OFFSET_MAX
+    bush_stub_r = BUSH.STUB_DIA_MAX / 2.0 + BUSH.SEAT_OFFSET_MAX
     fixed: list[tuple[str, tuple[float, float, float, float]]] = [
         (
             "arm",
@@ -3381,7 +3383,7 @@ def build(adapter) -> dict[str, str]:
         [0.0, 0.0, ARM_ANGLE_DEG], arm_rows,
     )
     _assert_arm_plate_registered(adapter, arm, arm_plate)
-    # MHA-PD-28 pressed in the plate's ream at K and reamed with it before the
+    # MHA-PD-28 bonded in the plate's ream at K and reamed with it before the
     # plate goes on the arm, so it is static with the plate (Rx+90: local +Y
     # rearward, its hub face forward on the thrust ring, its shoulder on face A).
     place_component(

@@ -106,7 +106,7 @@ CBORE_DIA_PLACES = 2
 CBORE_DEPTH_PLACES = 3
 
 if not math.isclose(
-    OD, math.floor(BUSH.PRESS_DIA / MM_PER_IN * 10**OD_PLACES + 0.5) / 10**OD_PLACES
+    OD, math.floor(BUSH.STUB_DIA / MM_PER_IN * 10**OD_PLACES + 0.5) / 10**OD_PLACES
     * MM_PER_IN,
 ):
     raise AssertionError("MHA-PD-16's O.D. no longer prints the MHA-PD-28 stub's .44")

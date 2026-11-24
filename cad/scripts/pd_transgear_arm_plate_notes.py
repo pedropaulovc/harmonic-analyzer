@@ -28,15 +28,15 @@ from pd_transgear_arm_plate_spec import (
     SCREW_NUMBER,
 )
 
-# The press hole is reamed with the .4385 set reamer and prints that size
-# with no band (drawing-guidelines rule 4, form 2): the
-# MHA-PD-28 bush's press step is turned to this hole as measured, so the
-# interference is the bush sheet's requirement, not this one's.  REAM, the
+# The hole K is reamed with the .4385 set reamer and prints that size
+# with no band (drawing-guidelines rule 4, form 2): the MHA-PD-28 bush's
+# stub is a slip fit bonded in it (owner question Q8b, held for the
+# owner), and the clearance is the bush
+# sheet's requirement, not this one's.  REAM, the
 # face-A mouth's lead-in chamfer in the hole callout's size form (as the
 # screw holes carry their countersink), then the fit and the bush by
-# drawing number, said to be turned to this bore in rule 4's own words
-# (guidelines v2: the acceptance prints once, on the sheet of the member
-# made last, MHA-PD-28's; Codjiflo #3486).  What the press protects is in
+# drawing number, said to be bonded in this bore (the acceptance prints
+# once, on the bush's sheet).  What the bond protects is in
 # the necessity register (cad/config/necessity/pd-transgear-arm-plate.yaml
 # N-01; owner ruling 2026-11-24: the sheet prints no reason).  The chamfer
 # is a three-place size, so rule 3 wants its function in a few words
@@ -51,10 +51,10 @@ _PRESS_CHAMFER_TEXT = (
     f"{PRESS_HOLE_CHAMFER / 25.4:.{PRESS_HOLE_CHAMFER_PLACES}f}".removeprefix("0")
 )
 PRESS_HOLE_CALLOUT = "\n".join((
-    "REAM THRU, PRESS FIT",
+    "REAM THRU, BONDED FIT",
     f"{_PRESS_CHAMFER_TEXT} X 45\u00b0 AT FACE A",
     f"CLEARS {BUSH_NUMBER} SHOULDER ROOT",
-    f"{BUSH_NUMBER} IS TURNED TO THIS BORE",
+    f"{BUSH_NUMBER} IS BONDED IN THIS BORE",
 ))
 
 # The locating holes: reamed with the .1260 set reamer, the size printed

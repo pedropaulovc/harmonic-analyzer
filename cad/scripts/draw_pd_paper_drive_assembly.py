@@ -191,7 +191,7 @@ SHEET_NAMES = (
     "ASSEMBLY AND FIT-UP (CONT. 3)",
     "ASSEMBLY AND FIT-UP (CONT. 4)",
     "ASSEMBLY AND FIT-UP (CONT. 5)",
-    # #2425: the bush press and the knob cup's facing, bond and screw steps
+    # #2425: the bush's bond and the knob cup's facing, bond and screw steps
     # take one more fit-up sheet.
     "ASSEMBLY AND FIT-UP (CONT. 6)",
     "CHAIN FIT-UP",
@@ -568,7 +568,7 @@ FITUP_CHAIN_KEY = "loaded-rack-geometry-checked"
 KNOB_SETTING_VIEW_NAME = steps.KNOB_SETTING_VIEW_NAME
 # On the sheet the arm-plate-located step opens (STEP_START_SHEETS): #2417's
 # cluster and pin steps ahead of it no longer leave it room on sheet 5, nor
-# #2425's bush press on sheet 6.
+# #2425's bush steps on sheet 6.
 KNOB_SETTING_SHEET = "ASSEMBLY AND FIT-UP (CONT. 2)"
 KNOB_SETTING_SCALE = (1.0, 1.0)
 KNOB_SETTING_CENTER = (0.320, 0.097)
@@ -588,7 +588,7 @@ KNOB_SETTING_TEXT_OFFSET = 0.024
 KNOB_SETTING_CENTRE_TEXT_PAST = 0.045
 KNOB_SETTING_CENTRE_TEXT_OFFSET = 0.018
 KNOB_SETTING_ARROWS_OUTSIDE = 1  # swDimensionArrowsSide_e.swDimArrowsOutside
-# The MHA-PD-28 bush is pressed and reamed in the plate before the plate is
+# The MHA-PD-28 bush is bonded and reamed in the plate before the plate is
 # set (#2425), so the knob bore N the located step indicates is the bush's.
 KNOB_SETTING_INSTANCES = frozenset(
     {"pd-transgear-arm-1", "pd-transgear-arm-plate-1", "pd-transgear-knob-bush-1"}
@@ -1903,6 +1903,9 @@ PIVOT_SPACER_BOND_CURE_H = 24
 PIN_BOND_COMPOUND = "LOCTITE 638"
 PIN_BOND_SUB_STEP = 1
 PIN_BOND_CURE_H = 24
+# The sub-step that coats the MHA-PD-28 bush's stub (owner question Q8b,
+# held for the owner): the same grade and cure.
+BUSH_BOND_SUB_STEP = 10
 # The reducer's backlash as an indicator reads it (#2417: a feeler leaf
 # cannot be laid between 48DP flanks). The knob shaft and the disc are
 # pressed lightly together, the shaft held and the disc rocked, with a test
@@ -2058,7 +2061,7 @@ def sub_step(key: str, index: int) -> str:
 # transfer screws, a bought shop tool, four in each guide's lock taps when
 # the locks are struck; and (rule 23, #2425) the retaining compounds, one
 # row group per grade naming every sub-step that uses it, with its cure:
-# LOCTITE 638 bonds the MHA-PD-23 pin and the pivot spacer and, by DETAIL
+# LOCTITE 638 bonds the MHA-PD-23 pin, the MHA-PD-28 bush and the pivot spacer and, by DETAIL
 # H's bond note, a plate dowel that slides in by hand (a latch dowel that
 # slides in renews the arm, step 10; a collar dowel or pin, the collar,
 # step 20);
@@ -2070,6 +2073,7 @@ LOCTITE_638_SUB_STEPS = tuple(
     sorted(
         (
             ("pin-pressed", PIN_BOND_SUB_STEP),
+            ("pin-pressed", BUSH_BOND_SUB_STEP),
             ("hanger-pivoted", PIVOT_SPACER_BOND_SUB_STEP),
             *BOND_NOTE_SUB_STEPS,
         ),
@@ -2260,7 +2264,7 @@ def _step_text(
     pin_window = steps.inch_window(setting_details.LATCH_PROUD_BAND, 3, " TO ")
     drive_window = steps.inch_window(setting_details.DRIVE_PIN_PROUD_BAND, 3, " TO ")
     knob_window = KNOB_END_FLOAT_WINDOW
-    # #2425: the MHA-PD-28 bush pressed in the plate and reamed (pin-pressed's
+    # #2425: the MHA-PD-28 bush bonded in the plate and reamed (pin-pressed's
     # last sub-steps, after the pin's bond sub-steps); a plate or bush
     # renewed later is made again by them.
     bush = n["pd-transgear-knob-bush"]
@@ -2270,7 +2274,7 @@ def _step_text(
     # The bore prints the reamer's size and no band; the journal is turned
     # to it (drawing-guidelines rule 4, form 2).
     bush_ream = steps.inch_text(knob_bush.BORE_DIA, 4)
-    bush_made = f"{sub_step('pin-pressed', 9)}-{sub_step('pin-pressed', 14)}"
+    bush_made = f"{sub_step('pin-pressed', 9)}-{sub_step('pin-pressed', 18)}"
     lock_gap = LOCK_GAP_WINDOW
     lock_gap_min, lock_gap_max = lock_gap.split(" TO ")
     # R9-47: the gap is the rail's depth less the bar's, so facing the rail's
@@ -2571,11 +2575,14 @@ def _step_text(
         # off the running shank and the rear bushing's seat on the arm's
         # front face, cure clamped before anything loads it); nothing is
         # pressed, so the press remedy is gone.  One action per sub-step.
-        # #2425 (owner ruling 2026-11-20): the MHA-PD-28 bush is pressed into
-        # the plate from face A to its shoulder and its bore reamed through
-        # after the press, before the plate is set on the arm, so the located
+        # #2425 (owner ruling 2026-11-20): the MHA-PD-28 bush goes into the
+        # plate from face A to its shoulder and its bore is reamed through
+        # once fixed, before the plate is set on the arm, so the located
         # step indicates the finished knob bore. Last in this step, so the
-        # arm-only remedies above it never meet a bushed plate.
+        # arm-only remedies above it never meet a bushed plate. The bush is
+        # bonded with the pin's compound and cure, the same rule-23 bullets
+        # (owner question Q8b, option B, held for the owner; it was pressed,
+        # turned to the measured hole).
         "pin-pressed": (
             f"DEGREASE THE {n['pd-transgear-pin']} PIN'S SHANK UNDER ITS HEAD AND THE "
             f"{n['pd-transgear-arm']} ARM'S REAMED HOLE.",
@@ -2596,22 +2603,22 @@ def _step_text(
             "IF IT MOVES, PULL THE PIN.",
             "IF PULLED, CLEAN THE PIN AND THE HOLE AND REPEAT "
             f"{s('pin-pressed', 0)}-{s('pin-pressed', 6)}.",
-            f"PRESS THE {bush} BUSH, STUB FIRST, INTO THE {n['pd-transgear-arm-plate']} "
-            f"PLATE FROM ITS FRONT FACE (FACE A ON {n['pd-transgear-arm-plate']}) "
-            "UNTIL ITS SHOULDER SEATS.",
-            # The bush is turned to the plate's measured hole, so a slip fit
-            # is an undersize bush, not a bad plate (codjiflo review, #2425).
-            # One action per sub-step, the face named by its view and the
-            # ream by its mate, fit and gauge (machinist review r10, #2425).
-            f"IF IT SLIDES IN BY HAND, REPEAT {s('pin-pressed', 9)} WITH A NEW {bush} "
-            "BUSH TURNED TO THE PLATE'S MEASURED HOLE.",
+            f"DEGREASE THE {bush} BUSH'S STUB AND THE "
+            f"{n['pd-transgear-arm-plate']} PLATE'S REAMED HOLE.",
+            f"COAT THE STUB, NOT THE HOLE, WITH {PIN_BOND_COMPOUND}.",
+            "PUSH THE BUSH, STUB FIRST, INTO THE PLATE FROM ITS FRONT FACE "
+            f"(FACE A ON {n['pd-transgear-arm-plate']}), TURNING IT, UNTIL ITS "
+            "SHOULDER SEATS.",
+            "WIPE ALL COMPOUND OFF FACE A AND OFF THE STUB AND THE PLATE BEHIND IT.",
+            "CLAMP THE SHOULDER ON FACE A.",
             f"CHECK: A {bush_seat_feeler} FEELER DOES NOT ENTER UNDER THE SHOULDER "
             f"{row_cite('bush-seated')}.",
-            # A first failure is pressed home and checked again before the
+            # A first failure is clamped home and checked again before the
             # pair is renewed (codjiflo review round 2, #2425).
-            f"IF IT ENTERS, PRESS AGAIN TO THE SHOULDER AND REPEAT {s('pin-pressed', 11)}.",
+            f"IF IT ENTERS, CLAMP THE SHOULDER AGAIN AND REPEAT {s('pin-pressed', 14)}.",
             f"IF IT STILL ENTERS, REPEAT FROM {s('pin-pressed', 9)} WITH A NEW "
             f"{n['pd-transgear-arm-plate']} PLATE AND {bush} BUSH.",
+            f"LET THE BOND CURE {PIN_BOND_CURE_H} H BEFORE THE BORE IS REAMED.",
             f"REAM THE BUSH'S BORE \u00d8{bush_ream} THRU, A RUNNING FIT ON THE "
             f"{n['pd-transgear-knob-shaft']} JOURNAL, WHICH IS TURNED TO IT "
             f"{row_cite('bush-reamed')}.",
@@ -2727,7 +2734,7 @@ def _step_text(
             f"{n['pd-rack-pinion']} DISC, {n['pd-transgear-knob-shaft']} JOURNAL AND "
             f"{bush} AND {n['pd-transgear-feed-pinion']} "
             "BORES TO THEIR SHEETS.",
-            # The bush is pressed for good, so a bore found outside renews it
+            # The bush is bonded for good, so a bore found outside renews it
             # with its plate, made again as before (#2425).
             f"REPLACE A {bush} BUSH FOUND OUTSIDE WITH A NEW BUSH AND "
             f"{n['pd-transgear-arm-plate']} PLATE PER {bush_made} AND REPEAT FROM "
@@ -2779,10 +2786,10 @@ def _step_text(
             # The arm carries DETAIL K's jig-boring by now, so a dowel that
             # slides in is bonded, not scrapped with the arm (owner ruling
             # 2026-11-20 (Pedro), #2497; machinist exception
-            # PD-00-press-salvage). The scrap rule stays at the bush's press
-            # (11), the latch dowel's (10B), the hub pin's (16) and the
-            # collar's pins (20); the MHA-PD-23 pin and the MHA-PD-20 spacer
-            # are bonded slip fits.
+            # PD-00-press-salvage). The scrap rule stays at the latch
+            # dowel's press (10B), the hub pin's (16) and the collar's pins
+            # (20); the MHA-PD-23 pin, the MHA-PD-28 bush and the MHA-PD-20
+            # spacer are bonded slip fits.
             # The cured dowel is read again before the plate goes on;
             # a bond that fails renews the arm's set as 13Y does. The plate
             # refit and its match mark share a sub-step (24-letter budget).
@@ -3728,14 +3735,14 @@ def setting_table_rows(
         # The bush's two step-11 acceptances are on no view (machinist
         # review r13, #2425, two runs).
         "bush-seated": (
-            s("pin-pressed", 11),
+            s("pin-pressed", 14),
             f"{n['pd-transgear-knob-bush']} SHOULDER ON THE "
             f"{n['pd-transgear-arm-plate']} FRONT FACE",
             f"{steps.inch_text(knob_bush.SHOULDER_SEAT_GAP_MAX, 3)} DOES NOT ENTER",
             "FEELER",
         ),
         "bush-reamed": (
-            s("pin-pressed", 14),
+            s("pin-pressed", 18),
             f"{n['pd-transgear-knob-bush']} BORE, REAMED IN THE PLATE",
             "TURNS FREE, NO SHAKE",
             f"{n['pd-transgear-knob-shaft']} JOURNAL",

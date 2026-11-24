@@ -17,7 +17,7 @@ still floats on the existing pilot and is driven by the two axial dowels.
 The thread relief carries clamp, not torque.
 
 The Ø.249 journal runs in the MHA-PD-28 bush's Ø.249 bore, reamed after the
-bush is pressed into the arm plate.  The loose Ø.257-bore thrust ring bears
+bush is bonded in the arm plate.  The loose Ø.257-bore thrust ring bears
 on the actual rear tooth ends.
 Every gap is cut straight at full depth through the whole face (#2034); the
 form root stands above the journal, so the cutter runs out in air over the

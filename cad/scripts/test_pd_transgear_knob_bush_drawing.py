@@ -50,9 +50,9 @@ def test_required_drawing_paths() -> None:
 
 
 def test_the_contract_dimensions_are_the_ruled_variant() -> None:
-    """#2425: hub Ø.52 x .809 to the shoulder, press Ø.4385 REF (the plate's
-    set reamer; fit audit 2026-11-23) on to the rear face, 1.143 overall,
-    bore .249 reamed after a .238 (B) drill."""
+    """#2425: hub Ø.52 x .809 to the shoulder, the stub Ø.4370 ±.0010 (owner
+    question Q8b, held: bonded in the plate's .4385 set-reamer hole) on to
+    the rear face, 1.143 overall, bore .249 reamed after a .238 (B) drill."""
     assert BUSH.HUB_DIA == pytest.approx(_in(0.52))
     assert BUSH.HUB_LENGTH == pytest.approx(_in(0.809))
     assert BUSH.HUB_LENGTH_BAND == FIT_LENGTH_BAND_IN
@@ -62,7 +62,9 @@ def test_the_contract_dimensions_are_the_ruled_variant() -> None:
     assert BUSH.LENGTH == pytest.approx(_in(1.143))
     assert BUSH.LENGTH_BAND == pytest.approx(_in(0.002))
     assert BUSH.STUB_LENGTH == pytest.approx(_in(0.334))
-    assert BUSH.PRESS_DIA == pytest.approx(_in(0.4385))
+    assert BUSH.STUB_DIA == pytest.approx(_in(0.4370))
+    assert BUSH.STUB_DIA_TOLERANCE == pytest.approx(_in(0.001))
+    assert BUSH.PRESS_HOLE_DIA == pytest.approx(_in(0.4385))
     assert BUSH.BORE_DIA == pytest.approx(_in(0.249))
     assert BUSH.BORE_DIA_LIMITS == pytest.approx((0.0, _in(0.0005)))
     assert BUSH.PRE_REAM_DRILL_DIA == pytest.approx(_in(0.238))
@@ -73,50 +75,64 @@ def test_the_contract_dimensions_are_the_ruled_variant() -> None:
         BUSH.HUB_DIA_PLACES,
         BUSH.HUB_LENGTH_PLACES,
         BUSH.LENGTH_PLACES,
-        BUSH.PRESS_DIA_PLACES,
+        BUSH.STUB_DIA_PLACES,
         BUSH.BORE_PLACES,
     ) == (2, 3, 3, 4, 4)
     assert BUSH.UNIT == "in"
 
 
-def test_the_press_is_turned_to_the_measured_hole() -> None:
-    """Fit audit 2026-11-23 (rule 4, made to fit): the plate's hole is cut
-    by the .4385 set reamer (modelled +.0005/0) and the step is turned
-    .0005-.0016 over that hole as measured, a range over .001 wide.  The
-    step's own band is the analysis envelope, not a printed limit."""
-    hole = tuple(BUSH.PRESS_DIA + deviation for deviation in BUSH.PRESS_HOLE_BAND)
+def test_the_stub_is_a_bonded_slip_fit_in_the_reamed_hole() -> None:
+    """Owner question Q8b, option B, held for the owner: the plate's hole
+    is cut by the .4385 set reamer
+    (modelled +.0005/0) and the stub, at the shop's turned row, slips into
+    every such hole with a LOCTITE 638 clearance of .0005-.0030, inside the
+    compound's gap limit the repo's other 638 joints hold."""
+    import pd_transgear_pin_spec
+    import pd_transgear_pivot_spacer_spec
+    import sm_gooseneck_spring_joint
+
+    hole = tuple(BUSH.PRESS_HOLE_DIA + deviation for deviation in BUSH.PRESS_HOLE_BAND)
     assert hole == pytest.approx((_in(0.4390), _in(0.4385)))
-    assert BUSH.PRESS_INTERFERENCE == pytest.approx((_in(0.0005), _in(0.0016)))
-    assert max(BUSH.PRESS_INTERFERENCE) - min(BUSH.PRESS_INTERFERENCE) >= _in(0.001)
-    press = tuple(BUSH.PRESS_DIA + deviation for deviation in BUSH.PRESS_DIA_BAND)
-    assert min(press) == pytest.approx(min(hole) + BUSH.PRESS_INTERFERENCE[0])
-    assert max(press) == pytest.approx(max(hole) + BUSH.PRESS_INTERFERENCE[1])
-    assert BUSH.PRESS_DIA_MIN == pytest.approx(min(press))
-    # The traveler's pilot only reads the hole and is faced off before the
-    # press diameter is cut: the geometry carries no pilot.
+    assert (BUSH.STUB_DIA_MIN, BUSH.STUB_DIA_MAX) == pytest.approx(
+        (_in(0.4360), _in(0.4380))
+    )
+    assert BUSH.BOND_CLEARANCE == pytest.approx(
+        (min(hole) - BUSH.STUB_DIA_MAX, max(hole) - BUSH.STUB_DIA_MIN)
+    )
+    assert BUSH.BOND_CLEARANCE == pytest.approx((_in(0.0005), _in(0.0030)), abs=1e-6)
+    assert (
+        BUSH.LOCTITE_638_GAP_MAX
+        == pd_transgear_pin_spec.LOCTITE_638_GAP_MAX
+        == pd_transgear_pivot_spacer_spec.LOCTITE_638_GAP_MAX
+        == sm_gooseneck_spring_joint.LOCTITE_638_GAP_MAX
+    )
+    assert 0.0 < BUSH.BOND_CLEARANCE[0] < BUSH.BOND_CLEARANCE[1] <= BUSH.LOCTITE_638_GAP_MAX
+    assert BUSH.SEAT_OFFSET_MAX == pytest.approx(BUSH.BOND_CLEARANCE[1] / 2.0)
+    # No press is left: no interference and no turn-to-measured pilot.
+    for gone in ("PRESS_DIA", "PRESS_INTERFERENCE", "PRESS_DIA_BAND", "PRESS_DIA_MIN"):
+        assert not hasattr(BUSH, gone)
     assert not [name for name in vars(BUSH) if name.startswith("PILOT_")]
     assert not hasattr(PLATE, "_STUB_BEHIND_PLATE_MIN_MM")
-    assert spec.PRESS_DIA_TEXT_PREFIX == "(<MOD-DIAM>"
-    assert spec.PRESS_DIA_TEXT_SUFFIX == ")"
+    assert spec.STUB_CALLOUT == f"BONDED FIT IN {spec.PLATE_NUMBER}\n(CLEARANCE .0005-.0030)"
 
 
-def test_the_plate_hole_is_the_bush_press_band() -> None:
-    """MHA-PD-19's press hole takes its size and band from the bush, so the
-    interference printed on both sheets is one figure."""
-    assert PLATE.PRESS_HOLE_DIA == BUSH.PRESS_DIA
+def test_the_plate_hole_is_the_bush_hole_band() -> None:
+    """MHA-PD-19's hole takes its size and band from the bush, so the
+    clearance printed on the bush is over the hole the plate prints."""
+    assert PLATE.PRESS_HOLE_DIA == BUSH.PRESS_HOLE_DIA
     assert tuple(sorted(PLATE.PRESS_HOLE_LIMITS)) == tuple(sorted(BUSH.PRESS_HOLE_BAND))
 
 
 def test_the_bands_live_on_the_model_from_named_constants() -> None:
     # The reamed running bore prints the reamer's size and no band (rule 4,
     # fit audit 2026-11-23); BORE_BAND is the analysis band the stacks read.
+    # The stub's ±.001 is the shop's turned row, a native band (owner question Q8b).
     assert model_toleranced_dimensions(part) == {
+        ("BushProfile", "StubDia"): "STUB_DIA_TOLERANCE",
         ("BushProfile", "HubLength"): "HUB_LENGTH_BAND",
         ("BushProfile", "BushLength"): "LENGTH_BAND",
     }
-    assert "_press_dia_reference(adapter)" in Path(part.__file__).read_text(
-        encoding="utf-8"
-    )
+    assert "_press_dia_reference" not in Path(part.__file__).read_text(encoding="utf-8")
     assert spec.BORE_BAND == (max(BUSH.BORE_DIA_LIMITS), min(BUSH.BORE_DIA_LIMITS))
     # Every band is narrower than the title-block row its places claim.
     for band, places in (
@@ -136,7 +152,7 @@ def test_every_marked_dimension_prints_with_model_places() -> None:
         == spec.DRAWING_DIMENSIONS["BushProfile"]
         == {
             "HubDia",
-            "PressDia",
+            "StubDia",
             "HubLength",
             "BushLength",
             "ShoulderR",
@@ -167,11 +183,11 @@ def test_the_profile_is_solid_to_the_axis_and_the_bore_a_circle_cut() -> None:
     assert 'adapter.create_sketch("Top")' in built
     assert "both_directions=True" in built
     assert part.BORE_CUT_DEPTH / 2.0 > BUSH.LENGTH
-    r, press_r = BUSH.SHOULDER_ROOT_R_MAX_MM, BUSH.PRESS_DIA / 2.0
+    r, stub_r = BUSH.SHOULDER_ROOT_R_MAX_MM, BUSH.STUB_DIA / 2.0
     assert part.V_ROOT == pytest.approx(
         2.0
         * math.pi
-        * (press_r * r * r * (1.0 - math.pi / 4.0) + r**3 * (5.0 / 6.0 - math.pi / 4.0))
+        * (stub_r * r * r * (1.0 - math.pi / 4.0) + r**3 * (5.0 / 6.0 - math.pi / 4.0))
     )
     assert 0.0 < part.V_ROOT < 0.005 * part.V_BUSH
     assert part.V_TURNED - part.V_BUSH == pytest.approx(
@@ -190,7 +206,7 @@ def test_the_drawing_reads_the_callouts_back_and_never_writes_them() -> None:
 
 
 def test_each_tight_callout_names_its_mate_by_drawing_number() -> None:
-    """Rule 4: the reamed bore and the press each name their mate and fit;
+    """Rule 4: the reamed bore and the stub each name their mate and fit;
     the hub station and the overall length, bands with no mate to try, print
     no label; no reason is printed (it is in the necessity register); rule
     7: at most two lines of words under the process line, the bore's fit
@@ -198,7 +214,7 @@ def test_each_tight_callout_names_its_mate_by_drawing_number() -> None:
     plate, shaft = _number("pd-transgear-arm-plate"), _number("pd-transgear-knob-shaft")
     bore = spec.BORE_CALLOUT.splitlines()
     assert bore == [
-        f"REAM THRU AFTER PRESSING IN {plate}",
+        f"REAM THRU AFTER BONDING IN {plate}",
         f"SEE NOTE {spec.BORE_NOTE_NUMBER}",
         spec.WALL_TEXT,
     ]
@@ -213,21 +229,19 @@ def test_each_tight_callout_names_its_mate_by_drawing_number() -> None:
     )
     assert not any(char.isdigit() for char in note.replace(shaft, "")[2:])
     assert drawing.DRAWING_NOTES == spec.BORE_NOTE
-    press = spec.PRESS_CALLOUT.splitlines()
-    assert len(press) == 2
-    assert press[0] == f"PRESS FIT IN {plate}"
-    assert max(map(len, press)) <= 48
-    assert press[1] == "TURN TO MEASURED HOLE (INTERFERENCE .0005-.0016)"
+    stub = spec.STUB_CALLOUT.splitlines()
+    assert stub == [f"BONDED FIT IN {plate}", "(CLEARANCE .0005-.0030)"]
+    assert max(map(len, stub)) <= 48
     # The ±.001 station and the ±.002 length are stack terms with no mate to
     # try: they print no label, and the register says what they protect.
     assert not hasattr(spec, "HUB_LENGTH_CALLOUT")
     assert not hasattr(spec, "LENGTH_CALLOUT")
-    printed = "\n".join((spec.BORE_CALLOUT, spec.BORE_NOTE, spec.PRESS_CALLOUT))
+    printed = "\n".join((spec.BORE_CALLOUT, spec.BORE_NOTE, spec.STUB_CALLOUT))
     for word in ("KEEPS", "SETS", "HOLDS", "FASTENER", "BACKLASH"):
         assert word not in printed, word
     assert spec.DIMENSION_CALLOUTS == {
         "BoreSketch": {"BoreDia": spec.BORE_CALLOUT},
-        "BushProfile": {"PressDia": spec.PRESS_CALLOUT},
+        "BushProfile": {"StubDia": spec.STUB_CALLOUT},
     }
     # The B pre-drill is the process's, not the sheet's.
     for callouts in spec.DIMENSION_CALLOUTS.values():
@@ -292,7 +306,7 @@ def _worst_walls_in() -> dict[str, float]:
     run_off = (1.143 + 0.002) * math.tan(math.radians(0.3))
     breaks = 2.0 * 0.010
     return {
-        "press section over the bore": (0.4385 + 0.0005) / 2.0
+        "stub section over the bore": (0.4370 - 0.0010) / 2.0
         - bore_r
         - run_off
         - breaks,
@@ -301,17 +315,17 @@ def _worst_walls_in() -> dict[str, float]:
 
 
 def test_walls_hold_at_the_printed_worst_case() -> None:
-    """Rule 17: the smallest press section (the least interference over the
-    smallest reamed hole) and hub (.XX) over the
+    """Rule 17: the smallest stub section (the .4360 low limit of its
+    ±.001) and hub (.XX) over the
     largest reamed bore, less 0.3 deg run-off over the longest bore and the
-    title-block break on both rims: press .0688 (between the floor and the
+    title-block break on both rims: stub .0673 (between the floor and the
     target, stated on the sheet), hub .1043."""
     expected = _worst_walls_in()
     assert set(BUSH.WALLS) == set(expected)
     for name, worst_in in expected.items():
         assert BUSH.WALLS[name][1] == pytest.approx(_in(worst_in), abs=1e-6), name
-    assert BUSH.WALLS["press section over the bore"][1] / 25.4 == pytest.approx(
-        0.06875, abs=5e-5
+    assert BUSH.WALLS["stub section over the bore"][1] / 25.4 == pytest.approx(
+        0.06725, abs=5e-5
     )
     assert BUSH.WALLS["hub over the bore"][1] >= WALL_TARGET_MM
     assert WALL_FLOOR_MM <= BUSH.WALL_WORST < WALL_TARGET_MM
@@ -322,8 +336,8 @@ def test_the_short_wall_is_stated_as_a_plain_fact() -> None:
     """Rule 20: under the target, the sheet states the wall, floored so it
     never claims more than is left, with no argument words."""
     assert BUSH.WALL_STATED_MIN <= BUSH.WALL_WORST
-    assert BUSH.WALL_STATED_MIN == pytest.approx(_in(0.068))
-    assert spec.WALL_TEXT == "WALL .068 MIN"
+    assert BUSH.WALL_STATED_MIN == pytest.approx(_in(0.067))
+    assert spec.WALL_TEXT == "WALL .067 MIN"
     assert spec.WALL_TEXT in spec.BORE_CALLOUT
     for word in ("EXCEPTION", "ACCEPTED", "RULING", "POLICY"):
         assert word not in spec.BORE_CALLOUT
@@ -344,10 +358,10 @@ def test_the_stated_wall_is_an_owner_minor_exception() -> None:
         " .080 target, with no geometry escape, are accepted as package-specific"
         " minor exceptions."
     )
-    press_min = f"{BUSH.PRESS_DIA_MIN / 25.4:.4f}"
+    stub_min = f"{BUSH.STUB_DIA_MIN / 25.4:.4f}"
     bore_max = f"{(BUSH.BORE_DIA + max(BUSH.BORE_DIA_LIMITS)) / 25.4:.4f}"
     longest = f"{(BUSH.LENGTH + BUSH.LENGTH_BAND) / 25.4:.3f}"
-    for fact in (press_min, bore_max, longest):
+    for fact in (stub_min, bore_max, longest):
         assert fact.removeprefix("0") in rv03["reason"], fact
 
 
@@ -363,7 +377,7 @@ def _bush_geometry_fresh():
 def test_the_wall_gate_refuses_a_wall_under_the_floor(monkeypatch) -> None:
     # Positive control: the title block as it is.
     assert _bush_geometry_fresh().WALL_WORST == pytest.approx(BUSH.WALL_WORST)
-    # Negative control: a coarser edge break thins the press wall under .060.
+    # Negative control: a coarser edge break thins the stub wall under .060.
     monkeypatch.setattr(_printed_tolerance, "edge_break_chamfer_mm", lambda **_: 0.5)
     with pytest.raises(AssertionError, match="floor"):
         _bush_geometry_fresh()
@@ -506,7 +520,7 @@ def _segment_y_at(start, end, x: float) -> float:
 def test_the_face_view_leaders_stay_left_of_the_cutting_line() -> None:
     """Farm r5: the bore finish's leader ran through the lower letter A and
     the frame's crossed the cutting line; r6: the finish's leader rose
-    through its own text and its text sat on the press circle.  The line runs
+    through its own text and its text sat on the stub circle.  The line runs
     vertically through the bore's centre with its arrows and letters on the
     right, so the frame, the finish and the Ø's leader all land left of it."""
     line_x = drawing.SECTION_LINE[0][0]
@@ -557,13 +571,13 @@ def test_the_face_view_leaders_stay_left_of_the_cutting_line() -> None:
 def test_the_section_texts_stay_inside_their_own_extension_lines() -> None:
     """Farm r6: the bore's dimension line ran out across the hub Ø's
     extension line.  Each diameter's text now sits between its own lines,
-    the hub's left of the hub face and the press's right of the rear face
+    the hub's left of the hub face and the stub's right of the rear face
     beyond the rear face's finish; both lengths above the part."""
     keep = drawing.SECTION_KEEP
     assert "BoreDia" not in keep
     assert keep["HubDia"][0] < drawing.HUB_FACE_X
-    assert keep["HubDia"][1] == keep["PressDia"][1] == drawing.SECTION_CENTER[1]
-    assert keep["PressDia"][0] > drawing.REAR_FACE_X
+    assert keep["HubDia"][1] == keep["StubDia"][1] == drawing.SECTION_CENTER[1]
+    assert keep["StubDia"][0] > drawing.REAR_FACE_X
     top = drawing.SECTION_CENTER[1] + drawing.HALF_HUB
     assert top < keep["HubLength"][1] < keep["BushLength"][1]
 
@@ -575,14 +589,14 @@ def test_the_thrust_face_finishes_stay_clear_of_lines_and_captions() -> None:
     extension lines, above its pick so the leader falls to the face away from
     its own ink, its caption over it with 1.27 mm of air; nothing reaches
     the hub face's line (the lengths' extension lines), the hub Ø's text or
-    the press Ø's block."""
+    the stub Ø's block."""
     centre_y = drawing.SECTION_CENTER[1]
     keep = drawing.SECTION_KEEP
-    press_block_left = keep["PressDia"][0] - 0.0605  # r6: 120.5 mm wide, centred
+    stub_block_left = keep["StubDia"][0] - 0.0605  # r6: 120.5 mm wide, centred
     hub_text_right = keep["HubDia"][0] + 0.006
     for key, half, outboard in (
         ("hub_face", drawing.HALF_HUB, -1.0),
-        ("rear_face", drawing.HALF_PRESS, 1.0),
+        ("rear_face", drawing.HALF_STUB, 1.0),
     ):
         pick, symbol, caption = drawing.FACE_FINISHES[key]
         ink = _finish_ink(symbol)
@@ -598,8 +612,8 @@ def test_the_thrust_face_finishes_stay_clear_of_lines_and_captions() -> None:
             assert hub_text_right + 0.003 < box[0] < box[2] < pick[0] - 0.005
             assert ink["symbol"][2] < pick[0] - 0.003
         else:
-            assert pick[0] + 0.003 < box[0] < box[2] < press_block_left - 0.003
-            assert ink["symbol"][2] < press_block_left - 0.003
+            assert pick[0] + 0.003 < box[0] < box[2] < stub_block_left - 0.003
+            assert ink["symbol"][2] < stub_block_left - 0.003
             # The leftward leader passes under the symbol's own baseline.
             assert _segment_y_at(start, pick, symbol[0]) < symbol[1] - 0.001
 
@@ -614,13 +628,13 @@ def test_the_section_caption_drops_only_its_scale_row() -> None:
             drawing.caption_without_scale(fields)
 
 
-def test_the_press_block_is_taller_than_inside_arrows_leave() -> None:
-    """Farm r10: the press Ø's lower inside arrow ran through the "(" of its
+def test_the_stub_block_is_taller_than_inside_arrows_leave() -> None:
+    """Farm r10: the Ø's lower inside arrow ran through the "(" of its
     last callout row; the build stands the arrows outside."""
-    between = 2.0 * drawing.HALF_PRESS
+    between = 2.0 * drawing.HALF_STUB
     shafts = 0.0066 + 0.0072  # read off r10
-    block = 0.0222  # stacked limits over the two callout rows, r10
-    assert len(spec.PRESS_CALLOUT.splitlines()) == 2
+    block = 0.0222  # the size over the two callout rows, r10
+    assert len(spec.STUB_CALLOUT.splitlines()) == 2
     assert block > between - shafts
     assert block < between - 0.004
 
@@ -641,18 +655,18 @@ def test_the_root_radius_text_stands_on_its_arc_centre_side() -> None:
     """Farm r9: the radius' leader runs through the arc's centre, outside the
     part above and right of the upper root; with its text below the part it
     crossed both walls and the bore.  The 24.8 mm text now stands right of
-    the rear face's extension line and over the press Ø's upper one, left of
-    the press Ø's block, so the leader rises from the root over the press Ø."""
+    the rear face's extension line and over the stub Ø's upper one, left of
+    the stub Ø's block, so the leader rises from the root over the stub Ø."""
     x, y = drawing.SECTION_KEEP["ShoulderR"]
     half_text = 0.0124
-    press_top = drawing.SECTION_CENTER[1] + drawing.HALF_PRESS
-    root = (drawing.SHOULDER_X, press_top)
+    stub_top = drawing.SECTION_CENTER[1] + drawing.HALF_STUB
+    root = (drawing.SHOULDER_X, stub_top)
     shelf = (x - half_text - 0.003, y - 0.002)
     assert shelf[0] > drawing.REAR_FACE_X + 0.0015
-    assert y - 0.002 > press_top + 0.005
+    assert y - 0.002 > stub_top + 0.005
     assert y + 0.002 < drawing.SECTION_KEEP["HubLength"][1] - 0.008
-    assert x + half_text < drawing.SECTION_KEEP["PressDia"][0] - 0.0605 - 0.010
-    # Over the press Ø all the way: the leader only rises from the root.
+    assert x + half_text < drawing.SECTION_KEEP["StubDia"][0] - 0.0605 - 0.010
+    # Over the stub Ø all the way: the leader only rises from the root.
     assert shelf[1] > root[1] + 0.004
 
 
@@ -675,7 +689,7 @@ def test_the_isometric_clears_the_title_block_and_the_section() -> None:
 
 def test_the_bore_note_stands_in_the_open_sheet_over_the_title_block() -> None:
     """The numbered note (top-left at its xy, about 2.85 mm a character and
-    4.5 mm a line): right of the SECTION caption, under the press Ø's lower
+    4.5 mm a line): right of the SECTION caption, under the stub Ø's lower
     arrow (r1: 0.148), above the title block and left of the right border."""
     x, y = drawing.BORE_NOTE_XY
     lines = spec.BORE_NOTE.splitlines()
@@ -700,7 +714,7 @@ def test_registry_row_is_the_turned_steel_mha_pd_28() -> None:
     assert row["tolerance_class"] == "machined_block"
     assert row["drawing_unit"] == "in"
     process = " ".join(row["process"].split())
-    for phrase in (".238 (letter B)", ".002 feeler", "ream the bore .249 through"):
+    for phrase in (".238 (letter B)", ".002 feeler", "LOCTITE 638", "ream the bore .249 through"):
         assert phrase in process, phrase
 
 
@@ -715,7 +729,7 @@ def test_the_bush_is_cut_from_the_bought_five_eighths_bar() -> None:
         "{{cad.revision}}",
     )
     assert plan["stock_refs"] == ["1018-round-5-8"]
-    # The B drill only: MHA-PD-00 step 11 reams the bore after pressing.
+    # The B drill only: MHA-PD-00 step 11 reams the bore after bonding.
     refs = {tool["ref"] for tool in plan["tools"]}
     assert "drill-b" in refs and "reamer-2490" not in refs
     bar = _shop_equipment.load()["stock"]["1018-round-5-8"]
@@ -725,7 +739,7 @@ def test_the_bush_is_cut_from_the_bought_five_eighths_bar() -> None:
         math.pi
         * (
             (BUSH.HUB_DIA / 2.0) ** 2 * BUSH.HUB_LENGTH
-            + (BUSH.PRESS_DIA / 2.0) ** 2 * BUSH.STUB_LENGTH
+            + (BUSH.STUB_DIA / 2.0) ** 2 * BUSH.STUB_LENGTH
             - (BUSH.BORE_DIA / 2.0) ** 2 * BUSH.LENGTH
         )
     )
@@ -751,31 +765,19 @@ def test_the_pin_check_holds_the_bore_square_to_the_shoulder() -> None:
     assert 2.0 * run_off * spacing * 25.4 > 3.0 * limit_mm
 
 
-def test_the_pilot_reading_guarantees_the_printed_interference() -> None:
-    """Codjiflo #3486: the pilot stands in for MHA-PD-19's hole, so the slip
-    it may have comes off the interference.  The hole lies between the last
-    two pilot readings, at most pilot_step_max_in apart, so the press
-    diameter is accepted from PILOT plus the sheet's least interference
-    plus that step, up to PILOT plus the greatest interference."""
+def test_the_stub_is_turned_to_its_printed_band() -> None:
+    """Owner question Q8b, held for the owner: the stub is turned to its printed ±.001 by
+    micrometer, nothing fitted to the plate at the lathe, so the traveler
+    carries no pilot setup and no tenths reading; the main setup's
+    stick-out stays inside three stub diameters."""
     plan = tomllib.loads(
         (CAD_ROOT / "process" / "pd_transgear_knob_bush" / "plan.toml").read_text(
             encoding="utf-8"
         )
     )
     params = plan["parameters"]
-    least, greatest = (value / 25.4 for value in BUSH.PRESS_INTERFERENCE)
-    step = params["pilot_step_max_in"]
-    over_min = params["press_over_pilot_min_in"]
-    assert over_min == pytest.approx(least + step, abs=1e-9)
-    # Worst cases against the hole itself: PILOT <= hole < PILOT + step.
-    assert over_min - step >= least - 1e-9
-    # The window left to aim at is still wider than the micrometer's .0001.
-    assert greatest - over_min >= 0.0008
-    # The pilot starts over the largest hole the reamer is modelled to cut.
-    hole_max = (BUSH.PRESS_DIA + max(BUSH.PRESS_HOLE_BAND)) / 25.4
-    assert params["pilot_rough_dia_in"] >= hole_max + 0.0005
-    # The pilot is faced off in its own setup, so it adds nothing to the
-    # main setup's stick-out, which stays inside three press diameters.
+    assert not [name for name in params if "pilot" in name or "press" in name]
+    assert len(plan["setups"]) == 3
     stickout = (
         BUSH.LENGTH / 25.4
         + params["regrip_allowance_in"]
@@ -783,8 +785,9 @@ def test_the_pilot_reading_guarantees_the_printed_interference() -> None:
         + params["jaw_clearance_in"]
         + params["face_allowance_in"]
     )
-    assert stickout <= 3.0 * BUSH.PRESS_DIA_MIN / 25.4
+    assert stickout <= 3.0 * BUSH.STUB_DIA_MIN / 25.4
     text = " ".join(
         op["instruction"] for setup in plan["setups"] for op in setup["operations"]
     )
-    assert "The pilot stays" not in text and "PILOT plus .0005" not in text
+    assert "PILOT" not in text and "INTERFERENCE" not in text.upper()
+    assert "{{cad.step_dia_min_in:.4dot}}–{{cad.step_dia_max_in:.4dot}}" in text

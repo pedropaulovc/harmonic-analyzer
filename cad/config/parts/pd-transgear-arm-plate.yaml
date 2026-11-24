@@ -9,10 +9,11 @@ pd-transgear-arm-plate:
   drawing_unit: in
   process: >-
     Mill the outline from the 1/4 x 1-1/2 flat bar and face it to .197;
-    drill and ream the press hole on K with the .4385 set reamer and chamfer
+    drill and ream the hole on K with the .4385 set reamer and chamfer
     its face-A mouth;
-    drill and countersink the two clamp screw holes. Press the MHA-PD-28
-    bush in from face A until its shoulder seats, then ream its bore,
+    drill and countersink the two clamp screw holes. Bond the MHA-PD-28
+    bush in from face A with LOCTITE 638, its shoulder clamped on face A,
+    cure it, then ream its bore,
     before the plate is clamped to MHA-PD-18. At assembly (MHA-PD-00 steps
     12-13), after the
     MHA-PD-23 pin is pressed into MHA-PD-18: clamp the plate on the arm's
@@ -39,6 +40,6 @@ pd-transgear-arm-plate:
       reason: "required by the whole-stack stock-form gate including the rigid two-hole registration yaw; stock dowels in reamed holes locate, the screws clamp (owner-accepted). Owner ruling 2026-11-20 (#1571): \"Follow recommendations unless noted otherwise\": the recommended option 1, the location names every printed frame."
     - id: "RV-02"
       kind: "accept"
-      where: "the Ø.4385 REAM THRU press hole for bush MHA-PD-28 (datum B)"
-      finding: "reamed press hole where a bonded slip fit in a drilled hole would hold (rules 4, 23)"
-      reason: "Owner ruling 2026-11-20 (Pedro), #2425, recorded there as: \"Flat .197 plate with the pressed flanged bush; hub-as-shoulder, Ø.4375 FN2 press with the bore reamed after pressing, and the .008 ±.002 end float set at fit-up are accepted.\" The one difference from that ruling is the hole's size, Ø.4385 for Ø.4375: the 7/16 over reamer of the over/under set (owner 2026-11-24 on the Shars set: \"Yes, order Shars on or after 26 November.\"), a standard size under rule 4 (a 64th size, or .001 over or under it). By rule 4, form 2 the hole prints that size with no band and MHA-PD-28, made in this shop, is turned to it: the same press with the bore reamed after pressing, at #2425's FN2 interference, .0005-.0016 over the hole as measured (pd_transgear_knob_bush_geometry.PRESS_INTERFERENCE). A LOCTITE-bonded slip fit in its place would reverse #2425 and is put to the owner as an open question, not decided here."
+      where: "the Ø.4385 REAM THRU hole for bush MHA-PD-28 (datum B), REAM THRU, BONDED FIT"
+      finding: "reamed hole where a bonded slip fit in a drilled hole would hold (rules 4, 23)"
+      reason: "Owner question Q8b, option B, held for the owner: MHA-PD-28 is a slip fit bonded with LOCTITE 638 in this hole, which keeps the 7/16 over reamer of the over/under set (owner 2026-11-24 on the Shars set: \"Yes, order Shars on or after 26 November.\"), Ø.4385, a standard size under rule 4, printed with no band (rule 4, form 2), so the plate's walls stand. The bush's stub prints the shop's turned row, .4370 ±.0010, for a clearance of .0005-.0030 over the hole the reamer is modelled to cut (pd_transgear_knob_bush_geometry.BOND_CLEARANCE). A 7/16 drilled hole (option C, .4375 +.004/0) takes the largest stub .0005 tight, and the plate's walls around it are not derived. The plate and the bush, flat .197 with the flanged bush and hub-as-shoulder, are owner ruling 2026-11-20 (Pedro), #2425."

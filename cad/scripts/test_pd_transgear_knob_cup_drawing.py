@@ -343,7 +343,7 @@ def test_owner_sizes_follow_the_bush_stub() -> None:
     """Owner ruling 2026-11-20 (Pedro), #2425: "pd-16 diameter should also be
     reduced to match new knob bush"."""
     assert spec.OD == pytest.approx(0.44 * IN)
-    assert round(bush.PRESS_DIA / IN, spec.OD_PLACES) == pytest.approx(spec.OD / IN)
+    assert round(bush.STUB_DIA / IN, spec.OD_PLACES) == pytest.approx(spec.OD / IN)
     assert spec.LENGTH == pytest.approx(0.36 * IN)
     assert spec.PILOT_DEPTH == pytest.approx(0.152 * IN)
     assert spec.CLEAR_HOLE_DIA == pytest.approx(0.113 * IN)  # #33
