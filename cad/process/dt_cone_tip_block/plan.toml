@@ -351,11 +351,12 @@ east_riser_height_mm = 28.575
 parallel_height_mm = 12.7
 parallel_thickness_mm = 3.175
 # The least gap between a through hole's edge (its tap's basic major) and a
-# stack's inner face, the block at its least size across the jaws: the pinch
-# hole in Setup 6 (.029), the adjuster in Setup 8 (.070). cam.py recomputes
-# both; the two Holding texts print them.
-pinch_stack_clear_min_mm = 0.7366
-adjuster_stack_clear_min_mm = 1.778
+# stack's inner face, the hole anywhere in its drawing band and the block at
+# its least size across the jaws: the pinch hole in Setup 6 (.019), the
+# adjuster in Setup 8 (.060). cam.py recomputes both; the two Holding texts
+# print them.
+pinch_stack_clear_min_mm = 0.4826
+adjuster_stack_clear_min_mm = 1.524
 vise_bed_height_mm = 73.3044     # Shop workholding.vise-pm-6.bed_height_mm.
 vise_jaw_height_mm = 44.9453     # Shop workholding.vise-pm-6.jaw_height_mm.
 vise_jaw_width_mm = 158.6738     # Shop workholding.vise-pm-6.jaw_width_mm.
@@ -542,7 +543,7 @@ speed_kind = "spindle"
 tool = "em-half"
 drilling = "none"
 sizing = "other"
-instruction = "Run DT01_depth (M6 T1, 1/2 in end mill; set 2450: the display rests near 2485, not 2380): face the face up down to Z {{process.depth_target_mm:in.4dot}} in equal levels no deeper than {{process.face_step_max_mm:in.3dot}} from {{process.bar_thickness_max_mm:in.3dot}} (the thickest bar: a thinner one cuts air first). Unclamp; mark this face S; mic N to S."
+instruction = "Run DT01_depth (M6 T1, 1/2 in end mill; set 2450: the display rests near 2485, not 2380): face the face up down to Z {{process.depth_target_mm:in.4dot}} in equal levels no deeper than {{process.face_step_max_mm:in.3dot}} from {{process.bar_thickness_max_mm:in.3dot}} (the thickest bar: a thinner one cuts air first). Unclamp; file the burr off the cut face's edges; mark this face S; mic N to S."
 settings = "em-half-carbide-1018-3439-face"
 inspection = "Depth {{cad.south_face_depth_min_in:.3dot}}–{{cad.south_face_depth_max_in:.3dot}}, N to S, miked at all four corners."
 gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.south_face_depth_band_mm}}" }]
@@ -596,7 +597,7 @@ speed_kind = "spindle"
 tool = "em-half"
 drilling = "none"
 sizing = "other"
-instruction = "Run DT02_east (M6 T1; 2450, display near 2485): skim the face up at Z0. A sawn patch left: send $#, note the G54 line's Z, G10 L2 P1 Z(that Z − 0.254) (Z0 .010 lower) and run it again. Unclamp; mark this face E again."
+instruction = "Run DT02_east (M6 T1; 2450, display near 2485): skim the face up at Z0. A sawn patch left: send $#, note the G54 line's Z, G10 L2 P1 Z(that Z − 0.254) (Z0 .010 lower) and run it again. Unclamp; file the burr off the skimmed face's edges; mark this face E again."
 settings = "em-half-carbide-1018-3439-face"
 inspection = "E cut clean end to end, no sawn patch left, by eye."
 gauge_checks = "other"
@@ -636,7 +637,7 @@ speed_kind = "spindle"
 tool = "em-half"
 drilling = "none"
 sizing = "other"
-instruction = "Run DT03_top (M6 T1; 2450, display near 2485): skim TOP down to Z0 in equal levels no deeper than {{process.face_step_max_mm:in.3dot}}. An edge patch left: Z0 .010 lower as in Setup 3 and run it again. Unclamp; mark this end TOP."
+instruction = "Run DT03_top (M6 T1; 2450, display near 2485): skim TOP down to Z0 in equal levels no deeper than {{process.face_step_max_mm:in.3dot}}. An edge patch left: Z0 .010 lower as in Setup 3 and run it again. Unclamp; file the burr off the skimmed end's edges; mark this end TOP."
 settings = "em-half-carbide-1018-3439-face"
 inspection = "TOP cut clean across, no bar-edge patch left, by eye."
 gauge_checks = "other"
@@ -781,7 +782,7 @@ speed_kind = "other"
 tool = "deburring-set"
 drilling = "none"
 sizing = "other"
-instruction = "Unclamp; scrape the foot hole's mouth flush with SEAT (no countersink). Mark the end SEAT."
+instruction = "Unclamp; file the burr off SEAT's edges (never across the face); scrape the foot hole's mouth flush with SEAT (no countersink). Mark the end SEAT."
 feed = "hand"
 
 [[setups.operations]]
@@ -893,7 +894,7 @@ speed_kind = "other"
 tool = "deburring-set"
 drilling = "none"
 sizing = "other"
-instruction = "Unclamp; scrape the pinch hole's exit on E and its mouth on W flush (E seats against the fixed jaw in Setup 8). Mark the face W."
+instruction = "Unclamp; file the burr off W's edges; scrape the pinch hole's exit on E and its mouth on W flush (E seats against the fixed jaw in Setup 8). Mark the face W."
 feed = "hand"
 
 [[setups]]
