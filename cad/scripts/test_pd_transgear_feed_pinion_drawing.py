@@ -132,22 +132,22 @@ def test_fits_take_standard_names_and_name_their_mates() -> None:
     assert not any(name in text for name in standard), text
     assert spec.PIN_NUMBER in text, text
     assert callouts.BORE_PROCESS_CALLOUT == "REAM THRU"
-    assert callouts.BORE_FIT_CALLOUT.split("\n")[0] == f"{spec.PIN_NUMBER} IS TURNED TO THIS BORE"
+    assert callouts.BORE_FIT_CALLOUT == f"{spec.PIN_NUMBER} IS TURNED TO THIS BORE"
     assert "NO SHAKE" not in text
     assert not re.search(r"\d*\.\d", callouts.BORE_CALLOUT)
-    # Rule 4's necessity answer: one line, at most six words beyond the
-    # mate's number, no size.
-    necessity = callouts.BORE_FIT_CALLOUT.split("\n")[-1]
-    assert necessity == callouts.BORE_NECESSITY == "KEEPS DISC OFF MHA-PD-22"
-    assert len(re.sub(r"MHA-\S+", "", necessity).split()) <= 6
+    # Owner ruling 2026-11-24: the reasons are in the part's necessity file,
+    # not on the sheet; no callout carries a KEEPS line.
+    assert not hasattr(callouts, "BORE_NECESSITY")
+    assert not hasattr(callouts, "BOSS_NECESSITY")
     # Fit audit 2026-11-23 (rule 4, made to fit): the boss is turned last to
     # the hub's reamed bore and accepted by feel; it prints no limits and no
-    # clearance range, and says what the fit protects.
-    boss = callouts.BOSS_CALLOUT.split("\n")
-    assert boss == [
-        f"TURN TO {callouts.HUB_NAME} {spec.HUB_NUMBER}: SLIDES ON, NO ROCK",
-        f"KEEPS {hub.COLLAR_NUMBER} GAP",
-    ]
+    # clearance range.
+    assert callouts.BOSS_CALLOUT == (
+        f"TURN TO {callouts.HUB_NAME} {spec.HUB_NUMBER}: SLIDES ON, NO ROCK"
+    )
+    for text in (callouts.BORE_CALLOUT, callouts.BOSS_CALLOUT, callouts.FLAT_CALLOUT,
+                 callouts.FACE_WIDTH_CALLOUT):
+        assert "KEEPS" not in text, text
     assert not re.search(r"\.\d", callouts.BOSS_CALLOUT)
     assert hub.BOSS_CLEARANCE_LIMITS == pytest.approx((0.0, 0.001 * 25.4))
     # #2409: the flat is no fit; it keys the hub's pin, named.
