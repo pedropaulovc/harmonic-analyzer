@@ -28,4 +28,4 @@ necessity:
     feature: "sheet 1, detail B, top notch width .124 +.007/0"
     kind: gap
     reason: "wider top notch closes bowed bars' mid-span running gap"
-    source: "ch_channel_assembly_spec.BAR_GAP mid_span_bowed: .006 at +.007, .0021 over the .0039 running floor; .0045 at the row's +.010, .0006 over it, under the .001 the shop reads (Main, by the owner's delegation of 2026-11-24, rulings.md D14)"
+    source: "ch_channel_assembly_spec.BAR_GAP mid_span_bowed: .006 at +.007, .0021 over the .0039 running floor; .0045 at the row's +.010, .0006 over it, under the .001 the shop reads (delegated ruling 2026-11-24 (Main), no precedent, #2144 (rulings.md D14))"

@@ -65,10 +65,10 @@ HOLE_REAMED_LIMITS = (HOLE_REAMER_DIA, 1.97866)  # .0775-.0779 in
 # A pin that enters a hole by hand is bonded (MHA-CH-00). The largest hole
 # that may be bonded is the one the .079 pin of the .061-.500 pin-gauge set
 # (gauges.pin-gauges, a minus pin, .0788-.0790) does not enter: the bar and
-# rod travelers try it only in a hole the pin entered. Main, by the owner's
-# delegation of 2026-11-24 (rulings.md D13): a single limit, one pin of the
-# owned .001-step set, so the audit's .0785 (not a size the set holds)
-# becomes .079, .0005 looser: the gap to the smallest pin stays .0009,
+# rod travelers try it only in a hole the pin entered. Delegated ruling
+# 2026-11-24 (Main), no precedent, #2144 (rulings.md D13): a single limit,
+# one pin of the owned .001-step set, so the audit's .0785 (not a size the
+# set holds) becomes .079, .0005 looser: the gap to the smallest pin stays .0009,
 # inside 641's gap fill (BOND_GAP), and the bar's hole wall is stated at
 # this hole (.078 MIN, MHA-CH-01 RV-06).
 BOND_HOLE_MAX = 0.0790 * MM_PER_IN  # 2.0066
