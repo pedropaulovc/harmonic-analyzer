@@ -19,24 +19,21 @@ _IN = spec.MM_PER_IN
 # A drilled hole may open by the title block's DRILLED HOLES row; it never
 # closes (minus 0).
 _DRILL_OVERSIZE = drilled_oversize_mm(unit=spec.UNIT)
-# The pin centres print as REF targets (fit audit 2026-11-23, pending owner
-# confirmation): a wheel is accepted by dropping on both seats' pins.
-# spec.PIN_LOCATION_TOL stays the ANALYSIS scatter about the targets that the
-# web and the slip budget are charged; it is not printed.
-# A wheel that binds has ONE drive-pin hole re-drilled with this drill, the
-# next number size over the #40.
-EASED_HOLE_DRILL = ("#39", 0.0995)
-_EASED_HOLE_DIA = EASED_HOLE_DRILL[1] * _IN
-if not spec.PIN_HOLE_DIA < _EASED_HOLE_DIA:
-    raise AssertionError("the easing drill is not over the pin-hole drill")
+# The pin centres print as REF targets (owner ruling 2026-11-24, fit audit
+# question 8): a wheel is accepted by dropping on both seats' pins.  That
+# trial bounds the holes' spacing, not how far both lie toward the bore, so
+# the web is charged spec.PIN_CENTRE_SHIFT_MAX, the shop's drilled-hole
+# location row, never the spacing analysis spec.PIN_LOCATION_TOL (Codjiflo
+# P1 on #3485).  The sheet names no easing drill: a wheel that binds is
+# renewed (MHA-PD-00).
 
 
 def _web_worst(pin_hole_dia: float) -> float:
     """Thinnest bore/pin-hole web: both holes at their drilled maximum, the
-    pin centre moved its full analysis scatter toward the bore."""
+    pin centre at the shop's drilled-hole location row toward the bore."""
     return (
         seat_geometry.PIN_CIRCLE_RADIUS
-        - spec.PIN_LOCATION_TOL
+        - spec.PIN_CENTRE_SHIFT_MAX
         - (pin_hole_dia + _DRILL_OVERSIZE) / 2.0
         - (spec.BORE_DIA + _DRILL_OVERSIZE) / 2.0
     )
@@ -48,12 +45,9 @@ def _floor_in(value_mm: float) -> float:
     return math.floor(value_mm / _IN * 1000.0 + 1e-9) / 1000.0
 
 
-_WEB_WORST = _web_worst(spec.PIN_HOLE_DIA)  # 0.4747 (.0187)
+_WEB_WORST = _web_worst(spec.PIN_HOLE_DIA)  # 0.3706 (.0146)
 BORE_PIN_WEB_WORST_IN = _floor_in(_WEB_WORST)
-# At a hole eased to the #39: 0.4557 (.0179).
-_EASED_WEB_WORST = _web_worst(_EASED_HOLE_DIA)
-EASED_WEB_WORST_IN = _floor_in(_EASED_WEB_WORST)
-if not 0.0 < EASED_WEB_WORST_IN <= BORE_PIN_WEB_WORST_IN:
+if not 0.0 < BORE_PIN_WEB_WORST_IN:
     raise AssertionError("the drive-pin holes break into the bore at print-worst")
 
 
@@ -63,20 +57,16 @@ def _inch(value_mm: float, places: int) -> str:
 
 
 # The shortfall prints as a plain fact; its governance is RV-01 in
-# pd-transgear-removable.yaml (owner ruling 2026-11-01: a permanent minor
-# exception, revisit in #2141), never the sheet.  The eased hole's web
-# follows it on the same line.
+# pd-transgear-removable.yaml (the owner's 2026-11-01 minor exception at
+# .018, restated at this value by a delegated ruling 2026-11-24; revisit in
+# #2141), never the sheet.
 BORE_PIN_WEB_NOTE = (
-    f"BORE TO DRIVE-PIN HOLE WEB {_inch(BORE_PIN_WEB_WORST_IN * _IN, 3)} MIN; "
-    f"{_inch(EASED_WEB_WORST_IN * _IN, 3)} MIN AT A HOLE DRILLED "
-    f"{EASED_HOLE_DRILL[0]}."
+    f"BORE TO DRIVE-PIN HOLE WEB {_inch(BORE_PIN_WEB_WORST_IN * _IN, 3)} MIN."
 )
-# The pin holes' acceptance: by the mates, never by a reading of the offsets,
-# which print as REF targets.  One line, so the notes stay five lines.
-TRIAL_NOTE = (
-    "WHEEL DROPS ON BOTH SEATS' PINS FREELY; ELSE DRILL ONE PIN HOLE "
-    f"{EASED_HOLE_DRILL[0]}."
-)
+# The pin holes' location is made to its mates (rule 4): the offsets print as
+# REF and the trial on the named pins, their acceptance, prints on the holes'
+# own 2X callout (pd_transgear_removable_callouts.PIN_HOLE_CALLOUT), so no
+# note line carries it.
 
 
 def _per_configuration(render: Callable[[int], str]) -> str:
@@ -119,8 +109,8 @@ GEAR_DATA = "\n".join(
     ]
 )
 
-# The drive-pin holes' mates print at their location callouts (the drawing's
-# CALLOUTS); the sheet draws T24 only, so it says what the other two share.
+# Four short lines (rule 7): the sheet draws T24 only, so the third says
+# what the other two share; the fourth is the web between those holes.
 DRAWING_NOTES = "\n".join(
     (
         "BLANK, 1 EACH: McMASTER "
@@ -129,10 +119,9 @@ DRAWING_NOTES = "\n".join(
         )
         + ".",
         "TEETH, O.D. AND PLATE FACES AS SUPPLIED; HUB REMOVED FLUSH.",
-        "BORE, DRIVE-PIN HOLES AND PLATE SAME ON "
+        "BORE AND DRIVE-PIN HOLES SAME ON "
         + " / ".join(name for name, _teeth in spec.CONFIGS)
         + ".",
         BORE_PIN_WEB_NOTE,
-        TRIAL_NOTE,
     )
 )

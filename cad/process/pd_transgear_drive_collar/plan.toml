@@ -19,21 +19,31 @@
 #   through, then drills #53 and reams the .0615 flat-pin hole blind to its
 #   floor, all on one line through the axis.
 # - Setup 3, bench: deburr, clear the flat-pin breakthrough from the bore,
-#   check the flat pin's centre over pins and its floor, oil.
+#   check the flat pin's centre over pins and its floor, press the
+#   MHA-PD-VN-70 flat pin to the floor, oil. The pin is pressed here, not at
+#   MHA-PD-00: MHA-PD-08's D-flat is milled to this collar with its pin
+#   pressed (MHA-PD-08 note 2), and that shaft is needed finished before the
+#   collar's own assembly step (Codjiflo P2 on #3485). Collar and pin leave
+#   this traveler as one permanent pair.
 # Left to MHA-PD-00 (final op): the MHA-PD-VN-54 dowel presses (step 20A),
-# the MHA-PD-VN-70 flat-pin press (20C), the three MHA-PD-09 wheels tried on
+# the pressed flat pin checked (20C), the three MHA-PD-09 wheels tried on
 # the dowels (20E), the pilot faced to fit (21A), the rear faced to fit (29D)
 # and the rear bore mouth's .008 X 45° break through the pin (29E).
 #
-# Fit audit 2026-11-23 (pending owner confirmation; owner, 2026-11-23: "can
-# the holes not be reamed in the first place"):
+# Owner ruling 2026-11-24, fit audit questions 7 (the bore drilled, the
+# D-core turned to it) and 8 (the dowel centres by trial); the reams to the
+# bought pins rest on drawing-guidelines rule 4 (owner, 2026-11-23: "can the
+# holes not be reamed in the first place"):
 # - The bore is the #11 drill's (the title block's DRILLED HOLES row);
 #   MHA-PD-08's D-core is turned to slide in it. No .1920 reamer, no pins
 #   for a .0005 bore band.
 # - The dowel holes and the flat pin's hole are reamed to the bought pins,
 #   which are their gauges: none enters by hand. No band is gauged, no pin
-#   or reamer is miked, no trial hole is reamed; a pin that does enter by
-#   hand is bonded at MHA-PD-00 (20B, 20D), not a scrapped collar.
+#   or reamer is miked, no trial hole is reamed. A pin that does enter by
+#   hand is in a hole of unknown size (the pins' least sizes lie over the
+#   whole of what the reamers are taken to cut), so no bonded clearance can
+#   be stated for it: the collar is scrap (the sheet's note 3; Codjiflo P2
+#   on #3485 removed the bond salvage).
 # - The dowel centres are the program's targets: their acceptance is the
 #   three MHA-PD-09 wheels dropping on at MHA-PD-00 (20E), never a reading
 #   over pins here. The flat pin's centre keeps its printed ±.002 and is
@@ -156,18 +166,11 @@ tool_out_min_in = 0.6
 # and the .061 pins; the centre is D + over_flat_half_sum_in - R, the
 # constant half of .093 + .061.
 over_flat_half_sum_in = 0.077
-# What the pins can hide: each is up to .0002 under its marked size (Class
-# ZZ minus) and stands loose in its hole, the bore's by under .0012 (the
-# next pin does not enter), the .093 by up to .0007 and the .061 by up to
-# .0012 in holes the reamers cut within .0005 over size; the anvils push
-# both pins toward each other. D reads low by up to .0002 + (.0012 +
-# .0007) / 2 = .00115 and R low by up to .00095, the half sum .0002 high:
-# the centre is off by up to .00115 either way (over_pins_bias_max_in,
-# rounded up). Its acceptance is the sheet's .116-.120 with that off each
-# end: .1172-.1188.
-over_pins_bias_max_in = 0.0012
-flat_accept_min_in = 0.1172
-flat_accept_max_in = 0.1188
+# The pins stand loose in their holes and up to .0002 under their marked
+# sizes, so a reading can sit up to .0012 off the true centre. The
+# acceptance is the sheet's .116-.120 as printed (traveler review r1 of the
+# fit batch: a narrower window scraps parts that meet the print); a reading
+# near a limit is taken again with the pins re-seated.
 # Speeds and feeds: the shop settings (cad/process/shop/pd.toml, the
 # MHA-PD-22 block, sourced there): spot, #43 and #53 2800 rpm × .001 in/rev
 # = 2.8 in/min; the reamers 1400 × .001 = 1.4 in/min. cam.py refuses a feed
@@ -233,6 +236,11 @@ status = "to_order"
 id = "files"
 name = "Files"
 ref = "jig-files"
+
+[[tools]]
+id = "arbor-press"
+name = "Arbor press, 1 ton"
+ref = "arbor-press"
 
 [[setups]]
 machine_kind = "lathe"
@@ -406,7 +414,7 @@ milling_cuts = [
 ]
 
 [[setups.operations]]
-instruction = "A dowel entering a hole by hand in Op 170: not scrap. Mark that hole on this sheet and go on: MHA-PD-00 bonds that dowel (step 20B)."
+instruction = "A dowel entering a hole by hand in Op 170 (the hole is oversize; no cut remedies it): stop the file at its M6 T4 stop. The collar is scrap; make another from Setup 1."
 feed = "hand"
 
 [[setups.operations]]
@@ -436,16 +444,16 @@ milling_cuts = [
 ]
 
 [[setups.operations]]
-instruction = "The pin entering by hand in Op 200: not scrap. Mark it on this sheet and go on: MHA-PD-00 bonds the pin (step 20D)."
+instruction = "The pin entering by hand in Op 200 (the hole is oversize; no cut remedies it): the collar is scrap; make another from Setup 1."
 feed = "hand"
 
 [[setups]]
 machine_kind = "other"
-title = "Bench: deburr, clear the bore, check the flat pin's centre and floor, oil"
+title = "Bench: deburr, clear the bore, check the flat pin's centre and floor, press the flat pin, oil"
 machine = "Bench"
 envelope = "other"
 indexing = "none"
-diagram = { file = "diagrams/inspect.svg", alt = "The finished collar: the drilled bore through, the 2X dowel holes reamed through at their .2756 targets from the bore's axis, the flat pin's blind hole at .118 with its floor .08 from the seat face; the flat pin's centre measured over pins." }
+diagram = { file = "diagrams/inspect.svg", alt = "The finished collar: the drilled bore through, the 2X dowel holes reamed through at their (.276) targets from the bore's axis, the flat pin's blind hole at .118 with its floor .08 from the seat face; the flat pin's centre measured over pins." }
 vise_hold = "other"
 beam = "other"
 
@@ -472,12 +480,12 @@ gauge_checks = [{ gauge = "pin-gauges", band_mm = "{{cad.bore_dia_band_mm}}" }]
 feed = "hand"
 
 [[setups.operations]]
-instruction = "The bore's pin through the bore and the set's .093 pin through the dowel hole beside the flat pin's hole, each standing about .3 out of the rear face. Mike over the two pins; the reading less half of Pb + .093 is that hole's centre from the bore's axis: write it as D. D is a step toward the flat pin's centre (Op 260), not an acceptance: the dowel centres are the program's targets, accepted by the three MHA-PD-09 wheels dropping on at MHA-PD-00 (step 20E)."
+instruction = "The bore's pin through the bore and the set's .093 pin through the dowel hole beside the flat pin's hole, each standing about .3 out of the rear face. Mike over the two pins as M. That hole's centre from the bore's axis is D = M − (Pb + .093)/2: write D here. D feeds Op 260; it is not an acceptance."
 feed = "hand"
 
 [[setups.operations]]
 instruction = "The bore's pin out. The .093 pin in the same dowel hole, the set's .061 pin in the flat pin's hole, both standing out of the rear face. Mike over the two pins as R. The flat pin's centre from the bore's axis is D + {{process.over_flat_half_sum_in:.3dot}} − R."
-inspection = "Flat pin's centre {{cad.flat_pin_hole_centre_min_in:.3dot}}–{{cad.flat_pin_hole_centre_max_in:.3dot}} from the bore's axis: accept {{process.flat_accept_min_in:.4dot}}–{{process.flat_accept_max_in:.4dot}} (the pins stand loose in their holes and up to .0002 under their marked sizes: up to {{process.over_pins_bias_max_in:.4dot}} either way)."
+inspection = "Flat pin's centre {{cad.flat_pin_hole_centre_min_in:.3dot}}–{{cad.flat_pin_hole_centre_max_in:.3dot}} from the bore's axis. Within .001 of a limit: re-seat both pins and mike again."
 gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.flat_pin_hole_centre_band_mm}}" }]
 feed = "hand"
 
@@ -488,13 +496,23 @@ gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.flat_pin_floor_station_ba
 feed = "hand"
 
 [[setups.operations]]
-instruction = "The .191 pin refused in the bore in Op 240: repeat Op 230 once and gauge again. Still refused, or the .195 pin entering; the flat pin's centre outside {{process.flat_accept_min_in:.4dot}}–{{process.flat_accept_max_in:.4dot}} (Op 260); or its floor outside {{cad.flat_pin_floor_station_min_in:.2dot}}–{{cad.flat_pin_floor_station_max_in:.2dot}} (Op 270): scrapped, not reworked; make another from Setup 1."
+instruction = "The .191 pin refused in the bore in Op 240: repeat Op 230 once and gauge again. Still refused, or the .195 pin entering; the flat pin's centre outside {{cad.flat_pin_hole_centre_min_in:.3dot}}–{{cad.flat_pin_hole_centre_max_in:.3dot}} (Op 260); or its floor outside {{cad.flat_pin_floor_station_min_in:.2dot}}–{{cad.flat_pin_floor_station_max_in:.2dot}} (Op 270): scrapped, not reworked; make another from Setup 1."
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Finish (drawing: bright machined, oiled): wipe the collar clean and give it a light coat of light machine oil; wipe the dowel holes and the flat pin's hole dry for their presses."
+speed_kind = "other"
+tool = "arbor-press"
+drilling = "none"
+sizing = "other"
+instruction = "Press the MHA-PD-VN-70 pin into the flat pin's hole: the collar on the arbor press's plate on its pilot's front face, rear face up; start the pin's lead in the hole's mouth and press it flush with the ram, then on to the floor with a 3/64 pin punch under the ram, until it stops solid. Collar and pin are one permanent pair from here: MHA-PD-08's D-flat is milled to this pin."
+feed = "hand"
+inspection = "The pin's end lies below the rear face and does not move under the punch pushed by hand. It moves: the collar is scrap; make another from Setup 1."
+gauge_checks = "other"
+
+[[setups.operations]]
+instruction = "Finish (drawing: bright machined, oiled): wipe the collar clean and give it a light coat of light machine oil; wipe the dowel holes dry for their presses."
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Left to MHA-PD-00, not done here: the two MHA-PD-VN-54 dowels pressed (step 20A) and the MHA-PD-VN-70 pin pressed to the floor (20C), either one bonded if it enters by hand (20B, 20D); the three MHA-PD-09 wheels tried on the dowels (20E); the pilot faced to fit (21A, note 5); the rear face faced to fit (29D, note 6) and the rear bore mouth broken .008 X 45° through the pin's crest (29E). The collar leaves this traveler with the body and pilot long."
+instruction = "Left to MHA-PD-00, not done here: the two MHA-PD-VN-54 dowels pressed (step 20A); the three MHA-PD-09 wheels tried on the dowels (20E); the pilot faced to fit (21A, note 5); the rear face faced to fit (29D, note 6) and the rear bore mouth broken .008 X 45° (29E)."
 feed = "hand"
