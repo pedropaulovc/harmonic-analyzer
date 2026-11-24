@@ -47,6 +47,7 @@ from _feature_requirements import part_metadata, requirement
 from _gtol_cylinder import CylinderFace
 from _gtol_planar import PlanarFace
 from _printed_limits import drilled_limits, limits
+from dt_crank_arm_spec import SEAM_BOND_CLEARANCE_MM
 from dt_crank_hub_geometry import (
     HUB_BARREL_LENGTH,
     HUB_BORE_BAND,
@@ -495,6 +496,14 @@ requirement(
         ),
         "depth_nominal": (SEAM_DEPTH, ((_GEOM, "SEAM_DEPTH"),)),
         "made_at": ("assembly", ((_NOTES, "SEAM_CALLOUT"),)),
+        "diametral_clearance": (
+            list(SEAM_BOND_CLEARANCE_MM),
+            (
+                ("dt_crank_arm_spec", "SEAM_BOND_CLEARANCE_MM"),
+                ("dt_crank_arm_spec", "SEAM_BOND_CLEARANCE_TEXT"),
+                (_NOTES, "SEAM_CALLOUT"),
+            ),
+        ),
         "callout": (
             SEAM_CALLOUT.replace("<MOD-DIAM>", "\u00d8").replace(
                 "<HOLE-DEPTH>", "\u21a7"

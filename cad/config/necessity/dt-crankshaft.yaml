@@ -1,7 +1,7 @@
 # Why each ream and each band tighter than the title block stays on MHA-DT-11
 # (drawing-guidelines rule 4; owner ruling 2026-11-24: the reason lives here,
 # not on the sheet).  The fit audit's rows for MHA-DT-11 (2026-11-23,
-# approved as recommended 2026-11-24): the drive-pin holes reamed with no
+# each one kept stands on its entry below): the drive-pin holes reamed with no
 # band, the offsets, spigot and overall kept as drawn; the three turned fits
 # became REF under note 3 and are not tight bands.
 necessity:
@@ -15,7 +15,7 @@ necessity:
   # pins alone: its bore has .018 radial air round the shank. At the
   # ±.002 reamed-hole row the offset leaves the ANSI #25 plate .0008 mm
   # from the spigot, under the floor. The band stays while the owner
-  # decides (FitLaneDT, 2026-11-24; batch-dt/crank/Q8-dt11-centre-shift.png).
+  # decides (N-02 names the failing check; batch-dt/crank/Q8-dt11-centre-shift.png).
   - id: N-02
     feature: "sheet 1, END view, 2X drive-pin offset .2756 ±.0009"
     kind: gap

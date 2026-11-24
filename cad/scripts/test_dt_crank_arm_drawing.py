@@ -43,6 +43,20 @@ def test_arm_is_a_matched_receiver_for_the_separate_hub() -> None:
     assert not hasattr(spec, "PIN_HOLE_SPEC")
 
 
+def test_seam_pin_note_prints_its_bond_clearance_inside_638s_gap() -> None:
+    # Machinist review r1 (farm run 20261124T110807008Z): the drilled bonded
+    # seat prints its diametral clearance (rule 23), at least .001 wide
+    # (rule 4) and inside LOCTITE 638's largest gap.
+    low, high = (value / 25.4 for value in spec.SEAM_BOND_CLEARANCE_MM)
+    assert (low, high) == pytest.approx((-0.0003, 0.0039))
+    assert high - low >= 0.001
+    assert spec.SEAM_BOND_CLEARANCE_MM[1] <= 0.25
+    assert spec.SEAM_BOND_CLEARANCE_TEXT == ".0003 INTERFERENCE TO .004 CLEARANCE"
+    assert "-" not in spec.SEAM_BOND_CLEARANCE_TEXT  # never a negative clearance
+    assert spec.SEAM_BOND_CLEARANCE_TEXT in spec.SEAM_NOTE
+    assert "MHA-DT-VN-59" in spec.SEAM_NOTE and "LOCTITE 638" in spec.SEAM_NOTE
+
+
 def test_axial_seam_key_is_six_oclock_and_the_cut_pin_seats_flush() -> None:
     assert spec.AXIAL_PIN_DIA == geometry.AXIAL_PIN_DIA == pytest.approx(5 / 32 * 25.4)
     # The seam runs deeper than the cut pin at every printed limit, and stops

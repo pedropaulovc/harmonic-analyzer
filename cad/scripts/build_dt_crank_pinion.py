@@ -71,7 +71,6 @@ from dt_crank_pinion_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
     FACE_WIDTH,
-    FACE_WIDTH_LIMITS,
     OUTSIDE_DIA,
     OVERALL_LENGTH,
     PIN_DIA,
@@ -671,13 +670,10 @@ def build(adapter) -> dict[str, str]:
     # diameter and the turned band take the title block's .XXX row (fit
     # audit 2026-11-23, MHA-DT-10.outside_dia and .turned_band).  None on the
     # boss -- nothing runs on it.
-    # The face's own +.000/-.010: the drive train proves the 64T row engagement
-    # at its short limit and the turned band's T120 clearance at its long one
-    # (Codex P1 on #1128; user ruling 2026-09-30).  It rides the printed
-    # lower witness; the blank's own extrude depth stays definition-only.
-    set_dimension_bilateral_tolerance(
-        adapter, "BossProfile", "FaceWidth", *FACE_WIDTH_LIMITS, display_unit=UNIT
-    )
+    # The face prints at the title block's .XX row, no band of its own
+    # (machinist review r1, farm run 20261124T110807008Z; dt_crank_pinion_spec
+    # FACE_WIDTH_BAND): the drive train still proves the 64T row engagement at
+    # its short limit and the turned band's T120 clearance at its long one.
     # The shoulder's +.000/-.010: the drive train proves the T120 air at its
     # long limit, and the radial clearance at the turned band's title-block
     # large limit.

@@ -279,13 +279,16 @@ def test_matched_fits_and_distinct_pins_live_on_their_feature_callouts() -> None
     assert not hasattr(dt_crank_hub_spec, "DRAWING_NOTES")
     seat = dt_crank_hub_notes.SEAT_CALLOUT
     # Owner ruling 2026-11-24, fit audit question 21: the seat is turned to
-    # arm MHA-DT-06's bore, the acceptance by feel, and bonded.  Two lines of
-    # words (rule 7), no assembly instruction (END FLUSH lives on the
-    # MHA-DT-00 bond step) and no private phrase (rule 26: TO SUIT).
+    # arm MHA-DT-06's bore and bonded; the bond's diametral clearance is the
+    # acceptance, printed once on this member made last (rule 23; machinist
+    # review r1, farm run 20261124T110807008Z).  Two lines of words (rule 7),
+    # no assembly instruction (END FLUSH lives on the MHA-DT-00 bond step)
+    # and no private phrase (rule 26: TO SUIT).
     assert seat.splitlines() == [
-        "TURN TO CRANK ARM MHA-DT-06 BORE:",
-        "ARM SLIDES ON BY HAND; BONDED",
+        "TURN TO CRANK ARM MHA-DT-06 BORE",
+        "LESS .0005-.003: SLIDES ON; BONDED",
     ]
+    assert geometry.SEAT_SLIP_CLEARANCE[1] <= 0.25  # LOCTITE 638's gap
     assert "FLUSH" not in seat and "TO SUIT" not in seat
     # The arm bore is made first; the hub seat is turned to it, so its
     # nominal prints as a reference.
@@ -293,14 +296,18 @@ def test_matched_fits_and_distinct_pins_live_on_their_feature_callouts() -> None
     seam = dt_crank_hub_notes.SEAM_CALLOUT
     # Size, the named drill (fit audit 2026-11-23, MHA-DT-06_DT-31.seam_pin:
     # 5/32 drilled and the pin bonded) and the depth first (rule 26), then two
-    # lines naming the mate and the pin by name and number; no private phrase
-    # (ON SEAM) and no assembly instruction (PERMANENT PAIR; DISASSEMBLE AT
-    # MHA-DT-09).
+    # lines naming the mate and the pin by number and the bond's clearance,
+    # the same text the arm's note 3 prints (one joint, both sheets agree);
+    # no private phrase (ON SEAM) and no assembly instruction (PERMANENT
+    # PAIR; DISASSEMBLE AT MHA-DT-09).
     assert seam.splitlines() == [
         "(<MOD-DIAM>.156) 5/32 DRILL <HOLE-DEPTH> .17 AT ASSEMBLY",
-        "WITH CRANK ARM MHA-DT-06 FOR",
-        "DOWEL PIN MHA-DT-VN-59, BONDED",
+        "WITH MHA-DT-06; PIN MHA-DT-VN-59 BONDED:",
+        ".0003 INTERFERENCE TO .004 CLEARANCE",
     ]
+    import dt_crank_arm_spec
+
+    assert dt_crank_arm_spec.SEAM_BOND_CLEARANCE_TEXT in dt_crank_arm_spec.SEAM_NOTE
     assert "REAM" not in seam
     # The bore is the .3760 reamer's, no band; the shank is turned to it.
     assert dt_crank_hub_notes.BORE_CALLOUT.splitlines() == [

@@ -2,7 +2,7 @@
 # (drawing-guidelines rule 4; owner ruling 2026-11-24: the reason lives here,
 # not on the sheet).  The bore reamed with MHA-DT-11's shank turned to it and
 # the seat length's +.000/-.010 are the fit audit's rows for MHA-DT-31
-# (2026-11-23, approved as recommended 2026-11-24); the seat's slip fit and
+# (2026-11-23; each one kept stands on its entry below); the seat's slip fit and
 # bond are owner ruling 2026-11-24, fit audit question 21.
 necessity:
   - id: N-01

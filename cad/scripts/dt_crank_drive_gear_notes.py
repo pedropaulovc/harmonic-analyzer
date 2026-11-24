@@ -21,7 +21,10 @@ from dt_crank_drive_gear_spec import inch_text
 # Copied here in mm rather than imported: the stack is an assembly diagnostic
 # outside the part's rebuild closure (test_dt_crank_drive_gear_drawing checks
 # the copy against the stack offline).
-MESH_BACKLASH_REF_MM = (0.088107, 0.958878)
+# The pinion's face at the title block's .XX row (machinist review r1, farm
+# run 20261124T110807008Z) moved the stack's range by .00001 in; it still
+# prints .0035 TO .0377.
+MESH_BACKLASH_REF_MM = (0.087891, 0.959133)
 BACKLASH_LABEL = "TRANSVERSE BACKLASH WITH MHA-DT-10 (REF)"
 
 

@@ -19,11 +19,20 @@ from _printed_tolerance import edge_break_chamfer_mm
 # .005-.010 (0.127-0.254).  The larger minimum only adds air over the R.004
 # MAX under-head radius; the maximum is the title block's edge break, which
 # the cup spec's floor budget already holds, and with the head's .010 the two
-# maxima (0.508) stay inside the ruling's 0.51 break budget.  swTolLIMIT
-# prints the two limits; the model sits at their middle.  (min, max) legs.
-LIMIT_TOL_TYPE = 3  # swTolType_e.swTolLIMIT
-FLOOR_HOLE_CHAMFER_LIMITS = (0.127, 0.254)  # .005-.010
-FLOOR_HOLE_CHAMFER = round(sum(FLOOR_HOLE_CHAMFER_LIMITS) / 2.0, 6)
+# maxima (0.508) stay inside the ruling's 0.51 break budget.
+#
+# Printed as the single limit .005 MIN (swTolMIN: the model sits at it): the
+# stacked .010/.005 was a band .005 wide with no register entry (machinist
+# review r1, farm run 20261124T110807008Z; drawing-guidelines rule 4: a
+# single-limit edge break is not a tight band).  The title block's .010 chamfer MAX on every edge is its
+# upper limit, so the two limits below are the analysis band the head-seat
+# proofs read, and only the minimum prints.  A single size at the .XXX row
+# would not serve: .005 +/-.005 can come out sharp under the R.004 radius,
+# and .010 +/-.005 breaks .015, past the edge break the head's bearing
+# annulus budgets.  (min, max) legs.
+MIN_TOL_TYPE = 5  # swTolType_e.swTolMIN
+FLOOR_HOLE_CHAMFER_LIMITS = (0.127, edge_break_chamfer_mm(unit=cup.UNIT))  # .005-.010
+FLOOR_HOLE_CHAMFER = FLOOR_HOLE_CHAMFER_LIMITS[0]
 
 for _ok, _what in (
     (

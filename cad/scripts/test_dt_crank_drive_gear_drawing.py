@@ -543,6 +543,19 @@ def test_bore_and_keyway_dimensions_link_one_matched_fit_note() -> None:
         assert notes.SHAFT_MATE_NUMBER not in callout, name
         assert notes.KEY_MATE_NUMBER not in callout, name
         assert "CLEARANCE" not in callout, name
+    # Machinist review r1 (farm run 20261124T110807008Z): the keyway width's
+    # band had no register reason of a rule-4 kind, so the width prints as a
+    # reference, key MHA-DT-VN-71's trial in note 1 its requirement, and the
+    # register keeps no entry for it.
+    assert drawing.REFERENCE_DIMENSIONS == ("KeywayWidth",)
+    assert f"KEY {notes.KEY_MATE_NUMBER} SLIDES IN THE KEYWAY." in drawing.BORE_FIT_NOTE
+    import yaml
+
+    register = Path(__file__).resolve().parents[1] / "config" / "necessity"
+    entries = yaml.safe_load(
+        (register / "dt-crank-drive-gear.yaml").read_text(encoding="utf-8")
+    )["necessity"]
+    assert not [e for e in entries if "keyway width" in e["feature"]]
     note = " ".join(line.strip() for line in drawing.BORE_FIT_NOTE.splitlines())
     # MHA-DT-03's keyed-sheet words (draw_dt_cone_gear on the cone batch):
     # the mate and its land by diameter, then the key; no clearance and no
@@ -649,7 +662,7 @@ def test_dimension_text_lands_clear_of_the_views_and_the_title_block() -> None:
         drawing.FRONT_KEEP["KeywayT"], drawing.KEYWAY_T_CALLOUT, "0.4025 \N{PLUS-MINUS SIGN}0.0030"
     )
     width_keep = drawing.FRONT_KEEP["KeywayWidth"]
-    centred = _text_box(width_keep, drawing.KEYWAY_WIDTH_CALLOUT, "0.0625 +0.0020")
+    centred = _text_box(width_keep, drawing.KEYWAY_WIDTH_CALLOUT, "(0.0625)")
     shift = width_keep[0] - centred[0]
     keyway_width = (centred[0] + shift, centred[1], centred[2] + shift, centred[3])
     chamfer_keep = drawing.SECTION_KEEP["BoreSouthChamferSize"]

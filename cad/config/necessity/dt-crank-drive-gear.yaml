@@ -1,19 +1,20 @@
 # Why each ream and each band tighter than the title block stays on MHA-DT-07
 # (drawing-guidelines rule 4; owner ruling 2026-11-24: the reason lives here,
 # not on the sheet).  The reamed bore with MHA-DT-04's land turned to it, the
-# keyway and the face width as kept are the fit audit's rows for MHA-DT-07
-# (2026-11-23, approved as recommended 2026-11-24).
+# keyway T and the face width as kept are the fit audit's rows for MHA-DT-07
+# (2026-11-23; each one kept stands on its entry below).  The keyway width's
+# .0625 +.002/.000 band (former N-02, kind gap) is gone: its reason, the 64T
+# clocking on the key, is no gap, and the key's side play only shifts the
+# crank index (error_budget.phase_profiles), so no check fails without it.
+# The width prints as a reference and key MHA-DT-VN-71's trial in note 1
+# governs (machinist review r1, farm run 20261124T110807008Z;
+# drawing-guidelines rule 4, form 3: the bought key is the gauge).
 necessity:
   - id: N-01
     feature: "sheet 1, front view, Ø.3760 REAM THRU bore"
     kind: trace
     reason: "bore shake rocks the 64T, a mesh run-out"
     source: "gear_seat_fit.GEAR_SEAT_CLEARANCE (.0010-.0038); the owned .3760 over reamer cuts the land-1 bores alike"
-  - id: N-02
-    feature: "sheet 1, front view, .0625 +.002/.000 keyway width"
-    kind: gap
-    reason: "a wider keyway lets the 64T clock on key MHA-DT-VN-71"
-    source: "cone_land_key.KEYWAY_WIDTH_BAND; the 1/16 broach shared with the land-1 cone gears"
   - id: N-03
     feature: "sheet 1, front view, .4025 ±.003 keyway T"
     kind: gap

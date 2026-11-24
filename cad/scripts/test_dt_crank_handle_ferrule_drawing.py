@@ -112,6 +112,10 @@ def test_callouts_name_the_mating_tenon_and_flag_the_skim_note() -> None:
     # words; the OD's skim and the walls it leaves are numbered note 1,
     # flagged from the OD.  Bonding the ring on is the assembly's business.
     assert notes.HANDLE_NUMBER in notes.BORE_FIT_CALLOUT
+    # Machinist review r2/r3 (farm run 20261124T110807008Z): an N drill is
+    # .302, so the .303 hole names its process but no letter drill (rule 3).
+    assert notes.BORE_FIT_CALLOUT.splitlines()[0] == "DRILL THRU"
+    assert spec.BORE_DIA == pytest.approx(0.303 * 25.4)
     for callout in (notes.BORE_FIT_CALLOUT, notes.OUTER_DIA_CALLOUT):
         assert len(callout.splitlines()) <= 3
         assert "EPOXY" not in callout and "LATHE" not in callout

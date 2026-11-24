@@ -103,6 +103,7 @@ from dt_crank_arm_spec import (
     HALF_WIDTH,
     HANDLE_PIVOT_HOLE_SPEC,
     HUB_SEAT_DIA,
+    SEAM_BOND_CLEARANCE_MM,
     SEAT_PRESS_NOTE,
     STOCK_FRACTION_DENOMINATOR,
     STOCK_FRACTION_DIMENSIONS,
@@ -578,6 +579,10 @@ requirement(
         "depth_nominal": (SEAM_DEPTH, ((_HUB, "SEAM_DEPTH"),)),
         "depth_from": ("outboard_face", ((_NOTES, "SEAM_CALLOUT"),)),
         "made_at": ("assembly", ("SEAM_NOTE",)),
+        "diametral_clearance": (
+            list(SEAM_BOND_CLEARANCE_MM),
+            ("SEAM_BOND_CLEARANCE_MM", "SEAM_BOND_CLEARANCE_TEXT", "SEAM_NOTE"),
+        ),
         "callout": (SEAM_CALLOUT, ((_NOTES, "SEAM_CALLOUT"),)),
     },
     precision={"depth": 2},

@@ -728,13 +728,18 @@ def test_head_seat_breaks_clear_each_mating_corner_and_keep_a_bearing_flat() -> 
     assert under_head == pytest.approx(seat.UNDER_HEAD_AIR_MIN, abs=1e-6)
     assert head_edge == pytest.approx(seat.HEAD_EDGE_AIR_MIN, abs=1e-6)
     assert min(under_head, head_edge) > 0.0
-    # Each break is modelled inside its limits and no larger than the title
-    # block's edge break, so the specs' existing annulus budgets still hold.
+    # Each break prints its single limit .005 MIN and is modelled at it; the
+    # title block's edge break caps it (machinist review r1, farm run
+    # 20261124T110807008Z: the stacked .010/.005 was a tight band), so the
+    # specs' existing annulus budgets still hold.  The two are one mating
+    # pair and print alike.
+    assert seat.HEAD_CHAMFER_TOL_TYPE == cup_seat.MIN_TOL_TYPE == 5  # swTolMIN
     for nominal, (low, high) in (
         (seat.HEAD_CHAMFER, seat.HEAD_CHAMFER_LIMITS),
         (cup_seat.FLOOR_HOLE_CHAMFER, cup_seat.FLOOR_HOLE_CHAMFER_LIMITS),
     ):
-        assert low < nominal < high <= edge_break_chamfer_mm(unit=spec.UNIT)
+        assert low == nominal == pytest.approx(0.005 * 25.4)
+        assert high == edge_break_chamfer_mm(unit=spec.UNIT)
     # The flat annulus left on the narrow side, from the printed limits:
     # smallest head less its largest break, over the largest drilled hole
     # plus its largest break, the head pushed over by its running play.  The
@@ -753,7 +758,7 @@ def test_head_seat_breaks_clear_each_mating_corner_and_keep_a_bearing_flat() -> 
 
 
 def test_head_seat_prints_native_limits_with_words_only_callouts() -> None:
-    # The limits are the model dimensions' own (swTolMAX, swTolLIMIT); the
+    # The limits are the model dimensions' own (swTolMAX, swTolMIN); the
     # callouts name what each feature clears and carry no number.
     for callout in (notes.UNDER_HEAD_RADIUS_CALLOUT, notes.HEAD_CHAMFER_CALLOUT):
         assert "MHA-DT-35" in callout

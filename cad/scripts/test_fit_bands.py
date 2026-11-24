@@ -601,10 +601,11 @@ def test_band_uses_are_found() -> None:
     helpers = [u for u in BAND_USES if u.order == "upper_lower"]
     assert len(helpers) >= 50, f"band consumer scan found only {len(helpers)} helper uses"
     ids = {f"{u.module}:{u.expression}" for u in BAND_USES}
-    # The 64T's keyway width is the anchor since its reamed bore lost its
-    # band (fit audit 2026-11-23, MHA-DT-07.bore).
-    assert "build_dt_crank_drive_gear:KEYWAY_WIDTH_BAND" in ids, (
-        "missing band consumer anchor: build_dt_crank_drive_gear:KEYWAY_WIDTH_BAND"
+    # The 64T's face width is the anchor since its reamed bore and then its
+    # keyway width lost their bands (fit audit 2026-11-23, MHA-DT-07.bore;
+    # machinist review r1, farm run 20261124T110807008Z).
+    assert "build_dt_crank_drive_gear:GEAR_FACE_WIDTH_BAND" in ids, (
+        "missing band consumer anchor: build_dt_crank_drive_gear:GEAR_FACE_WIDTH_BAND"
     )
     assert "build_dt_cone_gear_shaft:band" in ids, (
         "missing band consumer anchor: build_dt_cone_gear_shaft:band"
@@ -711,7 +712,7 @@ def test_classification_lists_are_current() -> None:
 def band_use_source_tree(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     """AST-only sources: every consumer anchor plus a rich unrelated module."""
     anchors = {
-        "build_dt_crank_drive_gear": "KEYWAY_WIDTH_BAND",
+        "build_dt_crank_drive_gear": "GEAR_FACE_WIDTH_BAND",
         "build_dt_cone_gear_shaft": "band",
     }
     for module, expression in anchors.items():
@@ -741,7 +742,7 @@ def test_band_uses_anchor_rejects_no_match(
 @pytest.mark.parametrize(
     ("module", "expression"),
     [
-        ("build_dt_crank_drive_gear", "KEYWAY_WIDTH_BAND"),
+        ("build_dt_crank_drive_gear", "GEAR_FACE_WIDTH_BAND"),
         ("build_dt_cone_gear_shaft", "band"),
     ],
 )

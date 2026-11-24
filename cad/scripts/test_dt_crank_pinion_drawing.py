@@ -145,6 +145,23 @@ def test_grown_teeth_keep_the_south_seat_and_boss_length() -> None:
     )
 
 
+def test_face_width_takes_the_title_block_row_and_the_mesh_still_closes() -> None:
+    # Machinist review r1 (farm run 20261124T110807008Z): the +.000/-.010
+    # band's register reason was not of its kind, so the face prints at the
+    # .XX row with no band; the short limit is unchanged and the long one
+    # still closes the mesh and the T120 air.
+    import crank_mesh_stack
+
+    assert spec.FACE_WIDTH_BAND == pytest.approx((0.254, -0.254))
+    assert spec.FACE_WIDTH + spec.FACE_WIDTH_LIMITS[0] == pytest.approx(0.45 * 25.4)
+    mesh = crank_mesh_stack.standard_check()
+    assert mesh.backlash_min_mm > 0.0 and mesh.root_clearance_min_mm > 0.25
+    assert spec.T120_TURNED_BAND_RADIAL_WORST >= 0.25
+    register = Path(__file__).resolve().parents[1] / "config" / "necessity"
+    text = (register / "dt-crank-pinion.yaml").read_text(encoding="utf-8")
+    assert "face width" not in text.split("necessity:", 1)[1]
+
+
 def test_the_boss_is_the_root_circle_and_the_pin_hole_stays_in_its_wall() -> None:
     # ch12 p.19: the hub boss is the tooth-root cylinder carried on past the
     # face, so the boss needs no second turned diameter and the tooth root

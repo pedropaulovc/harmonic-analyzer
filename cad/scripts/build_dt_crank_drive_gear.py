@@ -61,7 +61,6 @@ from _drawing_precision import _named_dimension, apply_drawing_precision
 from _drawing_marks import apply_drawing_properties, clear_dimensions_for_drawing, mark_dimensions_for_drawing
 from _drawing_tolerances import (
     _set_tolerance_precision,
-    set_dimension_bilateral_tolerance,
     set_dimension_symmetric_tolerance,
 )
 from _fit_deviations import deviations
@@ -81,7 +80,6 @@ from dt_crank_drive_gear_spec import (
     KEYWAY_T,
     KEYWAY_T_BAND,
     KEYWAY_WIDTH,
-    KEYWAY_WIDTH_BAND,
     NATIVE_FLANK_BOUND_MM,
     OUTSIDE_DIA,
     OUTSIDE_DIA_TOLERANCE_MM,
@@ -389,11 +387,9 @@ def build(adapter) -> dict[str, str]:
         places=DRAWING_PRECISION["GearBlank"]["FaceWidth"], display_unit=UNIT,
     )
     # BoreDia carries no band: the reamer's size, its mate the gauge (fit
-    # audit 2026-11-23, MHA-DT-07.bore).
-    set_dimension_bilateral_tolerance(
-        adapter, "BoreProfile", "KeywayWidth", *deviations(KEYWAY_WIDTH_BAND),
-        display_unit=UNIT,
-    )
+    # audit 2026-11-23, MHA-DT-07.bore).  KeywayWidth carries none either:
+    # the 1/16 A broach cuts it and key MHA-DT-VN-71 slides in it (note 1);
+    # the sheet prints it as a reference (draw_dt_crank_drive_gear).
     _set_keyway_t_limits(adapter)
     volume_check(
         adapter, "driven crank-drive gear (equations neutral)",

@@ -33,21 +33,22 @@ SCREW_NAME = "PIVOT SCREW"
 FLOOR_HOLE_CALLOUT = "DRILL THRU"
 # The pocket is one feature with three tight dimensions (its limits, its
 # depth and its floor corner): it names its mate once, on one numbered flag
-# note linked to all three (drawing-guidelines.md rule 4).  It is plunged with
-# the 1/4 end mill to its own limits and the MHA-DT-32 head, at its own
-# band, clears it: no matching, no clearance to read (owner ruling
-# 2026-11-24, fit audit question 15; the note had bored the pocket to the
-# head while the travelers turned the head to the pocket).  Notes carry no
-# dimensions.  The governing wall the pocket's upper limit leaves, at the
-# face with both edges broken (#2170), is stated as a plain fact on the
-# pocket's own callout (rule 20; RV-01).
+# note linked to all three (drawing-guidelines.md rule 4).  Cut to its own
+# limits, it clears the MHA-DT-32 head at its own band: no matching, no
+# clearance to read (owner ruling 2026-11-24, fit audit question 15; the note
+# had bored the pocket to the head while the travelers turned the head to the
+# pocket).  The tool (the 1/4 end mill, plunged) is the traveler's, not the
+# note's (rule 7; machinist review r1, farm run 20261124T110807008Z).  Notes
+# carry no dimensions.  The governing wall the pocket's upper limit leaves,
+# at the face with both edges broken (#2170), is stated as a plain fact on
+# the pocket's own callout (rule 20; RV-01).
 POCKET_NOTE = 1
 POCKET_FLAG = f"SEE NOTE {POCKET_NOTE}"
 POCKET_FIT_CALLOUT = "\n".join((POCKET_FLAG, f"WALL {inch_text(POCKET_WALL_MIN, 3)} MIN"))
 POCKET_NOTE_TEXT = "\n".join(
     (
-        f"{POCKET_NOTE}. POCKET: 1/4 END MILL PLUNGE; CLEARS",
-        f"   {SCREW_NUMBER} {SCREW_NAME} HEAD.",
+        f"{POCKET_NOTE}. POCKET: CLEARS {SCREW_NUMBER}",
+        f"   {SCREW_NAME} HEAD.",
     )
 )
 # The bottom chamfer's band reason: it clears the rounded corner of the

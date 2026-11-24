@@ -72,10 +72,10 @@ from _paths import CAD_ROOT
 from _session import run_build
 from _surface_finish import surface_finish_by_key
 import _telemetry
-from _limit_tolerance import SW_TOL_LIMIT as LIMIT_TOL_TYPE
 from dt_crank_handle_head_seat_spec import (
     HEAD_CHAMFER,
     HEAD_CHAMFER_LIMITS,
+    HEAD_CHAMFER_TOL_TYPE,
     SCREW_DRAWING_DIMENSIONS as DRAWING_DIMENSIONS,
     SCREW_DRAWING_PRECISION_BY_NAME as DRAWING_PRECISION_BY_NAME,
     UNDER_HEAD_RADIUS_BAND,
@@ -515,7 +515,8 @@ requirement(
 )
 # The head: Ø.236 and .157 at the .XXX row (SIDE_KEEP "HeadDia",
 # "HeadLength"), each clearing MHA-DT-35; its under-head edge broken
-# .005-.010 X 45 (DETAIL_B_KEEP "HeadChamfer").
+# .005 MIN X 45, the title block's edge break its cap (DETAIL_B_KEEP
+# "HeadChamfer").
 requirement(
     "head",
     kind="outside_cylinder",
@@ -698,7 +699,8 @@ def _dress_head_seat(adapter: Any, annotations: list[Any]) -> None:
     """Prove detail B's imports print the model's head seat (#1757): the
     under-head radius as a radial R.004 MAX, its leader reaching the arc
     through an arc extension (its text stands on the round's centre side,
-    off the arc's span), and the head break as its two native limits."""
+    off the arc's span), and the head break as its single MIN limit, the
+    title block's edge break its native upper deviation."""
     by_name = {dimension_name(adapter, a): a for a in annotations}
     for name in ("UnderHeadRadius", "HeadChamfer"):
         if name not in by_name:
@@ -744,7 +746,7 @@ def _dress_head_seat(adapter: Any, annotations: list[Any]) -> None:
     )
     if (
         not math.isclose(nominal, HEAD_CHAMFER, abs_tol=1e-6)
-        or int(tolerance.Type) != LIMIT_TOL_TYPE
+        or int(tolerance.Type) != HEAD_CHAMFER_TOL_TYPE
         or any(
             not math.isclose(actual, expected, abs_tol=1e-6)
             for actual, expected in zip(limits, HEAD_CHAMFER_LIMITS, strict=True)

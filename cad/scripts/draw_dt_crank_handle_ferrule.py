@@ -142,9 +142,10 @@ CUT_END = (END_CENTER[0], END_CENTER[1] + OUTER_R + 0.006)
 # (build_dt_crank_handle_ferrule: one revolve about model +X; the arm-bearing
 # face at x = 0, the datum end the length runs from; the seat face at x =
 # LENGTH). The O.D. is the 9/16 rod as supplied (a REF, skimmed at
-# MHA-DT-08, note 1); the hole is the N drill's at the title block's .XXX row
-# (fit audit question 15) and names its bonded tenon; the length the
-# .XX row. Each ``span`` is a diameter's model-X extent. The declarations
+# MHA-DT-08, note 1); the hole is drilled at the title block's .XXX row, no
+# drill named against .303 (fit audit question 15), and names its bonded
+# tenon; the length the .XX row. Each ``span`` is a diameter's model-X
+# extent. The declarations
 # print nothing.
 _P = DRAWING_PRECISION_BY_NAME
 _NOTES = "dt_crank_handle_ferrule_notes"

@@ -80,9 +80,12 @@ def test_pocket_names_its_mate_once_on_one_flag_note() -> None:
     assert pocket.startswith("1. ") and len(pocket.splitlines()) <= 2
     assert _config.parts("dt-crank-handle-pivot-screw")["number"] in pocket
     # Fit audit question 15: no matching, so no clearance to read; the note
-    # names the cutter and the mate and carries no dimension.
+    # names the mate and carries no dimension, and no tool (rule 7; machinist
+    # review r1, farm run 20261124T110807008Z: the end mill is the traveler's).
     assert "CLEARANCE" not in pocket and "BORE TO" not in pocket
-    assert "END MILL" in pocket and "CLEARS" in pocket
+    assert "CLEARS" in pocket
+    for method in ("END MILL", "PLUNGE"):
+        assert method not in pocket
     # The body's bond is a matched fit on flag note 2: the .XXX grade alone
     # cannot give the glue line, so the route prints (round 2 review).
     assert drawing.DIMENSION_CALLOUTS["BodyDia"] not in flags

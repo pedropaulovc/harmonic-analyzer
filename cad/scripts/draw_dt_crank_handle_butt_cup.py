@@ -102,7 +102,7 @@ from dt_crank_handle_butt_cup_seat_spec import (
     CUP_DRAWING_PRECISION_BY_NAME as DRAWING_PRECISION_BY_NAME,
     FLOOR_HOLE_CHAMFER,
     FLOOR_HOLE_CHAMFER_LIMITS,
-    LIMIT_TOL_TYPE,
+    MIN_TOL_TYPE,
 )
 from _fit_deviations import deviations
 from dt_crank_handle_spec import COUNTERBORE_GLUE_LINE
@@ -402,7 +402,7 @@ requirement(
     fields={
         "leg": (
             list(FLOOR_HOLE_CHAMFER_LIMITS),
-            ((_SEAT, "FLOOR_HOLE_CHAMFER_LIMITS"), (_SEAT, "LIMIT_TOL_TYPE")),
+            ((_SEAT, "FLOOR_HOLE_CHAMFER_LIMITS"), (_SEAT, "MIN_TOL_TYPE")),
         ),
         "leg_nominal": (FLOOR_HOLE_CHAMFER, ((_SEAT, "FLOOR_HOLE_CHAMFER"),)),
         "angle_deg": (45.0, ((_NOTES, "FLOOR_HOLE_CHAMFER_CALLOUT"),)),
@@ -427,7 +427,7 @@ def _detail_xy(model_x_mm: float, model_y_mm: float) -> tuple[float, float]:
 
 
 # The break's axial leg, as the screw's head break (draw_dt_crank_handle_
-# pivot_screw DETAIL_B_KEEP): its two limits, then its three callout rows,
+# pivot_screw DETAIL_B_KEEP): its MIN limit, then its three callout rows,
 # with the dimension line under the last row (5.1 mm from the keep to the
 # value, rows 5.5 mm apart, the line 2.5 mm under the last: 13.5 mm from the
 # keep to the line).  The line runs 4 mm over the circle's top; the block
@@ -446,7 +446,8 @@ DETAIL_KEEP = {
 
 
 def _dress_floor_hole_chamfer(annotation: Any) -> None:
-    """Prove the imported mouth break prints the model's two native limits."""
+    """Prove the imported mouth break prints the model's single MIN limit,
+    the title block's edge break its native upper deviation."""
     label = "MHA-DT-35 FloorHoleChamfer"
     annotation = _early_bound(annotation, "IAnnotation")
     display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
@@ -459,7 +460,7 @@ def _dress_floor_hole_chamfer(annotation: Any) -> None:
     )
     if (
         not math.isclose(nominal, FLOOR_HOLE_CHAMFER, abs_tol=1e-6)
-        or int(tolerance.Type) != LIMIT_TOL_TYPE
+        or int(tolerance.Type) != MIN_TOL_TYPE
         or any(
             not math.isclose(actual, expected, abs_tol=1e-6)
             for actual, expected in zip(limits, FLOOR_HOLE_CHAMFER_LIMITS, strict=True)

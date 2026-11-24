@@ -48,7 +48,11 @@ from _drawing_common import (
     rebuild_drawing,
     stamp_drawing_summary,
 )
-from _drawing_dimensions import assert_imported_precision, set_dimension_callouts
+from _drawing_dimensions import (
+    assert_imported_precision,
+    set_dimension_callouts,
+    set_reference_dimension,
+)
 from _drawing_hidden_sketches import curate_view_dimensions
 from _drawing_leaders import (
     assert_leaders_clear,
@@ -197,17 +201,22 @@ FACE_WIDTH_CALLOUT = "SETS CONE GEAR STACK\nON MHA-DT-04"
 
 # The round bore comes off the owned .3760 over reamer and prints its size
 # with no band (fit audit 2026-11-23, MHA-DT-07.bore; drawing-guidelines rule
-# 4: a reamed hole's mate is the gauge); the keyway keeps cone_land_key's
-# width and T bands for the MHA-DT-VN-71 key. The fit is named once, in
-# numbered note 1 that the bore and keyway dimensions link (rule 4: one
-# feature with several tight dimensions names its mate once): MHA-DT-04's
+# 4: a reamed hole's mate is the gauge). The keyway's width comes off the
+# stock 1/16 A broach and prints as a reference, the key the gauge: KEY
+# MHA-DT-VN-71 SLIDES IN THE KEYWAY is its requirement (rule 4 form 3; machinist
+# review r1, farm run 20261124T110807008Z: the .0625 +.002/.000 band's
+# register reason, the 64T clocking on the key, is not a kind rule 4 names,
+# and its side play only shifts the crank index, error_budget.phase_profiles,
+# so no check fails without it; drawing-guidelines rule 4's necessity test).
+# Its keyway T keeps cone_land_key's band (register N-03). The fit is named
+# once, in numbered note 1 that the bore and keyway dimensions link (rule 4:
+# one feature with several dimensions names its mate once): MHA-DT-04's
 # land is the member made last and is turned to the reamed bore, not the
 # bore to the land (the note had it backwards: a fixed reamer cannot be
 # made to a measured land). The round bore's callout carries REAM, rule 12's
 # process for a fit bore (no flat left for a reamer to cut away, so
-# dt-crank-drive-gear.yaml RV-01 is retired); the keyway's bands are its
-# requirement and print no process. Why the ream and the keyway bands stay
-# is in cad/config/necessity/dt-crank-drive-gear.yaml, not on the sheet.
+# dt-crank-drive-gear.yaml RV-01 is retired). Why the ream and the T band
+# stay is in cad/config/necessity/dt-crank-drive-gear.yaml, not on the sheet.
 # The mate's name lives here, not beside its number in
 # crank_drive_gear_notes, which is in the part's rebuild closure;
 # test_dt_crank_drive_gear_drawing checks it against the registry.
@@ -237,10 +246,12 @@ BORE_FIT_NOTE = "\n".join(
 SHEET_NOTES = BORE_FIT_NOTE
 NOTES_XY = (0.016, 0.060)
 BORE_CALLOUT = f"REAM THRU\nSEE NOTE {BORE_FIT_NOTE_NUMBER}"
-# The keyway's width and T print their value, band and flag only, as the
-# keyed cone gears' do (draw_dt_cone_gear: the machinist review of the
-# C1-keyed sheets dropped KEYWAY TO FAR SIDE; rule 25, sheets agree). T
-# reads from its witnesses: the keyway top and the far side of the bore.
+# The keyway's width and T print their value and flag only, as the keyed
+# cone gears' do (draw_dt_cone_gear: the machinist review of the C1-keyed
+# sheets dropped KEYWAY TO FAR SIDE; rule 25, sheets agree); the width's
+# value is a reference (REFERENCE_DIMENSIONS). T reads from its witnesses:
+# the keyway top and the far side of the bore.
+REFERENCE_DIMENSIONS = ("KeywayWidth",)
 KEYWAY_WIDTH_CALLOUT = f"SEE NOTE {BORE_FIT_NOTE_NUMBER}"
 KEYWAY_T_CALLOUT = f"SEE NOTE {BORE_FIT_NOTE_NUMBER}"
 DIMENSION_CALLOUTS = {
@@ -534,6 +545,10 @@ def build(adapter: Any) -> dict[str, str]:
         adapter, section_annotations,
         {name: DIMENSION_CALLOUTS[name] for name in SECTION_KEEP},
     )
+    for name in REFERENCE_DIMENSIONS:
+        set_reference_dimension(
+            adapter, _named(adapter, front_annotations, name), label=f"64T {name}"
+        )
     assert_imported_precision(
         adapter, front_annotations + section_annotations, DRAWING_PRECISION_BY_NAME
     )

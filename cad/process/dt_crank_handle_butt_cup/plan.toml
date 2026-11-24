@@ -271,7 +271,7 @@ speed_kind = "spindle"
 tool = "chamfer-mill"
 drilling = "none"
 sizing = "other"
-instruction = "Chamfer the #20 hole's edge on the pocket floor with the 3/16 90° chamfer cutter from the tailstock: touch the edge, then feed {{cad.chamfer_bore_leg_in:.4dot}} ({{cad.chamfer_bore_leg_min_in:.3dot}}–{{cad.chamfer_bore_leg_max_in:.3dot}} × 45°) by the quill scale."
+instruction = "Chamfer the #20 hole's edge on the pocket floor with the 3/16 90° chamfer cutter from the tailstock: touch the edge, then feed about .007 by the quill scale (drawn {{cad.chamfer_bore_leg_min_in:.3dot}} MIN × 45°; the title block's chamfer {{cad.chamfer_bore_leg_max_in:.3dot}} max caps it)."
 settings = "lathe-chamfer-3-16-1018"
 cut_diameter_mm = 4.7625
 

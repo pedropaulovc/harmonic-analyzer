@@ -209,13 +209,23 @@ BORE_DIA_BAND = (  # (upper, lower) deviations
 
 FACE_WIDTH = 11.684  # .46: teeth grown north past the 64T row; south face stays seated
 # The retained south-face datum and full tooth length still locate the boss
-# step. FaceWidth remains the native GearBlank extrusion with its existing
-# +.000/-.010 functional band, not the general .XX grade. Actual stock-form
+# step. FaceWidth is the native GearBlank extrusion at the title block's .XX
+# row, .45-.47 (machinist review r1, farm run 20261124T110807008Z: its
+# +.000/-.010 band's register reason, 64T engagement and T120 clearance, is
+# not a mesh centre distance or run-out; drawing-guidelines rule 4: a
+# register reason not of its kind).  No check needs the tighter band: the short limit is
+# unchanged, so the 64T row engagement is too, and at the long limit the
+# standard mesh check keeps .0035 backlash and .016 root clearance and the
+# turned band stays 1.67 mm radially off T120 (the tooth end grows north,
+# away from the seated south face; crank_mesh_stack and
+# build_dt_drive_train_assembly read these limits). Actual stock-form
 # acceptance must prove at least the source-owned row engagement fraction
 # at every manufactured/pose case. The former ideal-profile slice calculation
-# is not a certificate for this cutter-native pinion. The long limit also
-# bounds the turned band's physical T120 clearance independently of contact.
-FACE_WIDTH_BAND = (0.0, -0.254)  # (upper, lower) deviations: +.000/-.010
+# is not a certificate for this cutter-native pinion.
+FACE_WIDTH_BAND = (
+    printed_band_mm(2, unit=UNIT),
+    -printed_band_mm(2, unit=UNIT),
+)  # (upper, lower) deviations: the .XX row, +/-.01
 FACE_WIDTH_LIMITS = deviations(FACE_WIDTH_BAND)  # (lower, upper)
 # Full-OD shoulder: OutsideDia over SHOULDER_LENGTH from the south face,
 # with its +.000/-.010 band. The assembly retains the 0.25-mm T120
@@ -367,8 +377,8 @@ FACE_WIDTH_PLACES = 2
 SHOULDER_LENGTH_PLACES = FACE_WIDTH_PLACES  # stated like FaceWidth
 TURNED_DIA_PLACES = 3  # stated like the OutsideDia it cuts into
 OVERALL_LENGTH_GRADE_MM = printed_band_mm(OVERALL_LENGTH_PLACES, unit=UNIT)
-# W15 sizes the boss for a face accepted anywhere in the .XX row. The printed
-# band sits inside that row, so every W15 stack only gains margin.
+# W15 sizes the boss for a face accepted anywhere in the .XX row, the row
+# the face prints at.
 W15_FACE_ALLOWANCE_MM = printed_band_mm(FACE_WIDTH_PLACES, unit=UNIT)
 _FACE_LOWER, _FACE_UPPER = FACE_WIDTH_LIMITS
 if _FACE_LOWER < -W15_FACE_ALLOWANCE_MM - 1e-9 or _FACE_UPPER > W15_FACE_ALLOWANCE_MM:
@@ -634,9 +644,10 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 #
 # Inch sheet (#290). The bore is the only size fit on the part and prints
 # the .3135 reamer's size at four places, no band. The outside diameter
-# prints three at the title block's .XXX row. The face width prints two places with its own +.000/-.010
-# (FACE_WIDTH_BAND): the assembly proves the 64T row overlap at its short
-# limit and the turned band's T120 clearance at its long one. The shoulder
+# prints three at the title block's .XXX row. The face width prints two places
+# at the title block's .XX row (FACE_WIDTH_BAND): the assembly proves the 64T
+# row overlap at its short limit and the turned band's T120 clearance at its
+# long one. The shoulder
 # length prints two places with its band, and the turned diameter three at
 # the title block's row. The boss diameter is routine .XX, not a
 # running surface. The match-drilled hole prints its reference size at three

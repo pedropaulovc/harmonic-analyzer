@@ -13,11 +13,13 @@ first, the matched-fit prose after it (drawing-guidelines.md rule 7 (notes: few,
 
 from __future__ import annotations
 
+from dt_crank_arm_spec import SEAM_BOND_CLEARANCE_TEXT
 from dt_crank_hub_geometry import (
     AXIAL_PIN_DIA,
     MM_PER_IN,
     HUB_SEAT_LENGTH,
     SEAM_DEPTH,
+    SEAT_SLIP_CLEARANCE,
 )
 
 
@@ -31,18 +33,23 @@ def seat_callout(mate: str, name: str = "CRANK ARM") -> str:
 
     Two lines of words under the reference size (drawing-guidelines.md rule 7
     (notes: few, flagged, never a method): at most two).  The arm bore is
-    made first, so the reference nominal, the named mate and the acceptance
-    by feel define the made-to-fit seat (rule 4); the joint is bonded with
-    LOCTITE 638 (owner ruling 2026-11-24, fit audit question 21: a bonded
-    slip fit, not the light press).  ``name`` is the mate's part name,
-    printed with its number (r7 review of farm run 20261101T022045634Z).  The
-    seat end flush with the arm's front and the bond's preparation and cure
-    are the MHA-DT-00 bond step's, not this sheet's (rule 7).
+    made first, so the reference nominal, the named mate and the bond's
+    diametral clearance define the made-to-fit seat (rule 4); the joint is
+    bonded with LOCTITE 638 (owner ruling 2026-11-24, fit audit question 21:
+    a bonded slip fit, not the light press).  The clearance is the fit's
+    acceptance, printed once, here on the member made last (rules 4 and 23;
+    machinist review r1, farm run 20261124T110807008Z: the feel alone gave
+    the bond no gap), with the slide-on feel beside it; SEAT_SLIP_CLEARANCE
+    holds it inside 638's gap.  ``name`` is the mate's part name, printed
+    with its number (r7 review of farm run 20261101T022045634Z).  The seat
+    end flush with the arm's front and the bond's preparation and cure are
+    the MHA-DT-00 bond step's, not this sheet's (rule 7).
     """
+    low, high = SEAT_SLIP_CLEARANCE
     return "\n".join(
         (
-            f"TURN TO {name} {mate} BORE:",
-            "ARM SLIDES ON BY HAND; BONDED",
+            f"TURN TO {name} {mate} BORE",
+            f"LESS {inch_text(low, 4)}-{inch_text(high, 3)}: SLIDES ON; BONDED",
         )
     )
 
@@ -60,7 +67,11 @@ SEAT_CALLOUT = seat_callout("MHA-DT-06")
 # arm, so it is matched to its mate (rule 4), and the pin is bonded in
 # (fit audit 2026-11-23, MHA-DT-06_DT-31.seam_pin: the joint is bonded under
 # question 21, so the seam needs no reamed drive fit and the .1562 reamer is retired); the
-# pin is named by part name and number.  The depth sits in the callout (rule
+# pin is named by number.  The bond's diametral clearance prints once on
+# each sheet the hole is on (rule 23), the arm's note 3 and this callout
+# reading the one SEAM_BOND_CLEARANCE_TEXT (machinist review r1, farm run
+# 20261124T110807008Z: the 5/32 drill's 0-.004 started line to line).  The
+# depth sits in the callout (rule
 # 26: size, process, depth; a depth is never deferred to a view), read from
 # SEAM_DEPTH, the constant the model's seam cut is built to; the side view's
 # native depth then prints as a reference.  The hole's radial station is a
@@ -70,8 +81,8 @@ SEAM_DEPTH_TEXT = inch_text(SEAM_DEPTH, 2)
 SEAM_CALLOUT = "\n".join(
     (
         f"(<MOD-DIAM>{inch_text(AXIAL_PIN_DIA, 3)}) 5/32 DRILL <HOLE-DEPTH> {SEAM_DEPTH_TEXT} AT ASSEMBLY",
-        "WITH CRANK ARM MHA-DT-06 FOR",
-        "DOWEL PIN MHA-DT-VN-59, BONDED",
+        "WITH MHA-DT-06; PIN MHA-DT-VN-59 BONDED:",
+        SEAM_BOND_CLEARANCE_TEXT,
     )
 )
 # The seat length is the arm's thickness as made, not a turned size (owner
