@@ -66,7 +66,10 @@ apply to a size, length, radius or angle printed at its title-block band
 edge break (`R.03 MAX`), a hole match-drilled or reamed in
 place through its mate at assembly, a thread designation or class, gear
 tooth data in a gear data block, a title-block row, or a purchased part's
-catalogue designation or supplier REF size.
+catalogue designation or supplier REF size. Rule 3 is unchanged: a
+three-place size or location has its function when the feature's callout
+names a mate or says what it does (`RUNS ON PIN MHA-SH-VN-58`); the
+necessity test's "a mate alone is not an answer" is not applied to it.
 
 Shop-table standard — for a band that passes, apply "What the shop holds"
 literally. Read the band's total width, find its row, and decide only
