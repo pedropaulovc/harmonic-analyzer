@@ -170,7 +170,7 @@ def test_real_d_core_thread_and_inch_g6_source() -> None:
         (spec.THREAD_MAJOR_2A[1] - spec.THREAD_BASIC_MINOR) / 2.0
     )
     assert (5.0 - spec.THREAD_BASIC_MINOR) / 2.0 > spec.THREAD_PITCH
-    assert spec.TIP_CHAMFER_CALLOUT == "CHAMFER 45 DEG TO MINOR"
+    assert spec.TIP_CHAMFER_CALLOUT == "CHAMFER 45° TO MINOR"
     assert ring.LENGTH == 6.7818  # .267, the 3/8 arm (#2019)
 
 
@@ -359,10 +359,10 @@ def test_d_flat_uses_signed_physical_round_tool_end_and_real_neck() -> None:
     assert spec.FRONT_CORNER_RADIUS == 0.1016
     assert spec.FRONT_CORNER_RADIUS_MAX == 0.1016
     assert spec.CORE_ACTIVE_LENGTH == pytest.approx(4.9276)
-    assert -spec.CORE_FLAT_CUT_END_Z == pytest.approx(0.1016)
-    upper, lower = spec.CORE_FLAT_CUT_END_BAND
-    assert -spec.CORE_FLAT_CUT_END_Z + lower == pytest.approx(0.0508)
-    assert -spec.CORE_FLAT_CUT_END_Z + upper == pytest.approx(0.1778)
+    # One printed limit, .007 MAX from F (fit audit 2026-11-23, pending owner
+    # confirmation): modelled at it, accepted anywhere short of F.
+    assert -spec.CORE_FLAT_CUT_END_Z == pytest.approx(0.1778)
+    assert spec.CORE_FLAT_CUT_END_LIMITS == (0.0, 0.1778)
     assert spec.FRONT_RELIEF_WIDTH_MIN - 0.1778 >= 0.1016 - 1e-12
     # .XXX general ±.005 on the terminal could overrun F; not equivalent.
     assert 0.1016 - 0.127 < 0.0
@@ -389,11 +389,11 @@ def test_neck_diameter_prints_limits_and_one_reason() -> None:
     assert drawing.DIMENSION_SUFFIXES["FrontReliefDia"] == f" {drawing.NECK_LINK}"
     assert drawing.NECK_LINK == f"SEE NOTE {drawing.NECK_NOTE}"
     # Rounds 4-5: the nominal flat end coincides with the neck corner's
-    # tangent, so its limits link the neck note, which names the D-flat end
+    # tangent, so its limit links the neck note, which names the D-flat end
     # in words (a bare link read as the tangent; a bare label as coined).
-    # The link is the round-4-rendered suffix, so the text stays in its keep.
-    assert spec.CORE_FLAT_CUT_END_FROM_F == pytest.approx(spec.FRONT_CORNER_RADIUS)
-    assert drawing.DIMENSION_SUFFIXES["FlatEnd"] == f" {drawing.NECK_LINK}"
+    # The value's line carries the limit word; the link is the row below.
+    assert drawing.DIMENSION_SUFFIXES["FlatEnd"] == " MAX"
+    assert drawing.DIMENSION_CALLOUTS_BELOW["FlatEnd"] == drawing.NECK_LINK
     assert "D-FLAT END" in neck
     assert "FrontReliefDia" not in drawing.DIMENSION_CALLOUTS_BELOW
     # Negative control: the two-place general band would put the neck's
@@ -412,13 +412,12 @@ def test_neck_diameter_prints_limits_and_one_reason() -> None:
 
 
 def test_neck_corner_radius_prints_a_maximum_from_sharp() -> None:
-    # R0.10 MAX (swTolMAX): the modelled corner is the largest acceptable.
-    assert spec.FRONT_CORNER_RADIUS_TOL_TYPE == 6
+    # R.004 MAX: the modelled corner is the largest acceptable.  The limit
+    # word is the drawing's uppercase suffix (swTolMAX prints "max.").
+    assert spec.FRONT_CORNER_RADIUS_TOL_TYPE == 0
+    assert drawing.DIMENSION_SUFFIXES["FrontCornerRadius"] == " MAX"
     assert spec.FRONT_CORNER_RADIUS_PLACES == 3
     assert spec.FRONT_CORNER_RADIUS == spec.FRONT_CORNER_RADIUS_MAX
-    hi, lo = spec.FRONT_CORNER_RADIUS_BAND
-    assert spec.FRONT_CORNER_RADIUS + lo == 0.0
-    assert hi == 0.0
     # The narrowest neck keeps a straight floor between two maximum corners.
     assert spec.FRONT_RELIEF_WIDTH_MIN > 2.0 * spec.FRONT_CORNER_RADIUS_MAX
 
@@ -556,15 +555,15 @@ def test_tool_end_limits_print_as_native_detail_dimensions() -> None:
     assert places == {"FlatEnd": 3, "FlatToolRadius": 3}
     flat_places = spec.DRAWING_PRECISION["CoreFlatReference"]
     assert flat_places == {"FlatToAxis": spec.CORE_FLAT_PLACES}
-    assert spec.CORE_FLAT_TOOL_END_RADIUS_TOL_TYPE == 6
-    assert spec.CORE_FLAT_CUT_END_TOL_TYPE == 3
+    assert spec.CORE_FLAT_TOOL_END_RADIUS_TOL_TYPE == 0
+    assert spec.CORE_FLAT_CUT_END_TOL_TYPE == 0
+    assert drawing.DIMENSION_SUFFIXES["FlatToolRadius"] == " MAX"
     # The edge-break note is one short line leadered to a tooth; the collar's
     # bearing on F is the paper-drive assembly step's, not this sheet's.
     assert "\n" not in drawing.TOOTH_EDGE_NOTE
     assert not hasattr(drawing, "BEARING_LEADER_NOTE")
-    # A location prints its value and band alone: no prefix, no link.
+    # The flat end prints its value and limit word, the note's link below.
     assert not hasattr(spec, "CORE_FLAT_CUT_END_PREFIX")
-    assert "FlatEnd" not in drawing.DIMENSION_CALLOUTS_BELOW
     assert "FlatEnd" not in drawing.DIMENSION_CALLOUTS_ABOVE
 
 
@@ -587,9 +586,11 @@ def test_model_bands_and_source_linked_properties() -> None:
         assert control.datums == ("A",)
         assert float(control.tolerance) * 25.4 == pytest.approx(spec.CORE_TOTAL_RUNOUT)
     assert not hasattr(spec, "ROOT_ACCEPTANCE")
-    # swTolType_e.swTolMIN prints the model value then "min.": the circle is
-    # the printed limit, floored from every accepted corner's root.
-    assert spec.ROOT_DIA_TOL_TYPE == 5
+    # The model value prints with the limit word after it: the circle is
+    # the printed limit, floored from every accepted corner's root.  The
+    # limit word is the drawing's uppercase suffix (swTolMIN prints "min.").
+    assert spec.ROOT_DIA_TOL_TYPE == 0
+    assert drawing.DIMENSION_SUFFIXES["RootDia"] == " MIN"
     assert spec.ROOT_DIA_MIN <= spec.ROOT_DIA_EXACT_MIN < spec.ROOT_DIA_MIN + 0.0254
     assert spec.ROOT_PREFIX == "ROOT ENVELOPE <MOD-DIAM>"
 
@@ -918,7 +919,7 @@ def test_tight_bands_name_their_mates_once_by_name_and_number() -> None:
     # Vertical Ø callouts go above their text (a below one would sit on the
     # Ø's own line).
     assert not set(above) & set(below)
-    assert set(below) & set(drawing.DIMENSION_SUFFIXES) == {"RearChamferSize"}
+    assert set(below) & set(drawing.DIMENSION_SUFFIXES) == {"RearChamferSize", "FlatEnd"}
 
 
 def test_gear_data_backlash_is_the_mesh_check_range_rounded_inward() -> None:
@@ -1327,17 +1328,18 @@ def test_sheet_note_reads_back_its_last_line(monkeypatch, readback, ok) -> None:
 
 
 def test_run_035809_detail_b_blocks_stand_clear() -> None:
-    # The D-flat tool's end prints its limits and the neck note's link on the
-    # value's line (no prefix, no rows), the neck width its value alone, each
-    # on its own dimension line.  The tool end's stacked limits run from its
-    # line at keep - 4.5 mm to keep + 3.5 mm (run 20261101T035809796Z).
+    # The D-flat tool's end prints its one limit on the value's line and the
+    # neck note's link on the row below, the neck width its value and link,
+    # each on its own dimension line.  The block is charged the former
+    # stacked limits' extent, keep - 4.5 mm to keep + 3.5 mm (run
+    # 20261101T035809796Z).
     char_w = 0.0026
     center, crop = drawing.DETAIL_CENTER, drawing.DETAIL_CROP_RADIUS
     below = drawing.DIMENSION_CALLOUTS_BELOW
     fx, fy = drawing.DETAIL_KEEP["FlatEnd"]
-    assert "FlatEnd" not in below
-    flat_text = ".007" + drawing.DIMENSION_SUFFIXES["FlatEnd"]
-    flat_half = len(flat_text) * char_w / 2
+    flat_rows = (".007" + drawing.DIMENSION_SUFFIXES["FlatEnd"], below["FlatEnd"])
+    assert flat_rows == (".007 MAX", "SEE NOTE 4")
+    flat_half = max(len(row) for row in flat_rows) * char_w / 2
     flat_line = fy - 0.0045
     flat_top = fy + 0.0035
     # Its line stays over the end view's teeth (top 0.1735) and the

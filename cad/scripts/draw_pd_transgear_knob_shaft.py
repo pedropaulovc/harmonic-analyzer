@@ -118,6 +118,8 @@ from pd_transgear_knob_shaft_spec import (
     STOCK_PROFILE,
     GAP_AZIMUTH_DEG,
     SPAN_TEETH,
+    SINGLE_MAX_SUFFIX,
+    SINGLE_MIN_SUFFIX,
     TOOTH_SPACE_GAUGE_PIN_DIA_MM,
     TOOTH_SPACE_CALLOUT,
     TOOTH_SPACE_CALLOUT_PROPERTY,
@@ -256,13 +258,15 @@ NOTE_TEXTS = (
     # Made to fit (fit audit 2026-11-23, pending owner confirmation): the
     # collar's bore is drilled and its pin pressed first; the core's Ø and
     # the flat's distance print as REF and link this note, whose two fits by
-    # feel are the requirement, each with what it protects (rule 4).
+    # feel are the requirement, with one reason (rule 7; machinist review r1
+    # of the fit batch read the order of work and a second reason as
+    # narration: the order is the traveler's).  The acceptance prints here
+    # once, on the member made last; MHA-PD-22's bore callout names this core.
     (
         D_SECTION_FIT_NOTE,
-        f"MADE TO FIT {_COLLAR}: TURN THE CORE TO SLIDE IN ITS BORE BY HAND, "
-        f"NO SHAKE (CENTRES CHAIN WHEEL {_config.parts('pd-transgear-removable')['number']}); "
-        "THEN MILL THE D-FLAT LAST UNTIL THE COLLAR, ITS PIN PRESSED, SLIDES ON "
-        "BY HAND (KEEPS PIN CREST CLEAR, LEAST PLAY).",
+        f"MADE TO FIT {_COLLAR}: CORE SLIDES IN ITS BORE BY HAND, NO SHAKE; "
+        "D-FLAT: COLLAR WITH PIN PRESSED SLIDES ON BY HAND. "
+        f"CENTRES CHAIN WHEEL {_config.parts('pd-transgear-removable')['number']}.",
     ),
     (STATIONS_NOTE, f"D-FLAT SEAT UNDER {_COLLAR}."),
     (NECK_NOTE, f"NECK AND D-FLAT END UNDER {_COLLAR}."),
@@ -457,22 +461,30 @@ DIMENSION_CALLOUTS_BELOW = {
     "FlatToAxis": D_SECTION_FIT_LINK,
     "ToothSpan": SPAN_CALLOUT,
     "RearChamferSize": REAR_CHAMFER_FUNCTION,
+    "FlatEnd": NECK_LINK,
 }
 # The two D-flat stations link the seat note and the thread's end the thread
 # note, each on its value's line; detail
-# B's neck Ø (LIMITS) and the D-flat end's limits link the neck note, which
-# names both features and MHA-PD-22 once.  At nominal the flat's end stands
-# on the neck corner's R.004 tangent, so the note names the D-flat end in
-# words (round-4 repeat read a bare link as locating that tangent; round 5
+# B's neck Ø (LIMITS) links the neck note on its value's line and the D-flat
+# end's single MAX on the row under it (".007 MAX SEE NOTE 4" on one line
+# would run from F's witness line out over the end view), which
+# names both features and MHA-PD-22 once.  The note names the D-flat end in
+# words (round-4 repeat read a bare link as locating the neck corner's
+# tangent; round 5
 # read a bare `FLAT END` label as coined and unlinked).  (A row under the
 # neck Ø would top out past the border, and the side rows stand 10 mm apart.)
+# The four single limits carry no native tolerance: SolidWorks prints its
+# own as "max." and "min." (rule 26), so the limit word is the suffix.
 DIMENSION_SUFFIXES = {
     "RearChamferSize": REAR_CHAMFER_SUFFIX,
     "ThreadEndFromTip": f" {THREAD_LINK}",
     "CoreFromTip": f" {STATIONS_LINK}",
     "TipStation": f" {STATIONS_LINK}",
     "FrontReliefDia": f" {NECK_LINK}",
-    "FlatEnd": f" {NECK_LINK}",
+    "FlatEnd": SINGLE_MAX_SUFFIX,
+    "FlatToolRadius": SINGLE_MAX_SUFFIX,
+    "FrontCornerRadius": SINGLE_MAX_SUFFIX,
+    "RootDia": SINGLE_MIN_SUFFIX,
     # Round 7: the neck width keeps .XXX (at .XX its least, .006, falls
     # under the flat end's .007) and links the neck note like its neighbours.
     "FrontReliefWidth": f" {NECK_LINK}",
@@ -708,12 +720,12 @@ DETAIL_KEEP: dict[str, tuple[float, float]] = {
     # on the keep, ends 2.5 mm short of the crop circle (at 32.5 mm in, run
     # 20261031T233549214Z, the circle crossed its last letter).
     "FrontCornerRadius": (_CORNER_CENTER[0] - 0.0365, _CORNER_CENTER[1] - 0.006),
-    # The D-flat tool's end from F, under the crop: its limits and the neck
-    # note's link on the value's line, left of F's witness line, on its own
-    # dimension line 9 mm under the neck width's (round 1: at 2.3 mm the two
-    # read as one line carrying .007/.002 and .016).  The line (~174) stays
+    # The D-flat tool's end from F, under the crop: its single MAX on the
+    # value's line and the neck note's link on the row under it, left of F's
+    # witness line, on its own dimension line 9 mm under the neck width's
+    # (round 1: at 2.3 mm the two read as one line).  The line (~174) stays
     # over the end view's teeth (top 0.1735) and the journal's outline
-    # (0.169); the ~39 mm text, centred on the keep, ends 5.5 mm left of F
+    # (0.169); the ~26 mm block, centred on the keep, ends 12 mm left of F
     # and right of the end view's tooth tips (x ~0.0585).
     "FlatEnd": (_F_DETAIL_X - 0.025, _DETAIL_BOTTOM - 0.0160),
     # Left of the crop, just over the tool's end arc (centre ~0.105, 0.2003):
