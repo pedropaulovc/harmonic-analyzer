@@ -19,6 +19,12 @@
 # journal's stand-out less the end float, and the pilot is bonded on the
 # knob shaft with LOCTITE 641; this traveler supplies the length and the
 # pilot depth to their supply bands.
+# When the cup can be made (codjiflo r2 on #3493): its pilot is fitted to the
+# finished MHA-PD-08 journal, and that journal is turned last to the
+# MHA-PD-28 bush's bore, which MHA-PD-00 step 11 reams in the MHA-PD-19
+# plate (sub-step 11O, accepted by the journal: row bush-reamed). So the
+# journal, and this cup after it, are made once that ream is done; the cup
+# waits for step 22.
 #
 # Not on hand (cad/config/shop-equipment/gauges.toml pin-gauges, to order;
 # owner 2026-11-21: "ill buy pin gauges"): the .113 and .117 pins for the web
@@ -30,13 +36,17 @@
 # The pilot lies between P and P + .001, so its clearance on the journal is
 # inside the sheet's .0005-.005 and LOCTITE 641's fill
 # (pd_transgear_knob_cup_spec PILOT_CLEARANCE, LOCTITE_641_GAP_MAX). No
-# plug gauge pair.
+# plug gauge pair. The pins run from the end mill's .250 to one step over
+# the largest P that can pass (the journal as fitted, at most .2493, plus
+# .004, or the end mill's largest cut, to the .001 below), so P is always
+# found: .254. test_pd_transgear_knob_cup_drawing ties the gauge bands and
+# these keys to the spec.
 title = "Transgear Knob Cup"
 part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
 material = "C36000 free-machining brass round bar, 7/8 in (drawing: {{cad.material_name}})"
 stock = "Lot: {{process.quantity:d}} cup. Ø{{process.bar_dia_in:.3dot}} bar, on hand; the cup takes about {{process.bar_use_in:.2dot}} in of it."
-note = "Inches unless mm. Lathe PM-1127VF-LB (70–380 and 380–2000 rpm); brass cut dry. Make MHA-PD-08 first: Op 70 accepts the pilot on its finished journal. Left for MHA-PD-00 step 22, not made here: facing the front face to the fitted pilot depth and the pilot's bond on MHA-PD-08. To order (not on hand): the .113, .117 and .250–.254 pins (pin-gauge sets)."
+note = "Inches unless mm. Lathe PM-1127VF-LB (70–380 and 380–2000 rpm); brass cut dry. Make MHA-PD-08 first: Op 70 accepts the pilot on its finished journal. That journal is turned last to the MHA-PD-28 bush's bore, which MHA-PD-00 step 11 reams in the MHA-PD-19 plate, so this cup is made after that ream. Left for MHA-PD-00 step 22, not made here: facing the front face to the fitted pilot depth and the pilot's bond on MHA-PD-08. To order (not on hand): the .113, .117 and .250–.254 pins (pin-gauge sets)."
 shop = "../shop"
 stock_refs = ["c360-round-7-8"]
 material_key = "lathe-c360"

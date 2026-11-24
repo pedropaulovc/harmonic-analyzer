@@ -596,14 +596,16 @@ def test_declarations_print_the_sheets_bands_and_supply_sizes() -> None:
 def test_the_travelers_name_the_assembly_steps_they_leave_work_for():
     # The cup's and the bush's travelers print MHA-PD-00's step numbers as
     # text; they must follow the assembly sequence when steps are inserted.
+    # The cup's also names the bush's ream, after which the MHA-PD-08 journal
+    # its pilot is fitted to can be turned (codjiflo r2 on #3493).
     import re
 
     import pd_paper_drive_assembly_steps as steps
 
     process = Path(__file__).resolve().parents[1] / "process"
-    for stem, key in (
-        ("pd_transgear_knob_cup", "knob-stack-fitted"),
-        ("pd_transgear_knob_bush", "pin-pressed"),
+    for stem, keys in (
+        ("pd_transgear_knob_cup", ("pin-pressed", "knob-stack-fitted")),
+        ("pd_transgear_knob_bush", ("pin-pressed",)),
     ):
         text = "".join(
             path.read_text(encoding="utf-8")
@@ -613,4 +615,38 @@ def test_the_travelers_name_the_assembly_steps_they_leave_work_for():
             )
         )
         cited = set(re.findall(r"MHA-PD-00 step (\d+)", text))
-        assert cited == {str(steps.step_number(key))}, stem
+        assert cited == {str(steps.step_number(key)) for key in keys}, stem
+
+
+def test_the_cup_travelers_pilot_gauge_bands_follow_the_spec():
+    # Op 70 and Op 170 declare their pin and micrometer bands as numbers (a
+    # list binding cannot add the pin set's step to a key); they must follow
+    # PILOT_CLEARANCE, BORE_BAND and the journal as fitted to the bush
+    # (codjiflo r2 on #3493).
+    import tomllib
+
+    step = 0.001 * IN  # the pin set's step
+    plan = tomllib.loads(
+        (Path(__file__).resolve().parents[1] / "process" / "pd_transgear_knob_cup"
+         / "plan.toml").read_text(encoding="utf-8")
+    )
+    parameters = plan["parameters"]
+    go_pin = parameters["pilot_go_pin_in"] * IN
+    over_journal_max = parameters["pilot_pin_over_journal_max_in"] * IN
+    assert go_pin == pytest.approx(spec.BORE_DIA)
+    assert over_journal_max == pytest.approx(max(spec.PILOT_CLEARANCE) - step)
+    largest_pass = max(max(spec.JOURNAL_FITTED) + over_journal_max, spec.BORE_MAX)
+    top_pin = math.floor(largest_pass / step + 1e-6) * step + step
+    checks = [
+        check
+        for setup in plan["setups"]
+        for operation in setup["operations"]
+        for check in operation.get("gauge_checks", [])
+        if isinstance(check, dict) and not isinstance(check["band_mm"], str)
+    ]
+    pins = [check["band_mm"] for check in checks if check["gauge"] == "pin-gauges"]
+    micrometers = [check["band_mm"] for check in checks if check["gauge"] == "micrometers"]
+    assert len(pins) == 2 and len(micrometers) == 1
+    for band in pins:
+        assert band == pytest.approx([go_pin, top_pin])
+    assert micrometers[0] == pytest.approx([min(spec.PILOT_CLEARANCE), over_journal_max])
