@@ -105,7 +105,8 @@ claim the saved model or final sheet was inspected. Check at least:
   this machine (`kind`, `reason`), what sets its number (`source`) and its
   `basis`. So is a worst-case sum over a joint the assembly sets or fits, a
   budget term sized as the remainder, and a check whose margin is below what
-  the shop reads (`.001 in` on a size, `.0005 in` on an indicator, 0.01 mm).
+  the shop reads (`.001 in` on a size, one step of the instrument on a
+  setting, 0.01 mm).
   A part band, inspection, gauge or assembly setting added to make such a
   check pass is a rule-4 finding on the check, not a fix. A necessity entry
   that cites a check as its `source` is only as good as the check: the check

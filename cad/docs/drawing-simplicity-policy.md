@@ -338,7 +338,7 @@ frames and no datums. A new entry needs a user ruling or a delegated ruling
 
 ## Named exceptions
 
-A shortfall against rules 17–19 is acceptable only
+A shortfall against rules 17–19 (or another numeric rule) is acceptable only
 by a ruling declared as a `machinist_exceptions` entry (kind `minor`) under
 the package's own key in its config YAML. The wall floor, the 1.5D
 engagement and rule 19's stack are never loosened to admit a shortfall. A

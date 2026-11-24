@@ -242,12 +242,14 @@ printed corner must keep a contact ratio of at least 1.0 there; it is 1.133
 (`pd_paper_drive_assembly_steps.FEED_LOOSEST_MESH`). If every term stacks
 (0.299 mm, reported only as `FEED_WORST_CASE_MESH`), the contact ratio is 0.942,
 a slight hitch in the feed at that station, which the steady-advance check
-catches. The 1.0 floor and the root sum square are delegated rulings (Main,
-2026-11-11, under the owner's #2416 direction; owner review #2144):
+catches. The 1.0 floor is a delegated ruling (Main, 2026-11-11, under the
+owner's #2416 direction; owner review #2144):
 continuous conjugate action is what "paper advances at constant speed" asks,
-and the 1.1 of the removed .003 leaf fallback is not kept; the root sum square
-is used because the setting is by feel and the acceptance is functional, an
-exception to the worst-case mesh stacks limited to this mesh. A hitch with every
+and the 1.1 of the removed .003 leaf fallback is not kept. The root sum square
+was delegated with it and the owner confirmed it on 2026-11-24 for every joint
+set at assembly, with the plain sum reported beside it
+(`tolerance-policy.md`, "Checks in spec modules and tests"): the setting is by
+feel and the acceptance is functional. A hitch with every
 part inside its sheet is cured by loosening the guide screws and re-setting the
 bottom rail with the rack's crests reading the same at both ends, which leaves at most one .001 division of drift; with
 that the arithmetic worst case keeps contact ratio 1.0 (1.037,

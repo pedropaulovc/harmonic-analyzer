@@ -820,7 +820,7 @@ sub-assembly, never on part fabrication.
   or feeler that reads it; it never needs a gauge bought for that one
   setting. A fit acceptance given as a clearance or interference range or
   by feel is not such a setting (rule 4). A mesh, a play or a free-running
-  check that the step itself sets by feel or to a first bind prints no
+  check whose only acceptance is by feel or to a first bind prints no
   backlash, shake or gap number for that quantity: the step says what is
   felt and what must not happen (no bind through a full turn, no skipped
   tooth). This does not remove a clearance or interference range that rule

@@ -123,7 +123,8 @@ margin by construction and tells the builder nothing. A term is what the process
 or an instrument gives.
 
 **A margin is stated in the unit and to the place the shop reads it**: `.001 in` for a size,
-`.0005 in` for an indicator reading, 0.01 mm on a millimetre package. A check that passes or
+one step of the instrument for a setting (`.001 in` on the dial indicator, `.0005 in` on the
+lever test indicator, one feeler leaf), 0.01 mm on a millimetre package. A check that passes or
 fails by less than that is not evidence either way. It is never closed by tightening a part,
 adding a band, an inspection, a gauge or a term, or by moving its own limit by a digit:
 re-derive its basis, or give the design real room with geometry, or ask the owner.

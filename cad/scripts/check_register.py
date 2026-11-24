@@ -26,11 +26,13 @@ Code review and this module's test read the register; nothing that builds
 does. A spec module that read its own entries would turn every reason into a
 SolidWorks rebuild (``test_dodo_recipe`` forbids it). The loader is not part
 of ``machinist_necessity.py`` because that module's bytes key every machinist
-review.
+review. A necessity entry whose ``source`` cites a check is weighed by code
+review, not here: a cited constant may be a band, which is no check.
 """
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -100,12 +102,10 @@ def load_checks(path: Path) -> tuple[CheckEntry, ...]:
 
 
 def problems(config_root: Path, scripts_dir: Path) -> list[str]:
-    """Every way the registers disagree with the code they describe: a file
-    named for no module, a ``check`` its module's source does not spell, and
-    a necessity entry whose ``source`` names ``<module>.<CONSTANT>`` when
-    that constant has no check entry."""
+    """Every way the register disagrees with the code it describes: a file
+    named for no module, and a ``check`` its module's source no longer
+    spells (a whole name for a constant; the literal text for a message)."""
     found: list[str] = []
-    checks: dict[str, set[str]] = {}
     for path in sorted(register_dir(config_root).glob("*.yaml")):
         module = module_for(path, scripts_dir)
         if not module.is_file():
@@ -113,24 +113,10 @@ def problems(config_root: Path, scripts_dir: Path) -> list[str]:
             continue
         source = module.read_text(encoding="utf-8")
         entries = load_checks(path)
-        checks[module.stem] = {entry.check for entry in entries}
         found.extend(
             f"{path.name}: {entry.id} names {entry.check!r}, which {module.name} "
             "does not contain"
             for entry in entries
-            if entry.check not in source
+            if not re.search(rf"(?<!\w){re.escape(entry.check)}(?!\w)", source)
         )
-    for path in sorted((config_root / "necessity").glob("*.yaml")):
-        for entry in machinist_necessity.load_necessity(config_root, path.stem):
-            module, dot, constant = (entry.source or "").partition(".")
-            cited = (
-                dot
-                and constant.isidentifier()
-                and (scripts_dir / f"{module}.py").is_file()
-            )
-            if cited and constant not in checks.get(module, ()):
-                found.append(
-                    f"necessity/{path.name}: {entry.id} cites {entry.source}, which "
-                    f"has no entry in checks/{module.replace('_', '-')}.yaml"
-                )
     return found

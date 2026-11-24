@@ -89,34 +89,18 @@ def test_register_named_for_no_module_is_a_problem(tmp_path: Path):
     ]
 
 
-def test_necessity_entry_citing_a_check_needs_that_check_registered(tmp_path: Path):
-    config, scripts, _path = _tree(tmp_path, [_ENTRY])
-    necessity = config / "necessity" / "probe.yaml"
-    necessity.parent.mkdir()
-
-    def cite(source: str) -> list[str]:
-        necessity.write_text(
-            yaml.safe_dump(
-                {
-                    "necessity": [
-                        {
-                            "id": "N-01",
-                            "feature": "sheet 1, bore",
-                            "kind": "mesh",
-                            "reason": "sets mesh backlash",
-                            "source": source,
-                        }
-                    ]
-                }
-            ),
-            encoding="utf-8",
-        )
-        return check_register.problems(config, scripts)
-
-    assert cite("probe_spec.RATIO_FLOOR") == []
-    assert cite("owner ruling 2026-11-24") == []
-    (problem,) = cite("probe_spec.BACKLASH_BAND")
-    assert (
-        "cites probe_spec.BACKLASH_BAND, which has no entry in checks/probe-spec.yaml"
-        in problem
+def test_longer_name_or_removed_constant_does_not_satisfy_an_entry(tmp_path: Path):
+    config, scripts, _path = _tree(
+        tmp_path, [_ENTRY], module_text="FEED_RATIO_FLOOR_MM = 1.2\n"
     )
+    assert len(check_register.problems(config, scripts)) == 1
+
+
+def test_guard_message_matches_literally(tmp_path: Path):
+    entry = {**_ENTRY, "check": "pin leans past the bore (%.3f)"}
+    config, scripts, _path = _tree(
+        tmp_path,
+        [entry],
+        module_text='raise ValueError("pin leans past the bore (%.3f)" % x)\n',
+    )
+    assert check_register.problems(config, scripts) == []
