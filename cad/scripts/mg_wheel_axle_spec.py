@@ -1,10 +1,11 @@
 r"""Pure-data dimensional contract shared by the wheel axle and its drawing.
 
 A plain pin from 3/16 drill rod, bonded in the mg-wheel-bar's 3/16 drilled bore
-with the spacer (MHA-MG-11) on its shank against the bar's FRONT face, until
-its shank-to-thread step stands a gauge length past the spacer's outer face;
-the back end then lands near the back face (eight-views-6 shows only a point
-there). The magnifying wheel runs on the shank; the front end is
+with the spacer (MHA-MG-11) on its shank against the bar's FRONT face, set
+where a dry trial of the wheel stack accepts it (MHA-MG-00, owner ruling
+2026-11-24, fit audit part 2, C11); the back end then lands at or inside
+the back face (eight-views-6 shows only a point there). The magnifying
+wheel runs on the shank; the front end is
 a #4-40 thread for the nut and locknut, finished with a domed tip.
 ``mg_wheel_group`` sizes the lengths against the whole stack.
 
@@ -122,25 +123,26 @@ DOME_R = 1.778  # .07
 DOME_H = DOME_R - math.sqrt(DOME_R**2 - (THREAD_MAJOR / 2.0) ** 2)  # .028
 PIN_LEN = SHANK_LEN + THREAD_LEN + DOME_H  # a reference: the dome sets it
 
-# The press gauge. Owner ruling 2026-11-21 (tight-tolerance audit, row 3):
-# "fit at assembly". MHA-MG-00 presses the pin with the spacer (MHA-MG-11)
-# on its shank, seated on the bar's front face, and gauges the step from the
-# spacer's OUTER face: .768 +/-.002 past it. The spacer's length then leaves
-# the nut stack (mg_wheel_group) and prints at the title block; it only
-# places the back end in the bar. The gauge is the rev-10 19.5 the washer,
-# hub and nut stack need, snapped to the .001-in grid it prints on with its
-# band; the step stands the spacer's model length further out (38.1038, the
-# rev-10 1.500 station plus .00015).
+# The step station past the spacer's outer face: the model's nominal
+# setting, .768, the rev-10 19.5 the washer, hub and nut stack need, snapped
+# to the .001-in grid; the step stands the spacer's model length further out
+# (38.1038, the rev-10 1.500 station plus .00015). Owner ruling 2026-11-21
+# ("fit at assembly") took the spacer's length out of the nut stack; owner
+# ruling 2026-11-24, fit audit part 2, C11 then set the axle to the trial
+# stack, so MHA-MG-00 prints this station REF and no step reads it. The
+# +/-.002 band stays the model's band for the corner proofs below and in
+# mg_wheel_group.
 PRESS_GAUGE_PLACES = 3
 PRESS_GAUGE = round(round(19.5 / MM_PER_IN, PRESS_GAUGE_PLACES) * MM_PER_IN, 6)
 PRESS_GAUGE_TOL = 0.0508  # .002
 PRESS_GAUGE_LIMITS = (PRESS_GAUGE - PRESS_GAUGE_TOL, PRESS_GAUGE + PRESS_GAUGE_TOL)
 STEP_STATION = round(_spacer.LENGTH + PRESS_GAUGE, 6)
 
-# Where the back end lands on the bar's back face: the step stands the
-# spacer plus the gauge off the bar's front face, the shank runs back from
-# it, and the bar's printed depth is from the front face. At every corner it
-# stands sunk in the bore, never proud.
+# Where the back end lands on the bar's back face at the model setting: the
+# step stands the spacer plus the station off the bar's front face, the
+# shank runs back from it, and the bar's printed depth is from the front
+# face. At every corner it stands sunk in the bore, never proud; at
+# assembly the dry trial starts flush and only slides the axle out (C11).
 _SHANK = printed_deviations(SHANK_LEN, SHANK_LEN_PLACES, unit=UNIT)
 _DEPTH = printed_deviations(
     BAR_DEPTH, _bar.BAR_DEPTH_PLACES, deviations(_bar.BAR_DEPTH_BAND), unit=_bar.UNIT
@@ -222,13 +224,13 @@ for (_feature, _name), (_low, _high) in LIMIT_PAIRS.items():
 # The overall is the shank, the thread and the dome summed: a reference.
 REFERENCE_DIMENSIONS = frozenset({"PinLength"})
 
-# drawing-guidelines.md rule 7 (notes: few, flagged, never a method): no general notes. The press to
-# the gauge is MHA-MG-00's step and AXLE AS PRESSED detail
+# drawing-guidelines.md rule 7 (notes: few, flagged, never a method): no general notes. The setting
+# and the bond are MHA-MG-00's steps and DETAIL A
 # (mg_magnifier_assembly_spec); every requirement here rides its own callout
 # (mg_wheel_axle_callouts), and the back end's window rides the bar's depth
 # callout.
 # drawing-guidelines.md rule 6 (roughness symbols only where a surface runs, slides or locates): the magnifying wheel runs on the shank, a shaft-in-bushing journal,
-# so the one Ø3/16 face carries the machined grade (its pressed length in the
+# so the one Ø3/16 face carries the machined grade (its bonded length in the
 # bar is the same face).
 SURFACE_FINISHES: tuple[SurfaceFinishControl, ...] = (
     SurfaceFinishControl(

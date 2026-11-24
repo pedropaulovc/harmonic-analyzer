@@ -72,11 +72,11 @@ def test_stack_detail_station_increases_right(detail) -> None:
 
 
 def test_the_stack_settings_are_the_group_stations_with_their_bands() -> None:
-    # Owner ruling 2026-11-21: the gauge runs from the spacer's outer face,
-    # .768 +/-.002, the rev-10 19.5 snapped to the .001-in grid.
+    # The model's step station, .768 from the spacer's outer face (the rev-10
+    # 19.5 snapped to the .001-in grid), printed REF since owner ruling
+    # 2026-11-24, fit audit part 2, C11 (the axle is set to the trial stack).
     assert stack.PRESS_GAUGE == mg_wheel_axle_spec.PRESS_GAUGE == 0.768 * 25.4
-    assert stack.PRESS_GAUGE_TOL == 0.002 * 25.4
-    assert stack.PRESS_GAUGE_TOL == mg_wheel_axle_spec.PRESS_GAUGE_TOL
+    assert not hasattr(stack, "PRESS_GAUGE_TOL")
     # The printed endshake band is exactly the group's set window.
     assert stack.ENDSHAKE - stack.ENDSHAKE_TOL == pytest.approx(
         mg_wheel_group.ENDSHAKE_MIN
@@ -105,24 +105,22 @@ def test_the_stack_settings_are_the_group_stations_with_their_bands() -> None:
 
 
 def test_the_stack_dimensions_are_marked_banded_and_called_out() -> None:
-    limits = {
+    limits = {stack.THREAD_PAST_LOCKNUT_DIMENSION}
+    # C11: no step sets the step station; S4: the drum face is seen, not
+    # read; the plain end is where the setting leaves it (Codjiflo r1, #3334).
+    references = {
+        stack.PRESS_GAUGE_DIMENSION,
+        stack.BACK_END_SUNK_DIMENSION,
         stack.DRUM_RECESS_DIMENSION,
-        stack.THREAD_PAST_LOCKNUT_DIMENSION,
     }
-    names = (
-        {stack.PRESS_GAUGE_DIMENSION, stack.ENDSHAKE_DIMENSION, stack.BACK_END_SUNK_DIMENSION}
-        | limits
-    )
+    names = {stack.ENDSHAKE_DIMENSION} | limits | references
     assert notes.DRAWING_DIMENSIONS == {stack.FEATURE: names}
     assert set(stack.DRAWING_PRECISION[stack.FEATURE]) == names
-    assert set(stack.DIMENSION_TOLERANCES) == {
-        stack.PRESS_GAUGE_DIMENSION,
-        stack.ENDSHAKE_DIMENSION,
-    }
+    assert set(stack.DIMENSION_TOLERANCES) == {stack.ENDSHAKE_DIMENSION}
     assert set(stack.LIMIT_DIMENSIONS) == limits
+    assert stack.REFERENCE_DIMENSIONS == references
     assert stack.DIMENSION_TOLERANCES[stack.ENDSHAKE_DIMENSION] == stack.ENDSHAKE_TOL
-    assert stack.DIMENSION_TOLERANCES[stack.PRESS_GAUGE_DIMENSION] == stack.PRESS_GAUGE_TOL
-    # The sheet is inch; the gauge, the endshake and their bands print
+    # The sheet is inch; the endshake and its band and the step station print
     # exactly at their places (render_number refuses a value off the printed
     # grid), so each printed band is the stack's band; so do the limit pairs.
     assert stack.UNIT == "in"
@@ -130,27 +128,23 @@ def test_the_stack_dimensions_are_marked_banded_and_called_out() -> None:
     render_number(stack.ENDSHAKE / 25.4, "in", places[stack.ENDSHAKE_DIMENSION])
     render_number(stack.ENDSHAKE_TOL / 25.4, "in", stack.TOLERANCE_PRECISION)
     render_number(stack.PRESS_GAUGE / 25.4, "in", places[stack.PRESS_GAUGE_DIMENSION])
-    render_number(stack.PRESS_GAUGE_TOL / 25.4, "in", stack.TOLERANCE_PRECISION)
     for name, pair in stack.LIMIT_DIMENSIONS.items():
         assert places[name] == stack.LIMIT_PRECISION
         for limit in pair:
             render_number(limit / 25.4, "in", stack.LIMIT_PRECISION)
-    # Each limit pair carries the window its owner spec proves.
+    # Each window carries the limits its owner spec proves.
     assert stack.BACK_END_SUNK_LIMITS == (
         mg_wheel_axle_spec.BACK_END_SUNK_MIN,
         mg_wheel_axle_spec.BACK_END_SUNK_MAX,
     )
-    # The plain end is where the press setting leaves it: a reference, so
-    # DETAIL A sets the axle by the press gauge alone (Codjiflo r1, #3334).
-    assert stack.REFERENCE_DIMENSIONS == {stack.BACK_END_SUNK_DIMENSION}
-    assert stack.LIMIT_DIMENSIONS[stack.DRUM_RECESS_DIMENSION] == pytest.approx(
+    assert stack.DRUM_RECESS_LIMITS == pytest.approx(
         mg_magnifying_wheel_geom.DRUM_RECESS, abs=1e-9
     )
     assert stack.LIMIT_DIMENSIONS[stack.THREAD_PAST_LOCKNUT_DIMENSION] == (
         mg_wheel_axle_spec.TIP_INCOMPLETE,
         mg_wheel_axle_spec.THREAD_PAST_LOCKNUT_LIMIT,
     )
-    # DETAIL A imports the press settings; DETAIL B the stack's.
+    # DETAIL A imports the axle's setting; DETAIL B the stack's.
     assert set(drawing.PRESSED_KEEP) == {
         stack.PRESS_GAUGE_DIMENSION,
         stack.BACK_END_SUNK_DIMENSION,
@@ -162,24 +156,18 @@ def test_the_stack_dimensions_are_marked_banded_and_called_out() -> None:
     }
 
 
-def test_the_press_gauge_is_a_setting_accepted_at_the_nuts() -> None:
-    # Owner ruling 2026-11-21: the gauge, .768 +/-.002 from the spacer's
-    # outer face, is the press's setting. Its acceptance, read at the second
-    # nut, prints as DETAIL B's thread-end limits (#2286 option A: farm
-    # rounds 1-3 gated it as a DETAIL A callout, a view with no nut). A press
-    # inside the band passes it at every corner.
-    low = stack.PRESS_GAUGE - stack.PRESS_GAUGE_TOL
-    high = stack.PRESS_GAUGE + stack.PRESS_GAUGE_TOL
-    assert stack.PRESS_GAUGE_LOW_LIMIT / 25.4 == pytest.approx(0.764, abs=1e-6)
-    assert stack.PRESS_GAUGE_HIGH_LIMIT / 25.4 == pytest.approx(0.771, abs=1e-6)
-    assert stack.PRESS_GAUGE_LOW_LIMIT <= low < high <= stack.PRESS_GAUGE_HIGH_LIMIT
-    assert stack.SETTING_CALLOUTS[stack.FEATURE][stack.PRESS_GAUGE_DIMENSION][
-        1
-    ].startswith("PRESS SETTING:")
-    # The printed limits, in inches: the high side is the axle's own limit
-    # and passes the worst stack; the low side keeps the locknut on full
-    # thread, the dome's incomplete pitch past it, which the stack's low
-    # corner holds (owner ruling 2026-11-06).
+def test_the_axle_is_set_to_the_trial_stack_and_accepted_at_the_nuts() -> None:
+    """Owner ruling 2026-11-24, fit audit part 2, C11 ("Yes, set to the trial
+    stack") with question 18 (the axle is bonded): the axle goes in dry with
+    its plain end flush, a trial of the stack accepts it on three things to
+    see, a short thread end slides it out to the window's middle in the one
+    setting remedy, and the bond goes in at the recorded setting."""
+    assert not hasattr(stack, "PRESS_GAUGE_LOW_LIMIT")
+    gauge_callout = stack.SETTING_CALLOUTS[stack.FEATURE][stack.PRESS_GAUGE_DIMENSION][1]
+    assert "SETTING" not in gauge_callout
+    # The printed thread-end limits, in inches: the high side is the axle's
+    # own limit and passes the model stack's worst corner; the low side keeps
+    # the locknut on full thread, the dome's incomplete pitch past it.
     low_limit, high_limit = stack.LIMIT_DIMENSIONS[stack.THREAD_PAST_LOCKNUT_DIMENSION]
     assert mg_wheel_group.THREAD_PAST_LOCKNUT_MAX <= high_limit
     assert low_limit == mg_wheel_axle_spec.TIP_INCOMPLETE
@@ -191,140 +179,125 @@ def test_the_press_gauge_is_a_setting_accepted_at_the_nuts() -> None:
     assert "SETTING" not in stack.SETTING_CALLOUTS[stack.FEATURE][
         stack.BACK_END_SUNK_DIMENSION
     ][1]
-    # The acceptance is checked on the trial stack, then again once both
-    # nuts are set, where DETAIL B dimensions it, with a named instrument;
-    # the step names the view, never the value.
+    # C11's first check, the first nut on thread, keeps the shank step inside
+    # the wheel hub whatever the parts measure.
+    assert mg_wheel_group.TRIAL_STEP_INSIDE_HUB_MIN > 0.0
+    assert mg_wheel_group.TRIAL_ENDSHAKE_DROP == pytest.approx(
+        2.0 * stack.ENDSHAKE_TOL
+    )
+    order = steps.SEQUENCE
+    for earlier, later in (
+        (steps.SPACER_FITTED_KEY, steps.AXLE_DRY_FITTED_KEY),
+        (steps.AXLE_DRY_FITTED_KEY, steps.AXLE_TRIAL_KEY),
+        (steps.AXLE_TRIAL_KEY, steps.AXLE_SINK_RECORDED_KEY),
+        (steps.AXLE_SINK_RECORDED_KEY, "trial-parts-removed"),
+        ("trial-parts-removed", "axle-withdrawn"),
+        ("axle-withdrawn", steps.AXLE_BONDED_KEY),
+    ):
+        assert order.index(earlier) < order.index(later)
+    assert notes.STEP_TEXT[steps.SPACER_FITTED_KEY].startswith(f"SLIDE {notes._SPACER} ")
+    dry = notes.STEP_TEXT[steps.AXLE_DRY_FITTED_KEY]
+    assert dry.startswith(f"PUSH {notes._AXLE} DRY INTO {notes._BAR}")
+    assert "PLAIN END MEETS THE SURFACE PLATE" in dry
+    (trial_step,) = (step for step in steps.STEPS if step[0] == steps.AXLE_TRIAL_KEY)
+    # #3344: the trial jams its nuts over the endshake's go feeler.
+    assert trial_step == (
+        steps.AXLE_TRIAL_KEY,
+        "trial-feeler-placed",
+        "trial-nuts-jammed",
+        steps.AXLE_NUT_ON_THREAD_KEY,
+        steps.AXLE_CHECKED_KEY,
+        "axle-sunk",
+        "stack-part-replaced",
+        "trial-refitted",
+        "axle-replaced",
+    )
+    feeler = f"THE {notes.ENDSHAKE_GO_TEXT} FEELER BETWEEN {notes._WASHER}"
+    assert feeler in notes.STEP_TEXT["trial-feeler-placed"]
+    assert "FEELER" in notes.STEP_TEXT["trial-nuts-jammed"]
+    assert "FEELER" in notes.STEP_TEXT["trial-parts-removed"]
+    assert "ON THREAD" in notes.STEP_TEXT[steps.AXLE_NUT_ON_THREAD_KEY]
+    # The acceptance names the view and the instrument, never the value.
     checked = notes.STEP_TEXT[steps.AXLE_CHECKED_KEY]
     assert notes.ENDSHAKE_DETAIL_TITLE in checked and "CALIPER DEPTH ROD" in checked
     assert notes.PRESS_DETAIL_TITLE not in checked
-    assert not re.search(r"\.\d{3}", checked)
-    accepted = steps.SEQUENCE.index(steps.AXLE_ACCEPTED_KEY)
-    assert accepted > steps.SEQUENCE.index(steps.LOCKNUT_JAMMED_KEY)
+    assert "GOVERN" not in checked
+    for key in (
+        steps.AXLE_DRY_FITTED_KEY,
+        steps.AXLE_NUT_ON_THREAD_KEY,
+        steps.AXLE_CHECKED_KEY,
+        "axle-sunk",
+        steps.AXLE_SINK_RECORDED_KEY,
+        steps.AXLE_BONDED_KEY,
+    ):
+        assert not re.search(r"\.\d{3}", notes.STEP_TEXT[key]), key
+    sunk = notes.STEP_TEXT["axle-sunk"]
+    assert sunk.startswith("IF ONLY THE THREAD END FELL SHORT, RETURN TO STEP ")
+    assert f"STEP {steps.step_number('trial-nuts-jammed')} " in sunk
+    assert "MIDDLE OF" in sunk and "CALIPER DEPTH ROD" in sunk
+    assert notes.STEP_TEXT["trial-refitted"].endswith(
+        f"RETURN TO STEP {steps.step_number(steps.AXLE_TRIAL_KEY)}."
+    )
+    assert notes.STEP_TEXT["axle-replaced"].startswith(
+        f"IF NONE WAS, RETURN TO STEP {steps.step_number(steps.SPACER_FITTED_KEY)} "
+    )
+    assert "CALIPER DEPTH ROD" in notes.STEP_TEXT[steps.AXLE_SINK_RECORDED_KEY]
+    # The spacer stays on from the dry fit: the trial and final stacks start
+    # at the back washer.
+    for key in (steps.AXLE_TRIAL_KEY, "wheel-stacked"):
+        assert f"{notes.ITEM_NUMBERS['mg-wheel-axle-spacer']}," not in notes.STEP_TEXT[key]
+        assert f"AND {notes.ITEM_NUMBERS['mg-wheel-axle-spacer']}." not in notes.STEP_TEXT[key]
+    # The final reading has its own remedy: the set endshake only lowers the
+    # thread end from the trial's reading, so a short one closes the endshake
+    # back to the go leaf the trial read at.
+    accepted = order.index(steps.AXLE_ACCEPTED_KEY)
+    assert accepted > order.index(steps.LOCKNUT_JAMMED_KEY)
     assert notes.STEP_TEXT[steps.AXLE_ACCEPTED_KEY].startswith("CHECK ")
     assert f"STEP {steps.step_number(steps.AXLE_CHECKED_KEY)}" in (
         notes.STEP_TEXT[steps.AXLE_ACCEPTED_KEY]
     )
-    # The final reading has its own remedy: the stack comes off and the
-    # failed trial's remedies run from the press re-check, so a stack that
-    # passed the trial low is measured, not re-trialled (Codjiflo r1, #3345).
-    assert steps.SEQUENCE[accepted + 1 : accepted + 3] == ("axle-stack-removed", "axle-reset")
-    assert notes.STEP_TEXT["axle-reset"].endswith(
-        f"RETURN TO STEP {steps.step_number('axle-press-rechecked')}."
+    assert order[accepted + 1] == "axle-endshake-closed"
+    closed = notes.STEP_TEXT["axle-endshake-closed"]
+    assert closed.startswith(
+        f"IF IT FALLS SHORT, RETURN TO STEP {steps.step_number(steps.ENDSHAKE_SET_KEY)} "
     )
+    assert f"THE {notes.ENDSHAKE_GO_TEXT} FEELER JUST NIPPED" in closed
     # The endshake callout keeps one reason line; the steps carry the method.
     assert stack.SETTING_CALLOUTS[stack.FEATURE][stack.ENDSHAKE_DIMENSION] == (
         4, "WHEEL FREE, NO RATTLE"
     )
-    # The press setting is the axle's one position (owner ruling 2026-11-21):
-    # a failed acceptance reads the setting again and presses only back to
-    # it, then replaces the stack part outside its limits; no re-press chases
-    # the thread end past the DETAIL A band.
-    (trial_step,) = (step for step in steps.STEPS if step[0] == steps.AXLE_TRIAL_KEY)
-    # #3344: the trial jams its nuts over the endshake's go feeler, the
-    # endshake the stack's thread-end corners are booked at, so a conforming
-    # stack reads inside DETAIL B at the trial, and no less endshake follows.
-    assert trial_step[:4] == (
-        steps.AXLE_TRIAL_KEY,
-        "trial-feeler-placed",
-        "trial-nuts-jammed",
-        steps.AXLE_CHECKED_KEY,
-    )
-    assert stack.ENDSHAKE - stack.ENDSHAKE_TOL == pytest.approx(
-        mg_wheel_group.ENDSHAKE_MIN
-    )
-    trial_low, trial_high = (x / 25.4 for x in notes.TRIAL_THREAD_PAST_LOCKNUT)
-    assert (trial_low, trial_high) == pytest.approx((0.031, 0.113), abs=1e-6)
-    band = mg_wheel_group.ENDSHAKE_MAX - mg_wheel_group.ENDSHAKE_MIN
-    # At the trial, and once the endshake is set anywhere in its band.
-    assert low_limit <= notes.TRIAL_THREAD_PAST_LOCKNUT[0] - band
-    assert notes.TRIAL_THREAD_PAST_LOCKNUT[1] <= high_limit
-    feeler = f"THE {notes.ENDSHAKE_GO_TEXT} FEELER BETWEEN {notes._WASHER}"
-    assert feeler in notes.STEP_TEXT["trial-feeler-placed"]
-    assert "FEELER" in notes.STEP_TEXT["trial-nuts-jammed"]
-    assert "JUST FREE" not in notes.STEP_TEXT["trial-nuts-jammed"]
-    for key in ("trial-parts-removed-to-press", "trial-parts-removed"):
-        assert "FEELER" in notes.STEP_TEXT[key]
-    assert trial_step[4:] == (
-        "trial-parts-removed-to-press",
-        "axle-press-rechecked",
-        "axle-repressed",
-        "axle-rechecked",
-        "stack-part-replaced",
-        "trial-refitted",
-        "axle-pressed-out-to-replace",
-        "axle-replaced",
-    )
-    assert notes.PRESS_DETAIL_TITLE in notes.STEP_TEXT["axle-press-rechecked"]
-    # The spacer the setting reads from is held to the bar at every reading.
-    held = f"{notes._SPACER}, HELD AGAINST {notes._BAR}"
-    assert held in notes.STEP_TEXT["axle-press-rechecked"]
-    bond_held = f"{notes._SPACER} HELD AGAINST {notes._BAR}"
-    assert bond_held in notes.STEP_TEXT["axle-bond-set"]
-    assert "TO THAT SETTING" in notes.STEP_TEXT["axle-repressed"]
-    assert not any(
-        word in text for text in notes.STEP_TEXT.values() for word in ("EXCESS", "SHORTFALL")
-    )
-    assert notes.STEP_TEXT["axle-rechecked"].endswith(
-        f"RETURN TO STEP {steps.step_number(steps.AXLE_HELD_KEY)}."
-    )
-    assert notes.STEP_TEXT["trial-refitted"].endswith(
-        f"RETURN TO STEP {steps.step_number(steps.AXLE_TRIAL_KEY)}."
-    )
-    # The spacer the press gauges from goes on in a step of its own, before
-    # the press (rule 22).
-    order = steps.SEQUENCE
-    assert order.index(steps.SPACER_FITTED_KEY) < order.index(steps.AXLE_PRESSED_KEY)
-    assert notes.STEP_TEXT[steps.SPACER_FITTED_KEY].startswith(f"SLIDE {notes._SPACER} ")
 
 
-def test_each_press_is_accepted_at_the_bench_with_a_slip_fit_remedy() -> None:
-    """Rule 23: a press prints a bench acceptance and what a slip fit gets,
-    each a lettered sub-step of the press (rule 22, the shared step lint)."""
-    for pressed, held, taken_out, remedy in (
-        (steps.AXLE_PRESSED_KEY, steps.AXLE_HELD_KEY, "axle-pressed-out", "axle-cleaned"),
-    ):
-        (step,) = (step for step in steps.STEPS if step[0] == pressed)
-        assert step[1:4] == (held, taken_out, remedy)
-        assert notes.STEP_TEXT[held].endswith("DOES NOT TURN OR SLIDE BY HAND.")
-        # One action per step (rule 22): the slip test takes the part out,
-        # the next step is the remedy.
-        assert "BY HAND" in notes.STEP_TEXT[taken_out]
-        assert notes.STEP_TEXT[taken_out].count(",") == 2
-    # A slip axle is bonded under the one general bond note that prints with
-    # the checks, rather than remade from the same as-supplied rod (owner
-    # ruling 2026-11-11, #2541 and #2523, amending 2026-11-07).
+def test_the_axle_is_bonded_square_to_its_setting_and_accepted_once_cured() -> None:
+    """Owner ruling 2026-11-24, fit audit question 18: the axle is always
+    bonded in the drilled bar (rule 23), at the dry trial's setting, squared
+    while wet with owned equipment, and accepted at the bench once cured."""
+
     def ref(key: str) -> str:
         return f"STEP {steps.step_number(key)}"
 
-    assert not any("REMAKE" in text for text in notes.STEP_TEXT.values())
-    # The slip-axle remedies run in order inside step 2: press it out,
-    # clean, bond, set, then back to the hold check once cured.
-    (axle_step,) = (step for step in steps.STEPS if step[0] == steps.AXLE_PRESSED_KEY)
-    assert axle_step[2:] == (
-        "axle-pressed-out",
-        "axle-cleaned",
-        "axle-bonded",
-        "axle-spacer-refitted",
-        "axle-bond-set",
+    (bond_step,) = (step for step in steps.STEPS if step[0] == steps.AXLE_BONDED_KEY)
+    assert bond_step == (
+        steps.AXLE_BONDED_KEY,
+        "axle-squared",
         "axle-bond-cured",
+        steps.AXLE_HELD_KEY,
+        "axle-stripped",
     )
-    # Only an unbonded slip goes back out; a bonded axle that holds passes the
-    # hold check once cured (#2579).
-    assert "UNBONDED" in notes.STEP_TEXT["axle-pressed-out"]
-    assert notes.STEP_TEXT["axle-bonded"].endswith(
-        f"{notes.BOND_GRADE}, {notes.BOND_NOTE_REF}."
+    bonded = notes.STEP_TEXT[steps.AXLE_BONDED_KEY]
+    assert f"WITH {notes.BOND_GRADE}, {notes.BOND_NOTE_REF}" in bonded
+    assert ref(steps.AXLE_DRY_FITTED_KEY) in bonded
+    assert ref(steps.AXLE_SINK_RECORDED_KEY) in bonded
+    squared = notes.STEP_TEXT["axle-squared"]
+    assert squared.startswith("AT ONCE, BEFORE IT GRABS, SQUARE ")
+    assert "A SQUARE STANDING ON THE SURFACE PLATE" in squared
+    assert "24 H" in notes.STEP_TEXT["axle-bond-cured"]
+    assert notes.STEP_TEXT[steps.AXLE_HELD_KEY].endswith("DOES NOT TURN OR SLIDE BY HAND.")
+    assert notes.STEP_TEXT["axle-stripped"].startswith(
+        f"IF IT DOES, RETURN TO {ref(steps.AXLE_BONDED_KEY)} WITH "
     )
-    # #2578 is moot since the 2026-11-21 ruling: a bond is set inside its
-    # fixture time to the DETAIL A setting, the axle's one position.
-    bond_set = notes.STEP_TEXT["axle-bond-set"]
-    assert "AT ONCE" in bond_set
-    assert notes.PRESS_DETAIL_TITLE in bond_set
-    assert "CALIPER DEPTH ROD" in bond_set
-    assert notes.STEP_TEXT["axle-bond-cured"].startswith(
-        f"IF IT WAS BONDED, RETURN TO {ref(steps.AXLE_HELD_KEY)}"
-    )
-    # Step 3's re-press comes back through the same hold check.
-    assert notes.STEP_TEXT["axle-rechecked"].endswith(f"RETURN TO {ref(steps.AXLE_HELD_KEY)}.")
+    assert not any("REMAKE" in text for text in notes.STEP_TEXT.values())
+    assert not any("OIL" in notes.STEP_TEXT[key] for key in bond_step)
     assert notes.BOND_NOTE in notes.ASSEMBLY_CHECKS
     assert notes.BOND_NOTE.startswith(f"NOTE 1, {notes.BOND_GRADE} BOND:")
     # Rule 23's bond rules: prep, where it goes, the wiped excess, cure,
@@ -358,29 +331,11 @@ def test_the_drum_is_bonded_centred_wet_and_accepted_once_cured() -> None:
     )
 
 
-def test_the_axle_press_goes_to_the_gauge_past_the_spacer() -> None:
-    """Owner ruling 2026-11-21 (fit at assembly): the press step sets the
-    shoulder past the outer face of the spacer, slid on the shank against
-    the bar, as DETAIL A dimensions it; the plain end's window below the
-    bar's far face (the axle spec's limits) is where that press leaves it,
-    and the thread-end check is the only acceptance (#2286 option A)."""
+def test_the_plain_end_window_holds_at_the_model_setting() -> None:
+    """The plain end's window below the bar's far face (the axle spec's
+    limits) is where the model's setting leaves it, a reference."""
     low, high = stack.BACK_END_SUNK_LIMITS
     assert 0.0 < low < stack.BACK_END_D - stack.BAR_FAR_D < high
-    pressed = notes.STEP_TEXT[steps.AXLE_PRESSED_KEY]
-    assert (
-        "UNTIL THE SHOULDER STANDS PAST THE OUTER FACE OF ITEM "
-        f"{notes.ITEM_NUMBERS['mg-wheel-axle-spacer']}, HELD AGAINST "
-        f"ITEM {notes.ITEM_NUMBERS['mg-wheel-bar']}, AS {notes.PRESS_DETAIL_TITLE} "
-        "SETS IT" in pressed
-    )
-    # The spacer stays on from the press: the trial and final stacks start at
-    # the back washer.
-    for key in (steps.AXLE_TRIAL_KEY, "wheel-stacked", "axle-stack-removed"):
-        assert f"{notes.ITEM_NUMBERS['mg-wheel-axle-spacer']}," not in notes.STEP_TEXT[key]
-        assert f"AND {notes.ITEM_NUMBERS['mg-wheel-axle-spacer']}." not in notes.STEP_TEXT[key]
-    assert "CALIPER DEPTH ROD" in pressed
-    assert not re.search(r"\.\d{3}", pressed)
-    assert "GOVERN" not in notes.STEP_TEXT[steps.AXLE_CHECKED_KEY]
 
 
 def test_the_axle_presses_push_on_the_step_through_a_sleeve() -> None:
@@ -414,30 +369,30 @@ def test_the_axle_presses_push_on_the_step_through_a_sleeve() -> None:
     )
     neck = math.pi / 4.0 * (spec.RELIEF_DIA_LIMITS[1] / inch) ** 2
     assert notes.PRESS_FORCE_MAX_KIP / neck > 3.0 * notes.AXLE_YIELD_KSI
-    # Both presses that drive the axle in name the sleeve, which its own step
-    # makes (rule 22: one action per step), as does the oil.
+    # Both pushes that drive the axle in name the sleeve, which its own step
+    # makes (rule 22: one action per step); the bond goes in the same way.
     assert notes.PRESS_SLEEVE in notes.STEP_TEXT[steps.PRESS_SLEEVE_MADE_KEY]
     sleeve = f"STEP {steps.step_number(steps.PRESS_SLEEVE_MADE_KEY)} SLEEVE"
-    assert sleeve in notes.STEP_TEXT[steps.AXLE_PRESSED_KEY]
-    assert sleeve in notes.STEP_TEXT["axle-repressed"]
-    assert "OIL" not in notes.STEP_TEXT[steps.AXLE_PRESSED_KEY]
-    assert "OIL" in notes.STEP_TEXT["axle-plain-end-oiled"]
-
-
-def test_the_drum_bond_accepts_the_recess_window_the_wheel_lengths_prove() -> None:
-    """Rule 22: the drum bond step reads the drum face's window below the
-    spigot end (DRUM_RECESS) where DETAIL B dimensions it."""
-    low, high = stack.LIMIT_DIMENSIONS[stack.DRUM_RECESS_DIMENSION]
-    assert low == 0.0
-    assert (low, high) == pytest.approx(mg_magnifying_wheel_geom.DRUM_RECESS, abs=1e-9)
-    assert low < stack.DRUM_RECESS < high
-    pressed = notes.STEP_TEXT[steps.DRUM_BONDED_KEY]
-    assert "HARD AGAINST THE BOSS" in pressed
+    assert sleeve in notes.STEP_TEXT[steps.AXLE_DRY_FITTED_KEY]
     assert (
-        f"ITS OUTER FACE BELOW THE END OF THE SPIGOT AS {notes.ENDSHAKE_DETAIL_TITLE} SETS IT"
-        in pressed
+        f"SAME WAY AS STEP {steps.step_number(steps.AXLE_DRY_FITTED_KEY)}"
+        in notes.STEP_TEXT[steps.AXLE_BONDED_KEY]
     )
-    assert "CALIPER DEPTH ROD" in pressed
+
+
+def test_the_drum_bond_is_seen_seated_and_not_proud() -> None:
+    """Owner ruling 2026-11-24, fit audit part 2, S4: the drum bond stops
+    hard against the boss, seen, and not proud of the spigot end by a
+    straightedge; DETAIL B prints the window the wheel lengths prove as REF."""
+    low, high = stack.DRUM_RECESS_LIMITS
+    assert low == 0.0
+    assert low < stack.DRUM_RECESS < high
+    bonded = notes.STEP_TEXT[steps.DRUM_BONDED_KEY]
+    assert bonded.endswith(
+        "UNTIL IT IS HARD AGAINST THE BOSS: NO LIGHT UNDER THE DRUM, NOT PROUD OF "
+        "THE SPIGOT END (STRAIGHTEDGE)."
+    )
+    assert notes.ENDSHAKE_DETAIL_TITLE not in bonded
 
 
 def test_each_hand_set_clamp_is_checked_to_hold_its_setting() -> None:

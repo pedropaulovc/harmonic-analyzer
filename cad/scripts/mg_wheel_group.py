@@ -56,14 +56,14 @@ if not math.isclose(_SPOKE_MID_Z, WHEEL_MID_Z, abs_tol=1e-9):
     )
 
 # --- stack corners (the printed and catalogue bands) -----------------------------------
-# Owner ruling 2026-11-21 (tight-tolerance audit, row 3): "fit at assembly".
-# MHA-MG-00 presses the pin with the spacer on its shank against the bar's
-# front face and gauges the step from the spacer's OUTER face, so neither
-# the bar's depth nor the spacer's length is in the stack: they set only
-# where the back end lands (mg_wheel_axle_spec.BACK_END_SUNK_MIN /
-# BACK_END_SUNK_MAX). Each corner runs from the spacer's outer face, where
-# the back washer seats. The gauge and the hub keep millimetre nominals and
-# print rounded: each term is its printed limits.
+# Owner ruling 2026-11-24, fit audit part 2, C11 ("Yes, set to the trial
+# stack"): MHA-MG-00 no longer gauges the step. The axle is set where a dry
+# trial of the stack accepts it (TRIAL_* below); the corners here run the
+# model's nominal step station .768 (DETAIL A prints it as REF) with the
+# old +/-.002 as the model band, so the nominal stack is still proven. Each
+# corner runs from the spacer's outer face, where the back washer seats.
+# The gauge and the hub keep millimetre nominals and print rounded: each
+# term is its printed limits.
 _GAUGE = _pin.PRESS_GAUGE_LIMITS
 _BACK = (_back.THICKNESS_MIN, _back.THICKNESS_MAX)
 _HUB = _wheel.HUB_LEN_LIMITS
@@ -116,6 +116,22 @@ if THREAD_PAST_LOCKNUT_MAX > _pin.THREAD_PAST_LOCKNUT_LIMIT:
     raise AssertionError(
         f"{THREAD_PAST_LOCKNUT_MAX:.4f} of thread past the locknut "
         f"> {_pin.THREAD_PAST_LOCKNUT_LIMIT}"
+    )
+# The trial (C11) accepts on three things to see, at the go leaf's endshake
+# (ENDSHAKE_MIN): the first nut ran on full thread down to the front washer,
+# the thread end inside DETAIL B (TIP_INCOMPLETE .. THREAD_PAST_LOCKNUT_LIMIT)
+# and the plain end not proud. The first: the nut's inner face past the
+# thread's full start, so the step stands inside the hub by at least the
+# full-thread run less the go leaf and the thickest washer. The second
+# bounds the thread end; the set endshake (up to ENDSHAKE_MAX) lowers it by
+# at most TRIAL_ENDSHAKE_DROP and never raises it, so the re-read after the
+# locknut can only fall short, and closing the endshake to the go leaf
+# restores the trial's reading.
+TRIAL_STEP_INSIDE_HUB_MIN = _pin.FULL_THREAD_FROM_STEP_MAX - ENDSHAKE_MIN - _FRONT[1]
+TRIAL_ENDSHAKE_DROP = ENDSHAKE_MAX - ENDSHAKE_MIN
+if TRIAL_STEP_INSIDE_HUB_MIN <= 0.0:
+    raise AssertionError(
+        f"a trial nut on thread no longer keeps the step in the hub: {TRIAL_STEP_INSIDE_HUB_MIN:.4f}"
     )
 
 # --- fits on the pin ------------------------------------------------------------------
