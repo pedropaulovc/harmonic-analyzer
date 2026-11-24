@@ -734,12 +734,15 @@ def test_the_callouts_name_each_fit_and_the_matched_pair() -> None:
     assert press is notes.PRESS_HOLE_CALLOUT
     assert press.splitlines()[0] == "REAM THRU"
     # Reamed with the set reamer: no band, no interference range; the two
-    # lines of words say the mate is turned to this hole (its acceptance
-    # prints once, on MHA-PD-28) and what the press protects (rule 4).
+    # lines of words name the fit and say the mate is turned to this bore,
+    # in rule 4's words (its acceptance prints once, on MHA-PD-28).  No
+    # reason is printed: it is in the necessity register.
     assert press.splitlines()[2:] == [
-        f"{numbers['BUSH_NUMBER']} TURNED TO PRESS IN HERE",
-        "HOLDS KNOB AXIS, NO FASTENER",
+        "PRESS FIT",
+        f"{numbers['BUSH_NUMBER']} IS TURNED TO THIS BORE",
     ]
+    for word in ("HOLDS", "KEEPS", "SETS", "FASTENER"):
+        assert word not in press, word
     assert max(map(len, press.splitlines())) <= 33
     assert "INTERFERENCE" not in press and not re.search(r"\.\d{4}", press)
     locator = flat(drawing.LOCATOR_CALLOUT)
@@ -751,10 +754,10 @@ def test_the_callouts_name_each_fit_and_the_matched_pair() -> None:
     assert "SLIDES IN, NO SHAKE" in locator
     note = flat(drawing.LOCATOR_NOTE)
     # No clearance range is printed: the dowel is the gauge, named once, on
-    # the callout.  The note says what the pair protects.
+    # the callout.  The note prints no reason (necessity register N-02).
     assert "CLEARANCE" not in flat(locator + " " + note)
     assert not re.search(r"\.\d{4}", locator + note)
-    assert "KEEPS PLATE AT REDUCER MESH SETTING" in note
+    assert "KEEPS" not in note and "MESH" not in note
     # One scheme: sheet 2's frame says where the holes stand, the note only
     # when they are made; no order of work, no "match-drill".
     assert "DRILL AND REAM AT ASSEMBLY ON ARM" in note
