@@ -223,12 +223,13 @@ def test_machine_and_float_stations() -> None:
 
 def test_each_chucking_dimensions_from_its_faced_end() -> None:
     # Stud chucking: F, the core's front and the thread's end from the tip
-    # face at .XXX; rear chucking: the controlled overall to the rear face,
-    # the journal (the rest) a reference.
+    # face at .XXX; rear chucking: the controlled journal, pinion rear face
+    # to the rear face, at .XX; the overall a .XX reference.
     assert spec.STUD_STATION_PLACES == 3
     stations = spec.DRAWING_PRECISION["StudProfile"]
     assert stations["TipStation"] == stations["CoreFromTip"] == stations["ThreadEndFromTip"] == 3
-    assert stations["OverallLength"] == 3
+    assert stations["OverallLength"] == 2
+    assert spec.DRAWING_PRECISION["JournalProfile"]["JournalLength"] == 2
     assert spec.CORE_FRONT_FROM_TIP == pytest.approx(0.730 * spec.MM_PER_IN)
     assert spec.THREAD_END_FROM_TIP == pytest.approx(0.640 * spec.MM_PER_IN)
     # Two .XXX stations apart, the F-referenced stations hold the .XX band
@@ -237,15 +238,17 @@ def test_each_chucking_dimensions_from_its_faced_end() -> None:
     xxx = printed_band_mm(3, unit=spec.UNIT)
     assert 2.0 * xxx <= xx + 1e-12
     assert spec.CORE_FRONT_FROM_F_PLACES == spec.PLAIN_CORE_PLACES == spec.TIP_STATION_PLACES == 2
-    # The journal carries the overall's, F's and the face width's bands; its
-    # stand-out behind the bush adds the ring's and the bush's (.014).
-    assert spec._JOURNAL_LENGTH_BAND == pytest.approx(2.0 * xxx + spec.FACE_WIDTH_BAND)
+    # The stand-out reads the journal's own ±.01 (and the face width's .001
+    # kept as an allowance); behind the bush it adds the ring's and the
+    # bush's (.014, what MHA-PD-16's fitted range prints from).
+    assert spec._JOURNAL_LENGTH_BAND == pytest.approx(xx + spec.FACE_WIDTH_BAND)
+    assert spec._JOURNAL_LENGTH_BAND >= xx
     assert spec.JOURNAL_STANDOUT_BAND == pytest.approx(
         spec._JOURNAL_LENGTH_BAND + ring.LENGTH_TOL + bush.LENGTH_BAND
     )
     assert spec.JOURNAL_STANDOUT_BAND == pytest.approx(0.014 * spec.MM_PER_IN)
-    assert drawing.REFERENCE_DIMENSIONS["JournalLength"] is False
-    assert "OverallLength" not in drawing.REFERENCE_DIMENSIONS
+    assert "JournalLength" not in drawing.REFERENCE_DIMENSIONS
+    assert drawing.REFERENCE_DIMENSIONS["OverallLength"] is False
     # The from-tip dimensions stack outward from the tip's witness line, each
     # starting right of the next one's foot.
     rows = [drawing.SIDE_KEEP[name][1] for name in ("ThreadEndFromTip", "CoreFromTip", "TipStation")]
@@ -254,9 +257,9 @@ def test_each_chucking_dimensions_from_its_faced_end() -> None:
     # Round 2: each .XXX tip station names what it serves, by its link on the
     # value's line to a note naming the mate whose stack needs .XXX.  Machinist
     # review r1 of #2019 (rule 7): one reason a note, no values in its text.
-    # Round 6: the overall keeps .XXX (at .XX the knob cup's fit-up facing
-    # goes negative) and states that function once at the dimension, never
-    # in a note (r3).
+    # Fit batch r5: the journal's length controls at .XX and the overall is
+    # a .XX reference; neither carries words (r3 gated a reason on the
+    # overall, r4 its bare third place).
     notes = dict(drawing.NOTE_TEXTS)
     note = notes[drawing.STATIONS_NOTE] + notes[drawing.THREAD_NOTE]
     for name, link in (
@@ -270,19 +273,18 @@ def test_each_chucking_dimensions_from_its_faced_end() -> None:
     assert "D-FLAT SEAT" in notes[drawing.STATIONS_NOTE]
     assert "FULL THREAD" in notes[drawing.THREAD_NOTE]
     cup = _config.parts("pd-transgear-knob-cup")["number"]
-    assert "OverallLength" not in drawing.DIMENSION_SUFFIXES
-    assert "OverallLength" not in drawing.DIMENSION_CALLOUTS_BELOW
-    assert "OverallLength" not in drawing.DIMENSION_CALLOUTS_ABOVE
-    assert spec.inch_text(spec.OVERALL_LENGTH, 3) == "2.722"
-    assert "2.722" not in drawing.NOTES and cup not in drawing.NOTES
-    # At .XX the stand-out's band outruns the cup's supplied pilot: the
-    # least facing goes negative, so the overall keeps its third place.
+    for name in ("OverallLength", "JournalLength"):
+        assert name not in drawing.DIMENSION_SUFFIXES
+        assert name not in drawing.DIMENSION_CALLOUTS_BELOW
+        assert name not in drawing.DIMENSION_CALLOUTS_ABOVE
+    assert spec.inch_text(spec.OVERALL_LENGTH, 2) == "2.72"
+    assert spec.inch_text(spec.JOURNAL_LENGTH, 2) == "1.55"
+    assert spec.JOURNAL_LENGTH == pytest.approx(1.55 * spec.MM_PER_IN)
+    assert "2.72" not in drawing.NOTES and cup not in drawing.NOTES
+    # The cup's least facing stays positive on the journal's two-place band.
     import pd_transgear_knob_cup_spec as cup_spec
 
-    xx_band = printed_band_mm(2, unit=spec.UNIT) + printed_band_mm(3, unit=spec.UNIT) + spec.FACE_WIDTH_BAND
-    xx_facing = min(cup_spec.FACING_REMOVAL) - (xx_band - spec._JOURNAL_LENGTH_BAND)
     assert min(cup_spec.FACING_REMOVAL) >= 0.0
-    assert xx_facing < 0.0
     for key in ("pd-transgear-drive-collar", "pd-transgear-thumbnut"):
         assert _config.parts(key)["number"] in note, key
     # Rule 7: each note runs to four short lines; no process or coined
@@ -294,7 +296,7 @@ def test_each_chucking_dimensions_from_its_faced_end() -> None:
     # width's left witness line (the pinion's rear face, which drops with its
     # arrow to the text's height) and of the rear witness line.
     x, _y = drawing.SIDE_KEEP["OverallLength"]
-    chars = len("2.722")
+    chars = len("(2.72)")
     assert drawing.OVERALL_TEXT_CHARS == chars
     half = chars * 0.00275 / 2
     assert x + half <= drawing.PINION_REAR_X - 0.005
@@ -481,11 +483,11 @@ def test_every_native_dimension_is_placed_once_with_model_places() -> None:
     detail = {"FrontReliefDia", "FrontReliefWidth", "FrontCornerRadius"}
     assert set(drawing.DETAIL_KEEP) == detail | {"FlatEnd", "FlatToolRadius"}
     assert spec.DRAWING_PRECISION["StudProfile"]["ThreadBlankDia"] == 3
-    # #2169: the journal prints as a reference; the overall controls.  Its Ø
-    # is made to fit the bush's reamed bore (rule 4): REF, no limits.
+    # The journal's length controls; the overall prints as a reference.  The
+    # journal's Ø is made to fit the bush's reamed bore (rule 4): REF.
     assert spec.DRAWING_PRECISION["JournalProfile"]["JournalLength"] == 2
     references = {
-        "JournalLength": False,
+        "OverallLength": False,
         "JournalDia": True,
         "ThreadBlankDia": True,
         "CoreDia": True,

@@ -522,25 +522,30 @@ CUP_FACE_STATION = RING_LENGTH + BUSH.LENGTH + END_FLOAT  # 1.418
 CUP_FACE_STATION_BAND = RING_LENGTH_TOL + BUSH.LENGTH_BAND + END_FLOAT_SET_TOL
 # The journal ends JOURNAL_STANDOUT behind the bush's rear face at the stack
 # pose: the cup's fitted pilot (.132, which centres the cup on the journal
-# end) plus the float.  The rear chucking faces the rear end to the
-# controlled overall length from the tip face (OVERALL_LENGTH, .XXX) and the
-# pinion's rear face to the face width from F, so the journal (pinion rear
-# face to rear end, REF) carries the overall's, F's (from the tip) and the
-# face width's bands (#2169, Main delegated ruling 2026-11-04 under #989).
+# end) plus the float.  The journal's length, pinion rear face to rear end,
+# is the controlled dimension at .XX (the model's own driving dimension):
+# it alone sets the stand-out, so the stack reads one two-place band, and
+# the overall from the tip face prints as a .XX reference.  Until fit batch
+# r5 the overall was the controlled one at .XXX and the journal the REF
+# (#2169, Main delegated ruling 2026-11-04 under #989), which made the
+# stand-out carry three bands (.011) and left a three-place overall whose
+# function no rule lets the sheet state: bare it read as over-specified
+# (rule 3), labelled as narration (rule 7), in four review rounds.
 JOURNAL_STANDOUT = 3.556  # .140
-JOURNAL_LENGTH = RING_LENGTH + BUSH.LENGTH + JOURNAL_STANDOUT  # 1.550 REF
-JOURNAL_LENGTH_PLACES = 2
-OVERALL_LENGTH_PLACES = 3  # controlled, tip face to rear face
+JOURNAL_LENGTH = RING_LENGTH + BUSH.LENGTH + JOURNAL_STANDOUT  # 1.550
+JOURNAL_LENGTH_PLACES = 2  # controlled, pinion rear face to rear face
+OVERALL_LENGTH_PLACES = 2  # reference, tip face to rear face
+# The journal's own ±.01, and the face width's .001 the former chain also
+# charged: kept as an allowance so the stand-out's band, and with it
+# MHA-PD-16's printed fitted pilot range, stays what it was (.011, never
+# under the printed band).
 _JOURNAL_LENGTH_BAND = (
-    printed_band_mm(OVERALL_LENGTH_PLACES, unit=UNIT)
-    + _STUD_STATION_BAND
-    + FACE_WIDTH_BAND
+    printed_band_mm(JOURNAL_LENGTH_PLACES, unit=UNIT) + FACE_WIDTH_BAND
 )
 # The stand-out on a real stack, the pinion pushed forward onto the ring and
 # the ring onto the bush's hub face: the journal's, the ring's and the bush's
 # bands.  The cup's facing at fit-up takes it up
-# (pd_transgear_knob_cup_spec.FACING_REMOVAL, never negative only while the
-# overall holds .XXX).
+# (pd_transgear_knob_cup_spec.FACING_REMOVAL, never negative).
 JOURNAL_STANDOUT_BAND = _JOURNAL_LENGTH_BAND + RING_LENGTH_TOL + BUSH.LENGTH_BAND
 JOURNAL_DIA_MIN = JOURNAL_DIA + min(JOURNAL_DIA_BAND)
 
@@ -882,9 +887,9 @@ GEOMETRIC_CONTROLS = (
 # dimensions from its faced tip: F (TipStation), the core's front
 # (CoreFromTip) and the thread's end (ThreadEndFromTip) are stations from
 # the tip face.  It also carries two construction-only witnesses, the
-# tooth-tip blank across the face (OutsideDia) and the controlled overall
-# length from the tip face to the rear face (OverallLength) that the rear
-# chucking faces to, drawing-simplicity-policy.md `How the repository
+# tooth-tip blank across the face (OutsideDia) and the reference overall
+# length from the tip face to the rear face (OverallLength),
+# drawing-simplicity-policy.md `How the repository
 # implements the guidelines`'s reference-sketch allowance, so every turned
 # size imports natively beside its axial extent.  ``CoreFlatProfile``
 # carries the D-flat's in-air tool end (FlatEnd, FlatToolRadius).  The

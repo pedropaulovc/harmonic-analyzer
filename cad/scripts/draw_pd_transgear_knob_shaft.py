@@ -237,8 +237,8 @@ JOURNAL_CLEARANCE_MM = (
 # function), one reason each with no values in the text (machinist review
 # r1 of #2019, rule 7); and the neck's mate, which its Ø limits and the
 # flat's end limits link (round 2: the flat end's .005 band named no mate).
-# The overall prints .XXX plain: the title block's ±.005 keeps the knob
-# cup's fit-up facing positive.  They stand in the open field right of the
+# The journal's length is the controlled one at .XX and the overall a .XX
+# reference.  They stand in the open field right of the
 # overall's tip witness line, over the title block; at 2.2 mm a line runs
 # ~1.5 mm a character, so no line runs past 70 characters (~105 mm).
 JOURNAL_FIT_NOTE = 1
@@ -387,14 +387,14 @@ SIDE_KEEP: dict[str, tuple[float, float]] = {
     "ThreadEndFromTip": ((THREAD_END_X + TIP_X) / 2.0, _ROW_Y[0]),
     "CoreFromTip": ((CORE_END_X + TIP_X) / 2.0, _ROW_Y[1]),
     "TipStation": ((F_X + TIP_X) / 2.0, _ROW_Y[2]),
-    # The journal, the rest of the overall, as a reference.
+    # The journal, pinion rear face to rear end: controlled, .XX.
     "JournalLength": ((PINION_REAR_X + REAR_X) / 2.0, _ROW_Y[0]),
-    # The controlled overall, tip face to rear face, on the last row, its
-    # rear witness line right of the gear data block.  Its text, with its
-    # function on the value's line, centres between the rear witness line
-    # and the pinion's rear witness line (round 3: "2.792 SEE NOTE 3" left
-    # of F ran into the face width's left witness line and arrow, which drop
-    # to the overall text's height); OVERALL_TEXT_* below check both ends.
+    # The reference overall, tip face to rear face, on the last row, its
+    # rear witness line right of the gear data block.  Its text centres
+    # between the rear witness line and the pinion's rear witness line
+    # (round 3: text left of F ran into the face width's left witness line
+    # and arrow, which drop to the overall text's height); OVERALL_TEXT_*
+    # below check both ends.
     "OverallLength": ((REAR_X + PINION_REAR_X) / 2.0, _ROW_Y[5] + _OVERALL_LIFT),
     # #2425: the rear chamfer's leg, under the rear end (REAR_CHAMFER_FUNCTION).
     "RearChamferSize": (REAR_X + 0.030, _sheet_y(-JOURNAL_DIA / 2.0) - 0.0065),
@@ -487,18 +487,16 @@ DIMENSION_SUFFIXES = {
     # under the flat end's .007) and links the neck note like its neighbours.
     "FrontReliefWidth": f" {NECK_LINK}",
 }
-# The overall prints its value alone at .XXX, the title block's row (at .XX
-# the journal's stand-out can outrun the knob cup's supplied pilot,
-# pd_transgear_knob_cup_spec FACING_REMOVAL).  No reason prints on it
-# (machinist review r3 of the fit batch; owner ruling 2026-11-24: reasons
-# are not the sheet's).
+# The overall prints as a .XX reference: the journal's length is the
+# controlled dimension (pd_transgear_knob_shaft_spec.JOURNAL_LENGTH_PLACES),
+# so no three-place overall needs a function the sheet may not state.
 # The overall's one-line text (~2.75 mm a character, centred on its keep;
 # the round-6 render's digits ran 2.32 mm) ends 5 mm short of the face
 # width's left witness line (the pinion's rear face, which drops to the
 # text's height with its arrow) and starts 5 mm right of the rear witness
 # line.  It sits over the overall's line; SPAN 2 TEETH and the GEAR DATA
 # block stand under that line and left of the rear witness line.
-OVERALL_TEXT_CHARS = len(inch_text(REAR_END_Z - TIP_Z, 3))
+OVERALL_TEXT_CHARS = len(f"({inch_text(REAR_END_Z - TIP_Z, 2)})")
 _OVERALL_HALF = OVERALL_TEXT_CHARS * 0.00275 / 2.0
 OVERALL_TEXT_LEFT = SIDE_KEEP["OverallLength"][0] - _OVERALL_HALF
 OVERALL_TEXT_RIGHT = SIDE_KEEP["OverallLength"][0] + _OVERALL_HALF
@@ -506,13 +504,13 @@ if OVERALL_TEXT_RIGHT > PINION_REAR_X - 0.005:
     raise AssertionError("the overall's text runs into the face width's witness line")
 if OVERALL_TEXT_LEFT < REAR_X + 0.005:
     raise AssertionError("the overall's text runs over the rear witness line")
-# Reference sizes (parenthesized): the journal's length (the rest of the
-# controlled overall), its Ø (made to fit the bush's reamed bore, note 1),
-# the thread blank the #8-32 UNC-2A class governs, and the D-core's Ø and
-# its flat's distance from the axis, both made to fit MHA-PD-22 (note 2).
-# Name -> diameter glyph.
+# Reference sizes (parenthesized): the overall (the journal's length
+# controls the rear end), the journal's Ø (made to fit the bush's reamed
+# bore, note 1), the thread blank the #8-32 UNC-2A class governs, and the
+# D-core's Ø and its flat's distance from the axis, both made to fit
+# MHA-PD-22 (note 2).  Name -> diameter glyph.
 REFERENCE_DIMENSIONS = {
-    "JournalLength": False,
+    "OverallLength": False,
     "JournalDia": True,
     "ThreadBlankDia": True,
     "CoreDia": True,
