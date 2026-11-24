@@ -83,11 +83,12 @@ def test_hanger_screw_rows_follow_the_arm_plate_and_bar() -> None:
             pivot_screw.FITTED_THREAD_LEN - NECK_FLAT_END,
         )
     )
-    # R9-71: the spacer's reamed bore pressed on the shoulder, whole length.
-    assert allowed[
+    # The spacer's #12 drilled bore clears the shoulder (a bonded slip fit,
+    # fit audit 2026-11-23): no allowed-interference row.
+    assert spacer.BOND_GAP[0] > 0.0
+    assert (
         _pair("pd-transgear-pivot-spacer-1", "pd-vn-transgear-pivot-screw-1")
-    ] == pytest.approx(
-        _annulus(pivot_screw.SHOULDER_DIA, spacer.BORE_DIA, spacer.LENGTH)
+        not in allowed
     )
 
 
@@ -105,10 +106,10 @@ def test_latch_bracket_screw_rows_follow_the_screw_and_bar_taps() -> None:
 
 def test_disc_cluster_rows_follow_the_pin_hub_and_disc() -> None:
     allowed = _allowed()
-    # #2415: only the pin's press land grips the arm's reamed bore.
-    assert allowed[_pair("pd-transgear-pin-1", "pd-transgear-arm-1")] == pytest.approx(
-        _annulus(pin.PRESS_LAND_DIA, arm.PIN_BORE_DIA, pin.PRESS_LAND_LENGTH)
-    )
+    # Owner ruling 2026-11-24, fit audit question 4: the one-diameter
+    # pin is bonded in the arm's reamed bore with clearance, no overlap row.
+    assert _pair("pd-transgear-pin-1", "pd-transgear-arm-1") not in allowed
+    assert pin.DIA < arm.PIN_BORE_DIA
     # Each #0-80 is cut to fit (R9-47): it fills the disc's tap from the
     # flange's front face to its cut end, inside the disc's rear face.
     assert disc_screw.SHANK_DIA == pytest.approx(disc.SCREW_MAJOR_DIA)
@@ -287,17 +288,28 @@ def test_locating_dowels_press_into_the_arm_and_slip_in_the_plate() -> None:
         assert _pair(pin, "pd-transgear-arm-plate-1") not in allowed
 
 
+def test_the_latch_pin_presses_into_the_arms_blind_ream() -> None:
+    """MHA-PD-VN-58 in the arm's .1240 ream over its modelled insertion: the
+    hole is modelled at its set reamer's size (fit audit 2026-11-23), so the
+    press is a modelled overlap and takes a row."""
+    assert latch_pin.DIA > arm.PIN_HOLE_DIA
+    assert latch_pin.PRESS_DEPTH < arm.PIN_HOLE_DEPTH
+    pair = _pair("pd-vn-transgear-latch-pin-1", "pd-transgear-arm-1")
+    assert _allowed()[pair] == pytest.approx(
+        _annulus(latch_pin.DIA, arm.PIN_HOLE_DIA, latch_pin.PRESS_DEPTH)
+    )
+
+
 def test_pressed_and_slip_joints_without_a_row_do_not_overlap() -> None:
     """A row-less joint is modelled line to line or clear; a spec that turns
     one into a press needs a row here."""
     assert shaft.CORE_DIA <= _collar().BORE_DIA
-    assert latch_pin.DIA <= arm.PIN_HOLE_DIA
     # The modelled pin stands on the hook hole's axis offset by the bearing lift.
     assert hook.PIN_BEARING_LIFT + latch_pin.DIA / 2.0 <= hook.PIN_HOLE_DIA / 2.0
     assert drive_pin.DIA <= removable.PIN_HOLE_DIA
-    # #2425: the MHA-PD-28 bush's FN2 press in the plate is modelled line to
-    # line (its printed limits come from the bands), and the journal runs in
-    # its reamed bore.
+    # #2425: the MHA-PD-28 bush's press in the plate is modelled line to
+    # line (the step is turned to the measured hole), and the journal runs
+    # in its reamed bore.
     assert bush.PRESS_DIA == plate.PRESS_HOLE_DIA
     assert shaft.JOURNAL_DIA <= bush.BORE_DIA
     allowed = _allowed()

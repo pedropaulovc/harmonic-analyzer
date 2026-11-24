@@ -340,6 +340,27 @@ def set_reference_dimensions(
     rebuild_drawing(adapter, label="set_reference_dimensions")
 
 
+def set_dimension_suffixes(
+    adapter: Any, annotations: Iterable[Any], suffixes: dict[str, str]
+) -> None:
+    """Append each NAMED dimension's suffix to its value on the same line
+    (``Ø.0615 REAM``).  ``SetText`` reports nothing, so each suffix is read
+    back; a name no annotation carries fails loud."""
+    remaining = dict(suffixes)
+    for annotation in annotations:
+        name = dimension_name(adapter, annotation)
+        text = remaining.pop(name, None)
+        if text is None:
+            continue
+        display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+        display.SetText(2, text)  # swDimensionTextSuffix
+        applied = str(display.GetText(2) or "")
+        if applied.replace("\r", "") != text:
+            raise RuntimeError(f"{name}: suffix did not persist: {applied!r}")
+    if remaining:
+        raise RuntimeError(f"dimension suffixes not applied: {sorted(remaining)}")
+
+
 def offset_dimension_text(
     adapter: Any,
     annotations: Iterable[Any],

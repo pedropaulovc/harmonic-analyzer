@@ -35,7 +35,7 @@ pending exception ruling (#1377); the sheet states its printed worst case
 (``pd_transgear_removable_notes.BORE_PIN_WEB_NOTE``).
 
 Drawing marks (``draw_pd_transgear_removable``, decimal inch): ``spec.DRAWING_DIMENSIONS`` at
-``spec.DRAWING_PRECISION``, the plate thickness banded ``spec.PLATE_PRINTED_BAND``
+``spec.DRAWING_PRECISION``, the supplied plate thickness a REF size
 and each pin centre +/-``spec.PIN_LOCATION_TOL``; the outside diameter
 ``BlankDia`` is driven per configuration, so each configuration's view prints
 its own.  The sheet's SPROCKET DATA and notes are file properties.  The
@@ -93,8 +93,7 @@ from _drawing_precision import (
 )
 from _drawing_dimension_insert import add_diametric_linear_dimension
 from _drawing_marks import apply_drawing_properties, clear_dimensions_for_drawing, mark_dimensions_for_drawing
-from _drawing_tolerances import _set_tolerance_precision, set_dimension_symmetric_tolerance
-from _fit_deviations import deviations
+from _drawing_tolerances import set_dimension_symmetric_tolerance
 from _simplified_part import save_simplified_part
 from _grouped_bom_properties import apply_grouped_bom_properties
 from _visibility import blank_reference_geometry
@@ -131,7 +130,6 @@ if any(abs(x) > 1e-9 for x, _y in PIN_HOLE_CENTRES):
     raise AssertionError("drive-pin holes must sit on local +/-Y")
 
 
-_TOL_LIMIT = 3  # swTolType_e.swTolLIMIT
 _TOL_SYMMETRIC = 4  # swTolType_e.swTolSYMMETRIC
 
 
@@ -156,37 +154,13 @@ def author_dimension_callouts(adapter) -> None:
 
 def family_bands() -> dict[tuple[str, str], tuple[int, float, float]]:
     """``(feature, dimension) -> (tolerance type, lower, upper)`` in mm: the
-    bands the sheet prints once for T12, T18 and T24 (they share the plate
-    and the pin holes), as the build sets them below."""
+    bands the sheet prints once for T12, T18 and T24 (they share the pin
+    holes), as the build sets them below."""
     pin = (_TOL_SYMMETRIC, -spec.PIN_LOCATION_TOL, spec.PIN_LOCATION_TOL)
     return {
-        ("BlankProfile", "BlankWidth"): (_TOL_LIMIT, *deviations(spec.PLATE_PRINTED_BAND)),
         ("BorePinsProfile", "PinPosY"): pin,
         ("BorePinsProfile", "PinNegY"): pin,
     }
-
-
-def _plate_limits(adapter) -> None:
-    """The supplied plate's thickness as native LIMITs (.110/.107): a zero
-    upper deviation printed bilateral read ".000" with no sign (machinist
-    review round 2); the limits say the same with nothing to misread."""
-    label = "BlankWidth@BlankProfile"
-    display, dimension = _named_dimension(adapter, "BlankProfile", "BlankWidth")
-    lower, upper = deviations(spec.PLATE_PRINTED_BAND)
-    tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
-    tolerance.Type = _TOL_LIMIT
-    if tolerance.SetValues(lower / 1000.0, upper / 1000.0) is not True:
-        raise RuntimeError(f"{label}: LIMIT deviations were rejected")
-    if (
-        int(tolerance.Type) != _TOL_LIMIT
-        or abs(float(tolerance.GetMinValue()) - lower / 1000.0) > 1e-12
-        or abs(float(tolerance.GetMaxValue()) - upper / 1000.0) > 1e-12
-    ):
-        raise RuntimeError(f"{label}: LIMIT tolerance readback changed")
-    _set_tolerance_precision(
-        display, (lower, upper), display_unit=spec.UNIT, label=label,
-        places=spec.PLATE_PLACES,
-    )
 
 
 def assert_bands_in_every_configuration(adapter) -> None:
@@ -225,7 +199,7 @@ def assert_bands_in_every_configuration(adapter) -> None:
         adapter.set_active_configuration(spec.DEFAULT_CONFIG),
     )
     _telemetry.success(
-        f"plate and pin-location bands read back in {len(spec.CONFIGS)} configurations"
+        f"pin-location bands read back in {len(spec.CONFIGS)} configurations"
     )
 
 
@@ -1144,11 +1118,11 @@ def build(adapter) -> dict[str, str]:
         adapter.set_active_configuration(spec.DEFAULT_CONFIG),
     )
     report_mass_properties(adapter)
-    # Manufacturing drawing support: supplied plate thickness stays within
-    # its printed band and each machined pin centre holds its location band.
+    # Manufacturing drawing support: the supplied plate thickness is a REF
+    # size (the callouts module parenthesizes it) and each machined pin
+    # centre holds its location band.
     # Bore and pin-hole sizes are drilled (the title block's DRILLED HOLES
     # row governs them). The places are the part's (drawing-simplicity-policy.md `How the repository implements the guidelines`).
-    _plate_limits(adapter)
     for name in ("PinPosY", "PinNegY"):
         set_dimension_symmetric_tolerance(
             adapter, "BorePinsProfile", name, spec.PIN_LOCATION_TOL,

@@ -1,9 +1,9 @@
 r"""Create the MHA-PD-23 transgear pin manufacturing drawing.
 
 The SLDPRT remains authoritative.  A turned pin carries no datum and no
-geometric-control frame (drawing-guidelines.md rule 5 (avoid excessive GD&T)): the turned shank keeps its native
-fit band and the press land its reference Ø, both linked by SEE NOTE 1 to
-the numbered note naming their fits, and one bearing-surface finish; the
+geometric-control frame (drawing-guidelines.md rule 5 (avoid excessive GD&T)): the turned shank prints its
+reference Ø, linked by SEE NOTE 1 to the numbered note giving its fits (made
+to fit its mates' reamed bores; bonded in the arm), and one bearing-surface finish; the
 MHA-PD-VN-61 ring groove its catalogue Ø and width bands, and every other
 size is an ordinary model dimension at its part-authored places.
 
@@ -66,7 +66,6 @@ from _printed_limits import limits
 from _session import run_build
 from _surface_finish import surface_finish_by_key
 import _telemetry
-import pd_transgear_arm_geometry as ARM
 import pd_transgear_pin_callouts as callouts
 from pd_transgear_pin_spec import (
     ARM_NUMBER,
@@ -90,10 +89,8 @@ from pd_transgear_pin_spec import (
     HEAD_LAND,
     LENGTH,
     OVERALL_LENGTH,
-    PRESS_INTERFERENCE,
-    PRESS_LAND_DIA,
-    PRESS_LAND_LENGTH,
     RING_NUMBER,
+    RUNNING_CLEARANCE,
     RUNNING_MATES,
     SEAT_FILLET_R,
     SURFACE_FINISHES,
@@ -141,8 +138,6 @@ def _sheet_y(radius_mm: float) -> float:
 HEAD_APEX_X = _sheet_x(-HEAD_HEIGHT)
 HEAD_BACK_X = _sheet_x(-HEAD_LAND)
 SEAT_X = _sheet_x(0.0)
-LAND_END_X = _sheet_x(PRESS_LAND_LENGTH)
-LAND_MID_X = (SEAT_X + LAND_END_X) / 2.0
 GROOVE_REAR_X = _sheet_x(GROOVE_REAR_STATION)
 LOAD_WALL_X = _sheet_x(GROOVE_STATION)
 FRONT_END_X = _sheet_x(GROOVE_STATION + FRONT_LAND)
@@ -165,11 +160,8 @@ HEAD_LAND_MID_X = (HEAD_BACK_X + SEAT_X) / 2.0
 # sits at the same height right of the head.  The diameters
 # stand above the profile, each on its own section: the shank Ø's SEE NOTE 1
 # under its value, the groove Ø above it with the ring's name above its
-# value.  The tip dome's reference height stands above the tip.  The press
-# land (#2415) takes its reference Ø above its own length and its .XX length
-# in a row of its own between the profile and the station's row, the shorter
-# baseline nearer the part; the seat root's R MAX stands left of the land,
-# over that row.
+# value.  The tip dome's reference height stands above the tip.  The seat
+# root's R MAX stands left of the seat, under the shank.
 _ROW_Y = SIDE_CENTER[1] - 0.036
 SIDE_KEEP = {
     "GrooveStation": ((SEAT_X + LOAD_WALL_X) / 2.0, _ROW_Y),
@@ -178,17 +170,13 @@ SIDE_KEEP = {
     # audit text-on-line, run 20261024T060429646Z).
     "FrontLand": (TIP_X - 0.008, _ROW_Y),
     "HeadLand": (HEAD_APEX_X + 0.010, _ROW_Y),
-    "LandLength": (LAND_MID_X, SIDE_CENTER[1] - 0.024),
-    # Near the land's end, so the R MAX leader rising to the seat corner
-    # passes under its lower arrow (at the land's middle it crossed the
-    # arrow: machinist review, run 20261111T224008804Z).
-    "LandDia": (LAND_END_X + 0.006, SHANK_TOP_Y + 0.025),
     "GrooveWidth": (GROOVE_MID_X + 0.032, SIDE_CENTER[1] - 0.016),
     "HeadDia": (HEAD_LAND_MID_X, HEAD_TOP_Y + 0.010),
     # At the shank's middle: its dimension line, and the arrow below the
     # shank, stand clear right of the groove width's text and ring callout
     # (34 mm left of here the lower arrow struck the +0.0762, run
-    # 20261024T030409384Z).  The callout under the value runs right from
+    # 20261024T030409384Z).  The callout under the value, two rows (the
+    # note's link and the running clearance's reference), runs right from
     # the line, high enough that it clears the Ra symbol and the head Ø.
     "ShankDia": (SHANK_MID_X, SHANK_TOP_Y + 0.046),
     # Above the shank Ø's whole block, with a text gap past the audit's
@@ -203,16 +191,12 @@ SIDE_KEEP = {
     # the one controlled length at that end, under the station's three-row
     # callout.
     "TipDomeZ": ((SEAT_X + TIP_X) / 2.0, _ROW_Y - 0.027),
-    # The seat root's one-line R MAX under the shank, its shelf ending short
-    # of the land end's extension line: the 23 mm text does not fit between
-    # that line and the seat's (the 1.8600's, 2.02's, .09's and .29's), where
-    # run 20261111T193324863Z printed it crossed by the seat's (text-on-line),
-    # and at LAND_END_X - 0.014 its shelf, 2.7 mm past the text, crossed the
-    # land end's (shoulder-crosses-line, run 20261111T201934013Z).  Its
-    # leader rises steeply to the lower corner over the land, crossing only
-    # the land end's extension line, under the land Ø's lower arrow and above
-    # the land's .29 row.
-    "SeatRadius": (LAND_END_X - 0.018, SIDE_CENTER[1] - 0.016),
+    # The seat root's one-line R MAX under the shank, 40 mm left of the seat
+    # (where it stood beside the #2415 land): the 23 mm text and its shelf
+    # stay clear of the seat's extension line (the 1.923's, 2.08's and
+    # .09's), where run 20261111T193324863Z printed it crossed
+    # (text-on-line).  Its leader rises steeply to the lower seat corner.
+    "SeatRadius": (SEAT_X - 0.040, SIDE_CENTER[1] - 0.016),
 }
 # The callouts and the dome heights' reference parentheses are authored on
 # the part's dimensions (``pd_transgear_pin_callouts``); the sheet only
@@ -220,14 +204,14 @@ SIDE_KEEP = {
 OVERALL_TEXT_XY = (SIDE_CENTER[0], _ROW_Y - 0.047)
 # The shank's finish: the part-owned ``journal`` control's ONE Ø.125
 # cylinder, resolved on the part the side view references and attached as
-# that model FACE, its leader landing on the upper outline ahead of the press
-# land, between the shank Ø's tolerance stack and the land's reference Ø.
+# that model FACE, its leader landing on the upper outline 35 mm ahead of the
+# seat, right of the shank Ø's dimension line.
 # Not a SILHOUETTE pick: on farm runs 20261111T181535941Z and
 # 20261111T190609060Z ISilhouetteEdge::GetFace failed IsSame against the
 # picked silhouette's (same_entity=False, dangling=False), with or without a
 # selection-point landing (draw_mg_magnifying_lever's rod finish; the face is
 # proven by IsSame and the landing readback pins the flank and station).
-FINISH_STATION_MM = PRESS_LAND_LENGTH + 0.013 * 1000.0 / _S
+FINISH_STATION_MM = 0.035 * 1000.0 / _S
 FINISH_SYMBOL = (_sheet_x(FINISH_STATION_MM), SHANK_TOP_Y + 0.008)
 # A point on the shank face, clear of the Ø dimension line.
 CENTERLINE_PICK = (SHANK_MID_X + 0.010, SIDE_CENTER[1] + 0.001)
@@ -240,13 +224,20 @@ NOTES_XY = (0.016, 0.070)
 # underside, the seat).  The domed ends are the part's ends: the head's apex
 # (datum end, z = -HEAD_HEIGHT) and the tip's (far end, z = LENGTH), the
 # overall between them a reference.  The seat is the pin's one faced origin
-# (rule 11): the head land, the press land's length, the groove's load wall
+# (rule 11): the head land, the groove's load wall
 # and the tip apex are stationed from it (``station_from = "shoulder"``; the
-# head land runs back to the head dome's root).  The press land is a
-# reference Ø turned to the measured MHA-PD-18 ream for its interference;
-# the shank takes its +.0000/-.0002 band and, as REF, its running clearance
-# in its mates' measured reams (note 1).  Each ``span`` is a feature's
+# head land runs back to the head dome's root).  The shank is ONE diameter
+# from the seat to the tip dome's root; it prints a reference Ø made to fit
+# (note 1) and no band.  The ``dia`` and ``diametral_clearance`` declared
+# for it are the spec's ANALYSIS numbers (pd_transgear_pin_spec.DIA_BAND,
+# the shank the fit is modelled to produce, and the clearance it gives),
+# bound only because the traveler's turned_shaft adapter sizes its cuts and
+# draws its diagrams from a band (prechips has no made-to-fit form: its REF
+# form prints the clearance and its labels overrun the diagram).  No
+# traveler step quotes them as an acceptance: the acceptance is the mates
+# tried on the journal.  Each ``span`` is a feature's
 # model-Z extent.  The declarations print nothing.
+_ANALYSIS_PLACES = 4
 _P = DRAWING_PRECISION_BY_NAME
 _SELF = "draw_pd_transgear_pin"
 _KEEP = (_SELF, "SIDE_KEEP")
@@ -261,8 +252,6 @@ part_metadata(
         "HEAD_DOME_R",
         "TIP_DOME_R",
         "DIA",
-        "PRESS_LAND_DIA",
-        "PRESS_LAND_LENGTH",
         "GROOVE_STATION",
         "GROOVE_DIA",
         "GROOVE_WIDTH",
@@ -364,74 +353,34 @@ requirement(
     precision={"dia": _P["HeadDia"]},
 )
 requirement(
-    "step_land",
-    kind="diameter",
-    faces=(CylinderFace(PRESS_LAND_DIA, contains_z_mm=PRESS_LAND_LENGTH / 2.0),),
-    requirements=("dia_ref", "diametral_interference", "length"),
-    fields={
-        "axis": ([0.0, 0.0, 1.0], ("PRESS_LAND_DIA",)),
-        "at": ([0.0, 0.0, 0.0], ("PRESS_LAND_DIA",)),
-        "span": ([0.0, PRESS_LAND_LENGTH], ("PRESS_LAND_LENGTH",)),
-        "dia_ref": (PRESS_LAND_DIA, ("PRESS_LAND_DIA", _KEEP, _NOTES)),
-        "diametral_interference": (
-            [PRESS_INTERFERENCE[0], PRESS_INTERFERENCE[1]],
-            ("PRESS_INTERFERENCE", _NOTES),
-        ),
-        "mate": (ARM_NUMBER, ("ARM_NUMBER", _NOTES)),
-        "mate_dia": (
-            [ARM.PIN_BORE_DIA_MIN, ARM.PIN_BORE_DIA_MAX],
-            (
-                ("pd_transgear_arm_geometry", "PIN_BORE_DIA_MIN"),
-                ("pd_transgear_arm_geometry", "PIN_BORE_DIA_MAX"),
-                _NOTES,
-            ),
-        ),
-        "length": (
-            limits(PRESS_LAND_LENGTH, _P["LandLength"], unit=UNIT),
-            ("PRESS_LAND_LENGTH", "UNIT", _KEEP),
-        ),
-        "length_nominal": (PRESS_LAND_LENGTH, ("PRESS_LAND_LENGTH",)),
-        "length_from": ("shoulder", (_KEEP,)),
-        "callout": (
-            callouts.SHANK_CALLOUT,
-            (("pd_transgear_pin_callouts", "SHANK_CALLOUT"), _NOTES),
-        ),
-    },
-    precision={"dia_ref": _P["LandDia"], "length": _P["LandLength"]},
-)
-requirement(
     "outer",
     kind="diameter",
     faces=(
-        CylinderFace(
-            DIA, contains_z_mm=(PRESS_LAND_LENGTH + GROOVE_REAR_STATION) / 2.0
-        ),
+        CylinderFace(DIA, contains_z_mm=GROOVE_REAR_STATION / 2.0),
         CylinderFace(DIA, contains_z_mm=(GROOVE_STATION + _TIP_ROOT) / 2.0),
     ),
     requirements=("dia", "diametral_clearance"),
     fields={
         "axis": ([0.0, 0.0, 1.0], ("DIA",)),
         "at": ([0.0, 0.0, 0.0], ("DIA",)),
-        "span": (
-            [PRESS_LAND_LENGTH, _TIP_ROOT],
-            ("PRESS_LAND_LENGTH", "LENGTH", "TIP_DOME_SAG"),
-        ),
+        "span": ([0.0, _TIP_ROOT], ("LENGTH", "TIP_DOME_SAG")),
         "dia": (
-            limits(DIA, _P["ShankDia"], DIA_BAND, unit=UNIT),
-            ("DIA", "DIA_BAND", "UNIT", _KEEP),
+            limits(DIA, _ANALYSIS_PLACES, DIA_BAND, unit=UNIT),
+            ("DIA", "DIA_BAND", "UNIT", _NOTES),
         ),
         "dia_nominal": (DIA, ("DIA",)),
         "diametral_clearance": (
-            list(callouts.RUNNING_CLEARANCE),
-            (("pd_transgear_pin_callouts", "RUNNING_CLEARANCE"), _NOTES),
+            list(RUNNING_CLEARANCE),
+            ("RUNNING_CLEARANCE", "RUNNING_BORE_DIA_BAND", "DIA_BAND"),
         ),
         "mates": (list(RUNNING_MATES), ("RUNNING_MATES", _NOTES)),
+        "bonded_in": (ARM_NUMBER, ("ARM_NUMBER", _NOTES)),
         "callout": (
             callouts.SHANK_CALLOUT,
             (("pd_transgear_pin_callouts", "SHANK_CALLOUT"), _NOTES),
         ),
     },
-    precision={"dia": _P["ShankDia"]},
+    precision={"dia": _ANALYSIS_PLACES},
 )
 requirement(
     "groove",
@@ -486,14 +435,14 @@ requirement(
 requirement(
     "fillet_seat",
     kind="fillet",
-    faces=(TorusFace(PRESS_LAND_DIA / 2.0 + SEAT_FILLET_R, SEAT_FILLET_R),),
+    faces=(TorusFace(DIA / 2.0 + SEAT_FILLET_R, SEAT_FILLET_R),),
     requirements=("radius_max",),
     fields={
         "radius_max": (SEAT_FILLET_R, ("SEAT_FILLET_R", _KEEP)),
         "radius_nominal": (SEAT_FILLET_R, ("SEAT_FILLET_R",)),
         "axis": ([0.0, 0.0, 1.0], ("SEAT_FILLET_R",)),
         "at": ([0.0, 0.0, 0.0], ("SEAT_FILLET_R",)),
-        "between": (["shoulder", "step_land"], ("SEAT_FILLET_R",)),
+        "between": (["shoulder", "outer"], ("SEAT_FILLET_R",)),
     },
     precision={"radius_max": _P["SeatRadius"]},
 )

@@ -1,0 +1,21 @@
+necessity:
+  - id: N-01
+    feature: "sheet 1, end view, Ø.2490 REAM THRU AFTER PRESSING IN MHA-PD-19, the knob shaft's running bore"
+    kind: mesh
+    reason: "play here shifts MHA-PD-08's pinion in the reducer mesh"
+    source: "pd_transgear_knob_shaft_spec (MHA-PD-08 has an integral 48DP pinion on this journal); pd_transgear_knob_bush_geometry.BORE_DIA_LIMITS; paper_drive_arm_registration.AXIS_PROJECTED_ZONE_DIAMETER_MM"
+  - id: N-02
+    feature: "sheet 1, section A-A, .809 ±.001 hub face station from the shoulder"
+    kind: gap
+    reason: "keeps collar MHA-PD-22 clear of disc MHA-PD-06"
+    source: "no longer required after fit audit question 5; loosening tracked in issue (pending). With the disc cluster .005 back (owner ruling 2026-11-24) pd_cluster_air.COLLAR_AIR statistical is 0.1880 mm at ±.001, 0.1688 at ±.003, 0.1366 at ±.005 against its 0.1016 floor; loosening moves no gate, only paper_drive_arm_registration.S_/K_PROJECTED_HEIGHT_MM (printed on MHA-PD-18/19) by .002"
+  - id: N-03
+    feature: "sheet 1, section A-A, 1.143 ±.002 overall length"
+    kind: gap
+    reason: "stack term of the knob shaft's end float at MHA-PD-16"
+    source: "pd_transgear_knob_cup_spec.FACING_REMOVAL: .001 spare at ±.002, none at ±.003, negative at ±.005"
+  - id: N-04
+    feature: "sheet 1, section A-A, (Ø.4385) press step, INTERFERENCE .0005-.0016"
+    kind: joint
+    reason: "press, alone holds knob axis K; no bond, pin, screw"
+    source: "pd_transgear_knob_bush_geometry.PRESS_INTERFERENCE; owner ruling 2026-11-20, #2425 (registry RV-04)"

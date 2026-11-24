@@ -88,11 +88,11 @@ def test_the_spring_room_stays_inside_the_springs_catalogue_travel(
     corner, never pressed past its catalogue working height.  A deeper floor
     (7.0) presses it past that height; the old 6.4 floor, without the retired
     MHA-PD-VN-67 shim, leaves it loose."""
-    assert joints.SPRING_ROOM_MIN == pytest.approx(0.693, abs=1e-3)
-    assert joints.SPRING_ROOM_MAX == pytest.approx(0.957, abs=1e-3)
+    assert joints.SPRING_ROOM_MIN == pytest.approx(0.719, abs=1e-3)
+    assert joints.SPRING_ROOM_MAX == pytest.approx(0.932, abs=1e-3)
     assert spring.WORKING_HEIGHT <= joints.SPRING_ROOM_MIN
     assert joints.SPRING_ROOM_MAX < spring.FREE_HEIGHT
-    assert joints.SPRING_PRELOAD_N == pytest.approx((18.63, 39.43), abs=0.01)
+    assert joints.SPRING_PRELOAD_N == pytest.approx((20.63, 37.43), abs=0.01)
     for floor in (7.0, 6.4):
         monkeypatch.setattr(arm, "SPOT_FACE_FLOOR_FROM_FRONT", floor)
         with pytest.raises(AssertionError, match="leaves the spring"):
@@ -115,8 +115,26 @@ def test_the_shallower_spot_face_gives_the_spring_its_model_room(monkeypatch) ->
 
 def test_seated_hanger_enclosure_uses_actual_spacer_face_grades() -> None:
     assert joints.HANGER_TILT == pytest.approx(
-        (spacer.FRONT_FACE_PERPENDICULARITY + spacer.REAR_FACE_PERPENDICULARITY)
-        / spacer.FACE_PERPENDICULARITY_ZONE_DIA,
+        spacer.REAR_FACE_PARALLELISM / spacer.FACE_PARALLELISM_ZONE_DIA,
+    )
+
+
+def test_the_spacer_bond_carries_the_spring_drag_and_push() -> None:
+    """LOCTITE 638 on the #12 bore over the shoulder (owner ruling 2026-11-24,
+    fit audit question 6): derated for brass and the widest gap, it
+    holds the spring's friction torque on the whole O.D. radius and the
+    spring's push before the screw is seated, each with the margin."""
+    land = spacer.BOND_LAND_MIN
+    area = math.pi * (pivot.SHOULDER_DIA + min(pivot.SHOULDER_DIA_LIMITS)) * land
+    assert joints.SPACER_BOND_SHEAR_N == pytest.approx(
+        joints.LOCTITE_638_SHEAR_MPA * joints.SPACER_BOND_FACTOR * area
+    )
+    assert joints.SPACER_BOND_SHEAR_N == pytest.approx(199.2, abs=0.1)
+    assert joints.SPACER_BOND_TORQUE_MARGIN == pytest.approx(4.41, abs=0.01)
+    assert joints.SPACER_BOND_PUSH_MARGIN == pytest.approx(5.32, abs=0.01)
+    assert (
+        min(joints.SPACER_BOND_TORQUE_MARGIN, joints.SPACER_BOND_PUSH_MARGIN)
+        >= joints.SPACER_BOND_MARGIN_MIN
     )
 
 
@@ -310,9 +328,10 @@ def test_the_far_face_gate_refuses_the_three_quarter_pin(monkeypatch) -> None:
     With the hook's screw holes at the title block's ±.005 (delegated ruling
     2026-11-07, pending owner confirmation) the 3/4 dowel falls short even
     in the 6.20 hole that once barely cleared. The bar's pivot tap at the
-    title block's ±.005 (owner ruling 2026-11-20, #2422; it was ±.002) and
-    the 3/8 arm (#2019, #3184) leave the 7/8 pin 0.283 past the face."""
-    assert joints.LATCH_PIN_FAR_FACE_MARGIN_WORST == pytest.approx(0.283, abs=1e-3)
+    title block's ±.005 (owner ruling 2026-11-20, #2422; it was ±.002), the
+    3/8 arm (#2019, #3184) and the #9 drilled pivot bore (fit audit
+    2026-11-23) leave the 7/8 pin 0.219 past the face."""
+    assert joints.LATCH_PIN_FAR_FACE_MARGIN_WORST == pytest.approx(0.219, abs=1e-3)
     # The retired 3/4 pin bottomed in a 6.20 hole printed .24: its proud
     # window, length grade and depth reach included.
     reach = 6.20 - (0.24 - 0.01) * 25.4
@@ -344,8 +363,8 @@ def test_the_deepest_set_pin_stops_short_of_the_drill_point(monkeypatch) -> None
 
 def test_the_reamed_hole_keeps_the_press_at_both_limits(monkeypatch) -> None:
     assert min(joints.LATCH_PIN_PRESS_INTERFERENCE) > 0.0
-    # The dowel is only +0.0025 over nominal: a hole allowed 0.003 over loses it.
-    monkeypatch.setattr(arm, "PIN_HOLE_DIA_BAND", (0.003, -0.010))
+    # The dowel is only +0.0025 over nominal: a hole cut 0.03 over loses it.
+    monkeypatch.setattr(arm, "PIN_HOLE_DIA_BAND", (0.03, 0.0))
     with pytest.raises(AssertionError, match="loses the latch pin's press"):
         _reload_joints()
 
@@ -364,13 +383,14 @@ def test_every_wall_holds_the_target_at_the_printed_worst_case(module) -> None:
 
 def test_the_latch_pin_ligament_holds_the_target_on_the_three_eighths_bar() -> None:
     # Owner ruling 2026-10-27 (#1379): the next stock size up, 3/8 (#2019).
-    # The full-budget ligament, at the .XXX height reach (coordinator ruling
-    # (a)) and the run-off over the .38 MIN hole to its drill point (#3124),
-    # clears the .080 target the 5/16 bar missed.
+    # The full-budget ligament, at the .XX height reach (.19, fit batch
+    # review r4; coordinator ruling (a): no tightened band) and the run-off
+    # over the .38 MIN hole to its drill point (#3124), clears the .080
+    # target the 5/16 bar missed: .0896.
     assert not hasattr(arm, "WALL_FLOORS")
     worst = arm.WALLS["pin hole to faces"][1]
     assert worst >= arm.WALL_TARGET
-    assert worst == pytest.approx(2.4527, abs=1e-4)
+    assert worst == pytest.approx(2.2750, abs=1e-4)
 
 
 def test_spacer_wall_holds_the_target_with_both_rim_breaks() -> None:

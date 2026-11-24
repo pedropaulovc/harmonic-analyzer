@@ -4,60 +4,6 @@
 # names are in common.toml, with the conventions every file follows; prechips
 # merges the directory's files by section and refuses a key defined twice.
 
-# The MHA-PD-20 spacer bore's go/no-go pair (cad/config/shop-equipment/
-# gauges.plug-gauges-1855-1860, to buy): GO .1855 and NO-GO .1860 in =
-# 4.7117 and 4.7244 mm. A fixed-limit pair reads no scale; its resolution is
-# each member's Class X tolerance, .000040 in = 0.001016 mm. The tools record
-# lets a plan list the pair.
-[gauges.plug-gauges-1855-1860]
-range_mm = [4.7117, 4.7244]
-resolution_mm = 0.001016
-[tools.plug-gauges-1855-1860]
-description = "Plug gauge pair, .1855 GO (plus) and .1860 NO-GO (minus), Vermont Gage Class X"
-
-# The MHA-PD-16 cup pilot's go/no-go pair (cad/config/shop-equipment/
-# gauges.plug-gauges-2500-2510, to buy): GO .2500 and NO-GO .2510 in =
-# 6.35 and 6.3754 mm, Class X as the pair above.
-[gauges.plug-gauges-2500-2510]
-range_mm = [6.35, 6.3754]
-resolution_mm = 0.001016
-[tools.plug-gauges-2500-2510]
-description = "Plug gauge pair, .2500 GO (plus) and .2510 NO-GO (minus), Vermont Gage Class X"
-
-# Class ZZ go/no-go pins for the paper-drive reamed bands (owner ruling
-# 2026-11-23, tool audit Q1, verbatim: "ZZ singles per the record: 29 pins
-# (17 plus GO, 12 minus NO-GO), about $130. Accept that good holes near a
-# limit may be refused; the traveler mikes each pin so the real window is
-# known per pin."). Conventions as common.toml's zz-pins records: GO a plus
-# pin at the low limit, NO-GO a minus pin at the high limit (from the
-# .061-.500 minus box where that limit is a whole thousandth), resolution one
-# pin's Class ZZ tolerance, .0002 in = 0.00508 mm. The K bore's .4375-.4382
-# band is the odd one: its NO-GO is a
-# .4380 plus pin, .4380-.4382, at or under the .4382 limit. Bands only pd
-# plans gauge: .1240-.1245 (MHA-PD-18), .4375-.4382 (MHA-PD-19, and MHA-PD-28
-# re-gauging PD-19's hole with the same pins), .0615-.0620 (MHA-PD-17,
-# MHA-PD-22), .1920-.1925 (MHA-PD-22).
-[gauges.zz-pins-1240-1245]
-range_mm = [3.1496, 3.1623]
-resolution_mm = 0.00508
-[tools.zz-pins-1240-1245]
-description = "Class ZZ pins for .1240-.1245: GO .1240 plus (single), NO-GO .1245 minus (single)"
-[gauges.zz-pins-4375-4382]
-range_mm = [11.1125, 11.13028]
-resolution_mm = 0.00508
-[tools.zz-pins-4375-4382]
-description = "Class ZZ pins for .4375-.4382: GO .4375 plus (single), NO-GO .4380 plus (single)"
-[gauges.zz-pins-0615-0620]
-range_mm = [1.5621, 1.5748]
-resolution_mm = 0.00508
-[tools.zz-pins-0615-0620]
-description = "Class ZZ pins for .0615-.0620: GO .0615 plus (single), NO-GO .062 minus (the .061-.500 box)"
-[gauges.zz-pins-1920-1925]
-range_mm = [4.8768, 4.8895]
-resolution_mm = 0.00508
-[tools.zz-pins-1920-1925]
-description = "Class ZZ pins for .1920-.1925: GO .1920 plus (single), NO-GO .1925 minus (single)"
-
 # --- MHA-PD-15 ring, MHA-PD-20 spacer, MHA-PD-28 bush, MHA-PD-16 cup ---------
 # (cad/process/pd_transgear_knob_thrust_ring, pd_transgear_pivot_spacer,
 # pd_transgear_knob_bush, pd_transgear_knob_cup). Facing, turning and parting
@@ -77,16 +23,11 @@ tool = "jig-drill-f"
 material = "lathe-c360"
 sfm = 160
 feed = "tailstock quill by hand, steady, dry"
-[settings.lathe-drill-15-c360]
-tool = "block-drill-15"
+[settings.lathe-drill-12-c360]
+tool = "drill-12"
 material = "lathe-c360"
 sfm = 160
 feed = "tailstock quill by hand, steady, dry"
-[settings.lathe-ream-1855-c360]
-tool = "reamer-1855"
-material = "lathe-c360"
-sfm = 160
-feed = "tailstock quill by hand, slow and steady, dry; withdraw with the spindle running"
 [settings.lathe-drill-b-1018]
 tool = "drill-b"
 material = "lathe-1018-cold-finished"
@@ -133,6 +74,9 @@ diameter_mm = 2.1844
 [tools.drill-40]  # Drills #40
 description = "#40 (.0980 in) drill, 115-piece index"
 diameter_mm = 2.4892
+[tools.drill-11]  # 115-piece index #11; MHA-PD-22 #11 DRILL THRU (fit audit 2026-11-23)
+description = "#11 (.1910 in) drill, 115-piece index"
+diameter_mm = 4.8514
 [tools.drill-33]  # Drills #33
 description = "#33 (.1130 in) drill, 115-piece index"
 diameter_mm = 2.8702
@@ -181,29 +125,15 @@ description = "Shop-made latch-hook former: R3.13 roll and R.38 tab form"
 description = "Platen-clip bow former: four laminations of the .032 strip, each split into a male and a female die half (cut by PC01_sheet)"
 [tools.pd-rack-pinion-cutting-arbor]  # inventory fixtures.pd-rack-pinion-cutting-arbor
 description = "Shop-made work arbor with two backing discs for cutting the MHA-PD-06 teeth"
-[tools.reamer-0615]  # MHA-PD-17 Ø.0615 +.0005/.0000 REAM; MHA-PD-22 Ø.0615 +.0005/.0000 REAM (.163)
+[tools.reamer-0615]  # MHA-PD-17 Ø.0615 +.0005/.0000 REAM; MHA-PD-22 Ø.0615 REAM (.163), no band
 description = ".0615 in HSS chucking reamer"
 diameter_mm = 1.5621
-[tools.reamer-0945]  # MHA-PD-19 2X Ø.0945 +.0005/.0000 REAM THRU
-description = ".0945 in HSS chucking reamer"
-diameter_mm = 2.4003
-[tools.reamer-1855]  # MHA-PD-20 Ø.1850 +.0010/+.0005 REAM THRU
-description = ".1855 in HSS chucking reamer"
-diameter_mm = 4.7117
-[tools.reamer-1920]  # MHA-PD-22 Ø.1920 +.0005/.0000 REAM THRU
-description = ".1920 in HSS chucking reamer"
-diameter_mm = 4.8768
-[tools.reamer-1940]  # MHA-PD-18 Ø.1940 +.001/.000 REAM THRU
-description = ".1940 in HSS chucking reamer"
-diameter_mm = 4.9276
-# MHA-PD-19 press hole Ø.4375 +.0007/0 REAM THRU for the MHA-PD-28 bush (FN2,
-# #2425). The 27/64 (.4219 in) drill is the 115-piece index's, nominal × 25.4;
-# it leaves .0156 in on the diameter for the reamer. The .4375 reamer is not
-# owned (cad/config/shop-equipment/ tools.reamer-4375, to buy); diameter_mm is
-# its nominal size.
-[tools.reamer-4375]
-description = ".4375 in (7/16) HSS straight-flute chucking reamer"
-diameter_mm = 11.1125
+# MHA-PD-20's #12 DRILL THRU (a LOCTITE 638 bonded slip fit on MHA-PD-VN-57,
+# fit audit 2026-11-23): the 115-piece index's #12, nominal × 25.4
+# (cad/config/shop-equipment/tools-drills.toml drill-12).
+[tools.drill-12]
+description = "#12 (.189 in) drill, 115-piece index"
+diameter_mm = 4.8006
 [tools.endmill-hss-tin-2fl-3-16]  # MHA-PD-16 flat floor for the Ø.19 head counterbore, plunged from the tailstock
 description = "3/16 in TiN-coated HSS 2-flute square end mill, centre cutting (McMaster 8949A16)"
 diameter_mm = 4.7625
@@ -226,10 +156,6 @@ tool = "reamer-1260"
 material = "lathe-c360"
 sfm = 160
 feed = "tailstock quill by hand, slow and light, dry; withdraw with the spindle running"
-# The bores' go/no-go pair (gauges record gauges.plug-gauges-1260-1265 in
-# shop/common.toml, to buy): the tools record lets a plan list the pair.
-[tools.plug-gauges-1260-1265]
-description = "Plug gauge pair, .1260 GO (plus) and .1265 NO-GO (minus), Vermont Gage Class X"
 
 # --- MHA-PD-23 transgear pin (cad/process/pd_transgear_pin) -----------------
 # Turned from the 1/4 in 1018 bar. Speeds: lathe.toml header (LittleMachineShop
@@ -256,16 +182,6 @@ tool = "grooving-tool-020"
 material = "lathe-1018-cold-finished"
 rpm = 300
 feed = "by hand, light and steady, cutting oil"
-# The MHA-PD-18 ream read to .0001 in for the land's matched press (inventory
-# cad/config/shop-equipment/ gauges.plug-gauges-1261-1264, to buy): with the
-# .1260/.1265 pair the six pins step .1260-.1265 by .0001 in. The set's own
-# pins span .1261-.1264 in = 3.20294-3.21056 mm in .0001 in = 0.00254 mm
-# steps.
-[gauges.plug-gauges-1261-1264]
-range_mm = [3.20294, 3.21056]
-resolution_mm = 0.00254
-[tools.plug-gauges-1261-1264]
-description = "Plug gauges .1261, .1262, .1263, .1264, Vermont Gage Class X"
 
 # --- MHA-PD-13 transgear thumbnut (cad/process/pd_transgear_thumbnut) ---------
 # The #29 tap drill and the 90° chamfer mill's countersinks from the tailstock
@@ -300,19 +216,14 @@ feed = "cross slide by hand, one firm plunge, then the carriage along by hand; o
 # --- MHA-PD-22 drive collar (cad/process/pd_transgear_drive_collar/plan.toml) -
 # Lathe: facing, turning, the centre drill and parting take shop/lathe.toml's
 # C360 rows. LittleMachineShop "Cutting Speeds" (read live 2026-11-22,
-# lathe.toml header), Drilling & Reaming, Brass (C36000): drilling and
-# reaming both 160-175 ft/min; the low end asks over 3000 rpm of the #14 and
-# the .1920 reamer, so both clamp to the lathe's 2000 rpm top speed.
-[settings.lathe-drill-14-c360]
-tool = "drill-14"
+# lathe.toml header), Drilling & Reaming, Brass (C36000): drilling
+# 160-175 ft/min; the low end asks 3200 rpm of the #11, so it clamps to the
+# lathe's 2000 rpm top speed.
+[settings.lathe-drill-11-c360]
+tool = "drill-11"
 material = "lathe-c360"
 sfm = 160
 feed = "tailstock quill by hand, pecking, dry; back fully out to clear chips"
-[settings.lathe-ream-1920-c360]
-tool = "reamer-1920"
-material = "lathe-c360"
-sfm = 160
-feed = "tailstock quill by hand, slow and steady, dry; withdraw with the spindle running"
 # Mill (PM-30MV low belt, 100-2800 rpm), the same LittleMachineShop row and
 # AutoDrill "Suggested drilling feed rates" (read 2026-11-20, as shop/pn.toml),
 # row Brass: 1/16 in .001, 1/8 in .003 in/rev, a size between two columns

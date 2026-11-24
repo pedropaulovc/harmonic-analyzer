@@ -1,0 +1,11 @@
+# Why each band tighter than the title block stays on MHA-PD-09 (drawing-
+# guidelines rule 4; owner ruling 2026-11-24: the reason lives here, not on
+# the sheet).  Fit audit question 8 (owner approval 2026-11-24) is applied to
+# MHA-PD-22's pins only: a trial of the wheels on the pins bounds the holes'
+# spacing, not a shift of the whole pattern, so these offsets keep their band.
+necessity:
+  - id: N-01
+    feature: "sheet 1, front view, the two #40 drive-pin holes' .2756 ±.0009 locations from the bore axis"
+    kind: gap
+    reason: "keeps chain plates clear of MHA-DT-11 seat spigot"
+    source: "pd_transgear_removable_spec.PIN_LOCATION_TOL (_sprocket_seat_geometry.DRIVE_PIN_OFFSET_TOL), charged by dt_crankshaft_spec.WHEEL_SEAT_FLOAT into build_dt_drive_train_assembly.CHAIN_SPIGOT_RADIAL_AIR_ANSI: +0.029 mm at ±.0009, -0.075 mm at the ±.005 drilled-hole row, floor 0.010 mm. Datum the bore axis: bore and holes drilled in one CNC set-up swept true to the teeth. Inside no shop-table row (narrowest hole location ±.002): RV-02; the traveler requirement is in cad/process/pd_transgear_removable/plan.toml"

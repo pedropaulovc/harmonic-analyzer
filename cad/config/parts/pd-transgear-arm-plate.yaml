@@ -1,7 +1,7 @@
 pd-transgear-arm-plate:
   title: Transgear Arm Plate
   number: MHA-PD-19
-  material: AISI 1018 cold-finished steel
+  material: LOW-CARBON STEEL, E.G. 1018 CF
   material_specification: 1/4 x 1-1/2 1018 CF flat bar
   finish: bright machined; protect with ISO VG 32 machine-oil film
   quantity: 1
@@ -9,7 +9,8 @@ pd-transgear-arm-plate:
   drawing_unit: in
   process: >-
     Mill the outline from the 1/4 x 1-1/2 flat bar and face it to .197;
-    drill and ream the 7/16 press hole on K and chamfer its face-A mouth;
+    drill and ream the press hole on K with the .4385 set reamer and chamfer
+    its face-A mouth;
     drill and countersink the two clamp screw holes. Press the MHA-PD-28
     bush in from face A until its shoulder seats, then ream its bore,
     before the plate is clamped to MHA-PD-18. At assembly (MHA-PD-00 steps
@@ -17,9 +18,9 @@ pd-transgear-arm-plate:
     MHA-PD-23 pin is pressed into MHA-PD-18: clamp the plate on the arm's
     rear face and, on the mill DRO, set the knob bore at the MHA-PD-00
     DETAIL K settings from the pin's shank in the arm's pin bore S, indicated
-    true; run the trial mesh; once it reads, drill the two common #44 (.086)
+    true; run the trial mesh; once it reads, drill the two common #32 (.116)
     locating pilots through the arm and the plate in that setting.
-    Ream plate holes .0945 through and arm holes .0930
+    Ream plate holes .1260 through and arm holes .1240
     separately; never pass the larger plate reamer into an arm press seat.
     Arm-hole mouth breaks .002 MAX (plate holes per the title block).
     Reassemble the original matched pair and inspect
@@ -36,3 +37,8 @@ pd-transgear-arm-plate:
       where: "the two locator holes' and the two screw holes' position frames (A|B|C)"
       finding: "position controls over-specified (rule 5)"
       reason: "required by the whole-stack stock-form gate including the rigid two-hole registration yaw; stock dowels in reamed holes locate, the screws clamp (owner-accepted). Owner ruling 2026-11-20 (#1571): \"Follow recommendations unless noted otherwise\": the recommended option 1, the location names every printed frame."
+    - id: "RV-02"
+      kind: "accept"
+      where: "the Ø.4385 REAM THRU press hole for bush MHA-PD-28 (datum B)"
+      finding: "reamed press hole where a bonded slip fit in a drilled hole would hold (rules 4, 23)"
+      reason: "Owner ruling 2026-11-20 (Pedro), #2425, recorded there as: \"Flat .197 plate with the pressed flanged bush; hub-as-shoulder, Ø.4375 FN2 press with the bore reamed after pressing, and the .008 ±.002 end float set at fit-up are accepted.\" Delegated ruling 2026-11-24 for the one difference from that ruling, the hole's size (Ø.4385, the over/under set's reamer, for Ø.4375: fit audit 2026-11-23, pending owner confirmation), following #2425 itself as precedent, the same press with the bore reamed after pressing; the owner reviews it on https://github.com/pedropaulovc/harmonic-analyzer/issues/2144. The hole prints the set reamer's size with no band and MHA-PD-28 is turned to it. A LOCTITE-bonded slip fit in its place would reverse #2425 and is put to the owner as an open question, not decided here."

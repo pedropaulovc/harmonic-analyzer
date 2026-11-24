@@ -15,7 +15,6 @@ import build_pd_paper_drive_assembly
 import _sprocket_seat_geometry as seat_geometry
 import build_pd_platen_clip
 import build_pd_platen_guide
-import dt_crankshaft_spec
 import math
 import paper_drive_geom
 import pd_cluster_air as CLUSTER_AIR
@@ -295,8 +294,7 @@ def _knob_collar_and_drive_pins(paper) -> None:
 def _platen_rack_and_chain_air(paper) -> None:
     assert (
         abs(
-            paper.PLATEN_AIR.terms["MHA-PD-20 spacer rear face perpendicularity"]
-            + paper.PLATEN_AIR.terms["MHA-PD-20 spacer front face perpendicularity"]
+            paper.PLATEN_AIR.terms["MHA-PD-20 spacer rear face parallelism"]
             - paper.HANGER_TILT_AT_DISC_RIM
         )
         <= 1e-9
@@ -348,7 +346,7 @@ def _platen_rack_and_chain_air(paper) -> None:
         "the collar air stack's rim is not the collar's print-worst rim"
     )
     assert (
-        paper.KNOB_COLLAR_R_WORST + dt_crankshaft_spec.WHEEL_SEAT_FLOAT
+        paper.KNOB_COLLAR_R_WORST + paper.KNOB_WHEEL_SEAT_FLOAT
         < paper.KNOB_CHAIN_INNER_R
     ), "knob drive collar reaches the knob chain plates' inner edge"
 

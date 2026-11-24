@@ -87,8 +87,8 @@ GEAR_DATA = "\n".join(
     ]
 )
 
-# The drive-pin holes' mates print at their location callouts (the drawing's
-# CALLOUTS); the sheet draws T24 only, so it says what the other two share.
+# Four short lines (rule 7): the sheet draws T24 only, so the third says
+# what the other two share; the fourth is the web between those holes.
 DRAWING_NOTES = "\n".join(
     (
         "BLANK, 1 EACH: McMASTER "
@@ -97,7 +97,7 @@ DRAWING_NOTES = "\n".join(
         )
         + ".",
         "TEETH, O.D. AND PLATE FACES AS SUPPLIED; HUB REMOVED FLUSH.",
-        "BORE, DRIVE-PIN HOLES AND PLATE SAME ON "
+        "BORE AND DRIVE-PIN HOLES SAME ON "
         + " / ".join(name for name, _teeth in spec.CONFIGS)
         + ".",
         BORE_PIN_WEB_NOTE,

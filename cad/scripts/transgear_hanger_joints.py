@@ -17,10 +17,11 @@ paper-drive assembly may import it; no part build does.
   use published ASME head, eccentricity, fillet and thread-length bounds.
   Critical gear-centre/seat controls remain separate; nominal CAD pose is
   not a stock-pin whole-body or positive-load retention certificate.
-* The MHA-PD-20 spacer pressed on the MHA-PD-VN-57 shoulder, and the MHA-PD-VN-63
-  spring's room under the head: shoulder - spacer - spot-face floor (from
-  the arm's front face).  The spring holds the arm on the spacer, so the
-  hanger's tilt is the spacer's face squareness, fixed in the bar's frame.
+* The MHA-PD-20 spacer bonded (LOCTITE 638) on the MHA-PD-VN-57 shoulder, and
+  the MHA-PD-VN-63 spring's room under the head: shoulder - spacer -
+  spot-face floor (from the arm's front face).  The spring holds the arm on
+  the spacer, so the hanger's tilt is the spacer's face parallelism, fixed
+  in the bar's frame.
 * The MHA-PD-VN-58 latch pin pressed to its proud height in the arm's blind
   end-face hole, set at assembly (owner decision 2026-11-19, #3124): the
   hole's reamed band keeps the press, the set window and the dowel's length
@@ -107,12 +108,14 @@ if PIVOT.STOCK_THREAD_LEN_MIN + 1e-9 < _BAR_THICK - PIVOT.TIP_RECESS[1]:
 if not BAR.PIVOT_TAP_CSK_DIA < PIVOT.SHOULDER_DIA + PIVOT.SHOULDER_DIA_LIMITS[0]:
     raise AssertionError("the bar tap's countersink swallows the shoulder end")
 
-# --- MHA-PD-20 spacer pressed on the MHA-PD-VN-57 shoulder (R9-71) -----------------
-# Pressed at the bench, its front face flush with the shoulder's end on a
-# flat, so the screw seats both on the bar as one body: the spacer turns with
-# the screw while it is tightened and is then fixed in the bar's frame, its
-# faces' squareness with it (the fit-up reads the result).  The spacer's
-# spec holds the press at both limits (SPACER.PRESS_INTERFERENCE).
+# --- MHA-PD-20 spacer bonded on the MHA-PD-VN-57 shoulder --------------------------
+# Bonded at the bench (owner ruling 2026-11-24, fit audit question 6; it
+# was R9-71's press): a #12 drilled hole, LOCTITE 638, cured with its front
+# face and the shoulder's end down together on a flat plate, so the screw
+# seats both on the bar as one body: the spacer turns with the screw while
+# it is tightened and is then fixed in the bar's frame, its faces'
+# parallelism with it (the fit-up reads the result).  The spacer's spec
+# holds the gap inside the compound's limit (SPACER.BOND_GAP).
 _SHOULDER_MIN = PIVOT.SHOULDER_DIA + min(PIVOT.SHOULDER_DIA_LIMITS)
 
 # --- MHA-PD-VN-63 spring room: shoulder - spacer - floor ------------------------
@@ -126,13 +129,13 @@ SPRING_ROOM_MIN = (
     + PIVOT.SHOULDER_LEN_LIMITS[0]
     - (SPACER.LENGTH + SPACER.LENGTH_BAND)
     - (ARM.SPOT_FACE_FLOOR_FROM_FRONT + ARM.SPOT_FACE_FLOOR_BAND)
-)  # 0.693
+)  # 0.719
 SPRING_ROOM_MAX = (
     PIVOT.SHOULDER_LEN
     + PIVOT.SHOULDER_LEN_LIMITS[1]
     - (SPACER.LENGTH - SPACER.LENGTH_BAND)
     - (ARM.SPOT_FACE_FLOOR_FROM_FRONT - ARM.SPOT_FACE_FLOOR_BAND)
-)  # 0.957
+)  # 0.932
 if not SPRING.WORKING_HEIGHT <= SPRING_ROOM_MIN < SPRING_ROOM_MAX < SPRING.FREE_HEIGHT:
     raise AssertionError(
         f"MHA-PD-VN-63 room {SPRING_ROOM_MIN:.4f}..{SPRING_ROOM_MAX:.4f} leaves the "
@@ -144,26 +147,67 @@ if abs(SPRING.MODEL_HEIGHT - SPRING_ROOM_NOMINAL) > 1e-9:
 SPRING_PRELOAD_N = (
     SPRING.RATE_N_PER_MM * (SPRING.FREE_HEIGHT - SPRING_ROOM_MAX),
     SPRING.RATE_N_PER_MM * (SPRING.FREE_HEIGHT - SPRING_ROOM_MIN),
-)  # 18.6 .. 39.4
+)  # 20.6 .. 37.4
+
+# --- MHA-PD-20 bond: what it must hold ---------------------------------------
+# LOCTITE 638's ISO 10123 shear, 25 N/mm^2 minimum (TDS), derated by the
+# Henkel Retaining Compound Design Guide's factors as dt_pinion_arbor_geometry
+# and sm_gooseneck_spring_joint take them: 0.4 for brass (the lower of the
+# pair), 0.3 for the clearance at the wide end of the gap, 1.0 for a land no
+# longer than its diameter; over the smallest shoulder and the shortest land.
+LOCTITE_638_SHEAR_MPA = 25.0
+SPACER_BOND_FACTOR = 0.4 * 0.3 * 1.0
+if SPACER.BOND_LAND_MIN > _SHOULDER_MIN:
+    raise AssertionError("the spacer's bond land is longer than its diameter")
+SPACER_BOND_SHEAR_N = (
+    LOCTITE_638_SHEAR_MPA * SPACER_BOND_FACTOR * math.pi * _SHOULDER_MIN * SPACER.BOND_LAND_MIN
+)  # 199
+SPACER_BOND_TORQUE_NMM = SPACER_BOND_SHEAR_N * _SHOULDER_MIN / 2.0  # 472
+# The swinging arm, pressed on the rear face by the spring, tries to turn
+# the ring: the greatest preload at the rim of the largest O.D.
+# [INFERENCE: mu 0.5, the top of the textbook range for dry brass on steel;
+# the faces are oiled.]
+SPACER_FACE_FRICTION = 0.5
+SPACER_DRAG_TORQUE_NMM = (
+    SPACER_FACE_FRICTION * SPRING_PRELOAD_N[1] * (SPACER.OD + SPACER.OD_BAND) / 2.0
+)  # 107
+# Between the cure and the screw's seating on the bar the spring pushes the
+# ring toward the shoulder's end with its whole preload; seated, the bar
+# carries it.
+SPACER_BOND_MARGIN_MIN = 2.0
+SPACER_BOND_TORQUE_MARGIN = SPACER_BOND_TORQUE_NMM / SPACER_DRAG_TORQUE_NMM  # 4.4
+SPACER_BOND_PUSH_MARGIN = SPACER_BOND_SHEAR_N / SPRING_PRELOAD_N[1]  # 5.3
+if min(SPACER_BOND_TORQUE_MARGIN, SPACER_BOND_PUSH_MARGIN) < SPACER_BOND_MARGIN_MIN:
+    raise AssertionError(
+        "the MHA-PD-20 LOCTITE 638 bond does not hold the spring's drag or push:"
+        f" {SPACER_BOND_TORQUE_MARGIN:.2f}, {SPACER_BOND_PUSH_MARGIN:.2f}"
+    )
 
 # --- Seated spacer face-grade enclosure --------------------------------------
 # These are the spacer's geometric grades, conditional on staying seated.
 # The source-qualified physical operating-domain proof owns actual masses,
 # coupled loads and seat retention; preload/friction proxies do not certify it.
+# Bonded with its front face in the plane that seats on the bar, the ring
+# tilts the arm by its rear face's parallelism alone; the bought screw's
+# shoulder end leans only the shoulder in the arm's bore
+# (ARM.PIVOT_SHOULDER_END_SQUARENESS_ALLOWED), never the arm to the bar.
 HANGER_TILT = (
-    SPACER.REAR_FACE_PERPENDICULARITY + SPACER.FRONT_FACE_PERPENDICULARITY
-) / SPACER.FACE_PERPENDICULARITY_ZONE_DIA  # conservative angular enclosure
+    SPACER.REAR_FACE_PARALLELISM / SPACER.FACE_PARALLELISM_ZONE_DIA
+)  # conservative angular enclosure
+if ARM.PIVOT_SHOULDER_END_SQUARENESS_ALLOWED <= 0.0:
+    raise AssertionError("the pivot's least clearance leaves the shoulder end no lean")
 
 
-# Head and spring in the spot face; the arm bore is matched to THIS measured
-# shoulder. Stock OD variation is correlated and never added again as play.
+# Head and spring in the spot face, at its smallest (the title block's
+# .XX); the arm bore is a drilled running clearance on the stock shoulder,
+# its whole maximum paid as float.
 # The spring's I.D. may float on the stock shoulder to the spot-face wall.
-HEAD_RADIAL_CLEARANCE = (ARM.SPOT_FACE_DIA - PIVOT.HEAD_DIA) / 2.0
+HEAD_RADIAL_CLEARANCE = (ARM.SPOT_FACE_DIA_MIN - PIVOT.HEAD_DIA) / 2.0
 SHOULDER_RADIAL_CLEARANCE = ARM.PIVOT_BORE_DIAMETRAL_CLEARANCE[0] / 2.0
 PIVOT_RADIAL_FLOAT_MAX = ARM.PIVOT_BORE_DIAMETRAL_CLEARANCE[1] / 2.0
 SPRING_RIM_CLEARANCE = (
-    ARM.SPOT_FACE_DIA - SPRING.OD - (SPRING.ID - _SHOULDER_MIN)
-) / 2.0  # 0.81
+    ARM.SPOT_FACE_DIA_MIN - SPRING.OD - (SPRING.ID - _SHOULDER_MIN)
+) / 2.0  # 0.68
 if min(HEAD_RADIAL_CLEARANCE, SHOULDER_RADIAL_CLEARANCE, SPRING_RIM_CLEARANCE) <= 0.0:
     raise AssertionError("the pivot screw or its spring binds in the arm")
 
@@ -351,10 +395,14 @@ def require_arm_plate_joint_inspection(
 
 
 # --- MHA-PD-VN-58 latch pin pressed to its proud height in the arm's end-face hole
-if abs(LATCH_PIN.DIA - ARM.PIN_HOLE_DIA) > 1e-9:
-    raise AssertionError("the arm's press hole is not the latch pin's Ø")
-# The reamed band against the dowel's catalogue band: interference at both
-# limits, (smallest pin - largest hole, largest pin - smallest hole).
+# The hole is modelled at its .1240 set reamer's size (the sheet prints that
+# size and no band), so the 1/8 dowel stands in it with the press's overlap
+# (_pd_paper_drive_interference carries the row).
+if not LATCH_PIN.DIA > ARM.PIN_HOLE_DIA:
+    raise AssertionError("the arm's press hole is not under the latch pin's Ø")
+# The reamer's modelled band (analysis) against the dowel's catalogue band:
+# interference at both limits, (smallest pin - largest hole, largest pin -
+# smallest hole).
 _PIN_OD_MIN = LATCH_PIN.DIA + min(LATCH_PIN.DIA_BAND)
 _PIN_OD_MAX = LATCH_PIN.DIA + max(LATCH_PIN.DIA_BAND)
 _PIN_HOLE_MIN = ARM.PIN_HOLE_DIA + min(ARM.PIN_HOLE_DIA_BAND)

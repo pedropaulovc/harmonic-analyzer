@@ -1,0 +1,21 @@
+# Why each band under the title block stays on MHA-PD-23 (owner ruling
+# 2026-11-24: "In the part's registry file, not on the sheet. The sheet
+# stays clean; the reviewer fails a tight feature that has no registry
+# reason."). Read by the machinist review only. The shank is made to fit
+# and prints no band. Fit audit 2026-11-23, pending owner confirmation.
+necessity:
+  - id: N-01
+    feature: "sheet 1, front view, ring groove Ø.095 +.002/.000 (note 2)"
+    kind: bought_seat
+    reason: "catalogue groove diameter of bought ring MHA-PD-VN-61"
+    source: "pd_vn_transgear_retaining_ring_spec (McMaster 97431A240)"
+  - id: N-02
+    feature: "sheet 1, front view, ring groove width .020 +.002/.000 (note 2)"
+    kind: bought_seat
+    reason: "catalogue groove width of bought ring MHA-PD-VN-61"
+    source: "pd_vn_transgear_retaining_ring_spec (McMaster 97431A240)"
+  - id: N-03
+    feature: "sheet 1, front view, groove load wall 1.923 ±.001 from the seat"
+    kind: gap
+    reason: "sets end float of MHA-PD-10 and MHA-PD-25 stack"
+    source: "transgear_cluster_fit.SLEEVE_REAR_FORWARD_CHAIN (GS)"
