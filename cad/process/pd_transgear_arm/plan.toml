@@ -27,17 +27,18 @@
 #     ground thickness is the drawing's 3/8 (.3750) GROUND STOCK REF.
 #
 # To order (not owned): the 12095 bar (stock.1018-ground-flat-3-8x1, one
-# 12 in length), the Class ZZ pins .1240 plus (GO) and .1245 minus (NO-GO)
-# for the latch-pin hole (zz-pins-1240-1245), the .1260/.1265 Class X pair
+# 12 in length), the .1260/.1265 Class X pair
 # (plug-gauges-1260-1265, already on the to-buy list; Class X stays for that
 # band), the .1940 reamer (reamer-1940, already on the to-buy list), and the
 # two fixture screws (#10-32 x 5/8 and #4-40 x 5/8 socket head cap screws).
 #
-# Owner ruling 2026-11-23 (tool audit Q1, re-answered), verbatim: "ZZ singles
-# per the record: 29 pins (17 plus GO, 12 minus NO-GO), about $130. Accept
-# that good holes near a limit may be refused; the traveler mikes each pin so
-# the real window is known per pin." Setup 4 mikes both pins and the reamer
-# first; the GO pin, its length miked, reads the hole's depth. Tool audit
+# The latch-pin hole (fit audit 2026-11-23, pending owner confirmation; the
+# owner on the audit: "can the holes not be reamed in the first place"):
+# reamed with the over/under set's .1240 reamer and accepted with its own
+# MHA-PD-VN-58 dowel, which does not enter by hand; no Class ZZ pins, no pin
+# or reamer miking and no trial hole. A dowel that does slide in is not a
+# scrapped arm: MHA-PD-00 step 10B bonds it. Its depth is the reamer's quill
+# reading. Tool audit
 # 2026-11-23 (row india-stone-ib8): the stone is the owned two-grit stone's
 # 320 face (McMaster-Carr 4506A2), as ch_rocker_strap words it.
 #
@@ -136,13 +137,7 @@ blank_scrap_reach_mm = 6.556
 latch_ream_depth_mm = 10.16
 latch_ream_lead_mm = 0.508
 latch_drill_depth_mm = 11.684
-# The latch-pin hole's Class ZZ pins (owner ruling 2026-11-23, tool audit Q1;
-# header): the GO pin is a plus pin at the band's low limit, true size
-# .1240-.1242, the NO-GO a minus pin at its high limit, .1243-.1245 (Class ZZ
-# tolerance .0002). The most a usable GO pin can read and the least a usable
-# NO-GO can: with both there, only .1242-.1243 is sure to pass.
-latch_go_pin_max_mm = 3.15468
-latch_nogo_pin_min_mm = 3.15722
+# (The hole is accepted with its dowel: no pin-gauge parameters.)
 arm_length_mm = 141.4
 # Each vise hold is centred in the 6.247 in jaws: the work's inset (a
 # negative overhang) at the jaws' start, (its length − 158.6738) / 2.
@@ -249,11 +244,6 @@ ref = "pin-gauges"
 id = "plug-1260"
 name = "Plug gauges .1260 GO / .1265 NO-GO, TO BUY"
 ref = "plug-gauges-1260-1265"
-[[tools]]
-id = "zz-1240"
-name = "Class ZZ pins: .1240 plus (GO) and .1245 minus (NO-GO)"
-ref = "zz-pins-1240-1245"
-status = "to_order"
 
 # --- Setup 1 ------------------------------------------------------------------
 [[setups]]
@@ -563,20 +553,6 @@ lathe_hold = "other"
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Before the latch-pin hole: on the .0001 micrometer, mike the .1240 plus GO pin, the .1245 minus NO-GO pin and the .1240 reamer (across two opposite margins at its front); each reading is good to ±.00005. Write the three on this sheet and each pin's on its tag. Mike the GO pin's length too and write it here."
-inspection = "GO pin {{cad.latch_pin_hole_dia_min_in:.4dot}}–{{process.latch_go_pin_max_mm:in.4dot}}, NO-GO pin {{process.latch_nogo_pin_min_mm:in.4dot}}–{{cad.latch_pin_hole_dia_max_in:.4dot}}; a pin outside that is not used: stop and tell the owner. Accept a hole from the GO pin's reading to under the NO-GO's. Owner ruling 2026-11-23: 'Accept that good holes near a limit may be refused' (sure to pass: {{process.latch_go_pin_max_mm:in.4dot}}–{{process.latch_nogo_pin_min_mm:in.4dot}} only)."
-gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.latch_pin_hole_dia_band_mm}}" }]
-feed = "hand"
-
-[[setups.operations]]
-cut_kind = "other"
-instruction = "Only if the reamer read under the GO pin: before the arm, ream a trial hole in the end of the bar's offcut (the rest of the 12 in length) in the 4-jaw, as the ops below do (centre drill, #32, reamer), and gauge it with the two pins."
-inspection = "The GO pin enters the trial hole and the NO-GO does not: go on with the arm. GO refused: this reamer's holes will be refused: stop and tell the owner."
-gauge_checks = [{ gauge = "zz-pins-1240-1245", band_mm = "{{cad.latch_pin_hole_dia_band_mm}}" }]
-feed = "hand"
-
-[[setups.operations]]
-cut_kind = "other"
 instruction = "Before chucking: push the arm, pivot end first, through the open 4-jaw into the spindle bore by hand. It must pass freely to the square end. Tight: stop and tell the owner (the chuck's through bore is not on record)."
 feed = "hand"
 
@@ -614,16 +590,9 @@ cut_diameter_mm = 3.1496
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Still chucked, blow out the hole: its size and depth."
-inspection = "Latch-pin hole Ø{{cad.latch_pin_hole_dia_min_in:.4dot}}–{{cad.latch_pin_hole_dia_max_in:.4dot}}: GO enters, NO-GO does not. Push the GO pin in as far as it goes and read its stand-out with the calipers' depth rod, from the square end's face to the pin's end. The GO pin's miked length less the stand-out is the depth: at least {{cad.latch_pin_hole_depth_min_in:.2f}}. GO refused: next op. NO-GO enters: no cut remedies it; reject the arm (nothing shows the hole at or under {{cad.latch_pin_hole_dia_max_in:.4dot}}): stop and tell the owner. Depth short: stop and tell the owner."
-gauge_checks = [{ gauge = "zz-pins-1240-1245", band_mm = "{{cad.latch_pin_hole_dia_band_mm}}" }]
-feed = "hand"
-
-[[setups.operations]]
-cut_kind = "other"
-instruction = "Only if the GO pin was refused: still chucked, clear the chips, oil the hole and run the .1240 reamer through once more as before (set 600, the same quill reading); blow out and gauge again."
-inspection = "GO enters and NO-GO does not: then the depth as Op 380, and go on. GO still refused: reject the arm (the pins cannot show the hole at or over {{cad.latch_pin_hole_dia_min_in:.4dot}}, and a reamer cannot be made to cut larger): stop and tell the owner."
-gauge_checks = [{ gauge = "zz-pins-1240-1245", band_mm = "{{cad.latch_pin_hole_dia_band_mm}}" }]
+instruction = "Still chucked, blow out the hole and wipe it dry. Offer an MHA-PD-VN-58 dowel (the 1/8 x 7/8 latch pin, clean and dry) to the hole by hand, chamfered end first; take it away again."
+inspection = "The dowel does not enter by hand past its chamfer (sheet note 3: press fit, does not enter by hand). If it slides in: do not scrap the arm; write SLIP on its tag (MHA-PD-00 step 10B bonds the dowel). Depth, at least {{cad.latch_pin_hole_depth_min_in:.2f}} at full diameter: the reamer's quill reading in the op before ({{process.latch_ream_depth_mm:in.3dot}} plus its .020 chamfer); a short reading: ream again to the reading before unchucking."
+gauge_checks = "other"
 feed = "hand"
 
 # --- Setup 5 ------------------------------------------------------------------
