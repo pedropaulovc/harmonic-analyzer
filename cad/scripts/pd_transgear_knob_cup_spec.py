@@ -15,9 +15,10 @@ journal end seats on the pilot's floor.  The cup's O.D. is the bush's rear
 stub's, the Ø the cup's front face meets (owner: "pd-16 diameter should also
 be reduced to match new knob bush").
 
-Decimal inch (#290): the pilot is .250 +.004/0, the DRILLED HOLES row (fit
-audit 2026-11-23, pending owner confirmation): a bonded seat's gap takes the
-band, and the gap stays inside LOCTITE 641's fill.
+Decimal inch (#290): the pilot is .250 REF, a bonded seat made to fit the
+journal (fit audit 2026-11-23, pending owner confirmation); sheet note 2
+prints its diametral clearance on the journal (PILOT_CLEARANCE), which stays
+inside LOCTITE 641's fill.
 
 Part frame: axis local +Y through the origin (``Axis1``); the front face
 (the running face, as turned) is the Top Plane, y = 0; the pilot's floor

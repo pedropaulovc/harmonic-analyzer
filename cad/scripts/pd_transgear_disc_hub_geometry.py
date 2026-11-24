@@ -71,8 +71,9 @@ if len(SCREW_ANGLES_DEG) != SCREW_COUNT:
 # the disc floats further off the hub's axis while its taps are spotted and
 # the taps' finished web to the disc's bore falls
 # (pd_rack_pinion_spec.TAP_TO_BORE_WALL_FINISHED), and a smaller spigot
-# thins its own wall over the hub's bore under the .071 the owner confirmed
-# (pd_transgear_disc_hub_spec.BORE_WALLS_FINISHED).
+# thins its own wall over the hub's bore under the .071 of MHA-PD-17 RV-02
+# (delegated ruling 2026-11-12, owner review #2144; the owner's ruling of
+# 2026-11-08 kept .073) (pd_transgear_disc_hub_spec.BORE_WALLS_FINISHED).
 # SPIGOT_DIA_BAND is the ANALYSIS band, the modelled result of that fit
 # under the disc bore's own analysis band (.501-.503): .496 (the least bore
 # less the greatest clearance) to .500 (the greatest bore less the least),

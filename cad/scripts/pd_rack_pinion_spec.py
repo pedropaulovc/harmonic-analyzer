@@ -329,8 +329,9 @@ FACE_WIDTH_PLACES = 3
 # under the .080 target) loses .001 and falls under the wall the taps' note
 # states (RV-03).  A 1/2 drilled hole (+.004/0) takes the web to .0635 and,
 # the spigot being made to the hole, the MHA-PD-17 spigot's own wall to
-# .0705, under the .071 the owner confirmed there: the reamer stays until
-# the owner rules on those walls (fit-audit-2026-11-23/batch-pd/misc).
+# .0705, under the .071 MHA-PD-17 RV-02 keeps (delegated ruling 2026-11-12,
+# owner review #2144): the reamer stays until the owner rules on those walls
+# (fit-audit-2026-11-23/batch-pd/misc).
 BORE_DIA = 12.7254  # .501
 BORE_BAND = (0.0508, 0.0)  # analysis (upper, lower) deviations: +.002/0
 BORE_PLACES = 3
