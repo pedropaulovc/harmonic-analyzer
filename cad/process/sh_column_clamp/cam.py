@@ -338,6 +338,8 @@ def _pecked(
     """Drill from ``top`` to ``tip`` in pecks of ``peck``, each with a full
     retract to the R plane and a rapid back to just above the last peck.
     Moves to and from the hole run at ``clear``."""
+    if not (math.isfinite(peck) and peck > 0):
+        raise ValueError(f"peck {peck!r} is not a positive step")
     clear, r_plane = _r(clear), _r(top + SAFE_MM)
     depths = []
     depth = top

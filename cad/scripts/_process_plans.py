@@ -93,14 +93,16 @@ def _bound_parts(path: Path, _mtime_ns: int, stem: str) -> tuple[tuple[str, str]
     parts: dict[str, str] = {}
     for part in plan.get("parts", ()):
         manifest = Path(part["file"])
-        if (
-            manifest.name != "features.toml"
-            or manifest.parent.parent.name != "features"
-        ):
+        # The scoped manifest of the output root beside this process root,
+        # as a one-part plan's [cad] names it: its directory is the part.
+        scoped = Path("../../out/features") / manifest.parent.name / "features.toml"
+        if manifest.as_posix() != scoped.as_posix():
             raise ValueError(
                 f"{stem}: part {part['id']!r} binds {part['file']!r}, "
-                "not an out/features/<stem>/features.toml manifest"
+                "not its ../../out/features/<stem>/features.toml manifest"
             )
+        if part["id"] in parts:
+            raise ValueError(f"{stem}: two [[parts]] share the id {part['id']!r}")
         parts[part["id"]] = manifest.parent.name
     if len(set(parts.values())) != len(parts):
         raise ValueError(f"{stem}: two [[parts]] bind one manifest")

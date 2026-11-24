@@ -370,6 +370,10 @@ fetched from a release with no SolidWorks and no farm run:
 uv run --frozen python cad/scripts/fetch_features.py <stem> [--release vNN]
 ```
 
+A family plan needs each of its parts' bundles: fetch every part stem
+(`sh_column_clamp_front`, `sh_column_clamp_back`), then run the wrapper or
+`cam_nc.py` with the family's stem (`sh_column_clamp`).
+
 Releases cut after v50 ship every drawn part's bundle under `features/<stem>/`
 (v50 and earlier only the declared parts', so an older `--release` fails for
 any other part with "the release carries no ... bundle"); the script

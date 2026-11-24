@@ -175,17 +175,83 @@ def test_the_shared_programs_are_posted_once_and_cut_every_blank_alike(context) 
     keys = [op[0] for job in context["jobs"] for op in job["ops"]]
     assert len(keys) == len(set(keys))
     assert [key for key in keys if "." not in key] == list(RECIPE.SHARED.values())
-    # A number that makes one half's blank differ refuses the shared set.
+    # A skim one half takes deeper than the other: each half is consistent
+    # in itself, so only the comparison of their shared programs can refuse.
     plan = copy.deepcopy(PLAN)
     back = next(part for part in plan["parts"] if part["id"] == "back")
-    back["parameters"]["face_step_max_mm"] = 1.0
-    for setup in plan["setups"]:
-        for operation in setup["operations"]:
-            for cut in operation.get("milling_cuts", ()):
-                if cut.get("axial_doc_mm") == "{{process.face_step_max_mm}}":
-                    cut["axial_doc_mm"] = 1.27
-    with pytest.raises(ValueError, match="face_step_max_mm|derive different programs"):
+    back["parameters"]["bottom_skim_mm"] = PLAN["parameters"]["bottom_skim_mm"] + 0.1
+    with pytest.raises(ValueError, match="derive different programs"):
         _context(plan)
+
+
+def test_no_touch_off_is_taken_with_the_work_stop_between_the_jaws() -> None:
+    # CodeRabbit, 2026-11-24: the rod left locked from the setup before can
+    # lie under the end mill when it comes down beside the blank for Z0. No
+    # posted program's keep-out covers a hand move, so every mill setup opens
+    # with the rod drawn back, and the stop is set only after its touch-offs.
+    drawn_back = "rod drawn back clear of the vise"
+    mill = [setup for setup in PLAN["setups"] if setup.get("programs")]
+    assert len(mill) == 9
+    for setup in mill:
+        operations = setup["operations"]
+        touches = [
+            index
+            for index, operation in enumerate(operations)
+            if "G54" in operation["instruction"]
+            or "touch-off" in operation["instruction"]
+        ]
+        first = operations[touches[0]]
+        assert drawn_back in first["instruction"], setup["title"]
+        stops = [
+            index
+            for index, operation in enumerate(operations)
+            if operation.get("tool") == "work-stop"
+        ]
+        if setup["title"].startswith("Deburr, then the pair bore"):
+            assert not stops and "No work stop" in first["instruction"]
+            continue
+        (stop,) = stops
+        # Every zero of the setup is taken before the stop goes in.
+        zeros = [
+            index
+            for index, operation in enumerate(operations)
+            if re.search(r"G54 [XZ]0|Repeat Setup \d's", operation["instruction"])
+        ]
+        assert zeros and max(zeros) < stop, setup["title"]
+
+
+def test_a_peck_that_is_not_a_positive_step_is_refused() -> None:
+    for peck in (0.0, -1.0, float("nan"), float("inf")):
+        with pytest.raises(ValueError, match="not a positive step"):
+            RECIPE._pecked((0.0, 0.0), 0.0, -10.0, peck, 5.0)
+    assert RECIPE._pecked((0.0, 0.0), 0.0, -10.0, 4.0, 5.0)
+
+
+def test_a_family_plan_binds_each_part_once_to_its_scoped_manifest(tmp_path) -> None:
+    def parts(*rows: tuple[str, str]) -> dict[str, str]:
+        plan = tmp_path / "pair" / "plan.toml"
+        plan.parent.mkdir(exist_ok=True)
+        plan.write_text(
+            "".join(
+                f'[[parts]]\nid = "{part}"\nfile = "{file}"\n' for part, file in rows
+            ),
+            encoding="utf-8",
+        )
+        return _process_plans.family_parts("pair", tmp_path)
+
+    scoped = "../../out/features/{}/features.toml".format
+    assert parts(("a", scoped("p_a")), ("b", scoped("p_b"))) == {"a": "p_a", "b": "p_b"}
+    with pytest.raises(ValueError, match="share the id 'a'"):
+        parts(("a", scoped("p_a")), ("a", scoped("p_b")))
+    with pytest.raises(ValueError, match="two \\[\\[parts\\]\\] bind one manifest"):
+        parts(("a", scoped("p_a")), ("b", scoped("p_a")))
+    # A manifest of that name elsewhere is not the part's scoped one.
+    for elsewhere in (
+        "../../archive/features/p_a/features.toml",
+        "features/p_a/features.toml",
+    ):
+        with pytest.raises(ValueError, match="not its ../../out/features"):
+            parts(("a", elsewhere), ("b", scoped("p_b")))
 
 
 def test_the_sheet_names_exactly_the_recipes_programs() -> None:

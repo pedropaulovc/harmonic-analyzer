@@ -122,8 +122,9 @@ release ships "a placeholder pdf per part that points to shared one";
 "Renumber, so T3 means one drill everywhere on the sheet."; "Rename the marks
 (fronts F1-F3 stay; backs become K1-K3)."
 
-A family plan is one `<family>/plan.toml` for parts that are cut from one
-blank on one route and share setups. `sh_column_clamp/` is the first: it
+A family plan is one `<family>/plan.toml` for parts that start as the same
+blank (same stock, same sawn length; each part its own piece) and go through
+shared setups on one route. `sh_column_clamp/` is the first: it
 serves MHA-SH-01 (`sh_column_clamp_front`) and MHA-SH-02
 (`sh_column_clamp_back`), and neither part has a directory of its own here.
 The contract:
@@ -385,7 +386,10 @@ Each form needs the part's feature manifest at
 `package:features:<stem>` leaf (SolidWorks, via the supervised farm); the
 wrapper and the by-hand `uvx` command need an existing bundle, from a build or,
 with no SolidWorks and no farm run, from a release:
-`uv run --frozen python cad/scripts/fetch_features.py <stem>` (it rebinds the
+`uv run --frozen python cad/scripts/fetch_features.py <stem>` (for a family
+plan, once per part it binds: `fetch_features.py sh_column_clamp_front` and
+`sh_column_clamp_back`, then the family stem `sh_column_clamp` in the commands
+above; it rebinds the
 manifest to this checkout's declarations, and reports a bundle whose geometry
 has moved past the release, or any bundle from a release cut before face
 inventories shipped (#3232), as STALE and writes nothing; see
