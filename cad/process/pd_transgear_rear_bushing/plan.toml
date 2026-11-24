@@ -2,27 +2,31 @@
 # (owner ruling 2026-11-21: turned parts get lathe travelers, no NC). Route
 # chosen for speed: one chucking of the 1/2 in C36000 bar on hand
 # (cad/config/shop-equipment/stock-bought.toml c360-round-1-2).
-# Setup 1, the bar: face the end (Z0: the sleeve's thrust face, so it takes
+# Setup 1, the bar: face the end (Z0: the thrust face MHA-PD-10 runs on, so it takes
 # the faced finish), turn the outside to its .34-.36 band back past the
 # parting line, spot, drill #31 and ream .1260 through and past the parting
 # line in the same chucking, part off at the length; the parted face is the
 # arm face, which only seats on the MHA-PD-VN-68 shims (the length's .XXX
 # band moves only the shim count, owner ruling 2026-11-01, #2124).
 # Bench: file the parting burr off the arm face flat, break the edges and the
-# bore's ends, mike the length and check the bore with the .1260 GO /
-# .1265 NO-GO plug gauge pair (the band's ends).
+# bore's ends, mike the length. The drawing prints the bore as the reamer's
+# size with no band (fit audit 2026-11-23, pending owner confirmation): its
+# fit is accepted on the MHA-PD-23 pin, which is turned last to this bore and
+# tried in it on the pin's own traveler. Here the bore gets no size check
+# (traveler review t2: a .127 must-not-enter pin was an acceptance the
+# drawing does not print), only a look at its finish. cad.bore_dia_band_mm
+# is the drawing module's ANALYSIS band (what the reamer is modelled to
+# cut); it sizes the reaming op and is no acceptance.
 #
 # Not on hand (cad/config/shop-equipment/, to order): the .1260 chucking
-# reamer (tools-reamers-taps.toml reamer-1260) and the .1260 GO / .1265 NO-GO
-# Class X plug gauge pair (gauges.toml plug-gauges-1260-1265): the band is
-# .0005, under the pin-gauge sets' .001 step. Both serve MHA-PD-25 and
-# MHA-PN-05 too.
+# reamer (tools-reamers-taps.toml reamer-1260; it serves MHA-PD-25 and
+# MHA-PN-05 too).
 title = "Transgear Rear Bushing"
 part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
 material = "C36000 free-machining brass round bar, 1/2 in"
 stock = "Lot: {{process.quantity:d}} bushing. Ø{{process.stock_dia_in:.3dot}} bar, on hand: saw a {{process.bar_length_in:g}} in piece off it for the lathe, never the whole bar (it would run out past the spindle's rear end); the bushing takes {{cad.pitch_in:.2dot}} in of it."
-note = "Inches unless mm. Lathe PM-1127VF-LB (70–380 and 380–2000 rpm); brass cut dry. To order (not on hand): the .1260 chucking reamer and the .1260 GO / .1265 NO-GO plug gauge pair for the bore check."
+note = "Inches unless mm. Lathe PM-1127VF-LB (70–380 and 380–2000 rpm); brass cut dry. To order (not on hand): the .1260 chucking reamer. The bore's fit is accepted on the MHA-PD-23 pin, which is turned last to this bushing: keep the bushing with MHA-PD-18, MHA-PD-10 and MHA-PD-25."
 shop = "../shop"
 stock_refs = ["c360-round-1-2"]
 material_key = "lathe-c360"
@@ -93,12 +97,6 @@ id = "deburr"
 name = "Deburring countersink"
 ref = "deburring-set"
 
-[[tools]]
-id = "plugs"
-name = "Plug gauges .1260 GO, .1265 NO-GO"
-ref = "plug-gauges-1260-1265"
-status = "to_order"
-
 [[setups]]
 machine_kind = "lathe"
 title = "Bar: face, turn, drill and ream the bore, part off at length"
@@ -106,7 +104,7 @@ machine = "PM-1127VF-LB lathe"
 indexing = "none"
 machine_ref = "pm-1127vf-lb"
 holding = "3-jaw on the Ø{{process.stock_dia_in:.3dot}} bar, {{process.chuck_grip_in:.2dot}} in in the jaws; {{cad.stickout_in:.2dot}} in out of the jaw fronts."
-datum = "Z0 (carriage DRO) the bar end faced in Op 10: the sleeve's thrust face."
+datum = "Z0 (carriage DRO) the bar end faced in Op 10: the bushing's thrust face against MHA-PD-10."
 diagram = { file = "diagrams/bar.svg", alt = "The 1/2 in bar in the 3-jaw: the end faced, the outside turned back past the parting line, the bore spotted, drilled and reamed through past the parting line; the bushing parted off at its length." }
 lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{cad.stock_dia_mm}}", stock_diameter_mm = "{{cad.stock_dia_mm}}", stickout_mm = "{{cad.stickout_mm}}", minimum_diameter_mm = "{{cad.outer_turn_min_mm}}", support = "none" }
 turning_support = { kind = "chuck_only", chuck_z_mm = "{{cad.jaw_z_mm}}" }
@@ -132,7 +130,7 @@ speed_kind = "spindle"
 tool = "ar"
 drilling = "none"
 sizing = "other"
-instruction = "Turn the outside from Z0 back past the parting line to Z{{cad.run_end_z_mm:in.2dot}}, to Ø{{cad.outer_dia_mm:in.3dot}} (the band's middle), miking between passes and taking the last one light."
+instruction = "Turn the outside from Z0 back past the parting line to Z{{cad.run_end_z_mm:in.2dot}}, to Ø{{cad.outer_dia_mm:in.3dot}} (the band's middle), miking between passes (spindle stopped, the tool backed off) and taking the last one light."
 settings = "lathe-ar-c360"
 cut_diameter_mm = "{{cad.outer_dia_mm}}"
 inspection = "Outside Ø{{cad.outer_dia_min_in:.3dot}}–{{cad.outer_dia_max_in:.3dot}}, micrometer."
@@ -218,13 +216,13 @@ gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.length_band_mm}}" }]
 feed = "hand"
 
 [[setups.operations]]
-instruction = "The {{cad.bore_dia_min_in:.4dot}} GO plug enters the bore from both ends and the {{cad.bore_dia_max_in:.4dot}} NO-GO plug enters from neither."
-inspection = "Bore Ø{{cad.bore_dia_min_in:.4dot}}–{{cad.bore_dia_max_in:.4dot}}."
-gauge_checks = [{ gauge = "plug-gauges-1260-1265", band_mm = "{{cad.bore_dia_band_mm}}" }]
+instruction = "Look down the bore from each end against a light."
+inspection = "The bore's wall bright and smooth, no chatter rings or tears, by eye. The bore's size is the .1260 reamer's; the running fit is accepted on the MHA-PD-23 pin (its traveler: the pin enters and turns free, no shake)."
+gauge_checks = "other"
 feed = "hand"
 
 [[setups.operations]]
-instruction = "A bushing failing a check in Op 100 or Op 110 is scrapped, not reworked: make another from Setup 1."
+instruction = "A bushing failing the length check in Op 100, or with chatter rings or tears in its bore in Op 110, is scrapped, not reworked: make another from Setup 1."
 feed = "hand"
 
 [[setups.operations]]

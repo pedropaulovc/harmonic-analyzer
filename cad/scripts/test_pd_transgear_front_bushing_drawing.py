@@ -15,6 +15,7 @@ import transgear_cluster_fit as fit
 from pd_cluster_stack_band import FIT_LENGTH_BAND_IN, STACK_NAME
 import pd_transgear_disc_hub_spec as hub
 import pd_transgear_front_bushing_spec as spec
+import pd_transgear_pin_callouts as pin_callouts
 import pd_transgear_pin_spec as pin
 import pd_vn_transgear_retaining_ring_spec as ring
 from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dimensions
@@ -55,26 +56,35 @@ def test_the_chamfer_prints_a_max_the_ring_never_reaches() -> None:
     assert ring.OD < flat_dia_min
 
 
-def test_the_bore_and_the_printed_length_carry_model_bands() -> None:
-    """The bore runs on the pin, so its reamed band lives on the model
-    dimension; the length is a printed term of the disc cluster stack."""
+def test_only_the_printed_length_carries_a_model_band() -> None:
+    """Fit audit 2026-11-23: the reamed bore prints the reamer's size with
+    no band (the pin is turned last to it); the length is a printed term of
+    the disc cluster stack."""
     assert model_toleranced_dimensions(part) == {
-        ("RingProfile", "BoreDia"): "*deviations(BORE_DIA_BAND)",
         ("Ring", "RingLength"): "LENGTH_BAND",
     }
+    assert spec.BORE_PLACES == 3
 
 
 def test_the_bore_runs_on_the_pin_and_names_it() -> None:
-    """drawing-guidelines.md rule 4 (tighten only for function, and name the mate): the running-fit callout names the mate and its clearance;
+    """drawing-guidelines.md rule 4 (fit audit 2026-11-23): a reamed bore
+    prints size, REAM and that its mate is turned to it; no band, no
+    clearance.  The acceptance prints once, on the pin's sheet; the reason
+    for the REAM is in the part's necessity file (owner ruling 2026-11-24).
     drawing-guidelines.md rule 12 (hole and slot callouts say what to do): the fit bore's process is REAM."""
     low, high = fit.BORE_DIAMETRAL_CLEARANCE
     assert 0.0 < low < high
-    assert spec.BORE_DIA == pin.DIA
+    assert spec.BORE_DIA == fit.BORE_DIA == pytest.approx(0.1260 * 25.4)
     assert spec.BORE_DIA_BAND == fit.BORE_DIA_BAND
     callout = drawing.DIMENSION_CALLOUTS["BoreDia"]
-    assert callout.splitlines()[0] == "REAM THRU"
-    assert pin.PIN_NUMBER in callout
-    assert f"{pin.inch_text(low, 4)}-{pin.inch_text(high, 4)}" in callout
+    assert callout.splitlines() == [
+        "REAM THRU",
+        f"{pin.PIN_NUMBER} IS TURNED TO THIS BORE",
+    ]
+    assert not re.search(r"\d*\.\d", callout)
+    assert "NO SHAKE" not in callout
+    assert _config.parts("pd-transgear-front-bushing")["number"] in pin.RUNNING_MATES
+    assert "NO SHAKE" in pin_callouts.SHANK_ACCEPTANCE
 
 
 def test_wall_holds_the_target_at_the_printed_worst_case() -> None:
@@ -107,12 +117,12 @@ def test_the_unchanged_bushing_bears_on_the_smaller_d_flat_sleeve_nose() -> None
     rear face at every size limit, with both title-block edge breaks paid.
     This is geometric contact, not a load or torque certification."""
     sleeve = fit.SLEEVE
-    assert spec.BORE_DIA == sleeve.BORE_DIA == pin.DIA
+    assert spec.BORE_DIA == sleeve.BORE_DIA == fit.BORE_DIA
     assert spec.BORE_DIA_BAND == sleeve.BORE_DIA_BAND == fit.BORE_DIA_BAND
     assert fit.BORE_DIAMETRAL_CLEARANCE == pytest.approx(
         (
-            sleeve.BORE_DIA_BAND[1] - pin.DIA_BAND[0],
-            sleeve.BORE_DIA_BAND[0] - pin.DIA_BAND[1],
+            sleeve.BORE_DIA + sleeve.BORE_DIA_BAND[1] - pin.DIA_MAX,
+            sleeve.BORE_DIA + sleeve.BORE_DIA_BAND[0] - pin.DIA_MIN,
         )
     )
     nose_r = (sleeve.BOSS_DIA + sleeve.BOSS_DIA_BAND[1]) / 2.0 - hub.EDGE_BREAK_MAX
@@ -136,8 +146,11 @@ def test_the_unchanged_bushing_bears_on_the_smaller_d_flat_sleeve_nose() -> None
 
 
 def test_the_length_is_a_term_of_the_disc_cluster_stack() -> None:
-    """#2124: it sets the collar air, so it prints +/-.001 at 3 places, named
-    on the stack; the shims, not this length, set the end float."""
+    """#2124: it prints +/-.001 at 3 places, named on the disc cluster's
+    stack.  Since fit audit question 5 (owner ruling 2026-11-24) the band
+    serves the sleeve's unshimmed float at the ring, not the collar air, and
+    the callout names that gap, as necessity N-02 does (rule 25; Codjiflo r2
+    on #3506)."""
     assert spec.LENGTH == fit.FRONT_BUSHING_LENGTH
     assert spec.LENGTH_BAND == fit.LENGTH_BAND == FIT_LENGTH_BAND_IN
     assert spec.LENGTH_PLACES == fit.LENGTH_PLACES == 3
@@ -145,7 +158,13 @@ def test_the_length_is_a_term_of_the_disc_cluster_stack() -> None:
     assert "RingLength" not in spec.REFERENCE_DIMENSIONS
     callout = drawing.DIMENSION_CALLOUTS["RingLength"]
     assert callout == spec.LENGTH_CALLOUT
-    assert STACK_NAME in callout
+    assert callout == f"{STACK_NAME}:\nMHA-PD-VN-61 RING GAP"
+    assert "CLEARANCE" not in callout
+    # Looser (±.003, the title block's row), the unshimmed ring gap's low
+    # end closes under the float floor: N-02's 0.1778 against 0.2032.
+    loosened = fit.UNSHIMMED_FLOAT_RANGE[0] - (0.003 - 0.001) * 25.4
+    assert loosened == pytest.approx(0.1778, abs=1e-4)
+    assert fit.UNSHIMMED_FLOAT_RANGE[0] >= fit.END_FLOAT_MIN > loosened
 
 
 def test_the_bore_and_both_end_faces_run_machined() -> None:
@@ -157,7 +176,7 @@ def test_the_bore_and_both_end_faces_run_machined() -> None:
     }
     assert set(faces) == {"bore", "nose_face", "ring_face"}
     assert {ra for ra, _ in faces.values()} == {MACHINED_UM}
-    assert faces["bore"][1].diameter_mm == pin.DIA
+    assert faces["bore"][1].diameter_mm == spec.BORE_DIA
     assert (tuple(faces["nose_face"][1].normal), faces["nose_face"][1].offset_mm) == (
         (0.0, 0.0, -1.0),
         0.0,

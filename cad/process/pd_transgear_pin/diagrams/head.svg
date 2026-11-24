@@ -1,3 +1,25 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Turned round, the press land in the jaws over a shim wrap, the head out: its R.18 dome stepped from the table and filed on the faced end. Shell: prechips.shaft_diagrams; styles: prechips.palette. -->
-<svg xmlns="http://www.w3.org/2000/svg" data-cad-template="turned-shaft" data-hold="regrip" data-out="datum" data-grip="step_land" data-work="dome steps" data-done="turn groove"/>
+<!-- Turned round, the shank in the split bush in the 3-jaw, the head out: faced, its R.18 dome stepped from the table and filed. Hand-drawn, not to scale (#3500). -->
+<svg xmlns="http://www.w3.org/2000/svg" width="540" height="290" viewBox="0 0 540 290" font-family="sans-serif" font-size="12">
+<rect width="540" height="290" fill="#fff"/>
+<rect x="20" y="30" width="40" height="230" fill="#ccc" stroke="#000"/>
+<rect x="60" y="30" width="150" height="40" fill="#ccc" stroke="#000"/>
+<rect x="60" y="220" width="150" height="40" fill="#ccc" stroke="#000"/>
+<rect x="60" y="70" width="225" height="150" fill="#ec9" stroke="#000"/>
+<rect x="24" y="126" width="285" height="38" fill="#cde" stroke="#000"/>
+<rect x="309" y="115" width="36" height="60" fill="#cde" stroke="#000"/>
+<path d="M285 70 l-8 0 l4 8 z" fill="#000"/>
+<line x1="10" y1="145" x2="530" y2="145" stroke="#000" stroke-dasharray="12 3 2 3" stroke-width="0.6"/>
+<line x1="285" y1="225" x2="285" y2="262" stroke="#000" stroke-width="0.6"/>
+<line x1="345" y1="180" x2="345" y2="262" stroke="#000" stroke-width="0.6"/>
+<line x1="285" y1="256" x2="345" y2="256" stroke="#000" stroke-width="0.6"/>
+<text x="315" y="274" text-anchor="middle">.20 out of the bush</text>
+<text x="360" y="120" text-anchor="start">head: face to thickness,</text>
+<text x="360" y="135" text-anchor="start">step and file the R.18 dome</text>
+<line x1="358" y1="125" x2="346" y2="135" stroke="#000" stroke-width="0.6"/>
+<text x="300" y="66" text-anchor="start">nick at jaw 1</text>
+<line x1="298" y1="62" x2="283" y2="72" stroke="#000" stroke-width="0.6"/>
+<text x="135" y="22" text-anchor="middle">3-jaw on the bush, never on the pin</text>
+<text x="172" y="205" text-anchor="middle">split bush</text>
+<text x="40" y="282" text-anchor="start">the shank runs on into the chuck</text>
+</svg>

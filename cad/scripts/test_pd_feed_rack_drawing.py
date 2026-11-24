@@ -252,13 +252,14 @@ def test_tap_drill_is_the_native_number_drill() -> None:
     assert spec.TAP_DRILL_DIA == pytest.approx(TAP_DRILL_MM["#0-80"])
 
 
-def test_rack_index_and_face_lead_fit_the_feed_opposite_flank_budget() -> None:
-    """tolerances.yaml derivation: with two pairs in contact the second
-    pair's clearance is the set datum backlash less every lateral term."""
-    import paper_drive_geom
-
-    closing = quality.rack_pitch_index_deviation_mm() + paper_drive_geom.feed_lateral_deviation_mm()
-    assert closing <= min(feed.RACK_BACKLASH_RANGE)
+def test_rack_index_limit_is_not_under_the_vendors_accumulated_accuracy() -> None:
+    """The rack is bought: its index limit may not ask for more than SDP/SI
+    publishes.  The opposite-flank budget once asserted here (index plus the
+    feed's lateral terms under the low end of RACK_BACKLASH_RANGE) is deleted
+    (owner ruling 2026-11-24, fit audit part 2: "Delete the check."): the
+    mesh is set by feel at the run's tight spot (#2416), and the same terms
+    are gated where they act, at the loosest station
+    (pd_paper_drive_assembly_steps.FEED_LOOSEST_MESH)."""
     assert quality.rack_pitch_index_deviation_mm() >= 0.002 * 25.4  # SDP/SI accumulated
 
 

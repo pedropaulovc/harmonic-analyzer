@@ -104,9 +104,13 @@ def test_part_authors_every_callout_on_a_marked_dimension() -> None:
     for name, text in below.items():
         words = [row for row in text.split("\n") if row != callouts.BORE_PROCESS_CALLOUT]
         assert len(words) <= 2, name
+    # The boss is made to fit: its size prints REF, parenthesised by the
+    # prefix and suffix lanes the part authors.
     assert callouts.CALLOUTS[callouts.TEXT_PREFIX] == {
-        ("RootProfile", "RootDia"): "ROOT DIAMETER <MOD-DIAM>"
+        ("RootProfile", "RootDia"): "ROOT DIAMETER <MOD-DIAM>",
+        ("SleeveProfile", "BossDia"): "(<MOD-DIAM>",
     }
+    assert callouts.CALLOUTS[callouts.TEXT_SUFFIX] == {("SleeveProfile", "BossDia"): ")"}
 
 
 def test_fits_take_standard_names_and_name_their_mates() -> None:
@@ -117,18 +121,32 @@ def test_fits_take_standard_names_and_name_their_mates() -> None:
     prints where its function is stated."""
     import pd_transgear_disc_hub_spec as hub
 
-    def window(limits: tuple[float, float]) -> str:
-        return f"{_inch(limits[0], 4)}-{_inch(limits[1], 4)} REF"
-
     standard = ("RUNNING FIT", "SLIDING FIT", "LOCATIONAL CLEARANCE FIT")
-    for text, mate, clearance in (
-        (callouts.BORE_FIT_CALLOUT, spec.PIN_NUMBER, spec.BORE_DIAMETRAL_CLEARANCE),
-        (callouts.BOSS_CALLOUT, spec.HUB_NUMBER, hub.BOSS_CLEARANCE_LIMITS),
-    ):
-        assert any(name in text for name in standard), text
-        assert mate in text, text
-        if clearance is not None:
-            assert window(clearance) in text, text
+    # Fit audit 2026-11-23: the reamed bore prints no band and no
+    # clearance; the pair's acceptance prints once, on the pin's sheet
+    # (review-fix r1: not on both members).
+    text = callouts.BORE_CALLOUT
+    assert not any(name in text for name in standard), text
+    assert spec.PIN_NUMBER in text, text
+    assert callouts.BORE_PROCESS_CALLOUT == "REAM THRU"
+    assert callouts.BORE_FIT_CALLOUT == f"{spec.PIN_NUMBER} IS TURNED TO THIS BORE"
+    assert "NO SHAKE" not in text
+    assert not re.search(r"\d*\.\d", callouts.BORE_CALLOUT)
+    # Owner ruling 2026-11-24: the reasons are in the part's necessity file,
+    # not on the sheet; no callout carries a KEEPS line.
+    assert not hasattr(callouts, "BORE_NECESSITY")
+    assert not hasattr(callouts, "BOSS_NECESSITY")
+    # Fit audit 2026-11-23 (rule 4, made to fit): the boss is turned last to
+    # the hub's reamed bore and accepted by feel; it prints no limits and no
+    # clearance range.
+    assert callouts.BOSS_CALLOUT == (
+        f"TURN TO {callouts.HUB_NAME} {spec.HUB_NUMBER}: SLIDES ON, NO ROCK"
+    )
+    for text in (callouts.BORE_CALLOUT, callouts.BOSS_CALLOUT, callouts.FLAT_CALLOUT,
+                 callouts.FACE_WIDTH_CALLOUT):
+        assert "KEEPS" not in text, text
+    assert not re.search(r"\.\d", callouts.BOSS_CALLOUT)
+    assert hub.BOSS_CLEARANCE_LIMITS == pytest.approx((0.0, 0.001 * 25.4))
     # #2409: the flat is no fit; it keys the hub's pin, named.
     assert hub.KEY_PIN_NUMBER in callouts.FLAT_CALLOUT
     assert not any(name in callouts.FLAT_CALLOUT for name in standard)
@@ -158,24 +176,24 @@ def test_bands_come_from_named_spec_constants() -> None:
     assert model_toleranced_dimensions(part) == {
         ("SleeveProfile", "OverallLength"): "OVERALL_LENGTH_BAND",
         ("GearBlank", "FaceWidth"): "FACE_WIDTH_BAND",
-        ("SleeveProfile", "BoreDia"): "*BORE_DEVIATIONS",
-        ("SleeveProfile", "BossDia"): "*BOSS_DIA_DEVIATIONS",
         ("FlatReference", "FlatToAxis"): "FLAT_TO_AXIS_TOL",
         ("SleeveProfile", "OutsideDia"): "*OUTSIDE_DIA_DEVIATIONS",
     }
-    # A band tighter than its printed row needs a functional reason (drawing-guidelines.md rule 4 (tighten only for function, and name the mate)):
-    # the disc cluster stack's +/-.001 lengths at three places, the tip class
-    # and the boss's band at four, where the inch title block has no row, so
-    # each carries its own explicit band.  The flat prints the shop's milled
-    # ±.002 row (the hub key pin's air, its pin named at the callout).
+    # A band tighter than its printed row needs a functional reason (drawing-guidelines.md rule 4):
+    # the disc cluster stack's +/-.001 lengths at three places and the tip
+    # class at four, where the inch title block has no row, so each carries
+    # its own explicit band.  The flat prints the shop's milled ±.002 row
+    # (the hub key pin's air, its pin named at the callout).  The boss is
+    # made to fit the hub's bore: REF at three places, no band.
     assert spec.OVERALL_LENGTH_BAND == spec.FACE_WIDTH_BAND == FIT_LENGTH_BAND_IN
     by_name = spec.DRAWING_PRECISION_BY_NAME
     assert spec.STATION_PLACES == spec.FACE_WIDTH_PLACES == 3
     assert by_name["FlatToAxis"] == 3
     assert spec.FLAT_TO_AXIS_BAND == pytest.approx((0.002 * 25.4, -0.002 * 25.4))
     assert spec.FLAT_TO_AXIS_BAND == (spec.FLAT_TO_AXIS_TOL, -spec.FLAT_TO_AXIS_TOL)
-    for name in ("OutsideDia", "BossDia"):
-        assert by_name[name] == 4, name
+    assert by_name["OutsideDia"] == 4
+    assert by_name["BossDia"] == 3
+    assert not hasattr(spec, "BOSS_DIA_DEVIATIONS")
 
 
 def test_root_prints_as_the_cutter_depth_floor() -> None:
@@ -222,7 +240,10 @@ def test_boss_takes_the_hub_bore_and_flat_the_hub_key_pin() -> None:
     import pd_transgear_disc_hub_spec as hub
 
     inch = 25.4
-    assert spec.BOSS_DIA == hub.BORE_DIA
+    # The boss is turned to the hub's reamed bore: the reamer's size is the
+    # boss's modelled largest.
+    assert hub.BORE_DIA == pytest.approx(spec.BOSS_DIA + max(spec.BOSS_DIA_BAND))
+    assert hub.BORE_DIA == pytest.approx(0.3135 * inch)
     assert hub.BOSS_CLEARANCE_LIMITS[0] >= 0.0
     assert hub.KEY_PIN_CHORD_OFFSET == pytest.approx(0.174 * inch)
     flat = sorted(spec.FLAT_TO_AXIS + band for band in spec.FLAT_TO_AXIS_BAND)
@@ -441,18 +462,25 @@ def test_flat_volume_is_the_boss_segment() -> None:
 
 
 def test_bore_runs_on_the_pin() -> None:
+    """Fit audit 2026-11-23: the bore is the set reamer's, printed with no
+    band; the pin's shank is turned last to it by feel.  The bands here are
+    ANALYSIS numbers (what the reamer and the bought shims' bore model), and
+    the clearance they give is the stack's input, not a printed limit."""
     import pd_transgear_pin_spec as pin
 
-    assert spec.BORE_DIA == pin.DIA
-    p_upper, p_lower = pin.DIA_BAND
+    assert spec.BORE_DIA == pytest.approx(0.1260 * 25.4)
+    assert spec.BORE_PLACES == 3
+    assert not hasattr(spec, "BORE_DEVIATIONS")
     b_upper, b_lower = spec.BORE_DIA_BAND
-    clearance = (b_lower - p_upper, b_upper - p_lower)
+    clearance = (spec.BORE_DIA + b_lower - pin.DIA_MAX, spec.BORE_DIA + b_upper - pin.DIA_MIN)
     assert clearance == pytest.approx(spec.BORE_DIAMETRAL_CLEARANCE)
-    assert clearance[0] > 0.0
-    # A running fit exists only when both size bands are narrower than the
-    # clearance range they claim (tolerance-policy step 6b).
-    span = clearance[1] - clearance[0]
-    assert b_upper - b_lower < span and p_upper - p_lower < span
+    # Owner ruling 2026-11-24, fit audit question 5: pin +0/-.0005 in the
+    # reamer's +.0010/0, the one band the three running bores share
+    # (pd_transgear_pin_spec owns it).
+    assert (b_upper, b_lower) == pytest.approx((0.0010 * 25.4, 0.0))
+    assert spec.BORE_DIA_BAND is pin.RUNNING_BORE_DIA_BAND
+    assert spec.BORE_DIAMETRAL_CLEARANCE is pin.RUNNING_CLEARANCE
+    assert clearance == pytest.approx((0.0010 * 25.4, 0.0025 * 25.4))
 
 
 def test_oil_hole_lands_on_a_tooth_centre() -> None:
@@ -472,8 +500,19 @@ def test_walls_meet_the_target_worst_case() -> None:
     # and the sheet prints its worst case floored on the .001 in grid.
     assert spec.WALL_FLOOR <= spec.FLAT_WALL_WORST < spec.WALL_TARGET
     assert spec.FLAT_WALL_WORST <= spec.FLAT_WALL
-    # .138 -.002 flat over the Ø.1265 bore's radius: .07275, printed .072 MIN.
-    assert spec.FLAT_WALL_WORST == pytest.approx((0.136 - 0.1265 / 2.0) * 25.4)
+    # .138 -.002 flat over the modelled Ø.1270 bore's radius: .0725, still
+    # over the printed .072 MIN, which does not move (RV-03 as ruled).
+    assert spec.FLAT_WALL_WORST == pytest.approx((0.136 - 0.1270 / 2.0) * 25.4)
+    # RV-04 (owner ruling 2026-11-24: "Yes: restate RV-04 to .0730 and build
+    # the full form."): the boss wall at the nose between the two .010 breaks.
+    boss_wall = dict((name, worst) for name, _nominal, worst in spec.WALLS)["boss"]
+    assert boss_wall - 2 * 0.010 * 25.4 == pytest.approx(0.0730 * 25.4)
+    reason = next(
+        entry["reason"]
+        for entry in _config.parts("pd-transgear-feed-pinion")["machinist_exceptions"]
+        if entry["id"] == "RV-04"
+    )
+    assert "the worst wall is .0730" in reason
     assert "D-FLAT WALL TO BORE .072 MIN." in spec.DRAWING_NOTES.splitlines()
     assert spec.FLAT_WALL_PRINTED <= spec.FLAT_WALL_WORST
     assert spec.FLAT_WALL_WORST - spec.FLAT_WALL_PRINTED < 0.001 * 25.4
@@ -509,7 +548,7 @@ def test_sheet_text_names_the_right_parts() -> None:
     # #2409: the oil hole shares the key-pin hole's printed station.
     assert hub.OIL_HOLE_SLEEVE_Z == hub.KEY_PIN_SLEEVE_Z
     assert "KeyPinStation" in hub.DRAWING_PRECISION_BY_NAME
-    assert f"FIT ON {spec.PIN_NUMBER}" in callouts.BORE_FIT_CALLOUT
+    assert f"{spec.PIN_NUMBER} IS TURNED TO THIS BORE" in callouts.BORE_FIT_CALLOUT
     assert _config.parts("pd-transgear-front-bushing")["number"] == "MHA-PD-25"
 
 
@@ -547,15 +586,11 @@ _NOMINAL = {
     "ToothSpan": spec.SPAN_NOMINAL,
 }
 _DEVIATIONS = {
-    "BoreDia": spec.BORE_DEVIATIONS,
-    "BossDia": spec.BOSS_DIA_DEVIATIONS,
     "OutsideDia": spec.OUTSIDE_DIA_DEVIATIONS,
 }
 # The places SolidWorks printed each stacked band's deviations in (run
 # 20261001T110844152Z): the upper above the lower, the lower beside the value.
 _DEVIATION_PLACES = {
-    "BoreDia": spec.BORE_PLACES,
-    "BossDia": spec.BOSS_DIA_PLACES,
     "OutsideDia": spec.OUTSIDE_DIA_PLACES,
 }
 # The symmetric bands and the places their ± prints in: the disc-cluster
@@ -609,7 +644,7 @@ def _printed_text(name: str) -> str:
         band, places = _STATIONS[name]
         rows = [f"{value} \u00b1{_inch(band, places)}"]
     else:
-        rows = [value]
+        rows = [value + lanes.get(callouts.TEXT_SUFFIX, "")]
     if callouts.CALLOUT_BELOW in lanes:
         rows += lanes[callouts.CALLOUT_BELOW].split("\n")
     return "\n".join(f" {row} " for row in rows)
@@ -785,6 +820,14 @@ def test_section_values_and_bands_print_clear_of_each_other() -> None:
     flat_x = drawing.NOSE_KEEP["FlatToAxis"][0]
     assert flat_x == flat.xmin
     assert nose.xmax + ARROW_TEXT_CLEARANCE_M <= flat_x
+    # Leaf 20261124T014755Z (layout audit, shoulder-crosses-line): the text
+    # stands on a shelf as long as its widest row, running right from the
+    # dimension line, and the boss's inline diameter's dimension line
+    # stands at its text's x.  "KEYS MHA-PD-VN-69" ran the shelf across it.
+    assert flat.xmax + ARROW_TEXT_CLEARANCE_M <= drawing.RIGHT_KEEP["BossDia"][0]
+    assert max(len(row) for row in callouts.FLAT_CALLOUT.split("\n")) <= len(
+        callouts.HUB.KEY_PIN_NUMBER
+    )
     assert part.FLAT_WITNESS_STATION > 0.0
     boss_line_y = axis_y + spec.BOSS_DIA / 2.0 * s
     assert boss_line_y + ARROW_TEXT_CLEARANCE_M <= flat.ymin

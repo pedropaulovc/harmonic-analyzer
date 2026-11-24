@@ -39,6 +39,7 @@ import pd_transgear_drive_collar_spec as collar
 import pd_transgear_feed_pinion_spec as feed_pinion
 import pd_transgear_knob_bush_geometry as knob_bush
 import pd_transgear_knob_shaft_spec as knob_shaft
+import pd_transgear_pin_spec as cluster_pin
 import pd_vn_transgear_arm_plate_locating_pin_spec as plate_locating_pin
 import _transgear_arm_plate_locating_interface as plate_locating_interface
 import pd_vn_transgear_knob_drive_pin_spec as drive_pin
@@ -504,12 +505,14 @@ def test_a_dowel_that_slides_into_the_arm_is_bonded() -> None:
         drawing.detail_cite("arm-plate-fitted") == f"(DETAIL H, SHEET {detail_sheet})"
     )
     note = " ".join(drawing.SETTING_DETAIL_CAPTIONS["H"].split())
+    # A collar dowel or pin that slides in renews the collar (step 20) and a
+    # latch dowel the arm (step 10), so the note serves the plate dowels only.
     assert f"BOND NOTE ({drawing.sub_step('arm-plate-fitted', 6)}):" in note
     for words in (
         "PULL THE DOWEL.",
         "DEGREASE IT AND ITS HOLE.",
         "COAT THE DOWEL, NOT THE HOLE, WITH LOCTITE 638.",
-        f"PRESS IT BACK AT ONCE TO {drawing.sub_step('arm-plate-fitted', 5)}'S PROUD.",
+        "PRESS IT BACK AT ONCE TO ITS STEP'S PROUD.",
         "CURE 24 H.",
     ):
         assert words in note, words
@@ -542,19 +545,16 @@ def test_a_feed_sleeve_found_outside_after_hanging_has_a_renewal_route() -> None
         f"FOR A {sleeve} FOUND OUTSIDE, SLIDE THE COLLAR OFF.",
         f"FOR IT, STRIP THE CLUSTER ({drawing.sub_step('disc-cluster-hung', 4)} BACK TO "
         f"{drawing.sub_step('disc-cluster-hung', 1)}), KEEPING ITS SHIMS.",
-        f"FOR IT, DO {drawing.sub_step('arm-plate-located', 20)} AND THE REPEATS IN "
+        f"FOR IT, DO THE SLIDE-OFF AND THE REPEATS IN "
         f"{drawing.sub_step('arm-plate-located', 21)} ON A NEW ONE.",
         f"FOR IT, REPEAT STEPS {steps.step_number('oil-hole-drilled')}-"
         f"{steps.step_number('disc-cluster-shimmed')} AND "
         f"{drawing.sub_step('knob-stack-fitted', 18)}, THEN FROM "
         f"{drawing.sub_step('hanger-meshed', 0)}.",
     )
-    # The sub-steps it names are the ones that slide the sleeve off and on.
-    assert texts["arm-plate-located"][20].startswith(
-        "SLIDE THE HUB AND DISC AS ONE OFF"
-    )
+    # The sub-step it names is the one that slides the sleeve off and on.
     assert texts["arm-plate-located"][21].startswith(
-        "WITH THEM OFF AND THE DISC SCREWS"
+        f"REPLACE A {sleeve} FOUND OUTSIDE: SLIDE THE HUB AND DISC OFF IT AS ONE"
     )
     assert texts["knob-stack-fitted"][18].startswith(
         f"SLIDE THE {_number('pd-transgear-drive-collar')} COLLAR ON"
@@ -692,10 +692,43 @@ def test_view_k_carries_the_set_coordinates_as_assembly_model_dimensions() -> No
     assert (k[0] - s[0]) * (knob_setting.N_XY[1] - s[1]) - (k[1] - s[1]) * (
         knob_setting.N_XY[0] - s[0]
     ) == pytest.approx(0.0, abs=1e-9)
-    # The printed +x/-0 band stays inside the mesh window, within one
-    # .0001 count of it.
-    assert knob_setting.CENTRE_TOLERANCE_MM[0] == 0.0
+    # The printed limits: the set band's top, within one .0001 count of the
+    # mesh window, and the -.001 the trial may move the plate toward S
+    # (owner ruling 2026-11-24, audit part 2 question C1).
+    assert knob_setting.CENTRE_TOLERANCE_MM[0] == pytest.approx(-0.001 * 25.4)
     assert high - low - 0.00254 < knob_setting.CENTRE_TOLERANCE_MM[1] <= high - low
+    # C1 ("Yes, the trial may move the plate within those limits."): every
+    # setting the step reaches keeps N, indicated TRUE, inside the limits
+    # and clear of a bind with both running fits pressed shut (Codjiflo r2 on
+    # #3539: the old .001 away move let N reach about +.0027).
+    lower = disc.CENTRE_DISTANCE + knob_setting.CENTRE_TOLERANCE_MM[0]
+    upper = disc.CENTRE_DISTANCE + knob_setting.CENTRE_TOLERANCE_MM[1]
+    error = knob_setting.TRUE_RADIAL_ERROR_MM
+    assert error == pytest.approx(0.0199, abs=1e-4)
+    aim = knob_setting.setting_radius(1, (0.0, 0.0))
+    # From the mid-band aim the limit leaves .00028 away from S: under the
+    # .0005 a hobby mill sets, so no away move prints.
+    assert knob_setting.TRIAL_AWAY_ROOM_MM == pytest.approx(upper - error - aim)
+    assert knob_setting.TRIAL_AWAY_ROOM_MM == pytest.approx(0.00028 * 25.4, abs=0.000005 * 25.4)
+    assert knob_setting.TRIAL_AWAY_ROOM_MM < knob_setting.TRIAL_MOVE_MIN_IN * 25.4
+    assert knob_setting.TRIAL_MOVE_AWAY_MM is None
+    assert drawing.KNOB_TRIAL_AWAY_MOVE_TEXT is None
+    # Toward S the limit leaves .00116, but the pressed-shut mesh binds with
+    # N under -.00079: the derived move is .0006 each way (.00085 along S-K).
+    toward = knob_setting.TRIAL_MOVE_TOWARD_MM
+    assert toward == pytest.approx((0.0006 * 25.4, 0.0006 * 25.4))
+    assert drawing.KNOB_TRIAL_MOVE_TEXT == ".0006 ALONG AND .0006 ACROSS"
+    lowest = knob_setting.setting_radius(-1, toward) - error
+    assert lowest == pytest.approx(knob_setting.TRIAL_LOWEST_CENTRE_MM)
+    assert lower < lowest and not knob_setting.binds(lowest)
+    # The .0008/.0006 pair the old rule printed would bind there.
+    old = (0.0008 * 25.4, 0.0006 * 25.4)
+    assert knob_setting.binds(knob_setting.setting_radius(-1, old) - error)
+    highest = aim + error
+    assert highest == pytest.approx(knob_setting.TRIAL_HIGHEST_CENTRE_MM) and highest < upper
+    # C3's gate at the top, every gate at the bottom.
+    assert round(knob_setting.TRIAL_HIGHEST_MESH.runout_contact_ratio_min, 3) >= 1.1
+    assert not knob_setting.TRIAL_LOWEST_MESH.failures()
     # The view marks the band and the two settings, at the places the model
     # owns; only the settings are references.
     assert knob_setting.DRAWING_DIMENSIONS == {
@@ -903,6 +936,11 @@ def test_the_jig_bored_k_lands_in_the_set_band_with_margin_at_both_ends() -> Non
     tangential_err = dro + 2.0 * centring + 2.0 * centring * lever
     assert centring == pytest.approx(0.0005 * 25.4 / 2.0)
     assert radial_err == pytest.approx(0.0199, abs=1e-4)
+    # The spec charges the same budget against DETAIL K's limits for every
+    # setting the trial reaches (C1; Codjiflo r2 on #3539).
+    assert knob_setting.DRO_ACCURACY_MM == pytest.approx(accuracy)
+    assert knob_setting.TRUE_SWEEP_IN == drawing.KNOB_SETTING_SWEEP_IN
+    assert knob_setting.TRUE_RADIAL_ERROR_MM == pytest.approx(radial_err)
     # The printed values are the display's own counts: the operator dials
     # exactly what DETAIL K prints.
     # The 5 um scale's inch-mode count, .0002.
@@ -1489,24 +1527,71 @@ def test_the_knob_stack_goes_on_front_to_rear() -> None:
     assert positions == sorted(positions)
 
 
-def test_the_pivot_screw_is_unlocked_and_the_spacer_pressed_as_made() -> None:
+def test_the_pivot_screw_is_unlocked_and_the_spacer_bonded_as_made() -> None:
     """MHA-PD-VN-57 runs through the bar, its tip faced below the front face,
     and carries no lock (owner ruling U-MHA-PD-VN-57-no-lock, #1194): no
     stake, no threadlocker. The seat is shown in the pivot view. R9-6 never
-    faces MHA-PD-20.  R9-71: the spacer is pressed on the shoulder flush with
-    its end, and the MHA-PD-VN-63 spring under the head holds the arm on it."""
+    faces MHA-PD-20.  Owner ruling 2026-11-24, fit audit question 6: the
+    spacer is bonded on the shoulder flush with its end (rule 23: the grade,
+    the degrease, how it is held square while it cures, the compound kept
+    off the running fit, and the cure before load), and the MHA-PD-VN-63
+    spring under the head holds the arm on it."""
     body = _step_body("hanger-pivoted")
     window = steps.inch_window(pivot_screw.TIP_RECESS, 3, " TO ")
     assert "THREADLOCKER" not in body
     assert "STAKE" not in body
     assert "BLIND" not in body
-    assert f"{window} BELOW THE BAR'S FRONT FACE" in body
+    assert f"{window} BELOW THE BAR'S FRONT FACE" in _step_body("arm-plate-screws-cut")
     assert "ANOTHER SCREW" not in body
     assert drawing.PIVOT_VIEW_REF in body
     assert _number("pd-vn-transgear-pivot-screw") in body
     assert _number("pd-transgear-pivot-spacer") in body
     assert _number("pd-vn-transgear-pivot-spring") in body
     assert "AS MADE" in body
+    texts = drawing._step_text(operating_domain=_unit_operating_domain())["hanger-pivoted"]
+    assert len(texts) == 24
+    assert "PRESS THE" not in body and "REAMED" not in body
+    assert "SLIDES ON BY HAND" not in body
+    assert texts[1] == (
+        "FIT THE ARM, ITS BORE AND FRONT FACE COATED WITH PASTE WAX, ON IT FROM THE REAR."
+    )
+    # The dry trial proves the bought screw's shoulder end and the spacer's
+    # bore square enough before anything is bonded; its failure takes the
+    # step's one renewal, then the inspection (Codjiflo r1 on #3487).
+    assert texts[2].startswith("CHECK, DRY: ")
+    assert texts[2].endswith(
+        "THE SPACER SHOWS NO DAYLIGHT ON THE PLATE AND THE ARM SWINGS FREELY."
+    )
+    assert "FLAT PLATE COVERED WITH POLYETHYLENE FILM, WHOSE HOLE CLEARS" in texts[2]
+    assert "WAXED" not in body
+    assert texts[3] == (
+        f"IF EITHER FAILS, DO {drawing.sub_step('hanger-pivoted', 20)}-"
+        f"{drawing.sub_step('hanger-pivoted', 23)}."
+    )
+    assert texts[4] == "LIFT THE SPACER OFF THE SHOULDER."
+    # One action per sub-step (machinist review 20261124T013305458Z, rule
+    # 22): degrease, coat, push on, wipe, clamp; the screw is seated only
+    # when the bond has cured.
+    assert texts[5].startswith("DEGREASE THE SPACER'S BORE")
+    bond = texts[drawing.PIVOT_SPACER_BOND_SUB_STEP]
+    assert bond == "COAT THE SPACER'S BORE WITH LOCTITE 638, NOT THE SHOULDER."
+    assert texts[7] == (
+        "PUSH THE SPACER ON THE SHOULDER UNTIL ITS FRONT FACE IS FLUSH WITH THE SHOULDER'S END."
+    )
+    assert texts[8] == "WIPE THE SPACER'S FRONT FACE CLEAN."
+    clamp = texts[9]
+    assert clamp.startswith("AT ONCE, CLAMP THE SCREW DOWN")
+    assert clamp.endswith(f"BOTH ON THE PLATE OF {drawing.sub_step('hanger-pivoted', 2)}.")
+    assert texts[10].startswith(
+        f"WHEN THE BOND HAS CURED {drawing.PIVOT_SPACER_BOND_CURE_H} H, SEAT THE SCREW"
+    )
+    assert not any(" AND LET THE BOND CURE" in text for text in texts)
+    assert all(
+        len(lines) <= 6 for lines in drawing._wrapped_sub_steps("hanger-pivoted", texts)
+    )
+    import pd_transgear_pivot_spacer_spec as spacer_spec
+
+    assert spacer_spec.BOND_GAP[1] <= spacer_spec.LOCTITE_638_GAP_MAX
     # No step shortens the spacer.
     assert not re.search(r"\bFACE (IT|THE SPACER|TO)\b", _unit_step_notes().fitup_steps)
 
@@ -1748,49 +1833,94 @@ def test_the_knob_bush_is_pressed_and_reamed_before_the_plate_is_set() -> None:
     texts = drawing._step_text(operating_domain=_unit_operating_domain())["pin-pressed"]
     bush = _number("pd-transgear-knob-bush")
     plate = _number("pd-transgear-arm-plate")
+    # Owner ruling 2026-11-24, fit audit question 4: the pin is bonded
+    # first, one action per sub-step, its check and remedy apart (rule 22).
+    assert drawing.PIN_BOND_COMPOUND == cluster_pin.RETAINING_COMPOUND
+    bond = drawing.PIN_BOND_SUB_STEP
+    assert texts[bond].startswith(f"COAT THE SHANK UNDER THE HEAD, NOT THE HOLE, WITH {drawing.PIN_BOND_COMPOUND}")
     assert texts[2] == (
+        "PUSH THE PIN THROUGH THE HOLE FROM THE REAR, TURNING IT, UNTIL ITS HEAD SEATS ON THE ARM."
+    )
+    assert texts[4] == "CLAMP THE HEAD ON THE ARM'S REAR FACE."
+    assert texts[5] == (
+        f"LET THE BOND CURE {drawing.PIN_BOND_CURE_H} H BEFORE ANYTHING IS FITTED ON "
+        "THE PIN."
+    )
+    assert texts[6].startswith("CHECK: ") and texts[7] == "IF IT MOVES, PULL THE PIN."
+    assert texts[8] == (
+        "IF PULLED, CLEAN THE PIN AND THE HOLE AND REPEAT "
+        f"{drawing.sub_step('pin-pressed', 0)}-{drawing.sub_step('pin-pressed', 6)}."
+    )
+    assert not any("PRESS THE" in text and "PIN" in text.split("BUSH")[0] for text in texts[:9])
+    note = drawing.BOM_EXPENDABLES_NOTE.replace("\n", " ")
+    # One consumables statement per compound names every step that uses it.
+    assert (
+        "LOCTITE 638 AT "
+        + ", ".join(drawing.sub_step(key, index) for key, index in drawing.LOCTITE_638_SUB_STEPS)
+        + f"; CURE {drawing.PIN_BOND_CURE_H} H."
+    ) in note
+    assert (drawing.sub_step("pin-pressed", bond), drawing.sub_step(
+        "hanger-pivoted", drawing.PIVOT_SPACER_BOND_SUB_STEP
+    )) == ("11B", "15G")
+    assert (
+        drawing.PIN_BOND_CURE_H
+        == drawing.PIVOT_SPACER_BOND_CURE_H
+        == drawing.KNOB_CUP_BOND_CURE_H
+    )
+    all_steps = drawing._step_text(operating_domain=_unit_operating_domain())
+    # Every step that names the compound, or sends a part to DETAIL H's bond
+    # note, is in the consumables rows; nothing else is.
+    assert {
+        drawing.sub_step(key, index)
+        for key, rows in all_steps.items()
+        for index, row in enumerate(rows)
+        if "LOCTITE" in row or "BOND IT PER THE BOND NOTE" in row
+    } == set(re.findall(r"\b\d+[A-Z]\b", note[note.index("LOCTITE") :]))
+    assert texts[9] == (
         f"PRESS THE {bush} BUSH, STUB FIRST, INTO THE {plate} PLATE FROM ITS FRONT "
         f"FACE (FACE A ON {plate}) UNTIL ITS SHOULDER SEATS."
     )
     # Turned to the measured hole, a bush that slips is undersize (#2425);
     # one action per sub-step (machinist review r10).
-    assert texts[3] == (
-        f"IF IT SLIDES IN BY HAND, REPEAT {drawing.sub_step('pin-pressed', 2)} WITH A "
+    assert texts[10] == (
+        f"IF IT SLIDES IN BY HAND, REPEAT {drawing.sub_step('pin-pressed', 9)} WITH A "
         f"NEW {bush} BUSH TURNED TO THE PLATE'S MEASURED HOLE."
     )
-    feeler = disc.inch_text(knob_bush.SHOULDER_SEAT_GAP_MAX, 4)
-    assert feeler == ".0005"
+    # A leaf of the shop's set at three places, the coarsest that closes the
+    # collar-to-disc air (machinist review 20261124T013305458Z, rule 4).
+    feeler = disc.inch_text(knob_bush.SHOULDER_SEAT_GAP_MAX, 3)
+    assert feeler == ".002"
     # Both acceptances cite their setting-table rows (machinist review r13).
-    assert texts[4] == (
+    assert texts[11] == (
         f"CHECK: A {feeler} FEELER DOES NOT ENTER UNDER THE SHOULDER "
         f"{drawing.row_cite('bush-seated')}."
     )
     # A check and its remedy are separate sub-steps (rule 22).
     # A first failure is pressed home and checked again; a second renews the
     # pair (codjiflo review round 2).
-    assert texts[5] == (
+    assert texts[12] == (
         f"IF IT ENTERS, PRESS AGAIN TO THE SHOULDER AND REPEAT "
-        f"{drawing.sub_step('pin-pressed', 4)}."
+        f"{drawing.sub_step('pin-pressed', 11)}."
     )
-    assert texts[6] == (
-        f"IF IT STILL ENTERS, REPEAT FROM {drawing.sub_step('pin-pressed', 2)} WITH A "
+    assert texts[13] == (
+        f"IF IT STILL ENTERS, REPEAT FROM {drawing.sub_step('pin-pressed', 9)} WITH A "
         f"NEW {plate} PLATE AND {bush} BUSH."
     )
-    # The in-place ream names its mate, fit and gauge (rules 4 and 22).
-    assert texts[7].endswith(
+    # The in-place ream names its mate and fit; it prints the reamer's size
+    # and no band, and the journal is turned to the bore (rule 4, fit audit
+    # 2026-11-23).
+    assert texts[14].endswith(
         f"THRU, A RUNNING FIT ON THE {_number('pd-transgear-knob-shaft')} JOURNAL, "
-        f"CHECKED WITH PIN GAUGES {drawing.row_cite('bush-reamed')}."
+        f"WHICH IS TURNED TO IT {drawing.row_cite('bush-reamed')}."
     )
-    ream = steps.inch_window(
-        tuple(knob_bush.BORE_DIA + limit for limit in knob_bush.BORE_DIA_LIMITS), 4
-    )
-    assert ream == ".2490-.2495"
-    assert texts[7].startswith(f"REAM THE BUSH'S BORE \u00d8{ream} THRU, ")
-    assert len(texts) == 8
+    ream = steps.inch_text(knob_bush.BORE_DIA, 4)
+    assert ream == ".2490"
+    assert texts[14].startswith(f"REAM THE BUSH'S BORE \u00d8{ream} THRU, ")
+    assert len(texts) == 15
     assert steps.step_number("pin-pressed") < steps.step_number("arm-plate-located")
     located = _step_body("arm-plate-located")
     assert f"{bush} KNOB BORE {drawing.KNOB_BORE_LETTER} IS STILL TRUE" in located
-    assert f"INTO THE {bush} BUSH'S BORE FROM THE FRONT" in located
+    assert f"INTO THE {bush} BUSH FROM THE FRONT" in located
     assert drawing.KNOB_SETTING_LEGEND[drawing.KNOB_BORE_LETTER] == f"{bush} KNOB BORE"
     assert "pd-transgear-knob-bush-1" in drawing.KNOB_SETTING_INSTANCES
     # Every later renewal of the plate renews its pressed bush.
@@ -1852,7 +1982,8 @@ def test_the_rear_cup_is_faced_bonded_and_screwed_and_the_nut_seats_on_the_faced
         f"{s('knob-stack-fitted', 14)}-{s('knob-stack-fitted', 15)}."
     )
     every = drawing._step_text(operating_domain=_unit_operating_domain())
-    assert sum(cited in row for rows in every.values() for row in rows) == 2
+    # Steps 28 and 33, and the rear-faced collar's renewal (29).
+    assert sum(cited in row for rows in every.values() for row in rows) == 3
     assert sum("250\u00b0C" in row for rows in every.values() for row in rows) == 1
     for word in ("MATCH-DRILL", "PIN (PRESS FIT)", "FEELER AT THE PLATE"):
         assert word not in knob, word
@@ -1860,9 +1991,10 @@ def test_the_rear_cup_is_faced_bonded_and_screwed_and_the_nut_seats_on_the_faced
     assert "cup-pin-hole" not in drawing.SETTING_ROW_KEYS
     note = drawing.BOM_EXPENDABLES_NOTE.replace("\n", " ")
     assert (
-        f"{s('knob-stack-fitted', drawing.KNOB_CUP_BOND_SUB_STEP)} USES LOCTITE 641; "
+        f"LOCTITE 641 AT {s('knob-stack-fitted', drawing.KNOB_CUP_BOND_SUB_STEP)}; "
         f"CURE {drawing.KNOB_CUP_BOND_CURE_H} H."
     ) in note
+    assert drawing.PIVOT_SPACER_BOND_CURE_H == drawing.KNOB_CUP_BOND_CURE_H
     # Each sub-step prints in at most six lines (rule 22).
     assert all(
         len(lines) <= 6 for lines in drawing._wrapped_sub_steps("knob-stack-fitted", texts)
@@ -1963,18 +2095,30 @@ def test_the_cluster_float_and_pin_bands_print_their_spec_ranges() -> None:
         assert f"{steps.inch_window(band, 3, ' TO ')} PROUD" in _step_body(key)
 
 
-def test_an_over_pressed_latch_dowel_is_remade_with_its_arm() -> None:
+def test_an_over_pressed_or_slipping_latch_dowel_is_remade_with_its_arm() -> None:
     """#3124 / Codjiflo #3127: the dowel is pressed to height and the press
     is permanent (MHA-PD-18 RV-03), so a dowel set under the window stays in
-    the arm it scraps; the remedy remakes both, as the later restarts do."""
-    body = " ".join(_step_body("latch-pin-pressed").split())
+    the arm it scraps; the remedy remakes both, as the later restarts do.
+    A dowel that slides into the reamed hole by hand is a slip fit of
+    unknown clearance in an arm that does not yet carry DETAIL K's
+    jig-boring (#2497 allows compound only after it), so it remakes both
+    too, as the arm's traveler rejects the arm (Codjiflo r2 on #3486).  The
+    facts are asserted, not the wording (AGENTS.md, assembly data)."""
+    texts = drawing._step_text(operating_domain=_unit_operating_domain())
+    press, *remedies = (" ".join(row.split()) for row in texts["latch-pin-pressed"])
     low = steps.inch_text(drawing.setting_details.LATCH_PROUD_BAND[0], 3)
-    assert (
-        f"IF THE DOWEL SLIDES IN BY HAND OR READS UNDER {low}, MAKE A NEW "
-        f"{_number('pd-transgear-arm')} ARM AND "
-        f"{_number('pd-vn-transgear-latch-pin')} DOWEL AND REPEAT FROM STEP "
-        f"{steps.step_number('latch-pin-pressed')}."
-    ) in body
+    assert drawing.detail_cite("latch-pin-pressed") in press
+    remedy = " ".join(remedies)
+    for fact in (
+        "SLIDES IN BY HAND",
+        f"UNDER {low}",
+        f"NEW {_number('pd-transgear-arm')} ARM",
+        f"{_number('pd-vn-transgear-latch-pin')} DOWEL",
+        f"REPEAT FROM STEP {steps.step_number('latch-pin-pressed')}",
+    ):
+        assert fact in remedy, fact
+    assert "BOND" not in remedy and "LOCTITE" not in remedy
+    assert ("latch-pin-pressed", 1) not in drawing.BOND_NOTE_SUB_STEPS
 
 
 def test_the_cluster_is_shimmed_to_view_e_after_it_is_hung() -> None:
@@ -2700,47 +2844,50 @@ def test_every_screwed_setting_has_a_holding_check() -> None:
     assert plate[4] == "CHECK: ROCKED BY HAND, THE PLATE HAS NO SHAKE AND NO DAYLIGHT."
     assert plate[5] == "IF IT SHAKES OR SHOWS DAYLIGHT, DO 13U AND REPEAT 14E."
     pivot = texts["hanger-pivoted"]
-    assert pivot[5].startswith("SEAT THE SCREW, ITS SHOULDER TIGHT ON THE BAR'S BACK FACE")
-    assert pivot[6] == "CHECK: NO DAYLIGHT BETWEEN THE SPACER AND THE BAR'S BACK FACE."
-    assert pivot[7] == "CHECK: A HEX KEY BY HAND DOES NOT LOOSEN THE SCREW."
-    assert pivot[8] == "CHECK: RAISED AND RELEASED, THE ARM FALLS FREELY."
-    assert pivot[9] == "IF ALL THREE CHECKS PASS, SKIP 15L-15W."
-    # The remedy takes the captured arm off before anything is cleaned.
-    assert pivot[10].startswith("UNSCREW ") and pivot[11] == "LIFT THE ARM OFF."
-    assert pivot[12].startswith("FLUSH OIL INTO THE ARM'S BORE")
-    assert "BAR BACK FACE" in pivot[13]
-    assert pivot[14] == "REPEAT 15F-15J."
-    assert pivot[15] == "IF ALL THREE CHECKS NOW PASS, SKIP 15S-15W."
+    assert pivot[10].endswith("SEAT THE SCREW, ITS SHOULDER TIGHT ON THE BAR'S BACK FACE "
+                              f"({drawing.PIVOT_VIEW_REF}).")
+    assert pivot[11] == "CHECK: NO DAYLIGHT BETWEEN THE SPACER AND THE BAR'S BACK FACE."
+    assert pivot[12] == "CHECK: A HEX KEY BY HAND DOES NOT LOOSEN THE SCREW."
+    assert pivot[13] == "CHECK: RAISED AND RELEASED, THE ARM FALLS FREELY."
+    assert pivot[14] == "IF ALL THREE CHECKS PASS, SKIP 15R-15Z."
+    # The remedy takes the screw out with the arm captive on it (the bonded
+    # spacer keeps the arm on the shoulder) before anything is cleaned.
+    assert pivot[15].startswith("UNSCREW ")
+    assert pivot[16] == "LIFT IT OUT, THE ARM AND THE SPACER ON IT."
+    assert pivot[17].startswith("FLUSH OIL INTO THE ARM'S BORE")
+    assert "BAR BACK FACE" in pivot[18]
+    # One repeat of the reseat, its checks, their skip and the strip: checks
+    # that pass leave the step, checks that fail leave the arm off.
+    assert pivot[19] == "REPEAT 15L-15S ONCE."
     # #3107: the screw and spacer are renewed once; a second failure sends
     # the bar and the arm to their sheets, and every outcome has a route: a
     # bar outside (with the arm if it is outside too), an arm outside or all
     # inside, one action a step (rule 22).
     bar = _number("pd-support-bar")
-    assert pivot[16:20] == (
-        "DO 15L-15M.",
-        f"IF NOT YET RENEWED, REPEAT FROM 15A WITH A NEW "
+    assert pivot[20:23] == (
+        f"IF NOT YET RENEWED, REPEAT FROM 14G WITH A NEW "
         f"{_number('pd-vn-transgear-pivot-screw')} SCREW AND "
         f"{_number('pd-transgear-pivot-spacer')} SPACER.",
         f"IF ALREADY RENEWED, INSPECT THE {bar} BAR'S TAP AND BACK FACE AND THE "
         f"{_number('pd-transgear-arm')} ARM'S BORE TO THEIR SHEETS.",
         f"FOR A BAR FOUND OUTSIDE, MAKE A NEW {bar} BAR AND REBUILD FROM STEP "
-        f"{steps.step_number('bar-clamped')}, WITH 15W'S PARTS IF THE ARM IS ALSO OUTSIDE.",
+        f"{steps.step_number('bar-clamped')}, WITH 15Z'S PARTS IF THE ARM IS ALSO OUTSIDE.",
     )
-    assert pivot[20].startswith(
+    assert pivot[23].startswith(
         "FOR AN ARM FOUND OUTSIDE, OR IF ALL ARE INSIDE, REPEAT FROM STEP "
         f"{steps.step_number('latch-pin-pressed')} WITH A NEW {_number('pd-transgear-arm')} ARM,"
     )
     # Only the parts fitted by step 15 are renewed (Codjiflo P3 on f92995b8e6).
     for later in ("pd-transgear-knob-shaft", "pd-transgear-knob-cup", "pd-latch-hook"):
-        assert _number(later) not in pivot[20]
-    assert len(pivot) == 21
+        assert _number(later) not in pivot[23]
+    assert len(pivot) == 24
     assert not any("STAKE" in line for line in pivot)
     accepted = texts["fitup-accepted"]
     # From 33 the reseat runs; a repeat failure takes the knob stack off
     # (28G) and rebuilds the arm as 28R-28V, whose step 15 carries the
     # renewal and the inspection (Codjiflo P2 on e8b4e199aa).
-    assert "IF 33F FAILS, ARM UNLATCHED, DO 15L-15Q." in accepted
-    assert "IF A 15G-15J CHECK THEN FAILS, DO 28G AND 28R-28V." in accepted
+    assert "IF 33F FAILS, ARM UNLATCHED, DO 15R-15U AND 15L-15P." in accepted
+    assert "IF A 15M-15P CHECK THEN FAILS, DO 28G AND 28R-28V." in accepted
     assert texts["fitup-mesh-remedied"][6].startswith("REMOVE THE ")
     assert texts["fitup-mesh-remedied"][15].startswith(
         "FOR A FAULT ALL ROUND (ARM SETTING)"
@@ -2802,7 +2949,25 @@ def test_every_failure_branch_has_a_pass_exit() -> None:
         f"IF {s('arm-plate-located', 11)} AND {s('arm-plate-located', 12)} PASSED, GO TO STEP "
         f"{steps.step_number('arm-plate-fitted')}."
     )
-    assert located[17].startswith("IF NOT, INSPECT THE ")
+    # Owner ruling 2026-11-24, audit part 2 question C1: the trial's move
+    # before a part is inspected, toward S only (no away move is left inside
+    # the limits once TRUE's error is charged); a tight spot or no shake
+    # takes the inspection (Codjiflo r2 on #3539).
+    assert located[17] == (
+        f"IF ONLY {s('arm-plate-located', 12)} FAILED, ON SHAKE OVER .008, AT "
+        f"{drawing.KNOB_SETTING_VIEW_NAME}'S SETTING, MOVE THE TABLE "
+        f"{drawing.KNOB_TRIAL_MOVE_TEXT} TOWARD S, THEN FROM {s('arm-plate-located', 5)}."
+    )
+    assert "AWAY FROM S" not in located[17]
+    # The re-indication reads N at the table's setting, DETAIL K's or as
+    # moved, so a moved plate reaches the pass exit (Codjiflo r2 on #3539).
+    assert located[14].endswith(
+        f"KNOB BORE {drawing.KNOB_BORE_LETTER} AT THE TABLE'S SETTING."
+    )
+    # Every return to the tap (12H's re-tap, the move, a part's retrial)
+    # frees the plate first.
+    assert located[5].startswith("SLACKEN THE CLAMPS AND TAP THE PLATE UNTIL KNOB BORE")
+    assert located[18].startswith("IF NOT, INSPECT THE ")
 
 
 def test_the_lock_taps_are_the_even_taps_counted_from_either_end() -> None:
@@ -3178,8 +3343,9 @@ def test_the_reducer_is_clocked_once_with_an_ordinary_limit() -> None:
 
 def test_the_reducer_dial_window_is_what_a_build_inside_its_drawings_reads() -> None:
     """Pressed together, the mesh stands closer than the axes by half of both
-    running clearances; the window takes every reading that leaves, rounded
-    outward one division at most, and its floor is a readable positive shake."""
+    running clearances; the ceiling takes the loosest reading, rounded
+    outward one division at most, and the tightest mesh still shakes: no
+    floor prints (owner ruling 2026-11-24, audit part 2 question C2)."""
     journal = (
         min(knob_bush.BORE_DIA_LIMITS) - max(knob_shaft.JOURNAL_DIA_BAND),
         max(knob_bush.BORE_DIA_LIMITS) - min(knob_shaft.JOURNAL_DIA_BAND),
@@ -3191,7 +3357,8 @@ def test_the_reducer_dial_window_is_what_a_build_inside_its_drawings_reads() -> 
     pitch = disc.PITCH_DIA / 2.0
     readings = [
         backlash * tip / pitch
-        for centre in disc.CENTRE_DISTANCE_WINDOW
+        # C1: the trial's one move toward S reaches below the set band.
+        for centre in (drawing.knob_setting.TRIAL_LOWEST_CENTRE_MM, *disc.CENTRE_DISTANCE_WINDOW)
         for closure in closures
         for backlash in drawing.mesh_check.reducer_mesh(centre - closure).backlash_mm
         for tip in tips
@@ -3200,10 +3367,11 @@ def test_the_reducer_dial_window_is_what_a_build_inside_its_drawings_reads() -> 
     high = drawing.REDUCER_SHAKE_MAX_MM
     assert high - step < max(readings) <= high
     assert high / step == pytest.approx(round(high / step))
-    # "Visibly": the tightest shake moves the dial at least half a division.
-    assert min(readings) >= step / 2.0
+    # No bind: the tightest shake is positive; the needle moving shows it.
+    assert min(readings) > 0.0
+    assert drawing.REDUCER_SHAKE_MIN_MM == pytest.approx(min(readings))
     assert drawing.REDUCER_BACKLASH_DIAL_TEXT == (
-        f"{disc.inch_text(step / 2.0, 4)} TO {disc.inch_text(high, 3)}"
+        f"(THE NEEDLE MOVES), {disc.inch_text(high, 3)} MAX"
     )
 
 
@@ -3246,13 +3414,13 @@ def test_the_reducer_mesh_is_tried_before_the_plate_is_doweled() -> None:
     assert steps.step_number("disc-taps-transferred") < steps.step_number(
         "latch-pin-pressed"
     )
-    # The trial only reads the setting: the plate is tapped to its DETAIL K
-    # setting before it and never moved to chase a reading, so the S to N
-    # band stays the limit; S and N are proven unmoved before the pilots.
+    # The plate is tapped to its DETAIL K setting before the trial; the trial
+    # may move it once, within DETAIL K's limits (owner ruling 2026-11-24,
+    # audit part 2 question C1); S and N are proven unmoved before the pilots.
     assert located.rindex("TAP THE PLATE") < trial
     recheck = located[lifted:]
     assert "S READS TRUE AT THE DRO'S ZERO" in recheck
-    assert f"KNOB BORE {drawing.KNOB_BORE_LETTER} AT ITS SETTINGS" in recheck
+    assert f"KNOB BORE {drawing.KNOB_BORE_LETTER} AT THE TABLE'S SETTING" in recheck
     assert "CLAMP THE ARM FRONT UP ON PARALLELS ON THE MILL TABLE" in located
     # The setting is made where the mesh is: S is indicated at the disc's height.
     assert "PIN BORE S, AT THE HEIGHT THE DISC WILL RUN" in located
@@ -3264,38 +3432,47 @@ def test_the_reducer_mesh_is_tried_before_the_plate_is_doweled() -> None:
         f"{_number('pd-transgear-feed-pinion')} BORES TO THEIR SHEETS."
         in located
     )
-    # #2629: the inspection opens on the trial's pass exit.
+    # #2629: the trial's pass exit, then its one move, then the inspection.
     assert (
         f"IF {drawing.sub_step('arm-plate-located', 11)} AND "
         f"{drawing.sub_step('arm-plate-located', 12)} PASSED, GO TO STEP "
-        f"{steps.step_number('arm-plate-fitted')}. IF NOT, INSPECT" in located
+        f"{steps.step_number('arm-plate-fitted')}." in located
     )
+    assert located.index("PASSED, GO TO STEP") < located.index(
+        f"MOVE THE TABLE {drawing.KNOB_TRIAL_MOVE_TEXT}"
+    ) < located.index("IF NOT, INSPECT")
     # The restart follows the part, one sub-step each: a new plate is set
-    # again from 12A, a new disc or sleeve is centred again before the trial
-    # is repeated, a new shaft only re-meshes.
-    trial = drawing.sub_step("arm-plate-located", 9)
+    # again from 12A, a new disc or sleeve is centred again; a new disc,
+    # sleeve or shaft is tried with the table back at DETAIL K's setting,
+    # never at a move made for the part it replaced (Codjiflo r2 on #3539).
+    retrial = f"REPEAT FROM {drawing.sub_step('arm-plate-located', 4)}."
+    located_texts = drawing._step_text(operating_domain=_unit_operating_domain())[
+        "arm-plate-located"
+    ]
+    assert located_texts[4].startswith(
+        f"SET THE TABLE TO {drawing.KNOB_SETTING_VIEW_NAME}'S "
+    )
     for remedy in (
         f"REPLACE A {_number('pd-transgear-knob-bush')} BUSH FOUND OUTSIDE WITH A NEW BUSH AND "
-        f"{_number('pd-transgear-arm-plate')} PLATE PER {drawing.sub_step('pin-pressed', 2)}-"
-        f"{drawing.sub_step('pin-pressed', 7)} AND REPEAT FROM "
+        f"{_number('pd-transgear-arm-plate')} PLATE PER {drawing.sub_step('pin-pressed', 9)}-"
+        f"{drawing.sub_step('pin-pressed', 14)} AND REPEAT FROM "
         f"{drawing.sub_step('arm-plate-located', 0)}.",
         "REPLACE A DISC FOUND OUTSIDE THROUGH "
         f"{drawing.sub_step('disc-cluster-assembled', 2)}-"
         f"{drawing.sub_step('disc-taps-transferred', 17)} ON THE SAME HUB, ITS "
-        f"{_number('pd-vn-transgear-hub-key-pin')} PIN RIDING THE FLAT, "
-        f"AND REPEAT FROM {trial}.",
-        "SLIDE THE HUB AND DISC AS ONE OFF A "
-        f"{_number('pd-transgear-feed-pinion')} FOUND OUTSIDE, THE PIN RIDING THE FLAT.",
-        "WITH THEM OFF AND THE DISC SCREWS SLACKENED, REPEAT "
+        f"{_number('pd-vn-transgear-hub-key-pin')} PIN RIDING THE FLAT, AND {retrial}",
+        f"REPLACE A {_number('pd-transgear-feed-pinion')} FOUND OUTSIDE: SLIDE THE HUB "
+        "AND DISC OFF IT AS ONE, THE PIN RIDING THE FLAT, THE DISC SCREWS "
+        "SLACKENED, REPEAT "
         f"{drawing.sub_step('disc-cluster-assembled', 3)}-"
         f"{drawing.sub_step('disc-cluster-assembled', 4)}, "
         f"{drawing.sub_step('disc-taps-transferred', 0)}-"
         f"{drawing.sub_step('disc-taps-transferred', 2)}, "
         f"{drawing.sub_step('disc-taps-transferred', 9)} AND "
         f"{drawing.sub_step('disc-taps-transferred', 12)}-"
-        f"{drawing.sub_step('disc-taps-transferred', 17)} ON A NEW "
-        f"{_number('pd-transgear-feed-pinion')}, THEN FROM {trial}.",
-        f"REPLACE A {_number('pd-transgear-knob-shaft')} FOUND OUTSIDE AND REPEAT FROM {trial}.",
+        f"{drawing.sub_step('disc-taps-transferred', 17)} ON A NEW ONE, THEN FROM "
+        f"{drawing.sub_step('arm-plate-located', 4)}.",
+        f"REPLACE A {_number('pd-transgear-knob-shaft')} FOUND OUTSIDE AND {retrial}",
     ):
         assert remedy in located
     assert f"IF ALL ARE INSIDE, UNCLAMP AND REPEAT FROM STEP {steps.step_number('latch-pin-pressed')}" in located
@@ -3335,7 +3512,7 @@ def test_the_reducer_mesh_is_tried_before_the_plate_is_doweled() -> None:
     # The turn only finds the period; nothing on the rebuild is staked.
     assert "TURN THE DISC ONE TURN BY THE COLLAR, NOTING WHERE IT FAULTS." in pose
     assert "STAKING" not in pose
-    assert f"DO {drawing.sub_step('hanger-pivoted', 10)}-{drawing.sub_step('hanger-pivoted', 11)}." in pose[rebuild:]
+    assert f"DO {drawing.sub_step('hanger-pivoted', 15)}-{drawing.sub_step('hanger-pivoted', 16)}." in pose[rebuild:]
     # A new disc takes new screws, cut again to its own rear face, on the
     # same hub, its key pin left in (#2409).
     assert (
@@ -3392,12 +3569,66 @@ def test_the_hub_key_pin_and_collar_flat_pin_are_fitted_and_kept() -> None:
     pressed = texts["collar-pins-pressed"]
     pin = _number("pd-vn-transgear-collar-flat-pin")
     assert pin == collar.FLAT_PIN_NUMBER
-    assert any(
-        row.startswith(f"PRESS THE {pin} PIN")
-        and row.endswith("COLLAR AND PIN ARE ONE PERMANENT UNIT.")
-        for row in pressed
-    )
+    # The pin is pressed on the collar's traveler (MHA-PD-08's D-flat is
+    # milled to it before the shaft is first used); the step checks it.
+    assert not any(row.startswith(f"PRESS THE {pin} PIN") for row in pressed)
+    check = next(row for row in pressed if row.startswith(f"CHECK: THE {pin} PIN"))
+    assert "DOES NOT MOVE BY HAND" in check
+    assert check.endswith("COLLAR AND PIN ARE ONE PERMANENT UNIT.")
+    assert pressed[pressed.index(check) + 1].startswith("IF THE PIN MOVES, ")
+    from pathlib import Path
+
+    plan = (
+        Path(__file__).resolve().parent.parent
+        / "process" / "pd_transgear_drive_collar" / "plan.toml"
+    ).read_text(encoding="utf-8")
+    assert f"Press the {pin} pin into the flat pin's hole" in plan
     assert len(pressed) <= len(drawing.SUB_STEP_LETTERS)
+    # A dowel that slides in by hand is rule 23's slip fit: the collar is
+    # renewed, never bonded (the reamed holes print no band, so no bonded
+    # clearance could be stated: Codjiflo P2 on #3485).  The three
+    # wheels are then tried on the dowels, the drive-pin offsets'
+    # acceptance; a wheel that binds is renewed, no easing drill printed.
+    loose = [row for row in pressed if "SLIDES IN BY HAND" in row]
+    assert len(loose) == 1
+    assert all("BOND" not in row for row in pressed)
+    wheel = _number("pd-transgear-removable")
+    trial = next(row for row in pressed if row.startswith("CHECK: EACH OF THE"))
+    assert f"EACH OF THE 3 {wheel} WHEELS DROPS ON" in trial
+    at = pressed.index(trial)
+    assert pressed[at + 1] == "IF ONE WHEEL BINDS, RENEW IT."
+    step = steps.step_number("collar-pins-pressed")
+    assert pressed[at + 2] == f"IF NO WHEEL BINDS, GO TO STEP {step + 1}."
+    # Every collar renewal re-fits or renews MHA-PD-08, whose core and
+    # D-flat were made to the old collar (Codjiflo P2 on #3485): one block
+    # of single actions, which the four remedies cite.
+    shaft_no = _number("pd-transgear-knob-shaft")
+    block = pressed[at + 3 :]
+    assert len(block) == 5
+    assert block[0].endswith(f"MAKE A NEW {_number('pd-transgear-drive-collar')} COLLAR.")
+    assert block[1].startswith(f"CHECK: THE NEW COLLAR SLIDES ON THE {shaft_no} SHAFT'S CORE")
+    assert "NO SHAKE" in block[1] and "PIN ON THE D-FLAT" in block[1]
+    assert block[2].startswith("IF IT BINDS, CUT THE SHAFT'S CORE AND D-FLAT TO THE NEW COLLAR")
+    assert block[3] == f"IF IT SHAKES, MAKE A NEW {shaft_no} SHAFT TO THE NEW COLLAR."
+    assert block[4] == f"REPEAT FROM {step}A WITH THE NEW COLLAR."
+    letters = drawing.SUB_STEP_LETTERS
+    cite = f"RENEW THE COLLAR PER {step}{letters[at + 3]}-{step}{letters[len(pressed) - 1]}."
+    assert loose[0].endswith(cite)
+    assert pressed[pressed.index(check) + 1].endswith(cite)
+    assert texts["pilot-faced-to-fit"][-1].endswith(cite)
+    assert not any(
+        "MAKE A NEW" in row and "COLLAR AND REPEAT" in row
+        for rows in texts.values()
+        for row in rows
+    )
+    rear = texts["collar-rear-faced-to-fit"]
+    new = next(i for i, row in enumerate(rear) if row.endswith("MAKE A NEW " + block[0].split("MAKE A NEW ")[1]))
+    assert rear[new + 1] == f"CHECK THE NEW COLLAR ON THE SHAFT AS {step}{letters[at + 4]}."
+    assert all(row.startswith("IF IT BINDS OR SHAKES, ") for row in rear[new + 2 : new + 5])
+    assert "CUP OFF AS" in rear[new + 2] and "SHAFT OUT FORWARD" in rear[new + 3]
+    assert rear[new + 4].endswith(f"DO {step}{letters[at + 5]}-{step}{letters[at + 6]}.")
+    assert rear[-1].startswith(f"REPEAT FROM STEP {step} WITH THE NEW COLLAR")
+    assert all("RE-DRILL" not in row for row in pressed)
     # The pin rides the collar off the shaft, then (drawn apart only) leaves
     # its blind ream the way it went in, rearward out of the open end, before
     # any other move, so sheet 3's isometric can show it.

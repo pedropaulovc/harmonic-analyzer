@@ -6,7 +6,8 @@ plate, and the knob shaft's (MHA-PD-08) bearing is this turned, flanged
 steel bush pressed into it.  The hub (Ø.52) stands in front of the plate's
 face A and is the shoulder: its rear face seats on face A, its front face
 (the hub face) is the MHA-PD-15 thrust ring's seat at the chain-plane station.
-The press Ø.4375 FN2 runs from the shoulder through the plate and on behind
+The press (Ø.4385 REF, turned to the plate's measured hole) runs from the
+shoulder through the plate and on behind
 it to the rear face, the MHA-PD-16 cup's thrust face.  The bore is drilled
 .238 (letter B) with the turning and reamed .249 through after pressing, so
 the press's closing-in never reaches the running fit.
@@ -54,10 +55,16 @@ HUB_DIA_PLACES = 2
 HUB_LENGTH = 20.5486  # .809
 HUB_LENGTH_PLACES = 3
 HUB_LENGTH_BAND = FIT_LENGTH_BAND_IN
-# The press acceptance (registry process): a .0005 feeler does not enter
+# The press acceptance (registry process): a .002 feeler does not enter
 # under the shoulder.  One-sided: the hub face may stand at most this much
-# further forward of face A than HUB_LENGTH, never further back.
-SHOULDER_SEAT_GAP_MAX = 0.0127  # .0005
+# further forward of face A than HUB_LENGTH, never further back.  .002 is
+# the coarsest leaf, in .001 steps, at which the MHA-PD-22 collar's air to
+# the MHA-PD-06 disc still holds its floor (transgear_cluster_fit PS; .003
+# leaves the statistical air 0.092 mm under its 0.1016); it was .0005, a
+# check finer than .XXX with no failure to name (machinist review
+# 20261124T013305458Z, rule 4; fit audit 2026-11-23, pending owner
+# confirmation).
+SHOULDER_SEAT_GAP_MAX = 0.0508  # .002
 
 # --- Overall: hub face to rear face -------------------------------------------
 # The knob's end float runs between the thrust ring on the hub face and the
@@ -70,36 +77,61 @@ LENGTH_BAND = 0.0508  # ±.002, knob float
 # Shoulder to rear face: the stub behind face A that the cup meets (REF).
 STUB_LENGTH = LENGTH - HUB_LENGTH  # 8.4836, .334
 
-# --- Press: Ø.4375 FN2 in the plate's reamed hole -----------------------------
-# ANSI B4.1-1967 force fit class FN2, nominal 0.40-0.56 in (verified
-# 2026-11-20 against the table reprinted with ASME permission in R. L. Mott,
-# Machine Elements in Mechanical Design 4th ed., Table 13-4;
-# https://users.encs.concordia.ca/~nrskumar/Index_files/Mech344/Table-Force_and_Shrink_Fits.pdf):
-# limits of interference 0.5-1.6 thousandths, hole +0.7/-0, shaft +1.6/+1.2.
-# Both press diameters are modelled line to line at Ø.4375, as the repo's
-# other presses are; the printed limits come from the bands.
-PRESS_DIA = 11.1125  # .4375
-PRESS_DIA_BAND = (0.04064, 0.03048)  # (upper, lower): +.0016/+.0012, .4387/.4391
+# --- Press: made to the plate's reamed hole -----------------------------------
+# Fit audit 2026-11-23 (pending owner confirmation; owner, 2026-11-23: "can
+# the holes not be reamed in the first place"): MHA-PD-19's hole K is cut by
+# the over/under set's .4385 reamer and prints that size with no band; this
+# press step is turned LAST to the hole as measured, by the pilot-first
+# method (a short pilot turned on the bar's end until the plate's hole just
+# slides on it without shake, and miked; the pilot is then faced off and
+# the step turned to that reading plus the interference), so no reamer,
+# plug gauge or pin pair is bought for the hole.  The pilot only reads the
+# hole: it is gone before the press diameter is cut, so the finished step
+# is one diameter from the shoulder to the rear face, as the sheet draws it
+# (traveler review r2: a pilot left on the bush was a land the drawing does
+# not show).  The requirement is the interference, a range
+# .0011 wide; the size prints REF.  What fails if it is loose: the press is
+# the only thing that holds the knob axis K in the plate (no screw, pin or
+# bond), and K sets the reducer mesh.
+#
+# The interference keeps ANSI B4.1-1967 force fit class FN2's limits for
+# 0.40-0.56 in, 0.5-1.6 thousandths (verified 2026-11-20 against the table
+# reprinted with ASME permission in R. L. Mott, Machine Elements in
+# Mechanical Design 4th ed., Table 13-4;
+# https://users.encs.concordia.ca/~nrskumar/Index_files/Mech344/Table-Force_and_Shrink_Fits.pdf).
+# Both diameters are modelled line to line at the reamer's Ø.4385, as the
+# repo's other presses are.
+PRESS_DIA = 11.1379  # .4385 REF
 PRESS_DIA_PLACES = 4
-PRESS_HOLE_BAND = (0.01778, 0.0)  # (upper, lower): +.0007/0, MHA-PD-19's hole
-_FN2_INTERFERENCE = (0.0127, 0.04064)  # (least, greatest): .0005-.0016
-# (least, greatest) diametral interference: the smallest press in the largest
-# hole, the largest press in the smallest hole.
-PRESS_INTERFERENCE = (
-    round(PRESS_DIA_BAND[1] - PRESS_HOLE_BAND[0], 6),
-    round(PRESS_DIA_BAND[0] - PRESS_HOLE_BAND[1], 6),
-)
-if PRESS_INTERFERENCE != _FN2_INTERFERENCE:
-    raise AssertionError(
-        f"MHA-PD-28 press interference {PRESS_INTERFERENCE} mm is not FN2's "
-        f"{_FN2_INTERFERENCE}"
-    )
+# (least, greatest) diametral interference to the measured hole: the
+# requirement the sheet prints.
+PRESS_INTERFERENCE = (0.0127, 0.04064)  # .0005-.0016
+# ANALYSIS bands, not printed limits, (upper, lower): what the set reamer is
+# modelled to cut in MHA-PD-19 (REAM_H7, +.0005/0), and the press diameters
+# that fit gives over that range of holes, for the walls and the envelope.
+PRESS_HOLE_BAND = REAM_H7
+PRESS_DIA_BAND = (
+    round(max(PRESS_HOLE_BAND) + PRESS_INTERFERENCE[1], 6),
+    round(min(PRESS_HOLE_BAND) + PRESS_INTERFERENCE[0], 6),
+)  # +.0021/+.0005, .4390/.4406
+if PRESS_INTERFERENCE[1] - PRESS_INTERFERENCE[0] < 0.0254 - 1e-9:
+    raise AssertionError("MHA-PD-28's interference range is narrower than .001")
+# The smallest finished press diameter (ANALYSIS): the least interference
+# over the smallest hole the reamer is modelled to cut.
+PRESS_DIA_MIN = PRESS_DIA + min(PRESS_DIA_BAND)  # .4390
 
 # --- Bore: reamed through after pressing --------------------------------------
-# .249 REAM_H7 (#290 fit D8, the owned .2490 reamer) over the knob shaft's
-# .249 g6 journal: the plate's former running bore, the same limits.
+# The .2490 chucking reamer's size (#290 fit D8; reamer-2490, to order: not
+# on hand) under the knob shaft's journal, which is turned to this bore: the
+# plate's former running bore.  The sheet prints the reamer's size and no
+# band (drawing-guidelines rule 4; fit audit 2026-11-23, pending owner
+# confirmation).  BORE_DIA_LIMITS is the ANALYSIS band, what the reamer is
+# taken to cut, for the wall and the tilt stacks: the modelled result, not
+# printed limits.  A fit .002 looser trebles the journal's shake in the
+# bore, which the reducer mesh's backlash and the collar air's tilt term
+# (pd_cluster_air) both pay.
 BORE_DIA = 6.3246  # .249
-BORE_DIA_LIMITS = (min(REAM_H7), max(REAM_H7))  # +.0000/+.0005
+BORE_DIA_LIMITS = (min(REAM_H7), max(REAM_H7))  # analysis: +.0000/+.0005
 BORE_PLACES = 4
 # Letter B, drilled with the turning: the reamer's stock after the press has
 # closed the hole in.  The drill never cuts to the reamed size.
@@ -149,7 +181,7 @@ DRILL_RUN_OFF_DEG = 0.3
 BORE_RUN_OFF_MM = (LENGTH + LENGTH_BAND) * math.tan(math.radians(DRILL_RUN_OFF_DEG))
 _BORE_R_MAX = (BORE_DIA + max(BORE_DIA_LIMITS)) / 2.0
 _HUB_DIA_MIN = HUB_DIA - printed_band_mm(HUB_DIA_PLACES, unit=UNIT)
-_PRESS_DIA_MIN = PRESS_DIA + PRESS_DIA_BAND[1]
+_PRESS_DIA_MIN = PRESS_DIA_MIN
 _PRESS_HOLE_MAX = PRESS_DIA + PRESS_HOLE_BAND[0]
 WALLS: dict[str, tuple[float, float]] = {  # (nominal, worst)
     "press section over the bore": (
@@ -169,7 +201,7 @@ for _name, (_nominal, _worst) in WALLS.items():
             f"MHA-PD-28 {_name} wall {_worst:.4f} at the printed worst case is "
             f"under the {WALL_FLOOR} floor"
         )
-WALL_WORST = min(worst for _nominal, worst in WALLS.values())  # the press, .0686
+WALL_WORST = min(worst for _nominal, worst in WALLS.values())  # the press, .0688
 # Rule 20: under the target, the sheet states the wall as a plain fact,
 # floored to three places so it never claims more than is left.
 WALL_STATED_MIN = math.floor(WALL_WORST / 25.4 * 1000.0 + 1e-9) / 1000.0 * 25.4

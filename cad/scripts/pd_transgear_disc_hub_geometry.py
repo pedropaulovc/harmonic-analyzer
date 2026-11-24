@@ -57,21 +57,36 @@ BOLT_CIRCLE_POSITION_TOL = printed_band_mm(BOLT_CIRCLE_PLACES, unit=UNIT) / 2.0
 if len(SCREW_ANGLES_DEG) != SCREW_COUNT:
     raise AssertionError("one pattern angle per disc screw")
 
-# The retained hub spigot (R9-68): Ø.498 in the disc's bore, which it only
-# clears (the disc is centred at assembly), so it prints the turned
-# diameter's row as a plain inch step, +.000/-.001 (delegated ruling
-# 2026-11-07 L2, pending owner confirmation; it was the fleet's SHAFT_H
-# 0/-.0008 while it located the disc).  It is turned .003 under the owned
-# .501 chucking reamer that cuts the disc's bore, which keeps the disc's
-# .0030-.0045 centring clearance without a special .504 reamer (#2412).
+# The retained hub spigot (R9-68): Ø.498 REF in the disc's bore, made to fit
+# (fit audit 2026-11-23, pending owner confirmation; drawing-guidelines.md
+# rule 4, form 2): the disc's bore is reamed with the .501 chucking reamer
+# (tools.reamer-5010, to order, not owned) and prints no band, and the
+# spigot is turned last to that bore, so its size prints REF with no limits
+# and SPIGOT_CLEARANCE, the diametral clearance in the bore, is the printed
+# requirement.  It was a printed +.000/-.002 at three places (and
+# +.000/-.001 at four before, delegated ruling 2026-11-07 L2).
+# What each end of the clearance protects: under the least the disc cannot
+# be tapped central to its assembled tooth-space runout
+# (pd_rack_pinion_spec.PART_TOOTH_SPACE_RUNOUT_TIR_MM); over the greatest
+# the disc floats further off the hub's axis while its taps are spotted and
+# the taps' finished web to the disc's bore falls
+# (pd_rack_pinion_spec.TAP_TO_BORE_WALL_FINISHED), and a smaller spigot
+# thins its own wall over the hub's bore under the .071 of MHA-PD-17 RV-02
+# (delegated ruling 2026-11-12, owner review #2144; the owner's ruling of
+# 2026-11-08 kept .073) (pd_transgear_disc_hub_spec.BORE_WALLS_FINISHED).
+# SPIGOT_DIA_BAND is the ANALYSIS band, the modelled result of that fit
+# under the disc bore's own analysis band (.501-.503): .496 (the least bore
+# less the greatest clearance) to .500 (the greatest bore less the least),
+# never a printed limit; pd_rack_pinion_spec proves the pair.
 # Its length runs from the flange's
 # rear face to its end on the sleeve's step: a term of the disc cluster's
 # stack (transgear_cluster_fit) that sets the collar-to-disc air, so it
 # prints +/-.001 (the shims set the end float: owner ruling 2026-11-01,
 # #2124).
-SPIGOT_DIA = 12.6492  # .498
-SPIGOT_DIA_BAND = (0.0, -0.0254)  # (upper, lower) deviations: +.000/-.001
-SPIGOT_DIA_PLACES = 4
+SPIGOT_DIA = 12.6492  # .498 REF
+SPIGOT_CLEARANCE = (0.0762, 0.127)  # printed (least, greatest) diametral: .003-.005
+SPIGOT_DIA_BAND = (0.0508, -0.0508)  # analysis (upper, lower) deviations: +.002/-.002
+SPIGOT_DIA_PLACES = 3
 SPIGOT_LENGTH = 3.6576  # .144
 SPIGOT_LENGTH_PLACES = 3
 SPIGOT_LENGTH_BAND = FIT_LENGTH_BAND_IN

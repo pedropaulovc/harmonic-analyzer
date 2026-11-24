@@ -58,8 +58,10 @@ PLATEN_AIR_MIN = 0.03  # R9-68
 # of S closes: the step face's (.001, delegated ruling 2026-11-07 (Main),
 # owner review #2144), the hub spigot end's (.001, owner ruling 2026-11-08
 # (Pedro), #2144 item 3.2) and MHA-PD-18's pin bore S (⊥ .001, the reamed
-# row, owner ruling 2026-11-08 (Pedro), #2144 item 4.1: its axis zone at the
-# chain plane, paper_drive_arm_registration.S_AXIS_ZONE_DIAMETER_MM).  So the
+# row, owner ruling 2026-11-08 (Pedro), #2144 item 4.1) with the lean the
+# bonded MHA-PD-23 pin may take in that bore's gap (fit audit 2026-11-23):
+# its axis zone at the chain plane,
+# paper_drive_arm_registration.S_AXIS_ZONE_DIAMETER_MM.  So the
 # collar gate drops those terms; every other source still clears the same
 # floor by stack, and the platen stack and the meshes still charge them.
 ASSEMBLY_ACCEPTED_COLLAR_SOURCES = frozenset(
@@ -115,8 +117,7 @@ INDEPENDENT_TOLERANCES = frozenset(
         "MHA-PD-07 support bar depth",
         "MHA-PD-02 platen thickness",
         "MHA-PD-06 disc thickness",
-        "MHA-PD-20 spacer rear face perpendicularity",
-        "MHA-PD-20 spacer front face perpendicularity",
+        "MHA-PD-20 spacer rear face parallelism",
         "MHA-PD-06 disc rear face parallelism",
     }
 )

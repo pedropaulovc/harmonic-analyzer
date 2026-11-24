@@ -111,12 +111,8 @@ LOCAL_BAND_SOURCES: dict[tuple[str, str], tuple[str, str]] = {
         "(BLANK_DIA_BAND, FACE_WIDTH_BAND, TOOTH_THICKNESS_BAND, SPIGOT_DIA_BAND)",
         "each",
     ),
-    # _apply_neck_and_flat_limits passes each native LIMIT band in turn.
-    ("build_pd_transgear_knob_shaft", "band"): (
-        "(FRONT_RELIEF_DIA_BAND, FRONT_CORNER_RADIUS_BAND, CORE_FLAT_CUT_END_BAND,"
-        " CORE_FLAT_TOOL_END_RADIUS_BAND)",
-        "each",
-    ),
+    # _apply_neck_and_flat_limits passes its one native LIMIT band.
+    ("build_pd_transgear_knob_shaft", "band"): ("(FRONT_RELIEF_DIA_BAND,)", "each"),
     # for feature, name, band_for in _BANDED_DIMENSIONS: band = band_for(teeth), every configuration
     ("_cone_gear_readback", "band"): (
         "tuple(band_for(teeth) for _feature, _name, band_for in _BANDED_DIMENSIONS"
@@ -253,6 +249,19 @@ NOT_FIT_BANDS: dict[tuple[str, str], str] = {
 # to print or derive limits. An inverted one prints wrong limits, so they get
 # the same check as a helper-fed band.
 INDEXED_FIT_BANDS: dict[tuple[str, str], str] = {
+    # Fit audit 2026-11-23: MHA-PD-08's core and D-flat are made to fit
+    # MHA-PD-22 by feel and print as REF with no band; these are the ANALYSIS
+    # bands the collar's stacks index (the drilled bore's DRILLED HOLES row
+    # less the fitted air), tied to each other by the collar spec's asserts.
+    ("pd_transgear_drive_collar_spec", "BORE_DIA_BAND"): (
+        "DRILLED HOLES row of the #11 bore, indexed for the walls and the core's analysis band"
+    ),
+    ("pd_transgear_knob_shaft_spec", "CORE_DIA_BAND"): (
+        "analysis band of the core turned to fit the drilled bore, indexed for the stacks"
+    ),
+    ("pd_transgear_knob_shaft_spec", "CORE_FLAT_BAND"): (
+        "analysis band of the D-flat milled to fit the pressed pin's crest, indexed for the stacks"
+    ),
     # #2144 item 11.4: McMaster 91829A566 catalogue bands, indexed
     # into MIN/MAX limits that sm_gooseneck_spring_joint charges; the sheets
     # print them as untoleranced REF.
@@ -422,15 +431,27 @@ INDEXED_FIT_BANDS: dict[tuple[str, str], str] = {
         "native band); upper limit indexed for the ring's worst wall and the "
         "knob shaft's rear tooth-end bearing (RING_TRANSVERSE_FLOAT_MAX)"
     ),
+    ("pd_transgear_pivot_spacer_spec", "BORE_DIA_BAND"): (
+        "title-block drilled-hole deviations (the #12 DRILL THRU callout's row, "
+        "no native band); indexed for the bond gap on MHA-PD-VN-57's shoulder "
+        "(BOND_GAP) and the ring's worst wall"
+    ),
     ("pd_vn_transgear_latch_pin_spec", "DIA_BAND"): (
         "the pressed dowel's catalogue diameter: read by min/max for the press "
         "interference against the arm's blind hole"
     ),
     ("pd_rack_pinion_spec", "CENTRE_DISTANCE_SET_BAND"): (
-        "the reducer's S-K set band at assembly (+x/-0 fine-pitch centre "
-        "allowance), on MHA-PD-00 DETAIL K's S-K setting (the arm and plate "
-        "sheets point at that view and print no value), read by "
-        "paper_drive_arm_registration; no fit"
+        "the reducer's fine-pitch set band (+.002/-0 centre allowance): the "
+        "window the mesh gates are read over and the DRO's mid-band aim for K "
+        "(pd_paper_drive_knob_setting_spec); DETAIL K prints the trial band's "
+        "limits, which paper_drive_arm_registration reads (owner ruling "
+        "2026-11-24, audit part 2 question C1); no fit"
+    ),
+    ("pd_rack_pinion_spec", "CENTRE_DISTANCE_TRIAL_BAND"): (
+        "MHA-PD-00 DETAIL K's S to N limits (+.002/-.001): the set band opened "
+        "by the trial mesh's move toward S (owner ruling 2026-11-24, audit part "
+        "2 question C1), read by paper_drive_arm_registration and the knob "
+        "setting spec; no fit"
     ),
     ("sm_vn_knife_mount_dowel_spec", "DIA_BAND"): (
         "the pressed dowel's catalogue diameter: read by min/max for the press "
@@ -448,6 +469,33 @@ INDEXED_FIT_BANDS: dict[tuple[str, str], str] = {
     ("pd_transgear_drive_collar_spec", "PILOT_DIA_BAND"): (
         "the title block's .XX row on the .39 pilot (no authored band): indexed "
         "for the wheel-bore air, the pilot wall and the thumbnut's seat"
+    ),
+    # Fit audit 2026-11-23 (drawing-guidelines rule 4): analysis bands, not
+    # printed limits.
+    ("pd_rack_pinion_spec", "BORE_BAND"): (
+        "analysis band of the reamed Ø.501 bore, which prints the reamer's "
+        "size and no band: indexed for the spigot clearance, the disc's float "
+        "and the tap-to-bore web"
+    ),
+    ("pd_transgear_feed_pinion_spec", "BOSS_DIA_BAND"): (
+        "analysis band of the boss, which prints REF and is turned to the "
+        "MHA-PD-17 bore by feel: indexed for the hub's clearance, rock and "
+        "the boss wall"
+    ),
+    ("pd_transgear_disc_hub_geometry", "SPIGOT_DIA_BAND"): (
+        "analysis band of the spigot, which prints REF and is turned to the "
+        "reamed MHA-PD-06 bore at the printed clearance: indexed for the "
+        "spigot wall and the disc's float"
+    ),
+    ("pd_transgear_knob_cup_spec", "BORE_BAND"): (
+        "analysis band of the pilot, which prints REF and is bored to the "
+        "MHA-PD-08 journal at the printed clearance: indexed for the bond "
+        "gap and the pilot wall"
+    ),
+    ("pd_transgear_knob_bush_geometry", "PRESS_DIA_BAND"): (
+        "analysis band of the press diameter, which prints its interference "
+        "to the measured MHA-PD-19 hole and no band: indexed for the plate "
+        "stub's envelope and the press-to-bore wall"
     ),
 }
 
