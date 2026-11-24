@@ -30,11 +30,6 @@ name = "Feeler gauges (Pittsburgh 32-pc)"
 ref = "feeler-gauges"  # F-feeler-66MA; repointed from the Starrett 66MA (owner 2026-11-19)
 
 [[tools]]
-id = "pin-gauges"
-name = "Pin gauges .011-.500"
-ref = "pin-gauges"  # A1-pin-set-061-500-combined, A1-pin-set-251-500
-
-[[tools]]
 id = "drill-n"
 name = "N drill"
 ref = "drill-n"  # drawing cross-check 2026-11-19: pre-drill for the .3135 ream
