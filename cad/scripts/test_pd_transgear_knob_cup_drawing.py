@@ -111,19 +111,24 @@ def _block_half_width(text: str, anchor: tuple[float, float]) -> float:
 
 
 def test_pilot_callout_names_its_bonded_mate_and_stands_clear_below_the_pilot() -> None:
-    """Rule 23: a bonded fit is a fit; the part sheet gives the mate and the
-    diametral clearance."""
+    """Rule 4, form 2, and rule 23: the pilot is made to fit its mate; its
+    size prints REF, the callout says what it is bored to and links the note
+    that names the fit, its clearance and what that keeps."""
     shaft = _config.parts("pd-transgear-knob-shaft")["number"]
     callout = " ".join(drawing.BORE_CALLOUT.split())
     # Rule 7, machinist review r10: no tool or method words; the section
     # draws the flat floor and R.005 MAX limits its corner.
     assert "END MILL" not in callout and "FLAT BOTTOM" not in callout
-    assert callout.startswith("BONDED FIT ON ")
-    assert "REAM" not in callout
-    assert "THRU" not in callout
-    assert f"BONDED FIT ON {shaft}" in callout
-    assert f"(CLEARANCE {spec.BORE_CLEARANCE_TEXT})" in callout
-    assert spec.BORE_CLEARANCE_TEXT == ".0012-.0055"
+    assert callout == f"BORE TO {shaft} SEE NOTE {drawing.FIT_NOTE}"
+    assert spec.REFERENCE_DIMENSIONS == frozenset({"BoreDia"})
+    # Owner ruling 2026-11-24: the reason is the registry's, not the sheet's.
+    assert drawing.FIT_NOTE_TEXT == (
+        f"{drawing.FIT_NOTE}. BONDED FIT ON {shaft}: CLEARANCE "
+        f"{spec.BORE_CLEARANCE_TEXT}."
+    )
+    assert drawing.FIT_NOTE_TEXT in drawing.NOTES
+    assert spec.BORE_CLEARANCE_TEXT == ".0005-.005"
+    assert spec.PILOT_CLEARANCE == pytest.approx((0.0005 * IN, 0.005 * IN))
     # Every printed row stands a space off the dimension line, and a closing
     # no-break-space row keeps the shelf off the parentheses' tails.
     printed = drawing.SECTION_CALLOUTS["BoreDia"]
@@ -155,10 +160,12 @@ def test_supply_sizes_cite_note_1_and_the_note_gives_the_fitted_depth() -> None:
         assert drawing.SECTION_CALLOUTS[name] == "SEE NOTE 1"
     note = " ".join(drawing.NOTES.split())
     assert note.startswith("NOTES: 1. LENGTH AND PILOT DEPTH ARE SUPPLY SIZES.")
-    assert note.endswith(
+    assert (
         f"FITTED PILOT DEPTH {spec.PILOT_DEPTH_FITTED_TEXT} AT "
-        f"{steps.step_ref('knob-stack-fitted')}."
-    )
+        f"{steps.step_ref('knob-stack-fitted')}. {drawing.FIT_NOTE}. "
+    ) in note
+    # Rule 7: four note lines at most.
+    assert len(drawing.NOTES.splitlines()) - 1 <= 4
     assert spec.PILOT_DEPTH_FITTED_TEXT == ".116-.148"
     # The float and the facing action are the assembly step's, not the part's.
     assert "END FLOAT" not in note and "FACE THE" not in note
@@ -271,17 +278,36 @@ def test_cup_diameters_stand_between_the_face_view_and_the_section() -> None:
     assert drawing.CAPTION_XY[1] < drawing.SECTION_CENTER[1] - drawing.HALF_OD - 0.005
 
 
-def test_floor_corners_print_their_max_radius_under_their_own_corners() -> None:
-    """Rule 16: each corner's largest acceptable radius, on one row under the
-    section, above the caption and left of the pilot's callout block."""
+def test_floor_corners_print_their_max_radius_and_the_mate_each_seats() -> None:
+    """Rule 16: each corner's largest acceptable radius, and under it the
+    mate that seats past the corner, by its number (rule 4; machinist review
+    2026-11-23: an R MAX under the title block's named no mate).  One row
+    under the section, above the caption: the pocket's block runs left from
+    its corner, the pilot's right from its own, apart, left of the pilot
+    Ø's dimension line."""
+    callouts = drawing.SECTION_CALLOUTS
+    assert callouts["PilotFloorR"] == "SEATS MHA-PD-08 END"
+    assert callouts["PocketFloorR"] == "SEATS MHA-PD-VN-71 HEAD"
     pocket = drawing.SECTION_KEEP["PocketFloorR"]
     pilot = drawing.SECTION_KEEP["PilotFloorR"]
     assert pocket[1] == pilot[1] < drawing.SECTION_BOTTOM - 0.005
     assert drawing.CAPTION_XY[1] < pocket[1] - 0.010
-    assert drawing.REAR_FACE_X - 0.005 < pocket[0] < pilot[0] < drawing.FRONT_FACE_X
+    # The widths the sheet is laid out with, never under the estimate's.
+    pocket_half = drawing.POCKET_CORNER_HALF_WIDTH
+    pilot_half = drawing.PILOT_CORNER_HALF_WIDTH
+    assert pocket_half >= _block_half_width(callouts["PocketFloorR"], pocket)
+    assert pilot_half >= _block_half_width(callouts["PilotFloorR"], pilot)
+    # Each block's near end under its own corner.
+    pocket_corner = drawing.REAR_FACE_X + spec.CBORE_DEPTH * drawing._S / 1000.0
+    pilot_corner = drawing.FRONT_FACE_X - spec.PILOT_DEPTH * drawing._S / 1000.0
+    assert pocket[0] + pocket_half == pytest.approx(pocket_corner, abs=0.004)
+    assert pilot[0] - pilot_half == pytest.approx(pilot_corner, abs=0.004)
+    assert pilot[0] - pilot_half - (pocket[0] + pocket_half) >= 0.008
+    # The pocket's block right of the cutting line's lower letter, the
+    # pilot's left of the pilot Ø's dimension line.
+    assert pocket[0] - pocket_half > drawing.FACE_CENTER[0] + drawing.HALF_OD
     bore = drawing.SECTION_KEEP["BoreDia"]
-    half = _block_half_width(drawing.SECTION_CALLOUTS["BoreDia"], bore)
-    assert pilot[0] + 0.012 < bore[0] - half
+    assert pilot[0] + pilot_half + 0.010 < bore[0]
 
 
 def test_floor_corners_are_max_limits_that_clear_their_mates() -> None:
@@ -305,13 +331,12 @@ def test_a_sharper_journal_chamfer_refuses_the_pilot_corner(monkeypatch) -> None
         _fresh_spec()
 
 
-def test_only_the_pilot_carries_a_model_band() -> None:
-    assert model_toleranced_dimensions(part) == {
-        ("CupProfile", "BoreDia"): "*deviations(BORE_BAND)",
-    }
-    # A bonded seat at the DRILLED HOLES row, +.004/0 (fit audit 2026-11-23).
+def test_no_dimension_carries_a_model_band() -> None:
+    assert model_toleranced_dimensions(part) == {}
+    # A bonded seat made to fit the journal: REF, its analysis band what the
+    # 1/4 end mill is taken to cut, +.003/0 (fit audit 2026-11-23).
     assert spec.BORE_DIA == pytest.approx(0.250 * IN)
-    assert spec.BORE_BAND == pytest.approx((0.004 * IN, 0.0))
+    assert spec.BORE_BAND == pytest.approx((0.003 * IN, 0.0))
 
 
 def test_owner_sizes_follow_the_bush_stub() -> None:
@@ -341,9 +366,9 @@ def test_walls_hold_at_the_worst_case_the_sheet_prints() -> None:
     assert spec.WEB_MIN == pytest.approx(web_min)
     assert spec.PILOT_WALL_WORST == pytest.approx(pilot_wall)
     assert spec.CBORE_WALL_WORST == pytest.approx(cbore_wall)
-    # .080 web (exactly the target), .088 (the +.004 pilot) and .115 rings.
+    # .080 web (exactly the target), .0885 (the +.003 pilot) and .115 rings.
     assert web_min == pytest.approx(0.080 * IN, abs=1e-9)
-    assert pilot_wall == pytest.approx(0.088 * IN, abs=1e-9)
+    assert pilot_wall == pytest.approx(0.0885 * IN, abs=1e-9)
     assert cbore_wall == pytest.approx(0.115 * IN, abs=1e-9)
     for wall in (web_min, pilot_wall, cbore_wall):
         assert wall >= WALL_TARGET_MM - 1e-9
@@ -366,19 +391,37 @@ def test_a_looser_length_row_refuses_the_thin_web(monkeypatch) -> None:
 
 
 def test_the_bonded_pilot_clears_the_journal_inside_641_gap_fill() -> None:
-    tightest = (spec.BORE_DIA + min(spec.BORE_BAND)) - (
-        knob_shaft.JOURNAL_DIA + max(knob_shaft.JOURNAL_DIA_BAND)
+    """Codjiflo on #3493: the journal is itself turned to the bush's reamed
+    bore, so the journal this pilot meets is that bore's analysis band less
+    the pair's modelled running clearance, .2480-.2493, not the journal's own
+    g6 band."""
+    bush_bore = (
+        bush.BORE_DIA + min(bush.BORE_DIA_LIMITS),
+        bush.BORE_DIA + max(bush.BORE_DIA_LIMITS),
     )
-    loosest = (spec.BORE_DIA + max(spec.BORE_BAND)) - knob_shaft.JOURNAL_DIA_MIN
+    running = (
+        bush_bore[0] - (knob_shaft.JOURNAL_DIA + max(knob_shaft.JOURNAL_DIA_BAND)),
+        bush_bore[1] - (knob_shaft.JOURNAL_DIA + min(knob_shaft.JOURNAL_DIA_BAND)),
+    )
+    assert running == pytest.approx((0.0002 * IN, 0.0010 * IN))
+    fitted = (bush_bore[0] - running[1], bush_bore[1] - running[0])
+    assert spec.JOURNAL_FITTED == pytest.approx(fitted)
+    assert fitted == pytest.approx((0.2480 * IN, 0.2493 * IN))
+    tightest = (spec.BORE_DIA + min(spec.BORE_BAND)) - fitted[1]
+    loosest = (spec.BORE_DIA + max(spec.BORE_BAND)) - fitted[0]
     assert 0.0 < tightest <= loosest <= spec.LOCTITE_641_GAP_MAX == 0.15
     assert spec.BORE_JOURNAL_CLEARANCE == pytest.approx((tightest, loosest))
 
 
 def test_cup_bore_refuses_binding_on_the_actual_journal(monkeypatch) -> None:
-    assert spec.BORE_JOURNAL_CLEARANCE == pytest.approx((0.03048, 0.1397))
-    # The .254 limit is what keeps the bond gap inside LOCTITE 641's fill:
-    # one more thousandth on the pilot passes it.
-    assert max(spec.BORE_JOURNAL_CLEARANCE) + 0.0254 > spec.LOCTITE_641_GAP_MAX
+    assert spec.BORE_JOURNAL_CLEARANCE == pytest.approx((0.01778, 0.127))
+    # The modelled pilot (.0007-.0050 on the fitted journal) lies inside the
+    # printed clearance, and that inside LOCTITE 641's fill: one more
+    # thousandth on the printed range passes it.
+    assert min(spec.PILOT_CLEARANCE) <= min(spec.BORE_JOURNAL_CLEARANCE)
+    assert max(spec.BORE_JOURNAL_CLEARANCE) <= max(spec.PILOT_CLEARANCE) + 1e-9
+    assert max(spec.PILOT_CLEARANCE) <= spec.LOCTITE_641_GAP_MAX
+    assert max(spec.PILOT_CLEARANCE) + 0.0254 > spec.LOCTITE_641_GAP_MAX
     monkeypatch.setattr(knob_shaft, "JOURNAL_DIA_BAND", (0.030, 0.0))
     with pytest.raises(AssertionError, match="bore binds"):
         _fresh_spec()
@@ -534,9 +577,10 @@ def test_declarations_print_the_sheets_bands_and_supply_sizes() -> None:
 
     assert inch(features["outside"]["dia"]) == [0.43, 0.45]
     assert inch(features["rear_face"]["length"]) == [0.35, 0.37]
-    assert inch(features["pilot"]["dia"]) == [0.25, 0.254]
+    assert round(features["pilot"]["dia_ref"] / IN, 4) == 0.25
+    assert "dia" not in features["pilot"]
     assert inch(features["pilot"]["depth"]) == [0.147, 0.157]
-    assert inch(features["pilot"]["diametral_clearance"]) == [0.0012, 0.0055]
+    assert inch(features["pilot"]["diametral_clearance"]) == [0.0005, 0.005]
     assert inch([features["pilot"]["corner_radius_max"]]) == [0.005]
     assert inch(features["web_hole"]["dia"]) == [0.113, 0.117]
     assert inch(features["pocket"]["dia"]) == [0.18, 0.2]

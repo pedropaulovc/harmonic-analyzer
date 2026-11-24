@@ -9,7 +9,9 @@ printed here is read from it.
 drawing-guidelines.md rule 7: a callout carries its size and process lines
 plus at most two lines of words; anything longer is a numbered note its
 callout links by ``SEE NOTE n``.  Rule 4: the reamed bore prints no band;
-its note names the mate that is tried in it and what the ream protects (the
+its note names the mate, says that mate is turned to this bore (the
+acceptance, a clearance, prints once, on MHA-PD-17, made last) and what the
+ream protects (the
 necessity answer); one feature with several tight dimensions (the teeth:
 span and tip) names its mate once, in the GEAR DATA block both dimensions
 link.
@@ -85,13 +87,15 @@ MESH_CALLOUT = "SEE GEAR DATA"
 # 1.5D.
 FACE_WIDTH_CALLOUT = f"SETS {SCREW_NUMBER}\nENGAGEMENT"
 
-# Rule 4: the bore's mate, its acceptance by that mate and what the ream
-# protects: a looser hole spends the taps' web of note 2 (RV-03).
+# Rule 4: the bore's mate, made to this bore (fit audit 2026-11-23, pending
+# owner confirmation: the MHA-PD-17 spigot prints REF and the clearance,
+# the pair's one acceptance).  What the ream protects is the register's
+# (cad/config/necessity/pd-rack-pinion.yaml; owner ruling 2026-11-24: the
+# reason is not printed on the sheet).
 # Rule 20: the tap-to-bore web's stated shortfall (RV-03) ends the tap note.
 DRAWING_NOTES = "\n".join(
     (
-        f"{BORE_NOTE}. CLEARANCE FIT ON {HUB_NUMBER} SPIGOT: THE SPIGOT ENTERS.",
-        f"   KEEPS THE NOTE {TAP_NOTE} TAP WALL.",
+        f"{BORE_NOTE}. {HUB_NUMBER} SPIGOT IS TURNED TO THIS BORE.",
         f"{TAP_NOTE}. MATCH-DRILL AT ASSEMBLY WITH {HUB_NUMBER}: SPOT THRU ITS FLANGE",
         f"   HOLES, THEN DRILL AND TAP; MATCH-MARK BOTH. {TAP_WALL_TEXT}.",
     )

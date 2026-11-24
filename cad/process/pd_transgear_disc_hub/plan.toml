@@ -10,9 +10,10 @@
 #   them), part off .02 long.
 # - Setup 2, lathe: the hub turned round, its body in the 3-jaw over a shim
 #   wrap, the flange's front face seated on the jaw fronts: face the spigot
-#   end to the overall from the miked length (Z0), turn the spigot Ø.498 and
-#   face the flange's rear face with the sharp-nose tool (the root R.004
-#   MAX), then centre, drill N and ream .3135 through: the bore, the
+#   end to the overall from the miked length (Z0), turn the spigot to the
+#   MHA-PD-06 disc's reamed bore (Ø.498 REF) and face the flange's rear face
+#   with the sharp-nose tool (the root R.004 MAX), then centre, drill N and
+#   ream .3135 through: the bore, the
 #   flange's rear face and the spigot's end are cut in one chucking, so both
 #   faces run square to the bore (datum A), checked there with the DTI.
 # - Setup 3, PM-30MV, vise: the hub upright, the flange's front face on two
@@ -25,7 +26,7 @@
 #   1 in parallel. CM02 plunges a flat with the 1/16 end mill on the sloping
 #   O.D. (the chord meets it 40° off square), drills the #56 knockout
 #   through and the #53 to the stop; CM03 reams .0615 to the stop. The stop
-#   (±.002) is measured with the set's .061 pin standing in the ream and
+#   (the title block's ±.005) is measured with the set's .061 pin standing in the ream and
 #   CM03 is run again deeper by the shortfall: a chucking reamer's bevel
 #   leaves its full diameter short of its tip by an unknown .000-.010.
 #   That rerun may end-cut up to .010 into the #53's 118° point cone below
@@ -124,15 +125,21 @@ spigot_rough_length_in = 0.14
 # root's R.004 MAX), turned at the lathe's finest longitudinal power feed,
 # .0025 in/rev (the maker's page: longitudinal feeds .0025-.012 IPR, cross
 # feeds .001-.0056 IPR). Its cusp is f^2/(8r): at R.003, .0025^2/.024 =
-# .00026 radial. The micrometer reads the two-point size across the crests,
-# which is the size the drawing bands and what enters MHA-PD-06, so the
-# acceptance is the sheet's .496-.498 (machinist review 2026-11-23: no
-# guard band for the valleys), aim .497. The
-# last cut is set from the measured diameter, then a spring pass at the same
-# setting. The flange's rear face takes the .001 in/rev cross feed: its cusp
-# .00004.
-spigot_accept_min_in = 0.496
-spigot_aim_in = 0.497
+# .00026 radial. Fit audit 2026-11-23, pending owner confirmation: the
+# spigot is made to fit. The sheet prints its size REF and the requirement
+# is its diametral clearance in the MHA-PD-06 disc's reamed bore (note 4),
+# so the disc's bore is reamed before this operation and the acceptance is
+# the trial of that disc on the spigot, its shake read on the DTI; no size
+# band is gauged. The cuts are steered by the mate too (traveler review
+# 2026-11-24, three runs: a fixed aim scrapped spigots under a large bore):
+# the micrometer (it reads the two-point size across the crests, which is
+# what enters the disc) takes the spigot to a first size the .501 reamer's
+# hole accepts with shake still under the clearance, the disc is tried and
+# its shake S read, and the last cut takes half of (the aimed shake, the
+# middle of the clearance, less S), then a spring pass at the same setting.
+# The flange's rear face takes the .001 in/rev cross feed: its cusp .00004.
+spigot_first_dia_in = 0.5
+spigot_aim_shake_in = 0.004
 # Setup 2 drills and reams through from the spigot end: the quill readings
 # past the hub front face (inside the chuck's bore).
 drill_run_in = 0.75
@@ -175,9 +182,10 @@ endmill_reach_min_in = 0.1
 # hole's inner edge, the point then 0.5 mm over the parallel; the #53 to
 # the stop at its full diameter; the reamer's end at the stop (its bevel
 # leaves it short, measured and taken up in Ops 310–320). The stop's band
+# (the title block's ±.005 on .160)
 # as the console reads it (Z below the axis, mm); cam.py checks both.
-stop_shallow_mm = -4.0132
-stop_deep_mm = -4.1148
+stop_shallow_mm = -3.937
+stop_deep_mm = -4.191
 knockout_past_mm = 0.3
 knockout_tip_mm = -6.3444
 pilot_tip_mm = -4.518
@@ -341,7 +349,7 @@ machine_ref = "pm-1127vf-lb"
 holding = "3-jaw over a shim wrap of brass shim on the hub body, the flange's front face pushed flat against the jaw fronts while tightening (the body .30 long, all of it in the jaws); the parted end {{process.regrip_out_mm:in.3dot}} in out. Snug the jaws, put the DTI on the flange's rim, turn the chuck by hand and tap the flange until it runs within .001 TIR, then tighten: the bore reamed here then runs true to the body, which Setup 4 picks X0 from."
 datum = "Z0: the spigot's end, faced in Op 60 to {{process.length_target_in:.3dot}} from the hub front face, preset from the length miked there."
 diagram = { file = "diagrams/regrip.svg", alt = "The hub turned round, its body in the jaws over a shim wrap, the flange's front face on the jaw fronts, the parted end out: faced to length, the spigot turned to the flange's rear face, the bore drilled and reamed through from the tailstock." }
-lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{cad.hub_body_dia_mm}}", stock_diameter_mm = "{{cad.flange_dia_mm}}", stickout_mm = "{{process.regrip_out_mm}}", minimum_diameter_mm = "{{cad.spigot_dia_least_mm}}", support = "none" }
+lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{cad.hub_body_dia_mm}}", stock_diameter_mm = "{{cad.flange_dia_mm}}", stickout_mm = "{{process.regrip_out_mm}}", minimum_diameter_mm = "{{cad.spigot_dia_ref_mm}}", support = "none" }
 
 [[setups.operations]]
 cut_kind = "other"
@@ -349,20 +357,20 @@ speed_kind = "spindle"
 tool = "ar"
 drilling = "none"
 sizing = "other"
-instruction = "Mike the hub's length across the rims, from the hub front face to the parted end, clear of the parting pip; write it as L0 (about {{process.part_off_in:.3dot}}). Chuck it; spindle running, touch the AR lightly on the parted end's rim and set DRO Z to L0 less {{process.length_target_in:.3dot}}. Face in light skims to Z0: the spigot's end."
+instruction = "Mike the hub's length across the rims, from the hub front face to the parted end, clear of the parting pip: L0 (about {{process.part_off_in:.3dot}}). Mike the flange end at its rim, from the flange's front face to the parted end: T0. Write both down. Chuck it; spindle running, touch the AR lightly on the parted end's rim and set DRO Z to L0 less {{process.length_target_in:.3dot}}. Face in light skims to Z0: the spigot's end."
 settings = "lathe-ar-c360"
 cut_diameter_mm = "{{cad.flange_dia_mm}}"
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Spindle stopped: mike the overall from the hub front face to the spigot's end, the anvils on the faces' rims."
-inspection = "Overall {{cad.spigot_end_length_min_in:.3dot}}–{{cad.spigot_end_length_max_in:.3dot}}, micrometer."
+instruction = "Spindle stopped: between two jaws, mike the flange end at its rim again, from the flange's front face to the faced end: T. The overall is T plus (L0 less T0); the hub front face is inside the chuck."
+inspection = "Overall (T plus L0 less T0) {{cad.spigot_end_length_min_in:.3dot}}–{{cad.spigot_end_length_max_in:.3dot}}, micrometer."
 gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.spigot_end_length_band_mm}}" }]
 feed = "hand"
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Overall over {{cad.spigot_end_length_max_in:.3dot}} in Op 70: spindle running, touch the AR lightly on the spigot end's rim; set DRO Z to the excess (the Op 70 reading less {{process.length_target_in:.3dot}}); face in light skims to Z0; mike again. Under {{cad.spigot_end_length_min_in:.3dot}}: scrapped, not reworked; make another from Setup 1 (the bar holds a second)."
+instruction = "Overall over {{cad.spigot_end_length_max_in:.3dot}} in Op 70: spindle running, touch the AR lightly on the spigot end's rim; set DRO Z to the excess (the Op 70 overall less {{process.length_target_in:.3dot}}); face in light skims to Z0; mike T again. Under {{cad.spigot_end_length_min_in:.3dot}}: scrapped, not reworked; make another from Setup 1 (the bar holds a second)."
 feed = "hand"
 
 [[setups.operations]]
@@ -381,15 +389,15 @@ speed_kind = "spindle"
 tool = "sharp"
 drilling = "none"
 sizing = "other"
-instruction = "Sharp-nose tool (nose R.003–.004; to buy), on centre: turn the spigot from Z0 to Z-{{cad.spigot_length_mm:in.3dot}} at the .0025 in/rev power feed, miking after each pass. Within .003 of size, feed the cross slide in by half of (the reading less Ø{{process.spigot_aim_in:.3dot}}) for the last cut, then a spring pass with no infeed. Then face the flange's rear face out to the rim at Z-{{cad.spigot_length_mm:in.3dot}} on the .001 in/rev cross feed, leaving the root sharp (R{{cad.spigot_root_radius_max_mm:in.3dot}} MAX)."
+instruction = "Sharp-nose tool, on centre: turn the spigot from Z0 to Z-{{cad.spigot_length_mm:in.3dot}} at the .0025 in/rev power feed to Ø{{process.spigot_first_dia_in:.3dot}}, miked. Spindle stopped, try the reamed MHA-PD-06 disc on it and read its shake S as in the Check. S under {{cad.spigot_diametral_clearance_min_in:.3dot}}: take the last cut at half of ({{process.spigot_aim_shake_in:.3dot}} less S), then a spring pass. Then face the flange's rear face out to the rim at Z-{{cad.spigot_length_mm:in.3dot}} on the .001 in/rev cross feed, the root left sharp (R{{cad.spigot_root_radius_max_mm:in.3dot}} MAX)."
 settings = "lathe-sharp-nose-c360"
-cut_diameter_mm = "{{cad.spigot_dia_mm}}"
-inspection = "Spigot Ø{{cad.spigot_dia_min_in:.3dot}}–{{cad.spigot_dia_max_in:.3dot}}, micrometer. The flange's face at Z-{{cad.spigot_length_min_in:.3dot}} to Z-{{cad.spigot_length_max_in:.3dot}}, the tool's point touched on it; the flange {{cad.flange_front_face_thickness_min_in:.3dot}}–{{cad.flange_front_face_thickness_max_in:.3dot}} thick at the rim, micrometer."
-gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.spigot_dia_band_mm}}" }, { gauge = "micrometers", band_mm = "{{cad.flange_front_face_thickness_band_mm}}" }]
+cut_diameter_mm = "{{cad.spigot_dia_ref_mm}}"
+inspection = "The spigot is accepted by its mate: spindle stopped, slip the reamed MHA-PD-06 disc over the spigot up to the flange, the DTI on the carriage with its tip on the top of one of the disc's teeth; push the disc toward the DTI and pull it away, the hub not moving: the reading changes by {{cad.spigot_diametral_clearance_min_in:.3dot}}–{{cad.spigot_diametral_clearance_max_in:.3dot}}. The flange's face at Z-{{cad.spigot_length_min_in:.3dot}} to Z-{{cad.spigot_length_max_in:.3dot}}, the tool's point touched on it; the flange {{cad.flange_front_face_thickness_min_in:.3dot}}–{{cad.flange_front_face_thickness_max_in:.3dot}} thick at the rim, micrometer."
+gauge_checks = [{ gauge = "dti", band_mm = "{{cad.spigot_diametral_clearance_band_mm}}" }, { gauge = "micrometers", band_mm = "{{cad.flange_front_face_thickness_band_mm}}" }]
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Spigot reading over {{cad.spigot_dia_max_in:.3dot}} in Op 100: another last cut from the reading and a spring pass, mike again; the flange's face short of Z-{{cad.spigot_length_min_in:.3dot}}: face on to Z-{{cad.spigot_length_mm:in.3dot}}. The spigot reading under {{process.spigot_accept_min_in:.3dot}}, the face past Z-{{cad.spigot_length_max_in:.3dot}}, or the flange outside its thickness: scrapped, not reworked; make another from Setup 1."
+instruction = "In Op 100, the disc not going on: feed in .0005 (.001 off the diameter), a spring pass, try the disc again. Its shake S under {{cad.spigot_diametral_clearance_min_in:.3dot}}: feed in half of ({{process.spigot_aim_shake_in:.3dot}} less S), a spring pass, try the disc again. The flange's face short of Z-{{cad.spigot_length_min_in:.3dot}}: face on to Z-{{cad.spigot_length_mm:in.3dot}}. The shake over {{cad.spigot_diametral_clearance_max_in:.3dot}}, the face past Z-{{cad.spigot_length_max_in:.3dot}}, or the flange outside its thickness: scrapped, not reworked; make another from Setup 1."
 feed = "hand"
 
 [[setups.operations]]
@@ -515,7 +523,7 @@ feed = "hand"
 
 [[setups.operations]]
 instruction = "G54 X0: the hub's axis, midway between the body's left and right sides at Y−3.810, touched at one height."
-instruction_detailed = "Edge finder (900 rpm) at Y-3.810, lowered until its shank stands about .02 above the flange's top and Z locked there: its tip then reaches below the body's top line (if it does not, stop and tell the owner). On the LEFT side from the left: G10 L20 P1 X0. On the RIGHT side from the right, the same Z: G10 L20 P1 X(half the DRO X reading)."
+instruction_detailed = "Edge finder (900 rpm, its tip over .28 long) at Y-3.810, its shank about .02 above the flange's top; note the DRO Z. Touch the LEFT side from the left: G10 L20 P1 X0. Raise Z clear of the flange, cross over, lower to the noted Z and touch the RIGHT side from the right: G10 L20 P1 X(half the DRO X reading)."
 feed = "hand"
 
 [[setups.operations]]
@@ -626,18 +634,19 @@ instruction = "Clear the chord hole's breakthrough slivers inside the bore: grip
 feed = "hand"
 
 [[setups.operations]]
-instruction = "The chord ream after deburring: the .061 pin enters to the stop; the MHA-PD-VN-69 dowel, offered to the mouth by hand, does not enter (it is pressed at MHA-PD-00, step 8A). The dowel entering by hand: scrapped, not reworked; make another from Setup 1."
+instruction = "The chord ream after deburring: try the .061 pin in it, then offer the MHA-PD-VN-69 dowel to its mouth by hand (it is pressed at MHA-PD-00, step 8A)."
+inspection = "The .061 pin enters to the stop; the MHA-PD-VN-69 dowel does not enter by hand."
 gauge_checks = "other"
 feed = "hand"
 
 [[setups.operations]]
 instruction = "The .061 pin standing in the ream: calipers from the hub front face to the pin's far side; the station is the reading less half the pin's size (.0305)."
-inspection = "Station {{cad.pin_ream_station_min_in:.2dot}}–{{cad.pin_ream_station_max_in:.2dot}} from the hub front face (calipers read .171–.191)."
+inspection = "Station {{cad.pin_ream_station_min_in:.2dot}}–{{cad.pin_ream_station_max_in:.2dot}} from the hub front face (calipers read .171–.190)."
 gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.pin_ream_station_band_mm}}" }]
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Station outside its band in Op 380: scrapped (the hole is reamed and cannot move); make another from Setup 1."
+instruction = "Station outside its band in Op 380, or the dowel entering by hand in Op 370: scrapped (the hole is reamed and cannot move or close); make another from Setup 1."
 feed = "hand"
 
 [[setups.operations]]

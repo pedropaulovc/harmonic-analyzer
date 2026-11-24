@@ -54,14 +54,11 @@ from _drawing_marks import (
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
 )
-from _drawing_tolerances import set_dimension_bilateral_tolerance
 from _document_units import apply_package_model_units
-from _fit_deviations import deviations
 from _part_pmi import author_part_pmi
 from _part_properties import part_drawing_unit
 from _sketch_circle import define_circle
 from pd_transgear_knob_cup_spec import (
-    BORE_BAND,
     BORE_DIA,
     CBORE_DEPTH,
     CBORE_DIA,
@@ -76,7 +73,6 @@ from pd_transgear_knob_cup_spec import (
     PILOT_FLOOR_R_MAX,
     POCKET_FLOOR_R_MAX,
     SURFACE_FINISHES,
-    UNIT,
     WEB,
 )
 
@@ -346,9 +342,7 @@ def build(adapter) -> dict[str, str]:
 
     apply_material(adapter, MATERIAL)
     report_mass_properties(adapter)
-    set_dimension_bilateral_tolerance(
-        adapter, "CupProfile", "BoreDia", *deviations(BORE_BAND), display_unit=UNIT,
-    )
+    # The pilot's Ø prints REF (made to fit the MHA-PD-08 journal): no band.
     _corner_max_limits(adapter)
     # Every other printed dimension is governed by its places (the spec's
     # DRAWING_PRECISION): no model band.
