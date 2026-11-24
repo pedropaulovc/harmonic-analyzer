@@ -3,8 +3,11 @@
 # dt_mesh_checks.cone_check and test_standard_mesh_checks; the centres are
 # cone_set_stack's: the set's highest first bind, then the running runout
 # (cone and drum added), the keyed gear's seat float and the drum floats'
-# spread, combined by root sum square with the plain sum reported. Fit batch
-# DT, 2026-11-24: statement and per-station table in the batch's
+# spread, combined by root sum square with the plain sum reported. The bonded
+# gears' runouts are booked at their wet tap-true limits (MHA-DT-00 1S, 2B);
+# after cure they are a record, and a gear that hesitates in check 4R's run
+# is stripped and re-bonded (owner ruling 2026-11-24, audit part 2 C5). Fit
+# batch DT, 2026-11-24: statement and per-station table in the batch's
 # cone-set-check.md.
 checks:
   - id: C-01

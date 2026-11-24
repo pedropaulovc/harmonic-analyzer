@@ -1190,8 +1190,8 @@ def test_every_sheet_16_row_is_cited_by_its_step_and_fits_its_sheet(
     )
     for key, number in drawing.ACCEPTANCE_ROW_NUMBERS.items():
         cite = f"({drawing.acceptance_ref(key)}"
-        # T024's row is the setup 1S centres in and 1X accepts in (#3292),
-        # the pivot's the one 2B centres in and 2F accepts in (#2473).
+        # T024's row is the setup 1S centres in and 1X records in (#3292),
+        # the pivot's the one 2B centres in and 2F records in (#2473, C5).
         twice = ("tip-gap", "t024-runout", "pivot-runout")
         assert printed.count(cite) == (2 if key in twice else 1), key
         (row,) = (row for row in drawing.ACCEPTANCE_TABLE_ROWS if row[0] == str(number))
@@ -1600,7 +1600,7 @@ def test_cone_station_rows_run_front_to_back() -> None:
         "2C. CLIP MHA-DT-03-TL-02, BLADES WAXED AGAIN, OVER THE TIP, BOTH ARMS"
         " ON T036, T030'S BLADE BESIDE THE KEY."
     )
-    for head in ("1W", "2E"):
+    for head in ("1X", "2F"):
         step = steps[steps.index(f"{head}. ") :]
         assert step.split(".", 2)[1].endswith("BOTH ARMS ON T036"), step[:120]
     # #2473 (owner ruling 2026-11-22, option G): the pivot is tapped true
@@ -1618,27 +1618,37 @@ def test_cone_station_rows_run_front_to_back() -> None:
         " T024 UNTIL THEN."
     )
     gear_row = drawing.acceptance_ref("spigot-gear-runout")
-    assert steps[order[5] : order[6]].strip() == (
-        f"2F. CHECK THE RUNOUT ABOUT MHA-DT-04 OF THE MHA-DT-37 PIVOT ({pivot_row})"
+    # Owner ruling 2026-11-24, audit part 2 C5: the after-cure readings are a
+    # record, taken before the comb check so the strip and re-bond follows
+    # that check (rule 22), and a gear that hesitates in check 4R's run.
+    assert steps[order[4] : order[5]].strip() == (
+        f"2E. ONCE CURED, RECORD THE RUNOUT ABOUT MHA-DT-04 OF THE MHA-DT-37 PIVOT ({pivot_row})"
         f" AND OF T012'S AND T018'S TEETH ({gear_row})."
     )
-    assert steps[order[6] : order[7]].startswith("2G. IF ANY CHECK FAILS, AT 250 DEG C TAKE MHA-DT-37,")
+    assert steps[order[6] : order[7]].startswith(
+        "2G. IF IT FAILS, OR A GEAR HESITATES IN CHECK 4R, AT 250 DEG C TAKE MHA-DT-37,"
+    )
+    assert steps[steps.index("1W. ") :].startswith("1W. RECORD T024'S TOOTH RUNOUT")
+    assert steps[steps.index("1Y. ") :].startswith("1Y. IF IT FAILS, TAKE T024 OFF")
+    check = " ".join(drawing.CHECKS.split())
+    assert "MUST NEVER BIND OR HESITATE" in check
+    assert "4S. IF ONE BINDS, LOOSEN MHA-DT-VN-51 THERE (ONE HESITATES: STEP 2G)." in check
     assert steps[order[7] : order[8]].strip().endswith("FOR A REDO FROM 1L.")
     assert steps[order[8] :].startswith("2J. ALIGN THE MHA-DT-05 COUNTERBORES")
     (row,) = (r for r in drawing.ACCEPTANCE_TABLE_ROWS if r[2].startswith("MHA-DT-37 PIVOT"))
     assert row[1:] == (
-        "2B, 2F",
+        "2B, 2E",
         "MHA-DT-37 PIVOT, MHA-DT-04 ON END ON A V-BLOCK",
         ".0020 TIR MAX",
         "TEST INDICATOR",
     )
     # Owner ruling 2026-11-22 (#2473): T012 and T018 are read after cure in
-    # the same setup, as T024 is.
+    # the same setup, as T024 is; a record since C5 (2026-11-24).
     (row,) = (r for r in drawing.ACCEPTANCE_TABLE_ROWS if r[2].startswith("T012 AND T018"))
     assert row[1:] == (
-        "2F",
+        "2E",
         "T012 AND T018, \u00d8.040 GAUGE PIN, SETUP AS T024",
-        ".0030 TIR MAX EACH SPACE",
+        "RECORD EACH SPACE",
         "TEST INDICATOR",
     )
     assert "MHA-DT-03-TL-02 BLADES WITH" in steps
