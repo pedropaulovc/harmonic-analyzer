@@ -52,12 +52,6 @@ description = "V (.3770 in) drill, 115-piece index"
 diameter_mm = 9.5758
 [tools.taper-pin-reamer]  # B-reamer-taper-pin
 description = "Taper-pin reamer 1:48 (No. 3) for MHA-DT-09"
-[tools.reamer-0620]  # B-reamer-.0620
-description = ".0620 in HSS chucking reamer"
-diameter_mm = 1.5748
-[tools.reamer-0630]  # B-reamer-.0630
-description = ".0630 in HSS chucking reamer"
-diameter_mm = 1.6002
 [tools.reamer-2510]  # B-reamer-.2510
 description = ".2510 in HSS chucking reamer"
 diameter_mm = 6.3754
@@ -288,15 +282,6 @@ rpm = 560
 feed_mm_rev = 0.0254
 
 # --- MHA-DT-20 cone swing platform (cad/process/dt_cone_swing_platform/plan.toml) ---
-# The pivot bore, Ø.2500 +.0005/.0000 REAM THRU (a running fit on the
-# MHA-DT-VN-52 shoulder): a fixed .2500 chucking reamer, not the adjustable
-# set (owner ruling 2026-11-20, #3073: a fixed reamer for each running/press
-# fit). Not owned: to buy (cad/config/shop-equipment/ tools-reamers-taps,
-# same key). diameter_mm is its nominal size.
-[tools.reamer-2500]
-description = ".2500 in HSS chucking reamer"
-diameter_mm = 6.35
-
 # The platform's assembly shims (owner ruling 2026-11-22, issue #3363):
 # description only; the record is fixtures.shim-washers-1-4-id-arbor-19.
 [tools.shim-washers-1-4-id-arbor-19]
@@ -335,31 +320,6 @@ description = "Plug gauge pair, .0930 GO (plus) and .0935 NO-GO (minus), Vermont
 # resolution is one pin's Class ZZ tolerance, .0002 in = 0.00508 mm. Of the
 # Class X pairs only .0930-.0935 (MHA-DT-11) keeps its records: the
 # crankshaft's test reads its range (test_dt_crankshaft_process.py).
-# .3760-.3765: MHA-DT-02 arbor bore, MHA-DT-31 hub bore (MHA-DT-11 re-gauges
-# the hub's).
-[gauges.zz-pins-3760-3765]
-range_mm = [9.5504, 9.5631]
-resolution_mm = 0.00508
-[tools.zz-pins-3760-3765]
-description = "Class ZZ pins for .3760-.3765: GO .3760 plus (single), NO-GO .3765 minus (single)"
-# .2510-.2515: MHA-DT-18 pivot and lift bores, MHA-DT-23 bore, MHA-DT-14.
-[gauges.zz-pins-2510-2515]
-range_mm = [6.3754, 6.3881]
-resolution_mm = 0.00508
-[tools.zz-pins-2510-2515]
-description = "Class ZZ pins for .2510-.2515: GO .2510 plus (single), NO-GO .2515 minus (single)"
-# .2500-.2505: MHA-DT-20 pivot bore.
-[gauges.zz-pins-2500-2505]
-range_mm = [6.35, 6.3627]
-resolution_mm = 0.00508
-[tools.zz-pins-2500-2505]
-description = "Class ZZ pins for .2500-.2505: GO .2500 plus (single), NO-GO .2505 minus (single)"
-# .0630-.0635: MHA-DT-39 end screw hole.
-[gauges.zz-pins-0630-0635]
-range_mm = [1.6002, 1.6129]
-resolution_mm = 0.00508
-[tools.zz-pins-0630-0635]
-description = "Class ZZ pins for .0630-.0635: GO .0630 plus (single), NO-GO .0635 minus (single)"
 # .157-.160: MHA-DT-14 follower seat, end-milled (owner ruling 2026-11-23,
 # tool audit Q8: "check with .157/.160 pins").
 [gauges.zz-pins-1570-1600]
