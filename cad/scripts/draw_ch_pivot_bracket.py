@@ -248,13 +248,17 @@ TOP_KEEP = {
 EAR_THICK_TEXT_OFFSET = (0.042, 0.010)
 # The F-drilled cross-bore names its drill and the shaft it slides on, no
 # number (owner ruling 2026-11-24, fit audit question 1; drawing-guidelines.md
-# rule 4); the drilled hold-down hole says drill and
-# through. The ear thickness rides the title block's .XXX with no words (fit
-# audit census, MHA-CH-08 ear thickness: a reason on a size with no band of
-# its own is narration, drawing-guidelines.md rule 7); fit-up sets the pivot
-# shaft's tip off the ear's outboard face and the apex tap stands off the
-# inboard one (rocker_bank_layout.SET_SCREW_TO_FLAT_BAND; #3114: nothing
-# bears on an ear's face). The tap's station from the inboard
+# rule 4), its mate on a line of its own so the block's widest line keeps the
+# ~58 mm the placement was set for (machinist review r1, run
+# 20261124T095908844Z: one 30-character line ran into the ear's outline);
+# the drilled hold-down hole says drill and through. The ear thickness rides
+# the title block's .XXX, a three-place size given a function, so it names
+# what the third place holds (drawing-guidelines.md rules 3 and 4; same r1
+# review): at the .XX row the apex 4-40 tap's wall to the outboard face falls
+# to 2.007 mm, under the .080 wall (ch_pivot_bracket_spec's own assert). Fit-up
+# sets the pivot shaft's tip off the ear's outboard face and the apex tap
+# stands off the inboard one (rocker_bank_layout.SET_SCREW_TO_FLAT_BAND;
+# #3114: nothing bears on an ear's face). The tap's station from the inboard
 # face is a location, so it carries its value and band only (rule 7); the
 # set screw it places on the pivot shaft's flat rides the tap's own callout
 # (SET_SCREW_MATE). The foot length and the hold-down station ride the title
@@ -263,9 +267,12 @@ EAR_THICK_TEXT_OFFSET = (0.042, 0.010)
 # the foot top beside the ear's outboard face
 # (ch_pivot_bracket_drawing_spec.CORNER_R_MAX), so a larger round lifts it.
 DIMENSION_CALLOUTS = {
-    "ShaftBoreDia": f"{drill_process(BORE_HOLE_SPEC)} THRU\nSLIDING CLEARANCE ON {PIVOT_SHAFT_NUMBER}",
+    "ShaftBoreDia": (
+        f"{drill_process(BORE_HOLE_SPEC)} THRU\nSLIDING CLEARANCE ON\n{PIVOT_SHAFT_NUMBER}"
+    ),
     "HoleDia": "DRILL THRU",
     "CornerRadius": f"CLEARS HEAD OF\n{HOLD_DOWN_SCREW_NUMBER}",
+    "EarThick": f"KEEPS {SET_SCREW_THREAD.lstrip('#')} TAP WALLS",
 }
 # The right view prints the corner radius and the ear thickness.
 RIGHT_KEEP_NAMES = ("CornerRadius", "EarThick")
