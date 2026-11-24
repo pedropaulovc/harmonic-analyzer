@@ -281,7 +281,6 @@ def test_each_press_is_accepted_at_the_bench_with_a_slip_fit_remedy() -> None:
     """Rule 23: a press prints a bench acceptance and what a slip fit gets,
     each a lettered sub-step of the press (rule 22, the shared step lint)."""
     for pressed, held, taken_out, remedy in (
-        (steps.DRUM_PRESSED_KEY, steps.DRUM_HELD_KEY, "drum-pulled-off", "drum-bonded"),
         (steps.AXLE_PRESSED_KEY, steps.AXLE_HELD_KEY, "axle-pressed-out", "axle-cleaned"),
     ):
         (step,) = (step for step in steps.STEPS if step[0] == pressed)
@@ -291,10 +290,9 @@ def test_each_press_is_accepted_at_the_bench_with_a_slip_fit_remedy() -> None:
         # the next step is the remedy.
         assert "BY HAND" in notes.STEP_TEXT[taken_out]
         assert notes.STEP_TEXT[taken_out].count(",") == 2
-    # Both slip fits are bonded under the one general bond note that prints
-    # with the checks: the drum rather than the wheel remade (owner ruling
-    # 2026-11-07), the axle rather than remade from the same as-supplied rod
-    # (owner ruling 2026-11-11, #2541 and #2523, amending 2026-11-07).
+    # A slip axle is bonded under the one general bond note that prints with
+    # the checks, rather than remade from the same as-supplied rod (owner
+    # ruling 2026-11-11, #2541 and #2523, amending 2026-11-07).
     def ref(key: str) -> str:
         return f"STEP {steps.step_number(key)}"
 
@@ -310,17 +308,11 @@ def test_each_press_is_accepted_at_the_bench_with_a_slip_fit_remedy() -> None:
         "axle-bond-set",
         "axle-bond-cured",
     )
-    # Only an unbonded slip goes back out; a bonded part that holds passes the
-    # hold check, and a bonded drum, like the axle, comes back to it once
-    # cured (#2579).
+    # Only an unbonded slip goes back out; a bonded axle that holds passes the
+    # hold check once cured (#2579).
     assert "UNBONDED" in notes.STEP_TEXT["axle-pressed-out"]
-    assert "UNBONDED" in notes.STEP_TEXT["drum-pulled-off"]
-    for key in ("axle-bonded", "drum-bonded"):
-        assert notes.STEP_TEXT[key].endswith(f"{notes.BOND_GRADE}, {notes.BOND_NOTE_REF}.")
-    (drum_step,) = (step for step in steps.STEPS if step[0] == steps.DRUM_PRESSED_KEY)
-    assert drum_step[-1] == "drum-bond-cured"
-    assert notes.STEP_TEXT["drum-bond-cured"].startswith(
-        f"IF IT WAS BONDED, RETURN TO {ref(steps.DRUM_HELD_KEY)}"
+    assert notes.STEP_TEXT["axle-bonded"].endswith(
+        f"{notes.BOND_GRADE}, {notes.BOND_NOTE_REF}."
     )
     # #2578 is moot since the 2026-11-21 ruling: a bond is set inside its
     # fixture time to the DETAIL A setting, the axle's one position.
@@ -339,6 +331,31 @@ def test_each_press_is_accepted_at_the_bench_with_a_slip_fit_remedy() -> None:
     # acceptance.
     for rule in ("DEGREASE", "ONLY", "WIPE", "CURE 24 H", "BY HAND"):
         assert rule in notes.BOND_NOTE
+
+
+def test_the_drum_is_bonded_centred_wet_and_accepted_once_cured() -> None:
+    """Owner ruling 2026-11-24, fit audit question 17: the drum is always
+    bonded on the spigot turned to slide in its drilled bore, centred on an
+    indicator while wet, and accepted at the bench once cured (rule 23)."""
+    (drum_step,) = (step for step in steps.STEPS if step[0] == steps.DRUM_BONDED_KEY)
+    assert drum_step == (
+        steps.DRUM_BONDED_KEY,
+        "drum-centred",
+        "drum-bond-cured",
+        steps.DRUM_HELD_KEY,
+        "drum-stripped",
+    )
+    bonded = notes.STEP_TEXT[steps.DRUM_BONDED_KEY]
+    assert f"WITH {notes.BOND_GRADE}, {notes.BOND_NOTE_REF}" in bonded
+    assert "NONE IN THE BORE" in bonded
+    centred = notes.STEP_TEXT["drum-centred"]
+    assert centred.startswith("AT ONCE, BEFORE IT GRABS, TAP ")
+    assert "INDICATOR" in centred and "V-BLOCK" in centred
+    assert "24 H" in notes.STEP_TEXT["drum-bond-cured"]
+    assert notes.STEP_TEXT[steps.DRUM_HELD_KEY].endswith("DOES NOT TURN OR SLIDE BY HAND.")
+    assert notes.STEP_TEXT["drum-stripped"].startswith(
+        f"IF IT DOES, RETURN TO STEP {steps.step_number(steps.DRUM_BONDED_KEY)} WITH "
+    )
 
 
 def test_the_axle_press_goes_to_the_gauge_past_the_spacer() -> None:
@@ -407,14 +424,14 @@ def test_the_axle_presses_push_on_the_step_through_a_sleeve() -> None:
     assert "OIL" in notes.STEP_TEXT["axle-plain-end-oiled"]
 
 
-def test_the_drum_press_accepts_the_recess_window_the_wheel_lengths_prove() -> None:
-    """Rule 22: the drum press step reads the drum face's window below the
+def test_the_drum_bond_accepts_the_recess_window_the_wheel_lengths_prove() -> None:
+    """Rule 22: the drum bond step reads the drum face's window below the
     spigot end (DRUM_RECESS) where DETAIL B dimensions it."""
     low, high = stack.LIMIT_DIMENSIONS[stack.DRUM_RECESS_DIMENSION]
     assert low == 0.0
     assert (low, high) == pytest.approx(mg_magnifying_wheel_geom.DRUM_RECESS, abs=1e-9)
     assert low < stack.DRUM_RECESS < high
-    pressed = notes.STEP_TEXT[steps.DRUM_PRESSED_KEY]
+    pressed = notes.STEP_TEXT[steps.DRUM_BONDED_KEY]
     assert "HARD AGAINST THE BOSS" in pressed
     assert (
         f"ITS OUTER FACE BELOW THE END OF THE SPIGOT AS {notes.ENDSHAKE_DETAIL_TITLE} SETS IT"

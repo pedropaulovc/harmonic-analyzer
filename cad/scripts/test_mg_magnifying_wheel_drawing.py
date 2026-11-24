@@ -146,9 +146,9 @@ def test_walls_and_groove_hold_at_the_printed_bands() -> None:
     assert geom.CAST_ROUND_R == pytest.approx(0.03 * inch)
     assert not hasattr(geom, "CAST_ROUND_BAND")
     assert spec.ROUND_TEXT_SUFFIX == " MAX"
-    # The matched fits' worst pair: the smallest spigot (.4990 bore + .0002
-    # press) over the largest bore (.1877 pin + .0017 running clearance).
-    assert spec.WALLS["spigot_to_bore"] == pytest.approx((0.4992 - 0.1894) * inch / 2.0)
+    # The fits' worst pair: the smallest spigot (.500 drilled drum bore less
+    # the .0025 bond clearance) over the largest bore (.1877 pin + .0017).
+    assert spec.WALLS["spigot_to_bore"] == pytest.approx((0.4975 - 0.1894) * inch / 2.0)
     assert "RimRounds" not in spec.DRAWING_DIMENSIONS
     assert geom.TIE2_CLOCK_DEG == -43.0
     # The Ø.008 pen wire seats at every printed groove corner: the narrowest
@@ -400,7 +400,7 @@ def test_linked_notes_specify_the_fits_the_ties_and_the_angle_the_spokes() -> No
     # mate, named once in a note both link (rule 4).
     assert lines == [
         "1. RUNNING FIT ON AXLE MHA-MG-07 (CLEARANCE .0008-.0017).",
-        "2. PRESS FIT IN DRUM MHA-MG-10 (INTERFERENCE .0002-.0013).",
+        "2. BONDED FIT IN DRUM MHA-MG-10: TURN TO ITS BORE (CLEARANCE .0005-.0025).",
         "3. GROOVE SEATS PEN WIRE OF MHA-SH-VN-56.",
     ]
     assert "DIAMETRAL" not in notes
@@ -444,7 +444,7 @@ def test_linked_notes_specify_the_fits_the_ties_and_the_angle_the_spokes() -> No
 
 def test_no_gdt_frames_and_one_sheet_dimension() -> None:
     # drawing-guidelines.md rule 6 (roughness symbols only where a surface runs, slides or locates): the running bore takes the machined grade; the
-    # spigot is pressed into the drum and takes none.
+    # spigot is bonded in the drum and takes none.
     finishes = {
         control.key: control.roughness_um
         for control in mg_magnifying_wheel_spec.SURFACE_FINISHES

@@ -277,6 +277,13 @@ INDEXED_FIT_BANDS: dict[tuple[str, str], str] = {
     ("mg_magnifying_wheel_geom", "HUB_LEN_BAND"): (
         "equal band indexed into the native symmetric (+/-) tolerance"
     ),
+    # Owner ruling 2026-11-24, fit audit question 17: an analysis band, not a
+    # printed limit.
+    ("mg_wheel_drum_geom", "DRUM_BORE_BAND"): (
+        "title-block drilled-hole deviations (the 1/2 DRILL THRU callout's row, "
+        "no native band); indexed for the drum's worst wall and the spigot's "
+        "least size under the bond clearance (SPIGOT_DIA_MIN)"
+    ),
     ("pd_transgear_feed_pinion_spec", "FLAT_TO_AXIS_BAND"): (
         "equal band indexed into the native symmetric (+/-) tolerance and the "
         "hub key pin's air to the flat"

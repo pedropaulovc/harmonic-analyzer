@@ -38,7 +38,7 @@ from mg_magnifying_wheel_geom import (  # noqa: F401 (re-export)
     CAST_ROUND_R,
     CAST_TOL,
     DRILL_WANDER_DEG,
-    DRUM_PRESS,
+    DRUM_BOND_CLEARANCE,
     HUB_BACK_Z,
     HUB_DIA,
     HUB_FILLET_R,
@@ -219,9 +219,9 @@ REFERENCE_DIAMETERS = ("RimInnerDiaDim", "RimOuterDiaDim")
 ROUND_TEXT_SUFFIX = " MAX"
 
 # drawing-guidelines.md rule 7 (notes: few, flagged, never a method): the notes say only what no callout can.  The bore's running fit and
-# the spigot's press fit are matched-fit statements (rule 4: the standard
-# fit name, the mate, and the resulting clearance or interference as REF),
-# each a numbered note its own callout links by "SEE NOTE n", so neither
+# the spigot's bonded fit are fit statements (rule 4: the mate, the fit it
+# needs, and the clearance or acceptance), each a numbered note its own
+# callout links by "SEE NOTE n", so neither
 # callout runs past two lines of words.  The groove's two three-place sizes
 # (its bottom Ø and its R, drawing-guidelines.md rule 3: a third place with
 # a stated function) serve one mate, named once in a numbered note both
@@ -251,13 +251,16 @@ DRAWING_NOTES = "\n".join(
     (
         f"{BORE_FIT_NOTE}. RUNNING FIT ON AXLE {AXLE_NUMBER} "
         f"(CLEARANCE {_fit_limits(HUB_RUNNING)}).",
-        f"{SPIGOT_FIT_NOTE}. PRESS FIT IN DRUM {DRUM_NUMBER} "
-        f"(INTERFERENCE {_fit_limits(DRUM_PRESS)}).",
+        # Owner ruling 2026-11-24, fit audit question 17: the spigot is the
+        # member made last, so the bonded fit's acceptance prints here, once
+        # (rule 4, form 2); MHA-MG-10 names this spigot as turned to its bore.
+        f"{SPIGOT_FIT_NOTE}. BONDED FIT IN DRUM {DRUM_NUMBER}: TURN TO ITS BORE "
+        f"(CLEARANCE {_fit_limits(DRUM_BOND_CLEARANCE)}).",
         f"{GROOVE_SEAT_NOTE}. GROOVE SEATS PEN WIRE OF {WIRE_NUMBER}.",
     )
 )
 # drawing-guidelines.md rule 6 (roughness symbols only where a surface runs, slides or locates): the bore is a running journal on the axle.  The spigot is
-# pressed into the drum and the boss step the drum butts against is a
+# bonded in the drum and the boss step the drum butts against is a
 # register face: neither carries a symbol.
 SURFACE_FINISHES: tuple[SurfaceFinishControl, ...] = (
     SurfaceFinishControl(

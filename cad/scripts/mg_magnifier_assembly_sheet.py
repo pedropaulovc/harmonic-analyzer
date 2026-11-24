@@ -271,10 +271,11 @@ _STACK_PARTS = (
 )
 
 # Rule 23: a specified anaerobic bond equals a press fit. The package bonds
-# a press that went in slack: the drum on the wheel's spigot (owner ruling
-# 2026-11-07) and the axle in the bar (owner ruling 2026-11-11, #2541 and
-# #2523, amending the 2026-11-07 "a slip axle is remade": a remade axle cut
-# from the same as-supplied rod comes out the same size). Its degrease,
+# the drum on the wheel's spigot, always (owner ruling 2026-11-24, fit audit
+# question 17), and the axle in the bar when its press went in slack (owner
+# ruling 2026-11-11, #2541 and #2523, amending the 2026-11-07 "a slip axle
+# is remade": a remade axle cut from the same as-supplied rod comes out the
+# same size). Its degrease,
 # coated length, squeeze-out, cure and acceptance rules print once, as a
 # general note with the checks in ASSEMBLY.md. The axle's coat stays on the
 # length inside the bar and its squeeze-out is wiped off at once, since the
@@ -370,22 +371,32 @@ _PRESS_READ = (
     "SLEEVE ON THE SHOULDER, LESS ITS MEASURED LENGTH)"
 )
 STEP_TEXT = {
-    _steps.DRUM_PRESSED_KEY: (
-        f"PRESS {_DRUM} ONTO THE SPIGOT OF {_WHEEL} UNTIL IT IS HARD AGAINST THE "
-        f"BOSS, ITS OUTER FACE BELOW THE END OF THE SPIGOT AS {ENDSHAKE_DETAIL_TITLE} "
-        "SETS IT (CALIPER DEPTH ROD)."
+    # Owner ruling 2026-11-24, fit audit question 17: the drum is bonded on
+    # the spigot MHA-MG-05 is turned to slide in its drilled bore (rule 23:
+    # the step gives the grade, the stop and the acceptance; NOTE 1 the
+    # degrease, coat and cure). The boss face squares it; none of the
+    # compound goes in the wheel's bore, which runs on the axle.
+    _steps.DRUM_BONDED_KEY: (
+        f"BOND {_DRUM} ON THE SPIGOT OF {_WHEEL} WITH {BOND_GRADE}, {BOND_NOTE_REF}, "
+        "NONE IN THE BORE, UNTIL IT IS HARD AGAINST THE BOSS, ITS OUTER FACE "
+        f"BELOW THE END OF THE SPIGOT AS {ENDSHAKE_DETAIL_TITLE} SETS IT "
+        "(CALIPER DEPTH ROD)."
     ),
+    # A slip fit cures wherever it sits in its clearance, so the drum is
+    # centred while wet (fit audit question 17, as the cone gears' wet
+    # tap-true of #3292 on MHA-DT-00): the wheel turns on its own axle, held
+    # on an owned V-block, under an owned dial indicator on its magnetic
+    # base. Delegated ruling 2026-11-24 (FitLaneCH.SmallSubsys), precedent
+    # MHA-DT-00 1S: the setup.
+    "drum-centred": (
+        f"AT ONCE, BEFORE IT GRABS, TAP {_DRUM} TRUE TO AN INDICATOR ON ITS RIM, "
+        f"{_WHEEL} TURNING ON {_AXLE} CLAMPED ON A V-BLOCK."
+    ),
+    "drum-bond-cured": f"LEAVE {_DRUM} UNDISTURBED 24 H TO CURE.",
     _steps.DRUM_HELD_KEY: f"CHECK {_DRUM} DOES NOT TURN OR SLIDE BY HAND.",
-    # A press that goes on by hand is a slip fit (rule 23). Owner ruling
-    # 2026-11-07: a bond equals a press, so a slip drum is bonded rather than
-    # the wheel remade (BOND_NOTE). As the axle's (#2579): the slip clause
-    # names an unbonded drum, and a bonded one comes back through the hold
-    # check once cured, before anything oils or loads it.
-    "drum-pulled-off": f"IF IT DOES, OR AN UNBONDED {_DRUM} SLID ON BY HAND, PULL {_DRUM} OFF.",
-    "drum-bonded": f"IF IT CAME OFF, BOND IT ON WITH {BOND_GRADE}, {BOND_NOTE_REF}.",
-    "drum-bond-cured": (
-        f"IF IT WAS BONDED, RETURN TO {_step(_steps.DRUM_HELD_KEY)} ONCE IT HAS "
-        "CURED 24 H."
+    "drum-stripped": (
+        f"IF IT DOES, RETURN TO {_step(_steps.DRUM_BONDED_KEY)} WITH {_DRUM} PULLED "
+        "OFF AND BOTH CLEANED TO BARE METAL."
     ),
     # The press goes to its setting: the shoulder past the outer face of the
     # spacer slid on the shank against the bar (owner ruling 2026-11-21, fit
@@ -642,7 +653,7 @@ ASSEMBLY_STEPS = tuple(
 # step; the wire group's title states when its steps run, so no step carries
 # a precondition clause. Steps cite the drawing's sheets, views and BOM items.
 STEP_GROUPS = (
-    ("WHEEL GROUP (EXPLODED ON SHEET 2):", _steps.DRUM_PRESSED_KEY),
+    ("WHEEL GROUP (EXPLODED ON SHEET 2):", _steps.DRUM_BONDED_KEY),
     ("LEVER GROUP (EXPLODED ON SHEET 3):", _steps.LEVER_THREADED_KEY),
     (
         "LEVER WIRE, ON THE MACHINE, AFTER MHA-HA-00 HAS CLAMPED "
