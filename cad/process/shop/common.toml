@@ -504,11 +504,18 @@ feed_unit = "in/min"
 # cad/config/shop-equipment/measured-cuts.toml (prechips refuses any other key
 # on a setting), and test_measured_cuts.py refuses a plan cut outside them.
 # NOT tested, so the chart record above still carries them: any cut deeper
-# than 6.6 mm (the 10.54 mm side finishing); any cut wider than 3.4 mm at
-# 1.27 mm deep or wider than 3.0 mm deeper (the 12.7 mm full-width passes,
-# the .200 in facing stepover); climb milling; slotting; any other stick-out,
-# holder or material. 3.2 mm deep had one pass, which chattered; v6 planned a
-# 1.27 mm re-check and did not run it.
+# than 6.6 mm (the 10.54 mm side finishing); any cut wider than 6.4 mm at
+# 1.27 mm deep (7.6 mm chattered) or wider than 3.0 mm deeper (the 12.7 mm
+# full-width passes); climb milling; slotting; any other holder or material.
+# 3.2 mm deep had one pass, which chattered; v6 planned a 1.27 mm re-check and
+# did not run it.
+# Full width at shallow depth (#3428) is still NOT measured. The session of
+# 2026-11-23 (cad/process/dechatter/2026-11-23-pm30mv-em-half-carbide-1018-
+# issue3428-v1.html, 0.75 mm deep, setup stick-out 28.4 mm) ran one round on
+# stock 11 mm wide, narrower than the cutter: 1.3 mm wide stable at 2380 (asked
+# 2300 and 2420), 2600, 2690 and 2800 rpm as heard, 2.5 mm stable at 2375; its
+# second round (4.6 and 6.2 mm) was planned and not cut. Nothing wider than
+# 2.5 mm, so it adds no setting.
 # Speed: 2800 rpm chattered at both depths (1.8 mm wide at 1.27 deep, 1.3 mm
 # wide at 6.6 deep) and no speed between 2400 and 2800 was cut, so the chart's
 # 2650 is unmeasured, between the stable 2400 and the chattering 2800.
@@ -536,10 +543,34 @@ feed_unit = "in/min"
 # untested, not known bad. The chip-load sweep at 2370 rpm 3.4 mm cut 0.043
 # and 0.062 mm/tooth, both stable, below the 0.071 the round before held;
 # nothing above 0.071 was cut. 2370 × 3 × .0028 = 19.9 in/min.
+# The speeds above are the ones v5 asked for. As heard (the v5 session's
+# results.json), every pass asked 2300 to 2370 ran at 2375-2381 but the 2.4 mm
+# one, which ran at 2270. The next session heard 3.4 mm chatter at 2272
+# (settings.em-half-carbide-1018-3439-face), so this record's speed has
+# chatter one step of the dial below it: new plans use that record.
 [settings.em-half-carbide-1018-v5-face]
 tool = "endmill-carbide-3fl-1-2"
 material = "rocker-1018-cold-finished"
 rpm = 2370
+chip_load_mm_per_tooth = 0.07112
+flutes = 3
+feed_unit = "in/min"
+# Face, up to 1.27 mm (.050 in) deep and 6.4 mm wide (#3439): session
+# 1018-3.4mm-3fl-issue3439-v1, 2026-11-23, dechatter 0.5.0, same cutter and
+# collet, conventional, .0028 in (.071 mm)/tooth, 1.27 mm deep; the passes,
+# the speeds heard and why the limit is 6.4 mm and not the report's 7.1 are
+# beside measured_cuts.em-half-carbide-1018-3439-face (cad/config/
+# shop-equipment/measured-cuts.toml). Set 2450: asked for 2450, the spindle
+# ran 2486-2488 before the cut and 2455 in the 6.4 mm pass. The limit holds
+# for 2420-2490 rpm in the cut (2450-2490 before it); 3.4 mm chattered at 2272
+# and at 2582, so the stable band is about 100 rpm either side of 2480 at
+# most, and across four sessions the dial landed up to 80 rpm from the speed
+# asked. Up to 4.6 mm wide a spindle found near 2380 is also measured stable;
+# wider, bring it up to 2450-2490 first. 2450 × 3 × .0028 = 20.6 in/min.
+[settings.em-half-carbide-1018-3439-face]
+tool = "endmill-carbide-3fl-1-2"
+material = "rocker-1018-cold-finished"
+rpm = 2450
 chip_load_mm_per_tooth = 0.07112
 flutes = 3
 feed_unit = "in/min"

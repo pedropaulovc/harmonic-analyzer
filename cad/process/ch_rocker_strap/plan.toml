@@ -66,11 +66,14 @@ face_finish_stock_mm = 0.127
 face_rough_doc_mm = 0.2413
 face_finish_doc_mm = 0.127
 # Face stepover of the 1/2 in end mill, the measured face setting
-# (settings.em-half-carbide-1018-v5-face, dechatter v5, 2026-11-22: stable to
-# 3.4 mm wide at up to 1.27 mm deep; cad/config/shop-equipment/
-# measured-cuts.toml): twelve passes over the 1-1/2 in width plus the
-# recipe's overhang, a width cam.py posts exactly (26 % of the cutter).
-face_stepover_mm = 3.302
+# (settings.em-half-carbide-1018-3439-face, dechatter session of 2026-11-23,
+# #3439: stable to 6.4 mm wide at up to 1.27 mm deep, 2420-2490 rpm in the
+# cut; cad/config/shop-equipment/measured-cuts.toml): seven passes over the
+# 1-1/2 in width plus the recipe's overhang, a width cam.py posts exactly
+# (44 % of the cutter; six passes would need 6.43 mm, over the limit). Every
+# measured pass was conventional and the faces zigzag (owner ruling
+# 2026-11-16, kept 2026-11-22), so every other pass climbs, not measured.
+face_stepover_mm = 5.588
 # The strap in the blank, setup frame: X from the end stop, Y from the fence
 # into the blank (machine −Y), top arc toward the fence, bottom arc toward
 # the front edge. The hub is centred along the blank and 1.000 in from the
@@ -251,10 +254,10 @@ drill_chuck_gauge_mm = 95.0      # Archive holders.drill-chuck-r8.gauge_len_mm.
 # whole length below the chuck.
 reamer_oal_mm = 177.8
 # 1/2 in carbide end mill, 3 in overall (shop-equipment
-# tools.endmill-carbide-3fl-1-2): set 1.10 in out of the collet, the tool
-# assembly the dechatter cuts were measured with (cad/config/shop-equipment/
-# measured-cuts.toml; owner, Pedro, 2026-11-22: "stickout is recorded as 30mm
-# but is actually 27.94"). The collet's lower end then stands about 30 mm over
+# tools.endmill-carbide-3fl-1-2): set 1.10 in out of the collet, the shorter
+# end of the stick-out the measured face setting allows (cad/config/
+# shop-equipment/measured-cuts.toml: 27.94 to 28.448 mm; owner, Pedro,
+# 2026-11-22: "stickout is recorded as 30mm but is actually 27.94"). The collet's lower end then stands about 30 mm over
 # the plate top while the faces are cut: the jaws' top is 9 mm over it, the
 # fence, end stop and clamp noses at most 2 mm.
 half_mill_projection_mm = 27.94
@@ -394,8 +397,8 @@ speed_kind = "spindle"
 tool = "em-half"
 drilling = "none"
 sizing = "other"
-instruction = "Run RS01_rough_faces (M6 T1, 1/2 in end mill; set 2370): face 1 at Z {{cad.rough_face_1_z_in:.4dot}}. At its M0 (spindle off, cutter retracted): unclamp, turn the blank over end for end (face 2 up, the same long edge on the fence, the other end on the end stop), reclamp, Cycle Start: face 2 at Z {{cad.rough_face_2_z_in:.4dot}}."
-settings = "em-half-carbide-1018-v5-face"
+instruction = "Run RS01_rough_faces (M6 T1, 1/2 in end mill; set 2450): face 1 at Z {{cad.rough_face_1_z_in:.4dot}}. At its M0 (spindle off, cutter retracted): unclamp, turn the blank over end for end (face 2 up, the same long edge on the fence, the other end on the end stop), reclamp, Cycle Start: face 2 at Z {{cad.rough_face_2_z_in:.4dot}}."
+settings = "em-half-carbide-1018-3439-face"
 milling_cuts = [
   { name = "face rough", kind = "end", phase = "rough", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", axial_doc_mm = "{{process.face_rough_doc_mm}}", radial_woc_mm = "{{process.face_stepover_mm}}", traverse_mm = [0, "{{cad.blank_length_mm}}"] },
 ]
@@ -418,8 +421,8 @@ speed_kind = "spindle"
 tool = "em-half"
 drilling = "none"
 sizing = "other"
-instruction = "Run RS02_finish_face_1 (M6 T1 at its start, the 1/2 in end mill: set it on the tool setter again; 2370): the face at Z {{cad.finish_face_1_z_in:.4dot}}."
-settings = "em-half-carbide-1018-v5-face"
+instruction = "Run RS02_finish_face_1 (M6 T1 at its start, the 1/2 in end mill: set it on the tool setter again; 2450): the face at Z {{cad.finish_face_1_z_in:.4dot}}."
+settings = "em-half-carbide-1018-3439-face"
 milling_cuts = [
   { name = "face finish", kind = "end", phase = "finish", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", axial_doc_mm = "{{process.face_finish_doc_mm}}", radial_woc_mm = "{{process.face_stepover_mm}}", traverse_mm = [0, "{{cad.blank_length_mm}}"] },
 ]
@@ -447,10 +450,10 @@ speed_kind = "spindle"
 tool = "em-half"
 drilling = "none"
 sizing = "other"
-instruction = "Run RS03_finish_face_2_hub (M6 T1 at its start, the 1/2 in end mill; 2370): the face at Z {{cad.thickness_in:.4dot}}. It stops at its M6 T3 (spindle off, cutter retracted), before the centre drill goes in: unclamp the blank and lift it off for the check, since the micrometer cannot reach under it on the plate."
+instruction = "Run RS03_finish_face_2_hub (M6 T1 at its start, the 1/2 in end mill; 2450): the face at Z {{cad.thickness_in:.4dot}}. It stops at its M6 T3 (spindle off, cutter retracted), before the centre drill goes in: unclamp the blank and lift it off for the check, since the micrometer cannot reach under it on the plate."
 inspection = "Every blank's thickness acceptance: {{cad.thickness_min_in:.3dot}}–{{cad.thickness_max_in:.3dot}}, micrometer at both ends and mid-length."
 gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.thickness_band_mm}}" }]
-settings = "em-half-carbide-1018-v5-face"
+settings = "em-half-carbide-1018-3439-face"
 milling_cuts = [
   { name = "face finish", kind = "end", phase = "finish", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", axial_doc_mm = "{{process.face_finish_doc_mm}}", radial_woc_mm = "{{process.face_stepover_mm}}", traverse_mm = [0, "{{cad.blank_length_mm}}"] },
 ]

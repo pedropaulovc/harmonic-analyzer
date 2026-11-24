@@ -174,8 +174,14 @@ they need from their process plans. They hold:
   plan parameter that pins it, the deepest and the widest cut found stable.
   prechips refuses any other key on a setting, so the limits are data here;
   `test_measured_cuts.py` checks each against its report and refuses a plan
-  operation that names the setting with another stick-out, or a
-  `milling_cuts` entry deeper or wider than measured. The cut direction the
+  operation that names the setting with a stick-out the record does not
+  allow, or a
+  `milling_cuts` entry deeper or wider than measured. The spindle is set by
+  hand and a report prints the speed it asked for; the speed the spindle ran
+  is in the session's results file beside the report (`results`,
+  `spindle_hz` × 60), and a record may carry the band of heard speeds its
+  limit holds in (`speed_in_cut_rpm`, `speed_no_load_rpm`), which the test
+  checks against that file. The cut direction the
   passes ran (`direction`) is recorded and NOT checked: a cut has no direction
   field, so a climb pass on a measured setting is not refused;
 - ownership-only records, under the shop key, for the PM-30MV mill, the

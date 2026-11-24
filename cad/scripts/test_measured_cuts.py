@@ -4,6 +4,7 @@ report shows, and no plan uses a measured setting outside it."""
 from __future__ import annotations
 
 import html
+import json
 import re
 import tomllib
 
@@ -18,6 +19,8 @@ REPO_ROOT = CAD_ROOT.parent
 
 MEASURED = _measured_cuts.records()
 SETTING = "em-half-carbide-1018-v6-deep"
+WIDE_FACE = "em-half-carbide-1018-3439-face"
+V5_FACE = "em-half-carbide-1018-v5-face"
 
 
 def _passes(report: str) -> list[tuple[float, int, float, str, str]]:
@@ -61,7 +64,79 @@ def _plan(stickout: float, depth: object, width: object) -> dict:
 
 
 def test_records_exist() -> None:
-    assert set(MEASURED) >= {"em-half-carbide-1018-v5-face", SETTING}
+    assert set(MEASURED) >= {V5_FACE, SETTING, WIDE_FACE}
+
+
+def _heard(key: str) -> list[tuple[float, float, str, int]]:
+    """(width mm, rpm heard, verdict, rpm asked) of every analysed test pass in
+    a record's results file: the spindle is set by hand, and ``spindle_hz`` is
+    the speed dechatter heard it run."""
+    session = json.loads(
+        (REPO_ROOT / MEASURED[key]["results"]).read_text(encoding="utf-8")
+    )
+    return [
+        (p["width_mm"], p["spindle_hz"] * 60, p["verdict"], p["rpm"])
+        for r in session["rounds"]
+        for p in r["passes"]
+        if p["kind"] == "test" and p["status"] == "analysed"
+    ]
+
+
+def test_the_wide_face_speed_band_is_what_was_heard() -> None:
+    record = MEASURED[WIDE_FACE]
+    setting = _process_plans.load_shop()["settings"][WIDE_FACE]
+    low, high = record["speed_in_cut_rpm"]
+    width = record["radial_woc_max_mm"]
+    heard = _heard(WIDE_FACE)
+    # The limit pass ran inside the band, at the speed the setting asks for.
+    assert [
+        v for w, rpm, v, asked in heard if w == width and asked == setting["rpm"]
+    ] == ["stable"]
+    inside = [(w, v) for w, rpm, v, _a in heard if low <= rpm <= high]
+    assert all(v == "stable" for w, v in inside)
+    # The band is no wider than the stable speeds heard at the limit's width
+    # and wider, to the next 10 rpm.
+    wide = [rpm for w, rpm, v, _a in heard if w >= width and v == "stable"]
+    assert low <= min(wide) < low + 10
+    widest_inside = max(w for w, _v in inside)
+    top = max(rpm for w, rpm, v, _a in heard if v == "stable")
+    assert top <= high < top + 10
+    # Chatter was heard below and above the band, and wider than the limit.
+    assert any(v == "unstable" and rpm < low for w, rpm, v, _a in heard if w <= width)
+    assert any(v == "unstable" and rpm > high for w, rpm, v, _a in heard if w <= width)
+    chatter_width = min(w for w, rpm, v, _a in heard if w > width and v == "unstable")
+    assert width < widest_inside < chatter_width
+    # What to set before the cut lies in the band: the spindle slows in the cut.
+    no_load_low, no_load_high = record["speed_no_load_rpm"]
+    assert low <= no_load_low <= setting["rpm"] <= no_load_high <= high
+
+
+def test_v5_face_speed_has_chatter_a_dial_step_below() -> None:
+    # Why plans moved off the v5 face record: its passes ran near 2377 rpm,
+    # and the next session heard its limit width chatter near 2272.
+    width = MEASURED[V5_FACE]["radial_woc_max_mm"]
+    limit = [rpm for w, rpm, _v, _a in _heard(V5_FACE) if w == width]
+    assert limit and all(2370 < rpm < 2385 for rpm in limit)
+    below = [v for w, rpm, v, _a in _heard(WIDE_FACE) if w == width and rpm < 2300]
+    assert below == ["unstable"]
+
+
+def test_a_shorter_stickout_passes_only_where_the_record_allows_it() -> None:
+    record = MEASURED[WIDE_FACE]
+    plan = _plan(27.94, 1.27, 6.4)
+    plan["setups"][0]["operations"][1]["settings"] = WIDE_FACE
+    assert record["stickout_min_mm"] == MEASURED[SETTING]["stickout_mm"]
+    assert _measured_cuts.problems(plan, MEASURED) == []
+    plan["parameters"]["half_mill_projection_mm"] = record["stickout_mm"]
+    assert _measured_cuts.problems(plan, MEASURED) == []
+    for stickout in (25.4, 30.0):
+        plan["parameters"]["half_mill_projection_mm"] = stickout
+        (problem,) = _measured_cuts.problems(plan, MEASURED)
+        assert "measured at 27.94 to 28.448 mm stick-out" in problem
+    plan["parameters"]["half_mill_projection_mm"] = 27.94
+    plan["setups"][0]["operations"][1]["milling_cuts"][0]["radial_woc_mm"] = 7.1
+    (problem,) = _measured_cuts.problems(plan, MEASURED)
+    assert "radial_woc_mm 7.1 exceeds the measured 6.4" in problem
 
 
 @pytest.mark.parametrize("key", sorted(MEASURED))
