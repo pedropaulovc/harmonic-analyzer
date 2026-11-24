@@ -89,7 +89,6 @@ from pd_transgear_knob_shaft_spec import (
     FRONT_CORNER_RADIUS_TOL_TYPE,
     GEOMETRIC_CONTROLS,
     JOURNAL_DIA,
-    JOURNAL_DIA_BAND,
     JOURNAL_LENGTH,
     OUTSIDE_DIA_BAND,
     OUTSIDE_DIA,
@@ -946,10 +945,6 @@ def build(adapter: Any) -> dict[str, str]:
     # The D-core and its flat are made to fit MHA-PD-22 (sheet note 2): both
     # print as REF, so neither carries a native band (the spec's
     # CORE_DIA_BAND and CORE_FLAT_BAND are analysis numbers).
-    set_dimension_bilateral_tolerance(
-        adapter, "JournalProfile", "JournalDia", *deviations(JOURNAL_DIA_BAND),
-        display_unit=UNIT,
-    )
     set_dimension_bilateral_tolerance(
         adapter, "StudProfile", "OutsideDia", *deviations(OUTSIDE_DIA_BAND), display_unit=UNIT
     )

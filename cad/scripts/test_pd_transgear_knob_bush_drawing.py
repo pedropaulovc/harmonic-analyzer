@@ -100,8 +100,10 @@ def test_the_plate_hole_is_the_bush_press_band() -> None:
 
 
 def test_the_bands_live_on_the_model_from_named_constants() -> None:
+    # The reamed running bore prints the reamer's size and no band (rule 4,
+    # fit audit 2026-11-23); BORE_BAND is the analysis band the stacks read.
     assert model_toleranced_dimensions(part) == {
-        ("BoreSketch", "BoreDia"): "*deviations(BORE_BAND)",
+
         ("BushProfile", "HubLength"): "HUB_LENGTH_BAND",
         ("BushProfile", "BushLength"): "LENGTH_BAND",
     }
@@ -187,7 +189,9 @@ def test_each_tight_callout_names_its_mate_by_drawing_number() -> None:
     plate, shaft = _number("pd-transgear-arm-plate"), _number("pd-transgear-knob-shaft")
     bore = spec.BORE_CALLOUT.splitlines()
     assert bore[0] == f"REAM THRU AFTER PRESSING IN {plate}"
-    assert bore[1] == f"RUNNING FIT ON KNOB SHAFT {shaft}"
+    # The fit, its mate and what it protects (the necessity answer, no
+    # dimension in it), on one row.
+    assert bore[1] == f"RUNNING FIT ON KNOB SHAFT {shaft}, KEEPS REDUCER BACKLASH"
     assert bore[2] == spec.WALL_TEXT
     press = spec.PRESS_CALLOUT.splitlines()
     assert len(press) == 2

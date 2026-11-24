@@ -30,8 +30,9 @@ from _surface_finish import MACHINED_UM, SurfaceFinishControl
 
 UNIT = BUSH.UNIT
 
-# The H7 running bore's model band, (upper, lower), on the knob shaft's g6
-# journal.
+# The reamed running bore's ANALYSIS band, (upper, lower): what the reamer
+# is taken to cut.  Not a printed limit (the sheet prints the reamer's size
+# and no band); the feature declaration and the stacks read it.
 BORE_BAND = (max(BUSH.BORE_DIA_LIMITS), min(BUSH.BORE_DIA_LIMITS))
 
 
@@ -121,13 +122,16 @@ FINISH_CAPTIONS = {
 
 # --- Callouts -----------------------------------------------------------------
 # The bore is a fit reamed in place (rule 12 process, rule 4 route): REAM
-# after pressing, the H7 band naming the knob shaft's g6 journal it runs on,
-# and the press section's wall, under the .080 target, stated as a plain fact
-# (rule 20).  The B pre-drill is the process's, not the sheet's.
+# after pressing, at the reamer's size with no band, naming the knob shaft's
+# journal that is turned to it and what the fit protects (rule 4's
+# necessity answer: the journal's shake is the reducer mesh's backlash),
+# and the press section's wall, under the .080 target, stated as a plain
+# fact (rule 20).  The B pre-drill is the process's, not the sheet's.
 WALL_TEXT = f"WALL {_inch(BUSH.WALL_STATED_MIN, 3, math.floor)} MIN"
+BORE_NECESSITY = "KEEPS REDUCER BACKLASH"
 BORE_CALLOUT = (
     f"REAM THRU AFTER PRESSING IN {PLATE_NUMBER}\n"
-    f"RUNNING FIT ON KNOB SHAFT {KNOB_SHAFT_NUMBER}\n"
+    f"RUNNING FIT ON KNOB SHAFT {KNOB_SHAFT_NUMBER}, {BORE_NECESSITY}\n"
     f"{WALL_TEXT}"
 )
 # Made to fit (rule 4, form 2): the press step is turned last to MHA-PD-19's
