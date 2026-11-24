@@ -2739,7 +2739,12 @@ SPRING_TO_LIFT_ROD = (
 # strap pivot bore moved to the .2510 reamer's 6.3754, removing a ring
 # coaxial with the swing axis, 2.3213 mm^3 per strap (analytic: pi/4 x
 # (6.3754^2 - 6.35^2) x 9.144): its moment about that axis is zero, so the
-# moments stand; the strap volume and the mass (-0.036 g) follow.
+# moments stand; the strap volume and the mass (-0.036 g) follow.  Again
+# (fit audit F14): the arbor's crossrod hole moved to the .2510 reamer's
+# 6.3754, its analytic volume -3.6266 mm^3 (V_TOTAL), -0.0283 g at the arbor
+# head; at most C2C 28 off the swing axis, the moments would fall by at
+# most 0.0078 N mm (0.05%), so they stand; the arbor volume and the mass
+# follow.
 # Install the measured basis AND frozen fingerprint together (DEVELOPING.md).
 SWING_GRAVITY_NMM = (14.980239335725214, 25.47546406056267)
 SWING_GRAVITY_CORNER_NMM = (15.284948898840918, 25.98774126443521)
@@ -2749,14 +2754,14 @@ SWING_GRAVITY_CORNER_NMM = (15.284948898840918, 25.98774126443521)
 # any current part's analytic volume, material or governing dimensions move.
 SWING_GRAVITY_BASIS = {
     "dt-alignment-pinion": (1, 26128.94294339178, 8500.0),
-    "dt-pinion-arbor": (1, 13457.368170365333, 7800.0),
+    "dt-pinion-arbor": (1, 13453.741545886222, 7800.0),
     "dt-pinion-pivot-shaft": (1, 6219.3351191767015, 7800.0),
     "dt-pinion-bracket": (2, 4642.071111359271, 7800.0),
     "dt-pinion-arbor-collar": (1, 2113.391953300099, 7800.0),
     "dt-pinion-handle": (1, 2059.2591950522306, 7800.0),
     "dt-pinion-cam-pin": (2, 253.14809801839277, 7800.0),
 }
-SWING_GRAVITY_MASS_G = 484.48639930069766
+SWING_GRAVITY_MASS_G = 484.4581116297606
 # Frozen governing dimensions of the accepted native-STL calibration, never
 # live config aliases.
 SWING_GRAVITY_FINGERPRINT = {
