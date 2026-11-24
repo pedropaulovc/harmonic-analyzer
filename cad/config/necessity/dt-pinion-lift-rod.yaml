@@ -4,9 +4,9 @@
 # The rod turns freely in the MHA-DT-18 lift bores (fit audit F26, the F
 # drill), so they ask nothing of its diameter. The h band (.2492-.2500, 1/4
 # in ground stock as supplied) stays for the bores the rod slides into by hand:
-# the two MHA-DT-23 cams' and the MHA-DT-16 hub's .2510 reams (fit audit F19,
-# F23). On ±.0005 drill rod the cam's slip could pass its 0.10 mm limit
-# (dt_pinion_cam_spec.SLIP_CLEARANCE_MAX on t23/fitdt-rig). The set-screw
+# the two MHA-DT-23 cams' .2510 reams (fit audit F19; the MHA-DT-16 hub is F
+# drilled since fit audit F23). On ±.0005 drill rod the cam's slip could pass
+# its 0.10 mm limit (dt_pinion_cam_spec.SLIP_CLEARANCE_MAX). The set-screw
 # flats are .30 long (owner ruling C7, 2026-11-24, "Yes: ranges, longer flats,
 # no leaf miking.") and print at the title block's .XX.
 necessity:
@@ -14,4 +14,4 @@ necessity:
     feature: "Ø.2500 +.0000/-.0008 rod (TURNS FREELY IN MHA-DT-18 LIFT BORES, 1/4 IN GROUND STOCK OK)"
     kind: gap
     reason: "the cams' .2510 reamed bores keep their 0.10 slip"
-    source: "fit audit F19, F23 (MHA-DT-23 and MHA-DT-16 .2510 reams); dt_pinion_cam_spec slip limit"
+    source: "fit audit F19 (MHA-DT-23 .2510 reams); dt_pinion_cam_spec slip limit"
