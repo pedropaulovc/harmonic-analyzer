@@ -156,7 +156,7 @@ top_skim_min_mm = 0.127
 # settings.em-half-carbide-1018-3439-face, measured stable on the PM-30MV
 # at up to 1.27 mm (.050) deep and 6.4 mm wide, 2420-2490 rpm in the cut
 # (dechatter session of 2026-11-23, #3439; cad/config/shop-equipment/
-# measured-cuts.toml, which allows the 27.94 mm stick-out): equal passes
+# measured-cuts.toml, which allows the 28.45 mm stick-out): equal passes
 # across the face no wider than .207, the widest any face takes (the depth
 # faces' 10.033 + the 0.5 overhang in two: 5.2665; the rough-height faces'
 # 8.763 + 0.5 in two: 4.632; the 1/2 in faces' 12.7 + 0.5 in three: 4.400,
@@ -246,11 +246,11 @@ vise_clamp_end_mm = 217.2589
 # Machine-capacity inputs (mm): heights from the table, tool lengths from
 # spindle nose to tip.
 r8_collet_gauge_mm = 6.3         # HA: holders.r8-collets-lms-4860.gauge_len_mm.
-# 1/2 in end mill, 3 in overall, set 1.10 in (27.94) out of the collet: the
-# stick-out the measured settings hold for (cad/config/shop-equipment/
-# measured-cuts.toml; owner, Pedro, 2026-11-22: "stickout is recorded as
-# 30mm but is actually 27.94").
-half_mill_projection_mm = 27.94
+# 1/2 in end mill, 3 in overall, set 1.12 in (28.45) out of the collet
+# (owner, Pedro, 2026-11-24: "28.45"): the longer end of the stick-out the
+# measured face setting allows (cad/config/shop-equipment/
+# measured-cuts.toml: 27.94 to 28.45 mm).
+half_mill_projection_mm = 28.45
 # Tapping under the spring tap guide (tools.tap-guide-fisher): the guide and
 # the tap in its wrench together reach at most tap_stack_max_mm below the
 # collet face, the spindle-to-table maximum (shop machines.pm-30mv, 431.8)
@@ -345,7 +345,7 @@ feed = "hand"
 
 [[setups.operations]]
 instruction = "G54 Z0: the skimmed underside, the face up's high point less the {{process.underside_skim_mm:in.3dot}} skim."
-instruction_detailed = "Console M6 T1 (1/2 in end mill, 1.10 in out of the collet; the tool setter measures it). Spindle stopped, its tip just dragging a .002 feeler leaf on the highest point of the face up (try both ends and the middle): G10 L20 P1 Z0.559 (the {{process.underside_skim_mm:in.3dot}} skim plus the .002 leaf)."
+instruction_detailed = "Console M6 T1 (1/2 in end mill, {{process.half_mill_projection_mm:in.2f}} in out of the collet; the tool setter measures it). Spindle stopped, its tip just dragging a .002 feeler leaf on the highest point of the face up (try both ends and the middle): G10 L20 P1 Z0.559 (the {{process.underside_skim_mm:in.3dot}} skim plus the .002 leaf)."
 feed = "hand"
 
 [[setups.operations]]
@@ -358,7 +358,7 @@ speed_kind = "spindle"
 tool = "em-half"
 drilling = "none"
 sizing = "other"
-instruction = "Run PG01_underside (M6 T1, 1/2 in end mill; set 2450): skim the face up at Z0, in passes along the rail no wider than {{process.face_stepover_max_mm:in.3dot}}. A cold-finished patch left: send $#, note the G54 line's Z, G10 L2 P1 Z(that Z − 0.127) (Z0 .005 lower) and run it again. Unclamp; mark this face U (the underside) with marking fluid."
+instruction = "Run PG01_underside (M6 T1, 1/2 in end mill; set 2450: the display rests near 2485, not 2380): skim the face up at Z0, in passes along the rail no wider than {{process.face_stepover_max_mm:in.3dot}}. A cold-finished patch left: send $#, note the G54 line's Z, G10 L2 P1 Z(that Z − 0.127) (Z0 .005 lower) and run it again. Unclamp; mark this face U (the underside) with marking fluid."
 settings = "em-half-carbide-1018-3439-face"
 inspection = "U is the slide face on MHA-PD-07, Ra {{cad.bottom_face_finish_callout}} µin: one even end-mill finish end to end, no cold-finished patch, tear or chatter, by eye and fingernail. Torn or chattered: stop and tell the owner."
 gauge_checks = "other"
@@ -406,7 +406,7 @@ speed_kind = "spindle"
 tool = "em-half"
 drilling = "none"
 sizing = "other"
-instruction = "Run PG02_top (M6 T1; set 2450): face the top down to Z {{process.rough_height_mm:in.4dot}} (the rough height, .055 over the finished) in equal levels no deeper than {{process.top_step_max_mm:in.3dot}} from {{process.height_raw_max_mm:in.3dot}} (the thickest bar: a thinner one cuts air first). Unclamp; mic it."
+instruction = "Run PG02_top (M6 T1; 2450, display near 2485): face the top down to Z {{process.rough_height_mm:in.4dot}} (the rough height, .055 over the finished) in equal levels no deeper than {{process.top_step_max_mm:in.3dot}} from {{process.height_raw_max_mm:in.3dot}} (the thickest bar: a thinner one cuts air first). Unclamp; mic it."
 settings = "em-half-carbide-1018-3439-face"
 inspection = "U to the top {{process.rough_height_mm:in.3dot}} ±.002, miked at both ends and the middle, and no cold-finished patch left on the top (Setups 4-6 grip on it and set the stack's clearance from it). Off: as below."
 gauge_checks = [{ gauge = "micrometers", band_mm = [8.7122, 8.8138] }]
@@ -458,7 +458,7 @@ speed_kind = "spindle"
 tool = "em-half"
 drilling = "none"
 sizing = "other"
-instruction = "Run PG03_front (M6 T1; set 2450): face the face up down to Z0 in equal levels no deeper than {{process.front_step_max_mm:in.3dot}}. Unclamp; mark this face F (the front face) with marking fluid."
+instruction = "Run PG03_front (M6 T1; 2450, display near 2485): face the face up down to Z0 in equal levels no deeper than {{process.front_step_max_mm:in.3dot}}. Unclamp; mark this face F (the front face) with marking fluid."
 settings = "em-half-carbide-1018-3439-face"
 milling_cuts = [
   { name = "front face", kind = "end", phase = "finish", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", axial_doc_mm = "{{process.front_step_max_mm}}", radial_woc_mm = "{{process.face_stepover_max_mm}}", traverse_mm = ["{{process.left_end_skim_mm}}", "{{process.right_end_station_mm}}"] },
@@ -504,7 +504,7 @@ speed_kind = "spindle"
 tool = "em-half"
 drilling = "none"
 sizing = "other"
-instruction = "Run PG04_depth (M6 T1; set 2450): face the rear face down to Z {{process.depth_target_mm:in.4dot}} in equal levels no deeper than {{process.depth_step_max_mm:in.3dot}} from {{process.depth_raw_max_mm:in.3dot}} (the thickest bar: a thinner one cuts air first). Unclamp; mark this face R (the rear face); mic the depth."
+instruction = "Run PG04_depth (M6 T1; 2450, display near 2485): face the rear face down to Z {{process.depth_target_mm:in.4dot}} in equal levels no deeper than {{process.depth_step_max_mm:in.3dot}} from {{process.depth_raw_max_mm:in.3dot}} (the thickest bar: a thinner one cuts air first). Unclamp; mark this face R (the rear face); mic the depth."
 settings = "em-half-carbide-1018-3439-face"
 inspection = "Depth {{cad.rear_face_depth_min_in:.3dot}}–{{cad.rear_face_depth_max_in:.3dot}}, F to R, miked at both ends and the middle."
 gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.rear_face_depth_band_mm}}" }]
@@ -700,7 +700,7 @@ speed_kind = "spindle"
 tool = "em-half"
 drilling = "none"
 sizing = "other"
-instruction = "Run PG15_height (M6 T1; set 2450): face the top down from the rough {{process.rough_height_mm:in.3dot}} to Z {{process.height_target_mm:in.4dot}} in equal levels no deeper than {{process.height_step_max_mm:in.3dot}}. Unclamp; mic the height."
+instruction = "Run PG15_height (M6 T1; 2450, display near 2485): face the top down from the rough {{process.rough_height_mm:in.3dot}} to Z {{process.height_target_mm:in.4dot}} in equal levels no deeper than {{process.height_step_max_mm:in.3dot}}. Unclamp; mic the height."
 settings = "em-half-carbide-1018-3439-face"
 inspection = "Height {{cad.top_face_height_min_in:.3dot}}–{{cad.top_face_height_max_in:.3dot}}, U to the top, miked at both ends and the middle."
 gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.top_face_height_band_mm}}" }]

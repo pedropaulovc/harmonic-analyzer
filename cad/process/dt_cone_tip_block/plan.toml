@@ -265,12 +265,11 @@ vise_slit_inset_mm = -125.1458
 # the spindle nose to the tip.
 r8_collet_gauge_mm = 6.3         # HA: holders.r8-collets-lms-4860.gauge_len_mm.
 drill_chuck_gauge_mm = 95.0      # Archive holders.drill-chuck-r8.gauge_len_mm.
-# 1/2 in end mill, 3 in overall: set 1.100 in out of the collet, the stick-out
-# its measured setting allows (cad/config/shop-equipment/measured-cuts.toml:
-# 27.94 to 28.448 mm;
-# owner, Pedro, 2026-11-22: "stickout is recorded as 30mm but is actually
-# 27.94").
-half_mill_projection_mm = 27.94
+# 1/2 in end mill, 3 in overall: set 1.12 in (28.45 mm) out of the collet
+# (owner, Pedro, 2026-11-24: "28.45"), the longer end of the stick-out its
+# measured setting allows (cad/config/shop-equipment/measured-cuts.toml:
+# 27.94 to 28.45 mm).
+half_mill_projection_mm = 28.45
 chamfer_projection_min_mm = 12.7
 # Overall lengths: the #2 combined drill and countersink 1-7/8 in; the #30
 # jobber drill 2-3/4 in (ASME B94.11M), the longest drill under the chuck.
@@ -430,7 +429,7 @@ speed_kind = "spindle"
 tool = "em-half"
 drilling = "none"
 sizing = "other"
-instruction = "Run DT01_depth (M6 T1, 1/2 in end mill; set 2450): face the face up down to Z {{process.depth_target_mm:in.4dot}} in equal levels no deeper than {{process.face_step_max_mm:in.3dot}} from {{process.bar_thickness_max_mm:in.3dot}} (the thickest bar: a thinner one cuts air first). Unclamp; mark this face S; mic N to S."
+instruction = "Run DT01_depth (M6 T1, 1/2 in end mill; set 2450: the display rests near 2485, not 2380): face the face up down to Z {{process.depth_target_mm:in.4dot}} in equal levels no deeper than {{process.face_step_max_mm:in.3dot}} from {{process.bar_thickness_max_mm:in.3dot}} (the thickest bar: a thinner one cuts air first). Unclamp; mark this face S; mic N to S."
 settings = "em-half-carbide-1018-3439-face"
 inspection = "Depth {{cad.south_face_depth_min_in:.3dot}}–{{cad.south_face_depth_max_in:.3dot}}, N to S, miked at all four corners."
 gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.south_face_depth_band_mm}}" }]
@@ -478,7 +477,7 @@ speed_kind = "spindle"
 tool = "em-half"
 drilling = "none"
 sizing = "other"
-instruction = "Run DT02_east (M6 T1; set 2450): skim the face up at Z0. A sawn patch left: send $#, note the G54 line's Z, G10 L2 P1 Z(that Z − 0.254) (Z0 .010 lower) and run it again. Unclamp; mark this face E again."
+instruction = "Run DT02_east (M6 T1; 2450, display near 2485): skim the face up at Z0. A sawn patch left: send $#, note the G54 line's Z, G10 L2 P1 Z(that Z − 0.254) (Z0 .010 lower) and run it again. Unclamp; mark this face E again."
 settings = "em-half-carbide-1018-3439-face"
 inspection = "E cut clean end to end, no sawn patch left, by eye."
 gauge_checks = "other"
@@ -518,7 +517,7 @@ speed_kind = "spindle"
 tool = "em-half"
 drilling = "none"
 sizing = "other"
-instruction = "Run DT03_top (M6 T1; set 2450): skim TOP down to Z0 in equal levels no deeper than {{process.face_step_max_mm:in.3dot}}. An edge patch left: Z0 .010 lower as in Setup 3 and run it again. Unclamp; mark this end TOP."
+instruction = "Run DT03_top (M6 T1; 2450, display near 2485): skim TOP down to Z0 in equal levels no deeper than {{process.face_step_max_mm:in.3dot}}. An edge patch left: Z0 .010 lower as in Setup 3 and run it again. Unclamp; mark this end TOP."
 settings = "em-half-carbide-1018-3439-face"
 inspection = "TOP cut clean across, no bar-edge patch left, by eye."
 gauge_checks = "other"
@@ -562,7 +561,7 @@ speed_kind = "spindle"
 tool = "em-half"
 drilling = "none"
 sizing = "other"
-instruction = "Run DT04_seat (M6 T1; set 2450): face the end up down to Z {{process.length_target_mm:in.4dot}} in equal levels no deeper than {{process.face_step_max_mm:in.3dot}} from {{process.seat_raw_max_mm:in.3dot}} (the widest bar: a narrower one cuts air first). The file stops at its M6 T2, the spindle stopped and the end mill lifted clear."
+instruction = "Run DT04_seat (M6 T1; 2450, display near 2485): face the end up down to Z {{process.length_target_mm:in.4dot}} in equal levels no deeper than {{process.face_step_max_mm:in.3dot}} from {{process.seat_raw_max_mm:in.3dot}} (the widest bar: a narrower one cuts air first). The file stops at its M6 T2, the spindle stopped and the end mill lifted clear."
 settings = "em-half-carbide-1018-3439-face"
 inspection = "At the M6 T2 stop: SEAT, the face just cut, Ra {{cad.seat_finish_callout}} µin or finer: one even end-mill finish, no tear or chatter, by eye and fingernail. Torn: stop and tell the owner."
 gauge_checks = "other"
@@ -702,7 +701,7 @@ speed_kind = "spindle"
 tool = "em-half"
 drilling = "none"
 sizing = "other"
-instruction = "Run DT06_west (M6 T1; set 2450): face the face up down to Z {{process.width_target_mm:in.4dot}} in equal levels no deeper than {{process.face_step_max_mm:in.3dot}} from {{process.west_raw_max_mm:in.3dot}} (the widest strip). The file stops at its M6 T2, the spindle stopped and the end mill lifted clear."
+instruction = "Run DT06_west (M6 T1; 2450, display near 2485): face the face up down to Z {{process.width_target_mm:in.4dot}} in equal levels no deeper than {{process.face_step_max_mm:in.3dot}} from {{process.west_raw_max_mm:in.3dot}} (the widest strip). The file stops at its M6 T2, the spindle stopped and the end mill lifted clear."
 settings = "em-half-carbide-1018-3439-face"
 milling_cuts = [
   { name = "west face", kind = "end", phase = "finish", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", axial_doc_mm = "{{process.face_step_max_mm}}", radial_woc_mm = "{{process.face_stepover_max_mm}}", traverse_mm = [0, "{{process.length_target_mm}}"] },

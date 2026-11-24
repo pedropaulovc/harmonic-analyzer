@@ -254,13 +254,14 @@ drill_chuck_gauge_mm = 95.0      # Archive holders.drill-chuck-r8.gauge_len_mm.
 # whole length below the chuck.
 reamer_oal_mm = 177.8
 # 1/2 in carbide end mill, 3 in overall (shop-equipment
-# tools.endmill-carbide-3fl-1-2): set 1.10 in out of the collet, the shorter
-# end of the stick-out the measured face setting allows (cad/config/
-# shop-equipment/measured-cuts.toml: 27.94 to 28.448 mm; owner, Pedro,
-# 2026-11-22: "stickout is recorded as 30mm but is actually 27.94"). The collet's lower end then stands about 30 mm over
+# tools.endmill-carbide-3fl-1-2): set 1.12 in (28.45 mm) out of the collet
+# (owner, Pedro, 2026-11-24: "28.45"), the longer end of the stick-out the
+# measured face setting allows (cad/config/shop-equipment/
+# measured-cuts.toml: 27.94 to 28.45 mm). The collet's lower end then stands
+# about 31 mm over
 # the plate top while the faces are cut: the jaws' top is 9 mm over it, the
 # fence, end stop and clamp noses at most 2 mm.
-half_mill_projection_mm = 27.94
+half_mill_projection_mm = 28.45
 # 1/8 in end mill, 1-1/2 in overall, 1/2 in of flute: between this much out
 # of the collet and its flute length (4 diameters).
 eighth_mill_projection_min_mm = 12.0
@@ -366,7 +367,7 @@ steps = [
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Console M6 T1 (the 1/2 in end mill, 1.10 in out of the collet, measured on the tool setter). T1, spindle off, just dragging on a .200 gauge block on the plate top: G10 L20 P1 Z5.080. The .200 edge finder at 900 rpm on the fence face: G10 L20 P1 Y-2.540; on the end stop's face: G10 L20 P1 X2.540 (its 2.540 mm radius)."
+instruction = "Console M6 T1 (the 1/2 in end mill, {{process.half_mill_projection_mm:in.2f}} in out of the collet, measured on the tool setter). T1, spindle off, just dragging on a .200 gauge block on the plate top: G10 L20 P1 Z5.080. The .200 edge finder at 900 rpm on the fence face: G10 L20 P1 Y-2.540; on the end stop's face: G10 L20 P1 X2.540 (its 2.540 mm radius)."
 feed = "hand"
 
 # Prove-out: the clamps, fence and end stop stand about .02 under the finish
@@ -397,7 +398,7 @@ speed_kind = "spindle"
 tool = "em-half"
 drilling = "none"
 sizing = "other"
-instruction = "Run RS01_rough_faces (M6 T1, 1/2 in end mill; set 2450): face 1 at Z {{cad.rough_face_1_z_in:.4dot}}. At its M0 (spindle off, cutter retracted): unclamp, turn the blank over end for end (face 2 up, the same long edge on the fence, the other end on the end stop), reclamp, Cycle Start: face 2 at Z {{cad.rough_face_2_z_in:.4dot}}."
+instruction = "Run RS01_rough_faces (M6 T1, 1/2 in end mill; set 2450: the display rests near 2485, not 2380): face 1 at Z {{cad.rough_face_1_z_in:.4dot}}. At its M0 (spindle off, cutter retracted): unclamp, turn the blank over end for end (face 2 up, the same long edge on the fence, the other end on the end stop), reclamp, Cycle Start: face 2 at Z {{cad.rough_face_2_z_in:.4dot}}."
 settings = "em-half-carbide-1018-3439-face"
 milling_cuts = [
   { name = "face rough", kind = "end", phase = "rough", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", axial_doc_mm = "{{process.face_rough_doc_mm}}", radial_woc_mm = "{{process.face_stepover_mm}}", traverse_mm = [0, "{{cad.blank_length_mm}}"] },
@@ -421,7 +422,7 @@ speed_kind = "spindle"
 tool = "em-half"
 drilling = "none"
 sizing = "other"
-instruction = "Run RS02_finish_face_1 (M6 T1 at its start, the 1/2 in end mill: set it on the tool setter again; 2450): the face at Z {{cad.finish_face_1_z_in:.4dot}}."
+instruction = "Run RS02_finish_face_1 (M6 T1 at its start, the 1/2 in end mill: set it on the tool setter again; 2450, display near 2485): the face at Z {{cad.finish_face_1_z_in:.4dot}}."
 settings = "em-half-carbide-1018-3439-face"
 milling_cuts = [
   { name = "face finish", kind = "end", phase = "finish", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", axial_doc_mm = "{{process.face_finish_doc_mm}}", radial_woc_mm = "{{process.face_stepover_mm}}", traverse_mm = [0, "{{cad.blank_length_mm}}"] },
@@ -450,7 +451,7 @@ speed_kind = "spindle"
 tool = "em-half"
 drilling = "none"
 sizing = "other"
-instruction = "Run RS03_finish_face_2_hub (M6 T1 at its start, the 1/2 in end mill; 2450): the face at Z {{cad.thickness_in:.4dot}}. It stops at its M6 T3 (spindle off, cutter retracted), before the centre drill goes in: unclamp the blank and lift it off for the check, since the micrometer cannot reach under it on the plate."
+instruction = "Run RS03_finish_face_2_hub (M6 T1 at its start, the 1/2 in end mill; 2450, display near 2485): the face at Z {{cad.thickness_in:.4dot}}. It stops at its M6 T3 (spindle off, cutter retracted), before the centre drill goes in: unclamp the blank and lift it off for the check, since the micrometer cannot reach under it on the plate."
 inspection = "Every blank's thickness acceptance: {{cad.thickness_min_in:.3dot}}–{{cad.thickness_max_in:.3dot}}, micrometer at both ends and mid-length."
 gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.thickness_band_mm}}" }]
 settings = "em-half-carbide-1018-3439-face"
