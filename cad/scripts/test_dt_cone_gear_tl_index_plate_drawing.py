@@ -158,6 +158,9 @@ def test_the_measured_stock_plate_sets_the_envelope_and_the_screw_seat() -> None
     # about thread i will use the same screws with all plates".
     assert spec.CBORE_DIA - 0.005 * INCH > spec.MOUNT_SCREW_HEAD_DIA
     assert math.isclose(spec.HEAD_RISE, 0.038 * INCH)
+    # Owner fact 2026-11-24: "screw head 0.1380 high": below the face even in
+    # the shallowest counterbore the .XXX band allows.
+    assert math.isclose(spec.HEAD_BELOW_FACE_MIN, 0.002 * INCH, abs_tol=1e-9)
     # The plate is thinner than stock; the seat under the screw head is not.
     assert spec.THICKNESS < spec.STOCK_PLATE_THICKNESS
     assert math.isclose(spec.CBORE_SEAT, 0.095 * INCH)

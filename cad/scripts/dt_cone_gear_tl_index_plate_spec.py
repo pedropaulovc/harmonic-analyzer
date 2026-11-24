@@ -192,15 +192,18 @@ CBORE_PLACES = 3
 # seat at rule 17's .080 target with the thickness and depth bands both
 # against it. On the stock plate the heads sit below the face ("below
 # plate"); here each stands HEAD_RISE higher against the face than it does
-# on stock, so it is still below the face if it is no taller than the
-# counterbore is deep. Its height is unmeasured: the sector arms' clearance
-# over the screw heads is to be looked at once at first fitting (#2157).
+# on stock. The head is .138 high (owner fact 2026-11-24, verbatim: "screw
+# head 0.1380 high"), so in the shallowest counterbore the three-place band
+# allows (.140) it is still below the face, by .002: the sector arms pass
+# over it as they do on the stock plate.
 CBORE_DEPTH = 0.145 * INCH
 CBORE_DEPTH_PLACES = 3
 CBORE_SEAT = THICKNESS - CBORE_DEPTH  # .095; stock .2770 - .1830 = .094
 HEAD_RISE = STOCK_CBORE_DEPTH - CBORE_DEPTH
-if HEAD_RISE > 0.038 * INCH + 1e-9:
-    raise AssertionError("screw heads stand over .038 higher than on the stock plate")
+MOUNT_SCREW_HEAD_HEIGHT = 0.138 * INCH
+HEAD_BELOW_FACE_MIN = (CBORE_DEPTH - 0.005 * INCH) - MOUNT_SCREW_HEAD_HEIGHT
+if HEAD_BELOW_FACE_MIN < 0.0:
+    raise AssertionError("a plate screw's head can stand proud of the plate face")
 # Smallest three-place counterbore (-.005) over the head: .017 on diameter.
 if (CBORE_DIA - 0.005 * INCH) - MOUNT_SCREW_HEAD_DIA < 0.015 * INCH:
     raise AssertionError("counterbore does not clear the plate screw's Ø.3235 head")
