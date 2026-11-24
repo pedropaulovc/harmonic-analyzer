@@ -187,6 +187,10 @@ SAW_WEAR_FACTOR = 1.10
 WATTS_PER_HP = 745.7
 # The friction drive's torque is recomputed to this (N·m).
 DRIVE_TOL_NM = 0.05
+# A saw pass may take this share of the friction drive's torque at most: the
+# drive's friction and preload are a table's, not measured, and the saw runs
+# oiled (friction .10 under a preload a quarter low leaves about half).
+DRIVE_RESERVE = 2.0
 # The arbor's length from the spindle nose is rounded up to this (.1 in).
 ARBOR_LENGTH_STEP_MM = 0.1 * IN
 # A plan number the recipe recomputes must agree to this (its rounding).
@@ -844,21 +848,26 @@ def context(
         )
     # The slit's depth: X0 is the top end and the saw's centre its recorded
     # radius less the depth past it, so the tips' radial runout (at most
-    # saw_tip_tir_max_mm, read at the mounting) deepens the floor. With it
-    # and without, at both ends of the block's height band and of the
+    # saw_tip_tir_max_mm, read at the mounting) deepens the floor, and a saw
+    # off its recorded diameter (miked over two opposite tips to within
+    # saw_dia_tol_mm of it) moves the floor by half the error. At those
+    # limits together, at both ends of the block's height band and of the
     # adjuster's height band (H measured, within the band), the floor stays
     # inside the adjuster's minor bore.
     tip_tir = p["saw_tip_tir_max_mm"]
+    dia_tol = p["saw_dia_tol_mm"]
+    _agree(plan, "saw_dia_min_mm", p["saw_dia_mm"] - dia_tol)
+    _agree(plan, "saw_dia_max_mm", p["saw_dia_mm"] + dia_tol)
     bore_r = adj["dia"][0] / 2
     for h in adj["height"]:
         for top in f["top_face"]["height"]:
             if not (
-                h - bore_r < top - slit_depth - tip_tir
-                and top - slit_depth < h + bore_r
+                h - bore_r < top - slit_depth - tip_tir - dia_tol / 2
+                and top - slit_depth + dia_tol / 2 < h + bore_r
             ):
                 raise ValueError(
                     "the slit's floor is not inside the adjuster bore at "
-                    "process.saw_tip_tir_max_mm"
+                    "process.saw_tip_tir_max_mm and process.saw_dia_tol_mm"
                 )
     _agree(plan, "saw_cut_z_mm", lateral - thick / 2)
     saw_z = p["saw_cut_z_mm"]
@@ -959,8 +968,9 @@ def context(
     # on the clamp ring between the pilot (the saw's hole) and the narrower
     # of the body and the cap, at the plan's preload and friction; the other
     # face and the screw are its reserve. The heaviest pass (the deepest
-    # step, at the kerf's ceiling) takes less spindle torque, by the
-    # handbook's power at this feed per tooth, than that.
+    # step, at the kerf's ceiling) takes no more spindle torque, by the
+    # handbook's power at this feed per tooth, than that drive carries with
+    # DRIVE_RESERVE in hand.
     ring = _ring_radius(p["saw_bore_mm"] / 2, min(body_r, cap_r))
     drive = p["saw_drive_friction"] * p["saw_clamp_preload_kn"] * ring
     if not math.isclose(p["saw_drive_torque_max_nm"], drive, abs_tol=DRIVE_TOL_NM):
@@ -977,10 +987,11 @@ def context(
         )
     bite = max(b - a for a, b in zip([0.0, *saw_steps], saw_steps, strict=False))
     torque = _saw_torque_nm(bite, p["kerf_max_mm"], saw_feed, saw_rpm)
-    if torque > drive:
+    if torque * DRIVE_RESERVE > drive:
         raise ValueError(
             f"the saw's heaviest pass takes {torque:.1f} N·m, over the arbor's "
-            f"friction drive, process.saw_drive_torque_max_nm {drive:.1f}"
+            f"friction drive with its reserve: {drive / DRIVE_RESERVE:.1f} of "
+            f"process.saw_drive_torque_max_nm {drive:.1f}"
         )
     # The reach past the arbor, on both sides of the saw (the body above, the
     # cap below): (the saw - the wider of them) / 2 less ARBOR_CLEAR_MM. The
@@ -1017,8 +1028,14 @@ def context(
     saw_clear = p["saw_clear_z_mm"]
     _agree(plan, "saw_touch_x_mm", radius - TOUCH_IN_MM)
     _agree(plan, "saw_touch_y_mm", -depth / 2)
-    if p["saw_touch_x_mm"] - arbor_r <= 0:
-        raise ValueError("the arbor reaches the top end at the saw's touch-off")
+    # The touch-off puts the saw's rim TOUCH_IN_MM in over the top end: inside
+    # the arbor's reach, so the cap and its screw, hanging below the saw as it
+    # comes down, are beyond the end.
+    if TOUCH_IN_MM > p["saw_reach_max_mm"]:
+        raise ValueError(
+            "the saw's touch-off puts its rim farther in over the top end than "
+            "the arbor reaches: the cap would come down on it"
+        )
     proof_raise = p["saw_proof_raise_mm"]
 
     names = {tool["id"]: tool["name"] for tool in plan["tools"]}

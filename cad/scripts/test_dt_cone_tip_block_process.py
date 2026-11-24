@@ -176,14 +176,23 @@ def test_the_saw_and_arbor_sizes_are_their_inventory_records() -> None:
         assert gone not in p, gone
 
 
-def test_a_pass_over_the_friction_drive_is_refused() -> None:
+@pytest.mark.parametrize(
+    ("preload_kn", "drive_nm"),
+    [
+        # One face carries less than the heaviest pass takes (8.1 N·m).
+        (3.0, 6.03),
+        # It carries the pass, but not twice it.
+        (7.0, 14.06),
+    ],
+)
+def test_a_pass_over_the_friction_drive_is_refused(preload_kn, drive_nm) -> None:
     """The arbor is not keyed. One face of the clamp carries the drive (the
-    other face and the screw are reserve): a clamp whose one face carries
-    less torque than the heaviest pass takes is refused."""
+    other face and the screw are reserve), and the heaviest pass may take half
+    of it at most: a weaker clamp is refused."""
     plan = copy.deepcopy(PLAN)
-    plan["parameters"]["saw_clamp_preload_kn"] = 3.0
-    plan["parameters"]["saw_drive_torque_max_nm"] = 6.03
-    with pytest.raises(ValueError, match="friction drive"):
+    plan["parameters"]["saw_clamp_preload_kn"] = preload_kn
+    plan["parameters"]["saw_drive_torque_max_nm"] = drive_nm
+    with pytest.raises(ValueError, match="friction drive with its reserve"):
         _context(plan)
 
 
@@ -254,6 +263,7 @@ def test_the_recipes_programs_pass_every_check_they_declare(context, tmp_path) -
         ("kerf_max_mm", 1.778, "kerf_max_mm"),
         ("saw_side_tir_nominal_mm", 0.1524, "saw_side_tir_nominal_mm"),
         ("saw_tip_tir_max_mm", 2.0, "saw_tip_tir_max_mm"),
+        ("saw_dia_min_mm", 66.0, "saw_dia_min_mm"),
         ("slit_first_pass_mm", 4.3223, "slit_first_pass_mm"),
         ("saw_reach_max_mm", 20.0, "saw_reach_max_mm"),
         ("saw_screw_stand_max_mm", 12.7, "saw_below_max_mm"),
