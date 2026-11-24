@@ -86,8 +86,6 @@ demoted:
   pn_pen_hanger: fit-batch-pn
   pn_pen_rod: fit-batch-pn
   pn_pen_v_block: fit-batch-pn
-  sh_column_clamp_back: fit-batch-sh
-  sh_column_clamp_front: fit-batch-sh
   sm_gooseneck: fit-batch-sm
   sm_knife_mount: fit-batch-sm
   sm_summing_assembly: fit-batch-sm
