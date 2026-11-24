@@ -116,7 +116,6 @@ def test_each_hole_keeps_one_centre_mark() -> None:
 def test_model_bands_come_from_named_spec_constants() -> None:
     assert model_toleranced_dimensions(part) == {
         ("Ear", "EarThick"): "EAR_T_BAND",
-        ("ShaftBoreProfile", "ShaftBoreDia"): "*deviations(BORE_DIA_BAND)",
     }
     assert part.EAR_T_BAND == pytest.approx(0.1016)
     # The drilled apex tap's station prints plain at the title block's .XX
@@ -132,8 +131,9 @@ def test_model_bands_come_from_named_spec_constants() -> None:
     # hole is sized for it), so its sheet value carries no band of its own.
     assert spec.FOOT_LEN_BAND == spec.EDGE_BAND == pytest.approx(0.254)
     assert "FootLen" not in drawing.DIMENSION_CALLOUTS
-    # The reamed bore holds the drilled-hole growth its set-screw thread
-    # count assumes: largest bore = nominal + DRILL_GROWTH.
+    # The F-drilled bore takes the DRILLED HOLES row its set-screw thread
+    # count assumes (owner ruling 2026-11-24, fit audit question 1): largest
+    # bore = nominal + DRILL_GROWTH, and no native band on ShaftBoreDia.
     upper, lower = drawing_spec.BORE_DIA_BAND
     assert lower == 0.0
     assert abs(spec.BORE_DIA + upper - 2.0 * spec.BORE_RADIUS_MAX) < 1e-9
@@ -200,7 +200,10 @@ def test_bore_callout_names_the_mating_pivot_shaft() -> None:
     number = _config.parts("ch-pivot-shaft")["number"]
     assert number == "MHA-CH-05"
     bore = drawing.DIMENSION_CALLOUTS["ShaftBoreDia"]
-    assert bore.startswith("REAM THRU\n")
+    assert bore.startswith("F DRILL THRU\n")
+    assert "REAM" not in bore
+    assert not any(ch.isdigit() for ch in bore.replace(number, ""))
+    assert spec.BORE_HOLE_SPEC.size == "F"
     assert number in bore
     assert drawing.DIMENSION_CALLOUTS["HoleDia"] == "DRILL THRU"
     assert set(drawing.DIMENSION_CALLOUTS) <= set(drawing.FRONT_KEEP) | set(
@@ -536,8 +539,8 @@ def test_right_view_shows_the_corner_radius_clear_of_its_neighbours() -> None:
 
 
 def test_bore_callout_clears_the_elevation() -> None:
-    """The REAM block's widest line (its mate's part number, ~58 mm centred on
-    the text) starts clear of the elevation's right edge."""
+    """The F DRILL block's widest line (its mate's part number, ~58 mm
+    centred on the text) starts clear of the elevation's right edge."""
     x, _y = drawing.FRONT_KEEP["ShaftBoreDia"]
     assert x - 0.029 > drawing._EAST_X + 0.005
 

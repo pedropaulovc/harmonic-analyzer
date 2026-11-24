@@ -1,6 +1,6 @@
 r"""Create the curated machinist drawing for the rocker pivot bracket (MHA-CH-08).
 
-One sheet at 2:1, third-angle: the elevation (the ear face, the reamed
+One sheet at 2:1, third-angle: the elevation (the ear face, the F-drilled
 cross-bore and the arch) with the plan above it (the foot, the hold-down hole
 and the apex set-screw tap) and the right view beside it for the foot-to-ear
 corner's MAX radius, all three projected and aligned, and a shaded
@@ -50,7 +50,7 @@ from _drawing_view_display import set_hidden_lines_removed
 from _feature_requirements import part_metadata, requirement
 from _gtol_cylinder import CylinderFace
 from _gtol_planar import PlanarFace
-from _hole_spec import blind_cut_dia_mm
+from _hole_spec import blind_cut_dia_mm, drill_process
 from _machinist_review_mode import MachinistReviewMode
 from _part_properties import part_drawing_unit
 from _printed_limits import drilled_limits, limits
@@ -73,6 +73,7 @@ from ch_pivot_bracket_spec import (
     APEX_ABOVE_BORE,
     ARCH_LIFT,
     BORE_DIA,
+    BORE_HOLE_SPEC,
     BORE_H,
     EAR_ARCH_R,
     EAR_T,
@@ -246,8 +247,9 @@ TOP_KEEP = {
 # flat it locates) and neither extension line rises into its letters (r1
 # machinist review FIX: centred over the 8 mm span, both struck the callout).
 EAR_THICK_TEXT_OFFSET = (0.042, 0.010)
-# REAM marks a fit bore, so the callout names its mate and its standard fit
-# (drawing-guidelines.md rule 4); the drilled hold-down hole says drill and
+# The F-drilled cross-bore names its drill and the shaft it slides on, no
+# number (owner ruling 2026-11-24, fit audit question 1; drawing-guidelines.md
+# rule 4); the drilled hold-down hole says drill and
 # through. The ear thickness carries its own band and says what it holds:
 # fit-up sets the pivot shaft's tip off the ear's outboard face and the apex
 # tap stands off the inboard one, so the thickness locates the shaft's flat
@@ -261,7 +263,7 @@ EAR_THICK_TEXT_OFFSET = (0.042, 0.010)
 # the foot top beside the ear's outboard face
 # (ch_pivot_bracket_drawing_spec.CORNER_R_MAX), so a larger round lifts it.
 DIMENSION_CALLOUTS = {
-    "ShaftBoreDia": f"REAM THRU\nSLIDING FIT ON {PIVOT_SHAFT_NUMBER}",
+    "ShaftBoreDia": f"{drill_process(BORE_HOLE_SPEC)} THRU\nSLIDING CLEARANCE ON {PIVOT_SHAFT_NUMBER}",
     "HoleDia": "DRILL THRU",
     "EarThick": f"LOCATES FLAT OF {PIVOT_SHAFT_NUMBER}",
     "CornerRadius": f"CLEARS HEAD OF\n{HOLD_DOWN_SCREW_NUMBER}",
@@ -473,11 +475,11 @@ requirement(
         "apex_above_bore_ref": APEX_REFERENCE_PLACES,
     },
 )
-# The cross-bore, reamed through the ear from its outboard face: O.256
-# +.004/.000 (FRONT_KEEP "ShaftBoreDia", BORE_DIA_BAND) with its REAM THRU
-# callout; the bore height .99 off the seat and its lateral .32 off the west
-# side (FRONT_KEEP "BoreCz", "BoreLateral").
-_REAM = ((_SELF, "DIMENSION_CALLOUTS"),)
+# The cross-bore, F-drilled through the ear from its outboard face: O.257 at
+# the DRILLED HOLES row (FRONT_KEEP "ShaftBoreDia", BORE_DIA_BAND) with its
+# F DRILL THRU callout; the bore height .99 off the seat and its lateral .32
+# off the west side (FRONT_KEEP "BoreCz", "BoreLateral").
+_BORE_CALLOUT = ((_SELF, "DIMENSION_CALLOUTS"),)
 requirement(
     "bore",
     kind="hole",
@@ -491,9 +493,10 @@ requirement(
             ("BORE_DIA", (_DS, "BORE_DIA_BAND"), (_SELF, "FRONT_KEEP")),
         ),
         "nominal_dia": (BORE_DIA, ("BORE_DIA",)),
-        "process": ("ream", _REAM),
-        "thru": (True, _REAM),
-        "callout": (DIMENSION_CALLOUTS["ShaftBoreDia"], _REAM),
+        "drill": (BORE_HOLE_SPEC.size, ("BORE_HOLE_SPEC",)),
+        "process": (drill_process(BORE_HOLE_SPEC), _BORE_CALLOUT),
+        "thru": (True, _BORE_CALLOUT),
+        "callout": (DIMENSION_CALLOUTS["ShaftBoreDia"], _BORE_CALLOUT),
         "mates": (PIVOT_SHAFT_NUMBER, ((_SELF, "PIVOT_SHAFT_NUMBER"),)),
         "height": (
             limits(BORE_H, _P["BoreCz"], unit=UNIT),

@@ -54,7 +54,12 @@ FOOT_Z0 = -EAR_T / 2.0  # foot starts at the ear's inboard face
 # 228.6 support apex (kinematic, so exact; it prints .99).
 BORE_H = 25.2
 BORE_H_PLACES = 2
-BORE_DIA = 6.5024  # .256: O.250 shaft, .006 diametral clearance (fit F5)
+# The cross-bore on the O.250 pivot shaft MHA-CH-05: drilled F (.257) at the
+# title block's DRILLED HOLES row (owner ruling 2026-11-24, fit audit
+# question 1: the 44 bores on the two 1/4 in shafts are F-drilled; it printed
+# REAM over the drilled row before).
+BORE_HOLE_SPEC = HoleSpec("drilled_letter", "F")
+BORE_DIA = blind_cut_dia_mm(BORE_HOLE_SPEC)  # .257
 EAR_ARCH_R = EAR_W / 2.0  # .32: the ear's top is a half-round, tangent to its sides
 # Every height runs from the seat (drawing-guidelines.md rule 10, #1371 r1
 # review): the bore axis and the arch apex, each at the title block's .XX.
@@ -212,8 +217,8 @@ SET_SCREW_WALL_TERMS = {
     "bore sag across the thread": -_sag(BORE_RADIUS_MAX),
     "one-pitch entry chamfer": -SET_SCREW_PITCH,
 }
-SET_SCREW_FULL_THREAD_MIN = sum(SET_SCREW_WALL_TERMS.values())  # 5.01
-SET_SCREW_ENGAGEMENT_D = SET_SCREW_FULL_THREAD_MIN / SET_SCREW_MAJOR_DIA  # 1.76D
+SET_SCREW_FULL_THREAD_MIN = sum(SET_SCREW_WALL_TERMS.values())  # 5.00
+SET_SCREW_ENGAGEMENT_D = SET_SCREW_FULL_THREAD_MIN / SET_SCREW_MAJOR_DIA  # 1.757D
 SET_SCREW_ENGAGEMENT_PRINTED = int(SET_SCREW_ENGAGEMENT_D * 100.0) / 100.0
 SET_SCREW_MIN_ENGAGEMENT_D = 1.5  # drawing-guidelines.md rule 18 (thread engagement)
 if SET_SCREW_ENGAGEMENT_D < SET_SCREW_MIN_ENGAGEMENT_D:

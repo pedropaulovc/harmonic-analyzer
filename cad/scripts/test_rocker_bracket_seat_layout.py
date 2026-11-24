@@ -192,8 +192,8 @@ def test_bracket_hole_ligaments_keep_the_floor_at_worst_case() -> None:
 
 def test_bracket_lengths_along_the_foot_carry_their_bands_on_the_model() -> None:
     """The S4 fixture plan and the MHA-CH-08 sheet take the +/-0.10 ear
-    thickness from the saved model's dimension; the reamed bore carries the
-    drawing contract's band beside it. The foot length, the hold-down station
+    thickness from the saved model's dimension; the F-drilled bore takes the
+    title block's DRILLED HOLES row (fit audit question 1). The foot length, the hold-down station
     (user ruling 2026-10-14: the foot grew instead; #1371 review: the station
     went the same way) and the drilled tap station (delegated ruling
     2026-11-07, Q2-A) ride the title block."""
@@ -202,7 +202,6 @@ def test_bracket_lengths_along_the_foot_carry_their_bands_on_the_model() -> None
     assert bracket.EAR_T_BAND == pytest.approx(0.1016)
     assert model_toleranced_dimensions(bracket_build) == {
         ("Ear", "EarThick"): "EAR_T_BAND",
-        ("ShaftBoreProfile", "ShaftBoreDia"): "*deviations(BORE_DIA_BAND)",
     }
 
 

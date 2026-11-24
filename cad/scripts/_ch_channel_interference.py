@@ -38,7 +38,7 @@ ROD_PIVOT_PIN_PRESS = (1.984375, 1.97358, 6.096 - 2.6924)
 _PIVOT_PIN = "sh-vn-pivot-pin"
 # The MHA-CH-VN-53 #4-40 apex set screws (user, 2026-10-10), one down through
 # each MHA-CH-08 ear's arch (apex .388 (9.852) over the bore since #1371,
-# #290) into its Ø.256 bore, the tap cut at its drill. The thread's major envelope crosses no
+# #290) into its F-drilled Ø.257 bore (fit audit question 1), the tap cut at its drill. The thread's major envelope crosses no
 # longer a metal column than the apex's height over the bore axis less the
 # bore's height at the envelope's edge, so the smooth annulus over that column
 # bounds the overlap; the cup on the modelled shaft flat is contact, as the
@@ -47,7 +47,7 @@ _PIVOT_PIN = "sh-vn-pivot-pin"
 # does not re-key on the bracket spec; test_ch_channel_assembly_drawing pins
 # them to ch_pivot_bracket_spec. #911: re-pin to the measured overlap x 1.10
 # from the first channel leaf.
-PIVOT_EAR_APEX_AND_BORE = (9.852, 6.5024)
+PIVOT_EAR_APEX_AND_BORE = (9.852, 6.528)
 _PIVOT_EAR_TAP_COLUMN = PIVOT_EAR_APEX_AND_BORE[0] - math.sqrt(
     (PIVOT_EAR_APEX_AND_BORE[1] / 2.0) ** 2
     - (THREAD_MAJOR_MM[_ARBOR_SET_SCREW_THREAD] / 2.0) ** 2

@@ -6,7 +6,7 @@ the green rocker-arm support (ch14 page002_img01/img02, page002_img07
 at one END of the foot, and the foot is only as wide as the support's apex.
 #743 PR2 (Reading 1, user Q4): the bright dome on the ear is the pivot
 shaft's own domed end, not a brazed-on ball, so the ear is a plain plate
-arched EAR_W/2 over the O.256 cross-bore, its apex EAR_TOP_Y over the seat
+arched EAR_W/2 over the O.257 (F drill) cross-bore, its apex EAR_TOP_Y over the seat
 (#1371: the arch's centre stands ARCH_LIFT over the bore so the apex tap
 keeps 1.5D of full thread). Fit-up locates the north ear's inner face by DRO
 and sets the south one from it to the ears' inner-face span
@@ -86,17 +86,13 @@ from _drawing_marks import (
     mark_dimensions_for_drawing,
 )
 from _drawing_precision import _named_dimension, apply_drawing_precision
-from _drawing_tolerances import (
-    set_dimension_bilateral_tolerance,
-    set_dimension_symmetric_tolerance,
-)
+from _drawing_tolerances import set_dimension_symmetric_tolerance
 from _fit_deviations import deviations
 from _hole_spec import blind_cut_dia_mm
 from _holes import cross_hole_volume_mm3, wizard_hole_on_cylinder
 from _part_pmi import author_part_pmi
 import _telemetry
 from ch_pivot_bracket_drawing_spec import (
-    BORE_DIA_BAND,
     CORNER_R_BAND,
     CORNER_R_MAX,
     CORNER_R_TOL_TYPE,
@@ -589,18 +585,11 @@ def build(adapter) -> dict[str, str]:
     # The ear thickness carries +/-.004 natively (ch_pivot_bracket_spec). The
     # apex tap's station from the ear's inboard face (the face fit-up sets and
     # the S4 hold touches Z0 on), the foot length and the hold-down station
-    # ride the title block. The cross-bore holds the drilled-hole row's
-    # +.004/0 its set-screw thread is counted at.
+    # ride the title block. The F-drilled cross-bore takes the DRILLED HOLES
+    # row its set-screw thread is counted at (owner ruling 2026-11-24, fit
+    # audit question 1): no native band.
     set_dimension_symmetric_tolerance(
         adapter, "Ear", "EarThick", EAR_T_BAND, display_unit=UNIT
-    )
-    set_dimension_bilateral_tolerance(
-        adapter,
-        "ShaftBoreProfile",
-        "ShaftBoreDia",
-        *deviations(BORE_DIA_BAND),
-        places=3,
-        display_unit=UNIT,
     )
 
     report_mass_properties(adapter)

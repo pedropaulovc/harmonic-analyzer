@@ -130,8 +130,8 @@ def test_bracket_feature_bands_are_the_printed_ones() -> None:
     assert round(arch["apex_above_bore_ref"] / 25.4, 2) == 0.39
     assert arch["center"][1] + arch["radius_nominal"] == pytest.approx(spec.EAR_TOP_Y)
     bore = features["bore"]
-    assert bore["dia"] == pytest.approx([_in(0.256), _in(0.260)])
-    assert bore["process"] == "ream" and bore["thru"] is True
+    assert bore["dia"] == pytest.approx([6.528, 6.6296])  # F, +.004/0
+    assert bore["process"] == "F DRILL" and bore["drill"] == "F" and bore["thru"] is True
     assert bore["callout"] == drawing.DIMENSION_CALLOUTS["ShaftBoreDia"]
     assert bore["height"] == pytest.approx([_in(0.98), _in(1.00)])
     assert bore["lateral"] == pytest.approx([_in(0.31), _in(0.33)])
