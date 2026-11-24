@@ -5,7 +5,7 @@ checks:
     check: "BOND_HOLE_MAX"
     kind: gap
     reason: "a looser bonded hole passes 641's gap fill"
-    source: "Main, by the owner's delegation of 2026-11-24 (rulings.md D13): the hole the .079 pin of the owned .001-step .061-.500 set does not enter; set by the set's sizes, not by a failure (the audit's .0785 is not a size the set holds)"
+    source: "delegated ruling 2026-11-24 (Main), no precedent, #2144 (rulings.md D13): the hole the .079 pin of the owned .001-step .061-.500 set does not enter; set by the set's sizes, not by a failure (the audit's .0785 is not a size the set holds)"
     basis: measured
   - id: C-02
     check: "BOND_GAP"
