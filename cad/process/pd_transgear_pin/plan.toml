@@ -417,7 +417,9 @@ machine_ref = "pm-1127vf-lb"
 holding = "3-jaw over a brass shim wrap on the press land, the head out {{cad.step_land_stickout_datum_mm:in.2dot}} in from the jaw fronts; the rest of the pin on through the jaws into the chuck (the journal, smaller than the land, clears the jaws)."
 datum = "DRO Z0 the head's faced end (Op 200, the AR tool); the dome's steps (Op 220) are read from it."
 diagram = { file = "diagrams/head.svg", alt = "The pin turned round, the press land in the jaws over a shim wrap, the head out: the head faced and its R.18 dome stepped from the table and filed." }
-lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{cad.step_land_dia_mm}}", stock_diameter_mm = "{{cad.step_land_dia_mm}}", stickout_mm = "{{cad.step_land_stickout_datum_mm}}", minimum_diameter_mm = "{{cad.step_land_dia_mm}}", support = "none" }
+# The ~.126 land is under the 3-jaw's .1750 least grip (owner 2026-11-24;
+# workholding.chuck-3jaw-6): this regrip is impossible as written, #3500.
+lathe_hold = "other"
 
 [[setups.operations]]
 cut_kind = "other"
@@ -479,7 +481,8 @@ machine_ref = "pm-1127vf-lb"
 holding = "3-jaw over the shim wrap on the journal, the tip out {{cad.outer_stickout_far_mm:in.2dot}} in from the jaw fronts (the jaws past the groove); the head and the land inside the chuck."
 datum = "DRO Z0 the tip's faced end (Op 260, the AR tool); the dome's steps (Op 280) are read from it."
 diagram = { file = "diagrams/tip.svg", alt = "The pin turned round again, the journal in the jaws over a shim wrap, the tip out: the tip faced and its R.07 dome stepped from the table and filed." }
-lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{cad.outer_dia_mm}}", stock_diameter_mm = "{{cad.outer_dia_mm}}", stickout_mm = "{{cad.outer_stickout_far_mm}}", minimum_diameter_mm = "{{cad.groove_dia_min_mm}}", support = "none" }
+# Under the 3-jaw's .1750 least grip, as the land regrip: #3500.
+lathe_hold = "other"
 
 [[setups.operations]]
 cut_kind = "other"
