@@ -1374,7 +1374,8 @@ def acceptance_ref(key: str) -> str:
 
 # Rule 23 (rubric sample round 13, #3): a press whose part slides in by hand
 # is a slip fit, so each pressed pin's check is followed by this one remedy,
-# the sheet 1 LOCTITE 638 note's bond (4V-4W, 4A-4B, 6A-6B, 6E-6F).
+# the sheet 1 LOCTITE 638 note's bond (4V-4W, 4A-4B); steps 6 and 6D
+# bond the crank hub and its seam pin outright (fit audit question 21).
 SLIP_FIT_BOND = "BOND IT IN WITH LOCTITE 638 PER THE SHEET 1 NOTE."
 # MHA-DT-29's acceptance and flush condition, as both part sheets print them.
 PIN_FIT_ACCEPTANCE, PIN_FIT_FLUSH = pinion.PIN_FIT_LINES[1].split(", ")
@@ -1680,25 +1681,27 @@ CONE_CRANK_STEPS = _note_text(
         "4Y. CHECK MHA-DT-11'S END IS NOT BELOW MHA-DT-10 (STRAIGHTEDGE).",
         "4Z. DO NOT FACE THAT END.",
         f"5. SLIDE {CRANK_CHAIN_WHEEL} ON MHA-DT-11, HOLES OVER THE 2X MHA-DT-VN-67.",
-        # U33 (user, 2026-09-23): crank hub MHA-DT-31 pressed into the arm and
+        # U33 (user, 2026-09-23): crank hub MHA-DT-31 in the arm and
         # seam-pinned by MHA-DT-VN-59; the MHA-DT-09 cross-hole runs behind
         # the arm through the hub barrel. The seam's size and depth print
-        # once, on MHA-DT-06 and MHA-DT-31.  Pipeline review of 49287772c: the
-        # ream's acceptance (the ring clear of the hub) is an assembly setting.
-        "6. PRESS MHA-DT-31 INTO MHA-DT-06 TO THE SHOULDER: FACES FLUSH.",
-        # Rule 23 (rubric sample round 13, #3): the press's slip-fit remedy.
-        "6A. CHECK THAT MHA-DT-31 DOES NOT SLIDE IN MHA-DT-06 BY HAND.",
-        f"6B. IF IT DOES, {SLIP_FIT_BOND}",
-        "6C. MATCH-REAM THE MHA-DT-31/MHA-DT-06 SEAM PIN HOLE PER MHA-DT-31.",
+        # once, on MHA-DT-06 and MHA-DT-31.  Owner ruling 2026-11-24, fit
+        # audit question 21: the hub seat is a slip fit turned to the arm's
+        # bore and bonded with LOCTITE 638 (the sheet 1 note: degrease, coat,
+        # keep it off running lands, cure before load), held square to its
+        # shoulder while it grabs; fit audit 2026-11-23,
+        # MHA-DT-06_DT-31.seam_pin: the seam is drilled 5/32 across the cured
+        # joint and its pin bonded, not reamed and driven.
+        "6. BOND MHA-DT-31 INTO MHA-DT-06 PER THE SHEET 1 LOCTITE 638 NOTE.",
+        "6A. AT ONCE, SLIDE IT TO THE SHOULDER BY HAND, SQUARE: FACES FLUSH.",
+        "6B. LET THE BOND CURE AS THE SHEET 1 NOTE SAYS BEFORE 6C.",
+        "6C. DRILL THE MHA-DT-31/MHA-DT-06 SEAM PIN HOLE PER MHA-DT-31.",
         # FoDtVn1 (#2270): which end goes out moved here from the pin's sheet;
         # the faced cut end stays flush, the supplier's chamfer leads in
         # (dt_vn_crank_hub_pin_spec).
-        "6D. DRIVE MHA-DT-VN-59 INTO IT FLUSH, FACED END OUT.",
-        # Rule 23 (machinist review r8 of PR #2640): the seam pin's press fit
-        # (dt_crank_hub_notes: LIGHT DRIVE FIT) gets the check and remedy
-        # pair every other pressed pin has.
-        "6E. CHECK THAT MHA-DT-VN-59 DOES NOT SLIDE BY HAND.",
-        f"6F. IF IT DOES, {SLIP_FIT_BOND}",
+        "6D. BOND MHA-DT-VN-59 INTO IT FLUSH AS 6, FACED END OUT.",
+        "6E. LET IT CURE AS 6B BEFORE 6G.",
+        # Rule 23: the two bonds' bench acceptance, the sheet 1 note's.
+        "6F. CHECK THAT MHA-DT-31 AND MHA-DT-VN-59 DO NOT TURN OR SLIDE BY HAND.",
         # Round 17 (#0): the fit's parts by drawing number.
         "6G. SLIDE MHA-DT-06 ONTO MHA-DT-11: MHA-DT-31 FRONT FACE FLUSH WITH",
         f"   THE {HUB_FRONT_FACE_DATUM}, PUNCH MARKS ALIGNED.",
@@ -2375,7 +2378,7 @@ CONSUMABLES_NOTES = _note_text(
         "UNLESS ITS STEP GIVES ANOTHER SETTING.",
         # Rule 23 (rubric d9f8b0c): one package note may carry the bond's
         # degrease, apply and cure rules; the bonds are part-spec steps.
-        # Round 13: every bond cites the note (1N, 1R, 2-2A, 2X, 4B, 4U, 6B, 6F, 12-14), so the
+        # Round 13: every bond cites the note (1N, 1R, 2-2A, 2X, 4B, 4U, 6, 6D, 12-14), so the
         # note names no step range; the station it sets at once is 12A's.
         "LOCTITE 638 BONDS: DEGREASE BOTH PARTS; COAT THE "
         "INSERTED PART, NEVER A BLIND SEAT; KEEP IT OFF RUNNING LANDS; SET STEP "
