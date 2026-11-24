@@ -577,11 +577,15 @@ note = "On hand, three. Diameter, thickness and maximum rpm not recorded (not et
 # Its axial place is the shoulder and cap; its centring is a sliding fit,
 # so runout is read on every mounting. Measured by the owner 2026-11-24:
 # "sticks 1.4 in below spindle; 1.25 dia" (the arbor installed; its body
-# above the saw 1.25 across, the same as the cap). Whether the 1.4 runs to
-# the shoulder the saw seats on or to the cap's lower face is not stated
-# (asked): a plan takes the reading that is worse for it (lowest point 1.4 +
-# the saw + .50 cap below the nose for clearance under it) or stops to
-# measure. Not yet measured: the screw head's stand past the cap face (a
+# above the saw 1.25 across, the same as the cap). His photo
+# (owner-photos/saw-arbor-installed-1p4-2026-11-24.png) marks the 1.4 from
+# the spindle nose to the cap's lower face, the arbor installed with no saw
+# fitted. With a saw the cap's face drops by about the saw's thickness (the
+# .064 saw: about 1.46 below the nose); the shoulder sits about .90 below
+# the nose only if the cap seats on it with no saw (the spring pilot may hold
+# it off: unverified). Those figures serve clearance envelopes only: a plan
+# sets the saw's Z by touching off the saw itself. Not yet measured: the
+# screw head's stand past the cap face (a
 # countersunk head normally sits flush or under; not stated) and runout. A
 # plan that rests a clearance on one of those names it as a bounded
 # assumption and stops to measure it before the spindle starts. The R8 one is the
@@ -603,7 +607,7 @@ screw_head_dia_in = 0.623
 screw_length_in = 0.635
 screw_head_past_cap_in = "to_measure"
 body_dia_above_saw_in = 1.25
-# "sticks 1.4 in below spindle": to the shoulder or to the cap's face, not stated.
+# "sticks 1.4 in below spindle": nose to the cap's lower face, no saw (his photo).
 below_spindle_nose_in = 1.4
 screw_thread = "M8 x 1.25"
 screw_key_mm = 5

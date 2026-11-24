@@ -37,11 +37,16 @@ sku = "6745"
 status = "on_hand"
 note = "Possession: photo and LittleMachineShop package (archived inventory source.by)."
 
+# Owner (Pedro) 2026-11-24, verbatim: "add to inventory 2 v blocks 1.5 x 2 in
+# with 2 clamps". Brand, accuracy, whether the two are a matched pair, and
+# which faces the 1.5 and 2 in are: not stated, not recorded.
 [fixtures.v-blocks]
-name = "Matched V-block pair with clamps"
+name = "V-blocks, 1.5 x 2 in, two, with two clamps"
 kind = "v_blocks"
-status = "to_order"
-note = "The archived inventory recorded the pair only as a trial ownership assumption (#1413), not as owned."
+status = "on_hand"
+pieces = 2
+cite = ["Owner (Pedro) 2026-11-24, verbatim: \"add to inventory 2 v blocks 1.5 x 2 in with 2 clamps\""]
+note = "On hand (owner, 2026-11-24): two V-blocks, 1.5 x 2 in as he stated it, and two clamps. Replaces the archived #1413 trial assumption (to_order)."
 
 # MHA-FR-00 holds the top frame at its set cross-hole height on these until the
 # cross screws do (owner ruling 2026-11-20 (Pedro), #2324: "Shaft collars under
