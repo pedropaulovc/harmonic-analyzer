@@ -15,11 +15,12 @@
 # chamfer mill in stepped levels and sweep its flat with the chamfer mill's
 # tip in fine passes, then take the slot's two step corners with the 1/8 in
 # end mill (VB05); B down, face the top to the
-# height, spot, drill #32, ream .1260 and chamfer the pivot bore down into
+# height, spot, drill #30 (owner ruling 2026-11-24, fit audit question 20:
+# the pivot bore is drilled, no ream) and chamfer the pivot bore down into
 # the slot, then break the neck's two top edges .080 × 45° with the same
 # chamfer mill (VB06); front up, spot and drill #43 into the bore (VB07) and tap
 # 4-40 by hand under the spring tap guide (VB08), the plug tap first, then the
-# bottoming tap to the same reach. Bench: clean the bore with the reamer by
+# bottoming tap to the same reach. Bench: run the #30 through the bore by
 # hand, deburr, inspect. Bright brass: machined, washed, no coating.
 #
 # Tapping: FluidNC cannot rigid-tap (owner, Pedro, 2026-11-17). The tap is
@@ -35,15 +36,14 @@
 # own file ending M30 over its hole (VB08).
 #
 # Not owned, to buy before this traveler runs (flagged; the traveler marks
-# each): the .1260
-# chucking reamer (reamer-1260), the .1260/.1265 plug gauge pair
-# (plug-gauges-1260-1265: the pin-gauge sets step by .001 and hold no .1265)
-# and the 4-40 bottoming tap (tap-4-40-bottoming: the owned plug tap's
+# it): the 4-40 bottoming tap (tap-4-40-bottoming: the owned plug tap's
 # chamfer is not on record, and at B94.9's worst five threads it would leave
-# the set screw's thread tapered short of the bore).
+# the set screw's thread tapered short of the bore). The pivot bore is the
+# owned #30 from the 115-piece index (riser-drill-30; fit audit question 20):
+# no reamer and no plug gauges.
 # The placeholder's 1/2 in 90° chamfer mill is not needed: the owned 1/4 in
-# one cuts each flank in stepped levels; its pin gauges are replaced by the
-# plug gauge pair. The owned protractor checks the flanks.
+# one cuts each flank in stepped levels. The owned protractor checks the
+# flanks.
 #
 # Zeroing: the touch probe has no holder, so every X/Y zero is the owned
 # .200 in edge finder at 900 rpm and every Z zero the end mill on a .002
@@ -55,8 +55,8 @@
 # VB07_set_screw, VB08_set_screw_tap. Program names, the [parameters] and the
 # milling_cuts names are a contract with that recipe. Tool numbers are the
 # places in the tools list among the mill's tools: T1 1/2 in end mill, T2
-# 1/4 in chamfer mill, T3 1/8 in end mill, T4 centre drill, T5 #32, T6
-# .1260 reamer, T7 #43, T8 the tap guide (the tap is turned by hand).
+# 1/4 in chamfer mill, T3 1/8 in end mill, T4 centre drill, T5 #30, T6 #43,
+# T7 the tap guide (the tap is turned by hand).
 title = "Pen V block"
 part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
@@ -145,21 +145,18 @@ break_full_to_mm = 8.382
 # Ø.080 on the set-screw hole, under the #43, so neither leaves a chamfer.
 spot_bore_dia_mm = 2.54
 spot_tap_dia_mm = 2.032
-# Pecks with full retract, under one diameter each: #32 .100 in, #43 .080 in.
-peck_32_mm = 2.54
+# Pecks with full retract, under one diameter each: #30 .100 in, #43 .080 in.
+peck_30_mm = 2.54
 peck_43_mm = 2.032
-# The #32's full diameter runs this far past the relief slot's roof; the
-# reamer's end runs ream_past_mm past it (its full diameter past the roof
-# with the 45° bevel lead).
+# The #30's full diameter (the bore's finish) runs this far past the relief
+# slot's roof.
 drill_past_mm = 1.0
-ream_past_mm = 1.5
 # Feeds each program runs and the sheet prints (mm/min), the shop settings'
-# (cad/process/shop/pn.toml, sourced there): centre drill, #32 and #43 2800
-# rpm × .001 in/rev = 2.8 in/min; reamer 1400 × .003 = 4.2 in/min. cam.py
-# refuses a feed that is not its setting's.
+# (cad/process/shop/pn.toml, sourced there): centre drill, #30 and #43 2800
+# rpm × .001 in/rev = 2.8 in/min. cam.py refuses a feed that is not its
+# setting's.
 spot_feed_per_min_mm = 71.12
-drill_32_feed_per_min_mm = 71.12
-ream_feed_per_min_mm = 106.68
+drill_30_feed_per_min_mm = 71.12
 drill_43_feed_per_min_mm = 71.12
 # Tapping: the taps' point below the front face, both the plug tap and the
 # bottoming tap that finishes after it: from the bore's near wall at its
@@ -189,15 +186,14 @@ vise_lying_inset_mm = -66.26
 # Upright, the longest blank less the paper-end skim stands above the
 # parallels in VB02; cam.py checks it.
 upright_top_max_mm = 28.702
-# Deepest tips above the stacks: VB06, the #32's point (the slot roof less
-# drill_past_mm and its 118° point .885) and the reamer's end; VB07, the
-# #43's point past the bore's axis (its full diameter to the axis, 10.922
-# above the back face, less its .679 point). cam.py checks each.
-bore_tip_height_mm = 4.719
-ream_tip_height_mm = 5.104
+# Deepest tips above the stacks: VB06, the #30's point (the slot roof less
+# drill_past_mm and its 118° point .981); VB07, the #43's point past the
+# bore's axis (its full diameter to the axis, 10.922 above the back face,
+# less its .679 point). cam.py checks each.
+bore_tip_height_mm = 4.623
 tap_tip_height_mm = 10.243
 # Full-diameter hole depths the traveler prints, the ones the files drill:
-# the #32 the slot roof's depth below the top plus drill_past_mm; the #43 to
+# the #30 the slot roof's depth below the top plus drill_past_mm; the #43 to
 # the bore's axis below the front face. cam.py checks both.
 bore_drill_depth_mm = 12.396
 tap_drill_depth_mm = 10.922
@@ -207,12 +203,9 @@ r8_collet_gauge_mm = 6.3         # HA: holders.r8-collets-lms-4860.gauge_len_mm.
 drill_chuck_gauge_mm = 95.0      # Archive holders.drill-chuck-r8.gauge_len_mm.
 # 1/2 in end mill, 3 in overall: set at least 1 in out of the collet.
 half_mill_projection_min_mm = 25.4
-# ASME B94.11M jobber length, overall: #32 2-1/4 in; the #2 combined drill
-# and countersink 1-7/8 in. The .1260 reamer to buy has no length on record:
-# bounded by 3-1/2 in, longer than a straight-shank chucking reamer of the
-# size. Bounded by their whole length below the chuck.
-drill_32_oal_mm = 57.15
-reamer_oal_max_mm = 88.9
+# ASME B94.11M jobber length, overall: #30 2-3/4 in; the #2 combined drill
+# and countersink 1-7/8 in. Bounded by their whole length below the chuck.
+drill_30_oal_mm = 69.85
 centre_drill_oal_mm = 47.625
 # Tapping under the spring tap guide (tools.tap-guide-fisher): the guide and
 # the tap in its wrench together reach at most tap_stack_max_mm below the
@@ -246,13 +239,9 @@ id = "spot"
 name = "#2 centre drill"
 ref = "jig-spot"
 [[tools]]
-id = "drill-32"
-name = "#32 drill"
-ref = "drill-32"
-[[tools]]
-id = "reamer"
-name = ".1260 chucking reamer"
-ref = "reamer-1260"
+id = "drill-30"
+name = "#30 drill"
+ref = "riser-drill-30"
 [[tools]]
 id = "drill-43"
 name = "#43 drill"
@@ -621,8 +610,8 @@ indexing = "none"
 machine_ref = "pm-30mv"
 holding = "The same stacks. The block turned over: B down on both stacks (it bears on the slot's walls and the neck's lands), P to the LEFT, gripped on the FRONT and BACK faces, FRONT to the fixed jaw, centred. Tap it down while closing the vise. The bore exits into the slot, over the gap between the stacks."
 datum = "Program VB06_top_bore. G54: X0 P, Y0 the fixed jaw's face (FRONT), Z0 the stacks' top (B). Pivot bore at X {{cad.pivot_bore_station_in:.3f}} Y −{{cad.pivot_bore_depth_station_in:.3f}} in."
-diagram = { file = "diagrams/top.svg", alt = "The block lying on stacked parallels, B down, front face at the fixed jaw; the end mill faces the top to the height; the centre drill, #32 and reamer go down through the top into the relief slot; the chamfer mill breaks the bore's top edge and the neck's two top edges." }
-envelope = { x_span_mm = ["{{cad.far_end_length_mm}}", "{{process.face_cutter_dia_mm}}", 5.08], y_span_mm = ["{{cad.body_back_depth_mm}}", "{{process.face_cutter_dia_mm}}"], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.stack_height_mm}}", 18.542], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.stack_height_mm}}", "{{process.bore_tip_height_mm}}"], longest_tool_mm = ["{{process.drill_chuck_gauge_mm}}", "{{process.reamer_oal_max_mm}}"], shortest_tool_mm = ["{{process.drill_chuck_gauge_mm}}", "{{process.centre_drill_oal_mm}}"] }
+diagram = { file = "diagrams/top.svg", alt = "The block lying on stacked parallels, B down, front face at the fixed jaw; the end mill faces the top to the height; the centre drill and #30 go down through the top into the relief slot; the chamfer mill breaks the bore's top edge and the neck's two top edges." }
+envelope = { x_span_mm = ["{{cad.far_end_length_mm}}", "{{process.face_cutter_dia_mm}}", 5.08], y_span_mm = ["{{cad.body_back_depth_mm}}", "{{process.face_cutter_dia_mm}}"], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.stack_height_mm}}", 18.542], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.stack_height_mm}}", "{{process.bore_tip_height_mm}}"], longest_tool_mm = ["{{process.drill_chuck_gauge_mm}}", "{{process.drill_30_oal_mm}}"], shortest_tool_mm = ["{{process.drill_chuck_gauge_mm}}", "{{process.centre_drill_oal_mm}}"] }
 vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{cad.body_back_depth_mm}}", along_jaws_mm = "{{cad.far_end_length_mm}}", part_height_mm = 18.542, parallel_height_mm = "{{process.stack_height_mm}}", overhang_mm = ["{{process.vise_lying_inset_mm}}", "rest"], jaw_offset = "centred", fixed_jaw_face = "machined", moving_jaw_face = "machined", moving_jaw_contact = "flat" }
 beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{cad.far_end_length_mm}}"], clamp_mm = [0, "{{cad.far_end_length_mm}}"], section_mm = { y = "{{cad.body_back_depth_mm}}", z = 18.542 }, vise_left = "start" }
 
@@ -657,7 +646,7 @@ speed_kind = "spindle"
 tool = "spot"
 drilling = "none"
 sizing = "other"
-instruction = "Same file, M6 T4: spot the bore Ø{{process.spot_bore_dia_mm:in.3dot}}, under the #32; set 2800."
+instruction = "Same file, M6 T4: spot the bore Ø{{process.spot_bore_dia_mm:in.3dot}}, under the #30; set 2800."
 settings = "pn-spot-c360"
 milling_cuts = [
   { name = "bore spot", kind = "drill", phase = "rough", cutter_dia_mm = "{{process.spot_bore_dia_mm}}", flutes = 2, rpm = 2800, feed_mm_min = "{{process.spot_feed_per_min_mm}}", stations_mm = "{{cad.pivot_bore_x_mm}}" },
@@ -665,33 +654,16 @@ milling_cuts = [
 
 [[setups.operations]]
 speed_kind = "spindle"
-tool = "drill-32"
+tool = "drill-30"
 drilling = "twist_drill"
-sizing = "other"
-instruction = "Same file, M6 T5: #32 drill (the reamer's pilot) down into the slot, its full diameter {{process.drill_past_mm:in.3dot}} past the slot's roof, pecks of {{process.peck_32_mm:in.3dot}} with full retract; set 2800. A drop of cutting oil."
-settings = "pn-drill-32-c360"
-hole_depth_mm = "{{process.bore_drill_depth_mm}}"
-peck = { step_mm = "{{process.peck_32_mm}}", retract = "full" }
-milling_cuts = [
-  { name = "bore drill", kind = "drill", phase = "rough", cutter_dia_mm = 2.9464, flutes = 2, rpm = 2800, feed_mm_min = "{{process.drill_32_feed_per_min_mm}}", stations_mm = "{{cad.pivot_bore_x_mm}}" },
-]
-
-[[setups.operations]]
-speed_kind = "spindle"
-tool = "reamer"
-drilling = "none"
 sizing = { kind = "band", band_mm = "{{cad.pivot_bore_dia_band_mm}}" }
-instruction = "Same file, M6 T6 (the .1260 reamer, to buy): ream the bore through, its end {{process.ream_past_mm:in.3dot}} past the slot's roof, fed in and fed out, no peck; set 1400 (the file stops at the M6 for the speed). Cutting oil."
-settings = "pn-ream-1260-c360"
-inspection = "Bore Ø{{cad.pivot_bore_dia_min_in:.4dot}}–{{cad.pivot_bore_dia_max_in:.4dot}}, still clamped, at the M6 T2 stop (spindle stopped by the file's M5, the reamer raised clear: confirm both before reaching in): the .1260 GO plug enters full length, the .1265 NO-GO plug does not enter."
-gauge_checks = [{ gauge = "plug-gauges-1260-1265", band_mm = "{{cad.pivot_bore_dia_band_mm}}" }]
+instruction = "Same file, M6 T5: #30 drill (the bore's finish size) down into the slot, its full diameter {{process.drill_past_mm:in.3dot}} past the slot's roof, pecks of {{process.peck_30_mm:in.3dot}} with full retract; set 2800. A drop of cutting oil."
+settings = "pn-drill-30-c360"
+hole_depth_mm = "{{process.bore_drill_depth_mm}}"
+peck = { step_mm = "{{process.peck_30_mm}}", retract = "full" }
 milling_cuts = [
-  { name = "bore ream", kind = "drill", phase = "finish", cutter_dia_mm = 3.2004, flutes = 4, rpm = 1400, feed_mm_min = "{{process.ream_feed_per_min_mm}}", stations_mm = "{{cad.pivot_bore_x_mm}}" },
+  { name = "bore drill", kind = "drill", phase = "finish", cutter_dia_mm = 3.2639, flutes = 2, rpm = 2800, feed_mm_min = "{{process.drill_30_feed_per_min_mm}}", stations_mm = "{{cad.pivot_bore_x_mm}}" },
 ]
-
-[[setups.operations]]
-instruction = "The GO does not enter: stop and tell the owner (the reamer cuts under size). The NO-GO enters: the block is scrap."
-feed = "hand"
 
 [[setups.operations]]
 speed_kind = "spindle"
@@ -770,7 +742,7 @@ speed_kind = "spindle"
 tool = "drill-43"
 drilling = "twist_drill"
 sizing = { kind = "tap_drill", tap = "tap-4-40" }
-instruction = "Same file, M6 T7: #43 drill down into the pivot bore, its full diameter to the bore's axis ({{cad.set_screw_tap_into_axis_in:.3dot}} below the front face), pecks of {{process.peck_43_mm:in.3dot}} with full retract; set 2800. A drop of Tapmatic Gold."
+instruction = "Same file, M6 T6: #43 drill down into the pivot bore, its full diameter to the bore's axis ({{cad.set_screw_tap_into_axis_in:.3dot}} below the front face), pecks of {{process.peck_43_mm:in.3dot}} with full retract; set 2800. A drop of Tapmatic Gold."
 settings = "pn-drill-43-c360"
 hole_depth_mm = "{{process.tap_drill_depth_mm}}"
 peck = { step_mm = "{{process.peck_43_mm}}", retract = "full" }
@@ -795,7 +767,7 @@ speed_kind = "other"
 tool = "tap-guide"
 drilling = "none"
 sizing = "other"
-instruction = "Run VB08_set_screw_tap: M6 T8, the tap guide in the 1/2 in collet, pointed end out (the tool setter measures it), spindle off; the file ends Idle at the machine top over the hole."
+instruction = "Run VB08_set_screw_tap: M6 T7, the tap guide in the 1/2 in collet, pointed end out (the tool setter measures it), spindle off; the file ends Idle at the machine top over the hole."
 diagram = { file = "diagrams/tap.svg", alt = "The block lying front face up; a 4-40 tap in the T-handle wrench in the set-screw hole, the tap guide in the spindle, its spring point in the wrench's centre hole; the tap's point to go {{process.tap_reach_min_mm:in.3dot}}–{{process.tap_reach_max_mm:in.3dot}} below the front face, into the bore." }
 
 [[setups.operations]]
@@ -839,20 +811,20 @@ machine_kind = "other"
 title = "Clean the bore, deburr, inspect"
 machine = "Bench"
 indexing = "none"
-diagram = { file = "diagrams/inspect.svg", alt = "The finished block: the V along the bottom of the neck, the relief slot from the steps to the far end, the reamed pivot bore down from the top into the slot, the set-screw hole from the front face into the bore." }
+diagram = { file = "diagrams/inspect.svg", alt = "The finished block: the V along the bottom of the neck, the relief slot from the steps to the far end, the drilled pivot bore down from the top into the slot, the set-screw hole from the front face into the bore." }
 envelope = "other"
 vise_hold = "other"
 beam = "other"
 
 [[setups.operations]]
 speed_kind = "other"
-tool = "reamer"
+tool = "drill-30"
 drilling = "none"
-sizing = { kind = "band", band_mm = "{{cad.pivot_bore_dia_band_mm}}" }
-instruction = "The block in the bench vise's soft jaws, the top up. Run the .1260 reamer through the bore by hand in the tap wrench, cutting oil, turning forward only, to shear the #43 drill's and the tap's burrs where they broke into the bore. Blow it out."
+sizing = "other"
+instruction = "The block in the bench vise's soft jaws, the top up. Run the #30 drill through the bore by hand in the tap wrench, cutting oil, turning forward only, to clear the #43 drill's and the tap's burrs where they broke into the bore. Blow it out."
 feed = "hand"
-inspection = "Bore Ø{{cad.pivot_bore_dia_min_in:.4dot}}–{{cad.pivot_bore_dia_max_in:.4dot}} again: the GO enters full length past the set-screw hole, the NO-GO does not enter. If the MHA-PN-04 rod is at hand, its pivot slides in."
-gauge_checks = [{ gauge = "plug-gauges-1260-1265", band_mm = "{{cad.pivot_bore_dia_band_mm}}" }]
+inspection = "The #30 drill's shank enters full length past the set-screw hole. If the MHA-PN-04 rod is at hand, its pivot drops in and turns by hand."
+gauge_checks = "other"
 
 [[setups.operations]]
 speed_kind = "other"
@@ -868,7 +840,7 @@ feed = "hand"
 
 [[setups.operations]]
 instruction = "Inspect, the block on the surface plate."
-inspection = "Bore from P {{cad.pivot_bore_station_min_in:.3dot}}–{{cad.pivot_bore_station_max_in:.3dot}} and from the front face {{cad.pivot_bore_depth_station_min_in:.3dot}}–{{cad.pivot_bore_depth_station_max_in:.3dot}}: the GO plug standing in the bore, the height gauge over it less half its .1260 (the block on P, then on its front face). Set-screw hole from P {{cad.set_screw_tap_station_min_in:.3dot}}–{{cad.set_screw_tap_station_max_in:.3dot}} and from B {{cad.set_screw_tap_height_min_in:.3dot}}–{{cad.set_screw_tap_height_max_in:.3dot}}: the #43 drill's shank in it, the height gauge over it less half its .089 (the block on P, then on B). Tap wall to the step face at least {{cad.set_screw_tap_wall_min_min_in:.3dot}}: the bore and tap stations above put it there."
+inspection = "Bore from P {{cad.pivot_bore_station_min_in:.3dot}}–{{cad.pivot_bore_station_max_in:.3dot}} and from the front face {{cad.pivot_bore_depth_station_min_in:.3dot}}–{{cad.pivot_bore_depth_station_max_in:.3dot}}: the #30 drill's shank standing in the bore, the height gauge over it less half its .1285 (the block on P, then on its front face). Set-screw hole from P {{cad.set_screw_tap_station_min_in:.3dot}}–{{cad.set_screw_tap_station_max_in:.3dot}} and from B {{cad.set_screw_tap_height_min_in:.3dot}}–{{cad.set_screw_tap_height_max_in:.3dot}}: the #43 drill's shank in it, the height gauge over it less half its .089 (the block on P, then on B). Tap wall to the step face at least {{cad.set_screw_tap_wall_min_min_in:.3dot}}: the bore and tap stations above put it there."
 gauge_checks = [
   { gauge = "height-gauge", band_mm = "{{cad.pivot_bore_station_band_mm}}" },
   { gauge = "height-gauge", band_mm = "{{cad.pivot_bore_depth_station_band_mm}}" },

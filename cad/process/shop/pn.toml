@@ -104,24 +104,16 @@ chip_load_mm_per_tooth = 0.02794  # .0011 in; 2800 × 2 × .0011 = 6.2 in/min
 flutes = 2
 feed_unit = "in/min"
 # Pivot bore (HSS): the family block's LittleMachineShop and AutoDrill rows.
-# - #32 (.116 in, common.toml tools.drill-32), the reamer's pilot (.010 in
-#   on the diameter for the reamer): 160 ft/min is 5270 rpm, so 2800
-#   (85 ft/min); .116 lies between the 1/16 and 1/8 in columns, .001 in/rev:
-#   2.8 in/min.
-# - .1260 chucking reamer (common.toml tools.reamer-1260, to buy): the same
-#   row's 160 ft/min is the ceiling (4850 rpm); the author reams at half
-#   the spindle's 2800, 1400 rpm (46 ft/min), at the 1/8 in column's
-#   .003 in/rev: 4.2 in/min, fed in and fed out.
-[settings.pn-drill-32-c360]
-tool = "drill-32"
+# - #30 (.1285 in, common.toml tools.riser-drill-30, the owned 115-piece
+#   index), the bore's finish (owner ruling 2026-11-24, fit audit question
+#   20): 160 ft/min is 4760 rpm, so the spindle's 2800 (94 ft/min, 26 stops
+#   of 107.7); .001 in/rev, the 1/16-1/8 in columns' lower row, kept for a
+#   clean finish: 2.8 in/min.
+[settings.pn-drill-30-c360]
+tool = "riser-drill-30"
 material = "pn-c360-flat"
 rpm = 2800
 feed = "2.8 in/min"
-[settings.pn-ream-1260-c360]
-tool = "reamer-1260"
-material = "pn-c360-flat"
-rpm = 1400
-feed = "4.2 in/min"
 # MHA-PN-04 pen rod (C36000 key stock): the #0-80 tap drill from the lathe's
 # tailstock, at the C360 drill rows' 160 sfm (shop/lathe.toml
 # lathe-drill-n-c360; the 3/64 runs at the lathe's 2000 rpm top), pecked.

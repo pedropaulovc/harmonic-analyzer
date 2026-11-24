@@ -292,7 +292,7 @@ tap_drill_mm = 2.2606
 range_mm = [0.0, 222.25]
 resolution_mm = 0.005
 
-# The .1260 reams' go/no-go pair (pn pivot bore, pd transgear bushings) (cad/config/shop-equipment/
+# The .1260 reams' go/no-go pair (pd transgear arm and bushings) (cad/config/shop-equipment/
 # gauges.plug-gauges-1260-1265, to buy): GO .1260 and NO-GO .1265 in =
 # 3.2004 and 3.2131 mm. A fixed-limit pair reads no scale; its resolution is
 # each member's Class X tolerance, .000040 in = 0.001016 mm.

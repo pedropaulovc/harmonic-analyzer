@@ -331,7 +331,11 @@ def test_bands_are_model_owned_and_name_their_mates() -> None:
 def test_pivot_band_clears_the_v_block_pivot_bore() -> None:
     import pn_pen_v_block_spec as v_block
 
-    assert spec.PIVOT_DIA == v_block.PIVOT_BORE_DIA
+    # Owner ruling 2026-11-24, fit audit question 20: the block's bore is
+    # drilled #30 and the pivot keeps its .126; the rod restates the drill.
+    assert spec.PIVOT_BORE_DIA == v_block.PIVOT_BORE_DIA
+    assert spec.PIVOT_BORE_DIA == pytest.approx(0.1285 * 25.4)
+    assert spec.PIVOT_DIA == pytest.approx(0.126 * 25.4)
     shaft_max = spec.PIVOT_DIA + spec.PIVOT_BAND[0]
     bore_min = v_block.PIVOT_BORE_DIA + v_block.PIVOT_BORE_BAND[1]
     assert shaft_max < bore_min  # always a clearance (slip) fit
@@ -439,16 +443,14 @@ def test_pivot_fit_route_is_note_1_linked_from_the_diameter() -> None:
     assert len(lines) <= 4
     assert lines[0].startswith(f"{spec.PIVOT_FIT_NOTE}. ")
     assert spec.PEN_V_BLOCK_NUMBER in spec.DRAWING_NOTES
-    # The stated clearance is what the printed limits give in the REAM_H7 bore.
-    from _fit_deviations import deviations
+    # The stated clearance is what the printed limits give in the #30 bore
+    # (the DRILLED HOLES row), before the set screw clamps the pivot.
     from pn_pen_v_block_spec import PIVOT_BORE_BAND, PIVOT_BORE_DIA
 
-    bore_low, bore_high = deviations(PIVOT_BORE_BAND)
-    pin_low, pin_high = deviations(spec.PIVOT_BAND)
-    assert spec.PIVOT_DIA == PIVOT_BORE_DIA
-    assert spec.PIVOT_CLEARANCE_MM == pytest.approx(
-        (bore_low - pin_high, bore_high - pin_low)
-    )
+    bore = (PIVOT_BORE_DIA + PIVOT_BORE_BAND[1], PIVOT_BORE_DIA + PIVOT_BORE_BAND[0])
+    pin = (spec.PIVOT_DIA + spec.PIVOT_BAND[1], spec.PIVOT_DIA + spec.PIVOT_BAND[0])
+    assert spec.PIVOT_CLEARANCE_MM == pytest.approx((bore[0] - pin[1], bore[1] - pin[0]))
+    assert spec.PIVOT_CLEARANCE_MM == pytest.approx((0.0030 * 25.4, 0.0085 * 25.4))
     clearance = "-".join(spec._inch_text(mm) for mm in spec.PIVOT_CLEARANCE_MM)
     assert f"(CLEARANCE {clearance})" in spec.DRAWING_NOTES
     # Note 1 stands in the field under the side view, right of the tap's

@@ -334,27 +334,35 @@ def test_set_screw_point_lands_in_the_relief_groove() -> None:
     # #2439 option B: the groove centres on the screw's .24 printed station
     # (.71 block less .47), .010 under the Ø.126 pivot, and the point's
     # chamfer at the bore wall passes between the walls at every printed limit.
+    # Owner ruling 2026-11-24, fit audit question 20: the bore is drilled #30
+    # (.1285 +.004/0), the pivot unchanged.
     assert vb.BLOCK_HEIGHT / 25.4 == pytest.approx(0.71, abs=0.005)
     station = (groove.GROOVE_NEAR_STATION + groove.GROOVE_FAR_STATION) / 2.0
     assert station / 25.4 == pytest.approx(0.24)
     assert groove.GROOVE_DEPTH / 25.4 == pytest.approx(0.010)
     shoulder_side, end_side = g.groove_landing_spare()
-    assert shoulder_side / 25.4 == pytest.approx(0.009, abs=1e-4)
-    assert end_side / 25.4 == pytest.approx(0.009, abs=1e-4)
+    assert shoulder_side / 25.4 == pytest.approx(0.0077, abs=1e-4)
+    assert end_side / 25.4 == pytest.approx(0.0077, abs=1e-4)
     # Full printed worst case (codjiflo P3 on #3152): the deepest .XXX floor
-    # in the largest reamed bore raises the point's crossing of the bore wall
-    # to .01275, widening the chamfer there by twice the extra rise.  The
-    # point must still pass both walls, and the first full thread (one pitch
-    # back from the cup) must stay inside the tap.
+    # in the largest drilled bore raises the point's crossing of the bore
+    # wall to .01575, widening the chamfer there by twice the extra rise.  The
+    # point must still pass both walls (0.082 mm spare), and the first full
+    # thread (one pitch back from the cup) must stay inside the tap.
     floor_low, _ = printed_deviations(
         groove.GROOVE_DIA, groove.GROOVE_PLACES, unit=rod.UNIT
     )
     rise_max = (
         vb.PIVOT_BORE_DIA + vb.PIVOT_BORE_BAND[0] - (groove.GROOVE_DIA + floor_low)
     ) / 2.0
-    assert rise_max / 25.4 == pytest.approx(0.01275, abs=1e-5)
+    assert rise_max / 25.4 == pytest.approx(0.01575, abs=1e-5)
     extra = rise_max - (vb.PIVOT_BORE_DIA - groove.GROOVE_DIA) / 2.0
     for spare in (shoulder_side, end_side):
-        assert (spare - extra) / 25.4 == pytest.approx(0.00625, abs=1e-4)
+        assert (spare - extra) / 25.4 == pytest.approx(0.0032, abs=1e-4)
         assert spare - extra > 0.0
     assert rod_set_screw.POINT_LENGTH > rise_max
+    # The cup still reaches the groove floor with the pivot pushed off by
+    # its whole float in the largest bore (.0200 against the .025 point).
+    pin_min = rod.PIVOT_DIA + rod.PIVOT_BAND[1]
+    reach = rise_max + (vb.PIVOT_BORE_DIA + vb.PIVOT_BORE_BAND[0] - pin_min) / 2.0
+    assert reach / 25.4 == pytest.approx(0.0200, abs=1e-4)
+    assert rod_set_screw.POINT_LENGTH > reach

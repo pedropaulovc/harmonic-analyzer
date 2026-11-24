@@ -69,7 +69,6 @@ LOCAL_BAND_SOURCES: dict[tuple[str, str], tuple[str, str]] = {
     # Builders apply the same bands their specs publish on the sheet.
     ("build_pn_pen_hanger", "band"): ("DRAWING_BANDS", "values"),
     ("build_pn_pen_rod", "band"): ("DRAWING_BANDS", "values"),
-    ("build_pn_pen_v_block", "band"): ("DRAWING_BANDS", "values"),
     # for (feature, name), band in spec.MODEL_BANDS_MM.items(): deviations(band)
     ("build_dt_cone_gear_tl_keyed_arbor", "band"): ("spec.MODEL_BANDS_MM", "values"),
     ("build_dt_cylinder_gear_tl_cam_fixture", "deviations"): ("MODEL_BANDS_MM", "values"),
@@ -286,6 +285,13 @@ INDEXED_FIT_BANDS: dict[tuple[str, str], str] = {
         "title-block drilled-hole deviations (the 3/16 DRILL THRU callout's row, "
         "no native band); indexed for the bar's row walls and the axle's bond "
         "gap (mg_wheel_group.BAR_BOND_GAP)"
+    ),
+    # Owner ruling 2026-11-24, fit audit question 20: an analysis band, not a
+    # printed limit.
+    ("pn_pen_v_block_spec", "PIVOT_BORE_BAND"): (
+        "title-block drilled-hole deviations (the #30 DRILL THRU callout's row, "
+        "no native band); indexed for the step clearance, the neck break's wall "
+        "and the set screw's reach to the pivot's groove"
     ),
     ("pd_transgear_feed_pinion_spec", "FLAT_TO_AXIS_BAND"): (
         "equal band indexed into the native symmetric (+/-) tolerance and the "
@@ -577,7 +583,6 @@ def _resolve(use: BandUse) -> list[tuple[str, Any]]:
     [
         ("build_pn_pen_hanger", "DRAWING_BANDS"),
         ("build_pn_pen_rod", "DRAWING_BANDS"),
-        ("build_pn_pen_v_block", "DRAWING_BANDS"),
     ],
 )
 def test_local_sources_cover_every_band(module_name: str, expected: str) -> None:
