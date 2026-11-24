@@ -1,0 +1,11 @@
+# Why each band under the title block stays on MHA-CH-00 (owner ruling
+# 2026-11-24: "In the part's registry file, not on the sheet. The sheet stays
+# clean; the reviewer fails a tight feature that has no registry reason.").
+# Read by the machinist review only. Each band was re-derived .002 looser on
+# the spec chain (fit audit 2026-11-23, lane 2).
+necessity:
+  - id: N-01
+    feature: "sheet 5, VIEW F, lug centre .114 ±.004 off the MHA-FR-02 rail web centre (KeeperLugX)"
+    kind: gap
+    reason: "transferred foot tap's drill wall in rail web under .080"
+    source: "owner ruling X-A (50072e913, 2026-10-18); build_fr_top_frame raises 'keeper receiver leaves less than .080 with drill wander' at ±.005"
