@@ -22,11 +22,15 @@ verbatim: "hub plate sits on 0.8245; screw 32 tpi  byutton 0.5330 length
 0.0415"; and: "head dia 0.3235; below plate; why do you care about thread i
 will use the same screws with all plates"): the hub the bore pilots on, the
 bolt circle (inferred from the two screw-hole readings) and the head's own
-three plate screws, which this plate reuses. STILL GUESSES (#2157 tracks
-them): the bolt circle's clocking to a hole row and the three hole-circle
-diameters against the index arm's reach. Replace each ``# GUESS (#2157)``
-value with the measured one. The maker's manual (owner photographs
-2026-11-24) gives the 1:40 worm and the stock circles and no plate dimension.
+three plate screws, which this plate reuses. The three hole circles stand
+within the stock plates' circle band (owner facts 2026-11-24, verbatim: "rim
+to outermost hole edge 0.1030" and "innermost hole edge to hto bore 0.5545"),
+which the index arm is known to reach. No size is a guess any longer. The
+screw pattern's clocking to a hole row is free: indexing counts holes from
+wherever the pin stands, and the sector arms turn about the hub. One look is
+left for first fitting (#2157): how far the pin enters, the plate being .037
+thinner than stock. The maker's manual (owner photographs 2026-11-24) gives
+the 1:40 worm and the stock circles and no plate dimension.
 
 Thickness: the stock plate is .2770; this one is cut from the owned 1/4 in
 plate, skimmed to .24, so it sits .037 lower under the pin. The stock pin
@@ -59,9 +63,9 @@ Rule 17 shortfall (stated on the sheet; owner ruling 2026-11-02, RV-01 in the
 part's machinist_exceptions): #31 holes on the 57- and 51-hole circles leave
 .060 to .062 in between neighbouring holes and between those two circles, at
 the worst case of the drilled-hole band and the position zone: at the .060
-floor, below the .080 target. The two circles stand .020 larger than they did
-while the holes were reamed, which is what the wider drilled-hole zone costs;
-the plate's 3.94 OD leaves no larger radius at the .080 edge target. The
+floor, below the .080 target. The 57-hole circle cannot stand farther out
+than the stock plate's outermost circle, and the 51-hole circle sits where
+both its own webs and its web to the 57-hole circle keep the floor. The
 24-hole circle stands at Ø2.700, not the brief's Ø2.800, so its web to the
 51-hole circle meets the .080 target.
 
@@ -146,11 +150,25 @@ INDEX_PIN_CLEARANCE = (
 if INDEX_PIN_CLEARANCE[0] <= 0.0:
     raise AssertionError("the BS-0 index pin does not enter a least-size hole")
 RING_COUNTS = (57, 51, 24)
+# Owner facts 2026-11-24 (stock plate): "rim to outermost hole edge 0.1030"
+# and "innermost hole edge to hto bore 0.5545": with the 3.94 OD, the .8270
+# bore and .120 holes the stock circles run from R = .4135 + .5545 + .060 =
+# 1.028 to R = 1.970 - .103 - .060 = 1.807, the band the index arm is known
+# to reach.
+STOCK_OUTER_CIRCLE_DIA = PLATE_DIA - 2.0 * 0.103 * INCH - STOCK_PIN_HOLE_DIA
+STOCK_INNER_CIRCLE_DIA = 0.827 * INCH + 2.0 * 0.5545 * INCH + STOCK_PIN_HOLE_DIA
+# Within the stock plates' circle band (owner readings): the 57-hole circle
+# at the stock plate's outermost; the 51-hole circle where its own webs and
+# its web to the 57-hole circle keep the .060 floor; the 24-hole circle with
+# its web to the 51-hole circle at the .080 target.
 RING_PCDS = {
-    57: 3.620 * INCH,  # GUESS (#2157): outermost at the .080 edge target
-    51: 3.220 * INCH,  # GUESS (#2157)
-    24: 2.700 * INCH,  # GUESS (#2157): web to the 51 circle at the .080 target
+    57: 3.614 * INCH,
+    51: 3.217 * INCH,
+    24: 2.700 * INCH,
 }
+for _pcd in RING_PCDS.values():
+    if not STOCK_INNER_CIRCLE_DIA - 1e-9 <= _pcd <= STOCK_OUTER_CIRCLE_DIA + 1e-9:
+        raise AssertionError("a hole circle stands outside the index arm's reach")
 RING_TEETH = {57: 114, 51: 102, 24: 96}
 for _circle, _teeth in RING_TEETH.items():
     _advance = holes_per_tooth(_teeth, _circle)

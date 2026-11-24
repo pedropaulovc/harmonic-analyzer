@@ -10,8 +10,9 @@ mates ride the native callout text. A centre mark with extended lines on the
 bore gives the vertical centreline each pattern clocks to. The edge view
 (*Right) gives the thickness; the shaded isometric sits top right.
 
-Sizes the owner has not measured are best guesses (#2157); the sheet states
-the index circles' web shortfall as a plain fact (rule 20).
+The sizes come from the owner's measurements of the stock plate and the head
+(#2157); the sheet states the index circles' web shortfall and the screw
+counterbores' wall to the bore as plain facts (rule 20).
 """
 
 from __future__ import annotations

@@ -1245,7 +1245,8 @@ hole, the Ø.014 position zone a drilled pattern holds and the bore's .0055 on t
 hub together misplace a tooth by at most .0141° at the gear, 0.37 % of a 96-tooth pitch. The owner
 measured the stock plate and the head on 2026-11-24: OD 3.94, bore .8270, .120 pin holes,
 counterbored 15/64 screw holes on a 32 mm circle; the plate reuses the head's own screws. The
-hole-circle diameters against the index arm's reach are best guesses until read
+three hole circles stand within the stock plate's own circle band (R1.028 to R1.807), which the
+index arm reaches
 ([#2157](https://github.com/pedropaulovc/harmonic-analyzer/issues/2157)). Differential indexing on a
 universal head with change gears is the alternative. Those tooth counts did not change with the
 pitch, so this was already true of the old train.

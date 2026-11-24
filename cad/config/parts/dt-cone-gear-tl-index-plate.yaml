@@ -4,8 +4,8 @@ dt-cone-gear-tl-index-plate:
   # Indexes the 96T, 102T and 114T cone gears on the PM BS-0 dividing head,
   # whose stock plates cannot. The owner measured the index pin, the stock
   # plate, the hub and the plate screws on 2026-11-24 (words in
-  # dt_cone_gear_tl_index_plate_spec.py); the hole-circle diameters against the
-  # index arm's reach are still best guesses (#2157).
+  # dt_cone_gear_tl_index_plate_spec.py); the hole circles stand within the
+  # stock plates' circle band, which the index arm reaches (#2157).
   number: MHA-DT-03-TL-01
   material: 6061-T651 ALUMINUM
   material_specification: 6061-T651 aluminum, owned 1/4 in plate
@@ -19,7 +19,7 @@ dt-cone-gear-tl-index-plate:
       kind: "minor"
       where: "face view, the 132X index-hole callout: WEB .06 MIN"
       finding: "webs between neighbouring holes of the 57- and 51-hole circles and between those two circles below the .080 target (rules 17, 20)"
-      reason: "owner ruling 2026-11-02 (Pedro): accept webs down to .02 in on the 57- and 51-hole circles and between them, provisional until the #2157 measurements of the BS-0 plate and index pin land, when the pin diameter and circle radii are re-evaluated. Re-evaluated 2026-11-24 for the measured pin (owner fact: \"0.117 in dia dividing head pin\") and the #31 drilled holes of owner ruling 2026-11-23, tool audit Q15: at the worst drilled-hole band and the Ø.014 drilled-hole position zone the webs are .060 on the 51-hole circle, .061 on the 57-hole circle and .062 between them, at the .060 floor and under the .080 target; there is no larger radius at the .080 edge target, and the circle radii stay guesses (#2157)"
+      reason: "owner ruling 2026-11-02 (Pedro): accept webs down to .02 in on the 57- and 51-hole circles and between them, provisional until the #2157 measurements of the BS-0 plate and index pin land, when the pin diameter and circle radii are re-evaluated. Re-evaluated 2026-11-24 for the measured pin (owner fact: \"0.117 in dia dividing head pin\"), the #31 drilled holes of owner ruling 2026-11-23, tool audit Q15, and the stock plate's outermost circle (owner fact: \"rim to outermost hole edge 0.1030\", Ø3.614): at the worst drilled-hole band and the Ø.014 drilled-hole position zone the webs are .060 on the 51-hole circle, .061 on the 57-hole circle and .061 between them, at the .060 floor and under the .080 target; the 57-hole circle cannot stand outside the stock plate's outermost circle"
     - id: "RV-02"
       kind: "accept"
       where: "face view: the 57-, 51- and 24-hole circle diameters boxed BASIC and the 132X position frame Ø.014 to datum A (the bore axis)"

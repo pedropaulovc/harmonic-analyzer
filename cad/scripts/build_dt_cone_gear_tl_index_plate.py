@@ -2,8 +2,8 @@ r"""Build the cone gears' dividing-head index plate (MHA-DT-03-TL-01; shop tooli
 
 A BS-0 dividing-head plate with the 57-, 51- and 24-hole circles that index
 the 114T, 102T and 96T cone gears (``dt_cone_gear_tl_index_plate_spec``).
-The owner measured the stock plate's envelope and screw seats; what he has
-not measured is a best guess (#2157).
+Its sizes come from the owner's measurements of the stock plate and the head
+(#2157; his words are in the spec).
 
 Layout (the spec's model frame): the plate is a Front-plane annulus (OD and
 bore circles about the origin) extruded +Z by the thickness, so the back face

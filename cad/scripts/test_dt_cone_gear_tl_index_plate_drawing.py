@@ -55,8 +55,15 @@ def test_the_model_globals_are_the_spec_sizes() -> None:
     assert spec.MOUNT_SEED[0] < 0.0 < spec.MOUNT_SEED[1]
 
 
-def test_every_guess_cites_the_tracking_issue() -> None:
+def test_the_hole_circles_stand_inside_the_stock_plates_circle_band() -> None:
+    # Owner facts 2026-11-24: "rim to outermost hole edge 0.1030";
+    # "innermost hole edge to hto bore 0.5545".
     assert "issues/2157" in spec.TRACKING_ISSUE
+    assert math.isclose(spec.STOCK_OUTER_CIRCLE_DIA, 3.614 * INCH)
+    assert math.isclose(spec.STOCK_INNER_CIRCLE_DIA, 2.056 * INCH)
+    assert spec.RING_PCDS == {57: 3.614 * INCH, 51: 3.217 * INCH, 24: 2.700 * INCH}
+    for pcd in spec.RING_PCDS.values():
+        assert 2.056 * INCH - 1e-9 <= pcd <= 3.614 * INCH + 1e-9
 
 
 def test_registry_row_is_tooling_in_inch() -> None:
