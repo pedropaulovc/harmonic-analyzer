@@ -174,7 +174,7 @@ def test_every_squared_blank_is_sawn_from_a_flat_of_its_thickness(stem: str) -> 
 def test_the_pivot_spacer_plan_mikes_the_length_round_the_rim_and_tries_the_mate() -> (
     None
 ):
-    """MHA-PD-20 (fit audit 2026-11-23, pending owner confirmation): the
+    """MHA-PD-20 (owner ruling 2026-11-24, fit audit question 6): the
     sheet carries no frame between the faces, so the plan authors no zone:
     the length's limits read at four places round the rim bound the taper;
     the #12 hole is accepted by the screw's shoulder and, for the drawing's

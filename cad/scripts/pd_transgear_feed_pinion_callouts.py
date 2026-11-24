@@ -49,8 +49,8 @@ CALLOUT_BELOW = 4  # swDimensionTextCalloutBelow
 
 
 # The reamed bore runs on the MHA-PD-23 pin's 1/8 shank.  It prints the
-# reamer's size and no band (fit audit 2026-11-23, pending owner
-# confirmation): the pin is turned to it, and the pin's sheet carries the
+# reamer's size and no band (drawing-guidelines rule 4, form 2): the pin is
+# turned to it, and the pin's sheet carries the
 # pair's one acceptance (MHA-PD-23 note 1: each bore turns free with no
 # shake; machinist review r1 of the fit batch: an acceptance printed on
 # both members, and three rows of words under the size).  The callout is

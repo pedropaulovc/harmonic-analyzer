@@ -4,8 +4,8 @@
 # MHA-PD-VN-57 shoulder (owner ruling 2026-11-24, fit audit question 6):
 # no reamer, no plug gauges; the hole is accepted by trying the screw's
 # shoulder in it. The sheet carries no frame between the faces: its length
-# band (±.001; delegated ruling 2026-11-24 (FitBatchPD), no precedent, owner
-# review #2144) holds at every place round the rim, which bounds their taper
+# band (±.001; necessity register N-01: at ±.002 the faces' taper takes the
+# platen air under its floor) holds at every place round the rim, which bounds their taper
 # (pd_transgear_pivot_spacer_spec REAR_FACE_PARALLELISM). The 1/2 in C36000
 # bar on hand (cad/config/shop-equipment/stock-bought.toml c360-round-1-2;
 # the 7/16 bar is only to order).

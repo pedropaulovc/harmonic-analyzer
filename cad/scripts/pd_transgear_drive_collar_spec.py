@@ -955,9 +955,9 @@ FIT_UP_NOTE = "\n".join(
 
 # The external drive-pin rim shortfall, note 1: minor exception RV-01 in
 # cad/config/parts/pd-transgear-drive-collar.yaml (shared #25 sprocket-seat
-# geometry, #2141; the owner's ruling at .019, restated at the shop row's
-# value by a delegated ruling 2026-11-24).  The flat-pin hole to drive-pin
-# hole web, note 2: delegated minor exception RV-03 there (#2409).  Note 3: the
+# geometry, #2141; the owner's ruling at .019; the .018 the shop row now
+# gives is an open owner question).  The flat-pin hole to drive-pin hole
+# web, note 2: minor exception RV-03 there, advisory under rule 20.  Note 3: the
 # three reamed holes print no band, their bought dowels are their gauges.
 # Note 4, which both REF offsets link (rule 4: a location made to its mate):
 # the drive-pin holes are located to the wheels' holes, the trial of the

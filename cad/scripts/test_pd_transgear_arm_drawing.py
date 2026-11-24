@@ -236,7 +236,7 @@ def _floor_pressed_proud_range(pin_length: float, hole_depth: float) -> tuple[fl
 # with the rounding, MHA-PD-14).  The hook's screw holes take the title
 # block's ±.005 (delegated ruling 2026-11-07, the bar's taps spotted through
 # them), so the hook's screw drift grew; the MHA-PD-20 rear face parallel
-# .001 to its front (fit audit 2026-11-23, pending owner confirmation)
+# .001 to its front (owner ruling 2026-11-24, fit audit question 6)
 # seats the pivot; the #9 drilled pivot bore floats the pivot .0135 at most
 # (#2413's ream floated it .0085).  #3124: the 7/8 pin is set
 # .516-.565 proud at assembly (owner decision 2026-11-19).  #2019: on the 3/8

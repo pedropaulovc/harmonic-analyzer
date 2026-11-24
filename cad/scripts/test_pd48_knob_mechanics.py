@@ -141,8 +141,8 @@ def test_physical_flat_terminal_has_two_actual_end_limits():
     assert shaft.FRONT_RELIEF_DIA == 3.937  # .155
     assert shaft.FRONT_RELIEF_DIA_MIN == pytest.approx(3.81)
     assert shaft.FRONT_RELIEF_DIA_MAX == pytest.approx(3.937)
-    # One printed limit, .007 MAX from F (fit audit 2026-11-23, pending owner
-    # confirmation): the flat's end lies in the neck's air, never short of it.
+    # One printed limit, .007 MAX from F (rule 4: a single limit, set by the
+    # neck's air): the flat's end lies in the neck's air, never short of it.
     assert shaft.CORE_FLAT_CUT_END_FROM_F == pytest.approx(0.1778)
     assert shaft.CORE_FLAT_CUT_END_LIMITS == (0.0, 0.1778)
     assert shaft.CORE_FLAT_CUT_END_Z == -shaft.CORE_FLAT_CUT_END_FROM_F

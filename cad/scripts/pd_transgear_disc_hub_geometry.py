@@ -58,8 +58,8 @@ if len(SCREW_ANGLES_DEG) != SCREW_COUNT:
     raise AssertionError("one pattern angle per disc screw")
 
 # The retained hub spigot (R9-68): Ø.498 REF in the disc's bore, made to fit
-# (fit audit 2026-11-23, pending owner confirmation; drawing-guidelines.md
-# rule 4, form 2): the disc's bore is reamed with the .501 chucking reamer
+# (drawing-guidelines.md rule 4, form 2): the disc's bore is reamed with
+# the .501 chucking reamer
 # (tools.reamer-5010, to order, not owned) and prints no band, and the
 # spigot is turned last to that bore, so its size prints REF with no limits
 # and SPIGOT_CLEARANCE, the diametral clearance in the bore, is the printed

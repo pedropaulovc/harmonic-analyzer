@@ -361,8 +361,8 @@ def test_d_flat_uses_signed_physical_round_tool_end_and_real_neck() -> None:
     assert spec.FRONT_CORNER_RADIUS == 0.1016
     assert spec.FRONT_CORNER_RADIUS_MAX == 0.1016
     assert spec.CORE_ACTIVE_LENGTH == pytest.approx(4.9276)
-    # One printed limit, .007 MAX from F (fit audit 2026-11-23, pending owner
-    # confirmation): modelled at it, accepted anywhere short of F.
+    # One printed limit, .007 MAX from F (rule 4: a single limit, set by the
+    # neck's air): modelled at it, accepted anywhere short of F.
     assert -spec.CORE_FLAT_CUT_END_Z == pytest.approx(0.1778)
     assert spec.CORE_FLAT_CUT_END_LIMITS == (0.0, 0.1778)
     assert spec.FRONT_RELIEF_WIDTH_MIN - 0.1778 >= 0.1016 - 1e-12

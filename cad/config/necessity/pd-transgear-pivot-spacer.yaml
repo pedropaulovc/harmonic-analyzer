@@ -7,4 +7,4 @@ necessity:
     feature: "sheet 1, side view, length .197 ±.001"
     kind: gap
     reason: "Looser, the faces' taper closes MHA-PD-06 to MHA-PD-02 air"
-    source: "pd_transgear_pivot_spacer_spec.LENGTH_TOLERANCE, REAR_FACE_PARALLELISM; build_pd_paper_drive_assembly.PLATEN_AIR (statistical air over its 0.03 floor at ±.001, under it at ±.002: test_pd_transgear_pivot_spacer_drawing computes both from the specs); delegated ruling 2026-11-24 (FitBatchPD), no precedent; owner review #2144"
+    source: "pd_transgear_pivot_spacer_spec.LENGTH_TOLERANCE, REAR_FACE_PARALLELISM; build_pd_paper_drive_assembly.PLATEN_AIR (statistical air over its 0.03 floor at ±.001, under it at ±.002: test_pd_transgear_pivot_spacer_drawing computes both from the specs). The faces parallel .001 are the owner's ruling of 2026-11-24 on fit audit question 6"

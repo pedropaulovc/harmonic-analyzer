@@ -62,8 +62,9 @@ HUB_LENGTH_BAND = FIT_LENGTH_BAND_IN
 # the MHA-PD-06 disc still holds its floor (transgear_cluster_fit PS; .003
 # leaves the statistical air 0.092 mm under its 0.1016); it was .0005, a
 # check finer than .XXX with no failure to name (machinist review
-# 20261124T013305458Z, rule 4; fit audit 2026-11-23, pending owner
-# confirmation).
+# 20261124T013305458Z; rule 4's necessity test, MHA-PD-00 register N-16:
+# fit audit question 5 added collar air, so whether .002 is still needed
+# is open in #3528).
 SHOULDER_SEAT_GAP_MAX = 0.0508  # .002
 
 # --- Overall: hub face to rear face -------------------------------------------
@@ -78,7 +79,7 @@ LENGTH_BAND = 0.0508  # ±.002, knob float
 STUB_LENGTH = LENGTH - HUB_LENGTH  # 8.4836, .334
 
 # --- Press: made to the plate's reamed hole -----------------------------------
-# Fit audit 2026-11-23 (pending owner confirmation; owner, 2026-11-23: "can
+# Rule 4, form 2 (owner, 2026-11-23: "can
 # the holes not be reamed in the first place"): MHA-PD-19's hole K is cut by
 # the over/under set's .4385 reamer and prints that size with no band; this
 # press step is turned LAST to the hole as measured, by the pilot-first
@@ -124,8 +125,8 @@ PRESS_DIA_MIN = PRESS_DIA + min(PRESS_DIA_BAND)  # .4390
 # The .2490 chucking reamer's size (#290 fit D8; reamer-2490, to order: not
 # on hand) under the knob shaft's journal, which is turned to this bore: the
 # plate's former running bore.  The sheet prints the reamer's size and no
-# band (drawing-guidelines rule 4; fit audit 2026-11-23, pending owner
-# confirmation).  BORE_DIA_LIMITS is the ANALYSIS band, what the reamer is
+# band (drawing-guidelines rule 4, form 2).  BORE_DIA_LIMITS is the
+# ANALYSIS band, what the reamer is
 # taken to cut, for the wall and the tilt stacks: the modelled result, not
 # printed limits.  A fit .002 looser trebles the journal's shake in the
 # bore, which the reducer mesh's backlash and the collar air's tilt term
