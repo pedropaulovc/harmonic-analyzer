@@ -11,7 +11,6 @@ import _config
 import dt_cone_gear_stack
 import cone_stack_end_play
 import draw_dt_drive_train_assembly as drawing
-import dt_drive_train_acceptance_assembly_sheet as acceptance_sheet
 import dt_drive_train_assembly_sheet as sheet
 import dt_drive_train_steps as steps
 import pinion_rig_tip_gap as tip_gap
@@ -347,17 +346,15 @@ def test_step_four_holds_the_collar_on_the_boss_and_leaves_the_end_proud() -> No
         f"SET MHA-DT-10 {sheet.inch_text(pinion.SEAT_FEELER_MM, sheet.FEELER_PLACES)} "
         "OFF THE BOSS BACK FACE WITH A FEELER",
         "MATCH-DRILL THE MHA-DT-10",
-        f"END STANDS PROUD OF MHA-DT-10 ({drawing.acceptance_ref('crank-end-proud')}).",
+        "END IS NOT BELOW MHA-DT-10 (STRAIGHTEDGE).",
         "DO NOT FACE",
     )
     positions = [fitup.index(phrase) for phrase in order]
     assert positions == sorted(positions)
-    # A stack result the fitter cannot adjust: every accepted part set,
-    # including both extremes, must fall inside the printed range.
-    printed = _accept("crank-end-proud", cites=fitup)
-    assert printed == acceptance_sheet.inch_envelope((least, most), 3)
-    low, high = (float(limit) * 25.4 for limit in printed.split("-"))
-    assert low <= least and most <= high
+    # Owner ruling 2026-11-24, audit part 2 S5: the end is never below the
+    # 16T at any accepted part set (least >= 0 above), so the check is a
+    # straightedge with no printed window and no setting-table row.
+    assert "crank-end-proud" not in drawing.ACCEPTANCE_ROW_NUMBERS
     assert "SHIM" not in fitup and "MHA-CH-VN-57" not in fitup
 
 
