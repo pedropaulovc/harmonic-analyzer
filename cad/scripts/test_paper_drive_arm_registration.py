@@ -173,6 +173,29 @@ def test_native_controls_reference_actual_bores_and_reach_the_real_chain_plane()
         * (registration.S_PROJECTED_HEIGHT_MM + registration.S_ARM_FRONT_EDGE_BREAK_MAX_MM)
     )
     assert registration.S_AXIS_ZONE_DIAMETER_MM > registration.AXIS_PROJECTED_ZONE_DIAMETER_MM
+    # Codjiflo on #3494: a slip fit leaning on opposite walls stands half the
+    # gap off the bore's axis at the bore's front end, and the whole tilt
+    # carries it on from there; the position consumer reads that radius, and
+    # the tilt consumers still read the tilt alone.
+    import paper_drive_geom
+
+    assert registration.S_AXIS_TILT_MAX_RAD == pytest.approx(
+        (float(arm_control.tolerance) * 25.4 + arm_spec.PIN_BOND_GAP_ACCEPTED_MAX)
+        / cluster_pin.BOND_LENGTH_MIN
+    )
+    assert registration.S_AXIS_RADIAL_OFFSET_MAX_MM == pytest.approx(
+        arm_spec.PIN_BOND_GAP_ACCEPTED_MAX / 2.0
+        + registration.S_AXIS_TILT_MAX_RAD * registration.S_AXIS_RUN_ON_MM
+    )
+    assert registration.S_AXIS_RADIAL_OFFSET_MAX_MM > registration.S_AXIS_ZONE_DIAMETER_MM / 2.0
+    angle = 0.01
+    stud_error = paper_drive_geom._rotating_stud_error_change_mm(angle)
+    assert stud_error >= (
+        2.0 * registration.S_AXIS_RADIAL_OFFSET_MAX_MM * math.sin(angle / 2.0)
+    )
+    assert math.tan(paper_drive_geom.reducer_axis_tilt_maxima_rad()[1]) > (
+        registration.S_AXIS_TILT_MAX_RAD
+    )
     # K's tilt is the MHA-PD-28 bush bore's frame (#2425: the bore is reamed
     # after pressing, so the flat plate prints none); carried to K's projected
     # height past the real chain plane, that tilt stays inside the axes' tilt

@@ -144,15 +144,31 @@ K_PROJECTED_HEIGHT_MM = (
 # length on the thinnest stock.  No credit is taken for the head, clamped on
 # the rear face while the bond cures.  The gap charged is the largest the
 # sheets accept, not the modelled one: MHA-PD-18's bore refuses the pin
-# set's .127 pin, against the pin's smallest modelled shank.  The lean runs
-# on from the bore's front end, the front face's largest edge break behind
-# face A, to S_PROJECTED_HEIGHT_MM.  Wider than K's
-# AXIS_PROJECTED_ZONE_DIAMETER_MM; the meshes and the platen air charge it,
-# and MHA-PD-00's collar feeler accepts the collar air it closes
-# (pd_cluster_air.ASSEMBLY_ACCEPTED_COLLAR_SOURCES).  The pin's and the
-# bore's numbers are literals pinned by a test to pd_transgear_pin_spec and
-# pd_transgear_arm_spec, so pin edits do not re-key every importer of this
-# module.
+# set's .127 pin, against the pin's smallest modelled shank.
+#
+# A slip fit leans most with the pin on opposite walls at the two ends of
+# the bonded length (Codjiflo on #3494).  Two things follow, and they are
+# different quantities:
+# - the TILT, S_AXIS_TILT_MAX_RAD: the bore's tilt plus gap / bonded length.
+#   S_AXIS_ZONE_DIAMETER_MM is that tilt run on from the bore's front end
+#   (the front face's largest edge break behind face A) to
+#   S_PROJECTED_HEIGHT_MM.  It is what a tilt consumer divides by the
+#   height: the disc's tilt in the airs (pd_cluster_air.S_ZONE_TILT) and in
+#   the meshes (paper_drive_geom.reducer_axis_tilt_maxima_rad, which the
+#   feed rack's opposite-flank closing reads).  Wider than K's
+#   AXIS_PROJECTED_ZONE_DIAMETER_MM; MHA-PD-00's collar feeler accepts the
+#   collar air it closes (pd_cluster_air.ASSEMBLY_ACCEPTED_COLLAR_SOURCES).
+# - the OFFSET, S_AXIS_RADIAL_OFFSET_MAX_MM: where the pin's axis stands at
+#   that plane, off the bore's axis at the bore's front end (which the
+#   bore's position frame locates).  The leaning pin's axis crosses the
+#   bore's at mid-bond, so at the front end it is already half the gap off,
+#   and from there the whole tilt (the bore's and the pin's) carries it on:
+#   a radius of gap / 2 + tilt x run-on, not half the zone above.  A
+#   position consumer reads it (paper_drive_geom's rotating stud error).
+#   It moves no tilt, so no air and no mesh closing changes with it.
+# The pin's and the bore's numbers are literals pinned by a test to
+# pd_transgear_pin_spec and pd_transgear_arm_spec, so pin edits do not
+# re-key every importer of this module.
 S_PIN_BOND_LENGTH_MIN_MM = 8.9916  # .354
 S_PIN_BOND_GAP_MAX_MM = 0.05588  # .0022: the .127 NO-GO less the .1248 shank
 S_ARM_FRONT_EDGE_BREAK_MAX_MM = 0.254  # .010, the title block's
@@ -161,6 +177,8 @@ S_AXIS_TILT_MAX_RAD = (
 ) / S_PIN_BOND_LENGTH_MIN_MM
 S_AXIS_RUN_ON_MM = S_PROJECTED_HEIGHT_MM + S_ARM_FRONT_EDGE_BREAK_MAX_MM
 S_AXIS_ZONE_DIAMETER_MM = S_AXIS_TILT_MAX_RAD * S_AXIS_RUN_ON_MM
+S_AXIS_FRONT_END_OFFSET_MAX_MM = S_PIN_BOND_GAP_MAX_MM / 2.0
+S_AXIS_RADIAL_OFFSET_MAX_MM = S_AXIS_FRONT_END_OFFSET_MAX_MM + S_AXIS_ZONE_DIAMETER_MM
 # The shaft's journal runs the bush bore's whole length, hub face to stub end.
 KNOB_JOURNAL_CONTACT_START_LOCAL_Z_MM = SHAFT.PINION_REAR_Z + RING.LENGTH
 KNOB_JOURNAL_CONTACT_END_LOCAL_Z_MM = KNOB_JOURNAL_CONTACT_START_LOCAL_Z_MM + BUSH.LENGTH
