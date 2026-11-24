@@ -626,12 +626,14 @@ feed_unit = "in/min"
 range_mm = [6.5278, 6.6294]
 resolution_mm = 0.00254
 
-# --- MHA-CH-13-TL-01 rocker-strap sub-plate (cad/process/ch_rocker_strap_tl_sub_plate/plan.toml) ---
+# --- 1/4-20 tapping (fr, dt, mg plans) and the MHA-CH-13-TL-02 hub plug's bore ---
 
-# The 1/4-20 hub tap's drill: #7 (.201 in) is a member of the owned 115-piece
+# The 1/4-20 tap's drill: #7 (.201 in) is a member of the owned 115-piece
 # index (number drills #1-#60 among its 115, as jig-drill-11-32); nominal ×
 # 25.4. The 1/4-20 tap is owned (cad/config/shop-equipment/
-# tools.jig-tap-1-4-20-plug).
+# tools.jig-tap-1-4-20-plug). The rocker-strap sub-plate's hub hole no longer
+# uses either (owner ruling 2026-11-23: #10-32, drill-21 and tap-10-32-plug);
+# its hub plug's bore is the #7 drill.
 [tools.jig-drill-7]
 description = "#7 (.201 in) drill, 115-piece index"
 diameter_mm = 5.1054

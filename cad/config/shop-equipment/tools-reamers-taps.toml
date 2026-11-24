@@ -185,17 +185,18 @@ status = "on_hand"
 source = "owner 2026-11-13"
 note = "MHA-CH-06-TL-21 carrier L1, L2; TL-22/TL-32 5/16-18 hole under the pivot seat"
 
-# The MHA-CH-13-TL-01 sub-plate's 1/4-20 hub hole (owner ruling 2026-11-17:
-# the hub screw is 1/4-20). Owned (owner, Pedro, 2026-11-17, relayed by
-# Main: "a 1/4-20 tap"); plug or taper unrecorded. Its tap drill (#7) is in
-# the owned 115-piece index; sizing data is cad/process/shop/
-# tools.jig-drill-7 and tools.jig-tap-1-4-20-plug.
+# The 1/4-20 tap (dt, fr and mg plans). Owned (owner, Pedro, 2026-11-17,
+# relayed by Main: "a 1/4-20 tap"); plug or taper unrecorded. Its tap drill
+# (#7) is in the owned 115-piece index; sizing data is cad/process/shop/
+# tools.jig-drill-7 and tools.jig-tap-1-4-20-plug. Recorded for the
+# MHA-CH-13-TL-01 sub-plate's hub hole, which is #10-32 since the owner
+# ruling of 2026-11-23 (tools.tap-10-32-plug).
 [tools.jig-tap-1-4-20-plug]
 name = "1/4-20 UNC hand tap"
 kind = "tap"
 status = "on_hand"
 source = "owner 2026-11-17"
-note = "MHA-CH-13-TL-01 sub-plate: the hub screw's 1/4-20 hole through the counterbore floor"
+note = "1/4-20 tapped holes: the dt_cone_swing_platform, fr_harmonic_base, fr_top_frame and mg_magnifying_bracket plans"
 
 # --- MHA-CH-13 rocker strap on the CNC (cad/process/ch_rocker_strap) ---------
 

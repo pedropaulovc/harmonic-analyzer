@@ -128,12 +128,12 @@ def test_plan_tools_cut_the_drawn_features() -> None:
     assert tools[refs["drill-43"]]["diameter_mm"] == pytest.approx(
         spec.CLAMP_TAP_DRILL, abs=1e-3
     )
-    assert tools[refs["drill-7"]]["diameter_mm"] == pytest.approx(
+    assert tools[refs["drill-21"]]["diameter_mm"] == pytest.approx(
         spec.HUB_TAP_DRILL, abs=1e-3
     )
     assert (
-        tools[refs["tap-1-4-20"]]["tap_drill_mm"]
-        == tools[refs["drill-7"]]["diameter_mm"]
+        tools[refs["tap-10-32"]]["tap_drill_mm"]
+        == tools[refs["drill-21"]]["diameter_mm"]
     )
     eighth = tools[refs["em-eighth"]]["diameter_mm"]
     # The 1/8 in end mill forms every inside corner: R.07 MAX on the sheet.

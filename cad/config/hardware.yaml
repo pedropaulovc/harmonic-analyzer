@@ -20,11 +20,19 @@
 ch-rocker-strap-tl-vn-hub-screw:
   tier: 1
   why: "ASME B18.3 socket button head screw, used as supplied"
-  designation: "1/4-20 UNC-3A x 5/8 hex socket button head screw, black-oxide alloy steel"
+  designation: "#10-32 UNF-3A x 5/8 hex socket button head screw, black-oxide alloy steel"
   standard: "ASME B18.3"
   envelope:
-    "head Ø": "_mcmaster_91255a539 HEAD_DIA"
-    "head H": "_mcmaster_91255a539 HEAD_HEIGHT"
+    "head Ø": "_mcmaster_91255a267 HEAD_DIA"
+    "head H": "_mcmaster_91255a267 HEAD_HEIGHT"
+ch-rocker-strap-tl-vn-hub-washer:
+  tier: 1
+  why: "ASME B18.21.1 SAE plain washer, one picked by measurement from the pack and used as supplied"
+  designation: "#10 SAE plain washer, 18-8 stainless"
+  standard: "ASME B18.21.1"
+  envelope:
+    "OD": "_mcmaster_96659a104 DIMS.od_max"
+    "T": "_mcmaster_96659a104 DIMS.thickness_max"
 ch-vn-bracket-hold-down-screw:
   tier: 1
   why: "ASME B18.6.3 slotted machine screw, used as supplied"
