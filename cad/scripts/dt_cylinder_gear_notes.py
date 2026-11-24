@@ -19,19 +19,17 @@ def inch_text(value_mm: float, places: int) -> str:
 
 # Narrow rows (machinist review r1): the leader leaves the block's lower
 # right corner, and only a corner left of x ~0.07 m clears the cam diameter's
-# diametral line on its way down to the bore.  Size and process, then two
-# lines of words naming the fit and its mate (rules 4 and 7).
-BORE_FIT_CALLOUT = "REAM THRU\nRUNNING FIT ON\nSHAFT MHA-DT-13"
+# diametral line on its way down to the bore.  Rule 4's third form (fit
+# audit 2026-11-23, MHA-DT-12.bore): the bore is reamed with the .3760
+# reamer and prints no band; its mate, the 3/8 ground shaft MHA-DT-13, is
+# bought to size and is the gauge.  Why it stays reamed is in the necessity
+# register (cad/config/necessity/dt-cylinder-gear.yaml), not on the sheet.
+BORE_FIT_CALLOUT = "REAM THRU\nMHA-DT-13 ENTERS,\nNO SHAKE"
 # The worst-case crescent wall to the cam OD is under the .080 in target, so
 # it is stated as a plain fact (rule 20), at its own leader on the thin side.
 CAM_WALL_NOTE = f"WALL {inch_text(spec.CAM_WALL_MIN_MM, 3)} MIN TO BORE"
-# The bank is a solid stack preloaded onto its datum (#948 ruling R, PR #1292):
-# no gear interface opens, so a connecting-rod ring never overhangs its cam
-# and the callout no longer states an overhang bound.
-# Rows <= 18 characters: the stacking text stands right of the side view's
-# rims, clear of its extension lines, inside the border.  The band sets the
-# stack, so it names the stack and its shaft once (rules 4 and 7).
-STACK_FIT_CALLOUT = "SETS STACK ON\nSHAFT MHA-DT-13"
+# The stacking thickness's band has no mate to try: it prints value and band
+# only, and the register says what it protects (rule 4).
 GEAR_DATA = "\n".join(
     (
         "GEAR DATA",

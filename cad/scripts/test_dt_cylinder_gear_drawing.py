@@ -111,15 +111,17 @@ def test_title_block_notch_depth_still_cuts_below_the_root_and_clears_the_cam() 
     )
 
 
-def test_every_tight_band_states_its_mate_or_function_at_the_callout() -> None:
+def test_fit_callouts_name_their_mate_and_banded_sizes_carry_no_words() -> None:
     callouts = drawing.DIMENSION_CALLOUTS
     assert "MHA-DT-03" in callouts["OutsideDia"]
     assert "MHA-CH-03" in callouts["CamDia"]
-    assert "MHA-CH-03" in callouts["FaceWidth"]
-    assert "MHA-DT-03" in callouts["NotchWidth"]
+    # Rule 4 (major_version 2): the reamed bore prints no band and its
+    # bought mate is the gauge; the reasons live in the necessity register.
     assert "MHA-DT-13" in notes.BORE_FIT_CALLOUT
-    # Rule 7: a location carries its value and band and nothing else.
-    assert not {"CamCy", "NotchPhase", "NotchDepth"} & set(callouts)
+    assert ("BoreProfile", "BoreDia") not in model_toleranced_dimensions(part)
+    # Rule 7: a location or a band with no mate carries its value and band
+    # and nothing else.
+    assert not {"CamCy", "NotchPhase", "NotchDepth", "FaceWidth"} & set(callouts)
 
 
 def _kerf_flank_hits(width: float) -> int:
@@ -296,7 +298,7 @@ def test_every_marked_dimension_has_exactly_one_view_owner() -> None:
 def test_the_part_owns_every_printed_decimal_place() -> None:
     """drawing-simplicity-policy.md `How the repository implements the guidelines`: places are the tolerance, so the .SLDPRT carries them.
 
-    Inch places (#290): four on the reamed bore's +.0005 band and on the two
+    Inch places (#290): four on the reamed bore (the .3760 reamer's size) and on the two
     kinematic values held to +/-.0010 (the stacking thickness that IS the
     station pitch, and the cam throw); three on the +/-.002-class bands and
     the .016 MAX kerf; the cam thickness is the one sheet-derived value, a
@@ -347,18 +349,13 @@ def test_assembly_recipes_exclude_cylinder_drawing_prose(
 
 
 def test_stacking_thickness_is_the_held_marked_dimension() -> None:
-    import dt_cylinder_gear_notes as notes
-
     # The overall thickness sets every station of the solid bank (#743), so it
     # is a marked model dimension printed to four places with its own band;
     # the cam thickness between it and the face width is only a reference.
     assert spec.DRAWING_DIMENSIONS["CamBoss"] == {"OverallThickness"}
     assert spec.DRAWING_PRECISION_BY_NAME["OverallThickness"] == 4
     assert "OverallThickness" in drawing.RIGHT_KEEP
-    # The bank is preloaded (#948 ruling R, PR #1292): no ring overhangs its
-    # cam, so the stacking callout states no overhang bound.
-    assert "OVERHANG" not in notes.STACK_FIT_CALLOUT
-    assert "MHA-DT-13" in notes.STACK_FIT_CALLOUT
+    assert ("CamBoss", "OverallThickness") in model_toleranced_dimensions(part)
 
 
 def test_pattern_notch_reference_uses_the_actual_seed_gap() -> None:

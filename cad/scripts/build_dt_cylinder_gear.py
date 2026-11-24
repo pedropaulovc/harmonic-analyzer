@@ -119,7 +119,6 @@ from dt_cylinder_gear_phase_band import (
 )
 from dt_cylinder_gear_spec import (
     BORE_DIA as BORE_DIAMETER,
-    BORE_DIA_BAND,
     CAM_DIA as CAM_DIAMETER,
     CAM_DIA_BAND,
     CAM_THICKNESS,
@@ -756,14 +755,10 @@ def build(adapter) -> dict[str, str]:
         places=DRAWING_PRECISION["GearBlankProfile"]["OutsideDia"],
         display_unit=UNIT,
     )
-    set_dimension_bilateral_tolerance(
-        adapter,
-        "BoreProfile",
-        "BoreDia",
-        *deviations(BORE_DIA_BAND),
-        places=DRAWING_PRECISION["BoreProfile"]["BoreDia"],
-        display_unit=UNIT,
-    )
+    # The bore prints the .3760 reamer's size and no band (fit audit
+    # 2026-11-23, MHA-DT-12.bore; drawing-guidelines rule 4, form 3): the
+    # bought MHA-DT-13 shaft is its gauge.  BORE_DIA_BAND stays the spec's
+    # analysis band for the stacks, never a printed limit.
     set_dimension_symmetric_tolerance(
         adapter,
         "GearBlank",

@@ -1,0 +1,22 @@
+# MHA-DT-12-TL-01 cam turning fixture: why each REAM and each band tighter
+# than the title block stays (drawing-guidelines.md rule 4; owner ruling
+# 2026-11-24: the reason lives here, not on the sheet). Read by the machinist
+# review only. Fit audit 2026-11-23 "keep" rows MHA-DT-12-TL-01.stub_hole and
+# .clock_pin_hole; both reams are cut to bought pins (form 3), which are the
+# gauges.
+necessity:
+  - id: N-01
+    feature: "sheet 1, face view, Ø.3740 REAM THRU stub hole (PRESS FIT ON TL-VN-50)"
+    kind: joint
+    reason: "pressed stub holds the clamp screw's pull, no bond"
+    source: "dt_cylinder_gear_tl_cam_fixture_spec.STUB_PRESS_INTERFERENCE, STUB_RETENTION_MARGIN"
+  - id: N-02
+    feature: "sheet 1, face view, Ø.0365 REAM .20 clock pin hole (PRESS FIT ON TL-VN-51)"
+    kind: joint
+    reason: "pressed blind pin keeps its tooth-space station, no bond"
+    source: "dt_cylinder_gear_tl_cam_fixture_spec.PIN_PRESS_INTERFERENCE"
+  - id: N-03
+    feature: "sheet 1, face view, stub offset .3402 ±.0020 and clock pin stations .0704 ±.0020, .9246 ±.0020"
+    kind: trace
+    reason: "the stations set all twenty gears' cam phase"
+    source: "dt_cylinder_gear_tl_cam_fixture_spec.PHASE_FIXED_WORST_DEG, PHASE_TOTAL_WORST_DEG (inside MHA-DT-12's ±.7°)"

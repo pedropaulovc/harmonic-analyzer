@@ -186,15 +186,14 @@ def test_pins_stand_inside_the_gear_and_the_body_carries_the_gear() -> None:
         assert mm >= WALL_TARGET_MM, wall
 
 
-def test_only_the_hole_stations_and_reams_carry_a_model_band() -> None:
+def test_only_the_hole_stations_carry_a_model_band() -> None:
     bands = model_toleranced_dimensions(part)
     assert set(bands) == {("feature_name", "dimension_name")}
+    # Rule 4, form 3: the press reams print the reamer's size, no band.
     assert set(spec.MODEL_BANDS_MM) == {
         ("StubHoleProfile", "StubOffset"),
         ("PinHoleProfile", "PinX"),
         ("PinHoleProfile", "PinY"),
-        ("StubHoleProfile", "StubHoleDia"),
-        ("PinHoleProfile", "PinHoleDia"),
     }
     for (feature, name), (lower, upper) in spec.MODEL_BANDS_MM.items():
         assert lower < upper
@@ -206,9 +205,8 @@ def test_every_marked_dimension_has_a_place_and_callouts_name_their_mates() -> N
     marked = set().union(*spec.DRAWING_DIMENSIONS.values())
     assert set(drawing.FACE_KEEP) | set(drawing.EDGE_KEEP) == marked
     # Only the two REAM callouts carry words; a location carries its value
-    # and band only (rule 7).
+    # and band only (rule 7), and no callout carries a reason (rule 4).
     assert set(spec.CALLOUTS_BELOW) == {"StubHoleDia", "PinHoleDia"}
-    gear_number = str(_config.parts("dt-cylinder-gear")["number"])
     for name, number in (
         ("StubHoleDia", spec.STUB_NUMBER),
         ("PinHoleDia", spec.CLOCK_PIN_NUMBER),
@@ -218,7 +216,8 @@ def test_every_marked_dimension_has_a_place_and_callouts_name_their_mates() -> N
         assert len(words) <= 2
         assert f"PRESS FIT ON {spec.kit_short_form(number)}" in words[0]
         assert number.endswith(spec.kit_short_form(number))
-        assert gear_number in words[1]
+        assert not any(word.startswith(("SETS", "LOCATES")) for word in words)
+    assert "DOES NOT TURN BY HAND" in spec.CALLOUTS_BELOW["StubHoleDia"]
     assert spec.PIN_HOLE_DEPTH_TEXT in spec.CALLOUTS_BELOW["PinHoleDia"]
     # A .0375 pin pressed blind has no knockout: the pair is permanent.
     assert "PERMANENT PAIR" in spec.CALLOUTS_BELOW["PinHoleDia"]

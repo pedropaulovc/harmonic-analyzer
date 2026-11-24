@@ -88,9 +88,12 @@ MAX_CUT_DEPTH_MM = STOCK_FORM.blank_radius_mm - STOCK_FORM.root_radius_min_mm
 PITCH_TOOTH_THICKNESS_MM = STOCK_FORM.pitch_tooth_thickness_mm
 
 # --- machinable blank (build_dt_cylinder_gear.py) ------------------------------
-# #290: every gear is reamed interchangeable on the MHA-DT-13 arbor (SHAFT_H),
-# no longer bored to suit it: REAM_SLIDE's .3760-.3765 in, cut by the owned
-# .3760 over reamer and printed .3760 +.0005/.0000.
+# #290: every gear is reamed on the MHA-DT-13 arbor (SHAFT_H), no longer bored
+# to suit it, with the owned .3760 reamer.  The sheet prints the reamer's size
+# and no band, the bought ground shaft being the gauge (fit audit 2026-11-23,
+# MHA-DT-12.bore; drawing-guidelines rule 4, form 3).  BORE_DIA_BAND is the
+# ANALYSIS band, what the reamer is expected to cut (REAM_SLIDE's .3760-.3765
+# in), which the stacks, the cam wall and the fixture consume; never printed.
 BORE_DIA = round(arbor.SHAFT_DIA + REAM_SLIDE[1], 9)  # 9.5504, .3760
 BORE_DIA_BAND = (round(REAM_SLIDE[0] - REAM_SLIDE[1], 9), 0.0)  # (upper, lower)
 BORE_PLACES = 4
@@ -228,7 +231,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # Decimal places ARE the tolerance statement (drawing-simplicity-policy.md `How the repository implements the guidelines`
 # ), so the MODEL owns them: build_dt_cylinder_gear applies this map to the
 # .SLDPRT and draw_dt_cylinder_gear only reads it back.  Inch places: four on
-# the reamed bore (its +.0005 band) and on the two kinematic values held to
+# the reamed bore (the .3760 reamer's size) and on the two kinematic values held to
 # +/-.0010 (the stacking thickness that IS the station pitch and the cam
 # throw); three where a +/-.002-class band rides the dimension (tooth tip, cam
 # OD, face width) and on the .016 MAX kerf; two (.XX) on the kerf depth.  The
