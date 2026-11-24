@@ -1,11 +1,6 @@
 necessity:
-  - id: N-01
-    feature: "hub hole .4000 REAM THRU, MHA-CH-12 IS TURNED TO THIS HOLE"
-    kind: trace
-    reason: "the reamed hole locates the outline on the TL-02 plug"
-    source: "ch_rocker_hub_fit.STRAP_HOLE_BAND; ch_rocker_strap_tl_hub_plug_spec (pilot .3985-.3995 in the hole sets the outline round it)"
   - id: N-02
     feature: "strap thickness .098 +/-.001, the rod fork's mate"
     kind: gap
     reason: "a thicker strap closes the rod fork's slot"
-    source: "ch_rocker_arm_spec.ARM_THICKNESS_BAND (the fork guard fails at +/-.003, batch-ch/fitch-bores-hub/perturb.out)"
+    source: "sh_vn_pivot_pin_rod_spec: 'fork slot can close on the thickest arm' (fails at +/-.003); ch_rocker_arm_spec.ARM_THICKNESS_BAND"

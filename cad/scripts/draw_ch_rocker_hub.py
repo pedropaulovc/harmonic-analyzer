@@ -219,7 +219,7 @@ requirement(
             ("STRAP_NUMBER", (_NOTES, "LAND_CALLOUT")),
         ),
         "mate_nominal_dia": (LAND_DIA, ("LAND_DIA",)),
-        "bond": ("LOCTITE 638", ((_NOTES, "LAND_CALLOUT"),)),
+        "bond": ("LOCTITE 638", ((_NOTES, "DRAWING_NOTES"),)),
         "callout": (LAND_CALLOUT, ((_NOTES, "LAND_CALLOUT"),)),
     },
     precision={"dia_ref": _P["LandDia"]},

@@ -95,9 +95,12 @@ def test_the_sheet_never_repeats_a_finished_size() -> None:
         (rocker.HUB_LENGTH, 4),
     ):
         assert f"{value / 25.4:.{places}f}".removeprefix("0") not in printed
-    assert notes.DRAWING_NOTES == (
-        "1. BORE AND LENGTH ARE FINISHED AFTER JOINING TO MHA-CH-13; SEE MHA-CH-06."
-    )
+    assert notes.DRAWING_NOTES.splitlines() == [
+        "1. BORE AND LENGTH ARE FINISHED AFTER JOINING TO MHA-CH-13; SEE MHA-CH-06.",
+        "2. BONDED INTO MHA-CH-13 WITH LOCTITE 638: LAND AND HOLE DEGREASED,",
+        "   COMPOUND ON THE LAND ONLY; HELD SQUARE TO THE STRAP UNTIL SET; 24 H CURE",
+        "   BEFORE MHA-CH-06 IS FINISHED. THE HUB DOES NOT TURN BY HAND.",
+    ]
 
 
 def test_every_marked_dimension_has_one_view_and_model_places() -> None:
@@ -128,7 +131,7 @@ def test_every_band_is_native_and_named() -> None:
     # governs and the compound, once, on the member made last.
     assert notes.LAND_CALLOUT.splitlines() == [
         "TURN TO SLIDE INTO MHA-CH-13 HOLE",
-        ".0005-.0030 CLEARANCE, LOCTITE 638",
+        ".0005-.0030 CLEARANCE, SEE NOTE 2",
     ]
     # The stated wall is the spec's worst case, rounded down (rule 20): the
     # smallest land .3970 over the largest D drill .250.

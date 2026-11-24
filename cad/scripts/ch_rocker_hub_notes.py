@@ -59,8 +59,10 @@ def _inch_text(value_mm: float) -> str:
 
 
 CLEARANCE_TEXT = f"{_inch_text(BOND_CLEARANCE[0])}-{_inch_text(BOND_CLEARANCE[1])}"
+BOND_NOTE_NUMBER = 2
 LAND_CALLOUT = (
-    f"TURN TO SLIDE INTO {STRAP_NUMBER} HOLE\n{CLEARANCE_TEXT} CLEARANCE, LOCTITE 638"
+    f"TURN TO SLIDE INTO {STRAP_NUMBER} HOLE\n"
+    f"{CLEARANCE_TEXT} CLEARANCE, SEE NOTE {BOND_NOTE_NUMBER}"
 )
 # rule 19: the bore and the length are supply sizes; the numbered note says
 # where the finished ones are, and each supply size links it (rule 7). Rule
@@ -75,9 +77,21 @@ SUPPLY_LENGTH_PREFIX = "SUPPLY "
 SUPPLY_LENGTH_CALLOUT = SUPPLY_NOTE_LINK
 
 # drawing-guidelines.md rule 7: one line a machinist cannot read off the views.
-DRAWING_NOTES = (
-    f"{SUPPLY_NOTE_NUMBER}. BORE AND LENGTH ARE FINISHED AFTER JOINING TO"
-    f" {STRAP_NUMBER}; SEE {ROCKER_NUMBER}."
+# Rule 23 (a specified anaerobic bond is a fit): the bond prints its grade,
+# the degrease, where the compound goes, how the joint is held square while
+# it cures and the cure before the joined MHA-CH-06 is finished, with an
+# acceptance; rule 4 form 1. Printed once, here, on the member made last
+# (owner ruling 2026-11-24, fit audit question 2: "hub turned until it
+# slides in (clearance .0005-.0030); bond").
+DRAWING_NOTES = "\n".join(
+    (
+        f"{SUPPLY_NOTE_NUMBER}. BORE AND LENGTH ARE FINISHED AFTER JOINING TO"
+        f" {STRAP_NUMBER}; SEE {ROCKER_NUMBER}.",
+        f"{BOND_NOTE_NUMBER}. BONDED INTO {STRAP_NUMBER} WITH LOCTITE 638: LAND AND HOLE"
+        " DEGREASED,",
+        "   COMPOUND ON THE LAND ONLY; HELD SQUARE TO THE STRAP UNTIL SET; 24 H CURE",
+        f"   BEFORE {ROCKER_NUMBER} IS FINISHED. THE HUB DOES NOT TURN BY HAND.",
+    )
 )
 if NUMBER in DRAWING_NOTES:
     raise AssertionError("the note names the mates, not this part")

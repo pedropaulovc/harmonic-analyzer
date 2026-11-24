@@ -53,7 +53,8 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     },
     "Strap": {"StrapThickness"},
 }
-# The hole at four places, the .4000 reamer's size, no band; the thickness at three with
+# The hole at three places, the .400 reamer's size, no band (drawing-guidelines
+# rule 3: a fourth place would read as a .0001 requirement); the thickness at three with
 # its band; both edges at three with their bilateral bands, the .325 and .305
 # the finished MHA-CH-06 prints (at two places each rounds .005 off and
 # shifts its limits that far off the rocker's profile zone); the radii at
@@ -63,7 +64,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # one, under the title block's angular +/-1 deg.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "StrapProfile": {
-        "HoleDia": 4,
+        "HoleDia": 3,
         "TopAbovePivot": 3,
         "BottomBelowPivot": 3,
         "TopRadius": 1,
