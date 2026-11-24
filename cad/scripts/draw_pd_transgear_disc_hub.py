@@ -94,6 +94,7 @@ from pd_transgear_disc_hub_spec import (
     KEY_PIN_CALLOUT_BELOW,
     KEY_PIN_CHORD_OFFSET,
     KEY_PIN_DRILL_CALLOUT_BELOW,
+    KEY_PIN_SUFFIX,
     KEY_PIN_STOP,
     KEY_PIN_Z,
     OIL_HOLE_CALLOUT_BELOW,
@@ -402,6 +403,8 @@ SECTION_CALLOUTS_BELOW = {
     "KeyPinDia": KEY_PIN_CALLOUT_BELOW,
     "KeyPinDrillDia": KEY_PIN_DRILL_CALLOUT_BELOW,
 }
+# REAM stands beside the ream's size, on the value's own row.
+SECTION_SUFFIXES = {"KeyPinDia": KEY_PIN_SUFFIX}
 # Centrelines across the cut, each ending 1 mm past the O.D. where it crosses
 # it: the bore's two, the horizontal one the oil hole's axis, and the chord
 # hole's axis.  The section arrives centre-marked, the mark's arms running
@@ -749,7 +752,7 @@ requirement(
             ("KEY_PIN_HOLE_DIA", "KEY_PIN_HOLE_BAND", (_SELF, "SECTION_KEEP")),
         ),
         "nominal_dia": (_spec.KEY_PIN_HOLE_DIA, ("KEY_PIN_HOLE_DIA",)),
-        "process": ("ream", ("KEY_PIN_CALLOUT_BELOW",)),
+        "process": ("ream", ("KEY_PIN_SUFFIX",)),
         "depth": (
             [KEY_PIN_ENTRY_X + stop for stop in KEY_PIN_STOP_LIMITS],
             ((_SELF, "KEY_PIN_ENTRY_X"), (_SELF, "KEY_PIN_STOP_LIMITS")),
@@ -1254,11 +1257,32 @@ def _precision_of(keep: dict[str, tuple[float, float]]) -> dict[str, int]:
     return {name: DRAWING_PRECISION_BY_NAME[name] for name in keep}
 
 
+def _set_dimension_suffixes(
+    adapter: Any, annotations: list[Any], suffixes: dict[str, str]
+) -> None:
+    """Append each named dimension's suffix to its value on the same line
+    (draw_pd_transgear_drive_collar's).  ``SetText`` reports nothing, so each
+    suffix is read back."""
+    remaining = dict(suffixes)
+    for annotation in annotations:
+        name = dimension_name(adapter, annotation)
+        text = remaining.pop(name, None)
+        if text is None:
+            continue
+        display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+        display.SetText(2, text)  # swDimensionTextSuffix
+        applied = str(display.GetText(2) or "")
+        if applied.replace("\r", "") != text:
+            raise RuntimeError(f"{name}: suffix did not persist: {applied!r}")
+    if remaining:
+        raise RuntimeError(f"dimension suffixes not applied: {sorted(remaining)}")
+
+
 @_telemetry.traced("drawing.disc_hub.key_pin_dimensions")
 def _key_pin_dimensions(adapter: Any, section: Any) -> None:
     """The chord hole in A-A: the model's marked ream and knockout sizes,
-    chord offset and stop, their authored places proven, the ream's
-    press-fit and the knockout's drill callouts under them."""
+    chord offset and stop, their authored places proven, REAM beside the
+    ream's size, its pin and the knockout's drill callouts under them."""
     annotations = curate_view_dimensions(
         adapter,
         section,
@@ -1268,6 +1292,7 @@ def _key_pin_dimensions(adapter: Any, section: Any) -> None:
     )
     assert_imported_precision(adapter, annotations, _precision_of(SECTION_KEEP))
     set_dimension_callouts(adapter, annotations, SECTION_CALLOUTS_BELOW)
+    _set_dimension_suffixes(adapter, annotations, SECTION_SUFFIXES)
 
 
 @_telemetry.traced("drawing.disc_hub.section_centerlines")

@@ -5,7 +5,7 @@ driven 15:150 by the knob shaft's finite #7/reference-14 PA20 48DP form (#2034:
 15:150 replaced 12:120 at the same 1:10 feed) and
 screwed to the brass hub's flange (MHA-PD-17, ``pd_transgear_disc_hub_spec``) by three #0-80 fillister
 screws (MHA-PD-VN-55, McMaster 91794A055; the joint is
-``pd_transgear_disc_hub_geometry``'s).  Its Ø.501 REAM_H7 bore clears the
+``pd_transgear_disc_hub_geometry``'s).  Its reamed Ø.501 bore clears the
 hub's Ø.498 spigot, which passes it and seats on the pinion sleeve's
 (MHA-PD-10) step face; the clearance lets MHA-PD-00 set the disc central to
 the running axis before its taps are transferred.  Its front face, clamped by
@@ -37,7 +37,6 @@ import math
 
 import _config
 from _fit_deviations import deviations
-from _fit_ream_h7 import REAM_H7
 from _gear_fit_limits import gear_tip_band_mm
 from _gear_quality import toothspace_runout_tir_mm
 from _hole_spec import THREAD_MAJOR_MM, HoleSpec, blind_cut_dia_mm
@@ -290,16 +289,25 @@ FACE_WIDTH = 2.9972  # .118
 # sleeve nose, and that stack reads the disc thickness.
 FACE_WIDTH_PLACES = 3
 # Clears the hub's spigot (MHA-PD-17, pd_transgear_disc_hub_geometry): the
-# bore reamed .501 REAM_H7 (the owned .5010 chucking reamer) over the
-# spigot turned .003 under it.  The clearance is the set-at-assembly route
-# of the tooth space runout (PART_TOOTH_SPACE_RUNOUT_TIR_MM below).  Owner
-# ruling 2026-11-08 (Pedro), #2144 item 3.1 (Q-PD06-1 option B: a clearance
-# bore, disc set central at assembly); the bore moved from .504 to the owned
-# reamer and the spigot from .501 to .498 at the same clearance (#2412).
+# bore reamed with the .5010 chucking reamer (tools.reamer-5010, to order,
+# not owned) over the spigot turned under it.  The clearance is the
+# set-at-assembly route of the tooth space runout
+# (PART_TOOTH_SPACE_RUNOUT_TIR_MM below).  Owner ruling 2026-11-08 (Pedro),
+# #2144 item 3.1 (Q-PD06-1 option B: a clearance bore, disc set central at
+# assembly); the bore moved from .504 to the .501 reamer and the spigot from
+# .501 to .498 (#2412).
+# The sheet prints the reamer's size and no band (fit audit 2026-11-23,
+# pending owner confirmation; drawing-guidelines.md rule 4): the hub's
+# spigot entering is the acceptance.  BORE_BAND is the ANALYSIS band, what
+# the reamer is taken to cut in the .118 sheet, never a printed limit; it
+# was a printed +.0005/0.  What fails if the hole is .002 looser: the #0-80
+# taps' finished web to the bore (TAP_TO_BORE_WALL_FINISHED below, already
+# under the .080 target) falls under the .063 the owner confirmed (RV-03).
+# A 1/2 drilled hole (+.004/0) does the same, .0625: the reamer stays until
+# the owner rules on that web (fit-audit-2026-11-23/batch-pd/misc).
 BORE_DIA = 12.7254  # .501
-BORE_BAND = REAM_H7  # (upper, lower) deviations: +.0005/0
-BORE_DEVIATIONS = deviations(BORE_BAND)
-BORE_PLACES = 4
+BORE_BAND = (0.0508, 0.0)  # analysis (upper, lower) deviations: +.002/0
+BORE_PLACES = 3
 
 _BAND = {places: printed_band_mm(places, unit=UNIT) for places in (1, 2, 3)}
 FACE_WIDTH_MIN = FACE_WIDTH - _BAND[FACE_WIDTH_PLACES]
@@ -307,13 +315,13 @@ FACE_WIDTH_MAX = FACE_WIDTH + _BAND[FACE_WIDTH_PLACES]
 BORE_DIA_MIN = BORE_DIA + BORE_BAND[1]
 BORE_DIA_MAX = BORE_DIA + BORE_BAND[0]
 
-# The hub's spigot, turned to the h6 band the hub's model carries.  Its
-# limits and the bore's give the clearance the disc is centred in at
-# assembly and bound how far the disc can sit off the hub's axis while the
-# taps are spotted through the flange.
+# The hub's spigot, turned to the band the hub's model carries (the turned
+# diameter's shop row).  Its limits and the bore's analysis band give the
+# clearance the disc is centred in at assembly and bound how far the disc
+# can sit off the hub's axis while the taps are spotted through the flange.
 SPIGOT_DIA_MIN = SPIGOT_DIA + SPIGOT_DIA_BAND[1]
 SPIGOT_DIA_MAX = SPIGOT_DIA + SPIGOT_DIA_BAND[0]
-# (least, greatest) diametral clearance: .0030 .. .0045.
+# (least, greatest) diametral clearance: .0030 .. .0070.
 SPIGOT_DIAMETRAL_CLEARANCE = (
     round(BORE_DIA_MIN - SPIGOT_DIA_MAX, 6),
     round(BORE_DIA_MAX - SPIGOT_DIA_MIN, 6),

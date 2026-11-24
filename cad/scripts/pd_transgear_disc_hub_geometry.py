@@ -59,19 +59,23 @@ if len(SCREW_ANGLES_DEG) != SCREW_COUNT:
 
 # The retained hub spigot (R9-68): Ø.498 in the disc's bore, which it only
 # clears (the disc is centred at assembly), so it prints the turned
-# diameter's row as a plain inch step, +.000/-.001 (delegated ruling
-# 2026-11-07 L2, pending owner confirmation; it was the fleet's SHAFT_H
-# 0/-.0008 while it located the disc).  It is turned .003 under the owned
-# .501 chucking reamer that cuts the disc's bore, which keeps the disc's
-# .0030-.0045 centring clearance without a special .504 reamer (#2412).
+# diameter's shop row, +.000/-.002 at three places (fit audit 2026-11-23,
+# pending owner confirmation: it was +.000/-.001 at four, delegated ruling
+# 2026-11-07 L2).  It is turned .003 under the .501 chucking reamer
+# (tools.reamer-5010, to order, not owned) that cuts the disc's bore, which
+# keeps the disc's centring clearance without a special .504 reamer (#2412).
+# What fails if it is .002 looser: the disc floats further off the hub's axis
+# while its taps are spotted, and the taps' finished web to the disc's bore
+# falls under the .063 the owner confirmed
+# (pd_rack_pinion_spec.TAP_TO_BORE_WALL_FINISHED).
 # Its length runs from the flange's
 # rear face to its end on the sleeve's step: a term of the disc cluster's
 # stack (transgear_cluster_fit) that sets the collar-to-disc air, so it
 # prints +/-.001 (the shims set the end float: owner ruling 2026-11-01,
 # #2124).
 SPIGOT_DIA = 12.6492  # .498
-SPIGOT_DIA_BAND = (0.0, -0.0254)  # (upper, lower) deviations: +.000/-.001
-SPIGOT_DIA_PLACES = 4
+SPIGOT_DIA_BAND = (0.0, -0.0508)  # (upper, lower) deviations: +.000/-.002
+SPIGOT_DIA_PLACES = 3
 SPIGOT_LENGTH = 3.6576  # .144
 SPIGOT_LENGTH_PLACES = 3
 SPIGOT_LENGTH_BAND = FIT_LENGTH_BAND_IN

@@ -420,6 +420,18 @@ INDEXED_FIT_BANDS: dict[tuple[str, str], str] = {
         "the title block's .XX row on the .39 pilot (no authored band): indexed "
         "for the wheel-bore air, the pilot wall and the thumbnut's seat"
     ),
+    # Fit audit 2026-11-23 (drawing-guidelines rule 4): analysis bands, not
+    # printed limits.
+    ("pd_rack_pinion_spec", "BORE_BAND"): (
+        "analysis band of the reamed Ø.501 bore, which prints the reamer's "
+        "size and no band: indexed for the spigot clearance, the disc's float "
+        "and the tap-to-bore web"
+    ),
+    ("pd_transgear_feed_pinion_spec", "BOSS_DIA_BAND"): (
+        "analysis band of the boss, which prints REF and is turned to the "
+        "MHA-PD-17 bore by feel: indexed for the hub's clearance, rock and "
+        "the boss wall"
+    ),
 }
 
 KNOWN_BAD: dict[str, pytest.MarkDecorator] = {}

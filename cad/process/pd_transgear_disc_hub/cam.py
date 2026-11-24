@@ -595,7 +595,7 @@ def context(
     # cone below is the pin's firm seat. A corrective CM03 rerun (the stop
     # short by the reamer's bevel, at most .010) is deliberately allowed to
     # end-cut into that cone in free-machining C360, rather than drilling the
-    # #53 deeper and losing the seat; ops 350-360 take it in one rerun by the
+    # #53 deeper and losing the seat; ops 310-320 take it in one rerun by the
     # measured shortfall only.
     pilot_tip = stop - _point(d53)
     _agree(plan, "pilot_tip_mm", pilot_tip)
