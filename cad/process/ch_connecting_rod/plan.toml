@@ -315,8 +315,10 @@ saw_clamp_torque_nm = 20.0
 saw_clamp_preload_kn = 11.0
 saw_drive_friction = 0.14
 saw_drive_torque_max_nm = 22.1
-# Runout, NOT MEASURED (the pilot is a sliding fit: read at every clamping
-# of the saw). Axial: the slot's width is slot_rise_mm plus the saw's swept
+# Runout, NOT MEASURED: the axial read at every mounting of the arbor (the
+# R8 taper does not seat it the same twice), the radial at every clamping
+# of the saw (the pilot is a sliding fit). Axial: the slot's width is
+# slot_rise_mm plus the saw's swept
 # thickness, its miked thickness t plus its axial runout at the rim. Swept
 # from the width's least less the rise to its most less the rise and
 # saw_swept_margin_mm (.0005): .0620-.0655; the far tine is then .0655 or
@@ -866,8 +868,8 @@ tool = "dti"
 drilling = "none"
 sizing = "other"
 feed = "hand"
-instruction = "First load, and whenever the screw has been loosened: the lever indicator on its magnetic base on the vise, its tip up against the saw's lower face 1/8 in in from the teeth. Turn the spindle one turn by hand: the needle's total swing, in mm, is A. Mark LOW on the tooth that is over the tip where that face stands lowest."
-inspection = "A ≤ ({{process.slot_saw_swept_max_mm:in.4dot}} − t) × {{process.saw_axial_reading_per_in_mm:.1f}} mm (t .0640: {{process.slot_saw_axial_nominal_mm:.3f}} mm): the saw's wobble then keeps the slot's width and the far tine in their bands. Over: loosen the screw, wipe, turn the saw a quarter turn on the pilot, clamp to {{process.saw_clamp_torque_nm:.0f}} N·m, draw new witness lines and read again. Over after two tries: stop and tell the owner."
+instruction = "Every load (the taper never seats the arbor quite the same twice): the lever indicator on its magnetic base on the vise, its tip up against the saw's lower face 1/8 in in from the teeth. Turn the spindle one turn by hand: the needle's total swing, in mm, is A. Mark LOW afresh on the tooth that is over the tip where that face stands lowest."
+inspection = "A ≤ ({{process.slot_saw_swept_max_mm:in.4dot}} − t) × {{process.saw_axial_reading_per_in_mm:.1f}} mm (t .0640: {{process.slot_saw_axial_nominal_mm:.3f}} mm): the saw's wobble then keeps the slot's width and the far tine in their bands. Over: take the arbor out, wipe its shank and the taper, mount it and read again. Still over: loosen the screw, wipe, turn the saw a quarter turn on the pilot, clamp to {{process.saw_clamp_torque_nm:.0f}} N·m, draw new witness lines and read again, then the tips' swing. Over after two such tries: stop and tell the owner."
 gauge_checks = "other"
 
 [[setups.operations]]
@@ -932,7 +934,7 @@ gauge_checks = [
 ]
 
 [[setups.operations]]
-instruction = "Swap to the drill chuck. G54 Z0 again with T3, the #1 centre drill: console M6 T3, spindle stopped, its tip on a .002 leaf on the fork's F face of the blank against the fixed jaw ({{process.fork_thickness_mm:in.4dot}} above the plate), G10 L20 P1 Z{{process.fork_touch_z_mm:.3f}} (the fork's {{process.fork_thickness_mm:.3f}} plus the leaf). First load only: prove CR07_pin in air, Z0 raised 1.000 in, through each M6; then Z0 back."
+instruction = "Lift the arbor out, the saw still clamped on it (the screw untouched), and swap to the drill chuck. G54 Z0 again with T3, the #1 centre drill: console M6 T3, spindle stopped, its tip on a .002 leaf on the fork's F face of the blank against the fixed jaw ({{process.fork_thickness_mm:in.4dot}} above the plate), G10 L20 P1 Z{{process.fork_touch_z_mm:.3f}} (the fork's {{process.fork_thickness_mm:.3f}} plus the leaf). First load only: prove CR07_pin in air, Z0 raised 1.000 in, through each M6; then Z0 back."
 feed = "hand"
 
 [[setups.operations]]

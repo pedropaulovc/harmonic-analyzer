@@ -775,7 +775,8 @@ def context(
             f"the saw's heaviest pass takes {torque:.1f} N·m, over the arbor's "
             f"friction drive, process.saw_drive_torque_max_nm {drive:.1f}"
         )
-    # Runout (not measured: a stop reads it at every clamping). Axial: the
+    # Runout (not measured: stops read the axial at every mounting of the
+    # arbor, the radial at every clamping of the saw). Axial: the
     # slot's width is the second level's rise above the first plus the saw's
     # swept thickness (its miked thickness plus its axial runout at the rim),
     # which may run from the width's least less the rise to its most less the

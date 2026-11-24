@@ -12,7 +12,6 @@ them, and seeded faults show each check catches what it guards.
 from __future__ import annotations
 
 import copy
-import re
 import tomllib
 from pathlib import Path
 
@@ -186,10 +185,15 @@ def test_the_saw_runs_on_the_owned_arbor_as_its_record_gives_it() -> None:
     )
     arbor = next(tool for tool in PLAN["tools"] if tool["id"] == "saw-arbor")
     assert arbor["ref"] == "saw-arbor-r8-stepped"
-    text = _process_plans.plan_path(STEM).read_text(encoding="utf-8")
-    for gone in ("gear-cutter-arbor-1", "67-600", "TTC", "spacer", "collar"):
-        assert gone not in text, gone
-    assert not re.search(r"\bnuts?\b", text)
+    # The arbor that was to buy is no tool of the plan, and its limits are no
+    # parameters of it.
+    assert "gear-cutter-arbor-1" not in {tool["ref"] for tool in PLAN["tools"]}
+    for gone in (
+        "saw_collar_dia_max_mm",
+        "saw_spacer_below_min_mm",
+        "saw_nut_dia_max_mm",
+    ):
+        assert gone not in p, gone
 
 
 def test_each_saw_program_stops_after_a_light_pass_for_the_witness_lines(

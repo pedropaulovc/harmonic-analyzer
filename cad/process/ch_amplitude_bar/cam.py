@@ -677,14 +677,15 @@ def context(
     ring = _ring_radius(p["saw_bore_mm"] / 2, min(body_r, cap_r))
     drive = p["saw_drive_friction"] * p["saw_clamp_preload_kn"] * ring
     _agree(plan, "saw_drive_torque_max_nm", drive, 0.05)
-    # Runout (not measured: a stop reads it at every clamping). Axial: a
-    # notch's width is the second level's rise above the first plus the
-    # saw's swept thickness (its miked thickness plus its axial runout at the
-    # rim), which may run from the width's least less the rise to its most
-    # less the rise and the margin. Radial: the deepest tooth cuts the floor
-    # half the tips' total swing deeper, inside the depth's most less the
-    # margin. Setup 3 reads both to the foot notch's limits, which lie inside
-    # the top notch's.
+    # Runout (not measured: stops read the axial at every mounting of the
+    # arbor, the radial at every clamping of the saw). Axial: a notch's width
+    # is the second level's rise above the first plus the saw's swept
+    # thickness (its miked thickness plus its axial runout at the rim), which
+    # may run from the width's least less the rise to its most less the rise
+    # and the margin. Radial: the deepest tooth cuts the floor half the tips'
+    # total swing deeper, inside the depth's most less the margin. Both
+    # setups read to the foot notch's limits, which lie inside the top
+    # notch's.
     _agree(
         plan, "saw_axial_reading_per_in_mm", IN * (radius - RUNOUT_INSET_MM) / radius
     )
