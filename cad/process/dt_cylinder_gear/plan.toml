@@ -782,7 +782,7 @@ gauge_checks = "other"
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Blank {{process.depth_shallow_blank:d}} over {{process.depth_window_max_in:.4dot}} (too shallow: expected on the first run, set .003 shallow; blank {{process.depth_deep_blank:d}} is then over too): send $#, G10 L2 P1 Y(the G54 line's Y + 25.4 × (its reading - {{process.depth_aim_in:.4f}}) / 2); run GP01_first_space, index {{process.opposite_turns:d}} turns, run it again (both spaces deeper), and check again. Blank {{process.depth_shallow_blank:d}} at or under {{process.depth_window_max_in:.4dot}} with either reading outside the window (a cut too deep, or the two blanks too far apart): stop and tell the owner."
+instruction = "Blank {{process.depth_shallow_blank:d}} over {{process.depth_window_max_in:.4dot}} and blank {{process.depth_deep_blank:d}} not under {{process.depth_window_min_in:.4dot}} (too shallow: expected on the first run, set .003 shallow; blank {{process.depth_deep_blank:d}} may be over too): send $#, G10 L2 P1 Y(the G54 line's Y + 25.4 × (blank {{process.depth_shallow_blank:d}}'s reading - {{process.depth_aim_in:.4f}}) / 2); run GP01_first_space, index {{process.opposite_turns:d}} turns, run it again (both spaces deeper), and check again. Any other reading outside the window (either blank under {{process.depth_window_min_in:.4dot}}, or blank {{process.depth_deep_blank:d}} over {{process.depth_window_max_in:.4dot}} with blank {{process.depth_shallow_blank:d}} inside): stop and tell the owner; never cut deeper."
 feed = "hand"
 
 [[setups.operations]]
