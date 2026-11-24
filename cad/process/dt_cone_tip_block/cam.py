@@ -193,6 +193,11 @@ DRIVE_TOL_NM = 0.05
 DRIVE_RESERVE = 2.0
 # The arbor's length from the spindle nose is rounded up to this (.1 in).
 ARBOR_LENGTH_STEP_MM = 0.1 * IN
+# How far the arbor drops before its R8 shank is free of the spindle. The
+# shank's length is not on the arbor's record: 4.5 in is an assumed upper
+# bound (an R8 shank is about 4 in long), not a measured size. With it the
+# check below asks for 184 mm of the 303 mm under the nose.
+R8_SHANK_MM = 4.5 * IN
 # A plan number the recipe recomputes must agree to this (its rounding).
 PLAN_TOL_MM = 0.01
 # The #43 drill against the tap drill's printed band: the shop records the
@@ -954,6 +959,27 @@ def context(
     if p["saw_arbor_nose_to_cap_mm"] - cap_t < nose_above:
         raise ValueError(
             "process.saw_nose_above_min_mm is over what the arbor's record gives"
+        )
+    # The arbor goes in and comes out with the saw clamped on it, and only at
+    # the machine top (the traveler sends Z there first, both times, X and Y
+    # as they stand): its shank drops R8_SHANK_MM to come free. The room
+    # under the spindle nose there, over the block lying on its stacks,
+    # covers the arbor's length, that drop and the tool-change clearance.
+    top_room = (
+        machine["spindle_to_table_mm"][1]
+        - p["vise_bed_height_mm"]
+        - p["riser_height_mm"]
+        - f["west_face"]["width"][1]
+    )
+    if (
+        p["saw_arbor_length_mm"]
+        + R8_SHANK_MM
+        + shop["limits"]["tool_change_clearance_mm"]
+        > top_room
+    ):
+        raise ValueError(
+            "the arbor with its saw cannot drop out of the spindle at the "
+            f"machine top: {top_room:.1f} mm under the nose"
         )
     # The cap screw's thread carries the clamp torque the drive below rests
     # on: the record's engagement with no saw fitted, less the thickest blade

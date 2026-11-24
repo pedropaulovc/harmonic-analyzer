@@ -176,6 +176,23 @@ def test_the_saw_and_arbor_sizes_are_their_inventory_records() -> None:
         assert gone not in p, gone
 
 
+def test_the_clamp_torque_is_set_with_tools_on_record() -> None:
+    """The friction drive is checked against the clamp torque, so the
+    operation that sets it names a torque wrench, and the wrench and its 5 mm
+    bit are inventory records (to buy until the owner records them owned).
+    Setup 10's rule and straightedge are the owned combination square."""
+    refs = {tool["id"]: tool["ref"] for tool in PLAN["tools"]}
+    tools = _shop_equipment.load()["tools"]
+    for tool_id in ("torque-wrench", "hex-bit-5mm", "square"):
+        assert refs[tool_id] in tools, tool_id
+    assert tools[refs["square"]]["status"] == "on_hand"
+    assert any(
+        op.get("tool") == "torque-wrench"
+        for setup in PLAN["setups"]
+        for op in setup["operations"]
+    )
+
+
 @pytest.mark.parametrize(
     ("preload_kn", "drive_nm"),
     [
@@ -194,6 +211,15 @@ def test_a_pass_over_the_friction_drive_is_refused(preload_kn, drive_nm) -> None
     plan["parameters"]["saw_drive_torque_max_nm"] = drive_nm
     with pytest.raises(ValueError, match="friction drive with its reserve"):
         _context(plan)
+
+
+def test_the_arbor_must_have_room_to_drop_out_at_the_machine_top(monkeypatch) -> None:
+    """The arbor comes out with the saw clamped on it: its shank drops its
+    own length, so the traveler sends Z to the machine top first, and the
+    recipe refuses a mill without that room under the spindle nose there."""
+    monkeypatch.setattr(RECIPE, "R8_SHANK_MM", 300.0)
+    with pytest.raises(ValueError, match="cannot drop out of the spindle"):
+        _context()
 
 
 def test_the_slit_saw_steps_in_to_the_slits_depth(context) -> None:
