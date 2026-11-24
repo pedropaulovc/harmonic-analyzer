@@ -129,16 +129,35 @@ def test_the_head_is_turned_past_the_part_off_kerf(
     assert parameters["head_turn_end_z_mm"] < -kerf_end
 
 
-def test_the_journal_is_left_a_polish_over_its_band(
-    parameters: dict, features: dict
+def test_the_journal_is_polished_to_the_shims_bore_and_accepted_on_its_mates(
+    plan: dict, parameters: dict, features: dict
 ) -> None:
+    """Fit audit 2026-11-23: the journal is made to fit. The micrometer only
+    steers the polish (never over the bought shims' bore); the mates tried on
+    the journal accept it, and no step quotes the drawing module's analysis
+    band or clearance."""
     low, high = (d / IN for d in features["outer"]["dia"])
-    assert parameters["polish_dia_min_in"] > high
+    assert parameters["polish_stop_in"] == pytest.approx(high)
+    assert parameters["polish_dia_min_in"] > parameters["polish_stop_in"]
     assert parameters["polish_dia_max_in"] - low <= 0.0006 + 1e-9
     for end in ("min", "max"):
         assert parameters[f"polish_dia_{end}_mm"] == pytest.approx(
             parameters[f"polish_dia_{end}_in"] * IN
         )
+    text = _process_plans.plan_path(STEM).read_text(encoding="utf-8")
+    for token in ("cad.outer_dia_min", "cad.outer_dia_max", "cad.outer_clearance_m"):
+        assert token not in text, token
+    steps = [
+        op
+        for setup in plan["setups"]
+        for op in setup["operations"]
+        if "turns free" in op.get("inspection", "")
+    ]
+    # On the lathe once the stub is cut off, and again at the bench.
+    assert len(steps) == 2
+    for step in steps:
+        assert "no shake" in step["inspection"]
+        assert "{{cad.outer_mates}}" in step["instruction"]
 
 
 def test_each_regrip_stands_within_the_shops_stickout(

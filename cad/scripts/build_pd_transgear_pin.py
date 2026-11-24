@@ -61,7 +61,6 @@ import pd_transgear_pin_callouts as callouts
 from pd_transgear_pin_callouts import DRAWING_NOTES
 from pd_transgear_pin_spec import (
     DIA,
-    DIA_BAND,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
     FRONT_LAND,
@@ -482,14 +481,13 @@ def build(adapter) -> dict[str, str]:
     bbox_extent_check(adapter, "head Ø (x)", "x", HEAD_DIA, 0.01)
     bbox_extent_check(adapter, "head Ø (y)", "y", HEAD_DIA, 0.01)
 
-    # Model-owned bands (drawing-simplicity-policy.md `How the repository implements the guidelines`): the turned shank (the running fit), the
+    # Model-owned bands (drawing-simplicity-policy.md `How the repository implements the guidelines`): the
     # ring groove's catalogue Ø and width, and the groove station, a
-    # disc-cluster stack term at the cluster's band.  The press land's Ø is a
+    # disc-cluster stack term at the cluster's band.  The shank's Ø carries
+    # none: it is a reference, made to fit its mates' reamed bores (note 1;
+    # fit audit 2026-11-23).  The press land's Ø is a
     # reference made to the measured arm ream; its length and the front land
     # print .XX and the title block governs them.
-    set_dimension_bilateral_tolerance(
-        adapter, "PinProfile", "ShankDia", *deviations(DIA_BAND), display_unit=UNIT
-    )
     set_dimension_bilateral_tolerance(
         adapter,
         "PinProfile",

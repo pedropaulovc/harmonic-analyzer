@@ -55,26 +55,32 @@ def test_the_chamfer_prints_a_max_the_ring_never_reaches() -> None:
     assert ring.OD < flat_dia_min
 
 
-def test_the_bore_and_the_printed_length_carry_model_bands() -> None:
-    """The bore runs on the pin, so its reamed band lives on the model
-    dimension; the length is a printed term of the disc cluster stack."""
+def test_only_the_printed_length_carries_a_model_band() -> None:
+    """Fit audit 2026-11-23: the reamed bore prints the reamer's size with
+    no band (the pin is turned last to it); the length is a printed term of
+    the disc cluster stack."""
     assert model_toleranced_dimensions(part) == {
-        ("RingProfile", "BoreDia"): "*deviations(BORE_DIA_BAND)",
         ("Ring", "RingLength"): "LENGTH_BAND",
     }
+    assert spec.BORE_PLACES == 3
 
 
 def test_the_bore_runs_on_the_pin_and_names_it() -> None:
-    """drawing-guidelines.md rule 4 (tighten only for function, and name the mate): the running-fit callout names the mate and its clearance;
+    """drawing-guidelines.md rule 4 (fit audit 2026-11-23): a reamed bore
+    prints size, REAM, the mate, the acceptance by the mate and one line
+    saying what the fit protects; no band, no clearance.
     drawing-guidelines.md rule 12 (hole and slot callouts say what to do): the fit bore's process is REAM."""
     low, high = fit.BORE_DIAMETRAL_CLEARANCE
     assert 0.0 < low < high
-    assert spec.BORE_DIA == pin.DIA
+    assert spec.BORE_DIA == fit.BORE_DIA == pytest.approx(0.1260 * 25.4)
     assert spec.BORE_DIA_BAND == fit.BORE_DIA_BAND
     callout = drawing.DIMENSION_CALLOUTS["BoreDia"]
-    assert callout.splitlines()[0] == "REAM THRU"
-    assert pin.PIN_NUMBER in callout
-    assert f"{pin.inch_text(low, 4)}-{pin.inch_text(high, 4)}" in callout
+    assert callout.splitlines() == [
+        "REAM THRU, RUNNING FIT",
+        f"{pin.PIN_NUMBER} PIN ENTERS, NO SHAKE",
+        "KEEPS MHA-PD-06 CLEAR OF MHA-PD-22",
+    ]
+    assert not re.search(r"\d*\.\d", callout)
 
 
 def test_wall_holds_the_target_at_the_printed_worst_case() -> None:
@@ -107,12 +113,12 @@ def test_the_unchanged_bushing_bears_on_the_smaller_d_flat_sleeve_nose() -> None
     rear face at every size limit, with both title-block edge breaks paid.
     This is geometric contact, not a load or torque certification."""
     sleeve = fit.SLEEVE
-    assert spec.BORE_DIA == sleeve.BORE_DIA == pin.DIA
+    assert spec.BORE_DIA == sleeve.BORE_DIA == fit.BORE_DIA
     assert spec.BORE_DIA_BAND == sleeve.BORE_DIA_BAND == fit.BORE_DIA_BAND
     assert fit.BORE_DIAMETRAL_CLEARANCE == pytest.approx(
         (
-            sleeve.BORE_DIA_BAND[1] - pin.DIA_BAND[0],
-            sleeve.BORE_DIA_BAND[0] - pin.DIA_BAND[1],
+            sleeve.BORE_DIA + sleeve.BORE_DIA_BAND[1] - pin.DIA_MAX,
+            sleeve.BORE_DIA + sleeve.BORE_DIA_BAND[0] - pin.DIA_MIN,
         )
     )
     nose_r = (sleeve.BOSS_DIA + sleeve.BOSS_DIA_BAND[1]) / 2.0 - hub.EDGE_BREAK_MAX
@@ -157,7 +163,7 @@ def test_the_bore_and_both_end_faces_run_machined() -> None:
     }
     assert set(faces) == {"bore", "nose_face", "ring_face"}
     assert {ra for ra, _ in faces.values()} == {MACHINED_UM}
-    assert faces["bore"][1].diameter_mm == pin.DIA
+    assert faces["bore"][1].diameter_mm == spec.BORE_DIA
     assert (tuple(faces["nose_face"][1].normal), faces["nose_face"][1].offset_mm) == (
         (0.0, 0.0, -1.0),
         0.0,

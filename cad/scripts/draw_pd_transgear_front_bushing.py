@@ -1,6 +1,6 @@
 r"""Create the manufacturing drawing for the transgear front bushing (MHA-PD-25).
 
-A turned brass ring: Ø.47 O.D. over a reamed Ø.1250 bore, a .02 x 45 deg
+A turned brass ring: Ø.47 O.D. over a reamed Ø.126 bore, a .02 x 45 deg
 chamfer on the ring face's O.D. edge, its length printed to the disc cluster
 stack's band under the stack callout.  The profile lies as it sits in the lathe
 (axis horizontal): the ``*Top`` view turned a quarter turn, so model +Z runs
@@ -78,7 +78,6 @@ from pd_transgear_front_bushing_spec import (
     UNIT,
     WALL_WORST,
 )
-from transgear_cluster_fit import BORE_DIAMETRAL_CLEARANCE
 
 
 # Cached machinist review leaf: a FIX or ERROR verdict fails the build.
@@ -184,8 +183,12 @@ ISO_NOTE_XY = (0.315, 0.145)
 # chamfered ring face at z = LENGTH is the datum end the length runs from,
 # so the bar's faced end takes the chamfer; the nose face at z = 0 is the far
 # end.  The O.D. takes the title block's .XX row, the length its +/-.001
-# stack band, the bore its reamed band and the chamfer its single .02 MAX
-# limit (any break up to it: the ring bears inside it at its largest).  Each
+# stack band and the chamfer its single .02 MAX limit (any break up to it:
+# the ring bears inside it at its largest).  The bore prints the reamer's
+# size, REAM and its acceptance by the MHA-PD-23 pin, no band: its ``dia``
+# field is the spec's ANALYSIS band (what the reamer is modelled to cut),
+# carried only because the traveler's adapter needs a band to bind; it is
+# not a requirement and no step quotes it as an acceptance.  Each
 # ``span`` is a feature's model-Z extent.  The declarations print nothing.
 # The sheet prints no manufacturing note: every requirement is a dimension,
 # its band or its native callout, so the feature manifest's notes are empty.
@@ -245,7 +248,7 @@ requirement(
     "bore",
     kind="hole",
     faces=(CylinderFace(BORE_DIA),),
-    requirements=("dia", "thru"),
+    requirements=("thru", "mate"),
     fields={
         "axis": ([0.0, 0.0, 1.0], ("BORE_DIA",)),
         "at": ([0.0, 0.0, 0.0], ("BORE_DIA",)),
@@ -258,10 +261,6 @@ requirement(
         "thru": (True, ("BORE_CALLOUT",)),
         "process": ("ream", ("BORE_CALLOUT",)),
         "wall_min": (WALL_WORST, ("WALL_WORST",)),
-        "diametral_clearance_ref": (
-            list(BORE_DIAMETRAL_CLEARANCE),
-            (("transgear_cluster_fit", "BORE_DIAMETRAL_CLEARANCE"), "BORE_CALLOUT"),
-        ),
         "mate": (PIN_NUMBER, (("pd_transgear_pin_spec", "PIN_NUMBER"), "BORE_CALLOUT")),
         "callout": (BORE_CALLOUT, ("BORE_CALLOUT",)),
     },

@@ -42,7 +42,6 @@ import _config
 import pd_rack_pinion_spec
 import pd_transgear_pin_spec
 from _fit_deviations import deviations
-from _fit_ream_slide import REAM_SLIDE
 from _gear_fit_limits import gear_tip_band_mm
 from _gear_quality import toothspace_runout_tir_mm
 from _gtol_cylinder import CylinderFace
@@ -333,16 +332,24 @@ for _limit in (FLAT_END_MIN, FLAT_END_STATION):
     if not math.isclose(inch_floor_mm(_limit, FLAT_END_PLACES), _limit, abs_tol=1e-9):
         raise AssertionError("a flat end limit does not print at its places")
 
-# .125 REAM_SLIDE bore (an owned .1260 reamer) on the MHA-PD-23 1/8 pin's
-# +.0000/-.0002: .0010...0017 diametral clearance.  The true finite root at
-# every radial-setting corner retains the .080 wall.
-BORE_DIA = pd_transgear_pin_spec.DIA
-BORE_DIA_BAND = REAM_SLIDE  # (upper, lower): +.0015/+.0010
-BORE_PLACES = 4
-_PIN_UPPER, _PIN_LOWER = pd_transgear_pin_spec.DIA_BAND
+# The bore the sleeve runs on the MHA-PD-23 pin with: reamed with the set's
+# .1260 reamer and printed at that size with NO band (fit audit 2026-11-23,
+# pending owner confirmation); the pin's shank is turned last to it, and the
+# acceptance is the pin entering with no shake.  What fails if the fit is
+# .002 looser: the sleeve cocks on the pin and tilts the MHA-PD-06 disc into
+# the MHA-PD-22 collar (pd_cluster_air.COLLAR_AIR, "sleeve cocking on the
+# pin"; the gate is build_pd_paper_drive_assembly's).
+# BORE_DIA_BAND is NOT a printed limit: it is the ANALYSIS band, what the
+# set reamer is modelled to cut (on size to .0005 over, the band the hole
+# printed before), and BORE_DIAMETRAL_CLEARANCE the modelled result of the
+# fit on the pin's analysis band, .0010...0017.  Every stack reads these.
+# The true finite root at every radial-setting corner retains the .080 wall.
+BORE_DIA = 3.2004  # .1260, the reamer's size
+BORE_DIA_BAND = (0.0127, 0.0)  # (upper, lower) ANALYSIS deviations: +.0005/0
+BORE_PLACES = 3  # prints Ø.126 REAM THRU
 BORE_DIAMETRAL_CLEARANCE = (
-    round(BORE_DIA_BAND[1] - _PIN_UPPER, 6),
-    round(BORE_DIA_BAND[0] - _PIN_LOWER, 6),
+    round(BORE_DIA + BORE_DIA_BAND[1] - pd_transgear_pin_spec.DIA_MAX, 6),
+    round(BORE_DIA + BORE_DIA_BAND[0] - pd_transgear_pin_spec.DIA_MIN, 6),
 )
 if BORE_DIAMETRAL_CLEARANCE[0] <= 0.0:
     raise AssertionError(f"sleeve bore binds on the pin: {BORE_DIAMETRAL_CLEARANCE}")
@@ -547,7 +554,7 @@ WALLS = (
 for _name, _nominal, _worst in WALLS:
     if _worst < WALL_TARGET:
         raise AssertionError(f"sleeve wall {_name} {_worst:.3f} under {WALL_TARGET}")
-# The D-flat wall (.138 ±.002 flat over the .125 bore) sits under the .080
+# The D-flat wall (.138 ±.002 flat over the .126 bore) sits under the .080
 # target and keeps the .060 floor: minor RV-03.
 FLAT_WALL = FLAT_TO_AXIS - BORE_DIA / 2.0
 FLAT_WALL_WORST = round(FLAT_TO_AXIS + FLAT_TO_AXIS_BAND[1] - _BORE_MAX / 2.0, 6)
@@ -623,7 +630,6 @@ for _feature, _dimensions in DRAWING_PRECISION.items():
 
 # The bands the build applies, by dimension (``(lower, upper)`` deviations).
 STATION_DEVIATIONS = (-STATION_TOL, STATION_TOL)
-BORE_DEVIATIONS = deviations(BORE_DIA_BAND)
 BOSS_DIA_DEVIATIONS = deviations(BOSS_DIA_BAND)
 OUTSIDE_DIA_DEVIATIONS = deviations(OUTSIDE_DIA_BAND)
 # The root witness's nominal IS the printed physical MIN limit.

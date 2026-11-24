@@ -237,12 +237,13 @@ F_Z = round(ARM_REAR_Z - F_FROM_ARM_REAR, 6)  # the knob train's station
 # model's end float.
 MODEL_M = round(DISC_FRONT_Z - F_Z, 6)
 
-# Running fits on the pin (sleeve and both bushings share the bore band).
+# Running fits on the pin: the sleeve and both bushings are reamed with the
+# one .1260 reamer and share its size and ANALYSIS band; the pin's shank is
+# turned to them (fit audit 2026-11-23).  Neither is a printed limit: the
+# clearance is the modelled result of that fit, which the air stacks read.
+BORE_DIA = SLEEVE.BORE_DIA
 BORE_DIA_BAND = SLEEVE.BORE_DIA_BAND
-BORE_DIAMETRAL_CLEARANCE = (
-    round(BORE_DIA_BAND[1] - PIN.DIA_BAND[0], 6),
-    round(BORE_DIA_BAND[0] - PIN.DIA_BAND[1], 6),
-)
+BORE_DIAMETRAL_CLEARANCE = SLEEVE.BORE_DIAMETRAL_CLEARANCE
 
 for _ok, _what in (
     (
