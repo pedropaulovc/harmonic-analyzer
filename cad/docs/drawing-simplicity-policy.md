@@ -273,7 +273,11 @@ their sheet re-keys for another reason or the review leaf is force-refreshed.
   batch that brings a sheet to SHIP deletes its line, and the batch that
   deletes the last line deletes the file: an empty list fails the graph
   load, as does a line for a drawing that does not declare `ENFORCE`
-  (tracking issue #3511). No sheet is added without an owner ruling.
+  (tracking issue #3511). No sheet is added without an owner ruling. This
+  is the one adjustment kept in a central file rather than under each
+  package's own key (delegated ruling 2026-11-24, Main, on the owner's
+  demotion ruling): it is temporary, and one file is deleted when the
+  conversion ends.
 - **Thread engagement (rule 18)** is owned by the CAD: the build's seat-fit
   and stack asserts enforce it. Through-tapped receivers use actual retained
   material and external full-form overlap, not blind drilling depths or raw

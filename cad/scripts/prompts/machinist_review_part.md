@@ -44,8 +44,9 @@ Pass 1 — detection. Find every candidate item; classify nothing yet.
 6. Read the sheet as the first-time builder of the guidelines would, once,
    at the machine. For every callout and dimension check: does every part it
    refers to carry its drawing number or allowed short form (rule 4); for each
-   REAM and each explicit band narrower than its title-block row, does the
-   sheet print what fails if it is .002 loose, in one of rule 4's kinds, and is the
+   REAM and each explicit band narrower than its title-block row, does an
+   entry of the NECESSITY REGISTER in the package input cover it, with a
+   reason of the entry's kind (never ask the sheet to print one), and is the
    feature in the least demanding form its mate allows (drilled, made to fit,
    reamed to the bought mate, printed band); does anything need a gauge bought
    for one size; is each surviving band inside its "What the shop holds" row,

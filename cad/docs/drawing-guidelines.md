@@ -31,9 +31,9 @@ against a pen line about `.006 in` wide. Nothing in it is interchangeable, so
 no pair of mating parts needs limits printed on both. It is meant to be made
 with drills, the few standard reamers a hobby shop keeps, a micrometer,
 calipers and files, without working to tenths of a thousandth. Parts that
-work with loose tolerances are the mark of a good design. A sheet that needs
+work with loose tolerances are the mark of a good design. A package that needs
 a special reamer, a plug gauge or a band narrower than `.001 in` is presumed
-wrong until it prints what fails otherwise (rule 4).
+wrong until its necessity register says what fails otherwise (rule 4).
 
 The builder learned to read prints from a textbook and a shop handbook and
 reads each callout once, at the machine. They know standard ASME symbols and
@@ -203,15 +203,9 @@ made to their mate.
   fails on this one machine if it is `.002 in` loose?* The feature passes
   only when the answer is one of the kinds below and the package's necessity
   register carries an entry for it: the feature it covers, the kind, and the
-  reason in a few words. The register is part of the part's registry: it is
-  the file `cad/config/necessity/<drawing>.yaml` beside the part's row
-  `cad/config/parts/<part>.yaml`, kept separate because the row is a
-  cache-key input of the part's and the drawing's SolidWorks builds and the
-  register is read by the review alone, so a reason can be added or
-  corrected without rebuilding either. The sheet
-  prints none of it (owner ruling 2026-11-24: "In the part's registry file,
-  not on the sheet. The sheet stays clean; the reviewer fails a tight feature
-  that has no registry reason."). The kinds, with reasons as an entry gives
+  reason in a few words. The register belongs to the part's registry record
+  and is supplied with the package; the sheet prints none of it. The kinds,
+  with reasons as an entry gives
   them:
   - `trace`: play, out-of-roundness or run-out, or an error in a lever arm,
     throw or ratio, that reaches the pen trace or a reading ("play shows at
