@@ -348,7 +348,6 @@ from ch_fulcrum_keeper_spec import (
     KEEPER_FITUP_X_FROM_WEB_MM,
     KEEPER_SCREW_TRANSVERSE_BAND_MM,
     SCREW_FROM_SIDE,
-    KEEPER_FITUP_LOCATION_BAND_MM,
     KEEPER_FITUP_X_BAND_MM,
     KEEPER_FITUP_PLACES,
     KEEPER_INNER_FACE_FROM_FRONT_SOCKET_MM,
@@ -360,6 +359,7 @@ from ch_fulcrum_keeper_spec import (
     KEEPER_WIDTH,
     KEEPER_Z_OFF,
 )
+from ch_keeper_fitup import FACE_DEVIATIONS_MM as KEEPER_FACE_DEVIATIONS_MM
 
 import _telemetry
 
@@ -1577,17 +1577,19 @@ KEEPER_PRINTED_MIN_RELIEF_FROM_SOCKET = _printed_limit(
 KEEPER_PRINTED_MIN_SOCKET_PITCH = (
     REAR_COLUMN_Z - FRONT_COLUMN_Z
 ) - SOCKET_PATTERN_REFINEMENT_ZONE
+# The lug inner faces as fit-up leaves them (ch_keeper_fitup, C10: the front
+# by DRO, the rear pushed up to the lever stack over a leaf).
 KEEPER_FOOT_PRINTED_BOSS_MARGINS = (
-    _keeper_printed(KEEPER_INNER_FACE_FROM_FRONT_SOCKET_MM[0], KEEPER_FITUP_PLACES)
-    - KEEPER_FITUP_LOCATION_BAND_MM
+    KEEPER_INNER_FACE_FROM_FRONT_SOCKET_MM[0]
+    + KEEPER_FACE_DEVIATIONS_MM["front"][0]
     - KEEPER_PRINTED_MAX_OUTBOARD_REACH
     - KEEPER_PRINTED_MAX_RELIEF_FROM_SOCKET,
     KEEPER_PRINTED_MIN_SOCKET_PITCH
-    - _keeper_printed(KEEPER_INNER_FACE_FROM_FRONT_SOCKET_MM[1], KEEPER_FITUP_PLACES)
-    - KEEPER_FITUP_LOCATION_BAND_MM
+    - KEEPER_INNER_FACE_FROM_FRONT_SOCKET_MM[1]
+    - KEEPER_FACE_DEVIATIONS_MM["rear"][1]
     - KEEPER_PRINTED_MAX_OUTBOARD_REACH
     - KEEPER_PRINTED_MAX_RELIEF_FROM_SOCKET,
-)  # 0.737, 1.499
+)  # 0.635, 1.372
 # The taps stand on the faced span too, their thread's major clear of the
 # step.
 KEEPER_TAP_BOSS_MARGINS = (
@@ -1605,7 +1607,7 @@ if min(KEEPER_TAP_BOSS_MARGINS) <= 0.0:
 # own edge break is not credited), so the whole foot bears on the flat.
 KEEPER_FOOT_RELIEF_ROOT_MARGIN = (
     min(KEEPER_FOOT_PRINTED_BOSS_MARGINS) - KEEPER_BOSS_RELIEF_ROOT_R_MAX
-)  # 0.229
+)  # 0.127 (C10 front face at the title block's band)
 if KEEPER_FOOT_RELIEF_ROOT_MARGIN <= 0.0:
     raise AssertionError("a keeper foot reaches the relief step's root radius")
 # What the step must leave standing (K5).  The chord lies inside the

@@ -29,7 +29,6 @@ from ch_fulcrum_keeper_spec import (
     BORE_DIA_BAND,
     BORE_RUNNING_MIN_CLEARANCE_MM,
     CROWN_R,
-    KEEPER_FITUP_LOCATION_BAND_MM,
     KEEPER_Z_OFF,
     LUG_HALF_T,
     SET_SCREW_MIN_ENGAGEMENT_D,
@@ -37,6 +36,7 @@ from ch_fulcrum_keeper_spec import (
     crown_least_height,
 )
 from ch_fulcrum_keeper_spec import DRAWING_PRECISION as KEEPER_PRECISION
+from ch_keeper_fitup import FACE_DEVIATIONS_MM as KEEPER_FACE_DEVIATIONS_MM
 from ch_vn_fulcrum_set_screw_spec import CUP_DIA as SET_SCREW_CUP_DIA
 from ch_vn_fulcrum_set_screw_spec import LENGTH as SET_SCREW_LENGTH
 from ch_vn_fulcrum_set_screw_spec import MAJOR_DIA as SET_SCREW_MAJOR_DIA
@@ -200,7 +200,7 @@ DIMENSION_PREFIXES = {
 
 # --- Flat stations, at the worst case of every printed band and of the
 # MHA-CH-00 fit-up (drawing-guidelines.md rule 19 (absorb stacks at fit-up, not with tighter bands)). The keepers go on the frame with their
-# lug inner faces DRO-set (KEEPER_FITUP_LOCATION_BAND_MM each); each tap
+# lug inner faces set at fit-up (ch_keeper_fitup: the front by DRO, the rear to the lever stack, each face's larger deviation); each tap
 # stands SetScrewLocation off its lug's inner face, as the keeper prints it,
 # and the lug is LugThickness thick. The shaft is free to slide until both
 # screws bite, so it needs ONE
@@ -215,8 +215,8 @@ def _band(precision: dict[str, dict[str, int]], feature: str, name: str) -> floa
 
 
 _STATION_BANDS = {
-    "front_face": KEEPER_FITUP_LOCATION_BAND_MM,
-    "rear_face": KEEPER_FITUP_LOCATION_BAND_MM,
+    "front_face": max(map(abs, KEEPER_FACE_DEVIATIONS_MM["front"])),
+    "rear_face": max(map(abs, KEEPER_FACE_DEVIATIONS_MM["rear"])),
     "front_lug": _band(KEEPER_PRECISION, "LugBody", "LugThickness"),
     "rear_lug": _band(KEEPER_PRECISION, "LugBody", "LugThickness"),
     "front_tap": _band(KEEPER_PRECISION, "SetScrewReference", "SetScrewLocation"),
