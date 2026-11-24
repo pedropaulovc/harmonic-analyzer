@@ -31,7 +31,7 @@ import math
 import _config
 from _package_units import drawing_unit
 from _fit_deviations import deviations
-from _inch_wall_limits import WALL_TARGET_MM
+from _inch_wall_limits import WALL_FLOOR_MM, WALL_TARGET_MM
 from _printed_tolerance import printed_deviations
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
 from _gtol_cylinder import CylinderFace
@@ -75,38 +75,27 @@ if SLIP_CLEARANCE_MIN < 0.02 or SLIP_CLEARANCE_MAX > 0.10:
         f"cam slip clearance {SLIP_CLEARANCE_MIN}-{SLIP_CLEARANCE_MAX} is outside 0.02-0.10"
     )
 # The cam OD is the working surface the follower rides, and the bore-to-OD
-# offset IS the lift: both are on the drive train's critical list.  Nothing
-# else on this collar mates with anything, so nothing else carries a band.
-# Routine controlling dimensions use the title block's general grade.
-# drawing-guidelines.md rule 4 (tighten only for function, and name the mate):
-# both tight bands name the MHA-DT-25 follower pin they serve (machinist
-# review ENFORCE r1: the bands named no mate).
+# offset IS the lift.  Fit audit S3 (owner ruling 2026-11-24: "S1, S2, S3,
+# S4, S5, S6 all approved (ticked)"): both go from +/-.002 to +/-.005, the
+# title block's three-place row, so neither carries a band of its own and
+# the sheet prints no note on them: the rig is located with the MHA-DT-25
+# pins on the cams (MHA-DT-00 "rig-located"), which absorbs the parked
+# offset, and the engage reach keeps far more than its 0.25 at the limits
+# (batch-dt/rig/derive_f19_s3.py).
 FOLLOWER_PIN_NUMBER = "MHA-DT-25"
-COLLAR_OD_TOLERANCE_MM = 0.0508  # +/-.002 in
-COLLAR_AXIS_TOLERANCE_MM = 0.0508  # +/-.002 in
 
 # #290: the OD, eccentricity, length and station keep their millimetre
 # nominals (the drive train's park/engage/rig geometry) and print rounded in
 # inches -- .575, .079, .35, .16 -- so every wall below is judged at the
-# PRINTED limits.  Three places carry the OD's and eccentricity's +/-.002; the
-# length and station feed the end-face walls and the rig stack, so they print
-# at .XX, never .X.
+# PRINTED limits.  The OD and eccentricity print at three places (the title
+# block's +/-.005); the length and station feed the end-face walls and the
+# rig stack, so they print at .XX, never .X.
 COLLAR_OD_PLACES = 3
 ECC_PLACES = 3
 LENGTH_PLACES = 2
 SET_SCREW_Z_PLACES = 2
-_OD_LOWER, _OD_UPPER = printed_deviations(
-    CAM_OD,
-    COLLAR_OD_PLACES,
-    (-COLLAR_OD_TOLERANCE_MM, COLLAR_OD_TOLERANCE_MM),
-    unit=UNIT,
-)
-_ECC_LOWER, _ECC_UPPER = printed_deviations(
-    ECC,
-    ECC_PLACES,
-    (-COLLAR_AXIS_TOLERANCE_MM, COLLAR_AXIS_TOLERANCE_MM),
-    unit=UNIT,
-)
+_OD_LOWER, _OD_UPPER = printed_deviations(CAM_OD, COLLAR_OD_PLACES, unit=UNIT)
+_ECC_LOWER, _ECC_UPPER = printed_deviations(ECC, ECC_PLACES, unit=UNIT)
 _LENGTH_LOWER, _LENGTH_UPPER = printed_deviations(CAM_LEN, LENGTH_PLACES, unit=UNIT)
 _STATION_LOWER, _STATION_UPPER = printed_deviations(
     SET_SCREW_Z, SET_SCREW_Z_PLACES, unit=UNIT
@@ -127,20 +116,20 @@ THICK_SIDE_WALL_MIN_MM = (
     (CAM_OD + _OD_LOWER) / 2.0 - (BORE + _BORE_UPPER) / 2.0 + (ECC + _ECC_LOWER)
 )
 # Rule 17 on an inch sheet: .080 in target, .060 in floor.  At the printed
-# limits (OD .573, bore .2515, eccentricity .081) the thin side keeps .07975
-# in, .00025 under the target: owner minor RV-01
-# (cad/config/parts/dt-pinion-cam.yaml) accepts exactly that, so anything
-# thinner must be ruled again.
-if THIN_SIDE_WALL_MIN_MM < 0.07975 * 25.4 - 1e-9:
-    raise AssertionError("cam thin-side wall falls below RV-01's ruled .07975 in")
+# limits (OD .570, bore .2515, eccentricity .084) the thin side keeps .07525
+# in, between the floor and the target: owner minor RV-01
+# (cad/config/parts/dt-pinion-cam.yaml), restated for fit audit S3, accepts
+# a wall between the two, so anything under the floor must be ruled again.
+if THIN_SIDE_WALL_MIN_MM < WALL_FLOOR_MM - 1e-9:
+    raise AssertionError("cam thin-side wall falls below the .060 in floor (RV-01)")
 
 # Rule 20: the sheet states RV-01's wall on a native dimension, never in note
 # text.  build_dt_pinion_cam draws a hidden construction line up the thin side
 # from the bore's top, as long as the printed minimum, and prints it as the
-# single limit ".0797 MIN" (swTolMIN prints the nominal plus MIN): .07975
+# single limit ".0752 MIN" (swTolMIN prints the nominal plus MIN): .07525
 # floored to four places, so the sheet never states more wall than the worst
-# case leaves.  Its band runs up to the printed best case (OD .577, bore
-# .2510, eccentricity .077).
+# case leaves.  Its band runs up to the printed best case (OD .580, bore
+# .2510, eccentricity .074).
 THIN_WALL_MIN_PLACES = 4
 THIN_WALL_MIN_MM = round(
     math.floor(THIN_SIDE_WALL_MIN_MM / 25.4 * 10**THIN_WALL_MIN_PLACES + 1e-9)
@@ -214,18 +203,13 @@ if SET_SCREW_SUBFLUSH_MIN_MM <= 0.0:
 # rows (rule 7).  Keeping the reamer rather than an F drill is the
 # necessity register's N-01 (the thin wall).
 BORE_CALLOUT = f"REAM THRU; {LIFT_ROD_NUMBER} ROD\nSLIDES IN BY HAND"
-# The OD and its .079 offset from the bore together set the follower pin's
-# lift, so the one reason sits once, in numbered note 1, and both dimensions
-# flag it (rules 4 and 7; fan-out r1 57234c1d71: the reason on the OD's
-# callout alone left the tight .079 with no mate at its callout).  The tap
-# mouth stays 45 deg or more off the pin's track
+# The tap mouth stays 45 deg or more off the pin's track
 # (test_cam_set_screw_hole_stays_clear_of_the_follower); saying so on the
-# sheet was design rationale (fan-out screen 20261107T081227004Z).
-LIFT_NOTE_NUMBER = 1
-SCREW_NOTE_NUMBER = 2
-LIFT_NOTE_CALLOUT = f"SEE NOTE {LIFT_NOTE_NUMBER}"
-_OD_TEXT = f"{CAM_OD / 25.4:.{COLLAR_OD_PLACES}f}".removeprefix("0")
-_ECC_TEXT = f"{ECC / 25.4:.{ECC_PLACES}f}".removeprefix("0")
+# sheet was design rationale (fan-out screen 20261107T081227004Z).  Fit audit
+# S3 took the OD and eccentricity to the title block, so the note naming the
+# lift they set (old note 1) went with their bands: the sheet prints no
+# reason (owner ruling 2026-11-24, rule 4 v2).
+SCREW_NOTE_NUMBER = 1
 # The stake over the set screw is MHA-DT-00's cam-collars-set step (rule 23:
 # the assembly step gives the method); the part sheet gives only the tap.
 # The thick-side wall is deeper than the longest screw
@@ -260,9 +244,10 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 
 # The MODEL owns every printed decimal place: build_dt_pinion_cam applies this
 # map to the .SLDPRT and draw_dt_pinion_cam only reads it back.  Inch places:
-# four on the reamed bore (its +.0005 band needs them) and the RV-01 wall
-# minimum, three on the banded cam OD and eccentricity and on the #2-56 tap
-# drill (an inch drill size), two on the collar length and tap station.
+# four on the reamed bore (the reamer's .2510) and the RV-01 wall minimum,
+# three on the cam OD and eccentricity (the title block's +/-.005) and on
+# the #2-56 tap drill (an inch drill size), two on the collar length and tap
+# station.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "CollarProfile": {"CollarOd": COLLAR_OD_PLACES, "CollarCy": ECC_PLACES},
     "BoreProfile": {"BoreDia": BORE_PLACES},
@@ -296,11 +281,5 @@ if len(DRAWING_PRECISION_BY_NAME) != len(_PRECISION_NAMES):
 # the supplier's overall-length limits, not an invented SKU: the screw has
 # no registry number of its own.  Where the tightened screw sits is not
 # printed here (rule 7; see TAP_DRILL_CALLOUT).
-DRAWING_NOTES = "\n".join(
-    (
-        f"{LIFT_NOTE_NUMBER}. \N{LATIN CAPITAL LETTER O WITH STROKE}{_OD_TEXT} AND "
-        f"{_ECC_TEXT} SET THE LIFT OF FOLLOWER PIN {FOLLOWER_PIN_NUMBER}.",
-        f"{SCREW_NOTE_NUMBER}. SUPPLY ASME B18.3 #2-56 UNC X 3/16 FLAT-POINT SOCKET SET SCREW LOOSE.",
-    )
-)
+DRAWING_NOTES = f"{SCREW_NOTE_NUMBER}. SUPPLY ASME B18.3 #2-56 UNC X 3/16 FLAT-POINT SOCKET SET SCREW LOOSE."
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 2:1"

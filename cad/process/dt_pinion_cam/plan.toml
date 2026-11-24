@@ -506,5 +506,5 @@ inspection = "Station {{cad.set_screw_tap_station_min_in:.3dot}}–{{cad.set_scr
 gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.set_screw_tap_station_band_mm}}" }]
 
 [[setups.operations]]
-instruction = "Wipe on ISO VG 32 oil, into the tapped hole. Bag each cam with one ASME B18.3 #2-56 × 3/16 flat-point socket set screw, loose (drawing note 2)."
+instruction = "Wipe on ISO VG 32 oil, into the tapped hole. Bag each cam with one ASME B18.3 #2-56 × 3/16 flat-point socket set screw, loose (drawing note 1)."
 feed = "hand"
