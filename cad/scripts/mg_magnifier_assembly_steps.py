@@ -25,10 +25,13 @@ DRUM_BONDED_KEY = "drum-bonded"
 DRUM_HELD_KEY = "drum-held"
 PRESS_SLEEVE_MADE_KEY = "press-sleeve-made"
 SPACER_FITTED_KEY = "spacer-fitted"
-AXLE_PRESSED_KEY = "axle-pressed"
+AXLE_DRY_FITTED_KEY = "axle-dry-fitted"
+AXLE_BONDED_KEY = "axle-bonded"
 AXLE_HELD_KEY = "axle-held"
 AXLE_TRIAL_KEY = "axle-trial-fitted"
+AXLE_NUT_ON_THREAD_KEY = "trial-nut-on-thread"
 AXLE_CHECKED_KEY = "axle-checked"
+AXLE_SINK_RECORDED_KEY = "axle-sink-recorded"
 AXLE_ACCEPTED_KEY = "axle-accepted"
 COLUMN_CLAMP_STARTED_KEY = "column-clamp-started"
 ENDSHAKE_SET_KEY = "endshake-set"
@@ -58,43 +61,45 @@ STEPS: tuple[tuple[str, ...], ...] = (
         DRUM_HELD_KEY,
         "drum-stripped",
     ),
-    # The press's sleeve, the spacer it gauges from and the oil are their own
-    # steps (rule 22).
+    # The sleeve the axle is pushed through on its shoulder and the spacer
+    # are their own steps (rule 22).
     (PRESS_SLEEVE_MADE_KEY,),
     (SPACER_FITTED_KEY,),
-    ("axle-plain-end-oiled",),
-    (
-        AXLE_PRESSED_KEY,
-        AXLE_HELD_KEY,
-        "axle-pressed-out",
-        "axle-cleaned",
-        "axle-bonded",
-        "axle-spacer-refitted",
-        "axle-bond-set",
-        "axle-bond-cured",
-    ),
-    # The press setting is the axle's one position (owner ruling 2026-11-21):
-    # with it and every part in its drawing band the stack lands the thread
-    # end inside its acceptance (mg_wheel_group), so a failed trial reads the
-    # setting again, then replaces the stack part outside its limits, and
-    # with none the axle itself, whose thread length is the stack's last term.
-    # The trial's nuts jam over the endshake's go feeler, where the stack
-    # lands the thread end inside its acceptance (#3344).
+    # Owner ruling 2026-11-24, fit audit part 2, C11 ("Yes, set to the trial
+    # stack") with fit audit question 18 (the axle is bonded): a cured bond
+    # cannot be re-pressed, so the trial runs dry before the bond (delegated
+    # ruling 2026-11-24, FitLaneCH.SmallSubsys, accepted by FitLaneCH;
+    # precedent: the owner's C11 "press to the trial"). The axle goes in with
+    # its plain end flush on the surface plate, the expected setting; the
+    # trial accepts on C11's three things to see: the first nut on thread,
+    # the thread end inside DETAIL B and (the flush start, never pushed
+    # further) the plain end not proud. A short thread end slides the axle
+    # out by the shortfall to the window's middle and trials again; a part
+    # out of its limits, else the axle, is replaced.
+    (AXLE_DRY_FITTED_KEY,),
     (
         AXLE_TRIAL_KEY,
         "trial-feeler-placed",
         "trial-nuts-jammed",
+        AXLE_NUT_ON_THREAD_KEY,
         AXLE_CHECKED_KEY,
-        "trial-parts-removed-to-press",
-        "axle-press-rechecked",
-        "axle-repressed",
-        "axle-rechecked",
+        "axle-sunk",
         "stack-part-replaced",
         "trial-refitted",
-        "axle-pressed-out-to-replace",
         "axle-replaced",
     ),
+    (AXLE_SINK_RECORDED_KEY,),
     ("trial-parts-removed",),
+    ("axle-withdrawn",),
+    # Bonded to the trial's setting, squared to the bar while wet (nothing
+    # else squares a bonded axle), cured, then accepted by hand (rule 23).
+    (
+        AXLE_BONDED_KEY,
+        "axle-squared",
+        "axle-bond-cured",
+        AXLE_HELD_KEY,
+        "axle-stripped",
+    ),
     ("column-clamps-fitted",),
     (COLUMN_CLAMP_STARTED_KEY, "column-clamp-screws-left-loose"),
     ("axle-oiled",),
@@ -107,7 +112,7 @@ STEPS: tuple[tuple[str, ...], ...] = (
         "endshake-repeated",
     ),
     (LOCKNUT_JAMMED_KEY, "endshake-rechecked", "locknut-loosened", "locknut-reset"),
-    (AXLE_ACCEPTED_KEY, "axle-stack-removed", "axle-reset"),
+    (AXLE_ACCEPTED_KEY, "axle-endshake-closed"),
     # Lever group.
     (LEVER_THREADED_KEY,),
     ("clamp-thumb-screw-started",),

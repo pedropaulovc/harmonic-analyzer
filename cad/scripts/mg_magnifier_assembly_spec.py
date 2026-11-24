@@ -64,46 +64,13 @@ AXLE_X = WHEEL_X
 AXLE_Y = WHEEL_BAR_Y
 BAR_FRONT_Z = _bar.BAR_FRONT_Z
 
+# The shoulder past the spacer's OUTER face, the spacer on the shank against
+# the bar's front face: the model's step station (.768). Owner ruling
+# 2026-11-24, fit audit part 2, C11 ("Yes, set to the trial stack"): no step
+# sets or reads it any more (the dry trial sets the axle, accepted at the
+# thread end past the second nut, the first nut on thread and the plain end
+# not proud: mg_wheel_group.TRIAL_*), so it prints as a reference.
 PRESS_GAUGE = _pin.PRESS_GAUGE
-PRESS_GAUGE_TOL = _pin.PRESS_GAUGE_TOL
-# The press gauge: the shoulder past the spacer's OUTER face, the spacer on
-# the shank against the bar's front face, .768 +/-.002 (owner ruling
-# 2026-11-21, "fit at assembly": MHA-MG-00 sets the pin's press depth from
-# the spacer's outer face, so the spacer's length leaves the nut stack). It
-# is the press's setting; the thread end past the second nut stays its
-# acceptance (owner ruling 2026-11-06, Q1), checked once the nuts are set.
-# The stack shows a press inside the band passes that check: PRESS_GAUGE_TOL
-# is the press allocation the wheel-group stack spends (mg_wheel_group
-# corners), inside this window. Low: the shortest gauge whose full thread
-# still runs past the locknut's outer face at the thick-stack corner
-# (LOCKNUT_THREAD_MARGIN). High: the tightest of three upper limits, at the
-# thin-stack corner: at most THREAD_PAST_LOCKNUT_LIMIT of thread past the
-# locknut, the first nut clear of the axle's thread relief and the step
-# inside the hub. The acceptance callout names the thread-past-locknut
-# limit, so it must govern.
-PRESS_GAUGE_LOW_LIMIT = PRESS_GAUGE - PRESS_GAUGE_TOL - _group.LOCKNUT_THREAD_MARGIN
-_PRESS_GAUGE_HIGH_LIMITS = {
-    "thread past locknut": _pin.THREAD_PAST_LOCKNUT_LIMIT
-    - _group.THREAD_PAST_LOCKNUT_MAX,
-    "nut run-out": _group.NUT_RUNOUT_MARGIN,
-    "step inside hub": _group.STEP_INSIDE_HUB,
-}
-PRESS_GAUGE_HIGH_LIMIT = (
-    PRESS_GAUGE + PRESS_GAUGE_TOL + min(_PRESS_GAUGE_HIGH_LIMITS.values())
-)
-if min(_PRESS_GAUGE_HIGH_LIMITS, key=_PRESS_GAUGE_HIGH_LIMITS.get) != (
-    "thread past locknut"
-):
-    raise AssertionError(
-        "the press gauge's high limit no longer protects the thread end"
-    )
-if not (
-    PRESS_GAUGE_LOW_LIMIT
-    <= PRESS_GAUGE - PRESS_GAUGE_TOL
-    < PRESS_GAUGE + PRESS_GAUGE_TOL
-    <= PRESS_GAUGE_HIGH_LIMIT
-):
-    raise AssertionError("the press allocation leaves the wheel-group stack window")
 # The modelled endshake sits mid-band, so its band prints symmetric.
 ENDSHAKE = _group.ENDSHAKE
 ENDSHAKE_TOL = _group.ENDSHAKE_MAX - _group.ENDSHAKE
@@ -112,24 +79,29 @@ if abs((_group.ENDSHAKE - _group.ENDSHAKE_MIN) - ENDSHAKE_TOL) > 1e-9:
 
 # The stack lengths the MHA-MG-00 sheet prints, each a model length on the
 # same chain (rule 22: a measurable setting prints on a view even though the
-# steps print in ASSEMBLY.md). The press gauge and the endshake print banded
+# steps print in ASSEMBLY.md). The endshake prints banded
 # (DIMENSION_TOLERANCES), the drum recess and the thread end as their two
 # limits (LIMIT_DIMENSIONS); the model's own pose sits inside them.
-# The axle's plain end below the bar's far face: where the press setting
+# The axle's plain end below the bar's far face: where the nominal setting
 # leaves it, a window the axle spec proves from the printed shank, spacer,
-# gauge and bar depth (its low limit keeps the end inside the bore). No step
-# sets or reads it, so it prints as a reference (REFERENCE_DIMENSIONS).
+# step station and bar depth (its low limit keeps the end inside the bore).
+# The steps read it only against the trial's own reading, so it prints as
+# a reference (REFERENCE_DIMENSIONS), as the step station does.
 BAR_FAR_D = -_pin.BAR_DEPTH
 BACK_END_D = _pin.BACK_Y
 BACK_END_SUNK_LIMITS = (_pin.BACK_END_SUNK_MIN, _pin.BACK_END_SUNK_MAX)
 if not BACK_END_SUNK_LIMITS[0] < BACK_END_D - BAR_FAR_D < BACK_END_SUNK_LIMITS[1]:
     raise AssertionError("the model's plain end is outside its proven window")
-# The pressed drum's outer face below the spigot end (the wheel hub's front
-# face): the window the printed spigot and drum lengths prove. The geom
-# asserts the near limit >= -1e-9 mm; rounding (and + 0.0, for -0.0) drops
-# the float residue the limits' places check would reject.
+# The bonded drum's outer face below the spigot end (the wheel hub's front
+# face): the window the printed spigot and drum lengths prove. Owner ruling
+# 2026-11-24, fit audit part 2, S4: the drum step accepts it by sight (hard
+# against the boss, not proud by straightedge), so it prints as a reference.
+# The geom asserts the near limit >= -1e-9 mm; rounding (and + 0.0, for
+# -0.0) drops the float residue.
 DRUM_RECESS = _wheel.SPIGOT_LEN - _wheel.DRUM_LEN
 DRUM_RECESS_LIMITS = tuple(round(limit, 6) + 0.0 for limit in _wheel.DRUM_RECESS)
+if not DRUM_RECESS_LIMITS[0] <= DRUM_RECESS < DRUM_RECESS_LIMITS[1]:
+    raise AssertionError("the model's drum recess is outside its proven window")
 # The axle's thread end (the dome's tangent) past the second nut's outer face:
 # the press's one acceptance (owner ruling 2026-11-06, Q1), read on the stack.
 # High: the axle's limit. Low: the locknut on full thread, i.e. at least the
@@ -191,7 +163,6 @@ CHAIN_LEG_DIMENSIONS = (
 if len(CHAIN_LEG_DIMENSIONS) != len(CHAIN_D) - 1:
     raise AssertionError("every axle stack leg needs one dimension name")
 LIMIT_DIMENSIONS = {
-    DRUM_RECESS_DIMENSION: DRUM_RECESS_LIMITS,
     THREAD_PAST_LOCKNUT_DIMENSION: THREAD_PAST_LOCKNUT_LIMITS,
 }
 _legs = dict(zip(CHAIN_LEG_DIMENSIONS, zip(CHAIN_D, CHAIN_D[1:])))
@@ -201,17 +172,21 @@ for _name, (_low, _high) in LIMIT_DIMENSIONS.items():
         raise AssertionError(f"{_name}: the model's {_length:.4f} mm is outside {_low}-{_high}")
 LIMIT_PRECISION = 3
 # Printed as (value) through the native prefix/suffix channel, no band.
-REFERENCE_DIMENSIONS = frozenset({BACK_END_SUNK_DIMENSION})
+REFERENCE_DIMENSIONS = frozenset(
+    {BACK_END_SUNK_DIMENSION, PRESS_GAUGE_DIMENSION, DRUM_RECESS_DIMENSION}
+)
 DRAWING_PRECISION = {
     FEATURE: {
-        PRESS_GAUGE_DIMENSION: _pin.PRESS_GAUGE_PLACES,
         ENDSHAKE_DIMENSION: 3,
-        **{name: LIMIT_PRECISION for name in (*LIMIT_DIMENSIONS, *REFERENCE_DIMENSIONS)},
+        **{
+            name: LIMIT_PRECISION
+            for name in (*LIMIT_DIMENSIONS, BACK_END_SUNK_DIMENSION, DRUM_RECESS_DIMENSION)
+        },
+        PRESS_GAUGE_DIMENSION: _pin.PRESS_GAUGE_PLACES,
     }
 }
 TOLERANCE_PRECISION = 3
 DIMENSION_TOLERANCES = {
-    PRESS_GAUGE_DIMENSION: PRESS_GAUGE_TOL,
     ENDSHAKE_DIMENSION: ENDSHAKE_TOL,
 }
 _forms = (REFERENCE_DIMENSIONS, set(DIMENSION_TOLERANCES), set(LIMIT_DIMENSIONS))
@@ -264,22 +239,20 @@ INSTALLED_FULL_ENGAGEMENT_MIN = _lever.INSTALLED_FULL_ENGAGEMENT_MIN
 # but prints none of the callout (run 20261012T185729782Z). Below ones can wrap.
 SETTING_CALLOUTS = {
     FEATURE: {
-        # The press gauge is the press's setting, from the spacer's outer
-        # face (owner ruling 2026-11-21). Its acceptance, the number pair a
-        # depth rod reads at the second nut (owner ruling 2026-11-06, Q1), is
-        # ThreadPastLocknut on DETAIL B, the view that draws the nuts. Farm
-        # rounds 1-3 of #2286 gated the pair as a callout on DETAIL A, which
-        # draws no nut; Main chose option A on 2026-11-08.
-        PRESS_GAUGE_DIMENSION: (4, "PRESS SETTING:\nSHOULDER PAST\nSPACER FACE"),
+        # The step station past the spacer's outer face is the model's
+        # nominal, printed REF (owner ruling 2026-11-24, fit audit part 2,
+        # C11: the axle is set to the trial stack). The acceptance, the
+        # number pair a depth rod reads at the second nut (owner ruling
+        # 2026-11-06, Q1), is ThreadPastLocknut on DETAIL B, the view that
+        # draws the nuts (#2286 option A).
+        PRESS_GAUGE_DIMENSION: (4, "SHOULDER PAST\nSPACER FACE"),
         # One reason line; the steps carry how the nuts set and lock it
         # (owner ruling 2026-11-06, Q2).
         ENDSHAKE_DIMENSION: (4, "WHEEL FREE, NO RATTLE"),
-        # Each limit pair names the two faces it reads between; the press's
-        # setting and its one acceptance say which they are (r3 of #2286
+        # Each limit pair names the two faces it reads between (r3 of #2286
         # read two acceptances). The plain end below the far face prints as
-        # a reference, where the press setting leaves it, so DETAIL A sets
-        # the axle by the press gauge alone. The steps name the caliper
-        # depth rod.
+        # a reference, where the nominal setting leaves it; the steps name
+        # the caliper depth rod.
         BACK_END_SUNK_DIMENSION: (4, "PLAIN END BELOW\nFAR FACE"),
         DRUM_RECESS_DIMENSION: (4, "DRUM FACE BELOW\nSPIGOT END"),
         THREAD_PAST_LOCKNUT_DIMENSION: (4, "ACCEPTANCE:\nTHREAD END PAST\nSECOND NUT"),

@@ -8,16 +8,18 @@ group's two operator settings, the clamp station and the fixture drop. Every
 other view carries a letter (drawing-guidelines.md rules 9 and 26), its
 boundary circle or viewing arrow drawn on the right side view:
 - DETAIL A (2:1) shows only the bar, the axle and the spacer on its shank.
-  It prints the press gauge, the press's setting, from the spacer's outer
-  face to the shank step (owner ruling 2026-11-21; the wheel hub hides the
-  step once it is fitted) and, as a reference, the axle's plain end below
-  the bar's far face, where that press leaves it. A broken-out window to the
-  axle's mid-plane shows the plain end, sunk in the bar's bore, as the
-  visible edge that reference ends on.
-- DETAIL B (4:1) shows the stack. It prints, as limits, the drum's face below
-  the wheel's spigot end and the axle's thread end past the second nut (the
-  press's acceptance), and the endshake between the spigot face and the
-  front washer.
+  It prints, as references, the model's shank-step station from the
+  spacer's outer face (owner ruling 2026-11-24, fit audit part 2, C11: the
+  axle is set to the trial stack; the wheel hub hides the step once it is
+  fitted) and the axle's plain end below the bar's far face, where that
+  setting leaves it. A broken-out window to the axle's mid-plane shows the
+  plain end, sunk in the bar's bore, as the visible edge that reference
+  ends on.
+- DETAIL B (4:1) shows the stack. It prints the drum's face below the
+  wheel's spigot end as a reference (fit audit part 2, S4: seen, not read),
+  the axle's thread end past the second nut as limits (the trial's
+  acceptance), and the endshake between the spigot face and the front
+  washer.
 - VIEW C (4:1) looks at the flat threaded lever tip beyond the far bracket
   face, with the single imported ThreadProjection setting.
 - VIEW D (2:1, sheet 5) looks at the wheel hub at rest: TIE 1 and its angle
