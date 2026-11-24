@@ -15,6 +15,34 @@ kind = "mill"
 status = "on_hand"
 note = "Ownership only; its facts are cad/process/shop/, same key. Explicit on_hand preserves the pre-split ASSEMBLY.md OWNED, which read a shop.toml record with no present key as owned."
 
+# The BS-0 semi-universal dividing head (installed on the PM-30MV, #465; its
+# indexing facts for prechips are cad/process/shop/common.toml machines.bs-0,
+# same key). Accessories on hand, owner 2026-11-24, verbatim: "has
+# tailstock, dead center flange plate 3 jaw chuck all 3 plates etc": the
+# tailstock, a dead centre, the flange plate, the 3-jaw chuck
+# (shop workholding.chuck-3jaw-5-bs0) and index plates A, B and C. Not named
+# by him, so not recorded as owned: the carrier (driving dog) and the sector
+# arms. Maker figures, not measured (the head's manual, "Semi-Universal
+# Dividing Head", owner photos owner-photos/bs0-manual/ p01-p11 in the cnc
+# triage folder, read 2026-11-24): worm ratio 1:40; plates A 15-20, B 21, 23,
+# 27, 29, 31, 33, C 37, 39, 41, 43, 47, 49; spindle thread BS-0 1-1/2"-8 TPI;
+# centre taper B&S No. 7; spindle hole 18 mm; centre height (h) 100 mm;
+# differential indexing and spiral milling only on the BS-2.
+[machines.bs-0]
+kind = "dividing_head"
+status = "on_hand"
+accessories_on_hand = ["tailstock", "dead centre", "flange plate", "3-jaw chuck", "index plate A", "index plate B", "index plate C"]
+spindle_thread = "1-1/2-8"
+centre_taper = "B&S No. 7"
+spindle_hole_mm = 18.0
+centre_height_mm = 100.0
+differential_indexing = false
+cite = [
+  "Owner (Pedro) 2026-11-24, relayed by Main, verbatim: \"has tailstock, dead center flange plate 3 jaw chuck all 3 plates etc\"",
+  "BS-0 manual, Semi-Universal Dividing Head, ENCLOSURE and table \"Semi-Universal Index B&S Type No.0 No.1\": BS-0 h 100 mm, taper of center B&S No.7, diameter of spindle hole 18 mm; THREAD SPINDLE: BS-0 1-1/2\" -8TPI; worm gear ratio 1:40; plates A 15,16,17,18,19,20 B 21,23,27,29,31,33 C 37,39,41,43,47,49; differential and spiral milling (only BS-2); owner photos C:/farm-runs/triage-2026-11-19/owner-photos/bs0-manual/p01.jpg-p11.jpg, read 2026-11-24",
+]
+note = "On hand with its tailstock, dead centre, flange plate, 3-jaw chuck and plates A/B/C (owner 2026-11-24). Carrier and sector arms not stated, not recorded. Simple and direct indexing only (no differential on the BS-0)."
+
 # Tailstock taper MT3: owner (Pedro), answered in person 2026-11-21 (cnc
 # rulings record), "Lathe tailstock taper: MT3; the mill tap-guide dead centre
 # fits" (tools.dead-centre-mt3); the lathe's manual agrees ("Taper in
