@@ -305,10 +305,11 @@ description = "Class ZZ pins for .2560-.2570: GO .2560 plus (single), NO-GO .257
 
 # --- MHA-CH-01/-03 notches and slot (cad/process/ch_amplitude_bar, ch_connecting_rod) ---
 # The owned HSS slitting saw (cad/config/shop-equipment/
-# tools.slitting-saw-2-75-064, McMaster 3062A21): ROOTS R.015 MAX and the
-# fork slot's inside corners need its sharp corners, run horizontally on
-# the R8 1 in arbor (tools.gear-cutter-arbor-1, to buy). diameter_mm: its
-# 2-3/4 in × 25.4.
+# tools.slitting-saw-2-75-064, McMaster 3062A21, 1 in hole): ROOTS R.015 MAX
+# and the fork slot's inside corners need its sharp corners, run
+# horizontally on the owned R8 stepped saw arbor (tools.saw-arbor-r8-stepped,
+# owner 2026-11-24: its 1 in step, friction drive, not keyed). diameter_mm:
+# its 2-3/4 in × 25.4.
 [tools.slitting-saw-2-75-064]
 description = "HSS slitting saw, 2-3/4 in diameter, .064 in thick, 72 teeth (McMaster 3062A21)"
 diameter_mm = 69.85

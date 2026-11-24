@@ -111,6 +111,22 @@ make = "Bondhus"
 sku = "10937"
 status = "on_hand"
 
+[tools.hex-keys-bondhus-t-handle-inch]
+name = "Bondhus T-handle hex key set, inch"
+kind = "hex_key_set"
+make = "Bondhus"
+status = "on_hand"
+cite = ["Owner (Pedro) 2026-11-24, relayed by Main, verbatim: \"i have both bondhus  t handle imperial and metric sets\""]
+note = "On hand (owner, 2026-11-24). Sizes in the set not stated."
+
+[tools.hex-keys-bondhus-t-handle-metric]
+name = "Bondhus T-handle hex key set, metric"
+kind = "hex_key_set"
+make = "Bondhus"
+status = "on_hand"
+cite = ["Owner (Pedro) 2026-11-24, relayed by Main, verbatim: \"i have both bondhus  t handle imperial and metric sets\""]
+note = "On hand (owner, 2026-11-24). Sizes in the set not stated. A T-handle does not fit a torque wrench: the saw arbor's clamp screw is torqued with tools.torque-wrench and tools.hex-bit-5mm."
+
 # The MHA-CH-13 edge clamps are tightened to 6 in-lb (cad/process/ch_rocker_strap
 # plan clamp_torque_in_lb), under the Pitbull maker's 1.3 ft-lb (15.6 in-lb)
 # maximum (fixtures.edge-clamps-low-profile max_torque_ft_lb). #3083 row 10.
@@ -118,7 +134,60 @@ status = "on_hand"
 name = "Torque screwdriver reading in-lb"
 kind = "torque_screwdriver"
 status = "to_order"
-note = "Not owned: to buy. MHA-CH-13 Setups 2-4: the TL-VN-50 edge clamps at 6 in-lb. A driver whose range includes 6 in-lb (e.g. 2.5-11.5 in-lb) serves; the 15.6 in-lb clamp maximum is never a setting."
+note = "Not owned: to buy. MHA-CH-13 Setups 2-4: the TL-VN-50 edge clamps at 6 in-lb. A driver whose range includes 6 in-lb (e.g. 2.5-11.5 in-lb) serves; the 15.6 in-lb clamp maximum is never a setting. The owned Real Avid Smart-Torq (tools.torque-driver-real-avid-smart-torq) starts at 10 in-lb, so it does not serve here."
+
+# Owner (Pedro) 2026-11-24, relayed by Main, verbatim: "also own Husky
+# Professional #39104 - 1/2” Torque Wrench - 50-250 ft/lbs w/ Case and  Real
+# Avid Gunsmithing Torque Wrench Kit | All in One Torq Driver Tool with
+# Screwdriver Bit Set & Accurate 1 Inch/Pound Setting for Precision Scope
+# Mounting. Premium KIT." Neither sets the saw arbor's 20 N·m (14.75 ft-lb,
+# 177 in-lb): the Husky starts at 50 ft-lb, the Real Avid stops at 70 in-lb.
+[tools.torque-wrench-husky-39104]
+name = "Husky Professional 39104 torque wrench, 1/2 in drive, 50-250 ft-lb, with case"
+kind = "torque_wrench"
+make = "Husky"
+sku = "39104"
+status = "on_hand"
+cite = ["Owner (Pedro) 2026-11-24, relayed by Main, verbatim: \"also own Husky Professional #39104 - 1/2” Torque Wrench - 50-250 ft/lbs w/ Case\""]
+note = "On hand (owner, 2026-11-24). Range as he gave it."
+
+# Range and bits from the maker's page (Real Avid, "A smarter way to torque!",
+# realavid.com/blogs/product-spotlights/precision-torque-driver-for-firearms-
+# smart-torq, read 2026-11-24): "10 to 70 in-lb. range", one click 1 in-lb;
+# 1/4 in hex drive; "Included bits: T10, T15, T20, T25, 3mm Hex, 5/32 Hex,
+# 3/16 Hex, 7/64 Hex, 90-6 Flat, 38-4 Flat, 60-5 Flat", plus "a square drive
+# adapter bit to utilize with ¼” sockets". No 5 mm hex bit.
+[tools.torque-driver-real-avid-smart-torq]
+name = "Real Avid Smart-Torq torque driver kit, 10-70 in-lb in 1 in-lb steps, 1/4 in hex drive, 11 bits and a 1/4 in square-drive adapter, case"
+kind = "torque_screwdriver"
+make = "Real Avid"
+status = "on_hand"
+range_in_lb = [10, 70]
+cite = ["Owner (Pedro) 2026-11-24, relayed by Main, verbatim: \"Real Avid Gunsmithing Torque Wrench Kit | All in One Torq Driver Tool with Screwdriver Bit Set & Accurate 1 Inch/Pound Setting for Precision Scope Mounting. Premium KIT.\"", "Real Avid, \"A smarter way to torque!\", read 2026-11-24: https://realavid.com/blogs/product-spotlights/precision-torque-driver-for-firearms-smart-torq"]
+note = "On hand (owner, 2026-11-24)."
+
+# The stepped saw arbor's M8 clamp screw is set to 20 N·m
+# (tools.saw-arbor-r8-stepped clamp_torque_nm): the saw plans check the
+# arbor's friction drive against the preload that torque gives, so it is set
+# with a wrench, not by feel. The owner first answered "I own both." (a 5 mm
+# hex key and a torque wrench covering 20 N·m); the two wrenches he then
+# named do not reach 20 N·m (above), and he answered: "I have another torque
+# wrench that covers 15 ft-lb", which one "tbd tomorrow". Until he names it
+# the saw plans stop before the first saw program.
+[tools.torque-wrench]
+name = "Owner's torque wrench covering 20 N·m (15 ft-lb), to be identified"
+kind = "torque_wrench"
+status = "on_hand"
+cite = ["Owner (Pedro) 2026-11-24, relayed by Main: \"I have another torque wrench that covers 15 ft-lb\"; which one: \"tbd tomorrow\""]
+note = "On hand per the owner (2026-11-24); make, drive size and range to be identified. Sets the stepped saw arbor's M8 clamp screw to 20 N·m (15 ft-lb)."
+
+# No status: not confirmed. The Bondhus T-handles and the Real Avid's bits do
+# not include a 5 mm hex bit on record, and the owner's 20 N·m wrench is not
+# yet identified (its drive decides bit or socket).
+[tools.hex-bit-5mm]
+name = "5 mm hex bit or socket for the owner's torque wrench, to be confirmed"
+kind = "hex_bit"
+note = "To be confirmed with the wrench (owner 2026-11-24: \"tbd tomorrow\"). Not carted. Turns the stepped saw arbor's M8 x 1.25 countersunk clamp screw."
 
 [tools.pliers]
 name = "Pliers"
