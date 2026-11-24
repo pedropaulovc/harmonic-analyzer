@@ -57,7 +57,7 @@ def root_corner_extent(radius: float) -> tuple[float, float]:
 
 
 # At the printed greatest, R.070, each corner stays under the hub's top and
-# short of its side: the hub's .47 still reads across its round with the
+# short of its side: the hub's .48 still reads across its round with the
 # calipers, and the corner metal lies inside the square the hub already
 # fills in plan, in the plate's own thickness (nothing of a neighbour's lies
 # there: the hubs between the plates, the keepers outboard of the end hubs).
@@ -113,14 +113,14 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # (the walls read them), three on the tip radius (at two the spring-hole wall
 # falls under the target; the sheet states the wall it holds), the plate, the plate offset, the hub length (the
 # station pitch's .300), both lever arms and the root corners (.060-.070),
-# four on the reamed fulcrum bore.
+# and the F-drilled fulcrum bore (the drill's .257; DRILLED HOLES row).
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "LeverOutline": {"BarHeight": 2, "TaperStartX": 2, "TipRadius": 3},
     "LeverBody": {"LeverThick": 3},
     "HubProfile": {"HubDia": 2},
     "Hub": {"HubLength": 3},
     "PlateOffsetReference": {"PlateOffset": 3},
-    "FulcrumProfile": {"FulcrumDia": 4},
+    "FulcrumProfile": {"FulcrumDia": 3},
     "BarPinHole": {"BarPinCx": 3},
     "SpringHole": {"SpringCx": 3},
     "RootCorners": {"RootCornerR": CORNER_PLACES},
