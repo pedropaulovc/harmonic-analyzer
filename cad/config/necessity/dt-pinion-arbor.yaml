@@ -11,4 +11,4 @@ necessity:
     feature: "Ø.2510 REAM THRU crossrod hole (MHA-DT-15 ROD ENTERS BY HAND)"
     kind: gap
     reason: "F drill's gap exceeds Loctite 638's limit; 1/4 refuses rod"
-    source: "fit audit F14"
+    source: "fit audit F14; dt_pinion_arbor_geometry.CROSSROD_MAX_CLEARANCE"

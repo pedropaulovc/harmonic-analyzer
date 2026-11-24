@@ -11,3 +11,9 @@ checks:
     reason: "the drum bond gap exceeds what LOCTITE 638 fills"
     source: "LOCTITE 638 TDS, 0.25 mm max diametral gap; restated for the 5/16 drilled drum bore (owner ruling 2026-11-24, fit audit question 13)"
     basis: worst_case
+  - id: C-03
+    check: "CROSSROD_MAX_CLEARANCE"
+    kind: gap
+    reason: "the crossrod bond gap exceeds what LOCTITE 638 fills"
+    source: "LOCTITE 638 TDS, 0.25 mm max diametral gap (RETAINING_COMPOUND_MAX_GAP_MM); the .2510 reamer's analysis band on the MHA-DT-15 rod (owner ruling 2026-11-24, fit audit F14)"
+    basis: worst_case
