@@ -676,7 +676,7 @@ inspection = "{{cad.clamp_hole_1_height_min_in:.3dot}}–{{cad.clamp_hole_1_heig
 gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.clamp_hole_1_height_band_mm}}" }]
 
 [[setups.operations]]
-instruction = "The clamp holes' stations from the left end, on the surface plate: stand the bar on its LEFT end, F against the side of a 1-2-3 block, the .196 pin in each clamp hole in turn; the height gauge on the top of the pin, less half its Ø (.098)."
+instruction = "The clamp holes' stations from the left end, on the surface plate: stand the bar on its LEFT end, F held flat by hand against the side of a 1-2-3 block stood on end, the .196 pin in each clamp hole in turn; the height gauge on the top of the pin, less half its Ø (.098)."
 inspection = "Clamp hole 1 {{cad.clamp_hole_1_station_min_in:.3dot}}–{{cad.clamp_hole_1_station_max_in:.3dot}} and clamp hole 2 {{cad.clamp_hole_2_station_min_in:.3dot}}–{{cad.clamp_hole_2_station_max_in:.3dot}} from the left end. The hanger hole: the program's station from the same X0, its ±.010 band wider. Outside: stop and tell the owner."
 gauge_checks = [
   { gauge = "height-gauge", band_mm = "{{cad.clamp_hole_1_station_band_mm}}" },

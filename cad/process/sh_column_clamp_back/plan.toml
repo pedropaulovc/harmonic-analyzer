@@ -618,7 +618,7 @@ gauge_checks = "other"
 [[setups.operations]]
 instruction = "Mic the pre-face depth, mating face to outside face, at the N end and at the far end; write both readings, labelled N and far, on this traveler (Setups 9 and 10 use them)."
 feed = "hand"
-inspection = "Pre-face depth {{cad.pre_face_depth_min_in:.3dot}}–{{cad.pre_face_depth_max_in:.3dot}} at both ends."
+inspection = "Pre-face depth {{cad.pre_face_depth_min_in:.3dot}}–{{cad.pre_face_depth_max_in:.3dot}} at both ends. Outside: stop and tell the owner."
 gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.pre_face_depth_band_mm}}" }]
 
 [[setups]]

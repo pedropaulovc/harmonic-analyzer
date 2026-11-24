@@ -322,7 +322,7 @@ drilling = "none"
 sizing = "other"
 instruction = "Saw {{process.quantity:d}} blank about {{process.blank_length_nominal_in:.2f}} in long off the 3/8 x 1/2 in 1018 flat bar, the bar flat in the saw's vise. File the burr off both ends and the four long edges so it seats flat on the parallels and the jaws. Mark the end that is LEFT from here on with marking fluid: every X counts from it."
 feed = "hand"
-inspection = "Blank length on the combination square's 12 in blade: at least {{process.blank_length_min_in:.2f}} (X0 is {{process.left_end_skim_mm:in.3dot}} in from the left end and the right end mills at {{process.length_target_mm:in.3dot}} from X0; a shorter blank leaves the right end under {{process.end_cleanup_min_mm:in.3dot}} to clean up) and at most {{process.blank_length_max_in:.2f}} (PG05's right-end passes start at {{process.right_end_raw_mm:in.3dot}} from X0; a longer blank loads the first pass past its {{process.end_step_max_mm:in.4dot}}). Longer: saw it again. Shorter: saw a new blank."
+inspection = "Blank length on the combination square's 12 in blade: {{process.blank_length_min_in:.2f}}–{{process.blank_length_max_in:.2f}} (shorter: the right end does not clean up; longer: PG05's first end pass is overloaded). Longer: saw it again. Shorter: saw a new blank."
 gauge_checks = "other"
 
 [[setups]]
