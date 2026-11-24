@@ -19,6 +19,7 @@ from _printed_tolerance import (
     edge_break_radius_mm,
     printed_band_mm,
 )
+from _title_block_units import render_number
 import dt_swing_stop_screw_spec as stop_stock
 from cone_pitch import COS_I as _COS_I, INCLINE_DEG, SIN_I as _SIN_I
 from dt_cone_swing_platform_geometry import (
@@ -240,6 +241,9 @@ TIP_DOWEL_WEB_PRINTED_IN = (
 )  # .078
 if TIP_DOWEL_WEB_MIN_MM >= WALL_TARGET_MM:
     raise AssertionError("the tip dowel web meets the .080 target; drop its WALL print")
+# The shortfall as the hole's callout prints it (rule 20), owned here with
+# its value, not by the drawing (test_drawing_specification_purity).
+TIP_DOWEL_WALL_TEXT = f"WALL {render_number(TIP_DOWEL_WEB_PRINTED_IN, UNIT, 3)} MIN"
 
 
 # ASME B1.1 class-2B receiver limits, not a title-row coordinate tolerance.

@@ -919,6 +919,15 @@ def printed_value_text(name: str, nominal: float) -> str:
     return length_text(nominal, DRAWING_PRECISION_BY_NAME[name])
 
 
+# The two printed limits the dowel hole's callout and note carry (rules 20
+# and 23), owned here with their values, not by the drawing
+# (test_drawing_specification_purity).
+DOWEL_WALL_TEXT = f"WALL {length_text(DOWEL_WEB_PRINTED_IN * 25.4, 3)} MIN"
+DOWEL_BOND_CLEARANCE_TEXT = (
+    f"CLEARANCE {length_text(DOWEL_BOND_CLEARANCE_MAX_IN * 25.4, 3)} MAX"
+)
+
+
 # The two dowel values as the bottom view prints them, for the sheet's ink
 # estimate: the station in its reference parentheses, and the drilled
 # hole's untoleranced size (the drill rides the callout below it).
