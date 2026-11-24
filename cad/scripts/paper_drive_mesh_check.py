@@ -23,13 +23,21 @@ least 1.2 at the nominal centre, and at least 1.1 at the loose runout
 extreme (the centre opened by the two tooth-space runouts). AGMA guidance
 treats a contact ratio at or above about 1.1 as continuous action -- more
 than one tooth pair in contact at handover -- which is enough for this slow,
-hand-driven reducer; 1.2 remains the nominal design floor.
+hand-driven reducer; 1.2 remains the nominal design floor. Owner ruling
+2026-11-24, audit part 2 question C3: "Yes, O.D. +0/-.0015." (MHA-PD-08's
+15T tip), with 1.2 checked at the nominal centre and 1.1 at the runout
+extreme the one gate over the set band, then "Print +0/-.0015 as ruled; the
+gate is read at three places (1.100 passes)." At the band's top with the
+smallest tips the runout extreme gives 1.0997, which reads 1.100.
 
 The reducer's centre takes the ordinary fine-pitch set band, nominal
 +0.050/-0 (pd_rack_pinion_spec.CENTRE_DISTANCE_WINDOW). Both ends meet
 both tiers: the far end, 43.844, a stock 15T:150T pair at the stock 0.05
 TIR, gives CR 1.214 at the set centre and 1.123 at the runout extreme
 (owner ruling on #2034 x #2011: 43.794 +0.050/-0 at the full floors).
+MHA-PD-00's trial mesh may move the plate .001 in below the nominal
+(pd_rack_pinion_spec.CENTRE_DISTANCE_TRIAL_WINDOW; owner ruling 2026-11-24,
+audit part 2 question C1): reducer_trial_low_mesh holds every gate there.
 
 Finite-profile bound (not a gate). These formulas take the ideal involutes.
 Over the active profile at the printed corners, the disc cut by the stock
@@ -86,6 +94,9 @@ class MeshCheck:
     # CR at the loose runout extreme; None where contact_ratio_min is
     # already taken there (the rack mesh).
     runout_contact_ratio_min: float | None = None
+    # The floor contact_ratio_min is held to; None where only the runout
+    # extreme is gated (the reducer away from its nominal centre, C3).
+    contact_ratio_floor: float | None = CONTACT_RATIO_FLOOR
 
     def failures(self) -> list[str]:
         # Every gate below is an ordered comparison, which NaN passes; an
@@ -106,12 +117,16 @@ class MeshCheck:
         ]
         if problems:
             return problems
-        if self.contact_ratio_min < CONTACT_RATIO_FLOOR:
+        if (self.contact_ratio_floor is not None
+                and self.contact_ratio_min < self.contact_ratio_floor):
             problems.append(
-                f"contact ratio {self.contact_ratio_min:.3f} < {CONTACT_RATIO_FLOOR}"
+                f"contact ratio {self.contact_ratio_min:.3f} < {self.contact_ratio_floor}"
             )
+        # Read at three places, as reported: owner ruling 2026-11-24, audit
+        # part 2 question C3, "Print +0/-.0015 as ruled; the gate is read at
+        # three places (1.100 passes)." (the band-top corner is 1.0997).
         if (self.runout_contact_ratio_min is not None
-                and self.runout_contact_ratio_min < RUNOUT_CONTACT_RATIO_FLOOR):
+                and round(self.runout_contact_ratio_min, 3) < RUNOUT_CONTACT_RATIO_FLOOR):
             problems.append(
                 f"runout-extreme contact ratio {self.runout_contact_ratio_min:.3f} < "
                 f"{RUNOUT_CONTACT_RATIO_FLOOR}"
@@ -325,7 +340,19 @@ def reducer_mesh(centre_distance_mm: float = disc.CENTRE_DISTANCE) -> MeshCheck:
 
 
 def reducer_band_meshes() -> tuple[MeshCheck, MeshCheck]:
-    """The reducer at both ends of its set band, each at the design floors."""
+    """The reducer at both ends of its set band: 1.2 at the nominal end, the
+    runout extreme's 1.1 the one contact-ratio gate at the top (owner ruling
+    2026-11-24, audit part 2 question C3)."""
     low, high = disc.CENTRE_DISTANCE_WINDOW
     top = reducer_mesh(high)
-    return reducer_mesh(low), replace(top, label=f"{top.label} at +{high - low:.3f}")
+    return reducer_mesh(low), replace(
+        top, label=f"{top.label} at +{high - low:.3f}", contact_ratio_floor=None
+    )
+
+
+def reducer_trial_low_mesh() -> MeshCheck:
+    """The reducer at the lowest centre the trial mesh may move the plate to
+    (the top of that window is the set band's own)."""
+    low = disc.CENTRE_DISTANCE_TRIAL_WINDOW[0]
+    mesh = reducer_mesh(low)
+    return replace(mesh, label=f"{mesh.label} at {low - disc.CENTRE_DISTANCE:+.3f}")

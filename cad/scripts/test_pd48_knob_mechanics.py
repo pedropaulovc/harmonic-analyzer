@@ -278,8 +278,9 @@ def test_bearing_material_charges_breaks_axis_error_and_loose_float():
     assert collar.FRONT_BEARING_INNER_RADIUS_MAX > (collar.BORE_DIA + max(collar.BORE_DIA_BAND)) / 2.0
     # Regression value, not a load floor: the spec's physical gate is a
     # positive face. It charges bore, edge break, bore-axis error at F and
-    # half the 0.0508 tooth-space TIR, so it sits below the uncharged ring.
-    assert collar.FRONT_BEARING_AREA_MIN == pytest.approx(20.990202, abs=1e-3)
+    # half the 0.0508 tooth-space TIR, so it sits below the uncharged ring;
+    # the 15T tip's +0/-.0015 (owner ruling 2026-11-24, C3) trims it.
+    assert collar.FRONT_BEARING_AREA_MIN == pytest.approx(20.944554, abs=1e-3)
     assert shaft.RING_TRANSVERSE_FLOAT_MAX >= (ring.ID + max(ring.ID_BAND) - shaft.JOURNAL_DIA_MIN) / 2.0
     assert shaft.RING_TRANSVERSE_FLOAT_MAX == pytest.approx(0.18802833069091696)
     assert collar.BORE_SUPPORT_LENGTH_MIN == pytest.approx(shaft.CORE_ACTIVE_LENGTH_MIN)
@@ -287,7 +288,7 @@ def test_bearing_material_charges_breaks_axis_error_and_loose_float():
     assert shaft.REAR_BEARING_INNER_RADIUS_MAX == pytest.approx(3.782128330690917)
     assert shaft.REAR_BEARING_INNER_RADIUS_MAX > shaft.ROOT_DIA_EXACT_MIN / 2.0
     assert shaft.REAR_BEARING_AREA_MIN > 1.0
-    assert shaft.REAR_BEARING_AREA_MIN == pytest.approx(7.084215841961054)
+    assert shaft.REAR_BEARING_AREA_MIN == pytest.approx(7.03856861320768)  # C3 tip
     # Not the uncharged centred claim on the bare ring bore.
     centred = shaft.gear_bearing_area_lower(shaft.STOCK_PROFILE, ring.ID / 2.0)
     assert centred == pytest.approx(14.171169300934473)

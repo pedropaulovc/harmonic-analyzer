@@ -607,8 +607,9 @@ KNOB_SETTING_INSTANCES = frozenset(
 # (test_the_jig_bored_k_lands_in_the_set_band_with_margin_at_both_ends).
 # The radial part of that worst case (.0008) keeps N inside the S to N set
 # band, which governs along S-N; the .004 circle bounds the rest. TRUE names
-# both, so it no longer reads as wider than DETAIL K's +.002/0 (#2417). The
-# trial mesh only reads the setting; it never moves N.
+# both, so it no longer reads as wider than DETAIL K's S to N limits (#2417).
+# The trial mesh may move the table once, by KNOB_TRIAL_MOVE_TEXT, and only
+# within those limits (owner ruling 2026-11-24, audit part 2 question C1).
 # The knob-bore point's label inside DETAIL K. DETAIL K keeps its letter
 # (other sheets cite "MHA-PD-00 DETAIL K"), so the point takes a letter used
 # nowhere else on the package (machinist review round 7, rules 9 and 26: K
@@ -624,6 +625,14 @@ KNOB_SETTING_TRUE = (
     f"TRUE: SWEEP UNDER {_KNOB_SETTING_SWEEP_TEXT} ON THE TEST INDICATOR, SO "
     f"{KNOB_BORE_LETTER} LANDS INSIDE "
     f"THE S TO {KNOB_BORE_LETTER} BAND, {KNOB_SETTING_CIRCLE_TEXT}"
+)
+# One trial move of the table, in DRO counts on DETAIL K's two axes; one each
+# way is all the S to N limits hold (pd_paper_drive_knob_setting_spec).
+if not knob_setting.TRIAL_MOVES_AWAY == knob_setting.TRIAL_MOVES_TOWARD == 1:
+    raise AssertionError("the located step allows one trial move each way")
+KNOB_TRIAL_MOVE_TEXT = (
+    f"{steps.inch_text(knob_setting.TRIAL_MOVE_ALONG_MM, 4)} ALONG AND "
+    f"{steps.inch_text(knob_setting.TRIAL_MOVE_ACROSS_MM, 4)} ACROSS"
 )
 # The second column's steps end above this on DETAIL K's sheet.
 KNOB_SETTING_FIELD_TOP = 0.144
@@ -1897,26 +1906,33 @@ PIN_BOND_CURE_H = 24
 # flanks let it, so the cluster's shift on the pin and the pin's own bending
 # are not read as shake.
 #
-# The window is every reading the charged terms can give: the
-# circular backlash over the S to N set band at every printed corner
-# (paper_drive_mesh_check.reducer_mesh), at the band's bottom closed by the
-# largest clearances for the floor and at its top closed by the smallest for
-# the ceiling, moved to the tip by the tip radius over the pitch radius and
+# The ceiling is the loosest reading the charged terms can give: the
+# circular backlash at the top of the S to N set band at every printed corner
+# (paper_drive_mesh_check.reducer_mesh), closed by the smallest clearances,
+# moved to the tip by the tip radius over the pitch radius and
 # rounded outward onto the shop indicator's division, so that a build inside
-# those terms is never refused and a reading outside sends the fitter to
-# inspect the parts the remedy names. The pin's lean in its bore (S is held
+# those terms is never refused and a reading over it sends the fitter to
+# the remedy. It is the only check at assembly on the loose side of this
+# mesh, the side the contact ratio lives on. The pin's lean in its bore (S is held
 # square only within .001 over the arm, which the disc's height multiplies)
 # is not in the window: the located step indicates S on the shank at the
 # height the disc runs, so the setting is made where the mesh is (codjiflo
 # P2 on 176fad0). The smaller tilt terms at the knob
 # (paper_drive_geom.reducer_axis_tilt_maxima_rad) are not charged: #2510.
-# The floor is a positive shake at the tightest centre the fits allow, which
-# is the mesh check's own gate (backlash over zero at the tight extreme);
-# the no-tight-spot turn checks the same thing all round. Outward rounding
+# Outward rounding
 # departs from the package's inward windows (steps.inch_window) because this
 # reading is a cross-check of parts already accepted on their own sheets.
-# Delegated ruling 2026-11-10 (PR #2494 takeover agent), no precedent; owner
-# review #2144; pending owner confirmation.
+# No floor prints: the disc shakes, which the needle moving shows, and the
+# no-tight-spot turn checks the same thing all round (owner ruling
+# 2026-11-24, audit part 2 question C2: "Yes." to THE DISC SHAKES (THE
+# NEEDLE MOVES), .008 MAX; it retires the half-division floor of the
+# delegated ruling of 2026-11-10, review finding #2960). What stays coded is
+# that the tightest mesh the fits allow does not bind: a positive shake at
+# the closest table setting the trial's one move toward S reaches (owner
+# ruling 2026-11-24, audit part 2 question C1;
+# knob_setting.TRIAL_LOWEST_CENTRE_MM, -.00005) closed by the largest
+# clearances. At DETAIL K's printed -.001, which no step reaches, it would
+# bind; a tight spot at any setting is still caught by the re-run trial.
 _KNOB_JOURNAL_CLEARANCE_MM = (
     min(knob_bush.BORE_DIA_LIMITS) - max(knob_shaft.JOURNAL_DIA_BAND),
     max(knob_bush.BORE_DIA_LIMITS) - min(knob_shaft.JOURNAL_DIA_BAND),
@@ -1929,7 +1945,7 @@ _PRESSED_CLOSURE_MM = tuple(
 )
 _REDUCER_CIRCULAR_BACKLASH_MM = (
     mesh_check.reducer_mesh(
-        disc.CENTRE_DISTANCE_WINDOW[0] - _PRESSED_CLOSURE_MM[1]
+        knob_setting.TRIAL_LOWEST_CENTRE_MM - _PRESSED_CLOSURE_MM[1]
     ).backlash_mm[0],
     mesh_check.reducer_mesh(
         disc.CENTRE_DISTANCE_WINDOW[1] - _PRESSED_CLOSURE_MM[0]
@@ -1939,9 +1955,7 @@ _DISC_TIP_RADII_MM = [profile.blank_radius_mm for profile in disc.manufactured_p
 # Read on one of the shop's .001 in dial indicators (shop.toml
 # gauges.dial-indicators): the loosest mesh shakes about 0.19 mm at the tip,
 # past the 1 um lever indicator's 0.14 mm range (gauges.dti, owner
-# 2026-11-17). The ceiling prints on the .001 grid, rounded up; the
-# tightest mesh still shakes over half a division, which prints as the floor
-# (#2960: "visibly" let a needle twitch pass).
+# 2026-11-17). The ceiling prints on the .001 grid, rounded up.
 REDUCER_DIAL_STEP_MM = 0.001 * 25.4
 REDUCER_SHAKE_MIN_MM = (
     _REDUCER_CIRCULAR_BACKLASH_MM[0] * min(_DISC_TIP_RADII_MM) / (disc.PITCH_DIA / 2.0)
@@ -1950,12 +1964,11 @@ REDUCER_SHAKE_MAX_MM = math.ceil(
     _REDUCER_CIRCULAR_BACKLASH_MM[1] * max(_DISC_TIP_RADII_MM) / (disc.PITCH_DIA / 2.0)
     / REDUCER_DIAL_STEP_MM - 1e-9
 ) * REDUCER_DIAL_STEP_MM
-if REDUCER_SHAKE_MIN_MM < REDUCER_DIAL_STEP_MM / 2.0:
-    raise AssertionError("the reducer's tightest shake reads under half a division")
-# The floor prints as half a .001 division.
+if not REDUCER_SHAKE_MIN_MM > 0.0:
+    raise AssertionError("the reducer's tightest mesh binds when pressed together")
+# The acceptance: any shake the needle shows, under the ceiling.
 REDUCER_BACKLASH_DIAL_TEXT = (
-    f"{steps.inch_text(REDUCER_DIAL_STEP_MM / 2.0, 4)} TO "
-    f"{steps.inch_text(REDUCER_SHAKE_MAX_MM, 3)}"
+    f"(THE NEEDLE MOVES), {steps.inch_max_text(REDUCER_SHAKE_MAX_MM, 3)}"
 )
 # The disc is read at stations round one turn: 45 degrees apart sample its
 # once-a-turn tooth-space runout within cos 22.5 (92 %) of its peak. Each
@@ -2348,7 +2361,7 @@ def _step_text(
         f"THE {hub_pin} PIN RIDING THE FLAT."
     )
     # #3106: a feed sleeve found outside after the cluster is hung is renewed
-    # as 12W-12X renew it, from the stripped cluster: the collar slid on at
+    # as 12X renews it, from the stripped cluster: the collar slid on at
     # 22 comes off first, the hub's oil hole is drilled on into the new
     # sleeve (step 17) and the collar goes back on (22U; the bonded cup
     # stays, #2425). Written once at 24 and pointed to from 26 (the
@@ -2358,8 +2371,8 @@ def _step_text(
         f"FOR A {n['pd-transgear-feed-pinion']} FOUND OUTSIDE, SLIDE THE COLLAR OFF.",
         f"FOR IT, STRIP THE CLUSTER ({s('disc-cluster-hung', 4)} BACK TO "
         f"{s('disc-cluster-hung', 1)}), KEEPING ITS SHIMS.",
-        f"FOR IT, DO {s('arm-plate-located', 20)} AND THE REPEATS IN "
-        f"{s('arm-plate-located', 21)} ON A NEW ONE.",
+        f"FOR IT, DO THE SLIDE-OFF AND THE REPEATS IN {s('arm-plate-located', 21)} "
+        "ON A NEW ONE.",
         f"FOR IT, REPEAT STEPS {steps.step_number('oil-hole-drilled')}-"
         f"{steps.step_number('disc-cluster-shimmed')} AND {s('knob-stack-fitted', 18)}, "
         f"THEN FROM {s('hanger-meshed', 0)}.",
@@ -2642,38 +2655,49 @@ def _step_text(
             f"{n['pd-transgear-feed-pinion']} SLEEVE, HUB AND DISC, {FEED_PINION} "
             "REARWARD, ON THE PIN.",
             f"PASS THE {n['pd-transgear-knob-shaft']} SHAFT THROUGH THE LOOSE "
-            f"{n['pd-transgear-knob-thrust-ring']} RING INTO THE {bush} BUSH'S BORE FROM "
+            f"{n['pd-transgear-knob-thrust-ring']} RING INTO THE {bush} BUSH FROM "
             "THE FRONT, MESHING WITH THE DISC.",
             "CHECK: TURNED BY THE SHAFT, THE DISC RUNS ONE FULL TURN WITH NO TIGHT "
             "SPOT.",
             reducer_dial_check("SHAFT"),
             "LIFT OFF THE SHAFT, THE RING, THE CLUSTER AND THE BUSHING.",
             # The trial counts only if nothing moved under it: S still at the
-            # DRO's zero and N still true at its settings.  Named in full and
-            # pointed back like 12H: the step can pack onto a sheet without
-            # the DETAIL K key (machinist review on 0a4408f590).
+            # DRO's zero and N still true at its settings.  Pointed back like
+            # 12H, with both bores named: the step can pack onto a sheet without
+            # the DETAIL K key (machinist review on 0a4408f590). The arm's
+            # number is left to 12C so the steps fit their sheets (C1 restack).
             f"CHECK: RE-INDICATED PER {s('arm-plate-located', 2)} "
             f"(SHEET {SHEET_NAMES.index(KNOB_SETTING_SHEET) + 1}), "
-            f"{n['pd-transgear-arm']} PIN BORE S READS TRUE AT THE DRO'S ZERO AND "
+            "PIN BORE S READS TRUE AT THE DRO'S ZERO AND "
             f"{bush} KNOB BORE {KNOB_BORE_LETTER} AT ITS "
             "SETTINGS.",
             f"IF NOT, REPEAT FROM {s('arm-plate-located', 2)}.",
-            # The plate is not moved to chase a reading: the S to N band stays
-            # the setting's limit (owner ruling on #2034 x #2011; #2144 item
-            # 5.3), and the indication's own worst case uses .0008 of its .001
-            # either side of the aim, so no move inside it is worth a division
-            # (codjiflo P2 on 27438d7; delegated ruling 2026-11-10 (PR #2494
-            # takeover agent), no precedent; owner review #2144; pending owner
-            # confirmation). A mesh that reads outside the window with N true
-            # is a part off its drawing: a gear or one of the two running
-            # fits the window charges; only when all are inside is the arm
-            # renewed (codjiflo P2 on 176fad0). The restart follows the part
-            # (codjiflo P2 on ab2fdaf): a new plate is set to DETAIL K again,
-            # a new disc or sleeve is centred again, a new shaft only re-meshes;
-            # one sub-step per part (machinist review on 36242bf: one action
-            # per step).
+            # The trial may move the plate once, within DETAIL K's S to N
+            # limits, before a part is blamed: owner ruling 2026-11-24, audit
+            # part 2 question C1, "Yes, the trial may move the plate within
+            # those limits." (.001 away from S for a tight spot, .001 toward
+            # S if the shake reads over .008; never above +.002 nor below
+            # -.001 of DETAIL K). It retires the delegated ruling of
+            # 2026-11-10 that the plate is not moved to chase a reading. The
+            # move is whole DRO counts on both axes
+            # (pd_paper_drive_knob_setting_spec.TRIAL_MOVE_ALONG_MM); one
+            # move each way keeps the table inside the limits. A mesh that
+            # still reads outside the window with N true is a part off its
+            # drawing: a gear or one of the two running fits the window
+            # charges; only when all are inside is the arm renewed (codjiflo
+            # P2 on 176fad0). The restart follows the part (codjiflo P2 on
+            # ab2fdaf): a new plate is set to DETAIL K again, a new disc or
+            # sleeve is centred again, a new shaft only re-meshes; one
+            # sub-step per part (machinist review on 36242bf: one action per
+            # step).
             f"IF {s('arm-plate-located', 11)} AND {s('arm-plate-located', 12)} "
             f"PASSED, GO TO STEP {steps.step_number('arm-plate-fitted')}.",
+            f"IF ONLY {s('arm-plate-located', 11)} OR ONLY "
+            f"{s('arm-plate-located', 12)} FAILED AND THE TABLE IS STILL AT "
+            f"{KNOB_SETTING_VIEW_NAME}'S SETTING, SLACKEN THE CLAMPS, MOVE THE TABLE "
+            f"{KNOB_TRIAL_MOVE_TEXT}, AWAY FROM S FOR A TIGHT SPOT, TOWARD S FOR "
+            f"SHAKE OVER {steps.inch_text(REDUCER_SHAKE_MAX_MM, 3)}, AND REPEAT FROM "
+            f"{s('arm-plate-located', 5)}.",
             f"IF NOT, INSPECT THE {n['pd-transgear-knob-shaft']} PINION, "
             f"{n['pd-rack-pinion']} DISC, {n['pd-transgear-knob-shaft']} JOURNAL AND "
             f"{bush} AND {n['pd-transgear-feed-pinion']} "
@@ -2690,16 +2714,16 @@ def _step_text(
             f"SAME HUB, ITS {hub_pin} PIN RIDING THE FLAT, AND REPEAT FROM "
             f"{s('arm-plate-located', 9)}.",
             # The disc is screwed to the hub by then, so it is slackened before
-            # it is centred again (codjiflo P3 on 593f4ee).
-            "SLIDE THE HUB AND DISC AS ONE OFF A "
-            f"{n['pd-transgear-feed-pinion']} FOUND OUTSIDE, THE PIN RIDING THE FLAT.",
-            "WITH THEM OFF AND THE DISC SCREWS SLACKENED, "
-            "REPEAT "
+            # it is centred again (codjiflo P3 on 593f4ee). One sub-step, as
+            # the disc's (C1's move took the letter the slide-off had).
+            f"REPLACE A {n['pd-transgear-feed-pinion']} FOUND OUTSIDE: SLIDE THE HUB "
+            "AND DISC OFF IT AS ONE, THE PIN RIDING THE FLAT, THE DISC SCREWS "
+            "SLACKENED, REPEAT "
             f"{s('disc-cluster-assembled', 3)}-{s('disc-cluster-assembled', 4)}, "
             f"{s('disc-taps-transferred', 0)}-"
             f"{s('disc-taps-transferred', 2)}, {s('disc-taps-transferred', 9)} AND "
             f"{s('disc-taps-transferred', 12)}-{s('disc-taps-transferred', 17)} ON A NEW "
-            f"{n['pd-transgear-feed-pinion']}, THEN FROM "
+            "ONE, THEN FROM "
             f"{s('arm-plate-located', 9)}.",
             f"REPLACE A {n['pd-transgear-knob-shaft']} FOUND OUTSIDE AND REPEAT FROM "
             f"{s('arm-plate-located', 9)}.",
@@ -3686,8 +3710,7 @@ def setting_table_rows(
             f"{s('arm-plate-located', 12)}, {s('arm-plate-fitted', 20)}, "
             f"{s('fitup-pose-set', 9)}",
             "DISC SHAKE AT THE TIP OF THE TOOTH IN MESH",
-            f"{steps.inch_text(REDUCER_DIAL_STEP_MM / 2.0, 4)} TO "
-            f"{steps.inch_text(REDUCER_SHAKE_MAX_MM, 3)}",
+            f"THE NEEDLE MOVES, {steps.inch_max_text(REDUCER_SHAKE_MAX_MM, 3)}",
             f"DIAL INDICATOR, {REDUCER_DIAL_STATIONS} PLACES",
         ),
         "plate-screw-tips": (

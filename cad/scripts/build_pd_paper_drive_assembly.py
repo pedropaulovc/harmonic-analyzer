@@ -1857,8 +1857,11 @@ def _assert_gear_mesh() -> None:
     ext = centre_distance - c2c_nominal
     # CR at the minimum tips, positive backlash at the tight runout extreme,
     # AGMA root clearance and the interference points, at both ends of the
-    # set band (the nominal end is the model's centre).
+    # set band (the nominal end is the model's centre) and at the lowest
+    # centre the trial mesh may move the plate to (owner ruling 2026-11-24,
+    # audit part 2 question C1).
     reducer, reducer_top = (check.require() for check in mesh_check.reducer_band_meshes())
+    reducer_trial_low = mesh_check.reducer_trial_low_mesh().require()
     if DISC_SPEC.CENTRE_DISTANCE_WINDOW[0] != centre_distance:
         raise RuntimeError("the model's reducer centre is not the set band's nominal end")
     # The disc's teeth repeat every 360/DISC_TEETH deg, so a tooth must point
@@ -1889,6 +1892,7 @@ def _assert_gear_mesh() -> None:
     log(
         f"gear mesh {THIRD_TEETH}:{DISC_TEETH} {DISC_DP:g}DP PA{DISC_SPEC.PRESSURE_ANGLE_DEG:g}:"
         f" c2c {centre_distance} (ext {ext:.3f}); {reducer.summary}; {reducer_top.summary};"
+        f" {reducer_trial_low.summary};"
         f" {THIRD_TEETH}T phased {THIRD_PHASE_DEG:+.1f} deg,"
         f" tip/floor margin {min(root_margin, reciprocal_margin):.3f}"
     )
@@ -2311,8 +2315,9 @@ def _author_knob_setting_reference(adapter) -> None:
     name_last_feature(adapter, spec.FEATURE)
     for name, expression in dims.apply(adapter, spec.FEATURE):
         drive_dimension(adapter, name, expression)
-    # The set band itself, +x/-0, on S to N: an assembly setting is an
-    # associative model dimension, never a note (#1388).
+    # DETAIL K's limits on S to N, the set band's +x and the trial mesh's
+    # -.001: an assembly setting is an associative model dimension, never a
+    # note (#1388).
     set_dimension_bilateral_tolerance(
         adapter, spec.FEATURE, spec.CENTRE_DIMENSION, *KNOB_SETTING.CENTRE_TOLERANCE_MM,
         places=spec.TOLERANCE_PLACES, display_unit=assembly_contract(ASM_NAME).drawing_unit,

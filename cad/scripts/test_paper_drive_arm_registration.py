@@ -254,18 +254,23 @@ def test_measured_receiver_pays_full_two_pose_travel_and_uncertainty() -> None:
 
 def test_setup_must_hold_the_drawn_centre_distance_band_along_s_k() -> None:
     import pd_rack_pinion_spec as disc
-    high, low = disc.CENTRE_DISTANCE_SET_BAND
-    # +x/-0: never closer than nominal. Along S-K the set band is the tighter
-    # limit: its top lies inside K's setting circle (owner ruling 2026-11-08,
-    # #2144 item 5.3), so the receiver checks both.
-    assert low == 0.0 and 0.0 < high < registration.REDUCER_AXIS_SETUP_RADIUS_MM
+    high, low = disc.CENTRE_DISTANCE_TRIAL_BAND
+    # DETAIL K's S to N limits: the +x/-0 set band opened .001 below by the
+    # trial's move toward S (owner ruling 2026-11-24, audit part 2 question
+    # C1). Along S-K they are the tighter limit: the top lies inside K's
+    # setting circle (owner ruling 2026-11-08, #2144 item 5.3), so the
+    # receiver checks both.
+    assert high == disc.CENTRE_DISTANCE_SET_BAND[0]
+    assert low == pytest.approx(-0.001 * 25.4)
+    assert -registration.REDUCER_AXIS_SETUP_RADIUS_MM < low < 0.0 < high
+    assert high < registration.REDUCER_AXIS_SETUP_RADIUS_MM
     uncertainty = 0.001
     s_to_k = (arm.KNOB_BORE_STATION - arm.PIN_STATION, arm.KNOB_BORE_OFFSET)
     assert math.hypot(*s_to_k) == pytest.approx(disc.CENTRE_DISTANCE)
     # Exactly on the low limit with the uncertainty paid inward: accepted,
     # though the reading is rebuilt through S_TO_K_UNIT.
     _receive(setup_error_xy_mm=_setup(0.0, low + uncertainty))
-    # Closer than nominal, inside the position circle: refused.
+    # Below the low limit, inside the position circle: refused.
     for along in (low, low - 0.002):
         with pytest.raises(ValueError, match="centre distance"):
             _receive(setup_error_xy_mm=_setup(0.0, along))
@@ -365,7 +370,8 @@ def test_receiver_charges_full_delta_uncertainty_without_unneeded_one_micron_ins
 
 
 @pytest.mark.parametrize("changes", [
-    {"setup_error_xy_mm": (0.024, 0.024)}, {"setup_error_xy_mm": (0.025, 0.0)},
+    # The second: .0012 below DETAIL K's -.001 (C1) along S-K, inside the circle.
+    {"setup_error_xy_mm": (0.024, 0.024)}, {"setup_error_xy_mm": _setup(0.0, -0.030)},
     {"own_datum_patterns_accepted": (True, False)}, {"free_hand_assembly": False},
     {"required_load_cases": ("pull", "push")}, {"required_load_cases": ("pull", "push", "rock", "missing")},
     {"required_load_cases": ()}, {"measurement_uncertainty_mm": 0.0},

@@ -19,15 +19,15 @@ necessity:
     reason: "off centre, the reducer mesh's shake reading is false"
     source: "_gear_quality.reducer_setup_clock_deviation_mm; exception PD-00-knob-setting-true"
   - id: N-04
-    feature: "sheet 7 DETAIL K, S to N 1.7242 +.002/.000"
+    feature: "sheet 7 DETAIL K, S to N 1.7242 +.002/-.001"
     kind: mesh
     reason: "sets the reducer mesh's centre distance"
-    source: "pd_rack_pinion_spec.CENTRE_DISTANCE_SET_BAND_IN; owner ruling 2026-11-08, #2144 item 5.3"
+    source: "pd_rack_pinion_spec.CENTRE_DISTANCE_SET_BAND_IN, CENTRE_DISTANCE_TRIAL_BAND_IN; owner ruling 2026-11-08, #2144 item 5.3; owner ruling 2026-11-24, fit audit part 2 C1 (the trial may move the plate within +.002/-.001)"
   - id: N-05
-    feature: "setting table row 9 (12N, 13W, 27K), disc shake .0005 TO .008 at the tooth in mesh"
+    feature: "setting table row 9 (12N, 13W, 27K), disc shake (THE NEEDLE MOVES), .008 MAX at the tooth in mesh"
     kind: mesh
     reason: "sets the reducer mesh's backlash"
-    source: "draw_pd_paper_drive_assembly.REDUCER_SHAKE_MAX_MM, REDUCER_DIAL_STEP_MM"
+    source: "draw_pd_paper_drive_assembly.REDUCER_SHAKE_MAX_MM; owner ruling 2026-11-24, fit audit part 2 C2 (the .0005 floor retired)"
   - id: N-06
     feature: "setting table row 22 (22M, 33B), knob end float .006 TO .010"
     kind: gap

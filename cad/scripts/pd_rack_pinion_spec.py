@@ -281,6 +281,28 @@ CENTRE_DISTANCE_SET_BAND = (round(CENTRE_DISTANCE_WINDOW[1] - CENTRE_DISTANCE, 6
 CENTRE_DISTANCE_SET_TEXT = (
     f"{CENTRE_DISTANCE:.3f} +{CENTRE_DISTANCE_SET_BAND[0]:.3f}/-0"
 )
+# The limits the trial mesh may move the plate to (MHA-PD-00 arm-plate-located):
+# the plate, still only clamped, moves one TRIAL_STEP away from S for a tight
+# spot and one toward S if the shake reads over its ceiling, never past these
+# limits of DETAIL K's S to N. Owner ruling 2026-11-24, audit part 2 question
+# C1: "Yes, the trial may move the plate within those limits." (.001 away
+# from S for a tight spot, .001 toward S if the shake reads over .008; never
+# above +.002 nor below -.001 of DETAIL K). The DRO still aims at the middle
+# of the set band above; this band only adds the -.001 the trial may reach.
+# Every reducer_mesh gate holds at its bottom, 43.7686
+# (paper_drive_mesh_check.reducer_trial_low_mesh).
+CENTRE_DISTANCE_TRIAL_STEP_IN = 0.001
+CENTRE_DISTANCE_TRIAL_BAND_IN = (CENTRE_DISTANCE_SET_BAND_IN, -0.001)
+# (upper, lower) deviations from CENTRE_DISTANCE.
+CENTRE_DISTANCE_TRIAL_BAND = tuple(
+    round(value * 25.4, 6) for value in CENTRE_DISTANCE_TRIAL_BAND_IN
+)
+CENTRE_DISTANCE_TRIAL_WINDOW = (
+    round(CENTRE_DISTANCE + CENTRE_DISTANCE_TRIAL_BAND[1], 6),
+    round(CENTRE_DISTANCE + CENTRE_DISTANCE_TRIAL_BAND[0], 6),
+)
+if CENTRE_DISTANCE_TRIAL_WINDOW[1] != CENTRE_DISTANCE_WINDOW[1]:
+    raise AssertionError("the trial may not move the plate above the set band's top")
 STANDARD_CENTRE_DISTANCE = (TEETH + MESH_PINION_TEETH) * MODULE_MM / 2.0
 CENTRE_EXTENSION = CENTRE_DISTANCE - STANDARD_CENTRE_DISTANCE
 

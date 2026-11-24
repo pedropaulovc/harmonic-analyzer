@@ -9,7 +9,7 @@ controlled overall to the rear face, the journal a reference.  Each tight
 band names its mate once: the journal's running fit and the D-section's
 sliding fit are numbered notes their callouts link by "SEE NOTE n"
 (drawing-guidelines.md rule 4), and the mesh with the disc is the gear data
-block's, the span's matched fit accepted by its backlash row.  The front
+block's, the span's matched fit accepted by its last row.  The front
 end view carries the D-flat's distance from the
 axis, where the flat shows true, and the leadered tooth-edge note.  VIEW C
 carries the gear's native acceptance dimensions: the span over two teeth
@@ -80,8 +80,6 @@ from _part_properties import part_drawing_unit
 from _session import run_build
 from _surface_finish import surface_finish_by_key
 import _telemetry
-import paper_drive_mesh_check as mesh_check
-import pd_rack_pinion_spec as disc
 from paper_drive_stock_drawing import add_toothspace_callout, require_source_control
 import pd_transgear_knob_bush_geometry as BUSH
 from pd_transgear_knob_shaft_spec import (
@@ -130,8 +128,6 @@ from pd_transgear_knob_shaft_spec import (
     TIP_STATION,
     WHOLE_DEPTH,
     TIP_Z,
-    inch_ceil_mm,
-    inch_floor_mm,
     inch_text,
 )
 
@@ -284,39 +280,16 @@ STATIONS_LINK = f"SEE NOTE {STATIONS_NOTE}"
 NECK_LINK = f"SEE NOTE {NECK_NOTE}"
 THREAD_LINK = f"SEE NOTE {THREAD_NOTE}"
 
-
-def reducer_feeler_backlash_mm() -> tuple[float, float]:
-    """The 15T:150T mesh's normal (feeler) backlash over the disc's set band.
-
-    paper_drive_mesh_check's circular backlash at each end of the set band
-    (the tight end at the low centre less the runout shift, the loose end at
-    the high centre plus it), each times the cosine of its operating pressure
-    angle; MHA-PD-06's gear data prints the same range (rule 25).
-    """
-    low, high = disc.CENTRE_DISTANCE_WINDOW
-    shift = mesh_check.reducer_runout_shift_mm()
-    tight = mesh_check.reducer_mesh(low).backlash_mm[0]
-    loose = mesh_check.reducer_mesh(high).backlash_mm[1]
-    return (
-        tight * math.cos(mesh_check._operating_angle(low - shift)),
-        loose * math.cos(mesh_check._operating_angle(high + shift)),
-    )
-
-
 # The gear's tip and span bands are set by the mesh with MHA-PD-06, which the
-# GEAR DATA block names (MATES WITH); their fit route is the matched-fit
-# backlash acceptance, the block's last row as MHA-PD-06's block words it,
-# rounded INWARD to .001 so an accepted mesh never leaves the range the mesh
-# check passes.  The span's limits still print and control (the mesh check
+# GEAR DATA block names (MATES WITH); their fit route is the block's last
+# row, as MHA-PD-06's block words it: the pair runs together with no tight
+# spot, tried at MHA-PD-00's trial mesh.  No backlash number prints (owner
+# ruling 2026-11-24, audit part 2 question C2: "Yes.", the feeler row
+# deleted: a leaf cannot be laid between 48DP flanks, #2417).  The span's
+# limits still print and control (the mesh check
 # derives its gates from SPAN_LIMITS), so the span is not a reference.
-_BACKLASH_MM = reducer_feeler_backlash_mm()
-BACKLASH_ACCEPT_MM = (
-    inch_ceil_mm(_BACKLASH_MM[0], 3),
-    inch_floor_mm(_BACKLASH_MM[1], 3),
-)
-BACKLASH_ACCEPT_TEXT = "-".join(inch_text(value, 3) for value in BACKLASH_ACCEPT_MM)
 # What a machinist needs to cut and check the teeth (Main ruling 2026-10-10):
-# the cutting rows, the mate and the backlash acceptance that is the span
+# the cutting rows, the mate and the acceptance that is the span
 # band's fit route (rule 4).  The span prints in VIEW C with its limits, not
 # again here.  The mate's number and the last row's tail wrap so the block
 # ends left of the overall's rear witness line (REAR_X): on the 3/8 arm's
@@ -329,7 +302,7 @@ GEAR_DATA_ROWS = (
     ("WHOLE DEPTH (REF)", inch_text(WHOLE_DEPTH, 4)),
     ("CUTTER", f"#{CUTTER_NUMBER}, {CUTTER_TOOTH_RANGE[0]}-{CUTTER_TOOTH_RANGE[1]}T"),
     ("MATES WITH", "\n   ".join(_mate_name(_config.parts("pd-rack-pinion")).rsplit(" ", 1))),
-    ("SPAN MATCHED FIT", f"BACKLASH\n   WITH MATE {BACKLASH_ACCEPT_TEXT}, FEELER"),
+    ("SPAN MATCHED FIT", "RUNS ON\n   MATE WITH NO TIGHT SPOT"),
 )
 GEAR_DATA_NOTE = "\n".join(
     ("GEAR DATA", *(f"{label}:  {value}" for label, value in GEAR_DATA_ROWS))

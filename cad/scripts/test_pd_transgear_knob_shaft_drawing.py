@@ -60,7 +60,7 @@ def test_native_stock_source_is_the_selected_15t_48dp_master() -> None:
     assert profile.radial_translation_mm == spec.RADIAL_SETTING == 0.266
     assert profile.blank_radius_mm == spec.OUTSIDE_DIA / 2
     assert spec.OUTSIDE_DIA == 8.97382  # .3533
-    assert spec.OUTSIDE_DIA_BAND == (0.0, -0.02032)  # .0000/-.0008
+    assert spec.OUTSIDE_DIA_BAND == (0.0, -0.0381)  # .0000/-.0015, owner C3
     assert spec.CUTTER_DIA == 44.45
     assert spec.CUTTER_ARBOR_BORE == 22.225
     assert spec.CUTTER_SKU == "10-289-487"
@@ -922,23 +922,14 @@ def test_tight_bands_name_their_mates_once_by_name_and_number() -> None:
     assert set(below) & set(drawing.DIMENSION_SUFFIXES) == {"RearChamferSize", "FlatEnd"}
 
 
-def test_gear_data_backlash_is_the_mesh_check_range_rounded_inward() -> None:
-    import paper_drive_mesh_check as mesh_check
-
-    low, high = drawing.reducer_feeler_backlash_mm()
-    circular = [mesh.backlash_mm for mesh in mesh_check.reducer_band_meshes()]
-    # Normal (feeler) backlash is the circular less the cosine of the
-    # operating pressure angle; every band end passes the mesh check.
-    assert 0.0 < low < circular[0][0]
-    assert circular[1][1] * math.cos(math.radians(30.0)) < high < circular[1][1]
-    lo, hi = drawing.BACKLASH_ACCEPT_MM
-    assert low <= lo < hi <= high
-    lo_text, hi_text = drawing.BACKLASH_ACCEPT_TEXT.split("-")
-    assert len(lo_text) == len(hi_text) == 4  # .001 steps
+def test_gear_data_span_fit_is_accepted_by_the_trial_with_the_mate() -> None:
     # The block's last row, worded as MHA-PD-06's: the span's matched fit
-    # accepted by the feeler backlash with the mate.
+    # accepted by running on the mate; no feeler backlash row (owner ruling
+    # 2026-11-24, audit part 2 question C2).
     rows = " ".join(" ".join(drawing.GEAR_DATA_NOTE.splitlines()[-2:]).split())
-    assert rows == f"SPAN MATCHED FIT: BACKLASH WITH MATE {drawing.BACKLASH_ACCEPT_TEXT}, FEELER"
+    assert rows == "SPAN MATCHED FIT: RUNS ON MATE WITH NO TIGHT SPOT"
+    assert "FEELER" not in drawing.GEAR_DATA_NOTE
+    assert "BACKLASH" not in drawing.GEAR_DATA_NOTE
 
 
 def test_gear_data_block_ends_left_of_the_rear_witness_line() -> None:

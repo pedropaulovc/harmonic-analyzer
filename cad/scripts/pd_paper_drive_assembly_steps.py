@@ -86,8 +86,8 @@ SEQUENCE: tuple[str, ...] = (
     # shank S at MHA-PD-00 DETAIL K's model dimensions, the arm front up, and
     # held by clamps while the reducer is trial-meshed on its real seats (the
     # cluster on the pin, the knob shaft in the plate bore) and read with the
-    # indicator; the trial only reads the setting (the S to N band stays its
-    # limit, so the plate is not moved to chase a reading), and
+    # indicator; the trial may move the plate once, within DETAIL K's S to N
+    # limits (owner ruling 2026-11-24, audit part 2 question C1), and
     # only then are the two locating holes drilled and given their separate
     # final press/slip reams (#2417: doweled before any trial, a bad mesh was
     # found only at the chain fit-up and rebuilt twelve parts). The doweled
