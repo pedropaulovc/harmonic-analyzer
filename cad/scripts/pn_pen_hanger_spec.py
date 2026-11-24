@@ -148,19 +148,21 @@ GUIDE_ENGAGE_MARGIN = 3.0
 
 # --- Slot: the rod's only lateral guide.  Width on the rod, bottom just behind
 # the rod's back face, the plate's front arms past the rod's front face. ---
-SLOT_WIDTH = 5.08  # .200
-# (upper, lower) deviations, +.002/0 (inch-fit-bands-misc.md §5).  The low
-# limit leaves running clearance on the largest rod (pn_pen_rod_spec
-# SECTION_BAND); the high limit bounds the lean the two slots allow
-# (GUIDE_TILT_MAX).
-SLOT_WIDTH_BAND = (0.0508, 0.0)
+# Made to the rod (drawing-guidelines.md rule 4, form 2; fit audit
+# 2026-11-23, MHA-PN-02.guide_slots): the width prints as REF (.201) and the
+# fit is the requirement, on this sheet because the slots are cut last,
+# after the bond: the pen rod MHA-PN-04 slides through both under its own
+# weight (note 2), and with a SLOT_FIT_FEELER leaf beside it enters neither
+# (the callout's clearance, read with the owned feelers).  No pin gauges.
+SLOT_WIDTH = 5.1054  # (.201) REF, the traveler's two passes
+SLOT_FIT_FEELER = 0.1778  # .007, the clearance's upper limit
 # The plate's reach (strap front to plate front) and its slot depth, both
 # printed from the plate's free end.  The slots are required in line after
 # the bond cures (note 2); the shop reaches that by cutting both in one
 # setup: with the strap's back face on the mill table the cutter stands
 # square to the strap and one feed along it slots both plates, so the two
-# slots are in line however the bond left the plates, and the .002 slot band
-# rides the mill's travel, not the joint.  The cutter's side push across a
+# slots are in line however the bond left the plates, and their fit on the
+# rod rides the mill's travel, not the joint.  The cutter's side push across a
 # standing plate is the largest load the bond ever sees (it pries the butt
 # open), so each plate is packed solid on both faces up to just below its
 # slot and the slots are taken in light passes (the part's `process` record;
@@ -190,12 +192,17 @@ ARM_WIDTH = (GUIDE_PLATE_WIDTH - SLOT_WIDTH) / 2.0  # .14
 
 _ROD_MAX = ROD_SECTION + ROD_SECTION_BAND[0]
 _ROD_MIN = ROD_SECTION + ROD_SECTION_BAND[1]
-SLOT_CLEARANCE = (
-    SLOT_WIDTH + SLOT_WIDTH_BAND[1] - _ROD_MAX,
-    SLOT_WIDTH + SLOT_WIDTH_BAND[0] - _ROD_MIN,
-)  # (tightest, loosest) side-to-side
-if SLOT_CLEARANCE[0] <= 0.0:
-    raise AssertionError("guide slot binds the largest pen rod")
+# (tightest, loosest) side-to-side the acceptance passes, on any rod: the rod
+# slides through, the rod and the feeler do not.
+SLOT_CLEARANCE = (0.0, SLOT_FIT_FEELER)
+# The widths every rod of the stock band accepts (an analysis band, not a
+# printed limit): the traveler cuts SLOT_WIDTH inside it, so the slots fit
+# whichever rod is made.  The widest slot the acceptance passes is the
+# largest rod's plus the feeler (the walls below).
+SLOT_WIDTH_LIMITS = (_ROD_MAX, _ROD_MIN + SLOT_FIT_FEELER)
+SLOT_WIDTH_ACCEPTED_MAX = _ROD_MAX + SLOT_FIT_FEELER
+if not SLOT_WIDTH_LIMITS[0] < SLOT_WIDTH < SLOT_WIDTH_LIMITS[1]:
+    raise AssertionError("the slot's REF width does not fit every stock rod")
 # Worst lean of the rod between the two slots' outer faces (radians).
 GUIDE_TILT_MAX = math.atan(SLOT_CLEARANCE[1] / (GUIDE_PITCH + GUIDE_PLATE_T))
 if math.degrees(GUIDE_TILT_MAX) > 0.25:
@@ -292,10 +299,10 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 }
 # Places: every strap, plate and slot size feeds a stack, a wall or the
 # plate's flush fit on the strap's foot, so nothing prints .X; the title
-# block's .XX, except the banded slot (+.002/0).  The hole station keeps the
-# bar's screw axis and prints it rounded at .XX, the model inside the band
-# (the wall below is judged about the printed value).  The stock references
-# print the bar's three-place decimal.
+# block's .XX, except the slot's three-place REF (made to the rod).  The hole
+# station keeps the bar's screw axis and prints it rounded at .XX, the model
+# inside the band (the wall below is judged about the printed value).  The
+# stock references print the bar's three-place decimal.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "StrapProfile": {
         "StrapTopRun": 2,
@@ -327,10 +334,6 @@ if DRAWING_PRECISION.keys() != DRAWING_DIMENSIONS.keys() or any(
     for feature, names in DRAWING_DIMENSIONS.items()
 ):
     raise AssertionError("every marked pen-hanger dimension needs authored places")
-# (feature, dimension) -> (upper, lower) native band.
-DRAWING_BANDS: dict[tuple[str, str], tuple[float, float]] = {
-    ("UpperGuideProfile", "SlotWidth"): SLOT_WIDTH_BAND,
-}
 
 
 def _printed_limits(
@@ -345,14 +348,12 @@ def _printed_limits(
 
 # drawing-guidelines.md rule 17: both slot walls keep the .080 target at the
 # worst case of the PRINTED bands.  Section A-A prints the plate width, the
-# near (+x) arm and the banded slot; the far arm is what that chain leaves.
+# near (+x) arm and the slot's REF; the far arm is what that chain leaves,
+# with the slot at the widest its acceptance passes.
 _plate = _printed_limits(GUIDE_PLATE_WIDTH, "PlateWidth")
 _arm = _printed_limits(ARM_WIDTH, "ArmWidth")
-_slot = _printed_limits(
-    SLOT_WIDTH, "SlotWidth", (SLOT_WIDTH_BAND[1], SLOT_WIDTH_BAND[0])
-)
 NEAR_ARM_MIN = _arm[0]
-FAR_ARM_MIN = _plate[0] - _arm[1] - _slot[1]
+FAR_ARM_MIN = _plate[0] - _arm[1] - SLOT_WIDTH_ACCEPTED_MAX
 if min(NEAR_ARM_MIN, FAR_ARM_MIN) < WALL_TARGET_MM:
     raise AssertionError(
         f"guide slot walls {NEAR_ARM_MIN:.3f}/{FAR_ARM_MIN:.3f} at the printed "
@@ -378,16 +379,24 @@ if SCREW_HOLE_WALL_MIN < WALL_TARGET_MM:
         f"hanger screw hole wall {SCREW_HOLE_WALL_MIN:.3f} at the printed worst "
         f"case (< {WALL_TARGET_MM})"
     )
-# Every tight band names its mate on the dimension it governs.  The two
+# Every fit names its mate on the dimension it governs.  The two
 # numbered notes are flagged from the features they govern (rule 7: SEE NOTE
 # n puts the note at the callout; a location dimension carries only its
 # value and band): note 1, the plates' bond to the strap front, from the
 # plates' stock callout in the front view; note 2, the slots cut together,
 # from the slot width.  Rule 7: at most two lines of words under a value.
+# The slot's callout states its clearance on the rod (rule 4: a range at
+# least .001 wide, here up to the feeler); note 2 gives the rod's free fall.
+# Two rows no wider than the 27-character fit row they replace (the parked
+# text block's width, draw_pn_pen_hanger.SLOT_WIDTH_TEXT_XY).
 BOND_NOTE = 1
 SLOTS_NOTE = 2
+_FEELER_TEXT = f"{SLOT_FIT_FEELER / 25.4:.3f}".removeprefix("0")
 DIMENSION_CALLOUTS: dict[str, str] = {
-    "SlotWidth": f"2X SLIDING FIT ON {PEN_ROD_NUMBER}\nSEE NOTE {SLOTS_NOTE}",
+    "SlotWidth": (
+        f"2X CLEARANCE {_FEELER_TEXT} MAX\n"
+        f"ON {PEN_ROD_NUMBER}, SEE NOTE {SLOTS_NOTE}"
+    ),
     # "2X" counts the two corners of one slot, not the two plates.
     "SlotCornerR": "EACH SLOT",
     # The strap's and the plates' thickness is the bar's as supplied, not a
@@ -396,8 +405,11 @@ DIMENSION_CALLOUTS: dict[str, str] = {
     "StrapThick": "1/8 CF FLAT",
     "PlateThick": f"1/8 CF FLAT\nSEE NOTE {BOND_NOTE}",
 }
-# Model dimensions the sheet parenthesises as reference (the stock governs).
-REFERENCE_DIMENSIONS: frozenset[str] = frozenset({"StrapThick", "PlateThick"})
+# Model dimensions the sheet parenthesises as reference: the stock governs
+# the two thicknesses, the rod the slot (made to it).
+REFERENCE_DIMENSIONS: frozenset[str] = frozenset(
+    {"StrapThick", "PlateThick", "SlotWidth"}
+)
 # (feature, dimension) -> native prefix.  A custom radius prefix replaces
 # SolidWorks' own "R", so it carries it: the section's two slot corners.
 DIMENSION_PREFIXES: dict[tuple[str, str], str] = {
@@ -410,9 +422,9 @@ DIMENSION_PREFIXES: dict[tuple[str, str], str] = {
 # on this part, no assembly step makes it).  Note 2 is the slots'
 # requirement after the cure, with the rod's free fall as its acceptance
 # (rule 7: the plates' support while slotting is method, so it lives in the
-# part's `process` record, above; the shop reaches two .002-band slots in
-# line across a bonded joint by cutting both after the cure,
-# drawing-guidelines.md "What the shop holds", #2435).
+# part's `process` record, above; the shop reaches two slots in line across
+# a bonded joint by cutting both after the cure, drawing-guidelines.md "What
+# the shop holds", #2435).
 DRAWING_NOTES = "\n".join(
     (
         f"{BOND_NOTE}. TWO GUIDE PLATES ALIKE, BONDED (LOCTITE 638) TO STRAP FRONT, BOTH FACES",

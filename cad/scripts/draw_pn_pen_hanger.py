@@ -95,8 +95,9 @@ from pn_pen_hanger_spec import (
     SLOT_BOTTOM_Z,
     SLOT_CORNER_R,
     SLOT_DEPTH,
+    SLOT_FIT_FEELER,
     SLOT_WIDTH,
-    SLOT_WIDTH_BAND,
+    SLOT_WIDTH_LIMITS,
     STRAP_BOT_X,
     STRAP_BOT_Y,
     STRAP_OUTLINE,
@@ -126,7 +127,7 @@ PNG = OUTPUTS.png
 
 SHEET_SCALE = (1.0, 1.0)  # the 6.38-tall strap fits the sheet at full size
 FRONT_SCALE = (1, 1)
-SECTION_SCALE = (2, 1)  # the slot's .002 band and its corner radius need room
+SECTION_SCALE = (2, 1)  # the slot's three-place REF and its corner radius need room
 # At 1:1 the strap's edges, slots and plates read in the empty right half of
 # the sheet (the 1:2 iso read as a silhouette).  No drawing-view-only
 # lighting exists, so the part's own colour (BAR_STEEL, not PANEL_BLACK:
@@ -285,7 +286,7 @@ FRONT_KEEP = {
 # reaches -- the slot's extension lines stop at the slot row, the arm's at
 # the arm row.  The plate edges' extension lines run past the inner rows
 # OUTSIDE their spans, so no extension line crosses a dimension line.  The
-# slot width's 10 mm span cannot hold its banded value and fit callout, so
+# slot width's 10 mm span cannot hold its REF value and fit callout, so
 # its text is offset onto a leader, right of the section beyond every
 # extension line (SLOT_WIDTH_TEXT_XY).  On the left, the slot depth and,
 # outside it, the plate reach, both from the plate's free end: shortest
@@ -340,10 +341,11 @@ SECTION_KEEP = {
     # plate's -x edge.
     "SlotCornerR": (_ax(-_HALF_PLATE) + 0.019, _az(SLOT_BOTTOM_Z) + 0.012),
 }
-# The slot width's offset text block (value, band and two callout rows --
-# the fit on its mate and SEE NOTE 2 -- about 75 x 16 mm, its 27-character
-# fit row ~2.76 mm a character as the 17-character rows measured 47 mm on
-# run 20261113T084036645Z's sheet; positioned by its centre): its left end
+# The slot width's offset text block (REF value and two callout rows -- the
+# clearance on its mate, then the mate and SEE NOTE 2 -- kept at the 75 x
+# 16 mm the old 27-character fit row set, ~2.76 mm a character as the
+# 17-character rows measured 47 mm on run 20261113T084036645Z's sheet; the
+# longest row now 24 characters; positioned by its centre): its left end
 # 4 mm right of the section's rightmost ink (the strap end), centred just
 # below the slot row so the leader runs nearly level to the dimension line,
 # crossing only the plate's -x extension line.
@@ -859,9 +861,11 @@ requirement(
     },
 )
 # The two slots, one in each plate, cut together after the bond's 24 h cure
-# and in line (note 2): .200 +.002/0 wide for the pen rod's sliding fit, .42
-# deep from the plates' free end, the near arm .14, each slot's two floor
-# corners R.08 MAX (SECTION_KEEP).
+# and in line (note 2): (.201) REF, made to the pen rod (its clearance on the
+# rod the acceptance), .42 deep from the plates' free end, the near arm .14,
+# each slot's two floor corners R.08 MAX (SECTION_KEEP).  The width's limits
+# are the analysis band every stock rod accepts (SLOT_WIDTH_LIMITS), not a
+# printed band.
 requirement(
     "slots",
     kind="slot",
@@ -874,10 +878,13 @@ requirement(
     requirements=("width", "depth", "arm_width", "corner_r_max"),
     fields={
         "width": (
-            limits(SLOT_WIDTH, _P["SlotWidth"], SLOT_WIDTH_BAND),
-            ("SLOT_WIDTH", "SLOT_WIDTH_BAND", (_SELF, "SECTION_KEEP")),
+            [round(limit, 12) for limit in SLOT_WIDTH_LIMITS],
+            ("SLOT_WIDTH", "SLOT_WIDTH_LIMITS", (_SELF, "SECTION_KEEP")),
         ),
         "width_nominal": (SLOT_WIDTH, ("SLOT_WIDTH",)),
+        # The callout's clearance on the rod, the leaf that must not enter
+        # beside it.
+        "fit_feeler": (SLOT_FIT_FEELER, ("SLOT_FIT_FEELER", "DIMENSION_CALLOUTS")),
         "depth": (
             limits(SLOT_DEPTH, _P["SlotDepth"], unit=UNIT),
             ("SLOT_DEPTH", _UNIT, (_SELF, "SECTION_KEEP")),
@@ -991,7 +998,8 @@ def build(adapter: Any) -> dict[str, str]:
     )
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
     # The strap's and the guide plates' thickness is the bar stock's, each
-    # printed as a reference (no band) over its 1/8 CF FLAT callout row.
+    # printed as a reference (no band) over its 1/8 CF FLAT callout row; the
+    # slot width a reference too, the slots made to the rod.
     references = [
         (dimension_name(adapter, item), item)
         for item in annotations
@@ -999,10 +1007,10 @@ def build(adapter: Any) -> dict[str, str]:
     ]
     if sorted(name for name, _ in references) != sorted(REFERENCE_DIMENSIONS):
         raise RuntimeError(
-            f"expected one native stock thickness each: {sorted(REFERENCE_DIMENSIONS)}"
+            f"expected one native reference dimension each: {sorted(REFERENCE_DIMENSIONS)}"
         )
     for name, item in references:
-        set_reference_dimension(adapter, item, label=f"{name} stock thickness")
+        set_reference_dimension(adapter, item, label=f"{name} reference")
     # Places (and so each dimension's tolerance) are authored on the part; the
     # sheet only proves the import kept them.
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)

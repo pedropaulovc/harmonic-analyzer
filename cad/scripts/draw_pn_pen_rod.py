@@ -460,8 +460,8 @@ requirement(
     requirements=("plane",),
     fields={"plane": (_plane("y", -rod.PIVOT_LENGTH), (_FRAME, "PIVOT_LENGTH"))},
 )
-# The square's four flats, the bought key stock's: .197 +.000/-.002 SQ, a
-# sliding fit in the hanger's guides (END_KEEP "Depth"), across each pair.
+# The square's four flats, the bought key stock's: .197 +.000/-.002 SQ, the
+# hanger's slots cut to it (END_KEEP "Depth"), across each pair.
 for _name, _axis, _sign, _pair in (
     ("flat_x_pos", "x", 1.0, "flat_x_neg"),
     ("flat_x_neg", "x", -1.0, None),
