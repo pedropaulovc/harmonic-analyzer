@@ -667,10 +667,10 @@ def test_cone_swing_check_stops_disengaged_at_the_swing_stop() -> None:
     assert "SMALL STEPS" in ease and "RUN FREE" in ease
     order = [
         check.index("OUT TO THE MHA-SH-VN-52 STOP"),
-        check.index("EASE MHA-DT-VN-62 UNTIL EACH MHA-DT-02 MOVES"),
+        check.index("EASE EACH MHA-DT-02'S HOLD-DOWN UNTIL IT MOVES"),
         check.index(hold),
         check.index(taps),
-        check.index("TIGHTEN MHA-DT-VN-62"),
+        check.index("CLAMP EACH MHA-DT-02 TO MHA-FR-01 THERE"),
         check.index("SWING THE CONE SET OUT"),
         check.index("SWING IN UNTIL A GEAR JUST BINDS"),
         check.index(ease),
@@ -695,24 +695,45 @@ def test_the_run_check_accepts_end_gear_shake_but_no_bind_or_skip() -> None:
     assert check.index(run) < check.index("4S. IF ONE BINDS")
 
 
-def test_an_out_pedestal_has_a_remedy_that_fits_its_sheet() -> None:
-    """Check 4J sends the fitter to the recheck table's last column, and every
-    row has a remedy naming that end's gears (X) or its indicator (Y); the
-    widened table still fits inside the sheet 15 frame."""
+def test_the_pedestals_are_set_by_feel_then_spotted_with_one_tripwire() -> None:
+    """Owner ruling 2026-11-24, fit audit part 2 C6 ("Yes: set by feel, spot
+    the holes after, tripwire .015."): the pedestals stand clamped at their
+    DRO X/Y until check 4E has tapped them to their binds; their MHA-FR-01
+    seats are spotted, drilled and tapped through the foot holes after that;
+    the DRO recheck table is gone and one .015 X tripwire sends the fitter to
+    the cone pivot seat, which it clears with the pivot seat's whole error
+    and the DRO set band."""
+    import cone_set_stack
+    import cylinder_bank_layout
+    import dt_drive_train_steps as steps
+
     check = " ".join(drawing.CHECKS.split("4. CONE SWING")[1].split("\n5.")[0].split())
-    (line_4j,) = re.findall(r"4J\. [^.]*\.", check)
-    assert f"SHEET {drawing.SETTING_SHEET}" in line_4j
-    assert drawing.PEDESTAL_RECHECK_HEADER[-1] in line_4j
-    remedies = {row[0]: row[-1] for row in drawing.PEDESTAL_RECHECK_ROWS}
-    assert all(remedies.values())
-    gears = drawing.CYLINDER_GEAR_COUNT if hasattr(drawing, "CYLINDER_GEAR_COUNT") else 20
-    assert "GEAR 0 " in remedies["FRONT MHA-DT-02, X"]
-    assert f"GEAR {gears - 1} " in remedies["BACK MHA-DT-02, X"]
-    assert "INDICATOR" in remedies["FRONT MHA-DT-02, Y"]
-    widths = general_table.table_column_widths(
-        drawing.PEDESTAL_RECHECK_HEADER, drawing.PEDESTAL_RECHECK_ROWS
+    (clamp,) = re.findall(r"4F\. [^.]*\.", check)
+    (tripwire,) = re.findall(r"4G\. .*?\.015\.", check)
+    (remedy,) = re.findall(r"4H\. .*? GOING ON\.", check)
+    (seat,) = re.findall(r"4J\. .*? SPOT\.", check)
+    (screw,) = re.findall(r"4K\. [^.]*\.", check)
+    assert tripwire == "4G. NEITHER X INDICATOR READS OVER .015."
+    pivot = steps.step_number("other-base-mounting")
+    assert f"STEP {pivot}E-{pivot}H PIVOT SEAT" in remedy
+    assert "FOOT HOLE" in seat and "PER MHA-FR-01" in seat and "TRANSFER-PUNCH" in seat
+    assert "MHA-DT-VN-62" in screw and "CLAMP" in screw and "Y ZERO" in clamp
+    order = [check.index(text) for text in (clamp, tripwire, remedy, seat, screw)]
+    assert order == sorted(order)
+    follow = (
+        cone_set_stack.PIVOT_TRANSFER_PUNCH_PLAY_MM
+        + cone_set_stack.PUNCH_MARK_PICKUP_MM
+        + cone_set_stack.PIVOT_THREAD_CENTRING_MM
+        + cone_set_stack.PIVOT_BORE_FLOAT_MM
     )
-    assert drawing.SETTING_TABLE_LEFT + sum(widths) <= drawing.NOTE_FIELD_RIGHT[2]
+    assert follow + cylinder_bank_layout.FRONT_STRAP_LOCATE_BAND < 0.015 * 25.4
+    # The bank steps clamp; no seat is cut and nothing is recorded there.
+    assert "8T. CLAMP THE FRONT MHA-DT-02 TO MHA-FR-01 THERE." in drawing.BANK_STEPS
+    assert "9F. CLAMP IT TO MHA-FR-01." in drawing.BANK_STEPS
+    for gone in ("TRANSFER PUNCH", "MHA-DT-VN-62", "RECHECK TABLE", "DRILL AND TAP THE SEAT"):
+        assert gone not in drawing.BANK_STEPS, gone
+    assert not hasattr(drawing, "PEDESTAL_RECHECK_ROWS")
+    assert "FILL IN" not in check
 
 
 def test_the_cone_set_is_accepted_through_a_turn_of_every_drum_gear() -> None:
@@ -1104,7 +1125,9 @@ def test_sheet_15_tables_stack_clear_of_the_station_field_on_any_seat(
     station table field; on the 1010x598 px one it cleared by 0.53 mm.  A
     table hangs off its title's requested top, so a title box read a pixel
     or two off moves no table, and the stack ends 2 mm clear of the station
-    table field and the interface notes."""
+    table field and the interface notes.  Owner ruling C6 (2026-11-24) took
+    the recheck table out: the setting table now ends over the station table
+    field and the narrow feeler stack table stands left of it."""
     monkeypatch.setattr(general_table, "_early_bound", lambda value, _interface: value)
     monkeypatch.setattr(drawing, "_activate_sheet", lambda *_args: None)
     monkeypatch.setattr(drawing, "_heading", lambda *_args: None)
@@ -1131,17 +1154,20 @@ def test_sheet_15_tables_stack_clear_of_the_station_field_on_any_seat(
 
     assert drawing._place_setting_sheet(adapter, facts=None) == []
 
-    setting, recheck, feeler = tables
+    setting, feeler = tables
     assert setting.anchor[1] == pytest.approx(
         drawing.SETTING_TABLE_TOP - general_table.TABLE_TITLE_DROP
     )
     bottoms = [table.anchor[1] - table.RowCount * table.ROW_HEIGHT for table in tables]
-    for above, below in zip(bottoms, (recheck, feeler)):
-        assert above - below.anchor[1] == pytest.approx(
-            drawing.SETTING_TABLE_GAP + general_table.TABLE_TITLE_DROP
-        )
-    assert bottoms[1] - drawing.STATION_TABLE_FIELD[1] >= 0.002
-    assert bottoms[2] - drawing.INTERFACE_FIELD[1] >= 0.002
+    assert bottoms[0] - feeler.anchor[1] == pytest.approx(
+        drawing.SETTING_TABLE_GAP + general_table.TABLE_TITLE_DROP
+    )
+    assert bottoms[0] - drawing.STATION_TABLE_FIELD[1] >= 0.002
+    assert bottoms[1] - drawing.INTERFACE_FIELD[1] >= 0.002
+    widths = general_table.table_column_widths(
+        drawing.FEELER_STACK_HEADER, drawing.FEELER_STACK_ROWS
+    )
+    assert drawing.SETTING_TABLE_LEFT + sum(widths) <= drawing.STATION_TABLE_FIELD[0]
 
 
 def test_every_sheet_16_row_is_cited_by_its_step_and_fits_its_sheet(
