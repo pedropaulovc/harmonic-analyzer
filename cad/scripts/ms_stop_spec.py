@@ -139,21 +139,25 @@ PLATE_DRAWING_DIMENSIONS = {
     "RoofChamfers": {"RoofChamferSize", "RoofChamferAngle"},
     "PlateLocationReference": {"PlateLeftFromEnd", "PlateRightFromEnd", "PlateFromHeadFace"},
 }
-# The PLATE is the match-drill master. Its three absolute location bands
-# transfer to the block only when the X=0 ends and Y=0 edges, both labelled on
-# each sheet, are flush; the block's nominal locations are reference-only.
+# The pair is drilled together, the PLATE on top: the pair drill puts the
+# pilot through both at the plate's three stations, which transfer to the
+# block only when the X=0 ends and Y=0 edges, both labelled on each sheet, are
+# flush. Both sheets print the stations as references (rule 4 form 2), the
+# plate's note 1 giving the screw trial on MHA-MS-02.
 LOCATING_END_NOTE = "LOCATING END"
 LOCATING_EDGE_NOTE = "LOCATING EDGE"
 MATCH_DRILL_DATUM_ALIGNMENT = "LOCATING ENDS AND EDGES FLUSH"
-# The plate is the .040 brass sheet as supplied: its thickness prints at the
-# title block's .XXX (fit audit 2026-11-23, MHA-MS-03.plate_thickness, was
-# +-.004): at +-.005 the screws still reach 1.5 D into the block's taps and
-# stay short of their full thread (asserted below). The analysis band is
-# that printed row, not a native tolerance.
+# The plate is the .040 brass sheet as supplied: its thickness prints as a
+# reference over the stock (rule 4, stock that is good enough stays stock;
+# fit audit 2026-11-23, MHA-MS-03.plate_thickness, was +-.004). The analysis
+# band is the receiving range, the title block's .XXX: at +-.005 the screws
+# still reach 1.5 D into the block's taps and stay short of their full thread
+# (asserted below).
 PLATE_THICKNESS_TOLERANCE_MM = printed_band_mm(3, unit=UNIT)
-# Plain THRU clearance holes: the match-drill, not a band, aligns the pair, so
-# the stations take the title block's .XXX (rule 4; delegated ruling L2,
-# 2026-11-07: every web below still clears the .080 target).
+# Plain THRU clearance holes: the match-drill, not a band, aligns the pair.
+# The stations' analysis band is the title block's .XXX the pair drill's DRO
+# places hold: every web below clears the .080 target at it (and still at
+# +-.010).
 PLATE_HOLE_POSITION_TOLERANCE_MM = printed_band_mm(3, unit=UNIT)
 PLATE_LOCATION_DIMENSIONS = frozenset({
     "PlateLeftFromEnd", "PlateRightFromEnd", "PlateFromHeadFace",
@@ -163,9 +167,9 @@ PLATE_LOCATION_DIMENSIONS = frozenset({
 # from the rebate and the wall and prints as a reference "(.48)".
 BLOCK_REFERENCE_DIMENSIONS = frozenset({"BlockDepth"})
 # Sizes print the title block's .XX unless they need .XXX: the rebate (its
-# +.010/0 for the stick), the cover thickness and the match-drill stations
-# the cover masters; the block repeats those stations at the cover's places
-# as references. Angles print whole degrees against the title block's +/-1 deg.
+# +.010/0 for the stick); the cover's stock thickness and the match-drill
+# stations print as references at their exact three-place nominals on both
+# sheets. Angles print whole degrees against the title block's +/-1 deg.
 _THREE_PLACE = frozenset({
     "WindowWidth", "WindowHeight", "PlateThickness", *PLATE_LOCATION_DIMENSIONS,
 })
@@ -188,8 +192,16 @@ PLATE_DRAWING_PRECISION = {
 BLOCK_DRAWING_PRECISION_BY_NAME = {name: places for dims in BLOCK_DRAWING_PRECISION.values() for name, places in dims.items()}
 PLATE_DRAWING_PRECISION_BY_NAME = {name: places for dims in PLATE_DRAWING_PRECISION.values() for name, places in dims.items()}
 BLOCK_MATING_FACE_NOTE = f"{_config.parts('ms-stop-plate')['number']} MATING FACE"
-# Every native Hole Wizard length (drill diameters and depths) prints .XXX.
+# Native Hole Wizard drill and clearance diameters print .XXX (rule 3, under
+# DRILLED HOLES).
 HOLE_CALLOUT_PRECISION = 3
+# Rule 3: tap and tap-drill depths print two places. At .XX (+-.01) the plate
+# taps still hold every proof below: full thread .24 MIN past the screws'
+# .225 MAX reach (1.5 D .129 at their .195 MIN), a .03 MIN lead under it,
+# and the drill point inside the (.48) block behind a back wall over the
+# .080 target (machinist review, run 20261124T113015334Z-32b934c2: the
+# .300/.250 depths had no band and no stated function).
+TAP_DEPTH_PRECISION = 2
 # The rebate's sliding fit on the MS-01 stick: the low limit keeps the least
 # clearances (.010 across the width, .004 on the face) and the top limit only
 # opens the slide, since the thumb screw seats the stick on the roof. Owner
@@ -232,7 +244,7 @@ BLOCK_ISOMETRIC_OCTANT = (1, 1, -1)
 # Arithmetic print-worst proof, using the title block the sheets actually
 # print. The additional stock-length allowance is a design reserve requested
 # for this joint, NOT a claim that McMaster certifies that length tolerance.
-HOLE_LINEAR_TOLERANCE_MM = printed_band_mm(HOLE_CALLOUT_PRECISION, unit=UNIT)
+TAP_DEPTH_TOLERANCE_MM = printed_band_mm(TAP_DEPTH_PRECISION, unit=UNIT)
 BLOCK_PRINTED_BANDS_MM = {
     name: printed_band_mm(BLOCK_DRAWING_PRECISION_BY_NAME[name], unit=UNIT)
     for name in ("BlockLength", "BlockHeight", "RoofThickness", "BackWall", "ReliefDepth")
@@ -247,14 +259,14 @@ PLATE_THICKNESS_MIN = PLATE_THICKNESS - PLATE_THICKNESS_TOLERANCE_MM
 PLATE_THICKNESS_MAX = PLATE_THICKNESS + PLATE_THICKNESS_TOLERANCE_MM
 PLATE_SCREW_PENETRATION_MIN = PLATE_SCREW_LENGTH - PLATE_SCREW_LENGTH_RESERVE_MM - PLATE_THICKNESS_MAX
 PLATE_SCREW_PENETRATION_MAX = PLATE_SCREW_LENGTH + PLATE_SCREW_LENGTH_RESERVE_MM - PLATE_THICKNESS_MIN
-PLATE_FULL_THREAD_MIN = PLATE_TAP_THREAD_DEPTH - HOLE_LINEAR_TOLERANCE_MM
-PLATE_FULL_THREAD_MAX = PLATE_TAP_THREAD_DEPTH + HOLE_LINEAR_TOLERANCE_MM
-PLATE_TAP_LEAD_MIN = PLATE_TAP_DRILL_DEPTH - HOLE_LINEAR_TOLERANCE_MM - PLATE_FULL_THREAD_MAX
+PLATE_FULL_THREAD_MIN = PLATE_TAP_THREAD_DEPTH - TAP_DEPTH_TOLERANCE_MM
+PLATE_FULL_THREAD_MAX = PLATE_TAP_THREAD_DEPTH + TAP_DEPTH_TOLERANCE_MM
+PLATE_TAP_LEAD_MIN = PLATE_TAP_DRILL_DEPTH - TAP_DEPTH_TOLERANCE_MM - PLATE_FULL_THREAD_MAX
 # The reference depth is the rebate plus the directly toleranced back wall.
 BLOCK_DEPTH_MIN = (WINDOW_WIDTH + WINDOW_SIZE_TOLERANCE_MM[0]
                    + BACK_WALL_THICKNESS - BLOCK_PRINTED_BANDS_MM["BackWall"])
 PLATE_TAP_BACK_WALL_MIN = BLOCK_DEPTH_MIN - (
-    PLATE_TAP_DRILL_DEPTH + HOLE_LINEAR_TOLERANCE_MM
+    PLATE_TAP_DRILL_DEPTH + TAP_DEPTH_TOLERANCE_MM
     + (PLATE_TAP_DRILL_DIA + DRILL_OVERSIZE_MM) / 2.0 * DRILL_POINT_H
 )
 ROOF_THICKNESS_MIN = ROOF_THICKNESS - BLOCK_PRINTED_BANDS_MM["RoofThickness"]

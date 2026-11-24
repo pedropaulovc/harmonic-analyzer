@@ -14,7 +14,7 @@
 # the two gripped together across their .84 length, locating ends on the
 # fixed jaw, locating edges flushed with a 1-2-3 block; spot each hole with
 # the #1 carbide centre drill and drill the #49 pilot through the plate into
-# the block to its .300 tap-drill depth; Setup 4 (MS02_open): the plate
+# the block to its .30 tap-drill depth; Setup 4 (MS02_open): the plate
 # turned over about its long axis on the same block, so its pilots stand over
 # the block's open window (MHA-MS-02 .336-.470 above its locating edge), and
 # the #41 opens both through the plate into the window, touching nothing of
@@ -91,7 +91,7 @@ vise_inset_mm = -72.2249
 # pilot, 1/8 body) to Ø.065, under the #49, so no chamfer reaches the block:
 # its pilot runs about .018 into the block, inside the #49's Ø.073.
 spot_dia_mm = 1.651
-# #49 pilot: pecks of .050 with full retracts, its cylindrical depth .300
+# #49 pilot: pecks of .050 with full retracts, its cylindrical depth .30
 # below the block face (the MHA-MS-02 tap drill depth; the plate's declared
 # pair_pilot_depth_in_mate) with the plate's nominal .040 above it. cam.py
 # checks the tip: −(1.016 + 7.62 + the #49's 118° point 0.557).
@@ -157,7 +157,7 @@ beam = "other"
 
 [[setups.operations]]
 instruction = "Mike the sheet's thickness at three places along the edge you will use."
-inspection = "Sheet {{cad.outer_face_thickness_min_in:.3dot}}–{{cad.outer_face_thickness_max_in:.3dot}} thick everywhere (drawing .040, the title block's ±.005). Outside: use another sheet; this one is not machined to thickness."
+inspection = "Sheet {{cad.outer_face_thickness_min_in:.3dot}}–{{cad.outer_face_thickness_max_in:.3dot}} thick everywhere (drawing (.040) SHEET AS SUPPLIED; this range keeps the 2-56 screws' reach into MHA-MS-02). Outside: use another sheet; this one is not machined to thickness."
 gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.outer_face_thickness_band_mm}}" }]
 
 [[setups.operations]]
@@ -275,7 +275,7 @@ speed_kind = "spindle"
 tool = "drill-49"
 drilling = "twist_drill"
 sizing = { kind = "band", band_mm = [1.8542, 1.9558] }  # MHA-MS-02 2X Ø.073 +.004/0 (DRILLED HOLES)
-instruction = "Same file, M6 T2: #49 drill through the plate and into the block, {{cad.clearance_hole_1_pair_pilot_depth_in_mate_mm:in.3dot}} below the block face (its full diameter; the point goes on), pecks of {{process.pilot_peck_mm:in.3dot}} with full retract; set 2800."
+instruction = "Same file, M6 T2: #49 drill through the plate and into the block, {{cad.clearance_hole_1_pair_pilot_depth_in_mate_mm:in.2dot}} below the block face (its full diameter; the point goes on), pecks of {{process.pilot_peck_mm:in.3dot}} with full retract; set 2800."
 rpm = 2800
 feed = "{{process.hole_feed_per_min_mm:in.1f}} in/min"
 hole_depth_mm = "{{cad.clearance_hole_1_pair_pilot_depth_in_mate_mm}}"
@@ -290,7 +290,7 @@ feed = "hand"
 
 [[setups.operations]]
 instruction = "Pilot depth in the block: drop the #49 drill into each pilot shank end first, so it bottoms where the point begins; the calipers' depth rod from the block face to the drill's end, subtracted from the drill's miked length."
-inspection = "Each pilot {{cad.clearance_hole_1_pair_pilot_depth_in_mate_mm:in.3dot}} ±.005 below the block face (MHA-MS-02 Ø.073 ↧ .300). Short: the next op. Deep: stop and tell the owner (the block's back wall)."
+inspection = "Each pilot {{cad.clearance_hole_1_pair_pilot_depth_in_mate_min_in:.2dot}}–{{cad.clearance_hole_1_pair_pilot_depth_in_mate_max_in:.2dot}} below the block face (MHA-MS-02 Ø.073 ↧ .30). Short: the next op. Deep: stop and tell the owner (the block's back wall)."
 gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.clearance_hole_1_pair_pilot_depth_in_mate_band_mm}}" }]
 
 [[setups.operations]]
@@ -365,7 +365,7 @@ gauge_checks = [{ gauge = "ms-plate-hole-drill-shanks", band_mm = "{{cad.clearan
 
 [[setups.operations]]
 instruction = "Each hole's place: the #41 shank in the hole; the calipers from the locating end and from the locating edge to the shank's far side, less half its miked Ø."
-inspection = "Holes {{cad.clearance_hole_1_station_min_in:.3dot}}–{{cad.clearance_hole_1_station_max_in:.3dot}} and {{cad.clearance_hole_2_station_min_in:.3dot}}–{{cad.clearance_hole_2_station_max_in:.3dot}} from the locating end, {{cad.clearance_hole_1_height_min_in:.3dot}}–{{cad.clearance_hole_1_height_max_in:.3dot}} from the locating edge. Outside: the pair still fits (the holes came from the block's pilots); record it and tell the owner."
+inspection = "Record: holes {{cad.clearance_hole_1_station_min_in:.3dot}}–{{cad.clearance_hole_1_station_max_in:.3dot}} and {{cad.clearance_hole_2_station_min_in:.3dot}}–{{cad.clearance_hole_2_station_max_in:.3dot}} from the locating end, {{cad.clearance_hole_1_height_min_in:.3dot}}–{{cad.clearance_hole_1_height_max_in:.3dot}} from the locating edge (the drawing's references; note 1's screw trial, the fit after blackening, is the requirement). Outside: the pair still fits (the holes came from the block's pilots); record it and tell the owner (the webs)."
 gauge_checks = [
   { gauge = "calipers", band_mm = "{{cad.clearance_hole_1_station_band_mm}}" },
   { gauge = "calipers", band_mm = "{{cad.clearance_hole_2_station_band_mm}}" },

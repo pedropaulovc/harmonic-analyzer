@@ -12,9 +12,10 @@ import _config
 from ms_stop_spec import MATCH_DRILL_DATUM_ALIGNMENT
 
 # Rule 4: the matched pair and its screws are named once, in note 1; the hole
-# callout links it, and the three hole locations and the sheet's thickness
-# carry only their value (title block .XXX; the thickness's reason line went
-# with its +-.004, fit audit 2026-11-23, MHA-MS-03.plate_thickness). The
+# callout links it, and its screw trial is the requirement on the three hole
+# locations, which print as references (form 2: made with MHA-MS-02 in the
+# pair drill). The sheet's thickness prints as a reference over its stock and
+# links no note (fit audit 2026-11-23, MHA-MS-03.plate_thickness). The
 # pilot-and-open sequence is the plate's traveler (cad/process/ms_stop_plate,
 # Setups 3-4, on its finished MHA-MS-02 block).
 NOTE_NUMBER = 1
