@@ -4,14 +4,14 @@ The sheet prints decimal inch (the part's ``drawing_unit: in``). The face
 view (*Front, the countersunk face toward the index arm) at 3:2 carries the
 plate diameter, the banded bore, the three index circles' bolt-circle
 diameters with their counts, the index-hole size once for all 132 holes, and
-the mounting holes' size, countersink and bolt circle. Every size is a model
-dimension imported from the part; the counts, EQ SP, the countersink and the
+the mounting holes' size, counterbore and bolt circle. Every size is a model
+dimension imported from the part; the counts, EQ SP, the counterbore and the
 mates ride the native callout text. A centre mark with extended lines on the
 bore gives the vertical centreline each pattern clocks to. The edge view
 (*Right) gives the thickness; the shaded isometric sits top right.
 
-Every size is a best guess pending measurement (#2157); the sheet states the
-index circles' web shortfall as a plain fact (rule 20).
+Sizes the owner has not measured are best guesses (#2157); the sheet states
+the index circles' web shortfall as a plain fact (rule 20).
 """
 
 from __future__ import annotations
@@ -70,7 +70,7 @@ OUTPUTS = DrawingOutputs(
 )
 SLDDRW, PDF, PNG = OUTPUTS.slddrw, OUTPUTS.pdf, OUTPUTS.png
 
-# A Ø3.94 plate: 3:2 keeps the .120 holes and their .07 webs legible while the
+# A Ø3.94 plate: 3:2 keeps the .120 holes and their .06 webs legible while the
 # face view leaves room for callouts on both sides.
 SHEET_SCALE = (3.0, 2.0)
 VIEW_SCALE = (3, 2)
@@ -95,7 +95,7 @@ FACE_KEEP = {
     "Ring57Pcd": (_FX + 0.115, _FY + 0.050),
     "Ring51Pcd": (_FX + 0.115, _FY + 0.008),
     # Its near-side leader lands on the circle's right at -12.8 degrees,
-    # below the 51X's and clear of the 3X countersink callout (round 2,
+    # below the 51X's and clear of the 3X counterbore callout (round 2,
     # rule 14).
     "Ring24Pcd": (_FX + 0.110, _FY - 0.025),
     "MountHoleDia": (_FX - 0.095, _FY + 0.030),

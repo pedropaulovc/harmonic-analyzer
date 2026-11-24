@@ -2,9 +2,10 @@ dt-cone-gear-tl-index-plate:
   title: Cone Gear Dividing Head Index Plate
   # Shop tooling: the parent MHA-DT-03 Number plus -TL-nn (subsystem-identities.md).
   # Indexes the 96T, 102T and 114T cone gears on the PM BS-0 dividing head,
-  # whose stock plates cannot. The index pin is measured (owner fact
-  # 2026-11-24: "0.117 in dia dividing head pin"); every other size is a best
-  # guess pending the owner's measurement of his BS-0 plate (#2157).
+  # whose stock plates cannot. The owner measured the index pin and the stock
+  # plate on 2026-11-24 (words in dt_cone_gear_tl_index_plate_spec.py); the hub,
+  # the screws, their bolt circle and the hole-circle diameters are still best
+  # guesses (#2157).
   number: MHA-DT-03-TL-01
   material: 6061-T651 ALUMINUM
   material_specification: 6061-T651 aluminum, owned 1/4 in plate
@@ -12,18 +13,18 @@ dt-cone-gear-tl-index-plate:
   quantity: 1
   tolerance_class: machined_block
   drawing_unit: in
-  process: "face owned 1/4 in 6061-T651 plate to .22; turn the Ø3.94 OD and bore Ø.829 to the BS-0 plate hub; spot and drill (#31) the 57-, 51- and 24-hole circles and drill the three countersunk #8 mounting holes on the mill; break edges"
+  process: "skim both faces of owned 1/4 in 6061-T651 plate to .24; turn the Ø3.94 OD and bore Ø.827 to the BS-0 plate hub; spot and drill (#31) the 57-, 51- and 24-hole circles, drill (15/64) and counterbore the three mounting holes on the mill; break edges"
   machinist_exceptions:
     - id: "RV-01"
       kind: "minor"
       where: "face view, the 132X index-hole callout: WEB .06 MIN"
       finding: "webs between neighbouring holes of the 57- and 51-hole circles and between those two circles below the .080 target (rules 17, 20)"
-      reason: "owner ruling 2026-11-02 (Pedro): accept webs down to .02 in on the 57- and 51-hole circles and between them, provisional until the #2157 measurements of the BS-0 plate and index pin land, when the pin diameter and circle radii are re-evaluated. Re-evaluated 2026-11-24 for the measured pin (owner fact: \"0.117 in dia dividing head pin\") and the #31 drilled holes of owner ruling 2026-11-23, tool audit Q15: the webs are .069 at the worst drilled-hole band and position zone, above the .060 floor and under the .080 target; there is no larger radius at the .080 edge target, and the circle radii stay guesses (#2157)"
+      reason: "owner ruling 2026-11-02 (Pedro): accept webs down to .02 in on the 57- and 51-hole circles and between them, provisional until the #2157 measurements of the BS-0 plate and index pin land, when the pin diameter and circle radii are re-evaluated. Re-evaluated 2026-11-24 for the measured pin (owner fact: \"0.117 in dia dividing head pin\") and the #31 drilled holes of owner ruling 2026-11-23, tool audit Q15: at the worst drilled-hole band and the Ø.014 drilled-hole position zone the webs are .060 on the 51-hole circle, .061 on the 57-hole circle and .062 between them, at the .060 floor and under the .080 target; there is no larger radius at the .080 edge target, and the circle radii stay guesses (#2157)"
     - id: "RV-02"
       kind: "accept"
-      where: "face view: the 57-, 51- and 24-hole circle diameters boxed BASIC and the 132X position frame Ø.004 to datum A (the bore axis)"
+      where: "face view: the 57-, 51- and 24-hole circle diameters boxed BASIC and the 132X position frame Ø.014 to datum A (the bore axis)"
       finding: "geometric control (position frame, datum and basic dimensions) on a shop-tooling part (rule 5)"
-      reason: "owner ruling 2026-11-02 (Pedro): the index holes' angular spacing is the plate's function; without a position control the title block's ±1° on EQ SP would let neighbouring index holes run together, so all 132 holes are held to a Ø.004 zone about their BASIC positions from the bore that pilots the plate on the BS-0 head"
+      reason: "owner ruling 2026-11-02 (Pedro): the index holes' angular spacing is the plate's function; without a position control the title block's ±1° on EQ SP would let neighbouring index holes run together, so all 132 holes are held to a position zone about their BASIC positions from the bore that pilots the plate on the BS-0 head. The zone was Ø.004 while the holes were reamed; drilled (owner ruling 2026-11-23, tool audit Q15) it is the shop's drilled-hole location from a datum bore, ±.005, Ø.014"
     - id: "RV-03"
       kind: "accept"
       where: "face view: the bore, Ø1.500 BC and 132X index-hole callouts name BS-0 HEAD; note 1 names it in full"

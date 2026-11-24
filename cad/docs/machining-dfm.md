@@ -1202,8 +1202,12 @@ make every gear as designed. The comparison with catalogue gears is in
 Indexing assumes a 40:1 head, the ratio of the shop's Precision Matthews BS-0, so one tooth is
 40/N crank turns. The hole circles are the standard Brown & Sharpe plates (15, 16, 17, 18, 19,
 20, 21, 23, 27, 29, 31, 33, 37, 39, 41, 43, 47, 49), from
-`references/machinerys-handbook/` (printed p. 2008, which also covers differential indexing). The BS-0's own
-plates have not been checked against this list; check yours before cutting.
+`references/machinerys-handbook/` (printed p. 2008, which also covers differential indexing). The
+BS-0's own manual (owner photographs 2026-11-24, booklet p. 2 and parts list p. 13-14; maker's
+figures, not measurements) gives the same ratio (1:40) and the same three plates: A 15-20;
+B 21, 23, 27, 29, 31, 33; C 37, 39, 41, 43, 47, 49. It offers differential indexing and its change
+gears for the BS-2 only, and its dividing table (p. 17-18) lists 96, 102 and 114 divisions only
+with change gears, so the BS-0 cannot index them on its stock plates.
 
 ### Cone and cylinder train, 48DP PA20
 
@@ -1237,8 +1241,10 @@ shop-made index plate MHA-DT-03-TL-01 (`dt-cone-gear-tl-index-plate`) carries 24
 57-hole circles for them (10, 20 and 20 hole spaces a tooth). Its 132 pin holes are drilled #31
 (.120), just over the head's measured index pin (owner fact 2026-11-24: "0.117 in dia dividing head
 pin"; owner ruling 2026-11-23, tool audit Q15: drilled, no reamer). The pin's .003-.007 play in a
-hole and the Ø.004 position zone together misplace a tooth by at most .0058° at the gear, 0.16 %
-of a 96-tooth pitch. Its other sizes are best guesses until the BS-0 plate is measured
+hole and the Ø.014 position zone a drilled pattern holds together misplace a tooth by at most
+.0111° at the gear, 0.30 % of a 96-tooth pitch. The owner measured the stock plate on 2026-11-24:
+its OD (3.94), bore (.8270), .120 pin holes and counterbored 15/64 screw holes are on the sheet;
+the hub, the screws, their bolt circle and the hole-circle diameters are best guesses until read
 ([#2157](https://github.com/pedropaulovc/harmonic-analyzer/issues/2157)). Differential indexing on a
 universal head with change gears is the alternative. Those tooth counts did not change with the
 pitch, so this was already true of the old train.

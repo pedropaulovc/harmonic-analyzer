@@ -45,10 +45,11 @@ def test_the_model_globals_are_the_spec_sizes() -> None:
     )
     assert {n: g[f"Ring{n}Pcd"] for n in spec.RING_COUNTS} == spec.RING_PCDS
     assert g["IndexHoleDia"] == spec.INDEX_HOLE_DIA
-    assert (g["MountPcd"], g["MountHoleDia"], g["CskDia"]) == (
+    assert (g["MountPcd"], g["MountHoleDia"], g["CboreDia"], g["CboreDepth"]) == (
         spec.MOUNT_PCD,
         spec.MOUNT_HOLE_DIA,
-        spec.CSK_DIA,
+        spec.CBORE_DIA,
+        spec.CBORE_DEPTH,
     )
     assert math.isclose(math.hypot(*spec.MOUNT_SEED), spec.MOUNT_PCD / 2.0)
     assert spec.MOUNT_SEED[0] < 0.0 < spec.MOUNT_SEED[1]
@@ -95,16 +96,19 @@ def test_the_index_holes_are_the_owned_drill_just_over_the_measured_pin() -> Non
     assert "REAM" not in spec.CALLOUTS_BELOW[spec.PRINTED_HOLE]
 
 
-def test_pin_play_and_position_zone_stay_under_a_quarter_percent_of_pitch() -> None:
-    # Half the worst play (.007) plus half the zone (.004) along the circle.
-    assert math.isclose(spec.INDEX_ERROR_TANGENTIAL_MM, 0.0055 * INCH)
+def test_pin_play_and_position_zone_stay_under_half_a_percent_of_pitch() -> None:
+    # The drilled-hole location the shop holds from a datum bore: ±.005.
+    assert math.isclose(spec.INDEX_POSITION, 0.014 * INCH)
+    assert spec.INDEX_POSITION >= math.hypot(0.005, 0.005) * 2.0 * INCH - 0.001 * INCH
+    # Half the worst play (.007) plus half the zone (.014) along the circle.
+    assert math.isclose(spec.INDEX_ERROR_TANGENTIAL_MM, 0.0105 * INCH)
     for circle, teeth in spec.RING_TEETH.items():
-        crank = math.degrees(0.0055 / (spec.RING_PCDS[circle] / INCH / 2.0))
+        crank = math.degrees(0.0105 / (spec.RING_PCDS[circle] / INCH / 2.0))
         assert math.isclose(spec.INDEX_ERROR_GEAR_DEG[teeth], crank / 40.0)
     # The 24-hole circle is the smallest radius: the worst of the three.
     assert max(spec.INDEX_ERROR_GEAR_DEG, key=spec.INDEX_ERROR_GEAR_DEG.get) == 96
-    assert math.isclose(spec.INDEX_ERROR_GEAR_DEG[96], 0.005836, abs_tol=1e-6)
-    assert max(spec.INDEX_ERROR_TOOTH_FRACTION.values()) < 0.0025
+    assert math.isclose(spec.INDEX_ERROR_GEAR_DEG[96], 0.011141, abs_tol=1e-6)
+    assert max(spec.INDEX_ERROR_TOOTH_FRACTION.values()) < 0.003
 
 
 def test_the_sheet_states_the_web_shortfall_it_carries() -> None:
@@ -112,35 +116,52 @@ def test_the_sheet_states_the_web_shortfall_it_carries() -> None:
     shortest = min(spec.WEBS_MM[name] for name in spec.SHORT_WEBS)
     assert shortest == spec.WEB_MIN_MM
     assert spec.WEB_MIN_PRINTED * INCH <= spec.WEB_MIN_MM
-    # Above rule 17's .060 floor, under its .080 target (RV-01).
+    # At rule 17's .060 floor, under its .080 target (RV-01).
     assert 0.060 * INCH <= spec.WEB_MIN_MM < 0.080 * INCH
     assert spec.WEB_CALLOUT == "WEB .06 MIN"
     assert spec.CALLOUTS_BELOW[spec.PRINTED_HOLE].endswith(spec.WEB_CALLOUT)
 
 
-def test_callouts_name_counts_and_the_countersink() -> None:
+def test_callouts_name_counts_and_the_counterbore() -> None:
     assert spec.CALLOUTS_ABOVE[spec.PRINTED_HOLE] == "132X"
     assert spec.CALLOUTS_ABOVE["Ring57Pcd"] == "57X EQ SP ON"
     assert spec.CALLOUTS_ABOVE["MountHoleDia"] == "3X"
-    assert spec.CALLOUTS_BELOW["MountHoleDia"].split("\n")[0] == "DRILL THRU"
+    assert spec.CALLOUTS_BELOW["MountHoleDia"].split("\n")[:2] == [
+        "DRILL THRU",
+        "<HOLE-SPOT><MOD-DIAM>.35 <HOLE-DEPTH> .145",
+    ]
     marked = set().union(*spec.DRAWING_DIMENSIONS.values())
     assert set(spec.CALLOUTS_ABOVE) <= marked
     assert set(spec.CALLOUTS_BELOW) <= marked
     assert set(drawing.FACE_KEEP) | set(drawing.EDGE_KEEP) == marked
 
 
-def test_the_flat_head_sinks_and_the_countersink_stays_in_the_plate() -> None:
-    xx = 0.01 * INCH
-    assert spec.CSK_DIA - xx >= spec.MOUNT_HEAD_DIA_MAX
-    assert spec.CSK_DEPTH_MAX < spec.THICKNESS - xx
+def test_the_measured_stock_plate_sets_the_envelope_and_the_screw_seat() -> None:
+    # Owner fact 2026-11-24: "plate thickness 0.2770 dia 3.94; hole 0.8270; pin
+    # hpoles 0.120 dia blind 0.1635 deep; 3x screw holes thru 15/64 countersunk
+    # 0.3455 dia depth 0.1830"; corrected: "not countersunk counterbored;".
+    assert math.isclose(spec.PLATE_DIA, 3.94 * INCH)
+    assert math.isclose(spec.BORE_DIA, 0.827 * INCH)
+    assert spec.BORE_DIA + spec.BORE_DEVIATIONS[0] >= 0.8270 * INCH - 1e-9
+    assert math.isclose(spec.STOCK_PIN_HOLE_DIA, spec.INDEX_HOLE_DIA)
+    assert spec.MOUNT_COUNT == 3
+    assert 0.234 * INCH <= spec.MOUNT_HOLE_DIA <= 15.0 / 64.0 * INCH
     assert spec.MOUNT_HOLE_DIA > spec.MOUNT_SCREW_BODY_DIA
+    assert abs(spec.CBORE_DIA - 0.3455 * INCH) <= 0.01 * INCH
+    # The plate is thinner than stock; the seat under the screw head is not.
+    assert spec.THICKNESS < spec.STOCK_PLATE_THICKNESS
+    assert math.isclose(spec.CBORE_SEAT, 0.095 * INCH)
+    assert abs(spec.CBORE_SEAT - (0.2770 - 0.1830) * INCH) <= 0.0015 * INCH
+    assert spec.CBORE_SEAT_MIN >= 0.080 * INCH - 1e-9
+    # The pin cannot pass through: it reaches no deeper than a stock blind hole.
+    assert 0.1 * INCH < spec.PIN_ENGAGEMENT_MAX < spec.THICKNESS
 
 
 def test_the_build_volume_budget_counts_every_hole() -> None:
     holes = sum(spec.RING_COUNTS) * part.V_INDEX_HOLE
-    mounts = spec.MOUNT_COUNT * (part.V_MOUNT_HOLE + part.V_CSK)
+    mounts = spec.MOUNT_COUNT * (part.V_MOUNT_HOLE + part.V_CBORE)
     assert math.isclose(part.V_FINISHED, part.V_PLATE - holes - mounts)
-    assert part.V_CSK > 0.0
+    assert part.V_CBORE > 0.0
 
 
 def test_builder_declares_the_spec_part_name() -> None:

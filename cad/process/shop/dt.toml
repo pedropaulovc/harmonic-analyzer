@@ -35,6 +35,9 @@ diameter_mm = 2.0828
 [tools.drill-26]  # Drills #26
 description = "#26 (.1470 in) drill, 115-piece index"
 diameter_mm = 3.7338
+[tools.drill-15-64]  # dt_cone_gear_tl_index_plate: the stock BS-0 plate's screw-hole drill (owner fact 2026-11-24)
+description = "15/64 (.2344 in) drill, 115-piece index"
+diameter_mm = 5.953125
 [tools.drill-20]  # Drills #20
 description = "#20 (.1610 in) drill, 115-piece index"
 diameter_mm = 4.0894
