@@ -7,7 +7,7 @@ room with the arm's spot-face floor and the screw's shoulder, and the
 spread of its limits is all that bounds its two faces' taper, which tilts
 the hanger, so it prints ±.001; it is fitted as made, never faced (R9-6).
 It is a bonded slip fit
-(LOCTITE 638) on the shoulder, a #12 drilled hole, cured with its front face
+(LOCTITE 638) on the shoulder, a #11 drilled hole, cured with its front face
 and the shoulder's end down together on a flat plate, so screw and spacer
 seat on the bar as one body and the ring cannot index its wedge; the
 screw's one MHA-PD-VN-63 curved disc spring preloads the arm onto the rear
@@ -31,6 +31,7 @@ from _gtol_planar import PlanarFace
 from _inch_wall_limits import WALL_TARGET_MM
 from _package_units import drawing_unit
 from _printed_tolerance import (
+    angular_band_deg,
     drilled_oversize_mm,
     edge_break_chamfer_mm,
     edge_break_radius_mm,
@@ -54,14 +55,19 @@ OD_PLACES = 2
 OD_BAND = printed_band_mm(OD_PLACES, unit=UNIT)
 # The bore is a bonded slip fit on the .1875 -.0010/0 shoulder (owner ruling
 # 2026-11-24, fit audit question 6, which reverses R9-71's press and #2144
-# item 4.4's mandrel facing): a #12 drill at the title block's DRILLED HOLES row,
-# LOCTITE 638 in the gap.  Nothing reads its size but the bond's gap and the
-# wall, so it prints the drill and no band; BORE_DIA_BAND is the ANALYSIS
-# band of what the drill cuts (the DRILLED HOLES row), not a printed limit.
+# item 4.4's mandrel facing): a #11 drill at the title block's DRILLED HOLES
+# row, LOCTITE 638 in the gap.  Nothing reads its size but the bond's gap,
+# the wall and the tilt that gap lets the ring take (below), so it prints
+# the drill and no band; BORE_DIA_BAND is the ANALYSIS band of what the
+# drill cuts (the DRILLED HOLES row), not a printed limit.  #11, not #12
+# (Main, by the owner's delegation of 2026-11-24, D17: owner question Q7b,
+# option C): the #12's tightest gap let the ring lean only 0.49° on the
+# shoulder, under the title block's 1° angular row that holds the drilled
+# bore, so a ring made to its sheet could fail MHA-PD-00's dry trial.
 # A standard hole, it is fully defined by its callout on the end view, where
 # it is a circle.
-BORE_DRILL = "#12"
-BORE_DIA = 4.8006  # .189
+BORE_DRILL = "#11"
+BORE_DIA = 4.8514  # .191
 BORE_DIA_PLACES = 3
 BORE_DIA_BAND = (drilled_oversize_mm(unit=UNIT), 0.0)  # (upper, lower), drilled
 BORE_DIA_MAX = round(BORE_DIA + BORE_DIA_BAND[0], 6)
@@ -98,7 +104,7 @@ _SHOULDER_DIA_MAX = SCREW.SHOULDER_DIA + SCREW.SHOULDER_DIA_LIMITS[1]
 BOND_GAP = (
     round(BORE_DIA_MIN - _SHOULDER_DIA_MAX, 6),
     round(BORE_DIA_MAX - _SHOULDER_DIA_MIN, 6),
-)  # .0015, .0065
+)  # .0035, .0085
 if not 0.0 < BOND_GAP[0] <= BOND_GAP[1] <= LOCTITE_638_GAP_MAX:
     raise AssertionError(
         f"MHA-PD-20 bore leaves the LOCTITE 638 bond gap on the shoulder: {BOND_GAP}"
@@ -114,10 +120,11 @@ SEAT_OFFSET_MAX = BOND_GAP[1] / 2.0
 # attitude.  That needs the bore square enough to the front face for the
 # ring to tilt that much inside its tightest bond gap (BOND_GAP[0] over
 # BOND_LAND_MIN): the sheet holds the drilled bore only at the angular
-# row, so MHA-PD-00's dry trial (15C: the spacer, as made, shows no
-# daylight on the plate with the screw held down on it) is its acceptance,
-# and test_pd_transgear_pivot_spacer_drawing ties the tailstock drill's
-# run-off to that tilt (Codjiflo r2 on #3487).  The arm, seated on the rear
+# row, and BOND_GAP_TILT_DEG covers that whole row (asserted below), so
+# every ring made to its sheet cures flat; MHA-PD-00's dry trial (15C: the
+# spacer, as made, shows no daylight on the plate with the screw held down
+# on it) still proves the bought screw's shoulder end (Codjiflo r2 on
+# #3487).  The arm, seated on the rear
 # face, tilts to the bar by the rear
 # face's parallelism to the front over the smallest flat it seats on
 # (FACE_PARALLELISM_ZONE_DIA).  No frame prints it (machinist review
@@ -166,6 +173,15 @@ SEATED_FACE_TILT = math.atan(REAR_FACE_PARALLELISM / FACE_PARALLELISM_ZONE_DIA)
 # The bond's shortest land: the shortest ring less the bore's break at each
 # mouth.
 BOND_LAND_MIN = LENGTH - LENGTH_BAND - 2.0 * EDGE_BREAK
+# The lean the tightest bond gap lets the ring take on the shoulder over its
+# shortest land: 1.14° with the #11, over the title block's 1° angular row
+# (the only control on the drilled bore's squareness; D17).
+BOND_GAP_TILT_DEG = math.degrees(math.atan(BOND_GAP[0] / BOND_LAND_MIN))
+if BOND_GAP_TILT_DEG < angular_band_deg(unit=UNIT):
+    raise AssertionError(
+        f"MHA-PD-20's tightest bond gap lets the ring lean {BOND_GAP_TILT_DEG:.2f}°, "
+        "under the title block's angular row on the drilled bore"
+    )
 
 # The wall holds the target, so the sheet states no shortfall and carries no
 # notes: the length's band rides its dimension as a model tolerance

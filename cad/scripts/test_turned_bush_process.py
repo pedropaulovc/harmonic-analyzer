@@ -177,7 +177,7 @@ def test_the_pivot_spacer_plan_mikes_the_length_round_the_rim_and_tries_the_mate
     """MHA-PD-20 (owner ruling 2026-11-24, fit audit question 6): the
     sheet carries no frame between the faces, so the plan authors no zone:
     the length's limits read at four places round the rim bound the taper;
-    the #12 hole is accepted by the screw's shoulder and, for the drawing's
+    the #11 hole is accepted by the screw's shoulder and, for the drawing's
     bonded clearance, by the .001-step pin set against the miked shoulder
     (traveler review 2026-11-24), with no reamer and no plug pair."""
     plan = _plan("pd_transgear_pivot_spacer")
@@ -186,7 +186,7 @@ def test_the_pivot_spacer_plan_mikes_the_length_round_the_rim_and_tries_the_mate
     ]
     assert "parallelism" not in far
     assert "face_parallelism_in" not in plan["parameters"]
-    assert _drills(plan) == ["drill-12"]
+    assert _drills(plan) == ["drill-11"]
     refs = {tool["ref"] for tool in plan["tools"]}
     assert not {ref for ref in refs if "reamer" in ref or "plug" in ref}
     import pd_transgear_pivot_spacer_callouts as callouts

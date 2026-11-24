@@ -1,6 +1,6 @@
 r"""Create the manufacturing drawing for the transgear pivot spacer (MHA-PD-20).
 
-A turned brass ring: Ø.44 O.D. over a #12 drilled bore (a bonded slip fit,
+A turned brass ring: Ø.44 O.D. over a #11 drilled bore (a bonded slip fit,
 LOCTITE 638, on the MHA-PD-VN-57 shoulder), .197 long under its explicit
 band.  The profile lies as it sits in the lathe (axis horizontal): the
 ``*Top`` view turned a quarter turn, so model +Z runs LEFT and the bar-side
@@ -217,7 +217,7 @@ def _profile_x(z_mm: float) -> float:
 # bearing face, at z = LENGTH). The O.D. takes the title block's .XX row
 # and its circular runout to the bore (datum A); the length its printed
 # .197 ±.001 (the native band about the exact 5.0 mm model, read back as the
-# printed limits); the bore its #12 drill under the DRILLED HOLES row, a
+# printed limits); the bore its #11 drill under the DRILLED HOLES row, a
 # bonded slip fit on MHA-PD-VN-57's shoulder (the clearance is the spec's
 # analysis range, printed as REF). Each ``span`` is a diameter's model-Z extent.
 # The sheet prints no manufacturing note. The declarations print nothing.
