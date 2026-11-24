@@ -108,9 +108,11 @@ ACCEPTANCES = (
     (
         "shaft-end-play",
         _step_ref("end-play-set", "C"),
-        "MHA-DT-04 END PLAY AT THE SHAFT END",
+        # Fit audit 2026-11-23 part 2, B10: felt by hand once MHA-DT-VN-56 is
+        # tight (step 3C); the dial indicator only breaks a doubt.
+        "MHA-DT-04 END PLAY AT THE SHAFT END, BY FEEL",
         inch_window(SHAFT_END_PLAY, 3),
-        "DIAL INDICATOR",
+        "DIAL IF IN DOUBT",
     ),
     (
         "ring-butt-gap",

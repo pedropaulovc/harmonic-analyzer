@@ -196,9 +196,8 @@ def test_current_drive_train_record_matches_the_selected_production_specs() -> N
         f"face {crank_pinion.FACE_WIDTH:g} +0/{crank_pinion.FACE_WIDTH_BAND[1]:g}",
         f"full-OD shoulder {crank_pinion.SHOULDER_LENGTH:g} "
         f"+0/{crank_pinion.SHOULDER_LENGTH_BAND[1]:g} "
-        f"with {crank_pinion.SHOULDER_LENGTH_FITUP_MIN:g} fit-up floor",
-        f"north band Ø{crank_pinion.TURNED_DIA:g} ±{crank_pinion.TURNED_DIA_TOLERANCE_MM:g} "
-        f"with {crank_pinion.TURNED_DIA_FITUP_MIN:g} fit-up floor",
+        f"and north band Ø{crank_pinion.TURNED_DIA:g} ±{crank_pinion.TURNED_DIA_TOLERANCE_MM:g}, "
+        "each checked against T120 by a look for daylight with no fit-up cut",
     ):
         assert fragment in crank_row[1], fragment
     assert (

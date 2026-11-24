@@ -566,7 +566,7 @@ if END_SCREW_THREAD_FLOAT_MM[0] <= 0.0:
 # absolute value) within this match residual.  build_dt_drive_train_assembly
 # books it against the shaft's tilt in the journal, the screw's float in its
 # thread and the pivot's running clearance.  ASSUMPTION: the pinch locks the
-# screw where the seated pivot holds it (MHA-DT-00 steps 4N/4X turn MHA-DT-07
+# screw where the seated pivot holds it (MHA-DT-00 steps 4J/4S turn MHA-DT-07
 # a full turn after locking: it never binds).
 AXIS_HEIGHT_MATCH_RESIDUAL_MM = 0.0762  # +/-.003
 AXIS_HEIGHT_MATCH_MATE = "MHA-DT-05"

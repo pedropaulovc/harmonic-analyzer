@@ -532,7 +532,7 @@ def test_changed_gear_bom_counts_come_from_their_specs() -> None:
         assert f"{teeth}T" in drawing.BOM_DESCRIPTIONS[stem]
 
 
-def test_t120_fitup_envelope_matches_the_actual_model() -> None:
+def test_t120_clearance_facts_match_the_actual_model() -> None:
     import build_dt_drive_train_assembly as assembly
     import dt_crank_pinion_spec as pinion
 
@@ -583,30 +583,32 @@ def test_step_one_sets_the_64t_against_the_shaft_collar() -> None:
 
 
 def test_crank_mesh_is_accepted_by_hand_with_a_pinion_recut_remedy() -> None:
-    """Delegated ruling 2026-11-17 on #2481 (option B): 4N's full turn by
+    """Delegated ruling 2026-11-17 on #2481 (option B): 4J's full turn by
     hand, before the 16T is pinned, is the crank mesh's acceptance; a pair
     that binds in its teeth has the 16T recut at the same depth, the cutter
-    moved sideways, and the step is redone from the slide-on.  Each 4N
-    remedy names the bind it answers, and only a recut sends the fitter back
-    (Codjiflo r1 on #3090)."""
+    moved sideways, and the step is redone from the slide-on.  4J's remedy
+    is the teeth's: the band and shoulder were looked at in 4G (fit audit
+    part 2, B9), and only a recut sends the fitter back (Codjiflo r1 on
+    #3090)."""
     number = drawing.steps.step_number("crank-mesh-checked")
     step = drawing.CONE_CRANK_STEPS.split(f"\n{number}. ", 1)[1]
     step = " ".join(step.split(f"\n{number + 1}. ")[0].split())
-    (turn,) = re.findall(rf"{number}N\. [^.]*\.", step)
+    (look,) = re.findall(rf"{number}G\. [^.]*\.", step)
+    assert "DAYLIGHT" in look and "T120" in look
+    (turn,) = re.findall(rf"{number}J\. [^.]*\.", step)
     assert "ONE FULL REVOLUTION BY HAND" in turn and "MUST NEVER BIND" in turn
-    (rub,) = re.findall(rf"{number}P\. [^.]*\.", step)
-    assert rub.startswith(f"{number}P. IF THE BAND OR SHOULDER RUBS T120,")
-    (recut,) = re.findall(rf"{number}Q\. .*?SAME DEPTH\.", step)
+    assert "RUBS T120" not in step
+    (recut,) = re.findall(rf"{number}K\. .*?SAME DEPTH\.", step)
     assert recut == (
-        f"{number}Q. IF THE TEETH BIND, RECUT MHA-DT-10: EVERY TOOTH GAP .004 WIDER, "
+        f"{number}K. IF THE TEETH BIND, RECUT MHA-DT-10: EVERY TOOTH GAP .004 WIDER, "
         "CUTTER MOVED SIDEWAYS, SAME DEPTH."
     )
-    redo = f"{number}R. AFTER A RECUT, REPEAT FROM {number}D."
+    redo = f"{number}L. AFTER A RECUT, REPEAT FROM {number}D."
     assert redo in step
     assert f"{number}D. SLIDE MHA-DT-10 ON WITHOUT ITS PIN" in step
     order = [
+        step.index(look),
         step.index(turn),
-        step.index(rub),
         step.index(recut),
         step.index(redo),
         step.index("MATCH-DRILL"),
@@ -629,7 +631,7 @@ RECUT_TIP_LAND_MODULE_FRACTION_MIN = 0.25
 
 
 def test_pinion_recut_clears_the_print_worst_corner_and_keeps_a_tip_land() -> None:
-    """The recut 4Q prints is sized against the owner pack's figures (#2481
+    """The recut 4K prints is sized against the owner pack's figures (#2481
     option B) and checked against the 16T's own finite-form tooth."""
     import dt_crank_pinion_spec as pinion
 
@@ -825,10 +827,10 @@ def test_a_loosened_post_screw_re_sets_the_post_before_the_checks() -> None:
     assert "TURN MHA-DT-05 ON ITS SCREWS" in re_set
     assert "TIGHTEN BOTH MHA-DT-VN-61" in re_set
     # The post can shift along the shaft on the screws' float: the end play
-    # is indicated again, with its remedy and the pinch lock's check.
+    # is felt again, with its remedy and the pinch lock's check.
     assert step.group(4) == f"{end_play}C" and step.group(5) == f"{end_play}F"
     end_play_redo = redone(step.group(4), step.group(5))
-    assert "INDICATE THE MHA-DT-04 END PLAY" in end_play_redo
+    assert "FEEL THE MHA-DT-04 END PLAY AT THE SHAFT END" in end_play_redo
     assert "DOES NOT TURN IN MHA-DT-21" in end_play_redo
 
 
@@ -1087,7 +1089,8 @@ def test_every_set_feeler_the_steps_and_checks_print_has_a_leaf_row() -> None:
     def printed(setting: float) -> str:
         return drawing.inch_text(setting, drawing.FEELER_PLACES)
 
-    assert "4H, 4J" in rows[printed(drawing.pinion.T120_FITUP_FEELER_MM)]
+    # Fit audit part 2, B9: the T120 check is a look, so no leaf row cites 4G.
+    assert not any("4G" in cited for cited in rows.values())
     assert "4F" in rows[printed(drawing.pinion.SEAT_FEELER_MM)]
     # The cone swing is set by feel (#2365): no row cites check 4.
     assert not any("CHECK 4" in cited for cited in rows.values())

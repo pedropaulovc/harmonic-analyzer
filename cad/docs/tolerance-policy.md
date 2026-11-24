@@ -214,7 +214,7 @@ T012/T018/T024 are thick-only (+0.075/−0) for the standard blank (owner ruling
   at the nominal centre, positive backlash and no interference at the worst
   mid-face corner (`crank_mesh_stack.standard_check`); the open-corner contact
   ratio and the per-station figures are REF. The pair is accepted by hand at
-  assembly (MHA-DT-00 step 4N); if the teeth bind, the still-unpinned 16T is
+  assembly (MHA-DT-00 step 4J); if the teeth bind, the still-unpinned 16T is
   recut, every tooth gap .004 in wider at the same depth (delegated ruling
   2026-11-17, #2481 option B, owner review on #2144; see gear-standard.md).
 
