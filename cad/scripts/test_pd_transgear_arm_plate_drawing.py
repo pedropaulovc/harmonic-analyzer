@@ -732,17 +732,28 @@ def test_the_callouts_name_each_fit_and_the_matched_pair() -> None:
 
     press = drawing.PLAN_CALLOUTS["PressHoleDia"]
     assert press is notes.PRESS_HOLE_CALLOUT
-    assert press.splitlines()[0] == "REAM THRU"
-    # Reamed with the set reamer: no band, no interference range; the two
-    # lines of words name the fit and say the mate is turned to this bore,
-    # in rule 4's words (its acceptance prints once, on MHA-PD-28).  No
-    # reason is printed: it is in the necessity register.
+    assert press.splitlines()[0] == "REAM THRU, PRESS FIT"
+    # Reamed with the set reamer: no band, no interference range; the fit
+    # rides on the process line and the two lines of words give the
+    # three-place chamfer its function (rule 3) and say the mate is turned
+    # to this bore, in rule 4's words (its acceptance prints once, on
+    # MHA-PD-28).  No necessity reason is printed: it is in the register.
     assert press.splitlines()[2:] == [
-        "PRESS FIT",
+        f"CLEARS {numbers['BUSH_NUMBER']} SHOULDER ROOT",
         f"{numbers['BUSH_NUMBER']} IS TURNED TO THIS BORE",
     ]
     for word in ("HOLDS", "KEEPS", "SETS", "FASTENER"):
         assert word not in press, word
+    # The chamfer's window: over the bush's root radius, under the leg that
+    # still leaves a shoulder land; no two-place value fits inside it.
+    low = bush.SHOULDER_ROOT_R_MAX_MM / 25.4
+    high = (
+        (bush.HUB_DIA / 25.4 - 0.01) - (bush.PRESS_DIA + max(bush.PRESS_HOLE_BAND)) / 25.4
+    ) / 2.0 - 0.010
+    assert low == pytest.approx(0.005) and high == pytest.approx(0.0255, abs=1e-4)
+    for nominal in (0.01, 0.02):
+        assert not (low <= nominal - 0.01 and nominal + 0.01 <= high), nominal
+    assert low <= 0.015 - 0.005 and 0.015 + 0.005 <= high
     assert max(map(len, press.splitlines())) <= 33
     assert "INTERFERENCE" not in press and not re.search(r"\.\d{4}", press)
     locator = flat(drawing.LOCATOR_CALLOUT)

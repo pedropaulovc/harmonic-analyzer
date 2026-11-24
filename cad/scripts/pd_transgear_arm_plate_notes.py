@@ -38,16 +38,22 @@ from pd_transgear_arm_plate_spec import (
 # (guidelines v2: the acceptance prints once, on the sheet of the member
 # made last, MHA-PD-28's; Codjiflo #3486).  What the press protects is in
 # the necessity register (cad/config/necessity/pd-transgear-arm-plate.yaml
-# N-01; owner ruling 2026-11-24: the sheet prints no reason).  Two lines of
-# words under the size and process (rule 7), each at most 33 characters,
-# inside the left border.
+# N-01; owner ruling 2026-11-24: the sheet prints no reason).  The chamfer
+# is a three-place size, so rule 3 wants its function in a few words
+# (machinist review r4, over-specification, two runs): it clears the
+# bush's shoulder root.  No two-place value does: the leg must stay
+# between the root's R.005 MAX and the .0255 that still leaves a shoulder
+# land (pd_transgear_knob_bush_geometry), and .02 +/-.01 reaches .030,
+# .01 +/-.01 reaches 0.  The fit rides on the process line, so there are
+# still two lines of words under the size and process (rule 7), each at
+# most 33 characters, inside the left border.
 _PRESS_CHAMFER_TEXT = (
     f"{PRESS_HOLE_CHAMFER / 25.4:.{PRESS_HOLE_CHAMFER_PLACES}f}".removeprefix("0")
 )
 PRESS_HOLE_CALLOUT = "\n".join((
-    "REAM THRU",
+    "REAM THRU, PRESS FIT",
     f"{_PRESS_CHAMFER_TEXT} X 45\u00b0 AT FACE A",
-    "PRESS FIT",
+    f"CLEARS {BUSH_NUMBER} SHOULDER ROOT",
     f"{BUSH_NUMBER} IS TURNED TO THIS BORE",
 ))
 
