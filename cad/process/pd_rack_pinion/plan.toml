@@ -60,11 +60,6 @@ id = "pd-rack-pinion-cutting-arbor"
 name = "Work arbor with backing discs"
 ref = "pd-rack-pinion-cutting-arbor"  # drawing cross-check 2026-11-19: tooth cutting on the shop-made arbor
 
-[[tools]]
-id = "feeler-gauges"
-name = "Feeler gauges"
-ref = "feeler-gauges"  # drawing cross-check 2026-11-19: BACKLASH WITH MATE .002-.007, FEELER
-
 [[setups]]
 machine_kind = "other"
 machine = "To be written"

@@ -195,11 +195,11 @@ coordinates from S, each indicated true to a sweep under .0005. With
 the plate still only clamped, the cluster and the knob shaft are slipped on and
 the mesh is tried on a .001 in dial indicator (#2417): the knob shaft and the disc pressed
 lightly together, the disc rocked, the plunger on the disc tooth next to the
-15T. The acceptance, a visible shake of at most .008 in, covers every reading the band, the gears'
+15T. The acceptance, a shake that moves the needle and reads at most .008 in (owner
+ruling 2026-11-24, audit part 2 question C2; no floor prints), has for its ceiling every reading the band, the gears'
 runout and the two running fits can give (`draw_pd_paper_drive_assembly.REDUCER_SHAKE_MAX_MM`; #2510):
 the band's backlash at the loosest centre the two running fits allow, read
-at the tip and rounded up to the indicator's division (the tightest still
-moves it about 0.9 division). The 1 um lever indicator's 0.14 mm range is too
+at the tip and rounded up to the indicator's division. The 1 um lever indicator's 0.14 mm range is too
 short for it (#2888). The trial only
 reads the setting; it never moves K, so the band stays the limit. The pilots
 are drilled after it passes, and the doweled plate is read the same way again

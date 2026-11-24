@@ -3288,8 +3288,9 @@ def test_the_reducer_is_clocked_once_with_an_ordinary_limit() -> None:
 
 def test_the_reducer_dial_window_is_what_a_build_inside_its_drawings_reads() -> None:
     """Pressed together, the mesh stands closer than the axes by half of both
-    running clearances; the window takes every reading that leaves, rounded
-    outward one division at most, and its floor is a readable positive shake."""
+    running clearances; the ceiling takes the loosest reading, rounded
+    outward one division at most, and the tightest mesh still shakes: no
+    floor prints (owner ruling 2026-11-24, audit part 2 question C2)."""
     journal = (
         min(knob_bush.BORE_DIA_LIMITS) - max(knob_shaft.JOURNAL_DIA_BAND),
         max(knob_bush.BORE_DIA_LIMITS) - min(knob_shaft.JOURNAL_DIA_BAND),
@@ -3310,10 +3311,11 @@ def test_the_reducer_dial_window_is_what_a_build_inside_its_drawings_reads() -> 
     high = drawing.REDUCER_SHAKE_MAX_MM
     assert high - step < max(readings) <= high
     assert high / step == pytest.approx(round(high / step))
-    # "Visibly": the tightest shake moves the dial at least half a division.
-    assert min(readings) >= step / 2.0
+    # No bind: the tightest shake is positive; the needle moving shows it.
+    assert min(readings) > 0.0
+    assert drawing.REDUCER_SHAKE_MIN_MM == pytest.approx(min(readings))
     assert drawing.REDUCER_BACKLASH_DIAL_TEXT == (
-        f"{disc.inch_text(step / 2.0, 4)} TO {disc.inch_text(high, 3)}"
+        f"(THE NEEDLE MOVES), {disc.inch_text(high, 3)} MAX"
     )
 
 

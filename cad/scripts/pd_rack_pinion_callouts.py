@@ -19,13 +19,9 @@ link.
 
 from __future__ import annotations
 
-import math
 
-import paper_drive_mesh_check as mesh_check
-import pd_transgear_knob_shaft_spec as knob
 from pd_rack_pinion_spec import (
     BORE_FRONT_CHAMFER,
-    CENTRE_DISTANCE_WINDOW,
     CUTTER_NUMBER,
     CUTTER_TOOTH_RANGE,
     DIAMETRAL_PITCH,
@@ -37,8 +33,6 @@ from pd_rack_pinion_spec import (
     TAP_WALL_TEXT,
     TEETH,
     WHOLE_DEPTH,
-    inch_ceil_mm,
-    inch_floor_mm,
     inch_text,
 )
 
@@ -76,7 +70,7 @@ TAP_CALLOUT_QUALIFIER = "\n".join(TAP_CALLOUT_LINES)
 # and still controls (paper_drive_mesh_check reads the span-inverted cutter
 # translations for backlash, root clearance and contact ratio), so its
 # callout names its fit route, a matched fit with MHA-PD-08 accepted by the
-# block's backlash row (rule 4: matching does not waive the limits).  One
+# block's last row (rule 4: matching does not waive the limits).  One
 # line: the sheet's above-callout lane prints a single line (round 2 printed
 # nothing of a two-line one), 22 characters keeping it left of the
 # tooth-space control's leader.
@@ -101,48 +95,14 @@ DRAWING_NOTES = "\n".join(
     )
 )
 
-
-def _feeler_backlash_mm(circular_mm: float, centre_distance_mm: float) -> float:
-    """Circular backlash on the operating pitch circles as the normal
-    backlash a feeler gauge reads between the flanks: times the operating
-    pressure angle's cosine at that centre."""
-    base_sum = (knob.PITCH_DIA + PITCH_DIA) / 2.0 * math.cos(
-        math.radians(PRESSURE_ANGLE_DEG)
-    )
-    return circular_mm * base_sum / centre_distance_mm
-
-
-# The reducer's backlash budget (paper_drive_mesh_check.reducer_band_meshes):
-# tight at the low end of the set centre band less the runout shift with the
-# thickest printed teeth, loose at the high end plus the shift with the
-# thinnest.  The acceptance is that budget as a feeler reads it, rounded
-# inward onto the .001 in grid: a disc whose span is anywhere in its band
-# meshes MHA-PD-08 inside it.  MHA-PD-08's GEAR DATA prints the same row.
-_SHIFT = mesh_check.reducer_runout_shift_mm()
-_LOW_BAND, _HIGH_BAND = mesh_check.reducer_band_meshes()
-BACKLASH_BUDGET_MM = (
-    _feeler_backlash_mm(_LOW_BAND.backlash_mm[0], CENTRE_DISTANCE_WINDOW[0] - _SHIFT),
-    _feeler_backlash_mm(_HIGH_BAND.backlash_mm[1], CENTRE_DISTANCE_WINDOW[1] + _SHIFT),
-)
-BACKLASH_ACCEPT_MM = (
-    inch_ceil_mm(BACKLASH_BUDGET_MM[0], 3),
-    inch_floor_mm(BACKLASH_BUDGET_MM[1], 3),
-)
-if not (
-    BACKLASH_BUDGET_MM[0]
-    <= BACKLASH_ACCEPT_MM[0]
-    < BACKLASH_ACCEPT_MM[1]
-    <= BACKLASH_BUDGET_MM[1]
-):
-    raise AssertionError(
-        f"MHA-PD-06 backlash acceptance {BACKLASH_ACCEPT_MM} leaves the budget "
-        f"{BACKLASH_BUDGET_MM}"
-    )
-
 # What a machinist needs to cut and check the teeth (Main ruling 2026-10-10):
-# the cutting rows, the mate and the backlash acceptance that is the span
-# band's fit route (rule 4).  The span prints on the face view with its
-# limits, not again here.
+# the cutting rows, the mate and the acceptance that is the span band's fit
+# route (rule 4): the pair runs together with no tight spot, tried at
+# MHA-PD-00's trial mesh.  No backlash number prints: a feeler leaf cannot be
+# laid between 48DP flanks (#2417), and MHA-PD-00 reads the mesh's shake on a
+# dial indicator (owner ruling 2026-11-24, audit part 2 question C2: "Yes.",
+# the feeler row deleted).  MHA-PD-08's GEAR DATA prints the same row.  The
+# span prints on the face view with its limits, not again here.
 _GEAR_DATA_ROWS = (
     ("NUMBER OF TEETH", f"{TEETH}"),
     ("DIAMETRAL PITCH", f"{DIAMETRAL_PITCH:.2f}"),
@@ -157,12 +117,7 @@ _GEAR_DATA_ROWS = (
         else f"#{CUTTER_NUMBER}, {CUTTER_TOOTH_RANGE[0]}-{CUTTER_TOOTH_RANGE[1]}T",
     ),
     ("MATES WITH", f"KNOB SHAFT {KNOB_NUMBER}, {MESH_PINION_TEETH}T"),
-    (
-        "SPAN MATCHED FIT",
-        "BACKLASH WITH MATE "
-        + "-".join(inch_text(value, 3) for value in BACKLASH_ACCEPT_MM)
-        + ", FEELER",
-    ),
+    ("SPAN MATCHED FIT", "RUNS ON MATE WITH NO TIGHT SPOT"),
 )
 GEAR_DATA_NOTE = "\n".join(
     ("GEAR DATA", *(f"{label}:  {value}" for label, value in _GEAR_DATA_ROWS))

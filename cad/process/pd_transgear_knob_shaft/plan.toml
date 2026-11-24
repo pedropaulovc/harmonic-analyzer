@@ -35,11 +35,6 @@ name = "Sharp-nose turning tool"
 ref = "lathe-tool-sharp-nose"  # drawing cross-check 2026-11-19: R.004 max. corners, .016 neck
 
 [[tools]]
-id = "feeler-gauges"
-name = "Feeler gauges"
-ref = "feeler-gauges"  # drawing cross-check 2026-11-19: BACKLASH .002-.007, FEELER
-
-[[tools]]
 id = "drill-50"
 name = "#50 drill"
 ref = "drill-50"  # #2425: the rear #2-56 tap drill
