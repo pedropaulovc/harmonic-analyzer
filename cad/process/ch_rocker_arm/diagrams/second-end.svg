@@ -4,7 +4,7 @@
        through the hub's axis from the front, 1 in = 200 px, Z0 the strap's
        top at y 330. -->
   <rect class="paper" x="0" y="0" width="760" height="470"/>
-  <text class="title" x="20" y="18">Setup 3: face B up; face the second end, F through the hub, #47 through the strap</text>
+  <text class="title" x="20" y="18">Setup 3: strap face 2 up; face the second end, F through the hub, #47 through the strap</text>
   <text class="label" x="20" y="38">Plan</text>
   <rect class="fixture-support" x="201.3" y="102.5" width="164.95" height="55"/>
   <rect class="fixture-support" x="393.75" y="102.5" width="164.95" height="55"/>
