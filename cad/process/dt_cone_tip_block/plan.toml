@@ -662,7 +662,7 @@ milling_cuts = [
 [[setups.operations]]
 instruction = "Still at the M6 T2 stop: the height, before the hole."
 instruction_detailed = "Still at the M6 T2 stop, before the hole: the calipers' depth rod from SEAT down to the fixed-jaw parallel's top beside the block, at both sides of the block."
-inspection = "Height {{cad.top_face_height_min_in:.3dot}}–{{cad.top_face_height_max_in:.3dot}}. Over: stop the file; home, repeat this setup's touch-offs with a new reading and run DT04_seat again from its start. Under: the block is scrap."
+inspection = "Height {{cad.top_face_height_min_in:.3dot}}–{{cad.top_face_height_max_in:.3dot}}. Over: stop the file; home; repeat this setup's touch-offs, the Z one on SEAT as cut with the depth-rod height just read as its reading; run DT04_seat again from its start. Under: the block is scrap."
 gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.top_face_height_band_mm}}" }]
 feed = "hand"
 
@@ -800,7 +800,7 @@ milling_cuts = [
 [[setups.operations]]
 instruction = "Still at the M6 T2 stop: the width, before the holes."
 instruction_detailed = "Still at the M6 T2 stop, before the holes: the calipers' depth rod from W, the face just cut, down to the fixed-jaw stack's top beside the block, at both ends."
-inspection = "Width {{cad.west_face_width_min_in:.3dot}}–{{cad.west_face_width_max_in:.3dot}} (it stays within the MHA-DT-20 edge). Over: stop the file; home, repeat this setup's touch-offs with a new reading and run DT06_west again from its start. Under: the block is scrap."
+inspection = "Width {{cad.west_face_width_min_in:.3dot}}–{{cad.west_face_width_max_in:.3dot}} (it stays within the MHA-DT-20 edge). Over: stop the file; home; repeat this setup's touch-offs, the Z one on W as cut with the depth-rod width just read as its reading; run DT06_west again from its start. Under: the block is scrap."
 gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.west_face_width_band_mm}}" }]
 feed = "hand"
 
@@ -1235,7 +1235,7 @@ gauge_checks = [{ gauge = "height-gauge", band_mm = "{{cad.adjuster_height_band_
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Fits: a 4-40 screw runs from E across the slit into W's #30 and draws the two halves together; a 1/4-28 screw runs through the adjuster; the foot hole takes its 4-40 screw to the Setup 5 depth."
+instruction = "Fits: a 4-40 screw runs in from W through the #30, across the slit into the E half's thread, and draws the two halves together; a 1/4-28 screw runs through the adjuster; the foot hole takes its 4-40 screw to the Setup 5 depth."
 inspection = "Each runs in by hand and seats. Any failure: stop and tell the owner."
 gauge_checks = "other"
 feed = "hand"
