@@ -50,11 +50,15 @@ Each physical source enters the stack once, with its full projected effect,
 and every source is in exactly one of two sets: in-service clearances the
 parts can take up together (IN_SERVICE_CLEARANCES, arithmetic) or independent
 printed manufacturing and set tolerances (INDEPENDENT_TOLERANCES, RSS); an
-unclassified source is refused.  The whole sweep is worst-case arithmetic
-over every source when that closes everywhere; otherwise the clearances
-arithmetic plus the RSS of the tolerances, everywhere (machining-dfm.md).
-Either way ``check:recipe`` (test_drive_train_cone_tip_holddown) fails if the
-governing air closes.
+unclassified source is refused.  The bushing, which MHA-DT-00 step 23 looks
+at after the set (A 3/64 DRILL SHANK PASSES BETWEEN MHA-DT-38 AND GEAR 19;
+owner ruling 2026-11-24, audit part 2 C9), is gated on the shank less the
+sources that act after the look (AFTER_SET_SOURCES).  The screw end and the
+block are not looked at: their sweep is worst-case arithmetic over every
+source when that closes everywhere; otherwise the clearances arithmetic plus
+the RSS of the tolerances, everywhere (machining-dfm.md).  Either way
+``check:recipe`` (test_drive_train_cone_tip_holddown) fails if the governing
+air closes.
 """
 
 from __future__ import annotations
@@ -270,10 +274,9 @@ AXIAL_TERMS_MM = {
     "post platform tap station": plate.POST_MOUNT_STATION_TOL_MM,
     "post screw clearance": _POST_FLOAT - POST_SCREW_CLEARANCE_TAKEN_UP_MM,
     "post counterbore pattern": _MOUNT_X_BAND * _SIN_I,
-    "post cone boss length": printed_band_mm(
-        post.DRAWING_PRECISION_BY_NAME["ConeBossLen"], unit=post.UNIT
-    )
-    / 2.0,
+    # The collar face's station, at the title block since owner ruling
+    # 2026-11-24, audit part 2 C9 (erased for the bushing by step 23's look).
+    "post cone boss north face": post.CONE_BOSS_NORTH_STATION_TOLERANCE_MM,
     "shaft thrust collar width": shaft.printed_band("CollarWidth"),
     "gear stack T006 north face": -stack.face_band(stack.COUNT - 1, "north")[1],
 }
@@ -336,7 +339,7 @@ INDEPENDENT_TOLERANCES = frozenset(
     {
         "post platform tap station",
         "post counterbore pattern",
-        "post cone boss length",
+        "post cone boss north face",
         "shaft thrust collar width",
         "gear stack T006 north face",
         "tip platform hold-down station",
@@ -357,6 +360,35 @@ INDEPENDENT_TOLERANCES = frozenset(
 )
 if IN_SERVICE_CLEARANCES & INDEPENDENT_TOLERANCES:
     raise AssertionError("a tip air source cannot be both a clearance and a tolerance")
+# Owner ruling 2026-11-24, audit part 2 C9: "Yes: add the look and relax the
+# rest."  MHA-DT-00 step 23 sets the cone set against the real bank and then
+# looks: A 3/64 DRILL SHANK PASSES BETWEEN MHA-DT-38 AND GEAR 19, at the
+# working pose (the P1 sweep's in end, where the swing is set).  The look
+# erases every source fixed before it: the chains tying the bank and T006's
+# face to the base (gear stack, collar, post mounting and boss station, bank
+# datum chain and accepted length) and the parts already frozen at the
+# bushing (tip block stations and square, hold-down, bushing bands, post
+# screws).  The bushing's air is then the look's shank, plus what the swing
+# out adds over the working pose's nominal, less the sources that act after
+# the look (AFTER_SET_SOURCES) and the interval arc (SkepticDT2 j04
+# DTR.tip_air_g19: nine terms, 0.670 mm there).  The screw end and the block
+# are not looked at: they keep the full stack.
+LOOK_SHANK_MM = 3.0 / 64.0 * 25.4
+LOOK_TIER = "bushing"
+AFTER_SET_SOURCES = frozenset(
+    {
+        "G19 cock in its running fit",
+        "pivot thread centring",
+        "base pivot seat transferred through the platform bore",
+        "end screw in its thread",
+        "swing feel set",
+        "platform pivot bore on the shoulder",
+        "pivot in the end screw's hole",
+        "post running journal fit",
+    }
+)
+if not AFTER_SET_SOURCES <= IN_SERVICE_CLEARANCES | INDEPENDENT_TOLERANCES:
+    raise AssertionError("an after-set source is not a booked tip air source")
 # Sources only some tiers carry.
 _TIER_ONLY_SOURCES = frozenset(
     {name for tier in TIERS for name in tier.limits}
@@ -667,6 +699,9 @@ class AirStack:
     nominal_mm: float
     terms: dict[str, float]
     arc_mm: float  # the swing between this interval's midpoint and its ends
+    # The looked-at tier's nominal at the working pose, where step 23 looks
+    # (None for a tier that is not looked at).
+    look_nominal_mm: float | None = None
 
     def __post_init__(self):
         unclassified = (
@@ -700,7 +735,27 @@ class AirStack:
             - self.arc_mm
         )
 
+    @property
+    def after_set_terms(self) -> dict[str, float]:
+        return {k: v for k, v in self.terms.items() if k in AFTER_SET_SOURCES}
+
+    @property
+    def after_set_mm(self) -> float:
+        """The air after step 23's look: the shank, plus the swing's nominal
+        gain over the look's pose, less what acts after the look."""
+        if self.look_nominal_mm is None:
+            raise ValueError(f"tip air: the {self.tier} is not looked at")
+        return (
+            LOOK_SHANK_MM
+            + self.nominal_mm
+            - self.look_nominal_mm
+            - sum(self.after_set_terms.values())
+            - self.arc_mm
+        )
+
     def closure_mm(self, method: str) -> dict[str, float]:
+        if method == "after_set":
+            return {**self.after_set_terms, "continuous p1 interval arc": self.arc_mm}
         if method == "arithmetic":
             return {**self.terms, "continuous p1 interval arc": self.arc_mm}
         return {
@@ -716,16 +771,27 @@ def full_sweep_proof(*, intervals: int = 400) -> list[dict]:
     Each row is one interval's midpoint; the arc term bounds the poses
     between midpoints.  A block row exists only where some block material
     stands over that drum tier (elsewhere the block clears it in plan, even
-    shifted by its tolerances).  The whole sweep is worst-case arithmetic
-    when that closes everywhere; otherwise "statistical" everywhere: the
+    shifted by its tolerances).  The looked-at tier (LOOK_TIER) is gated on
+    its air after step 23's look (AirStack.after_set_mm, method
+    "after_set"); every other tier's sweep is worst-case arithmetic when
+    that closes everywhere; otherwise "statistical" everywhere: the
     clearances arithmetic plus the RSS of the printed tolerances.  Raises if
-    the governing air closes anywhere.
+    the governing air closes anywhere, or if the nominal parts at the
+    working pose would not pass the look.
     """
     if type(intervals) is not int or intervals < 1:
         raise ValueError("tip swing proof requires at least one closed interval")
     lower, upper = P1_SWEEP_DEG
     width = (upper - lower) / intervals
     half_rad = abs(math.radians(width)) / 2.0
+    look_nominal = {
+        fixed.name: projection_nominal_mm(LOOK_TIER, fixed, lower) for fixed in DRUM_TIERS
+    }
+    if min(look_nominal.values()) <= LOOK_SHANK_MM:
+        raise ValueError(
+            f"the nominal cone tip fails step 23's look: {look_nominal} mm air "
+            f"at the working pose, shank {LOOK_SHANK_MM:.3f} mm"
+        )
     stacks = []
     for index in range(intervals):
         angle = lower + (index + 0.5) * width
@@ -750,22 +816,29 @@ def full_sweep_proof(*, intervals: int = 400) -> list[dict]:
                             nominal,
                             terms,
                             pivot_reach_mm(tier, angle) * half_rad,
+                            look_nominal[fixed.name] if tier == LOOK_TIER else None,
                         ),
                     )
                 )
     method = (
         "arithmetic"
-        if all(s.arithmetic_mm > 0.0 for _, s in stacks)
+        if all(s.arithmetic_mm > 0.0 for _, s in stacks if s.tier != LOOK_TIER)
         else "statistical"
     )
     rows = []
     for index, s in stacks:
-        air = s.arithmetic_mm if method == "arithmetic" else s.statistical_mm
+        governing = "after_set" if s.tier == LOOK_TIER else method
+        air = {
+            "after_set": s.after_set_mm if s.tier == LOOK_TIER else math.nan,
+            "arithmetic": s.arithmetic_mm,
+            "statistical": s.statistical_mm,
+        }[governing]
         if not math.isfinite(air) or air <= 0.0:
             raise ValueError(
                 f"cone tip {s.tier} can reach G19 at P1 {s.angle_deg:.3f} deg: "
-                f"{s.drum_tier} nominal {s.nominal_mm:.3f}, arithmetic "
-                f"{s.arithmetic_mm:.3f}, statistical {s.statistical_mm:.3f}: {s.terms}"
+                f"{s.drum_tier} nominal {s.nominal_mm:.3f}, {governing} {air:.3f}, "
+                f"arithmetic {s.arithmetic_mm:.3f}, statistical {s.statistical_mm:.3f}: "
+                f"{s.terms}"
             )
         rows.append(
             {
@@ -777,10 +850,10 @@ def full_sweep_proof(*, intervals: int = 400) -> list[dict]:
                     lower + (index + 1) * width,
                 ),
                 "nominal_mm": s.nominal_mm,
-                "method": method,
+                "method": governing,
                 "arithmetic_mm": s.arithmetic_mm,
                 "statistical_mm": s.statistical_mm,
-                "closure_mm": s.closure_mm(method),
+                "closure_mm": s.closure_mm(governing),
                 "air_mm": air,
             }
         )

@@ -1,0 +1,15 @@
+# The cone tip's air to the bank's G19 (tolerance-policy.md, "Checks in spec
+# modules and tests"; cad/scripts/check_register.py). Applied by
+# dt_cone_tip_air.full_sweep_proof and test_drive_train_cone_tip_holddown.
+# The bushing is gated after MHA-DT-00 step 23's look (A 3/64 DRILL SHANK
+# PASSES BETWEEN MHA-DT-38 AND GEAR 19): the shank, plus the swing's nominal
+# gain over the working pose, less the eight sources that act after the look
+# and the interval arc. The screw end and the block keep the full sweep. Fit
+# batch DT, 2026-11-24.
+checks:
+  - id: C-01
+    check: "AFTER_SET_SOURCES"
+    kind: gap
+    reason: "the bushing rubs gear 19's face as the cone turns"
+    source: "owner ruling 2026-11-24, audit part 2 C9: \"Yes: add the look and relax the rest.\"; terms per SkepticDT2 j04 DTR.tip_air_g19"
+    basis: after_setting

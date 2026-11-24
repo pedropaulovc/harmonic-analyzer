@@ -495,12 +495,16 @@ def test_the_certified_swing_ends_before_the_crank_boss_meets_column_0() -> None
 def test_cone_tip_keeps_air_to_g19_over_the_whole_swing() -> None:
     """C1 keyed (owner decision 2026-11-09, PR #1992): the bushing, the end
     screw's proud end and MHA-DT-21's south face (where it stands over G19)
-    each keep positive air to G19's tooth and cam tiers over the P1 sweep at
-    the printed limits, worst-case arithmetic over every source."""
+    each keep positive air to G19's tooth and cam tiers over the P1 sweep.
+    The bushing is gated after MHA-DT-00 step 23's look (owner ruling
+    2026-11-24, audit part 2 C9): the 3/64 shank less the sources that act
+    after it; the screw end and the block stay worst-case arithmetic over
+    every source."""
     import dt_cone_tip_air as air
 
     rows = air.full_sweep_proof(intervals=100)
-    assert {row["method"] for row in rows} == {"arithmetic"}
+    assert {row["method"] for row in rows if row["tier"] == air.LOOK_TIER} == {"after_set"}
+    assert {row["method"] for row in rows if row["tier"] != air.LOOK_TIER} == {"arithmetic"}
     assert {row["tier"] for row in rows} == set(air.TIER_NAMES)
     least = air.require_air()
     assert set(least) == set(air.TIER_NAMES)
@@ -509,6 +513,11 @@ def test_cone_tip_keeps_air_to_g19_over_the_whole_swing() -> None:
         assert row["closure_mm"].keys() - {"continuous p1 interval arc"} <= (
             air.IN_SERVICE_CLEARANCES | air.INDEPENDENT_TOLERANCES
         )
+        if row["tier"] == air.LOOK_TIER:
+            assert row["closure_mm"].keys() - {"continuous p1 interval arc"} == (
+                air.AFTER_SET_SOURCES
+            )
+    assert air.LOOK_SHANK_MM == pytest.approx(3.0 / 64.0 * 25.4)
 
 
 def test_tip_air_refuses_an_unclassified_source() -> None:
@@ -518,16 +527,37 @@ def test_tip_air_refuses_an_unclassified_source() -> None:
         air.AirStack("bushing", "tooth_face", 0.0, 1.0, {"a stray source": 0.1}, 0.0)
 
 
-def test_shaft_thrust_collar_width_needs_its_band_for_the_bushing_air(monkeypatch) -> None:
-    """CollarWidth's printed band sets where the shaft, and so the bushing on
-    T006's pivot, stands along the cone axis; at the inch .X the bushing can
-    reach G19."""
+def test_the_look_erases_what_comes_before_it_for_the_bushing(monkeypatch) -> None:
+    """CollarWidth's band sets where the bushing stands along the cone axis
+    before step 23's look; the look takes it out of the bushing's air (owner
+    ruling 2026-11-24, audit part 2 C9).  Even at the inch .X the bushing's
+    after-set air is unchanged, and the screw end, which is not looked at,
+    still books it."""
     import dt_cone_tip_air as air
     import dt_cone_tip_block_spec as block
 
+    before = air.require_air()
     terms = dict(air.AXIAL_TERMS_MM)
     terms["shaft thrust collar width"] = block.printed_band_mm(1)
     monkeypatch.setattr(air, "AXIAL_TERMS_MM", terms)
+    after = air.require_air()
+    assert after[air.LOOK_TIER] == pytest.approx(before[air.LOOK_TIER])
+    assert after["screw end"] < before["screw end"]
+
+
+def test_the_bushing_air_closes_on_what_acts_after_the_look(monkeypatch) -> None:
+    """Fail-first controls: a shank the nominal parts cannot pass at the
+    working pose is refused, and an after-set source as large as the shank
+    closes the bushing's air."""
+    import dt_cone_tip_air as air
+
+    monkeypatch.setattr(air, "LOOK_SHANK_MM", 3.0)
+    with pytest.raises(ValueError, match="fails step 23's look"):
+        air.full_sweep_proof(intervals=40)
+    monkeypatch.setattr(air, "LOOK_SHANK_MM", 3.0 / 64.0 * 25.4)
+    swing = dict(air.SWING_TERMS_MM)
+    swing["pivot thread centring"] = air.LOOK_SHANK_MM
+    monkeypatch.setattr(air, "SWING_TERMS_MM", swing)
     with pytest.raises(ValueError, match="cone tip bushing can reach G19"):
         air.full_sweep_proof(intervals=40)
 
