@@ -17,12 +17,7 @@ ref = "drill-51"  # Drills #51
 [[tools]]
 id = "reamer-2510"
 name = ".2510 reamer"
-ref = "reamer-2510"  # B-reamer-.2510
-
-[[tools]]
-id = "pin-gauges"
-name = "Pin gauges .011-.500"
-ref = "pin-gauges"  # A1-pin-set-061-500-combined, A1-pin-set-251-500
+ref = "reamer-2510"  # B-reamer-.2510; fit audit F23: the MHA-DT-17 rod is the bore's gauge, no pin gauges
 
 [[tools]]
 id = "centre-punch-starrett-18a"

@@ -1,0 +1,17 @@
+# MHA-DT-16 pinion engage lever: why each REAM and each band tighter than
+# the title block stays (drawing-guidelines.md rule 4; owner ruling
+# 2026-11-24: the reason lives here, not on the sheet). Read by the machinist
+# review only.
+# The blind hub bore is reamed with the owned .2510 reamer and prints no
+# band; the MHA-DT-17 rod entering by hand is its acceptance (fit audit F23,
+# owner ruling 2026-11-24). The hub is pinned to the rod at assembly as it
+# stands, so the bore's play over its .32 depth sets how far the hub can be
+# frozen cocked: .0023 (reamer) is 0.4 deg, an F drill's .0118 is 2.1 deg,
+# the 3.39 grip's tip 3.2 mm out of its throw plane and 0.69 mm of the
+# throw plane's 2.47 mm worst air to the MHA-DT-19 front end gone.
+necessity:
+  - id: N-01
+    feature: "Ø.2510 REAM (.32) FLAT BOTTOM hub bore (MHA-DT-17 ROD ENTERS BY HAND)"
+    kind: gap
+    reason: "F drill lets the pinned hub freeze 2 deg cocked"
+    source: "fit audit F23"
