@@ -1,0 +1,24 @@
+# Why each ream and each band tighter than the title block stays on MHA-PD-22
+# (owner ruling 2026-11-24: the reason lives here, not on the sheet).
+# Fit audit 2026-11-23, pending owner confirmation.
+necessity:
+  - id: N-01
+    feature: "sheet 1, end view, Ø.0930 2X REAM THRU drive-pin holes"
+    kind: bought_seat
+    reason: "Bought dowels MHA-PD-VN-54 press in and stay"
+    source: "pd_transgear_drive_collar_spec.PIN_HOLE_DIA; a 3/32 drill leaves the rim .017, under RV-01's .019"
+  - id: N-02
+    feature: "sheet 1, section A-A, Ø.0615 REAM blind flat-pin hole"
+    kind: bought_seat
+    reason: "Bought pin MHA-PD-VN-70 presses in for good"
+    source: "pd_transgear_drive_collar_spec.FLAT_PIN_HOLE_DIA"
+  - id: N-03
+    feature: "sheet 1, section A-A, .118 ±.002 flat-pin hole centre from the bore axis"
+    kind: gap
+    reason: "Pin crest must pass the MHA-PD-08 #8-32 stud"
+    source: "pd_transgear_drive_collar_spec.STUD_FLAT_PIN_AIR (.0031 at ±.002, .0001 at ±.005); FLAT_PIN_CONTACT_EDGE_MARGIN; FLAT_PIN_SHOULDER_WALL_WORST"
+  - id: N-04
+    feature: "sheet 1, section A-A, Ø.689 +.000/-.004 collar seat diameter"
+    kind: gap
+    reason: "Seat clears chain MHA-SH-VN-50 on the 12-tooth wheel"
+    source: "pd_transgear_drive_collar_spec.OD_BAND (_sprocket_seat_geometry.SPIGOT_DIA_BAND)"

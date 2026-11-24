@@ -1,0 +1,20 @@
+# Why each band tighter than the title block stays on MHA-PD-08 (owner ruling
+# 2026-11-24: the reason lives here, not on the sheet).  The tooth-tip Ø and
+# the root envelope are gear O.D./root bands, exempt from the necessity test.
+# Fit audit 2026-11-23, pending owner confirmation.
+necessity:
+  - id: N-01
+    feature: "sheet 1, view C, SPAN 2 TEETH .0969/.0964"
+    kind: mesh
+    reason: "Sets backlash with reducer disc MHA-PD-06"
+    source: "pd_transgear_knob_shaft_spec.SPAN_LIMITS; paper_drive_mesh_check"
+  - id: N-02
+    feature: "sheet 1, side view, .232 ±.001 pinion face width"
+    kind: gap
+    reason: "Disc cluster end float with MHA-PD-15 and MHA-PD-28"
+    source: "pd_transgear_knob_shaft_spec.FACE_WIDTH_BAND (FIT_LENGTH_BAND_IN)"
+  - id: N-03
+    feature: "sheet 1, detail B, Ø.155/.150 front neck"
+    kind: gap
+    reason: "Neck crown stays under the D-flat MHA-PD-22's pin rides"
+    source: "pd_transgear_knob_shaft_spec.FRONT_RELIEF_DIA_BAND; owner ruling r8 (limits on the neck)"
