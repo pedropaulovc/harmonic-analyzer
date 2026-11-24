@@ -113,8 +113,8 @@ their sheet re-keys for another reason or the review leaf is force-refreshed.
   (`ICalloutLengthVariable.Precision`, per variable, read back and refused on
   mismatch) and, for a banded hole size, that variable's
   `ICalloutLengthVariable.TolerancePrecision`, read back the same way
-  (`draw_dt_cone_swing_platform._print_pivot_band_exactly` derives both from
-  the part's band). The exception covers those callout variables' decimal
+  (`draw_pd_support_bar._band_counterbore_diameter` derives them from the
+  part's band). The exception covers those callout variables' decimal
   places only: not `SetPrecision3` or `set_dimension_precision` on any
   dimension, and not a band, callout text or other package departure. The
   model still owns every band, and every other dimension's places stay

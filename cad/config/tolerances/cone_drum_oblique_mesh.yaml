@@ -10,6 +10,6 @@ cone_drum_oblique_mesh:  # the inclined cone partial engagement
   #   the loosest. The swing stop (the shared MHA-SH-VN-52) only limits the
   #   disengaged swing.
   edge_slack_mm: 0.20               # CAD placement of the cone line over standard; the feel set runs tighter (cone_set_stack)
-  pivot_bore_band_mm: [0.0127, 0.0]  # platform pivot bore, .2500 +.0005/.0000 in on the stock 1/4 shoulder
+  pivot_bore_band_mm: [0.0127, 0.0]  # platform pivot bore: ANALYSIS band of the .2510 over reamer (.2510-.2515), not printed (owner ruling 2026-11-24, fit audit question 10)
   tooth_cutting_runout_tir_mm: 0.0508 # .002 in TIR per gear (each cone and the drum) about its finished bore
   note: "oblique partial engagement; centre set by feel at assembly (cone_set_stack)"

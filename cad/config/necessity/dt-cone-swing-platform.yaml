@@ -1,0 +1,16 @@
+# MHA-DT-20 cone swing platform: why each REAM and each band tighter than
+# the title block stays (drawing-guidelines.md rule 4; owner ruling
+# 2026-11-24: the reason lives here, not on the sheet). Read by the machinist
+# review only.
+# The pivot bore is reamed with the set's .2510 reamer and prints no band; the
+# bought MHA-DT-VN-52 shoulder is its gauge (form 3). A 1/4 drill can cut size
+# for size on the shoulder and an F drill (.257 +.004/0) loses the cone tip's
+# air to gear 19: the bore's radial float is a term of that stack
+# (dt_cone_tip_air, "platform pivot bore on the shoulder"; least air 0.128 mm
+# at the reamer's .2515 analysis maximum).
+necessity:
+  - id: N-01
+    feature: "sheet 1, plan, Ø.251 REAM THRU pivot bore (MHA-DT-VN-52 SHOULDER ENTERS, SWINGS FREE)"
+    kind: gap
+    reason: "pivot float closes the cone tip's air to gear 19"
+    source: "owner ruling 2026-11-24, fit audit question 10"

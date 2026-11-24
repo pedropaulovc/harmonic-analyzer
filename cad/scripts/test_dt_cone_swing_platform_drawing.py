@@ -50,9 +50,10 @@ def test_every_marked_model_dimension_has_one_view_and_native_precision() -> Non
     assert set(drawing_spec.DRAWING_PRECISION_BY_NAME.values()) == {2, 3, 4}
 
 
-def test_pivot_is_the_reamed_h7_bore_on_the_stock_shoulder() -> None:
-    """Main ruling 2026-10-10: the plate is reamed Ø6.350 H7 on the 6.3246-6.350
-    shoulder, band from config, carried natively on the Hole Wizard feature."""
+def test_pivot_is_reamed_by_the_2510_reamer_on_the_stock_shoulder() -> None:
+    """Owner ruling 2026-11-24, fit audit question 10: the plate is reamed with
+    the .2510 over reamer and prints no band; the 1/4 Hole Wizard hole is cut
+    at the reamer's size and the shoulder enters it at its largest."""
     import _config
 
     import dt_cone_swing_platform_pivot_spec as pivot_spec
@@ -60,8 +61,11 @@ def test_pivot_is_the_reamed_h7_bore_on_the_stock_shoulder() -> None:
     assert pivot_spec.PIVOT_HOLE_SPEC.kind == "drilled_fractional"
     assert pivot_spec.PIVOT_HOLE_SPEC.size == "1/4"
     assert pivot_spec.PIVOT_HOLE_SPEC.end == "through_all"
-    assert pivot_spec.PIVOT_HOLE_DIA == blind_cut_dia_mm(pivot_spec.PIVOT_HOLE_SPEC)
-    assert pivot_spec.PIVOT_HOLE_DIA == pytest.approx(6.350)
+    assert pivot_spec.PIVOT_HOLE_DIA == pytest.approx(0.2510 * 25.4)
+    assert pivot_spec.PIVOT_HOLE_SPEC.overrides_mm == {
+        "HoleDiameter": pivot_spec.PIVOT_HOLE_DIA
+    }
+    # The ANALYSIS band: what the reamer is modelled to cut, never printed.
     assert pivot_spec.PIVOT_HOLE_BAND == tuple(
         _config.fit("cone_drum_oblique_mesh", "pivot_bore_band_mm")
     ) == (0.0127, 0.0)
@@ -1603,7 +1607,7 @@ def test_holddown_callout_drills_in_its_thru_row_and_names_face_and_mate() -> No
         {5: "<MOD-DIAM><hw-diam> THRU ALL", 6: "", 7: "", 8: ""}
     )
     assert pivot[5] == "<MOD-DIAM><hw-diam> REAM THRU ALL"
-    assert pivot[8] == "RUNNING FIT ON MHA-DT-VN-52 SHOULDER"
+    assert pivot[8] == "MHA-DT-VN-52 SHOULDER ENTERS, SWINGS FREE"
     # Round 1 seat: the Hole Wizard writes the depth as its <hw-thru> token.
     native = drawing.pivot_callout_definitions(
         {5: "<MOD-DIAM> <hw-diam> <hw-thru>", 6: "", 7: "", 8: ""}
@@ -1694,9 +1698,11 @@ def test_post_mount_tap_drill_prints_three_inch_places() -> None:
 
 
 def test_tight_bands_name_their_mates_on_their_callouts() -> None:
-    """Rule 4: the reamed bore and both +-0.1 hole groups name the part that
-    makes the tolerance necessary, each at its own callout (r1 blocker)."""
-    assert drawing.PIVOT_BORE_CALLOUT_BELOW == ("RUNNING FIT ON MHA-DT-VN-52 SHOULDER",)
+    """Rule 4: the reamed bore names its gauge (the bought shoulder) and its
+    acceptance; both +-0.1 hole groups name their mates at their callouts."""
+    assert drawing.PIVOT_BORE_CALLOUT_BELOW == (
+        "MHA-DT-VN-52 SHOULDER ENTERS, SWINGS FREE",
+    )
     assert "MHA-DT-05" in drawing.POST_MOUNT_CALLOUT_BELOW[0]
     assert "MHA-DT-21" in drawing.HOLDDOWN_CALLOUT_BELOW[1]
     pivot = drawing.callout_below_definitions(
@@ -1707,7 +1713,7 @@ def test_tight_bands_name_their_mates_on_their_callouts() -> None:
         5: "REAM <MOD-DIAM><hw-diam>",
         6: "",
         7: "",
-        8: "RUNNING FIT ON MHA-DT-VN-52 SHOULDER",
+        8: "MHA-DT-VN-52 SHOULDER ENTERS, SWINGS FREE",
     }
     # SolidWorks drops multi-line text above a dimension; every added row is
     # below, and the tallest callout's rows stay in their free fields.
@@ -1982,7 +1988,6 @@ def test_profile_radius_saved_envelopes_clear_a_a_and_c_c():
 
 def test_pivot_callout_precision_write_is_the_declared_exception():
     from _paths import CAD_ROOT
-    from _drawing_tolerances import _tolerance_places
     from machinist_exceptions import load_exceptions
 
     declared = {
@@ -1997,12 +2002,14 @@ def test_pivot_callout_precision_write_is_the_declared_exception():
         "Owner ruling 2026-11-08 (Pedro), #2144 item 1.2"
     )
     assert "#2144" in entry.reason
-    places = _tolerance_places(*part.PIVOT_HOLE_BAND, display_unit=drawing.UNIT)
+    # The reamer's size prints at three places (.251) and no band.
+    assert drawing.PIVOT_CALLOUT_PLACES == 3
+    assert f"{part.PIVOT_HOLE_DIA / 25.4:.3f}" == "0.251"
     assert (
-        f"hw-diam callout variable's tolerance places, written as {places} "
-        in entry.where
+        "hw-diam callout variable's places, written as "
+        f"{drawing.PIVOT_CALLOUT_PLACES} " in entry.where
     )
-    emitter = drawing._print_pivot_band_exactly
+    emitter = drawing._print_pivot_reamer_size
     assert emitter.__name__ in entry.where
     assert (
         "RV-01" in emitter.__doc__ and "dt-cone-swing-platform.yaml" in emitter.__doc__
@@ -2161,9 +2168,11 @@ def test_platform_feature_bands_are_the_printed_ones() -> None:
     assert top["thickness_as_supplied"] == pytest.approx(_in(0.25))
     assert top["callout"] == "1/4 PLATE AS SUPPLIED"
     bore = features["pivot_bore"]
-    assert bore["dia"] == pytest.approx([_in(0.2500), _in(0.2505)])
+    # The .2510 reamer's ANALYSIS band; the bore prints no band.
+    assert bore["dia"] == pytest.approx([_in(0.2510), _in(0.2515)])
     assert bore["process"] == "ream"
-    assert bore["fit"] == "RUNNING FIT ON MHA-DT-VN-52 SHOULDER"
+    assert bore["mate"] == "MHA-DT-VN-52"
+    assert bore["acceptance"] == "MHA-DT-VN-52 SHOULDER ENTERS, SWINGS FREE"
     assert features["north_edge"]["station"] == pytest.approx([_in(0.27), _in(0.29)])
     assert features["north_edge"]["station_from"] == "pivot_bore"
     assert features["south_edge"]["length"] == pytest.approx([_in(9.53), _in(9.55)])

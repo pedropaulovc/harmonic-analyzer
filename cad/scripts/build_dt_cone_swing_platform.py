@@ -158,7 +158,6 @@ from dt_cone_swing_platform_spec import (
     UNIT,
 )
 from dt_cone_swing_platform_pivot_spec import (
-    PIVOT_HOLE_BAND,
     PIVOT_HOLE_DIA,
     PIVOT_HOLE_SPEC,
 )
@@ -571,18 +570,19 @@ def build(adapter) -> dict[str, str]:
     )
     volume = volume_check(adapter, "plate", v_plate, 0.005 * v_plate)
 
-    # Pivot bore at the origin: native Hole Wizard 1/4 drill-size hole,
-    # reamed H7 on the stock shoulder (dt_cone_swing_platform_spec). The band
-    # lives on the feature, so the sheet's REAM callout displays it.
+    # Pivot bore at the origin: native Hole Wizard 1/4 drill-size hole with
+    # its diameter overridden to the .2510 reamer (owner ruling 2026-11-24,
+    # fit audit question 10).  No band on the feature: the sheet prints the
+    # reamer's size, REAM and the shoulder as the gauge.
     pivot_dia = PIVOT_HOLE_DIA
     wizard_holes(
         adapter,
         PIVOT_HOLE_SPEC,
         [[0.0, 0.0, 0.0]],
         (0.0, -1.0, 0.0),
-        "pivot bore (1/4 reamed H7)",
+        "pivot bore (.2510 reamed)",
         name="PivotHole",
-        dia_tolerance_mm=(-PIVOT_HOLE_BAND[1], PIVOT_HOLE_BAND[0]),
+        expect_dia_mm=PIVOT_HOLE_DIA,
     )
     v_hole = math.pi * (pivot_dia / 2.0) ** 2 * PLATE_T
     volume = volume_check(
