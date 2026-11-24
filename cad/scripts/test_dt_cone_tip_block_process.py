@@ -20,6 +20,7 @@ import pytest
 
 import _cam_programs
 import _process_plans
+import _shop_equipment
 import cam_nc
 import export_features
 
@@ -43,7 +44,9 @@ def _post(ctx: dict, out: Path) -> None:
     """Each program as the runtime posts it: the grbl preamble, then per
     section an M6 block (M5, the operator's %msg, M6, M3) and its lines, the
     feeds in mm/min; a program that does not load its first tool starts on
-    its M3; a tap stop's lines after its M6, ending with its M30."""
+    its M3; a tap stop's lines after its M6, ending with its M30; a manual
+    section of the tool already in the spindle (the saw's stop) is its own
+    lines alone, and the section after it starts on its M3."""
     sections = {op[0]: job for job in ctx["jobs"] for op in job["ops"]}
     lines_of = {op[0]: op[2] for job in ctx["jobs"] for op in job["ops"]}
     for name, groups in RECIPE.PROGRAMS:
@@ -56,19 +59,26 @@ def _post(ctx: dict, out: Path) -> None:
             "G54",
         ]
         keys = [group[0] if isinstance(group, tuple) else group for group in groups]
-        for index, key in enumerate(keys):
+        previous = None
+        for key in keys:
             if key in ctx["manual"]:
                 manual = ctx["manual"][key]
-                text += [
-                    "M5",
-                    f"%msg TOOL CHANGE: T{manual['tool']} {manual['label']}, {manual['setting']}",
-                    f"M6 T{manual['tool']}",
-                    *manual["gcode"],
-                ]
+                if manual["tool"] != previous:
+                    text += [
+                        "M5",
+                        f"%msg TOOL CHANGE: T{manual['tool']} {manual['label']}, {manual['setting']}",
+                        f"M6 T{manual['tool']}",
+                    ]
+                text += manual["gcode"]
+                previous = manual["tool"]
                 continue
             job = sections[key]
             number = ctx["numbers"][job["tool"]]
-            if index or name in RECIPE.LOAD_FIRST_TOOL:
+            if (
+                name in RECIPE.LOAD_FIRST_TOOL
+                if previous is None
+                else number != previous
+            ):
                 text += [
                     "M5",
                     f"%msg TOOL CHANGE: T{number} {ctx['names'][job['tool']]}, SET SPINDLE TO {job['rpm']:g} RPM",
@@ -83,7 +93,8 @@ def _post(ctx: dict, out: Path) -> None:
                     for line in lines_of[key]
                 ),
             ]
-        if not any(key in ctx["manual"] for key in keys):
+            previous = number
+        if keys[-1] not in ctx["manual"]:
             text += ["M5", "G17 G90", "M2"]
         (out / f"{name}.nc").write_text("\n".join(text) + "\n", encoding="utf-8")
 
@@ -113,26 +124,80 @@ def test_context_accepts_the_plan_and_numbers_the_tools(context) -> None:
     # on its arbor by hand, with no tool-setter length.
     names = [name for name, _ops in RECIPE.PROGRAMS]
     assert set(RECIPE.LOAD_FIRST_TOOL) == set(names) - {"DT11_slit"}
-    for stop in context["manual"].values():
+    taps = {key: stop for key, stop in context["manual"].items() if key != "slit_check"}
+    assert set(taps) == {"tap_foot", "tap_pinch", "tap_adjuster"}
+    for stop in taps.values():
         assert stop["tool"] == 7
         assert stop["gcode"][0] == "G53 G0 Z0.000" and stop["gcode"][-1] == "M30"
 
 
-def test_the_slit_saw_steps_in_to_the_slits_depth(context) -> None:
-    """Three passes, each a step no deeper than the plan's, the last at the
-    slit's depth past the TOP end: the saw's centre its radius less that."""
+def test_the_saw_and_arbor_sizes_are_their_inventory_records() -> None:
+    """Tool-audit Q10: the slit is cut with the owned 2-3/4 x .064 saw on the
+    owned R8 stepped arbor. Every size of either that the plan repeats is the
+    inventory record's; the two sizes the record does not carry stay named
+    bounds of the plan, not record numbers."""
     p = PLAN["parameters"]
-    xs = [
-        float(line.split()[1][1:])
-        for line in _lines(context, "slit")
-        if line.startswith("G0 X")
-    ]
+    refs = {tool["id"]: tool["ref"] for tool in PLAN["tools"]}
+    assert refs["slit-saw"] == "slitting-saw-2-75-064"
+    assert refs["arbor"] == "saw-arbor-r8-stepped"
+    tools = _shop_equipment.load()["tools"]
+    saw, arbor = tools[refs["slit-saw"]], tools[refs["arbor"]]
+    assert saw["bore_in"] == 1.0  # Q10's condition: it goes on the 1 in pilot
+    for key, value in (
+        ("saw_dia_mm", saw["dia_in"]),
+        ("saw_thickness_mm", saw["thickness_in"]),
+        ("saw_arbor_body_dia_mm", arbor["body_dia_above_saw_in"]),
+        ("saw_arbor_cap_dia_mm", arbor["cap_dia_in"]),
+        ("saw_arbor_cap_thickness_mm", arbor["cap_thickness_in"]),
+        ("saw_arbor_screw_head_dia_mm", arbor["screw_head_dia_in"]),
+        ("saw_arbor_nose_to_cap_mm", arbor["below_spindle_nose_in"]),
+    ):
+        assert p[key] == pytest.approx(value * 25.4, abs=1e-4), key
+    assert p["saw_teeth"] == saw["teeth"]
+    assert arbor["screw_head_past_cap_in"] == "to_measure"
+    assert (arbor["clamp_torque_nm"], arbor["screw_key_mm"]) == (20.0, 5)
+    mount = next(
+        op["instruction"]
+        for setup in PLAN["setups"]
+        for op in setup["operations"]
+        if "pilot step" in op["instruction"]
+    )
+    assert "20 N·m with the 5 mm key" in mount
+
+
+def test_the_slit_saw_steps_in_to_the_slits_depth(context) -> None:
+    """Four passes: a light first one, half a step, then the file's own stop
+    with the spindle off (the arbor drives the saw by friction: its marker
+    lines are read there), then three equal steps no deeper than the plan's,
+    the last at the slit's depth past the TOP end: the saw's centre its
+    radius less that."""
+    p = PLAN["parameters"]
     radius = p["saw_dia_mm"] / 2
-    depths = [round(radius - x, 3) for x in xs]
-    assert depths == sorted(depths) and len(depths) == 3
-    assert depths[-1] == pytest.approx(p["slit_depth_mm"], abs=1e-3)
-    steps = [b - a for a, b in zip([0.0, *depths], depths, strict=False)]
+
+    def depths(key: str) -> list[float]:
+        return [
+            round(radius - float(line.split()[1][1:]), 3)
+            for line in _lines(context, key)
+            if line.startswith("G0 X")
+        ]
+
+    first, rest = depths("slit_first"), depths("slit")
+    assert (len(first), len(rest)) == (1, 3)
+    cut = first + rest
+    assert cut == sorted(cut)
+    assert cut[-1] == pytest.approx(p["slit_depth_mm"], abs=1e-3)
+    steps = [b - a for a, b in zip(cut, cut[1:], strict=False)]
     assert max(steps) <= p["slit_step_max_mm"] + 1e-3
+    assert max(steps) - min(steps) < 2e-3
+    assert first[0] == pytest.approx(steps[0] / 2, abs=2e-3)
+    assert first[0] == pytest.approx(p["slit_first_pass_mm"], abs=1e-3)
+    assert steps[0] == pytest.approx(p["slit_step_mm"], abs=1e-3)
+    groups = dict(RECIPE.PROGRAMS)["DT11_slit"]
+    assert [group[0] for group in groups] == ["slit_first", "slit_check", "slit"]
+    stop = context["manual"]["slit_check"]
+    assert stop["tool"] == context["numbers"]["slit-saw"]
+    assert stop["gcode"][0] == "M5" and stop["gcode"][-1] == "M0"
+    assert stop["gcode"][-2].startswith("%msg ")
 
 
 def test_the_adjuster_is_drilled_where_it_is_countersunk_and_tapped(context) -> None:
@@ -164,8 +229,14 @@ def test_the_recipes_programs_pass_every_check_they_declare(context, tmp_path) -
         ("pinch_tap_reach_mm", 8.0, "pinch_tap_reach_mm"),
         ("adjuster_tap_reach_mm", 12.0, "adjuster_tap_reach_mm"),
         ("saw_cut_z_mm", 7.5, "saw_cut_z_mm"),
-        ("blade_max_mm", 1.524, "blade_max_mm"),
-        ("saw_collar_dia_max_mm", 50.8, "saw_collar_dia_max_mm"),
+        ("kerf_max_mm", 1.778, "kerf_max_mm"),
+        ("saw_side_tir_nominal_mm", 0.1524, "saw_side_tir_nominal_mm"),
+        ("saw_tip_tir_max_mm", 2.0, "saw_tip_tir_max_mm"),
+        ("slit_first_pass_mm", 4.3223, "slit_first_pass_mm"),
+        ("saw_reach_max_mm", 20.0, "saw_reach_max_mm"),
+        ("saw_screw_stand_max_mm", 12.7, "saw_below_max_mm"),
+        ("saw_nose_above_min_mm", 5.0, "saw_nose_above_min_mm"),
+        ("saw_arbor_body_dia_mm", 44.45, "saw_reach_max_mm"),
         ("lying_grip_mm", 8.0, "lying_grip_mm"),
         ("east_grip_mm", 6.8453, "east_grip_mm"),
         ("tap_stack_max_mm", 261.62, "tap_stack_max_mm"),
@@ -196,16 +267,30 @@ def _seed(ctx: dict, key: str, pick, change) -> dict:
         # The last saw pass short of the slit's depth.
         (
             "slit",
-            lambda line: line.startswith("G0 X22.972"),
-            lambda line: line.replace("X22.972", "X25.000"),
+            lambda line: line.startswith("G0 X19.797"),
+            lambda line: line.replace("X19.797", "X22.000"),
             "passes",
         ),
-        # A saw pass lowered under the jaw tops, its spacers into the jaws.
+        # A saw pass lowered under its height, toward the jaw tops.
         (
             "slit",
             lambda line: line.startswith("G1 Z"),
             lambda line: "G1 Z5.000 F{feed}",
             "depth",
+        ),
+        # The saw's stop after its first pass left with the spindle running.
+        (
+            "slit_check",
+            lambda line: line == "M5",
+            lambda line: "G17",
+            "pauses",
+        ),
+        # The saw's first pass run at full depth: the arbor's body into TOP.
+        (
+            "slit_first",
+            lambda line: line.startswith("G0 X32.764"),
+            lambda line: line.replace("X32.764", "X12.000"),
+            "keep_out",
         ),
         # The adjuster drilled short of S.
         (

@@ -7,7 +7,8 @@ checks the posted G-code against :func:`expectations`. The block's sizes come
 from the feature export (its height, width and depth bands; the 1/4-28
 adjuster with its countersinks; the #4-40 pinch tap and its #30 clearance; the
 #4-40 foot tap; the slit); the blank, the skims, levels, passes, spots, pecks,
-the stacks and the slitting saw's arbor from ``plan.toml`` ``[parameters]``
+the stacks and the saw's arbor (the owned R8 stepped arbor's recorded sizes
+and the two bounds measured at its mounting) from ``plan.toml`` ``[parameters]``
 and ``milling_cuts``; the end mill's diameter, speed and feed from the shop
 (``shop/``), the hole and saw settings from the plan's authored operations.
 Every path is written here (``rt.custom``): straight lines and circles a
@@ -32,7 +33,9 @@ through and countersinks the adjuster, its height from the seat the
 measured MHA-DT-05 axis height H (a G54 X shift the traveler sets); DT09
 brings the tap guide over it; DT10 (S up) countersinks its other end.
 DT11 (on edge, E down, the top end past the right jaw side) saws the slit
-into the adjuster with the 3 x .051 slitting saw on the R8 1 in arbor.
+into the adjuster with the owned 2-3/4 x .064 slitting saw on the owned R8
+stepped arbor: a light first pass, a stop to read the friction drive's
+marker lines, then the rest.
 
 Work frames (G54), each set in its setup:
 - DT01: X0 the strip's E-marked sawn face (left), Y0 the fixed jaw (the
@@ -56,7 +59,8 @@ Toolpath rules (owner rulings 2026-11-16): faces zigzag (ball screws),
 plunges beside the stock at the cutting feed, real G0 above the stock. The
 countersinks are circles of the chamfer mill inside the hole (climb, G3).
 The saw's passes run one way, conventional for an M3 saw right of the block
-(+Y), each from beside the block to past it. The holes are tapped by hand
+(+Y: a climb cut would let the teeth grab and slip the arbor's friction
+drive), each from beside the block to past it. The holes are tapped by hand
 (FluidNC cannot rigid-tap; owner, Pedro, 2026-11-17), the T-handle wrench's
 centre hole on the spring point of the Fisher tap guide in the 1/2 in R8
 collet (owner, Pedro, 2026-11-21: "use
@@ -93,7 +97,7 @@ PROGRAMS: tuple[tuple[str, tuple[Any, ...]], ...] = (
     ("DT08_adjuster", (("adjuster_spot",), ("adjuster_drill",), ("north_csk",))),
     ("DT09_adjuster_tap", ("tap_adjuster",)),
     ("DT10_south_csk", ("south_csk",)),
-    ("DT11_slit", ("slit",)),
+    ("DT11_slit", (("slit_first",), ("slit_check",), ("slit",))),
 )
 # The end mill, drill and chamfer programs and the tap stops load their own
 # first tool (M6, the tool setter); the saw program runs on the saw already
@@ -158,14 +162,19 @@ PECK_REENTRY_MM = 0.5
 # parallels' length (4 in, shop-equipment fixtures.parallels-lms-6745).
 JAW_DEPTH_MM = IN
 PARALLEL_LENGTH_MM = 4 * IN
-# The arbor spacer by the saw clears the block's top end by at least this
-# at the slit's full depth.
-COLLAR_CLEAR_MM = 1.0
+# The saw's arbor (the owned R8 stepped arbor: its body above the saw, its
+# cap below) clears the block's top end by at least this at the slit's full
+# depth: the reach past the arbor is (the saw - the arbor) / 2 less this.
+ARBOR_CLEAR_MM = 1.0
+# The spindle nose stands at least this far over everything in the vise.
+NOSE_CLEAR_MM = 1.0
 # The saw is touched off with its rim this far in over the top end.
 TOUCH_IN_MM = 3.0
-# The slitting saw's runout allowance on the miked blade: the slit is the
-# blade plus this at most.
-SAW_RUNOUT_MM = 0.003 * IN
+# The slit's printed ceiling less this is the most the miked blade and its
+# axial runout may add up to.
+KERF_ALLOWANCE_MM = 0.002 * IN
+# The arbor's length from the spindle nose is rounded up to this (.1 in).
+ARBOR_LENGTH_STEP_MM = 0.1 * IN
 # A plan number the recipe recomputes must agree to this (its rounding).
 PLAN_TOL_MM = 0.01
 # The #43 drill against the tap drill's printed band: the shop records the
@@ -403,6 +412,15 @@ def _saw(
             f"G0 Z{clear:.3f}",
         ]
     return lines
+
+
+def _saw_depths(depth: float, max_step: float) -> list[float]:
+    """Depths of the saw's passes into the end, the slit's ``depth`` last: the
+    first half a step (a light cut that proves the arbor's friction drive
+    before the full ones), the rest equal steps no deeper than ``max_step``."""
+    n = math.ceil(depth / max_step + 0.5 - 1e-9)
+    step = depth / (n - 0.5)
+    return [step * (k + 0.5) for k in range(n - 1)] + [depth]
 
 
 def _thread(designation: str) -> tuple[str, float, float]:
@@ -759,10 +777,12 @@ def context(
     _agree(plan, "vise_upright_inset_mm", -(jaw_w - w_raw_max) / 2)
     _agree(plan, "vise_length_inset_mm", -(jaw_w - length) / 2)
 
-    # The slit: the 3 x .051 saw on the R8 1 in arbor, horizontal, its lower
-    # face saw_cut_z_mm above E (the slit's middle at the adjuster's lateral
-    # place), sawing in from the top end in equal steps no deeper than
-    # slit_step_max_mm to the slit's depth (the export's REF, into the bore).
+    # The slit: the owned 2-3/4 x .064 saw (shop slitting-saw-2-75-064) on the
+    # owned R8 stepped arbor (shop saw-arbor-r8-stepped), horizontal, its
+    # lower face saw_cut_z_mm above E (the slit's middle at the adjuster's
+    # lateral place), sawing in from the top end: a first pass of half a step,
+    # then equal steps no deeper than slit_step_max_mm, to the slit's depth
+    # (the export's REF, into the bore).
     saw = _shop_tool(plan, shop, "slit-saw")["diameter_mm"]
     _agree(plan, "saw_dia_mm", saw)
     radius = saw / 2
@@ -771,27 +791,43 @@ def context(
     _agree(plan, "slit_depth_mm", slit_depth)
     if slit.get("extent") != "SLOT INTO BORE":
         raise ValueError("slit: expected SLOT INTO BORE")
-    # The slit's floor inside the adjuster's minor bore at either end of the
-    # adjuster height band (H measured, within the band).
-    floor = length - slit_depth
+    # The kerf: the blade, miked at its mounting, at least the slit's floor;
+    # the miked blade plus its axial runout (an indicator on its side face,
+    # one hand revolution) at most the slit's ceiling less KERF_ALLOWANCE_MM.
+    # saw_side_tir_nominal_mm is what that leaves the catalogue blade.
+    _agree(plan, "blade_min_mm", slit["width"][0])
+    _agree(plan, "kerf_max_mm", slit["width"][1] - KERF_ALLOWANCE_MM)
+    if not p["blade_min_mm"] <= thick < p["kerf_max_mm"]:
+        raise ValueError(
+            "process.saw_thickness_mm: the blade leaves no runout inside the slit's width"
+        )
+    _agree(plan, "saw_side_tir_nominal_mm", p["kerf_max_mm"] - thick)
+    # The slit's depth: X0 is the top end and the saw's centre its recorded
+    # radius less the depth past it, so the tips' radial runout (at most
+    # saw_tip_tir_max_mm, read at the mounting) deepens the floor. With it
+    # and without, at both ends of the block's height band and of the
+    # adjuster's height band (H measured, within the band), the floor stays
+    # inside the adjuster's minor bore.
+    tip_tir = p["saw_tip_tir_max_mm"]
     bore_r = adj["dia"][0] / 2
     for h in adj["height"]:
-        if not h - bore_r < floor < h + bore_r:
-            raise ValueError("the slit's floor is not inside the adjuster bore")
-    # The blade: miked, accepted between the slit's floor and its ceiling
-    # less the runout allowance; the catalogue .051 inside that.
-    _agree(plan, "blade_min_mm", slit["width"][0])
-    _agree(plan, "blade_max_mm", slit["width"][1] - SAW_RUNOUT_MM)
-    if not p["blade_min_mm"] <= thick <= p["blade_max_mm"]:
-        raise ValueError("process.saw_thickness_mm is outside the accepted blade")
+        for top in f["top_face"]["height"]:
+            if not (
+                h - bore_r < top - slit_depth - tip_tir
+                and top - slit_depth < h + bore_r
+            ):
+                raise ValueError(
+                    "the slit's floor is not inside the adjuster bore at "
+                    "process.saw_tip_tir_max_mm"
+                )
     _agree(plan, "saw_cut_z_mm", lateral - thick / 2)
     saw_z = p["saw_cut_z_mm"]
     if not lying_grip < saw_z:
         raise ValueError("the saw's lower face is under the jaw tops")
     # Depths into the TOP end, shallowest first, the slit's depth last.
-    saw_steps = [
-        slit_depth - v for v in _levels(slit_depth, 0.0, p["slit_step_max_mm"])
-    ]
+    saw_steps = _saw_depths(slit_depth, p["slit_step_max_mm"])
+    _agree(plan, "slit_first_pass_mm", saw_steps[0])
+    _agree(plan, "slit_step_mm", saw_steps[1] - saw_steps[0])
     saw_xs = [radius - d for d in saw_steps]
     if not math.isclose(_cut(plan, "slit", "cutter_dia_mm"), saw, abs_tol=1e-6):
         raise ValueError("'slit' cutter_dia_mm is not the saw's")
@@ -799,40 +835,100 @@ def context(
         _cut(plan, "slit", "radial_woc_mm"), p["slit_step_max_mm"], abs_tol=1e-6
     ):
         raise ValueError("'slit' radial_woc_mm is not process.slit_step_max_mm")
+    if not math.isclose(_cut(plan, "slit", "axial_doc_mm"), thick, abs_tol=1e-6):
+        raise ValueError("'slit' axial_doc_mm is not process.saw_thickness_mm")
+    teeth = p["saw_teeth"]
+    if _cut(plan, "slit", "flutes") != teeth:
+        raise ValueError("'slit' flutes is not process.saw_teeth")
     saw_rpm, saw_feed = _setting(plan, shop, "slit")
     if (saw_rpm, saw_feed) != (p["saw_rpm"], p["saw_feed_per_min_mm"]):
         raise ValueError("the slit is not process.saw_rpm and saw_feed_per_min_mm")
-    # The arbor round the saw (tools.gear-cutter-arbor-1, to buy: its sizes
-    # are the plan's assumed limits, checked when it is mounted): spacers no
-    # wider than the collar limit by the saw, at least saw_spacer_above_min_mm
-    # of them above it (the arbor's shoulder then clears W), at least
-    # saw_spacer_below_min_mm below, the nut within saw_below_max_mm of the
-    # saw's lower face and no wider than saw_nut_dia_max_mm across its corners.
-    _agree(plan, "saw_collar_dia_max_mm", 2 * (radius - slit_depth - COLLAR_CLEAR_MM))
-    collar_r = p["saw_collar_dia_max_mm"] / 2
-    nut_r = p["saw_nut_dia_max_mm"] / 2
-    below, spacer_below = p["saw_below_max_mm"], p["saw_spacer_below_min_mm"]
-    above = p["saw_spacer_above_min_mm"]
-    if not 0 < spacer_below < below:
-        raise ValueError("the spacers under the saw are not inside its stack's depth")
-    if saw_z + thick + above <= f["west_face"]["width"][1]:
+    # The first pass is the same saw at the same speed and feed, its step the
+    # light one.
+    for key, value in (
+        ("cutter_dia_mm", saw),
+        ("axial_doc_mm", thick),
+        ("flutes", teeth),
+        ("radial_woc_mm", p["slit_first_pass_mm"]),
+    ):
+        if not math.isclose(_cut(plan, "slit first", key), value, abs_tol=1e-6):
+            raise ValueError(f"'slit first' {key} is not the slit's")
+    if _setting(plan, shop, "slit first") != (saw_rpm, saw_feed):
+        raise ValueError("the slit's first pass is not at the slit's speed and feed")
+    # A saw running out at its tips by saw_tip_tir_max_mm (half of it the
+    # eccentricity) stands, from one tooth to the next, at most that
+    # eccentricity times the tooth pitch angle higher: under the feed per
+    # tooth, so no tooth takes more than twice its feed.
+    if tip_tir / 2 * 2 * math.pi / teeth >= saw_feed / (saw_rpm * teeth):
         raise ValueError(
-            "process.saw_spacer_above_min_mm: the arbor's shoulder meets W"
+            "process.saw_tip_tir_max_mm: a tooth could take over twice its feed"
         )
-    # At the slit's full depth the saw's centre stands saw_xs[-1] past the
-    # top end: the spacers and the nut clear it, and both jaw sides the
-    # overhang puts farther in.
-    if saw_xs[-1] - collar_r < COLLAR_CLEAR_MM - 1e-6 or saw_xs[-1] - nut_r <= 0:
-        raise ValueError("the arbor's spacers or nut reach the top end")
+    # The arbor round the saw: the owned R8 stepped arbor (inventory
+    # tools.saw-arbor-r8-stepped; the plan repeats its recorded sizes, and
+    # test_dt_cone_tip_block_process.py holds the two together). The saw seats
+    # against the body's shoulder on its upper (spindle) side, the body
+    # saw_arbor_body_dia_mm across; the cap, saw_arbor_cap_dia_mm across and
+    # saw_arbor_cap_thickness_mm thick, clamps it from below with its
+    # countersunk screw. Two sizes the record does not carry are the plan's
+    # bounds, measured at the mounting before the spindle starts: the screw
+    # head stands at most saw_screw_stand_max_mm past the cap's face, and the
+    # spindle nose (or anything wider than the body) at least
+    # saw_nose_above_min_mm above the saw's upper face.
+    body_r = p["saw_arbor_body_dia_mm"] / 2
+    cap_r = p["saw_arbor_cap_dia_mm"] / 2
+    cap_t = p["saw_arbor_cap_thickness_mm"]
+    stand_max = p["saw_screw_stand_max_mm"]
+    nose_above = p["saw_nose_above_min_mm"]
+    if not 0 <= stand_max or not p["saw_arbor_screw_head_dia_mm"] < 2 * cap_r:
+        raise ValueError("the cap's screw head is not inside the cap")
+    _agree(plan, "saw_below_max_mm", cap_t + stand_max)
+    below = p["saw_below_max_mm"]
+    # The arbor's lowest point from the spindle nose: the record's nose to the
+    # cap's lower face (no saw fitted) plus the saw, rounded up, plus the
+    # screw head's bound.
+    _agree(
+        plan,
+        "saw_arbor_length_mm",
+        math.ceil(
+            (p["saw_arbor_nose_to_cap_mm"] + thick) / ARBOR_LENGTH_STEP_MM - 1e-9
+        )
+        * ARBOR_LENGTH_STEP_MM
+        + stand_max,
+    )
+    # The record's own figures pass both bounds: a flush screw head, and the
+    # nose the record's length less the cap above the saw.
+    if p["saw_arbor_nose_to_cap_mm"] - cap_t < nose_above:
+        raise ValueError(
+            "process.saw_nose_above_min_mm is over what the arbor's record gives"
+        )
+    # The reach past the arbor, on both sides of the saw (the body above, the
+    # cap below): (the saw - the wider of them) / 2 less ARBOR_CLEAR_MM. The
+    # slit's depth is inside it, so at full depth the body and the cap stand
+    # past the top end, and past both jaw sides the overhang puts farther in.
+    arbor_r = max(body_r, cap_r)
+    _agree(plan, "saw_reach_max_mm", radius - arbor_r - ARBOR_CLEAR_MM)
+    if slit_depth > p["saw_reach_max_mm"] + 1e-6:
+        raise ValueError("the slit is deeper than the saw's reach past its arbor")
+    if saw_xs[-1] - arbor_r < ARBOR_CLEAR_MM - 1e-6:
+        raise ValueError("the arbor's body or cap reaches the top end")
     overhang = p["slit_overhang_mm"]
     if overhang <= slit_depth + 1.0:
         raise ValueError("process.slit_overhang_mm: the saw reaches the jaws")
     _agree(plan, "vise_slit_inset_mm", -(jaw_w - (length - overhang)))
+    # The spindle nose, saw_nose_above_min_mm or more above the saw's upper
+    # face, passes over everything in the vise at the cut (the saw's lowest
+    # height): the block's W and the spacer strip standing on the vise bed.
+    strip_top = bar_w_max - p["riser_height_mm"]
+    tallest = max(f["west_face"]["width"][1], strip_top, lying_grip)
+    if saw_z + thick + nose_above < tallest + NOSE_CLEAR_MM - 1e-6:
+        raise ValueError(
+            "process.saw_nose_above_min_mm: the spindle nose does not clear the vise's load"
+        )
     _agree(plan, "saw_clear_z_mm", f["west_face"]["width"][1] + CLEAR_MM + below)
     saw_clear = p["saw_clear_z_mm"]
     _agree(plan, "saw_touch_x_mm", radius - TOUCH_IN_MM)
     _agree(plan, "saw_touch_y_mm", -depth / 2)
-    if p["saw_touch_x_mm"] - max(collar_r, nut_r) <= 0:
+    if p["saw_touch_x_mm"] - arbor_r <= 0:
         raise ValueError("the arbor reaches the top end at the saw's touch-off")
     proof_raise = p["saw_proof_raise_mm"]
 
@@ -1123,15 +1219,25 @@ def context(
     )
     # DT11: the slit, passes along +Y (conventional: the M3 saw right of the
     # top end), from beside the moving jaw's side of the block to past the
-    # fixed jaw's.
+    # fixed jaw's. The first, light pass is a section of its own: the stop
+    # after it reads the friction drive's marker line before the full passes.
     saw_y = (-depth - radius - APPROACH_MM, radius + APPROACH_MM)
+    jobs.append(
+        job(
+            saw_tool,
+            "slit",
+            "slit_first",
+            "saw the slit's first, light pass",
+            _saw(saw_xs[:1], saw_z, saw_y, width, saw_clear),
+        )
+    )
     jobs.append(
         job(
             saw_tool,
             "slit",
             "slit",
             "saw the slit into the adjuster",
-            _saw(saw_xs, saw_z, saw_y, width, saw_clear),
+            _saw(saw_xs[1:], saw_z, saw_y, width, saw_clear),
         )
     )
 
@@ -1158,6 +1264,23 @@ def context(
         "tap_foot": tap_stop("4-40 PLUG THEN BOTTOMING TAP IN THE FOOT HOLE", foot_xy),
         "tap_pinch": tap_stop("4-40 PLUG TAP IN THE PINCH HOLE FROM E", tap_pinch_xy),
         "tap_adjuster": tap_stop("1/4-28 PLUG TAP THROUGH THE ADJUSTER", adj_xy),
+        # The saw's stop after its first pass: raised clear past the top end
+        # (the pass's last move), the spindle stopped, the same tool kept (no
+        # M6); the next section starts the spindle again. CNCjs shows the
+        # %msg line when the M0 pauses it.
+        "slit_check": {
+            "tool": numbers["slit-saw"],
+            "label": names["slit-saw"],
+            "setting": "SPINDLE STOPPED",
+            "gcode": [
+                "M5",
+                "%msg PAUSE: SPINDLE STOPPED. BOTH MARKER LINES (CAP TO SAW, SAW TO"
+                " THE ARBOR'S BODY) UNBROKEN: CYCLE START. A LINE BROKEN: STOP,"
+                " THE SAW SLIPPED ON THE ARBOR",
+                "M0",
+            ],
+            "at": [_r(saw_xs[0]), _r(saw_y[1])],
+        },
     }
 
     # Keep-outs (each program's frame): the jaws beside the gripped span, from
@@ -1212,7 +1335,8 @@ def context(
     ):
         if not (-across + t_par + half < xy[1] < -t_par - half):
             raise ValueError(f"{what} reaches a stack")
-    # DT11: the jaws inward of the overhang, the stacks inside them, and the
+    # DT11: the jaws inward of the overhang, the stacks inside them, the
+    # spacer strip standing on the vise bed at the jaws' left end, and the
     # block itself (the arbor's parts must miss it at every Z).
     side = -overhang
     slit_jaws = [
@@ -1233,8 +1357,14 @@ def context(
             0.0,
         ),
     ]
+    slit_strip = _box(
+        "the spacer strip",
+        (side - jaw_w, side - jaw_w + strip_max),
+        (-depth, 0.0),
+        strip_top,
+    )
     block = _box("the block", (-length, 0.0), (-depth, 0.0), f["west_face"]["width"][1])
-    solids = slit_jaws + slit_stacks + [block]
+    solids = slit_jaws + slit_stacks + [slit_strip, block]
 
     def reach(part: str, lo: float) -> list[dict[str, Any]]:
         """``solids`` as bands of the programmed Z (the saw's lower face) in
@@ -1406,7 +1536,18 @@ def context(
     expect += [
         [name, "tool_changes", {"z_top": width, "tools": [], "loads_first": False}],
         [name, "spindle", {"rpm": [[saw_rpm]]}],
-        [name, "pauses", {"z_top": width, "count": 0}],
+        # One stop, after the first pass: the saw raised clear where that pass
+        # ended, the spindle stopped before the operator looks at the arbor.
+        [
+            name,
+            "pauses",
+            {
+                "z_top": width,
+                "count": 1,
+                "at": [manual["slit_check"]["at"]],
+                "spindle_off": True,
+            },
+        ],
         [name, "depth", {"z_min": _r(saw_z)}],
         [name, "rapids_clear", {"z_top": width}],
         [name, "air_feed", {"z_top": width}],
@@ -1423,17 +1564,22 @@ def context(
                 "below_z": width,
             },
         ],
-        [name, "keep_out", {"radius": radius, "boxes": slit_jaws + slit_stacks}],
+        [
+            name,
+            "keep_out",
+            {"radius": radius, "boxes": slit_jaws + slit_stacks + [slit_strip]},
+        ],
     ]
     # The arbor round the saw, part by part, as cut and as proved in air
     # (Z0 raised proof_raise: every part that much higher over the same
-    # shapes): spacers above the saw (from its upper face up), spacers below
-    # it (down to the stack's depth) and the nut.
+    # shapes): the body above the saw (from its upper face up, as far as the
+    # spindle) and the cap with its screw below it (down to the screw head's
+    # bound). The spindle nose is over every shape at the cut (checked with
+    # process.saw_nose_above_min_mm above).
     for lift, when in ((0.0, ""), (proof_raise, ", proved in air")):
         for part, radius_of, lo in (
-            ("spacers above the saw", collar_r, thick),
-            ("spacers below the saw", collar_r, -below),
-            ("the arbor's nut", nut_r, -below),
+            ("the arbor's body above the saw", body_r, thick),
+            ("the arbor's cap and screw below the saw", cap_r, -below),
         ):
             expect.append(
                 [
