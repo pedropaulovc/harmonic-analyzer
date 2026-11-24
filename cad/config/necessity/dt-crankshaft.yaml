@@ -14,13 +14,14 @@ necessity:
   # the pins' spacing only. The wheel's offset on the shaft comes from the
   # pins alone: its bore has .018 radial air round the shank. At the
   # ±.002 reamed-hole row the offset leaves the ANSI #25 plate .0008 mm
-  # from the spigot, under the floor. The band stays while the owner
-  # decides (N-02 names the failing check; batch-dt/crank/Q8-dt11-centre-shift.png).
+  # from the spigot, under the floor. The band stays by Main's ruling D12
+  # under the owner's delegation of 2026-11-24 (N-02 names the failing
+  # check; batch-dt/crank/Q8-dt11-centre-shift.png).
   - id: N-02
     feature: "sheet 1, END view, 2X drive-pin offset .2756 ±.0009"
     kind: gap
     reason: "shifted pins float the wheel; #25 plates hit the spigot"
-    source: "build_dt_drive_train_assembly.CHAIN_RADIAL_AIR_WORST_MIN"
+    source: "Main, by the owner's delegation of 2026-11-24 (D12): \"Q8 chain clearance: MHA-DT-11 and the three MHA-PD-09 wheels keep ±.0009 (today's band), wheel holes located from the teeth; collar by trial.\" The check it keeps is build_dt_drive_train_assembly's CHAIN_RADIAL_AIR_WORST_MIN (checks/build-dt-drive-train-assembly.yaml C-01)."
   - id: N-03
     feature: "sheet 1, FRONT view, Ø.689 +.000/-.004 seat spigot, note 2"
     kind: gap
