@@ -118,6 +118,10 @@ SAW_STEP_MAX_MM = 3.0
 # Each saw program's first pass takes this share of a step, then stops (M0,
 # spindle off) for the witness lines: a light proof of the friction drive.
 LIGHT_PASS_SHARE = 0.5
+# A saw pass may take this share of the friction drive's torque at most: the
+# drive's friction and preload are a table's, not measured, and the saw runs
+# oiled (friction .10 under a preload a quarter low leaves about half).
+DRIVE_RESERVE = 2.0
 # The plan's saw arbor: its tool id, and the shop record it names, the owned
 # R8 stepped saw arbor.
 ARBOR_TOOL = "saw-arbor"
@@ -673,35 +677,31 @@ def context(
     _agree(plan, "saw_arbor_length_mm", p["saw_arbor_below_nose_mm"] + stand)
     # The friction drive (not keyed): one face's friction torque on the clamp
     # ring between the pilot (the saw's hole) and the cap, at the plan's
-    # preload and friction; the other face and the screw are its reserve.
+    # preload and friction.
     ring = _ring_radius(p["saw_bore_mm"] / 2, min(body_r, cap_r))
     drive = p["saw_drive_friction"] * p["saw_clamp_preload_kn"] * ring
     _agree(plan, "saw_drive_torque_max_nm", drive, 0.05)
-    # That preload is the INFERRED clamp torque's (record
-    # clamp_torque_nm_inferred) and stands only on enough thread: the screw's
-    # engagement is not measured. A first-load stop counts its turns from
-    # first bite to seated before it is torqued; under one diameter of
-    # thread (to the half turn) the screw is left snug and the saw not run.
-    if p["saw_screw_engagement_min_mm"] < p["saw_screw_dia_mm"]:
+    # The screw holds that preload on its thread in the arbor: the record's
+    # engagement with no saw fitted (measured), less this saw between the
+    # shoulder and the cap, is at least one screw diameter.
+    if p["saw_screw_engagement_no_saw_mm"] - thick < p["saw_screw_dia_mm"]:
         raise ValueError(
-            "process.saw_screw_engagement_min_mm is under one screw diameter"
+            "the clamp screw's thread behind this saw, "
+            "process.saw_screw_engagement_no_saw_mm less the saw's thickness, is "
+            "under one screw diameter"
         )
-    _agree(
-        plan,
-        "saw_screw_turns_min",
-        math.ceil(2 * p["saw_screw_engagement_min_mm"] / p["saw_screw_pitch_mm"] - 1e-9)
-        / 2,
-        1e-9,
-    )
     # Runout (not measured: stops read the axial at every mounting of the
     # arbor, the radial at every clamping of the saw). Axial: a notch's width
     # is the second level's rise above the first plus the saw's swept
     # thickness (its miked thickness plus its axial runout at the rim), which
     # may run from the width's least less the rise to its most less the rise
-    # and the margin. Radial: the deepest tooth cuts the floor half the tips'
-    # total swing deeper, inside the depth's most less the margin. Both
-    # setups read to the foot notch's limits, which lie inside the top
-    # notch's.
+    # and the margin. Radial: the passes are laid out on the saw's catalogue
+    # diameter, so the deepest tooth cuts the floor deeper than the depth's
+    # target (its band's middle) by half the tips' total swing plus half the
+    # saw's excess over that diameter (the calipers read it on the first
+    # load): their sum within twice the depth's most less its target less
+    # the margin, either way. Both setups read to the foot notch's limits,
+    # which lie inside the top notch's.
     _agree(
         plan, "saw_axial_reading_per_in_mm", IN * (radius - RUNOUT_INSET_MM) / radius
     )
@@ -742,9 +742,13 @@ def context(
     )
     # The touch-off station: the saw's rim TOUCH_IN_MM in over the ends, over
     # the middle of the bar against the fixed jaw (X mirrored for the top
-    # ends). That is less than the top notch's depth, so the cap and its
-    # screw, hanging below the saw as it comes down, are beyond the ends by
-    # more than at the deepest cut.
+    # ends). That is inside the arbor's reach, so the cap and its screw,
+    # hanging below the saw as it comes down, are beyond the ends.
+    if TOUCH_IN_MM > arbor_reach:
+        raise ValueError(
+            "the saw's touch-off puts its rim farther in over the ends than the "
+            "arbor reaches: the cap would come down on them"
+        )
     touch_x = radius - TOUCH_IN_MM
     _agree(plan, "saw_touch_x_mm", touch_x)
     _agree(plan, "saw_touch_y_mm", -pitch / 2)
@@ -780,8 +784,8 @@ def context(
             "the saw's cuts are not process.saw_rpm and saw_feed_per_min_mm"
         )
     # The heaviest saw pass (the deepest bite, at the saw's full width) takes
-    # less spindle torque, by the handbook's power at this feed per tooth,
-    # than the friction drive carries.
+    # no more spindle torque, by the handbook's power at this feed per tooth,
+    # than the friction drive carries with DRIVE_RESERVE in hand.
     teeth = _cut(plan, "foot notch", "flutes")
     if teeth != p["saw_teeth"] or not math.isclose(
         saw_feed / (saw_rpm * teeth), SAW_FEED_FACTOR_AT_MM, abs_tol=1e-6
@@ -794,10 +798,11 @@ def context(
         [[lights["foot"], foot_depth], [foot_depth], [lights["top"], *top_steps], top_steps]
     )
     torque = _saw_torque_nm(bite, thick, saw_feed, saw_rpm)
-    if torque > drive:
+    if torque * DRIVE_RESERVE > drive:
         raise ValueError(
             f"the saw's heaviest pass takes {torque:.1f} N·m, over the arbor's "
-            f"friction drive, process.saw_drive_torque_max_nm {drive:.1f}"
+            f"friction drive with its reserve: {drive / DRIVE_RESERVE:.1f} of "
+            f"process.saw_drive_torque_max_nm {drive:.1f}"
         )
 
     # Ends: the end mill on its side, full height in one level.

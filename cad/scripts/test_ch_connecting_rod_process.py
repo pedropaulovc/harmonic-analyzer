@@ -124,12 +124,13 @@ def test_context_numbers_the_tools_and_places_the_cuts(ctx) -> None:
         (2.794, 1.27, 1.524)
     }
     assert outline["passes"] == [{"offset": 1.5875, "levels": [3.387, 2.201, 1.016]}]
-    # The saw's two heights, each two steps into the crowns: a step is what
-    # the arbor's friction drive carries.
+    # The saw's two heights, each three steps into the crowns: a step is what
+    # the arbor's friction drive carries with its reserve.
     saw = next(
         kw for p, c, kw in ctx["expect"] if p == "CR06_slot" and c == "side_passes"
     )
-    assert (saw["final"], saw["raw"], saw["max_step"]) == (207.012, 221.744, 7.366)
+    assert (saw["final"], saw["raw"]) == (207.012, 221.744)
+    assert saw["max_step"] == pytest.approx(14.732 / 3)
     # The end trim: two passes of 1/16 in from the longest blank's end to the
     # crowns, each 6.6 mm deep, on the measured deep setting.
     trim = next(
@@ -187,11 +188,11 @@ def test_the_saw_runs_on_the_owned_arbor_as_its_record_gives_it() -> None:
         ("saw_arbor_nose_to_cap_mm", "below_spindle_nose_in"),
     ):
         assert p[key] == pytest.approx(record[field] * 25.4, abs=1e-4), key
-    # The thread and the clamp torque are the record's inferred ones.
-    assert p["saw_clamp_torque_nm"] == record["clamp_torque_nm_inferred"]
+    # The thread, its engagement and the clamp torque are the record's.
+    assert p["saw_clamp_torque_nm"] == record["clamp_torque_nm"]
+    assert record["screw_thread"].startswith(f"M{p['saw_screw_dia_mm']:g} x ")
     assert (
-        f"M{p['saw_screw_dia_mm']:g} x {p['saw_screw_pitch_mm']:g}"
-        == record["screw_thread_inferred"]
+        p["saw_screw_engagement_no_saw_mm"] == record["screw_engagement_no_saw_mm"]
     )
     assert p["saw_bore_mm"] == pytest.approx(
         inventory["slitting-saw-2-75-064"]["bore_in"] * 25.4
@@ -214,7 +215,7 @@ def test_the_slot_program_stops_after_a_light_pass_for_the_witness_lines(
 ) -> None:
     p = PLAN["parameters"]
     # The light pass: half a step into the crowns at the near tine's wall;
-    # then two steps at each level, none over the step the drive carries.
+    # then three steps at each level, none over the step the drive carries.
     crown = p["crown_x_mm"] + p["saw_dia_mm"] / 2
     light = _lines(ctx, "slot_light")
     assert [line for line in light if line.startswith("G1 Z")] == ["G1 Z1.702 F{feed}"]
@@ -222,12 +223,13 @@ def test_the_slot_program_stops_after_a_light_pass_for_the_witness_lines(
         line.startswith(f"G0 X{crown - p['slot_light_mm']:.3f} Y") for line in light
     ) == 1
     stations = [
-        line.split()[1] for line in _lines(ctx, "slot") if line.startswith("G0 X")
+        float(line.split()[1][1:])
+        for line in _lines(ctx, "slot")
+        if line.startswith("G0 X")
     ]
-    assert stations == [
-        f"X{crown - depth:.3f}"
-        for depth in (p["slot_step_mm"], 2 * p["slot_step_mm"]) * 2
-    ]
+    assert stations == pytest.approx(
+        [crown - k * p["slot_step_mm"] for k in (1, 2, 3)] * 2, abs=1e-3
+    )
     # Then M5, the operator's %msg and M0; the rest restarts on its own M3.
     _post(ctx, tmp_path)
     text = (tmp_path / "CR06_slot.nc").read_text(encoding="utf-8").splitlines()
@@ -320,12 +322,11 @@ def test_the_eighth_cutter_leaves_the_shank_corners_inside_their_limits() -> Non
         ({"saw_arbor_length_mm": 76.2}, "saw_arbor_length_mm"),
         ({"saw_park_z_mm": 40.61}, "saw_park_z_mm"),
         ({"saw_clamp_preload_kn": 2.0}, "saw_drive_torque_max_nm"),
-        ({"saw_screw_turns_min": 6.0}, "saw_screw_turns_min"),
-        ({"saw_screw_engagement_min_mm": 4.0}, "under one screw diameter"),
-        # The slot's whole depth in one step, as before the owned arbor.
+        ({"saw_screw_engagement_no_saw_mm": 9.0}, "under one screw diameter"),
+        # The slot in two steps a level: a step over the drive's reserve.
         (
-            {"slot_step_max_mm": 15.0, "slot_step_mm": 14.732, "slot_light_mm": 7.366},
-            "takes 26.1 N·m, over the arbor's friction drive",
+            {"slot_step_max_mm": 7.5, "slot_step_mm": 7.366, "slot_light_mm": 3.683},
+            "takes 13.1 N·m, over the arbor's friction drive",
         ),
         ({"saw_feed_per_min_mm": 365.76}, "not the .001 in/tooth"),
         ({"saw_swept_margin_mm": 0.0508}, "slot_saw_swept_max_mm"),
@@ -357,19 +358,6 @@ def _seed(ctx: dict, key: str, pick, change) -> dict:
     index = next(i for i, line in enumerate(lines) if pick(line))
     lines[index] = change(lines[index])
     return seeded
-
-
-def _nth(text: str, n: int):
-    """A ``pick`` accepting the ``n``-th line equal to ``text``."""
-    seen: list[str] = []
-
-    def pick(line: str) -> bool:
-        if line == text:
-            seen.append(line)
-            return len(seen) == n
-        return False
-
-    return pick
 
 
 @pytest.mark.parametrize(

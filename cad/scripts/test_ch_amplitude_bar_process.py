@@ -179,11 +179,11 @@ def test_the_saw_runs_on_the_owned_arbor_as_its_record_gives_it() -> None:
         ("saw_arbor_nose_to_cap_mm", "below_spindle_nose_in"),
     ):
         assert p[key] == pytest.approx(record[field] * 25.4, abs=1e-4), key
-    # The thread and the clamp torque are the record's inferred ones.
-    assert p["saw_clamp_torque_nm"] == record["clamp_torque_nm_inferred"]
+    # The thread, its engagement and the clamp torque are the record's.
+    assert p["saw_clamp_torque_nm"] == record["clamp_torque_nm"]
+    assert record["screw_thread"].startswith(f"M{p['saw_screw_dia_mm']:g} x ")
     assert (
-        f"M{p['saw_screw_dia_mm']:g} x {p['saw_screw_pitch_mm']:g}"
-        == record["screw_thread_inferred"]
+        p["saw_screw_engagement_no_saw_mm"] == record["screw_engagement_no_saw_mm"]
     )
     assert p["saw_bore_mm"] == pytest.approx(
         inventory["slitting-saw-2-75-064"]["bore_in"] * 25.4
@@ -301,8 +301,7 @@ def test_a_pass_past_the_arbors_reach_is_caught_at_the_bars_ends(ctx, tmp_path) 
         ({"saw_touch_y_mm": -3.0}, "saw_touch_y_mm"),
         ({"saw_park_z_mm": 17.75}, "saw_park_z_mm"),
         ({"saw_clamp_preload_kn": 2.0}, "saw_drive_torque_max_nm"),
-        ({"saw_screw_turns_min": 6.0}, "saw_screw_turns_min"),
-        ({"saw_screw_engagement_min_mm": 4.0}, "under one screw diameter"),
+        ({"saw_screw_engagement_no_saw_mm": 9.0}, "under one screw diameter"),
         (
             {"saw_clamp_preload_kn": 2.0, "saw_drive_torque_max_nm": 4.02},
             "over the arbor's friction drive",

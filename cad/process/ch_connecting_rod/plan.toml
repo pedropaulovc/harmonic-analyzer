@@ -29,14 +29,14 @@
 # frame (not after it). Both faces are still roughed in turns to .020 over,
 # the blanks released and reseated, then both finished.
 #
-# Speed (owner's priority): NC 46 min per load of two (about 23 min a rod),
+# Speed (owner's priority): NC 49 min per load of two (about 24 min a rod),
 # from 100 in the first draft: only the ring's zone and the shank's band are
 # pocketed (the waste beside the shank was pocketed on both faces), the skim
 # covers the fork alone and the outline takes three levels instead of five.
 # The 5/64 in corner recut and its tool change went with owner ruling
 # 2026-11-23, tool audit Q9 (2 min and one M6 a load). The slot's light
-# pass and its two steps a level, for the owned arbor's friction drive, put
-# 3 min a load back (CR06 5.3 min, from 2.1).
+# pass and its three steps a level, for the owned arbor's friction drive
+# and its reserve, put 5 min a load back (CR06 7.5 min, from 2.1).
 #
 # Workholding: the agent's recommendation (option A, the vise; owner's
 # per-part choice pending, 2026-11-21). The plate supports the two blanks'
@@ -64,8 +64,8 @@
 # (saw_screw_head_stand_max_mm) and the saw's runout (slot_saw_swept_*_mm,
 # slot_saw_radial_tir_max_mm). The drive is friction alone (not keyed): the
 # screw at 20 N·m, witness lines, a light first pass and a stop to look at
-# them; the slot is cut in two steps a level (slot_step_max_mm), one step's
-# handbook torque inside the clamp's friction. CR06 and its touch-off are
+# them; the slot is cut in three steps a level (slot_step_max_mm), one step's
+# handbook torque inside half the clamp's friction. CR06 and its touch-off are
 # laid out on the record's sizes and those bounds (cam.py checks every move
 # of the saw, the arbor's body, the cap and the screw head against the stock
 # and the vise).
@@ -257,9 +257,9 @@ saw_feed_per_min_mm = 182.88
 saw_low_mm = 1.7018
 saw_high_mm = 2.7686
 slot_rise_mm = 1.0668
-slot_step_max_mm = 7.5
-slot_step_mm = 7.366
-slot_light_mm = 3.683
+slot_step_max_mm = 5.0
+slot_step_mm = 4.910667
+slot_light_mm = 2.455333
 # The owned R8 stepped saw arbor, from its record (cad/config/shop-
 # equipment/ tools.saw-arbor-r8-stepped, owner 2026-11-24; the process test
 # holds these to it): the body above the saw (body_dia_above_saw_in), the
@@ -300,30 +300,27 @@ saw_clear_z_mm = 27.098
 # that side.
 saw_below_plate_top_mm = 14.0462
 # The drive (record keyed = false): the cap's screw clamps the saw between
-# the shoulder and the cap. INFERRED by the agent, not measured (record
-# screw_thread_inferred, screw_key_mm_inferred, clamp_torque_nm_inferred):
-# an M8 x 1.25 thread, a 5 mm hex key and saw_clamp_torque_nm, about 11 kN
-# of preload (the record's cited table: 13.2 kN at 23 N·m, friction .14).
-# NOT MEASURED: the screw's thread engagement (record screw_engagement_in,
-# to_measure: a .635 screw through the .50 cap may reach only .135 into the
-# arbor, and so few threads may strip near 11 kN). Setup 5 stops on the
-# first load, before the screw is torqued: its turns by hand from first bite
-# to seated, times saw_screw_pitch_mm, are the engagement; under
-# saw_screw_engagement_min_mm (one screw diameter: saw_screw_turns_min
-# turns) the screw is left snug and the saw is not run. The friction check
-# rests on that inferred torque until the engagement is read. One face's
-# friction on the ring between the 1 in pilot and the 1.25 cap (mean radius
-# 14.35 mm) carries .14 × 11 kN × 14.35 mm = 22.1 N·m
-# (saw_drive_torque_max_nm); the other face and the screw are the reserve.
-# One step of the slot, .290 into the crowns at the full .064 width, takes
-# 13.1 N·m by the handbook's milling power; the whole .580 in one step would
-# take 26, over the drive: hence slot_step_max_mm (cam.py checks them).
-# CR06's first pass is half a step (slot_light_mm); the file then stops (M0,
-# spindle off) for a look at the witness lines.
+# the shoulder and the cap. From the record: screw_thread M8 x 1.25 (the
+# pitch gauged by the owner, the M8 read from the head),
+# screw_key_mm_inferred 5, clamp_torque_nm 20 (saw_clamp_torque_nm): about
+# 11 kN of preload (the record's cited table: 13.2 kN at 23 N·m, friction
+# .14); and screw_engagement_no_saw_mm 10.0 (the owner's 8 turns from first
+# bite to seated). With this saw between the shoulder and the cap the thread
+# holds by 10.0 less the saw's thickness, 8.4 mm: over one screw diameter
+# (saw_screw_dia_mm; cam.py checks it). One face's friction on the ring
+# between the 1 in pilot and the 1.25 cap (mean radius 14.35 mm) carries
+# .14 × 11 kN × 14.35 mm = 22.1 N·m (saw_drive_torque_max_nm). That
+# friction and preload are a table's, not measured, and the saw runs oiled:
+# a pass may take half of it at most (cam.py's DRIVE_RESERVE: oil in the
+# clamp, friction .10, under a preload a quarter low would leave 11.8 N·m).
+# One step of the slot, .193 into the crowns at the full .064 width, takes
+# 8.7 N·m by the handbook's milling power; two steps a level would take
+# 13.1 each, over half the drive, and the whole .580 in one 26: hence
+# slot_step_max_mm (cam.py checks them). CR06's first pass is half a step
+# (slot_light_mm); the file then stops (M0, spindle off) for a look at the
+# witness lines.
 saw_screw_dia_mm = 8.0
-saw_screw_pitch_mm = 1.25
-saw_screw_engagement_min_mm = 8.0
-saw_screw_turns_min = 6.5
+saw_screw_engagement_no_saw_mm = 10.0
 saw_clamp_torque_nm = 20.0
 saw_clamp_preload_kn = 11.0
 saw_drive_friction = 0.14
@@ -340,10 +337,13 @@ saw_drive_torque_max_nm = 22.1
 # 1/1.10 of itself: saw_axial_reading_per_in_mm is its reading, in mm, per
 # inch at the rim; slot_saw_axial_nominal_mm the reading a saw miking .0640
 # may show. Z0 is touched under the tooth where that face stands lowest, so
-# the near tine keeps its size and the far wall takes the runout. Radial, on
-# the tips: the deepest tooth cuts the floor half the total swing deeper;
-# the swing at most twice (the depth's most less its target less
-# saw_depth_margin_mm, .002): .016.
+# the near tine keeps its size and the far wall takes the runout. Radial:
+# the file is posted for the saw's catalogue diameter (saw_dia_mm, the
+# packing list's, not measured), so the calipers read it over two opposite
+# tips on the first load: D. The deepest tooth cuts the floor half of (D
+# less 2.750, plus the tips' total swing R) deeper than the file's depth,
+# the band's middle: that sum within twice (the depth's most less its
+# target less saw_depth_margin_mm, .002) either way: .016.
 saw_swept_margin_mm = 0.0127
 saw_depth_margin_mm = 0.0508
 saw_axial_reading_per_in_mm = 23.091
@@ -482,7 +482,7 @@ name = "2-3/4 x .064 HSS slitting saw, 1 in hole, on the R8 stepped saw arbor"
 ref = "slitting-saw-2-75-064"
 [[tools]]
 id = "saw-arbor"
-name = "R8 stepped saw arbor (owned): 1 in pilot step, body and cap 1.25 across, cap .50 thick, M8 flat-head screw (5 mm hex key), not keyed"
+name = "R8 stepped saw arbor (owned): 1 in pilot step, body and cap 1.25 across, cap .50 thick, M8 x 1.25 countersunk screw (5 mm hex key), not keyed"
 ref = "saw-arbor-r8-stepped"
 [[tools]]
 id = "dti"
@@ -848,7 +848,7 @@ inspection = "The rule touches neither parallel: both end inside the jaws' right
 gauge_checks = "other"
 
 [[setups.operations]]
-instruction = "First load, and again whenever the cap's screw has been loosened: mic the slitting saw's thickness at its rim, just inside the teeth, at four places a quarter turn apart, to .0001. Write the largest on this sheet: t."
+instruction = "First load, and again whenever the cap's screw has been loosened: mic the slitting saw's thickness at its rim, just inside the teeth, at four places a quarter turn apart, to .0001. Write the largest on this sheet: t. First load only: also the calipers across the tips of two opposite teeth, at three places round the saw. Write the largest: D."
 inspection = "t {{process.slot_saw_swept_min_mm:in.4dot}}–{{process.slot_saw_swept_max_mm:in.4dot}}: two levels of it, the second {{process.slot_rise_mm:in.3dot}} higher, make the fork slot's {{cad.fork_slot_width_min_in:.4dot}}–{{cad.fork_slot_width_max_in:.4dot}} width. Outside: stop and tell the owner."
 gauge_checks = [{ gauge = "micrometers", band_mm = ["{{process.slot_saw_swept_min_mm}}", "{{process.slot_saw_swept_max_mm}}"] }]
 
@@ -863,12 +863,7 @@ inspection = "Loads after the first: both witness lines on the saw (drawn below)
 gauge_checks = "other"
 
 [[setups.operations]]
-instruction = "First load, and whenever the screw has been loosened: wipe the arbor's shoulder, the saw's faces round its hole and the cap's face clean and dry. Saw on the pilot's 1 in step, up against the shoulder, teeth cutting with M3 (clockwise from above); cap under it; run its screw in from below by hand with the 5 mm hex key until it seats. First load: count its turns from the first bite of the thread: N."
-inspection = "First load: N {{process.saw_screw_turns_min:.1f}} or more: N × {{process.saw_screw_pitch_mm:.2f}} mm of thread holds the cap, {{process.saw_screw_engagement_min_mm:.0f}} mm (one screw diameter) or more. Fewer: so few threads may strip at the torque below: leave the screw snug, do not torque it, do not start the spindle; stop and tell the owner."
-gauge_checks = "other"
-
-[[setups.operations]]
-instruction = "First load, and whenever the screw has been loosened: torque the screw, the hex key on the torque wrench: {{process.saw_clamp_torque_nm:.0f}} N·m (15 ft·lb), the spindle held as for the drawbar. Friction alone drives the saw: the clean, dry faces and this torque are its whole drive."
+instruction = "First load, and whenever the screw has been loosened: wipe the arbor's shoulder, the saw's faces round its hole and the cap's face clean and dry (friction alone drives the saw). Saw on the pilot's 1 in step, up against the shoulder, teeth cutting with M3 (clockwise from above); cap under it; its M8 screw from below, 5 mm hex key on the torque wrench: {{process.saw_clamp_torque_nm:.0f}} N·m (15 ft·lb), spindle held as for the drawbar."
 feed = "hand"
 
 [[setups.operations]]
@@ -896,8 +891,8 @@ tool = "dial-indicator"
 drilling = "none"
 sizing = "other"
 feed = "hand"
-instruction = "First load, and whenever the screw has been loosened: the .001 in dial indicator on its magnetic base, its plunger square on the tips of the teeth. Turn the spindle one turn backward by hand (counter-clockwise seen from above, so no tooth catches the plunger) and read the tips' total swing."
-inspection = "Total swing {{process.slot_saw_radial_tir_max_mm:in.3dot}} or less: the deepest tooth cuts the floor half that deeper, inside the slot's depth band. Over: re-seat the saw as for A and read both again. Over after two tries: stop and tell the owner."
+instruction = "First load, and whenever the screw has been loosened: the .001 in dial indicator on its magnetic base, its plunger square on the tips of the teeth. Turn the spindle one turn backward by hand (counter-clockwise seen from above, so no tooth catches the plunger). The needle drops into every gullet: read its peaks, on the tips, only. R = the highest peak less the lowest."
+inspection = "R + (D − {{process.saw_dia_mm:in.3dot}}) from −{{process.slot_saw_radial_tir_max_mm:in.3dot}} to {{process.slot_saw_radial_tir_max_mm:in.3dot}}: the file is posted for a {{process.saw_dia_mm:in.3dot}} saw, and the deepest tooth cuts the floor half that sum deeper, inside the slot's depth band. Over: re-seat the saw as for A and read both again. Over after two tries, or under: stop and tell the owner D and R."
 gauge_checks = "other"
 
 [[setups.operations]]
@@ -917,7 +912,7 @@ speed_kind = "spindle"
 tool = "saw"
 drilling = "none"
 sizing = "other"
-instruction = "Run CR06_slot (the saw; set 100): first one light pass along +Y across the whole load, {{process.slot_light_mm:in.3dot}} into both forks' crowns, the saw's lower face {{process.saw_low_mm:in.4dot}} above Z0 (conventional: the saw turns clockwise right of the forks; fed the other way it would grab and turn on the arbor). Cutting oil on the saw. The file then stops (M0): spindle off, the saw raised clear past the fixed jaw."
+instruction = "Run CR06_slot (the saw; set 100): first one light pass along +Y across the whole load, {{process.slot_light_mm:in.3dot}} into both forks' crowns, the saw's lower face {{process.saw_low_mm:in.4dot}} above Z0 (conventional: clockwise right of the forks, each tooth cuts from the floor outward; fed the other way the saw would climb and turn on the arbor). Cutting oil on the saw. The file then stops (M0): spindle off, the saw raised clear past the fixed jaw."
 rpm = 100
 feed = "{{process.saw_feed_per_min_mm:in.1f}} in/min"
 milling_cuts = [
@@ -934,7 +929,7 @@ speed_kind = "spindle"
 tool = "saw"
 drilling = "none"
 sizing = "other"
-instruction = "Same file, after Cycle Start: four more passes along +Y, {{process.slot_step_mm:in.3dot}} then {{cad.fork_slot_depth_in:.3dot}} into both forks' crowns and the waste strips beside them: two with the saw's lower face {{process.saw_low_mm:in.4dot}} above Z0 (the near tine's wall), two with it {{process.saw_high_mm:in.4dot}} above Z0, its upper face making the far tine's wall."
+instruction = "Same file, after Cycle Start: six more passes along +Y into both forks' crowns and the waste strips beside them, in three steps of {{process.slot_step_mm:in.3dot}} to {{cad.fork_slot_depth_in:.3dot}}: three with the saw's lower face {{process.saw_low_mm:in.4dot}} above Z0 (the near tine's wall), three with it {{process.saw_high_mm:in.4dot}} above Z0, its upper face making the far tine's wall."
 rpm = 100
 feed = "{{process.saw_feed_per_min_mm:in.1f}} in/min"
 milling_cuts = [
