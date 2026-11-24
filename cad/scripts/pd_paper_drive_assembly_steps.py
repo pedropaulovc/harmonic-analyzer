@@ -75,9 +75,10 @@ SEQUENCE: tuple[str, ...] = (
     "disc-taps-transferred",
     # Hanger, on the bench, then hung (R9-6: the spacer is fitted as made).
     "latch-pin-pressed",
-    # R9-68: the plain pin pressed into the arm's reamed hole, head on the
-    # arm's rear face (pd_transgear_pin_spec), before the plate is set: the
-    # pressed shank is the cluster's running axis, so the setting indicates
+    # R9-68: the plain one-diameter pin bonded in the arm's reamed hole, head
+    # on the arm's rear face (pd_transgear_pin_spec; a slip fit with LOCTITE
+    # 638, fit audit 2026-11-23), before the plate is set: the
+    # bonded shank is the cluster's running axis, so the setting indicates
     # it (not the head, which no drawing control holds to the shank: codjiflo
     # P2 on 8e8d5d5) and the trial mesh runs the cluster on it (#2417).
     "pin-pressed",

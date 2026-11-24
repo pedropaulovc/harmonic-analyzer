@@ -218,13 +218,13 @@ PIVOT_SHOULDER_END_SQUARENESS_ALLOWED = (
 ) * math.tan(PIVOT_SHOULDER_END_ANGLE_ALLOWED)  # .0019
 
 
-# --- Pin at S: REAM THROUGH, the press for the MHA-PD-23 pin (R9-68) ---------
-# The MHA-PD-23 pin is pressed in from the rear until its head seats on the
-# rear face, so the hole is reamed square through the ground faces.  #2415:
-# only the pin's short press land under its head grips this ream; the
-# running journal passes through it clear and is never dragged through the
-# press.  The press is asserted in pd_transgear_arm_spec, which imports
-# both: the pin spec imports this module.
+# --- Pin at S: REAM THROUGH, the bore the MHA-PD-23 pin is bonded in ---------
+# The one-diameter MHA-PD-23 pin slips in from the rear until its head seats
+# on the rear face and is bonded there (fit audit 2026-11-23, pending owner
+# confirmation; it replaces the #2415 press), so the hole is reamed square
+# through the ground faces.  The bond's gap is asserted in
+# pd_transgear_arm_spec, which imports both: the pin spec imports this
+# module.
 PIN_STATION = 68.815  # |S - P|, the reducer's kinematic station; BASIC .XXXX
 # Preserve the pivot, latch and pressed stud. The rack setting follows the
 # feed contact law; only the reducer bearing follows its physical axis datum.
