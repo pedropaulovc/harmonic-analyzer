@@ -55,10 +55,16 @@ HUB_DIA_PLACES = 2
 HUB_LENGTH = 20.5486  # .809
 HUB_LENGTH_PLACES = 3
 HUB_LENGTH_BAND = FIT_LENGTH_BAND_IN
-# The press acceptance (registry process): a .0005 feeler does not enter
+# The press acceptance (registry process): a .002 feeler does not enter
 # under the shoulder.  One-sided: the hub face may stand at most this much
-# further forward of face A than HUB_LENGTH, never further back.
-SHOULDER_SEAT_GAP_MAX = 0.0127  # .0005
+# further forward of face A than HUB_LENGTH, never further back.  .002 is
+# the coarsest leaf, in .001 steps, at which the MHA-PD-22 collar's air to
+# the MHA-PD-06 disc still holds its floor (transgear_cluster_fit PS; .003
+# leaves the statistical air 0.092 mm under its 0.1016); it was .0005, a
+# check finer than .XXX with no failure to name (machinist review
+# 20261124T013305458Z, rule 4; fit audit 2026-11-23, pending owner
+# confirmation).
+SHOULDER_SEAT_GAP_MAX = 0.0508  # .002
 
 # --- Overall: hub face to rear face -------------------------------------------
 # The knob's end float runs between the thrust ring on the hub face and the

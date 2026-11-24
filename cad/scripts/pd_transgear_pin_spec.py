@@ -3,7 +3,7 @@ r"""Pure-data contract for MHA-PD-23, the transgear pin (R9-68).
 The plain steel pin the disc cluster runs on: one diameter from head to tip.
 Its shank slides through the MHA-PD-18 arm's reamed hole at S from the rear
 until the domed head seats on the arm's rear face, and is bonded there with
-LOCTITE 638 (fit audit 2026-11-23, pending owner confirmation; it replaces
+LOCTITE 638 (owner ruling 2026-11-24, fit audit question 4; it replaces
 the #2415 press land).  Forward of the arm the same shank carries, rear to
 front, the MHA-PD-24 rear bushing, the MHA-PD-10 sleeve (with the disc, hub
 and screws on it), the MHA-PD-25 front bushing and, in the groove near its
@@ -93,6 +93,14 @@ BOND_GAP = (
     round(ARM.PIN_BORE_DIA_MIN - DIA_MAX, 6),
     round(ARM.PIN_BORE_DIA_MAX - DIA_MIN, 6),
 )  # (least, greatest) diametral: .0010, .0017
+# Rule 23: the bond's clearance as note 1 prints it (the pin is made last),
+# the least the reamer and the shank model to the most the arm traveler's
+# .127 set pin accepts: a bore that just refuses that pin, on the smallest
+# modelled shank.  Here, not in pd_transgear_arm_spec, so the pin's sheet
+# reads no arm module but the geometry above (Codjiflo r1 on #3492).
+BOND_NO_GO_PIN_DIA = 3.2258  # .127, one pin of the .001-step set
+BOND_GAP_ACCEPTED_MAX = round(BOND_NO_GO_PIN_DIA - DIA_MIN, 6)  # .0022
+BOND_CLEARANCE_PRINTED = (BOND_GAP[0], BOND_GAP_ACCEPTED_MAX)  # .0010-.0022
 # The bonded length: the thinnest arm less the rear mouth's largest chamfer
 # and the front face's largest edge break.
 BOND_LENGTH_MIN = round(

@@ -198,15 +198,16 @@ if ARM.PIVOT_SHOULDER_END_SQUARENESS_ALLOWED <= 0.0:
     raise AssertionError("the pivot's least clearance leaves the shoulder end no lean")
 
 
-# Head and spring in the spot face; the arm bore is a drilled running
-# clearance on the stock shoulder, its whole maximum paid as float.
+# Head and spring in the spot face, at its smallest (the title block's
+# .XX); the arm bore is a drilled running clearance on the stock shoulder,
+# its whole maximum paid as float.
 # The spring's I.D. may float on the stock shoulder to the spot-face wall.
-HEAD_RADIAL_CLEARANCE = (ARM.SPOT_FACE_DIA - PIVOT.HEAD_DIA) / 2.0
+HEAD_RADIAL_CLEARANCE = (ARM.SPOT_FACE_DIA_MIN - PIVOT.HEAD_DIA) / 2.0
 SHOULDER_RADIAL_CLEARANCE = ARM.PIVOT_BORE_DIAMETRAL_CLEARANCE[0] / 2.0
 PIVOT_RADIAL_FLOAT_MAX = ARM.PIVOT_BORE_DIAMETRAL_CLEARANCE[1] / 2.0
 SPRING_RIM_CLEARANCE = (
-    ARM.SPOT_FACE_DIA - SPRING.OD - (SPRING.ID - _SHOULDER_MIN)
-) / 2.0  # 0.81
+    ARM.SPOT_FACE_DIA_MIN - SPRING.OD - (SPRING.ID - _SHOULDER_MIN)
+) / 2.0  # 0.68
 if min(HEAD_RADIAL_CLEARANCE, SHOULDER_RADIAL_CLEARANCE, SPRING_RIM_CLEARANCE) <= 0.0:
     raise AssertionError("the pivot screw or its spring binds in the arm")
 

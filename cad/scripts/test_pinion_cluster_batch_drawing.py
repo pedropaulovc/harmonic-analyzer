@@ -716,7 +716,7 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
                 2.261,
                 8.7122,
             ),
-            # Fit audit 2026-11-23 (pending owner confirmation): MHA-PD-23 is
+            # Owner ruling 2026-11-24, fit audit question 4: MHA-PD-23 is
             # a bonded slip fit in the arm's ream, modelled with clearance,
             # so the pair needs no interference allowance.
             # MHA-PD-VN-64 1/8 (Ø3.175) dowels pressed into the arm's Ø3.1496

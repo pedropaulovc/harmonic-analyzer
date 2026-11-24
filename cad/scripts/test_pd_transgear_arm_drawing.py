@@ -147,20 +147,26 @@ def test_the_latch_pin_hole_depth_is_a_min_over_a_drill_point() -> None:
     assert geometry.PIN_HOLE_POINT_LENGTH == pytest.approx(
         geometry.PIN_HOLE_DIA / 2.0 / math.tan(math.radians(59.0)), abs=1e-4
     )
+    # The MIN prints as the model value with " MIN" its suffix and no native
+    # tolerance (swTolMIN prints a lowercase "min."; fit batch review r1).
     calls = [
         node
         for node in ast.walk(ast.parse(Path(part.__file__).read_text(encoding="utf-8")))
-        if isinstance(node, ast.Call) and getattr(node.func, "id", None) == "set_single_limit"
+        if isinstance(node, ast.Call)
+        and getattr(node.func, "id", None) == "_author_dimension_text"
     ]
-    assert len(calls) == 1
-    call = calls[0]
-    assert [ast.unparse(arg) for arg in call.args[1:]] == ["'PinHole'", "'PinHoleDepth'"]
-    assert {kw.arg: ast.unparse(kw.value) for kw in call.keywords} == {
-        "limit": "PIN_HOLE_DEPTH",
-        "band": "PIN_HOLE_DEPTH_BAND",
-        "tol_type": "SW_TOL_MIN",
+    authored = {
+        ast.unparse(call.args[2]): {kw.arg: ast.unparse(kw.value) for kw in call.keywords}
+        for call in calls
     }
-    # The MIN's upper record: the deepest hole that still holds the wall
+    assert authored == {
+        "'SpotFaceDia'": {"lane": "1", "text": "COUNTERBORE_PREFIX"},
+        "'PinHoleDepth'": {"lane": "2", "text": "MIN_SUFFIX", "limit": "PIN_HOLE_DEPTH"},
+        "'PinMouthChamfer'": {"lane": "2", "text": "MIN_SUFFIX", "limit": "PIN_MOUTH_CHAMFER"},
+    }
+    assert spec.MIN_SUFFIX == " MIN"
+    assert "set_single_limit" not in Path(part.__file__).read_text(encoding="utf-8")
+    # The MIN's analysis record: the deepest hole that still holds the wall
     # target at the faces (run-off charged) and from its point to the pin
     # bore; on the 3/8 bar the pin bore governs (#2019).
     upper, lower = spec.PIN_HOLE_DEPTH_BAND
@@ -357,24 +363,26 @@ def test_the_latch_pin_full_diameter_passes_the_hook_at_the_printed_tip_band() -
     ) > _worst_far_face_margin(printed, deeper)
 
 
-def test_the_explicit_bands_are_the_spot_face_and_the_reams() -> None:
+def test_the_explicit_bands_are_the_floor_and_the_rear_mouth() -> None:
     """The latch-pin hole's height has no explicit band: its .XXX title-block
     row governs (coordinator ruling (a), #2019).  The locating reams and the
     latch-pin ream print their set reamer's size and no band: their dowels
-    are the gauges (fit audit 2026-11-23)."""
+    are the gauges (fit audit 2026-11-23).  The counterbore's Ø prints at
+    the title block's .XX (fit batch review r1: its +.004/0 answered no
+    necessity test)."""
     assert model_toleranced_dimensions(part) == {
-        ("SpotFaceProfile", "SpotFaceDia"): "*deviations(SPOT_FACE_DIA_BAND)",
         ("SpotFaceProfile", "FloorDepth"): "SPOT_FACE_FLOOR_TOLERANCE",
-        ("PinBoreRearMouthProfile", "PinMouthChamfer"): "PIN_MOUTH_CHAMFER_TOLERANCE",
     }
     assert geometry.LATCH_PIN_HEIGHT_BAND == geometry.printed_reach_mm(
         geometry.PIN_HOLE_Z, spec.DRAWING_PRECISION_BY_NAME["PinHoleZ"]
     )
     assert not hasattr(spec, "LATCH_PIN_HEIGHT_TOLERANCE")
-    # The piloted counterbore only cuts oversize.  The latch pin's hole is
-    # modelled at its .1240 reamer's size, under the 1/8 dowel at every size
-    # the reamer is modelled to cut.
-    assert min(spec.SPOT_FACE_DIA_BAND) == 0.0 < max(spec.SPOT_FACE_DIA_BAND)
+    # The counterbore's Ø is the title block's .XX row, both ways.  The latch
+    # pin's hole is modelled at its .1240 reamer's size, under the 1/8 dowel
+    # at every size the reamer is modelled to cut.
+    assert spec.SPOT_FACE_DIA_PLACES == spec.DRAWING_PRECISION_BY_NAME["SpotFaceDia"] == 2
+    assert spec.SPOT_FACE_DIA_BAND == pytest.approx((0.254, -0.254))
+    assert spec.COUNTERBORE_PREFIX == "<HOLE-SPOT> <MOD-DIAM>"
     assert geometry.PIN_HOLE_DIA == pytest.approx(0.1240 * 25.4)
     assert geometry.PIN_HOLE_DIA + max(geometry.PIN_HOLE_DIA_BAND) < pin.DIA + min(pin.DIA_BAND)
 
@@ -431,11 +439,12 @@ def test_the_tap_callout_text_is_proved_by_its_readback(monkeypatch, persist) ->
 
 
 def test_the_pin_is_bonded_in_the_bore_with_clearance_at_every_limit() -> None:
-    """Fit audit 2026-11-23 (pending owner confirmation): the reamed bore at
-    S takes the one-diameter MHA-PD-23 pin as a bonded slip fit.  The bore
-    prints the reamer's size with no band; its callout prints rule 23's bond
-    clearance and the gap's one limit, a set pin that must not enter, and
-    the note names the mate, the compound, the acceptance and why."""
+    """Owner ruling 2026-11-24, fit audit question 4: the reamed bore at
+    S takes the one-diameter MHA-PD-23 pin, bonded.  The bore prints the
+    reamer's size with no band and says the pin is turned to it; the pin,
+    made last, prints rule 23's clearance and the trial on its own sheet
+    (fit batch review r2).  The set pin that bounds the gap is the
+    traveler's."""
     assert not hasattr(spec, "PIN_PRESS_INTERFERENCE")
     least, greatest = spec.PIN_BOND_GAP
     assert (least, greatest) == pytest.approx(cluster_pin.BOND_GAP)
@@ -445,21 +454,25 @@ def test_the_pin_is_bonded_in_the_bore_with_clearance_at_every_limit() -> None:
     )
     assert spec.PIN_BOND_GAP_ACCEPTED_MAX < cluster_pin.LOCTITE_638_GAP_MAX
     assert spec.PIN_BOND_CLEARANCE_PRINTED == (least, spec.PIN_BOND_GAP_ACCEPTED_MAX)
+    # Owner ruling 2026-11-24: the reason the bore is reamed is in the
+    # part's necessity file, not on the sheet.
     assert arm_notes.PIN_BORE_CALLOUT.split("\n") == [
-        f"REAM THRU, SEE NOTE {arm_notes.PIN_NOTE}, SHEET 2",
-        f"BONDED FIT ON {cluster_pin.PIN_NUMBER} (CLEARANCE .0010-.0022)",
-        ".127 PIN DOES NOT ENTER",
+        "REAM THRU",
+        f"{cluster_pin.PIN_NUMBER} BONDED, TURNED TO THIS BORE",
     ]
-    note = " ".join(arm_notes.NOTES[arm_notes.PIN_NOTE - 1].split())
-    assert note == (
-        f"{arm_notes.PIN_NOTE}. PIN BORE: PIN {cluster_pin.PIN_NUMBER} BONDED WITH "
-        f"{cluster_pin.RETAINING_COMPOUND}: PIN ENTERS, NO SHAKE. "
-        f"{arm_notes.PIN_BORE_NECESSITY}."
-    )
-    # A note carries no size; the necessity answer is one line of at most
-    # six words beyond the mate's number.
-    assert not re.search(r"\d*\.\d", note.split(". ", 1)[1])
-    assert len(re.sub(r"MHA-\S+", "", arm_notes.PIN_BORE_NECESSITY).split()) <= 6
+    assert "CLEARANCE" not in arm_notes.PIN_BORE_CALLOUT
+    # The pin station's extension line stands left of the text and the
+    # square end's right of it (r1 and r2 each struck a row), at the
+    # 2.61 mm a character r2's sheet printed.
+    text_x = drawing.FRONT_KEEP["PinBoreDia"][0]
+    half = max(map(len, arm_notes.PIN_BORE_CALLOUT.split("\n"))) * 0.00261 / 2.0
+    assert text_x - half > drawing._front_x(geometry.PIN_STATION) + 0.005
+    assert text_x + half < drawing._front_x(geometry.TIP_STATION) - 0.005
+    assert not hasattr(arm_notes, "PIN_NOTE")
+    assert "PIN BORE" not in arm_notes.NOTES_TEXT
+    assert cluster_pin.RETAINING_COMPOUND not in arm_notes.NOTES_TEXT
+    assert "DOES NOT ENTER" not in arm_notes.PIN_BORE_CALLOUT
+    assert not hasattr(arm_notes, "PIN_BORE_NECESSITY")
     # #2174: the rear mouth's band is its own native leg dimension's, in
     # section D-D, not callout text.
     assert "MOUTH" not in arm_notes.PIN_BORE_CALLOUT
@@ -467,21 +480,24 @@ def test_the_pin_is_bonded_in_the_bore_with_clearance_at_every_limit() -> None:
     assert min(geometry.PIN_BORE_DIA_BAND) == 0.0 < max(geometry.PIN_BORE_DIA_BAND)
 
 
-def test_the_rear_mouth_prints_its_modelled_band_on_its_native_leg_in_d_d() -> None:
-    """#2174 (Codjiflo on #2124): the rear mouth's .006/.010 printed as text
-    in the pin bore's callout. Its leg is the revolved profile's native
-    dimension, toleranced on the part, and the pin's root-clearance check
-    reads the limits that band prints. Section D-D cuts on the profile's
-    plane; its text stands off the line, left of the cut face, its shoulder
-    at the mouth's height, clear of the border, the plan and the title
-    block."""
+def test_the_rear_mouth_prints_its_minimum_on_its_native_leg_in_d_d() -> None:
+    """#2174 (Codjiflo on #2124): the rear mouth's leg is the revolved
+    profile's native dimension, and the pin's root-clearance check reads its
+    limits. Fit batch review r3: it prints one limit, .006 MIN (the model
+    value with a MIN suffix); its upper limit is the title block's break.
+    Section D-D cuts on the profile's plane; its text stands off the line,
+    left of the cut face, its shoulder at the mouth's height, clear of the
+    border, the plan and the title block."""
     assert spec.DRAWING_DIMENSIONS["PinBoreRearMouthProfile"] == {"PinMouthChamfer"}
     assert set(drawing.PIN_SECTION_KEEP) == {"PinMouthChamfer"}
-    tolerance = geometry.PIN_MOUTH_CHAMFER_TOLERANCE
-    assert geometry.PIN_MOUTH_CHAMFER_LIMITS == pytest.approx(
-        (geometry.PIN_MOUTH_CHAMFER - tolerance, geometry.PIN_MOUTH_CHAMFER + tolerance)
-    )
+    assert not hasattr(geometry, "PIN_MOUTH_CHAMFER_TOLERANCE")
+    assert geometry.PIN_MOUTH_CHAMFER_LIMITS[0] == geometry.PIN_MOUTH_CHAMFER
     assert geometry.PIN_MOUTH_CHAMFER_LIMITS == pytest.approx((0.1524, 0.254))
+    source = Path(part.__file__).read_text(encoding="utf-8")
+    assert (
+        'adapter, "PinBoreRearMouthProfile", "PinMouthChamfer", lane=2,\n'
+        "        text=MIN_SUFFIX, limit=PIN_MOUTH_CHAMFER,"
+    ) in source
     # Round 4: the mouth is named by the datum its face is opposite, never by
     # the undefined direction word REAR.
     assert arm_notes.PIN_MOUTH_CALLOUT.splitlines()[0] == "X 45\u00b0 MOUTH OPPOSITE DATUM A"
@@ -642,7 +658,7 @@ def test_the_latch_pin_hole_names_its_press_on_mha_169() -> None:
     assert f"SEE NOTE {arm_notes.LATCH_PIN_NOTE}" in arm_notes.PIN_HOLE_CALLOUT
     note = " ".join(arm_notes.NOTES[arm_notes.LATCH_PIN_NOTE - 1].split())
     assert "DOES NOT ENTER BY HAND" in note
-    assert "HOLDS LATCH STOP, NO OTHER FASTENER" in note
+    assert "HOLDS" not in note and "FASTENER" not in note
     assert "INTERFERENCE" not in note and not any(char.isdigit() for char in note[2:].replace(
         spec.LATCH_PIN_NUMBER, ""
     ))
@@ -738,7 +754,7 @@ def test_the_section_texts_stand_inside_the_left_border_and_off_the_section() ->
     right end up through the text, so the text stands right of its line,
     clear of section A-A's caption (centred under the section, about 46 mm
     wide); the isometric moved to sheet 2 (review of 67d749fb4)."""
-    lines = [".2717 \u00b1.002", *arm_notes.SPRING_CALLOUT.splitlines()]
+    lines = [".2717 \u00b1.002", *arm_notes.FLOOR_CALLOUT.splitlines()]
     width = max(map(len, lines)) * _CAPS_CHAR_WIDTH
     half_height = len(lines) * _LINE_PITCH / 2.0
     x, y = drawing.FLOOR_TEXT_XY
@@ -769,10 +785,7 @@ def test_the_section_texts_stand_inside_the_left_border_and_off_the_section() ->
 
 
 def _counterbore_box() -> tuple[float, ...]:
-    return _centred_box(
-        ["+.004", "\u00d8.500 .000", *arm_notes.SPRING_CALLOUT.splitlines()],
-        drawing.SECTION_KEEP["SpotFaceDia"],
-    )
+    return _centred_box(["\u2334 \u00d8.50"], drawing.SECTION_KEEP["SpotFaceDia"])
 
 
 def test_the_end_width_text_clears_the_section_arrow_and_the_end_view() -> None:
@@ -892,16 +905,23 @@ def test_registry_row_is_the_made_steel_mha_164() -> None:
 
 def test_the_counterbore_and_its_floor_name_the_pivot_spring() -> None:
     """Machinist review (blocker): the counterbore's +0.1/0 and its floor's
-    ±0.05 named no mate. The spring seats in it; the floor sets its room."""
+    ±0.05 named no mate. The spring seats in it; the floor sets its room.
+    Fit batch review r1: the Ø is a clearance pocket at the title block's
+    row and carries no words; the floor's row names the spring it seats.
+    Owner ruling 2026-11-24: why the floor's band is tight is in the part's
+    necessity file, not on the sheet."""
     spring = _config.parts("pd-vn-transgear-pivot-spring")["number"]
     assert spring == "MHA-PD-VN-63"
-    # The counterbore's Ø and its floor link one note naming the spring they
-    # seat and preload.
-    assert arm_notes.DIMENSION_CALLOUTS["SpotFaceDia"] == arm_notes.SPRING_CALLOUT
-    assert arm_notes.DIMENSION_CALLOUTS["FloorDepth"] == arm_notes.SPRING_CALLOUT
-    assert arm_notes.SPRING_CALLOUT == f"SEE NOTE {arm_notes.SPRING_NOTE}, SHEET 2"
-    note = " ".join(arm_notes.NOTES[arm_notes.SPRING_NOTE - 1].split())
-    assert spring in note and "PRELOAD" in note
+    assert "SpotFaceDia" not in arm_notes.DIMENSION_CALLOUTS
+    assert arm_notes.DIMENSION_CALLOUTS["FloorDepth"] == arm_notes.FLOOR_CALLOUT
+    assert arm_notes.FLOOR_CALLOUT == f"SEATS SPRING {spring}"
+    assert "SPRING" not in arm_notes.NOTES_TEXT
+    # The registry reason: the room leaves the spring's working range at
+    # the title block's ±.005.
+    import transgear_hanger_joints as joints
+
+    loosened = joints.SPRING_ROOM_MIN + geometry.SPOT_FACE_FLOOR_BAND - 0.127
+    assert joints.SPRING_ROOM_MIN >= joints.SPRING.WORKING_HEIGHT > loosened
 
 
 def test_every_sheet_one_note_link_names_the_notes_sheet() -> None:
@@ -913,7 +933,7 @@ def test_every_sheet_one_note_link_names_the_notes_sheet() -> None:
         for line in text.splitlines()
         if "SEE NOTE" in line
     ]
-    assert len(links) == 6
+    assert len(links) == 3
     assert all(line.endswith(f", SHEET {arm_notes.NOTES_SHEET}") for line in links)
     assert arm_notes.NOTES_SHEET == 2 == len(drawing.SHEET_NAMES)
 
@@ -945,16 +965,17 @@ def test_the_locating_holes_name_their_dowel_press_and_match_drill() -> None:
     flat = " ".join(
         (arm_notes.LOCATOR_CALLOUT_TEXT + " " + arm_notes.NOTES[arm_notes.LOCATOR_NOTE - 1]).split()
     )
-    # The contract, not the wording: the through ream, the mouth break's
-    # limit, the dowel, its acceptance by trial, what the press protects,
-    # and the match-drill partner and the assembly view that sets it.  No
-    # interference range is printed.
+    # The contract, not the wording: the through ream, the dowel, its
+    # acceptance by trial, what the press protects, and the match-drill
+    # partner and the assembly view that sets it.  No interference range is
+    # printed, and no mouth break: the title block's governs (fit batch
+    # review r1).
+    assert "MOUTH" not in flat and "MAX" not in flat
+    assert geometry.LOCATOR_MOUTH_BREAK_MAX_MM == geometry.OUTLINE_EDGE_BREAK_MAX_MM
     for fact in (
         "THRU",
-        ".002 MAX",
         dowel.PART_NUMBER,
         "DOES NOT ENTER BY HAND",
-        "KEEPS PLATE AT REDUCER MESH SETTING",
         plate,
         knob_setting_ref(),
     ):
@@ -975,7 +996,7 @@ def test_the_locating_dowels_punch_out_from_the_front() -> None:
     assert "LocatorDepth" not in arm_notes.DIMENSION_CALLOUTS
     assert "LocatorHoles" not in spec.DRAWING_DIMENSIONS
     deepest = max(dowel.INSERTION_LIMITS_MM)
-    front_break = geometry.LOCATING_PIN.HOLE_MOUTH_BREAK_AXIAL_MAX_MM
+    front_break = geometry.LOCATOR_MOUTH_BREAK_MAX_MM
     thinnest = geometry.THICKNESS - geometry.THICKNESS_BAND
     assert spec.LOCATOR_PUNCH_AIR_MIN_MM == pytest.approx(thinnest - front_break - deepest)
     assert spec.LOCATOR_PUNCH_AIR_MIN_MM > 1.0
@@ -1293,7 +1314,7 @@ def test_arm_feature_bands_are_the_printed_ones() -> None:
     assert pivot["dia"] == pytest.approx([_in(0.196), _in(0.200)])
     assert pivot["process"] == "drill" and pivot["thru"] is True and pivot["datum"] == "B"
     spot = features["spot_face"]
-    assert spot["dia"] == pytest.approx([_in(0.500), _in(0.504)])
+    assert spot["dia"] == pytest.approx([_in(0.49), _in(0.51)])
     # The native ±.002 qualifies the 6.9 model floor (.2717 printed).
     assert spot["floor"] == pytest.approx([6.9 - _in(0.002), 6.9 + _in(0.002)])
     assert spot["floor_from"] == "front_face"
@@ -1306,7 +1327,7 @@ def test_arm_feature_bands_are_the_printed_ones() -> None:
     latch = features["latch_pin_hole"]
     assert latch["dia"] == pytest.approx([_in(0.1240), _in(0.1245)])
     assert latch["depth"][0] == pytest.approx(_in(0.38)) and latch["depth_printed"] == "MIN"
-    assert latch["height"] == pytest.approx([_in(0.183), _in(0.193)])
+    assert latch["height"] == pytest.approx([_in(0.18), _in(0.20)])
     dowels = features["dowel_holes"]
     assert dowels["dia"] == pytest.approx([_in(0.1240), _in(0.1245)])
     assert dowels["made_at"] == "assembly" and dowels["count"] == 2
