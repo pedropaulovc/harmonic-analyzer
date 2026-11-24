@@ -582,7 +582,14 @@ if GEAR_DATA_RIGHT > REAR_X - 0.003:
 NOTES_XY = (0.300, 0.100)
 TITLE_BLOCK_TOP = 0.0663
 NOTES_CHAR_HEIGHT = GEAR_DATA_CHAR_HEIGHT
-DATUM_A_SYMBOL = (END_CENTER[0] - 0.017, END_CENTER[1] - 0.018)
+# Datum A stands on the journal's own upper outline in the side view, where
+# only the journal can be meant: on the rear view's journal circle its
+# triangle read as resting on the tooth-root circle .005 outside it
+# (machinist review r2 of the fit batch).  A turned flank is a drawing
+# SILHOUETTE.  The tag stands between detail B's kept texts (right ends
+# ~0.100) and the journal Ø's line (0.1348), under the detail's crop.
+DATUM_A_PICK = (REAR_X + 0.041, _sheet_y(JOURNAL_DIA / 2.0))
+DATUM_A_SYMBOL = (DATUM_A_PICK[0], DATUM_A_PICK[1] + 0.011)
 # The rear #2-56 tap's native callout, from the rear view's hole to the open
 # field under the journal.  Its leader lands on the lower corner of the
 # rows' underline, so rows that straddle the hole's x are struck by it
@@ -1416,8 +1423,9 @@ def build(adapter: Any) -> dict[str, str]:
     journal_datum = PART_DATUMS[0]
     add_datum_feature(
         adapter,
-        end,
-        entity=visible_circle_edge(adapter, end, JOURNAL_DIA),
+        side,
+        edge_xy=DATUM_A_PICK,
+        entity_type="SILHOUETTE",
         symbol_xy=DATUM_A_SYMBOL,
         datum=journal_datum.letter,
         label="knob running journal datum",

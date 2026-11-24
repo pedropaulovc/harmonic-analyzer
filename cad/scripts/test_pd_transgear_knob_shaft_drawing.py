@@ -1039,9 +1039,9 @@ def test_neck_dia_block_and_frames_share_the_band_over_the_crop() -> None:
 
 def test_neck_detail_annotations_stay_clear_of_the_side_and_end_views() -> None:
     # The detail, its frame, label and kept texts sit left of the journal
-    # Ø's witness line and over the journal's outline; the gear data dropped
-    # to the lower left, between the datum A box (bottom 0.140) and the
-    # border (0.0127).
+    # Ø's witness line and over the journal's outline; the gear data stands
+    # at the lower left, under the rear view (0.140) and over the border
+    # (0.0127).
     journal_line = drawing.SIDE_KEEP["JournalDia"][0]
     journal_top = drawing._sheet_y(spec.JOURNAL_DIA / 2.0)
     center, crop = drawing.DETAIL_CENTER, drawing.DETAIL_CROP_RADIUS
@@ -1054,6 +1054,15 @@ def test_neck_detail_annotations_stay_clear_of_the_side_and_end_views() -> None:
     lines = len(drawing.GEAR_DATA_NOTE.splitlines())
     assert gear_top < 0.140 - 0.010
     assert gear_top - lines * 1.4 * drawing.GEAR_DATA_CHAR_HEIGHT > 0.0127
+    # Datum A stands on the journal's upper outline in the side view, right
+    # of detail B's kept texts (their right ends ~0.100), left of the journal
+    # Ø's line and under the detail's crop.
+    pick_x, pick_y = drawing.DATUM_A_PICK
+    symbol_x, symbol_y = drawing.DATUM_A_SYMBOL
+    assert pick_y == pytest.approx(journal_top) and symbol_x == pick_x
+    assert 0.100 + 0.010 < pick_x < journal_line - 0.010
+    assert drawing.REAR_X < pick_x < drawing.PINION_REAR_X
+    assert math.dist((symbol_x, symbol_y + 0.005), center) > crop + 0.003
     # The tool end's texts stand outside the crop.
     for name in ("FlatEnd", "FlatToolRadius"):
         assert math.dist(drawing.DETAIL_KEEP[name], center) > crop, name
