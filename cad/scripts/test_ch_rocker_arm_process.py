@@ -23,6 +23,7 @@ import pytest
 import _cam_programs
 import _process_plans
 import cam_nc
+import ch_rocker_arm_spec
 import ch_rocker_hub_fit
 import ch_rocker_hub_spec
 import export_features
@@ -111,6 +112,23 @@ def test_the_members_are_the_hub_and_strap_travelers_products() -> None:
     assert p["hub_supply_length_min_in"] * IN == pytest.approx(
         ch_rocker_hub_spec.SUPPLY_LENGTH_MIN
     )
+
+
+def test_the_first_arm_checks_hold_the_drawings_position_zones() -> None:
+    p = PLAN["parameters"]
+    assert p["hub_pilot_bore_in"] * IN == pytest.approx(
+        SHOP["tools"]["drill-d"]["diameter_mm"], abs=0.01
+    )
+    zones = ch_rocker_arm_spec.GEOMETRIC_TOLERANCES_IN
+    # The bore's centre within the limit each way stays inside half the hub
+    # OD's position zone with room for the edge finder's reading.
+    radial = p["bore_centre_max_in"] * 2**0.5
+    assert radial < float(zones["hub OD position to bore"]) / 2 - 0.0005
+    # The strap's mid-plane from end G: the hub's half within its zone.
+    half = ch_rocker_arm_spec.HUB_LENGTH / 2 / IN
+    zone = float(zones["strap position to hub"])
+    assert p["strap_mid_min_in"] == pytest.approx(half - zone / 2, abs=5e-4)
+    assert p["strap_mid_max_in"] == pytest.approx(half + zone / 2, abs=5e-4)
 
 
 def test_the_bond_moved_from_the_hub_traveler() -> None:

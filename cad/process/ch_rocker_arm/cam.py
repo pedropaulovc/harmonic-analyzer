@@ -20,12 +20,13 @@ Route (plan text in ``plan.toml``): after the bond's 24 h cure the arm lies
 on two 1-2-3 blocks, 2 in up, the hub's lower end in the .500 gap between
 them, a step clamp over each block, the strap's right tip on a third block.
 
-- RA01 (face A up): face the hub's top end (datum G's) to the hub end
+- RA01 (strap face 1 up): face the hub's top end (datum G's) to the hub end
   height over the strap's top face in two X passes, the cutter's centre at
   Y +r then -r.
-- RA02 (turned over, face B up, trammed on the strap's top edge): face the
-  other end the same way; the F drill through the hub down the D bore; spot
-  and drill #47 through the strap at the rod-pin hole's BASIC place.
+- RA02 (turned over, strap face 2 up, trammed on the strap's top edge): face
+  the other end the same way; the F drill through the hub down its letter-D
+  pilot bore; spot and drill #47 through the strap at the rod-pin hole's
+  BASIC place.
 
 Work frame (G54, both programs): X0 Y0 the hub's axis, Z0 the strap's top
 face. RA02 is the model frame moved to the hub's axis and the strap's +Z
