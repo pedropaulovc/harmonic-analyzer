@@ -712,7 +712,7 @@ beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{cad.envelope_x_mm}}
 
 [[setups.operations]]
 instruction = "Home the mill first ($H). Before the block goes in, G54 Z0: the stacks' top, touched with the 1/8 in end mill on the fixed-jaw stack, the jaws open."
-instruction_detailed = "Home the mill first ($H). Before the block goes in, the stacks in place and the jaws open: console M6 T2 (the 1/8 in end mill; the tool setter measures it). Jog it over the fixed-jaw stack, clear of the jaw. Spindle stopped, its tip just dragging a .002 feeler leaf on the stack: G10 L20 P1 Z0.051. Raise Z. MS08_thumb's M6 T5 then measures the centre drill against it. Not with the block in: the collet would reach the block as the tip reached the stack."
+instruction_detailed = "Home the mill first ($H). Before the block goes in, the stacks in place and the jaws open: console M6 T2 (the 1/8 in end mill). Jog it over the fixed-jaw stack, clear of the jaw. Spindle stopped, its tip just dragging a .002 feeler leaf on the stack: G10 L20 P1 Z0.051. Raise Z. MS08_thumb's M6 T5 then measures the centre drill against it. Not with the block in: the collet would reach the block first."
 feed = "hand"
 
 [[setups.operations]]

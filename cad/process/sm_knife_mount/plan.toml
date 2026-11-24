@@ -619,7 +619,7 @@ feed = "hand"
 
 [[setups.operations]]
 instruction = "Start only with the .1280 reamer and the .1275/.1285 Class ZZ pins in hand (all to buy). Home the mill first ($H). Before each blank goes in, G54 Z0: the parallels' top (U), touched with the end mill on the fixed-jaw parallel, the jaws open."
-instruction_detailed = "Start only with the .1280 reamer and the .1275/.1285 Class ZZ pins in hand (all to buy). Home the mill first ($H). Before each blank goes in, the parallels in place and the jaws open: console M6 T1 (the tool setter measures it). Jog it over the fixed-jaw parallel, its edge clear of the jaw. Spindle stopped, its tip just dragging a .002 feeler leaf on the parallel: G10 L20 P1 Z0.051. Raise Z. Not with the blank in: the collet would meet the blank before the tip reached the parallel."
+instruction_detailed = "Start only with the .1280 reamer and the .1275/.1285 Class ZZ pins in hand (all to buy). Home the mill first ($H). Before each blank goes in, the jaws open: console M6 T1. Jog it over the fixed-jaw parallel, clear of the jaw. Spindle stopped, its tip just dragging a .002 feeler leaf on the parallel: G10 L20 P1 Z0.051. Raise Z. Not with the blank in: the collet would meet the blank first."
 feed = "hand"
 
 [[setups.operations]]

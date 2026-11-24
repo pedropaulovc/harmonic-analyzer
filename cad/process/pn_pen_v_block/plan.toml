@@ -538,7 +538,7 @@ instruction_detailed = "Home the mill first ($H). Mic the block's depth across t
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Console M6 T1, then the feeler Z0 on the fixed-jaw stack, as Setup 4."
+instruction = "Console M6 T1, then the feeler Z0 on the fixed-jaw stack left of P, the block staying clamped."
 instruction_detailed = "Console M6 T1; MDI G0 X-12.700 Y-6.850; the tip dragging a .002 leaf on the fixed-jaw stack: G10 L20 P1 Z0.051."
 feed = "hand"
 
@@ -627,7 +627,7 @@ vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{cad.body_back_depth_mm}}",
 beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{cad.far_end_length_mm}}"], clamp_mm = [0, "{{cad.far_end_length_mm}}"], section_mm = { y = "{{cad.body_back_depth_mm}}", z = 18.542 }, vise_left = "start" }
 
 [[setups.operations]]
-instruction = "Home the mill first ($H). G54 X0 P, Y0 the fixed jaw's face (FRONT): edge finder (900 rpm), then M6 T1 and the feeler Z0 on the fixed-jaw stack, as Setup 4."
+instruction = "Home the mill first ($H). G54 X0 P, Y0 the fixed jaw's face (FRONT): edge finder (900 rpm). Then, the block staying clamped: console M6 T1; MDI G0 X-12.700 Y-6.850 (the cutter left of P, over the fixed-jaw stack); its tip dragging a .002 leaf on the stack: G10 L20 P1 Z0.051."
 feed = "hand"
 
 [[setups.operations]]
