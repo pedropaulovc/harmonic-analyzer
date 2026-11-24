@@ -154,20 +154,25 @@ BORE_R_MAX = R_BORE + max(BORE_DIA_BAND) / 2.0  # 6.35
 # (shop-equipment gauges.gauge-bar-0472x8).  Owner ruling 2026-11-20
 # (Pedro), #2499: "Follow recommendations unless noted otherwise" -- widen
 # the printed fit to cover the bores' pitch and height and charge its
-# maximum in the stack.  The class ZZ pin's .0002-.0017 it kept did not pass
-# two conforming bores: the minimum is the clearance their ∥.002|A pitch and
-# ⌖Ø.008 heights demand of a straight bar
-# (``build_sm_summing_assembly.KNIFE_BAR_FIT_NEED``, .00255, rounded up to
-# the .0001 step), the band keeps the bore band's .0015 width, so one bar
-# fits both bores of any conforming pair, and the rock budget and both
-# hanger-bolt stacks charge the .0041 maximum.  A bar so cut is Ø.4944-.4974.
-# The fit lives here, beside the bore it is cut to, so MHA-FR-02's hanger
-# mirror can charge the bar's play without importing the summing spec's
-# config closure (test_dodo_recipe's fine-grained config deps).
-KNIFE_GAUGE_BAR_CLEARANCE_IN = (0.0026, 0.0041)  # (min, max) diametral, each bore
-# The bar at the fit's minimum in the smallest conforming bore: its
-# clearance in the largest bore is the fit's maximum.
-KNIFE_GAUGE_BAR_DIA_MIN = 2.0 * BORE_R_MIN - KNIFE_GAUGE_BAR_CLEARANCE_IN[0] * 25.4
+# maximum in the stack (.0026-.0041 then).  Owner ruling 2026-11-24, fit
+# audit S6 (approved): the matched fit gives way to a trial and a floor,
+# "TURN THE BAR UNTIL IT SLIDES THROUGH BOTH MOUNTS; DIA .496 MIN", stated
+# in the bar's make record; MHA-SM-00 says nothing more (owner, #3203,
+# 2026-11-24: "Accepted when the bar is made; the assembly sheet says
+# nothing more").  The trial passes every pair it is made to; the floor
+# caps the bar's play, .5000 - .4960 = .0040 in the largest bore, under the
+# .0041 the stacks were proven at.  Recorded corner: a straight bar through
+# the smallest conforming pair pitched within ∥.002 and at opposite heights
+# in ⌖Ø.008 needs .00255 (``build_sm_summing_assembly.KNIFE_BAR_FIT_NEED``),
+# so at most .49595, .00005 under the floor -- below the shop's .001
+# reading unit (policy #3518: such a margin is evidence neither way), and
+# the .4990 reamer's own .4991 least bore leaves +.00055; the trial governs
+# (delegated ruling 2026-11-24, FitLaneCH).  The floor lives here, beside the bore the bar
+# is cut to, so MHA-FR-02's hanger mirror can charge the bar's play without
+# importing the summing spec's config closure (test_dodo_recipe's
+# fine-grained config deps).
+KNIFE_GAUGE_BAR_DIA_MIN_IN = 0.496
+KNIFE_GAUGE_BAR_DIA_MIN = KNIFE_GAUGE_BAR_DIA_MIN_IN * 25.4
 KNIFE_GAUGE_BAR_LENGTH_IN = 8.0
 
 # The block's overall sizes print two places (.XX): every stack below reads
@@ -224,7 +229,8 @@ KNIFE_BORE_PARALLELISM_TOL = GEOMETRIC_TOLERANCES_MM["knife-bore parallelism"]
 # left 0.018 of bolt spare in MHA-FR-02's C-drill hole; Ø.005 left 0.072
 # and FR-02 unchanged (machinist exception RV-06: under the drilled-hole row),
 # and 0.046 once the gauge bar's fit widened to .0026-.0041 (owner ruling
-# 2026-11-20 (Pedro), #2499).
+# 2026-11-20 (Pedro), #2499); 0.078 in MHA-FR-02's E-drill hole with the
+# bar's play capped at .0040 (owner ruling 2026-11-24, fit audit OQ19, S6).
 STUD_TAP_POSITION_TOL = GEOMETRIC_TOLERANCES_MM["knife-hanger tap position"]
 # Datum B's round slip hole stands square to the datum-A top seat, so the
 # MHA-SM-VN-53 dowel, pressed square into the crossbar, enters it without
