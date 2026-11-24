@@ -105,18 +105,22 @@ cite = ["Owner (Pedro) 2026-11-17: \"already have follow and steady rests for th
 # hand." Owner (Pedro) 2026-11-22, measured: "i measured the 4 jaw chuck;
 # 160mm diameter ; max jaw opening 140mm". Its prechips record is
 # cad/process/shop/common.toml workholding.chuck-4jaw-6 (kind and the body
-# diameter). The maximum jaw opening stays here: prechips' grip_range_mm
-# needs a minimum too, not measured. The through-bore is not measured.
+# diameter). The jaw range stays here: least grip measured by the owner
+# 2026-11-24, verbatim: "0.2865 in min dia for 4 jaw" (.2865 in = 7.2771
+# mm, the smallest diameter the jaws close on). A setup gripping less in the
+# 4-jaw (shims included) cannot be held. The through-bore is not measured.
 [fixtures.chuck-4jaw-6]
 name = "6 in 4-jaw independent chuck for the PM-1127VF-LB lathe"
 kind = "chuck"
 status = "on_hand"
+min_grip_dia_mm = 7.2771
 max_jaw_opening_mm = 140.0
 through_bore_mm = "to_measure"
-note = "Body Ø160 mm and maximum jaw opening 140 mm, measured by the owner 2026-11-22. Not recorded: the through-bore (to measure), the least grip, the body length, and the jaw width and height (neither the lathe's manual nor Precision Matthews' 6 in 4-jaw page states them, read 2026-11-21)."
+note = "Body Ø160 mm and maximum jaw opening 140 mm, measured by the owner 2026-11-22; least grip Ø.2865 in, owner 2026-11-24. Not recorded: the through-bore (to measure), the body length, and the jaw width and height (neither the lathe's manual nor Precision Matthews' 6 in 4-jaw page states them, read 2026-11-21)."
 cite = [
   "Owner (Pedro) 2026-11-21, answered in person: \"Lathe 6 in 4-jaw independent chuck: on hand.\"",
   "Owner (Pedro) 2026-11-22, relayed by Main: \"i measured the 4 jaw chuck; 160mm diameter ; max jaw opening 140mm\"",
+  "Owner (Pedro) 2026-11-24, relayed by Main, verbatim: \"0.2865 in min dia for 4 jaw\"",
   "PM-1127VF-LB Operator's Manual (2015), \"Chuck\", read 2026-11-21 (https://archive.org/download/pm-1440-gs-v-3-2020-10/Precision%20Matthews/PM-1127VF-LB-Manual-2015.pdf): \"PM-1127VF-LB comes equiped with a 6\" 3-jaw chuck, a 6\" 4-jaw chuck and a 9\" faceplate\"; \"the 4-jaw chuck features four independent jaws. The 4-jaw chuck is used to clamp square or unevenly-shaped work-pieces.\"",
 ]
 
