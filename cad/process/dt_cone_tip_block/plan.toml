@@ -318,6 +318,15 @@ saw_proof_raise_mm = 25.4
 # The TOP end stands .75 in past the right jaw side in Setup 10, past the
 # slit's depth: the saw never reaches the jaws (cam.py checks it).
 slit_overhang_mm = 19.05
+# The Setup 10 vise spacer (the second strip) against the block, N to S:
+# never thicker (the jaws would close on it and leave the block loose under
+# the saw); at most spacer_under_max_mm (.002) thinner: the moving jaw then
+# tilts .002 over the 5 in between the two, a quarter of it, .0005, across
+# the block's 1.3 in grip. Setup 2 takes the thicker strip as the block; a
+# larger difference is made up in Setup 10 with feeler leaves (cam.py: the
+# allowance is no finer than the set's thinnest leaf, shop
+# gauges.feeler-gauges, so leaves can always land inside it).
+spacer_under_max_mm = 0.0508
 # Holding (shop workholding.vise-pm-6 and fixtures.parallels-lms-6745, 1/8 in
 # thick, 4 in long, 1/2-1 in by 1/16): lying, the set's 1 in and 1/2 in
 # parallels stacked against each jaw (1.5 in); the strip on edge for E's skim
@@ -469,7 +478,7 @@ speed_kind = "other"
 tool = "saw"
 drilling = "none"
 sizing = "other"
-instruction = "Saw two strips, each marked .80 wide, off the end of the 1/2 × 2-1/4 in 1018 bar, the bar lying on a wide face in the saw's vise, each cut across its full 2-1/4 width. One is the part; the other the spacer for Setup 10. The rest of the bar stays for MHA-DT-18, MHA-DT-16 and MHA-MG-01."
+instruction = "Saw two strips, each marked .80 wide, off the end of the 1/2 × 2-1/4 in 1018 bar, the bar lying on a wide face in the saw's vise, each cut across its full 2-1/4 width. One becomes the part, the other the vise spacer for Setup 10 (Setup 2 decides which). The rest of the bar stays for MHA-DT-18, MHA-DT-16 and MHA-MG-01."
 feed = "hand"
 inspection = "Each strip {{process.strip_min_mm:in.2dot}}–{{process.strip_max_mm:in.2dot}} wide at both ends, calipers. Narrower: scrap it and saw another. Wider: file the sawn face until it is, then recheck."
 gauge_checks = [{ gauge = "calipers", band_mm = ["{{process.strip_min_mm}}", "{{process.strip_max_mm}}"] }]
@@ -479,7 +488,7 @@ speed_kind = "other"
 tool = "files"
 drilling = "none"
 sizing = "other"
-instruction = "File the burr off both sawn faces and the edges so the strip seats flat on the parallels. With marking fluid: one bar face N, one sawn face E, one bar edge SEAT (the drawing names none; this traveler does, and the marks go back on after each cut)."
+instruction = "File the burr off both sawn faces and the edges of each strip so it seats flat on the parallels. With marking fluid, on each: one bar face N, one sawn face E, one bar edge SEAT (the drawing names none; this traveler does, and the marks go back on after each cut)."
 feed = "hand"
 
 [[setups]]
@@ -532,7 +541,13 @@ instruction = "Over {{cad.south_face_depth_max_in:.3dot}}: wipe N and the stacks
 feed = "hand"
 
 [[setups.operations]]
-instruction = "The spacer strip: this setup's ops again, from the first (mic, clamp, edge finder, Z0, DT01_depth). Its depth .43–.45 as well, so it holds Setup 10's jaws parallel; nothing else is done to it."
+instruction = "The second strip: this setup's ops again, from the first (mic, clamp, edge finder, Z0, DT01_depth), to the same depth check."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Mic both strips N to S at the middle and write both down. The thicker one is the block from here on; the other is Setup 10's vise spacer, and nothing else is done to it. (A spacer thicker than the block would take the jaws' grip off the block under the saw.)"
+inspection = "The spacer no thicker than the block and at most {{process.spacer_under_max_mm:in.3dot}} thinner. Thinner by more: write the difference on it; Setup 10 makes it up with feeler leaves."
+gauge_checks = [{ gauge = "micrometers", band_mm = [0, "{{process.spacer_under_max_mm}}"] }]
 feed = "hand"
 
 [[setups]]
@@ -700,7 +715,7 @@ gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.foot_tap_station_band_mm}
 feed = "hand"
 
 [[setups.operations]]
-instruction = "No 4-40 bottoming tap in hand (it is to buy): do the stop check, the tap file, the plug tap's depth reference, the plug tap and the scrape now; skip the bottoming tap's depth reference, the bottoming tap and the thread-depth check. Tag the block AWAITING 4-40 BOTTOMING TAP and go on to Setup 6. When the tap comes: clamp, home, the touch-offs above, the stop check on the bottoming tap, DT05_foot_tap, then those three ops."
+instruction = "No 4-40 bottoming tap in hand (it is to buy): do the stop check, the tap file, the plug tap's depth reference, the plug tap and the scrape now; skip the bottoming tap's depth reference, the bottoming tap and the thread-depth check. Tag the block AWAITING 4-40 BOTTOMING TAP and go on to Setup 6. When the tap comes: clamp, home, the edge-finder touch-off above (X and Y only: the tap file moves Z only to the machine top), the stop check on the bottoming tap, DT05_foot_tap, then those three ops."
 feed = "hand"
 
 [[setups.operations]]
@@ -1094,7 +1109,7 @@ title = "Saw the slit"
 machine = "PM-30MV CNC (FluidNC, CNCjs) / vise, swivel off; the 2-3/4 × .064 slitting saw on the R8 stepped saw arbor"
 indexing = "none"
 machine_ref = "pm-30mv"
-holding = "The 1 in and 1/2 in parallels stacked against each jaw, their right ends at or left of the right jaw side. The block on edge on them, E down, W up, gripped on N and S: N against the FIXED jaw; TOP to the RIGHT, standing {{process.slit_overhang_mm:in.2dot}} in past the right jaw side. The spacer strip (Setup 2) standing on end on the vise bed at the jaws' left end (its 2-1/4 length upright, a .44 × .80 end down), the stacks ending to its right: the bare jaws grip it on its two wide faces (the bar's faces, which Setup 2 left {{cad.south_face_depth_min_in:.2dot}}–{{cad.south_face_depth_max_in:.2dot}} apart: the block's depth), its .80 width along the jaws. Tap the block down onto both stacks while closing the vise. The saw works right of TOP: the arbor's body above the saw and its cap and screw below pass beside the TOP end, right of the jaws."
+holding = "The 1 in and 1/2 in parallels stacked against each jaw, their right ends at or left of the right jaw side. The block on edge on them, E down, W up, gripped on N and S: N against the FIXED jaw; TOP to the RIGHT, standing {{process.slit_overhang_mm:in.2dot}} in past the right jaw side. The spacer strip (Setup 2) standing on end on the vise bed at the jaws' left end (its 2-1/4 length upright, a .44 × .80 end down), the stacks ending to its right: the bare jaws grip it on its two wide faces (the bar's faces: Setup 2 left it no thicker than the block and at most {{process.spacer_under_max_mm:in.3dot}} thinner), its .80 width along the jaws. If Setup 2 wrote a larger difference on it, feeler leaves between it and the moving jaw bring it to within {{process.spacer_under_max_mm:in.3dot}} under the block, never over. Tap the block down onto both stacks while closing the vise. The saw works right of TOP: the arbor's body above the saw and its cap and screw below pass beside the TOP end, right of the jaws."
 datum = "Program DT11_slit. G54: X0 TOP (right, the block to −X), Y0 the fixed jaw's face (N), Z0 the stacks' top (E), set from the miked width with the saw's lower face touched off on W. The file's Z is the saw's lower face; it loads no tool."
 diagram = { file = "diagrams/slit.svg", alt = "The block on edge on stacked parallels, E down, gripped on N and S, TOP .75 in past the right jaw side; the slitting saw, horizontal on the stepped arbor, saws the slit in from TOP across the block's depth, the arbor's body above the saw and its cap and screw below it, both past the end." }
 envelope = { x_span_mm = ["{{process.saw_dia_mm}}", "{{process.slit_depth_mm}}", 5.08], y_span_mm = ["{{process.saw_dia_mm}}", "{{process.depth_target_mm}}", 5.08], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{process.width_target_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{process.saw_cut_z_mm}}"], longest_tool_mm = "{{process.saw_arbor_length_mm}}", shortest_tool_mm = "{{process.saw_arbor_length_mm}}" }

@@ -982,6 +982,14 @@ def context(
     if overhang <= slit_depth + 1.0:
         raise ValueError("process.slit_overhang_mm: the saw reaches the jaws")
     _agree(plan, "vise_slit_inset_mm", -(jaw_w - (length - overhang)))
+    # The vise spacer may be at most spacer_under_max_mm thinner than the
+    # block (never thicker: Setup 2 takes the thicker strip as the block).
+    # The allowance is no finer than the feeler set's thinnest leaf, so the
+    # leaves that make up a larger difference can always land inside it.
+    if not p["spacer_under_max_mm"] >= shop["gauges"]["feeler-gauges"]["range_mm"][0]:
+        raise ValueError(
+            "process.spacer_under_max_mm is finer than the thinnest feeler leaf"
+        )
     # The spindle nose, saw_nose_above_min_mm or more above the saw's upper
     # face, passes over everything in the vise at the cut (the saw's lowest
     # height): the block's W and the spacer strip standing on the vise bed.
