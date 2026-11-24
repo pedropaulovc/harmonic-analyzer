@@ -275,8 +275,9 @@ their sheet re-keys for another reason or the review leaf is force-refreshed.
   load, as does a line for a drawing that does not declare `ENFORCE`
   (tracking issue #3511). No sheet is added without an owner ruling. This
   is the one adjustment kept in a central file rather than under each
-  package's own key (delegated ruling 2026-11-24, Main, on the owner's
-  demotion ruling): it is temporary, and one file is deleted when the
+  package's own key, by the owner's ruling of 2026-11-24 ("Approve." on
+  "92 sheets go on a temporary warn-only list (no rebuilds); each batch
+  removes its lines"): it is temporary, and one file is deleted when the
   conversion ends.
 - **Thread engagement (rule 18)** is owned by the CAD: the build's seat-fit
   and stack asserts enforce it. Through-tapped receivers use actual retained
