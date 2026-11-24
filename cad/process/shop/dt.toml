@@ -354,26 +354,12 @@ range_mm = [6.35, 6.3627]
 resolution_mm = 0.00508
 [tools.zz-pins-2500-2505]
 description = "Class ZZ pins for .2500-.2505: GO .2500 plus (single), NO-GO .2505 minus (single)"
-# .0625-.0630: MHA-DT-38 bushing bore.
-[gauges.zz-pins-0625-0630]
-range_mm = [1.5875, 1.6002]
-resolution_mm = 0.00508
-[tools.zz-pins-0625-0630]
-description = "Class ZZ pins for .0625-.0630: GO .0625 plus (single), NO-GO .063 minus (the .061-.500 box)"
 # .0630-.0635: MHA-DT-39 end screw hole.
 [gauges.zz-pins-0630-0635]
 range_mm = [1.6002, 1.6129]
 resolution_mm = 0.00508
 [tools.zz-pins-0630-0635]
 description = "Class ZZ pins for .0630-.0635: GO .0630 plus (single), NO-GO .0635 minus (single)"
-# .4385-.4390: MHA-DT-05's two journal bores and the MHA-DT-11 drive-pin
-# jig's bore (owner ruling 2026-11-23, tool audit Q11); MHA-DT-11 re-gauges
-# the post's crank bore.
-[gauges.zz-pins-4385-4390]
-range_mm = [11.1379, 11.1506]
-resolution_mm = 0.00508
-[tools.zz-pins-4385-4390]
-description = "Class ZZ pins for .4385-.4390: GO .4385 plus (single), NO-GO .439 minus (the .061-.500 box)"
 # .157-.160: MHA-DT-14 follower seat, end-milled (owner ruling 2026-11-23,
 # tool audit Q8: "check with .157/.160 pins").
 [gauges.zz-pins-1570-1600]

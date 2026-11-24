@@ -349,15 +349,6 @@ source = "https://www.mscdirect.com/product/details/88906151"
 purchase = "MSC 88906151 (.0615 plus, $4.48): Vermont Gage Class ZZ steel plug gages, 2 in long, in stock."
 note = "MHA-PD-17, MHA-PD-22. GO: ZZ .0615 plus single. NO-GO: the .062 minus pin of the sets (gauges.pin-gauges). Each pin is miked before first use and its size written on its tag."
 
-[gauges.zz-pins-0625-0630]
-name = "Class ZZ pins for the .0625-.0630 band"
-kind = "gauge_pin"
-make = "Vermont Gage"
-# No status: nothing is bought under this record (its two pins belong to
-# gauge-pin-0625 and pin-gauges); it exists so the band has one key.
-purchase = "Nothing to buy for this band: both pins are bought under other records."
-note = "MHA-DT-38. GO: the .0625 plus pin of gauges.gauge-pin-0625. NO-GO: the .063 minus pin of the sets (gauges.pin-gauges). Each pin is miked before first use and its size written on its tag."
-
 [gauges.zz-pins-0630-0635]
 name = "Class ZZ pins for the .0630-.0635 band"
 kind = "plug_gauge_pair"
@@ -510,15 +501,6 @@ status = "to_order"
 source = "https://www.mscdirect.com/product/details/88949854"
 purchase = "MSC 88949854 (.4985 plus, $4.48): Vermont Gage Class ZZ steel plug gage, 2 in long (read live 2026-11-23)."
 note = "MHA-SM-02 knife bore (Q13). GO: ZZ .4985 plus single. NO-GO: the .500 minus pin of the sets (gauges.pin-gauges). Each pin is miked before first use and its size written on its tag."
-
-[gauges.zz-pins-4385-4390]
-name = "Class ZZ pins for the .4385-.4390 band"
-kind = "gauge_pin"
-make = "Vermont Gage"
-status = "to_order"
-source = "https://www.mscdirect.com/product/details/88943857"
-purchase = "MSC 88943857 (.4385 plus, $4.48): Vermont Gage Class ZZ steel plug gage, 2 in long (read live 2026-11-23)."
-note = "MHA-DT-05 post bores and the MHA-DT-11 drive-pin jig bore (Q11). GO: ZZ .4385 plus single. NO-GO: the .439 minus pin of the sets (gauges.pin-gauges). Each pin is miked before first use and its size written on its tag."
 
 [gauges.zz-pins-1570-1600]
 name = "Class ZZ pins for the .1570-.1600 band"
