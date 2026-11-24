@@ -50,8 +50,12 @@ _SETTER = "set_dimension_bilateral_tolerance"
 # the imported module) must say here which module-level expression build()
 # derives it from. "each" checks a tuple of bands; "values" checks a band mapping.
 LOCAL_BAND_SOURCES: dict[tuple[str, str], tuple[str, str]] = {
-    # for section, band in enumerate(SECTION_DIA_BANDS): ... deviations(band)
-    ("build_dt_cone_gear_shaft", "band"): ("SECTION_DIA_BANDS", "each"),
+    # for name, band in (keyseat width, keyseat S): ... deviations(band); the
+    # turned diameters are REF (fit batch DT, 2026-11-24)
+    ("build_dt_cone_gear_shaft", "band"): (
+        "(cone_land_key.KEYSEAT_WIDTH_BAND, cone_land_key.KEYSEAT_S_BAND)",
+        "each",
+    ),
     # def gear_tip_band_mm(grade): band = ...; deviations(band)
     ("_gear_fit_limits", "band"): (
         "(gear_tip_band_mm('standard'), gear_tip_band_mm('contact_critical'))",
@@ -108,7 +112,7 @@ LOCAL_BAND_SOURCES: dict[tuple[str, str], tuple[str, str]] = {
     ),
     # The cone tip gear's loop over its own module-level bands.
     ("build_dt_cone_tip_gear", "band"): (
-        "(BLANK_DIA_BAND, FACE_WIDTH_BAND, TOOTH_THICKNESS_BAND, SPIGOT_DIA_BAND)",
+        "(BLANK_DIA_BAND, FACE_WIDTH_BAND, TOOTH_THICKNESS_BAND)",
         "each",
     ),
     # _apply_neck_and_flat_limits passes each native LIMIT band in turn.
@@ -287,6 +291,25 @@ INDEXED_FIT_BANDS: dict[tuple[str, str], str] = {
     ("dt_cone_gear_shaft_spec", "_T030_NORTH_BAND"): (
         "the cone gear stack's T030 north-face station band (an axial stack "
         "position, not a fit), indexed into T024_NORTH_FACE_DEVIATION_MM"
+    ),
+    # Fit batch DT, 2026-11-24 (rule 4 forms 2/3): the bores print the
+    # reamer's size with no band and the mates are made last to them; these
+    # stay the analysis bands the stacks index.
+    ("dt_cone_gear_spec", "BORE_DIA_BAND"): (
+        "the keyed bores' reamed spread over the Ø.3750 nominal, indexed for "
+        "the seat clearance (GEAR_SEAT_CLEARANCE) and cone_set_stack's float"
+    ),
+    ("dt_cone_gear_spec", "LAND_SEAT_BORE_BAND"): (
+        "the reamed land-seat bores' spread above the reamer's size, indexed "
+        "for the seat and bond clearances; the sheet prints no band"
+    ),
+    ("dt_cone_tip_gear_spec", "SPIGOT_DIA_BAND"): (
+        "the spigot's analysis band (it prints REF, turned last to its holes), "
+        "indexed for the bond clearance and the tip cluster's offsets"
+    ),
+    ("dt_cone_tip_gear_spec", "PIVOT_DIA_BAND"): (
+        "the pivot's analysis band (it prints REF, turned last to its holes), "
+        "indexed for the bond and running clearances"
     ),
     ("pn_pen_hanger_spec", "STRAP_T_STOCK_BAND"): (
         "the 3 mm strap stock's supplied thickness band, indexed for the "

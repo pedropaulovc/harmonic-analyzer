@@ -18,21 +18,14 @@ demoted:
   ch_rocker_strap: fit-batch-ch
   dt_alignment_pinion: fit-batch-dt
   dt_arbor_pedestal: fit-batch-dt
-  dt_cone_gear: fit-batch-dt
-  dt_cone_gear_shaft: fit-batch-dt
   dt_cone_gear_tl_arbor_assembly: fit-batch-dt
   dt_cone_gear_tl_arbor_key: fit-batch-dt
   dt_cone_gear_tl_index_plate: fit-batch-dt
   dt_cone_gear_tl_phasing_comb: fit-batch-dt
-  dt_cone_pivot_post: fit-batch-dt
   dt_cone_swing_platform: fit-batch-dt
   dt_cone_tip_block: fit-batch-dt
-  dt_cone_tip_bushing: fit-batch-dt
   dt_cone_tip_end_screw: fit-batch-dt
-  dt_cone_tip_gear: fit-batch-dt
   dt_cone_tip_gear_tl_cutter_assembly: fit-batch-dt
-  dt_cone_tip_gear_tl_cutter_bar: fit-batch-dt
-  dt_cone_tip_gear_tl_form_cutter: fit-batch-dt
   dt_crank_arm: fit-batch-dt
   dt_crank_drive_gear: fit-batch-dt
   dt_crank_handle: fit-batch-dt
