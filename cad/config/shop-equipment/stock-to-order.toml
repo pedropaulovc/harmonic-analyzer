@@ -66,7 +66,7 @@ cite = ["OnlineMetals part 7467 https://www.onlinemetals.com/en/buy/carbon-steel
 [stock.1018-ground-round-1-4]
 form = "round_bar"
 material = "12L14 free-machining carbon steel, precision ground"
-note = "To order: McMaster-Carr 5227T232, 1/4 in ground 12L14 round, 3 ft, $13.65 (in the cart 2026-11-24; read live: diameter tolerance -0.0005/0 in, inside the shafts' +.0000/-.0008; straightness 1/16 in per 3 ft); used as supplied on the O.D. Allocation: ch-pivot-shaft (MHA-CH-05, 6.73 in), ch-fulcrum-shaft (MHA-CH-04, 7.01 in), dt-pinion-lift-rod (MHA-DT-17, 8.15 in), dt-pinion-pivot-shaft (MHA-DT-19, 7.81 in): 29.70 in before kerfs, lengths computed from the spec modules. NOT YET AS PRINTED: the four drawings and plans name AISI 1018 (issue #3561). Not owned."
+note = "To order: McMaster-Carr 5227T232, 1/4 in ground 12L14 round, 3 ft, $13.65 (in the cart 2026-11-24; read live: diameter tolerance -0.0005/0 in, inside the shafts' +.0000/-.0008; straightness 1/16 in per 3 ft); used as supplied on the O.D. Allocation, as the plans saw it: ch-fulcrum-shaft (MHA-CH-04) 7.07 in, ch-pivot-shaft (MHA-CH-05) 6.91 in, dt-pinion-lift-rod (MHA-DT-17) 8.26 in, dt-pinion-pivot-shaft (MHA-DT-19) 7.88 in, and a 1.00 in trial offcut for each: 34.12 in plus eight saw kerfs out of the 36 in bar. NOT YET AS PRINTED: the four drawings and plans name AISI 1018 (issue #3561). Not owned."
 dia_in = [0.25]
 status = "to_order"
 cite = ["issue #2346 owner ruling 2026-11-20", "ch_pivot_shaft and ch_fulcrum_shaft sheets: 1/4 GROUND STOCK OK; dt_pinion_lift_rod_spec: 1/4 IN GROUND STOCK OK", "registry material_specification: AISI 1018 (CH-04, CH-05, DT-17, DT-19)"]
@@ -74,10 +74,10 @@ cite = ["issue #2346 owner ruling 2026-11-20", "ch_pivot_shaft and ch_fulcrum_sh
 [stock.1018-or-1045-ground-round-3-8]
 form = "round_bar"
 material = "12L14 free-machining carbon steel, precision ground"
-note = "To order: McMaster-Carr 5227T252, 3/8 in ground 12L14 round, 1 ft, $7.70 (in the cart 2026-11-24; read live: diameter tolerance -0.0005/0 in, inside the shaft's +.0000/-.0008; straightness 1/16 in per 3 ft); used as supplied on the O.D. Allocation: dt-cylinder-gear-shaft (MHA-DT-13, about 7.07 in, computed from the spec module). NOT YET AS PRINTED: the drawing and plan name SAE 1018 CF or 1045 (issue #3561). Not owned."
+note = "To order: McMaster-Carr 5227T252, 3/8 in ground 12L14 round, 2 ft, $12.94 (in the cart 2026-11-24; read live: diameter tolerance -0.0005/0 in, inside the shaft's +.0000/-.0008; straightness 1/16 in per 3 ft; 1 ft is $7.70 and is too short); used as supplied on the O.D. Allocation: dt-cylinder-gear-shaft (MHA-DT-13), one piece 7.50 in as its plan saws it, and the setting mandrel (tools.setting-mandrel-375), an offcut of this same bar long enough to pass both MHA-DT-02 pedestals (about 7 in): about 14.5 in plus kerfs out of the 24 in bar. NOT YET AS PRINTED: the drawing and plan name SAE 1018 CF or 1045 (issue #3561). Not owned."
 dia_in = [0.375]
 status = "to_order"
-cite = ["issue #2346 owner ruling 2026-11-20", "Owner ruling 2026-11-24 (Pedro, form, purchases), ground rounds: \"12L14 (free-machining; drawings change material)\"", "McMaster-Carr 5227T252 (read live 2026-11-24): 3/8 in ground 12L14, 1 ft $7.70: https://www.mcmaster.com/5227T252/", "dt_cylinder_gear_shaft_notes.SHAFT_DIA_CALLOUT: 3/8 GROUND STOCK OK", "dt-cylinder-gear-shaft registry material_specification: SAE 1018 CF or 1045 ground bar"]
+cite = ["issue #2346 owner ruling 2026-11-20", "Owner ruling 2026-11-24 (Pedro, form, purchases), ground rounds: \"12L14 (free-machining; drawings change material)\"", "McMaster-Carr 5227T252 (read live 2026-11-24): 3/8 in ground 12L14, 1 ft $7.70, 2 ft $12.94, 3 ft $17.86: https://www.mcmaster.com/5227T252/", "cad/process/shop/dt.toml tools.setting-mandrel-375: an offcut of this bar, \"ordered one mandrel length longer\"", "dt_cylinder_gear_shaft_notes.SHAFT_DIA_CALLOUT: 3/8 GROUND STOCK OK", "dt-cylinder-gear-shaft registry material_specification: SAE 1018 CF or 1045 ground bar"]
 
 # MHA-PD-07 support bar (owner ruling 2026-11-20 (Pedro), #2421 option B).
 [stock.1018-flat-3-8x1]
