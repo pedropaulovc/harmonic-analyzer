@@ -219,8 +219,11 @@ def _fit_range_text(low_mm: float, high_mm: float) -> str:
     return f"{inch_text(low_mm, 4)}-{inch_text(high_mm, 4)}"
 
 
-# The journal keeps its g6 limits under the MHA-PD-28 bush's reamed H7 bore:
-# a matched running fit (rule 4), its clearance from both parts' limits as REF.
+# The journal is made to fit (rule 4; fit audit 2026-11-23, pending owner
+# confirmation): turned last to the MHA-PD-28 bush's reamed bore and tried
+# in it, so it prints REF and no limits.  JOURNAL_DIA_BAND stays the
+# ANALYSIS band (the modelled result of that fitting) and this the
+# clearance the stacks consume; neither prints.
 JOURNAL_CLEARANCE_MM = (
     BUSH.BORE_DIA + min(BUSH.BORE_DIA_LIMITS) - (JOURNAL_DIA + max(JOURNAL_DIA_BAND)),
     BUSH.BORE_DIA + max(BUSH.BORE_DIA_LIMITS) - (JOURNAL_DIA + min(JOURNAL_DIA_BAND)),
@@ -247,8 +250,8 @@ NOTE_TEXTS = (
     (
         JOURNAL_FIT_NOTE,
         f"RUNNING FIT IN {_mate_name(_config.parts('pd-transgear-knob-bush'))}: "
-        "TURN TO MEASURED "
-        f"BORE (CLEARANCE {_fit_range_text(*JOURNAL_CLEARANCE_MM)}).",
+        "TURN TO ITS REAMED BORE, TURNS FREE WITH NO SHAKE. "
+        "KEEPS REDUCER BACKLASH.",
     ),
     # Made to fit (fit audit 2026-11-23, pending owner confirmation): the
     # collar's bore is drilled and its pin pressed first; the core's Ø and
@@ -497,12 +500,14 @@ if OVERALL_TEXT_RIGHT > PINION_REAR_X - 0.005:
     raise AssertionError("the overall's text runs into the face width's witness line")
 if OVERALL_TEXT_LEFT < REAR_X + 0.005:
     raise AssertionError("the overall's text runs over the rear witness line")
-# Reference sizes (parenthesized): the journal (the rest of the controlled
-# overall), the thread blank the #8-32 UNC-2A class governs, and the D-core's
-# Ø and its flat's distance from the axis, both made to fit MHA-PD-22
-# (note 2).  Name -> diameter glyph.
+# Reference sizes (parenthesized): the journal's length (the rest of the
+# controlled overall), its Ø (made to fit the bush's reamed bore, note 1),
+# the thread blank the #8-32 UNC-2A class governs, and the D-core's Ø and
+# its flat's distance from the axis, both made to fit MHA-PD-22 (note 2).
+# Name -> diameter glyph.
 REFERENCE_DIMENSIONS = {
     "JournalLength": False,
+    "JournalDia": True,
     "ThreadBlankDia": True,
     "CoreDia": True,
     "FlatToAxis": False,
