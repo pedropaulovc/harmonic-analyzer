@@ -19,7 +19,8 @@ the edge view at that station and removed right of it, carries the chord
 hole: its ream with the pin's press fit, its #56 knockout, its chord
 offset and its stop.
 
-The bore imports the model's sleeve-matched dimension and native band.
+The bore and the key-pin ream import their reamers' sizes with no band; the
+spigot, made to the disc's bore, prints in parentheses as a reference.
 Decimal-inch sheet (#290); the model keeps its millimetre nominals.
 """
 
@@ -52,7 +53,11 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_detail_crop import native_circle_geometry
-from _drawing_dimensions import assert_imported_precision, set_dimension_callouts
+from _drawing_dimensions import (
+    assert_imported_precision,
+    set_dimension_callouts,
+    set_reference_dimensions,
+)
 from _drawing_edges import ViewEdge, ViewEdges, scan_view_edges
 from _drawing_gdt import add_datum_feature, add_feature_control_frame
 from _drawing_hidden_sketches import curate_view_dimensions
@@ -104,7 +109,6 @@ from pd_transgear_disc_hub_spec import (
     SPIGOT_DIA,
     SPIGOT_LENGTH,
     SPIGOT_LENGTH_CALLOUT,
-    STACK_NOTE,
     STACK_TEXT,
 )
 
@@ -154,10 +158,11 @@ SPIGOT_END_X = _side_x(SPIGOT_LENGTH)
 _FLANGE_R = FLANGE_DIA / 2.0 * _S
 _SPIGOT_R = SPIGOT_DIA / 2.0 * _S
 
-# The stack note the overall's and the spigot length's callouts link;
-# top-left anchored in the empty field above the face view, left of the
-# overall's callout.
-_NOTE_WIDTH = 92
+# The numbered notes the callouts link (the stack the overall and the
+# spigot's length set, and the three fits: the bore's, the key pin's and
+# the spigot's), one line each; top-left anchored in the empty field above
+# the face view, left of the overall's callout.
+_NOTE_WIDTH = 96
 
 
 def _numbered(number: int, text: str) -> str:
@@ -171,7 +176,9 @@ def _numbered(number: int, text: str) -> str:
     )
 
 
-NOTES_TEXT = _numbered(STACK_NOTE, STACK_TEXT)
+NOTES_TEXT = "\n".join(
+    _numbered(number, text) for number, text in _spec.NOTE_TEXTS.items()
+)
 NOTES_XY = (0.020, 0.262)
 
 # Every size and callout sits outside the silhouettes.
@@ -184,9 +191,9 @@ NOTES_XY = (0.020, 0.262)
 #   bore (near-side): through the centre its line crossed the bolt circle's
 #   and ran almost on the vertical centreline (machinist review r6).
 #   SolidWorks lands that arrow on the bore's radius toward the shelf's near
-#   end, the block's lower-left corner, so the corner stands on the bore's
-#   -60° ray, below the oil hole's block: the leader leaves the bore
-#   down-right, clear of both centrelines.
+#   end, the block's lower-left corner, which stands below the oil hole's
+#   block and left of it: the leader leaves the bore down-right, clear of
+#   both centrelines.
 # - Edge view: the hub's diameter inline left of the hub front face; the
 #   spigot's and then the flange's inline right of the spigot's end, the
 #   flange's outermost so the spigot's extension lines end inside it, the
@@ -217,17 +224,16 @@ NOTES_XY = (0.020, 0.262)
 #   flange's extension lines; the spigot end's inside the spigot's, between
 #   its upper extension line and its diameter's text, left of that
 #   dimension's line.
-# Estimated (width, height) of the bore's block: the two size rows, REAM
-# THRU, the fit and the wall row (5.3 mm a row, 2.4 mm a character, as run
-# 20261101T054343686Z printed the seven-row block; the fit row is the
-# widest).  The shoulder sits on the bore's -60° ray, the block's top under
-# the oil hole's block and its right end left of the title block.
-BORE_TEXT_BLOCK = (0.058, 0.027)
+# Estimated (width, height) of the bore's block: the size row, REAM THRU,
+# the fit note's link and the wall row (5.3 mm a row, 2.73 mm a character
+# on the r1 render of 2026-11-23; the wall row is the widest).  The block's
+# lower-left corner, where SolidWorks starts the leader, stays where that
+# render's wider block had it (x .1235), so the leader keeps its proven run
+# down-right from the bore, left of the oil hole's block; the block's top
+# stands under that block and its right end left of the title block.
+BORE_TEXT_BLOCK = (0.0355, 0.027)
 _BORE_SHOULDER_DROP = 0.108
-_BORE_SHOULDER = (
-    END_CENTER[0] + _BORE_SHOULDER_DROP / math.tan(math.radians(60.0)),
-    AXIS_Y - _BORE_SHOULDER_DROP,
-)
+_BORE_SHOULDER = (0.1235, AXIS_Y - _BORE_SHOULDER_DROP)
 END_KEEP = {
     "BoltCircleDia": (END_CENTER[0] - 0.030, AXIS_Y + _FLANGE_R + 0.016),
     "ScrewHoleDia": (END_CENTER[0] + 0.036, AXIS_Y + _FLANGE_R + 0.016),
@@ -453,13 +459,11 @@ _UNIT = _geom.UNIT
 _PLUS_MINUS = {
     "HubLength": (_spec.HUB_LENGTH_BAND, -_spec.HUB_LENGTH_BAND),
     "SpigotLength": (_geom.SPIGOT_LENGTH_BAND, -_geom.SPIGOT_LENGTH_BAND),
-    "KeyPinLocation": (_spec.KEY_PIN_LOCATION_BAND, -_spec.KEY_PIN_LOCATION_BAND),
+    "KeyPinChord": (_spec.KEY_PIN_CHORD_BAND, -_spec.KEY_PIN_CHORD_BAND),
 }
 # The chord ream enters the hub body's O.D. where its axis meets it (+X).
 KEY_PIN_ENTRY_X = math.sqrt((HUB_DIA / 2.0) ** 2 - KEY_PIN_CHORD_OFFSET**2)
-KEY_PIN_STOP_LIMITS = limits(
-    KEY_PIN_STOP, _P["KeyPinStop"], _PLUS_MINUS["KeyPinLocation"], unit=_UNIT
-)
+KEY_PIN_STOP_LIMITS = limits(KEY_PIN_STOP, _P["KeyPinStop"], unit=_UNIT)
 part_metadata(
     model_sources=(
         (_GEOM, "SPIGOT_LENGTH"),
@@ -581,21 +585,25 @@ requirement(
     },
     precision={"dia": _P["FlangeDia"]},
 )
-# The spigot: a sliding fit in the MHA-PD-06 disc's bore, its root sharp,
-# its length from the flange's rear face (note 1).
+# The spigot: made to the MHA-PD-06 disc's reamed bore (its size REF, the
+# clearance in that bore the requirement, note 4), its root sharp, its
+# length from the flange's rear face (note 1).
 requirement(
     "spigot",
     kind="outside_cylinder",
     faces=(CylinderFace(SPIGOT_DIA),),
-    requirements=("dia", "length", "root_radius_max"),
+    requirements=("dia_ref", "diametral_clearance", "length", "root_radius_max"),
     fields={
         "at": ([0.0, 0.0, 0.0], ("__frame__",)),
         "axis": ([0.0, 0.0, 1.0], ("__frame__",)),
-        "dia": (
-            limits(SPIGOT_DIA, _P["SpigotDia"], _geom.SPIGOT_DIA_BAND, unit=_UNIT),
-            ((_GEOM, "SPIGOT_DIA"), (_GEOM, "SPIGOT_DIA_BAND"), (_SELF, "SIDE_KEEP")),
+        "dia_ref": (
+            SPIGOT_DIA,
+            ((_GEOM, "SPIGOT_DIA"), "REFERENCE_DIMENSIONS", (_SELF, "SIDE_KEEP")),
         ),
-        "nominal_dia": (SPIGOT_DIA, ((_GEOM, "SPIGOT_DIA"),)),
+        "diametral_clearance": (
+            list(_geom.SPIGOT_CLEARANCE),
+            ((_GEOM, "SPIGOT_CLEARANCE"), "SPIGOT_NOTE_TEXT"),
+        ),
         "length": (
             limits(
                 SPIGOT_LENGTH,
@@ -614,13 +622,14 @@ requirement(
         "length_callout": (SPIGOT_LENGTH_CALLOUT, ("SPIGOT_LENGTH_CALLOUT",)),
         "root_radius_max": (
             _spec.CORNER_RADIUS_MAX,
-            ("CORNER_RADIUS_MAX", "SPIGOT_CALLOUT_BELOW"),
+            ("CORNER_RADIUS_MAX", "SPIGOT_NOTE_TEXT"),
         ),
         "mate": ("MHA-PD-06", ("DISC_NUMBER", "SPIGOT_CALLOUT_BELOW")),
-        "fit": ("sliding", ("SPIGOT_CALLOUT_BELOW",)),
+        "fit": ("clearance", ("SPIGOT_NOTE_TEXT",)),
         "callout": (SPIGOT_CALLOUT_BELOW, ("SPIGOT_CALLOUT_BELOW",)),
+        "note": (_spec.SPIGOT_NOTE_TEXT, ("SPIGOT_NOTE_TEXT", (_SELF, "DRAWING_NOTES"))),
     },
-    precision={"dia": _P["SpigotDia"], "length": _P["SpigotLength"]},
+    precision={"dia_ref": _P["SpigotDia"], "length": _P["SpigotLength"]},
 )
 # The hub body, from the hub front face to the flange: its third place holds
 # the wall over the chord ream, printed under the size.
@@ -662,8 +671,8 @@ requirement(
         "nominal_dia": (BORE_DIA, ("BORE_DIA",)),
         "thru": (True, ("BORE_CALLOUT_BELOW",)),
         "process": ("ream", ("BORE_CALLOUT_BELOW",)),
-        "mate": ("MHA-PD-10", ("SLEEVE_NUMBER", "BORE_CALLOUT_BELOW")),
-        "fit": ("sliding", ("BORE_CALLOUT_BELOW",)),
+        "mate": ("MHA-PD-10", ("SLEEVE_NUMBER", "BORE_NOTE_TEXT")),
+        "fit": ("sliding", ("BORE_NOTE_TEXT",)),
         "diametral_clearance": (
             list(_spec.BOSS_CLEARANCE_LIMITS),
             ("BOSS_CLEARANCE_LIMITS",),
@@ -674,6 +683,7 @@ requirement(
         ),
         "datum": (BORE_DATUM, ("BORE_DATUM", (_SELF, "DATUM_A_SYMBOL"))),
         "callout": (BORE_CALLOUT_BELOW, ("BORE_CALLOUT_BELOW",)),
+        "note": (_spec.BORE_NOTE_TEXT, ("BORE_NOTE_TEXT", (_SELF, "DRAWING_NOTES"))),
     },
     precision={"dia": _P["BoreDia"]},
 )
@@ -761,17 +771,17 @@ requirement(
             limits(
                 KEY_PIN_CHORD_OFFSET,
                 _P["KeyPinChord"],
-                _PLUS_MINUS["KeyPinLocation"],
+                _PLUS_MINUS["KeyPinChord"],
                 unit=_UNIT,
             ),
-            ("KEY_PIN_CHORD_OFFSET", "KEY_PIN_LOCATION_BAND", (_SELF, "SECTION_KEEP")),
+            ("KEY_PIN_CHORD_OFFSET", "KEY_PIN_CHORD_BAND", (_SELF, "SECTION_KEEP")),
         ),
         "chord_nominal": (KEY_PIN_CHORD_OFFSET, ("KEY_PIN_CHORD_OFFSET",)),
         "chord_from": ("bore", ((_SELF, "SECTION_KEEP"),)),
         "chord_axis": ("y", ("__frame__",)),
         "stop": (
             KEY_PIN_STOP_LIMITS,
-            ("KEY_PIN_STOP", "KEY_PIN_LOCATION_BAND", (_SELF, "SECTION_KEEP")),
+            ("KEY_PIN_STOP", (_GEOM, "UNIT"), (_SELF, "SECTION_KEEP")),
         ),
         "stop_nominal": (KEY_PIN_STOP, ("KEY_PIN_STOP",)),
         "stop_x": (-KEY_PIN_STOP, ("KEY_PIN_STOP_X",)),
@@ -782,12 +792,16 @@ requirement(
         "station_nominal": (_spec.KEY_PIN_STATION, ("KEY_PIN_STATION",)),
         "station_from": ("front_face", ((_SELF, "SIDE_KEEP"),)),
         "mate": ("MHA-PD-VN-69", ("KEY_PIN_NUMBER", "KEY_PIN_CALLOUT_BELOW")),
-        "fit": ("press", ("KEY_PIN_CALLOUT_BELOW",)),
+        "fit": ("press", ("KEY_PIN_NOTE_TEXT",)),
         "diametral_interference": (
             list(_spec.KEY_PIN_INTERFERENCE),
             ("KEY_PIN_INTERFERENCE",),
         ),
         "callout": (KEY_PIN_CALLOUT_BELOW, ("KEY_PIN_CALLOUT_BELOW",)),
+        "note": (
+            _spec.KEY_PIN_NOTE_TEXT,
+            ("KEY_PIN_NOTE_TEXT", (_SELF, "DRAWING_NOTES")),
+        ),
     },
     precision={
         "dia": _P["KeyPinDia"],
@@ -1591,6 +1605,7 @@ def build(adapter: Any) -> dict[str, str]:
     set_dimension_callouts(
         adapter, annotations, DIMENSION_CALLOUTS_ABOVE, location="above"
     )
+    set_reference_dimensions(adapter, side_annotations, _spec.REFERENCE_DIMENSIONS)
     for view, label in ((end, "face"), (side, "edge")):
         if not auto_center_marks(adapter, view, holes=True, size=0.0025):
             raise RuntimeError(
