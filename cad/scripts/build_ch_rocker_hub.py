@@ -4,7 +4,7 @@ The turned 1018 hub of the built-up rocker arm MHA-CH-06
 (``ch_rocker_arm_notes.BUILT_UP_PERMISSION_NOTE``), as SUPPLIED to the joint
 (``ch_rocker_hub_spec``): the Ø.400 land at its finished size, a reference
 turned to the MHA-CH-13 strap's measured hole for the press
-(``ch_rocker_hub_fit``), the bore drilled under the finished ream and the
+(``ch_rocker_hub_fit``), the bore drilled under the finished F drill and the
 length left long, both finished on the joined part to the MHA-CH-06 print.
 
 Layout: Front-plane annulus at the origin (land, bore) extruded mid-plane, so

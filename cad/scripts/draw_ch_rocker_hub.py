@@ -222,7 +222,7 @@ requirement(
     },
     precision={"dia_ref": _P["LandDia"]},
 )
-# The supply bore: a D drill through, under the finished ream (note 1).
+# The supply bore: a D drill through, under the joined part's F drill (note 1).
 requirement(
     "bore",
     kind="hole",
