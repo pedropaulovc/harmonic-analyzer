@@ -6,7 +6,6 @@
 # to SHIP deletes its line; the batch that deletes the last line deletes this
 # file (an empty list fails the graph load).
 demoted:
-  ch_amplitude_bar: fit-batch-ch
   ch_channel_assembly: fit-batch-ch
   ch_channel_lever: fit-batch-ch
   ch_connecting_rod: fit-batch-ch
