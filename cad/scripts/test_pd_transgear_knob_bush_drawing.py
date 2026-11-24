@@ -182,27 +182,47 @@ def test_the_drawing_reads_the_callouts_back_and_never_writes_them() -> None:
 
 def test_each_tight_callout_names_its_mate_by_drawing_number() -> None:
     """Rule 4: the reamed bore, the press, the hub station and the overall
-    length each name what they fit or set; rule 7: at most two lines of
-    words under the process line."""
+    length each name what they fit or set and print one necessity answer of
+    an allowed kind; rule 7: at most two lines of words under the process
+    line, the bore's fit statement in its numbered note."""
     plate, shaft = _number("pd-transgear-arm-plate"), _number("pd-transgear-knob-shaft")
     bore = spec.BORE_CALLOUT.splitlines()
-    assert bore[0] == f"REAM THRU AFTER PRESSING IN {plate}"
-    # The fit, its mate and what it protects (the necessity answer, no
-    # dimension in it), on one row.
-    assert bore[1] == f"RUNNING FIT ON KNOB SHAFT {shaft}, KEEPS REDUCER BACKLASH"
-    assert bore[2] == spec.WALL_TEXT
+    assert bore == [
+        f"REAM THRU AFTER PRESSING IN {plate}",
+        f"SEE NOTE {spec.BORE_NOTE_NUMBER}",
+        spec.WALL_TEXT,
+    ]
+    # r1: at 59 characters the block left the border; nothing is longer than
+    # the process line the block's measured width was read at.
+    assert max(map(len, bore)) <= drawing.BORE_BLOCK_LINE_MAX
+    # The note: the mate, said to be turned to this bore (its acceptance
+    # prints once, on MHA-PD-08's sheet), and the necessity answer, with no
+    # dimension in it.
+    note = " ".join(spec.BORE_NOTE.split())
+    assert note == (
+        f"{spec.BORE_NOTE_NUMBER}. KNOB SHAFT {shaft} IS TURNED TO THIS BORE."
+        " KEEPS REDUCER BACKLASH."
+    )
+    assert not any(char.isdigit() for char in note.replace(shaft, "")[2:])
+    assert drawing.DRAWING_NOTES == spec.BORE_NOTE
     press = spec.PRESS_CALLOUT.splitlines()
     assert len(press) == 2
-    assert press[0] == f"PRESS FIT IN {plate}, HOLDS KNOB AXIS"
+    assert press[0] == f"PRESS IN {plate}, HOLDS KNOB AXIS, NO FASTENER"
+    assert max(map(len, press)) <= 48
     assert press[1] == "TURN TO MEASURED HOLE (INTERFERENCE .0005-.0016)"
+    # The ±.001 station is the first term of the disc cluster's stack: the
+    # collar's air to the disc closes at the title block's band.
     assert spec.HUB_LENGTH_CALLOUT == (
-        f"SETS {shaft}\nAND {_number('pd-transgear-removable')}"
+        f"KEEPS GAP AT\nCOLLAR {_number('pd-transgear-drive-collar')}"
     )
     # The ±.002 bounds the journal's stand-out, which the cup's supplied
-    # pilot absorbs by facing at fit-up.
+    # pilot must cover for the end float to be set by facing the cup.
     assert spec.LENGTH_CALLOUT == (
-        f"SETS FACING RANGE\nOF CUP {_number('pd-transgear-knob-cup')}"
+        f"SETS KNOB END FLOAT\nAT CUP {_number('pd-transgear-knob-cup')}"
     )
+    for callout in (spec.HUB_LENGTH_CALLOUT, spec.LENGTH_CALLOUT):
+        words = [w for w in callout.split() if not w.startswith("MHA-")]
+        assert len(words) <= 6 and not any(c.isdigit() for w in words for c in w)
     assert spec.DIMENSION_CALLOUTS == {
         "BoreSketch": {"BoreDia": spec.BORE_CALLOUT},
         "BushProfile": {
@@ -214,6 +234,33 @@ def test_each_tight_callout_names_its_mate_by_drawing_number() -> None:
     # The B pre-drill is the process's, not the sheet's.
     for callouts in spec.DIMENSION_CALLOUTS.values():
         assert ".238" not in "".join(callouts.values())
+
+
+def test_the_tight_lengths_fail_their_stacks_at_the_title_block_band() -> None:
+    """Rule 4's necessity test, re-derived (fit audit 2026-11-23): with the
+    hub station at the title block's ±.005 the collar's statistical air
+    falls under its floor; with the length looser than ±.002 by more than
+    .001 the cup's supplied pilot cannot set the end float."""
+    import pd_cluster_air as air
+    import pd_transgear_knob_cup_spec as cup
+
+    title_block = _printed_tolerance.printed_band_mm(3, unit=BUSH.UNIT)
+    assert BUSH.HUB_LENGTH_BAND < BUSH.LENGTH_BAND < title_block
+    label = "MHA-PD-28 hub face station"
+    terms = dict(air.COLLAR_AIR.terms)
+    assert terms[label] == BUSH.HUB_LENGTH_BAND
+    assert air.COLLAR_AIR.air_mm("statistical") >= air.COLLAR_AIR_MIN
+    loose = air.AirStack(
+        air.COLLAR_AIR.name,
+        air.COLLAR_AIR.nominal_mm,
+        terms | {label: title_block},
+        air.COLLAR_AIR_MIN,
+    )
+    assert loose.air_mm("statistical") < air.COLLAR_AIR_MIN
+    # What the cup's supplied pilot leaves over the stand-out's stack, of
+    # which this length's band is one term.
+    spare = min(cup.FACING_REMOVAL)
+    assert 0.0 <= spare < title_block - BUSH.LENGTH_BAND
 
 
 def _worst_walls_in() -> dict[str, float]:
@@ -600,6 +647,22 @@ def test_the_isometric_clears_the_title_block_and_the_section() -> None:
     assert top < drawing.SECTION_CENTER[1] - drawing.HALF_HUB - 0.010
     assert top < drawing.FRAME_XY[1] - drawing.FRAME_HEIGHT_M - 0.010
     assert right < drawing.CAPTION_XY[0] - 0.030  # the SECTION caption
+
+
+def test_the_bore_note_stands_in_the_open_sheet_over_the_title_block() -> None:
+    """The numbered note (top-left at its xy, about 2.85 mm a character and
+    4.5 mm a line): right of the SECTION caption, under the press Ø's lower
+    arrow (r1: 0.148), above the title block and left of the right border."""
+    x, y = drawing.BORE_NOTE_XY
+    lines = spec.BORE_NOTE.splitlines()
+    assert max(map(len, lines)) <= spec.BORE_NOTE_WIDTH
+    assert len(lines) <= 4  # rule 7
+    right = x + max(map(len, lines)) * 0.00285
+    bottom = y - len(lines) * 0.0045
+    assert x > drawing.CAPTION_XY[0] + 0.040
+    assert right < 0.4318 - 0.0127 - 0.003
+    assert y < 0.148 - 0.010
+    assert bottom > 0.066 + 0.005
 
 
 def test_registry_row_is_the_turned_steel_mha_pd_28() -> None:

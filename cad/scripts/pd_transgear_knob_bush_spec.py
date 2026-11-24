@@ -19,6 +19,7 @@ y = 0, shoulder y = HUB_LENGTH, rear face y = LENGTH.
 from __future__ import annotations
 
 import math
+import textwrap
 
 import _config
 import paper_drive_arm_registration as REGISTRATION
@@ -78,7 +79,7 @@ PLATE_NUMBER = _config.parts("pd-transgear-arm-plate")["number"]
 KNOB_SHAFT_NUMBER = _config.parts("pd-transgear-knob-shaft")["number"]
 THRUST_RING_NUMBER = _config.parts("pd-transgear-knob-thrust-ring")["number"]
 KNOB_CUP_NUMBER = _config.parts("pd-transgear-knob-cup")["number"]
-SPROCKET_NUMBER = _config.parts("pd-transgear-removable")["number"]
+DRIVE_COLLAR_NUMBER = _config.parts("pd-transgear-drive-collar")["number"]
 
 
 def _inch(value_mm: float, places: int, rounding) -> str:
@@ -122,25 +123,47 @@ FINISH_CAPTIONS = {
 
 # --- Callouts -----------------------------------------------------------------
 # The bore is a fit reamed in place (rule 12 process, rule 4 route): REAM
-# after pressing, at the reamer's size with no band, naming the knob shaft's
-# journal that is turned to it and what the fit protects (rule 4's
-# necessity answer: the journal's shake is the reducer mesh's backlash),
-# and the press section's wall, under the .080 target, stated as a plain
-# fact (rule 20).  The B pre-drill is the process's, not the sheet's.
+# after pressing, at the reamer's size with no band, then the pointer to the
+# sheet's one numbered note and the press section's wall, under the .080
+# target, stated as a plain fact (rule 20).  Under the size and process a
+# callout carries at most two lines of words (rule 7), so the fit statement
+# stands in the note: the knob shaft is turned to this bore (guidelines v2:
+# the acceptance prints once, on the sheet of the member made last,
+# MHA-PD-08's note 1; a bare fit name here was r1's blocker) and what the
+# fit protects (rule 4's necessity answer: the journal's shake is the
+# reducer mesh's backlash).  No line of the callout is longer than its process
+# line: at 59 characters the block ran out through the left border and its
+# leader through the bore finish's text (r1).  The B pre-drill is the
+# process's, not the sheet's.
 WALL_TEXT = f"WALL {_inch(BUSH.WALL_STATED_MIN, 3, math.floor)} MIN"
 BORE_NECESSITY = "KEEPS REDUCER BACKLASH"
+BORE_NOTE_NUMBER = 1
+BORE_NOTE_WIDTH = 40
+BORE_NOTE = "\n".join(
+    textwrap.wrap(
+        f"{BORE_NOTE_NUMBER}. KNOB SHAFT {KNOB_SHAFT_NUMBER} IS TURNED TO THIS "
+        f"BORE. {BORE_NECESSITY}.",
+        width=BORE_NOTE_WIDTH,
+        subsequent_indent="   ",
+        break_on_hyphens=False,
+    )
+)
 BORE_CALLOUT = (
     f"REAM THRU AFTER PRESSING IN {PLATE_NUMBER}\n"
-    f"RUNNING FIT ON KNOB SHAFT {KNOB_SHAFT_NUMBER}, {BORE_NECESSITY}\n"
+    f"SEE NOTE {BORE_NOTE_NUMBER}\n"
     f"{WALL_TEXT}"
 )
 # Made to fit (rule 4, form 2): the press step is turned last to MHA-PD-19's
 # hole as measured, so its size prints REF and the interference range
-# (.0011 wide) is the requirement, with what the press protects: it alone
-# holds knob axis K in the plate (the MHA-CH-12 press land's form,
-# ch_rocker_hub_notes.LAND_CALLOUT).
+# (.0011 wide) is the requirement, with what the press protects, rule 4's
+# fixed-joint answer in full: it alone holds knob axis K in the plate, with
+# no fastener (the MHA-CH-12 press land's form,
+# ch_rocker_hub_notes.LAND_CALLOUT).  The press itself, where rule 4 would
+# take a bonded slip fit, is the owner's #2425 choice (the registry row's
+# RV-04).  Neither line is longer than the 48 characters the block's place
+# was set for.
 PRESS_CALLOUT = (
-    f"PRESS FIT IN {PLATE_NUMBER}, HOLDS KNOB AXIS\n"
+    f"PRESS IN {PLATE_NUMBER}, HOLDS KNOB AXIS, NO FASTENER\n"
     "TURN TO MEASURED HOLE (INTERFERENCE "
     f"{_inch(BUSH.PRESS_INTERFERENCE[0], 4, math.floor)}-"
     f"{_inch(BUSH.PRESS_INTERFERENCE[1], 4, math.ceil)})"
@@ -149,19 +172,24 @@ PRESS_CALLOUT = (
 # land's form, pd_transgear_pin_callouts.DIMENSION_TEXT).
 PRESS_DIA_TEXT_PREFIX = "(<MOD-DIAM>"
 PRESS_DIA_TEXT_SUFFIX = ")"
-# The hub face's station from the shoulder (face A) sets the knob shaft (its
-# integral 15T meshing the reducer disc) and, through the drive collar on
-# the 15T's front face, the removable chain sprocket's plane
-# (paper_drive_arm_registration.KNOB_F_MACHINE_Z_MM,
-# transgear_cluster_fit.F_CHAIN): it names both by drawing number, as the
-# plate's hub station did.
-HUB_LENGTH_CALLOUT = f"SETS {KNOB_SHAFT_NUMBER}\nAND {SPROCKET_NUMBER}"
+# The hub face's station from the shoulder (face A) is the first term of
+# the disc cluster's stack (F, transgear_cluster_fit), and the stack's air
+# between the MHA-PD-22 drive collar and the MHA-PD-06 disc is what closes
+# when it is loose: at the title block's ±.005 the statistical air falls to
+# 0.0599 mm under its 0.1016 floor (pd_cluster_air.require_air).  The
+# callout names that gap (rule 4's necessity answer, a running gap that
+# closes; machinist review r1: the mates alone were no answer).  At most 16
+# characters a line, inside the station's own extension lines.
+HUB_LENGTH_CALLOUT = f"KEEPS GAP AT\nCOLLAR {DRIVE_COLLAR_NUMBER}"
 # The hub-to-rear-face length places the bush's rear face on the knob shaft,
 # so its ±.002 is a term of the journal's stand-out behind it
-# (pd_transgear_knob_shaft_spec.JOURNAL_STANDOUT_BAND), the range the
-# MHA-PD-16 cup's supplied pilot absorbs by facing at fit-up
-# (pd_transgear_knob_cup_spec.FACING_REMOVAL, never negative).
-LENGTH_CALLOUT = f"SETS FACING RANGE\nOF CUP {KNOB_CUP_NUMBER}"
+# (pd_transgear_knob_shaft_spec.JOURNAL_STANDOUT_BAND), which the
+# MHA-PD-16 cup's supplied pilot must cover for the knob's end float to be
+# set by facing the cup (pd_transgear_knob_cup_spec.FACING_REMOVAL, never
+# negative: .001 is left at ±.002, none at ±.003, and at the title block's
+# ±.005 the float cannot be set).  The callout names that float (rule 4's
+# necessity answer; r1: "facing range" named no gap or stack).
+LENGTH_CALLOUT = f"SETS KNOB END FLOAT\nAT CUP {KNOB_CUP_NUMBER}"
 # Below-text the part build authors on its source dimensions; the drawing
 # imports and reads it back (text set from the drawing writes through to the
 # built part, fleet issue #1942).

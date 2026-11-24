@@ -76,6 +76,7 @@ from pd_transgear_knob_bush_geometry import (
 from pd_transgear_knob_bush_spec import (
     BORE_BAND,
     BORE_CALLOUT,
+    BORE_NOTE,
     DIMENSION_CALLOUTS,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
@@ -177,8 +178,16 @@ FACE_KEEP = {
     "BoreDia": (FACE_CENTER[0] + 0.015, FACE_CENTER[1] + HALF_HUB + 0.0265),
 }
 _ARROWS_OUTSIDE = 1  # swDimensionArrowsSide_e.swDimArrowsOutside
-# The bore's block, read off r6's A-A: 96 mm wide, 25 mm from shelf to top.
+# The bore's block, read off r6's A-A: 96 mm wide (its 37-character process
+# line, the longest the callout may carry), 25 mm from shelf to top.
 BORE_BLOCK_SIZE_M = (0.096, 0.025)
+BORE_BLOCK_LINE_MAX = 37
+# The bore's numbered note (its top-left corner): in the open sheet right of
+# the SECTION caption and above the title block (its top at 0.066), under
+# the press Ø's lower arrow (r1: its tail ends at 0.148).  At most
+# BORE_NOTE_WIDTH characters a line, about 2.85 mm each, ends left of the
+# right border.
+BORE_NOTE_XY = (0.290, 0.110)
 
 # A surface finish's ink, read off r6 relative to its symbol point: the
 # leader leaves 6.3 mm right of it, the symbol stands up to 7.2 mm above it,
@@ -260,9 +269,9 @@ SECTION_POSITION_TOL_M = 1e-4
 # the shoulder's station its ±.001 and its root the printed R.005 MAX; the
 # length its ±.002; the bore its H7 band, reamed through after pressing in
 # MHA-PD-19 (MHA-PD-00), square to A, under the stated wall. Each ``span``
-# is a diameter's model-Y extent. The sheet prints no manufacturing note.
-# The declarations print nothing.
-DRAWING_NOTES = ""
+# is a diameter's model-Y extent. The sheet's one numbered note is the
+# bore's fit statement.  The declarations print nothing.
+DRAWING_NOTES = BORE_NOTE
 _P = DRAWING_PRECISION_BY_NAME
 _SELF = "draw_pd_transgear_knob_bush"
 _GEOM = "pd_transgear_knob_bush_geometry"
@@ -770,6 +779,7 @@ def build(adapter: Any) -> dict[str, str]:
             char_height=FINISH_CHAR_HEIGHT,
         )
         _add_placed_note(adapter, FINISH_CAPTIONS[key], caption, f"{label} caption")
+    _add_placed_note(adapter, BORE_NOTE, BORE_NOTE_XY, "bore fit note")
 
     return finalize_drawing(
         adapter,
