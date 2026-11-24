@@ -285,8 +285,8 @@ vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{process.blank_section_mm}}
 beam = { axis = "z", hold = "cantilever", extent_mm = [0, "{{cad.blank_length_max_mm}}"], clamp_mm = [0, "{{process.upright_grip_mm}}"], section_mm = { x = "{{process.blank_section_mm}}", y = "{{process.blank_section_mm}}" }, vise_left = "other" }
 
 [[setups.operations]]
-instruction = "Home the mill first ($H). G54 X0 Y0 the bar's axis: edge finder (900 rpm) on the left and right faces and on the fixed jaw."
-instruction_detailed = "Home the mill first ($H). Edge finder (900 rpm). Y: its tip .10 below the jaw top, on the fixed jaw's face beside the blank, G10 L20 P1 Y(half the miked section in mm − 2.540); for .750, Y6.985. X: its tip .10 below the sawn top, on the blank's LEFT face from the left, G10 L20 P1 X0; on its RIGHT face from the right, G10 L20 P1 X(half the DRO X reading)."
+instruction = "Before clamping: mic the blank's section across the faces the jaws grip and write it down. Home the mill first ($H). G54 X0 Y0 the bar's axis: edge finder (900 rpm) on the left and right faces and on the fixed jaw."
+instruction_detailed = "Before clamping: mic the blank's section across the faces the jaws grip; write it down in mm (in × 25.4). Home the mill first ($H). Edge finder (900 rpm). Y: its tip .10 below the jaw top, on the fixed jaw's face beside the blank, G10 L20 P1 Y(half the miked section in mm − 2.540); for .750, Y6.985. X: its tip .10 below the sawn top, on the blank's LEFT face from the left, G10 L20 P1 X0; on its RIGHT face from the right, G10 L20 P1 X(half the DRO X reading)."
 feed = "hand"
 
 [[setups.operations]]
