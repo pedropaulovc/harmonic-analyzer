@@ -285,13 +285,12 @@ sink_pin_depth_mid_mm = 0.9058
 # K's chamfer rim: Ø.4385 plus twice the leg's band. The check: a .450 pin
 # (over the largest K the reamer is modelled to cut, under the smallest rim)
 # stands in the chamfer; its end sits half the rim less the pin below face
-# A. Its band holds for any K the reamer is modelled to cut (.4385-.4390):
-# from the largest K and the shortest leg (.0045) to the smallest and the
-# longest (.01425), so no reading passes a leg outside .010-.020.
+# A. Its band is the sheet's .010-.020 leg on the printed Ø.4385 (.00425 to
+# .01425), no tighter than the drawing (traveler review r5, rule T15).
 chamfer_rim_min_mm = 11.6459
 chamfer_rim_max_mm = 12.1539
 chamfer_pin_dia_mm = 11.43
-chamfer_pin_depth_min_mm = 0.1143
+chamfer_pin_depth_min_mm = 0.10795
 chamfer_pin_depth_max_mm = 0.36195
 
 [[tools]]
@@ -513,7 +512,7 @@ speed_kind = "spindle"
 tool = "spot"
 drilling = "none"
 sizing = "other"
-instruction = "Same file, M6 T2 (#1 centre drill in the drill chuck; set 2800): spot K and the two screw holes Ø{{process.spot_dia_mm:in.3dot}}, under the #1."
+instruction = "Same file, M6 T2 (#1 centre drill in the drill chuck; set 2800): spot K and the two screw holes Ø{{process.spot_dia_mm:in.3dot}}, smaller than the #1 (.228) drill that follows."
 rpm = 2800
 feed = "{{process.spot_feed_per_min_mm:in.1f}} in/min"
 milling_cuts = [

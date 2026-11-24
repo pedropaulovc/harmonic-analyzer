@@ -732,11 +732,29 @@ def test_the_callouts_name_each_fit_and_the_matched_pair() -> None:
 
     press = drawing.PLAN_CALLOUTS["PressHoleDia"]
     assert press is notes.PRESS_HOLE_CALLOUT
-    assert press.splitlines()[0] == "REAM THRU"
-    assert f"PRESS FIT FOR {numbers['BUSH_NUMBER']}" in press.splitlines()
-    # Reamed with the set reamer: no band, no interference range; the last
-    # line says what the press protects (rule 4).
-    assert press.splitlines()[-1] == "HOLDS KNOB AXIS, NO FASTENER"
+    assert press.splitlines()[0] == "REAM THRU, PRESS FIT"
+    # Reamed with the set reamer: no band, no interference range; the fit
+    # rides on the process line and the two lines of words give the
+    # three-place chamfer its function (rule 3) and say the mate is turned
+    # to this bore, in rule 4's words (its acceptance prints once, on
+    # MHA-PD-28).  No necessity reason is printed: it is in the register.
+    assert press.splitlines()[2:] == [
+        f"CLEARS {numbers['BUSH_NUMBER']} SHOULDER ROOT",
+        f"{numbers['BUSH_NUMBER']} IS TURNED TO THIS BORE",
+    ]
+    for word in ("HOLDS", "KEEPS", "SETS", "FASTENER"):
+        assert word not in press, word
+    # The chamfer's window: over the bush's root radius, under the leg that
+    # still leaves a shoulder land; no two-place value fits inside it.
+    low = bush.SHOULDER_ROOT_R_MAX_MM / 25.4
+    high = (
+        (bush.HUB_DIA / 25.4 - 0.01) - (bush.PRESS_DIA + max(bush.PRESS_HOLE_BAND)) / 25.4
+    ) / 2.0 - 0.010
+    assert low == pytest.approx(0.005) and high == pytest.approx(0.0255, abs=1e-4)
+    for nominal in (0.01, 0.02):
+        assert not (low <= nominal - 0.01 and nominal + 0.01 <= high), nominal
+    assert low <= 0.015 - 0.005 and 0.015 + 0.005 <= high
+    assert max(map(len, press.splitlines())) <= 33
     assert "INTERFERENCE" not in press and not re.search(r"\.\d{4}", press)
     locator = flat(drawing.LOCATOR_CALLOUT)
     assert drawing.CALLOUTS_ABOVE["LocatorDia1"] == f"{len(geometry.LOCATOR_SITES_MM)}X"
@@ -747,10 +765,19 @@ def test_the_callouts_name_each_fit_and_the_matched_pair() -> None:
     assert "SLIDES IN, NO SHAKE" in locator
     note = flat(drawing.LOCATOR_NOTE)
     # No clearance range is printed: the dowel is the gauge, named once, on
-    # the callout.  The note says what the pair protects.
+    # the callout.  The note prints no reason (necessity register N-02).
     assert "CLEARANCE" not in flat(locator + " " + note)
     assert not re.search(r"\.\d{4}", locator + note)
-    assert "KEEPS PLATE AT REDUCER MESH SETTING" in note
+    assert "KEEPS" not in note and "MESH" not in note
+    # One scheme: sheet 2's frame says where the holes stand, the note only
+    # when they are made; no order of work, no "match-drill".
+    assert "DRILL AND REAM AT ASSEMBLY ON ARM" in note
+    for word in ("MATCH", "THROUGH", "CLAMPED", "FIRST", "THEN"):
+        assert word not in note, word
+    locator_frames = [
+        c for c in spec.GEOMETRIC_CONTROLS if c.key.startswith("plate_locator_")
+    ]
+    assert len(locator_frames) == len(geometry.LOCATOR_SITES_MM)
     assert numbers["DOWEL_NUMBER"] not in note
     assert min(dowel.SLIP_DIAMETRAL_CLEARANCE_MM) > 0.0
     assert note.startswith(f"{notes.LOCATOR_NOTE_NUMBER}. ")
