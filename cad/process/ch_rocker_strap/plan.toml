@@ -382,8 +382,9 @@ beam = { axis = "x", hold = "plate", extent_mm = [0, "{{cad.blank_length_mm}}"],
 # underside are not parallel; the fence and end-stop heights do not change.
 [[setups.operations]]
 steps = [
-  { kind = "check", text = "Once per vise setup, no blank in: the lever indicator along the plate top over X 0–12 reads within .001." },
-  { kind = "stop", text = "Over: reseat the plate on the parallels and indicate again. Still over: a feeler-gauge leaf between the parallels and the plate's low end, then indicate again." },
+  { kind = "check", text = "Once per vise setup, no blank in: the lever indicator along the plate top over X 0–12 reads within .001; then along the fence face over X 0–12, within .001." },
+  { kind = "stop", text = "Plate top over: reseat the plate on the parallels and indicate again. Still over: a feeler-gauge leaf between the parallels and the plate's low end, then indicate again." },
+  { kind = "stop", text = "Fence over: open the vise a little, tap the plate's high-reading end away from the indicator with a soft mallet, close the vise and indicate the fence, then the plate top, again." },
 ]
 feed = "hand"
 
@@ -543,7 +544,7 @@ tool = "hub-reamer"
 drilling = "none"
 sizing = { kind = "band", band_mm = "{{cad.hub_dia_band_mm}}" }
 instruction = "Same file, M6 T5 (spindle off, retracted): ream through, .4000 reamer in the drill chuck; set 400. Cutting oil. The file feeds the reamer in and feeds it back out, spindle running: no rapid leaves the bore. Leave the blank clamped for the check."
-inspection = "Still clamped: the .400 minus pin of the pin-gauge set enters the hub hole by hand. The drawing prints REAM with no band: the .4000 reamer sizes the hole and MHA-CH-12 is turned to slide into it (owner ruling 2026-11-24, fit audit question 2). Every hole; the first blank's before reaming any other."
+inspection = "Still clamped: the .400 minus pin of the pin-gauge set enters the hub hole by hand. Every hole; the first blank's before reaming any other."
 rpm = 400
 feed = "{{process.hub_ream_feed_per_min_mm:in.1f}} in/min, in and out"
 gauge_checks = "other"
