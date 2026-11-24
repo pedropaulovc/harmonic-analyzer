@@ -26,7 +26,6 @@ IN = 25.4
 # pivot is turned to it, so no pin gauges it.
 PLANS = {
     "dt_cone_tip_end_screw": ("zz-pins-0630-0635", None, "go_pin_max_in", "nogo_pin_min_in"),
-    "dt_crank_hub": ("zz-pins-3760-3765", None, "go_pin_max_in", "nogo_pin_min_in"),
     "dt_pinion_arbor": (
         "zz-pins-3135-3140",
         ("strap_bore_min_in", "strap_bore_max_in"),

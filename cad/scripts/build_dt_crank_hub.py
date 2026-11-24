@@ -58,7 +58,6 @@ from dt_crank_hub_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
     HUB_BARREL_DIA,
-    HUB_BORE_BAND,
     HUB_BARREL_LENGTH,
     HUB_BORE_DIA,
     HUB_LENGTH,
@@ -411,9 +410,8 @@ def build(adapter) -> dict[str, str]:
         axis_name=seam_axis,
         axis_expected_components_mm={0: 0.0, 2: AXIAL_PIN_RADIUS_FROM_AXIS},
     )
-    set_dimension_bilateral_tolerance(
-        adapter, "BoreProfile", "BoreDia", *deviations(HUB_BORE_BAND), display_unit=UNIT
-    )
+    # The bore prints the .3760 reamer's size with no band; MHA-DT-11 is
+    # turned to it (fit audit 2026-11-23, MHA-DT-31.bore).
     # The overall places the rear face the removable and the drive-pin tips
     # clear, so it carries its functional limit on the side that closes an
     # air and keeps the .XX band's -.010 on the other (dt_crank_hub_geometry),
