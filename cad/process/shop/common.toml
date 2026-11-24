@@ -396,12 +396,15 @@ body_length_mm = 72.0
 # 2026-11-21: "Removable / Reversible Jaws for ID and OD Work", shipping box
 # 8 x 8 x 8 in only) give no sizes. The owner measured it 2026-11-22: "i
 # measured the 4 jaw chuck; 160mm diameter ; max jaw opening 140mm":
-# body_diameter_mm below. No grip range is declared (prechips needs its
-# minimum too, not measured; the 140 mm maximum opening is
-# cad/config/shop-equipment/fixtures.toml, same key), so a plan holding work
-# in it sets lathe_hold = "other".
+# body_diameter_mm below. Grip range: the owner's least grip 2026-11-24,
+# verbatim "0.2865 in min dia for 4 jaw" (7.2771 mm), to the 140 mm maximum
+# opening (cad/config/shop-equipment/fixtures.toml, same key, cites both).
+# Plans holding work in it still set lathe_hold = "other" (independent jaws
+# dialled in by hand); pn_pen_rod and dt_cone_tip_end_screw grip under the
+# least grip (#3495, #3496).
 [workholding.chuck-4jaw-6]
 kind = "chuck"
+grip_range_mm = [7.2771, 140.0]
 body_diameter_mm = 160.0
 
 # --- 3-flute uncoated carbide square end mills (McMaster 88815) ---

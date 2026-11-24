@@ -103,11 +103,11 @@ note = "The installed PM-30MV DRO's Y scale (dro.pm-30mv: installed DRO confirme
 
 [gauges.lathe-z-dro]
 status = "on_hand"
-note = "The PM-1127VF-LB's DRO, carriage (Z) axis (dro.pm-1127vf-lb: 5 um, owner 2026-11-21; its axes are not recorded, a Z axis is assumed: check on first use)."
+note = "The PM-1127VF-LB's DRO, carriage (Z) axis (dro.pm-1127vf-lb: 5 um, owner 2026-11-21; axes, owner 2026-11-24: \"dro main slide and cross sline not compound\": the carriage and the cross slide, not the compound)."
 
 [gauges.lathe-x-dro]
 status = "on_hand"
-note = "The PM-1127VF-LB's DRO, cross-slide (X) axis (dro.pm-1127vf-lb: 5 um, owner 2026-11-21; its axes are not recorded, an X axis is assumed: check on first use). Its accuracy over the 7 mm drive-pin offset is not recorded (flagged): the dt_crankshaft plan proves the offsets on a slug before the shaft."
+note = "The PM-1127VF-LB's DRO, cross-slide (X) axis (dro.pm-1127vf-lb: 5 um, owner 2026-11-21; axes, owner 2026-11-24: \"dro main slide and cross sline not compound\": the carriage and the cross slide, not the compound). Its accuracy over the 7 mm drive-pin offset is not recorded (flagged): the dt_crankshaft plan proves the offsets on a slug before the shaft."
 
 [gauges.clamp-bore-drill-shanks]
 status = "on_hand"
