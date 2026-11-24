@@ -119,16 +119,16 @@ def test_fitted_rear_face_reacts_on_actual_f_at_every_printed_corner(
     bore_r = (collar.BORE_DIA + max(collar.BORE_DIA_BAND)) / 2.0
     float_max = max(shaft.CORE_FIT_CLEARANCE) / 2.0
     # The bore's axis is bounded at both support sections of the core and
-    # extrapolated to F; its rear mouth takes the title block's edge break.
+    # extrapolated to F; its rear mouth takes the printed break's largest leg.
     lever = 1.0 + 2.0 * shaft.FRONT_RELIEF_WIDTH_MAX / shaft.CORE_ACTIVE_LENGTH_MIN
-    assert collar.BORE_EDGE_BREAK_MAX == pytest.approx(0.254)
+    assert max(collar.REAR_BREAK_LIMITS) == pytest.approx(0.3302)
     inner = (
-        bore_r + collar.BORE_EDGE_BREAK_MAX
+        bore_r + max(collar.REAR_BREAK_LIMITS)
         + (float_max + shaft.CORE_TOTAL_RUNOUT / 2.0) * lever
         + shaft.TOOTH_SPACE_RUNOUT_TIR_MM / 2.0
     )
     assert collar.ROUND_FIT_FLOAT_MAX == pytest.approx(float_max)
-    assert inner == pytest.approx(2.823324, abs=1e-6)
+    assert inner == pytest.approx(2.899524, abs=1e-6)
     assert collar.FRONT_BEARING_INNER_RADIUS_MAX == pytest.approx(inner)
     areas = [
         shaft.gear_bearing_area_lower(profile, inner)

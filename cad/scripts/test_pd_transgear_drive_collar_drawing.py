@@ -281,7 +281,7 @@ def test_the_flat_pin_crest_drives_the_core_flat_with_bounded_play() -> None:
     # The pin's front end stands on the core's flat over a real length at
     # every corner of the fitted body, floor, pin and core-front bands, behind
     # the rear break's relief of its crest.
-    assert spec.FLAT_PIN_CORE_ENGAGEMENT_MIN == pytest.approx(0.03934 * inch, abs=1e-4)
+    assert spec.FLAT_PIN_CORE_ENGAGEMENT_MIN == pytest.approx(0.03623 * inch, abs=1e-4)
     nominal = spec.flat_pin_core_engagement(
         spec.LENGTH, spec.FLAT_PIN_FLOOR, spec.FLAT_PIN_LENGTH, shaft.CORE_FRONT_FROM_F
     )
@@ -326,27 +326,29 @@ def test_the_rear_break_lifts_the_pin_crest_off_the_root_corner() -> None:
     )
     assert cone_r > min(spec.FLAT_PIN_CREST_LIMITS)
     assert spec.FLAT_PIN_CREST_CORNER_AIR_MIN == pytest.approx(cone_r - reach)
-    assert spec.FLAT_PIN_CREST_CORNER_AIR_MIN == pytest.approx(0.3228, abs=1e-4)  # .0127
+    assert spec.FLAT_PIN_CREST_CORNER_AIR_MIN == pytest.approx(0.2466, abs=1e-4)  # .0097
     # Negative control: the bare crest, no break cone, has no air there.
     assert min(spec.FLAT_PIN_CREST_LIMITS) - reach <= 1e-9
 
 
 def test_the_rear_break_ends_inside_the_neck() -> None:
-    # The .010 leg at 44°, the widest and shallowest, ends .0104 in: inside the
-    # neck's .011, so the bore keeps its whole support on the core.
+    # The break takes the title block's ±.005 (fit audit 2026-11-23, pending
+    # owner confirmation).  Its .013 leg at 44°, the widest and shallowest,
+    # ends .0135 in: inside the neck's widest .021, so the bore's support on
+    # the core, counted from that width, is whole.
     assert spec.REAR_BREAK == pytest.approx(0.008 * 25.4)
-    assert spec.REAR_BREAK_TOL == pytest.approx(0.002 * 25.4)
-    assert spec.REAR_BREAK_DEPTH_MAX == pytest.approx(0.2630, abs=1e-4)  # .0104
-    assert spec.REAR_BREAK_DEPTH_MAX <= shaft.FRONT_RELIEF_WIDTH_MIN
+    assert spec.REAR_BREAK_TOL == pytest.approx(printed_band_mm(3, unit=spec.UNIT))
+    assert spec.REAR_BREAK_DEPTH_MAX == pytest.approx(0.3419, abs=1e-4)  # .0135
+    assert spec.REAR_BREAK_DEPTH_MAX <= shaft.FRONT_RELIEF_WIDTH_MAX
     # The widest, shallowest cone from the largest drilled bore reaches down
-    # to the lowest crest .0237 in from F; the pin bears on the flat only
+    # to the lowest crest .0268 in from F; the pin bears on the flat only
     # behind it, past the neck's widest .021.
     bore_r_max = spec.BORE_DIA / 2.0 + max(spec.BORE_DIA_BAND) / 2.0
     assert spec.rear_break_radius(
         spec.FLAT_PIN_CREST_RELIEF_MAX, bore_r_max, max(spec.REAR_BREAK_LIMITS),
         min(spec.REAR_BREAK_ANGLE_LIMITS),
     ) == pytest.approx(min(spec.FLAT_PIN_CREST_LIMITS))
-    assert spec.FLAT_PIN_CREST_RELIEF_MAX == pytest.approx(0.02366 * 25.4, abs=1e-4)
+    assert spec.FLAT_PIN_CREST_RELIEF_MAX == pytest.approx(0.02677 * 25.4, abs=1e-4)
     assert spec.FLAT_PIN_CREST_RELIEF_MAX > shaft.FRONT_RELIEF_WIDTH_MAX
 
 
@@ -400,7 +402,6 @@ def test_fits_carry_named_bands_and_the_lengths_print_their_places() -> None:
     assert model_toleranced_dimensions(part) == {
         ("BodyProfile", "CollarDia"): "*deviations(OD_BAND)",
         ("FlatPinProfile", "FlatPinCentre"): "FLAT_PIN_CENTRE_TOL",
-        ("RearBreakProfile", "RearBreak"): "REAR_BREAK_TOL",
     }
     # The seat O.D. and the drive-pin layout are the crank spigot's, so the
     # removable wheels fit either shaft.
@@ -408,7 +409,7 @@ def test_fits_carry_named_bands_and_the_lengths_print_their_places() -> None:
     assert spec.PIN_CIRCLE_RADIUS == removable.PIN_CIRCLE_RADIUS
     assert spec.PIN_HOLE_DIA == removable.DRIVE_PIN_HOLE_DIA
     assert spec.DRAWING_PRECISION_BY_NAME["CollarLength"] == 3
-    assert spec.DRAWING_PRECISION_BY_NAME["PinPosY"] == 4
+    assert spec.DRAWING_PRECISION_BY_NAME["PinPosY"] == 3
     assert spec.DRAWING_PRECISION_BY_NAME["FlatPinDia"] == 4
     assert spec.DRAWING_PRECISION_BY_NAME["FlatPinCentre"] == 3
     # The floor station takes the title block's .XX row: over .07-.09 the
@@ -441,15 +442,15 @@ def test_every_tight_band_names_its_registered_mate_at_its_callout() -> None:
     assert _config.parts("pd-transgear-removable")["number"] in (
         drawing.DIMENSION_CALLOUTS_BELOW["PinPosDia"]
     )
-    # The pressed pin is the collar's for good; its location is tight because
-    # its crest drives the shaft (named there): two lines of words (rule 7).
+    # The pressed pin is the collar's for good; its location is tight to keep
+    # the stud's gap under its crest (rule 4): two lines of words (rule 7).
     pin_rows = drawing.DIMENSION_CALLOUTS_BELOW["FlatPinDia"].splitlines()
     assert len(pin_rows) == 2
     assert "PRESS FIT" in pin_rows[0] and spec.FLAT_PIN_NUMBER in pin_rows[0]
     # rule 16: the package declares the pin permanent, in the part notes.
     assert f"PERMANENT PIN {spec.FLAT_PIN_NUMBER}" in spec.DRAWING_NOTES
     shaft_number = _config.parts("pd-transgear-knob-shaft")["number"]
-    assert pin_rows[1] == f"CREST DRIVES {shaft_number}  "
+    assert pin_rows[1] == f"KEEPS GAP TO {shaft_number} STUD  "
     # Rule 26: size, process, depth.  The ream's process follows the value on
     # its line, as the sheet's other reams read, then its depth: a REF from the
     # section's nominal fitted rear face, the .XX floor controlling.  The depth
@@ -485,8 +486,15 @@ def test_every_tight_band_names_its_registered_mate_at_its_callout() -> None:
     assert drawing.DIMENSION_SUFFIXES.keys() == {"RearBreak", "FlatPinDia"}
     assert "ROOT CORNER" in drawing.DIMENSION_CALLOUTS_BELOW["RearBreak"]
     assert all(len(r) <= 21 for r in drawing.DIMENSION_CALLOUTS_BELOW["RearBreak"].splitlines())
-    for location in ("PinPosY", "PinNegY", "FlatPinCentre", "FlatPinFloor"):
+    for location in ("FlatPinCentre", "FlatPinFloor"):
         assert location not in drawing.DIMENSION_CALLOUTS_BELOW
+    # Each REF offset links the flag note that gives its trial (rule 4).
+    link = f"SEE NOTE {spec.TRIAL_NOTE}"
+    assert drawing.DIMENSION_CALLOUTS_BELOW["PinPosY"] == link
+    assert drawing.DIMENSION_CALLOUTS_BELOW["PinNegY"] == link
+    assert spec.DRAWING_NOTES.splitlines()[spec.TRIAL_NOTE - 1].startswith(
+        f"{spec.TRIAL_NOTE}. LOCATE TO "
+    )
     # Rule 7: size and process lines plus at most two lines of words.
     assert all(
         len(text.splitlines()) <= 3 for text in drawing.DIMENSION_CALLOUTS_BELOW.values()
@@ -747,20 +755,20 @@ def test_the_round_bore_clears_the_root_corner_and_bears_on_the_whole_core(monke
     inch = 25.4
     # The rear mouth's 45° break, not an entry chamfer, meets the neck; it
     # ends inside the neck so the bore bears on the core's length.
-    assert spec.REAR_BREAK_DEPTH_MAX <= shaft.FRONT_RELIEF_WIDTH_MIN
+    assert spec.REAR_BREAK_DEPTH_MAX <= shaft.FRONT_RELIEF_WIDTH_MAX
     assert spec.ROUND_FIT_FLOAT_MAX == pytest.approx(0.00115 * inch)
     assert spec.ROOT_CORNER_BORE_AIR_MIN == pytest.approx(0.01085 * inch)
     assert spec.BORE_AXIS_AT_F_FROM_JOURNAL_MAX == pytest.approx(0.06742, abs=1e-5)  # .0027
     # The rear face's bearing annulus on the gear starts outside the mouth,
     # its break, the bore's tilt at F and the gear's runout.
     assert spec.FRONT_BEARING_INNER_RADIUS_MAX > spec.BORE_DIA / 2.0 + max(spec.REAR_BREAK_LIMITS)
-    # The largest drilled bore (.195) starts the annulus further out than the
-    # former .1925 ream did: 22.92 then.
-    assert spec.FRONT_BEARING_AREA_MIN == pytest.approx(22.36, abs=0.01)
+    # The largest drilled bore (.195) and the .013 break start the annulus
+    # further out than the former .1925 ream and .010 break did.
+    assert spec.FRONT_BEARING_AREA_MIN == pytest.approx(20.99, abs=0.01)
     # Negative control: a neck narrower than the mouth's break would leave
     # the break on the core, shortening the bore's support.
-    monkeypatch.setattr(shaft, "FRONT_RELIEF_WIDTH_MIN", spec.REAR_BREAK_DEPTH_MAX / 2.0)
-    with pytest.raises(AssertionError, match="shortens the bore's support"):
+    monkeypatch.setattr(shaft, "FRONT_RELIEF_WIDTH_MAX", spec.REAR_BREAK_DEPTH_MAX / 2.0)
+    with pytest.raises(AssertionError, match="recompute the bore's support"):
         _fresh_collar_spec()
 
 
@@ -872,4 +880,4 @@ def test_collar_feature_bands_are_the_printed_ones() -> None:
     assert pilot["faced_at"] == rear["faced_at"] == "assembly"
     # The rear mouth's break is cut at assembly (MHA-PD-00 step 29).
     assert features["rear_break"]["made_at"] == "assembly"
-    assert features["rear_break"]["leg"] == pytest.approx([_in(0.006), _in(0.010)])
+    assert features["rear_break"]["leg"] == pytest.approx([_in(0.003), _in(0.013)])

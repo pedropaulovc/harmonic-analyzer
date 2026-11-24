@@ -445,7 +445,7 @@ title = "Bench: deburr, clear the bore, check the flat pin's centre and floor, o
 machine = "Bench"
 envelope = "other"
 indexing = "none"
-diagram = { file = "diagrams/inspect.svg", alt = "The finished collar: the drilled bore through, the 2X dowel holes reamed through at their .2756 targets from the bore's axis, the flat pin's blind hole at .118 with its floor .08 from the seat face; the flat pin's centre measured over pins." }
+diagram = { file = "diagrams/inspect.svg", alt = "The finished collar: the drilled bore through, the 2X dowel holes reamed through at their (.276) targets from the bore's axis, the flat pin's blind hole at .118 with its floor .08 from the seat face; the flat pin's centre measured over pins." }
 vise_hold = "other"
 beam = "other"
 
