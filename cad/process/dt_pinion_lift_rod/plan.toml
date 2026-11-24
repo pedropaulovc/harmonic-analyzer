@@ -82,12 +82,12 @@ trial_offcut_in = 1.0
 # .005; the R.1875 set here would allow .0474 on the least Ø.2492 bar
 # (cad.dome_far_form_chamfer_max; the adapter refuses more).
 dome_chamfer_in = 0.035
-# The back flat read from the crown's apex: its .58–.60 station from the
+# The back flat read from the crown's apex: its .51–.53 station from the
 # crown's root plus the .0477 crown the R.1875 sweep cuts on the Ø.250 bar.
-flat_back_apex_min_in = 0.6277
-flat_back_apex_max_in = 0.6477
-flat_back_apex_min_mm = 15.9447
-flat_back_apex_max_mm = 16.4527
+flat_back_apex_min_in = 0.5577
+flat_back_apex_max_in = 0.5777
+flat_back_apex_min_mm = 14.1656
+flat_back_apex_max_mm = 14.6736
 # Mill (shop workholding.vise-pm-6 and fixtures.parallels-lms-6745, 1/8 in
 # thick): one 1 in parallel of the set standing on edge, centred between the
 # jaws, 1/16 in clear of each (two parallels would fill the 1/4 in gap and
@@ -122,10 +122,10 @@ em_eighth_projection_min_mm = 19.05
 flat_depth_mm = 0.3048
 # Each flat's ends from the crown's apex (X0) as the R.1875 sweep cuts it,
 # .021 mm past the model's SR.19 apex; cam.py checks them.
-flat_back_from_mm = 16.199
-flat_back_to_mm = 20.517
-flat_front_from_mm = 177.997
-flat_front_to_mm = 183.839
+flat_back_from_mm = 14.421
+flat_back_to_mm = 22.041
+flat_front_from_mm = 177.235
+flat_front_to_mm = 184.855
 
 [[tools]]
 id = "saw"
@@ -370,7 +370,7 @@ title = "Mill both flats"
 machine = "PM-30MV CNC (FluidNC, CNCjs with the electronic tool setter) / vise, swivel off"
 indexing = "none"
 machine_ref = "pm-30mv"
-holding = "The PM 6 in vise (jaws {{process.vise_jaw_height_mm:in.2dot}} high). One 1 in parallel of the 1/8 in thick set standing on edge, centred between the jaws, 1/16 in clear of each. The rod lying on its top edge along the jaws, the crown to the LEFT, gripped on its O.D., centred on the jaws: the crown {{process.vise_jaw_from_x0_mm:in.2dot}} in past the left jaw side, the front face as far past the right. Tap it down onto the parallel while closing the vise. Its top stands {{process.jaw_top_over_od_mm:in.3dot}} under the jaw tops. The back flat lies on the overhang left of the jaws; the front flat ends at the right jaw side; the cutter works down between the jaw faces, clear of them."
+holding = "The PM 6 in vise (jaws {{process.vise_jaw_height_mm:in.2dot}} high). One 1 in parallel of the 1/8 in thick set standing on edge, centred between the jaws, 1/16 in clear of each. The rod lying on its top edge along the jaws, the crown to the LEFT, gripped on its O.D., centred on the jaws: the crown {{process.vise_jaw_from_x0_mm:in.2dot}} in past the left jaw side, the front face as far past the right. Tap it down onto the parallel while closing the vise. Its top stands {{process.jaw_top_over_od_mm:in.3dot}} under the jaw tops. The back flat lies on the overhang left of the jaws; the front flat runs just past the right jaw side; the cutter works down between the jaw faces, clear of them."
 datum = "Program LR01_flats (cam:dt_pinion_lift_rod). G54: X0 the crown's apex, +X along the rod toward the front face; Y0 the rod's axis; Z0 the top of the O.D. The file starts with an M6 for the end mill; tool lengths from the tool setter."
 diagram = { file = "diagrams/flats.svg", alt = "The crowned rod lying along the vise jaws on a parallel; the 1/8 in end mill cuts both flats on top, the back flat on the left overhang." }
 envelope = { x_span_mm = ["{{cad.length_mm}}", "{{process.em_eighth_dia_mm}}"], y_span_mm = ["{{cad.stock_dia_mm}}", "{{process.em_eighth_dia_mm}}"], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{cad.stock_dia_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{cad.flat_back_across_mm}}"], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.em_eighth_projection_min_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.em_eighth_projection_min_mm}}"] }
