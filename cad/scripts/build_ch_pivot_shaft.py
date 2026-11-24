@@ -55,8 +55,6 @@ from _drawing_marks import (
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
 )
-from _drawing_tolerances import set_dimension_bilateral_tolerance
-from _fit_deviations import deviations
 from _part_pmi import author_part_pmi
 from _part_properties import part_drawing_unit
 from ch_pivot_shaft_spec import (
@@ -72,9 +70,7 @@ from ch_pivot_shaft_spec import (
     ISOMETRIC_VIEW_NOTE,
     NORTH_FLAT_STATION,
     SHAFT_DIA,
-    SHAFT_DIA_BAND,
     SURFACE_FINISHES,
-    UNIT,
     V_DOME,
     V_FLAT,
 )
@@ -445,19 +441,13 @@ def build(adapter) -> dict[str, str]:
     apply_material(adapter, MATERIAL)
     apply_color(adapter, POLISHED_STEEL)
     report_mass_properties(adapter)
-    set_dimension_bilateral_tolerance(
-        adapter,
-        "ShaftProfile",
-        "ShaftDia",
-        *deviations(SHAFT_DIA_BAND),
-        display_unit=UNIT,
-    )
+    # ShaftDia carries no band: the bought ground rod prints as its stock
+    # (draw_ch_pivot_shaft, drawing-guidelines.md rule 4).
     # Decimal places belong to the model dimension, not to the sheet.
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
-    # The running faces' roughness lives on the MODEL as plain annotations.
     author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)
     apply_drawing_properties(
         adapter,

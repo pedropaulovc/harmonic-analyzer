@@ -175,7 +175,7 @@ def context(
     outer = f["outer"]
     if outer["axis"] != [0.0, 0.0, 1.0] or outer["at"] != [0.0, 0.0, 0.0]:
         raise ValueError("outer: expected the model Z axis")
-    dia = outer["dia_nominal"]
+    dia = outer["dia_ref"]  # the bought rod, as supplied
     radius = dia / 2
 
     def apex(name: str) -> float:

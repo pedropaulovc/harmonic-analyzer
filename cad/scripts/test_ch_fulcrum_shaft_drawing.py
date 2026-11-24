@@ -11,11 +11,13 @@ import ch_fulcrum_shaft_spec
 import draw_ch_fulcrum_shaft as drawing
 
 
-def test_surface_finish_is_part_owned_and_consumed_by_key() -> None:
-    (control,) = ch_fulcrum_shaft_spec.SURFACE_FINISHES
-    assert control.key == "bearing"
-    assert control.roughness_um == 1.6
-    assert control.face.diameter_mm == ch_fulcrum_shaft_spec.SHAFT_DIA
+def test_the_bought_rod_carries_no_roughness_symbol() -> None:
+    # The O.D. is the ground rod as supplied, never cut (drawing-guidelines.md
+    # rule 4 prints the stock; rule 6).
+    assert ch_fulcrum_shaft_spec.SURFACE_FINISHES == ()
+    source = open(drawing.__file__, encoding="utf-8").read()
+    assert "add_surface_finish" not in source
+    assert "supplier_reference_dimension(" in source
 
 
 def test_every_marked_model_dimension_is_shown() -> None:
@@ -158,15 +160,6 @@ def test_side_view_texts_stand_clear_of_extension_lines() -> None:
     dome_x, _ = keep["DomeRadius"]
     assert dome_x + len("2X (SR.125)") * char / 2.0 + 0.005 <= dia_x - dia_widest * char
     assert dia_y + 0.007 + 0.003 <= drawing._SHAFT_BOTTOM_Y
-    # The Ra symbol (~9 mm tall up from its anchor) stands on the upper
-    # silhouette right of the Ø line, left of the across-flat callout, between
-    # the shaft and the second row's dimension line (~3 mm under its text).
-    finish_x, finish_y = drawing.FINISH_SYMBOL
-    assert finish_x > dia_x + 0.005
-    assert finish_x + 0.035 < across_x
-    assert finish_y > drawing._SHAFT_TOP_Y + 0.004
-    assert finish_y + 0.009 < keep["FlatBaseline"][1] - 0.003
-    assert math.isclose(drawing.FINISH_EDGE[1], drawing._SHAFT_TOP_Y)
     # Machinist review r2: a row's last glyph meets the dimension's vertical
     # leader, and a trailing ';' touched it.
     for callout in (notes.SHAFT_DIA_CALLOUT, notes.ACROSS_FLAT_CALLOUT):
@@ -184,15 +177,13 @@ def test_side_view_texts_stand_clear_of_extension_lines() -> None:
 
 
 def test_three_place_sizes_name_their_mates() -> None:
-    # Rule 4: the shaft is the first-made part of the keeper fit, so its band
-    # stays here and the callout names the bores by the standard fit and,
-    # the SHAFT_H band being narrower than the turned-diameter row, its route
-    # (fan-out F1: bought ground stock); the across-flat size sets the set
-    # screw's engagement. Rule 7: one fit statement, two lines of words.
-    assert notes.SHAFT_DIA_CALLOUT.splitlines() == [
-        "SLIDING FIT IN MHA-CH-07 BORES",
-        "1/4 GROUND STOCK OK",
-    ]
+    # Rule 4: the shaft is the bought 1/4 ground rod, never cut on its O.D.,
+    # so it prints the stock (a 1/4 REF fraction over this line), not
+    # limits; the keeper bores name it as their mate (fit audit question 1).
+    # The across-flat size sets the set screw's engagement.
+    assert notes.SHAFT_DIA_CALLOUT == "GROUND ROD, AS SUPPLIED"
+    assert ch_fulcrum_shaft_spec.SHAFT_DIA_FRACTION_DENOMINATOR == 4
+    assert ch_fulcrum_shaft_spec.SHAFT_DIA == 0.25 * 25.4
     assert "MHA-CH-VN-55" in notes.ACROSS_FLAT_CALLOUT
     # The sheet's drawing text lives off the spec the assembly imports.
     for name in ("SHAFT_DIA_CALLOUT", "ACROSS_FLAT_CALLOUT", "DRAWING_NOTES", "ISO_VIEW_NOTE"):
@@ -267,7 +258,7 @@ def test_analytic_volumes() -> None:
 
 def test_precision_matches_the_marked_dimensions() -> None:
     spec = ch_fulcrum_shaft_spec
-    assert spec.DRAWING_PRECISION["ShaftProfile"]["ShaftDia"] == 4
+    assert spec.DRAWING_PRECISION["ShaftProfile"]["ShaftDia"] == 3
     assert spec.DRAWING_PRECISION["FlatProfile"]["AcrossFlat"] == 3
     assert len(notes.DRAWING_NOTES.splitlines()) <= 4
 

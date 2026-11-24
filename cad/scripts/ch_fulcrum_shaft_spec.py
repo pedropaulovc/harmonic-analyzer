@@ -20,10 +20,9 @@ from math import sqrt
 
 import _config
 from _fit_shaft_h import SHAFT_H
-from _gtol_cylinder import CylinderFace
 from _package_units import drawing_unit
 from _printed_tolerance import printed_band_mm
-from _surface_finish import MACHINED_UM, SurfaceFinishControl
+from _surface_finish import SurfaceFinishControl
 from ch_fulcrum_keeper_spec import (
     BORE_ALIGNMENT_ALLOWANCE_MM,
     BORE_DIA,
@@ -49,7 +48,13 @@ MM_PER_IN = 25.4
 UNIT = drawing_unit("parts/ch-fulcrum-shaft", _config.parts("ch-fulcrum-shaft"))
 
 SHAFT_DIA = 0.25 * MM_PER_IN
+# The bought 1/4 ground rod's catalogue band (stock 1018-ground-round-1-4:
+# its stated tolerance lies inside +.0000/-.0008). The sheet prints the
+# stock, 1/4 REF GROUND ROD, AS SUPPLIED, not limits (drawing-guidelines.md
+# rule 4: a diameter bought to size and never cut); this band stays the
+# analysis band every clearance below is taken at.
 SHAFT_DIA_BAND = SHAFT_H
+SHAFT_DIA_FRACTION_DENOMINATOR = 4
 SHAFT_R = SHAFT_DIA / 2.0
 
 # --- Length: cylindrical to END_PROUD past each keeper lug's outer face, then
@@ -140,11 +145,9 @@ SET_SCREW_PROUD_WORST = _SEAT_HIGH + SET_SCREW_LENGTH - crown_least_height(0.0)
 if SET_SCREW_PROUD_NOMINAL >= 0.0 or SET_SCREW_PROUD_WORST > 0.4:
     raise AssertionError("set screw stands proud of the keeper crown past the ruling")
 
-SURFACE_FINISHES = (
-    SurfaceFinishControl(
-        "bearing", MACHINED_UM, CylinderFace(SHAFT_DIA), display_unit=UNIT
-    ),
-)
+# No roughness symbol: the O.D. is the ground rod as supplied, never cut
+# (drawing-guidelines.md rule 4: the stock is printed; rule 6).
+SURFACE_FINISHES: tuple[SurfaceFinishControl, ...] = ()
 
 # One revolved half-profile carries the diameter and the tip-to-tip length;
 # the flats' cut sketch carries their length, both stations off the -Z dome
@@ -162,14 +165,16 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     },
 }
 # Decimal places are the tolerance statement (drawing-simplicity-policy.md `How the repository implements the guidelines`); the model owns
-# them, in inches. ShaftDia carries its SHAFT_H band natively at four places;
+# them, in inches. ShaftDia is the bought rod's fraction reference (1/4,
+# AS SUPPLIED; the supplier's band governs, rule 4), set at three places as
+# the fleet's other as-bought fractions are (dt_crank_pinion_pin_spec);
 # AcrossFlat at .XXX holds FLAT_CHORD_MIN above the set screw's major and its
 # >= 1.5D engagement and proud ruling. FlatFromEnd, FlatBaseline, FlatLength
 # and OverallLength at .XX hold FLAT_STATION_WINDOW_MM open (inch .X is far
 # too loose for it). DomeRadius is a reference (.125): the full hemisphere
 # follows from the diameter.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
-    "ShaftProfile": {"ShaftDia": 4, "OverallLength": 2},
+    "ShaftProfile": {"ShaftDia": 3, "OverallLength": 2},
     "FlatProfile": {
         "FlatLength": 2,
         "FlatFromEnd": 2,
