@@ -114,7 +114,7 @@ def _far_cheek_min(
 
 # drawing-guidelines.md rule 20: both far cheeks fall short of the .080 wall
 # target, and each states its worst case at its notch's width. The top
-# notch's (.124 +.007 on the lever, #1038) also falls under the .060 floor:
+# notch's (.124 +.010 on the lever, #1038) also falls under the .060 floor:
 # owner ruling 2026-10-15 (#1293/#1038) approves it at or above 1.17 mm MIN
 # (MHA-CH-01 RV-04). The foot notch's (.104 +.006 on the .098 strap, #3114)
 # holds the floor at .063 (MHA-CH-01 RV-05).
