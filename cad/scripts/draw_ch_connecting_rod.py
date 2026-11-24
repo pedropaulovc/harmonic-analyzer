@@ -669,9 +669,12 @@ requirement(
     },
     precision={"dia": _P["StrapBoreDia"], "finish_ra": 1},
 )
-# The reamed press hole through both tines on the rod axis: its limits and
-# REAM THRU / SEE NOTE 1, at the BASIC centre distance from A and .16 BASIC
-# from B, inside a diameter-.008 position zone to A and B.
+# The reamed press hole through both tines on the rod axis: the .0775
+# reamer's size, no band, and REAM THRU / SEE NOTE 1 (owner ruling
+# 2026-11-24, fit audit question 3), at the BASIC centre distance from A and
+# .16 BASIC from B, inside a diameter-.008 position zone to A and B. "dia" is
+# the spec's ANALYSIS band (what the reamer is modelled to cut), not a
+# printed limit.
 requirement(
     "pin_hole",
     kind="hole",

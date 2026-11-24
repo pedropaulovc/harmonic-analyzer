@@ -303,31 +303,26 @@ def test_q9_corners_hold_every_margin_at_their_greatest_radius() -> None:
 def test_pin_hole_is_the_reamed_press_hole_for_the_rod_pivot_pin() -> None:
     """User ruling 2026-10-09 (PR #1292 review F1): the RodPin member of
     MHA-SH-VN-58 is pressed into both tines as the bar pin is into the
-    amplitude bar (sh_vn_pivot_pin_rod_spec holds the fit), so the hole is reamed to a band of
-    its own, native on PinHoleDia, not a #47 drill."""
+    amplitude bar (sh_vn_pivot_pin_rod_spec holds the fit), so the hole is
+    reamed, not a #47 drill. Owner ruling 2026-11-24, fit audit question 3:
+    it prints the .0775 reamer's size with no band, the pin itself the
+    gauge."""
     import _config
 
     spec = ch_connecting_rod_spec
     assert rod.PIN_HOLE_DIA is spec.PIN_HOLE_DIA
-    assert rod.PIN_HOLE_LIMITS is spec.PIN_HOLE_LIMITS
     assert drawing._PIN_HOLE_DIA is spec.PIN_HOLE_DIA
-    # Owner decision 2026-11-19 (#3124 item 5, limit-form follow-up): the
-    # .0775-.0779 limits the pin budget holds print as the two limits
-    # (swTolLIMIT), with the model mid-band; the delegated acceptance of the
-    # old +.0009/+.0005 step (RV-04) is withdrawn and no exception replaces it.
+    # The .0775-.0779 band is the ANALYSIS band, what the reamer is modelled
+    # to cut; the model and the print are the reamer's size.
     assert tuple(limit / 25.4 for limit in spec.PIN_HOLE_LIMITS) == pytest.approx(
         (0.0775, 0.0779), abs=1e-12
     )
-    assert spec.PIN_HOLE_DIA == pytest.approx(sum(spec.PIN_HOLE_LIMITS) / 2.0)
+    assert spec.PIN_HOLE_DIA == pytest.approx(0.0775 * 25.4)
     assert "RV-04" not in {
         row["id"] for row in _config.parts("ch-connecting-rod")["machinist_exceptions"]
     }
     assert not hasattr(spec, "PIN_HOLE_SPEC")
-    assert _pin_hole_limits_call() == {
-        "limits": "PIN_HOLE_LIMITS",
-        "places": "DRAWING_PRECISION['PinHoleProfile']['PinHoleDia']",
-        "display_unit": "UNIT",
-    }
+    assert not _set_limits_calls()
     assert ch_connecting_rod_notes.PIN_NUMBER == _config.parts("sh-vn-pivot-pin")["number"]
     assert ch_connecting_rod_notes.ARM_NUMBER == _config.parts("ch-rocker-arm")["number"]
     assert drawing.CAM_NUMBER == _config.parts("dt-cylinder-gear")["number"]
@@ -362,8 +357,8 @@ def test_sheet_runs_at_1_to_1_with_1_to_2_isometric() -> None:
     # carries the fork detail's circle and the ring's two bands.
     assert drawing.LEFT_CENTER == (0.080, drawing.FRONT_CENTER[1])
     assert ch_connecting_rod_notes.DRAWING_NOTES.splitlines() == [
-        "1. MATCHED PRESS FIT ON ROD PIVOT PIN MHA-SH-VN-58:",
-        "    REAM .0002-.0008 UNDER THE MEASURED PIN.",
+        "1. PRESS FIT ON ROD PIVOT PIN MHA-SH-VN-58:",
+        "    THE PIN DOES NOT ENTER BY HAND.",
         "2. FORK SLOT: RUNNING FIT ON ARM MHA-CH-06.",
         "3. RING: SLIDING FIT IN MHA-DT-12 CAM SLOT; LOCATES ROD.",
     ]
@@ -721,35 +716,33 @@ def test_each_view_imports_only_the_features_it_dimensions() -> None:
     assert 0.0 < rod.DATUM_FACE_REF_RUN < spec.FORK_TOP_Y - spec.FORK_BASE_Y
 
 
-def _pin_hole_limits_call() -> dict[str, str]:
-    """The keyword sources of the build's one ``set_limits`` call, which must
-    name PinHoleDia@PinHoleProfile."""
+def _set_limits_calls() -> list[ast.Call]:
+    """The build's ``set_limits`` calls: none since the pin hole prints the
+    reamer's size with no band."""
     tree = ast.parse(Path(rod.__file__).read_text(encoding="utf-8"))
-    (call,) = [
+    return [
         node
         for node in ast.walk(tree)
         if isinstance(node, ast.Call) and getattr(node.func, "id", None) == "set_limits"
     ]
-    assert [ast.unparse(a) for a in call.args[1:]] == ["'PinHoleProfile'", "'PinHoleDia'"]
-    return {k.arg: ast.unparse(k.value) for k in call.keywords}
 
 
 def test_reamed_pin_hole_is_a_native_four_place_dimension() -> None:
     """PR #1292 review N1 (drawing-simplicity-policy.md `How the repository implements the guidelines` and drawing-guidelines.md rule 7 (notes: few, flagged, never a method)): the press hole's
-    .0775-.0779 limits are the PinHoleDia model dimension's -- marked, printed
-    at four places as its native swTolLIMIT -- imported into the front view
-    with the process beneath it, never general-note text."""
+    size is the PinHoleDia model dimension's -- marked, printed at four places
+    as the .0775 reamer's size with no band (owner ruling 2026-11-24, fit
+    audit question 3) -- imported into the front view with the process
+    beneath it, never general-note text."""
     spec = ch_connecting_rod_spec
     assert ch_connecting_rod_notes.DRAWING_DIMENSIONS["PinHoleProfile"] == {
         "PinHoleDia"
     }
-    # The limits are exact at four inch places, as set_limits prints them.
-    assert all(
-        round(d / 25.4, 4) == pytest.approx(d / 25.4, abs=1e-12)
-        for d in spec.PIN_HOLE_LIMITS
+    # The reamer's size is exact at four inch places.
+    assert round(spec.PIN_HOLE_DIA / 25.4, 4) == pytest.approx(
+        spec.PIN_HOLE_DIA / 25.4, abs=1e-12
     )
     assert ch_connecting_rod_notes.DRAWING_PRECISION["PinHoleProfile"] == {"PinHoleDia": 4}
-    assert _pin_hole_limits_call()["limits"] == "PIN_HOLE_LIMITS"
+    assert not _set_limits_calls()
     assert ("PinHoleProfile", "PinHoleDia") not in model_toleranced_dimensions(rod)
     assert "PinHoleDia" in drawing.FRONT_KEEP
     assert drawing.FRONT_CALLOUTS["PinHoleDia"].startswith("REAM THRU\n")
@@ -849,8 +842,9 @@ def test_model_bands_are_owned_by_named_model_dimensions() -> None:
         ("RingFaceReference", "RingFaceNear"): "face_upper",
         ("Ring", "RingThick"): "thick_upper",
     }
-    # The pin hole prints its two limits (set_limits), not a band.
-    assert _pin_hole_limits_call()["limits"] == "PIN_HOLE_LIMITS"
+    # The reamed pin hole prints no band (owner ruling 2026-11-24, fit audit
+    # question 3): no set_limits call.
+    assert not _set_limits_calls()
 
 
 def test_bore_finish_is_routed_clear_of_the_lower_dimension_stack() -> None:
