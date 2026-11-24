@@ -803,6 +803,14 @@ def test_section_values_and_bands_print_clear_of_each_other() -> None:
     flat_x = drawing.NOSE_KEEP["FlatToAxis"][0]
     assert flat_x == flat.xmin
     assert nose.xmax + ARROW_TEXT_CLEARANCE_M <= flat_x
+    # Leaf 20261124T014755Z (layout audit, shoulder-crosses-line): the text
+    # stands on a shelf as long as its widest row, running right from the
+    # dimension line, and the boss's inline diameter's dimension line
+    # stands at its text's x.  "KEYS MHA-PD-VN-69" ran the shelf across it.
+    assert flat.xmax + ARROW_TEXT_CLEARANCE_M <= drawing.RIGHT_KEEP["BossDia"][0]
+    assert max(len(row) for row in callouts.FLAT_CALLOUT.split("\n")) <= len(
+        callouts.HUB.KEY_PIN_NUMBER
+    )
     assert part.FLAT_WITNESS_STATION > 0.0
     boss_line_y = axis_y + spec.BOSS_DIA / 2.0 * s
     assert boss_line_y + ARROW_TEXT_CLEARANCE_M <= flat.ymin

@@ -99,11 +99,15 @@ BOSS_CALLOUT = "\n".join(
 # which keys hub and disc to the sleeve; the hub's plain bore fits the boss
 # only.  The pin bears across the flat, so the pin is the mate it names.
 # Its ±.002 is under the title block's row for what it keeps (rule 4's
-# necessity answer): the pin's air to the flat
+# necessity answer, in the rule's own form): the pin's gap to the flat
 # (pd_transgear_disc_hub_spec.KEY_PIN_FLAT_AIR, .0006 least), which closes
-# at a looser band, so the hub would not slide on.
-FLAT_NECESSITY = "KEEPS PIN GAP"
-FLAT_CALLOUT = "\n".join((f"KEYS {HUB.KEY_PIN_NUMBER}", FLAT_NECESSITY))
+# at a looser band, so the hub would not slide on.  Two rows no wider than
+# the pin's number: VIEW E prints the text right of its dimension line on a
+# shelf as long as its widest row, and the boss's dimension line stands
+# 40 mm right of it.  "KEYS MHA-PD-VN-69", five characters wider, ran that
+# shelf across the boss's line (leaf 20261124T014755Z, layout audit
+# shoulder-crosses-line: the drawing leaf failed).
+FLAT_CALLOUT = "\n".join(("KEEPS GAP TO", HUB.KEY_PIN_NUMBER))
 # The step seats the hub's spigot: the tooth length places hub and disc.  Its
 # ±band is a term of the disc cluster's printed stack (transgear_cluster_fit.TL),
 # named once, on the overall (r8 machinist review, rule 7: a second reason).
