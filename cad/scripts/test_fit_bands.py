@@ -379,6 +379,11 @@ INDEXED_FIT_BANDS: dict[tuple[str, str], str] = {
         "the F drilled lift bore's ANALYSIS band, the title block's "
         "drilled-hole row (no native band; fit audit F26)"
     ),
+    ("dt_arbor_pedestal_spec", "BORE_DIA_BAND"): (
+        "the V drilled arbor bore's ANALYSIS band, the title block's "
+        "drilled-hole row (no native band; fit audit F01): indexed for the "
+        "set screw's thread, point margin and the arbor's float"
+    ),
     ("dt_pinion_handle_geometry", "ROD_DIA_BAND"): (
         "indexed by pinion_arbor_spec for the cross-rod fit limits"
     ),

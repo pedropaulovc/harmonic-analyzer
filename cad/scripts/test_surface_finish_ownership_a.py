@@ -54,7 +54,7 @@ CASES = (
         (
             SurfaceFinishControl(
                 "arbor_bore",
-                MACHINED_UM,
+                SEAT_UM,
                 CylinderFace(
                     dt_arbor_pedestal_spec.BORE_DIA,
                     contains_y_mm=dt_arbor_pedestal_spec.BORE_HEIGHT,

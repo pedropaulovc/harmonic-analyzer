@@ -12,14 +12,14 @@
 # far face's bar face down, face the near end (PA02); Setup 4 upright, a
 # sawn end up: face the seat, drill the #15 hold-down hole from it into the
 # waste above the foot (PA03); Setup 5 the near end up: mill the step down to
-# the strap, which opens the hold-down hole, then spot, drill 23/64 and ream
-# .3760 the arbor bore through the strap (PA04); Setup 6 upright on the seat:
+# the strap, which opens the hold-down hole, then spot and drill V (.377)
+# the arbor bore through the strap (PA04); Setup 6 upright on the seat:
 # face the top end, spot and drill #43 from the apex into the bore (PA05),
 # tap 4-40 by hand under the spring tap guide (PA06); Setup 7 the far face
 # up, the foot gripped by the seat and the foot top: face the far face to
 # the depth and profile the tapered flanks and the crown round the bore
 # (PA07); bench
-# deburr (the reamer by hand through the bore) and inspect; black enamel,
+# deburr (the V drill by hand through the bore) and inspect; black enamel,
 # the bore and the foot seat masked, the bare machined faces oiled: the
 # owner's Rust-Oleum Flat Black 376855 (owner 2026-11-21, answered in
 # person: "rust-oleum Flat Black376855") over the maker's Clean Metal
@@ -48,8 +48,8 @@
 # PA06_apex_tap, PA07_outline. Program names, the [parameters] and the
 # milling_cuts names are a contract with that recipe. Tool numbers are the
 # places in the tools list among the mill's tools: T1 1/2 in end mill, T2
-# centre drill, T3 #15, T4 23/64, T5 .3760 reamer, T6 #43, T7 the tap
-# guide (the tap is turned by hand).
+# centre drill, T3 #15, T4 V, T5 #43, T6 the tap guide (the tap is turned by
+# hand).
 title = "Arbor pedestal"
 part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
@@ -153,9 +153,9 @@ outline_finish_stock_mm = 0.508
 outline_rough_woc_mm = 4.75
 # The strap's narrowest section, at the bore: the crown's Ø less the bore's
 # largest (the PA07 beam).
-strap_net_width_mm = 12.28
+strap_net_width_mm = 12.17
 # Spots with the #2 centre drill, each under its drill (no chamfer at the
-# mouth): Ø.150 under the #15, Ø.180 under the 23/64, Ø.080 on the apex
+# mouth): Ø.150 under the #15, Ø.180 under the V, Ø.080 on the apex
 # under the #43.
 hold_spot_dia_mm = 3.81
 bore_spot_dia_mm = 4.572
@@ -165,59 +165,37 @@ apex_spot_dia_mm = 2.032
 # removes; its point hold_tip_depth_mm below the seat.
 hold_drill_past_mm = 1.0
 hold_tip_depth_mm = 7.454
-# Bore (PA04): the 23/64 drill (.3594, .0166 under the reamer: a chucking
-# reamer's allowance, .010-.020 at 3/8), one plunge from the step's floor
-# (L/D 1.3), its full diameter bore_drill_past_mm past the stacks' top into
-# the gap between them; the reamer's full diameter bore_ream_past_mm past it,
-# its tip (a chucking reamer's 45° bevel, under reamer_lead_mm long) above
-# the drill's point. Tip heights above the stacks (below: negative); cam.py
-# checks them.
+# Bore (PA04): the V drill (.377), one plunge from the step's floor (L/D
+# 1.2), its full diameter bore_drill_past_mm past the stacks' top into the
+# gap between them (fit audit F01: "V DRILL (.377) THRU; ARBOR MHA-DT-13
+# ENTERS BY HAND, CLAMPED BY MHA-DT-VN-64": no reamer, no pins). Tip height
+# above the stacks (below: negative); cam.py checks it.
 bore_drill_past_mm = 1.0
-bore_ream_past_mm = 1.0
-reamer_lead_mm = 1.0
-bore_tip_height_mm = -3.742
-ream_tip_height_mm = -2.0
-# The bore's re-ream by MDI after a GO refusal (owner ruling 2026-11-23,
-# tool audit Q1: one more pass with the same reamer): it feeds from 3.3 mm
-# above the step's floor (step_floor_mm 11.684) and leaves at 5.5 mm over
-# the uncut top (depth_top_mm 29.464), above the part and the jaw tops.
-reream_r_plane_mm = 15.0
-reream_clear_mm = 35.0
-# The Class ZZ pins (shop dt.toml zz-pins-3760-3765; owner ruling
-# 2026-11-23, tool audit Q1): GO a plus pin at the bore's low limit, true
-# size .3760 to .3762; NO-GO a minus pin at the high limit, .3763 to .3765
-# (one pin's ZZ tolerance, .0002, is the record's resolution_mm 0.00508).
-# The largest GO pin and the smallest NO-GO pin the sheet may use: with
-# both pins there, a bore is sure to pass only between them, the middle
-# .0001 of the .0005 band.
-go_pin_max_in = 0.3762
-nogo_pin_min_in = 0.3763
+bore_tip_height_mm = -3.877
 # Apex (PA05): the #43 pecked .080 with full retract (L/D 4.8), its full
 # diameter apex_drill_past_mm past the bore's wall; its point then stands
 # apex_tip_height_mm above the parallels.
 apex_peck_mm = 2.032
 apex_drill_past_mm = 0.5
-apex_tip_height_mm = 47.91
+apex_tip_height_mm = 47.92
 # Hand tap (PA06): the plug tap's 5-thread lead (5 × .025) past the bore's
 # wall at the thread's major diameter, and 1.0 short of the bore's far wall:
 # the tap's point to go tap_reach_min_mm–tap_reach_max_mm below the apex.
 plug_tap_lead_mm = 3.175
-tap_reach_min_mm = 9.539
-tap_reach_max_mm = 14.697
+tap_reach_min_mm = 9.525
+tap_reach_max_mm = 14.710
 # Speeds and feeds of the holes, authored in the operations: LittleMachineShop
 # "Cutting Speeds", Drilling & Reaming, Plain carbon steels 1006-1026 (read
 # 2026-11-20): drilling 60-100 ft/min, reaming 40-65; AutoDrill "Suggested
 # drilling feed rates" (read 2026-11-20), row Stl, Carbon: 1/16 in .001,
 # 1/8 in .003 in/rev, a larger size taking the 1/8 column's. Centre drill
 # 1800 rpm × .001 = 1.8 in/min (the column clamp's). #15 (.180): 1300 rpm
-# (61 ft/min) × .003 = 3.9 in/min. 23/64 (.3594): 650 rpm (61 ft/min) × .003
+# (61 ft/min) × .003 = 3.9 in/min. V (.377): 650 rpm (64 ft/min) × .003
 # = 1.95 in/min. #43 (.089): 2600 rpm (61 ft/min) × .001 = 2.6 in/min.
-# Reamer .3760: 400 rpm (39 ft/min, under the band: the finish matters
-# more) × .004 = 1.6 in/min, in and out. cam.py posts these.
+# cam.py posts these.
 spot_feed_per_min_mm = 45.72
 hold_drill_feed_per_min_mm = 99.06
 bore_drill_feed_per_min_mm = 49.53
-ream_feed_per_min_mm = 40.64
 apex_drill_feed_per_min_mm = 66.04
 # Holding (shop workholding.vise-pm-6 and fixtures.parallels-lms-6745, 1/8
 # in thick, 1/2-1 in by 1/16): upright, a 7/8 in parallel against each jaw;
@@ -264,22 +242,12 @@ drill_chuck_gauge_mm = 95.0      # Archive holders.drill-chuck-r8.gauge_len_mm.
 # 27.94 to 28.45 mm). The deep one was measured at 27.94 only: 28.45 is the
 # owner's ruling for it, not a cut, and a longer tool is the less stiff case.
 half_mill_projection_mm = 28.45
-# Overall lengths: jobber #15 3-1/2 in, 23/64 4-7/8 in (ASME B94.11M); the
+# Overall lengths: jobber #15 3-1/2 in, V (.377) 5 in (ASME B94.11M); the
 # #2 combined drill and countersink 1-7/8 in. Bounded by their whole length
 # below the chuck.
 drill_15_oal_mm = 88.9
-drill_23_64_oal_mm = 123.825
+drill_v_oal_mm = 127.0
 centre_drill_oal_mm = 47.625
-# The .3760 reamer in the 5/16 R8 collet (holders.r8-collets-south-bend-
-# sb1280): a .3760 chucking reamer is 7 in long on a .3105 shank (Lawson
-# LV533 .3760 listing, read 2026-11-21; the owned reamer's make is not on
-# record, so its shank is miked first), set 4.25 in out, about 2-3/4 in of
-# shank in the collet. In the drill chuck it would stand 7 in below the
-# chuck: Setup 5's work top plus that and the tool-change clearance pass the
-# mill's 17 in.
-reamer_projection_mm = 107.95
-reamer_shank_min_mm = 7.874
-reamer_shank_max_mm = 7.9375
 # Tapping under the spring tap guide (tools.tap-guide-fisher): the guide and
 # the tap in its wrench together reach at most tap_stack_max_mm below the
 # collet face, the spindle-to-table maximum (shop machines.pm-30mv, 431.8)
@@ -308,13 +276,9 @@ id = "drill-15"
 name = "#15 drill"
 ref = "block-drill-15"
 [[tools]]
-id = "drill-23-64"
-name = "23/64 drill"
-ref = "jig-drill-23-64"
-[[tools]]
-id = "reamer"
-name = ".3760 reamer"
-ref = "reamer-0376"
+id = "drill-v"
+name = "V drill"
+ref = "drill-v"
 [[tools]]
 id = "drill-43"
 name = "#43 drill"
@@ -327,18 +291,6 @@ ref = "tap-guide-fisher"
 id = "tap-4-40"
 name = "4-40 plug tap"
 ref = "jig-tap-4-40-plug"
-# The arbor bore's Class ZZ pins (shop dt.toml zz-pins-3760-3765), not on
-# hand. Owner ruling 2026-11-23 (tool audit Q1, re-answered on the corrected
-# facts), verbatim: "ZZ singles per the record: 29 pins (17 plus GO, 12
-# minus NO-GO), about $130. Accept that good holes near a limit may be
-# refused; the traveler mikes each pin so the real window is known per pin."
-# They replace the Class X .3760/.3765 pair: Setup 5 mikes both pins and the
-# reamer, and the bore is accepted between the two pins' readings.
-[[tools]]
-id = "pins"
-name = "Class ZZ pins: .3760 plus (GO) and .3765 minus (NO-GO)"
-ref = "zz-pins-3760-3765"
-status = "to_order"
 [[tools]]
 id = "feeler"
 name = "Feeler gauges"
@@ -568,49 +520,13 @@ indexing = "none"
 machine_ref = "pm-30mv"
 holding = "The 7/8 in + 1/2 in stacks against each jaw (1/8 in thick: the bore falls between them). The part lying along the jaws, N UP, F down on both stacks; gripped on W (against the FIXED jaw) and E; the seat to the RIGHT; centred on the jaws. The jaws grip only the lower {{process.step_grip_mm:in.3dot}} (a third of the part's height): the strap and the far face's stock. The step's floor stands {{process.step_floor_mm:in.3dot}} above the stacks, above the jaw tops; tap the part down onto both stacks and close the vise firmly."
 datum = "Program PA04_step_bore. G54: X0 the seat (the part's RIGHT end), the part to −X; Y0 the fixed jaw's face (W), +Y toward it; Z0 the stacks' top (F). The foot top at X −{{cad.foot_top_height_mm:.3f}}; the bore at X −{{cad.arbor_bore_height_mm:.3f}}, Y −{{cad.arbor_bore_lateral_mm:.3f}} mm. Tool lengths from the tool setter at each M6; at every M6 stop the file has stopped the spindle and lifted the tool above the part."
-diagram = { file = "diagrams/step.svg", alt = "The part lying on stacked parallels, N up, the seat to the right; the 1/2 in end mill cuts the step in passes across the width, level by level, from the left end to the foot top, down to the strap; then the centre drill, the 23/64 drill and the .3760 reamer make the bore down through the strap between the stacks." }
-envelope = { x_span_mm = ["{{process.upright_top_max_mm}}", "{{process.face_cutter_dia_mm}}", "{{process.face_cutter_dia_mm}}", 5.08], y_span_mm = ["{{cad.east_side_width_mm}}", "{{process.face_cutter_dia_mm}}", "{{process.face_cutter_dia_mm}}", 5.08], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.step_riser_height_mm}}", "{{process.depth_top_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.step_riser_height_mm}}", "{{process.bore_tip_height_mm}}"], longest_tool_mm = ["{{process.drill_chuck_gauge_mm}}", "{{process.drill_23_64_oal_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_mm}}"] }
+diagram = { file = "diagrams/step.svg", alt = "The part lying on stacked parallels, N up, the seat to the right; the 1/2 in end mill cuts the step in passes across the width, level by level, from the left end to the foot top, down to the strap; then the centre drill and the V drill make the bore down through the strap between the stacks." }
+envelope = { x_span_mm = ["{{process.upright_top_max_mm}}", "{{process.face_cutter_dia_mm}}", "{{process.face_cutter_dia_mm}}", 5.08], y_span_mm = ["{{cad.east_side_width_mm}}", "{{process.face_cutter_dia_mm}}", "{{process.face_cutter_dia_mm}}", 5.08], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.step_riser_height_mm}}", "{{process.depth_top_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.step_riser_height_mm}}", "{{process.bore_tip_height_mm}}"], longest_tool_mm = ["{{process.drill_chuck_gauge_mm}}", "{{process.drill_v_oal_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_mm}}"] }
 vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{cad.east_side_width_mm}}", along_jaws_mm = "{{process.upright_top_max_mm}}", part_height_mm = "{{process.depth_top_mm}}", parallel_height_mm = "{{process.step_riser_height_mm}}", overhang_mm = ["{{process.vise_step_inset_mm}}", "rest"], jaw_offset = "centred", fixed_jaw_face = "as_bought", moving_jaw_face = "machined", moving_jaw_contact = "flat" }
 beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{process.upright_top_max_mm}}"], clamp_mm = [0, "{{process.upright_top_max_mm}}"], section_mm = { y = "{{cad.east_side_width_mm}}", z = "{{process.step_floor_mm}}" }, vise_left = "end" }
 
 [[setups.operations]]
 instruction = "Before clamping: file the burr off the seat's four edges (milled in Setup 4), one light stroke along each, and wipe the part and the stacks clean: a burr tilts it."
-feed = "hand"
-
-[[setups.operations]]
-steps = [
-  { kind = "stop", text = "Start this setup only with the .3760 reamer and the two Class ZZ pins, {{cad.arbor_bore_dia_min_in:.4dot}} plus (GO) and {{cad.arbor_bore_dia_max_in:.4dot}} minus (NO-GO), in hand: the pins are to order, not in the shop." },
-]
-feed = "hand"
-
-[[setups.operations]]
-instruction = "The reamer goes in the 5/16 R8 collet, not the drill chuck: mic its shank first, {{process.reamer_shank_min_mm:in.4dot}}–{{process.reamer_shank_max_mm:in.4dot}}; set it {{process.reamer_projection_mm:in.2f}} in out of the collet."
-inspection = "Reamer shank {{process.reamer_shank_min_mm:in.4dot}}–{{process.reamer_shank_max_mm:in.4dot}}, miked."
-gauge_checks = [{ gauge = "micrometers", band_mm = ["{{process.reamer_shank_min_mm}}", "{{process.reamer_shank_max_mm}}"] }]
-feed = "hand"
-
-[[setups.operations]]
-steps = [
-  { kind = "stop", text = "Shank outside {{process.reamer_shank_min_mm:in.4dot}}–{{process.reamer_shank_max_mm:in.4dot}}: stop and tell the owner (the 5/16 collet will not hold it, and the drill chuck stands it too long for this setup)." },
-]
-feed = "hand"
-
-[[setups.operations]]
-instruction = "On the 0–1 in micrometer (reads .0001; trust a reading to ±.00005), mike the {{cad.arbor_bore_dia_min_in:.4dot}} GO pin, the {{cad.arbor_bore_dia_max_in:.4dot}} NO-GO pin, and the reamer across two opposite margins at its front end. Write the three readings here, and each pin's on its tag."
-inspection = "GO pin reads {{cad.arbor_bore_dia_min_in:.4dot}}–{{process.go_pin_max_in:.4dot}}, NO-GO pin {{process.nogo_pin_min_in:.4dot}}–{{cad.arbor_bore_dia_max_in:.4dot}}: a pin outside its range is not used. The reamer reads under the NO-GO pin's reading, else it is not used: stop and tell the owner."
-gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.arbor_bore_dia_band_mm}}" }]
-feed = "hand"
-
-[[setups.operations]]
-instruction = "This sheet accepts a bore the GO pin enters and the NO-GO pin does not: GO reading ≤ bore < NO-GO reading. With both pins at their size limits only {{process.go_pin_max_in:.4dot}}–{{process.nogo_pin_min_in:.4dot}} is sure to pass; a good bore within .0002 of either band limit may be refused (owner ruling 2026-11-23)."
-feed = "hand"
-
-[[setups.operations]]
-instruction = "Only if the reamer read under the GO pin, before the first part: grip a 2 in offcut of the 1 x 1-1/4 flat on the stacks as Holding says, lying on a 1-1/4 in face (1.00 thick). Console M6 T4 (23/64; the tool setter measures it). Jog it over the offcut's middle, above the gap between the stacks; spindle stopped, its point on a .002 leaf on the top: G10 L20 P1 X0 Y0 Z0.051."
-feed = "hand"
-
-[[setups.operations]]
-instruction = "Trial hole, MDI: M3 S650, G0 Z2, G1 Z-29 F{{process.bore_drill_feed_per_min_mm:.1f}}, G0 Z15, M5. Console M6 T5 (the reamer in its collet): M3 S400, G0 Z2, G1 Z-29 F{{process.ream_feed_per_min_mm:.1f}}, G1 Z15, M5. Cutting oil. Gauge it with the pins. The GO pin enters: take the offcut out and go on. Refused: stop and tell the owner (the pins refuse this reamer's holes)."
 feed = "hand"
 
 [[setups.operations]]
@@ -624,8 +540,8 @@ instruction_detailed = "The part clamped as Holding says. Edge finder (900 rpm):
 feed = "hand"
 
 [[setups.operations]]
-instruction = "First blank only: prove PA04_step_bore in air, Z0 raised {{process.step_prove_raise_mm:in.3dot}} in (the uncut top, the drill and the reamer all clear); every pass crosses above the jaw tops, through every M6. Then Z0 back."
-instruction_detailed = "First blank only: send $# and note the G54 line's Z. G10 L2 P1 Z(that Z + {{process.step_prove_raise_mm:.3f}}) raises Z0 {{process.step_prove_raise_mm:in.3dot}} in: the reamer's and the drill's lowest point then stands above N. Run PA04_step_bore through every M6, watching each move cut only air and each pass cross above the jaws. G10 L2 P1 Z(the noted Z) puts Z0 back."
+instruction = "First blank only: prove PA04_step_bore in air, Z0 raised {{process.step_prove_raise_mm:in.3dot}} in (the uncut top and the drill clear); every pass crosses above the jaw tops, through every M6. Then Z0 back."
+instruction_detailed = "First blank only: send $# and note the G54 line's Z. G10 L2 P1 Z(that Z + {{process.step_prove_raise_mm:.3f}}) raises Z0 {{process.step_prove_raise_mm:in.3dot}} in: the drill's point then stands above N. Run PA04_step_bore through every M6, watching each move cut only air and each pass cross above the jaws. G10 L2 P1 Z(the noted Z) puts Z0 back."
 feed = "hand"
 
 # The step's depth and width lie inside em-half-carbide-1018-v6-deep, but
@@ -655,7 +571,7 @@ speed_kind = "spindle"
 tool = "spot"
 drilling = "none"
 sizing = "other"
-instruction = "Same file, M6 T2: spot the bore on the step's floor Ø{{process.bore_spot_dia_mm:in.3dot}}, under the 23/64; set 1800."
+instruction = "Same file, M6 T2: spot the bore on the step's floor Ø{{process.bore_spot_dia_mm:in.3dot}}, under the V drill; set 1800."
 rpm = 1800
 feed = "{{process.spot_feed_per_min_mm:in.1f}} in/min"
 milling_cuts = [
@@ -664,46 +580,24 @@ milling_cuts = [
 
 [[setups.operations]]
 speed_kind = "spindle"
-tool = "drill-23-64"
+tool = "drill-v"
 drilling = "twist_drill"
 sizing = "other"
-instruction = "Same file, M6 T4: 23/64 drill (.3594, the reamer's pilot) down through the strap, one plunge, its full diameter {{process.bore_drill_past_mm:in.3dot}} below the stacks' top, between them; set 650. Cutting oil."
+instruction = "Same file, M6 T4: V drill (.377) down through the strap, one plunge, its full diameter {{process.bore_drill_past_mm:in.3dot}} below the stacks' top, between them; set 650. Cutting oil. Leave the part clamped for the check."
 rpm = 650
 feed = "{{process.bore_drill_feed_per_min_mm:in.2f}} in/min"
 hole_depth_mm = "{{process.step_floor_mm}}"
 peck = "none"
 milling_cuts = [
-  { name = "bore drill", kind = "drill", phase = "rough", cutter_dia_mm = 9.128125, flutes = 2, rpm = 650, feed_mm_min = "{{process.bore_drill_feed_per_min_mm}}", stations_mm = "{{cad.arbor_bore_height_mm}}" },
+  { name = "bore drill", kind = "drill", phase = "finish", cutter_dia_mm = 9.5758, flutes = 2, rpm = 650, feed_mm_min = "{{process.bore_drill_feed_per_min_mm}}", stations_mm = "{{cad.arbor_bore_height_mm}}" },
 ]
-
-[[setups.operations]]
-speed_kind = "spindle"
-tool = "reamer"
-drilling = "none"
-sizing = { kind = "band", band_mm = "{{cad.arbor_bore_dia_band_mm}}" }
-instruction = "Same file, M6 T5 (spindle off, retracted): ream the bore, the .3760 reamer in its collet, its full diameter {{process.bore_ream_past_mm:in.3dot}} below the stacks' top; set 400. Cutting oil. The file feeds the reamer in and feeds it back out, spindle running: no rapid leaves the bore, which keeps its Ra {{cad.arbor_bore_finish_ra}} µm reamed finish. Leave the part clamped for the check."
-rpm = 400
-feed = "{{process.ream_feed_per_min_mm:in.1f}} in/min, in and out"
-milling_cuts = [
-  { name = "bore ream", kind = "drill", phase = "finish", cutter_dia_mm = 9.5504, flutes = 2, rpm = 400, feed_mm_min = "{{process.ream_feed_per_min_mm}}", stations_mm = "{{cad.arbor_bore_height_mm}}" },
-]
-inspection = "Still clamped, the first part before the second is reamed: GO enters, NO-GO does not: bore Ø{{cad.arbor_bore_dia_min_in:.4dot}}–{{cad.arbor_bore_dia_max_in:.4dot}}, the GO pin the full depth. Finish Ra {{cad.arbor_bore_finish_ra}} µm: an even reamed bore, bright, no chatter rings, tears or spiral marks."
-gauge_checks = [{ gauge = "zz-pins-3760-3765", band_mm = "{{cad.arbor_bore_dia_band_mm}}" }]
-
-# The ream's remedy follows its check: prechips prints an op's Check after
-# its work, so it is the next op.
-[[setups.operations]]
-instruction = "GO pin refused: blow out the chips and oil; T5 still in, the part still clamped. MDI G0 Z{{process.reream_clear_mm:.3f}}, G0 X-{{cad.arbor_bore_height_mm:.3f}} Y-{{cad.arbor_bore_lateral_mm:.3f}}, M3 S400, G0 Z{{process.reream_r_plane_mm:.3f}}, G1 Z{{process.ream_tip_height_mm:.3f}} F{{process.ream_feed_per_min_mm:.1f}}, G1 Z{{process.reream_r_plane_mm:.3f}}, G0 Z{{process.reream_clear_mm:.3f}}, M5 (the same reamer once more); gauge again."
-feed = "hand"
+inspection = "Still clamped, chips blown out and the bore oiled: the MHA-DT-13 arbor (or an offcut of its 3/8 ground stock) enters the bore by hand the full depth of the strap (fit audit F01: V DRILL THRU, the arbor enters by hand). The bore bright, no tears (Ra {{cad.arbor_bore_finish_ra}} µm)."
+gauge_checks = "other"
 
 [[setups.operations]]
 steps = [
-  { kind = "stop", text = "GO pin still refused (a reamer cannot be made to cut larger), NO-GO pin enters (no cut remedies it), or chatter or tears in the bore: the part is scrap; stop and tell the owner." },
+  { kind = "stop", text = "The arbor refused, or the bore torn: stop and tell the owner with the part still clamped." },
 ]
-feed = "hand"
-
-[[setups.operations]]
-instruction = "In band: the next part is reamed without the check."
 feed = "hand"
 
 [[setups.operations]]
@@ -717,7 +611,7 @@ feed = "hand"
 
 [[setups.operations]]
 instruction = "Strap over its band: reclamp as before (Z0 is the stacks' top) and pick X0 up again on the seat, as the setup's first op; lower G54 Z by the excess; run PA04_step_bore to the M6 T2 (its upper levels cut air). Mic again."
-instruction_detailed = "Strap over: reclamp; edge finder on the seat from the right, G10 L20 P1 X2.540. Send $#, note the G54 line's Z; G10 L2 P1 Z(that Z − (the reading − {{process.step_floor_mm:in.4dot}}) × 25.4). Run PA04_step_bore; feed hold at the M6 T2 and reset (the bore is already reamed)."
+instruction_detailed = "Strap over: reclamp; edge finder on the seat from the right, G10 L20 P1 X2.540. Send $#, note the G54 line's Z; G10 L2 P1 Z(that Z − (the reading − {{process.step_floor_mm:in.4dot}}) × 25.4). Run PA04_step_bore; feed hold at the M6 T2 and reset (the bore is already drilled)."
 feed = "hand"
 
 [[setups.operations]]
@@ -786,7 +680,7 @@ speed_kind = "spindle"
 tool = "drill-43"
 drilling = "twist_drill"
 sizing = { kind = "tap_drill", tap = "tap-4-40" }
-instruction = "Same file, M6 T6: #43 drill down into the bore, pecks of {{process.apex_peck_mm:in.3dot}} with full retract, its full diameter {{process.apex_drill_past_mm:in.3dot}} past the bore's wall; set 2600. Cutting oil. Look through the bore: the drill has broken into it. The part stays in the vise for the tap."
+instruction = "Same file, M6 T5: #43 drill down into the bore, pecks of {{process.apex_peck_mm:in.3dot}} with full retract, its full diameter {{process.apex_drill_past_mm:in.3dot}} past the bore's wall; set 2600. Cutting oil. Look through the bore: the drill has broken into it. The part stays in the vise for the tap."
 rpm = 2600
 feed = "{{process.apex_drill_feed_per_min_mm:in.1f}} in/min"
 hole_depth_mm = "{{cad.apex_tap_into_axis_mm}}"
@@ -808,7 +702,7 @@ speed_kind = "other"
 tool = "tap-guide"
 drilling = "none"
 sizing = "other"
-instruction = "Run PA06_apex_tap: M6 T7, the tap guide in the 1/2 in collet, pointed end out (the tool setter measures it), spindle off; the file ends Idle at the machine top over the hole."
+instruction = "Run PA06_apex_tap: M6 T6, the tap guide in the 1/2 in collet, pointed end out (the tool setter measures it), spindle off; the file ends Idle at the machine top over the hole."
 diagram = { file = "diagrams/apex-tap.svg", alt = "The pedestal upright in the vise, the strap up; the 4-40 tap in the T-handle wrench in the apex hole, the tap guide in the spindle, its spring point in the wrench's centre hole; the tap's point to go {{process.tap_reach_min_mm:in.3dot}}–{{process.tap_reach_max_mm:in.3dot}} below the apex, into the bore." }
 
 [[setups.operations]]
@@ -921,10 +815,10 @@ beam = "other"
 
 [[setups.operations]]
 speed_kind = "other"
-tool = "reamer"
+tool = "drill-v"
 drilling = "none"
 sizing = "other"
-instruction = "The apex hole's burr inside the bore: turn the .3760 reamer through the bore by hand in a tap wrench, forward only, Tapmatic Gold, and draw it out still turning forward. Blow the bore out; run the 4-40 tap through the apex hole by hand once more if its mouth is burred."
+instruction = "The apex hole's burr inside the bore: turn the V drill through the bore by hand in a tap wrench, forward only, and draw it out still turning forward. Blow the bore out; run the 4-40 tap through the apex hole by hand once more if its mouth is burred."
 feed = "hand"
 
 [[setups.operations]]
@@ -940,15 +834,10 @@ gauge_checks = "other"
 [[setups.operations]]
 instruction = "Inspect each pedestal; record the readings with its number."
 feed = "hand"
-inspection = "Every pedestal: GO enters, NO-GO does not: bore Ø{{cad.arbor_bore_dia_min_in:.4dot}}–{{cad.arbor_bore_dia_max_in:.4dot}} after the hand ream, the GO pin the full depth; the arbor {{cad.arbor_bore_mates}} slides through it; the bore bright, no chatter or tears (Ra {{cad.arbor_bore_finish_ra}} µm). Bore height {{cad.arbor_bore_height_min_in:.3dot}}–{{cad.arbor_bore_height_max_in:.3dot}}: the pedestal on its seat on the surface plate, the height gauge on the bore's bottom and top walls, their mean. A 4-40 screw runs in by hand into the bore."
+inspection = "Every pedestal: the arbor {{cad.arbor_bore_mates}} enters the bore by hand the full length of the strap (fit audit F01); the bore bright, no tears (Ra {{cad.arbor_bore_finish_ra}} µm). Bore height {{cad.arbor_bore_height_min_in:.3dot}}–{{cad.arbor_bore_height_max_in:.3dot}}: the pedestal on its seat on the surface plate, the height gauge on the bore's bottom and top walls, their mean. A 4-40 screw runs in by hand into the bore."
 gauge_checks = [
-  { gauge = "zz-pins-3760-3765", band_mm = "{{cad.arbor_bore_dia_band_mm}}" },
   { gauge = "height-gauge", band_mm = "{{cad.arbor_bore_height_band_mm}}" },
 ]
-
-[[setups.operations]]
-instruction = "GO pin refused: oil, and turn the same reamer through the bore by hand once more as above; gauge again. Still refused (a reamer cannot be made to cut larger), or the NO-GO pin entering (no cut remedies it): the pedestal is scrap; tell the owner."
-feed = "hand"
 
 [[setups.operations]]
 instruction = "First pedestal only (the programs hold the second): the crown and the hole stations."
