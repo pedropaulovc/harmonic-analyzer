@@ -2044,15 +2044,14 @@ def sub_step(key: str, index: int) -> str:
 # the locks are struck; and (rule 23, #2425) the retaining compounds, one
 # row group per grade naming every sub-step that uses it, with its cure:
 # LOCTITE 638 bonds the MHA-PD-23 pin and the pivot spacer and, by DETAIL
-# H's bond note, a latch, plate or collar dowel that slides in by hand;
+# H's bond note, a latch or plate dowel that slides in by hand (a collar
+# dowel or pin that slides in renews the collar, step 20);
 # LOCTITE 641 bonds the knob cup.
 LOCK_TRANSFER_SCREWS = 4 * 2
 # The sub-steps that send a hand-slid dowel or pin to DETAIL H's bond note.
 BOND_NOTE_SUB_STEPS = (
     ("latch-pin-pressed", 1),
     ("arm-plate-fitted", 6),
-    ("collar-pins-pressed", 1),
-    ("collar-pins-pressed", 4),
 )
 LOCTITE_638_SUB_STEPS = tuple(
     sorted(
@@ -2072,8 +2071,8 @@ BOM_EXPENDABLES_NOTE = (
     f"SCREWS, AND 1 MORE {BOM_PART_NUMBERS['pd-vn-chain-connecting-link']} TO\n"
     f"CLOSE THE SPARE'S LOOP. {sub_step('platen-hung', 0)} USES {LOCK_TRANSFER_SCREWS}\n"
     "#4-40 TRANSFER SCREWS, A SHOP TOOL.\n"
-    f"LOCTITE 638 AT {', '.join(_LOCTITE_638_HEADS[:4])},\n"
-    f"{', '.join(_LOCTITE_638_HEADS[4:])}; CURE {PIN_BOND_CURE_H} H.\n"
+    f"LOCTITE 638 AT {', '.join(_LOCTITE_638_HEADS[:3])},\n"
+    f"{', '.join(_LOCTITE_638_HEADS[3:])}; CURE {PIN_BOND_CURE_H} H.\n"
     f"LOCTITE 641 AT {sub_step('knob-stack-fitted', KNOB_CUP_BOND_SUB_STEP)}; "
     f"CURE {KNOB_CUP_BOND_CURE_H} H."
 )
@@ -4104,8 +4103,7 @@ SETTING_CAPTION_WIDTH = 26
 # DETAIL H carries the bond 13G points to (owner ruling 2026-11-20 (Pedro),
 # #2497: retaining compound only on the arm, which already carries DETAIL K's
 # jig-boring) and, under the fit audit of 2026-11-23 (pending owner
-# confirmation), the latch dowel's at 10B and the collar's pins' at 20B and
-# 20D. Its prep and where the compound
+# confirmation), the latch dowel's at 10B. Its prep and where the compound
 # goes are the machinist review's (592b20079f); as a note, 13G stays one
 # action (review of 70917f0316). The column under H's caption is empty down
 # to the title block, clear of DETAIL L left and DETAIL J right.

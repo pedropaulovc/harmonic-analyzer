@@ -505,11 +505,11 @@ def test_a_dowel_that_slides_into_the_arm_is_bonded() -> None:
         drawing.detail_cite("arm-plate-fitted") == f"(DETAIL H, SHEET {detail_sheet})"
     )
     note = " ".join(drawing.SETTING_DETAIL_CAPTIONS["H"].split())
+    # A collar dowel or pin that slides in renews the collar (step 20), so
+    # the note serves the latch dowel and the plate dowels only.
     assert (
         f"BOND NOTE ({drawing.sub_step('latch-pin-pressed', 1)}, "
-        f"{drawing.sub_step('arm-plate-fitted', 6)}, "
-        f"{drawing.sub_step('collar-pins-pressed', 1)}, "
-        f"{drawing.sub_step('collar-pins-pressed', 4)}):"
+        f"{drawing.sub_step('arm-plate-fitted', 6)}):"
     ) in note
     for words in (
         "PULL THE DOWEL.",

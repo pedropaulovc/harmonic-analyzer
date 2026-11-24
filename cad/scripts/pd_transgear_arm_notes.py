@@ -49,10 +49,10 @@ def see_note(number: int) -> str:
 # S_AXIS_TILT_MAX_RAD, which takes no credit for the clamped head: the bore
 # is what squares the pin); the lean is charged to the platen air, the
 # reducer and rack meshes and the collar air, and the first to close as the
-# gap opens is the feed rack's opposite-flank budget, then the MHA-PD-10
-# 12T's full-depth teeth stopping inside the MHA-PD-26 rack's reach
-# (test_pd_feed_rack_drawing; build_pd_paper_drive_assembly's platen, rack
-# and chain check; fit audit 2026-11-23 batch sweep).
+# gap opens is the MHA-PD-10 12T's full-depth teeth stopping inside the
+# MHA-PD-26 rack's reach (build_pd_paper_drive_assembly's platen, rack and
+# chain check; fit audit 2026-11-23 batch sweep; the rack's opposite-flank
+# budget check is deleted, owner ruling 2026-11-24 on audit part 2).
 
 
 NOTES = (
@@ -83,7 +83,7 @@ NOTES_TEXT = "\n".join(NOTES)
 DRAWING_NOTES = NOTES_TEXT
 
 PIVOT_BORE_CALLOUT = f"{PIVOT_BORE_DRILL} DRILL THRU, {see_note(PIVOT_NOTE)}"
-# The pin bore's callout (fit audit 2026-11-23, pending owner confirmation:
+# The pin bore's callout (owner ruling 2026-11-24, fit audit question 4:
 # the one-diameter pin is bonded in the reamed bore): size and process,
 # then the mate and that it is made to this bore: MHA-PD-23 is turned
 # last, so its sheet carries the bond's clearance and the trial, once (fit

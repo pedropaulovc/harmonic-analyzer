@@ -18,7 +18,7 @@
 # Left to the assembly (MHA-PD-00, not made here; the last op names them):
 # 2X Ø.1240 dowel holes (PD-00 13A pilots through arm and plate, 13D reams the
 # arm's two), the 2X 8-32 tapped holes' match work (13L spot through the
-# plate, 13N #29 drill, 13P tap) and the MHA-PD-23 pin's bond (11A-11G).
+# plate, 13N #29 drill, 13P tap) and the MHA-PD-23 pin's bond (11A-11J).
 #
 # PENDING OWNER CORRECTION (#3184): two assumptions this plan rests on.
 # (1) Stock: 3/8 x 1 precision-ground 1018, Online Metals 12095 (±.001
@@ -651,5 +651,5 @@ instruction = "The drawing's finish: {{cad.finish}}. Wash off the cutting oil an
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Not made here, left to the assembly (MHA-PD-00): the 2X Ø.1240 dowel holes (PD-00 step 13A drills pilots through the arm and the arm plate MHA-PD-19 together; 13D reams the arm's two, press fit), the 2X 8-32 tapped holes' match work (13L spots through the plate; 13N drills #29; 13P taps) and the MHA-PD-23 pin bonded into the pin bore (11A-11G). Send the arm to assembly with the plate."
+instruction = "Not made here, left to the assembly (MHA-PD-00): the 2X Ø.1240 dowel holes (PD-00 step 13A drills pilots through the arm and the arm plate MHA-PD-19 together; 13D reams the arm's two, press fit), the 2X 8-32 tapped holes' match work (13L spots through the plate; 13N drills #29; 13P taps) and the MHA-PD-23 pin bonded into the pin bore (11A-11J). Send the arm to assembly with the plate."
 feed = "hand"
