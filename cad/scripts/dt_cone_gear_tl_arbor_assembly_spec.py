@@ -142,7 +142,16 @@ if key.END_Z_MM + key.LENGTH >= BLANK_FACE_Z:
 # (machinist review of farm 20261113T234307484Z read 2.27° against half a
 # pitch: the title now names the station). Half a pitch on the 64T would
 # leave its mid-face tooth .54° off the key, over the arbor's setting
-# allowance (KEY_SETTING_ALLOWANCE_DEG).
+# allowance (KEY_SETTING_ALLOWANCE_DEG): the model's phase, not a function.
+#
+# Nothing in the machine reads the 64T's tooth-to-key clock (fit audit part 2,
+# B13; drawing-guidelines rule 4: a setting nothing needs takes no
+# requirement). The 16T it meshes is match-drilled to MHA-DT-11 wherever it
+# meshes (MHA-DT-00 step 4S; dt_crank_pinion_spec's retention pin), so any
+# 64T phase on the key is taken up there, and error_budget's crank index
+# (timebase.crank_index_deg) is the crank arm's stop repeatability, not this
+# clock. So the 64T row prints its index as REF and says any index serves;
+# the cone rows keep theirs (a keyed cone gear's clock reaches the pen).
 CONE_FIRST_INDEX_PITCHES = 0.5
 CRANK_MIDFACE_DRIFT_DEG = math.degrees(
     math.asin(
@@ -162,6 +171,7 @@ if (
     raise AssertionError("the 64T's model no longer centres a tooth on +X at mid-face")
 CRANK_FIRST_INDEX_DEG = round(math.degrees(crank.TOOTH_SPACE.azimuth_rad), 2)
 CRANK_FIRST_INDEX_SENSE = "CCW FROM CHAMFERED FACE"
+CRANK_ANY_INDEX = "ANY INDEX SERVES"
 
 
 def cone_first_index_deg(teeth: int) -> float:
@@ -279,7 +289,12 @@ _SEAT_TEXT = "Ø" + arbor.inch_text(
 # index's acceptance is the title block's angle, set on the dividing head's
 # own dial (the last fitting step). The title names the station every index
 # centres a tooth on the key at: the blank's mid-face (the 64T derivation
-# above), so the 64T row's 2.27° agrees with it.
+# above), so the 64T row's 2.27° REF agrees with it. That row reads
+# "2.27° REF" under FIRST INDEX and "ANY INDEX SERVES" under DIRECTION (fit
+# audit part 2, B13): a direction for an index nothing reads would be a
+# setting with no function, and the one-cell "2.27° REF (ANY INDEX SERVES)"
+# runs the table past the sheet's right border. CRANK_FIRST_INDEX_SENSE stays
+# the REF value's sense in the model (the test checks the cut against it).
 SETUP_TABLE_TITLE = "\n".join(
     (
         "SETUP TABLE: EACH BLANK'S COLLAR AND FIRST INDEX",
@@ -287,8 +302,8 @@ SETUP_TABLE_TITLE = "\n".join(
         "MID-FACE)",
     )
 )
-# Collar cells read "ITEM n" under COLLAR, and the 64T's direction is CCW
-# seen from its chamfered face, so every cell prints on one line.
+# Collar cells read "ITEM n" under COLLAR, and the 64T's direction cell says
+# any index serves, so every cell prints on one line.
 SETUP_TABLE_HEADER = ("BLANK", "TEETH", "COLLAR", "FIRST INDEX", "DIRECTION")
 
 
@@ -296,7 +311,7 @@ def _first_index(tag: str) -> tuple[str, str]:
     """A blank's first index as the table prints it: angle and direction."""
     if tag.startswith("T"):
         return f"{cone_first_index_deg(blank_teeth(tag)):.2f}°", "EITHER WAY"
-    return f"{CRANK_FIRST_INDEX_DEG:.2f}°", CRANK_FIRST_INDEX_SENSE
+    return f"{CRANK_FIRST_INDEX_DEG:.2f}° REF", CRANK_ANY_INDEX
 
 
 SETUP_TABLE_ROWS: tuple[tuple[str, ...], ...] = tuple(
