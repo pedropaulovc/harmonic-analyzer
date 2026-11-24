@@ -40,9 +40,6 @@ demoted:
   - pd_rack_pinion
   - pd_transgear_arm
   - pd_transgear_disc_hub
-  - pd_transgear_feed_pinion
-  - pd_transgear_front_bushing
-  - pd_transgear_rear_bushing
   - pn_pen_v_block
   - sm_knife_mount
   # parts with an explicit band tighter than the title block: 29
@@ -70,7 +67,6 @@ demoted:
   - pd_platen_guide
   - pd_support_bar
   - pd_transgear_knob_cup
-  - pd_transgear_pin
   - pn_pen_hanger
   - pn_pen_rod
   - sh_column_clamp_back

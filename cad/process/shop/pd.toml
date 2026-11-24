@@ -185,10 +185,6 @@ tool = "reamer-1260"
 material = "lathe-c360"
 sfm = 160
 feed = "tailstock quill by hand, slow and light, dry; withdraw with the spindle running"
-# The bores' go/no-go pair (gauges record gauges.plug-gauges-1260-1265 in
-# shop/common.toml, to buy): the tools record lets a plan list the pair.
-[tools.plug-gauges-1260-1265]
-description = "Plug gauge pair, .1260 GO (plus) and .1265 NO-GO (minus), Vermont Gage Class X"
 
 # --- MHA-PD-23 transgear pin (cad/process/pd_transgear_pin) -----------------
 # Turned from the 1/4 in 1018 bar. Speeds: lathe.toml header (LittleMachineShop
@@ -215,16 +211,6 @@ tool = "grooving-tool-020"
 material = "lathe-1018-cold-finished"
 rpm = 300
 feed = "by hand, light and steady, cutting oil"
-# The MHA-PD-18 ream read to .0001 in for the land's matched press (inventory
-# cad/config/shop-equipment/ gauges.plug-gauges-1261-1264, to buy): with the
-# .1260/.1265 pair the six pins step .1260-.1265 by .0001 in. The set's own
-# pins span .1261-.1264 in = 3.20294-3.21056 mm in .0001 in = 0.00254 mm
-# steps.
-[gauges.plug-gauges-1261-1264]
-range_mm = [3.20294, 3.21056]
-resolution_mm = 0.00254
-[tools.plug-gauges-1261-1264]
-description = "Plug gauges .1261, .1262, .1263, .1264, Vermont Gage Class X"
 
 # --- MHA-PD-13 transgear thumbnut (cad/process/pd_transgear_thumbnut) ---------
 # The #29 tap drill and the 90° chamfer mill's countersinks from the tailstock

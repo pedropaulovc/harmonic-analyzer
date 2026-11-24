@@ -1,3 +1,34 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- The finished bushing and its printed sizes, measured from the Setup 1 faced end (the thrust face). Shell: prechips.bush_diagrams; styles: prechips.palette. -->
-<svg xmlns="http://www.w3.org/2000/svg" data-cad-template="turned-bush" data-hold="inspect" data-datum="Setup 1 faced end"/>
+<!-- The finished bushing and its printed sizes, measured from the Setup 1 faced end (the thrust face). Drawn once by prechips.bush_diagrams and kept as a picture: the template labels the reamed bore with a size band, and the drawing prints none (fit audit 2026-11-23). Not to scale after a model change; its sizes are bound. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 431.32" width="720" height="431.32" font-family="Arial, Helvetica, sans-serif" font-size="14"><defs>
+  <marker id="prechips-arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+    <path d="M0 0L10 5L0 10z" fill="#111" />
+  </marker>
+  <pattern id="prechips-cut" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+    <rect width="6" height="6" fill="#fbe1dd" />
+    <line x1="0" y1="0" x2="0" y2="6" stroke="#b33" stroke-width="1.6" />
+  </pattern>
+  <pattern id="prechips-sec" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(-45)">
+    <rect width="6" height="6" fill="#d7e1ec" />
+    <line x1="0" y1="0" x2="0" y2="6" stroke="#333" stroke-width="0.9" />
+  </pattern>
+  <pattern id="prechips-thread" width="4" height="4" patternUnits="userSpaceOnUse">
+    <rect width="4" height="4" fill="#fff" />
+    <path d="M0 0L4 4M4 0L0 4" stroke="#333" stroke-width="0.8" />
+  </pattern>
+  <pattern id="prechips-vise" width="6" height="6" patternUnits="userSpaceOnUse">
+    <rect width="6" height="6" fill="#dcdee1" />
+    <line x1="0" y1="3" x2="6" y2="3" stroke="#9a9fa6" stroke-width="1" />
+  </pattern>
+  <pattern id="prechips-plate" width="8" height="8" patternUnits="userSpaceOnUse">
+    <rect width="8" height="8" fill="#e6e8ea" />
+    <line x1="4" y1="0" x2="4" y2="8" stroke="#9a9fa6" stroke-width="1" />
+  </pattern>
+  <pattern id="prechips-bond" width="10" height="6" patternUnits="userSpaceOnUse">
+    <rect width="10" height="6" fill="#f4f1e4" />
+    <path d="M1 1.5H5M6 4.5H10" stroke="#555" stroke-width="1" />
+  </pattern>
+  <pattern id="prechips-support" width="4" height="4" patternUnits="userSpaceOnUse">
+    <circle cx="2" cy="2" r="1.1" fill="#2f6b3a" />
+  </pattern>
+</defs><rect class="paper" width="720" height="431.32" fill="#fff" /><g class="fixture-table" fill="#f1f2f3" stroke="#7a7f86" stroke-width="1" /><g class="fixture-vise" fill="url(#prechips-vise)" stroke="#555" stroke-width="1.2" /><g class="fixture-plate" fill="url(#prechips-plate)" stroke="#555" stroke-width="1.2" /><g class="bond" fill="url(#prechips-bond)" stroke="none" /><g class="part-rest" fill="#c9cbce" stroke="#888" stroke-width="1.2" /><g class="part-waste" fill="#eeeff0" stroke="#666" stroke-width="1.2" stroke-dasharray="2 2" /><g class="part-arriving" fill="none" stroke="#444" stroke-width="1.3" stroke-dasharray="8 4" /><g class="part-kept" fill="#d7e1ec" stroke="#111" stroke-width="1.6"><path d="M200.00 207.77L276.10 207.77L276.10 332.23L200.00 332.23Z" /></g><g class="section" fill="url(#prechips-sec)" stroke="#111" stroke-width="1.5" /><g class="part-removed" fill="url(#prechips-cut)" stroke="none" /><g class="part-threads" fill="url(#prechips-thread)" stroke="#555" stroke-width="0.6" /><g class="holes" fill="#fff" stroke="#111" stroke-width="1.2" /><g class="hidden" fill="none" stroke="#555" stroke-width="1.1" stroke-dasharray="4 3"><rect x="200" y="247.6" width="76.1" height="44.81" /></g><g class="fixture-support" fill="url(#prechips-support)" stroke="#2f6b3a" stroke-width="1.3" stroke-dasharray="1.5 2" /><g class="clamp" fill="#6b7178" stroke="#111" stroke-width="1.2" /><g class="cutter" fill="#e0a800" stroke="#111" stroke-width="1.6" /><g class="centre-line" fill="none" stroke="#555" stroke-width="0.9" stroke-dasharray="16 3 3 3"><line x1="160" y1="270" x2="316.1" y2="270" /></g><g class="active-face" fill="none" stroke="#e07000" stroke-width="3" stroke-linecap="round" /><g class="datum" fill="#b22" stroke="#b22" stroke-width="2.4"><line x1="200" y1="197.77" x2="200" y2="342.23" /></g><g class="arrow" stroke="#111" stroke-width="1.5" marker-end="url(#prechips-arr)" /><g class="axis" fill="none" stroke="#111" stroke-width="1" marker-end="url(#prechips-arr)" /><g class="dims" fill="none" stroke="#111" stroke-width="1"><line x1="200" y1="205.77" x2="200" y2="185.77" /><line x1="276.1" y1="205.77" x2="276.1" y2="185.77" /><line x1="200" y1="189.77" x2="276.1" y2="189.77" marker-start="url(#prechips-arr)" marker-end="url(#prechips-arr)" /></g><g class="leader" fill="none" stroke="#333" stroke-width="0.9"><polyline points="238.05 385.32 238.05 362.23 238.05 332.23" /><circle cx="238.05" cy="332.23" r="1.8" class="leader-dot" fill="#333" stroke="none" /><polyline points="339.37 385.32 270.1 362.23 270.1 292.4" /><circle cx="270.1" cy="292.4" r="1.8" class="leader-dot" fill="#333" stroke="none" /></g><g class="leader-dot" fill="#333" stroke="none" /><g class="label" fill="#111"><text x="194" y="356.23" text-anchor="end" class="datum-label" fill="#b22" font-weight="bold">Setup 1 faced end</text><text x="282.1" y="194.77">length {{cad.length_min_in:.3dot}}–{{cad.length_max_in:.3dot}}</text><text x="238.05" y="401.32" text-anchor="middle">Ø{{cad.outer_dia_min_in:.3dot}}–{{cad.outer_dia_max_in:.3dot}}</text><text x="339.37" y="401.32" text-anchor="middle">bore</text><text x="339.37" y="417.32" text-anchor="middle">Ø.126 reamed</text></g><g class="label-on-clamp" fill="#fff" /><g class="label-halo" fill="#111" stroke="#fff" stroke-width="4" paint-order="stroke" /><g class="datum-label" fill="#b22" font-weight="bold" /><g class="title" fill="#555" font-style="italic"><text x="20" y="24">Finished part, seen from the side</text></g></svg>

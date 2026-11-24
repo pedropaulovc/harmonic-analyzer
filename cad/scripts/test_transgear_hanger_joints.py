@@ -383,13 +383,14 @@ def test_every_wall_holds_the_target_at_the_printed_worst_case(module) -> None:
 
 def test_the_latch_pin_ligament_holds_the_target_on_the_three_eighths_bar() -> None:
     # Owner ruling 2026-10-27 (#1379): the next stock size up, 3/8 (#2019).
-    # The full-budget ligament, at the .XXX height reach (coordinator ruling
-    # (a)) and the run-off over the .38 MIN hole to its drill point (#3124),
-    # clears the .080 target the 5/16 bar missed.
+    # The full-budget ligament, at the .XX height reach (.19, fit batch
+    # review r4; coordinator ruling (a): no tightened band) and the run-off
+    # over the .38 MIN hole to its drill point (#3124), clears the .080
+    # target the 5/16 bar missed: .0896.
     assert not hasattr(arm, "WALL_FLOORS")
     worst = arm.WALLS["pin hole to faces"][1]
     assert worst >= arm.WALL_TARGET
-    assert worst == pytest.approx(2.4527, abs=1e-4)
+    assert worst == pytest.approx(2.2750, abs=1e-4)
 
 
 def test_spacer_wall_holds_the_target_with_both_rim_breaks() -> None:

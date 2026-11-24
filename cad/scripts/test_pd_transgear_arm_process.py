@@ -121,7 +121,7 @@ def test_the_assembly_holes_are_left_to_md_pd_00(ctx) -> None:
     )
     final = PLAN["setups"][-1]["operations"][-1]["instruction"]
     for words in (
-        "Ø.0930",
+        "Ø.1240",
         "13A",
         "13D",
         "8-32",
