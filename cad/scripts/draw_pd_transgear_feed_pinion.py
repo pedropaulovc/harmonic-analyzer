@@ -227,7 +227,7 @@ def _left_of(edge_x: float, width: float) -> float:
 # estimates them (3.5 mm caps, 2.61 mm advance, a space padding either side;
 # test_pd_transgear_feed_pinion_drawing): the rows are placed by their text
 # centres, each a 3 mm gap under the row above.
-_FACE_WIDTH_TEXT_WIDTH = 0.0627
+_FACE_WIDTH_TEXT_WIDTH = 0.0757
 _FLAT_END_TEXT_WIDTH = 0.0131
 # The boss's fit rows (the standard fit name and the mate's name and number,
 # the route and the clearance REF) are the sheet's widest: centred this far

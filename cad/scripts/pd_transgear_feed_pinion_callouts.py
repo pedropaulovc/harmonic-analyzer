@@ -113,9 +113,13 @@ BOSS_CALLOUT = "\n".join(
 # shoulder-crosses-line: the drawing leaf failed).
 FLAT_CALLOUT = "\n".join(("KEEPS GAP TO", HUB.KEY_PIN_NUMBER))
 # The step seats the hub's spigot: the tooth length places hub and disc.  Its
-# ±band is a term of the disc cluster's printed stack (transgear_cluster_fit.TL),
-# named once, on the overall (r8 machinist review, rule 7: a second reason).
-FACE_WIDTH_CALLOUT = f"SEATS {HUB_NUMBER} SPIGOT"
+# ±band is a term of the disc cluster's printed stack (transgear_cluster_fit.TL).
+# Rule 4's necessity answer, one line (fit batch review r2: SEATS MHA-PD-17
+# SPIGOT named the mate and nothing that fails): the hub's front face stands
+# .000-.006 behind the sleeve's nose (transgear_cluster_fit.RECESS_RANGE), so
+# at the title block's ±.005 it would stand .004 proud and take the front
+# bushing's thrust.
+FACE_WIDTH_CALLOUT = f"KEEPS {HUB_NUMBER} BEHIND NOSE"
 # The overall sets the hub's recess behind the nose and carries the front
 # bushing's thrust: a term of the disc cluster's printed stack
 # (transgear_cluster_fit.OL).
