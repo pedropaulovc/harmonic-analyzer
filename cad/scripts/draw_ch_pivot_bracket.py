@@ -499,7 +499,9 @@ requirement(
         ),
         "nominal_dia": (BORE_DIA, ("BORE_DIA",)),
         "drill": (BORE_HOLE_SPEC.size, ("BORE_HOLE_SPEC",)),
-        "process": (drill_process(BORE_HOLE_SPEC), _BORE_CALLOUT),
+        # The drilled-block adapter's process is "drill" or "ream"; the
+        # letter rides "drill" (prechips cad_drilled_block).
+        "process": ("drill", _BORE_CALLOUT),
         "thru": (True, _BORE_CALLOUT),
         "callout": (DIMENSION_CALLOUTS["ShaftBoreDia"], _BORE_CALLOUT),
         "mates": (PIVOT_SHAFT_NUMBER, ((_SELF, "PIVOT_SHAFT_NUMBER"),)),
