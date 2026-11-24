@@ -110,23 +110,27 @@ def test_the_supplied_plate_prints_as_reference_stock() -> None:
 
 
 def test_web_worst_case_is_the_printed_limits() -> None:
-    """Both holes at the DRILLED HOLES maximum and the pin centre moved its
-    full band toward the bore; floored so the sheet never states more web."""
+    """Both holes at the DRILLED HOLES maximum and the pin centre at the
+    shop's drilled-hole location row toward the bore (the trial on the pins
+    bounds the spacing, not that shift); floored so the sheet never states
+    more web."""
     from _printed_tolerance import drilled_oversize_mm, drilled_undersize_mm
 
     assert drilled_undersize_mm(unit=spec.UNIT) == 0.0
     oversize = drilled_oversize_mm(unit=spec.UNIT)
     web = (
         seat_geometry.PIN_CIRCLE_DIA / 2.0
-        - spec.PIN_LOCATION_TOL
+        - spec.PIN_CENTRE_SHIFT_MAX
         - (spec.PIN_HOLE_DIA + oversize) / 2.0
         - (spec.BORE_DIA + oversize) / 2.0
     ) / 25.4
     assert notes.BORE_PIN_WEB_WORST_IN <= web < notes.BORE_PIN_WEB_WORST_IN + 0.001
     assert 0.0 < notes.BORE_PIN_WEB_WORST_IN * 25.4 < seat_geometry.BORE_PIN_WEB
     assert notes.BORE_PIN_WEB_NOTE in notes.DRAWING_NOTES.splitlines()
-    assert notes.BORE_PIN_WEB_NOTE == "BORE TO DRIVE-PIN HOLE WEB .018 MIN."
-    # No easing drill prints: a #39 hole's .017 web is not RV-01's.
+    assert notes.BORE_PIN_WEB_NOTE == "BORE TO DRIVE-PIN HOLE WEB .014 MIN."
+    assert spec.PIN_CENTRE_SHIFT_MAX == pytest.approx(0.005 * 25.4)
+    assert spec.PIN_LOCATION_TOL < spec.PIN_CENTRE_SHIFT_MAX
+    # No easing drill prints.
     assert "#39" not in notes.DRAWING_NOTES
     assert len(notes.DRAWING_NOTES.splitlines()) == 4
     # The acceptance is the trial on the pins, never a reading of the

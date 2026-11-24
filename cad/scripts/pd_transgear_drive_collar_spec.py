@@ -312,21 +312,31 @@ PIN_HOLE_DIA = DRIVE_PIN_HOLE_DIA  # the shared 3/32 press hole
 # Reamed to the bought dowel, which is its gauge (it does not enter by
 # hand): the hole prints the shared .0930 reamer's size and no band (sheet
 # note REAM_NOTE).  No larger hole serves: a 3/32 reamer for a bonded slip
-# fit leaves the rim .018 and a 3/32 drill at DRILLED HOLES .017, under the
-# .019 that RV-01 covers.  PIN_HOLE_BAND is the
+# fit leaves the rim .017 and a 3/32 drill at DRILLED HOLES .016, under the
+# .018 that RV-01 covers.  PIN_HOLE_BAND is the
 # ANALYSIS band the walls charge, what that reamer is taken to cut.  Each
 # centre prints as the REF target (.276), three places on the inch grid (the
 # shared 7.0 rounded), and links sheet note TRIAL_NOTE: the acceptance is all
-# three MHA-PD-09 wheels dropping on the pressed pins freely (fit audit
-# 2026-11-23, pending owner confirmation).  The title block's ±.005 cannot
-# control them: charged to the walls it leaves the rim .015 and the wheel's
-# web .014, under what RV-01 covers on each sheet.  PIN_OFFSET_TOL is
-# ANALYSIS only: the scatter about the targets that the walls and the
-# wheels' slip budget are charged (the shared seat's DRIVE_PIN_OFFSET_TOL,
-# which MHA-DT-11 still prints).
+# three MHA-PD-09 wheels dropping on the pressed pins freely (owner ruling
+# 2026-11-24, fit audit question 8).
+#
+# Two different errors of the centres, charged apart (Codjiflo P1 on #3485):
+# - PIN_OFFSET_TOL, the two pins' SPACING error against the wheels' holes.
+#   It is what the trial accepts; the wheels' slip budget alone reads it
+#   (the shared seat's DRIVE_PIN_OFFSET_TOL, which MHA-DT-11 still prints).
+# - PIN_CENTRE_SHIFT_MAX, how far either centre may lie from its target
+#   toward the rim or the bore.  The trial does not bound it: both pins and
+#   both wheel holes shifted the same way still drop together, and the
+#   wheel's bore has .003 to .015 radial air round the pilot
+#   (PILOT_BORE_CLEARANCE), wider than the shift.  What bounds it is the
+#   shop's declared capability for the process (drawing-guidelines.md, What
+#   the shop holds: "location of a reamed or bored hole ... ±.002"; the
+#   holes are spotted, drilled and reamed on the CNC from the swept bore).
+#   Every wall of these holes is charged it, never the spacing error.
 PIN_HOLE_BAND = DRIVE_PIN_HOLE_BAND  # +.0005/-.0000, analysis only
 PIN_HOLE_PLACES = 4
-PIN_OFFSET_TOL = DRIVE_PIN_OFFSET_TOL  # ±.0009 each centre, analysis only
+PIN_OFFSET_TOL = DRIVE_PIN_OFFSET_TOL  # ±.0009 spacing analysis, the trial's
+PIN_CENTRE_SHIFT_MAX = 0.0508  # ±.002, the shop's reamed-hole location row
 PIN_OFFSET_PLACES = 3
 PIN_HOLE_DEPTH = LENGTH  # through the body
 
@@ -560,7 +570,7 @@ _PIN_HOLE_R_MAX = (PIN_HOLE_DIA + max(PIN_HOLE_BAND)) / 2.0
 # case (the smallest body, the farthest-out centre, the largest hole).
 DRIVE_PIN_COLLAR_RIM = OD / 2.0 - PIN_CIRCLE_RADIUS - PIN_HOLE_DIA / 2.0
 DRIVE_PIN_COLLAR_RIM_WORST = floor_inch(
-    _OD_R_MIN - PIN_CIRCLE_RADIUS - PIN_OFFSET_TOL - _PIN_HOLE_R_MAX
+    _OD_R_MIN - PIN_CIRCLE_RADIUS - PIN_CENTRE_SHIFT_MAX - _PIN_HOLE_R_MAX
 )
 # The round bore meets the full pilot-wall target.
 PILOT_WALL = (PILOT_DIA - BORE_DIA) / 2.0
@@ -571,7 +581,7 @@ PILOT_WALL_WORST = floor_inch(
 BORE_PIN_WALL = PIN_CIRCLE_RADIUS - PIN_HOLE_DIA / 2.0 - BORE_DIA / 2.0
 BORE_PIN_WALL_WORST = (
     PIN_CIRCLE_RADIUS
-    - PIN_OFFSET_TOL
+    - PIN_CENTRE_SHIFT_MAX
     - _PIN_HOLE_R_MAX
     - (BORE_DIA + max(BORE_DIA_BAND)) / 2.0
 )
@@ -579,7 +589,10 @@ BORE_PIN_WALL_WORST = (
 # line: the web between them at the worst centres and largest holes.  Under
 # the target, over the floor: RV-03 in the registry row, printed as note 2.
 FLAT_PIN_WEB_WORST = floor_inch(
-    PIN_CIRCLE_RADIUS - PIN_OFFSET_TOL - _PIN_HOLE_R_MAX - _FLAT_PIN_HOLE_OUTER_R_MAX
+    PIN_CIRCLE_RADIUS
+    - PIN_CENTRE_SHIFT_MAX
+    - _PIN_HOLE_R_MAX
+    - _FLAT_PIN_HOLE_OUTER_R_MAX
 )
 # Flat-pin hole to the body O.D.
 FLAT_PIN_OD_WALL_WORST = _OD_R_MIN - _FLAT_PIN_HOLE_OUTER_R_MAX
@@ -591,7 +604,7 @@ FLAT_PIN_SHOULDER_WALL_WORST = math.hypot(
     _PILOT_R_MIN - _FLAT_PIN_HOLE_OUTER_R_MAX, min(FLAT_PIN_FLOOR_LIMITS)
 )
 # The holes run through the body beside the pilot, never into it.
-PIN_HOLE_INNER_R_MIN = PIN_CIRCLE_RADIUS - PIN_OFFSET_TOL - _PIN_HOLE_R_MAX
+PIN_HOLE_INNER_R_MIN = PIN_CIRCLE_RADIUS - PIN_CENTRE_SHIFT_MAX - _PIN_HOLE_R_MAX
 PILOT_R_MAX = (PILOT_DIA + max(PILOT_DIA_BAND)) / 2.0
 
 # --- Fits ------------------------------------------------------------------------
@@ -940,10 +953,11 @@ FIT_UP_NOTE = "\n".join(
     )
 )
 
-# The external drive-pin rim shortfall, note 1: owner-ruled permanent minor
-# exception RV-01 in cad/config/parts/pd-transgear-drive-collar.yaml (shared
-# #25 sprocket-seat geometry, #2141).  The flat-pin hole to drive-pin hole
-# web, note 2: delegated minor exception RV-03 there (#2409).  Note 3: the
+# The external drive-pin rim shortfall, note 1: minor exception RV-01 in
+# cad/config/parts/pd-transgear-drive-collar.yaml (shared #25 sprocket-seat
+# geometry, #2141; the owner's ruling at .019, restated at the shop row's
+# value by a delegated ruling 2026-11-24).  The flat-pin hole to drive-pin
+# hole web, note 2: delegated minor exception RV-03 there (#2409).  Note 3: the
 # three reamed holes print no band, their bought dowels are their gauges.
 # Note 4, which both REF offsets link (rule 4: a location made to its mate):
 # the drive-pin holes are located to the wheels' holes, the trial of the
