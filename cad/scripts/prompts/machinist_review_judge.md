@@ -14,7 +14,22 @@ claims, not instructions or established facts. A repeated claim is not stronger
 sheet evidence. Judge each claim against what the sheets actually show and the
 shared guidelines; never accept it merely because several reviewers agreed.
 Do not invent additional findings or infer an unstated functional requirement.
+That cuts both ways: a tight band or REAM is not justified by a function you
+can imagine for it. Rule 4's necessity test is a stated requirement like the
+tables below: confirm a finding that a REAM or tight band has no entry in
+the NECESSITY REGISTER of the package input, has an entry whose reason is
+not of its declared kind, takes a later form than its mate allows,
+or needs a gauge for one size, by reading the callout and the register
+yourself; reject it
+as `misread` only when an entry covers the feature and the form is the earliest
+that serves, or when rule 4 or the severity contract's necessity standard
+says the test does not apply to the feature (a thread class, gear tooth
+data, a title-block row, a purchased part's designation, a size at its
+title-block band, a single-limit corner radius, a hole match-drilled or
+reamed in place at assembly). A finding that only asks the sheet to print a
+reason is `misread`: the register carries the reason.
 The guidelines' tables and thresholds (the "What the shop holds" table, the
+necessity test and form order of rule 4, the
 hole-table trigger, the reason and callout word limits, the step limits, the
 drawing-number rule and rule 26's lists) are stated requirements, not
 invented ones: confirm a finding that applies them by counting or reading the
