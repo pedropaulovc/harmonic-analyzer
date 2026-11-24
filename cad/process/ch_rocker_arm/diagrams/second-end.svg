@@ -48,6 +48,7 @@
   <line class="leader" x1="420" y1="312" x2="470" y2="312"/>
   <text class="label" x="475" y="316">.090 over the strap (Z0 its top)</text>
   <line class="dims" x1="455" y1="349.6" x2="455" y2="367.6"/>
-  <line class="leader" x1="420" y1="367.6" x2="470" y2="367.6"/>
-  <text class="label" x="475" y="372">end G, faced in Setup 2</text>
+  <line class="leader" x1="420" y1="367.6" x2="616" y2="367.6"/>
+  <text class="label" x="620" y="364">end G, faced</text>
+  <text class="label" x="620" y="379">in Setup 2</text>
 </svg>
