@@ -271,17 +271,36 @@ def test_cup_diameters_stand_between_the_face_view_and_the_section() -> None:
     assert drawing.CAPTION_XY[1] < drawing.SECTION_CENTER[1] - drawing.HALF_OD - 0.005
 
 
-def test_floor_corners_print_their_max_radius_under_their_own_corners() -> None:
-    """Rule 16: each corner's largest acceptable radius, on one row under the
-    section, above the caption and left of the pilot's callout block."""
+def test_floor_corners_print_their_max_radius_and_the_mate_each_seats() -> None:
+    """Rule 16: each corner's largest acceptable radius, and under it the
+    mate that seats past the corner, by its number (rule 4; machinist review
+    2026-11-23: an R MAX under the title block's named no mate).  One row
+    under the section, above the caption: the pocket's block runs left from
+    its corner, the pilot's right from its own, apart, left of the pilot
+    Ø's dimension line."""
+    callouts = drawing.SECTION_CALLOUTS
+    assert callouts["PilotFloorR"] == "SEATS MHA-PD-08 END"
+    assert callouts["PocketFloorR"] == "SEATS MHA-PD-VN-71 HEAD"
     pocket = drawing.SECTION_KEEP["PocketFloorR"]
     pilot = drawing.SECTION_KEEP["PilotFloorR"]
     assert pocket[1] == pilot[1] < drawing.SECTION_BOTTOM - 0.005
     assert drawing.CAPTION_XY[1] < pocket[1] - 0.010
-    assert drawing.REAR_FACE_X - 0.005 < pocket[0] < pilot[0] < drawing.FRONT_FACE_X
+    # The widths the sheet is laid out with, never under the estimate's.
+    pocket_half = drawing.POCKET_CORNER_HALF_WIDTH
+    pilot_half = drawing.PILOT_CORNER_HALF_WIDTH
+    assert pocket_half >= _block_half_width(callouts["PocketFloorR"], pocket)
+    assert pilot_half >= _block_half_width(callouts["PilotFloorR"], pilot)
+    # Each block's near end under its own corner.
+    pocket_corner = drawing.REAR_FACE_X + spec.CBORE_DEPTH * drawing._S / 1000.0
+    pilot_corner = drawing.FRONT_FACE_X - spec.PILOT_DEPTH * drawing._S / 1000.0
+    assert pocket[0] + pocket_half == pytest.approx(pocket_corner, abs=0.004)
+    assert pilot[0] - pilot_half == pytest.approx(pilot_corner, abs=0.004)
+    assert pilot[0] - pilot_half - (pocket[0] + pocket_half) >= 0.008
+    # The pocket's block right of the cutting line's lower letter, the
+    # pilot's left of the pilot Ø's dimension line.
+    assert pocket[0] - pocket_half > drawing.FACE_CENTER[0] + drawing.HALF_OD
     bore = drawing.SECTION_KEEP["BoreDia"]
-    half = _block_half_width(drawing.SECTION_CALLOUTS["BoreDia"], bore)
-    assert pilot[0] + 0.012 < bore[0] - half
+    assert pilot[0] + pilot_half + 0.010 < bore[0]
 
 
 def test_floor_corners_are_max_limits_that_clear_their_mates() -> None:

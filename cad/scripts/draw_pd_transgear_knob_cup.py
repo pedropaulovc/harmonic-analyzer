@@ -59,7 +59,11 @@ from _gtol_cylinder import CylinderFace
 from _gtol_planar import PlanarFace
 from _printed_limits import drilled_limits, limits
 from pd_paper_drive_assembly_steps import step_ref
-from pd_transgear_knob_cup_notes import CBORE_DEPTH_CALLOUT
+from pd_transgear_knob_cup_notes import (
+    CBORE_DEPTH_CALLOUT,
+    PILOT_CORNER_CALLOUT,
+    POCKET_CORNER_CALLOUT,
+)
 from pd_transgear_knob_cup_spec import (
     BORE_BAND,
     BORE_DIA,
@@ -159,12 +163,14 @@ BORE_CALLOUT_ROWS = "\n".join(f" {row}" for row in BORE_CALLOUT.splitlines()) + 
 SUPPLY_CALLOUT = "SEE NOTE 1"
 HOLE_CALLOUT = "#33 DRILL THRU"
 # The pocket depth's function row is pd_transgear_knob_cup_notes' (the web
-# its third place holds).
+# its third place holds), as are the mates the two floor corners seat.
 SECTION_CALLOUTS = {
     "BoreDia": BORE_CALLOUT_ROWS,
     "CupLength": SUPPLY_CALLOUT,
     "PilotDepth": SUPPLY_CALLOUT,
     "CboreDepth": CBORE_DEPTH_CALLOUT,
+    "PilotFloorR": PILOT_CORNER_CALLOUT,
+    "PocketFloorR": POCKET_CORNER_CALLOUT,
 }
 FACE_CALLOUTS = {"HoleDia": HOLE_CALLOUT}
 
@@ -189,7 +195,16 @@ BORE_BLOCK_HALF_HEIGHT = 0.0130
 # over 15 mm) right of the front face, where the length's extension line
 # no longer strikes its NOTE row and the pocket depth's arrow no longer
 # runs into its "S" (r5 render).  Below the section, the two floor corners'
-# R.xxx MAX on one row, each under its own corner, the caption beneath.
+# R.xxx MAX on one row, each over the mate it seats, the caption beneath.
+# Each block's near end stands under its own corner, where the r1 render of
+# 2026-11-23 began the leader (the pocket's corner 11 mm right of the rear
+# face, the pilot's 15 mm left of the front face), so the pocket's block
+# runs left from its corner and the pilot's right from its own, 12 mm
+# apart, the pilot's ending 20 mm left of the pilot Ø's dimension line.
+CORNER_TEXT_ADVANCE = 0.00277  # the callouts' width a character
+POCKET_CORNER_HALF_WIDTH = len(POCKET_CORNER_CALLOUT) * CORNER_TEXT_ADVANCE / 2.0
+PILOT_CORNER_HALF_WIDTH = len(PILOT_CORNER_CALLOUT) * CORNER_TEXT_ADVANCE / 2.0
+CORNER_ROW_Y = SECTION_BOTTOM - 0.013
 DEPTH_TEXT_HALF_WIDTH = 0.012  # "SEE NOTE 1", 23.9 mm on the r5 render
 # The pocket depth's block: its function row at the callouts' 2.77 mm a
 # character (".108" alone was 8.5 mm on the r6 render).
@@ -208,8 +223,8 @@ SECTION_KEEP = {
         FRONT_FACE_X + 0.060,
         SECTION_CENTER[1] - HALF_BORE - BORE_BLOCK_HALF_HEIGHT - 0.010,
     ),
-    "PocketFloorR": (REAR_FACE_X - 0.002, SECTION_BOTTOM - 0.010),
-    "PilotFloorR": (FRONT_FACE_X - 0.004, SECTION_BOTTOM - 0.010),
+    "PocketFloorR": (REAR_FACE_X + 0.011 - POCKET_CORNER_HALF_WIDTH, CORNER_ROW_Y),
+    "PilotFloorR": (FRONT_FACE_X - 0.014 + PILOT_CORNER_HALF_WIDTH, CORNER_ROW_Y),
 }
 # The web drill's Ø on the face view, up and left of it on a leader.
 FACE_KEEP = {"HoleDia": (FACE_CENTER[0] - 0.040, FACE_CENTER[1] + 0.037)}
