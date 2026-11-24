@@ -41,25 +41,13 @@ def test_the_pin_windows_sit_on_the_model_bore_band(stem, feature, gauge) -> Non
     assert any(tool.get("ref") == gauge for tool in plan["tools"])
 
 
-def test_the_knife_mount_datum_b_pins_sit_inside_its_band() -> None:
-    """MHA-SM-02 datum B (.1273-.1287): GO a .1275 minus single, NO-GO a
-    .1285 plus single (owner ruling 2026-11-23, tool audit Q1: ZZ singles per
-    the record), each pin's window one ZZ tolerance wide and inside the band."""
+def test_the_knife_mount_datum_b_takes_no_zz_pins() -> None:
+    """MHA-SM-02 datum B is a #30 drill at the title block's DRILLED HOLES row
+    (owner ruling 2026-11-24, fit audit OQ19): its .1275/.1285 ZZ pins and
+    their windows are retired."""
     plan = tomllib.loads(
         _process_plans.plan_path("sm_knife_mount").read_text(encoding="utf-8")
     )
-    p = plan["parameters"]
-    manifest = export_features.requirement_manifest("sm_knife_mount")
-    low, high = manifest["features"]["dowel_hole"]["dia"]
-    go, nogo = 0.1275 * 25.4, 0.1285 * 25.4
-    expected = {
-        "dowel_go_pin_min_mm": go - ZZ_TOL_MM,
-        "dowel_go_pin_max_mm": go,
-        "dowel_nogo_pin_min_mm": nogo,
-        "dowel_nogo_pin_max_mm": nogo + ZZ_TOL_MM,
-    }
-    for key, value in expected.items():
-        assert math.isclose(p[key], value, abs_tol=1e-4), (key, p[key], value)
-    assert low - 1e-4 <= p["dowel_go_pin_min_mm"] and p["dowel_nogo_pin_max_mm"] <= high + 1e-4
-    record = _process_plans.load_shop()["gauges"]["zz-pins-1273-1287"]
-    assert record["range_mm"] == pytest.approx([low, high], abs=1e-4)
+    assert not any(key.startswith("dowel_go") or key.startswith("dowel_nogo") for key in plan["parameters"])
+    assert "zz-pins-1273-1287" not in _process_plans.load_shop()["gauges"]
+    assert not any(tool.get("ref") == "zz-pins-1273-1287" for tool in plan["tools"])

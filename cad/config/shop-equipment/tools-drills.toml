@@ -211,6 +211,11 @@ kind = "drill"
 status = "on_hand"
 note = "quotes-2026-11-17-rev3.xlsx Drills D: owned in 115-pc index (quality unverified); not on the buy list."
 
+[tools.drill-e]
+kind = "drill"
+status = "on_hand"
+note = "Letter E (.2500 in) of the owned 115-pc index (quality unverified), the same size as its 1/4 in; not on the buy list. MHA-FR-02 2X E DRILL THRU hanger holes (owner ruling 2026-11-24, fit audit OQ19, superseding the 2026-11-06 letter C)."
+
 [tools.drill-h]
 kind = "drill"
 status = "on_hand"

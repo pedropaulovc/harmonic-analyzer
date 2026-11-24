@@ -1,0 +1,9 @@
+# MHA-FR-02 top frame: the checks build_fr_top_frame asserts
+# (check_register.py; tolerance-policy.md, "Checks in spec modules and tests").
+checks:
+  - id: C-01
+    check: "washer bearing width round the hole"
+    kind: gap
+    reason: "washer rim meets the hole edge; clamp loses its seat"
+    source: "owner ruling 2026-11-24, fit audit part 2 C12 (A, per Main); computed in build_fr_top_frame"
+    basis: worst_case

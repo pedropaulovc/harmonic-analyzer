@@ -1147,8 +1147,10 @@ def test_edge_breaks_stay_clear_of_both_print_worst_knife_seats() -> None:
     _groups, clearance = part._external_edge_breaks()
     assert clearance == part.KNIFE_SEAT_EDGE_BREAK_CLEARANCE
     assert min(clearance.values()) >= part.KNIFE_SEAT_EDGE_BREAK_MIN_CLEARANCE == 0.5
+    # The #30 slip's 0.188 maximum (owner ruling 2026-11-24, fit audit OQ19)
+    # swings each hull 0.048 further than the former reamed slip's 0.091.
     assert clearance == pytest.approx(
-        {"front": 3.427334718490891 + 6.35, "rear": 4.009909177049053}
+        {"front": 3.379074718490893 + 6.35, "rear": 3.961649177049054}
     )
     # The printed worst leg, .06 + .01, never the model's 1.524.
     assert part.EDGE_BREAK_PRINTED == pytest.approx(1.524)
@@ -2597,21 +2599,21 @@ def test_hub_side_boss_width_and_spot_face_stand_clear_of_their_ink() -> None:
 # --- Knife hanger: #10 loose plain clearance and dowels --------------------
 
 
-def test_knife_hanger_is_a_plain_10_clearance_c_drill_hole() -> None:
+def test_knife_hanger_is_a_plain_10_clearance_e_drill_hole() -> None:
     import spring_mount_geom
     from _hole_spec import CLEARANCE_MM, blind_cut_dia_mm
 
-    # Owner ruling 2026-11-06: the native #10 loose clearance row cuts the
-    # letter C drill, .242, through its diameter override.
+    # Owner ruling 2026-11-24, fit audit OQ19: the native #10 loose clearance
+    # row cuts the letter E drill, .250, through its diameter override.
     hole = spec.HANGER_HOLE_SPEC
     assert (hole.kind, hole.size, hole.fit, hole.end) == (
         "clearance", "#10", "loose", "through_all",
     )
     assert hole.overrides_mm == {"HoleDiameter": spec.HANGER_CLEARANCE_DIA}
     assert blind_cut_dia_mm(hole) == CLEARANCE_MM[("#10", "loose")] == 6.045
-    assert spec.HANGER_HOLE_DRILL == "C"
-    assert spec.HANGER_CLEARANCE_DIA == pytest.approx(0.242 * 25.4)
-    assert spec.HANGER_CLEARANCE_DIA == pytest.approx(6.1468)
+    assert spec.HANGER_HOLE_DRILL == "E"
+    assert spec.HANGER_CLEARANCE_DIA == pytest.approx(0.250 * 25.4)
+    assert spec.HANGER_CLEARANCE_DIA == pytest.approx(6.35)
     assert spec.HANGER_CLEARANCE_DIA_PLACES == 3
     # The washer spotfaces are gone, not aliased (user ruling 2026-10-14).
     assert not [name for name in dir(spec) if name.startswith("HANGER_SPOTFACE")]
@@ -2626,7 +2628,7 @@ def test_knife_hanger_is_a_plain_10_clearance_c_drill_hole() -> None:
     # Washer bounds are parent-verified ASME Table 11 exports, not head guesses.
     assert (spec.HANGER_WASHER.OD_MIN, spec.HANGER_WASHER.OD_MAX) == (12.573, 13.081)
     assert spec.HANGER_WASHER.OD_ID_RUNOUT_MAX == pytest.approx(0.3302)
-    assert spec.HANGER_WASHER_CONCENTRIC_ANNULUS_MIN == pytest.approx(3.1623)
+    assert spec.HANGER_WASHER_CONCENTRIC_ANNULUS_MIN == pytest.approx(3.0607)
     assert part.STUD_Z_REAR + spec.HANGER_WASHER.OD_MAX/2 < part.INNER_Z+part.GUSSET
 
 
@@ -3676,8 +3678,9 @@ def test_knockouts_land_the_punch_and_keep_their_walls() -> None:
     largest knockout still lands on the pressed end's flat.  The knockout
     prints two places, Ø1.70, under the DRILLED HOLES row (machinist review,
     run 20261027T175429300Z).  It keeps its walls where its shift is
-    greatest, at the top, a land inside the top break and a continuous
-    washer bearing ring inside it."""
+    greatest, at the top, and a land inside the top break; the washer over
+    it bears on its width round the hole (owner ruling 2026-11-24, fit
+    audit C12, option A), not on an unbroken ring inside it."""
     from pathlib import Path as _Path
 
     from _hole_spec import HoleSpec, NUMBER_DRILL_MM
@@ -3807,23 +3810,18 @@ def test_knockouts_land_the_punch_and_keep_their_walls() -> None:
         near - knockout_r - clearance_r - part.HANGER_DRIFT_AT_TOP
     )
     assert part.KNOCKOUT_BAR_WALL == pytest.approx(3.097521, abs=5e-6)
-    assert part.KNOCKOUT_SCREW_WALL == pytest.approx(2.956542, abs=5e-6)
+    assert part.KNOCKOUT_SCREW_WALL == pytest.approx(2.854942, abs=5e-6)
     assert min(part.KNOCKOUT_BAR_WALL, part.KNOCKOUT_SCREW_WALL) >= 2.032
     assert part.KNOCKOUT_TOP_BREAK_LAND == pytest.approx(
         reach - part.EDGE_BREAK_PRINTED_MAX - spec.HANGER_PIN_X
         - spec.HANGER_PIN_X_TOL - knockout_r - shift
     )
     assert part.KNOCKOUT_TOP_BREAK_LAND == pytest.approx(1.319521, abs=5e-6)
-    # The knockout exits under the washer: the washer still bears on a
-    # continuous ring inside the knockouts at every printed limit.
-    offset = part.HANGER_WASHER_OFFSET_MAX
-    assert near - knockout_r < washer.OD_MAX / 2.0 + offset
-    ring = min(washer.OD_MIN / 2.0, near - knockout_r - offset) - max(
-        washer.ID_MAX / 2.0, clearance_r + offset
-    )
-    assert part.HANGER_WASHER_KNOCKOUT_RING_MIN == pytest.approx(ring)
-    assert part.HANGER_WASHER_KNOCKOUT_RING_MIN == pytest.approx(0.110710, abs=5e-6)
-    assert ring > 0.0
+    # The knockout exits under the washer; the former unbroken-ring guard is
+    # gone (owner ruling 2026-11-24, fit audit C12, option A): the washer's
+    # seat is its bearing width round the hole
+    # (test_hanger_walls_meet_the_target_after_drift).
+    assert not hasattr(part, "HANGER_WASHER_KNOCKOUT_RING_MIN")
 
 
 def test_hanger_walls_meet_the_target_after_drift() -> None:
@@ -3865,7 +3863,7 @@ def test_hanger_walls_meet_the_target_after_drift() -> None:
         assert wall == pytest.approx(print_worst - charged), label
         assert wall >= 2.032, label
     assert part.PIN_HOLE_BAR_WALL == pytest.approx(2.545071, abs=5e-6)
-    assert part.PIN_HOLE_SCREW_WALL == pytest.approx(2.404092, abs=5e-6)
+    assert part.PIN_HOLE_SCREW_WALL == pytest.approx(2.302492, abs=5e-6)
     # The band's upper deviation is the deepest hole whose tallest point
     # keeps the wall target under the faced top: a THRU ream is out of band.
     # The tallest point is the sharpest the title block's ±1° accepts, 117°,
@@ -3915,7 +3913,7 @@ def test_hanger_walls_meet_the_target_after_drift() -> None:
         station - off - spec.HANGER_KNOCKOUT_DIA_MAX / 2.0
         - part.HANGER_KNOCKOUT_SHIFT_AT_TOP
     )
-    assert pocket["hanger clearance hole"] == pytest.approx(16.131177189775258)
+    assert pocket["hanger clearance hole"] == pytest.approx(16.029577189775253)
     assert pocket["dowel ream"] == pytest.approx(17.508659, abs=5e-6)
     assert pocket["dowel knockout"] == pytest.approx(18.061109, abs=5e-6)
 
@@ -3948,7 +3946,7 @@ def test_washer_support_on_the_faced_top_charges_all_printed_limits() -> None:
         knife_mount.KNIFE_BORE_POSITION_TOL,
     ) == pytest.approx((0.127, 0.0254, 0.2032))
     slip = dowel.SLIP_CLEARANCE_MAX
-    assert slip == pytest.approx(0.09144)  # .0036
+    assert slip == pytest.approx(0.18796)  # .0074, the #30 drill (fit audit OQ19)
     off = spec.HANGER_PIN_X_TOL
     tap = knife_mount.STUD_TAP_POSITION_TOL / 2.0
     perp = knife_mount.DOWEL_HOLE_PERPENDICULARITY_TOL  # B's round hole
@@ -3972,11 +3970,11 @@ def test_washer_support_on_the_faced_top_charges_all_printed_limits() -> None:
         math.atan(2.0 * line / (spec.STUD_Z_REAR - spec.STUD_Z_FRONT)) + play
     )
     assert part.HANGER_BAR_YAW_SHIFT == pytest.approx(yaw_shift)
-    assert yaw_shift == pytest.approx(0.09282, abs=5e-5)
+    assert yaw_shift == pytest.approx(0.09690, abs=5e-5)
     assert part.HANGER_SEAT_BOLT_MISMATCH == pytest.approx(
         math.hypot(block, block + yaw_shift)
     )
-    assert part.HANGER_SEAT_BOLT_MISMATCH == pytest.approx(0.42278624450066854)
+    assert part.HANGER_SEAT_BOLT_MISMATCH == pytest.approx(0.4935713855058345)
     assert spec.HANGER_WASHER_FLOAT_MAX == pytest.approx(
         (spec.HANGER_WASHER.ID_MAX-spec.HANGER_SCREW.SHANK_DIA_MIN)/2,
     )
@@ -3990,7 +3988,7 @@ def test_washer_support_on_the_faced_top_charges_all_printed_limits() -> None:
         + part.HANGER_DRIFT_AT_TOP
         + spec.HANGER_WASHER.OD_ID_RUNOUT_MAX
     )
-    assert part.HANGER_WASHER_OFFSET_MAX == pytest.approx(1.5188054734235261)
+    assert part.HANGER_WASHER_OFFSET_MAX == pytest.approx(1.5895906144286922)
     reach = spec.HANGER_WASHER.OD_MAX / 2.0 + part.HANGER_WASHER_OFFSET_MAX
     # Inside the top break's printed worst leg at the narrowest printed bar
     # half width, centred on D.
@@ -4001,7 +3999,7 @@ def test_washer_support_on_the_faced_top_charges_all_printed_limits() -> None:
         - part.EDGE_BREAK_PRINTED_MAX
         - reach
     )
-    assert part.HANGER_WASHER_BAR_TOP_MARGIN == pytest.approx(2.2276945265764727)
+    assert part.HANGER_WASHER_BAR_TOP_MARGIN == pytest.approx(2.156909385571307)
     # Clear of the outer front/rear rail ends: each washer's Z reach is its
     # station band plus the print-worst reach; the rail's outer face is the
     # narrowest printed half flange past its socket axis. The stations stand
@@ -4017,11 +4015,11 @@ def test_washer_support_on_the_faced_top_charges_all_printed_limits() -> None:
     rear_end_wall = part.REAR_COLUMN_Z - part.STUD_Z_REAR + half_flange - z_reach
     assert front_end_wall < rear_end_wall
     assert part.HANGER_WASHER_OUTER_END_WALL == pytest.approx(front_end_wall)
-    assert part.HANGER_WASHER_OUTER_END_WALL == pytest.approx(31.539282307003003)
+    assert part.HANGER_WASHER_OUTER_END_WALL == pytest.approx(31.46849716599784)
     assert part.HANGER_WASHER_BEARING_MIN == pytest.approx(
         spec.HANGER_WASHER_CONCENTRIC_ANNULUS_MIN - part.HANGER_WASHER_OFFSET_MAX
     )
-    assert part.HANGER_WASHER_BEARING_MIN == pytest.approx(1.643494526576474)
+    assert part.HANGER_WASHER_BEARING_MIN == pytest.approx(1.471109385571308)
     assert part.HANGER_WASHER_BAR_TOP_MARGIN > 0.0 and part.HANGER_WASHER_BEARING_MIN > 0.0
     assert part.HANGER_WASHER_OUTER_END_WALL >= 2.032
     # The spotface guards are gone, not aliased.
@@ -4869,21 +4867,22 @@ def test_ream_size_parks_above_the_plan() -> None:
             assert _segment_gap(leader, line) >= ink, name
 
 
-def test_hanger_callout_states_c_drill_thru_on_the_native_rows(monkeypatch) -> None:
+def test_hanger_callout_states_e_drill_thru_on_the_native_rows(monkeypatch) -> None:
     """The plain wizard's native callout keeps its variable-driven diameter,
     leads with the letter drill and reads THRU for its one extent token
-    (owner ruling 2026-11-06: 2X C DRILL Ø.242 THRU); no spotface row,
+    (owner ruling 2026-11-24, fit audit OQ19: 2X E DRILL Ø.250 THRU); no
+    spotface row,
     method note or depth survives."""
     import ast
 
-    assert spec.HANGER_HOLE_DRILL == "C"
-    assert drawing.HANGER_HOLE_PROCESS_TEXT == "C DRILL "
+    assert spec.HANGER_HOLE_DRILL == "E"
+    assert drawing.HANGER_HOLE_PROCESS_TEXT == "E DRILL "
     assert drawing.HANGER_HOLE_EXTENT_TEXT == "THRU"
     # The installed R2026x calloutformat.txt, [ANSI INCH] line 93:
     # HOLE-THRU=;<MOD-DIAM> <hw-diam> <hw-thru>
     native = "<MOD-DIAM> <hw-diam> <hw-thru>"
     assert drawing._hanger_hole_callout_definitions({5: native, 6: "", 7: "", 8: ""}) == {
-        5: "C DRILL <MOD-DIAM> <hw-diam> THRU", 6: "", 7: "", 8: "",
+        5: "E DRILL <MOD-DIAM> <hw-diam> THRU", 6: "", 7: "", 8: "",
     }
     counterbore = (
         "<MOD-DIAM> <hw-thruholedia> <hw-thru>\n"
@@ -4903,7 +4902,7 @@ def test_hanger_callout_states_c_drill_thru_on_the_native_rows(monkeypatch) -> N
             drawing._hanger_hole_callout_definitions(stale)
 
     resolved_tokens = {
-        "<MOD-DIAM>": "\u00d8", "<hw-diam>": "6.147", "<hw-thru>": "THRU ALL",
+        "<MOD-DIAM>": "\u00d8", "<hw-diam>": "6.350", "<hw-thru>": "THRU ALL",
     }
 
     class Display:
@@ -4934,7 +4933,7 @@ def test_hanger_callout_states_c_drill_thru_on_the_native_rows(monkeypatch) -> N
     )
     display = Display()
     drawing._set_hanger_hole_callout(display)
-    assert display.GetText(1) == "C DRILL \u00d8 6.147 THRU"
+    assert display.GetText(1) == "E DRILL \u00d8 6.350 THRU"
     assert calls == [
         ("places", {"hw-diam": spec.HANGER_CLEARANCE_DIA_PLACES}), "band",
     ]
@@ -4954,7 +4953,7 @@ def test_hanger_callout_states_c_drill_thru_on_the_native_rows(monkeypatch) -> N
         and any(
             keyword.arg == "label"
             and isinstance(keyword.value, ast.Constant)
-            and keyword.value.value == "2X C drill hanger clearance holes"
+            and keyword.value.value == "2X E drill hanger clearance holes"
             for keyword in node.keywords
         )
     ]

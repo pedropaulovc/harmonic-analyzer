@@ -685,6 +685,9 @@ diameter_mm = 6.0452
 [tools.drill-c]  # Drills C
 description = "C (.2420 in) drill, 115-piece index"
 diameter_mm = 6.1468
+[tools.drill-e]  # Drills E; MHA-FR-02 2X E DRILL THRU (owner ruling 2026-11-24, fit audit OQ19)
+description = "E (.2500 in) drill, 115-piece index"
+diameter_mm = 6.35
 [tools.drill-n]  # Drills N
 description = "N (.3020 in) drill, 115-piece index"
 diameter_mm = 7.6708

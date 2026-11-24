@@ -15,7 +15,7 @@ boss-hook / counter-spring / gooseneck chain.
 * knife-hanger-stud x2 -- McMaster 92314A253 #10-24 plain hex bolts from
   2 in stock, each cut at this assembly to the stack measured at its hole
   plus the .351 +/-.005 in fit-up reach (46.70 mm nominal under the head);
-  each passes the crossbar's #10 clearance hole (C drill) and threads into the
+  each passes the crossbar's #10 clearance hole (E drill) and threads into the
   knife-mount tap.
 * knife-hanger-washer x2 -- new McMaster 96659A104 18-8 SAE washers,
   one beneath each hex head, seated on the crossbar's faced top.
@@ -53,7 +53,7 @@ boss-hook / counter-spring / gooseneck chain.
 Cross-subassembly fits (checked at the top level): the channel springs
 (ch-channel.SLDASM) thread the summing-lever plate's O4.5 holes -- gated
 analytically by build_ch_channel_assembly._assert_plate_threading; the knife-
-hanger bolts pass the top-frame crossbar's O6.147 clearance holes and clamp
+hanger bolts pass the top-frame crossbar's O6.35 clearance holes and clamp
 through their washers on its faced top; the knife-mount dowels press into
 its blind reams (fr-frame.SLDASM); the gooseneck's bare leg drops
 through the casting's rail-hub bore, gripped by its 1/4-20 set screw.
@@ -209,8 +209,8 @@ KNIFE_DOWEL_ROWS = [[1.0, 0.0, 0.0], [0.0, -1.0, 0.0], [0.0, 0.0, -1.0]]
 # The one dowel's station from the bolt axis, +X (datum B): 7.62 along X
 # (Owner ruling 2026-11-08 (Pedro), #2144 item 11.3).
 KNIFE_DOWEL_X_OFFSETS = (knife_mount.PIN_HOLE_X,)
-# The bolt must pass the crossbar's #10 clearance hole (a C drill, owner
-# ruling 2026-11-06) at the printed-band
+# The bolt must pass the crossbar's #10 clearance hole (an E drill, owner
+# ruling 2026-11-24, fit audit OQ19) at the printed-band
 # worst case (drawing-guidelines.md rule 19 (absorb stacks)) when every
 # station sits at its limit.  Owner ruling 2026-11-08 (Pedro), #2144 item
 # 11.3 (scheme S1): one dowel (pressed into the crossbar, slipping into
@@ -279,9 +279,9 @@ HANGER_SCREW_MISMATCH_Z = KNIFE_BLOCK_SHIFT + KNIFE_BAR_YAW_SHIFT
 HANGER_SCREW_MISMATCH = math.hypot(HANGER_SCREW_MISMATCH_X, HANGER_SCREW_MISMATCH_Z)
 # The hole is drilled from the finished underside. Prove drift over the FULL
 # crossbar body to the hole's top end at the faced top, at the longest
-# printed grip: tan(0.3 deg) * (36.50 + 0.13) = 0.1918. The #10 C drill
-# hole's 0.6604 radial float covers this plus the station mismatch,
-# 0.4228, with 0.0458 spare (HANGER_SCREW_FLOAT_SPARE).
+# printed grip: tan(0.3 deg) * (36.50 + 0.13) = 0.1918. The #10 E drill
+# hole's 0.762 radial float covers this plus the station mismatch,
+# 0.4936, with 0.0766 spare (HANGER_SCREW_FLOAT_SPARE).
 HANGER_SCREW_DRIFT = top_frame.DRILL_DRIFT_PER_MM * (
     top_frame.HANGER_GRIP + top_frame.HANGER_GRIP_TOL
 )
@@ -380,18 +380,18 @@ KNIFE_FREE_ROCK_FLOOR_DEG = spec.KNIFE_FREE_ROCK_FLOOR_DEG
 # chamfer (the ream's full diameter runs past the deepest pressed end, owner
 # decision 2026-11-19, #3124 item 3); in the block its shortest printed
 # full-diameter depth (both holes end in drill points, #3124 items 3 and 4)
-# less KNIFE_REAM_LEAD_ALLOWANCE.  The proud pin (PROUD_MAX, set at
+# less KNIFE_HOLE_WALL_ALLOWANCE.  The proud pin (PROUD_MAX, set at
 # assembly) bears in the hole over its full-diameter length short of its
 # rounded free end, and the tightest slip takes a relative tilt of at most
 # atan(SLIP_CLEARANCE_MIN / that length) before the pin binds.
 #
-# The lead allowance is conservatism beyond the print, not an admission of
-# an undersize tail: the block hole's band applies over its full-diameter
-# depth, so a conforming hole is full size to there (a bevel-lead reamer's
-# undersize tail would be non-conforming).  The proof simply declines to
-# count the last 0.5 of the wall towards the length that limits the tilt
-# (codjiflo round 6).
-KNIFE_REAM_LEAD_ALLOWANCE = 0.5
+# The wall allowance is conservatism beyond the print, not an admission of
+# an undersize tail: the block hole's #30 drill (owner ruling 2026-11-24,
+# fit audit OQ19) is full size to its printed full-diameter depth.  The
+# proof simply declines to count the last 0.5 of the wall towards the
+# length that limits the tilt (codjiflo round 6, then against a reamer's
+# lead).
+KNIFE_HOLE_WALL_ALLOWANCE = 0.5
 # ASSUMPTION, not a drawing control: the crossbar underside under the
 # block's 25.4 x 14 seat and the block's face-milled top seat conform,
 # clamped, to within 0.01 across the seat's shortest printed depth (14.0 -
@@ -408,7 +408,7 @@ KNIFE_DOWEL_TILT_ALLOWED_DEG = math.degrees(
 )
 _KNIFE_REAM_TILT_WALL = knife_dowel.INSERTION_MIN - knife_dowel.CHAMFER_LEN
 _KNIFE_HOLE_TILT_WALL = (
-    knife_dowel.SLIP_DEPTH - knife_dowel.SLIP_DEPTH_TOL - KNIFE_REAM_LEAD_ALLOWANCE
+    knife_dowel.SLIP_DEPTH - knife_dowel.SLIP_DEPTH_TOL - KNIFE_HOLE_WALL_ALLOWANCE
 )
 KNIFE_DOWEL_TILT_REAM_DEG = math.degrees(
     math.atan(top_frame.HANGER_PRESS_HOLE_PERPENDICULARITY_TOL / _KNIFE_REAM_TILT_WALL)
