@@ -25,10 +25,7 @@ demoted:
   dt_cone_gear_tl_index_plate: fit-batch-dt
   dt_cone_gear_tl_phasing_comb: fit-batch-dt
   dt_cone_pivot_post: fit-batch-dt
-  dt_cone_swing_platform: fit-batch-dt
-  dt_cone_tip_block: fit-batch-dt
   dt_cone_tip_bushing: fit-batch-dt
-  dt_cone_tip_end_screw: fit-batch-dt
   dt_cone_tip_gear: fit-batch-dt
   dt_cone_tip_gear_tl_cutter_assembly: fit-batch-dt
   dt_cone_tip_gear_tl_cutter_bar: fit-batch-dt

@@ -4,7 +4,7 @@ The small adjuster-support block at the thin end of the cone shaft. It stands
 on the swing platform beside the pivot and carries the end screw (MHA-DT-39,
 a 1/4-28 slotted fillister threaded through it from the north face); the
 screw's end stands proud of the south face, bears on the brass bushing on
-T006's pivot and carries that pivot in its reamed hole, which sets the shaft's
+T006's pivot and carries that pivot in its drilled hole, which sets the shaft's
 end play (owner decision C1 keyed, 2026-11-09, PR #1992). The block and whole
 cone set swing as one unit about the platform's pivot axis.
 
@@ -24,7 +24,7 @@ Layout: block standing on the Top plane, plan centred on the origin,
 adjuster axis along Z at y = ADJUSTER_AXIS_HEIGHT (the assembly rotates the
 block about Y to align it with the cone axis). Named "adjuster axis" for the
 view-independent coaxial mate to the end screw, and "dowel axis"
-(vertical through the MHA-DT-VN-69 locating dowel's press ream; rule-23
+(vertical through the MHA-DT-VN-69 locating dowel's bonded hole; rule-23
 retention, owner ruling 2026-11-07 (MHA-DT-00 rubric sample, PR #2248)) for
 the dowel's mate.
 
@@ -74,10 +74,8 @@ from dt_cone_tip_block_spec import (
     BLOCK_X,
     BLOCK_Z,
     DOWEL_FROM_TAP,
-    DOWEL_HOLE_BAND,
     DOWEL_HOLE_DEPTH,
     DOWEL_HOLE_DIA,
-    DOWEL_HOLE_PLACES,
     DOWEL_X,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
@@ -292,7 +290,7 @@ def build(adapter) -> dict[str, str]:
     set_global(adapter, "FootTapX", '"BlockX" / 2 + "FootTapOffsetX"')
     set_global(adapter, "FootTapZ", '"BlockZ" / 2')
     # Rule-23 retention, owner ruling 2026-11-07 (MHA-DT-00 rubric sample, PR
-    # #2248): the locating dowel's station and press ream.
+    # #2248): the locating dowel's station and drilled hole.
     set_global(adapter, "DowelFromTap", f"{DOWEL_FROM_TAP}mm")
     set_global(adapter, "DowelHoleDia", f"{DOWEL_HOLE_DIA}mm")
     set_global(adapter, "DowelHoleDepth", f"{DOWEL_HOLE_DEPTH}mm")
@@ -458,8 +456,8 @@ def build(adapter) -> dict[str, str]:
     volume = volume_check(adapter, "foot tap", volume - v_foot, 0.03 * v_foot)
 
     # Locating dowel (rule-23 retention, owner ruling 2026-11-07 (MHA-DT-00
-    # rubric sample, PR #2248)): a flat-bottomed press
-    # ream up into the foot, the MHA-DT-VN-69 pin pressed to its floor up
+    # rubric sample, PR #2248)): a 1/16 drilled hole
+    # up into the foot, the MHA-DT-VN-69 pin bonded to its floor up
     # through the platform, on the tap's line DOWEL_FROM_TAP toward +X.
     # Match-drilled up through MHA-DT-20 at MHA-DT-00 step post-and-tip-block,
     # modelled at its nominal station.  The Top plane IS the foot, so the cut
@@ -638,15 +636,6 @@ def build(adapter) -> dict[str, str]:
         "Width",
         *deviations(BLOCK_WIDTH_BAND),
         places=BLOCK_WIDTH_PLACES,
-        display_unit=UNIT,
-    )
-    # The dowel's press ream carries its REAM_H7 at four places.
-    set_dimension_bilateral_tolerance(
-        adapter,
-        "DowelProfile",
-        "DowelHoleDia",
-        *deviations(DOWEL_HOLE_BAND),
-        places=DOWEL_HOLE_PLACES,
         display_unit=UNIT,
     )
     # Model-owned places are applied only after the reference sketches exist.

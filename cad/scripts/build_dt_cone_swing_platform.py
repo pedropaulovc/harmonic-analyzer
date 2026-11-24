@@ -82,10 +82,8 @@ from _sketch_circle import define_circle
 from _drawing_precision import apply_drawing_precision
 from _drawing_marks import apply_drawing_properties, clear_dimensions_for_drawing, mark_dimensions_for_drawing
 from _drawing_tolerances import (
-    set_dimension_bilateral_tolerance,
     set_dimension_symmetric_tolerance,
 )
-from _fit_deviations import deviations
 from _holes import wizard_holes
 from _part_pmi import author_part_pmi
 from _visibility import blank_reference_geometry
@@ -150,7 +148,6 @@ from dt_cone_swing_platform_spec import (
     POST_MOUNT_TAP_DIA,
     SURFACE_FINISHES,
     TIP_DOWEL_FROM_HOLDDOWN,
-    TIP_DOWEL_HOLE_BAND,
     TIP_DOWEL_HOLE_DIA,
     TIP_DOWEL_LOCAL_X,
     TIP_DOWEL_LOCAL_Z,
@@ -1000,20 +997,12 @@ def build(adapter) -> dict[str, str]:
     )
     # The tip-block locating dowel's station carries the hold-down's band
     # (the webs to its counterbore here and to MHA-DT-21's +X face close on
-    # it); the slip ream its REAM_H7, at the nominal's four places.
+    # it); the #52 hole prints its drill, no band.
     set_dimension_symmetric_tolerance(
         adapter,
         "TipDowelProfile",
         "TipDowelX",
         TIP_DOWEL_STATION_TOL_MM,
-        display_unit=UNIT,
-    )
-    set_dimension_bilateral_tolerance(
-        adapter,
-        "TipDowelProfile",
-        "TipDowelDia",
-        *deviations(TIP_DOWEL_HOLE_BAND),
-        places=DRAWING_PRECISION["TipDowelProfile"]["TipDowelDia"],
         display_unit=UNIT,
     )
     volume_check(

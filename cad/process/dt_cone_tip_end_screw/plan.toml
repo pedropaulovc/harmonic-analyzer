@@ -1,36 +1,32 @@
 # Cone tip end screw MHA-DT-39, one off: a bought McMaster-Carr 91794A559
 # (18-8 stainless, 1/4-28 x 3/4 slotted fillister head) with the one added
-# operation the sheet asks for, a Ø.0630 +.0005/.0000 hole reamed .12 deep,
-# concentric in its threaded end (owner decision C1, PR #1992). On the manual
-# PM-1127VF-LB (owner ruling 2026-11-21: turned parts get lathe travelers, no
-# NC). Route chosen for speed: one chucking.
+# operation the sheet asks for, a #52 hole drilled .12 deep at full diameter,
+# concentric in its threaded end (owner decision C1, PR #1992; owner ruling
+# 2026-11-24, fit audit question 11: drilled #52, no longer reamed .0630).
+# On the manual PM-1127VF-LB (owner ruling 2026-11-21: turned parts get
+# lathe travelers, no NC). Route chosen for speed: one chucking.
 # Setup 1: the 6 in 4-jaw (on hand, cad/config/shop-equipment/fixtures.toml
 # chuck-4jaw-6) on the threaded shank over a brass shim wrap, on the jaws'
 # front step only, the head behind it clear of the jaws; the thread crests
 # dialled in with the DTI. The hole's wall to the thread's minimum minor is
-# .0679 at a centred hole against the printed .067 MIN, so the hole may sit
-# only .0009 off the thread's axis: the crests are dialled to .0005 TIR (an
-# offset of .00025) before anything cuts. The threaded end is left as
-# supplied (the sheet keeps all purchased geometry). Spot, drill #53 .15
-# deep, ream .0630 to .12 by the quill scale, check depth and size with the
-# Class ZZ pins before unchucking. Bench: break the hole's mouth, clean.
+# .0659 at a centred hole at the drilled row's largest .0675 against the
+# printed .065 MIN, so the hole may sit only .0009 off the thread's axis: the
+# crests are dialled to .0005 TIR (an offset of .00025) before anything
+# cuts. The threaded end is left as supplied (the sheet keeps all purchased
+# geometry). Spot, drill #52 by the quill scale, check the depth with the
+# drill's own shank before unchucking. Bench: break the hole's mouth, clean.
 #
 # Bought, not stock (owner ruling 2026-11-20, #2368, as MHA-DT-09): no stock
-# row; the stock BOM reads the registry SKU. Not on hand (cad/config/
-# shop-equipment/, to order): the .0630 reamer (tools-reamers-taps.toml
-# reamer-0630) and the hole's two Class ZZ pins, .0630 plus (GO) and .0635
-# minus (NO-GO), shop dt.toml zz-pins-0630-0635. Owner ruling 2026-11-23
-# (tool audit Q1, re-answered on the corrected facts), verbatim: "ZZ singles
-# per the record: 29 pins (17 plus GO, 12 minus NO-GO), about $130. Accept
-# that good holes near a limit may be refused; the traveler mikes each pin so
-# the real window is known per pin." Setup 1 opens by miking both pins and
-# the reamer; the hole is accepted between the two pins' written readings.
+# row; the stock BOM reads the registry SKU. Every tool is on hand: the #52
+# drill is in the owned 115-piece index (tools-drills.toml drill-52). The
+# .0630 reamer and its Class ZZ pins (reamer-0630, zz-pins-0630-0635) are no
+# longer needed.
 title = "Cone Tip End Screw"
 part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
 material = "18-8 stainless steel, McMaster-Carr 91794A559 (1/4-28 x 3/4 in slotted fillister head screw), as supplied"
 stock = "Lot: {{process.quantity:d}} screw, bought: McMaster-Carr 91794A559, used as supplied but for the added hole."
-note = "Inches unless mm. Lathe PM-1127VF-LB (70–380 and 380–2000 rpm); cutting oil on the stainless. To order (not on hand): the .0630 chucking reamer and the two Class ZZ pins, .0630 plus (GO) and .0635 minus (NO-GO). The screw's thread, head and slot are left as bought."
+note = "Inches unless mm. Lathe PM-1127VF-LB (70–380 and 380–2000 rpm); cutting oil on the stainless. The screw's thread, head and slot are left as bought."
 shop = "../shop"
 material_key = "lathe-18-8"
 
@@ -50,17 +46,11 @@ blank_z_in = 0.414
 # DTI's tip on the crests and for the drill chuck, the head and .35 of the
 # shank behind it.
 stickout_in = 0.4
-# The #53 drill's full diameter goes .03 past the reamed depth, so the
-# reamer's end never meets the drill point's cone.
-drill_depth_mm = 3.81
-# The Class ZZ pins (shop dt.toml zz-pins-0630-0635; owner ruling 2026-11-23,
-# tool audit Q1): GO a plus pin at the band's low limit, true size .0630 to
-# .0632; NO-GO a minus pin at the high limit, .0633 to .0635 (one pin's ZZ
-# tolerance, .0002, is the record's resolution_mm 0.00508). The largest GO
-# pin and the smallest NO-GO pin a sheet may use: with both pins there, a
-# hole is sure to pass only between them, the middle .0001 of the .0005 band.
-go_pin_max_in = 0.0632
-nogo_pin_min_in = 0.0633
+# The #52 drill's quill reading, from the lips touching the spot's rim: its
+# full diameter then stands about .007 above the face (the Ø.04 spot under
+# the drill's 118-degree point), so .125 on the scale leaves about .118 at
+# full diameter, inside the sheet's .11–.13.
+drill_depth_mm = 3.175
 
 [[tools]]
 id = "centre"
@@ -68,21 +58,9 @@ name = "No. 1 centre drill"
 ref = "centre-drills-carbide-60"
 
 [[tools]]
-id = "drill-53"
-name = "#53 drill"
-ref = "drill-53"
-
-[[tools]]
-id = "reamer"
-name = ".0630 chucking reamer"
-ref = "reamer-0630"
-status = "to_order"
-
-[[tools]]
-id = "pins"
-name = "Class ZZ pins: .0630 plus (GO) and .0635 minus (NO-GO)"
-ref = "zz-pins-0630-0635"
-status = "to_order"
+id = "drill-52"
+name = "#52 drill"
+ref = "drill-52"
 
 [[tools]]
 id = "deburr"
@@ -91,36 +69,19 @@ ref = "deburring-set"
 
 [[setups]]
 machine_kind = "lathe"
-title = "4-jaw on the thread: dial in, spot, drill and ream the end hole"
+title = "4-jaw on the thread: dial in, spot and drill the end hole"
 machine = "PM-1127VF-LB lathe"
 indexing = "none"
 machine_ref = "pm-1127vf-lb"
 holding = "6 in 4-jaw on the threaded shank over a wrap of brass shim (it keeps the jaws off the thread), on the jaws' front step only: the head sits behind that step, clear of the jaws, and the threaded end stands {{process.stickout_in:.2dot}} in out of the jaw fronts. Jaws snug, then dialled in (Op 40) and tightened in turn."
 datum = "The threaded end face as bought: the hole's depth is measured from it (the tailstock quill scale zeroed on it)."
 lathe_hold = "other"
-diagram = { file = "diagrams/lathe.svg", alt = "The bought screw in the 4-jaw on the jaws' front step over brass shim, the head behind the step clear of the jaws, the threaded end .40 out: the crests dialled in, the end hole spotted, drilled #53 and reamed .0630 from the tailstock." }
-
-[[setups.operations]]
-cut_kind = "other"
-instruction = "Before chucking: on the 0–1 in micrometer (reads .0001; trust a reading to ±.00005), mike the {{cad.end_hole_dia_min_in:.4dot}} GO pin, the {{cad.end_hole_dia_max_in:.4dot}} NO-GO pin, and the reamer across two opposite margins at its front end. Write the three readings here, and each pin's reading on its tag."
-inspection = "GO pin reads {{cad.end_hole_dia_min_in:.4dot}}–{{process.go_pin_max_in:.4dot}}, NO-GO pin {{process.nogo_pin_min_in:.4dot}}–{{cad.end_hole_dia_max_in:.4dot}}: a pin outside its range is not used. The reamer reads under the NO-GO pin's reading, else it is not used: stop and tell the owner."
-gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.end_hole_dia_band_mm}}" }]
-feed = "hand"
-
-[[setups.operations]]
-cut_kind = "other"
-instruction = "This sheet accepts a hole the GO pin enters and the NO-GO pin does not: GO reading ≤ hole < NO-GO reading. With both pins at their size limits only {{process.go_pin_max_in:.4dot}}–{{process.nogo_pin_min_in:.4dot}} is sure to pass; a good hole within .0002 of either band limit may be refused (owner ruling 2026-11-23)."
-feed = "hand"
-
-[[setups.operations]]
-cut_kind = "other"
-instruction = "Only if the reamer read under the GO pin: first chuck an 18-8 stainless offcut, 1/4 in or over (a spare 91794A559 serves), as Holding says, and spot, drill and ream its end as Ops 50–70; gauge it as Op 80. The GO pin enters: go on with the screw. Refused: stop and tell the owner (the pins refuse this reamer's holes)."
-feed = "hand"
+diagram = { file = "diagrams/lathe.svg", alt = "The bought screw in the 4-jaw on the jaws' front step over brass shim, the head behind the step clear of the jaws, the threaded end .40 out: the crests dialled in, the end hole spotted and drilled #52 from the tailstock." }
 
 [[setups.operations]]
 cut_kind = "other"
 instruction = "Dial in: lay the .100 gauge block flat on the thread crests across the axis, its edge flush with the screw's end (its .35 width bridges about ten pitches, so the thread form cannot move the needle), the DTI's tip on its top; turn the chuck slowly by hand, a fingertip keeping the block from turning, and bring the jaws in a pair at a time until the needle moves .0005 or less in a turn. Check again after the last jaw is tightened."
-inspection = "Thread crests run out .0005 or less, DTI on the .100 gauge block. The hole then sits within .00025 of the thread's axis: the wall has .0009 to spare against its .067 MIN."
+inspection = "Thread crests run out .0005 or less, DTI on the .100 gauge block. The hole then sits within .00025 of the thread's axis: the wall has .0009 to spare against its .065 MIN."
 gauge_checks = "other"
 feed = "hand"
 
@@ -130,48 +91,38 @@ speed_kind = "spindle"
 tool = "centre"
 drilling = "none"
 sizing = "other"
-instruction = "Spot the centre of the end from the tailstock with the No. 1 centre drill, only the point's cone, about Ø.04 across: under the #53 drill, so the drill removes it and the mouth keeps no countersink."
+instruction = "Spot the centre of the end from the tailstock with the No. 1 centre drill, only the point's cone, about Ø.04 across: under the #52 drill, so the drill removes it and the mouth keeps no countersink."
 settings = "lathe-centre-18-8"
 cut_diameter_mm = 1.0
 
 [[setups.operations]]
 cut_kind = "other"
 speed_kind = "spindle"
-tool = "drill-53"
+tool = "drill-52"
 drilling = "twist_drill"
 sizing = "other"
-instruction = "Feed the #53 drill in until its lips just touch the spot's rim and zero the tailstock quill scale there. Drill until the scale reads {{process.drill_depth_mm:in.2dot}}, backing fully out to clear chips every .06 in (once its own diameter). It leaves the reamer about .0018 a side."
-settings = "lathe-drill-53-18-8"
-cut_diameter_mm = 1.5113
+instruction = "Feed the #52 drill in until its lips just touch the spot's rim and zero the tailstock quill scale there. Drill until the scale reads {{process.drill_depth_mm:in.3dot}}, backing fully out to clear chips every .06 in (once its own diameter), then withdraw."
+settings = "lathe-drill-52-18-8"
+cut_diameter_mm = 1.6129
 hole_depth_mm = "{{process.drill_depth_mm}}"
-peck = { step_mm = 1.5113, retract = "full" }
-peck_reason = "18-8 makes stringy chips that pack in a .0595 drill's flutes and snap it: backing fully out every .06 clears them and lets fresh oil in"
+peck = { step_mm = 1.6129, retract = "full" }
+peck_reason = "18-8 makes stringy chips that pack in a .0635 drill's flutes and snap it: backing fully out every .06 clears them and lets fresh oil in"
 
 [[setups.operations]]
 cut_kind = "other"
-speed_kind = "spindle"
-tool = "reamer"
-drilling = "none"
-sizing = { kind = "band", band_mm = "{{cad.end_hole_dia_band_mm}}" }
-instruction = "Ream .0630 from the tailstock: spindle running, feed the reamer in until its end chamfer just meets the drilled hole's mouth and zero the quill scale there; ream until the scale reads {{cad.end_hole_depth_in:.2dot}}, then withdraw with the spindle still running."
-settings = "lathe-ream-0630-18-8"
-cut_diameter_mm = "{{cad.end_hole_dia_mm}}"
-
-[[setups.operations]]
-cut_kind = "other"
-instruction = "Still chucked, spindle stopped, the tailstock left locked and only the quill wound back, the hole blown clean: the GO pin enters to the bottom and the NO-GO pin does not enter. Caliper the GO pin's length; with it at the bottom, read how far it stands out of the end face with the calipers' depth rod; its length less that is the depth."
-inspection = "GO enters, NO-GO does not: hole Ø{{cad.end_hole_dia_min_in:.4dot}}–{{cad.end_hole_dia_max_in:.4dot}}; {{cad.end_hole_depth_min_in:.2dot}}–{{cad.end_hole_depth_max_in:.2dot}} deep at full diameter."
-gauge_checks = [{ gauge = "zz-pins-0630-0635", band_mm = "{{cad.end_hole_dia_band_mm}}" }, { gauge = "calipers", band_mm = "{{cad.end_hole_depth_band_mm}}" }]
+instruction = "Still chucked, spindle stopped, the tailstock left locked and only the quill wound back, the hole blown clean: take the #52 drill from the chuck and push its shank end into the hole by hand to the bottom (the square end stops where the full diameter ends). Caliper the drill's length; with it at the bottom, read how far it stands out of the end face with the calipers' depth rod; its length less that is the depth."
+inspection = "The #52 shank enters to the bottom; {{cad.end_hole_depth_min_in:.2dot}}–{{cad.end_hole_depth_max_in:.2dot}} deep at full diameter."
+gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.end_hole_depth_band_mm}}" }]
 feed = "hand"
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Shallow in Op 80 (under {{cad.end_hole_depth_min_in:.2dot}}), or the GO pin refused: blow the chips out, oil, and run the same reamer back in, spindle running, on Op 70's quill zero (the tailstock still locked), until the scale reads .125; then repeat Op 80."
+instruction = "Shallow (under {{cad.end_hole_depth_min_in:.2dot}}): blow the chips out, oil, and run the same drill back in, spindle running, on the quill zero (the tailstock still locked), until the scale reads .130; then check again as the operation before."
 feed = "hand"
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Deep (over {{cad.end_hole_depth_max_in:.2dot}}), still shallow after Op 90, the GO pin still refused (the pins cannot show the hole at or over {{cad.end_hole_dia_min_in:.4dot}}, and a reamer cannot be made to cut larger), or the NO-GO pin entering (no cut remedies it): scrapped, not reworked; make another from a new screw."
+instruction = "Deep (over {{cad.end_hole_depth_max_in:.2dot}}), or still shallow after the second pass: scrapped, not reworked; make another from a new screw."
 feed = "hand"
 
 [[setups]]
@@ -180,7 +131,7 @@ title = "Bench: break the hole's mouth, clean"
 machine = "Bench"
 envelope = "other"
 indexing = "none"
-diagram = { file = "diagrams/inspect.svg", alt = "The finished screw: the bought 1/4-28 x 3/4 fillister screw with the Ø.0630 hole reamed .12 deep in its threaded end, the mouth broken." }
+diagram = { file = "diagrams/inspect.svg", alt = "The finished screw: the bought 1/4-28 x 3/4 fillister screw with the #52 hole drilled .12 deep in its threaded end, the mouth broken." }
 vise_hold = "other"
 beam = "other"
 

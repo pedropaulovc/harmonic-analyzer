@@ -1,10 +1,11 @@
 r"""Create the machinist drawing for MHA-DT-39, the cone tip end screw.
 
 A stock McMaster 91794A559 slotted fillister screw with one shop operation:
-the pivot hole reamed concentric in its threaded end (owner decision C1
-keyed, 2026-11-09).  The MHA-DT-34 ferrule's layout: the end view, looking at
-the threaded end, carries the hole's centre mark, the cutting plane and the
-hole's reamed diameter, its model band, with REAM and the depth, the fit and
+the #52 pivot hole drilled concentric in its threaded end (owner decision C1
+keyed, 2026-11-09; owner ruling 2026-11-24, fit audit question 11).  The
+MHA-DT-34 ferrule's layout: the end view, looking at the threaded end,
+carries the hole's centre mark, the cutting plane and the hole's
+untoleranced diameter with the drill and the depth, the fit and
 its mate and the wall to the thread root below it (drawing-guidelines.md
 rules 4, 7, 12, 20, 26; dt_cone_tip_block's dowel-hole form); the
 longitudinal section A-A shows the hole on cut edges (rule 9).  Note 1 names
@@ -48,23 +49,24 @@ from _gtol_planar import PlanarFace
 from _mcmaster_91794a559 import SKU, THREAD, THREAD_CLASS
 from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
-from _printed_limits import limits
+from _printed_limits import drilled_limits, limits
 from _section_axis import create_section_axis_centerline, position_section_caption
 from _session import run_build
 import _telemetry
 from dt_cone_tip_end_screw_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
-    END_HOLE_BAND,
     END_HOLE_CALLOUT,
     END_HOLE_DEPTH,
     END_HOLE_DIA,
+    END_HOLE_DRILL,
     END_HOLE_WALL_PRINTED_IN,
     HEAD_DIA,
     HEAD_H,
     HEAD_RADIUS,
     ISOMETRIC_VIEW_SCALE,
     OVERALL_LENGTH,
+    PIVOT_NUMBER,
     SHANK_LEN,
     STOCK_NOTE,
     UNIT,
@@ -112,10 +114,11 @@ if not SECTION_CENTER[0] < HOLE_FLOOR_X < TIP_X:
 # its rim, and its text stands left of the view at mid height, its leader
 # running right to the rim: the cutting line's arrows and letters stand above
 # and below the view, right of the line, so the leader crosses neither.  The
-# model dimension prints the reamed band at its four places (r8: a native
-# cut-extrude hole callout printed two); REAM, the depth and two lines of
-# words ride below it.  The widest row is the fit's, 24 characters at ~2.48
-# mm (r7's 30-character fit row, 74.4 mm): ~60 mm, so the block spans about
+# model dimension prints the drill's size at its four places, no band (r8: a
+# native cut-extrude hole callout printed two); the drill, the depth and two
+# lines of words ride below it.  The widest row is the fit's, 19 characters,
+# under the 24 at ~2.48 mm the block was sized on (r7's 30-character fit row,
+# 74.4 mm): ~60 mm at most, so the block spans about
 # 0.017..0.077 about END_KEEP, inside the frame (0.0124) and short of the
 # head's outline (END_CENTER - HEAD_R, 0.089).  The section carries no
 # dimension.
@@ -131,8 +134,8 @@ CUT_END = (END_CENTER[0], END_CENTER[1] + HEAD_R + 0.006)
 # features-travelers.md): what this sheet prints, in the part frame (the
 # stock fillister frame, build_dt_cone_tip_end_screw: axis +Y, head up, the
 # under-head face at y = 0, the threaded end face TipFace at y =
-# -SHANK_LEN). The one shop feature is the reamed hole from TipFace: its
-# model band at four places, its depth at the title block's .XX row and the
+# -SHANK_LEN). The one shop feature is the #52 drilled hole from TipFace: its
+# drill's size at four places, its depth at the title block's .XX row and the
 # wall to the thread root it holds (the floored MIN its callout prints). The
 # head is the stock's own, printed nowhere (note 2: undimensioned purchased
 # geometry is reference): declared as the catalogue's reference size, the
@@ -184,7 +187,7 @@ requirement(
         "at": ([0.0, -SHANK_LEN, 0.0], ((_STOCK, "SHANK_LEN"),)),
         "axis": ([0.0, 1.0, 0.0], ((_STOCK, "SHANK_LEN"),)),
         "dia": (
-            limits(END_HOLE_DIA, _P["EndHoleDia"], END_HOLE_BAND, unit=UNIT),
+            drilled_limits(END_HOLE_DIA, _P["EndHoleDia"], unit=UNIT),
             ("END_HOLE_DIA", "END_HOLE_BAND", "UNIT", (_SELF, "END_KEEP")),
         ),
         "nominal_dia": (END_HOLE_DIA, ("END_HOLE_DIA",)),
@@ -193,7 +196,9 @@ requirement(
             ("END_HOLE_DEPTH", "UNIT", "END_HOLE_CALLOUT"),
         ),
         "depth_nominal": (END_HOLE_DEPTH, ("END_HOLE_DEPTH",)),
-        "process": ("ream", ("END_HOLE_CALLOUT",)),
+        "process": ("drill", ("END_HOLE_CALLOUT",)),
+        "drill": (END_HOLE_DRILL, ("END_HOLE_CALLOUT",)),
+        "mate": (PIVOT_NUMBER, ("END_HOLE_CALLOUT",)),
         "wall_min": (
             END_HOLE_WALL_PRINTED_IN * 25.4,
             ("END_HOLE_WALL_PRINTED_IN", "END_HOLE_CALLOUT"),
@@ -245,7 +250,7 @@ def build(adapter: Any) -> dict[str, str]:
             0: "Cone Tip End Screw Manufacturing Drawing",
             1: "Harmonic Analyzer hobby-machinist book drawing",
             2: "Harmonic Analyzer Project",
-            3: "cone tip end screw; McMaster 91794A559 with a reamed pivot hole",
+            3: "cone tip end screw; McMaster 91794A559 with a drilled pivot hole",
             4: "Generated from the project-owned ASME B drawing standard",
         },
     )
@@ -274,7 +279,7 @@ def build(adapter: Any) -> dict[str, str]:
         view_label="end",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
-    # Places and the reamed band are authored on the part; the sheet only
+    # Places are authored on the part; the sheet only
     # proves the import kept them.
     assert_imported_precision(
         adapter,

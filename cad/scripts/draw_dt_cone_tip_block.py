@@ -73,11 +73,13 @@ from dt_cone_tip_block_spec import (
     BLOCK_WIDTH_BAND,
     BLOCK_X,
     BLOCK_Z,
-    DOWEL_HOLE_BAND,
+    DOWEL_BOND_CLEARANCE_MAX_IN,
+    DOWEL_BOND_CLEARANCE_MM,
     DOWEL_HOLE_DEPTH,
     DOWEL_HOLE_DEPTH_PLACES,
     DOWEL_HOLE_DIA,
     DOWEL_HOLE_PRINTED_TEXT,
+    DOWEL_WEB_PRINTED_IN,
     DOWEL_X,
     DOWEL_X_PRINTED_TEXT,
     DRAWING_DIMENSIONS,
@@ -108,6 +110,7 @@ from dt_cone_tip_block_spec import (
     length_text,
     printed_value_text,
 )
+from cone_tip_cluster import RETAINING_COMPOUND
 from dt_drive_train_steps import step_ref
 
 
@@ -127,14 +130,14 @@ PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
 # Rule-23 retention, owner ruling 2026-11-07 (MHA-DT-00 rubric sample, PR
-# #2248).  The press ream's callout, under its banded diameter on
-# the bottom view: the process and its depth (rule 12; no view shows the
-# blind hole's floor, hidden lines removed and no section cut, so the depth
-# rides the callout at its .XX with the native depth symbol), then the flag
-# to the numbered note that carries the rest.  Machinist review of round 6:
-# four rows of words under the size (#2, rule 7 allows two), depth in words
-# (#3), and "TO FLOOR", an assembly instruction that the MHA-DT-00 step
-# already states (#1).
+# #2248); owner ruling 2026-11-24, fit audit question 11.  The drilled
+# hole's callout, under its untoleranced size on the bottom view: the drill
+# and its depth (rule 12; no view shows the blind hole's floor, hidden lines
+# removed and no section cut, so the depth rides the callout at its .XX
+# with the native depth symbol), the +X web's shortfall under the .080
+# target (rule 20), then the flag to the numbered note that carries the
+# rest.  Machinist review of round 6: depth in words (#3), and "TO FLOOR",
+# an assembly instruction that the MHA-DT-00 step already states (#1).
 DOWEL_PIN_NUMBER = _config.parts("dt-vn-locating-pin")["number"]
 PLATFORM_NUMBER = _config.parts("dt-cone-swing-platform")["number"]
 TIP_GEAR_NUMBER = _config.parts("dt-cone-tip-gear")["number"]
@@ -142,30 +145,36 @@ POST_NUMBER = _config.parts("dt-cone-pivot-post")["number"]
 if POST_NUMBER != AXIS_HEIGHT_MATCH_MATE:
     raise AssertionError("the axis height's matched mate is not the pivot post")
 DOWEL_NOTE_NUMBER = 1
+DOWEL_HOLE_DRILL = "1/16"
 DOWEL_HOLE_DEPTH_TEXT = length_text(DOWEL_HOLE_DEPTH, DOWEL_HOLE_DEPTH_PLACES)
+DOWEL_WALL_TEXT = f"WALL {length_text(DOWEL_WEB_PRINTED_IN * 25.4, 3)} MIN"
 DOWEL_HOLE_CALLOUT = "\n".join(
     (
-        f"REAM <HOLE-DEPTH> {DOWEL_HOLE_DEPTH_TEXT}",
+        f"{DOWEL_HOLE_DRILL} DRILL <HOLE-DEPTH> {DOWEL_HOLE_DEPTH_TEXT}",
+        DOWEL_WALL_TEXT,
         f"SEE NOTE {DOWEL_NOTE_NUMBER}",
     )
 )
 # The callout as it prints (the native token is one depth glyph), for its
 # ink estimate.
 DOWEL_HOLE_CALLOUT_PRINTED = DOWEL_HOLE_CALLOUT.replace("<HOLE-DEPTH>", "\u21a7")
-# The numbered note the callout flags: the fit and its mate, where and
-# through what the hole is match-drilled (the lift rod's made-at-assembly
-# precedent, dt_pinion_lift_rod_spec.PIN_HOLE_CALLOUT; MHA-DT-00 step
-# post-and-tip-block points back at this callout), and the pair's
-# disassembly (round 6, #0: the dowel is pressed into a blind ream, so the
-# sheet declares the press fit permanent; the dowel only slips in MHA-DT-20,
-# so the two lift off it together).  Round 7 (#0, #1): the note is the
-# requirement only, four rows at most (rule 7), clear of the border.
-# Wrapped to a hanging indent under its number, at most DOWEL_NOTE_WIDTH
-# characters a row; the step reference never breaks across rows.
+# The numbered note the callout flags: the bond, its grade and its clearance
+# (rule 23: a bonded joint prints its clearance on the part sheet), and
+# where and through what the hole is match-drilled (the lift rod's
+# made-at-assembly precedent, dt_pinion_lift_rod_spec.PIN_HOLE_CALLOUT;
+# MHA-DT-00 step post-and-tip-block points back at this callout).  Round 7
+# (#0, #1): the note is the requirement only, four rows at most (rule 7),
+# clear of the border.  Wrapped to a hanging indent under its number, at
+# most DOWEL_NOTE_WIDTH characters a row; the step reference never breaks
+# across rows.
 DOWEL_NOTE_WIDTH = 30
 _NBSP = "\u00a0"
+DOWEL_BOND_CLEARANCE_TEXT = (
+    f"CLEARANCE {length_text(DOWEL_BOND_CLEARANCE_MAX_IN * 25.4, 3)} MAX"
+)
 DOWEL_NOTE = textwrap.fill(
-    f"PRESS FIT FOR {DOWEL_PIN_NUMBER}, PERMANENT. MATCH-DRILLED UP THRU "
+    f"{DOWEL_PIN_NUMBER} BONDED, {RETAINING_COMPOUND}, "
+    f"{DOWEL_BOND_CLEARANCE_TEXT}. DRILLED THRU "
     f"{PLATFORM_NUMBER} AT {step_ref('post-and-tip-block').replace(' ', _NBSP)}.",
     width=DOWEL_NOTE_WIDTH,
     initial_indent=f"{DOWEL_NOTE_NUMBER}. ",
@@ -350,8 +359,8 @@ DIMENSION_CALLOUTS = {
     # The matched axis height (AXIS_MATCH_NOTE).
     "AxisHeight": AXIS_HEIGHT_CALLOUT,
     # Rule-23 retention, owner ruling 2026-11-07 (MHA-DT-00 rubric sample, PR
-    # #2248): the locating dowel's press ream -- its depth,
-    # the dowel pressed to its floor and the match-drilling through MHA-DT-20.
+    # #2248): the locating dowel's drilled hole -- its drill and depth, its
+    # web, and the flag to the bonded-fit note.
     "DowelHoleDia": DOWEL_HOLE_CALLOUT,
 }
 DIMENSION_CALLOUTS_ABOVE = {
@@ -480,7 +489,7 @@ FOOT_TAP_CENTER = (_BOTTOM_LEFT + FOOT_TAP_X * _S, _bottom_y(Z_NORTH - FOOT_TAP_
 FOOT_TAP_X_RISE = 0.0078
 FOOT_TAP_Z_LINE_X = _BOTTOM_LEFT - 0.013
 # Rule-23 retention, owner ruling 2026-11-07 (MHA-DT-00 rubric sample, PR
-# #2248): the locating dowel's press ream, on the tap's line.  Machinist
+# #2248): the locating dowel's drilled hole, on the tap's line.  Machinist
 # review of round 6, #9: its station is a baseline from the -X face (the
 # FootTapX datum), printed as a reference.  Its line runs 1.5 mm under the
 # view's south edge, 2 mm over the width's line (round-1 farm review,
@@ -488,7 +497,7 @@ FOOT_TAP_Z_LINE_X = _BOTTOM_LEFT - 0.013
 # stood); inside its span the value would stand on that edge.  Its value
 # hangs LEFT of the view, past FootTapZ's line and that line's lower outside
 # arrow by an arrow's clearance, so the space right of the view is the
-# width's and the ream callout's (round 6, #4: on the r6 render the ream's
+# width's and the hole callout's (round 6, #4: on the r6 render the ream's
 # leader ran through the old ".228 ±.01" value and its line).
 DOWEL_CENTER = (_BOTTOM_LEFT + DOWEL_X * _S, FOOT_TAP_CENTER[1])
 DOWEL_X_EXTENT = (
@@ -504,11 +513,12 @@ DOWEL_X_TEXT_RIGHT = (
     - ROUND_OUT
 )
 DOWEL_X_TEXT_RISE = 0.0013
-# The ream's size and its two callout rows, measured on the r6 render (run
+# The hole's size and its callout rows, measured on the r6 render (run
 # 20261107T030627004Z): its callout rows printed 2.71 mm a glyph and 5.3 mm
-# a line, the size row two lines (its stacked band), and SolidWorks centred
-# the block, from the last row's underline to the band's top, on the
-# dimension's point.  The leader leaves that underline's near (left) end.
+# a line, and SolidWorks centred the block, from the last row's underline to
+# the size's top, on the dimension's point.  The size row is one line (the
+# drilled hole prints no band; the r6 ream's stacked band took two).  The
+# leader leaves that underline's near (left) end.
 DOWEL_CALLOUT_GLYPH_WIDTH = 0.00271
 DOWEL_CALLOUT_LINE_PITCH = 0.0053
 _DOWEL_HOLE_HALF_WIDTH = max(
@@ -516,7 +526,7 @@ _DOWEL_HOLE_HALF_WIDTH = max(
     for line in (DOWEL_HOLE_PRINTED_TEXT, *DOWEL_HOLE_CALLOUT_PRINTED.split("\n"))
 )
 _DOWEL_HOLE_HALF_HEIGHT = (
-    (2 + len(DOWEL_HOLE_CALLOUT.split("\n"))) * DOWEL_CALLOUT_LINE_PITCH / 2.0
+    (1 + len(DOWEL_HOLE_CALLOUT.split("\n"))) * DOWEL_CALLOUT_LINE_PITCH / 2.0
 )
 DOWEL_HOLE_EXTENT = (
     _DOWEL_HOLE_HALF_WIDTH,
@@ -704,7 +714,7 @@ def _sheet_notes() -> tuple[tuple[str, float, float], ...]:
     return (
         # The removed view's caption is its letter, centred under it.
         ("VIEW B", LEFT_CENTER[0] - VIEW_CAPTION_EXTENT[2] / 2.0, CAPTION_Y),
-        # The ream callout's SEE NOTE 1 (round 6, #2).
+        # The hole callout's SEE NOTE 1 (round 6, #2).
         (DOWEL_NOTE, *DOWEL_NOTE_XY),
         (AXIS_MATCH_NOTE, *AXIS_MATCH_NOTE_XY),
     )
@@ -761,7 +771,7 @@ def _value_and_rows_extent(
 _VALUE_EXTENTS = {
     # The pinch hole's .22 depth station.
     "PinchDepthCenter": _value_extent("PinchDepthCenter", PINCH_DEPTH_CENTER),
-    # The locating dowel's station and its ream's banded size with rows.
+    # The locating dowel's station and its hole's size with rows.
     "DowelX": DOWEL_X_EXTENT,
     "DowelHoleDia": DOWEL_HOLE_EXTENT,
     **{
@@ -789,11 +799,11 @@ _VALUE_EXTENTS = {
 # pinch callouts' with theirs).  r3: "Ø 3.26 ↓ 6.9" measured 28.5 mm of text
 # (I31); "Ø 2.26 TO SLOT" on the same sheet 33.7 mm; "DRILL " added 19.6 mm,
 # the 0.0196 in the pinch clearance callout's growth.
-# The locating dowel's ream callout (rule-23 retention, owner ruling
+# The locating dowel's hole callout (rule-23 retention, owner ruling
 # 2026-11-07 (MHA-DT-00 rubric sample, PR #2248)).  Right of the bottom view
 # the width's value and row (round-1 farm review, dt-fab-4) stand under the
 # hold-down tap's callout, leaving 15 mm between them, too little for the
-# ream's 21 mm block.  So the block stands right of the tap's callout, a text
+# callout's block.  So the block stands right of the tap's callout, a text
 # clearance past it, and its leader -- from the underline's left end --
 # runs midway between the width's row and the tap callout's shoulder, under
 # the view's +X face, to the rim right of the station's dowel witness: it
@@ -812,10 +822,10 @@ BOTTOM_KEEP["DowelHoleDia"] = (
     DOWEL_HOLE_TEXT_LEFT + DOWEL_HOLE_EXTENT[0],
     DOWEL_HOLE_LEADER_Y + DOWEL_HOLE_EXTENT[1],
 )
-# The ream's numbered note (DOWEL_NOTE), by its upper-left corner.  The
+# The hole's numbered note (DOWEL_NOTE), by its upper-left corner.  The
 # sheet's free-note text prints 2.64 mm a glyph and 4.05 mm a row (the old
 # captions' measured extents).  The note is 79 mm wide: no gap beside the
-# ream's block or under the view row holds it short of the title block, so
+# hole's block or under the view row holds it short of the title block, so
 # it stands in the open field over the title block, right of VIEW B's
 # height dimension and under the isometric, with room right and below for
 # an estimate that prints wide or tall (draw_pd_transgear_knob_shaft's
@@ -1250,7 +1260,7 @@ def sheet_leaders() -> dict[str, Leader]:
             FOOT_TAP_CENTER,
             FOOT_BORE_DIA * _S / 2.0,
         ),
-        # The ream's diameter: SolidWorks runs its leader from the near end of
+        # The hole's diameter: SolidWorks runs its leader from the near end of
         # the underline under its last row (r6 render) to the rim.
         "DowelHoleDia": _leader_to_circle(
             (
@@ -1871,7 +1881,7 @@ def _set_pinch_thread_callout_text(display: Any) -> None:
 # BLOCK_WIDTH_BAND, the tap drills and the clearance the DRILLED HOLES row at
 # the callouts' three places. The adjuster axis's absolute height keeps its
 # .XX band and is made to the measured MHA-DT-05 journal axis height within
-# AXIS_HEIGHT_MATCH_RESIDUAL_MM (note 2). The locating dowel's press ream is
+# AXIS_HEIGHT_MATCH_RESIDUAL_MM (note 2). The locating dowel's hole is
 # match-drilled through MHA-DT-20 at MHA-DT-00 (note 1), so a traveler that
 # makes the block leaves it. The declarations print nothing.
 _P = DRAWING_PRECISION_BY_NAME
@@ -2213,11 +2223,12 @@ requirement(
         "depth_station": _P["FootTapZ"],
     },
 )
-# The locating dowel's press ream up into the foot: Ø.0620 +.0005/.0000
-# REAM ↧ .16, SEE NOTE 1 (match-drilled up through MHA-DT-20 at MHA-DT-00);
-# its (.528) station off the -X face is a reference.
+# The locating dowel's drilled hole up into the foot: Ø.0625, 1/16 DRILL
+# ↧ .16, WALL .078 MIN, SEE NOTE 1 (the pin bonded with its clearance;
+# drilled up through MHA-DT-20 at MHA-DT-00); its (.528) station off the -X
+# face is a reference.
 requirement(
-    "dowel_ream",
+    "dowel_hole",
     kind="hole",
     faces=(CylinderFace(DOWEL_HOLE_DIA),),
     requirements=("dia", "depth"),
@@ -2225,10 +2236,22 @@ requirement(
         "at": ([DOWEL_X - _HALF_X, 0.0, 0.0], ("DOWEL_X", "BLOCK_X")),
         "axis": ((0.0, 1.0, 0.0), (_FRAME,)),
         "dia": (
-            limits(DOWEL_HOLE_DIA, _P["DowelHoleDia"], DOWEL_HOLE_BAND, unit=UNIT),
-            ("DOWEL_HOLE_DIA", "DOWEL_HOLE_BAND", (_SELF, "BOTTOM_KEEP")),
+            drilled_limits(DOWEL_HOLE_DIA, _P["DowelHoleDia"], unit=UNIT),
+            ("DOWEL_HOLE_DIA", "UNIT", (_SELF, "BOTTOM_KEEP")),
         ),
         "nominal_dia": (DOWEL_HOLE_DIA, ("DOWEL_HOLE_DIA",)),
+        "process": ("drill", ((_SELF, "DOWEL_HOLE_CALLOUT"),)),
+        "drill": (DOWEL_HOLE_DRILL, ((_SELF, "DOWEL_HOLE_CALLOUT"),)),
+        "wall_min": (
+            DOWEL_WEB_PRINTED_IN * 25.4,
+            ("DOWEL_WEB_PRINTED_IN", (_SELF, "DOWEL_WALL_TEXT")),
+        ),
+        "diametral_clearance": (
+            list(DOWEL_BOND_CLEARANCE_MM),
+            ("DOWEL_BOND_CLEARANCE_MM", (_SELF, "DOWEL_BOND_CLEARANCE_TEXT")),
+        ),
+        "mate": (DOWEL_PIN_NUMBER, ((_SELF, "DOWEL_NOTE"),)),
+        "bonded": (True, ((_SELF, "DOWEL_NOTE"),)),
         "depth": (
             limits(DOWEL_HOLE_DEPTH, DOWEL_HOLE_DEPTH_PLACES, unit=UNIT),
             ("DOWEL_HOLE_DEPTH", "DOWEL_HOLE_DEPTH_PLACES", (_SELF, "DOWEL_HOLE_CALLOUT")),

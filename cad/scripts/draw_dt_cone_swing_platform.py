@@ -88,6 +88,7 @@ from _paths import CAD_ROOT
 from _session import run_build
 from _part_properties import part_drawing_unit
 from _surface_finish import surface_finish_by_key
+from _title_block_units import render_number
 import _config
 import _telemetry
 import build_dt_cone_swing_platform as _part
@@ -467,26 +468,30 @@ _TIP_DOWEL_X_TEXT_X = (
     - TIP_DOWEL_X_TEXT_SIZE[0] / 2.0
 )
 # Rule-23 retention, owner ruling 2026-11-07 (MHA-DT-00 rubric sample, PR
-# #2248).  The tip-block locating dowel's slip ream, under its
-# banded diameter in detail B, for MHA-DT-00 step post-and-tip-block ("DRILL
-# AND REAM UP THRU MHA-DT-20 INTO MHA-DT-21 PER THEIR CALLOUTS"): the
-# process, then the flag to the numbered note that states the fit, the part
-# that goes in the hole and where it is match-reamed (machinist review of
-# round 6, #7; two rows under the size, rule 7; round 8, #2: the order of
-# operations is MHA-DT-00 step 2's, not this sheet's).
+# #2248).  The tip-block locating dowel's #52 slip hole (owner ruling
+# 2026-11-24, fit audit question 11), under its untoleranced size in detail
+# B, for MHA-DT-00 step post-and-tip-block: the drill, the web's shortfall
+# under the .080 target (rule 20), then the flag to the numbered note that
+# states the fit, the part that goes in the hole and where it is drilled
+# (machinist review of round 6, #7; round 8, #2: the order of operations is
+# MHA-DT-00 step 2's, not this sheet's).
 TIP_DOWEL_PIN_NUMBER = _config.parts("dt-vn-locating-pin")["number"]
 TIP_DOWEL_NOTE_NUMBER = 3
+TIP_DOWEL_WALL_TEXT = (
+    f"WALL {render_number(_chk.TIP_DOWEL_WEB_PRINTED_IN, _sp.UNIT, 3)} MIN"
+)
 TIP_DOWEL_CALLOUT = "\n".join(
     (
-        "MATCH-REAM THRU",
+        f"{_sp.TIP_DOWEL_HOLE_DRILL} DRILL THRU",
+        TIP_DOWEL_WALL_TEXT,
         f"SEE NOTE {TIP_DOWEL_NOTE_NUMBER}",
     )
 )
 # The note the callout flags (the lift rod's made-at-assembly precedent,
 # dt_pinion_lift_rod_spec.PIN_HOLE_CALLOUT): the hole slips over the dowel
-# MHA-DT-21 holds pressed, and is reamed to size through with the block on,
-# after MHA-DT-21's press ream has been drilled and reamed up through this
-# plate.  Its banded spacing from the hold-down hole matches the block's own
+# MHA-DT-21 holds bonded, and is opened to #52 through with the block on,
+# after MHA-DT-21's 1/16 hole has been drilled up through this plate.  Its
+# banded spacing from the hold-down hole matches the block's own
 # tap-to-dowel spacing (dt_cone_tip_block_spec.DOWEL_FROM_TAP), so the note
 # names that mate (rule 4); words on the .228 itself read as a location
 # carrying words (rule 7; proof run 20261109T134133430Z, 3 of 3 runs).  Two
@@ -501,7 +506,7 @@ TIP_BLOCK_NUMBER = _config.parts("dt-cone-tip-block")["number"]
 _NBSP = "\u00a0"
 TIP_DOWEL_NOTE = textwrap.fill(
     f"SLIDING FIT ON {TIP_DOWEL_PIN_NUMBER}, SPACED TO MATCH {TIP_BLOCK_NUMBER}. "
-    f"MATCH-REAM THRU AT {step_ref('post-and-tip-block').replace(' ', _NBSP)}.",
+    f"DRILLED THRU AT {step_ref('post-and-tip-block').replace(' ', _NBSP)}.",
     width=TIP_DOWEL_NOTE_WIDTH,
     initial_indent=f"{TIP_DOWEL_NOTE_NUMBER}. ",
     subsequent_indent="   ",
@@ -516,7 +521,10 @@ TIP_DOWEL_NOTE_ROW_HEIGHT = 0.0044
 # in the band between the title block (top 0.066) and note 2 (ink from
 # 0.0760, as on the r6 render), left-aligned with it.
 TIP_DOWEL_NOTE_XY = (0.222, 0.0745)
-TIP_DOWEL_CALLOUT_SIZE = (0.0475, 0.0210)
+# The callout's block: three rows under the drill's untoleranced size (one
+# row; the r6 ream's stacked band took 8.4 mm), at the r6 render's 5.45 mm a
+# row and its 1.7 mm underline and 3.6 mm top margin, 21.65 mm tall.
+TIP_DOWEL_CALLOUT_SIZE = (0.0475, 0.0217)
 _TIP_DOWEL_CALLOUT_BOTTOM = (
     TIP_DOWEL_PIVOT_X_LINE_Y + TIP_DOWEL_PIVOT_X_TEXT_SIZE[1] + 0.0015
 )
@@ -2935,10 +2943,10 @@ requirement(
         "z_from_pivot": _P["HoldDownZ"],
     },
 )
-# The tip-block dowel's slip ream, Ø.0630 +.0005/.0000 MATCH-REAM THRU at
-# assembly (note 3), so this part's traveler does not make it: .228 ±.004
-# from the hold-down hole on its line (TIP_DOWEL_STATION_TOL_MM), (.188)
-# from the pivot a reference (detail B).
+# The tip-block dowel's slip hole, Ø.0635 #52 DRILL THRU at assembly (note
+# 3; owner ruling 2026-11-24, fit audit question 11), so this part's
+# traveler does not make it: .228 ±.004 from the hold-down hole on its line
+# (TIP_DOWEL_STATION_TOL_MM), (.188) from the pivot a reference (detail B).
 requirement(
     "tip_dowel",
     kind="hole",
@@ -2951,12 +2959,18 @@ requirement(
         ),
         "axis": (_Y, (_FRAME,)),
         "dia": (
-            limits(_sp.TIP_DOWEL_HOLE_DIA, _P["TipDowelDia"], _sp.TIP_DOWEL_HOLE_BAND),
+            drilled_limits(_sp.TIP_DOWEL_HOLE_DIA, _P["TipDowelDia"], unit=UNIT),
             ("TIP_DOWEL_HOLE_DIA", "TIP_DOWEL_HOLE_BAND", (_SELF, "DETAIL_KEEP")),
         ),
         "dia_nominal": (_sp.TIP_DOWEL_HOLE_DIA, ("TIP_DOWEL_HOLE_DIA",)),
         "thru": (True, ((_SELF, "TIP_DOWEL_CALLOUT"),)),
-        "process": ("ream", ((_SELF, "TIP_DOWEL_CALLOUT"),)),
+        "process": ("drill", ((_SELF, "TIP_DOWEL_CALLOUT"),)),
+        "drill": (_sp.TIP_DOWEL_HOLE_DRILL, ((_SELF, "TIP_DOWEL_CALLOUT"),)),
+        "wall_min": (
+            _chk.TIP_DOWEL_WEB_PRINTED_IN * 25.4,
+            (("dt_cone_swing_platform_checks", "TIP_DOWEL_WEB_PRINTED_IN"),),
+        ),
+        "mate": (TIP_DOWEL_PIN_NUMBER, ((_SELF, "TIP_DOWEL_NOTE"),)),
         "x_from_holddown": (
             limits(_sp.TIP_DOWEL_FROM_HOLDDOWN, _P["TipDowelX"], _DOWEL_BAND),
             ("TIP_DOWEL_FROM_HOLDDOWN", "TIP_DOWEL_STATION_TOL_MM", (_SELF, "DETAIL_KEEP")),

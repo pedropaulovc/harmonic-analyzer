@@ -41,6 +41,11 @@ kind = "drill"
 status = "on_hand"
 note = "quotes-2026-11-17-rev3.xlsx Drills 1/16: owned in 115-pc index (quality unverified); spares on the buy list as G-spare-1-16 (Travers 01-001-004)."
 
+[tools.drill-52]
+kind = "drill"
+status = "on_hand"
+note = "#52 in the owned 115-pc index (#1-#60; quality unverified). Named 2026-11-24 for MHA-DT-39's pivot hole and MHA-DT-20's tip-dowel hole (owner ruling 2026-11-24, fit audit question 11)."
+
 [tools.drill-51]
 kind = "drill"
 status = "on_hand"

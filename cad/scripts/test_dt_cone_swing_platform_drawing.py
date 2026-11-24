@@ -27,7 +27,7 @@ import pytest
 from _drawing_contract import model_toleranced_dimensions
 from _gtol_planar import PlanarFace
 from _hole_spec import CLEARANCE_MM, THREAD_MAJOR_MM, blind_cut_dia_mm
-from _inch_wall_limits import WALL_TARGET_MM
+from _inch_wall_limits import WALL_FLOOR_MM, WALL_TARGET_MM
 from _printed_tolerance import drilled_oversize_mm, printed_band_mm
 from _surface_finish import MACHINED_UM, SEAT_UM
 
@@ -1223,25 +1223,25 @@ def test_holddown_web_guard_refuses_a_station_that_crowds_a_neighbour(
 
 # --- the tip-block locating dowel (rule-23 retention, owner ruling 2026-11-07
 # (MHA-DT-00 rubric sample, PR #2248)) ----------------------------------------
-def test_tip_dowel_slip_ream_clears_the_pin_on_the_hold_down_line() -> None:
-    """The slip ream is .0630 REAM_H7, clear of the pin at both extremes and
-    opening the foot's .0620 press ream; it stands on the hold-down line at
-    MHA-DT-21's own centre distance from its foot tap, and its station band
-    plus the screw's float fits MHA-DT-21's print."""
+def test_tip_dowel_slip_hole_clears_the_pin_on_the_hold_down_line() -> None:
+    """The slip hole is drilled #52 (owner ruling 2026-11-24, fit audit
+    question 11), its DRILLED HOLES row clear of the pin at both extremes; it
+    stands on the hold-down line at MHA-DT-21's own centre distance from its
+    foot tap, and its station band plus the screw's float fits MHA-DT-21's
+    print."""
     import dt_vn_locating_pin_spec as pin
-    from _fit_ream_h7 import REAM_H7
 
-    assert spec.TIP_DOWEL_HOLE_DIA == pytest.approx(0.0630 * 25.4)
-    assert spec.TIP_DOWEL_HOLE_BAND == REAM_H7
+    assert spec.TIP_DOWEL_HOLE_DIA == pytest.approx(0.0635 * 25.4)
+    assert spec.TIP_DOWEL_HOLE_DRILL == "#52"
+    assert spec.TIP_DOWEL_HOLE_BAND == pytest.approx((0.004 * 25.4, 0.0))
     hole_min, hole_max = spec.TIP_DOWEL_HOLE_LIMITS
-    assert (hole_min, hole_max) == pytest.approx((0.0630 * 25.4, 0.0635 * 25.4))
+    assert (hole_min, hole_max) == pytest.approx((0.0635 * 25.4, 0.0675 * 25.4))
     pin_min, pin_max = (pin.DIA + band * 25.4 for band in pin.DIA_BAND_IN)
     assert hole_min - pin_max > 0.0
     assert spec.TIP_DOWEL_SLIP_CLEARANCE_MM == pytest.approx(
         (hole_min - pin_max, hole_max - pin_min)
     )
-    assert hole_min > block.DOWEL_HOLE_LIMITS[1]
-    assert block.DOWEL_HOLE_DIA == pin.PRESS_HOLE_DIA
+    assert block.DOWEL_HOLE_DIA == pytest.approx(0.0625 * 25.4)
     assert spec.TIP_DOWEL_FROM_HOLDDOWN == block.DOWEL_FROM_TAP
     assert spec.TIP_DOWEL_LOCAL_X == pytest.approx(spec.HOLDDOWN_LOCAL_X + block.DOWEL_FROM_TAP)
     assert spec.TIP_DOWEL_LOCAL_Z == spec.HOLDDOWN_LOCAL_Z
@@ -1262,15 +1262,18 @@ def test_tip_dowel_slip_ream_clears_the_pin_on_the_hold_down_line() -> None:
     assert spec.TIP_DOWEL_END_ABOVE_UNDERSIDE_RANGE_MM[0] >= 0.0
 
 
-def test_tip_dowel_webs_meet_the_wall_target_at_print_worst() -> None:
+def test_tip_dowel_webs_keep_the_floor_at_print_worst() -> None:
     """Recomputed for the tightest web: the counterbore under the plate, at
-    the dowel's station band and both holes' upper limits."""
+    the dowel's station band and both holes' upper limits.  It stands under
+    the .080 target at .078 (owner ruling 2026-11-24, fit audit question 11;
+    registry RV-04), which the callout prints."""
     cbore_r = (spec.HOLDDOWN_CBORE_DIA + printed_band_mm(3, unit=spec.UNIT)) / 2.0
-    ream_r = (spec.TIP_DOWEL_HOLE_DIA + max(spec.TIP_DOWEL_HOLE_BAND)) / 2.0
-    web = spec.TIP_DOWEL_FROM_HOLDDOWN - spec.TIP_DOWEL_STATION_TOL_MM - cbore_r - ream_r
+    hole_r = (spec.TIP_DOWEL_HOLE_DIA + max(spec.TIP_DOWEL_HOLE_BAND)) / 2.0
+    web = spec.TIP_DOWEL_FROM_HOLDDOWN - spec.TIP_DOWEL_STATION_TOL_MM - cbore_r - hole_r
     assert checks.TIP_DOWEL_WEBS["hold-down counterbore (underside)"] == pytest.approx(web)
-    assert web >= WALL_TARGET_MM
-    assert min(checks.TIP_DOWEL_WEBS.values()) >= WALL_TARGET_MM
+    assert WALL_FLOOR_MM <= web < WALL_TARGET_MM
+    assert min(checks.TIP_DOWEL_WEBS.values()) == pytest.approx(web)
+    assert checks.TIP_DOWEL_WEB_PRINTED_IN == pytest.approx(0.078)
 
 
 def test_tip_dowel_web_guard_refuses_a_dowel_that_crowds_the_counterbore(
@@ -1278,24 +1281,24 @@ def test_tip_dowel_web_guard_refuses_a_dowel_that_crowds_the_counterbore(
 ) -> None:
     _exec_mutated(checks, {})  # positive control: the shipped station passes
     mutated = _exec_mutated(spec, {})
-    mutated.TIP_DOWEL_FROM_HOLDDOWN = 5.0  # 0.79 mm toward the hold-down hole
+    mutated.TIP_DOWEL_FROM_HOLDDOWN = 4.7  # 1.09 mm toward the hold-down hole
     monkeypatch.setitem(sys.modules, spec.__name__, mutated)
     with pytest.raises(AssertionError, match="tip-block locating dowel leaves a web"):
         _exec_mutated(checks, {})
 
 
-def test_tip_dowel_ream_callout_flags_its_fit_note() -> None:
-    """Machinist review of round 6, #7: the slip ream states its fit and the
-    part it takes, by drawing number, and when it is match-reamed.  Under the
-    banded size the callout keeps two rows, the process and the flag to
-    note 3; the note carries the fit, MHA-DT-VN-69, and the match-ream at
-    the assembly step after MHA-DT-21's ream (the step's own "PER THEIR
-    CALLOUTS" points here)."""
+def test_tip_dowel_hole_callout_flags_its_fit_note() -> None:
+    """Machinist review of round 6, #7: the slip hole states its fit and the
+    part it takes, by drawing number, and when it is drilled.  Under the
+    untoleranced size the callout gives the drill, the web's shortfall (rule
+    20) and the flag to note 3; the note carries the fit, MHA-DT-VN-69, and
+    the drilling at the assembly step."""
     import dt_drive_train_steps
 
     callout = drawing.TIP_DOWEL_CALLOUT
     assert callout.split("\n") == [
-        "MATCH-REAM THRU",
+        "#52 DRILL THRU",
+        "WALL .078 MIN",
         f"SEE NOTE {drawing.TIP_DOWEL_NOTE_NUMBER}",
     ]
     note = drawing.TIP_DOWEL_NOTE
@@ -1308,7 +1311,7 @@ def test_tip_dowel_ream_callout_flags_its_fit_note() -> None:
     step = dt_drive_train_steps.step_ref("post-and-tip-block")
     for phrase in (
         "SLIDING FIT ON MHA-DT-VN-69",
-        f"MATCH-REAM THRU AT {step}.",
+        f"DRILLED THRU AT {step}.",
     ):
         assert phrase in flat, phrase
     assert drawing_spec.DRAWING_DIMENSIONS["TipDowelProfile"] == {
@@ -1329,9 +1332,9 @@ def test_tip_dowel_ream_callout_flags_its_fit_note() -> None:
     assert "_add_sized_note(\n        adapter,\n        TIP_DOWEL_NOTE," in source
     # Each row fits the block the layout reserves, at the r6 render's
     # measured callout text (2.87 mm a glyph; 5.45 mm a row, the size row
-    # with its stacked band 8.4 mm, the underline 1.7 mm under the last row).
+    # one row with no band, the underline 1.7 mm under the last row).
     assert max(map(len, callout.split("\n"))) * 0.00287 <= drawing.TIP_DOWEL_CALLOUT_SIZE[0]
-    rows_height = 0.0017 + 0.0084 + (len(callout.split("\n")) - 1) * 0.00545 + 0.0036
+    rows_height = 0.0017 + 0.00545 + (len(callout.split("\n")) - 1) * 0.00545 + 0.0036
     assert rows_height <= drawing.TIP_DOWEL_CALLOUT_SIZE[1] + 1e-9
 
 
@@ -1377,10 +1380,10 @@ def test_tip_dowel_note_stands_in_the_band_over_the_title_block() -> None:
     assert drawing.TIP_DOWEL_NOTE_CHAR_HEIGHT == 0.0025
 
 
-def test_build_cuts_the_tip_dowel_ream_on_a_named_axis() -> None:
+def test_build_cuts_the_tip_dowel_hole_on_a_named_axis() -> None:
     banded = model_toleranced_dimensions(part)
     assert banded[("TipDowelProfile", "TipDowelX")] == "TIP_DOWEL_STATION_TOL_MM"
-    assert banded[("TipDowelProfile", "TipDowelDia")] == "*deviations(TIP_DOWEL_HOLE_BAND)"
+    assert ("TipDowelProfile", "TipDowelDia") not in banded
     # Round 6, #6: the pivot-axis station is a reference, no band.
     assert ("TipDowelProfile", "TipDowelPivotX") not in banded
     # The equations put the REF station where the spec does.
@@ -1404,14 +1407,16 @@ def test_tip_dowel_stays_chained_for_the_stack() -> None:
     assert f"SPACED TO MATCH {drawing.TIP_BLOCK_NUMBER}." in flat
     assert drawing.TIP_BLOCK_NUMBER == "MHA-DT-21"
     web = checks.TIP_DOWEL_WEBS["hold-down counterbore (underside)"]
-    assert web >= WALL_TARGET_MM
-    assert web - spec.HOLDDOWN_STATION_TOL_MM < WALL_TARGET_MM
+    assert web >= WALL_FLOOR_MM
     from_pivot_band = (
         spec.TIP_DOWEL_STATION_TOL_MM + spec.HOLDDOWN_STATION_TOL_MM + spec.TIP_HOLDDOWN_SCREW_FLOAT_MM
     )
     plus_x = block.WORST_DOWEL_WEBS_MM["+X face"]
-    assert plus_x >= WALL_TARGET_MM - 1e-6
-    assert plus_x - (from_pivot_band - block.DOWEL_X_TOL_MM) < WALL_TARGET_MM
+    assert plus_x >= WALL_FLOOR_MM
+    # From the pivot both webs fall under the .078 the owner accepted (fit
+    # audit question 11).
+    assert web - spec.HOLDDOWN_STATION_TOL_MM < checks.TIP_DOWEL_WEB_PRINTED_IN * 25.4
+    assert plus_x - (from_pivot_band - block.DOWEL_X_TOL_MM) < block.DOWEL_WEB_PRINTED_IN * 25.4
 
 
 def _tip_dowel_pivot_x_text_box() -> tuple[float, float, float, float]:
@@ -2219,10 +2224,11 @@ def test_platform_feature_bands_are_the_printed_ones() -> None:
     station = -spec.HOLDDOWN_LOCAL_Z
     assert hold["z_from_pivot"] == pytest.approx([station - _in(0.005), station + _in(0.005)])
     dowel = features["tip_dowel"]
-    assert dowel["dia"] == pytest.approx([_in(0.0630), _in(0.0635)])
+    assert dowel["dia"] == pytest.approx([_in(0.0635), _in(0.0675)])
+    assert dowel["drill"] == "#52" and dowel["mate"] == "MHA-DT-VN-69"
     assert dowel["x_from_holddown"] == pytest.approx([_in(0.224), _in(0.232)], abs=1e-3)
     assert dowel["x_from_holddown_from"] == "holddown"
-    assert dowel["made_at"] == "assembly" and dowel["process"] == "ream"
+    assert dowel["made_at"] == "assembly" and dowel["process"] == "drill"
     notch = features["lock_notch"]
     assert notch["width"] == pytest.approx([_in(0.30), _in(0.32)])
     assert notch["seat_x"] == pytest.approx([_in(1.29), _in(1.31)])

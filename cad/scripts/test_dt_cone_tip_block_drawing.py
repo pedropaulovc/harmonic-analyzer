@@ -14,7 +14,7 @@ from _drawing_contract import model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_types import DRAWING_TEMPLATES
 from _hole_spec import blind_cut_dia_mm
-from _inch_wall_limits import WALL_TARGET_MM
+from _inch_wall_limits import WALL_FLOOR_MM, WALL_TARGET_MM
 from _printed_tolerance import drilled_oversize_mm, printed_band_mm
 from _surface_finish import SEAT_UM
 
@@ -897,8 +897,9 @@ def test_drawing_side_callout_precision_is_the_declared_exception() -> None:
 
 # --- the locating dowel (rule-23 retention, owner ruling 2026-11-07 (MHA-DT-00
 # rubric sample, PR #2248)) ---------------------------------------------------
-# MHA-DT-VN-69 is pressed into a blind ream in the foot, up through a slip
-# ream in MHA-DT-20.
+# MHA-DT-VN-69 is bonded (LOCTITE 638) in a blind 1/16 drilled hole in the
+# foot, up through a #52 slip hole in MHA-DT-20 (owner ruling 2026-11-24, fit
+# audit question 11).
 _DOWEL_MUTATIONS = {
     "pin stands proud of the plate's underside": (
         "DOWEL_HOLE_DEPTH = 4.064",
@@ -910,11 +911,15 @@ _DOWEL_MUTATIONS = {
     ),
     "station band eats the +X face web": (
         "DOWEL_X_TOL_MM = 0.254",
-        "DOWEL_X_TOL_MM = 0.3",
+        "DOWEL_X_TOL_MM = 0.75",
     ),
     "dowel crowds the +X face": (
         "DOWEL_FROM_TAP = 5.7912",
-        "DOWEL_FROM_TAP = 6.0",
+        "DOWEL_FROM_TAP = 6.3",
+    ),
+    "the bond gap passes LOCTITE 638's": (
+        "DOWEL_HOLE_DIA = 1.5875",
+        "DOWEL_HOLE_DIA = 1.83",
     ),
 }
 
@@ -926,17 +931,26 @@ def test_spec_refuses_a_locating_dowel_that_cannot_locate(mutation: str) -> None
 
 
 def test_locating_dowel_keeps_every_limit_at_the_printed_extremes() -> None:
-    """Recomputed from the print and the pin's catalogue limits: the press
-    ream is the pin's shared contract, its shallowest floor grips 1.5D and
-    keeps the longest pin's lower end inside the thinnest plate, the
-    shortest pin still engages the plate 1.5D, and the +X face keeps the
-    wall target at the width's lower limit and both station bands."""
+    """Recomputed from the print and the pin's catalogue limits: the 1/16
+    drilled hole's DRILLED HOLES row keeps the pin's bond inside LOCTITE
+    638's gap, its shallowest floor grips 1.5D and keeps the longest pin's
+    lower end inside the thinnest plate, the shortest pin still engages the
+    plate 1.5D, and the +X face keeps the .060 floor at the width's lower
+    limit and both station bands (.078, owner ruling 2026-11-24, fit audit
+    question 11), the value the callout prints."""
+    import cone_tip_cluster
     import dt_vn_locating_pin_spec as pin
 
     spec = dt_cone_tip_block_spec
-    assert spec.DOWEL_HOLE_DIA == pin.PRESS_HOLE_DIA
-    assert spec.DOWEL_HOLE_BAND == pin.PRESS_HOLE_BAND
-    hole_max = spec.DOWEL_HOLE_LIMITS[1]
+    assert spec.DOWEL_HOLE_DIA == pytest.approx(0.0625 * 25.4)
+    assert spec.DOWEL_HOLE_BAND == pytest.approx((0.004 * 25.4, 0.0))
+    hole_min, hole_max = spec.DOWEL_HOLE_LIMITS
+    pin_min, pin_max = (pin.DIA + band * 25.4 for band in pin.DIA_BAND_IN)
+    assert spec.DOWEL_BOND_CLEARANCE_MM == pytest.approx(
+        (hole_min - pin_max, hole_max - pin_min)
+    )
+    assert spec.DOWEL_BOND_CLEARANCE_MM[1] <= cone_tip_cluster.RETAINING_COMPOUND_MAX_GAP_MM
+    assert spec.DOWEL_BOND_CLEARANCE_MAX_IN == pytest.approx(0.004)
     depth_min = _on_print(spec.DOWEL_HOLE_DEPTH, 2) - _GENERAL[2]
     depth_max = _on_print(spec.DOWEL_HOLE_DEPTH, 2) + _GENERAL[2]
     assert spec.DOWEL_HOLE_DEPTH_LIMITS == pytest.approx((depth_min, depth_max))
@@ -953,28 +967,30 @@ def test_locating_dowel_keeps_every_limit_at_the_printed_extremes() -> None:
     tap_high = _printed("FootTapX", spec.FOOT_TAP_X)[1]
     width_min = _printed("Width", spec.BLOCK_X)[0]
     plus_x_web = width_min - tap_high - (spec.DOWEL_FROM_TAP + spec.DOWEL_X_TOL_MM) - hole_max / 2.0
-    assert round(plus_x_web, 6) >= WALL_TARGET_MM
+    assert WALL_FLOOR_MM <= round(plus_x_web, 6) < WALL_TARGET_MM
     assert spec.WORST_DOWEL_WEBS_MM["+X face"] == pytest.approx(plus_x_web)
-    assert min(spec.WORST_DOWEL_WEBS_MM.values()) >= WALL_TARGET_MM - 1e-6
+    assert min(spec.WORST_DOWEL_WEBS_MM.values()) == pytest.approx(plus_x_web)
+    assert spec.DOWEL_WEB_PRINTED_IN == pytest.approx(0.078)
 
 
-def test_dowel_hole_callout_keeps_two_rows_and_flags_its_note() -> None:
-    """Machinist review of round 6 (#1, #2, #3): under its banded size the
-    callout keeps to two rows, the ream with the native depth symbol and the
-    flag to note 1; the note names the fit and its dowel, where and through
-    what the hole is match-drilled (the step's own text points at this
-    callout), and declares the block and dowel a permanent pair (#0).  No
-    assembly instruction ("TO FLOOR") rides the part sheet."""
+def test_dowel_hole_callout_gives_the_drill_its_wall_and_the_note_flag() -> None:
+    """Under its untoleranced size the callout gives the drill with the native
+    depth symbol, the +X web's shortfall (rule 20) and the flag to note 1;
+    the note names the bond, its grade and clearance (rule 23), and where and
+    through what the hole is drilled (the step's own text points at this
+    callout).  No assembly instruction ("TO FLOOR") rides the part sheet."""
     import dt_drive_train_steps
 
     spec = dt_cone_tip_block_spec
     callout = drawing.DOWEL_HOLE_CALLOUT
     assert drawing.DIMENSION_CALLOUTS["DowelHoleDia"] == callout
     assert callout.split("\n") == [
-        f"REAM <HOLE-DEPTH> {spec.length_text(spec.DOWEL_HOLE_DEPTH, 2)}",
+        f"1/16 DRILL <HOLE-DEPTH> {spec.length_text(spec.DOWEL_HOLE_DEPTH, 2)}",
+        "WALL .078 MIN",
         f"SEE NOTE {drawing.DOWEL_NOTE_NUMBER}",
     ]
     assert "DEEP" not in callout and "FLOOR" not in callout
+    assert "REAM" not in callout
     note = drawing.DOWEL_NOTE
     assert note.startswith(f"{drawing.DOWEL_NOTE_NUMBER}. ")
     assert all(line.startswith("   ") for line in note.split("\n")[1:])
@@ -982,9 +998,8 @@ def test_dowel_hole_callout_keeps_two_rows_and_flags_its_note() -> None:
     flat = " ".join(line.strip() for line in note.split("\n"))
     step = dt_drive_train_steps.step_ref("post-and-tip-block")
     for phrase in (
-        "PRESS FIT FOR MHA-DT-VN-69",
-        f"MATCH-DRILLED UP THRU MHA-DT-20 AT {step}",
-        "MHA-DT-VN-69, PERMANENT.",
+        "MHA-DT-VN-69 BONDED, LOCTITE 638, CLEARANCE .004 MAX.",
+        f"DRILLED THRU MHA-DT-20 AT {step}",
     ):
         assert phrase in flat, phrase
     # Round 7 (#0): rule 7's four short rows, no lift-off narration.
@@ -992,6 +1007,7 @@ def test_dowel_hole_callout_keeps_two_rows_and_flags_its_note() -> None:
     assert "TOGETHER" not in note
     assert "FLOOR" not in note
     assert any(text == note for text, _x, _y in drawing._sheet_notes())
+    assert spec.DOWEL_HOLE_PRINTED_TEXT == "Ø.0625"
     assert spec.DRAWING_PRECISION_BY_NAME["DowelHoleDia"] == 4
     assert spec.DRAWING_PRECISION_BY_NAME["DowelX"] == 3
 
@@ -1002,7 +1018,7 @@ def test_build_models_the_dowel_ream_on_a_named_axis() -> None:
     placed by, and the drawing parenthesises the station."""
     spec = dt_cone_tip_block_spec
     banded = model_toleranced_dimensions(part)
-    assert banded[("DowelProfile", "DowelHoleDia")] == "*deviations(DOWEL_HOLE_BAND)"
+    assert ("DowelProfile", "DowelHoleDia") not in banded
     assert ("DowelXReference", "DowelX") not in banded
     assert spec.DOWEL_X == pytest.approx(spec.FOOT_TAP_X + spec.DOWEL_FROM_TAP)
     assert spec.DOWEL_Z == spec.FOOT_TAP_Z
@@ -1078,9 +1094,11 @@ def test_the_block_declares_one_owner_per_face() -> None:
         "pinch_tap": "threaded_hole",
         "pinch_clearance": "hole",
         "foot_tap": "threaded_hole",
-        "dowel_ream": "hole",
+        "dowel_hole": "hole",
     }
-    assert manifest["features"]["dowel_ream"]["made_at"] == "assembly"
+    assert manifest["features"]["dowel_hole"]["made_at"] == "assembly"
+    assert manifest["features"]["dowel_hole"]["drill"] == "1/16"
+    assert manifest["features"]["dowel_hole"]["bonded"] is True
     hx, hz, w = spec.BLOCK_X / 2, spec.BLOCK_Z / 2, spec.SLIT_W / 2
     r = spec.PINCH_BORE_DIA / 2
     faces = {
@@ -1096,7 +1114,7 @@ def test_the_block_declares_one_owner_per_face() -> None:
         "pinch_tap": cylinder(spec.PINCH_BORE_DIA, (-hx, spec.PINCH_HEIGHT - r, -r, -w, spec.PINCH_HEIGHT + r, r)),
         "pinch_clearance": cylinder(spec.PINCH_CLEARANCE_DIA, (w, 45.3, -1.7, hx, 48.7, 1.7)),
         "foot_tap": cylinder(spec.FOOT_BORE_DIA, (-2.2, 0.0, -r, 0.2, spec.FOOT_DEPTH, r)),
-        "dowel_ream": cylinder(spec.DOWEL_HOLE_DIA, (4.0, 0.0, -0.8, 5.6, spec.DOWEL_HOLE_DEPTH, 0.8)),
+        "dowel_hole": cylinder(spec.DOWEL_HOLE_DIA, (4.0, 0.0, -0.8, 5.6, spec.DOWEL_HOLE_DEPTH, 0.8)),
     }
     selectors = export_features.feature_selectors("dt_cone_tip_block")
     for name, face in faces.items():
