@@ -823,7 +823,7 @@ drilling = "none"
 sizing = "other"
 feed = "hand"
 instruction = "Rule bar 1 from its faced foot end to its sawn top end, a 1-2-3 block square against the foot end, to the nearest 1/64 in. Write it on this sheet as a decimal to .001 (for example 31 57/64 = 31.891): L1. Bar 1 is the length every other bar is compared with."
-inspection = "L1 {{process.measured_length_min_mm:in.3f}}–{{process.measured_length_max_mm:in.3f}}: bar 1's own x (L1 − {{cad.top_end_length_in:.2f}}) then lies in Op 380's 0 to {{process.top_excess_max_mm:in.3dot}}, the most CA03 is written to face off. Over: saw or file its top end back and rule it again. Under: it cannot reach the length; scrap it and the next bar becomes bar 1."
+inspection = "L1 {{process.measured_length_min_mm:in.3f}}–{{process.measured_length_max_mm:in.3f}}: bar 1's own x (L1 − {{cad.top_end_length_in:.2f}}) then lies in the 0 to {{process.top_excess_max_mm:in.3dot}} every bar's x is held to below, the most CA03 is written to face off. Over: saw or file its top end back and rule it again. Under: it cannot reach the length; scrap it and the next bar becomes bar 1."
 gauge_checks = [{ gauge = "steel-rule-48", band_mm = ["{{process.measured_length_min_mm}}", "{{process.measured_length_max_mm}}"] }]
 
 [[setups.operations]]
