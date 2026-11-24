@@ -21,19 +21,30 @@
 #
 # Notches: ROOTS R.015 MAX rules out an end mill along the bar's depth (its
 # root would be a full R.0625), and an end mill along the cheeks cannot reach
-# between them. The owned 2-3/4 x .064 HSS slitting saw (McMaster 3062A21)
-# runs horizontally on the vertical spindle: its periphery cuts the root
-# straight across the bar's depth with the saw's sharp corners, its faces cut
-# the notch walls, two passes per width. FLAGGED: it needs an R8 1 in saw
-# arbor; the one on record is to buy (cad/config/shop-equipment/
-# tools.gear-cutter-arbor-1, bought for the gear cutters), and the saw's
-# arbor hole is not on the packing list: 1 in is assumed for McMaster's
-# 2-3/4 in series, UNVERIFIED. The arbor's sizes are ASSUMED, UNVERIFIED
-# until it is bought, and checked when it is mounted (Setups 3 and 5): the
-# spacers by the saw under the saw_collar_dia_max_mm below (or the collar
-# meets the bar's end in the top notch), at least saw_spacer_below_min_mm of
-# spacers under the saw, the stack below it within saw_below_max_mm of its
-# lower face, the nut under saw_nut_dia_max_mm.
+# between them. The owned 2-3/4 x .064 HSS slitting saw (McMaster 3062A21,
+# 1 in hole) runs horizontally on the vertical spindle: its periphery cuts
+# the root straight across the bar's depth with the saw's sharp corners, its
+# faces cut the notch walls, two passes per width (kerf: the .064 saw twice,
+# the second level .043 above the first for the foot's .104-.110, .0635 for
+# the top's .124-.131).
+#
+# The saw's arbor is the owned R8 stepped saw arbor (cad/config/shop-
+# equipment/ tools.saw-arbor-r8-stepped, owner 2026-11-24; shop key
+# saw-arbor-r8-stepped): drawn up in the spindle, the saw on the 1 in step of
+# its spring pilot, seated against the body's shoulder ABOVE it (the spindle
+# side) and clamped by the cap and its M8 flat-head screw BELOW it. Body and
+# cap are both 1.25 across, so the saw cuts at most
+# saw_depth_past_arbor_max_mm (.711) past them: (2.75 - 1.25)/2 less
+# saw_arbor_clear_mm; the top notch's deepest .56 leaves .15 more. At every
+# cut the bars' ends stand beside the saw's rim, the jaws .75 behind the
+# ends; the body passes above the saw and the cap and screw below it, both
+# beyond the ends (cap to end .20 at the top notch's last step, .67 at the
+# foot's), never over the jaws nor under the bars. NOT MEASURED, each a
+# bounded assumption a STOP measures before the spindle starts: the screw
+# head's stand past the cap's face (saw_screw_head_stand_max_mm) and the
+# saw's runout (the *_saw_swept_* and *_saw_radial_tir_max_mm limits). The
+# drive is friction alone (not keyed): the screw at 20 N·m, witness lines,
+# a light first pass and a stop to look at them.
 #
 # FLAGGED: the .0775 reamer is to buy (tools.reamer-0775). The hole's size
 # is gauged by a special Class ZZ pin-gauge pair, GO .0775 plus and NO-GO
@@ -99,9 +110,9 @@
 # drill chuck) stays above the jaw tops at its deepest cut, each tool set out
 # of its holder by at least its stated projection (cam.py checks each
 # against the jaw tops and the tool's length less a 1/2 in grip). The saw
-# arbor never stands over the jaws: its spacers and nut stay past the jaw
-# side, and every move of them after the saw's first rise misses the bars,
-# the riser and the jaws (cam.py checks it).
+# arbor never stands over the jaws: its body, cap and screw stay beyond the
+# bars' ends, and every move of them after the saw's first rise misses the
+# bars, the riser and the jaws (cam.py checks it).
 #
 # NC (cam:ch_amplitude_bar, cad/process/ch_amplitude_bar/cam.py):
 # CA00_riser_face (a new riser only), CA01_foot_end, CA02_foot_notch,
@@ -115,7 +126,7 @@ part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
 material = "1018 cold-finished steel, 1/4 in square (drawing: {{cad.material_spec}})"
 stock = "{{process.blank_width_in:fraction}} in square bar, 72 in lengths; {{process.quantity:d}} × {{process.blank_length_in:.2f}}–{{process.blank_length_max_in:.2f}} in blanks, two per length. The riser (made once, kept): two {{process.riser_width_min_mm:in.2dot}}–{{process.riser_width_max_mm:in.2dot}} in slices sawn across the 1 × 3 in 6061-T6511 bar."
-note = "Inches unless mm; G-code and console entries in mm (the files and the controller run G21). The bar's section is the stock's, {{cad.front_face_section_min_in:.3dot}}–{{cad.front_face_section_max_in:.3dot}} square, never cut. Finished {{cad.top_end_length_min_in:.2f}}–{{cad.top_end_length_max_in:.2f}} long, foot end to top end. Faces: the drawing names none; this traveler names them L, F, R and B and marks them on each blank in Setup 1 (Op 20). L carries the foot notch's ledge (Detail A, .073), R the top notch's ledge (Detail B, .063), and B is the face the pin hole is located from (View C, .125). Keep the marks readable. Speeds on the PM-30MV low belt (100–2800 rpm): no belt change. Home the mill ($H) and touch off G54 at the start of every mill setup: a FluidNC reset loses home (logbook 2026-11-06). After any controller reset, stall or E-stop, home and touch off again before Cycle Start. Every file is proved in air on the first load. The bars hang about 25 in past the vise: before every X move, check nothing stands in their sweep beside the table."
+note = "Inches unless mm; G-code and console entries in mm (the files and the controller run G21). The bar's section is the stock's, {{cad.front_face_section_min_in:.3dot}}–{{cad.front_face_section_max_in:.3dot}} square, never cut. Finished {{cad.top_end_length_min_in:.2f}}–{{cad.top_end_length_max_in:.2f}} long, foot end to top end. Faces: the drawing names none; this traveler names them L, F, R and B and marks them on each blank in Setup 1 (Op 20). L carries the foot notch's ledge (Detail A, .073), R the top notch's ledge (Detail B, .063), and B is the face the pin hole is located from (View C, .125). Keep the marks readable. Speeds on the PM-30MV low belt (100–2800 rpm): no belt change. Home the mill ($H) once a session, not at every setup; each mill setup touches off its own G54. A Reset after a Feed Hold keeps G54: no homing, no new zero. After any other controller reset (it restarted by itself in a pass once, and lost home: logbook 2026-11-06), an alarm, a stall or an E-stop: home and touch off again before Cycle Start. Every file is proved in air on the first load. The bars hang about 25 in past the vise: before every X move, check nothing stands in their sweep beside the table."
 shop = "../shop"
 stock_refs = ["1018-square-1-4", "6061-flat-1x3"]
 material_key = "rocker-1018-cold-finished"
@@ -232,54 +243,126 @@ end_tip_below_mm = 0.1
 # past the length X0 is set to, the drawing band's middle 31.82 (Setup 5;
 # computed by cam.py: 811.276 − 0.508 − 808.228).
 top_excess_max_mm = 2.54
-# The slitting saw (McMaster 3062A21: 2-3/4 in, .064 in, 72 teeth): 100
-# rpm, the mill's slowest, is 72 ft/min at its rim; LittleMachineShop
-# "Cutting Speeds" (read 2026-11-20), Milling, Plain carbon steels
-# 1006-1026, HSS: 80-110 ft/min; the bottom of the mill's range is the
+# The slitting saw (McMaster 3062A21: 2-3/4 in, .064 in, 72 teeth, 1 in
+# hole): 100 rpm, the slowest in the mill's shop record (100-2800; its plate
+# reads L 50-1500, so 100 is inside the L range), is 72 ft/min at its rim;
+# LittleMachineShop "Cutting Speeds" (read 2026-11-20), Milling, Plain carbon
+# steels 1006-1026, HSS: 80-110 ft/min; the bottom of the mill's range is the
 # nearest it runs. Feed .001 in/tooth × 72 × 100 = 7.2 in/min (182.88
 # mm/min): the author's choice, the lowest chip load prechips' force table
 # holds; a thinner chip rubs the HSS teeth.
 saw_dia_mm = 69.85
 saw_thickness_mm = 1.6256
+saw_bore_mm = 25.4
 saw_teeth = 72
 saw_rpm = 100
 saw_feed_per_min_mm = 182.88
-# Largest arbor spacer diameter by the saw: 2 × (the saw's radius − the top
-# notch's deepest point − 1.0 mm clear of the bar end) (cam.py checks it).
-saw_collar_dia_max_mm = 39.402
-# The arbor round the saw, ASSUMED until it is bought (tools.gear-cutter-
-# arbor-1, the TTC 67-600-016; Setups 3 and 5 check the real one at its
-# mounting): below the saw at least .25 in of spacers, then the nut, all
-# within 1.00 in of the saw's lower face; the nut no wider than 1.75 in
-# across its corners. The nut, wider than the spacers by the saw, reaches
-# over the top ends at the deepest step: the .25 in keeps it under the bars
-# (their ends overhang air) while the saw cuts. The saw moves between passes
-# with its lower face at saw_clear_z_mm, the stack's lowest point .20 in (5
-# mm) over the bars' top (cam.py checks every move of the saw's spacers and
-# nut, after its first rise from the touch-off, against the bars and the
-# jaws). The saw programs are proved in air with Z0 raised
-# saw_proof_raise_mm, not 1 in: raised, the nut that passes under the top
-# ends would rise into them; this raise lifts the whole stack over the bars'
-# top (cam.py checks it and the raised programs' moves too).
-saw_spacer_below_min_mm = 6.35
-saw_below_max_mm = 25.4
-saw_nut_dia_max_mm = 44.45
-saw_clear_z_mm = 36.75
-saw_proof_raise_mm = 38.1
+# The owned R8 stepped saw arbor, from its record (cad/config/shop-
+# equipment/ tools.saw-arbor-r8-stepped, owner 2026-11-24; the process test
+# holds these to it): the body above the saw (body_dia_above_saw_in), the
+# cap below it (cap_dia_in, cap_thickness_in), the screw's head
+# (screw_head_dia_in) and the cap's lower face below the spindle nose with
+# no saw on (below_spindle_nose_in).
+saw_arbor_body_dia_mm = 31.75
+saw_arbor_cap_dia_mm = 31.75
+saw_arbor_cap_thickness_mm = 12.7
+saw_arbor_screw_head_dia_mm = 15.8242
+saw_arbor_nose_to_cap_mm = 35.56
+# The saw cuts no deeper past the arbor than its radius less the wider of
+# body and cap, less saw_arbor_clear_mm: (69.85 - 31.75)/2 - 1.0 = 18.05
+# (.711), on both sides of the saw (cam.py checks each notch's deepest
+# limit, .094 and .56, against it).
+saw_arbor_clear_mm = 1.0
+saw_depth_past_arbor_max_mm = 18.05
+# NOT MEASURED: how far the screw's head stands past the cap's lower face
+# (countersunk: normally flush or under). A bounded assumption, .115: the
+# largest, to .005, at which the saw programs' 1.000 in air proof still
+# carries the head 5 mm over the bars' top (cam.py checks it); Setup 3
+# measures it on the first load, before the spindle starts. The stack below
+# the saw's lower face is the cap plus that (saw_below_max_mm), and the saw
+# moves between passes with that stack 5 mm over the bars' top
+# (saw_clear_z_mm; cam.py checks every move of the body, the cap and the
+# screw head, after the saw's first rise from the touch-off, against the
+# bars, the riser and the jaws, as cut and as proved in air).
+saw_screw_head_stand_max_mm = 2.921
+saw_below_max_mm = 15.621
+saw_clear_z_mm = 26.971
+saw_proof_raise_mm = 25.4
+# The drive (record keyed = false): the cap's screw clamps the saw between
+# the shoulder and the cap. From the record: screw_thread M8 x 1.25 (the
+# pitch gauged by the owner, the M8 read from the head),
+# screw_key_mm_inferred 5, clamp_torque_nm 20 (saw_clamp_torque_nm): about
+# 11 kN of preload (the record's cited table: 13.2 kN at 23 N·m, friction
+# .14); and screw_engagement_no_saw_mm 10.0 (the owner's 8 turns from first
+# bite to seated). With this saw between the shoulder and the cap the thread
+# holds by 10.0 less the saw's thickness, 8.4 mm: over one screw diameter
+# (saw_screw_dia_mm; cam.py checks it). One face's friction on the ring
+# between the 1 in pilot and the 1.25 cap (mean radius 14.35 mm) carries
+# .14 × 11 kN × 14.35 mm = 22.1 N·m (saw_drive_torque_max_nm). That
+# friction and preload are a table's, not measured, and the saw runs oiled:
+# a pass may take half of it at most (cam.py's DRIVE_RESERVE: oil in the
+# clamp, friction .10, under a preload a quarter low would leave 11.8 N·m).
+# The heaviest pass here, .110 into the ends at the full .064 width, takes
+# 5.0 N·m by the handbook's milling power. Every saw program's first pass is
+# half a step (foot_notch_light_mm, top_notch_light_mm); the file then stops
+# (M0, spindle off) for a look at the witness lines.
+saw_screw_dia_mm = 8.0
+saw_screw_engagement_no_saw_mm = 10.0
+saw_clamp_torque_nm = 20.0
+saw_clamp_preload_kn = 11.0
+saw_drive_friction = 0.14
+saw_drive_torque_max_nm = 22.1
+# Runout, NOT MEASURED: the axial read at every mounting of the arbor (the
+# R8 taper does not seat it the same twice), the radial at every clamping
+# of the saw (the pilot is a sliding fit). Axial: a notch's width is the
+# second level's rise above the first (its target less .064:
+# foot_notch_rise_mm, top_notch_rise_mm) plus the saw's swept thickness, its
+# miked thickness t plus its axial runout at the rim. Swept from the width's
+# least less the rise to its most less the rise and saw_swept_margin_mm
+# (.0005): foot .0610-.0665, top .0605-.0670; the foot's window lies inside
+# the top's, so both setups read to the foot's limit and Setup 3's t serves
+# both (cam.py checks them). The lever indicator reads the saw's lower face 1/8
+# in in from the teeth, where the rim's runout shows 1/1.10 of itself:
+# saw_axial_reading_per_in_mm is its reading, in mm, per inch at the rim;
+# foot_saw_axial_nominal_mm the reading a saw miking .0640 may show. Z0 is
+# touched under the tooth where that face stands lowest, so the ledge keeps
+# its budget and the far wall takes the runout. Radial: the files are posted
+# for the saw's catalogue diameter (saw_dia_mm, the packing list's, not
+# measured), so the calipers read it over two opposite tips on the first
+# load: D. The deepest tooth cuts the floor half of (D less 2.750, plus the
+# tips' total swing R) deeper than the file's depth, the band's middle: that
+# sum within twice (the depth's most less its target less
+# saw_depth_margin_mm, .002) either way: .016 for both notches.
+saw_swept_margin_mm = 0.0127
+saw_depth_margin_mm = 0.0508
+saw_axial_reading_per_in_mm = 23.091
+foot_notch_rise_mm = 1.0922
+top_notch_rise_mm = 1.6129
+foot_saw_swept_min_mm = 1.5494
+foot_saw_swept_max_mm = 1.6891
+foot_saw_axial_nominal_mm = 0.0577
+top_saw_swept_min_mm = 1.5367
+top_saw_swept_max_mm = 1.7018
+foot_saw_radial_tir_max_mm = 0.4063
+top_saw_radial_tir_max_mm = 0.4064
 # The saw's touch-off station: over the middle of the bar against the fixed
 # jaw, the saw's rim 3 mm in over the ends (its centre the saw's radius less
-# 3 mm past them, X mirrored for the top ends), the spacers and the nut past
+# 3 mm past them, X mirrored for the top ends), the cap and its screw beyond
 # the ends. CA01 and CA03 end with T1 parked over it: up to saw_park_z_mm,
-# along X past the ends, along Y over the bar; there the arbor, swapped in
-# for T1 (its lowest point no more than saw_arbor_length_mm from the nose,
-# T1 at least its collet and its 2 in projection out), hangs 5 mm over the
-# bars' top.
+# along X past the ends, along Y over the bar. T1 (its collet and its 2 in
+# projection: 2.25 from the nose) is longer than the arbor
+# (saw_arbor_length_mm), so its tip parks 5 mm over the bars' top and the
+# arbor, swapped in for it, hangs higher still. An R8 shank goes up into
+# the spindle from below, so for every change of the arbor the builder jogs
+# Z only, up, until the saw on it clears the bars; X and Y stay, and Z0 is
+# touched again from the saw.
 saw_touch_x_mm = 31.925
 saw_touch_y_mm = -3.1623
-saw_park_z_mm = 17.75
-# After a reset or homing ($H) between the park and the touch-off, the saw
-# goes back over the station by MDI from the homed Z (its top), X and Y
-# only, then down in Z.
+saw_park_z_mm = 11.35
+# After a homing ($H) between the park and the touch-off (a controller
+# reset other than one after a Feed Hold, an alarm, a stall or an E-stop
+# needs one), the saw goes back over the station by MDI from the homed Z
+# (its top), X and Y only, then down in Z.
 # Notch targets: each band's middle, from the export (cam.py checks them).
 foot_notch_width_mm = 2.7178
 foot_notch_depth_mm = 2.1273
@@ -288,8 +371,12 @@ top_notch_depth_mm = 13.97
 # The top notch is cut in equal steps into the end no deeper than .118 (3.0
 # mm) at each of its two levels: in one 13.97 mm bite the saw's push would
 # bend the .75 in overhang about .085 mm (prechips' estimate), past the
-# finish limit. Five steps of 2.794 (cam.py checks them).
+# finish limit. Five steps of 2.794 (cam.py checks them). Each notch's first
+# pass is half a step, at the ledge's level: half the foot's depth, half a
+# top step (cam.py checks them).
 top_notch_step_mm = 2.794
+foot_notch_light_mm = 1.0637
+top_notch_light_mm = 1.397
 # Pin hole: spot Ø.065 with the #1 carbide centre drill (under the #49, so no
 # chamfer at the mouth), the #49 through in pecks of .050 with full retracts,
 # its full diameter .5 mm past the down face, then the .0775 reamer through,
@@ -377,11 +464,13 @@ spot_projection_mm = 17.78
 # The #49 and the reamer: 1.00 in out.
 drill_projection_mm = 25.4
 ream_projection_mm = 25.4
-# The saw arbor (tools.gear-cutter-arbor-1): 2 in shoulder to nut; the saw
-# is on it within that, so the whole arbor is under 2.5 in from the nose
-# (ASSUMED, the arbor to buy): the length the T1 parks before it
-# (saw_park_z_mm) allow for.
-saw_arbor_length_mm = 63.5
+# The saw arbor's lowest point from the spindle nose: the record's 1.4 in to
+# the cap's lower face with no saw on (saw_arbor_nose_to_cap_mm) plus the
+# .064 saw is 1.464; taken as 1.5 (saw_arbor_below_nose_mm), plus the screw
+# head's stand bound: the length the T1 parks before it (saw_park_z_mm)
+# allow for (cam.py checks them). The saw's own Z is always touched off.
+saw_arbor_below_nose_mm = 38.1
+saw_arbor_length_mm = 41.021
 # ASME B94.11M jobber, #49: 1-7/8 in overall; the reamer bounded by 2-1/2 in.
 drill_49_oal_mm = 47.625
 reamer_oal_mm = 63.5
@@ -392,8 +481,32 @@ name = "1/2 in carbide end mill"
 ref = "endmill-carbide-3fl-1-2"
 [[tools]]
 id = "saw"
-name = "2-3/4 x .064 HSS slitting saw on the TTC 67-600-016 R8 1 in spacer-type arbor, its own spacers and nut, arbor TO BUY"
+name = "2-3/4 x .064 HSS slitting saw, 1 in hole, on the R8 stepped saw arbor"
 ref = "slitting-saw-2-75-064"
+[[tools]]
+id = "saw-arbor"
+name = "R8 stepped saw arbor (owned): 1 in pilot step, body and cap 1.25 across, cap .50 thick, M8 x 1.25 countersunk screw (5 mm hex key), not keyed"
+ref = "saw-arbor-r8-stepped"
+[[tools]]
+id = "torque-wrench"
+name = "Torque wrench covering 20 N·m (15 ft·lb)"
+ref = "torque-wrench"
+[[tools]]
+id = "hex-bit-5mm"
+name = "5 mm hex bit or socket for the torque wrench (owner to confirm)"
+ref = "hex-bit-5mm"
+[[tools]]
+id = "square"
+name = "12 in combination square: its blade as straightedge"
+ref = "combination-square-starrett-c11h-12"
+[[tools]]
+id = "dti"
+name = "Lever indicator, 0.001 mm, on the magnetic base"
+ref = "dti"
+[[tools]]
+id = "dial-indicator"
+name = ".001 in dial indicator on the magnetic base"
+ref = "dial-indicators"
 [[tools]]
 id = "spot"
 name = "#1 carbide centre drill"
@@ -511,8 +624,8 @@ vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{process.riser_length_max_m
 beam = { axis = "y", hold = "cantilever", extent_mm = [0, "{{process.riser_length_max_mm}}"], clamp_mm = [0, "{{process.riser_length_max_mm}}"], section_mm = { x = "{{process.riser_width_min_mm}}", z = "{{process.riser_height_min_mm}}" }, vise_left = "other" }
 
 [[setups.operations]]
-instruction = "The vise empty: Home ($H). G54 for CA00_riser_face: Y0 the fixed jaw's face, X0 the vise's left jaw side, edge finder (900 rpm)."
-instruction_detailed = "The vise open and empty: Home the mill ($H). Edge finder (900 rpm), its tip .10 below the jaw top. Y: on the fixed jaw's face from the open side (−Y), G10 L20 P1 Y-2.540. X: on the fixed jaw's left side from the left, G10 L20 P1 X-2.540. Edge finder out."
+instruction = "The vise empty. Home ($H) if not yet homed this session. G54 for CA00_riser_face: Y0 the fixed jaw's face, X0 the vise's left jaw side, edge finder (900 rpm)."
+instruction_detailed = "The vise open and empty. Home ($H) if not yet homed this session. Edge finder (900 rpm), its tip .10 below the jaw top. Y: on the fixed jaw's face from the open side (−Y), G10 L20 P1 Y-2.540. X: on the fixed jaw's left side from the left, G10 L20 P1 X-2.540. Edge finder out."
 feed = "hand"
 
 [[setups.operations]]
@@ -564,13 +677,16 @@ machine_ref = "pm-30mv"
 holding = "The riser (made in Setups 1 and 2, then kept): its two blocks end to end on the bed of the PM 6 in vise (jaws 6.247 long: the two 3 in blocks fit inside both jaw sides), TOP up, a sawn face of each against the fixed jaw, centred along the jaws, neither past a jaw side, never clamped: the jaws close on the bars above it. Four blanks of any numbers side by side across the jaws on the riser, in positions P1 (against the fixed jaw) to P4 (against the moving jaw). Each on its L face, its F face toward the fixed jaw, foot ends to the LEFT. Before closing the vise, hold a 1-2-3 block's 2 in face across the four foot ends and its 1 in face along the P4 bar, and push the ends against it so they are flush; then slide the four together until the foot ends stand {{process.end_protrusion_mm:in.2dot}} past the left jaw side (the calipers' depth rod). Tap each blank down onto the riser while closing the vise. The rest of each blank, about 25 in, hangs past the right jaw side."
 datum = "Programs CA01_foot_end (end mill) and CA02_foot_notch (saw). G54: X0 the faced foot end, Y0 the fixed jaw's face, Z0 the bars' down face (on the riser). +X toward the jaws, +Y toward the fixed jaw."
 diagram = { file = "diagrams/foot.svg", alt = "Four bars side by side across the jaws on the riser's two blocks, foot ends past the left jaw side; the end mill faces the ends, then the slitting saw, horizontal, cuts the notch across all four." }
-envelope = { x_span_mm = ["{{process.saw_dia_mm}}", "{{process.foot_notch_depth_mm}}", 5.0], y_span_mm = ["{{process.saw_dia_mm}}", "{{process.load_width_mm}}", 4.0], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_max_mm}}", "{{cad.envelope_width_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_min_mm}}"], longest_tool_mm = "{{process.saw_arbor_length_mm}}", shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_min_mm}}"] }
+# The saw arbor is now the shortest tool: its saw's lower face is at least
+# the saw's own thickness below the nose (the shoulder's height below the
+# nose is not on record: at most .90, the record's 1.4 less the cap).
+envelope = { x_span_mm = ["{{process.saw_dia_mm}}", "{{process.foot_notch_depth_mm}}", 5.0], y_span_mm = ["{{process.saw_dia_mm}}", "{{process.load_width_mm}}", 4.0], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_max_mm}}", "{{cad.envelope_width_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_min_mm}}"], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_min_mm}}"], shortest_tool_mm = "{{process.saw_thickness_mm}}" }
 vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{process.load_width_mm}}", along_jaws_mm = "{{cad.envelope_length_mm}}", part_height_mm = "{{cad.envelope_thickness_mm}}", parallel_height_mm = "{{process.riser_height_min_mm}}", overhang_mm = ["{{process.end_protrusion_mm}}", "rest"], jaw_offset = "centred", fixed_jaw_face = "as_bought", moving_jaw_face = "as_bought", moving_jaw_contact = "flat" }
 beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{cad.envelope_length_mm}}"], clamp_mm = ["{{process.end_protrusion_mm}}", "{{process.foot_clamp_end_mm}}"], section_mm = { y = "{{process.bar_section_min_mm}}", z = "{{process.bar_section_min_mm}}" }, vise_left = "start" }
 
 [[setups.operations]]
 instruction = "Every lot: brush the vise bed and the riser blocks clean; stand the two blocks end to end on the bed, TOP up, a sawn face of each against the fixed jaw, centred along the jaws. They stay there unclamped for every load of Setups 3 and 5; brush them before each load."
-inspection = "A rule held flat against each jaw side touches neither block: the two 3 in blocks (6 in end to end) inside the 6.247 in jaws, none past a jaw side (the saw's arbor passes under the bars' ends there)."
+inspection = "A rule held flat against each jaw side touches neither block: the two 3 in blocks (6 in end to end) inside the 6.247 in jaws, none past a jaw side (beyond the bars' ends the saw arbor's cap passes lower than the riser's top)."
 gauge_checks = "other"
 
 [[setups.operations]]
@@ -583,8 +699,8 @@ inspection = "Every d within ±{{process.seat_offset_max_mm:in.4dot}}: that bar'
 gauge_checks = "other"
 
 [[setups.operations]]
-instruction = "Home the mill first ($H). G54 Y0 the fixed jaw's face; X0 the faced foot end, {{process.foot_skim_mm:in.3dot}} inside the shortest foot end: edge finder (900 rpm)."
-instruction_detailed = "Home the mill first ($H). Edge finder (900 rpm). Y: its tip .10 below the jaw top, on the fixed jaw's face from the bars' side (−Y), G10 L20 P1 Y-2.540 (the finder's centre is its radius short of Y0). X: its tip .10 below the bars' top, on the foot end nearest the jaws, from the left: G10 L20 P1 X-3.048 (the finder's radius 2.540 plus the {{process.foot_skim_mm:in.3dot}} skim to its left)."
+instruction = "Home ($H) if not yet homed this session. G54 Y0 the fixed jaw's face; X0 the faced foot end, {{process.foot_skim_mm:in.3dot}} inside the shortest foot end: edge finder (900 rpm)."
+instruction_detailed = "Home ($H) if not yet homed this session. Edge finder (900 rpm). Y: its tip .10 below the jaw top, on the fixed jaw's face from the bars' side (−Y), G10 L20 P1 Y-2.540 (the finder's centre is its radius short of Y0). X: its tip .10 below the bars' top, on the foot end nearest the jaws, from the left: G10 L20 P1 X-3.048 (the finder's radius 2.540 plus the {{process.foot_skim_mm:in.3dot}} skim to its left)."
 feed = "hand"
 
 [[setups.operations]]
@@ -615,25 +731,65 @@ instruction = "Only if a sawn patch was left (otherwise skip): send $#, note the
 feed = "hand"
 
 [[setups.operations]]
-instruction = "First load only (the spacers stay on the arbor after): before mounting the saw, mic every spacer and collar of the TTC 67-600-016 R8 1 in spacer-type arbor (Travers; TO BUY) that will sit within 1/4 in above or below the saw, and the nut across its corners."
-inspection = "Each spacer and collar under {{process.saw_collar_dia_max_mm:in.2dot}} in diameter, or the top notch's end meets it in Setup 5; the nut under {{process.saw_nut_dia_max_mm:in.2dot}} across its corners. CA02 and CA04 assume these sizes. Over: stop and tell the owner."
+instruction = "First load, and again whenever the cap's screw has been loosened: mic the slitting saw's thickness at its rim, just inside the teeth, at four places a quarter turn apart, to .0001. Write the largest on this sheet: t. First load only: also the calipers across the tips of two opposite teeth, at three places round the saw. Write the largest: D."
+inspection = "t {{process.foot_saw_swept_min_mm:in.4dot}}–{{process.foot_saw_swept_max_mm:in.4dot}}: two passes of it, the second {{process.foot_notch_rise_mm:in.3dot}} higher, make the foot notch's {{cad.foot_notch_width_min_in:.3dot}}–{{cad.foot_notch_width_max_in:.3dot}} width. Outside: stop and tell the owner."
+gauge_checks = [{ gauge = "micrometers", band_mm = ["{{process.foot_saw_swept_min_mm}}", "{{process.foot_saw_swept_max_mm}}"] }]
+
+[[setups.operations]]
+speed_kind = "other"
+tool = "saw-arbor"
+drilling = "none"
+sizing = "other"
+feed = "hand"
+instruction = "Spindle stopped (M5), the head where CA01_foot_end parked it: do not jog X or Y. Jog Z only, up, until the arbor can go up into the spindle with its saw clear above the bars. Take out the collet and end mill. Wipe the R8 stepped saw arbor's shank and the spindle's taper clean and mount the arbor (drawbar tight). Do not move the bars. Loads after the first: the saw is still clamped on it."
+inspection = "Loads after the first: both witness lines on the saw (drawn below) unbroken. A line broken: the saw has turned on the arbor: stop and tell the owner."
 gauge_checks = "other"
 
 [[setups.operations]]
-instruction = "Spindle stopped (M5), the head where CA01_foot_end parked it: do not jog X or Y. Take out the collet and end mill; mount the arbor (drawbar tight), the saw between the spacers just checked, at least {{process.saw_spacer_below_min_mm:in.2dot}} in of them under it, then the nut; teeth cutting with M3 (clockwise seen from above). Do not move the bars."
-inspection = "The nut's upper face at least {{process.saw_spacer_below_min_mm:in.2dot}} and the arbor's lowest point at most {{process.saw_below_max_mm:in.2dot}} below the saw's lower face (the calipers' depth rod). Outside: change the spacers under the saw, or stop and tell the owner."
-gauge_checks = [{ gauge = "calipers", band_mm = ["{{process.saw_spacer_below_min_mm}}", "{{process.saw_below_max_mm}}"] }]
-
-[[setups.operations]]
-instruction = "Only after a reset or homing ($H) since CA01_foot_end parked T1: from the homed Z, MDI G0 X-{{process.saw_touch_x_mm:.3f}} Y{{process.saw_touch_y_mm:.3f}} (the station, X and Y only), then the touch-off below, Z only."
+instruction = "First load, and whenever the screw has been loosened: wipe the arbor's shoulder, the saw's faces round its hole and the cap's face clean and dry (friction alone drives the saw). Saw on the pilot's 1 in step, up against the shoulder, teeth cutting with M3 (clockwise from above); cap under it; its M8 screw from below, the 5 mm hex bit on the torque wrench: {{process.saw_clamp_torque_nm:.0f}} N·m (15 ft·lb), spindle held as for the drawbar."
+inspection = "No torque wrench covering 15 ft·lb with a 5 mm hex bit to hand, or the screw not torqued with it: stop: run no saw program; tell the owner."
+gauge_checks = "other"
 feed = "hand"
 
 [[setups.operations]]
-instruction = "G54 Z0 again, from the saw's lower face, its rim 3 mm in over the end of the P1 bar: spindle stopped, jog Z only, down in CNCjs ({{process.saw_touch_step_mm:.2f}} mm steps near the leaf), until a .002 leaf just drags under the saw on that bar's top; G10 L20 P1 Z(that bar's L-to-R reading × 25.4 + 0.051). CA02 loads no tool."
+instruction = "First load only, before the spindle starts: lay the combination square's blade on edge across the cap's lower face, over the screw's head. If the head stands past the face, measure how far: the calipers' beam end on the head, the depth rod run up to the cap's face."
+inspection = "The head flush with the cap's face or under it, or standing {{process.saw_screw_head_stand_max_mm:in.3dot}} or less: CA02, CA04 and their air proofs carry the cap and that much head clear over the bars. More: stop and tell the owner."
+gauge_checks = [{ gauge = "calipers", band_mm = [0, "{{process.saw_screw_head_stand_max_mm}}"] }]
+
+[[setups.operations]]
+instruction = "First load, and whenever the screw has been loosened: with a marker draw two witness lines: one from the arbor's body across the shoulder onto the saw's upper face, one from the cap's rim onto the saw's lower face. A line that breaks later shows the saw has turned on the arbor."
 feed = "hand"
 
 [[setups.operations]]
-instruction = "First load only: prove CA02_foot_notch in air, Z0 raised {{process.saw_proof_raise_mm:in.3f}} in (send $#, then G10 L2 P1 Z(the G54 line's Z + {{process.saw_proof_raise_mm:.3f}})); it rises straight to its clear height before any X or Y move, and the saw, spacers and nut clear the jaws and the four bars' ends. Then Z0 back."
+speed_kind = "other"
+tool = "dti"
+drilling = "none"
+sizing = "other"
+feed = "hand"
+instruction = "Every load (the taper never seats the arbor quite the same twice): the lever indicator on its magnetic base on the vise, its tip up against the saw's lower face 1/8 in in from the teeth. Turn the spindle one turn by hand: the needle's total swing, in mm, is A. Wipe off any old LOW mark; mark LOW on the tooth that is over the tip where that face stands lowest."
+inspection = "A ≤ ({{process.foot_saw_swept_max_mm:in.4dot}} − t) × {{process.saw_axial_reading_per_in_mm:.1f}} mm (t .0640: {{process.foot_saw_axial_nominal_mm:.3f}} mm): the saw's wobble then keeps the foot notch's width in its band. Over: take the arbor out, wipe its shank and the taper, mount it and read again. Still over: loosen the screw, wipe, turn the saw a quarter turn on the pilot, clamp to {{process.saw_clamp_torque_nm:.0f}} N·m, draw new witness lines and read again, then the tips' swing. Over after two such tries: stop and tell the owner."
+gauge_checks = "other"
+
+[[setups.operations]]
+speed_kind = "other"
+tool = "dial-indicator"
+drilling = "none"
+sizing = "other"
+feed = "hand"
+instruction = "First load, and whenever the screw has been loosened: the .001 in dial indicator on its magnetic base, its plunger square on the tips of the teeth. Turn the spindle one turn backward by hand (counter-clockwise seen from above, so no tooth catches the plunger). The needle drops into every gullet: read its peaks, on the tips, only. R = the highest peak less the lowest."
+inspection = "R + (D − {{process.saw_dia_mm:in.3dot}}) from −{{process.foot_saw_radial_tir_max_mm:in.3dot}} to {{process.foot_saw_radial_tir_max_mm:in.3dot}}: the files are posted for a {{process.saw_dia_mm:in.3dot}} saw, and the deepest tooth cuts the floor half that sum deeper, inside both notches' depth bands. Over: re-seat the saw as for A and read both again. Over after two tries, or under: stop and tell the owner D and R."
+gauge_checks = "other"
+
+[[setups.operations]]
+instruction = "Only if the mill had to be homed ($H) since CA01_foot_end parked T1 (a controller reset, an alarm, a stall or an E-stop): from the homed Z, MDI G0 X-{{process.saw_touch_x_mm:.3f}} Y{{process.saw_touch_y_mm:.3f}} (the station, X and Y only), then the touch-off below, Z only."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "G54 Z0 again, from the saw's lower face: spindle stopped, turn the saw by hand until the tooth marked LOW is over the end of the P1 bar, the rim 3 mm in over it. Jog Z only, down in CNCjs ({{process.saw_touch_step_mm:.2f}} mm steps near the leaf), until a .002 leaf just drags under the saw on that bar's top; G10 L20 P1 Z(that bar's L-to-R reading × 25.4 + 0.051). CA02 loads no tool."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "First load only: prove CA02_foot_notch in air, Z0 raised {{process.saw_proof_raise_mm:in.3f}} in (send $#, then G10 L2 P1 Z(the G54 line's Z + {{process.saw_proof_raise_mm:.3f}})); it rises straight to its clear height before any X or Y move, and the saw, the arbor's body, the cap and the screw clear the jaws and the four bars' ends; Cycle Start again at its M0 stop. Then Z0 back."
 feed = "hand"
 
 [[setups.operations]]
@@ -641,7 +797,24 @@ speed_kind = "spindle"
 tool = "saw"
 drilling = "none"
 sizing = "other"
-instruction = "Run CA02_foot_notch (the saw; set 100): two passes along −Y across the four foot ends (conventional: the saw turns clockwise left of them), {{process.foot_notch_depth_mm:in.3dot}} deep: the first with the saw's lower face at the ledge, {{cad.foot_notch_ledge_in:.3dot}} above the L face, the second widening the notch to {{process.foot_notch_width_mm:in.4dot}}. Cutting oil on the saw."
+instruction = "Run CA02_foot_notch (the saw; set 100): first one light pass along −Y across the four foot ends, {{process.foot_notch_light_mm:in.3dot}} deep, the saw's lower face at the ledge (conventional: clockwise left of the ends, each tooth cuts from the floor outward; fed the other way the saw would climb and turn on the arbor). Cutting oil on the saw. The file then stops (M0): spindle off, the saw raised clear beyond the moving jaw's side."
+rpm = 100
+feed = "{{process.saw_feed_per_min_mm:in.1f}} in/min"
+milling_cuts = [
+  { name = "foot notch light", kind = "side", phase = "rough", cutter_dia_mm = "{{process.saw_dia_mm}}", flutes = 72, rpm = 100, feed_mm_min = "{{process.saw_feed_per_min_mm}}", axial_doc_mm = "{{process.saw_thickness_mm}}", radial_woc_mm = "{{process.foot_notch_light_mm}}", stations_mm = 0 },
+]
+
+[[setups.operations]]
+instruction = "At CA02's M0 stop, the spindle stopped: look at both witness lines on the saw."
+inspection = "Both unbroken: Cycle Start (the file restarts the spindle; 100 still set). A line broken: the saw has slipped on the arbor: do not restart; stop and tell the owner."
+gauge_checks = "other"
+
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "saw"
+drilling = "none"
+sizing = "other"
+instruction = "Same file, after Cycle Start: two more passes along −Y, {{process.foot_notch_depth_mm:in.3dot}} deep: the first with the saw's lower face at the ledge, {{cad.foot_notch_ledge_in:.3dot}} above the L face, the second {{process.foot_notch_rise_mm:in.3dot}} higher, widening the notch to {{process.foot_notch_width_mm:in.4dot}}."
 rpm = 100
 feed = "{{process.saw_feed_per_min_mm:in.1f}} in/min"
 milling_cuts = [
@@ -649,8 +822,8 @@ milling_cuts = [
 ]
 
 [[setups.operations]]
-instruction = "Every load (each has its own saw Z0 touch-off), still clamped: CA02 has ended with the spindle stopped (M5) and the saw raised clear beyond the moving jaw's side; confirm it has stopped. Then check the foot notch's width and ledge on all four bars (Z0 is touched on the P1 bar; the P2–P4 bars hold their ledges through the seat sweep, so each is checked)."
-inspection = "Width {{cad.foot_notch_width_min_in:.3dot}}–{{cad.foot_notch_width_max_in:.3dot}}: the {{cad.foot_notch_width_min_in:.3dot}} gauge block enters across the notch, the {{cad.foot_notch_width_max_in:.3dot}} does not. Ledge (the L-side cheek) {{cad.foot_notch_ledge_min_in:.3dot}}–{{cad.foot_notch_ledge_max_in:.3dot}}: the calipers' outside jaw tips across it. Outside: stop and tell the owner."
+instruction = "Every load (each has its own saw Z0 touch-off), still clamped: CA02 has ended with the spindle stopped (M5) and the saw raised clear beyond the moving jaw's side; confirm it has stopped. Then check the foot notch's width and ledge on all four bars (Z0 is touched on the P1 bar; the P2–P4 bars hold their ledges through the seat sweep, so each is checked), and the saw's witness lines."
+inspection = "Width {{cad.foot_notch_width_min_in:.3dot}}–{{cad.foot_notch_width_max_in:.3dot}}: the {{cad.foot_notch_width_min_in:.3dot}} gauge block enters across the notch, the {{cad.foot_notch_width_max_in:.3dot}} does not. Ledge (the L-side cheek) {{cad.foot_notch_ledge_min_in:.3dot}}–{{cad.foot_notch_ledge_max_in:.3dot}}: the calipers' outside jaw tips across it. Witness lines unbroken. Any outside, or a line broken (the saw slipped in the cut): stop and tell the owner."
 gauge_checks = [
   { gauge = "gauge-blocks-mitutoyo", band_mm = "{{cad.foot_notch_width_band_mm}}" },
   { gauge = "calipers", band_mm = "{{cad.foot_notch_ledge_band_mm}}" },
@@ -662,7 +835,11 @@ inspection = "Depth {{cad.foot_notch_depth_min_in:.3dot}}–{{cad.foot_notch_dep
 gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.foot_notch_depth_band_mm}}" }]
 
 [[setups.operations]]
-instruction = "After every load, the fifth included: spindle stopped (M5), lift the arbor out with the saw, spacers and nut still on it (as checked), back to the collet; unclamp the load, the riser left in place. Clamp the next four and repeat this setup from the seat sweep, skipping the riser's and the first-load-only ops: 5 loads for the 20 bars. The X0 each load's foot notch is cut from is the end CA01 faced in that same clamping."
+instruction = "After every load, the fifth included: spindle stopped (M5). Jog Z only, up (X and Y untouched), until the clamped saw clears the bars and the arbor can drop out of the spindle. Lift the arbor out with the saw still clamped on it (the screw untouched); back to the collet."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Unclamp the load, the riser left in place. Clamp the next four and repeat this setup from the seat sweep, skipping the riser's and the first-load ops: 5 loads for the 20 bars. The X0 each load's foot notch is cut from is the end CA01 faced in that same clamping."
 feed = "hand"
 
 [[setups]]
@@ -682,7 +859,7 @@ drilling = "none"
 sizing = "other"
 feed = "hand"
 instruction = "Rule bar 1 from its faced foot end to its sawn top end, a 1-2-3 block square against the foot end, to the nearest 1/64 in. Write it on this sheet as a decimal to .001 (for example 31 57/64 = 31.891): L1. Bar 1 is the length every other bar is compared with."
-inspection = "L1 {{process.measured_length_min_mm:in.3f}}–{{process.measured_length_max_mm:in.3f}}: bar 1's own x (L1 − {{cad.top_end_length_in:.2f}}) then lies in Op 380's 0 to {{process.top_excess_max_mm:in.3dot}}, the most CA03 is written to face off. Over: saw or file its top end back and rule it again. Under: it cannot reach the length; scrap it and the next bar becomes bar 1."
+inspection = "L1 {{process.measured_length_min_mm:in.3f}}–{{process.measured_length_max_mm:in.3f}}: bar 1's own x (L1 − {{cad.top_end_length_in:.2f}}) then lies in the 0 to {{process.top_excess_max_mm:in.3dot}} every bar's x is held to below, the most CA03 is written to face off. Over: saw or file its top end back and rule it again. Under: it cannot reach the length; scrap it and the next bar becomes bar 1."
 gauge_checks = [{ gauge = "steel-rule-48", band_mm = ["{{process.measured_length_min_mm}}", "{{process.measured_length_max_mm}}"] }]
 
 [[setups.operations]]
@@ -717,7 +894,7 @@ machine_ref = "pm-30mv"
 holding = "The riser as left in Setup 3 (two blocks end to end on the vise bed against the fixed jaw, neither past a jaw side, unclamped; brushed clean). The four bars of one load (sorted by x in Setup 4, any blank numbers) side by side across the jaws on the riser in positions P1 (against the fixed jaw) to P4 (against the moving jaw), each on its R face, its B face toward the fixed jaw, top ends to the RIGHT: each bar as in Setup 3, rolled over about its length (L face up) and slid left along the jaws. At the far (foot) ends, beyond the table, hold the 1-2-3 block's 2 in face across the four foot ends and its 1 in face along the P4 bar, and push the ends flush against it; slide the four together until the top ends stand {{process.end_protrusion_mm:in.2dot}} past the right jaw side. Tap each down onto the riser while closing the vise."
 datum = "Programs CA03_top_end (end mill), CA04_top_notch (saw), CA05_pin_hole (centre drill, drill, reamer). G54: X0 the top end at the length, Y0 the fixed jaw's face, Z0 the bars' down face (R, on the riser). +X toward the top ends, +Y toward the fixed jaw."
 diagram = { file = "diagrams/top.svg", alt = "Four bars side by side across the jaws on the riser's two blocks, top ends past the right jaw side; the end mill faces them to length, the slitting saw cuts the top notch across all four, and the pin hole is drilled down through both cheeks of each bar." }
-envelope = { x_span_mm = ["{{process.saw_dia_mm}}", "{{process.top_notch_depth_mm}}", 5.0], y_span_mm = ["{{process.saw_dia_mm}}", "{{process.load_width_mm}}", 4.0], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_max_mm}}", "{{cad.envelope_width_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_min_mm}}", "{{process.drill_tip_height_mm}}"], longest_tool_mm = ["{{process.drill_chuck_gauge_mm}}", "{{process.reamer_oal_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_min_mm}}"] }
+envelope = { x_span_mm = ["{{process.saw_dia_mm}}", "{{process.top_notch_depth_mm}}", 5.0], y_span_mm = ["{{process.saw_dia_mm}}", "{{process.load_width_mm}}", 4.0], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_max_mm}}", "{{cad.envelope_width_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_min_mm}}", "{{process.drill_tip_height_mm}}"], longest_tool_mm = ["{{process.drill_chuck_gauge_mm}}", "{{process.reamer_oal_mm}}"], shortest_tool_mm = "{{process.saw_thickness_mm}}" }
 vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{process.load_width_mm}}", along_jaws_mm = "{{cad.envelope_length_mm}}", part_height_mm = "{{cad.envelope_thickness_mm}}", parallel_height_mm = "{{process.riser_height_min_mm}}", overhang_mm = ["rest", "{{process.end_protrusion_mm}}"], jaw_offset = "centred", fixed_jaw_face = "as_bought", moving_jaw_face = "as_bought", moving_jaw_contact = "flat" }
 beam = { axis = "x", hold = "cantilever", extent_mm = ["{{process.top_extent_start_mm}}", 0], clamp_mm = ["{{process.top_clamp_start_mm}}", "{{process.top_clamp_end_mm}}"], section_mm = { y = "{{process.bar_section_min_mm}}", z = "{{process.bar_section_min_mm}}" }, vise_left = "start" }
 
@@ -736,8 +913,8 @@ inspection = "Every step {{process.foot_flush_max_mm:in.3dot}} or less: the four
 gauge_checks = [{ gauge = "calipers", band_mm = [0, "{{process.foot_flush_max_mm}}"] }]
 
 [[setups.operations]]
-instruction = "Home the mill first ($H). G54 Y0 the fixed jaw's face; X0 the top end at the length: edge finder (900 rpm) on the top end that stands farthest right, less that bar's x (Setup 4). It is the bar of the four with the largest x: if not, stop and recheck the x written on them."
-instruction_detailed = "Home the mill first ($H). Edge finder (900 rpm). Y: its tip .10 below the jaw top (well above the bars), on the fixed jaw's face from the bars' side (−Y), G10 L20 P1 Y-2.540. X: its tip .10 below the bars' top, on the top end that stands farthest right (the bar with the largest x of the four; if not, stop and recheck the x written on them), from the right: G10 L20 P1 X(2.540 + that bar's x × 25.4); for x = .060, X4.064."
+instruction = "Home ($H) if not yet homed this session. G54 Y0 the fixed jaw's face; X0 the top end at the length: edge finder (900 rpm) on the top end that stands farthest right, less that bar's x (Setup 4). It is the bar of the four with the largest x: if not, stop and recheck the x written on them."
+instruction_detailed = "Home ($H) if not yet homed this session. Edge finder (900 rpm). Y: its tip .10 below the jaw top (well above the bars), on the fixed jaw's face from the bars' side (−Y), G10 L20 P1 Y-2.540. X: its tip .10 below the bars' top, on the top end farthest right (the bar with the largest x of the four; if not, stop and recheck the x written on them), from the right: G10 L20 P1 X(2.540 + that bar's x × 25.4); for x = .060, X4.064."
 feed = "hand"
 
 [[setups.operations]]
@@ -772,20 +949,35 @@ inspection = "Rule the four again: each {{process.length_rule_min_mm:in.3f}}–{
 gauge_checks = [{ gauge = "steel-rule-48", band_mm = ["{{process.length_rule_min_mm}}", "{{process.length_rule_max_mm}}"] }]
 
 [[setups.operations]]
-instruction = "Spindle stopped (M5), the head where CA03_top_end parked it: do not jog X or Y. Take out the collet and end mill; mount the arbor and slitting saw as in Setup 3, at least {{process.saw_spacer_below_min_mm:in.2dot}} in of spacers under the saw, then the nut; drawbar tight, teeth cutting with M3. Do not move the bars."
-inspection = "The nut's upper face at least {{process.saw_spacer_below_min_mm:in.2dot}} and the arbor's lowest point at most {{process.saw_below_max_mm:in.2dot}} below the saw's lower face (the calipers' depth rod): here the nut passes under the top ends. Outside: change the spacers under the saw, or stop and tell the owner."
-gauge_checks = [{ gauge = "calipers", band_mm = ["{{process.saw_spacer_below_min_mm}}", "{{process.saw_below_max_mm}}"] }]
+speed_kind = "other"
+tool = "saw-arbor"
+drilling = "none"
+sizing = "other"
+feed = "hand"
+instruction = "Spindle stopped (M5), the head where CA03_top_end parked it: do not jog X or Y. Jog Z only, up, until the arbor can go up into the spindle with its saw clear above the bars. Take out the collet and end mill. Wipe the saw arbor's shank and the spindle's taper clean and mount the arbor (drawbar tight), the saw still clamped on it as checked in Setup 3, teeth cutting with M3. Do not move the bars."
+inspection = "Both witness lines unbroken and the screw untouched since Setup 3: its t, its D and its tips' swing R stand for the top notch too (its {{cad.top_notch_width_min_in:.3dot}}–{{cad.top_notch_width_max_in:.3dot}} width and {{cad.top_notch_depth_min_in:.2f}}–{{cad.top_notch_depth_max_in:.2f}} depth allow at least as much). Otherwise: do Setup 3's first-load saw ops again here, from the miking, to the same limits."
+gauge_checks = "other"
 
 [[setups.operations]]
-instruction = "Only after a reset or homing ($H) since CA03_top_end parked T1: from the homed Z, MDI G0 X{{process.saw_touch_x_mm:.3f}} Y{{process.saw_touch_y_mm:.3f}} (the station, X and Y only), then the touch-off below, Z only."
+speed_kind = "other"
+tool = "dti"
+drilling = "none"
+sizing = "other"
+feed = "hand"
+instruction = "Every load (the arbor is seated afresh): read the saw's swing A again as in Setup 3, the lever indicator's tip up against the saw's lower face 1/8 in in from the teeth, one turn by hand. Wipe off the old LOW mark; mark LOW on the tooth that is over the tip where that face stands lowest."
+inspection = "A ≤ ({{process.foot_saw_swept_max_mm:in.4dot}} − t) × {{process.saw_axial_reading_per_in_mm:.1f}} mm, Setup 3's limit (t .0640: {{process.foot_saw_axial_nominal_mm:.3f}} mm). Over: take the arbor out, wipe its shank and the taper, mount it and read again. Still over: loosen the screw, wipe, turn the saw a quarter turn on the pilot, clamp to {{process.saw_clamp_torque_nm:.0f}} N·m, draw new witness lines and read again, then the tips' swing as in Setup 3. Over after two such tries: stop and tell the owner."
+gauge_checks = "other"
+
+[[setups.operations]]
+instruction = "Only if the mill had to be homed ($H) since CA03_top_end parked T1 (a controller reset, an alarm, a stall or an E-stop): from the homed Z, MDI G0 X{{process.saw_touch_x_mm:.3f}} Y{{process.saw_touch_y_mm:.3f}} (the station, X and Y only), then the touch-off below, Z only."
 feed = "hand"
 
 [[setups.operations]]
-instruction = "G54 Z0 again, from the saw's lower face, its rim 3 mm in over the end of the P1 bar: spindle stopped, jog Z only, down in CNCjs ({{process.saw_touch_step_mm:.2f}} mm steps near the leaf), until a .002 leaf just drags under the saw on that bar's top; G10 L20 P1 Z(that bar's L-to-R reading × 25.4 + 0.051)."
+instruction = "G54 Z0 again, from the saw's lower face: spindle stopped, turn the saw by hand until the tooth marked LOW is over the end of the P1 bar, the rim 3 mm in over it. Jog Z only, down in CNCjs ({{process.saw_touch_step_mm:.2f}} mm steps near the leaf), until a .002 leaf just drags under the saw on that bar's top; G10 L20 P1 Z(that bar's L-to-R reading × 25.4 + 0.051)."
 feed = "hand"
 
 [[setups.operations]]
-instruction = "First load only: prove CA04_top_notch in air, Z0 raised {{process.saw_proof_raise_mm:in.3f}} in (send $#, then G10 L2 P1 Z(the G54 line's Z + {{process.saw_proof_raise_mm:.3f}})), not 1 in: lower, the nut under the saw would meet the top ends. It rises straight to its clear height before any X or Y move. Then Z0 back."
+instruction = "First load only: prove CA04_top_notch in air, Z0 raised {{process.saw_proof_raise_mm:in.3f}} in (send $#, then G10 L2 P1 Z(the G54 line's Z + {{process.saw_proof_raise_mm:.3f}})); it rises straight to its clear height before any X or Y move, and the saw, the arbor's body, the cap and the screw clear the jaws and the four bars' ends; Cycle Start again at its M0 stop. Then Z0 back."
 feed = "hand"
 
 [[setups.operations]]
@@ -793,7 +985,24 @@ speed_kind = "spindle"
 tool = "saw"
 drilling = "none"
 sizing = "other"
-instruction = "Run CA04_top_notch (the saw; set 100): at each of two levels, passes along +Y across the four top ends (conventional: the saw turns clockwise right of them) stepping {{process.top_notch_step_mm:in.3dot}} deeper into the ends each time to {{process.top_notch_depth_mm:in.3dot}}: the first level with the saw's lower face at the ledge, {{cad.top_notch_ledge_in:.3dot}} above the R face, the second widening the notch to {{process.top_notch_width_mm:in.4dot}}. Cutting oil on the saw."
+instruction = "Run CA04_top_notch (the saw; set 100): first one light pass along +Y across the four top ends, {{process.top_notch_light_mm:in.3dot}} into the ends, the saw's lower face at the ledge (conventional: clockwise right of the ends, each tooth cuts from the floor outward; fed the other way the saw would climb and turn on the arbor). Cutting oil on the saw. The file then stops (M0): spindle off, the saw raised clear beyond the fixed jaw's side."
+rpm = 100
+feed = "{{process.saw_feed_per_min_mm:in.1f}} in/min"
+milling_cuts = [
+  { name = "top notch light", kind = "side", phase = "rough", cutter_dia_mm = "{{process.saw_dia_mm}}", flutes = 72, rpm = 100, feed_mm_min = "{{process.saw_feed_per_min_mm}}", axial_doc_mm = "{{process.saw_thickness_mm}}", radial_woc_mm = "{{process.top_notch_light_mm}}", stations_mm = 0 },
+]
+
+[[setups.operations]]
+instruction = "At CA04's M0 stop, the spindle stopped: look at both witness lines on the saw."
+inspection = "Both unbroken: Cycle Start (the file restarts the spindle; 100 still set). A line broken: the saw has slipped on the arbor: do not restart; stop and tell the owner."
+gauge_checks = "other"
+
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "saw"
+drilling = "none"
+sizing = "other"
+instruction = "Same file, after Cycle Start: at each of two levels, passes along +Y stepping {{process.top_notch_step_mm:in.3dot}} deeper into the ends each time to {{process.top_notch_depth_mm:in.3dot}}: the first level with the saw's lower face at the ledge, {{cad.top_notch_ledge_in:.3dot}} above the R face, the second {{process.top_notch_rise_mm:in.4dot}} higher, widening the notch to {{process.top_notch_width_mm:in.4dot}}."
 rpm = 100
 feed = "{{process.saw_feed_per_min_mm:in.1f}} in/min"
 milling_cuts = [
@@ -802,8 +1011,8 @@ milling_cuts = [
 ]
 
 [[setups.operations]]
-instruction = "Every load (each has its own saw Z0 touch-off), still clamped: CA04 has ended with the spindle stopped (M5) and the saw raised clear beyond the fixed jaw's side; confirm it has stopped. Then check the top notch's width and ledge on all four bars (Z0 is touched on the P1 bar; the P2–P4 bars hold their ledges through the seat sweep, so each is checked)."
-inspection = "Width {{cad.top_notch_width_min_in:.3dot}}–{{cad.top_notch_width_max_in:.3dot}}: the {{cad.top_notch_width_min_in:.3dot}} gauge block enters across the notch, the {{cad.top_notch_width_max_in:.3dot}} does not. Ledge (the R-side cheek) {{cad.top_notch_ledge_min_in:.3dot}}–{{cad.top_notch_ledge_max_in:.3dot}}: the calipers' outside jaw tips across it. Outside: stop and tell the owner."
+instruction = "Every load (each has its own saw Z0 touch-off), still clamped: CA04 has ended with the spindle stopped (M5) and the saw raised clear beyond the fixed jaw's side; confirm it has stopped. Then check the top notch's width and ledge on all four bars (Z0 is touched on the P1 bar; the P2–P4 bars hold their ledges through the seat sweep, so each is checked), and the saw's witness lines."
+inspection = "Width {{cad.top_notch_width_min_in:.3dot}}–{{cad.top_notch_width_max_in:.3dot}}: the {{cad.top_notch_width_min_in:.3dot}} gauge block enters across the notch, the {{cad.top_notch_width_max_in:.3dot}} does not. Ledge (the R-side cheek) {{cad.top_notch_ledge_min_in:.3dot}}–{{cad.top_notch_ledge_max_in:.3dot}}: the calipers' outside jaw tips across it. Witness lines unbroken. Any outside, or a line broken (the saw slipped in the cut): stop and tell the owner."
 gauge_checks = [
   { gauge = "gauge-blocks-mitutoyo", band_mm = "{{cad.top_notch_width_band_mm}}" },
   { gauge = "calipers", band_mm = "{{cad.top_notch_ledge_band_mm}}" },
@@ -815,7 +1024,7 @@ inspection = "Depth {{cad.top_notch_depth_min_in:.2f}}–{{cad.top_notch_depth_m
 gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.top_notch_depth_band_mm}}" }]
 
 [[setups.operations]]
-instruction = "Swap to the drill chuck. Set each CA05 tool out of the chuck by at least: #1 centre drill {{process.spot_projection_mm:in.2dot}}, #49 {{process.drill_projection_mm:in.2f}}, reamer {{process.ream_projection_mm:in.2f}} (the calipers' depth rod), so the chuck's nose stays above the jaw tops at its deepest cut."
+instruction = "Jog Z only, up (X and Y untouched), until the clamped saw clears the bars and the arbor can drop out of the spindle. Lift it out, the saw still clamped on it (the screw untouched), and swap to the drill chuck. Set each CA05 tool out of the chuck by at least: #1 centre drill {{process.spot_projection_mm:in.2dot}}, #49 {{process.drill_projection_mm:in.2f}}, reamer {{process.ream_projection_mm:in.2f}} (the calipers' depth rod), so the chuck's nose stays above the jaw tops at its deepest cut."
 feed = "hand"
 
 [[setups.operations]]
