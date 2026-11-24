@@ -86,6 +86,22 @@ def test_tool_changes_split_the_program_into_tool_sections(tmp_path):
     assert any("G28/G30/G53" in f.detail for f in _gcode.check_tool_changes(_program(tmp_path, text + "G53 G0 Z0\n"), 12.0, [1, 3]))
 
 
+def test_indexed_passes_on_a_later_tool_section_count_moves_from_the_program_start(tmp_path):
+    # Stops and M3 starts count moves from the file's start; so must the
+    # section's passes, or every stop after the first M6 reads as misplaced.
+    text = (
+        "M3 S500\nG0 X0 Y-5 Z0\nG1 Y-4 F100\nG1 Y-5\n"
+        "M5\n(TOOL CHANGE: T2 GEAR CUTTER, SET SPINDLE TO 215 RPM)\nM6 T2\nM3 S215\n"
+        "G0 X80 Y-5 Z0\nG1 Y1 F100\nG1 X-8\n"
+        "M5\n%msg INDEX A\nM0\nM3 S215\nG1 X80\n"
+        "M5\n%msg INDEX B\nM0\nM3 S215\nG1 X-8\nG1 Y-5\nM5\n"
+    )
+    section = _program(tmp_path, text).tool_section(1)
+    assert _gcode.check_indexed_passes(section, (80.0, -8.0), 1.0, -1, ["INDEX A", "INDEX B"], -5.0) == []
+    unstarted = _program(tmp_path, text.replace("%msg INDEX B\nM0\nM3 S215\n", "%msg INDEX B\nM0\n")).tool_section(1)
+    assert any("no M3/M4 restarts" in f.detail for f in _gcode.check_indexed_passes(unstarted, (80.0, -8.0), 1.0, -1, ["INDEX A", "INDEX B"], -5.0))
+
+
 def test_a_program_that_loads_its_first_tool_does_so_before_any_move(tmp_path):
     body = "M3 S2250\nG0 X0 Y0 Z20\nG1 Z5 F100\nG0 Z20\n"
     change = "M5\n%msg TOOL CHANGE: T1 END MILL, SET SPINDLE TO 2250 RPM\nM6 T1\n"

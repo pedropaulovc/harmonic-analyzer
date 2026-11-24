@@ -15,14 +15,17 @@ vertical spindle lies flat at the stack's axis height and cuts on the
 operator's side of the stack, one X pass a tooth space, the head indexed by
 hand at an M0 between passes:
 
-- GP01_first_space: one space, -X, ending past blank 1 with the cutter still
-  at depth: run on space 1 and on space 61 (20 crank turns on) for the
-  two-pin depth check, re-run deeper from a corrected G54 Y.
-- GP02_teeth: spaces 2-120, alternately +X and -X (each pass ends where the
-  next begins; no form cutter is drawn back through a cut space), then the
-  closure pass in space 1 again (120 indexes of 5 spaces on the 15-hole
-  circle are 40 crank turns: the plunger is back in space 1's hole). Y never
-  moves between spaces: the axis's repeatability stays out of the depth.
+- GP01_first_space: one space, -X, ending past blank 1 with the cutter drawn
+  back along Y to ``measure_park_y_mm`` (room to mike over the pins): run on
+  space 1 and on space 61 (20 crank turns on) for the two-pin depth check,
+  re-run deeper from a corrected G54 Y.
+- GP02_teeth: feeds back to the depth along +Y past blank 1 (as every GP01
+  run reaches it), then spaces 2-120, alternately +X and -X (each pass ends
+  where the next begins; no form cutter is drawn back through a cut space),
+  then the closure pass in space 1 again (120 indexes of 5 spaces on the
+  15-hole circle are 40 crank turns: the plunger is back in space 1's hole).
+  Y never moves between spaces: the axis's repeatability stays out of the
+  space-to-space depth.
 - GP03_notch: the slotting saw through space 1 to the notch's depth, -X to
   over blank 1's back face, then out along Y.
 
@@ -551,6 +554,7 @@ def context(
                 f"G4 P{DWELL_S}",
                 f"G1 Y{_r(y_teeth):.3f} F{{feed}}",
                 f"G1 X{ends[1]:.3f} F{{feed}}",
+                f"G1 Y{p['measure_park_y_mm']:.3f} F{{feed}}",
             ],
         ),
         job(

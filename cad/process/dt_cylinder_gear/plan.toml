@@ -190,9 +190,9 @@ collar_dia_mm = 44.45
 collar_length_mm = 8.382
 # Setup 5 and 6 mount acceptance: the body at the lathe's jaws, and the
 # stack's O.D. on the BS-0, within .001 TIR (the shop's runout row floor).
-# On the BS-0 it is the stack's eccentricity to the head: it spreads the
-# depth around the circle and is the runout's mount term (cam.py). Any tilt
-# or taper along X is read by the depth check on blanks 2 and 9 instead.
+# On the BS-0 it is the stack's eccentricity to the head: the runout's mount
+# term only (cam.py). The depth check's two opposite pins cancel it; tilt or
+# taper along X is read by that check on blanks 1 and 9.
 mount_tir_max_mm = 0.0254
 # Setup 5: the stack's O.D., the print's band, aim mid-band.
 stack_od_min_in = 2.532
@@ -218,6 +218,13 @@ cutter_x_start_mm = 79.19
 cutter_x_end_mm = -7.61
 # Every rapid and every index stop's approach stays .100 out from the tips.
 clear_y_mm = -2.54
+# GP01 ends with the cutter drawn back 2.00 from the tips past blank 1: room
+# for the micrometer's anvil and frame over the pin on the cutter's side
+# (parked at depth, the rim would stand .008 off blank 1's
+# tips, where the pin and anvil go). GP02 feeds back to the depth along +Y,
+# the way every GP01 run reaches it, so only the axis's one-way repeat
+# stands between the measured spaces and the rest.
+measure_park_y_mm = -50.8
 # GP01's first run is set .003 shallow (G54 Y back 0.076 mm) and deepened
 # from the depth check.
 first_run_shallow_mm = 0.0762
@@ -737,7 +744,7 @@ speed_kind = "spindle"
 tool = "cutter"
 drilling = "none"
 sizing = "other"
-instruction = "Run GP01_first_space (T1 already in; set 215): one pass -X through space 1 of all ten rims to Y {{process.plunge_aim_mm:.3f}}. It ends with the spindle stopped and the program ended, the cutter past blank 1 still at depth: do not jog Y. Check the spindle has stopped before reaching in."
+instruction = "Run GP01_first_space (T1 already in; set 215): one pass -X through space 1 of all ten rims to Y {{process.plunge_aim_mm:.3f}}. It ends past blank 1 with the cutter drawn back 2.00 from the tips (room for the micrometer), the spindle stopped and the program ended: do not jog. Check the spindle has stopped before reaching in."
 settings = "cylinder-gear-cutter-c360"
 milling_cuts = [
   { name = "tooth space", kind = "side", phase = "finish", cutter_dia_mm = 44.45, axial_doc_mm = 1.6624, radial_woc_mm = "{{process.plunge_aim_mm}}", stations_mm = [0.0, 35.79, 71.58] },

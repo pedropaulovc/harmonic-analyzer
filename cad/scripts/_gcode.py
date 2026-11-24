@@ -149,6 +149,9 @@ class Program:
     section: int | None = None
     # Every M3/M4 in file order, as (line, moves before it).
     starts: tuple[tuple[int, int], ...] = ()
+    # Moves of the whole program before ``moves[0]``: stops and starts count
+    # moves from the program's start, on a section too.
+    first_move: int = 0
 
     @property
     def name(self) -> str:
@@ -191,6 +194,7 @@ class Program:
                 tuple(p for p in self.probes if first <= p.line < last),
                 index,
                 starts=tuple(s for s in self.starts if first <= s[0] < last),
+                first_move=start,
             ))
         return sections
 
@@ -805,7 +809,7 @@ def check_indexed_passes(
     name = program.name
     findings: list[Finding] = []
     passes: list[tuple[int, Move]] = []
-    for index, m in enumerate(program.moves):
+    for index, m in enumerate(program.moves, program.first_move):
         if m.length <= _TOL_MM:
             continue
         where = f"X{m.start[0]:.3f} Y{m.start[1]:.3f} Z{m.start[2]:.3f} -> X{m.end[0]:.3f} Y{m.end[1]:.3f} Z{m.end[2]:.3f}"
@@ -844,7 +848,7 @@ def check_indexed_passes(
             findings.append(Finding(name, "indexed_passes", f"line {stop.line}: stop {k + 1} says {stop.comment!r}, expected {message!r}"))
         if stop.spindle_on:
             findings.append(Finding(name, "indexed_passes", f"line {stop.line}: stop {k + 1} with the spindle on (no M5 before it)"))
-        before = passes[k + 1][0] if k + 1 < len(passes) else len(program.moves)
+        before = passes[k + 1][0] if k + 1 < len(passes) else program.first_move + len(program.moves)
         if not any(stop.line < line and moves <= before for line, moves in program.starts):
             findings.append(Finding(name, "indexed_passes", f"line {stop.line}: no M3/M4 restarts the spindle after stop {k + 1} before the next pass"))
     return findings
