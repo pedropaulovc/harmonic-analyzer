@@ -566,7 +566,7 @@ milling_cuts = [
 ]
 
 [[setups.operations]]
-instruction = "Over {{cad.high_side_width_max_in:.3dot}}: reclamp as before; send $#, note the G54 line's Z; G10 L2 P1 Z(that Z − (the reading − {{cad.high_side_width_in:.3dot}}) × 25.4); run MB04_low again. Under {{cad.high_side_width_min_in:.3dot}}: the part is scrap."
+instruction = "Over {{cad.high_side_width_max_in:.3dot}}: reclamp as before. Pick up X0 again, edge finder (900 rpm) on O (the RIGHT side) from the right, its tip .10 below the blank's top: G10 L20 P1 X2.540. Send $#, note the G54 line's Z; G10 L2 P1 Z(that Z − (the reading − {{cad.high_side_width_in:.3dot}}) × 25.4); run MB04_low again. Under {{cad.high_side_width_min_in:.3dot}}: the part is scrap."
 feed = "hand"
 
 [[setups]]
@@ -643,7 +643,7 @@ milling_cuts = [
 ]
 
 [[setups.operations]]
-instruction = "Over {{cad.neck_inner_face_thickness_max_in:.3dot}}: reclamp as before; send $#, note the G54 line's Z; G10 L2 P1 Z(that Z − (the reading − {{cad.neck_inner_face_thickness_in:.3dot}}) × 25.4); run MB05_neck again. Under {{cad.neck_inner_face_thickness_min_in:.3dot}}: the part is scrap."
+instruction = "Over {{cad.neck_inner_face_thickness_max_in:.3dot}}: reclamp as before. Pick up X0 again, edge finder (900 rpm) on the seat (the LEFT end) from the left, its tip .50 below the foot's top: G10 L20 P1 X-2.540. Send $#, note the G54 line's Z; G10 L2 P1 Z(that Z − (the reading − {{cad.neck_inner_face_thickness_in:.3dot}}) × 25.4); run MB05_neck again. Under {{cad.neck_inner_face_thickness_min_in:.3dot}}: the part is scrap."
 feed = "hand"
 
 [[setups]]
