@@ -13,7 +13,8 @@ assembly.
 
 The engagement this leaves falls short of drawing guideline rule 18; the owner
 accepted 0.87D MIN (0.88D after #2107) as a minor exception on 2026-11-01
-(RV-01). The sheet states it as a plain fact, "ENGAGEMENT 0.88D MIN", the last
+(RV-01), and 0.84D MIN with the cut end flush to .015 short on 2026-11-24
+(fit audit part 2 S2). The sheet states it as a plain fact, "ENGAGEMENT 0.84D MIN", the last
 line of the cut-length callout (CUT_TO_FIT_CALLOUT), formatted from the floored
 worst case
 POST_MOUNT_ENGAGEMENT_PRINTED; the asserts below still guard that value and
@@ -230,8 +231,10 @@ if FACTORY_THREAD_START_MM >= FLOOR_LOW_MM:
 PLATE_THICK_MM = platform.PLATE_THICKNESS + PLATE_STOCK_BAND_MM
 
 # Rule 18 wants 1.5D and #1019's 0.90D target is not met; the owner ruling of
-# 2026-11-01 (RV-01) accepts the rule-18 audit's 0.87D floor.
-MIN_ENGAGEMENT_DIAMETERS = 0.87
+# 2026-11-01 (RV-01) accepted the rule-18 audit's 0.87D floor, and owner
+# ruling 2026-11-24 (fit audit part 2 S2, "all approved (ticked)") 0.84D, the
+# cut end flush to .015 short by straightedge.
+MIN_ENGAGEMENT_DIAMETERS = 0.84
 MIN_ENGAGEMENT_MM = MIN_ENGAGEMENT_DIAMETERS * THREAD_DIA_MM
 # Corner 1, never proud: lowest floor on the thinnest plate.  A fixed length
 # must not exceed this.
@@ -268,7 +271,7 @@ if _fit_upper != 0.0:
 POST_SCREW_CUT_TO_FIT_SHORT = -_fit_lower
 # The acceptance prints where the part sheet delegates the cut: the CutLength
 # callout, as well as the drive-train assembly step. The cut length prints
-# .XX; the allowance (.005) needs .XXX, and an allowance those places would
+# .XX; the allowance (.015) needs .XXX, and an allowance those places would
 # round is refused.
 _FIT_PLACES = DRAWING_PRECISION[CUT_LENGTH_SKETCH][CUT_LENGTH_DIMENSION]
 if _FIT_PLACES != mount_stack.CUT_LENGTH_PLACES:
@@ -322,8 +325,9 @@ if POST_MOUNT_ENGAGEMENT_PRINTED < MIN_ENGAGEMENT_DIAMETERS:
 # the sheet states the FACT -- the worst-case engagement, floored above --
 # never its label (no rule number, ruling id, EXCEPTION or ACCEPTED).
 # Provenance stays here: the User's U37c/U41 ruling admits short engagement
-# under the 1.5D rule; the owner ruling of 2026-11-01 (RV-01) accepts 0.87D.
-# The wording follows S1's drive-train step ("ENGAGEMENT 0.87D MIN.").
+# under the 1.5D rule; the owner rulings of 2026-11-01 (RV-01) and 2026-11-24
+# (S2) accept 0.84D.  The wording follows S1's drive-train step ("ENGAGEMENT
+# 0.87D MIN.").
 CUT_TO_FIT_CALLOUT = (
     "CUT TO FIT AT ASSEMBLY\n"
     f"END FLUSH TO {inch_text(POST_SCREW_CUT_TO_FIT_SHORT, CUT_TO_FIT_SHORT_PLACES)} SHORT\n"

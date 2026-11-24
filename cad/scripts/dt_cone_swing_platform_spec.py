@@ -206,10 +206,12 @@ POST_MOUNT_ENGAGEMENT_WORST_DIAMETERS = (
 POST_MOUNT_ENGAGEMENT_PRINTED = (
     math.floor(POST_MOUNT_ENGAGEMENT_WORST_DIAMETERS * 100.0) / 100.0
 )
-# The drawing-guidelines.md rule 18 (thread engagement) audit's E7 floor (0.87D, at the old .XX plate band): the stock
-# band must not print below it without a new ruling.
-if POST_MOUNT_ENGAGEMENT_PRINTED < 0.87:
-    raise AssertionError("MHA-DT-VN-61 engagement fell below the audited 0.87D floor")
+# The owner's floor: 0.84D (owner ruling 2026-11-24, fit audit part 2 S2,
+# "all approved (ticked)": cut flush to .015 short; was the rule-18 audit's
+# E7 0.87D, ruled 2026-11-01).  The stock band must not print below it
+# without a new ruling.
+if POST_MOUNT_ENGAGEMENT_PRINTED < 0.84:
+    raise AssertionError("MHA-DT-VN-61 engagement fell below the owner's 0.84D floor")
 # The sheet states the shortfall as a plain fact, worded like MHA-DT-32's.
 # The taps' callout names the post they mount, so the line names no screw
 # (machinist review r1). Owner-accepted 2026-11-01: MHA-DT-VN-61's RV-01.

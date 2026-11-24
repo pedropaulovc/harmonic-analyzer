@@ -1551,11 +1551,12 @@ CONE_CRANK_STEPS = _note_text(
         # Rubric sample round 6 (rule 22): the stock is the BOM row's, so the
         # step does one thing.
         "2J. ALIGN THE MHA-DT-05 COUNTERBORES TO THE MHA-DT-20 TAPS.",
-        # The exact maximum short the part sheet allows (.005 in = 0.127): a
+        # The exact maximum short the part sheet allows (.015 in = 0.381, owner
+        # ruling 2026-11-24, audit part 2 S2): a
         # maximum never rounds outward, and the part's places print it whole
         # (POST_SCREW_SHORT_TEXT, its sheet 16 row).  Rule 22 (rubric sample
         # round 10 lint): one sentence; the REF cut length and the stated
-        # engagement are the cut's own facts.  FLUSH TO .005 SHORT is the
+        # engagement are the cut's own facts.  FLUSH TO .015 SHORT is the
         # never-proud limit (MHA-DT-VN-61's own sheet dropped NEVER PROUD as a
         # restatement; PR 2 round 4 needed its line here).
         "2K. CUT EACH MHA-DT-VN-61 TO FIT, "
