@@ -409,7 +409,7 @@ gauge_checks = "other"
 
 [[setups.operations]]
 instruction = "The pin bore."
-inspection = "Pin bore (drawing: Ø.126 REAM THRU, MHA-PD-23 IS TURNED TO THIS BORE): the pin-gauge set's .127 pin does not enter from either face, by hand, never forced (the upper end of the bond clearance on MHA-PD-23's drawing). The MHA-PD-23 pin is fitted to this bore on its own traveler. Its rear mouth shows an even ring of break all round; the break's .008 ±.002 size is not gauged: held by T7's programmed depth in op 130. The .127 pin enters: stop and tell the owner."
+inspection = "Pin bore (drawing: Ø.126 REAM THRU, MHA-PD-23 BONDED, TURNED TO THIS BORE): the pin-gauge set's .127 pin does not enter from either face, by hand, never forced (the upper end of the bond clearance on MHA-PD-23's drawing). The MHA-PD-23 pin is fitted to this bore on its own traveler. Its rear mouth shows an even ring of break all round; the break's .008 ±.002 size is not gauged: held by T7's programmed depth in op 130. The .127 pin enters: stop and tell the owner."
 gauge_checks = "other"
 
 [[setups.operations]]

@@ -90,8 +90,9 @@ PIVOT_BORE_CALLOUT = f"{PIVOT_BORE_DRILL} DRILL THRU, {see_note(PIVOT_NOTE)}"
 # batch review r2: with the range here the pin's sheet printed none; r1: a
 # linked note 5 repeated the mate and the bond with a second acceptance).
 # The grade and the method stand in MHA-PD-00's pin step, and the set pin
-# that checks the bore is the traveler's.
-PIN_BORE_MATE_TEXT = f"{PIN.PIN_NUMBER} IS TURNED TO THIS BORE"
+# that checks the bore is the traveler's.  The fit is named (fit batch
+# review r5: nothing on this sheet said the pin is bonded).
+PIN_BORE_MATE_TEXT = f"{PIN.PIN_NUMBER} BONDED, TURNED TO THIS BORE"
 PIN_BORE_CALLOUT = f"REAM THRU\n{PIN_BORE_MATE_TEXT}"
 # Note 2 names the dowel and its press; the callout links it (round 2: the
 # dowel named on both was named twice for one pattern).

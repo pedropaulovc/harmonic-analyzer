@@ -5,7 +5,7 @@
 # 2026-11-23, pending owner confirmation.
 necessity:
   - id: N-01
-    feature: "sheet 1, front view, Ø.126 REAM THRU pin bore (datum C), MHA-PD-23 IS TURNED TO THIS BORE"
+    feature: "sheet 1, front view, Ø.126 REAM THRU pin bore (datum C), MHA-PD-23 BONDED, TURNED TO THIS BORE"
     kind: mesh
     reason: "keeps bonded pin MHA-PD-23 square to MHA-PD-26 rack mesh"
     source: "owner ruling 2026-11-24, fit audit question 4 (MHA-PD-23 bonded, no lean check); paper_drive_arm_registration.S_AXIS_TILT_MAX_RAD"

@@ -458,7 +458,7 @@ def test_the_pin_is_bonded_in_the_bore_with_clearance_at_every_limit() -> None:
     # part's necessity file, not on the sheet.
     assert arm_notes.PIN_BORE_CALLOUT.split("\n") == [
         "REAM THRU",
-        f"{cluster_pin.PIN_NUMBER} IS TURNED TO THIS BORE",
+        f"{cluster_pin.PIN_NUMBER} BONDED, TURNED TO THIS BORE",
     ]
     assert "CLEARANCE" not in arm_notes.PIN_BORE_CALLOUT
     # The pin station's extension line stands left of the text and the
