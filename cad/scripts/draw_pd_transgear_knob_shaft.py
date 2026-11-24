@@ -252,21 +252,19 @@ NOTE_TEXTS = (
     (
         JOURNAL_FIT_NOTE,
         f"RUNNING FIT IN {_mate_name(_config.parts('pd-transgear-knob-bush'))}: "
-        "TURN TO ITS REAMED BORE, TURNS FREE WITH NO SHAKE. "
-        "KEEPS REDUCER BACKLASH.",
+        "TURN TO ITS REAMED BORE, TURNS FREE WITH NO SHAKE.",
     ),
     # Made to fit (fit audit 2026-11-23, pending owner confirmation): the
     # collar's bore is drilled and its pin pressed first; the core's Ø and
     # the flat's distance print as REF and link this note, whose two fits by
-    # feel are the requirement, with one reason (rule 7; machinist review r1
-    # of the fit batch read the order of work and a second reason as
-    # narration: the order is the traveler's).  The acceptance prints here
-    # once, on the member made last; MHA-PD-22's bore callout names this core.
+    # feel are the requirement.  No reason prints (owner ruling 2026-11-24:
+    # a justification on the sheet is narration).  The acceptance prints
+    # here once, on the member made last; MHA-PD-22's bore callout names
+    # this core.
     (
         D_SECTION_FIT_NOTE,
         f"MADE TO FIT {_COLLAR}: CORE SLIDES IN ITS BORE BY HAND, NO SHAKE; "
-        "D-FLAT: COLLAR WITH PIN PRESSED SLIDES ON BY HAND. "
-        f"CENTRES CHAIN WHEEL {_config.parts('pd-transgear-removable')['number']}.",
+        "D-FLAT: COLLAR WITH PIN PRESSED SLIDES ON BY HAND.",
     ),
     (STATIONS_NOTE, f"D-FLAT SEAT UNDER {_COLLAR}."),
     (NECK_NOTE, f"NECK AND D-FLAT END UNDER {_COLLAR}."),
