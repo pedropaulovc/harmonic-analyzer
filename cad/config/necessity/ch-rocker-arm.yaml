@@ -1,0 +1,26 @@
+necessity:
+  - id: N-01
+    feature: "strap thickness .098 +/-.001"
+    kind: gap
+    reason: "thick strap closes the MHA-CH-03 fork slot"
+    source: "ch_rocker_arm_spec.ARM_THICKNESS_BAND; sh_vn_pivot_pin_rod_spec guard 'fork slot can close on the thickest arm' (fails at +/-.003)"
+  - id: N-02
+    feature: "hub length .278 +/-.002"
+    kind: gap
+    reason: "neighbouring rod forks touch in the inter-arm gap"
+    source: "ch_rocker_arm_spec.HUB_LENGTH_BAND; sh_vn_pivot_pin_rod_spec guard 'neighbouring forks can touch in the inter-arm gap' (fails at +/-.004)"
+  - id: N-03
+    feature: "strap position to hub, .004 zone"
+    kind: gap
+    reason: "strap off the hub mid-plane closes the fork gap"
+    source: "ch_rocker_arm_spec.STRAP_HUB_SYMMETRY; sh_vn_pivot_pin_rod_spec guard (fails at .008)"
+  - id: N-04
+    feature: "hub O.D. position to the pivot bore, .004 zone"
+    kind: gap
+    reason: "at the title block the hub wall falls under .060"
+    source: "ch_rocker_arm_spec.HUB_COAXIALITY_DIA; ch_rocker_arm_notes hub wall (title-block O.014 leaves .0575)"
+  - id: N-05
+    feature: "2X R.008 MAX hub-to-strap root"
+    kind: gap
+    reason: "title-block root radius hits the MHA-CH-01 foot cheeks"
+    source: "ch_rocker_arm_spec.HUB_ROOT_RADIUS_MAX (the cheeks' .0152 radial air over the hub; title block R.040 MAX)"
