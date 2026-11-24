@@ -3,9 +3,10 @@
 # SUPPLY 7-1/2 LONG; the length is cut to fit and both domes turned at
 # assembly, where the #43 set-screw spots are drilled through the MHA-DT-02
 # taps (MHA-DT-00). Route chosen for speed: the O.D. is 3/8 ground stock as
-# supplied (3/8 GROUND STOCK OK, inside the .3742-.3750 band), and the supply
-# length takes the title block's .X band, so nothing is turned: mike the bar,
-# saw one piece 7-1/2 long, deburr both ends, check the length, oil. No lathe
+# supplied (the sheet prints the stock, not limits: drawing-guidelines rule
+# 4; the MHA-DT-12 bores are reamed to it, the bar their gauge), and the
+# supply length takes the title block's .X band, so nothing is turned: saw
+# one piece 7-1/2 long, deburr both ends, check the length, oil. No lathe
 # and no NC.
 #
 # Stock: 3/8 in 1018 or 1045 ground round is to order
@@ -56,14 +57,6 @@ envelope = "other"
 vise_hold = "other"
 beam = "other"
 diagram = { file = "diagrams/saw.svg", alt = "The 3/8 in ground bar on the saw: one piece 7-1/2 in long sawn from its end, the O.D. left as supplied." }
-
-[[setups.operations]]
-instruction = "Mike the bar over the 7-1/2 in you will cut, at both ends and the middle: every reading {{cad.outer_dia_min_in:.4dot}}–{{cad.outer_dia_max_in:.4dot}} (the O.D. is left as supplied)."
-inspection = "Bar Ø{{cad.outer_dia_min_in:.4dot}}–{{cad.outer_dia_max_in:.4dot}}."
-gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.outer_dia_band_mm}}" }]
-
-[[setups.operations]]
-instruction = "A reading outside the band: mark that length scrap and mike the next 7-1/2 in of the bar."
 
 [[setups.operations]]
 speed_kind = "other"

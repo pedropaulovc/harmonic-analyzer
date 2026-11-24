@@ -30,12 +30,11 @@ def test_every_marked_dimension_lands_where_a_turner_reads_it() -> None:
     assert not set(drawing.PROFILE_DIAMETERS) & set(drawing.PROFILE_KEEP)
 
 
-def test_only_the_running_fit_carries_a_size_band() -> None:
-    """The O.D. is the one critical feature; the length rides the title block."""
+def test_no_dimension_carries_a_size_band() -> None:
+    """The O.D. is bought ground stock and prints the stock (rule 4); the
+    length rides the title block."""
     assert spec.SHAFT_DIA_BAND == _fit_shaft_h.SHAFT_H
-    assert model_toleranced_dimensions(part) == {
-        ("ShaftProfile", "ShaftDia"): "*deviations(SHAFT_DIA_BAND)",
-    }
+    assert model_toleranced_dimensions(part) == {}
 
 
 def test_shaft_band_closes_the_configured_running_fit() -> None:
@@ -94,12 +93,11 @@ def test_notes_are_short_specific_facts_with_no_dimension_in_them() -> None:
 
 
 def test_the_od_names_its_mates_and_its_stock_route_at_the_callout() -> None:
-    """Fan-out screen 20261107T081227004Z: the .0008 band's only fit route,
-    ground stock, sat in an unlinked general note; the set-screw spots named
-    no mate."""
-    assert notes.SHAFT_DIA_CALLOUT == (
-        "RUNNING FIT IN MHA-DT-12 AND MHA-DT-02 BORES; 3/8 GROUND STOCK OK"
-    )
+    """Rule 4: a diameter bought to size prints the stock, not limits; the
+    gear bores reamed to it are named. Fan-out screen 20261107T081227004Z:
+    the set-screw spots named no mate."""
+    assert notes.SHAFT_DIA_CALLOUT.startswith("3/8 GROUND STOCK, AS SUPPLIED")
+    assert "MHA-DT-12" in notes.SHAFT_DIA_CALLOUT
     assert "GROUND STOCK" not in notes.DRAWING_NOTES
     # The spots print at a leader on the bar, not in the unflagged block
     # (fan-out local repeat of e308920ca9, 3 of 3 runs).

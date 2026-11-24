@@ -466,7 +466,19 @@ def build(adapter: Any) -> dict[str, str]:
         raise RuntimeError("profile view does not carry exactly one dome radius")
     _set_spherical_reference(adapter, radius_annotations[0], label="arbor dome radius")
     # Above the value: the Ø's dimension line runs down to the bar, so the
-    # below lane would sit on it.
+    # below lane would sit on it.  The O.D. is bought ground stock, never cut:
+    # it prints as REFERENCE beside the stock it is (rule 4: the stock, not
+    # limits of size).
+    shaft_annotations = [
+        annotation
+        for annotation in profile_annotations
+        if dimension_name(adapter, annotation) == "ShaftDia"
+    ]
+    if len(shaft_annotations) != 1:
+        raise RuntimeError("profile view does not carry exactly one arbor diameter")
+    set_reference_dimension(
+        adapter, shaft_annotations[0], label="arbor diameter", diameter=True
+    )
     set_dimension_callouts(
         adapter, profile_annotations, {"ShaftDia": SHAFT_DIA_CALLOUT}, location="above"
     )
