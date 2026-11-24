@@ -14,14 +14,9 @@ name = "#47 drill"
 ref = "drill-47"  # Drills #47
 
 [[tools]]
-id = "reamer-2560"
-name = ".2560 reamer"
-ref = "reamer-2560"  # B-reamer-.2559, B-reamer-.2560
-
-[[tools]]
-id = "pin-gauges"
-name = "Pin gauges .011-.500"
-ref = "pin-gauges"  # A1-pin-set-061-500-combined, A1-pin-set-251-500
+id = "drill-f"
+name = "F drill"
+ref = "jig-drill-f"  # owner ruling 2026-11-24, fit audit question 1: the pivot bore F-drilled, no reamer or pin gauges
 
 [[tools]]
 id = "arbor-press"
