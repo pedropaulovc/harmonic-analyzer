@@ -6,7 +6,7 @@ The flat 1018 strap of the built-up rocker arm MHA-CH-06
 radial to their shared centre and the tapered end faces
 (``build_ch_rocker_arm``'s strap profile) -- at the finished thickness, with
 the Ø.400 reamed hole the
-MHA-CH-12 hub is pressed into (``ch_rocker_hub_fit``). The #47 rod-pin hole is
+MHA-CH-12 hub is bonded into (``ch_rocker_hub_fit``). The #47 rod-pin hole is
 drilled after joining, so it is not here (``ch_rocker_strap_spec``).
 
 Layout: the MHA-CH-06 frame (origin on the bottom arc's midpoint, +X the rod
@@ -63,7 +63,6 @@ from _sketch import (
 )
 from _sketch_circle import define_circle
 from ch_rocker_arm_spec import _ALPHA_TOP
-from ch_rocker_hub_fit import STRAP_HOLE_BAND
 from ch_rocker_strap_notes import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
@@ -363,20 +362,15 @@ def build(adapter) -> dict[str, str]:
     report_mass_properties(adapter)
 
     # Native bands: the thickness (the finished part's, the faces are not cut
-    # again), the hub hole's press band, and the arc-system zone's bilateral
-    # band on the top edge's height over the hole and the bottom edge's under it.
+    # again) and the arc-system zone's bilateral band on the top edge's height
+    # over the hole and the bottom edge's under it. The hub hole prints the
+    # .4000 reamer's size with no band (owner ruling 2026-11-24, fit audit
+    # question 2: the hub is turned to it).
     strap_lower, strap_upper = deviations(ARM_THICKNESS_BAND)
     if strap_lower != -strap_upper:
         raise AssertionError("ch_rocker_arm_spec.ARM_THICKNESS_BAND must be symmetric")
     set_dimension_symmetric_tolerance(
         adapter, "Strap", "StrapThickness", strap_upper, display_unit=UNIT
-    )
-    set_dimension_bilateral_tolerance(
-        adapter,
-        "StrapProfile",
-        "HoleDia",
-        *deviations(STRAP_HOLE_BAND),
-        display_unit=UNIT,
     )
     set_dimension_bilateral_tolerance(
         adapter,

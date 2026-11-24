@@ -10,11 +10,12 @@ part's symmetry axis and so carries both arcs' centres (~32 in off the
 sheet); each arc's own radius; both tip corners' and both taper feet's
 offsets, and the 2X radial tip land; the parenthesised overall length across
 the tip corners ties the two offsets together (rule 10: the overall size is
-conspicuous). The hole's press band names the MHA-CH-12 hub and the fit
-(rule 4) and keeps both its edges sharp (the title block's break would groove
-the pressed root); the thickness, on the end view, names the rod fork it
+conspicuous). The hole prints the .4000 reamer's size with no band, names
+the MHA-CH-12 hub turned to it (rule 4, made to fit; the bond clearance is the
+hub sheet's) and keeps both its edges sharp (the title block's break would
+groove the bonded root); the thickness, on the end view, names the rod fork it
 runs in. No notes, no datums, no frames, no roughness symbol (rule 6: a
-pressed bore carries none). The decimal places and bands are the PART's
+bonded bore carries none). The decimal places and bands are the PART's
 (``ch_rocker_strap_notes.DRAWING_PRECISION``); this script only reads them
 back off the sheet.
 
@@ -213,8 +214,9 @@ part_metadata(
         "DRAWING_REFERENCE_PRECISION",
     ),
 )
-# The hub hole's Ø, its press band and its callout (FRONT_KEEP "HoleDia",
-# DIMENSION_CALLOUTS): every printed location runs from its centre.
+# The hub hole's Ø, its callout (FRONT_KEEP "HoleDia", DIMENSION_CALLOUTS)
+# and the reamer's modelled cut, STRAP_HOLE_BAND (an analysis band: the sheet
+# prints REAM with no band): every printed location runs from its centre.
 _HOLE_CALLOUT_SOURCES = (
     ("ch_rocker_strap_notes", "HOLE_CALLOUT"),
     ("ch_rocker_strap_notes", "DIMENSION_CALLOUTS"),
@@ -239,7 +241,7 @@ requirement(
         "nominal_dia": (HOLE_DIA, ("HOLE_DIA",)),
         "thru": (True, _HOLE_CALLOUT_SOURCES),
         "process": ("ream", _HOLE_CALLOUT_SOURCES),
-        "press_fit_on": (HUB_NUMBER, ("HUB_NUMBER", *_HOLE_CALLOUT_SOURCES)),
+        "mate": (HUB_NUMBER, ("HUB_NUMBER", *_HOLE_CALLOUT_SOURCES)),
         "edge_note": (
             HOLE_EDGE_CALLOUT,
             (("ch_rocker_strap_notes", "HOLE_EDGE_CALLOUT"), *_HOLE_CALLOUT_SOURCES),
@@ -703,7 +705,7 @@ def build(adapter: Any) -> dict[str, str]:
             0: "Rocker Strap Manufacturing Drawing",
             1: "Harmonic Analyzer hobby-machinist book drawing",
             2: "Harmonic Analyzer Project",
-            3: "rocker strap; 1018 flat; hub hole press fit",
+            3: "rocker strap; 1018 flat; hub hole reamed, hub bonded",
             4: "Generated from the project-owned ASME B drawing standard",
         },
     )
