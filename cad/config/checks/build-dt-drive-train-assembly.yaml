@@ -1,0 +1,7 @@
+checks:
+  - id: C-01
+    check: "CHAIN_RADIAL_AIR_WORST_MIN"
+    kind: gap
+    reason: "a bought #25 plate rubs the spigot or relief"
+    source: "build_dt_drive_train_assembly chain_radial_air: positive air at every printed limit for an ANSI B29.1 #25 plate (0.230 in, pd_transgear_removable_spec ANSI_PLATE_HEIGHT)"
+    basis: worst_case

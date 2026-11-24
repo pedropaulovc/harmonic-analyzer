@@ -10,11 +10,17 @@ necessity:
     kind: bought_seat
     reason: "pins MHA-DT-VN-67 press in, not by hand"
     source: "fit audit 2026-11-23, MHA-DT-11.drive_pin_holes; dt_crankshaft_spec DRIVE_PIN_PRESS_INTERFERENCE"
+  # The wheel trial (owner ruling 2026-11-24, fit audit question 8) accepts
+  # the pins' spacing only. The wheel's offset on the shaft comes from the
+  # pins alone: its bore has .018 radial air round the shank. At the
+  # ±.002 reamed-hole row the offset leaves the ANSI #25 plate .0008 mm
+  # from the spigot, under the floor. The band stays while the owner
+  # decides (FitLaneDT, 2026-11-24; batch-dt/crank/Q8-dt11-centre-shift.png).
   - id: N-02
     feature: "sheet 1, END view, 2X drive-pin offset .2756 ±.0009"
     kind: gap
-    reason: "spacing error must stay inside the wheel's slip"
-    source: "fit audit 2026-11-23, MHA-DT-11.drive_pin_offset (kept); owner ruling C2 2026-11-22"
+    reason: "shifted pins float the wheel; #25 plates hit the spigot"
+    source: "build_dt_drive_train_assembly.CHAIN_RADIAL_AIR_WORST_MIN"
   - id: N-03
     feature: "sheet 1, FRONT view, Ø.689 +.000/-.004 seat spigot, note 2"
     kind: gap
