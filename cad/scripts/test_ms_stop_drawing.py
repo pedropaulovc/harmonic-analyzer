@@ -411,12 +411,13 @@ def test_build_projects_metre_hole_mouths_into_the_native_callout_view(
     else:
         assert notes == [(plate_drawing.MATCHED_PAIR_NOTE, plate_drawing.MATCHED_PAIR_NOTE_XY)]
     assert len(native_contracts) == 1
-    bands = native_contracts[0]["bands"]
+    bands = native_contracts[0].get("bands") or {}
     if drawing is block_drawing:
         assert not set(bands) & (spec.PLATE_LOCATION_DIMENSIONS | spec.BLOCK_REFERENCE_DIMENSIONS)
         assert bands == {name: spec.WINDOW_SIZE_TOLERANCE_MM for name in ("WindowWidth", "WindowHeight")}
     else:
-        assert not set(bands) & spec.PLATE_LOCATION_DIMENSIONS
+        # The plate carries no native band: its thickness takes the title block.
+        assert bands == {}
     # The displayed cover face is *Back: +X goes left, +Y goes up. Its
     # third-angle right view is unrotated *Left (+Z right, +Y up); its
     # third-angle underside must retain -X and send +Z down, not up.
