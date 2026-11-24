@@ -394,9 +394,10 @@ INDEXED_FIT_BANDS: dict[tuple[str, str], str] = {
         "tolerance (the pin slips into the #51 match-drilled hole)"
     ),
     ("dt_cone_swing_platform_pivot_spec", "PIVOT_HOLE_BAND"): (
-        "the pivot bore reamed 6.350 H7 on the 91829A560 shoulder: indexed into "
-        "the Hole Wizard diameter tolerance, the cone set stack's and support "
-        "pose's pivot float and the assembly's pivot air"
+        "the .2510 reamed pivot bore's ANALYSIS band (no native band; fit "
+        "audit question 10, necessity N-01): indexed into the float on the "
+        "91829A560 shoulder, the cone set stack's transfer-punch and "
+        "support-pose pivot float and the assembly's pivot air"
     ),
     ("ch_rocker_arm_spec", "PIVOT_HOLE_BAND"): (
         "indexed into the hub's wall floor (HUB_DIA_MIN); the build also "
