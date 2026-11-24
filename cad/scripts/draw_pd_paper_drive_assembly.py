@@ -2941,9 +2941,17 @@ def _step_text(
             # the screw out and the arm off for the renewal (the 24-letter
             # budget).
             f"REPEAT {s('hanger-pivoted', 10)}-{s('hanger-pivoted', 16)} ONCE.",
-            "IF NOT YET RENEWED, REPEAT FROM "
-            f"{s('arm-plate-screws-cut', 6)} WITH A NEW "
-            f"{n['pd-vn-transgear-pivot-screw']} "
+            # The arm is captive between the screw's head and the spacer
+            # bonded on its shoulder: the renewal frees it on the owned arbor
+            # press, the screw pushed out of the spacer (the LOCTITE 638 bond
+            # shears at about 199 N, transgear_hanger_joints
+            # .SPACER_BOND_SHEAR_N) with no heat near the arm's other bonds;
+            # screw and spacer are renewed anyway (Main, by the owner's
+            # delegation of 2026-11-24, D10: owner question Q7a, option B).
+            # In this sub-step, not a new one: the steps fill STEP_SLOTS.
+            "IF NOT YET RENEWED, PUSH THE SCREW OUT OF THE SPACER, ARM REAR FACE "
+            f"DOWN ON THE ARBOR PRESS, AND REPEAT FROM {s('arm-plate-screws-cut', 6)} "
+            f"WITH A NEW {n['pd-vn-transgear-pivot-screw']} "
             f"SCREW AND {n['pd-transgear-pivot-spacer']} SPACER.",
             f"IF ALREADY RENEWED, INSPECT THE {n['pd-support-bar']} BAR'S "
             f"TAP AND BACK FACE AND THE {n['pd-transgear-arm']} ARM'S BORE "
