@@ -1,16 +1,19 @@
 # MHA-PN-04 pen rod: why each band tighter than the title block stays
 # (drawing-guidelines.md rule 4; owner ruling 2026-11-24: the reason lives
 # here, not on the sheet). Read by the machinist review only.
-# The pivot stays turned to -.0005/-.0020 under its .126 (owner ruling
-# 2026-11-24, fit audit question 20, option A: the rod left as it is; the
-# v-block's bore is drilled #30). The block's cup-point set screw clamps the
-# pivot through its relief groove: the pivot's float in the #30 bore adds to
-# the screw's reach to the groove floor (.0200 at worst against the .025
-# point, batch-ch/fitch-small/q20_pivot.py) and to where its cup lands
-# between the groove walls (0.082 mm spare at the full worst case).
+# The pivot keeps its .126 in the v-block's drilled #30 bore (owner ruling
+# 2026-11-24, fit audit question 20, option A: the rod left as it is). Rule 4
+# form 2: it prints (Ø.126) REF, turned to that bore, and note 1's clearance
+# .0030-.0085 is the requirement: the range the former -.0005/-.0020 band
+# gives in any #30 bore of the DRILLED HOLES row, unchanged. The block's
+# cup-point set screw clamps the pivot through its relief groove: the
+# pivot's float in the #30 bore adds to the screw's reach to the groove floor
+# (.0200 at worst against the .025 point, batch-ch/fitch-small/q20_pivot.py)
+# and to where its cup lands between the groove walls (0.082 mm spare at the
+# full worst case).
 necessity:
   - id: N-01
-    feature: "sheet 1, pivot Ø.126 -.0005/-.0020 (SEE NOTE 1)"
+    feature: "sheet 1, note 1, pivot (Ø.126) REF: CLEARANCE .0030-.0085 in the MHA-PN-05 pivot bore"
     kind: gap
     reason: "pivot float eats the set screw's reach to the groove"
     source: "pn_pen_carriage_geom.groove_landing_spare; owner ruling 2026-11-24, fit audit question 20"

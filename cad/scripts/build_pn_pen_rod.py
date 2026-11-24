@@ -56,7 +56,6 @@ from _drawing_marks import (
     mark_dimensions_for_drawing,
 )
 from _drawing_precision import _named_dimension, apply_drawing_precision
-from _drawing_tolerances import set_dimension_bilateral_tolerance
 from _fit_deviations import deviations
 from _saved_part_guard import require_saved_drawing_properties
 from _holes import blind_hole_volume_mm3, wizard_holes
@@ -64,7 +63,6 @@ from _drawing_dimension_insert import add_diametric_linear_dimension
 import pn_pen_rod_groove_spec as groove
 import pn_pen_rod_spec as rod
 from pn_pen_rod_spec import (
-    DRAWING_BANDS,
     END_VIEW_NOTE,
     ISOMETRIC_VIEW_NOTE,
     PIVOT_DIA,
@@ -80,7 +78,6 @@ from pn_pen_rod_spec import (
     TAP_WALL_MIN_MM,
     TAP_WALL_MIN_TOL_TYPE,
     TAP_WALL_START_R,
-    UNIT,
 )
 
 PART_NAME = "pn-pen-rod"
@@ -419,10 +416,6 @@ def build(adapter) -> dict[str, str]:
 
     apply_material(adapter, MATERIAL)
     report_mass_properties(adapter)
-    for (feature_name, dimension_name), band in DRAWING_BANDS.items():
-        set_dimension_bilateral_tolerance(
-            adapter, feature_name, dimension_name, *deviations(band), display_unit=UNIT
-        )
     set_single_limit(
         adapter,
         "TapWallReference",

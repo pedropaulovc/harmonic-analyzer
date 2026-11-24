@@ -379,6 +379,23 @@ RIGHT_KEEP = {
 #   dimension line.
 _PAPER_ROW = 0.0065
 _NECK_ROW_X = _fx(0.0) + 0.0055
+# The step corners' 2X R.065, off the part (rule 14; fan-out 2b-final: inside
+# the slot it sat in the silhouette with the sheet beside the view empty), in
+# the free sheet right of the view over the title block.  Its three rows,
+# ~41 x 15 mm about the keep (measured on the 2b sheet), start 7.5 mm right of
+# the depth's line: x ~0.180..0.222, y ~0.112..0.130, 10 mm under the
+# paper-end view's rows and left of the iso.  Its leader leaves the shelf's
+# left end (~7.7 mm under the keep) on the radius of the near corner, rising
+# 3 degrees from its centre: it meets the arc at the step wall and runs out
+# through the neck over its first long edge (1 to 3 mm clear), under the
+# ".08"'s lower arrow (~2 mm) to the text, crossing the ".78" and ".86"
+# lines on the way.  Steeper, it would cross the ".08"; any other way out of
+# the slot corner crosses the view.
+_CORNER_CENTRE = (_fx(RELIEF_X0 + RELIEF_CORNER_R), _bz(RELIEF_Z0 + RELIEF_CORNER_R))
+_CORNER_TEXT_HALF_W = 0.0207
+_CORNER_SHELF_DROP = 0.0077
+_CORNER_LEADER_RISE_DEG = 3.0
+_CORNER_TEXT_LEFT = _NECK_ROW_X + _END_ROW + 0.008 + 0.0075
 BOTTOM_KEEP = {
     "ReliefX0": (_fx(RELIEF_X0 / 2.0), _bz(BODY_Z1) - _PAPER_ROW),
     "PivotX": (_fx(PIVOT_BORE_X / 2.0), _bz(BODY_Z1) - 2 * _PAPER_ROW),
@@ -390,9 +407,13 @@ BOTTOM_KEEP = {
         (_bz(NECK_DEPTH) + _bz(DEPTH_MID_Z)) / 2.0,
     ),
     "PivotDia": (_fx(0.0) + 0.040, _bz(NECK_DEPTH) - 0.0067),
-    # The step corners' 2X R.065 inside the slot's open bottom, left of the
-    # step and the bore, its leader up-right to the near wall's corner.
-    "ReliefCornerR": (_fx(RELIEF_X0) - 0.040, _bz(RELIEF_Z0) - 0.012),
+    "ReliefCornerR": (
+        _CORNER_TEXT_LEFT + _CORNER_TEXT_HALF_W,
+        _CORNER_CENTRE[1]
+        + (_CORNER_TEXT_LEFT - _CORNER_CENTRE[0])
+        * math.tan(math.radians(_CORNER_LEADER_RISE_DEG))
+        + _CORNER_SHELF_DROP,
+    ),
 }
 # Section A-A looks the same way as the paper-end view beside it: the body's
 # front face at x 0.306 on the LEFT, the bottom face at y 0.156, the top at

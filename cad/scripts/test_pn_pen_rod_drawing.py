@@ -281,36 +281,30 @@ def test_tap_wall_text_stands_on_a_shelf_clear_of_every_line() -> None:
     assert y + 0.0035 < drawing.TAP_CALLOUT_XY[1] - 0.0056 - 0.010
 
 
-def test_bands_are_model_owned_and_name_their_mates() -> None:
-    assert spec.DRAWING_BANDS == {
-        ("RodProfile", "Section"): spec.SECTION_BAND,
-        ("Rod", "Depth"): spec.SECTION_BAND,
-        ("PivotProfile", "PivotDia"): spec.PIVOT_BAND,
-    }
-    assert model_toleranced_dimensions(part) == {
-        ("feature_name", "dimension_name"): "*deviations(band)"
-    }
-    assert "for (feature_name, dimension_name), band in DRAWING_BANDS.items():" in (
-        _PART_SOURCE
-    )
+def test_sizes_are_references_and_name_their_mates() -> None:
+    # Fit audit 2b-final (rule 4): the square is bought and never cut, so it
+    # prints the stock, (.197) SQ, AS SUPPLIED; the pivot is turned to the
+    # v-block's drilled bore (form 2), so it prints (Ø.126) REF and note 1's
+    # clearance is the requirement.  The part carries no native band.
+    assert not hasattr(spec, "DRAWING_BANDS")
+    assert model_toleranced_dimensions(part) == {}
+    assert "set_dimension_bilateral_tolerance" not in _PART_SOURCE
     assert "apply_drawing_precision(adapter, DRAWING_PRECISION)" in _PART_SOURCE
-    # Every banded dimension names its mate (rule 4), the shoulder radius its
-    # seat face's part.
-    assert {
-        name
-        for feature, name in spec.DRAWING_BANDS
-        if name in spec.DRAWING_DIMENSIONS[feature]
-    } | {"ShoulderRadius"} <= set(spec.DIMENSION_CALLOUTS)
-    # Section keeps its model band unprinted: Depth's SQ states the width,
-    # so the two bands must be one.
-    assert ("RodProfile", "Section") in spec.DRAWING_BANDS
+    assert spec.REFERENCE_DIMENSIONS == frozenset({"Depth", "PivotDia"})
+    assert spec.DRAWING_PRECISION["Rod"]["Depth"] == 3
+    assert spec.DRAWING_PRECISION["PivotProfile"]["PivotDia"] == 3
+    assert "rod.REFERENCE_DIMENSIONS" in _DRAWING_SOURCE
+    assert 'diameter=name == "PivotDia"' in _DRAWING_SOURCE
+    # Every REF size names its mate (rule 4), the shoulder radius its seat
+    # face's part.
+    references = spec.REFERENCE_DIMENSIONS | {"ShoulderRadius"}
+    assert references <= set(spec.DIMENSION_CALLOUTS)
     assert "Section" not in spec.DRAWING_DIMENSIONS["RodProfile"]
-    assert (
-        spec.DRAWING_BANDS[("RodProfile", "Section")]
-        == spec.DRAWING_BANDS[("Rod", "Depth")]
+    assert spec.DIMENSION_CALLOUTS["Depth"] == (
+        f"SQ, AS SUPPLIED\n{spec.PEN_HANGER_NUMBER} IS CUT TO IT"
     )
-    assert spec.DIMENSION_CALLOUTS["Depth"].startswith("SQ")
-    assert spec.PEN_HANGER_NUMBER in spec.DIMENSION_CALLOUTS["Depth"]
+    # Rows no longer than the 23 characters the end view's block holds.
+    assert max(map(len, spec.DIMENSION_CALLOUTS["Depth"].splitlines())) <= 23
     # The pivot's mate rides note 1, which its SEE NOTE links (rule 7).
     assert spec.PEN_V_BLOCK_NUMBER in spec.DRAWING_NOTES
     assert drawing.DIMENSION_CALLOUTS == {
@@ -328,7 +322,7 @@ def test_bands_are_model_owned_and_name_their_mates() -> None:
     )
 
 
-def test_pivot_band_clears_the_v_block_pivot_bore() -> None:
+def test_pivot_analysis_band_clears_the_v_block_pivot_bore() -> None:
     import pn_pen_v_block_spec as v_block
 
     # Owner ruling 2026-11-24, fit audit question 20: the block's bore is
@@ -336,13 +330,14 @@ def test_pivot_band_clears_the_v_block_pivot_bore() -> None:
     assert spec.PIVOT_BORE_DIA == v_block.PIVOT_BORE_DIA
     assert spec.PIVOT_BORE_DIA == pytest.approx(0.1285 * 25.4)
     assert spec.PIVOT_DIA == pytest.approx(0.126 * 25.4)
+    # Rule 4 form 2: the pivot is turned to that bore.  PIVOT_BAND, no longer
+    # printed, is the pin that keeps note 1's clearance in every drilled
+    # bore: always a clearance (slip) fit, its range at least .001 wide.
     shaft_max = spec.PIVOT_DIA + spec.PIVOT_BAND[0]
     bore_min = v_block.PIVOT_BORE_DIA + v_block.PIVOT_BORE_BAND[1]
-    assert shaft_max < bore_min  # always a clearance (slip) fit
-    # #2437: the block's set screw clamps the pivot once the yaw is set, so
-    # the pivot is turned to number: its band is at least the shop's
-    # turned-diameter row (+/-.0005, .001 wide), no measured-bore route.
-    assert spec.PIVOT_BAND[0] - spec.PIVOT_BAND[1] >= 0.001 * 25.4
+    assert shaft_max < bore_min
+    low, high = spec.PIVOT_CLEARANCE_MM
+    assert high - low >= 0.001 * 25.4
     assert spec.PIVOT_DIA < spec.ROD_SECTION  # a real shoulder
 
 
@@ -370,10 +365,11 @@ def test_stud_tap_drill_leaves_a_plug_tap_lead_at_the_printed_bands() -> None:
         assert depth / 25.4 == pytest.approx(round(depth / 25.4, 2), abs=1e-9)
 
 
-def test_square_is_bought_key_stock_inside_the_printed_band() -> None:
+def test_square_is_bought_key_stock_inside_its_band() -> None:
     """#2438: the square stays as the key stock supplies it, so its whole
-    catalogue section lies inside the printed SQ band, one bar yields the rod,
-    and the title-block finish says the square takes no cut."""
+    catalogue section lies inside SECTION_BAND (the tap wall's analysis
+    band), one bar yields the rod, the title-block finish says the square
+    takes no cut and the SQ size prints it AS SUPPLIED (rule 4)."""
     import _config
 
     low, high = spec.STOCK_SECTION_MIN, spec.STOCK_SECTION_MAX
@@ -384,6 +380,7 @@ def test_square_is_bought_key_stock_inside_the_printed_band() -> None:
     assert spec.STOCK_SKU in str(row["material_specification"])
     assert "square as supplied" in str(row["finish"]).lower()
     assert "AS SUPPLIED" not in spec.DRAWING_NOTES
+    assert "AS SUPPLIED" in spec.DIMENSION_CALLOUTS["Depth"]
 
 
 def test_overall_length_is_one_parenthesised_reference() -> None:
@@ -436,15 +433,17 @@ def test_slide_axis_is_axis1_through_the_rod_axis() -> None:
 
 
 def test_pivot_fit_route_is_note_1_linked_from_the_diameter() -> None:
-    """The pivot's mate and its clearance (REF) ride a numbered note the
-    diameter links to (drawing-guidelines.md rules 4 and 7)."""
+    """The pivot's mate and its clearance, the requirement of a pivot turned
+    to its bore (rule 4 form 2), ride a numbered note the (Ø.126) REF links
+    to (drawing-guidelines.md rules 4 and 7)."""
     assert spec.DIMENSION_CALLOUTS["PivotDia"] == f"SEE NOTE {spec.PIVOT_FIT_NOTE}"
     lines = spec.DRAWING_NOTES.splitlines()
     assert len(lines) <= 4
     assert lines[0].startswith(f"{spec.PIVOT_FIT_NOTE}. ")
     assert spec.PEN_V_BLOCK_NUMBER in spec.DRAWING_NOTES
-    # The stated clearance is what the printed limits give in the #30 bore
-    # (the DRILLED HOLES row), before the set screw clamps the pivot.
+    # The clearance is what PIVOT_BAND gives in any #30 bore of the DRILLED
+    # HOLES row, before the set screw clamps the pivot: the range the set
+    # screw's reach to the groove was proved with (pn-pen-rod.yaml N-01).
     from pn_pen_v_block_spec import PIVOT_BORE_BAND, PIVOT_BORE_DIA
 
     bore = (PIVOT_BORE_DIA + PIVOT_BORE_BAND[1], PIVOT_BORE_DIA + PIVOT_BORE_BAND[0])
@@ -455,6 +454,8 @@ def test_pivot_fit_route_is_note_1_linked_from_the_diameter() -> None:
     assert spec.PIVOT_CLEARANCE_MM == pytest.approx((0.0030 * 25.4, 0.0085 * 25.4))
     clearance = "-".join(spec._inch_text(mm) for mm in spec.PIVOT_CLEARANCE_MM)
     assert f"(CLEARANCE {clearance})" in spec.DRAWING_NOTES
+    assert f"{spec.PEN_V_BLOCK_NUMBER} PIVOT BORE. TURN TO IT" in lines[0]
+    assert max(map(len, lines)) <= 53
     # Note 1 stands in the field under the side view, right of the tap's
     # callout and under the R MAX block, left of the title block's top.
     x, y = drawing.NOTES_XY

@@ -155,7 +155,10 @@ GUIDE_ENGAGE_MARGIN = 3.0
 # weight (note 2), and with a SLOT_FIT_FEELER leaf beside it enters neither
 # (the callout's clearance, read with the owned feelers).  No pin gauges.
 SLOT_WIDTH = 5.1054  # (.201) REF, the traveler's two passes
-SLOT_FIT_FEELER = 0.1778  # .007, the clearance's upper limit
+# .007, the clearance's upper limit.  It stays a limit: past .0074 the rod's
+# lean (GUIDE_TILT_MAX below) fails its 0.25 deg guard; the reason is in
+# cad/config/necessity/pn-pen-hanger.yaml, not on the sheet.
+SLOT_FIT_FEELER = 0.1778
 # The plate's reach (strap front to plate front) and its slot depth, both
 # printed from the plate's free end.  The slots are required in line after
 # the bond cures (note 2); the shop reaches that by cutting both in one

@@ -4,20 +4,20 @@ The SLDPRT remains authoritative.  This recipe supplies only the rod's views,
 the placement of its imported model dimensions, the stud-tap callout, the
 overall-length reference, VIEW A's viewing arrow and the property-linked
 notes; sheet/template and export behavior lives in ``_drawing_common``.
-Places, bands, mate callouts and the pivot's fit note are authored on the
-part (``pn_pen_rod_spec``, the groove's in ``pn_pen_rod_groove_spec``).
+Places, references, mate callouts and the pivot's fit note are authored on
+the part (``pn_pen_rod_spec``, the groove's in ``pn_pen_rod_groove_spec``).
 
 The sheet prints decimal inch (the part's ``drawing_unit: in``).  The side
 view (2:1, the sheet scale) lays the rod axis horizontal, as the bar sits in
 the lathe (drawing-guidelines.md rule 11), and carries the square's and the
-pivot's lengths from the shoulder, the pivot's banded diameter between its
-flanks (SEE NOTE 1: its mate), the shoulder root's R MAX, the (4.82)
+pivot's lengths from the shoulder, the pivot's (Ø.126) REF between its
+flanks (SEE NOTE 1: turned to its mate), the shoulder root's R MAX, the (4.82)
 end-to-end reference and VIEW A's lettered arrow onto the tapped top face;
-VIEW A (5:1) under it looks at that face and carries the square's banded SQ
-size, the native Hole Wizard callout of the #0-80 stud tap, its drill Ø at
-.XXX and both depths at .XX, and the tap's .067 MIN wall (RV-01, from the
-part's hidden TapWallReference sketch, shown in that view only).  DETAIL B
-(5:1, a cropped *Front model view turned like the side view: the
+VIEW A (5:1) under it looks at that face and carries the square's (.197) REF
+SQ, AS SUPPLIED, the native Hole Wizard callout of the #0-80 stud tap, its
+drill Ø at .XXX and both depths at .XX, and the tap's .067 MIN wall (RV-01,
+from the part's hidden TapWallReference sketch, shown in that view only).
+DETAIL B (5:1, a cropped *Front model view turned like the side view: the
 draw_mg_wheel_axle detail-A recipe) carries the set-screw relief groove
 (#2439): both walls from the shoulder and the floor's Ø, each SEE NOTE 2.
 The labelled 1:1 isometric sits right, the notes in the field under the
@@ -216,15 +216,17 @@ _END_HALF_M = _HALF * END_SCALE[0] / END_SCALE[1] / 1000.0
 #     (ARROW_SIDES) so no outside tail runs left toward the Ø's line;
 #   row 3 (y 0.2045): the (4.82) reference, end face to end face, its line
 #     at y ~0.2017 and its text ~0.2026..0.2061 (audit offsets).
-# Ø.1260 -.0005/-.0020 between the pivot flanks: its line stands 5.75 mm
-#   left of the pivot end (x 0.07675), the flanks' extension lines reaching
-#   it, so it rises past every row clear of their lines (all start at the
-#   pivot end or right of it) to the four-row ~56 x 20 mm block centred at
-#   y 0.2225: shoulder y ~0.2124 (6.3 mm over the (4.82) text), top
-#   ~0.2325.  Hanging left it spans x 0.0210..0.0768 (8.3 mm inside the
-#   border), hanging right 0.0768..0.1326; either way only its bottom row's
-#   end meets the line, at the shoulder.  Under the rod its outside-arrow
-#   tail (6.35 mm) runs to y ~0.1597 at x 0.0768, where nothing else is.
+# (Ø.126) REF over SEE NOTE 1 between the pivot flanks: its line stands
+#   5.75 mm left of the pivot end (x 0.07675), the flanks' extension lines
+#   reaching it, so it rises past every row clear of their lines (all start
+#   at the pivot end or right of it) to its block centred at y 0.2225.  The
+#   keep was laid out for the four-row ~56 x 20 mm block of the banded
+#   diameter it replaced (fit audit 2b-final, rule 4 form 2): shoulder y
+#   ~0.2124 (6.3 mm over the (4.82) text), top ~0.2325, hanging left x
+#   0.0210..0.0768 (8.3 mm inside the border), hanging right 0.0768..0.1326;
+#   the two rows stand inside that envelope, and only the bottom row's end
+#   meets the line, at the shoulder.  Under the rod its outside-arrow tail
+#   (6.35 mm) runs to y ~0.1597 at x 0.0768, where nothing else is.
 # Below the rod, where the ShoulderRadius's arc is (model +X, the root the
 # vertical layout's leader found):
 #   R.008 MAX / SEATS ON PEN V-BLOCK / MHA-PN-05 down-right of the root:
@@ -262,12 +264,15 @@ _FRAME_TOL_M = 2.5e-4
 _CENTER_MARK_ANNOTATION = 13  # swAnnotationType_e.swCenterMarkSym
 
 # End view (5:1, square 0.0675..0.0925 x 0.0625..0.0875).  The SQ size's
-# four-row block centres on its dimension line (audit 20261014T053239477Z:
-# rows 66.6 mm wide at most, from keep y - 10.08 to keep y + 9.06 mm), so
-# keep y = centre + 0.51 mm centres it: y 0.0654..0.0846, 2.9 mm inside
-# each extension line (0.0625/0.0875).  Its line 52 mm right of the
-# centre puts the block at x 0.0987..0.1653, 6.2 mm right of the square
-# and ~3 mm past the centre mark's extended arm.  The tap callout keeps the
+# block centres on its dimension line.  The keep was laid out for the
+# four-row block of the banded size it replaced (audit 20261014T053239477Z:
+# rows 66.6 mm wide at most, from keep y - 10.08 to keep y + 9.06 mm); the
+# REF's three rows, no wider (fit audit 2b-final, rule 4: stock AS
+# SUPPLIED), stand inside it.  Keep y = centre + 0.51 mm centred that
+# block: y 0.0654..0.0846, 2.9 mm inside each extension line
+# (0.0625/0.0875).  Its line 52 mm right of the centre puts the block at x
+# 0.0987..0.1653, 6.2 mm right of the square and ~3 mm past the centre
+# mark's extended arm.  The tap callout keeps the
 # green sheet's offsets from the hole (text centred on keep x, 45.6 mm wide,
 # shoulder 5.6 mm under keep y): x 0.0792..0.1248, y 0.1044..0.1135, 17 mm
 # over the square, 18 mm over the block, 7 mm left of the SQ line's upper
@@ -404,9 +409,10 @@ ISO_NOTE_XY = (ISO_CENTER[0] - 0.030, ISO_CENTER[1] - 0.0577 - 0.008)
 # code that prints it, in the part frame (pn_pen_rod_spec: the origin on the
 # rod axis at the shoulder, the square running +Y to its tapped top face,
 # its flats square to X and Z; the pivot running -Y).  The square is bought
-# key stock left as supplied (its SQ band holds the catalogue section).  The
-# shoulder root's R.008 MAX rides on the pivot.  The declarations print
-# nothing.
+# key stock left as supplied, printed (.197) REF; its across-flats limits
+# are SECTION_BAND, the analysis band the catalogue section lies in (the
+# traveler's receiving check), not a printed band.  The shoulder root's
+# R.008 MAX rides on the pivot.  The declarations print nothing.
 _P = DRAWING_PRECISION_BY_NAME
 _SELF = "draw_pn_pen_rod"
 _GROOVE = "pn_pen_rod_groove_spec"
@@ -460,8 +466,8 @@ requirement(
     requirements=("plane",),
     fields={"plane": (_plane("y", -rod.PIVOT_LENGTH), (_FRAME, "PIVOT_LENGTH"))},
 )
-# The square's four flats, the bought key stock's: .197 +.000/-.002 SQ, the
-# hanger's slots cut to it (END_KEEP "Depth"), across each pair.
+# The square's four flats, the bought key stock's: (.197) REF, SQ, AS
+# SUPPLIED, the hanger's slots cut to it (END_KEEP "Depth"), across each pair.
 for _name, _axis, _sign, _pair in (
     ("flat_x_pos", "x", 1.0, "flat_x_neg"),
     ("flat_x_neg", "x", -1.0, None),
@@ -497,9 +503,12 @@ for _name, _axis, _sign, _pair in (
         fields=_fields,
         precision={"across": _P["Depth"]} if _pair is not None else None,
     )
-# The turned pivot: Ø.1240-.1255, a sliding fit in the v-block's reamed
-# pivot bore (note 1; SIDE_KEEP "PivotDia"), .41 long from the shoulder
-# (SIDE_KEEP "PivotLength"), its root R.008 MAX (SIDE_KEEP "ShoulderRadius").
+# The turned pivot: (Ø.126) REF, turned to the v-block's #30 drilled pivot
+# bore at note 1's clearance (rule 4 form 2; SIDE_KEEP "PivotDia"), .41 long
+# from the shoulder (SIDE_KEEP "PivotLength"), its root R.008 MAX (SIDE_KEEP
+# "ShoulderRadius").  Its "dia" limits are PIVOT_BAND, the analysis band
+# that keeps note 1's clearance in every drilled bore (the traveler turns
+# to it), not a printed band.
 requirement(
     "pivot",
     kind="outside_cylinder",
@@ -1226,7 +1235,7 @@ def build(adapter: Any) -> dict[str, str]:
 
     # PivotDia imports straight into the side view: every farm leaf of the
     # vertical layout logged its targeted *Front import delivering it
-    # (unrequested, then deleted), so the turned pivot's banded diameter is
+    # (unrequested, then deleted), so the turned pivot's diameter is
     # dimensioned between its flanks where the lathe reads it (rule 11).
     annotations = [
         *detail_annotations,
@@ -1246,6 +1255,25 @@ def build(adapter: Any) -> dict[str, str]:
         ),
     ]
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
+    # The square's stock and the pivot's size print as references (rule 4:
+    # the key stock AS SUPPLIED; the pivot turned to its mate, note 1).
+    references = [
+        (dimension_name(adapter, item), item)
+        for item in annotations
+        if dimension_name(adapter, item) in rod.REFERENCE_DIMENSIONS
+    ]
+    if sorted(name for name, _ in references) != sorted(rod.REFERENCE_DIMENSIONS):
+        raise RuntimeError(
+            "expected one native reference dimension each: "
+            f"{sorted(rod.REFERENCE_DIMENSIONS)}"
+        )
+    for name, item in references:
+        set_reference_dimension(
+            adapter,
+            item,
+            label=f"pen-rod {name} reference",
+            diameter=name == "PivotDia",
+        )
     _dress_shoulder_radius(adapter, annotations)
     _set_arrow_sides(adapter, annotations)
     # Places (and so each dimension's tolerance) are authored on the part; the

@@ -121,6 +121,33 @@ def test_relief_corners_print_r065_and_clear_the_grip_at_r070() -> None:
     assert spec.RELIEF_CORNER_GRIP_MARGIN_MIN >= 0.25
 
 
+def test_relief_corner_callout_stands_off_the_part_beside_the_bottom_view() -> None:
+    # Fan-out 2b-final (rule 14): inside the slot the three rows sat in the
+    # bottom view's silhouette with the sheet right of it empty.  They stand
+    # there now, right of the depth's line, over the title block, under the
+    # paper-end view's rows; the leader rises from the near corner's centre
+    # through the neck, clear of the V's mouth edge and under the ".08"'s
+    # lower arrow (~6.2 mm from its extension line, measured on the 2b sheet).
+    keep_x, keep_y = drawing.BOTTOM_KEEP["ReliefCornerR"]
+    half_w, half_h = drawing._CORNER_TEXT_HALF_W, 0.0075
+    left = keep_x - half_w
+    depth_line = drawing.BOTTOM_KEEP["Depth"][0]
+    assert left == pytest.approx(drawing._CORNER_TEXT_LEFT)
+    assert left > depth_line + 0.005 > drawing._fx(0.0)
+    assert keep_y - half_h > 0.0651 + 0.03  # the title block's top
+    assert keep_y + half_h < drawing.RIGHT_KEEP["VMouthZ1"][1] - 0.0033 - 0.008
+    assert keep_x + half_w < drawing.ISO_CENTER[0] - 0.0350 * 1.5 / 2.0 - 0.03
+    centre_x, centre_y = drawing._CORNER_CENTRE
+    shelf_y = keep_y - drawing._CORNER_SHELF_DROP
+    slope = (shelf_y - centre_y) / (left - centre_x)
+    assert 0.0 < slope < math.tan(math.radians(5.0))
+    step_wall_y = centre_y + slope * (drawing._fx(spec.RELIEF_X0) - centre_x)
+    assert step_wall_y > drawing._bz(spec.V_MOUTH_Z0) + 0.001
+    neck_arrow_x = drawing.BOTTOM_KEEP["NeckZ0"][0]
+    at_neck_arrow = centre_y + slope * (neck_arrow_x - centre_x)
+    assert at_neck_arrow < drawing._bz(0.0) - 0.0062 - 0.0015
+
+
 def test_pivot_bore_drops_wholly_into_the_slot_at_its_printed_limits() -> None:
     import pn_pen_carriage_geom as carriage
     import pn_vn_pen_marker_spec as marker

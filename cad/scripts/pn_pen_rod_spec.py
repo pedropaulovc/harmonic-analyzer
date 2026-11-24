@@ -42,10 +42,13 @@ PEN_V_BLOCK_NUMBER = _config.parts("pn-pen-v-block")["number"]
 # 90457A730, 360 brass machine key stock, 5 x 5 mm, DIN 6880 undersized
 # (height and width -0.030 to 0.000 mm), 305 mm long (-1.000 to +1.000 mm),
 # $13.23, read live 2026-11-12 (https://www.mcmaster.com/90457A730/).  Its
-# section lies inside the printed band, so the square stays as supplied --
-# flats and the long edges' factory break (DIN 6880 key stock; the page
-# states no edge form), which the title-block FINISH covers: only the ends
-# are faced, the pivot turned and the stud tap cut.
+# section lies inside SECTION_BAND, so the square stays as supplied -- flats
+# and the long edges' factory break (DIN 6880 key stock; the page states no
+# edge form), which the title-block FINISH covers: only the ends are faced,
+# the pivot turned and the stud tap cut.  A size bought and never cut prints
+# the stock, not limits (drawing-guidelines.md rule 4): (.197) REF, SQ, AS
+# SUPPLIED.  SECTION_BAND is the analysis band the catalogue section lies in
+# (the tap wall below, the hanger's slot), not a printed band.
 ROD_SECTION = 5.0038  # .197
 SECTION_BAND = (0.0, -0.0508)  # +.000/-.002
 STOCK_SKU = "90457A730"
@@ -59,7 +62,7 @@ if not (
     <= STOCK_SECTION_MAX
     <= ROD_SECTION + SECTION_BAND[0]
 ):
-    raise AssertionError(f"{STOCK_SKU} key stock is not inside the printed square band")
+    raise AssertionError(f"{STOCK_SKU} key stock is not inside the square's band")
 # Square length: the shoulder sits on the v-block top and the top face carries
 # the jam nut + adjuster stud under the wheel rim. 112 puts the top at the
 # engineerguy 4/4 (9:15-10:34) photo ratio -- rod top ~1.6 rod-lengths of
@@ -74,12 +77,14 @@ SQUARE_LENGTH = 112.0  # closure (module docstring); prints 4.41
 # pivot only has to drop into the bore by hand and turn while the pen's yaw
 # is set: the block's cup-point set screw then clamps it (MHA-PN-00 steps
 # 4A-4B), so nothing runs in the bore and any clearance is taken up by the
-# clamp (#2437).  -.0005/-.0020 is a .0015 band, inside the shop's
-# turned-diameter row (+/-.0005 holds .001), so it is turned to number with a
-# micrometer, not to a measured bore; it keeps the set screw's cup on the
-# relief groove's floor (pn_pen_carriage_geom; the reason is in
+# clamp (#2437).  Rule 4 form 2: the pivot is turned to that drilled bore,
+# printed (Ø.126) REF, and note 1's clearance .0030-.0085 is the requirement
+# (fit audit 2b-final).  PIVOT_BAND is analysis only, no longer printed: the
+# pin whose clearance in any #30 bore of the DRILLED HOLES row is that range
+# (PIVOT_CLEARANCE_MM), the range the set screw's reach to the relief
+# groove's floor was proved with (pn_pen_carriage_geom; the reason is in
 # cad/config/necessity/pn-pen-rod.yaml).
-PIVOT_DIA = 3.2004  # .126
+PIVOT_DIA = 3.2004  # (.126) REF
 PIVOT_BAND = (-0.0127, -0.0508)  # -.0005/-.0020: .0030-.0085 in the #30 bore
 PIVOT_LENGTH = 10.414  # .41, shoulder to end: stops clear above the v-block relief roof
 
@@ -185,13 +190,13 @@ if PIVOT_DIA / 2.0 + SHOULDER_FILLET_R >= (ROD_SECTION + SECTION_BAND[1]) / 2.0:
 DRAWING_REFERENCE_PRECISION = 2
 
 # Side view (2:1, rod axis horizontal as in the lathe): the square's length,
-# the pivot's length and banded diameter, and the shoulder root's MAX radius.
-# End view (5:1) of the tapped top face: the square's banded depth, which the
-# SQ in its callout makes the size of both flats (Section and Depth are one
-# "RodSection" global, so the model holds the square), the stud-tap wizard
-# callout, and RV-01's tap wall (TapWallMin on the hidden TapWallReference).
-# Section keeps its model band but is not printed: one SQ size defines a
-# square (fr_rocker_arm_support's WinWidth "SQ POCKET").
+# the pivot's length and its (Ø.126) REF, and the shoulder root's MAX radius.
+# End view (5:1) of the tapped top face: the square's (.197) REF depth as
+# supplied, which the SQ in its callout makes the size of both flats
+# (Section and Depth are one "RodSection" global, so the model holds the
+# square), the stud-tap wizard callout, and RV-01's tap wall (TapWallMin on
+# the hidden TapWallReference).  Section is not printed: one SQ size defines
+# a square (fr_rocker_arm_support's WinWidth "SQ POCKET").
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "RodProfile": {"Length"},
     "Rod": {"Depth"},
@@ -200,15 +205,15 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "ShoulderFillet": {"ShoulderRadius"},
     "TapWallReference": {"TapWallMin"},
 }
-# Places (drawing-guidelines.md rule 3): the banded square and pivot print at
-# their bands' places (.XXX, .XXXX); the square's length (the guide
-# engagement) and the pivot's length (clear of the v-block relief roof) print
-# the title block's .XX; the shoulder radius prints its MAX limit at three,
-# the tap wall its MIN limit at three.
+# Places (drawing-guidelines.md rule 3): the square's and the pivot's REF
+# sizes print .XXX; the square's length (the guide engagement) and the
+# pivot's length (clear of the v-block relief roof) print the title block's
+# .XX; the shoulder radius prints its MAX limit at three, the tap wall its
+# MIN limit at three.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "RodProfile": {"Length": 2},
     "Rod": {"Depth": 3},
-    "PivotProfile": {"PivotDia": 4},
+    "PivotProfile": {"PivotDia": 3},
     "Pivot": {"PivotLength": 2},
     "ShoulderFillet": {"ShoulderRadius": SHOULDER_FILLET_PLACES},
     "TapWallReference": {"TapWallMin": TAP_WALL_MIN_PLACES},
@@ -223,27 +228,20 @@ if DRAWING_PRECISION.keys() != DRAWING_DIMENSIONS.keys() or any(
     for feature, names in DRAWING_DIMENSIONS.items()
 ):
     raise AssertionError("every marked pen-rod dimension needs authored places")
-# (feature, dimension) -> (upper, lower) native band.  Section (the width)
-# keeps its band on the model; the sheet states it through Depth's SQ.
-DRAWING_BANDS: dict[tuple[str, str], tuple[float, float]] = {
-    ("RodProfile", "Section"): SECTION_BAND,
-    ("Rod", "Depth"): SECTION_BAND,
-    ("PivotProfile", "PivotDia"): PIVOT_BAND,
-}
-if DRAWING_BANDS[("RodProfile", "Section")] != DRAWING_BANDS[("Rod", "Depth")]:
-    raise AssertionError("one SQ size can only state a square whose flats share a band")
-# Every tight band names its mate on the dimension it governs (rule 4); the
-# shoulder radius names the part its seat face lands on, the tap wall what
-# it is.  The pivot names its mate on numbered note PIVOT_FIT_NOTE, linked
-# from the diameter by SEE NOTE (rule 7: the note counts as at the callout;
-# two lines of words would overrun the border from the diameter's
-# left-hanging block).
+# No native band (rule 4): the square prints its stock as a reference, the
+# pivot its size as a reference turned to its mate (form 2).  Both REF sizes
+# name their mate; the shoulder radius names the part its seat face lands
+# on, the tap wall what it is.  The pivot names its mate on numbered note
+# PIVOT_FIT_NOTE, linked from the diameter by SEE NOTE (rule 7: the note
+# counts as at the callout; two lines of words would overrun the border from
+# the diameter's left-hanging block).
+REFERENCE_DIMENSIONS: frozenset[str] = frozenset({"Depth", "PivotDia"})
 PIVOT_FIT_NOTE = 1
 # The pivot in the v-block's #30 drilled bore (owner ruling 2026-11-24, fit
 # audit question 20; pn_pen_v_block_spec.PIVOT_BORE_DIA and PIVOT_BORE_BAND,
 # a module that imports this one, so the drill's size and the DRILLED HOLES
 # row are restated here and test_pn_pen_rod_drawing pins them equal):
-# .0030-.0085 diametral before the set screw clamps it, printed as REF.
+# .0030-.0085 diametral before the set screw clamps it, note 1's requirement.
 PIVOT_BORE_DIA = 3.2639  # .1285, a #30 drill
 _BORE_LOW, _BORE_HIGH = PIVOT_BORE_DIA, PIVOT_BORE_DIA + drilled_oversize_mm(unit=UNIT)
 _PIN_LOW, _PIN_HIGH = (PIVOT_DIA + deviation for deviation in deviations(PIVOT_BAND))
@@ -260,17 +258,18 @@ def _inch_text(mm: float) -> str:
 # made last; this sheet names the mate and says it is cut to the rod.  Rows
 # no longer than the 23 characters the end view's block was laid out for.
 DIMENSION_CALLOUTS: dict[str, str] = {
-    "Depth": f"SQ, PEN HANGER\n{PEN_HANGER_NUMBER} IS CUT TO IT",
+    "Depth": f"SQ, AS SUPPLIED\n{PEN_HANGER_NUMBER} IS CUT TO IT",
     "PivotDia": f"SEE NOTE {PIVOT_FIT_NOTE}",
     "ShoulderRadius": f"SEATS ON PEN V-BLOCK\n{PEN_V_BLOCK_NUMBER}",
     "TapWallMin": TAP_WALL_CALLOUT,
 }
 # The square's flats and long edges are the key stock's own: the title-block
-# FINISH says so (rule 2; pn-pen-rod.yaml), so the sheet needs no note for it
-# and the SQ size above still states the band the stock must hold.
+# FINISH says so (rule 2; pn-pen-rod.yaml) and the SQ size above prints it
+# AS SUPPLIED, so the sheet needs no note for it.  Note 1 is the pivot's
+# fit, the acceptance of the member made last (rule 4 form 2).
 DRAWING_NOTES = "\n".join(
     (
-        f"{PIVOT_FIT_NOTE}. PIVOT: CLAMPED IN {PEN_V_BLOCK_NUMBER} PIVOT BORE",
+        f"{PIVOT_FIT_NOTE}. PIVOT: CLAMPED IN {PEN_V_BLOCK_NUMBER} PIVOT BORE. TURN TO IT",
         "   (CLEARANCE "
         f"{_inch_text(PIVOT_CLEARANCE_MM[0])}-{_inch_text(PIVOT_CLEARANCE_MM[1])}).",
     )
