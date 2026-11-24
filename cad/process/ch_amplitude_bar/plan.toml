@@ -25,8 +25,8 @@
 # 1 in hole) runs horizontally on the vertical spindle: its periphery cuts
 # the root straight across the bar's depth with the saw's sharp corners, its
 # faces cut the notch walls, two passes per width (kerf: the .064 saw twice,
-# the second level .043 above the first for the foot's .104-.110, .0635 for
-# the top's .124-.131).
+# the second level .043 above the first for the foot's .104-.110, .064 for
+# the top's .124-.134: two saw widths, .128, the most two passes reach).
 #
 # The saw's arbor is the owned R8 stepped saw arbor (cad/config/shop-
 # equipment/ tools.saw-arbor-r8-stepped, owner 2026-11-24; shop key
@@ -322,7 +322,7 @@ saw_drive_torque_max_nm = 22.1
 # foot_notch_rise_mm, top_notch_rise_mm) plus the saw's swept thickness, its
 # miked thickness t plus its axial runout at the rim. Swept from the width's
 # least less the rise to its most less the rise and saw_swept_margin_mm
-# (.0005): foot .0610-.0665, top .0605-.0670; the foot's window lies inside
+# (.0005): foot .0610-.0665, top .0600-.0695; the foot's window lies inside
 # the top's, so both setups read to the foot's limit and Setup 3's t serves
 # both (cam.py checks them). The lever indicator reads the saw's lower face 1/8
 # in in from the teeth, where the rim's runout shows 1/1.10 of itself:
@@ -340,12 +340,12 @@ saw_swept_margin_mm = 0.0127
 saw_depth_margin_mm = 0.0508
 saw_axial_reading_per_in_mm = 23.091
 foot_notch_rise_mm = 1.0922
-top_notch_rise_mm = 1.6129
+top_notch_rise_mm = 1.6256
 foot_saw_swept_min_mm = 1.5494
 foot_saw_swept_max_mm = 1.6891
 foot_saw_axial_nominal_mm = 0.0577
-top_saw_swept_min_mm = 1.5367
-top_saw_swept_max_mm = 1.7018
+top_saw_swept_min_mm = 1.524
+top_saw_swept_max_mm = 1.7653
 foot_saw_radial_tir_max_mm = 0.4063
 top_saw_radial_tir_max_mm = 0.4064
 # The saw's touch-off station: over the middle of the bar against the fixed
@@ -369,7 +369,7 @@ saw_park_z_mm = 11.35
 # Notch targets: each band's middle, from the export (cam.py checks them).
 foot_notch_width_mm = 2.7178
 foot_notch_depth_mm = 2.1273
-top_notch_width_mm = 3.2385
+top_notch_width_mm = 3.2512
 top_notch_depth_mm = 13.97
 # The top notch is cut in equal steps into the end no deeper than .118 (3.0
 # mm) at each of its two levels: in one 13.97 mm bite the saw's push would
