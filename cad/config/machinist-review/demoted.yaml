@@ -41,9 +41,7 @@ demoted:
   dt_crank_hub: fit-batch-dt
   dt_crank_pinion: fit-batch-dt
   dt_crankshaft: fit-batch-dt
-  dt_cylinder_gear: fit-batch-dt
   dt_cylinder_gear_shaft: fit-batch-dt
-  dt_cylinder_gear_tl_cam_fixture: fit-batch-dt
   dt_cylinder_gear_tl_cam_turning_assembly: fit-batch-dt
   dt_drive_train_assembly: fit-batch-dt
   dt_pinion_arbor: fit-batch-dt
