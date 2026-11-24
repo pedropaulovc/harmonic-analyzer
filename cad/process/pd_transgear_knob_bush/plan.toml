@@ -15,7 +15,14 @@
 # Setup 2, the bar pulled out, rear end out: face the rear face (Z0), turn
 # the hub to its .51-.53 band back past the parting line, then the press
 # diameter and the shoulder (datum A): Op 80 finishes the press diameter to
-# the PILOT reading plus .0005-.0016, the sheet's interference.
+# the PILOT reading plus .0007-.0016. That is the sheet's .0005-.0016 over
+# the hole (Codjiflo #3486: the pilot stands in for the hole, so its slip
+# comes off the interference): Op 10 mikes the pilot after every pass and
+# writes the last two readings, the one the plate would not go on (BEFORE)
+# and the one it slides on (PILOT); the hole lies between them, so with
+# BEFORE at most .0002 over PILOT (pilot_step_max_in) a press diameter of
+# PILOT plus .0007 is at least .0005 over the hole, and PILOT plus .0016 at
+# most .0016 over it.
 # The shoulder's root is formed by the P1 blade's corner
 # (R.005 MAX; the AR's R0.4 mm nose cannot form it). Then spot and drill B
 # (.238) through past the parting line in the same chucking, and part off
@@ -121,15 +128,21 @@ pin_tilt_reading_max_mm = 0.015
 # The feeler leaf the tools are touched through (the shop's feeler gauges,
 # cad/config/shop-equipment/gauges.toml feeler-gauges).
 touch_leaf_in = 0.002
-# Setup 1's pilot: the length of the bar's end turned to a slip in
-# MHA-PD-19's hole, the diameter the AR roughs it to before the fitting
-# passes, the bar's stick-out for it (authored, short), and the smallest
-# the pilot can come out (under the .4385 reamer's hole), for the hold.
+# Setup 1's pilot: the bar's stick-out for it (authored, short), the
+# smallest the pilot can come out (under the .4385 reamer's hole), for the
+# hold, the length of the bar's end turned to a slip in MHA-PD-19's hole,
+# the diameter it is turned to before the fitting passes (over the largest
+# hole the reamer is modelled to cut, .4390), the most the last fitting
+# pass may take off the diameter, and the least the press diameter stands
+# over PILOT: the sheet's least interference plus that step
+# (test_pd_transgear_knob_bush_drawing holds the sum).
 pilot_stickout_in = 1.0
 pilot_stickout_mm = 25.4
 pilot_min_dia_mm = 11.1
 pilot_length_in = 0.06
-pilot_rough_dia_in = 0.445
+pilot_rough_dia_in = 0.44
+pilot_step_max_in = 0.0002
+press_over_pilot_min_in = 0.0007
 
 [[tools]]
 id = "ar"
@@ -199,15 +212,15 @@ speed_kind = "spindle"
 tool = "ar"
 drilling = "none"
 sizing = "other"
-instruction = "Face the sawn end square. Turn the first {{process.pilot_length_in:.2dot}} in of the end to Ø{{process.pilot_rough_dia_in:.3dot}}, cutting oil, then in passes of .0005 a side or less. After each, spindle stopped, offer MHA-PD-19's hole to the pilot by hand, both wiped clean, chamfered side first. Stop when the plate first slides on without shake. Mike the pilot; write PILOT = ______."
+instruction = "Face the sawn end square. Turn the first {{process.pilot_length_in:.2dot}} in of the end to Ø{{process.pilot_rough_dia_in:.4dot}}, then in passes of .0001 a side or less, miking the pilot after each. After each, spindle stopped, offer MHA-PD-19's hole to the pilot by hand, both wiped clean, chamfered side first. Stop when the plate first slides on without shake. Write the last two readings: BEFORE = ______, PILOT = ______."
 settings = "lathe-ar-1018"
 cut_diameter_mm = "{{cad.step_dia_mm}}"
-inspection = "The plate slides onto the pilot by hand and does not shake on it; the pilot miked to .0001 and written down."
+inspection = "The plate slides onto the pilot by hand and does not shake on it; PILOT no more than {{process.pilot_step_max_in:.4dot}} under BEFORE (the hole lies between the two), micrometer."
 gauge_checks = "other"
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "A pass too many in Op 10 (the plate shakes on the pilot): face the pilot off and turn it again as Op 10."
+instruction = "The plate shakes on the pilot, or PILOT is more than {{process.pilot_step_max_in:.4dot}} under BEFORE: face the pilot off and turn it again as Op 10. The plate slides on at the first trial: stop, its hole is over {{process.pilot_rough_dia_in:.4dot}}."
 feed = "hand"
 
 [[setups.operations]]
@@ -285,10 +298,10 @@ speed_kind = "spindle"
 tool = "ar"
 drilling = "none"
 sizing = "other"
-instruction = "Finish it to the same shoulder Z in passes of .0005 a side or less, miking between them, to PILOT plus .0005–.0016, aiming at PILOT plus .0010. The AR's nose leaves its R0.4 mm in the root (Ops 90–110 take it out). Write down the cross-slide DRO X (diameter) at the finished diameter."
+instruction = "Finish it to the same shoulder Z in passes of .0005 a side or less, miking between them, to PILOT plus {{process.press_over_pilot_min_in:.4dot}}–{{cad.step_interference_max_in:.4dot}}, aiming at PILOT plus .0011. The AR's nose leaves its R0.4 mm in the root (Ops 90–110 take it out). Write down the cross-slide DRO X (diameter) at the finished diameter."
 settings = "lathe-ar-1018"
 cut_diameter_mm = "{{cad.step_dia_mm}}"
-inspection = "Press diameter {{cad.step_interference_min_in:.4dot}}–{{cad.step_interference_max_in:.4dot}} over the written PILOT reading, along its length, micrometer."
+inspection = "Press diameter {{process.press_over_pilot_min_in:.4dot}}–{{cad.step_interference_max_in:.4dot}} over the written PILOT reading, along its length, micrometer: {{cad.step_interference_min_in:.4dot}}–{{cad.step_interference_max_in:.4dot}} over the hole, which is PILOT to PILOT plus {{process.pilot_step_max_in:.4dot}}."
 gauge_checks = "other"
 
 [[setups.operations]]
@@ -318,12 +331,12 @@ sizing = "other"
 instruction = "Spindle running, cutting oil: plunge until DRO X reads the Op 80 reading, no further. The blade cuts only the AR's fillet out of the root, leaving its own corner: the sheet's R{{cad.shoulder_root_r_max_in:.3dot}} MAX, which the AR's nose cannot form."
 settings = "lathe-part-1018"
 cut_diameter_mm = "{{cad.step_dia_mm}}"
-inspection = "Root: square to the eye, no fillet, step or groove at the press diameter's end; the press diameter by micrometer next to the root as Op 80 (PILOT plus .0005–.0016)."
+inspection = "Root: square to the eye, no fillet, step or groove at the press diameter's end; the press diameter by micrometer next to the root as Op 80 (PILOT plus {{process.press_over_pilot_min_in:.4dot}}–{{cad.step_interference_max_in:.4dot}})."
 gauge_checks = "other"
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Press diameter over PILOT plus .0016 in Op 80: another AR finish pass of .0005 a side or less to the same shoulder Z, checked again as Op 80, before Op 90. Over in Op 110: the same AR pass, write down its new DRO X, then repeat Ops 90–110 with that reading. Under PILOT plus .0005 (too light a press in that hole), or a groove at the root: part the turned length off as scrap and start again at Op 40."
+instruction = "Press diameter over PILOT plus {{cad.step_interference_max_in:.4dot}} in Op 80: another AR finish pass of .0005 a side or less to the same shoulder Z, checked again as Op 80, before Op 90. Over in Op 110: the same AR pass, write down its new DRO X, then repeat Ops 90–110 with that reading. Under PILOT plus {{process.press_over_pilot_min_in:.4dot}} (too light a press in that hole), or a groove at the root: part the turned length off as scrap and start again at Op 40."
 feed = "hand"
 
 [[setups.operations]]
