@@ -377,7 +377,6 @@ def test_fitup_exports_for_the_top_frame() -> None:
     from frame_column_stations import COLUMN_X
 
     spec = ch_fulcrum_keeper_spec
-    assert spec.KEEPER_FITUP_LOCATION_BAND_MM == 0.0254
     assert spec.KEEPER_FITUP_PLACES == 2
     # The lug centres stand on the fulcrum line, off the column (web) line.
     assert COLUMN_X + spec.KEEPER_FITUP_X_FROM_WEB_MM == pytest.approx(

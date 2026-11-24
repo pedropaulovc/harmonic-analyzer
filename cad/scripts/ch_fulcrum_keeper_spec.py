@@ -67,12 +67,12 @@ FULCRUM_KEEPER_CENTRE_Z = (
 )  # -0.504
 # Lug mid-plane off the centre, on the .005 in grid so the shaft's flat
 # stations (2 x this apart) print .XX: 3.180 in, inner face at 76.708. The
-# least grid value whose inner faces, each at the -.001 edge of its fit-up
-# band, leave twenty levers at the top of their +.001 hub band a .010 feeler
-# leaf of end play (draw_ch_channel_assembly) and each lug >= 0.25 of float
-# (build_ch_channel_assembly): KEEPER_Z_OFF >= 10P + LUG_HALF_T + 10 x .001
-# + .001 + .005, i.e. 80.645 at P 7.62 gives .0080 in of play, under a leaf;
-# 80.772 (3.180) gives .0180, a .010 leaf, 0.508 nominal float per lug.
+# value was chosen (#1038 re-pitch) as the least grid value leaving twenty
+# levers a .010 feeler leaf of end play with each inner face DRO-set to
+# ±.001: 80.645 gave .0080 in of play, 80.772 (3.180) .0180. Since C10
+# (owner ruling 2026-11-24, fit audit part 2) the rear lug is pushed up to
+# the stack over a .020 leaf, so this nominal sets only the front face and
+# the reference place of the rear one (ch_keeper_fitup).
 KEEPER_Z_OFF = 80.772  # 3.180 in (#1038 re-pitch; was 2.955 at the 7.0565 pitch)
 
 # --- Nominal geometry (mm; inch in the comments). Shaft axis 25.2 above the
@@ -136,14 +136,14 @@ KEEPER_INNER_FACE_SPAN_MM = 2.0 * (KEEPER_Z_OFF - LUG_HALF_T)  # 153.416
 KEEPER_SEAT_FLATNESS_BUDGET_MM = 0.04
 KEEPER_SEAT_LENGTH_MM = LUG_HALF_T + FOOT_TIP_X  # 16.5: seat along the shaft
 # --- Fit-up on the top frame (MHA-CH-00): the pair goes on with the shaft
-# through both bores and is set by DRO, the lug centres on the fulcrum line
-# within KEEPER_FITUP_X_BAND_MM and the lug INNER faces off the front column
-# socket each within KEEPER_FITUP_LOCATION_BAND_MM; the frame's keeper taps
-# are then transferred from the foot holes, so no frame-tap or foot-hole
-# station reaches the keeper's place. The step prints these distances to
-# KEEPER_FITUP_PLACES; build_fr_top_frame reads the same names for the
-# foot-to-boss stack. ---
-KEEPER_FITUP_LOCATION_BAND_MM = 0.0254  # ±.001 in on the inch assembly sheet
+# through both bores, the lug centres set by DRO on the fulcrum line within
+# KEEPER_FITUP_X_BAND_MM; the front lug's inner face is set by DRO at the
+# title block's band and the rear one pushed up to the lever stack over a
+# feeler leaf (owner ruling 2026-11-24, fit audit part 2, C10;
+# ch_keeper_fitup). The frame's keeper taps are then transferred from the
+# foot holes, so no frame-tap or foot-hole station reaches the keeper's
+# place. The step prints the X distance to KEEPER_FITUP_PLACES;
+# build_fr_top_frame reads the same names for the foot-to-boss stack. ---
 KEEPER_FITUP_PLACES = 2
 # Each lug centre stands this far west (+x) of the centre of the top-frame
 # rail web under it, its column's socket axis (Main's ruling: a local X
@@ -154,9 +154,8 @@ KEEPER_FITUP_X_FROM_WEB_MM = 2.8976  # fulcrum 199.9 - column 197.0024
 # The lug centre's own band (owner ruling X-A, 2026-10-18, on the 5d5245a48
 # machinist review): no mate needs the lateral X held tight -- the pair is
 # set with the shaft through both bores, the fulcrum's gain
-# sensitivity is ~0.04 %/mm and common to every channel -- so it carries a
-# looser band than the inner faces (KEEPER_FITUP_LOCATION_BAND_MM, which the
-# shaft flats need). build_fr_top_frame reads it for its X-side stacks.
+# sensitivity is ~0.04 %/mm and common to every channel -- so it carries
+# ±.004. build_fr_top_frame reads it for its X-side stacks.
 KEEPER_FITUP_X_BAND_MM = 0.1016  # ±.004 in
 KEEPER_INNER_FACE_FROM_FRONT_SOCKET_MM = tuple(
     FULCRUM_KEEPER_CENTRE_Z + side * (KEEPER_Z_OFF - LUG_HALF_T) - FRAME_FRONT_COLUMN_Z
