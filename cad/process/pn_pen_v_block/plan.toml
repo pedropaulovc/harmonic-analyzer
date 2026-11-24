@@ -627,7 +627,7 @@ vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{cad.body_back_depth_mm}}",
 beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{cad.far_end_length_mm}}"], clamp_mm = [0, "{{cad.far_end_length_mm}}"], section_mm = { y = "{{cad.body_back_depth_mm}}", z = 18.542 }, vise_left = "start" }
 
 [[setups.operations]]
-instruction = "Home the mill first ($H). G54 X0 P, Y0 the fixed jaw's face (FRONT): edge finder (900 rpm). Then, the block staying clamped: console M6 T1; MDI G0 X-12.700 Y-6.850 (the cutter left of P, over the fixed-jaw stack); its tip dragging a .002 leaf on the stack: G10 L20 P1 Z0.051."
+instruction = "Home the mill first ($H). Edge finder (900 rpm): on the fixed jaw's face beside the block, G10 L20 P1 Y-2.540; on P from the left, G10 L20 P1 X-2.540. Then, the block staying clamped: console M6 T1; MDI G0 X-12.700 Y-6.850 (the cutter left of P, over the fixed-jaw stack); its tip dragging a .002 leaf on the stack: G10 L20 P1 Z0.051."
 feed = "hand"
 
 [[setups.operations]]

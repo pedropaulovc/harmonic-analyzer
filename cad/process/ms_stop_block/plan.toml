@@ -320,7 +320,7 @@ speed_kind = "other"
 tool = "saw"
 drilling = "none"
 sizing = "other"
-instruction = "Saw one slice {{process.blank_z_min_mm:in.2dot}}–{{process.blank_z_max_mm:in.2dot}} in thick (mark .59) off one end of the 3/4 × 1-1/4 C360 bar, the bar lying on a wide face in the saw's vise, the cut across its full 1-1/4 × 3/4 section. The rest of the bar stays for MHA-PN-05. File the burr off both sawn faces and the four edges so the slice seats flat on the parallels. Mark one 1-1/4 in end L with marking fluid: it becomes the locating end's side."
+instruction = "Saw one slice {{process.blank_z_min_mm:in.2dot}}–{{process.blank_z_max_mm:in.2dot}} in thick (mark .59) off one end of the 3/4 × 1-1/4 C360 bar, the bar lying on a wide face in the saw's vise, the cut across its full 1-1/4 × 3/4 section. The rest of the bar stays for MHA-PN-05. File the burr off both sawn faces and the four edges so the slice seats flat on the parallels. Mark L with marking fluid on one 3/4 × .59 face, an end of the 1-1/4 width: it becomes the locating end's side."
 feed = "hand"
 inspection = "Slice {{process.blank_z_min_mm:in.3dot}}–{{process.blank_z_max_mm:in.3dot}} thick at all four corners, calipers. Thinner: scrap it and saw another. Thicker: file the sawn face flat until the calipers read {{process.blank_z_max_mm:in.3dot}} or less, then recheck all four corners. Every program assumes this slice."
 gauge_checks = [{ gauge = "calipers", band_mm = ["{{process.blank_z_min_mm}}", "{{process.blank_z_max_mm}}"] }]
