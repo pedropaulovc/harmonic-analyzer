@@ -60,8 +60,7 @@ def _inch_text(value_mm: float) -> str:
 
 CLEARANCE_TEXT = f"{_inch_text(BOND_CLEARANCE[0])}-{_inch_text(BOND_CLEARANCE[1])}"
 LAND_CALLOUT = (
-    f"TURN TO SLIDE INTO {STRAP_NUMBER} HOLE\n"
-    f"{CLEARANCE_TEXT} CLEARANCE, LOCTITE 638"
+    f"TURN TO SLIDE INTO {STRAP_NUMBER} HOLE\n{CLEARANCE_TEXT} CLEARANCE, LOCTITE 638"
 )
 # rule 19: the bore and the length are supply sizes; the numbered note says
 # where the finished ones are, and each supply size links it (rule 7). Rule
