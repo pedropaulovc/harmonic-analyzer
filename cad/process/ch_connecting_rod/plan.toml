@@ -368,15 +368,15 @@ saw_park_z_mm = 17.748
 # The saw's and T3's Z0 touch-offs on the fork's F face: the fork's
 # thickness plus the .002 leaf under the tool (cam.py checks it).
 fork_touch_z_mm = 6.147
-# The ring's bore Ø1.213 +.003/0: interpolated with the 1/2 in end mill, a
+# The ring's bore Ø1.213 +.005/0: interpolated with the 1/2 in end mill, a
 # plunge on the bore's centre and a circle at each level (no slug left), the
 # rough .010 a side (.020 on the diameter) under the band's middle, then the finish circle
 # full depth and a spring pass, clockwise (conventional inside), entered and
 # left on half-circle arcs from and back to the bore's centre (no plunge on
 # the wall, no rapid up it). cam.py computes the circles' radii.
 bore_finish_mm = 0.254
-bore_rough_radius_mm = 8.8201
-bore_finish_radius_mm = 9.0741
+bore_rough_radius_mm = 8.8329
+bore_finish_radius_mm = 9.086
 # Pin hole: spot Ø.065 with the #1 carbide centre drill (under the #49, so no
 # chamfer at the mouth), the #49 through the fork in pecks of .050 with full
 # retracts, its full diameter .5 mm past face D (in the air past the plate's
