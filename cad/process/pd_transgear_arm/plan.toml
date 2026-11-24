@@ -36,9 +36,11 @@
 # drawing module's ANALYSIS band, which sizes the reaming op and is no
 # acceptance), and the
 # two fixture screws (#10-32 x 5/8 and #4-40 x 5/8 socket head cap screws).
-# The pivot bore is the #9 drill's hole (fit audit 2026-11-23, pending owner
-# confirmation): no reamer; the drawing's DRILLED HOLES row, .196 +.004/0,
-# is checked with two set pins: .196 enters, .201 does not.
+# The pivot bore is the #9 drill's hole (owner ruling 2026-11-24, fit audit
+# question 6: "Pivot spacer MHA-PD-20 drilled #12 and bonded, with the arm
+# pivot drilled #9", approved as recommended; it reverses #2413's .1940
+# reamer): no reamer; the drawing's DRILLED HOLES row, .196 +.004/0, is
+# checked with two set pins: .196 enters, .200 does not.
 #
 # The latch-pin hole (fit audit 2026-11-23, pending owner confirmation; the
 # owner on the audit: "can the holes not be reamed in the first place"):
@@ -248,7 +250,7 @@ name = "Two-grit sharpening stone (320 face)"
 ref = "sharpening-stone-two-grit"
 [[tools]]
 id = "pin-gauges"
-name = "Pin gauges: .196 and .201 for the pivot bore and the pins beside them; .126 and .127 for the pin bore"
+name = "Pin gauges: .196 and .200 for the pivot bore and the pins beside them; .126 and .127 for the pin bore"
 ref = "pin-gauges"
 
 # --- Setup 1 ------------------------------------------------------------------
@@ -406,7 +408,7 @@ milling_cuts = [
 
 [[setups.operations]]
 instruction = "Still clamped, blow out the chips: the pivot bore."
-inspection = "Pivot bore (drawing: Ø.196, DRILLED HOLES +.004/0): the .196 pin enters by hand and the .201 pin does not. Either fails: stop and tell the owner."
+inspection = "Pivot bore (drawing: Ø.196, DRILLED HOLES +.004/0): the .196 pin enters by hand and the .200 pin does not. Either fails: stop and tell the owner."
 gauge_checks = "other"
 
 [[setups.operations]]
@@ -632,7 +634,7 @@ gauge_checks = [
 
 [[setups.operations]]
 instruction = "Re-gauge both bores after deburring, then their spacing. Not gauged, held by AR01's one clamping from one G54 with face A on the parallels: C's Y position and its squareness to A."
-inspection = "The pivot bore's .196 and .201 pins and the pin bore's .127 pin as in Setup 2; spacing B to C: the largest set pin that enters B and the set's .126 pin in C, the calipers over both less half of each, {{cad.pin_bore_x_mm:in.4dot}} ±.002. Outside: set it aside and tell the owner."
+inspection = "The pivot bore's .196 and .200 pins and the pin bore's .127 pin as in Setup 2; spacing B to C: the largest set pin that enters B and the set's .126 pin in C, the calipers over both less half of each, {{cad.pin_bore_x_mm:in.4dot}} ±.002. Outside: set it aside and tell the owner."
 gauge_checks = "other"
 
 # --- Setup 6 ------------------------------------------------------------------

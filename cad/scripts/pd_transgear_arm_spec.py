@@ -186,8 +186,9 @@ STOCK_TEXT_SUFFIX = ") GROUND STOCK REF"
 # (paper_drive_arm_registration.S_AXIS_TILT_MAX_RAD), and a drilled #30
 # (.1285 +.004/0) would open it past what the meshes and the airs clear.
 # ``pd_transgear_arm_geometry.PIN_BORE_DIA_BAND`` is the ANALYSIS band the
-# set reamer is modelled to cut, not a printed limit.  The sheet states the
-# fit once, at the bore's callout, as the bond's clearance range (rule 23);
+# set reamer is modelled to cut, not a printed limit.  The arm's callout
+# names the bonded mate only; the bond's clearance range prints once, on
+# MHA-PD-23's note 1 (rule 23; Codjiflo r2 on #3494), and
 # the traveler checks the range's upper end with one pin of the .001-step
 # set that must not enter (the sheet prints no gauge).
 # (PIN_BORE_DIA_PLACES above: three places, Ø.126 REAM THRU.)
