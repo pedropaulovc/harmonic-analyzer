@@ -241,10 +241,10 @@ their sheet re-keys for another reason or the review leaf is force-refreshed.
   plan that names a reamer outside the standard set, a plug gauge or a pin
   pair for one band is a signal that the drawing is wrong: change the
   feature's form (rule 4) before adding the inventory record.
-- **A REAM or tight band that fails rule 4's necessity test stays only by an
-  owner ruling**, declared as a `machinist_exceptions` entry (kind `accept`)
-  under the package's own key, quoting his words (see "Named exceptions").
-  The sheet prints no argument for it.
+- **A REAM or tight band that fails rule 4's necessity test stays only by a
+  ruling**, the owner's or a delegated one, declared as a
+  `machinist_exceptions` entry (kind `accept`) under the package's own key
+  in the form "Named exceptions" gives. The sheet prints no argument for it.
 - **Thread engagement (rule 18)** is owned by the CAD: the build's seat-fit
   and stack asserts enforce it. Through-tapped receivers use actual retained
   material and external full-form overlap, not blind drilling depths or raw

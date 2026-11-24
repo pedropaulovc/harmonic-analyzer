@@ -209,7 +209,7 @@ made to their mate.
     GAIN`);
   - a gear mesh's centre distance or run-out (`SETS MESH BACKLASH`);
   - a running gap or stack that closes, or a wall that falls under rule 17,
-    at the looser size (`KEEPS GAP TO MHA-CH-06`, `SETS THE 20-GEAR STACK`,
+    at the looser size (`KEEPS GAP TO MHA-XX-nn`, `SETS THE GEAR STACK`,
     or the wall in rule 20's form, `WALL .080 MIN`);
   - a fixed joint that must hold with no bond, pin, key or screw
     (`PRESS, HOLDS CRANK TORQUE`);
@@ -217,10 +217,11 @@ made to their mate.
     bought part (a retaining-ring groove): the callout names the bought part
     by its drawing number, and that is the answer.
 
-  A fit name alone (`RUNNING FIT ON MHA-CH-04`), a named mate alone, "it
+  A fit name alone (`RUNNING FIT ON MHA-XX-nn`), a named mate alone, "it
   runs", "it locates" or "a reamer leaves a better hole" is not an answer. A
-  spring, a weight or a screw that keeps a pivot or slide against one side of
-  its clearance takes the play out: such a joint fails the test. A feature
+  spring, a weight or a screw that keeps a pivot or slide that only rocks or
+  shifts against one side of its clearance takes the play out: such a joint
+  fails the test. A feature
   that fails takes the title-block band, and a hole a named drill. The test
   is applied to what is printed: a tight band or REAM with no printed answer
   is over-specification, whatever reason may lie behind it.
@@ -239,16 +240,16 @@ made to their mate.
   2. **Made to fit.** The hole is drilled, or reamed with whatever reamer is
      on hand, and prints no band; its mate is turned, filed or selected last
      to that hole. The mate's size prints as REF and the fit is the
-     requirement: an acceptance by feel (`TURN TO MHA-DT-14 BORE: TURNS FREE,
+     requirement: an acceptance by feel (`TURN TO MHA-XX-nn BORE: TURNS FREE,
      NO SHAKE`) or a clearance or interference range no narrower than `.001`
      wide. This is the default wherever the mate is made in this shop. A
      hole match-drilled or reamed in place through its mate at assembly, for
      the pin that joins them, is this form and needs no further answer.
   3. **Reamed to the bought mate.** Where the mate is bought to size (drill
      rod, ground shaft, dowel pin, shoulder screw), or one mate passes
-     through several parts (twenty gears on one shaft), the hole takes a
+     through several parts (a row of gears on one shaft), the hole takes a
      standard reamer (a 64th size, or `.001` over or under it), prints no
-     band, and the mate is the gauge (`Ø.376 REAM THRU; MHA-DT-13 ENTERS,
+     band, and the mate is the gauge (`Ø.376 REAM THRU; MHA-XX-nn ENTERS,
      NO SHAKE`). A hole that is short of the title block's wall or web by
      rule 17 still prints its wall.
   4. **A printed band.** Only where no mate can be tried in the feature: a
@@ -333,8 +334,8 @@ made to their mate.
   ROCK`, `TURNS FREE, NO SHAKE`, `PRESSES IN, DOES NOT TURN BY HAND`), or a
   clearance or interference range, diametral unless it says `RADIAL`. "MATCH
   FIT" alone is incomplete. A reference nominal does not mean purchased
-  stock. The pair stays together: where several like pairs exist (twenty
-  hubs in twenty straps) the sheet or its assembly says they are kept as
+  stock. The pair stays together: where several like pairs exist (a row of
+  hubs in their straps) the sheet or its assembly says they are kept as
   fitted, or says that one size serves them all. Printed limits on both
   members are for interchangeable parts, and this machine has none.
 - **Stock that is good enough stays stock.** Where bar stock already meets the
@@ -775,9 +776,10 @@ sub-assembly, never on part fabrication.
   its native dimension, with a setting diagram or setting table (reference,
   target, range and check in columns) where a view alone cannot carry it.
   A retention or fit acceptance that is a measurable value (a check with a
-  number) is such a setting and prints here. A setting finer than `.XXX`
-  passes rule 4's necessity test and names the indicator or feeler that
-  reads it; it never needs a gauge bought for that one setting. A fit made
+  number) is such a setting and prints here. A setting finer than `.XXX`,
+  or banded tighter than its title-block row, passes rule 4's necessity
+  test and names the indicator or feeler that reads it; it never needs a
+  gauge bought for that one setting. A fit made
   at assembly
   (match-drill, ream in place, shim, adjust) names the mating parts as rule 4
   requires; an item reference is enough when the BOM supplies the item's name
@@ -921,7 +923,8 @@ beside them. Every symbol, abbreviation and phrase is one they can look up.
   standard view names (front, top, right side), never a compass (`NORTH`,
   `EAST`), a clock reading or a private convention.
 - **Holes.** Size first, then process, then depth, with the Y14.5 symbols:
-  `Ø.257 THRU`, `Ø.376 REAM THRU`, `⌴ Ø.31 ↧ .19`,
+  `Ø.257 THRU`, `Ø.376 REAM THRU` (its rule 4 fit lines follow),
+  `⌴ Ø.31 ↧ .19`,
   `⌵ Ø.312 X 82°`, `1/4-20 UNC ↧ .45`. A counterbore or countersink is
   written with its symbol, not in words; a depth is never deferred to a view.
   A depth printed as REF in the callout is complete when a controlling
