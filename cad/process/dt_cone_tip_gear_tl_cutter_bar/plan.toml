@@ -22,17 +22,12 @@ ref = "drill-32"  # Drills #32
 [[tools]]
 id = "reamer-1260"
 name = ".1260 reamer"
-ref = "reamer-1260"  # B-reamer-.1260
+ref = "reamer-1260"  # B-reamer-.1260; cross hole .1260 REAM THRU, no band, the bit slides in (fit audit 2026-11-23)
 
 [[tools]]
 id = "jig-tap-4-40-plug"
 name = "#4-40 plug tap"
 ref = "jig-tap-4-40-plug"  # Tap coverage #4-40 UNC
-
-[[tools]]
-id = "pin-gauges"
-name = "Pin gauges .011-.500"
-ref = "pin-gauges"  # A1-pin-set-061-250, A1-pin-set-061-500-combined
 
 [[setups]]
 machine_kind = "other"
