@@ -1866,7 +1866,7 @@ KNOB_END_FLOAT_RANGE = (
 KNOB_CUP_BOND_SUB_STEP = 6
 KNOB_CUP_BOND_CURE_H = 24
 # Rule 23's bond bullet for the MHA-PD-20 spacer on the MHA-PD-VN-57
-# shoulder (fit audit 2026-11-23, pending owner confirmation; LOCTITE 638,
+# shoulder (owner ruling 2026-11-24, fit audit question 6; LOCTITE 638,
 # the grade pd_transgear_pivot_spacer_spec holds the gap to): the sub-step
 # that coats the spacer's bore, which the BOM sheet's consumables lines cite,
 # and the cure before the screw is seated (the spring then loads the bond).
@@ -2806,9 +2806,19 @@ def _step_text(
             "CHECK: ROCKED BY HAND, THE PLATE HAS NO SHAKE AND NO DAYLIGHT.",
             f"IF IT SHAKES OR SHOWS DAYLIGHT, DO {s('arm-plate-fitted', 18)} AND "
             f"REPEAT {s('arm-plate-screws-cut', 4)}.",
+            # #2430: the pivot screw's tip is faced on the bare screw, before
+            # the spring, the arm and the bonded spacer make it captive; it
+            # seats the same bare as finished (the spacer stands flush with
+            # the shoulder's end, both on the bar's back face). It is this
+            # step's last cut tip so step 15 keeps a letter for lifting the
+            # dry-trial spacer off (Codjiflo r1 on #3487).
+            f"FACE THE {n['pd-vn-transgear-pivot-screw']} SCREW'S TIP UNTIL, SEATED "
+            f"BARE IN THE {n['pd-support-bar']} BAR'S TAP, IT STANDS "
+            f"{steps.inch_window(pivot_screw.TIP_RECESS, 3, ' TO ')} BELOW THE BAR'S "
+            f"FRONT FACE, CALIPER DEPTH ROD {row_cite('pivot-tip')}.",
         ),
-        # The spacer is bonded on the shoulder (LOCTITE 638; fit audit
-        # 2026-11-23, pending owner confirmation), its front face and the
+        # The spacer is bonded on the shoulder (LOCTITE 638; owner ruling
+        # 2026-11-24, fit audit question 6), its front face and the
         # shoulder's end clamped down on one flat plate while it cures, so
         # its faces' tilt is fixed in the bar; the MHA-PD-VN-63 spring holds
         # the arm on it. The
@@ -2817,40 +2827,47 @@ def _step_text(
         # bar's back face (owner ruling U-MHA-PD-VN-57-no-lock, #1194). The
         # spot-face floor sets the spring room (transgear_hanger_joints).
         "hanger-pivoted": (
-            # #2430: the tip is faced on the bare screw, before the spring,
-            # the arm and the bonded spacer make it captive; it seats the
-            # same bare as finished (the spacer stands flush with the
-            # shoulder's end, both on the bar's back face).
-            f"FACE THE {n['pd-vn-transgear-pivot-screw']} SCREW'S TIP UNTIL, SEATED "
-            f"BARE IN THE {n['pd-support-bar']} BAR'S TAP, IT STANDS "
-            f"{steps.inch_window(pivot_screw.TIP_RECESS, 3, ' TO ')} BELOW THE BAR'S "
-            f"FRONT FACE, CALIPER DEPTH ROD {row_cite('pivot-tip')}.",
             f"FIT THE {n['pd-vn-transgear-pivot-spring']} SPRING ON ITS SHOULDER, FROM "
             "THE REAR.",
-            # Wax keeps the compound out of the running fit and off the
-            # face the arm bears on (rule 23).
-            "FIT THE ARM, ITS BORE AND FRONT FACE WAXED, ON IT FROM THE REAR.",
+            # Paste wax keeps the compound out of the running fit and off the
+            # face the arm bears on (rule 23); named in full so the package's
+            # tool scan lists it (Codjiflo r1 on #3487).
+            "FIT THE ARM, ITS BORE AND FRONT FACE COATED WITH PASTE WAX, ON IT "
+            "FROM THE REAR.",
             # The dry trial is what holds one bought screw's shoulder end
             # inside the squareness the drilled pivot bore tolerates
             # (pd_transgear_arm_geometry.PIVOT_SHOULDER_END_SQUARENESS_ALLOWED):
-            # no catalogue row states it.
+            # no catalogue row states it. It is also the acceptance of the
+            # spacer's bore-to-face squareness, which the MHA-PD-20 sheet
+            # holds only at the angular row: a spacer whose front face will
+            # not lie on the plate with the shoulder's end cannot cure in
+            # the plane the hanger tilt stack assumes (Codjiflo r1 on
+            # #3487). The plate is covered with polyethylene film, which the
+            # compound does not bond to, not waxed: the shoulder's end is
+            # the unlocked screw's only seat and takes no wax.
             f"CHECK, DRY: THE {n['pd-transgear-pivot-spacer']} SPACER, AS MADE, ON "
-            "THE SHOULDER, SCREW HELD DOWN ON A WAXED FLAT PLATE WHOSE HOLE CLEARS "
-            f"THE {pivot_screw.THREAD} THREAD, NOT THE "
-            f"\u00d8{steps.inch_text(pivot_screw.SHOULDER_DIA, 4)} SHOULDER, THE ARM "
-            "SWINGS FREELY.",
-            f"IF IT BINDS, REPEAT FROM {s('hanger-pivoted', 0)} WITH A NEW "
-            f"{n['pd-vn-transgear-pivot-screw']} SCREW.",
+            "THE SHOULDER, SCREW HELD DOWN ON A FLAT PLATE COVERED WITH "
+            f"POLYETHYLENE FILM, WHOSE HOLE CLEARS THE {pivot_screw.THREAD} THREAD, "
+            f"NOT THE \u00d8{steps.inch_text(pivot_screw.SHOULDER_DIA, 4)} SHOULDER: "
+            "THE SPACER SHOWS NO DAYLIGHT ON THE PLATE AND THE ARM SWINGS FREELY.",
+            # Bounded: the one renewal and the inspection that follows it
+            # are the step's own tail (Codjiflo r1 on #3487).
+            f"IF EITHER FAILS, DO {s('hanger-pivoted', 20)}-{s('hanger-pivoted', 23)}.",
+            "LIFT THE SPACER OFF THE SHOULDER.",
             # One action per sub-step (machinist review
             # 20261124T013305458Z, rule 22): coat, push on, wipe and clamp
             # each stand alone, and the cure is the wait before the screw is
             # seated (the arm is first oiled only in the remedy after it).
+            # The bore is coated, not the shoulder: the shoulder's end
+            # entering the bore drives the compound toward the spacer's
+            # front face, away from the arm, where it is wiped.
             "DEGREASE THE SPACER'S BORE AND THE SHOULDER BELOW THE ARM.",
             "COAT THE SPACER'S BORE WITH LOCTITE 638, NOT THE SHOULDER.",
-            "PUSH THE SPACER ON THE SHOULDER, CLEAR OF THE ARM.",
+            "PUSH THE SPACER ON THE SHOULDER UNTIL ITS FRONT FACE IS FLUSH WITH "
+            "THE SHOULDER'S END.",
             "WIPE THE SPACER'S FRONT FACE CLEAN.",
             "AT ONCE, CLAMP THE SCREW DOWN, THE SHOULDER'S END AND THE SPACER BOTH "
-            f"ON THE PLATE OF {s('hanger-pivoted', 3)}.",
+            f"ON THE PLATE OF {s('hanger-pivoted', 2)}.",
             f"WHEN THE BOND HAS CURED {PIVOT_SPACER_BOND_CURE_H} H, SEAT THE SCREW, "
             f"ITS SHOULDER TIGHT ON THE BAR'S BACK FACE ({PIVOT_VIEW_REF}).",
             "CHECK: NO DAYLIGHT BETWEEN THE SPACER AND THE BAR'S BACK FACE.",
@@ -2877,7 +2894,8 @@ def _step_text(
             # budget).
             f"REPEAT {s('hanger-pivoted', 10)}-{s('hanger-pivoted', 16)} ONCE.",
             "IF NOT YET RENEWED, REPEAT FROM "
-            f"{s('hanger-pivoted', 0)} WITH A NEW {n['pd-vn-transgear-pivot-screw']} "
+            f"{s('arm-plate-screws-cut', 6)} WITH A NEW "
+            f"{n['pd-vn-transgear-pivot-screw']} "
             f"SCREW AND {n['pd-transgear-pivot-spacer']} SPACER.",
             f"IF ALREADY RENEWED, INSPECT THE {n['pd-support-bar']} BAR'S "
             f"TAP AND BACK FACE AND THE {n['pd-transgear-arm']} ARM'S BORE "
@@ -3652,7 +3670,7 @@ def setting_table_rows(
             "STRAIGHTEDGE AND FEELERS",
         ),
         "pivot-tip": (
-            s("hanger-pivoted", 0),
+            s("arm-plate-screws-cut", 6),
             f"{n['pd-vn-transgear-pivot-screw']} TIP BELOW THE BAR FRONT FACE",
             steps.inch_window(pivot_screw.TIP_RECESS, 3, " TO "),
             "CALIPER DEPTH ROD",

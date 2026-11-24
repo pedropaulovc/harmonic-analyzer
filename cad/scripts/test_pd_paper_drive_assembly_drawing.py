@@ -1509,7 +1509,7 @@ def test_the_pivot_screw_is_unlocked_and_the_spacer_bonded_as_made() -> None:
     assert "THREADLOCKER" not in body
     assert "STAKE" not in body
     assert "BLIND" not in body
-    assert f"{window} BELOW THE BAR'S FRONT FACE" in body
+    assert f"{window} BELOW THE BAR'S FRONT FACE" in _step_body("arm-plate-screws-cut")
     assert "ANOTHER SCREW" not in body
     assert drawing.PIVOT_VIEW_REF in body
     assert _number("pd-vn-transgear-pivot-screw") in body
@@ -1520,26 +1520,36 @@ def test_the_pivot_screw_is_unlocked_and_the_spacer_bonded_as_made() -> None:
     assert len(texts) == 24
     assert "PRESS THE" not in body and "REAMED" not in body
     assert "SLIDES ON BY HAND" not in body
-    assert texts[2] == "FIT THE ARM, ITS BORE AND FRONT FACE WAXED, ON IT FROM THE REAR."
-    # The dry trial proves the bought screw's shoulder end square enough
-    # for the drilled bore before anything is bonded.
-    assert texts[3].startswith("CHECK, DRY: ") and texts[3].endswith("THE ARM SWINGS FREELY.")
-    assert "FLAT PLATE WHOSE HOLE CLEARS" in texts[3]
-    assert texts[4] == (
-        f"IF IT BINDS, REPEAT FROM {drawing.sub_step('hanger-pivoted', 0)} WITH A NEW "
-        f"{_number('pd-vn-transgear-pivot-screw')} SCREW."
+    assert texts[1] == (
+        "FIT THE ARM, ITS BORE AND FRONT FACE COATED WITH PASTE WAX, ON IT FROM THE REAR."
     )
+    # The dry trial proves the bought screw's shoulder end and the spacer's
+    # bore square enough before anything is bonded; its failure takes the
+    # step's one renewal, then the inspection (Codjiflo r1 on #3487).
+    assert texts[2].startswith("CHECK, DRY: ")
+    assert texts[2].endswith(
+        "THE SPACER SHOWS NO DAYLIGHT ON THE PLATE AND THE ARM SWINGS FREELY."
+    )
+    assert "FLAT PLATE COVERED WITH POLYETHYLENE FILM, WHOSE HOLE CLEARS" in texts[2]
+    assert "WAXED" not in body
+    assert texts[3] == (
+        f"IF EITHER FAILS, DO {drawing.sub_step('hanger-pivoted', 20)}-"
+        f"{drawing.sub_step('hanger-pivoted', 23)}."
+    )
+    assert texts[4] == "LIFT THE SPACER OFF THE SHOULDER."
     # One action per sub-step (machinist review 20261124T013305458Z, rule
     # 22): degrease, coat, push on, wipe, clamp; the screw is seated only
     # when the bond has cured.
     assert texts[5].startswith("DEGREASE THE SPACER'S BORE")
     bond = texts[drawing.PIVOT_SPACER_BOND_SUB_STEP]
     assert bond == "COAT THE SPACER'S BORE WITH LOCTITE 638, NOT THE SHOULDER."
-    assert texts[7] == "PUSH THE SPACER ON THE SHOULDER, CLEAR OF THE ARM."
+    assert texts[7] == (
+        "PUSH THE SPACER ON THE SHOULDER UNTIL ITS FRONT FACE IS FLUSH WITH THE SHOULDER'S END."
+    )
     assert texts[8] == "WIPE THE SPACER'S FRONT FACE CLEAN."
     clamp = texts[9]
     assert clamp.startswith("AT ONCE, CLAMP THE SCREW DOWN")
-    assert clamp.endswith(f"BOTH ON THE PLATE OF {drawing.sub_step('hanger-pivoted', 3)}.")
+    assert clamp.endswith(f"BOTH ON THE PLATE OF {drawing.sub_step('hanger-pivoted', 2)}.")
     assert texts[10].startswith(
         f"WHEN THE BOND HAS CURED {drawing.PIVOT_SPACER_BOND_CURE_H} H, SEAT THE SCREW"
     )
@@ -2817,7 +2827,7 @@ def test_every_screwed_setting_has_a_holding_check() -> None:
     # inside, one action a step (rule 22).
     bar = _number("pd-support-bar")
     assert pivot[20:23] == (
-        f"IF NOT YET RENEWED, REPEAT FROM 15A WITH A NEW "
+        f"IF NOT YET RENEWED, REPEAT FROM 14G WITH A NEW "
         f"{_number('pd-vn-transgear-pivot-screw')} SCREW AND "
         f"{_number('pd-transgear-pivot-spacer')} SPACER.",
         f"IF ALREADY RENEWED, INSPECT THE {bar} BAR'S TAP AND BACK FACE AND THE "
