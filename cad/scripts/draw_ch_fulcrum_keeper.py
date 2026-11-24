@@ -57,7 +57,7 @@ from _drawing_view_display import set_hidden_lines_removed
 from _feature_requirements import part_metadata, requirement
 from _gtol_cylinder import CylinderFace
 from _gtol_planar import PlanarFace
-from _hole_spec import blind_cut_dia_mm, drill_process
+from _hole_spec import blind_cut_dia_mm
 from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
 from _printed_limits import drilled_limits, limits
@@ -479,7 +479,9 @@ requirement(
         ),
         "nominal_dia": (BORE_DIA, ("BORE_DIA",)),
         "drill": (BORE_HOLE_SPEC.size, ("BORE_HOLE_SPEC",)),
-        "process": (drill_process(BORE_HOLE_SPEC), _BORE_CALLOUT),
+        # The drilled-block adapter's process is "drill" or "ream"; the
+        # letter rides "drill" (prechips cad_drilled_block).
+        "process": ("drill", _BORE_CALLOUT),
         "thru": (True, _BORE_CALLOUT),
         "callout": (BORE_CALLOUT, ((_NOTES, "BORE_CALLOUT"), *_BORE_CALLOUT)),
         "height": (
