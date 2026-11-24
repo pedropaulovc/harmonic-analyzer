@@ -89,7 +89,10 @@ def test_the_blank_sizes_are_native_model_dimensions() -> None:
         spec.DRAWING_PRECISION_BY_NAME["OutsideDia"],
     )
     assert spec.FACE_WIDTH == part.FACE_WIDTH
-    assert spec.BORE_DIA == pytest.approx(part.BORE_DIAMETER)
+    # The bore is modelled at the owned .3135 reamer's size, no band (fit
+    # audit 2026-11-23, MHA-DT-10.bore).
+    assert part.BORE_DIAMETER == pytest.approx(0.3135 * 25.4)
+    assert part.BORE_DIAMETER == pytest.approx(spec.BORE_DIA + min(spec.BORE_DIA_BAND))
     assert "OUTSIDE DIAMETER" not in notes.GEAR_DATA
     assert "FACE WIDTH" not in notes.GEAR_DATA
     # The printed face width is the lower witness's, driven from the same
@@ -298,10 +301,10 @@ def test_callouts_link_the_numbered_note_that_names_their_mate() -> None:
     assert _note(notes.MESH_NOTE_NUMBER) == (
         "1. MESH WITH CRANK DRIVE GEAR MHA-DT-07; CLEARANCE TO 120T CONE GEAR MHA-DT-03."
     )
-    low, high = spec.BORE_DIAMETRAL_CLEARANCE
+    # Fit audit 2026-11-23, MHA-DT-10.bore: MHA-DT-11's seat is made last,
+    # to this reamed bore; the acceptance prints on the crankshaft's sheet.
     assert _note(notes.BORE_FIT_NOTE_NUMBER) == (
-        f"3. SLIDING FIT ON CRANKSHAFT {spec.CRANKSHAFT_NUMBER} "
-        f"(CLEARANCE {spec.inch_text(low, 4)}-{spec.inch_text(high, 4)})."
+        f"3. CRANKSHAFT {spec.CRANKSHAFT_NUMBER} SEAT IS TURNED TO THIS BORE."
     )
     # Each mate is named once among the notes, except the 120T cone gear:
     # notes 1 (its clearance) and 2 (the feeler check the Ø.730 flags) each
@@ -383,12 +386,13 @@ def test_tooth_system_and_pair_acceptance_match_current_geometry() -> None:
     assert data[notes.SPAN_LABEL].strip() == mate_notes.accept_limits_text(
         spec.BASE_TANGENT_SPAN_LIMITS_MM, 4
     )
-    assert notes.BACKLASH_LABEL == (
-        f"TRANSVERSE BACKLASH WITH {spec.MESH_GEAR_NUMBER}, ACCEPT AT ASSEMBLY"
-    )
+    # Fit audit question 16: the backlash is the mesh's REF range; the mesh
+    # is accepted by turning free by hand (the mate row below).
+    assert notes.BACKLASH_LABEL == f"TRANSVERSE BACKLASH WITH {spec.MESH_GEAR_NUMBER} (REF)"
     assert labels.index(notes.BACKLASH_LABEL) == labels.index(notes.SPAN_LABEL) + 1
     backlash = data[notes.BACKLASH_LABEL].strip()
-    assert backlash == mate_notes.accept_limits_text(mate_notes.GEAR_MESH_BACKLASH_MM, 3)
+    assert backlash == mate_notes.accept_limits_text(mate_notes.MESH_BACKLASH_REF_MM, 4)
+    assert "ACCEPT AT ASSEMBLY" not in notes.GEAR_DATA
     mate_data = dict(
         line.partition(":")[::2] for line in mate_notes.GEAR_DATA.splitlines()[1:]
     )

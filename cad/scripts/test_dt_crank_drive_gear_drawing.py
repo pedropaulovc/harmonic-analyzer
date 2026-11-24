@@ -281,7 +281,7 @@ def test_gear_data_block_is_the_tooth_system_and_nothing_else() -> None:
         "TOOTH LINE:  STRAIGHT, 12.0 DEG RIGHT HAND FROM AXIS",
         "FORM CUTTER CENTRAL PLANE CROSSES GEAR AXIS AT:  .07 FROM CHAMFERED BORE FACE",
         f"BASE TANGENT SPAN OVER {spec.BASE_TANGENT_SPAN_TEETH} TEETH, NORMAL, ACCEPT ON THIS PART",
-        "TRANSVERSE BACKLASH WITH MHA-DT-10, ACCEPT AT ASSEMBLY",
+        "TRANSVERSE BACKLASH WITH MHA-DT-10 (REF)",
         "TOOTH FORM",
         "TOOTH EDGES",
         "TOOTH RUNOUT TO BORE",
@@ -303,25 +303,44 @@ def test_gear_data_block_is_the_tooth_system_and_nothing_else() -> None:
         "LONG ADDENDUM",
     ):
         assert banned not in data, banned
-    # Exact stock span is checked on the part; backlash belongs to the actual
-    # assembly, never a circular-caliper shortcut.
+    # Exact stock span is checked on the part; the mesh is accepted at
+    # assembly by turning free (owner ruling 2026-11-24, fit audit question
+    # 16), its backlash a REF range, never a circular-caliper shortcut.
     accepting = [
         line
         for line in data.splitlines()
         if any(owner in line for owner in ("ACCEPT ON THIS PART", "ACCEPT AT ASSEMBLY"))
     ]
-    assert len(accepting) == 2
+    assert len(accepting) == 1
     assert "ACCEPT AT SETUP" not in data
     for line in accepting:
         assert "REF" not in line
     # ... and no OTHER row claims an acceptance band. A tooth count, the
     # cutter's pitch and the pressure angle are definitional; a row that
-    # carries limits without saying who checks them is the defect.
+    # carries limits without saying who checks them is the defect; a REF
+    # range is a fact, not a band.
     for line in data.splitlines()[1:]:
         if line in accepting:
             continue
-        _, _, value = line.partition(":")
+        label, _, value = line.partition(":")
+        if label.endswith("(REF)"):
+            continue
         assert " +" not in value and " TO " not in value, line
+
+
+def test_backlash_ref_is_the_crank_mesh_stack_range() -> None:
+    # Fit audit question 16: the REF row is the stack's own range at print
+    # worst, copied into the notes to keep the stack out of the part's
+    # rebuild closure.
+    import crank_mesh_stack
+
+    check = crank_mesh_stack.standard_check()
+    assert notes.MESH_BACKLASH_REF_MM == pytest.approx(
+        (check.backlash_min_mm, check.backlash_max_mm), abs=1e-6
+    )
+    data = dict(line.partition(":")[::2] for line in notes.GEAR_DATA.splitlines()[1:])
+    assert data[notes.BACKLASH_LABEL].strip() == ".0035 TO .0377"
+    assert ".002 TO .007" not in notes.GEAR_DATA
 
 
 @pytest.mark.parametrize("part_spec", (spec, pinion_spec))

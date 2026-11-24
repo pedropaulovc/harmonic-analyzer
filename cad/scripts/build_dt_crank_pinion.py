@@ -73,7 +73,6 @@ from dt_crank_pinion_spec import (
     FACE_WIDTH,
     FACE_WIDTH_LIMITS,
     OUTSIDE_DIA,
-    OUTSIDE_DIA_TOLERANCE_MM,
     OVERALL_LENGTH,
     PIN_DIA,
     PIN_HOLE_SPEC,
@@ -90,7 +89,6 @@ from dt_crank_pinion_spec import (
     STOCK_PROFILE,
     stock_profile,
     TURNED_DIA,
-    TURNED_DIA_TOLERANCE_MM,
     UNIT,
 )
 
@@ -100,7 +98,10 @@ MATERIAL = "Plain Carbon Steel"  # steel like its mate (p.19/20)
 # FACE_WIDTH (the whole tooth length), SHOULDER_LENGTH, TURNED_DIA and
 # BOSS_LENGTH are in dt_crank_pinion_spec. build_dt_drive_train_assembly checks the
 # installed south face, the T120 clearances and the 64T row overlap.
-BORE_DIAMETER = BORE_DIA  # the crankshaft's Ø.3125 pinion seat (dt_crank_pinion_spec)
+# The bore at the owned .3135 reamer's size, the lower end of the spec's
+# analysis band over the crankshaft's Ø.3125 seat; it prints that size with
+# no band (fit audit 2026-11-23, MHA-DT-10.bore).
+BORE_DIAMETER = BORE_DIA + min(BORE_DIA_BAND)
 
 # The hub boss as the runtime gate reads it (#906 diag v3, d6ca08eb7): a boss
 # revolve coincident with the gap floors' root arcs vanished on a
@@ -664,16 +665,12 @@ def build(adapter) -> dict[str, str]:
     # and prove the solid kept its boss (the rebuild's own verdict did not).
     force_rebuild(adapter)
     assert_boss_present(adapter, "driven crank pinion")
-    # The bands are millimetres; UNIT prints them in inches.
-    set_dimension_bilateral_tolerance(
-        adapter, "BossProfile", "BoreDia", *deviations(BORE_DIA_BAND), display_unit=UNIT
-    )
-    # The tip diameter's own band, on the witness the sheet imports: the
-    # crank-mesh stack's tip-to-root air takes it (dt_crank_pinion_spec).  None on
-    # the boss -- nothing runs on it.
-    set_dimension_symmetric_tolerance(
-        adapter, "BossProfile", "OutsideDia", OUTSIDE_DIA_TOLERANCE_MM, display_unit=UNIT
-    )
+    # The bands are millimetres; UNIT prints them in inches.  The bore
+    # carries none: it is the owned .3135 reamer's size and MHA-DT-11's seat
+    # is turned to it (fit audit 2026-11-23, MHA-DT-10.bore); the tip
+    # diameter and the turned band take the title block's .XXX row (fit
+    # audit 2026-11-23, MHA-DT-10.outside_dia and .turned_band).  None on the
+    # boss -- nothing runs on it.
     # The face's own +.000/-.010: the drive train proves the 64T row engagement
     # at its short limit and the turned band's T120 clearance at its long one
     # (Codex P1 on #1128; user ruling 2026-09-30).  It rides the printed
@@ -681,13 +678,11 @@ def build(adapter) -> dict[str, str]:
     set_dimension_bilateral_tolerance(
         adapter, "BossProfile", "FaceWidth", *FACE_WIDTH_LIMITS, display_unit=UNIT
     )
-    # The shoulder's +.000/-.010 and the turned diameter's +/-.004: the drive
-    # train proves the T120 air and radial clearance at their long/large limits.
+    # The shoulder's +.000/-.010: the drive train proves the T120 air at its
+    # long limit, and the radial clearance at the turned band's title-block
+    # large limit.
     set_dimension_bilateral_tolerance(
         adapter, "BossProfile", "ShoulderLength", *SHOULDER_LENGTH_LIMITS, display_unit=UNIT
-    )
-    set_dimension_symmetric_tolerance(
-        adapter, "TurnedBandProfile", "TurnedDia", TURNED_DIA_TOLERANCE_MM, display_unit=UNIT
     )
     set_dimension_symmetric_tolerance(
         adapter,
