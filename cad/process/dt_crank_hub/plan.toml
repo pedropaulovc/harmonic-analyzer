@@ -9,28 +9,26 @@
 #   turns them; the seat, smaller than the barrel at the far end, waits for
 #   Setup 2, where it stands out.
 # - Setup 2, lathe: crank arm MHA-DT-06 is made first (the seat is turned to
-#   its measured bore and thickness, notes on the sheet). The hub turned
+#   its bore by trial and to its measured thickness). The hub turned
 #   round, its barrel in the 3-jaw over a shim wrap, the parted end out:
 #   face to length from the miked length (Z0 the front face), turn the seat
-#   to the plug-measured bore plus .0009 back to the shoulder at the measured
-#   arm thickness less .001, then centre, drill L and 23/64 and ream .3760
+#   until the arm slides on by hand, back to the shoulder at the measured
+#   arm thickness less .005, then centre, drill L and 23/64 and ream .3760
 #   through from the tailstock in the same chucking, so the bore runs true
-#   to the seat the arm is pressed on.
+#   to the seat the arm is bonded on.
 # - Setup 3, PM-30MV, vise: the hub lying on two parallels, gripped on the
 #   barrel; CM01 spots and drills #14 through it at .53 from the front face.
 # - Setup 4, bench: deburr, check the length, oil.
-# The taper ream through the #14 hole (note 1) and the .156 seam ream with the
-# arm (MHA-DT-VN-59) are assembly operations on the drive-train package.
+# The taper ream through the #14 hole (note 1), the bond to the arm and the
+# 5/32 seam drilled with the arm (MHA-DT-VN-59) are assembly operations on
+# the drive-train package.
 #
-# Not on hand (to order): the bore's two Class ZZ pins, .3760 plus (GO) and
-# .3765 minus (NO-GO), shop dt.toml zz-pins-3760-3765. Owner ruling
-# 2026-11-23 (tool audit Q1, re-answered on the corrected facts), verbatim:
-# "ZZ singles per the record: 29 pins (17 plus GO, 12 minus NO-GO), about
-# $130. Accept that good holes near a limit may be refused; the traveler
-# mikes each pin so the real window is known per pin." Setup 1 ends by
-# miking both pins and the reamer (a trial hole in the bar's remainder if
-# the reamer reads under the GO pin); the bore is accepted between the two
-# pins' written readings.
+# Owner ruling 2026-11-24, fit audit question 21: the seat is a slip fit in
+# the arm, bonded with LOCTITE 638, turned to the arm's bore until it slides
+# on by hand (no sizing plug, no B + .0009 press arithmetic). Fit audit
+# 2026-11-23, MHA-DT-31.bore: the bore is the .3760 reamer's, printed with no
+# band; MHA-DT-11's shank is turned to it, so nothing here gauges it (the
+# Class ZZ pins zz-pins-3760-3765 are dropped from this plan).
 #
 # NC (cad/process/dt_crank_hub/cam.py): CM01_pin_hole. Program names, the
 # [parameters] and the milling_cuts names are a contract with that recipe.
@@ -40,8 +38,8 @@ title = "Crank Hub"
 part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
 material = "1018 cold-finished steel, 1 in round (drawing: {{cad.material_spec}})"
-stock = "Lot: {{process.quantity:d}} hub. Ø{{process.bar_dia_in:.3dot}} bar, on hand; Setup 1 takes about {{process.bar_use_in:.2dot}} in of it, the sizing plug included: saw a 3 in piece off it for the lathe (1.75 out of the jaws, .50 in them), never the whole bar (it would run out past the spindle's rear end)."
-note = "Inches unless mm; G-code and console entries in mm (the files and the controller run G21). Lathe PM-1127VF-LB (70–380 and 380–2000 rpm); mill PM-30MV low belt (100–2800 rpm). Cutting oil on the steel. Crank arm MHA-DT-06 is finished before Setup 1: Op 20 sizes a plug to its bore and Op 30 mikes its thickness; the seat is turned to both. Home the mill ($H) and touch off G54 at the start of the mill setup; prove CM01 in air before it cuts. To order (not on hand): the two Class ZZ pins, .3760 plus (GO) and .3765 minus (NO-GO)."
+stock = "Lot: {{process.quantity:d}} hub. Ø{{process.bar_dia_in:.3dot}} bar, on hand; Setup 1 takes about {{process.bar_use_in:.2dot}} in of it: saw a 3 in piece off it for the lathe (1.25 out of the jaws, .50 in them), never the whole bar (it would run out past the spindle's rear end)."
+note = "Inches unless mm; G-code and console entries in mm (the files and the controller run G21). Lathe PM-1127VF-LB (70–380 and 380–2000 rpm); mill PM-30MV low belt (100–2800 rpm). Cutting oil on the steel. Crank arm MHA-DT-06 is finished before Setup 1: Op 20 mikes its thickness and Setup 2 tries its bore on the seat; the seat is turned to both. Home the mill ($H) and touch off G54 at the start of the mill setup; prove CM01 in air before it cuts."
 shop = "../shop"
 stock_refs = ["1018-round-1"]
 material_key = "lathe-1018-cold-finished"
@@ -55,22 +53,16 @@ part = "dt-crank-hub"
 [parameters]
 quantity = 1
 bar_dia_in = 1.0
-# Setup 1: .02 faced, the .40 sizing plug and its kerf, about .01 re-faced,
-# the hub's 1.01 parted length and its kerf.
-bar_use_in = 1.57
+# Setup 1: .02 faced, the hub's 1.01 parted length and its kerf.
+bar_use_in = 1.11
 # The blank a hub is cut from (stock_fit: envelope X, Y, Z): the 1 in bar,
 # the hub's length plus the Setup 2 allowance.
 blank_x_in = 1.0
 blank_y_in = 1.03
 blank_z_in = 1.0
-# Setup 1: out of the jaw fronts, the sizing plug's .40, its kerf and the
-# re-facing (.50 in all), then the hub's 1.01 parted length, its kerf and
-# room for the blade to clear the jaws.
-stickout_mm = 44.45
-# The sizing plug Setup 1 turns on the bar end to the arm's bore (its
-# length, and the Z its parting face stands at).
-plug_length_in = 0.3
-plug_off_in = 0.4
+# Setup 1: out of the jaw fronts, the facing allowance, the hub's 1.01
+# parted length, its kerf and room for the blade to clear the jaws.
+stickout_mm = 31.75
 face_allowance_in = 0.02
 # Left on the parted end for Setup 2 to face to length.
 regrip_allowance_in = 0.02
@@ -120,14 +112,10 @@ drill_tip_mm = -24.7406
 # 1.8 in/min, as dt_pinion_cam's spots.
 spot_feed_per_min_mm = 45.72
 drill_14_feed_per_min_mm = 95.25
-# The Class ZZ pins (shop dt.toml zz-pins-3760-3765; owner ruling 2026-11-23,
-# tool audit Q1): GO a plus pin at the band's low limit, true size .3760 to
-# .3762; NO-GO a minus pin at the high limit, .3763 to .3765 (one pin's ZZ
-# tolerance, .0002, is the record's resolution_mm 0.00508). The largest GO
-# pin and the smallest NO-GO pin a sheet may use: with both pins there, a
-# bore is sure to pass only between them, the middle .0001 of the .0005 band.
-go_pin_max_in = 0.3762
-nogo_pin_min_in = 0.3763
+# The seat's slip fit (fit audit question 21): passes of this much a side
+# once the seat is within .002 of the arm, trying the arm after each, so the
+# first fit that slides on stays inside the design's .0005-.003 diametral.
+seat_trial_step_in = 0.0002
 
 [[tools]]
 id = "ar"
@@ -170,24 +158,18 @@ name = "#14 drill"
 ref = "drill-14"
 
 [[tools]]
-id = "pins"
-name = "Class ZZ pins: .3760 plus (GO) and .3765 minus (NO-GO)"
-ref = "zz-pins-3760-3765"
-status = "to_order"
-
-[[tools]]
 id = "files"
 name = "Files"
 ref = "jig-files"
 
 [[setups]]
 machine_kind = "lathe"
-title = "Bar: size the arm's bore on a plug, then turn the barrel and relief, part off long"
+title = "Bar: turn the barrel and relief, part off long"
 machine = "PM-1127VF-LB lathe"
 indexing = "none"
 machine_ref = "pm-1127vf-lb"
 holding = "3-jaw on the Ø{{process.bar_dia_in:.3dot}} bar, {{process.stickout_mm:in.2dot}} in out of the jaw fronts (rule)."
-datum = "Z0 (carriage DRO): the bar end, faced in Op 10 for the sizing plug, then faced again in Op 50: the hub's REAR face (the relief end)."
+datum = "Z0 (carriage DRO): the bar end, faced in Op 10: the hub's REAR face (the relief end)."
 diagram = { file = "diagrams/bar.svg", alt = "The 1 in bar in the 3-jaw: the rear end faced, the barrel Ø.88 turned back past the parting line, the relief Ø.65 turned .16 long at the rear end; the hub parted off 1.01 from the rear face." }
 lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = 25.4, stock_diameter_mm = 25.4, stickout_mm = "{{process.stickout_mm}}", minimum_diameter_mm = "{{cad.relief_dia_mm}}", support = "none" }
 
@@ -197,44 +179,14 @@ speed_kind = "spindle"
 tool = "ar"
 drilling = "none"
 sizing = "other"
-instruction = "Face the bar end square, about {{process.face_allowance_in:.2dot}} off; set DRO Z0 on it."
+instruction = "Face the bar end square, about {{process.face_allowance_in:.2dot}} off; set DRO Z0 on it. This is the hub's rear face."
 settings = "lathe-ar-1018"
 cut_diameter_mm = 25.4
 
 [[setups.operations]]
 cut_kind = "other"
-speed_kind = "spindle"
-tool = "ar"
-drilling = "none"
-sizing = "other"
-instruction = "Sizing plug for crank arm MHA-DT-06's seat bore (made first): turn the bar end Ø.770 from Z0 back to Z-{{process.plug_length_in:.2dot}}. Then, spindle stopped between passes, mike and take .0005–.001 a side a pass to about Ø.762, .002 over the expected bore; then .0001 a side a pass, trying the arm after each, until its bore first slides onto the plug with a light push and no rock."
-settings = "lathe-ar-1018"
-cut_diameter_mm = 19.558
-
-[[setups.operations]]
-cut_kind = "other"
-instruction = "Mike the plug where the arm fitted; write it on this sheet as B (about .760): the bore's size. Mike the arm's thickness at four places round its bore; write the smallest as T (about .3125)."
+instruction = "Mike crank arm MHA-DT-06's thickness at four places round its bore (the arm is made first); write the smallest on this sheet as T (about .3125)."
 feed = "hand"
-
-[[setups.operations]]
-cut_kind = "other"
-speed_kind = "spindle"
-tool = "cutoff"
-drilling = "none"
-sizing = "other"
-instruction = "Bring the blade's chuck-side face onto the faced end and set DRO Z there to the blade's width, miked across its cutting edge ({{process.blade_width_in:.4dot}} nominal): the DRO then reads the blade's tailstock-side face. Part off with that face at Z-{{process.plug_off_in:.3dot}}: the plug comes off; keep it with the arm."
-settings = "lathe-part-1018"
-cut_diameter_mm = 25.4
-
-[[setups.operations]]
-cut_kind = "other"
-speed_kind = "spindle"
-tool = "ar"
-drilling = "none"
-sizing = "other"
-instruction = "Face the new bar end square, clean of the parting pip; set DRO Z0 on it again. This is the hub's rear face."
-settings = "lathe-ar-1018"
-cut_diameter_mm = 25.4
 
 [[setups.operations]]
 cut_kind = "other"
@@ -262,7 +214,7 @@ gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.relief_dia_band_mm}}" 
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Barrel or relief over its band in Op 60 or Op 70: another finish pass, mike again; relief short: turn on to the length. Under a band, or a relief over {{cad.relief_length_max_in:.3dot}} long: part it off as scrap; chuck a fresh piece of the bar at least 1.75 long, 1.25 in out (rule), and start again at Op 50, keeping the plug and the B and T written in Op 30."
+instruction = "Barrel or relief over its band in Op 30 or Op 40: another finish pass, mike again; relief short: turn on to the length. Under a band, or a relief over {{cad.relief_length_max_in:.3dot}} long: part it off as scrap; chuck a fresh piece of the bar at least 1.75 long, 1.25 in out (rule), and start again at Op 10, keeping the T written in Op 20."
 feed = "hand"
 
 [[setups.operations]]
@@ -275,23 +227,6 @@ instruction = "Bring the blade's chuck-side face onto the faced end and set DRO 
 settings = "lathe-part-1018"
 cut_diameter_mm = 25.4
 
-[[setups.operations]]
-cut_kind = "other"
-instruction = "The bar's remainder still in the jaws: on the 0–1 in micrometer (reads .0001; trust a reading to ±.00005), mike the {{cad.bore_dia_min_in:.4dot}} GO pin, the {{cad.bore_dia_max_in:.4dot}} NO-GO pin, and the .3760 reamer across two opposite margins at its front end. Write the three readings here, and each pin's reading on its tag."
-inspection = "GO pin reads {{cad.bore_dia_min_in:.4dot}}–{{process.go_pin_max_in:.4dot}}, NO-GO pin {{process.nogo_pin_min_in:.4dot}}–{{cad.bore_dia_max_in:.4dot}}: a pin outside its range is not used. The reamer reads under the NO-GO pin's reading, else it is not used: stop and tell the owner."
-gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.bore_dia_band_mm}}" }]
-feed = "hand"
-
-[[setups.operations]]
-cut_kind = "other"
-instruction = "This sheet accepts a bore the GO pin enters and the NO-GO pin does not: GO reading ≤ bore < NO-GO reading. With both pins at their size limits only {{process.go_pin_max_in:.4dot}}–{{process.nogo_pin_min_in:.4dot}} is sure to pass; a good bore within .0002 of either band limit may be refused (owner ruling 2026-11-23)."
-feed = "hand"
-
-[[setups.operations]]
-cut_kind = "other"
-instruction = "Only if the reamer read under the GO pin, before unchucking the bar's remainder: face its end, then spot, drill L and 23/64 and ream it .40 deep by the quill scale as Ops 170–200 do; gauge it as Op 210. The GO pin enters: go on. Refused: stop and tell the owner (the pins refuse this reamer's holes)."
-feed = "hand"
-
 [[setups]]
 machine_kind = "lathe"
 title = "Turned round: face to length, turn the seat to the arm, ream the bore"
@@ -299,13 +234,13 @@ machine = "PM-1127VF-LB lathe"
 indexing = "none"
 machine_ref = "pm-1127vf-lb"
 holding = "3-jaw over a shim wrap of brass shim on the barrel, {{process.regrip_grip_in:.2dot}} in of the hub in the jaws from the rear face (the relief end inward), the parted end {{process.regrip_out_mm:in.2dot}} in out. Nothing seats the hub axially: the jaw tips may stand proud of the chuck face."
-datum = "Z0: the front face, faced in Op 140 to {{process.length_target_in:.3dot}} from the rear face, preset from the length miked there."
+datum = "Z0: the front face, faced in Op 80 to {{process.length_target_in:.3dot}} from the rear face, preset from the length miked there."
 diagram = { file = "diagrams/regrip.svg", alt = "The hub turned round, its barrel in the jaws over a shim wrap, the parted end out: faced to length, the seat turned back to the shoulder, the bore drilled and reamed through from the tailstock." }
 lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{cad.barrel_dia_mm}}", stock_diameter_mm = "{{cad.barrel_dia_mm}}", stickout_mm = "{{process.regrip_out_mm}}", minimum_diameter_mm = "{{cad.seat_dia_ref_mm}}", support = "none" }
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Write the targets from B and T (Op 30): seat Ø = B + .0009 (the bore lies within .0002 over B, so B + .0006 to B + .0012 holds the .0004–.0012 press); seat length S = T − .001 (the middle of −.000/−.002)."
+instruction = "Write the seat length from T (Op 20): S = T − .005 (the middle of −.000/−.010). The seat's diameter has no number to write: it is turned to the arm's bore by trial in Op 90."
 feed = "hand"
 
 [[setups.operations]]
@@ -324,15 +259,15 @@ speed_kind = "spindle"
 tool = "ar"
 drilling = "none"
 sizing = "other"
-instruction = "Turn the seat from Z0 back to Z−S by the DRO, the shoulder square: rough to Ø(B + .010), then finish in light passes of .0005–.001 a side, miking between them, to within .002 of Ø(B + .0009); then .0001–.0002 a side a pass, miking after each, to Ø(B + .0009)."
+instruction = "Turn the seat from Z0 back to Z−S by the DRO, the shoulder square: rough to Ø.772, over the arm bore's .770 limit. Then, spindle stopped after each pass, try crank arm MHA-DT-06 square on the seat end, clean and dry: passes of .001 a side until its bore first starts onto the seat, then {{process.seat_trial_step_in:.4dot}} a side a pass until it slides on by hand to the shoulder."
 settings = "lathe-ar-1018"
 cut_diameter_mm = "{{cad.seat_dia_ref_mm}}"
-inspection = "Seat Ø B + .0006 to B + .0012, micrometer. Shoulder: touch the AR on it, the DRO reads −T to −(T − .002)."
+inspection = "The arm slides on by hand to the shoulder, no force and no felt rock (the drawing's slip fit; MHA-DT-00 bonds it with LOCTITE 638). Shoulder: touch the AR on it, the DRO reads −T to −(T − .010)."
 gauge_checks = "other"
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Seat over B + .0012 in Op 150: another pass of .0001 a side; shoulder short of −(T − .002): turn on to Z−S. Seat under B + .0006, or the shoulder past −T: scrapped, not reworked; make another from Setup 1."
+instruction = "Arm will not go on in Op 90: another {{process.seat_trial_step_in:.4dot}} a side pass; shoulder short of −(T − .010): turn on to Z−S. The arm rocks on the seat (a pass taken too deep), or the shoulder past −T: scrapped, not reworked; make another from Setup 1."
 feed = "hand"
 
 [[setups.operations]]
@@ -379,18 +314,6 @@ instruction = "Ream .3760 through from the tailstock, spindle running: feed the 
 settings = "lathe-ream-3760-1018"
 cut_diameter_mm = "{{cad.bore_dia_mm}}"
 
-[[setups.operations]]
-cut_kind = "other"
-instruction = "Still chucked, the bore wiped clean: the GO pin passes through and the NO-GO pin does not enter the front end (both ends are checked again at the bench, after the cross hole, Op 310)."
-inspection = "GO enters, NO-GO does not: bore Ø{{cad.bore_dia_min_in:.4dot}}–{{cad.bore_dia_max_in:.4dot}} through."
-gauge_checks = [{ gauge = "zz-pins-3760-3765", band_mm = "{{cad.bore_dia_band_mm}}" }]
-feed = "hand"
-
-[[setups.operations]]
-cut_kind = "other"
-instruction = "The GO pin refused in Op 210: clear the chips, oil, run the same reamer through once more as Op 200 and gauge again. Still refused (the pins cannot show the bore at or over {{cad.bore_dia_min_in:.4dot}}, and a reamer cannot be made to cut larger), or the NO-GO pin entering (no cut remedies it): scrapped, not reworked; make another from Setup 1."
-feed = "hand"
-
 [[setups]]
 machine_kind = "other"
 title = "Drill the #14 cross hole"
@@ -398,7 +321,7 @@ machine = "PM-30MV CNC (FluidNC, CNCjs with the electronic tool setter) / vise, 
 indexing = "none"
 machine_ref = "pm-30mv"
 holding = "The PM 6 in vise (jaws {{process.vise_jaw_height_mm:in.2f}} tall above its seat). A 1 in parallel, 1/8 in thick, against each jaw. The hub lying along the jaws, centred on them, front face to the LEFT, its barrel on the parallels' inner top edges and gripped by the jaws; the seat and relief hang clear of both. Between the parallels a {{process.cross_parallel_gap_mm:in.3dot}} gap: the #14 runs out into it. Tap the barrel down onto both edges while closing the vise."
-datum = "Program CM01_pin_hole (cam:dt_crank_hub). G54: X0 the front face, +X toward the rear face; Y0 the barrel's axis, +Y toward the fixed (rear) jaw; Z0 the barrel's top line. Tool lengths from the tool setter at each M6; the jaw tops stand {{process.cross_jaw_top_mm:in.3dot}} above Z0. After any reset, alarm, stall or E-stop, or if the hub is disturbed in the vise: home ($H) and repeat Ops 230–250 before Cycle Start. At each M6 the program has stopped the spindle (M5) and shows the tool and speed: wait for the spindle to stop, change the tool, set the speed, then Cycle Start."
+datum = "Program CM01_pin_hole (cam:dt_crank_hub). G54: X0 the front face, +X toward the rear face; Y0 the barrel's axis, +Y toward the fixed (rear) jaw; Z0 the barrel's top line. Tool lengths from the tool setter at each M6; the jaw tops stand {{process.cross_jaw_top_mm:in.3dot}} above Z0. After any reset, alarm, stall or E-stop, or if the hub is disturbed in the vise: home ($H) and repeat Ops 150–170 before Cycle Start. At each M6 the program has stopped the spindle (M5) and shows the tool and speed: wait for the spindle to stop, change the tool, set the speed, then Cycle Start."
 diagram = { file = "diagrams/cross.svg", alt = "The hub lying in the vise on two parallels' edges, gripped on its barrel; the #14 drills down through the barrel and bore {{cad.pin_hole_station_in:.2dot}} from the front face, into the gap between the parallels." }
 envelope = "other"
 vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{cad.barrel_dia_mm}}", along_jaws_mm = "{{cad.envelope_y_mm}}", part_height_mm = "{{cad.barrel_dia_mm}}", parallel_height_mm = "{{process.parallel_height_mm}}", overhang_mm = [-66.7639, -66.7639], jaw_offset = "centred", fixed_jaw_face = "machined", moving_jaw_face = "machined", moving_jaw_contact = "rod" }
@@ -483,15 +406,15 @@ instruction = "Clear the #14's breakthrough burrs inside the bore: grip the .376
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Mike the length across the front and rear faces. The GO pin passes the full length of the bore, past the cross hole; the NO-GO pin enters from neither end."
-inspection = "Length {{cad.rear_face_length_min_in:.3dot}}–{{cad.rear_face_length_max_in:.3dot}}, micrometer; GO enters, NO-GO does not: bore Ø{{cad.bore_dia_min_in:.4dot}}–{{cad.bore_dia_max_in:.4dot}} through after the cross hole."
-gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.rear_face_length_band_mm}}" }, { gauge = "zz-pins-3760-3765", band_mm = "{{cad.bore_dia_band_mm}}" }]
+instruction = "Mike the length across the front and rear faces. The bore is the reamer's (drawing: Ø.3760 REAM THRU, no band): MHA-DT-11's shank is turned to it, so it is not gauged here."
+inspection = "Length {{cad.rear_face_length_min_in:.3dot}}–{{cad.rear_face_length_max_in:.3dot}}, micrometer."
+gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.rear_face_length_band_mm}}" }]
 feed = "hand"
 
 [[setups.operations]]
-instruction = "GO pin refused in Op 310: clear the chips, oil, repeat Op 300 once and gauge again. Still refused, the NO-GO pin entering (no cut remedies it), or the length outside its band: scrapped, not reworked; make another from Setup 1."
+instruction = "Length outside its band in Op 230: scrapped, not reworked; make another from Setup 1."
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Finish (drawing: bright machined, oiled): wipe the hub clean and give it a light coat of light machine oil; wipe the seat dry for the press into MHA-DT-06."
+instruction = "Finish (drawing: bright machined, oiled): wipe the hub clean and give it a light coat of light machine oil; leave the seat oiled too: MHA-DT-00 degreases it before the bond into MHA-DT-06. Tag the hub to that arm: its seat was turned to that arm's bore."
 feed = "hand"

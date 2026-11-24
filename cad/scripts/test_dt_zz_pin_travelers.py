@@ -24,7 +24,6 @@ IN = 25.4
 # band is bound from the drawing).
 PLANS = {
     "dt_cone_tip_bushing": ("zz-pins-0625-0630", "go_pin_max_in", "nogo_pin_min_in"),
-    "dt_crank_hub": ("zz-pins-3760-3765", "go_pin_max_in", "nogo_pin_min_in"),
 }
 
 
