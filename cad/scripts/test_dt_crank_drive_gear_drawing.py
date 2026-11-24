@@ -523,10 +523,10 @@ def test_notes_do_not_substitute_for_native_fit_dimensions() -> None:
 
 def test_bore_and_keyway_dimensions_link_one_matched_fit_note() -> None:
     # The bore is reamed (no band) and the keyway's bands are cone_land_key's;
-    # the fit route is MHA-DT-04's keyed land turned to the reamed bore, with
-    # an acceptance (rule 4; fit audit 2026-11-23: "BORE MADE TO THE MEASURED
-    # LAND" had it backwards). One feature, several dimensions: the mates
-    # print once, in note 1, and every bore and keyway dimension links it.
+    # MHA-DT-04's keyed land is turned last to the reamed bore, so the
+    # acceptance prints once, on MHA-DT-04 (rule 4 form 2; fit audit
+    # 2026-11-23: "BORE MADE TO THE MEASURED LAND" had it backwards). One
+    # feature, several dimensions: the mates print once, in note 1.
     link = f"SEE NOTE {drawing.BORE_FIT_NOTE_NUMBER}"
     assert drawing.DIMENSION_CALLOUTS["BoreDia"] == f"REAM THRU\n{link}"
     # The keyway's width and T print the bare flag, as the keyed cone gears'
@@ -544,27 +544,16 @@ def test_bore_and_keyway_dimensions_link_one_matched_fit_note() -> None:
         assert notes.KEY_MATE_NUMBER not in callout, name
         assert "CLEARANCE" not in callout, name
     note = " ".join(line.strip() for line in drawing.BORE_FIT_NOTE.splitlines())
-    assert note.startswith(f"{drawing.BORE_FIT_NOTE_NUMBER}. ")
-    # The land is named by what it is (its key), not by an undefined label.
-    assert f"THE KEYED LAND OF CONE GEAR SHAFT {notes.SHAFT_MATE_NUMBER}" in note
-    assert "LAND 1" not in note
-    assert notes.KEY_MATE_NUMBER in note
-    # The clearances print as REF in the keyed cone gears' form, off the
-    # same limits (draw_dt_cone_gear.sheet_notes on the same land).
-    import draw_dt_cone_gear as cone_drawing
-
-    (round_lo, round_hi), (key_lo, key_hi) = cone_drawing.bore_clearances_mm(30)
-    reference = (
-        f"(CLEARANCE {spec.inch_text(round_lo, 4)}-{spec.inch_text(round_hi, 4)} "
-        f"ON \u00d8, {spec.inch_text(key_lo, 4)}-{spec.inch_text(key_hi, 4)} KEYWAY TO KEY)"
+    # MHA-DT-03's keyed-sheet words (draw_dt_cone_gear on the cone batch):
+    # the mate and its land by diameter, then the key; no clearance and no
+    # acceptance, which MHA-DT-04's note 1 prints.
+    assert note == (
+        f"{drawing.BORE_FIT_NOTE_NUMBER}. SLIDING FIT: CONE GEAR SHAFT "
+        f"{notes.SHAFT_MATE_NUMBER} \u00d8.3750 LAND IS TURNED TO THIS BORE; "
+        f"KEY {notes.KEY_MATE_NUMBER} SLIDES IN THE KEYWAY."
     )
-    assert reference in " ".join(
-        line.strip() for line in cone_drawing.sheet_notes(30).splitlines()
-    )
-    assert reference in note
-    assert note.endswith("SLIDES ON, NO ROCK.")
-    assert "THE LAND IS TURNED TO THE BORE" in note
-    assert "BORE MADE TO" not in note
+    for phrase in ("CLEARANCE", "SLIDES ON", "NO ROCK", "LAND 1", "BORE MADE TO"):
+        assert phrase not in note, phrase
     # Every line ends left of the keyway width's text above the block.
     assert max(len(line) for line in drawing.SHEET_NOTES.splitlines()) <= 51
     assert "FLAT" not in drawing.SHEET_NOTES
