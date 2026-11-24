@@ -166,8 +166,8 @@ BORE_R_MAX = R_BORE + max(BORE_DIA_BAND) / 2.0  # 6.35
 # in ⌖Ø.008 needs .00255 (``build_sm_summing_assembly.KNIFE_BAR_FIT_NEED``),
 # so at most .49595, .00005 under the floor -- below the shop's .001
 # reading unit (policy #3518: such a margin is evidence neither way), and
-# the .4990 reamer's own .4991 least bore leaves +.00055; the trial governs
-# (delegated ruling 2026-11-24, FitLaneCH).  The floor lives here, beside the bore the bar
+# the .4990 reamer's own .4991 least bore leaves +.00055; the trial
+# governs.  The floor lives here, beside the bore the bar
 # is cut to, so MHA-FR-02's hanger mirror can charge the bar's play without
 # importing the summing spec's config closure (test_dodo_recipe's
 # fine-grained config deps).

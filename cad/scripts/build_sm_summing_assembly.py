@@ -365,9 +365,8 @@ KNIFE_BAR_FIT_NEED = (
 # through the smallest conforming pair is at most .4985 - .00255 = .49595,
 # .00005 under the floor -- below the shop's .001 reading unit (policy
 # #3518: such a margin is evidence neither way; the .4990 reamer's own
-# .4991 least bore leaves +.00055), so the trial governs (delegated ruling
-# 2026-11-24, FitLaneCH).  The guard keeps that corner under the reading
-# unit.
+# .4991 least bore leaves +.00055), so the trial governs.  The guard keeps
+# that corner under the reading unit.
 KNIFE_BAR_PLAY_PROVEN_IN = 0.0041
 KNIFE_BAR_READING_UNIT_IN = 0.001
 KNIFE_BAR_CORNER_SHORTFALL_IN = knife_mount.KNIFE_GAUGE_BAR_DIA_MIN_IN - (

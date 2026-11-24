@@ -839,7 +839,7 @@ def test_the_gauge_bar_floor_caps_its_play_and_records_the_corner() -> None:
     assert asm.KNIFE_BAR_FIT_NEED / 25.4 == pytest.approx(0.0025517, abs=5e-8)
     # The floor stands .00005 over the largest straight bar the smallest
     # conforming pair passes, under the shop's .001 reading unit (policy
-    # #3518), so the trial governs (delegated ruling 2026-11-24, FitLaneCH).
+    # #3518: evidence neither way), so the trial governs.
     corner = knife_mount.KNIFE_GAUGE_BAR_DIA_MIN_IN - (
         2.0 * knife_mount.BORE_R_MIN - asm.KNIFE_BAR_FIT_NEED
     ) / 25.4
