@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- The split bush that holds the pin turned round (#3500): 1/2 in brass in the 3-jaw, drilled and reamed .1260 through, slit along one side. Hand-drawn, not to scale. -->
+<svg xmlns="http://www.w3.org/2000/svg" width="540" height="290" viewBox="0 0 540 290" font-family="sans-serif" font-size="12">
+<rect width="540" height="290" fill="#fff"/>
+<rect x="20" y="30" width="40" height="230" fill="#ccc" stroke="#000"/>
+<rect x="60" y="30" width="150" height="40" fill="#ccc" stroke="#000"/>
+<rect x="60" y="220" width="150" height="40" fill="#ccc" stroke="#000"/>
+<rect x="60" y="70" width="225" height="150" fill="#ec9" stroke="#000"/>
+<rect x="60" y="126" width="225" height="38" fill="#fff" stroke="#000"/>
+<line x1="60" y1="100" x2="285" y2="100" stroke="#000" stroke-width="2"/>
+<path d="M285 70 l-8 0 l4 8 z" fill="#000"/>
+<line x1="10" y1="145" x2="530" y2="145" stroke="#000" stroke-dasharray="12 3 2 3" stroke-width="0.6"/>
+<text x="300" y="66" text-anchor="start">nick on the rim at jaw 1</text>
+<line x1="298" y1="62" x2="283" y2="72" stroke="#000" stroke-width="0.6"/>
+<text x="300" y="104" text-anchor="start">slit, sawn after reaming:</text>
+<text x="300" y="119" text-anchor="start">one wall, end to end</text>
+<line x1="298" y1="100" x2="285" y2="100" stroke="#000" stroke-width="0.6"/>
+<text x="300" y="149" text-anchor="start">#31 drill, then .1260 reamer,</text>
+<text x="300" y="164" text-anchor="start">right through</text>
+<text x="135" y="22" text-anchor="middle">3-jaw on .50 of the piece</text>
+<text x="172" y="282" text-anchor="middle">1/2 brass, .75 long</text>
+</svg>
