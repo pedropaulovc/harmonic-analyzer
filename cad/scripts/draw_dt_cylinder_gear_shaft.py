@@ -56,6 +56,7 @@ from dt_cylinder_gear_shaft_spec import (
     LENGTH_CALLOUT,
     SHAFT_DIA,
     SHAFT_RADIUS,
+    SHAFT_DIA_BAND,
     SURFACE_FINISHES,
     UNIT,
 )
@@ -150,18 +151,32 @@ requirement(
     },
     precision={"height": _P["DomeHeight"], "supply_length": 1},
 )
+# The O.D. prints REF (the bought ground stock). Its feature still carries a
+# band, because the traveler's as-supplied O.D. (plan process.
+# as_supplied_outer) reads a banded diameter: prechips 0.11.47 refuses a bare
+# reference ("'outer' is not a banded diameter", head 4bff0cce54). The band
+# is no sheet text: it is the purchase requirement for the stock, "3/8 in SAE
+# 1018 or 1045 precision-ground round whose stated diameter tolerance lies
+# inside +.0000/-.0008" (cad/config/shop-equipment/stock-to-order.toml,
+# issue #2346 owner ruling 2026-11-20; no SKU selected yet), carried by
+# SHAFT_DIA_BAND (= _fit_shaft_h.SHAFT_H).
 requirement(
     "outer",
     kind="diameter",
     faces=(CylinderFace(SHAFT_DIA),),
-    requirements=("stock",),
+    requirements=("dia",),
     fields={
         "axis": ([0.0, 1.0, 0.0], ("SHAFT_DIA",)),
         "at": ([0.0, 0.0, 0.0], ("SHAFT_DIA",)),
         "span": ([0.0, ARBOR_LENGTH], ((_LAYOUT, "ARBOR_LENGTH"),)),
-        "dia_ref": (SHAFT_DIA, ("SHAFT_DIA",)),
-        "stock": (SHAFT_DIA_CALLOUT, ((_NOTES, "SHAFT_DIA_CALLOUT"),)),
+        "dia": (
+            limits(SHAFT_DIA, _P["ShaftDia"], SHAFT_DIA_BAND, unit=UNIT),
+            ("SHAFT_DIA", "SHAFT_DIA_BAND", "UNIT"),
+        ),
+        "dia_nominal": (SHAFT_DIA, ("SHAFT_DIA",)),
+        "callout": (SHAFT_DIA_CALLOUT, ((_NOTES, "SHAFT_DIA_CALLOUT"),)),
     },
+    precision={"dia": _P["ShaftDia"]},
 )
 
 
