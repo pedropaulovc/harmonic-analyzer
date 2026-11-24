@@ -255,8 +255,12 @@ def _inch_text(mm: float) -> str:
     return f"{mm / 25.4:.4f}".removeprefix("0")
 
 
+# The hanger's slots are cut to this square (fit audit 2026-11-23,
+# MHA-PN-02.guide_slots): the acceptance prints once, on the hanger's sheet,
+# made last; this sheet names the mate and says it is cut to the rod.  Rows
+# no longer than the 23 characters the end view's block was laid out for.
 DIMENSION_CALLOUTS: dict[str, str] = {
-    "Depth": f"SQ, SLIDING FIT IN PEN\nHANGER {PEN_HANGER_NUMBER} GUIDES",
+    "Depth": f"SQ, PEN HANGER\n{PEN_HANGER_NUMBER} IS CUT TO IT",
     "PivotDia": f"SEE NOTE {PIVOT_FIT_NOTE}",
     "ShoulderRadius": f"SEATS ON PEN V-BLOCK\n{PEN_V_BLOCK_NUMBER}",
     "TapWallMin": TAP_WALL_CALLOUT,

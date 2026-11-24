@@ -67,7 +67,6 @@ LOCAL_BAND_SOURCES: dict[tuple[str, str], tuple[str, str]] = {
         "each",
     ),
     # Builders apply the same bands their specs publish on the sheet.
-    ("build_pn_pen_hanger", "band"): ("DRAWING_BANDS", "values"),
     ("build_pn_pen_rod", "band"): ("DRAWING_BANDS", "values"),
     # for (feature, name), band in spec.MODEL_BANDS_MM.items(): deviations(band)
     ("build_dt_cone_gear_tl_keyed_arbor", "band"): ("spec.MODEL_BANDS_MM", "values"),
@@ -526,7 +525,6 @@ def _resolve(use: BandUse) -> list[tuple[str, Any]]:
 @pytest.mark.parametrize(
     ("module_name", "expected"),
     [
-        ("build_pn_pen_hanger", "DRAWING_BANDS"),
         ("build_pn_pen_rod", "DRAWING_BANDS"),
     ],
 )
