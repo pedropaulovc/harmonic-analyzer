@@ -1,0 +1,7 @@
+checks:
+  - id: C-01
+    check: "SLIDE_CLEARANCE_MIN"
+    kind: gap
+    reason: "MHA-DT-33 no longer slides over the arbor span"
+    source: "dt_pinion_arbor_geometry.SHAFT_DIA_BAND (5/16 -.0004/-.0038) against the collar's 5/16 drilled bore (DRILLED HOLES +.004/0); fit audit F12 (keep)"
+    basis: worst_case

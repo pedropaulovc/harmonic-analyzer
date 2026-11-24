@@ -15,5 +15,10 @@ necessity:
   - id: N-02
     feature: "Ø.0625 +.0025/.0000 collar pin hole (1/16 DRILL THRU; MHA-DT-VN-63 MUST DRIVE, NOT ENTER BY HAND)"
     kind: bought_seat
-    reason: "B18.8.2's recommended hole for the 1/16 spring pin"
+    reason: "B18.8.2's recommended hole for the MHA-DT-VN-63 spring pin"
     source: "ASME B18.8.2 (.062-.065 for 1/16); fit audit F15 (keep the band, the pin is the gauge)"
+  - id: N-03
+    feature: "Ø5/16 -.0004/-.0038 spans (collar span, back stub)"
+    kind: gap
+    reason: "past .3121 the MHA-DT-33 collar no longer slides on"
+    source: "fit audit F12 (keep as is); dt_pinion_arbor_collar_spec.SLIDE_CLEARANCE_MIN"

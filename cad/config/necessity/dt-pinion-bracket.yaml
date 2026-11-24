@@ -19,5 +19,5 @@ necessity:
   - id: N-02
     feature: "Ø.0625 +.0025/.0000 cross hole (MATCH-DRILL ... MHA-DT-VN-63 MUST DRIVE)"
     kind: bought_seat
-    reason: "B18.8.2's recommended hole for the 1/16 spring pin"
+    reason: "B18.8.2's recommended hole for the MHA-DT-VN-63 spring pin"
     source: "ASME B18.8.2 (.062-.065 for 1/16); fit audit F15 (keep the band, the pin is the gauge)"
