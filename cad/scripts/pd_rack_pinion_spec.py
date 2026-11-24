@@ -299,7 +299,8 @@ FACE_WIDTH_PLACES = 3
 # .501 to .498 (#2412).
 # The sheet prints the reamer's size and no band (fit audit 2026-11-23,
 # pending owner confirmation; drawing-guidelines.md rule 4): the hub's
-# spigot entering is the acceptance.  BORE_BAND is the ANALYSIS band, what
+# spigot is turned to it (MHA-PD-17 note 4 prints the clearance, the
+# acceptance, once).  BORE_BAND is the ANALYSIS band, what
 # the reamer is taken to cut in the .118 sheet, never a printed limit; it
 # was a printed +.0005/0.  What fails if the hole is .002 looser: the #0-80
 # taps' finished web to the bore (TAP_TO_BORE_WALL_FINISHED below, already
