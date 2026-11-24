@@ -715,7 +715,7 @@ description = "Steel rule, 48 in, finest graduation 1/64 in (Insize 7110-1200)"
 [tools.transfer-punches]  # F-transfer-punches-fractional
 description = "Transfer punch set, fractional 3/32-1/2 by 64ths"
 [tools.v-blocks]  # F-v-blocks
-description = "Matched V-block pair with clamps"
+description = "V-blocks, two, 1.5 x 2 in, with two clamps (owner 2026-11-24; matched or not: not stated)"
 
 # --- Drawing cross-check additions (2026-11-19) -------------------------------
 # Tools the v50 drawings call for that the quote workbook left out, from the

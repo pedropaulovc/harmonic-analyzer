@@ -102,8 +102,8 @@ note = "Explicit on_hand preserves the pre-split record, which had no present ke
 # so no arbor is bought for it. Reach: blade radius 1.375 in = 34.9 mm against
 # the notch's .12 depth; the arbor sits 64.1 mm off the gear axis. The 45 mm
 # nut of the archived #1413 record is replaced by that arbor's cap, 1.25 in
-# (31.75 mm) across, which stands about 16 mm over the tips; its screw head
-# and body above the saw are not yet measured.
+# (31.75 mm) across, which stands about 16 mm over the tips, as does its body
+# above the saw (also 1.25 across); only the screw head's stand is unmeasured.
 [tools.cylinder-notch-saw]
 name = "TTC 10-215-014 HSS screw-slotting saw, 2-3/4 x .014 x 1 in hole, 72 teeth"
 kind = "slitting_saw"
@@ -478,8 +478,8 @@ cite = ["McMaster-Carr packing list, PO 0803PCAMPOS (1616317-01, 08/04/2025), li
 3 = { sku = "2925A13", for_drill_in = 0.109375 }
 6 = { sku = "2925A16", for_drill_in = 0.21875 }
 
-# The small Malco in the owner's photo (owner-photos/saws-arbors-2026-11-24.jpg
-# in the cnc triage folder; etched "MALCO ... COMPANY" and ".032") is this
+# The small Malco in the owner's photo (research/shop-evidence/2026-11-24/
+# saws-arbors.jpg; etched "MALCO ... COMPANY" and ".032") is this
 # record's saw. Its hole, measured by the owner 2026-11-24: "malco 0.315 in
 # hole". The McMaster 3044A23 packing-list line says 3/8 in: either McMaster
 # shipped a .315 (8 mm) hole saw under that line or the owned saw is a
@@ -493,7 +493,7 @@ status = "on_hand"
 pieces = 1
 thickness_in = 0.032
 bore_in = 0.315
-cite = ["McMaster-Carr packing list, PO 0803PCAMPOS (1616317-01, 08/04/2025), line 15: \"Smooth-Finish Slitting Saw, 0.032\" Thick, 1\" Diameter with 3/8\" Arbor Hole\", 1 each", "Owner (Pedro) 2026-11-17: \"add to inventory ... already owned\"", "Owner (Pedro) 2026-11-24, verbatim: \"the larger slitting saws have 1in bore diam, the small ones 0.315\"; \"malco 0.315 in hole\"; photo C:/farm-runs/triage-2026-11-19/owner-photos/saws-arbors-2026-11-24.jpg"]
+cite = ["McMaster-Carr packing list, PO 0803PCAMPOS (1616317-01, 08/04/2025), line 15: \"Smooth-Finish Slitting Saw, 0.032\" Thick, 1\" Diameter with 3/8\" Arbor Hole\", 1 each", "Owner (Pedro) 2026-11-17: \"add to inventory ... already owned\"", "Owner (Pedro) 2026-11-24, verbatim: \"the larger slitting saws have 1in bore diam, the small ones 0.315\"; \"malco 0.315 in hole\"; photo research/shop-evidence/2026-11-24/saws-arbors.jpg"]
 note = "Owner confirmed on hand 2026-11-19 (McMaster 3044A23, $14.06). Hole .315, measured by the owner 2026-11-24 (the packing list's 3/8 conflicts; his measurement governs). Fits neither owned stepped arbor (smallest step 1/2)."
 
 # The owned Malco .064 (photo: etched "MALCO SAW COMPANY CRANSTON RI USA" and
@@ -512,7 +512,7 @@ dia_in = 2.75
 thickness_in = 0.064
 bore_in = 1.0
 teeth = 72
-cite = ["McMaster-Carr packing list, PO 0803PCAMPOS (1616317-01, 08/04/2025), line 16: \"High-Speed Steel Slitting Saw, 0.064\" Thick, 2-3/4\" Mill Diameter, 72 Teeth\", 1 each", "Owner (Pedro) 2026-11-17: \"add to inventory ... already owned\"", "Owner (Pedro) 2026-11-24, verbatim: \"the larger slitting saws have 1in bore diam\"; photo C:/farm-runs/triage-2026-11-19/owner-photos/saws-arbors-2026-11-24.jpg (Malco, .064, keyway)"]
+cite = ["McMaster-Carr packing list, PO 0803PCAMPOS (1616317-01, 08/04/2025), line 16: \"High-Speed Steel Slitting Saw, 0.064\" Thick, 2-3/4\" Mill Diameter, 72 Teeth\", 1 each", "Owner (Pedro) 2026-11-17: \"add to inventory ... already owned\"", "Owner (Pedro) 2026-11-24, verbatim: \"the larger slitting saws have 1in bore diam\"; photo research/shop-evidence/2026-11-24/saws-arbors.jpg (Malco, .064, keyway)"]
 note = "Owner confirmed on hand 2026-11-19 (McMaster 3062A21). Hole 1 in, owner 2026-11-24: it goes on the owned stepped saw arbors (tools.saw-arbor-r8-stepped), not keyed."
 
 # The other owned saws in the owner's 2026-11-24 photo, sizes only as etched
@@ -528,7 +528,7 @@ dia_in = 3.0
 thickness_in = 0.03125
 bore_in = 1.0
 teeth = 30
-cite = ["Owner (Pedro) 2026-11-24 photo C:/farm-runs/triage-2026-11-19/owner-photos/saws-arbors-2026-11-24.jpg, etched: \"Globus\", \"3\" x 1/32\" x 1\" / 30T\", \"HSS 5-747-045\"; a keyway in its hole", "Owner (Pedro) 2026-11-24, verbatim: \"the larger slitting saws have 1in bore diam\""]
+cite = ["Owner (Pedro) 2026-11-24 photo research/shop-evidence/2026-11-24/saws-arbors.jpg, etched: \"Globus\", \"3\" x 1/32\" x 1\" / 30T\", \"HSS 5-747-045\"; a keyway in its hole", "Owner (Pedro) 2026-11-24, verbatim: \"the larger slitting saws have 1in bore diam\""]
 note = "On hand (owner's photo and words, 2026-11-24)."
 
 [tools.slitting-saw-3-1-8]
@@ -540,7 +540,7 @@ dia_in = 3.0
 thickness_in = 0.125
 bore_in = 1.0
 teeth = 30
-cite = ["Owner (Pedro) 2026-11-24 photo C:/farm-runs/triage-2026-11-19/owner-photos/saws-arbors-2026-11-24.jpg, etched: \"3\"X1/8X1\"X30T HSS\" (the hole figure partly hidden by a mark); a keyway in its hole; maker not legible", "Owner (Pedro) 2026-11-24, verbatim: \"the larger slitting saws have 1in bore diam\""]
+cite = ["Owner (Pedro) 2026-11-24 photo research/shop-evidence/2026-11-24/saws-arbors.jpg, etched: \"3\"X1/8X1\"X30T HSS\" (the hole figure partly hidden by a mark); a keyway in its hole; maker not legible", "Owner (Pedro) 2026-11-24, verbatim: \"the larger slitting saws have 1in bore diam\""]
 note = "On hand (owner's photo and words, 2026-11-24). Maker not recorded (not legible)."
 
 [tools.cutoff-saw-blades-42805]
@@ -550,7 +550,7 @@ sku = "42805"
 status = "on_hand"
 pieces = 3
 bore_in = 0.315
-cite = ["Owner (Pedro) 2026-11-24 photo C:/farm-runs/triage-2026-11-19/owner-photos/saws-arbors-2026-11-24.jpg, etched on each of three: \"#42805\", \"Fits #42307 Mini Cut Off Saw\", \"Max. RPM\" (its figure not legible), a rotation arrow", "Owner (Pedro) 2026-11-24, verbatim: \"the small ones 0.315\""]
+cite = ["Owner (Pedro) 2026-11-24 photo research/shop-evidence/2026-11-24/saws-arbors.jpg, etched on each of three: \"#42805\", \"Fits #42307 Mini Cut Off Saw\", \"Max. RPM\" (its figure not legible), a rotation arrow", "Owner (Pedro) 2026-11-24, verbatim: \"the small ones 0.315\""]
 note = "On hand, three. Diameter, thickness and maximum rpm not recorded (not etched legibly). Their .315 hole fits neither owned stepped arbor (smallest step 1/2)."
 
 # The owner's two stepped saw arbors (photo above): an R8-shank one with a cap
@@ -564,21 +564,26 @@ note = "On hand, three. Diameter, thickness and maximum rpm not recorded (not et
 # against the body's shoulder, and is clamped by the cap (1.25 in across,
 # .50 in thick) and its countersunk hex-socket screw on the side away from
 # the spindle. The screw: .635 long, head .623 across, and the owner's thread
-# gauge "says 1 . 25" (2026-11-24): read as a 1.25 mm pitch, so M8 x 1.25
-# (the agent's reading: a .623 = 15.82 mm head is inside DIN 7991's M8 head,
-# 15.57-16.00 mm, Fuller Fasteners "DIN 7991 Specifications", read
-# 2026-11-24; .635 = 16.1 mm overall, an M8 x 16; its key 5 mm by that
-# standard, not read by him). Clamp torque 20 N·m (about 15 ft·lbf): under
-# the 23 N·m Engineers Edge gives for an M8 class 8.8 ISO countersunk
-# hex-socket screw at friction .14 (preload 13.2 kN; class 10.9 28.3 N·m;
-# "Countersunk Screws Torque Table Metric, ISO", read 2026-11-24), so it
-# holds whatever the screw's class (not read). The drive is the cap's
-# friction only (not keyed): about 11 kN of preload on two faces of the saw.
+# gauge "says 1 . 25" (2026-11-24). INFERRED by the agent, not measured:
+# M8 x 1.25 (a 1.25 mm pitch; a .623 = 15.82 mm head is inside DIN 7991's M8
+# head, 15.57-16.00 mm, Fuller Fasteners "DIN 7991 Specifications", read
+# 2026-11-24; .635 = 16.1 mm overall, an M8 x 16), a 5 mm key by that
+# standard, and a 20 N·m clamp torque (under the 23 N·m Engineers Edge gives
+# for an M8 class 8.8 ISO countersunk hex-socket screw at friction .14,
+# preload 13.2 kN; class 10.9 28.3 N·m; "Countersunk Screws Torque Table
+# Metric, ISO", read 2026-11-24). That torque considers the screw only, not
+# its thread engagement: a .635 overall countersunk screw through a .50 cap
+# reaches about .135 in (3.4 mm, under half a diameter) into the arbor unless
+# the cap is cupped, and a few M8 threads may strip near 11 kN. So the
+# engagement is to be measured (asked 2026-11-24) and these three stay
+# *_inferred fields; a plan torquing the screw stops first to read the
+# engagement (turns from first bite to seated x 1.25 mm). The drive is the
+# cap's friction only (not keyed).
 # Its axial place is the shoulder and cap; its centring is a sliding fit,
 # so runout is read on every mounting. Measured by the owner 2026-11-24:
 # "sticks 1.4 in below spindle; 1.25 dia" (the arbor installed; its body
 # above the saw 1.25 across, the same as the cap). His photo
-# (owner-photos/saw-arbor-installed-1p4-2026-11-24.png) marks the 1.4 from
+# (research/shop-evidence/2026-11-24/saw-arbor-installed-1p4.jpg) marks the 1.4 from
 # the spindle nose to the cap's lower face, the arbor installed with no saw
 # fitted. With a saw the cap's face drops by about the saw's thickness (the
 # .064 saw: about 1.46 below the nose); the shoulder sits about .90 below
@@ -609,11 +614,12 @@ screw_head_past_cap_in = "to_measure"
 body_dia_above_saw_in = 1.25
 # "sticks 1.4 in below spindle": nose to the cap's lower face, no saw (his photo).
 below_spindle_nose_in = 1.4
-screw_thread = "M8 x 1.25"
-screw_key_mm = 5
-clamp_torque_nm = 20.0
-cite = ["Owner (Pedro) 2026-11-24 photo C:/farm-runs/triage-2026-11-19/owner-photos/saws-arbors-2026-11-24.jpg", "Owner (Pedro) 2026-11-24, verbatim: \"both are designed for saws with bores of 1 7/8 3/4 5/8 1/2 ; they are not keyed\"; \"caps are 1/2 in each ; both arbors steps are spring loaded so they fit 1 in bores\"; \"1/2 thickness 1.25 dia\"; \"screw are standdard hex countersunk 0.635 len; 0.623 dia\"; \"thread gauge says 1 . 25 not sure how to interpret\"; \"sticks 1.4 in below spindle; 1.25 dia\"", "Fuller Fasteners, DIN 7991 Specifications, M8 dk 15.57-16.00 mm, read 2026-11-24: https://fullerfasteners.com/tech/din-7991-specifications-hex-socket-countersunk-head-cap-screws/", "Engineers Edge, Countersunk Screws Torque Table Metric, ISO (friction .14), M8: class 8.8 13.20 kN / 23 N·m, class 10.9 18.90 kN / 28.3 N·m, read 2026-11-24: https://www.engineersedge.com/hardware/countersunk_screws_torque_table_13477.htm"]
-note = "On hand (owner, 2026-11-24). Carries the 1 in-hole slitting saws (2-3/4 x .064 and the 3 in saws) on the PM-30MV; replaces the TTC 67-600-016 for the saw work."
+screw_thread_inferred = "M8 x 1.25"
+screw_key_mm_inferred = 5
+clamp_torque_nm_inferred = 20.0
+screw_engagement_in = "to_measure"
+cite = ["Owner (Pedro) 2026-11-24 photos research/shop-evidence/2026-11-24/saws-arbors.jpg and saw-arbor-installed-1p4.jpg", "Owner (Pedro) 2026-11-24, verbatim: \"both are designed for saws with bores of 1 7/8 3/4 5/8 1/2 ; they are not keyed\"; \"caps are 1/2 in each ; both arbors steps are spring loaded so they fit 1 in bores\"; \"1/2 thickness 1.25 dia\"; \"screw are standdard hex countersunk 0.635 len; 0.623 dia\"; \"thread gauge says 1 . 25 not sure how to interpret\"; \"sticks 1.4 in below spindle; 1.25 dia\"", "Fuller Fasteners, DIN 7991 Specifications, M8 dk 15.57-16.00 mm, read 2026-11-24: https://fullerfasteners.com/tech/din-7991-specifications-hex-socket-countersunk-head-cap-screws/", "Engineers Edge, Countersunk Screws Torque Table Metric, ISO (friction .14), M8: class 8.8 13.20 kN / 23 N·m, class 10.9 18.90 kN / 28.3 N·m, read 2026-11-24: https://www.engineersedge.com/hardware/countersunk_screws_torque_table_13477.htm"]
+note = "On hand (owner, 2026-11-24). Carries the 1 in-hole slitting saws (2-3/4 x .064 and the 3 in saws) on the PM-30MV. The TTC 67-600-016's record changes with the saw plans that move off it."
 
 [tools.saw-arbor-1-2-shank-stepped]
 name = "1/2 in straight-shank stepped slitting-saw arbor, spring-loaded pilot for 1, 7/8, 3/4, 5/8, 1/2 in holes, cap, not keyed"
@@ -626,15 +632,20 @@ keyed = false
 cap_dia_in = 1.25
 cap_thickness_in = 0.5
 body_dia_above_saw_in = "to_measure"
-cite = ["Owner (Pedro) 2026-11-24 photo C:/farm-runs/triage-2026-11-19/owner-photos/saws-arbors-2026-11-24.jpg", "Owner (Pedro) 2026-11-24, verbatim: \"the bottom arbor has 0.5 in shank and both are designed for saws with bores of 1 7/8 3/4 5/8 1/2 ; they are not keyed\"; \"caps are 1/2 in each ; both arbors steps are spring loaded so they fit 1 in bores\"; \"1/2 thickness 1.25 dia\""]
+cite = ["Owner (Pedro) 2026-11-24 photo research/shop-evidence/2026-11-24/saws-arbors.jpg", "Owner (Pedro) 2026-11-24, verbatim: \"the bottom arbor has 0.5 in shank and both are designed for saws with bores of 1 7/8 3/4 5/8 1/2 ; they are not keyed\"; \"caps are 1/2 in each ; both arbors steps are spring loaded so they fit 1 in bores\"; \"1/2 thickness 1.25 dia\""]
 note = "On hand (owner, 2026-11-24). Held in the 1/2 in R8 collet."
 
-# MHA-DT-21 cone tip block's pinch slit. NOT TO BE BOUGHT: the 2026-11-23
-# tool-audit ruling Q10 ("Print .06 (.050-.070) and use the owned 2-3/4 x
-# .064 saw on the 1 in arbor, IF the owned saw's hole is 1 in") has its
-# condition met (owner 2026-11-24: "the larger slitting saws have 1in bore
-# diam"). The record stays only while the DT-21 plan still names it; the PR
-# that moves DT-21 to the owned saw deletes it.
+# MHA-DT-21 cone tip block's pinch slit (.040-.060 wide, depth_ref .596 from
+# the top into the 1/4-28 adjuster hole, through the .44 depth). Neither owned
+# saw cuts it: the 1 in x .032 reaches about 4.7 mm past a 3/8 arbor's nut
+# (and no 3/8 arbor is owned), and the 2-3/4 x .064 is over the .060 MAX.
+# This one goes on the R8 1 in arbor (tools.gear-cutter-arbor-1, to_order),
+# which DT-21 shares with the gear work and the amplitude bar. Its reach past
+# the arbor's spacers and nut, and the blade thickness the slit accepts, are
+# the DT-21 plan's limits, checked by its recipe
+# (cad/process/dt_cone_tip_block/plan.toml and cam.py) and miked at mounting.
+# Read live on penntoolco.com 2026-11-22: Precise 10-200-445, $34.95, in
+# stock, 168 teeth, straight peripheral teeth, no side teeth, HSS 58-60 RC.
 [tools.slitting-saw-3-051]
 name = "Precise HSS jewelers slotting saw, 3 in diameter, .051 in thick, 1 in arbor hole, 168 teeth"
 kind = "slitting_saw"
@@ -645,8 +656,8 @@ status = "to_order"
 dia_in = 3.0
 thickness_in = 0.051
 teeth = 168
-purchase = "None: not to be bought (tool-audit Q10 met, 2026-11-24)."
-note = "Retired, not to be bought: MHA-DT-21's slit moves to the owned 2-3/4 x .064 saw (slitting-saw-2-75-064) under Q10; deleted with that plan change."
+purchase = "One Precise 10-200-445 (Penn Tool Co.), $34.95."
+note = "Saws MHA-DT-21's .040-.060 pinch slit into the adjuster hole on the R8 1 in arbor (gear-cutter-arbor-1). The DT-21 recipe must check reach and width against the miked spacer OD and blade thickness."
 
 # Lathe inserts, insert code CCMT-32.51, one each. No holder for them is on
 # the packing list; their fit to tools.boring-bar-s10r-sclcr3 is not asserted.

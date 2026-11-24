@@ -27,8 +27,8 @@ note = "Ownership only; its facts are cad/process/shop/, same key. Explicit on_h
 # and the indirect dividing table; plus the 3-jaw chuck he named
 # (shop workholding.chuck-3jaw-5-bs0). The sector arms are part of the head.
 # Maker figures, not measured (the head's manual, "Semi-Universal
-# Dividing Head", owner photos owner-photos/bs0-manual/ p01-p11 in the cnc
-# triage folder, read 2026-11-24): worm ratio 1:40; plates A 15-20, B 21, 23,
+# Dividing Head", pages photographed by the owner; p01-p02 committed as
+# research/shop-evidence/2026-11-24/, read 2026-11-24): worm ratio 1:40; plates A 15-20, B 21, 23,
 # 27, 29, 31, 33, C 37, 39, 41, 43, 47, 49; spindle thread BS-0 1-1/2"-8 TPI;
 # centre taper B&S No. 7; spindle hole 18 mm; centre height (h) 100 mm;
 # differential indexing and spiral milling only on the BS-2.
@@ -43,7 +43,7 @@ centre_height_mm = 100.0
 differential_indexing = false
 cite = [
   "Owner (Pedro) 2026-11-24, relayed by Main, verbatim: \"has tailstock, dead center flange plate 3 jaw chuck all 3 plates etc\"; \"everything in manual is accounted\"",
-  "BS-0 manual, Semi-Universal Dividing Head, ENCLOSURE and table \"Semi-Universal Index B&S Type No.0 No.1\": BS-0 h 100 mm, taper of center B&S No.7, diameter of spindle hole 18 mm; THREAD SPINDLE: BS-0 1-1/2\" -8TPI; worm gear ratio 1:40; plates A 15,16,17,18,19,20 B 21,23,27,29,31,33 C 37,39,41,43,47,49; differential and spiral milling (only BS-2); owner photos C:/farm-runs/triage-2026-11-19/owner-photos/bs0-manual/p01.jpg-p11.jpg, read 2026-11-24",
+  "BS-0 manual, Semi-Universal Dividing Head, ENCLOSURE and table \"Semi-Universal Index B&S Type No.0 No.1\": BS-0 h 100 mm, taper of center B&S No.7, diameter of spindle hole 18 mm; THREAD SPINDLE: BS-0 1-1/2\" -8TPI; worm gear ratio 1:40; plates A 15,16,17,18,19,20 B 21,23,27,29,31,33 C 37,39,41,43,47,49; differential and spiral milling (only BS-2); owner photos research/shop-evidence/2026-11-24/bs0-manual-p01.jpg and bs0-manual-p02.jpg, read 2026-11-24",
 ]
 note = "On hand with every item of the manual's BS-0 enclosure list and the 3-jaw chuck (owner 2026-11-24); sector arms are part of the head. Simple and direct indexing only (no differential on the BS-0)."
 
@@ -60,7 +60,8 @@ tailstock_taper = "MT3"
 # PM-1127VF-LB; read 2026-11-23 from its Wayback copy of 2019-12-31, the live
 # page now 404): "Spindle Bore 1-1/2″", "Longitudinal Feeds .0025-.012 IPR",
 # "Cross Feeds .001-.0056 IPR". prechips has no field for them. The bore is
-# the spindle's; the 4-jaw's through bore is not on record.
+# the spindle's, and it, not the 4-jaw's 1-3/4 in through-bore
+# (fixtures.chuck-4jaw-6), limits bar through the headstock.
 spindle_bore_in = 1.5
 longitudinal_feed_in_rev = [0.0025, 0.012]
 cross_feed_in_rev = [0.001, 0.0056]
