@@ -249,6 +249,12 @@ made to their mate.
      in this shop. A
      hole match-drilled or reamed in place through its mate at assembly, for
      the pin that joins them, is this form and needs no further answer.
+     The acceptance prints once, on the sheet of the member made last; the
+     other member's sheet names that mate and says it is made to this
+     feature (`MHA-XX-nn IS TURNED TO THIS BORE`) and prints no acceptance
+     of its own. A location is made to its mate the same way: it prints as
+     REF, and a note linked to the feature gives the trial on the named
+     mate (`ALL MHA-XX-nn WHEELS DROP ON FREELY`).
   3. **Reamed to the bought mate.** Where the mate is bought to size (drill
      rod, ground shaft, dowel pin, shoulder screw), or one mate passes
      through several parts (a row of gears on one shaft), the hole takes a
@@ -259,8 +265,10 @@ made to their mate.
   4. **A printed band.** Only where no mate can be tried in the feature: a
      wall, a stack, a gap set by two faces, a gear's size over pins. It is
      never narrower than its "What the shop holds" row. Gear tooth data
-     (span, tooth thickness, run-out) keep the gear data block's own rules
-     (rule 7). A diameter that is bought to size and never cut prints the
+     (span, tooth thickness, run-out, a gear's outside and root diameters)
+     keep the gear data block's own rules (rule 7) and take neither the
+     necessity test nor this order. A diameter that is bought to size and
+     never cut prints the
      stock (`1/4 GROUND ROD, AS SUPPLIED`), not limits of size.
 - **What is over-specification on a one-off.** Limits of size printed on
   both members of a mating pair; a band on a reamed hole (`+.0005 / 0`); a
@@ -282,7 +290,7 @@ made to their mate.
   three-place size given a function, printed at its title-block band, names
   its mate as below but is not a tight band, and the necessity test does not
   apply to it; nor is a single-limit corner radius or edge break (`R.03
-  MAX`, rule 16), a thread designation or class, a gear data block, a
+  MAX`, rule 16), a thread designation or class, gear tooth data, a
   purchased part's catalogue designation or one of the title block's own
   rows. The callout of a tight band, or a flagged note attached
   to it (rule 7), names the mate, the fit it needs (running, sliding, press,
