@@ -10,3 +10,9 @@ dt-crank-pinion:
   process: "gear cutting: 16T normal-24DP PA20 straight-spur milling with the finite 14T stock form, cutter #7 (14-16T)"
   # Face, shoulder and north band follow the current dt_crank_pinion_spec.
   # SDP/SI S1086Z-024S016 is a pitch/count candidate, not a cutter-native drop-in.
+  machinist_exceptions:
+    - id: "RV-01"
+      kind: "accept"
+      where: "sheet 1, section A-A, crankshaft bore callout Ø.3135 REAM THRU / SEE NOTE 2"
+      finding: "the bore's mate MHA-DT-11 is turned to it (rule 4 form 2), so a reamer the shop keeps (5/16) is asked instead of the .3135 reamer that is to order"
+      reason: "delegated ruling 2026-11-24 (Main), precedent: owner ruling 2026-11-20 (#3073, a fixed reamer is bought for each running fit); .3135 is 5/16 + .001, a standard over/under size under rule 4; owner review #2144 (D19). The bore runs on MHA-DT-11's seat (.0010-.0023 clearance, necessity N-01), a running fit, so its fixed reamer is the one #3073 buys (tools reamer-3135). Accepts this bore's .3135 reamer only, with no band."
