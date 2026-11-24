@@ -159,14 +159,18 @@ def test_the_saw_and_arbor_sizes_are_their_inventory_records() -> None:
     # The drive is the cap's friction alone, at the record's clamp torque.
     assert arbor["keyed"] is False
     assert p["saw_clamp_torque_nm"] == arbor["clamp_torque_nm"]
-    assert arbor["screw_key_mm"] == 5
-    mount = next(
-        op["instruction"]
-        for setup in PLAN["setups"]
-        for op in setup["operations"]
-        if "pilot step" in op["instruction"]
-    )
-    assert "{{process.saw_clamp_torque_nm:g}} N·m with the 5 mm key" in mount
+    # The saw and the arbor that were to buy are no tools of the plan, and the
+    # limits laid out on them (that blade's upper bound, the spacer-type
+    # arbor's collars, spacers and nut) are no parameters of it.
+    assert not {"slitting-saw-3-051", "gear-cutter-arbor-1"} & set(refs.values())
+    for gone in (
+        "blade_max_mm",
+        "saw_collar_dia_max_mm",
+        "saw_spacer_above_min_mm",
+        "saw_spacer_below_min_mm",
+        "saw_nut_dia_max_mm",
+    ):
+        assert gone not in p, gone
 
 
 def test_a_pass_over_the_friction_drive_is_refused() -> None:
@@ -250,6 +254,8 @@ def test_the_recipes_programs_pass_every_check_they_declare(context, tmp_path) -
         ("slit_first_pass_mm", 4.3223, "slit_first_pass_mm"),
         ("saw_reach_max_mm", 20.0, "saw_reach_max_mm"),
         ("saw_screw_stand_max_mm", 12.7, "saw_below_max_mm"),
+        ("saw_below_stack_top_mm", 9.0, "saw_below_stack_top_mm"),
+        ("spacer_under_max_mm", 0.02, "spacer_under_max_mm"),
         ("saw_nose_above_min_mm", 5.0, "saw_nose_above_min_mm"),
         ("saw_arbor_body_dia_mm", 44.45, "saw_reach_max_mm"),
         ("saw_drive_torque_max_nm", 44.2, "saw_drive_torque_max_nm"),

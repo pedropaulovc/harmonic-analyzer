@@ -923,6 +923,11 @@ def context(
         raise ValueError("the cap's screw head is not inside the cap")
     _agree(plan, "saw_below_max_mm", cap_t + stand_max)
     below = p["saw_below_max_mm"]
+    # At the cut the cap and screw hang this far below the stacks' top, right
+    # of TOP: lower than the parallels' top. The keep-outs below end the
+    # stacks at the jaws' right side; the traveler has the builder check at
+    # every clamping that no parallel stands past it.
+    _agree(plan, "saw_below_stack_top_mm", below - saw_z)
     # The arbor's lowest point from the spindle nose: the record's nose to the
     # cap's lower face (no saw fitted) plus the saw, rounded up, plus the
     # screw head's bound.

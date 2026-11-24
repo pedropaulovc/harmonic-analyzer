@@ -307,6 +307,11 @@ saw_nose_above_min_mm = 10.922
 # bound.
 saw_reach_max_mm = 18.05
 saw_below_max_mm = 19.05
+# At the cut that stack hangs saw_below_stack_top_mm (.44) below the stacks'
+# top (saw_below_max_mm less saw_cut_z_mm), right of TOP. cam.py's keep-outs
+# end the stacks at the jaws' right side, so Setup 10 checks at every
+# clamping that no parallel stands past it.
+saw_below_stack_top_mm = 11.2268
 # The saw moves between passes with the arbor's lowest point 5 mm over W's
 # highest (cam.py checks it). It is touched off with its rim 3 mm in over
 # the TOP end, over the block's middle; the cap then hangs past the end.
@@ -715,7 +720,7 @@ gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.foot_tap_station_band_mm}
 feed = "hand"
 
 [[setups.operations]]
-instruction = "No 4-40 bottoming tap in hand (it is to buy): do the stop check, the tap file, the plug tap's depth reference, the plug tap and the scrape now; skip the bottoming tap's depth reference, the bottoming tap and the thread-depth check. Tag the block AWAITING 4-40 BOTTOMING TAP and go on to Setup 6. When the tap comes: clamp, home, the edge-finder touch-off above (X and Y only: the tap file moves Z only to the machine top), the stop check on the bottoming tap, DT05_foot_tap, then those three ops."
+instruction = "No 4-40 bottoming tap in hand (it is to buy): do the stop check, the tap file, the plug tap's depth reference, the plug tap and the scrape now; skip the bottoming tap's depth reference, the bottoming tap and the thread-depth check. Tag the block AWAITING 4-40 BOTTOMING TAP and go on to Setup 6. This setup's last op is the way back."
 feed = "hand"
 
 [[setups.operations]]
@@ -768,6 +773,10 @@ tool = "deburring-set"
 drilling = "none"
 sizing = "other"
 instruction = "Unclamp; scrape the foot hole's mouth flush with SEAT (no countersink). Mark the end SEAT."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "A block tagged AWAITING 4-40 BOTTOMING TAP, when the tap comes: clamp as Holding says, home, this setup's edge-finder touch-off (X and Y only: the tap file moves Z only to the machine top), the stop check on the bottoming tap, DT05_foot_tap, then the three skipped ops. Unclamp and scrape as in the op before this one."
 feed = "hand"
 
 [[setups]]
@@ -1133,30 +1142,36 @@ instruction = "Before clamping: mic E to W at the TOP end and write it down (mm 
 feed = "hand"
 
 [[setups.operations]]
+instruction = "Every time the block is clamped, before the arbor goes in: hold a 6 in steel rule flat against the jaws' right side, across the right ends of both stacks of parallels, under the block's overhanging end."
+inspection = "The rule touches no parallel: both stacks end at or inside the jaws' right side. Right of TOP the arbor's cap and its screw pass down to {{process.saw_below_stack_top_mm:in.2dot}} below the stacks' top. A parallel out: unclamp, slide it in and clamp again as Holding says."
+gauge_checks = "other"
+feed = "hand"
+
+[[setups.operations]]
 instruction = "G54 X0 TOP (right), Y0 the fixed jaw's face: edge finder (900 rpm); then Z fully up."
 instruction_detailed = "Edge finder (900 rpm), in the collet: on the fixed jaw's face beside the block, G10 L20 P1 Y-2.540; on TOP from the right, G10 L20 P1 X2.540 (plus: the finder's centre is right of TOP). Then $H: Z goes to the machine top, G54 stays."
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Spindle stopped (M5). Take out the collet; the arbor with its saw into the spindle, cap down, drawbar tight. Calipers' depth rod: the arbor's body from the saw's upper face up to the first thing wider than it (the arbor's flange or the spindle nose)."
+instruction = "Spindle stopped (M5). Take out the collet. Wipe the arbor's shank and the spindle's taper clean; the arbor with its saw into the spindle, cap down, drawbar tight. Calipers' depth rod: the arbor's body from the saw's upper face up to the first thing wider than it (the arbor's flange or the spindle nose)."
 inspection = "{{process.saw_nose_above_min_mm:in.2dot}} or more (about .90 expected). Less: stop and tell the owner."
 gauge_checks = [{ gauge = "calipers", band_mm = ["{{process.saw_nose_above_min_mm}}", "{{process.saw_arbor_nose_to_cap_mm}}"] }]
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Side runout, spindle stopped: the lever indicator's magnetic base on the mill's head, its stylus on the saw's upper face 1/8 in in from the teeth. Turn the spindle one full turn by hand, backward (anticlockwise seen from above)."
-inspection = "The needle's swing plus the saw's thickness written down: at most {{process.kerf_max_mm:in.3dot}} ({{process.saw_side_tir_nominal_mm:in.3dot}}, 0.10 mm, of swing for a .064 saw). Over: back to the bench mounting, the saw a quarter turn round on the pilot; still over, stop and tell the owner."
+instruction = "Side runout, at every mounting of the arbor in the spindle (the taper never seats it quite the same twice), spindle stopped: the lever indicator's magnetic base on the mill's head, its stylus on the saw's upper face 1/8 in in from the teeth. One full turn by hand, backward (anticlockwise seen from above). Wipe off any old LOW mark; mark LOW on the tooth under the stylus where the face stands lowest."
+inspection = "The needle's swing plus the saw's thickness written down: at most {{process.kerf_max_mm:in.3dot}} ({{process.saw_side_tir_nominal_mm:in.3dot}}, 0.10 mm, of swing for a .064 saw). Over: take the arbor out, wipe its shank and the taper, mount it and read again. Still over: back to the bench mounting, the saw a quarter turn round on the pilot, then both runouts again. Over after two such tries: stop and tell the owner."
 gauge_checks = [{ gauge = "dti", band_mm = [0, "{{process.saw_side_tir_nominal_mm}}"] }]
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Tip runout, spindle stopped: the .001 dial indicator on the same base, its plunger square on the saw's rim. Turn the spindle one full turn by hand, backward; take the highest and the lowest tooth. Then the indicator and its base off the mill."
-inspection = "Highest to lowest at most {{process.saw_tip_tir_max_mm:in.3dot}}. Over: back to the bench mounting, the saw a quarter turn round on the pilot; still over, stop and tell the owner."
+instruction = "Tip runout, every time the saw has been clamped on the arbor, spindle stopped: the .001 dial indicator on the same base, its plunger square on the saw's rim. One full turn by hand, backward; take the highest and the lowest tooth. Then the indicator and its base off the mill."
+inspection = "Highest to lowest at most {{process.saw_tip_tir_max_mm:in.3dot}}. Over: back to the bench mounting, the saw a quarter turn round on the pilot, then both runouts again. Over after two such tries: stop and tell the owner."
 gauge_checks = "other"
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Both runouts accepted: with a marker, one line down the cap's rim and out across the saw's lower face; a second, in line with it, down the arbor's body and out across the saw's upper face. The cap's friction alone drives the saw: the lines show if it slips."
+instruction = "Both runouts accepted: wipe off any old marker lines, then with a marker draw one line down the cap's rim and out across the saw's lower face; a second, in line with it, down the arbor's body and out across the saw's upper face. The cap's friction alone drives the saw: the lines show if it slips."
 feed = "hand"
 
 [[setups.operations]]
@@ -1164,11 +1179,11 @@ instruction = "Confirm Z is at the machine top (no move since the $H), then MDI 
 feed = "hand"
 
 [[setups.operations]]
-instruction = "G54 Z0: spindle stopped, jog Z only, down in CNCjs (0.01 mm steps near the leaf), until a .002 leaf just drags under the saw on W; G10 L20 P1 Z(the E-to-W reading taken before clamping, in mm, + 0.051). DT11 loads no tool."
+instruction = "G54 Z0: spindle stopped, turn the saw by hand until the tooth marked LOW is the one over W. Jog Z only, down in CNCjs (0.01 mm steps near the leaf), until a .002 leaf just drags under that tooth on W; G10 L20 P1 Z(the E-to-W reading taken before clamping, in mm, + 0.051). DT11 loads no tool."
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Prove DT11_slit in air, Z0 raised {{process.saw_proof_raise_mm:in.3f}} in (send $#, then G10 L2 P1 Z(the G54 line's Z + {{process.saw_proof_raise_mm:.3f}})): it rises straight to its clear height before any X or Y move; the saw, the arbor's body and its cap clear the block, the jaws and the stacks; it stops once after its first pass, spindle stopped (Cycle Start). Then Z0 back."
+instruction = "Prove DT11_slit in air, Z0 raised {{process.saw_proof_raise_mm:in.3f}} in (send $#, then G10 L2 P1 Z(the G54 line's Z + {{process.saw_proof_raise_mm:.3f}})): it rises straight to its clear height before any X or Y move; the saw, the arbor's body, its cap and the screw clear the block, the jaws and the stacks; it stops once after its first pass, spindle stopped (Cycle Start). Then Z0 back."
 feed = "hand"
 
 [[setups.operations]]
@@ -1176,7 +1191,7 @@ speed_kind = "spindle"
 tool = "slit-saw"
 drilling = "none"
 sizing = "other"
-instruction = "Run DT11_slit (the saw; set 100, in the L range): one light pass along +Y across the block's depth (conventional: the saw turns clockwise right of TOP), {{process.slit_first_pass_mm:in.3dot}} into TOP. The file then lifts the saw clear and stops the spindle (M0). Cutting oil on the saw."
+instruction = "Run DT11_slit (the saw; set 100, in the L range): one light pass along +Y across the block's depth, {{process.slit_first_pass_mm:in.3dot}} into TOP. Conventional: the saw turns clockwise right of TOP, so at the block its teeth run +Y, the way it is fed, and the cut pushes back against the feed (fed −Y it would grab and turn on the arbor). The file then lifts the saw clear and stops the spindle (M0). Cutting oil on the saw."
 rpm = 100
 feed = "{{process.saw_feed_per_min_mm:in.1f}} in/min"
 milling_cuts = [
@@ -1222,7 +1237,7 @@ vise_hold = "other"
 beam = "other"
 
 [[setups.operations]]
-instruction = "Hold: a block tagged AWAITING 4-40 BOTTOMING TAP goes back to Setup 5 for the bottoming tap and the thread-depth check before anything here."
+instruction = "Hold: a block tagged AWAITING 4-40 BOTTOMING TAP goes back to Setup 5 (its last op) for the bottoming tap and the thread-depth check before anything here."
 feed = "hand"
 
 [[setups.operations]]

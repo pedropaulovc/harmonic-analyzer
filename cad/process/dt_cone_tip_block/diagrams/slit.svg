@@ -12,8 +12,8 @@
   <rect class="cutter" x="423.8" y="263.6" width="31.6" height="12.7"/>
   <line class="centre-line" x1="439.6" y1="56.0" x2="439.6" y2="284.0"/>
   <circle class="hidden" cx="371.0" cy="236.5" r="5.4"/>
-  <line class="hidden" x1="44.6" y1="215.7" x2="85.2" y2="215.7"/>
-  <line class="hidden" x1="85.2" y1="215.7" x2="85.2" y2="330.0"/>
+  <rect class="fixture-support" x="44.6" y="215.7" width="40.6" height="24.4"/>
+  <line class="hidden" x1="85.2" y1="240.1" x2="85.2" y2="330.0"/>
   <text class="label" x="560.0" y="70.0">R8 stepped arbor, body Ø1.25</text>
   <line class="leader" x1="556.0" y1="66.0" x2="471.3" y2="100.0"/>
   <circle class="leader-dot" cx="471.3" cy="100.0" r="2.5"/>
@@ -29,13 +29,13 @@
   <text class="label" x="560.0" y="302.0">E down on the stacks</text>
   <line class="leader" x1="556.0" y1="298.0" x2="340.0" y2="253.8"/>
   <circle class="leader-dot" cx="340.0" cy="253.8" r="2.5"/>
-  <text class="label" x="560.0" y="342.0">moving jaw (N behind)</text>
-  <line class="leader" x1="556.0" y1="338.0" x2="164.6" y2="310.0"/>
-  <circle class="leader-dot" cx="164.6" cy="310.0" r="2.5"/>
+  <text class="label" x="100.0" y="200.0">moving jaw (N behind)</text>
+  <line class="leader" x1="150.0" y1="206.0" x2="130.0" y2="285.0"/>
+  <circle class="leader-dot" cx="130.0" cy="285.0" r="2.5"/>
   <text class="label" x="150.0" y="120.0">slit .596 REF, into the adjuster</text>
   <line class="leader" x1="250.0" y1="126.0" x2="384.9" y2="236.5"/>
   <circle class="leader-dot" cx="384.9" cy="236.5" r="2.5"/>
-  <text class="label" x="30.0" y="170.0">spacer strip on end (hidden)</text>
+  <text class="label" x="30.0" y="170.0">spacer strip on end</text>
   <line class="leader" x1="64.9" y1="176.0" x2="64.9" y2="225.7"/>
   <circle class="leader-dot" cx="64.9" cy="225.7" r="2.5"/>
   <text class="label" x="16.0" y="406.0">Along the jaws, 2 px per mm, the saw at full depth. Passes along +Y, away from the viewer (toward the fixed jaw).</text>
