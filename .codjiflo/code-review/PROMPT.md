@@ -98,6 +98,20 @@ claim the saved model or final sheet was inspected. Check at least:
   (rule 4); a new or changed entry is a claim about the machine: check its
   kind and reason against the spec module or ruling it cites, and flag one
   that only restates a fit name or a mate.
+- **Checks need a registered reason (`tolerance-policy.md`, "Checks in spec
+  modules and tests").** A new or tighter floor, limit, budget term, guard or
+  `math.nextafter` rounding in a spec module or a test is itself a finding
+  unless `cad/config/checks/<module>.yaml` carries its entry: what fails on
+  this machine (`kind`, `reason`), what sets its number (`source`) and its
+  `basis`. So is a worst-case sum over a joint the assembly sets or fits, a
+  budget term sized as the remainder, and a check whose margin is below what
+  the shop reads (`.001 in` on a size, `.0005 in` on an indicator, 0.01 mm).
+  A part band, inspection, gauge or assembly setting added to make such a
+  check pass is a rule-4 finding on the check, not a fix. A necessity entry
+  that cites a check as its `source` is only as good as the check: the check
+  has its own entry, and "the budget closes" is a reason of no kind.
+  Relaxing or deleting a check is not a removed-behavior finding when the PR
+  says why the machine does not need it.
 - **GD&T allowlist (rule 5).** A feature-control frame or datum appears only
   where the package's own `machinist_exceptions` `accept` entry allows it.
   New frames, datums or boxed basics without one are findings.
@@ -107,11 +121,15 @@ claim the saved model or final sheet was inspected. Check at least:
   selection, visibility/finalization calls and dimension associations. Flag
   concrete layout arithmetic or placement defects supported by source, not
   speculative text overlap, leader crossings or final-sheet appearance.
-- **Design for the shop (rules 16–21).** Walls/webs 2.0 mm target, 1.5 mm
-  floor at the worst case; 1.5D thread engagement; fit-up adjustment only as a
-  last resort; thresholds never loosened to admit a shortfall; a shortfall is
-  stated as a plain fact only with a matching user-ruled `minor` entry; a
-  geometry defect is fixed in the model, not papered over on the sheet.
+- **Design for the shop (rules 16–21).** Walls/webs `.080 in` target, `.060 in`
+  floor (2.0 / 1.5 mm on millimetre packages) at the worst case; 1.5D thread
+  engagement; a stack nothing sets at assembly holds at the worst case, and a
+  joint the assembly sets is judged after its setting; a new fit-up adjustment
+  is a last resort; those three rule thresholds are never loosened to admit a
+  shortfall; a shortfall is stated as a plain fact only with a matching ruled
+  `minor` entry; a geometry defect is fixed in the model, not papered over on
+  the sheet. "Never loosened" covers those rule thresholds, not a check an
+  author wrote into a spec module or a test.
 - **Assemblies (rules 22–24).** Package completeness, mechanical locks for
   threaded joints under operating load (threadlocker is never the default),
   assembly sheets carry assembly information only.
@@ -159,7 +177,13 @@ removed from the cache key.
 ## Code review (adapted e-code-review xhigh)
 
 Recall-oriented: surface a nameable concrete failure scenario even when
-uncertain; do not invent findings to fill a quota.
+uncertain; do not invent findings to fill a quota. For design criteria a
+failure scenario is something that fails on the built machine or in the
+build, not a term missing from a sum. A finding that asks for another term,
+guard, inspection or tighter bound says what it would change in a printed
+number, a purchase or an assembly step, and why the existing margin does not
+already cover it; it is P3 unless it shows a part inside its sheet that
+fails on the machine, and it never blocks on its own.
 
 **Phase 1: candidates.** Run these ten angles in sequence in this context; do
 not spawn subagents. Each surfaces up to eight candidates; one angle's
@@ -173,6 +197,8 @@ conclusion never suppresses another's.
 2. Removed-behavior auditor. For each deleted or rewritten line, name the
    invariant it enforced and find where the new code re-establishes it: dropped
    guards, error paths, narrowed validation, deleted live test coverage.
+   A relaxed or deleted design check is a candidate only if you can name what
+   now fails on the machine; "the check is gone" is not a failure.
 3. Cross-file tracer. Find callers of each changed function; check new
    preconditions, return shapes, exceptions and ordering. Check callees made
    unsafe by parallel changes.

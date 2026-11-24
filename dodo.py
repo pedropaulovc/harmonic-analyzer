@@ -4036,6 +4036,12 @@ def _check_recipe_spec(pytest_cmd: list[str]) -> dict[str, Any]:
             str(
                 (REPO_ROOT / "cad" / "config" / "current-identity-map.json").resolve()
             ),
+            # test_check_register reads every check and necessity register.
+            *(
+                str(path.resolve())
+                for family in ("checks", "necessity")
+                for path in sorted((REPO_ROOT / "cad" / "config" / family).glob("*.yaml"))
+            ),
             *captured_fixtures,
         }
     )
