@@ -80,10 +80,11 @@ def test_round_bore_and_flat_pin_clear_the_core_and_round_stud_at_printed_limits
     core_flat = tuple(
         shaft.CORE_FLAT_FROM_AXIS + delta for delta in sorted(shaft.CORE_FLAT_BAND)
     )
-    # The pin's crest: its centre .118 ±.002 less the 1/16 pin's 0/+.0002 radius.
+    # The pin's crest: its centre .118 ±.002, widened by the over-pins
+    # reading's .0012 bias (D6), less the 1/16 pin's 0/+.0002 radius.
     crest = (
-        (0.118 - 0.002) * INCH - (0.0627 * INCH) / 2.0,
-        (0.118 + 0.002) * INCH - (0.0625 * INCH) / 2.0,
+        (0.118 - 0.002 - 0.0012) * INCH - (0.0627 * INCH) / 2.0,
+        (0.118 + 0.002 + 0.0012) * INCH - (0.0625 * INCH) / 2.0,
     )
     # Both fits are made on MHA-PD-08 by feel (fit audit 2026-11-23): the
     # shaft's analysis bands are the collar's sizes less the fitted air.
@@ -101,7 +102,7 @@ def test_round_bore_and_flat_pin_clear_the_core_and_round_stud_at_printed_limits
     # The #8-32 UNC-2A class governs the blank: its largest major.
     stud_max = max(shaft.THREAD_BLANK_LIMITS)
     stud_air = min(bore[0] / 2.0, crest[0]) - stud_max / 2.0
-    assert stud_air == pytest.approx(0.07874)
+    assert stud_air == pytest.approx(0.04826)  # .0019 (D6)
     assert collar.STUD_FLAT_PIN_AIR == pytest.approx(stud_air)
     with monkeypatch.context() as patch:
         with pytest.raises(AssertionError, match="flat analysis band is not"):
