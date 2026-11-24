@@ -688,8 +688,8 @@ def test_each_notch_minimum_clears_its_plate_at_max_material() -> None:
     assert spec.STRADDLE_RUNNING_FLOOR == bank.RUNNING_FLOOR
 
     # #1038 option 2 (owner ruling 2026-10-15): the top notch .124 at its
-    # least, its band the .XXX row's width, +.010/.000 (delegated ruling
-    # 2026-11-24: nothing fails at +.009, rule 4). The foot +.006/.000
+    # least, its band the .XXX row's width, +.010/.000 (rule 4: as wide as
+    # its row, not tight; nothing fails at +.009). The foot +.006/.000
     # (#3114): the float left to the bars once two floating arms close hub on
     # hub.
     assert spec.TOP_NOTCH_WIDTH_BAND == pytest.approx((0.010 * 25.4, 0.0))
@@ -805,8 +805,8 @@ def test_the_bow_ch00_accepts_keeps_the_mid_span_gap() -> None:
     leaf = asm.BAR_GAP["leaf"]
     assert bank.RUNNING_FLOOR <= leaf <= min(top, foot, bowed)
     assert leaf / 25.4 == pytest.approx(0.004)
-    # With the top notch at the .XXX row's width (+.010/0, delegated ruling
-    # 2026-11-24) .005 is the widest bow on the .001 grid that still holds
+    # With the top notch at the .XXX row's width (+.010/0, rule 4's row
+    # width) .005 is the widest bow on the .001 grid that still holds
     # the floor; .006 closes.
     assert mid - 2.0 * 0.005 * 25.4 >= bank.RUNNING_FLOOR
     assert mid - 2.0 * 0.006 * 25.4 < bank.RUNNING_FLOOR

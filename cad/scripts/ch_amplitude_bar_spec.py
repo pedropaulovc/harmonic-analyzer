@@ -66,10 +66,10 @@ BAR_STOCK_UNDERSIZE = 0.002 * MM_PER_IN  # 0.051
 # (rocker_bank_layout.MARGIN_SPARE) is deliberately left out.
 # The top notch (owner ruling 2026-10-15, #1038 option 2): the lever plate
 # prints .118 +/-.002, so the notch is .124 at its least; its band is the
-# .XXX row's width all on the plus side, +.010/.000 (delegated ruling
-# 2026-11-24, FitLaneCH; precedent: drawing-guidelines rule 4 row-width
-# conversions of the fit audit's no-question rows: at +.009 nothing fails,
-# so the band is not tight; the MHA-CH-00 bar-gap leaf follows to .004).
+# .XXX row's width all on the plus side, +.010/.000 (drawing-guidelines
+# rule 4: a band as wide as its title-block row is not tight; nothing
+# checked fails at the widest notch, and the MHA-CH-00 bar-gap leaf,
+# ch_channel_assembly_spec.BAR_GAP, still reads .004).
 # The foot notch is
 # .104 +.006/.000 on the .098 +/-.001 strap (#3114): the rocker arms float
 # on their shaft, each following its own rod, so two neighbouring arms can

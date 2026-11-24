@@ -52,7 +52,8 @@
 # hand); no special Class ZZ pins. A hole the pin enters by hand is not a
 # scrapped bar: tagged SLIP, MHA-CH-00 bonds its pin, if the .079 pin of the
 # .061-.500 set (gauges.pin-gauges, on order) does not enter it (the largest
-# hole bonded; delegated ruling 2026-11-24, no precedent). The set's .077 pin
+# hole bonded: rule 4's single limit read with one pin of the set,
+# sh_vn_pivot_pin_spec.BOND_HOLE_MAX). The set's .077 pin
 # stands in the hole for the drop and place readings.
 #
 # Length: owner ruling 2026-11-23 (tool audit Q3), verbatim: "B. Buy only the
