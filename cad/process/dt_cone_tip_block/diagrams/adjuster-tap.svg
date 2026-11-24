@@ -13,20 +13,21 @@
   <rect class="part-kept" x="174.5" y="182.2" width="51.1" height="33.5"/>
   <rect class="part-threads" x="190.5" y="182.2" width="19.0" height="33.5"/>
   <rect class="cutter" x="190.5" y="154.2" width="19.0" height="30.0"/>
+  <rect class="cutter" x="190.5" y="215.7" width="19.0" height="16.0"/>
   <rect class="clamp" x="170.0" y="144.2" width="60.0" height="8.0"/>
   <rect class="cutter" x="196.0" y="99.2" width="8.0" height="45.0"/>
   <line class="arrow" x1="200.0" y1="84.2" x2="200.0" y2="96.2"/>
   <text class="label" x="440.0" y="70.0">tap guide's spring point in the wrench</text>
   <line class="leader" x1="436.0" y1="66.0" x2="200.0" y2="122.2"/>
   <circle class="leader-dot" cx="200.0" cy="122.2" r="2.5"/>
-  <text class="label" x="440.0" y="110.0">1/4-28 plug tap, stop .650 below N</text>
-  <line class="leader" x1="436.0" y1="106.0" x2="200.0" y2="215.7"/>
-  <circle class="leader-dot" cx="200.0" cy="215.7" r="2.5"/>
-  <text class="label" x="440.0" y="150.0">N up</text>
-  <line class="leader" x1="436.0" y1="146.0" x2="182.0" y2="182.2"/>
+  <text class="label" x="440.0" y="110.0">N up</text>
+  <line class="leader" x1="436.0" y1="106.0" x2="182.0" y2="182.2"/>
   <circle class="leader-dot" cx="182.0" cy="182.2" r="2.5"/>
-  <text class="label" x="440.0" y="190.0">E (fixed jaw)</text>
-  <line class="leader" x1="436.0" y1="186.0" x2="223.5" y2="204.2"/>
+  <text class="label" x="440.0" y="150.0">E (fixed jaw)</text>
+  <line class="leader" x1="436.0" y1="146.0" x2="223.5" y2="204.2"/>
   <circle class="leader-dot" cx="223.5" cy="204.2" r="2.5"/>
+  <text class="label" x="440.0" y="190.0">1/4-28 plug tap, stop .650 below N</text>
+  <line class="leader" x1="436.0" y1="186.0" x2="200.0" y2="231.7"/>
+  <circle class="leader-dot" cx="200.0" cy="231.7" r="2.5"/>
   <text class="label" x="16.0" y="406.0">Spindle off; the full thread runs out through S between the stacks.</text>
 </svg>

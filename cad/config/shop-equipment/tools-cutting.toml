@@ -590,29 +590,6 @@ body_dia_above_saw_in = "to_measure"
 cite = ["Owner (Pedro) 2026-11-24 photo research/shop-evidence/2026-11-24/saws-arbors.jpg", "Owner (Pedro) 2026-11-24, verbatim: \"the bottom arbor has 0.5 in shank and both are designed for saws with bores of 1 7/8 3/4 5/8 1/2 ; they are not keyed\"; \"caps are 1/2 in each ; both arbors steps are spring loaded so they fit 1 in bores\"; \"1/2 thickness 1.25 dia\""]
 note = "On hand (owner, 2026-11-24). Held in the 1/2 in R8 collet."
 
-# MHA-DT-21 cone tip block's pinch slit (.040-.060 wide, depth_ref .596 from
-# the top into the 1/4-28 adjuster hole, through the .44 depth). Neither owned
-# saw cuts it: the 1 in x .032 reaches about 4.7 mm past a 3/8 arbor's nut
-# (and no 3/8 arbor is owned), and the 2-3/4 x .064 is over the .060 MAX.
-# This one goes on the R8 1 in arbor (tools.gear-cutter-arbor-1, to_order),
-# which DT-21 shares with the gear work. Its reach past
-# the arbor's spacers and nut, and the blade thickness the slit accepts, are
-# the DT-21 plan's limits, checked by its recipe
-# (cad/process/dt_cone_tip_block/plan.toml and cam.py) and miked at mounting.
-# Read live on penntoolco.com 2026-11-22: Precise 10-200-445, $34.95, in
-# stock, 168 teeth, straight peripheral teeth, no side teeth, HSS 58-60 RC.
-[tools.slitting-saw-3-051]
-name = "Precise HSS jewelers slotting saw, 3 in diameter, .051 in thick, 1 in arbor hole, 168 teeth"
-kind = "slitting_saw"
-make = "Precise"
-sku = "10-200-445"
-source = "https://www.penntoolco.com/precise-3-size-hss-jewelers-slotting-saw-051-thickness-1-hole-size/"
-status = "to_order"
-dia_in = 3.0
-thickness_in = 0.051
-teeth = 168
-purchase = "One Precise 10-200-445 (Penn Tool Co.), $34.95."
-note = "Saws MHA-DT-21's .040-.060 pinch slit into the adjuster hole on the R8 1 in arbor (gear-cutter-arbor-1). The DT-21 recipe must check reach and width against the miked spacer OD and blade thickness."
 
 # Lathe inserts, insert code CCMT-32.51, one each. No holder for them is on
 # the packing list; their fit to tools.boring-bar-s10r-sclcr3 is not asserted.

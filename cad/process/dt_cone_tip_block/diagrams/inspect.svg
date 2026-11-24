@@ -2,7 +2,7 @@
   <rect class="paper" x="0" y="0" width="760" height="420"/>
   <text class="title" x="16" y="22">Setup 11: deburr, chase, inspect</text>
   <rect class="part-kept" x="160.0" y="80.0" width="51.1" height="157.7"/>
-  <rect class="part-removed" x="183.6" y="80.0" width="3.9" height="45.4"/>
+  <rect class="holes" x="183.2" y="80.0" width="4.6" height="45.4"/>
   <circle class="holes" cx="185.5" cy="123.4" r="9.8"/>
   <circle class="part-threads" cx="185.5" cy="123.4" r="9.5"/>
   <line class="hidden" x1="160.0" y1="93.4" x2="211.1" y2="93.4"/>
@@ -15,7 +15,7 @@
   <text class="label" x="440.0" y="70.0">adjuster: height gauge over a screw: H ±.003</text>
   <line class="leader" x1="436.0" y1="66.0" x2="185.5" y2="123.4"/>
   <circle class="leader-dot" cx="185.5" cy="123.4" r="2.5"/>
-  <text class="label" x="440.0" y="110.0">slit .040-.060, from TOP into the adjuster</text>
+  <text class="label" x="440.0" y="110.0">slit .050-.070, from TOP into the adjuster</text>
   <line class="leader" x1="436.0" y1="106.0" x2="185.5" y2="100.0"/>
   <circle class="leader-dot" cx="185.5" cy="100.0" r="2.5"/>
   <text class="label" x="440.0" y="150.0">pinch hole (4-40 in E, #30 in W)</text>

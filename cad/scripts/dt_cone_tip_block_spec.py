@@ -138,7 +138,22 @@ SLIT_W_PLACES = 2
 # slit width instead.  The floor stays 0.65 under the axis: inside the 1/4-28
 # tap drill by the margins checked below.
 SLIT_FLOOR = ADJUSTER_AXIS_HEIGHT - 0.65
-SLIT_W = 1.27  # .05
+# Tool-audit ruling Q10 (owner, 2026-11-23, verbatim: "Print .06 (.050-.070)
+# and use the owned 2-3/4 x .064 saw on the 1 in arbor, IF the owned saw's
+# hole is 1 in"; the condition met 2026-11-24, owner: "the larger slitting
+# saws have 1in bore diam"): .06, .050-.070 at the title block's .XX band,
+# so the owned .064 saw cuts it at one width (.05 before, which no owned saw
+# cut).  What the pinch asks of the width: the #4-40 screw draws the two
+# jaws onto the 1/4-28 end screw, by that thread's 2A/2B fit whatever the
+# slit's width, so a wider slit only leaves the jaws more room before they
+# meet (.050 at its narrowest, .040 before), and each jaw is .31 thick at
+# the .68 width (.315 before).  The checks below that read the width, each
+# at its printed limits: the slit-mouth web under the pinch hole (it grows:
+# the wider slit meets the thread root lower), the #30 clearance drilled to
+# the slot without its point scarring the far jaw, and 1.5 D of the pinch
+# screw's thread in the far jaw past the widest slit (2.14 D; 2.19 D
+# before).  The slit's floor does not move.
+SLIT_W = 1.524  # .06
 SLIT_DEPTH = BLOCK_HEIGHT - SLIT_FLOOR
 # Owner decision C1 keyed (2026-11-09, PR #1992): the end screw, McMaster
 # 91794A559 (1/4-28 x 3/4 slotted fillister, 18-8, owner ruling 2026-11-20,

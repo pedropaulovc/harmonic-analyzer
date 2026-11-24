@@ -5,36 +5,38 @@
   <rect class="clamp" x="44.6" y="240.1" width="317.3" height="89.9"/>
   <rect class="fixture-support" x="158.7" y="253.8" width="203.2" height="76.2"/>
   <rect class="part-kept" x="294.8" y="219.8" width="105.2" height="34.0"/>
-  <rect class="part-removed" x="369.7" y="235.2" width="30.3" height="2.6"/>
-  <rect class="cutter" x="369.7" y="235.2" width="152.4" height="2.6"/>
-  <rect class="cutter" x="402.0" y="216.2" width="87.9" height="19.1"/>
-  <rect class="cutter" x="402.0" y="237.8" width="87.9" height="19.1"/>
-  <rect class="cutter" x="401.5" y="256.9" width="88.9" height="12.0"/>
-  <rect class="cutter" x="420.5" y="60.0" width="50.8" height="156.2"/>
-  <line class="centre-line" x1="445.9" y1="56.0" x2="445.9" y2="277.8"/>
-  <line class="hidden" x1="323.8" y1="219.8" x2="323.8" y2="253.8"/>
-  <line class="hidden" x1="44.6" y1="215.7" x2="85.2" y2="215.7"/>
-  <line class="hidden" x1="85.2" y1="215.7" x2="85.2" y2="330.0"/>
-  <text class="label" x="560.0" y="70.0">arbor, spacers, nut</text>
-  <line class="leader" x1="556.0" y1="66.0" x2="471.3" y2="80.0"/>
-  <circle class="leader-dot" cx="471.3" cy="80.0" r="2.5"/>
-  <text class="label" x="560.0" y="110.0">3 in x .051 saw</text>
-  <line class="leader" x1="556.0" y1="106.0" x2="505.9" y2="236.5"/>
-  <circle class="leader-dot" cx="505.9" cy="236.5" r="2.5"/>
-  <text class="label" x="560.0" y="150.0">slit .596 REF</text>
-  <line class="leader" x1="556.0" y1="146.0" x2="384.9" y2="236.5"/>
+  <rect class="part-removed" x="369.7" y="234.9" width="30.3" height="3.3"/>
+  <rect class="cutter" x="369.7" y="234.9" width="139.7" height="3.3"/>
+  <rect class="cutter" x="407.8" y="60.0" width="63.5" height="174.9"/>
+  <rect class="cutter" x="407.8" y="238.2" width="63.5" height="25.4"/>
+  <rect class="cutter" x="423.8" y="263.6" width="31.6" height="12.7"/>
+  <line class="centre-line" x1="439.6" y1="56.0" x2="439.6" y2="284.0"/>
+  <circle class="hidden" cx="371.0" cy="236.5" r="5.4"/>
+  <rect class="fixture-support" x="44.6" y="215.7" width="40.6" height="24.4"/>
+  <line class="hidden" x1="85.2" y1="240.1" x2="85.2" y2="330.0"/>
+  <text class="label" x="560.0" y="70.0">R8 stepped arbor, body Ø1.25</text>
+  <line class="leader" x1="556.0" y1="66.0" x2="471.3" y2="100.0"/>
+  <circle class="leader-dot" cx="471.3" cy="100.0" r="2.5"/>
+  <text class="label" x="560.0" y="110.0">2-3/4 x .064 saw</text>
+  <line class="leader" x1="556.0" y1="106.0" x2="495.0" y2="236.5"/>
+  <circle class="leader-dot" cx="495.0" cy="236.5" r="2.5"/>
+  <text class="label" x="232.0" y="92.0">TOP, .75 past jaw side</text>
+  <line class="leader" x1="372.0" y1="96.0" x2="400.0" y2="219.8"/>
+  <circle class="leader-dot" cx="400.0" cy="219.8" r="2.5"/>
+  <text class="label" x="560.0" y="262.0">cap Ø1.25 x .50, its screw</text>
+  <line class="leader" x1="556.0" y1="258.0" x2="471.3" y2="252.0"/>
+  <circle class="leader-dot" cx="471.3" cy="252.0" r="2.5"/>
+  <text class="label" x="560.0" y="302.0">E down on the stacks</text>
+  <line class="leader" x1="556.0" y1="298.0" x2="340.0" y2="253.8"/>
+  <circle class="leader-dot" cx="340.0" cy="253.8" r="2.5"/>
+  <text class="label" x="100.0" y="200.0">moving jaw (N behind)</text>
+  <line class="leader" x1="150.0" y1="206.0" x2="130.0" y2="285.0"/>
+  <circle class="leader-dot" cx="130.0" cy="285.0" r="2.5"/>
+  <text class="label" x="150.0" y="120.0">slit .596 REF, into the adjuster</text>
+  <line class="leader" x1="250.0" y1="126.0" x2="384.9" y2="236.5"/>
   <circle class="leader-dot" cx="384.9" cy="236.5" r="2.5"/>
-  <text class="label" x="560.0" y="190.0">TOP, .75 past jaw side</text>
-  <line class="leader" x1="556.0" y1="186.0" x2="400.0" y2="229.8"/>
-  <circle class="leader-dot" cx="400.0" cy="229.8" r="2.5"/>
-  <text class="label" x="560.0" y="230.0">E down on the stacks</text>
-  <line class="leader" x1="556.0" y1="226.0" x2="320.0" y2="253.8"/>
-  <circle class="leader-dot" cx="320.0" cy="253.8" r="2.5"/>
-  <text class="label" x="560.0" y="270.0">moving jaw (N behind)</text>
-  <line class="leader" x1="556.0" y1="266.0" x2="164.6" y2="310.0"/>
-  <circle class="leader-dot" cx="164.6" cy="310.0" r="2.5"/>
-  <text class="label" x="560.0" y="310.0">spacer strip on end (hidden)</text>
-  <line class="leader" x1="556.0" y1="306.0" x2="64.9" y2="225.7"/>
+  <text class="label" x="30.0" y="170.0">spacer strip on end</text>
+  <line class="leader" x1="64.9" y1="176.0" x2="64.9" y2="225.7"/>
   <circle class="leader-dot" cx="64.9" cy="225.7" r="2.5"/>
   <text class="label" x="16.0" y="406.0">Along the jaws, 2 px per mm, the saw at full depth. Passes along +Y, away from the viewer (toward the fixed jaw).</text>
 </svg>
