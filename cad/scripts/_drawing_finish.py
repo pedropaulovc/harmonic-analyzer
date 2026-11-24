@@ -15,6 +15,7 @@ from _com import _early_bound
 from _drawing_attachment import (
     _LEADER_BENT,
     _LEADER_SIDE_SMART,
+    _SEL_SILHOUETTE,
     _assert_attached_to,
     _assert_leader_lands,
 )
@@ -91,6 +92,45 @@ def _validate_surface_finish_control_face(
     )
 
 
+def _assert_attached_to_silhouette_of(
+    adapter: Any, annotation: Any, picked_face: Any, *, label: str
+) -> None:
+    """Fail unless the symbol is attached, by one live leader, to exactly one
+    silhouette of ``picked_face``, the face the picked silhouette owned at
+    pick time.
+
+    The picked ``ISilhouetteEdge`` handle itself cannot be asked afterwards:
+    on MHA-DT-13 at a 176.4538 mm arbor (#3478, runs 20261123T194841143Z and
+    20261123T221138793Z) it read the Ø.375 cylinder before
+    ``InsertSurfaceFinishSymbol3`` and the north dome straight after it,
+    before any rebuild, while the symbol stayed attached to the cylinder's
+    silhouette; ``_assert_attached_to`` then refused a correct attachment.
+    """
+    attached = tuple(annotation.GetAttachedEntities3() or ())
+    count = int(annotation.GetAttachedEntityCount3())
+    types = tuple(int(t) for t in (annotation.GetAttachedEntityTypes() or ()))
+    leaders = int(annotation.GetLeaderCount())
+    dangling = bool(annotation.IsDangling())
+    same = False
+    if (
+        len(attached) == 1
+        and count == 1
+        and types == (_SEL_SILHOUETTE,)
+        and attached[0] is not None
+    ):
+        attached_face = _early_bound(attached[0], "ISilhouetteEdge").GetFace()
+        same = (
+            attached_face is not None
+            and int(adapter.swApp.IsSame(attached_face, picked_face)) == 1
+        )
+    if not same or dangling or leaders != 1:
+        raise RuntimeError(
+            f"surface-finish symbol lost its silhouette attachment ({label}): "
+            f"entities={len(attached)}, count={count}, types={types}, "
+            f"same_entity={same}, dangling={dangling}, leaders={leaders}"
+        )
+
+
 @_telemetry.traced("drawing.surface_finish", label_param="label")
 def add_surface_finish(
     adapter: Any,
@@ -143,6 +183,15 @@ def add_surface_finish(
         entity_type=entity_type,
         label=label,
     )
+    # A picked silhouette is identified by its owning face, read NOW: the
+    # handle does not outlive the insertion (see _assert_attached_to_silhouette_of).
+    picked_face = (
+        _early_bound(selected_entity, "ISilhouetteEdge").GetFace()
+        if entity_type.upper() == "SILHOUETTE"
+        else None
+    )
+    if entity_type.upper() == "SILHOUETTE" and picked_face is None:
+        raise RuntimeError(f"picked silhouette has no owning face ({label})")
     signatures: tuple[dict[str, Any], ...] = ()
     if control is not None:
         signatures = _validate_surface_finish_control_face(
@@ -254,14 +303,17 @@ def add_surface_finish(
             raise RuntimeError(f"failed to set surface-finish text height ({label})")
     draw.ClearSelection2(True)
     rebuild_drawing(adapter, label="add_surface_finish")
-    _assert_attached_to(
-        adapter,
-        annotation,
-        selected_entity,
-        entity_type=entity_type,
-        what="surface-finish symbol",
-        label=label,
-    )
+    if picked_face is None:
+        _assert_attached_to(
+            adapter,
+            annotation,
+            selected_entity,
+            entity_type=entity_type,
+            what="surface-finish symbol",
+            label=label,
+        )
+    else:
+        _assert_attached_to_silhouette_of(adapter, annotation, picked_face, label=label)
     if leader_attach_xy is not None:
         _assert_leader_lands(
             annotation, leader_attach_xy, what="surface-finish symbol", label=label

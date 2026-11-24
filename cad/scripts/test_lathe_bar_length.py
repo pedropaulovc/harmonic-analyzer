@@ -5,13 +5,14 @@ The PM-1127VF-LB's change-gear cover has a hole at the spindle's rear, so
 bar can pass out the back, but the spindle supports it only up to its rear
 end: bar longer than that runs unsupported, and a slender bar whips, bends
 and strikes whatever is near. So bar ends inside the spindle unless an
-outboard support is declared. The spindle's length from the jaw fronts to
-its rear end is not published (``cad/config/shop-equipment/machines.toml``
-``machines.pm-1127vf-lb``, ``jaw_fronts_to_spindle_rear_in``, to measure);
-until the owner tapes it, ``bar_behind_jaw_fronts_max_in`` is the assumed
-supported length. A plan's ``bar_length_in`` is the piece the lathe holds,
-so the whole piece, grip included, must fit within it: a plan that starts
-from longer bar saws a working piece first.
+outboard support is declared. The maker does not publish the spindle's
+length from the jaw fronts to its rear end; the owner measured it, 17 in
+(2026-11-24; ``cad/config/shop-equipment/machines.toml``
+``machines.pm-1127vf-lb``, ``jaw_fronts_to_spindle_rear_in``), and
+``bar_behind_jaw_fronts_max_in`` is that less ``bar_behind_margin_in``. A
+plan's ``bar_length_in`` is the piece the lathe holds, so the whole piece,
+grip included, must fit within it: a plan that starts from longer bar saws a
+working piece first.
 
 A part parting off falls on its own; the plan says so and keeps hands clear,
 never "catch it" (by hand or in a rag beside the turning work).
@@ -43,12 +44,11 @@ def _plans() -> dict[str, dict]:
 PLANS = _plans()
 
 
-def test_the_spindle_length_is_recorded_or_to_measure() -> None:
+def test_the_limit_is_the_measured_spindle_less_its_margin() -> None:
     measured = LATHE["jaw_fronts_to_spindle_rear_in"]
-    assert measured == "to_measure" or (
-        isinstance(measured, (int, float)) and measured > BAR_BEHIND_MAX_IN
-    )
-    assert 0 < BAR_BEHIND_MAX_IN
+    margin = LATHE["bar_behind_margin_in"]
+    assert isinstance(measured, (int, float)) and 0 < margin < measured
+    assert BAR_BEHIND_MAX_IN == pytest.approx(measured - margin)
 
 
 @pytest.mark.parametrize(

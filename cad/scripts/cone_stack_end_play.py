@@ -10,7 +10,8 @@ Two independent floats (user ruling 2026-09-29; owner decision C1 keyed,
   bonded one STACK_FEELER leaf off T030's north face.  That gap is how far
   the stack can float north in service, whatever the shaft does.  The feeler
   follows the pinion drum's shim rule (pinion_rig_layout.DRUM_END_SHIM): the
-  smallest 0.05 blade whose tightest setting keeps MIN_END_PLAY with
+  thinnest leaf of the shop's inch feeler gauge (dt_feeler_leaves, #3042)
+  whose tightest setting, its own tolerance booked, keeps MIN_END_PLAY with
   MARGIN_SPARE to spare.  T024, T018, T012 and T006 are bonded to the shaft,
   so they move only with it.
 * The shaft floats between the MHA-DT-05 boss (its thrust collar's south face)
@@ -21,23 +22,26 @@ Two independent floats (user ruling 2026-09-29; owner decision C1 keyed,
 The 2026-09-29 collar version (MHA-DT-VN-54 set-screw collar off T006, the
 MHA-DT-VN-55 cup on the tip) is superseded by that decision.
 
-Import-free on purpose: the shaft spec, the gear-mesh proof and the assembly
-sheet all read these numbers, and none of them may pick up another spec
-through this module.
+Free of spec imports on purpose (its one import, dt_feeler_leaves, has none):
+the shaft spec, the gear-mesh proof and the assembly sheet all read these
+numbers, and none of them may pick up another spec through this module.
 """
 
 from __future__ import annotations
 
-import math
+import dt_feeler_leaves as _leaves
 
 MIN_END_PLAY = 0.10  # running floor: the stack never clamped on the shaft
 MARGIN_SPARE = 0.25  # novice spare over every floor (pinion_rig_layout rule)
-FEELER_STEP = 0.05  # blades of the metric gauge set
 # Set error: T024 can creep on its land before the 638 fixes.
-STACK_FEELER_BAND = 0.10
-STACK_FEELER = FEELER_STEP * math.ceil(
-    round((MIN_END_PLAY + MARGIN_SPARE + STACK_FEELER_BAND) / FEELER_STEP, 9)
-)  # 0.45
+STACK_FEELER_SET_BAND = 0.10
+STACK_FEELER = _leaves.smallest_setting(
+    MIN_END_PLAY + MARGIN_SPARE, STACK_FEELER_SET_BAND
+)  # .019 (0.45 on the metric set printed .018; the leaf tolerance moves it up)
+if len(_leaves.leaf_stack(STACK_FEELER)) != 1:
+    raise AssertionError("the stack feeler is not one leaf of the set")
+# What T024's gap can be off by: the set band and the leaf's own tolerance.
+STACK_FEELER_BAND = STACK_FEELER_SET_BAND + _leaves.stack_error(STACK_FEELER)
 # (min, max) float of the stack north off the thrust collar in service.
 STACK_FLOAT = (
     STACK_FEELER - STACK_FEELER_BAND,

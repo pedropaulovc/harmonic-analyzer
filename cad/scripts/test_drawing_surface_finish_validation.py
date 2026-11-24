@@ -297,6 +297,68 @@ def test_face_guard_rejects_a_face_that_is_not_the_selected_one() -> None:
         _guard(_Annotation((object(),), (2,)), object(), "FACE")
 
 
+def _finish_guard(annotation: _Annotation, picked_face: Any) -> None:
+    _drawing_finish._assert_attached_to_silhouette_of(
+        _Adapter(), annotation, picked_face, label="bore"
+    )
+
+
+def test_finish_guard_survives_a_picked_silhouette_handle_that_re_points() -> None:
+    """MHA-DT-13 at a 176.4538 mm arbor (#3478): the picked handle read the
+    cylinder at pick time and the north dome after the insertion, while the
+    symbol stayed on the cylinder's silhouette."""
+    cylinder, dome = object(), object()
+    picked = _Silhouette(cylinder)
+    picked_face = picked.GetFace()
+    picked.face = dome  # the handle re-points once the symbol is inserted
+    annotation = _Annotation((_Silhouette(cylinder),), (46,))
+    _finish_guard(annotation, picked_face)
+    # Asking the handle afterwards refuses that same correct attachment.
+    with pytest.raises(RuntimeError, match="same_entity=False"):
+        _guard(annotation, picked, "SILHOUETTE")
+
+
+@pytest.mark.parametrize(
+    ("attached_face", "types", "count", "leaders", "dangling", "expected"),
+    (
+        ("dome", (46,), 1, 1, False, "same_entity=False"),
+        (None, (46,), 1, 1, False, "same_entity=False"),
+        ("cylinder", (1,), 1, 1, False, "types=(1,)"),
+        ("cylinder", (46,), 0, 1, False, "count=0"),
+        ("cylinder", (46,), 1, 0, False, "leaders=0"),
+        ("cylinder", (46,), 1, 2, False, "leaders=2"),
+        ("cylinder", (46,), 1, 1, True, "dangling=True"),
+    ),
+    ids=(
+        "other-face", "faceless", "type-is-edge", "count-disagrees",
+        "no-leader", "two-leaders", "dangling",
+    ),
+)
+def test_finish_guard_still_refuses_a_symbol_off_the_picked_face(
+    attached_face: str | None,
+    types: tuple[int, ...],
+    count: int,
+    leaders: int,
+    dangling: bool,
+    expected: str,
+) -> None:
+    faces = {"cylinder": object(), "dome": object(), None: None}
+    annotation = _Annotation(
+        (_Silhouette(faces[attached_face]),), types,
+        count=count, leaders=leaders, dangling=dangling,
+    )
+    with pytest.raises(RuntimeError, match=r"lost its silhouette attachment \(bore\)") as info:
+        _finish_guard(annotation, faces["cylinder"])
+    assert expected in str(info.value)
+
+
+def test_finish_guard_refuses_a_detached_or_doubled_symbol() -> None:
+    cylinder = object()
+    for entities, types in (((), ()), ((_Silhouette(cylinder),) * 2, (46, 46))):
+        with pytest.raises(RuntimeError, match="same_entity=False"):
+            _finish_guard(_Annotation(entities, types, count=len(entities)), cylinder)
+
+
 def test_attachment_guard_refuses_a_kind_it_cannot_prove() -> None:
     with pytest.raises(ValueError, match="cannot verify a DIMENSION attachment"):
         _guard(_Annotation((object(),), (14,)), object(), "DIMENSION")
