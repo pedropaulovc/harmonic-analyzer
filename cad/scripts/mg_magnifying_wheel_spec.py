@@ -70,7 +70,7 @@ from mg_magnifying_wheel_geom import (  # noqa: F401 (re-export)
     fillet,
     printed_limits,
 )
-from mg_wheel_group import HUB_RUNNING, WHEEL_BORE_MAX
+from mg_wheel_group import WHEEL_BORE_MAX
 
 # --- Marked-dimension contract: feature -> the parametric dimension NAMES the
 # print shows.  The face view carries the bore, spoke, fillet and tie
@@ -249,8 +249,12 @@ def _fit_limits(limits_mm: tuple[float, float]) -> str:
 
 DRAWING_NOTES = "\n".join(
     (
-        f"{BORE_FIT_NOTE}. RUNNING FIT ON AXLE {AXLE_NUMBER} "
-        f"(CLEARANCE {_fit_limits(HUB_RUNNING)}).",
+        # Rule 4, form 3 (fit audit, MHA-MG-05.running_bore, second pass): the
+        # bore stays reamed on the set's .1885 with no band, the drill-rod
+        # axle as its gauge; the reamer's cut and the rod's band
+        # (mg_wheel_group.HUB_RUNNING) are analysis only. Its reason is in
+        # cad/config/necessity/mg-magnifying-wheel.yaml, not on the sheet.
+        f"{BORE_FIT_NOTE}. RUNNING FIT ON AXLE {AXLE_NUMBER}: AXLE TURNS FREE, NO SHAKE.",
         # Owner ruling 2026-11-24, fit audit question 17: the spigot is the
         # member made last, so the bonded fit's acceptance prints here, once
         # (rule 4, form 2); MHA-MG-10 names this spigot as turned to its bore.

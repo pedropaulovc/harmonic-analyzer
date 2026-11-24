@@ -57,11 +57,6 @@ demoted:
   fr_frame_assembly: fit-batch-fr
   fr_top_frame: fit-batch-fr
   ha_harmonic_analyzer_assembly: fit-batch-ha
-  mg_magnifier_assembly: fit-batch-mg
-  mg_magnifying_bracket: fit-batch-mg
-  mg_magnifying_vertical_rod: fit-batch-mg
-  mg_magnifying_wheel: fit-batch-mg
-  mg_wheel_axle: fit-batch-mg
   ms_measuring_stick_assembly: fit-batch-ms
   ms_stick: fit-batch-ms
   ms_stop_plate: fit-batch-ms

@@ -184,7 +184,7 @@ def test_journal_finish_and_no_gdt() -> None:
     # name, one line each.
     assert callouts.callout_rows(callouts.PIN_DIA_CALLOUT) == (
         "BONDED IN MHA-MG-08 WHEEL BAR",
-        "RUNNING FIT IN MHA-MG-05 MAGNIFYING WHEEL (CLEARANCE .0008-.0017)",
+        "RUNNING FIT IN MHA-MG-05 MAGNIFYING WHEEL",
     )
 
 
@@ -193,14 +193,11 @@ def test_thread_callout_and_no_general_notes() -> None:
     assert not hasattr(spec, "DRAWING_NOTES")
     # The stock Ø is an untoleranced REF (the supplier's limits govern) that
     # states both fits: the bond in the bar's drilled bore (its clearance on
-    # the bar's sheet) and the wheel running on the shank, matching the wheel
-    # group's proofs.
+    # the bar's sheet) and the wheel running on the shank (accepted on the
+    # wheel's sheet: its reamed bore carries no band, rule 4 form 3).
     words = " ".join(callouts.PIN_DIA_CALLOUT.split())
     assert ".1873" not in words and "STOCK" not in words
-    assert "INTERFERENCE" not in words
-    assert callouts.RUNNING_CLEARANCE_TEXT == "-".join(
-        f"{value / 25.4:.4f}".lstrip("0") for value in group.HUB_RUNNING
-    )
+    assert "INTERFERENCE" not in words and "CLEARANCE" not in words
 
 
 def test_callouts_are_part_authored_and_only_read_by_the_sheet() -> None:
@@ -244,23 +241,24 @@ def test_part_stamps_make_critical_properties() -> None:
 
 
 def test_wheel_group_stack_fits_the_pin() -> None:
-    # Every corner at the printed limits (inch): the step inside the hub...
-    # Owner ruling 2026-11-21: gauged from the spacer's outer face, the
-    # spacer's length leaves every corner below.
-    assert group.STEP_INSIDE_HUB == pytest.approx(0.027 * 25.4, abs=1e-6)
+    # Every corner at the printed limits (inch), at the model's step station
+    # (owner ruling 2026-11-24, fit audit part 2, C11: the trial sets the
+    # axle; the hub rides the title block, fit audit MHA-MG-05.hub_length):
+    # the step inside the hub...
+    assert group.STEP_INSIDE_HUB == pytest.approx(0.026 * 25.4, abs=1e-6)
     # (b) on FULL thread: the dome's incomplete pitch is not counted, and the
     # first nut stays clear of the step's relief.
-    assert group.LOCKNUT_THREAD_MARGIN == pytest.approx(0.002 * 25.4, abs=1e-6)
-    assert group.NUT_RUNOUT_MARGIN == pytest.approx(0.004 * 25.4, abs=1e-6)
-    # (c) the ruled 2.9 floored to .114, and the long corner under it.
+    assert group.LOCKNUT_THREAD_MARGIN == pytest.approx(0.001 * 25.4, abs=1e-6)
+    assert group.NUT_RUNOUT_MARGIN == pytest.approx(0.003 * 25.4, abs=1e-6)
+    # (c) the ruled 2.9 floored to .114, and the long corner on it.
     assert spec.THREAD_PAST_LOCKNUT_LIMIT == pytest.approx(0.114 * 25.4)
     assert spec.THREAD_PAST_LOCKNUT_LIMIT <= 2.9
-    assert group.THREAD_PAST_LOCKNUT_MAX == pytest.approx(0.113 * 25.4, abs=1e-6)
+    assert group.THREAD_PAST_LOCKNUT_MAX == pytest.approx(0.114 * 25.4, abs=1e-6)
     assert group.THREAD_PAST_LOCKNUT_MAX <= spec.THREAD_PAST_LOCKNUT_LIMIT
     assert group.THREAD_PAST_LOCKNUT_NOMINAL == pytest.approx(1.719, abs=0.005)
-    # Pressed to the gauge past the spacer (its .XXX band now places the
-    # back end), the shank lands the back end sunk in the bore at every
-    # corner; nothing stands behind it there.
+    # At the model station past the spacer (its .XXX band places the back
+    # end), the shank lands the back end sunk in the bore at every corner;
+    # nothing stands behind it there.
     assert spec.BACK_END_SUNK_MIN == pytest.approx(0.002 * 25.4, abs=1e-6)
     assert spec.BACK_END_SUNK_MAX == pytest.approx(0.046 * 25.4, abs=1e-6)
     # The spacer lands the spokes' mid-plane on the pen-rod line.

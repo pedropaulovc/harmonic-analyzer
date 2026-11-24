@@ -79,16 +79,18 @@ DRUM_MID_Z = round((HUB_STEP_Z + HUB_FRONT_Z) / 2.0, 6)  # -11.01, the drum wire
 # The drum is bonded hard against the boss: its installed centre is half its
 # own (shorter) length off the boss face, not the spigot's midpoint.
 DRUM_SEATED_MID_Z = HUB_STEP_Z - DRUM_LEN / 2.0
-# Reamed on the owned .1885 reamer to a stated running clearance on the
-# finished axle (mg_wheel_group HUB_RUNNING), so the Ø prints as a reference
-# nominal.
+# Reamed on the set's .1885 reamer (to order, shop-equipment
+# tools.reamer-1885) with no band, the finished axle its gauge (MHA-MG-05
+# note 1; mg_wheel_group HUB_RUNNING is the analysis band), so the Ø prints
+# as a reference nominal.
 BORE_DIA = 4.7879  # .1885
 
-# Printed bands, (upper, lower) deviations.  The overall sets the axle's
-# locknut stack (mg_wheel_group reads HUB_LEN_LIMITS).
+# The overall is a term of the axle's locknut stack (mg_wheel_group reads
+# HUB_LEN_LIMITS) at the title block's .XXX: the +/-.004 it carried is gone
+# (fit audit MHA-MG-05.hub_length; owner ruling 2026-11-24, fit audit part 2,
+# C11 sets the axle to the trial stack, which takes up the hub's length).
 HUB_LEN_PLACES = 3
-HUB_LEN_BAND = (0.1016, -0.1016)  # +/-.004, the mm sheet's +/-0.10 restated
-HUB_LEN_LIMITS = printed_limits(HUB_LEN, HUB_LEN_PLACES, HUB_LEN_BAND)  # .768-.776
+HUB_LEN_LIMITS = printed_limits(HUB_LEN, HUB_LEN_PLACES)  # .767-.777
 # Spigot length against the drum's length, both on the title block's .XXX
 # row: the drum, bonded hard against the boss, never stands proud of the spigot face,
 # so the front washer bears on the spigot (the iron), never on the drum: the

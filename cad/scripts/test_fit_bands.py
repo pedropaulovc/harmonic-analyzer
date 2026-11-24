@@ -274,9 +274,6 @@ INDEXED_FIT_BANDS: dict[tuple[str, str], str] = {
     ("mg_wheel_axle_spec", "THREAD_LEN_BAND"): (
         "equal band indexed into the native symmetric (+/-) tolerance"
     ),
-    ("mg_magnifying_wheel_geom", "HUB_LEN_BAND"): (
-        "equal band indexed into the native symmetric (+/-) tolerance"
-    ),
     # Owner ruling 2026-11-24, fit audit question 17: an analysis band, not a
     # printed limit.
     ("mg_wheel_drum_geom", "DRUM_BORE_BAND"): (
