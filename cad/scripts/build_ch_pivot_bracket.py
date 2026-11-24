@@ -86,7 +86,6 @@ from _drawing_marks import (
     mark_dimensions_for_drawing,
 )
 from _drawing_precision import _named_dimension, apply_drawing_precision
-from _drawing_tolerances import set_dimension_symmetric_tolerance
 from _fit_deviations import deviations
 from _hole_spec import blind_cut_dia_mm
 from _holes import cross_hole_volume_mm3, wizard_hole_on_cylinder
@@ -108,7 +107,6 @@ from ch_pivot_bracket_spec import (
     BORE_H,
     EAR_ARCH_R,
     EAR_T,
-    EAR_T_BAND,
     EAR_TOP_Y,
     EAR_W,
     FOOT_H,
@@ -116,7 +114,6 @@ from ch_pivot_bracket_spec import (
     FOOT_Z0,
     HOLE_DIA,
     SET_SCREW_HOLE_SPEC,
-    UNIT,
 )
 
 
@@ -582,15 +579,12 @@ def build(adapter) -> dict[str, str]:
     # guidelines`); the drawing reads them back instead of rewriting them.
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     _corner_radius_max_limit(adapter)
-    # The ear thickness carries +/-.004 natively (ch_pivot_bracket_spec). The
-    # apex tap's station from the ear's inboard face (the face fit-up sets and
-    # the S4 hold touches Z0 on), the foot length and the hold-down station
-    # ride the title block. The F-drilled cross-bore takes the DRILLED HOLES
-    # row its set-screw thread is counted at (owner ruling 2026-11-24, fit
-    # audit question 1): no native band.
-    set_dimension_symmetric_tolerance(
-        adapter, "Ear", "EarThick", EAR_T_BAND, display_unit=UNIT
-    )
+    # The ear thickness, the apex tap's station from the ear's inboard face
+    # (the face fit-up sets and the S4 hold touches Z0 on), the foot length
+    # and the hold-down station ride the title block (fit audit census,
+    # MHA-CH-08 ear thickness). The F-drilled cross-bore takes the DRILLED
+    # HOLES row its set-screw thread is counted at (owner ruling 2026-11-24,
+    # fit audit question 1): no native band.
 
     report_mass_properties(adapter)
     clear_dimensions_for_drawing(adapter)

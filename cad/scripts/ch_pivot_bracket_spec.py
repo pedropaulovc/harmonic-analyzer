@@ -91,16 +91,16 @@ HOLE_DIA = blind_cut_dia_mm(HOLD_DOWN_HOLE_SPEC)
 # seat's end wall at those bands (user ruling 2026-10-14, #954 machinist
 # review: fix the wall with geometry, not a band; #1371 review: the station's
 # own band went the same way; ``ch_pivot_bracket_sides`` checks the support,
-# and so the foot, for it). The ear thickness keeps its +/-.004 for the tap's
-# walls and the pivot shaft's flat under the tap (the shaft is set off the
+# and so the foot, for it). The ear thickness rides the title block's .XXX
+# (+/-.005; fit audit census, MHA-CH-08 ear thickness: the +/-.004 it
+# printed held nothing the row does not -- the tap's walls and the pivot
+# shaft's flat under the tap still clear at the row; the shaft is set off the
 # outboard face, the tap stands off the inboard one). Across the foot its sides stay at .XX (the band
 # rocker_bracket_seat_layout carries this foot at) and the hole's centring on
 # x = 0 at .XX; a drilled hole grows by the title block's +.004/0.
-# build_ch_pivot_bracket carries the +/-.004 band on the model's own
-# dimension.
 _LINEAR_2PL = printed_band_mm(2, unit=UNIT)
 FOOT_LEN_BAND = _LINEAR_2PL
-EAR_T_BAND = 0.1016  # +/-.004
+EAR_T_BAND = printed_band_mm(3, unit=UNIT)  # .XXX row, +/-.005
 STATION_BAND = _LINEAR_2PL
 EDGE_BAND = _LINEAR_2PL  # the foot's sides
 HOLE_X_BAND = _LINEAR_2PL  # the hole's centring across the foot
@@ -189,7 +189,7 @@ SET_SCREW_WALLS_MIN = {
     - EAR_T_BAND
     - SET_SCREW_OFF_MID_MAX
     - SET_SCREW_MAJOR_DIA / 2.0,
-}  # 2.34, 2.24
+}  # 2.32, 2.20 (.0915, .0865; .092, .088 at the old +/-.004)
 if min(SET_SCREW_WALLS_MIN.values()) < LIGAMENT_TARGET:
     raise AssertionError(
         f"the apex tap leaves {SET_SCREW_WALLS_MIN} to the ear faces at worst"
