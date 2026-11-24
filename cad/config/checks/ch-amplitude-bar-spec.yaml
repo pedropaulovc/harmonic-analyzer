@@ -1,0 +1,9 @@
+# What fails past each numeric check ch_amplitude_bar_spec asserts
+# (check_register.py, tolerance-policy.md "Checks in spec modules and tests").
+checks:
+  - id: C-01
+    check: "TOP_NOTCH_WIDTH"
+    kind: gap
+    reason: "the lever plate rubs the notch cheeks"
+    source: "the module computes it (_straddle_minimum): the thickest lever plate (ch_channel_lever_spec .118 +/-.002) plus STRADDLE_RUNNING_FLOOR 0.10 mm (rocker_bank_layout.RUNNING_FLOOR), rounded up to an even thousandth, .124"
+    basis: worst_case

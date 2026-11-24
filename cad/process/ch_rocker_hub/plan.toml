@@ -14,22 +14,28 @@
 # land governs (owner ruling 2026-11-24, fit audit question 2, approved as
 # recommended: "ream .400 with no band; hub turned until it slides in
 # (clearance .0005-.0030); bond"): (Ø.400) REF, TURN TO SLIDE INTO MHA-CH-13
-# HOLE / .0005-.0030 CLEARANCE, LOCTITE 638 (rule 4, form 2). The check, the
-# only acceptance: the land slides by hand into a strap's reamed hole with no
-# shake. Any finished strap will do: the one .4000 reamer (tools.reamer-4000)
-# cuts every hole, and the MHA-CH-13-TL-02 plug needs them alike. The aim,
-# Ø.3975-.3995 (ch_rocker_hub_fit.LAND_WINDOW, land_min_in/land_max_in), is
-# the turning target that follows from that clearance over the reamer's
-# modelled .4000-.4005 hole (ch_rocker_hub_fit.STRAP_HOLE_BAND); it is not a
-# second gate. Traveler review r2 (2026-11-24) retired the telescoping hole
-# reading, the numbering of straps by it and the per-pull window: the
-# reading's .0005 repeatability left a window narrower than the turned row.
-# The matched press (owner ruling 2026-11-21), its four Class X reading pins
-# (tool audit Q2, 2026-11-23) and the .4000/.4005 pair stay retired. The hubs
-# part .02 long over the .32 MIN supply length: the drawing's note 1
-# finishes bore and length after joining, on MHA-CH-06. Bench: deburr, check
-# length. The rocker arm traveler (cad/process/ch_rocker_arm) pairs each hub
-# with a strap, hub n into strap n, and bonds them (LOCTITE 638).
+# HOLE / .0005-.0030 CLEARANCE, LOCTITE 638 (rule 4, form 2). The lathe turns
+# every land into one micrometer aim, land_min_in-land_max_in
+# (ch_rocker_hub_fit.LAND_WINDOW, which test_ch_rocker_hub_drawing binds):
+# the largest hole the .4000 reamer (tools.reamer-4000) is taken to cut less
+# the greatest clearance, to the smallest less the least
+# (ch_rocker_hub_fit.STRAP_HOLE_BAND, BOND_CLEARANCE), so a land in the aim
+# holds the drawing's clearance in every strap of the lot. The made-to-fit
+# check on the lathe: the land slides by hand into a finished strap's reamed
+# hole with no shake. The pair actually bonded is accepted where it is
+# joined, at the rocker arm traveler's dry fit (cad/process/ch_rocker_arm,
+# Setup 1): hub n into strap n, slides by hand, no force, no shake; a hub
+# that fits no strap of the lot goes to the owner. Traveler review r2
+# (2026-11-24) retired the telescoping hole reading and the numbering of
+# straps by it: the reading's .0005 repeatability left a window narrower than
+# the turned row. The matched press (owner ruling 2026-11-21), its four
+# Class X reading pins (tool audit Q2, 2026-11-23) and the .4000/.4005 pair
+# stay retired. The hubs part .02 long over the .32 MIN supply length: the
+# drawing's note 1 finishes bore and length after joining, on MHA-CH-06.
+# Bench: deburr, check length. Each hub has one lathe-faced end (Op 20 or
+# Op 90); the other is parted. The rocker arm traveler stands each hub on
+# its lathe-faced end, bonds it into its own strap (LOCTITE 638) and faces
+# both ends from the strap.
 title = "Rocker Hub"
 part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
@@ -48,10 +54,10 @@ part = "ch-rocker-hub"
 
 [parameters]
 quantity = 20
-# The aim for the land, a turning target and not a gate: the drawing's
-# .0005-.0030 clearance over every hole the reamer is taken to cut
-# (.4000-.4005): .4005 less .0030 to .4000 less .0005.
-# test_ch_rocker_hub_drawing binds both to ch_rocker_hub_fit.LAND_WINDOW.
+# The micrometer aim for the land: the drawing's clearance over every hole
+# the reamer is taken to cut, the largest hole less the greatest clearance to
+# the smallest less the least (ch_rocker_hub_fit.LAND_WINDOW;
+# test_ch_rocker_hub_drawing binds both).
 land_min_in = 0.3975
 land_max_in = 0.3995
 stock_dia_in = 0.5
@@ -178,10 +184,10 @@ speed_kind = "spindle"
 tool = "ar"
 drilling = "none"
 sizing = "other"
-instruction = "Finish the land over the same length in light passes. Before each micrometer reading, stop the spindle and put the lathe in neutral; then mike each hub's length of land. Aim (the turning target): Ø{{process.land_min_in:.4dot}}–{{process.land_max_in:.4dot}}. Once a land is near the aim, spindle stopped and lathe in neutral, slide a finished MHA-CH-13 strap (any one) onto the bar end and over that hub's land by hand."
+instruction = "Finish the land over the same length in light passes. Before each micrometer reading, stop the spindle and put the lathe in neutral; then mike each hub's length of land. Turn each land to the aim Ø{{process.land_min_in:.4dot}}–{{process.land_max_in:.4dot}}, the turning target that holds the drawing's clearance in every hole the .4000 reamer cuts. Once a land is in the aim, spindle stopped and lathe in neutral, slide a finished MHA-CH-13 strap (any one) onto the bar end and over that hub's land by hand."
 settings = "lathe-ar-1018"
 cut_diameter_mm = "{{cad.outer_dia_mm}}"
-inspection = "The check, the only acceptance: the strap slides over each hub's land by hand, no force, no shake (the drawing's {{cad.outer_clearance_min_in:.4dot}}–{{cad.outer_clearance_max_in:.4dot}} clearance in the reamed hole). The micrometer aim is not a gate."
+inspection = "The made-to-fit check: the strap slides over each hub's land by hand, no force, no shake (the drawing's {{cad.outer_clearance_min_in:.4dot}}–{{cad.outer_clearance_max_in:.4dot}} clearance in the reamed hole). The pair that is bonded is accepted at the rocker arm traveler's dry fit (MHA-CH-06, Setup 1), hub n in strap n."
 gauge_checks = "other"
 
 [[setups.operations]]

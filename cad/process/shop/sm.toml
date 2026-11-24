@@ -58,13 +58,12 @@ material = "6061-t6511"
 rpm = 2800
 chip_load_mm_per_tooth = 0.05588  # .0022 in
 flutes = 2
-# The finish's oil (sheet: "polished bare; oil or wax") and its polish.
-# Ownership: cad/config/shop-equipment/consumables.toml, same keys (the oil
-# to buy, as MHA-MG-02 needs; the roll on hand).
+# The finish's oil (sheet: "polished bare; oil or wax"); its polish, the
+# 220 sanding roll, is common.toml's (MHA-CH-06 scuffs with it too).
+# Ownership: cad/config/shop-equipment/consumables.toml, same key (the oil
+# to buy, as MHA-MG-02 needs).
 [tools.barricade-birchwood-casey]
 description = "Birchwood Casey Barricade rust protection oil"
-[tools.sanding-roll-220]
-description = "Sanding roll, 2 in wide, 220 grit (McMaster 4687A223)"
 
 # --- Stock the process plans name (stock_refs) ---------------------------------
 # One record per cad/config/shop-equipment/stock-*.toml key a plan names, so

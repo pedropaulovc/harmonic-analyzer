@@ -1,0 +1,9 @@
+# What fails past each numeric check ch_rocker_arm_notes asserts
+# (check_register.py, tolerance-policy.md "Checks in spec modules and tests").
+checks:
+  - id: C-01
+    check: "HUB_WALL_MIN"
+    kind: wall
+    reason: "the hub wall around the bore is too thin"
+    source: "drawing-guidelines.md rule 17 (walls and webs), .060 in floor; the module computes the hub O.D. at its .XX band less the F bore at the DRILLED HOLES row and the position zone, rounded down"
+    basis: worst_case

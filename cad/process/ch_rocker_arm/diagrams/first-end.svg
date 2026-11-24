@@ -3,7 +3,7 @@
        +Y up the page (the back). Section (bottom): through the hub's axis,
        seen from the front, 1 in = 200 px, Z0 the strap's top at y 330. -->
   <rect class="paper" x="0" y="0" width="760" height="470"/>
-  <text class="title" x="20" y="18">Setup 2: strap face 1 up; face the hub's top end (datum G's) to .090 over the strap</text>
+  <text class="title" x="20" y="18">Setup 2: strap face 1 up; face the hub's top end (datum G's) to {{cad.hub_end_height_in:.3dot}} over the strap</text>
   <text class="label" x="20" y="38">Plan</text>
   <!-- Gap blocks (2 in up, 3 in along X, inner ends .500 apart) and the tip block. -->
   <rect class="fixture-support" x="201.3" y="102.5" width="164.95" height="55"/>
@@ -25,7 +25,7 @@
   <line class="arrow" x1="350" y1="119" x2="410" y2="119"/>
   <line class="arrow" x1="410" y1="141" x2="350" y2="141"/>
   <line class="leader" x1="410" y1="119" x2="440" y2="40"/>
-  <text class="label" x="444" y="40">cutter path: Y +.200 along +X, then Y −.200 along −X</text>
+  <text class="label" x="444" y="40">cutter path: Y +{{process.face_pass_y_mm:in.3dot}} along +X, then Y −{{process.face_pass_y_mm:in.3dot}} along −X</text>
   <text class="label" x="20" y="200">X0 Y0: edge finder on the hub's top end, both sides each way. The arm may lie either end to the right.</text>
   <text class="label" x="20" y="232">Section through the hub</text>
   <!-- Gap blocks (broken: 2 in tall) under the strap. -->
@@ -46,9 +46,9 @@
   <!-- .090 from the strap's top (Z0) to the faced end. -->
   <line class="dims" x1="310" y1="312" x2="310" y2="330"/>
   <line class="leader" x1="300" y1="312" x2="340" y2="312"/>
-  <text class="label" x="120" y="292">removed: .0115–.0455</text>
-  <text class="label" x="120" y="308">.090 over the strap (Z0 its top)</text>
+  <text class="label" x="120" y="292">removed: {{cad.face_depth_min_in:.4dot}}–{{cad.face_depth_max_in:.4dot}}</text>
+  <text class="label" x="120" y="308">{{cad.hub_end_height_in:.3dot}} over the strap (Z0 its top)</text>
   <text class="label" x="20" y="325">strap MHA-CH-13</text>
-  <text class="label" x="420" y="458">hub MHA-CH-12 (Ø.246 pilot bore hidden)</text>
+  <text class="label" x="420" y="458">hub MHA-CH-12 (Ø{{process.hub_pilot_bore_in:.3dot}} pilot bore hidden)</text>
   <line class="leader" x1="418" y1="452" x2="390" y2="378"/>
 </svg>

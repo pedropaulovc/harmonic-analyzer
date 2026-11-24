@@ -24,7 +24,7 @@
   <text class="label" x="470" y="36">X +100.08: Y within 0.05 of X −100.08's</text>
   <line class="leader" x1="668.1" y1="111.7" x2="640" y2="170"/>
   <circle class="leader-dot" cx="668.1" cy="111.7" r="1.5"/>
-  <text class="label" x="520" y="184">#47 at X 5.2389, Y .3329</text>
+  <text class="label" x="520" y="184">#47 at X {{cad.rod_hole_from_bore_x_in:.4dot}}, Y {{cad.rod_hole_from_bore_y_in:.4dot}}</text>
   <line class="leader" x1="714" y1="138" x2="712" y2="128"/>
   <text class="label" x="690" y="150">tip block</text>
   <line class="leader" x1="380" y1="130" x2="340" y2="180"/>
@@ -47,7 +47,7 @@
   <line class="leader" x1="300" y1="266" x2="354" y2="280"/>
   <line class="dims" x1="455" y1="312" x2="455" y2="330"/>
   <line class="leader" x1="420" y1="312" x2="470" y2="312"/>
-  <text class="label" x="475" y="316">.090 over the strap (Z0 its top)</text>
+  <text class="label" x="475" y="316">{{cad.hub_end_height_in:.3dot}} over the strap (Z0 its top)</text>
   <line class="dims" x1="455" y1="349.6" x2="455" y2="367.6"/>
   <line class="leader" x1="420" y1="367.6" x2="616" y2="367.6"/>
   <text class="label" x="620" y="364">end G, faced</text>

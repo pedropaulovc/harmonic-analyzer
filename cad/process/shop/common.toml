@@ -857,6 +857,12 @@ description = "Starbond CA accelerator spray"
 [tools.aviation-snips-straight]
 description = "Aviation snips, straight cut"
 
+# The 220 sanding roll: MHA-SM-01's polish and MHA-CH-06's scuff before
+# blackening, moved here from sm.toml. Ownership: cad/config/shop-equipment/
+# consumables.toml, same key (on hand).
+[tools.sanding-roll-220]
+description = "Sanding roll, 2 in wide, 220 grit (McMaster 4687A223)"
+
 # The sheet parts' outline cutter, moved here from pd.toml: the MHA-PD-03
 # platen clip and the MHA-DT-03-TL-02 phasing comb (tool audit 2026-11-23:
 # the comb takes the clip's 1/32 instead of a 1/16 bought for it alone) both

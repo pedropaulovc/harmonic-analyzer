@@ -1,0 +1,27 @@
+# What fails past each numeric check sh_vn_pivot_pin_bar_spec asserts
+# (check_register.py, tolerance-policy.md "Checks in spec modules and tests").
+checks:
+  - id: C-01
+    check: "the loosest pin can slide out of the largest reamed hole"
+    kind: joint
+    reason: "the pin slides out of the bar cheeks"
+    source: "the module computes it: least pin less the largest reamed hole (sh_vn_pivot_pin_spec.HOLE_REAMED_LIMITS), above zero; .00022 in"
+    basis: worst_case
+  - id: C-02
+    check: "the tightest press exceeds ANSI FN2 for the bar cheeks"
+    kind: joint
+    reason: "the press splits or bulges a cheek"
+    source: "ANSI B4.1-1967 (R1987) FN2, nominal 0-0.12 in: .0002-.00085 interference (sh_vn_pivot_pin_spec.FN2_INTERFERENCE)"
+    basis: worst_case
+  - id: C-03
+    check: "reamed hole to bar face under the drawing-guidelines.md rule 17 (walls and webs) floor"
+    kind: wall
+    reason: "the wall beside the pin hole is too thin"
+    source: "drawing-guidelines.md rule 17 (walls and webs), .060 in floor; the module computes hole_face_wall_min at sh_vn_pivot_pin_spec.BOND_HOLE_MAX on the narrowest stock, .0785 in (MHA-CH-01 RV-06, owner ruling 2026-11-01)"
+    basis: worst_case
+  - id: C-04
+    check: "a bonded bar pin's gap passes LOCTITE 641's gap fill"
+    kind: gap
+    reason: "the bond does not fill the bar pin's gap"
+    source: "Henkel LOCTITE 641 product page, \"Gap fill: 0.15 mm\" (sh_vn_pivot_pin_spec.LOCTITE_641_GAP_MAX); the module's bond_gap_max is the accepted hole less the least pin, .00087 in"
+    basis: worst_case

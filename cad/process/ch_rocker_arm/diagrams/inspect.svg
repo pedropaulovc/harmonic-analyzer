@@ -9,7 +9,7 @@
   <line class="dims" x1="140" y1="190" x2="428.1" y2="190"/>
   <line class="leader" x1="140" y1="141" x2="140" y2="196"/>
   <line class="leader" x1="428.1" y1="114" x2="428.1" y2="196"/>
-  <text class="label" x="150" y="210">#47 5.249 REF from the bore (5.239/.333 basic;</text>
+  <text class="label" x="150" y="210">#47 {{cad.rod_hole_from_bore_in:.3dot}} REF from the bore ({{cad.rod_hole_from_bore_x_in:.3dot}}/{{cad.rod_hole_from_bore_y_in:.3dot}} basic;</text>
   <text class="label" x="150" y="226">first arm, calipers over offcut and #47 shank)</text>
   <text class="label" x="30" y="60">F bore: the 1/4 in ground bar offcut slides through, every arm</text>
   <!-- Hub section, 1 in = 200 px: Ø.40 hub, Ø.257 bore, length .278, the
@@ -29,10 +29,10 @@
   </g>
   <text class="label" x="660" y="222">end G</text>
   <line class="leader" x1="440" y1="246" x2="468" y2="190"/>
-  <text class="label" x="300" y="258">hub length .276–.280,</text>
+  <text class="label" x="300" y="258">hub length {{cad.hub_length_min_in:.3dot}}–{{cad.hub_length_max_in:.3dot}},</text>
   <text class="label" x="300" y="274">micrometer, every arm</text>
   <line class="leader" x1="700" y1="246" x2="748" y2="195"/>
   <text class="label" x="540" y="258">strap mid-plane from end G</text>
-  <text class="label" x="540" y="274">.137–.141, first arm</text>
-  <text class="label" x="20" y="315">Edges the cuts left: R.010 or .010 chamfer max; both bore mouths, both #47 mouths, the hub rims.</text>
+  <text class="label" x="540" y="274">{{process.strap_mid_min_in:.3dot}}–{{process.strap_mid_max_in:.3dot}}, first arm</text>
+  <text class="label" x="20" y="315">Edges the cuts left: R{{cad.edge_break_in:.3dot}} or {{cad.chamfer_max_in:.3dot}} chamfer max; both bore mouths, both #47 mouths, the hub rims.</text>
 </svg>

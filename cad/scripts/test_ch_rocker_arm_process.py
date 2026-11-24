@@ -135,17 +135,29 @@ def test_the_first_arm_checks_hold_the_drawings_position_zones() -> None:
     assert p["strap_mid_max_in"] == pytest.approx(half + zone / 2, abs=5e-4)
 
 
-def test_the_bond_moved_from_the_hub_traveler() -> None:
-    hub_titles = [setup["title"] for setup in HUB_PLAN["setups"]]
-    assert not any("Bond" in title for title in hub_titles)
+def test_the_bonded_pair_is_accepted_at_its_dry_fit_before_any_cut() -> None:
+    p = PLAN["parameters"]
+    clearance = (p["bond_clearance_min_in"] * IN, p["bond_clearance_max_in"] * IN)
+    assert clearance == pytest.approx(ch_rocker_hub_fit.BOND_CLEARANCE, abs=1e-6)
+    # The bond is this traveler's, on the gauge blocks, before the mill loads
+    # the joint; the hub traveler holds no bond.
     assert "gauge-blocks" not in {t["id"] for t in HUB_PLAN["tools"]}
-    hub_diagrams = _process_plans.plan_path("ch_rocker_hub").parent / "diagrams"
-    assert not (hub_diagrams / "bond.svg").exists()
-    first = PLAN["setups"][0]
-    assert first["title"].startswith("Bond each hub into its own strap")
-    assert first["diagram"]["file"] == "diagrams/bond.svg"
-    text = " ".join(op.get("instruction", "") for op in first["operations"])
-    assert "LOCTITE 638" in text and "24 h" in text
+    setups = PLAN["setups"]
+    bond = next(
+        i
+        for i, setup in enumerate(setups)
+        if any(op.get("tool") == "gauge-blocks" for op in setup["operations"])
+    )
+    assert bond < min(i for i, setup in enumerate(setups) if "machine_ref" in setup)
+    # The dry fit reads the drawing's clearance and is followed by its stop.
+    ops = setups[bond]["operations"]
+    dry = next(
+        i
+        for i, op in enumerate(ops)
+        if "{{process.bond_clearance_min_in" in op.get("inspection", "")
+        and "{{process.bond_clearance_max_in" in op["inspection"]
+    )
+    assert any(step["kind"] == "stop" for step in ops[dry + 1].get("steps", []))
 
 
 def test_every_spindle_speed_rests_on_a_stop_or_the_measured_face_setting() -> None:

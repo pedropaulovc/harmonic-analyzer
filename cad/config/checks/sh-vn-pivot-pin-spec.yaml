@@ -1,0 +1,21 @@
+# What fails past each numeric check sh_vn_pivot_pin_spec asserts
+# (check_register.py, tolerance-policy.md "Checks in spec modules and tests").
+checks:
+  - id: C-01
+    check: "BOND_HOLE_MAX"
+    kind: gap
+    reason: "a looser bonded hole passes 641's gap fill"
+    source: "Main, by the owner's delegation of 2026-11-24 (rulings.md D13): the hole the .079 pin of the owned .001-step .061-.500 set does not enter; set by the set's sizes, not by a failure (the audit's .0785 is not a size the set holds)"
+    basis: measured
+  - id: C-02
+    check: "BOND_GAP"
+    kind: gap
+    reason: "the bond does not fill the pin-to-hole gap"
+    source: "the module computes it: BOND_HOLE_MAX less the least pin (PIN_DIA_LIMITS), .0009 in (0.0222 mm) against 641's 0.15 mm"
+    basis: worst_case
+  - id: C-03
+    check: "LOCTITE_641_GAP_MAX"
+    kind: gap
+    reason: "a wider gap goes unfilled; the pin works loose"
+    source: "Henkel LOCTITE 641 product page, \"Gap fill: 0.15 mm\""
+    basis: worst_case

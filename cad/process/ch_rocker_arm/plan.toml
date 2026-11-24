@@ -5,16 +5,20 @@
 # until it slides in (clearance .0005-.0030); bond; a cure jig and the
 # MHA-CH-06 traveler are written first". Fit audit question 1 (same ruling):
 # the pivot bore is F-drilled, no reamer or pins, accepted by trial on the
-# 1/4 in shaft bar. The hub arrives with its land at the finished Ø (it
-# slides by hand into a strap's reamed hole, the hub traveler's check; aim
-# .3975-.3995), and its letter-D pilot bore and length left with stock; the
-# strap arrives finished. Setup 1 pairs them: hub n goes into strap n.
+# 1/4 in shaft bar. The hub arrives with its land at the finished Ø (turned
+# to the hub traveler's aim, which holds the drawing's .0005-.0030 clearance
+# in every hole the .4000 reamer cuts, and tried in a strap's reamed hole),
+# its letter-D pilot bore and length left with stock, and one lathe-faced
+# end (the other is parted); the strap arrives finished. Setup 1 pairs them,
+# hub n into strap n, and its dry fit is the acceptance of the pair that is
+# bonded.
 #
 # Setup 1 bonds each hub into its own strap with LOCTITE 638 on the surface plate
-# (moved here from the hub traveler's Setup 4): the hub stands on its faced
-# end, the strap lies on two gauge blocks of the owned Mitutoyo set so it is
-# parallel to the plate at the hub's middle; no fixture is made (the cure jig
-# is the plate and the blocks). 24 h cure before anything loads the joint.
+# (moved here from the hub traveler's Setup 4): the hub stands on its
+# lathe-faced end, the strap lies on two gauge blocks of the owned Mitutoyo
+# set so it is parallel to the plate at the hub's middle; no fixture is made
+# (the cure jig is the plate and the blocks). 24 h cure before anything loads
+# the joint.
 #
 # Setups 2-3 run on the PM-30MV with the vise off (the arm is 11.5 in long
 # and .098 thick: no vise grip holds it; the strap sub-plate MHA-CH-13-TL-01
@@ -86,6 +90,11 @@ hub_supply_length_max_in = 0.35
 # end's facing depth, cad.face_depth_min_in .0115 to cad.face_depth_max_in
 # .0455 (1.16 mm, under the measured face setting's 1.27).
 bond_offset_max_in = 0.009
+# The drawing's diametral clearance of the hub in the strap's hole, the dry
+# fit's (ch_rocker_hub_fit.BOND_CLEARANCE; test_ch_rocker_arm_process binds
+# both).
+bond_clearance_min_in = 0.0005
+bond_clearance_max_in = 0.003
 # Gauge blocks for the bond (shop-equipment gauges.gauge-blocks-mitutoyo:
 # the .101-.149 by .001 series), the strap's nominal taken off the hub.
 gauge_block_min_in = 0.101
@@ -220,13 +229,23 @@ ref = "sanding-roll-220"
 
 # Setup 1: the bond (owner ruling 2026-11-24, fit audit question 2), moved
 # from the hub traveler. Held with owned equipment only, no fixture made: the
-# hub stands on its faced end on the surface plate (gauges.surface-plate), so
-# its axis is square to the plate, and the strap lies on two gauge blocks of
-# the owned Mitutoyo set (gauges.gauge-blocks-mitutoyo, the .101-.149 by
-# .001 series), so it is parallel to the plate at the hub's middle: square
-# hub to strap within the blocks' .001 difference over their spacing. The
-# offset of the strap from the hub's middle (bond_offset_max_in) is taken by
-# the hub's face stock each end (ch_rocker_hub_spec.FACE_STOCK).
+# hub stands on its lathe-faced end (Op 20 or Op 90 of the hub traveler; the
+# other end is parted and would tilt it) on the surface plate
+# (gauges.surface-plate), so its axis is square to the plate, and the strap
+# lies on two gauge blocks of the owned Mitutoyo set
+# (gauges.gauge-blocks-mitutoyo, the .101-.149 by .001 series), so it is
+# parallel to the plate at the hub's middle. The bond's squareness does not
+# make the strap's .004 position zone to datum G (ch_rocker_arm_spec
+# STRAP_HUB_SYMMETRY): Setups 2-3 face both hub ends from the strap (Z0 the
+# strap's top face at each load, the strap flat on the 1-2-3 blocks), so end
+# G is faced parallel to the strap and at its height from it whatever the
+# hub's tilt in the hole, and Setup 4's first-arm reading (strap_mid_*) holds
+# the zone. The tilt reaches only the hub's Ø.004 OD position to the bore
+# (the F is drilled square to the strap at the hub's top end): two blocks
+# .001 different, about 2 in apart, tilt it .0005 rad, .00014 over the .278
+# hub.
+# The offset of the strap from the hub's middle (bond_offset_max_in) is taken
+# by the hub's face stock each end (ch_rocker_hub_spec.FACE_STOCK).
 # LOCTITE 638 (consumables.loctite-638, on hand): fixture about 4 min on
 # steel, full cure 24 h (Henkel, LOCTITE 638 product page, read 2026-11-24:
 # https://next.henkel-adhesives.com/us/en/products/industrial-adhesives/central-pdp.html/loctite-638/BP000000450822.html);
@@ -235,14 +254,15 @@ ref = "sanding-roll-220"
 # Degrease with isopropyl alcohol, as the strap traveler's bond does. The F
 # bore is drilled through the hub after the cure, so the compound is kept
 # off the hub's ends and out of its bore, which that drill and the facing
-# would meet.
+# would meet. The dry fit is where the pair that is bonded is accepted (rule
+# 4, form 2: made to fit): the hub traveler tried each land in any one strap.
 [[setups]]
 machine_kind = "other"
 title = "Bond each hub into its own strap (LOCTITE 638), 24 h cure"
 machine = "Surface plate (bench)"
 indexing = "none"
-holding = "On the surface plate, one joint at a time per pair of blocks: a square of plain paper under the hub's place (it keeps the 638 off the plate); strap n lying flat across two gauge blocks, one under each arm about 1 in either side of the hub hole; hub n through its hub hole, standing on either lathe-faced end on the paper."
-datum = "None. The plate squares the hub (it stands on either lathe-faced end); the two blocks hold the strap parallel to the plate at the hub's middle."
+holding = "On the surface plate, one joint at a time per pair of blocks: a square of plain paper under the hub's place (it keeps the 638 off the plate); strap n lying flat across two gauge blocks, one under each arm about 1 in either side of the hub hole; hub n through its hub hole, standing on its lathe-faced end (not the parted one) on the paper."
+datum = "None. The plate squares the hub (it stands on its lathe-faced end); the two blocks hold the strap parallel to the plate at the hub's middle."
 diagram = { file = "diagrams/bond.svg", alt = "Section through the hub: the surface plate, a paper square under the hub, the hub standing on its end through the strap's hub hole, the strap resting on a gauge block under each arm, the 638 film in the land's middle." }
 envelope = "other"
 vise_hold = "other"
@@ -264,10 +284,16 @@ instruction = "Each hub: H = (L − {{cad.strap_thickness_in:.3dot}})/2. Pick tw
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Pair each hub with a strap and number both with a marker, hub n and strap n, on the strap's arm and the hub's outside; they stay together from here. Dry fit as in Holding, no compound: hub n slides through strap n's hole by hand and stands on its end on the paper, the strap on both blocks."
+instruction = "Pair each hub with a strap and number both with a marker, hub n and strap n, on the strap's arm and the hub's outside; they stay together from here. Dry fit as in Holding, no compound: hub n into strap n's reamed hole by hand, then standing on its lathe-faced end on the paper, the strap on both blocks."
 feed = "hand"
-inspection = "Dry fit: the strap rests on both blocks (no light under either), the hub stands upright on the paper without being held."
+inspection = "Dry fit, the acceptance of the pair that is bonded (the drawing's {{process.bond_clearance_min_in:.4dot}}–{{process.bond_clearance_max_in:.4dot}} clearance): hub n slides into strap n's hole by hand, no force, no shake; the strap rests on both blocks (no light under either); the hub stands upright on the paper without being held."
 gauge_checks = "other"
+
+[[setups.operations]]
+steps = [
+  { kind = "stop", text = "Hub n tight in strap n's hole, or shaking in it: try it in the next strap of the lot that has no hub yet and number the new pair. It fits none: set the hub aside and tell the owner. Never force a hub in, and never bond a pair that failed the dry fit." },
+]
+feed = "hand"
 
 [[setups.operations]]
 instruction = "Lift the strap and hub off. Degrease the land and the strap's hub hole with isopropyl alcohol on a clean rag and let them dry; from here on touch neither."
@@ -282,7 +308,7 @@ instruction = "At once wipe any squeeze-out off both strap faces and the hub's o
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Leave the joint untouched on its blocks for 30 min. Then lift it off by the strap, peel the paper off the hub's end and set it aside untouched until 24 h from the bond. Wipe the blocks with isopropyl alcohol and oil them. Nothing loads the joint (Setups 2–3) before the 24 h."
+instruction = "Leave the joint untouched on its blocks for 30 min. Then lift it off by the strap, peel the paper off the hub's lathe-faced end and set it aside untouched until 24 h from the bond. Wipe the blocks with isopropyl alcohol and oil them. Nothing loads the joint (Setups 2–3) before the 24 h."
 feed = "hand"
 inspection = "At 24 h: the hub does not turn or shift in the strap when twisted hard by hand; no 638 on the hub's ends or in its bore."
 gauge_checks = "other"
@@ -503,7 +529,7 @@ feed = "hand"
 
 [[setups.operations]]
 instruction = "First arm only: the offcut in the bore and the #47 drill's shank in the rod-pin hole; calipers over both, once with the two pressed apart in their holes and once pressed together; the mean of the two readings takes out their slack. Not gauged to its frame: the program's coordinates from the hub's axis place the hole; this reading proves its radius from the bore (X0, Y0 and the program). The tram readings (Op 180) hold its angle."
-inspection = "The mean less .164 (half of .250 plus .0785): {{cad.rod_hole_from_bore_in:.4dot}} within .007, the drawing's Ø.014 position along the radius."
+inspection = "The mean less .164 (half of .250 plus .0785): {{cad.rod_hole_from_bore_in:.4dot}} within half the drawing's Ø{{cad.rod_hole_position_dia_in:.3dot}} position, along the radius."
 gauge_checks = "other"
 feed = "hand"
 

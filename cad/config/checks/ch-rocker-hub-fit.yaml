@@ -1,0 +1,15 @@
+# What fails past each numeric check ch_rocker_hub_fit asserts
+# (check_register.py, tolerance-policy.md "Checks in spec modules and tests").
+checks:
+  - id: C-01
+    check: "LOCTITE_638_GAP_MAX"
+    kind: gap
+    reason: "638 does not fill a wider gap; hub works loose"
+    source: "Henkel LOCTITE 638 TDS, August 2016: 0.25 mm largest gap (diametral); owner ruling 2026-11-20, #2469 (a 638 bonded slip fit)"
+    basis: worst_case
+  - id: C-02
+    check: "LAND_WINDOW"
+    kind: gap
+    reason: "a land goes tight or loose in some reamed hole"
+    source: "the module computes it: the largest reamed hole (STRAP_HOLE_BAND, the reamer's +.0005/0) less the greatest BOND_CLEARANCE to the smallest less the least, -.0025/-.0005 (.3975-.3995), inside LAND_RANGE"
+    basis: worst_case
