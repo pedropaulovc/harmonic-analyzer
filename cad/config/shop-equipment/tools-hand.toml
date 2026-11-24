@@ -415,15 +415,12 @@ purchase = "McMaster-Carr 4542A1, $44.44 (read live 2026-11-23)."
 note = "Not owned: to buy. Trues and opens the white wheel. Cheaper alternative read the same day: LittleMachineShop 3191, $22.95, shank and carat not on its page."
 cite = ["https://www.mcmaster.com/4542A1/ read live 2026-11-23"]
 
-[tools.tool-bit-blanks-m2-1-4]
-name = "M2 HSS square tool bit blanks, 1/4 x 1/4 x 2-1/2 in"
+[tools.hss-tool-bit-blanks]
+name = "HSS square tool bit blanks, 1/4 in and 3/8 x 3/8 in"
 kind = "tool_bit_blank"
-sku = "02603165"
-status = "to_order"
-pieces = 3
-purchase = "MSC 02603165, $5.32 each, in stock (read live 2026-11-23); three carted."
-note = "Not owned: to buy. The blanks the hand-ground bits are made from: the R.024 full-radius groover (tools.form-tool-r024) and practice pieces. 5/16 in M2 is MSC 02603207, $7.80; M35 cobalt 1/4 in is MSC 02604163, $9.09."
-cite = ["https://www.mscdirect.com/product/details/02603165 read live 2026-11-23", "Owner ruling 2026-11-24 (Pedro): \"Grind it by hand from an HSS blank.\""]
+status = "on_hand"
+note = "Owned (owner 2026-11-24); quantity, grade and length not stated. The blanks the hand-ground bits are made from: the R.024 full-radius groover (tools.form-tool-r024) and practice pieces. None is bought: the three MSC 02603165 M2 blanks carted on 2026-11-23 came out of the cart."
+cite = ["Owner ruling 2026-11-24 (Pedro): \"already own 1/4 blank also 3/8 x 3/8\"", "Owner ruling 2026-11-24 (Pedro): \"Grind it by hand from an HSS blank.\""]
 
 [tools.slip-stone-240]
 name = "Aluminium-oxide polishing stone, contoured, 240 grit, 4 x 1 in"

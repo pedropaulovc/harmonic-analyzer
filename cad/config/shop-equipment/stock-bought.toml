@@ -561,7 +561,7 @@ cite = ["McMaster-Carr packing list, PO 1103PCAMPOS (8227120-01, 11/03/2026), li
 [stock.c260-sheet-032-6x6]
 form = "sheet"
 material = "260 brass, ultra-formable"
-note = "Bought (McMaster-Carr PO 1103PCAMPOS, packing list line 78): 8956K425 ultra-formable 260 brass sheet, 6 x 6 in, .0320 in thick, 1 each. The packing list names MHA-PD-03 pd-platen-clip. Not reconciled with stock.c260-h02-strip-032x2, the H02 strip the platen-clip plan asks for: the temper is not on the packing list and the form differs."
+note = "Bought (McMaster-Carr PO 1103PCAMPOS, packing list line 78): 8956K425 ultra-formable 260 brass sheet, 6 x 6 in, .0320 in thick, 1 each. The packing list names MHA-PD-03 pd-platen-clip. Owner ruling 2026-11-24: \"Use the sheet; buy strip only if the hook takes a set.\": this sheet makes the MHA-PD-14 latch hook first (the temper trial) and the MHA-PD-03 platen clips, in place of the H02 strip (stock.c260-h02-strip-032x2), whose temper this sheet's packing list does not state. The plans' stock lines are not yet changed."
 section_mm = [152.4, 0.8128]
 length_mm = 152.4
 status = "on_hand"
