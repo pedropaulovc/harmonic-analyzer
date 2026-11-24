@@ -127,11 +127,7 @@ from dt_pinion_arbor_collar_spec import (
     BORE_BAND as COLLAR_BORE_BAND,
     COLLAR_NUMBER,
 )
-from dt_alignment_pinion_spec import (
-    ARBOR_BORE_BAND as DRUM_BORE_BAND,
-    BORE_DIA as DRUM_BORE,
-)
-from dt_pinion_arbor_geometry import JOURNAL_FIT_CLEARANCE
+from dt_pinion_arbor_geometry import BOND_FIT_CLEARANCE, JOURNAL_FIT_CLEARANCE
 
 
 def _inch(value_mm: float) -> str:
@@ -151,10 +147,11 @@ JOURNAL_CALLOUT = "SEE NOTE 1"
 # Every Ø5/16 span's size is on the view (round 3 of fan-out dt-fab-3).  The
 # drum's two bond lands either side of the relief (#2360; the drum, 2.40-8.04
 # from the head rear face, rests on both journals' inner ends:
-# dt_pinion_arbor_spec.DRUM_*_END_ON_JOURNAL_MIN) are its bonded fit, sized
-# by one 2X diameter with its reason once at its callout.  The two spans
-# outside the journals (the collar's, by
-# the head, with its pin hole; the back stub) take the same -.0004/-.0038:
+# dt_pinion_arbor_spec.DRUM_*_END_ON_JOURNAL_MIN) are made to fit the 5/16
+# drilled MHA-DT-01 bore (owner ruling 2026-11-24, fit audit question 13;
+# made to fit: delegated ruling 2026-11-24 (FitLaneDT)): each prints its size
+# REF and note 3 the acceptance.  The two spans outside the journals (the
+# collar's, by the head, with its pin hole; the back stub) take -.0004/-.0038:
 # MHA-DT-33 slides over both from the back crown to its pin station, the
 # band's upper limit its slide-on clearance
 # (dt_pinion_arbor_collar_spec.SLIDE_CLEARANCE_MIN).  One 2X diameter on the
@@ -162,8 +159,7 @@ JOURNAL_CALLOUT = "SEE NOTE 1"
 # fit (round 5: the collar span's own block had no open space between the
 # front land's and the neck's witnesses, whichever side SolidWorks put it).
 # The title block's .XX or .XXX on the back stub (Ø.32 or Ø.317 max) would
-# stop the collar (bore .3125 min) and the drum (.3135 min) passing it, so it
-# keeps the band.
+# stop the collar (bore .3125 min) passing it, so it keeps the band.
 COLLAR_CLEARANCE = (
     COLLAR_BORE + COLLAR_BORE_BAND[1] - (SHAFT_DIA + SHAFT_DIA_BAND[0]),
     COLLAR_BORE + COLLAR_BORE_BAND[0] - (SHAFT_DIA + SHAFT_DIA_BAND[1]),
@@ -177,14 +173,11 @@ BOND_CALLOUT = "SEE NOTE 3"
 SPAN_CALLOUT = "SEE NOTE 2"
 # Rule 23: a bonded joint prints its diametral clearance on the part sheet,
 # inside the grade's gap (farm run 20261117T130901535Z r2, two blockers):
-# the lands' in the MHA-DT-01 drum's REAM_SLIDE bore on note 3, which keeps
-# one row by naming the lands and their fit in one phrase, and the head
-# cross bore's on the MHA-DT-15 crossrod at its own callout, in two wider
-# rows (rule 7 holds the notes block to four).
-BOND_CLEARANCE = (
-    DRUM_BORE + DRUM_BORE_BAND[1] - (SHAFT_DIA + SHAFT_DIA_BAND[0]),
-    DRUM_BORE + DRUM_BORE_BAND[0] - (SHAFT_DIA + SHAFT_DIA_BAND[1]),
-)
+# the lands' in the drilled MHA-DT-01 bore on note 3, the fit's own range
+# (BOND_FIT_CLEARANCE: the lands are turned to the measured bore, not limits
+# on both members), and the head cross bore's on the MHA-DT-15 crossrod at
+# its own callout, in two wider rows (rule 7 holds the notes block to four).
+BOND_CLEARANCE = BOND_FIT_CLEARANCE
 CROSS_HOLE_CALLOUT = (
     f"REAM THRU, BONDED FIT ON {CROSSROD_NUMBER},\n{RETAINING_COMPOUND} (CLEARANCE "
     f"{_inch(CROSSROD_MIN_CLEARANCE)}-{_inch(CROSSROD_MAX_CLEARANCE)})"
@@ -201,7 +194,7 @@ SHEET_NOTES = (
     f"{DRUM_NUMBER} SLIDES OVER THE BACK ONE.\n"
     f"2. SPANS (2X): SLIDING FIT IN {COLLAR_NUMBER} (CLEARANCE "
     f"{_inch(COLLAR_CLEARANCE[0])}-{_inch(COLLAR_CLEARANCE[1])}).\n"
-    f"3. LANDS BONDED IN {DRUM_NUMBER}, {RETAINING_COMPOUND} (CLEARANCE "
+    f"3. LANDS: TURN TO {DRUM_NUMBER}, {RETAINING_COMPOUND} (CLEARANCE "
     f"{_inch(BOND_CLEARANCE[0])}-{_inch(BOND_CLEARANCE[1])})."
 )
 # Under the property-linked inside-corner note (top-left at y 0.060).
@@ -298,10 +291,10 @@ requirement(
     },
     precision={"dia": _P["NeckDia"], "length": _P["NeckLen"]},
 )
-# Every Ø5/16 span but the two journals: the collar's span and the back stub
-# (note 2, sliding fit in MHA-DT-33) and the two drum bond lands (note 3,
-# bonded in MHA-DT-01).  It runs from the neck shoulder to the back crown's
-# root.
+# Every Ø5/16 span but the two journals and the two bond lands: the collar's
+# span and the back stub (note 2, sliding fit in MHA-DT-33).  The bond lands'
+# made-to-fit clearance in MHA-DT-01 (note 3) rides here as data; their
+# sizes print REF.  It runs from the neck shoulder to the back crown's root.
 requirement(
     "shaft",
     kind="outside_cylinder",

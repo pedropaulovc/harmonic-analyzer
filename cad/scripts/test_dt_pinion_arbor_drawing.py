@@ -192,14 +192,14 @@ def test_crossrod_is_a_bonded_slip_fit_not_a_press() -> None:
 
 
 def test_only_the_two_journal_lands_carry_the_finish_and_no_band() -> None:
-    # Owner ruling 2026-11-24, fit audit question 12: the journals are made to
-    # fit the drilled MHA-DT-14 bores, so their size is a REF with no band; the
-    # analysis band spans what the fit turns over the drilled range.
+    # Owner ruling 2026-11-24, fit audit questions 12 and 13: the journals are
+    # made to fit the drilled MHA-DT-14 bores and the bond lands the drilled
+    # MHA-DT-01 bore, so their sizes are REFs with no band; the analysis
+    # bands span what each fit turns over the drilled range.
     assert spec.JOURNAL_DIA_BAND == (-0.01016, -0.0762)
+    assert geometry.BOND_LAND_DIA_BAND == (-0.01016, -0.1016)
     assert spec.SHAFT_DIA_BAND == (-0.01016, -0.09652)
     assert model_toleranced_dimensions(part) == {
-        ("BondZoneReference", "BondZoneDia"): "*deviations(SHAFT_DIA_BAND)",
-        ("BackBondReference", "BackBondDia"): "*deviations(SHAFT_DIA_BAND)",
         ("BackStubReference", "BackStubDia"): "*deviations(SHAFT_DIA_BAND)",
         ("CrossHoleProfile", "CrossHoleDia"): "*deviations(CROSS_HOLE_DIA_BAND)",
         ("PinHoleProfile", "PinHoleDia"): "*deviations(PIN_HOLE_DIA_BAND)",
@@ -273,17 +273,23 @@ def test_journal_and_bond_zone_bands_leave_the_intended_fits() -> None:
     assert journal_upper == pytest.approx(-0.01016)
     assert strap_lower - journal_upper > 0.0
     # Every bore slides on from the back crown, so no zone may exceed 5/16.
-    # The drum's REAM_SLIDE bore clears the bond zone by 0.03556 for a
-    # guaranteed slide, and the worst gap stays inside Loctite 638's 0.25.
+    # Owner ruling 2026-11-24, fit audit question 13: the drum bore is
+    # drilled 5/16 and the bond lands are turned to it (made to fit), so the
+    # lands' analysis band tops out .0004 under 5/16, as the journals', and
+    # its loosest pair is the fit's .008, inside Loctite 638's 0.25.
     shaft_upper, shaft_lower = spec.SHAFT_DIA_BAND
     assert shaft_upper == pytest.approx(-0.01016)
+    land_upper, land_lower = geometry.BOND_LAND_DIA_BAND
     drum_upper, drum_lower = drum.ARBOR_BORE_BAND
-    assert drum_lower - shaft_upper == pytest.approx(0.03556)
-    assert drum_upper - shaft_lower <= 0.20 + 1e-9
-    # The drum passes over the back land on its way on, so "SLIDES BY HAND"
-    # must hold there too: every Ø5/16 zone it crosses stays 0.010 under its bore.
-    assert drum_lower - journal_upper == pytest.approx(0.03556)
-    assert min(drum_lower - journal_upper, drum_lower - shaft_upper) >= 0.010 - 1e-9
+    assert drum.ARBOR_BORE_BAND == pytest.approx((0.1016, 0.0))
+    assert land_upper == pytest.approx(-0.01016)
+    assert drum_upper - land_lower == pytest.approx(geometry.BOND_FIT_CLEARANCE[1])
+    assert drum_upper - land_lower <= 0.25
+    # The drum passes over the back journal on its way on (note 1), and the
+    # collar over the lands (bore .3125 min): every Ø5/16 zone they cross
+    # stays .0004 under 5/16.
+    assert drum_lower - journal_upper == pytest.approx(0.01016)
+    assert min(drum_lower - journal_upper, drum_lower - land_upper) > 0.0
 
 
 def test_retired_socket_and_retention_pin_are_not_exported() -> None:
@@ -532,14 +538,19 @@ def test_back_bond_land_carries_its_own_diameter_under_the_shaft() -> None:
     line under the shaft, between the 6.80 and 8.25 station witnesses and
     over the 8.25 row."""
     # #1038 r11 machinist review (rule 26, all 3 runs): both lands carry the
-    # same fit name with its LOCTITE grade, through note 3; farm run
-    # 20261117T130901535Z r2 (rule 23): with the clearance the drum's
-    # REAM_SLIDE bore and the land band give.
+    # LOCTITE grade through note 3; farm run 20261117T130901535Z r2 (rule
+    # 23): with the clearance.  Owner ruling 2026-11-24, fit audit question
+    # 13: the lands are turned to the drilled drum bore, size REF, so note 3
+    # prints the made-to-fit acceptance (delegated ruling 2026-11-24).
     assert drawing.DIMENSION_CALLOUTS["BackBondDia"] == drawing.BOND_CALLOUT
     assert drawing.DIMENSION_CALLOUTS["BondZoneDia"] == drawing.BOND_CALLOUT
     assert drawing.BOND_CALLOUT == "SEE NOTE 3"
+    assert (sheet.BOND_LAND_DIA_PREFIX, sheet.BOND_LAND_DIA_SUFFIX) == (
+        "(<MOD-DIAM>",
+        ")",
+    )
     note_3 = drawing.SHEET_NOTES.split("\n3. ")[1]
-    assert note_3 == "LANDS BONDED IN MHA-DT-01, LOCTITE 638 (CLEARANCE .0014-.0053)."
+    assert note_3 == "LANDS: TURN TO MHA-DT-01, LOCTITE 638 (CLEARANCE .0020-.0080)."
     assert max(drawing.BOND_CLEARANCE) <= spec.RETAINING_COMPOUND_MAX_GAP_MM
     assert min(drawing.BOND_CLEARANCE) > 0.0
     assert sheet.DRAWING_PRECISION_BY_NAME["BackBondDia"] == 4
@@ -943,11 +954,11 @@ def test_bond_zone_diameter_is_a_flank_dimension_on_the_drum() -> None:
     assert "ShaftProfile" not in spec.DRAWING_DIMENSIONS
     assert spec.DRAWING_DIMENSIONS["BondZoneReference"] == {"BondZoneDia"}
     assert drawing.DIMENSION_CALLOUTS["BondZoneDia"] is drawing.BOND_CALLOUT
-    # The bonded fit, its mate and its grade print once, on note 3, which
-    # both bond lands' callouts link (#1038 r11 machinist review, rule 26);
-    # note 1 names the drum only as the journals' slide-over acceptance.
+    # The bond's mate and its grade print once, on note 3, which both bond
+    # lands' callouts link (#1038 r11 machinist review, rule 26); note 1 names
+    # the drum only as the journals' slide-over acceptance.
     words = drawing.SHEET_NOTES.split("\n3. ")[1].split()
-    assert "BONDED" in words and "MHA-DT-01," in words and "638" in words
+    assert "LOCTITE" in words and "MHA-DT-01," in words and "638" in words
     assert "BONDED" not in drawing.SHEET_NOTES.split("\n2. ")[0]
     import _config
 

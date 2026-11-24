@@ -62,29 +62,30 @@ def test_only_the_bore_carries_a_finish_symbol() -> None:
 
 
 def test_bonded_slip_fit_clears_the_mha102_journal_within_the_bond_gap() -> None:
-    shaft_limits = (
-        arbor_geometry.SHAFT_DIA + arbor.SHAFT_DIA_BAND[1],
-        arbor_geometry.SHAFT_DIA + arbor.SHAFT_DIA_BAND[0],
-    )
+    # Owner ruling 2026-11-24, fit audit question 13: the bore is drilled
+    # 5/16 (the DRILLED HOLES row is its analysis band) and MHA-DT-22's bond
+    # lands are turned to it (made to fit: delegated ruling 2026-11-24).
     bore_limits = (
         spec.BORE_DIA + spec.ARBOR_BORE_BAND[1],
         spec.BORE_DIA + spec.ARBOR_BORE_BAND[0],
     )
-    # The drum bonds onto MHA-DT-22's bond zone, not its journal lands (U39).
-    assert arbor.SHAFT_DIA_BAND != arbor.JOURNAL_DIA_BAND
-    assert bore_limits == pytest.approx((7.9629, 7.9756))
-    minimum_clearance = bore_limits[0] - shaft_limits[1]
-    maximum_clearance = bore_limits[1] - shaft_limits[0]
-    assert minimum_clearance == pytest.approx(
-        spec.ARBOR_BORE_BAND[1] - arbor.SHAFT_DIA_BAND[0]
+    assert spec.ARBOR_BORE_BAND == pytest.approx((0.1016, 0.0))
+    assert bore_limits == pytest.approx((7.9375, 8.0391))
+    # The arbor's geometry models the same drilled band (no import cycle).
+    assert arbor_geometry.DRUM_BORE_BAND == spec.ARBOR_BORE_BAND
+    land_limits = (
+        arbor_geometry.SHAFT_DIA + arbor_geometry.BOND_LAND_DIA_BAND[1],
+        arbor_geometry.SHAFT_DIA + arbor_geometry.BOND_LAND_DIA_BAND[0],
     )
-    # The drum slides on by hand: the bore's REAM_SLIDE band clears the bond zone.
-    assert minimum_clearance == pytest.approx(0.03556)
-    assert minimum_clearance >= 0.010 - 1e-9
-    assert maximum_clearance == pytest.approx(
-        spec.ARBOR_BORE_BAND[0] - arbor.SHAFT_DIA_BAND[1]
-    )
+    # The drum bonds onto MHA-DT-22's bond lands, not its journal lands (U39).
+    assert arbor_geometry.BOND_LAND_DIA_BAND != arbor.JOURNAL_DIA_BAND
+    # The loosest pair, the drill's top over the smallest land, is the fit's
+    # own .008 and inside LOCTITE 638's gap.
+    maximum_clearance = bore_limits[1] - land_limits[0]
+    assert maximum_clearance == pytest.approx(arbor_geometry.BOND_FIT_CLEARANCE[1])
     assert maximum_clearance < spec.RETAINING_COMPOUND_MAX_GAP_MM
+    # The drum slides on by hand: the lands are turned .002 under its bore.
+    assert arbor_geometry.BOND_FIT_CLEARANCE[0] == pytest.approx(0.0508)
     assert spec.BORE_DIA == arbor_geometry.SHAFT_DIA  # the CAD models line-to-line
 
 
@@ -111,7 +112,7 @@ def test_the_drum_bond_is_the_fitup_step_not_a_note() -> None:
 def test_part_metadata_preserves_material_finish_quantity() -> None:
     config = _config.parts("dt-alignment-pinion")
     assert config["material_specification"] == "C36000 free-machining brass"
-    assert config["finish"] == "bore as reamed; teeth as cut"
+    assert config["finish"] == "bore as drilled; teeth as cut"
     assert int(config["quantity"]) == 1
 
 
@@ -166,7 +167,11 @@ def test_printed_thickness_corners_keep_finite_actual_cutter_support() -> None:
 def test_fit_bore_callout_names_its_process() -> None:
     import draw_dt_alignment_pinion as draw
 
-    assert draw.DIMENSION_CALLOUTS["ArborBoreDia"].splitlines()[0] == "REAM THRU"
+    assert draw.DIMENSION_CALLOUTS["ArborBoreDia"].splitlines() == [
+        "5/16 DRILL THRU",
+        "MHA-DT-22 IS TURNED",
+        "TO THIS BORE",
+    ]
 
 
 def test_diagnostic_home_clocking_uses_engaged_pose_and_native_row_handedness() -> None:

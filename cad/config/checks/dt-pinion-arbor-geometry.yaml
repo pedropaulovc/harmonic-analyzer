@@ -1,0 +1,13 @@
+checks:
+  - id: C-01
+    check: "BOND_GAP_MIN"
+    kind: gap
+    reason: "MHA-DT-01 does not slide onto its bond lands"
+    source: "owner ruling 2026-11-24, fit audit question 13 (drum drilled 5/16); delegated ruling 2026-11-24 (FitLaneDT): bond lands made to fit, .002 min under the measured drum bore"
+    basis: measured
+  - id: C-02
+    check: "BOND_GAP_MAX"
+    kind: gap
+    reason: "the drum bond gap exceeds what LOCTITE 638 fills"
+    source: "LOCTITE 638 TDS, 0.25 mm max diametral gap; restated for the 5/16 drilled drum bore (owner ruling 2026-11-24, fit audit question 13)"
+    basis: worst_case

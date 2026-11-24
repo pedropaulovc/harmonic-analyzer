@@ -33,8 +33,11 @@
 # the shaft is finished and aims the whole shaft at the smaller bore less
 # .002, never over .3117 (the drum and the collar still slide over it): the
 # journals then run at the drawing's .001-.003. No gauge pins on the
-# journals. The spans' sliding fit in MHA-DT-33 and the lands' bond in
-# MHA-DT-01 are fixed bands.
+# journals. The bond lands are made to the MHA-DT-01 drum's 5/16 drilled
+# bore too (note 3; owner ruling 2026-11-24, fit audit question 13): Setup 7
+# measures its two ends and skims the lands only where the aim leaves the
+# drum less than .002 clear. The spans' sliding fit in MHA-DT-33 is a fixed
+# band.
 #
 # To order before Setup 4 runs: the .2510 reamer (tools.reamer-2510, owner
 # ruling #3073); pin gauges (gauges.pin-gauges).
@@ -218,6 +221,14 @@ pin_square_dti_mm = 0.089
 # the DRILLED HOLES row). A bore over strap_bore_max_fit_in leaves the
 # journals more than .003 even at journal_aim_in: stop and tell the owner.
 strap_bore_max_fit_in = 0.3147
+# Setup 7: the bond lands are made to the MHA-DT-01 drum's 5/16 drilled bore
+# (note 3, .002-.008 clear; owner ruling 2026-11-24, fit audit question 13):
+# they take the journals' aim A unless that leaves the drum's smaller end D
+# under .002 clear; then they are skimmed to D − land_clearance_aim_in. A D
+# under drum_bore_min_fit_in would put a skimmed land under the .3085 the
+# lands are modelled to (D − .003 − .0004).
+land_clearance_aim_in = 0.003
+drum_bore_min_fit_in = 0.3119
 
 [[tools]]
 id = "saw"
@@ -682,8 +693,8 @@ cut_diameter_mm = "{{process.bar_dia_mm}}"
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Measure both arbor bores of the MHA-DT-14 strap (the journals' mate) with the telescoping gauge and the 0–1 in micrometer (reads .0001), at each end of each bore; write the smallest reading S here. The aim A for the whole shaft is S − {{process.journal_clearance_aim_in:.3dot}}, never over {{process.journal_aim_in:.4dot}}: write A."
-inspection = "S at most {{process.strap_bore_max_fit_in:.4dot}}. Over it (the journals would run more than .003 loose at the {{process.journal_aim_in:.4dot}} limit): stop and tell the owner; the journals are not finished."
+instruction = "Measure both arbor bores of the MHA-DT-14 strap (the journals' mate) with the telescoping gauge and the 0–1 in micrometer (reads .0001), at each end of each bore; write the smallest reading S here. The aim A for the whole shaft is S − {{process.journal_clearance_aim_in:.3dot}}, never over {{process.journal_aim_in:.4dot}}: write A. Then measure the MHA-DT-01 drum's bore the same way at each end (the bond lands' mate); write the smaller reading D."
+inspection = "S at most {{process.strap_bore_max_fit_in:.4dot}}. Over it (the journals would run more than .003 loose at the {{process.journal_aim_in:.4dot}} limit): stop and tell the owner; the journals are not finished. D at least {{process.drum_bore_min_fit_in:.4dot}}: under it, stop and tell the owner."
 gauge_checks = [{ gauge = "telescoping-gauges-starrett-s579gz", band_mm = [7.9375, 8.0391] }]
 
 [[setups.operations]]
@@ -744,7 +755,7 @@ cut_diameter_mm = "{{cad.shaft_dia_mm}}"
 [[setups.operations]]
 cut_kind = "other"
 instruction = "Spindle stopped: mike the shaft at Z+2.2 and Z+8.6 (the journals) and at Z+1.0, Z+3.5, Z+7.5 and Z+9.2. Journals smooth to the nail, no chatter (Ra 63)."
-inspection = "Journals at both: A to .0004 under it, so .001–.003 under S (note 1: turned to the measured strap bores); elsewhere Ø{{cad.shaft_dia_min_in:.4dot}}–{{cad.shaft_dia_max_in:.4dot}}."
+inspection = "Journals at both: A to .0004 under it, so .001–.003 under S (note 1: turned to the measured strap bores). The bond lands (Z+3.5 and Z+7.5): at least .002 under D, else skim them as below. Elsewhere Ø{{cad.shaft_dia_min_in:.4dot}}–{{cad.shaft_dia_max_in:.4dot}}."
 gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.shaft_dia_band_mm}}" }]
 
 [[setups.operations]]
@@ -759,6 +770,18 @@ tool = "ar"
 drilling = "none"
 sizing = "other"
 instruction = "Skim that stretch only to A, the cross slide in by half the miked excess per side: a journal Z+{{cad.front_journal_station_in:.2dot}} to Z+{{cad.front_journal_end_station_in:.2dot}} or Z+{{cad.back_journal_station_in:.2dot}} to Z+{{cad.back_journal_end_station_in:.2dot}}; a span or land from the journal's end to the next journal, shoulder or back end. Mike again. A journal more than .003 under S, or any other reading under its band's bottom: the arbor is scrap; start again from Setup 1."
+settings = "lathe-ar-1018"
+cut_diameter_mm = "{{cad.shaft_dia_mm}}"
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "ar"
+drilling = "none"
+sizing = "other"
+instruction = "Only if A is over D − .002 (the drum would not slide on): skim both bond lands to D − {{process.land_clearance_aim_in:.3dot}}, the same way, the front land from Z+{{cad.front_journal_end_station_in:.2dot}} to Z+{{cad.bond_relief_station_in:.2dot}} and the back land from Z+{{cad.bond_relief_end_station_in:.2dot}} to Z+{{cad.back_journal_station_in:.2dot}}, the journals untouched. Mike both lands."
+inspection = "Each land D − {{process.land_clearance_aim_in:.3dot}} to .0004 under it (note 3: turned to MHA-DT-01, .002–.008 clear)."
+gauge_checks = [{ gauge = "micrometers", band_mm = [7.8359, 7.9273] }]
 settings = "lathe-ar-1018"
 cut_diameter_mm = "{{cad.shaft_dia_mm}}"
 

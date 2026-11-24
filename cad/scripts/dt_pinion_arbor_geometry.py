@@ -18,7 +18,6 @@ import math
 from itertools import product
 
 import _config
-from _fit_ream_slide import REAM_SLIDE
 from _inch_wall_limits import WALL_TARGET_MM
 from _package_units import drawing_unit
 from _printed_tolerance import printed_band_mm
@@ -54,13 +53,29 @@ SHAFT_DIA = 7.9375
 # the same 10.668 (226.162 -> 236.830) to keep the land clear of the crown.
 SHAFT_LEN = 236.83
 # Only the two short lands that run in the MHA-DT-14 strap bores (made to
-# fit, JOURNAL_DIA_BAND below) carry the Ra 1.6 finish (U39).  Every other Ø5/16
-# span, the two MHA-DT-01 bond lands included, is 5/16 -.0004/-.0038 in: the
-# drum's REAM_SLIDE bore starts at .3135, so the guaranteed slide-on clearance
-# is .0014 in, and the loosest pair (.3140 on .3087) stays a .0053 in
-# diametral gap, inside Loctite 638's 0.25 mm.  The middle of the drum's
+# fit, JOURNAL_DIA_BAND below) carry the Ra 1.6 finish (U39).  The two
+# MHA-DT-01 bond lands are made to fit too (BOND_LAND_DIA_BAND below).  The
+# other Ø5/16 spans (the collar's, by the head, and the back stub) are 5/16
+# -.0004/-.0038 in: MHA-DT-33 slides over them.  The middle of the drum's
 # length is relieved (BOND_RELIEF_* below).
 SHAFT_DIA_BAND = (-0.01016, -0.09652)
+# The two bond lands are turned last to the MHA-DT-01 drum bore, drilled
+# 5/16 from both ends (owner ruling 2026-11-24, fit audit question 13: the
+# bore drilled, the bond taking the size): at least .002 under the smaller
+# of its two measured ends, so the drum slides on by hand, and never more
+# than .008 under its larger end, inside LOCTITE 638's gap (made to fit,
+# form 2: delegated ruling 2026-11-24 (FitLaneDT), in place of question 13's
+# printed -.0014/-.0048).  The shaft is finished whole length to the
+# journals' aim first; the lands are skimmed only where that aim leaves the
+# drum less than .002.  The sheet prints the size REF and the acceptance
+# (draw_dt_pinion_arbor note 3).  BOND_FIT_CLEARANCE is the fit's own
+# diametral clearance anywhere along the drum; BOND_LAND_DIA_BAND is NOT a
+# printed limit: it is the ANALYSIS band the fit is modelled to produce over
+# the drilled range, .3085-.3121 (its top .0004 under 5/16, as the journals',
+# so the MHA-DT-33 collar still slides over both lands on its way to the
+# head).
+BOND_FIT_CLEARANCE = (0.0508, 0.2032)  # .002-.008 in
+BOND_LAND_DIA_BAND = (-0.01016, -0.1016)  # ANALYSIS deviations, -.0004/-.0040 in
 # The two journals are made to fit (owner ruling 2026-11-24, fit audit
 # question 12): turned last to the 5/16 drilled MHA-DT-14 strap bores
 # (.3125-.3165 at the DRILLED HOLES row), clearance .001-.003, and the drum
@@ -378,22 +393,20 @@ if (
 ):
     raise AssertionError("back journal land runs into the back-crown root")
 # --- Bond lands and middle relief (#2360; owner, 2026-11-11) -----------------
-# The 6.06 in MHA-DT-01 bore is longer than the owned .3135 reamer reaches
-# (about 4.25 in), so it is drilled and reamed from both ends and its two
-# halves meet near mid-length with whatever small step the re-chucking
-# leaves.  The owner's direction: hold the fit only at the two ends and let
-# the middle be clearance.  A recess in the drum's bore cannot be cut with
-# owned tools (it would need a boring bar reaching 3.0 in through a .3135
-# land), so the clearance is turned on the arbor instead: a plain relief
-# between two bond lands.  The drum then bears and bonds only on those lands,
-# and the long shaft no longer has to follow the bore's straightness over its
-# whole length.  The arbor's back end still slides through the meeting point
-# on assembly, so the halves must meet within what the drum sheet's SLIDES ON
-# BY HAND check passes, made before bonding on the actual pair: a high-limit
-# .3140 bore slides over a low-limit .3113 back journal, so a step under a
-# land can reach about .0027 in, not the .0014 worst-case journal clearance.
-# With the land's loosest .0053 bond clearance the gap is then about .0080
-# in (0.20 mm), still inside LOCTITE 638's 0.25 mm (#2612).
+# The 6.06 in MHA-DT-01 bore is longer than a 5/16 jobber drill reaches, so
+# it is drilled from both ends (owner ruling 2026-11-24, fit audit question
+# 13) and its two halves meet near mid-length with whatever small step the
+# re-chucking leaves.  The owner's direction (2026-11-11): hold the fit only
+# at the two ends and let the middle be clearance.  A recess in the drum's
+# bore cannot be cut with owned tools (it would need a boring bar reaching
+# 3.0 in through a 5/16 land), so the clearance is turned on the arbor
+# instead: a plain relief between two bond lands.  The drum then bears and
+# bonds only on those lands, and the long shaft no longer has to follow the
+# bore's straightness over its whole length.  The drum is tried on before
+# bonding (note 3's SLIDES ON BY HAND), so a step at the meeting point that
+# would stop it is found then, not at the bond.  The loosest pair is the
+# drill's .3165 top over the smallest land (.3085): .0080 in (0.203 mm),
+# inside LOCTITE 638's 0.25 mm (BOND_GAP_MAX below).
 #
 # Both relief shoulders are located from the head rear face, the sheet's
 # datum for every station (drawing-guidelines rules 10/11; machinist review
@@ -407,18 +420,35 @@ BOND_RELIEF_FROM_HEAD_REAR = 106.68  # 4.20
 BOND_RELIEF_BACK_FROM_HEAD_REAR = 172.72  # 6.80
 BOND_RELIEF_LEN = BOND_RELIEF_BACK_FROM_HEAD_REAR - BOND_RELIEF_FROM_HEAD_REAR
 BOND_RELIEF_Z = HEAD_REAR_Z + BOND_RELIEF_FROM_HEAD_REAR
-# Ø.28 at the title block's .XX: from the drum's .3135 minimum bore to the
-# relief's .29 maximum the radial air is .0118 in (0.30 mm), about four times
-# the .0027 step the reamed halves may leave (#2612), so nothing in the middle
-# touches.
+# Ø.28 at the title block's .XX: from the drum's .3125 minimum drilled bore
+# to the relief's .29 maximum the radial air is .0113 in (0.29 mm), so
+# nothing in the middle touches.
 BOND_RELIEF_DIA = 7.112  # .28
 BOND_RELIEF_MIN_RADIAL_AIR = 0.25
-DRUM_BORE_MIN = SHAFT_DIA + REAM_SLIDE[1]  # MHA-DT-01's REAM_SLIDE bore, .3135
+# MHA-DT-01's 5/16 drilled bore, its ANALYSIS band (the DRILLED HOLES row's
+# +.004/0): dt_alignment_pinion_spec.ARBOR_BORE_BAND, which imports nothing
+# from here; test_dt_alignment_pinion_drawing pins the two together.
+DRUM_BORE_BAND = (0.1016, 0.0)
+DRUM_BORE_MIN = SHAFT_DIA + DRUM_BORE_BAND[1]  # .3125
+DRUM_BORE_MAX = SHAFT_DIA + DRUM_BORE_BAND[0]  # .3165
 BOND_RELIEF_RADIAL_AIR = (DRUM_BORE_MIN - (BOND_RELIEF_DIA + LINEAR_XX_BAND)) / 2.0
 if BOND_RELIEF_RADIAL_AIR < BOND_RELIEF_MIN_RADIAL_AIR:
     raise AssertionError(
         f"bond relief clears the drum bore by {BOND_RELIEF_RADIAL_AIR:.3f}, "
         f"under {BOND_RELIEF_MIN_RADIAL_AIR}"
+    )
+# The made-to-fit bond (BOND_FIT_CLEARANCE, BOND_LAND_DIA_BAND above): the
+# drum slides on, and the loosest pair, the drill's top over the smallest
+# land, stays inside the fit's own .008 and so inside the compound's gap.
+BOND_GAP_MIN = BOND_FIT_CLEARANCE[0]
+BOND_GAP_MAX = DRUM_BORE_MAX - (SHAFT_DIA + BOND_LAND_DIA_BAND[1])
+if BOND_GAP_MIN <= 0.0:
+    raise AssertionError("MHA-DT-01 no longer slides onto its bond lands")
+if BOND_GAP_MAX > min(BOND_FIT_CLEARANCE[1], RETAINING_COMPOUND_MAX_GAP_MM) + 1e-9:
+    raise AssertionError(
+        f"drum bond gap {BOND_GAP_MAX:.3f} exceeds the fit's "
+        f"{BOND_FIT_CLEARANCE[1]:.4f} or the {RETAINING_COMPOUND} limit "
+        f"{RETAINING_COMPOUND_MAX_GAP_MM}"
     )
 # Each drum end's bonded overlap, every printed band at its short corner: the
 # relief's shoulders from the head rear face; the drum from its station and
@@ -429,11 +459,10 @@ FRONT_BOND_OVERLAP_MIN = (BOND_RELIEF_FROM_HEAD_REAR - LINEAR_XX_BAND) - (
 BACK_BOND_OVERLAP_MIN = (
     DRUM_STATION - DRUM_STATION_BAND + DRUM_LEN + DRUM_LEN_BAND[1]
 ) - (BOND_RELIEF_BACK_FROM_HEAD_REAR + LINEAR_XX_BAND)
-# The relief spans the drum's mid-length, where halves reamed to about half
-# depth from each end meet.  This is not a requirement: a deeper pass (the
-# reamer's reach, about 4.25 in, puts the step anywhere from 4.21 to 6.65 in
-# from the head rear face) may leave the step under a land, where the slide
-# check above already bounds it.  #1038 re-pitch: the 6.06 in drum keeps
+# The relief spans the drum's mid-length, where halves drilled to about half
+# depth from each end meet.  This is not a requirement: a deeper pass from
+# one end may leave the step under a land, where note 3's slide-on trial
+# before bonding already bounds it.  #1038 re-pitch: the 6.06 in drum keeps
 # this relief; its mid moved 5.22 -> 5.43 in, the front land stays the longer
 # (1.80 in against the back land's 1.66, was 1.24) and both hold over three
 # times the hand torque.
@@ -449,8 +478,8 @@ if not (
 # Retaining Compound Design Guide's factors taken low: 0.4 for the brass drum
 # (Factor 2, Materials, p. 10: "Copper and Alloys 0.4", the lower of the
 # dissimilar pair against mild steel's 1.0; read 2026-11-20, #2608), 0.3 for
-# the clearance at the loosest pair (.0053 in; sm_gooseneck_spring_joint
-# books 0.3 at 0.25 mm) and 0.5 for a long land.
+# the clearance at the loosest pair (.0080 in, 0.203 mm, BOND_GAP_MAX;
+# sm_gooseneck_spring_joint books 0.3 at 0.25 mm) and 0.5 for a long land.
 LOCTITE_638_SHEAR_MPA = 25.0
 BOND_FACTOR = 0.4 * 0.3 * 0.5
 HAND_TORQUE_NM = 2.0 * 30.0 * ROD_SPAN / 2.0 / 1000.0
