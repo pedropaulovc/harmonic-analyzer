@@ -53,20 +53,26 @@ SHAFT_DIA = 7.9375
 # .42 in aft (198.882 -> 209.550 from the head rear face), so the shaft grew
 # the same 10.668 (226.162 -> 236.830) to keep the land clear of the crown.
 SHAFT_LEN = 236.83
-# Only the two short lands that run in the MHA-DT-14 strap bores (REAM_SLIDE)
-# carry the running band and the Ra 1.6 finish (U39).  Every other Ø5/16
+# Only the two short lands that run in the MHA-DT-14 strap bores (made to
+# fit, JOURNAL_DIA_BAND below) carry the Ra 1.6 finish (U39).  Every other Ø5/16
 # span, the two MHA-DT-01 bond lands included, is 5/16 -.0004/-.0038 in: the
 # drum's REAM_SLIDE bore starts at .3135, so the guaranteed slide-on clearance
 # is .0014 in, and the loosest pair (.3140 on .3087) stays a .0053 in
 # diametral gap, inside Loctite 638's 0.25 mm.  The middle of the drum's
 # length is relieved (BOND_RELIEF_* below).
 SHAFT_DIA_BAND = (-0.01016, -0.09652)
-# The drum also slides over the back land on its way on from the back crown,
-# so the lands sit .0004 in under 5/16 too (Main ruling): the same .0008-wide
-# band as ground shafting, shifted down, so it is no harder to turn.  In the
-# MHA-DT-14 REAM_SLIDE bores (.3135-.3140) the running clearance is
-# .0014-.0027 in.
-JOURNAL_DIA_BAND = (-0.01016, -0.03048)
+# The two journals are made to fit (owner ruling 2026-11-24, fit audit
+# question 12): turned last to the 5/16 drilled MHA-DT-14 strap bores
+# (.3125-.3165 at the DRILLED HOLES row), clearance .001-.003, and the drum
+# still slides over the back one on its way on.  The sheet prints the size
+# REF and that acceptance (draw_dt_pinion_arbor note 1).  JOURNAL_DIA_BAND is
+# NOT a printed limit: it is the ANALYSIS band, the journal the fit is
+# modelled to produce over the drilled range, .3095-.3121 (its top .0004
+# under 5/16, so the drum and the collar still pass it).
+JOURNAL_DIA_BAND = (-0.01016, -0.0762)  # ANALYSIS deviations, -.0004/-.0030 in
+# The clearance the journals are turned to in the measured strap bores: the
+# fit's own acceptance, the modelled result every running stack reads.
+JOURNAL_FIT_CLEARANCE = (0.0254, 0.0762)  # .001-.003 in
 
 # Former handle-body envelope, turned integrally with the arbor.  drawing-guidelines.md rule 17 (walls and webs)
 # (audit W6, 2026-09-23): the Ø6 crossrod hole left 1.50 of wall to each face

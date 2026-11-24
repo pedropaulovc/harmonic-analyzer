@@ -67,15 +67,17 @@ from dt_pinion_pivot_block_spec import (
     BLOCK_TOP_Y,
     BLOCK_WEST,
     BLOCK_WIDTH as BLOCK_WIDTH,
-    BORE_DIA,
-    BORE_DIA_BAND,
     BORE_UP,
     DRAWING_PRECISION,
     FRONT_BBOX_CX,
     FRONT_BBOX_CY,
+    LIFT_BORE_BAND as LIFT_BORE_BAND,
+    LIFT_BORE_DIA,
     LIFT_BORE_RISE,
     LIFT_BORE_SPACING,
     LIFT_ROD_MATE,
+    PIVOT_BORE_BAND,
+    PIVOT_BORE_DIA,
     PIVOT_SHAFT_MATE,
     SCREW_HALF_SPACING,
     SCREW_HOLE_CALLOUT_PRECISION,
@@ -125,7 +127,8 @@ def _front_y(model_y_mm: float) -> float:
     return FRONT_CENTER[1] + (model_y_mm - FRONT_BBOX_CY) * SHEET_SCALE[0] / 1000.0
 
 
-BORE_R_SHEET = BORE_DIA * SHEET_SCALE[0] / 2000.0
+PIVOT_BORE_R_SHEET = PIVOT_BORE_DIA * SHEET_SCALE[0] / 2000.0
+LIFT_BORE_R_SHEET = LIFT_BORE_DIA * SHEET_SCALE[0] / 2000.0
 SCREW_R_SHEET = SCREW_HOLE_DIA * SHEET_SCALE[0] / 2000.0
 FRONT_TOP_Y = _front_y(BLOCK_HEIGHT - BORE_UP)
 PIVOT_SHEET_XY = (_front_x(0.0), _front_y(0.0))
@@ -172,21 +175,21 @@ FRONT_KEEP = {
     # at 0/90/180/270 deg.  The leader runs to the NEAR end of the text's
     # shoulder (the bottom line's), so the text sits up and right of the bore
     # and the leader climbs at ~65 deg, clear of the Ra symbol's ~30 deg
-    # sector.  The six-line callout (limits, size, THRU - REAM and its mate)
-    # is centred here, so its bottom stays over the Ra symbol and its left
-    # edge right of the top view.
+    # sector.  The four-line callout (size, REAM THRU and the shaft's
+    # acceptance) is centred here, so its bottom stays over the Ra symbol and
+    # its left edge right of the top view.
     "PivotBoreDia": (0.224, 0.205),
     # Up-left of the lift bore, in the clear band left of the top view and
     # above the lift-bore rise.  Farm round 1 (f08277cd0ee5) centred the
     # block at x 0.045: its widest row ran through the inner border (x
-    # ~0.0124) onto zone letter C.  At 0.055 the widest row ("RUNNING FIT ON
-    # MHA-DT-17", ~63 mm) spans ~0.0236..0.0864: 11 mm inside the border and
-    # left of the .728 extension line (x ~0.1025).
+    # ~0.0124) onto zone letter C.  At 0.055 the widest row ("MHA-DT-17
+    # TURNS FREELY", ~58 mm) stays inside the border and left of the .728
+    # extension line (x ~0.1025).
     "LiftBoreDia": (0.055, 0.182),
 }
 RIGHT_KEEP = {"Depth": (RIGHT_CENTER[0], FRONT_TOP_Y + 0.00925)}
 TOP_KEEP = {}
-# Each reamed bore: size, then process, then at most two rows of words
+# Each bore: size, then process, then at most two rows of words
 # (rule 7; rule 26 size-process-depth order).  The lift bore's .728/.085
 # locations carry value and band only; their reason is numbered note 1
 # (dt_pinion_pivot_block_notes, which the feature export reads), flagged from
@@ -196,12 +199,12 @@ TOP_KEEP = {}
 LIFT_BORE_NOTE_XY = (0.020, 0.058)
 DIMENSION_CALLOUTS = {
     "PivotBoreDia": "\n".join(
-        ("REAM THRU", f"RUNNING FIT ON {PIVOT_SHAFT_MATE[0]}", PIVOT_SHAFT_MATE[1])
+        ("REAM THRU", f"{PIVOT_SHAFT_MATE[0]} ENTERS,", "TURNS BY HAND")
     ),
     "LiftBoreDia": "\n".join(
         (
-            "REAM THRU",
-            f"RUNNING FIT ON {LIFT_ROD_MATE[0]}",
+            "F DRILL THRU",
+            f"{LIFT_ROD_MATE[0]} TURNS FREELY",
             f"SEE NOTE {LIFT_BORE_NOTE_NUMBER}",
         )
     ),
@@ -220,11 +223,12 @@ _CLOSED_ARROWHEAD = 1  # swArrowStyle_e.swCLOSED_ARROWHEAD
 # from the west end (x = -BLOCK_WEST) to the east end (x = +BLOCK_EAST), +Y up
 # from the bottom (base seat, y = -BORE_UP) to the top (y = BLOCK_TOP_Y), and
 # the block is extruded +Z to the front face (z = BLOCK_DEPTH), the face the
-# front view looks at.  Both reamed bores run along Z (entered here from the
+# front view looks at.  Both bores run along Z (entered here from the
 # front face); the two #8 hold-down holes run along Y (entered from the top
 # face the top view shows), at mid-depth.  A band is the title block's row for
-# the places the sheet prints (DRAWING_PRECISION) on the printed nominal, or
-# the part-authored REAM_SLIDE band on the exact bore diameter; the hold-down
+# the places the sheet prints (DRAWING_PRECISION) on the printed nominal, the
+# DRILLED HOLES row on a drilled diameter, or the reamer's ANALYSIS band on the
+# reamed pivot bore; the hold-down
 # drill takes the DRILLED HOLES row at its callout's .XXX.  The declarations
 # print nothing.
 #
@@ -346,32 +350,46 @@ requirement(
     },
     precision={"depth": _DEPTH_P},
 )
-# Both reamed bores: Ø.2500 +.0015/+.0010 (the part-authored REAM_SLIDE band
-# on the exact diameter, .XXXX), REAM THRU and the mate each runs (or the note
-# it cites) under the size (DIMENSION_CALLOUTS), and Ra 63 (SURFACE_FINISHES:
-# each turns its shaft).  The pivot bore is the front view's one datum: 1.02
-# from the west end ("AnchorX") and .66 up from the bottom ("AnchorZ"); the
-# lift bore stands .728 west of it ("LiftBoreX") and .085 above it
-# ("LiftBoreCz"), at .XXX.
-_BORE_DIA = (
-    limits(BORE_DIA, _P["PivotBoreDia"], BORE_DIA_BAND, unit=UNIT),
-    ((_GEOM, "BORE_DIA"), "BORE_DIA_BAND", _UNIT, (_SELF, "FRONT_KEEP")),
-)
-_REAM = ((_SELF, "DIMENSION_CALLOUTS"),)
+# The pivot bore at the .2510 reamer's size, REAM THRU, no band, the MHA-DT-19
+# shaft its gauge (owner ruling 2026-11-24, fit audit question 12, option B);
+# the lift bore drilled F THRU, the MHA-DT-17 rod turning freely in it (fit
+# audit F26).  Each callout carries its acceptance by the mate (or the note it
+# cites) under the size (DIMENSION_CALLOUTS), and Ra 63 (SURFACE_FINISHES:
+# each turns its shaft).  The pivot bore's ``dia`` is the spec's ANALYSIS band
+# (what the reamer is modelled to cut), not a requirement.  The pivot bore is
+# the front view's one datum: 1.02 from the west end ("AnchorX") and .66 up
+# from the bottom ("AnchorZ"); the lift bore stands .728 west of it
+# ("LiftBoreX") and .085 above it ("LiftBoreCz"), at .XXX.
+_CALLOUTS = ((_SELF, "DIMENSION_CALLOUTS"),)
 _FINISH = ("SURFACE_FINISHES", ("_surface_finish", "MACHINED_UM"))
 requirement(
     "pivot_bore",
     kind="hole",
     faces=(surface_finish_by_key(SURFACE_FINISHES, "pivot_bore").face,),
-    requirements=("dia", "thru", "finish_ra", "x_from_west", "height"),
+    # ``dia`` (the reamer's ANALYSIS band) stays a traveler requirement, as
+    # #3492's MHA-PD-18 bore keeps it: prechips' drilled_block adapter refuses
+    # a hole without one. The sheet prints the reamer's size and no band.
+    requirements=(
+        "dia",
+        "thru",
+        "process",
+        "mate",
+        "finish_ra",
+        "x_from_west",
+        "height",
+    ),
     fields={
         "at": ([0.0, 0.0, BLOCK_DEPTH], (*_FRAME, (_GEOM, "BLOCK_DEPTH"))),
         "axis": ((0.0, 0.0, -1.0), _FRAME),
-        "dia": _BORE_DIA,
-        "nominal_dia": (BORE_DIA, ((_GEOM, "BORE_DIA"),)),
-        "process": ("ream", _REAM),
-        "thru": (True, _REAM),
-        "callout": (DIMENSION_CALLOUTS["PivotBoreDia"], _REAM),
+        "dia": (
+            limits(PIVOT_BORE_DIA, _P["PivotBoreDia"], PIVOT_BORE_BAND, unit=UNIT),
+            ((_GEOM, "PIVOT_BORE_DIA"), "PIVOT_BORE_BAND", _UNIT, (_SELF, "FRONT_KEEP")),
+        ),
+        "nominal_dia": (PIVOT_BORE_DIA, ((_GEOM, "PIVOT_BORE_DIA"),)),
+        "process": ("ream", _CALLOUTS),
+        "thru": (True, _CALLOUTS),
+        "callout": (DIMENSION_CALLOUTS["PivotBoreDia"], _CALLOUTS),
+        "mate": (PIVOT_SHAFT_MATE[0], _CALLOUTS),
         "mates": (" ".join(PIVOT_SHAFT_MATE), ("PIVOT_SHAFT_MATE",)),
         "finish_ra": (MACHINED_UM, _FINISH),
         "x_from_west": (
@@ -397,7 +415,7 @@ requirement(
     "lift_bore",
     kind="hole",
     faces=(surface_finish_by_key(SURFACE_FINISHES, "lift_bore").face,),
-    requirements=("dia", "thru", "finish_ra", "spacing", "rise"),
+    requirements=("dia", "thru", "process", "mate", "finish_ra", "spacing", "rise"),
     fields={
         "at": (
             [-LIFT_BORE_SPACING, LIFT_BORE_RISE, BLOCK_DEPTH],
@@ -409,13 +427,15 @@ requirement(
         ),
         "axis": ((0.0, 0.0, -1.0), _FRAME),
         "dia": (
-            limits(BORE_DIA, _P["LiftBoreDia"], BORE_DIA_BAND, unit=UNIT),
-            ((_GEOM, "BORE_DIA"), "BORE_DIA_BAND", _UNIT, (_SELF, "FRONT_KEEP")),
+            drilled_limits(LIFT_BORE_DIA, _P["LiftBoreDia"], unit=UNIT),
+            ((_GEOM, "LIFT_BORE_DIA"), "LIFT_BORE_BAND", _UNIT, (_SELF, "FRONT_KEEP")),
         ),
-        "nominal_dia": (BORE_DIA, ((_GEOM, "BORE_DIA"),)),
-        "process": ("ream", _REAM),
-        "thru": (True, _REAM),
-        "callout": (DIMENSION_CALLOUTS["LiftBoreDia"], _REAM),
+        "nominal_dia": (LIFT_BORE_DIA, ((_GEOM, "LIFT_BORE_DIA"),)),
+        "process": ("drill", _CALLOUTS),
+        "drill": ("F", _CALLOUTS),
+        "thru": (True, _CALLOUTS),
+        "callout": (DIMENSION_CALLOUTS["LiftBoreDia"], _CALLOUTS),
+        "mate": (LIFT_ROD_MATE[0], _CALLOUTS),
         "mates": (" ".join(LIFT_ROD_MATE), ("LIFT_ROD_MATE",)),
         "note": (
             LIFT_BORE_NOTE_TEXT,
@@ -703,8 +723,8 @@ def build(adapter: Any) -> dict[str, str]:
     # it cannot cross BlockHeight's extension line) and the symbol stays
     # under the PivotBoreDia callout.
     pivot_right_edge = (
-        _front_x(0.0) + BORE_R_SHEET * 0.866,
-        _front_y(0.0) + BORE_R_SHEET * 0.5,
+        _front_x(0.0) + PIVOT_BORE_R_SHEET * 0.866,
+        _front_y(0.0) + PIVOT_BORE_R_SHEET * 0.5,
     )
     add_surface_finish(
         adapter,
@@ -716,7 +736,7 @@ def build(adapter: Any) -> dict[str, str]:
         char_height=0.0025,
     )
     # The lift bore runs MHA-DT-17 (drawing-guidelines.md rule 6 (roughness
-    # symbols only where a surface runs, slides or locates)).  Its REAM
+    # symbols only where a surface runs, slides or locates)).  Its DRILL
     # callout leaves the rim upper-left, its centre lines leave at 180 and
     # 270 deg, and the lift-bore rise's pivot-centre witness cuts the rim at
     # ~223 and ~317 deg, so the leader lands at 250 deg, under that witness
@@ -724,8 +744,8 @@ def build(adapter: Any) -> dict[str, str]:
     # left of the block, under the lift-bore rise and above the length
     # dimensions.
     lift_lower_edge = (
-        _front_x(-LIFT_BORE_SPACING) - BORE_R_SHEET * 0.342,
-        _front_y(LIFT_BORE_RISE) - BORE_R_SHEET * 0.940,
+        _front_x(-LIFT_BORE_SPACING) - LIFT_BORE_R_SHEET * 0.342,
+        _front_y(LIFT_BORE_RISE) - LIFT_BORE_R_SHEET * 0.940,
     )
     add_surface_finish(
         adapter,

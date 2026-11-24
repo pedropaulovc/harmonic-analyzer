@@ -17,7 +17,6 @@ from __future__ import annotations
 import math
 
 import _config
-from _fit_ream_slide import REAM_SLIDE
 from _fit_shaft_h import SHAFT_H
 from _inch_wall_limits import WALL_FLOOR_MM, WALL_TARGET_MM
 from _package_units import drawing_unit
@@ -29,6 +28,8 @@ from dt_pinion_bracket_geometry import (
     PIN_BORE,
     PIN_DROP,
     PIVOT_BORE,
+    PIVOT_BORE_BAND,
+    PIVOT_SHAFT_DIA,
     R_END,
     THICKNESS,
     THICKNESS_PLACES,
@@ -105,9 +106,10 @@ FOLLOWER_SEAT_LIGAMENT = abs(PIN_DROP) - HOLE_MAX / 2.0 - PIN_BORE / 2.0
 # is tighter than the title block, and no position frame, which
 # drawing-guidelines.md rule 5 (avoid excessive GD&T) bars on a bracket.  A
 # V-block set-up holding 0.25 leaves SHAFT_LIGAMENT_QUARTER.
-# The MHA-DT-19 shaft is the pivot bore's own nominal (a lockstep test pins it).
+# The MHA-DT-19 shaft is the ruled 1/4 in (a lockstep test pins
+# PIVOT_SHAFT_DIA to dt_pinion_pivot_shaft_spec.SHAFT_DIA).
 SHAFT_LIGAMENT_FLOOR = WALL_FLOOR_MM
-_SHAFT_MIN = PIVOT_BORE + SHAFT_H[1]
+_SHAFT_MIN = PIVOT_SHAFT_DIA + SHAFT_H[1]
 SHAFT_LIGAMENT_CENTRED = (_SHAFT_MIN - HOLE_MAX) / 2.0
 SHAFT_LIGAMENT_QUARTER = SHAFT_LIGAMENT_CENTRED - 0.25
 SHAFT_LIGAMENT_WORST = SHAFT_LIGAMENT_CENTRED - _AXIS_OFFSET_MAX
@@ -133,7 +135,7 @@ PIN_CENTRED_SUB_FLUSH = (STRAP_FOOT_MIN_WIDTH - PIN_LEN) / 2.0
 # foot less shortest pin, is under 2 S.
 _R_END_UPPER = printed_deviations(R_END, END_RADIUS_PLACES, unit=UNIT)[1]
 STRAP_FOOT_MAX_WIDTH = 2.0 * (R_END + _R_END_UPPER)
-PIVOT_BORE_MAX = PIVOT_BORE + REAM_SLIDE[0]  # MHA-DT-14 PIVOT_BORE_BAND
+PIVOT_BORE_MAX = PIVOT_BORE + PIVOT_BORE_BAND[0]  # the .2510 reamer's ANALYSIS band
 PIN_WALL_ENGAGEMENT_FLOOR = PIN_DIA
 _PIN_LEN_MIN = PIN_LEN - PIN_LEN_BAND
 PIN_SUB_FLUSH_MAX = (

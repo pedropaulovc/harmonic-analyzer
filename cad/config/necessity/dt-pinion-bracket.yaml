@@ -1,0 +1,18 @@
+# MHA-DT-14 pinion bracket strap: why each REAM and each band tighter than
+# the title block stays (drawing-guidelines.md rule 4; owner ruling
+# 2026-11-24: the reason lives here, not on the sheet). Read by the machinist
+# review only.
+# The pivot bore is reamed with the set's .2510 reamer and prints no band; the
+# MHA-DT-19 shaft is its gauge (form 3, fit audit F16). An F drill (.257
+# +.004/0) fails two evaluated floors: the strap's web round the cross pin
+# and the MHA-DT-VN-pinion strap pin's wall engagement
+# (dt_vn_pinion_strap_pin_spec.PIN_WALL_ENGAGEMENT_WORST, worst at the
+# bore's .2515 analysis maximum); a 1/4 drill can cut size for size on the
+# .2500 shaft. The arbor bore is 5/16 drilled and the journals are turned to
+# it (owner ruling 2026-11-24, fit audit question 12): no entry.
+necessity:
+  - id: N-01
+    feature: "Ø.251 REAM THRU pivot bore (MHA-DT-19 ENTERS, TURNS BY HAND)"
+    kind: gap
+    reason: "an F drill thins the cross-pin walls under the floor"
+    source: "fit audit F16"

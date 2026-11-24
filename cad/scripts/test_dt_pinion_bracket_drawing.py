@@ -12,7 +12,6 @@ import build_dt_pinion_bracket as bracket
 from _buildgraph import module_deps_of
 from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
-from _fit_ream_slide import REAM_SLIDE
 from _fit_deviations import deviations
 from _inch_wall_limits import WALL_FLOOR_MM
 from _printed_tolerance import printed_band_mm, printed_deviations
@@ -76,25 +75,28 @@ def test_drive_train_recipe_depends_on_geometry_not_drawing_notes() -> None:
 def test_every_band_traces_to_a_named_fit_class() -> None:
     # drawing-guidelines.md rule 4 (tighten only for function, and name the mate): a per-feature band exists only where a fit demands it, and
     # its numbers come from the shared fit table rather than a local literal.
-    # Four features qualify -- two running bores, the pressed follower seat and
-    # the spring pin's cross hole.
+    # Two features qualify -- the bonded follower seat and the spring pin's
+    # cross hole.  The bores print the tool's size and no band: the pivot bore
+    # the .2510 reamer, the MHA-DT-19 shaft its gauge (fit audit F16), the
+    # arbor bore the 5/16 drill, the MHA-DT-22 journals turned to it (owner
+    # ruling 2026-11-24, fit audit question 12).
     assert model_toleranced_dimensions(bracket) == {
-        ("StrapProfile", "PivotBoreDia"): "*deviations(PIVOT_BORE_BAND)",
-        ("StrapProfile", "ArborBoreDia"): "*deviations(ARBOR_BORE_BAND)",
         ("PinSeatProfile", "PinSeatDia"): "*deviations(PIN_SEAT_DIA_BAND)",
         ("CrossHoleProfile", "CrossHoleDia"): "*deviations(CROSS_HOLE_BAND)",
     }
     # #290: at .XXX the seat's station needs no band of its own.
     assert not hasattr(dt_pinion_bracket_spec, "PIN_SEAT_STATION_TOL")
-    assert dt_pinion_bracket_spec.PIVOT_BORE_BAND is REAM_SLIDE
-    assert dt_pinion_bracket_spec.ARBOR_BORE_BAND is REAM_SLIDE
+    # The bores' ANALYSIS bands: what the reamer and the drill cut.
+    assert math.isclose(dt_pinion_bracket_spec.PIVOT_BORE, 0.2510 * 25.4)
+    assert dt_pinion_bracket_spec.PIVOT_BORE_BAND == (0.0127, 0.0)
+    assert math.isclose(dt_pinion_bracket_spec.ARBOR_BORE, 0.3125 * 25.4)
+    assert dt_pinion_bracket_spec.ARBOR_BORE_BAND == (0.1016, 0.0)
+    callouts = drawing.DIMENSION_CALLOUTS
+    assert callouts["PivotBoreDia"] == "REAM THRU\nMHA-DT-19 ENTERS,\nTURNS BY HAND"
+    assert callouts["ArborBoreDia"] == "5/16 DRILL THRU\nMHA-DT-22 IS TURNED\nTO THIS BORE"
     # Owner ruling 2026-11-23, tool audit Q8: "Re-band to +.003/0, finish with
     # the 1/8 end mill, check with .157/.160 pins".
     assert dt_pinion_bracket_spec.PIN_SEAT_DIA_BAND == (0.0762, 0.0)
-    # A running bore must start above nominal; the bonded seat starts at it
-    # (the .157 GO pin): that sign difference is the whole reason the two
-    # bands differ, and swapping them would be silent on the sheet.
-    assert deviations(REAM_SLIDE)[0] > 0.0
     assert deviations(dt_pinion_bracket_spec.PIN_SEAT_DIA_BAND)[0] == 0.0
 
 

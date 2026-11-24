@@ -4,7 +4,8 @@
 part's exported ``features.toml`` and the plan/shop TOML, then runs
 :func:`build` inside headless FreeCAD (``freecadcmd``) with that context and
 checks the posted G-code against :func:`expectations`. The block's sizes come
-from the feature export (its width, height and depth, both reamed bores and
+from the feature export (its width, height and depth, the reamed pivot bore,
+the F-drilled lift bore and
 both hold-down holes); the blank, the skims, face levels, spots, pecks, tips
 and the parallels from ``plan.toml`` ``[parameters]`` and ``milling_cuts``;
 cutter diameters, speeds and feeds from the shop (``shop/``) and the plan's
@@ -24,7 +25,9 @@ down) faces the top to the height, then spots and drills both #9 hold-down
 holes through between the parallels. PB03 (upright, gripped on B and the top)
 skims the east bar edge to the east end; PB04 (turned over) faces the west
 end to the width. PB05 (lying, gripped on the two ends) faces the front face
-to the depth, then spots, drills C and reams both .2510 bores through.
+to the depth, then spots both bores, drills the pivot bore C and the lift
+bore F through, and reams the pivot bore .2510 (owner ruling 2026-11-24,
+fit audit question 12; fit audit F26).
 
 Work frames (G54), each set in its setup:
 - PB01: X0 the east bar edge (the left end), Y0 the fixed jaw (the back
@@ -62,7 +65,13 @@ PROGRAMS: tuple[tuple[str, tuple[Any, ...]], ...] = (
     ("PB04_width", ("west_end",)),
     (
         "PB05_front_bores",
-        (("front_face",), ("bore_spot",), ("bore_drill",), ("bore_ream",)),
+        (
+            ("front_face",),
+            ("bore_spot",),
+            ("bore_drill",),
+            ("lift_drill",),
+            ("bore_ream",),
+        ),
     ),
 )
 # Every program loads its own first tool (M6, the tool setter): each setup
@@ -70,7 +79,7 @@ PROGRAMS: tuple[tuple[str, tuple[Any, ...]], ...] = (
 LOAD_FIRST_TOOL = tuple(name for name, _ops in PROGRAMS)
 # The plan's tools the mill runs, numbered by their places in the plan's tool
 # list among these (the saw, files and gauges are not).
-CAM_TOOLS = ("em-half", "spot", "drill-9", "drill-c", "reamer")
+CAM_TOOLS = ("em-half", "spot", "drill-9", "drill-c", "drill-f", "reamer")
 IN = 25.4
 # ANSI #2 combined drill and countersink, 60° included: the shop record names
 # the tool, not its geometry.
@@ -346,16 +355,16 @@ def _geometry(features: dict[str, Any]) -> dict[str, Any]:
     if back != 0.0:
         raise ValueError("back_face: expected at model Z0")
     bores = []
-    for name in ("pivot_bore", "lift_bore"):
+    for name, process in (("pivot_bore", "ream"), ("lift_bore", "drill")):
         hole = f[name]
         if (
             hole["axis"] != [0.0, 0.0, -1.0]
             or not math.isclose(hole["at"][2], front, abs_tol=1e-3)
             or hole.get("thru") is not True
-            or hole["process"] != "ream"
+            or hole["process"] != process
         ):
             raise ValueError(
-                f"{name}: expected reamed through from the front face along -Z"
+                f"{name}: expected {process} through from the front face along -Z"
             )
         bores.append({"name": name, "at": hole["at"], "dia": hole["dia"]})
     holds = []
@@ -417,18 +426,21 @@ def context(
     em = _shop_tool(plan, shop, "em-half")["diameter_mm"]
     d9 = _shop_tool(plan, shop, "drill-9")["diameter_mm"]
     dc = _shop_tool(plan, shop, "drill-c")["diameter_mm"]
+    df = _shop_tool(plan, shop, "drill-f")["diameter_mm"]
     dr = _shop_tool(plan, shop, "reamer")["diameter_mm"]
     r = em / 2
     for hole in g["holds"]:
         if not hole["dia"][0] <= d9 <= hole["dia"][1]:
             raise ValueError(f"#9 Ø{d9} is outside {hole['name']}'s band {hole['dia']}")
-    for hole in g["bores"]:
-        if not hole["dia"][0] <= dr <= hole["dia"][1]:
-            raise ValueError(
-                f"reamer Ø{dr} is outside {hole['name']}'s band {hole['dia']}"
-            )
+    pivot_bore, lift_bore = g["bores"]
+    if not pivot_bore["dia"][0] <= dr <= pivot_bore["dia"][1]:
+        raise ValueError(f"reamer Ø{dr} is outside pivot_bore's band {pivot_bore['dia']}")
+    if not lift_bore["dia"][0] <= df <= lift_bore["dia"][1]:
+        raise ValueError(f"F drill Ø{df} is outside lift_bore's band {lift_bore['dia']}")
     if not p["spot_dia_mm"] < dc < dr:
         raise ValueError("the spot, the C drill and the reamer are not in rising order")
+    if not p["spot_dia_mm"] < df:
+        raise ValueError("the spot is not under the F drill: it would chamfer the bore")
     step_max = p["face_stepover_max_mm"]
     level_max = p["face_step_max_mm"]
     face_rpm, face_feed = _setting(plan, shop, "bottom face")
@@ -464,6 +476,7 @@ def context(
         raise ValueError("'bore spot' runs at another setting than 'hold spot'")
     hold_rpm, hold_feed = _setting(plan, shop, "hold drill")
     bore_rpm, bore_feed = _setting(plan, shop, "bore drill")
+    lift_rpm, lift_feed = _setting(plan, shop, "lift drill")
     ream_rpm, ream_feed = _setting(plan, shop, "bore ream")
     for name in ("hold spot", "bore spot"):
         if not math.isclose(
@@ -474,7 +487,12 @@ def context(
         raise ValueError(
             "the spot is not under the #9 drill: it would chamfer the hole"
         )
-    for name, dia in (("hold drill", d9), ("bore drill", dc), ("bore ream", dr)):
+    for name, dia in (
+        ("hold drill", d9),
+        ("bore drill", dc),
+        ("lift drill", df),
+        ("bore ream", dr),
+    ):
         if not math.isclose(_cut(plan, name, "cutter_dia_mm"), dia, abs_tol=1e-6):
             raise ValueError(f"'{name}' cutter_dia_mm is not its tool's Ø{dia}")
     spot_depth = _spot_depth(p["spot_dia_mm"])
@@ -484,18 +502,21 @@ def context(
         raise ValueError("'hold drill' peck is not process.peck_mm with full retract")
     if op["hole_depth_mm"] != "{{cad.top_face_height_mm}}":
         raise ValueError("'hold drill' hole_depth_mm is not {{cad.top_face_height_mm}}")
-    op = _op_with_cut(plan, "bore drill")[0]
-    if op["peck"] != "none" or op["hole_depth_mm"] != "{{cad.front_face_depth_mm}}":
-        raise ValueError(
-            "'bore drill' is not one feed through {{cad.front_face_depth_mm}}"
-        )
+    for name in ("bore drill", "lift drill"):
+        op = _op_with_cut(plan, name)[0]
+        if op["peck"] != "none" or op["hole_depth_mm"] != "{{cad.front_face_depth_mm}}":
+            raise ValueError(
+                f"'{name}' is not one feed through {{{{cad.front_face_depth_mm}}}}"
+            )
     if depth / dc > 3:
         raise ValueError("the C drill's L/D is over 3: it would need pecks")
     past = p["drill_past_mm"]
     hold_tip = -(past + _point(d9))
     bore_tip = -(past + _point(dc))
+    lift_tip = -(past + _point(df))
     _agree(plan, "hold_tip_height_mm", hold_tip)
     _agree(plan, "bore_tip_height_mm", bore_tip)
+    _agree(plan, "lift_tip_height_mm", lift_tip)
     ream_tip = p["ream_tip_height_mm"]
     if not bore_tip < ream_tip < -past:
         raise ValueError(
@@ -578,13 +599,15 @@ def context(
                 f"{hole['name']} does not enter at the front in the PB05 frame"
             )
         bores.append([_r(x), _r(y)])
+    pivots, lifts = bores[:1], bores[1:]
     # The holes clear the parallels: PB02's against the bar edges (the
     # narrowest bar puts the moving jaw's nearest), PB05's against the ends.
     for x, y in holds:
         if not (-w_min + t < y - d9 / 2 and y + d9 / 2 < -t):
             raise ValueError(f"the hold-down at Y {y} reaches a parallel ({t} thick)")
     for x, y in bores:
-        if not (-width + t < y - dr / 2 and y + dr / 2 < -t):
+        big = max(dr, df)
+        if not (-width + t < y - big / 2 and y + big / 2 < -t):
             raise ValueError(f"the bore at Y {y} reaches a parallel ({t} thick)")
 
     em_tool = {
@@ -615,6 +638,7 @@ def context(
     )
     hold_tool = drill_tool("drill-9", d9, hold_rpm, hold_feed, DRILL_POINT_DEG)
     bore_tool = drill_tool("drill-c", dc, bore_rpm, bore_feed, DRILL_POINT_DEG)
+    lift_tool = drill_tool("drill-f", df, lift_rpm, lift_feed, DRILL_POINT_DEG)
     ream_tool = drill_tool("reamer", dr, ream_rpm, ream_feed, DRILL_POINT_DEG)
 
     def run(x: tuple[float, float]) -> tuple[float, float]:
@@ -730,21 +754,33 @@ def context(
             bore_tool,
             "front",
             "bore_drill",
-            "drill both bores C",
-            bores,
+            "drill the pivot bore C",
+            pivots,
             [
                 ln
-                for xy in bores
+                for xy in pivots
                 for ln in _pecked(xy, depth, bore_tip, None, bore_clear)
+            ],
+        ),
+        (
+            lift_tool,
+            "front",
+            "lift_drill",
+            "drill the lift bore F",
+            lifts,
+            [
+                ln
+                for xy in lifts
+                for ln in _pecked(xy, depth, lift_tip, None, bore_clear)
             ],
         ),
         (
             ream_tool,
             "front",
             "bore_ream",
-            "ream both bores .2510",
-            bores,
-            [ln for xy in bores for ln in _ream(xy, depth, ream_tip, bore_clear)],
+            "ream the pivot bore .2510",
+            pivots,
+            [ln for xy in pivots for ln in _ream(xy, depth, ream_tip, bore_clear)],
         ),
     )
     for tool, frame, key, label, _centres, lines in holes_jobs:
@@ -886,21 +922,32 @@ def context(
             "tool_changes",
             {
                 "z_top": t_max,
-                "tools": [tn["em-half"], tn["spot"], tn["drill-c"], tn["reamer"]],
+                "tools": [
+                    tn["em-half"],
+                    tn["spot"],
+                    tn["drill-c"],
+                    tn["drill-f"],
+                    tn["reamer"],
+                ],
                 "loads_first": True,
             },
         ],
-        [name, "spindle", {"rpm": [[face_rpm], [spot_rpm], [bore_rpm], [ream_rpm]]}],
+        [
+            name,
+            "spindle",
+            {"rpm": [[face_rpm], [spot_rpm], [bore_rpm], [lift_rpm], [ream_rpm]]},
+        ],
         [name, "pauses", {"z_top": t_max, "count": 0}],
-        [name, "depth", {"z_min": _r(bore_tip)}],
+        [name, "depth", {"z_min": _r(min(bore_tip, lift_tip))}],
     ]
     for k, checks in enumerate(
         (
             face_checks("front_face"),
             hole_checks(bores, depth, depth - spot_depth, spot_r, bore_keep),
-            hole_checks(bores, depth, bore_tip, dc / 2, bore_keep),
+            hole_checks(pivots, depth, bore_tip, dc / 2, bore_keep),
+            hole_checks(lifts, depth, lift_tip, df / 2, bore_keep),
             [
-                *hole_checks(bores, depth, ream_tip, dr / 2, bore_keep),
+                *hole_checks(pivots, depth, ream_tip, dr / 2, bore_keep),
                 ["feed_out", {"z_top": depth}],
             ],
         )

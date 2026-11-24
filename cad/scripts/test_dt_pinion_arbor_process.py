@@ -89,13 +89,21 @@ def test_the_lathe_stations_match_the_model():
 
 
 def test_the_journal_aim_gives_the_drawings_clearance_on_the_strap():
+    # Owner ruling 2026-11-24, fit audit question 12: the journals are turned
+    # to the measured strap bores, aim = the smaller bore less the clearance
+    # aim, never over journal_aim_in (the drum and collar pass the shaft).
     p = _plan()["parameters"]
-    journal = _features()["features"]["front_journal"]
-    low, high = (v / IN for v in journal["dia"])
+    f = _features()["features"]
+    # The journals print no band (REF Ø, made to fit): the aim's cap stays
+    # inside the spans' band, which the drum and collar pass.
+    low, high = (v / IN for v in f["shaft"]["dia"])
     assert low <= p["journal_aim_in"] <= high
-    clearance = [v / IN for v in journal["diametral_clearance"]]
-    assert p["strap_bore_min_in"] - high == pytest.approx(clearance[0], abs=1e-4)
-    assert p["strap_bore_max_in"] - low == pytest.approx(clearance[1], abs=1e-4)
+    clearance = [v / IN for v in f["front_journal"]["diametral_clearance"]]
+    assert clearance[0] < p["journal_clearance_aim_in"] < clearance[1]
+    # The largest strap bore the capped aim still fits at the loosest clearance.
+    assert p["strap_bore_max_fit_in"] == pytest.approx(
+        p["journal_aim_in"] + clearance[1], abs=1e-4
+    )
 
 
 def test_the_bench_gauges_read_inside_the_drawings_bands():

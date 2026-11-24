@@ -74,13 +74,11 @@ from dt_pinion_bracket_geometry import (
     WIDTH,
 )
 from dt_pinion_bracket_spec import (
-    ARBOR_BORE_BAND,
     CROSS_HOLE_BAND,
     CROSS_HOLE_DIA,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
     PIN_SEAT_DIA_BAND,
-    PIVOT_BORE_BAND,
     SURFACE_FINISHES,
     UNIT,
 )
@@ -515,24 +513,12 @@ def build(adapter) -> dict[str, str]:
     # Manufacturing drawing support: mark exactly the print's dimensions (the
     # drawing recipe imports the marked set and must find every one of these),
     # author their decimal places ON THE MODEL, and stamp the make-critical
-    # title-block properties.  Only the three fitted bores and the cross hole
-    # carry a band, each from a named fit class or the spring pin's window;
-    # every other feature is governed by its decimal places against the title
-    # block's general grades.  The bands are millimetres; UNIT prints them.
-    set_dimension_bilateral_tolerance(
-        adapter,
-        "StrapProfile",
-        "PivotBoreDia",
-        *deviations(PIVOT_BORE_BAND),
-        display_unit=UNIT,
-    )
-    set_dimension_bilateral_tolerance(
-        adapter,
-        "StrapProfile",
-        "ArborBoreDia",
-        *deviations(ARBOR_BORE_BAND),
-        display_unit=UNIT,
-    )
+    # title-block properties.  Only the follower seat and the cross hole
+    # carry a band; the two bores print the reamer's and the drill's size
+    # bare (fit audit F16 and question 12: no band on a reamed or drilled
+    # hole); every other feature is governed by its decimal places against
+    # the title block's general grades.  The bands are millimetres; UNIT
+    # prints them.
     set_dimension_bilateral_tolerance(
         adapter,
         "PinSeatProfile",

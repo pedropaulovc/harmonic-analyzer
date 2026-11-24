@@ -130,16 +130,19 @@ def test_strap_feature_bands_are_the_printed_ones() -> None:
     assert features["arbor_end"]["overall_length_ref"] == spec.OVERALL_LENGTH
     assert round(spec.OVERALL_LENGTH / 25.4, 1) == 1.7
     assert features["arbor_end"]["precision"]["overall_length_ref"] == 1
-    # Ø.2500 +.0015/+.0010 REAM THRU, sliding fit on MHA-DT-19.
+    # The .2510 reamer's size, no printed band (its ANALYSIS band .2510-.2515);
+    # the MHA-DT-19 shaft is the gauge (fit audit F16).
     pivot = features["pivot_bore"]
     assert pivot["dia"] == pytest.approx([_in(0.2510), _in(0.2515)])
     assert (pivot["process"], pivot["thru"]) == ("ream", True)
     assert pivot["callout"] == drawing.DIMENSION_CALLOUTS["PivotBoreDia"]
-    # Ø.3125 +.0015/+.0010 REAM THRU, running fit on MHA-DT-22, Ra 63, 1.10
+    # 5/16 DRILL THRU at the DRILLED HOLES row, the MHA-DT-22 journals turned
+    # to it (owner ruling 2026-11-24, fit audit question 12), Ra 63, 1.10
     # from the pivot bore.
     arbor = features["arbor_bore"]
-    assert arbor["dia"] == pytest.approx([_in(0.3135), _in(0.3140)])
-    assert (arbor["process"], arbor["thru"]) == ("ream", True)
+    assert arbor["dia"] == pytest.approx([_in(0.3125), _in(0.3165)])
+    assert (arbor["process"], arbor["thru"]) == ("drill", True)
+    assert arbor["drill"] == "5/16"
     assert arbor["callout"] == drawing.DIMENSION_CALLOUTS["ArborBoreDia"]
     assert arbor["center_distance"] == pytest.approx([_in(1.09), _in(1.11)])
     assert (arbor["center_distance_from"], arbor["center_distance_axis"]) == (

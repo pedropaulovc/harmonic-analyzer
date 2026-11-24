@@ -24,7 +24,6 @@ part marks and the drawing keeps EXACTLY ``DRAWING_DIMENSIONS``.
 from __future__ import annotations
 
 import _config
-from _fit_ream_slide import REAM_SLIDE
 from _gtol_cylinder import CylinderFace
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
 
@@ -38,7 +37,8 @@ from dt_pinion_pivot_block_geometry import (
     BLOCK_DEPTH as BLOCK_DEPTH,
     BLOCK_DEPTH_PLACES as BLOCK_DEPTH_PLACES,
     BORE_UP as BORE_UP,
-    BORE_DIA as BORE_DIA,
+    LIFT_BORE_DIA as LIFT_BORE_DIA,
+    PIVOT_BORE_DIA as PIVOT_BORE_DIA,
     LIFT_BORE_SPACING as LIFT_BORE_SPACING,
     LIFT_BORE_RISE as LIFT_BORE_RISE,
     SCREW_HALF_SPACING as SCREW_HALF_SPACING,
@@ -52,29 +52,30 @@ from dt_pinion_pivot_block_geometry import (
     UNIT as UNIT,
 )
 
-# One fit per shaft (Main R2, converged-r7 review): the same REAM_SLIDE band
-# MHA-DT-14 holds on the same Ø6.35 h shafts, never a line-to-line limit on a
-# bore that must turn or slide by hand.
-BORE_DIA_BAND = REAM_SLIDE
+# Neither bore prints a band.  The pivot bore takes the .2510 reamer, the
+# MHA-DT-19 shaft its gauge (owner ruling 2026-11-24, fit audit question 12,
+# option B); the lift bore is drilled F, the MHA-DT-17 rod turning freely in
+# it (fit audit F26).  These are the ANALYSIS bands, what each tool is
+# modelled to cut (the reamer's +.0005; the DRILLED HOLES row's +.004/0), not
+# printed limits.  (upper, lower) deviations.
+PIVOT_BORE_BAND = (0.0127, 0.0)  # ANALYSIS, .2510 reamer: .2510-.2515
+LIFT_BORE_BAND = (0.1016, 0.0)  # ANALYSIS, F drill: .257-.261
 
-# Both reamed bores are running faces (drawing-guidelines.md rule 6 (roughness symbols only where a surface runs, slides or locates)): MHA-DT-19 turns in the pivot
+# Both bores are running faces (drawing-guidelines.md rule 6 (roughness symbols only where a surface runs, slides or locates)): MHA-DT-19 turns in the pivot
 # bore and MHA-DT-17 in the lift bore (Main, MHA-DT-18 eye pass: the lift bore
-# had none).  They share a diameter.  The harvested pivot-bore cylinder
-# spans y=-BORE_DIA/2..+BORE_DIA/2, while the raised lift bore does not reach
-# the pivot bore's lower generator; that point makes the pivot selector
-# exact.  The lift bore sits LIFT_BORE_SPACING west, beyond the pivot
-# bore's x-span, which makes its selector exact.
+# had none).  Each selector is exact by its own diameter; the lift bore also
+# sits LIFT_BORE_SPACING west, beyond the pivot bore's x-span.
 SURFACE_FINISHES = (
     SurfaceFinishControl(
         "pivot_bore",
         MACHINED_UM,
-        CylinderFace(BORE_DIA, contains_y_mm=-BORE_DIA / 2.0),
+        CylinderFace(PIVOT_BORE_DIA),
         display_unit=UNIT,
     ),
     SurfaceFinishControl(
         "lift_bore",
         MACHINED_UM,
-        CylinderFace(BORE_DIA, contains_x_mm=-LIFT_BORE_SPACING),
+        CylinderFace(LIFT_BORE_DIA, contains_x_mm=-LIFT_BORE_SPACING),
         display_unit=UNIT,
     ),
 )
@@ -98,8 +99,8 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 }
 
 # #290 inch sheet: the part authors each printed dimension's places
-# (build_dt_pinion_pivot_block).  Four on the two reamed bores, whose
-# +.0015/+.0010 band needs them; three on the lift bore's spacing and rise,
+# (build_dt_pinion_pivot_block).  Four on the pivot bore (the .2510 reamer's
+# size) and three on the lift bore (the F drill's .257); three on the lift bore's spacing and rise,
 # kinematic nominals kept from the millimetre design (the cam park-gap
 # closure, named by the spacing's callout); two on the snapped envelope and
 # depth (BLOCK_DEPTH_PLACES, the row the rig's stack reads) and on the pivot
@@ -116,7 +117,7 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
         "PivotBoreDia": 4,
         "LiftBoreX": 3,
         "LiftBoreCz": 3,
-        "LiftBoreDia": 4,
+        "LiftBoreDia": 3,
     },
     "Block": {"Depth": BLOCK_DEPTH_PLACES},
 }
@@ -133,32 +134,12 @@ def _registry_mate(row: dict) -> tuple[str, str]:
     return str(row["number"]), str(row["title"]).upper()
 
 
-# Each running bore's mate is named from the registry, so the callout cannot
-# drift from that part's own title block (Main, pc-r7 eye pass: the note said
+# Each bore's mate is named from the registry, so the callout cannot drift
+# from that part's own title block (Main, pc-r7 eye pass: the note said
 # "TORQUE SHAFT" where MHA-DT-19's title reads PINION PIVOT SHAFT).  Each row is
 # read by its literal name so the drawing's config deps carry those two rows
 # (a computed name reads as the part's own row only).
 PIVOT_SHAFT_MATE = _registry_mate(_config.parts("dt-pinion-pivot-shaft"))
 LIFT_ROD_MATE = _registry_mate(_config.parts("dt-pinion-lift-rod"))
 
-
-def _ream_callout(mate: tuple[str, str]) -> str:
-    """The text under a reamed bore's size: process, fit and the mate it runs on
-    (drawing-guidelines.md rule 4 (tighten only for function, and name the
-    mate), at the callout it serves; machinist review r1, #1014).  One phrase
-    per line keeps the block narrow beside the 3:1 front view."""
-    number, title = mate
-    return "\n".join(("THRU - REAM", "RUNNING FIT ON", number, title))
-
-
-# The sheet carries no general notes: each bore's mate and fit ride its REAM
-# callout (rule 7 (notes: few, flagged, never a method): flag it where it
-# applies), the hold-downs are fully defined by their DRILL callout, and
-# assembly operations (the front block's feeler setting, spotting the base seats
-# through the block holes) live on the drive-train assembly's step list and the
-# harmonic base's "TRANSFER FROM MHA-DT-18" callout.
-BORE_CALLOUTS = {
-    "PivotBoreDia": _ream_callout(PIVOT_SHAFT_MATE),
-    "LiftBoreDia": _ream_callout(LIFT_ROD_MATE),
-}
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 2:1"

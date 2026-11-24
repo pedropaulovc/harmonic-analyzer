@@ -92,7 +92,8 @@ def test_context_numbers_the_tools_and_places_the_holes_from_the_model(context) 
         "spot": 2,
         "drill-9": 3,
         "drill-c": 4,
-        "reamer": 5,
+        "drill-f": 5,
+        "reamer": 6,
     }
     assert RECIPE.LOAD_FIRST_TOOL == tuple(name for name, _ops in RECIPE.PROGRAMS)
     f = FEATURES["features"]
@@ -127,6 +128,7 @@ def test_the_recipes_programs_pass_every_check_they_declare(context, tmp_path) -
         ("blank_width_min_in", 1.65, "narrowest bar"),
         ("hold_tip_height_mm", -2.0, "hold_tip_height_mm"),
         ("bore_tip_height_mm", -2.5, "bore_tip_height_mm"),
+        ("lift_tip_height_mm", -2.5, "lift_tip_height_mm"),
         ("ream_tip_height_mm", -3.0, "reamer tip"),
         ("spot_dia_mm", 4.9, "between the pilot"),
         ("east_skim_mm", 1.27, "upright_top_max_mm"),
@@ -176,10 +178,17 @@ def _seed(ctx: dict, key: str, pick, change) -> dict:
             lambda line: "G0 Z15.000",
             "rapid",
         ),
-        # A bore's C drill stopped above the back face.
+        # The pivot bore's C drill stopped above the back face.
         (
             "bore_drill",
             lambda line: line == "G1 Z-2.847 F{feed}",
+            lambda line: "G1 Z0.500 F{feed}",
+            "holes",
+        ),
+        # The lift bore's F drill stopped above the back face.
+        (
+            "lift_drill",
+            lambda line: line == "G1 Z-2.961 F{feed}",
             lambda line: "G1 Z0.500 F{feed}",
             "holes",
         ),

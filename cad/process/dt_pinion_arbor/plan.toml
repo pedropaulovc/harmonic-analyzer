@@ -21,29 +21,23 @@
 #   table and file it smooth.
 # - Setup 7, lathe, between the 3-jaw (on the head, over a brass shim wrap)
 #   and the tailstock dead centre, the follow rest behind the tool: rough the
-#   shaft from the bar, finish it whole length to the journals' band
-#   .3113-.3121 (inside the spans' and lands' .3087-.3121), turn the Ø.28
+#   shaft from the bar, finish it whole length to the aim set by the
+#   measured strap bores (inside the spans' and lands' .3087-.3121), turn the Ø.28
 #   relief, step the SR.28 back crown from a DRO table, every station by the
 #   carriage DRO from the head's rear face.
 # - Setup 8, bench: deburr, check, oil, bag.
 #
-# Matched fit (note 1): the journals run in the MHA-DT-14 strap's two .3135-
-# .3140 reamed bores; Setup 7 mikes the band's two Class ZZ pins, .3135 plus
-# (GO) and .3140 minus (NO-GO), and gauges both bores with them before the
-# journals are finished: a strap bore the GO pin enters and the NO-GO pin
-# does not lies between the two pins' readings, so inside .3135-.3140, and a
-# journal in .3113-.3121 gives the drawing's .0014-.0027 clearance (no
-# constant here assumed the old pair's size). The spans' sliding fit in
-# MHA-DT-33 and the lands' bond in MHA-DT-01 are fixed bands.
+# Made to fit (note 1; owner ruling 2026-11-24, fit audit question 12): the
+# journals run in the MHA-DT-14 strap's two 5/16 drilled bores. Setup 7
+# measures both bores with the telescoping gauge and the micrometer before
+# the shaft is finished and aims the whole shaft at the smaller bore less
+# .002, never over .3117 (the drum and the collar still slide over it): the
+# journals then run at the drawing's .001-.003. No gauge pins on the
+# journals. The spans' sliding fit in MHA-DT-33 and the lands' bond in
+# MHA-DT-01 are fixed bands.
 #
 # To order before Setup 4 runs: the .2510 reamer (tools.reamer-2510, owner
-# ruling #3073); pin gauges (gauges.pin-gauges); before Setup 7, the strap
-# band's .3135 plus Class ZZ pin (GO; the .314 NO-GO is the Class ZZ minus
-# box's), shop common.toml zz-pins-3135-3140. Owner ruling 2026-11-23 (tool
-# audit Q1, re-answered on the corrected facts), verbatim: "ZZ singles per
-# the record: 29 pins (17 plus GO, 12 minus NO-GO), about $130. Accept that
-# good holes near a limit may be refused; the traveler mikes each pin so the
-# real window is known per pin."
+# ruling #3073); pin gauges (gauges.pin-gauges).
 #
 # NC (cam:dt_pinion_arbor, cad/process/dt_pinion_arbor/cam.py):
 # PA01_cross_hole, PA02_pin_hole. The program names, the [parameters] and the
@@ -179,7 +173,9 @@ ream_feed_per_min_mm = 40.64
 drill_feed_per_min_mm = 71.12
 # Setup 7: the 3-jaw on the head over the shim wrap, the back end on the
 # greased dead centre; the shaft roughed in passes of .040 per side from
-# Ø.625 to Ø.330, then finished whole length to .3113-.3121, aiming .3117.
+# Ø.625 to Ø.330, then finished whole length to the aim: the smaller
+# measured strap bore less journal_clearance_aim_in, never over
+# journal_aim_in (.3117, .0004 under the spans' .3121 top).
 # The follow rest bolts to the saddle's headstock side, its jaws a lead L
 # ahead of the tool, so it cannot reach the head: the stretch from the
 # shoulder to the joint at Z+3.20 (in the span between the front journal
@@ -188,6 +184,7 @@ drill_feed_per_min_mm = 71.12
 rough_doc_in = 0.04
 rough_dia_in = 0.33
 journal_aim_in = 0.3117
+journal_clearance_aim_in = 0.002
 relief_aim_in = 0.28
 rest_joint_in = 3.2
 # The AR holder's TCMT insert (60° included) has a trailing edge at 30° or
@@ -217,18 +214,10 @@ pin_far_side_max_in = 1.5413
 # angles): the spindle DTI (shop gauges.dti) on the pin over .200 of Z,
 # .200 × tan 1° = .0035 in = 0.089 mm.
 pin_square_dti_mm = 0.089
-# Setup 7: the MHA-DT-14 strap's arbor bores, Ø.3125 +.0015/+.0010 =
-# .3135-.3140 (dt_pinion_bracket_spec.py REAM_SLIDE; shop common.toml
-# gauges.zz-pins-3135-3140 range_mm). Their Class ZZ pins (owner ruling
-# 2026-11-23, tool audit Q1): GO a plus pin at the low limit, true size
-# .3135 to .3137; NO-GO the box's .314 minus pin, .3138 to .3140 (one pin's
-# ZZ tolerance, .0002, is the record's resolution_mm 0.00508). The largest
-# GO pin and the smallest NO-GO pin the sheet may use: with both pins there,
-# a bore is sure to pass only between them, the middle .0001 of the band.
-strap_bore_min_in = 0.3135
-strap_bore_max_in = 0.314
-strap_go_pin_max_in = 0.3137
-strap_nogo_pin_min_in = 0.3138
+# Setup 7: the MHA-DT-14 strap's arbor bores, 5/16 drilled (.3125-.3165 at
+# the DRILLED HOLES row). A bore over strap_bore_max_fit_in leaves the
+# journals more than .003 even at journal_aim_in: stop and tell the owner.
+strap_bore_max_fit_in = 0.3147
 
 [[tools]]
 id = "saw"
@@ -282,10 +271,9 @@ name = "1/16 drill"
 ref = "drill-1-16"
 
 [[tools]]
-id = "strap-pins"
-name = "Class ZZ pins: .3135 plus (GO) and .3140 minus (NO-GO)"
-ref = "zz-pins-3135-3140"
-status = "to_order"
+id = "telescoping-gauges"
+name = "Telescoping gauges (Starrett S579GZ)"
+ref = "telescoping-gauges-starrett-s579gz"
 
 [[tools]]
 id = "gauge-pin"
@@ -694,19 +682,9 @@ cut_diameter_mm = "{{process.bar_dia_mm}}"
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "On the 0–1 in micrometer (reads .0001; trust a reading to ±.00005), mike the strap's {{process.strap_bore_min_in:.4dot}} GO pin and {{process.strap_bore_max_in:.4dot}} NO-GO pin (Class ZZ). Write both readings here and each on its pin's tag."
-inspection = "GO pin reads {{process.strap_bore_min_in:.4dot}}–{{process.strap_go_pin_max_in:.4dot}}, NO-GO pin {{process.strap_nogo_pin_min_in:.4dot}}–{{process.strap_bore_max_in:.4dot}}: a pin outside its range is not used."
-gauge_checks = [{ gauge = "micrometers", band_mm = [7.9629, 7.9756] }]
-
-[[setups.operations]]
-cut_kind = "other"
-instruction = "Gauge both bores of the MHA-DT-14 strap (the journals' mate): the GO pin enters each, the NO-GO pin enters neither; write the result here. A bore passing lies between the two readings: GO reading ≤ bore < NO-GO reading. Only {{process.strap_go_pin_max_in:.4dot}}–{{process.strap_nogo_pin_min_in:.4dot}} is sure to pass; a good bore within .0002 of a limit may be refused (owner ruling 2026-11-23)."
-inspection = "GO enters, NO-GO does not: strap bores Ø{{process.strap_bore_min_in:.4dot}}–{{process.strap_bore_max_in:.4dot}}, both."
-gauge_checks = [{ gauge = "zz-pins-3135-3140", band_mm = [7.9629, 7.9756] }]
-
-[[setups.operations]]
-cut_kind = "other"
-instruction = "A strap bore the GO pin does not enter, or the NO-GO pin enters: stop; the strap goes back to its own traveler, and the journals are not finished until it gauges in band."
+instruction = "Measure both arbor bores of the MHA-DT-14 strap (the journals' mate) with the telescoping gauge and the 0–1 in micrometer (reads .0001), at each end of each bore; write the smallest reading S here. The aim A for the whole shaft is S − {{process.journal_clearance_aim_in:.3dot}}, never over {{process.journal_aim_in:.4dot}}: write A."
+inspection = "S at most {{process.strap_bore_max_fit_in:.4dot}}. Over it (the journals would run more than .003 loose at the {{process.journal_aim_in:.4dot}} limit): stop and tell the owner; the journals are not finished."
+gauge_checks = [{ gauge = "telescoping-gauges-starrett-s579gz", band_mm = [7.9375, 8.0391] }]
 
 [[setups.operations]]
 cut_kind = "other"
@@ -714,9 +692,9 @@ speed_kind = "spindle"
 tool = "ar"
 drilling = "none"
 sizing = "other"
-instruction = "The follow rest still off. Trial cut first: spindle running, skim .25 in at Z+{{process.rest_joint_in:.2f}} at a setting .002 over the aim; stop the spindle, mike it, and move the cross slide in by half the difference from {{process.journal_aim_in:.4dot}}."
+instruction = "The follow rest still off. Trial cut first: spindle running, skim .25 in at Z+{{process.rest_joint_in:.2f}} at a setting .002 over the aim; stop the spindle, mike it, and move the cross slide in by half the difference from the written aim A."
 settings = "lathe-ar-1018"
-cut_diameter_mm = "{{cad.front_journal_dia_mm}}"
+cut_diameter_mm = "{{cad.shaft_dia_mm}}"
 
 [[setups.operations]]
 cut_kind = "other"
@@ -724,9 +702,9 @@ speed_kind = "spindle"
 tool = "ar"
 drilling = "none"
 sizing = "other"
-instruction = "Then finish the head-end stretch from Z+{{process.rest_joint_in:.2f}} to Z+{{cad.neck_length_in:.3dot}} in one pass at the settings column's power feed to Ø{{cad.front_journal_dia_min_in:.4dot}}–{{cad.front_journal_dia_max_in:.4dot}}, aiming {{process.journal_aim_in:.4dot}} (the front journal's band, inside the span's {{cad.shaft_dia_min_in:.4dot}}–{{cad.shaft_dia_max_in:.4dot}}). Write the cross-slide DRO's reading for this finish setting."
+instruction = "Then finish the head-end stretch from Z+{{process.rest_joint_in:.2f}} to Z+{{cad.neck_length_in:.3dot}} in one pass at the settings column's power feed, aiming A (the journals made to the strap, inside the span's {{cad.shaft_dia_min_in:.4dot}}–{{cad.shaft_dia_max_in:.4dot}}). Write the cross-slide DRO's reading for this finish setting."
 settings = "lathe-ar-1018"
-cut_diameter_mm = "{{cad.front_journal_dia_mm}}"
+cut_diameter_mm = "{{cad.shaft_dia_mm}}"
 
 [[setups.operations]]
 cut_kind = "other"
@@ -759,19 +737,19 @@ speed_kind = "spindle"
 tool = "ar"
 drilling = "none"
 sizing = "other"
-instruction = "Finish from the back end to Z+{{process.rest_joint_in:.2f}} in one pass at the settings column's power feed, aiming {{process.journal_aim_in:.4dot}}, the follow rest's jaws, ahead of the tool, set on the roughed Ø{{process.rough_dia_in:.3dot}}. First, spindle running, skim .25 in at the back end at the written finish reading, stop, mike it, and move the cross slide by half the difference from {{process.journal_aim_in:.4dot}} (the AR holder may have moved since); then the pass. Stop at Z+{{process.rest_joint_in:.2f}}, where it meets the head-end stretch."
+instruction = "Finish from the back end to Z+{{process.rest_joint_in:.2f}} in one pass at the settings column's power feed, aiming A, the follow rest's jaws, ahead of the tool, set on the roughed Ø{{process.rough_dia_in:.3dot}}. First, spindle running, skim .25 in at the back end at the written finish reading, stop, mike it, and move the cross slide by half the difference from A (the AR holder may have moved since); then the pass. Stop at Z+{{process.rest_joint_in:.2f}}, where it meets the head-end stretch."
 settings = "lathe-ar-1018"
-cut_diameter_mm = "{{cad.front_journal_dia_mm}}"
+cut_diameter_mm = "{{cad.shaft_dia_mm}}"
 
 [[setups.operations]]
 cut_kind = "other"
 instruction = "Spindle stopped: mike the shaft at Z+2.2 and Z+8.6 (the journals) and at Z+1.0, Z+3.5, Z+7.5 and Z+9.2. Journals smooth to the nail, no chatter (Ra 63)."
-inspection = "Journals Ø{{cad.front_journal_dia_min_in:.4dot}}–{{cad.front_journal_dia_max_in:.4dot}} at both; elsewhere Ø{{cad.shaft_dia_min_in:.4dot}}–{{cad.shaft_dia_max_in:.4dot}}."
-gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.front_journal_dia_band_mm}}" }, { gauge = "micrometers", band_mm = "{{cad.shaft_dia_band_mm}}" }]
+inspection = "Journals at both: A to .0004 under it, so .001–.003 under S (note 1: turned to the measured strap bores); elsewhere Ø{{cad.shaft_dia_min_in:.4dot}}–{{cad.shaft_dia_max_in:.4dot}}."
+gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.shaft_dia_band_mm}}" }]
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "A journal, span or land over its band's top: spindle stopped, the follow rest lifted off; the AR tool's left edge on the head's rear face, DRO Z0 again. Bolt the rest back (jaws on the finished diameter) unless the stretch lies under Z+{{process.rest_joint_in:.2f}}."
+instruction = "A journal over A, or a span or land over its band's top: spindle stopped, the follow rest lifted off; the AR tool's left edge on the head's rear face, DRO Z0 again. Bolt the rest back (jaws on the finished diameter) unless the stretch lies under Z+{{process.rest_joint_in:.2f}}."
 feed = "hand"
 
 [[setups.operations]]
@@ -780,9 +758,9 @@ speed_kind = "spindle"
 tool = "ar"
 drilling = "none"
 sizing = "other"
-instruction = "Skim that stretch only to Ø{{process.journal_aim_in:.4dot}}, the cross slide in by half the miked excess per side: a journal Z+{{cad.front_journal_station_in:.2dot}} to Z+{{cad.front_journal_end_station_in:.2dot}} or Z+{{cad.back_journal_station_in:.2dot}} to Z+{{cad.back_journal_end_station_in:.2dot}}; a span or land from the journal's end to the next journal, shoulder or back end. Mike again. Any reading under its band's bottom: the arbor is scrap; start again from Setup 1."
+instruction = "Skim that stretch only to A, the cross slide in by half the miked excess per side: a journal Z+{{cad.front_journal_station_in:.2dot}} to Z+{{cad.front_journal_end_station_in:.2dot}} or Z+{{cad.back_journal_station_in:.2dot}} to Z+{{cad.back_journal_end_station_in:.2dot}}; a span or land from the journal's end to the next journal, shoulder or back end. Mike again. A journal more than .003 under S, or any other reading under its band's bottom: the arbor is scrap; start again from Setup 1."
 settings = "lathe-ar-1018"
-cut_diameter_mm = "{{cad.front_journal_dia_mm}}"
+cut_diameter_mm = "{{cad.shaft_dia_mm}}"
 
 [[setups.operations]]
 cut_kind = "other"
@@ -853,7 +831,7 @@ drilling = "none"
 sizing = "other"
 instruction = "AR tool back. Spindle stopped, the follow rest lifted off: touch its left edge on the head's rear face, DRO Z0 again; the rest bolted back, its jaws on the Ø.3117. Step the SR.28 back crown from the rim at Z+{{cad.back_crown_rim_station_in:.2dot}}: at each line, carriage at the Z, face from the Ø out to the shaft's O.D.: Z+9.3602 from Ø.280; Z+9.3707 Ø.240; Z+9.3792 Ø.200; Z+9.3860 Ø.160; Z+9.3912 Ø.120. The dead centre's hole stays inside Ø.12."
 settings = "lathe-ar-1018"
-cut_diameter_mm = "{{cad.front_journal_dia_mm}}"
+cut_diameter_mm = "{{cad.shaft_dia_mm}}"
 
 [[setups.operations]]
 cut_kind = "other"

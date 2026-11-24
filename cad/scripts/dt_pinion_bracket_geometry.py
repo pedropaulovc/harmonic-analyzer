@@ -54,8 +54,19 @@ THICKNESS_PLACES = 2  # Depth prints .XX (dt_pinion_bracket_spec.DRAWING_PRECISI
 THICKNESS_LIMITS = tuple(
     THICKNESS + d for d in printed_deviations(THICKNESS, THICKNESS_PLACES, unit=UNIT)
 )
-PIVOT_BORE = 6.35  # .2500, REAM_SLIDE on the MHA-DT-19 shaft
-ARBOR_BORE = 7.9375  # 5/16 in, REAM_SLIDE on the MHA-DT-22 arbor
+# The pivot bore is the .2510 reamer's size, the MHA-DT-19 shaft its gauge
+# (fit audit F16); the arbor bore is drilled 5/16 and the MHA-DT-22 journals
+# are turned to it (owner ruling 2026-11-24, fit audit question 12).
+PIVOT_BORE = 6.3754  # .2510 reamer
+# The pivot bore's ANALYSIS band, what the reamer is modelled to cut
+# (.2510-.2515), not a printed limit; here rather than in the spec so the
+# strap pin's stacks read it without importing the sheet contract.
+PIVOT_BORE_BAND = (0.0127, 0.0)
+# The MHA-DT-19 shaft's 1/4 in nominal (dt_pinion_pivot_shaft_spec.SHAFT_DIA,
+# which imports the strap pin spec, so it cannot be read from here;
+# test_dt_drive_train_assembly_stack pins the two together).
+PIVOT_SHAFT_DIA = 6.35
+ARBOR_BORE = 7.9375  # 5/16 drill
 # #290: the MHA-DT-25 stud is 5/32 drill rod, bonded in a .157 +.003/.000
 # seat finished with the 1/8 end mill (owner ruling 2026-11-23, tool audit Q8).
 PIN_BORE = 3.9878  # .157
