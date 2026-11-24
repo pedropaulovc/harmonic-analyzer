@@ -458,11 +458,11 @@ vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{cad.envelope_z_mm}}", alon
 beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{process.bar_width_mm}}"], clamp_mm = [0, "{{process.bar_width_mm}}"], section_mm = { y = "{{cad.envelope_z_mm}}", z = "{{process.height_top_mm}}" }, vise_left = "start" }
 
 [[setups.operations]]
-instruction = "Home the mill first ($H). Repeat Setup 2's edge finder X0 (left end L) and Y0 (fixed jaw, now on the mating face)."
+instruction = "Home the mill first ($H). Before the slice goes in, G54 Z0: the stacks' top, touched with the 1/2 in end mill on the fixed-jaw stack, the jaws open. Console M6 T1 (the tool setter measures it); jog it over the fixed-jaw stack, its edge clear of the jaw; spindle stopped, its tip just dragging a .002 feeler leaf on the stack: G10 L20 P1 Z0.051. Raise Z. Not with the slice in: the collet would meet the slice before the tip reached the stack."
 feed = "hand"
 
 [[setups.operations]]
-instruction = "G54 Z0 with the 1/8 in end mill (the jaws are only the slice's depth apart). Console M6 T2 (the tool setter measures it); MDI G0 X-12.700 Y-2.000, its edge .016 off the fixed jaw over that jaw's stack; spindle stopped, its tip just dragging a .002 feeler leaf on the stack: G10 L20 P1 Z0.051."
+instruction = "The slice clamped as Holding says: repeat Setup 2's edge finder X0 (left end L) and Y0 (fixed jaw, now on the mating face)."
 feed = "hand"
 
 [[setups.operations]]
@@ -604,13 +604,13 @@ vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{cad.envelope_z_mm}}", alon
 beam = { axis = "z", hold = "cantilever", extent_mm = [0, "{{process.bar_width_mm}}"], clamp_mm = [0, "{{process.upright_grip_mm}}"], section_mm = { x = "{{cad.envelope_y_mm}}", y = "{{cad.envelope_z_mm}}" }, vise_left = "other" }
 
 [[setups.operations]]
-instruction = "Home the mill first ($H). G54 X0 the top face (left), Y0 the fixed jaw's face: edge finder (900 rpm)."
-instruction_detailed = "Home the mill first ($H). Edge finder (900 rpm): on the fixed jaw's face beside the slice, G10 L20 P1 Y-2.540; on the TOP face from the left, its tip .10 below the slice's top, G10 L20 P1 X-2.540."
+instruction = "Home the mill first ($H). Before the slice goes in, G54 Z0: the parallels' top, touched with the 1/2 in end mill on the fixed-jaw parallel, the jaws open."
+instruction_detailed = "Home the mill first ($H). Before the slice goes in, the parallels in place and the jaws open: console M6 T1 (the tool setter measures it). Jog it over the fixed-jaw parallel, its edge clear of the jaw. Spindle stopped, its tip just dragging a .002 feeler leaf on the parallel: G10 L20 P1 Z0.051. Raise Z. Not with the slice in: the collet would meet the slice and the jaw tops before the tip reached the parallel."
 feed = "hand"
 
 [[setups.operations]]
-instruction = "G54 Z0: the parallels' top, touched with the 1/8 in end mill on the fixed-jaw parallel left of the slice (the 1/2 in end mill would not fit between the jaws, only the slice's depth apart)."
-instruction_detailed = "Console M6 T2 (the tool setter measures it). MDI G0 X-12.700 Y-2.000: the cutter left of the slice, its edge .016 off the fixed jaw, over that jaw's parallel. Spindle stopped, its tip just dragging a .002 feeler leaf on the parallel: G10 L20 P1 Z0.051."
+instruction = "The slice clamped as Holding says: G54 X0 the top face (left), Y0 the fixed jaw's face: edge finder (900 rpm)."
+instruction_detailed = "The slice clamped as Holding says. Edge finder (900 rpm): on the fixed jaw's face beside the slice, G10 L20 P1 Y-2.540; on the TOP face from the left, its tip .10 below the slice's top, G10 L20 P1 X-2.540."
 feed = "hand"
 
 [[setups.operations]]
@@ -655,7 +655,7 @@ vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{cad.envelope_z_mm}}", alon
 beam = { axis = "z", hold = "cantilever", extent_mm = [0, "{{process.far_top_mm}}"], clamp_mm = [0, "{{process.upright_grip_mm}}"], section_mm = { x = "{{cad.envelope_y_mm}}", y = "{{cad.envelope_z_mm}}" }, vise_left = "other" }
 
 [[setups.operations]]
-instruction = "Home the mill first ($H). Repeat Setup 7's touch-off: edge finder X0 on the top face (left) and Y0 on the fixed jaw, then M6 T2 (the 1/8 in end mill) at X-12.700 Y-2.000 and the feeler Z0 on the fixed-jaw parallel (G10 L20 P1 Z0.051)."
+instruction = "Home the mill first ($H). Before the slice goes back in, repeat Setup 7's Z0: M6 T1, its tip on the .002 feeler leaf on the fixed-jaw parallel, the jaws open (G10 L20 P1 Z0.051); raise Z. Then clamp the slice as Holding says and repeat Setup 7's edge finder X0 on the top face (left) and Y0 on the fixed jaw."
 feed = "hand"
 
 [[setups.operations]]
@@ -676,7 +676,7 @@ milling_cuts = [
 ]
 
 [[setups.operations]]
-instruction = "Length over {{cad.far_end_length_max_in:.3dot}}: stop the file; home ($H) and repeat this setup's touch-offs; send $#, note the G54 line's Z; G10 L2 P1 Z(that Z − (the reading − {{cad.far_end_length_in:.3dot}}) × 25.4); run MS07_far_end again from its start and re-check. Under {{cad.far_end_length_min_in:.3dot}}: the block is scrap."
+instruction = "Length over {{cad.far_end_length_max_in:.3dot}}: stop the file there (the controller keeps G54: no homing, no new touch-off); send $#, note the G54 line's Z; G10 L2 P1 Z(that Z − (the reading − {{cad.far_end_length_in:.3dot}}) × 25.4); run MS07_far_end again from its start and re-check. Under {{cad.far_end_length_min_in:.3dot}}: the block is scrap."
 feed = "hand"
 
 [[setups.operations]]
@@ -711,13 +711,13 @@ vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{cad.envelope_z_mm}}", alon
 beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{cad.envelope_x_mm}}"], clamp_mm = [0, "{{cad.envelope_x_mm}}"], section_mm = { y = "{{cad.envelope_z_mm}}", z = "{{cad.envelope_y_mm}}" }, vise_left = "start" }
 
 [[setups.operations]]
-instruction = "Home the mill first ($H). G54 X0 the locating end (right), Y0 the fixed jaw's face: edge finder (900 rpm)."
-instruction_detailed = "Home the mill first ($H). Edge finder (900 rpm): on the fixed jaw's face beside the block, G10 L20 P1 Y-2.540; on the locating end (RIGHT) from the right, G10 L20 P1 X2.540 (plus: the finder's centre is right of the end)."
+instruction = "Home the mill first ($H). Before the block goes in, G54 Z0: the stacks' top, touched with the 1/8 in end mill on the fixed-jaw stack, the jaws open."
+instruction_detailed = "Home the mill first ($H). Before the block goes in, the stacks in place and the jaws open: console M6 T2 (the 1/8 in end mill; the tool setter measures it). Jog it over the fixed-jaw stack, clear of the jaw. Spindle stopped, its tip just dragging a .002 feeler leaf on the stack: G10 L20 P1 Z0.051. Raise Z. MS08_thumb's M6 T5 then measures the centre drill against it. Not with the block in: the collet would reach the block as the tip reached the stack."
 feed = "hand"
 
 [[setups.operations]]
-instruction = "G54 Z0: the stacks' top, touched with the 1/8 in end mill on the fixed-jaw stack right of the block (the centre drill's body would meet the jaw there)."
-instruction_detailed = "Console M6 T2 (the 1/8 in end mill; the tool setter measures it). MDI G0 X6.000 Y-2.000: right of the block, its edge .016 off the fixed jaw, over that jaw's stack. Spindle stopped, its tip just dragging a .002 feeler leaf on the stack: G10 L20 P1 Z0.051. MS08_thumb's M6 T5 then measures the centre drill against it."
+instruction = "The block clamped as Holding says: G54 X0 the locating end (right), Y0 the fixed jaw's face: edge finder (900 rpm)."
+instruction_detailed = "The block clamped as Holding says. Edge finder (900 rpm): on the fixed jaw's face beside the block, G10 L20 P1 Y-2.540; on the locating end (RIGHT) from the right, G10 L20 P1 X2.540 (plus: the finder's centre is right of the end)."
 feed = "hand"
 
 [[setups.operations]]

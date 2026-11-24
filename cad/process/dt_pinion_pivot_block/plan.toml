@@ -346,13 +346,13 @@ vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{process.blank_width_max_mm
 beam = { axis = "z", hold = "cantilever", extent_mm = [0, "{{process.edge_top_max_mm}}"], clamp_mm = [0, "{{process.edge_grip_mm}}"], section_mm = { x = "{{process.blank_thickness_max_mm}}", y = "{{process.blank_width_max_mm}}" }, vise_left = "other" }
 
 [[setups.operations]]
-instruction = "Home the mill first ($H). G54 X0 the back face K (left), Y0 the fixed jaw's face (E): edge finder (900 rpm)."
-instruction_detailed = "Home the mill first ($H). Edge finder (900 rpm): on the fixed jaw's face beside the blank, G10 L20 P1 Y-2.540; its tip .10 below the blank's top, on K from the left, G10 L20 P1 X-2.540."
+instruction = "Home the mill first ($H). Before each blank goes in, G54 Z0: the parallels' top (B), touched with the end mill on the fixed-jaw parallel, the jaws open."
+instruction_detailed = "Home the mill first ($H). Before each blank goes in, the parallels in place and the jaws open: console M6 T1 (the tool setter measures it). Jog it over the fixed-jaw parallel, its edge clear of the jaw. Spindle stopped, its tip just dragging a .002 feeler leaf on the parallel: G10 L20 P1 Z0.051. Raise Z. Not with the blank in: the collet would meet the blank before the tip reached the parallel."
 feed = "hand"
 
 [[setups.operations]]
-instruction = "G54 Z0: the parallels' top (B), touched with the end mill on the fixed-jaw parallel left of the blank."
-instruction_detailed = "Console M6 T1 (the tool setter measures it). MDI G0 X-8.000 Y-6.850: the cutter left of the blank, its edge .02 off the fixed jaw, over that jaw's parallel. Spindle stopped, its tip just dragging a .002 feeler leaf on the parallel: G10 L20 P1 Z0.051."
+instruction = "The blank clamped as Holding says: G54 X0 the back face K (left), Y0 the fixed jaw's face (E): edge finder (900 rpm)."
+instruction_detailed = "The blank clamped as Holding says. Edge finder (900 rpm): on the fixed jaw's face beside the blank, G10 L20 P1 Y-2.540; its tip .10 below the blank's top, on K from the left, G10 L20 P1 X-2.540."
 feed = "hand"
 
 [[setups.operations]]
@@ -377,7 +377,7 @@ instruction = "A sawn patch left on the top: stop and tell the owner (the blank 
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Height over {{cad.top_face_height_max_in:.3dot}}: stop the file; home ($H) and repeat this setup's X0, Y0 and Z0 touch-offs; then send $#, note the G54 line's Z; G10 L2 P1 Z(that Z − (the reading − {{cad.top_face_height_mm:in.4dot}}) × 25.4); run PB02_top_holds again from its start and re-check. Under {{cad.top_face_height_min_in:.3dot}}: the blank is scrap."
+instruction = "Height over {{cad.top_face_height_max_in:.3dot}}: stop the file there (the controller keeps G54: no homing, no new touch-off); send $#, note the G54 line's Z; G10 L2 P1 Z(that Z − (the reading − {{cad.top_face_height_mm:in.4dot}}) × 25.4); run PB02_top_holds again from its start and re-check. Under {{cad.top_face_height_min_in:.3dot}}: the blank is scrap."
 feed = "hand"
 
 [[setups.operations]]
@@ -468,12 +468,12 @@ vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{cad.top_face_height_mm}}",
 beam = { axis = "z", hold = "cantilever", extent_mm = [0, "{{process.upright_top_max_mm}}"], clamp_mm = [0, "{{process.upright_grip_mm}}"], section_mm = { x = "{{process.blank_thickness_max_mm}}", y = "{{cad.top_face_height_mm}}" }, vise_left = "other" }
 
 [[setups.operations]]
-instruction = "Home the mill first ($H). Repeat Setup 4's edge-finder X0 (on K) and Y0 (on the fixed jaw): the block was turned over."
+instruction = "Home the mill first ($H). Before each block goes in, G54 Z0: the parallels' top (E), from a 1-2-3 block lying flat across both parallels, the jaws open: mike its 1 in thickness first."
+instruction_detailed = "Home the mill first ($H). Before each block goes in, the jaws open about 2-1/2 in, a parallel against each: lay a 1-2-3 block flat across both parallels (1 in up). Console M6 T1 (the tool setter measures it). Jog it over the block's middle. Spindle stopped, its tip just dragging a .002 feeler leaf on the block: G10 L20 P1 Z(the block's miked thickness × 25.4 + 0.051); for 1.0000, Z25.451. Raise Z; take the block out. Not on the parallel: the jaw tops stand 1.27 above the 1/2 in parallels, more than the end mill is out of the collet."
 feed = "hand"
 
 [[setups.operations]]
-instruction = "G54 Z0: the parallels' top (E), touched with the end mill on the fixed-jaw parallel left of the block."
-instruction_detailed = "Console M6 T1 (the tool setter measures it). MDI G0 X-8.000 Y-6.850: the cutter left of the block, its edge .02 off the fixed jaw, over that jaw's parallel. Spindle stopped, its tip just dragging a .002 feeler leaf on the parallel: G10 L20 P1 Z0.051."
+instruction = "The block clamped as Holding says: repeat Setup 4's edge-finder X0 (on K) and Y0 (on the fixed jaw): the block was turned over."
 feed = "hand"
 
 [[setups.operations]]

@@ -555,13 +555,13 @@ vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{cad.back_face_depth_mm}}",
 beam = { axis = "z", hold = "cantilever", extent_mm = [0, "{{process.end_top_max_mm}}"], clamp_mm = [0, "{{process.edge_grip_mm}}"], section_mm = { x = "{{process.top_top_max_mm}}", y = "{{cad.back_face_depth_mm}}" }, vise_left = "other" }
 
 [[setups.operations]]
-instruction = "Home the mill first ($H). G54 X0 the underside U (the RIGHT side), Y0 the fixed jaw's face (F): edge finder (900 rpm)."
-instruction_detailed = "Home the mill first ($H). Edge finder (900 rpm): on the fixed jaw's face beside the blank, G10 L20 P1 Y-2.540; its tip .10 below N, on U from the right, G10 L20 P1 X2.540."
+instruction = "Home the mill first ($H). Before each blank goes back in, G54 Z0: the parallels' top (S), touched with the end mill on the fixed-jaw parallel, the jaws open."
+instruction_detailed = "Home the mill first ($H). Before each blank goes back in, the parallels in place and the jaws open: console M6 T1 (the tool setter measures it). Jog it over the fixed-jaw parallel, its edge clear of the jaw. Spindle stopped, its tip just dragging a .002 feeler leaf on the parallel: G10 L20 P1 Z0.051. Raise Z. Not with the blank in: the collet would meet the blank before the tip reached the parallel."
 feed = "hand"
 
 [[setups.operations]]
-instruction = "G54 Z0: the parallels' top (S), touched with the end mill on the fixed-jaw parallel right of the blank."
-instruction_detailed = "Console M6 T1 (the tool setter measures it). MDI G0 X8.000 Y-6.850: the cutter right of the blank, its edge .02 off the fixed jaw, over that jaw's parallel. Spindle stopped, its tip just dragging a .002 feeler leaf on the parallel: G10 L20 P1 Z0.051."
+instruction = "The blank clamped as Holding says: G54 X0 the underside U (the RIGHT side), Y0 the fixed jaw's face (F): edge finder (900 rpm)."
+instruction_detailed = "The blank clamped as Holding says. Edge finder (900 rpm): on the fixed jaw's face beside the blank, G10 L20 P1 Y-2.540; its tip .10 below N, on U from the right, G10 L20 P1 X2.540."
 feed = "hand"
 
 [[setups.operations]]
@@ -618,13 +618,13 @@ instruction = "If the .1280 reamer reads under the GO pin's reading, its holes w
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Start only with the .1280 reamer and the .1275/.1285 Class ZZ pins in hand (all to buy). Home the mill first ($H). G54 X0 the S end (left), Y0 the fixed jaw's face (F): edge finder (900 rpm)."
-instruction_detailed = "Start only with the .1280 reamer and the .1275/.1285 Class ZZ pins in hand (all to buy). Home the mill first ($H). Edge finder (900 rpm): on the fixed jaw's face beside the blank, G10 L20 P1 Y-2.540; its tip .10 below the blank's top, on S from the left, G10 L20 P1 X-2.540. S places datum B and the tap: edge-find it carefully."
+instruction = "Start only with the .1280 reamer and the .1275/.1285 Class ZZ pins in hand (all to buy). Home the mill first ($H). Before each blank goes in, G54 Z0: the parallels' top (U), touched with the end mill on the fixed-jaw parallel, the jaws open."
+instruction_detailed = "Start only with the .1280 reamer and the .1275/.1285 Class ZZ pins in hand (all to buy). Home the mill first ($H). Before each blank goes in, the parallels in place and the jaws open: console M6 T1 (the tool setter measures it). Jog it over the fixed-jaw parallel, its edge clear of the jaw. Spindle stopped, its tip just dragging a .002 feeler leaf on the parallel: G10 L20 P1 Z0.051. Raise Z. Not with the blank in: the collet would meet the blank before the tip reached the parallel."
 feed = "hand"
 
 [[setups.operations]]
-instruction = "G54 Z0: the parallels' top (U), touched with the end mill on the fixed-jaw parallel left of the blank."
-instruction_detailed = "Console M6 T1 (the tool setter measures it). MDI G0 X-8.000 Y-6.850: the cutter left of the blank, its edge .02 off the fixed jaw, over that jaw's parallel. Spindle stopped, its tip just dragging a .002 feeler leaf on the parallel: G10 L20 P1 Z0.051."
+instruction = "The blank clamped as Holding says: G54 X0 the S end (left), Y0 the fixed jaw's face (F): edge finder (900 rpm)."
+instruction_detailed = "The blank clamped as Holding says. Edge finder (900 rpm): on the fixed jaw's face beside the blank, G10 L20 P1 Y-2.540; its tip .10 below the blank's top, on S from the left, G10 L20 P1 X-2.540. S places datum B and the tap: edge-find it carefully."
 feed = "hand"
 
 [[setups.operations]]
@@ -645,7 +645,7 @@ milling_cuts = [
 ]
 
 [[setups.operations]]
-instruction = "Height over {{cad.bottom_face_height_max_in:.3dot}}: stop the file; home ($H) and repeat this setup's X0, Y0 and Z0 touch-offs. Send $#, note the G54 line's Z; work out w = that Z − (the reading − {{cad.bottom_face_height_mm:in.4dot}}) × 25.4 and send G10 L2 P1 Z followed by w. Run KM06_top_holes again from its start and re-check. Under {{cad.bottom_face_height_min_in:.3dot}}: the blank is scrap."
+instruction = "Height over {{cad.bottom_face_height_max_in:.3dot}}: stop the file there (the controller keeps G54: no homing, no new touch-off). Send $#, note the G54 line's Z; work out w = that Z − (the reading − {{cad.bottom_face_height_mm:in.4dot}}) × 25.4 and send G10 L2 P1 Z followed by w. Run KM06_top_holes again from its start and re-check. Under {{cad.bottom_face_height_min_in:.3dot}}: the blank is scrap."
 feed = "hand"
 
 [[setups.operations]]

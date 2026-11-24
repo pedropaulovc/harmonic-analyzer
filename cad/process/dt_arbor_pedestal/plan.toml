@@ -405,13 +405,13 @@ vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{process.blank_z_mm}}", alo
 beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{process.blank_length_max_mm}}"], clamp_mm = [0, "{{process.blank_length_max_mm}}"], section_mm = { y = "{{process.blank_z_mm}}", z = "{{process.blank_x_mm}}" }, vise_left = "start" }
 
 [[setups.operations]]
-instruction = "Home the mill first ($H). G54 X0 the blank's left end, Y0 the fixed jaw's face: edge finder (900 rpm)."
-instruction_detailed = "Home the mill first ($H). Edge finder (900 rpm): on the fixed jaw's face beside the blank, G10 L20 P1 Y-2.540; on the blank's LEFT end from the left, G10 L20 P1 X-2.540."
+instruction = "Home the mill first ($H). Before each blank goes in, G54 Z0: the stacks' top, touched with the end mill on the fixed-jaw stack, the jaws open."
+instruction_detailed = "Home the mill first ($H). Before each blank goes in, the stacks in place and the jaws open: console M6 T1 (1/2 in end mill, {{process.half_mill_projection_mm:in.2f}} in out of the collet; the tool setter measures it). Jog it over the fixed-jaw stack, its edge clear of the jaw. Spindle stopped, its tip just dragging a .002 feeler leaf on the stack: G10 L20 P1 Z0.051. Raise Z. Not with the blank in: the collet would meet the blank before the tip reached the stack."
 feed = "hand"
 
 [[setups.operations]]
-instruction = "G54 Z0: the stacks' top, touched with the end mill on the fixed-jaw stack left of the blank."
-instruction_detailed = "Console M6 T1 (1/2 in end mill, {{process.half_mill_projection_mm:in.2f}} in out of the collet; the tool setter measures it). MDI G0 X-12.700 Y-6.850: the cutter left of the blank, its edge .02 off the fixed jaw, over that jaw's stack. Spindle stopped, its tip just dragging a .002 feeler leaf on the stack: G10 L20 P1 Z0.051."
+instruction = "The blank clamped as Holding says: G54 X0 the blank's left end, Y0 the fixed jaw's face: edge finder (900 rpm)."
+instruction_detailed = "The blank clamped as Holding says. Edge finder (900 rpm): on the fixed jaw's face beside the blank, G10 L20 P1 Y-2.540; on the blank's LEFT end from the left, G10 L20 P1 X-2.540."
 feed = "hand"
 
 [[setups.operations]]
@@ -454,13 +454,13 @@ instruction = "Before clamping: file the burr off E's four edges (milled in Setu
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Home the mill first ($H). G54 X0 the blank's RIGHT end, Y0 the fixed jaw's face (W): edge finder (900 rpm)."
-instruction_detailed = "Home the mill first ($H). Edge finder (900 rpm): on the fixed jaw's face beside the blank, G10 L20 P1 Y-2.540; on the blank's RIGHT end from the right, G10 L20 P1 X2.540 (plus: the finder's centre is right of the end)."
+instruction = "Home the mill first ($H). Before each blank goes in, G54 Z0: the stacks' top, touched with the end mill on the fixed-jaw stack, the jaws open."
+instruction_detailed = "Home the mill first ($H). Before each blank goes in, the stacks in place and the jaws open: console M6 T1 (the tool setter measures it). Jog it over the fixed-jaw stack, its edge clear of the jaw. Spindle stopped, its tip just dragging a .002 feeler leaf on the stack: G10 L20 P1 Z0.051. Raise Z. Not with the blank in: the collet would meet the blank before the tip reached the stack."
 feed = "hand"
 
 [[setups.operations]]
-instruction = "G54 Z0: the stacks' top, touched with the end mill on the fixed-jaw stack right of the blank."
-instruction_detailed = "Console M6 T1 (the tool setter measures it). MDI G0 X12.700 Y-6.850: the cutter right of the blank, its edge .02 off the fixed jaw, over that jaw's stack. Spindle stopped, its tip just dragging a .002 feeler leaf on the stack: G10 L20 P1 Z0.051."
+instruction = "The blank clamped as Holding says: G54 X0 the blank's RIGHT end, Y0 the fixed jaw's face (W): edge finder (900 rpm)."
+instruction_detailed = "The blank clamped as Holding says. Edge finder (900 rpm): on the fixed jaw's face beside the blank, G10 L20 P1 Y-2.540; on the blank's RIGHT end from the right, G10 L20 P1 X2.540 (plus: the finder's centre is right of the end)."
 feed = "hand"
 
 [[setups.operations]]
@@ -614,13 +614,13 @@ instruction = "Trial hole, MDI: M3 S650, G0 Z2, G1 Z-29 F{{process.bore_drill_fe
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Home the mill first ($H). G54 X0 the seat (the RIGHT end), Y0 the fixed jaw's face (W): edge finder (900 rpm)."
-instruction_detailed = "Home the mill first ($H). Edge finder (900 rpm): on the fixed jaw's face beside the part, G10 L20 P1 Y-2.540; on the seat (the part's RIGHT end) from the right, G10 L20 P1 X2.540 (plus: the finder's centre is right of the end)."
+instruction = "Home the mill first ($H). Before each part goes in, G54 Z0: the stacks' top, touched with the end mill on the fixed-jaw stack, the jaws open."
+instruction_detailed = "Home the mill first ($H). Before each part goes in, the stacks in place and the jaws open: console M6 T1 (the tool setter measures it). Jog it over the fixed-jaw stack, its edge clear of the jaw. Spindle stopped, its tip just dragging a .002 feeler leaf on the stack: G10 L20 P1 Z0.051. Raise Z. Not with the part in: the collet would meet the part before the tip reached the stack."
 feed = "hand"
 
 [[setups.operations]]
-instruction = "G54 Z0: the stacks' top, touched with the end mill on the fixed-jaw stack right of the part."
-instruction_detailed = "Console M6 T1 (the tool setter measures it). MDI G0 X12.700 Y-6.850: the cutter right of the seat, its edge .02 off the fixed jaw, over that jaw's stack. Spindle stopped, its tip just dragging a .002 feeler leaf on the stack: G10 L20 P1 Z0.051."
+instruction = "The part clamped as Holding says: G54 X0 the seat (the RIGHT end), Y0 the fixed jaw's face (W): edge finder (900 rpm)."
+instruction_detailed = "The part clamped as Holding says. Edge finder (900 rpm): on the fixed jaw's face beside the part, G10 L20 P1 Y-2.540; on the seat (the part's RIGHT end) from the right, G10 L20 P1 X2.540 (plus: the finder's centre is right of the end)."
 feed = "hand"
 
 [[setups.operations]]
@@ -744,13 +744,13 @@ instruction = "Before clamping: file the burr off the step's edges, the foot top
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Home the mill first ($H). G54 X0 the near end N (the RIGHT side), Y0 the fixed jaw's face (W): edge finder (900 rpm), its tip on the foot above the parallels."
-instruction_detailed = "Home the mill first ($H). Edge finder (900 rpm): on the fixed jaw's face beside the part, G10 L20 P1 Y-2.540; its tip about .10 in above the seat, on the foot (below the jaw tops is fine: the jaws stand back from N), on N from the right, G10 L20 P1 X2.540."
+instruction = "Home the mill first ($H). Before each part goes in, G54 Z0: the parallels' top (the seat), touched with the end mill on the fixed-jaw parallel, the jaws open."
+instruction_detailed = "Home the mill first ($H). Before each part goes in, the parallels in place and the jaws open: console M6 T1 (the tool setter measures it). Jog it over the fixed-jaw parallel, its edge clear of the jaw. Spindle stopped, its tip just dragging a .002 feeler leaf on the parallel: G10 L20 P1 Z0.051. Raise Z. Not with the part in: the collet would meet the part before the tip reached the parallel."
 feed = "hand"
 
 [[setups.operations]]
-instruction = "G54 Z0: the parallels' top (the seat), touched with the end mill on the fixed-jaw parallel right of the part."
-instruction_detailed = "Console M6 T1 (the tool setter measures it). MDI G0 X12.700 Y-6.850: the cutter right of N, its edge .02 off the fixed jaw, over that jaw's parallel. Spindle stopped, its tip just dragging a .002 feeler leaf on the parallel: G10 L20 P1 Z0.051."
+instruction = "The part clamped as Holding says: G54 X0 the near end N (the RIGHT side), Y0 the fixed jaw's face (W): edge finder (900 rpm), its tip on the foot above the parallels."
+instruction_detailed = "The part clamped as Holding says. Edge finder (900 rpm): on the fixed jaw's face beside the part, G10 L20 P1 Y-2.540; its tip about .10 in above the seat, on the foot (below the jaw tops is fine: the jaws stand back from N), on N from the right, G10 L20 P1 X2.540."
 feed = "hand"
 
 [[setups.operations]]

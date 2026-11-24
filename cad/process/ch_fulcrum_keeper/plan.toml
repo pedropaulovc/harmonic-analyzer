@@ -781,13 +781,13 @@ vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{cad.far_side_width_mm}}", 
 beam = { axis = "z", hold = "cantilever", extent_mm = [0, "{{cad.crown_overall_height_ref}}"], clamp_mm = [0, "{{process.upright_grip_mm}}"], section_mm = { x = "{{cad.lug_outer_face_thickness_mm}}", y = "{{cad.far_side_width_mm}}" }, vise_left = "other" }
 
 [[setups.operations]]
-instruction = "Home the mill first ($H). G54 X0 the inner face I (the RIGHT side), Y0 the fixed jaw's face (F): edge finder (900 rpm), its tip on the lug above the jaws."
-instruction_detailed = "Home the mill first ($H). Edge finder (900 rpm): on the fixed jaw's face beside the part, G10 L20 P1 Y-2.540; its tip .10 below the crown's sides (above the jaws), on I from the right, G10 L20 P1 X2.540."
+instruction = "Home the mill first ($H). Before each part goes in, G54 Z0: the parallels' top (the seat), touched with the 1/2 in end mill on the fixed-jaw parallel, the jaws open."
+instruction_detailed = "Home the mill first ($H). Before each part goes in, the parallels in place and the jaws open: console M6 T1 (the tool setter measures it). Jog it over the fixed-jaw parallel, its edge clear of the jaw. Spindle stopped, its tip just dragging a .002 feeler leaf on that parallel: G10 L20 P1 Z0.051. Raise Z. FK06_crown_cbore's M6s then measure its tools against it. Not with the part in: the collet would meet the crown before the tip reached the parallel."
 feed = "hand"
 
 [[setups.operations]]
-instruction = "G54 Z0: the parallels' top (the seat), touched with the 1/2 in end mill on the fixed-jaw parallel right of the part (the centre drill's body would meet the jaw there)."
-instruction_detailed = "Console M6 T1 (the tool setter measures it). MDI G0 X12.700 Y-6.850: the cutter right of I, its edge .02 off the fixed jaw, over that jaw's parallel. Spindle stopped, its tip just dragging a .002 feeler leaf on that parallel: G10 L20 P1 Z0.051. FK06_crown_cbore's M6s then measure its tools against it."
+instruction = "The part clamped as Holding says: G54 X0 the inner face I (the RIGHT side), Y0 the fixed jaw's face (F): edge finder (900 rpm), its tip on the lug above the jaws."
+instruction_detailed = "The part clamped as Holding says. Edge finder (900 rpm): on the fixed jaw's face beside the part, G10 L20 P1 Y-2.540; its tip .10 below the crown's sides (above the jaws), on I from the right, G10 L20 P1 X2.540."
 feed = "hand"
 
 [[setups.operations]]
