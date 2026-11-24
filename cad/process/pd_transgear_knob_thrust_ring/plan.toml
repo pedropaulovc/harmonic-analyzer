@@ -1,23 +1,262 @@
-# Placeholder process plan (owner 2026-11-19): the tools this part needs, from
-# quotes-2026-11-17-rev3.xlsx, until its traveler is written. Not enrolled in
-# _process_plans.TRAVELER_STEMS; see cad/process/README.md, "Placeholder plans".
+# Transgear knob thrust ring MHA-PD-15, one off, turned on the manual
+# PM-1127VF-LB (owner ruling 2026-11-21: turned parts get lathe travelers, no
+# NC). Route chosen for speed: two chuckings of the 5/8 in C36000 bar on hand
+# (cad/config/shop-equipment/stock-bought.toml c360-round-5-8, a 4 in piece
+# allocated to MHA-PD-15).
+# Setup 1, the bar: face the end (Z0, the ring's front face), turn the outside
+# to its .51-.53 band back past the parting line, spot, drill F (.257)
+# through and past the parting line in the same chucking, part off .02 long.
+# Setup 2: the ring turned round, .12 of its outside in the 3-jaw over a shim
+# wrap, the parted end out; nothing seats it axially, so the length is set
+# from the micrometer (the MHA-MG-10 drum's regrip), and, the band being
+# ±.001, the tool is touched on through a .002 feeler leaf (no touch mark):
+# mike the length, preset the DRO to the miked length less the .267 nominal,
+# face to Z0. Both faces are thrust faces (Ra 63): faced with the AR, never
+# left parted. Bench: deburr, check the bore with pin gauges (F drill, the
+# DRILLED HOLES row), the length again.
+#
+# Not on hand (cad/config/shop-equipment/gauges.toml pin-gauges, to order;
+# owner 2026-11-21: "ill buy pin gauges"): the .257 and .261 pins of the
+# .061-.500 set for the bore check.
 title = "Transgear Knob Thrust Ring"
-part = "MHA-PD-15 Transgear Knob Thrust Ring"
-revision = "placeholder"
-material = "C36000 free-machining brass"
-stock = "To be written"
+part = "{{cad.drawing_number}}"
+revision = "{{cad.revision}}"
+material = "C36000 free-machining brass round bar, 5/8 in"
+stock = "Lot: {{process.quantity:d}} ring. Ø{{process.stock_dia_in:.3dot}} bar, on hand (a {{process.bar_length_in:g}} in piece); the ring takes {{cad.pitch_in:.2dot}} in of it."
+note = "Inches unless mm. Lathe PM-1127VF-LB (70–380 and 380–2000 rpm); brass cut dry. To order (not on hand): the .257 and .261 pin gauges (pin-gauge set) for the bore check."
 shop = "../shop"
 stock_refs = ["c360-round-5-8"]
+material_key = "lathe-c360"
+turning_material = "brass"
+
+[cad]
+file = "../../out/features/pd_transgear_knob_thrust_ring/features.toml"
+adapter = "turned_bush"
+part = "pd-transgear-knob-thrust-ring"
+
+[parameters]
+quantity = 1
+stock_dia_in = 0.625
+# The 4 in piece on hand and the length the 3-jaw grips of it.
+bar_length_in = 4.0
+chuck_grip_in = 0.75
+# Facing allowance: squares a sawn bar end.
+face_allowance_in = 0.02
+# Left on the parted end for Setup 2 to face to length.
+regrip_allowance_in = 0.02
+# Parting kerf: the P1 blade's width plus .0125 (authored), for wander or a
+# .010 step toward the chuck that widens a deep groove.
+part_kerf_in = 0.075
+# The P1 cutoff blade's width: its record (cad/config/shop-equipment/
+# tools-cutting.toml tools.cutoff-blade-p1 width_in, the makers' 1/16 in).
+# The part-off op mikes the blade's cutting edge and presets the DRO to that.
+blade_width_in = 0.0625
+parts_per_pull = 1
+# The parting blade's clearance to the jaw fronts.
+jaw_clearance_in = 0.1
+# Setup 2: how much of the outside the jaws take, from the Setup 1 faced end.
+regrip_grip_in = 0.12
+# Left a side over the band's low end for the finish passes: roughed to the
+# band's top, finished to its middle.
+finish_allowance_in = 0.01
+rough_radial_doc_mm = 0.5
+finish_radial_doc_mm = 0.05
+turn_feed_mm_rev = 0.1016
+turn_start_z_mm = 0.5
+# The feeler leaf the AR's tip is touched through in Setup 2 (the shop's
+# feeler gauges, cad/config/shop-equipment/gauges.toml feeler-gauges).
+touch_leaf_in = 0.002
 
 [[tools]]
-id = "jig-drill-f"
+id = "ar"
+name = "AR turning tool"
+ref = "lathe-ar"
+
+[[tools]]
+id = "centre"
+name = "No. 3 centre drill"
+ref = "centre-drills-carbide-60"
+
+[[tools]]
+id = "drill-f"
 name = "F drill"
-ref = "jig-drill-f"  # Drills F
+ref = "jig-drill-f"
+
+[[tools]]
+id = "cutoff"
+name = "P1 HSS cutoff blade"
+ref = "cutoff-blade-p1"
+
+[[tools]]
+id = "feelers"
+name = "Feeler gauges"
+ref = "feeler-gauges"
+
+[[tools]]
+id = "pins"
+name = "Pin gauges .257 and .261"
+ref = "pin-gauges"
+status = "to_order"
+
+[[tools]]
+id = "file"
+name = "Smooth file"
+ref = "jig-files"
+
+[[tools]]
+id = "deburr"
+name = "Deburring countersink"
+ref = "deburring-set"
+
+[[setups]]
+machine_kind = "lathe"
+title = "Bar: face, turn the outside, drill F through, part off long"
+machine = "PM-1127VF-LB lathe"
+indexing = "none"
+machine_ref = "pm-1127vf-lb"
+holding = "3-jaw on the Ø{{process.stock_dia_in:.3dot}} bar, {{process.chuck_grip_in:.2dot}} in in the jaws; {{cad.stickout_in:.2dot}} in out of the jaw fronts."
+datum = "Z0 (carriage DRO) the bar end faced in Op 10: the ring's front face."
+diagram = { file = "diagrams/bar.svg", alt = "The 5/8 in bar in the 3-jaw: the end faced, the outside turned, the F hole spotted and drilled through past the parting line; the ring parted off .02 long." }
+lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{cad.stock_dia_mm}}", stock_diameter_mm = "{{cad.stock_dia_mm}}", stickout_mm = "{{cad.stickout_mm}}", minimum_diameter_mm = "{{cad.outer_turn_min_mm}}", support = "none" }
+turning_support = { kind = "chuck_only", chuck_z_mm = "{{cad.jaw_z_mm}}" }
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "ar"
+drilling = "none"
+sizing = "other"
+instruction = "Face the bar end square, {{process.face_allowance_in:.2dot}} in off, the last skim light for a smooth face (a thrust face, Ra 63); set DRO Z0 on it."
+settings = "lathe-ar-c360"
+cut_diameter_mm = "{{cad.stock_dia_mm}}"
+
+[[setups.operations]]
+cut_kind = "longitudinal_turning"
+turning_cuts = [
+  { name = "Outside rough", phase = "rough", start_z_mm = "{{process.turn_start_z_mm}}", end_z_mm = "{{cad.run_end_z_mm}}", kept_start_z_mm = "{{cad.outer_datum_out_near_z_mm}}", kept_end_z_mm = "{{cad.kept_end_z_mm}}", start_diameter_mm = "{{cad.stock_dia_mm}}", end_diameter_mm = "{{cad.outer_rough_dia_mm}}", max_radial_doc_mm = "{{process.rough_radial_doc_mm}}", feed_mm_rev = "{{process.turn_feed_mm_rev}}", minimum_diameter_mm = "{{cad.outer_rough_dia_mm}}" },
+  { name = "Outside finish", phase = "finish", start_z_mm = "{{process.turn_start_z_mm}}", end_z_mm = "{{cad.run_end_z_mm}}", kept_start_z_mm = "{{cad.outer_datum_out_near_z_mm}}", kept_end_z_mm = "{{cad.kept_end_z_mm}}", start_diameter_mm = "{{cad.outer_rough_dia_mm}}", end_diameter_mm = "{{cad.outer_turn_min_mm}}", max_radial_doc_mm = "{{process.finish_radial_doc_mm}}", feed_mm_rev = "{{process.turn_feed_mm_rev}}", minimum_diameter_mm = "{{cad.outer_turn_min_mm}}" },
+]
+speed_kind = "spindle"
+tool = "ar"
+drilling = "none"
+sizing = "other"
+instruction = "Turn the outside from Z0 back past the parting line to Z{{cad.run_end_z_mm:in.2dot}}: rough to Ø{{cad.outer_rough_dia_mm:in.3dot}}, then finish in light passes of .001–.002 a side, miking between them, to Ø{{cad.outer_dia_mm:in.3dot}} (the band's middle)."
+settings = "lathe-ar-c360"
+cut_diameter_mm = "{{cad.outer_dia_mm}}"
+inspection = "Outside Ø{{cad.outer_dia_min_in:.3dot}}–{{cad.outer_dia_max_in:.3dot}}, micrometer."
+gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.outer_dia_band_mm}}" }]
+
+[[setups.operations]]
+cut_kind = "other"
+instruction = "Outside over {{cad.outer_dia_max_in:.3dot}} in Op 20: take another finish pass and mike again. Under {{cad.outer_dia_min_in:.3dot}}: part the turned length off as scrap, pull the bar out to {{cad.stickout_in:.2dot}} in again and start again at Op 10."
+feed = "hand"
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "centre"
+drilling = "none"
+sizing = "other"
+instruction = "Spot the centre from the tailstock with the No. 3 centre drill, about Ø.18 across the countersink: under the F drill, so the drill removes it."
+settings = "lathe-centre-c360"
+cut_diameter_mm = 2.778
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "drill-f"
+drilling = "twist_drill"
+sizing = { kind = "band", band_mm = "{{cad.bore_dia_band_mm}}" }
+instruction = "Feed the F drill in until its lips just touch the spot's rim and zero the tailstock quill scale there. Drill in one steady feed until the scale reads {{cad.run_in:.2dot}}: the drill's full diameter then runs through the ring and past the parting line. The F drill is the bore (drawing: DRILL THRU, Ø{{cad.bore_dia_min_in:.3dot}}–{{cad.bore_dia_max_in:.3dot}})."
+settings = "lathe-drill-f-c360"
+cut_diameter_mm = "{{cad.bore_dia_mm}}"
+hole_depth_mm = "{{cad.run_mm}}"
+peck = "none"
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "cutoff"
+drilling = "none"
+sizing = "other"
+instruction = "Bring the blade's chuck-side face onto the faced end and set DRO Z there to the blade's width, miked across its cutting edge ({{process.blade_width_in:.4dot}} nominal): the DRO then reads the blade's tailstock-side face. Part off with that face at Z-{{cad.part_off_in:.3dot}}: {{process.regrip_allowance_in:.2dot}} over length, for Setup 2. Hands clear: let the ring fall; pick it up from the bed or the chip tray only after the spindle has stopped."
+settings = "lathe-part-c360"
+cut_diameter_mm = "{{cad.outer_dia_mm}}"
+
+[[setups]]
+machine_kind = "lathe"
+title = "Turned round: face the parted end to length"
+machine = "PM-1127VF-LB lathe"
+indexing = "none"
+machine_ref = "pm-1127vf-lb"
+holding = "3-jaw over a shim wrap of brass shim, {{process.regrip_grip_in:.2dot}} in of the outside in the jaws from the Setup 1 faced end (a pencil line that far from it at the jaw fronts), the wrap cut no wider than that, closed lightly; the parted end {{cad.outer_stickout_far_mm:in.2dot}} in out. Nothing seats the ring axially: the jaw tips may stand proud of the chuck face."
+datum = "Z0 (carriage DRO): the parted face faced in Op 80, {{cad.length_nominal_in:.3dot}} from the Setup 1 faced end, preset from the length miked in Op 70 through a {{process.touch_leaf_in:.3dot}} feeler leaf, so the touch leaves no mark."
+diagram = { file = "diagrams/regrip.svg", alt = "The ring turned round, its front end in the jaws over a shim wrap with nothing behind it; the parted end faced to length from the miked length." }
+lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{cad.outer_dia_mm}}", stock_diameter_mm = "{{cad.outer_dia_mm}}", stickout_mm = "{{cad.outer_stickout_far_mm}}", minimum_diameter_mm = "{{cad.outer_dia_mm}}", support = "none" }
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "ar"
+drilling = "none"
+sizing = "other"
+instruction = "Mike the length at the outer rim; write it down (about {{cad.part_off_in:.3dot}} the first time). Chuck it. Spindle stopped, bring the AR's tip onto the parted end's outer rim with a {{process.touch_leaf_in:.3dot}} feeler leaf between, until the leaf just drags; set DRO Z to that length less {{cad.length_nominal_in:.3dot}}, plus the leaf."
+settings = "lathe-ar-c360"
+cut_diameter_mm = "{{cad.outer_dia_mm}}"
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "ar"
+drilling = "none"
+sizing = "other"
+instruction = "Pull the leaf out. Spindle running, face in light skims to Z0, the last no more than .002 deep and light for a smooth face (the second thrust face, Ra 63); unchuck and mike at the rim."
+settings = "lathe-ar-c360"
+cut_diameter_mm = "{{cad.outer_dia_mm}}"
+inspection = "Length {{cad.length_min_in:.3dot}}–{{cad.length_max_in:.3dot}} across the faces, micrometer."
+gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.length_band_mm}}" }]
+
+[[setups.operations]]
+cut_kind = "other"
+instruction = "Over {{cad.length_max_in:.3dot}} in Op 80: chuck it again as Op 70 and repeat Ops 70–80 from that reading. Under {{cad.length_min_in:.3dot}}: scrapped, not reworked; make another from Setup 1 on the bar."
+feed = "hand"
 
 [[setups]]
 machine_kind = "other"
-machine = "To be written"
-title = "Traveler to come"
+title = "Bench: deburr and check the ring"
+machine = "Bench"
+envelope = "other"
+indexing = "none"
+diagram = { file = "diagrams/inspect.svg", alt = "The finished ring: its {{cad.length_min_in:.3dot}}–{{cad.length_max_in:.3dot}} length between the two thrust faces, the turned outside and the F hole through." }
+vise_hold = "other"
+beam = "other"
 
 [[setups.operations]]
-instruction = "Process not written yet."
+speed_kind = "other"
+tool = "file"
+drilling = "none"
+sizing = "other"
+instruction = "Deburr the outside edges with the smooth file: R{{cad.edge_break_in:.3dot}} or chamfer {{cad.chamfer_max_in:.3dot}} max, without touching either face's flat."
+feed = "hand"
+
+[[setups.operations]]
+speed_kind = "other"
+tool = "deburr"
+drilling = "none"
+sizing = "other"
+instruction = "Deburr both ends of the bore with a twist of the deburring set's countersink by hand: R{{cad.edge_break_in:.3dot}} or chamfer {{cad.chamfer_max_in:.3dot}} max, no burr standing on either face."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Bore: the {{cad.bore_dia_min_in:.3dot}} pin enters from both ends and the {{cad.bore_dia_max_in:.3dot}} pin enters from neither. Length again across the faces at three places round the rim."
+inspection = "Bore Ø{{cad.bore_dia_min_in:.3dot}}–{{cad.bore_dia_max_in:.3dot}}; length {{cad.length_min_in:.3dot}}–{{cad.length_max_in:.3dot}} at every place."
+gauge_checks = [{ gauge = "pin-gauges", band_mm = "{{cad.bore_dia_band_mm}}" }, { gauge = "micrometers", band_mm = "{{cad.length_band_mm}}" }]
+feed = "hand"
+
+[[setups.operations]]
+instruction = "A ring failing Op 120 is scrapped, not reworked: make another from Setup 1 on the bar."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Finish (drawing: bright machined, oiled): wipe the ring clean and give it a light coat of light machine oil."
+feed = "hand"

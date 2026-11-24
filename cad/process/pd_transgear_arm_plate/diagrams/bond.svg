@@ -1,11 +1,12 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 600" font-family="sans-serif" font-size="13">
   <rect class="paper" x="0" y="0" width="760" height="600"/>
-  <text class="title" x="20" y="20">Setup 2 (plan view, rear face up): the blank bonded on the spoil block in the vise</text>
+  <text class="title" x="20" y="20">Setup 3 (plan view, rear face up): the blank bonded on the spoil block in the vise</text>
   <rect class="clamp" x="96" y="68" width="634" height="26"/>
   <text class="label-on-clamp" x="110" y="86">fixed jaw</text>
   <rect class="clamp" x="96" y="399" width="634" height="26"/>
   <text class="label-on-clamp" x="110" y="417">moving jaw</text>
   <rect class="fixture-plate" x="235" y="94" width="356" height="305"/>
+  <rect class="bond" x="260" y="94" width="306" height="214"/>
   <rect class="part-waste" x="286" y="94" width="254" height="152"/>
   <path class="part-kept" d="M 310.2 246.2 L 316.7 93.8 L 437.1 93.8 L 501.8 125.2 A 49.78 49.78 0 0 1 501.8 214.8 L 437.1 246.2 Z"/>
   <circle class="holes" cx="480" cy="170" r="22.2"/>
@@ -23,12 +24,14 @@
   <text class="label" x="600" y="124">R end (round)</text>
   <line class="leader" x1="250" y1="50" x2="380" y2="94"/>
   <text class="label" x="150" y="48">C edge, flush with the block's fixed-jaw edge</text>
-  <line class="leader" x1="300" y1="300" x2="357" y2="225"/>
-  <text class="label" x="200" y="316">screw holes: #1 through, 82° countersinks</text>
+  <line class="leader" x1="300" y1="318" x2="357" y2="225"/>
+  <text class="label" x="200" y="332">screw holes: #1 through, 82° countersinks</text>
   <line class="leader" x1="600" y1="270" x2="490" y2="190"/>
   <text class="label" x="560" y="286">K: #1, 27/64, ream .4375</text>
   <line class="leader" x1="620" y1="220" x2="572" y2="200"/>
   <text class="label" x="624" y="224">corner clearing R.965</text>
+  <line class="leader" x1="538" y1="356" x2="553" y2="236"/>
+  <text class="label" x="240" y="362">blue tape on the block, 1/4 in past the blank</text>
   <text class="label" x="240" y="390">6061 spoil block, 1 x 3 x 3.5, on the 1 in parallels</text>
   <text class="label" x="20" y="452">Section across the jaws (not to scale):</text>
   <rect class="clamp" x="250" y="500" width="40" height="70"/>
@@ -36,11 +39,13 @@
   <rect class="fixture-support" x="290" y="530" width="10" height="40"/>
   <rect class="fixture-support" x="472" y="530" width="10" height="40"/>
   <rect class="fixture-plate" x="290" y="488" width="192" height="42"/>
-  <rect class="label-halo" x="368" y="484" width="114" height="4"/>
-  <rect class="part-kept" x="368" y="472" width="114" height="12"/>
-  <text class="label" x="530" y="470">blank, face A on the tape</text>
-  <text class="label" x="530" y="486">(fixed jaw at right)</text>
+  <rect class="bond" x="322" y="484" width="160" height="4"/>
+  <rect class="bond" x="368" y="480" width="114" height="4"/>
+  <rect class="part-kept" x="368" y="468" width="114" height="12"/>
+  <text class="label" x="530" y="466">blank, face A down (fixed jaw at right)</text>
+  <line class="leader" x1="526" y1="483" x2="478" y2="483"/>
+  <text class="label" x="530" y="487">blue tape, CA glue, blue tape</text>
   <text class="label" x="530" y="506">spoil block, top over the jaws</text>
   <text class="label" x="530" y="560">jaws and 1 in parallels</text>
-  <text class="label" x="20" y="590">The waste round the plate (dotted) goes to chips in AP03; X0 Y0 at K, Z0 face A (the blank's underside on the tape).</text>
+  <text class="label" x="20" y="590">The waste round the plate (dotted) goes to chips in AP03; X0 Y0 at K, Z0 face A (the blank's underside, on the tape stack).</text>
 </svg>

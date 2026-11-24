@@ -46,14 +46,22 @@ from _part_properties import part_drawing_unit
 from _session import run_build
 from _surface_finish import surface_finish_by_key
 import _telemetry
+from _feature_requirements import part_metadata, requirement
+from _gtol_cylinder import CylinderFace
+from _gtol_planar import PlanarFace
+from _printed_limits import drilled_limits, limits
 from pd_transgear_knob_thrust_ring_spec import (
+    BORE_CALLOUT,
     DIMENSION_CALLOUTS,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     ID,
     LENGTH,
+    LENGTH_CALLOUT,
+    LENGTH_TOL,
     OD,
     SURFACE_FINISHES,
+    UNIT,
 )
 
 # Cached machinist review leaf: a FIX or ERROR verdict fails the build.
@@ -125,6 +133,88 @@ FACE_FINISHES = {
         (_sheet_x(LENGTH) + 0.014, SIDE_CENTER[1] - 0.008),
     ),
 }
+
+# Feature-export declarations (export_features; cad/docs/pipeline/
+# features-travelers.md): what this sheet prints, in the part frame
+# (pd_transgear_knob_thrust_ring_spec: axis +Y; the front face, on the
+# pinion, at y = 0 is the datum end the length runs from; the rear face, on
+# the bush's hub face, at y = LENGTH). The O.D. takes the title block's .XX
+# row, the length its explicit ±.001 (the disc cluster stack), the bore the
+# DRILLED HOLES row under its DRILL THRU callout. Each ``span`` is a
+# diameter's model-Y extent. The sheet prints no manufacturing note. The
+# declarations print nothing.
+DRAWING_NOTES = ""
+_P = DRAWING_PRECISION_BY_NAME
+_SELF = "draw_pd_transgear_knob_thrust_ring"
+part_metadata(
+    model_sources=("LENGTH", "OD", "ID"),
+    precision_sources=("DRAWING_PRECISION", "DRAWING_PRECISION_BY_NAME"),
+)
+requirement(
+    "datum_end",
+    kind="face",
+    faces=(PlanarFace((0.0, -1.0, 0.0), 0.0),),
+    requirements=("plane",),
+    fields={
+        "plane": ({"frame": "model", "axis": "y", "value": 0.0}, ("__frame__",)),
+        "outward": ([0.0, -1.0, 0.0], ("__frame__",)),
+    },
+)
+requirement(
+    "far_end",
+    kind="face",
+    faces=(PlanarFace((0.0, 1.0, 0.0), LENGTH),),
+    requirements=("length",),
+    fields={
+        "plane": ({"frame": "model", "axis": "y", "value": LENGTH}, ("LENGTH",)),
+        "outward": ([0.0, 1.0, 0.0], ("LENGTH",)),
+        "length": (
+            limits(LENGTH, _P["RingLength"], (LENGTH_TOL, -LENGTH_TOL), unit=UNIT),
+            ("LENGTH", "LENGTH_TOL", "UNIT", (_SELF, "SIDE_KEEP")),
+        ),
+        "length_nominal": (LENGTH, ("LENGTH",)),
+        "length_from": ("datum_end", ((_SELF, "SIDE_KEEP"),)),
+        "callout": (LENGTH_CALLOUT, ("LENGTH_CALLOUT",)),
+    },
+    precision={"length": _P["RingLength"]},
+)
+requirement(
+    "outer",
+    kind="diameter",
+    faces=(CylinderFace(OD),),
+    requirements=("dia",),
+    fields={
+        "axis": ([0.0, 1.0, 0.0], ("__frame__",)),
+        "at": ([0.0, 0.0, 0.0], ("__frame__",)),
+        "span": ([0.0, LENGTH], ("LENGTH",)),
+        "dia": (
+            limits(OD, _P["RingOd"], unit=UNIT),
+            ("OD", "UNIT", (_SELF, "OD_ON_SIDE")),
+        ),
+        "dia_nominal": (OD, ("OD",)),
+    },
+    precision={"dia": _P["RingOd"]},
+)
+requirement(
+    "bore",
+    kind="hole",
+    faces=(CylinderFace(ID),),
+    requirements=("dia", "thru"),
+    fields={
+        "axis": ([0.0, 1.0, 0.0], ("__frame__",)),
+        "at": ([0.0, 0.0, 0.0], ("__frame__",)),
+        "span": ([0.0, LENGTH], ("LENGTH",)),
+        "dia": (
+            drilled_limits(ID, _P["BoreDia"], unit=UNIT),
+            ("ID", "ID_BAND", "UNIT", (_SELF, "END_KEEP")),
+        ),
+        "nominal_dia": (ID, ("ID",)),
+        "thru": (True, ("BORE_CALLOUT",)),
+        "process": ("drill", ("BORE_CALLOUT",)),
+        "callout": (BORE_CALLOUT, ("BORE_CALLOUT",)),
+    },
+    precision={"dia": _P["BoreDia"]},
+)
 
 # swAnnotationType_e.swCenterMarkSym.  The template centre-marks the face
 # view's bore as it is placed; an unconditional auto_center_marks printed a

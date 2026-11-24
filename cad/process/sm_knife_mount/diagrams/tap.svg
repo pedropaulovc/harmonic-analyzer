@@ -12,8 +12,6 @@
   <line class="centre-line" x1="227.9" y1="165.5" x2="227.9" y2="238.0"/>
   <text class="label-on-clamp" x="175.0" y="390.0" text-anchor="middle">moving</text>
   <text class="label-on-clamp" x="280.9" y="390.0" text-anchor="middle">fixed</text>
-  <line class="datum" x1="255.9" y1="139.5" x2="255.9" y2="175.5"/>
-  <text class="datum-label" x="259.9" y="149.5"></text>
   <line class="datum" x1="309.9" y1="298.4" x2="329.9" y2="298.4"/>
   <text class="datum-label" x="333.9" y="302.4">Z0 = U</text>
   <text class="label-halo" x="330.0" y="120.0">Fisher tap guide in the 1/2 in collet, spindle off</text>

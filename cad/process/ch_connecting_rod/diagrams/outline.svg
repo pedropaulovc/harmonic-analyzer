@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Setup 6: same load; the 1/8 in end mill cuts each rod's outline on seven tabs; the 5/64 recuts the roots. Styles: prechips.palette. -->
+<!-- Setup 6: same load; the 1/8 in end mill cuts each rod's outline on seven tabs, its radius leaving the four shank corners. Styles: prechips.palette. -->
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 470" width="640" height="470" font-family="sans-serif" font-size="12">
 <rect class="paper" width="640" height="470"/>
 <text class="title" x="20" y="22">Face F up: outline on tabs (top view)</text>
@@ -8,10 +8,10 @@
 <rect class="fixture-plate" x="50" y="76" width="442" height="283" fill-opacity="0.35"/>
 <rect class="part-rest" x="50" y="70.0" width="541.8" height="147.3"/>
 <path class="part-kept" d="M50.0 75.2 L204.1 75.2 L204.1 115.1 L539.5 115.1 L539.5 92.5 L577.4 92.5 L577.4 194.9 L539.5 194.9 L539.5 172.2 L204.1 172.2 L204.1 212.2 L50.0 212.2 Z"/>
-<text class="label" x="54" y="84.0">1</text>
+<text class="label" x="38" y="84.0">1</text>
 <rect class="part-rest" x="50" y="217.3" width="541.8" height="147.3"/>
 <path class="part-kept" d="M50.0 222.5 L204.1 222.5 L204.1 262.4 L539.5 262.4 L539.5 239.8 L577.4 239.8 L577.4 342.2 L539.5 342.2 L539.5 319.5 L204.1 319.5 L204.1 359.5 L50.0 359.5 Z"/>
-<text class="label" x="54" y="231.3">2</text>
+<text class="label" x="38" y="231.3">2</text>
 <rect class="clamp" x="85" y="365" width="460" height="24"/>
 <text class="label" x="270" y="381">moving jaw</text>
 <line class="datum" x1="50" y1="36" x2="50" y2="399"/>
@@ -39,5 +39,5 @@
 <rect class="part-kept" x="521.9" y="271.6" width="7.4" height="6"/>
 <rect class="part-kept" x="114.1" y="223.0" width="8" height="8"/>
 <rect class="part-kept" x="68.9" y="332.2" width="8" height="8"/>
-<text class="label" x="170" y="433">outline on seven tabs (kept, solid); the 5/64 recuts the inside corners</text>
+<text class="label" x="170" y="433">outline on seven tabs (kept, solid); the 1/8 in leaves the four corners</text>
 </svg>

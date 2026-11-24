@@ -105,12 +105,20 @@ high_level_mm = 11.889
 face_step_max_mm = 1.27
 # F (MB01): faced from the widest bar to the foot's length in equal levels.
 width_level_mm = 1.009
-# Facing: the 1/2 in carbide end mill (shop endmill-carbide-3fl-1-2), equal
-# passes no wider than .200 in, under half the cutter (the 6G chip-load
-# factor 1.0 holds to 50 % engagement, shop
-# settings.endmill-carbide-3fl-1-2-1018-cf).
+# Facing: the 1/2 in carbide end mill (shop endmill-carbide-3fl-1-2). F
+# (MB01) and the seat (MB02) in equal passes no wider than
+# skim_stepover_max_mm, 3.4 mm (.134 in), and levels no deeper than .050:
+# the measured face envelope, shop settings.em-half-carbide-1018-v5-face
+# (dechatter v5, 2370 rpm stable at 1.27 mm deep and 3.0-3.4 mm wide,
+# conventional; the zigzag's return passes climb, and that half is not
+# measured); each level starts with the cutter over the edge, so no pass
+# takes more than the stepover. H, L and the neck (MB03-MB05) keep passes no
+# wider than .200 in, under half the cutter, on the chart setting
+# (settings.endmill-carbide-3fl-1-2-1018-cf): those programs also cut the
+# notch, whose stepovers run full width, and MB05 runs at a longer stick-out.
 face_cutter_dia_mm = 12.7
 face_stepover_max_mm = 5.08
+skim_stepover_max_mm = 3.4
 # The notch: half its depth from H (MB03, L down: down to notch_split_mm
 # above the stacks), the other half from L once L is faced (MB04, H down:
 # down to notch_through_mm, notch_past_mm through MB03's floor), so no thin
@@ -233,8 +241,12 @@ rod_dia_mm = 6.35
 r8_collet_gauge_mm = 6.3         # HA: holders.r8-collets-lms-4860.gauge_len_mm.
 drill_chuck_gauge_mm = 95.0      # Archive holders.drill-chuck-r8.gauge_len_mm.
 # 1/2 in end mill, 3 in overall (tools.endmill-carbide-3fl-1-2's
-# description): set at least 1 in out of the collet.
-half_mill_projection_min_mm = 25.4
+# description): set 1.10 in out of the collet, the stick-out its measured
+# settings were cut at (cad/config/shop-equipment/measured-cuts.toml; owner,
+# Pedro, 2026-11-22: "stickout is recorded as 30mm but is actually 27.94").
+# cam.py checks the collet's nose clears the part and the jaws at each
+# program's deepest end-mill cut. MB05 sets it longer (below).
+half_mill_projection_mm = 27.94
 half_mill_oal_mm = 76.2
 # MB05: at the neck's last level the end mill stands beside the foot, which
 # rises the part's width above O. Set it at least 1.85 in out, so the collet
@@ -343,13 +355,13 @@ machine_ref = "pm-30mv"
 holding = "A 1 in parallel against each jaw. The blank on edge on them along the jaws, O DOWN, gripped on its two flat faces, centred on the jaws; the edge up becomes the free end F. Tap it down onto both parallels while closing the vise. The lower {{process.upright_grip_mm:in.3dot}} of it is in the jaws."
 datum = "Program MB01_width (cam:mg_magnifying_bracket). G54: X0 the blank's LEFT end, Y0 the fixed jaw's face, Z0 the parallels' top (O); +Y toward the fixed jaw. The file starts with an M6 for the end mill; tool lengths from the tool setter."
 diagram = { file = "diagrams/width.svg", alt = "The blank on edge on two 1 in parallels, O down; the 1/2 in end mill faces the upper edge down to the foot's length in levels; it becomes F." }
-envelope = { x_span_mm = ["{{process.blank_length_max_mm}}", "{{process.face_cutter_dia_mm}}", 5.08], y_span_mm = ["{{process.bar_thickness_max_mm}}", "{{process.face_cutter_dia_mm}}"], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{process.bar_width_max_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{cad.outer_face_length_mm}}"], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_min_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_min_mm}}"] }
+envelope = { x_span_mm = ["{{process.blank_length_max_mm}}", "{{process.face_cutter_dia_mm}}", 5.08], y_span_mm = ["{{process.bar_thickness_max_mm}}", "{{process.face_cutter_dia_mm}}"], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{process.bar_width_max_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{cad.outer_face_length_mm}}"], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_mm}}"] }
 vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{process.bar_thickness_max_mm}}", along_jaws_mm = "{{process.blank_length_max_mm}}", part_height_mm = "{{process.bar_width_max_mm}}", parallel_height_mm = "{{process.parallel_height_mm}}", overhang_mm = ["{{process.vise_blank_inset_mm}}", "rest"], jaw_offset = "centred", fixed_jaw_face = "as_bought", moving_jaw_face = "as_bought", moving_jaw_contact = "flat" }
 beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{process.blank_length_max_mm}}"], clamp_mm = [0, "{{process.blank_length_max_mm}}"], section_mm = { y = "{{process.bar_thickness_min_mm}}", z = "{{process.bar_width_min_mm}}" }, vise_left = "start" }
 
 [[setups.operations]]
 instruction = "Home the mill first ($H). Before loading the blank, G54 Z0: the parallels' top, touched with the end mill on the fixed-jaw parallel, the jaws open."
-instruction_detailed = "Home the mill first ($H). Before loading the blank, the parallels in and the jaws open: console M6 T1 (1/2 in end mill, at least 1.00 in out of the collet; the tool setter measures it). Jog it over the fixed-jaw parallel, its edge clear of the jaw. Spindle stopped, its tip just dragging a .002 feeler leaf on the parallel: G10 L20 P1 Z0.051. Raise Z."
+instruction_detailed = "Home the mill first ($H). Before loading the blank, the parallels in and the jaws open: console M6 T1 (1/2 in end mill, {{process.half_mill_projection_mm:in.2f}} in out of the collet; the tool setter measures it). Jog it over the fixed-jaw parallel, its edge clear of the jaw. Spindle stopped, its tip just dragging a .002 feeler leaf on the parallel: G10 L20 P1 Z0.051. Raise Z."
 feed = "hand"
 
 [[setups.operations]]
@@ -367,12 +379,12 @@ speed_kind = "spindle"
 tool = "em-half"
 drilling = "none"
 sizing = "other"
-instruction = "Run MB01_width (M6 T1, 1/2 in end mill; set 2650): face the top edge down to Z {{cad.outer_face_length_mm:in.4dot}} in equal levels of {{process.width_level_mm:in.3dot}}. Unclamp; calipers across it. Mark this edge F."
-settings = "endmill-carbide-3fl-1-2-1018-cf"
+instruction = "Run MB01_width (M6 T1, 1/2 in end mill; set 2370): face the top edge down to Z {{cad.outer_face_length_mm:in.4dot}} in equal levels of {{process.width_level_mm:in.3dot}}, in passes along the blank no wider than {{process.skim_stepover_max_mm:in.3dot}}. Unclamp; calipers across it. Mark this edge F."
+settings = "em-half-carbide-1018-v5-face"
 inspection = "Length {{cad.outer_face_length_min_in:.3dot}}–{{cad.outer_face_length_max_in:.3dot}}, O to F, calipers at both ends."
 gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.outer_face_length_band_mm}}" }]
 milling_cuts = [
-  { name = "width", kind = "end", phase = "finish", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", axial_doc_mm = "{{process.width_level_mm}}", radial_woc_mm = "{{process.face_stepover_max_mm}}", traverse_mm = [0, "{{process.blank_length_max_mm}}"] },
+  { name = "width", kind = "end", phase = "finish", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", axial_doc_mm = "{{process.width_level_mm}}", radial_woc_mm = "{{process.skim_stepover_max_mm}}", traverse_mm = [0, "{{process.blank_length_max_mm}}"] },
 ]
 
 [[setups.operations]]
@@ -388,7 +400,7 @@ machine_ref = "pm-30mv"
 holding = "No parallels. The blank upright on the vise bed, a sawn end up (it becomes the seat), gripped on its two flat faces, O to the LEFT, F to the RIGHT, centred on the jaws. Tap it down onto the bed with a soft mallet while closing the vise. The lower {{process.vise_jaw_height_mm:in.2dot}} of it is in the jaws. The face against the FIXED jaw becomes L: mark it."
 datum = "Program MB02_seat. G54: X0 the free end F (the blank's RIGHT side), the blank to −X; Y0 the fixed jaw's face (L), +Y toward it; Z0 the faced seat. The holes at X −{{cad.mounting_hole_1_station_mm:.3f}} and −{{cad.mounting_hole_2_station_mm:.3f}}, Y −{{process.mount_y_mm:.3f}} mm: {{process.mount_y_mm:in.3dot}} from this face now, {{cad.mounting_hole_1_lateral_in:.3dot}} from L once Setup 5 takes {{process.low_skim_mm:in.3dot}} off it. Tool lengths from the tool setter at each M6; at every M6 stop the file has stopped the spindle and lifted the tool above the part."
 diagram = { file = "diagrams/seat.svg", alt = "The blank upright on the vise bed, a sawn end up, F to the right; the 1/2 in end mill faces the seat, the centre drill spots and the #37 drills the two mounting holes down through the foot into the waste below it." }
-envelope = { x_span_mm = ["{{cad.outer_face_length_mm}}", "{{process.face_cutter_dia_mm}}", "{{process.face_cutter_dia_mm}}", 5.08], y_span_mm = ["{{process.bar_thickness_max_mm}}", "{{process.face_cutter_dia_mm}}"], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.blank_length_max_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.blank_length_min_mm}}", "{{process.mount_tip_z_mm}}"], longest_tool_mm = ["{{process.drill_chuck_gauge_mm}}", "{{process.drill_37_oal_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_min_mm}}"] }
+envelope = { x_span_mm = ["{{cad.outer_face_length_mm}}", "{{process.face_cutter_dia_mm}}", "{{process.face_cutter_dia_mm}}", 5.08], y_span_mm = ["{{process.bar_thickness_max_mm}}", "{{process.face_cutter_dia_mm}}"], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.blank_length_max_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.blank_length_min_mm}}", "{{process.mount_tip_z_mm}}"], longest_tool_mm = ["{{process.drill_chuck_gauge_mm}}", "{{process.drill_37_oal_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_mm}}"] }
 vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{process.bar_thickness_max_mm}}", along_jaws_mm = "{{cad.outer_face_length_mm}}", part_height_mm = "{{process.blank_length_max_mm}}", parallel_height_mm = 0, overhang_mm = ["{{process.vise_width_inset_mm}}", "rest"], jaw_offset = "centred", fixed_jaw_face = "as_bought", moving_jaw_face = "as_bought", moving_jaw_contact = "flat" }
 beam = { axis = "z", hold = "cantilever", extent_mm = [0, "{{process.blank_length_max_mm}}"], clamp_mm = [0, "{{process.vise_jaw_height_mm}}"], section_mm = { x = "{{cad.outer_face_length_mm}}", y = "{{process.bar_thickness_min_mm}}" }, vise_left = "other" }
 
@@ -399,7 +411,7 @@ feed = "hand"
 
 [[setups.operations]]
 instruction = "G54 Z0: the faced seat, the sawn top's high point less the {{process.seat_skim_mm:in.3dot}} skim."
-instruction_detailed = "Console M6 T1 (1/2 in end mill, at least 1.00 in out of the collet; the tool setter measures it). Spindle stopped, its tip just dragging a .002 feeler leaf on the highest point of the sawn top: G10 L20 P1 Z0.559 (the {{process.seat_skim_mm:in.3dot}} skim plus the .002 leaf)."
+instruction_detailed = "Console M6 T1 (1/2 in end mill, {{process.half_mill_projection_mm:in.2f}} in out of the collet; the tool setter measures it). Spindle stopped, its tip just dragging a .002 feeler leaf on the highest point of the sawn top: G10 L20 P1 Z0.559 (the {{process.seat_skim_mm:in.3dot}} skim plus the .002 leaf)."
 feed = "hand"
 
 [[setups.operations]]
@@ -412,12 +424,12 @@ speed_kind = "spindle"
 tool = "em-half"
 drilling = "none"
 sizing = "other"
-instruction = "Run MB02_seat (M6 T1, 1/2 in end mill; set 2650): face the seat at Z0, {{process.seat_skim_mm:in.3dot}} off the high point, in passes no wider than {{process.face_stepover_max_mm:in.3dot}}; the file then stops at its M6 T2."
+instruction = "Run MB02_seat (M6 T1, 1/2 in end mill; set 2370): face the seat at Z0, {{process.seat_skim_mm:in.3dot}} off the high point, in passes no wider than {{process.skim_stepover_max_mm:in.3dot}}; the file then stops at its M6 T2."
 inspection = "At the M6 T2 stop: the whole end faced, Ra {{cad.seat_finish_ra:.1f}} µm (125 µin) or finer: an even end-mill finish, no tears, no sawn patch left."
 gauge_checks = "other"
-settings = "endmill-carbide-3fl-1-2-1018-cf"
+settings = "em-half-carbide-1018-v5-face"
 milling_cuts = [
-  { name = "seat", kind = "end", phase = "finish", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", axial_doc_mm = "{{process.seat_skim_mm}}", radial_woc_mm = "{{process.face_stepover_max_mm}}", stations_mm = "{{process.blank_length_max_mm}}" },
+  { name = "seat", kind = "end", phase = "finish", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", axial_doc_mm = "{{process.seat_skim_mm}}", radial_woc_mm = "{{process.skim_stepover_max_mm}}", stations_mm = "{{process.blank_length_max_mm}}" },
 ]
 
 [[setups.operations]]
@@ -459,7 +471,7 @@ machine_ref = "pm-30mv"
 holding = "Two 1 in + 1/2 in stacks lying along the jaws: one against the FIXED jaw, the other under the blank's sawn end, its outer face flush with that end. The blank lying on them ACROSS the jaws, L down, the seat against the FIXED jaw; a {{process.rod_dia_mm:in.3dot}} rod between the sawn end and the moving jaw, held at the blank's mid-height until the jaw nips it (nothing under the rod); O to the LEFT, centred on the jaws. Tap the blank down onto both stacks while closing. The jaws grip the lower {{process.lying_grip_mm:in.3dot}} of the ends. H is cut above the jaw tops and the rod; the notch's floor runs below the jaw tops, between the jaws: the foot keeps the cutter's edge {{cad.foot_underside_thickness_in:.3dot}} off the fixed jaw, the waste beyond the notch keeps it off the rod."
 datum = "Program MB03_notch. G54: X0 O (the blank's LEFT side), +X toward F; Y0 the fixed jaw's face (the seat), +Y toward it; Z0 the stacks' top (L). The foot's underside at Y −{{cad.foot_underside_thickness_mm:.3f}}; the notch from {{process.neck_stock_mm:in.3dot}} past the neck to F, down to Z {{process.notch_split_mm:.3f}} mm. Tool lengths from the tool setter."
 diagram = { file = "diagrams/notch.svg", alt = "The blank lying across the jaws on stacked parallels, L down, the seat against the fixed jaw and a rod at the sawn end; the 1/2 in end mill faces H, then mills the notch between the foot and the neck, open at F, half the part's width deep." }
-envelope = { x_span_mm = ["{{cad.outer_face_length_mm}}", "{{process.face_cutter_dia_mm}}", 5.08], y_span_mm = ["{{process.blank_length_max_mm}}", "{{process.face_cutter_dia_mm}}"], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{process.bar_thickness_max_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{process.notch_split_mm}}"], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_min_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_min_mm}}"] }
+envelope = { x_span_mm = ["{{cad.outer_face_length_mm}}", "{{process.face_cutter_dia_mm}}", 5.08], y_span_mm = ["{{process.blank_length_max_mm}}", "{{process.face_cutter_dia_mm}}"], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{process.bar_thickness_max_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{process.notch_split_mm}}"], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_mm}}"] }
 vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{process.blank_length_max_mm}}", along_jaws_mm = "{{cad.outer_face_length_mm}}", part_height_mm = "{{process.bar_thickness_max_mm}}", parallel_height_mm = "{{process.riser_height_mm}}", overhang_mm = ["{{process.vise_width_inset_mm}}", "rest"], jaw_offset = "centred", fixed_jaw_face = "machined", moving_jaw_face = "sawn", moving_jaw_contact = "rod" }
 beam = { axis = "y", hold = "between", extent_mm = [0, "{{process.blank_length_max_mm}}"], supports_mm = [0, "{{process.blank_length_min_mm}}"], section_mm = { x = 13.0, z = "{{process.bar_thickness_min_mm}}" } }
 
@@ -476,6 +488,15 @@ feed = "hand"
 [[setups.operations]]
 instruction = "Prove MB03_notch in air, Z0 raised 1.000 in; every pass crosses above the jaw tops and the rod. Then Z0 back."
 instruction_detailed = "Send $# and note the G54 line's Z. G10 L2 P1 Z(that Z + 25.400) raises Z0 1.000 in. Run MB03_notch, watching each pass cross above the jaws and the rod. G10 L2 P1 Z(the noted Z) puts Z0 back."
+feed = "hand"
+
+# Not chatter-tested (#3428): H's face .200 wide and the notch's .180
+# steps at .074 deep are wider than tested at those depths, and the notch's
+# stepovers at the foot and the waste line run full width; the foot wall pass
+# climbs. Owner, Pedro, 2026-11-22: "same log new dechatter issues to try
+# full radial depth but shallow axial".
+[[setups.operations]]
+instruction = "First part only: these cuts at 2650 rpm have not been chatter-tested on this end mill (owner's test list #3428): H's face .037 deep x {{process.face_stepover_max_mm:in.3dot}} wide, the notch {{process.notch_level_mm:in.3dot}} deep x {{process.notch_step_mm:in.3dot}} wide with full-width ({{process.face_cutter_dia_mm:in.3dot}}) stepovers, the foot wall .222 deep x {{process.foot_wall_woc_mm:in.3dot}} wide, climb. Listen through the run; on chatter, feed hold, stop the spindle and tell the owner."
 feed = "hand"
 
 [[setups.operations]]
@@ -506,7 +527,7 @@ machine_ref = "pm-30mv"
 holding = "As Setup 4, the blank turned over: H DOWN on both stacks, one against the FIXED jaw, the other under the sawn end, flush with it; the seat against the FIXED jaw, the rod at the sawn end at mid-height; O to the RIGHT, centred. L, up, still the bar's face."
 datum = "Program MB04_low. G54: X0 O (the blank's RIGHT side), the part to −X; Y0 the fixed jaw's face (the seat); Z0 the stacks' top (H)."
 diagram = { file = "diagrams/low.svg", alt = "The blank lying across the jaws, H down, MB03's half-notch underneath; the 1/2 in end mill faces L down to the width, then mills the notch's other half through to it." }
-envelope = { x_span_mm = ["{{cad.outer_face_length_mm}}", "{{process.face_cutter_dia_mm}}", 5.08], y_span_mm = ["{{process.blank_length_max_mm}}", "{{process.face_cutter_dia_mm}}"], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{process.high_level_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{process.notch_through_mm}}"], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_min_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_min_mm}}"] }
+envelope = { x_span_mm = ["{{cad.outer_face_length_mm}}", "{{process.face_cutter_dia_mm}}", 5.08], y_span_mm = ["{{process.blank_length_max_mm}}", "{{process.face_cutter_dia_mm}}"], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{process.high_level_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{process.notch_through_mm}}"], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_mm}}"] }
 vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{process.blank_length_max_mm}}", along_jaws_mm = "{{cad.outer_face_length_mm}}", part_height_mm = "{{process.high_level_mm}}", parallel_height_mm = "{{process.riser_height_mm}}", overhang_mm = ["{{process.vise_width_inset_mm}}", "rest"], jaw_offset = "centred", fixed_jaw_face = "machined", moving_jaw_face = "sawn", moving_jaw_contact = "rod" }
 beam = { axis = "y", hold = "between", extent_mm = [0, "{{process.blank_length_max_mm}}"], supports_mm = [0, "{{process.blank_length_min_mm}}"], section_mm = { x = 13.0, z = "{{cad.high_side_width_mm}}" } }
 
@@ -516,6 +537,12 @@ feed = "hand"
 
 [[setups.operations]]
 instruction = "Prove MB04_low in air, Z0 raised 1.000 in. Then Z0 back."
+feed = "hand"
+
+# Not chatter-tested (#3428): as MB03's. Owner, Pedro, 2026-11-22: "same log
+# new dechatter issues to try full radial depth but shallow axial".
+[[setups.operations]]
+instruction = "First part only: these cuts at 2650 rpm have not been chatter-tested on this end mill (owner's test list #3428): L's face {{process.low_skim_mm:in.3dot}} deep x {{process.face_stepover_max_mm:in.3dot}} wide, the notch {{process.notch_level_mm:in.3dot}} deep x {{process.notch_step_mm:in.3dot}} wide with full-width ({{process.face_cutter_dia_mm:in.3dot}}) stepovers, the foot wall .222 deep x {{process.foot_wall_woc_mm:in.3dot}} wide, climb. Listen through the run; on chatter, feed hold, stop the spindle and tell the owner."
 feed = "hand"
 
 [[setups.operations]]
@@ -592,6 +619,14 @@ instruction = "Prove MB05_neck in air, Z0 raised 1.000 in; the cutter enters eac
 instruction_detailed = "Send $# and note the G54 line's Z. G10 L2 P1 Z(that Z + 25.400) raises Z0 1.000 in. Run MB05_neck, watching each level enter over the fixed jaw and stop short of the foot, and every move between them run above the foot's top. G10 L2 P1 Z(the noted Z) puts Z0 back."
 feed = "hand"
 
+# Not chatter-tested (#3428): .151 wide at .135 deep is wider than tested at
+# that depth, and the end mill stands 1.85-2.00 out, longer than the 1.10 it
+# was tested at. Owner, Pedro, 2026-11-22: "same log new dechatter issues to
+# try full radial depth but shallow axial".
+[[setups.operations]]
+instruction = "First part only: this cut at 2650 rpm, the end mill {{process.neck_mill_projection_min_mm:in.2dot}}–2.00 out, has not been chatter-tested on this end mill (owner's test list #3428): the neck {{process.neck_level_mm:in.3dot}} deep x .151 wide. Listen through the run; on chatter, feed hold, stop the spindle and tell the owner."
+feed = "hand"
+
 [[setups.operations]]
 speed_kind = "spindle"
 tool = "em-half"
@@ -635,6 +670,15 @@ feed = "hand"
 [[setups.operations]]
 instruction = "Prove MB06_nose in air, Z0 raised 1.000 in, through every M6; the cutter stays right of the jaws. Then Z0 back."
 instruction_detailed = "Send $# and note the G54 line's Z. G10 L2 P1 Z(that Z + 25.400) raises Z0 1.000 in. Run MB06_nose through every M6, watching the cutter stay right of the jaws' side. G10 L2 P1 Z(the noted Z) puts Z0 back."
+feed = "hand"
+
+# Not chatter-tested (#3427, #3428): the finish pass is deeper than tested
+# and the rough pass wider; both climb. Owner, Pedro, 2026-11-22: "log new
+# dechatter issues to try deep axial cuts but with shallow radial depth" and
+# "same log new dechatter issues to try full radial depth but shallow
+# axial".
+[[setups.operations]]
+instruction = "First part only: these cuts at 2650 rpm have not been chatter-tested on this end mill (owner's test list #3427, #3428): the nose rough {{process.nose_rough_level_mm:in.3dot}} deep x {{process.nose_rough_woc_mm:in.3dot}} wide, the nose finish {{process.nose_depth_mm:in.3dot}} deep x {{process.nose_finish_stock_mm:in.3dot}} wide. Listen through the run; on chatter, feed hold, stop the spindle and tell the owner."
 feed = "hand"
 
 [[setups.operations]]

@@ -77,18 +77,10 @@ flutes = 3
 feed_unit = "in/min"
 
 # The rebate's corner relief (.05 deep × .06 high, beside the roof, at the
-# bottom of the .134 rebate): no owned cutter is under .07 wide and reaches
-# .38 down inside the rebate. It is plunge-milled (owner ruling 2026-11-21,
-# relayed by CncBlockA) with Harvey Tool 34662, Miniature End Mill, Square,
-# Long Reach, Stub Flute: 3 flutes, centre cutting, .0620 cutter × .0930
-# length of cut × .5000 reach (8×), 1/8 shank, 2-1/2 overall, uncoated,
-# "optimized for plunging", $60.30 (harveytool.com/products/tool-details-
-# 34662, read 2026-11-21). Not owned: to buy. diameter_mm and
-# flute_length_mm: its .0620 and .0930 × 25.4.
-[tools.endmill-carbide-3fl-1-16-reach-1-2]
-description = "1/16 in (.0620) 3-flute carbide square end mill, stub flute .093 length of cut, .500 reach, 1/8 shank (Harvey Tool 34662)"
-diameter_mm = 1.5748
-flute_length_mm = 2.3622
+# bottom of the .134 rebate) is plunge-milled with Harvey Tool 34662 (owner
+# ruling 2026-11-21, relayed by CncBlockA): its tools record,
+# endmill-carbide-3fl-1-16-reach-1-2, is in common.toml (MHA-PD-17 plunges
+# with it too).
 # Its setting: Harvey Tool Speeds & Feeds, Miniature End Mills - Square -
 # Long Reach, Stub Flute, 9x Reach Multiple (W.C. Chapman's copy of Harvey's
 # table, shop.wcchapman.com/speeds-feeds/harvey-tool-miniature-end-mills-

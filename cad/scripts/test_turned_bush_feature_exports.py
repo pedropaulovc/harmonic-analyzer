@@ -21,6 +21,9 @@ import dt_crank_handle_ferrule_spec as ferrule
 import dt_cylinder_end_disc_spec as disc
 import export_features
 import mg_wheel_axle_spacer_spec as spacer
+import pd_transgear_knob_bush_geometry as knob_bush
+import pd_transgear_knob_thrust_ring_spec as thrust_ring
+import pd_transgear_pivot_spacer_spec as pivot_spacer
 import sm_gooseneck_geom as gooseneck
 import sm_gooseneck_spring_joint as joint
 from _gtol_face import SURFACE_CONE, SURFACE_CYLINDER, SURFACE_PLANE, FaceGeometry
@@ -60,6 +63,8 @@ _Z = (0.0, 0.0, 1.0)
 _X = (1.0, 0.0, 0.0)
 _MINUS_Z = (0.0, 0.0, -1.0)
 _MINUS_X = (-1.0, 0.0, 0.0)
+_Y = (0.0, 1.0, 0.0)
+_MINUS_Y = (0.0, -1.0, 0.0)
 
 
 def _annulus(length: float, od: float, bore: float) -> dict[str, FaceGeometry]:
@@ -130,6 +135,23 @@ _FACES: dict[tuple[str, str | None], dict[str, FaceGeometry]] = {
         "outer": _cylinder(gooseneck.PLUG_DIA, _X),
         "step": _cylinder(joint.PLUG_SHANK_DIA, _X),
         "tap": _cylinder(joint.TAP_DRILL_DIA, _X),
+    },
+    ("pd_transgear_knob_thrust_ring", None): {
+        "datum_end": _plane(_MINUS_Y, 0.0),
+        "far_end": _plane(_Y, thrust_ring.LENGTH),
+        "outer": _cylinder(thrust_ring.OD, _Y),
+        "bore": _cylinder(thrust_ring.ID, _Y),
+    },
+    ("pd_transgear_pivot_spacer", None): _annulus(
+        pivot_spacer.LENGTH, pivot_spacer.OD, pivot_spacer.BORE_DIA
+    ),
+    ("pd_transgear_knob_bush", None): {
+        "datum_end": _plane(_MINUS_Y, 0.0),
+        "shoulder": _plane(_Y, knob_bush.HUB_LENGTH),
+        "far_end": _plane(_Y, knob_bush.LENGTH),
+        "outer": _cylinder(knob_bush.HUB_DIA, _Y),
+        "step": _cylinder(knob_bush.PRESS_DIA, _Y),
+        "bore": _cylinder(knob_bush.BORE_DIA, _Y),
     },
 }
 _POCKET_WALL = ("dt_crank_handle_butt_cup", "pocket", _cylinder(cup.POCKET_DIA, _X))
@@ -223,6 +245,39 @@ def test_printed_bands_are_the_sheets() -> None:
     assert _inch(plug_end["tap"]["drill_depth"]) == [0.55, 0.57]
     assert _inch(plug_end["tap"]["thread_depth"]) == [0.43, 0.45]
     assert _inch(plug_end["step"]["diametral_clearance"]) == [0.004, 0.009]
+
+
+def test_the_paper_drive_bushes_print_the_sheets_bands() -> None:
+    manifest = export_features.requirement_manifest
+    ring = manifest("pd_transgear_knob_thrust_ring")["features"]
+    assert _inch(ring["far_end"]["length"]) == [0.266, 0.268]
+    assert _inch(ring["outer"]["dia"]) == [0.51, 0.53]
+    assert _inch(ring["bore"]["dia"]) == [0.257, 0.261]
+    assert ring["bore"]["process"] == "drill"
+
+    pivot = manifest("pd_transgear_pivot_spacer")["features"]
+    # The sheet prints .197 ±.002 about the exact 5.0 mm model.
+    assert _inch(pivot["far_end"]["length"]) == [0.195, 0.199]
+    assert _inch(pivot["outer"]["dia"]) == [0.43, 0.45]
+    assert _inch(pivot["bore"]["dia"]) == [0.1855, 0.186]
+    assert _inch(pivot["bore"]["diametral_interference"]) == [0.0005, 0.002]
+    for end in ("datum_end", "far_end"):
+        assert _inch([pivot[end]["perpendicularity"]]) == [0.001]
+        assert pivot[end]["datum"] == "bore"
+    assert _inch([pivot["outer"]["runout"]]) == [0.016]
+
+    bush = manifest("pd_transgear_knob_bush")["features"]
+    assert _inch(bush["outer"]["dia"]) == [0.51, 0.53]
+    assert _inch(bush["step"]["dia"]) == [0.4387, 0.4391]
+    assert _inch(bush["step"]["diametral_interference"]) == [0.0005, 0.0016]
+    assert _inch(bush["shoulder"]["station"]) == [0.808, 0.81]
+    assert _inch([bush["shoulder"]["root_radius_max"]]) == [0.005]
+    assert _inch(bush["far_end"]["length"]) == [1.141, 1.145]
+    # Reamed through after pressing, at MHA-PD-00: the bush's own traveler
+    # leaves its drilled hole for that ream.
+    assert _inch(bush["bore"]["dia"]) == [0.249, 0.2495]
+    assert bush["bore"]["made_at"] == "assembly"
+    assert _inch([bush["bore"]["wall_min"]]) == [0.068]
 
 
 def test_manifest_notes_are_the_printed_notes() -> None:

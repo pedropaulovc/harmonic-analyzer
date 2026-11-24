@@ -53,6 +53,10 @@ from pn_pen_assembly_spec import (
     STUD_NUT,
     STUD_PRECISION,
     STUD_TOLERANCE_MM,
+    STIRRUP_DIMENSION,
+    STIRRUP_PRECISION,
+    STIRRUP_REAR,
+    STIRRUP_TOLERANCE_MM,
     THUMB_SCREW,
     TRAVEL_DIMENSION,
     TRAVEL_LINE,
@@ -85,15 +89,20 @@ DIMENSION_TOLERANCES = {
     NIB_DIMENSION: NIB_TOLERANCE_MM,
     TRAVEL_DIMENSION: TRAVEL_TOLERANCE_MM,
 }
+# (lower, upper) deviations, mm: the stirrup setting runs from the model's
+# flush stirrup one way only.
+BILATERAL_TOLERANCES = {STIRRUP_DIMENSION: STIRRUP_TOLERANCE_MM}
 ANGULAR_TOLERANCES = {YAW_DIMENSION: YAW_TOLERANCE_DEG}
 TOLERANCE_PRECISION = {
     NIB_DIMENSION: NIB_PRECISION,
     YAW_DIMENSION: 0,
+    STIRRUP_DIMENSION: STIRRUP_PRECISION,
     TRAVEL_DIMENSION: TRAVEL_PRECISION,
 }
 DIMENSION_NOMINALS = {
     STUD_DIMENSION: STUD_HEIGHT,
     NIB_DIMENSION: NIB_PROTRUSION,
+    STIRRUP_DIMENSION: STIRRUP_REAR,
     TRAVEL_DIMENSION: TRAVEL_REFERENCE,
 }
 
@@ -207,7 +216,7 @@ THUMB_SCREW_TRAIL = (
 )
 # The stirrup: from its exploded rod-side face, at the block's mid-height on
 # the section's centre line, back along the slide-on axis to the block's
-# paper-end face, which it seats flush with (step 3).
+# paper-end face, its modelled flush place (its setting: steps 5A-5D).
 _STIRRUP_TRAIL_Y = v_block.BLOCK_HEIGHT / 2.0
 STIRRUP_TRAIL = (
     exploded_point(
@@ -242,6 +251,23 @@ NIB_TEXT_UV = (
     NIB_UV[0] - (NIB_TEXT_BEYOND - NIB_TEXT_OFFSET) * math.sqrt(0.5),
     NIB_UV[1] - (NIB_TEXT_BEYOND + NIB_TEXT_OFFSET) * math.sqrt(0.5),
 )
+# The stirrup setting's text point, machine mm: beyond the stirrup's rear
+# face along the marker axis and toward the neck's front face (VIEW C's
+# sheet-up), so the text stands clear of both extension lines, its
+# dimension line about 9 sheet mm over the stirrup's top edge and above C's
+# title, under RIGHT's label line (farm r1: centred over the stirrup, the
+# extension lines struck the text; r2: 19 off, its last line ran into C's
+# title).
+STIRRUP_TEXT_BEYOND = 15.0
+STIRRUP_TEXT_OFFSET = 24.0
+STIRRUP_TEXT_MACHINE = carriage.block_to_machine(
+    (
+        STIRRUP_REAR + STIRRUP_TEXT_BEYOND,
+        v_block.MARKER_AXIS_Y,
+        v_block.DEPTH_MID_Z - STIRRUP_TEXT_OFFSET,
+    )
+)
+STIRRUP_TEXT_UV = (STIRRUP_TEXT_MACHINE[0], -STIRRUP_TEXT_MACHINE[2])
 # The stud height's text point, machine mm: on the sheet-left of the rod axis
 # in a Right view (machine +Z), away from the wire, mid-height, far enough out
 # that the callout's widest line clears the stud's shank.
@@ -269,6 +295,7 @@ DIMENSION_CALLOUTS = {
     STUD_DIMENSION: f"STUD HEAD\nABOVE ROD TOP:\nSTUD LENGTH\nLESS {_STUD_LESS}",
     NIB_DIMENSION: "NIB PRESET\nBEYOND END FACE",
     YAW_DIMENSION: "MARKER TO\nROD FLAT",
+    STIRRUP_DIMENSION: "STIRRUP REAR FACE\nFROM END FACE",
     TRAVEL_DIMENSION: "FREE ROD TRAVEL:\nBLOCK TOP BELOW\nUPPER GUIDE TOP",
 }
 
@@ -292,6 +319,11 @@ _NIB_SETTING = (
 _YAW_SETTING = f"{YAW_DEG:.0f}° ±{YAW_TOLERANCE_DEG:.0f}°"
 _TRAVEL = f"±{_decimal(TRAVEL_TOLERANCE_MM, TRAVEL_PRECISION)}"
 _TRAVEL_SETTING = f"{_decimal(TRAVEL_REFERENCE, TRAVEL_PRECISION)} {_TRAVEL}"
+# The stirrup setting as its two limits, which the calipers read.
+_STIRRUP_SETTING = (
+    f"{_decimal(STIRRUP_REAR + STIRRUP_TOLERANCE_MM[0], STIRRUP_PRECISION)} TO "
+    f"{_decimal(STIRRUP_REAR + STIRRUP_TOLERANCE_MM[1], STIRRUP_PRECISION)}"
+)
 
 # --- detail regions (machine mm): what each fitter detail is centred on and how
 # far round it reaches ------------------------------------------------------------
@@ -362,7 +394,8 @@ CARRIAGE_ARROW_TIP = (
 DETAIL_LETTERS = {"stud": "A", "hanger": "B", "carriage": "C", "stirrup": "D"}
 SHEET_TITLES = {
     "carriage": f"VIEW {DETAIL_LETTERS['carriage']} - FROM ABOVE\n"
-    f"ROTATED {CARRIAGE_TURN_CW_DEG:g} DEG CW\nPEN YAW + NIB PRESET\nSCALE 2 : 1",
+    f"ROTATED {CARRIAGE_TURN_CW_DEG:g} DEG CW\nPEN YAW + NIB PRESET\n"
+    "+ STIRRUP SETTING\nSCALE 2 : 1",
     "stud": f"DETAIL {DETAIL_LETTERS['stud']}\nSTUD HEIGHT + LOCK\nSCALE 2 : 1",
     "hanger": f"DETAIL {DETAIL_LETTERS['hanger']}\nHANGER SCREW LOCK\nSCALE 2 : 1",
     "stirrup": f"DETAIL {DETAIL_LETTERS['stirrup']}\nSTIRRUP + THUMB SCREW\nSCALE 1 : 1",
@@ -375,7 +408,7 @@ VIEW_TITLES = {
 }
 SETTINGS_NOTE = (
     "AS SHIPPED: STUD SET AND LOCKED (DETAIL A); YAW SET, SET SCREW TIGHT; "
-    "NIB PRESET, THUMB SCREW FINGER-TIGHT (VIEW C); ROD FREE IN BOTH "
+    "NIB PRESET, STIRRUP SET, THUMB SCREW FINGER-TIGHT (VIEW C); ROD FREE IN BOTH "
     f"GUIDES. ITEMS {ITEM[HANGER_SCREW]}-{ITEM[HANGER_JAM_NUT]} BAGGED WITH "
     "THE SUB-ASSEMBLY; UPPER END OF THE PEN WIRE LEFT LONG, COILED. "
     "NO LUBRICANT, NO THREAD LOCKER."
@@ -405,7 +438,7 @@ _BENCH_STEPS = (
     "2C. CHECK: THE KNOT DOES NOT SLIP UNDER A LIGHT PULL BY HAND.",
     "2D. TRIM THE TAIL CLOSE TO THE KNOT; THE UPPER END STAYS LONG.",
     f"3. STIRRUP: SLIDE THE STIRRUP (ITEM {ITEM[FRAME]}) ONTO THE V-BLOCK "
-    f"(ITEM {ITEM[V_BLOCK]}) FLUSH WITH THE BLOCK'S END FACE AT THE NIB END "
+    f"(ITEM {ITEM[V_BLOCK]}) OVER THE BLOCK'S END FACE AT THE NIB END "
     "(VIEW C).",
     f"3A. START THE THUMB SCREW (ITEM {ITEM[THUMB_SCREW]}) UP INTO THE "
     "STIRRUP'S BOTTOM-RAIL TAP (DETAIL D).",
@@ -419,10 +452,19 @@ _BENCH_STEPS = (
     f"5. NIB PRESET: MARKER (ITEM {ITEM[MARKER]}, CONSUMABLE), CAP OFF, NIB "
     "FIRST THROUGH THE STIRRUP WINDOW INTO THE V UNTIL THE NIB TIP STANDS "
     f"{_NIB_SETTING} BEYOND THE END FACE ALONG THE MARKER AXIS (VIEW C).",
-    "5A. TIGHTEN THE THUMB SCREW FINGER-TIGHT: ITS TIP CLAMPS THE GRIP INTO "
-    "THE V.",
+    "5A. TIGHTEN THE THUMB SCREW FINGER-TIGHT WITH THE STIRRUP'S PAPER FACE "
+    "NOT PROUD OF THE END FACE AND ITS REAR FACE "
+    f"{_STIRRUP_SETTING} FROM THE END FACE (VIEW C, CALIPERS): ITS TIP CLAMPS "
+    "THE GRIP INTO THE V AND THE STIRRUP ON THE BLOCK.",
     "5B. CHECK: THE MARKER DOES NOT SLIDE OR TURN IN THE V BY HAND, AND THE "
     f"NIB STILL STANDS {_NIB_SETTING} BEYOND THE END FACE (VIEW C).",
+    "5C. CHECK: THE STIRRUP'S REAR FACE STILL STANDS "
+    f"{_STIRRUP_SETTING} FROM THE END FACE (VIEW C, CALIPERS).",
+    "5D. CHECK: WITH A SQUARE'S BLADE ON EDGE ACROSS THE STIRRUP'S TWO SIDE "
+    "RAILS AND THE BLOCK'S END FACE BETWEEN THE MARKER AND THE STIRRUP'S TOP "
+    "RAIL, NO LIGHT SHOWS BETWEEN THE BLADE AND THE END FACE (THE STIRRUP NOT "
+    "PROUD).",
+    "5E. IF ANY CHECK FAILS, SLACKEN THE THUMB SCREW AND REPEAT 5-5D.",
     f"6. INTO THE GUIDES: ENTER THE SQUARE OF THE ROD (ITEM {ITEM[ROD]}) INTO BOTH U GUIDES OF THE "
     f"HANGER (ITEM {ITEM[HANGER]}) FROM THEIR OPEN FRONT ENDS, THE {_BELOW_GUIDE} "
     "BELOW THE LOWER GUIDE.",
@@ -447,7 +489,7 @@ _MACHINE_STEPS = (
     "8B. TO CHANGE A DRY MARKER, SLACKEN THE THUMB SCREW (ITEM "
     f"{ITEM[THUMB_SCREW]}).",
     f"8C. PULL THE OLD MARKER (ITEM {ITEM[MARKER]}) OUT OF THE V.",
-    "8D. FIT THE NEW MARKER PER STEPS 5-5B.",
+    "8D. FIT THE NEW MARKER PER STEPS 5-5E.",
     "8E. SET ITS NIB TO PAPER PER STEP 8A.",
 )
 STEP_SECTIONS = (("AT THE BENCH", _BENCH_STEPS), ("AT MHA-HA-00", _MACHINE_STEPS))

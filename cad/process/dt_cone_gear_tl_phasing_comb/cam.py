@@ -5,7 +5,7 @@ part's exported ``features.toml`` and the plan/shop TOML, then runs
 :func:`build` inside headless FreeCAD (``freecadcmd``) with that context and
 checks the posted G-code against :func:`expectations`. No part dimension is
 typed here: the U's ends, edges, slot, blade steps and sheet come from the
-manifest; the blank, its place on the spoil plate, the tape, the cutter's tip
+manifest; the blank, its place on the spoil plate, the tape stack, the cutter's tip
 height, the vise and the plate from ``plan.toml`` ``[parameters]``; the
 cutter's diameter, flute length, speed and feed from the shop (``shop/``).
 Typed here, because neither record carries them: the safe and clearance
@@ -13,13 +13,16 @@ heights, the vise jaws' depth (keep-out shapes only) and the share of a
 printed band the posted path may use.
 
 Route (plan text in ``plan.toml``): the blank, snipped from the .020 sheet,
-is bonded on 3M VHB 5906 tape to the spoil plate (``fixtures.sheet-spoil-
-plate``) gripped in the vise on parallels. One file, CB01_outline: the 1/16
+is bonded to the spoil plate (``fixtures.sheet-spoil-plate``), gripped in
+the vise on parallels, on blue painter's tape on both faces with CA glue
+between (owner 2026-11-23). One file, CB01_outline: the 1/32
 in carbide downcut end mill comes down in front of the blank, feeds in
-through the blank's margin and runs once round the whole U at the finished
-size, one level, its tip a few thousandths into the spoil plate (past the
-tape, whatever the tape's and the plate top's variation), so the comb comes
-free of the blank in one pass.
+through the blank's margin and runs round the whole U at the finished size
+once per level, in the fewest equal levels each within the maker's slotting
+depth, backing out through the margin and stepping down there between
+levels; the last level's tip stands a few thousandths into the spoil plate
+(past the tape stack, whatever the stack's and the plate top's variation),
+so the comb comes free of the blank on its own island of tape.
 
 Work frame (G54): X0 the plate's left end, Y0 the fixed jaw's face (the
 plate's back edge), +Y toward the fixed jaw; Z0 the plate top. The comb lies
@@ -44,14 +47,14 @@ PROGRAMS: tuple[tuple[str, tuple[Any, ...]], ...] = (("CB01_outline", ("outline"
 LOAD_FIRST_TOOL = ("CB01_outline",)
 # The plan's tools the mill runs, numbered by their places in the plan's tool
 # list among these.
-CAM_TOOLS = ("em-sixteenth",)
+CAM_TOOLS = ("em-thirtysecond",)
 # Blade features south to north (the staircase's order along X).
 BLADES = ("blade_t024", "blade_t018", "blade_t012", "blade_t006")
 IN = 25.4
 # The cutter comes down this far in front of the blank's front edge (beyond
-# its radius), its tip into the spoil plate only, then feeds in through the
-# blank's margin to the path: it never plunges into the brass sheet, whose
-# burr and tape would lift at a plunge.
+# its radius), its tip into the plate's tape and the spoil plate only, then
+# feeds in through the blank's margin to the path: it never plunges into the
+# brass sheet, whose burr and tape would lift at a plunge.
 APPROACH_MM = 1.0
 # The descent starts this far above the stock top: real G0 brings the cutter
 # to it.
@@ -369,15 +372,16 @@ def _offset_path(
 def _gcode(
     segs: list[tuple],
     shift: tuple[float, float],
-    z_cut: float,
+    levels: list[float],
     top: float,
     clear: float,
     entry_y: float,
 ) -> list[str]:
-    """The path as G-code in the work frame: down at ``entry_y`` in front of
-    the blank, level with the first segment's middle (the spring arm's front
-    edge), in through the margin to it, the segments round and back to it,
-    lift."""
+    """The path as G-code in the work frame: down to the first level at
+    ``entry_y`` in front of the blank, level with the first segment's middle
+    (the spring arm's front edge); at each level in through the margin to
+    it, the segments round and back to it, and back out the way it came to
+    ``entry_y``, where the next level steps down; lift."""
 
     def w(p):
         return (_r(p[0] + shift[0]), _r(p[1] + shift[1]))
@@ -385,27 +389,29 @@ def _gcode(
     first = segs[0]
     mid = [(first[1][0] + first[2][0]) / 2, (first[1][1] + first[2][1]) / 2]
     sx, sy = w(mid)
+    ex, ey = w(first[2])
     lines = [
         f"G0 Z{_r(top + clear):.3f}",
         f"G0 X{sx:.3f} Y{_r(entry_y):.3f}",
         f"G0 Z{_r(top + SAFE_MM):.3f}",
-        f"G1 Z{_r(z_cut):.3f} F{{feed}}",
-        f"G1 Y{sy:.3f} F{{feed}}",
     ]
-    ex, ey = w(first[2])
-    lines.append(f"G1 X{ex:.3f} Y{ey:.3f} F{{feed}}")
-    for seg in segs[1:]:
-        x, y = w(seg[2])
-        if seg[0] == "line":
-            if math.dist(seg[1], seg[2]) < 1e-6:
-                continue
-            lines.append(f"G1 X{x:.3f} Y{y:.3f} F{{feed}}")
-        else:
-            c = seg[3]
-            i, j = _r(c[0] - seg[1][0]), _r(c[1] - seg[1][1])
-            word = "G2" if seg[4] else "G3"
-            lines.append(f"{word} X{x:.3f} Y{y:.3f} I{i:.3f} J{j:.3f} F{{feed}}")
-    lines.append(f"G1 X{sx:.3f} Y{sy:.3f} F{{feed}}")
+    for z in levels:
+        lines.append(f"G1 Z{_r(z):.3f} F{{feed}}")
+        lines.append(f"G1 Y{sy:.3f} F{{feed}}")
+        lines.append(f"G1 X{ex:.3f} Y{ey:.3f} F{{feed}}")
+        for seg in segs[1:]:
+            x, y = w(seg[2])
+            if seg[0] == "line":
+                if math.dist(seg[1], seg[2]) < 1e-6:
+                    continue
+                lines.append(f"G1 X{x:.3f} Y{y:.3f} F{{feed}}")
+            else:
+                c = seg[3]
+                i, j = _r(c[0] - seg[1][0]), _r(c[1] - seg[1][1])
+                word = "G2" if seg[4] else "G3"
+                lines.append(f"{word} X{x:.3f} Y{y:.3f} I{i:.3f} J{j:.3f} F{{feed}}")
+        lines.append(f"G1 X{sx:.3f} Y{sy:.3f} F{{feed}}")
+        lines.append(f"G1 Y{_r(entry_y):.3f} F{{feed}}")
     lines.append(f"G0 Z{_r(top + clear):.3f}")
     return lines
 
@@ -439,7 +445,7 @@ def context(
     if not math.isclose(_plane(f, "underside", "z"), 0.0, abs_tol=1e-9):
         raise ValueError("underside: expected the model's Z0")
 
-    em = _shop_tool(plan, shop, "em-sixteenth")
+    em = _shop_tool(plan, shop, "em-thirtysecond")
     dia = em["diameter_mm"]
     r = dia / 2
     rpm, feed, flutes = _setting(plan, shop, "outline")
@@ -461,10 +467,16 @@ def context(
             f"the slot under the deepest blade ({gap:.3f}) passes no cutter"
         )
 
-    # Through the sheet in one level: the tip into the spoil plate, through
-    # the thinnest sheet on the thinnest tape by the stated margin, no deeper
-    # into the plate than stated.
-    tape = p["tape_thickness_mm"]
+    # Through the sheet: the tip into the spoil plate. Z0 is the bare plate
+    # top, so the tip's depth into the plate is the same on every tape stack
+    # (the comb's .004, at most spoil_cut_max_mm); its margin under the
+    # sheet's underside (on the stack's top) is least on the thinnest stack.
+    stack = p["tape_stack_mm"]
+    stack_lo, stack_hi = p["tape_stack_min_mm"], p["tape_stack_max_mm"]
+    if stack_lo > stack:
+        raise ValueError("tape_stack_min_mm is over the tape stack")
+    if stack_hi < stack:
+        raise ValueError("tape_stack_max_mm is under the tape stack")
     tip = p["outline_tip_z_mm"]
     _agree(plan, "outline_tip_into_plate_mm", -tip)
     if not -p["spoil_cut_max_mm"] <= tip <= 0.0:
@@ -472,24 +484,43 @@ def context(
             "the cutter's tip must stand at or below the plate top, no deeper"
             " than spoil_cut_max_mm"
         )
-    if p["tape_thickness_min_mm"] > tape:
-        raise ValueError("tape_thickness_min_mm is over the tape's thickness")
-    # The sheet's underside rests on the tape's top.
-    if p["tape_thickness_min_mm"] - tip < p["through_margin_min_mm"]:
+    if stack_lo - tip < p["through_margin_min_mm"]:
         raise ValueError(
             "the tip is not through_margin_min_mm below the thinnest sheet's"
-            " underside on the thinnest tape"
+            " underside on the thinnest tape stack"
         )
-    top = tape + sheet_max
+    top = stack + sheet_max
+    # The thickest sheet on the thickest stack: the first level's real depth
+    # and the floor every rapid and tool change stays above.
+    top_hi = stack_hi + sheet_max
     depth = top - tip
     _agree(plan, "outline_depth_mm", depth)
-    if depth > em["flute_length_mm"]:
+    if top_hi - tip > em["flute_length_mm"]:
         raise ValueError(
-            f"the cut ({depth:.3f}) is deeper than the end mill's flutes"
+            f"the cut ({top_hi - tip:.3f}) is deeper than the end mill's flutes"
             f" ({em['flute_length_mm']:.3f})"
         )
-    if _cut(plan, "outline", "axial_doc_mm") + 1e-6 < depth:
-        raise ValueError("'outline' axial_doc_mm is under the one level's depth")
+    # Equal levels, the fewest with each no deeper than the stated share of
+    # the cutter's diameter (the maker's slotting depth), from the top to
+    # the tip.
+    count = math.ceil(depth / (p["level_depth_max_fraction"] * dia) - 1e-9)
+    if count != p["level_count"]:
+        raise ValueError(
+            f"process.level_count {p['level_count']}, the recipe computes {count}"
+        )
+    step = depth / count
+    _agree(plan, "level_depth_mm", step)
+    if _cut(plan, "outline", "axial_doc_mm") + 1e-6 < step:
+        raise ValueError("'outline' axial_doc_mm is under one level's depth")
+    levels = [_r(top - step * (k + 1)) for k in range(count)]
+    levels[-1] = _r(tip)
+    # On the thickest stack the sheet stands higher and the first level
+    # takes more: still no deeper than the maker's share of the diameter.
+    if top_hi - levels[0] > p["level_depth_max_fraction"] * dia + 1e-6:
+        raise ValueError(
+            "the first level on the thickest tape stack is deeper than"
+            " level_depth_max_fraction of the cutter's diameter"
+        )
 
     # The blank and the comb's place on it, the blank's place on the plate.
     margin = p["blank_margin_mm"]
@@ -516,7 +547,8 @@ def context(
     ):
         raise ValueError("the blank runs off the plate")
 
-    # Bond: the comb and the waste round it, each on its own tape once cut.
+    # Bond: the comb and the waste round it, each on its own island of tape
+    # once cut.
     comb_area = _area(elements)
     waste_area = p["blank_length_in"] * IN * p["blank_width_in"] * IN - comb_area
     _agree(plan, "comb_bond_area_mm2", comb_area)
@@ -529,10 +561,10 @@ def context(
         p["vise_jaw_height_mm"] - p["parallel_height_mm"] - p["plate_thickness_mm"]
     )
     _agree(plan, "jaw_top_over_plate_mm", jaw_top)
-    if p["em_sixteenth_projection_min_mm"] < jaw_top - tip + CLEAR_MM:
+    if p["em_thirtysecond_projection_min_mm"] < jaw_top - tip + CLEAR_MM:
         raise ValueError(
-            "em_sixteenth_projection_min_mm: the collet would not clear the jaw"
-            " tops with the tip at the cut"
+            "em_thirtysecond_projection_min_mm: the collet would not clear the"
+            " jaw tops with the tip at the cut"
         )
     clear = max(CLEAR_MM, jaw_top - top + CLEAR_MM)
     boxes = [
@@ -552,13 +584,14 @@ def context(
         raise ValueError(f"plan tools lack {missing}")
     names = {t["id"]: t["name"] for t in plan["tools"]}
 
-    z_cut = _r(tip)
+    z_cut = levels[-1]
     front = -by - p["blank_width_in"] * IN
     entry_y = front - r - APPROACH_MM
     if entry_y - r < -plate_w:
         raise ValueError("the cutter's way in runs off the plate's front edge")
-    lines = _gcode(segs, shift, z_cut, top, clear, entry_y)
+    lines = _gcode(segs, shift, levels, top, clear, entry_y)
     entry_x = _r((segs[0][1][0] + segs[0][2][0]) / 2 + shift[0])
+    start_y = _r((segs[0][1][1] + segs[0][2][1]) / 2 + shift[1])
     work_elements = [
         {
             **e,
@@ -574,7 +607,7 @@ def context(
     ]
     jobs = [
         {
-            "tool": "em-sixteenth",
+            "tool": "em-thirtysecond",
             "dia": dia,
             "shape": "endmill",
             "flutes": flutes,
@@ -586,35 +619,43 @@ def context(
             "stock": (
                 (bx, bx + p["blank_length_in"] * IN),
                 (-by - p["blank_width_in"] * IN, -by),
-                (tape, top),
+                (stack, top),
             ),
             "ops": [["outline", "cut the U out", lines]],
         }
     ]
     frames = {
         "plate": {
-            "origin": [-shift[0], -shift[1], -tape],
+            "origin": [-shift[0], -shift[1], -stack],
             "axes": [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]],
         }
     }
-    t = numbers["em-sixteenth"]
+    t = numbers["em-thirtysecond"]
     name = PROGRAMS[0][0]
     expect = [
-        [name, "tool_changes", {"z_top": top, "tools": [t], "loads_first": True}],
+        [name, "tool_changes", {"z_top": top_hi, "tools": [t], "loads_first": True}],
         [name, "spindle", {"rpm": [[rpm]]}],
-        [name, "pauses", {"z_top": top, "count": 0}],
+        [name, "pauses", {"z_top": top_hi, "count": 0}],
         [name, "depth", {"z_min": z_cut}],
-        [name, "rapids_clear", {"z_top": top}],
+        [name, "rapids_clear", {"z_top": top_hi}],
         [name, "air_feed", {"z_top": top}],
         [
             name,
             "outline",
             {
                 "elements": work_elements,
-                "passes": [{"offset": r, "levels": [z_cut]}],
+                "passes": [{"offset": r, "levels": levels}],
                 "z_top": top,
-                # The way in through the blank's front margin.
-                "clearing": [{"x": [entry_x - r, entry_x + r], "levels": [z_cut]}],
+                # The way in and back out through the blank's front margin,
+                # at every level: waste in no order (each level's way out
+                # follows its pass, the next level's way in follows that).
+                "leads": [
+                    {
+                        "centre": [entry_x, _r((entry_y + start_y) / 2)],
+                        "radius": (start_y - entry_y) / 2,
+                        "levels": levels,
+                    }
+                ],
             },
         ],
         [name, "keep_out", {"radius": r, "boxes": boxes}],

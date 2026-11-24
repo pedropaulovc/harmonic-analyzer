@@ -34,6 +34,10 @@ note = "Not owned: to buy. Variable Helix End Mills for Aluminum Alloys - Square
 flutes = 3
 
 [tools.endmill-carbide-3-64]
+make = "Titan USA"
+sku = "TC10203"
+source = "https://www.dixie-tool.com/end-mill-3-64-2fl-se-stub-carb-130392/"
+purchase = "Dixie Tool TITUS1-TC10203, 3/64 in 2-flute single-end stub-length solid carbide square end mill, uncoated, $13.37 (read live 2026-11-22)."
 kind = "end_mill"
 status = "to_order"
 note = "Not owned: to buy. MHA-PD-17 disc hub: plunges the flat floor at the pin hole's mouth (CM02_pin_hole). No longer for MHA-PD-03, which the 1/32 downcut cuts."
@@ -58,11 +62,18 @@ status = "to_order"
 note = "Not owned: to buy. Miniature End Mill, Square, Long Reach, Stub Flute: .0620 × .093 length of cut × .500 reach (8x), 3 flutes, 1/8 shank, uncoated, optimized for plunging. MHA-MS-02 rebate corner relief .05 ±.01 deep × .06 ±.01 high beside the roof, .38 below the mating face inside the .134 rebate, plunge-milled: no owned cutter is .07 or under and reaches it."
 
 [tools.knurl-straight-25tpi]
+make = "Form Roll"
+sku = "30-931-225"
+source = "https://www.travers.com/product/form-roll-knurl-30-931-225"
+purchase = "Two Travers 30-931-225, Form Roll HSS straight knurl wheels, 25 pitch, 3/4 in diameter x 3/8 in wide x 1/4 in hole, $19.23 each (read live 2026-11-22), for the AXA No. 10 knurling holder of the owned set (tools.qctp-axa-lms-2280). Owner 2026-11-23, reading the wheels on that holder: \"LAPPED MEDIUM DIAMOND KNURLS. DIMENSIONS: 3/4 X 3/8 X 1/4\", so the holder takes this size."
 kind = "knurling_tool"
 status = "to_order"
 note = "Not owned: to buy. drawing cross-check 2026-11-19: MHA-PD-13 STRAIGHT KNURL 25 TPI."
 
 [tools.lathe-tool-sharp-nose]
+sku = "1965"
+source = "https://littlemachineshop.com/products/tool-bits-1-4-presharpened-individual-tool-bits"
+purchase = "LittleMachineShop 1965, Tool Bit 1/4 in Right Hand Presharpened (HSS), $7.95, available (read live 2026-11-22); its nose is stoned to R.004 or less in the shop. No stock insert for the owned TCMT-21.51 holders reads R.004: LittleMachineShop's TCMT-21.50 (3416) states R.008."
 kind = "turning_tool"
 status = "to_order"
 note = "Not owned: to buy. drawing cross-check 2026-11-19: MHA-PD-08 R.004 max. corners, .016 neck; MHA-PD-17 SPIGOT ROOT R.004 MAX; MHA-PD-23 R.005 MAX land-to-head corner; MHA-PN-04 R.008 max. shoulder."
@@ -98,14 +109,22 @@ status = "to_order"
 note = "Not owned: to buy. drawing cross-check 2026-11-19: MHA-PD-23 R.18 head dome."
 
 [tools.needle-files-swiss]
+make = "TTC"
+sku = "51-502-961"
+source = "https://www.travers.com/product/ttc-51-502-961-needle-file-51-502-961"
+purchase = "Travers 51-502-961, TTC 12-piece 5-1/2 in Swiss-pattern needle file set, cut 2, with handles, $19.75, in stock (read live 2026-11-22). Swiss-made alternative: Grobet 31.675 (Travers 51-602-963), $119.41."
 kind = "file_set"
 status = "to_order"
 note = "Not owned: to buy. drawing cross-check 2026-11-19: MHA-DT-37-TL-01 file the tooth-space form (.0114-.0323)."
 
 [tools.number-stamps]
+make = "C.H. Hanson"
+sku = "20541"
+source = "https://www.travers.com/product/ch-hanson-20541-letters-figures-99-006-013"
+purchase = "Travers 99-006-013, C.H. Hanson 20541 steel number stamp set, 1/8 in characters, 0-8 (6 serves as 9), $23.75 (read live 2026-11-22): the sheet's 1/8 FIGURE STAMP."
 kind = "stamp_set"
 status = "to_order"
-note = "Not owned: to buy. drawing cross-check 2026-11-19: MHA-FR-01 STAMP \"2\" .14 HIGH."
+note = "Not owned: to buy. MHA-FR-01 STAMP \"2\", 1/8 FIGURE STAMP (owner decision 2026-11-19, #3124 item 1)."
 
 [tools.endmill-carbide-3fl-1-16-downcut]
 name = "Harvey Tool 896262 carbide downcut square end mill, 1/16 in (.0620), .186 length of cut, 3 flutes, 1/8 shank, 1-1/2 in overall"
@@ -117,3 +136,17 @@ purchase = "Harvey Tool 896262, $51.40 each (listing read live 2026-11-22); buy 
 status = "to_order"
 note = "Not owned: to buy. Variable Helix End Mills for Aluminum Alloys - Square - Downcut: 3 left-hand spiral, right-hand cut flutes, centre cutting, uncoated; the family page states it prevents lifting of the workpiece and performs in brass. Cuts the MHA-DT-03-TL-02 phasing comb's outline out of .020 brass sheet bonded on tape (CB01_outline): a downcut pushes the narrow arms onto the tape instead of lifting them."
 flutes = 3
+
+# Owner ruling 2026-11-23 (tool audit Q5): the dome ends are turned with a
+# bought ball and radius turning tool; step-and-file is the fallback for any
+# dome it cannot reach. It replaces the four custom form tools
+# (form-tool-r070, -r125, -r160, -r180) once the plans name it.
+[tools.ball-radius-turner-lms-2569]
+name = "Ball and Radius Turning Tool, Small"
+make = "LittleMachineShop"
+sku = "2569"
+source = "https://littlemachineshop.com/products/ball-and-radius-turning-tool-small"
+purchase = "LittleMachineShop 2569, Ball and Radius Turning Tool, Small, $119.95, available (read live 2026-11-23; the ruling's note of 2026-11-23 quoted $124.95)."
+kind = "turning_tool"
+status = "to_order"
+note = "Not owned: to buy. Convex dome ends on the Ø.25 and smaller rods and pins of the ch, dt, mg and pd families."

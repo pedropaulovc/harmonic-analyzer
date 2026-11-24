@@ -77,7 +77,7 @@ def _findings(ctx: dict, out: Path) -> list:
 
 
 def test_context_accepts_the_plan_and_rounds_every_inside_corner(context) -> None:
-    assert context["numbers"] == {"em-sixteenth": 1}
+    assert context["numbers"] == {"em-thirtysecond": 1}
     assert RECIPE.LOAD_FIRST_TOOL == ("CB01_outline",)
     outline = next(
         kwargs for _p, check, kwargs in context["expect"] if check == "outline"
@@ -120,14 +120,18 @@ def test_the_recipes_program_passes_every_check_it_declares(context, tmp_path) -
         ("blank_left_x_mm", 50.0, "comb_south_x_mm"),
         ("outline_tip_z_mm", -0.3, "outline_tip_into_plate_mm"),
         ("spoil_cut_max_mm", 0.05, "no deeper than spoil_cut_max_mm"),
-        ("through_margin_min_mm", 0.3, "through_margin_min_mm below"),
-        ("tape_thickness_min_mm", 0.2, "over the tape"),
+        ("through_margin_min_mm", 0.4, "through_margin_min_mm below"),
+        ("tape_stack_min_mm", 0.3, "over the tape stack"),
+        ("tape_stack_max_mm", 0.25, "under the tape stack"),
+        ("tape_stack_max_mm", 0.4, "first level on the thickest tape stack"),
         ("outline_depth_mm", 0.5, "outline_depth_mm"),
         ("comb_bond_area_mm2", 900.0, "comb_bond_area_mm2"),
         ("jaw_top_over_plate_mm", 6.0, "jaw_top_over_plate_mm"),
-        ("em_sixteenth_projection_min_mm", 5.0, "collet would not clear"),
-        ("inside_corner_max_mm", 0.5, "title block's"),
-        ("outline_cutter_dia_mm", 1.5875, "cutter_dia_mm"),
+        ("em_thirtysecond_projection_min_mm", 5.0, "collet would not clear"),
+        ("inside_corner_max_mm", 0.3, "title block's"),
+        ("outline_cutter_dia_mm", 1.5748, "cutter_dia_mm"),
+        ("level_count", 2, "level_count"),
+        ("level_depth_mm", 0.4, "level_depth_mm"),
     ],
 )
 def test_a_plan_number_off_the_model_or_shop_is_refused(key, value, detail) -> None:
@@ -154,11 +158,11 @@ def _seed(ctx: dict, pick, change) -> dict:
     [
         # The back edge cut .27 mm inside the comb.
         (
-            lambda line: line.startswith("G1 X113.030 Y-43.967"),
-            lambda line: line.replace("Y-43.967", "Y-43.700"),
+            lambda line: line.startswith("G1 X113.030 Y-43.574"),
+            lambda line: line.replace("Y-43.574", "Y-43.300"),
             "outline",
         ),
-        # The level taken deeper into the spoil plate.
+        # The last level taken deeper into the spoil plate.
         (
             lambda line: line.startswith("G1 Z-0.102"),
             lambda line: line.replace("Z-0.102", "Z-0.400"),
@@ -166,8 +170,8 @@ def _seed(ctx: dict, pick, change) -> dict:
         ),
         # The feed in through the margin rapided at cutting depth.
         (
-            lambda line: line.startswith("G1 Y-43.967"),
-            lambda line: "G0 Y-43.967",
+            lambda line: line.startswith("G1 Y-43.574"),
+            lambda line: "G0 Y-43.574",
             "rapid",
         ),
     ],

@@ -110,7 +110,11 @@ from pn_pen_v_block_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
     ISOMETRIC_VIEW_NOTE,
+    NECK_BREAK_FULL_X,
+    NECK_BREAK_RUNOUT_VOLUME,
+    NECK_BREAK_VOLUME,
     NECK_DEPTH,
+    NECK_EDGE_BREAK,
     PIVOT_BORE_DIA,
     PIVOT_BORE_TOP_CHAMFER,
     PIVOT_BORE_X,
@@ -156,6 +160,9 @@ _DATUM_U = BODY_SIDE_STEP
 # Section A-A's cutting plane (the drawing cuts at x = PIVOT_BORE_X): the
 # section's reference sketches lie in it.
 SECTION_PLANE = "SectionAPlane"
+# The neck breaks' stop: where the chamfer mill is fed up out of each break,
+# the run-outs' sketches on it.
+NECK_BREAK_PLANE = "NeckBreakStopPlane"
 # Length of the datum stubs and the pivot reference's axis chord; unprinted,
 # short enough to stay on the front face clear of the set-screw tap.
 _STUB = 1.0
@@ -186,6 +193,10 @@ V_PIVOT_CHAMFER = (
     * PIVOT_BORE_TOP_CHAMFER**2
     * (PIVOT_BORE_DIA / 2.0 + PIVOT_BORE_TOP_CHAMFER / 3.0)
 )
+# Each neck edge break: its triangle on the neck from the paper end to the
+# stop, then its run-out (the cone's part past the stop, into the step).
+V_NECK_BREAKS = 2.0 * NECK_BREAK_VOLUME
+V_NECK_BREAK_RUNOUTS = 2.0 * NECK_BREAK_RUNOUT_VOLUME
 # The tap runs from the body's front face to where its whole profile is inside
 # the bore: the drill cylinder to the bore axis less its near half of the
 # drill-through-bore intersection (already void).
@@ -197,6 +208,8 @@ V_TOTAL = (
     V_BLOCK
     - V_GROOVE
     + V_APEX_FILLETS
+    - V_NECK_BREAKS
+    - V_NECK_BREAK_RUNOUTS
     - V_RELIEF
     - V_PIVOT_BORE
     - V_PIVOT_CHAMFER
@@ -521,44 +534,175 @@ def _plane_frame(adapter, name: str) -> tuple[tuple[float, ...], tuple[float, ..
 
 def _section_plane(adapter) -> None:
     """Section A-A's cutting plane: the Right plane carried +X to the pivot-bore
-    axis.  Read back against the Right plane: the same rotation (so a sketch on
-    it keeps the Right plane's (u, v) = model (-Z, Y)) and an origin shifted by
-    exactly PIVOT_BORE_X along +X; anything else raises before a chord is laid.
-    """
+    axis (``_right_plane_at``)."""
+    _right_plane_at(adapter, SECTION_PLANE, PIVOT_BORE_X)
+
+
+def _right_plane_at(adapter, name: str, x: float) -> str:
+    """A plane parallel to the Right plane at model ``x``.  Read back against
+    the Right plane: the same rotation (so a sketch on it keeps the Right
+    plane's (u, v) = model (-Z, Y)) and an origin shifted by exactly ``x``
+    along +X; anything else raises before a chord is laid.  Returns the
+    plane's offset dimension, named ``name`` + "X"."""
     from solidworks_mcp.adapters.base import CreatePlaneParameters
 
     check(
-        f"create plane {SECTION_PLANE}",
+        f"create plane {name}",
         adapter.create_plane(
-            CreatePlaneParameters(
-                mode="offset", base_plane="Right Plane", offset=PIVOT_BORE_X
-            )
+            CreatePlaneParameters(mode="offset", base_plane="Right Plane", offset=x)
         ),
     )
-    name_last_feature(adapter, SECTION_PLANE)
+    name_last_feature(adapter, name)
     right_rotation, right_origin = _plane_frame(adapter, "Right Plane")
-    rotation, origin = _plane_frame(adapter, SECTION_PLANE)
+    rotation, origin = _plane_frame(adapter, name)
     shift = tuple(o - r for o, r in zip(origin, right_origin))
     if any(abs(a - b) > 1e-9 for a, b in zip(rotation, right_rotation)) or any(
-        abs(s - e) > 1e-6 for s, e in zip(shift, (PIVOT_BORE_X, 0.0, 0.0))
+        abs(s - e) > 1e-6 for s, e in zip(shift, (x, 0.0, 0.0))
     ):
         raise RuntimeError(
-            f"{SECTION_PLANE}: rotation {rotation} / origin shift {shift} mm, "
-            f"expected the Right plane's {right_rotation} shifted "
-            f"({PIVOT_BORE_X}, 0, 0)"
+            f"{name}: rotation {rotation} / origin shift {shift} mm, "
+            f"expected the Right plane's {right_rotation} shifted ({x}, 0, 0)"
         )
+    return name_dimensions(adapter, name, [f"{name}X"])[0]
 
 
-def _require_on_section_plane(adapter, sketch: str) -> None:
+def _require_on_section_plane(adapter, sketch: str, plane: str = SECTION_PLANE) -> None:
     """create_sketch falls back to a standard plane when a named one fails to
-    select; the sketch's parents must name SECTION_PLANE."""
+    select; the sketch's parents must name ``plane``."""
     feature = _early_bound(_feature_by_name(adapter, sketch), "IFeature")
     parents = [
         str(_early_bound(parent, "IFeature").Name)
         for parent in (feature.GetParents() or ())
     ]
-    if SECTION_PLANE not in parents:
-        raise RuntimeError(f"{sketch} is not on {SECTION_PLANE}: parents {parents}")
+    if plane not in parents:
+        raise RuntimeError(f"{sketch} is not on {plane}: parents {parents}")
+
+
+# The neck's top edges in the Right plane's sketch (u = -Z): each break's
+# point on its neck face, the cone's metal side toward the neck.
+_BREAK_EDGES = (
+    ("front", 0.0, -1.0, ""),
+    ("back", -NECK_DEPTH, 1.0, "Back"),
+)
+
+
+def _neck_breaks(adapter, dims: SketchDims) -> None:
+    """The two neck edge breaks' section on the Right plane, sketch (u, v) =
+    model (-Z, Y): per edge the chamfer mill's 90° V about the neck face's
+    line, its point NeckBreak under the top, its top on the top face, the
+    half outside the neck in air (the cut's section from the paper end to
+    the stop is the cone's whole V).  Per triangle, chained top-outer ->
+    point -> top-inner: the top horizontal, the point on its neck face's
+    station and NeckBreak under the top, its run in and drop to the inner
+    top corner (the printed leg; the back edge's prints) and its run out to
+    the outer: 3 x 2 DOF less 1 relation and 5 dims (the front point's
+    station is the origin's: a relation for a dim)."""
+    leg, top = NECK_EDGE_BREAK, BLOCK_HEIGHT
+    for label, u, inward, suffix in _BREAK_EDGES:
+        outer = (u - inward * leg, top)
+        point = (u, top - leg)
+        inner = (u + inward * leg, top)
+        flank_out, flank_in, top_line = add_line_chain(adapter, [outer, point, inner])
+        check(
+            f"{label} break top horizontal",
+            adapter.add_sketch_constraint(top_line, None, "horizontal"),
+        )
+        anchor_point_to_origin(
+            adapter, f"{flank_in}.start", u, top - leg, f"{label} break point"
+        )
+        if suffix:
+            dims.record("NeckBreakBackZ", '"NeckBackZ" - "NeckFrontZ"')
+        dims.record(f"{suffix or 'Front'}NeckBreakY", '"BlockHeight" - "NeckBreak"')
+        dimension_between(
+            adapter,
+            f"{flank_in}.start",
+            f"{flank_in}.end",
+            "horizontal_distance",
+            leg,
+            f"{label} break leg",
+        )
+        dims.record("NeckBreak" if suffix else "FrontNeckBreak", '"NeckBreak"')
+        dimension_between(
+            adapter,
+            f"{flank_in}.start",
+            f"{flank_in}.end",
+            "vertical_distance",
+            leg,
+            f"{label} break drop",
+        )
+        dims.record(f"{suffix or 'Front'}NeckBreakDrop", '"NeckBreak"')
+        dimension_between(
+            adapter,
+            f"{flank_out}.start",
+            f"{flank_out}.end",
+            "horizontal_distance",
+            leg,
+            f"{label} break run out",
+        )
+        dims.record(f"{suffix or 'Front'}NeckBreakOut", '"NeckBreak"')
+
+
+def _break_runout(
+    adapter, label: str, u: float, inward: float, suffix: str
+) -> list[tuple[str, str]]:
+    """One break's run-out: the chamfer mill's cone where it is fed up, a
+    right triangle on NECK_BREAK_PLANE (sketch (u, v) = model (-Z, Y)) --
+    point, top on its axis, top toward the neck -- revolved whole about a
+    centreline on its axis side.  Relations: the top horizontal, the axis
+    side vertical, the centreline's ends on the point and the top; dims: the
+    point's station and height (the front's station is the origin's) and the
+    top's and axis side's lengths."""
+    from solidworks_mcp.adapters.base import RevolveParameters
+
+    feature = f"{suffix or 'Front'}NeckBreakRunoutProfile"
+    dims = SketchDims()
+    check(
+        f"create_sketch {label} break run-out", adapter.create_sketch(NECK_BREAK_PLANE)
+    )
+    leg, top = NECK_EDGE_BREAK, BLOCK_HEIGHT
+    set_sketch_direct_db(adapter, True)
+    axis = check(f"{label} run-out axis", adapter.add_centerline(u, top - leg, u, top))
+    set_sketch_direct_db(adapter, False)
+    flank, top_line, side = add_line_chain(
+        adapter, [(u, top - leg), (u + inward * leg, top), (u, top)]
+    )
+    for entity, other, relation in (
+        (top_line, None, "horizontal"),
+        (side, None, "vertical"),
+        (f"{axis}.start", f"{flank}.start", "coincident"),
+        (f"{axis}.end", f"{side}.start", "coincident"),
+    ):
+        check(
+            f"{label} run-out {relation}",
+            adapter.add_sketch_constraint(entity, other, relation),
+        )
+    anchor_point_to_origin(
+        adapter, f"{flank}.start", u, top - leg, f"{label} run-out point"
+    )
+    if suffix:
+        dims.record(f"{feature}Z", '"NeckBackZ" - "NeckFrontZ"')
+    dims.record(f"{feature}Y", '"BlockHeight" - "NeckBreak"')
+    check(
+        f"{label} run-out top",
+        adapter.add_sketch_dimension(top_line, None, "linear", leg),
+    )
+    dims.record(f"{feature}Top", '"NeckBreak"')
+    check(
+        f"{label} run-out side",
+        adapter.add_sketch_dimension(side, None, "linear", leg),
+    )
+    dims.record(f"{feature}Side", '"NeckBreak"')
+    ensure_fully_defined(adapter, f"{label} break run-out sketch")
+    check(f"exit_sketch {label} break run-out", adapter.exit_sketch())
+    name_last_feature(adapter, feature)
+    _require_on_section_plane(adapter, feature, NECK_BREAK_PLANE)
+    jobs = dims.apply(adapter, feature)
+    check(
+        f"revolve-cut {label} break run-out",
+        adapter.create_revolve(RevolveParameters(angle=360.0, is_cut=True)),
+    )
+    name_last_feature(adapter, f"{suffix or 'Front'}NeckBreakRunout")
+    return jobs
 
 
 def _relief_reference(adapter) -> list[tuple[str, str]]:
@@ -940,6 +1084,8 @@ def build(adapter) -> dict[str, str]:
         ("PivotChamfer", PIVOT_BORE_TOP_CHAMFER),
         ("VApexFilletR", V_APEX_FILLET_R),
         ("SetScrewY", SET_SCREW_Y),
+        ("NeckBreak", NECK_EDGE_BREAK),
+        ("NeckBreakStop", NECK_BREAK_FULL_X),
     ):
         set_global(adapter, name, f"{value}mm")
     # Both flanks' angle to the bottom face drives its sketch (degrees, not mm).
@@ -1009,6 +1155,46 @@ def build(adapter) -> dict[str, str]:
     drive_jobs += [(fillet_dim[0], '"VApexFilletR"')]
     volume = volume_check(
         adapter, "V apex fillets", volume + V_APEX_FILLETS, 0.01 * V_GROOVE
+    )
+
+    # 2c. The neck's two top edges broken 45° (owner seat ruling 2026-11-23:
+    # they clear the stirrup's R.065 window corners), as the chamfer mill
+    # leaves them: each its V cut +X from the paper end to the stop, then the
+    # cone where it is fed up there, revolved, its run-out into the step.
+    breaks = SketchDims()
+    check("create_sketch neck breaks", adapter.create_sketch("Right"))
+    _neck_breaks(adapter, breaks)
+    ensure_fully_defined(adapter, "neck breaks sketch")
+    check("exit_sketch neck breaks", adapter.exit_sketch())
+    name_last_feature(adapter, "NeckBreakProfile")
+    drive_jobs += breaks.apply(adapter, "NeckBreakProfile")
+    check(
+        "cut neck breaks",
+        adapter.create_cut_extrude(ExtrusionParameters(depth=NECK_BREAK_FULL_X)),
+    )
+    name_last_feature(adapter, "NeckBreaks")
+    drive_jobs += [
+        (
+            name_dimensions(adapter, "NeckBreaks", ["NeckBreakLength"])[0],
+            '"NeckBreakStop"',
+        )
+    ]
+    volume = volume_check(
+        adapter, "neck breaks", volume - V_NECK_BREAKS, 0.01 * V_NECK_BREAKS
+    )
+    drive_jobs.append(
+        (
+            _right_plane_at(adapter, NECK_BREAK_PLANE, NECK_BREAK_FULL_X),
+            '"NeckBreakStop"',
+        )
+    )
+    for edge in _BREAK_EDGES:
+        drive_jobs += _break_runout(adapter, *edge)
+    volume = volume_check(
+        adapter,
+        "neck break run-outs",
+        volume - V_NECK_BREAK_RUNOUTS,
+        0.03 * V_NECK_BREAK_RUNOUTS + 0.05,
     )
 
     # 3. The body's relief slot, cut +Y (the Top plane's normal) up to its roof.
@@ -1235,7 +1421,9 @@ def build(adapter) -> dict[str, str]:
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
     # Saved hidden: the drawing shows them per view (_drawing_hidden_sketches).
     blank_reference_sketches(adapter, REFERENCE_SKETCHES)
-    blank_reference_geometry(adapter, ((SECTION_PLANE, "PLANE"),))
+    blank_reference_geometry(
+        adapter, ((SECTION_PLANE, "PLANE"), (NECK_BREAK_PLANE, "PLANE"))
+    )
     apply_drawing_properties(
         adapter, PART_NAME, {"Isometric View Note": ISOMETRIC_VIEW_NOTE}
     )

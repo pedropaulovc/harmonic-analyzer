@@ -91,11 +91,17 @@ HANDLE_MAX_DIA = 21.082  # .83 at the swell
 # The title block's .XX band governs every grip size (MHA-DT-08 machinist
 # review of 2026-10-18: a tighter contour allowance had no mate to justify it).
 _GENERAL_2PL = printed_band_mm(2, unit=UNIT)
-# Reamed running bore on the MHA-DT-32 shoulder (#290 fit F12): a .1610
-# chucking reamer cuts .1610-.1615.  The checks read that band; the sheet
-# prints the bore as a reference over the running clearance it gives on the
-# shoulder (MHA-DT-08 review of 29af6f44d: a .0005 band in oak was
-# over-specification), the fleet's matched-fit form.
+# Drilled running bore on the MHA-DT-32 shoulder (#290 fit F12).  Owner ruling
+# 2026-11-23, tool audit Q14: "DRILL #20, read with pins, turn the MHA-DT-32
+# shoulder last to the bore less .0050-.0075, trial hole in an oak offcut
+# first" (it was reamed .1610).  A #20 cuts .1610 and up (DRILLED HOLES
+# +.004/0); the travelers accept a bore only to .1635 (PIVOT_BORE_FIT_MAX:
+# the largest the .1540-.1560 shoulder fits at .0075, and the walls' basis)
+# and turn the shoulder to the read bore, so the fit is matched.  The band
+# below is the fit's bookkeeping: .1610-.1615 on the .154-.156 shoulder spans
+# exactly the printed .0050-.0075.  The sheet prints the bore as a reference
+# over that clearance (MHA-DT-08 review of 29af6f44d: a .0005 band in oak
+# was over-specification), the fleet's matched-fit form.
 PIVOT_BORE_DIA = 4.0894  # .1610
 PIVOT_BORE_BAND = (0.0127, 0.0)  # +.0005/.0000
 

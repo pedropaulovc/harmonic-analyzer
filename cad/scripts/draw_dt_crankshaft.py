@@ -439,7 +439,7 @@ requirement(
     },
     precision={"dia": _P["NeckDiaDim"]},
 )
-# The 2X Ø.4490 running fits in MHA-DT-05 (note 3, Ra 63): each end a .XX
+# The 2X Ø.4375 running fits in MHA-DT-05 (note 3, Ra 63): each end a .XX
 # station from the far end, ``station`` the end nearer the far end.
 requirement(
     "outboard_journal",
@@ -791,7 +791,7 @@ DIAMETER_POSITIONS = {
 # each block stays as narrow as its value row: the #9 cross-hole's leader
 # passes right of the Ø.3750's block and the 16T pin note's leader right of
 # the Ø.3125's (farm round 1: the 116-mm route rows ran through both).  The
-# bare necks carry their own loose diameter.  The 2X Ø.4490 names both
+# bare necks carry their own loose diameter.  The 2X Ø.4375 names both
 # bearing lands across the relief.  The spigot's diameter links
 # note 2, the chain they clear.
 CALLOUTS_ABOVE = {

@@ -1,7 +1,8 @@
 r"""Create the curated machinist drawing for the knife-mount bearing block.
 
 A machined, heat-treated steel block (25.4 wide x ~29.6 tall x 14 deep) with a
-single Ø12 bore.  The bore is the knife-edge bearing: the summing-lever
+single bore, Ø.4985 (the book's Ø12 close bore, opened 5.6 % by owner ruling
+2026-11-23, tool audit Q13).  The bore is the knife-edge bearing: the summing-lever
 trunnion's top vertex rides its upper inner wall in line contact (ch18 p.42:
 unpainted heat-treated steel, close bore -- 2026-09-02 user re-read; 4140/4142
 HT as supplied, owner ruling 2026-11-10 (Pedro), #2334).  Every face
@@ -346,8 +347,9 @@ TOP_KEEP = {
 # so the frame's import closure keeps its key.
 LEVER_NUMBER = str(_config.parts("sm-summing-lever")["number"])
 # The bore is reamed to size in the supplied 28-32 HRC condition, like
-# datum B (Owner ruling 2026-11-10 (Pedro), #2334 option B1): a 12 mm H7
-# HSS reamer (.4724-.4731) cuts inside the +.0015/0 band.
+# datum B (Owner ruling 2026-11-10 (Pedro), #2334 option B1): the .4990
+# chucking reamer (owner ruling 2026-11-23, tool audit Q13: "no 12 mm
+# reamer"; .4991-.4995) cuts inside the +.0015/0 band.
 BORE_CALLOUT = "\n".join(("REAM THRU", "RUNNING FIT ON", f"{LEVER_NUMBER} TRUNNION"))
 _SLIP_FIT = f"{DOWEL_NUMBER} SLIDING FIT"
 _SLIP_CLEARANCE = "CLEARANCE {:.4f}-{:.4f}".format(*PIN_SLIP_PRINTED).replace("0.", ".")
@@ -518,8 +520,8 @@ BORE_FRAME_XY = (FRONT_CENTER[0] + 0.035, _front_y(BLK_TOP) + 0.019)
 # mm, its mid-width 167.3 (the letter 1.73 left of the box's middle).
 # Datum C (Owner ruling 2026-11-10 (Pedro), #2334: the bore clocks the
 # tap's frame) hangs under its middle on datum B's shortened stem, its box
-# (about y 157..164 mm) over the block's corner-to-.811 witness (y 155) and
-# right of the .811 BASIC's witness end (x ~155).
+# (about y 157..164 mm) over the block's corner-to-.824 witness (y 155) and
+# right of the .824 BASIC's witness end (x ~155).
 BORE_FRAME_SIZE = (0.0346, _GTOL_ROW)
 BORE_DATUM_C_XY = (
     BORE_FRAME_XY[0] + BORE_FRAME_SIZE[0] / 2.0,
@@ -674,9 +676,9 @@ requirement(
     },
     precision={"depth": _REF["block-depth overall"]},
 )
-# The knife bore, datum C: Ø.4720 +.0015/.0000 REAM THRU, RUNNING FIT ON
+# The knife bore, datum C: Ø.4985 +.0015/.0000 REAM THRU, RUNNING FIT ON
 # the MHA-SM-03 trunnion (FRONT_KEEP "BoreDia", DIMENSION_CALLOUTS), Ra 63;
-# ⌖Ø.008|A|B at its BASIC .811 under A and BASIC .300 from B's axis
+# ⌖Ø.008|A|B at its BASIC .824 under A and BASIC .300 from B's axis
 # (BORE_FRAME_XY, BORE_BASIC_TEXT_XY, TAP_STATION_TEXT_XY), and ∥.002|A
 # (BORE_PARALLELISM_FRAME_XY). Reamed in the supplied 28-32 HRC condition.
 requirement(

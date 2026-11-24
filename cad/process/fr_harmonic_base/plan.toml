@@ -33,6 +33,15 @@ id = "jig-drill-7"
 name = "#7 drill"
 ref = "jig-drill-7"  # Drills #7
 
+# Main's decision 2026-11-23 (delegated; no owner ruling names a #4): the
+# near-wall clearance stays the #5 stub of the owner's 2026-11-05 wording.
+# The hole is Ø.206 +.004/0 (.206-.210); a #5 (.2055) cutting to size leaves
+# it under .206, so the traveler to come gauges it with the .061-.500 minus
+# pin box (pin-gauges): GO the .207 minus pin (.2068-.2070, so a hole it
+# enters is over .206), NO-GO the .210 minus (.2098-.2100). GO refused: open
+# the hole by hand with the owned #4 (.2090) jobber from the 115-piece index
+# in the T-handle tap wrench, following the drilled hole (.0018 a side), and
+# gauge again. NO-GO entering: stop and tell the owner.
 [[tools]]
 id = "frame-clearance-stub-drill"
 name = "#5 stub drill"
@@ -68,10 +77,13 @@ id = "tap-10-32-plug"
 name = "#10-32 plug tap"
 ref = "tap-10-32-plug"  # Tap coverage #10-32 UNF
 
+# Tool audit 2026-11-23 (row frame-spotface-endmill): the Ø.35 spotfaces are
+# interpolated with the owned LMS 6784 5/16 end mill (3/8 shank, the 3/8 R8
+# collet), path radius (.35 - .3125)/2 = .019; no 11/32 end mill.
 [[tools]]
-id = "frame-spotface-endmill"
-name = "11/32 end mill"
-ref = "frame-spotface-endmill"  # F-spotface-endmill-11-32
+id = "spotface-em"
+name = "5/16 end mill (LMS 6784), interpolated"
+ref = "basebar-counterbore"
 
 [[tools]]
 id = "depth-micrometer"
@@ -83,10 +95,13 @@ id = "angle-plate-4"
 name = "4 in angle plate"
 ref = "angle-plate-4"  # F-angle-plate-LMS-5386
 
+# Tool audit 2026-11-23 (row transfer-punches): the fractional set only;
+# number-size holes are spotted through the hole with the same-number drill
+# from the 115-piece index.
 [[tools]]
 id = "transfer-punches"
-name = "Transfer punches"
-ref = "transfer-punches"  # F-transfer-punches-fractional, F-transfer-punches-number
+name = "Transfer punches, fractional set (number-size holes spotted with the same-number drill)"
+ref = "transfer-punches"
 
 [[tools]]
 id = "v-blocks"

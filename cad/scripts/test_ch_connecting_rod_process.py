@@ -12,7 +12,6 @@ them, and seeded faults show each check catches what it guards.
 from __future__ import annotations
 
 import copy
-import re
 import tomllib
 from pathlib import Path
 
@@ -92,8 +91,7 @@ def test_context_numbers_the_tools_and_places_the_cuts(ctx) -> None:
         "spot": 3,
         "drill-49": 4,
         "reamer-0775": 5,
-        "em-5-64": 6,
-        "saw": 7,
+        "saw": 6,
     }
     holes = {
         program: (kwargs["centres"], kwargs["z_bottom"])
@@ -115,8 +113,22 @@ def test_context_numbers_the_tools_and_places_the_cuts(ctx) -> None:
     }
     assert outline["passes"] == [{"offset": 1.5875, "levels": [3.387, 2.201, 1.016]}]
     # The saw's two heights, each one step into the crowns.
-    saw = next(kw for p, c, kw in ctx["expect"] if c == "side_passes")
+    saw = next(
+        kw for p, c, kw in ctx["expect"] if p == "CR06_slot" and c == "side_passes"
+    )
     assert (saw["final"], saw["raw"], saw["max_step"]) == (207.012, 221.744, 14.732)
+    # The end trim: two passes of 1/16 in from the longest blank's end to the
+    # crowns, each 6.6 mm deep, on the measured deep setting.
+    trim = next(
+        kw for p, c, kw in ctx["expect"] if p == "CR04a_end_trim" and c == "side_passes"
+    )
+    assert (
+        trim["final"],
+        trim["raw"],
+        trim["max_step"],
+        trim["direction"],
+        trim["max_stepdown"],
+    ) == (193.169, 196.342, 1.5865, 1, 6.6)
 
 
 def test_the_recipes_programs_pass_every_check_they_declare(ctx, tmp_path) -> None:
@@ -138,10 +150,19 @@ def test_the_saw_is_mounted_and_moved_only_where_its_arbor_clears(ctx) -> None:
     assert _lines(ctx, "slot")[0] == f"G0 Z{p['saw_clear_z_mm']:.3f}"
 
 
-def test_a_root_run_short_of_the_eighth_cutters_round_is_refused(monkeypatch) -> None:
-    monkeypatch.setattr(RECIPE, "ROOT_RUN_MM", 0.4)
-    with pytest.raises(ValueError, match="stops short of the 1/8 in cutter's round"):
-        _context()
+def test_the_eighth_cutter_leaves_the_shank_corners_inside_their_limits() -> None:
+    """Owner ruling 2026-11-23, tool audit Q9: the 1/8 in end mill's R.0625
+    is the shank's four corners, printed R.065 (.060-.070), and no 5/64 in
+    end mill recuts them; a print whose limits shut that radius out stops
+    the recipe."""
+    lo, hi = FEATURES["features"]["shank_right_flank"]["corner_r"]
+    assert (lo, hi) == pytest.approx((0.060 * 25.4, 0.070 * 25.4))
+    assert "em-5-64" not in RECIPE.CAM_TOOLS
+    assert "em-5-64" not in {tool["id"] for tool in PLAN["tools"]}
+    features = copy.deepcopy(FEATURES)
+    features["features"]["shank_right_flank"]["corner_r"] = [0.889, 1.016]
+    with pytest.raises(ValueError, match="outside the shank corners' limits"):
+        RECIPE.context(features, PLAN, SHOP, "rod.step")
 
 
 @pytest.mark.parametrize(
@@ -162,7 +183,6 @@ def test_a_root_run_short_of_the_eighth_cutters_round_is_refused(monkeypatch) ->
         ({"ring_from_end_mm": 22.0}, "left end by its margin"),
         ({"spot_dia_mm": 2.0}, "under the #49"),
         ({"tab_top_3_x_mm": 142.0}, "off the shank's flanks"),
-        ({"inside_corner_max_mm": 0.9}, "inside-corner ceiling"),
         (
             {"blank_length_in": 7.36, "blank_length_min_mm": 186.944},
             "right end by its margin",
@@ -170,7 +190,8 @@ def test_a_root_run_short_of_the_eighth_cutters_round_is_refused(monkeypatch) ->
         ({"saw_below_max_mm": 25.4}, "saw_clear_z_mm"),
         ({"saw_nut_dia_max_mm": 64.0}, "nut reaches the crown"),
         ({"saw_arbor_length_mm": 76.2}, "saw_park_z_mm"),
-        ({"root_station_mm": 168.0}, "root_station_mm"),
+        ({"end_trim_run_past_mm": 0.254}, "thickest blank plus its run-past"),
+        ({"end_trim_step_mm": 2.0}, "even step"),
     ],
 )
 def test_a_plan_number_off_the_model_or_shop_is_refused(changes, detail) -> None:
@@ -188,11 +209,6 @@ def _seed(ctx: dict, key: str, pick, change) -> dict:
     index = next(i for i, line in enumerate(lines) if pick(line))
     lines[index] = change(lines[index])
     return seeded
-
-
-def _shift_y(line: str, by: float) -> str:
-    y = float(re.search(r"Y(-?[\d.]+)", line).group(1))
-    return re.sub(r"Y-?[\d.]+", f"Y{y + by:.3f}", line)
 
 
 def _nth(text: str, n: int):
@@ -253,13 +269,6 @@ def _nth(text: str, n: int):
             lambda line: "G1 Z1.400 F{feed}",
             "depth",
         ),
-        # A root pass run 0.3 mm into the shank's top flank.
-        (
-            "roots",
-            lambda line: line.startswith("G1 X") and "Y" in line,
-            lambda line: _shift_y(line, -0.3),
-            "outline",
-        ),
         # The saw's return after its first pass at the old clearance, the
         # stock top plus 5 mm: the nut hanging under it sweeps through the
         # blanks' ends.
@@ -268,6 +277,21 @@ def _nth(text: str, n: int):
             _nth("G0 Z30.400", 2),
             lambda line: "G0 Z11.350",
             "keep_out",
+        ),
+        # The end trim's first pass skipped: the crown pass takes the whole
+        # excess, past the measured width.
+        (
+            "end_trim",
+            lambda line: line == "G0 X194.755 Y-110.490",
+            lambda line: "G0 X193.169 Y-110.490",
+            "passes",
+        ),
+        # The end trim run deeper than its declared depth.
+        (
+            "end_trim",
+            lambda line: line == "G1 Z-0.250 F{feed}",
+            lambda line: "G1 Z-0.500 F{feed}",
+            "depth",
         ),
     ],
 )

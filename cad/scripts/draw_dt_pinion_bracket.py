@@ -338,8 +338,8 @@ ARBOR_FINISH_XY = (0.155, 0.205)
 # it stops, what it mates with and the fit it needs (rule 4).  The seat's
 # mate rides its size callout.  The seat's depth rides its callout as REF
 # (rule 26: never deferred to a view) while Section B-B's .16 controls the
-# floor; the floor-corner allowance lets the builder pick a flat-bottom reamer
-# or end mill (rule 16).  The pivot bore is a sliding fit so the strap goes
+# floor; the floor-corner allowance is what the 1/8 end mill that finishes the
+# seat leaves (rule 16; tool audit Q8).  The pivot bore is a sliding fit so the strap goes
 # onto the shaft for fit-up, then pinned (option E-a); the arbor runs in its
 # bore; the follower stud slips into its seat and is bonded (LOCTITE 638,
 # dt_pinion_cam_pin_spec's bond gap).  Both seat stations print bare (rule 7):
@@ -562,7 +562,7 @@ requirement(
         "finish_ra": 1,
     },
 )
-# The blind follower seat, flat-bottom reamed into the -X flank
+# The blind follower seat, drilled and end-milled flat-bottom into the -X flank
 # (DIMENSION_CALLOUTS "PinSeatDia": PIN_SEAT_CALLOUT, its bonded fit on the
 # MHA-DT-25 stud and the floor-corner allowance), its .16 depth controlled by
 # Section B-B (SECTION_KEEP "PinSeatDepth"), located .276 above the pivot
@@ -588,12 +588,14 @@ requirement(
             (
                 (_GEOM, "PIN_BORE"),
                 "PIN_SEAT_DIA_BAND",
-                ("_fit_ream_h7", "REAM_H7"),
                 (_SELF, "LEFT_KEEP"),
             ),
         ),
         "nominal_dia": (PIN_BORE, ((_GEOM, "PIN_BORE"),)),
-        "process": ("ream", _SEAT_CALLOUT),
+        # Drilled #26, then opened and flattened by the 1/8 end mill (owner
+        # ruling 2026-11-23, tool audit Q8): the traveler's hole vocabulary is
+        # drill or ream, and this hole is not reamed.
+        "process": ("drill", _SEAT_CALLOUT),
         "flat_bottom": (True, _SEAT_CALLOUT),
         "depth": (
             limits(PIN_SEAT, _P["PinSeatDepth"], unit=UNIT),

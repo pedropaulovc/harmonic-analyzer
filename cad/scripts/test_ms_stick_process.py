@@ -129,10 +129,11 @@ def test_the_plan_repeats_the_shop_inventory() -> None:
     assert bit["sku"] in described
     assert f"{bit['included_angle_deg']:g}°" in described
     assert f"{bit['tip_width_in']:.3f}"[1:] in described
-    tape = EQUIPMENT["consumables"]["tape-3m-vhb-5906"]
-    assert p["tape_thickness_mm"] == tape["thickness_mm"]
-    assert p["tape_tensile_mpa"] == pytest.approx(tape["normal_tensile_kpa"] / 1000)
-    assert p["tape_shear_mpa"] == pytest.approx(tape["dynamic_shear_kpa"] / 1000)
+    # One strip of the hold's tape covers the bar's top (no seam): the plan
+    # tapes each face with a single strip trimmed to width.
+    hold = EQUIPMENT["consumables"]["hold-painters-tape-ca"]
+    tape = EQUIPMENT["consumables"][hold["tape"]]
+    assert tape["width_mm"] > p["fixture_width_mm"] > p["blank_width_max_mm"]
     bar = EQUIPMENT["stock"]["6061-flat-1-2x1-12in"]
     assert [p["fixture_height_mm"], p["fixture_width_mm"]] == bar["section_mm"]
     assert p["fixture_length_mm"] == bar["length_mm"]
@@ -200,6 +201,8 @@ def test_the_fixture_bar_holds_under_the_screening_load(ctx) -> None:
         ("blank_width_max_mm", 9.9, "outline_radial_max_mm"),
         ("blank_length_in", 7.9, "zero end of the shortest blank"),
         ("fixture_skim_max_mm", 0.1, "fixture_skim_max_mm"),
+        ("tape_stack_min_mm", 0.05, "thinnest tape stack"),
+        ("tape_stack_mm", 0.4, "tape_stack_min_mm..tape_stack_max_mm"),
         ("fixture_length_mm", 609.6, "fixture_overhang_mm"),
         ("fixture_check_load_n", 500.0, "fixture_deflection_max_mm"),
         ("fixture_face_woc_mm", 5.0, "fixture_face_woc_mm"),
@@ -271,8 +274,12 @@ def _seed(ctx: dict, key: str, old: str, new: str) -> dict:
             "G1 X-214.852 Y-14.613 F{feed}",
             "keep_out",
         ),
-        # Two levels taken at once: twice the lift the tape is rated for here.
-        ("outline", "G1 Z-0.282 F{feed}", "G1 Z-0.564 F{feed}", "passes"),
+        # Two levels taken at once: 1.08 MPa of lift on the stick's edge,
+        # over the 0.6 MPa the shop accepts for the bond.
+        ("outline", "G1 Z-1.128 F{feed}", "G1 Z-2.256 F{feed}", "passes"),
+        # The last level cut past the stack: into the fixture bar deeper than
+        # the skim under the thinnest blank on the thinnest stack.
+        ("outline", "G1 Z-3.384 F{feed}", "G1 Z-3.600 F{feed}", "keep_out"),
         # A pass of the last level left short of the tape.
         ("outline", "G1 Z-3.384 F{feed}", "G1 Z-3.100 F{feed}", "holes"),
         # The 0 tick .002 off its station.
@@ -330,7 +337,7 @@ def _outline_entries(ctx: dict) -> list[list[float]]:
 
 
 def test_every_outline_pass_is_entered_off_the_fixture_bar(ctx) -> None:
-    """The last levels reach the tape and, under a thin blank, the fixture
+    """The last level reaches the tape and, under a thin blank, the fixture
     bar's top. Every plunge of MS02 stands with the whole cutter behind the
     bar's rear face (Y0) or in front of its front face; the blank lies
     inside the bar's width."""

@@ -23,17 +23,19 @@ shank's width plus the outline's kerf, the waste beyond it staying whole.
 Side 2 (the fork's far face) up: CR01 skims the fork's far face and roughs
 side 2 to .020 over its floors. Side 1 (the datum face, as bought) up: CR02
 roughs side 1; the blanks are released and reseated; CR03 finishes side 1.
-Side 2 up again: CR04 finishes side 2, trims the blank's right end to the
-fork's crown and clears the waste beside the fork's end through; CR05 bores
+Side 2 up again: CR04a trims the blank's right end to the fork's crown on
+the measured deep setting; CR04 finishes side 2 and clears the waste beside
+the fork's end through; CR05 bores
 the ring by interpolation; CR06 saws the fork slot with the slitting saw
 running horizontally; CR07 spots, drills and reams the pin hole; CR08 cuts
-the outline on seven tabs with the 1/8 in end mill and recuts the four
-inside corners with the 5/64 in end mill. A switch to a plate fixture
-replaces CR08 and its setup only.
+the outline on seven tabs with the 1/8 in end mill, whose radius is the
+shank's four corners' R.065 (.060-.070; owner ruling 2026-11-23, tool audit
+Q9: no 5/64 cutter). A switch to a plate fixture replaces CR08 and its setup
+only.
 
 Work frames (G54): X0 the blanks' left ends (flush), Y0 the fixed jaw, blank
 k's centre line at Y −(k + ½) × the pitch, the ring's centre
-``ring_from_end_mm`` from the left end. Side 2 up (CR01, CR04-CR08): Z0 the
+``ring_from_end_mm`` from the left end. Side 2 up (CR01, CR04a-CR08): Z0 the
 support plate's top, which is the datum face (model y → X, model −x → Y,
 model z → Z). Side 1 up (CR02, CR03): Z0 the datum face, on top (model y →
 X, model x → Y, model −z → Z).
@@ -59,11 +61,12 @@ PROGRAMS: tuple[tuple[str, tuple[Any, ...]], ...] = (
     ("CR01_rough_2", (("rough_2",), ("band_rough_2",))),
     ("CR02_rough_1", (("rough_1",), ("band_rough_1",))),
     ("CR03_finish_1", (("finish_1",), ("band_1",))),
+    ("CR04a_end_trim", ("end_trim",)),
     ("CR04_finish_2", (("finish_2",), ("band_2",))),
     ("CR05_bore", ("bore",)),
     ("CR06_slot", ("slot",)),
     ("CR07_pin", (("pin_spot",), ("pin_drill",), ("pin_ream",))),
-    ("CR08_outline", (("outline",), ("roots",))),
+    ("CR08_outline", ("outline",)),
 )
 # The end mill and drill-chuck programs load their own first tool (M6, the
 # tool setter); the saw program runs on the saw already on its arbor and
@@ -77,7 +80,6 @@ CAM_TOOLS = (
     "spot",
     "drill-49",
     "reamer-0775",
-    "em-5-64",
     "saw",
 )
 IN = 25.4
@@ -104,15 +106,6 @@ PECK_REENTRY_MM = 0.5
 JAW_DEPTH_MM = IN
 # How far the cutter centre may stray from its offset round the outline.
 OUTLINE_TOL_MM = 0.05
-# The 5/64 in root passes run this far along the shank's flank and this far
-# round the ring (degrees) or along the fork's side from each corner, inside
-# the 1/8 in cutter's cut. The flank run must reach past where the 1/8 in
-# cutter's round leaves the flank (context() checks it against both
-# corners: a shorter run leaves a sliver of its R.0625 above R.040 MAX); a
-# short one keeps the cutter off the shank's tabs near the corners.
-ROOT_RUN_MM = 1.0
-ROOT_ARC_DEG = 15.0
-ROOT_SIDE_MM = 1.0
 # The 1/8 in outline and the 1/2 in fork contour overlap this far along the
 # fork's sides past the slot's floor.
 FORK_OVERLAP_MM = 1.0
@@ -389,7 +382,7 @@ def _geometry(features: dict[str, Any]) -> dict[str, Any]:
         "near_tine": _mid(slot["near_tine"]),
         "far_tine": _mid(slot["far_tine"]),
         "slot_depth": _mid(slot["depth"]),
-        "corner_max": slot["corner_radius_max"],
+        "shank_corner_r": f["shank_right_flank"]["corner_r"],
         "pin": pin["dia"],
     }
 
@@ -547,9 +540,11 @@ def context(
     r = em / 2
     _agree(plan, "face_cutter_dia_mm", em)
     em_rpm, em_feed = _setting(plan, shop, "rough 2")
-    for name in ("skim 2", "rough 1", "finish 1", "finish 2", "end zone", "end trim"):
+    for name in ("skim 2", "rough 1", "finish 1", "finish 2", "end zone"):
         if _setting(plan, shop, name) != (em_rpm, em_feed):
             raise ValueError(f"'{name}' runs at another setting than 'rough 2'")
+    # The end trim runs on its own (measured) setting, in its own program.
+    trim_rpm, trim_feed = _setting(plan, shop, "end trim")
     e8 = _shop_tool(plan, shop, "em-eighth")["diameter_mm"]
     r8 = e8 / 2
     _agree(plan, "eighth_cutter_dia_mm", e8)
@@ -652,14 +647,14 @@ def context(
         raise ValueError("the arbor's nut reaches the crown at the saw's touch-off")
     # CR05 leaves T1 parked over that station, high enough that the arbor
     # mounted in its place (its lowest point no more than saw_arbor_length_mm
-    # from the nose; T1's tip at least its collet and projection out) hangs
+    # from the nose; T1's tip its collet and its set projection out) hangs
     # CLEAR_MM over the stock top: the saw never moves in X or Y on a
     # height the controller does not know.
     park_z = (
         t_max
         + CLEAR_MM
         + p["saw_arbor_length_mm"]
-        - (p["r8_collet_gauge_mm"] + p["half_mill_projection_min_mm"])
+        - (p["r8_collet_gauge_mm"] + p["half_mill_projection_mm"])
     )
     _agree(plan, "saw_park_z_mm", park_z)
 
@@ -762,26 +757,18 @@ def context(
     _agree(plan, "rod_start_mm", rx - big_r)
     _agree(plan, "outline_end_mm", slot_floor_x + FORK_OVERLAP_MM)
 
-    # The 5/64 in end mill's roots: the four inside corners (shank flank to
-    # ring, flank to fork step) from the 1/8 in cutter's to its own radius.
-    e5 = tools["em-5-64"]
-    r5 = e5 / 2
-    if r5 > g["corner_max"] or r5 > p["inside_corner_max_mm"]:
+    # The shank's four corners (flank to ring, flank to fork step) are the
+    # outline's own: the 1/8 in end mill's radius stands inside their printed
+    # limits (owner ruling 2026-11-23, tool audit Q9), so no cutter recuts
+    # them.
+    corner_lo, corner_hi = g["shank_corner_r"]
+    if not corner_lo <= r8 <= corner_hi:
         raise ValueError(
-            "the 5/64 in end mill's radius is over the inside-corner ceiling"
+            "the 1/8 in end mill's radius is outside the shank corners' limits"
         )
-    root_rpm, root_feed = _setting(plan, shop, "roots")
-    root_levels = _levels(shank_far, shank_near - through, p["root_level_max_mm"])
-    # The roots' cut as the plan declares it to the bending screen: the
-    # cutter, its station (the fork's step) and its radial engagement at a
-    # corner (the 1/8 in cutter's radius less its own).
-    _agree(plan, "root_cutter_dia_mm", e5)
-    _agree(plan, "root_station_mm", fb)
-    _agree(plan, "root_woc_mm", r8 - r5)
-    # The levels the outline and the roots cut (their cuts' declared depths)
-    # and the bending screen's stations and webs.
+    # The level the outline cuts (its cut's declared depth) and the bending
+    # screen's stations and webs.
     _agree(plan, "outline_level_mm", (out_levels[0] - out_levels[1]))
-    _agree(plan, "root_level_mm", (root_levels[0] - root_levels[1]))
     _agree(plan, "blank_mid_mm", pitch / 2)
     _agree(plan, "web_d_finish_mm", side2["floor_rough"] - shank_near)
     _agree(plan, "pin_x_mm", rx + g["crown"])
@@ -963,13 +950,36 @@ def context(
     finish1, band1_levels, band1 = side_pockets(side1, 0.0, False)
     finish2, band2_levels, band2 = side_pockets(side2, t_max, False)
 
-    # The end: trim the right end to the crown through the full thickness,
-    # then cut through round each fork's end, from the crown along both its
-    # sides to past the slot's floor (both faces' contours took the kerf
-    # there to the shank's faces).
+    # The end trim, its own program (CR04a_end_trim, the measured deep
+    # setting), run before CR04_finish_2: the end zone's arcs below come down
+    # at the cutting feed on the crown's apex, beside the stock only once the
+    # end is trimmed. Passes from the longest blank's end in to the crown,
+    # each the plan's even step wide and the full depth to
+    # end_trim_run_past_mm below Z0, along +Y: with M3 and the end on the
+    # cutter's -X side that is conventional, the direction the setting was
+    # measured in.
     trim_x = crown_x + r
+    trim_raw = l_max + r
+    trim_step = _cut(plan, "end trim", "radial_woc_mm")
+    n_trim = math.ceil((trim_raw - trim_x) / trim_step - 1e-9)
+    if not math.isclose(trim_step, (trim_raw - trim_x) / n_trim, abs_tol=PLAN_TOL_MM):
+        raise ValueError(
+            f"'end trim' radial_woc_mm {trim_step:g} is not its {n_trim} passes' "
+            f"even step, {(trim_raw - trim_x) / n_trim:.4f}"
+        )
+    trim_run_past = p["end_trim_run_past_mm"]
+    trim_doc = _cut(plan, "end trim", "axial_doc_mm")
+    _agree(plan, "end_trim_doc_mm", t_max + trim_run_past)
+    if not math.isclose(trim_doc, t_max + trim_run_past, abs_tol=1e-6):
+        raise ValueError(
+            "'end trim' axial_doc_mm is not the thickest blank plus its run-past"
+        )
+    trim_xs = [trim_raw - trim_step * k for k in range(1, n_trim + 1)]
     trim = _side(
-        [trim_x], [-through], (r + APPROACH_MM, -load - r - APPROACH_MM), t_max
+        trim_xs,
+        [-trim_run_past],
+        (-load - r - APPROACH_MM, r + APPROACH_MM),
+        t_max,
     )
     end_levels = _levels(shank_far, shank_near - through, level_max)
     end_zone: list[str] = []
@@ -990,7 +1000,7 @@ def context(
                     f"G1 X{_r(slot_floor_x - FORK_OVERLAP_MM):.3f} F{{feed}}",
                 ]
         end_zone.append(f"G0 Z{clear2:.3f}")
-    finish2 = finish2 + trim + end_zone
+    finish2 = finish2 + end_zone
 
     # The bores: every blank's rough levels, then every blank's finish
     # circle and its spring pass (the check orders clearing before passes).
@@ -1186,136 +1196,6 @@ def context(
             outline += _hops(j_bot, start, z, boxes)
         outline.append(f"G0 Z{clear2:.3f}")
 
-    # The roots, rod by rod, corner by corner, level by level.
-    big5 = big_r + r5
-    j5 = math.sqrt(big5**2 - (half + r5) ** 2)
-    c5 = math.degrees(math.atan2(half + r5, j5))
-    d5 = math.sqrt(r5**2 - (r5 - (w - half)) ** 2)
-    # Each flank run reaches past where the 1/8 in cutter's round leaves the
-    # flank (ring side jx8, step side fb - k8) from where the 5/64 in
-    # cutter's own round meets it (j5, fb - d5): shorter, it leaves a sliver
-    # of the R.0625 on the flank, over R.040 MAX.
-    if ROOT_RUN_MM < max(jx8 - j5, k8 - d5) + OUTLINE_TOL_MM:
-        raise ValueError("a root pass stops short of the 1/8 in cutter's round")
-    # The root passes stay off every bar tab: the tab's material spans its
-    # width along the flank, out from the flank by the kerf.
-    tab_w = p["tab_width_mm"]
-    for _flank, x in bar_tabs:
-        if not (
-            j5 + ROOT_RUN_MM + r5 < x - tab_w / 2
-            and x + tab_w / 2 < fb_rel - d5 - ROOT_RUN_MM - r5
-        ):
-            raise ValueError(f"a root pass reaches the tab at x {x:g}")
-    root_elements: list[dict[str, Any]] = []
-    roots: list[str] = []
-    for k, yc in enumerate(centres):
-        name = f"rod {k + 1}"
-        c = (rx, yc)
-        els = [
-            {
-                "name": f"{name} top ring root flank",
-                "start": (rx + j5 + ROOT_RUN_MM, yc + half),
-                "end": (rx + j5, yc + half),
-            },
-            {
-                "name": f"{name} top ring root",
-                "start": _polar(c, big_r, c5),
-                "end": _polar(c, big_r, c5 + ROOT_ARC_DEG),
-                "centre": c,
-            },
-            {
-                "name": f"{name} bottom ring root",
-                "start": _polar(c, big_r, -c5 - ROOT_ARC_DEG),
-                "end": _polar(c, big_r, -c5),
-                "centre": c,
-            },
-            {
-                "name": f"{name} bottom ring root flank",
-                "start": (rx + j5, yc - half),
-                "end": (rx + j5 + ROOT_RUN_MM, yc - half),
-            },
-            {
-                "name": f"{name} bottom step flank",
-                "start": (fb - d5 - ROOT_RUN_MM, yc - half),
-                "end": (fb - d5, yc - half),
-            },
-            {
-                "name": f"{name} bottom step side",
-                "start": (fb, yc - w),
-                "end": (fb + ROOT_SIDE_MM, yc - w),
-            },
-            {
-                "name": f"{name} top step side",
-                "start": (fb + ROOT_SIDE_MM, yc + w),
-                "end": (fb, yc + w),
-            },
-            {
-                "name": f"{name} top step flank",
-                "start": (fb - d5, yc + half),
-                "end": (fb - d5 - ROOT_RUN_MM, yc + half),
-            },
-        ]
-        for e in els:
-            e["tol"] = OUTLINE_TOL_MM
-        root_elements += els
-        paths = [
-            (
-                (rx + j5 + ROOT_RUN_MM, yc + half + r5),
-                [
-                    f"G1 {_xy(rx + j5, yc + half + r5)} F{{feed}}",
-                    _arc(
-                        "G3",
-                        (rx + j5, yc + half + r5),
-                        _polar(c, big5, c5 + ROOT_ARC_DEG),
-                        c,
-                    ),
-                ],
-            ),
-            (
-                _polar(c, big5, -c5 - ROOT_ARC_DEG),
-                [
-                    _arc(
-                        "G3",
-                        _polar(c, big5, -c5 - ROOT_ARC_DEG),
-                        (rx + j5, yc - half - r5),
-                        c,
-                    ),
-                    f"G1 {_xy(rx + j5 + ROOT_RUN_MM, yc - half - r5)} F{{feed}}",
-                ],
-            ),
-            (
-                (fb - d5 - ROOT_RUN_MM, yc - half - r5),
-                [
-                    f"G1 {_xy(fb - d5, yc - half - r5)} F{{feed}}",
-                    _arc(
-                        "G3", (fb - d5, yc - half - r5), (fb, yc - w - r5), (fb, yc - w)
-                    ),
-                    f"G1 {_xy(fb + ROOT_SIDE_MM, yc - w - r5)} F{{feed}}",
-                ],
-            ),
-            (
-                (fb + ROOT_SIDE_MM, yc + w + r5),
-                [
-                    f"G1 {_xy(fb, yc + w + r5)} F{{feed}}",
-                    _arc(
-                        "G3", (fb, yc + w + r5), (fb - d5, yc + half + r5), (fb, yc + w)
-                    ),
-                    f"G1 {_xy(fb - d5 - ROOT_RUN_MM, yc + half + r5)} F{{feed}}",
-                ],
-            ),
-        ]
-        for start, body in paths:
-            # Each start is in the 1/8 in cutter's cut, through the waste:
-            # up over the stock and back to it for each level.
-            for z in root_levels:
-                roots += [
-                    f"G0 Z{safe2:.3f}",
-                    f"G0 {_xy(*start)}",
-                    f"G1 Z{_r(z):.3f} F{{feed}}",
-                    *body,
-                ]
-        roots.append(f"G0 Z{clear2:.3f}")
-
     def job(
         key,
         label,
@@ -1433,8 +1313,22 @@ def context(
             3,
         ),
         job(
+            "end_trim",
+            "trim the ends to the crowns",
+            "em-half",
+            em,
+            "endmill",
+            trim_rpm,
+            trim_feed,
+            trim_feed,
+            "two",
+            stock_two,
+            trim,
+            3,
+        ),
+        job(
             "finish_2",
-            "finish side 2, trim and clear the end",
+            "finish side 2 and clear the end",
             "em-half",
             em,
             "endmill",
@@ -1543,20 +1437,6 @@ def context(
             stock_two,
             outline,
             3,
-        ),
-        job(
-            "roots",
-            "recut the inside corners",
-            "em-5-64",
-            e5,
-            "endmill",
-            root_rpm,
-            root_feed,
-            root_feed,
-            "two",
-            stock_two,
-            roots,
-            2,
         ),
     ]
 
@@ -1753,11 +1633,54 @@ def context(
                         {"points": fork_pts, "radius": r, "z": _r(side2["top"])},
                     ]
                 )
+    boxes, circles = islands(side2)
+    # CR04a: every pass at full depth on the measured deep setting, from the
+    # longest blank's end in to the crown along +Y (conventional), each pass
+    # taking no more than the plan's step and stepping down no more than the
+    # declared depth, clear of the jaws, the frames and the fork.
+    name = "CR04a_end_trim"
+    expect += common(name, t_max, [tn["em-half"]], [trim_rpm], -trim_run_past)
+    trim_pts = [
+        [_r(crown_x + 0.3), _r(y)]
+        for y in (-0.5, -pitch + 0.5, -pitch - 0.5, -load + 0.5)
+    ]
+    expect += [
+        [name, "rapids_clear", {"z_top": t_max}],
+        [name, "air_feed", {"z_top": t_max}],
+        [
+            name,
+            "side_passes",
+            {
+                "axis": "X",
+                "final": _r(trim_x),
+                "raw": _r(trim_raw),
+                "max_step": trim_step,
+                "direction": 1,
+                "span": load,
+                "below_z": t_max,
+                "max_stepdown": trim_doc,
+            },
+        ],
+        [name, "cleared", {"points": trim_pts, "radius": r, "z": _r(-trim_run_past)}],
+        [
+            name,
+            "keep_out",
+            {
+                "radius": r,
+                "boxes": jaws2 + boxes + frames_of(t_max),
+                "circles": circles,
+            },
+        ],
+    ]
+
     name = "CR04_finish_2"
     expect += common(
-        name, t_max, [tn["em-half"], tn["em-eighth"]], [em_rpm, e8_rpm], -through
+        name,
+        t_max,
+        [tn["em-half"], tn["em-eighth"]],
+        [em_rpm, e8_rpm],
+        end_levels[-1],
     )
-    boxes, circles = islands(side2)
     pts = [q for yc in centres for q in pocket_points(yc, slot_floor_x - r)]
     end_pts = []
     for yc in centres:
@@ -1766,10 +1689,6 @@ def context(
             for dy in (w + 0.5, w + r, w + 2 * r - 0.5):
                 end_pts += [[_r(x), _r(yc + dy)], [_r(x), _r(yc - dy)]]
             x += 3.0
-    trim_pts = [
-        [_r(crown_x + 0.3), _r(y)]
-        for y in (-0.5, -pitch + 0.5, -pitch - 0.5, -load + 0.5)
-    ]
     expect += [
         [f"{name}@0", "rapids_clear", {"z_top": t_max}],
         [f"{name}@0", "air_feed", {"z_top": t_max}],
@@ -1779,7 +1698,6 @@ def context(
             "cleared",
             {"points": end_pts, "radius": r, "z": _r(end_levels[-1])},
         ],
-        [f"{name}@0", "cleared", {"points": trim_pts, "radius": r, "z": _r(-through)}],
         [
             f"{name}@0",
             "keep_out",
@@ -1968,8 +1886,8 @@ def context(
     expect += common(
         name,
         t_max,
-        [tn["em-eighth"], tn["em-5-64"]],
-        [e8_rpm, root_rpm],
+        [tn["em-eighth"]],
+        [e8_rpm],
         shank_near - through,
     )
     expect += [
@@ -1986,37 +1904,6 @@ def context(
             },
         ],
         [f"{name}@0", "keep_out", {"radius": r8, "boxes": jaws2}],
-        [f"{name}@1", "rapids_clear", {"z_top": t_max}],
-        [f"{name}@1", "air_feed", {"z_top": t_max}],
-        [
-            f"{name}@1",
-            "outline",
-            {
-                "elements": root_elements,
-                "z_top": shank_far,
-                "passes": [{"offset": r5, "levels": [_r(z) for z in root_levels]}],
-            },
-        ],
-        [
-            f"{name}@1",
-            "keep_out",
-            {
-                "radius": r5,
-                "boxes": jaws2
-                + [
-                    _box(
-                        f"rod {k + 1} {side} tab x{x:g}",
-                        (rx + x - tab_w / 2, rx + x + tab_w / 2),
-                        (yc + half, yc + half + e8)
-                        if side == "top"
-                        else (yc - half - e8, yc - half),
-                        tab_top,
-                    )
-                    for k, yc in enumerate(centres)
-                    for side, x in bar_tabs
-                ],
-            },
-        ],
     ]
 
     return {
@@ -2037,7 +1924,6 @@ def context(
             "end": end_levels,
             "bore": bore_levels,
             "outline": out_levels,
-            "roots": root_levels,
         },
     }
 

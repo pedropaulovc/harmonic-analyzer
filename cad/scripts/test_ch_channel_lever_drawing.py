@@ -99,6 +99,40 @@ def test_walls_clear_the_floor_at_worst_case() -> None:
     assert any("#21" in item["where"] and item["kind"] == "minor" for item in exceptions)
 
 
+def test_root_corners_print_r065_and_judge_r070() -> None:
+    """Owner ruling 2026-11-23, tool audit Q9: the two bar-to-hub roots print
+    2X R.065 at three places (.060-.070, the title block's .XXX), naming why
+    they stand over INSIDE CORNERS R.040 MAX."""
+    assert notes.ROOT_CORNER_R == pytest.approx(_in(0.065))
+    assert (notes.ROOT_CORNER_R_MIN, notes.ROOT_CORNER_R_MAX) == pytest.approx(
+        (_in(0.060), _in(0.070))
+    )
+    assert notes.DRAWING_DIMENSIONS["RootCorners"] == {"RootCornerR"}
+    assert notes.DRAWING_PRECISION["RootCorners"]["RootCornerR"] == 3
+    assert notes.ROOT_CORNER_PREFIX == "2X R"
+    assert drawing.FRONT_CALLOUTS["RootCornerR"] == "NOTHING SEATS IN\nTHESE CORNERS"
+    # The fillet's edges: where the bar's edges meet the hub's round.
+    half, hub_r = spec.BAR_TALL / 2.0, spec.HUB_DIA / 2.0
+    assert math.hypot(notes.ROOT_CORNER_X, half) == pytest.approx(hub_r)
+    assert notes.ROOT_CORNER_ANGLE_DEG == pytest.approx(141.93, abs=0.01)
+    # At R.070 each corner stays inside the hub's square: under its top
+    # (the calipers still read the .47 across the round) and short of its
+    # side, in the plate's own thickness.
+    assert (notes.ROOT_CORNER_REACH_X, notes.ROOT_CORNER_REACH_Y) == pytest.approx(
+        (4.2502, 4.9905), abs=1e-4
+    )
+    assert notes.ROOT_CORNER_HUB_TOP_MARGIN == pytest.approx(0.9785, abs=1e-4)
+    # The root gains metal on its bisector at every radius in the band over
+    # the sharp corner the title block allowed, and over its R.040 MAX.
+    gain_min = notes.root_bisector_metal(notes.ROOT_CORNER_R_MIN)
+    assert gain_min == pytest.approx(0.0777, abs=1e-4)
+    assert gain_min > notes.root_bisector_metal(_in(0.040)) + 0.02
+    # Both corners' metal, against the builder's analytic volume.
+    assert notes.root_corner_volume(notes.ROOT_CORNER_R) == pytest.approx(
+        0.1606, abs=1e-4
+    )
+
+
 def test_the_end_tapers_from_its_own_station_to_a_tangent_tip() -> None:
     """#3113: full depth through the bar pin and the bar's notch to the 5.50
     taper start, outboard of the bar pin, then straight edges tangent to the tip."""
@@ -295,6 +329,9 @@ def test_lever_feature_bands_are_the_printed_ones() -> None:
     assert outline["taper_start"] == pytest.approx([_in(5.49), _in(5.51)])
     assert outline["tip_radius"] == pytest.approx([_in(0.162), _in(0.172)])
     assert outline["tip_callout"] == drawing.FRONT_CALLOUTS["TipRadius"]
+    assert outline["root_corner_r"] == pytest.approx([_in(0.060), _in(0.070)])
+    assert outline["root_corner_count"] == 2
+    assert outline["root_corner_callout"] == drawing.FRONT_CALLOUTS["RootCornerR"]
     bore = features["fulcrum_bore"]
     assert bore["dia"] == pytest.approx([_in(0.2560), _in(0.2570)])
     assert bore["process"] == "ream" and bore["finish_ra"] == pytest.approx(1.6)

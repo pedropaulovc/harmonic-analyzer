@@ -13,6 +13,7 @@ guards.
 from __future__ import annotations
 
 import copy
+import math
 import tomllib
 from pathlib import Path
 
@@ -94,16 +95,15 @@ def test_context_accepts_the_plan_and_numbers_the_tools(ctx) -> None:
     assert ctx["numbers"] == {
         "em-half": 1,
         "em-eighth": 2,
-        "em-fine": 3,
-        "spot": 4,
-        "drill-43": 5,
-        "tap-guide": 6,
+        "spot": 3,
+        "drill-43": 4,
+        "tap-guide": 5,
     }
     assert RECIPE.LOAD_FIRST_TOOL == tuple(name for name, _ops in RECIPE.PROGRAMS)
     stop = ctx["manual"]["tap"]
     # The tap from the bottom end at the drawing's .50 from L, .155 from the
     # front face against the fixed jaw; L on the right, the frame to -X.
-    assert stop["tool"] == 6 and stop["at"] == [-12.7, -3.937]
+    assert stop["tool"] == 5 and stop["at"] == [-12.7, -3.937]
     assert stop["gcode"][0] == "G53 G0 Z0.000" and stop["gcode"][-1] == "M30"
 
 
@@ -126,18 +126,17 @@ def test_the_recipes_programs_pass_every_check_it_declares(ctx, tmp_path) -> Non
         ("tap_reach_min_mm", 8.0, "tap_reach_min_mm"),
         ("tap_reach_max_mm", 35.0, "far wall"),
         ("tap_stack_max_mm", 270.0, "tap_stack_max_mm"),
-        ("window_finish_stock_mm", 0.2, "radial"),
-        ("window_rough_step_mm", 1.2, "window_rough_step_mm"),
-        ("window_finish_step_mm", 8.382, "window_finish_step_mm"),
-        ("rough_plunge_feed_per_min_mm", 234.7, "rough_plunge_feed_per_min_mm"),
-        ("finish_cutter_dia_mm", 2.38125, "cutter"),
+        ("window_finish_stock_mm", 0.2, "corner band"),
+        ("window_step_mm", 1.2, "window_step_mm"),
+        ("window_plunge_feed_per_min_mm", 234.7, "window_plunge_feed_per_min_mm"),
+        ("window_cutter_dia_mm", 2.38125, "cutter"),
         ("window_right_mm", 22.5, "window_right_mm"),
+        # The .22 top rail's window wall of the withdrawn PN-01 B1.
+        ("window_near_mm", 5.588, "window_near_mm"),
         ("parallel_thickness_mm", 6.35, "parallel stack"),
         ("lying_grip_mm", 7.5, "lying_grip_mm"),
         ("bar_width_min_mm", 31.5, "bar_width_min_mm"),
         ("bar_thick_max_mm", 10.0, "bar_thick_max_mm"),
-        ("window_corner_step_mm", 0.12, "window_corner_step_mm"),
-        ("window_corner_laps", 2, "window_corner_laps"),
     ],
 )
 def test_a_plan_number_off_the_model_or_shop_is_refused(key, value, detail) -> None:
@@ -147,51 +146,55 @@ def test_a_plan_number_off_the_model_or_shop_is_refused(key, value, detail) -> N
         _context(plan)
 
 
-def test_a_finish_cutter_over_the_corner_radius_is_refused() -> None:
+def test_no_5_64_cutter_and_a_1_8_cutter_off_the_corner_band_is_refused(ctx) -> None:
+    """Owner ruling 2026-11-23, tool audit Q9: no 5/64 cutter; the 1/8 in end
+    mill's finish leaves the window's corners at its radius plus the finish
+    stock, which the printed R.065 (.060-.070) must hold."""
+    assert "em-fine" not in {tool["id"] for tool in PLAN["tools"]}
     shop = copy.deepcopy(SHOP)
-    shop["tools"]["endmill-5-64-long"]["diameter_mm"] = 2.38125
+    shop["tools"]["endmill-carbide-3fl-1-8"]["diameter_mm"] = 3.6
     plan = copy.deepcopy(PLAN)
-    plan["parameters"]["finish_cutter_dia_mm"] = 2.38125
-    with pytest.raises(ValueError, match="corners over"):
+    plan["parameters"]["window_cutter_dia_mm"] = 3.6
+    with pytest.raises(ValueError, match="corner band"):
         RECIPE.context(FEATURES, plan, shop, "frame.step")
 
 
-def test_the_corner_steps_keep_each_corner_cut_under_the_radial_limit(ctx) -> None:
-    """At each finish level the corners op steps every window corner in on
-    its diagonal from where the 1/8 in slot left it to one step short of
-    where the finish leaves it, no step over .05 × the 5/64's diameter."""
+def test_the_finish_takes_the_stock_evenly_round_each_corner(ctx) -> None:
+    """At each level the finish turns each window corner on an arc of the
+    stock's radius about the slot path's corner, so it takes the same .003
+    in the corners as on the walls and leaves them at R.0655, inside the
+    printed .060-.070."""
     p = PLAN["parameters"]
-    e5, e8 = p["finish_cutter_dia_mm"], p["rough_cutter_dia_mm"]
-    limit = 0.05 * e5
-    d_rough = e8 / 2 + p["window_finish_stock_mm"]
-    left_rough = 2**0.5 * d_rough - e8 / 2
-    left_finish = (2**0.5 - 1) * e5 / 2
+    stock, e8 = p["window_finish_stock_mm"], p["window_cutter_dia_mm"]
+    d_rough = e8 / 2 + stock
+    assert 0.060 * 25.4 <= d_rough <= 0.070 * 25.4
+    assert d_rough / 25.4 == pytest.approx(0.0655)
     g = RECIPE._geometry(FEATURES)
     height = g["height"]
     (x0, x1), (y0, y1) = g["window_x"], g["window_y"]
-    corners = [(x, y - height) for x in (x0, x1) for y in (y0, y1)]
+    centres = [
+        (x + sx * d_rough, y - height + sy * d_rough)
+        for x, sx in ((x0, 1), (x1, -1))
+        for y, sy in ((y0, 1), (y1, -1))
+    ]
     lines = next(
-        op[2] for job in ctx["jobs"] for op in job["ops"] if op[0] == "window_corners"
+        op[2] for job in ctx["jobs"] for op in job["ops"] if op[0] == "window_finish"
     )
     z = None
-    reached: dict[tuple, list[float]] = {}
+    turned: dict[tuple, list[float]] = {}
     for line in lines:
         words = dict((w[0], w[1:]) for w in line.split()[1:] if w[0] in "XYZ")
         if "Z" in words:
             z = float(words["Z"])
         if line.startswith("G1") and "X" in words:
             px, py = float(words["X"]), float(words["Y"])
-            for kx, ky in corners:
-                ox, oy = abs(px - kx), abs(py - ky)
-                if abs(ox - oy) < 0.01 and ox < 2:
-                    reach = ((ox**2 + oy**2) ** 0.5) - e5 / 2
-                    reached.setdefault((z, kx, ky), []).append(reach)
-    levels = {key[0] for key in reached}
-    assert len(levels) == 2 and len(reached) == 8
-    for steps in reached.values():
-        chain = [left_rough, *steps, left_finish]
-        cuts = [a - b for a, b in zip(chain, chain[1:])]
-        assert all(0 < cut <= limit + 0.002 for cut in cuts), cuts
+            for cx, cy in centres:
+                gap = math.dist((px, py), (cx, cy))
+                if gap < 1.0:
+                    turned.setdefault((z, cx, cy), []).append(gap)
+    assert len({key[0] for key in turned}) == 8 and len(turned) == 32
+    for gaps in turned.values():
+        assert all(gap == pytest.approx(stock, abs=0.002) for gap in gaps), gaps
 
 
 def _seed(ctx: dict, key: str, old: str, new: str) -> dict:
@@ -214,6 +217,16 @@ def _line(ctx: dict, key: str, prefix: str, index: int = 0) -> str:
     return [line for line in lines if line.startswith(prefix)][index]
 
 
+def _shift(dx: float, dy: float):
+    """A change moving a G1 X Y line's point by ``dx``, ``dy``."""
+
+    def change(line: str) -> str:
+        words = dict((w[0], float(w[1:])) for w in line.split()[1:] if w[0] in "XY")
+        return f"G1 X{words['X'] + dx:.3f} Y{words['Y'] + dy:.3f} F{{feed}}"
+
+    return change
+
+
 @pytest.mark.parametrize(
     ("key", "prefix", "index", "change", "check"),
     [
@@ -225,12 +238,12 @@ def _line(ctx: dict, key: str, prefix: str, index: int = 0) -> str:
             lambda line: line.split(" Y")[0] + " Y-20.000",
             "face",
         ),
-        # The window's far wall finished .010 too far out: the window oversize.
-        ("window_finish", "G1 Y-7.", 0, lambda line: "G1 Y-6.834 F{feed}", "outline"),
+        # The finish's left wall run .010 too far out: the window oversize.
+        ("window_finish", "G1 X", 0, _shift(-0.254, 0.0), "outline"),
         # The rough slot run anticlockwise on its first side: climb.
         ("window_rough", "G1 Y-7.", 0, lambda line: "G1 Y-32.372 F{feed}", "outline"),
         # The finish's last level stopped short of the front face: the walls
-        # below it uncut (the corner steps still reach the depth).
+        # below it uncut.
         (
             "window_finish",
             "G1 Z-0.508",
@@ -238,14 +251,8 @@ def _line(ctx: dict, key: str, prefix: str, index: int = 0) -> str:
             lambda line: "G1 Z0.000 F{plunge}",
             "outline",
         ),
-        # A corner step moved past the finish path into the wall: a gouge.
-        (
-            "window_corners",
-            "G1 X4.480",
-            0,
-            lambda line: "G1 X4.000 Y-7.000 F{feed}",
-            "outline",
-        ),
+        # A finish corner point pushed into the corner: a gouge.
+        ("window_finish", "G1 X", 2, _shift(-0.2, 0.2), "outline"),
         # The tap drill stopped in the rail.
         ("tap_drill", "G1 Z-7.775", 0, lambda line: "G1 Z-5.000 F{feed}", "holes"),
         # A peck re-entry rapided past the depth already drilled.

@@ -26,9 +26,6 @@ diameter_mm = 5.0546
 [tools.frame-clearance-stub-drill]  # G-drill-5-stub; Drills #5
 description = "#5 (.2055) screw-machine-length drill"
 diameter_mm = 5.2197
-[tools.drill-13mm]  # G-drill-13mm; Drills 13 mm
-description = "13 mm drill, shank <= 1/2 in"
-diameter_mm = 13.0
 [tools.drill-33-64]  # G-drill-33-64; Drills 33/64
 description = "33/64 drill, 1/2 in reduced shank"
 diameter_mm = 13.096875
@@ -36,8 +33,6 @@ diameter_mm = 13.096875
 description = "#10-32 UNF bottoming hand tap (OSG 1025308)"
 [tools.tap-10-32-plug]  # Tap coverage #10-32 UNF
 description = "#10-32 UNF plug hand tap (OSG 1025200)"
-[tools.frame-spotface-endmill]  # F-spotface-endmill-11-32
-description = "11/32 HSS 2-flute end mill"
 [tools.angle-plate-4]  # F-angle-plate-LMS-5386
 description = "Angle plate 4x4x4 webbed end (LMS 5386)"
 

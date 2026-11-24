@@ -14,7 +14,7 @@
   <rect class="bond" x="150" y="222.8" width="420" height="4"/>
   <rect class="fixture-plate" x="120" y="226.8" width="480" height="26"/>
   <line class="leader" x1="570" y1="224.8" x2="600" y2="232.8"/>
-  <text class="label" x="604" y="236.8">fresh tape</text>
+  <text class="label" x="604" y="236.8">fresh blue tape, CA glue, blue tape</text>
   <line class="leader" x1="600" y1="244.8" x2="620" y2="252.8"/>
   <text class="label" x="624" y="256.8">fixture bar</text>
   <text class="label" x="140" y="76" text-anchor="end">face B</text>

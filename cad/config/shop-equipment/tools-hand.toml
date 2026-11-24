@@ -50,7 +50,11 @@ note = "Owner confirmed on hand 2026-11-19 (Central Machinery, 1 ton). Also push
 # in rule the archived inventory lists (Starrett C604R-6) cannot read the
 # MHA-HA-00 bar height (ha_harmonic_analyzer_assembly_spec.BAR_HEIGHT_MM).
 [tools.steel-rule-48]
-name = "Steel rule, 48 in"
+name = "Steel rule, 48 in, graduated 1/64 in and 0.5 mm"
+make = "Insize"
+sku = "7110-1200"
+source = "https://www.zoro.com/i/G2549342/"
+purchase = "Zoro G2549342, Insize 7110-1200 stainless steel rule, 48 in x 1-3/8 in x .07 in, $65.25 (read live 2026-11-23). Maker's table (https://insize.com/rulers/7110.html, read 2026-11-23): 7110-1200, 1200 mm / 48 in, accuracy +/-0.80 mm, graduations 0.5 mm, 1 mm, 1/64, 1/32 and 1/16 in. Zoro's listing prints +/- .009 in for the same rule; the maker's figure governs. Owner ruling 2026-11-23 (tool audit Q3): buy only this rule; it does not prove a printed +/-.01 length."
 kind = "rule"
 status = "to_order"
 length_in = 48
@@ -74,7 +78,11 @@ kind = "straightedge"
 status = "to_order"
 
 [tools.transfer-punches]
-name = "Transfer punch set, fractional and number sizes"
+name = "Transfer punch set, fractional 3/32-1/2 in by 64ths"
+make = "LittleMachineShop"
+sku = "2031"
+source = "https://littlemachineshop.com/products/transfer-punch-sets-individual-sizes"
+purchase = "LittleMachineShop 2031, transfer punch set 3/32 to 1/2 in by 64ths plus 17/32, 4-7/8 in long, $18.95 (read live 2026-11-23). Fractional set only (tool audit 2026-11-23): every punch a plan names is a 64ths size. The listing does not state how far under nominal the punches are ground: mike the 1/4 in punch on receipt against the note's limit."
 kind = "transfer_punch_set"
 status = "to_order"
 note = "Buy a set ground no more than .003 in under nominal (e.g. Precise spotters, .0025 ±.0005 under from 2.5 mm to 17/32 in, Penn Tool listing read 2026-11-12): cone_set_stack.PIVOT_SEAT_TRANSFER_MM books the 1/4 in punch's radial play in the MHA-DT-20 pivot bore at that grind (#2366)."
@@ -154,6 +162,9 @@ status = "on_hand"
 note = "Owner confirmed on hand 2026-11-19 (an automatic centre punch). Purchase approved by Pedro 2026-10-11 (archived inventory)."
 
 [tools.file-nicholson-10-second-cut]
+sku = "08673NN"
+source = "https://www.zoro.com/nicholson-10-mill-single-cut-second-file-08673nn/i/G3071397/"
+purchase = "Zoro G3071397, Nicholson 08673NN 10 in mill single-cut second file, $12.39, in stock (read live 2026-11-22)."
 name = "Nicholson 10 in mill second-cut file (archived inventory)"
 kind = "file"
 make = "Nicholson"
@@ -214,6 +225,7 @@ sku = "4289A78"
 status = "on_hand"
 pieces = 1
 cite = ["McMaster-Carr packing list, PO 0803PCAMPOS (1616317-01, 08/04/2025), line 34: \"7 Piece Deburring Scraper and Countersink Set\", 1 each", "Owner (Pedro) 2026-11-17: \"add to inventory ... already owned\""]
+note = "Owner 2026-11-23: \"the mcmaster kit sold is actually noga sp1007\". Noga's catalogue lists the SP1007 set's countersink blade as RD16.5 (p. 53), a 90° blade for 1-16.5 mm (p. 27 table, BC1651): https://www.noga.com/wp-content/uploads/2025/05/Noga_Deburring-2017.pdf. The blade in hand was not measured."
 
 [tools.sharpening-stone-two-grit]
 name = "Aluminum oxide two-grit sharpening stone, 6 x 2 x 1 in, 100 x 320 grit"
@@ -246,15 +258,22 @@ note = "Pushes one outer link's pin out to cut the MHA-PD-00 chain loops (step 3
 # MHA-DT-30 pinion lever pin (cad/process/dt_pinion_lever_pin/plan.toml): a 1/16
 # drill rod is too slender for the 3-jaw or the 14 in saw's vise, so its piece is
 # sawn by hand in the bench vise. MHA-SM-01 gooseneck (cad/process/sm_gooseneck/
-# plan.toml Setup 7): both ends of the bent tube are sawn in the bench vise. No
-# vendor or SKU is asserted (a tool to buy).
+# plan.toml Setup 7): both ends of the bent tube are sawn in the bench vise.
 [tools.junior-hacksaw]
+make = "Bahco"
+sku = "228"
+source = "https://www.zoro.com/bahco-junior-hacksaw-ergo-handle-6-bah228/i/G7622207/"
+purchase = "Zoro G7622207, Bahco 228 junior hacksaw, 6 in, $14.15, in stock (read live 2026-11-22). The listing read does not state the supplied blade's pitch: fit a 32 TPI junior blade if it differs. Cheaper there: Westward 5WFW7 junior saw, $3.99."
 name = "Junior hacksaw, 6 in blade, 32 TPI"
 kind = "hacksaw"
 status = "to_order"
 note = "Not owned: to buy (the shop records no hand hacksaw). Saws the MHA-DT-30 pin's .65 piece off the 1/16 drill rod and the MHA-SM-01 gooseneck's two ends (1/2 in x .065 wall 4130 tube) in the bench vise; any 6 in junior frame with a 32 TPI blade serves."
 
 [tools.aviation-snips-straight]
+make = "Irwin"
+sku = "2073113"
+source = "https://www.travers.com/product/irwin-2073113-snips-61-163-025"
+purchase = "Travers 61-163-025, Irwin 2073113 aviation snips, 18 ga CRS capacity, 10 in overall, 1-3/8 in cut, $23.48 (read live 2026-11-23). Straight cut: the Travers listing does not state the direction, and Irwin's page for 2073113 (https://www.irwintools.com/product/2073113/utility-snips, read 2026-11-23) lists it as \"IRWIN Aviation Snips Straight\"."
 name = "Aviation snips, straight cut"
 kind = "snips"
 status = "to_order"

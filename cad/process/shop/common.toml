@@ -103,44 +103,49 @@ resolution_mm = 0.00254
 range_mm = [10.16, 10.1727]
 resolution_mm = 0.001016
 
-# The MHA-CH-13 hub hole read to .0001 for the MHA-CH-12 matched press (owner
-# ruling 2026-11-21: the land is turned to the measured strap hole): the hub
-# pair above plus four Class X steps .4001-.4004 between them
-# (cad/config/shop-equipment/ gauges.plug-gauges-4001-4004, to buy). The
-# set's own pins span .4001-.4004 = 10.16254-10.17016 mm in .0001 in =
-# 0.00254 mm steps; with the .4000/.4005 pair the largest pin that enters
-# reads the hole over .4000-.4005.
-[gauges.plug-gauges-4001-4004]
-range_mm = [10.16254, 10.17016]
-resolution_mm = 0.00254
+# The MHA-CH-13 hub hole read with two Class X steps, .4002 and .4004, between
+# the hub pair above (owner ruling 2026-11-23, tool audit Q2, verbatim: "B.
+# Four reading pins (.4000, .4002, .4004, .4005)."). It replaces the four
+# .4001-.4004 steps the hub hole was first read with. Range:
+# the two pins, .4002-.4004 in = 10.16508-10.17016 mm; resolution: the
+# reading's step, .0002 in = 0.00508 mm (the last step, .4004 to the pair's
+# .4005, is .0001). Not owned: to buy. Its inventory record
+# (cad/config/shop-equipment/, same key) is ShopSourcing's to add.
+[gauges.plug-gauges-4002-4004]
+range_mm = [10.16508, 10.17016]
+resolution_mm = 0.00508
 
-# The dt reamed-bore go/no-go pairs, Vermont Gage Class X as the hub pair
-# (cad/config/shop-equipment/ gauges, same keys, to buy; tools rows in
-# shop/dt.toml): .2510/.2515 (MHA-DT-18, MHA-DT-14, MHA-DT-23), .3135/.3140
-# and .1570/.1575 (MHA-DT-14), .3760/.3765 (MHA-DT-02), .0930/.0935 and
-# .4500/.4505 (MHA-DT-11).
-[gauges.plug-gauges-2510-2515]
-range_mm = [6.3754, 6.3881]
-resolution_mm = 0.001016
-[gauges.plug-gauges-3135-3140]
+# Class ZZ go/no-go pins for the reamed bands (owner ruling 2026-11-23, tool
+# audit Q1, verbatim: "ZZ singles per the record: 29 pins (17 plus GO, 12
+# minus NO-GO), about $130. Accept that good holes near a limit may be
+# refused; the traveler mikes each pin so the real window is known per pin.").
+# One record per band, key zz-pins-<low>-<high>, here when two families' plans
+# gauge the band, else in the family file. GO is a plus pin at the low limit
+# (its size the limit to .0002 over), NO-GO a minus pin at the high limit (its
+# size .0002 under to the limit), as the #3075 record has it
+# (cad/config/shop-equipment/gauges.toml gauges.pin-gauges). The pair reads no
+# scale; its resolution is one pin's Class ZZ tolerance, .0002 in =
+# 0.00508 mm: with both pins at their tolerance limits only the middle .0001
+# of a .0005 band is sure to pass, so each traveler mikes its pins and
+# accepts between the two readings. Of the Class X pairs the ZZ pins replace,
+# only .0930/.0935's gauges record below stays: a test reads it.
+[gauges.zz-pins-3135-3140]
 range_mm = [7.9629, 7.9756]
-resolution_mm = 0.001016
-[gauges.plug-gauges-1570-1575]
-range_mm = [3.9878, 4.0005]
-resolution_mm = 0.001016
-[gauges.plug-gauges-3760-3765]
-range_mm = [9.5504, 9.5631]
-resolution_mm = 0.001016
-# MHA-DT-20's pivot bore pair (.2500/.2505; tools row in shop/dt.toml;
-# cad/config/shop-equipment/ gauges, same key, to buy).
-[gauges.plug-gauges-2500-2505]
-range_mm = [6.35, 6.3627]
-resolution_mm = 0.001016
+resolution_mm = 0.00508
+[tools.zz-pins-3135-3140]
+description = "Class ZZ pins for .3135-.3140: GO .3135 plus (single), NO-GO .314 minus (the .061-.500 box)"
+[gauges.zz-pins-0930-0935]
+range_mm = [2.3622, 2.3749]
+resolution_mm = 0.00508
+[tools.zz-pins-0930-0935]
+description = "Class ZZ pins for .0930-.0935: GO .0930 plus (single), NO-GO .0935 minus (single)"
+
+# The MHA-DT-11 drive-pin holes' go/no-go pair .0930/.0935, Vermont Gage
+# Class X as the hub pair (cad/config/shop-equipment/ gauges, same key, to
+# buy; tools row in shop/dt.toml). No plan names it since the ZZ pins
+# replaced it; test_dt_crankshaft_process.py reads its range.
 [gauges.plug-gauges-0930-0935]
 range_mm = [2.3622, 2.3749]
-resolution_mm = 0.001016
-[gauges.plug-gauges-4500-4505]
-range_mm = [11.43, 11.4427]
 resolution_mm = 0.001016
 
 [gauges.height-gauge]
@@ -201,13 +206,17 @@ range_mm = [1.27, 101.6]
 resolution_mm = 0.00254
 
 # The 48 in steel rule (cad/config/shop-equipment/ tools.steel-rule-48),
-# to buy: the only length gauge on record past the 6 in calipers. A plan
-# that reads it needs its 1/100 in graduation (MHA-CH-01's 31.82 ± .01
-# length), a requirement of the purchase: 48 in = 1219.2 mm, .01 in =
-# .254 mm.
+# to buy: the only length gauge on record past the 6 in calipers. The rule
+# bought is the Insize 7110-1200 (owner ruling 2026-11-23, tool audit Q3:
+# "B. Buy only the Insize rule; ..."): its finest graduation is 1/64 in
+# (also 1/32, 1/16, 0.5 mm and 1 mm), it does not read 1/100 in, and Insize
+# rates it ±0.80 mm (±.031 in) over its length (insize.com/rulers/7110.html,
+# read 2026-11-22). 48 in = 1219.2 mm; resolution 1/64 in = 0.396875 mm.
+# It cannot prove a ±.01 band: MHA-CH-01 accepts its length with it to
+# ±1/32 only and makes the 20 bars equal by comparison with the calipers.
 [gauges.steel-rule-48]
 range_mm = [0.0, 1219.2]
-resolution_mm = 0.254
+resolution_mm = 0.396875
 
 [limits]
 # HA: shop-policy numbers.stickout_ld_max 3.0.
@@ -645,6 +654,9 @@ diameter_mm = 7.6708
 [tools.drill-31-64]  # Drills 31/64
 description = "31/64 (.4844 in) drill, 115-piece index"
 diameter_mm = 12.303125
+[tools.reamer-4990]  # B-reamer-.4990
+description = ".4990 in HSS chucking reamer"
+diameter_mm = 12.6746
 [tools.reamer-1240]  # B-reamer-.1240
 description = ".1240 in HSS chucking reamer"
 diameter_mm = 3.1496
@@ -688,12 +700,17 @@ description = "Starrett 18A automatic centre punch"
 description = "Nicholson 10 in mill second-cut file"
 [tools.india-stone-ib8]  # F-stone-norton-IB8
 description = "Norton IB8 India combination stone"
+[tools.sharpening-stone-two-grit]  # inventory tools.sharpening-stone-two-grit (on hand); tool audit 2026-11-23 level 0: the owned stone stands in for the India stone
+description = "Aluminium oxide two-grit sharpening stone, 6 x 2 x 1 in, 100 and 320 grit (McMaster-Carr 4506A2)"
 [tools.pliers]  # F-pliers
 description = "Pliers"
 [tools.steel-rule-48]  # F-steel-rule-48
-description = "Steel rule, 48 in"
-[tools.transfer-punches]  # F-transfer-punches-fractional, F-transfer-punches-number
-description = "Transfer punch sets, fractional 3/32-1/2 by 64ths and number sizes #1-#60"
+description = "Steel rule, 48 in, finest graduation 1/64 in (Insize 7110-1200)"
+# Tool audit 2026-11-23 (row transfer-punches): the fractional set only; a
+# number-size hole is spotted through with the same-number drill from the
+# 115-piece index (no plan names a number-size punch).
+[tools.transfer-punches]  # F-transfer-punches-fractional
+description = "Transfer punch set, fractional 3/32-1/2 by 64ths"
 [tools.v-blocks]  # F-v-blocks
 description = "Matched V-block pair with clamps"
 
@@ -711,8 +728,29 @@ description = "Carbide 60° centre drills, trade sizes 1, 3 and 6"
 description = "Carbide 1/4 in 90° chamfering end mill, 2-flute (McMaster 3073A46)"
 diameter_mm = 6.35
 flute_length_mm = 3.175
-[tools.deburring-set]  # inventory tools.deburring-set (McMaster 4289A78); MHA-MS-03 and MHA-PD-27 edges and hole mouths
-description = "7-piece deburring scraper and countersink set (McMaster 4289A78)"
+# Harvey Tool 34662, here since two families plunge with it (tool audit
+# 2026-11-23: it replaces the 3/64 in end mill): MHA-MS-02's rebate relief and
+# MHA-PD-17's pin-hole flat. MHA-MS-02: the rebate's corner relief (.05
+# deep × .06 high, beside the roof, at the
+# bottom of the .134 rebate): no owned cutter is under .07 wide and reaches
+# .38 down inside the rebate. It is plunge-milled (owner ruling 2026-11-21,
+# relayed by CncBlockA) with Harvey Tool 34662, Miniature End Mill, Square,
+# Long Reach, Stub Flute: 3 flutes, centre cutting, .0620 cutter × .0930
+# length of cut × .5000 reach (8×), 1/8 shank, 2-1/2 overall, uncoated,
+# "optimized for plunging", $60.30 (harveytool.com/products/tool-details-
+# 34662, read 2026-11-21). Not owned: to buy. diameter_mm and
+# flute_length_mm: its .0620 and .0930 × 25.4.
+[tools.endmill-carbide-3fl-1-16-reach-1-2]
+description = "1/16 in (.0620) 3-flute carbide square end mill, stub flute .093 length of cut, .500 reach, 1/8 shank (Harvey Tool 34662)"
+diameter_mm = 1.5748
+flute_length_mm = 2.3622
+# The set McMaster-Carr sells as 4289A78 is Noga's SP1007 (owner 2026-11-23,
+# tool audit Q12: "the mcmaster kit sold is actually noga sp1007"; "check Noga
+# SP1007"). Noga_Deburring-2017.pdf (noga.com) p.53 lists the RD16.5
+# RotoDrive countersink in SP1007; p.27's blade table, row RD16.5 / BC1651:
+# range 1-16.5 mm, angle 90°. MHA-PD-19 chamfers K's mouth with it.
+[tools.deburring-set]  # inventory tools.deburring-set (McMaster 4289A78 = Noga SP1007); MHA-MS-03 and MHA-PD-27 edges and hole mouths; MHA-PD-19 K chamfer (RD16.5)
+description = "7-piece deburring scraper and countersink set, Noga SP1007 (McMaster 4289A78), with the RD16.5 RotoDrive 90° countersink, 1-16.5 mm"
 [tools.die-stock-13-16]  # inventory holders.die-stock-13-16
 description = "Die stock for 13/16 in round dies (Drillco 3000DS1)"
 [tools.dies-zoro-wb7365521946]  # inventory tools.dies-zoro-wb7365521946
@@ -727,19 +765,16 @@ diameter_mm = 6.35
 description = "27/64 (.4219 in) drill, 115-piece index"
 diameter_mm = 10.715625
 # The owned Pittsburgh SAE/metric 32-piece feeler set (inventory
-# gauges.feeler-gauges, owner 2026-11-19), Harbor Freight 63665: leaves
-# .0015-.035 in (.0015, .002, .0025, .003-.026 by .001, .028, .030, .032,
-# .035; harborfreight.com/saemetric-feeler-gauge-32-piece-63665.html, read
+# gauges.feeler-gauges, owner 2026-11-19), Harbor Freight 63665 (also sold as
+# 32214): 32 blades in 31 sizes, the .010 twice, leaves .0015-.035 in (.0015,
+# .002, .0025, .003-.026 by .001, .028, .030, .032, .035;
+# harborfreight.com/saemetric-feeler-gauge-32-piece-63665.html, read
 # 2026-11-23) = 0.0381-0.889 mm; resolution its .001 in = 0.0254 mm steps.
 [gauges.feeler-gauges]
 range_mm = [0.0381, 0.889]
 resolution_mm = 0.0254
 [tools.feeler-gauges]  # inventory gauges.feeler-gauges
 description = "Pittsburgh SAE/metric feeler gauge set, 32 pieces"
-[tools.form-tool-r070]  # MHA-PD-23 R.07 shank-end dome; MHA-MG-07 R.07 tip
-description = "R.070 dome form tool: concave R.070 edge, cuts a convex R.070 dome"
-[tools.form-tool-r125]  # MHA-CH-04 2X (SR.125) ends; MHA-MG-03 SR.13 tip; MHA-MG-04 R.13 TANGENT HEMISPHERE
-description = "R.125 full-radius dome form tool: concave R.125 edge, cuts a convex SR.125 dome (hemisphere on 1/4 rod)"
 [tools.gauge-blocks-mitutoyo]  # inventory gauges.gauge-blocks-mitutoyo
 description = "Mitutoyo 81-piece inch gauge block set, shop grade"
 [tools.grooving-tool-020]  # MHA-PD-23 .020 +.002/.000 ring groove; MHA-MG-04 thread relief, corners R.008 max.; MHA-MG-07 thread relief, corners R.008 max.
@@ -758,22 +793,69 @@ description = "Starrett S579Gz telescoping bore gauge set, 4 pieces"
 [tools.threading-bits-lms-6685]  # MHA-DT-03-TL-03 1/4-28 UNF single-pointed (owner 2026-11-19); MHA-PD-08 #8-32 UNC single-pointed (owner 2026-11-19); MHA-MG-03 1/4-20 UNC single-pointed (owner 2026-11-19); MHA-DT-03-TL-07 #8-32 UNC single-pointed (drawing callout 2026-11-20, #2356)
 description = "5/16 in HSS threading tool bit, set of two (LMS 6685)"
 
-# --- Sheet parts bonded to a spoil plate on the CNC (dt, pd) ------------------
+# --- Parts bonded to a plate on the CNC (ch, ms, dt, pd) ----------------------
 # The .020-.032 brass sheet parts (MHA-DT-03-TL-02 phasing comb, and the pd
-# sheet parts) are cut out on the PM-30MV bonded on tape to a plain spoil
-# plate gripped in the vise. Ownership: cad/config/shop-equipment/
-# fixtures.sheet-spoil-plate and consumables.tape-3m-vhb-5906 (moved here
-# from ch.toml: the MHA-CH-13 strap and the MHA-MS-01 stick bond on it too).
+# sheet parts) are cut out on the PM-30MV bonded to a plain spoil plate
+# gripped in the vise; the MHA-CH-13 strap and the MHA-MS-01 stick bond to
+# their own fixtures the same way: blue painter's tape on both faces, thick
+# CA glue between (owner ruling 2026-11-23). Ownership: cad/config/
+# shop-equipment/ fixtures.sheet-spoil-plate and consumables.
+# hold-painters-tape-ca with its three products, same keys.
 [tools.sheet-spoil-plate]
 description = "Spoil plate: a 5 in length of the 1/2 x 6 in 6061 flat, top as supplied, gripped in the vise on parallels"
-[tools.tape-3m-vhb-5906]
-description = "3M VHB 5906 double-sided tape, .006 in"
+[tools.tape-scotchblue-2090]
+description = "ScotchBlue 2090 blue painter's tape, 1.41 in wide"
+[tools.ca-glue-gh1200]
+description = "GH1200 CA glue, the 1500 cps thick bottle"
+[tools.ca-accelerator-starbond]
+description = "Starbond CA accelerator spray"
 # The sheet blanks are snipped off their sheet or strip (the comb's .020
 # sheet, moved here from dt.toml; the MHA-PD-03 clip's .032 strip).
 # Ownership: cad/config/shop-equipment/tools-hand.toml
 # tools.aviation-snips-straight, same key.
 [tools.aviation-snips-straight]
 description = "Aviation snips, straight cut"
+
+# The sheet parts' outline cutter, moved here from pd.toml: the MHA-PD-03
+# platen clip and the MHA-DT-03-TL-02 phasing comb (tool audit 2026-11-23:
+# the comb takes the clip's 1/32 instead of a 1/16 bought for it alone) both
+# cut with it.
+# The clip's cutter: Harvey Tool 896231, Variable Helix End Mill for
+# Aluminum Alloys - Square - Downcut (harveytool.com/products/tool-details-
+# 896231 and the family page, read 2026-11-22): .0310 (1/32) cutter, .0930
+# length of cut, 3 left-hand spiral right-hand cut flutes (a downcut:
+# "prevents lifting of workpiece"), centre cutting, 1/8 shank, 1-1/2
+# overall, uncoated, the family "excellent performance in copper, brass, and
+# bronze alloys". It fits the .04 slit, which it cuts by running down one
+# side and back up the other. Ownership: cad/config/shop-equipment/
+# tools-special-cutters.toml, same key. diameter_mm and flute_length_mm: its
+# .0310 and .0930 × 25.4.
+[tools.endmill-carbide-3fl-1-32-downcut]
+description = "1/32 in (.0310) 3-flute carbide downcut square end mill, .093 length of cut, 1/8 shank (Harvey Tool 896231)"
+diameter_mm = 0.7874
+flute_length_mm = 2.3622
+# Harvey's own speeds and feeds for the series (SF_896200, "Variable Helix End
+# Mills for Aluminum Alloys - Square - Downcut", harveyperformance.widen.net/
+# content/urxytgzfxb/pdf/SF_896200.pdf, read 2026-11-22), uncoated, Brass
+# (Copper Zinc alloys, C2xxxx): 500 SFM; .031 cutter slotting .00033 in/tooth
+# (1x D radial, .5x D axial), max .00044. Every clip cut is a full-width slot
+# level, so the slotting figure is the ceiling (.00033 × 25.4).
+maker_chip_load_mm_per_tooth = { brass = 0.008382 }
+maker_chip_load_source = "Harvey Tool SF_896200 (8962xx downcut), uncoated, Brass C2xxxx, .031 cutter, slotting .00033 in/tooth"
+# Its setting in half-hard C26000 strip: Harvey's 500 SFM on .031 in is
+# 61,600 rpm, so the spindle's 2800 (machines.pm-30mv; 23 ft/min). Chip load
+# at Harvey's slotting figure, rounded down to the 0.1 in/min the sheet
+# prints: 2800 × 3 × .00033 = 2.77, so 2.7 in/min, .000321 in/tooth
+# (2.7 × 25.4 / 8400 mm); the plan holds each level to Harvey's .5 x D depth.
+# Delegated ruling 2026-11-22 (Main, owner review #2144): never above the
+# maker's published chip load without a measurement.
+[settings.endmill-carbide-3fl-1-32-downcut-c260]
+tool = "endmill-carbide-3fl-1-32-downcut"
+material = "c260-h02"
+rpm = 2800
+chip_load_mm_per_tooth = 0.0081643  # .000321 in; 2800 × 3 × .000321 = 2.7 in/min
+flutes = 3
+feed_unit = "in/min"
 
 # --- The 1/2 in HSS end mill and its slot setting (ch, sm) --------------------
 # Moved here from ch.toml: the MHA-CH-13-TL-01 sub-plate's SP01 slots the 1/2

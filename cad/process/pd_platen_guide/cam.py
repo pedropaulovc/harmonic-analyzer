@@ -523,23 +523,25 @@ def context(
         if not low - SIZE_TOL_MM <= d43 <= high:
             raise ValueError(f"#43 Ø{d43} is outside {tap['name']}'s band {tap['dia']}")
     step_max = p["face_stepover_max_mm"]
-    face_cuts = (
-        "underside",
-        "top skim",
-        "front face",
-        "depth",
-        "height",
-        "left end",
-        "right end",
-    )
+    # The five faces run at one setting and the two ends at another: the
+    # ends' depth lies past the faces' measured envelope (plan.toml).
     face_rpm, face_feed = _setting(plan, shop, "underside")
-    for name in face_cuts:
-        if not math.isclose(_cut(plan, name, "cutter_dia_mm"), em, abs_tol=1e-6):
-            raise ValueError(
-                f"'{name}' cutter Ø{_cut(plan, name, 'cutter_dia_mm')}, the end mill is Ø{em}"
-            )
-        if _setting(plan, shop, name) != (face_rpm, face_feed):
-            raise ValueError(f"'{name}' runs at another setting than 'underside'")
+    end_rpm, end_feed = _setting(plan, shop, "left end")
+    for names, first, speeds in (
+        (
+            ("underside", "top skim", "front face", "depth", "height"),
+            "underside",
+            (face_rpm, face_feed),
+        ),
+        (("left end", "right end"), "left end", (end_rpm, end_feed)),
+    ):
+        for name in names:
+            if not math.isclose(_cut(plan, name, "cutter_dia_mm"), em, abs_tol=1e-6):
+                raise ValueError(
+                    f"'{name}' cutter Ø{_cut(plan, name, 'cutter_dia_mm')}, the end mill is Ø{em}"
+                )
+            if _setting(plan, shop, name) != speeds:
+                raise ValueError(f"'{name}' runs at another setting than '{first}'")
     # Each face's own level ceiling: light enough that the long, thin rail's
     # overhang past the jaws bends under its cut force within the finish
     # limit (the cut's axial_doc_mm, the force's depth, is that ceiling).
@@ -783,6 +785,18 @@ def context(
             "height",
         ),
     }
+    # The faces' declared width is the widest pass any of them takes: every
+    # pass of a face is one equal width (the first engages its width, the
+    # cutter overhanging the edge; the last ends FACE_OVERHANG_MM past the
+    # other edge).
+    widest = max(
+        (y[1] - y[0] + FACE_OVERHANG_MM) / len(ys)
+        for _lv, _top, ys, y, _frame in faces.values()
+    )
+    if not math.isclose(widest, step_max, abs_tol=PLAN_TOL_MM):
+        raise ValueError(
+            f"the widest face pass is {widest:.4f}, not process.face_stepover_max_mm"
+        )
     jobs = []
 
     def face_job(key: str) -> dict[str, Any]:
@@ -815,6 +829,9 @@ def context(
     jobs.append(
         {
             **em_tool,
+            "rpm": end_rpm,
+            "feed": end_feed,
+            "plunge": end_feed,
             "frame": "depth",
             "label": "ends",
             "stock": stocks["ends"],
@@ -984,7 +1001,7 @@ def context(
                 "loads_first": True,
             },
         ],
-        [name, "spindle", {"rpm": [[face_rpm], [spot_rpm], [drill_rpm]]}],
+        [name, "spindle", {"rpm": [[end_rpm], [spot_rpm], [drill_rpm]]}],
         [name, "pauses", {"z_top": depth, "count": 0}],
         [name, "depth", {"z_min": _r(tip)}],
     ]

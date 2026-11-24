@@ -21,15 +21,17 @@ down to the plate's near face (the 1/2 in end mill's slot and its arc round
 the hub, then the 1/8 in end mill's rings into the bar-to-hub roots), CL03
 spots, drills and reams the fulcrum bore, CL04 spots and drills the #47 and
 #21 holes. Turned over, side A up: CL05 pockets A to the plate's far face,
-CL06 cuts the outline on seven tabs with the 1/8 in end mill, then the 5/64
-in end mill takes the two bar-to-hub roots to R.039. A switch to a plate
-fixture replaces CL06 and its setup only.
+CL06 cuts the outline on seven tabs with the 1/8 in end mill, which leaves
+the two bar-to-hub roots at its own radius, R.0625, inside the drawing's
+2X R.065 (.060-.070; owner ruling 2026-11-23, tool audit Q9: no 5/64 in
+cutter), and CL07, on the same tool, rounds the hubs above and below the
+plate. A switch to a plate fixture replaces CL06, CL07 and their setup only.
 
 Work frames (G54), each set in its setup: X0 the blanks' left ends (flush),
 Y0 the fixed jaw, Z0 the spoil plate's top. Blank k's centre line is Y
 −(k + ½) × the pitch; the hub centre is ``hub_from_end_mm`` from the left
 end. Side B up (CL01-CL04): the lever turned about X (model y → −Y, model
-z → −Z, face A on the plate). Side A up (CL05-CL06): model axes, face B on
+z → −Z, face A on the plate). Side A up (CL05-CL07): model axes, face B on
 the plate.
 
 Toolpath rules (owner rulings 2026-11-16): plunges beside the stock at the
@@ -54,10 +56,16 @@ PROGRAMS: tuple[tuple[str, tuple[Any, ...]], ...] = (
     ("CL03_bore", (("bore_spot",), ("bore_drill",), ("bore_ream",))),
     ("CL04_holes", (("holes_spot",), ("drill_47",), ("drill_21",))),
     ("CL05_pocket_a", (("pocket_a",), ("rings_a",))),
-    ("CL06_outline", (("outline",), ("roots",), ("outline_hub",))),
+    ("CL06_outline", ("outline",)),
+    # Its own program, not a second CL06 section: on the same tool at the
+    # same speed the post joins sections with no M6 or M0, so CL06's
+    # per-section checks could not tell the outline's passes from these.
+    ("CL07_hub", ("outline_hub",)),
 )
-# Every program loads its own first tool (M6, the tool setter).
-LOAD_FIRST_TOOL = tuple(name for name, _ops in PROGRAMS)
+# Every program loads its own first tool (M6, the tool setter), but CL07:
+# it runs on the 1/8 in end mill CL06 left in the spindle, already touched
+# off.
+LOAD_FIRST_TOOL = tuple(name for name, _ops in PROGRAMS if name != "CL07_hub")
 # The plan's tools the mill runs, numbered by their places in the plan's tool
 # list among these.
 CAM_TOOLS = (
@@ -68,7 +76,6 @@ CAM_TOOLS = (
     "drill-21",
     "drill-d",
     "reamer-2560",
-    "em-5-64",
 )
 IN = 25.4
 # ANSI #1 combined drill and countersink, 60° included (McMaster 2925A11,
@@ -94,10 +101,6 @@ PECK_REENTRY_MM = 0.5
 JAW_DEPTH_MM = IN
 # How far the cutter centre may stray from its offset round the outline.
 OUTLINE_TOL_MM = 0.05
-# The 5/64 in root passes run this far along the bar edge and this far round
-# the hub (degrees) from each root, inside the 1/8 in cutter's cut.
-ROOT_RUN_MM = 3.0
-ROOT_ARC_DEG = 15.0
 # A plan number the recipe recomputes must agree to this (its rounding).
 PLAN_TOL_MM = 0.01
 
@@ -322,6 +325,7 @@ def _geometry(features: dict[str, Any]) -> dict[str, Any]:
         "tangent": (tangent[0], tangent[1]),
         "tip": (tip[0], 0.0),
         "tip_r": outline["tip_radius_nominal"],
+        "root_corner_r": outline["root_corner_r"],
         "holes": holes,
     }
 
@@ -532,10 +536,11 @@ def context(
     em = _shop_tool(plan, shop, "em-half")["diameter_mm"]
     r = em / 2
     _agree(plan, "face_cutter_dia_mm", em)
-    em_rpm, em_feed = _setting(plan, shop, "face b")
-    for name in ("pocket b", "pocket a"):
-        if _setting(plan, shop, name) != (em_rpm, em_feed):
-            raise ValueError(f"'{name}' runs at another setting than 'face b'")
+    # Face B runs on its own (measured) setting; the two pockets share one.
+    face_rpm, face_feed = _setting(plan, shop, "face b")
+    em_rpm, em_feed = _setting(plan, shop, "pocket b")
+    if _setting(plan, shop, "pocket a") != (em_rpm, em_feed):
+        raise ValueError("'pocket a' runs at another setting than 'pocket b'")
     woc = _cut(plan, "face b", "radial_woc_mm")
     if r - g["bar_half"] < 1.0 or r < g["tip_r"] + 1.0:
         raise ValueError(
@@ -570,8 +575,16 @@ def context(
     e8 = _shop_tool(plan, shop, "em-eighth")["diameter_mm"]
     r8 = e8 / 2
     _agree(plan, "eighth_cutter_dia_mm", e8)
+    # The roots themselves: the outline's offset path leaves each at the
+    # cutter's own radius, which must lie in the drawing's printed band.
+    root_band = g["root_corner_r"]
+    if not root_band[0] <= r8 <= root_band[1]:
+        raise ValueError(
+            f"the 1/8 in end mill's radius {r8:.4f} is outside the root "
+            f"corners' band {root_band}"
+        )
     e8_rpm, e8_feed = _setting(plan, shop, "rings b")
-    for name in ("rings a", "outline"):
+    for name in ("rings a", "outline", "outline hub"):
         if _setting(plan, shop, name) != (e8_rpm, e8_feed):
             raise ValueError(f"'{name}' runs at another setting than 'rings b'")
     plunge8 = p["eighth_plunge_feed_per_min_mm"]
@@ -693,18 +706,6 @@ def context(
             return g["bar_half"]
         run = (x - g["taper_start"]) / (tx - g["taper_start"])
         return g["bar_half"] - run * (g["bar_half"] - g["tangent"][1])
-
-    # The 5/64 in end mill's roots: the bar-to-hub inside corners from the
-    # 1/8 in cutter's radius to its own, under the drawing's inside-corner
-    # ceiling, over the plate's thickness.
-    e5 = tools["em-5-64"]
-    r5 = e5 / 2
-    if r5 > p["inside_corner_max_mm"]:
-        raise ValueError(
-            "the 5/64 in end mill's radius is over the inside-corner ceiling"
-        )
-    root_rpm, root_feed = _setting(plan, shop, "roots")
-    root_levels = _levels(floor_a, offset - through, p["root_level_max_mm"])
 
     names = {tool["id"]: tool["name"] for tool in plan["tools"]}
     numbers = {
@@ -859,74 +860,6 @@ def context(
             ]
         outline_hub.append(f"G0 Z{_r(clear):.3f}")
 
-    # The roots, lever by lever, each corner's level by level.
-    big5 = g["hub_r"] + r5
-    j5 = math.sqrt(big5**2 - (g["bar_half"] + r5) ** 2)
-    c5 = math.degrees(math.atan2(g["bar_half"] + r5, j5))
-    root_elements: list[dict[str, Any]] = []
-    roots = []
-    for k, h in enumerate(hubs):
-        hx, hy = h
-        half = g["bar_half"]
-        top_line = {
-            "name": f"lever {k + 1} top root edge",
-            "start": (hx + j5 + ROOT_RUN_MM, hy + half),
-            "end": (hx + j5, hy + half),
-        }
-        top_arc = {
-            "name": f"lever {k + 1} top root hub",
-            "start": _polar(h, g["hub_r"], c5),
-            "end": _polar(h, g["hub_r"], c5 + ROOT_ARC_DEG),
-            "centre": h,
-        }
-        bottom_arc = {
-            "name": f"lever {k + 1} bottom root hub",
-            "start": _polar(h, g["hub_r"], -c5 - ROOT_ARC_DEG),
-            "end": _polar(h, g["hub_r"], -c5),
-            "centre": h,
-        }
-        bottom_line = {
-            "name": f"lever {k + 1} bottom root edge",
-            "start": (hx + j5, hy - half),
-            "end": (hx + j5 + ROOT_RUN_MM, hy - half),
-        }
-        for e in (top_line, top_arc, bottom_arc, bottom_line):
-            e["tol"] = OUTLINE_TOL_MM
-            root_elements.append(e)
-        top_start = (hx + j5 + ROOT_RUN_MM, hy + half + r5)
-        top_corner = (hx + j5, hy + half + r5)
-        top_end = _polar(h, big5, c5 + ROOT_ARC_DEG)
-        bottom_start = _polar(h, big5, -c5 - ROOT_ARC_DEG)
-        bottom_corner = (hx + j5, hy - half - r5)
-        bottom_end = (hx + j5 + ROOT_RUN_MM, hy - half - r5)
-        for start, body in (
-            (
-                top_start,
-                [
-                    f"G1 {_xy(*top_corner)} F{{feed}}",
-                    _arc("G3", top_corner, top_end, h),
-                ],
-            ),
-            (
-                bottom_start,
-                [
-                    _arc("G3", bottom_start, bottom_corner, h),
-                    f"G1 {_xy(*bottom_end)} F{{feed}}",
-                ],
-            ),
-        ):
-            # Each start is over the pockets and rings, cleared to the plate:
-            # its stock top is the plate's far face.
-            for z in root_levels:
-                roots += [
-                    f"G0 Z{_r(clear):.3f}",
-                    f"G0 {_xy(*start)}",
-                    f"G0 Z{_r(floor_a + SAFE_MM):.3f}",
-                    f"G1 Z{_r(z):.3f} F{{feed}}",
-                    *body,
-                ]
-        roots.append(f"G0 Z{_r(clear):.3f}")
-
     def job(
         key,
         label,
@@ -971,9 +904,9 @@ def context(
             "em-half",
             em,
             "endmill",
-            em_rpm,
-            em_feed,
-            em_feed,
+            face_rpm,
+            face_feed,
+            face_feed,
             "b",
             stock_b,
             face,
@@ -1159,20 +1092,6 @@ def context(
             3,
         ),
         job(
-            "roots",
-            "roots R.039",
-            "em-5-64",
-            e5,
-            "endmill",
-            root_rpm,
-            root_feed,
-            root_feed,
-            "a",
-            stock,
-            roots,
-            2,
-        ),
-        job(
             "outline_hub",
             "round the hubs",
             "em-eighth",
@@ -1236,7 +1155,11 @@ def context(
             [
                 name,
                 "tool_changes",
-                {"z_top": z_top, "tools": tools_loaded, "loads_first": True},
+                {
+                    "z_top": z_top,
+                    "tools": tools_loaded,
+                    "loads_first": name in LOAD_FIRST_TOOL,
+                },
             ],
             [name, "spindle", {"rpm": [[x] for x in rpms]}],
             [name, "pauses", {"z_top": z_top, "count": 0}],
@@ -1244,7 +1167,7 @@ def context(
         ]
 
     name = "CL01_face_b"
-    expect += common(name, t_max, [tn["em-half"]], [em_rpm], hub_t)
+    expect += common(name, t_max, [tn["em-half"]], [face_rpm], hub_t)
     expect += [
         [name, "rapids_clear", {"z_top": t_max}],
         [name, "air_feed", {"z_top": t_max}],
@@ -1346,18 +1269,12 @@ def context(
             if tool == "reamer-2560":
                 expect.append([f"{name}@{k}", "feed_out", {"z_top": hub_t}])
     name = "CL06_outline"
-    expect += common(
-        name,
-        hub_t,
-        [tn["em-eighth"], tn["em-5-64"], tn["em-eighth"]],
-        [e8_rpm, root_rpm, e8_rpm],
-        -through,
-    )
+    expect += common(name, hub_t, [tn["em-eighth"]], [e8_rpm], out_levels[-1])
     expect += [
-        [f"{name}@0", "rapids_clear", {"z_top": hub_t}],
-        [f"{name}@0", "air_feed", {"z_top": hub_t}],
+        [name, "rapids_clear", {"z_top": hub_t}],
+        [name, "air_feed", {"z_top": hub_t}],
         [
-            f"{name}@0",
+            name,
             "outline",
             {
                 "elements": elements,
@@ -1366,13 +1283,16 @@ def context(
                 "tabs": tabs,
             },
         ],
-        [f"{name}@0", "depth", {"z_min": _r(out_levels[-1])}],
-        [f"{name}@0", "keep_out", {"radius": r8, "boxes": jaws}],
-        [f"{name}@2", "rapids_clear", {"z_top": hub_t}],
-        [f"{name}@2", "air_feed", {"z_top": hub_t}],
-        [f"{name}@2", "depth", {"z_min": _r(-through)}],
+        [name, "keep_out", {"radius": r8, "boxes": jaws}],
+    ]
+    # CL07 carries on with CL06's 1/8 in end mill: no M6 at all.
+    name = "CL07_hub"
+    expect += common(name, hub_t, [], [e8_rpm], -through)
+    expect += [
+        [name, "rapids_clear", {"z_top": hub_t}],
+        [name, "air_feed", {"z_top": hub_t}],
         [
-            f"{name}@2",
+            name,
             "outline",
             {
                 "elements": hub_elements,
@@ -1380,20 +1300,7 @@ def context(
                 "passes": [{"offset": r8, "levels": [_r(z) for z in hub_levels]}],
             },
         ],
-        [f"{name}@2", "keep_out", {"radius": r8, "boxes": jaws}],
-        [f"{name}@1", "rapids_clear", {"z_top": floor_a}],
-        [f"{name}@1", "air_feed", {"z_top": floor_a}],
-        [f"{name}@1", "depth", {"z_min": _r(root_levels[-1])}],
-        [
-            f"{name}@1",
-            "outline",
-            {
-                "elements": root_elements,
-                "z_top": floor_a,
-                "passes": [{"offset": r5, "levels": [_r(z) for z in root_levels]}],
-            },
-        ],
-        [f"{name}@1", "keep_out", {"radius": r5, "boxes": jaws}],
+        [name, "keep_out", {"radius": r8, "boxes": jaws}],
     ]
 
     return {

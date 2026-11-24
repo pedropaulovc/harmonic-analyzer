@@ -3010,7 +3010,7 @@ DRUM_TIP_TO_END_DISC_STACK = {
 # with the strip's aft edge flush (pinion_rig_layout).  Each term moves the
 # strip's front edge south, toward the gear.
 SPRING_TO_J19_STACK = {
-    "rig-set leaf D, thinnest setting": RIG.FEELER_SET_ERROR,
+    "rig-set leaf D, thinnest setting": RIG.RIG_SET_ERROR,
     "MHA-DT-14 strap thickness .XX, thinnest": -printed_deviations(
         STRAP_T, STRAP_T_PLACES, unit=STRAP_UNIT
     )[0],

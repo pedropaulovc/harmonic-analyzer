@@ -121,6 +121,8 @@ from pn_pen_v_block_spec import (
     DRAWING_PRECISION_BY_NAME,
     INSIDE_CORNER_R_MAX,
     ISOMETRIC_VIEW_SCALE,
+    NECK_BREAK_FULL_X,
+    NECK_EDGE_BREAK,
     NECK_DEPTH,
     PIVOT_BORE_BAND,
     PIVOT_BORE_DIA,
@@ -318,6 +320,13 @@ _TEXT_SETTLE_M = 0.0005
 #   they ran across the whole end face).
 # * the flat's height, a reference "(.20)", right of the view (x
 #   ~0.283..0.292), 12 mm clear of section A-A (from x 0.306).
+# * the back neck edge's break, "2X .080" over "X 45°" with "CLEARS
+#   MHA-PN-01" above (owner seat ruling 2026-11-23): its run along the top
+#   (x 0.2594..0.2676, the view's top at y 0.228), its text centred at x
+#   0.270 (rows ~0.248..0.292 wide at most) 16 mm over the top: its line
+#   ~8 mm over the top face, the block to ~0.252, 10 mm right of the tap
+#   callout's rows (to x ~0.236), 12 mm left of section A-A's pivot
+#   station and chamfer rows (from x 0.302) and 15 mm under the border.
 _END_ROW = 0.007
 # The flank's continuation past the corner runs down-right at the flank's
 # angle under the bottom face's line; the arc stands on the bisector between.
@@ -334,6 +343,7 @@ RIGHT_KEEP = {
     ),
     "VFlatWidth": (RIGHT_CENTER[0], _ry(V_FLAT_Y) - 0.0066),
     "VFlatY": (_rz(BODY_Z1) + 0.012, _ry(V_FLAT_Y / 2.0)),
+    "NeckBreak": (0.270, _ry(BLOCK_HEIGHT) + 0.016),
 }
 # Bottom (front faces at the top, y 0.128 for the body's, 0.1196 for the
 # neck's):
@@ -380,6 +390,9 @@ BOTTOM_KEEP = {
         (_bz(NECK_DEPTH) + _bz(DEPTH_MID_Z)) / 2.0,
     ),
     "PivotDia": (_fx(0.0) + 0.040, _bz(NECK_DEPTH) - 0.0067),
+    # The step corners' 2X R.065 inside the slot's open bottom, left of the
+    # step and the bore, its leader up-right to the near wall's corner.
+    "ReliefCornerR": (_fx(RELIEF_X0) - 0.040, _bz(RELIEF_Z0) - 0.012),
 }
 # Section A-A looks the same way as the paper-end view beside it: the body's
 # front face at x 0.306 on the LEFT, the bottom face at y 0.156, the top at
@@ -907,6 +920,32 @@ requirement(
     },
     precision={"station": _P["ReliefX0"]},
 )
+# The neck's two top edges broken 2X .080 X 45° (.075-.085; RIGHT_KEEP),
+# CLEARS MHA-PN-01 (owner seat ruling 2026-11-23): full from the paper end
+# to full_to_x, where the chamfer mill is fed up; past it the cone's run-out.
+_BREAK_Y = BLOCK_HEIGHT - NECK_EDGE_BREAK
+requirement(
+    "neck_edge_breaks",
+    kind="chamfer",
+    faces=(
+        PlanarFace((0.0, 1.0, -1.0), _BREAK_Y / math.sqrt(2.0)),
+        PlanarFace((0.0, 1.0, 1.0), (_BREAK_Y + NECK_DEPTH) / math.sqrt(2.0)),
+    ),
+    requirements=("leg",),
+    fields={
+        "axis": ((1.0, 0.0, 0.0), (_FRAME,)),
+        "leg": _printed(
+            "NeckBreak", NECK_EDGE_BREAK, "NECK_EDGE_BREAK", (_SELF, "RIGHT_KEEP")
+        ),
+        "leg_nominal": (NECK_EDGE_BREAK, ("NECK_EDGE_BREAK",)),
+        "angle_deg": (45.0, ("DIMENSION_CALLOUTS",)),
+        "count": (2, ("DIMENSION_PREFIXES",)),
+        "edges": (["neck_front", "neck_back"], ("NECK_DEPTH",)),
+        "full_to_x": (NECK_BREAK_FULL_X, ("NECK_BREAK_FULL_X",)),
+        "note": (DIMENSION_CALLOUTS_ABOVE["NeckBreak"], ("DIMENSION_CALLOUTS_ABOVE",)),
+    },
+    precision={"leg": _P["NeckBreak"]},
+)
 # The grip's V along the neck's bottom, open at the paper end and run to the
 # step: each flank 2X 45° to the bottom face, its mouth edges .19 and .67
 # from the body's front face, the apex flat .08 wide at (.20) (RIGHT_KEEP).
@@ -969,7 +1008,8 @@ requirement(
 # The relief slot under the body, open at the far end and the bottom: its
 # walls .12 and .74 from the body's front face and roof .26 from the bottom
 # (SECTION_KEEP), its end wall at the step .35 from the paper end; the two
-# corners at the step take the title block's R.040 MAX.
+# corners at the step print 2X R.065 (BOTTOM_KEEP ReliefCornerR; owner ruling
+# 2026-11-23, tool audit Q9).
 _RELIEF_ARC = 0.3 * RELIEF_CORNER_R
 requirement(
     "relief",
@@ -990,7 +1030,7 @@ requirement(
             contains_z_mm=RELIEF_Z1 - _RELIEF_ARC,
         ),
     ),
-    requirements=("near_wall", "far_wall", "height", "station", "corner_r_max"),
+    requirements=("near_wall", "far_wall", "height", "station", "corner_r"),
     fields={
         "axis": ((1.0, 0.0, 0.0), (_FRAME,)),
         "near_wall": _printed(
@@ -1011,14 +1051,18 @@ requirement(
         "station": _printed("ReliefX0", RELIEF_X0, "RELIEF_X0", (_SELF, "BOTTOM_KEEP")),
         "station_nominal": (RELIEF_X0, ("RELIEF_X0",)),
         "station_from": ("paper_end", ((_SELF, "BOTTOM_KEEP"),)),
-        "corner_r_max": (INSIDE_CORNER_R_MAX, ("INSIDE_CORNER_R_MAX",)),
-        "corner_r_model": (RELIEF_CORNER_R, ("RELIEF_CORNER_R",)),
+        "corner_r": _printed(
+            "ReliefCornerR", RELIEF_CORNER_R, "RELIEF_CORNER_R", (_SELF, "BOTTOM_KEEP")
+        ),
+        "corner_r_nominal": (RELIEF_CORNER_R, ("RELIEF_CORNER_R",)),
+        "corner_count": (2, ("DIMENSION_PREFIXES",)),
     },
     precision={
         "near_wall": _P["ReliefZ0"],
         "far_wall": _P["ReliefZ1"],
         "height": _P["ReliefHeight"],
         "station": _P["ReliefX0"],
+        "corner_r": _P["ReliefCornerR"],
     },
 )
 # The pivot bore, reamed down from the top face through into the relief:

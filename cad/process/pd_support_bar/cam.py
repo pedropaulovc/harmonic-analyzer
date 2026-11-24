@@ -654,11 +654,12 @@ def context(
     em = em_record["diameter_mm"]
     r = em / 2
     step_max = p["face_stepover_max_mm"]
-    face_rpm, face_feed = _setting(plan, shop, "top face")
     for name in ("top face", "end a"):
         _same(plan, name, "cutter_dia_mm", em, "the end mill's diameter")
-        if _setting(plan, shop, name) != (face_rpm, face_feed):
-            raise ValueError(f"'{name}' runs at another setting than 'top face'")
+    # The top skim runs at its measured setting, END A (deeper than it was
+    # measured) at the chart's.
+    face_rpm, face_feed = _setting(plan, shop, "top face")
+    end_rpm, end_feed = _setting(plan, shop, "end a")
     _agree(plan, "face_cutter_dia_mm", em)
     _same(plan, "top face", "radial_woc_mm", step_max, "process.face_stepover_max_mm")
     _same(plan, "top face", "axial_doc_mm", level_max, "process.face_step_max_mm")
@@ -674,6 +675,14 @@ def context(
     _same(plan, "end a", "axial_doc_mm", -end_z, "process.end_axial_doc_mm")
     if em_record["flute_length_mm"] < -end_z:
         raise ValueError("the 1/2 in end mill's flutes are shorter than END A's cut")
+    # The end mill's collet: its nose half_mill_projection_mm above the tip
+    # stays clear of the bar's top (over the jaws, the stacks and the pin)
+    # at the deepest end-mill cut, END A's one level.
+    em_depth = max(width_max - height, -end_z)
+    if p["half_mill_projection_mm"] < em_depth + CLEAR_MM:
+        raise ValueError(
+            f"the 1/2 in end mill's collet would reach the bar {em_depth:.3f} below its top"
+        )
     end_faces = _end_stations(skim, 0.0, end_step)
 
     # Holes: the spot under every drill; each cutter against its hole's
@@ -993,6 +1002,7 @@ def context(
         "feed": face_feed,
         "plunge": face_feed,
     }
+    end_tool = {**em_tool, "rpm": end_rpm, "feed": end_feed, "plunge": end_feed}
 
     def point_tool(tool: str, dia: float, cut: str, angle: float) -> dict[str, Any]:
         rpm, feed = speeds[cut]
@@ -1046,7 +1056,7 @@ def context(
             ],
         },
         {
-            **em_tool,
+            **end_tool,
             "frame": "a",
             "label": "end a",
             "stock": stocks["a"],
@@ -1287,7 +1297,7 @@ def context(
         ["keep_out", {"radius": r, "boxes": keep["a"]}],
     ]
     sb03 = [
-        (face_rpm, end_checks),
+        (end_rpm, end_checks),
         (
             speeds["spot"][0],
             hole_checks(

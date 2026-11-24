@@ -457,7 +457,7 @@ requirement(
         "overall_height_ref": _P["OverallHeight"],
     },
 )
-# The shaft bore, reamed through the lug from its outer face: Ø.2550
+# The shaft bore, reamed through the lug from its outer face: Ø.2560
 # +.0010/.0000 REAM THRU, SLIDING FIT ON MHA-CH-04 (RIGHT_KEEP "BoreDia"); its
 # axis .99 off the seat (RIGHT_KEEP "LugRise") and on the width's centre
 # plane within ±.012 (RIGHT_KEEP "BoreFromSide": the (.275) reference off the

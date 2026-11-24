@@ -85,7 +85,7 @@ def test_the_plan_is_an_enrolled_traveler_and_cam_stem() -> None:
     assert PLAN["revision"] != "placeholder"
     assert STEM in _process_plans.enrolled_stems()
     assert STEM in _cam_programs.CAM_STEMS
-    assert {"plugs"} <= {
+    assert {"pins"} <= {
         t["id"] for t in PLAN["tools"] if t.get("status") == "to_order"
     }
 

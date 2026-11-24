@@ -93,7 +93,6 @@ def test_context_numbers_the_tools_and_places_the_cuts(ctx) -> None:
         "drill-21": 5,
         "drill-d": 6,
         "reamer-2560": 7,
-        "em-5-64": 8,
     }
     holes = {
         program: (kwargs["centres"], kwargs["z_bottom"])
@@ -115,7 +114,7 @@ def test_context_numbers_the_tools_and_places_the_cuts(ctx) -> None:
     assert holes["CL03_bore@1"][1] == -2.377
     # Seven tabs per lever, each .050 thick on the plate's near face.
     outline = next(
-        kw for p, c, kw in ctx["expect"] if p == "CL06_outline@0" and c == "outline"
+        kw for p, c, kw in ctx["expect"] if p == "CL06_outline" and c == "outline"
     )
     assert len(outline["tabs"]) == 28
     assert {(t["top"], t["floor"], t["thickness"]) for t in outline["tabs"]} == {
@@ -128,6 +127,38 @@ def test_the_recipes_programs_pass_every_check_they_declare(ctx, tmp_path) -> No
     assert _findings(ctx, tmp_path) == []
     times = cam_nc.cycle_times(RECIPE.expectations(ctx), tmp_path)
     assert set(times) == {name for name, _ops in RECIPE.PROGRAMS}
+
+
+def test_the_1_8_end_mill_leaves_the_roots_and_rounds_the_hubs_unchanged(ctx) -> None:
+    """Owner ruling 2026-11-23, tool audit Q9: no 5/64 in cutter; the 1/8 in
+    outline leaves the roots at its own R.0625 inside the printed .060-.070.
+    The hub rounding is its own program on the same tool, with no tool
+    change: each load runs two M6 fewer (T8 in, T2 back), 12 in all."""
+    names = [name for name, _ops in RECIPE.PROGRAMS]
+    assert names[-2:] == ["CL06_outline", "CL07_hub"]
+    assert RECIPE.LOAD_FIRST_TOOL == tuple(names[:-1])
+    changes = {
+        program: kwargs
+        for program, check, kwargs in ctx["expect"]
+        if check == "tool_changes"
+    }
+    assert changes["CL06_outline"]["tools"] == [2]
+    assert changes["CL06_outline"]["loads_first"] is True
+    assert changes["CL07_hub"]["tools"] == []
+    assert changes["CL07_hub"]["loads_first"] is False
+    assert sum(len(kwargs["tools"]) for kwargs in changes.values()) == 12
+    band = FEATURES["features"]["outline"]["root_corner_r"]
+    assert band == pytest.approx([0.060 * 25.4, 0.070 * 25.4])
+    eighth = SHOP["tools"]["endmill-carbide-3fl-1-8"]["diameter_mm"] / 2
+    assert band[0] < eighth < band[1]
+    assert "em-5-64" not in {tool["id"] for tool in PLAN["tools"]}
+
+
+def test_a_root_band_the_1_8_end_mill_cannot_leave_is_refused() -> None:
+    features = copy.deepcopy(FEATURES)
+    features["features"]["outline"]["root_corner_r"] = [0.9, 1.016]
+    with pytest.raises(ValueError, match="outside the root corners' band"):
+        RECIPE.context(features, PLAN, SHOP, "lever.step")
 
 
 @pytest.mark.parametrize(
@@ -149,7 +180,6 @@ def test_the_recipes_programs_pass_every_check_they_declare(ctx, tmp_path) -> No
         ({"ring_half_angle_deg": 50}, "short of the bar-to-hub roots"),
         ({"ring_outer_radius_mm": 8.5}, "reach the slot arc"),
         ({"tab_bottom_2_x_mm": 140}, "taper's corner"),
-        ({"inside_corner_max_mm": 0.9}, "inside-corner ceiling"),
     ],
 )
 def test_a_plan_number_off_the_model_or_shop_is_refused(changes, detail) -> None:
@@ -196,8 +226,8 @@ def _seed(ctx: dict, key: str, pick, change) -> dict:
         # A face row skipped: a strip of B left standing.
         (
             "face_b",
-            lambda line: line.startswith("G1 Y-85.795"),
-            lambda line: "G1 Y-78.527 F{feed}",
+            lambda line: line.startswith("G1 Y-84.810"),
+            lambda line: "G1 Y-81.520 F{feed}",
             "face",
         ),
         # The D drill stopped short of the plate.
@@ -214,11 +244,11 @@ def _seed(ctx: dict, key: str, pick, change) -> dict:
             lambda line: "G0 Z8.633",
             "feed_out",
         ),
-        # A root pass run 0.3 mm into the bar's edge.
+        # The first hub level cut at 5.000: a full-depth bite round the hub.
         (
-            "roots",
-            lambda line: line == "G1 X15.820 Y-7.009 F{feed}",
-            lambda line: "G1 X15.820 Y-7.309 F{feed}",
+            "outline_hub",
+            lambda line: line.startswith("G1 Z"),
+            lambda line: "G1 Z5.000 F{feed}",
             "outline",
         ),
     ],

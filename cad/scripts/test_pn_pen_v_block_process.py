@@ -102,7 +102,7 @@ def test_context_accepts_the_plan_and_numbers_the_tools(ctx) -> None:
     assert ctx["numbers"] == {
         "em-half": 1,
         "chamfer": 2,
-        "em-5-64": 3,
+        "em-eighth": 3,
         "spot": 4,
         "drill-32": 5,
         "reamer": 6,
@@ -141,6 +141,64 @@ def test_the_v_passes_put_the_cone_on_both_flanks(ctx) -> None:
     flat = FEATURES["features"]["v_groove"]["flat_width_nominal"] / 2
     assert v["passes"][-1][1][-1] == pytest.approx(flat)
     assert math.isclose(v["centre_y"], -10.922, abs_tol=1e-6)
+
+
+def test_the_tip_sweeps_the_flat_edge_to_edge_within_the_ridge_limit(ctx) -> None:
+    """Owner ruling 2026-11-23, tool audit Q9: no 5/64 cutter. The chamfer
+    mill's point sweeps the flat at the last level, its outer passes on the
+    flat's edges (the flat at its nominal .080, inside its printed .07-.09),
+    the passes no further apart than twice the ridge limit: a 90° cone's
+    ridge between two tip passes stands half their spacing."""
+    v = ctx["v"]
+    groove = FEATURES["features"]["v_groove"]
+    half = groove["flat_width_nominal"] / 2
+    flat = v["flat"]
+    assert flat[0] == pytest.approx(-half) and flat[-1] == pytest.approx(half)
+    lo, hi = groove["flat_width"]
+    assert lo <= flat[-1] - flat[0] <= hi
+    spacing = max(b - a for a, b in zip(flat, flat[1:]))
+    assert spacing / 2 <= RECIPE.V_FLAT_RIDGE_MAX_MM + 1e-9
+    assert spacing == pytest.approx(PLAN["parameters"]["v_flat_stepover_mm"])
+    assert len(flat) == 41
+
+
+def test_the_neck_breaks_run_each_neck_face_to_the_stop(ctx) -> None:
+    """Owner seat ruling 2026-11-23: the neck's two top edges .080 X 45°
+    with the chamfer mill. Its point runs along each neck face (VB06 Y
+    -.080 and -.780 from the front face) in three equal levels to the .080
+    leg, from a ramp beside P to the export's stop (.33), and is fed up
+    there; the whole cone starts clear of P."""
+    lines = next(
+        op[2] for job in ctx["jobs"] for op in job["ops"] if op[0] == "neck_breaks"
+    )
+    job = next(job for job in ctx["jobs"] if job["ops"][0][0] == "bore_chamfer")
+    assert [op[0] for op in job["ops"]] == ["bore_chamfer", "neck_breaks"]
+    breaks = FEATURES["features"]["neck_edge_breaks"]
+    height = FEATURES["features"]["top_face"]["plane"]["value"]
+    ramps = [line for line in lines if line.startswith("G1 X-5.715 Z")]
+    depths = sorted(
+        {round(height - float(line.split("Z")[1].split()[0]), 3) for line in ramps}
+    )
+    assert depths == pytest.approx([0.677, 1.355, 2.032])
+    assert len(ramps) == 6
+    stops = [line for line in lines if line.startswith("G1 X") and " Z" not in line]
+    assert stops == [f"G1 X{breaks['full_to_x']:.3f} F{{feed}}"] * 6
+    ys = [line.split("Y")[1] for line in lines if line.startswith("G0 X")]
+    assert sorted(set(ys)) == ["-19.812", "-2.032"]
+    # The cone's top radius at the deepest level clears P at the ramp's end.
+    assert -5.715 + breaks["leg_nominal"] < 0.0
+
+
+def test_no_5_64_cutter_and_a_corner_cutter_off_the_corner_band_is_refused() -> None:
+    """The slot's step corners print R.065 (.060-.070): the 1/8 in end mill's
+    R.0625 is in the band; a 1/4 in end mill's R.125 is refused, and no tool
+    of the plan is the 5/64 in end mill."""
+    assert not any(tool["ref"] == "endmill-5-64-long" for tool in PLAN["tools"])
+    plan = copy.deepcopy(PLAN)
+    tool = next(t for t in plan["tools"] if t["id"] == "em-eighth")
+    tool["ref"] = "endmill-carbide-3fl-1-4"
+    with pytest.raises(ValueError, match="slot corners' printed band"):
+        _context(plan)
 
 
 def _v_plunge_xs(ctx: dict) -> list[float]:
@@ -194,6 +252,10 @@ def test_every_v_level_plunges_beside_p(stepover) -> None:
         ({"lying_grip_mm": 17.0}, "lying_grip_mm"),
         ({"v_level_mm": 0.8}, "level step"),
         ({"corner_cutter_dia_mm": 2.38125}, "the tool is"),
+        ({"corner_step_max_mm": 1.4}, "corner_step_max_mm"),
+        ({"v_flat_stepover_mm": 0.1}, "v_flat_stepover_mm"),
+        ({"break_level_mm": 1.016}, "break_level_mm"),
+        ({"break_full_to_mm": 8.89}, "break_full_to_mm"),
         # One inch parallels lying: the front step's floor sits at the jaw tops.
         (
             {
@@ -261,11 +323,13 @@ def _seed(ctx: dict, key: str, old: str, new: str) -> dict:
         ("bottom", "G1 X15.240 F{feed}", "G1 X8.000 F{feed}", "keep_out"),
         # The V's last level cut below the flat.
         ("v_groove", "G1 Z13.558 F{feed}", "G1 Z12.558 F{feed}", "depth"),
+        # The flat's middle tip pass moved .1 mm: a ridge over .001 in.
+        ("v_groove", "G1 Y-10.922 F{feed}", "G1 Y-10.822 F{feed}", "cleared"),
         # A corner pass into the slot's near wall.
         (
             "corners",
-            "G1 X9.882 Y-17.804 F{feed}",
-            "G1 X9.882 Y-18.300 F{feed}",
+            "G1 X10.478 Y-17.209 F{feed}",
+            "G1 X10.478 Y-18.300 F{feed}",
             "keep_out",
         ),
         # The #32 stopped short of the slot.
@@ -274,6 +338,18 @@ def _seed(ctx: dict, key: str, old: str, new: str) -> dict:
         ("bore_ream", "G1 Z19.000 F{feed}", "G0 Z19.000", "feed_out"),
         # A #43 peck re-entry rapided past the depth already drilled.
         ("tap_drill", "G0 Z20.312", "G0 Z18.000", "rapid"),
+        # A neck break run on past its stop, into the body.
+        ("neck_breaks", "G1 X8.382 F{feed}", "G1 X9.500 F{feed}", "keep_out"),
+        # A neck break plunged straight down instead of ramped beside P: a
+        # second hole in the bore chamfer's section.
+        ("neck_breaks", "G1 X-5.715 Z17.323 F{feed}", "G1 Z17.323 F{feed}", "holes"),
+        # A neck break's last level short of the leg.
+        (
+            "neck_breaks",
+            "G1 X-5.715 Z15.968 F{feed}",
+            "G1 X-5.715 Z16.200 F{feed}",
+            "cleared",
+        ),
         # A tap stop that holds (M0) instead of ending Idle.
         ("tap", "M30", "M0", "tap_stop"),
     ],

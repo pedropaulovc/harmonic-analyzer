@@ -138,6 +138,8 @@ def test_analytic_volumes_follow_the_fork_geometry() -> None:
         rod.boss_volume()
         - rod.slot_volume()
         + rod.inside_corner_volume()
+        + rod.shank_corner_volume()
+        + rod.step_corner_volume()
         - rod.strap_bore_volume()
         - rod.pin_hole_volume()
     )
@@ -149,12 +151,12 @@ def test_inside_corner_volume_is_the_fillets_closed_form() -> None:
     r = spec.INSIDE_CORNER_R
     square = r**2 * (1.0 - math.pi / 4.0)
     assert rod._fillet_area(r, math.pi / 2.0) == pytest.approx(square)
-    # A wider opening adds less; a straight wall adds nothing.
-    assert rod._fillet_area(r, rod.SHANK_RING_OPENING) < square
+    # A straight wall adds nothing.
     assert rod._fillet_area(r, math.pi) == pytest.approx(0.0, abs=1e-12)
-    edges = 2.0 * spec.FORK_WIDTH + 2.0 * spec.SHANK_WIDTH + 2.0 * spec.SHANK_THICKNESS
-    ring = rod._fillet_area(r, rod.SHANK_RING_OPENING) * 2.0 * spec.SHANK_THICKNESS
-    assert rod.inside_corner_volume() == pytest.approx(square * edges + ring)
+    # The slot floor's two corners across the fork, the two ledges where the
+    # shank's faces meet the root step across the shank.
+    edges = 2.0 * spec.FORK_WIDTH + 2.0 * spec.SHANK_WIDTH
+    assert rod.inside_corner_volume() == pytest.approx(square * edges)
     # #3114: the flank fillets run through the shank's thickness, not the
     # ring's. The two corners where a shank face meets the ring's OD stay
     # sharp: the ring stands .015 over the shank's near face, less than the
@@ -178,6 +180,124 @@ def test_inside_corner_volume_is_the_fillets_closed_form() -> None:
     assert rod.SHANK_NEAR_X == pytest.approx(1.778)
     assert rod.SHANK_FAR_X == pytest.approx(-1.524)
     assert rod.SHANK_NEAR_X - rod.SHANK_FAR_X == pytest.approx(spec.SHANK_THICKNESS)
+
+
+def _strip_area(lower, upper, x0: float, x1: float, steps: int = 20000) -> float:
+    """Area between ``lower(x)`` and ``upper(x)`` for x in [x0, x1]."""
+    dx = (x1 - x0) / steps
+    return sum(
+        (upper(x) - lower(x)) * dx for x in (x0 + (k + 0.5) * dx for k in range(steps))
+    )
+
+
+def test_q9_corner_volumes_are_the_cutters_sections() -> None:
+    """Owner ruling 2026-11-23, tool audit Q9: the shank's two corners on the
+    ring are R.065 fillets between the flank and the ring's OD, and its two
+    corners on the fork's step the 1/8 in cutter's arc run from the flank
+    onto the step's outer corner; each through the shank's thickness.
+    Checked against the areas integrated between the edges and the arcs."""
+    spec = ch_connecting_rod_spec
+    r = ch_connecting_rod_notes.SHANK_CORNER_R
+    half, big = spec.SHANK_WIDTH / 2.0, spec.RING_OUTER_RADIUS
+    cx = half + r
+    # Ring corner: over the OD, under the fillet's arc, out from the flank
+    # to the fillet's tangent point on the ring.
+    cy = math.sqrt((big + r) ** 2 - cx**2)
+    ring = _strip_area(
+        lambda x: math.sqrt(big**2 - x**2),
+        lambda x: cy - math.sqrt(max(r**2 - (x - cx) ** 2, 0.0)),
+        half,
+        cx * big / (big + r),
+    )
+    assert rod.shank_corner_volume() == pytest.approx(
+        2.0 * ring * spec.SHANK_THICKNESS, rel=1e-4
+    )
+    # Step corner: under the step, over the cutter's arc, from the flank out
+    # to the step's outer corner.
+    step, base = rod.FORK_STEP, spec.FORK_BASE_Y
+    low = base - math.sqrt(r**2 - (r - step) ** 2)
+    corner = _strip_area(
+        lambda x: low + math.sqrt(max(r**2 - (x - cx) ** 2, 0.0)),
+        lambda x: base,
+        half,
+        half + step,
+    )
+    assert rod.step_corner_volume() == pytest.approx(
+        2.0 * corner * spec.SHANK_THICKNESS, rel=1e-4
+    )
+
+
+def test_q9_shank_corners_print_one_local_limit_with_its_reason() -> None:
+    """Owner ruling 2026-11-23, tool audit Q9: "Print a local corner limit
+    R.065 (.060-.070), cut with the 1/8 end mill; no 5/64 cutter". One
+    native radius prints 4X R.065 at three places (the title block's .XXX
+    is .060-.070) with its reason beneath it; one global drives the ring
+    corners' fillet and the step corners' arcs, so it is all four's."""
+    notes = ch_connecting_rod_notes
+    assert notes.SHANK_CORNER_R == pytest.approx(_in(0.065))
+    assert notes.DRAWING_DIMENSIONS["ShankCorners"] == {"ShankCornerR"}
+    assert notes.DRAWING_PRECISION["ShankCorners"] == {"ShankCornerR": 3}
+    assert notes.DIMENSION_PREFIXES == {("ShankCorners", "ShankCornerR"): "4X R"}
+    assert drawing.FRONT_CALLOUTS["ShankCornerR"] == "NOTHING SEATS IN\nTHESE CORNERS"
+    assert "ShankCornerR" in drawing.FRONT_KEEP
+    assert rod.SHANK_CORNER_R_LIMITS == pytest.approx((_in(0.060), _in(0.070)))
+    source = Path(rod.__file__).read_text(encoding="utf-8")
+    assert "(shank_corner_dim[0], '\"CornerR\"')" in source
+    assert "step_sd.record(f\"StepCornerR{suffix}\", '\"CornerR\"')" in source
+    assert 'name_last_feature(adapter, "StepCorners")' in source
+
+
+def test_q9_corners_hold_every_margin_at_their_greatest_radius() -> None:
+    """Owner ruling 2026-11-23, tool audit Q9, judged at the printed R.070.
+    The corners add metal, so no wall thins: the shank's least section stays
+    its width by its thickness, and the fork, its tines, the bridge and the
+    pin hole's walls stand above the root step, where no corner reaches.
+    Every corner lies inside the shank's two faces, so the cam slot's tooth
+    discs (on the ring's faces) and the neighbouring rods (off the fork's
+    faces) meet nothing new. The step corners stand at or below the root
+    step and inside the fork's sides, under the arm by its least clearance
+    over the slot floor plus the bridge."""
+    import sh_vn_pivot_pin_rod_spec as pin
+    from _milled_corner_limit import runout_rise
+    from _printed_tolerance import inside_corner_radius_mm
+
+    spec = ch_connecting_rod_spec
+    least, greatest = rod.SHANK_CORNER_R_LIMITS
+    assert inside_corner_radius_mm(unit=spec.UNIT) < least
+    # The step (.035) is narrower than the least radius: the cutter's arc
+    # runs onto its outer corner at every radius the print allows, leaving
+    # the flank .0606 below the step at R.070.
+    assert rod.FORK_STEP == pytest.approx(_in(0.035))
+    assert rod.FORK_STEP < least
+    assert rod.FORK_STEP + spec.SHANK_WIDTH / 2.0 == pytest.approx(spec.FORK_WIDTH / 2.0)
+    rise = runout_rise(greatest, rod.FORK_STEP)
+    assert rise == pytest.approx(_in(0.0606), abs=_in(0.0001))
+    # The ring corner's metal on its bisector (the OD taken as its tangent):
+    # .0204 at R.070, .0090 more than the 5/64 in end mill's R.039 left.
+    half, big = spec.SHANK_WIDTH / 2.0, spec.RING_OUTER_RADIUS
+    opening = math.pi / 2.0 + math.asin(half / big)
+    assert math.degrees(opening) == pytest.approx(101.5, abs=0.05)
+
+    def bisector(radius: float) -> float:
+        return radius * (1.0 / math.sin(opening / 2.0) - 1.0)
+
+    assert bisector(greatest) == pytest.approx(_in(0.0204), abs=_in(0.0001))
+    assert bisector(greatest) - bisector(_in(0.039)) == pytest.approx(
+        _in(0.0090), abs=_in(0.0001)
+    )
+    # The two corners on a flank stay apart along it.
+    ring_tangent_y = math.sqrt((big + greatest) ** 2 - (half + greatest) ** 2)
+    assert ring_tangent_y < spec.FORK_BASE_Y - rise
+    # Inside the shank's faces: the corner features run the shank's
+    # thickness on its own mid-plane, at least SHANK_INSIDE_RING_MIN (.001)
+    # inside each ring face.
+    assert rod.SHANK_MID_Z == pytest.approx(-(rod.SHANK_NEAR_X + rod.SHANK_FAR_X) / 2.0)
+    assert min(spec.SHANK_INSIDE_RING_MIN) == pytest.approx(_in(0.001))
+    # The arm: over the slot floor by its least clearance, the floor over the
+    # root step by the least bridge: 4.876 mm over the step corners.
+    arm_gap = pin.BUDGET["crotch_clearance_min"] + pin.BUDGET["bridge_min"]
+    assert arm_gap == pytest.approx(4.876, abs=1e-3)
+    assert arm_gap > pin.CROTCH_CLEARANCE_MIN
 
 
 def test_pin_hole_is_the_reamed_press_hole_for_the_rod_pivot_pin() -> None:
@@ -417,12 +537,14 @@ def test_ring_and_shank_locate_from_the_fork_face_and_print_their_thickness() ->
 
 
 def test_inside_corners_are_one_modelled_radius_under_the_title_block() -> None:
-    """#982 review r1 (drawing-guidelines.md rule 16): the slot floor, the
-    fork's root step and the shank's run onto the ring had sharp inside
-    corners. One fillet carries them all. The ENFORCE review found the
+    """#982 review r1 (drawing-guidelines.md rule 16): the slot floor and the
+    fork's root step had sharp inside corners. One fillet carries the slot
+    floor's and the root step's ledges. The ENFORCE review found the
     printed all-corners R0.5 MAX a needless tightening of the title block's
     INSIDE CORNERS R.040 MAX, so the title block governs; that ceiling still
-    stands under the arm's least clearance over the slot floor."""
+    stands under the arm's least clearance over the slot floor. The shank's
+    four corners print their own R.065 (owner ruling 2026-11-23, tool audit
+    Q9)."""
     import sh_vn_pivot_pin_rod_spec as pin
     from _printed_tolerance import inside_corner_radius_mm
 
@@ -870,11 +992,13 @@ def test_the_rod_is_a_feature_export_part_with_one_owner_per_face() -> None:
                 if any(selector.matches(face) for selector in specs)
             ]
             assert owners == [name], name
-    # The model's R0.5 inside-corner fillets belong to no feature.
-    fillet = _cylinder(2 * spec.INSIDE_CORNER_R, spec.FORK_CROTCH_Y)
-    assert not any(
-        selector.matches(fillet) for specs in selectors.values() for selector in specs
-    )
+    # The model's R0.5 inside-corner fillets and its R.065 shank corners
+    # belong to no feature.
+    for radius in (spec.INSIDE_CORNER_R, ch_connecting_rod_notes.SHANK_CORNER_R):
+        fillet = _cylinder(2 * radius, spec.FORK_CROTCH_Y)
+        assert not any(
+            selector.matches(fillet) for specs in selectors.values() for selector in specs
+        )
 
 
 def test_rod_feature_bands_are_the_printed_ones() -> None:
@@ -901,6 +1025,10 @@ def test_rod_feature_bands_are_the_printed_ones() -> None:
         assert slot[side] == pytest.approx([_in(0.065), _in(0.069)])
     assert slot["depth"] == pytest.approx([_in(0.57), _in(0.59)])
     assert slot["corner_radius_max"] == pytest.approx(_in(0.040))
+    flank = features["shank_right_flank"]
+    assert flank["corner_r"] == pytest.approx([_in(0.060), _in(0.070)])
+    assert flank["corner_count"] == 4
+    assert flank["corner_callout"] == drawing.FRONT_CALLOUTS["ShankCornerR"]
     bore, pin = features["strap_bore"], features["pin_hole"]
     assert bore["dia"] == pytest.approx([_in(1.213), _in(1.216)])
     assert bore["datum"] == "A" and bore["finish_ra"] == pytest.approx(1.6)

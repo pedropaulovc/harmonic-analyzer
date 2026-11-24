@@ -43,6 +43,8 @@ note = "Owner inventory 2026-11-13; lathe boring bar."
 # (a Micro 100 Micro-Quik holder, or a 1/4 in ID sleeve in the tool post's
 # boring-bar holder): none is on record.
 [tools.boring-bar-micro100-bb-180500s]
+source = "https://www.dixie-tool.com/right-hand-0-1800-min-bore-dia-x-0-500-1-2-max-bore-depth-x-0-1500-tooth-width-x-0-0450-projection-x-2-50-2-1-2-overall-length-bb-180500s/"
+purchase = "Dixie Tool MIC100-BB-180500S, $48.25 (read live 2026-11-22; the listing states .1800 in minimum bore, .500 in maximum bore depth, 2-1/2 in overall). Travers 20-471-272, $48.24. The 1/4 in shank holder is still not chosen."
 name = "Micro 100 BB-180500S solid carbide boring bar, sharp corner, .196 min bore x .500 deep, 1/4 in shank"
 kind = "boring_bar"
 sku = "BB-180500S"
@@ -55,6 +57,8 @@ note = "To buy, with a 1/4 in shank holder or sleeve (not on record). Supplier f
 # 2026-11-21): 3/16 in 90° pointed 2-flute solid carbide chamfer cutter,
 # 3/16 in shank, double ended.
 [tools.chamfer-mill-3-16-90]
+source = "https://www.dixie-tool.com/0-1875-3-16-shank-dia-x-45-per-side-de-2-fl-altin-coated-902345-c3/"
+purchase = "Dixie Tool HARTO1-902345-C3, $67.20 (read live 2026-11-22). The uncoated 902345 is $54.60 there."
 name = "Harvey Tool 902345-C3 3/16 in 90 deg pointed 2-flute carbide chamfer cutter, double ended"
 kind = "chamfer_mill"
 sku = "902345-C3"
@@ -178,6 +182,14 @@ kind = "endmill"
 status = "on_hand"
 note = "In the shop: measured on the owner's PM-30MV, dechatter 0.3.0 report v11, 2026-11-12, a 1/2 in 2-flute HSS end mill (48.8 mm stickout, R8) side-milling 6061 (cad/process/dechatter/2026-11-12-pm30mv-em-half-hss-6061-v11.html; cad/process/shop/ settings.basebar-edge-6061-t6511)."
 
+# The MHA-PD-07 support bar's counterbore cutter: the 5/16 in 2-flute of the
+# owned end mill set. Its description is cad/process/shop/
+# tools.basebar-counterbore, same key.
+[tools.basebar-counterbore]
+kind = "endmill"
+status = "on_hand"
+note = "The 5/16 in centre-cutting 2-flute end mill of the owned 20-piece set (tools.endmills-lms-6784, sizes_in 2_and_4_flute 5/16): cad/process/pd_support_bar/plan.toml counterbores clamp holes 1 and 2 with it. No purchase (#3429)."
+
 # --- carrier (MHA-CH-06-TL-21) plan workholding, tools and gauges ---------
 
 # Traveler tools the shop owns (owner, Pedro, 2026-11-19): the centre drill,
@@ -205,6 +217,14 @@ kind = "drill"
 status = "on_hand"
 source = "owner 2026-11-19"
 
+# The MHA-MG-06 output fixture's G drill; its shank is the clamp bore's NO-GO
+# (gauges.clamp-bore-drill-shanks). Its description is cad/process/shop/
+# tools.clamp-drill-g, same key.
+[tools.clamp-drill-g]
+kind = "drill"
+status = "on_hand"
+note = "The G (.261 in) drill of the owned 115-piece index (owner 2026-11-17, as gauges.clamp-bore-drill-shanks records): cad/process/mg_output_fixture/plan.toml. No purchase (#3429)."
+
 [tools.drill-25-64]
 kind = "drill"
 status = "on_hand"
@@ -223,7 +243,8 @@ source = "owner 2026-11-19"
 # --- 82° countersink (riser plan, then the index-plate and arm-plate plans) --
 
 # Same key as its prechips record in cad/process/shop/, which holds the
-# identity (one fact in one file); this record holds only ownership and use.
+# identity (one fact in one file); this record holds ownership, use and the
+# purchase read.
 # Owner decision 2026-11-13: buy two 82° countersinks, 3/16 in and 3/8 in;
 # the owned 330CH 1/4 in 90° chamfer mill is the wrong angle. The oblique
 # jig's riser and kit tools (12 mm drill, the 3/16 in kit countersink,
@@ -231,6 +252,10 @@ source = "owner 2026-11-19"
 # jack) left the buy list with the jig (owner 2026-11-17; #3083 row 20, owner
 # ruling 2026-11-20) and their records are removed.
 [tools.riser-countersink]
+make = "M.A. Ford"
+sku = "07-055-036"
+source = "https://www.travers.com/product/ma-ford-61037502-single-flute-countersink-07-055-036"
+purchase = "Travers 07-055-036, M.A. Ford 61037502 3/8 in 82 deg HSS single-flute countersink, 1/4 in shank, 2 in overall, $14.60, in stock (read live 2026-11-22). Import alternatives: Travers 07-031-024, $8.09; LittleMachineShop 4536, $6.95."
 kind = "countersink"
 status = "to_order"
 note = "Not owned: to buy. The 3/8 in 82° countersink: MHA-DT-03-TL-01 index plate (.35 x 82°) and MHA-PD-19 arm plate (Ø.312 x 82°) plans."
@@ -238,8 +263,12 @@ note = "Not owned: to buy. The 3/8 in 82° countersink: MHA-DT-03-TL-01 index pl
 # MHA-PD-19 K's face-A chamfer, cut by hand (delegated ruling 2026-11-22,
 # Main, owner review #2144: option C). The owned deburring set (tools-hand
 # deburring-set, McMaster 4289A78) has a countersink blade, but its angle is
-# not on record, so a 90° one is to buy. No part number or price read.
+# not on record, so a 90° one is to buy.
 [tools.hand-countersink-90]
+make = "Noga"
+sku = "99-000-151"
+source = "https://www.travers.com/product/noga-rc2000-deburring-blade-99-000-151"
+purchase = "Travers 99-000-151, Noga RC2000 reversible hand countersink (handle with the 90 deg HSS countersink blade), $27.06, in stock (read live 2026-11-22). The blade's diameter is not stated on the listing read: confirm it is over K's .4775 rim on receipt."
 kind = "countersink"
 status = "to_order"
 cite = ["McMaster-Carr, Hole Deburring Tools (read 2026-11-23): hand countersinks with handles, 90° variants: https://www.mcmaster.com/products/hole-deburring-tools/"]
