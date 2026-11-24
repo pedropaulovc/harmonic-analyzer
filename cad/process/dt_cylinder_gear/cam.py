@@ -72,6 +72,9 @@ CAM_TOOLS = ("cutter", "saw")
 IN = 25.4
 # Seconds the spindle runs up after each restart before the cutter moves.
 DWELL_S = 2
+# Least room GP01's park leaves between the cutter's rim and the tips for the
+# depth check: a 2-3 in micrometer's anvil and frame over the pin (1.50 in).
+MEASURE_ROOM_MM = 38.1
 # Shapes the tools must miss stand this high (every move is at Z0).
 SHAPE_TOP_MM = 1000.0
 # How far the tailstock and the chuck reach along X from their faces (any
@@ -471,6 +474,12 @@ def context(
         raise ValueError(f"plan tools lack {missing}")
 
     clear = p["clear_y_mm"]
+    park = p["measure_park_y_mm"]
+    if park > -MEASURE_ROOM_MM:
+        raise ValueError(
+            f"GP01 parks the cutter {-park:.2f} mm back from the tips: under the {MEASURE_ROOM_MM:g} mm "
+            "the micrometer needs over the pin"
+        )
     rpm_word = f"M3 S{cutter_rpm:g}"
     feed_word = f"F{cutter_feed:.2f}"
 
@@ -554,7 +563,7 @@ def context(
                 f"G4 P{DWELL_S}",
                 f"G1 Y{_r(y_teeth):.3f} F{{feed}}",
                 f"G1 X{ends[1]:.3f} F{{feed}}",
-                f"G1 Y{p['measure_park_y_mm']:.3f} F{{feed}}",
+                f"G1 Y{park:.3f} F{{feed}}",
             ],
         ),
         job(

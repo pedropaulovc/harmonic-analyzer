@@ -249,6 +249,22 @@ def test_a_journal_that_cannot_enter_the_least_bore_is_refused() -> None:
         _context(plan)
 
 
+def test_a_park_too_close_for_the_micrometer_is_refused() -> None:
+    plan = copy.deepcopy(PLAN)
+    plan["parameters"]["measure_park_y_mm"] = plan["parameters"]["clear_y_mm"]
+    with pytest.raises(ValueError, match="the micrometer needs"):
+        _context(plan)
+    # The traveler prints the park the program makes.
+    park_in = -PLAN["parameters"]["measure_park_y_mm"] / 25.4
+    (step,) = (
+        op["instruction"]
+        for setup in PLAN["setups"]
+        for op in setup["operations"]
+        if op.get("instruction", "").startswith("Run GP01_first_space (")
+    )
+    assert f"drawn back {park_in:.2f} from the tips" in step
+
+
 def test_an_index_count_off_the_teeth_is_refused() -> None:
     plan = copy.deepcopy(PLAN)
     setup = next(s for s in plan["setups"] if isinstance(s.get("indexing"), dict))

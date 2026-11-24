@@ -517,8 +517,13 @@ sizing = { kind = "band", band_mm = "{{cad.bore_dia_band_mm}}" }
 instruction = "Ream .3760 through from the tailstock, in and out. The bore's Ra 63 comes from the reamer: a sharp reamer, steady feed, no dwell."
 settings = "lathe-ream-0376-c360"
 cut_diameter_mm = "{{cad.bore_dia_mm}}"
-inspection = "Bore: the 3/8 ground setting mandrel enters from the cam face and turns freely, with no shake felt at its end. It will not enter, or it shakes: set the blank aside and tell the owner. Ra 63: reamed clean, no tears or chatter (visual)."
+inspection = "Bore: the 3/8 ground setting mandrel enters from the cam face and turns freely, with no shake felt at its end. Ra 63: reamed clean, no tears or chatter (visual)."
 gauge_checks = "other"
+
+[[setups.operations]]
+cut_kind = "other"
+instruction = "The mandrel will not enter, or it shakes: set the blank aside and tell the owner."
+feed = "hand"
 
 [[setups.operations]]
 cut_kind = "other"
@@ -551,7 +556,7 @@ speed_kind = "spindle"
 tool = "ar"
 drilling = "none"
 sizing = "other"
-instruction = "Face the back face, light skims, miking between them, to gear k's aim, back face to cam face. Write the miked thickness on the card. No mark on the part: gear k goes in envelope k and lives there between setups; on the arbor the gears go on in number order (blank 1 the lowest) and come off in the same order."
+instruction = "Face the back face, light skims, to gear k's aim, back face to cam face. Between skims take the blank out and mike it on the boss; rechuck with the rim face home on the jaw fronts. Write the miked thickness on the card. No mark on the part: gear k goes in envelope k and lives there between setups; on the arbor the gears go on in number order (blank 1 the lowest) and come off in the same order."
 settings = "lathe-ar-c360"
 cut_diameter_mm = "{{process.slice_dia_mm}}"
 inspection = "Thickness {{cad.cam_face_thickness_min_in:.4dot}}-{{cad.cam_face_thickness_max_in:.4dot}} (micrometer, on the boss); rim {{cad.rim_face_face_width_min_in:.3dot}}-{{cad.rim_face_face_width_max_in:.3dot}} (micrometer across the rim)."
@@ -622,8 +627,13 @@ instruction = "Fit the journal to the blanks: take .0004 off its diameter a pass
 rpm = 300
 feed = ".002 in/rev (0.05 mm), power feed; dead centre oiled"
 cut_diameter_mm = "{{process.journal_dia_min_mm}}"
-inspection = "A reamed blank slides the journal's whole length with no shake felt; journal Ø{{process.journal_dia_min_mm:in.4dot}} or over at both ends and the middle (micrometer). Under {{process.journal_dia_min_mm:in.4dot}}: the arbor is scrap (the tooth runout budget); make another."
+inspection = "A reamed blank slides the journal's whole length with no shake felt; journal Ø{{process.journal_dia_min_mm:in.4dot}} or over at both ends and the middle (micrometer)."
 gauge_checks = [{ gauge = "micrometers", band_mm = [9.54532, 9.5504] }]
+
+[[setups.operations]]
+cut_kind = "other"
+instruction = "Journal under {{process.journal_dia_min_mm:in.4dot}} anywhere: the arbor is scrap (it would spend the tooth runout allowance); make another."
+feed = "hand"
 
 [[setups.operations]]
 cut_kind = "other"
@@ -766,7 +776,7 @@ milling_cuts = [
 ]
 
 [[setups.operations]]
-instruction = "Depth check on blanks {{process.depth_deep_blank:d}} and {{process.depth_shallow_blank:d}}: Ø.040 pin gauges in spaces 1 and 61, mike over them, subtract that blank's O.D. from the tally card (Setup 5). Accept: both within {{process.depth_window_min_in:.4dot}}-{{process.depth_window_max_in:.4dot}}."
+instruction = "Depth check on blanks {{process.depth_deep_blank:d}} and {{process.depth_shallow_blank:d}}: Ø.040 pin gauges in spaces 1 and 61, mike over them, subtract that blank's O.D. from the tally card (Setup 5). Accept: both within {{process.depth_window_min_in:.4dot}}-{{process.depth_window_max_in:.4dot}} (.0002 a side inside Setup 8's band: the two micrometer readings' resolution)."
 inspection = "Over pins less O.D. {{process.depth_window_min_in:.4dot}}-{{process.depth_window_max_in:.4dot}} on blanks {{process.depth_deep_blank:d}} and {{process.depth_shallow_blank:d}} before GP02."
 gauge_checks = "other"
 feed = "hand"
@@ -789,8 +799,12 @@ settings = "cylinder-gear-cutter-c360"
 milling_cuts = [
   { name = "tooth spaces", kind = "side", phase = "finish", cutter_dia_mm = 44.45, axial_doc_mm = 1.6624, radial_woc_mm = "{{process.plunge_aim_mm}}", stations_mm = [0.0, 35.79, 71.58] },
 ]
-inspection = "Plunger back in the marked hole after the last index; the closure pass cut no chips. Chips or the plunger elsewhere: stop and tell the owner (a miscounted index)."
+inspection = "Plunger back in the marked hole after the last index; the closure pass cut no chips."
 gauge_checks = "other"
+
+[[setups.operations]]
+instruction = "Chips on the closure pass, or the plunger not in the marked hole: stop and tell the owner (a miscounted index)."
+feed = "hand"
 
 [[setups]]
 machine_kind = "other"
