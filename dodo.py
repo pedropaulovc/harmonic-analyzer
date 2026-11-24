@@ -4599,7 +4599,6 @@ def task_prechips():
 
 def _cam_task(stem: str) -> dict[str, Any]:
     import _cam_programs
-    import _process_plans
 
     label = f"cam:{stem}"
     targets = _canonical_targets(label)
@@ -4623,7 +4622,7 @@ def _cam_task(stem: str) -> dict[str, Any]:
         "file_dep": sorted({*deps, _source_text_dep(label, [runtime])}),
         # A family recipe posts from every part's bundle.
         "task_dep": [
-            f"package:manifest:{part}" for part in _process_plans.part_stems(stem)
+            f"package:manifest:{part}" for part in _cam_programs.cam_parts(stem)
         ],
         "targets": targets,
         # A failed post or check must not leave a previous success's stamp; the

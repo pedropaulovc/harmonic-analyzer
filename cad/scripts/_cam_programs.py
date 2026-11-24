@@ -57,13 +57,20 @@ def recipe_path(stem: str) -> Path:
     return PROCESS_ROOT / stem / "cam.py"
 
 
+def cam_parts(stem: str) -> tuple[str, ...]:
+    """The registry parts a recipe posts for: its family plan's parts, else
+    its own stem. The plan is the one beside the recipe (``PROCESS_ROOT``),
+    the root ``CAM_STEMS`` was read from."""
+    return _process_plans.part_stems(stem, PROCESS_ROOT)
+
+
 def cam_inputs(stem: str, out: Path = CAD_OUT) -> dict[str, Path]:
     """Every file a posted set depends on, by the name ``manifest.json``
     records its SHA-256 under: the scoped feature bundle (``features``,
     ``step``; a family's, one pair per part, ``features/<part stem>`` and
     ``step/<part stem>``), the ``plan``, each shop file
     (``shop/<name>.toml``), the ``recipe`` and the FreeCAD ``runtime``."""
-    family = _process_plans.family_parts(stem)
+    family = _process_plans.family_parts(stem, PROCESS_ROOT)
     bundles: dict[str, Path] = {}
     for part in family.values():
         bundles[f"features/{part}"], bundles[f"step/{part}"] = bundle_paths(part, out)

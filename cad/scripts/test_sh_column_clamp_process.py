@@ -111,7 +111,9 @@ def test_the_family_is_the_enrolled_plan_and_recipe_of_both_halves() -> None:
         # No plan, recipe, task or nc/ directory under a half's own name.
         assert part not in _process_plans.TRAVELER_STEMS
         assert part not in _cam_programs.CAM_STEMS
-        assert not (_process_plans.PROCESS_ROOT / part).exists()
+        # (A leftover __pycache__ from an older checkout is not a plan.)
+        for name in ("plan.toml", "cam.py"):
+            assert not (_process_plans.PROCESS_ROOT / part / name).exists()
     # The shared sheet once, then a placeholder under each half's own name.
     assert [path.name for path in _process_plans.traveler_pdf_paths(STEM)] == [
         "sh-column-clamp-traveler.pdf",
