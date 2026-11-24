@@ -44,9 +44,10 @@ def test_set_screw_cup_is_the_vendors_point() -> None:
 def test_apex_tap_keeps_its_walls_to_both_ear_faces() -> None:
     # Q2-A/L2 (delegated ruling 2026-11-07, owner review #2144): the tap
     # station prints .16 at the title block's +/-.01, so the walls are taken
-    # at that band's worst end.
+    # at that band's worst end; the ear thickness at the title block's
+    # +/-.005 (fit audit census; 2.3367 / 2.2351 at +/-.004).
     assert bracket.SET_SCREW_WALLS_MIN == pytest.approx(
-        {"inboard face": 2.3367, "outboard face": 2.2351}
+        {"inboard face": 2.324, "outboard face": 2.197}
     )
     assert min(bracket.SET_SCREW_WALLS_MIN.values()) >= bracket.LIGAMENT_TARGET
     assert bracket.LIGAMENT_TARGET == pytest.approx(2.032)  # .080 in

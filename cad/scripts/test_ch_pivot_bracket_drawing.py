@@ -114,10 +114,10 @@ def test_each_hole_keeps_one_centre_mark() -> None:
 
 
 def test_model_bands_come_from_named_spec_constants() -> None:
-    assert model_toleranced_dimensions(part) == {
-        ("Ear", "EarThick"): "EAR_T_BAND",
-    }
-    assert part.EAR_T_BAND == pytest.approx(0.1016)
+    assert model_toleranced_dimensions(part) == {}
+    # The ear thickness rides the title block's .XXX (fit audit census,
+    # MHA-CH-08 ear thickness).
+    assert spec.EAR_T_BAND == pytest.approx(0.127)
     # The drilled apex tap's station prints plain at the title block's .XX
     # (Q2-A, then L2 to the row).
     assert spec.SET_SCREW_STATION_BAND == pytest.approx(0.254)
@@ -218,11 +218,11 @@ def test_every_banded_length_says_what_its_band_holds() -> None:
     banded = {name for _feature, name in model_toleranced_dimensions(part)}
     assert banded - {"SetScrewLocation"} <= set(drawing.DIMENSION_CALLOUTS)
     shaft = _config.parts("ch-pivot-shaft")["number"]
-    # #3114: nothing bears on an ear, so its thickness band holds the shaft's
-    # flat under the apex tap (the shaft is set off the outboard face, the
-    # tap stands off the inboard one).
+    # #3114: nothing bears on an ear; its thickness rides the title block, so
+    # it carries no words (rule 7: no reason on a size with no band of its
+    # own; fit audit census, MHA-CH-08 ear thickness).
     assert shaft == "MHA-CH-05"
-    assert drawing.DIMENSION_CALLOUTS["EarThick"] == f"LOCATES FLAT OF {shaft}"
+    assert "EarThick" not in drawing.DIMENSION_CALLOUTS
     # Rule 7: the tap's station is a location, so its mate rides the tap.
     assert "SetScrewLocation" not in drawing.DIMENSION_CALLOUTS
     assert shaft in drawing.SET_SCREW_MATE
@@ -429,7 +429,7 @@ def test_ear_thickness_prints_beside_the_ear_on_the_right_view() -> None:
     apex = drawing._right_y(spec.EAR_TOP_Y)
     dz, dy = drawing.EAR_THICK_TEXT_OFFSET
     box = estimate_text_box(
-        f".320 ±.004\n{drawing.DIMENSION_CALLOUTS['EarThick']}",
+        ".320",
         anchor=(outboard - dz, apex + dy),
         height=0.0035,
         reference=2,  # swCENTER

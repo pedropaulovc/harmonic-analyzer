@@ -191,18 +191,17 @@ def test_bracket_hole_ligaments_keep_the_floor_at_worst_case() -> None:
 
 
 def test_bracket_lengths_along_the_foot_carry_their_bands_on_the_model() -> None:
-    """The S4 fixture plan and the MHA-CH-08 sheet take the +/-0.10 ear
-    thickness from the saved model's dimension; the F-drilled bore takes the
-    title block's DRILLED HOLES row (fit audit question 1). The foot length, the hold-down station
+    """The MHA-CH-08 model carries no native band: the ear thickness rides
+    the title block's .XXX (fit audit census, MHA-CH-08 ear thickness), the
+    F-drilled bore the DRILLED HOLES row (fit audit question 1). The foot
+    length, the hold-down station
     (user ruling 2026-10-14: the foot grew instead; #1371 review: the station
     went the same way) and the drilled tap station (delegated ruling
     2026-11-07, Q2-A) ride the title block."""
     from _drawing_contract import model_toleranced_dimensions
 
-    assert bracket.EAR_T_BAND == pytest.approx(0.1016)
-    assert model_toleranced_dimensions(bracket_build) == {
-        ("Ear", "EarThick"): "EAR_T_BAND",
-    }
+    assert bracket.EAR_T_BAND == pytest.approx(0.127)
+    assert model_toleranced_dimensions(bracket_build) == {}
 
 
 def test_hold_down_station_is_given_from_the_ears_inboard_face() -> None:
@@ -292,5 +291,7 @@ def test_screw_heads_keep_air_to_the_ear_and_the_foot_end() -> None:
         - bracket.STATION_BAND
         - bracket.PUNCH_FLOAT
     )
-    assert sides.HEAD_TO_EAR_FACE_MIN == pytest.approx(0.0249 * 25.4, abs=1e-3)
+    # .0239 with the ear thickness at the title block's +/-.005 (fit audit
+    # census; .0249 at +/-.004); CORNER_R_MAX stays .020.
+    assert sides.HEAD_TO_EAR_FACE_MIN == pytest.approx(0.0239 * 25.4, abs=1e-3)
     assert sides.HOLE_Z + head_r < sides.FOOT_Z1
