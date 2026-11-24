@@ -1,0 +1,18 @@
+# Why each band under the title block stays on MHA-DT-37 (drawing-guidelines
+# rule 4; owner ruling 2026-11-24: "In the part's registry file, not on the
+# sheet."). Read by the machinist review only. The spigot and the pivot carry
+# no band: each is turned last to slide in its reamed holes and prints as a
+# reference with its clearance (form 2, fit audit 2026-11-23 MHA-DT-37.stems).
+# Tooth data (tooth thickness, root envelope, runout, over pins) keep the
+# gear data block's rules. Fit batch DT, 2026-11-24.
+necessity:
+  - id: N-01
+    feature: "Ø.1696 +.0000/-.0008 blank (tip) diameter"
+    kind: mesh
+    reason: "larger loses the tip land, smaller loses T006 contact"
+    source: "fit audit 2026-11-23 MHA-DT-37.blank_od (keep; recommended A, T006 exception #971 pending): DT6-FORM1's drum-tip relief (dt_mesh_checks.t006_relief_clearance_mm) not re-run at a wider band"
+  - id: N-02
+    feature: "face width .2934 ±.002 (CONE SEAT PITCH ON MHA-DT-04)"
+    kind: gap
+    reason: "sets the cone set's last seat station on the shaft"
+    source: "owner ruling 2026-11-20 (#2631), exception RV-02: the shared .2934 face; dt_cone_gear_stack books each face's band in the 20-gear stack (fit audit 2026-11-23 MHA-DT-03.face_width, keep)"
