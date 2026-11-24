@@ -112,18 +112,22 @@ west_skim_mm = 1.27
 face_step_max_mm = 1.27
 # Facing W, E and the seat (PB01-PB03): the 1/2 in carbide end mill (shop
 # endmill-carbide-3fl-1-2) on the measured face setting
-# em-half-carbide-1018-v5-face, valid to 1.27 mm deep and 3.4 mm wide
-# (cad/config/shop-equipment/measured-cuts.toml): equal passes no wider
+# em-half-carbide-1018-3439-face, valid to 1.27 mm deep and 6.4 mm wide at
+# 2420-2490 rpm in the cut (dechatter session of 2026-11-23, #3439;
+# cad/config/shop-equipment/measured-cuts.toml): equal passes no wider
 # than face_stepover_max_mm, its width limit. Each face cut declares its
 # true stepover, the most any of its passes engages, the first and the last
 # included (cam.py computes both and the post checks every pass): lying
-# across the 3/4 section 6 passes of lying_stepover_mm, upright across the
-# .64 width 5 of seat_stepover_mm. E comes down to the width in equal
-# levels of width_level_mm, the fewest no deeper than face_step_max_mm.
+# across the 3/4 section 4 passes of lying_stepover_mm (3 would need 6.52,
+# over the limit), upright across the .64 width 3 of seat_stepover_mm (2
+# would need 8.38). Every measured pass was conventional and the faces
+# zigzag, so every other pass climbs, not measured. E comes down to the
+# width in equal levels of width_level_mm, the fewest no deeper than
+# face_step_max_mm.
 face_cutter_dia_mm = 12.7
-face_stepover_max_mm = 3.4
-lying_stepover_mm = 3.2583
-seat_stepover_mm = 3.3512
+face_stepover_max_mm = 6.4
+lying_stepover_mm = 4.8875
+seat_stepover_mm = 5.5853
 width_level_mm = 0.762
 # PB05 (the foot end, the step and its wall pass: one operation, on the
 # chart setting endmill-carbide-3fl-1-2-1018-cf, whose wall pass is deeper
@@ -232,9 +236,10 @@ upright_top_max_mm = 37.592
 r8_collet_gauge_mm = 6.3         # HA: holders.r8-collets-lms-4860.gauge_len_mm.
 drill_chuck_gauge_mm = 95.0      # Archive holders.drill-chuck-r8.gauge_len_mm.
 # The 1/2 in end mill, 3 in overall, 1.10 in out of the R8 collet: the
-# assembly the measured settings were cut with
-# (cad/config/shop-equipment/measured-cuts.toml; owner, Pedro, 2026-11-22:
-# "stickout is recorded as 30mm but is actually 27.94"). cam.py checks its
+# shorter end of the stick-out the measured face setting allows
+# (cad/config/shop-equipment/measured-cuts.toml: 27.94 to 28.448 mm; owner,
+# Pedro, 2026-11-22: "stickout is recorded as 30mm but is actually 27.94").
+# cam.py checks its
 # collet nose clears the stock at every program's deepest cut.
 half_mill_projection_mm = 27.94
 # Overall lengths: jobber #15 3-1/2 in, D 4 in, #43 2-1/4 in (ASME B94.11M);
@@ -362,10 +367,10 @@ speed_kind = "spindle"
 tool = "em-half"
 drilling = "none"
 sizing = "other"
-instruction = "Run PB01_west (M6 T1, 1/2 in end mill; set 2370): skim the top face {{process.west_skim_mm:in.3dot}}, in passes no wider than {{process.lying_stepover_mm:in.3dot}}."
+instruction = "Run PB01_west (M6 T1, 1/2 in end mill; set 2450): skim the top face {{process.west_skim_mm:in.3dot}}, in passes no wider than {{process.lying_stepover_mm:in.3dot}}."
 inspection = "Still clamped: the whole top face cut, no cold-finished patch left."
 gauge_checks = "other"
-settings = "em-half-carbide-1018-v5-face"
+settings = "em-half-carbide-1018-3439-face"
 milling_cuts = [
   { name = "west side", kind = "end", phase = "finish", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", axial_doc_mm = "{{process.west_skim_mm}}", radial_woc_mm = "{{process.lying_stepover_mm}}", traverse_mm = [0, "{{process.blank_length_max_mm}}"] },
 ]
@@ -404,8 +409,8 @@ speed_kind = "spindle"
 tool = "em-half"
 drilling = "none"
 sizing = "other"
-instruction = "Run PB02_width (M6 T1; set 2370): face the top down to Z {{cad.east_side_width_mm:in.4dot}} in equal levels of {{process.width_level_mm:in.3dot}}, in passes no wider than {{process.lying_stepover_mm:in.3dot}}. Unclamp; mic the width. Mark this face E."
-settings = "em-half-carbide-1018-v5-face"
+instruction = "Run PB02_width (M6 T1; set 2450): face the top down to Z {{cad.east_side_width_mm:in.4dot}} in equal levels of {{process.width_level_mm:in.3dot}}, in passes no wider than {{process.lying_stepover_mm:in.3dot}}. Unclamp; mic the width. Mark this face E."
+settings = "em-half-carbide-1018-3439-face"
 inspection = "Width {{cad.east_side_width_min_in:.3dot}}–{{cad.east_side_width_max_in:.3dot}}, W to E, miked at both ends."
 gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.east_side_width_band_mm}}" }]
 milling_cuts = [
@@ -449,10 +454,10 @@ speed_kind = "spindle"
 tool = "em-half"
 drilling = "none"
 sizing = "other"
-instruction = "Run PB03_seat (M6 T1, 1/2 in end mill; set 2370): face the seat at Z0, {{process.seat_skim_mm:in.3dot}} off the high point, in passes no wider than {{process.seat_stepover_mm:in.3dot}}; the file then stops at its M6 T2."
+instruction = "Run PB03_seat (M6 T1, 1/2 in end mill; set 2450): face the seat at Z0, {{process.seat_skim_mm:in.3dot}} off the high point, in passes no wider than {{process.seat_stepover_mm:in.3dot}}; the file then stops at its M6 T2."
 inspection = "At the M6 T2 stop: the whole end faced, Ra {{cad.seat_finish_callout}} µin or finer (an even end-mill finish, no tears), no sawn patch left."
 gauge_checks = "other"
-settings = "em-half-carbide-1018-v5-face"
+settings = "em-half-carbide-1018-3439-face"
 milling_cuts = [
   { name = "seat", kind = "end", phase = "finish", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", axial_doc_mm = "{{process.seat_skim_mm}}", radial_woc_mm = "{{process.seat_stepover_mm}}", stations_mm = "{{process.upright_top_max_mm}}" },
 ]
@@ -636,8 +641,9 @@ instruction_detailed = "First blank only: send $# and note the G54 line's Z. G10
 feed = "hand"
 
 # PB05 stays on the chart setting, outside the measured envelope: the wall
-# pass 9.652 deep x 0.355, the foot-end and step passes 4.189 wide (the
-# measured 3.4 at most). Owner (Pedro), 2026-11-22: deep walls, "log new
+# pass 9.652 deep x 0.355, the foot-end and step passes 4.189 wide in the
+# same operation at its 2650 rpm (the measured face record holds at
+# 2420-2490). Owner (Pedro), 2026-11-22: deep walls, "log new
 # dechatter issues to try deep axial cuts but with shallow radial depth"
 # (#3427); full-width passes, "same log new dechatter issues to try full
 # radial depth but shallow axial" (#3428). No re-cut: the first blank is
