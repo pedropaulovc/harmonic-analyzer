@@ -8,24 +8,19 @@ from __future__ import annotations
 
 import math
 
-from dt_crank_handle_pivot_screw_spec import (
-    DIAMETRAL_CLEARANCE_MAX,
-    DIAMETRAL_CLEARANCE_MIN,
-)
 from dt_crank_handle_spec import (
     COUNTERBORE_GLUE_LINE,
     CUP_NAME,
     CUP_NUMBER,
     FERRULE_NAME,
     FERRULE_NUMBER,
+    PIVOT_BORE_FIT_MAX,
     SCREW_NUMBER,
     TENON_GLUE_LINE,
     TENON_STRAIGHT_WALL_MIN,
     TENON_WALL_MIN,
     inch_text,
 )
-
-SCREW_NAME = "PIVOT SCREW"
 
 
 def _range(band: tuple[float, float], places: int) -> str:
@@ -42,14 +37,17 @@ def _floor_thou(value_mm: float) -> str:
 # Rule 4: each fit by its standard name and its mate by name and full
 # number, the clearance its limits give as a reference.  The tenon and the
 # counterbore are epoxied (dt_crank_handle_ferrule_spec,
-# dt_crank_handle_butt_cup_spec), so bonded.  The drilled bore runs on the
-# MHA-DT-32 shoulder (#290 fit F12: .0050-.0075).  Owner ruling 2026-11-23,
-# tool audit Q14: "DRILL #20, read with pins, turn the MHA-DT-32 shoulder
-# last to the bore less .0050-.0075, trial hole in an oak offcut first": the
-# process word is DRILL (#20 is .1610, the bore's printed reference).
+# dt_crank_handle_butt_cup_spec), so bonded.  The bore is drilled #20 and the
+# MHA-DT-32 shoulder, made last, is turned to it: the fit's acceptance prints
+# once, on MHA-DT-32 (owner ruling 2026-11-23, tool audit Q14: "DRILL #20";
+# owner ruling 2026-11-24, fit audit question 14: "handle stays DRILL #20;
+# DT-32 shoulder by trial").  The .1635 MAX cap is the largest bore the
+# tenon walls are judged at (dt_crank_handle_spec.PIVOT_BORE_FIT_MAX; the
+# shoulder's .1635 trial step must not enter).
+PIVOT_BORE_DRILL = "#20"
 PIVOT_BORE_CALLOUT = (
-    f"DRILL THRU, RUNNING FIT ON\n{SCREW_NUMBER} {SCREW_NAME}\n"
-    f"(CLEARANCE {_range((DIAMETRAL_CLEARANCE_MIN, DIAMETRAL_CLEARANCE_MAX), 4)})"
+    f"{PIVOT_BORE_DRILL} DRILL THRU, <MOD-DIAM>{inch_text(PIVOT_BORE_FIT_MAX, 4)} MAX\n"
+    f"{SCREW_NUMBER} SHOULDER IS\nTURNED TO THIS BORE"
 )
 TENON_NOTE_NUMBER = 1
 COUNTERBORE_NOTE_NUMBER = 2

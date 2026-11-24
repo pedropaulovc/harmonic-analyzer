@@ -13,11 +13,11 @@
   <rect class="cutter" x="140" y="76" width="10" height="64"/>
   <text class="label" x="160" y="70">part-off at Z−P: the blade's tailstock-side face on it</text>
   <line class="dims" x1="170" y1="180" x2="110" y2="248"/>
-  <text class="label" x="14" y="264">head Ø H = C − .012</text>
+  <text class="label" x="14" y="264">head Ø.231–.241</text>
   <line class="dims" x1="190" y1="172" x2="190" y2="272"/>
   <text class="label" x="150" y="290">under-head face at Z−U, squared by the blade (R.004 MAX)</text>
   <line class="dims" x1="380" y1="172" x2="380" y2="224"/>
-  <text class="label" x="320" y="240">shoulder Ø D (Op 40), Ra 63 µin</text>
+  <text class="label" x="320" y="240">shoulder Ø T − .006 (Op 130), Ra 63 µin</text>
   <line class="dims" x1="568" y1="165" x2="560" y2="118"/>
   <text class="label" x="470" y="110">relief at the seat</text>
   <line class="dims" x1="640" y1="152" x2="640" y2="142"/>

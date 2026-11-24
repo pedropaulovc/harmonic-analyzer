@@ -1,41 +1,34 @@
 # Crank handle pivot screw MHA-DT-32, one off, on the manual PM-1127VF-LB
 # (owner ruling 2026-11-21: turned parts get lathe travelers, no NC), from
-# the owned 1/4 in 1018 rod. Order of manufacture: the MHA-DT-35 butt cup and
-# its pocket first (bonded into the handle), this screw's head second. Owner
-# ruling 2026-11-23 (tool audit Q6): "B. End-mill the pocket with the owned
-# 1/4 carbide end mill and turn the MHA-DT-32 head to it (pocket less .012
-# +/-.004); no boring bar." The cup's traveler pins its pocket and tags the
-# reading C (the largest minus pin that enters, true size C -.0002 to
-# C +.001, accepted .248-.253); the head is turned to the larger of .231 and
-# C -.015, up to the smaller of .241 and C -.009, aimed at C -.012 (inside
-# that window for every accepted C), so the true clearance stays inside
-# drawing note 1 of MHA-DT-35 (.008-.016) and the head inside its own
-# Ø.231-.241.
+# the owned 1/4 in 1018 rod. Order of manufacture: the MHA-DT-35 butt cup
+# (bonded into the handle) first, this screw last. Owner ruling 2026-11-24,
+# fit audit question 15 (no matching): the head is turned to its own
+# Ø.231-.241 and clears any pocket the cup's 1/4 end mill cuts (.248-.257);
+# nothing is read off the cup. Owner ruling 2026-11-24, fit audit question
+# 14: "handle stays DRILL #20; DT-32 shoulder by trial, limits .1535-.1585":
+# no pins; the shoulder's own trial steps read the handle's bore.
 #
 # - Bench: measure the bonded handle (MHA-DT-08 with MHA-DT-34 and -35) for
 #   the shoulder's length (drawing note 1: the measured stack plus .010-.040
-#   end play); copy C off the cup's tag and work out the head's window; read
-#   the handle's #20-drilled bore with Class ZZ pins for the shoulder's
-#   diameter. Owner ruling 2026-11-23, tool audit Q14: "DRILL #20, read with
-#   pins, turn the MHA-DT-32 shoulder last to the bore less .0050-.0075,
-#   trial hole in an oak offcut first". A bore the .1635 NO-GO enters is
-#   MHA-DT-08's reject (its walls are sized at .1635), so the shoulder's
-#   printed .1540-.1560 always holds a .0050-.0075 fit.
+#   end play).
 # - Saw a blank. Lathe, 3-jaw, the tip end out on the tailstock dead centre
-#   ("CENTRE OK" at the tip): turn the head's diameter to the window over the
-#   whole length out of the jaws, the Ø.155 shoulder to the under-head
-#   station, the #4-40 blank to the seat; the 1/16 P1 blade squares the
-#   under-head corner sharp (R.004 MAX; the AR insert's R0.4 nose cannot). Chamfer the head,
-#   withdraw the centre, run the die to the seat, plunge the relief at
-#   the seat with the blade and cut its 45° lead with the blade's corner on
-#   the compound; part off at the head's length.
+#   ("CENTRE OK" at the tip): turn the head's diameter over the whole length
+#   out of the jaws; the shoulder to the under-head station, first to a
+#   Ø.1635 trial size the handle must NOT go on (it does: the bore is over
+#   MHA-DT-08's .1635 MAX), then down .0005 at a time until the handle just
+#   starts on (B), then finished to B less .0050-.0075; the #4-40 blank to
+#   the seat; the 1/16 P1 blade squares the under-head corner sharp (R.004
+#   MAX; the AR insert's R0.4 nose cannot). Chamfer the head, withdraw the
+#   centre, run the die to the seat, plunge the relief at the seat with the
+#   blade and cut its 45° lead with the blade's corner on the compound; part
+#   off at the head's length.
 # - Bench: file the part-off pip, saw the screwdriver slot with the 32 TPI
 #   junior hacksaw to a scribed depth, deburr, oil (FINISH: bright turned,
 #   oiled).
 #
-# Flagged: the junior hacksaw (tools-hand.toml junior-hacksaw), the pin
-# gauges (gauges.pin-gauges) and the .1635 minus single (zz-pins-1610-1635)
-# are to order. The owned 1 in x .032 slitting saw
+# Flagged: the junior hacksaw (tools-hand.toml junior-hacksaw) and the pin
+# gauges (gauges.pin-gauges, the slot's two pins) are to order. The owned
+# 1 in x .032 slitting saw
 # the placeholder named would need a 3/8 in arbor not on record and an NC slot
 # file on the mill; the bench saw needs neither. No #4-40 ring gauge is on
 # record: the thread is accepted on a #4-40 nut (the MHA-MG-VN-52 hex nut,
@@ -102,23 +95,24 @@ turn_feed_mm_rev = 0.0508
 # The head's diameter turned over the whole stickout, to the part-off and
 # .8 mm past the blade: Z of its end (the drawn screw).
 head_turn_end_z_mm = -69.0
-# Aims, mm: the head at C - .012 for a pocket read at the end mill's 1/4
-# (.250 - .012 = .238; the operator aims at the H written in Op 30, the
-# turning checks take this one), the shoulder .001 under the top
-# of its band (a running fit; cad.shoulder_dia's nominal is the band's top;
-# the operator aims at the D written in Op 40 from the bore read in Op 20,
-# owner ruling 2026-11-23, tool audit Q14),
-# the thread blank at .1085, inside cad.thread_dia (the #4-40 UNC-2A major
-# .1061-.1112, the title block's CLASS 2A).
-head_aim_dia_mm = 6.0452
-shoulder_rough_dia_mm = 4.0
-shoulder_aim_dia_mm = 3.937
+# Aims, mm: the head at the middle of its drawn Ø.231-.241 (.236; owner
+# ruling 2026-11-24, fit audit question 15: nothing is read off the cup);
+# the shoulder roughed to .1654, over the .1635 trial size, and finished at
+# the middle of its drawn .1535-.1585 for the turning checks (the operator
+# aims at B - .006 from the trial, owner ruling 2026-11-24, fit audit
+# question 14); the thread blank at .1085, inside cad.thread_dia (the #4-40
+# UNC-2A major .1061-.1112, the title block's CLASS 2A).
+head_aim_dia_mm = 5.9944
+shoulder_rough_dia_mm = 4.2
+shoulder_aim_dia_mm = 3.9624
+# The trial size the handle must not go on: MHA-DT-08's .1635 MAX.
+shoulder_trial_dia_mm = 4.1529
 thread_rough_dia_mm = 2.957
 thread_aim_dia_mm = 2.7559
 # The bands' low ends, mm (cad.head_dia, cad.shoulder_dia, cad.thread_dia):
 # no pass goes under them.
 head_dia_min_mm = 5.8674
-shoulder_dia_min_mm = 3.9116
+shoulder_dia_min_mm = 3.8989
 thread_dia_min_mm = 2.69494
 # The drawn under-head and seat stations from the tip (Z0), mm: the
 # shoulder's turning runs to the under-head station less .25 mm before the
@@ -194,12 +188,6 @@ id = "file"
 name = "Smooth file"
 ref = "jig-files"
 
-[[tools]]
-id = "bore-pins"
-name = "Class ZZ pins: .161, .162 and .163 minus (reading) and .1635 minus (NO-GO)"
-ref = "zz-pins-1610-1635"
-status = "to_order"
-
 [[setups]]
 machine_kind = "other"
 title = "Bench: measure the bonded handle"
@@ -217,22 +205,9 @@ inspection = "M {{process.m_min_in:.2dot}}–{{process.m_max_in:.2dot}} (the bla
 gauge_checks = [{ gauge = "calipers", band_mm = [50.038, 55.88] }]
 
 [[setups.operations]]
-instruction = "On the 0–1 in micrometer (reads .0001; trust a reading to ±.00005), mike the .161, .162, .163 and .1635 minus pins; write each reading here and on its tag. Try them in the handle's bore from the ferrule (tenon) end, clear of the cup's own hole, smallest first, clean and dry, by hand: write P_in, the reading of the largest that enters, and P_out, the reading of the smallest that does not."
-inspection = "The .161 pin enters the bore and the .1635 does not (bore .1610–.1635); otherwise the handle is not as built: set it aside for the owner."
-gauge_checks = [{ gauge = "zz-pins-1610-1635", band_mm = [4.0894, 4.1529] }]
-
-[[setups.operations]]
-instruction = "Work out and write on this sheet: the shoulder's length L = M + {{process.end_play_aim_in:.3dot}}, and its band M + {{process.end_play_min_in:.3dot}} to M + {{process.end_play_max_in:.3dot}}; the under-head station U = {{process.seat_z_in:.3dot}} + L from the tip; the part-off station P = U + {{cad.head_length_in:.3dot}}; the blank B = P + {{process.blank_over_p_in:.2dot}}; the stickout S = P + {{process.stickout_over_p_in:.2dot}}. Copy C, the butt cup's pocket reading, off its tag (MHA-DT-35 Op 100). Write the head's window: low = the larger of {{cad.head_dia_min_in:.3dot}} and C − .015, high = the smaller of {{cad.head_dia_max_in:.3dot}} and C − .009; and its aim H = C − .012."
-inspection = "C .248–.253 on the tag (H then lies inside the window); any other C: stop, the cup is not as its traveler accepts it. The window keeps the head in its drawn Ø{{cad.head_dia_min_in:.3dot}}–{{cad.head_dia_max_in:.3dot}} and its clearance in the cup's pocket inside MHA-DT-35 note 1's .008–.016."
+instruction = "Work out and write on this sheet: the shoulder's length L = M + {{process.end_play_aim_in:.3dot}}, and its band M + {{process.end_play_min_in:.3dot}} to M + {{process.end_play_max_in:.3dot}}; the under-head station U = {{process.seat_z_in:.3dot}} + L from the tip; the part-off station P = U + {{cad.head_length_in:.3dot}}; the blank B = P + {{process.blank_over_p_in:.2dot}}; the stickout S = P + {{process.stickout_over_p_in:.2dot}}."
+inspection = "L, U, P, B and S written on this sheet, each from the largest M of Op 10."
 gauge_checks = "other"
-
-[[setups.operations]]
-instruction = "Write the shoulder's window on this sheet: D_max = the lesser of {{cad.shoulder_dia_max_in:.4dot}} and P_in − .0050; D_min = the greater of {{cad.shoulder_dia_min_in:.4dot}} and P_out − .0075; the aim D at their middle."
-inspection = "D_max − D_min .001 or more (a turned diameter holds .001)."
-gauge_checks = "other"
-
-[[setups.operations]]
-instruction = "D_max − D_min under .001: do not turn the shoulder; set the handle aside for the owner (its bore is too large for the shoulder's band to hold the fit)."
 
 [[setups]]
 machine_kind = "other"
@@ -259,9 +234,9 @@ title = "Lathe: turn the screw on the centre, thread, relief, part off"
 machine = "PM-1127VF-LB lathe"
 indexing = "none"
 machine_ref = "pm-1127vf-lb"
-holding = "3-jaw on the rod, S (Setup 1) out of the jaw fronts, set with the calipers' depth rod, the beam's end on the jaw fronts; the rest in the jaws. The tailstock dead centre, greased, in the tip's centre hole for every cut but the die and the part-off: in for Ops 90–210 and 260–300, the quill backed off for each touch-off on the tip and for the readings (Ops 150, 160, 190, 210, 290) and brought back snug; out for the die (Ops 220–250, the quill squaring it) and the part-off (Op 310)."
-datum = "Z0 (carriage DRO) the tip's faced plane, set in Op 70; each tool touched on the tip again when it takes over (Ops 150, 160, 210, 310). The seat at Z−{{process.seat_z_in:.3dot}}; the under-head face at Z−U and the part-off at Z−P from Setup 1."
-diagram = { file = "diagrams/turn.svg", alt = "The rod in the 3-jaw on the dead centre at the tip: the head turned to H = C − .012 next to the jaws, the long Ø.155 shoulder, the #4-40 thread at the tip; the relief at the seat; the part-off at the head's face." }
+holding = "3-jaw on the rod, S (Setup 1) out of the jaw fronts, set with the calipers' depth rod, the beam's end on the jaw fronts; the rest in the jaws. The tailstock dead centre, greased, in the tip's centre hole for every cut but the die and the part-off: in for Ops 60–210 and 260–300, the quill backed off for each touch-off on the tip, for the handle's trials (Ops 100, 120) and for the readings (Ops 150, 160, 190, 210, 290) and brought back snug; out for the die (Ops 220–250, the quill squaring it) and the part-off (Op 310)."
+datum = "Z0 (carriage DRO) the tip's faced plane, set in Op 40; each tool touched on the tip again when it takes over (Ops 150, 160, 210, 310). The seat at Z−{{process.seat_z_in:.3dot}}; the under-head face at Z−U and the part-off at Z−P from Setup 1."
+diagram = { file = "diagrams/turn.svg", alt = "The rod in the 3-jaw on the dead centre at the tip: the head turned to Ø.236 next to the jaws, the long shoulder turned to the handle's bore by trial, the #4-40 thread at the tip; the relief at the seat; the part-off at the head's face." }
 lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{process.stock_dia_mm}}", stock_diameter_mm = "{{process.stock_dia_mm}}", stickout_mm = "{{process.stickout_mm}}", minimum_diameter_mm = "{{process.thread_dia_min_mm}}", support = "tailstock" }
 turning_support = { kind = "tailstock", chuck_z_mm = "{{process.jaw_front_z_mm}}", centre_z_mm = 0.0 }
 
@@ -298,15 +273,15 @@ speed_kind = "spindle"
 tool = "ar"
 drilling = "none"
 sizing = "other"
-instruction = "Spindle stopped: run the carriage by hand to Z−(P + .10); the tool and its holder clear the jaw fronts by .15 or more (or stop: the stickout is short). Turn the whole stickout from the tip to Z−(P + .10) to the head's window written in Op 30, aiming at H; cutting oil."
+instruction = "Spindle stopped: run the carriage by hand to Z−(P + .10); the tool and its holder clear the jaw fronts by .15 or more (or stop: the stickout is short). Turn the whole stickout from the tip to Z−(P + .10) to Ø{{cad.head_dia_min_in:.3dot}}–{{cad.head_dia_max_in:.3dot}}, aiming at Ø{{process.head_aim_dia_mm:in.3dot}}; cutting oil."
 settings = "dt-lathe-ar-1018-centre"
 cut_diameter_mm = "{{process.stock_dia_mm}}"
-inspection = "Head Ø inside the window written in Op 30 (itself inside Ø{{cad.head_dia_min_in:.3dot}}–{{cad.head_dia_max_in:.3dot}}), miked with the .0001 micrometer."
+inspection = "Head Ø{{cad.head_dia_min_in:.3dot}}–{{cad.head_dia_max_in:.3dot}}, miked."
 gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.head_dia_band_mm}}" }]
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Head under the window's low end: scrap the blank and make another from Setup 2 (too loose in the cup's pocket). Over its high end: another light pass."
+instruction = "Head under {{cad.head_dia_min_in:.3dot}}: scrap the blank and make another from Setup 2. Over {{cad.head_dia_max_in:.3dot}}: another light pass."
 
 [[setups.operations]]
 cut_kind = "longitudinal_turning"
@@ -324,21 +299,52 @@ cut_diameter_mm = "{{process.head_aim_dia_mm}}"
 [[setups.operations]]
 cut_kind = "longitudinal_turning"
 turning_cuts = [
-  { name = "Shoulder finish", phase = "finish", start_z_mm = "{{process.turn_start_z_mm}}", end_z_mm = "{{process.shoulder_rough_end_z_mm}}", kept_start_z_mm = "{{process.seat_z_mm}}", kept_end_z_mm = "{{process.shoulder_rough_end_z_mm}}", start_diameter_mm = "{{process.shoulder_rough_dia_mm}}", end_diameter_mm = "{{process.shoulder_aim_dia_mm}}", max_radial_doc_mm = "{{process.finish_radial_doc_mm}}", feed_mm_rev = "{{process.finish_feed_mm_rev}}", minimum_diameter_mm = "{{process.shoulder_dia_min_mm}}" },
+  { name = "Shoulder to the trial size", phase = "finish", start_z_mm = "{{process.turn_start_z_mm}}", end_z_mm = "{{process.shoulder_rough_end_z_mm}}", kept_start_z_mm = "{{process.seat_z_mm}}", kept_end_z_mm = "{{process.shoulder_rough_end_z_mm}}", start_diameter_mm = "{{process.shoulder_rough_dia_mm}}", end_diameter_mm = "{{process.shoulder_trial_dia_mm}}", max_radial_doc_mm = "{{process.finish_radial_doc_mm}}", feed_mm_rev = "{{process.finish_feed_mm_rev}}", minimum_diameter_mm = "{{process.shoulder_trial_dia_mm}}" },
 ]
 speed_kind = "spindle"
 tool = "ar"
 drilling = "none"
 sizing = "other"
-instruction = "Finish the shoulder over the same length to D_min–D_max (Setup 1), aiming at D, miking at both ends and the middle between light passes; one last pass at the same setting for the drawing's Ra 63 µin (1.6 µm) finish, no feed marks you can catch with a fingernail."
+instruction = "Finish the shoulder over the same length to Ø{{process.shoulder_trial_dia_mm:in.4dot}}, miking at both ends and the middle between light passes. Spindle stopped: back the quill until the centre clears the tip; slide the bonded handle, ferrule end first, over the tip onto the shoulder by hand, clean and dry, no force."
+settings = "dt-lathe-ar-1018-centre-finish"
+cut_diameter_mm = "{{process.shoulder_rough_dia_mm}}"
+inspection = "At Ø{{process.shoulder_trial_dia_mm:in.4dot}} the handle does not go on (MHA-DT-08's bore .1635 MAX)."
+gauge_checks = [{ gauge = "micrometers", band_mm = [4.1402, 4.1656] }]
+
+[[setups.operations]]
+cut_kind = "other"
+instruction = "The handle goes on at Ø{{process.shoulder_trial_dia_mm:in.4dot}}: its bore is over MHA-DT-08's .1635 MAX; stop and set the handle aside for the owner, the blank kept in the chuck."
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "ar"
+drilling = "none"
+sizing = "other"
+instruction = "Bring the centre back snug. Take .0005 off the shoulder's diameter over the same length (one pass .00025 deep on the cross-slide), mike it, and try the handle on again as in Op 100; repeat until the handle just starts onto the shoulder by hand. Write T, the shoulder's miked diameter at that try, on this sheet."
+settings = "dt-lathe-ar-1018-centre-finish"
+cut_diameter_mm = "{{process.shoulder_trial_dia_mm}}"
+inspection = "T .1610–.1635, written on this sheet. The handle still not on at Ø.1610: its bore is under the #20 drill; stop and set the handle aside for the owner."
+gauge_checks = [{ gauge = "micrometers", band_mm = [4.0894, 4.1529] }]
+
+[[setups.operations]]
+cut_kind = "longitudinal_turning"
+turning_cuts = [
+  { name = "Shoulder finish", phase = "finish", start_z_mm = "{{process.turn_start_z_mm}}", end_z_mm = "{{process.shoulder_rough_end_z_mm}}", kept_start_z_mm = "{{process.seat_z_mm}}", kept_end_z_mm = "{{process.shoulder_rough_end_z_mm}}", start_diameter_mm = "{{process.shoulder_trial_dia_mm}}", end_diameter_mm = "{{process.shoulder_aim_dia_mm}}", max_radial_doc_mm = "{{process.finish_radial_doc_mm}}", feed_mm_rev = "{{process.finish_feed_mm_rev}}", minimum_diameter_mm = "{{process.shoulder_dia_min_mm}}" },
+]
+speed_kind = "spindle"
+tool = "ar"
+drilling = "none"
+sizing = "other"
+instruction = "Finish the shoulder over the same length to T − .0075 to T − .0050 (MHA-DT-32's running fit in the handle's bore), aiming at T − .006, miking at both ends and the middle between light passes; one last pass at the same setting for the drawing's Ra 63 µin (1.6 µm) finish, no feed marks you can catch with a fingernail."
 settings = "dt-lathe-ar-1018-centre-finish"
 cut_diameter_mm = "{{process.shoulder_aim_dia_mm}}"
-inspection = "Shoulder D_min–D_max, inside Ø{{cad.shoulder_dia_min_in:.4dot}}–{{cad.shoulder_dia_max_in:.4dot}}, at both ends and the middle."
+inspection = "Shoulder T − .0075 to T − .0050, inside Ø{{cad.shoulder_dia_min_in:.4dot}}–{{cad.shoulder_dia_max_in:.4dot}}, at both ends and the middle."
 gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.shoulder_dia_band_mm}}" }]
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Shoulder under D_min at any reading: scrap the blank and make another from Setup 2. Over D_max at both ends: another light pass. One end over, the other in band: set the tailstock over by half the ends' difference (toward the tool if the tip end is larger), skim, mike both ends again; both in band or scrap as above."
+instruction = "Shoulder under T − .0075 at any reading: scrap the blank and make another from Setup 2. Over T − .0050 at both ends: another light pass. One end over, the other in band: set the tailstock over by half the ends' difference (toward the tool if the tip end is larger), skim, mike both ends again; both in band or scrap as above."
 
 [[setups.operations]]
 cut_kind = "other"
@@ -384,7 +390,7 @@ instruction = "Blank under {{cad.thread_dia_min_in:.4dot}}: scrap the blank and 
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Spindle stopped: back the quill until the dead centre clears the tip. With the calipers' depth rod, the beam's end on the tip each time, read down beside the blank onto the seat face, then down beside the shoulder onto the under-head face; the shoulder is the second less the first. Bring the centre back in, snug as in Op 90."
+instruction = "Spindle stopped: back the quill until the dead centre clears the tip. With the calipers' depth rod, the beam's end on the tip each time, read down beside the blank onto the seat face, then down beside the shoulder onto the under-head face; the shoulder is the second less the first. Bring the centre back in, snug as in Op 60."
 inspection = "Tip to seat {{cad.seat_face_station_min_in:.2dot}}–{{cad.seat_face_station_max_in:.2dot}}; the shoulder M + {{process.end_play_min_in:.3dot}} to M + {{process.end_play_max_in:.3dot}}."
 gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.seat_face_station_band_mm}}" }, { gauge = "calipers", band_mm = [50.292, 56.896] }]
 
