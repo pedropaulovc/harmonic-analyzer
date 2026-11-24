@@ -4,7 +4,7 @@ R5 machinist review (rule 22, 3/3 runs): every measurable fit and acceptance
 a step or check makes prints in a setting-table row, not only in its step.
 None is a single model dimension a setting view could carry (stack results,
 end plays, gaps, flush and pin-depth limits, the spring-foot station inside
-#1037's centred window, engagements read as the lesser of two records), so each
+#1037's centred window, engagements counted in turns from first bite), so each
 is a row the drawing numbers on from sheet 15's rows and places with the
 shared general-table helper; its step cites the row in place of the number.
 
@@ -16,6 +16,9 @@ ha_assembly_package reads its instruments into the ASSEMBLY.md tool list.
 
 from __future__ import annotations
 
+import math
+
+from _mcmaster_91829a560 import PITCH as PIVOT_SCREW_PITCH
 from cone_set_stack import (
     LAND_2_ASSEMBLED_RUNOUT_TIR_MM,
     PIVOT_RUNOUT_TIR_MM,
@@ -38,10 +41,8 @@ from dt_pinion_arbor_collar_spec import (
     PIN_END_DEPTH_SPREAD_TEXT as COLLAR_PIN_DEPTH_SPREAD,
 )
 from dt_pinion_spring_section import SCREW_EAST_OF_PIVOT as SPRING_SCREW_EAST_OF_PIVOT
-from dt_swing_stop_screw_spec import MIN_USEFUL_ENGAGEMENT_TEXT as STOP_SCREW_ENGAGEMENT
-from dt_vn_cone_pivot_screw_spec import (
-    MIN_USEFUL_ENGAGEMENT_TEXT as PIVOT_SCREW_ENGAGEMENT,
-)
+import dt_swing_stop_screw_spec as stop_screw
+import dt_vn_cone_pivot_screw_spec as pivot_screw
 from dt_vn_pinion_strap_pin_spec import PIN_SUB_FLUSH_MAX as STRAP_PIN_SUB_FLUSH_MAX
 import dt_vn_post_mount_screw_spec as post_screw
 from pinion_rig_layout import FLUSH_SET_ERROR
@@ -60,6 +61,29 @@ POST_SCREW_SHORT_TEXT = inch_max_text(
     post_screw.POST_SCREW_CUT_TO_FIT_SHORT, post_screw.CUT_TO_FIT_SHORT_PLACES
 )
 (_LAND_2_TEETH,) = cone_gear.LAND_2_TEETH
+
+
+# Owner ruling 2026-11-24, audit part 2 S1 ("all approved (ticked)"): checks
+# 4W and 4Y count turns from first bite, the screw run in to seated, in place
+# of the lesser of two recorded depth readings.  After N turns the full-form
+# engagement is N pitches less the incomplete lead where the screw first
+# bites: its tip chamfer and the receiver's entrance break, a pitch each.  So
+# the count that keeps each screw spec's inspected floor (DT-04's 1D for the
+# pivot, 1.5D for the stop) is that floor in pitches plus two, rounded up.
+FIRST_BITE_LEAD_PITCHES = 2
+
+
+def first_bite_turns(floor_mm: float, pitch_mm: float) -> int:
+    """Turns from first bite that hold ``floor_mm`` of full-form thread."""
+    return math.ceil(floor_mm / pitch_mm + FIRST_BITE_LEAD_PITCHES - 1e-9)
+
+
+PIVOT_SCREW_TURNS = first_bite_turns(
+    pivot_screw.MIN_USEFUL_ENGAGEMENT_MM, PIVOT_SCREW_PITCH
+)
+STOP_SCREW_TURNS = first_bite_turns(
+    stop_screw.MIN_USEFUL_ENGAGEMENT_MM, stop_screw.THREAD_PITCH
+)
 # (key, step, setting, set to / accept, check with), in step order, then rows
 # added later appended so no earlier row (which other records cite by number)
 # renumbers.
@@ -155,24 +179,22 @@ ACCEPTANCES = (
         "CALIPER DEPTH ROD",
     ),
     # Attempt 1 review (run 20261117T133225781Z, rule 22): checks 4W and 4Y
-    # printed their engagement minimums only in check text.  Each is the lesser
-    # of two recorded readings (step 23's depth gauge and calipers), never one
-    # model dimension.
+    # printed their engagement minimums only in check text.  Each is a count
+    # of turns from first bite, recorded in step 23 as the screw goes in
+    # (owner ruling S1, above).
     (
         "pivot-screw-engagement",
         "CHECK 4W",
-        "MHA-DT-VN-52 FULL-FORM THREAD ENGAGEMENT",
-        PIVOT_SCREW_ENGAGEMENT,
-        f"LESSER OF {_step_ref('other-base-mounting', 'J')}, "
-        f"{_step_ref('other-base-mounting', 'K')}",
+        "MHA-DT-VN-52 TURNS, FIRST BITE TO SHOULDER SEATED",
+        f"{PIVOT_SCREW_TURNS} MIN",
+        f"COUNTED AT {_step_ref('other-base-mounting', 'K')}",
     ),
     (
         "stop-screw-engagement",
         "CHECK 4Y",
-        "MHA-SH-VN-52 SWING STOP FULL-FORM THREAD ENGAGEMENT",
-        STOP_SCREW_ENGAGEMENT,
-        f"LESSER OF {_step_ref('other-base-mounting', 'N')}, "
-        f"{_step_ref('other-base-mounting', 'P')}",
+        "MHA-SH-VN-52 SWING STOP TURNS, FIRST BITE TO SEATED",
+        f"{STOP_SCREW_TURNS} MIN",
+        f"COUNTED AT {_step_ref('other-base-mounting', 'N')}",
     ),
     # #3292 (owner ruling 2026-11-21, options 2 + 4): T024 is centred to this
     # row while its bond is wet (1S); after cure it is recorded (1W: owner
