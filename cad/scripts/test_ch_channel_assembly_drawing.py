@@ -1449,7 +1449,7 @@ def test_the_feeler_acceptances_are_setting_table_rows_their_steps_cite() -> Non
         assert drawing.notes.setting_row(key) in _step_body(key)
         assert "SHEET 6" in drawing.notes.setting_row(key)
     assert _setting_table_row("rear-keeper-to-stack")[2:] == (
-        "REAR LUG TO LAST HUB",
+        "LEFT LUG TO LAST HUB",
         "-",
         ".020",
         "FEELER LEAF",
