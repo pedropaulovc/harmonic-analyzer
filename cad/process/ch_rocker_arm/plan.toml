@@ -1,12 +1,179 @@
-# Placeholder process plan (owner 2026-11-19): the tools this part needs, from
-# quotes-2026-11-17-rev3.xlsx, until its traveler is written. Not enrolled in
-# _process_plans.TRAVELER_STEMS; see cad/process/README.md, "Placeholder plans".
-title = "Rocker Arm"
-part = "MHA-CH-06 Rocker Arm"
-revision = "placeholder"
-material = "AISI 1018 low-carbon steel"
-stock = "To be written"
+# Rocker arm MHA-CH-06, 20 off, built up (the drawing's note 2) from the
+# finished hub MHA-CH-12 (cad/process/ch_rocker_hub) and the finished strap
+# MHA-CH-13 (cad/process/ch_rocker_strap). Owner ruling 2026-11-24, fit audit
+# question 2, approved as recommended: "ream .400 with no band; hub turned
+# until it slides in (clearance .0005-.0030); bond; a cure jig and the
+# MHA-CH-06 traveler are written first". Fit audit question 1 (same ruling):
+# the pivot bore is F-drilled, no reamer or pins, accepted by trial on the
+# 1/4 in shaft bar. The hub arrives with its land at the finished Ø, turned
+# to its own numbered strap's measured hole (hub n to strap n; over the
+# reamer's band the lands span .3975-.3995), and its D bore and length left
+# with stock; the strap arrives finished. This traveler:
+#
+# Setup 1 bonds each hub into its own strap with LOCTITE 638 on the surface plate
+# (moved here from the hub traveler's Setup 4): the hub stands on its faced
+# end, the strap lies on two gauge blocks of the owned Mitutoyo set so it is
+# parallel to the plate at the hub's middle; no fixture is made (the cure jig
+# is the plate and the blocks). 24 h cure before anything loads the joint.
+#
+# Setups 2-3 run on the PM-30MV with the vise off (the arm is 11.5 in long
+# and .098 thick: no vise grip holds it; the strap sub-plate MHA-CH-13-TL-01
+# cannot locate a finished strap and has no relief under the #47 hole). The
+# arm lies on the two owned Taytools 1-2-3 blocks, 2 in up, .500 apart, the
+# hub's lower end in the gap between them, under two LMS 1268 step clamps
+# over the blocks. Each hub end is faced from its own strap face: Z0 is the
+# strap's top face at every load, and the program faces the top end to
+# Z +.090 (prechips cad.hub_end_height_in: (.278 - .098)/2), so the strap is
+# centred on the hub whatever the strap's thickness and the hub length is
+# .090 + t + .090, .277-.279 over the strap's .097-.099. Setup 2 faces the
+# first end (datum G's, the hub's -Z end, up). Setup 3, turned over, faces
+# the other end and, still in that load, drills F through the hub (the D
+# bore was drilled on the land's own axis in the hub traveler, so the F
+# follows it: the hub OD's Ø.004 position to the bore is held by that) and
+# spots and drills the #47 rod-pin hole through the strap at its BASIC
+# offset from the hub's axis, the strap's tip on a third block beyond it. The
+# arm's angle for the #47 is set by the strap's top edge: an arc
+# symmetric about the hub, so the edge finder reads the same Y on it at X
+# -3.94 and X +3.94.
+#
+# Route for speed: two loads per arm, both on one table setup that stays for
+# the lot (blocks and clamps set once); the alternative,
+# fixturing on the strap sub-plate, needs a second fixture plate and adds a
+# tape-and-CA bond per load.
+#
+# Bench (Setup 4): deburr; the hub length by micrometer and the bore by trial
+# on the 1/4 in ground bar offcut every arm; first article: each hub end's
+# height over its strap face and the #47's distance from the bore. Setup 5
+# blackens the arm with Presto Black Steel PC9 (owner ruling 2026-11-21: the
+# drawing's black oxide); the strap and hub sheets call black oxide after
+# joining, so this is their blackening too.
+#
+# NC (cam:ch_rocker_arm, cad/process/ch_rocker_arm/cam.py): RA01_first_end
+# and RA02_second_end_holes. G54 per load: X0 Y0 the hub's axis (edge
+# finder), Z0 the strap's top face (T1 on a .200 gauge block). Program
+# names, the [parameters] and the milling_cuts names are a contract with
+# that recipe.
+title = "Rocker arm"
+part = "{{cad.drawing_number}}"
+revision = "{{cad.revision}}"
+material = "AISI 1018: hub MHA-CH-12 bonded into strap MHA-CH-13 (the drawing's note 2)"
+stock = "Per arm: one finished hub MHA-CH-12 and its own finished strap MHA-CH-13, paired by number in the hub traveler (hub n's land turned to strap n's hole, inside Ø{{cad.hub_land_min_in:.4dot}}–{{cad.hub_land_max_in:.4dot}}; D bore; {{process.hub_supply_length_min_in:.2dot}}–{{process.hub_supply_length_max_in:.2dot}} long); {{process.quantity:d}} arms."
+note = "Inches unless mm; G-code and console entries in mm (the files and the controller run G21). Setups 2–3 on the PM-30MV with the vise off: the arm on 1-2-3 blocks under two step clamps; the blocks and clamps stay set for the lot. Home the mill ($H) once a session, not at every setup. Speeds on the PM-30MV low belt (100–2800 rpm), each on one of its 107.7 rpm stops: no belt change."
 shop = "../shop"
+material_key = "rocker-1018-cold-finished"
+milling_material = "steel_1018"
+
+[cad]
+file = "../../out/features/ch_rocker_arm/features.toml"
+adapter = "joined_hub"
+part = "ch-rocker-arm"
+
+[parameters]
+quantity = 20
+# The hub as made (cad/process/ch_rocker_hub): the span of the land windows
+# its traveler turns (ch_rocker_hub_fit.LAND_WINDOW; test_ch_rocker_arm_process binds
+# both), inside the arm's Ø.40 ±.01 (prechips refuses otherwise: the land is
+# not cut again); its length, the .32 MIN supply length (ch_rocker_hub_spec
+# SUPPLY_LENGTH_MIN) to .35, the .34 the hub traveler parts at plus .01 for
+# the blade's wander; Setup 1 sets a longer hub aside.
+hub_land_min_in = 0.3975
+hub_land_max_in = 0.3995
+hub_supply_length_min_in = 0.32
+hub_supply_length_max_in = 0.35
+# How far off the hub's middle the bond may leave the strap: the gauge
+# blocks within .005 of H, plus the paper under the hub, .004 (plain copy
+# paper, the author's figure). With the lengths above prechips binds each
+# end's facing depth, cad.face_depth_min_in .0115 to cad.face_depth_max_in
+# .0455 (1.16 mm, under the measured face setting's 1.27).
+bond_offset_max_in = 0.009
+# Gauge blocks for the bond (shop-equipment gauges.gauge-blocks-mitutoyo:
+# the .101-.149 by .001 series), the strap's nominal taken off the hub.
+gauge_block_min_in = 0.101
+gauge_block_max_in = 0.149
+# --- Table hold, Setups 2-3 (shop-equipment fixtures.blocks-123, the owned
+# Taytools pair; fixtures.clamping-kit-lms-1268) ---
+# Each block stands on its 1 x 3 face, 2 in up, its 3 in along X: on 1 in
+# blocks the 1/2 in end mill's spindle nose would come under the mill's
+# 2.4 in least spindle-to-table reach (prechips machine_capacity). The gap
+# between them, .500, is set with the .500 gauge block: the hub's Ø.40 hangs
+# in it with .05 a side. X from the hub's axis.
+block_height_mm = 50.8
+block_inner_x_mm = 6.35
+block_outer_x_mm = 82.55
+# A step clamp's toe on the strap over each block, 2.50 in either side of
+# the hub; clamp tops at most 1.50 in above the strap (a prove-out check):
+# every move between the hub and the #47 runs at traverse_z_mm, above them.
+clamp_x_mm = 63.5
+clamp_toe_mm = 12.7
+clamp_top_max_mm = 38.1
+traverse_z_mm = 45.0
+# A third 1-2-3 block (the shop has five, fixtures.blocks-123), also 2 in
+# up, under the strap's right tip, its inner end at X 5.375: the #47 at
+# X 5.239 then lies between it and the right block, .135 in from its end
+# (the drill's .039 radius inside that). The drill pushes the strap down onto
+# both: pinned at the right block's outer end and the tip block's inner end
+# (milling_deflection), the strap's tip a .4 in overhang beyond. On a screw
+# jack beside the hole the strap overhangs it and bends .26 mm under the
+# drill's thrust (prechips milling_deflection, over its .1 mm limit).
+tip_block_x_mm = 136.525
+# The strap as a beam (milling_deflection): its 16 mm depth (the drawing's
+# REF, cad.profile_outer_depth_ref_mm) at its thickness, from tip to tip.
+strap_depth_mm = 16.0
+strap_tip_x_mm = 145.978
+# --- Facing, both setups: the 1/2 in carbide end mill at the #3439
+# measured face setting (settings.em-half-carbide-1018-3439-face: <= 6.4 mm
+# wide, <= 1.27 mm deep, 2450 rpm), 1.12 in out of the collet (owner
+# 2026-11-24: "28.45"). Two passes along X at the end's final Z, the
+# cutter's centre on the hub's edge at Y +r then -r (r the hub's nominal
+# radius, cad.hub_dia_in/2): each takes at most the cutter's radius,
+# 6.35 mm, of the end; both conventional, the hub on the cutter's right.
+half_mill_projection_mm = 28.45
+face_cutter_dia_mm = 12.7
+face_woc_mm = 6.35
+face_pass_y_mm = 5.08
+face_pass_x_mm = 14.0
+# --- Holes, Setup 3. Speeds: LittleMachineShop "Cutting Speeds", plain
+# carbon steels 1006-1026, drilling 60-100 ft/min; feeds: AutoDrill
+# "Suggested drilling feed rates", Stl, Carbon, 1/16 in .001, 1/4 in .003
+# in/rev (as cad/process/ch_pivot_bracket). Each on a spindle stop
+# (machines.pm-30mv, 107.7 rpm): F (.257) 969 (stop 9, 65 ft/min) x .003 =
+# 2.9 in/min; centre drill 1831 (stop 17) x .001 = 1.83 in/min; #47 (.0785)
+# 2800 (stop 26, the top, 58 ft/min) x .001 = 2.8 in/min.
+# F: through the faced hub, its full diameter bore_drill_past_mm past the
+# lower end (Z -(.098 + .090)); the D bore leaves it only .0055 a side.
+bore_drill_past_mm = 0.5
+bore_tip_z_mm = -7.236
+bore_feed_per_min_mm = 73.66
+# The #47 spot: Ø.063 on the #2 centre drill's pilot point, under the #47.
+spot_dia_mm = 1.6
+spot_feed_per_min_mm = 46.48
+rod_drill_past_mm = 0.5
+rod_tip_z_mm = -3.588
+rod_feed_per_min_mm = 71.12
+# Machine-capacity inputs (mm): tool lengths from the spindle nose.
+r8_collet_gauge_mm = 6.3         # HA: holders.r8-collets-lms-4860.gauge_len_mm (as the strap plan).
+drill_chuck_gauge_mm = 95.0      # Archive holders.drill-chuck-r8.gauge_len_mm.
+drill_oal_mm = 101.6             # F jobber drill, 4 in overall: bounded by its whole length.
+
+[[tools]]
+id = "gauge-blocks"
+name = "Gauge blocks"
+ref = "gauge-blocks-mitutoyo"
+
+[[tools]]
+id = "em-half"
+name = "1/2 in carbide end mill"
+ref = "endmill-carbide-3fl-1-2"
+
+[[tools]]
+id = "drill-f"
+name = "F drill"
+ref = "jig-drill-f"  # owner ruling 2026-11-24, fit audit question 1: the pivot bore F-drilled, no reamer or pin gauges
+
+[[tools]]
+id = "spot"
+name = "#2 centre drill"
+ref = "jig-spot"
 
 [[tools]]
 id = "drill-47"
@@ -14,14 +181,342 @@ name = "#47 drill"
 ref = "drill-47"  # Drills #47
 
 [[tools]]
-id = "drill-f"
-name = "F drill"
-ref = "jig-drill-f"  # owner ruling 2026-11-24, fit audit question 1: the pivot bore F-drilled, no reamer or pin gauges
+id = "deburr"
+name = "Deburring set"
+ref = "deburring-set"
+
+[[tools]]
+id = "files"
+name = "Files"
+ref = "jig-files"
+
+[[tools]]
+id = "sanding-roll"
+name = "220 sanding roll"
+ref = "sanding-roll-220"
+
+# Setup 1: the bond (owner ruling 2026-11-24, fit audit question 2), moved
+# from the hub traveler. Held with owned equipment only, no fixture made: the
+# hub stands on its faced end on the surface plate (gauges.surface-plate), so
+# its axis is square to the plate, and the strap lies on two gauge blocks of
+# the owned Mitutoyo set (gauges.gauge-blocks-mitutoyo, the .101-.149 by
+# .001 series), so it is parallel to the plate at the hub's middle: square
+# hub to strap within the blocks' .001 difference over their spacing. The
+# offset of the strap from the hub's middle (bond_offset_max_in) is taken by
+# the hub's face stock each end (ch_rocker_hub_spec.FACE_STOCK).
+# LOCTITE 638 (consumables.loctite-638, on hand): fixture about 4 min on
+# steel, full cure 24 h (Henkel, LOCTITE 638 product page, read 2026-11-24:
+# https://next.henkel-adhesives.com/us/en/products/industrial-adhesives/central-pdp.html/loctite-638/BP000000450822.html);
+# 30 min on the blocks is the shop's margin for the .0030 widest gap, which
+# cures slower. The joint is loaded first by Setup 2, after the 24 h.
+# Degrease with isopropyl alcohol, as the strap traveler's bond does. The F
+# bore is drilled through the hub after the cure, so the compound is kept
+# off the hub's ends and out of its bore, which that drill and the facing
+# would meet.
+[[setups]]
+machine_kind = "other"
+title = "Bond each hub into its own strap (LOCTITE 638), 24 h cure"
+machine = "Surface plate (bench)"
+indexing = "none"
+holding = "On the surface plate, one joint at a time per pair of blocks: a square of plain paper under the hub's place (it keeps the 638 off the plate); strap n lying flat across two gauge blocks, one under each arm about 1 in either side of the hub hole; hub n through its hub hole, standing on its faced end on the paper."
+datum = "None. The plate squares the hub (it stands on its faced end); the two blocks hold the strap parallel to the plate at the hub's middle."
+diagram = { file = "diagrams/bond.svg", alt = "Section through the hub: the surface plate, a paper square under the hub, the hub standing on its end through the strap's hub hole, the strap resting on a gauge block under each arm, the 638 film in the land's middle." }
+envelope = "other"
+vise_hold = "other"
+beam = "other"
+
+[[setups.operations]]
+steps = [
+  { kind = "check", text = "Each hub: its length L across the faces, calipers, {{process.hub_supply_length_min_in:.2dot}}–{{process.hub_supply_length_max_in:.2dot}}." },
+  { kind = "stop", text = "Over {{process.hub_supply_length_max_in:.2dot}}: set the hub aside and tell the owner (its end would take more than the end mill's measured depth)." },
+]
+feed = "hand"
+
+[[setups.operations]]
+speed_kind = "other"
+tool = "gauge-blocks"
+drilling = "none"
+sizing = "other"
+instruction = "Each hub: H = (L − {{cad.strap_thickness_in:.3dot}})/2. Pick two blocks of the {{process.gauge_block_min_in:.3dot}}–{{process.gauge_block_max_in:.3dot}} series within .005 of H and within .001 of each other (for example .120 and .121 when H is .121); up to five joints go at once on different pairs."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Dry fit as in Holding, no compound: each hub slides through its own strap's hole (the same number) by hand and stands on its end on the paper, the strap on both blocks."
+feed = "hand"
+inspection = "Dry fit: the strap rests on both blocks (no light under either), the hub stands upright on the paper without being held."
+gauge_checks = "other"
+
+[[setups.operations]]
+instruction = "Lift the strap and hub off. Degrease the land and the strap's hub hole with isopropyl alcohol on a clean rag and let them dry; from here on touch neither."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Put a thin ring of LOCTITE 638 round the middle of the land, no more than covers it once the hub is in; none on the hub's ends or in its bore. Slide the hub into its strap's hole with a quarter turn to spread the compound and set both back as in the dry fit."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "At once wipe any squeeze-out off both strap faces and the hub's outside with a dry rag; none may run down onto the paper."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Leave the joint untouched on its blocks for 30 min. Then lift it off by the strap, peel the paper off the hub's end and set it aside untouched until 24 h from the bond. Wipe the blocks with isopropyl alcohol and oil them. Nothing loads the joint (Setups 2–3) before the 24 h."
+feed = "hand"
+inspection = "At 24 h: the hub does not turn or shift in the strap when twisted hard by hand; no 638 on the hub's ends or in its bore."
+gauge_checks = "other"
+
+[[setups.operations]]
+steps = [
+  { kind = "stop", text = "The hub moves in the strap: stop and tell the owner (do not re-bond over cured 638)." },
+]
+feed = "hand"
+
+# Setup 2: the first hub end. Strap face A (the face toward datum G's end,
+# the hub's -Z end) up. Model to work: X = -x, Y = y - pivot, Z = -z - t/2
+# (turned over about the model's Y axis); the facing is symmetric, so the
+# arm may lie either end to the right. The blocks only push up; the clamps
+# over them hold the strap down: the strap is pinned at the blocks' inner
+# edges either side of the hub for the cuts at the hub.
+[[setups]]
+machine_kind = "other"
+title = "First hub end (datum G's end) to its height"
+machine = "PM-30MV CNC (FluidNC, CNCjs with the electronic tool setter), vise off"
+indexing = "none"
+machine_ref = "pm-30mv"
+holding = "Vise off. Two 1-2-3 blocks on the table, each on its 1 × 3 face (2 in up), 3 in along X, their inner ends .500 apart; a third, the tip block, the same way, its inner end {{process.tip_block_x_mm:in.3f}} right of the gap's middle. The arm across them, face A up, the hub's lower end in the gap. A step clamp (LMS 1268) on the strap over each gap block, toes {{process.clamp_x_mm:in.2f}} either side of the hub."
+datum = "Program RA01_first_end. G54 per arm: X0 Y0 the hub's axis (edge finder on both sides of the hub's top end, each way); Z0 the strap's top face (T1 on a .200 gauge block on the strap over a block). The M6 measures T1 on the tool setter."
+diagram = { file = "diagrams/first-end.svg", alt = "Elevation from the front: the strap on two 1-2-3 blocks 2 in up, .500 apart, the hub's lower end in the gap, a step clamp on the strap over each block; the 1/2 in end mill faces the hub's top end {{cad.hub_end_height_in:.3dot}} above the strap. Plan: the two passes at Y +{{process.face_pass_y_mm:in.3dot}} and −{{process.face_pass_y_mm:in.3dot}}." }
+envelope = { x_span_mm = ["{{process.strap_tip_x_mm}}", "{{process.strap_tip_x_mm}}"], y_span_mm = ["{{process.strap_depth_mm}}", "{{process.face_cutter_dia_mm}}"], work_top_mm = ["{{process.block_height_mm}}", "{{cad.strap_thickness_mm}}", "{{cad.hub_end_supply_max_mm}}"], deepest_cut_mm = ["{{process.block_height_mm}}", "{{cad.strap_thickness_mm}}", "{{cad.hub_end_height_mm}}"], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_mm}}"] }
+vise_hold = "other"
+# Signed spans are written out (a template cannot negate): extent ±strap_tip_x_mm, supports ±block_inner_x_mm; test_ch_rocker_arm_process checks them.
+beam = { axis = "x", hold = "between", extent_mm = [-145.978, 145.978], supports_mm = [-6.35, 6.35], section_mm = { y = "{{process.strap_depth_mm}}", z = "{{cad.strap_thickness_mm}}" } }
+
+[[setups.operations]]
+instruction = "Once for the lot: vise off; the two gap blocks on the table as in Holding, the .500 gauge block between their inner ends while they are pushed together, then out; the tip block in line, its inner end {{process.tip_block_x_mm:in.3f}} from the gap's middle (steel rule). Step clamps and step blocks in the T-slots behind, set for the strap."
+feed = "hand"
+
+[[setups.operations]]
+steps = [
+  { kind = "action", text = "Per arm, 24 h or more after its bond: lay it across the blocks, face A up (both hub ends unfaced, the first time), the hub's lower end in the gap, one tip on the tip block; clamp over each gap block, snug." },
+  { kind = "check", text = "The strap lies flat on the gap blocks (no light under either) and the hub's lower end clears both blocks' ends." },
+]
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Home ($H) if not yet homed this session. The edge finder at 969 (a spindle stop), its tip .03 above the strap, on the hub's top end: X on its left side, G10 L20 P1 X0; on its right side, read X and enter G10 L20 P1 X(half that reading). Y the same way, front then back."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Console M6 T1 (the 1/2 in end mill, {{process.half_mill_projection_mm:in.2f}} in out of the collet, measured on the tool setter). T1, spindle off, just dragging on the .200 gauge block laid on the strap over the left block, about X −1.0: G10 L20 P1 Z5.080."
+feed = "hand"
+
+[[setups.operations]]
+steps = [
+  { kind = "action", text = "First arm only: prove RA01 and RA02 in air. Console M6 T1; on the .200 block: G10 L20 P1 Z-20.320 (Z0 1.000 in high). Run each file single block through its first moves, then M6 T1 and G10 L20 P1 Z5.080 on the block again." },
+  { kind = "check", text = "Steel rule from the strap: every clamp's top, nut included, {{process.clamp_top_max_mm:in.2f}} in or less above the strap." },
+  { kind = "stop", text = "Over: lower the clamp on its step block and check again; nothing runs until it is." },
+]
+feed = "hand"
+
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "em-half"
+drilling = "none"
+sizing = "other"
+instruction = "Run RA01_first_end (M6 T1, the 1/2 in end mill; set 2450: the display rests near 2485, not 2380). Dry. Two passes along X at Z {{cad.hub_end_height_in:.3dot}}, the cutter's centre at Y +{{process.face_pass_y_mm:in.3dot}} then Y −{{process.face_pass_y_mm:in.3dot}}: each end takes {{cad.face_depth_min_in:.3dot}}–{{cad.face_depth_max_in:.3dot}}."
+settings = "em-half-carbide-1018-3439-face"
+milling_cuts = [
+  { name = "first end", kind = "end", phase = "finish", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", axial_doc_mm = "{{cad.face_depth_max_mm}}", radial_woc_mm = "{{process.face_woc_mm}}", traverse_mm = [-14.0, 14.0] },
+]
+inspection = "The whole end is faced: no unfaced patch on it."
+gauge_checks = "other"
+
+[[setups.operations]]
+steps = [
+  { kind = "stop", text = "An unfaced patch: the strap sits further off the hub's middle than the end's stock allows; stop and tell the owner, do not face deeper." },
+  { kind = "action", text = "Unclamp; the arm goes on to Setup 3. The next arm in, from Op 90." },
+]
+feed = "hand"
+
+# Setup 3: the second end and both holes, face B (datum B, the hub's +Z end)
+# up. Model to work: X = x, Y = y - pivot, Z = z - t/2 (the model frame,
+# offset): the #47 lies at prechips cad.rod_hole_from_bore_x/_y_in from the
+# hub's axis, the strap's top edge toward +Y (the back). The strap's tip
+# rests on the tip block: the #47 lies between it and the right block,
+# pinned on both.
+[[setups]]
+machine_kind = "other"
+title = "Second hub end; F bore and #47 rod-pin hole"
+machine = "PM-30MV CNC (FluidNC, CNCjs with the electronic tool setter), vise off"
+indexing = "none"
+machine_ref = "pm-30mv"
+holding = "As Setup 2, the arm turned over: face B up, the faced end G down in the gap, the strap's top edge (the concave one) to the back; one tip on the tip block (before the #47 the strap's two ends are alike)."
+datum = "Program RA02_second_end_holes. G54 per arm: X0 Y0 the hub's axis, +X toward the tip block, the top edge trammed along X; Z0 the strap's top face (T1 on the .200 gauge block). Each M6 measures its tool on the tool setter."
+diagram = { file = "diagrams/second-end.svg", alt = "Elevation from the front: the arm turned over on the blocks, its right tip on the tip block; the end mill faces the hub's top end, the F drill runs through the hub into the gap, the #47 through the strap between the right block and the tip block. Plan: the top edge read at X −3.94 and +3.94; the #47 at X {{cad.rod_hole_from_bore_x_in:.4dot}}, Y {{cad.rod_hole_from_bore_y_in:.4dot}}." }
+envelope = { x_span_mm = ["{{process.strap_tip_x_mm}}", "{{process.strap_tip_x_mm}}"], y_span_mm = ["{{process.strap_depth_mm}}", "{{process.face_cutter_dia_mm}}"], work_top_mm = ["{{process.block_height_mm}}", "{{cad.strap_thickness_mm}}", "{{cad.hub_end_supply_max_mm}}"], deepest_cut_mm = ["{{process.block_height_mm}}", "{{cad.strap_thickness_mm}}", "{{process.bore_tip_z_mm}}"], longest_tool_mm = ["{{process.drill_chuck_gauge_mm}}", "{{process.drill_oal_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_mm}}"] }
+vise_hold = "other"
+beam = { axis = "x", hold = "between", extent_mm = [-145.978, 145.978], supports_mm = [-6.35, 6.35], section_mm = { y = "{{process.strap_depth_mm}}", z = "{{cad.strap_thickness_mm}}" } }
+
+[[setups.operations]]
+instruction = "Turn the arm over (face B up, end G down in the gap), the strap's concave edge to the back and the same blocks under it; clamp over each block, light. Edge finder on the hub's top end, X0 Y0 as in Setup 2."
+feed = "hand"
+
+[[setups.operations]]
+steps = [
+  { kind = "action", text = "Tram the arm: edge finder on the strap's back (concave) edge from the back at X −3.94, then at X +3.94; read Y at each touch." },
+  { kind = "check", text = "The two readings within .002 of each other." },
+  { kind = "stop", text = "Not: tap the high end round about the hub, clamp, X0 Y0 again on the hub and read both again." },
+]
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Clamp both clamps snug. The strap's right tip lies on the tip block, no light under it. T1 on the .200 block over the left block: G10 L20 P1 Z5.080."
+feed = "hand"
+
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "em-half"
+drilling = "none"
+sizing = "other"
+instruction = "Run RA02_second_end_holes (M6 T1, the 1/2 in end mill; set 2450, display near 2485). Dry. The second end at Z {{cad.hub_end_height_in:.3dot}}, the same two passes as RA01."
+settings = "em-half-carbide-1018-3439-face"
+milling_cuts = [
+  { name = "second end", kind = "end", phase = "finish", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", axial_doc_mm = "{{cad.face_depth_max_mm}}", radial_woc_mm = "{{process.face_woc_mm}}", traverse_mm = [-14.0, 14.0] },
+]
+
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "drill-f"
+drilling = "twist_drill"
+sizing = "other"
+instruction = "Same file, M6 T2 (spindle off, retracted): the F drill down the D bore at X0 Y0, one plunge, its full diameter {{process.bore_drill_past_mm:in.3dot}} past end G into the gap; set 969. Cutting oil."
+rpm = 969
+feed = "{{process.bore_feed_per_min_mm:in.1f}} in/min"
+hole_depth_mm = "{{cad.bore_depth_mm}}"
+peck = "none"
+milling_cuts = [
+  { name = "bore", kind = "drill", phase = "finish", cutter_dia_mm = 6.5278, flutes = 2, rpm = 969, feed_mm_min = "{{process.bore_feed_per_min_mm}}", stations_mm = [0] },
+]
+inspection = "First arm, still clamped, at the next M6 (spindle off): the 1/4 in ground bar offcut (stock 1018-ground-round-1-4, the MHA-CH-05 bar) slides through the bore by hand."
+gauge_checks = "other"
+
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "spot"
+drilling = "none"
+sizing = "other"
+instruction = "Same file, M6 T3 (spindle off, retracted): the #2 centre drill spots the rod-pin hole Ø{{process.spot_dia_mm:in.3dot}} at X {{cad.rod_hole_from_bore_x_in:.4dot}}, Y {{cad.rod_hole_from_bore_y_in:.4dot}}, under the #47; set 1831. Every move between runs {{process.traverse_z_mm:in.2f}} above the strap."
+rpm = 1831
+feed = "{{process.spot_feed_per_min_mm:in.2f}} in/min"
+beam = { axis = "x", hold = "between", extent_mm = [-145.978, 145.978], supports_mm = ["{{process.block_outer_x_mm}}", "{{process.tip_block_x_mm}}"], section_mm = { y = "{{process.strap_depth_mm}}", z = "{{cad.strap_thickness_mm}}" } }
+milling_cuts = [
+  { name = "rod spot", kind = "drill", phase = "rough", cutter_dia_mm = "{{process.spot_dia_mm}}", flutes = 2, rpm = 1831, feed_mm_min = "{{process.spot_feed_per_min_mm}}", stations_mm = "{{cad.rod_hole_from_bore_x_mm}}" },
+]
+
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "drill-47"
+drilling = "twist_drill"
+sizing = "other"
+instruction = "Same file, M6 T4 (spindle off, retracted): the #47 drill through the strap, one plunge, its full diameter {{process.rod_drill_past_mm:in.3dot}} past the underside; set 2800. Cutting oil. At the file's end: unclamp, the arm to the bench."
+rpm = 2800
+feed = "{{process.rod_feed_per_min_mm:in.1f}} in/min"
+hole_depth_mm = "{{cad.strap_thickness_mm}}"
+peck = "none"
+beam = { axis = "x", hold = "between", extent_mm = [-145.978, 145.978], supports_mm = ["{{process.block_outer_x_mm}}", "{{process.tip_block_x_mm}}"], section_mm = { y = "{{process.strap_depth_mm}}", z = "{{cad.strap_thickness_mm}}" } }
+milling_cuts = [
+  { name = "rod drill", kind = "drill", phase = "rough", cutter_dia_mm = 1.9939, flutes = 2, rpm = 2800, feed_mm_min = "{{process.rod_feed_per_min_mm}}", stations_mm = "{{cad.rod_hole_from_bore_x_mm}}" },
+]
 
 [[setups]]
 machine_kind = "other"
-machine = "To be written"
-title = "Traveler to come"
+title = "Bench: deburr and inspect"
+machine = "Bench"
+indexing = "none"
+diagram = { file = "diagrams/inspect.svg", alt = "The finished arm: the hub length across both ends, each end's height over its strap face, the F bore through the hub, the #47 at its distance from the bore." }
+envelope = "other"
+vise_hold = "other"
+beam = "other"
 
 [[setups.operations]]
-instruction = "Process not written yet."
+speed_kind = "other"
+tool = "deburr"
+drilling = "none"
+sizing = "other"
+instruction = "Break the edges the cuts left, R{{cad.edge_break_in:.3dot}} or chamfer {{cad.chamfer_max_in:.3dot}} max: both mouths of the F bore and of the #47 with the deburring set's countersink, by hand, a light turn; the hub's two faced rims with the smooth file. No burr may stand on a hub end."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Each arm: hub length across its two ends, micrometer, the anvils on the hub's rim beside the bore. The 1/4 in ground bar offcut slides through the bore by hand."
+inspection = "Hub length {{cad.hub_length_min_in:.3dot}}–{{cad.hub_length_max_in:.3dot}}; the offcut slides through the bore: its running clearance on MHA-CH-05."
+gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.hub_length_band_mm}}" }]
+feed = "hand"
+
+[[setups.operations]]
+steps = [
+  { kind = "stop", text = "A hub length out of band or a bore the offcut does not pass: set the arm aside and tell the owner; do not re-face or open the bore." },
+]
+feed = "hand"
+
+[[setups.operations]]
+instruction = "First arm only: the strap face down on two .150 gauge blocks on the surface plate, the hub between them; dial height gauge zeroed on the strap's top face beside the hub, read the hub's top end. Turn the arm over and read the other end the same way."
+inspection = "Each hub end {{cad.hub_end_height_in:.3dot}} ±.002 over its own strap face: the strap is then within .002 of the hub's middle, the drawing's .004 position to G."
+gauge_checks = "other"
+feed = "hand"
+
+[[setups.operations]]
+instruction = "First arm only: the offcut in the bore and the #47 drill's shank in the rod-pin hole; calipers over both. Not gauged to its frame: the program's coordinates from the hub's axis place the hole; this reading proves X0, Y0 and the tram."
+inspection = "The caliper reading less .164 (half of .250 plus .0785): {{cad.rod_hole_from_bore_in:.3dot}} within .010, the pins' slack in their holes."
+gauge_checks = "other"
+feed = "hand"
+
+[[setups.operations]]
+steps = [
+  { kind = "stop", text = "Either first-arm reading out: stop before the next arm; recheck Z0 (heights) or X0, Y0 and the tram (the #47) and tell the owner." },
+]
+feed = "hand"
+
+[[setups]]
+machine_kind = "other"
+title = "Blacken with Presto Black Steel PC9 (the drawing's black oxide)"
+machine = "Bench, ventilated"
+indexing = "none"
+diagram = { file = "diagrams/blacken.svg", alt = "The finished arm, every surface to be blackened: the strap, the hub's outside and ends, the F bore and the #47 hole." }
+envelope = "other"
+vise_hold = "other"
+beam = "other"
+
+[[setups.operations]]
+instruction = "The drawing's finish: {{cad.finish}}, done in the shop by cold blackening with Birchwood Presto Black Steel PC9 (owner ruling 2026-11-21: accepted as the drawing's black oxide), by its maker's instructions as below. To buy before this setup (none on record): the PC9, chemical-resistant gloves and safety glasses."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Gloves and safety glasses on (the maker: it contains acid). Wash the arm with soap and water to take off the oil; rinse and dry it. Hold it by its tips from here on."
+feed = "hand"
+
+[[setups.operations]]
+speed_kind = "other"
+tool = "sanding-roll"
+drilling = "none"
+sizing = "other"
+instruction = "Scuff both strap faces lightly with the 220 sanding roll to fresh metal (the maker: Scotch-Brite or blasting), along the strap, flat. Not the hub's ends, its outside or the holes. Wash again and dry."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Mix the PC9 with water 1:1 in a plastic cup (the maker: 50–100% for brush-on). Brush it on every surface with even, light strokes, into the F bore and the #47; re-wet the brush and go over the edges, the hub and any light spot until the arm is an even black (the maker: do not press hard)."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Rinse thoroughly with clean water to stop the reaction (left acid keeps working and rusts the part); dry with a lint-free cloth or compressed air. Light spots: brush again, rinse, dry. Collect the solution and rinse water for a hazardous-waste drop-off, not the drain (the maker)."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Seal: wipe on the stone lubricant (a light oil; the maker: clear coat, wax or oil), leave it a few minutes, wipe off the excess."
+feed = "hand"
+inspection = "Even black all over, no bare spot and no wiping-off coating. After blackening the 1/4 in ground bar offcut still slides through the bore by hand."
+gauge_checks = "other"
+
+[[setups.operations]]
+steps = [
+  { kind = "stop", text = "The offcut tight after blackening: stop and tell the owner; do not open the bore." },
+]
+feed = "hand"
