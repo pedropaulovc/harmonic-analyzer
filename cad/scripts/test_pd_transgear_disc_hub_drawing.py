@@ -1480,7 +1480,9 @@ def test_hub_feature_bands_are_the_printed_ones() -> None:
     assert features["hub_body"]["dia"] == band(0.535, 0.545)
     assert features["hub_body"]["pin_ream_wall_min"] == pytest.approx(0.060 * IN)
     bore = features["bore"]
+    # The reamed holes print no band: their bands are marked analysis-only.
     assert bore["dia"] == band(0.3135, 0.3140)
+    assert bore["dia_basis"] == features["pin_ream"]["dia_basis"] == "analysis"
     assert (bore["process"], bore["thru"], bore["mate"], bore["datum"]) == (
         "ream",
         True,

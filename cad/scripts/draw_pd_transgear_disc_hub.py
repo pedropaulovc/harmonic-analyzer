@@ -56,6 +56,7 @@ from _drawing_detail_crop import native_circle_geometry
 from _drawing_dimensions import (
     assert_imported_precision,
     set_dimension_callouts,
+    set_dimension_suffixes,
     set_reference_dimensions,
 )
 from _drawing_edges import ViewEdge, ViewEdges, scan_view_edges
@@ -666,6 +667,10 @@ requirement(
     precision={"dia": _P["HubDia"]},
 )
 # The bore, datum A: reamed through, a sliding fit on the MHA-PD-10 boss.
+# The sheet prints the reamer's size and no band: ``dia`` and the clearance
+# are the ANALYSIS bands (what the reamer is taken to cut, and the boss
+# turned to it), which ``dia_basis`` says so no consumer reads them as
+# printed limits; a hole's manifest record needs the band.
 requirement(
     "bore",
     kind="hole",
@@ -678,6 +683,7 @@ requirement(
             limits(BORE_DIA, _P["BoreDia"], _spec.BORE_BAND, unit=_UNIT),
             ("BORE_DIA", "BORE_BAND", (_SELF, "END_KEEP")),
         ),
+        "dia_basis": ("analysis", ("BORE_BAND", "BORE_CALLOUT_BELOW")),
         "nominal_dia": (BORE_DIA, ("BORE_DIA",)),
         "thru": (True, ("BORE_CALLOUT_BELOW",)),
         "process": ("ream", ("BORE_CALLOUT_BELOW",)),
@@ -771,6 +777,7 @@ requirement(
             ),
             ("KEY_PIN_HOLE_DIA", "KEY_PIN_HOLE_BAND", (_SELF, "SECTION_KEEP")),
         ),
+        "dia_basis": ("analysis", ("KEY_PIN_HOLE_BAND", "KEY_PIN_SUFFIX")),
         "nominal_dia": (_spec.KEY_PIN_HOLE_DIA, ("KEY_PIN_HOLE_DIA",)),
         "process": ("ream", ("KEY_PIN_SUFFIX",)),
         "depth": (
@@ -1281,27 +1288,6 @@ def _precision_of(keep: dict[str, tuple[float, float]]) -> dict[str, int]:
     return {name: DRAWING_PRECISION_BY_NAME[name] for name in keep}
 
 
-def _set_dimension_suffixes(
-    adapter: Any, annotations: list[Any], suffixes: dict[str, str]
-) -> None:
-    """Append each named dimension's suffix to its value on the same line
-    (draw_pd_transgear_drive_collar's).  ``SetText`` reports nothing, so each
-    suffix is read back."""
-    remaining = dict(suffixes)
-    for annotation in annotations:
-        name = dimension_name(adapter, annotation)
-        text = remaining.pop(name, None)
-        if text is None:
-            continue
-        display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
-        display.SetText(2, text)  # swDimensionTextSuffix
-        applied = str(display.GetText(2) or "")
-        if applied.replace("\r", "") != text:
-            raise RuntimeError(f"{name}: suffix did not persist: {applied!r}")
-    if remaining:
-        raise RuntimeError(f"dimension suffixes not applied: {sorted(remaining)}")
-
-
 @_telemetry.traced("drawing.disc_hub.key_pin_dimensions")
 def _key_pin_dimensions(adapter: Any, section: Any) -> None:
     """The chord hole in A-A: the model's marked ream and knockout sizes,
@@ -1316,7 +1302,7 @@ def _key_pin_dimensions(adapter: Any, section: Any) -> None:
     )
     assert_imported_precision(adapter, annotations, _precision_of(SECTION_KEEP))
     set_dimension_callouts(adapter, annotations, SECTION_CALLOUTS_BELOW)
-    _set_dimension_suffixes(adapter, annotations, SECTION_SUFFIXES)
+    set_dimension_suffixes(adapter, annotations, SECTION_SUFFIXES)
 
 
 @_telemetry.traced("drawing.disc_hub.section_centerlines")
