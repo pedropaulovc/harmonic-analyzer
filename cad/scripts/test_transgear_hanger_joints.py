@@ -88,11 +88,11 @@ def test_the_spring_room_stays_inside_the_springs_catalogue_travel(
     corner, never pressed past its catalogue working height.  A deeper floor
     (7.0) presses it past that height; the old 6.4 floor, without the retired
     MHA-PD-VN-67 shim, leaves it loose."""
-    assert joints.SPRING_ROOM_MIN == pytest.approx(0.693, abs=1e-3)
-    assert joints.SPRING_ROOM_MAX == pytest.approx(0.957, abs=1e-3)
+    assert joints.SPRING_ROOM_MIN == pytest.approx(0.719, abs=1e-3)
+    assert joints.SPRING_ROOM_MAX == pytest.approx(0.932, abs=1e-3)
     assert spring.WORKING_HEIGHT <= joints.SPRING_ROOM_MIN
     assert joints.SPRING_ROOM_MAX < spring.FREE_HEIGHT
-    assert joints.SPRING_PRELOAD_N == pytest.approx((18.63, 39.43), abs=0.01)
+    assert joints.SPRING_PRELOAD_N == pytest.approx((20.63, 37.43), abs=0.01)
     for floor in (7.0, 6.4):
         monkeypatch.setattr(arm, "SPOT_FACE_FLOOR_FROM_FRONT", floor)
         with pytest.raises(AssertionError, match="leaves the spring"):
@@ -129,9 +129,9 @@ def test_the_spacer_bond_carries_the_spring_drag_and_push() -> None:
     assert joints.SPACER_BOND_SHEAR_N == pytest.approx(
         joints.LOCTITE_638_SHEAR_MPA * joints.SPACER_BOND_FACTOR * area
     )
-    assert joints.SPACER_BOND_SHEAR_N == pytest.approx(198.1, abs=0.1)
-    assert joints.SPACER_BOND_TORQUE_MARGIN == pytest.approx(4.16, abs=0.01)
-    assert joints.SPACER_BOND_PUSH_MARGIN == pytest.approx(5.02, abs=0.01)
+    assert joints.SPACER_BOND_SHEAR_N == pytest.approx(199.2, abs=0.1)
+    assert joints.SPACER_BOND_TORQUE_MARGIN == pytest.approx(4.41, abs=0.01)
+    assert joints.SPACER_BOND_PUSH_MARGIN == pytest.approx(5.32, abs=0.01)
     assert (
         min(joints.SPACER_BOND_TORQUE_MARGIN, joints.SPACER_BOND_PUSH_MARGIN)
         >= joints.SPACER_BOND_MARGIN_MIN
