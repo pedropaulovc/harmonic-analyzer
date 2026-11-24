@@ -9,13 +9,20 @@ from __future__ import annotations
 
 import math
 
-import _config
 import dt_crank_drive_gear_spec as spec
 from dt_crank_drive_gear_spec import inch_text
 
 
-# Keep the part's stock-form geometry independent of assembly diagnostics.
-GEAR_MESH_BACKLASH_MM = tuple(_config.fit("gear_mesh", "backlash_mm"))
+# Owner ruling 2026-11-24, fit audit question 16: the cone-to-cylinder class
+# (.002-.007) printed as this mesh's acceptance could not be met by the
+# crossed crank mesh; its own transverse backlash at print worst,
+# crank_mesh_stack.standard_check(), prints as a REF fact on both gear
+# sheets, and MHA-DT-00's turn-by-hand check (never binds) accepts the mesh.
+# Copied here in mm rather than imported: the stack is an assembly diagnostic
+# outside the part's rebuild closure (test_dt_crank_drive_gear_drawing checks
+# the copy against the stack offline).
+MESH_BACKLASH_REF_MM = (0.088107, 0.958878)
+BACKLASH_LABEL = "TRANSVERSE BACKLASH WITH MHA-DT-10 (REF)"
 
 
 def gear_data_note(rows: list[tuple[str, str]], *, title: str = "GEAR DATA") -> str:
@@ -101,16 +108,14 @@ GEAR_DATA = gear_data_note(
             inch_text(spec.TRANSVERSE_CIRCULAR_TOOTH_THICKNESS, 4),
         ),
         ("NORMAL TOOL PLUNGE (REF)", inch_text(spec.TOOL_PLUNGE_MM, 4)),
-        (
-            "TRANSVERSE BACKLASH WITH MHA-DT-10, ACCEPT AT ASSEMBLY",
-            accept_limits_text(GEAR_MESH_BACKLASH_MM, 3),
-        ),
+        (BACKLASH_LABEL, accept_limits_text(MESH_BACKLASH_REF_MM, 4)),
         # A finished-part acceptance, not a setup: how the teeth are held to
         # the bore is the builder's (machinist review of PR #2331 round 9: an
         # arbor and ACCEPT AT SETUP were method). The .002 TIR is under the
         # shop's runout row on this Ø2.8 blank (.001/in), so the row names
         # its mate and reason (rule 4: SETS ... BACKLASH); the backlash row
-        # above is that mesh's acceptance at assembly. No wider than the
+        # above is that mesh's REF range, the mesh accepted at assembly by
+        # turning free (fit audit question 16). No wider than the
         # block's widest row and on one line: a longer row or an extra line
         # runs the block's last rows into the tooth tips.
         (
