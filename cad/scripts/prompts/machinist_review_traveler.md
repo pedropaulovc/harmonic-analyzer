@@ -90,12 +90,13 @@ Pass 1 — detection. Find every candidate item; classify nothing yet.
    - **Route walk (rule T19):** once, in route order, ask of every op "does a
      later op cut, face or re-machine what this op worked on, or repeat it?"
      and "could this be done once, later?" Report each hit with both op
-     numbers (a deburr, edge break, wash or mark on a face that a later op
-     faces off; the same tap mouths deburred in two setups). Never report an
-     early op a later cut, seat or check depends on (burrs off before a face
-     seats; exits scraped flush and a no-rock check before a bolted pair is
-     bored; a mark later setups orient by), or one whose reason the sheet
-     prints.
+     numbers (a deburr, edge break or wash on a face that a later op faces
+     off; the same tap mouths deburred in two setups). Never report an early
+     op a later cut, seat or check depends on (burrs off before a face seats;
+     exits scraped flush and a no-rock check before a bolted pair is bored),
+     an orienting or identity mark (F1/K1, a face letter, a scribed end) that
+     tells the operator how to load the blank, even if a later cut removes it
+     and a later op marks it again, or an op whose reason the sheet prints.
 Record each candidate with its where (setup, op or diagram), the defect, its
 evidence (rendered crop + exact text), and the fix.
 

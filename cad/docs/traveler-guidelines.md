@@ -489,7 +489,7 @@ this?* and *could this be done once, later?* Report each hit with both op
 numbers:
 
 - **Wasted work:** a bench or finishing op (deburr, edge break, stone,
-  polish, wash, mark, finish coat) on a surface or edge that a later op cuts,
+  polish, wash, finish coat) on a surface or edge that a later op cuts,
   faces or re-machines, so the later op removes what the earlier one did.
 - **Duplicated hand work:** the same hand operation on the same feature in two
   setups with no reason printed for the first (deburring the same tap mouths
@@ -502,9 +502,13 @@ numbers:
 **Not wasted (never report):** an early op that a later cut, seat or check
 depends on, even though a later op removes its surface: burrs filed off before
 a face seats on parallels, a fixed jaw or a mate (rule T9); tap or drill exits
-scraped flush and a no-rock seat check before a bolted pair is bored; a face
-mark or scribed datum later setups orient by; a skim that gives the next setup
-its datum. If the printed sheet says why the first op is needed, it is not
-duplicated. A route that merely could be combined or reordered, with nothing
+scraped flush and a no-rock seat check before a bolted pair is bored; a skim
+that gives the next setup its datum; and **an orienting or identity mark** (a
+part number such as F1 or K1, a face letter, a scribed end) that tells the
+operator how to load the blank or which part it is, even when a later cut
+removes it and a later op marks it again (owner 2026-11-25: marks on a face a
+later cut removes are "Allowed"). If the printed sheet says why the first op
+is needed, it is not duplicated.
+A route that merely could be combined or reordered, with nothing
 undone or repeated, is a non-gating `polish` note; do not propose a different
 process for a route that works (rule T15).
