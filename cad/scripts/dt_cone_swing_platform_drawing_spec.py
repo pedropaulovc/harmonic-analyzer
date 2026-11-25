@@ -82,8 +82,8 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
         "PostMountEastZ": 3,
     },
     "LockNotchCapEProfile": {"CapECx": 2, "CapECz": 2, "CapEDia": 2},
-    # HOLDDOWN_STATION_TOL_MM: HoldDownX's explicit band on the part, and
-    # HoldDownZ's .XXX title-block grade.
+    # Both at their title-block grades: HoldDownX .XX (HOLDDOWN_X_TOL_MM,
+    # Codjiflo 3547-6) and HoldDownZ .XXX (HOLDDOWN_STATION_TOL_MM).
     "HoldDownHole": {"HoldDownX": 2, "HoldDownZ": 3},
     # Banded on the part: the station with the hold-down's +/-.004
     # (TIP_DOWEL_STATION_TOL_MM), the ream with its REAM_H7 at four places.
@@ -147,9 +147,9 @@ PIVOT_BORE_CALLOUT_BELOW = (f"{PIVOT_SHOULDER_NUMBER} SHOULDER ENTERS, SWINGS FR
 PIVOT_CALLOUT_PLACES = 3
 POST_MOUNT_LOCATING_CALLOUT = "LOCATES MHA-DT-05 CONE PIVOT POST"
 # A drawing number identifies the hold-down's mate without lengthening its
-# leader shelf into the title block.  Its stations print at the shop's
-# drilled-hole row (HOLDDOWN_STATION_TOL_MM), so the hole is drilled to them
-# and no assembly spot is named.
+# leader shelf into the title block.  Its stations print at their
+# title-block grades (HOLDDOWN_X_TOL_MM, HOLDDOWN_STATION_TOL_MM), so the
+# hole is drilled to them and no assembly spot is named.
 HOLDDOWN_CALLOUT_BELOW = ("FROM UNDERSIDE", "LOCATES MHA-DT-21")
 # The process belongs to the THRU row, not the counterbore-diameter row.
 HOLDDOWN_PROCESS = "DRILL"
