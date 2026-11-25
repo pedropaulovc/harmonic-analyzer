@@ -110,6 +110,13 @@ STOP_SCREW_TURNS = first_bite_turns(
     full_thread_start_mm=stop_screw.FULL_THREAD_START_MAX_MM,
     thread_len_mm=stop_screw.LENGTH_MIN_MM,
 )
+# Step 23C's look leaf: dt_cone_tip_air.LOOK_LEAF_MM, held here in lockstep
+# (test_step_23c_prints_the_leaf_the_proof_sizes) so the drawing does not
+# import the proof.
+TIP_LOOK_LEAF_MM = 0.010 * 25.4
+# Owner ruling 2026-11-24, fit audit part 2 C6 ("Yes: set by feel, spot the
+# holes after, tripwire .015."): each pedestal's X reading at the feel set.
+PEDESTAL_X_TRIPWIRE_MM = 0.015 * 25.4
 # (key, step, setting, set to / accept, check with), in step order, then rows
 # added later appended so no earlier row (which other records cite by number)
 # renumbers.
@@ -274,5 +281,21 @@ ACCEPTANCES = (
         f"SETUP AS T{_LAND_2_TEETH:03d}",
         "RECORD EACH SPACE",
         "TEST INDICATOR",
+    ),
+    # DT-00 machinist round 1 (farm run 7, rule 22): step 23C's look leaf and
+    # check 4G's X tripwire printed only in step text.
+    (
+        "tip-look-leaf",
+        _step_ref("other-base-mounting", "C"),
+        "MHA-DT-38 TO GEAR 19, SWING SET",
+        f"{inch_text(TIP_LOOK_LEAF_MM, 3)} LEAF PASSES",
+        "FEELERS",
+    ),
+    (
+        "pedestal-x-tripwire",
+        "CHECK 4G",
+        "EACH MHA-DT-02 X FROM ITS 4B ZERO",
+        f"{inch_text(PEDESTAL_X_TRIPWIRE_MM, 3)} MAX",
+        "DIAL INDICATOR",
     ),
 )

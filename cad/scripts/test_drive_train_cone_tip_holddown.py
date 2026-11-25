@@ -547,14 +547,22 @@ def test_step_23s_leaf_passes_every_in_print_build() -> None:
 
 
 def test_step_23c_prints_the_leaf_the_proof_sizes() -> None:
-    """Step 23C prints LOOK_LEAF_MM's size (lockstep: the drawing does not
-    import the proof), and its remedy names the parts the look sees."""
+    """Step 23C's sheet 16 row prints LOOK_LEAF_MM's size (lockstep: the
+    drawing does not import the proof), the feeler table lists 23C with it,
+    and its remedy names the parts the look sees."""
     import draw_dt_drive_train_assembly as drawing
     import dt_cone_tip_air as air
+    import dt_drive_train_acceptance_assembly_sheet as acceptance
 
+    assert acceptance.TIP_LOOK_LEAF_MM == pytest.approx(air.LOOK_LEAF_MM)
     steps = " ".join(drawing.rig_steps(pivot_blocks=2, cams=2, slotted=4).split())
     leaf = f".{round(air.LOOK_LEAF_MM / 25.4 * 1000):03d}"
-    assert f"A {leaf} FEELER LEAF PASSES BETWEEN MHA-DT-38 AND GEAR 19." in steps
+    row = drawing.acceptance_ref("tip-look-leaf")
+    assert f"A FEELER LEAF PASSES BETWEEN MHA-DT-38 AND GEAR 19 ({row})." in steps
+    (cells,) = [r for r in drawing.ACCEPTANCE_TABLE_ROWS if row.endswith(f" ROW {r[0]}")]
+    assert cells[1].endswith("C") and cells[3:] == (f"{leaf} LEAF PASSES", "FEELERS")
+    (stack,) = [r for r in drawing.FEELER_STACK_ROWS if r[0] == leaf]
+    assert cells[1] in stack[2].split(", ")
     (remedy,) = re.findall(r"IF IT DOES NOT, MEASURE [^.]*\.", steps)
     for part in ("MHA-DT-04", "MHA-DT-05", "MHA-DT-12", "MHA-DT-20", "MHA-DT-21",
                  "MHA-DT-38", "MHA-DT-39"):

@@ -712,7 +712,7 @@ def test_the_pedestals_are_set_by_feel_then_spotted_with_one_tripwire() -> None:
 
     check = " ".join(drawing.CHECKS.split("4. CONE SWING")[1].split("\n5.")[0].split())
     (snug,) = re.findall(r"4F\. [^.]*\.", check)
-    (tripwire,) = re.findall(r"4G\. .*?\.015 OR LESS\.", check)
+    (tripwire,) = re.findall(r"4G\. [^.]*\. ", check + " ")
     (remedy,) = re.findall(r"4H\. .*? GOING ON\.", check)
     (spot,) = re.findall(r"4J\. [^.]*\.", check)
     (lift,) = re.findall(r"4K\. [^.]*\.", check)
@@ -721,7 +721,14 @@ def test_the_pedestals_are_set_by_feel_then_spotted_with_one_tripwire() -> None:
     (accept,) = re.findall(r"4N\. .*? BY HAND\.", check)
     # The indicators stand on MHA-FR-01 (4B) and 4G records them at the set.
     assert "4B. ZERO INDICATORS ON MHA-FR-01: EACH MHA-DT-02 IN X, THE FRONT IN Y." in check
-    assert tripwire == "4G. RECORD EACH INDICATOR'S READING: EACH X MUST BE .015 OR LESS."
+    # DT-00 machinist round 1 (farm run 7, rule 22): the tripwire is a sheet
+    # 16 row, .015 MAX on the dial indicator, which 4G cites.
+    row = drawing.acceptance_ref("pedestal-x-tripwire")
+    assert tripwire.strip() == f"4G. RECORD EACH INDICATOR: EACH X MUST PASS ({row})."
+    (cells,) = [r for r in drawing.ACCEPTANCE_TABLE_ROWS if row.endswith(f" ROW {r[0]}")]
+    assert cells[1:] == (
+        "CHECK 4G", "EACH MHA-DT-02 X FROM ITS 4B ZERO", ".015 MAX", "DIAL INDICATOR"
+    )
     pivot = steps.step_number("other-base-mounting")
     assert f"STEP {pivot}F-{pivot}J PIVOT SEAT" in remedy
     # Codjiflo round 4 on #3550 (r4-8): no drill or tap reaches the seat

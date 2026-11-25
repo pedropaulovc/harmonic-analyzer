@@ -1111,6 +1111,8 @@ def _feeler_stack_rows() -> tuple[tuple[str, str, str], ...]:
         # T024's is a range since D4 (below).
         (PINION_SEAT_FEELER, _step_ref("crank-mesh-checked", "F")),
         (bank.BANK_SPRING_SET, _step_ref("cylinder-bank-located", "D")),
+        # DT-00 machinist round 1 (farm run 7): step 23C's look leaf.
+        (acceptance_sheet.TIP_LOOK_LEAF_MM, _step_ref("other-base-mounting", "C")),
         # The cone swing is set by feel (owner direction 2026-11-11, #2365)
         # and the crank pinion's T120 air by a look (fit audit part 2, B9):
         # neither takes leaves.
@@ -2160,7 +2162,7 @@ def rig_steps(*, pivot_blocks: int, cams: int, slotted: int) -> str:
             "SWING IT IN UNTIL THE GEARS AT BOTH ENDS JUST BIND.\n"
             f"EASE IT OUT SQUARE IN SMALL STEPS UNTIL {CONE_TURN_CRANK_TURNS} CRANK TURNS "
             "RUN FREE.\n"
-            "A .010 FEELER LEAF PASSES BETWEEN MHA-DT-38 AND GEAR 19.\n"
+            f"A FEELER LEAF PASSES BETWEEN MHA-DT-38 AND GEAR 19 ({acceptance_ref('tip-look-leaf')}).\n"
             "IF IT DOES NOT, MEASURE MHA-DT-04, MHA-DT-05, GEAR 19 (MHA-DT-12), MHA-DT-20, "
             "MHA-DT-21, MHA-DT-38 AND MHA-DT-39 AGAINST THEIR PRINTS.\n"
             "CLAMP MHA-DT-20 TO MHA-FR-01.\n"
@@ -2267,7 +2269,7 @@ CHECKS = _note_text(
         "4D. HOLD THE CONE SET SWUNG IN AT THE FIRST BIND.",
         "4E. TAP EACH MHA-DT-02 IN OR OUT UNTIL THE GEARS AT ITS END JUST BIND.",
         "4F. SNUG EACH HOLD-DOWN THERE, THE FRONT MHA-DT-02 AT ITS Y ZERO.",
-        "4G. RECORD EACH INDICATOR'S READING: EACH X MUST BE .015 OR LESS.",
+        f"4G. RECORD EACH INDICATOR: EACH X MUST PASS ({acceptance_ref('pedestal-x-tripwire')}).",
         f"4H. IF NOT, RECHECK THE STEP {_step_ref('other-base-mounting', 'F')}-"
         f"{_step_ref('other-base-mounting', 'J')} PIVOT SEAT BEFORE GOING ON.",
         # Codjiflo round 4 on #3550 (r4-8): the MHA-DT-02 upright stands .35
