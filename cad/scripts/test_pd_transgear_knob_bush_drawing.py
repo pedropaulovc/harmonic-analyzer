@@ -248,12 +248,13 @@ def test_the_overall_length_fails_the_pilot_stack_at_the_title_block_band() -> N
     assert 0.0 <= spare < title_block - BUSH.LENGTH_BAND
 
 
-def test_the_hub_station_no_longer_closes_the_collar_air_after_question_5() -> None:
-    """With the disc cluster .005 back (owner ruling 2026-11-24, fit audit
-    question 5) the collar's statistical air holds its floor with the hub
-    station .002 looser (rule 4's test) and at the title block's ±.005, so
-    the collar air no longer answers for the ±.001 the sheet still prints:
-    register N-02 says so, and the loosening is an open follow-up."""
+def test_the_hub_station_stays_tight_by_ruling_not_by_the_necessity_test() -> None:
+    """The collar air is one shared budget (delegated ruling D21, 2026-11-25,
+    Main): the MHA-PD-17 spigot length spent it at the title block, so the
+    hub station .002 looser alone still holds the floor (rule 4's test
+    fails) but at the title block's ±.005 it does not.  The ±.001 the sheet
+    prints therefore has no register entry and stands on accept entry RV-05,
+    whose numbers test_pd_collar_air_necessity derives."""
     import pd_cluster_air as air
 
     title_block = _printed_tolerance.printed_band_mm(3, unit=BUSH.UNIT)
@@ -275,16 +276,18 @@ def test_the_hub_station_no_longer_closes_the_collar_air_after_question_5() -> N
     at_title_block = collar_air(title_block)
     assert printed == pytest.approx(air.COLLAR_AIR.air_mm("statistical"))
     assert (printed, loose, at_title_block) == pytest.approx(
-        (0.1880, 0.1688, 0.1366), abs=5e-4
+        (0.1366, 0.1225, 0.0972), abs=5e-4
     )
-    assert air.COLLAR_AIR_MIN < at_title_block < loose < printed
+    assert at_title_block < air.COLLAR_AIR_MIN < loose < printed
     registry = yaml.safe_load(
         (_config.CONFIG_DIR / "necessity" / "pd-transgear-knob-bush.yaml").read_text(
             encoding="utf-8"
         )
     )["necessity"]
-    (entry,) = (row for row in registry if row["id"] == "N-02")
-    assert "no longer required after fit audit question 5" in entry["source"]
+    assert not [row for row in registry if "hub face station" in row["feature"]]
+    exceptions = _config.parts("pd-transgear-knob-bush")["machinist_exceptions"]
+    (accept,) = (row for row in exceptions if row["id"] == "RV-05")
+    assert accept["kind"] == "accept" and ".809 ±.001" in accept["where"]
 
 
 def _worst_walls_in() -> dict[str, float]:
