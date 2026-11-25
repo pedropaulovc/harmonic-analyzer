@@ -9,7 +9,8 @@ stock = "To be written"
 shop = "../shop"
 stock_refs = ["1018-round-3-and-7-8"]
 
-# The Ø.3135 bore (D19, delegated ruling 2026-11-24, Main): reamed with the
+# The Ø.3135 bore (D19, delegated ruling 2026-11-24 (Main), precedent: owner
+# ruling 2026-11-20, #3073; owner review #2144): reamed with the
 # owned adjustable set, the piece whose range covers .3135 set over its
 # blades by micrometer to .3135 and proved in scrap until the trial hole
 # measures .3135 (telescoping gauge and micrometer). Nothing is bought for

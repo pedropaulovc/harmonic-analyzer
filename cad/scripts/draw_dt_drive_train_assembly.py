@@ -1116,7 +1116,8 @@ def _feeler_stack_rows() -> tuple[tuple[str, str, str], ...]:
         # neither takes leaves.
     )
     ranged = (
-        # D4 (delegated ruling 2026-11-24 (Main), no precedent; #2144): T024 off T030.
+        # D4 (delegated ruling 2026-11-24 (Main), no precedent; owner review
+        # #2144): T024 off T030.
         (STACK_FEELER_RANGE, "ANY ONE", _step_ref("cone-gears-stacked", "R")),
         (
             FITUP.SMALL_LEAF_RANGE,
@@ -1574,8 +1575,9 @@ CONE_CRANK_STEPS = _note_text(
         "3A. BACK MHA-DT-39 OFF 1/8 TURN.",
         "3B. TIGHTEN MHA-DT-VN-56 ACROSS THE SLIT.",
         # Fit audit 2026-11-23 part 2, B10 (drawing-guidelines rule 4, form 2;
-        # Main 2026-11-24 on Codjiflo round 1 of #3550: print the feel or the
-        # window, not both).  The window is needed by checks: the end screw's
+        # Codjiflo round 1 of #3550, delegated ruling 2026-11-24 (Main), no
+        # precedent; owner review #2144: print the feel or the window, not
+        # both).  The window is needed by checks: the end screw's
         # embed (dt_cone_tip_block_spec END_SCREW_EMBED band) and its pivot's
         # proud length (dt_cone_tip_end_screw_spec) and the journal's free end
         # (dt_cone_gear_shaft_spec) book SHAFT_END_PLAY[1], 0.25 mm (.009 in

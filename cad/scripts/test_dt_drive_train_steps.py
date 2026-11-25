@@ -104,7 +104,8 @@ def test_the_tip_is_measured_dry_then_bonded_on_the_feeler_in_two_cures() -> Non
     """Owner decision C1 keyed (2026-11-09, PR #1992): the stack is measured
     dry, MHA-DT-38 is bonded on the loose MHA-DT-37 (owner ruling
     2026-11-20, #2469), and only then is T024 bonded on one leaf of
-    STACK_FEELER_RANGE (D4, Main, 2026-11-24) off
+    STACK_FEELER_RANGE (D4, delegated ruling 2026-11-24 (Main), no precedent;
+    owner review #2144) off
     T030 with the bonded gears phased to T030 by the MHA-DT-03-TL-02 phasing
     comb, T030's blade beside the key (owner rulings 2026-11-09 and
     2026-11-10).  #2470: T024's joint is degreased, the faces its squeeze-out
@@ -230,7 +231,8 @@ def test_the_printed_shaft_end_play_is_the_band_the_stacks_book() -> None:
     """The end screw's embed and the bushing air book
     cone_stack_end_play.SHAFT_END_PLAY; the sheet prints that band, rounded
     inward to the thousandth, as step 3C's sheet 16 row.  Fit audit part 2,
-    B10, and Main 2026-11-24 on Codjiflo round 1 of #3550: the sheet prints
+    B10, and Codjiflo round 1 of #3550 (delegated ruling 2026-11-24 (Main), no
+    precedent; owner review #2144): the sheet prints
     the window or the feel, not both; the embed and the air need the window,
     which a hand cannot read, so 3C measures it on the dial indicator, and
     step 3A's 1/8 turn of the 1/4-28 end screw leaves a play inside it."""

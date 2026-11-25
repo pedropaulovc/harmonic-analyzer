@@ -740,7 +740,8 @@ CALLOUTS_BELOW: dict[str, str] = {
         f"REAM THRU\nPRESS FIT ON {kit_short_form(STUB_NUMBER)},\nDOES NOT TURN BY HAND"
     ),
     # Machinist review of 25a5c536c2 (blocker, 2 of 3 runs): the press fit
-    # prints its acceptance, worded as the stub's (Main 2026-11-24).
+    # prints its acceptance, worded as the stub's (delegated ruling
+    # 2026-11-24 (Main), no precedent; owner review #2144).
     "PinHoleDia": (
         f"REAM <HOLE-DEPTH> {PIN_HOLE_DEPTH_TEXT}\n"
         f"PRESS FIT ON {kit_short_form(CLOCK_PIN_NUMBER)}, PERMANENT PAIR,\n"

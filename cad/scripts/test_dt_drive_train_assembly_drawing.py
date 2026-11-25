@@ -583,7 +583,8 @@ def test_step_one_sets_the_64t_against_the_shaft_collar() -> None:
 
 
 def test_crank_mesh_is_accepted_by_hand_with_a_pinion_recut_remedy() -> None:
-    """Delegated ruling 2026-11-17 on #2481 (option B): 4J's full turn by
+    """Delegated ruling 2026-11-17 (Main) on #2481 (option B), precedent: the
+    owner's fit-by-feel directions (#2365, #2416); owner review #2144: 4J's full turn by
     hand, before the 16T is pinned, is the crank mesh's acceptance; a pair
     that binds in its teeth has the 16T recut at the same depth, the cutter
     moved sideways, and the step is redone from the slide-on.  4J's remedy
@@ -719,7 +720,8 @@ def test_the_pedestals_are_set_by_feel_then_spotted_with_one_tripwire() -> None:
     pivot = steps.step_number("other-base-mounting")
     assert f"STEP {pivot}F-{pivot}J PIVOT SEAT" in remedy
     assert "FOOT HOLE" in seat and "PER MHA-FR-01" in seat and "TRANSFER-PUNCH" in seat
-    # Codjiflo round 1 on #3550 (delegated ruling 2026-11-24, Main): the
+    # Codjiflo round 1 on #3550 (delegated ruling 2026-11-24 (Main), no
+    # precedent; owner review #2144): the
     # seat is blown out, clamp still on, before 4K screws the foot down.
     assert seat.endswith("SPOT: BLOWN FREE OF CHIPS."), seat
     assert "MHA-DT-VN-62" in screw and "CLAMP" in screw and "Y ZERO" in clamp
@@ -1081,7 +1083,8 @@ def test_every_set_feeler_the_steps_and_checks_print_has_a_leaf_row() -> None:
         assert math.isclose(sum(sizes), float(setting), abs_tol=1e-9), setting
     assert ranged == {
         ".010 TO .020": ("ANY ONE", "16B, 19, 21C"),
-        # D4 (delegated ruling 2026-11-24 (Main), no precedent; #2144): T024 off T030.
+        # D4 (delegated ruling 2026-11-24 (Main), no precedent; owner review
+        # #2144): T024 off T030.
         ".015 TO .020": ("ANY ONE", "1R"),
         ".020 TO .040": ("ANY ONE", "19B, 21D"),
         ".049 TO .065": ("TWO, OR 1/16 DRILL", "19A"),
@@ -1650,7 +1653,8 @@ def test_cone_station_rows_run_front_to_back() -> None:
     # record, taken before the comb check so the strip and re-bond follows
     # that check (rule 22), and a bonded gear that hesitates in check 4R's
     # run; a keyed one is not bonded and goes to 3H (Codjiflo round 1 on
-    # #3550, delegated ruling 2026-11-24, Main).
+    # #3550, delegated ruling 2026-11-24 (Main), no precedent; owner review
+    # #2144).
     assert steps[order[4] : order[5]].strip() == (
         f"2E. ONCE CURED, RECORD THE RUNOUT ABOUT MHA-DT-04 OF THE MHA-DT-37 PIVOT ({pivot_row})"
         f" AND OF T012'S AND T018'S TEETH ({gear_row})."

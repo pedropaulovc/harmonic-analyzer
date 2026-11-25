@@ -265,7 +265,8 @@ HOLDDOWN_STATION_TOL_MM = 0.127  # +/-.005
 # embed window, the tip lateral take-up, the pivot-head air), and the cone
 # tip's air to gear 19 still closes with HoldDownX at +/-.01: the bushing
 # tier's full-arithmetic least air 0.024 mm (0.053 at +/-.005), and step
-# 23's .020 leaf passes every in-print build (look air 0.731 mm; D18).
+# 23's .020 leaf passes every in-print build (look air 0.731 mm; D18,
+# delegated ruling 2026-11-24 (Main), no precedent; owner review #2144).
 HOLDDOWN_LATERAL_TOL_MM = printed_band_mm(2, unit=UNIT)  # +/-.01
 # The same stacks run through the post-mount taps, whose placement dimensions
 # (PostMountWestX/WestZ/EastX/EastZ) print .XXX, so the title-block grade is
