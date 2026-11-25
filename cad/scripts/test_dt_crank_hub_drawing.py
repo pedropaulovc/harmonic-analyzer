@@ -216,7 +216,9 @@ def test_floated_stack_a_ignores_the_seat_and_hub_stations() -> None:
 
 
 def test_named_shaft_fit_class_bounds_the_through_bore() -> None:
-    # D27 (delegated ruling 2026-11-25): the bore is the 3/8 drill's at
+    # D27 (delegated ruling 2026-11-25 (Main), precedent: the fit-necessity
+    # rule of the owner-approved fit policy (owner ruling 2026-11-24); owner
+    # review #2144): the bore is the 3/8 drill's at
     # DRILLED HOLES, .375-.379, and MHA-DT-11's stub is turned to its smallest
     # reading less the catalogued shaft-in-bushing clearance.
     bore_limits = (

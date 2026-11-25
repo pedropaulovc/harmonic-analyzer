@@ -337,6 +337,9 @@ INDEXED_FIT_BANDS: dict[tuple[str, str], str] = {
         "analysis aim of the REF pinion seat turned to MHA-DT-10's measured bore; "
         "dt_crankshaft_notes.FIT_CLEARANCES derives note 3's .0010-.0023 from it"
     ),
+    # D27 below: delegated ruling 2026-11-25 (Main), precedent: the
+    # fit-necessity rule of the owner-approved fit policy (owner ruling
+    # 2026-11-24); owner review #2144.
     ("dt_crank_hub_geometry", "SHAFT_DIA_BAND"): (
         "analysis aim of MHA-DT-11's REF stub turned to MHA-DT-31's measured bore "
         "(the 3/8 drill's, D27) less SHAFT_CLEARANCE, note 3's clearance"

@@ -11,7 +11,7 @@ dt-crank-handle:
     - id: "RV-01"
       kind: "minor"
       where: "tenon callout: WALL .061 MIN"
-      finding: "oak tenon wall over the pivot bore .0615 along the tenon at the smallest tenon (turned to the MHA-DT-34 N drill's .302 less the widest glue line), the #20 bore at its DRILLED HOLES .165 (delegated ruling 2026-11-25, D26) and its .004 offset, above the .060 floor and under the .080 target (rule 17)"
+      finding: "oak tenon wall over the pivot bore .0615 along the tenon at the smallest tenon (turned to the MHA-DT-34 N drill's .302 less the widest glue line), the #20 bore at its DRILLED HOLES .165 (delegated ruling 2026-11-25 (Main), precedent: owner ruling 2026-11-24 merging the fit policy; RETIRES the owner's fit-audit Q14 answer's trial step; owner review #2144 (D26)) and its .004 offset, above the .060 floor and under the .080 target (rule 17)"
       reason: "Owner ruling 2026-11-01: thin walls above the .060 floor but under the .080 target, with no geometry escape, are accepted as package-specific minor exceptions (extends to MHA-DT-08; a larger tenon thins the MHA-DT-34 ferrule, whose walls are already exceptions, and the bore runs on the MHA-DT-32 shoulder)"
     - id: "RV-02"
       kind: "minor"

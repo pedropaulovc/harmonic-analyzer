@@ -127,8 +127,10 @@ def test_every_profile_size_is_a_model_dimension() -> None:
     assert spec.REFERENCE_RADII == {"FlareR", "SConcaveR", "SConvexR", "DomeR"}
     assert spec.REFERENCE_RADII <= spec.DRAWING_DIMENSIONS["HandleProfile"]
     # Owner ruling 2026-11-24, fit audit question 14: the bore stays drilled
-    # #20 and MHA-DT-32 is turned to it; D26 (delegated ruling 2026-11-25)
-    # retired the .1635 MAX cap: a plain drilled hole, no size in the callout.
+    # #20 and MHA-DT-32 is turned to it; delegated ruling 2026-11-25 (Main),
+    # precedent: owner ruling 2026-11-24 merging the fit policy; RETIRES the
+    # owner's fit-audit Q14 answer's trial step; owner review #2144 (D26):
+    # the .1635 MAX cap is retired: a plain drilled hole, no size in the callout.
     assert drawing.PIVOT_BORE_CALLOUT.startswith("#20 DRILL THRU\n")
     assert "MAX" not in drawing.PIVOT_BORE_CALLOUT
     assert "MHA-DT-32 SHOULDER IS\nTURNED TO THIS BORE" in drawing.PIVOT_BORE_CALLOUT

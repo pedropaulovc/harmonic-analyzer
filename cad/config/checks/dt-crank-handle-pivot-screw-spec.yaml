@@ -3,13 +3,13 @@ checks:
     check: "the shoulder's limits leave an accepted MHA-DT-08 bore no fit"
     kind: gap
     reason: "some accepted bore has no shoulder inside the printed limits"
-    source: "owner ruling 2026-11-24, fit audit question 14; delegated ruling 2026-11-25 (D26)"
+    source: "owner ruling 2026-11-24, fit audit question 14; delegated ruling 2026-11-25 (Main), precedent: owner ruling 2026-11-24 merging the fit policy; RETIRES the owner's fit-audit Q14 answer's trial step; owner review #2144 (D26)"
     basis: worst_case
   - id: C-02
     check: "MHA-DT-08's tenon walls read a bore other than its largest accepted"
     kind: wall
     reason: "the tenon wall is judged at an unaccepted bore"
-    source: "dt_crank_handle_spec PIVOT_BORE_FIT_MAX, the #20's DRILLED HOLES .165; delegated ruling 2026-11-25 (D26)"
+    source: "dt_crank_handle_spec PIVOT_BORE_FIT_MAX, the #20's DRILLED HOLES .165; delegated ruling 2026-11-25 (Main), precedent: owner ruling 2026-11-24 merging the fit policy; RETIRES the owner's fit-audit Q14 answer's trial step; owner review #2144 (D26)"
     basis: worst_case
   - id: C-03
     check: "the MHA-DT-35 pocket at its .257 limit leaves under its .060 "

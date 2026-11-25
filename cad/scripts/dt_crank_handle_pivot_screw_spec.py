@@ -103,8 +103,10 @@ SLOT_DEPTH = 1.016  # .04
 SLOT_DEPTH_TOL = _GENERAL_2PL
 
 # The running surface in the oak bore (#290 fit F12).  MHA-DT-08's bore is a
-# plain #20 drilled hole at DRILLED HOLES, .1610-.1650 (D26, delegated ruling
-# 2026-11-25 (Main): the .1635 MAX cap and its trial step are retired); the
+# plain #20 drilled hole at DRILLED HOLES, .1610-.1650 (delegated ruling
+# 2026-11-25 (Main), precedent: owner ruling 2026-11-24 merging the fit
+# policy; RETIRES the owner's fit-audit Q14 answer's trial step; owner review
+# #2144 (D26): the .1635 MAX cap and its trial step are retired); the
 # shoulder is turned last to that bore less .0050-.0075, its own trial steps
 # reading the bore (owner ruling 2026-11-24, fit audit question 14: "handle
 # stays DRILL #20; DT-32 shoulder by trial, limits .1535-.1585").  The limits

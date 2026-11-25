@@ -422,7 +422,9 @@ requirement(
         "at": ([0.0, 0.0, 0.0], ("__frame__",)),
         "axis": ([0.0, 1.0, 0.0], ("__frame__",)),
         # The sheet prints the 3/8 drill's Ø.375 under DRILLED HOLES (rule 3;
-        # delegated ruling 2026-11-25, D27); MHA-DT-11's shank is turned to
+        # D27, delegated ruling 2026-11-25 (Main), precedent: the fit-necessity
+        # rule of the owner-approved fit policy (owner ruling 2026-11-24);
+        # owner review #2144); MHA-DT-11's shank is turned to
         # the measured bore.
         "dia": (
             drilled_limits(HUB_BORE_DIA, _P["BoreDia"], unit=UNIT),

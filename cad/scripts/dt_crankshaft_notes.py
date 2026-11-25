@@ -91,7 +91,9 @@ def _clearance(
 
 # Note 3: the three fit diameters.  The crankshaft is made last of the fit
 # pairs: each diameter is turned to its mate's bore (the reamers' bores, no
-# band, and MHA-DT-31's 3/8 drilled bore, D27), so each prints as a REF and
+# band, and MHA-DT-31's 3/8 drilled bore, D27: delegated ruling 2026-11-25
+# (Main), precedent: the fit-necessity rule of the owner-approved fit policy
+# (owner ruling 2026-11-24); owner review #2144), so each prints as a REF and
 # the acceptance prints here
 # once (fit audit 2026-11-23, MHA-DT-31.bore__MHA-DT-11.hub_shaft,
 # MHA-DT-11.journals and MHA-DT-10.bore__MHA-DT-11.pinion_seat; drawing-
