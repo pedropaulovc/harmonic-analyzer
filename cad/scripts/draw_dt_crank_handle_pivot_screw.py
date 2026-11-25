@@ -87,6 +87,7 @@ from dt_crank_handle_pivot_screw_notes import (
     HEAD_DIA_CALLOUT,
     HEAD_LENGTH_CALLOUT,
     RELIEF_LEAD_CALLOUT,
+    SHOULDER_FIT_CALLOUT,
     SHOULDER_LENGTH_CALLOUT,
     SHOULDER_LENGTH_NOTE,
     THREAD_NOTE,
@@ -575,7 +576,8 @@ requirement(
     },
     precision={"width": _P["SlotWidth"], "depth": _P["SlotDepth"]},
 )
-# The running shoulder: Ø.1535-.1585, the owner's limits, no matched fit
+# The running shoulder: Ø.1535-.1585, the owner's fit-audit Q14 limits, a
+# running fit in MHA-DT-08's bore (SHOULDER_FIT_CALLOUT), no matched fit
 # (SIDE_KEEP "ShoulderDia"), Ra 63 (SURFACE_FINISHES
 # "pivot_shoulder"); its under-head corner R.004 MAX (DETAIL_B_KEEP
 # "UnderHeadRadius").  Its length is the fitted reference above.
@@ -593,6 +595,7 @@ requirement(
         ),
         "nominal_dia": (SHOULDER_DIA, ("SHOULDER_DIA",)),
         "length_nominal": (SHOULDER_LENGTH, ("SHOULDER_LENGTH",)),
+        "callout": (SHOULDER_FIT_CALLOUT, ((_NOTES, "SHOULDER_FIT_CALLOUT"),)),
         "finish_ra": (_SHOULDER_FINISH.roughness_um, ("SURFACE_FINISHES",)),
         "corner_radius_max": (
             UNDER_HEAD_RADIUS_MAX,
@@ -1013,6 +1016,7 @@ def build(adapter: Any) -> dict[str, str]:
         {
             "TipChamfer": TIP_CHAMFER_CALLOUT,
             "ShoulderLength": SHOULDER_LENGTH_CALLOUT,
+            "ShoulderDia": SHOULDER_FIT_CALLOUT,
             "HeadDia": HEAD_DIA_CALLOUT,
             "HeadLength": HEAD_LENGTH_CALLOUT,
             "ReliefLead": RELIEF_LEAD_CALLOUT,

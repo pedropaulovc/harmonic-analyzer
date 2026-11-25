@@ -230,6 +230,17 @@ def test_thread_relief_sits_below_the_minor_with_a_45_degree_lead() -> None:
         abs=1e-4,
     )
     assert spec.SEAT_RADIAL_MIN >= 0.2
+    # Necessity N-01's lower end (Codjiflo 3550-r7-12): at the title block's
+    # .156 - .005 = .151 the same seat falls under 0.2, so the band's lower
+    # limit is needed too.  0.215 at .1535, 0.183 at .151.
+    title_min = spec.SHOULDER_DIA - printed_band_mm(3, unit=spec.UNIT)
+    assert title_min == pytest.approx(0.151 * 25.4)
+    seat_at_title = (
+        (title_min - 2.0 * spec.SEAT_EDGE_BREAK_MAX) - spec.SEAT_CONTACT_INNER_DIA
+    ) / 2.0 - spec.THREAD_FIT_OFFSET_MAX
+    assert seat_at_title < 0.2
+    assert seat_at_title == pytest.approx(0.183, abs=5e-4)
+    assert spec.SEAT_RADIAL_MIN == pytest.approx(0.215, abs=5e-4)
     title_break = edge_break_chamfer_mm(unit=spec.UNIT)
     assert (spec.SHOULDER_DIA_MIN - 2.0 * title_break) - (2.845 + 2.0 * title_break) < 0.1
     assert spec.SEAT_FLAT_ANNULUS_AREA == pytest.approx(
@@ -532,8 +543,11 @@ def test_fitted_shoulder_length_is_one_flagged_numbered_note() -> None:
     x, _ = drawing.NOTES_XY
     assert x + max(map(len, lines)) * 0.0027 < 0.4191
     # Standard fit name and forms on the other callouts (rules 3, 4, 7).
-    # The shoulder prints its limits alone: no matched-fit or trial callout.
-    assert not hasattr(notes, "SHOULDER_FIT_CALLOUT")
+    # Rule 4 (Codjiflo 3550-r7-12): the shoulder's band names its mate and
+    # its fit, no number and no trial.
+    assert notes.SHOULDER_FIT_CALLOUT == "RUNNING FIT IN\nMHA-DT-08 BORE"
+    assert max(map(len, notes.SHOULDER_FIT_CALLOUT.splitlines())) <= 21
+    assert not re.search(r"\d\.|\.\d|TRIAL|TURN", notes.SHOULDER_FIT_CALLOUT)
     assert notes.HEAD_LENGTH_CALLOUT == "CLEARS\nMHA-DT-35 FACE"
     assert notes.HEAD_DIA_CALLOUT == "CLEARS POCKET\nOF MHA-DT-35"
     assert max(map(len, notes.HEAD_DIA_CALLOUT.splitlines())) <= 15
