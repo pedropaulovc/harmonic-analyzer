@@ -146,7 +146,8 @@ KEEPER_SEAT_LENGTH_MM = LUG_HALF_T + FOOT_TIP_X  # 16.5: seat along the shaft
 # ±.004) at KEEPER_FITUP_PLACES (ch_channel_assembly_spec.DRAWING_PRECISION),
 # and build_fr_top_frame charges that printed value in its foot-to-boss
 # stacks (delegated ruling 2026-11-24 (Main), precedent: owner ruling
-# 2026-11-01, #2144 (rulings.md D15)). ---
+# 2026-11-01 (thin walls accepted as minor); no owner number changed, #2144
+# (rulings.md D15)). ---
 KEEPER_FITUP_PLACES = 3
 # Each lug centre stands this far west (+x) of the centre of the top-frame
 # rail web under it, its column's socket axis (Main's ruling: a local X
@@ -191,10 +192,14 @@ CBORE_DEPTH_MM = 2.1082
 # The counterbore prints its own limits on the native callout (owner ruling
 # 2026-11-22, #3367), so the sheet, the feature record, the RV-04 tip wall
 # below and the traveler read one band: the title block's ±.005, Ø.145-.155
-# x .078-.088 deep. Delegated ruling 2026-11-25 (Main), precedent: owner
-# ruling 2026-11-24 merging the fit policy; CHANGES the band printed under
-# the owner's #3367 ruling of 2026-11-22 (which ruled where the limits
-# print, not their width), #2144 (rulings.md D25): at Ø.155 the tip wall is
+# x .078-.088 deep. Delegated ruling 2026-11-25 (Main), precedent: the
+# fit-necessity rule of the owner-approved fit policy
+# (drawing-simplicity-policy.md; owner ruling 2026-11-24): a band stays
+# tighter than the title block only when a named check fails at the looser
+# size, and at Ø.150 ±.005 the four checks hold at Ø.145 and Ø.155; changes
+# the owner's 2026-11-22 #3367 number (the Ø.150 +.004/.000 band printed
+# under that ruling, which decided where the limits print, not their width),
+# #2144 (rulings.md D25): at Ø.155 the tip wall is
 # .0925 (target .080) and its worst case still floors to .072, the lug
 # clearance 1.08 mm; at Ø.145 the Ø.140 head still clears. The part's Hole
 # Wizard dimensions carry the band (build_ch_fulcrum_keeper

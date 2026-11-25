@@ -689,9 +689,9 @@ def test_each_notch_minimum_clears_its_plate_at_max_material() -> None:
 
     # #1038 option 2 (owner ruling 2026-10-15): the top notch +.007/.000
     # (necessity N-05: +.010 leaves the mid-span bar gap under a thousandth,
-    # delegated ruling 2026-11-24 (Main), no precedent, #2144 (rulings.md
-    # D14)). The foot +.006/.000 (#3114): the float left to the
-    # bars once two floating arms close hub on hub.
+    # delegated ruling 2026-11-24 (Main), no precedent; no owner number
+    # changed, #2144 (rulings.md D14)). The foot +.006/.000 (#3114): the
+    # float left to the bars once two floating arms close hub on hub.
     assert spec.TOP_NOTCH_WIDTH_BAND == pytest.approx((0.007 * 25.4, 0.0))
     assert spec.BOTTOM_NOTCH_WIDTH_BAND == pytest.approx((0.006 * 25.4, 0.0))
     for width, (_upper, lower), plate, plate_upper in (

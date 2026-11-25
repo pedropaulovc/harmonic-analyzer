@@ -2,10 +2,13 @@
 # (drawing-guidelines.md rule 4; owner ruling 2026-11-24: the reason lives
 # here, not on the sheet). Read by the machinist review only.
 # The flanks' 122.4° to the side faces print at the title block's ±1°
-# (delegated ruling 2026-11-25 (Main), precedent: owner ruling 2026-11-24
-# merging the fit policy; CHANGES the owner's T1 number of 2026-10-17, #2144
-# (rulings.md D24)): worst knife rock 8.16° against the 5.0° floor, so no
-# check earns a band. R.004 MAX and R.040 MAX are single limits.
+# (delegated ruling 2026-11-25 (Main), precedent: the fit-necessity rule of
+# the owner-approved fit policy (drawing-simplicity-policy.md; owner ruling
+# 2026-11-24): a band stays tighter than the title block only when a named
+# check fails at the looser size, and none fails at ±1°; changes the owner's
+# 2026-10-17 T1 number, #2144 (rulings.md D24)): worst knife rock 8.16°
+# against the 5.0° floor, so no check earns a band. R.004 MAX and R.040 MAX
+# are single limits.
 necessity:
   - id: N-01
     feature: "DETAIL D, both stubs, knife ridge .159 ±.002 from each side face"

@@ -992,7 +992,8 @@ DRILL_DRIFT_PER_MM = tan(radians(KEEPER_TAP_DRILL_WANDER_DEG))  # 0.00524
 # printed .114 ±.004 is .0767 at the 2° minimum added draft, under the .080
 # target and over the .060 floor: accepted at .076, the .0767 floored to
 # the .001 reading unit (delegated ruling 2026-11-24 (Main), precedent:
-# owner ruling 2026-11-01, #2144 (rulings.md D15); RV-14). The added draft's
+# owner ruling 2026-11-01 (thin walls accepted as minor); no owner number
+# changed, #2144 (rulings.md D15); RV-14). The added draft's
 # callout states this held wall.
 KEEPER_TAP_WALL_ACCEPTED_MM = 0.076 * IN
 # The knockout's offset from its ream.  The print locates each knockout on

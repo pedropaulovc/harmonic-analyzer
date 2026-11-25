@@ -227,9 +227,11 @@ TOLERANCE_PRECISION = {
 # The lug centre carries its fit-up band on its own dimension (owner ruling
 # X-A, 2026-10-18), in necessity register ch-channel-assembly N-01. The ear
 # span prints the title block's +/-.005 as its setting band: delegated
-# ruling 2026-11-25 (Main), precedent: owner ruling 2026-11-24 merging the
-# fit policy (a band tighter than the title block must earn its place),
-# #2144 (rulings.md D20), replacing owner ruling X1+B1's +/-.004; its end
+# ruling 2026-11-25 (Main), precedent: the fit-necessity rule of the
+# owner-approved fit policy (drawing-simplicity-policy.md; owner ruling
+# 2026-11-24): a band stays tighter than the title block only when a named
+# check fails at the looser size, and none fails at +/-.005; changes the
+# owner's 2026-10-18 X1+B1 number (+/-.004), #2144 (rulings.md D20); its end
 # hubs still clear at it (rocker_bank_layout.END_CLEARANCE_MIN, #3563). The
 # front lug inner face the title block's band and the rear inner face is a
 # reference (C10, ch_keeper_fitup: the rear keeper is set to the bare lever

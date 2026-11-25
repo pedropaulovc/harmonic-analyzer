@@ -21,8 +21,8 @@ _WALL_PLACES = 3
 # hold at every printed limit with the lug centre at MHA-CH-00's printed .114
 # (KEEPER_TAP_DRILL_WALL_MARGIN: .0767 at the 2° minimum, .0596 a degree
 # under it), stated as accepted under the .080 target (delegated ruling
-# 2026-11-24 (Main), precedent: owner ruling 2026-11-01, #2144 (rulings.md
-# D15); RV-14).
+# 2026-11-24 (Main), precedent: owner ruling 2026-11-01 (thin walls accepted
+# as minor); no owner number changed, #2144 (rulings.md D15); RV-14).
 ADDED_DRAFT_WALL_CALLOUT = (
     f"HOLDS {KEEPER_TAP_SPEC.size.lstrip('#')} TAP WALL "
     f"{render_number(KEEPER_TAP_WALL_ACCEPTED_MM / IN, UNIT, _WALL_PLACES)} MIN"

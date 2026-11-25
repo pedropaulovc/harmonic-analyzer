@@ -215,7 +215,8 @@ def test_each_side_of_the_plate_band_is_earned_by_its_named_check(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Necessity ch-channel-lever N-02 (delegated ruling 2026-11-25 (Main), no
-    precedent, #2144 (rulings.md D23)): the plate prints .118 +.002/-.004.
+    precedent; no owner number changed, #2144 (rulings.md D23)): the plate
+    prints .118 +.002/-.004.
     Thick side: the narrowest top notch keeps the running floor on the
     thickest plate, and .002 more does not. Thin side: the bowed mid-span bar
     gap keeps the .001 the shop reads over its floor (D14's criterion), and

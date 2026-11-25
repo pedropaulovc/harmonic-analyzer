@@ -103,8 +103,11 @@ KNIFE_RIDGE_TANGENT_XY = (
 # face and each upper flank KNIFE_FLANK_TO_SIDE_DEG to its side face; HexWidth
 # becomes a reference.  The ridge offset carries its own band; the flank angle
 # prints at the title block's ±1° (delegated ruling 2026-11-25 (Main),
-# precedent: owner ruling 2026-11-24 merging the fit policy; CHANGES the
-# owner's T1 number of 2026-10-17, #2144 (rulings.md D24)): at ±1° the worst
+# precedent: the fit-necessity rule of the owner-approved fit policy
+# (drawing-simplicity-policy.md; owner ruling 2026-11-24): a band stays
+# tighter than the title block only when a named check fails at the looser
+# size, and none fails at ±1°; changes the owner's 2026-10-17 T1 number,
+# #2144 (rulings.md D24)): at ±1° the worst
 # knife rock is 8.16° against the 5.0° floor (8.53° at T1's ±.5°), so no check
 # earns the tighter band.  The worst shoulder is
 # the farthest from the ridge with the flattest flank: KNIFE_SHOULDER_X_MAX

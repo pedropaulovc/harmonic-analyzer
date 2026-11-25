@@ -125,9 +125,14 @@ def test_rule_12_worst_case_walls_and_thread() -> None:
 
 def test_counterbore_prints_the_title_block_limits() -> None:
     # Owner ruling 2026-11-22 (#3367): the callout prints the counterbore's
-    # limits; D25 (delegated ruling 2026-11-25 (Main), #2144) opened them to
-    # the title block's ±.005, Ø.145-.155 x .078-.088, and the RV-04 tip
-    # wall stands on that printed band.
+    # limits; D25 (delegated ruling 2026-11-25 (Main), precedent: the
+    # fit-necessity rule of the owner-approved fit policy
+    # (drawing-simplicity-policy.md; owner ruling 2026-11-24): a band stays
+    # tighter than the title block only when a named check fails at the
+    # looser size, and at Ø.150 ±.005 the four checks hold at Ø.145 and Ø.155;
+    # changes the owner's 2026-11-22 #3367 number, #2144 (rulings.md D25))
+    # opened them to the title block's ±.005, Ø.145-.155 x .078-.088, and the
+    # RV-04 tip wall stands on that printed band.
     from ch_vn_frame_side_screw_spec import HEAD_DIA
 
     spec = ch_fulcrum_keeper_spec
@@ -393,7 +398,8 @@ def test_fitup_exports_for_the_top_frame() -> None:
     spec = ch_fulcrum_keeper_spec
     # MHA-CH-00 prints the lug centre (.114 ±.004) at these places, and the
     # frame's stacks charge that printed value (delegated ruling 2026-11-24
-    # (Main), precedent: owner ruling 2026-11-01, #2144 (rulings.md D15)).
+    # (Main), precedent: owner ruling 2026-11-01 (thin walls accepted as
+    # minor); no owner number changed, #2144 (rulings.md D15)).
     import ch_channel_assembly_spec as asm
 
     assert spec.KEEPER_FITUP_PLACES == 3

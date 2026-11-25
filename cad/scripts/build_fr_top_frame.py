@@ -1793,10 +1793,10 @@ KEEPER_TAP_DRILL_WALL_MARGIN = (
 # Owner rulings D3/D4 (#2333) leave the drill wall its least at the 2°
 # minimum added draft; with the lug centre charged at MHA-CH-00's printed
 # .114 ±.004 it is .0767, under the .080 target. Delegated ruling 2026-11-24
-# (Main), precedent: owner ruling 2026-11-01, #2144 (rulings.md D15): "tap
-# wall .0767 accepted against the .080 target (floor .060) as an exception
-# entry" (RV-14), held at KEEPER_TAP_WALL_ACCEPTED_MM (.076); the floor still
-# binds.
+# (Main), precedent: owner ruling 2026-11-01 (thin walls accepted as minor);
+# no owner number changed, #2144 (rulings.md D15): the tap wall .0767 is
+# accepted against the .080 target (floor .060) as an exception entry
+# (RV-14), held at KEEPER_TAP_WALL_ACCEPTED_MM (.076); the floor still binds.
 _KEEPER_TAP_WALL = min(KEEPER_TAP_THREAD_WALL_MARGIN, KEEPER_TAP_DRILL_WALL_MARGIN)
 if _KEEPER_TAP_WALL < WALL_FLOOR_MM:
     raise AssertionError("keeper receiver leaves less than .060 with drill wander")

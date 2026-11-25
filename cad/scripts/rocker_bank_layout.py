@@ -97,11 +97,12 @@ END_FLOAT = (
 # Fit-up: the north ear's inner face is DRO-located off the located drum bank;
 # the south bracket is then set to the ears' inner-face span at the title
 # block's .XXX, +/-.005 in: delegated ruling 2026-11-25 (Main), precedent:
-# owner ruling 2026-11-24 merging the fit policy (a band tighter than the
-# title block must earn its place), #2144 (rulings.md D20). It was +/-.004
-# (owner ruling X1+B1, 2026-10-18); at +/-.005 END_CLEARANCE_MIN is still
-# (0.560, 0.281) mm over the 0.10 running floor, so nothing earns the
-# tighter band.
+# the fit-necessity rule of the owner-approved fit policy
+# (drawing-simplicity-policy.md; owner ruling 2026-11-24): a band stays
+# tighter than the title block only when a named check fails at the looser
+# size, and at +/-.005 END_CLEARANCE_MIN is still (0.560, 0.281) mm over the
+# 0.10 running floor; changes the owner's 2026-10-18 X1+B1 number (+/-.004),
+# #2144 (rulings.md D20).
 NORTH_EAR_LOCATE_BAND = 0.10  # DRO edge-find on the ear's inner face
 EAR_INNER_SPAN = NORTH_EAR_INNER_Z - SOUTH_EAR_INNER_Z
 EAR_SPAN_BAND = 0.127  # +/-.005, the title block's .XXX

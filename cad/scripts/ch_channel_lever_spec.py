@@ -119,8 +119,9 @@ PIVOT_HOLE_BAND = (drilled_oversize_mm(unit=UNIT), 0.0)
 # The plate is straddled by the amplitude bar's top notch, whose minimum is
 # this band's maximum plus the running floor (ch_amplitude_bar_spec, which
 # restates it; owner ruling 2026-10-15, #1038 option 2). The plate prints
-# .118 +.002/-.004 (delegated ruling 2026-11-25 (Main), no precedent, #2144
-# (rulings.md D23)), each side earned by a named check (necessity
+# .118 +.002/-.004 (delegated ruling 2026-11-25 (Main), no precedent; no
+# owner number changed, #2144 (rulings.md D23)), each side earned by a named
+# check (necessity
 # ch-channel-lever N-02): past +.002 the plate leaves less than the 0.10 mm
 # running floor in the narrowest notch (.0508 mm at +.004), and at +.005 the
 # bar's lean closes a cheek on it (CHEEK_CLOSURE_LIMIT .0254 mm against the
