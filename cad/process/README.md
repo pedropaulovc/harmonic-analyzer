@@ -98,7 +98,8 @@ reads is a plan parameter restating its shop record, held to it by a test
 face overhang). A picture shows one moment: every view in it shows the same
 tool at the same place, over the part (the face pass least past its edges, not
 the first pass, which hangs over the fixed jaw). The setup's picture shows its first
-cutting operation; each later tool (a drill, a tap) is drawn in its own
+cutting operation on the part (the first cut on the part, not a test plunge
+into waste); each later tool (a drill, a tap) is drawn in its own
 operation's picture, and a centre drill that spots the stations the next
 drill drills is not drawn (the drill's picture stands for it). The work stop
 is drawn as what it is, a round rod reaching in from its post beside the
