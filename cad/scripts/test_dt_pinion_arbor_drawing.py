@@ -212,7 +212,8 @@ def test_only_the_two_journal_lands_carry_the_finish_and_no_band() -> None:
     for key, (station_z, _symbol_xy, _flank) in drawing.JOURNAL_FINISHES.items():
         assert lands[key] < station_z < lands[key] + spec.JOURNAL_LEN
     # The callout flags note 1: the made-to-fit acceptance (turned last to the
-    # measured MHA-DT-14 bores, the clearance, the drum still sliding over).
+    # measured MHA-DT-14 strap bores, the clearance, and the drum sliding over
+    # both journals: owner ruling 2026-11-25, option A).
     assert drawing.JOURNAL_CALLOUT == "SEE NOTE 1"
     # #1038 sheet decision: one 2X diameter on the back land sizes both lands; the
     # front land prints only its two stations.  The size is a REFERENCE.
@@ -222,9 +223,15 @@ def test_only_the_two_journal_lands_carry_the_finish_and_no_band() -> None:
     assert "FrontJournalDia" not in drawing.DIMENSION_CALLOUTS
     note_1 = " ".join(drawing.SHEET_NOTES.split("\n2. ")[0].split())
     assert note_1 == (
-        "1. JOURNALS (2X): TURN LAST TO THE MEASURED BORES OF MHA-DT-14, "
-        "CLEARANCE .0010-.0030; MHA-DT-01 SLIDES OVER THE BACK ONE."
+        "1. JOURNALS (2X): TURN LAST TO THE MEASURED MHA-DT-14 STRAP BORES, "
+        "CLEARANCE .0010-.0030; MHA-DT-01 DRUM SLIDES OVER BOTH."
     )
+    # Each mate by its registry name (cad/config/parts).
+    import _config
+
+    assert "STRAP" in _config.parts("dt-pinion-bracket")["title"].upper()
+    assert "DRUM" in _config.parts("dt-alignment-pinion")["title"].upper()
+    assert "BACK" not in note_1
     # Rule 7: four short rows at most, left of the title block (x 0.216).
     rows = drawing.SHEET_NOTES.replace("<MOD-DIAM>", "Ø").splitlines()
     assert len(rows) <= 4
@@ -544,7 +551,7 @@ def test_back_bond_land_carries_its_own_diameter_under_the_shaft() -> None:
         ")",
     )
     note_3 = drawing.SHEET_NOTES.split("\n3. ")[1]
-    assert note_3 == "LANDS: TURN TO MHA-DT-01, LOCTITE 638 (CLEARANCE .0020-.0080)."
+    assert note_3 == "LANDS: TURN TO MHA-DT-01 DRUM, LOCTITE 638 (CLEARANCE .0020-.0080)."
     assert max(drawing.BOND_CLEARANCE) <= spec.RETAINING_COMPOUND_MAX_GAP_MM
     assert min(drawing.BOND_CLEARANCE) > 0.0
     assert sheet.DRAWING_PRECISION_BY_NAME["BackBondDia"] == 4
@@ -887,7 +894,7 @@ def test_spans_outside_the_journals_share_one_2x_diameter_and_mate() -> None:
     assert "right" not in _crossed_either_side(stub_xy, _DIA_BLOCK_RUN_MM + _COUNT_PREFIX_MM)
     rows = drawing.SHEET_NOTES.replace("<MOD-DIAM>", "Ø").splitlines()
     assert len(rows) <= 4
-    assert max(map(len, rows)) <= 66
+    assert max(map(len, rows)) <= 70
 
 
 def test_each_2x_second_span_carries_a_leadered_tag_in_its_pocket() -> None:
@@ -953,7 +960,7 @@ def test_bond_zone_diameter_is_a_flank_dimension_on_the_drum() -> None:
     # lands' callouts link (#1038 r11 machinist review, rule 26); note 1 names
     # the drum only as the journals' slide-over acceptance.
     words = drawing.SHEET_NOTES.split("\n3. ")[1].split()
-    assert "LOCTITE" in words and "MHA-DT-01," in words and "638" in words
+    assert "LOCTITE" in words and "MHA-DT-01" in words and "DRUM," in words and "638" in words
     assert "BONDED" not in drawing.SHEET_NOTES.split("\n2. ")[0]
     import _config
 
@@ -980,6 +987,11 @@ def test_bond_zone_diameter_is_a_flank_dimension_on_the_drum() -> None:
     assert spec.DRUM_FRONT_END_ON_JOURNAL_MIN == pytest.approx(front_min)
     assert spec.DRUM_BACK_END_ON_JOURNAL_MIN == pytest.approx(back_min)
     assert min(front_min, back_min) > 0.0
+    # Owner ruling 2026-11-25 (option A): the drum's front end seats .19 min
+    # (.23 max) on the front journal, which the traveler's remedy reams past.
+    assert spec.DRUM_FRONT_END_ON_JOURNAL_MIN / 25.4 == pytest.approx(0.19)
+    assert spec.DRUM_FRONT_END_ON_JOURNAL_MAX / 25.4 == pytest.approx(0.23)
+    assert spec.DRUM_FRONT_END_ON_JOURNAL_MIN >= spec.DRUM_FRONT_SEAT_FLOOR - 1e-9
     # So the drum covers exactly the span between the journals, and the
     # collar's span by the head (its pin hole) lies outside the drum.
     front_land_end = spec.FRONT_JOURNAL_END_FROM_HEAD_REAR

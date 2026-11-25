@@ -275,6 +275,21 @@ DRUM_BACK_END_ON_JOURNAL_MIN = (
 ) - (BACK_JOURNAL_FROM_HEAD_REAR + LINEAR_XX_BAND)
 if min(DRUM_FRONT_END_ON_JOURNAL_MIN, DRUM_BACK_END_ON_JOURNAL_MIN) <= 0.0:
     raise AssertionError("a drum end can leave its journal; BOND_ZONE_CALLOUT lies")
+# Owner ruling 2026-11-25 (pinion arbor, option A): the drum slides over both
+# journals, so its front end seats on the front journal (1.82-2.61) from its
+# 2.40 station: (2.61 - .01) - (2.40 + .01) = .19 at the short corner.  Note 1
+# and the traveler's remedy (the drum's front end opened past the seat when
+# no journal size fits both bores) read this seat; a station move that
+# shortens it re-opens the question the ruling answered.
+DRUM_FRONT_SEAT_FLOOR = 0.19 * 25.4
+DRUM_FRONT_END_ON_JOURNAL_MAX = (FRONT_JOURNAL_END_FROM_HEAD_REAR + LINEAR_XX_BAND) - (
+    DRUM_STATION - DRUM_STATION_BAND
+)
+if DRUM_FRONT_END_ON_JOURNAL_MIN < DRUM_FRONT_SEAT_FLOOR - 1e-9:
+    raise AssertionError(
+        f"the drum's front end seats {DRUM_FRONT_END_ON_JOURNAL_MIN / 25.4:.3f} on the "
+        "front journal, under the .19 the 2026-11-25 ruling read"
+    )
 # Notes never carry dimensions (Codex P1 on #814): the drum station is the
 # model's DrumStationFromHeadRear, printed on the profile.  Machinist review
 # r1 of #1685 (clarity): it ended on no feature of this part, so its callout
