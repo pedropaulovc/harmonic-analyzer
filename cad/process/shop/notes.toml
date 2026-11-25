@@ -1,0 +1,29 @@
+# Shop standing rules for prechips traveler heads (cad/process/shop/, merged
+# with the other *.toml here). A plan prints one with `[[notes]] ref = "<key>"`
+# where its own head notes go; the text lives here once, so a change to a
+# standing rule is one edit for every sheet that prints it. Part-specific
+# notes stay in the plan's own [[notes]]. Shop strings print as written (no
+# {{...}} binding). Each row is one rule: a short "when" label and what to do.
+
+# The CNC-converted PM-30MV (FluidNC and CNCjs; owner 2026-11-16). The rules
+# are the standing sentences of the mill plans' top-level notes on main
+# 0c471356dd (sh_column_clamp, ch_fulcrum_keeper, ms_stop_block, ...), one
+# rule per row, the wording kept:
+# - Units: the posted files and the controller run G21.
+# - Speeds: machines.pm-30mv rpm_ranges in common.toml, 100-2800 rpm on the
+#   low belt (owner 2026-11-16: "2800 max with low belty").
+# - Homing once, homing again, the zero re-check within .001 in and Feed
+#   Hold/Reset: the homing sentences PR #3521 carries into every mill note.
+# - Prove in air (traveler rule T8); burrs off before a milled face seats.
+[notes.pm-30mv-cnc]
+title = "PM-30MV standing rules (the same on every mill sheet)"
+rows = [
+  ["Switching on", "Home the mill (`$H`) once. Every M6's trip to the tool setter and every G53 retract count from home."],
+  ["Home again only after", "A power cycle or a controller restart, an E-stop, an alarm, a limit switch hit, a stall or a crash. Homing brings the stored G54 back."],
+  ["After homing again", "Before Cycle Start, touch one of the setup's zeros again with the edge finder: it must read what its step set, within .001 in. It does not: the part may have moved; take the setup again from its first step, the part out."],
+  ["Feed Hold", "Then Reset with the axes stopped: position and G54 are kept; no homing, no new zero. Console M6 for the tool in the spindle, then Cycle Start."],
+  ["A file's first blank", "Prove the file in air on the first blank it cuts."],
+  ["Before a face seats", "File the burr off a milled face's edges before it goes down on the parallels or against the fixed jaw: a burr under the seat lifts the part and the next cut comes out thin."],
+  ["Units", "Inches unless mm. G-code and console entries in mm: the files and the controller run G21."],
+  ["Speeds", "All on the low belt (100–2800 rpm): no belt change."],
+]
