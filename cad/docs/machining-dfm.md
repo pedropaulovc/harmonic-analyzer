@@ -1011,8 +1011,9 @@ fulcrum shaft on their own integral hubs, which stack face to face and set the 7
 pitch (`ch_channel_lever_spec.HUB_LENGTH`). The 20 rocker arms float on the pivot shaft: each hub is
 .278 ±.002 (`ch_rocker_arm_spec.HUB_LENGTH`), shorter than the pitch, and each arm is located along
 the bank by its own connecting rod, whose ring slides in its cam slot; nothing bears on a bracket
-ear, and the ears stand 6.094 ±.004 apart on their inner faces (`rocker_bank_layout`, owner ruling
-2026-11-18, [#3114](https://github.com/pedropaulovc/harmonic-analyzer/issues/3114)).
+ear, and the ears stand 6.094 ±.005 apart on their inner faces, the title block's .XXX
+(`rocker_bank_layout`, owner ruling 2026-11-18,
+[#3114](https://github.com/pedropaulovc/harmonic-analyzer/issues/3114); D20).
 
 ### Rocker arms + support (T1 — built-up profile arm + cast bracket)
 

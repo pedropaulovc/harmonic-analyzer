@@ -26,8 +26,9 @@ the two tooth discs of its cam slot and whose fork carries the arm's strap.
   (END_CLEARANCE_MIN).
 * The NORTH bracket is DRO-located at fit-up (NORTH_EAR_LOCATE_BAND) and the
   SOUTH bracket is set from it to the ears' inner-face span (EAR_INNER_SPAN,
-  +/-EAR_SPAN_BAND). The ears stand within .008 of where the retired
-  preloaded stack put them, and the shaft keeps its printed length.
+  +/-EAR_SPAN_BAND, the title block's .XXX). The ears stand within .008 of
+  where the retired preloaded stack put them, and the shaft keeps its
+  printed length.
 * The shaft is a plain rod whose cylinder spans both ears' outer faces, each
   end domed proud of its ear. One #4-40 set screw down through each ear's
   arch apex bites a flat milled on the shaft at that ear's mid-plane, so the
@@ -94,10 +95,16 @@ END_FLOAT = (
     NORTH_EAR_INNER_Z - HUB19_NORTH_FACE_Z,
 )
 # Fit-up: the north ear's inner face is DRO-located off the located drum bank;
-# the south bracket is then set to the ears' inner-face span, +/-.004 in.
+# the south bracket is then set to the ears' inner-face span at the title
+# block's .XXX, +/-.005 in: delegated ruling 2026-11-25 (Main), precedent:
+# owner ruling 2026-11-24 merging the fit policy (a band tighter than the
+# title block must earn its place), #2144 (rulings.md D20). It was +/-.004
+# (owner ruling X1+B1, 2026-10-18); at +/-.005 END_CLEARANCE_MIN is still
+# (0.560, 0.281) mm over the 0.10 running floor, so nothing earns the
+# tighter band.
 NORTH_EAR_LOCATE_BAND = 0.10  # DRO edge-find on the ear's inner face
 EAR_INNER_SPAN = NORTH_EAR_INNER_Z - SOUTH_EAR_INNER_Z
-EAR_SPAN_BAND = 0.1016  # +/-.004
+EAR_SPAN_BAND = 0.127  # +/-.005, the title block's .XXX
 # Each ear's inner face off its nominal station, (south, north).
 EAR_LOCATE_BAND = (NORTH_EAR_LOCATE_BAND + EAR_SPAN_BAND, NORTH_EAR_LOCATE_BAND)
 # How far an END arm's hub mid-plane may stand off its nominal station while

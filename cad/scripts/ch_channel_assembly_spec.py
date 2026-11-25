@@ -195,7 +195,7 @@ DRAWING_DIMENSIONS = {
 }
 # Inch places per setting. The ears' inner-face span is 6.094 (nineteen .300
 # pitches and the two ear stand-offs, .189 and .205), on the plain inch grid
-# at its +/-.004 band's three places. The front lug inner face (1.3702), set
+# at the title block's .XXX (+/-.005). The front lug inner face (1.3702), set
 # off the kinematic fulcrum line by DRO at the title block's band, prints
 # 1.370; the rear (7.4102) is set to the lever stack, so it prints as a
 # reference at the same places; three for the lug centre (.114, band .004).
@@ -224,12 +224,16 @@ TOLERANCE_PRECISION = {
     for name, places in places_by_name.items()
 }
 # (lower, upper) deviations.
-# The ear span and the lug centre carry their fit-up bands on their own
-# dimensions (owner rulings X1+B1 and X-A, 2026-10-18). The lug centre's
-# is in necessity register ch-channel-assembly N-01; the ear span's has no
-# entry: its end hubs still clear at the title block (#3563); the front lug inner face the title block's band and
-# the rear inner face is a reference (C10, ch_keeper_fitup: the rear keeper
-# is set to the bare lever stack over a leaf).
+# The lug centre carries its fit-up band on its own dimension (owner ruling
+# X-A, 2026-10-18), in necessity register ch-channel-assembly N-01. The ear
+# span prints the title block's +/-.005 as its setting band: delegated
+# ruling 2026-11-25 (Main), precedent: owner ruling 2026-11-24 merging the
+# fit policy (a band tighter than the title block must earn its place),
+# #2144 (rulings.md D20), replacing owner ruling X1+B1's +/-.004; its end
+# hubs still clear at it (rocker_bank_layout.END_CLEARANCE_MIN, #3563). The
+# front lug inner face the title block's band and the rear inner face is a
+# reference (C10, ch_keeper_fitup: the rear keeper is set to the bare lever
+# stack over a leaf).
 DIMENSION_TOLERANCES = {
     EAR_SPAN_DIMENSION: (-EAR_SPAN_BAND, EAR_SPAN_BAND),
     TIP_PROUD_DIMENSION: (-SHAFT_TIP_SET_BAND, SHAFT_TIP_SET_BAND),

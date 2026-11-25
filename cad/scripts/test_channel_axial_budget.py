@@ -205,7 +205,8 @@ def test_the_bar_lean_books_the_lever_bank_and_closes_no_cheek() -> None:
 
 def test_the_end_hubs_never_reach_their_ears() -> None:
     south, north = rocker.END_CLEARANCE_MIN
-    assert (south, north) == pytest.approx((0.5858, 0.2810), abs=1e-4)
+    # The south ear at the span's ±.005 (D20; 0.5858 at ±.004).
+    assert (south, north) == pytest.approx((0.5604, 0.2810), abs=1e-4)
     assert min(south, north) >= rocker.RUNNING_FLOOR
     assert rocker.END_FLOAT == pytest.approx((1.6764, 1.27))
     # The same from this test's own stack, the ear at its locate band.
