@@ -35,8 +35,9 @@ UNIT = drawing_unit(
 OD = 8.89  # .35
 OD_PLACES = 2
 # The bore: reamed with the set's .1260 reamer, the sleeve's (one reamer,
-# one size), and printed at that size with NO band (fit audit 2026-11-23,
-# pending owner confirmation).  BORE_DIA_BAND is the ANALYSIS band the
+# one size), and printed at that size with NO band (rule 4, form 2; the
+# modelled cut, +.001, is the owner's ruling of 2026-11-24 on fit audit
+# question 5).  BORE_DIA_BAND is the ANALYSIS band the
 # reamer is modelled to cut, never printed; the wall and the cocking check
 # below read it.
 BORE_DIA = FIT.BORE_DIA  # .1260

@@ -47,7 +47,7 @@
 # end mill, Harvey Tool 34662, bought for MHA-MS-02 too
 # (endmill-carbide-3fl-1-16-reach-1-2).
 #
-# Fit audit 2026-11-23, pending owner confirmation (the owner, 2026-11-23:
+# Rule 4, form 2 for the bore, form 3 for the chord ream (the owner, 2026-11-23:
 # "why do we need single micron level tolerance x class plug gauges for a
 # hobby machining project"): both reamed holes print their reamers' sizes
 # and no band, so neither is gauged for size and the Class ZZ pins
@@ -125,7 +125,7 @@ spigot_rough_length_in = 0.14
 # root's R.004 MAX), turned at the lathe's finest longitudinal power feed,
 # .0025 in/rev (the maker's page: longitudinal feeds .0025-.012 IPR, cross
 # feeds .001-.0056 IPR). Its cusp is f^2/(8r): at R.003, .0025^2/.024 =
-# .00026 radial. Fit audit 2026-11-23, pending owner confirmation: the
+# .00026 radial. Rule 4, form 2 (drawing-guidelines): the
 # spigot is made to fit. The sheet prints its size REF and the requirement
 # is its diametral clearance in the MHA-PD-06 disc's reamed bore (note 4),
 # so the disc's bore is reamed before this operation and the acceptance is

@@ -23,8 +23,9 @@ tool = "jig-drill-f"
 material = "lathe-c360"
 sfm = 160
 feed = "tailstock quill by hand, steady, dry"
-[settings.lathe-drill-12-c360]
-tool = "drill-12"
+# MHA-PD-20's #11 DRILL THRU, a short hole drilled in one feed (D17, Q7b).
+[settings.spacer-lathe-drill-11-c360]
+tool = "drill-11"
 material = "lathe-c360"
 sfm = 160
 feed = "tailstock quill by hand, steady, dry"
@@ -74,7 +75,7 @@ diameter_mm = 2.1844
 [tools.drill-40]  # Drills #40
 description = "#40 (.0980 in) drill, 115-piece index"
 diameter_mm = 2.4892
-[tools.drill-11]  # 115-piece index #11; MHA-PD-22 #11 DRILL THRU (fit audit 2026-11-23)
+[tools.drill-11]  # 115-piece index #11; MHA-PD-22 #11 DRILL THRU (fit audit 2026-11-23); MHA-PD-20 #11 DRILL THRU (D17, Q7b)
 description = "#11 (.1910 in) drill, 115-piece index"
 diameter_mm = 4.8514
 [tools.drill-33]  # Drills #33
@@ -128,12 +129,6 @@ description = "Shop-made work arbor with two backing discs for cutting the MHA-P
 [tools.reamer-0615]  # MHA-PD-17 Ø.0615 +.0005/.0000 REAM; MHA-PD-22 Ø.0615 REAM (.163), no band
 description = ".0615 in HSS chucking reamer"
 diameter_mm = 1.5621
-# MHA-PD-20's #12 DRILL THRU (a LOCTITE 638 bonded slip fit on MHA-PD-VN-57,
-# fit audit 2026-11-23): the 115-piece index's #12, nominal × 25.4
-# (cad/config/shop-equipment/tools-drills.toml drill-12).
-[tools.drill-12]
-description = "#12 (.189 in) drill, 115-piece index"
-diameter_mm = 4.8006
 [tools.endmill-hss-tin-2fl-3-16]  # MHA-PD-16 flat floor for the Ø.19 head counterbore, plunged from the tailstock
 description = "3/16 in TiN-coated HSS 2-flute square end mill, centre cutting (McMaster 8949A16)"
 diameter_mm = 4.7625

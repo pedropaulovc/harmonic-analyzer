@@ -235,10 +235,11 @@ def _floor_pressed_proud_range(pin_length: float, hole_depth: float) -> tuple[fl
 # to .XX inch (reach 0.376), the hook its formed .XX ±.02 (FORMED_BAND .024
 # with the rounding, MHA-PD-14).  The hook's screw holes take the title
 # block's ±.005 (delegated ruling 2026-11-07, the bar's taps spotted through
-# them), so the hook's screw drift grew; the MHA-PD-20 rear face parallel
-# .001 to its front (fit audit 2026-11-23, pending owner confirmation)
-# seats the pivot; the #9 drilled pivot bore floats the pivot .0135 at most
-# (#2413's ream floated it .0085).  #3124: the 7/8 pin is set
+# them), so the hook's screw drift grew; the MHA-PD-20 rear face, within
+# .002 of parallel to its front (its .197 ±.001 length band's total spread,
+# REAR_FACE_PARALLELISM: no frame prints), seats the pivot; the #9 drilled
+# pivot bore (owner ruling 2026-11-24, fit audit question 6) floats the
+# pivot .0135 at most (#2413's ream floated it .0085).  #3124: the 7/8 pin is set
 # .516-.565 proud at assembly (owner decision 2026-11-19).  #2019: on the 3/8
 # arm (latch height .188, hook hole on the moved axis) each margin is about
 # 0.011 smaller.  #2422: the bar's pivot tap prints the title block's ±.005

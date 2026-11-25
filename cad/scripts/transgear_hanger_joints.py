@@ -110,7 +110,7 @@ if not BAR.PIVOT_TAP_CSK_DIA < PIVOT.SHOULDER_DIA + PIVOT.SHOULDER_DIA_LIMITS[0]
 
 # --- MHA-PD-20 spacer bonded on the MHA-PD-VN-57 shoulder --------------------------
 # Bonded at the bench (owner ruling 2026-11-24, fit audit question 6; it
-# was R9-71's press): a #12 drilled hole, LOCTITE 638, cured with its front
+# was R9-71's press): a #11 drilled hole, LOCTITE 638, cured with its front
 # face and the shoulder's end down together on a flat plate, so the screw
 # seats both on the bar as one body: the spacer turns with the screw while
 # it is tightened and is then fixed in the bar's frame, its faces'
@@ -153,10 +153,23 @@ SPRING_PRELOAD_N = (
 # LOCTITE 638's ISO 10123 shear, 25 N/mm^2 minimum (TDS), derated by the
 # Henkel Retaining Compound Design Guide's factors as dt_pinion_arbor_geometry
 # and sm_gooseneck_spring_joint take them: 0.4 for brass (the lower of the
-# pair), 0.3 for the clearance at the wide end of the gap, 1.0 for a land no
+# pair), 0.3 for the clearance, booked at 0.25 mm diametral (the grade's
+# limit; the factor only falls as the gap widens), 1.0 for a land no
 # longer than its diameter; over the smallest shoulder and the shortest land.
+# The margins below are therefore the margins at the #11 bore's widest gap,
+# .0085 (0.216 mm), asserted under the booked 0.25 mm (delegated ruling
+# 2026-11-24 (Main), D17, no precedent, #2144: the #11 stands only while the drag margin
+# at the widest gap stays at 2x or more).
 LOCTITE_638_SHEAR_MPA = 25.0
-SPACER_BOND_FACTOR = 0.4 * 0.3 * 1.0
+SPACER_BOND_CLEARANCE_FACTOR = 0.3
+SPACER_BOND_CLEARANCE_FACTOR_GAP_MM = 0.25
+SPACER_BOND_GAP_WIDEST = max(SPACER.BOND_GAP)  # 0.2159, .0085
+if SPACER_BOND_GAP_WIDEST > SPACER_BOND_CLEARANCE_FACTOR_GAP_MM:
+    raise AssertionError(
+        f"MHA-PD-20's widest bond gap {SPACER_BOND_GAP_WIDEST:.4f} mm is past the"
+        f" {SPACER_BOND_CLEARANCE_FACTOR_GAP_MM} mm its clearance factor is booked at"
+    )
+SPACER_BOND_FACTOR = 0.4 * SPACER_BOND_CLEARANCE_FACTOR * 1.0
 if SPACER.BOND_LAND_MIN > _SHOULDER_MIN:
     raise AssertionError("the spacer's bond land is longer than its diameter")
 SPACER_BOND_SHEAR_N = (
