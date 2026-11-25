@@ -40,7 +40,7 @@ machine = "To be written"
 title = "Traveler to come"
 
 [[setups.operations]]
-instruction = "Mike the bar before anything is cut: .240 to .260 thick (the sheet's .25 ±.01; Online Metals gives ±.008 for this extruded bar). Outside that, stop and tell the owner. Owner ruling 2026-11-25: the plate is used at its supplied thickness, faces as supplied."
+instruction = "Before anything is cut, check the bar two ways. Mike it: .240 to .260 thick (the sheet's .25 ±.01; Online Metals gives ±.008 for this extruded bar). Lay it on the surface plate, each face down in turn: it must sit without rocking, because the sector arms sweep one face and the other seats on the head. If either check fails, stop and tell the owner. Owner ruling 2026-11-25: the plate is used at its supplied thickness, faces as supplied, so there is no stock to skim it flat."
 
 [[setups.operations]]
 instruction = "Process not written yet."
