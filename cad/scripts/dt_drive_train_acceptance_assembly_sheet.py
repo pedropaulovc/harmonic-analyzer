@@ -64,24 +64,51 @@ POST_SCREW_SHORT_TEXT = inch_max_text(
 
 # Owner ruling 2026-11-24, audit part 2 S1 ("all approved (ticked)"): checks
 # 4W and 4Y count turns from first bite, the screw run in to seated, in place
-# of the lesser of two recorded depth readings.  After N turns the full-form
-# engagement is N pitches less the incomplete lead where the screw first
-# bites: its tip chamfer and the receiver's entrance break, a pitch each.  So
-# the count that keeps each screw spec's inspected floor (DT-04's 1D for the
-# pivot, 1.5D for the stop) is that floor in pitches plus two, rounded up.
-FIRST_BITE_LEAD_PITCHES = 2
-
-
-def first_bite_turns(floor_mm: float, pitch_mm: float) -> int:
+# of the lesser of two recorded depth readings.  Codjiflo r3-5 on #3550: the
+# count is derived from each screw's own thread.  N turns from first bite
+# advance the tip N pitches past where it first caught, which is no shallower
+# than the receiver's face.  Seated, the screw's full form runs from its
+# head-end runout (FULL_THREAD_START, under the shoulder or head, at the
+# receiver's mouth, where its entrance break also lies) to its tip chamfer
+# (TIP_CHAMFER).  So the full-form overlap is at least N pitches less those
+# two, and the count that keeps each screw spec's inspected floor (DT-04's 1D
+# for the pivot, rule 18's 1.5D for the stop) is that floor plus both, in
+# pitches, rounded up.  A count the screw's thread cannot reach before it
+# seats could never be recorded, so the derivation refuses it: a screw swap
+# with a shorter thread fails here, not on the sheet.
+def first_bite_turns(
+    floor_mm: float,
+    pitch_mm: float,
+    *,
+    tip_chamfer_mm: float,
+    full_thread_start_mm: float,
+    thread_len_mm: float,
+) -> int:
     """Turns from first bite that hold ``floor_mm`` of full-form thread."""
-    return math.ceil(floor_mm / pitch_mm + FIRST_BITE_LEAD_PITCHES - 1e-9)
+    turns = math.ceil((floor_mm + tip_chamfer_mm + full_thread_start_mm) / pitch_mm - 1e-9)
+    if turns * pitch_mm > thread_len_mm + 1e-9:
+        raise AssertionError(
+            f"{turns} turns ({turns * pitch_mm:.3f} mm) run past the screw's "
+            f"{thread_len_mm:.3f} mm thread before it seats"
+        )
+    return turns
 
 
 PIVOT_SCREW_TURNS = first_bite_turns(
-    pivot_screw.MIN_USEFUL_ENGAGEMENT_MM, PIVOT_SCREW_PITCH
+    pivot_screw.MIN_USEFUL_ENGAGEMENT_MM,
+    PIVOT_SCREW_PITCH,
+    tip_chamfer_mm=pivot_screw.TIP_CHAMFER,
+    full_thread_start_mm=pivot_screw.FULL_THREAD_START,
+    thread_len_mm=pivot_screw.THREAD_TAIL_LEN,
 )
+# The fillister stop screw is threaded to its head; its shortest stock length
+# is the thread it can run in.
 STOP_SCREW_TURNS = first_bite_turns(
-    stop_screw.MIN_USEFUL_ENGAGEMENT_MM, stop_screw.THREAD_PITCH
+    stop_screw.MIN_USEFUL_ENGAGEMENT_MM,
+    stop_screw.THREAD_PITCH,
+    tip_chamfer_mm=stop_screw.TIP_CHAMFER,
+    full_thread_start_mm=stop_screw.FULL_THREAD_START_MAX_MM,
+    thread_len_mm=stop_screw.LENGTH_MIN_MM,
 )
 # (key, step, setting, set to / accept, check with), in step order, then rows
 # added later appended so no earlier row (which other records cite by number)

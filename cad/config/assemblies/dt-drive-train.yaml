@@ -145,7 +145,7 @@ machinist_exceptions:
   # reused.
   - id: "DT-04"
     kind: "minor"
-    where: "sheet 13 checks 4W-4X: VERIFY MHA-DT-VN-52'S STEP 23L TURNS (SHEET 16 ROW 18: 7 MIN); SHOULDER STAYS SEATED."
+    where: "sheet 13 checks 4W-4X: VERIFY MHA-DT-VN-52'S STEP 23L TURNS (SHEET 16 ROW 18: 8 MIN); SHOULDER STAYS SEATED."
     finding: "thread engagement below 1.5D (rule 18)"
     reason: "Owner ruling 2026-11-01: thread engagement below 1.5D with no geometry escape accepted as a minor exception. MHA-DT-VN-52 cone pivot shoulder screw in the MHA-FR-01 blind seat, 1.0D"
   - id: "DT-05"
