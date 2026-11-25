@@ -55,8 +55,11 @@ def seat_callout(mate: str, name: str = "CRANK ARM") -> str:
 
 
 # The bore is the named 3/8 drill's, Ø.375 at DRILLED HOLES (rule 3: a named
-# drill keeps its own decimal; delegated ruling 2026-11-25 (Main), no owner
-# number changed; owner review #2144 (D27)).  MHA-DT-11's shank is made last,
+# drill keeps its own decimal; delegated ruling 2026-11-25 (Main), precedent:
+# the fit-necessity rule of the owner-approved fit policy
+# (drawing-simplicity-policy.md; owner ruling 2026-11-24): a bore with no
+# failing check takes the plain drill; no owner number changed; owner review
+# #2144 (D27)).  MHA-DT-11's shank is made last,
 # turned to the bore's smallest reading, and carries the fit's acceptance on
 # its own sheet (fit audit 2026-11-23, MHA-DT-31.bore: the acceptance prints
 # once, on the member made last).

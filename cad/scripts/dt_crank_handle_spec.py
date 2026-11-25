@@ -100,9 +100,10 @@ _GENERAL_2PL = printed_band_mm(2, unit=UNIT)
 # #20; DT-32 shoulder by trial, limits .1535-.1585".  A #20 cuts .1610 and up,
 # and the sheet takes it at DRILLED HOLES (+.004/0, .1610-.1650): a plain
 # drilled hole, no cap of its own (delegated ruling 2026-11-25 (Main),
-# precedent: owner ruling 2026-11-24 merging the fit policy; RETIRES the
-# owner's fit-audit Q14 answer's trial step (the shoulder's .1635 trial must
-# not enter); owner review #2144 (D26)).  The band below is that drilled
+# precedent: the fit-necessity rule of the owner-approved fit policy
+# (drawing-simplicity-policy.md; owner ruling 2026-11-24): a bore with no
+# failing check takes the plain drill; RETIRES the owner's fit-audit Q14
+# answer's trial step; owner review #2144 (D26)).  The band below is that drilled
 # range, an analysis band for the walls and the shoulder's limits, not a
 # printed one: the sheet prints the drill, and MHA-DT-32 prints the fit.
 PIVOT_BORE_DIA = 4.0894  # .1610

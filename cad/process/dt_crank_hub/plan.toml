@@ -26,8 +26,11 @@
 # Owner ruling 2026-11-24, fit audit question 21: the seat is a slip fit in
 # the arm, bonded with LOCTITE 638, turned to the arm's bore until it slides
 # on by hand (no sizing plug, no B + .0009 press arithmetic). Delegated
-# ruling 2026-11-25 (Main), no owner number changed; owner review #2144
-# (D27): the bore is the 3/8 drill's, Ø.375 at DRILLED HOLES (.375-.379);
+# ruling 2026-11-25 (Main), precedent: the fit-necessity rule of the
+# owner-approved fit policy (drawing-simplicity-policy.md; owner ruling
+# 2026-11-24): a bore with no failing check takes the plain drill; no owner
+# number changed; owner review #2144 (D27): the bore is the 3/8 drill's,
+# Ø.375 at DRILLED HOLES (.375-.379);
 # MHA-DT-11's shank is turned to its smallest measured reading, so nothing
 # here gauges it (the .3760 reamer, its 23/64 pilot and the Class ZZ pins
 # zz-pins-3760-3765 are dropped from this plan).
