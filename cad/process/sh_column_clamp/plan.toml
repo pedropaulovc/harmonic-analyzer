@@ -20,13 +20,13 @@
 # outside face to the .610 pre-face depth (the drawing's .590 plus the .020
 # grip offset, MHA-SH-02 NOTE 1), both #29 tap drills (CB06) and the 8-32
 # taps by hand under the spring tap guide (CB07, CB08). Setup 9: bench
-# deburr, then each back bolted to its front with the pair's own #8-32
+# seat check (burrs off, no edge break), then each back bolted to its front with the pair's own #8-32
 # screws, gripped on the two outside faces with a 1-2-3 block between the
 # screw heads, and the full Ø1.008 bore interpolated on the split line with
 # the 1/2 in carbide end mill (CB09; CB10 opens it if the gauge reads it
 # small), gauged with the telescoping gauges. Setup 10: .020 faced off the
 # back's mating face (CB11; .610 -> .590), the drawing's gap between the
-# halves. Setup 11: inspect, deburr, black enamel: the owner's Rust-Oleum
+# halves. Setup 11: inspect, the one edge break, black enamel: the owner's Rust-Oleum
 # Flat Black 376855 (owner 2026-11-21, answered in person: "rust-oleum Flat
 # Black376855") over the maker's Clean Metal Primer, by Rust-Oleum's
 # technical data SRT-01 (consumables.black-alkyd-enamel cites it).
@@ -908,7 +908,7 @@ feed = "hand"
 [[setups]]
 machine_kind = "other"
 part = "back"
-title = "Deburr, then the pair bore: each back bolted to its front"
+title = "Seat check, then the pair bore: each back bolted to its front"
 machine = "PM-30MV CNC (FluidNC, CNCjs with the electronic tool setter) / vise, swivel off"
 indexing = "none"
 machine_ref = "pm-30mv"
@@ -926,11 +926,11 @@ speed_kind = "other"
 tool = "files"
 drilling = "none"
 sizing = "other"
-instruction = "Every half: deburr the drill exits (a back's: the tap exits) on the mating face flush (scraper from the deburring set; no countersink), then break every edge, R{{cad.edge_break_in:.3dot}} or chamfer {{cad.chamfer_max_in:.3dot}} max. The mating face must lie flat on its mate's: stone it lightly on a flat stone and wipe it. Keep N and B readable. Wash off the oil."
+instruction = "Every half, burrs only (Setup 11 breaks the edges, once): scrape the drill exits (a back's: the tap exits) on the mating face flush (scraper from the deburring set; no countersink) and file off any burr standing at an edge. The mating face must lie flat on its mate's: stone it lightly on a flat stone and wipe it. Keep N and B readable."
 feed = "hand"
 inspection = "Mating face down on the surface plate: it does not rock and no burr stands proud."
 gauge_checks = "other"
-diagram = { file = "diagrams/deburr.svg", part = "front", alt = "A front on the bench, mating face up: the drill exits deburred flush, the edges broken." }
+diagram = { file = "diagrams/deburr.svg", part = "front", alt = "A front on the bench, mating face up: the drill exits scraped flush, no burr standing at an edge." }
 
 [[setups.operations]]
 instruction = "Only if it rocks or a burr stands proud: stone it again and check it again."
@@ -942,10 +942,10 @@ instruction = "Each back: mic the pre-face depth, mating face to outside face, a
 feed = "hand"
 inspection = "Pre-face depth {{cad.pre_face_depth_min_in:.3dot}}–{{cad.pre_face_depth_max_in:.3dot}} at both ends. Outside: stop and tell the owner."
 gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.pre_face_depth_band_mm}}" }]
-diagram = { file = "diagrams/deburr.svg", part = "back", alt = "A back on the bench, mating face up, at its pre-face depth: the tap exits deburred flush, the edges broken." }
+diagram = { file = "diagrams/deburr.svg", part = "back", alt = "A back on the bench, mating face up, at its pre-face depth: the tap exits scraped flush, no burr standing at an edge." }
 
 [[setups.operations]]
-instruction = "On the bench: bolt a back to a front (both deburred as above), mating face to mating face, with the pair's own two MHA-SH-VN-53 screws (90280A201 #8-32 × 1-1/4 narrow fillisters; none in hand: stop, no substitute) through the front's ear holes into the back's taps, heads on the front's outside face."
+instruction = "On the bench: bolt a back to a front (both checked as above), mating face to mating face, with the pair's own two MHA-SH-VN-53 screws (90280A201 #8-32 × 1-1/4 narrow fillisters; none in hand: stop, no substitute) through the front's ear holes into the back's taps, heads on the front's outside face."
 instruction_detailed = "On the surface plate: both halves on their B faces, N ends together against the side of a 1-2-3 block; snug the screws, then tighten them. The screw tips stop at least {{cad.screw_short_in:.3dot}} short of the back's outside face."
 inspection = "N ends flush (a fingernail across them finds no step) and both B faces flat on the plate (no rock); each screw tip at least {{cad.screw_short_in:.3dot}} below the back's outside face (the calipers' depth rod down each tapped hole). A tip proud: stop and tell the owner."
 gauge_checks = "other"
@@ -1121,7 +1121,7 @@ speed_kind = "other"
 tool = "files"
 drilling = "none"
 sizing = "other"
-instruction = "Every half: deburr the bore's edges at the top and bottom faces and along the mating face (a back's is the faced one), R{{cad.edge_break_in:.3dot}} or chamfer {{cad.chamfer_max_in:.3dot}} max, scraper and smooth file; no burr may stand proud of the mating face. Each back also: break the four outer edges of the mating face that Setup 10 faced and deburr both tap mouths on it flush (scraper; no countersink), then run a screw through each tapped hole again. Wash off the oil."
+instruction = "Every half, the one edge break: every edge, the bore's at the top and bottom faces and along the mating face included, R{{cad.edge_break_in:.3dot}} or chamfer {{cad.chamfer_max_in:.3dot}} max, scraper and smooth file; no burr may stand proud of the mating face. Keep N and B readable. Each back also: deburr both tap mouths on the faced mating face flush (scraper; no countersink), then run a screw through each tapped hole again."
 feed = "hand"
 
 [[setups.operations]]

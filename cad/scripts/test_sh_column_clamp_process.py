@@ -214,7 +214,7 @@ def test_no_touch_off_is_taken_with_the_work_stop_between_the_jaws() -> None:
             for index, operation in enumerate(operations)
             if operation.get("tool") == "work-stop"
         ]
-        if setup["title"].startswith("Deburr, then the pair bore"):
+        if setup["title"].startswith("Seat check, then the pair bore"):
             assert not stops
             for key in ("instruction", "instruction_detailed"):
                 assert "No work stop" in first.get(key, "No work stop")
