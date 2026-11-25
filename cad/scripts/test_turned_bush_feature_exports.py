@@ -232,8 +232,14 @@ def test_printed_bands_are_the_sheets() -> None:
     assert ferrule_features["bore"]["process"] == "drill"
     cup_features = manifest("dt_crank_handle_butt_cup")["features"]
     assert _inch(cup_features["pocket"]["depth"]) == [0.212, 0.222]
-    # The pocket's own limits, unmatched to the head (fit audit question 15).
-    assert _inch(cup_features["pocket"]["dia"]) == [0.248, 0.257]
+    # The pocket's own limits, unmatched to the head (fit audit question 15),
+    # in the turned_bush adapter's form: the reference size, the upper limit
+    # the .257 pin checks, and the head's clearance in the pocket.
+    pocket = cup_features["pocket"]
+    assert pocket["dia_ref"] == pytest.approx(0.25 * IN)
+    assert pocket["dia_max"] == pytest.approx(0.257 * IN)
+    assert _inch(pocket["diametral_clearance"]) == [0.007, 0.026]
+    assert "dia" not in pocket
     assert _inch(cup_features["chamfer_bore"]["leg"]) == [0.005, 0.01]
     plug_end = manifest("sm_gooseneck_end_plug")["features"]
     assert plug_end["tap"]["thread"] == "#10-24 UNC-2B"
