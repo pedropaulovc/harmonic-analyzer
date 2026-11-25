@@ -681,14 +681,25 @@ _PLAN_LUG = KEEPER_PLAN.plan_xy(asm.KEEPER_LUG_X, asm.KEEPER_SOCKET_XZ[1])
 _PLAN_FACES = tuple(
     KEEPER_PLAN.plan_xy(asm.KEEPER_LUG_X, z) for z in asm.LUG_INNER_FACE_Z
 )
-# The X text above the boss, its dimension line clear of the boss top and
+# The X text right of the boss, its dimension line clear of the boss top and
 # off the inner-face dimensions' shared extension line on the socket line
 # (5d5245a review); each Z text centred on its own dimension line west of
 # the keepers, the rear's inside the front's so neither text sits on the
 # other's line (the front line stops at the front face, above the rear text;
-# the front text clears the rear line by 3 mm).
+# the front text clears the rear line by 3 mm). The X text is a three-row
+# block (callout, value, the rail web wall under it): SolidWorks centres a
+# block on its text position and hangs the dimension line under its last
+# row (MHA-FR-02 sheet 7's draft callout, farm run 20261125T172832344Z), so
+# the third row lowers that line half a row, about 3 mm; the text rises 3 mm
+# to keep the line where the two-row block left it (y 0.1347 on that run's
+# sheet 5, over the boss top at 0.1345). The wall row is the block's widest,
+# about 75 mm (MHA-FR-02's 28-character HOLDS 2-56 TAP WALL .076 MIN
+# measured 68.4 mm), 86 mm at the note glyph width; centred 0.050 east of
+# the lug it runs from about 0.125 (0.119 at most), east of both extension
+# lines at 0.112, to 0.200 (0.205 at most), short of the steps column at
+# 0.222.
 PLAN_KEEP = {
-    asm.KEEPER_X_DIMENSION: (_PLAN_LUG[0] + 0.016, KEEPER_PLAN_SOCKET_Y + 0.017),
+    asm.KEEPER_X_DIMENSION: (_PLAN_LUG[0] + 0.050, KEEPER_PLAN_SOCKET_Y + 0.020),
     asm.KEEPER_REAR_Z_DIMENSION: (
         _PLAN_LUG[0] + 0.035,
         (KEEPER_PLAN_SOCKET_Y + _PLAN_FACES[1][1]) / 2.0,
@@ -888,6 +899,7 @@ DETAIL_POINTERS = tuple(
 LUG_KEEP = {asm.LUG_SPAN_DIMENSION: LEVER_BANK.sheet_xy(_LUG_MID, _FULCRUM_Y + 32.0)}
 # swDimensionTextParts_e compartments.
 CALLOUT_TEXT_PART = 3  # swDimensionTextCalloutAbove
+CALLOUT_BELOW_PART = 4  # swDimensionTextCalloutBelow
 REFERENCE_PREFIX_PART = 1  # swDimensionTextPrefix
 REFERENCE_SUFFIX_PART = 2  # swDimensionTextSuffix
 BROKEN_LINE_ALIGNED_TEXT = 3  # swDisplayDimensionLeaderText_e.swBrokenLeaderAlignedText
@@ -898,6 +910,7 @@ DIMENSION_CALLOUTS = {
 }
 if any("\n" in text for text in DIMENSION_CALLOUTS.values()):
     raise AssertionError("an above-callout with a line break does not print")
+DIMENSION_BELOW_CALLOUTS = dict(notes.DIMENSION_BELOW_CALLOUTS)
 
 
 if not asm.KEEPER_SOCKET_XZ[1] < asm.LUG_INNER_FACE_Z[0] < asm.LUG_INNER_FACE_Z[1]:
@@ -2350,6 +2363,9 @@ def _assert_settings(displays: dict[str, Any]) -> None:
         text = str(display.GetText(CALLOUT_TEXT_PART) or "").replace("\r\n", "\n")
         if text != DIMENSION_CALLOUTS[name]:
             raise RuntimeError(f"{name}: callout reads {text!r}")
+        below = str(display.GetText(CALLOUT_BELOW_PART) or "").replace("\r\n", "\n")
+        if below != DIMENSION_BELOW_CALLOUTS.get(name, ""):
+            raise RuntimeError(f"{name}: below-callout reads {below!r}")
 
 
 def _place_steps(adapter: Any, sheet: str) -> None:
@@ -2386,6 +2402,9 @@ def _place_fitup_sheets(adapter: Any) -> Callable[[], None]:
 
     for name, text in DIMENSION_CALLOUTS.items():
         set_dimension_callouts(adapter, annotations, {name: text}, location="above")
+    set_dimension_callouts(
+        adapter, annotations, DIMENSION_BELOW_CALLOUTS, location="below"
+    )
     displays = _displays(adapter, annotations)
     for annotation in annotations:
         name = dimension_name(adapter, annotation)

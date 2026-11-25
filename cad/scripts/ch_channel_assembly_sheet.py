@@ -33,6 +33,8 @@ from ch_channel_assembly_spec import (
     TOLERANCE_PRECISION,
     UNIT,
 )
+from ch_fulcrum_keeper_spec import KEEPER_TAP_SPEC
+from fr_top_frame_spec import KEEPER_TAP_WALL_ACCEPTED_MM
 from ch_keeper_fitup import END_PLAY_MM, REAR_KEEPER_LEAF_MM
 from rocker_bank_layout import EAR_INNER_SPAN, END_CLEARANCE_MIN, RUNNING_FLOOR
 from ch_channel_explode_spec import (
@@ -93,6 +95,22 @@ DIMENSION_CALLOUTS = {
 }
 if set(DIMENSION_CALLOUTS) != set(DIMENSION_FEATURE):
     raise AssertionError("every marked dimension carries a callout")
+
+# Rule 20: the lug centre's band holds the wall of the keeper's transferred
+# foot tap in the MHA-FR-02 rail web at the accepted .076, under rule 17's
+# .080 target (necessity N-01; fr_top_frame_spec KEEPER_TAP_WALL_ACCEPTED_MM,
+# the .0767 floored, as MHA-FR-02 sheet 7 prints it). Stated once, as a plain
+# fact, under the lug centre's value (machinist review of farm run
+# 20261125T172832344Z, r1 and r2).
+KEEPER_TAP_WALL_PLACES = 3
+KEEPER_TAP_WALL_TEXT = (
+    f"RAIL WEB {KEEPER_TAP_SPEC.size.lstrip('#')} TAP WALL "
+    f"{render_number(KEEPER_TAP_WALL_ACCEPTED_MM / LENGTH_UNITS[UNIT], UNIT, KEEPER_TAP_WALL_PLACES)}"
+    " MIN"
+)
+DIMENSION_BELOW_CALLOUTS = {KEEPER_X_DIMENSION: KEEPER_TAP_WALL_TEXT}
+if not set(DIMENSION_BELOW_CALLOUTS) <= set(DIMENSION_FEATURE):
+    raise AssertionError("a below-callout names no marked dimension")
 
 # --- sheet 6: the setting table ------------------------------------------------
 # R5 machinist review (rule 22): the feeler acceptances printed only in their

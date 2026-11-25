@@ -307,6 +307,7 @@ def test_no_compass_or_private_words_print() -> None:
             *(text for text, _, _ in drawing.DETAIL_POINTERS),
             *(text for text, _, _ in drawing.PLAN_POINTERS),
             *drawing.DIMENSION_CALLOUTS.values(),
+            *drawing.DIMENSION_BELOW_CALLOUTS.values(),
         )
     )
     for word in ("NORTH", "SOUTH", "STRAP", "APEX", "CROWN", "CLOSED UP", "HUB 0", "SPLIT OF"):
@@ -1490,16 +1491,79 @@ def test_the_feeler_acceptances_are_setting_table_rows_their_steps_cite() -> Non
     assert drawing.SETTING_TABLE_SHEET == drawing.SHEET_NAMES[5]
 
 
+# The LUG CENTRE block on farm run 20261125T172832344Z's sheet 5 (two rows,
+# text point y 0.140): its top 4.5 mm over the text point, its dimension
+# line 5.3 mm under it, 5.5 mm between row baselines. SolidWorks centres a
+# block on its text point, so each added row moves both ends half a row.
+DIMENSION_TWO_ROW_TOP = 0.0045
+DIMENSION_TWO_ROW_SHELF = 0.0053
+DIMENSION_ROW_PITCH = 0.0055
+
+
+def _plan_keep_x_block() -> tuple[int, float, float]:
+    """View F's lug-centre block: its rows, its top and its dimension line
+    (sheet m), from its text point and the rows its callouts print."""
+    name = drawing.asm.KEEPER_X_DIMENSION
+    rows = 2 + len(drawing.DIMENSION_BELOW_CALLOUTS.get(name, "").splitlines())
+    y = drawing.PLAN_KEEP[name][1]
+    half_rows = (rows - 2) * DIMENSION_ROW_PITCH / 2.0
+    return rows, y + DIMENSION_TWO_ROW_TOP + half_rows, y - DIMENSION_TWO_ROW_SHELF - half_rows
+
+
 def test_view_e_caption_stands_with_its_own_view() -> None:
     """Machinist review r1/r2 (2026-11-19): view E's caption sat nearer view
     F's LUG CENTRE callout than its own view. It now sits just under view E's
     lowest ink (the keeper foot screws' tips, y 0.172 on the farm sheet), with
-    far more air above view F's topmost callout than under view E."""
+    more air above view F's lug-centre block than under view E, and that
+    block's top row (LUG CENTRE) starts east of the caption's end."""
     view = drawing.LEVER_BANK
     x, top = view.label_xy
     foot = top - len(view.label_text.splitlines()) * NOTE_LINE_PITCH
     view_ink_bottom = 0.172
-    view_f_top_text = drawing.PLAN_KEEP[drawing.asm.KEEPER_X_DIMENSION][1]
+    _, block_top, _ = _plan_keep_x_block()
     assert x == pytest.approx(view.centre[0] - 0.016)
     assert 0.002 <= view_ink_bottom - top <= 0.006
-    assert foot - view_f_top_text > 3.0 * (view_ink_bottom - top)
+    assert foot - block_top > 2.0 * (view_ink_bottom - top)
+    name = drawing.asm.KEEPER_X_DIMENSION
+    caption_right = x + max(map(len, view.label_text.splitlines())) * NOTE_CHAR_WIDTH
+    top_row_left = (
+        drawing.PLAN_KEEP[name][0]
+        - len(drawing.DIMENSION_CALLOUTS[name]) * NOTE_CHAR_WIDTH / 2.0
+    )
+    assert top_row_left > caption_right + 0.010
+
+
+def test_the_lug_centre_states_the_rail_web_wall_once() -> None:
+    """Machinist review of farm run 20261125T172832344Z, r1 and r2 (rule 20):
+    the lug centre's band holds the keeper's transferred 2-56 tap's wall in
+    the MHA-FR-02 rail web at .076, under rule 17's .080 target (necessity
+    N-01), and neither view F nor the transfer steps stated it. It prints
+    once, as a plain fact, under the lug centre's value: the number and
+    wording MHA-FR-02 sheet 7 prints, read off the same accepted wall."""
+    from fr_top_frame_callouts import ADDED_DRAFT_WALL_CALLOUT
+
+    name = drawing.asm.KEEPER_X_DIMENSION
+    wall = drawing.notes.KEEPER_TAP_WALL_TEXT
+    assert drawing.DIMENSION_BELOW_CALLOUTS == {name: wall}
+    assert wall == "RAIL WEB " + ADDED_DRAFT_WALL_CALLOUT.removeprefix("HOLDS ")
+    assert "\n" not in wall
+    for _column, block in drawing.FITUP_NOTES:
+        assert "TAP WALL" not in block
+    # The wall row is the block's widest. It starts east of the dimension's
+    # extension lines (the lug and the web centre) and ends short of the
+    # steps column; the third row leaves the dimension line where the
+    # two-row block printed it (y 0.1347, over the boss top at 0.1345).
+    x, _ = drawing.PLAN_KEEP[name]
+    half_width = len(wall) * NOTE_CHAR_WIDTH / 2.0
+    assert len(wall) > len(drawing.DIMENSION_CALLOUTS[name])
+    extension_east = max(
+        drawing._PLAN_LUG[0],
+        drawing.KEEPER_PLAN.plan_xy(
+            drawing.asm.KEEPER_SOCKET_XZ[0], drawing.asm.KEEPER_SOCKET_XZ[1]
+        )[0],
+    )
+    assert x - half_width > extension_east + 0.005
+    assert x + half_width < drawing.STEPS_RIGHT_X - 0.015
+    rows, _, shelf = _plan_keep_x_block()
+    assert rows == 3
+    assert shelf == pytest.approx(0.1347, abs=0.0005)
