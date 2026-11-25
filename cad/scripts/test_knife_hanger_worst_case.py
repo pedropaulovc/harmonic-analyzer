@@ -848,10 +848,10 @@ def test_the_gauge_bar_floor_caps_its_play_and_records_the_corner() -> None:
     assert 0.0 < corner < asm.KNIFE_BAR_READING_UNIT_IN == 0.001
     # With the .4990 reamer's own .4991 least bore the bar clears by .00055.
     assert 0.4991 - asm.KNIFE_BAR_FIT_NEED / 25.4 - 0.496 == pytest.approx(0.0005483, abs=5e-8)
-    # The floor's play in the largest bore is what every stack charges, within
-    # the .0041 they were proven at, and each still closes.
+    # The floor's play in the largest bore is what every stack charges, and
+    # each stack's own guard below still closes.
     assert asm.KNIFE_BAR_CLEARANCE == pytest.approx(0.0040 * 25.4)
-    assert asm.KNIFE_BAR_CLEARANCE < asm.KNIFE_BAR_PLAY_PROVEN_IN * 25.4
+    assert not hasattr(asm, "KNIFE_BAR_PLAY_PROVEN_IN")
     for retired in ("KNIFE_BAR_FIT_MIN_IN", "KNIFE_BAR_FIT_STEP_IN"):
         assert not hasattr(asm, retired), retired
     assert asm.HANGER_SCREW_FLOAT_SPARE > 0.0

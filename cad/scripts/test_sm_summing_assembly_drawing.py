@@ -512,9 +512,8 @@ def test_step_five_runs_each_hanger_bolt_home_by_hand_then_sets_the_gauge_bar() 
     assert notes.KNIFE_GAUGE_BAR_SIZES_IN == pytest.approx((0.4960, 0.5000))
     assert notes.KNIFE_GAUGE_BAR_REF_DIA_IN == 0.49
     # The floor's play in the largest bore is the clearance every stack
-    # charges, within the .0041 they were proven at.
+    # charges.
     assert builder.KNIFE_BAR_CLEARANCE == pytest.approx(0.0040 * 25.4)
-    assert builder.KNIFE_BAR_CLEARANCE <= builder.KNIFE_BAR_PLAY_PROVEN_IN * 25.4
     # The recorded corner: the floor stands .00005 over the largest straight
     # bar the smallest conforming pair passes, under the .001 reading unit.
     assert builder.KNIFE_BAR_CORNER_SHORTFALL_IN == pytest.approx(0.0000517, abs=5e-8)

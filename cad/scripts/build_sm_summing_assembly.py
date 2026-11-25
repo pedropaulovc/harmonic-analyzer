@@ -360,14 +360,14 @@ KNIFE_BAR_FIT_NEED = (
 )  # 0.0648 (.00255)
 # Owner ruling 2026-11-24, fit audit S6: "TURN THE BAR UNTIL IT SLIDES
 # THROUGH BOTH MOUNTS; DIA .496 MIN".  The trial makes the bar pass the
-# pair it is made to; the floor caps its play, which must stay within the
-# .0041 every stack was proven at under #2499.  The corner: a straight bar
+# pair it is made to; the floor's play in the largest bore is the
+# KNIFE_BAR_CLEARANCE every stack below charges, and each stack guards its own
+# failure.  The corner: a straight bar
 # through the smallest conforming pair is at most .4985 - .00255 = .49595,
 # .00005 under the floor -- below the shop's .001 reading unit (policy
 # #3518: such a margin is evidence neither way; the .4990 reamer's own
 # .4991 least bore leaves +.00055), so the trial governs.  The guard keeps
 # that corner under the reading unit.
-KNIFE_BAR_PLAY_PROVEN_IN = 0.0041
 KNIFE_BAR_READING_UNIT_IN = 0.001
 KNIFE_BAR_CORNER_SHORTFALL_IN = knife_mount.KNIFE_GAUGE_BAR_DIA_MIN_IN - (
     2.0 * knife_mount.BORE_R_MIN - KNIFE_BAR_FIT_NEED
@@ -555,13 +555,6 @@ def _assert_knife_hanger_stack() -> None:
         raise RuntimeError(
             f"the {KNIFE_GAUGE_BAR_LENGTH:.1f} gauge bar does not span both knife "
             f"mounts' outer faces ({KNIFE_MOUNT_OUTER_SPAN_MAX:.2f})"
-        )
-    # The bar's floor caps its play under the play every stack was proven at.
-    if KNIFE_BAR_CLEARANCE > KNIFE_BAR_PLAY_PROVEN_IN * 25.4 + 1e-9:
-        raise RuntimeError(
-            f"the gauge bar's DIA {knife_mount.KNIFE_GAUGE_BAR_DIA_MIN_IN:.4f} MIN "
-            f"leaves {KNIFE_BAR_CLEARANCE / 25.4:.4f} play in the largest bore, over "
-            f"the {KNIFE_BAR_PLAY_PROVEN_IN:.4f} the stacks were proven at"
         )
     # The trial governs only while the corner pair's shortfall under the
     # floor stays below the shop's reading unit (fit audit S6).
