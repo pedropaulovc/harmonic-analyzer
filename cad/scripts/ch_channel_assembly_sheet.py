@@ -99,9 +99,11 @@ if set(DIMENSION_CALLOUTS) != set(DIMENSION_FEATURE):
 # Rule 20: the lug centre's band holds the wall of the keeper's transferred
 # foot tap in the MHA-FR-02 rail web at the accepted .076, under rule 17's
 # .080 target (necessity N-01; fr_top_frame_spec KEEPER_TAP_WALL_ACCEPTED_MM,
-# the .0767 floored, as MHA-FR-02 sheet 7 prints it). Stated once, as a plain
-# fact, under the lug centre's value (machinist review of farm run
-# 20261125T172832344Z, r1 and r2).
+# the .0767 floored, as MHA-FR-02 sheet 7 prints it). The shortfall is this
+# package's minor exception CH-00-rail-web-tap-wall (ch-channel.yaml), the
+# same wall as MHA-FR-02 RV-14. Stated once, as a plain fact, under the lug
+# centre's value (machinist review of farm run 20261125T172832344Z, r1 and
+# r2).
 KEEPER_TAP_WALL_PLACES = 3
 KEEPER_TAP_WALL_TEXT = (
     f"RAIL WEB {KEEPER_TAP_SPEC.size.lstrip('#')} TAP WALL "

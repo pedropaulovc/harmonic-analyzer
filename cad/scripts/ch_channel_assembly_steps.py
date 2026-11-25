@@ -81,6 +81,7 @@ LEFT_HUB_REMEDY: tuple[str, ...] = (
 RIGHT_HUB_REMEDY: tuple[str, ...] = (
     "right-hub-shaft-drawn-back",
     "right-hub-clamp-eased",
+    "right-hub-span-to-upper-limit",
     "right-hub-return",
 )
 # A pin that slid in by hand is bonded with LOCTITE 641 instead of its rod or

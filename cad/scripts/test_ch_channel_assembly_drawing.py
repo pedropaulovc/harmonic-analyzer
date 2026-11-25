@@ -262,17 +262,25 @@ def test_every_step_is_one_action_of_at_most_six_lines() -> None:
             "CURED, CHECK THAT ITEM "
         )
         assert " AND " not in _step_body(f"{prefix}-pin-bond-held")
+        # The swing check applies only after a bond, as the held check does.
+        assert _step_body(f"{prefix}-pin-bond-swings").startswith(
+            "CURED, CHECK ITEM "
+        )
         assert " AND " not in _step_body(f"{prefix}-pin-bond-swings")
     # #3563: the right-hub remedy says which way the right ear moves: out,
-    # to the span's upper limit as view D prints it (nominal plus band).
+    # to the span's upper limit as view D prints it (nominal plus band), one
+    # action a step: the new setting, then the return on its own.
     span_band = drawing.asm.DIMENSION_TOLERANCES[drawing.asm.EAR_SPAN_DIMENSION]
     upper = (bank.EAR_INNER_SPAN + span_band[1]) / 25.4
     assert drawing.notes.EAR_SPAN_UPPER_TEXT == f"{upper:.3f}" == "6.099"
-    assert _step_body("right-hub-return") == (
-        f"RIGHT HUB: RETURN TO STEP {steps.step_number('bare-shaft-through-ears')}; "
-        f"AT STEP {steps.step_number('south-bracket-span-set')} SET THE EAR SPAN "
-        "TO ITS UPPER LIMIT, 6.099."
+    assert _step_body("right-hub-span-to-upper-limit") == (
+        f"RIGHT HUB: AT STEP {steps.step_number('south-bracket-span-set')}, SET "
+        "THE EAR SPAN TO ITS UPPER LIMIT, 6.099."
     )
+    assert _step_body("right-hub-return") == (
+        f"RIGHT HUB: RETURN TO STEP {steps.step_number('bare-shaft-through-ears')}."
+    )
+    assert ";" not in drawing.FITUP_STEPS
 
 
 def test_the_steps_name_parts_by_bom_item() -> None:
@@ -362,7 +370,7 @@ def test_the_right_bracket_is_set_to_the_ear_span_and_the_end_hubs_checked() -> 
     # remedy prints only the band's upper limit (#3563), a different number.
     for text in (f"{nominal / 25.4:.3f}", f"{nominal / 25.4:.2f}"):
         assert not re.search(rf"(?<![\d.]){re.escape(text)}(?![\d])", drawing.FITUP_STEPS)
-    assert drawing.notes.EAR_SPAN_UPPER_TEXT in _step_body("right-hub-return")
+    assert drawing.notes.EAR_SPAN_UPPER_TEXT in _step_body("right-hub-span-to-upper-limit")
     assert asm.DIMENSION_TOLERANCES[asm.EAR_SPAN_DIMENSION] == (
         -bank.EAR_SPAN_BAND,
         bank.EAR_SPAN_BAND,
@@ -1203,7 +1211,8 @@ def test_each_rod_fork_is_pinned_to_its_arm_at_the_bench_first() -> None:
             f"CURED, CHECK THAT {drawing.item(host_pin)} DOES NOT SLIDE BY HAND."
         )
         assert _step_body(f"{prefix}-pin-bond-swings") == (
-            f"CHECK THAT {drawing.item(mover)} SWINGS FREE ON ITS PIN BY ITS OWN WEIGHT."
+            f"CURED, CHECK {drawing.item(mover)} SWINGS FREE ON ITS PIN BY ITS "
+            "OWN WEIGHT."
         )
         assert steps.step_number(f"{prefix}-pin-bond-swings") == (
             steps.step_number(f"{prefix}-pin-bond-held") + 1
