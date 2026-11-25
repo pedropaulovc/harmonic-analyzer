@@ -25,16 +25,16 @@
   <line class="arrow" x1="652" y1="336" x2="652" y2="262"/>
   <text class="label" x="662" y="300">facing to</text>
   <text class="label" x="662" y="316">the centre</text>
-  <line class="datum" x1="600" y1="90" x2="600" y2="120"/>
-  <text class="datum-label" x="560" y="84">Z0 spigot face</text>
+  <line class="datum" x1="600" y1="90" x2="600" y2="110"/>
+  <text class="datum-label" x="528" y="84">Z0 spigot face</text>
   <line class="dims" x1="315.0" y1="360" x2="600" y2="360"/>
   <line class="dims" x1="315.0" y1="317.8" x2="315.0" y2="366"/>
   <text class="label" x="400" y="354">.95 out of the jaws</text>
-  <line class="leader" x1="565" y1="140.9" x2="560" y2="96"/>
-  <text class="label" x="380" y="70">spigot Ø.42 × .25, FULL R groove .14 from the face</text>
-  <line class="leader" x1="520" y1="200" x2="480" y2="104"/>
-  <text class="label" x="240" y="100">#43 .49 deep from the tailstock; 4-40 plug, then bottoming</text>
-  <text class="label" x="240" y="116">tap (each tool in its own op's picture)</text>
+  <line class="leader" x1="565" y1="140.9" x2="700" y2="73"/>
+  <text class="label" x="440" y="68">spigot Ø.42 × .25, FULL R groove .14 from the face</text>
+  <line class="leader" x1="520" y1="200" x2="382" y2="42"/>
+  <text class="label" x="40" y="40">#43 .49 deep from the tailstock; 4-40 plug, then bottoming</text>
+  <text class="label" x="40" y="55">tap (each tool in its own op's picture)</text>
   <text class="label-halo" x="60" y="240">hex 7/16 (stock)</text>
   <text class="label" x="40" y="385">The part (.72 long) is parted off in Setup 3, after the cross bore (Setup 2): the bar stays whole until then.</text>
 </svg>

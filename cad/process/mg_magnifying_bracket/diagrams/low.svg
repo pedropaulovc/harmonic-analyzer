@@ -36,7 +36,7 @@
   <circle class="leader-dot" cx="190" cy="230" r="2"/>
   <text class="label" x="380" y="146">the notch's other half, through</text>
   <text class="label" x="380" y="196">1/2 in end mill, to scale,</text>
-  <text class="label" x="380" y="212">on L's pass at Y −24.1</text>
+  <text class="label" x="380" y="212">on L's pass at Y −24.1 mm</text>
   <line class="leader" x1="220.1" y1="117.4" x2="376" y2="200"/>
   <text class="title" x="470" y="110">Section through the notch at that pass, H down:</text>
   <rect class="part-kept" x="635.0" y="286.0" width="52.0" height="44.0"/>

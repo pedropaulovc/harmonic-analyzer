@@ -12,15 +12,18 @@
   <text class="label" x="206" y="392">jaws' right side</text>
   <line class="leader" x1="120" y1="340" x2="120" y2="345"/>
   <text class="label-halo" x="60" y="345">1 in parallels</text>
-  <path class="part-kept" d="M40 250 H254.2 A22 22 0 0 1 254.2 300 H40 Z"/>
-  <line class="centre-line" x1="254.2" y1="140" x2="254.2" y2="330"/>
+  <path class="part-kept" d="M40 250 H259.4 V300 H40 Z"/>
+  <!-- The nose: a half-cylinder about the tap's axis (R.217, 22 px), seen
+       side on as a rectangle; the axis nose_jaw_back_mm 9.35 (37.4 px) past
+       the jaws' right side. -->
+  <line class="centre-line" x1="237.4" y1="140" x2="237.4" y2="330"/>
   <!-- The #7 drill to scale (cutter_dia_mm 5.1054 = 20.4 px), its full
        diameter tap_drill_past_mm 1.0 below O, its 118 deg point at
        tap_tip_z_mm -2.534; drawn short to a break line (its length out of
        the chuck is not on record; drill_7_oal_mm 92.075 is its whole
        length). The centre drill's spot under it is not drawn. -->
-  <path class="cutter" d="M264.4 150.0L264.4 304.0L254.2 310.1L244.0 304.0L244.0 150.0L247.4 147.0L250.8 150.0L254.2 147.0L257.6 150.0L261.0 147.0Z"/>
-  <line class="arrow" x1="225" y1="160" x2="225" y2="195"/>
+  <path class="cutter" d="M247.6 150.0L247.6 304.0L237.4 310.1L227.2 304.0L227.2 150.0L230.6 147.0L234.0 150.0L237.4 147.0L240.8 150.0L244.2 147.0Z"/>
+  <line class="arrow" x1="208.2" y1="160" x2="208.2" y2="195"/>
   <text class="label" x="290" y="200">#7 drill, to scale, one plunge through the neck:</text>
   <text class="label" x="290" y="216">its full diameter {{process.tap_drill_past_mm:in.3dot}} past O, nothing under the nose</text>
   <text class="label" x="290" y="232">X {{cad.lever_tap_height_mm:.3f}}, Y −{{cad.lever_tap_lateral_mm:.3f}} mm</text>

@@ -4,7 +4,7 @@
   <!-- The No. 1 centre drill (tools.centre-drills-carbide-60, for a 3/64
        drill): its 3/64 pilot (14.1 px) and 60 deg countersink to about Ø.08
        at the stub's end (the op's), to scale across. The pilot's length and
-       the body's Ø are not on record: the pilot drawn .06 long and the body
+       the body's Ø are not on record: the pilot drawn .04 long (its point .017 inside the stub, short of Z0) and the body
        at the countersink's Ø.08, schematic, to a break line. -->
   <!-- The 3-jaw, schematic (its jaws' and body's sizes are not on record):
        its jaw fronts to scale from the part. -->
@@ -12,8 +12,8 @@
   <rect class="clamp" x="295.0" y="126.5" width="40" height="36"/>
   <rect class="clamp" x="295.0" y="237.5" width="40" height="36"/>
   <path class="part-kept" d="M500.0 162.5L40.0 162.5L43.0 166.7L40.0 170.8L43.0 175.0L40.0 179.2L43.0 183.3L40.0 187.5L43.0 191.7L40.0 195.8L43.0 200.0L40.0 204.2L43.0 208.3L40.0 212.5L43.0 216.7L40.0 220.8L43.0 225.0L40.0 229.2L43.0 233.3L40.0 237.5L500.0 237.5Z"/>
-  <path class="holes" d="M500.0 188.0L491.4 193.0L473.4 193.0L469.2 200L473.4 207.0L491.4 207.0L500.0 212.0Z"/>
-  <path class="cutter" d="M720.0 188.0L500.0 188.0L491.4 193.0L473.4 193.0L469.2 200.0L473.4 207.0L491.4 207.0L500.0 212.0L720.0 212.0L717.0 208.0L720.0 204.0L717.0 200.0L720.0 196.0L717.0 192.0Z"/>
+  <path class="holes" d="M500.0 188.0L491.4 193.0L479.4 193.0L475.2 200L479.4 207.0L491.4 207.0L500.0 212.0Z"/>
+  <path class="cutter" d="M720.0 188.0L500.0 188.0L491.4 193.0L479.4 193.0L475.2 200.0L479.4 207.0L491.4 207.0L500.0 212.0L720.0 212.0L717.0 208.0L720.0 204.0L717.0 200.0L720.0 196.0L717.0 192.0Z"/>
   <line class="arrow" x1="700" y1="166.0" x2="650" y2="166.0"/>
   <line class="centre-line" x1="20" y1="200" x2="740" y2="200"/>
   <line class="datum" x1="470" y1="100" x2="470" y2="150"/>

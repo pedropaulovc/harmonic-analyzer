@@ -461,7 +461,7 @@ tool = "drill-15"
 drilling = "twist_drill"
 sizing = { kind = "band", band_mm = "{{cad.hanger_hole_dia_band_mm}}" }
 instruction = "Same file, M6 T4: #15 drill through the hanger hole the same way; set 1250. Cutting oil."
-diagram = { file = "diagrams/left-drill-15.svg", alt = "Section at the hanger hole from the right end: the #15 drill, to scale, through the bar, its full diameter .039 past F into the air beside the stacks. From above: the drill in the hanger hole near the left end." }
+diagram = { file = "diagrams/left-drill-15.svg", alt = "Section at the hanger hole from the right end: the #15 drill, to scale, through the bar, its full diameter .039 past F into the air, the hole .244 out past the jaws' left side; the jaws as outlines, the stacks and the pin further in. From above: the drill in the hanger hole near the left end." }
 rpm = 1250
 feed = "{{process.drill_15_feed_per_min_mm:in.1f}} in/min"
 hole_depth_mm = "{{cad.back_face_depth_mm}}"

@@ -18,7 +18,7 @@
   <rect class="part-kept" x="560.0" y="173.0" width="60.0" height="54.0"/>
   <rect class="part-threads" x="254.0" y="162.5" width="216.0" height="75.0"/>
   <path class="holes" d="M620.0 186.5L596.6 200L620.0 213.5Z"/>
-  <path class="clamp" d="M602.6 200L654.6 170L744.6 170L744.6 230L654.6 230Z"/>
+  <path class="clamp" d="M596.6 200L648.6 170L738.6 170L738.6 230L648.6 230Z"/>
   <line class="leader" x1="694.6" y1="170" x2="694.6" y2="134"/>
   <text class="label" x="600" y="112">dead centre, oiled,</text>
   <text class="label" x="600" y="128">in the stub's centre hole</text>
