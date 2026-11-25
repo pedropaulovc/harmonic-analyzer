@@ -107,6 +107,8 @@ Pass 1 — detection. Find every candidate item; classify nothing yet.
      tool (tap wrench, T-handle, guide, chuck), grey only the surroundings
      (P4c); unrecorded sizes are schematic and long tools
      broken (P5); every role has a key entry and the stop is a round rod (P6);
+     a locator that would lie across or behind the part is left out of that
+     view with a callout, and drawn in another (P6a);
      a moving or confusing locator is named once in its first picture (P7);
      and no clutter (P8).
    - **Route walk (rule T19):** once, in route order, ask of every op "does a

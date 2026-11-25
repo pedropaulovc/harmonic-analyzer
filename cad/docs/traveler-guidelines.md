@@ -575,8 +575,16 @@ sheet image (criteria P1–P8, `cad/process/README.md`, Plans):
   in a break line.
 - **P6 One key for every role.** The sheet's picture key has an entry for
   every colour and pattern the pictures use, and a locator is drawn as what
-  it is: the work stop as a round rod reaching in from its post (end on, a
-  circle), with its own key entry, not the supports' hatch.
+  it is: the work stop as a round rod reaching in from its post, with its
+  own key entry, not the supports' hatch.
+- **P6a A locator that would hide the part is left out of that view.** A
+  locator that would lie across or behind the part in a view is not drawn
+  in it, and that view says so in a short callout ("work stop rod not shown
+  (see from above)"); the locator appears in at least one view of the
+  picture. A picture whose only view leaves it out names in the callout
+  which end it is on. The stop drawn end-on over or behind the part in a
+  side view, a locator left out of every view, or a side-view-only picture
+  whose callout does not name the end fails.
 - **P7 A confusing locator is named in the picture.** A locator that moves
   between parts of one setup, or is uncommon or confusing (the work stop set
   after the first blank's touch-offs; its rod moving from the left to the
