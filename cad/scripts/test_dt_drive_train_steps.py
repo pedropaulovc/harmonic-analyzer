@@ -170,7 +170,7 @@ def test_the_tip_is_measured_dry_then_bonded_on_the_feeler_in_two_cures() -> Non
             "ONCE THE BONDS GRAB, MHA-DT-37 HELD HOME",
             "RECORD THE RUNOUT ABOUT MHA-DT-04 OF THE MHA-DT-37 PIVOT",
             "CLIPS OVER ALL FIVE GEARS",
-            "IF IT FAILS, OR A BONDED GEAR HESITATES IN CHECK 4R, AT 250 DEG C",
+            "IF IT FAILS, OR A BONDED GEAR HESITATES IN CHECK 4S, AT 250 DEG C",
             "SPIGOT, PIVOT",
             "REDO FROM 1L.",
             "ALIGN THE MHA-DT-05 COUNTERBORES",

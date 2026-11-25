@@ -663,7 +663,7 @@ def test_cone_swing_check_stops_disengaged_at_the_swing_stop() -> None:
     check = " ".join(drawing.CHECKS.split("4. CONE SWING")[1].split("\n5.")[0].split())
     (hold,) = re.findall(r"4D\. [^.]*\.", check)
     (taps,) = re.findall(r"4E\. [^.]*\.", check)
-    (ease,) = re.findall(r"4N\. [^.]*\.", check)
+    (ease,) = re.findall(r"4P\. [^.]*\.", check)
     assert "BIND" in hold and "HOLD" in hold
     assert " IN " in taps and " OUT " in taps
     assert "AT ITS END" in taps
@@ -674,7 +674,7 @@ def test_cone_swing_check_stops_disengaged_at_the_swing_stop() -> None:
         check.index(hold),
         check.index(taps),
         check.index("CLAMP EACH MHA-DT-02 TO MHA-FR-01 THERE"),
-        check.index("SWING THE CONE SET OUT"),
+        check.index("WITH THE CONE SET SWUNG OUT"),
         check.index("SWING IN UNTIL A GEAR JUST BINDS"),
         check.index(ease),
         check.index("TIGHTEN MHA-DT-VN-51"),
@@ -687,25 +687,25 @@ def test_cone_swing_check_stops_disengaged_at_the_swing_stop() -> None:
 def test_the_run_check_accepts_end_gear_shake_but_no_bind_or_skip() -> None:
     """Owner ruling 2026-11-14 on #2584 (option A): a gear past the binds
     that hold the cone line may run loose; the sheet states it as a plain
-    fact naming those gears by the 4E binds.  Check 4R, the run after the
-    lock, still refuses a bind, and its remedy (4S) still follows it."""
+    fact naming those gears by the 4E binds.  Check 4S, the run after the
+    lock, still refuses a bind, and its remedy (4T) still follows it."""
     check = " ".join(drawing.CHECKS.split("4. CONE SWING")[1].split("\n5.")[0].split())
-    (run,) = re.findall(r"(?<![-\w])4R\. [^.]*\.", check)
+    (run,) = re.findall(r"(?<![-\w])4S\. [^.]*\.", check)
     assert f"{drawing.CHECK_RUN_CRANK_TURNS} TURNS" in run
     assert "NEVER BIND" in run
     assert "4E" in run and "SHAKE" in run
     assert "ACCEPT" not in run
-    assert check.index(run) < check.index("4S. IF ONE BINDS")
+    assert check.index(run) < check.index("4T. IF ONE BINDS")
 
 
 def test_the_pedestals_are_set_by_feel_then_spotted_with_one_tripwire() -> None:
     """Owner ruling 2026-11-24, fit audit part 2 C6 ("Yes: set by feel, spot
     the holes after, tripwire .015."): the pedestals stand clamped at their
     DRO X/Y until check 4E has tapped them to their binds; their MHA-FR-01
-    seats are spotted, drilled and tapped through the foot holes after that;
-    the DRO recheck table is gone and one .015 X tripwire sends the fitter to
-    the cone pivot seat, which it clears with the pivot seat's whole error
-    and the DRO set band."""
+    seats are spotted through the foot holes after that; the DRO recheck
+    table is gone and one .015 X tripwire sends the fitter to the cone pivot
+    seat, which it clears with the pivot seat's whole error and the DRO set
+    band."""
     import cone_set_stack
     import cylinder_bank_layout
     import dt_drive_train_steps as steps
@@ -714,18 +714,24 @@ def test_the_pedestals_are_set_by_feel_then_spotted_with_one_tripwire() -> None:
     (clamp,) = re.findall(r"4F\. [^.]*\.", check)
     (tripwire,) = re.findall(r"4G\. .*?\.015\.", check)
     (remedy,) = re.findall(r"4H\. .*? GOING ON\.", check)
-    (seat,) = re.findall(r"4J\. .*? SPOT: [^.]*\.", check)
-    (screw,) = re.findall(r"4K\. [^.]*\.", check)
+    (spot,) = re.findall(r"4J\. [^.]*\.", check)
+    (lift,) = re.findall(r"4K\. [^.]*\.", check)
+    (drill,) = re.findall(r"4L\. [^.]*\.", check)
+    (refit,) = re.findall(r"4M\. .*?\.015\.", check)
     assert tripwire == "4G. NEITHER X INDICATOR READS OVER .015."
     pivot = steps.step_number("other-base-mounting")
     assert f"STEP {pivot}F-{pivot}J PIVOT SEAT" in remedy
-    assert "FOOT HOLE" in seat and "PER MHA-FR-01" in seat and "TRANSFER-PUNCH" in seat
-    # Codjiflo round 1 on #3550 (delegated ruling 2026-11-24 (Main), no
-    # precedent; owner review #2144): the
-    # seat is blown out, clamp still on, before 4K screws the foot down.
-    assert seat.endswith("SPOT: BLOWN FREE OF CHIPS."), seat
-    assert "MHA-DT-VN-62" in screw and "CLAMP" in screw and "Y ZERO" in clamp
-    order = [check.index(text) for text in (clamp, tripwire, remedy, seat, screw)]
+    # Codjiflo round 4 on #3550 (r4-8): no drill or tap reaches the seat
+    # past the MHA-DT-02 upright, so the seat is spotted through the foot
+    # hole with the clamps on, the bank comes off for the drilling and
+    # tapping and the chips, and the refit on MHA-DT-VN-62 is read again
+    # against 4G's tripwire.
+    assert spot.startswith("4J. CLAMPS ON:") and "TRANSFER-PUNCH" in spot and "FOOT HOLE" in spot
+    assert "WITH THE CONE SET SWUNG OUT," in lift and "LIFT THE PEDESTAL BANK OFF" in lift
+    assert "DRILL AND TAP" in drill and "PER MHA-FR-01" in drill and "BLOWN CLEAN" in drill
+    assert "MHA-DT-VN-62 IN PLACE OF THE CLAMPS" in refit and "4G X INDICATOR" in refit
+    assert "Y ZERO" in clamp
+    order = [check.index(text) for text in (clamp, tripwire, remedy, spot, lift, drill, refit)]
     assert order == sorted(order)
     follow = (
         cone_set_stack.PIVOT_TRANSFER_PUNCH_PLAY_MM
@@ -795,17 +801,17 @@ def test_cone_swing_check_requires_installed_stop_inspection_and_seating() -> No
     assert (turns - 1) * pitch - lead < stop_screw.MIN_USEFUL_ENGAGEMENT_MM
     assert turns * pitch <= stop_screw.LENGTH_MIN_MM + 1e-9
     assert turns == 10
-    assert "CHECK THAT ITS HEAD IS FULLY SEATED" in check
+    assert "TURNS (SHEET 16 ROW 19) AND THAT ITS HEAD IS FULLY SEATED" in check
     assert "CHECK THAT MHA-DT-20 AND THE MHA-DT-VN-52 SHOULDER STAY SEATED" in check
 
 
 def test_a_loosened_post_screw_re_sets_the_post_before_the_checks() -> None:
     # Owner ruling 2026-11-20 (#1177 friction-only, #3085 option B).
     check = " ".join(drawing.CHECKS.split("4. CONE SWING")[1].split("\n5.")[0].split())
-    assert "4U. MHA-DT-02 AND MHA-DT-VN-61 STAY AS SET FROM HERE ON." in check
+    assert "4V. MHA-DT-02 AND MHA-DT-VN-61 STAY AS SET FROM HERE ON." in check
     post = drawing.steps.step_number("post-and-tip-block")
     end_play = drawing.steps.step_number("end-play-set")
-    redo = re.search(r"4V\. IF ONE LOOSENS, REDO CHECKS 4-7 \(A SCREW: STEP (\d+[A-Z]) FIRST\)\.", check)
+    redo = re.search(r"4W\. IF ONE LOOSENS, REDO CHECKS 4-7 \(A SCREW: STEP (\d+[A-Z]) FIRST\)\.", check)
     assert redo is not None, check
     bodies: dict[str, str] = {}
     key: str | None = None
@@ -823,7 +829,7 @@ def test_a_loosened_post_screw_re_sets_the_post_before_the_checks() -> None:
     def redone(first: str, last: str) -> str:
         return " ".join(bodies[key] for key in keys[keys.index(first) : keys.index(last) + 1])
 
-    # 4V names the remedy step 3G, which follows the end-play steps.
+    # 4W names the remedy step 3G, which follows the end-play steps.
     assert redo.group(1) == f"{end_play}G"
     step = re.fullmatch(
         rf"{end_play}G\. IF A MHA-DT-VN-61 IS EVER LOOSENED, REDO (\d+[A-Z]), (\d+[A-Z])-(\d+[A-Z]), "
@@ -853,7 +859,7 @@ def _assert_engagement_cites_its_count(check: str, screw: str, row: str) -> int:
     import dt_drive_train_steps as steps
 
     cited = re.search(
-        rf"VERIFY {screw}'S STEP (\d+\w) TURNS \({re.escape(drawing.acceptance_ref(row))}\)\.",
+        rf"VERIFY {screw}'S STEP (\d+\w) TURNS \({re.escape(drawing.acceptance_ref(row))}\)(?:\.| AND THAT)",
         check,
     )
     assert cited is not None, check
@@ -1651,7 +1657,7 @@ def test_cone_station_rows_run_front_to_back() -> None:
     gear_row = drawing.acceptance_ref("spigot-gear-runout")
     # Owner ruling 2026-11-24, audit part 2 C5: the after-cure readings are a
     # record, taken before the comb check so the strip and re-bond follows
-    # that check (rule 22), and a bonded gear that hesitates in check 4R's
+    # that check (rule 22), and a bonded gear that hesitates in check 4S's
     # run; a keyed one is not bonded and goes to 3H (Codjiflo round 1 on
     # #3550, delegated ruling 2026-11-24 (Main), no precedent; owner review
     # #2144).
@@ -1660,7 +1666,7 @@ def test_cone_station_rows_run_front_to_back() -> None:
         f" AND OF T012'S AND T018'S TEETH ({gear_row})."
     )
     assert steps[order[6] : order[7]].startswith(
-        "2G. IF IT FAILS, OR A BONDED GEAR HESITATES IN CHECK 4R, AT 250 DEG C TAKE MHA-DT-37,"
+        "2G. IF IT FAILS, OR A BONDED GEAR HESITATES IN CHECK 4S, AT 250 DEG C TAKE MHA-DT-37,"
     )
     assert steps[steps.index("1W. ") :].startswith("1W. RECORD T024'S TOOTH RUNOUT")
     assert steps[steps.index("1Y. ") :].startswith("1Y. IF IT FAILS, TAKE T024 OFF")
@@ -1670,12 +1676,12 @@ def test_cone_station_rows_run_front_to_back() -> None:
 
     end_play = steps_registry.step_number("end-play-set")
     assert (
-        "4S. IF ONE BINDS, LOOSEN MHA-DT-VN-51 THERE (A BONDED GEAR HESITATES: STEP 2G,"
+        "4T. IF ONE BINDS, LOOSEN MHA-DT-VN-51 THERE (A BONDED GEAR HESITATES: STEP 2G,"
         f" A KEYED ONE: STEP {end_play}H)."
     ) in check
     keyed = " ".join(drawing.CONE_CRANK_STEPS.split())
     assert (
-        f"{end_play}H. IF A KEYED GEAR HESITATES IN CHECK 4R, TAKE IT OFF MHA-DT-04 AFTER 2G-2H."
+        f"{end_play}H. IF A KEYED GEAR HESITATES IN CHECK 4S, TAKE IT OFF MHA-DT-04 AFTER 2G-2H."
         f" {end_play}J. CHECK A GEAR TAKEN OFF: BORE AND TEETH TO ITS MHA-DT-03 SHEET,"
         f" NO SHAKE ON MHA-DT-04. {end_play}K. IF IT FAILS, REMAKE IT TO THAT SHEET."
         f" {end_play}L. AFTER {end_play}H, REDO FROM 1B."

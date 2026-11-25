@@ -1449,7 +1449,7 @@ CONE_CRANK_STEPS = _note_text(
         # steps; the after-cure readings become a record only; strip and
         # re-bond only if a gear hesitates in the 80-turn running check."  So
         # 1W records, before the comb check, so the remedy follows that check
-        # alone (rule 22); a bonded gear that hesitates in check 4R is
+        # alone (rule 22); a bonded gear that hesitates in check 4S is
         # stripped by 2G, a keyed one checked at 3H-3L.  Step 1 has one letter
         # left for the clean, which names the redo it prepares.
         f"1W. RECORD T024'S TOOTH RUNOUT ABOUT MHA-DT-04 ({acceptance_ref('t024-runout')}).",
@@ -1490,7 +1490,7 @@ CONE_CRANK_STEPS = _note_text(
         # MHA-DT-04's socket standing off its journal).  Owner ruling
         # 2026-11-24, audit part 2 C5: the readings are a record only; the
         # tip is stripped and re-bonded only if a bonded gear hesitates in
-        # check 4R's run, so 2G names that run beside the comb check it follows.
+        # check 4S's run, so 2G names that run beside the comb check it follows.
         f"2E. ONCE CURED, RECORD THE RUNOUT ABOUT MHA-DT-04 OF THE MHA-DT-37 PIVOT ({acceptance_ref('pivot-runout')})"
         f" AND OF T012'S AND T018'S TEETH ({acceptance_ref('spigot-gear-runout')}).",
         # The cured tip is accepted on the comb before the post is assembled,
@@ -1505,7 +1505,7 @@ CONE_CRANK_STEPS = _note_text(
         # precedent; owner review #2144: stripping the tip helps only the
         # bonded gears it parts; a keyed gear (T030-T054 on land 1, not
         # bonded) that hesitates is taken off after this and checked at 3H-3L.
-        "2G. IF IT FAILS, OR A BONDED GEAR HESITATES IN CHECK 4R, AT 250 DEG C TAKE MHA-DT-37, T018, T012, T024 AND MHA-DT-38 OFF.",
+        "2G. IF IT FAILS, OR A BONDED GEAR HESITATES IN CHECK 4S, AT 250 DEG C TAKE MHA-DT-37, T018, T012, T024 AND MHA-DT-38 OFF.",
         "2H. CLEAN THE CURED 638 OFF EVERY PARTED FACE: SPIGOT, PIVOT, LAND, BORES, SOCKET, FOR A REDO FROM 1L.",
         # U37c cut-to-fit acceptance survives the taller post and longer stock:
         # MHA-DT-VN-61's registry/spec own the selected screw and reference length.
@@ -1602,11 +1602,11 @@ CONE_CRANK_STEPS = _note_text(
         # post screw loosened later re-sets the post (2M eases both screws,
         # 2S-2U set its yaw) and, as the post can shift along the shaft on the
         # screws' float, indicates the end play again (3C-3F).  It lives here,
-        # among the steps it cites, so check 4V can name it by one STEP head.
+        # among the steps it cites, so check 4W can name it by one STEP head.
         "3G. IF A MHA-DT-VN-61 IS EVER LOOSENED, REDO 2M, 2S-2U, THEN 3C-3F.",
         # Codjiflo round 1 on #3550, delegated ruling 2026-11-24 (Main), no
         # precedent; owner review #2144: a keyed gear (T030-T054) that
-        # hesitates in check 4R is not bonded, so 2G's strip cannot help it.
+        # hesitates in check 4S is not bonded, so 2G's strip cannot help it.
         # What opens its centre past the set (cone_set_stack.after_set_terms_mm)
         # is its own tooth runout about its bore and its float on land 1,
         # both its MHA-DT-03 sheet's (bore reamed .3760, tooth runout) and
@@ -1614,9 +1614,9 @@ CONE_CRANK_STEPS = _note_text(
         # it.  It comes off only past T024 and the tip, so 2G-2H part them
         # first; the redo from 1B re-stacks, re-bonds and re-taps the tip.
         # Steps 1 and 2 have no letter left, so the remedy lives here beside
-        # 3G, check 4V's remedy; 3J-3L are conditioned on 3H's taking off as
+        # 3G, check 4W's remedy; 3J-3L are conditioned on 3H's taking off as
         # 4L is on its recut.
-        "3H. IF A KEYED GEAR HESITATES IN CHECK 4R, TAKE IT OFF MHA-DT-04 AFTER 2G-2H.",
+        "3H. IF A KEYED GEAR HESITATES IN CHECK 4S, TAKE IT OFF MHA-DT-04 AFTER 2G-2H.",
         "3J. CHECK A GEAR TAKEN OFF: BORE AND TEETH TO ITS MHA-DT-03 SHEET, NO SHAKE ON MHA-DT-04.",
         "3K. IF IT FAILS, REMAKE IT TO THAT SHEET.",
         "3L. AFTER 3H, REDO FROM 1B.",
@@ -1822,7 +1822,7 @@ BANK_STEPS = _note_text(
         "   BESIDE MHA-DT-VN-68, BETWEEN ITS INNER FACE AND GEAR 19'S BACK FACE (SHEET",
         f"   {BANK_SETTINGS_SHEET}, DETAIL A), IS LIGHTLY PINCHED.",
         "9E. SET ITS X (SETTING TABLE ROW 3).",
-        # C6: clamped, not screwed, until check 4J (8T).
+        # C6: clamped, not screwed, until check 4M (8T).
         "9F. CLAMP IT TO MHA-FR-01.",
         "9G. REMOVE THE FEELER.",
         # The MHA-FR-01 pivot seat is not cut here on the DRO: step 23
@@ -2124,9 +2124,9 @@ def rig_steps(*, pivot_blocks: int, cams: int, slotted: int) -> str:
         # Check 4 then sets the swing and clamps it.  Owner ruling 2026-11-24,
         # audit part 2 S1 ("all approved (ticked)"): a seated screw's
         # engagement cannot be read, so each screw's turns from first bite are
-        # counted as it goes in and checks 4W and 4Y accept the counts (sheet
+        # counted as it goes in and checks 4X and 4Z accept the counts (sheet
         # 16), in place of the two depth records PR 2 machinist review round 6
-        # had asked for.  The transfer pose is check 4's feel set (4M-4N:
+        # had asked for.  The transfer pose is check 4's feel set (4N-4P:
         # in to the first bind, eased out in small steps to the first free
         # run, #2585), so
         # the permanent pivot is punched where check 4 will set the swing.
@@ -2212,7 +2212,7 @@ CHECKS = _note_text(
         "2. MHA-DT-10 TURNS WITHOUT BINDING THROUGH ONE FULL MHA-DT-07 TURN.",
         "2A. MHA-DT-07 CLEARS THE UNRELIEVED MHA-DT-20 TOP THROUGH THAT TURN.",
         # Round 17 (#3): the mesh is set and accepted in check 4.
-        "2B. EACH CONE GEAR MESHES ITS MHA-DT-12 PER CHECKS 4E, 4M AND 4R.",
+        "2B. EACH CONE GEAR MESHES ITS MHA-DT-12 PER CHECKS 4E, 4N AND 4S.",
         "3. EACH MHA-DT-12 TURNS FREELY ON MHA-DT-13 WITHOUT AXIAL BINDING.",
         # Prove the reversed preload seats on the front disc.
         "3A. PUSH GEAR 0 TOWARD THE BACK BY HAND AND RELEASE: THE BANK SPRINGS",
@@ -2228,7 +2228,7 @@ CHECKS = _note_text(
         # pedestal is then tapped either way until the gears at its end just
         # bind, so the arbor lies on a bind near each end.  A gear past a hold
         # rides the line's extension and may run below contact ratio 1; owner
-        # ruling 2026-11-14 (Pedro, #2584, option A): accepted, stated in 4R
+        # ruling 2026-11-14 (Pedro, #2584, option A): accepted, stated in 4S
         # as a plain fact (rule 20; the approval is dt-drive-train.yaml DT-08).
         # The swing then comes in
         # to the first bind and eases out in small steps to the first free
@@ -2245,9 +2245,10 @@ CHECKS = _note_text(
         # Owner ruling 2026-11-24, fit audit part 2 C6 ("Yes: set by feel,
         # spot the holes after, tripwire .015."): no DRO recheck.  Each
         # pedestal stands clamped (8T, 9F) until its seat is spotted through
-        # its foot hole after 4E and drilled and tapped there (4J, the
-        # MHA-FR-01 "TRANSFER FROM MHA-DT-02 AT ASSEMBLY" callout); on a redo
-        # (4V) the eased hold-down is MHA-DT-VN-62.  The X indicators, zeroed
+        # its foot hole after 4E (4J) and drilled and tapped with the bank
+        # lifted off (4L, the MHA-FR-01 "TRANSFER FROM MHA-DT-02 AT ASSEMBLY"
+        # callout); on a redo (4W) the eased hold-down is MHA-DT-VN-62.  The
+        # X indicators, zeroed
         # at the DRO X (4B), read how far 4E moved each pedestal: following
         # the transfer-punched cone pivot seat takes at most its whole error
         # (0.249 mm, cone_set_stack) plus the DRO set band (0.10), 0.349 mm,
@@ -2257,61 +2258,64 @@ CHECKS = _note_text(
         "4C. EASE EACH MHA-DT-02'S HOLD-DOWN UNTIL IT MOVES UNDER LIGHT TAPS.",
         "4D. HOLD THE CONE SET SWUNG IN AT THE FIRST BIND.",
         "4E. TAP EACH MHA-DT-02 IN OR OUT UNTIL THE GEARS AT ITS END JUST BIND.",
-        "4F. CLAMP EACH MHA-DT-02 TO MHA-FR-01 THERE, THE FRONT ONE AT ITS Y ZERO.",
+        "4F. CLAMP EACH MHA-DT-02 TO MHA-FR-01 THERE, THE FRONT AT ITS Y ZERO.",
         "4G. NEITHER X INDICATOR READS OVER .015.",
         f"4H. IF ONE DOES, RECHECK THE STEP {_step_ref('other-base-mounting', 'F')}-"
         f"{_step_ref('other-base-mounting', 'J')} PIVOT SEAT BEFORE GOING ON.",
-        # Codjiflo round 1 on #3550, delegated ruling 2026-11-24 (Main), no
-        # precedent; owner review #2144: drilling and tapping the blind seat
-        # through the foot hole leaves chips in it and on the foot; one left
-        # under the foot when 4K swaps the clamp for the screw tilts the
-        # pedestal after 4G's tripwire was read, and one in the blind hole
-        # can bottom MHA-DT-VN-62.  The 4A-4Z letters are full, so the seat
-        # is finished blown out, clamp still on, as 4J's own stop (rule 23),
-        # in its second line's spare characters.
-        "4J. DRILL AND TAP EACH UNDRILLED SEAT PER MHA-FR-01 THRU ITS MHA-DT-02 FOOT "
-        "HOLE, ON AN 11/64 TRANSFER-PUNCH SPOT: BLOWN FREE OF CHIPS.",
-        "4K. SCREW EACH MHA-DT-02 DOWN WITH MHA-DT-VN-62 IN PLACE OF ITS CLAMP.",
-        "4L. SWING THE CONE SET OUT.",
-        "4M. SWING IN UNTIL A GEAR JUST BINDS.",
-        f"4N. EASE OUT IN SMALL STEPS UNTIL {CONE_TURN_CRANK_TURNS} CRANK TURNS RUN FREE.",
-        "4P. TIGHTEN MHA-DT-VN-51 WITH THE CONE SET HELD THERE.",
+        # Codjiflo round 4 on #3550 (r4-8): the MHA-DT-02 upright stands .35
+        # from its foot hole and 4.18 tall, so no drill, tap or wrench reaches
+        # the seat with the pedestal on it.  The seat is spotted through the
+        # foot hole while the clamps still hold the 4E set (4J); the cone set
+        # is swung out and the bank lifted off (4K); the seat, tapped through
+        # MHA-FR-01 (its PedestalSeats), is drilled and tapped and the deck
+        # and the foot undersides blown clear, so no chip sits under a foot
+        # (4L); the bank goes back on MHA-DT-VN-62 and 4G's X indicators are
+        # read again against the same .015 (4M).  The 4A-4Z letters are full:
+        # 4K takes the old swing-out, and 4Z carries the stop screw's turns
+        # and its seated head on one line.
+        "4J. CLAMPS ON: 11/64 TRANSFER-PUNCH EACH SEAT THRU ITS FOOT HOLE.",
+        "4K. WITH THE CONE SET SWUNG OUT, LIFT THE PEDESTAL BANK OFF MHA-FR-01.",
+        "4L. DRILL AND TAP THE SEATS PER MHA-FR-01: DECK AND FEET BLOWN CLEAN.",
+        "4M. REFIT THE BANK WITH MHA-DT-VN-62 IN PLACE OF THE CLAMPS: NEITHER "
+        "4G X INDICATOR READS OVER .015.",
+        "4N. SWING IN UNTIL A GEAR JUST BINDS.",
+        f"4P. EASE OUT IN SMALL STEPS UNTIL {CONE_TURN_CRANK_TURNS} CRANK TURNS RUN FREE.",
+        "4Q. TIGHTEN MHA-DT-VN-51 WITH THE CONE SET HELD THERE.",
         # Rule 23 (rubric sample round 5): the adjustable clamp's acceptance.
-        "4Q. PUSH THE CONE SET BY HAND: IT DOES NOT SWING.",
+        "4R. PUSH THE CONE SET BY HAND: IT DOES NOT SWING.",
         # Owner ruling 2026-11-24, audit part 2 C5: the bonded gears'
         # after-cure readings are a record; a bonded gear that hesitates in
         # this run is what strips and re-bonds the tip (step 2G).  A keyed one
-        # is not bonded, so 4S sends it to step 3H (Codjiflo round 1 on #3550,
+        # is not bonded, so 4T sends it to step 3H (Codjiflo round 1 on #3550,
         # delegated ruling 2026-11-24 (Main), no precedent; owner review
-        # #2144); the two routes take 4S to two lines, the sheet 13 left
+        # #2144); the two routes take 4T to two lines, the sheet 13 left
         # field's one spare line.
-        f"4R. TURN THE CRANK {CHECK_RUN_CRANK_TURNS} TURNS: THE GEARS MUST NEVER BIND "
+        f"4S. TURN THE CRANK {CHECK_RUN_CRANK_TURNS} TURNS: THE GEARS MUST NEVER BIND "
         "OR HESITATE (A GEAR OUTSIDE THE TWO 4E BINDS MAY SHAKE).",
         # Rubric sample round 9 (rule 22): the check, its remedy, the hold and
         # the redo are one step each.
-        "4S. IF ONE BINDS, LOOSEN MHA-DT-VN-51 THERE "
+        "4T. IF ONE BINDS, LOOSEN MHA-DT-VN-51 THERE "
         f"(A BONDED GEAR HESITATES: STEP {_step_ref('post-and-tip-block', 'G')}, "
         f"A KEYED ONE: STEP {_step_ref('end-play-set', 'H')}).",
-        "4T. REDO 4N-4R.",
+        "4U. REDO 4P-4S.",
         # Owner ruling 2026-11-20 (Pedro, #1177: no blind plate hole, so no
         # post dowel; #3085 option B): only the two MHA-DT-VN-61 screws'
         # friction holds MHA-DT-05's yaw, which steps 2S-2U set, so the hold
         # names them beside the pedestals, and a loosened post screw re-sets
         # the post by the remedy step 3G (2M, 2S-2U, then the end play again
         # at 3C-3F) before the checks are redone.  A check cites steps only
-        # under a STEP head, so 4V names 3G.  The 4A-4Z letters are full and
+        # under a STEP head, so 4W names 3G.  The 4A-4Z letters are full and
         # the sheet 13 left field has no line to spare: the hold and the redo
-        # stay one line each ("A SCREW" is the only screw 4U names).  Rule
-        # 22's lint: the hold is stated as a check (no imperative), so 4V's IF
+        # stay one line each ("A SCREW" is the only screw 4V names).  Rule
+        # 22's lint: the hold is stated as a check (no imperative), so 4W's IF
         # is a remedy that follows its check.
-        "4U. MHA-DT-02 AND MHA-DT-VN-61 STAY AS SET FROM HERE ON.",
-        f"4V. IF ONE LOOSENS, REDO CHECKS 4-7 (A SCREW: STEP {_step_ref('end-play-set', 'G')} FIRST).",
-        f"4W. VERIFY MHA-DT-VN-52'S STEP {_step_ref('other-base-mounting', 'L')} TURNS "
+        "4V. MHA-DT-02 AND MHA-DT-VN-61 STAY AS SET FROM HERE ON.",
+        f"4W. IF ONE LOOSENS, REDO CHECKS 4-7 (A SCREW: STEP {_step_ref('end-play-set', 'G')} FIRST).",
+        f"4X. VERIFY MHA-DT-VN-52'S STEP {_step_ref('other-base-mounting', 'L')} TURNS "
         f"({acceptance_ref('pivot-screw-engagement')}).",
-        "4X. CHECK THAT MHA-DT-20 AND THE MHA-DT-VN-52 SHOULDER STAY SEATED.",
-        f"4Y. VERIFY MHA-SH-VN-52'S STEP {_step_ref('other-base-mounting', 'P')} TURNS "
-        f"({acceptance_ref('stop-screw-engagement')}).",
-        "4Z. CHECK THAT ITS HEAD IS FULLY SEATED.",
+        "4Y. CHECK THAT MHA-DT-20 AND THE MHA-DT-VN-52 SHOULDER STAY SEATED.",
+        f"4Z. VERIFY MHA-SH-VN-52'S STEP {_step_ref('other-base-mounting', 'P')} TURNS "
+        f"({acceptance_ref('stop-screw-engagement')}) AND THAT ITS HEAD IS FULLY SEATED.",
         # Rubric sample round 2: the notch's reference, the running direction
         # and the sine sense must be readable.  Notches up = cosine mode,
         # turned 90° = sine mode (book pp. 66-67; dimensions.yaml ch14).
@@ -2341,7 +2345,7 @@ CHECKS = _note_text(
         # zeroing ends by re-setting the swing by feel as check 4 does, then
         # cranks on to whole turns of every drum, so the zero just set returns.
         "5F. RETURN MHA-DT-16 TO PARK.",
-        "5G. RE-SET THE CONE SET SWING AS 4M-4T.",
+        "5G. RE-SET THE CONE SET SWING AS 4N-4U.",
         "5H. TURN THE CRANK ON UNTIL EVERY NOTCH IS BACK AS 5D OR 5E.",
         "6. PARKED, MHA-DT-24 HOLDS MHA-DT-01 CLEAR OF EVERY MHA-DT-12.",
         f"7. PARKED, PINS ON THE CAMS: A {TIP_GAP.TIP_GAP_ROD_TEXT} IS SNUG TIP TO TIP",

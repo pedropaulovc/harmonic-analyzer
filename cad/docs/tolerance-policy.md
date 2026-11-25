@@ -184,7 +184,7 @@ T012/T018/T024 are thick-only (+0.075/−0) for the standard blank (owner ruling
   leaves the cone: the highest first bind of any pair (taking every pair to
   lie between the two holds; an end-side gear past a hold may run below it,
   accepted by owner ruling 2026-11-14 on #2584 and stated on MHA-DT-00 check
-  4R), opened by both gears'
+  4S), opened by both gears'
   running runout: the drum's 0.05 TIR about its bore and each cone gear's
   eccentricity about the running axis (MHA-DT-04's journal to MHA-DT-37's
   pivot). That is half its 0.05 TIR for a keyed gear. T012, T018 and T024 are
@@ -204,7 +204,7 @@ T012/T018/T024 are thick-only (+0.075/−0) for the standard blank (owner ruling
   the standard (N + 2)/DP blank for it, their tooth thickness +.003/−0 in.
   The least margin is T012's, contact ratio 1.023. Not booked: the runout of
   MHA-DT-04's land 1 to its journal, which its sheet does not print.
-  No number is booked for the ease out of the bind (check 4N;
+  No number is booked for the ease out of the bind (check 4P;
   delegated ruling 2026-11-12, #2144, see gear-standard.md). Reported only (REF): the
   printed-corner contact ratio there. A gear that binds is cleared by easing
   the swing, not by stoning a tip.

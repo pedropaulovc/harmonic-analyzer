@@ -63,7 +63,7 @@ POST_SCREW_SHORT_TEXT = inch_max_text(
 
 
 # Owner ruling 2026-11-24, audit part 2 S1 ("all approved (ticked)"): checks
-# 4W and 4Y count turns from first bite, the screw run in to seated, in place
+# 4X and 4Z count turns from first bite, the screw run in to seated, in place
 # of the lesser of two recorded depth readings.  Codjiflo r3-5 on #3550: the
 # count is derived from each screw's own thread.  N turns from first bite
 # advance the tip N pitches past where it first caught, which is no shallower
@@ -210,20 +210,20 @@ ACCEPTANCES = (
         f"FLUSH {FLUSH_SET_TEXT}",
         "CALIPER DEPTH ROD",
     ),
-    # Attempt 1 review (run 20261117T133225781Z, rule 22): checks 4W and 4Y
+    # Attempt 1 review (run 20261117T133225781Z, rule 22): checks 4X and 4Z
     # printed their engagement minimums only in check text.  Each is a count
     # of turns from first bite, recorded in step 23 as the screw goes in
     # (owner ruling S1, above).
     (
         "pivot-screw-engagement",
-        "CHECK 4W",
+        "CHECK 4X",
         "MHA-DT-VN-52 TURNS, FIRST BITE TO SHOULDER SEATED",
         f"{PIVOT_SCREW_TURNS} MIN",
         f"COUNTED AT {_step_ref('other-base-mounting', 'L')}",
     ),
     (
         "stop-screw-engagement",
-        "CHECK 4Y",
+        "CHECK 4Z",
         "MHA-SH-VN-52 SWING STOP TURNS, FIRST BITE TO SEATED",
         f"{STOP_SCREW_TURNS} MIN",
         f"COUNTED AT {_step_ref('other-base-mounting', 'P')}",
@@ -265,7 +265,7 @@ ACCEPTANCES = (
     # has)". Owner ruling 2026-11-24, audit part 2 C5: "the after-cure
     # readings become a record only; strip and re-bond only if a gear
     # hesitates in the 80-turn running check", so the row records (nothing
-    # is set to it) and the hesitation in check 4R accepts.
+    # is set to it) and the hesitation in check 4S accepts.
     (
         "spigot-gear-runout",
         _step_ref("post-and-tip-block", "E"),
