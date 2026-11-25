@@ -791,8 +791,8 @@ def test_pinch_screw_is_the_5_8_stainless_fillister() -> None:
 # import; the unmutated module imports, so the guard is what fails.
 _FOOT_TAP_MUTATIONS = {
     "screw engages under 1.5D": (
-        "HOLDDOWN_LEDGE_RANGE_MM = (2.5908, 3.0988)",
-        "HOLDDOWN_LEDGE_RANGE_MM = (2.5908, 6.0)",
+        "HOLDDOWN_LEDGE_RANGE_MM = (2.4638, 3.2258)",
+        "HOLDDOWN_LEDGE_RANGE_MM = (2.4638, 6.0)",
     ),
     "screw reaches the incomplete threads": (
         "FOOT_THREAD_DEPTH = 8.636",

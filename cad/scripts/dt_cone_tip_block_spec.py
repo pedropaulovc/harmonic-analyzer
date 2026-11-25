@@ -585,11 +585,12 @@ HOLDDOWN_SCREW_LENGTH_MIN = HOLDDOWN_SCREW_LENGTH - 0.03 * 25.4
 _HOLDDOWN_MAJOR_MM = THREAD_MAJOR_MM[HOLDDOWN_THREAD]
 _HOLDDOWN_PITCH_MM = 25.4 / 40.0
 # The ledge the head bears on, counterbore floor to platform top, at the
-# plate's stock band and its .XXX counterbore depth
+# plate's stock band and its wizard counterbore depth's .XX grade
 # (dt_cone_swing_platform_spec.HOLDDOWN_LEDGE_RANGE, asserted equal in
 # build_dt_drive_train_assembly; a copy so this part does not re-key on the
-# platform's print).
-HOLDDOWN_LEDGE_RANGE_MM = (2.5908, 3.0988)
+# platform's print).  .097-.127 since the cbore band audit (2026-11-25,
+# rule 3, was .102-.122 at .XXX): engagement .218 (1.5D .168), reach .278.
+HOLDDOWN_LEDGE_RANGE_MM = (2.4638, 3.2258)
 # The block's foot sits on the platform top, so the screw reaches past the
 # ledge straight into the tap.
 WORST_HOLDDOWN_ENGAGEMENT_MM = HOLDDOWN_SCREW_LENGTH_MIN - HOLDDOWN_LEDGE_RANGE_MM[1]

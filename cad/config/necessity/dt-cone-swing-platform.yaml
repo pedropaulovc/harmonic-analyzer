@@ -19,9 +19,11 @@
 # The tip dowel's .228 +/-.004 station from the hold-down hole: the webs to
 # the hold-down counterbore here and to MHA-DT-21's +X face close on it
 # (dt_cone_swing_platform_checks.TIP_DOWEL_WEBS, dt_cone_tip_block_spec.
-# WORST_DOWEL_WEBS_MM): .0783 and .0788 with the drilled pair, the values the
+# WORST_DOWEL_WEBS_MM): .0803 (the Ø.210 counterbore at its .XX largest,
+# owner ruling 2026-11-25: "C: counterbore Ø.210, web .080, no shortfall
+# (recommended)") and .0788 with the drilled pair, the second the value the
 # owner accepted under the .080 target; at the .XXX row's +/-.005 they fall
-# to .0773 and .0778.
+# to .0793 and .0778.
 necessity:
   - id: N-01
     feature: "sheet 1, plan, Ø.251 REAM THRU pivot bore (MHA-DT-VN-52 SHOULDER ENTERS, SWINGS FREE)"
@@ -31,5 +33,5 @@ necessity:
   - id: N-02
     feature: "sheet 2, detail B, .228 ±.004 tip dowel station from the hold-down hole"
     kind: gap
-    reason: "looser, the dowel webs fall under the accepted .078"
-    source: "owner ruling 2026-11-24, fit audit question 11"
+    reason: "looser, the plate and MHA-DT-21 dowel webs fall short"
+    source: "owner ruling 2026-11-24, fit audit question 11; owner ruling 2026-11-25 (Ø.210 counterbore)"

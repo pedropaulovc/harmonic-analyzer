@@ -1155,21 +1155,44 @@ def test_holddown_x_is_a_title_block_dimension_hanging_right_of_detail_b() -> No
 
 
 def test_holddown_print_worst_stack_keeps_its_margins() -> None:
-    """At the counterbore callout's .XXX and the drilled oversize: head recess
-    under the slide face, head clearance, bearing beside the hole, the
-    counterbore-floor ledge and every web to a neighbour (the wall target)."""
-    xxx = printed_band_mm(3, unit=spec.UNIT)
+    """At the wizard counterbore's .XX grade (rule 3: its three-place Ø and
+    depth are clearance sizes at +/-.01) and the drilled oversize: head
+    recess under the slide face, head clearance, bearing beside the hole,
+    the counterbore-floor ledge and every web to a neighbour (the wall
+    target).  Owner ruling 2026-11-25: "C: counterbore Ø.210, web .080, no
+    shortfall (recommended)"."""
+    xx = printed_band_mm(2, unit=spec.UNIT)
+    assert spec.HOLDDOWN_CBORE_BAND_MM == xx
+    assert spec.HOLDDOWN_CBORE_DIA == pytest.approx(0.210 * 25.4)
+    assert spec.HOLDDOWN_CBORE_DEPTH == pytest.approx(0.138 * 25.4)
     head_d, head_h = 0.183 * 25.4, 0.112 * 25.4
-    assert spec.HOLDDOWN_CBORE_DEPTH - xxx - head_h >= 0.1
-    assert spec.HOLDDOWN_CBORE_DIA - xxx - head_d >= 0.25
+    assert spec.HOLDDOWN_SCREW_HEAD_DIA == head_d and spec.HOLDDOWN_SCREW_HEAD_H == head_h
+    assert spec.HOLDDOWN_CBORE_DEPTH - xx - head_h >= 0.1
+    # The Ø.183 head enters the smallest pocket, Ø.200: .0085 a side against
+    # the .0049 (0.25 mm on the diameter) the spec's guard asks.
+    smallest = spec.HOLDDOWN_CBORE_DIA - xx
+    assert smallest == pytest.approx(0.200 * 25.4)
+    assert (smallest - head_d) / 2.0 == pytest.approx(0.0085 * 25.4)
+    assert (smallest - head_d) / 2.0 >= 0.25 / 2.0
+    assert 0.25 / 2.0 / 25.4 == pytest.approx(0.0049, abs=5e-5)
+    assert spec.HOLDDOWN_CBORE_HEAD_CLEARANCE == pytest.approx(smallest - head_d)
     drilled = drilled_oversize_mm(unit=spec.UNIT)
     assert (head_d - (spec.HOLDDOWN_CLEARANCE_DIA + drilled)) / 2.0 >= 0.5
     ledge_min = (
-        spec.PLATE_THICKNESS - spec.PLATE_STOCK_BAND - (spec.HOLDDOWN_CBORE_DEPTH + xxx)
+        spec.PLATE_THICKNESS - spec.PLATE_STOCK_BAND - (spec.HOLDDOWN_CBORE_DEPTH + xx)
     )
     assert spec.HOLDDOWN_LEDGE_RANGE[0] == pytest.approx(ledge_min)
     assert ledge_min >= WALL_TARGET_MM
     assert min(checks.HOLDDOWN_WEBS.values()) >= WALL_TARGET_MM
+    # What the hole locates, MHA-DT-21 on its MHA-DT-VN-60 screw, is the
+    # screw's float in the Ø.120 clearance and the head's bearing on the
+    # floor: neither reads the pocket's Ø, so the Ø.219 to Ø.210 change
+    # moves neither (MHA-DT-21's dowel band covers the same float).
+    wider = _exec_mutated(spec, {"HOLDDOWN_CBORE_DIA = 5.334": "HOLDDOWN_CBORE_DIA = 5.5626"})
+    assert wider.TIP_HOLDDOWN_SCREW_FLOAT_MM == spec.TIP_HOLDDOWN_SCREW_FLOAT_MM
+    assert wider.HOLDDOWN_HEAD_BEARING == spec.HOLDDOWN_HEAD_BEARING
+    assert wider.HOLDDOWN_LEDGE_RANGE == spec.HOLDDOWN_LEDGE_RANGE
+    assert wider.HOLDDOWN_HEAD_RECESS == spec.HOLDDOWN_HEAD_RECESS
 
 
 def _exec_mutated(module, replacements: dict[str, str]):
@@ -1189,7 +1212,7 @@ def _exec_mutated(module, replacements: dict[str, str]):
     ("replacements", "message"),
     [
         ({"HOLDDOWN_CBORE_DEPTH = 3.5052": "HOLDDOWN_CBORE_DEPTH = 3.00"}, "stand proud"),
-        ({"HOLDDOWN_CBORE_DIA = 5.5626": "HOLDDOWN_CBORE_DIA = 4.90"}, "does not clear"),
+        ({"HOLDDOWN_CBORE_DIA = 5.334": "HOLDDOWN_CBORE_DIA = 4.90"}, "does not clear"),
         ({"HOLDDOWN_SCREW_HEAD_DIA = 0.183": "HOLDDOWN_SCREW_HEAD_DIA = 0.160"}, "bears on"),
         ({"HOLDDOWN_CBORE_DEPTH = 3.5052": "HOLDDOWN_CBORE_DEPTH = 4.20"}, "ledge"),
     ],
@@ -1265,18 +1288,26 @@ def test_tip_dowel_slip_hole_clears_the_pin_on_the_hold_down_line() -> None:
     assert spec.TIP_DOWEL_END_ABOVE_UNDERSIDE_RANGE_MM[0] >= 0.0
 
 
-def test_tip_dowel_webs_keep_the_floor_at_print_worst() -> None:
-    """Recomputed for the tightest web: the counterbore under the plate, at
-    the dowel's station band and both holes' upper limits.  It stands under
-    the .080 target at .078 (owner ruling 2026-11-24, fit audit question 11;
-    registry RV-04), which the callout prints."""
-    cbore_r = (spec.HOLDDOWN_CBORE_DIA + printed_band_mm(3, unit=spec.UNIT)) / 2.0
+def test_tip_dowel_webs_meet_the_target_at_print_worst() -> None:
+    """Recomputed for the tightest web: the counterbore under the plate at
+    its wizard .XX largest (Ø.220), the dowel's station band and the #52
+    hole's upper limit.  Owner ruling 2026-11-25: "C: counterbore Ø.210, web
+    .080, no shortfall (recommended)": .0803 meets rule 17's .080 target, so
+    no registry wall exception and no wall print (was .078, RV-04)."""
+    cbore_r = (spec.HOLDDOWN_CBORE_DIA + printed_band_mm(2, unit=spec.UNIT)) / 2.0
+    assert cbore_r * 2.0 == pytest.approx(0.220 * 25.4)
     hole_r = (spec.TIP_DOWEL_HOLE_DIA + max(spec.TIP_DOWEL_HOLE_BAND)) / 2.0
     web = spec.TIP_DOWEL_FROM_HOLDDOWN - spec.TIP_DOWEL_STATION_TOL_MM - cbore_r - hole_r
     assert checks.TIP_DOWEL_WEBS["hold-down counterbore (underside)"] == pytest.approx(web)
-    assert WALL_FLOOR_MM <= web < WALL_TARGET_MM
+    assert web >= WALL_TARGET_MM
+    assert web / 25.4 == pytest.approx(0.0803, abs=6e-5)
     assert min(checks.TIP_DOWEL_WEBS.values()) == pytest.approx(web)
-    assert checks.TIP_DOWEL_WEB_PRINTED_IN == pytest.approx(0.078)
+    assert not hasattr(checks, "TIP_DOWEL_WALL_TEXT")
+    assert not hasattr(checks, "TIP_DOWEL_WEB_PRINTED_IN")
+    from machinist_exceptions import load_exceptions
+
+    declared = load_exceptions(_config.CONFIG_DIR, "dt_cone_swing_platform", "part")
+    assert not any("WALL" in entry.where for entry in declared)
 
 
 def test_tip_dowel_web_guard_refuses_a_dowel_that_crowds_the_counterbore(
@@ -1293,15 +1324,14 @@ def test_tip_dowel_web_guard_refuses_a_dowel_that_crowds_the_counterbore(
 def test_tip_dowel_hole_callout_flags_its_fit_note() -> None:
     """Machinist review of round 6, #7: the slip hole states its fit and the
     part it takes, by drawing number, and when it is drilled.  Under the
-    untoleranced size the callout gives the drill, the web's shortfall (rule
-    20) and the flag to note 3; the note carries the fit, MHA-DT-VN-69, and
-    the drilling at the assembly step."""
+    untoleranced size the callout gives the drill and the flag to note 3 (no
+    wall row since the Ø.210 counterbore, owner ruling 2026-11-25); the note
+    carries the fit, MHA-DT-VN-69, and the drilling at the assembly step."""
     import dt_drive_train_steps
 
     callout = drawing.TIP_DOWEL_CALLOUT
     assert callout.split("\n") == [
         "#52 DRILL THRU",
-        "WALL .078 MIN",
         f"SEE NOTE {drawing.TIP_DOWEL_NOTE_NUMBER}",
     ]
     note = drawing.TIP_DOWEL_NOTE
@@ -1410,15 +1440,15 @@ def test_tip_dowel_stays_chained_for_the_stack() -> None:
     assert f"SPACED TO MATCH {drawing.TIP_BLOCK_NUMBER}." in flat
     assert drawing.TIP_BLOCK_NUMBER == "MHA-DT-21"
     web = checks.TIP_DOWEL_WEBS["hold-down counterbore (underside)"]
-    assert web >= WALL_FLOOR_MM
+    assert web >= WALL_TARGET_MM
     from_pivot_band = (
         spec.TIP_DOWEL_STATION_TOL_MM + spec.HOLDDOWN_LATERAL_TOL_MM + spec.TIP_HOLDDOWN_SCREW_FLOAT_MM
     )
     plus_x = block.WORST_DOWEL_WEBS_MM["+X face"]
     assert plus_x >= WALL_FLOOR_MM
-    # From the pivot both webs fall under the .078 the owner accepted (fit
-    # audit question 11).
-    assert web - spec.HOLDDOWN_LATERAL_TOL_MM < checks.TIP_DOWEL_WEB_PRINTED_IN * 25.4
+    # From the pivot the plate's web falls under the .080 target and
+    # MHA-DT-21's under the .078 the owner accepted (fit audit question 11).
+    assert web - spec.HOLDDOWN_LATERAL_TOL_MM < WALL_TARGET_MM
     assert plus_x - (from_pivot_band - block.DOWEL_X_TOL_MM) < block.DOWEL_WEB_PRINTED_IN * 25.4
 
 
@@ -2220,8 +2250,10 @@ def test_platform_feature_bands_are_the_printed_ones() -> None:
     hold = features["holddown"]
     assert hold["dia"] == pytest.approx([_in(0.120), _in(0.124)], abs=1e-3)
     assert hold["process"] == "drill"
-    assert hold["cbore_dia"] == pytest.approx([_in(0.214), _in(0.224)], abs=1e-3)
-    assert hold["cbore_depth"] == pytest.approx([_in(0.133), _in(0.143)], abs=1e-3)
+    # The wizard pocket at the .XX grade (rule 3; owner ruling 2026-11-25,
+    # Ø.210).
+    assert hold["cbore_dia"] == pytest.approx([_in(0.200), _in(0.220)], abs=1e-3)
+    assert hold["cbore_depth"] == pytest.approx([_in(0.128), _in(0.148)], abs=1e-3)
     assert hold["cbore_depth_from"] == "underside"
     # .04 at the title block's .XX (machinist review r1, 20261124T125542720Z).
     assert hold["x_from_pivot"] == pytest.approx([_in(0.03), _in(0.05)], abs=1e-3)

@@ -161,7 +161,7 @@ s2_overhang_mm = 44.2341
 s2_overhang_min_mm = 43.18
 s2_overhang_max_mm = 45.72
 s2_south_reach_mm = 31.8807
-s2_north_reach_mm = 217.5807
+s2_north_reach_mm = 217.695
 pivot_x2_mm = 236.997
 holddown_x2_mm = 220.362
 # The ends: the 1/4 in end mill's side, end_levels levels of end_level_mm
@@ -214,8 +214,10 @@ quarter_projection_min_mm = 34.925
 eighth_projection_min_mm = 19.05
 # The counterbore: the 1/8 in end mill's centre on a G2 helix of
 # cbore_path_radius_mm about the hold-down's axis, cbore_helix_pitch_mm a
-# turn, to the counterbore's nominal depth, then one level turn.
-cbore_path_radius_mm = 1.1938
+# turn, to the counterbore's nominal depth, then one level turn.  .0425 in
+# for the Ø.210 counterbore (owner ruling 2026-11-25, "C: counterbore
+# Ø.210, web .080, no shortfall (recommended)"; was .0470 for Ø.219).
+cbore_path_radius_mm = 1.0795
 cbore_helix_pitch_mm = 0.5
 # Shop settings.endmill-carbide-3fl-1-4-1018-cf (2800 rpm, .0017 in/tooth,
 # 3 flutes: 14.3 in/min) and -1-8-1018-cf-tru-edge (2800, .001: 8.4 in/min,

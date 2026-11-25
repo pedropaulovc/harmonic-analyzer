@@ -472,18 +472,17 @@ _TIP_DOWEL_X_TEXT_X = (
 # Rule-23 retention, owner ruling 2026-11-07 (MHA-DT-00 rubric sample, PR
 # #2248).  The tip-block locating dowel's #52 slip hole (owner ruling
 # 2026-11-24, fit audit question 11), under its untoleranced size in detail
-# B, for MHA-DT-00 step post-and-tip-block: the drill, the web's shortfall
-# under the .080 target (rule 20), then the flag to the numbered note that
-# states the fit, the part that goes in the hole and where it is drilled
-# (machinist review of round 6, #7; round 8, #2: the order of operations is
-# MHA-DT-00 step 2's, not this sheet's).
+# B, for MHA-DT-00 step post-and-tip-block: the drill, then the flag to the
+# numbered note that states the fit, the part that goes in the hole and
+# where it is drilled (machinist review of round 6, #7; round 8, #2: the
+# order of operations is MHA-DT-00 step 2's, not this sheet's).  No wall
+# row: owner ruling 2026-11-25, "C: counterbore Ø.210, web .080, no
+# shortfall (recommended)" (dt_cone_swing_platform_checks.TIP_DOWEL_WEBS).
 TIP_DOWEL_PIN_NUMBER = _config.parts("dt-vn-locating-pin")["number"]
 TIP_DOWEL_NOTE_NUMBER = 3
-TIP_DOWEL_WALL_TEXT = _chk.TIP_DOWEL_WALL_TEXT
 TIP_DOWEL_CALLOUT = "\n".join(
     (
         f"{_sp.TIP_DOWEL_HOLE_DRILL} DRILL THRU",
-        TIP_DOWEL_WALL_TEXT,
         f"SEE NOTE {TIP_DOWEL_NOTE_NUMBER}",
     )
 )
@@ -521,14 +520,14 @@ TIP_DOWEL_NOTE_ROW_HEIGHT = 0.0044
 # in the band between the title block (top 0.066) and note 2 (ink from
 # 0.0760, as on the r6 render), left-aligned with it.
 TIP_DOWEL_NOTE_XY = (0.222, 0.0745)
-# The callout's block: three rows under the drill's untoleranced size (one
+# The callout's block: two rows under the drill's untoleranced size (one
 # row; the r6 ream's stacked band took 8.4 mm), at the r6 render's 5.45 mm a
-# row and its 1.7 mm underline and 3.6 mm top margin, 21.65 mm tall.  Its
+# row and its 1.7 mm underline and 3.6 mm top margin, 16.2 mm tall.  Its
 # bottom stands 2.3 mm over TipDowelPivotX's text: run
 # 20261124T110807008Z printed the drilled block's Ø.0635 row 1.08 mm over
 # the (.188) at a 1.5 mm offset (layout audit text-clearance, 1.78 mm
 # needed).
-TIP_DOWEL_CALLOUT_SIZE = (0.0475, 0.0217)
+TIP_DOWEL_CALLOUT_SIZE = (0.0475, 0.0162)
 _TIP_DOWEL_CALLOUT_BOTTOM = (
     TIP_DOWEL_PIVOT_X_LINE_Y + TIP_DOWEL_PIVOT_X_TEXT_SIZE[1] + 0.0023
 )
@@ -2577,6 +2576,9 @@ _NOTCH_N = (_geo.SLOT_TZ, 0.0, -_geo.SLOT_TX)
 _NOTCH_MID = _NOTCH_N[0] * _geo.SLOT_E_X + _NOTCH_N[2] * _geo.SLOT_E_Z
 _RELIEF_HALF = _sp.PIVOT_BEARING_RELIEF_DIAMETER / 2.0
 _DOWEL_BAND = (_sp.TIP_DOWEL_STATION_TOL_MM, -_sp.TIP_DOWEL_STATION_TOL_MM)
+# The hold-down counterbore's wizard Ø and depth: three places, the .XX
+# grade (rule 3; dt_cone_swing_platform_spec.HOLDDOWN_CBORE_BAND_MM).
+_CBORE_BAND = (_sp.HOLDDOWN_CBORE_BAND_MM, -_sp.HOLDDOWN_CBORE_BAND_MM)
 
 part_metadata(
     fields={"material.thickness": (_T, ("PLATE_THICKNESS", "PLATE_STOCK_CALLOUT"))},
@@ -2882,7 +2884,7 @@ for _name, _xz, _x_dim, _z_dim, _xz_name in (
         },
         precision={"dia": 3, "x_from_pivot": _P[_x_dim], "z_from_pivot": _P[_z_dim]},
     )
-# The tip-block hold-down: Ø.120 DRILL THRU, Ø.219 counterbore .138 deep
+# The tip-block hold-down: Ø.120 DRILL THRU, Ø.210 counterbore .138 deep
 # FROM UNDERSIDE (HOLDDOWN_CALLOUT_PRECISION, three places), located from
 # the pivot along (.XXX) and .04 across, both at the title block
 # (HOLDDOWN_STATION_TOL_MM, HOLDDOWN_LATERAL_TOL_MM, detail B).
@@ -2914,13 +2916,23 @@ requirement(
         "thru": (True, ("HOLDDOWN_HOLE_SPEC",)),
         "process": (HOLDDOWN_PROCESS.lower(), ((_DSPEC, "HOLDDOWN_PROCESS"),)),
         "cbore_dia": (
-            limits(HOLDDOWN_CBORE_DIA, 3, unit=UNIT),
-            ("HOLDDOWN_CBORE_DIA", _UNIT, (_SELF, "HOLDDOWN_CALLOUT_PRECISION")),
+            limits(HOLDDOWN_CBORE_DIA, 3, _CBORE_BAND, unit=UNIT),
+            (
+                "HOLDDOWN_CBORE_DIA",
+                "HOLDDOWN_CBORE_BAND_MM",
+                _UNIT,
+                (_SELF, "HOLDDOWN_CALLOUT_PRECISION"),
+            ),
         ),
         "cbore_dia_nominal": (HOLDDOWN_CBORE_DIA, ("HOLDDOWN_CBORE_DIA",)),
         "cbore_depth": (
-            limits(_sp.HOLDDOWN_CBORE_DEPTH, 3, unit=UNIT),
-            ("HOLDDOWN_CBORE_DEPTH", _UNIT, (_SELF, "HOLDDOWN_CALLOUT_PRECISION")),
+            limits(_sp.HOLDDOWN_CBORE_DEPTH, 3, _CBORE_BAND, unit=UNIT),
+            (
+                "HOLDDOWN_CBORE_DEPTH",
+                "HOLDDOWN_CBORE_BAND_MM",
+                _UNIT,
+                (_SELF, "HOLDDOWN_CALLOUT_PRECISION"),
+            ),
         ),
         "cbore_depth_nominal": (_sp.HOLDDOWN_CBORE_DEPTH, ("HOLDDOWN_CBORE_DEPTH",)),
         "cbore_depth_from": ("underside", ((_DSPEC, "HOLDDOWN_CALLOUT_BELOW"),)),
@@ -2969,10 +2981,6 @@ requirement(
         "thru": (True, ((_SELF, "TIP_DOWEL_CALLOUT"),)),
         "process": ("drill", ((_SELF, "TIP_DOWEL_CALLOUT"),)),
         "drill": (_sp.TIP_DOWEL_HOLE_DRILL, ((_SELF, "TIP_DOWEL_CALLOUT"),)),
-        "wall_min": (
-            _chk.TIP_DOWEL_WEB_PRINTED_IN * 25.4,
-            (("dt_cone_swing_platform_checks", "TIP_DOWEL_WEB_PRINTED_IN"),),
-        ),
         "mate": (TIP_DOWEL_PIN_NUMBER, ((_SELF, "TIP_DOWEL_NOTE"),)),
         "x_from_holddown": (
             limits(_sp.TIP_DOWEL_FROM_HOLDDOWN, _P["TipDowelX"], _DOWEL_BAND),

@@ -11,7 +11,7 @@ import math
 
 import _config
 import dt_vn_cone_pivot_screw_spec as pivot_stock
-from _inch_wall_limits import WALL_FLOOR_MM, WALL_TARGET_MM
+from _inch_wall_limits import WALL_TARGET_MM
 from _package_units import drawing_unit
 from _printed_tolerance import (
     drilled_oversize_mm,
@@ -19,7 +19,6 @@ from _printed_tolerance import (
     edge_break_radius_mm,
     printed_band_mm,
 )
-from _title_block_units import render_number
 import dt_swing_stop_screw_spec as stop_stock
 from cone_pitch import COS_I as _COS_I, INCLINE_DEG, SIN_I as _SIN_I
 from dt_cone_swing_platform_geometry import (
@@ -46,6 +45,7 @@ from dt_cone_swing_platform_geometry import (
     swing_hardware_geometry,
 )
 from dt_cone_swing_platform_spec import (
+    HOLDDOWN_CBORE_BAND_MM,
     HOLDDOWN_CBORE_DIA,
     HOLDDOWN_CLEARANCE_DIA,
     HOLDDOWN_LATERAL_TOL_MM,
@@ -121,9 +121,9 @@ if POST_MOUNT_HALF_PITCH + POST_MOUNT_TAP_DIA / 2.0 > _POST_R:
     raise AssertionError("v2 post mount taps fall outside the casting foot")
 
 # drawing-guidelines.md rule 17 (walls and webs) webs round the tip-block hold-down hole (user ruling 2026-09-29), at
-# print worst: the outline and relief at .XX, the counterbore at its
-# callout's .XXX, drilled holes at the DRILLED HOLES row, the hole's two
-# stations at the title block (HoldDownX .XX, HoldDownZ .XXX); the post taps at
+# print worst: the outline and relief at .XX, the counterbore at its wizard
+# callout's .XX grade (rule 3), drilled holes at the DRILLED HOLES row, the
+# hole's two stations at the title block (HoldDownX .XX, HoldDownZ .XXX); the post taps at
 # their explicit bands, judged at the thread major.
 # The relief is on the TOP face only (there the hole is the drilled
 # clearance), the counterbore on the UNDERSIDE only (there the pivot is the
@@ -138,7 +138,7 @@ _BASE_XX_MM = printed_band_mm(
 _DRILL_OVERSIZE_MM = drilled_oversize_mm(unit=UNIT)
 _HOLDDOWN_SHIFT = math.hypot(HOLDDOWN_LATERAL_TOL_MM, HOLDDOWN_STATION_TOL_MM)
 _HOLDDOWN_THRU_R = (HOLDDOWN_CLEARANCE_DIA + _DRILL_OVERSIZE_MM) / 2.0
-_HOLDDOWN_CBORE_R = (HOLDDOWN_CBORE_DIA + printed_band_mm(3, unit=UNIT)) / 2.0
+_HOLDDOWN_CBORE_R = (HOLDDOWN_CBORE_DIA + HOLDDOWN_CBORE_BAND_MM) / 2.0
 _HOLDDOWN_PIVOT_DIST = math.hypot(HOLDDOWN_LOCAL_X, HOLDDOWN_LOCAL_Z)
 
 
@@ -228,23 +228,15 @@ TIP_DOWEL_WEBS = {
 }
 for _edge in ("north edge", "east edge", "west edge"):
     TIP_DOWEL_WEBS[_edge] -= _DOWEL_SHIFT + _DOWEL_R + _XX_MM
-# Owner ruling 2026-11-24, fit audit question 11: the #52 hole leaves the
-# counterbore web at .078, under rule 17's .080 target; the owner accepts it
-# (registry wall exception), so these webs gate at the .060 floor and the
-# shortfall prints on the hole's callout (rule 20).
-if min(TIP_DOWEL_WEBS.values()) < WALL_FLOOR_MM:
+# Owner ruling 2026-11-25 (#3547): "C: counterbore Ø.210, web .080, no
+# shortfall (recommended)".  With the #52 hole of fit audit question 11 the
+# counterbore web stands at .0803 with the pocket at its .XX largest, so
+# these webs gate at rule 17's .080 target and the hole's callout prints no
+# wall (was .078, owner ruling 2026-11-24, fit audit question 11).
+if min(TIP_DOWEL_WEBS.values()) < WALL_TARGET_MM:
     raise AssertionError(
-        f"tip-block locating dowel leaves a web under the .060 in wall floor: {TIP_DOWEL_WEBS}"
+        f"tip-block locating dowel leaves a web under the .080 in wall target: {TIP_DOWEL_WEBS}"
     )
-TIP_DOWEL_WEB_MIN_MM = min(TIP_DOWEL_WEBS.values())
-TIP_DOWEL_WEB_PRINTED_IN = (
-    math.floor(round(TIP_DOWEL_WEB_MIN_MM / 25.4 * 1000.0, 6)) / 1000.0
-)  # .078
-if TIP_DOWEL_WEB_MIN_MM >= WALL_TARGET_MM:
-    raise AssertionError("the tip dowel web meets the .080 target; drop its WALL print")
-# The shortfall as the hole's callout prints it (rule 20), owned here with
-# its value, not by the drawing (test_drawing_specification_purity).
-TIP_DOWEL_WALL_TEXT = f"WALL {render_number(TIP_DOWEL_WEB_PRINTED_IN, UNIT, 3)} MIN"
 
 
 # ASME B1.1 class-2B receiver limits, not a title-row coordinate tolerance.

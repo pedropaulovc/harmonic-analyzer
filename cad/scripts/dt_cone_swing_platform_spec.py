@@ -290,9 +290,15 @@ HOLDDOWN_SCREW_HEAD_DIA = 0.183 * 25.4
 HOLDDOWN_SCREW_HEAD_H = 0.112 * 25.4
 # #4 CLOSE clearance, drilled: the title block's DRILLED HOLES row.
 HOLDDOWN_CLEARANCE_DIA = CLEARANCE_MM[("#4", "close")]
-# The counterbore's sizes print three places on its Hole Wizard callout.
-HOLDDOWN_CBORE_DIA = 5.5626  # .219
+# The counterbore's sizes print three places on its Hole Wizard callout,
+# toleranced by the .XX grade (drawing-guidelines.md rule 3: a wizard
+# pocket's Ø and depth are clearance sizes at +/-.01).  Owner ruling
+# 2026-11-25 (#3547, swing-platform web options): "C: counterbore Ø.210,
+# web .080, no shortfall (recommended)" (was Ø.219, its web to the tip dowel
+# .0777 at +/-.01).
+HOLDDOWN_CBORE_DIA = 5.334  # .210
 HOLDDOWN_CBORE_DEPTH = 3.5052  # .138, from the underside
+HOLDDOWN_CBORE_BAND_MM = printed_band_mm(2, unit=UNIT)  # +/-.01, Ø and depth
 HOLDDOWN_HOLE_SPEC = HoleSpec(
     "counterbore_socket",
     "#4",
@@ -302,17 +308,22 @@ HOLDDOWN_HOLE_SPEC = HoleSpec(
         "CounterBoreDepth": HOLDDOWN_CBORE_DEPTH,
     },
 )
-# Print-worst checks (drawing-guidelines.md rule 17 (walls and webs)): .XXX counterbore sizes, drilled-hole oversize,
-# the stock plate's mill band.
-HOLDDOWN_HEAD_RECESS = HOLDDOWN_CBORE_DEPTH - _XXX - HOLDDOWN_SCREW_HEAD_H
-HOLDDOWN_CBORE_HEAD_CLEARANCE = HOLDDOWN_CBORE_DIA - _XXX - HOLDDOWN_SCREW_HEAD_DIA
+# Print-worst checks (drawing-guidelines.md rule 17 (walls and webs)): the
+# wizard pocket's .XX band, drilled-hole oversize, the stock plate's mill
+# band.
+HOLDDOWN_HEAD_RECESS = HOLDDOWN_CBORE_DEPTH - HOLDDOWN_CBORE_BAND_MM - HOLDDOWN_SCREW_HEAD_H
+# The Ø.183 head in the smallest pocket (Ø.200): .017 in, .0085 a side,
+# against the 0.25 mm (.0049 a side) the guard below asks.
+HOLDDOWN_CBORE_HEAD_CLEARANCE = (
+    HOLDDOWN_CBORE_DIA - HOLDDOWN_CBORE_BAND_MM - HOLDDOWN_SCREW_HEAD_DIA
+)
 HOLDDOWN_HEAD_BEARING = (
     HOLDDOWN_SCREW_HEAD_DIA - (HOLDDOWN_CLEARANCE_DIA + _DRILL_OVERSIZE)
 ) / 2.0
 # Ledge from the counterbore floor to the top face, both bands.
 HOLDDOWN_LEDGE_RANGE = (
-    PLATE_THICKNESS - PLATE_STOCK_BAND - (HOLDDOWN_CBORE_DEPTH + _XXX),
-    PLATE_THICKNESS + PLATE_STOCK_BAND - (HOLDDOWN_CBORE_DEPTH - _XXX),
+    PLATE_THICKNESS - PLATE_STOCK_BAND - (HOLDDOWN_CBORE_DEPTH + HOLDDOWN_CBORE_BAND_MM),
+    PLATE_THICKNESS + PLATE_STOCK_BAND - (HOLDDOWN_CBORE_DEPTH - HOLDDOWN_CBORE_BAND_MM),
 )
 if HOLDDOWN_HEAD_RECESS < 0.1:
     raise AssertionError("hold-down screw head can stand proud of the slide face")
@@ -345,21 +356,25 @@ if HOLDDOWN_LEDGE_RANGE[0] < WALL_TARGET_MM:
 # own +/-.004 band, tighter than the hole's +/-.005 drilled row
 # (HOLDDOWN_STATION_TOL_MM), which the webs to the counterbore here and to
 # the block's +X face need: with the drilled pair (fit audit question 11)
-# they stand at .078 here and .078 in the foot, the values the owner
-# accepted under the .080 target (necessity register N-02).
+# they stand at .0803 here (the Ø.210 counterbore at +/-.01, owner ruling
+# 2026-11-25: "C: counterbore Ø.210, web .080, no shortfall
+# (recommended)") and .078 in the foot, the value the owner accepted under
+# the .080 target (necessity register N-02).
 #
 # Why the controlling station stays chained to the hold-down hole, with the
 # pivot-bore axis station printed only as a REF (machinist review of round
 # 6, #6; delegated ruling 2026-11-07, option A): the two webs that close on
 # the dowel-to-hold-down distance have almost no margin.  At print-worst
-# with the chained +/-.004 and the drilled holes (2026-11-24), the plate's
-# web to the Ø.219 hold-down counterbore is .0783 in and MHA-DT-21's web
-# from the foot hole to its +X face .0788 in (the foot's hole lands within
-# this band plus the screw's .006 float, .010, from its tap).
+# with the chained +/-.004 and the drilled holes (2026-11-25), the plate's
+# web to the Ø.210 hold-down counterbore at +/-.01 is .0803 in and
+# MHA-DT-21's web from the foot hole to its +X face .0788 in (the foot's
+# hole lands within this band plus the screw's .006 float, .010, from its
+# tap).
 # Located from the pivot at +/-.004 instead, with HoldDownX also +/-.004 from
 # the pivot, the dowel-to-hold-down distance takes both bands (+/-.008): the
-# counterbore web falls to -.0037 in, and the foot's landing band grows to
-# .014, its +X face web to about -.0032 in.  No DOWEL_FROM_TAP closes both
+# counterbore web falls .0037 in under the .080 target, and the foot's
+# landing band grows to .014, its +X face web to about .0032 in under the
+# accepted .078.  No DOWEL_FROM_TAP closes both
 # (the window is short by about .007 in), so the pivot-axis station prints
 # as a reference, TIP_DOWEL_LOCAL_X, and the chained station controls.
 TIP_DOWEL_FROM_HOLDDOWN = dt_cone_tip_block_spec.DOWEL_FROM_TAP  # .228
