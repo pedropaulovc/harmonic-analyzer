@@ -1,9 +1,9 @@
 necessity:
   - id: N-01
-    feature: "strap thickness .098 +/-.001"
+    feature: "strap thickness .098 ±.001 SLIDING FIT IN MHA-CH-03 FORK"
     kind: gap
-    reason: "thick strap closes the MHA-CH-03 fork slot"
-    source: "sh_vn_pivot_pin_rod_spec: 'fork slot can close on the thickest arm' (fails at +/-.003); ch_rocker_arm_spec.ARM_THICKNESS_BAND"
+    reason: "thick strap closes fork slot; thin closes bar gap"
+    source: "sh_vn_pivot_pin_rod_spec.BUDGET side_clearance_min 'fork slot can close on the thickest arm' (.0762 mm at ±.003, .0254 at ±.005; floor .10) and neighbour_clearance_min 'neighbouring forks can touch in the inter-arm gap' (.3302 at ±.003, .2794 at ±.005; floor .35); ch_channel_assembly_spec.BAR_GAP foot \"a bar's foot-notch float can close the bar-to-bar running gap\" and leaf \"the bank's feeler leaf does not prove the running floor\" (.0762 at ±.003, .0254 at ±.005; floor .10): the strap's least size sets the bar's float in its second mate, the MHA-CH-01 foot notch .104 +.006/0, which no trial in a fork shows; ch_rocker_arm_spec.ARM_THICKNESS_BAND"
   - id: N-02
     feature: "hub length .278 +/-.002"
     kind: gap
