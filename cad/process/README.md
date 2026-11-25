@@ -103,7 +103,12 @@ operation's picture, and a centre drill that spots the stations the next
 drill drills is not drawn (the drill's picture stands for it). The work stop
 is drawn as what it is, a round rod reaching in from its post beside the
 vise (its own key entry, not the supports' hatch), and named once, in the
-first picture that draws it, with when it is set; touch-off tools (the edge
+first picture that draws it, with when it is set. A locator that would lie
+across or behind the part in a view is left out of that view, which says so
+in a short callout (owner 2026-11-25: "rod is confusing on side view, better
+to replace with a callout saying its not shown"); it appears in at least one
+view of the picture, and a picture with only that view says in the callout
+which end the locator is on. Touch-off tools (the edge
 finder, the feeler) are not drawn in a cutting picture. Colour follows what
 moves (owner 2026-11-25: "shouldnt the tap t handle be yellow since it is
 arguably part of the cutter"): the tool's yellow covers the tool and all
