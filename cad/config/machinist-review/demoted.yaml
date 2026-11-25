@@ -6,16 +6,6 @@
 # to SHIP deletes its line; the batch that deletes the last line deletes this
 # file (an empty list fails the graph load).
 demoted:
-  ch_channel_assembly: fit-batch-ch
-  ch_channel_lever: fit-batch-ch
-  ch_pivot_bracket: fit-batch-ch
-  # Hand-over farm run 20261124T175053911Z on 4bce4b3e08 read FIX on its last
-  # review round (strap thickness .098 ±.001 to be made to the MHA-CH-03 fork,
-  # the same finding as ch_rocker_strap; issue #3583). Owner ruling
-  # 2026-11-24, main during fit conversion: "better to be able to cut
-  # releases with known issues than to hold unreleased code".
-  ch_rocker_arm: fit-batch-ch
-  ch_rocker_strap: fit-batch-ch
   dt_alignment_pinion: fit-batch-dt
   dt_arbor_pedestal: fit-batch-dt
   dt_cone_gear: fit-batch-dt
@@ -54,8 +44,6 @@ demoted:
   dt_pinion_lift_rod: fit-batch-dt
   dt_pinion_pivot_block: fit-batch-dt
   dt_pinion_pivot_shaft: fit-batch-dt
-  fr_top_frame: fit-batch-fr
-  mg_wheel_bar: fit-batch-mg
   pd_paper_drive_assembly: fit-batch-pd
   pd_platen_bottom_guide: fit-batch-pd
   pd_platen_guide: fit-batch-pd
@@ -70,4 +58,3 @@ demoted:
   pd_transgear_front_bushing: fit-batch-pd
   pd_transgear_knob_bush: fit-batch-pd
   pd_transgear_knob_thrust_ring: fit-batch-pd
-  sm_summing_lever: fit-batch-sm
