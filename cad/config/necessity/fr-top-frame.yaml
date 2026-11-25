@@ -16,5 +16,5 @@ necessity:
   - id: N-02
     feature: "sheet 7, 2° +1°/0° DRAFT on the added-draft faces"
     kind: gap
-    reason: "less draft thins the keeper 2-56 tap wall under .080"
-    source: "owner ruling 2026-11-10 (#2333, D4); machinist exception RV-12: wall .0807 at 2°, .0636 at 1°"
+    reason: "less draft thins the keeper 2-56 tap wall under .060"
+    source: "owner ruling 2026-11-10 (#2333, D4); machinist exceptions RV-12 and RV-14: wall .0767 at 2°, .0596 at 1°, under the .060 floor"
