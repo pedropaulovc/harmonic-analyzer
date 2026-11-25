@@ -405,8 +405,9 @@ def test_tenon_wall_charges_both_breaks_at_its_free_end() -> None:
     # the pivot bore's mouth each take the title block's break, as the glue
     # length charges the end break; the governing wall is the straight one
     # less both.  Owner ruling 2026-11-08 (Pedro), #2144 item 7.2 (#2171, option C) accepts
-    # .040 there as RV-02; the straight .060 stays RV-01.  The fit note states
-    # each, matching its declaration.
+    # .040 there as RV-02; the straight wall stays RV-01 (.062 and .042 since
+    # MHA-DT-34 is drilled N at DRILLED HOLES, codjiflo 3548-1).  The fit note
+    # states each, matching its declaration.
     spec = dt_crank_handle_spec
     brk = spec.EDGE_BREAK_MAX_MM
     assert brk == pytest.approx(0.010 * IN)
@@ -424,7 +425,7 @@ def test_tenon_wall_charges_both_breaks_at_its_free_end() -> None:
         row["id"]: row for row in _config.parts("dt-crank-handle")["machinist_exceptions"]
     }
     assert {"RV-01", "RV-02"} <= set(exceptions)
-    for rule, text in (("RV-01", "WALL .060 MIN"), ("RV-02", "WALL .040 MIN AT TENON END")):
+    for rule, text in (("RV-01", "WALL .062 MIN"), ("RV-02", "WALL .042 MIN AT TENON END")):
         assert exceptions[rule]["where"] == "tenon callout: " + text
         assert text in notes.TENON_NOTE
 
@@ -442,12 +443,14 @@ def test_tenon_root_relief_clears_the_ferrule_seat_and_keeps_the_tenon() -> None
     radius = spec.INSIDE_CORNER_R_MAX
     step = 0.001 * IN
     assert spec.TENON_ROOT_ROUND_REACH == pytest.approx(radius * (1.0 + math.sqrt(2.0)))
-    assert (spec.TENON_ROOT_RELIEF_MIN, spec.TENON_ROOT_RELIEF_MAX) == pytest.approx(
-        (spec.TENON_ROOT_RELIEF - spec.TENON_ROOT_RELIEF_TOL,
-         spec.TENON_ROOT_RELIEF + spec.TENON_ROOT_RELIEF_TOL)
-    )
+    # The printed band is the widest .XXX band inside the limits (codjiflo
+    # 3548-1: the N-drill ferrule left the limits an odd span, .029-.050).
+    low = spec.TENON_ROOT_RELIEF - spec.TENON_ROOT_RELIEF_TOL
+    high = spec.TENON_ROOT_RELIEF + spec.TENON_ROOT_RELIEF_TOL
+    assert spec.TENON_ROOT_RELIEF_MIN - 1e-9 <= low and high <= spec.TENON_ROOT_RELIEF_MAX + 1e-9
+    assert min(low - spec.TENON_ROOT_RELIEF_MIN, spec.TENON_ROOT_RELIEF_MAX - high) < step
     assert spec.TENON_ROOT_RELIEF_MIN - step < spec.TENON_ROOT_ROUND_REACH
-    assert spec.FERRULE_SEAT_RADIAL_MIN - step < spec.FERRULE_SEAT_RADIAL_FLOOR
+    assert spec.FERRULE_SEAT_RADIAL_MIN >= spec.FERRULE_SEAT_RADIAL_FLOOR
     assert spec.TENON_STRAIGHT_WALL_MIN >= spec.TENON_WALL_FLOOR_MM
     assert "TenonRootRelief" in spec.DRAWING_DIMENSIONS["HandleProfile"]
     assert spec.DRAWING_PRECISION_BY_NAME["TenonRootRelief"] == 3

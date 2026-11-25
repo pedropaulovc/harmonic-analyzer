@@ -227,8 +227,9 @@ def test_printed_bands_are_the_sheets() -> None:
     assert _inch(disc_features["outer"]["dia"]) == [2.16, 2.18]
     assert _inch(disc_features["far_end"]["length"]) == [0.10, 0.12]
     ferrule_features = manifest("dt_crank_handle_ferrule")["features"]
-    assert _inch(ferrule_features["bore"]["dia"]) == [0.298, 0.308]
-    # Fit audit question 15: the N drill names the hole's process.
+    # Codjiflo 3548-1: the N drill's .302 at DRILLED HOLES (+.004/0), what the
+    # sheet's N DRILL THRU prints.
+    assert _inch(ferrule_features["bore"]["dia"]) == [0.302, 0.306]
     assert ferrule_features["bore"]["process"] == "drill"
     cup_features = manifest("dt_crank_handle_butt_cup")["features"]
     assert _inch(cup_features["pocket"]["depth"]) == [0.212, 0.222]
