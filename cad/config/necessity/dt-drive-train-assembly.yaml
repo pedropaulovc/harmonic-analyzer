@@ -21,9 +21,6 @@
 # it does not tighten them.
 # N-03 and N-04 gate on a contact ratio, so their margins are the contact
 # ratio over the 1.0 floor.
-# N-06: ±.004 (0.1016 mm) would keep 0.0330 mm and is allowed by D28, but it
-# re-keys the frame (build_fr_harmonic_base reads pinion_rig_layout), so the
-# band stays at today's ±.003.
 # Margins: lane-3 harness, %TEMP%/dtplan (re-derived 2026-11-25 on branch
 # t23/fitdt-enforce-dt00).
 necessity:
@@ -47,13 +44,3 @@ necessity:
     kind: mesh
     reason: "pivot runout tilts the cone gears off centre"
     source: "delegated ruling 2026-11-25 (Main), no precedent; owner review #2144 (D28); owner ruling 2026-11-22, #2473 option G: cone gate C-01 (NOMINAL_CONTACT_RATIO_MIN 1.0): least contact ratio T012 1.022 at today's .0020 TIR, 1.001 at .0025, 0.899 at .005"
-  - id: N-05
-    feature: "sheet 15, setting table row 3 (steps 8S, 9E): mandrel centre at each MHA-DT-02, DRO X 6.619-6.626"
-    kind: gap
-    reason: "keeps check 4G's .015 tripwire passing in-print builds"
-    source: "delegated ruling 2026-11-25 (Main), no precedent; owner review #2144 (D28): check 4G tripwire .015 against the pivot follow .0098 in plus this DRO band (test_dt_drive_train_assembly_drawing); margin .0013 in at today's ±.0039 (0.10 mm), .0002 in at the title block's ±.005; the widest band keeping .001 is ±.0042, which still prints 6.619-6.626"
-  - id: N-06
-    feature: "sheet 16, rows 13 and 17 (steps 16C, 21A): MHA-DT-19 and MHA-DT-17 rear ends to the MHA-DT-18 rear face, FLUSH ±.003"
-    kind: gap
-    reason: "holds MHA-DT-19's bearing length in the front MHA-DT-18"
-    source: "delegated ruling 2026-11-25 (Main), no precedent; owner review #2144 (D28): pinion_rig_layout TORQUE_SHAFT_BEARING_STACK at least FRONT_BLOCK_MIN_BEARING + BLOCK_BEARING_MARGIN (9.5 + 0.5 mm, #858); margin 0.0346 mm at today's 0.10 mm (prints ±.003), 0.0330 mm at ±.004 (0.1016 mm, not taken: it re-keys the frame), 0.0076 mm at the title block's ±.005"
