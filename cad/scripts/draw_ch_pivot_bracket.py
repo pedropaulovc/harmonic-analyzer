@@ -78,6 +78,7 @@ from ch_pivot_bracket_spec import (
     EAR_ARCH_R,
     EAR_T,
     EAR_TOP_Y,
+    EAR_WALL_TEXT,
     FOOT_H,
     FOOT_W,
     FOOT_Z0,
@@ -252,10 +253,11 @@ EAR_THICK_TEXT_OFFSET = (0.042, 0.010)
 # ~58 mm the placement was set for (machinist review r1, run
 # 20261124T095908844Z: one 30-character line ran into the ear's outline);
 # the drilled hold-down hole says drill and through. The ear thickness rides
-# the title block's .XXX, a three-place size given a function, so it names
-# what the third place holds (drawing-guidelines.md rules 3 and 4; same r1
+# the title block's .XXX, a three-place size given a function, so it states
+# the wall the third place holds (drawing-guidelines.md rules 3 and 4; same r1
 # review): at the .XX row the apex 4-40 tap's wall to the outboard face falls
-# to 2.007 mm, under the .080 wall (ch_pivot_bracket_spec's own assert). Fit-up
+# to 2.007 mm, under the .080 wall (ch_pivot_bracket_spec.EAR_WALL_TEXT, the
+# worst case at .XXX floored to .001). Fit-up
 # sets the pivot shaft's tip off the ear's outboard face and the apex tap
 # stands off the inboard one (rocker_bank_layout.SET_SCREW_TO_FLAT_BAND;
 # #3114: nothing bears on an ear's face). The tap's station from the inboard
@@ -272,7 +274,7 @@ DIMENSION_CALLOUTS = {
     ),
     "HoleDia": "DRILL THRU",
     "CornerRadius": f"CLEARS HEAD OF\n{HOLD_DOWN_SCREW_NUMBER}",
-    "EarThick": f"KEEPS {SET_SCREW_THREAD.lstrip('#')} TAP WALLS",
+    "EarThick": f"HOLDS WALL {EAR_WALL_TEXT} MIN",
 }
 # The right view prints the corner radius and the ear thickness.
 RIGHT_KEEP_NAMES = ("CornerRadius", "EarThick")
@@ -423,6 +425,7 @@ requirement(
         ),
         "thickness_nominal": (EAR_T, ("EAR_T",)),
         "thickness_from": ("inboard_face", ((_SELF, "RIGHT_KEEP_NAMES"),)),
+        "callout": (DIMENSION_CALLOUTS["EarThick"], ((_SELF, "DIMENSION_CALLOUTS"),)),
     },
     precision={"thickness": _P["EarThick"]},
 )

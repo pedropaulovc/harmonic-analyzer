@@ -219,10 +219,11 @@ def test_every_banded_length_says_what_its_band_holds() -> None:
     assert banded - {"SetScrewLocation"} <= set(drawing.DIMENSION_CALLOUTS)
     shaft = _config.parts("ch-pivot-shaft")["number"]
     # #3114: nothing bears on an ear; its thickness rides the title block's
-    # .XXX, a three-place size given a function, so it names what the third
-    # place holds: the apex tap's walls (at .XX the spec's wall assert fails).
+    # .XXX, a three-place size given a function, so it states the wall the
+    # third place holds (rule 3): the apex tap's outboard wall, floored to
+    # .001 (at .XX the spec's wall assert fails).
     assert shaft == "MHA-CH-05"
-    assert drawing.DIMENSION_CALLOUTS["EarThick"] == "KEEPS 4-40 TAP WALLS"
+    assert drawing.DIMENSION_CALLOUTS["EarThick"] == "HOLDS WALL .086 MIN"
     # Rule 7: the tap's station is a location, so its mate rides the tap.
     assert "SetScrewLocation" not in drawing.DIMENSION_CALLOUTS
     assert shaft in drawing.SET_SCREW_MATE
@@ -428,8 +429,10 @@ def test_ear_thickness_prints_beside_the_ear_on_the_right_view() -> None:
     outboard = drawing._right_x(spec.FOOT_Z0 + spec.EAR_T)
     apex = drawing._right_y(spec.EAR_TOP_Y)
     dz, dy = drawing.EAR_THICK_TEXT_OFFSET
+    # The printed block is both lines: the value and the wall it holds.
+    ear_text = ".320"
     box = estimate_text_box(
-        ".320",
+        f"{ear_text}\n{drawing.DIMENSION_CALLOUTS['EarThick']}",
         anchor=(outboard - dz, apex + dy),
         height=0.0035,
         reference=2,  # swCENTER

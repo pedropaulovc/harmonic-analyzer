@@ -33,7 +33,7 @@ checks them with the ligament functions below.
 
 from __future__ import annotations
 
-from math import sqrt
+from math import floor, sqrt
 
 import _config
 from _hole_spec import THREAD_MAJOR_MM, HoleSpec, blind_cut_dia_mm
@@ -195,6 +195,12 @@ if min(SET_SCREW_WALLS_MIN.values()) < LIGAMENT_TARGET:
         f"the apex tap leaves {SET_SCREW_WALLS_MIN} to the ear faces at worst"
         f" case, under the {LIGAMENT_TARGET} wall"
     )
+# Rule 3: the ear thickness keeps its third place for the outboard face's
+# wall (the one that also loses the thickness band; at the .XX row it falls
+# to 2.007 mm, under the target), so it states that wall once, floored to the
+# .001 reading unit so the MIN never overstates it.
+_EAR_WALL_IN = floor(SET_SCREW_WALLS_MIN["outboard face"] / 25.4 * 1000 + 1e-9) / 1000
+EAR_WALL_TEXT = f"{_EAR_WALL_IN:.3f}".removeprefix("0")  # .086
 
 
 def _sag(radius: float) -> float:
