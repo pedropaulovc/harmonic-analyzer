@@ -47,8 +47,10 @@ REGION_CAP = 40
 THICKNESS_POINTS = 400
 # Points sampled across each region face, per parameter direction.
 FACE_GRID = 3
-# Lattice cells tried inside each region (isInside), about: 0.5 mm cells
-# for the stop block's strip and its two plugged 1.85 mm pilot holes.
+# The lattice inside each region: cells of LATTICE_MM (a plugged 1.85 mm
+# pilot hole gets ~200), coarser where that would make more than about
+# LATTICE_CELLS (each inside cell costs a distance query).
+LATTICE_MM = 0.5
 LATTICE_CELLS = 2000
 
 
@@ -234,12 +236,13 @@ def _strided(points, cap):
 
 
 def _lattice(region):
-    """Cell centres of a lattice over the region's bound box (about
-    LATTICE_CELLS cubic cells, at least 3 along every side) that lie inside
-    the region."""
+    """Cell centres of a lattice over the region's bound box (LATTICE_MM
+    cells or about LATTICE_CELLS cubic cells, whichever is coarser, at least
+    3 along every side) that lie inside the region."""
     bb = region.BoundBox
     spans = [(bb.XMin, bb.XLength), (bb.YMin, bb.YLength), (bb.ZMin, bb.ZLength)]
-    step = max(max(length for _lo, length in spans) / 64, (bb.XLength * bb.YLength * bb.ZLength / LATTICE_CELLS) ** (1 / 3))
+    step = max(LATTICE_MM, max(length for _lo, length in spans) / 64,
+               (bb.XLength * bb.YLength * bb.ZLength / LATTICE_CELLS) ** (1 / 3))
     counts = [max(3, round(length / step)) for _lo, length in spans]
     while counts[0] * counts[1] * counts[2] > 3 * LATTICE_CELLS:
         step *= 1.25
@@ -254,14 +257,25 @@ def _lattice(region):
     return inside
 
 
+def _near(other, region):
+    """``other``'s faces within reach of the region. The region (outside
+    ``other``) touches it, so no point of the region is farther from it than
+    the region's bound box diagonal: faces beyond that cannot be nearest."""
+    reach = region.BoundBox.DiagonalLength + 1e-3
+    box = FreeCAD.BoundBox(region.BoundBox)
+    box.enlarge(reach)
+    faces = [f for f in other.Faces if f.BoundBox.intersect(box)]
+    return Part.makeCompound(faces) if faces else other
+
+
 def thickness(region, other):
     """The region's farthest sampled point from ``other``. Sampled at the
-    mesh vertices, on a FACE_GRID x FACE_GRID grid inside every face and on
-    a lattice inside the solid: a cylinder's mesh has vertices on its edges
-    only, a plugged hole or a ring left in a groove touches ``other`` along
-    every edge (its depth shows at the middle of its cap), and a plugged hole
-    under a thin strip left over it has no cap of its own (its depth is
-    inside the region)."""
+    mesh vertices and on a FACE_GRID x FACE_GRID grid inside every face: a
+    cylinder's mesh has vertices on its edges only, and a plugged hole or a
+    ring left in a groove touches ``other`` along every edge (its depth
+    shows at the middle of its cap). And on a lattice inside it (cells of
+    LATTICE_MM where that makes fewer than LATTICE_CELLS): a plugged hole
+    under a thin strip left over it has no cap of its own."""
     grid = []
     for face in region.Faces:
         u0, u1, v0, v1 = face.ParameterRange
@@ -272,11 +286,11 @@ def thickness(region, other):
                 if face.isPartOfDomain(u, v):
                     grid.append(face.valueAt(u, v))
     mesh = MeshPart.meshFromShape(Shape=region, LinearDeflection=0.01, AngularDeflection=0.2, Relative=False)
-    pts = (_lattice(region) + _strided(grid, 2 * THICKNESS_POINTS)
-           + _strided([V(*p) for p in mesh.Topology[0]], THICKNESS_POINTS))
+    pts = _strided(grid, 2 * THICKNESS_POINTS) + _strided([V(*p) for p in mesh.Topology[0]], THICKNESS_POINTS)
+    near = _near(other, region)
     best, where = 0.0, None
-    for p in pts:
-        d = other.distToShape(Part.Vertex(p))[0]
+    for p in pts + _lattice(region):
+        d = near.distToShape(Part.Vertex(p))[0]
         if d > best:
             best, where = d, [p.x, p.y, p.z]
     return best, where
