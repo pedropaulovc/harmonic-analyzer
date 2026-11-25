@@ -2136,7 +2136,7 @@ def rig_steps(*, pivot_blocks: int, cams: int, slotted: int) -> str:
         # working position: punch, lift off, spot-drill, drill and tap.  That
         # position is found by feel, where the gears mesh without binding
         # (owner direction 2026-11-11, #2365, superseding the check 4D
-        # leaves).  The swing check (23M) is the only acceptance, and
+        # leaves).  The swing check (23N) is the only acceptance, and
         # DT-00 prints no offset from the pedestal seats (FoFr #2261 owns D1
         # as a transfer).  The stop and lock seats are MHA-FR-01 print holes.
         # Check 4 then sets the swing and clamps it.  PR 2 machinist review
@@ -2156,9 +2156,14 @@ def rig_steps(*, pivot_blocks: int, cams: int, slotted: int) -> str:
         # owner's by-feel direction of 2026-11-11 (#2365).  #1038 re-pitch,
         # on machinist review of point A ("WHERE NO GEAR BINDS" gave no pose
         # and no check).  Owner ruling 2026-11-24, audit part 2 C9 ("Yes: add
-        # the look and relax the rest."): at that pose, before the clamp, the
-        # bushing's air to gear 19 is looked at with a 3/64 drill shank;
-        # dt_cone_tip_air gates the bushing on it (AFTER_SET_SOURCES).
+        # the look and relax the rest."), its wording changed by delegated
+        # ruling 2026-11-24 (Main), no precedent; owner review #2144 (D18): at
+        # that pose, before the clamp, the bushing's air to gear 19 is looked
+        # at with a .020 feeler leaf, which every build with its parts in
+        # print passes (0.730 mm least, dt_cone_tip_air.look_in_print_air_mm);
+        # the 3/64 drill shank (1.191 mm) rejected some.  The bushing keeps
+        # the full arithmetic stack.  The remedy is its own line (rule 22):
+        # the parts whose print errors close that air before the look.
         (
             "other-base-mounting",
             "CONE SET ON THE BASE: SLIDE MHA-DT-20 UNTIL GEARS 0 AND 19 SIT FULLY ON THEIR "
@@ -2166,7 +2171,9 @@ def rig_steps(*, pivot_blocks: int, cams: int, slotted: int) -> str:
             "SWING IT IN UNTIL THE GEARS AT BOTH ENDS JUST BIND.\n"
             f"EASE IT OUT SQUARE IN SMALL STEPS UNTIL {CONE_TURN_CRANK_TURNS} CRANK TURNS "
             "RUN FREE.\n"
-            "A 3/64 DRILL SHANK PASSES BETWEEN MHA-DT-38 AND GEAR 19.\n"
+            "A .020 FEELER LEAF PASSES BETWEEN MHA-DT-38 AND GEAR 19.\n"
+            "IF IT DOES NOT, MEASURE MHA-DT-04, MHA-DT-05, MHA-DT-20, MHA-DT-21 AND "
+            "MHA-DT-38 AGAINST THEIR PRINTS.\n"
             "CLAMP MHA-DT-20 TO MHA-FR-01.\n"
             "TRANSFER-PUNCH MHA-FR-01 THRU THE MHA-DT-20 PIVOT BORE.\n"
             "LIFT MHA-DT-20 OFF.\n"
@@ -2300,12 +2307,12 @@ CHECKS = _note_text(
         "4U. MHA-DT-02 AND MHA-DT-VN-61 STAY AS SET FROM HERE ON.",
         f"4V. IF ONE LOOSENS, REDO CHECKS 4-7 (A SCREW: STEP {_step_ref('end-play-set', 'G')} FIRST).",
         "4W. VERIFY MHA-DT-VN-52 FULL-FORM THREAD ENGAGEMENT, THE LESSER READING OF STEPS "
-        f"{_step_ref('other-base-mounting', 'J')}-{_step_ref('other-base-mounting', 'K')} "
+        f"{_step_ref('other-base-mounting', 'K')}-{_step_ref('other-base-mounting', 'L')} "
         f"({acceptance_ref('pivot-screw-engagement')}).",
         "4X. CHECK THAT MHA-DT-20 AND THE MHA-DT-VN-52 SHOULDER STAY SEATED.",
         "4Y. VERIFY THE MHA-SH-VN-52 SWING STOP FULL-FORM THREAD ENGAGEMENT, THE LESSER "
-        f"READING OF STEPS {_step_ref('other-base-mounting', 'N')}-"
-        f"{_step_ref('other-base-mounting', 'P')} ({acceptance_ref('stop-screw-engagement')}).",
+        f"READING OF STEPS {_step_ref('other-base-mounting', 'P')}-"
+        f"{_step_ref('other-base-mounting', 'Q')} ({acceptance_ref('stop-screw-engagement')}).",
         "4Z. CHECK THAT ITS HEAD IS FULLY SEATED.",
         # Rubric sample round 2: the notch's reference, the running direction
         # and the sine sense must be readable.  Notches up = cosine mode,
