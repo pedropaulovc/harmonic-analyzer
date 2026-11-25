@@ -934,19 +934,44 @@ class StepColumn:
 
 _RIGHT_FOOT = _TEMPLATE.title_block_top_m + STEPS_FOOT_CLEARANCE
 _BORDER_FOOT = BORDER + STEPS_FOOT_CLEARANCE
-# Sheet 3: right of view D. Sheet 4: the full-height left column, detail A
-# right of it. Sheet 5: right of views E and F. Sheet 6: the full-height left
-# column, then the setting table under view G's label on the right (round 1
-# review: balanced sheets, no lone step in an empty half). Each right column
-# runs down to the title block: with every remedy one action a step (rule
-# 22) the rocker bank needs both of its columns' full height, and the
-# end-hub check and its remedy blocks print together beside detail A.
+# Sheet 3: right of view D, then under view D's caption. Sheet 4: the
+# full-height left column, then under detail A's caption. Sheet 5: right of
+# views E and F. Sheet 6: the full-height left column, then the setting table
+# under view G's label on the right (round 1 review: balanced sheets, no lone
+# step in an empty half). Each right column runs down to the title block.
+# With every remedy one action a step (rule 22), the bonded-pin blocks ending
+# in a replaced part and the strap check back in its own bank, the rocker
+# bank needs the two short columns as well; a check and its remedy block
+# print in one column (ROCKER_BLOCKS), so the end-hub check and both hub
+# blocks print together beside detail A.
 _HOOKUP_LABEL_FOOT = (
     HOOKUP_BOTTOM_Y - 0.004 - len(HOOKUP.label_text.splitlines()) * NOTE_LINE_PITCH
 )
+# View D's caption foot: the farm render (chms-r3, 2026-11-21) prints its two
+# lines under the outline from about y 0.114 to 0.105; the column starts a
+# line and more below it, and _dimensioned_bank refuses a caption that
+# reaches it.
+ROCKER_UNDER_VIEW_TOP = 0.095
+# Detail A's caption (under its circle) ends here; the column starts a line
+# below it.
+_DETAIL_LABEL_FOOT = (
+    SOUTH_END.crop_label_xy[1] - len(SOUTH_END.label_text.splitlines()) * NOTE_LINE_PITCH
+)
 ROCKER_COLUMNS = (
     StepColumn(SHEET_NAMES[2], (STEPS_RIGHT_X, STEPS_TOP_Y), _RIGHT_FOOT),
+    StepColumn(SHEET_NAMES[2], (STEPS_LEFT_X, ROCKER_UNDER_VIEW_TOP), _BORDER_FOOT),
     StepColumn(SHEET_NAMES[3], (STEPS_LEFT_X, STEPS_TOP_Y), _BORDER_FOOT),
+    StepColumn(
+        SHEET_NAMES[3],
+        (STEPS_RIGHT_X, _DETAIL_LABEL_FOOT - NOTE_LINE_PITCH),
+        _RIGHT_FOOT,
+    ),
+)
+# Each check with the remedy block that follows it prints in one column.
+ROCKER_BLOCKS = (
+    ("rod-arms-swing", *steps.ROD_PIN_REMEDY),
+    ("end-hubs-clear", *steps.LEFT_HUB_REMEDY, *steps.RIGHT_HUB_REMEDY),
+    ("straps-shake-in-forks", *steps.STRAP_SHAKE_REMEDY),
 )
 
 
@@ -975,19 +1000,29 @@ def flow_steps(
     keys: tuple[str, ...],
     text: dict[str, str],
     columns: tuple[StepColumn, ...],
+    together: tuple[tuple[str, ...], ...] = (),
 ) -> tuple[tuple[StepColumn, str], ...]:
     """Flow ``keys``' wrapped steps down ``columns`` in order: one blank line
     between consecutive steps (user request), a step never split, each
     column headed by ``heading`` (its continuations ``heading (CONT.)``).
-    Columns left over stay empty."""
+    Each run of keys in ``together`` (consecutive in ``keys``) prints in one
+    column. Columns left over stay empty."""
+    wrapped = {key: _wrapped_step(key, text[key]) for key in keys}
+    run_lines: dict[str, int] = {}
+    for run in together:
+        start = keys.index(run[0])
+        if keys[start : start + len(run)] != run:
+            raise AssertionError(f"{run[0]!r}'s block is not consecutive")
+        run_lines[run[0]] = sum(len(wrapped[key]) for key in run) + len(run) - 1
     blocks: list[tuple[StepColumn, str]] = []
     remaining = iter(columns)
     column = next(remaining)
     lines = [heading]
     for key in keys:
-        step = _wrapped_step(key, text[key])
+        step = wrapped[key]
         gap = [""] if len(lines) > 1 else []
-        if len(lines) + len(gap) + len(step) > column.capacity:
+        need = run_lines.get(key, len(step))
+        if len(lines) + len(gap) + need > column.capacity:
             if len(lines) == 1:
                 raise AssertionError(f"step {key!r} does not fit an empty column")
             blocks.append((column, "\n".join(lines)))
@@ -995,6 +1030,8 @@ def flow_steps(
             if column is None:
                 raise AssertionError(f"{heading} overflows its columns at {key!r}")
             lines, gap = [f"{heading} (CONT.)"], []
+            if len(lines) + need > column.capacity:
+                raise AssertionError(f"step {key!r} does not fit an empty column")
         lines += gap + step
     blocks.append((column, "\n".join(lines)))
     return tuple(blocks)
@@ -1100,18 +1137,26 @@ def _fitup_text() -> dict[str, str]:
         # pin bond note on the detail sheet says how (one end only, the
         # compound kept off the arm), and the bond is checked once cured, one
         # check a step as rod-pins-held and rod-arms-swing are. One action a
-        # step (rule 22): "CURED" ties both checks to the bond, "THAT" the
-        # held check to the pin the bond step names.
+        # step (rule 22); every step after the bond opens "BONDED PIN:", as
+        # the hub blocks open "LEFT HUB:", so none reads as main flow. A bond
+        # that fails is not bonded again: the pin comes out hot (641 is the
+        # removable grade, the pin bond note's step 1) and the rod is replaced,
+        # as main replaced it, the new one going back to the pinning step.
         "rod-pin-bonded": (
             f"IF AN {pin} SLID IN BY HAND, BOND IT PER THE PIN BOND NOTE "
             f"(SHEET {SHEET_NAMES.index(DETAIL_SHEET) + 1})."
         ),
-        "rod-pin-bond-held": f"CURED, CHECK THAT {pin} DOES NOT SLIDE BY HAND.",
+        "rod-pin-bond-held": f"BONDED PIN: CURED, CHECK {pin} DOES NOT SLIDE BY HAND.",
         "rod-pin-bond-swings": (
-            f"CURED, CHECK {arm} SWINGS FREE ON ITS PIN BY ITS OWN WEIGHT."
+            f"BONDED PIN: CHECK {arm} SWINGS FREE ON ITS PIN BY ITS OWN WEIGHT."
         ),
+        "rod-pin-pushed-out": (
+            f"BONDED PIN: IF {pin} SLIDES OR {arm} BINDS, PUSH THAT PIN OUT, "
+            "HEATING THE TINES."
+        ),
+        "rod-replaced": f"BONDED PIN: REPLACE THAT {rod}.",
         "rod-pin-return": (
-            f"RETURN TO STEP {n('rod-pin-bonded')} IF {pin} SLIDES OR {arm} BINDS."
+            f"BONDED PIN: RETURN TO STEP {n(steps.RODS_PINNED_KEY)} WITH THE NEW {rod}."
         ),
         # The fitter leaves this list after the rod pins for the drive train's
         # cylinder stack through its north-bracket set, then comes back here
@@ -1266,6 +1311,9 @@ def _fitup_text() -> dict[str, str]:
             f"HUBS ON THE FEELER LEAF OF {notes.setting_row('rear-keeper-to-stack')}."
         ),
         "keepers-clamped-on-frame": f"CLAMP BOTH {keeper} TO THE RAIL.",
+        # The leaf set the left keeper's station; it comes out before the
+        # keepers are drilled, not when the shaft is drawn.
+        "rear-keeper-leaf-removed": "REMOVE THE FEELER LEAF.",
         "keeper-feet-transferred": (
             f"TRANSFER-DRILL EACH {keeper} FOOT HOLE INTO THE RAIL."
         ),
@@ -1282,8 +1330,12 @@ def _fitup_text() -> dict[str, str]:
         "keeper-bores-checked": (
             f"CHECK {fulcrum_shaft} SLIDES FREELY THROUGH BOTH {keeper} BORES."
         ),
+        # The levers ride the shaft between the screwed keepers, so each
+        # comes off as the shaft leaves its hub (#3571): they go to the bench
+        # for their bars with the shaft out.
         "fulcrum-shaft-withdrawn": (
-            f"DRAW {fulcrum_shaft} OUT OF BOTH {keeper} TO THE LEFT ({lever_view})."
+            f"DRAW {fulcrum_shaft} OUT OF BOTH {keeper} TO THE LEFT ({lever_view}), "
+            f"CATCHING EACH {lever} LEVER AS IT COMES OFF."
         ),
         "bars-straight": (
             f"LAY EACH {bar} BAR ON THE SURFACE PLATE ON EACH SIDE FACE IN TURN: "
@@ -1314,12 +1366,19 @@ def _fitup_text() -> dict[str, str]:
             f"IF AN {bar_pin} SLID IN BY HAND, BOND IT PER THE PIN BOND NOTE "
             f"(SHEET {SHEET_NAMES.index(DETAIL_SHEET) + 1})."
         ),
-        "bar-pin-bond-held": f"CURED, CHECK THAT {bar_pin} DOES NOT SLIDE BY HAND.",
-        "bar-pin-bond-swings": (
-            f"CURED, CHECK {bar} SWINGS FREE ON ITS PIN BY ITS OWN WEIGHT."
+        "bar-pin-bond-held": (
+            f"BONDED PIN: CURED, CHECK {bar_pin} DOES NOT SLIDE BY HAND."
         ),
+        "bar-pin-bond-swings": (
+            f"BONDED PIN: CHECK {bar} SWINGS FREE ON ITS PIN UNDER ITS OWN WEIGHT."
+        ),
+        "bar-pin-pushed-out": (
+            f"BONDED PIN: IF {bar_pin} SLIDES OR {bar} BINDS, PUSH THAT PIN OUT, "
+            "HEATING THE CHEEKS."
+        ),
+        "bar-replaced": f"BONDED PIN: REPLACE THAT {bar} BAR.",
         "bar-pin-return": (
-            f"RETURN TO STEP {n('bar-pin-bonded')} IF {bar_pin} SLIDES OR {bar} BINDS."
+            f"BONDED PIN: RETURN TO STEP {n('bars-straight')} WITH THE NEW {bar} BAR."
         ),
         steps.LEVER_BANK_THREADED_KEY: (
             f"PUSH {fulcrum_shaft} BACK THROUGH THE LEFT {keeper}, THEN THROUGH "
@@ -1368,7 +1427,11 @@ FITUP_TEXT = _fitup_text()
 if tuple(FITUP_TEXT) != steps.SEQUENCE:
     raise AssertionError("the step text must follow ch_channel_assembly_steps.SEQUENCE")
 FITUP_NOTES = flow_steps(
-    "ROCKER BANK FIT-UP", steps.ROCKER_SEQUENCE, FITUP_TEXT, ROCKER_COLUMNS
+    "ROCKER BANK FIT-UP",
+    steps.ROCKER_SEQUENCE,
+    FITUP_TEXT,
+    ROCKER_COLUMNS,
+    ROCKER_BLOCKS,
 ) + flow_steps("LEVER BANK FIT-UP", steps.LEVER_SEQUENCE, FITUP_TEXT, LEVER_COLUMNS)
 FITUP_STEPS = "\n".join(text for _column, text in FITUP_NOTES)
 
@@ -2319,6 +2382,12 @@ def _dimensioned_bank(
     _activate_view(adapter, view, label=bank.title)
     if add_note(adapter, bank.label_text, x0, y0) is None:
         raise RuntimeError(f"failed to label {bank.title}")
+    label_foot = y0 - len(bank.label_text.splitlines()) * NOTE_LINE_PITCH
+    if bank == ROCKER_BANK and label_foot < ROCKER_UNDER_VIEW_TOP + NOTE_LINE_PITCH:
+        raise RuntimeError(
+            f"{bank.title}'s caption ends at y {label_foot:.4f}, into the step "
+            f"column under it (top {ROCKER_UNDER_VIEW_TOP})"
+        )
     for text, text_xy, tip in pointers:
         add_leader_note(
             adapter,

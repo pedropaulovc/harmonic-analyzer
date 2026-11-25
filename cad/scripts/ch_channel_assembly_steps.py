@@ -87,18 +87,25 @@ RIGHT_HUB_REMEDY: tuple[str, ...] = (
 # A pin that slid in by hand is bonded with LOCTITE 641 instead of its rod or
 # bar being replaced (owner ruling 2026-11-24, fit audit question 3), per the
 # sheet's pin bond note; once cured the pin is checked held and its arm or
-# bar free, one check a step as the main flow's two are (rule 22), and a
-# failed bond goes back to the bond.
+# bar free, one check a step as the main flow's two are (rule 22). Every step
+# after the bond carries the block's prefix, so none reads as main flow. A
+# bond that fails its cured check is not bonded again: the pin comes out and
+# its rod or bar is replaced (main's remedy before the bond), and the new part
+# goes back to the step that starts it.
 ROD_PIN_REMEDY: tuple[str, ...] = (
     "rod-pin-bonded",
     "rod-pin-bond-held",
     "rod-pin-bond-swings",
+    "rod-pin-pushed-out",
+    "rod-replaced",
     "rod-pin-return",
 )
 BAR_PIN_REMEDY: tuple[str, ...] = (
     "bar-pin-bonded",
     "bar-pin-bond-held",
     "bar-pin-bond-swings",
+    "bar-pin-pushed-out",
+    "bar-replaced",
     "bar-pin-return",
 )
 # Each arm's strap is accepted where it works, in its rod's fork: once the
@@ -106,8 +113,8 @@ BAR_PIN_REMEDY: tuple[str, ...] = (
 # lever bank's bars sit on the arms, the strap must shake sideways between
 # the tines (owner ruling 2026-11-20, #2343: the fork clearance is the
 # functional check of the strap's position); a strap that binds is set by
-# hand and checked again (rule 22: the remedy is its own steps). The rocker
-# bank's two columns are full, so the check opens the lever bank's.
+# hand and checked again (rule 22: the remedy is its own steps). It closes
+# the rocker bank, in its short column under detail A.
 STRAP_SHAKE_REMEDY: tuple[str, ...] = (
     "strap-set-by-hand",
     "strap-set-return",
@@ -139,16 +146,17 @@ ROCKER_SEQUENCE: tuple[str, ...] = (
     "set-screws-driven",
     "pivot-shaft-held",
     "arms-follow-rods",
-)
-LEVER_SEQUENCE: tuple[str, ...] = (
     "straps-shake-in-forks",
     *STRAP_SHAKE_REMEDY,
+)
+LEVER_SEQUENCE: tuple[str, ...] = (
     "keepers-on-frame",
     "fulcrum-shaft-through-keepers",
     KEEPERS_SET_KEY,
     "keeper-faces-set",
     "rear-keeper-to-stack",
     "keepers-clamped-on-frame",
+    "rear-keeper-leaf-removed",
     "keeper-feet-transferred",
     "keeper-feet-tapped",
     KEEPERS_SCREWED_KEY,

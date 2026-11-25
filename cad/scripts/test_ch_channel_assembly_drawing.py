@@ -206,9 +206,11 @@ def test_the_printed_step_heads_are_the_registry_in_order() -> None:
     assert len(set(steps.SEQUENCE)) == len(steps.SEQUENCE)
     assert tuple(drawing.FITUP_TEXT) == steps.SEQUENCE
     # The lever bank's steps all follow the rocker bank's; the strap check
-    # (#2343) opens them, the rocker bank's columns being full.
-    assert steps.LEVER_SEQUENCE[0] == "straps-shake-in-forks"
-    assert steps.LEVER_SEQUENCE[len(steps.STRAP_SHAKE_REMEDY) + 1] == "keepers-on-frame"
+    # (#2343) closes the rocker bank, and the keepers open the lever bank.
+    assert steps.ROCKER_SEQUENCE[-1 - len(steps.STRAP_SHAKE_REMEDY)] == (
+        "straps-shake-in-forks"
+    )
+    assert steps.LEVER_SEQUENCE[0] == "keepers-on-frame"
     assert steps.SEQUENCE[-1] == "spring-bottom-loops-left"
 
 
@@ -220,10 +222,10 @@ def test_every_step_is_one_action_of_at_most_six_lines() -> None:
     for key in steps.SEQUENCE:
         assert len(drawing._wrapped_step(key, drawing.FITUP_TEXT[key])) <= 6
     returns = {
-        "rod-pin-return": "rod-pin-bonded",
+        "rod-pin-return": steps.RODS_PINNED_KEY,
         "left-hub-return": "bare-shaft-through-ears",
         "right-hub-return": "bare-shaft-through-ears",
-        "bar-pin-return": "bar-pin-bonded",
+        "bar-pin-return": "bars-straight",
         "bar-straightened-return": "bars-straight",
         "strap-set-return": "straps-shake-in-forks",
     }
@@ -232,7 +234,9 @@ def test_every_step_is_one_action_of_at_most_six_lines() -> None:
         body = _step_body(key)
         assert re.search(rf"RETURN TO STEP {steps.step_number(target)}\b", body), key
         # The return is the whole step: nothing but its block prefix before it.
-        assert re.fullmatch(r"((LEFT|RIGHT) HUB: )?RETURN TO STEP .*", body), key
+        assert re.fullmatch(
+            r"((LEFT|RIGHT) HUB: |BONDED PIN: )?RETURN TO STEP .*", body
+        ), key
     for key in steps.SEQUENCE:
         assert ("RETURN TO STEP" in _step_body(key)) == (key in returns), key
     # Each remedy block is consecutive, in order, right after its check.
@@ -256,17 +260,26 @@ def test_every_step_is_one_action_of_at_most_six_lines() -> None:
         )
         for key in block[1:]:
             assert _step_body(key).startswith(f"{side} HUB: "), key
+    # Each bonded-pin block opens with its condition; every later step
+    # carries "BONDED PIN:" (#3601 independent read: on the normal path
+    # nothing was bonded, so an unprefixed check read as main flow).
+    for block in (steps.ROD_PIN_REMEDY, steps.BAR_PIN_REMEDY):
+        assert _step_body(block[0]).startswith("IF AN ITEM ")
+        for key in block[1:]:
+            assert _step_body(key).startswith("BONDED PIN: "), key
     for prefix in ("rod", "bar"):
-        assert _step_body(f"{prefix}-pin-bonded").startswith("IF AN ITEM ")
         assert _step_body(f"{prefix}-pin-bond-held").startswith(
-            "CURED, CHECK THAT ITEM "
+            "BONDED PIN: CURED, CHECK ITEM "
         )
         assert " AND " not in _step_body(f"{prefix}-pin-bond-held")
-        # The swing check applies only after a bond, as the held check does.
-        assert _step_body(f"{prefix}-pin-bond-swings").startswith(
-            "CURED, CHECK ITEM "
-        )
         assert " AND " not in _step_body(f"{prefix}-pin-bond-swings")
+        # A failed bond is not bonded again: the pin comes out and its part is
+        # replaced (main's remedy), the new part back to its starting step.
+        assert _step_body(f"{prefix}-pin-pushed-out").endswith(
+            "PUSH THAT PIN OUT, HEATING THE "
+            + ("TINES." if prefix == "rod" else "CHEEKS.")
+        )
+        assert _step_body(f"{prefix}-replaced").startswith("BONDED PIN: REPLACE THAT ITEM ")
     # #3563: the right-hub remedy says which way the right ear moves: out,
     # to the span's upper limit as view D prints it (nominal plus band), one
     # action a step: the new setting, then the return on its own.
@@ -1053,7 +1066,7 @@ def test_the_fulcrum_keepers_are_set_by_dro_checked_and_screwed() -> None:
     assert not hasattr(steps, "KEEPERS_PAIR_REAMED_KEY")
     for retired in ("keepers-clamped", "keeper-tops-finished", "keeper-taps-made"):
         assert retired not in steps.SEQUENCE
-    assert steps.LEVER_SEQUENCE[len(steps.STRAP_SHAKE_REMEDY) + 1] == "keepers-on-frame"
+    assert steps.LEVER_SEQUENCE[0] == "keepers-on-frame"
     order = [
         "keepers-on-frame",
         "fulcrum-shaft-through-keepers",
@@ -1061,6 +1074,7 @@ def test_the_fulcrum_keepers_are_set_by_dro_checked_and_screwed() -> None:
         "keeper-faces-set",
         "rear-keeper-to-stack",
         "keepers-clamped-on-frame",
+        "rear-keeper-leaf-removed",
         "keeper-feet-transferred",
         steps.KEEPERS_SCREWED_KEY,
         "keepers-held",
@@ -1103,6 +1117,17 @@ def test_the_fulcrum_keepers_are_set_by_dro_checked_and_screwed() -> None:
     pushed = _step_body("rear-keeper-to-stack")
     assert drawing.notes.setting_row("rear-keeper-to-stack") in pushed
     assert ".020" not in pushed
+    # The leaf comes out once the clamp holds the keeper, before the drill
+    # (#3601 independent read: no step removed it).
+    assert steps.step_number("rear-keeper-leaf-removed") == (
+        steps.step_number("keepers-clamped-on-frame") + 1
+    )
+    assert _step_body("rear-keeper-leaf-removed") == "REMOVE THE FEELER LEAF."
+    # The levers come off with the shaft, in its step (#3571 P3), before the
+    # bench work on them.
+    assert _step_body("fulcrum-shaft-withdrawn").endswith(
+        f"CATCHING EACH {lever} LEVER AS IT COMES OFF."
+    )
     # The bank's end play is the leaf less or plus the push's settle; a
     # cocked hub (.012 longer, c10_close_solid.py) never closes it solid,
     # and the slide check's leaf enters at the least play.
@@ -1179,14 +1204,14 @@ def test_each_rod_fork_is_pinned_to_its_arm_at_the_bench_first() -> None:
     for word in ("PEEN", "COUNTERSINK", "DRIVE OUT"):
         assert word not in drawing.FITUP_STEPS
     # Positive control: only the pin steps name the rod pin (the bond's swing
-    # check, like rod-arms-swing, names the arm on "ITS PIN"); only the two
-    # pinning steps press.
+    # check, like rod-arms-swing, names the arm on "ITS PIN"; the replace and
+    # return steps name the rod); only the two pinning steps press.
     pin_steps = {
         steps.RODS_PINNED_KEY,
         "rod-pins-dressed",
         "rod-pins-held",
         *steps.ROD_PIN_REMEDY,
-    } - {"rod-pin-bond-swings"}
+    } - {"rod-pin-bond-swings", "rod-replaced", "rod-pin-return"}
     pressing = {steps.RODS_PINNED_KEY, steps.BARS_PINNED_KEY}
     pin = drawing.item(drawing.explode.ROD_PIN)
     for key in steps.SEQUENCE:
@@ -1194,13 +1219,32 @@ def test_each_rod_fork_is_pinned_to_its_arm_at_the_bench_first() -> None:
         assert (re.search(rf"\b{pin}\b", body) is not None) == (key in pin_steps), key
         assert ("PRESS" in body) == (key in pressing), key
     # Owner ruling 2026-11-24, fit audit question 3: a pin that slid in by
-    # hand is bonded with LOCTITE 641 per the pin bond note, not pressed out
-    # with its host replaced; the bond is checked cured and a failed bond
-    # goes back to the bond, one action a step (rule 22).
+    # hand is bonded with LOCTITE 641 per the pin bond note; the bond is
+    # checked cured, one check a step (rule 22), each step after the bond
+    # under "BONDED PIN:". A bond that fails its check is not bonded again:
+    # the pin comes out hot and its rod or bar is replaced, as main replaced
+    # it, the new part going back to the step that starts it (#3601
+    # independent read: the old return looped on the bond).
     detail_sheet = drawing.SHEET_NAMES.index(drawing.DETAIL_SHEET) + 1
-    for prefix, host_pin, mover in (
-        ("rod", drawing.explode.ROD_PIN, "ch-rocker-arm"),
-        ("bar", drawing.explode.BAR_PIN, drawing.explode.BAR),
+    for prefix, host_pin, mover, host, start, weight, faces in (
+        (
+            "rod",
+            drawing.explode.ROD_PIN,
+            "ch-rocker-arm",
+            drawing.item(drawing.explode.ROD),
+            steps.RODS_PINNED_KEY,
+            "BY",
+            "TINES",
+        ),
+        (
+            "bar",
+            drawing.explode.BAR_PIN,
+            drawing.explode.BAR,
+            f"{drawing.item(drawing.explode.BAR)} BAR",
+            "bars-straight",
+            "UNDER",
+            "CHEEKS",
+        ),
     ):
         assert _step_body(f"{prefix}-pin-bonded") == (
             f"IF AN {drawing.item(host_pin)} SLID IN BY HAND, BOND IT PER THE "
@@ -1208,21 +1252,21 @@ def test_each_rod_fork_is_pinned_to_its_arm_at_the_bench_first() -> None:
         )
         # One check a step (#3563), as the main flow's held and swing checks.
         assert _step_body(f"{prefix}-pin-bond-held") == (
-            f"CURED, CHECK THAT {drawing.item(host_pin)} DOES NOT SLIDE BY HAND."
+            f"BONDED PIN: CURED, CHECK {drawing.item(host_pin)} DOES NOT SLIDE BY HAND."
         )
         assert _step_body(f"{prefix}-pin-bond-swings") == (
-            f"CURED, CHECK {drawing.item(mover)} SWINGS FREE ON ITS PIN BY ITS "
-            "OWN WEIGHT."
+            f"BONDED PIN: CHECK {drawing.item(mover)} SWINGS FREE ON ITS PIN "
+            f"{weight} ITS OWN WEIGHT."
         )
-        assert steps.step_number(f"{prefix}-pin-bond-swings") == (
-            steps.step_number(f"{prefix}-pin-bond-held") + 1
+        assert _step_body(f"{prefix}-pin-pushed-out") == (
+            f"BONDED PIN: IF {drawing.item(host_pin)} SLIDES OR "
+            f"{drawing.item(mover)} BINDS, PUSH THAT PIN OUT, HEATING THE {faces}."
         )
+        assert _step_body(f"{prefix}-replaced") == f"BONDED PIN: REPLACE THAT {host}."
         assert _step_body(f"{prefix}-pin-return") == (
-            f"RETURN TO STEP {steps.step_number(f'{prefix}-pin-bonded')} IF "
-            f"{drawing.item(host_pin)} SLIDES OR {drawing.item(mover)} BINDS."
+            f"BONDED PIN: RETURN TO STEP {steps.step_number(start)} WITH THE NEW {host}."
         )
         assert "REMAKE" not in drawing.FITUP_STEPS
-        assert "REPLACE THAT" not in drawing.FITUP_STEPS
 
 
 def test_the_pin_bond_note_keeps_the_compound_off_the_running_joint() -> None:
