@@ -1,0 +1,15 @@
+# What fails past each numeric check mg_wheel_group asserts
+# (check_register.py, tolerance-policy.md "Checks in spec modules and tests").
+checks:
+  - id: C-01
+    check: "TRIAL_STEP_INSIDE_HUB_MIN"
+    kind: gap
+    reason: "pin step clears the hub; wheel runs on thread"
+    source: "the module computes it: FULL_THREAD_FROM_STEP_MAX less the go leaf's ENDSHAKE_MIN less the thickest front washer, .009 in; owner ruling 2026-11-24, fit audit C11 (the axle set to the trial stack)"
+    basis: worst_case
+  - id: C-02
+    check: "BAR_BOND_GAP"
+    kind: gap
+    reason: "638 does not fill the gap; axle works loose"
+    source: "the module computes it: the 3/16 drill's DRILLED HOLES row over the drill rod's band, -.0002 to .0042 in, against LOCTITE_638_GAP_MAX (Henkel 638 TDS, 0.25 mm diametral); owner ruling 2026-11-24, fit audit question 18"
+    basis: worst_case
