@@ -663,7 +663,7 @@ def test_cone_swing_check_stops_disengaged_at_the_swing_stop() -> None:
     check = " ".join(drawing.CHECKS.split("4. CONE SWING")[1].split("\n5.")[0].split())
     (hold,) = re.findall(r"4D\. [^.]*\.", check)
     (taps,) = re.findall(r"4E\. [^.]*\.", check)
-    (ease,) = re.findall(r"4P\. [^.]*\.", check)
+    (ease,) = re.findall(r"4Q\. [^.]*\.", check)
     assert "BIND" in hold and "HOLD" in hold
     assert " IN " in taps and " OUT " in taps
     assert "AT ITS END" in taps
@@ -673,11 +673,11 @@ def test_cone_swing_check_stops_disengaged_at_the_swing_stop() -> None:
         check.index("EASE EACH MHA-DT-02'S HOLD-DOWN UNTIL IT MOVES"),
         check.index(hold),
         check.index(taps),
-        check.index("CLAMP EACH MHA-DT-02 TO MHA-FR-01 THERE"),
+        check.index("SNUG EACH HOLD-DOWN THERE"),
         check.index("WITH THE CONE SET SWUNG OUT"),
         check.index("SWING IN UNTIL A GEAR JUST BINDS"),
         check.index(ease),
-        check.index("TIGHTEN MHA-DT-VN-51"),
+        check.index("TIGHTEN MHA-DT-VN-51 THERE: THE CONE SET DOES NOT SWING BY HAND."),
     ]
     assert order == sorted(order), check
     assert "RETURN IT TO THE MHA-SH-VN-52" not in check
@@ -711,30 +711,40 @@ def test_the_pedestals_are_set_by_feel_then_spotted_with_one_tripwire() -> None:
     import dt_drive_train_steps as steps
 
     check = " ".join(drawing.CHECKS.split("4. CONE SWING")[1].split("\n5.")[0].split())
-    (clamp,) = re.findall(r"4F\. [^.]*\.", check)
-    (tripwire,) = re.findall(r"4G\. .*?\.015\.", check)
+    (snug,) = re.findall(r"4F\. [^.]*\.", check)
+    (tripwire,) = re.findall(r"4G\. .*?\.015 OR LESS\.", check)
     (remedy,) = re.findall(r"4H\. .*? GOING ON\.", check)
     (spot,) = re.findall(r"4J\. [^.]*\.", check)
     (lift,) = re.findall(r"4K\. [^.]*\.", check)
     (drill,) = re.findall(r"4L\. [^.]*\.", check)
-    (refit,) = re.findall(r"4M\. .*? BY HAND\.", check)
-    assert tripwire == "4G. NEITHER X INDICATOR READS OVER .015."
+    (back,) = re.findall(r"4M\. [^.]*\.", check)
+    (accept,) = re.findall(r"4N\. .*? BY HAND\.", check)
+    # The indicators stand on MHA-FR-01 (4B) and 4G records them at the set.
+    assert "4B. ZERO INDICATORS ON MHA-FR-01: EACH MHA-DT-02 IN X, THE FRONT IN Y." in check
+    assert tripwire == "4G. RECORD EACH INDICATOR'S READING: EACH X MUST BE .015 OR LESS."
     pivot = steps.step_number("other-base-mounting")
     assert f"STEP {pivot}F-{pivot}J PIVOT SEAT" in remedy
     # Codjiflo round 4 on #3550 (r4-8): no drill or tap reaches the seat
     # past the MHA-DT-02 upright, so the seat is spotted through the foot
-    # hole with the clamps on, the bank comes off for the drilling and
-    # tapping and the chips, and the refit on MHA-DT-VN-62 is read again
-    # against 4G's tripwire.
-    assert spot.startswith("4J. CLAMPS ON:") and "TRANSFER-PUNCH" in spot and "FOOT HOLE" in spot
+    # hole with the clamps on, and the bank comes off for the drilling and
+    # tapping and the chips.  Round 6 (r6-10): 4J-4M run on undrilled seats
+    # only, so a redo goes from 4H to 4N.
+    assert spot.startswith("4J. UNDRILLED SEATS (4J-4M):"), spot
+    assert "TRANSFER-PUNCH" in spot and "FOOT HOLE" in spot
     assert "WITH THE CONE SET SWUNG OUT," in lift and "LIFT THE PEDESTAL BANK OFF" in lift
     assert "DRILL AND TAP" in drill and "PER MHA-FR-01" in drill and "BLOWN CLEAN" in drill
-    assert "MHA-DT-VN-62 FOR THE CLAMPS" in refit and "NEITHER 4G X INDICATOR OVER .015" in refit
+    # r6-10: the Ø.180 foot holes let each pedestal float, so the refit goes
+    # on MHA-DT-VN-62 snug and each pedestal is tapped back to its 4G
+    # readings (its X set and the front's Y zero) before the tightening.
+    assert back == "4M. WITH THE BANK ON MHA-DT-VN-62 SNUG, TAP EACH TO ITS 4G READINGS."
+    assert accept.startswith("4N. TIGHTEN MHA-DT-VN-62: NEITHER X INDICATOR OVER .015,"), accept
     # Codjiflo round 4 on #3550 (r4-9, rule 23): the screwed pedestals get
     # their hand check once MHA-DT-VN-62 holds them.
-    assert refit.endswith("NEITHER MHA-DT-02 TURNS OR MOVES BY HAND."), refit
-    assert "Y ZERO" in clamp
-    order = [check.index(text) for text in (clamp, tripwire, remedy, spot, lift, drill, refit)]
+    assert accept.endswith("NEITHER MHA-DT-02 TURNS OR MOVES BY HAND."), accept
+    # One hold-down word for the clamps (first time) and MHA-DT-VN-62 (redo).
+    assert "4C. EASE EACH MHA-DT-02'S HOLD-DOWN" in check
+    assert "Y ZERO" in snug and "HOLD-DOWN" in snug and "CLAMP" not in snug
+    order = [check.index(text) for text in (snug, tripwire, remedy, spot, lift, drill, back, accept)]
     assert order == sorted(order)
     follow = (
         cone_set_stack.PIVOT_TRANSFER_PUNCH_PLAY_MM

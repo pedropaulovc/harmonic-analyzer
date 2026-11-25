@@ -132,7 +132,7 @@ a feel set leaves (`cone_set_stack`, `dt_mesh_checks`,
   it as a plain fact: a gear outside the two 4E binds may shake, and no gear
   may bind. The stack's contact ratio ≥ 1 holds for pairs
   between the holds; an end-side gear past a hold may run below it. No
-  allowance is booked for it. Check 4P stops easing at the first free run, an
+  allowance is booked for it. Check 4Q stops easing at the first free run, an
   observable stop; the ease is neither printed nor measured, and no number is
   booked for it (delegated ruling 2026-11-12, Main, following the owner's
   direction of 2026-11-11 on #2416; owner review

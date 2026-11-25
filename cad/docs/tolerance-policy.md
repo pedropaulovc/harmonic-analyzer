@@ -204,7 +204,7 @@ T012/T018/T024 are thick-only (+0.075/−0) for the standard blank (owner ruling
   the standard (N + 2)/DP blank for it, their tooth thickness +.003/−0 in.
   The least margin is T012's, contact ratio 1.023. Not booked: the runout of
   MHA-DT-04's land 1 to its journal, which its sheet does not print.
-  No number is booked for the ease out of the bind (check 4P;
+  No number is booked for the ease out of the bind (check 4Q;
   delegated ruling 2026-11-12, #2144, see gear-standard.md). Reported only (REF): the
   printed-corner contact ratio there. A gear that binds is cleared by easing
   the swing, not by stoning a tip.
