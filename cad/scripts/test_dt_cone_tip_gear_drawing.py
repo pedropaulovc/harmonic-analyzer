@@ -107,22 +107,19 @@ def test_every_printed_dimension_has_the_parts_places() -> None:
 
 def test_callouts_and_notes_name_every_mate_once() -> None:
     callouts = notes.DIMENSION_CALLOUTS
-    # Two lines of words at most, beside one parenthesized row (rule 7).
-    assert all(
-        len([row for row in text.splitlines() if not row.startswith("(")]) <= 2
-        for text in callouts.values()
-    )
+    # Two lines of words at most (rule 7).
+    assert all(len(text.splitlines()) <= 2 for text in callouts.values())
     spigot = callouts["SpigotDia"]
     for mate in ("MHA-DT-04", "MHA-DT-03-T012", "MHA-DT-03-T018"):
         assert mate in spigot
     # Rule 26's fit name: the bond with its compound, the one MHA-DT-04 prints;
-    # the spigot is turned last to its holes and prints the bond's clearance
-    # (rule 4, form 2; rule 23).
-    assert spigot.startswith(f"BONDED FIT, {cluster.RETAINING_COMPOUND}, TURNED TO")
+    # the spigot is turned last to its holes, so beside its REF size the
+    # bond's clearance is the requirement and prints bare (rule 4, form 2;
+    # rule 23).
+    assert spigot.startswith(f"BONDED FIT, {cluster.RETAINING_COMPOUND}, ")
     low, high = cluster.SPIGOT_BOND_CLEARANCE_MM
-    assert spigot.splitlines()[-1] == (
-        f"(CLEARANCE {spec.inch_text(low, 4)}-{spec.inch_text(high, 4)})"
-    )
+    assert f"CLEARANCE {spec.inch_text(low, 4)}-{spec.inch_text(high, 4)}" in spigot
+    assert "(" not in spigot
     assert notes.MADE_TO_FIT_STEMS == ("SpigotDia", "PivotDia")
     pivot = callouts["PivotDia"]
     assert pivot == f"BONDED AND RUNNING FIT\n{notes.PIVOT_NOTE_FLAG}"
@@ -141,6 +138,7 @@ def test_callouts_and_notes_name_every_mate_once() -> None:
     for clearance in (cluster.BUSHING_BOND_CLEARANCE_MM, cluster.PIVOT_RUNNING_CLEARANCE_MM):
         assert f"{spec.inch_text(clearance[0], 4)}-{spec.inch_text(clearance[1], 4)}" in pivot_note
     assert "MEASURED" not in pivot_note
+    assert "(" not in pivot_note
     assert sheet[3].startswith(f"{notes.TEETH_NOTE_NUMBER}. TEETH MESH WITH MHA-DT-12")
     assert sheet[-1] == "3. CENTRES OK."
     # The width says at the dimension that it is the cone's seat pitch on its

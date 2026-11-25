@@ -178,9 +178,10 @@ SPIGOT_END_X = side_x(SPIGOT_END_Z_MM)
 # The spigot's block and the tip's share a tier (they never overlap in x);
 # the pivot's two callout lines reach over the leaves, so it stands above,
 # under Gear Data.  The spigot's block hangs right of its dimension line and
-# its first line names the compound (44 characters, ~114 mm), so the line
-# stands a quarter of the spigot from the leaves, which keeps the block's
-# end ~8 mm inside the border.
+# its first line names the compound and the bond's clearance (46 characters,
+# ~119 mm; Codjiflo #3549-12 moved the clearance up from a third row), so
+# the line stands a fifth of the spigot from the leaves, which keeps the
+# block's end ~9 mm inside the border.
 BLANK_DIA_TEXT_Y = AXIS_Y + HALF_OD + 0.016
 SPIGOT_DIA_TEXT_Y = BLANK_DIA_TEXT_Y
 PIVOT_DIA_TEXT_Y = AXIS_Y + HALF_OD + 0.040
@@ -190,7 +191,7 @@ SIDE_KEEP = {
     "PivotDia": ((PIVOT_END_X + LEAVES_NORTH_X) / 2.0, PIVOT_DIA_TEXT_Y),
     "BlankDia": ((LEAVES_NORTH_X + LEAVES_SOUTH_X) / 2.0, BLANK_DIA_TEXT_Y),
     "SpigotDia": (
-        LEAVES_SOUTH_X + (SPIGOT_END_X - LEAVES_SOUTH_X) / 4.0,
+        LEAVES_SOUTH_X + (SPIGOT_END_X - LEAVES_SOUTH_X) / 5.0,
         SPIGOT_DIA_TEXT_Y,
     ),
     "PivotLength": ((PIVOT_END_X + LEAVES_NORTH_X) / 2.0, LENGTH_TEXT_Y),

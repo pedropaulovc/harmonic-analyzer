@@ -94,8 +94,8 @@ def sheet_notes() -> str:
             f"{BUSHING_MATE_NUMBER} {BUSHING_MATE_TITLE};",
             f"   ITS END RUNNING FIT IN {END_SCREW_MATE_NUMBER} {END_SCREW_MATE_TITLE}; "
             "TURNED LAST TO",
-            f"   SLIDE IN BOTH (CLEARANCE {PIVOT_BOND_CLEARANCE_TEXT} BONDED, "
-            f"{PIVOT_RUNNING_CLEARANCE_TEXT} RUNNING).",
+            f"   SLIDE IN BOTH: CLEARANCE {PIVOT_BOND_CLEARANCE_TEXT} BONDED, "
+            f"{PIVOT_RUNNING_CLEARANCE_TEXT} RUNNING.",
             f"{TEETH_NOTE_NUMBER}. TEETH MESH WITH {CYLINDER_MATE_NUMBER}: ACCEPT OVER PINS, "
             "THEN BY FEEL AT ASSEMBLY,",
             f"   PER GEAR DATA. {TOOTH_EDGE_NOTE}",
@@ -105,16 +105,16 @@ def sheet_notes() -> str:
 
 
 # Callouts under the value. A callout keeps at most two lines of words
-# (rule 7) and a parenthesized clearance row; a mate serving several
-# dimensions is named once, in a flagged note (rule 4).
+# (rule 7); a mate serving several dimensions is named once, in a flagged
+# note (rule 4).  Beside a REF stem size the clearance is the requirement
+# and prints bare (rule 4, form 2; Codjiflo #3549-12).
 DIMENSION_CALLOUTS = {
     # The spigot is turned last to its three reamed holes: the bonded fit
-    # with its compound (rule 26's fit name, as MHA-DT-04's note prints it),
-    # its three mates and its bond clearance (rule 23).
+    # with its compound (rule 26's fit name, as MHA-DT-04's note prints it)
+    # and its bond clearance (rule 23), then its three mates.
     "SpigotDia": (
-        f"BONDED FIT, {cone_tip_cluster.RETAINING_COMPOUND}, TURNED TO {SHAFT_MATE_NUMBER}\n"
-        f"SOCKET AND {STEM_BORE_MATES[0]}, {STEM_BORE_MATES[1]}\n"
-        f"(CLEARANCE {SPIGOT_CLEARANCE_TEXT})"
+        f"BONDED FIT, {cone_tip_cluster.RETAINING_COMPOUND}, CLEARANCE {SPIGOT_CLEARANCE_TEXT}\n"
+        f"IN {SHAFT_MATE_NUMBER}, {STEM_BORE_MATES[0]}, {STEM_BORE_MATES[1]}"
     ),
     # One reference diameter carries both of note 1's fits.
     "PivotDia": f"BONDED AND RUNNING FIT\n{PIVOT_NOTE_FLAG}",
@@ -135,11 +135,8 @@ CALLOUTS_ABOVE = {
 }
 if any("\n" in text for text in CALLOUTS_ABOVE.values()):
     raise AssertionError("an above-callout with a line break does not print")
-# At most two lines of words per callout, beside a parenthesized row (rule 7).
-if any(
-    len([row for row in text.splitlines() if not row.startswith("(")]) > 2
-    for text in DIMENSION_CALLOUTS.values()
-):
+# At most two lines of words per callout (rule 7).
+if any(len(text.splitlines()) > 2 for text in DIMENSION_CALLOUTS.values()):
     raise AssertionError("a callout carries at most two lines of words")
 
 

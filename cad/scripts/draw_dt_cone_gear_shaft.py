@@ -234,9 +234,9 @@ SIDE_DIAMETERS = {
     # proved it hangs RIGHT of its line (r2 render 20261107T104940656Z: ink
     # from 0.2575).  Dragged onto the journal instead (round 3, 0.2190) the
     # proof's box hung LEFT, 0.1325..0.2041, onto section A's lower letter.
-    # Its widest line, "(CLEARANCE .0010-.0023)", boxes 23 x 2.17 mm in the
+    # Its widest line, "RUNNING FIT TO MHA-DT-05", boxes 24 x 2.17 mm in the
     # proof's estimator (round 3: 33 characters 0.0716 wide), so the block
-    # ends ~0.307, 6.7 mm short of section A-A's box (x 0.3141).  The round 3
+    # ends ~0.310, 4.5 mm short of section A-A's box (x 0.3141).  The round 3
     # box stood 10.1 mm below and 9.1 mm above the text position over four
     # rows; at 0.1785 a fifth row of 5.3 mm, grown either way, stays 7 mm
     # above the journal's upper extension line (0.1561) and 7 mm below the

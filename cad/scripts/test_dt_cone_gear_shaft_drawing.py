@@ -165,7 +165,15 @@ def test_every_tight_band_names_its_mate_and_fit_route():
     spec = dt_cone_gear_shaft_spec
     journal = drawing.DIMENSION_CALLOUTS["Sec0Dia"]
     assert _config.parts("dt-cone-pivot-post")["number"] in journal
-    assert "CLEARANCE" in journal
+    # Beside the REF journal size the clearance is the requirement (rule 4,
+    # form 2): printed bare, never parenthesized as a reference, and no
+    # narrower than .001.
+    journal_low, journal_high = spec.JOURNAL_DIAMETRAL_CLEARANCE_MM
+    assert journal_high - journal_low >= 0.001 * 25.4 - 1e-9
+    assert journal.split("\n")[-1] == (
+        f"CLEARANCE {spec.inch_text(journal_low, 4)}-{spec.inch_text(journal_high, 4)}"
+    )
+    assert not any("(" in row for row in journal.split("\n"))
     # The journal's text hangs right of its line only off the faced end
     # (round 3: dragged onto the journal its box hung left onto section A's
     # letter); its widest row, in the proof's 2.17 mm a character, ends at
@@ -225,11 +233,11 @@ def test_every_tight_band_names_its_mate_and_fit_route():
     ]
     assert drawing.SOCKET_CALLOUTS == {"SocketDia": spec.SOCKET_CALLOUT}
     # Every suffix is one line; every below callout carries at most two lines
-    # of words (rule 7), a parenthesized REF clearance row beside them.
+    # of words (rule 7).
     assert not any("\n" in text for text in drawing.DIMENSION_SUFFIXES.values())
     assert not any("\n" in text for text in spec.KEYSEAT_MATE_SUFFIXES.values())
     for text in spec.SEAT_MATE_CALLOUTS.values():
-        assert len([row for row in text.split("\n") if not row.startswith("(")]) <= 2
+        assert len(text.split("\n")) <= 2
 
 
 def test_display_precision_is_owned_by_the_part() -> None:
