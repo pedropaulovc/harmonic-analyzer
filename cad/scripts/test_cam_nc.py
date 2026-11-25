@@ -687,6 +687,61 @@ def test_jaw_clearance_floor_catches_a_cutter_0_5_mm_over_the_jaw(tmp_path):
         assert _gcode.is_jaw_shape(name), name
 
 
+# Every keep-out shape name the posted recipes declare with "jaw", "clamp" or
+# "strap" in it (census of every cam.py's keep_out checks, 2026-11-25; the
+# arbor recipes' per-part copies once, with their part). The jaws, clamps and
+# straps keep the floor; the supports, the vise body and the stock do not.
+_FLEET_JAWS = (
+    "fixed jaw",
+    "moving jaw",
+    "fixed jaw (the arbor's body above the saw)",
+    "moving jaw (the arbor's cap below the saw, proved in air)",
+    "fixed jaw (the arbor's cap and screw below the saw)",
+    "moving jaw (the cap's screw head)",
+    "left clamp",
+    "middle clamp",
+    "waste clamp",
+    "left step clamps",
+    "right step clamps",
+    "step clamp 1",
+    "step clamp 4",
+    "plate strap left",
+    "plate strap right",
+    "remainder strap left",
+    "remainder strap right",
+)
+_FLEET_NOT_JAWS = (
+    "fixed-jaw parallel",
+    "fixed-jaw parallels",
+    "moving-jaw parallel",
+    "moving-jaw parallels",
+    "fixed-jaw stack",
+    "moving-jaw stack",
+    "moving-jaw stack (the arbor's body above the saw)",
+    "fixed-jaw stack (the arbor's cap and screw below the saw, proved in air)",
+    "stack at the fixed jaw",
+    "stacks at the fixed jaw",
+    "stacks at the moving jaw",
+    "the bars between the jaws",
+    "the bars between the jaws (the cap's screw head)",
+    "the vise past the plate",
+    "the vise past the plate (the arbor's body above the saw)",
+    "vise bed",
+    "plate block left",
+    "remainder block right",
+)
+
+
+@pytest.mark.parametrize("name", _FLEET_JAWS)
+def test_every_fleet_jaw_clamp_and_strap_keeps_the_floor(name):
+    assert _gcode.is_jaw_shape(name)
+
+
+@pytest.mark.parametrize("name", _FLEET_NOT_JAWS)
+def test_fleet_supports_vise_body_and_stock_do_not(name):
+    assert not _gcode.is_jaw_shape(name)
+
+
 def test_verify_applies_the_shop_floor_and_reads_the_known_list(tmp_path):
     assert cam_nc.jaw_clearance_min_mm() == 1.0
     (tmp_path / "A1.nc").write_text("G0 X5 Y-10 Z12\nG0 Z6.5\nG1 Y3 F500\nG0 Z12\n", encoding="utf-8")

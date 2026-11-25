@@ -14,7 +14,7 @@
   <line class="hidden" x1="132.0" y1="226.3" x2="290.4" y2="226.3"/>
   <path class="cutter" d="M290.4 226.3 L265 200.9 L265 120 L271.4 116 L277.7 124 L284.1 116 L290.4 124 L296.8 116 L303.1 124 L309.5 116 L315.8 120 L315.8 200.9 Z"/>
   <line class="dims" x1="300" y1="226.3" x2="300" y2="275.2"/>
-  <text class="label" x="306" y="256">6.113 (.241) over the jaw</text>
+  <text class="label" x="306" y="256">6.113 mm (.241) over the jaw</text>
   <text class="label" x="330" y="60">chamfer mill, at the pass's start</text>
   <line class="leader" x1="326" y1="56" x2="300" y2="150"/>
   <circle class="leader-dot" cx="300" cy="150" r="2.5"/>
@@ -42,5 +42,6 @@
   <text class="label" x="500" y="290">FAR END to the right (X0);</text>
   <text class="label" x="500" y="306">the pass runs across the jaws,</text>
   <text class="label" x="500" y="322">its axis {{process.chamfer_offset_mm:in.3dot}} outside the far end</text>
-  <text class="label" x="16.0" y="406.0">Not upright: there the finished far end left the point only 0.525 mm (.021) over the jaws (#3607).</text>
+  <!-- Upright, the finished far end left the chamfer mill's point 0.525 mm over the jaws: issue #3607. -->
+  <text class="label" x="16.0" y="406.0">Not upright: there the finished far end left the point only 0.525 mm (.021) over the jaws.</text>
 </svg>

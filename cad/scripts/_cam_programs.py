@@ -26,6 +26,7 @@ from pathlib import Path
 from types import ModuleType
 
 import _process_plans
+import _shop_equipment
 from export_features import OUT as CAD_OUT, bundle_paths
 
 PROCESS_ROOT = _process_plans.PROCESS_ROOT
@@ -69,7 +70,9 @@ def cam_inputs(stem: str, out: Path = CAD_OUT) -> dict[str, Path]:
     records its SHA-256 under: the scoped feature bundle (``features``,
     ``step``; a family's, one pair per part, ``features/<part stem>`` and
     ``step/<part stem>``), the ``plan``, each shop file
-    (``shop/<name>.toml``), the ``recipe`` and the FreeCAD ``runtime``."""
+    (``shop/<name>.toml``), each shop-equipment file
+    (``shop-equipment/<name>.toml``: ``cam_nc.verify`` reads the jaw-clearance
+    floor from the inventory), the ``recipe`` and the FreeCAD ``runtime``."""
     family = _process_plans.family_parts(stem, PROCESS_ROOT)
     bundles: dict[str, Path] = {}
     for part in family.values():
@@ -80,6 +83,7 @@ def cam_inputs(stem: str, out: Path = CAD_OUT) -> dict[str, Path]:
         **bundles,
         "plan": _process_plans.plan_path(stem),
         **{f"shop/{path.name}": path for path in _process_plans.shop_files()},
+        **{f"shop-equipment/{path.name}": path for path in _shop_equipment.files()},
         "recipe": recipe_path(stem),
         "runtime": RUNTIME_PATH,
     }

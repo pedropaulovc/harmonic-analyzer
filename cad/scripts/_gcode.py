@@ -1206,11 +1206,22 @@ def _box_distance(box: dict, p: Point) -> float:
     return math.hypot(dx, dy)
 
 
-# A vise jaw or a clamp, by its keep-out shape's name: one word, optionally
-# after one qualifier ("fixed jaw", "moving jaw", "toe clamp"). Supports under
-# or beside them ("fixed-jaw parallel", "fixed-jaw stack", "vise bed") and
-# stock between them ("the bars between the jaws") are not.
-_JAW_SHAPE = re.compile(r"^(?:[\w-]+ )?(?:jaw|jaws|clamp|clamps)$", re.IGNORECASE)
+# A vise jaw, a clamp or a strap clamp, by its keep-out shape's name: the noun
+# (jaw, clamp, strap, singular or plural) after at most two qualifiers, then
+# optionally an index or a side, then optionally a parenthesised tool part
+# ("fixed jaw", "left step clamps", "step clamp 3", "plate strap left",
+# "moving jaw (the arbor's cap below the saw)": a recipe that checks an
+# arbor's parts shifts the jaw's top by the part's reach, so the gap is that
+# part's air over the jaw). Supports under or beside them ("fixed-jaw
+# parallel", "stacks at the moving jaw", "vise bed", the strap's "plate block
+# left"), the vise body ("the vise past the plate") and stock between them
+# ("the bars between the jaws") are not. test_cam_nc lists every fixture name
+# the posted recipes declare with "jaw", "clamp" or "strap" in it.
+_JAW_SHAPE = re.compile(
+    r"^(?:(?!(?:the|at|between|past|on|under|beside)\b)[\w-]+ ){0,2}"
+    r"(?:jaw|jaws|clamp|clamps|strap|straps)(?: (?:\d+|left|right))?(?: \(.*\))?$",
+    re.IGNORECASE,
+)
 
 
 def is_jaw_shape(name: str) -> bool:

@@ -500,6 +500,7 @@ def test_release_stages_every_cam_output_under_nc_and_refuses_missing_or_stale_o
 ) -> None:
     import _cam_programs
     import _process_plans
+    import _shop_equipment
     import export_features
 
     # A synthetic enrolment of a feature-exporting part, every input of its
@@ -536,7 +537,10 @@ def test_release_stages_every_cam_output_under_nc_and_refuses_missing_or_stale_o
     manifest = directory / _cam_programs.MANIFEST_NAME
     inputs = {
         "features": features, "step": step, "plan": process / stem / "plan.toml",
-        "shop/common.toml": process / "shop" / "common.toml", "recipe": recipe, "runtime": runtime,
+        "shop/common.toml": process / "shop" / "common.toml",
+        # The real inventory: cam_nc.verify reads its jaw-clearance floor.
+        **{f"shop-equipment/{path.name}": path for path in _shop_equipment.files()},
+        "recipe": recipe, "runtime": runtime,
     }
 
     def sha(path: Path) -> str:

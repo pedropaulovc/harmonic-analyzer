@@ -12,7 +12,7 @@
   <text class="label" x="164.5" y="303.1">length: Setup 8</text>
   <line class="dims" x1="44.0" y1="70.0" x2="44.0" y2="269.1"/>
   <text class="label" x="46.0" y="62.0">height: Setup 5</text>
-  <text class="label" x="440.0" y="80.0">roof chamfers: Setups 7, 8</text>
+  <text class="label" x="440.0" y="80.0">roof chamfers: Setups 7, 9</text>
   <line class="leader" x1="436.0" y1="76.0" x2="354.7" y2="74.0"/>
   <circle class="leader-dot" cx="354.7" cy="74.0" r="2.5"/>
   <text class="label" x="440.0" y="120.0">rebate and relief: Setup 6</text>
