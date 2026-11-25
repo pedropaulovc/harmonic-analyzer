@@ -22,8 +22,9 @@
   <line class="datum" x1="172" y1="132" x2="172" y2="228"/>
   <text class="datum-label" x="110" y="300">block's locating edge</text>
   <path class="leader" d="M172 220 L190 288"/>
-  <path class="leader" d="M60 214 L40 238"/>
-  <text class="label" x="12" y="252">block's roof side, flush</text>
+  <path class="leader" d="M40 229 L60 212"/>
+  <text class="label" x="12" y="242">block's roof</text>
+  <text class="label" x="12" y="256">side, flush</text>
   <!-- Right: along the jaws, as Setup 3, sectioned through the holes (X +0.160 from the plate's locating edge, .400 from the block's): the cut passes through the block's window, which runs end to end, .336-.470 from the block's locating edge and .330 (66 px) deep, so the #41's point (Z -2.250, 17.7 px under the plate's top: 9.7 px, 1.23 mm, under the block's mating face) lands in the window's air. Jaw tops 6.34 mm (50 px) above the plate's top. -->
   <text class="title" x="330" y="40">along the jaws, through the holes</text>
   <path class="clamp" d="M300 100.1 L352 100.1 L352 300 L345.5 296 L332.5 304 L319.5 296 L306.5 304 L300 300 Z"/>

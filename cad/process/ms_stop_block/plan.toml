@@ -608,7 +608,7 @@ settings = "stop-em-sixteenth-c360"
 milling_cuts = [
   { name = "relief", kind = "plunge", phase = "finish", cutter_dia_mm = "{{process.relief_cutter_dia_mm}}", stations_mm = "{{process.rebate_centre_x_mm}}" },
 ]
-diagram = { file = "diagrams/relief.svg", alt = "The same clamping: the 1/16 in long-reach end mill, to scale, plunged to the relief's bottom beside the roof, under the rebate's floor; its 1/8 shank starts .50 above its tip, clear of the mating face; it steps along the rebate end to end." }
+diagram = { file = "diagrams/relief.svg", alt = "The same clamping: the 1/16 in long-reach end mill, to scale, plunged to the relief's bottom beside the roof, past the rebate's back; its 1/8 shank starts .50 above its tip, clear of the mating face; it steps along the rebate end to end." }
 
 [[setups.operations]]
 instruction = "Look along the rebate: the relief runs end to end beside the roof, its walls lightly ridged. Its depth ({{cad.relief_back_relief_depth_min_in:.3dot}}–{{cad.relief_back_relief_depth_max_in:.3dot}}) is the file's Z and its height the cutter's, held by its pin-gauged test cut above: neither is gauged here."
