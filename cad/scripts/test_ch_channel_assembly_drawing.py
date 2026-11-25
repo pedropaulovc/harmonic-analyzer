@@ -235,7 +235,7 @@ def test_every_step_is_one_action_of_at_most_six_lines() -> None:
         assert re.search(rf"RETURN TO STEP {steps.step_number(target)}\b", body), key
         # The return is the whole step: nothing but its block prefix before it.
         assert re.fullmatch(
-            r"((LEFT|RIGHT) HUB: |BONDED PIN: )?RETURN TO STEP .*", body
+            r"((LEFT|RIGHT) HUB: |BONDED PIN: |PIN PUSHED OUT: )?RETURN TO STEP .*", body
         ), key
     for key in steps.SEQUENCE:
         assert ("RETURN TO STEP" in _step_body(key)) == (key in returns), key
@@ -262,11 +262,17 @@ def test_every_step_is_one_action_of_at_most_six_lines() -> None:
             assert _step_body(key).startswith(f"{side} HUB: "), key
     # Each bonded-pin block opens with its condition; every later step
     # carries "BONDED PIN:" (#3601 independent read: on the normal path
-    # nothing was bonded, so an unprefixed check read as main flow).
+    # nothing was bonded, so an unprefixed check read as main flow), and the
+    # steps after a failed bond's push-out carry "PIN PUSHED OUT:" (#3601
+    # Codjiflo r2: a bonded pin that passed never replaces its part).
     for block in (steps.ROD_PIN_REMEDY, steps.BAR_PIN_REMEDY):
         assert _step_body(block[0]).startswith("IF AN ITEM ")
-        for key in block[1:]:
+        pushed = next(i for i, key in enumerate(block) if key.endswith("-pin-pushed-out"))
+        for key in block[1 : pushed + 1]:
             assert _step_body(key).startswith("BONDED PIN: "), key
+        assert block[pushed + 1 :], block
+        for key in block[pushed + 1 :]:
+            assert _step_body(key).startswith("PIN PUSHED OUT: "), key
     for prefix in ("rod", "bar"):
         assert _step_body(f"{prefix}-pin-bond-held").startswith(
             "BONDED PIN: CURED, CHECK ITEM "
@@ -279,7 +285,9 @@ def test_every_step_is_one_action_of_at_most_six_lines() -> None:
             "PUSH THAT PIN OUT, HEATING THE "
             + ("TINES." if prefix == "rod" else "CHEEKS.")
         )
-        assert _step_body(f"{prefix}-replaced").startswith("BONDED PIN: REPLACE THAT ITEM ")
+        # The replace and return steps carry the push-out's own condition, so a
+        # bonded pin that passed its cured checks never reaches them.
+        assert _step_body(f"{prefix}-replaced").startswith("PIN PUSHED OUT: REPLACE THAT ITEM ")
     # #3563: the right-hub remedy says which way the right ear moves: out,
     # to the span's upper limit as view D prints it (nominal plus band), one
     # action a step: the new setting, then the return on its own.
@@ -1262,9 +1270,9 @@ def test_each_rod_fork_is_pinned_to_its_arm_at_the_bench_first() -> None:
             f"BONDED PIN: IF {drawing.item(host_pin)} SLIDES OR "
             f"{drawing.item(mover)} BINDS, PUSH THAT PIN OUT, HEATING THE {faces}."
         )
-        assert _step_body(f"{prefix}-replaced") == f"BONDED PIN: REPLACE THAT {host}."
+        assert _step_body(f"{prefix}-replaced") == f"PIN PUSHED OUT: REPLACE THAT {host}."
         assert _step_body(f"{prefix}-pin-return") == (
-            f"BONDED PIN: RETURN TO STEP {steps.step_number(start)} WITH THE NEW {host}."
+            f"PIN PUSHED OUT: RETURN TO STEP {steps.step_number(start)} WITH THE NEW {host}."
         )
         assert "REMAKE" not in drawing.FITUP_STEPS
 

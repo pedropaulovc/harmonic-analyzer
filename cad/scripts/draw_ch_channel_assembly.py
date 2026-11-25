@@ -1154,9 +1154,9 @@ def _fitup_text() -> dict[str, str]:
             f"BONDED PIN: IF {pin} SLIDES OR {arm} BINDS, PUSH THAT PIN OUT, "
             "HEATING THE TINES."
         ),
-        "rod-replaced": f"BONDED PIN: REPLACE THAT {rod}.",
+        "rod-replaced": f"PIN PUSHED OUT: REPLACE THAT {rod}.",
         "rod-pin-return": (
-            f"BONDED PIN: RETURN TO STEP {n(steps.RODS_PINNED_KEY)} WITH THE NEW {rod}."
+            f"PIN PUSHED OUT: RETURN TO STEP {n(steps.RODS_PINNED_KEY)} WITH THE NEW {rod}."
         ),
         # The fitter leaves this list after the rod pins for the drive train's
         # cylinder stack through its north-bracket set, then comes back here
@@ -1376,9 +1376,9 @@ def _fitup_text() -> dict[str, str]:
             f"BONDED PIN: IF {bar_pin} SLIDES OR {bar} BINDS, PUSH THAT PIN OUT, "
             "HEATING THE CHEEKS."
         ),
-        "bar-replaced": f"BONDED PIN: REPLACE THAT {bar} BAR.",
+        "bar-replaced": f"PIN PUSHED OUT: REPLACE THAT {bar} BAR.",
         "bar-pin-return": (
-            f"BONDED PIN: RETURN TO STEP {n('bars-straight')} WITH THE NEW {bar} BAR."
+            f"PIN PUSHED OUT: RETURN TO STEP {n('bars-straight')} WITH THE NEW {bar} BAR."
         ),
         steps.LEVER_BANK_THREADED_KEY: (
             f"PUSH {fulcrum_shaft} BACK THROUGH THE LEFT {keeper}, THEN THROUGH "
