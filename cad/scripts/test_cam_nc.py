@@ -771,6 +771,18 @@ def test_the_known_jaw_clearance_list_names_its_issue():
     assert all("#3607" in why for why in cam_nc.KNOWN_JAW_CLEARANCE_VIOLATIONS.values())
 
 
+def test_cnc_toml_alone_of_the_inventory_is_a_cam_input():
+    """The floor's file keys every posted set; the inventory's other files do
+    not, so an unrelated record edit leaves every set fresh."""
+    import _cam_programs
+    import _shop_equipment
+
+    inputs = _cam_programs.cam_inputs("ms_stop_block")
+    assert [k for k in inputs if k.startswith("shop-equipment/")] == ["shop-equipment/cnc.toml"]
+    assert inputs["shop-equipment/cnc.toml"] == _shop_equipment.DIRECTORY / "cnc.toml"
+    assert "jaw-clearance" in _shop_equipment.merge([inputs["shop-equipment/cnc.toml"]])["cnc"]
+
+
 def test_a_reamer_rapided_out_of_its_bore_is_caught(tmp_path):
     fed = _program(tmp_path, "G0 X10 Y5 Z5\nG0 Z1\nG1 Z-7 F80\nG1 Z1 F80\nG0 Z5\n")
     assert _gcode.check_feed_out(fed, 0.0) == []

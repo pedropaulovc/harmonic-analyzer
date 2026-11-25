@@ -500,7 +500,6 @@ def test_release_stages_every_cam_output_under_nc_and_refuses_missing_or_stale_o
 ) -> None:
     import _cam_programs
     import _process_plans
-    import _shop_equipment
     import export_features
 
     # A synthetic enrolment of a feature-exporting part, every input of its
@@ -515,10 +514,14 @@ def test_release_stages_every_cam_output_under_nc_and_refuses_missing_or_stale_o
     (process / "shop" / "common.toml").write_bytes(b"[tools]\n")
     runtime = tmp_path / "_freecad_cam_runtime.py"
     runtime.write_bytes(b"# runtime\n")
+    cnc = tmp_path / "shop-equipment" / "cnc.toml"
+    cnc.parent.mkdir()
+    cnc.write_bytes(b"[cnc.jaw-clearance]\njaw_clearance_min_mm = 1.0\n")
     out = tmp_path / "cad" / "out"
     monkeypatch.setattr(_cam_programs, "CAM_STEMS", (stem,))
     monkeypatch.setattr(_cam_programs, "PROCESS_ROOT", process)
     monkeypatch.setattr(_cam_programs, "RUNTIME_PATH", runtime)
+    monkeypatch.setattr(_cam_programs, "CNC_EQUIPMENT_PATH", cnc)
     monkeypatch.setattr(_process_plans, "PROCESS_ROOT", process)
     monkeypatch.setattr(_process_plans, "SHOP_DIR", process / "shop")
     monkeypatch.setattr(cut_release, "CAD_ROOT", out.parent)
@@ -538,9 +541,7 @@ def test_release_stages_every_cam_output_under_nc_and_refuses_missing_or_stale_o
     inputs = {
         "features": features, "step": step, "plan": process / stem / "plan.toml",
         "shop/common.toml": process / "shop" / "common.toml",
-        # The real inventory: cam_nc.verify reads its jaw-clearance floor.
-        **{f"shop-equipment/{path.name}": path for path in _shop_equipment.files()},
-        "recipe": recipe, "runtime": runtime,
+        "shop-equipment/cnc.toml": cnc, "recipe": recipe, "runtime": runtime,
     }
 
     def sha(path: Path) -> str:
