@@ -640,9 +640,9 @@ def test_the_crossbar_webs_hold_round_the_press_reams_and_knockouts() -> None:
     for label, (wall, expected) in walls.items():
         assert wall == pytest.approx(expected, abs=5e-6), label
         assert wall >= 2.032, label
-    # Owner ruling 2026-11-24 (fit audit part 2, C12, option A per Main): the
-    # washer's criterion is its bearing width round the hole, not an
-    # unbroken ring inside the knockouts.
+    # Owner ruling 2026-11-24 (fit audit part 2, C12): "A. The ring is not
+    # needed: the rule becomes the washer's bearing width (1.47 mm, 1.64
+    # today) and question 19 stands."
     assert not hasattr(build_fr_top_frame, "HANGER_WASHER_KNOCKOUT_RING_MIN")
     lands = {
         "knockout to top-rim break": (build_fr_top_frame.KNOCKOUT_TOP_BREAK_LAND, 1.319521),
