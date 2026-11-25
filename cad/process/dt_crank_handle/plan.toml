@@ -19,21 +19,16 @@ name = "Pin gauges .011-.500"
 ref = "pin-gauges"  # A1-pin-set-061-250, A1-pin-set-061-500-combined
 
 [[tools]]
-# Owner ruling 2026-11-23, tool audit Q14: "DRILL #20 ... turn the MHA-DT-32
-# shoulder last to the bore less .0050-.0075, trial hole in an oak offcut
-# first" (it was a .1610 reamer); owner ruling 2026-11-24, fit audit
-# question 14: no pins, "handle stays DRILL #20; DT-32 shoulder by trial".
-# For the traveler to come: a trial #20 hole through an offcut of the same
-# oak first, then the handle's bore: a plain #20 drilled hole at DRILLED
-# HOLES, .1610-.1650 (delegated ruling 2026-11-25 (Main), precedent: owner
-# ruling 2026-11-24 merging the fit policy; RETIRES the owner's fit-audit Q14
-# answer's trial step; owner review #2144 (D26): the .1635 MAX
-# cap and the shoulder's .1635 trial step are retired). Nothing reads the
-# bore here: MHA-DT-32's traveler turns its shoulder down to the bore by
-# trial.
+# Owner ruling 2026-11-23, tool audit Q14: "DRILL #20" (it was a .1610
+# reamer). The handle's bore is a plain #20 drilled hole at DRILLED HOLES,
+# .1610-.1650 (delegated ruling 2026-11-25 (Main); owner review #2144
+# (D26)). Nothing reads the bore: MHA-DT-32's shoulder is turned to its own
+# .1535-.1585 (owner ruling 2026-11-24, fit audit question 14: "limits
+# .1535-.1585"; delegated ruling 2026-11-25 (Main)), clearing the smallest
+# bore by .0025.
 id = "drill-20"
 name = "#20 drill"
-ref = "drill-20"  # Drills #20: #20 DRILL THRU; MHA-DT-32 is turned to it
+ref = "drill-20"  # Drills #20: #20 DRILL THRU
 
 [[tools]]
 id = "boring-bars-meda-6045000"

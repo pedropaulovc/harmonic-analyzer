@@ -93,19 +93,17 @@ HANDLE_MAX_DIA = 21.082  # .83 at the swell
 # review of 2026-10-18: a tighter contour allowance had no mate to justify it).
 _GENERAL_2PL = printed_band_mm(2, unit=UNIT)
 # Drilled running bore on the MHA-DT-32 shoulder (#290 fit F12).  Owner ruling
-# 2026-11-23, tool audit Q14: "DRILL #20 ... turn the MHA-DT-32 shoulder last
-# to the bore less .0050-.0075, trial hole in an oak offcut first" (it was
-# reamed .1610); owner ruling 2026-11-24, fit audit question 14: the
-# shoulder's own trial steps read the bore, no pins, and "handle stays DRILL
-# #20; DT-32 shoulder by trial, limits .1535-.1585".  A #20 cuts .1610 and up,
-# and the sheet takes it at DRILLED HOLES (+.004/0, .1610-.1650): a plain
-# drilled hole, no cap of its own (delegated ruling 2026-11-25 (Main),
-# precedent: the fit-necessity rule of the owner-approved fit policy
-# (drawing-simplicity-policy.md; owner ruling 2026-11-24): a bore with no
-# failing check takes the plain drill; RETIRES the owner's fit-audit Q14
-# answer's trial step; owner review #2144 (D26)).  The band below is that drilled
-# range, an analysis band for the walls and the shoulder's limits, not a
-# printed one: the sheet prints the drill, and MHA-DT-32 prints the fit.
+# 2026-11-23, tool audit Q14: "DRILL #20" (it was reamed .1610).  A #20 cuts
+# .1610 and up, and the sheet takes it at DRILLED HOLES (+.004/0,
+# .1610-.1650): a plain drilled hole, no cap of its own (delegated ruling
+# 2026-11-25 (Main), precedent: the fit-necessity rule of the owner-approved
+# fit policy (drawing-simplicity-policy.md; owner ruling 2026-11-24): a bore
+# with no failing check takes the plain drill; owner review #2144 (D26)).
+# Nothing is matched to it: the MHA-DT-32 shoulder holds its own .1535-.1585
+# (owner ruling 2026-11-24, fit audit question 14: "limits .1535-.1585";
+# delegated ruling 2026-11-25 (Main)), clearing the smallest bore by .0025.
+# The band below is that drilled range, an analysis band for the walls and
+# the shoulder's clearance, not a printed one: the sheet prints the drill.
 PIVOT_BORE_DIA = 4.0894  # .1610
 PIVOT_BORE_BAND = (drilled_oversize_mm(unit=UNIT), 0.0)  # #20 drilled, .1610-.1650
 

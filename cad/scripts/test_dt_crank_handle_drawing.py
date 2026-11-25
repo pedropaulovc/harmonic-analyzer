@@ -126,14 +126,12 @@ def test_every_profile_size_is_a_model_dimension() -> None:
     assert not hasattr(spec, "DRAWING_NOTES")
     assert spec.REFERENCE_RADII == {"FlareR", "SConcaveR", "SConvexR", "DomeR"}
     assert spec.REFERENCE_RADII <= spec.DRAWING_DIMENSIONS["HandleProfile"]
-    # Owner ruling 2026-11-24, fit audit question 14: the bore stays drilled
-    # #20 and MHA-DT-32 is turned to it; delegated ruling 2026-11-25 (Main),
-    # precedent: owner ruling 2026-11-24 merging the fit policy; RETIRES the
-    # owner's fit-audit Q14 answer's trial step; owner review #2144 (D26):
-    # the .1635 MAX cap is retired: a plain drilled hole, no size in the callout.
-    assert drawing.PIVOT_BORE_CALLOUT.startswith("#20 DRILL THRU\n")
-    assert "MAX" not in drawing.PIVOT_BORE_CALLOUT
-    assert "MHA-DT-32 SHOULDER IS\nTURNED TO THIS BORE" in drawing.PIVOT_BORE_CALLOUT
+    # Owner ruling 2026-11-23, tool audit Q14: the bore is drilled #20, a
+    # plain drilled hole (delegated ruling 2026-11-25 (Main); owner review
+    # #2144 (D26)).  Nothing is matched to it: MHA-DT-32's shoulder holds its
+    # own .1535-.1585 (delegated ruling 2026-11-25 (Main)), so the callout is
+    # the drill alone and the sheets agree (rule 25).
+    assert drawing.PIVOT_BORE_CALLOUT == "#20 DRILL THRU"
     # The fitted sizes and the small corner features print at three places,
     # the routine contour at the title block's two.
     three = {

@@ -14,7 +14,6 @@ from dt_crank_handle_spec import (
     CUP_NUMBER,
     FERRULE_NAME,
     FERRULE_NUMBER,
-    SCREW_NUMBER,
     TENON_GLUE_LINE,
     TENON_STRAIGHT_WALL_MIN,
     TENON_WALL_MIN,
@@ -36,21 +35,16 @@ def _floor_thou(value_mm: float) -> str:
 # Rule 4: each fit by its standard name and its mate by name and full
 # number, the clearance its limits give as a reference.  The tenon and the
 # counterbore are epoxied (dt_crank_handle_ferrule_spec,
-# dt_crank_handle_butt_cup_spec), so bonded.  The bore is drilled #20 and the
-# MHA-DT-32 shoulder, made last, is turned to it: the fit's acceptance prints
-# once, on MHA-DT-32 (owner ruling 2026-11-23, tool audit Q14: "DRILL #20";
-# owner ruling 2026-11-24, fit audit question 14: "handle stays DRILL #20;
-# DT-32 shoulder by trial").  The bore is a plain #20 drilled hole at
-# DRILLED HOLES, .1610-.1650, which the tenon walls are judged at
-# (dt_crank_handle_spec.PIVOT_BORE_FIT_MAX; delegated ruling 2026-11-25
-# (Main), precedent: owner ruling 2026-11-24 merging the fit policy; RETIRES
-# the owner's fit-audit Q14 answer's trial step; owner review #2144 (D26),
-# retired the .1635 MAX cap and the shoulder's .1635 trial step).
+# dt_crank_handle_butt_cup_spec), so bonded.  The bore is a plain #20
+# drilled hole at DRILLED HOLES, .1610-.1650 (owner ruling 2026-11-23, tool
+# audit Q14: "DRILL #20"; delegated ruling 2026-11-25 (Main); owner review
+# #2144 (D26)), which the tenon walls are judged at
+# (dt_crank_handle_spec.PIVOT_BORE_FIT_MAX).  Nothing is matched to it: the
+# MHA-DT-32 shoulder holds its own .1535-.1585 (owner ruling 2026-11-24, fit
+# audit question 14: "limits .1535-.1585"; delegated ruling 2026-11-25
+# (Main)), so the callout is the drill alone (rule 25: the sheets agree).
 PIVOT_BORE_DRILL = "#20"
-PIVOT_BORE_CALLOUT = (
-    f"{PIVOT_BORE_DRILL} DRILL THRU\n"
-    f"{SCREW_NUMBER} SHOULDER IS\nTURNED TO THIS BORE"
-)
+PIVOT_BORE_CALLOUT = f"{PIVOT_BORE_DRILL} DRILL THRU"
 TENON_NOTE_NUMBER = 1
 COUNTERBORE_NOTE_NUMBER = 2
 TENON_CALLOUT = (
