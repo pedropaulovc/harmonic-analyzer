@@ -215,7 +215,7 @@ def test_each_tight_callout_names_its_mate_by_drawing_number() -> None:
     assert drawing.DRAWING_NOTES == spec.BORE_NOTE
     press = spec.PRESS_CALLOUT.splitlines()
     assert len(press) == 2
-    assert press[0] == f"PRESS FIT IN {plate}"
+    assert press[0] == f"PRESS FIT IN ARM PLATE {plate}"
     assert max(map(len, press)) <= 48
     assert press[1] == "TURN TO MEASURED HOLE (INTERFERENCE .0005-.0016)"
     # The ±.001 station and the ±.002 length are stack terms with no mate to

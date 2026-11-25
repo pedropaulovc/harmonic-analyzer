@@ -157,10 +157,12 @@ BORE_CALLOUT = (
 # (.0011 wide) is the requirement (the MHA-CH-12 press land's form,
 # ch_rocker_hub_notes.LAND_CALLOUT).  What the press protects is in the
 # necessity register (N-04).  The press itself, where rule 4 would take a
-# bonded slip fit, is the registry row's RV-04.  Neither line is longer than
-# the 48 characters the block's place was set for.
+# bonded slip fit, is the registry row's RV-04.  The fitted mate is named
+# with its number, as the shaft, ring and cup are (rule 4; machinist review
+# of 2fd8267613).  Neither line is longer than the 48 characters the
+# block's place was set for.
 PRESS_CALLOUT = (
-    f"PRESS FIT IN {PLATE_NUMBER}\n"
+    f"PRESS FIT IN ARM PLATE {PLATE_NUMBER}\n"
     "TURN TO MEASURED HOLE (INTERFERENCE "
     f"{_inch(BUSH.PRESS_INTERFERENCE[0], 4, math.floor)}-"
     f"{_inch(BUSH.PRESS_INTERFERENCE[1], 4, math.ceil)})"
