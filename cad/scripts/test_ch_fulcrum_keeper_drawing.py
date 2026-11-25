@@ -101,10 +101,10 @@ def test_rule_12_worst_case_walls_and_thread() -> None:
     assert spec.BORE_SIDE_WALL_MM >= WALL_TARGET_MM
     assert round(spec.BORE_SIDE_WALL_MM, 3) == 3.238
     assert round(spec.SET_SCREW_WEB_MM, 3) == 2.629
-    assert round(spec.FOOT_TIP_WALL_MM, 3) == 2.362
+    assert round(spec.FOOT_TIP_WALL_MM, 3) == 2.349  # 2.362 at +.004/0 (D25)
     # Owner ruling 2026-10-28: the outer lug face sits .65 - .32 off the
-    # tip, both bands, so the counterbore keeps 1.092 off it.
-    assert round(spec.FOOT_CBORE_LUG_CLEARANCE_MM, 3) == 1.092
+    # tip, both bands, so the counterbore keeps 1.080 off it (D25's Ø.155).
+    assert spec.FOOT_CBORE_LUG_CLEARANCE_MM == pytest.approx(1.0795, abs=1e-4)
     assert round(spec.FOOT_SCREW_ENGAGEMENT_D, 2) == 2.27
     # The native counterbore callout prints .XXX with its own limits; the
     # engagement and bottoming stacks take that printed band (.078-.088).
@@ -123,9 +123,13 @@ def test_rule_12_worst_case_walls_and_thread() -> None:
     assert spec.KEEPER_SCREW_TRANSVERSE_BAND_MM == spec._BAND_BY_PLACES[3]
 
 
-def test_counterbore_prints_the_owner_ruled_limits() -> None:
-    # Owner ruling 2026-11-22 (#3367): the callout prints Ø.150-.154 x
-    # .078-.088, and the RV-04 tip wall stands on that printed band.
+def test_counterbore_prints_the_title_block_limits() -> None:
+    # Owner ruling 2026-11-22 (#3367): the callout prints the counterbore's
+    # limits; D25 (delegated ruling 2026-11-25 (Main), #2144) opened them to
+    # the title block's ±.005, Ø.145-.155 x .078-.088, and the RV-04 tip
+    # wall stands on that printed band.
+    from ch_vn_frame_side_screw_spec import HEAD_DIA
+
     spec = ch_fulcrum_keeper_spec
     dia = [
         spec.CBORE_DIA_MM + spec.CBORE_DIA_BAND[1],
@@ -135,15 +139,25 @@ def test_counterbore_prints_the_owner_ruled_limits() -> None:
         spec.CBORE_DEPTH_MM + spec.CBORE_DEPTH_BAND[1],
         spec.CBORE_DEPTH_MM + spec.CBORE_DEPTH_BAND[0],
     ]
-    assert [round(v / 25.4, 3) for v in dia] == [0.150, 0.154]
+    assert [round(v / 25.4, 3) for v in dia] == [0.145, 0.155]
     assert [round(v / 25.4, 3) for v in depth] == [0.078, 0.088]
     assert spec._CBORE_MAX_RADIUS == pytest.approx(dia[1] / 2.0)
-    assert spec.FOOT_TIP_WALL_WORST_MM / 25.4 == pytest.approx(0.0725, abs=5e-5)
+    # At Ø.155: the tip wall against the .080 target, its full worst case
+    # still floored to the printed .072, and the lug's outer face clear.
+    assert spec.FOOT_TIP_WALL_MM / 25.4 == pytest.approx(0.0925, abs=5e-5)
+    assert spec.FOOT_TIP_WALL_MM >= 0.080 * 25.4
+    assert spec.FOOT_TIP_WALL_WORST_MM / 25.4 == pytest.approx(0.0720, abs=5e-5)
     assert spec.FOOT_TIP_WALL_TEXT == ".072"
+    assert spec.FOOT_CBORE_LUG_CLEARANCE_MM == pytest.approx(1.0795, abs=1e-4)
+    assert spec.FOOT_CBORE_LUG_CLEARANCE_MM > 0.0
+    # At Ø.145: the MHA-CH-VN-52's Ø.140 head still clears.
+    assert HEAD_DIA == pytest.approx(0.140 * 25.4)
+    assert dia[0] - HEAD_DIA == pytest.approx(0.005 * 25.4)
+    assert dia[0] - HEAD_DIA > 0.0
     rows = _config.parts("ch-fulcrum-keeper")["machinist_exceptions"]
     exception = {row["id"]: row for row in rows}["RV-04"]
-    assert ".0725" in exception["finding"]
-    assert "\u00d8.150-.154 x .078-.088" in exception["reason"]
+    assert ".0720" in exception["finding"]
+    assert "\u00d8.145-.155 x .078-.088" in exception["reason"]
 
 
 def test_side_station_names_the_frame_tap_and_the_web_needs_xx() -> None:
@@ -996,7 +1010,7 @@ def test_keeper_feature_bands_are_the_printed_ones() -> None:
     assert tap["station"] == pytest.approx([_in(0.15), _in(0.17)])
     hole = features["foot_hole"]
     assert hole["dia"] == pytest.approx([_in(0.094), _in(0.098)], abs=1e-3)
-    assert hole["cbore_dia"] == pytest.approx([_in(0.150), _in(0.154)])
+    assert hole["cbore_dia"] == pytest.approx([_in(0.145), _in(0.155)])
     assert hole["cbore_depth"] == pytest.approx([_in(0.078), _in(0.088)], abs=1e-3)
     assert hole["station"] == pytest.approx([_in(0.17), _in(0.19)])
     assert hole["lateral"] == pytest.approx([_in(0.270), _in(0.280)])

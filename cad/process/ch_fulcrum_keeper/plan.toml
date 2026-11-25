@@ -205,25 +205,26 @@ plug_tap_lead_mm = 1.764
 tap_reach_min_mm = 5.619
 tap_reach_max_mm = 9.249
 # Counterbore (FK06): the long-reach 1/8 in end mill's centre on a circle
-# cbore_path_radius_mm round the foot hole's axis (Ø.152, the middle of the
-# drawing's .150-.154 band, less the cutter), 17 helical turns of .0049 down
+# cbore_path_radius_mm round the foot hole's axis (Ø.150, the middle of the
+# drawing's .145-.155 band, less the cutter), 17 helical turns of .0049 down
 # to cbore_depth_mm (.083, the band's middle), then one flat turn on the
-# floor. The band is the sheet's printed Ø.150 +.004/.000 x .083 +.005/-.005
-# (owner ruling 2026-11-22, #3367; RV-04 in ch-fulcrum-keeper.yaml): it keeps
+# floor. The band is the sheet's printed Ø.150 ±.005 x .083 ±.005 (owner
+# ruling 2026-11-22, #3367, where the limits print; D25, their width; RV-04
+# in ch-fulcrum-keeper.yaml): it keeps
 # the foot tip's .072 wall and clears the MHA-CH-VN-52's Ø.140 head. Its
 # collet nose stays cbore_collet_clear_mm over the crown's apex with the
 # cutter on the floor: at least cbore_projection_min_mm out of the collet,
 # inside its 1-1/4 in reach (cam.py). Feed: the setting's chip load
 # (endmill-carbide-3fl-1-8-lr-1018-cf, 2800 rpm × 3 × .001 = 8.4 in/min)
 # holds at the cutter's edge, which on the helix runs (path radius + cutter
-# radius)/path radius = 5.63× faster than its centre: the centre's F is
-# 8.4 × .3429/1.9304 = 1.49 in/min (cam.py; sh_column_clamp_back's rule).
-cbore_path_radius_mm = 0.3429
+# radius)/path radius = 6.00× faster than its centre: the centre's F is
+# 8.4 × .3175/1.905 = 1.40 in/min (cam.py; sh_column_clamp_back's rule).
+cbore_path_radius_mm = 0.3175
 cbore_depth_mm = 2.1082
 cbore_pitch_mm = 0.127
 cbore_collet_clear_mm = 2.54
 cbore_projection_min_mm = 28.959
-cbore_feed_per_min_mm = 37.899
+cbore_feed_per_min_mm = 35.56
 # The edge's feed, the setting's 8.4 in/min: the cut's feed (its chip load
 # .001 in/tooth is what deflects the long-reach cutter).
 cbore_edge_feed_per_min_mm = 213.36

@@ -159,7 +159,7 @@ def test_the_recipes_programs_pass_every_check_they_declare(ctx, tmp_path) -> No
         ("cbore_projection_min_mm", 25.0, "cbore_projection_min_mm"),
         ("long_reach_mm", 25.4, "the end mill reaches"),
         ("foot_hole_station_from_i_mm", 12.5, "foot_hole_station_from_i_mm"),
-        # The setting's centre feed on the helix: 5.6x the chip load at the edge.
+        # The setting's centre feed on the helix: 6.0x the chip load at the edge.
         ("cbore_feed_per_min_mm", 213.36, "cbore_feed_per_min_mm"),
         ("cbore_edge_feed_per_min_mm", 37.899, "cbore_edge_feed_per_min_mm"),
     ],
@@ -243,8 +243,8 @@ def _seed(ctx: dict, key: str, pick, change) -> dict:
         # The counterbore's circle .010 too large: off its band's middle.
         (
             "cbore",
-            lambda line: line.startswith("G0 X-11.595"),
-            lambda line: "G0 X-11.341 Y-6.985",
+            lambda line: line.startswith("G0 X-11.620"),
+            lambda line: "G0 X-11.366 Y-6.985",
             "bounds",
         ),
         # The counterbore's last turn .010 deep: under its floor.
@@ -264,7 +264,7 @@ def _seed(ctx: dict, key: str, pick, change) -> dict:
         # The counterbore's cutter dropped onto the lug's side of the foot.
         (
             "cbore",
-            lambda line: line.startswith("G0 X-11.595"),
+            lambda line: line.startswith("G0 X-11.620"),
             lambda line: "G0 X-9.000 Y-6.985",
             "keep_out",
         ),

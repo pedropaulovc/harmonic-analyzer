@@ -160,7 +160,7 @@ TAP_R_SHEET = blind_cut_dia_mm(SET_SCREW_HOLE_SPEC) * SHEET_SCALE[0] / 2000.0
 # the through row reads "Ø .094 DRILL THRU" (FOOT_HOLE_THRU_ROW), then the
 # counterbore, then the two mate rows (FOOT_HOLE_MATE, widest last); four
 # rows. The counterbore row now carries its own limits (owner ruling
-# 2026-11-22, #3367), stacked +.004/.000 and +.005/-.005, so it is the
+# 2026-11-22, #3367), stacked +.005/-.005 twice (D25), so it is the
 # block's widest row (x 104..172 centred at x 138, layout audit of farm run
 # 20261122T220015080Z) and its left end stood right of the shoulder's: the
 # leader rising from x 102 to the hole at x 116 ran 3.4 mm through the
@@ -552,7 +552,7 @@ requirement(
 )
 # The foot hole, drilled through the foot from its top with a flush
 # counterbore for the #2-56 fillister (the native callout: Ø.094 DRILL THRU,
-# Ø.150 +.004/.000 ↧ .083 +.005/-.005, FOR MHA-CH-VN-52; CENTERS MHA-FR-02 TAP:
+# Ø.150 +.005/-.005 ↧ .083 +.005/-.005, FOR MHA-CH-VN-52; CENTERS MHA-FR-02 TAP:
 # the counterbore's own limits, owner ruling 2026-11-22, #3367), its station .18
 # off the foot tip and .275 off the -Z side face (TOP_KEEP "ScrewFromTip",
 # "ScrewFromSide"); note 2 states the tip wall's worst case.
@@ -870,7 +870,7 @@ _TOL_BILATERAL = 2  # swTolType_e.swTolBILAT
 @_telemetry.traced("drawing.fulcrum_keeper.counterbore_band")
 def _print_counterbore_band(display: Any) -> None:
     """Print the counterbore's limits (owner ruling 2026-11-22, #3367:
-    Ø.150-.154 x .078-.088) on its native callout. The bands live on the
+    Ø.145-.155 x .078-.088, D25) on its native callout. The bands live on the
     part's Hole Wizard feature (build_ch_fulcrum_keeper._band_foot_counterbore)
     and ``<hw-cbdia>`` / ``<hw-cbdepth>`` display them; this sets only their
     tolerance places, the nominals' (FOOT_HOLE_CALLOUT_PRECISION), as

@@ -219,7 +219,7 @@ _TOL_BILATERAL = 2  # swTolType_e.swTolBILAT
 
 def _band_foot_counterbore(adapter) -> None:
     """Put the counterbore's printed limits (owner ruling 2026-11-22, #3367:
-    Ø.150-.154 x .078-.088; CBORE_DIA_BAND, CBORE_DEPTH_BAND) on the
+    Ø.145-.155 x .078-.088, D25; CBORE_DIA_BAND, CBORE_DEPTH_BAND) on the
     FootScrewHole Hole Wizard feature's counterbore diameter and depth IN THE
     PART, so the sheet's native callout displays them (the
     build_pd_support_bar._band_round_counterbores pattern); the drawing sets

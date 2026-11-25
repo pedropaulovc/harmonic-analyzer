@@ -189,11 +189,17 @@ HOLE_DIA_MM = blind_cut_dia_mm(SCREW_CLEARANCE_SPEC)
 CBORE_DIA_MM = 3.81  # .150
 CBORE_DEPTH_MM = 2.1082
 # The counterbore prints its own limits on the native callout (owner ruling
-# 2026-11-22, #3367): Ø.150-.154 x .078-.088 deep, so the sheet, the feature
-# record, the RV-04 tip wall below and the traveler read one band. The
-# part's Hole Wizard dimensions carry them (build_ch_fulcrum_keeper
+# 2026-11-22, #3367), so the sheet, the feature record, the RV-04 tip wall
+# below and the traveler read one band: the title block's ±.005, Ø.145-.155
+# x .078-.088 deep. Delegated ruling 2026-11-25 (Main), precedent: owner
+# ruling 2026-11-24 merging the fit policy; CHANGES the band printed under
+# the owner's #3367 ruling of 2026-11-22 (which ruled where the limits
+# print, not their width), #2144 (rulings.md D25): at Ø.155 the tip wall is
+# .0925 (target .080) and its worst case still floors to .072, the lug
+# clearance 1.08 mm; at Ø.145 the Ø.140 head still clears. The part's Hole
+# Wizard dimensions carry the band (build_ch_fulcrum_keeper
 # ._band_foot_counterbore). (upper, lower), millimetres.
-CBORE_DIA_BAND = (0.1016, 0.0)  # Ø.150 +.004/.000
+CBORE_DIA_BAND = (0.127, -0.127)  # Ø.150 ±.005, the title block's .XXX
 CBORE_DEPTH_BAND = (0.127, -0.127)  # .083 +.005/-.005
 SCREW_HOLE_SPEC = HoleSpec(
     "counterbore_fillister",
@@ -326,9 +332,9 @@ if SET_SCREW_WEB_MM < WALL_TARGET_MM:
 # off a side face at .XXX (FootScrewReference / FootScrewSideReference: the
 # side station is the frame tap's transverse place, transferred at fit-up);
 # the lug thickness and the overall length print .XX off the inner lug face,
-# the width .XX, and the counterbore prints its own Ø.150-.154 x .078-.088
+# the width .XX, and the counterbore prints its own Ø.145-.155 x .078-.088
 # (CBORE_DIA_BAND, CBORE_DEPTH_BAND). Located off the tip, the tip wall
-# takes only the station's band: .093 here, .0725 at the full worst case
+# takes only the station's band: .0925 here, .0720 at the full worst case
 # (less two .010 title-block edge breaks, the counterbore rim and the tip's
 # top edge, and 0.3 deg run-off over its .088 deepest), between
 # the .060 floor and the .080 target. Off the inner lug face (.47) the .65's
@@ -345,14 +351,14 @@ if FOOT_TIP_WALL_MM < WALL_TARGET_MM:
         f"keeper counterbore tip wall {FOOT_TIP_WALL_MM:.3f} < {WALL_TARGET_MM}"
     )
 # The full worst case the sheet states as a plain fact (rule 20; review
-# exception RV-04): the wall at the counterbore's printed Ø.154 less two
+# exception RV-04): the wall at the counterbore's printed Ø.155 less two
 # title-block edge breaks and the 0.3 deg drill run-off over its printed
 # .088 deepest, floored to .001 so the MIN never overstates it.
 FOOT_TIP_WALL_WORST_MM = (
     FOOT_TIP_WALL_MM
     - 2.0 * edge_break_radius_mm(unit=UNIT)
     - (CBORE_DEPTH_MM + CBORE_DEPTH_BAND[0]) * tan(radians(0.3))
-)  # 1.842 (.0725)
+)  # 1.830 (.0720)
 FOOT_TIP_WALL_TEXT = (
     f"{floor(FOOT_TIP_WALL_WORST_MM / 25.4 * 1000 + 1e-9) / 1000:.3f}".removeprefix("0")
 )  # .072
@@ -361,7 +367,7 @@ FOOT_CBORE_LUG_CLEARANCE_MM = (
     - (2.0 * LUG_HALF_T + _LUG_T_BAND)
     - (SCREW_FROM_TIP + _BAND_BY_PLACES[2])
     - _CBORE_MAX_RADIUS
-)  # 1.09
+)  # 1.08
 if FOOT_CBORE_LUG_CLEARANCE_MM <= 0.0:
     raise AssertionError("the keeper counterbore runs into the lug's outer face")
 # The foot-to-lug inside corner (drawing-guidelines.md rule 16; machinist
@@ -369,7 +375,7 @@ if FOOT_CBORE_LUG_CLEARANCE_MM <= 0.0:
 # block's INSIDE CORNERS R.040 MAX governs it, so the sheet prints no local
 # limit (ENFORCE review 2026-10-24: a local "R1.0 MAX" restated that row,
 # rule 2). The part models the round at that ceiling. The counterbore's
-# nearest worst-case edge stands FOOT_CBORE_LUG_CLEARANCE_MM (1.09) off the
+# nearest worst-case edge stands FOOT_CBORE_LUG_CLEARANCE_MM (1.08) off the
 # lug's outer face, outside a round at that ceiling, and it never reaches the
 # lug face (the assert above).
 CORNER_R = 1.016  # .040
