@@ -1179,6 +1179,36 @@ def test_settled_callouts_refuse_a_bare_dimension(monkeypatch: pytest.MonkeyPatc
     assert "_assert_settled_callouts(adapter, sheet_callouts)" in source
 
 
+def test_settled_keyway_width_stays_ref(monkeypatch: pytest.MonkeyPatch) -> None:
+    # Codjiflo 3549-r5: a later sheet's whole-model import could clear the
+    # keyway width's REF parentheses; they are written again after the last
+    # import and read back after the settling rebuild.
+    from types import SimpleNamespace
+
+    ddoc = SimpleNamespace(ActivateSheet=lambda _name: True)
+    monkeypatch.setattr(drawing, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(drawing, "dimension_name", lambda _adapter, item: item.name)
+    monkeypatch.setattr(drawing, "set_dimension_callouts", lambda *_a, **_k: None)
+    adapter = SimpleNamespace(currentModel=ddoc)
+    width = _callout_dimension("KeywayWidth", {})
+    sheet = [("T030", [width], {}, {})]
+    with pytest.raises(RuntimeError, match="T030 KeywayWidth: \\('', ''\\)"):
+        drawing._assert_settled_callouts(adapter, sheet)
+    with pytest.raises(RuntimeError, match="T030: 0 KeywayWidth dimensions printed"):
+        drawing._assert_settled_callouts(adapter, [("T030", [], {}, {})])
+    monkeypatch.setattr(
+        drawing,
+        "set_reference_dimension",
+        lambda _adapter, item, *, label: (
+            item.GetSpecificAnnotation().SetText(1, "("),
+            item.GetSpecificAnnotation().SetText(2, ")"),
+        ),
+    )
+    drawing._rewrite_callouts(adapter, sheet)
+    drawing._assert_settled_callouts(adapter, sheet)
+    drawing._assert_settled_callouts(adapter, [("T024", [], {}, {})])
+
+
 # The T012 thickness callout, each PDF text run's ink relative to its shelf's
 # start (sheet metres): run 20261024T091056564Z's print, its name row moved
 # over the value and its flag, recentred, under it. The root envelope's flag

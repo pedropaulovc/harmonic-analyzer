@@ -925,15 +925,26 @@ def _rewrite_callouts(adapter: Any, sheets: list[SheetCallouts]) -> None:
     on T030..T120 and the web's on every sheet, so the keyed sheets reset the
     callouts T012..T024 had written (farm proof 6fda5a4: the reamed bore's Ø
     printed bare, the T012 web without its words).
+
+    The keyway width's REF parentheses are a shared model dimension's prefix
+    and suffix too, so they are written again here (Codjiflo 3549-r5: the
+    later sheets' imports could clear them) and read back after the settling
+    rebuild (``_assert_settled_callouts``).
     """
-    for _sheet, printed, below, above in sheets:
+    for sheet, printed, below, above in sheets:
         set_dimension_callouts(adapter, printed, below)
         set_dimension_callouts(adapter, printed, above, location="above")
+        for annotation in printed:
+            if dimension_name(adapter, annotation) == "KeywayWidth":
+                set_reference_dimension(
+                    adapter, annotation, label=f"{sheet} keyway width reference"
+                )
 
 
 def _assert_settled_callouts(adapter: Any, sheets: list[SheetCallouts]) -> None:
     """After finalize's settling rebuild, every sheet's printed dimensions
-    still carry their callouts (``_rewrite_callouts``)."""
+    still carry their callouts (``_rewrite_callouts``), and a keyed sheet's
+    keyway width still prints as REF, in parentheses."""
     ddoc = _early_bound(adapter.currentModel, "IDrawingDoc")
     faults = []
     for sheet, printed, below, above in sheets:
@@ -944,10 +955,24 @@ def _assert_settled_callouts(adapter: Any, sheets: list[SheetCallouts]) -> None:
             for part, texts in ((_CALLOUT_BELOW, below), (_CALLOUT_ABOVE, above))
             for name, text in texts.items()
         }
+        keyway_widths = 0
         for annotation in printed:
             annotation = _early_bound(annotation, "IAnnotation")
             name = dimension_name(adapter, annotation)
             display = None
+            if name == "KeywayWidth":
+                keyway_widths += 1
+                display = _early_bound(
+                    annotation.GetSpecificAnnotation(), "IDisplayDimension"
+                )
+                parens = (
+                    str(display.GetText(1) or ""),
+                    str(display.GetText(2) or ""),
+                )
+                if parens != ("(", ")"):
+                    faults.append(
+                        f"{sheet} KeywayWidth: {parens!r}, expected REF ('(', ')')"
+                    )
             for part in (_CALLOUT_BELOW, _CALLOUT_ABOVE):
                 text = expected.pop((name, part), None)
                 if text is None:
@@ -960,6 +985,8 @@ def _assert_settled_callouts(adapter: Any, sheets: list[SheetCallouts]) -> None:
                 if read != text:
                     faults.append(f"{sheet} {name}: {read!r}, expected {text!r}")
         faults.extend(f"{sheet} {name}: not on the sheet" for name, _part in expected)
+        if keyway_widths != (1 if keyed(int(sheet[1:])) else 0):
+            faults.append(f"{sheet}: {keyway_widths} KeywayWidth dimensions printed")
     if faults:
         raise RuntimeError(
             "dimension callouts after the settling rebuild:\n" + "\n".join(faults)
