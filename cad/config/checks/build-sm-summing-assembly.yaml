@@ -1,0 +1,16 @@
+# What fails past each numeric check build_sm_summing_assembly asserts on the
+# knife gauge bar (check_register.py, tolerance-policy.md "Checks in spec
+# modules and tests").
+checks:
+  - id: C-01
+    check: "KNIFE_BAR_PLAY_PROVEN_IN"
+    kind: trace
+    reason: "more bar play than the knife stacks were proven at"
+    source: "#2499: every knife stack in this module was proven at .0041 gauge-bar play in the largest bore; the bar's DIA .496 MIN (owner ruling 2026-11-24, fit audit S6: \"TURN THE BAR UNTIL IT SLIDES THROUGH BOTH MOUNTS; DIA .496 MIN\") keeps KNIFE_BAR_CLEARANCE within it"
+    basis: worst_case
+  - id: C-02
+    check: "KNIFE_BAR_CORNER_SHORTFALL_IN"
+    kind: gap
+    reason: "the floor refuses a bar the smallest bores pass"
+    source: "the module computes it: DIA .496 MIN less the largest straight bar the smallest conforming bore pair passes (.4985 - .00255 = .49595), +.00005; it must stay under the shop's .001 reading unit (tolerance-policy.md) so the slide trial, not the floor, governs (owner ruling 2026-11-24, fit audit S6)"
+    basis: worst_case
