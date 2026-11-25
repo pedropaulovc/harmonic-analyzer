@@ -20,7 +20,7 @@ checks:
     check: "the index pin's engagement in the plate is not held"
     kind: joint
     reason: "the pin rides out of its hole; the division slips"
-    source: "owner facts 2026-11-24: \"pin goes 0.1555 into blind holes\", \"plate thickness 0.2770\"; the .1 in floor (about .85 pin diameter) is the author's round figure: a guess"
+    source: "owner facts 2026-11-24: \"pin goes 0.1555 into blind holes\", \"plate thickness 0.2770\"; made plate .25 ±.01; the .1 in floor (about .85 pin diameter) is the author's round figure: a guess"
     basis: worst_case
   - id: C-04
     check: "a hole circle stands outside the index arm's reach"
@@ -44,25 +44,25 @@ checks:
     check: "the plate under the screw head is not the stock plate's"
     kind: thread
     reason: "the head's own screws engage the head less deep"
-    source: "owner facts 2026-11-24: \"plate thickness 0.2770\", \"depth 0.1830\", \"i will use the same screws with all plates\"; the .0015 in agreement is the author's"
+    source: "owner facts 2026-11-24: \"plate thickness 0.2770\", \"depth 0.1830\", \"i will use the same screws with all plates\"; made seat .10 against the stock .094: agreement within the title block's two-place band"
     basis: measured
   - id: C-08
     check: "a plate screw's head can stand proud of the plate face"
     kind: gap
     reason: "the sector arms foul a screw head"
-    source: "owner facts 2026-11-24: \"screw head 0.1380 high\", \"below plate\"; counterbore depth .145 at the title block's three-place band"
+    source: "owner facts 2026-11-24: \"screw head 0.1380 high\", \"below plate\"; counterbore depth .15 at the .XX grade rule 3 gives a counterbore callout (shallowest .14)"
     basis: worst_case
   - id: C-09
     check: "counterbore does not clear the plate screw's Ø.3235 head"
     kind: gap
     reason: "a screw head will not enter its counterbore"
-    source: "owner fact 2026-11-24: \"head dia 0.3235\"; the .015 in diametral margin is the author's round figure: a guess (the stock plate's own is .022)"
+    source: "owner fact 2026-11-24: \"head dia 0.3235\"; the .015 in diametral margin is the author's round figure: a guess (the stock plate's own is .022); counterbore .35 at the .XX grade leaves .0165"
     basis: worst_case
   - id: C-10
     check: "counterbore floor under rule 17's .080 target"
     kind: wall
     reason: "the seat under a screw head tears out"
-    source: "drawing-guidelines.md rule 17 (_inch_wall_limits.WALL_TARGET_MM); met with no margin at thickness .23 and depth .150"
+    source: "drawing-guidelines.md rule 17 (_inch_wall_limits.WALL_TARGET_MM); met with no margin at thickness .24 and depth .16 (owner ruling 2026-11-25, option B)"
     basis: worst_case
   - id: C-11
     check: "counterbore wall is not the shortfall RV-04 accepts"
@@ -86,7 +86,7 @@ checks:
     check: "counterbore wall is thinner than the stock plate's"
     kind: wall
     reason: "a counterbore breaks into the bore"
-    source: "owner fact 2026-11-24 (stock plate): \"screw hole edge to bore edge 0.0415\"; the made plate's nominal wall is no thinner"
+    source: "owner fact 2026-11-24 (stock plate): \"screw hole edge to bore edge 0.0415\"; the made plate's nominal wall is the same .0415"
     basis: measured
   - id: C-15
     check: "mounting hole is not the stock plate's 15/64 drill"
@@ -100,3 +100,9 @@ checks:
     reason: "a screw head will not enter its counterbore"
     source: "owner fact 2026-11-24 (stock plate): \"countersunk 0.3455 dia\", corrected \"not countersunk counterbored;\""
     basis: measured
+  - id: C-17
+    check: "the bar as supplied can leave the printed thickness band"
+    kind: gap
+    reason: "a thin bar lets the counterbore floor fall short"
+    source: "Online Metals aluminium tolerance table (https://www.onlinemetals.com/en/aluminum-tolerances), rectangle bar, extruded, .250 to .499 thick: ±.008; part 1148 (stock 6061-flat-1-4x5); the plan mikes the bar first"
+    basis: worst_case

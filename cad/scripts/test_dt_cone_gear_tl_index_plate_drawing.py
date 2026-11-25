@@ -144,7 +144,7 @@ def test_callouts_name_counts_and_the_counterbore() -> None:
     assert spec.CALLOUTS_ABOVE["MountHoleDia"] == "3X"
     assert spec.CALLOUTS_BELOW["MountHoleDia"].split("\n") == [
         "DRILL THRU",
-        "<HOLE-SPOT><MOD-DIAM>.346 <HOLE-DEPTH> .145",
+        "<HOLE-SPOT><MOD-DIAM>.35 <HOLE-DEPTH> .15",
         "BS-0 HEAD SCREWS",
         "WALL .03 MIN",
     ]
@@ -165,23 +165,40 @@ def test_the_measured_stock_plate_sets_the_envelope_and_the_screw_seat() -> None
     assert spec.MOUNT_COUNT == 3
     assert 0.234 * INCH <= spec.MOUNT_HOLE_DIA <= 15.0 / 64.0 * INCH
     assert spec.MOUNT_HOLE_DIA > spec.MOUNT_SCREW_BODY_DIA
-    assert abs(spec.CBORE_DIA - 0.3455 * INCH) <= 0.0005 * INCH + 1e-9
+    assert abs(spec.CBORE_DIA - 0.3455 * INCH) <= 0.005 * INCH + 1e-9
+    # Rule 3: a counterbore in a hole callout is toleranced at .XX (±.01)
+    # whatever places it prints; every guard on it takes that band.
+    band = spec.CBORE_CALLOUT_BAND
+    assert math.isclose(band, 0.01 * INCH)
     # Owner fact 2026-11-24: "head dia 0.3235; below plate; why do you care
     # about thread i will use the same screws with all plates".
-    assert spec.CBORE_DIA - 0.005 * INCH > spec.MOUNT_SCREW_HEAD_DIA
-    assert math.isclose(spec.HEAD_RISE, 0.038 * INCH)
+    assert math.isclose(
+        spec.CBORE_DIA - band - spec.MOUNT_SCREW_HEAD_DIA, 0.0165 * INCH
+    )
+    assert math.isclose(spec.HEAD_RISE, 0.033 * INCH)
     # Owner fact 2026-11-24: "screw head 0.1380 high": below the face even in
-    # the shallowest counterbore the .XXX band allows.
+    # the shallowest counterbore the print allows (.14).
+    assert math.isclose(
+        spec.CBORE_DEPTH - band - spec.MOUNT_SCREW_HEAD_HEIGHT, 0.002 * INCH
+    )
     assert math.isclose(spec.HEAD_BELOW_FACE_MIN, 0.002 * INCH, abs_tol=1e-9)
-    # The plate is thinner than stock; the seat under the screw head is not.
-    assert spec.THICKNESS < spec.STOCK_PLATE_THICKNESS
-    assert math.isclose(spec.CBORE_SEAT, 0.095 * INCH)
-    assert abs(spec.CBORE_SEAT - (0.2770 - 0.1830) * INCH) <= 0.0015 * INCH
+    # Owner ruling 2026-11-25 (option B): "B: plate .25 as supplied,
+    # counterbore .35 × .15 (recommended; one micrometer reading from you)".
+    assert math.isclose(spec.THICKNESS, 0.25 * INCH)
+    assert math.isclose(spec.CBORE_DIA, 0.35 * INCH)
+    assert math.isclose(spec.CBORE_DEPTH, 0.15 * INCH)
+    # The bar as supplied (±.008) stays inside the printed .25 ±.01.
+    assert spec.SUPPLIED_THICKNESS_BAND <= 0.01 * INCH
+    # The deepest counterbore in the thinnest plate leaves rule 17's .080.
+    assert math.isclose(
+        (spec.THICKNESS - 0.01 * INCH) - (spec.CBORE_DEPTH + band), 0.080 * INCH
+    )
     assert spec.CBORE_SEAT_MIN >= 0.080 * INCH - 1e-9
-    # Owner fact 2026-11-24: "pin goes 0.1555 into blind holes": .037 less in
+    assert math.isclose(spec.CBORE_SEAT, 0.10 * INCH)
+    # Owner fact 2026-11-24: "pin goes 0.1555 into blind holes": .027 less in
     # this thinner plate, and never through it.
-    assert math.isclose(spec.PIN_ENGAGEMENT, 0.1185 * INCH)
-    assert math.isclose(spec.PIN_ENGAGEMENT_MIN, 0.1085 * INCH)
+    assert math.isclose(spec.PIN_ENGAGEMENT, 0.1285 * INCH)
+    assert math.isclose(spec.PIN_ENGAGEMENT_MIN, 0.1185 * INCH)
     assert spec.PIN_ENGAGEMENT < spec.THICKNESS - 0.01 * INCH
 
 
@@ -199,8 +216,8 @@ def test_the_bolt_circle_is_inferred_from_the_owners_two_readings() -> None:
     # Owner ruling 2026-11-24 (RV-04): "Accept the .04 wall as an exception,
     # same as the maker's plate."
     assert spec.CBORE_WALL not in spec.WEBS_MM
-    assert spec.CBORE_WALL_NOMINAL >= 0.0415 * INCH
-    assert math.isclose(spec.CBORE_WALL_MIN_MM, 0.036 * INCH)
+    assert spec.CBORE_WALL_NOMINAL >= 0.0415 * INCH - 1e-9
+    assert math.isclose(spec.CBORE_WALL_MIN_MM, 0.0315 * INCH)
     assert spec.CBORE_WALL_CALLOUT == "WALL .03 MIN"
 
 

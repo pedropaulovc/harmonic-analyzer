@@ -31,11 +31,13 @@ wherever the pin stands, and the sector arms turn about the hub. The maker's
 manual (owner photographs 2026-11-24) gives the 1:40 worm and the stock
 circles and no plate dimension.
 
-Thickness: the stock plate is .2770; this one is cut from the owned 1/4 in
-plate, skimmed to .24, so it sits .037 lower under the pin. The pin enters a
-stock plate's blind hole .1555 (owner fact 2026-11-24, verbatim: "pin goes
-0.1555 into blind holes"), so it enters this plate .1185, about one pin
-diameter, and stops inside the through hole.
+Thickness: the stock plate is .2770; this one is the owned 1/4 x 5 in 6061
+extruded bar at the thickness it was supplied, .25 (owner ruling 2026-11-25,
+verbatim: "B: plate .25 as supplied, counterbore .35 × .15 (recommended; one
+micrometer reading from you)"), so it sits .027 lower under the pin. The pin
+enters a stock plate's blind hole .1555 (owner fact 2026-11-24, verbatim:
+"pin goes 0.1555 into blind holes"), so it enters this plate .1285, a little
+over one pin diameter, and stops inside the through hole.
 
 Frame (the SolidWorks model): the plate's axis is model Z through the
 origin. The back face (Z0) seats on the head; the front face (Z = THICKNESS)
@@ -95,6 +97,9 @@ UNIT = drawing_unit(
 assert UNIT == "in"
 INCH = 25.4
 TRACKING_ISSUE = "https://github.com/pedropaulovc/harmonic-analyzer/issues/2157"
+# The title block's general bands, each way, by the places a size prints.
+_XX = printed_band_mm(2, unit=UNIT)
+_XXX = printed_band_mm(3, unit=UNIT)
 
 # --- Plate envelope ------------------------------------------------------------
 # Owner fact 2026-11-24 (stock plate): "dia 3.94".
@@ -102,23 +107,33 @@ PLATE_DIA = 3.94 * INCH
 # Owner fact 2026-11-24 (stock plate): "hole 0.8270". The bore pilots on the
 # head's plate hub and is bored to it, the hub being the gauge: no band.
 BORE_DIA = 0.827 * INCH
-# Owner fact 2026-11-24 (stock plate): "plate thickness 0.2770". The owned
-# 1/4 in plate cannot make that: both faces skimmed, .24.
+# Owner fact 2026-11-24 (stock plate): "plate thickness 0.2770". The made
+# plate is the owned 1/4 x 5 in 6061-T6511 extruded bar (Online Metals part
+# 1148, shop stock 6061-flat-1-4x5) at its supplied thickness, faces as
+# supplied (owner ruling 2026-11-25, option B). Online Metals' aluminium
+# tolerance table (https://www.onlinemetals.com/en/aluminum-tolerances,
+# rectangle bar, extruded, .250 to .499 thick) gives ±.008: .242 to .258,
+# inside the sheet's .25 ±.01. The earlier .22 and .24 were sizes only (a
+# forum figure, then a skim to clean the faces); no function asked for a
+# skim, and the plan mikes the bar before anything is cut.
 STOCK_PLATE_THICKNESS = 0.277 * INCH
-THICKNESS = 0.24 * INCH
+THICKNESS = 0.25 * INCH
+SUPPLIED_THICKNESS_BAND = 0.008 * INCH
+if SUPPLIED_THICKNESS_BAND > _XX:
+    raise AssertionError("the bar as supplied can leave the printed thickness band")
 # Owner fact 2026-11-24 (stock plate): "pin hpoles 0.120 dia blind 0.1635
 # deep": the maker runs the same pin in the same .120 hole, and the pin
 # enters a plate no deeper than the blind depth.
 STOCK_PIN_HOLE_DIA = 0.120 * INCH
 STOCK_PIN_HOLE_DEPTH = 0.1635 * INCH
 # Owner fact 2026-11-24: "pin goes 0.1555 into blind holes". The pin's reach
-# is its own, so in this thinner, lower plate it enters that much less: .1185
-# nominal, and at the thin end of the thickness band still nine tenths of a
-# pin diameter, stopping inside the through hole.
+# is its own, so in this thinner, lower plate it enters that much less: .1285
+# nominal, and at the thin end of the thickness band still a pin diameter,
+# stopping inside the through hole.
 STOCK_PIN_ENTRY = 0.1555 * INCH
 PIN_ENGAGEMENT = STOCK_PIN_ENTRY - (STOCK_PLATE_THICKNESS - THICKNESS)
-PIN_ENGAGEMENT_MIN = PIN_ENGAGEMENT - 0.01 * INCH  # thickness at -.01
-if not 0.1 * INCH <= PIN_ENGAGEMENT_MIN < PIN_ENGAGEMENT < THICKNESS - 0.01 * INCH:
+PIN_ENGAGEMENT_MIN = PIN_ENGAGEMENT - _XX  # thickness at its thin end
+if not 0.1 * INCH <= PIN_ENGAGEMENT_MIN < PIN_ENGAGEMENT < THICKNESS - _XX:
     raise AssertionError("the index pin's engagement in the plate is not held")
 
 # --- Worm and the gears this plate indexes ------------------------------------
@@ -141,6 +156,9 @@ INDEX_PIN_DIA = 0.117 * INCH
 INDEX_HOLE_DRILL = "#31"
 INDEX_HOLE_DIA = 0.120 * INCH
 # The title block's DRILLED HOLES row: the model dimension carries no band.
+# This is how the ruling's "(+.004/0)" is read: the drilled-hole band on the
+# .120 hole, so .003 to .007 over the .117 pin, not a cap of pin + .004 (an
+# owned drill cannot hold that; the maker's own holes measure .120).
 INDEX_HOLE_DEVIATIONS = (
     -drilled_undersize_mm(unit=UNIT),
     drilled_oversize_mm(unit=UNIT),
@@ -201,33 +219,34 @@ MOUNT_PCD = 1.260 * INCH
 STOCK_CBORE_TO_BORE_WALL = 0.0415 * INCH
 MOUNT_SCREW_BODY_DIA = 0.192 * INCH
 MOUNT_SCREW_HEAD_DIA = 0.3235 * INCH
-# 15/64 = .2344: printed on the three-place grid, drilled 15/64.
-MOUNT_HOLE_DRILL = "15/64"
+# 15/64 = .2344: a plain size under DRILLED HOLES on the three-place grid.
 MOUNT_HOLE_DIA = 0.234 * INCH
 STOCK_CBORE_DIA = 0.3455 * INCH
 STOCK_CBORE_DEPTH = 0.183 * INCH
-CBORE_DIA = 0.346 * INCH  # stock .3455 on the .XXX grid
-CBORE_PLACES = 3
-# This plate is thinner than stock: the counterbore is shallower by the same
-# amount, so the plate under the head, and with it the same screws' reach
-# into the head, stays the stock plate's. .145 rather than .146 keeps that
-# seat at rule 17's .080 target with the thickness and depth bands both
-# against it. On the stock plate the heads sit below the face ("below
-# plate"); here each stands HEAD_RISE higher against the face than it does
-# on stock. The head is .138 high (owner fact 2026-11-24, verbatim: "screw
-# head 0.1380 high"), so in the shallowest counterbore the three-place band
-# allows (.140) it is still below the face, by .002: the sector arms pass
-# over it as they do on the stock plate.
-CBORE_DEPTH = 0.145 * INCH
-CBORE_DEPTH_PLACES = 3
-CBORE_SEAT = THICKNESS - CBORE_DEPTH  # .095; stock .2770 - .1830 = .094
+# Rule 3 (drawing-guidelines): a counterbore's diameter and depth in a hole
+# callout are clearance pockets toleranced by the .XX grade whatever places
+# the callout prints. Every guard on the counterbore below takes this band.
+CBORE_CALLOUT_BAND = _XX
+CBORE_DIA = 0.35 * INCH  # stock .3455 on the .XX grid
+CBORE_PLACES = 2
+# Owner ruling 2026-11-25 (option B): plate .25, counterbore .35 x .15. With
+# ±.01 on the depth the shallowest counterbore (.14) still sinks the .138
+# head (owner fact 2026-11-24, verbatim: "screw head 0.1380 high"; on the
+# stock plate it sits "below plate"), so the sector arms pass over it; with
+# ±.01 on the thickness too, the deepest (.16) in the thinnest plate (.24)
+# leaves rule 17's .080 under the head. The seat is .10 against the stock
+# plate's .094, so the head's own screws engage the head .006 less of about
+# .43: nothing.
+CBORE_DEPTH = 0.15 * INCH
+CBORE_DEPTH_PLACES = 2
+CBORE_SEAT = THICKNESS - CBORE_DEPTH  # .10; stock .2770 - .1830 = .094
 HEAD_RISE = STOCK_CBORE_DEPTH - CBORE_DEPTH
 MOUNT_SCREW_HEAD_HEIGHT = 0.138 * INCH
-HEAD_BELOW_FACE_MIN = (CBORE_DEPTH - 0.005 * INCH) - MOUNT_SCREW_HEAD_HEIGHT
+HEAD_BELOW_FACE_MIN = (CBORE_DEPTH - CBORE_CALLOUT_BAND) - MOUNT_SCREW_HEAD_HEIGHT
 if HEAD_BELOW_FACE_MIN < 0.0:
     raise AssertionError("a plate screw's head can stand proud of the plate face")
-# Smallest three-place counterbore (-.005) over the head: .017 on diameter.
-if (CBORE_DIA - 0.005 * INCH) - MOUNT_SCREW_HEAD_DIA < 0.015 * INCH:
+# Smallest counterbore over the head: .0165 on diameter.
+if (CBORE_DIA - CBORE_CALLOUT_BAND) - MOUNT_SCREW_HEAD_DIA < 0.015 * INCH:
     raise AssertionError("counterbore does not clear the plate screw's Ø.3235 head")
 # Seed hole at 150 degrees; the pattern adds 270 (on the vertical centreline)
 # and 30. Its row plane is the Top plane offset by the seed's +Y.
@@ -240,25 +259,23 @@ MOUNT_SEED = (
 )
 
 # --- Printed precision --------------------------------------------------------
-# Places: OD, thickness and the counterbore at .XX; the bore (banded, the
-# hub pilot), the bolt circles (index arm reach, head taps) and the drill
-# sizes at .XXX (rule 3: drill diameters print three places).
-_XX = printed_band_mm(2, unit=UNIT)
-_XXX = printed_band_mm(3, unit=UNIT)
+# Places: OD and thickness at .XX; the bore (made to the hub), the bolt
+# circles (index arm reach, head taps) and the drill sizes at .XXX (rule 3:
+# drill diameters print three places). The counterbore prints .XX.
 
 if not MOUNT_SCREW_BODY_DIA < MOUNT_HOLE_DIA <= 15.0 / 64.0 * INCH:
     raise AssertionError("mounting hole is not the stock plate's 15/64 drill")
-if abs(CBORE_DIA - STOCK_CBORE_DIA) > 0.0005 * INCH + 1e-9:
+if abs(CBORE_DIA - STOCK_CBORE_DIA) > _XX / 2.0 + 1e-9:
     raise AssertionError("counterbore is not the stock plate's Ø.3455")
 for _radius in (
     (1.4445 * INCH - STOCK_CBORE_DIA) / math.sqrt(3.0),
     0.827 * INCH / 2.0 + STOCK_CBORE_TO_BORE_WALL + STOCK_CBORE_DIA / 2.0,
 ):
-    if abs(_radius - MOUNT_PCD / 2.0) > 0.005 * INCH:
+    if abs(_radius - MOUNT_PCD / 2.0) > _XXX:
         raise AssertionError("bolt circle disagrees with the owner's two readings")
-if abs(CBORE_SEAT - (STOCK_PLATE_THICKNESS - STOCK_CBORE_DEPTH)) > 0.0015 * INCH:
+if abs(CBORE_SEAT - (STOCK_PLATE_THICKNESS - STOCK_CBORE_DEPTH)) > _XX:
     raise AssertionError("the plate under the screw head is not the stock plate's")
-CBORE_SEAT_MIN = (THICKNESS - _XX) - (CBORE_DEPTH + _XXX)
+CBORE_SEAT_MIN = (THICKNESS - _XX) - (CBORE_DEPTH + CBORE_CALLOUT_BAND)
 if CBORE_SEAT_MIN < WALL_TARGET_MM - 1e-9:
     raise AssertionError("counterbore floor under rule 17's .080 target")
 
@@ -281,7 +298,7 @@ def _pitch(circle: int) -> float:
 
 
 _INDEX_R_MAX = (INDEX_HOLE_DIA + INDEX_HOLE_DEVIATIONS[1]) / 2.0
-_CBORE_R_MAX = (CBORE_DIA + _XXX) / 2.0
+_CBORE_R_MAX = (CBORE_DIA + CBORE_CALLOUT_BAND) / 2.0
 WEBS_MM: dict[str, float] = {
     **{
         f"{n}-hole circle, between holes": _pitch(n)
@@ -322,7 +339,7 @@ SHORT_WEBS = frozenset(
 CBORE_WALL = "counterbores to bore"
 CBORE_WALL_NOMINAL = (MOUNT_PCD - CBORE_DIA - BORE_DIA) / 2.0
 # Nominal no thinner than the maker's measured wall.
-if CBORE_WALL_NOMINAL < STOCK_CBORE_TO_BORE_WALL:
+if CBORE_WALL_NOMINAL < STOCK_CBORE_TO_BORE_WALL - 1e-9:
     raise AssertionError("counterbore wall is thinner than the stock plate's")
 CBORE_WALL_MIN_MM = WEBS_MM.pop(CBORE_WALL)
 CBORE_WALL_PRINTED = math.floor(CBORE_WALL_MIN_MM / INCH * 100.0) / 100.0

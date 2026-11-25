@@ -11,4 +11,4 @@ necessity:
     feature: "sheet 1, face view, 132X position frame Ø.014 to A on the BASIC Ø3.614, Ø3.217 and Ø2.700 hole circles"
     kind: mesh
     reason: "hole spacing becomes the cone gears' tooth spacing"
-    source: "dt_cone_gear_tl_index_plate_spec.INDEX_POSITION, INDEX_ERROR_GEAR_DEG; owner ruling 2026-11-02 (RV-02); the zone is the shop's drilled-hole location from a datum bore, ±.005"
+    source: "dt_cone_gear_tl_index_plate_spec.INDEX_ERROR_TOOTH_FRACTION_MAX"

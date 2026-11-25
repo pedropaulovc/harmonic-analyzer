@@ -1,8 +1,8 @@
 r"""Manufacturing drawing of the cone gears' dividing-head index plate (MHA-DT-03-TL-01).
 
 The sheet prints decimal inch (the part's ``drawing_unit: in``). The face
-view (*Front, the countersunk face toward the index arm) at 3:2 carries the
-plate diameter, the banded bore, the three index circles' bolt-circle
+view (*Front, the counterbored face toward the index arm) at 3:2 carries the
+plate diameter, the bore made to the head's hub, the three index circles' bolt-circle
 diameters with their counts, the index-hole size once for all 132 holes, and
 the mounting holes' size, counterbore and bolt circle. Every size is a model
 dimension imported from the part; the counts, EQ SP, the counterbore and the

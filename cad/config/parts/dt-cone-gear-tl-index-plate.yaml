@@ -7,13 +7,13 @@ dt-cone-gear-tl-index-plate:
   # dt_cone_gear_tl_index_plate_spec.py); the hole circles stand within the
   # stock plates' circle band, which the index arm reaches (#2157).
   number: MHA-DT-03-TL-01
-  material: 6061-T651 ALUMINUM
-  material_specification: 6061-T651 aluminum, owned 1/4 in plate
+  material: 6061-T6511 ALUMINUM
+  material_specification: 6061-T6511 aluminum, owned 1/4 x 5 in extruded bar
   finish: as machined
   quantity: 1
   tolerance_class: machined_block
   drawing_unit: in
-  process: "skim both faces of owned 1/4 in 6061-T651 plate to .24; turn the Ø3.94 OD and bore Ø.827 to the BS-0 plate hub; spot and drill (#31) the 57-, 51- and 24-hole circles, drill (15/64) and counterbore the three mounting holes on the mill; break edges"
+  process: "mike the owned 1/4 x 5 in 6061 bar: .240 to .260, else stop and tell the owner; use it at that thickness, faces as supplied; turn the Ø3.94 OD and bore Ø.827 to the BS-0 plate hub; spot and drill (#31) the 57-, 51- and 24-hole circles, drill (15/64) and counterbore the three mounting holes on the mill; break edges"
   machinist_exceptions:
     - id: "RV-01"
       kind: "minor"
@@ -34,4 +34,4 @@ dt-cone-gear-tl-index-plate:
       kind: "minor"
       where: "face view, the 3X mounting-hole callout: WALL .03 MIN"
       finding: "wall between each screw counterbore and the bore below the .060 floor (rules 17, 20)"
-      reason: "owner ruling 2026-11-24 (Pedro): \"Accept the .04 wall as an exception, same as the maker's plate.\" The head's screw pattern fixes it: the owner measured .0415 on the stock BS-0 plate (\"screw hole edge to bore edge 0.0415\"); the made plate has .0435 nominal and .036 at the worst case of the bore, counterbore and bolt-circle sizes"
+      reason: "owner ruling 2026-11-24 (Pedro): \"Accept the .04 wall as an exception, same as the maker's plate.\" The head's screw pattern fixes it: the owner measured .0415 on the stock BS-0 plate (\"screw hole edge to bore edge 0.0415\"); the made plate has .0415 nominal and .0315 at the worst case of the bore, counterbore and bolt-circle sizes"
