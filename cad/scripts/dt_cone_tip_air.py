@@ -274,7 +274,8 @@ AXIAL_TERMS_MM = {
     "post screw clearance": _POST_FLOAT - POST_SCREW_CLEARANCE_TAKEN_UP_MM,
     "post counterbore pattern": _MOUNT_X_BAND * _SIN_I,
     # The collar face's station, at the title block since owner ruling
-    # 2026-11-24, audit part 2 C9 (booked in full for every tier: D18).
+    # 2026-11-24, audit part 2 C9 (booked in full for every tier: D18,
+    # delegated ruling 2026-11-24 (Main), no precedent; owner review #2144).
     "post cone boss north face": post.CONE_BOSS_NORTH_STATION_TOLERANCE_MM,
     "shaft thrust collar width": shaft.printed_band("CollarWidth"),
     "gear stack T006 north face": -stack.face_band(stack.COUNT - 1, "north")[1],
