@@ -158,7 +158,9 @@ def test_chain_on_the_floated_crank_wheel_keeps_its_radial_air() -> None:
     # The bore is no stop: its tightest clearance on the pilot is wider.
     assert (seat_geometry.BORE_DIA - hub.SHAFT_DIA) / 2.0 > wheel
     # The stub turned to the drilled bore's smallest reading less the widest
-    # clearance, in a bore up to .379 across (D27).
+    # clearance, in a bore up to .379 across (D27, delegated ruling 2026-11-25
+    # (Main), precedent: the fit-necessity rule of the owner-approved fit
+    # policy (owner ruling 2026-11-24); owner review #2144).
     hub_float = (
         hub.HUB_BORE_DIA_MAX
         - (hub.HUB_BORE_DIA + hub.HUB_BORE_BAND[1] - hub.SHAFT_CLEARANCE_MAX)

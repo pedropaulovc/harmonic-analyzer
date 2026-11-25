@@ -100,9 +100,10 @@ _GENERAL_2PL = printed_band_mm(2, unit=UNIT)
 # #20; DT-32 shoulder by trial, limits .1535-.1585".  A #20 cuts .1610 and up,
 # and the sheet takes it at DRILLED HOLES (+.004/0, .1610-.1650): a plain
 # drilled hole, no cap of its own (delegated ruling 2026-11-25 (Main),
-# precedent: owner ruling 2026-11-24 merging the fit policy; RETIRES the
-# owner's fit-audit Q14 answer's trial step (the shoulder's .1635 trial must
-# not enter); owner review #2144 (D26)).  The band below is that drilled
+# precedent: the fit-necessity rule of the owner-approved fit policy
+# (drawing-simplicity-policy.md; owner ruling 2026-11-24): a bore with no
+# failing check takes the plain drill; RETIRES the owner's fit-audit Q14
+# answer's trial step; owner review #2144 (D26)).  The band below is that drilled
 # range, an analysis band for the walls and the shoulder's limits, not a
 # printed one: the sheet prints the drill, and MHA-DT-32 prints the fit.
 PIVOT_BORE_DIA = 4.0894  # .1610
@@ -527,11 +528,11 @@ DRAWING_PRECISION_BY_NAME: dict[str, int] = {
 }
 if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
     raise AssertionError("every marked MHA-DT-08 dimension needs authored places")
-# Fitted to the ferrule and the cup (user ruling 2026-09-29), and the reamed
-# bore under its running clearance: references.
-REFERENCE_DIMENSIONS = frozenset(
-    {"PivotBoreDia", "TenonDia", "CounterboreDia", "CounterboreDepth"}
-)
+# Fitted to the ferrule and the cup (user ruling 2026-09-29): references.
+# The pivot bore is not one: it is the #20 drill's Ø.161 under DRILLED HOLES
+# (D26, codjiflo 3548-r3-2), the hole made first, so it prints bare and the
+# title block's drilled row controls it.
+REFERENCE_DIMENSIONS = frozenset({"TenonDia", "CounterboreDia", "CounterboreDepth"})
 # Driven by the tangencies: references.
 REFERENCE_RADII = frozenset({"FlareR", "SConcaveR", "SConvexR", "DomeR"})
 # The tangent point the inflection station ends on, where the S-curve's

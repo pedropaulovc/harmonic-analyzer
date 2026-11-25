@@ -231,7 +231,9 @@ def test_integral_dome_is_the_only_outboard_shaft_projection() -> None:
     # A cap within the Ø.375: nothing outboard of the shank's own diameter.
     assert 0.0 < spec.SHAFT_DOME_HEIGHT <= spec.SHAFT_DIA / 2.0
     # The REF stub may sit line-on-line with MHA-DT-31's 3/8 drill nominal
-    # (D27); it is turned to the measured bore less the fit's clearance.
+    # (D27, delegated ruling 2026-11-25 (Main), precedent: the fit-necessity
+    # rule of the owner-approved fit policy (owner ruling 2026-11-24); owner
+    # review #2144); it is turned to the measured bore less the fit's clearance.
     assert geometry.SHAFT_DIA + geometry.SHAFT_DIA_BAND[0] <= (
         geometry.HUB_BORE_DIA + geometry.HUB_BORE_BAND[1]
     )

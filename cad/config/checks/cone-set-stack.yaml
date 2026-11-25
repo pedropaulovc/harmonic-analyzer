@@ -23,5 +23,5 @@ checks:
     check: "NOMINAL_CONTACT_RATIO_MIN"
     kind: mesh
     reason: "a cone gear lets go of its drum, which hesitates"
-    source: "delegated ruling 2026-11-12 (Main) after owner direction 2026-11-11, #2416; root sum square after the set: owner ruling 2026-11-24, audit part 2 P1"
+    source: "delegated ruling 2026-11-12 (Main), precedent: owner direction 2026-11-11, #2416; owner review #2144; root sum square after the set: owner ruling 2026-11-24, audit part 2 P1"
     basis: after_setting

@@ -181,7 +181,9 @@ feed = "tailstock quill by hand, a steady positive feed, cutting oil; back fully
 # LittleMachineShop "Cutting Speeds" (read live 2026-11-22, lathe.toml
 # header), Drilling & Reaming, Plain carbon steels 1006-1026: drilling 60-100,
 # reaming 40-65 ft/min; each takes the low end (the 3/8 drill 611 rpm).  The
-# bore is the 3/8 drill's at DRILLED HOLES (delegated ruling 2026-11-25, D27),
+# bore is the 3/8 drill's at DRILLED HOLES (D27, delegated ruling 2026-11-25
+# (Main), precedent: the fit-necessity rule of the owner-approved fit policy
+# (owner ruling 2026-11-24); owner review #2144),
 # so the hub takes no 23/64 pilot and no reamer.
 [settings.lathe-drill-3-8-1018]
 tool = "drill-3-8"
