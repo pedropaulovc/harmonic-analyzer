@@ -1241,8 +1241,9 @@ shop-made index plate MHA-DT-03-TL-01 (`dt-cone-gear-tl-index-plate`) carries 24
 57-hole circles for them (10, 20 and 20 hole spaces a tooth). Its 132 pin holes are drilled #31
 (.120), just over the head's measured index pin (owner fact 2026-11-24: "0.117 in dia dividing head
 pin"; owner ruling 2026-11-23, tool audit Q15: drilled, no reamer). The pin's .003-.007 play in a
-hole, the Ø.014 position zone a drilled pattern holds and the bore's .0055 on the head's Ø.8245
-hub together misplace a tooth by at most .0141° at the gear, 0.37 % of a 96-tooth pitch. The owner
+hole, the Ø.014 position zone a drilled pattern holds and the bore's clearance on the head's Ø.8245
+hub (bored to the hub, .0075 at the loosest the title block passes) together misplace a tooth by at
+most .0151° at the gear, 0.40 % of a 96-tooth pitch. The owner
 measured the stock plate and the head on 2026-11-24: OD 3.94, bore .8270, .120 pin holes,
 counterbored 15/64 screw holes on a 32 mm circle; the plate reuses the head's own screws. The
 three hole circles stand within the stock plate's own circle band (R1.028 to R1.807), which the

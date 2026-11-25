@@ -56,8 +56,10 @@ over the pin (+.004/0) with an owned drill, no reamer (revises the 2026-11-08
 reamed-fit ruling)."). The pin is the gauge: it enters every hole. The play
 of the pin in its hole and the position zone are an indexing error at the
 crank, divided by the 40:1 worm at the gear (``INDEX_ERROR_*`` below). The
-bore pilots the plate on the head's Ø.8245 hub: never under the stock plate's
-measured .8270 bore, +.003/0, so .0025 to .0055 on the hub.
+bore pilots the plate on the head's Ø.8245 hub. It is bored to that hub,
+which is on the shop's bench and is the gauge (drawing-guidelines rule 4,
+form 3: the mate is bought, so the bore prints no band): the hub enters with
+no shake. Its nominal is the stock plate's measured .8270 bore.
 
 Rule 17 shortfall (stated on the sheet; owner ruling 2026-11-02, RV-01 in the
 part's machinist_exceptions): #31 holes on the 57- and 51-hole circles leave
@@ -98,9 +100,8 @@ TRACKING_ISSUE = "https://github.com/pedropaulovc/harmonic-analyzer/issues/2157"
 # Owner fact 2026-11-24 (stock plate): "dia 3.94".
 PLATE_DIA = 3.94 * INCH
 # Owner fact 2026-11-24 (stock plate): "hole 0.8270". The bore pilots on the
-# head's plate hub (unmeasured, #2157): never under the stock plate's bore.
+# head's plate hub and is bored to it, the hub being the gauge: no band.
 BORE_DIA = 0.827 * INCH
-BORE_DEVIATIONS = (0.0, 0.003 * INCH)
 # Owner fact 2026-11-24 (stock plate): "plate thickness 0.2770". The owned
 # 1/4 in plate cannot make that: both faces skimmed, .24.
 STOCK_PLATE_THICKNESS = 0.277 * INCH
@@ -304,7 +305,7 @@ WEBS_MM: dict[str, float] = {
     - _CBORE_R_MAX,
     "counterbores to bore": (MOUNT_PCD - _XXX) / 2.0
     - _CBORE_R_MAX
-    - (BORE_DIA + BORE_DEVIATIONS[1]) / 2.0,
+    - (BORE_DIA + _XXX) / 2.0,
 }
 # The two fine circles stand between rule 17's .060 floor and its .080 target
 # (owner ruling RV-01). The wall from each counterbore to the bore is the
@@ -352,12 +353,12 @@ if WEB_MIN_MM < RULED_WEB_MIN_MM:
 # the gear and as a fraction of that gear's tooth pitch.
 # The plate also stands off centre on the hub by up to half the bore's
 # clearance on it (owner fact 2026-11-24: "hub plate sits on 0.8245"), which
-# moves every hole by that much along its circle at two places a turn.
+# moves every hole by that much along its circle at two places a turn. The
+# bore is accepted on the hub itself (enters, no shake); the sum below takes
+# the loosest bore the title block's three-place band would pass, .0075 on
+# the hub, which shakes and would be bored again.
 HUB_DIA = 0.8245 * INCH
-HUB_CLEARANCE = (
-    BORE_DIA + BORE_DEVIATIONS[0] - HUB_DIA,
-    BORE_DIA + BORE_DEVIATIONS[1] - HUB_DIA,
-)
+HUB_CLEARANCE = (BORE_DIA - HUB_DIA, BORE_DIA + _XXX - HUB_DIA)
 if HUB_CLEARANCE[0] <= 0.0:
     raise AssertionError("index plate bore does not pass the head's plate hub")
 INDEX_ERROR_TANGENTIAL_MM = (
@@ -373,8 +374,8 @@ INDEX_ERROR_TOOTH_FRACTION: dict[int, float] = {
 }
 # Either way of true position, each tooth space stands within half of one
 # percent of its pitch (.0003 in at the 96-tooth pitch line), so neither a
-# reamed sliding fit nor a tighter bore band buys anything a cone gear
-# needs: the bore's share is a fifth of the sum.
+# reamed sliding fit nor a band on the bore buys anything a cone gear
+# needs: the bore's share is a quarter of the sum.
 INDEX_ERROR_TOOTH_FRACTION_MAX = 0.005
 if max(INDEX_ERROR_TOOTH_FRACTION.values()) > INDEX_ERROR_TOOTH_FRACTION_MAX:
     raise AssertionError("drilled index holes misplace a tooth by over 0.5 % of pitch")
@@ -488,7 +489,7 @@ CALLOUTS_BELOW: dict[str, str] = {
     PRINTED_HOLE: (
         f"{INDEX_HOLE_DRILL} DRILL THRU\n{HEAD} INDEX PIN ENTERS\n{WEB_CALLOUT}"
     ),
-    "BoreDia": f"BORE THRU\nLOCATING FIT ON\n{HEAD} PLATE HUB",
+    "BoreDia": f"BORE THRU\n{HEAD} PLATE HUB\nENTERS, NO SHAKE",
     "MountHoleDia": (
         f"DRILL THRU\n{CBORE_CALLOUT}\n{HEAD} SCREWS\n{CBORE_WALL_CALLOUT}"
     ),

@@ -34,4 +34,4 @@ dt-cone-gear-tl-index-plate:
       kind: "minor"
       where: "face view, the 3X mounting-hole callout: WALL .03 MIN"
       finding: "wall between each screw counterbore and the bore below the .060 floor (rules 17, 20)"
-      reason: "owner ruling 2026-11-24 (Pedro): \"Accept the .04 wall as an exception, same as the maker's plate.\" The head's screw pattern fixes it: the owner measured .0415 on the stock BS-0 plate (\"screw hole edge to bore edge 0.0415\"); the made plate has .0435 nominal and .037 at the worst case of the bore, counterbore and bolt-circle bands"
+      reason: "owner ruling 2026-11-24 (Pedro): \"Accept the .04 wall as an exception, same as the maker's plate.\" The head's screw pattern fixes it: the owner measured .0415 on the stock BS-0 plate (\"screw hole edge to bore edge 0.0415\"); the made plate has .0435 nominal and .036 at the worst case of the bore, counterbore and bolt-circle sizes"

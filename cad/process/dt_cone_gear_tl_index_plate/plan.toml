@@ -32,7 +32,7 @@ ref = "endmill-carbide-3fl-1-4"  # 3X counterbore Ø.346 x .145 deep, interpolat
 [[tools]]
 id = "boring-bars-meda-6045000"
 name = "Lathe boring bars"
-ref = "boring-bars-meda-6045000"  # .827 +.003/.000 BORE THRU (owner fact 2026-11-24: "hole 0.8270")
+ref = "boring-bars-meda-6045000"  # .827 BORE THRU to the BS-0 head's plate hub, the hub is the gauge (owner facts 2026-11-24: "hole 0.8270", "hub plate sits on 0.8245")
 
 [[setups]]
 machine_kind = "other"

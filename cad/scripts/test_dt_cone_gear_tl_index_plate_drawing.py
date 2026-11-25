@@ -77,10 +77,15 @@ def test_registry_row_is_tooling_in_inch() -> None:
     assert entry.source_kind == "part"
 
 
-def test_only_the_bore_carries_a_model_band() -> None:
-    bands = model_toleranced_dimensions(part)
-    assert set(bands) == {("PlateProfile", "BoreDia")}
-    assert spec.BORE_DEVIATIONS == (0.0, 0.003 * INCH)
+def test_no_model_dimension_carries_a_band() -> None:
+    # The bore is bored to the head's hub (rule 4, form 3: the mate is the
+    # gauge); the pin holes are drilled at the title block's band.
+    assert model_toleranced_dimensions(part) == {}
+    assert spec.CALLOUTS_BELOW["BoreDia"].split("\n") == [
+        "BORE THRU",
+        "BS-0 HEAD PLATE HUB",
+        "ENTERS, NO SHAKE",
+    ]
     assert spec.DRAWING_PRECISION_BY_NAME[spec.PRINTED_HOLE] == 3
 
 
@@ -109,17 +114,17 @@ def test_pin_play_and_position_zone_stay_under_half_a_percent_of_pitch() -> None
     assert spec.INDEX_POSITION >= math.hypot(0.005, 0.005) * 2.0 * INCH - 0.001 * INCH
     # Owner fact 2026-11-24: "hub plate sits on 0.8245".
     assert math.isclose(spec.HUB_CLEARANCE[0], 0.0025 * INCH)
-    assert math.isclose(spec.HUB_CLEARANCE[1], 0.0055 * INCH)
+    assert math.isclose(spec.HUB_CLEARANCE[1], 0.0075 * INCH)
     # Half of each along the circle: the worst pin play (.007), the position
-    # zone (.014) and the bore's clearance on the hub (.0055).
-    assert math.isclose(spec.INDEX_ERROR_TANGENTIAL_MM, 0.01325 * INCH)
+    # zone (.014) and the loosest bore's clearance on the hub (.0075).
+    assert math.isclose(spec.INDEX_ERROR_TANGENTIAL_MM, 0.01425 * INCH)
     for circle, teeth in spec.RING_TEETH.items():
-        crank = math.degrees(0.01325 / (spec.RING_PCDS[circle] / INCH / 2.0))
+        crank = math.degrees(0.01425 / (spec.RING_PCDS[circle] / INCH / 2.0))
         assert math.isclose(spec.INDEX_ERROR_GEAR_DEG[teeth], crank / 40.0)
     # The 24-hole circle is the smallest radius: the worst of the three.
     assert max(spec.INDEX_ERROR_GEAR_DEG, key=spec.INDEX_ERROR_GEAR_DEG.get) == 96
-    assert math.isclose(spec.INDEX_ERROR_GEAR_DEG[96], 0.014059, abs_tol=1e-6)
-    assert max(spec.INDEX_ERROR_TOOTH_FRACTION.values()) < 0.004
+    assert math.isclose(spec.INDEX_ERROR_GEAR_DEG[96], 0.015120, abs_tol=1e-6)
+    assert max(spec.INDEX_ERROR_TOOTH_FRACTION.values()) < 0.0045
 
 
 def test_the_sheet_states_the_web_shortfall_it_carries() -> None:
@@ -155,7 +160,7 @@ def test_the_measured_stock_plate_sets_the_envelope_and_the_screw_seat() -> None
     # 0.3455 dia depth 0.1830"; corrected: "not countersunk counterbored;".
     assert math.isclose(spec.PLATE_DIA, 3.94 * INCH)
     assert math.isclose(spec.BORE_DIA, 0.827 * INCH)
-    assert spec.BORE_DIA + spec.BORE_DEVIATIONS[0] >= 0.8270 * INCH - 1e-9
+    assert spec.BORE_DIA >= 0.8270 * INCH - 1e-9
     assert math.isclose(spec.STOCK_PIN_HOLE_DIA, spec.INDEX_HOLE_DIA)
     assert spec.MOUNT_COUNT == 3
     assert 0.234 * INCH <= spec.MOUNT_HOLE_DIA <= 15.0 / 64.0 * INCH
@@ -195,7 +200,7 @@ def test_the_bolt_circle_is_inferred_from_the_owners_two_readings() -> None:
     # same as the maker's plate."
     assert spec.CBORE_WALL not in spec.WEBS_MM
     assert spec.CBORE_WALL_NOMINAL >= 0.0415 * INCH
-    assert math.isclose(spec.CBORE_WALL_MIN_MM, 0.037 * INCH)
+    assert math.isclose(spec.CBORE_WALL_MIN_MM, 0.036 * INCH)
     assert spec.CBORE_WALL_CALLOUT == "WALL .03 MIN"
 
 

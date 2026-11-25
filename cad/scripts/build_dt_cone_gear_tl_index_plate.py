@@ -41,7 +41,6 @@ from _drawing_marks import (
     mark_dimensions_for_drawing,
 )
 from _drawing_precision import apply_drawing_precision
-from _drawing_tolerances import set_dimension_bilateral_tolerance
 from _feature_tree import name_last_feature
 from _part_checks import report_mass_properties, volume_check
 from _part_properties import part_drawing_unit
@@ -59,7 +58,6 @@ from _sketch import (
 from _sketch_circle import define_circle
 from _visibility import blank_reference_geometry
 from dt_cone_gear_tl_index_plate_spec import (
-    BORE_DEVIATIONS,
     BORE_DIA,
     CBORE_DEPTH,
     CBORE_DIA,
@@ -78,7 +76,6 @@ from dt_cone_gear_tl_index_plate_spec import (
     RING_COUNTS,
     RING_PCDS,
     THICKNESS,
-    UNIT,
 )
 
 PART_NAME = "dt-cone-gear-tl-index-plate"
@@ -506,17 +503,9 @@ def build(adapter: Any) -> dict[str, str]:
     )
     _require_one_solid_body(adapter, label="driven index plate")
 
-    # The bore pilots on the head's hub: never under the stock plate's bore.
-    set_dimension_bilateral_tolerance(
-        adapter,
-        "PlateProfile",
-        "BoreDia",
-        *BORE_DEVIATIONS,
-        places=3,
-        display_unit=UNIT,
-    )
-    # The drilled index holes take the title block's DRILLED HOLES band: the
-    # model dimension carries none (owner ruling 2026-11-23, tool audit Q15).
+    # No model dimension carries a band: the bore is bored to the head's hub,
+    # which is the gauge, and the drilled index holes take the title block's
+    # DRILLED HOLES band (owner ruling 2026-11-23, tool audit Q15).
     apply_material(adapter, MATERIAL)
     report_mass_properties(adapter)
     apply_drawing_precision(adapter, DRAWING_PRECISION)
