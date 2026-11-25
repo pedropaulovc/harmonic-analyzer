@@ -973,25 +973,31 @@ HANGER_SECTION_CAPTION_XY = (0.120, 0.031)
 _HUB_BOTTOM_M_PER_MM = HUB_BOTTOM_SCALE[0] / HUB_BOTTOM_SCALE[1] / 1000.0
 # The rear ream's size (the circle that owns HangerPinHoleDia), the .1240
 # reamer's with no band (rule 4, form 3: the MHA-SM-VN-53 dowel is the
-# gauge), and its one callout row: count, process, REF
-# depth, mate and fit.  Farm run 20261027T030041319Z printed the block
-# centred on its point: the 42-glyph row 112.5 mm wide (2.68 mm a glyph, as
-# estimated) on its shelf at y 247.5 mm, the shelf starting 1.5 mm left of
-# the row, the band's top at 261.1, so 15.1 mm in all, inside the 17.9 mm
-# between the plan's top and the sheet frame less ink each side.  The block
-# stands 25.9 mm left of its older foot (145.9, 247.2) mm: its leader rises
-# 58 deg from the rear ream, and the block ends 47 mm short of detail J's
-# fence (the layout audit read the old block's right end into J's view).
-# Right of the ream, the cutting line, F-F's right arrow and the rear-right
-# boss leave no leader route to a block beside the plan.
+# gauge), and its two callout rows: count, process, REF depth, mate and
+# fit; then the dowel's acceptance (machinist review, farm run
+# 20261125T172832344Z: the callout "gives no acceptance").  Farm run
+# 20261027T030041319Z printed the block centred on its point: a 42-glyph
+# row 112.5 mm wide (2.68 mm a glyph, as estimated).  Farm run
+# 20261125T172832344Z printed the size and one row centred 0.1 mm under
+# the point (254.8 mm): the size's cap line at 259.4, the underline at
+# 250.0, rows 5.6 mm apart, so the acceptance's row makes the block 15.0
+# mm, inside the 15.2 mm box.  Its point stands 1.0 mm higher than that
+# run's, so the box (248.2 to 263.4 mm) keeps 3.4 mm over the plan's top
+# (244.8) and 3.3 under the sheet frame (266.7).  The block's left end
+# stands 25.9 mm left of its older foot (145.9, 247.2) mm: its leader
+# rises 58 deg from the rear ream, and its widest row ends 15 mm short of
+# where the layout audit read detail J's view (it read the old block's
+# right end into it).  Right of the ream, the cutting line, F-F's right
+# arrow and the rear-right boss leave no leader route to a block beside
+# the plan.
 # Rule 26: a blind ream's callout carries its depth (farm run
 # 20261107T004559647Z, stability repeat 1: "gives size and process but no
 # depth").  F-F's native .50 MIN to the full diameter stays the control
 # (owner decision 2026-11-19, #3124 item 3: drilled and reamed to a drill
 # point), so the callout prints it as REF, the rule's own example (`↧
 # (.235)` with the floor located on a view), between process and mate: the
-# row may grow only 10 glyphs before it reaches detail J's fence, and the
-# band leaves no height for a second row.
+# widest row may grow only 2 glyphs before it reaches the audit's 10 mm
+# margin to detail J.
 HANGER_PIN_DEPTH_REF = f"({HANGER_PIN_HOLE_DEPTH / 25.4:.2f})".replace("(0.", "(.")
 _REAM_PROCESS, _REAM_MATE = HANGER_PIN_HOLE_CALLOUT.split(", ")
 HANGER_PIN_DIA_CALLOUT = (
@@ -999,11 +1005,13 @@ HANGER_PIN_DIA_CALLOUT = (
 )
 # The depth token prints as one ↧ glyph.
 HANGER_PIN_DIA_CALLOUT_PRINTED = HANGER_PIN_DIA_CALLOUT.replace("<HOLE-DEPTH>", "↧")
-HANGER_PIN_DIA_TEXT_WIDTH = 0.067 * max(25, len(HANGER_PIN_DIA_CALLOUT_PRINTED)) / 25
+HANGER_PIN_DIA_TEXT_WIDTH = (
+    0.067 * max(25, *map(len, HANGER_PIN_DIA_CALLOUT_PRINTED.splitlines())) / 25
+)
 HANGER_PIN_DIA_TEXT_HALF_HEIGHT = 0.0076
 HANGER_PIN_DIA_TEXT_XY = (
     0.120 + HANGER_PIN_DIA_TEXT_WIDTH / 2.0,
-    0.2472 + HANGER_PIN_DIA_TEXT_HALF_HEIGHT,
+    0.2482 + HANGER_PIN_DIA_TEXT_HALF_HEIGHT,
 )
 # The knockouts' native callout (dt_crankshaft's form: the drill above the
 # native "2X" size and extent, the purpose below) on the FRONT ream's
@@ -1017,19 +1025,24 @@ HANGER_PIN_DIA_TEXT_XY = (
 # with no visible air (machinist review, rule 13).  The knockout drills up
 # from the ream's drill point on the ream's drawn axis (codjiflo, PR
 # #1978), its coaxiality the title block's implied ±0.13, charged in the
-# punch's land on the dowel's end flat; the drill row and a row under the
-# native size state it, so four rows, none
-# wider than 21 glyphs (estimated at the measured row's width): 20.2 mm
-# tall, centred on the same 1.0 mm offset.  The block stands 4.0 mm inside
-# the border in the band under the front rail, 5 mm under the front-left
-# boss and 7.9 mm over the bottom view's note.  Its leader leaves the
-# underline's right end up-right to the floor circle.  On the former -X
-# ream it landed at x 102.3 mm; the +X ream stands 15.24 mm (5.08 mm at
-# 1:3) further right (Owner ruling 2026-11-08 (Pedro), #2144 item 11.3), so
-# it lands about x 107.4, still left of the land-end dimension's extension
-# lines (x 109.17 and 117.17 mm) and their dimension line: it crosses no
-# dimension line, only the part's own outline.
-HANGER_KNOCKOUT_CALLOUT_INK = (-0.03065, -0.01114, 0.03223, 0.00908)
+# punch's land on the dowel's end flat; section F-F draws that common
+# axis, so the rows name the drill, the native size and the purpose only
+# (machinist review, farm run 20261125T172832344Z: "FROM REAM POINT" was
+# a private phrase, rule 26).  Three rows, none wider than 21 glyphs: farm
+# run 20261027T030041319Z's three rows printed 14.66 mm underline to cap
+# line, so the box is that tall, centred on the same 1.0 mm offset, its
+# width unchanged (the widest row stays).  The four-row block it replaces
+# stood 20.2 mm tall; dropping a row moves the underline up 2.8 mm.  The
+# block stands 4.0 mm inside the border in the band under the front rail,
+# 7.8 mm under the front-left boss and 10.7 mm over the bottom view's
+# note.  Its leader leaves the underline's right end up-right to the floor
+# circle.  On the former -X ream it landed at x 102.3 mm; the +X ream
+# stands 15.24 mm (5.08 mm at 1:3) further right (Owner ruling 2026-11-08
+# (Pedro), #2144 item 11.3), so it lands about x 107.4, still left of the
+# land-end dimension's extension lines (x 109.17 and 117.17 mm) and their
+# dimension line: it crosses no dimension line, only the part's own
+# outline.
+HANGER_KNOCKOUT_CALLOUT_INK = (-0.03065, -0.00836, 0.03223, 0.00630)
 HANGER_KNOCKOUT_CALLOUT_XY = (
     SHEET_FRAME[0] + 0.004 - HANGER_KNOCKOUT_CALLOUT_INK[0],
     0.1410,

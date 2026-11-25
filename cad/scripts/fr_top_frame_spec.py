@@ -569,24 +569,35 @@ HANGER_KNOCKOUT_PUNCH_REACH_MIN = HANGER_GRIP + HANGER_GRIP_TOL  # 36.6268, no r
 # Callouts on the model's own ream size and depth (drawing-guidelines.md
 # rule 4: a REAM names its mate and fit; rule 12: count, process and
 # purpose; the size and its band print natively).  The underside locator
-# carries the ream size, its count, mate and fit on one row under it; F-F
-# the full-diameter depth both share, a native single MIN limit.  Where the
+# carries the ream size, then its count, mate and fit on one row under it
+# and the acceptance on a second: rule 4, form 3 makes the bought dowel the
+# gauge, so the row states what the builder checks with it, in the fleet's
+# press-fit wording (ch_amplitude_bar_notes.DRAWING_NOTES: the pin does not
+# enter by hand; machinist review, farm run 20261125T172832344Z: "gives no
+# acceptance").  No interference band prints: the .1240 ream on the dowel's
+# own band leaves a range under the .001 the shop reads.  F-F carries the
+# full-diameter depth both share, a native single MIN limit.  Where the
 # press stops (each dowel to its proud) is MHA-SM-00's step 1 and its
 # setting dimension, not this part's (rule 7: an assembly instruction on a
 # part sheet; farm run 20261106T234223948Z).  The knockouts' native callout
 # reads its drill above the native size and its purpose below
-# (dt_crankshaft_notes.KNOCKOUT_CALLOUT_*).
-HANGER_PIN_HOLE_CALLOUT = "2X REAM, PRESS FIT MHA-SM-VN-53 DOWEL"
+# (dt_crankshaft_notes.KNOCKOUT_CALLOUT_*).  The drawing splits this text
+# at its one ", " to put the ream's REF depth after the process.
+HANGER_PIN_HOLE_CALLOUT = (
+    "2X REAM, PRESS FIT MHA-SM-VN-53 DOWEL:\nTHE DOWEL DOES NOT ENTER BY HAND."
+)
 # The depth's row carries its count only: the drill point below it is the
 # standard form of a drilled-and-reamed blind hole, and nothing seats there.
 HANGER_PIN_DEPTH_CALLOUT = "2X"
 # The knockout's process row names the drill only (machinist review, farm
 # run 20261027T175429300Z: "REAM SETUP" was a method, not a requirement;
-# owner ruling 2026-10-27); the row under the native size names its start,
-# the ream's drill point.  The drawn common axis is its only location to
-# the ream.
+# owner ruling 2026-10-27); the row under the native size names its
+# purpose only.  Its start is geometry, not words: section F-F draws the
+# knockout on the ream's axis from the ream's drill point (machinist
+# review, farm run 20261125T172832344Z: "FROM REAM POINT" was a private
+# phrase, rule 26).
 HANGER_KNOCKOUT_CALLOUT_ABOVE = drill_process(HANGER_KNOCKOUT_SPEC)
-HANGER_KNOCKOUT_CALLOUT_BELOW = "FROM REAM POINT;\nMHA-SM-VN-53 KNOCKOUT"
+HANGER_KNOCKOUT_CALLOUT_BELOW = "MHA-SM-VN-53 KNOCKOUT"
 
 # Full thread in the hub at the printed worst case (dt_arbor_pedestal_spec's
 # terms): the thread is full only where its major circle lies wholly in metal,

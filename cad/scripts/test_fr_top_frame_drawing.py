@@ -3790,10 +3790,12 @@ def test_knockouts_land_the_punch_and_keep_their_walls() -> None:
     assert spec.HANGER_PIN_X - spec.HANGER_PIN_HOLE_DIA_MAX / 2.0 < washer.OD_MIN / 2.0
     # The process row names the drill only (machinist review: "REAM SETUP"
     # was a method; owner ruling 2026-10-27), the row under the native size
-    # the start: the ream's drill point.
+    # the purpose only: F-F draws the knockout's start on the ream's axis
+    # (machinist review, farm run 20261125T172832344Z: "FROM REAM POINT"
+    # was a private phrase).
     assert spec.HANGER_KNOCKOUT_CALLOUT_ABOVE == "#51 DRILL"
     assert "SETUP" not in spec.HANGER_KNOCKOUT_CALLOUT_BELOW
-    assert spec.HANGER_KNOCKOUT_CALLOUT_BELOW == "FROM REAM POINT;\nMHA-SM-VN-53 KNOCKOUT"
+    assert spec.HANGER_KNOCKOUT_CALLOUT_BELOW == "MHA-SM-VN-53 KNOCKOUT"
     drift = per_mm * spec.HANGER_KNOCKOUT_LENGTH_MAX
     assert part.HANGER_KNOCKOUT_DRIFT == pytest.approx(drift)
     setup_drift = per_mm * spec.HANGER_PIN_HOLE_DEPTH
@@ -4279,16 +4281,17 @@ def test_knockout_callout_leader_passes_left_of_the_land_dimension() -> None:
     centre, m_per_mm = drawing.HUB_BOTTOM_CENTER, drawing._HUB_BOTTOM_M_PER_MM
     block = _knockout_callout_box()
     # The measured block about its point: centred rows, 62.9 mm from the
-    # text's left edge to the underline's end; four rows 5.56 mm apart, 20.2
-    # mm underline to cap line (three printed 14.7), none wider than 21.
+    # text's left edge to the underline's end; three rows 5.56 mm apart,
+    # 14.66 mm underline to cap line (four printed 20.2), none wider than 21.
     x0, y0, x1, y1 = drawing.HANGER_KNOCKOUT_CALLOUT_INK
-    assert (x1 - x0, y1 - y0) == pytest.approx((0.06288, 0.01466 + 0.00556))
+    assert (x1 - x0, y1 - y0) == pytest.approx((0.06288, 0.01466))
+    assert (y0 + y1) / 2.0 == pytest.approx(-0.00103)
     rows = [
         spec.HANGER_KNOCKOUT_CALLOUT_ABOVE,
         f"2X \u00d8{spec.HANGER_KNOCKOUT_DIA:.{spec.HANGER_KNOCKOUT_DIA_PLACES}f} THRU ALL",
         *spec.HANGER_KNOCKOUT_CALLOUT_BELOW.splitlines(),
     ]
-    assert len(rows) == 4 and max(map(len, rows)) <= len("MHA-SM-VN-53 KNOCKOUT")
+    assert len(rows) == 3 and max(map(len, rows)) <= len("MHA-SM-VN-53 KNOCKOUT")
     sheet = drawing.SHEET_FRAME
     assert block.xmin - sheet[0] >= 0.0035
     # The land's ends are dimensioned from the crossbar's +X face
@@ -4811,29 +4814,34 @@ def test_cap_recess_bands_preserve_the_counterbore_ligament() -> None:
 
 
 def test_ream_size_parks_above_the_plan() -> None:
-    # The rear ream's size, its stacked +0.000/-0.010 band and its one
-    # callout row print face-on in the underside locator.  Farm run
-    # 20261027T030041319Z measured the block (the row 112.5 mm, 15.1 mm in
-    # all); the leader lands on the underline's end facing the ream.  The
-    # block parks over the plan, inside the sheet frame and short of detail
-    # J; it and its leader keep ink clear of every locator line, box and
-    # circle, and the leader, leaving the rim above F-F's cutting line,
-    # does not cross it.
+    # The rear ream's size and its two callout rows (count, process, REF
+    # depth, mate and fit; the dowel's acceptance) print face-on in the
+    # underside locator.  Farm run 20261027T030041319Z measured a row's
+    # glyphs (112.5 mm for 42); farm run 20261125T172832344Z printed the
+    # size and one row 9.4 mm cap line to underline, rows 5.6 mm apart.
+    # The leader lands on the underline's end facing the ream.  The block
+    # parks over the plan, inside the sheet frame and short of detail J; it
+    # and its leader keep ink clear of every locator line, box and circle,
+    # and the leader, leaving the rim above F-F's cutting line, does not
+    # cross it.
     from _layout_geometry import Box, Segment, segment_box_distance, segment_circle_distance
 
-    assert len(drawing.HANGER_PIN_DIA_CALLOUT.splitlines()) == 1
+    rows = drawing.HANGER_PIN_DIA_CALLOUT_PRINTED.splitlines()
+    assert len(rows) == 2
+    # Rule 4, form 3: the bought dowel is the gauge, in the fleet's
+    # press-fit wording; no interference band prints.
+    assert rows[1] == "THE DOWEL DOES NOT ENTER BY HAND."
     half_w = drawing.HANGER_PIN_DIA_TEXT_WIDTH / 2.0
     half_h = drawing.HANGER_PIN_DIA_TEXT_HALF_HEIGHT
-    # Farm run 20261027T030041319Z: 67 mm per 25 glyphs of the callout row.
-    assert 2.0 * half_w == pytest.approx(
-        0.067 * len(drawing.HANGER_PIN_DIA_CALLOUT_PRINTED) / 25, abs=0.0005
-    )
-    # The stacked band (two half rows) and one callout row.
-    assert 2.0 * half_h >= 0.0151
+    # Farm run 20261027T030041319Z: 67 mm per 25 glyphs of the widest row.
+    assert 2.0 * half_w == pytest.approx(0.067 * max(map(len, rows)) / 25, abs=0.0005)
+    # The size's row and two callout rows: 9.4 mm for the size and one row,
+    # plus one 5.6 mm row.
+    assert 2.0 * half_h >= 0.0094 + 0.0056
     x, y = drawing.HANGER_PIN_DIA_TEXT_XY
     block = Box(x - half_w, y - half_h, x + half_w, y + half_h)
     ink = drawing.INK_CLEARANCE
-    assert (block.xmin, block.ymin) == pytest.approx((0.120, 0.2472))
+    assert (block.xmin, block.ymin) == pytest.approx((0.120, 0.2482))
     # The layout audit read detail J's view from x 255.95, y 249.34 mm, and
     # the old block's row (to x 258.1) over it.
     assert block.xmax <= 0.25595 - 0.010
