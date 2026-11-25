@@ -158,3 +158,13 @@ def test_a_drill_deeper_into_the_air_below_a_through_hole_finds_nothing(freecadc
     out, variants = _report(freecadcmd, step, tmp_path, hole=_HOLE.replace("Z-3", "Z-4"))
     assert variants["nominal"]["over_noise"] == [] and variants["nominal"]["rapid_cuts"] == []
     assert am.failures(out) == []
+
+
+def test_an_undrilled_hole_under_a_strip_left_shows_its_depth(freecadcmd, step, tmp_path):
+    """The face 0.1 mm high and the hole not drilled: one region, the strip
+    and the plug under it; its thickness is the plug's (about its 3 mm
+    radius), not the strip's 0.1 mm."""
+    face = _FACE.replace("G1 Z10", "G1 Z10.1")
+    out, variants = _report(freecadcmd, step, tmp_path, face=face, hole=_HOLE.replace("G1 Z-3 F50\n", ""))
+    (region,) = variants["nominal"]["over_noise"]
+    assert region["kind"] == "left" and region["thickness_mm"] > 2.5

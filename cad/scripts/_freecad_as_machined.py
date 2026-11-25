@@ -46,7 +46,10 @@ REGION_CAP = 40
 # Tessellation points per region whose distance to the other solid is measured.
 THICKNESS_POINTS = 400
 # Points sampled across each region face, per parameter direction.
-FACE_GRID = 5
+FACE_GRID = 3
+# Lattice cells tried inside each region (isInside), about: 0.5 mm cells
+# for the stop block's strip and its two plugged 1.85 mm pilot holes.
+LATTICE_CELLS = 2000
 
 
 def _clean(points):
@@ -165,9 +168,10 @@ def simulate(part, programs, profiles, cad):
             if not cut.Solids:
                 raise RuntimeError(f"{program['name']} move {move['index']} cut the whole part away")
             kept, loose = _keep(cut, cad)
-            gone = before - kept.Volume
+            after = kept.Volume  # OCC recomputes it on every access
+            gone = before - after
             if gone > REMOVED_EPS_MM3:
-                part, before, shed = kept, kept.Volume, shed + loose
+                part, before, shed = kept, after, shed + loose
                 removed.append(gone)
             else:
                 removed.append(0.0)
@@ -184,12 +188,35 @@ def _strided(points, cap):
     return [points[int(k * step)] for k in range(cap)]
 
 
+def _lattice(region):
+    """Cell centres of a lattice over the region's bound box (about
+    LATTICE_CELLS cubic cells, at least 3 along every side) that lie inside
+    the region."""
+    bb = region.BoundBox
+    spans = [(bb.XMin, bb.XLength), (bb.YMin, bb.YLength), (bb.ZMin, bb.ZLength)]
+    step = max(max(length for _lo, length in spans) / 64, (bb.XLength * bb.YLength * bb.ZLength / LATTICE_CELLS) ** (1 / 3))
+    counts = [max(3, round(length / step)) for _lo, length in spans]
+    while counts[0] * counts[1] * counts[2] > 3 * LATTICE_CELLS:
+        step *= 1.25
+        counts = [max(3, round(length / step)) for _lo, length in spans]
+    inside = []
+    for i in range(counts[0]):
+        for j in range(counts[1]):
+            for k in range(counts[2]):
+                p = V(*(lo + length * (n + 0.5) / count for (lo, length), n, count in zip(spans, (i, j, k), counts)))
+                if region.isInside(p, 1e-6, True):
+                    inside.append(p)
+    return inside
+
+
 def thickness(region, other):
-    """The region's farthest sampled point from ``other``. Sampled on a
-    FACE_GRID x FACE_GRID grid inside every face as well as at the mesh
-    vertices: a cylinder's mesh has vertices on its edges only, and a plugged
-    hole or a ring left in a groove touches ``other`` along every edge (the
-    plug's depth shows at the middle of its cap)."""
+    """The region's farthest sampled point from ``other``. Sampled at the
+    mesh vertices, on a FACE_GRID x FACE_GRID grid inside every face and on
+    a lattice inside the solid: a cylinder's mesh has vertices on its edges
+    only, a plugged hole or a ring left in a groove touches ``other`` along
+    every edge (its depth shows at the middle of its cap), and a plugged hole
+    under a thin strip left over it has no cap of its own (its depth is
+    inside the region)."""
     grid = []
     for face in region.Faces:
         u0, u1, v0, v1 = face.ParameterRange
@@ -200,8 +227,8 @@ def thickness(region, other):
                 if face.isPartOfDomain(u, v):
                     grid.append(face.valueAt(u, v))
     mesh = MeshPart.meshFromShape(Shape=region, LinearDeflection=0.01, AngularDeflection=0.2, Relative=False)
-    grid = _strided(grid, 3 * THICKNESS_POINTS)
-    pts = grid + _strided([V(*p) for p in mesh.Topology[0]], THICKNESS_POINTS)
+    pts = (_lattice(region) + _strided(grid, 2 * THICKNESS_POINTS)
+           + _strided([V(*p) for p in mesh.Topology[0]], THICKNESS_POINTS))
     best, where = 0.0, None
     for p in pts:
         d = other.distToShape(Part.Vertex(p))[0]
