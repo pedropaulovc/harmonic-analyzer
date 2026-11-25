@@ -4,9 +4,11 @@
 # (bonded into the handle) first, this screw last. Owner ruling 2026-11-24,
 # fit audit question 15 (no matching): the head is turned to its own
 # Ø.231-.241 and clears any pocket the cup's 1/4 end mill cuts (.248-.257);
-# nothing is read off the cup. Owner ruling 2026-11-24, fit audit question
-# 14: "handle stays DRILL #20; DT-32 shoulder by trial, limits .1535-.1585":
-# no pins; the shoulder's own trial steps read the handle's bore.
+# nothing is read off the cup. The shoulder is turned to its own drawn
+# .1535-.1585 (owner ruling 2026-11-24, fit audit question 14: "limits
+# .1535-.1585"); MHA-DT-08's bore is a plain #20 drilled hole, .1610-.1650
+# (D26), so the largest shoulder still clears the smallest bore by .0025
+# (delegated ruling 2026-11-25 (Main)): nothing is read off the handle.
 #
 # - Bench: measure the bonded handle (MHA-DT-08 with MHA-DT-34 and -35) for
 #   the shoulder's length (drawing note 1: the measured stack plus .010-.040
@@ -14,13 +16,7 @@
 # - Saw a blank. Lathe, 3-jaw, the tip end out on the tailstock dead centre
 #   ("CENTRE OK" at the tip): turn the head's diameter over the whole length
 #   out of the jaws; the shoulder to the under-head station, roughed to
-#   Ø.1654, over any accepted bore (MHA-DT-08's bore is a plain #20 drilled
-#   hole at DRILLED HOLES, .1610-.1650; delegated ruling 2026-11-25 (Main),
-#   precedent: owner ruling 2026-11-24 merging the fit policy; RETIRES the
-#   owner's fit-audit Q14 answer's trial step; owner review #2144 (D26),
-#   retired the .1635 trial step), then down .0005 at a time until the
-#   handle just starts on (T), then finished to T less .0050-.0075 inside
-#   the drawn .1535-.1585; the #4-40 blank to
+#   Ø.1654, then finished to the drawn .1535-.1585; the #4-40 blank to
 #   the seat; the 1/16 P1 blade squares the under-head corner sharp (R.004
 #   MAX; the AR insert's R0.4 nose cannot). Chamfer the head, withdraw the
 #   centre, run the die to the seat, plunge the relief at the seat with the
@@ -101,10 +97,9 @@ turn_feed_mm_rev = 0.0508
 head_turn_end_z_mm = -69.0
 # Aims, mm: the head at the middle of its drawn Ø.231-.241 (.236; owner
 # ruling 2026-11-24, fit audit question 15: nothing is read off the cup);
-# the shoulder roughed to .1654, over the #20's DRILLED HOLES .1650 (D26),
-# and finished at the middle of its drawn .1535-.1585 for the turning checks
-# (the operator aims at T - .006 from the trial, owner ruling 2026-11-24, fit
-# audit question 14, never over .1580); the thread blank at .1085, inside
+# the shoulder roughed to .1654 and finished at the middle of its drawn
+# .1535-.1585 (owner ruling 2026-11-24, fit audit question 14: "limits
+# .1535-.1585"); the thread blank at .1085, inside
 # cad.thread_dia (the #4-40 UNC-2A major .1061-.1112, the title block's
 # CLASS 2A).
 head_aim_dia_mm = 5.9944
@@ -119,7 +114,7 @@ shoulder_dia_min_mm = 3.8989
 thread_dia_min_mm = 2.69494
 # The drawn under-head and seat stations from the tip (Z0), mm: the
 # shoulder's turning runs to the under-head station less .25 mm before the
-# blade squares the corner (Op 150).
+# blade squares the corner (Op 120).
 seat_z_mm = -9.652
 under_head_z_mm = -62.5602
 shoulder_rough_end_z_mm = -62.31
@@ -237,9 +232,9 @@ title = "Lathe: turn the screw on the centre, thread, relief, part off"
 machine = "PM-1127VF-LB lathe"
 indexing = "none"
 machine_ref = "pm-1127vf-lb"
-holding = "3-jaw on the rod, S (Setup 1) out of the jaw fronts, set with the calipers' depth rod, the beam's end on the jaw fronts; the rest in the jaws. The tailstock dead centre, greased, in the tip's centre hole for every cut but the die and the part-off: in for Ops 60–210 and 260–300, the quill backed off for each touch-off on the tip, for the handle's trials (Ops 100, 120) and for the readings (Ops 150, 160, 190, 210, 290) and brought back snug; out for the die (Ops 220–250, the quill squaring it) and the part-off (Op 310)."
-datum = "Z0 (carriage DRO) the tip's faced plane, set in Op 40; each tool touched on the tip again when it takes over (Ops 150, 160, 210, 310). The seat at Z−{{process.seat_z_in:.3dot}}; the under-head face at Z−U and the part-off at Z−P from Setup 1."
-diagram = { file = "diagrams/turn.svg", alt = "The rod in the 3-jaw on the dead centre at the tip: the head turned to Ø.236 next to the jaws, the long shoulder turned to the handle's bore by trial, the #4-40 thread at the tip; the relief at the seat; the part-off at the head's face." }
+holding = "3-jaw on the rod, S (Setup 1) out of the jaw fronts, set with the calipers' depth rod, the beam's end on the jaw fronts; the rest in the jaws. The tailstock dead centre, greased, in the tip's centre hole for every cut but the die and the part-off: in for Ops 60–180 and 230–270, the quill backed off for each touch-off on the tip and for the readings (Ops 120, 130, 160, 180, 260) and brought back snug; out for the die (Ops 190–220, the quill squaring it) and the part-off (Op 280)."
+datum = "Z0 (carriage DRO) the tip's faced plane, set in Op 40; each tool touched on the tip again when it takes over (Ops 120, 130, 180, 280). The seat at Z−{{process.seat_z_in:.3dot}}; the under-head face at Z−U and the part-off at Z−P from Setup 1."
+diagram = { file = "diagrams/turn.svg", alt = "The rod in the 3-jaw on the dead centre at the tip: the head turned to Ø.236 next to the jaws, the long shoulder turned to Ø.1535–.1585, the #4-40 thread at the tip; the relief at the seat; the part-off at the head's face." }
 lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{process.stock_dia_mm}}", stock_diameter_mm = "{{process.stock_dia_mm}}", stickout_mm = "{{process.stickout_mm}}", minimum_diameter_mm = "{{process.thread_dia_min_mm}}", support = "tailstock" }
 turning_support = { kind = "tailstock", chuck_z_mm = "{{process.jaw_front_z_mm}}", centre_z_mm = 0.0 }
 
@@ -300,28 +295,6 @@ settings = "dt-lathe-ar-1018-centre"
 cut_diameter_mm = "{{process.head_aim_dia_mm}}"
 
 [[setups.operations]]
-cut_kind = "other"
-instruction = "Spindle stopped: back the quill until the centre clears the tip; slide the bonded handle, ferrule end first, over the tip onto the roughed shoulder by hand, clean and dry, no force."
-inspection = "At the rough Ø{{process.shoulder_rough_dia_mm:in.4dot}} the handle does not go on (MHA-DT-08's #20 bore is .1650 at most, DRILLED HOLES)."
-gauge_checks = "other"
-
-[[setups.operations]]
-cut_kind = "other"
-instruction = "The handle goes on at Ø{{process.shoulder_rough_dia_mm:in.4dot}}: its bore is over the #20 drill's DRILLED HOLES .1650; stop and set the handle aside for the owner, the blank kept in the chuck."
-
-[[setups.operations]]
-cut_kind = "other"
-speed_kind = "spindle"
-tool = "ar"
-drilling = "none"
-sizing = "other"
-instruction = "Bring the centre back snug. Take .0005 off the shoulder's diameter over the same length (one pass .00025 deep on the cross-slide), mike it, and try the handle on again as in Op 100; repeat until the handle just starts onto the shoulder by hand. Write T, the shoulder's miked diameter at that try, on this sheet."
-settings = "dt-lathe-ar-1018-centre-finish"
-cut_diameter_mm = "{{process.shoulder_rough_dia_mm}}"
-inspection = "T .1610–.1650, written on this sheet. The handle still not on at Ø.1610: its bore is under the #20 drill; stop and set the handle aside for the owner."
-gauge_checks = [{ gauge = "micrometers", band_mm = [4.0894, 4.191] }]
-
-[[setups.operations]]
 cut_kind = "longitudinal_turning"
 turning_cuts = [
   { name = "Shoulder finish", phase = "finish", start_z_mm = "{{process.turn_start_z_mm}}", end_z_mm = "{{process.shoulder_rough_end_z_mm}}", kept_start_z_mm = "{{process.seat_z_mm}}", kept_end_z_mm = "{{process.shoulder_rough_end_z_mm}}", start_diameter_mm = "{{process.shoulder_rough_dia_mm}}", end_diameter_mm = "{{process.shoulder_aim_dia_mm}}", max_radial_doc_mm = "{{process.finish_radial_doc_mm}}", feed_mm_rev = "{{process.finish_feed_mm_rev}}", minimum_diameter_mm = "{{process.shoulder_dia_min_mm}}" },
@@ -330,15 +303,15 @@ speed_kind = "spindle"
 tool = "ar"
 drilling = "none"
 sizing = "other"
-instruction = "Finish the shoulder over the same length to T − .0075 to T − .0050 (MHA-DT-32's running fit in the handle's bore) and no larger than Ø{{cad.shoulder_dia_max_in:.4dot}}, aiming at T − .006 but never over .1580, miking at both ends and the middle between light passes; one last pass at the same setting for the drawing's Ra 63 µin (1.6 µm) finish, no feed marks you can catch with a fingernail."
+instruction = "Finish the shoulder over the same length to Ø{{cad.shoulder_dia_min_in:.4dot}}–{{cad.shoulder_dia_max_in:.4dot}}, aiming at Ø{{process.shoulder_aim_dia_mm:in.4dot}}, miking at both ends and the middle between light passes; one last pass at the same setting for the drawing's Ra 63 µin (1.6 µm) finish, no feed marks you can catch with a fingernail."
 settings = "dt-lathe-ar-1018-centre-finish"
 cut_diameter_mm = "{{process.shoulder_aim_dia_mm}}"
-inspection = "Shoulder T − .0075 to T − .0050, inside Ø{{cad.shoulder_dia_min_in:.4dot}}–{{cad.shoulder_dia_max_in:.4dot}}, at both ends and the middle."
+inspection = "Shoulder Ø{{cad.shoulder_dia_min_in:.4dot}}–{{cad.shoulder_dia_max_in:.4dot}} at both ends and the middle."
 gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.shoulder_dia_band_mm}}" }]
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Shoulder under T − .0075 at any reading: scrap the blank and make another from Setup 2. Over T − .0050 or over Ø{{cad.shoulder_dia_max_in:.4dot}} at both ends: another light pass. One end over, the other in band: set the tailstock over by half the ends' difference (toward the tool if the tip end is larger), skim, mike both ends again; both in band or scrap as above."
+instruction = "Shoulder under Ø{{cad.shoulder_dia_min_in:.4dot}} at any reading: scrap the blank and make another from Setup 2. Over Ø{{cad.shoulder_dia_max_in:.4dot}} at both ends: another light pass. One end over, the other in band: set the tailstock over by half the ends' difference (toward the tool if the tip end is larger), skim, mike both ends again; both in band or scrap as above."
 
 [[setups.operations]]
 cut_kind = "other"
@@ -404,7 +377,7 @@ cut_diameter_mm = "{{process.head_aim_dia_mm}}"
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Spindle stopped: back the tailstock away and take the dead centre out of the quill (it goes back in for the relief, Op 260)."
+instruction = "Spindle stopped: back the tailstock away and take the dead centre out of the quill (it goes back in for the relief, Op 230)."
 
 [[setups.operations]]
 cut_kind = "other"
@@ -434,7 +407,7 @@ speed_kind = "spindle"
 tool = "part"
 drilling = "none"
 sizing = "other"
-instruction = "Relief, first plunge, the {{process.blade_width_in:.4dot}} blade on centre height, square. Spindle stopped: the dead centre back in the tip, greased, snug. The blade's chuck-side face on the seat face (Z−{{process.seat_z_in:.3dot}}) over a cigarette paper; lock the carriage; zero the cross-slide on the thread's crest. Spindle on: feed in (Op 170's blank − {{process.lead_outer_dia_in:.3dot}})/2 on the radius, to Ø{{process.lead_outer_dia_in:.3dot}}; back out."
+instruction = "Relief, first plunge, the {{process.blade_width_in:.4dot}} blade on centre height, square. Spindle stopped: the dead centre back in the tip, greased, snug. The blade's chuck-side face on the seat face (Z−{{process.seat_z_in:.3dot}}) over a cigarette paper; lock the carriage; zero the cross-slide on the thread's crest. Spindle on: feed in (Op 140's blank − {{process.lead_outer_dia_in:.3dot}})/2 on the radius, to Ø{{process.lead_outer_dia_in:.3dot}}; back out."
 settings = "lathe-part-1018"
 cut_diameter_mm = "{{process.thread_aim_dia_mm}}"
 
@@ -444,7 +417,7 @@ speed_kind = "spindle"
 tool = "part"
 drilling = "none"
 sizing = "other"
-instruction = "Relief, second plunge: unlock the carriage and move it {{process.relief_step_in:.4dot}} toward the tip (DRO Z−{{process.seat_z_in:.3dot}} + {{process.relief_step_in:.4dot}}); lock it and feed in (the blank miked in Op 170 − {{process.relief_aim_dia_in:.3dot}})/2 on the radius from the crest zero, to the Ø{{process.relief_aim_dia_in:.3dot}} floor; back out for chips, cutting oil."
+instruction = "Relief, second plunge: unlock the carriage and move it {{process.relief_step_in:.4dot}} toward the tip (DRO Z−{{process.seat_z_in:.3dot}} + {{process.relief_step_in:.4dot}}); lock it and feed in (the blank miked in Op 140 − {{process.relief_aim_dia_in:.3dot}})/2 on the radius from the crest zero, to the Ø{{process.relief_aim_dia_in:.3dot}} floor; back out for chips, cutting oil."
 settings = "lathe-part-1018"
 cut_diameter_mm = "{{process.thread_aim_dia_mm}}"
 
@@ -454,7 +427,7 @@ speed_kind = "spindle"
 tool = "part"
 drilling = "none"
 sizing = "other"
-instruction = "Relief lead, 45° from the floor up into the seat face: the compound at 45° as in Op 210 (its feed in and toward the tip), the holder square. Spindle stopped: the blade's chuck-side face back on the seat face, its tip at Ø{{process.lead_outer_dia_in:.3dot}} (the first plunge's floor); lock the carriage, zero the compound. Spindle on: feed {{process.lead_compound_in:.3dot}} along the compound to cut the lead to the floor, then wind the compound back to its zero."
+instruction = "Relief lead, 45° from the floor up into the seat face: the compound at 45° as in Op 180 (its feed in and toward the tip), the holder square. Spindle stopped: the blade's chuck-side face back on the seat face, its tip at Ø{{process.lead_outer_dia_in:.3dot}} (the first plunge's floor); lock the carriage, zero the compound. Spindle on: feed {{process.lead_compound_in:.3dot}} along the compound to cut the lead to the floor, then wind the compound back to its zero."
 settings = "lathe-part-1018"
 cut_diameter_mm = "{{process.thread_aim_dia_mm}}"
 
@@ -466,7 +439,7 @@ gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.relief_dia_band_mm}}" }, 
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Relief floor over {{cad.relief_dia_max_in:.3dot}}: plunge again as Op 270, .002 deeper on the cross-slide dial (on the radius), read the floor again, and repeat until it is in. Floor under {{cad.relief_dia_min_in:.3dot}}, or the width outside {{cad.relief_width_min_in:.2dot}}–{{cad.relief_width_max_in:.2dot}}: scrap the blank and make another from Setup 2. A nut that binds: close the split die a little with its adjusting screw and run it over once more as Ops 240–250; still binding: scrap the blank and make another from Setup 2."
+instruction = "Relief floor over {{cad.relief_dia_max_in:.3dot}}: plunge again as Op 240, .002 deeper on the cross-slide dial (on the radius), read the floor again, and repeat until it is in. Floor under {{cad.relief_dia_min_in:.3dot}}, or the width outside {{cad.relief_width_min_in:.2dot}}–{{cad.relief_width_max_in:.2dot}}: scrap the blank and make another from Setup 2. A nut that binds: close the split die a little with its adjusting screw and run it over once more as Ops 210–220; still binding: scrap the blank and make another from Setup 2."
 
 [[setups.operations]]
 cut_kind = "other"
@@ -503,10 +476,10 @@ inspection = "Head length {{cad.head_length_min_in:.3dot}}–{{cad.head_length_m
 gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.head_length_band_mm}}" }]
 
 [[setups.operations]]
-instruction = "Head over {{cad.head_length_max_in:.3dot}}: file the face again, flat, and read again as Op 330. Under {{cad.head_length_min_in:.3dot}}: scrap the screw and make another from Setup 2."
+instruction = "Head over {{cad.head_length_max_in:.3dot}}: file the face again, flat, and read again as Op 300. Under {{cad.head_length_min_in:.3dot}}: scrap the screw and make another from Setup 2."
 
 [[setups.operations]]
-instruction = "Scribe the slot's depth band: set the calipers to the head length read in Op 330 less {{cad.slot_depth_min_in:.3dot}} and, one jaw's tip on the under-head face, scribe a line round the head with the other jaw's tip; scribe a second line the same way at the head length less {{cad.slot_depth_max_in:.3dot}}."
+instruction = "Scribe the slot's depth band: set the calipers to the head length read in Op 300 less {{cad.slot_depth_min_in:.3dot}} and, one jaw's tip on the under-head face, scribe a line round the head with the other jaw's tip; scribe a second line the same way at the head length less {{cad.slot_depth_max_in:.3dot}}."
 
 [[setups.operations]]
 speed_kind = "other"
@@ -522,7 +495,7 @@ inspection = "Slot {{cad.slot_width_min_in:.2dot}}–{{cad.slot_width_max_in:.2d
 gauge_checks = [{ gauge = "pin-gauges", band_mm = "{{cad.slot_width_band_mm}}" }, { gauge = "calipers", band_mm = "{{cad.slot_depth_band_mm}}" }]
 
 [[setups.operations]]
-instruction = "The {{cad.slot_width_min_in:.3dot}} pin does not enter: saw once more down the slot, the blade pressed against one wall, and gauge again as Op 370. The floor short of the first line on either side: saw on down to between the lines and gauge again as Op 370. The {{cad.slot_width_max_in:.3dot}} pin enters, or the floor past the second line: scrap the screw and make another from Setup 2."
+instruction = "The {{cad.slot_width_min_in:.3dot}} pin does not enter: saw once more down the slot, the blade pressed against one wall, and gauge again as Op 340. The floor short of the first line on either side: saw on down to between the lines and gauge again as Op 340. The {{cad.slot_width_max_in:.3dot}} pin enters, or the floor past the second line: scrap the screw and make another from Setup 2."
 
 [[setups.operations]]
 speed_kind = "other"

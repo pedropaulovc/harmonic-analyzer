@@ -255,11 +255,10 @@ def test_tenon_and_counterbore_are_fitted_to_the_parts_they_take() -> None:
         assert "TO SUIT" not in callout and "DIAMETRAL" not in callout
     assert drawing.SHEET_NOTES.startswith("1. ")
     assert "\n2. " in drawing.SHEET_NOTES
-    # F12 (#290): the shoulder's running clearance is MHA-DT-32's acceptance
-    # (made last); the bore names it and prints no clearance of its own.
+    # F12 (#290): the bore is a plain #20 drill; the MHA-DT-32 shoulder's own
+    # limits clear its smallest by .0025, and it prints no clearance.
     assert callouts["PivotBoreDia"] == drawing.PIVOT_BORE_CALLOUT
-    assert screw.DIAMETRAL_CLEARANCE_MIN == pytest.approx(0.0050 * IN)
-    assert screw.DIAMETRAL_CLEARANCE_MAX == pytest.approx(0.0075 * IN)
+    assert screw.SHOULDER_CLEARANCE_MIN == pytest.approx(0.0025 * IN)
     assert "CLEARANCE" not in drawing.PIVOT_BORE_CALLOUT
     # The bonded-fit clearance alone controls the counterbore (round 1
     # f08277cd): the largest cup plus the widest glue line stays under the

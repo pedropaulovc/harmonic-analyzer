@@ -57,13 +57,6 @@ THREAD_NOTE = f"{THREAD_CALLOUT}\nCENTRE OK"
 # words (fan-out r2: "LEAD, INSIDE" is a private phrase, rule 26).  Rows of
 # 18 characters at most, as the spec's callouts.
 RELIEF_LEAD_CALLOUT = f"{CHAMFER_CALLOUT}\nSTAYS INSIDE\nMHA-DT-06 THREAD"
-# The shoulder is the member made last: it carries the fit's one acceptance,
-# turned to MHA-DT-08's #20 drilled bore less .0050-.0075, its own trial
-# steps reading the bore (owner ruling 2026-11-24, fit audit question 14:
-# "DT-32 shoulder by trial, limits .1535-.1585"; MHA-DT-08 says the shoulder
-# is turned to its bore).  No bare fit name (rule 4).  Rows of 21 characters
-# at most so they clear the Ra 63 leader.
-SHOULDER_FIT_CALLOUT = "TURN TO MHA-DT-08\nBORE LESS .0050-.0075"
 # The head seat on MHA-DT-35 (#1757), in detail B: each corner names the
 # MHA-DT-35 feature it clears (rule 3's CLEARS form, rule 4).  The radius
 # lands in the cup's floor-hole break; the head's break clears the cup's

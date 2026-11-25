@@ -102,19 +102,15 @@ SLOT_WIDTH = 1.016  # .04
 SLOT_DEPTH = 1.016  # .04
 SLOT_DEPTH_TOL = _GENERAL_2PL
 
-# The running surface in the oak bore (#290 fit F12).  MHA-DT-08's bore is a
-# plain #20 drilled hole at DRILLED HOLES, .1610-.1650 (delegated ruling
-# 2026-11-25 (Main), precedent: owner ruling 2026-11-24 merging the fit
-# policy; RETIRES the owner's fit-audit Q14 answer's trial step; owner review
-# #2144 (D26): the .1635 MAX cap and its trial step are retired); the
-# shoulder is turned last to that bore less .0050-.0075, its own trial steps
-# reading the bore (owner ruling 2026-11-24, fit audit question 14: "handle
-# stays DRILL #20; DT-32 shoulder by trial, limits .1535-.1585").  The limits
-# give every accepted bore a window: the smallest bore's whole fit (.1610
-# less .0075), and up to .1585 (.1650 less .0065, and a .1660 bore still
-# leaves .1585 at .0075); the old +.000/-.002 left a bore of .162 or more
-# no window.  (upper, lower) deviations; the model carries the band natively.
-# The tenon keeps the rule-17 floor of oak over its bore.
+# The running surface in the oak bore (#290 fit F12).  The shoulder's limits
+# are the owner's (owner ruling 2026-11-24, fit audit question 14: "limits
+# .1535-.1585"), turned to on their own: nothing is read off the handle.
+# MHA-DT-08's bore is a plain #20 drilled hole at DRILLED HOLES, .1610-.1650
+# (delegated ruling 2026-11-25 (Main); owner review #2144 (D26)), so the
+# largest shoulder clears the smallest bore by .0025 (SHOULDER_CLEARANCE_MIN
+# below); the title block's .156 ±.005 would leave none.  (upper, lower)
+# deviations; the model carries the band natively.  The tenon keeps the
+# rule-17 floor of oak over its bore.
 SHOULDER_DIA = 3.9624  # .1560
 SHOULDER_DIA_BAND = (0.0635, -0.0635)  # .1535-.1585
 # The shoulder's thread-end face is the seat on the arm face.  Under the
@@ -326,11 +322,9 @@ HEAD_RUNNING_OFFSET_MAX = round(
     6,
 )
 HEAD_BEARING_RADIAL_MIN = round(HEAD_BEARING_RADIAL_CONCENTRIC_MIN - HEAD_RUNNING_OFFSET_MAX, 6)
-# Wood-on-steel running clearance, on diameter: the modelled result of the
-# fit, the shoulder turned to the read bore less .0050-.0075 (this sheet's
-# acceptance), not a difference of two printed bands.
-SHOULDER_FIT_CLEARANCE = (0.127, 0.1905)  # .0050-.0075
-DIAMETRAL_CLEARANCE_MIN, DIAMETRAL_CLEARANCE_MAX = SHOULDER_FIT_CLEARANCE
+# Wood-on-steel running clearance, on diameter, at its least: the smallest
+# #20 bore over the largest shoulder, .1610 - .1585 = .0025 (0.0635 mm).
+SHOULDER_CLEARANCE_MIN = round(HANDLE_BORE_MIN - SHOULDER_DIA_MAX, 6)
 # Engagement in the MHA-DT-06 tapped through hole.  The relief sits in the arm's
 # first RELIEF_WIDTH below the seat face, so only the full thread beyond it
 # engages, and never deeper than the arm is thick.  The drawing-simplicity
@@ -451,18 +445,10 @@ for _ok, _what in (
         END_PLAY_RANGE[0] <= END_PLAY_NOMINAL <= END_PLAY_RANGE[1],
         "the modelled end play is outside the fitted band",
     ),
-    (DIAMETRAL_CLEARANCE_MIN > 0.0, "shoulder can bind in the oak bore"),
+    (SHOULDER_CLEARANCE_MIN > 0.0, "shoulder can bind in the oak bore"),
     (
         abs(PIVOT_BORE_FIT_MAX - HANDLE_BORE_MAX) < 1e-6,
         "MHA-DT-08's tenon walls read a bore other than its largest accepted",
-    ),
-    # Every accepted bore keeps a window inside the shoulder's limits: the
-    # smallest bore the fit's whole range, the largest at least the loosest
-    # clearance (the window narrows toward .165, D26).
-    (
-        SHOULDER_DIA_MIN <= HANDLE_BORE_MIN - DIAMETRAL_CLEARANCE_MAX + 1e-6
-        and SHOULDER_DIA_MAX >= HANDLE_BORE_MAX - DIAMETRAL_CLEARANCE_MAX - 1e-6,
-        "the shoulder's limits leave an accepted MHA-DT-08 bore no fit",
     ),
     (
         RELIEF_DIA_MAX <= min(THREAD_MINOR_BASIC_ROOT, THREAD_MINOR_UNR_2A_MAX),
