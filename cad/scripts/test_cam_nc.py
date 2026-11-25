@@ -662,6 +662,60 @@ def test_keep_out_band_catches_a_tool_part_crossing_an_overhang(tmp_path):
     assert hits("G0 X5 Y5.8 Z8\nG0 Y6.05 Z-3\n") == ["ledge"]
 
 
+_JAW = {"name": "fixed jaw", "x": (0.0, 20.0), "y": (0.0, 25.4), "z_top": 6.0}
+
+
+def test_jaw_clearance_floor_passes_a_cutter_clear_of_the_jaw(tmp_path):
+    # A 1/2 in end mill's pass past the jaw face, 1.2 mm over the jaw's top.
+    program = _program(tmp_path, "G0 X5 Y-10 Z12\nG0 Z7.2\nG1 Y3 F500\nG0 Z12\n")
+    assert _gcode.check_keep_out(program, 6.35, boxes=[_JAW], clearance=1.0) == []
+
+
+def test_jaw_clearance_floor_catches_a_cutter_0_5_mm_over_the_jaw(tmp_path):
+    program = _program(tmp_path, "G0 X5 Y-10 Z12\nG0 Z6.5\nG1 Y3 F500\nG0 Z12\n")
+    found = _gcode.check_keep_out(program, 6.35, boxes=[_JAW], clearance=1.0)
+    assert [(f.program, f.check) for f in found] == [("p.nc", "jaw_clearance")]
+    assert "least 0.500 mm (0.020 in) at line 3" in found[0].detail
+    # Without the floor the same pass is clear: it never goes below the top.
+    assert _gcode.check_keep_out(program, 6.35, boxes=[_JAW]) == []
+    # Supports beside the jaw and stock between the jaws are not jaws.
+    for name in ("fixed-jaw parallel", "fixed-jaw stack", "the bars between the jaws", "vise bed"):
+        assert not _gcode.is_jaw_shape(name), name
+        other = {**_JAW, "name": name}
+        assert _gcode.check_keep_out(program, 6.35, boxes=[other], clearance=1.0) == []
+    for name in ("moving jaw", "jaw", "toe clamp"):
+        assert _gcode.is_jaw_shape(name), name
+
+
+def test_verify_applies_the_shop_floor_and_reads_the_known_list(tmp_path):
+    assert cam_nc.jaw_clearance_min_mm() == 1.0
+    (tmp_path / "A1.nc").write_text("G0 X5 Y-10 Z12\nG0 Z6.5\nG1 Y3 F500\nG0 Z12\n", encoding="utf-8")
+    (tmp_path / "B1.nc").write_text("G0 X5 Y-10 Z12\nG0 Z7.2\nG1 Y3 F500\nG0 Z12\n", encoding="utf-8")
+    checks = [
+        (name, "keep_out", {"radius": 6.35, "boxes": [_JAW]}) for name in ("A1", "B1")
+    ]
+    # Unlisted: the 0.5 mm pass fails.
+    found = cam_nc.verify(checks, tmp_path, known={})
+    assert [(f.program, f.check) for f in found] == [("A1.nc", "jaw_clearance")]
+    # Listed: reported as known, not returned.
+    assert cam_nc.verify(checks, tmp_path, known={"A1.nc": "#3607"}) == []
+    # Listed but clear: the entry is stale and fails.
+    stale = cam_nc.verify(checks, tmp_path, known={"A1.nc": "#3607", "B1.nc": "#3607"})
+    assert [(f.program, f.check) for f in stale] == [("B1.nc", "jaw_clearance")]
+    assert "remove its entry" in stale[0].detail
+    # A recipe may raise the floor, never lower it.
+    raised = [("B1", "keep_out", {"radius": 6.35, "boxes": [_JAW], "clearance": 1.5})]
+    assert [f.check for f in cam_nc.verify(raised, tmp_path, known={})] == ["jaw_clearance"]
+    lowered = [("B1", "keep_out", {"radius": 6.35, "boxes": [_JAW], "clearance": 0.5})]
+    with pytest.raises(ValueError, match="under the shop floor"):
+        cam_nc.verify(lowered, tmp_path, known={})
+
+
+def test_the_known_jaw_clearance_list_names_its_issue():
+    assert cam_nc.KNOWN_JAW_CLEARANCE_VIOLATIONS.keys() == {"CL01_face_b.nc", "PG15_height.nc"}
+    assert all("#3607" in why for why in cam_nc.KNOWN_JAW_CLEARANCE_VIOLATIONS.values())
+
+
 def test_a_reamer_rapided_out_of_its_bore_is_caught(tmp_path):
     fed = _program(tmp_path, "G0 X10 Y5 Z5\nG0 Z1\nG1 Z-7 F80\nG1 Z1 F80\nG0 Z5\n")
     assert _gcode.check_feed_out(fed, 0.0) == []

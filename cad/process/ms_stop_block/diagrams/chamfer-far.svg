@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 420" font-family="sans-serif" font-size="13">
+  <!-- Setup 9, MS07b_far_chamfer: the 1/4 in 90° chamfer mill at the start of its one pass, over the fixed jaw. Left: the far end seen from the right (+X), the fixed jaw on the right (+Y); right: from above. Both to scale at 8 px/mm from the .56 height (14.224 mm, 113.8 px) and the .48 depth (12.192 mm, 97.5 px). The block lies on its locating edge on the 1 in + 1/2 in stacks (riser_height_mm), the top face up at Z 14.224 above the stacks; the jaw tops 6.845 above the stacks (lying_grip_mm), 54.8 px. The chamfer mill Ø6.35 (milling_cuts "far chamfer") = 50.8 px; its 90° point (taken as sharp, as the plan does) 1.266 mm below the top face (chamfer_tip_depth_mm), at Z 12.958 (far_chamfer_tip_mm), its axis 0.25 mm outside the far end (chamfer_offset_mm); the pass runs from Y +3.806 to Y −15.998 (MS07b_far_chamfer.nc), so the point crosses both jaws 6.113 mm (.241) above their tops. At least .50 in out of its collet (chamfer_projection_min_mm): drawn short, broken off. Jaws and stacks broken off below. Hand-drawn; styles: prechips.palette. -->
+  <rect class="paper" x="0" y="0" width="760" height="420"/>
+  <text class="title" x="16" y="22">Setup 9 (MS07b): chamfer the far end's roof corner, lying, top face up</text>
+  <path class="clamp" d="M132.5 275.2 L162.5 275.2 L162.5 360 L155 356 L147.5 364 L140 356 L132.5 360 Z"/>
+  <path class="clamp" d="M260 275.2 L290 275.2 L290 360 L282.5 356 L275 364 L267.5 356 L260 360 Z"/>
+  <text class="label" x="147.5" y="382" text-anchor="middle">moving jaw</text>
+  <text class="label" x="275" y="382" text-anchor="middle">fixed jaw</text>
+  <path class="fixture-support" d="M162.5 330 L187.9 330 L187.9 360 L175.2 356 L162.5 360 Z"/>
+  <path class="fixture-support" d="M234.6 330 L260 330 L260 360 L247.3 356 L234.6 360 Z"/>
+  <rect class="part-kept" x="162.5" y="216.2" width="97.5" height="113.8"/>
+  <rect class="part-removed" x="162.5" y="216.2" width="97.5" height="8.1"/>
+  <line class="active-face" x1="162.5" y1="224.3" x2="260" y2="224.3"/>
+  <line class="hidden" x1="132.0" y1="226.3" x2="290.4" y2="226.3"/>
+  <path class="cutter" d="M290.4 226.3 L265 200.9 L265 120 L271.4 116 L277.7 124 L284.1 116 L290.4 124 L296.8 116 L303.1 124 L309.5 116 L315.8 120 L315.8 200.9 Z"/>
+  <line class="dims" x1="300" y1="226.3" x2="300" y2="275.2"/>
+  <text class="label" x="306" y="256">6.113 (.241) over the jaw</text>
+  <text class="label" x="330" y="60">chamfer mill, at the pass's start</text>
+  <line class="leader" x1="326" y1="56" x2="300" y2="150"/>
+  <circle class="leader-dot" cx="300" cy="150" r="2.5"/>
+  <text class="label" x="330" y="90">chamfer {{cad.roof_chamfer_2_size_in:.2dot}} × 45°</text>
+  <line class="leader" x1="326" y1="86" x2="230" y2="220"/>
+  <circle class="leader-dot" cx="230" cy="220" r="2.5"/>
+  <text class="label" x="330" y="120">TOP face up</text>
+  <line class="leader" x1="326" y1="116" x2="200" y2="216.2"/>
+  <circle class="leader-dot" cx="200" cy="216.2" r="2.5"/>
+  <text class="label" x="330" y="300">LOCATING EDGE down</text>
+  <line class="leader" x1="326" y1="296" x2="211" y2="330"/>
+  <circle class="leader-dot" cx="211" cy="330" r="2.5"/>
+  <text class="label" x="330" y="330">1 in + 1/2 in parallels stacked</text>
+  <line class="leader" x1="326" y1="326" x2="247" y2="345"/>
+  <circle class="leader-dot" cx="247" cy="345" r="2.5"/>
+  <text class="label" x="615" y="70" text-anchor="middle">From above</text>
+  <rect class="clamp" x="500" y="124" width="230" height="16"/>
+  <text class="label-on-clamp" x="600" y="136" text-anchor="middle">fixed jaw (mating face)</text>
+  <rect class="clamp" x="500" y="237.5" width="230" height="16"/>
+  <text class="label-on-clamp" x="600" y="249.5" text-anchor="middle">moving jaw (back face)</text>
+  <rect class="part-kept" x="529.3" y="140" width="170.7" height="97.5"/>
+  <rect class="part-removed" x="691.9" y="140" width="8.1" height="97.5"/>
+  <line class="hidden" x1="702" y1="109.6" x2="702" y2="268"/>
+  <circle class="cutter" cx="702" cy="109.6" r="25.4"/>
+  <text class="label" x="500" y="290">FAR END to the right (X0);</text>
+  <text class="label" x="500" y="306">the pass runs across the jaws,</text>
+  <text class="label" x="500" y="322">its axis .010 outside the far end</text>
+  <text class="label" x="16.0" y="406.0">Not upright: there the finished far end left the point only 0.525 mm (.021) over the jaws (#3607).</text>
+</svg>

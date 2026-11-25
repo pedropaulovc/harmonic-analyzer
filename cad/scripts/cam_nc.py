@@ -49,6 +49,7 @@ from typing import Any
 import _cam_programs
 import _gcode
 import _process_plans
+import _shop_equipment
 import _telemetry
 
 FREECAD_ENV = "HARMONIC_FREECAD"
@@ -166,13 +167,59 @@ def _program(directory: Path, name: str, cache: dict[str, _gcode.Program]) -> _g
     return cache[file].tool_section(int(section)) if section else cache[file]
 
 
-def verify(expectations, directory: Path) -> list[_gcode.Finding]:
-    """Run every expectation against its posted program or tool section."""
+# Posted files known to pass a cutter over a vise jaw with less air than the
+# shop floor (cad/config/shop-equipment cnc.jaw-clearance), by file name, each
+# naming its issue. verify reports their jaw_clearance findings as known (a
+# warning) instead of failing on them, and fails when a listed file no longer
+# falls under the floor: its owner empties its entry once fixed. Nothing else
+# exempts a file from the floor.
+KNOWN_JAW_CLEARANCE_VIOLATIONS: dict[str, str] = {
+    "CL01_face_b.nc": "#3607 (ch_channel_lever: 0.521 mm over the moving jaw); not to be run until fixed",
+    "PG15_height.nc": "#3607 (pd_platen_guide: 0.521 mm over the fixed jaw); not to be run until fixed",
+}
+
+
+def jaw_clearance_min_mm() -> float:
+    """The shop's least air between a cutter and a jaw or clamp it passes over."""
+    return float(_shop_equipment.load()["cnc"]["jaw-clearance"]["jaw_clearance_min_mm"])
+
+
+def verify(expectations, directory: Path, known: dict[str, str] | None = None) -> list[_gcode.Finding]:
+    """Run every expectation against its posted program or tool section.
+
+    Every ``keep_out`` check runs with the shop's jaw-clearance floor; a
+    recipe's own ``clearance`` may raise it, not lower it. A listed file's
+    (``known``, by default :data:`KNOWN_JAW_CLEARANCE_VIOLATIONS`)
+    ``jaw_clearance`` findings are logged as known, not returned; a listed file
+    the expectations check with no such finding is a finding itself."""
+    known = KNOWN_JAW_CLEARANCE_VIOLATIONS if known is None else known
+    floor = jaw_clearance_min_mm()
     findings: list[_gcode.Finding] = []
     cache: dict[str, _gcode.Program] = {}
+    floored: set[str] = set()
     for program, check, kwargs in expectations:
+        if check == "keep_out":
+            own = kwargs.get("clearance", floor)
+            if own < floor:
+                raise ValueError(f"{program}: keep_out clearance {own} is under the shop floor {floor} mm")
+            kwargs = {**kwargs, "clearance": own}
+            floored.add(f"{program.partition('@')[0]}.nc")
         findings += getattr(_gcode, f"check_{check}")(_program(directory, program, cache), **kwargs)
-    return findings
+    kept: list[_gcode.Finding] = []
+    violating: set[str] = set()
+    for finding in findings:
+        file = finding.program.partition("@")[0]
+        if finding.check == "jaw_clearance" and file in known:
+            violating.add(file)
+            _telemetry.warn(f"known jaw-clearance violation ({known[file]}): {finding}")
+        else:
+            kept.append(finding)
+    for file in sorted((floored & known.keys()) - violating):
+        kept.append(_gcode.Finding(
+            file, "jaw_clearance",
+            f"listed in cam_nc.KNOWN_JAW_CLEARANCE_VIOLATIONS ({known[file]}) but clears the floor: remove its entry",
+        ))
+    return kept
 
 
 def cycle_times(expectations, directory: Path, rapid_mm_min: float = _gcode.RAPID_MM_MIN) -> dict[str, _gcode.CycleTime]:

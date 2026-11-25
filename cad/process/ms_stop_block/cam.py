@@ -26,10 +26,12 @@ MS05_rebate mills the rebate with the 1/8 in end mill, MS05_relief plunge-mills
 its corner relief with the 1/16 in long-reach end mill, both stopping short of the bar's ends, so the
 roof is never squeezed by the jaws. Upright, gripped on the mating and back
 faces: MS06 faces the locating end and chamfers its roof corner, MS07 the
-far end to the length and its roof corner. Lying, locating edge up: MS08
-spots and drills the thumb hole into the rebate; MS09 brings the tap guide
-over it. After MHA-MS-03's pair pilot: MS10 and MS11 bring it over each
-plate hole.
+far end to the length. Lying as for MS04 again, the locating edge down and
+the top face up: MS07b chamfers the far end's roof corner (upright, the
+finished far end stands too little over the jaws for the chamfer mill's
+point: issue #3607). Lying, locating edge up: MS08 spots and drills the
+thumb hole into the rebate; MS09 brings the tap guide over it. After
+MHA-MS-03's pair pilot: MS10 and MS11 bring it over each plate hole.
 
 Work frames (G54), each set in its setup; model frame x along the length
 from the locating end, y up from the locating edge, z into the block from
@@ -41,6 +43,8 @@ the mating face:
   locating-end side), Z0 the mating face; +Y toward the fixed jaw.
 - MS06/MS07: X0 the top face (left), Y0 the fixed jaw's face, Z0 the
   parallels' top.
+- MS07b: X0 the far end (right, the part to -X), Y0 the fixed jaw's face
+  (the mating face), Z0 the stacks' top (the locating edge).
 - MS08/MS09: X0 the locating end (right, the part to -X), Y0 the fixed jaw's
   face (the mating face), Z0 the stacks' top (the top face).
 - MS10/MS11: X0 the locating edge (right, the part to -X), Y0 the fixed
@@ -80,7 +84,8 @@ PROGRAMS: tuple[tuple[str, tuple[Any, ...]], ...] = (
     ("MS05_rebate", ("rebate",)),
     ("MS05_relief", ("relief",)),
     ("MS06_locating_end", (("locating_end",), ("locating_chamfer",))),
-    ("MS07_far_end", (("far_end",), ("far_chamfer",))),
+    ("MS07_far_end", ("far_end",)),
+    ("MS07b_far_chamfer", ("far_chamfer",)),
     ("MS08_thumb", (("thumb_spot",), ("thumb_drill",))),
     ("MS09_thumb_tap", ("tap_thumb",)),
     ("MS10_plate_tap_1", ("tap_plate_1",)),
@@ -690,10 +695,12 @@ def context(
     relief_lines.append(f"G0 Z{CLEAR_MM:.3f}")
     relief_centres = [[_r(x_relief), _r(y)] for y in relief_ys]
 
-    # MS06/MS07, the ends and the roof chamfers: machine X = height - y (the
+    # MS06/MS07, the ends, and MS06's roof chamfer: machine X = height - y (the
     # top face at X0), the faces along X, Y across [-depth, 0]; the chamfer
     # mill's axis offset outside the top face, its point below the end so
-    # the cone cuts the printed leg on both faces.
+    # the cone cuts the printed leg on both faces. MS07b chamfers the far
+    # corner lying, top face up: its axis offset outside the far end (X0),
+    # its point the same depth below the top face.
     chamfer_rpm, chamfer_feed = _setting(plan, shop, "locating chamfer")
     if _setting(plan, shop, "far chamfer") != (chamfer_rpm, chamfer_feed):
         raise ValueError(
@@ -790,6 +797,8 @@ def context(
         "rebate": ([-trim, height, 0.0], [[0, -1, 0], [-1, 0, 0], [0, 0, -1]]),
         "locating": ([far_top, height, depth], [[0, -1, 0], [0, 0, 1], [-1, 0, 0]]),
         "far": ([0.0, height, 0.0], [[0, -1, 0], [0, 0, -1], [1, 0, 0]]),
+        # MS07b: lying as for MS04, the far end to the right.
+        "far_chamfer": ([length, 0.0, 0.0], [[1, 0, 0], [0, 0, -1], [0, 1, 0]]),
         "thumb": ([0.0, height, 0.0], [[-1, 0, 0], [0, 0, -1], [0, -1, 0]]),
     }
     for key, (_origin, axes) in frames.items():
@@ -866,10 +875,14 @@ def context(
         "rebate": ((0.0, height), (-bar_x, 0.0), (-depth, 0.0)),
         "locating": ((0.0, height), (-depth, 0.0), (0.0, bar_x)),
         "far": ((0.0, height), (-depth, 0.0), (0.0, far_top)),
+        "far_chamfer": ((-length, 0.0), (-depth, 0.0), (0.0, height)),
         "thumb": ((-length, 0.0), (-depth, 0.0), (0.0, height)),
     }
     locating_tip = far_top - tip_depth
-    far_tip = length - tip_depth
+    _agree(plan, "locating_chamfer_tip_mm", locating_tip)
+    # MS07b: the point below the top face, lying (Z0 the locating edge).
+    far_tip = height - tip_depth
+    _agree(plan, "far_chamfer_tip_mm", far_tip)
     jobs = [
         {
             **em_tool,
@@ -969,13 +982,13 @@ def context(
         },
         {
             **chamfer_tool,
-            "frame": "far",
+            "frame": "far_chamfer",
             "label": "far chamfer",
             "ops": [
                 [
                     "far_chamfer",
                     "chamfer the far end's roof corner",
-                    _chamfer(-offset, chamfer_ys, length, far_tip, far_top),
+                    _chamfer(offset, chamfer_ys, height, far_tip, height),
                 ]
             ],
         },
@@ -1056,6 +1069,7 @@ def context(
     jaws_height = jaws(depth, (0.0, bar_x), lying_grip)
     jaws_upright = jaws(depth, (0.0, height), upright_grip)
     jaws_thumb = jaws(depth, (-length, 0.0), lying_grip)
+    jaws_far_chamfer = jaws(depth, (-length, 0.0), lying_grip)
     # MS05: gripped across the bar's width, the jaws along machine X; the
     # thinnest accepted block sets their tops highest below Z0.
     rebate_jaw_top = lying_grip - p["thickness_min_mm"]
@@ -1243,12 +1257,15 @@ def context(
         ),
         "MS07_far_end": (
             far_top,
-            [t["em-half"], t["chamfer"]],
+            [t["em-half"]],
+            length,
+            [face_checks(far_levels, far_top, height, -depth, jaws_upright)],
+        ),
+        "MS07b_far_chamfer": (
+            height,
+            [t["chamfer"]],
             far_tip,
-            [
-                face_checks(far_levels, far_top, height, -depth, jaws_upright),
-                chamfer_checks(length, jaws_upright),
-            ],
+            [chamfer_checks(height, jaws_far_chamfer)],
         ),
         "MS08_thumb": (
             height,

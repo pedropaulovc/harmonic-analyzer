@@ -63,6 +63,8 @@ class Move:
     # Arc centre and principal plane (17/18/19), for G2/G3 only.
     centre: tuple[float, float, float] | None = None
     plane: int = 17
+    # The file line the move is on (1-based; 0 when built by hand).
+    line: int = 0
 
     def _arc(self) -> tuple[int, int, float, float, float]:
         """In-plane axes, radius, start angle and swept angle (always positive)."""
@@ -302,6 +304,7 @@ def read_program(path: Path) -> Program:
             moves.append(Move(
                 motion, start, tuple(target),  # type: ignore[arg-type]
                 feed=None if motion is Motion.RAPID else feed, centre=centre, plane=plane,
+                line=number,
             ))
         position = target
     return Program(Path(path), tuple(moves), tuple(stops), tuple(spindle), tuple(machine_moves), tuple(probes))
@@ -1203,11 +1206,23 @@ def _box_distance(box: dict, p: Point) -> float:
     return math.hypot(dx, dy)
 
 
+# A vise jaw or a clamp, by its keep-out shape's name: one word, optionally
+# after one qualifier ("fixed jaw", "moving jaw", "toe clamp"). Supports under
+# or beside them ("fixed-jaw parallel", "fixed-jaw stack", "vise bed") and
+# stock between them ("the bars between the jaws") are not.
+_JAW_SHAPE = re.compile(r"^(?:[\w-]+ )?(?:jaw|jaws|clamp|clamps)$", re.IGNORECASE)
+
+
+def is_jaw_shape(name: str) -> bool:
+    return bool(_JAW_SHAPE.match(name))
+
+
 def check_keep_out(
     program: Program,
     radius: float,
     boxes: Sequence[dict] = (),
     circles: Sequence[dict] = (),
+    clearance: float = 0.0,
 ) -> list[Finding]:
     """No move, rapid or feed, brings the cutter (``radius``) into a fixture
     shape below its top: each of ``boxes`` an ``x`` × ``y`` rectangle, each of
@@ -1218,12 +1233,21 @@ def check_keep_out(
     the next must not cross the band within reach of either point. A recipe
     whose tool reaches above or below its programmed point (an arbor's
     spacers and nut round a slitting saw) checks each such part with every
-    shape's band shifted by the part's reach."""
+    shape's band shifted by the part's reach.
+
+    Over a vise jaw or a clamp (:func:`is_jaw_shape`; no ``z_bottom``) the
+    cutter keeps ``clearance`` of air: a point within its reach of the shape
+    and at or above the top but less than ``clearance`` over it is a
+    ``jaw_clearance`` finding naming the file, the least clearance and its
+    line. The programmed point is the tool's lowest (an end mill's end, a
+    drill's or chamfer mill's point)."""
     shapes = [(b, lambda p, b=b: _box_distance(b, p)) for b in boxes]
     shapes += [
         (c, lambda p, c=c: math.dist(c["centre"], p[:2]) - c["radius"]) for c in circles
     ]
     hits: dict[str, list[str]] = {}
+    # shape name -> (count, least clearance, its line, its point)
+    thin: dict[str, tuple[int, float, int, Point]] = {}
     for m in program.moves:
         previous = m.start
         for point in (m.start, *_xy_points(m)):
@@ -1236,11 +1260,29 @@ def check_keep_out(
                 if low < shape["z_top"] - _TOL_MM and high > shape.get("z_bottom", -math.inf) + _TOL_MM:
                     if near < radius - _TOL_MM:
                         hits.setdefault(shape["name"], []).append(_where(point))
+                elif (
+                    clearance > 0.0
+                    and "z_bottom" not in shape
+                    and is_jaw_shape(shape["name"])
+                    and near < radius - _TOL_MM
+                    and point[2] - shape["z_top"] < clearance - _TOL_MM
+                ):
+                    gap = point[2] - shape["z_top"]
+                    count, least, line, at = thin.get(shape["name"], (0, math.inf, 0, point))
+                    if gap < least:
+                        least, line, at = gap, m.line, point
+                    thin[shape["name"]] = (count + 1, least, line, at)
             previous = point
     findings: list[Finding] = []
     for shape, items in hits.items():
         what = f"cutter points into {shape}"
         _report(findings, program.name, what, items, "keep_out")
+    for shape, (count, least, line, at) in thin.items():
+        detail = (
+            f"{count} cutter points over {shape}'s top under the {clearance:.3f} mm floor: "
+            f"least {least:.3f} mm ({least / 25.4:.3f} in) at line {line} ({_where(at)})"
+        )
+        findings.append(Finding(program.name, "jaw_clearance", detail))
     return findings
 
 

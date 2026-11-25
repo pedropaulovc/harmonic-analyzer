@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 420" font-family="sans-serif" font-size="13">
   <rect class="paper" x="0" y="0" width="760" height="420"/>
-  <text class="title" x="16" y="22">Setup 13: the finished block, seen on its mating face</text>
+  <text class="title" x="16" y="22">Setup 14: the finished block, seen on its mating face</text>
   <polygon class="part-kept" points="74.2,70.0 344.5,70.0 358.7,84.2 358.7,269.1 60.0,269.1 60.0,84.2"/>
   <rect class="holes" x="60.0" y="102.0" width="298.7" height="48.4"/>
   <circle class="part-threads" cx="305.4" cy="212.2" r="15.3"/>
@@ -18,10 +18,10 @@
   <text class="label" x="440.0" y="120.0">rebate and relief: Setup 6</text>
   <line class="leader" x1="436.0" y1="116.0" x2="299.0" y2="126.2"/>
   <circle class="leader-dot" cx="299.0" cy="126.2" r="2.5"/>
-  <text class="label" x="440.0" y="160.0">2X 2-56 plate holes: Setup 12</text>
+  <text class="label" x="440.0" y="160.0">2X 2-56 plate holes: Setup 13</text>
   <line class="leader" x1="436.0" y1="156.0" x2="305.4" y2="212.2"/>
   <circle class="leader-dot" cx="305.4" cy="212.2" r="2.5"/>
-  <text class="label" x="440.0" y="260.0">thumb hole from the locating edge: Setup 9</text>
+  <text class="label" x="440.0" y="260.0">thumb hole from the locating edge: Setup 10</text>
   <line class="leader" x1="436.0" y1="256.0" x2="209.4" y2="252.0"/>
   <circle class="leader-dot" cx="209.4" cy="252.0" r="2.5"/>
   <text class="label" x="440.0" y="300.0">LOCATING END (right)</text>
