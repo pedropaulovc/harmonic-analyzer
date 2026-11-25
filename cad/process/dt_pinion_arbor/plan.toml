@@ -923,6 +923,7 @@ feed = "hand"
 [[setups.operations]]
 instruction = "Spans: slide the MHA-DT-33 collar (made before this arbor) on from the back crown, by hand, over the back stub and on to the pin hole; slide it off again."
 inspection = "MHA-DT-33 slides on by hand over both spans (note 2: turned to the collar's bore). A tight spot: chuck the arbor again as in Setup 7 and skim that span only to A."
+gauge_checks = "other"
 feed = "hand"
 
 [[setups.operations]]

@@ -591,7 +591,7 @@ peck = "none"
 milling_cuts = [
   { name = "bore drill", kind = "drill", phase = "finish", cutter_dia_mm = 9.5758, flutes = 2, rpm = 650, feed_mm_min = "{{process.bore_drill_feed_per_min_mm}}", stations_mm = "{{cad.arbor_bore_height_mm}}" },
 ]
-inspection = "Still clamped, chips blown out and the bore oiled: the MHA-DT-13 arbor (or an offcut of its 3/8 ground stock) enters the bore by hand the full depth of the strap (fit audit F01: V DRILL THRU, the arbor enters by hand). The bore bright, no tears (Ra {{cad.arbor_bore_finish_ra}} µm)."
+inspection = "Still clamped, chips blown out and the bore oiled: the MHA-DT-13 arbor (or an offcut of its 3/8 ground stock) enters the bore by hand the full depth of the strap (fit audit F01: V DRILL THRU, the arbor enters by hand; a clamp seat, no finish symbol)."
 gauge_checks = "other"
 
 [[setups.operations]]
@@ -834,7 +834,7 @@ gauge_checks = "other"
 [[setups.operations]]
 instruction = "Inspect each pedestal; record the readings with its number."
 feed = "hand"
-inspection = "Every pedestal: the arbor {{cad.arbor_bore_mates}} enters the bore by hand the full length of the strap (fit audit F01); the bore bright, no tears (Ra {{cad.arbor_bore_finish_ra}} µm). Bore height {{cad.arbor_bore_height_min_in:.3dot}}–{{cad.arbor_bore_height_max_in:.3dot}}: the pedestal on its seat on the surface plate, the height gauge on the bore's bottom and top walls, their mean. A 4-40 screw runs in by hand into the bore."
+inspection = "Every pedestal: the arbor {{cad.arbor_bore_mates}} enters the bore by hand the full length of the strap (fit audit F01). Bore height {{cad.arbor_bore_height_min_in:.3dot}}–{{cad.arbor_bore_height_max_in:.3dot}}: the pedestal on its seat on the surface plate, the height gauge on the bore's bottom and top walls, their mean. A 4-40 screw runs in by hand into the bore."
 gauge_checks = [
   { gauge = "height-gauge", band_mm = "{{cad.arbor_bore_height_band_mm}}" },
 ]

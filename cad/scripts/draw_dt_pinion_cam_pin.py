@@ -211,12 +211,13 @@ requirement(
 )
 # The shank: the 5/32 drill rod as supplied, size REF (no printed band);
 # ``dia`` is the supplier's catalogue band, the traveler's check that the bar
-# is the stock.
+# is the stock (the turned_shaft adapter reads an as-supplied outer as a
+# band, as MHA-DT-13's and MHA-DT-17's).
 requirement(
     "outer",
     kind="diameter",
     faces=(CylinderFace(PIN_DIA),),
-    requirements=("stock",),
+    requirements=("dia",),
     fields={
         "axis": ([0.0, 0.0, 1.0], ((_GEOM, "PIN_DIA"),)),
         "at": ([0.0, 0.0, 0.0], ((_GEOM, "PIN_DIA"),)),
@@ -226,7 +227,6 @@ requirement(
             ((_GEOM, "PIN_DIA"), "PIN_DIA_BAND", (_SELF, "RIGHT_KEEP")),
         ),
         "dia_nominal": (PIN_DIA, ((_GEOM, "PIN_DIA"),)),
-        "stock": (PIN_DIA_CALLOUT, ("PIN_DIA_CALLOUT",)),
         "callout": (PIN_DIA_CALLOUT, ("PIN_DIA_CALLOUT",)),
     },
     precision={"dia": _P["PinDia"]},
