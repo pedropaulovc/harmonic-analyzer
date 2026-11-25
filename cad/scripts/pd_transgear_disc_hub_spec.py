@@ -716,12 +716,16 @@ OIL_HOLE_CALLOUT_BELOW = "\n".join(
 # callout ("TO .160 PAST AXIS") was not the standard form; a bare .144 was
 # gated 3/3 for no stated function.  So the stop's .160 links the pin's fit
 # note on its own row, as the overall and the spigot's length link the
-# stack's (rule 7: a linked note counts as being at the dimension), and the
-# note states, in rule 3's sense, what the third place keeps clear: the
-# pressed pin's end and the floor inside the O.D.  The note names the pin
-# and its press fit, so the ream's callout links it and no longer repeats
-# the pin.  Why the hole is reamed and its offset held to +/-.002 is the
-# registry's.  The #56 knockout is drilled through; the chord's offset from
+# stack's (rule 7: a linked note counts as being at the dimension): the
+# stop is where the pressed pin seats.  The note keeps to the fit, its mate
+# and its acceptance: a version that also said how far the pin presses and
+# what stays inside the O.D. was gated as an assembly instruction and
+# design reasoning on a part sheet (review of 67b6a3879a); that the third
+# place keeps the pin's end under the O.D. is KEY_PIN_END_RECESS_WORST's to
+# prove, above.  The note names the pin, so the ream's callout links it and
+# no longer repeats the pin.  Why the hole is reamed and its offset held to
+# +/-.002 is the registry's.  The #56 knockout is drilled through; the
+# chord's offset from
 # the hub axis is a location that carries its value and band only (rule 7).
 KEY_PIN_ENTRY_X = math.sqrt((HUB_DIA / 2.0) ** 2 - KEY_PIN_CHORD_OFFSET**2)
 KEY_PIN_DEPTH_REF = KEY_PIN_ENTRY_X + KEY_PIN_STOP  # .366
@@ -733,10 +737,7 @@ KEY_PIN_CALLOUT_BELOW = "\n".join(
     )
 )
 KEY_PIN_STOP_SUFFIX = f" SEE NOTE {KEY_PIN_NOTE}"
-KEY_PIN_NOTE_TEXT = (
-    f"PRESS FIT ON {KEY_PIN_NUMBER}, PRESSED IN TO THE FLOOR: "
-    "PIN END AND FLOOR STAY INSIDE THE O.D."
-)
+KEY_PIN_NOTE_TEXT = f"PRESS FIT ON {KEY_PIN_NUMBER}: THE PIN PRESSES IN."
 # The numbered notes, in order.
 NOTE_TEXTS = {
     STACK_NOTE: STACK_TEXT,

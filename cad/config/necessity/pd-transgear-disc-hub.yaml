@@ -10,7 +10,7 @@
 # The ream's floor .160 from the axis (SECTION A-A) is also at the title
 # block: at .XX the pressed pin's end and the floor's corner break the O.D.
 # (pd_transgear_disc_hub_spec.KEY_PIN_END_RECESS_WORST); the .160 links
-# note 3, which says so.
+# note 3, the fit note of the pin that seats on that floor.
 necessity:
   - id: N-01
     feature: "sheet 1, end view, Ø.3135 REAM THRU bore (note 2: MHA-PD-10 is turned to it)"

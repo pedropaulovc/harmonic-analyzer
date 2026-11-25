@@ -1236,12 +1236,13 @@ def test_the_chord_hole_dimensions_print_left_of_the_ring() -> None:
         f"SEE NOTE {spec.KEY_PIN_NOTE}",
     ]
     assert "PAST AXIS" not in _sheet_text()
-    # The stop's .160 links the fit note (rule 7), which says what its third
-    # place keeps clear (rule 3): KEY_PIN_END_RECESS_WORST holds at the .XXX
-    # row and breaks through at the .XX row's +/-.01.
+    # The stop's .160 links the fit note (rule 7); the note keeps to the
+    # fit, its mate and its acceptance (an instruction and a reason in it
+    # were gated, review of 67b6a3879a).  That the third place keeps the
+    # pin's end under the O.D. is the spec's check: it holds at the .XXX row
+    # and breaks through at the .XX row's +/-.01.
     assert spec.KEY_PIN_NOTE_TEXT == (
-        f"PRESS FIT ON {spec.KEY_PIN_NUMBER}, PRESSED IN TO THE FLOOR: "
-        "PIN END AND FLOOR STAY INSIDE THE O.D."
+        f"PRESS FIT ON {spec.KEY_PIN_NUMBER}: THE PIN PRESSES IN."
     )
     assert spec.KEY_PIN_END_RECESS_WORST > 0.0
     assert len(f"{spec.KEY_PIN_NOTE}. {spec.KEY_PIN_NOTE_TEXT}") <= drawing._NOTE_WIDTH
