@@ -268,14 +268,17 @@ def _near(other, region):
     return Part.makeCompound(faces) if faces else other
 
 
-def thickness(region, other):
-    """The region's farthest sampled point from ``other``. Sampled at the
-    mesh vertices and on a FACE_GRID x FACE_GRID grid inside every face: a
-    cylinder's mesh has vertices on its edges only, and a plugged hole or a
-    ring left in a groove touches ``other`` along every edge (its depth
-    shows at the middle of its cap). And on a lattice inside it (cells of
-    LATTICE_MM where that makes fewer than LATTICE_CELLS): a plugged hole
-    under a thin strip left over it has no cap of its own."""
+def thickness(region, whole, other):
+    """The region's (of ``whole`` less ``other``) farthest sampled point from
+    ``other``. Sampled at the mesh vertices and on a FACE_GRID x FACE_GRID
+    grid inside every face: a cylinder's mesh has vertices on its edges
+    only, and a plugged hole or a ring left in a groove touches ``other``
+    along every edge (its depth shows at the middle of its cap). And on a
+    lattice inside it (cells of LATTICE_MM where that makes fewer than
+    LATTICE_CELLS): a plugged hole under a thin strip left over it has no
+    cap of its own. A lattice point that would set the depth must be in
+    ``whole`` and not in ``other``: the region's own inside test misplaced
+    the bracket's tap-mouth rings' lattice into the metal around the hole."""
     grid = []
     for face in region.Faces:
         u0, u1, v0, v1 = face.ParameterRange
@@ -289,19 +292,20 @@ def thickness(region, other):
     pts = _strided(grid, 2 * THICKNESS_POINTS) + _strided([V(*p) for p in mesh.Topology[0]], THICKNESS_POINTS)
     near = _near(other, region)
     best, where = 0.0, None
-    for p in pts + _lattice(region):
-        d = near.distToShape(Part.Vertex(p))[0]
-        if d > best:
-            best, where = d, [p.x, p.y, p.z]
+    for lattice, sample in ((False, pts), (True, _lattice(region))):
+        for p in sample:
+            d = near.distToShape(Part.Vertex(p))[0]
+            if d > best and (not lattice or whole.isInside(p, 1e-6, False) and not other.isInside(p, 1e-6, True)):
+                best, where = d, [p.x, p.y, p.z]
     return best, where
 
 
-def regions(shape, other):
-    solids = sorted(shape.Solids, key=lambda s: -s.Volume)
+def regions(whole, other):
+    solids = sorted(whole.cut(other).Solids, key=lambda s: -s.Volume)
     big = [s for s in solids if s.Volume >= REGION_MIN_MM3]
     measured = []
     for s in big[:REGION_CAP]:
-        t, at = thickness(s, other)
+        t, at = thickness(s, whole, other)
         measured.append({"volume_mm3": s.Volume, "thickness_mm": t, "at_mm": at, "extent_mm": _bbox(s)})
     return measured, {
         "unmeasured_regions": len(big) - len(measured),
@@ -336,8 +340,8 @@ def run_part(spec_part, noise_mm, mesh_dir, move_cap):
         blank = blank.Solids[0]
         part, programs = simulate(blank, variant["programs"], profiles, cad, move_cap)
         t1 = time.perf_counter()
-        left, left_rest, left_solids = regions(part.cut(cad), cad)
-        gouge, gouge_rest, gouge_solids = regions(cad.cut(part), part)
+        left, left_rest, left_solids = regions(part, cad)
+        gouge, gouge_rest, gouge_solids = regions(cad, part)
         t2 = time.perf_counter()
         meshes = None
         over = [r for r in left + gouge if r["thickness_mm"] > noise_mm]
