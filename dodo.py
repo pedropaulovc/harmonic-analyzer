@@ -4540,7 +4540,10 @@ def _prechips_task(stem: str) -> dict[str, Any]:
     import _process_plans
     from export_features import SUPPORTED_PARTS, bundle_paths
 
-    assert stem in SUPPORTED_PARTS, f"traveler stem is not exported: {stem}"
+    # The parts whose manifests the plan binds: its own, or a family's.
+    parts = _process_plans.part_stems(stem)
+    unexported = sorted(set(parts) - set(SUPPORTED_PARTS))
+    assert not unexported, f"traveler stem is not exported: {unexported}"
     label = f"prechips:{stem}"
     plan = _process_plans.plan_path(stem)
     targets = _canonical_targets(label)
@@ -4548,7 +4551,7 @@ def _prechips_task(stem: str) -> dict[str, Any]:
         sys.executable, str(SCRIPTS_DIR / "prechips_traveler.py"),
         stem, "--out", str(CAD_OUT),
     ]
-    manifest, _step = bundle_paths(stem, CAD_OUT)
+    manifests = [bundle_paths(part, CAD_OUT)[0] for part in parts]
     return {
         "name": stem,
         "file_dep": sorted({
@@ -4563,10 +4566,10 @@ def _prechips_task(stem: str) -> dict[str, Any]:
                 and "__pycache__" not in path.relative_to(plan.parent).parts
             ),
             *(str(path.resolve()) for path in _process_plans.shop_files()),
-            str(manifest.resolve()),
+            *(str(manifest.resolve()) for manifest in manifests),
             *_executed_closure(cmd),
         }),
-        "task_dep": [f"package:manifest:{stem}"],
+        "task_dep": [f"package:manifest:{part}" for part in parts],
         "targets": targets,
         # The wrapper runs the latest prechips release from PyPI (not a locked
         # dependency, #2502), so no local input pins the generator: always run.
@@ -4585,8 +4588,9 @@ def _prechips_task(stem: str) -> dict[str, Any]:
 def task_prechips():
     """prechips travelers for enrolled parts (pro and hobby HTML, plus the hobby
     sheet printed to ``<slug>-traveler.pdf``), rendered by the latest PyPI release.
-    ``build`` and ``release`` run every one (release ships the PDFs);
-    ``build_bare`` runs none."""
+    A family plan's task (one plan for several parts) also prints each part's
+    placeholder, ``<part slug>-traveler.pdf``. ``build`` and ``release`` run
+    every one (release ships the PDFs); ``build_bare`` runs none."""
     import _process_plans
 
     for stem in _process_plans.TRAVELER_STEMS:
@@ -4616,7 +4620,10 @@ def _cam_task(stem: str) -> dict[str, Any]:
         # as is the runtime's own hash, so the runtime's text is an input too
         # (the recipe, outside cad/scripts, is already keyed by bytes).
         "file_dep": sorted({*deps, _source_text_dep(label, [runtime])}),
-        "task_dep": [f"package:manifest:{stem}"],
+        # A family recipe posts from every part's bundle.
+        "task_dep": [
+            f"package:manifest:{part}" for part in _cam_programs.cam_parts(stem)
+        ],
         "targets": targets,
         # A failed post or check must not leave a previous success's stamp; the
         # driver removes every program and the manifest itself.
@@ -4632,7 +4639,8 @@ def _cam_task(stem: str) -> dict[str, Any]:
 def task_cam():
     """NC programs for enrolled parts, posted by headless FreeCAD CAM
     (``freecadcmd``) from ``cad/process/<stem>/cam.py`` and checked against the
-    part's feature bundle, with each program's cycle time. ``build`` and
+    part's feature bundle (a family recipe: every part's, posted once for the
+    family), with each program's cycle time. ``build`` and
     ``release`` run every one (release ships the programs under ``nc/<stem>/``);
     ``build_bare`` runs none. Submitter-only, like ``prechips``: no farm worker
     has FreeCAD, so the submitter needs FreeCAD 1.1+ and the task fails loud

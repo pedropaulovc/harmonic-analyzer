@@ -294,6 +294,23 @@ def test_a_cut_outside_the_envelope_is_refused(stickout, depth, width, message) 
     assert message in problem
 
 
+def test_a_family_operation_reads_its_own_parts_parameters() -> None:
+    # A family plan (cad/process/README.md, Family plans): a part's own
+    # parameter bounds the cuts of the setups and operations that name it.
+    plan = _plan(27.94, "{{process.skim_mm}}", 2.2)
+    plan["parts"] = [
+        {"id": "thin", "parameters": {"skim_mm": 0.5}},
+        {"id": "thick", "parameters": {"skim_mm": 7.0}},
+    ]
+    (problem,) = _measured_cuts.problems(plan, MEASURED)
+    assert "not a number or one process parameter" in problem
+    plan["setups"][0]["part"] = "thin"
+    assert _measured_cuts.problems(plan, MEASURED) == []
+    plan["setups"][0]["operations"][1]["part"] = "thick"
+    (problem,) = _measured_cuts.problems(plan, MEASURED)
+    assert "axial_doc_mm 7 exceeds the measured 6.6" in problem
+
+
 def test_a_measured_setting_without_declared_cuts_is_refused() -> None:
     plan = _plan(27.94, 6.6, 2.2)
     del plan["setups"][0]["operations"][1]["milling_cuts"]

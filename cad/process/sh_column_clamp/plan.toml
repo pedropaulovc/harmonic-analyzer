@@ -1,0 +1,1157 @@
+# Column clamp pair: front MHA-SH-01 and back MHA-SH-02 (qty 3 each), one
+# traveler for both halves (owner, Pedro, 2026-11-22: "theres too much
+# repetition bw front and back clamps"; rulings 2026-11-24: "Adopt it: delete
+# the two single plans; one plan serves both parts.", "One shared CC01-04
+# set.", a release ships "a placeholder pdf per part that points to shared
+# one", "Renumber, so T3 means one drill everywhere on the sheet.", "Rename
+# the marks (fronts F1-F3 stay; backs become K1-K3)."). A prechips family
+# plan: it binds each half's manifest under [[parts]] and has no [cad] table.
+# Routed for the CNC mill (owner ruling 2026-11-20, relayed by Main).
+#
+# Route: saw six blanks of 3/4 in square 1018 about 2.0 long. Setups 2-5 cut
+# all six alike: upright on the 1 in parallels, face the first end (CC01),
+# turn over, face to the 1.890 width (CC02); lying on the 1 in and 1/2 in
+# parallels stacked under each jaw (1.5 in, so every face stands above the
+# jaw tops), face the bottom face B (CC03) and, B down, the top to the .630
+# height (CC04). Setup 6, jaws on B and the top, skims the mating face and
+# makes a blank a front (N at the left, CF05) or a back (N at the right,
+# CB05). Setup 7, mating face down: the fronts' outside face to the .685
+# depth and both #9 ear holes from one zero (CF06). Setup 8: the backs'
+# outside face to the .610 pre-face depth (the drawing's .590 plus the .020
+# grip offset, MHA-SH-02 NOTE 1), both #29 tap drills (CB06) and the 8-32
+# taps by hand under the spring tap guide (CB07, CB08). Setup 9: bench
+# deburr, then each back bolted to its front with the pair's own #8-32
+# screws, gripped on the two outside faces with a 1-2-3 block between the
+# screw heads, and the full Ø1.008 bore interpolated on the split line with
+# the 1/2 in carbide end mill (CB09; CB10 opens it if the gauge reads it
+# small), gauged with the telescoping gauges. Setup 10: .020 faced off the
+# back's mating face (CB11; .610 -> .590), the drawing's gap between the
+# halves. Setup 11: inspect, deburr, black enamel: the owner's Rust-Oleum
+# Flat Black 376855 (owner 2026-11-21, answered in person: "rust-oleum Flat
+# Black376855") over the maker's Clean Metal Primer, by Rust-Oleum's
+# technical data SRT-01 (consumables.black-alkyd-enamel cites it).
+#
+# Family binding: a setup or operation with part = "front" or "back" binds
+# that half's drawing values; the others bind only values both halves'
+# manifests give alike (prechips refuses any that differ), so a shared setup
+# cannot print a number that is true of one half only. {{cad.front.KEY}} and
+# {{cad.back.KEY}} name a half anywhere. The pair bore prints the back's
+# values and serves both halves (serves).
+#
+# Blank to blank inside one setup (owner 2026-11-24 on the sheet's length:
+# "ask agent to be skeptical if setups are efficient"): the fixed jaw (Y0)
+# and the parallels' or stacks' top (Z0) do not move when a blank is
+# changed, and the work stop (owner ruling 2026-11-24: "Yes, use the work
+# stop for X0 (agent's recommendation)."; [parameters] stop_*) holds X0, so
+# a setup's later blanks take no touch-off but the Z0 of Setups 2 and 10,
+# which is the blank's own top. Every cut to a drawing size is measured on
+# every blank before it leaves its setup, which catches a blank seated on a
+# chip or short of the stop. The bolted pairs (Setup 9) take every
+# touch-off: their Y0 is each back's own depth. The same form: "No, keep
+# single blanks" (no strips of three) and "No, keep skimming face B (datum
+# stays a machined face)."
+#
+# Tapping: FluidNC cannot rigid-tap (owner, Pedro, 2026-11-17). The tap is
+# guided by the Fisher spring tap guide in the 1/2 in R8 collet (owner, Pedro,
+# answered in person 2026-11-21, cnc rulings record: "use
+# https://littlemachineshop.com/products/tap-guide-fisher?variant=45472915226805
+# on r8 0.5 collet"; cad/config/shop-equipment/ tools.tap-guide-fisher, to
+# buy, owner ruling 2026-11-22): its spring-loaded point seats in the T-handle
+# wrench's centre hole and follows the tap down 1/2 in, spindle off; the
+# operator jogs Z only to push the point home again and to read the depth.
+# FluidNC refuses jogs in the Hold an M0 leaves
+# (wiki.fluidnc.com/en/features/single_block_mode), so each tap stop is its
+# own file ending M30 over its hole (CB07, CB08).
+#
+# Zeroing: the touch probe has no holder (its 6 mm R8 collet is off the buy
+# list, cad/config/shop-equipment/ gauges.touch-probe-diy0-tp05), so every
+# X/Y zero is the owned .200 in edge finder at 900 rpm (logbook 2026-11-04,
+# tools.edge-finder) and every Z zero the end mill on a .002 feeler leaf, as
+# the magnifying clamp plan does. The pair's Y0, the split line, is the
+# fixed jaw's face less the back's miked pre-face depth (Main, 2026-11-20):
+# the back's outside face is against that jaw.
+#
+# NC (cam:sh_column_clamp, cad/process/sh_column_clamp/cam.py), posted once
+# for the pair into cad/out/nc/sh_column_clamp/: CC01_first_end, CC02_length,
+# CC03_bottom, CC04_height (every blank); CF05_mating, CF06_bar_drill (a
+# front); CB05_mating, CB06_back_drill, CB07_tap_1, CB08_tap_2,
+# CB09_pair_bore, CB10_bore_open, CB11_face_off (a back, or the pair).
+# Program names (each setup's `programs`), the [parameters] and the
+# milling_cuts names are a contract with that recipe. One T number names one
+# tool on the whole sheet, each tool's `number` below, which the recipe posts:
+# T1 1/2 in end mill, T2 centre drill, T3 #9 drill, T4 #29 drill, T5 tap
+# guide (the tap is turned by hand).
+title = "Column clamp front and back"
+part = "{{cad.front.drawing_number}} front, {{cad.back.drawing_number}} back"
+revision = "{{cad.revision}}"
+material = "1018 cold-finished steel, 3/4 in square (drawing: {{cad.material_spec}})"
+stock = "{{process.blank_section_in:fraction}} in square bar; {{process.blank_count:d}} × {{process.blank_length_min_in:.2f}}–{{process.blank_length_max_in:.2f}} in blanks ({{process.quantity:d}} fronts, {{process.quantity:d}} backs), {{process.sawn_bar_length_in:.1f}} in of bar with the kerfs."
+note = "Inches unless mm; G-code and console entries in mm (the files and the controller run G21). One traveler for the pair: {{process.quantity:d}} fronts ({{cad.front.drawing_number}}, marked F1–F3) and {{process.quantity:d}} backs ({{cad.back.drawing_number}}, marked K1–K3), bored bolted together. Setups 1–6 and 11 serve both halves (through Setup 5 all six blanks are cut alike; Setup 6 makes a blank a front or a back); Setup 7 is the fronts', Setups 8 and 10 the backs', Setup 9 the bolted pairs'. Every blank goes through a setup before the next setup starts. In a single-blank setup, take every touch-off on its first blank, then set the work stop against it; push each later blank against the stop and repeat only what its Datum line names: X0 on the stop, Y0 on the fixed jaw and a Z0 on the parallels or the stacks stand while the vise, the parallels and the stop stay put. No touch-off beside the work (the edge finder, or the end mill coming down on a parallel or a stack) is taken with the stop's rod between the jaws: every setup starts with the rod drawn back clear of the vise, and the stop's own step sets it again. A Z0 taken on the work's own top (Setups 2 and 10) stays clear of the rod, which sits below that top. Programs: a CC file cuts any blank, a CF file a front, a CB file a back or the pair. One tool number means one tool in every file: T1 the 1/2 in end mill, T2 the centre drill, T3 the #9 drill, T4 the #29 drill, T5 the tap guide. Finished sizes: Setup 1's table. Before a milled face goes down on the parallels or against the fixed jaw in the next setup, file the burr off its edges: a burr under the seat lifts the part and the next cut comes out thin. Speeds on the PM-30MV low belt (100–2800 rpm): no belt change. Home the mill ($H) once, after switching it on: every M6's trip to the tool setter and the tap files' G53 retract count from home. Home again only after a power cycle or a controller restart, an E-stop, an alarm, a limit switch hit, a stall or a crash: homing brings the stored G54 back. Then, before Cycle Start, touch one of the setup's zeros again with the edge finder: it must read what its step set, within .001 in. It does not, or the part may have moved: take the setup again from its first step, the part out. Feed Hold, then Reset with the axes stopped keeps position and G54: no homing, no new zero; console M6 for the tool in the spindle, then Cycle Start. Every file is proved in air on the first blank it cuts. Keep each back with its front from the pair bore (Setup 9) on: scribe the pair number on both."
+shop = "../shop"
+stock_refs = ["1018-square-3-4"]
+material_key = "rocker-1018-cold-finished"
+milling_material = "steel_1018"
+
+[[parts]]
+id = "front"
+label = "Front {{cad.drawing_number}}"
+title = "{{cad.drawing_number}} column clamp front"
+file = "../../out/features/sh_column_clamp_front/features.toml"
+adapter = "clamp_half"
+part = "sh-column-clamp-front"
+
+# The front's own numbers.
+[parts.parameters]
+# The other half's outside face to the split line (MHA-SH-02's pre-face
+# depth band, .600-.620): the pair picture's back half.
+other_half_depth_min_mm = 15.24
+other_half_depth_max_mm = 15.748
+# Ear holes: spot Ø.150 with the #2 centre drill, under the #9 (no chamfer
+# at the mouth), then the #9 through, pecked .180 (under one diameter) with
+# full retracts (L/D 3.5), its full diameter drill_past_mm past the mating
+# face into the gap between the parallels.
+spot_dia_mm = 3.81
+peck_mm = 4.572
+# The #9's point 1.0 + its 118° point (1.496) below the parallels' top;
+# cam.py checks it.
+drill_tip_height_mm = -2.496
+# #9 (.196): 1200 rpm (62 ft/min) × .003 = 3.6 in/min (sources: the shared
+# spot_feed_per_min_mm comment). cam.py posts it.
+drill_feed_per_min_mm = 91.44
+# ASME B94.11M jobber length, overall, of the #9: 3-1/2 in. Bounded by its
+# whole length below the chuck.
+drill_9_oal_mm = 88.9
+
+[[parts]]
+id = "back"
+label = "Back {{cad.drawing_number}}"
+title = "{{cad.drawing_number}} column clamp back"
+file = "../../out/features/sh_column_clamp_back/features.toml"
+adapter = "clamp_half"
+part = "sh-column-clamp-back"
+
+# The back's own numbers.
+[parts.parameters]
+# The other half's outside face to the bore axis (MHA-SH-01's depth band,
+# .680-.690): the pair's front half.
+other_half_depth_min_mm = 17.272
+other_half_depth_max_mm = 17.526
+# The grip offset CB11 faces off the mating face in one level: the drawing's
+# .020 (MHA-SH-02 NOTE 1), restated here so the measured envelope can read
+# the cut's depth; cam.py checks it equals the export's grip offset.
+grip_offset_mm = 0.508
+# Tap drills: spot Ø.120 with the #2 centre drill, under the #29 (no chamfer
+# at the mouth; the tap's start is the drill's), then the #29 through,
+# pecked .120 (under one diameter) with full retracts (L/D 4.5), its full
+# diameter drill_past_mm past the mating face into the gap between the
+# parallels.
+spot_dia_mm = 3.048
+peck_mm = 3.048
+# The #29's point 1.0 + its 118° point (1.038) below the parallels' top;
+# cam.py checks it.
+drill_tip_height_mm = -2.038
+# #29 (.136): 1700 rpm (61 ft/min) × .003 = 5.1 in/min (sources: the shared
+# spot_feed_per_min_mm comment). cam.py posts it.
+drill_feed_per_min_mm = 129.54
+# Tapping 8-32 through: the plug tap's point stops this far below the
+# outside face, a standard #8 hand tap's .750 thread length, so its shank
+# stays out of the hole; its 5/32 chamfer then leaves partial threads only
+# in the last .016 at the mating face, which the .020 face-off removes.
+tap_point_depth_mm = 19.05
+# The pair's 1-2-3 block (shop fixtures.blocks-123), one of the owner's
+# two: its 1 in face between the screw heads (spacer_block_width_mm, shared),
+# 2 in tall on the vise bed, 3 in across the jaws.
+spacer_block_height_mm = 50.8
+spacer_block_length_mm = 76.2
+# Across the jaws in the pair: the front's depth, the back's pre-face depth
+# and the block's 3 in. cam.py checks it.
+pair_jaw_span_mm = 109.093
+# The pair bore (CB09): a climbing helix at the rough radius, .010 in under
+# the finish on the radius, .020 in down per turn, from the pair's top to
+# 1.0 mm past the underside (into the gap between the parallels); a finish
+# and a spring turn at full depth. CB10 opens the finish .002 in on the
+# diameter (.001 on the radius) when the gauge reads it small.
+bore_finish_stock_mm = 0.254
+helix_pitch_mm = 0.508
+bore_past_mm = 1.0
+bore_tip_height_mm = -1.0
+bore_open_mm = 0.0508
+bore_open_radial_mm = 0.0254
+# The end mill's centre runs the helix at the chart setting's feed scaled to
+# its centre: the edge, at the rough radius plus the cutter's, carries the
+# chip load of shop settings.endmill-carbide-3fl-1-2-1018-cf (565.4 ×
+# 6.198/12.548). The bore is not inside a measured envelope (a full-width
+# helix and a 17 mm deep finish wall), so it stays on that chart setting.
+# cam.py checks it.
+bore_feed_per_min_mm = 279.27
+# The 1/2 in end mill set at least 1.25 in out of its collet for the bore,
+# so the collet's face clears the 1-2-3 block and the fixed jaw with the
+# cutter 1.0 mm below the pair (cam.py checks it).
+bore_mill_projection_min_mm = 31.75
+# Tapping under the spring tap guide (tools.tap-guide-fisher): the guide and
+# the tap in its wrench together reach at most tap_stack_max_mm below the
+# collet face, the spindle-to-table maximum (shop machines.pm-30mv, 431.8)
+# less 25.0 to bring the point down onto the wrench (the shop's tool-change
+# clearance), the vise bed, the stacks, the setup's tallest stock (the
+# blank's section) and the collet gauge, rounded down to .01 in; cam.py
+# checks it. It is also the guide-and-tap stack's declared reach in the
+# capacity check. The guide is 3 1/8 in (79.375) overall, its sellers' size
+# and the most it can stand below the collet face; the tap's reach in its
+# wrench is not on record, so the traveler stops before the first tap file
+# unless the tap, point to the wrench's centre hole, is at most
+# tap_wrench_reach_max_mm: 270.002 less 79.375, 190.627, rounded down to
+# .01 in (cam.py checks it).
+tap_stack_max_mm = 270.002
+tap_wrench_reach_max_mm = 190.5
+
+# What both halves share: the blank, the skims and facing passes, the holding
+# and the machine-capacity inputs.
+[parameters]
+quantity = 3
+# Blanks sawn in Setup 1, both halves together, and the bar they come off:
+# blank_count × blank_length_max_in + (blank_count − 1) × kerf_in.
+blank_count = 6
+sawn_bar_length_in = 12.925
+# The bar (stock.1018-square-3-4) and the blank the programs are posted for:
+# the owner's "about 2.0" sawn length, ±.05 for the saw.
+blank_section_in = 0.75
+blank_section_mm = 19.05         # blank_section_in × 25.4: the vise holds' and cam.py's section.
+blank_length_min_in = 1.95
+blank_length_max_in = 2.05
+kerf_in = 0.125
+# Skims (author's choice, .020 in each, enough to clean a sawn end or the
+# bar's cold-finished face): the first end, the bottom face and the mating
+# face. The other end, the top and the outside face are faced to size from
+# them in equal levels no deeper than face_step_max_mm (.050 in).
+end_skim_mm = 0.508
+bottom_skim_mm = 0.508
+mating_skim_mm = 0.508
+face_step_max_mm = 1.27
+# Facing: the 1/2 in carbide end mill (shop endmill-carbide-3fl-1-2) on the
+# owner's measured face setting, shop settings.em-half-carbide-1018-3439-face
+# (dechatter session of 2026-11-23, #3439: stable to 6.4 mm wide at up to
+# 1.27 mm deep, 2420-2490 rpm in the cut; cad/config/shop-equipment/
+# measured-cuts.toml): every face level no deeper than face_step_max_mm and
+# equal passes across the face no wider than that record's 6.4 mm, the
+# first with the cutter over the edge so it too takes one pass's width
+# (cam.py checks both). The 3/4 in faces take four passes of 4.89 mm (19.05
+# + the 0.5 overhang; three would need 6.52, over the limit), the .630 faces
+# three of 5.50 mm (two would need 8.25). Every measured pass was
+# conventional and the faces zigzag (owner ruling 2026-11-16), so every
+# other pass climbs: that half is not measured.
+face_cutter_dia_mm = 12.7
+face_stepover_max_mm = 6.4
+# Every drill's full diameter this far past the mating face, into the gap
+# between the parallels.
+drill_past_mm = 1.0
+# Speeds and feeds of the holes, authored in the operations: LittleMachineShop
+# "Cutting Speeds", Drilling & Reaming, Plain carbon steels 1006-1026 (read
+# 2026-11-20): drilling 60-100 ft/min; AutoDrill "Suggested drilling feed
+# rates" (read 2026-11-20), row Stl, Carbon: 1/16 in .001, 1/8 in .003 in/rev,
+# a size between two columns taking the lower one's feed. Centre drill:
+# 1800 rpm (88 ft/min on its 3/16 body; the strap plan's spot speed) × .001
+# (its 5/64 pilot) = 1.8 in/min. Each half's drill: its own
+# drill_feed_per_min_mm. cam.py posts these.
+spot_feed_per_min_mm = 45.72
+# Holding (shop workholding.vise-pm-6 and fixtures.parallels-lms-6745, 1/8
+# in thick): upright, a 1 in parallel against each jaw; lying, the set's 1 in
+# and 1/2 in parallels stacked against each jaw (1.5 in), as the sub-plate
+# plan stacks them, so every lying face stands above the jaw tops.
+parallel_height_mm = 25.4
+riser_height_mm = 38.1
+parallel_thickness_mm = 3.175
+vise_bed_height_mm = 73.3044     # Shop workholding.vise-pm-6.bed_height_mm.
+vise_jaw_height_mm = 44.9453     # Shop workholding.vise-pm-6.jaw_height_mm.
+vise_jaw_width_mm = 158.6738     # Shop workholding.vise-pm-6.jaw_width_mm.
+# Grips: jaw height less the parallels (upright) or the stacks (lying).
+upright_grip_mm = 19.5453
+lying_grip_mm = 6.8453
+# Each part centred on the jaws: its ends (jaw width − its length along the
+# jaws)/2 in from the jaw sides, upright the section, lying the width.
+vise_upright_inset_mm = -69.81
+vise_lying_inset_mm = -55.33
+# Upright, the tallest blank less the first-end skim stands above the
+# parallels in CC02; cam.py checks it.
+upright_top_max_mm = 51.562
+# The bolted pair (Setup 9; the pair picture): the MHA-SH-VN-53 clamp
+# screws, McMaster 90280A201 #8-32 × 1-1/4 narrow fillister
+# (sh_vn_clamp_screw_spec.FILLISTER_SIZE: head Ø.270 × .156), the
+# assembly's own pair; a 1-2-3 block, its 1 in face between the heads; a
+# single 1 in parallel under each half, the back's stopped .625 from the
+# bore axis along the jaws (it would otherwise run under the bore: the back
+# is only .610 deep).
+screw_head_dia_mm = 6.858
+screw_head_height_mm = 3.9624
+screw_length_mm = 31.75
+spacer_block_width_mm = 25.4
+back_parallel_end_mm = 15.875
+# Machine-capacity inputs (mm): heights from the table, tool lengths from
+# spindle nose to tip.
+r8_collet_gauge_mm = 6.3         # HA: holders.r8-collets-lms-4860.gauge_len_mm.
+drill_chuck_gauge_mm = 95.0      # Archive holders.drill-chuck-r8.gauge_len_mm.
+# 1/2 in end mill, 3 in overall: set 1.12 in (28.45 mm) out of the collet
+# for every face (Setups 2-8 and 10) (owner, Pedro, 2026-11-24: "28.45"),
+# the longer end of the stick-out the measured face setting allows
+# (cad/config/shop-equipment/measured-cuts.toml: 27.94 to 28.45 mm). Setup
+# 10 resets it from the bore's longer set.
+half_mill_projection_mm = 28.45
+# ASME B94.11M jobber length, overall, of the #2 combined drill and
+# countersink, 1-7/8 in. Bounded by its whole length below the chuck.
+centre_drill_oal_mm = 47.625
+# The work stop (owner ruling 2026-11-24, asked with
+# sketches/clamp-family-setup-options.png: "Yes, use the work stop for X0
+# (agent's recommendation)."): the owned HHIP 3900-2125 (cad/config/
+# shop-equipment/ fixtures.work-stop-hhip-3900-2125, rod 3/8 x 10 in) on the
+# table, its rod lying between the jaws against the blank's N end (upright:
+# its left face), set on a setup's first blank after its touch-offs; every
+# later blank is pushed against it and takes no X0 touch-off. The rod's top
+# is set no higher than stop_rod_top_max_mm (.440) above the parallels' or
+# stacks' top, and no cutter comes nearer its top than stop_clear_min_mm
+# (.137): the lowest facing cut over it is the back's face-off, .580 above
+# the stacks on the shallowest back (.600 less the .020 grip offset), .140
+# over the rod. cam.py carries the rod as a keep-out of every single-blank
+# program at that height plus that clearance. Every blank's X0 is still
+# proved by what is measured on it: the ear holes' stations from N (Setups
+# 7, 8) and the bore's place from N (Setups 9, 11).
+stop_rod_dia_mm = 9.525
+stop_rod_top_max_mm = 11.176
+stop_clear_min_mm = 3.48
+
+# `number`: the T number every program calls the tool by (cam.py posts
+# these and checks each file's M6 calls against them).
+[[tools]]
+id = "em-half"
+number = 1
+name = "1/2 in carbide end mill"
+ref = "endmill-carbide-3fl-1-2"
+[[tools]]
+id = "spot"
+number = 2
+name = "#2 centre drill"
+ref = "jig-spot"
+[[tools]]
+id = "drill-9"
+number = 3
+name = "#9 drill"
+ref = "riser-drill-9"
+[[tools]]
+id = "drill-29"
+number = 4
+name = "#29 drill"
+ref = "jig-drill-29"
+[[tools]]
+id = "tap-guide"
+number = 5
+name = "Fisher spring tap guide"
+ref = "tap-guide-fisher"
+[[tools]]
+id = "tap-8-32"
+name = "8-32 plug tap"
+ref = "jig-tap-8-32-plug"
+[[tools]]
+id = "work-stop"
+name = "Work stop"
+ref = "work-stop-hhip-3900-2125"
+[[tools]]
+id = "saw"
+name = "Evolution miter saw"
+ref = "saw-evolution-14"
+[[tools]]
+id = "files"
+name = "Files"
+ref = "jig-files"
+
+[[setups]]
+machine_kind = "other"
+title = "Saw the blanks"
+machine = "Saw / bench"
+indexing = "none"
+diagram = { file = "diagrams/saw.svg", alt = "The 3/4 in square bar with blanks {{process.blank_length_min_in:.2f}}–{{process.blank_length_max_in:.2f}} in long marked off its end, a saw kerf between each." }
+envelope = "other"
+vise_hold = "other"
+beam = "other"
+
+[[setups.operations]]
+speed_kind = "other"
+tool = "saw"
+drilling = "none"
+sizing = "other"
+instruction = "Saw {{process.blank_count:d}} blanks {{process.blank_length_min_in:.2f}}–{{process.blank_length_max_in:.2f}} in long off the 3/4 in square 1018 bar, the bar flat in the saw's vise: {{process.quantity:d}} for the fronts and {{process.quantity:d}} for the backs, about {{process.sawn_bar_length_in:.1f}} in of bar with the kerfs."
+feed = "hand"
+inspection = "Each blank {{process.blank_length_min_in:.2f}}–{{process.blank_length_max_in:.2f}} long, calipers. Shorter: scrap it. Every program assumes this blank."
+gauge_checks = [{ gauge = "calipers", band_mm = ["{{cad.blank_length_min_mm}}", "{{cad.blank_length_max_mm}}"] }]
+table = { columns = ["Finished size", "Front {{cad.front.drawing_number}}", "Back {{cad.back.drawing_number}}"], rows = [
+  ["Width, N to the far end", "{{cad.width_min_in:.3dot}}–{{cad.width_max_in:.3dot}}", "{{cad.width_min_in:.3dot}}–{{cad.width_max_in:.3dot}}"],
+  ["Height, B to the top", "{{cad.height_min_in:.3dot}}–{{cad.height_max_in:.3dot}}", "{{cad.height_min_in:.3dot}}–{{cad.height_max_in:.3dot}}"],
+  ["Depth, mating face to outside face", "{{cad.front.depth_min_in:.3dot}}–{{cad.front.depth_max_in:.3dot}}", "{{cad.back.depth_min_in:.3dot}}–{{cad.back.depth_max_in:.3dot}} ({{cad.back.pre_face_depth_min_in:.3dot}}–{{cad.back.pre_face_depth_max_in:.3dot}} until Setup 10's face-off)"],
+  ["Ear holes, both", "#9 drill through, Ø{{cad.front.ear_dia_min_in:.3dot}}–{{cad.front.ear_dia_max_in:.3dot}}", "{{cad.back.ear_thread}} through, #29 tap drill"],
+  ["Ear holes from the bore's axis, each side", "{{cad.ear_station_min_in:.3dot}}–{{cad.ear_station_max_in:.3dot}}", "the same"],
+  ["Drilling targets for that, from N: near, far (not an acceptance)", "{{cad.ear_near_x_min_in:.3dot}}–{{cad.ear_near_x_max_in:.3dot}}, {{cad.ear_far_x_min_in:.3dot}}–{{cad.ear_far_x_max_in:.3dot}}", "the same"],
+  ["Ear holes from B", "{{cad.ear_height_min_in:.3dot}}–{{cad.ear_height_max_in:.3dot}}", "the same"],
+  ["Bore, cut in the bolted pair", "Ø{{cad.bore_dia_in:.3dot}} REF, {{cad.bore_clearance_min_in:.3dot}}–{{cad.bore_clearance_max_in:.3dot}} over the miked column; {{cad.bore_location_min_in:.3dot}}–{{cad.bore_location_max_in:.3dot}} from N", "the same"],
+  ["Ear web to the bore", "at least {{cad.front.ear_wall_min_in:.3dot}} (MIN EAR WALL)", "no limit printed"],
+] }
+
+[[setups.operations]]
+instruction = "Only if a blank is longer: saw it again and check its length again."
+feed = "hand"
+
+[[setups.operations]]
+speed_kind = "other"
+tool = "files"
+drilling = "none"
+sizing = "other"
+instruction = "File the burr off both ends and the four long edges of each blank so it seats flat on the parallels. Mark the blanks F1, F2, F3 (fronts) and K1, K2, K3 (backs) on a cold-finished long face with marking fluid (the sawn ends are faced off)."
+feed = "hand"
+
+[[setups]]
+machine_kind = "other"
+title = "First end"
+machine = "PM-30MV CNC (FluidNC, CNCjs with the electronic tool setter) / vise, swivel off"
+indexing = "none"
+machine_ref = "pm-30mv"
+holding = "A 1 in parallel against each jaw. The blank upright on them, a sawn end up, gripped across two opposite faces of the square, centred on the jaws. Tap it down onto both parallels with a soft mallet while closing the vise; both parallels pinned. The lower {{process.upright_grip_mm:in.2dot}} of it is in the jaws."
+programs = ["CC01_first_end"]
+datum = "Program CC01_first_end (cam:sh_column_clamp). G54: X0 Y0 the bar's axis, Z0 the faced first end; +Y toward the fixed jaw. The file starts with an M6 for the end mill; tool lengths from the tool setter. Each later blank: against the work stop, then Z0 again (it is taken on the blank's own top); X0 and Y0 stand."
+diagram = { file = "diagrams/first-end.svg", alt = "The blank upright on two 1 in parallels in the vise, a sawn end up; the 1/2 in end mill faces it in passes across the square." }
+envelope = { x_span_mm = ["{{process.blank_section_mm}}", "{{process.face_cutter_dia_mm}}", "{{process.face_cutter_dia_mm}}", 5.08], y_span_mm = ["{{process.blank_section_mm}}", "{{process.face_cutter_dia_mm}}"], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{cad.blank_length_max_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{process.upright_top_max_mm}}"], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_mm}}"] }
+vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{process.blank_section_mm}}", along_jaws_mm = "{{process.blank_section_mm}}", part_height_mm = "{{cad.blank_length_max_mm}}", parallel_height_mm = "{{process.parallel_height_mm}}", overhang_mm = ["{{process.vise_upright_inset_mm}}", "rest"], jaw_offset = "centred", fixed_jaw_face = "as_bought", moving_jaw_face = "as_bought", moving_jaw_contact = "flat" }
+beam = { axis = "z", hold = "cantilever", extent_mm = [0, "{{cad.blank_length_max_mm}}"], clamp_mm = [0, "{{process.upright_grip_mm}}"], section_mm = { x = "{{process.blank_section_mm}}", y = "{{process.blank_section_mm}}" }, vise_left = "other" }
+
+[[setups.operations]]
+instruction = "Work stop unlocked, its rod drawn back clear of the vise. G54 X0 Y0 the bar's axis: edge finder (900 rpm) on the left and right faces and on the fixed jaw."
+instruction_detailed = "Work stop's rod drawn back clear of the vise. Mic the first blank across the gripped faces. Edge finder, 900 rpm. Y: tip .10 below the jaw top, on the fixed jaw's face beside the blank, G10 L20 P1 Y(half that mic reading in mm − 2.540); for .750, Y6.985. X: tip .10 below the sawn top, on the LEFT face from the left, G10 L20 P1 X0; on the RIGHT face from the right, G10 L20 P1 X(half the DRO X reading)."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "G54 Z0: the faced first end, the sawn top's high point less the {{process.end_skim_mm:in.3dot}} skim."
+instruction_detailed = "Console M6 T1 (1/2 in end mill, {{process.half_mill_projection_mm:in.2dot}} in out of the collet; the tool setter measures it). Spindle stopped, its tip just dragging a .002 feeler leaf on the highest point of the sawn top: G10 L20 P1 Z0.559 (the {{process.end_skim_mm:in.3dot}} skim plus the .002 leaf)."
+feed = "hand"
+
+[[setups.operations]]
+speed_kind = "other"
+tool = "work-stop"
+drilling = "none"
+sizing = "other"
+instruction = "Set the work stop: its rod between the jaws, low, its tip touching the blank's LEFT face. Lock it."
+inspection = "The rod's top at most {{process.stop_rod_top_max_mm:in.3dot}} above the parallels' top (the calipers' depth rod beside it). Each later blank is pushed against the rod as the vise closes: a .002 feeler leaf does not enter between them."
+gauge_checks = [{ gauge = "calipers", band_mm = [0, "{{process.stop_rod_top_max_mm}}"] }]
+feed = "hand"
+
+[[setups.operations]]
+instruction = "First blank only: prove CC01_first_end in air, Z0 raised 1.000 in; every move clears the jaws. Then Z0 back."
+instruction_detailed = "First blank only: send $# and note the G54 line's Z. G10 L2 P1 Z(that Z + 25.400) raises Z0 1.000 in. Run CC01_first_end, watching each move clear the jaws. G10 L2 P1 Z(the noted Z) puts Z0 back."
+feed = "hand"
+
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "em-half"
+drilling = "none"
+sizing = "other"
+instruction = "Run CC01_first_end (M6 T1, 1/2 in end mill; set 2450: the display rests near 2485, not 2380): face the first end at Z0, {{process.end_skim_mm:in.3dot}} off the high point, in passes no wider than {{process.face_stepover_max_mm:in.3dot}}. A sawn patch left: send $#, note the G54 line's Z, G10 L2 P1 Z(that Z − 0.254) (Z0 .010 lower) and run it again."
+settings = "em-half-carbide-1018-3439-face"
+milling_cuts = [
+  { name = "first end", kind = "end", phase = "finish", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", axial_doc_mm = "{{process.end_skim_mm}}", radial_woc_mm = "{{process.face_stepover_max_mm}}", stations_mm = "{{process.upright_top_max_mm}}" },
+]
+
+[[setups]]
+machine_kind = "other"
+title = "Other end to the width"
+machine = "PM-30MV CNC (FluidNC, CNCjs with the electronic tool setter) / vise, swivel off"
+indexing = "none"
+machine_ref = "pm-30mv"
+holding = "As Setup 2, the blank turned over: the faced first end down on both parallels, the sawn end up."
+programs = ["CC02_length"]
+datum = "Program CC02_length. G54: X0 Y0 the bar's axis, Z0 the parallels' top (the faced first end); +Y toward the fixed jaw. Each later blank: against the work stop; X0, Y0 and Z0 stand."
+diagram = { file = "diagrams/length.svg", alt = "The blank upright on two 1 in parallels, the faced end down; the 1/2 in end mill faces the sawn end down to the width in levels." }
+envelope = { x_span_mm = ["{{process.blank_section_mm}}", "{{process.face_cutter_dia_mm}}", "{{process.face_cutter_dia_mm}}", 5.08], y_span_mm = ["{{process.blank_section_mm}}", "{{process.face_cutter_dia_mm}}"], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{process.upright_top_max_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{cad.width_mm}}"], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_mm}}"] }
+vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{process.blank_section_mm}}", along_jaws_mm = "{{process.blank_section_mm}}", part_height_mm = "{{process.upright_top_max_mm}}", parallel_height_mm = "{{process.parallel_height_mm}}", overhang_mm = ["{{process.vise_upright_inset_mm}}", "rest"], jaw_offset = "centred", fixed_jaw_face = "as_bought", moving_jaw_face = "as_bought", moving_jaw_contact = "flat" }
+beam = { axis = "z", hold = "cantilever", extent_mm = [0, "{{process.upright_top_max_mm}}"], clamp_mm = [0, "{{process.upright_grip_mm}}"], section_mm = { x = "{{process.blank_section_mm}}", y = "{{process.blank_section_mm}}" }, vise_left = "other" }
+
+[[setups.operations]]
+instruction = "Work stop unlocked, its rod drawn back clear of the vise. Before the first blank goes in: G54 Z0 on the parallels' top, touched with the end mill on the fixed-jaw parallel. The vise holds no blank yet: beside a standing blank the spindle nose would meet its top before the tip reached the parallel."
+instruction_detailed = "Work stop unlocked, its rod drawn back clear of the vise. Before the first blank goes in, the vise holding only the parallels: console M6 T1 (the tool setter measures it). Jog the cutter over the fixed-jaw parallel near its middle, its edge clear of the jaw. Spindle stopped, its tip just dragging a .002 feeler leaf on the parallel: G10 L20 P1 Z0.051. Raise Z to the top of its travel before loading the blank."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Clamp the first blank as the Holding line says. Repeat Setup 2's edge-finder touch-off: X0 Y0 on the bar's axis (the blank was turned over). Z0 stands."
+feed = "hand"
+
+[[setups.operations]]
+speed_kind = "other"
+tool = "work-stop"
+drilling = "none"
+sizing = "other"
+instruction = "Set the work stop: its rod between the jaws, low, its tip touching the blank's LEFT face. Lock it."
+inspection = "The rod's top at most {{process.stop_rod_top_max_mm:in.3dot}} above the parallels' top (the calipers' depth rod beside it). Each later blank is pushed against the rod as the vise closes: a .002 feeler leaf does not enter between them."
+gauge_checks = [{ gauge = "calipers", band_mm = [0, "{{process.stop_rod_top_max_mm}}"] }]
+feed = "hand"
+
+[[setups.operations]]
+instruction = "First blank only: prove CC02_length in air, Z0 raised 1.000 in. Then Z0 back."
+feed = "hand"
+
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "em-half"
+drilling = "none"
+sizing = "other"
+instruction = "Run CC02_length (M6 T1; 2450, display near 2485): face the sawn end down to Z {{cad.width_mm:in.4dot}} in equal levels no deeper than {{process.face_step_max_mm:in.3dot}} from {{process.upright_top_max_mm:in.3dot}} (the longest blank: a shorter one cuts air first). Then, still clamped, check the width."
+settings = "em-half-carbide-1018-3439-face"
+inspection = "Width {{cad.width_min_in:.3dot}}–{{cad.width_max_in:.3dot}}: the calipers' depth rod from the faced top to the fixed-jaw parallel beside the blank, at two corners."
+gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.width_band_mm}}" }]
+milling_cuts = [
+  { name = "length", kind = "end", phase = "finish", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", axial_doc_mm = "{{process.face_step_max_mm}}", radial_woc_mm = "{{process.face_stepover_max_mm}}", stations_mm = "{{process.upright_top_max_mm}}" },
+]
+
+[[setups.operations]]
+instruction = "Over {{cad.width_max_in:.3dot}}: lower G54 Z by the reading less {{cad.width_mm:in.3dot}} and run CC02_length again. Under {{cad.width_min_in:.3dot}}: the blank is scrap."
+instruction_detailed = "Over {{cad.width_max_in:.3dot}}: send $# and note the G54 line's Z; G10 L2 P1 Z(that Z − (the reading − {{cad.width_mm:in.3dot}}) × 25.4). Run CC02_length again and check again. Then G10 L2 P1 Z(the noted Z): Z0 goes back for the next blank. Under {{cad.width_min_in:.3dot}}: the blank is scrap."
+feed = "hand"
+
+[[setups]]
+machine_kind = "other"
+title = "Bottom face B"
+machine = "PM-30MV CNC (FluidNC, CNCjs with the electronic tool setter) / vise, swivel off"
+indexing = "none"
+machine_ref = "pm-30mv"
+holding = "The 1 in and the 1/2 in parallels of the set stacked against each jaw (1.5 in). The blank lying on them along the jaws, gripped across two opposite cold-finished faces, centred on the jaws; the face up becomes the bottom face B. Tap it down onto both stacks while closing the vise. Its top stands {{process.blank_section_in:.3dot}} above the stacks, the lower {{process.lying_grip_mm:in.3dot}} of it in the jaws."
+programs = ["CC03_bottom"]
+datum = "Program CC03_bottom. G54: X0 the blank's LEFT end, the near side N (scribed after this cut), Y0 the fixed jaw's face, Z0 the stacks' top; +Y toward the fixed jaw. Each later blank: against the work stop; X0, Y0 and Z0 stand."
+diagram = { file = "diagrams/bottom.svg", alt = "The blank lying along the jaws on stacked parallels; the 1/2 in end mill skims the top face, which becomes the bottom face B." }
+envelope = { x_span_mm = ["{{cad.width_mm}}", "{{process.face_cutter_dia_mm}}", 5.08], y_span_mm = ["{{process.blank_section_mm}}", "{{process.face_cutter_dia_mm}}"], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{process.blank_section_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{cad.height_mm}}"], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_mm}}"] }
+vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{process.blank_section_mm}}", along_jaws_mm = "{{cad.width_mm}}", part_height_mm = "{{process.blank_section_mm}}", parallel_height_mm = "{{process.riser_height_mm}}", overhang_mm = ["{{process.vise_lying_inset_mm}}", "rest"], jaw_offset = "centred", fixed_jaw_face = "as_bought", moving_jaw_face = "as_bought", moving_jaw_contact = "flat" }
+beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{cad.width_mm}}"], clamp_mm = [0, "{{cad.width_mm}}"], section_mm = { y = "{{process.blank_section_mm}}", z = "{{process.blank_section_mm}}" }, vise_left = "start" }
+
+[[setups.operations]]
+instruction = "Work stop unlocked, its rod drawn back clear of the vise. G54 X0 the blank's left end, Y0 the fixed jaw's face: edge finder (900 rpm)."
+instruction_detailed = "Work stop unlocked, its rod drawn back clear of the vise. Edge finder (900 rpm): on the fixed jaw's face beside the blank, G10 L20 P1 Y-2.540; on the blank's LEFT end from the left, G10 L20 P1 X-2.540."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "G54 Z0: the stacks' top, touched with the end mill on the fixed-jaw stack left of the blank."
+instruction_detailed = "Console M6 T1 (the tool setter measures it). MDI G0 X-12.700 Y-6.850: the cutter left of the blank, its edge .02 off the fixed jaw, over that jaw's stack. Spindle stopped, its tip just dragging a .002 feeler leaf on the stack: G10 L20 P1 Z0.051."
+feed = "hand"
+
+[[setups.operations]]
+speed_kind = "other"
+tool = "work-stop"
+drilling = "none"
+sizing = "other"
+instruction = "Set the work stop: its rod between the jaws, low, its tip touching the blank's LEFT end. Lock it."
+inspection = "The rod's top at most {{process.stop_rod_top_max_mm:in.3dot}} above the stacks' top (the calipers' depth rod beside it). Each later blank is pushed against the rod as the vise closes: a .002 feeler leaf does not enter between them."
+gauge_checks = [{ gauge = "calipers", band_mm = [0, "{{process.stop_rod_top_max_mm}}"] }]
+feed = "hand"
+
+[[setups.operations]]
+instruction = "First blank only: prove CC03_bottom in air, Z0 raised 1.000 in. Then Z0 back."
+feed = "hand"
+
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "em-half"
+drilling = "none"
+sizing = "other"
+instruction = "Run CC03_bottom (M6 T1; 2450, display near 2485): skim the top face {{process.bottom_skim_mm:in.3dot}} at Z {{process.blank_section_mm:in.3dot}} less the skim. A cold-finished patch left: send $#, note the G54 line's Z, G10 L2 P1 Z(that Z − 0.254) (Z0 .010 lower) and run it again. Then G10 L2 P1 Z(the noted Z): Z0 goes back for the next blank."
+settings = "em-half-carbide-1018-3439-face"
+milling_cuts = [
+  { name = "bottom face", kind = "end", phase = "finish", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", axial_doc_mm = "{{process.bottom_skim_mm}}", radial_woc_mm = "{{process.face_stepover_max_mm}}", traverse_mm = [0, "{{cad.width_mm}}"] },
+]
+
+[[setups.operations]]
+instruction = "Unclamp; mark this face B (blue marking fluid and a scribed B) and the blank's number on it, and scribe N on the left end: the near side the stations and the bore count from."
+feed = "hand"
+
+[[setups]]
+machine_kind = "other"
+title = "Top face to the height"
+machine = "PM-30MV CNC (FluidNC, CNCjs with the electronic tool setter) / vise, swivel off"
+indexing = "none"
+machine_ref = "pm-30mv"
+holding = "As Setup 4, the blank turned over, its ends unchanged: B down on both stacks, N still at the LEFT end, gripped across the same two cold-finished faces, centred."
+programs = ["CC04_height"]
+datum = "Program CC04_height. G54: X0 the blank's LEFT end, Y0 the fixed jaw's face, Z0 the stacks' top (B). Each later blank: against the work stop; X0, Y0 and Z0 stand."
+diagram = { file = "diagrams/height.svg", alt = "The blank lying on stacked parallels, B down; the 1/2 in end mill faces the top down to the height in levels." }
+envelope = { x_span_mm = ["{{cad.width_mm}}", "{{process.face_cutter_dia_mm}}", 5.08], y_span_mm = ["{{process.blank_section_mm}}", "{{process.face_cutter_dia_mm}}"], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{process.blank_section_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{cad.height_mm}}"], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_mm}}"] }
+vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{process.blank_section_mm}}", along_jaws_mm = "{{cad.width_mm}}", part_height_mm = "{{process.blank_section_mm}}", parallel_height_mm = "{{process.riser_height_mm}}", overhang_mm = ["{{process.vise_lying_inset_mm}}", "rest"], jaw_offset = "centred", fixed_jaw_face = "as_bought", moving_jaw_face = "as_bought", moving_jaw_contact = "flat" }
+beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{cad.width_mm}}"], clamp_mm = [0, "{{cad.width_mm}}"], section_mm = { y = "{{process.blank_section_mm}}", z = "{{cad.height_mm}}" }, vise_left = "start" }
+
+[[setups.operations]]
+instruction = "Work stop unlocked, its rod drawn back clear of the vise. Repeat Setup 4's touch-off (the blank was re-gripped): edge finder Y0 on the fixed jaw and X0 on the left end, then M6 T1 and the feeler Z0.051 on the fixed-jaw stack."
+feed = "hand"
+
+[[setups.operations]]
+speed_kind = "other"
+tool = "work-stop"
+drilling = "none"
+sizing = "other"
+instruction = "Set the work stop: its rod between the jaws, low, its tip touching the blank's LEFT end (N). Lock it."
+inspection = "The rod's top at most {{process.stop_rod_top_max_mm:in.3dot}} above the stacks' top (the calipers' depth rod beside it). Each later blank is pushed against the rod as the vise closes: a .002 feeler leaf does not enter between them."
+gauge_checks = [{ gauge = "calipers", band_mm = [0, "{{process.stop_rod_top_max_mm}}"] }]
+feed = "hand"
+
+[[setups.operations]]
+instruction = "First blank only: prove CC04_height in air, Z0 raised 1.000 in. Then Z0 back."
+feed = "hand"
+
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "em-half"
+drilling = "none"
+sizing = "other"
+instruction = "Run CC04_height (M6 T1; 2450, display near 2485): face the top down to Z {{cad.height_mm:in.4dot}} in equal levels no deeper than {{process.face_step_max_mm:in.3dot}}. Unclamp; mic the height."
+settings = "em-half-carbide-1018-3439-face"
+inspection = "Height {{cad.height_min_in:.3dot}}–{{cad.height_max_in:.3dot}}, B to the top, miked at both ends."
+gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.height_band_mm}}" }]
+milling_cuts = [
+  { name = "height", kind = "end", phase = "finish", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", axial_doc_mm = "{{process.face_step_max_mm}}", radial_woc_mm = "{{process.face_stepover_max_mm}}", traverse_mm = [0, "{{cad.width_mm}}"] },
+]
+
+[[setups.operations]]
+instruction = "Over {{cad.height_max_in:.3dot}}: reclamp as before; send $#, note the G54 line's Z; G10 L2 P1 Z(that Z − (the reading − {{cad.height_mm:in.3dot}}) × 25.4); run CC04_height again. Then G10 L2 P1 Z(the noted Z): Z0 goes back for the next blank. Under {{cad.height_min_in:.3dot}}: the blank is scrap."
+feed = "hand"
+
+[[setups]]
+machine_kind = "other"
+title = "Mating face skim: a blank becomes a front or a back"
+machine = "PM-30MV CNC (FluidNC, CNCjs with the electronic tool setter) / vise, swivel off"
+indexing = "none"
+machine_ref = "pm-30mv"
+holding = "The same stacks. The blank lying along the jaws, gripped on B and the top: B against the FIXED jaw, the two cold-finished faces left horizontal; the face up becomes the mating face. A front (F1–F3): the N end at the LEFT. A back (K1–K3): the N end at the RIGHT. Centred on the jaws; tap it down onto both stacks while closing the vise."
+programs = ["CF05_mating", "CB05_mating"]
+datum = "Program CF05_mating for a front, CB05_mating for a back: the two files differ, each cuts from its own X0. G54: X0 the N end, at the left for a front (the part to +X), at the right for a back (the part to −X); Y0 the fixed jaw's face (B), +Y toward it; Z0 the stacks' top. Each later blank: against the work stop; X0, Y0 and Z0 stand."
+diagram = { file = "diagrams/mating.svg", part = "front", alt = "A front lying on stacked parallels, gripped on its bottom and top faces, B at the fixed jaw, the near side N at the left; the 1/2 in end mill skims the face up, the mating face." }
+# The capacity check's lowest cut is the lower of the two halves' faces, the
+# back's pre-face depth; both halves stand the blank's section above the stacks.
+envelope = { x_span_mm = ["{{cad.width_mm}}", "{{process.face_cutter_dia_mm}}", 5.08], y_span_mm = ["{{cad.height_mm}}", "{{process.face_cutter_dia_mm}}"], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{process.blank_section_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{cad.back.pre_face_depth_mm}}"], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_mm}}"] }
+vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{cad.height_mm}}", along_jaws_mm = "{{cad.width_mm}}", part_height_mm = "{{process.blank_section_mm}}", parallel_height_mm = "{{process.riser_height_mm}}", overhang_mm = ["{{process.vise_lying_inset_mm}}", "rest"], jaw_offset = "centred", fixed_jaw_face = "machined", moving_jaw_face = "machined", moving_jaw_contact = "flat" }
+beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{cad.width_mm}}"], clamp_mm = [0, "{{cad.width_mm}}"], section_mm = { y = "{{cad.height_mm}}", z = "{{process.blank_section_mm}}" }, vise_left = "start" }
+
+[[setups.operations]]
+instruction = "Work stop unlocked, its rod drawn back clear of the vise. G54 X0 the N end, Y0 the fixed jaw's face (B): edge finder (900 rpm), by the table's row for the half in the vise."
+instruction_detailed = "Work stop unlocked, its rod drawn back clear of the vise. Edge finder (900 rpm): on the fixed jaw's face beside the blank, G10 L20 P1 Y-2.540; then on the blank's N end, from the side and with the entry in the table's row for the half in the vise."
+feed = "hand"
+diagram = { file = "diagrams/mating.svg", part = "back", alt = "A back held the same way, the near side N at the right: its X0 is the right end." }
+table = { columns = ["Half", "Program", "N end (X0)", "Edge finder on the N end", "Z0 touch: MDI, then the feeler"], rows = [
+  ["Front, F1–F3", "CF05_mating", "LEFT; the part to +X", "from the left: G10 L20 P1 X-2.540", "G0 X-12.700 Y-6.850 (the stack left of the blank)"],
+  ["Back, K1–K3", "CB05_mating", "RIGHT; the part to −X", "from the right: G10 L20 P1 X2.540", "G0 X12.700 Y-6.850 (the stack right of the blank)"],
+] }
+
+[[setups.operations]]
+instruction = "G54 Z0: the stacks' top, touched with the end mill on the fixed-jaw stack beyond the N end."
+instruction_detailed = "Console M6 T1 (the tool setter measures it). MDI the table's G0 for this half: the cutter beyond the N end, its edge .02 off the fixed jaw, over that jaw's stack. Spindle stopped, its tip just dragging a .002 feeler leaf on the stack: G10 L20 P1 Z0.051."
+feed = "hand"
+
+[[setups.operations]]
+speed_kind = "other"
+tool = "work-stop"
+drilling = "none"
+sizing = "other"
+instruction = "Set the work stop: its rod between the jaws, low, its tip touching the blank's N end. Lock it. Fronts first, the rod at the LEFT. For the backs: draw the rod back clear of the vise, take X0 again on the first back by the table's row, then set the rod on its RIGHT end."
+inspection = "The rod's top at most {{process.stop_rod_top_max_mm:in.3dot}} above the stacks' top (the calipers' depth rod beside it). Each later blank is pushed against the rod as the vise closes: a .002 feeler leaf does not enter between them."
+gauge_checks = [{ gauge = "calipers", band_mm = [0, "{{process.stop_rod_top_max_mm}}"] }]
+feed = "hand"
+
+[[setups.operations]]
+instruction = "The first front and the first back: prove its file (CF05_mating, CB05_mating) in air, Z0 raised 1.000 in. Then Z0 back."
+feed = "hand"
+
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "em-half"
+drilling = "none"
+sizing = "other"
+instruction = "Run CF05_mating on a front, CB05_mating on a back (M6 T1; 2450, display near 2485): skim the face up {{process.mating_skim_mm:in.3dot}}. A cold-finished patch left: send $#, note the G54 line's Z, G10 L2 P1 Z(that Z − 0.254) (Z0 .010 lower) and run it again. Then G10 L2 P1 Z(the noted Z): Z0 goes back for the next blank. This is the mating face: it seats on the other half in the pair, so keep it free of dings."
+settings = "em-half-carbide-1018-3439-face"
+milling_cuts = [
+  { name = "mating face", kind = "end", phase = "finish", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", axial_doc_mm = "{{process.mating_skim_mm}}", radial_woc_mm = "{{process.face_stepover_max_mm}}", traverse_mm = [0, "{{cad.width_mm}}"] },
+]
+
+[[setups]]
+machine_kind = "other"
+part = "front"
+title = "Fronts: outside face to the depth; drill both ear holes"
+machine = "PM-30MV CNC (FluidNC, CNCjs with the electronic tool setter) / vise, swivel off"
+indexing = "none"
+machine_ref = "pm-30mv"
+holding = "The same stacks (1/8 in thick: the holes fall between them). A front, turned over end for end from Setup 6: the mating face down on both stacks, B against the FIXED jaw, gripped on B and the top, centred. Its RIGHT end is the near side N: the hole stations count from it."
+programs = ["CF06_bar_drill"]
+datum = "Program CF06_bar_drill. G54: X0 the RIGHT end (N), the part to −X; Y0 the fixed jaw's face (B), +Y toward it; Z0 the stacks' top (the mating face). Ear holes at X −{{cad.ear_near_x_in:.3f}} and −{{cad.ear_far_x_in:.3f}} in, Y −{{cad.ear_height_in:.3f}} in. Tool lengths from the tool setter at each M6; at every M6 stop the file has stopped the spindle and lifted the tool above the part. Each later front: against the work stop; X0, Y0 and Z0 stand."
+diagram = { file = "diagrams/drill.svg", alt = "The half lying on stacked parallels, mating face down, bottom face at the fixed jaw; the 1/2 in end mill faces the outside face to the depth, the centre drill spots and the #9 drills both ear holes through between the parallels." }
+envelope = { x_span_mm = ["{{cad.width_mm}}", "{{process.face_cutter_dia_mm}}", 5.08], y_span_mm = ["{{cad.height_mm}}", "{{process.face_cutter_dia_mm}}"], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{process.blank_section_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{process.drill_tip_height_mm}}"], longest_tool_mm = ["{{process.drill_chuck_gauge_mm}}", "{{process.drill_9_oal_mm}}"], shortest_tool_mm = ["{{process.drill_chuck_gauge_mm}}", "{{process.centre_drill_oal_mm}}"] }
+vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{cad.height_mm}}", along_jaws_mm = "{{cad.width_mm}}", part_height_mm = "{{process.blank_section_mm}}", parallel_height_mm = "{{process.riser_height_mm}}", overhang_mm = ["{{process.vise_lying_inset_mm}}", "rest"], jaw_offset = "centred", fixed_jaw_face = "machined", moving_jaw_face = "machined", moving_jaw_contact = "flat" }
+beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{cad.width_mm}}"], clamp_mm = [0, "{{cad.width_mm}}"], section_mm = { y = "{{cad.height_mm}}", z = "{{cad.depth_mm}}" }, vise_left = "start" }
+
+[[setups.operations]]
+instruction = "Work stop unlocked, its rod drawn back clear of the vise. G54 X0 the RIGHT end (N, marked in Setup 4), Y0 the fixed jaw's face (B): edge finder (900 rpm). N, marked in Setup 4, is that end here."
+instruction_detailed = "Work stop unlocked, its rod drawn back clear of the vise. Edge finder (900 rpm): on the fixed jaw's face beside the part, G10 L20 P1 Y-2.540; on the part's RIGHT end (N) from the right, G10 L20 P1 X2.540 (plus: the finder's centre is right of the end). N, scribed in Setup 4, is the right end here: it is the near side the stations and the bore count from, here and in the pair (Setup 9)."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "G54 Z0: the stacks' top, touched with the end mill on the fixed-jaw stack left of the part."
+instruction_detailed = "Console M6 T1 (the tool setter measures it). MDI G0 X-55.400 Y-6.850: the cutter left of the part's far end, its edge .02 off the fixed jaw, over that jaw's stack. Spindle stopped, its tip just dragging a .002 feeler leaf on the stack: G10 L20 P1 Z0.051."
+feed = "hand"
+
+[[setups.operations]]
+speed_kind = "other"
+tool = "work-stop"
+drilling = "none"
+sizing = "other"
+instruction = "Set the work stop: its rod between the jaws, low, its tip touching the blank's RIGHT end (N). Lock it."
+inspection = "The rod's top at most {{process.stop_rod_top_max_mm:in.3dot}} above the stacks' top (the calipers' depth rod beside it). Each later blank is pushed against the rod as the vise closes: a .002 feeler leaf does not enter between them."
+gauge_checks = [{ gauge = "calipers", band_mm = [0, "{{process.stop_rod_top_max_mm}}"] }]
+feed = "hand"
+
+[[setups.operations]]
+instruction = "First front only: prove CF06_bar_drill in air, Z0 raised 1.000 in; every move clears the jaws, through every M6. Then Z0 back."
+feed = "hand"
+
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "em-half"
+drilling = "none"
+sizing = "other"
+instruction = "Run CF06_bar_drill (M6 T1; 2450, display near 2485): face the outside face down to Z {{cad.depth_mm:in.4dot}} in equal levels no deeper than {{process.face_step_max_mm:in.3dot}}. At the M6 T2 stop, still clamped: check the depth."
+settings = "em-half-carbide-1018-3439-face"
+inspection = "Depth {{cad.depth_min_in:.3dot}}–{{cad.depth_max_in:.3dot}} at the M6 T2 stop: the calipers' depth rod from the outside face to the fixed-jaw stack's top beside the part, at both ends."
+gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.depth_band_mm}}" }]
+milling_cuts = [
+  { name = "outside face", kind = "end", phase = "finish", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", axial_doc_mm = "{{process.face_step_max_mm}}", radial_woc_mm = "{{process.face_stepover_max_mm}}", traverse_mm = [0, "{{cad.width_mm}}"] },
+]
+
+[[setups.operations]]
+instruction = "Depth over {{cad.depth_max_in:.3dot}}: stop the file there (the controller keeps G54: no homing, no new touch-off). Send $#, note the G54 line's Z; G10 L2 P1 Z(that Z − (the reading − {{cad.depth_mm:in.4dot}}) × 25.4); run CF06_bar_drill again from its start (the face, then the holes) and re-check. Then G10 L2 P1 Z(the noted Z): Z0 goes back for the next blank. Under {{cad.depth_min_in:.3dot}}: the half is scrap."
+feed = "hand"
+
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "spot"
+drilling = "none"
+sizing = "other"
+instruction = "Same file, M6 T2: spot both ear holes Ø{{process.spot_dia_mm:in.3dot}}, under the #9; set 1800."
+rpm = 1800
+feed = "{{process.spot_feed_per_min_mm:in.1f}} in/min"
+milling_cuts = [
+  { name = "ear spot", kind = "drill", phase = "rough", cutter_dia_mm = "{{process.spot_dia_mm}}", flutes = 2, rpm = 1800, feed_mm_min = "{{process.spot_feed_per_min_mm}}", stations_mm = ["{{cad.ear_near_x_mm}}", "{{cad.ear_far_x_mm}}"] },
+]
+
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "drill-9"
+drilling = "twist_drill"
+sizing = { kind = "band", band_mm = "{{cad.ear_dia_band_mm}}" }
+instruction = "Same file, M6 T3: #9 drill through both ear holes, pecks of {{process.peck_mm:in.3dot}} with full retract, its full diameter {{process.drill_past_mm:in.3dot}} past the mating face into the gap between the stacks; set 1200. Cutting oil."
+rpm = 1200
+feed = "{{process.drill_feed_per_min_mm:in.1f}} in/min"
+hole_depth_mm = "{{cad.depth_mm}}"
+peck = { step_mm = 4.572, retract = "full" }
+milling_cuts = [
+  { name = "ear drill", kind = "drill", phase = "finish", cutter_dia_mm = 4.9784, flutes = 2, rpm = 1200, feed_mm_min = "{{process.drill_feed_per_min_mm}}", stations_mm = ["{{cad.ear_near_x_mm}}", "{{cad.ear_far_x_mm}}"] },
+]
+
+[[setups.operations]]
+instruction = "Every front, still clamped: each hole's X from N, the calipers from the right end over the largest pin gauge that slips in, less half its Ø."
+inspection = "Near hole {{cad.ear_near_x_min_in:.3dot}}–{{cad.ear_near_x_max_in:.3dot}} and far hole {{cad.ear_far_x_min_in:.3dot}}–{{cad.ear_far_x_max_in:.3dot}} from N: the drawing's {{cad.ear_station_min_in:.3dot}}–{{cad.ear_station_max_in:.3dot}} about the bore, which the pair bore (Setup 9) puts {{cad.bore_location_in:.3dot}} from N. Outside: stop and tell the owner (MIN EAR WALL {{cad.ear_wall_min_in:.3dot}})."
+gauge_checks = [
+  { gauge = "calipers", band_mm = "{{cad.ear_near_x_band_mm}}" },
+  { gauge = "calipers", band_mm = "{{cad.ear_far_x_band_mm}}" },
+]
+
+[[setups.operations]]
+instruction = "First front only: unclamp it and check each hole's height on the surface plate. The fixed jaw (B against it) and the program hold this height on the later fronts."
+inspection = "Each hole from B (Y) {{cad.ear_height_min_in:.3dot}}–{{cad.ear_height_max_in:.3dot}}: the part on B on the surface plate, the height gauge over the slip-in pin less half its Ø. Outside: stop and tell the owner."
+gauge_checks = [{ gauge = "height-gauge", band_mm = "{{cad.ear_height_band_mm}}" }]
+
+[[setups]]
+machine_kind = "other"
+part = "back"
+title = "Backs: outside face to the pre-face depth; drill and tap both ears"
+machine = "PM-30MV CNC (FluidNC, CNCjs with the electronic tool setter) / vise, swivel off"
+indexing = "none"
+machine_ref = "pm-30mv"
+holding = "The same stacks (1/8 in thick: the holes fall between them). A back, turned over end for end from Setup 6: the mating face down on both stacks, B against the FIXED jaw, gripped on B and the top, centred. Its LEFT end is the near side N: the hole stations count from it."
+programs = ["CB06_back_drill", "CB07_tap_1", "CB08_tap_2"]
+datum = "Program CB06_back_drill. G54: X0 the LEFT end (N), the part to +X; Y0 the fixed jaw's face (B), +Y toward it; Z0 the stacks' top (the mating face). Tap drills at X {{cad.ear_near_x_in:.3f}} and {{cad.ear_far_x_in:.3f}} in, Y −{{cad.ear_height_in:.3f}} in. Tool lengths from the tool setter at each M6; at every M6 stop the file has stopped the spindle and lifted the tool above the part. Each later back: against the work stop; X0, Y0 and Z0 stand."
+diagram = { file = "diagrams/drill.svg", alt = "The half lying on stacked parallels, mating face down, bottom face at the fixed jaw; the 1/2 in end mill faces the outside face to the pre-face depth, the centre drill spots and the #29 drills both tap drills through between the parallels." }
+envelope = { x_span_mm = ["{{cad.width_mm}}", "{{process.face_cutter_dia_mm}}", 5.08], y_span_mm = ["{{cad.height_mm}}", "{{process.face_cutter_dia_mm}}"], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{process.blank_section_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{process.drill_tip_height_mm}}"], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.tap_stack_max_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_mm}}"] }
+vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{cad.height_mm}}", along_jaws_mm = "{{cad.width_mm}}", part_height_mm = "{{process.blank_section_mm}}", parallel_height_mm = "{{process.riser_height_mm}}", overhang_mm = ["{{process.vise_lying_inset_mm}}", "rest"], jaw_offset = "centred", fixed_jaw_face = "machined", moving_jaw_face = "machined", moving_jaw_contact = "flat" }
+beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{cad.width_mm}}"], clamp_mm = [0, "{{cad.width_mm}}"], section_mm = { y = "{{cad.height_mm}}", z = "{{cad.pre_face_depth_mm}}" }, vise_left = "start" }
+
+[[setups.operations]]
+instruction = "Work stop unlocked, its rod drawn back clear of the vise. G54 X0 the LEFT end (N), Y0 the fixed jaw's face (B): edge finder (900 rpm)."
+instruction_detailed = "Work stop unlocked, its rod drawn back clear of the vise. Edge finder (900 rpm): on the fixed jaw's face beside the part, G10 L20 P1 Y-2.540; on the part's LEFT end from the left, G10 L20 P1 X-2.540. N, scribed in Setup 4, is the left end here and in the pair."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "G54 Z0: the stacks' top, touched with the end mill on the fixed-jaw stack right of the part."
+instruction_detailed = "Console M6 T1 (the tool setter measures it). MDI G0 X55.400 Y-6.850: the cutter right of the part's far end, its edge .02 off the fixed jaw, over that jaw's stack. Spindle stopped, its tip just dragging a .002 feeler leaf on the stack: G10 L20 P1 Z0.051."
+feed = "hand"
+
+[[setups.operations]]
+speed_kind = "other"
+tool = "work-stop"
+drilling = "none"
+sizing = "other"
+instruction = "Set the work stop: its rod between the jaws, low, its tip touching the blank's LEFT end (N). Lock it."
+inspection = "The rod's top at most {{process.stop_rod_top_max_mm:in.3dot}} above the stacks' top (the calipers' depth rod beside it). Each later blank is pushed against the rod as the vise closes: a .002 feeler leaf does not enter between them."
+gauge_checks = [{ gauge = "calipers", band_mm = [0, "{{process.stop_rod_top_max_mm}}"] }]
+feed = "hand"
+
+[[setups.operations]]
+instruction = "First back only: prove CB06_back_drill in air, Z0 raised 1.000 in; every move clears the jaws, through every M6. Then Z0 back."
+feed = "hand"
+
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "em-half"
+drilling = "none"
+sizing = "other"
+instruction = "Run CB06_back_drill (M6 T1; 2450, display near 2485): face the outside face down to Z {{cad.pre_face_depth_mm:in.4dot}} in equal levels no deeper than {{process.face_step_max_mm:in.3dot}}. At the M6 T2 stop, still clamped: check the depth."
+settings = "em-half-carbide-1018-3439-face"
+inspection = "Pre-face depth {{cad.pre_face_depth_min_in:.3dot}}–{{cad.pre_face_depth_max_in:.3dot}} at the M6 T2 stop: the calipers' depth rod from the outside face to the fixed-jaw stack's top beside the part, at both ends."
+gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.pre_face_depth_band_mm}}" }]
+milling_cuts = [
+  { name = "outside face", kind = "end", phase = "finish", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", axial_doc_mm = "{{process.face_step_max_mm}}", radial_woc_mm = "{{process.face_stepover_max_mm}}", traverse_mm = [0, "{{cad.width_mm}}"] },
+]
+
+[[setups.operations]]
+instruction = "Depth over {{cad.pre_face_depth_max_in:.3dot}}: stop the file there (the controller keeps G54: no homing, no new touch-off). Send $#, note the G54 line's Z; G10 L2 P1 Z(that Z − (the reading − {{cad.pre_face_depth_mm:in.4dot}}) × 25.4); run CB06_back_drill again from its start (the face, then the holes) and re-check. Then G10 L2 P1 Z(the noted Z): Z0 goes back for the next blank. Under {{cad.pre_face_depth_min_in:.3dot}}: the half is scrap."
+feed = "hand"
+
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "spot"
+drilling = "none"
+sizing = "other"
+instruction = "Same file, M6 T2: spot both tap drills Ø{{process.spot_dia_mm:in.3dot}}, under the #29; set 1800."
+rpm = 1800
+feed = "{{process.spot_feed_per_min_mm:in.1f}} in/min"
+milling_cuts = [
+  { name = "ear spot", kind = "drill", phase = "rough", cutter_dia_mm = "{{process.spot_dia_mm}}", flutes = 2, rpm = 1800, feed_mm_min = "{{process.spot_feed_per_min_mm}}", stations_mm = ["{{cad.ear_near_x_mm}}", "{{cad.ear_far_x_mm}}"] },
+]
+
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "drill-29"
+drilling = "twist_drill"
+sizing = { kind = "tap_drill", tap = "tap-8-32" }
+instruction = "Same file, M6 T4: #29 drill through both tap drills, pecks of {{process.peck_mm:in.3dot}} with full retract, its full diameter {{process.drill_past_mm:in.3dot}} past the mating face into the gap between the stacks; set 1700. Cutting oil. The half stays in the vise for the tap."
+rpm = 1700
+feed = "{{process.drill_feed_per_min_mm:in.1f}} in/min"
+hole_depth_mm = "{{cad.pre_face_depth_mm}}"
+peck = { step_mm = 3.048, retract = "full" }
+milling_cuts = [
+  { name = "ear drill", kind = "drill", phase = "finish", cutter_dia_mm = 3.4544, flutes = 2, rpm = 1700, feed_mm_min = "{{process.drill_feed_per_min_mm}}", stations_mm = ["{{cad.ear_near_x_mm}}", "{{cad.ear_far_x_mm}}"] },
+]
+
+[[setups.operations]]
+instruction = "Every back, still clamped, before tapping: each hole's X from N, the calipers from the left end over the largest pin gauge that slips in, less half its Ø. Write both readings on this traveler with the blank's number: Setup 11 checks them against the bore."
+inspection = "Near hole {{cad.ear_near_x_min_in:.3dot}}–{{cad.ear_near_x_max_in:.3dot}} and far hole {{cad.ear_far_x_min_in:.3dot}}–{{cad.ear_far_x_max_in:.3dot}} from N: the drawing's {{cad.ear_station_min_in:.3dot}}–{{cad.ear_station_max_in:.3dot}} about the bore, which the pair bore (Setup 9) puts {{cad.bore_location_in:.3dot}} from N. Outside: stop and tell the owner."
+gauge_checks = [
+  { gauge = "calipers", band_mm = "{{cad.ear_near_x_band_mm}}" },
+  { gauge = "calipers", band_mm = "{{cad.ear_far_x_band_mm}}" },
+]
+
+[[setups.operations]]
+instruction = "First back only, then: unclamp, check each hole's height on the surface plate, reclamp as before, its N end against the work stop (X0, Y0 and Z0 stand: the stop, the fixed jaw, the same stacks)."
+inspection = "Each hole from B (Y) {{cad.ear_height_min_in:.3dot}}–{{cad.ear_height_max_in:.3dot}}: the part on B on the surface plate, the height gauge over the slip-in pin less half its Ø. Outside: stop and tell the owner."
+gauge_checks = [{ gauge = "height-gauge", band_mm = "{{cad.ear_height_band_mm}}" }]
+
+[[setups.operations]]
+instruction = "The 8-32 plug tap, its thread at least .750 long (a standard hand tap), goes in the small T-handle tap wrench with the centre hole in its top: the tap guide's point seats in that hole. If that wrench does not take the 8-32 tap: stop; do not tap on this setup."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Stop check before the first tap file: measure the 8-32 tap in the T-handle wrench from its point to the wrench's centre hole (calipers, or the combination square's 12 in blade). It must be at most {{process.tap_wrench_reach_max_mm:in.2f}} in (the mill's 17 in opening less the vise, the stacks, this half, the collet, the tap guide's 3 1/8 in and 1 in to bring the point down onto the wrench). Over: stop; do not tap on this setup."
+feed = "hand"
+
+[[setups.operations]]
+speed_kind = "other"
+tool = "tap-guide"
+drilling = "none"
+sizing = "other"
+instruction = "Run CB07_tap_1: M6 T5, the tap guide in the 1/2 in collet, pointed end out (the tool setter measures it), spindle off; the file ends Idle at the machine top over the near tap drill."
+diagram = { file = "diagrams/tap.svg", alt = "The half as before, outside face up; the 8-32 tap in the T-handle wrench in a tap drill, the tap guide in the spindle, its spring point in the wrench's centre hole; the tap's point to go {{process.tap_point_depth_mm:in.3dot}} below the outside face, through the mating face." }
+
+[[setups.operations]]
+instruction = "Tap depth reference: the DRO's work Z, in inches, with the tap's point standing on the outside face beside the hole and the tap guide's point pushed fully home in the wrench."
+instruction_detailed = "MDI G91 G0 X3.810 (beside the hole, on the outside face), G90, then send G20: the DRO reads inches. Stand the 8-32 plug tap, in its T-handle wrench, on its point on the outside face; jog Z down until the guide's point is in the wrench's centre hole and pushed fully home. Note the DRO Z. Jog Z up clear, send G21 and MDI G91 G0 X-3.810, G90: back over the hole."
+feed = "hand"
+
+[[setups.operations]]
+speed_kind = "other"
+tool = "tap-8-32"
+drilling = "none"
+sizing = "other"
+instruction = "Send G20 (the DRO reads inches). Tap {{cad.ear_thread}} through by hand under the tap guide, spindle off, cutting oil: the spring keeps the point in the wrench as the tap feeds, up to 1/2 in. Read the depth with the point pushed fully home, as the reference: stop when the DRO Z reads the noted Z − {{process.tap_point_depth_mm:in.3dot}}: the point through the mating face, the full thread the whole depth."
+instruction_detailed = "Send G20, as when the depth was noted. Tap's point in the hole, a drop of cutting oil; jog Z down until the guide's point is pushed fully home: the spring then holds the tap square and follows it down. Turn the wrench, a half turn back each turn; push the point home again before the tap has gone 1/2 in. To read, push it fully home: stop at the noted Z − {{process.tap_point_depth_mm:in.3dot}}."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Jog Z up clear, send G21, back the tap out by hand and blow the hole out."
+inspection = "One of the pair's MHA-SH-VN-53 screws runs through the thread by hand."
+gauge_checks = "other"
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Only if the screw binds: run the tap through again under the tap guide and try the screw again. Still binds: stop and tell the owner."
+feed = "hand"
+
+[[setups.operations]]
+speed_kind = "other"
+tool = "tap-guide"
+drilling = "none"
+sizing = "other"
+instruction = "Run CB08_tap_2 (the tap guide still in, spindle off; it ends Idle over the far tap drill). Tap it the same way: G20, depth reference beside it, tap through to the same depth under the tap guide, G21, back out, blow out, screw check."
+feed = "hand"
+
+[[setups]]
+machine_kind = "other"
+part = "back"
+title = "Deburr, then the pair bore: each back bolted to its front"
+machine = "PM-30MV CNC (FluidNC, CNCjs with the electronic tool setter) / vise, swivel off"
+indexing = "none"
+machine_ref = "pm-30mv"
+holding = "The bolted pair (op before this setup's touch-off) in the vise: the back's outside face against the FIXED jaw; a 1-2-3 block standing on the vise bed on a 1 x 3 in face, 2 in tall, its 1 x 2 in face against the front's outside face centred between the screw heads ({{cad.block_head_clear_in:.3dot}} clear of each head); the MOVING jaw on the block's far 1 x 2 in face. Under the pair, the 1 in parallels: one under the front, against the block; one against the fixed jaw under the back's N end only, its end {{process.back_parallel_end_mm:in.3dot}} from the bore axis ({{cad.back_parallel_clear_in:.3dot}} clear of the bore). Close the vise SNUG, NOT HARD (the back's wall behind the bore is {{cad.bore_wall_worst_in:.3dot}} at worst): tap the pair down onto both parallels with a soft mallet while closing it; both parallels pinned."
+serves = ["front", "back"]
+programs = ["CB09_pair_bore", "CB10_bore_open"]
+datum = "Program CB09_pair_bore. G54: X0 the two N ends (flush, on the LEFT), the pair to +X; Y0 the split line, +Y toward the fixed jaw (the back); Z0 the parallels' top (both B faces). The bore at X {{cad.bore_location_in:.3f}} in, Y0. No work stop here. Every pair: every touch-off again (Y0 is that back's own depth)."
+diagram = { file = "diagrams/pair.svg", alt = "From above: the fixed jaw on the back's outside face, the back, the split line, the front, the two screw heads on the front's bar face with the 1-2-3 block between them against the moving jaw; one parallel along the front against the block, one along the back stopped short of the bore; the 1/2 in end mill interpolates the full bore on the split line." }
+envelope = { x_span_mm = ["{{cad.width_mm}}", "{{process.face_cutter_dia_mm}}"], y_span_mm = ["{{cad.pair_depth_mm}}", "{{process.face_cutter_dia_mm}}"], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{cad.height_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{process.bore_tip_height_mm}}"], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.bore_mill_projection_min_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.bore_mill_projection_min_mm}}"] }
+vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{process.pair_jaw_span_mm}}", along_jaws_mm = "{{cad.width_mm}}", part_height_mm = "{{cad.height_mm}}", parallel_height_mm = "{{process.parallel_height_mm}}", overhang_mm = ["{{process.vise_lying_inset_mm}}", "rest"], jaw_offset = "centred", fixed_jaw_face = "machined", moving_jaw_face = "machined", moving_jaw_contact = "flat" }
+beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{cad.width_mm}}"], clamp_mm = [0, "{{cad.width_mm}}"], section_mm = { y = "{{cad.pair_depth_mm}}", z = "{{cad.height_mm}}" }, vise_left = "start" }
+
+[[setups.operations]]
+speed_kind = "other"
+tool = "files"
+drilling = "none"
+sizing = "other"
+instruction = "Every half: deburr the drill exits (a back's: the tap exits) on the mating face flush (scraper from the deburring set; no countersink), then break every edge, R{{cad.edge_break_in:.3dot}} or chamfer {{cad.chamfer_max_in:.3dot}} max. The mating face must lie flat on its mate's: stone it lightly on a flat stone and wipe it. Keep N and B readable. Wash off the oil."
+feed = "hand"
+inspection = "Mating face down on the surface plate: it does not rock and no burr stands proud."
+gauge_checks = "other"
+diagram = { file = "diagrams/deburr.svg", part = "front", alt = "A front on the bench, mating face up: the drill exits deburred flush, the edges broken." }
+
+[[setups.operations]]
+instruction = "Only if it rocks or a burr stands proud: stone it again and check it again."
+feed = "hand"
+
+[[setups.operations]]
+part = "back"
+instruction = "Each back: mic the pre-face depth, mating face to outside face, at the N end and at the far end; write both readings, labelled N and far, on this traveler with the back's number (this setup's Y0 and Setup 10 use them)."
+feed = "hand"
+inspection = "Pre-face depth {{cad.pre_face_depth_min_in:.3dot}}–{{cad.pre_face_depth_max_in:.3dot}} at both ends. Outside: stop and tell the owner."
+gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.pre_face_depth_band_mm}}" }]
+diagram = { file = "diagrams/deburr.svg", part = "back", alt = "A back on the bench, mating face up, at its pre-face depth: the tap exits deburred flush, the edges broken." }
+
+[[setups.operations]]
+instruction = "On the bench: bolt a back to a front (both deburred as above), mating face to mating face, with the pair's own two MHA-SH-VN-53 screws (90280A201 #8-32 × 1-1/4 narrow fillisters; none in hand: stop, no substitute) through the front's ear holes into the back's taps, heads on the front's outside face."
+instruction_detailed = "On the surface plate: both halves on their B faces, N ends together against the side of a 1-2-3 block; snug the screws, then tighten them. The screw tips stop at least {{cad.screw_short_in:.3dot}} short of the back's outside face."
+inspection = "N ends flush (a fingernail across them finds no step) and both B faces flat on the plate (no rock); each screw tip at least {{cad.screw_short_in:.3dot}} below the back's outside face (the calipers' depth rod down each tapped hole). A tip proud: stop and tell the owner."
+gauge_checks = "other"
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Only if the N ends step or a B face rocks: loosen the screws, reseat the halves and tighten again; check again."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Mic the column this clamp goes on (MHA-FR-03, 1020 DOM tube, 1.000 OD × .120 wall) where the clamp will sit, two readings 90° apart; record both for this pair. The bore is accepted on them."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "No work stop in this setup: its rod drawn back clear of the vise. G54 X0 the N ends, Y0 the split line: edge finder (900 rpm) on the N ends and on the fixed jaw, less this back's recorded pre-face depth."
+instruction_detailed = "No work stop in this setup: its rod drawn back clear of the vise. Edge finder (900 rpm), its tip .10 below the pair's top: on the N ends from the left, G10 L20 P1 X-2.540. On the fixed jaw's face beside the pair (right of it), G10 L20 P1 Y(the mean of this back's two recorded pre-face depths, in mm, − 2.540). The split line is that depth from the jaw."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "G54 Z0: the parallels' top, touched with the end mill on the front's parallel right of the pair."
+instruction_detailed = "Console M6 T1, the 1/2 in end mill at least {{process.bore_mill_projection_min_mm:in.2dot}} out of the collet (the collet's face must clear the block and the fixed jaw at the bore's bottom; the tool setter measures it). MDI G0 X55.400 Y-12.000: the cutter right of the pair, over the front's parallel and clear of the block. Spindle stopped, its tip just dragging a .002 feeler leaf on that parallel: G10 L20 P1 Z0.051."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "First pair only: prove CB09_pair_bore in air, Z0 raised 1.000 in; the helix circles the bore's place and clears the screw heads and the block. Then Z0 back."
+feed = "hand"
+
+# CB09 runs outside the measured envelope of the 1/2 in end mill (shop
+# settings.em-half-carbide-1018-3439-face/-v6-deep): the rough helix cuts the
+# cutter's full width, the finish a 17.0 mm deep wall. Owner ruling (Pedro,
+# 2026-11-22), no re-cut: for full-width passes "same log new dechatter
+# issues to try full radial depth but shallow axial" (#3428); for deep walls
+# "log new dechatter issues to try deep axial cuts but with shallow radial
+# depth" (GitHub issue #3427). It keeps the chart setting; the first pair is watched.
+[[setups.operations]]
+instruction = "First pair only: these CB09 cuts at 2650 rpm have not been chatter-tested on this end mill (the owner's test list: GitHub issues #3427 and #3428): rough helix {{process.helix_pitch_mm:in.3dot}} deep a turn x {{process.face_cutter_dia_mm:in.3dot}} wide, finish turn about .67 deep x {{process.bore_finish_stock_mm:in.3dot}} wide. Listen through the run; on chatter, feed hold, stop the spindle and tell the owner."
+feed = "hand"
+
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "em-half"
+drilling = "none"
+sizing = "other"
+instruction = "Run CB09_pair_bore (M6 T1; set 2650): the end mill helixes down the bore's place, climbing, {{process.helix_pitch_mm:in.3dot}} a turn, to {{process.bore_past_mm:in.3dot}} below the pair, then a finish turn and a spring turn at full depth. Cutting oil on the pair before Cycle Start; hands clear until the program ends, then blow the chips out of the bore. It puts the bore {{cad.bore_location_in:.3dot}} from the flush N ends, where both halves' holes were drilled from. Then, still clamped, gauge the bore."
+rpm = 2650
+feed = "{{process.bore_feed_per_min_mm:in.1f}} in/min"
+inspection = "Bore Ø (Ø{{cad.bore_dia_in:.3dot}} REF) still clamped: at least {{cad.bore_clearance_min_in:.3dot}} over the larger column reading and at most {{cad.bore_clearance_max_in:.3dot}} over the smaller, each reading on the 3/4–1-1/4 in telescoping gauge at mid-height, across the split line and along it, read on the 0–1 in or 1–2 in micrometer."
+gauge_checks = [{ gauge = "telescoping-gauges-starrett-s579gz", band_mm = "{{cad.bore_dia_band_mm}}" }]
+milling_cuts = [
+  { name = "bore rough", kind = "slot", phase = "rough", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", flutes = 3, axial_doc_mm = "{{process.helix_pitch_mm}}", radial_woc_mm = "{{process.face_cutter_dia_mm}}", rpm = 2650, feed_mm_min = "{{process.bore_feed_per_min_mm}}", stations_mm = "{{cad.bore_location_mm}}" },
+  { name = "bore finish", kind = "side", phase = "finish", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", flutes = 3, axial_doc_mm = "{{cad.height_mm}}", radial_woc_mm = "{{process.bore_finish_stock_mm}}", rpm = 2650, feed_mm_min = "{{process.bore_feed_per_min_mm}}", stations_mm = "{{cad.bore_location_mm}}" },
+]
+
+# CB10 runs outside the measured envelope too: a 17.0 mm deep wall. Owner
+# ruling (Pedro, 2026-11-22), no re-cut: "log new dechatter issues to try
+# deep axial cuts but with shallow radial depth" (GitHub issue #3427).
+[[setups.operations]]
+instruction = "First pair that needs CB10 only: this CB10 cut at 2650 rpm has not been chatter-tested on this end mill (the owner's test list: GitHub issue #3427): opening turn about .67 deep x {{process.bore_open_radial_mm:in.3dot}} wide. Listen through the run; on chatter, feed hold, stop the spindle and tell the owner."
+feed = "hand"
+
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "em-half"
+drilling = "none"
+sizing = "other"
+instruction = "Bore under the larger column reading plus {{cad.bore_clearance_min_in:.3dot}} either way: run CB10_bore_open (M6 T1; set 2650): down the bore's centre, out, a turn {{process.bore_open_mm:in.3dot}} larger on the diameter and a spring turn; gauge again. Over the smaller column reading plus {{cad.bore_clearance_max_in:.3dot}} either way, or still under after CB10: stop and tell the owner."
+rpm = 2650
+feed = "{{process.bore_feed_per_min_mm:in.1f}} in/min"
+milling_cuts = [
+  { name = "bore open", kind = "side", phase = "finish", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", flutes = 3, axial_doc_mm = "{{cad.height_mm}}", radial_woc_mm = "{{process.bore_open_radial_mm}}", rpm = 2650, feed_mm_min = "{{process.bore_feed_per_min_mm}}", stations_mm = "{{cad.bore_location_mm}}" },
+]
+
+[[setups.operations]]
+instruction = "Unclamp (the pair still bolted) and gauge the bore again the same two ways: the vise's squeeze may have held it round or oval."
+inspection = "Bore Ø unclamped, across the split line and along it: at least {{cad.bore_clearance_min_in:.3dot}} over the larger column reading and at most {{cad.bore_clearance_max_in:.3dot}} over the smaller. Outside it only now: stop and tell the owner (the vise sprang the pair; do not re-clamp to open it). In band: scribe the pair number on both halves' N ends and record both bore readings, labelled across and along the split line, and both column readings for the pair."
+gauge_checks = [{ gauge = "telescoping-gauges-starrett-s579gz", band_mm = "{{cad.bore_dia_band_mm}}" }]
+
+[[setups.operations]]
+instruction = "Unbolt the pair; keep the screws with it. The back goes to Setup 10; the front waits for it at Setup 11."
+feed = "hand"
+
+[[setups]]
+machine_kind = "other"
+part = "back"
+title = "Backs: face the grip offset off the mating face"
+machine = "PM-30MV CNC (FluidNC, CNCjs with the electronic tool setter) / vise, swivel off"
+indexing = "none"
+machine_ref = "pm-30mv"
+holding = "The back alone, on the stacks: the outside face down, B against the FIXED jaw, gripped on B and the top, centred; the mating face up, the half bore open upward. Snug: the wall behind the bore is thin. Tap it down onto both stacks while closing the vise."
+programs = ["CB11_face_off"]
+datum = "Program CB11_face_off. G54: X0 the RIGHT end (N), the part to −X; Y0 the fixed jaw's face (B); Z0 the mating face as it stands. Each later back: against the work stop, then Z0 again (it is taken on the back's own face); X0 and Y0 stand."
+diagram = { file = "diagrams/face-off.svg", alt = "The back lying on stacked parallels, outside face down, bottom face at the fixed jaw, the half bore open upward; the 1/2 in end mill faces {{cad.grip_offset_in:.3dot}} off the mating face." }
+envelope = { x_span_mm = ["{{cad.width_mm}}", "{{process.face_cutter_dia_mm}}", 5.08], y_span_mm = ["{{cad.height_mm}}", "{{process.face_cutter_dia_mm}}"], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{cad.pre_face_depth_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{cad.depth_mm}}"], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_mm}}"] }
+vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{cad.height_mm}}", along_jaws_mm = "{{cad.width_mm}}", part_height_mm = "{{cad.pre_face_depth_mm}}", parallel_height_mm = "{{process.riser_height_mm}}", overhang_mm = ["{{process.vise_lying_inset_mm}}", "rest"], jaw_offset = "centred", fixed_jaw_face = "machined", moving_jaw_face = "machined", moving_jaw_contact = "flat" }
+beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{cad.width_mm}}"], clamp_mm = [0, "{{cad.width_mm}}"], section_mm = { y = "{{cad.height_mm}}", z = "{{cad.pre_face_depth_mm}}" }, vise_left = "start" }
+
+[[setups.operations]]
+instruction = "Work stop unlocked, its rod drawn back clear of the vise. G54 X0 the RIGHT end (N), Y0 the fixed jaw's face (B): edge finder (900 rpm)."
+instruction_detailed = "Work stop unlocked, its rod drawn back clear of the vise. Edge finder (900 rpm): on the fixed jaw's face beside the part, G10 L20 P1 Y-2.540; on the part's RIGHT end (N) from the right, G10 L20 P1 X2.540."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "G54 Z0: the mating face as it stands, touched with the end mill on its N-end pad, beside the bore."
+instruction_detailed = "Console M6 T1, the 1/2 in end mill reset to {{process.half_mill_projection_mm:in.2dot}} in out of the collet, the facing set (the bore ran it longer; the tool setter measures it). MDI G0 X-4.000 Y-8.000 (over the N-end pad, clear of the bore). Spindle stopped, its tip just dragging a .002 feeler leaf on the mating face: G10 L20 P1 Z0.051."
+feed = "hand"
+
+[[setups.operations]]
+speed_kind = "other"
+tool = "work-stop"
+drilling = "none"
+sizing = "other"
+instruction = "Set the work stop: its rod between the jaws, low, its tip touching the blank's RIGHT end (N). Lock it."
+inspection = "The rod's top at most {{process.stop_rod_top_max_mm:in.3dot}} above the stacks' top (the calipers' depth rod beside it). Each later blank is pushed against the rod as the vise closes: a .002 feeler leaf does not enter between them."
+gauge_checks = [{ gauge = "calipers", band_mm = [0, "{{process.stop_rod_top_max_mm}}"] }]
+feed = "hand"
+
+[[setups.operations]]
+instruction = "First back only: prove CB11_face_off in air, Z0 raised 1.000 in. Then Z0 back."
+feed = "hand"
+
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "em-half"
+drilling = "none"
+sizing = "other"
+instruction = "Run CB11_face_off (M6 T1; 2450, display near 2485): face the mating face down {{cad.grip_offset_mm:in.3dot}} at Z −{{cad.grip_offset_mm:in.3dot}} in one level, across the half bore. Unclamp; mic the depth, mating face to outside face, at both ends."
+settings = "em-half-carbide-1018-3439-face"
+inspection = "Depth {{cad.depth_min_in:.3dot}}–{{cad.depth_max_in:.3dot}}, miked at the N end and the far end; and at each end the grip offset, that end's recorded pre-face depth less its reading here, {{cad.grip_offset_min_in:.3dot}}–{{cad.grip_offset_max_in:.3dot}}."
+gauge_checks = [
+  { gauge = "micrometers", band_mm = "{{cad.depth_band_mm}}" },
+  { gauge = "micrometers", band_mm = "{{cad.grip_offset_band_mm}}" },
+]
+milling_cuts = [
+  { name = "face off", kind = "end", phase = "finish", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", axial_doc_mm = "{{process.grip_offset_mm}}", radial_woc_mm = "{{process.face_stepover_max_mm}}", traverse_mm = [0, "{{cad.width_mm}}"] },
+]
+
+[[setups.operations]]
+instruction = "Too little off (at either end, depth over {{cad.depth_max_in:.3dot}} or offset under {{cad.grip_offset_min_in:.3dot}}): reclamp as before (Z0 stands); send $#, note the G54 line's Z; G10 L2 P1 Z(that Z − (the largest, over both ends, of the depth reading − {{cad.depth_mm:in.3dot}} and {{cad.grip_offset_mm:in.3dot}} − that end's offset) × 25.4); run CB11_face_off again and re-check. Too much off (at either end, depth under {{cad.depth_min_in:.3dot}} or offset over {{cad.grip_offset_max_in:.3dot}}), or one band short and the other full: stop and tell the owner."
+feed = "hand"
+
+[[setups]]
+machine_kind = "other"
+title = "Inspect, deburr, black enamel"
+machine = "Bench"
+indexing = "none"
+diagram = { file = "diagrams/inspect.svg", part = "front", alt = "The finished front, looking down the bore: the ear holes either side, the web between each and the bore, the bore's place from the N end." }
+envelope = "other"
+vise_hold = "other"
+beam = "other"
+
+[[setups.operations]]
+part = "front"
+instruction = "Each front. Inspect first, the bore's edges still sharp (the deburr below breaks them): the bore was accepted in the pair (Setup 9). The ears and the bore's place from N now; under the web or outside a band: stop and tell the owner."
+inspection = "Each ear's web to the bore, on the mating face: the calipers' outside jaw tips into the ear hole and the bore, closed on the web: at least {{cad.ear_wall_min_in:.3dot}} (MIN EAR WALL). Each ear's station: that web plus half the largest pin gauge that slips into that ear hole (try it now) plus half the bore's Ø recorded along the split line, {{cad.ear_station_min_in:.3dot}}–{{cad.ear_station_max_in:.3dot}}. The bore's place: the calipers from N to the bore's near edge on the mating face, plus half its Ø recorded along the split line, {{cad.bore_location_min_in:.3dot}}–{{cad.bore_location_max_in:.3dot}}."
+gauge_checks = [
+  { gauge = "calipers", band_mm = ["{{cad.ear_wall_min_mm}}", "{{cad.ear_wall_best_mm}}"] },
+  { gauge = "calipers", band_mm = "{{cad.ear_station_band_mm}}" },
+  { gauge = "calipers", band_mm = "{{cad.bore_location_band_mm}}" },
+]
+
+[[setups.operations]]
+part = "back"
+instruction = "Each back. Inspect first, the bore's edges still sharp (the deburr below breaks them); its depth and grip offset were accepted in Setup 10. Outside a band: stop and tell the owner."
+inspection = "Bore Ø accepted in the pair (Setup 9). The bore's place, the calipers from N to the half bore's near edge on the mating face, plus half its Ø recorded along the split line, {{cad.bore_location_min_in:.3dot}}–{{cad.bore_location_max_in:.3dot}}. Each tap drill's station from the bore: that place less the hole's X recorded in Setup 8 (near hole), or the far hole's X less that place, {{cad.ear_station_min_in:.3dot}}–{{cad.ear_station_max_in:.3dot}}."
+gauge_checks = [
+  { gauge = "calipers", band_mm = "{{cad.bore_location_band_mm}}" },
+  { gauge = "calipers", band_mm = "{{cad.ear_station_band_mm}}" },
+]
+diagram = { file = "diagrams/inspect.svg", part = "back", alt = "The finished back, looking down the half bore: the tapped ear holes either side, the bore's place from the N end." }
+
+[[setups.operations]]
+speed_kind = "other"
+tool = "files"
+drilling = "none"
+sizing = "other"
+instruction = "Every half: deburr the bore's edges at the top and bottom faces and along the mating face (a back's is the faced one), R{{cad.edge_break_in:.3dot}} or chamfer {{cad.chamfer_max_in:.3dot}} max, scraper and smooth file; no burr may stand proud of the mating face. Each back also: break the four outer edges of the mating face that Setup 10 faced and deburr both tap mouths on it flush (scraper; no countersink), then run a screw through each tapped hole again. Wash off the oil."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "If the enamel cannot follow now: oil each half lightly, bag each pair together and tag it with its pair number; wash the oil off before the enamel."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Paint: the owner's Rust-Oleum Stops Rust Flat Black 376855 over Rust-Oleum Stops Rust Clean Metal Primer 7780830, the paint maker's primer for bare metal. The primer is not owned: buy it. The enamel: check the shelf, buy if none."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Wash every half in detergent, rinse it in clean water and dry it thoroughly."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Mask. A front: the bore, both ear holes (a plug or a #8 screw in each) and the outside face (the bar seats on it), the face opposite the bore. A back: the half bore and both tapped holes (a #8-32 screw in each)."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Spray outdoors or in a well-ventilated space, at 50–90 °F and humidity under 70 %. Primer: shake the can a full minute after the ball rattles; 2 light coats a few minutes apart, the can 10–16 in off."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Enamel straight after the primer: every unmasked face black, 2 or more light coats a few minutes apart, the can moving and at one distance, no runs. Any further coat within 1 hour or after 48 hours."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Let it dry: tack-free in 2–4 hours, handle after 5–9 hours, fully dry in 24 hours."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Unmask; wipe the bare bores, the ear and tapped holes and the fronts' outside faces with light oil."
+feed = "hand"

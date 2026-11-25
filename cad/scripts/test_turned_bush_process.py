@@ -25,9 +25,10 @@ EQUIPMENT = ROOT / "cad" / "config" / "shop-equipment"
 STEMS = tuple(
     stem
     for stem in _process_plans.TRAVELER_STEMS
-    if tomllib.loads(_process_plans.plan_path(stem).read_text(encoding="utf-8"))[
-        "cad"
-    ].get("adapter")
+    if tomllib.loads(_process_plans.plan_path(stem).read_text(encoding="utf-8"))
+    # A family plan binds its parts under [[parts]] and has no [cad].
+    .get("cad", {})
+    .get("adapter")
     == "turned_bush"
 )
 SHOP = _process_plans.load_shop()

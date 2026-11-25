@@ -9,6 +9,13 @@ them to their inputs, under ``cad/out/nc/<stem>/``. FreeCAD is part of the
 build on the submitter: ``build`` and ``release`` run every enrolled part's
 ``cam:<stem>`` task there (no farm worker has FreeCAD), and a release ships the
 files under ``nc/<stem>/``.
+
+A family plan (``_process_plans.family_parts``) has **one** recipe, beside it,
+which posts every program of the family once: the programs every part runs
+and each part's own, into the one ``cad/out/nc/<family stem>/`` with one
+``cycle_times.json`` and one ``manifest.json`` that binds both parts' feature
+bundles. The family's parts have no recipe, task or ``nc/`` directory of their
+own; their placeholder travelers name the family's programs.
 """
 
 from __future__ import annotations
@@ -50,15 +57,27 @@ def recipe_path(stem: str) -> Path:
     return PROCESS_ROOT / stem / "cam.py"
 
 
+def cam_parts(stem: str) -> tuple[str, ...]:
+    """The registry parts a recipe posts for: its family plan's parts, else
+    its own stem. The plan is the one beside the recipe (``PROCESS_ROOT``),
+    the root ``CAM_STEMS`` was read from."""
+    return _process_plans.part_stems(stem, PROCESS_ROOT)
+
+
 def cam_inputs(stem: str, out: Path = CAD_OUT) -> dict[str, Path]:
     """Every file a posted set depends on, by the name ``manifest.json``
     records its SHA-256 under: the scoped feature bundle (``features``,
-    ``step``), the part's ``plan``, each shop file (``shop/<name>.toml``), the
-    ``recipe`` and the FreeCAD ``runtime``."""
-    features, step = bundle_paths(stem, out)
+    ``step``; a family's, one pair per part, ``features/<part stem>`` and
+    ``step/<part stem>``), the ``plan``, each shop file
+    (``shop/<name>.toml``), the ``recipe`` and the FreeCAD ``runtime``."""
+    family = _process_plans.family_parts(stem, PROCESS_ROOT)
+    bundles: dict[str, Path] = {}
+    for part in family.values():
+        bundles[f"features/{part}"], bundles[f"step/{part}"] = bundle_paths(part, out)
+    if not family:
+        bundles["features"], bundles["step"] = bundle_paths(stem, out)
     return {
-        "features": features,
-        "step": step,
+        **bundles,
         "plan": _process_plans.plan_path(stem),
         **{f"shop/{path.name}": path for path in _process_plans.shop_files()},
         "recipe": recipe_path(stem),

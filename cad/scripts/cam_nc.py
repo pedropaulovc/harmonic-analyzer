@@ -6,6 +6,9 @@
    ``features.toml`` and the STEP it binds), ``cad/process/<stem>/plan.toml``
    and the shop directory ``cad/process/shop/`` (merged), and has the recipe
    (``cad/process/<stem>/cam.py``) derive every number it needs from them.
+   A family plan's recipe posts for every part at once: it is given each
+   part's features, its reading of the plan (``_process_plans.part_view``)
+   and its STEP path, each as a dict by the part's id in the plan.
 2. Writes that context, the recipe's path and its programs to a JSON job spec
    in a fresh staging directory and runs ``freecadcmd`` on
    ``_freecad_cam_runtime.py``. FreeCAD imports the STEP, builds one CAM Job
@@ -245,7 +248,6 @@ def main(argv: list[str] | None = None) -> int:
         staging.mkdir(parents=True)
         inputs = _cam_programs.cam_inputs(stem, args.out)
         recipe_path, plan_path = inputs["recipe"], inputs["plan"]
-        features_path, step_path = inputs["features"], inputs["step"]
         try:
             recipe = _cam_programs.load_recipe(stem)
             programs = [directory / f"{name}.nc" for name, _ops in recipe.PROGRAMS]
@@ -253,12 +255,26 @@ def main(argv: list[str] | None = None) -> int:
             manifest_path = directory / _cam_programs.MANIFEST_NAME
             missing = [str(p) for p in inputs.values() if not Path(p).is_file()]
             if missing:
-                raise FileNotFoundError(f"missing inputs {missing}; run package:manifest:{stem} (or fetch_features.py {stem}) first")
-            features = _load_toml(features_path)
-            if features["step_sha256"] != sha256(step_path):
-                raise ValueError(f"{step_path.name} does not match features.toml step_sha256")
+                parts = " ".join(_process_plans.part_stems(stem))
+                raise FileNotFoundError(f"missing inputs {missing}; run package:manifest:<part> (or fetch_features.py {parts}) first")
+            plan = _load_toml(plan_path)
+            family = _process_plans.family_parts(stem)
+            bundles = {
+                part_id: (inputs[f"features/{part}"], inputs[f"step/{part}"])
+                for part_id, part in family.items()
+            } or {"": (inputs["features"], inputs["step"])}
+            features, steps = {}, {}
+            for part_id, (features_path, step_path) in bundles.items():
+                features[part_id] = _load_toml(features_path)
+                if features[part_id]["step_sha256"] != sha256(step_path):
+                    raise ValueError(f"{step_path.name} does not match its features.toml step_sha256")
+                steps[part_id] = str(step_path.resolve())
             with _telemetry.span("cam.context", stem=stem):
-                ctx = recipe.context(features, _load_toml(plan_path), _process_plans.load_shop(), str(step_path.resolve()))
+                if family:
+                    views = {part_id: _process_plans.part_view(plan, part_id) for part_id in family}
+                    ctx = recipe.context(features, views, _process_plans.load_shop(), steps)
+                else:
+                    ctx = recipe.context(features[""], plan, _process_plans.load_shop(), steps[""])
             with _telemetry.span("cam.freecad", stem=stem) as span:
                 freecadcmd = resolve_freecadcmd()
                 result = run_freecad(recipe_path, ctx, recipe.PROGRAMS, staging, freecadcmd, directory / LOG_NAME)

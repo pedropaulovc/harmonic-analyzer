@@ -39,14 +39,22 @@ def _number(parameters: dict[str, Any], value: Any) -> float | None:
 
 
 def problems(plan: dict[str, Any], measured: dict[str, dict[str, Any]]) -> list[str]:
-    """Every way ``plan`` uses a measured setting outside its envelope."""
-    parameters = plan.get("parameters", {})
+    """Every way ``plan`` uses a measured setting outside its envelope. In a
+    family plan an operation reads the parameters of the part it (or its
+    setup) names laid over the plan's, as prechips binds them; one that names
+    no part reads the plan's alone."""
+    shared = plan.get("parameters", {})
+    own = {
+        part["id"]: shared | part.get("parameters", {})
+        for part in plan.get("parts", ())
+    }
     found: list[str] = []
     for setup_index, setup in enumerate(plan.get("setups", []), 1):
         for op_index, operation in enumerate(setup.get("operations", []), 1):
             key = operation.get("settings")
             if key not in measured:
                 continue
+            parameters = own.get(operation.get("part", setup.get("part")), shared)
             record = measured[key]
             where = f"setups[{setup_index}].operations[{op_index}] ({key})"
             pin = record["stickout_parameter"]
