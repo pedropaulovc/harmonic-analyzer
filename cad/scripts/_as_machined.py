@@ -61,6 +61,11 @@ OUTPUT_NAMES = (REPORT_NAME, PICTURE_NAME, LOG_NAME)
 TIMEOUT_S = 1800
 # freecadcmd processes at once: each part and blank length is one.
 PARALLEL = 4
+# A program of more moves is cut in one boolean, not move by move (one move's
+# boolean on the growing part costs ~0.3 s: ms_stick's 1900 engraving
+# strokes ran past the 30 min timeout). Its passes and rapids are then
+# measured against the part before and after it (_freecad_as_machined).
+MOVE_CAP = 200
 # The tool's envelope reaches this far above the blank's top in each setup.
 CLEAR_MM = 5.0
 # A ramp is cut as flat pieces at their lower end, each dropping at most this.
@@ -371,7 +376,14 @@ def pieces(move: _gcode.Move, top: float) -> list[dict[str, Any]]:
         # Less a hair, so a 0.1 mm drop is five 0.02 pieces, not six.
         n = max(1, math.ceil(abs(e[2] - s[2]) / RAMP_DZ_MM - 1e-9))
         sub = [tuple(s[i] + (e[i] - s[i]) * k / n for i in range(3)) for k in range(n + 1)]
-        out += [{"kind": "seg", "a": [p[0], p[1]], "b": [q[0], q[1]], "z": _lower(p, q)} for p, q in zip(sub, sub[1:])]
+        out += [{"kind": "seg", "a": [p[0], p[1]], "b": [q[0], q[1]], "z": _lower(p, q), "caps": [False, False]}
+                for p, q in zip(sub, sub[1:])]
+    # The tool standing at each end of a chain of pieces; a cap between two
+    # pieces is inside the pieces either side of it (to within one piece's
+    # drop), and every cap is a revolved solid in the one boolean.
+    segs = [piece for piece in out if piece["kind"] == "seg"]
+    if segs:
+        segs[0]["caps"][0] = segs[-1]["caps"][1] = True
     return out
 
 
@@ -387,10 +399,17 @@ def move_tools(program: _gcode.Program, entry_tool: int | None) -> list[int | No
     return tools
 
 
+def is_pass(move: _gcode.Move, profile: list[tuple[float, float]]) -> bool:
+    """A feed move at one Z at least its tool's diameter long."""
+    return (move.motion is not _gcode.Motion.RAPID and abs(move.start[2] - move.end[2]) < 1e-6
+            and move.length >= 2 * max(r for r, _h in profile))
+
+
 def program_moves(program: _gcode.Program, setup: Setup, top: float, profiles) -> tuple[list[dict], int]:
     """The program's moves FreeCAD cuts (those of a tool with a profile that
     can reach the blank), and how many moves of tools without a cutting
-    shape (tap guides, probes) were left out."""
+    shape (tap guides, probes) were left out. Rapids and passes are marked
+    ``probe``: what a program too long to cut move by move still measures."""
     spec, uncut = [], 0
     for index, (move, tool) in enumerate(zip(program.moves, move_tools(program, setup.entry_tool))):
         if move.start == move.end and move.centre is None:
@@ -399,7 +418,8 @@ def program_moves(program: _gcode.Program, setup: Setup, top: float, profiles) -
             uncut += 1
             continue
         if found := pieces(move, top):
-            spec.append({"index": index, "tool": tool, "pieces": found})
+            probe = "rapid" if move.motion is _gcode.Motion.RAPID else "pass" if is_pass(move, profiles[tool]) else None
+            spec.append({"index": index, "tool": tool, "pieces": found, "probe": probe})
     return spec, uncut
 
 
@@ -428,7 +448,7 @@ def build_spec(decl: Declaration, nc_dir: Path, mesh_dir: Path) -> tuple[dict[st
             variants.append({"name": name, "blank": blank, "programs": out})
         parts.append({"id": part.id, "step": part.step, "variants": variants,
                       "profiles": {str(n): [list(p) for p in prof] for n, prof in decl.profiles.items()}})
-    return {"marker": RESULT_MARKER, "noise_mm": NOISE_MM, "mesh_dir": str(mesh_dir), "parts": parts}, kept
+    return {"marker": RESULT_MARKER, "noise_mm": NOISE_MM, "move_cap": MOVE_CAP, "mesh_dir": str(mesh_dir), "parts": parts}, kept
 
 
 def _run_unit(spec: dict[str, Any], freecadcmd: Path, work: Path, tag: str) -> tuple[dict[str, Any], str]:
@@ -470,24 +490,24 @@ def run_freecad(spec: dict[str, Any], freecadcmd: Path, work: Path, log: Path) -
     return {"freecad_version": done[0][0]["freecad_version"], "parts": parts}
 
 
-def passes(program: _gcode.Program, entry_tool: int | None, sent: list[int], removed: list[float],
+def passes(program: _gcode.Program, entry_tool: int | None, sent: list[int], removed: list[float | None],
            profiles: dict[int, list[tuple[float, float]]]) -> tuple[list[dict], list[dict]]:
-    """Passes that removed nothing (a feed move at one Z, at least its tool's
-    diameter long; one wholly above the blank was not cut at all) and
-    rapids that removed material."""
+    """Passes (:func:`is_pass`) that removed nothing (one wholly above the
+    blank was not cut at all) and rapids that removed material. A move FreeCAD
+    did not measure (``None``: a program cut in one boolean) is neither."""
     by_index = dict(zip(sent, removed))
     air, rapid_cuts = [], []
     for index, (move, tool) in enumerate(zip(program.moves, move_tools(program, entry_tool))):
         if tool not in profiles:
             continue
         gone = by_index.get(index, 0.0)
+        if gone is None:
+            continue
         if move.motion is _gcode.Motion.RAPID:
             if gone > RAPID_CUT_MM3:
                 rapid_cuts.append({"move": index, "tool": tool, "from": list(move.start), "to": list(move.end),
                                    "removed_mm3": gone})
-            continue
-        dia = 2 * max(r for r, _h in profiles[tool])
-        if abs(move.start[2] - move.end[2]) < 1e-6 and move.length >= dia and gone < AIR_MM3:
+        elif is_pass(move, profiles[tool]) and gone < AIR_MM3:
             air.append({"move": index, "tool": tool, "z_mm": move.start[2], "length_mm": move.length,
                         "minutes": move.length / move.feed if move.feed else None,
                         "above_blank": index not in by_index})
@@ -511,7 +531,8 @@ def summarize(decl: Declaration, result: dict[str, Any], kept: dict) -> dict[str
                 a, r = passes(program, setup.entry_tool, sent, prog["removed_mm3"], decl.profiles)
                 air += [{"program": prog["name"], **p} for p in a]
                 rapid_cuts += [{"program": prog["name"], **p} for p in r]
-                programs.append({"program": prog["name"], "removed_mm3": sum(prog["removed_mm3"]) + prog["shed_mm3"],
+                programs.append({"program": prog["name"], "removed_mm3": prog["total_mm3"], "shed_mm3": prog["shed_mm3"],
+                                 "accounting": prog["accounting"],
                                  "moves_cut": len(sent), "moves_of_uncut_tools": uncut,
                                  "air_passes": len(a), "air_pass_minutes": sum(p["minutes"] or 0.0 for p in a),
                                  "seconds": prog["seconds"]})

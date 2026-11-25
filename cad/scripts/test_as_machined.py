@@ -152,10 +152,12 @@ def test_pieces_of_plunges_ramps_helices_and_moves_above_the_blank(tmp_path):
     assert plunge == [{"kind": "stand", "x": 0.0, "y": 0.0, "z": -1.0}]
     assert len(ramp) == math.ceil(0.1 / am.RAMP_DZ_MM) and ramp[-1]["z"] == pytest.approx(-1.1)
     assert max(p["z"] for p in ramp) <= -1.0
+    # The tool stands at the ramp's two ends only.
+    assert [p["caps"] for p in ramp] == [[True, False], [False, False], [False, False], [False, False], [False, True]]
     # A full helical turn, cut at its upper Z.
     assert len(helix) == 1 and helix[0]["kind"] == "arc" and helix[0]["z"] == -1.1
     assert helix[0]["sweep"] == pytest.approx(-2 * math.pi) and helix[0]["r"] == pytest.approx(5.0)
-    assert flat == [{"kind": "seg", "a": [10.0, 0.0], "b": [20.0, 0.0], "z": -1.5}]
+    assert flat == [{"kind": "seg", "a": [10.0, 0.0], "b": [20.0, 0.0], "z": -1.5, "caps": [True, True]}]
     assert high == []
 
 

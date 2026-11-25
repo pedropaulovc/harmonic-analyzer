@@ -168,3 +168,22 @@ def test_an_undrilled_hole_under_a_strip_left_shows_its_depth(freecadcmd, step, 
     out, variants = _report(freecadcmd, step, tmp_path, face=face, hole=_HOLE.replace("G1 Z-3 F50\n", ""))
     (region,) = variants["nominal"]["over_noise"]
     assert region["kind"] == "left" and region["thickness_mm"] > 2.5
+
+
+def test_programs_past_the_move_cap_are_cut_in_one_boolean(freecadcmd, step, tmp_path, monkeypatch):
+    """Every program cut in one boolean: the same part, the same material
+    each program removed, the same thin-blank air passes, and the same rapid
+    through the part (it shares material with the part after the program)."""
+    monkeypatch.setattr(am, "MOVE_CAP", 0)
+    (tmp_path / "clean").mkdir()
+    _out, variants = _report(freecadcmd, step, tmp_path / "clean")
+    nominal = variants["nominal"]
+    assert abs(nominal["volume_mm3"]["difference"]) < 0.01 and nominal["over_noise"] == []
+    assert all(p["accounting"].startswith("batched") for p in nominal["programs"])
+    assert {p["program"]: round(p["removed_mm3"]) for p in nominal["programs"]} == {"P1_face": 1600, "P2_hole": 283}
+    assert [(p["move"], p["above_blank"]) for p in variants["min"]["air_passes"]] == [(2, True), (4, True), (6, True)]
+    (tmp_path / "rapid").mkdir()
+    hole = _HOLE.replace("G0 X30 Y10 Z15\nG0 Z11", "G0 X5 Y10 Z15\nG0 Z5\nG0 X30\nG0 Z11")
+    _out, variants = _report(freecadcmd, step, tmp_path / "rapid", hole=hole)
+    cuts = variants["nominal"]["rapid_cuts"]
+    assert [(c["program"], c["to"]) for c in cuts] == [("P2_hole", [5.0, 10.0, 5.0]), ("P2_hole", [30.0, 10.0, 5.0])]

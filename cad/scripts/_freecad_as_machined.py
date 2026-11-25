@@ -78,13 +78,12 @@ def standing(profile, x, y, z, top):
     return solid
 
 
-def segment(profile, a, b, z, top):
+def segment(profile, a, b, z, top, caps=(True, True)):
     (ax, ay), (bx, by) = a, b
     length = math.hypot(bx - ax, by - ay)
-    ends = [standing(profile, ax, ay, z, top)]
     if length < 1e-6:
-        return ends
-    ends.append(standing(profile, bx, by, z, top))
+        return [standing(profile, ax, ay, z, top)]
+    ends = [standing(profile, x, y, z, top) for cap, (x, y) in zip(caps, (a, b)) if cap]
     nx, ny = -(by - ay) / length, (bx - ax) / length
     prof = _profile(profile, top - z)
     pts = [V(ax - nx * r, ay - ny * r, z + h) for r, h in reversed(prof)]
@@ -114,7 +113,7 @@ def solids_of(piece, profile, top):
     if kind == "stand":
         return [standing(profile, piece["x"], piece["y"], piece["z"], top)]
     if kind == "seg":
-        return segment(profile, piece["a"], piece["b"], piece["z"], top)
+        return segment(profile, piece["a"], piece["b"], piece["z"], top, piece["caps"])
     return arc(profile, piece["c"], piece["r"], piece["a0"], piece["sweep"], piece["z"], top)
 
 
@@ -144,40 +143,86 @@ def _keep(shape, cad):
     return best, sum(s.Volume for s in solids if s is not best)
 
 
-def simulate(part, programs, profiles, cad):
-    """Cut every move from ``part`` in order; per program, each listed move's
-    removed volume (mm3) and the volume shed as loose offcuts."""
+def _cutter(move, profiles, top, place):
+    profile = profiles[str(move["tool"])]
+    solids = []
+    for piece in move["pieces"]:
+        solids += solids_of(piece, profile, top)
+    cutter = Part.makeCompound(solids)
+    # A rigid move keeps the analytic surfaces exact.
+    cutter.transformShape(place)
+    return cutter
+
+
+def _common(cutter, part):
+    if not cutter.BoundBox.intersect(part.BoundBox):
+        return 0.0
+    return sum(part.common(solid).Volume for solid in cutter.Solids if solid.BoundBox.intersect(part.BoundBox))
+
+
+def simulate(part, programs, profiles, cad, move_cap):
+    """Cut every move from ``part`` in order. A program of at most ``move_cap``
+    moves is cut move by move: each move's removed volume is exact. A longer
+    one (engraving, long finishing) is cut in two booleans, its feed moves
+    then its rapids; each probed move (a pass or a rapid, as the host marks
+    them) is measured against the part before the program (a pass sharing
+    nothing with it removed nothing) or after its feed moves (a rapid
+    sharing material with that cut), bounds that miss only what the
+    program's own earlier moves cleared. Per program: the moves' volumes
+    (None where not measured), the total and the volume shed as loose
+    offcuts."""
     out = []
     for program in programs:
         t0 = time.perf_counter()
         place = matrix(program["origin"], program["axes"])
+        moves = program["moves"]
         removed, shed = [], 0.0
-        before = part.Volume
-        for move in program["moves"]:
-            profile = profiles[str(move["tool"])]
-            solids = []
-            for piece in move["pieces"]:
-                solids += solids_of(piece, profile, program["top"])
-            cutter = Part.makeCompound(solids)
-            # A rigid move keeps the analytic surfaces exact.
-            cutter.transformShape(place)
-            if not cutter.BoundBox.intersect(part.BoundBox):
-                removed.append(0.0)
-                continue
-            cut = part.cut(cutter.Solids)
-            if not cut.Solids:
-                raise RuntimeError(f"{program['name']} move {move['index']} cut the whole part away")
-            kept, loose = _keep(cut, cad)
-            after = kept.Volume  # OCC recomputes it on every access
-            gone = before - after
-            if gone > REMOVED_EPS_MM3:
-                part, before, shed = kept, after, shed + loose
-                removed.append(gone)
-            else:
-                removed.append(0.0)
+        start = before = part.Volume
+        if len(moves) <= move_cap:
+            for move in moves:
+                cutter = _cutter(move, profiles, program["top"], place)
+                if not cutter.BoundBox.intersect(part.BoundBox):
+                    removed.append(0.0)
+                    continue
+                cut = part.cut(cutter.Solids)
+                if not cut.Solids:
+                    raise RuntimeError(f"{program['name']} move {move['index']} cut the whole part away")
+                kept, loose = _keep(cut, cad)
+                after = kept.Volume  # OCC recomputes it on every access
+                gone = before - after
+                if gone > REMOVED_EPS_MM3:
+                    part, before, shed = kept, after, shed + loose
+                    removed.append(gone)
+                else:
+                    removed.append(0.0)
+            accounting = "per move"
+        else:
+            # Feed moves first: material still there after all of them was
+            # there when any rapid of the program passed; then the rapids.
+            cutters = [_cutter(move, profiles, program["top"], place) for move in moves]
+            initial = part
+            for rapid in (False, True):
+                solids = [solid for move, cutter in zip(moves, cutters) if (move.get("probe") == "rapid") == rapid
+                          for solid in cutter.Solids]
+                if rapid:
+                    fed = part
+                if solids:
+                    cut = part.cut(solids)
+                    if not cut.Solids:
+                        raise RuntimeError(f"{program['name']} cut the whole part away")
+                    part, loose = _keep(cut, cad)
+                    shed += loose
+            for move, cutter in zip(moves, cutters):
+                if move.get("probe") == "pass":
+                    removed.append(_common(cutter, initial))
+                elif move.get("probe") == "rapid":
+                    removed.append(_common(cutter, fed))
+                else:
+                    removed.append(None)
+            accounting = f"batched ({len(moves)} moves > {move_cap})"
         part = part.removeSplitter()
-        out.append({"name": program["name"], "removed_mm3": removed, "shed_mm3": shed,
-                    "seconds": time.perf_counter() - t0})
+        out.append({"name": program["name"], "removed_mm3": removed, "total_mm3": start - part.Volume,
+                    "shed_mm3": shed, "accounting": accounting, "seconds": time.perf_counter() - t0})
     return part, out
 
 
@@ -257,7 +302,7 @@ def _triangles(shape, deflection):
     return [[list(points[i]) for i in facet] for facet in facets]
 
 
-def run_part(spec_part, noise_mm, mesh_dir):
+def run_part(spec_part, noise_mm, mesh_dir, move_cap):
     cad = Part.Shape()
     cad.read(spec_part["step"])
     if len(cad.Solids) != 1:
@@ -275,7 +320,7 @@ def run_part(spec_part, noise_mm, mesh_dir):
         if len(blank.Solids) != 1:
             raise RuntimeError(f"the blank's prisms make {len(blank.Solids)} solids, not one")
         blank = blank.Solids[0]
-        part, programs = simulate(blank, variant["programs"], profiles, cad)
+        part, programs = simulate(blank, variant["programs"], profiles, cad, move_cap)
         t1 = time.perf_counter()
         left, left_rest, left_solids = regions(part.cut(cad), cad)
         gouge, gouge_rest, gouge_solids = regions(cad.cut(part), part)
@@ -309,7 +354,7 @@ def main():
     with open(os.environ[SPEC_ENV], encoding="utf-8") as handle:
         spec = json.load(handle)
     try:
-        parts = [run_part(p, spec["noise_mm"], spec.get("mesh_dir")) for p in spec["parts"]]
+        parts = [run_part(p, spec["noise_mm"], spec.get("mesh_dir"), spec["move_cap"]) for p in spec["parts"]]
         result = {"freecad_version": ".".join(FreeCAD.Version()[:3]), "parts": parts}
     except Exception:  # noqa: BLE001 -- the traceback is the host's report
         result = {"error": traceback.format_exc()}
