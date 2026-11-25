@@ -227,9 +227,10 @@ def test_tenon_and_counterbore_are_fitted_to_the_parts_they_take() -> None:
     # the rest in the numbered note each flags.
     spec = dt_crank_handle_spec
     # The counterbore depth seats the cup face flush, so it is fitted too.
-    assert spec.REFERENCE_DIMENSIONS == {
-        "PivotBoreDia", "TenonDia", "CounterboreDia", "CounterboreDepth",
-    }
+    # The #20 drilled pivot bore is no reference: DRILLED HOLES controls it
+    # (D26, codjiflo 3548-r3-2).
+    assert spec.REFERENCE_DIMENSIONS == {"TenonDia", "CounterboreDia", "CounterboreDepth"}
+    assert "PivotBoreDia" not in spec.REFERENCE_DIMENSIONS
     assert spec.TENON_DIA == pytest.approx(ferrule.BORE_DIA - sum(spec.TENON_GLUE_LINE) / 2.0)
     assert spec.COUNTERBORE_DIA == pytest.approx(
         cup.BODY_DIA + sum(spec.COUNTERBORE_GLUE_LINE) / 2.0

@@ -527,11 +527,11 @@ DRAWING_PRECISION_BY_NAME: dict[str, int] = {
 }
 if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
     raise AssertionError("every marked MHA-DT-08 dimension needs authored places")
-# Fitted to the ferrule and the cup (user ruling 2026-09-29), and the reamed
-# bore under its running clearance: references.
-REFERENCE_DIMENSIONS = frozenset(
-    {"PivotBoreDia", "TenonDia", "CounterboreDia", "CounterboreDepth"}
-)
+# Fitted to the ferrule and the cup (user ruling 2026-09-29): references.
+# The pivot bore is not one: it is the #20 drill's Ø.161 under DRILLED HOLES
+# (D26, codjiflo 3548-r3-2), the hole made first, so it prints bare and the
+# title block's drilled row controls it.
+REFERENCE_DIMENSIONS = frozenset({"TenonDia", "CounterboreDia", "CounterboreDepth"})
 # Driven by the tangencies: references.
 REFERENCE_RADII = frozenset({"FlareR", "SConcaveR", "SConvexR", "DomeR"})
 # The tangent point the inflection station ends on, where the S-curve's

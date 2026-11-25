@@ -674,7 +674,7 @@ def build(adapter: Any) -> dict[str, str]:
     by_name = {dimension_name(adapter, a): a for a in annotations}
     # The tenon and the counterbore are bonded fits to the ferrule and cup,
     # and the S-curve's tangent point is fixed by its arcs, so their sizes
-    # print as references.
+    # print as references; the #20 drilled pivot bore prints bare (D26).
     for name in sorted(REFERENCE_DIMENSIONS | TANGENT_POINT_DIAMETERS):
         set_reference_dimension(
             adapter,
