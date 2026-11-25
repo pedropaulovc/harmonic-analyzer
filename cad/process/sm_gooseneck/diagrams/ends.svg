@@ -18,15 +18,15 @@
   <text class="label" x="151" y="329.1">below the jaws</text>
   <text class="label" x="151" y="345.1">(schematic)</text>
   <rect class="fixture-support" x="67.6" y="212.9" width="38.1" height="76.2"/>
-  <text class="label" x="40" y="452">packing: a .500 piece of the trial tube at the</text>
+  <text class="label" x="40" y="452">packing: a {{process.stock_od_in:.3dot}} piece of the trial tube at the</text>
   <text class="label" x="40" y="468">jaws' left end, to keep them square</text>
   <line class="leader" x1="60" y1="440" x2="86.65" y2="283.1"/>
   <circle class="leader-dot" cx="86.65" cy="283.1" r="2"/>
   <path class="part-kept" d="M334.3 209.9L334.3 248A247.65 247.65 0 0 0 581.95 495.65L740 495.65L737 491.84L740 488.03L737 484.22L740 480.41L737 476.6L740 472.79L737 468.98L740 465.17L737 461.36L740 457.55L581.95 457.55A209.55 209.55 0 0 1 372.4 248L372.4 209.9Z"/>
   <rect class="part-removed" x="334.3" y="57.5" width="38.1" height="152.4"/>
-  <text class="label" x="384.4" y="77.5">tail, 2 in, off</text>
+  <text class="label" x="384.4" y="77.5">tail, {{process.tube_tail_mm:ind}} in, off</text>
   <line class="datum" x1="320.3" y1="209.9" x2="386.4" y2="209.9"/>
-  <text class="datum-label" x="442.4" y="231.9">the scribed line, 3.750 in above the</text>
+  <text class="datum-label" x="442.4" y="231.9">the scribed line, {{process.arm_line_mm:in.3f}} in above the</text>
   <text class="datum-label" x="442.4" y="247.9">leg's outer side; the jaw tops just below</text>
   <line class="leader" x1="440.4" y1="227.9" x2="388.4" y2="209.9"/>
   <circle class="leader-dot" cx="388.4" cy="209.9" r="2"/>
@@ -43,7 +43,7 @@
   <path class="part-kept" d="M199.05 580L199.05 696.2L195.24 699.2L191.43 696.2L187.62 699.2L183.81 696.2L180 699.2L176.19 696.2L172.38 699.2L168.57 696.2L164.76 699.2L160.95 696.2L160.95 580Z"/>
   <path class="cutter" d="M249.05 572.5L249.05 575.5L110.95 575.5L107.95 574.75L110.95 574L107.95 573.25L110.95 572.5Z"/>
   <line class="datum" x1="146.95" y1="580" x2="213.05" y2="580"/>
-  <text class="label" x="279.05" y="610">the .500 tube between the two soft jaws,</text>
+  <text class="label" x="279.05" y="610">the {{process.stock_od_in:.3dot}} tube between the two soft jaws,</text>
   <text class="label" x="279.05" y="626">gripped over the jaws' whole depth:</text>
   <text class="label" x="279.05" y="642">the bend lies in the jaws' plane</text>
   <line class="leader" x1="277.05" y1="606" x2="195.05" y2="620"/>

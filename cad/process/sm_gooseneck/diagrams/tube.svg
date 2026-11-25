@@ -17,7 +17,7 @@
   <circle class="leader-dot" cx="705.6" cy="98.0" r="2.5"/>
   <text class="label" x="30.0" y="60.0">O.D.: micrometer 1 in from each end, two readings 90° apart, both ends</text>
   <line class="dims" x1="30.0" y1="180.0" x2="386.2" y2="180.0"/>
-  <text class="label" x="120.0" y="198.0">blank 24.6 in (tape measure)</text>
+  <text class="label" x="120.0" y="198.0">blank {{process.blank_length_in:.1f}} in (tape measure)</text>
   <line class="dims" x1="386.2" y1="180.0" x2="725.0" y2="180.0"/>
   <text class="label" x="400.0" y="198.0">rest (about 23 in): the trial piece; checks the grooves first</text>
   <circle class="section" cx="90" cy="228" r="26"/>
