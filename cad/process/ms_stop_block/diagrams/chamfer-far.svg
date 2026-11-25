@@ -41,6 +41,6 @@
   <circle class="cutter" cx="702" cy="109.6" r="25.4"/>
   <text class="label" x="500" y="290">FAR END to the right (X0);</text>
   <text class="label" x="500" y="306">the pass runs across the jaws,</text>
-  <text class="label" x="500" y="322">its axis .010 outside the far end</text>
+  <text class="label" x="500" y="322">its axis {{process.chamfer_offset_mm:in.3dot}} outside the far end</text>
   <text class="label" x="16.0" y="406.0">Not upright: there the finished far end left the point only 0.525 mm (.021) over the jaws (#3607).</text>
 </svg>
