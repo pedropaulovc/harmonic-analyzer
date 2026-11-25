@@ -79,6 +79,23 @@ and bed height) repeat the shop's `workholding.vise-pm-6` (`shop/common.toml`), 
 plan bindings cannot read shop records; each such parameter names the shop
 field it repeats, and the two must be changed together.
 
+Setup pictures (owner 2026-11-25: "work stop does not appear in sketches;
+cutter is a wide yellow rectangle even for 1/2 in end mills"): every
+workholding element a setup's holding, datum or operation text names (vise
+jaws, parallels or stacks, 1-2-3 block, work stop, screws) appears in its
+picture, and none it does not name; cutters, drills, taps, the tap guide and
+locators such as the work stop's rod are drawn to scale from the plan's
+numbers (a tool's diameter, its stick-out, its point's depth), at the pass or
+station the picture shows, and end in a break line where drawn short; a
+size with no record stays schematic and is said to be. A tool size a picture
+reads is a plan parameter restating its shop record, held to it by a test
+(`test_shop_equipment.py` for the tap guide) or by `cam.py`'s `_agree` (the
+face overhang). The work stop is named once, in the first picture that draws
+it, with when it is set; touch-off tools (the edge finder, the feeler) are
+not drawn in a cutting picture. Template pictures (`data-cad-template`) are
+drawn by prechips; the column clamp's `clamp-half` takes `data-stop="rod"`
+or `"rod-labelled"`.
+
 ## Placeholder plans
 
 Until its traveler is written, a made part without an enrolled plan has a
