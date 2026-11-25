@@ -66,11 +66,12 @@ HOLE_REAMED_LIMITS = (HOLE_REAMER_DIA, 1.97866)  # .0775-.0779 in
 # that may be bonded is the one the .079 pin of the .061-.500 pin-gauge set
 # (gauges.pin-gauges, a minus pin, .0788-.0790) does not enter: the bar and
 # rod travelers try it only in a hole the pin entered. Delegated ruling
-# 2026-11-24 (Main), no precedent, #2144 (rulings.md D13): a single limit,
-# one pin of the owned .001-step set, so the audit's .0785 (not a size the
-# set holds) becomes .079, .0005 looser: the gap to the smallest pin stays .0009,
-# inside 641's gap fill (BOND_GAP), and the bar's hole wall is stated at
-# this hole (.078 MIN, MHA-CH-01 RV-06).
+# 2026-11-24 (Main), no precedent; changes the number in the owner's
+# 2026-11-24 fit-audit question 3 answer (.0785 → .079: the owned pin set
+# has no .0785 pin; .079 is the nearest pin; HOLE WALL .078 MIN unchanged),
+# #2144 (rulings.md D13): a single limit, .0005 looser: the gap to the
+# smallest pin stays .0009, inside 641's gap fill (BOND_GAP), and the bar's
+# hole wall is stated at this hole (.078 MIN, MHA-CH-01 RV-06).
 BOND_HOLE_MAX = 0.0790 * MM_PER_IN  # 2.0066
 # LOCTITE 641's gap fill (pd_transgear_knob_cup_spec.LOCTITE_641_GAP_MAX,
 # Henkel's product page: "Gap fill: 0.15 mm"); 641 is the removable grade
