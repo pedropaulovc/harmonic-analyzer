@@ -737,7 +737,8 @@ def test_the_pedestals_are_set_by_feel_then_spotted_with_one_tripwire() -> None:
     # on MHA-DT-VN-62 snug and each pedestal is tapped back to its 4G
     # readings (its X set and the front's Y zero) before the tightening.
     assert back == "4M. WITH THE BANK ON MHA-DT-VN-62 SNUG, TAP EACH TO ITS 4G READINGS."
-    assert accept.startswith("4N. TIGHTEN MHA-DT-VN-62: NEITHER X INDICATOR OVER .015,"), accept
+    # Codjiflo r7-14: the tightening keeps the 4G readings 4M tapped back to.
+    assert accept.startswith("4N. TIGHTEN MHA-DT-VN-62: INDICATORS HOLD 4G READINGS,"), accept
     # Codjiflo round 4 on #3550 (r4-9, rule 23): the screwed pedestals get
     # their hand check once MHA-DT-VN-62 holds them.
     assert accept.endswith("NEITHER MHA-DT-02 TURNS OR MOVES BY HAND."), accept

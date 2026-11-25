@@ -2281,7 +2281,9 @@ CHECKS = _note_text(
         # #8 screws let each pedestal float ±.008 or more, so the refit goes
         # on MHA-DT-VN-62 snug and each pedestal is tapped back to its 4G
         # readings, X and the front's Y zero (4M), before MHA-DT-VN-62 is
-        # tightened and accepted against 4G's .015 and, rule 23's one-screw
+        # tightened and accepted on the indicators still holding those 4G
+        # readings (Codjiflo r7-14: the 4G readings, not a .015 tripwire,
+        # are what the tightening must keep) and, rule 23's one-screw
         # static clamp (r4-9, DT-09), by hand (4N).  4J-4M run on undrilled
         # seats only, so a redo (4W) goes from 4H straight to 4N.  The 4A-4Z
         # letters are full: 4K takes the old swing-out, 4M's WITH clause
@@ -2292,7 +2294,7 @@ CHECKS = _note_text(
         "4K. WITH THE CONE SET SWUNG OUT, LIFT THE PEDESTAL BANK OFF MHA-FR-01.",
         "4L. DRILL AND TAP THE SEATS PER MHA-FR-01: DECK AND FEET BLOWN CLEAN.",
         "4M. WITH THE BANK ON MHA-DT-VN-62 SNUG, TAP EACH TO ITS 4G READINGS.",
-        "4N. TIGHTEN MHA-DT-VN-62: NEITHER X INDICATOR OVER .015, NEITHER "
+        "4N. TIGHTEN MHA-DT-VN-62: INDICATORS HOLD 4G READINGS, NEITHER "
         "MHA-DT-02 TURNS OR MOVES BY HAND.",
         "4P. SWING IN UNTIL A GEAR JUST BINDS.",
         f"4Q. EASE OUT IN SMALL STEPS UNTIL {CONE_TURN_CRANK_TURNS} CRANK TURNS RUN FREE.",
