@@ -8,12 +8,15 @@
 # gives in any #30 bore of the DRILLED HOLES row, unchanged. The block's
 # cup-point set screw clamps the pivot through its relief groove: the
 # pivot's float in the #30 bore adds to the screw's reach to the groove floor
-# (.0200 at worst against the .025 point, batch-ch/fitch-small/q20_pivot.py)
+# (.0200 at worst against the .025 point,
+# test_pn_pen_carriage_geom.test_set_screw_point_lands_in_the_relief_groove)
 # and to where its cup lands between the groove walls (0.082 mm spare at the
-# full worst case).
+# full worst case, pn_pen_carriage_geom.groove_landing_spare and the same
+# test). N-01's source is the plain constant, so the check register's gate
+# finds its entry in checks/pn-pen-carriage-geom.yaml; the ruling is beside it.
 necessity:
   - id: N-01
     feature: "sheet 1, note 1, pivot (Ø.126) REF: CLEARANCE .0030-.0085 in the MHA-PN-05 pivot bore"
     kind: gap
     reason: "pivot float eats the set screw's reach to the groove"
-    source: "pn_pen_carriage_geom.groove_landing_spare; owner ruling 2026-11-24, fit audit question 20"
+    source: "pn_pen_carriage_geom.groove_landing_spare"  # owner ruling 2026-11-24, fit audit question 20

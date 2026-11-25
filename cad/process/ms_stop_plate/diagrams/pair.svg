@@ -21,7 +21,7 @@
   <rect class="fixture-support" x="170" y="124" width="5" height="96"/>
   <path class="leader" d="M188 96 L173 140"/>
   <text class="label" x="180" y="90">feeler leaves</text>
-  <!-- Pilots: .150 and .690 from the locating end (fixed jaw), into the block .300. -->
+  <!-- Pilots: .150 and .690 from the locating end (fixed jaw), into the block .30. -->
   <rect class="part-removed" x="395" y="124" width="14" height="74"/>
   <rect class="part-removed" x="287" y="124" width="14" height="74"/>
   <path class="part-removed" d="M395 198 L402 206 L409 198 Z"/>
@@ -36,6 +36,6 @@
   <line class="datum" x1="235" y1="116" x2="235" y2="124"/>
   <text class="datum-label" x="210" y="112">Z0 plate top</text>
   <path class="dims" d="M281 132 L281 198"/>
-  <text class="label" x="200" y="152">pilots .300</text><text class="label" x="200" y="168">below the</text><text class="label" x="200" y="184">block face</text>
+  <text class="label" x="200" y="152">pilots {{cad.clearance_hole_1_pair_pilot_depth_in_mate_mm:in.2dot}}</text><text class="label" x="200" y="168">below the</text><text class="label" x="200" y="184">block face</text>
   <text class="label" x="200" y="370">locating edges flushed against a 1-2-3 block (X0, the near side)</text>
 </svg>

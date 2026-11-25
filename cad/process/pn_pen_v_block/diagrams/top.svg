@@ -8,11 +8,11 @@
   <!-- The block at the bore's plane: the V's flat under the neck, the relief slot under the body. -->
   <polygon class="part-kept" points="120,67.4 329.3,67.4 329.3,158.6 191.1,158.6 191.1,171.5 120,171.5"/>
   <rect class="part-removed" x="120" y="63.1" width="209.3" height="4.3"/>
-  <!-- Pivot bore down into the slot; the #32's point below the roof. -->
+  <!-- Pivot bore down into the slot; the #30's point below the roof. -->
   <rect class="holes" x="206.8" y="67.4" width="25.6" height="91.2"/>
   <polygon class="holes" points="207.8,158.6 231.4,158.6 219.6,173.6"/>
   <polygon class="active-face" points="203.9,67.4 235.3,67.4 232.4,70.3 206.8,70.3"/>
-  <!-- The reamer above the bore. -->
+  <!-- The #30 drill above the bore. -->
   <rect class="cutter" x="206.8" y="32" width="25.6" height="28"/>
   <line class="arrow" x1="219.6" y1="30" x2="219.6" y2="100"/>
   <line class="datum" x1="120" y1="40" x2="120" y2="66"/>
@@ -23,10 +23,10 @@
   <text class="label" x="434" y="70">top faced to the height</text>
   <line class="leader" x1="430" y1="100" x2="233" y2="100"/>
   <text class="label" x="434" y="104">pivot bore Ø{{cad.pivot_bore_dia_min_in:.4dot}}–{{cad.pivot_bore_dia_max_in:.4dot}}, X {{cad.pivot_bore_station_in:.3dot}}:</text>
-  <text class="label" x="434" y="120">spot, #32 pecked, .1260 reamer</text>
-  <text class="label" x="434" y="136">fed in and out, chamfer mill</text>
+  <text class="label" x="434" y="120">spot, #30 drill to size, pecks of</text>
+  <text class="label" x="434" y="136">{{process.peck_30_mm:in.3dot}} full retract, chamfer mill</text>
   <line class="leader" x1="430" y1="172" x2="232" y2="168"/>
-  <text class="label" x="434" y="176">#32 point in the slot's air</text>
+  <text class="label" x="434" y="176">#30 point in the slot's air</text>
   <text class="label" x="434" y="230">relief slot (cut in VB05)</text>
   <line class="leader" x1="430" y1="226" x2="300" y2="185"/>
   <text class="label-halo" x="130" y="190">V flat (VB05)</text>

@@ -19,6 +19,6 @@
   <text class="label" x="449.0" y="242.0">support block</text>
   <text class="label" x="498.5" y="217.8">strap</text>
   <text class="label" x="20.0" y="307.9">Side view from the moving jaw: X0 the foot end (left), Z0 the plates' far ends;</text>
-  <text class="label" x="20.0" y="323.9">slots .200 x .420 hatched. Plan as Setup 5 (same clamping); Y0 the fixed jaw.</text>
+  <text class="label" x="20.0" y="323.9">slots ({{cad.slots_width_nominal_in:.3dot}}) x {{cad.slots_depth_in:.3dot}} hatched. Plan as Setup 5 (same clamping); Y0 the fixed jaw.</text>
   <text class="label" x="20" y="343">T4 3/16 in end mill at least .70 out; oil brushed on before Cycle Start.</text>
 </svg>

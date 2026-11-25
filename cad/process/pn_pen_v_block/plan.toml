@@ -141,7 +141,7 @@ v_flat_stepover_mm = 0.0508
 # neck_edge_breaks.full_to_x). cam.py checks both.
 break_level_mm = 0.677333
 break_full_to_mm = 8.382
-# Spots, the #2 centre drill (60°): Ø.100 on the pivot bore, under the #32;
+# Spots, the #2 centre drill (60°): Ø.100 on the pivot bore, under the #30;
 # Ø.080 on the set-screw hole, under the #43, so neither leaves a chamfer.
 spot_bore_dia_mm = 2.54
 spot_tap_dia_mm = 2.032
