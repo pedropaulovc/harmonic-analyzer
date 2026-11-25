@@ -21,7 +21,7 @@ checks:
     kind: joint
     reason: "the pin rides out of its hole; the division slips"
     source: "owner facts 2026-11-24: \"pin goes 0.1555 into blind holes\", \"plate thickness 0.2770\"; the .1 in floor (about .85 pin diameter) is the author's round figure: a guess"
-    basis: measured
+    basis: worst_case
   - id: C-04
     check: "a hole circle stands outside the index arm's reach"
     kind: gap
@@ -82,3 +82,21 @@ checks:
     reason: "neighbouring index holes break into each other"
     source: "owner ruling 2026-11-02 (RV-01): webs down to .02 in on and between the 57- and 51-hole circles"
     basis: worst_case
+  - id: C-14
+    check: "counterbore wall is thinner than the stock plate's"
+    kind: wall
+    reason: "a counterbore breaks into the bore"
+    source: "owner fact 2026-11-24 (stock plate): \"screw hole edge to bore edge 0.0415\"; the made plate's nominal wall is no thinner"
+    basis: measured
+  - id: C-15
+    check: "mounting hole is not the stock plate's 15/64 drill"
+    kind: gap
+    reason: "a plate screw binds in its hole"
+    source: "owner facts 2026-11-24: \"3x screw holes thru 15/64\", \"0.1920 dia\" (the screw)"
+    basis: measured
+  - id: C-16
+    check: "counterbore is not the stock plate's Ø.3455"
+    kind: gap
+    reason: "a screw head will not enter its counterbore"
+    source: "owner fact 2026-11-24 (stock plate): \"countersunk 0.3455 dia\", corrected \"not countersunk counterbored;\""
+    basis: measured
