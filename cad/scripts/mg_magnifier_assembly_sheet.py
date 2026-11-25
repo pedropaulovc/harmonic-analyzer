@@ -345,16 +345,12 @@ _PLATE = f"THE SURFACE PLATE {_BAR} STANDS ON"
 STEP_TEXT = {
     # Owner ruling 2026-11-24, fit audit question 17: the drum is bonded on
     # the spigot MHA-MG-05 is turned to slide in its drilled bore (rule 23:
-    # the step gives the grade, the stop and the acceptance; NOTE 1 the
-    # degrease, coat and cure). The boss face squares it; none of the
-    # compound goes in the wheel's bore, which runs on the axle. Owner
-    # ruling 2026-11-24, fit audit part 2, S4: the stop is seen, not read
-    # (DETAIL B prints the drum face's window as REF); the semicolon of the
-    # approved text is a comma here (rule 22's one-clause lint).
+    # the step gives the grade and the stop, its own check the acceptance;
+    # NOTE 1 the degrease, coat and cure). The boss face squares it; none of
+    # the compound goes in the wheel's bore, which runs on the axle.
     _steps.DRUM_BONDED_KEY: (
         f"BOND {_DRUM} ON THE SPIGOT OF {_WHEEL} WITH {BOND_GRADE}, {BOND_NOTE_REF}, "
-        "NONE IN THE BORE, UNTIL IT IS HARD AGAINST THE BOSS: NO LIGHT UNDER THE "
-        "DRUM, NOT PROUD OF THE SPIGOT END (STRAIGHTEDGE)."
+        "NONE IN THE BORE, UNTIL IT IS HARD AGAINST THE BOSS."
     ),
     # A slip fit cures wherever it sits in its clearance, so the drum is
     # centred while wet (fit audit question 17, as the cone gears' wet
@@ -371,10 +367,25 @@ STEP_TEXT = {
         f"THE RIM SWINGS LEAST, {_WHEEL} TURNING ON {_AXLE} CLAMPED ON A V-BLOCK."
     ),
     "drum-bond-cured": f"LEAVE {_DRUM} UNDISTURBED 24 H TO CURE.",
+    # Owner ruling 2026-11-24, fit audit part 2, S4: the seat is seen, not
+    # read (DETAIL B prints the drum face's window as REF); the semicolon of
+    # the approved text is a comma here (rule 22's one-clause lint). Its own
+    # check (rule 22, machinist review of run 20261125T172832344Z r2), with
+    # the hand check sharing the strip below.
+    "drum-seated": (
+        f"CHECK {_DRUM} IS HARD AGAINST THE BOSS: NO LIGHT UNDER THE DRUM, NOT "
+        "PROUD OF THE SPIGOT END (STRAIGHTEDGE)."
+    ),
     _steps.DRUM_HELD_KEY: f"CHECK {_DRUM} DOES NOT TURN OR SLIDE BY HAND.",
     "drum-stripped": (
-        f"IF IT DOES, RETURN TO {_step(_steps.DRUM_BONDED_KEY)} WITH {_DRUM} PULLED "
-        "OFF AND BOTH CLEANED TO BARE METAL."
+        f"IF {_step('drum-seated')} OR {_step(_steps.DRUM_HELD_KEY)} FAILS, PULL "
+        f"{_DRUM} OFF {_WHEEL}."
+    ),
+    "drum-cleaned": (
+        f"IF {_DRUM} WAS PULLED OFF, CLEAN IT AND THE SPIGOT TO BARE METAL."
+    ),
+    "drum-rebonded": (
+        f"IF {_DRUM} WAS PULLED OFF, RETURN TO {_step(_steps.DRUM_BONDED_KEY)}."
     ),
     # Owner ruling 2026-11-24, fit audit part 2, C11 ("Yes, set to the trial
     # stack"), with question 18's bond: the trial runs dry (the steps module
@@ -418,29 +429,38 @@ STEP_TEXT = {
     ),
     # The one setting remedy: a short thread end moves the axle out, its
     # plain end sunk by the shortfall to the window's middle, and the trial
-    # runs again from the washer seat.
+    # runs again from the washer seat. One action per step (rule 22).
+    "trial-nuts-off": (
+        f"IF ONLY THE THREAD END FELL SHORT, REMOVE THE NUTS AND THE FEELER FROM "
+        f"{_AXLE}."
+    ),
     "axle-sunk": (
+        f"IF ONLY THE THREAD END FELL SHORT, SLIDE {_AXLE} OUT BY ITS SHORTFALL TO "
+        f"THE MIDDLE OF {ENDSHAKE_DETAIL_TITLE}, READ AT ITS PLAIN END INSIDE THE "
+        "BORE (CALIPER DEPTH ROD)."
+    ),
+    "trial-rerun": (
         f"IF ONLY THE THREAD END FELL SHORT, RETURN TO "
-        f"{_step(_steps.TRIAL_WASHER_SEATED_KEY)} WITH THE NUTS AND FEELER OFF AND "
-        f"{_AXLE} SLID OUT BY ITS SHORTFALL TO THE MIDDLE OF {ENDSHAKE_DETAIL_TITLE} "
-        "(ITS PLAIN END THAT FAR INSIDE THE BORE, CALIPER DEPTH ROD)."
+        f"{_step(_steps.TRIAL_WASHER_SEATED_KEY)}."
     ),
     # Any other failure: the trial comes off and the axle out, so a replaced
     # bar, spacer or axle restarts at the spacer like any other part. A part
     # outside its own limits, else the axle (its lengths, the stack's last
     # terms), is replaced, so the loop always ends on a new part. Each
-    # sub-step is conditioned on the one before, so a passed trial skips them.
+    # sub-step is conditioned on the failure, so a passed trial skips them;
+    # the measurement and the replacement are separate steps (rule 22).
     "trial-stripped": (
         f"IF {_step(_steps.TRIAL_WASHER_SEATED_KEY)}, "
         f"{_step(_steps.AXLE_NUT_ON_THREAD_KEY)} OR "
         f"{_step(_steps.AXLE_CHECKED_KEY)} FAILS ANY OTHER WAY, REMOVE {_TRIAL_OFF} "
         f"FROM {_AXLE}."
     ),
-    "trial-axle-withdrawn": f"IF THEY WERE REMOVED, PUSH {_AXLE} OUT OF {_BAR}.",
-    "stack-part-replaced": (
-        f"IF {_AXLE} WAS PUSHED OUT, REPLACE ANY OF {_STACK_PARTS} THAT MEASURES "
-        "OUTSIDE ITS DRAWING OR CATALOGUE LIMITS (MICROMETER)."
+    "trial-axle-withdrawn": f"IF {_SPACER} WAS REMOVED, PUSH {_AXLE} OUT OF {_BAR}.",
+    "stack-parts-measured": (
+        f"IF {_AXLE} WAS PUSHED OUT, MEASURE {_STACK_PARTS} AGAINST THEIR DRAWING "
+        "OR CATALOGUE LIMITS (MICROMETER)."
     ),
+    "stack-part-replaced": "IF ONE MEASURES OUTSIDE ITS LIMITS, REPLACE IT.",
     "axle-replaced": (
         f"IF {_AXLE} WAS PUSHED OUT AND NO OTHER PART WAS REPLACED, REPLACE {_AXLE}."
     ),
@@ -468,9 +488,12 @@ STEP_TEXT = {
     ),
     "axle-bond-cured": f"LEAVE {_AXLE} UNDISTURBED 24 H TO CURE.",
     _steps.AXLE_HELD_KEY: f"CHECK {_AXLE} DOES NOT TURN OR SLIDE BY HAND.",
-    "axle-stripped": (
-        f"IF IT DOES, RETURN TO {_step(_steps.AXLE_BONDED_KEY)} WITH {_AXLE} "
-        "PUSHED OUT AND BOTH CLEANED TO BARE METAL."
+    "axle-stripped": f"IF IT DOES, PUSH {_AXLE} OUT OF {_BAR}.",
+    "axle-cleaned": (
+        f"IF {_AXLE} WAS PUSHED OUT, CLEAN IT AND THE BORE OF {_BAR} TO BARE METAL."
+    ),
+    "axle-rebonded": (
+        f"IF {_AXLE} WAS PUSHED OUT, RETURN TO {_step(_steps.AXLE_BONDED_KEY)}."
     ),
     "column-clamps-fitted": (
         f"FIT {_item(CLAMP_FRONT)} AND {_item(CLAMP_BACK)} TO {_BAR} AS THE "
@@ -531,10 +554,14 @@ STEP_TEXT = {
     # never past the high limit: a short final reading closes the endshake
     # back to the go leaf, where it reads what the trial read (the drop is
     # bounded by mg_wheel_group.TRIAL_ENDSHAKE_DROP, so no new limit).
+    # Loosen, close, return: one action per step (rule 22).
+    "locknut-backed-off": "IF IT FALLS SHORT, LOOSEN THE SECOND NUT.",
     "axle-endshake-closed": (
-        f"IF IT FALLS SHORT, RETURN TO {_step(_steps.ENDSHAKE_SET_KEY)} WITH THE "
-        f"SECOND NUT BACKED OFF AND THE ENDSHAKE CLOSED TO THE {ENDSHAKE_GO_TEXT} "
-        "FEELER JUST NIPPED."
+        f"IF THE SECOND NUT WAS LOOSENED, TIGHTEN THE FIRST NUT UNTIL THE "
+        f"{ENDSHAKE_GO_TEXT} FEELER BETWEEN {_WASHER} AND THE SPIGOT FACE IS JUST NIPPED."
+    ),
+    "endshake-reset": (
+        f"IF THE SECOND NUT WAS LOOSENED, RETURN TO {_step(_steps.ENDSHAKE_SET_KEY)}."
     ),
     # The setting names the instrument that reads it (rule 22).
     _steps.LEVER_THREADED_KEY: (

@@ -215,9 +215,12 @@ def test_the_axle_is_set_to_the_trial_stack_and_accepted_at_the_nuts() -> None:
         "trial-nuts-jammed",
         steps.AXLE_NUT_ON_THREAD_KEY,
         steps.AXLE_CHECKED_KEY,
+        "trial-nuts-off",
         "axle-sunk",
+        "trial-rerun",
         "trial-stripped",
         "trial-axle-withdrawn",
+        "stack-parts-measured",
         "stack-part-replaced",
         "axle-replaced",
         "trial-refitted",
@@ -244,11 +247,20 @@ def test_the_axle_is_set_to_the_trial_stack_and_accepted_at_the_nuts() -> None:
         steps.AXLE_BONDED_KEY,
     ):
         assert not re.search(r"\.\d{3}", notes.STEP_TEXT[key]), key
+    # The short-thread remedy, one action per step (rule 22, machinist review
+    # of run 20261125T172832344Z): the nuts and feeler off, the slide, the
+    # return to the washer seat, each conditioned on the short thread end.
+    short = "IF ONLY THE THREAD END FELL SHORT, "
+    for key in ("trial-nuts-off", "axle-sunk", "trial-rerun"):
+        assert notes.STEP_TEXT[key].startswith(short), key
     sunk = notes.STEP_TEXT["axle-sunk"]
-    assert sunk.startswith("IF ONLY THE THREAD END FELL SHORT, RETURN TO STEP ")
-    assert f"STEP {steps.step_number(steps.TRIAL_WASHER_SEATED_KEY)} " in sunk
+    assert sunk.startswith(f"{short}SLIDE {notes._AXLE} OUT ")
+    assert "RETURN" not in sunk
+    assert notes.STEP_TEXT["trial-rerun"].endswith(
+        f"RETURN TO STEP {steps.step_number(steps.TRIAL_WASHER_SEATED_KEY)}."
+    )
     # Any other failure strips the trial, spacer included, and pushes the
-    # axle out, each sub-step conditioned on the one before (Codjiflo r1 of
+    # axle out, each sub-step conditioned on the failure (Codjiflo r1 of
     # #3529: a bare "IF NONE WAS" also read true on a passed trial).
     spacer = f"{notes.ITEM_NUMBERS['mg-wheel-axle-spacer']}"
     stripped = notes.STEP_TEXT["trial-stripped"]
@@ -256,16 +268,23 @@ def test_the_axle_is_set_to_the_trial_stack_and_accepted_at_the_nuts() -> None:
         f"IF STEP {steps.step_number(steps.TRIAL_WASHER_SEATED_KEY)}, "
     )
     assert "FAILS ANY OTHER WAY, REMOVE " in stripped and f"AND {spacer} FROM" in stripped
-    assert notes.STEP_TEXT["trial-axle-withdrawn"].startswith("IF THEY WERE REMOVED, PUSH ")
+    assert notes.STEP_TEXT["trial-axle-withdrawn"].startswith(
+        f"IF {notes._SPACER} WAS REMOVED, PUSH "
+    )
     pushed_out = f"IF {notes._AXLE} WAS PUSHED OUT"
-    for key in ("stack-part-replaced", "axle-replaced", "trial-refitted"):
+    for key in ("stack-parts-measured", "axle-replaced", "trial-refitted"):
         assert notes.STEP_TEXT[key].startswith(pushed_out), key
     # The bar's depth and the spacer's length place the step under the flush
-    # start, so they are measured with the washers, hub and nuts.
-    replaced = notes.STEP_TEXT["stack-part-replaced"]
+    # start, so they are measured with the washers, hub and nuts; the
+    # measurement and the replacement are separate steps (rule 22).
+    measured = notes.STEP_TEXT["stack-parts-measured"]
     for part in (notes._BAR, notes._SPACER, notes._WHEEL):
-        assert part in replaced
-    assert "MICROMETER" in replaced
+        assert part in measured
+    assert "MICROMETER" in measured and "REPLACE" not in measured
+    assert order.index("stack-parts-measured") + 1 == order.index("stack-part-replaced")
+    assert notes.STEP_TEXT["stack-part-replaced"] == (
+        "IF ONE MEASURES OUTSIDE ITS LIMITS, REPLACE IT."
+    )
     assert notes.STEP_TEXT["axle-replaced"].endswith(f"REPLACE {notes._AXLE}.")
     assert "MIDDLE OF" in sunk and "CALIPER DEPTH ROD" in sunk
     assert notes.STEP_TEXT["trial-refitted"].endswith(
@@ -290,12 +309,20 @@ def test_the_axle_is_set_to_the_trial_stack_and_accepted_at_the_nuts() -> None:
     assert f"STEP {steps.step_number(steps.AXLE_CHECKED_KEY)}" in (
         notes.STEP_TEXT[steps.AXLE_ACCEPTED_KEY]
     )
-    assert order[accepted + 1] == "axle-endshake-closed"
-    closed = notes.STEP_TEXT["axle-endshake-closed"]
-    assert closed.startswith(
-        f"IF IT FALLS SHORT, RETURN TO STEP {steps.step_number(steps.ENDSHAKE_SET_KEY)} "
+    assert order[accepted + 1 : accepted + 4] == (
+        "locknut-backed-off",
+        "axle-endshake-closed",
+        "endshake-reset",
     )
-    assert f"THE {notes.ENDSHAKE_GO_TEXT} FEELER JUST NIPPED" in closed
+    assert notes.STEP_TEXT["locknut-backed-off"] == "IF IT FALLS SHORT, LOOSEN THE SECOND NUT."
+    closed = notes.STEP_TEXT["axle-endshake-closed"]
+    assert closed.startswith("IF THE SECOND NUT WAS LOOSENED, TIGHTEN THE FIRST NUT ")
+    assert f"THE {notes.ENDSHAKE_GO_TEXT} FEELER BETWEEN" in closed
+    assert closed.endswith("IS JUST NIPPED.")
+    assert notes.STEP_TEXT["endshake-reset"] == (
+        "IF THE SECOND NUT WAS LOOSENED, RETURN TO "
+        f"STEP {steps.step_number(steps.ENDSHAKE_SET_KEY)}."
+    )
     # The endshake callout keeps one reason line; the steps carry the method.
     assert stack.SETTING_CALLOUTS[stack.FEATURE][stack.ENDSHAKE_DIMENSION] == (
         4, "WHEEL FREE, NO RATTLE"
@@ -317,6 +344,8 @@ def test_the_axle_is_bonded_square_to_its_setting_and_accepted_once_cured() -> N
         "axle-bond-cured",
         steps.AXLE_HELD_KEY,
         "axle-stripped",
+        "axle-cleaned",
+        "axle-rebonded",
     )
     bonded = notes.STEP_TEXT[steps.AXLE_BONDED_KEY]
     assert f"WITH {notes.BOND_GRADE}, {notes.BOND_NOTE_REF}" in bonded
@@ -327,8 +356,13 @@ def test_the_axle_is_bonded_square_to_its_setting_and_accepted_once_cured() -> N
     assert "A SQUARE STANDING ON THE SURFACE PLATE" in squared
     assert "24 H" in notes.STEP_TEXT["axle-bond-cured"]
     assert notes.STEP_TEXT[steps.AXLE_HELD_KEY].endswith("DOES NOT TURN OR SLIDE BY HAND.")
-    assert notes.STEP_TEXT["axle-stripped"].startswith(
-        f"IF IT DOES, RETURN TO {ref(steps.AXLE_BONDED_KEY)} WITH "
+    # Push out, clean, return: one action per step (rule 22).
+    assert notes.STEP_TEXT["axle-stripped"] == (
+        f"IF IT DOES, PUSH {notes._AXLE} OUT OF {notes._BAR}."
+    )
+    assert "BARE METAL" in notes.STEP_TEXT["axle-cleaned"]
+    assert notes.STEP_TEXT["axle-rebonded"].endswith(
+        f"RETURN TO {ref(steps.AXLE_BONDED_KEY)}."
     )
     assert not any("REMAKE" in text for text in notes.STEP_TEXT.values())
     assert not any("OIL" in notes.STEP_TEXT[key] for key in bond_step)
@@ -349,8 +383,11 @@ def test_the_drum_is_bonded_centred_wet_and_accepted_once_cured() -> None:
         steps.DRUM_BONDED_KEY,
         "drum-centred",
         "drum-bond-cured",
+        "drum-seated",
         steps.DRUM_HELD_KEY,
         "drum-stripped",
+        "drum-cleaned",
+        "drum-rebonded",
     )
     bonded = notes.STEP_TEXT[steps.DRUM_BONDED_KEY]
     assert f"WITH {notes.BOND_GRADE}, {notes.BOND_NOTE_REF}" in bonded
@@ -362,8 +399,15 @@ def test_the_drum_is_bonded_centred_wet_and_accepted_once_cured() -> None:
     assert "SWINGS LEAST" in centred and ".00" not in centred
     assert "24 H" in notes.STEP_TEXT["drum-bond-cured"]
     assert notes.STEP_TEXT[steps.DRUM_HELD_KEY].endswith("DOES NOT TURN OR SLIDE BY HAND.")
+    # Pull off, clean, return: one action per step (rule 22), after either
+    # check fails.
     assert notes.STEP_TEXT["drum-stripped"].startswith(
-        f"IF IT DOES, RETURN TO STEP {steps.step_number(steps.DRUM_BONDED_KEY)} WITH "
+        f"IF STEP {steps.step_number('drum-seated')} OR "
+        f"STEP {steps.step_number(steps.DRUM_HELD_KEY)} FAILS, PULL "
+    )
+    assert "BARE METAL" in notes.STEP_TEXT["drum-cleaned"]
+    assert notes.STEP_TEXT["drum-rebonded"].endswith(
+        f"RETURN TO STEP {steps.step_number(steps.DRUM_BONDED_KEY)}."
     )
 
 
@@ -424,9 +468,11 @@ def test_the_drum_bond_is_seen_seated_and_not_proud() -> None:
     assert low == 0.0
     assert low < stack.DRUM_RECESS < high
     bonded = notes.STEP_TEXT[steps.DRUM_BONDED_KEY]
-    assert bonded.endswith(
-        "UNTIL IT IS HARD AGAINST THE BOSS: NO LIGHT UNDER THE DRUM, NOT PROUD OF "
-        "THE SPIGOT END (STRAIGHTEDGE)."
+    assert bonded.endswith("UNTIL IT IS HARD AGAINST THE BOSS.")
+    # The S4 acceptance is its own check (rule 22).
+    assert notes.STEP_TEXT["drum-seated"] == (
+        f"CHECK {notes._DRUM} IS HARD AGAINST THE BOSS: NO LIGHT UNDER THE DRUM, NOT "
+        "PROUD OF THE SPIGOT END (STRAIGHTEDGE)."
     )
     assert notes.ENDSHAKE_DETAIL_TITLE not in bonded
 

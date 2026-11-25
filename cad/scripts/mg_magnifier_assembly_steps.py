@@ -54,13 +54,19 @@ STEPS: tuple[tuple[str, ...], ...] = (
     # Owner ruling 2026-11-24, fit audit question 17: the drum is always
     # bonded on a spigot turned to slide in its drilled bore, centred on an
     # indicator while wet; a drum that turns once cured is stripped and
-    # bonded again.
+    # bonded again. Rule 22 (machinist review of run 20261125T172832344Z,
+    # r2 and r3): one action per step, a check apart from its remedy, so the
+    # S4 seat is its own check after the cure and the strip runs as pull
+    # off, clean, return.
     (
         DRUM_BONDED_KEY,
         "drum-centred",
         "drum-bond-cured",
+        "drum-seated",
         DRUM_HELD_KEY,
         "drum-stripped",
+        "drum-cleaned",
+        "drum-rebonded",
     ),
     # The sleeve the axle is pushed through on its shoulder and the spacer
     # are their own steps (rule 22).
@@ -89,9 +95,12 @@ STEPS: tuple[tuple[str, ...], ...] = (
         "trial-nuts-jammed",
         AXLE_NUT_ON_THREAD_KEY,
         AXLE_CHECKED_KEY,
+        "trial-nuts-off",
         "axle-sunk",
+        "trial-rerun",
         "trial-stripped",
         "trial-axle-withdrawn",
+        "stack-parts-measured",
         "stack-part-replaced",
         "axle-replaced",
         "trial-refitted",
@@ -109,6 +118,8 @@ STEPS: tuple[tuple[str, ...], ...] = (
         "axle-bond-cured",
         AXLE_HELD_KEY,
         "axle-stripped",
+        "axle-cleaned",
+        "axle-rebonded",
     ),
     ("column-clamps-fitted",),
     (COLUMN_CLAMP_STARTED_KEY, "column-clamp-screws-left-loose"),
@@ -123,7 +134,12 @@ STEPS: tuple[tuple[str, ...], ...] = (
         "endshake-repeated",
     ),
     (LOCKNUT_JAMMED_KEY, "endshake-rechecked", "locknut-loosened", "locknut-reset"),
-    (AXLE_ACCEPTED_KEY, "axle-endshake-closed"),
+    (
+        AXLE_ACCEPTED_KEY,
+        "locknut-backed-off",
+        "axle-endshake-closed",
+        "endshake-reset",
+    ),
     # Lever group.
     (LEVER_THREADED_KEY,),
     ("clamp-thumb-screw-started",),
