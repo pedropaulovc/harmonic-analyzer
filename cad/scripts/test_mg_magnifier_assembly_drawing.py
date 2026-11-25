@@ -194,6 +194,8 @@ def test_the_axle_is_set_to_the_trial_stack_and_accepted_at_the_nuts() -> None:
         (steps.AXLE_SINK_RECORDED_KEY, "trial-parts-removed"),
         ("trial-parts-removed", "axle-withdrawn"),
         ("axle-withdrawn", steps.AXLE_BONDED_KEY),
+        (steps.AXLE_HELD_KEY, "spacer-refitted"),
+        ("axle-oiled", "spacer-refitted"),
     ):
         assert order.index(earlier) < order.index(later)
     assert notes.STEP_TEXT[steps.SPACER_FITTED_KEY].startswith(f"SLIDE {notes._SPACER} ")
@@ -210,9 +212,11 @@ def test_the_axle_is_set_to_the_trial_stack_and_accepted_at_the_nuts() -> None:
         steps.AXLE_NUT_ON_THREAD_KEY,
         steps.AXLE_CHECKED_KEY,
         "axle-sunk",
+        "trial-stripped",
+        "trial-axle-withdrawn",
         "stack-part-replaced",
-        "trial-refitted",
         "axle-replaced",
+        "trial-refitted",
     )
     feeler = f"THE {notes.ENDSHAKE_GO_TEXT} FEELER BETWEEN {notes._WASHER}"
     seated = notes.STEP_TEXT[steps.TRIAL_WASHER_SEATED_KEY]
@@ -239,22 +243,40 @@ def test_the_axle_is_set_to_the_trial_stack_and_accepted_at_the_nuts() -> None:
     sunk = notes.STEP_TEXT["axle-sunk"]
     assert sunk.startswith("IF ONLY THE THREAD END FELL SHORT, RETURN TO STEP ")
     assert f"STEP {steps.step_number(steps.TRIAL_WASHER_SEATED_KEY)} " in sunk
-    assert f"STEP {steps.step_number(steps.TRIAL_WASHER_SEATED_KEY)}, " in (
-        notes.STEP_TEXT["stack-part-replaced"]
+    # Any other failure strips the trial, spacer included, and pushes the
+    # axle out, each sub-step conditioned on the one before (Codjiflo r1 of
+    # #3529: a bare "IF NONE WAS" also read true on a passed trial).
+    spacer = f"{notes.ITEM_NUMBERS['mg-wheel-axle-spacer']}"
+    stripped = notes.STEP_TEXT["trial-stripped"]
+    assert stripped.startswith(
+        f"IF STEP {steps.step_number(steps.TRIAL_WASHER_SEATED_KEY)}, "
     )
+    assert "FAILS ANY OTHER WAY, REMOVE " in stripped and f"AND {spacer} FROM" in stripped
+    assert notes.STEP_TEXT["trial-axle-withdrawn"].startswith("IF THEY WERE REMOVED, PUSH ")
+    pushed_out = f"IF {notes._AXLE} WAS PUSHED OUT"
+    for key in ("stack-part-replaced", "axle-replaced", "trial-refitted"):
+        assert notes.STEP_TEXT[key].startswith(pushed_out), key
+    # The bar's depth and the spacer's length place the step under the flush
+    # start, so they are measured with the washers, hub and nuts.
+    replaced = notes.STEP_TEXT["stack-part-replaced"]
+    for part in (notes._BAR, notes._SPACER, notes._WHEEL):
+        assert part in replaced
+    assert "MICROMETER" in replaced
+    assert notes.STEP_TEXT["axle-replaced"].endswith(f"REPLACE {notes._AXLE}.")
     assert "MIDDLE OF" in sunk and "CALIPER DEPTH ROD" in sunk
     assert notes.STEP_TEXT["trial-refitted"].endswith(
-        f"RETURN TO STEP {steps.step_number(steps.AXLE_TRIAL_KEY)}."
-    )
-    assert notes.STEP_TEXT["axle-replaced"].startswith(
-        f"IF NONE WAS, RETURN TO STEP {steps.step_number(steps.SPACER_FITTED_KEY)} "
+        f"RETURN TO STEP {steps.step_number(steps.SPACER_FITTED_KEY)}."
     )
     assert "CALIPER DEPTH ROD" in notes.STEP_TEXT[steps.AXLE_SINK_RECORDED_KEY]
-    # The spacer stays on from the dry fit: the trial and final stacks start
-    # at the back washer.
+    # The spacer comes off with the trial stack before the bond (on the
+    # shank it would sit in the squeeze-out) and goes back on by its own step
+    # before the wheel stack, which starts at the back washer.
+    assert f"AND {spacer} FROM" in notes.STEP_TEXT["trial-parts-removed"]
+    assert notes.STEP_TEXT["spacer-refitted"].startswith(f"SLIDE {notes._SPACER} ONTO ")
+    assert order.index("spacer-refitted") + 1 == order.index("wheel-stacked")
     for key in (steps.AXLE_TRIAL_KEY, "wheel-stacked"):
-        assert f"{notes.ITEM_NUMBERS['mg-wheel-axle-spacer']}," not in notes.STEP_TEXT[key]
-        assert f"AND {notes.ITEM_NUMBERS['mg-wheel-axle-spacer']}." not in notes.STEP_TEXT[key]
+        assert f"{spacer}," not in notes.STEP_TEXT[key]
+        assert f"AND {spacer}." not in notes.STEP_TEXT[key]
     # The final reading has its own remedy: the set endshake only lowers the
     # thread end from the trial's reading, so a short one closes the endshake
     # back to the go leaf the trial read at.

@@ -76,8 +76,11 @@ STEPS: tuple[tuple[str, ...], ...] = (
     # further) the plain end not proud, and on the front washer seated on
     # the hub, which reads the shank step inside it (mg_wheel_group
     # TRIAL_STEP_INSIDE_HUB_MIN). A short thread end slides the axle out by
-    # the shortfall to the window's middle and trials again from the seat; a
-    # part out of its limits, else the axle, is replaced.
+    # the shortfall to the window's middle and trials again from the seat.
+    # Any other failure strips the trial and pushes the axle out; a part out
+    # of its limits (the bar's depth, the spacer's length, the hub's, the
+    # washers' and nuts' thickness), else the axle, is replaced, and the
+    # trial restarts from the spacer.
     (AXLE_DRY_FITTED_KEY,),
     (
         AXLE_TRIAL_KEY,
@@ -87,11 +90,15 @@ STEPS: tuple[tuple[str, ...], ...] = (
         AXLE_NUT_ON_THREAD_KEY,
         AXLE_CHECKED_KEY,
         "axle-sunk",
+        "trial-stripped",
+        "trial-axle-withdrawn",
         "stack-part-replaced",
-        "trial-refitted",
         "axle-replaced",
+        "trial-refitted",
     ),
     (AXLE_SINK_RECORDED_KEY,),
+    # The spacer comes off with the trial stack: on the shank during the
+    # bond it would sit in the squeeze-out at the bar's face.
     ("trial-parts-removed",),
     ("axle-withdrawn",),
     # Bonded to the trial's setting, squared to the bar while wet (nothing
@@ -106,6 +113,7 @@ STEPS: tuple[tuple[str, ...], ...] = (
     ("column-clamps-fitted",),
     (COLUMN_CLAMP_STARTED_KEY, "column-clamp-screws-left-loose"),
     ("axle-oiled",),
+    ("spacer-refitted",),
     ("wheel-stacked",),
     (
         ENDSHAKE_SET_KEY,

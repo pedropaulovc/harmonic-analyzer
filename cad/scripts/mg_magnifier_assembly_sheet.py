@@ -258,16 +258,26 @@ _CLAMP, _THUMB, _ROD, _FIXTURE = _item(CLAMP), _item(THUMB_SCREW), _item(ROD), _
 _WIRE = _item(WIRE)
 _SPACER = _item(SPACER)
 # The wheel stack on the axle past the spacer, bar side first (sheet 2 shows
-# the order). The spacer goes on before the dry trial and stays on.
+# the order). The spacer goes on before the dry trial, comes off with the
+# trial stack before the bond and goes back on before the wheel stack.
 _STACK = (
     f"ITEMS {ITEM_NUMBERS[BACK_WASHER]}, "
     f"{ITEM_NUMBERS[WHEEL]} ({_DRUM} AWAY FROM {_BAR}) AND {ITEM_NUMBERS[FRONT_WASHER]}"
 )
-# The parts on the axle whose printed or catalogue thickness is a term of the
-# thread end's stack (mg_wheel_group), for the failed-trial remedy.
+# What the trial puts on the axle, outermost first, as it comes off.
+_TRIAL_OFF = (
+    f"THE NUTS, THE FEELER AND ITEMS {ITEM_NUMBERS[FRONT_WASHER]}, "
+    f"{ITEM_NUMBERS[WHEEL]}, {ITEM_NUMBERS[BACK_WASHER]} AND {ITEM_NUMBERS[SPACER]}"
+)
+# Every part whose size is a term of the trial's stack under the flush start
+# (mg_wheel_group): the bar's depth and the spacer's length place the step
+# and the hub's front face, the hub and the washers and nuts their own
+# thickness (the axle's lengths are the axle's own replacement). Each reads
+# on a micrometer against its own sheet or catalogue band.
 _STACK_PARTS = (
-    f"ITEMS {ITEM_NUMBERS[BACK_WASHER]}, {ITEM_NUMBERS[WHEEL]}, "
-    f"{ITEM_NUMBERS[FRONT_WASHER]} AND {ITEM_NUMBERS[NUT]}"
+    f"{_BAR} (DEPTH), {_SPACER} (LENGTH), {_WHEEL} (HUB LENGTH) AND ITEMS "
+    f"{ITEM_NUMBERS[BACK_WASHER]}, {ITEM_NUMBERS[FRONT_WASHER]} AND "
+    f"{ITEM_NUMBERS[NUT]} (THICKNESS)"
 )
 
 # Rule 23: a specified anaerobic bond equals a press fit. The package bonds
@@ -446,26 +456,33 @@ STEP_TEXT = {
         f"{_AXLE} SLID OUT BY ITS SHORTFALL TO THE MIDDLE OF {ENDSHAKE_DETAIL_TITLE} "
         "(ITS PLAIN END THAT FAR INSIDE THE BORE, CALIPER DEPTH ROD)."
     ),
-    # A part outside its own limits, else the axle (its thread length, the
-    # stack's last term), is replaced, so the loop always ends on a new part.
-    "stack-part-replaced": (
+    # Any other failure: the trial comes off and the axle out, so a replaced
+    # bar, spacer or axle restarts at the spacer like any other part. A part
+    # outside its own limits, else the axle (its lengths, the stack's last
+    # terms), is replaced, so the loop always ends on a new part. Each
+    # sub-step is conditioned on the one before, so a passed trial skips them.
+    "trial-stripped": (
         f"IF {_step(_steps.TRIAL_WASHER_SEATED_KEY)}, "
         f"{_step(_steps.AXLE_NUT_ON_THREAD_KEY)} OR "
-        f"{_step(_steps.AXLE_CHECKED_KEY)} FAILS ANY OTHER WAY, REPLACE WHICHEVER OF "
-        f"{_STACK_PARTS} MEASURES OUTSIDE ITS DRAWING OR CATALOGUE LIMITS."
+        f"{_step(_steps.AXLE_CHECKED_KEY)} FAILS ANY OTHER WAY, REMOVE {_TRIAL_OFF} "
+        f"FROM {_AXLE}."
     ),
-    "trial-refitted": (
-        f"IF A PART WAS REPLACED, RETURN TO {_step(_steps.AXLE_TRIAL_KEY)}."
+    "trial-axle-withdrawn": f"IF THEY WERE REMOVED, PUSH {_AXLE} OUT OF {_BAR}.",
+    "stack-part-replaced": (
+        f"IF {_AXLE} WAS PUSHED OUT, REPLACE ANY OF {_STACK_PARTS} THAT MEASURES "
+        "OUTSIDE ITS DRAWING OR CATALOGUE LIMITS (MICROMETER)."
     ),
     "axle-replaced": (
-        f"IF NONE WAS, RETURN TO {_step(_steps.SPACER_FITTED_KEY)} "
-        f"WITH A NEW {_AXLE}."
+        f"IF {_AXLE} WAS PUSHED OUT AND NO OTHER PART WAS REPLACED, REPLACE {_AXLE}."
+    ),
+    "trial-refitted": (
+        f"IF {_AXLE} WAS PUSHED OUT, RETURN TO {_step(_steps.SPACER_FITTED_KEY)}."
     ),
     _steps.AXLE_SINK_RECORDED_KEY: (
         f"RECORD HOW FAR THE PLAIN END OF {_AXLE} STANDS INSIDE THE BORE "
         "(CALIPER DEPTH ROD, NONE WHEN FLUSH)."
     ),
-    "trial-parts-removed": f"REMOVE THE TRIAL NUTS, FEELER AND PARTS FROM {_AXLE}.",
+    "trial-parts-removed": f"REMOVE {_TRIAL_OFF} FROM {_AXLE}.",
     "axle-withdrawn": f"PUSH {_AXLE} OUT OF {_BAR}.",
     # Rule 23 for the bond: the grade and the stop here, NOTE 1 the degrease,
     # the coat on the length inside the bar only and the cure; held square
@@ -502,6 +519,9 @@ STEP_TEXT = {
         "TO TIGHTEN."
     ),
     "axle-oiled": f"WIPE LIGHT MACHINE OIL ON {_AXLE}.",
+    # The spacer the trial set the axle with, off for the bond (NOTE 1 wipes
+    # the squeeze-out at the bar's face), back on the shank against the bar.
+    "spacer-refitted": f"SLIDE {_SPACER} ONTO THE SHANK OF {_AXLE} AGAIN, AGAINST {_BAR}.",
     # The stack the washer and nut sheets once described in INSTALLATION
     # notes (F6): the order here, the nut and locknut in the next two steps.
     "wheel-stacked": f"SLIDE {_STACK} ONTO {_AXLE}, IN THAT ORDER.",
