@@ -158,12 +158,13 @@ requirement(
     precision={"length": _P["PinLen"]},
 )
 # The 1/16 drill rod as supplied, size REF (no printed band); ``dia`` is the
-# supplier's catalogue band, the traveler's check that the rod is the stock.
+# supplier's catalogue band, the traveler's check that the rod is the stock
+# (the turned_bush adapter reads an as-supplied outer as a band).
 requirement(
     "outer",
     kind="diameter",
     faces=(CylinderFace(PIN_DIA),),
-    requirements=("stock",),
+    requirements=("dia",),
     fields={
         "axis": ([1.0, 0.0, 0.0], ((_GEOM, "PIN_DIA"),)),
         "at": ([-_HALF_LEN, 0.0, 0.0], ((_GEOM, "PIN_LEN"),)),
@@ -173,7 +174,6 @@ requirement(
             ((_GEOM, "PIN_DIA"), "PIN_DIA_BAND", (_SELF, "FRONT_KEEP")),
         ),
         "dia_nominal": (PIN_DIA, ((_GEOM, "PIN_DIA"),)),
-        "stock": (PIN_DIA_CALLOUT, ("PIN_DIA_CALLOUT",)),
         "callout": (PIN_DIA_CALLOUT, ("PIN_DIA_CALLOUT",)),
     },
     precision={"dia": _P["PinDia"]},

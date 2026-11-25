@@ -242,27 +242,26 @@ HOLDDOWN_LOCAL_Z = -dt_cone_tip_block_spec.TIP_BLOCK_PIVOT_OFFSET
 # to -x of its adjuster axis (dt_cone_tip_block_spec.FOOT_TAP_OFFSET_X), so the
 # block body still stands centred on the cone line.  The offset exists only
 # so the hole's lateral station is a real dimension (HoldDownX): on the line
-# it was a zero-valued placement, which a sketch can hold only as a relation,
-# and so it printed at the general .XX band the tip block's containment and
-# lateral stacks cannot absorb (user ruling 2026-09-29: HoldDownX +/-0.10
-# from the pivot bore, now +/-.004).  -x (east) rather than +x because it
+# it was a zero-valued placement, which a sketch can hold only as a relation
+# (user ruling 2026-09-29: HoldDownX dimensioned from the pivot bore; its
+# band now the title block's .XX, Codjiflo 3547-6).  -x (east) rather than +x because it
 # leaves the larger webs on both parts: the hole's web to the narrow west edge
 # grows on that side, and the block's foot tap moves off its +X side, where
 # the width's band sits.
 HOLDDOWN_LOCAL_X = -1.016  # -.04
-# The band on both printed stations from the pivot bore (HoldDownX,
-# HoldDownZ): the block's lateral and axial stacks need it rather than the
-# general .XX grade.  HoldDownZ prints .XXX, whose title-block grade is this
-# band; HoldDownX prints .XX and carries it explicitly (a .XXX restating
-# the title block is over-specification, rule 2: C1 keyed r9 machinist
-# review).  The shop's +/-.005 drilled-hole row (delegated ruling
-# 2026-11-07 (Main), no precedent; owner review #2144: was +/-.004 with a
-# spot from MHA-DT-21; a sheet cannot print an imported banded station as
-# REF, so the band went to the row).  build_dt_drive_train_assembly proves
-# the pivot-head air, the tip lateral take-up, the end screw's embed window
-# (C1 keyed, 2026-11-09) and the hold-down webs at +/-.005, with the post
-# taps also at +/-.005.
-HOLDDOWN_STATION_TOL_MM = 0.127  # +/-.005
+# The bands on the two printed stations from the pivot bore.  HoldDownZ
+# prints .XXX at the title block's +/-.005 (the shop's drilled-hole row,
+# delegated ruling 2026-11-07 (Main); owner review #2144: was +/-.004 with a
+# spot from MHA-DT-21).  HoldDownX prints .XX at the title block's +/-.01
+# (Codjiflo 3547-6, drawing-guidelines rule 4: its explicit +/-.005 had no
+# necessity entry, and nothing fails at +/-.01).  At +/-.01 across, the
+# stacks that run through it still close: the cone tip's least air
+# (dt_cone_tip_air, bushing tier) stays positive, the hold-down webs keep
+# .32 in or more against the .080 target, the tip block stays on the plate
+# (build_dt_drive_train_assembly containment), and the tip dowel's webs
+# do not see it (its station chains from the hold-down hole, N-02).
+HOLDDOWN_STATION_TOL_MM = 0.127  # +/-.005, HoldDownZ
+HOLDDOWN_X_TOL_MM = printed_band_mm(2, unit=UNIT)  # +/-.01, HoldDownX
 # The same stacks run through the post-mount taps, whose placement dimensions
 # (PostMountWestX/WestZ/EastX/EastZ) print .XXX, so the title-block grade is
 # this band: the shop's +/-.005 drilled-hole row. Owner ruling 2026-11-08 (Pedro), #2144 item 9.1

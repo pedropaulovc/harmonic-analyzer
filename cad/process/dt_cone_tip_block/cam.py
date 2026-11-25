@@ -883,6 +883,10 @@ def context(
                     "the slit's floor is not inside the adjuster bore at "
                     "process.saw_tip_tir_max_mm and process.saw_dia_tol_mm"
                 )
+    # Setup 11's height-gauge check: the match about the drawn (REF) height,
+    # as the gauge reads it from SEAT.
+    _agree(plan, "adjuster_height_check_min_mm", adj["height_ref"] + adj["height_match"][0])
+    _agree(plan, "adjuster_height_check_max_mm", adj["height_ref"] + adj["height_match"][1])
     _agree(plan, "saw_cut_z_mm", lateral - thick / 2)
     saw_z = p["saw_cut_z_mm"]
     if not lying_grip < saw_z:

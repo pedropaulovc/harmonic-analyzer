@@ -111,9 +111,14 @@ def test_hole_callout_is_process_depth_then_two_lines_of_words() -> None:
         "SEE NOTE 3",
         "WALL .065 MIN",
     ]
+    # Rule 4 form 1 (Codjiflo 3547-1): MHA-DT-37's pivot band is set by its
+    # bond in the reamed MHA-DT-38 bushing, so the note names the mate and
+    # its running fit in the hole as drilled, not a pivot turned to it.
     assert spec.STOCK_NOTE.splitlines()[-1] == (
-        "3. MHA-DT-37 PIVOT IS TURNED TO THE DRILLED HOLE."
+        "3. MHA-DT-37 PIVOT RUNS IN THE HOLE AS DRILLED."
     )
+    assert "TURNED TO" not in spec.STOCK_NOTE
+    assert spec.PIVOT_CLEARANCE[0] > 0.0
     assert "91794A559" in spec.STOCK_NOTE
     # Rule 2: the material lives in the title block only.
     assert "STAINLESS" not in spec.STOCK_NOTE
