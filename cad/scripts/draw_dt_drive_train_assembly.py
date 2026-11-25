@@ -2145,7 +2145,7 @@ def rig_steps(*, pivot_blocks: int, cams: int, slotted: int) -> str:
         # replaces D18's .020; owner review #2144 (Codjiflo 3549-r4-13): at
         # that pose, before the clamp, the bushing's air to gear 19 is looked
         # at with a .010 feeler leaf, which every build with its parts in
-        # print passes, the leaf's own tolerance charged (0.280 mm least
+        # print passes, the leaf's own tolerance charged (0.278 mm least
         # against 0.267, dt_cone_tip_air.look_in_print_air_mm, every source
         # present at the look booked); the 3/64 drill shank (1.191 mm) and
         # the .020 leaf rejected some.  The bushing keeps the full arithmetic

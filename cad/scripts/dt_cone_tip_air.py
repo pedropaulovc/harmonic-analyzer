@@ -379,14 +379,14 @@ if IN_SERVICE_CLEARANCES & INDEPENDENT_TOLERANCES:
 # (locked at step 3), and G19's cock and the post journal's running fits,
 # at their worst as the look is taken.  Only the pivot's transfer acts
 # after it (23E-23N): AFTER_LOOK_SOURCES, the three pivot-transfer terms.
-# At the working pose the least in-print air before the look is 0.280 mm
+# At the working pose the least in-print air before the look is 0.278 mm
 # (tooth face) against the .010 leaf plus its tolerance, 0.267 mm (margin
-# 0.013 mm); the transfer terms total 0.249 mm, so a build that just passes
+# 0.012 mm); the transfer terms total 0.249 mm, so a build that just passes
 # the nominal leaf keeps 0.005 mm after the transfer.  Known residual: a
 # leaf .0005 thin (still in LEAF_TOLERANCE) passes a build that is left
 # -0.008 mm after the transfer; the look does not cover that, the
 # arithmetic gate does (the bushing's air over every source, least
-# 0.026 mm: check register C-01, with the look's own guard C-02).
+# 0.024 mm: check register C-01, with the look's own guard C-02).
 LOOK_LEAF_MM = 0.010 * 25.4
 LOOK_TIER = "bushing"
 AFTER_LOOK_SOURCES = frozenset(
