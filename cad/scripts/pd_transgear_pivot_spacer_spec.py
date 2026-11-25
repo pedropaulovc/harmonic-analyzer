@@ -118,13 +118,13 @@ SEAT_OFFSET_MAX = BOND_GAP[1] / 2.0
 # end down together on a flat plate (MHA-PD-00), so the front face lies in
 # the plane that seats on the bar and the bore plays no part in the arm's
 # attitude.  That needs the bore square enough to the front face for the
-# ring to tilt that much inside its tightest bond gap (BOND_GAP[0] over
-# BOND_LAND_MIN): the sheet holds the drilled bore only at the angular
-# row, and BOND_GAP_TILT_DEG covers that whole row (asserted below), so
-# every ring made to its sheet cures flat; MHA-PD-00's dry trial (15C: the
-# spacer, as made, shows no daylight on the plate with the screw held down
-# on it) still proves the bought screw's shoulder end (Codjiflo r2 on
-# #3487).  The arm, seated on the rear
+# ring to tilt that much inside its tightest bond gap (BOND_GAP_TILT_DEG,
+# below): the sheet holds the drilled bore only at the angular row, and
+# BOND_GAP_TILT_DEG clears that whole row, but by .0044°, less than the shop
+# reads, so MHA-PD-00's dry trial (15C: the spacer, as made, shows no
+# daylight on the plate with the screw held down on it) is each ring's
+# acceptance, and it also proves the bought screw's shoulder end (Codjiflo
+# r2 on #3487).  The arm, seated on the rear
 # face, tilts to the bar by the rear
 # face's parallelism to the front over the smallest flat it seats on
 # (FACE_PARALLELISM_ZONE_DIA).  No frame prints it (machinist review
@@ -173,13 +173,24 @@ SEATED_FACE_TILT = math.atan(REAR_FACE_PARALLELISM / FACE_PARALLELISM_ZONE_DIA)
 # The bond's shortest land: the shortest ring less the bore's break at each
 # mouth.
 BOND_LAND_MIN = LENGTH - LENGTH_BAND - 2.0 * EDGE_BREAK
-# The lean the tightest bond gap lets the ring take on the shoulder over its
-# shortest land: 1.14° with the #11, over the title block's 1° angular row
-# (the only control on the drilled bore's squareness; D17).
-BOND_GAP_TILT_DEG = math.degrees(math.atan(BOND_GAP[0] / BOND_LAND_MIN))
+# The longest land the ring bears on: the longest ring with no break at
+# either bore mouth (the title block's break is a maximum, so no credit).
+BOND_LAND_MAX = LENGTH + LENGTH_BAND
+# The lean the tightest bond gap lets the ring take on the shoulder over that
+# land, by the exact relation for a short bore tilted on a long shaft,
+# D cos(t) = d + L sin(t) (Codjiflo r1 on #3569: atan(gap / shortest land)
+# overstated it at 1.14°).  With the #11 (D17) it is 1.0044°, over the title
+# block's 1° angular row (the only control on the drilled bore's squareness)
+# by .0044°, which is .000015 in of bore: a margin under what the shop reads
+# (tolerance-policy.md), so the dry trial above, not this number, accepts
+# each ring.  Check register: cad/config/checks/pd-transgear-pivot-spacer-spec.yaml.
+BOND_GAP_TILT_DEG = math.degrees(
+    math.acos(_SHOULDER_DIA_MAX / math.hypot(BORE_DIA_MIN, BOND_LAND_MAX))
+    - math.atan2(BOND_LAND_MAX, BORE_DIA_MIN)
+)
 if BOND_GAP_TILT_DEG < angular_band_deg(unit=UNIT):
     raise AssertionError(
-        f"MHA-PD-20's tightest bond gap lets the ring lean {BOND_GAP_TILT_DEG:.2f}°, "
+        f"MHA-PD-20's tightest bond gap lets the ring lean {BOND_GAP_TILT_DEG:.4f}°, "
         "under the title block's angular row on the drilled bore"
     )
 

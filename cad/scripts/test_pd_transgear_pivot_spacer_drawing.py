@@ -108,18 +108,31 @@ def test_the_bore_is_a_bonded_slip_fit_on_the_shoulder_at_every_limit() -> None:
 def test_the_tightest_bond_gap_absorbs_the_drilled_bore_squareness() -> None:
     """Codjiflo r2 on #3487: the front face cures in one plane with the
     shoulder's end only if the ring can tilt on the shoulder, inside its
-    tightest gap over its shortest land, as far as its bore is off square to
-    that face.  The sheet holds the drilled bore at the title block's
-    angular row alone, so the #11's tightest gap must let the ring lean the
-    whole row: 1.14 degrees against 1 (delegated ruling 2026-11-24 (Main),
-    D17: owner question Q7b; the #12 gave 0.49)."""
-    tilt = math.degrees(math.atan(spec.BOND_GAP[0] / spec.BOND_LAND_MIN))
-    assert spec.BOND_GAP_TILT_DEG == pytest.approx(tilt)
-    assert tilt == pytest.approx(
-        math.degrees(math.atan(0.0889 / (5.0 - 0.0254 - 2 * 0.254))), rel=1e-3
-    )
-    assert tilt == pytest.approx(1.14, abs=0.005)
+    tightest gap, as far as its bore is off square to that face.  The sheet
+    holds the drilled bore at the title block's angular row alone, so the
+    #11's tightest gap must let the ring lean the whole row (delegated ruling
+    2026-11-24 (Main), D17: owner question Q7b; the #12 gave 0.49 degrees).
+    Codjiflo r1 on #3569: taken over the longest land with no edge-break
+    credit, by the exact short-bore relation D cos t = d + L sin t, it is
+    1.0044 degrees: over the row by .0044, .000015 in of bore, a margin
+    under what the shop reads, so MHA-PD-00's dry trial accepts each ring."""
+    inch = 25.4
+    bore, shoulder, land = 0.191 * inch, 0.1875 * inch, 0.198 * inch
+    assert (spec.BORE_DIA_MIN, spec.BOND_LAND_MAX) == pytest.approx((bore, land))
+    assert spec.BOND_GAP[0] == pytest.approx(bore - shoulder)
+    lo, hi = 0.0, math.radians(5.0)
+    for _ in range(80):
+        mid = (lo + hi) / 2.0
+        if bore * math.cos(mid) - land * math.sin(mid) > shoulder:
+            lo = mid
+        else:
+            hi = mid
+    tilt = math.degrees(lo)
+    assert spec.BOND_GAP_TILT_DEG == pytest.approx(tilt, abs=1e-9)
+    assert tilt == pytest.approx(1.0044, abs=1e-4)
     assert tilt >= angular_band_deg(unit=spec.UNIT) == 1.0
+    # The shortest land's atan(gap / land) overstated it.
+    assert math.degrees(math.atan(spec.BOND_GAP[0] / spec.BOND_LAND_MIN)) > tilt + 0.1
 
 
 def test_wall_holds_the_target_at_the_full_worst_case() -> None:

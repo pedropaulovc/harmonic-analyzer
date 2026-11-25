@@ -228,3 +228,17 @@ def test_the_flat_pin_centre_is_accepted_as_printed_and_the_spec_charges_the_bia
     text = _process_plans.plan_path(STEM).read_text(encoding="utf-8")
     accept = "{{cad.flat_pin_hole_centre_min_in:.3dot}}–{{cad.flat_pin_hole_centre_max_in:.3dot}}"
     assert f"Flat pin's centre {accept} from the bore's axis" in text
+
+
+def test_the_pilot_drill_stops_where_the_shoulder_wall_charges_it() -> None:
+    # Traveler review 2026-11-25 on #3569: the #53's full diameter runs .005
+    # past the reamer's end; with the body at its shortest it stands nearest
+    # the seat face, and never nearer than the spec's wall to the pilot
+    # shoulder (note 5) charges it.
+    p = PLAN["parameters"]
+    nearest = p["flat_drill_station_in"] - (p["body_supply_in"] - p["body_min_in"])
+    assert nearest * 25.4 >= SPEC.FLAT_PIN_DRILL_STATION_MIN - 1e-9
+    lead = p["flat_ream_station_in"] - p["flat_drill_station_in"]
+    assert lead * 25.4 == pytest.approx(SPEC.FLAT_PIN_PILOT_LEAD)
+    assert SPEC.FLAT_PIN_PILOT_DRILL == "#53"
+    assert any(tool["ref"] == "drill-53" for tool in PLAN["tools"])

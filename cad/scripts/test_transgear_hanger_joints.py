@@ -120,8 +120,9 @@ def test_seated_hanger_enclosure_uses_actual_spacer_face_grades() -> None:
 
 
 def test_the_spacer_bond_carries_the_spring_drag_and_push() -> None:
-    """LOCTITE 638 on the #11 bore over the shoulder (owner ruling 2026-11-24,
-    fit audit question 6): derated for brass and the widest gap, it
+    """LOCTITE 638 on the drilled bore over the shoulder (owner ruling
+    2026-11-24, fit audit question 6; the #11 by delegated ruling 2026-11-24
+    (Main), D17): derated for brass and the widest gap, it
     holds the spring's friction torque on the whole O.D. radius and the
     spring's push before the screw is seated, each with the margin."""
     land = spacer.BOND_LAND_MIN

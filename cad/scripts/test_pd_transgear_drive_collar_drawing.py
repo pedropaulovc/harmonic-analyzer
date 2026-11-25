@@ -378,21 +378,40 @@ def test_the_knob_reversal_play_costs_a_fraction_of_a_millimetre_of_paper() -> N
 
 
 def test_the_flat_pin_ream_keeps_its_walls_and_stays_in_the_body() -> None:
-    # The web to the -Y drive-pin hole and the floor's wall to the pilot
+    # The web to the -Y drive-pin hole and the hole's wall to the pilot
     # shoulder fall short of the target, over the floor, each printed as a
-    # MIN note (the shoulder wall accepted at .079 by D6); the O.D. wall
-    # meets the target.
+    # MIN note (the shoulder wall RV-06, D6); the O.D. wall meets the target.
     assert spec.FLAT_PIN_WEB_WORST == pytest.approx(0.074 * 25.4)
     assert spec.WALL_FLOOR <= spec.FLAT_PIN_WEB_WORST < spec.WALL_TARGET_MM
     assert f"{_in(spec.FLAT_PIN_WEB_WORST)} MIN" in spec.DRAWING_NOTES
     assert spec.FLAT_PIN_OD_WALL_WORST >= spec.WALL_TARGET_MM
-    assert round(spec.FLAT_PIN_SHOULDER_WALL_WORST / 25.4, 4) == 0.0796
+    # Traveler review 2026-11-25 on #3569: the wall runs from the shoulder's
+    # corner to the hole's end, which is the #53 pilot's full diameter .005
+    # past the shallowest floor (at the reamed hole's largest radius) and its
+    # 118-degree point, not the floor's edge (.0796 there).
+    inch = 25.4
+    corner = (0.380 / 2.0 - (0.118 + 0.002 + 0.0012)) * inch
+    radius = spec._FLAT_PIN_HOLE_R_MAX
+    station = (0.07 - 0.005) * inch
+    point = radius / math.tan(math.radians(59.0))
+    assert spec.FLAT_PIN_DRILL_STATION_MIN == pytest.approx(station)
+    assert spec.FLAT_PIN_DRILL_TIP_MIN == pytest.approx(station - point)
+    # The nearest point of the cone's flank from the corner, by hand.
+    flank = (-radius, -point)
+    t = ((corner - radius) * flank[0] + (0.0 - station) * flank[1]) / (
+        flank[0] ** 2 + flank[1] ** 2
+    )
+    assert 0.0 < t < 1.0
+    wall = math.hypot(corner - (radius + t * flank[0]), station + t * flank[1])
+    assert spec.FLAT_PIN_SHOULDER_WALL_WORST == pytest.approx(wall)
+    assert round(wall / inch, 4) == 0.0752
+    assert math.hypot(corner - radius, 0.07 * inch) / inch == pytest.approx(0.0796, abs=5e-5)
     assert spec.WALL_FLOOR <= spec.FLAT_PIN_SHOULDER_WALL_WORST < spec.WALL_TARGET_MM
-    assert spec.FLAT_PIN_SHOULDER_WALL_PRINTED == pytest.approx(0.079 * 25.4)
-    assert spec.FLAT_PIN_SHOULDER_WALL_ACCEPTED == pytest.approx(0.079 * 25.4)
+    assert spec.FLAT_PIN_SHOULDER_WALL_PRINTED == pytest.approx(0.075 * inch)
+    assert spec.FLAT_PIN_SHOULDER_WALL_ACCEPTED == pytest.approx(0.075 * inch)
     shoulder = spec.DRAWING_NOTES.splitlines()[spec.SHOULDER_NOTE - 1]
     assert shoulder == (
-        f"{spec.SHOULDER_NOTE}. PIN {spec.FLAT_PIN_NUMBER} HOLE FLOOR TO PILOT SHOULDER .079 MIN."
+        f"{spec.SHOULDER_NOTE}. WALL FROM PIN {spec.FLAT_PIN_NUMBER} HOLE TO PILOT SHOULDER .075 MIN."
     )
     # The drill point stays behind the front face and the pressed pin's rear
     # end inside the supplied body.

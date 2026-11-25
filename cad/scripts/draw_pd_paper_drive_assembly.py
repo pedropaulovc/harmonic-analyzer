@@ -2948,9 +2948,15 @@ def _step_text(
             # .SPACER_BOND_SHEAR_N) with no heat near the arm's other bonds;
             # screw and spacer are renewed anyway (delegated ruling 2026-11-24
             # (Main), D10: owner question Q7a, option B; no precedent, #2144).
+            # The dry trial's failure jumps here too, with the spacer only
+            # slipped on, where it lifts off by hand: the press is for a
+            # bonded one alone (Codjiflo r1 on #3569). The screw's head, proud
+            # of the arm's rear face, goes down in a slot of the press's
+            # rotating plate (Central Machinery 59766 manual: the plate's
+            # width settings); naming it would add a line past STEP_SLOTS.
             # In this sub-step, not a new one: the steps fill STEP_SLOTS.
-            "IF NOT YET RENEWED, PUSH THE SCREW OUT OF THE SPACER, ARM REAR FACE "
-            f"DOWN ON THE ARBOR PRESS, AND REPEAT FROM {s('arm-plate-screws-cut', 6)} "
+            "IF NOT YET RENEWED, PRESS A BONDED SPACER OFF THE SCREW ON THE ARBOR "
+            f"PRESS, ARM REAR FACE DOWN, AND REPEAT FROM {s('arm-plate-screws-cut', 6)} "
             f"WITH A NEW {n['pd-vn-transgear-pivot-screw']} "
             f"SCREW AND {n['pd-transgear-pivot-spacer']} SPACER.",
             f"IF ALREADY RENEWED, INSPECT THE {n['pd-support-bar']} BAR'S "

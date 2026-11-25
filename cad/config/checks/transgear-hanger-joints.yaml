@@ -1,0 +1,16 @@
+# The transgear hanger's joint checks (tolerance-policy.md, "Checks in spec
+# modules and tests"; cad/scripts/check_register.py). Entered on Codjiflo r1
+# on #3569 for the MHA-PD-20 bond of D17.
+checks:
+  - id: C-01
+    check: "SPACER_BOND_CLEARANCE_FACTOR_GAP_MM"
+    kind: joint
+    reason: "past it the derated bond strength is not known"
+    source: "Henkel Retaining Compound Design Guide clearance factor, 0.3, booked at 0.25 mm diametral, LOCTITE 638's gap limit (the factor only falls as the gap widens), as dt_pinion_arbor_geometry and sm_gooseneck_spring_joint take it; the guard refuses a widest gap (pd_transgear_pivot_spacer_spec.BOND_GAP, the #11 bore: .0085, 0.216 mm) past the gap the factor is booked at, so the margins below are those at the widest gap (delegated ruling 2026-11-24 (Main), D17, no precedent; owner review on #2144, https://github.com/pedropaulovc/harmonic-analyzer/issues/2144#issuecomment-7139937225)"
+    basis: worst_case
+  - id: C-02
+    check: "SPACER_BOND_MARGIN_MIN"
+    kind: joint
+    reason: "the spring's drag turns the spacer on the shoulder"
+    source: "delegated ruling 2026-11-24 (Main), D17, no precedent: the #11 bore stands only while the drag margin at the widest gap stays 2x or more; owner review on #2144 (https://github.com/pedropaulovc/harmonic-analyzer/issues/2144#issuecomment-7139937225). LOCTITE 638's ISO 10123 shear, 25 N/mm^2 minimum (TDS), x 0.4 brass x 0.3 clearance x 1.0 land over the smallest shoulder and the shortest land: 199 N, 472 N mm; the drag uses mu 0.5, the top of the textbook range for dry brass on steel (an inference: no measured figure), at the spring's greatest preload on the largest O.D.: torque margin 4.4, push margin 5.3"
+    basis: worst_case

@@ -2863,11 +2863,14 @@ def test_every_screwed_setting_has_a_holding_check() -> None:
     # the bar and the arm to their sheets, and every outcome has a route: a
     # bar outside (with the arm if it is outside too), an arm outside or all
     # inside, one action a step (rule 22). The renewal frees the captive arm
-    # on the arbor press (D10, owner question Q7a, option B).
+    # on the arbor press (D10, owner question Q7a, option B), a bonded spacer
+    # only: the dry trial's failure reaches it with the spacer slipped on
+    # (Codjiflo r1 on #3569).
     bar = _number("pd-support-bar")
+    assert pivot[3] == "IF EITHER FAILS, DO 15W-15Z."
     assert pivot[20:23] == (
-        "IF NOT YET RENEWED, PUSH THE SCREW OUT OF THE SPACER, ARM REAR FACE "
-        "DOWN ON THE ARBOR PRESS, AND REPEAT FROM 14G WITH A NEW "
+        "IF NOT YET RENEWED, PRESS A BONDED SPACER OFF THE SCREW ON THE ARBOR "
+        "PRESS, ARM REAR FACE DOWN, AND REPEAT FROM 14G WITH A NEW "
         f"{_number('pd-vn-transgear-pivot-screw')} SCREW AND "
         f"{_number('pd-transgear-pivot-spacer')} SPACER.",
         f"IF ALREADY RENEWED, INSPECT THE {bar} BAR'S TAP AND BACK FACE AND THE "
