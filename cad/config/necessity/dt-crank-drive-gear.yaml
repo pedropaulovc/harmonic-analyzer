@@ -12,7 +12,7 @@
 necessity:
   - id: N-01
     feature: "sheet 1, front view, Ø.3760 REAM THRU bore"
-    kind: trace
+    kind: mesh
     reason: "bore shake rocks the 64T, a mesh run-out"
     source: "gear_seat_fit.GEAR_SEAT_CLEARANCE (.0010-.0038); the owned .3760 over reamer cuts the land-1 bores alike"
   - id: N-03

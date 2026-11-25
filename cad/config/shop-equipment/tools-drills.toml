@@ -256,6 +256,11 @@ kind = "drill"
 status = "on_hand"
 note = "quotes-2026-11-17-rev3.xlsx Drills V: owned in 115-pc index (quality unverified); not on the buy list."
 
+[tools.drill-3-8]
+kind = "drill"
+status = "on_hand"
+note = "The 3/8 of the owned 115-piece index (1/16-1/2 by 64ths, as the 13/32 and 7/16 below; quality unverified). Named 2026-11-25 for MHA-DT-31's 3/8 DRILL THRU bore (delegated ruling D27)."
+
 [tools.drill-13-32]
 kind = "drill"
 status = "on_hand"

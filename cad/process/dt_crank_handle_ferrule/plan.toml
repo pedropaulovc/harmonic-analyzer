@@ -2,8 +2,8 @@
 # (owner ruling 2026-11-21: turned parts get lathe travelers, no NC). Route
 # chosen for speed: one chucking on 9/16 in C36000 rod, its outside left as
 # supplied (drawing: ROD AS SUPPLIED, skimmed with MHA-DT-08 after cure):
-# mike the rod, face the end (Z0), spot, drill N (.302, inside the drawing's
-# Ø.303 ±.005 DRILL THRU) past the parting line, part off .28 from the faced
+# mike the rod, face the end (Z0), spot, drill N (the drawing's N DRILL Ø.302
+# THRU at DRILLED HOLES, .302-.306) past the parting line, part off .28 from the faced
 # end; the parted face is the ferrule's other face, held to the .27-.29 band
 # by the DRO. Owner ruling 2026-11-24, fit audit question 15: the hole is the
 # N drill's, no pin reading and no tag; MHA-DT-08's tenon is turned to the
@@ -113,7 +113,7 @@ speed_kind = "spindle"
 tool = "drill-n"
 drilling = "twist_drill"
 sizing = { kind = "band", band_mm = "{{cad.bore_dia_band_mm}}" }
-instruction = "Feed the N (.302) drill in until its lips just touch the spot's rim and zero the tailstock quill scale there. Drill until the scale reads {{cad.run_in:.2dot}}: the drill's full diameter then runs through the ferrule and past the parting line (the drawing's DRILL THRU, Ø{{cad.bore_dia_min_in:.3dot}}–{{cad.bore_dia_max_in:.3dot}}: the hole is the drill's, not read)."
+instruction = "Feed the N (.302) drill in until its lips just touch the spot's rim and zero the tailstock quill scale there. Drill until the scale reads {{cad.run_in:.2dot}}: the drill's full diameter then runs through the ferrule and past the parting line (the drawing's N DRILL THRU, Ø{{cad.bore_dia_min_in:.3dot}}–{{cad.bore_dia_max_in:.3dot}} at DRILLED HOLES: the hole is the drill's, not read)."
 settings = "lathe-drill-n-c360"
 cut_diameter_mm = 7.6708
 hole_depth_mm = "{{cad.run_mm}}"

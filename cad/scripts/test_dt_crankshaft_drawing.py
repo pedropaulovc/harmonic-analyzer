@@ -230,7 +230,9 @@ def test_integral_dome_is_the_only_outboard_shaft_projection() -> None:
     assert spec.SHAFT_DIA == pytest.approx(9.525, abs=1e-12)
     # A cap within the Ø.375: nothing outboard of the shank's own diameter.
     assert 0.0 < spec.SHAFT_DOME_HEIGHT <= spec.SHAFT_DIA / 2.0
-    assert geometry.SHAFT_DIA + geometry.SHAFT_DIA_BAND[0] < (
+    # The REF stub may sit line-on-line with MHA-DT-31's 3/8 drill nominal
+    # (D27); it is turned to the measured bore less the fit's clearance.
+    assert geometry.SHAFT_DIA + geometry.SHAFT_DIA_BAND[0] <= (
         geometry.HUB_BORE_DIA + geometry.HUB_BORE_BAND[1]
     )
     assert not hasattr(spec, "CRANK_END_NOTE")

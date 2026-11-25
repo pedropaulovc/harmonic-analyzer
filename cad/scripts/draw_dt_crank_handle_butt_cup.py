@@ -88,8 +88,9 @@ from dt_crank_handle_butt_cup_spec import (
     FLOOR_HOLE_DIA,
     OVERALL_LENGTH,
     POCKET_DEPTH,
+    POCKET_CLEARANCE,
     POCKET_DIA,
-    POCKET_DIA_BAND,
+    POCKET_DIA_MAX,
     POCKET_FLOOR_CORNER_R_BAND,
     POCKET_FLOOR_CORNER_R_MAX,
     POCKET_FLOOR_CORNER_R_TOL_TYPE,
@@ -316,16 +317,19 @@ requirement(
     "pocket",
     kind="counterbore",
     faces=(CylinderFace(POCKET_DIA), PlanarFace((1.0, 0.0, 0.0), -POCKET_DEPTH)),
-    requirements=("dia", "depth", "corner_radius_max"),
+    requirements=("diametral_clearance", "dia_max", "depth", "corner_radius_max"),
     fields={
         "axis": ([-1.0, 0.0, 0.0], ("POCKET_DIA",)),
         "at": ([0.0, 0.0, 0.0], ("POCKET_DIA",)),
         "span": ([-POCKET_DEPTH, 0.0], ("POCKET_DEPTH",)),
-        "dia": (
-            limits(POCKET_DIA, _P["PocketDia"], POCKET_DIA_BAND, unit=UNIT),
-            ("POCKET_DIA", "POCKET_DIA_BAND", "UNIT", (_SELF, "SECTION_KEEP")),
-        ),
-        "nominal_dia": (POCKET_DIA, ("POCKET_DIA",)),
+        # The traveler's turned_bush adapter takes a pocket as its reference
+        # size, its upper limit and the head's clearance in it: the owned 1/4
+        # end mill cuts .248 or over (the band's lower limit), the .257 pin
+        # that must not enter checks the upper one, and the head clears it by
+        # .007-.026 unmatched (fit audit Q15).
+        "dia_ref": (POCKET_DIA, ("POCKET_DIA", (_SELF, "SECTION_KEEP"))),
+        "dia_max": (POCKET_DIA_MAX, ("POCKET_DIA_MAX", "POCKET_DIA_BAND")),
+        "diametral_clearance": (list(POCKET_CLEARANCE), ("POCKET_CLEARANCE",)),
         "mate": (
             f"{SCREW_NUMBER} {SCREW_NAME} HEAD",
             (
@@ -351,7 +355,7 @@ requirement(
         "callout": (POCKET_FIT_CALLOUT, ((_NOTES, "POCKET_FIT_CALLOUT"),)),
     },
     precision={
-        "dia": _P["PocketDia"],
+        "dia_ref": _P["PocketDia"],
         "depth": _P["PocketDepth"],
         "corner_radius_max": _P["PocketFloorRadius"],
     },

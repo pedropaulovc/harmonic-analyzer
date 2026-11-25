@@ -24,13 +24,14 @@ ref = "pin-gauges"  # A1-pin-set-061-250, A1-pin-set-061-500-combined
 # first" (it was a .1610 reamer); owner ruling 2026-11-24, fit audit
 # question 14: no pins, "handle stays DRILL #20; DT-32 shoulder by trial".
 # For the traveler to come: a trial #20 hole through an offcut of the same
-# oak first, then the handle's bore. Nothing reads the bore here: MHA-DT-32's
-# traveler turns its shoulder to a Ø.1635 trial size the bonded handle must
-# not go on (the sheet's .1635 MAX, the walls' basis,
-# dt_crank_handle_spec.PIVOT_BORE_FIT_MAX), then to the bore by trial.
+# oak first, then the handle's bore: a plain #20 drilled hole at DRILLED
+# HOLES, .1610-.1650 (delegated ruling 2026-11-25 (Main), D26: the .1635 MAX
+# cap and the shoulder's .1635 trial step are retired). Nothing reads the
+# bore here: MHA-DT-32's traveler turns its shoulder down to the bore by
+# trial.
 id = "drill-20"
 name = "#20 drill"
-ref = "drill-20"  # Drills #20: #20 DRILL THRU, .1635 MAX; MHA-DT-32 is turned to it
+ref = "drill-20"  # Drills #20: #20 DRILL THRU; MHA-DT-32 is turned to it
 
 [[tools]]
 id = "boring-bars-meda-6045000"

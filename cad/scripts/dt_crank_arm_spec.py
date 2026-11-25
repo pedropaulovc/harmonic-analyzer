@@ -29,7 +29,6 @@ import math
 
 import _config
 import _mcmaster_3603t354 as jack_chain
-import cone_tip_cluster
 import dt_crank_hub_geometry
 from _hole_spec import THREAD_MAJOR_MM, HoleSpec
 from _inch_wall_limits import WALL_FLOOR_MM, WALL_TARGET_MM
@@ -311,7 +310,9 @@ SEAM_BOND_CLEARANCE_MM = (
     AXIAL_PIN_DIA - max(_seam_pin_limits),
     dt_crank_hub_geometry.SEAM_HOLE_DIA_MAX - min(_seam_pin_limits),
 )  # (-.0003, .0039) in
-if SEAM_BOND_CLEARANCE_MM[1] > cone_tip_cluster.RETAINING_COMPOUND_MAX_GAP_MM:
+# LOCTITE 638's largest gap, as dt_crank_hub_geometry restates it (already in
+# this module's closure; cone_tip_cluster would widen the crank's recipes).
+if SEAM_BOND_CLEARANCE_MM[1] > dt_crank_hub_geometry._LOCTITE_638_MAX_GAP_MM:
     raise AssertionError("MHA-DT-VN-59's bond gap passes LOCTITE 638's largest")
 if SEAM_BOND_CLEARANCE_MM[1] - SEAM_BOND_CLEARANCE_MM[0] < 0.0254 - 1e-9:
     raise AssertionError("MHA-DT-VN-59's bond range is under .001 wide (rule 4)")

@@ -13,10 +13,12 @@
 #   end play).
 # - Saw a blank. Lathe, 3-jaw, the tip end out on the tailstock dead centre
 #   ("CENTRE OK" at the tip): turn the head's diameter over the whole length
-#   out of the jaws; the shoulder to the under-head station, first to a
-#   Ø.1635 trial size the handle must NOT go on (it does: the bore is over
-#   MHA-DT-08's .1635 MAX), then down .0005 at a time until the handle just
-#   starts on (B), then finished to B less .0050-.0075; the #4-40 blank to
+#   out of the jaws; the shoulder to the under-head station, roughed to
+#   Ø.1654, over any accepted bore (MHA-DT-08's bore is a plain #20 drilled
+#   hole at DRILLED HOLES, .1610-.1650; delegated ruling 2026-11-25 (Main),
+#   D26, retired the .1635 trial step), then down .0005 at a time until the
+#   handle just starts on (T), then finished to T less .0050-.0075 inside
+#   the drawn .1535-.1585; the #4-40 blank to
 #   the seat; the 1/16 P1 blade squares the under-head corner sharp (R.004
 #   MAX; the AR insert's R0.4 nose cannot). Chamfer the head, withdraw the
 #   centre, run the die to the seat, plunge the relief at the seat with the
@@ -97,16 +99,15 @@ turn_feed_mm_rev = 0.0508
 head_turn_end_z_mm = -69.0
 # Aims, mm: the head at the middle of its drawn Ø.231-.241 (.236; owner
 # ruling 2026-11-24, fit audit question 15: nothing is read off the cup);
-# the shoulder roughed to .1654, over the .1635 trial size, and finished at
-# the middle of its drawn .1535-.1585 for the turning checks (the operator
-# aims at B - .006 from the trial, owner ruling 2026-11-24, fit audit
-# question 14); the thread blank at .1085, inside cad.thread_dia (the #4-40
-# UNC-2A major .1061-.1112, the title block's CLASS 2A).
+# the shoulder roughed to .1654, over the #20's DRILLED HOLES .1650 (D26),
+# and finished at the middle of its drawn .1535-.1585 for the turning checks
+# (the operator aims at T - .006 from the trial, owner ruling 2026-11-24, fit
+# audit question 14, never over .1580); the thread blank at .1085, inside
+# cad.thread_dia (the #4-40 UNC-2A major .1061-.1112, the title block's
+# CLASS 2A).
 head_aim_dia_mm = 5.9944
 shoulder_rough_dia_mm = 4.2
 shoulder_aim_dia_mm = 3.9624
-# The trial size the handle must not go on: MHA-DT-08's .1635 MAX.
-shoulder_trial_dia_mm = 4.1529
 thread_rough_dia_mm = 2.957
 thread_aim_dia_mm = 2.7559
 # The bands' low ends, mm (cad.head_dia, cad.shoulder_dia, cad.thread_dia):
@@ -297,23 +298,14 @@ settings = "dt-lathe-ar-1018-centre"
 cut_diameter_mm = "{{process.head_aim_dia_mm}}"
 
 [[setups.operations]]
-cut_kind = "longitudinal_turning"
-turning_cuts = [
-  { name = "Shoulder to the trial size", phase = "finish", start_z_mm = "{{process.turn_start_z_mm}}", end_z_mm = "{{process.shoulder_rough_end_z_mm}}", kept_start_z_mm = "{{process.seat_z_mm}}", kept_end_z_mm = "{{process.shoulder_rough_end_z_mm}}", start_diameter_mm = "{{process.shoulder_rough_dia_mm}}", end_diameter_mm = "{{process.shoulder_trial_dia_mm}}", max_radial_doc_mm = "{{process.finish_radial_doc_mm}}", feed_mm_rev = "{{process.finish_feed_mm_rev}}", minimum_diameter_mm = "{{process.shoulder_trial_dia_mm}}" },
-]
-speed_kind = "spindle"
-tool = "ar"
-drilling = "none"
-sizing = "other"
-instruction = "Finish the shoulder over the same length to Ø{{process.shoulder_trial_dia_mm:in.4dot}}, miking at both ends and the middle between light passes. Spindle stopped: back the quill until the centre clears the tip; slide the bonded handle, ferrule end first, over the tip onto the shoulder by hand, clean and dry, no force."
-settings = "dt-lathe-ar-1018-centre-finish"
-cut_diameter_mm = "{{process.shoulder_rough_dia_mm}}"
-inspection = "At Ø{{process.shoulder_trial_dia_mm:in.4dot}} the handle does not go on (MHA-DT-08's bore .1635 MAX)."
-gauge_checks = [{ gauge = "micrometers", band_mm = [4.1402, 4.1656] }]
+cut_kind = "other"
+instruction = "Spindle stopped: back the quill until the centre clears the tip; slide the bonded handle, ferrule end first, over the tip onto the roughed shoulder by hand, clean and dry, no force."
+inspection = "At the rough Ø{{process.shoulder_rough_dia_mm:in.4dot}} the handle does not go on (MHA-DT-08's #20 bore is .1650 at most, DRILLED HOLES)."
+gauge_checks = "other"
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "The handle goes on at Ø{{process.shoulder_trial_dia_mm:in.4dot}}: its bore is over MHA-DT-08's .1635 MAX; stop and set the handle aside for the owner, the blank kept in the chuck."
+instruction = "The handle goes on at Ø{{process.shoulder_rough_dia_mm:in.4dot}}: its bore is over the #20 drill's DRILLED HOLES .1650; stop and set the handle aside for the owner, the blank kept in the chuck."
 
 [[setups.operations]]
 cut_kind = "other"
@@ -323,20 +315,20 @@ drilling = "none"
 sizing = "other"
 instruction = "Bring the centre back snug. Take .0005 off the shoulder's diameter over the same length (one pass .00025 deep on the cross-slide), mike it, and try the handle on again as in Op 100; repeat until the handle just starts onto the shoulder by hand. Write T, the shoulder's miked diameter at that try, on this sheet."
 settings = "dt-lathe-ar-1018-centre-finish"
-cut_diameter_mm = "{{process.shoulder_trial_dia_mm}}"
-inspection = "T .1610–.1635, written on this sheet. The handle still not on at Ø.1610: its bore is under the #20 drill; stop and set the handle aside for the owner."
-gauge_checks = [{ gauge = "micrometers", band_mm = [4.0894, 4.1529] }]
+cut_diameter_mm = "{{process.shoulder_rough_dia_mm}}"
+inspection = "T .1610–.1650, written on this sheet. The handle still not on at Ø.1610: its bore is under the #20 drill; stop and set the handle aside for the owner."
+gauge_checks = [{ gauge = "micrometers", band_mm = [4.0894, 4.191] }]
 
 [[setups.operations]]
 cut_kind = "longitudinal_turning"
 turning_cuts = [
-  { name = "Shoulder finish", phase = "finish", start_z_mm = "{{process.turn_start_z_mm}}", end_z_mm = "{{process.shoulder_rough_end_z_mm}}", kept_start_z_mm = "{{process.seat_z_mm}}", kept_end_z_mm = "{{process.shoulder_rough_end_z_mm}}", start_diameter_mm = "{{process.shoulder_trial_dia_mm}}", end_diameter_mm = "{{process.shoulder_aim_dia_mm}}", max_radial_doc_mm = "{{process.finish_radial_doc_mm}}", feed_mm_rev = "{{process.finish_feed_mm_rev}}", minimum_diameter_mm = "{{process.shoulder_dia_min_mm}}" },
+  { name = "Shoulder finish", phase = "finish", start_z_mm = "{{process.turn_start_z_mm}}", end_z_mm = "{{process.shoulder_rough_end_z_mm}}", kept_start_z_mm = "{{process.seat_z_mm}}", kept_end_z_mm = "{{process.shoulder_rough_end_z_mm}}", start_diameter_mm = "{{process.shoulder_rough_dia_mm}}", end_diameter_mm = "{{process.shoulder_aim_dia_mm}}", max_radial_doc_mm = "{{process.finish_radial_doc_mm}}", feed_mm_rev = "{{process.finish_feed_mm_rev}}", minimum_diameter_mm = "{{process.shoulder_dia_min_mm}}" },
 ]
 speed_kind = "spindle"
 tool = "ar"
 drilling = "none"
 sizing = "other"
-instruction = "Finish the shoulder over the same length to T − .0075 to T − .0050 (MHA-DT-32's running fit in the handle's bore), aiming at T − .006, miking at both ends and the middle between light passes; one last pass at the same setting for the drawing's Ra 63 µin (1.6 µm) finish, no feed marks you can catch with a fingernail."
+instruction = "Finish the shoulder over the same length to T − .0075 to T − .0050 (MHA-DT-32's running fit in the handle's bore) and no larger than Ø{{cad.shoulder_dia_max_in:.4dot}}, aiming at T − .006 but never over .1580, miking at both ends and the middle between light passes; one last pass at the same setting for the drawing's Ra 63 µin (1.6 µm) finish, no feed marks you can catch with a fingernail."
 settings = "dt-lathe-ar-1018-centre-finish"
 cut_diameter_mm = "{{process.shoulder_aim_dia_mm}}"
 inspection = "Shoulder T − .0075 to T − .0050, inside Ø{{cad.shoulder_dia_min_in:.4dot}}–{{cad.shoulder_dia_max_in:.4dot}}, at both ends and the middle."
@@ -344,7 +336,7 @@ gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.shoulder_dia_band_mm}}
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Shoulder under T − .0075 at any reading: scrap the blank and make another from Setup 2. Over T − .0050 at both ends: another light pass. One end over, the other in band: set the tailstock over by half the ends' difference (toward the tool if the tip end is larger), skim, mike both ends again; both in band or scrap as above."
+instruction = "Shoulder under T − .0075 at any reading: scrap the blank and make another from Setup 2. Over T − .0050 or over Ø{{cad.shoulder_dia_max_in:.4dot}} at both ends: another light pass. One end over, the other in band: set the tailstock over by half the ends' difference (toward the tool if the tip end is larger), skim, mike both ends again; both in band or scrap as above."
 
 [[setups.operations]]
 cut_kind = "other"

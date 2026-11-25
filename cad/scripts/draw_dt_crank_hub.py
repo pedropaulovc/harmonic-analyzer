@@ -50,7 +50,6 @@ from _printed_limits import drilled_limits, limits
 from dt_crank_arm_spec import SEAM_BOND_CLEARANCE_MM
 from dt_crank_hub_geometry import (
     HUB_BARREL_LENGTH,
-    HUB_BORE_BAND,
     HUB_LENGTH_BAND,
     HUB_SEAT_DIA,
     RELIEF_DIA,
@@ -269,8 +268,8 @@ DIMENSION_CALLOUTS = {
 # measured MHA-DT-06 bore for the stated interference, its length the arm's
 # measured thickness +.000/-.002 (note 2); the barrel, relief and their
 # lengths take the title block's .XX row; the overall its +.004/-.010; the
-# bore its reamed band; the #14 pilot the DRILLED HOLES row, stationed .XX
-# from the front face and taper-reamed at assembly (note 1); the seam is
+# bore the 3/8 drill's DRILLED HOLES row (D27); the #14 pilot the same row,
+# stationed .XX from the front face and taper-reamed at assembly (note 1); the seam is
 # match-reamed at assembly, never by the part's traveler. The declarations
 # print nothing.
 DRAWING_NOTES = SHEET_NOTES
@@ -422,16 +421,16 @@ requirement(
     fields={
         "at": ([0.0, 0.0, 0.0], ("__frame__",)),
         "axis": ([0.0, 1.0, 0.0], ("__frame__",)),
-        # The sheet prints the .3760 reamer's size with no band (fit audit
-        # 2026-11-23, MHA-DT-31.bore); HUB_BORE_BAND is the analysis band,
-        # what the reamer cuts, declared here for the traveler.
+        # The sheet prints the 3/8 drill's Ø.375 under DRILLED HOLES (rule 3;
+        # delegated ruling 2026-11-25, D27); MHA-DT-11's shank is turned to
+        # the measured bore.
         "dia": (
-            limits(HUB_BORE_DIA, _P["BoreDia"], HUB_BORE_BAND, unit=UNIT),
-            ((_GEOM, "HUB_BORE_DIA"), (_GEOM, "HUB_BORE_BAND"), (_SELF, "END_KEEP")),
+            drilled_limits(HUB_BORE_DIA, _P["BoreDia"], unit=UNIT),
+            ((_GEOM, "HUB_BORE_DIA"), (_GEOM, "UNIT"), (_SELF, "END_KEEP")),
         ),
         "nominal_dia": (HUB_BORE_DIA, ((_GEOM, "HUB_BORE_DIA"),)),
         "thru": (True, ((_NOTES, "BORE_CALLOUT"),)),
-        "process": ("ream", ((_NOTES, "BORE_CALLOUT"),)),
+        "process": ("drill", ((_NOTES, "BORE_CALLOUT"),)),
         "mate": ("MHA-DT-11", ((_NOTES, "BORE_CALLOUT"),)),
         "diametral_clearance": (
             [SHAFT_CLEARANCE_MIN, SHAFT_CLEARANCE_MAX],
