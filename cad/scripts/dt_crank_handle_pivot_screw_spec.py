@@ -105,10 +105,12 @@ SLOT_DEPTH_TOL = _GENERAL_2PL
 # The running surface in the oak bore (#290 fit F12).  The shoulder's limits
 # are the owner's (owner ruling 2026-11-24, fit audit question 14: "limits
 # .1535-.1585"), turned to on their own: nothing is read off the handle.
-# MHA-DT-08's bore is a plain #20 drilled hole at DRILLED HOLES, .1610-.1650
-# (delegated ruling 2026-11-25 (Main); owner review #2144 (D26)), so the
-# largest shoulder clears the smallest bore by .0025 (SHOULDER_CLEARANCE_MIN
-# below); the title block's .156 ±.005 would leave none.  (upper, lower)
+# MHA-DT-08's bore is a plain #20 drilled hole at DRILLED HOLES, .1610-.1650,
+# so the largest shoulder clears the smallest bore by .0025
+# (SHOULDER_CLEARANCE_MIN below) and the title block's .156 ±.005 would leave
+# none (delegated ruling 2026-11-25 (Main), no precedent; owner review #2144
+# (D35: MHA-DT-32's shoulder keeps owner Q14's .1535-.1585 as a necessity
+# band; Q14's trial retired with D26)).  (upper, lower)
 # deviations; the model carries the band natively.  The tenon keeps the
 # rule-17 floor of oak over its bore.
 SHOULDER_DIA = 3.9624  # .1560

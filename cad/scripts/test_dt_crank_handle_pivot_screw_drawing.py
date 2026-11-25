@@ -165,7 +165,9 @@ def test_u33_running_fit_end_play_and_engagement() -> None:
     low, high = spec.END_PLAY_RANGE
     assert low < spec.END_PLAY_NOMINAL < high
     # The owner's limits .1535-.1585, turned to on their own (delegated ruling
-    # 2026-11-25 (Main)): the largest shoulder still clears the smallest #20
+    # 2026-11-25 (Main), no precedent; owner review #2144 (D35: MHA-DT-32's
+    # shoulder keeps owner Q14's .1535-.1585 as a necessity band; Q14's trial
+    # retired with D26)): the largest shoulder still clears the smallest #20
     # bore, .1610 - .1585 = .0025, and the title block's .161 would not.
     assert (spec.SHOULDER_DIA_MIN, spec.SHOULDER_DIA_MAX) == pytest.approx(
         (0.1535 * 25.4, 0.1585 * 25.4)

@@ -21,11 +21,12 @@ ref = "pin-gauges"  # A1-pin-set-061-250, A1-pin-set-061-500-combined
 [[tools]]
 # Owner ruling 2026-11-23, tool audit Q14: "DRILL #20" (it was a .1610
 # reamer). The handle's bore is a plain #20 drilled hole at DRILLED HOLES,
-# .1610-.1650 (delegated ruling 2026-11-25 (Main); owner review #2144
-# (D26)). Nothing reads the bore: MHA-DT-32's shoulder is turned to its own
-# .1535-.1585 (owner ruling 2026-11-24, fit audit question 14: "limits
-# .1535-.1585"; delegated ruling 2026-11-25 (Main)), clearing the smallest
-# bore by .0025.
+# .1610-.1650 (D26). Nothing reads the bore: MHA-DT-32's shoulder is turned
+# to its own .1535-.1585 (owner ruling 2026-11-24, fit audit question 14:
+# "limits .1535-.1585"; delegated ruling 2026-11-25 (Main), no precedent;
+# owner review #2144 (D35: MHA-DT-32's shoulder keeps owner Q14's
+# .1535-.1585 as a necessity band; Q14's trial retired with D26)), clearing
+# the smallest bore by .0025.
 id = "drill-20"
 name = "#20 drill"
 ref = "drill-20"  # Drills #20: #20 DRILL THRU

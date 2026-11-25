@@ -37,12 +37,13 @@ def _floor_thou(value_mm: float) -> str:
 # counterbore are epoxied (dt_crank_handle_ferrule_spec,
 # dt_crank_handle_butt_cup_spec), so bonded.  The bore is a plain #20
 # drilled hole at DRILLED HOLES, .1610-.1650 (owner ruling 2026-11-23, tool
-# audit Q14: "DRILL #20"; delegated ruling 2026-11-25 (Main); owner review
-# #2144 (D26)), which the tenon walls are judged at
+# audit Q14: "DRILL #20"; D26), which the tenon walls are judged at
 # (dt_crank_handle_spec.PIVOT_BORE_FIT_MAX).  Nothing is matched to it: the
 # MHA-DT-32 shoulder holds its own .1535-.1585 (owner ruling 2026-11-24, fit
 # audit question 14: "limits .1535-.1585"; delegated ruling 2026-11-25
-# (Main)), so the callout is the drill alone (rule 25: the sheets agree).
+# (Main), no precedent; owner review #2144 (D35: MHA-DT-32's shoulder keeps
+# owner Q14's .1535-.1585 as a necessity band; Q14's trial retired with
+# D26)), so the callout is the drill alone (rule 25: the sheets agree).
 PIVOT_BORE_DRILL = "#20"
 PIVOT_BORE_CALLOUT = f"{PIVOT_BORE_DRILL} DRILL THRU"
 TENON_NOTE_NUMBER = 1

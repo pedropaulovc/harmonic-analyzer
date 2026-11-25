@@ -3,7 +3,7 @@ checks:
     check: "shoulder can bind in the oak bore"
     kind: gap
     reason: "the largest shoulder binds in the smallest MHA-DT-08 bore"
-    source: "SHOULDER_CLEARANCE_MIN = HANDLE_BORE_MIN - SHOULDER_DIA_MAX = .1610 - .1585 = .0025; owner ruling 2026-11-24, fit audit question 14 (limits .1535-.1585); delegated ruling 2026-11-25 (Main); owner review #2144 (D26)"
+    source: "SHOULDER_CLEARANCE_MIN = HANDLE_BORE_MIN - SHOULDER_DIA_MAX = .1610 - .1585 = .0025; owner ruling 2026-11-24, fit audit question 14 (limits .1535-.1585); delegated ruling 2026-11-25 (Main), no precedent; owner review #2144 (D35: MHA-DT-32's shoulder keeps owner Q14's .1535-.1585 as a necessity band; Q14's trial retired with D26)"
     basis: worst_case
   - id: C-02
     check: "MHA-DT-08's tenon walls read a bore other than its largest accepted"

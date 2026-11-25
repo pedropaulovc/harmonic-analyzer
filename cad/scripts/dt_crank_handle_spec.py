@@ -101,7 +101,9 @@ _GENERAL_2PL = printed_band_mm(2, unit=UNIT)
 # with no failing check takes the plain drill; owner review #2144 (D26)).
 # Nothing is matched to it: the MHA-DT-32 shoulder holds its own .1535-.1585
 # (owner ruling 2026-11-24, fit audit question 14: "limits .1535-.1585";
-# delegated ruling 2026-11-25 (Main)), clearing the smallest bore by .0025.
+# delegated ruling 2026-11-25 (Main), no precedent; owner review #2144 (D35:
+# MHA-DT-32's shoulder keeps owner Q14's .1535-.1585 as a necessity band;
+# Q14's trial retired with D26)), clearing the smallest bore by .0025.
 # The band below is that drilled range, an analysis band for the walls and
 # the shoulder's clearance, not a printed one: the sheet prints the drill.
 PIVOT_BORE_DIA = 4.0894  # .1610

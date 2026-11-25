@@ -2,7 +2,9 @@
 # (drawing-guidelines rule 4; owner ruling 2026-11-24: the reason lives here,
 # not on the sheet).  The shoulder's limits .1535-.1585 are owner ruling
 # 2026-11-24, fit audit question 14; the shoulder is turned to them, nothing
-# read off the handle (delegated ruling 2026-11-25 (Main)).  The sheet
+# read off the handle (delegated ruling 2026-11-25 (Main), no precedent;
+# owner review #2144 (D35: MHA-DT-32's shoulder keeps owner Q14's
+# .1535-.1585 as a necessity band; Q14's trial retired with D26)).  The sheet
 # prints the band as swTolBILAT, +.0025/-.0025.
 necessity:
   - id: N-01
