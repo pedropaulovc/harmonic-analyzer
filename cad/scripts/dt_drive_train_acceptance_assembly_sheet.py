@@ -272,14 +272,15 @@ ACCEPTANCES = (
     # has)". Owner ruling 2026-11-24, audit part 2 C5: "the after-cure
     # readings become a record only; strip and re-bond only if a gear
     # hesitates in the 80-turn running check", so the row records (nothing
-    # is set to it) and the hesitation in check 5C accepts.
+    # is set to it, nothing accepted on it: DT-00 machinist round 1 asked
+    # the cell to say so) and the hesitation in check 5C accepts.
     (
         "spigot-gear-runout",
         _step_ref("post-and-tip-block", "F"),
         f"{' AND '.join(f'T{teeth:03d}' for teeth in cone_gear.SPIGOT_TEETH)}, "
         f"\u00d8{inch_text(cone_gear.over_pins_pin_dia_mm(cone_gear.SPIGOT_TEETH[0]), 3)} GAUGE PIN, "
         f"SETUP AS T{_LAND_2_TEETH:03d}",
-        "RECORD EACH SPACE",
+        "RECORD ONLY, NO ACCEPTANCE",
         "TEST INDICATOR",
     ),
     # DT-00 machinist round 1 (farm run 7, rule 22): step 23C's look leaf and

@@ -1457,9 +1457,11 @@ CONE_CRANK_STEPS = _note_text(
         # re-bond only if a gear hesitates in the 80-turn running check."  So
         # 1W records, before the comb check, so the remedy follows that check
         # alone (rule 22); a bonded gear that hesitates in check 5C is
-        # stripped by 2H, a keyed one checked at 3P-3S.  Step 1 has one letter
-        # left for the clean, which names the redo it prepares.
-        f"1W. RECORD T024'S TOOTH RUNOUT ABOUT MHA-DT-04 ({acceptance_ref('t024-runout')}).",
+        # stripped by 2H, a keyed one checked at 3P-3S.  DT-00 machinist
+        # round 1: 1W, 2E and 2F say plainly that they record and accept
+        # nothing (C5), and add no remedy.  Step 1 has one letter left for
+        # the clean, which names the redo it prepares.
+        f"1W. RECORD ONLY, NO ACCEPTANCE: T024 TOOTH RUNOUT ({acceptance_ref('t024-runout')}).",
         f"1X. CHECK THAT {PHASING_COMB} CLIPS OVER T030 AND T024, BOTH ARMS ON T036.",
         "1Y. IF IT FAILS, TAKE T024 OFF AT 250 DEG C.",
         "1Z. CLEAN THE CURED 638 OFF ITS BORE AND LAND FOR A REDO FROM 1P.",
@@ -1500,8 +1502,8 @@ CONE_CRANK_STEPS = _note_text(
         # part 2 C5: the readings are a record only; the tip is stripped and
         # re-bonded only if a bonded gear hesitates in check 5C's run, so 2H
         # names that run beside the comb check it follows.
-        f"2E. ONCE CURED, RECORD THE MHA-DT-37 PIVOT'S RUNOUT ABOUT MHA-DT-04 ({acceptance_ref('pivot-runout')}).",
-        f"2F. RECORD T012'S AND T018'S TOOTH RUNOUT IN THAT SETUP ({acceptance_ref('spigot-gear-runout')}).",
+        f"2E. ONCE CURED, RECORD ONLY, NO ACCEPTANCE: MHA-DT-37 PIVOT RUNOUT ABOUT MHA-DT-04 ({acceptance_ref('pivot-runout')}).",
+        f"2F. RECORD ONLY, NO ACCEPTANCE: T012 AND T018 TOOTH RUNOUT, SAME SETUP ({acceptance_ref('spigot-gear-runout')}).",
         # The cured tip is accepted on the comb before the post is assembled,
         # so a failure costs no more than the tip: the one remedy parts every
         # tip bond, cleans the film off the coated spigot and the pivot too,

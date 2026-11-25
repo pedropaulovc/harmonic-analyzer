@@ -1713,17 +1713,21 @@ def test_cone_station_rows_run_front_to_back() -> None:
     # that check (rule 22), and a bonded gear that hesitates in check 5C's
     # run; a keyed one is not bonded and goes to 3P (Codjiflo round 1 on
     # #3550, delegated ruling 2026-11-24 (Main), no precedent; owner review
-    # #2144).  DT-00 machinist round 1 (rule 22): one reading a step.
+    # #2144).  DT-00 machinist round 1 (rule 22): one reading a step, each
+    # saying plainly it is a record with nothing accepted on it (C5).
     assert steps[order[4] : order[5]].strip() == (
-        f"2E. ONCE CURED, RECORD THE MHA-DT-37 PIVOT'S RUNOUT ABOUT MHA-DT-04 ({pivot_row})."
+        "2E. ONCE CURED, RECORD ONLY, NO ACCEPTANCE: MHA-DT-37 PIVOT RUNOUT ABOUT"
+        f" MHA-DT-04 ({pivot_row})."
     )
     assert steps[order[5] : order[6]].strip() == (
-        f"2F. RECORD T012'S AND T018'S TOOTH RUNOUT IN THAT SETUP ({gear_row})."
+        f"2F. RECORD ONLY, NO ACCEPTANCE: T012 AND T018 TOOTH RUNOUT, SAME SETUP ({gear_row})."
     )
     assert steps[order[7] : order[8]].startswith(
         "2H. IF IT FAILS, OR A BONDED GEAR HESITATES IN CHECK 5C, AT 250 DEG C TAKE MHA-DT-37,"
     )
-    assert steps[steps.index("1W. ") :].startswith("1W. RECORD T024'S TOOTH RUNOUT")
+    assert steps[steps.index("1W. ") :].startswith(
+        "1W. RECORD ONLY, NO ACCEPTANCE: T024 TOOTH RUNOUT ("
+    )
     assert steps[steps.index("1Y. ") :].startswith("1Y. IF IT FAILS, TAKE T024 OFF")
     check = " ".join(drawing.CHECKS.split())
     assert "MUST NEVER BIND OR HESITATE" in check
@@ -1756,7 +1760,7 @@ def test_cone_station_rows_run_front_to_back() -> None:
     assert row[1:] == (
         "2F",
         "T012 AND T018, \u00d8.040 GAUGE PIN, SETUP AS T024",
-        "RECORD EACH SPACE",
+        "RECORD ONLY, NO ACCEPTANCE",
         "TEST INDICATOR",
     )
     assert "MHA-DT-03-TL-02 BLADES WITH" in steps
