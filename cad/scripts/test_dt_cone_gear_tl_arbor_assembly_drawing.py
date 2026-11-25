@@ -330,7 +330,7 @@ def test_the_setup_table_names_every_blank_its_collar_and_index() -> None:
             arbor.COLLAR_DIAS[arbor.COLLAR_BY_GEAR[blank.tag]]
         ), blank.tag
     assert spec.SETUP_TABLE_TITLE.splitlines()[1] == (
-        "(THE FIRST INDEX CENTRES A TOOTH ON ITEM 5 AT THE BLANK'S MID-FACE)"
+        "(EACH MHA-DT-03 FIRST INDEX CENTRES A TOOTH ON ITEM 5 AT MID-FACE)"
     )
     # Each cell on one line: columns cut at the widest glyph run printed
     # (farm 20261113T234307484Z: "CCW FROM CHAMFERED BORE" spanned 73.6 mm
@@ -419,16 +419,17 @@ def _midface_gap_rad(space: StraightGash) -> float:
     return math.atan2(y, x)
 
 
-def test_the_table_gives_the_64t_index_as_ref_matching_the_model() -> None:
+def test_the_table_prints_no_64t_index_and_the_model_keeps_its_phase() -> None:
     """The 64T's space is straight and inclined: its cutter plane crosses the
     axis at TOOTH_SPACE_CROSSING from the chamfered (z = 0) face, and the
-    model centres a tooth on the keyway at mid-face. The table's REF index,
-    turned in the model's sense, cuts the model's space inside the arbor's
-    setting allowance, where half a pitch is not; the index plus the space's
-    drift from the crossing to mid-face is half a pitch, the station the
-    table's title names. Nothing reads the 64T's clock on the key (the 16T is
-    match-drilled wherever it meshes, MHA-DT-00 4S: fit audit part 2, B13),
-    so the row prints the angle as REF and says any index serves."""
+    model centres a tooth on the keyway at mid-face. The model's index
+    (CRANK_FIRST_INDEX_DEG), turned in the model's sense, cuts the model's
+    space inside the arbor's setting allowance, where half a pitch is not;
+    the index plus the space's drift from the crossing to mid-face is half a
+    pitch. Nothing reads the 64T's clock on the key (the 16T is match-drilled
+    wherever it meshes, MHA-DT-00 4S: fit audit part 2, B13), so the row
+    prints NONE / NOT CLOCKED and the title claims only the cone blanks
+    (restoration round 1, 2026-11-25)."""
     pitch = 2.0 * math.pi / crank.TEETH
     allowance = math.radians(arbor.KEY_SETTING_ALLOWANCE_DEG)
     model = _midface_gap_rad(crank.TOOTH_SPACE)
@@ -439,13 +440,14 @@ def test_the_table_gives_the_64t_index_as_ref_matching_the_model() -> None:
     drift = model - crank.TOOTH_SPACE.azimuth_rad
     assert math.degrees(drift) == pytest.approx(spec.CRANK_MIDFACE_DRIFT_DEG, abs=1e-9)
     assert drift > allowance  # the crossing is no station for the tooth
-    printed, words, ref = _printed_index_deg(crank.TEETH)
-    assert ref and words == spec.CRANK_ANY_INDEX
-    assert printed == spec.CRANK_FIRST_INDEX_DEG
+    (row,) = (row for row in spec.SETUP_TABLE_ROWS if row[1] == str(crank.TEETH))
+    assert (row[3], row[4]) == ("NONE", "NOT CLOCKED") == spec.CRANK_NOT_CLOCKED
+    printed = spec.CRANK_FIRST_INDEX_DEG
     assert printed + spec.CRANK_MIDFACE_DRIFT_DEG == pytest.approx(
         180.0 / crank.TEETH, abs=0.005
     )
     assert "MID-FACE" in spec.SETUP_TABLE_TITLE
+    assert spec.CONE_NUMBER in spec.SETUP_TABLE_TITLE
     # The phantoms' labels say which way the chamfered face goes: toward
     # item 2, the collar that covers its mouth.
     assert spec.CHAMFERED_FACE_TOWARD in spec.SHOWN_BLANK_LABEL
@@ -460,7 +462,6 @@ def test_the_table_gives_the_64t_index_as_ref_matching_the_model() -> None:
     assert _off_pitches(_midface_gap_rad(cut), model, pitch) < allowance
     half = replace(crank.TOOTH_SPACE, azimuth_rad=pitch / 2.0)
     assert _off_pitches(_midface_gap_rad(half), model, pitch) > allowance
-    (row,) = (row for row in spec.SETUP_TABLE_ROWS if row[1] == str(crank.TEETH))
     assert row[0] == arbor.KEYED_GEARS[-1].number
 
 
