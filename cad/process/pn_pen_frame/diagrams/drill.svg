@@ -1,26 +1,32 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 490" font-family="sans-serif" font-size="13">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 490" width="760" height="490" font-family="sans-serif" font-size="13">
+  <!-- Hand picture, to scale at 5 px/mm from the frame's depth (.310, 7.874 mm). #43 drill Ø2.2606 mm (the plan's milling_cuts cutter_dia_mm, shop drill-43), 118° point, its full diameter 7.096 mm below B (drill_full_depth_mm: the .24 rail and tap_drill_past_mm 1.0), its point at 7.775 mm (drill_tip_depth_mm); drawn short to a break line, the chuck not drawn (no size on record). The hole .155 from BK (Y-3.937). The #2 centre drill's spot before it is not drawn (the drill stands for it). The window hidden, dashed: its end rails .24 (6.096 mm). The vise jaws' thickness and the parallels' length are not on record: schematic. Jaw height 44.9453 mm (vise_jaw_height_mm). -->
   <rect class="paper" x="0" y="0" width="760" height="490"/>
-  <text class="title" x="16" y="20">PF07, across the jaws: spot and drill the thumb-screw hole from B</text>
-  <line class="fixture-table" x1="130.3" y1="470.0" x2="469.7" y2="470.0"/>
-  <rect class="clamp" x="170.3" y="245.3" width="110.0" height="224.7"/>
-  <rect class="clamp" x="319.7" y="245.3" width="110.0" height="224.7"/>
-  <text class="label-on-clamp" x="225.3" y="265.3" text-anchor="middle">moving jaw</text>
-  <text class="label-on-clamp" x="374.7" y="265.3" text-anchor="middle">fixed jaw</text>
-  <rect class="fixture-support" x="280.3" y="343.0" width="15.9" height="127.0"/>
-  <rect class="fixture-support" x="303.8" y="343.0" width="15.9" height="127.0"/>
-  <rect class="part-kept" x="280.3" y="142.3" width="39.4" height="200.7"/>
-  <rect class="hidden" x="280.3" y="172.8" width="39.4" height="139.7"/>
-  <line class="leader" x1="409.7" y1="202.3" x2="300.0" y2="242.3"/>
-  <text class="label-halo" x="413.7" y="198.3">the window (dashed: hidden)</text>
-  <line class="centre-line" x1="300.0" y1="82.3" x2="300.0" y2="202.3"/>
-  <rect class="holes" x="294.4" y="142.3" width="11.3" height="38.9"/>
-  <rect class="cutter" x="294.4" y="62.3" width="11.3" height="118.9"/>
-  <text class="label-halo" x="370.0" y="112.3">spot Ø{{process.spot_dia_mm:in.3dot}}, then #43 through</text>
-  <text class="label-halo" x="370.0" y="128.3">the bottom rail into the window</text>
-  <line class="datum" x1="256.3" y1="142.3" x2="276.3" y2="142.3"/>
-  <text class="datum-label" x="252.3" y="146.3" text-anchor="end">Z0 (B)</text>
-  <text class="label" x="470.0" y="300.0">Upright on the 1 in parallels, B up,</text>
-  <text class="label" x="470.0" y="316.0">gripped on the front and back faces,</text>
-  <text class="label" x="470.0" y="332.0">BK at the fixed jaw, L on the RIGHT.</text>
-  <text class="label" x="470.0" y="348.0">Hole {{cad.thumb_screw_tap_station_in:.3dot}} from L, {{cad.thumb_screw_tap_z_from_min_in:.3dot}} from BK.</text>
+  <text class="title" x="20" y="24">PF07, across the jaws, to scale (5 px/mm): the #43 drill through the bottom rail into the window</text>
+  <rect class="fixture-vise" x="220.31" y="470" width="219.37" height="14"/>
+  <rect class="clamp" x="220.31" y="245.27" width="90" height="224.73"/>
+  <rect class="clamp" x="349.69" y="245.27" width="90" height="224.73"/>
+  <rect class="fixture-support" x="310.31" y="343" width="15.88" height="127"/>
+  <rect class="fixture-support" x="333.81" y="343" width="15.88" height="127"/>
+  <rect class="part-kept" x="310.31" y="142.34" width="39.37" height="200.66"/>
+  <text class="label-on-clamp" x="265.31" y="265.27" text-anchor="middle">moving jaw</text>
+  <text class="label-on-clamp" x="394.69" y="265.27" text-anchor="middle">fixed jaw</text>
+  <rect class="hidden" x="310.31" y="172.82" width="39.37" height="139.7"/>
+  <rect class="part-removed" x="324.35" y="142.34" width="11.3" height="30.48"/>
+  <path class="cutter" d="M335.65 62.34L335.65 177.82L330 181.22L324.35 177.82L324.35 62.34L327.17 59.34L330 62.34L332.83 59.34Z"/>
+  <line class="centre-line" x1="330" y1="52.34" x2="330" y2="201.22"/>
+  <line class="arrow" x1="304" y1="72.34" x2="304" y2="112.34"/>
+  <line class="datum" x1="266.31" y1="142.34" x2="306.31" y2="142.34"/>
+  <text class="datum-label" x="262.31" y="147.34" text-anchor="end">Z0 (B)</text>
+  <text class="label" x="440" y="70">#43 drill (Ø.089): its full diameter 1 mm</text>
+  <text class="label" x="440" y="86">past the .24 bottom rail into the window</text>
+  <text class="label" x="440" y="102">(after the centre drill's spot)</text>
+  <line class="leader" x1="450" y1="106" x2="335.65" y2="102.34"/>
+  <circle class="leader-dot" cx="335.65" cy="102.34" r="2"/>
+  <text class="label" x="440" y="190">the window (dashed: hidden)</text>
+  <line class="leader" x1="450" y1="196" x2="330" y2="202.34"/>
+  <circle class="leader-dot" cx="330" cy="202.34" r="2"/>
+  <text class="label" x="500" y="330">Upright on the 1 in parallels, B up,</text>
+  <text class="label" x="500" y="346">gripped on the front and back faces,</text>
+  <text class="label" x="500" y="362">BK at the fixed jaw, L on the RIGHT.</text>
+  <text class="label" x="500" y="378">Hole .500 from L, .155 from BK.</text>
 </svg>

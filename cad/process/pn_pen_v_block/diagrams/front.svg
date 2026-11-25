@@ -1,30 +1,33 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 460" font-family="sans-serif" font-size="13">
-  <rect class="paper" x="0" y="0" width="760" height="460"/>
-  <text class="title" x="20" y="22">VB04: elevation along the jaws (6 px/mm), BACK down on the stacks, P left</text>
-  <rect class="fixture-support" x="70" y="268.5" width="320" height="171.5"/>
-  <line class="fixture-table" x1="40" y1="440" x2="420" y2="440"/>
-  <!-- The front faced from 31.24 down to the depth 21.84 in five levels, then the front step.
-       The back step (cut in VB03) stands clear of the stacks at the lower left. -->
-  <polygon class="part-kept" points="150,149.6 203.3,149.6 203.3,137.4 307,137.4 307,268.5 203.3,268.5 203.3,256.3 150,256.3"/>
-  <rect class="part-removed" x="150" y="81" width="157" height="56.4"/>
-  <rect class="part-removed" x="150" y="137.4" width="53.3" height="12.2"/>
-  <rect class="hidden" x="60" y="170.3" width="340" height="269.7" fill="none"/>
-  <rect class="cutter" x="127.1" y="40" width="76.2" height="80"/>
-  <line class="arrow" x1="165" y1="120" x2="165" y2="145"/>
-  <line class="datum" x1="150" y1="152" x2="150" y2="180"/>
-  <text class="datum-label" x="90" y="162">X0 = P</text>
-  <line class="datum" x1="307" y1="268.5" x2="420" y2="268.5"/>
-  <text class="datum-label" x="424" y="272">Z0 stacks' top (BACK)</text>
-  <line class="dims" x1="320" y1="137.4" x2="320" y2="268.5"/>
-  <text class="label-halo" x="326" y="240">depth {{cad.body_back_depth_min_in:.3dot}}–{{cad.body_back_depth_max_in:.3dot}}</text>
-  <line class="leader" x1="420" y1="100" x2="308" y2="100"/>
-  <text class="label" x="424" y="104">front faced in levels of {{process.face_step_max_mm:in.3dot}} max</text>
-  <line class="leader" x1="420" y1="146" x2="200" y2="146"/>
-  <text class="label" x="424" y="150">front neck step {{cad.neck_front_station_in:.3dot}} deep,</text>
-  <text class="label" x="424" y="166">its floor .13 above the jaw tops</text>
-  <line class="leader" x1="420" y1="196" x2="400" y2="196"/>
-  <text class="label" x="424" y="200">fixed jaw behind (dashed): the bottom face</text>
-  <line class="leader" x1="60" y1="250" x2="160" y2="262"/>
-  <text class="label-halo" x="20" y="246">back step, clear of the stacks</text>
-  <text class="label" x="424" y="364">the back face bears past the back step</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 470" width="760" height="470" font-family="sans-serif" font-size="13">
+  <!-- Hand picture, to scale at 5 px/mm from the block's length (1.030, 26.162 mm). 1/2 in end mill Ø12.7 mm (face_cutter_dia_mm, shop endmill-carbide-3fl-1-2), its square end drawn as the near half of its end face (arc 12 % of its diameter deep, its lowest point the true end), drawn 1 in out (half_mill_projection_min_mm, a least stick-out) to a break line; the collet not drawn. Shown at its last level, the depth .860 (21.844 mm), over the block (the files' first pass, Y1.463, hangs over the fixed jaw); hatched: the levels from 31.242 and the front neck step it cuts next, .080 deep from P to .350. The back step leaves the P end .080 clear of the stacks. Stacks 1/2 + 5/8 in (stack_height_mm). The vise jaws' thickness and the parallels' length are not on record: schematic. Jaw height 44.9453 mm (vise_jaw_height_mm). -->
+  <rect class="paper" x="0" y="0" width="760" height="470"/>
+  <text class="title" x="20" y="24">VB04, along the jaws, to scale (5 px/mm): BACK down, the front faced to the depth</text>
+  <rect class="fixture-vise" x="150" y="440" width="290.81" height="14"/>
+  <rect class="clamp" x="150" y="215.27" width="290.81" height="224.73"/>
+  <path class="paper" d="M170 297.12L390.81 297.12L393.81 301.09L390.81 305.06L393.81 309.03L390.81 313L393.81 316.97L390.81 320.94L393.81 324.91L390.81 328.88L393.81 332.84L390.81 336.81L393.81 340.78L390.81 344.75L393.81 348.72L390.81 352.69L393.81 356.66L390.81 360.62L393.81 364.59L390.81 368.56L393.81 372.53L390.81 376.5L393.81 380.47L390.81 384.44L393.81 388.41L390.81 392.38L393.81 396.34L390.81 400.31L393.81 404.28L390.81 408.25L393.81 412.22L390.81 416.19L393.81 420.16L390.81 424.12L393.81 428.09L390.81 432.06L393.81 436.03L390.81 440L170 440Z"/>
+  <path class="fixture-support" d="M170 297.12L390.81 297.12L393.81 301.09L390.81 305.06L393.81 309.03L390.81 313L393.81 316.97L390.81 320.94L393.81 324.91L390.81 328.88L393.81 332.84L390.81 336.81L393.81 340.78L390.81 344.75L393.81 348.72L390.81 352.69L393.81 356.66L390.81 360.62L393.81 364.59L390.81 368.56L393.81 372.53L390.81 376.5L393.81 380.47L390.81 384.44L393.81 388.41L390.81 392.38L393.81 396.34L390.81 400.31L393.81 404.28L390.81 408.25L393.81 412.22L390.81 416.19L393.81 420.16L390.81 424.12L393.81 428.09L390.81 432.06L393.81 436.03L390.81 440L170 440Z"/>
+  <path class="part-kept" d="M200 286.96L244.45 286.96L244.45 297.12L330.81 297.12L330.81 187.91L200 187.91Z"/>
+  <text class="label-on-clamp" x="432.81" y="235.27" text-anchor="end">fixed jaw (behind);</text>
+  <text class="label-on-clamp" x="432.81" y="251.27" text-anchor="end">the moving jaw</text>
+  <text class="label-on-clamp" x="432.81" y="267.27" text-anchor="end">not shown</text>
+  <rect class="part-removed" x="200" y="140.91" width="130.81" height="46.99"/>
+  <rect class="part-removed" x="200" y="187.91" width="44.45" height="10.16"/>
+  <path class="cutter" d="M310.24 180.28L310.24 111.7L306.27 114.7L302.3 111.7L298.33 114.7L294.36 111.7L290.39 114.7L286.42 111.7L282.45 114.7L278.49 111.7L274.52 114.7L270.55 111.7L266.58 114.7L262.61 111.7L258.64 114.7L254.67 111.7L250.7 114.7L246.74 111.7L246.74 180.28A31.75 7.62 0 0 0 310.24 180.28Z"/>
+  <line class="arrow" x1="320.24" y1="127.91" x2="390.24" y2="127.91"/>
+  <line class="datum" x1="20" y1="297.12" x2="156" y2="297.12"/>
+  <text class="datum-label" x="20" y="273.12">Z0 the stacks'</text>
+  <text class="datum-label" x="20" y="289.12">top (BACK)</text>
+  <line class="datum" x1="200" y1="110.91" x2="200" y2="136.91"/>
+  <text class="datum-label" x="194" y="126.91" text-anchor="end">X0 = P</text>
+  <text class="label" x="520" y="70">front faced in levels of .080 max</text>
+  <text class="label" x="520" y="86">to the depth .850-.870; then the front</text>
+  <text class="label" x="520" y="102">neck step .080 deep (hatched)</text>
+  <text class="label" x="20" y="237.12">back step, clear</text>
+  <text class="label" x="20" y="253.12">of the stacks</text>
+  <line class="leader" x1="80" y1="253.12" x2="220" y2="293.12"/>
+  <circle class="leader-dot" cx="220" cy="293.12" r="2"/>
+  <text class="label" x="520" y="370">the back face bears on the</text>
+  <text class="label" x="520" y="386">stacks past the back step;</text>
+  <text class="label" x="520" y="402">1/2 + 5/8 in parallels,</text>
+  <text class="label" x="520" y="418">stacked against each jaw</text>
 </svg>

@@ -1,24 +1,29 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 300" width="760" height="300">
-  <rect class="paper" x="0" y="0" width="760" height="300"/>
-  <text class="title" x="20" y="24">Top end out of the 4-jaw: face, spot, drill 3/64, tap #0-80 (not to scale)</text>
-  <rect class="fixture-vise" x="180" y="60" width="110" height="70"/>
-  <rect class="fixture-vise" x="180" y="170" width="110" height="70"/>
-  <rect class="clamp" x="200" y="120" width="90" height="10"/>
-  <rect class="clamp" x="200" y="170" width="90" height="10"/>
-  <rect class="part-kept" x="40" y="130" width="420" height="40"/>
-  <rect class="paper" x="420" y="146" width="40" height="8"/>
-  <line class="centre-line" x1="30" y1="150" x2="740" y2="150"/>
-  <rect class="cutter" x="470" y="144" width="90" height="12"/>
-  <rect class="clamp" x="560" y="138" width="40" height="24"/>
-  <rect class="clamp" x="572" y="96" width="16" height="108"/>
-  <path class="clamp" d="M600 150 L630 140 L710 140 L710 160 L630 160 Z"/>
-  <line class="datum" x1="460" y1="90" x2="460" y2="128"/>
-  <text class="datum-label" x="420" y="84">Z0 top face</text>
-  <text class="label" x="600" y="70">T-handle tap wrench</text>
-  <line class="dims" x1="610" y1="74" x2="588" y2="96"/>
-  <text class="label" x="600" y="214">dead centre's point</text>
-  <text class="label" x="600" y="232">in the wrench's top</text>
-  <text class="label" x="600" y="250">centre hole</text>
-  <line class="dims" x1="640" y1="200" x2="602" y2="152"/>
-  <text class="label" x="40" y="270">4-jaw on the flats over brass shims; indicate each pair of flats</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 400" width="760" height="400">
+  <!-- Hand picture, the blank to scale at 20 px/mm from the 5 mm square (square_mm). Top end .50 in (top_stickout_in) out of the jaw fronts, about .05 in faced off. The 4-jaw, its shims and the AR tool (its TCMT insert size is not on record) are schematic. -->
+  <rect class="paper" x="0" y="0" width="760" height="400"/>
+  <text class="title" x="20" y="24">Top end out of the 4-jaw, to scale (20 px/mm) bar the chuck and the AR tool: facing to Z0</text>
+  <rect class="fixture-vise" x="70" y="65" width="110" height="250"/>
+  <rect class="clamp" x="180" y="66" width="120" height="70"/>
+  <rect class="part-rest" x="180" y="136" width="120" height="4"/>
+  <rect class="clamp" x="180" y="244" width="120" height="70"/>
+  <rect class="part-rest" x="180" y="240" width="120" height="4"/>
+  <text class="label" x="70" y="370">4-jaw (schematic) on the flats over brass shims;</text>
+  <text class="label" x="70" y="386">indicate each pair of flats within .001 TIR</text>
+  <path class="part-kept" d="M528.6 140L528.6 240L20 240L17 235.83L20 231.67L17 227.5L20 223.33L17 219.17L20 215L17 210.83L20 206.67L17 202.5L20 198.33L17 194.17L20 190L17 185.83L20 181.67L17 177.5L20 173.33L17 169.17L20 165L17 160.83L20 156.67L17 152.5L20 148.33L17 144.17L20 140Z"/>
+  <rect class="part-removed" x="528.6" y="140" width="25.4" height="100"/>
+  <line class="centre-line" x1="10" y1="190" x2="740" y2="190"/>
+  <path class="cutter" d="M528.6 216.0L562.6 238.0L562.6 346.0L498.6 346.0L498.6 256.0Z"/>
+  <line class="arrow" x1="588.6" y1="300" x2="588.6" y2="220"/>
+  <line class="datum" x1="528.6" y1="80" x2="528.6" y2="136"/>
+  <text class="datum-label" x="522.6" y="74">Z0 top face</text>
+  <line class="dims" x1="300" y1="110" x2="300" y2="136"/>
+  <line class="dims" x1="300" y1="120" x2="554" y2="120"/>
+  <line class="dims" x1="554" y1="110" x2="554" y2="136"/>
+  <text class="label" x="310" y="114">.50 out of the jaw fronts</text>
+  <text class="label" x="578.6" y="330">AR tool (schematic):</text>
+  <text class="label" x="578.6" y="346">faces about .05 off,</text>
+  <text class="label" x="578.6" y="362">to the centre, no pip</text>
+  <text class="label" x="20" y="48">the rest of the blank back through the spindle bore</text>
+  <line class="leader" x1="40" y1="54" x2="120" y2="142"/>
+  <circle class="leader-dot" cx="120" cy="142" r="2"/>
 </svg>

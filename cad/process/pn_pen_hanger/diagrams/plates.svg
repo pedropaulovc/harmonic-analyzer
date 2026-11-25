@@ -1,24 +1,51 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 381" font-family="sans-serif" font-size="13">
-  <rect class="paper" x="0" y="0" width="760" height="381"/>
-  <text class="title" x="20" y="20">Setup 3 (plan view): PH02, both plates on four tabs each, blanks end to end</text>
-  <rect class="clamp" x="60.0" y="49.5" width="585.0" height="40.5"/>
-  <rect class="clamp" x="60.0" y="261.5" width="585.0" height="40.5"/>
-  <rect class="part-rest" x="150.0" y="90.0" width="200.7" height="171.5"/>
-  <rect class="part-rest" x="352.9" y="90.0" width="200.7" height="171.5"/>
-  <path class="part-kept" d="M 305.4 148.3 L 194.6 148.3 L 194.6 203.2 L 305.4 203.2 Z"/>
-  <path class="part-kept" d="M 508.3 148.3 L 397.5 148.3 L 397.5 203.2 L 508.3 203.2 Z"/>
-  <rect class="part-rest" x="216.6" y="138.9" width="11.4" height="11.6"/>
-  <rect class="part-rest" x="272.0" y="138.9" width="11.4" height="11.6"/>
-  <rect class="part-rest" x="216.6" y="200.9" width="11.4" height="11.6"/>
-  <rect class="part-rest" x="272.0" y="200.9" width="11.4" height="11.6"/>
-  <rect class="part-rest" x="419.5" y="138.9" width="11.4" height="11.6"/>
-  <rect class="part-rest" x="474.9" y="138.9" width="11.4" height="11.6"/>
-  <rect class="part-rest" x="419.5" y="200.9" width="11.4" height="11.6"/>
-  <rect class="part-rest" x="474.9" y="200.9" width="11.4" height="11.6"/>
-  <text class="label" x="198.6" y="180.7">B</text>
-  <text class="label" x="401.5" y="180.7">B</text>
-  <text class="label" x="150.0" y="43.5">fixed jaw (Y0)</text>
-  <text class="label" x="150.0" y="318.0">moving jaw; the jaws run on past both ends</text>
-  <text class="label" x="20.0" y="347.0">X0 blank 1's left end; B: each plate's bond end (left). Tabs: the frame-shaded bridges, two per long side.</text>
-  <text class="label" x="20" y="369">Same spoil plate, Y0 and Z0 as Setup 2.</text>
-</svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 700" width="760" height="700" font-family="sans-serif" font-size="13">
+  <!-- Hand picture, plan and section to scale at 4.5 px/mm from the 1-1/2 in bar. 1/8 in end mill Ø3.175 mm (eighth_cutter_dia_mm, shop endmill-carbide-3fl-1-8) at PH02's first plunge, X36.132 Y-19.05 (plate 1's outline), at its last level, .010 into the spoil plate (outline_through_mm); its square end drawn as the near half of its end face, arc 12 % of its diameter deep; drawn .55 in out (its least stick-out) to a break line. Parallels 1 in, the spoil plate 1/2 x 1.40, as Setup 2; the jaws' thickness, the parallels' and the spoil plate's place along X are not on record: schematic. -->
+  <rect class="paper" x="0" y="0" width="760" height="700"/>
+  <text class="title" x="20" y="24">Setup 3 (plan view): PH02, the 1/8 in end mill on plate 1's outline, to scale (4.5 px/mm)</text>
+  <rect class="clamp" x="60.0" y="49.5" width="585.0" height="40.5"/>
+  <rect class="clamp" x="60.0" y="261.5" width="585.0" height="40.5"/>
+  <rect class="part-rest" x="150.0" y="90.0" width="200.7" height="171.5"/>
+  <rect class="part-rest" x="352.9" y="90.0" width="200.7" height="171.5"/>
+  <path class="part-kept" d="M 305.4 148.3 L 194.6 148.3 L 194.6 203.2 L 305.4 203.2 Z"/>
+  <path class="part-kept" d="M 508.3 148.3 L 397.5 148.3 L 397.5 203.2 L 508.3 203.2 Z"/>
+  <rect class="part-rest" x="216.6" y="138.9" width="11.4" height="11.6"/>
+  <rect class="part-rest" x="272.0" y="138.9" width="11.4" height="11.6"/>
+  <rect class="part-rest" x="216.6" y="200.9" width="11.4" height="11.6"/>
+  <rect class="part-rest" x="272.0" y="200.9" width="11.4" height="11.6"/>
+  <rect class="part-rest" x="419.5" y="138.9" width="11.4" height="11.6"/>
+  <rect class="part-rest" x="474.9" y="138.9" width="11.4" height="11.6"/>
+  <rect class="part-rest" x="419.5" y="200.9" width="11.4" height="11.6"/>
+  <rect class="part-rest" x="474.9" y="200.9" width="11.4" height="11.6"/>
+  <text class="label" x="198.6" y="180.7">B</text>
+  <text class="label" x="401.5" y="180.7">B</text>
+  <text class="label" x="150.0" y="43.5">fixed jaw (Y0)</text>
+  <text class="label" x="150.0" y="318.0">moving jaw; the jaws run on past both ends</text>
+  <circle class="cutter" cx="312.59" cy="175.73" r="7.14"/>
+  <text class="label" x="560" y="190">1/8 in end mill at its</text>
+  <text class="label" x="560" y="206">first plunge</text>
+  <line class="leader" x1="558" y1="186" x2="320.59" y2="175.73"/>
+  <circle class="leader-dot" cx="320.59" cy="175.73" r="2"/>
+  <rect class="fixture-vise" x="180" y="625" width="271.45" height="12"/>
+  <rect class="clamp" x="180" y="422.75" width="50" height="202.25"/>
+  <rect class="clamp" x="401.45" y="422.75" width="50" height="202.25"/>
+  <rect class="fixture-support" x="230" y="510.7" width="14.29" height="114.3"/>
+  <rect class="fixture-support" x="387.16" y="510.7" width="14.29" height="114.3"/>
+  <rect class="fixture-plate" x="235.72" y="453.55" width="160.02" height="57.15"/>
+  <rect class="part-rest" x="230" y="439.26" width="171.45" height="14.29"/>
+  <rect class="part-removed" x="308.58" y="439.26" width="14.29" height="14.29"/>
+  <path class="cutter" d="M322.87 452.98L322.87 376.4L319.3 379.4L315.73 376.4L312.15 379.4L308.58 376.4L308.58 452.98A7.14 1.71 0 0 0 322.87 452.98Z"/>
+  <line class="datum" x1="140" y1="453.55" x2="176" y2="453.55"/>
+  <text class="datum-label" x="136" y="458.55" text-anchor="end">Z0</text>
+  <text class="title" x="180" y="364.4">Across the jaws at X36.1, fixed jaw at the right</text>
+  <text class="label" x="463.45" y="567.85">1 in parallel against</text>
+  <text class="label" x="463.45" y="583.85">each jaw</text>
+  <line class="leader" x1="461.45" y1="563.85" x2="394.31" y2="577.85"/>
+  <circle class="leader-dot" cx="394.31" cy="577.85" r="2"/>
+  <text class="label" x="463.45" y="474.12">the spoil plate, 1.40 wide</text>
+  <line class="leader" x1="461.45" y1="470.12" x2="383.45" y2="482.12"/>
+  <circle class="leader-dot" cx="383.45" cy="482.12" r="2"/>
+  <text class="label-on-clamp" x="426.45" y="436.75" text-anchor="middle">fixed</text>
+  <text class="label-on-clamp" x="205" y="436.75" text-anchor="middle">moving</text>
+  <text class="label" x="20" y="664">X0 blank 1's left end; B: each plate's bond end (left). Tabs: the frame-shaded bridges, two per long side.</text>
+  <text class="label" x="20" y="680">Same spoil plate on the 1 in parallels, Y0 and Z0 as Setup 2.</text>
+</svg>

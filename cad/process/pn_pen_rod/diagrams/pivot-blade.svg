@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 420" width="760" height="420">
+  <!-- Hand picture, to scale at 20 px/mm from the 5 mm square (square_mm). P1 cutoff blade 1/16 in (1.5875 mm, blade_width_in) wide; its height out of the holder is not on record: drawn short to a break line. Pivot Ø.125 x .41 (pivot_aim_dia_mm, pivot_len_in); the groove .165-.315 from the shoulder, floor Ø.106 (groove_plunge_1_in, groove_plunge_3_in plus the blade, groove_aim_dia_in), hatched: the same blade plunges it next. The 4-jaw and its shims are schematic. -->
+  <rect class="paper" x="0" y="0" width="760" height="420"/>
+  <text class="title" x="20" y="24">Pivot end, to scale (20 px/mm) bar the chuck: the 1/16 blade squares the shoulder</text>
+  <rect class="fixture-vise" x="70" y="65" width="110" height="250"/>
+  <rect class="clamp" x="180" y="66" width="120" height="70"/>
+  <rect class="part-rest" x="180" y="136" width="120" height="4"/>
+  <rect class="clamp" x="180" y="244" width="120" height="70"/>
+  <rect class="part-rest" x="180" y="240" width="120" height="4"/>
+  <text class="label" x="70" y="390">4-jaw (schematic) on the flats over brass shims;</text>
+  <text class="label" x="70" y="406">indicate each pair of flats within .001 TIR</text>
+  <path class="part-kept" d="M396.52 140L396.52 240L20 240L17 235.83L20 231.67L17 227.5L20 223.33L17 219.17L20 215L17 210.83L20 206.67L17 202.5L20 198.33L17 194.17L20 190L17 185.83L20 181.67L17 177.5L20 173.33L17 169.17L20 165L17 160.83L20 156.67L17 152.5L20 148.33L17 144.17L20 140Z"/>
+  <rect class="part-kept" x="396.52" y="158.33" width="208.28" height="63.35"/>
+  <rect class="part-removed" x="480.34" y="158.33" width="76.2" height="4.75"/>
+  <rect class="part-removed" x="480.34" y="216.92" width="76.2" height="4.75"/>
+  <line class="centre-line" x1="10" y1="190" x2="740" y2="190"/>
+  <path class="cutter" d="M428.27 221.67L428.27 371.67L424.3 374.67L420.33 371.67L416.36 374.67L412.39 371.67L408.43 374.67L404.46 371.67L400.49 374.67L396.52 371.67L396.52 221.67Z"/>
+  <line class="arrow" x1="444.27" y1="320" x2="444.27" y2="231.67"/>
+  <line class="datum" x1="604.8" y1="70" x2="604.8" y2="136"/>
+  <text class="datum-label" x="610.8" y="80">Z0 pivot end</text>
+  <line class="dims" x1="396.52" y1="108" x2="396.52" y2="154.33"/>
+  <line class="dims" x1="396.52" y1="116" x2="604.8" y2="116"/>
+  <text class="label" x="406.52" y="110">shoulder at Z-.410</text>
+  <text class="label" x="456.52" y="300">1/16 P1 blade, its chuck-side face</text>
+  <text class="label" x="456.52" y="316">on Z-.410: plunged to the pivot's O.D.,</text>
+  <text class="label" x="456.52" y="332">the corner sharp (R.008 MAX)</text>
+  <text class="label" x="20" y="44">hatched: the groove, three plunges of the same blade next,</text>
+  <text class="label" x="20" y="60">.165-.315 from the shoulder, floor Ø.106</text>
+  <line class="leader" x1="340" y1="64" x2="518.44" y2="164.33"/>
+  <circle class="leader-dot" cx="518.44" cy="164.33" r="2"/>
+</svg>

@@ -1,38 +1,39 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 340" width="760" height="340">
-  <rect class="paper" x="0" y="0" width="760" height="340"/>
-  <text class="title" x="20" y="24">Side view along the jaws: the head end out past the jaws, the eye drilled in the overhang (not to scale)</text>
-  <rect class="fixture-vise" x="258" y="260" width="462" height="30"/>
-  <rect class="clamp" x="258" y="100" width="462" height="90"/>
-  <rect class="fixture-support" x="258" y="190" width="296" height="70"/>
-  <rect class="part-kept" x="160" y="160" width="260" height="30"/>
-  <rect class="fixture-support" x="480" y="160" width="74" height="30"/>
-  <rect class="part-removed" x="195" y="160" width="10" height="30"/>
-  <rect class="cutter" x="195" y="60" width="10" height="94"/>
-  <line class="centre-line" x1="200" y1="50" x2="200" y2="200"/>
-  <line class="datum" x1="160" y1="140" x2="160" y2="215"/>
-  <line class="dims" x1="160" y1="215" x2="120" y2="232"/>
-  <text class="datum-label" x="20" y="238">X0 head end</text>
-  <line class="datum" x1="150" y1="160" x2="250" y2="160"/>
-  <line class="dims" x1="240" y1="160" x2="240" y2="88"/>
-  <text class="datum-label" x="245" y="84">Z0 the O.D. top</text>
-  <line class="dims" x1="160" y1="300" x2="200" y2="300"/>
-  <line class="dims" x1="160" y1="292" x2="160" y2="308"/>
-  <line class="dims" x1="200" y1="292" x2="200" y2="308"/>
-  <text class="label" x="150" y="322">.16 to the eye</text>
-  <line class="dims" x1="160" y1="250" x2="258" y2="250"/>
-  <line class="dims" x1="258" y1="242" x2="258" y2="258"/>
-  <text class="label" x="190" y="270">.25 out</text>
-  <line class="dims" x1="150" y1="276" x2="205" y2="200"/>
-  <text class="label" x="40" y="288">air under the eye</text>
-  <text class="label" x="20" y="48">centre drill, then #54 through</text>
-  <line class="dims" x1="185" y1="50" x2="196" y2="62"/>
-  <text class="label" x="420" y="72">jaw (behind) grips the O.D.</text>
-  <line class="dims" x1="470" y1="78" x2="470" y2="104"/>
-  <text class="label" x="330" y="310">4 in parallel on edge, centred</text>
-  <line class="dims" x1="400" y1="296" x2="400" y2="256"/>
-  <text class="label" x="560" y="310">offcut spacer on</text>
-  <text class="label" x="560" y="326">the parallel's right end</text>
-  <line class="dims" x1="600" y1="296" x2="520" y2="186"/>
-  <text class="label" x="20" y="120">blank, thread end right</text>
-  <line class="dims" x1="100" y1="124" x2="170" y2="165"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 930 470" width="930" height="470">
+  <!-- Hand picture, to scale at 150 px/in (5.906 px/mm) from the blank's Ø.250 (6.35 mm). #54 drill Ø1.397 mm (plan [parameters] drill_54_dia_mm, shop tools.drill-54), 118° point, its tip eye_drill_past_mm 0.5 mm past the blank's underside; drawn short to a break line (its chuck is not drawn: no size on record). The #1 centre drill's spot before it is not drawn. Parallel 1 x 4 in (riser_height_mm, parallel_length_mm), jaw 44.9453 mm high (vise_jaw_height_mm), jaw top 13.1953 mm over the O.D. (jaw_top_over_od_mm), overhang 6.35 mm (head_overhang_mm), eye .16 from the head end (the drawing). -->
+  <rect class="paper" x="0" y="0" width="930" height="470"/>
+  <text class="title" x="20" y="24">Side view along the jaws, to scale (150 px/in): the #54 drill through the eye in the overhang</text>
+  <path class="fixture-vise" d="M270 362.5L910 362.5L913 366.17L910 369.83L913 373.5L910 377.17L913 380.83L910 384.5L270 384.5Z"/>
+  <path class="clamp" d="M270 97.08L910 97.08L913 101.1L910 105.12L913 109.14L910 113.16L913 117.18L910 121.2L913 125.23L910 129.25L913 133.27L910 137.29L913 141.31L910 145.33L913 149.36L910 153.38L913 157.4L910 161.42L913 165.44L910 169.46L913 173.49L910 177.51L913 181.53L910 185.55L913 189.57L910 193.59L913 197.61L910 201.64L913 205.66L910 209.68L913 213.7L910 217.72L913 221.74L910 225.77L913 229.79L910 233.81L913 237.83L910 241.85L913 245.87L910 249.9L913 253.92L910 257.94L913 261.96L910 265.98L913 270L910 274.02L913 278.05L910 282.07L913 286.09L910 290.11L913 294.13L910 298.15L913 302.18L910 306.2L913 310.22L910 314.24L913 318.26L910 322.28L913 326.31L910 330.33L913 334.35L910 338.37L913 342.39L910 346.41L913 350.44L910 354.46L913 358.48L910 362.5L270 362.5Z"/>
+  <rect class="fixture-support" x="270" y="212.5" width="600" height="150"/>
+  <rect class="part-kept" x="232.5" y="175" width="153" height="37.5"/>
+  <rect class="part-rest" x="720" y="175" width="150" height="37.5"/>
+  <rect class="part-removed" x="252.38" y="175" width="8.25" height="37.5"/>
+  <path class="cutter" d="M260.62 46L260.62 212.97L256.5 215.45L252.38 212.97L252.38 46L254.44 43L256.5 46L258.56 43Z"/>
+  <line class="centre-line" x1="256.5" y1="36" x2="256.5" y2="241.45"/>
+  <line class="arrow" x1="232.5" y1="60" x2="232.5" y2="100"/>
+  <line class="datum" x1="232.5" y1="145" x2="232.5" y2="422.5"/>
+  <text class="datum-label" x="224.5" y="418.5" text-anchor="end">X0 head end</text>
+  <line class="datum" x1="192.5" y1="175" x2="272.5" y2="175"/>
+  <text class="datum-label" x="186.5" y="180" text-anchor="end">Z0 the O.D. top</text>
+  <line class="dims" x1="270" y1="384.5" x2="270" y2="414.5"/>
+  <line class="dims" x1="232.5" y1="408.5" x2="270" y2="408.5"/>
+  <text class="label" x="278" y="413.5">.25 out past the jaws' left face</text>
+  <line class="dims" x1="256.5" y1="245.45" x2="256.5" y2="438.5"/>
+  <line class="dims" x1="232.5" y1="432.5" x2="256.5" y2="432.5"/>
+  <text class="label" x="264.5" y="437.5">.16 to the eye</text>
+  <text class="label" x="286.5" y="58">#54 drill, Ø.055, through into air: its point</text>
+  <text class="label" x="286.5" y="74">.5 mm past the underside (after the centre drill's spot)</text>
+  <line class="leader" x1="284.5" y1="66" x2="260.62" y2="90"/>
+  <circle class="leader-dot" cx="260.62" cy="90" r="2"/>
+  <text class="label-on-clamp" x="480" y="121.08">fixed jaw (behind) grips the O.D.; the moving jaw not shown</text>
+  <text class="label" x="560" y="412.5">1 x 4 in parallel on edge, centred between the jaws,</text>
+  <text class="label" x="560" y="428.5">its left end flush with the jaws' left face</text>
+  <line class="leader" x1="600" y1="400.5" x2="640" y2="322.5"/>
+  <circle class="leader-dot" cx="640" cy="322.5" r="2"/>
+  <text class="label-on-clamp" x="720" y="139">1 in offcut of the bar on</text>
+  <text class="label-on-clamp" x="720" y="155">the parallel's right end</text>
+  <text class="label-on-clamp" x="405.5" y="198.75">blank, head end LEFT</text>
+  <text class="label" x="20" y="252.5">air under the eye</text>
+  <line class="leader" x1="130" y1="248.5" x2="253.5" y2="228.5"/>
+  <circle class="leader-dot" cx="253.5" cy="228.5" r="2"/>
 </svg>

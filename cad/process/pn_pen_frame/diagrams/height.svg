@@ -1,21 +1,31 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 440" font-family="sans-serif" font-size="13">
-  <rect class="paper" x="0" y="0" width="760" height="440"/>
-  <text class="title" x="16" y="20">PF02, across the jaws: T down, the bottom end B faced to the height</text>
-  <line class="fixture-table" x1="126.2" y1="420.0" x2="473.8" y2="420.0"/>
-  <rect class="clamp" x="166.2" y="195.3" width="110.0" height="224.7"/>
-  <rect class="clamp" x="323.8" y="195.3" width="110.0" height="224.7"/>
-  <text class="label-on-clamp" x="221.2" y="215.3" text-anchor="middle">moving jaw</text>
-  <text class="label-on-clamp" x="378.8" y="215.3" text-anchor="middle">fixed jaw</text>
-  <rect class="fixture-support" x="276.2" y="293.0" width="15.9" height="127.0"/>
-  <rect class="fixture-support" x="307.9" y="293.0" width="15.9" height="127.0"/>
-  <rect class="part-kept" x="276.2" y="92.3" width="47.6" height="200.7"/>
-  <rect class="part-removed" x="276.2" y="73.3" width="47.6" height="19.1"/>
-  <rect class="cutter" x="268.2" y="41.3" width="63.5" height="30.0"/>
-  <text class="label-halo" x="337.8" y="59.3">1/2 in end mill, two passes along the jaws</text>
-  <line class="datum" x1="256.2" y1="92.3" x2="272.2" y2="92.3"/>
-  <text class="datum-label" x="252.2" y="96.3" text-anchor="end">Z {{cad.top_face_height_mm:in.3dot}}</text>
-  <text class="label" x="470.0" y="250.0">T down on the 1 in parallels; Z0 their top.</text>
-  <text class="label" x="470.0" y="268.0">Levels of {{process.face_step_max_mm:in.3dot}} max down to</text>
-  <text class="label" x="470.0" y="286.0">the height {{cad.top_face_height_min_in:.3dot}}–{{cad.top_face_height_max_in:.3dot}}.</text>
-  <text class="label" x="470.0" y="304.0">The faced end is B: the tap goes in it.</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 520" width="760" height="520" font-family="sans-serif" font-size="13">
+  <!-- Hand picture, to scale at 4 px/mm from the blank's 3/8 in (9.525 mm) thickness. 1/2 in end mill Ø12.7 mm (face_cutter_dia_mm, shop endmill-carbide-3fl-1-2), its square end drawn as the near half of its end face (an arc 12 % of its diameter deep, its lowest point the true end), drawn 1 in out to a break line (half_mill_projection_min_mm 25.4 is a least stick-out; the collet is not drawn). Drawn at PF02's last level, Z40.132 (the height 1.580), on its second pass, Y1.088 (the first, at Y6.100, hangs over the fixed jaw); hatched: the levels from the longest blank's 43.942 (upright_top_max_mm). The vise jaws' thickness and the parallels' length are not on record: schematic. Jaw height 44.9453 mm (vise_jaw_height_mm). -->
+  <rect class="paper" x="0" y="0" width="760" height="520"/>
+  <text class="title" x="20" y="24">PF02, across the jaws, to scale (4 px/mm): T down, the bottom end B faced to the height</text>
+  <rect class="fixture-vise" x="190.95" y="495" width="218.1" height="14"/>
+  <rect class="clamp" x="190.95" y="315.22" width="90" height="179.78"/>
+  <rect class="clamp" x="319.05" y="315.22" width="90" height="179.78"/>
+  <rect class="fixture-support" x="280.95" y="393.4" width="12.7" height="101.6"/>
+  <rect class="fixture-support" x="306.35" y="393.4" width="12.7" height="101.6"/>
+  <rect class="part-kept" x="280.95" y="232.87" width="38.1" height="160.53"/>
+  <text class="label-on-clamp" x="235.95" y="335.22" text-anchor="middle">moving jaw</text>
+  <text class="label-on-clamp" x="364.05" y="335.22" text-anchor="middle">fixed jaw</text>
+  <rect class="part-removed" x="280.95" y="217.63" width="38.1" height="15.24"/>
+  <path class="cutter" d="M329.75 226.78L329.75 131.27L325.52 134.27L321.29 131.27L317.05 134.27L312.82 131.27L308.59 134.27L304.35 131.27L300.12 134.27L295.89 131.27L291.65 134.27L287.42 131.27L283.19 134.27L278.95 131.27L278.95 226.78A25.4 6.1 0 0 0 329.75 226.78Z"/>
+  <line class="centre-line" x1="300" y1="40" x2="300" y2="515"/>
+  <line class="datum" x1="240.95" y1="393.4" x2="276.95" y2="393.4"/>
+  <text class="datum-label" x="236.95" y="398.4" text-anchor="end">Z0 the parallels' top (T)</text>
+  <line class="datum" x1="240.95" y1="232.87" x2="276.95" y2="232.87"/>
+  <text class="datum-label" x="236.95" y="237.87" text-anchor="end">Z 1.580</text>
+  <text class="label" x="420" y="142.87">1/2 in end mill at the last level,</text>
+  <text class="label" x="420" y="158.87">second pass, along X (into the page)</text>
+  <line class="leader" x1="440" y1="170.87" x2="329.75" y2="182.87"/>
+  <circle class="leader-dot" cx="329.75" cy="182.87" r="2"/>
+  <text class="label" x="470" y="230">T down on the 1 in parallels.</text>
+  <text class="label" x="470" y="246">Levels of .050 max down to</text>
+  <text class="label" x="470" y="262">the height 1.570-1.590.</text>
+  <text class="label" x="470" y="278">The faced end is B: the tap goes in it.</text>
+  <text class="label" x="470" y="380">1 in parallel against each jaw</text>
+  <line class="leader" x1="468" y1="376" x2="312.7" y2="455"/>
+  <circle class="leader-dot" cx="312.7" cy="455" r="2"/>
 </svg>

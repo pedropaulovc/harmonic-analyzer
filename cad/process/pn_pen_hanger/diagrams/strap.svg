@@ -1,33 +1,58 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 369" font-family="sans-serif" font-size="13">
-  <rect class="paper" x="0" y="0" width="760" height="369"/>
-  <text class="title" x="20" y="20">Setup 2 (plan view): PH01, the strap on 14 tabs in its blank, back face up</text>
-  <rect class="clamp" x="74.4" y="47.6" width="571.2" height="32.4"/>
-  <rect class="clamp" x="74.4" y="217.2" width="571.2" height="32.4"/>
-  <rect class="part-rest" x="40.0" y="80.0" width="640.1" height="137.2"/>
-  <path class="part-kept" d="M 68.8 130.7 L 68.8 188.4 L 652.2 152.7 L 652.2 108.8 Z"/>
-  <rect class="part-rest" x="85.8" y="184.6" width="9.1" height="10.6"/>
-  <rect class="part-rest" x="175.8" y="179.1" width="9.1" height="10.6"/>
-  <rect class="part-rest" x="265.8" y="173.6" width="9.1" height="10.6"/>
-  <rect class="part-rest" x="355.8" y="168.1" width="9.1" height="10.6"/>
-  <rect class="part-rest" x="445.8" y="162.6" width="9.1" height="10.6"/>
-  <rect class="part-rest" x="535.8" y="157.1" width="9.1" height="10.6"/>
-  <rect class="part-rest" x="622.2" y="151.8" width="9.1" height="10.6"/>
-  <rect class="part-rest" x="85.8" y="122.0" width="9.1" height="10.1"/>
-  <rect class="part-rest" x="175.8" y="118.6" width="9.1" height="10.1"/>
-  <rect class="part-rest" x="265.8" y="115.3" width="9.1" height="10.1"/>
-  <rect class="part-rest" x="355.8" y="111.9" width="9.1" height="10.1"/>
-  <rect class="part-rest" x="445.8" y="108.5" width="9.1" height="10.1"/>
-  <rect class="part-rest" x="535.8" y="105.1" width="9.1" height="10.1"/>
-  <rect class="part-rest" x="622.2" y="101.9" width="9.1" height="10.1"/>
-  <rect class="fixture-support" x="49.1" y="84.6" width="548.6" height="128.0" fill="none" stroke-dasharray="6 4"/>
-  <circle class="holes" cx="86.8" cy="155.2" r="8.2"/>
-  <line class="leader" x1="86.8" y1="279.6" x2="86.8" y2="155.2"/>
-  <text class="label" x="76.8" y="294.6">#15 screw hole</text>
-  <text class="label" x="256.0" y="41.6">fixed jaw (Y0); the strap's outer edge toward it</text>
-  <text class="label" x="256.0" y="265.6">moving jaw</text>
-  <line class="leader" x1="601.6" y1="188.0" x2="580.0" y2="281.6"/>
-  <text class="label" x="464.8" y="294.6">spoil plate ends (dashed)</text>
-  <text class="label" x="20.0" y="319.6">X0 the blank's left end; the strap's top end .315 in from it, its foot to the right. Tabs: the small</text>
-  <text class="label" x="20.0" y="335.6">frame-shaded bridges on both long edges (seven each), sawn off in Setup 4.</text>
-  <text class="label" x="20" y="357">Spoil plate under the top end and the hole, its left end .05–.15 inside the blank's; the foot is cut over air.</text>
-</svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 660" width="760" height="660" font-family="sans-serif" font-size="13">
+  <!-- Hand picture, plan and section to scale at 3.6 px/mm from the 7.0 in blank. #15 drill Ø4.572 mm (the plan's milling_cuts cutter_dia_mm, shop drill-15), 118° point, its full diameter .020 (drill_past_mm) into the spoil plate, at X13 Y-20.895 (PH01); drawn 1.00 in out (its least stick-out) to a break line, the chuck not drawn (no size on record). The #1 centre drill's spot before it is not drawn (the drill stands for it). Parallels 1 in (parallel_height_mm), the spoil plate 1/2 x 1.40 (spoil_plate_thickness_mm, spoil_plate_width_mm), jaw height 44.9453 mm (vise_jaw_height_mm); the jaws' thickness and the parallels' length are not on record: schematic. -->
+  <rect class="paper" x="0" y="0" width="760" height="660"/>
+  <text class="title" x="20" y="24">Setup 2 (plan view): PH01, the #15 drill in the screw hole, to scale (3.6 px/mm)</text>
+  <rect class="clamp" x="74.4" y="47.6" width="571.2" height="32.4"/>
+  <rect class="clamp" x="74.4" y="217.2" width="571.2" height="32.4"/>
+  <rect class="part-rest" x="40.0" y="80.0" width="640.1" height="137.2"/>
+  <path class="part-kept" d="M 68.8 130.7 L 68.8 188.4 L 652.2 152.7 L 652.2 108.8 Z"/>
+  <rect class="part-rest" x="85.8" y="184.6" width="9.1" height="10.6"/>
+  <rect class="part-rest" x="175.8" y="179.1" width="9.1" height="10.6"/>
+  <rect class="part-rest" x="265.8" y="173.6" width="9.1" height="10.6"/>
+  <rect class="part-rest" x="355.8" y="168.1" width="9.1" height="10.6"/>
+  <rect class="part-rest" x="445.8" y="162.6" width="9.1" height="10.6"/>
+  <rect class="part-rest" x="535.8" y="157.1" width="9.1" height="10.6"/>
+  <rect class="part-rest" x="622.2" y="151.8" width="9.1" height="10.6"/>
+  <rect class="part-rest" x="85.8" y="122.0" width="9.1" height="10.1"/>
+  <rect class="part-rest" x="175.8" y="118.6" width="9.1" height="10.1"/>
+  <rect class="part-rest" x="265.8" y="115.3" width="9.1" height="10.1"/>
+  <rect class="part-rest" x="355.8" y="111.9" width="9.1" height="10.1"/>
+  <rect class="part-rest" x="445.8" y="108.5" width="9.1" height="10.1"/>
+  <rect class="part-rest" x="535.8" y="105.1" width="9.1" height="10.1"/>
+  <rect class="part-rest" x="622.2" y="101.9" width="9.1" height="10.1"/>
+  <circle class="holes" cx="86.8" cy="155.2" r="8.2"/>
+  <text class="label" x="256.0" y="41.6">fixed jaw (Y0); the strap's outer edge toward it</text>
+  <text class="label" x="256.0" y="265.6">moving jaw</text>
+  <rect class="hidden" x="49.1" y="84.6" width="548.6" height="128"/>
+  <circle class="cutter" cx="86.8" cy="155.22" r="8.23"/>
+  <text class="label" x="20" y="285">#15 drill in the screw hole (after the centre drill's spot)</text>
+  <line class="leader" x1="80" y1="276" x2="86.8" y2="163.22"/>
+  <circle class="leader-dot" cx="86.8" cy="163.22" r="2"/>
+  <text class="label" x="470" y="285">spoil plate under the blank (dashed)</text>
+  <line class="leader" x1="580" y1="276" x2="590" y2="210"/>
+  <circle class="leader-dot" cx="590" cy="210" r="2"/>
+  <rect class="fixture-vise" x="200" y="565" width="237.16" height="12"/>
+  <rect class="clamp" x="200" y="403.2" width="50" height="161.8"/>
+  <rect class="clamp" x="387.16" y="403.2" width="50" height="161.8"/>
+  <rect class="fixture-support" x="250" y="473.56" width="11.43" height="91.44"/>
+  <rect class="fixture-support" x="375.73" y="473.56" width="11.43" height="91.44"/>
+  <rect class="fixture-plate" x="254.57" y="427.84" width="128.02" height="45.72"/>
+  <rect class="part-rest" x="250" y="416.41" width="137.16" height="11.43"/>
+  <rect class="part-removed" x="303.71" y="416.41" width="16.46" height="11.43"/>
+  <path class="cutter" d="M320.17 324.97L320.17 429.64L311.94 434.59L303.71 429.64L303.71 324.97L307.82 321.97L311.94 324.97L316.05 321.97Z"/>
+  <line class="datum" x1="160" y1="427.84" x2="196" y2="427.84"/>
+  <text class="datum-label" x="156" y="432.84" text-anchor="end">Z0</text>
+  <text class="title" x="200" y="312.97">Across the jaws at X13, fixed jaw at the right</text>
+  <text class="label" x="449.16" y="519.28">1 in parallel against</text>
+  <text class="label" x="449.16" y="535.28">each jaw</text>
+  <line class="leader" x1="447.16" y1="515.28" x2="381.44" y2="529.28"/>
+  <circle class="leader-dot" cx="381.44" cy="529.28" r="2"/>
+  <text class="label" x="449.16" y="442.7">the spoil plate, 1.40 wide</text>
+  <line class="leader" x1="447.16" y1="438.7" x2="372.76" y2="450.7"/>
+  <circle class="leader-dot" cx="372.76" cy="450.7" r="2"/>
+  <text class="label-on-clamp" x="412.16" y="417.2" text-anchor="middle">fixed</text>
+  <text class="label-on-clamp" x="225" y="417.2" text-anchor="middle">moving</text>
+  <text class="label" x="20" y="604">X0 the blank's left end; the strap's top end .315 in from it, its foot to the right. Tabs: the small</text>
+  <text class="label" x="20" y="620">frame-shaded bridges on both long edges (seven each), sawn off in Setup 4.</text>
+  <text class="label" x="20" y="636">Spoil plate under the top end and the hole, its left end .05–.15 inside the blank's; the foot is cut over air.</text>
+</svg>

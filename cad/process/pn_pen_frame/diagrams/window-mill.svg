@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 820 480" width="820" height="480" font-family="sans-serif" font-size="13">
+  <!-- Hand picture, both views to scale at 5 px/mm from the blank's width (.990, 25.146 mm). 1/8 in end mill Ø3.175 mm (window_cutter_dia_mm, shop endmill-carbide-3fl-1-8), its square end drawn as the near half of its end face (arc 12 % of its diameter deep, lowest point the true end), drawn .625 in out (eighth_mill_projection_min_mm 15.875, a least stick-out) to a break line. Shown at its plunge, X4.966 Y-20.066 (the slot's path at the left wall), at the last level, Z-0.508 (window_run_past_mm), the same place in both views; the slot runs clockwise round the window. Stacks .24 from the window's walls (the side rails .13 thick, the end rails .24). The vise jaws' thickness and the parallels' length are not on record: schematic. Jaw height 44.9453 mm (vise_jaw_height_mm). -->
+  <rect class="paper" x="0" y="0" width="820" height="480"/>
+  <text class="title" x="20" y="24">PF06, M6 T2: the 1/8 in end mill plunges at the window's left wall, to scale (5 px/mm)</text>
+  <path class="clamp" d="M50 114L295.73 114L298.73 118L295.73 122L298.73 126L295.73 130L50 130Z"/>
+  <text class="label-on-clamp" x="172.87" y="126" text-anchor="middle">fixed jaw</text>
+  <path class="clamp" d="M50 330.66L295.73 330.66L298.73 334.66L295.73 338.66L298.73 342.66L295.73 346.66L50 346.66Z"/>
+  <text class="label-on-clamp" x="172.87" y="342.66" text-anchor="middle">moving jaw</text>
+  <path class="fixture-support" d="M65 130L280.73 130L283.73 133.97L280.73 137.94L283.73 141.91L280.73 145.88L65 145.88Z"/>
+  <path class="fixture-support" d="M65 314.78L280.73 314.78L283.73 318.75L280.73 322.72L283.73 326.69L280.73 330.66L65 330.66Z"/>
+  <rect class="part-kept" x="110" y="130" width="125.73" height="200.66"/>
+  <rect class="part-removed" x="126.51" y="160.48" width="93.98" height="139.7"/>
+  <circle class="cutter" cx="134.83" cy="230.33" r="7.94"/>
+  <text class="title" x="100" y="78">Plan, fixed jaw at the top</text>
+  <line class="datum" x1="110" y1="104" x2="110" y2="144"/>
+  <text class="datum-label" x="46" y="128" text-anchor="end">X0 Y0</text>
+  <rect class="fixture-vise" x="410" y="440" width="280.66" height="14"/>
+  <rect class="clamp" x="410" y="215.27" width="40" height="224.73"/>
+  <rect class="clamp" x="650.66" y="215.27" width="40" height="224.73"/>
+  <rect class="fixture-support" x="450" y="249.5" width="15.88" height="190.5"/>
+  <rect class="fixture-support" x="634.79" y="249.5" width="15.88" height="190.5"/>
+  <rect class="part-kept" x="450" y="210.13" width="200.66" height="39.37"/>
+  <rect class="part-removed" x="480.48" y="210.13" width="139.7" height="41.91"/>
+  <path class="cutter" d="M558.27 250.13L558.27 172.66L554.3 175.66L550.33 172.66L546.36 175.66L542.39 172.66L542.39 250.13A7.94 1.91 0 0 0 558.27 250.13Z"/>
+  <line class="datum" x1="690.66" y1="249.5" x2="720.66" y2="249.5"/>
+  <text class="datum-label" x="724.66" y="254.5">Z0 the</text>
+  <text class="datum-label" x="724.66" y="270.5">stacks' top</text>
+  <path class="leader" d="M134.8 230.3L134.8 168.8L212.2 168.8L212.2 291.9L134.8 291.9L134.8 237.5"/>
+  <line class="arrow" x1="212.17" y1="230" x2="212.17" y2="260"/>
+  <text class="title" x="440" y="52">Across the jaws (fixed jaw at the right)</text>
+  <text class="label" x="40" y="380">T to the fixed jaw. The slot round the window, clockwise,</text>
+  <text class="label" x="40" y="396">.003 inside its walls, in levels to .020 below BK; then</text>
+  <text class="label" x="40" y="412">the finish pass. The slug drops onto the bed between</text>
+  <text class="label" x="40" y="428">the stacks.</text>
+  <text class="label" x="450" y="472">stacks under the ends, .24 from the window's walls</text>
+</svg>

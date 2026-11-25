@@ -1,26 +1,29 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 460" font-family="sans-serif" font-size="13">
-  <rect class="paper" x="0" y="0" width="760" height="460"/>
-  <text class="title" x="20" y="22">VB01: section across the jaws (5 px/mm), the blank upright, a sawn end up</text>
-  <!-- Vise jaws: moving at the left, fixed at the right; their tops 44.9 mm above the bed. -->
-  <rect class="clamp" x="252" y="215" width="80.5" height="225"/>
-  <rect class="clamp" x="427.5" y="215" width="80.5" height="225"/>
-  <!-- 1 in parallels, 1/8 in thick. -->
-  <rect class="fixture-support" x="332.5" y="313" width="16" height="127"/>
-  <rect class="fixture-support" x="411.5" y="313" width="16" height="127"/>
-  <line class="fixture-table" x1="220" y1="440" x2="540" y2="440"/>
-  <!-- The blank, 3/4 across the jaws, up to 1.15 long; the .020 skim off its top. -->
-  <rect class="part-kept" x="332.5" y="169.5" width="95" height="143.5"/>
-  <rect class="part-removed" x="332.5" y="167" width="95" height="2.5"/>
-  <!-- The 1/2 in end mill, its passes along X (into the page). -->
-  <rect class="cutter" x="348.25" y="80" width="63.5" height="87"/>
-  <line class="datum" x1="300" y1="169.5" x2="460" y2="169.5"/>
-  <text class="datum-label" x="466" y="173">Z0: the faced end P, {{process.end_skim_mm:in.3dot}} off the high point</text>
-  <line class="centre-line" x1="380" y1="60" x2="380" y2="450"/>
-  <text class="datum-label" x="386" y="70">X0 Y0 the blank's axis</text>
-  <line class="leader" x1="520" y1="380" x2="428" y2="380"/>
-  <text class="label" x="524" y="384">1 in parallels, one against each jaw</text>
-  <text class="label" x="524" y="230">fixed jaw: TOP face</text>
-  <text class="label" x="40" y="230">moving jaw</text>
-  <text class="label" x="524" y="290">{{process.upright_grip_mm:in.2dot}} of the blank in the jaws</text>
-  <text class="label-halo" x="30" y="60">1/2 in end mill, passes along X (into the page)</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 470" width="760" height="470" font-family="sans-serif" font-size="13">
+  <!-- Hand picture, to scale at 5 px/mm from the bar's 3/4 in (19.05 mm) thickness. 1/2 in end mill Ø12.7 mm (face_cutter_dia_mm, shop endmill-carbide-3fl-1-2), its square end drawn as the near half of its end face (arc 12 % of its diameter deep, its lowest point the true end), drawn 1 in out (half_mill_projection_min_mm, a least stick-out) to a break line; the collet not drawn. Shown on the pass at Y1.213 (the files' first pass, Y10.987, hangs over the fixed jaw), into the page; the longest blank, 1.15 in (blank_x_max_in), .020 off (end_skim_mm). The 1 in parallels (parallel_height_mm, parallel_thickness_mm). The vise jaws' thickness and the parallels' length are not on record: schematic. Jaw height 44.9453 mm (vise_jaw_height_mm). -->
+  <rect class="paper" x="0" y="0" width="760" height="470"/>
+  <text class="title" x="20" y="24">VB01, across the jaws, to scale (5 px/mm): the paper end P faced, a middle pass</text>
+  <rect class="fixture-vise" x="162.38" y="450" width="275.25" height="14"/>
+  <rect class="clamp" x="162.38" y="225.27" width="90" height="224.73"/>
+  <rect class="clamp" x="347.62" y="225.27" width="90" height="224.73"/>
+  <rect class="fixture-support" x="252.38" y="323" width="15.88" height="127"/>
+  <rect class="fixture-support" x="331.75" y="323" width="15.88" height="127"/>
+  <rect class="part-kept" x="252.38" y="176.95" width="95.25" height="146.05"/>
+  <text class="label-on-clamp" x="207.38" y="245.27" text-anchor="middle">moving jaw</text>
+  <text class="label-on-clamp" x="392.62" y="245.27" text-anchor="middle">fixed jaw</text>
+  <rect class="part-removed" x="252.38" y="176.95" width="95.25" height="2.54"/>
+  <path class="cutter" d="M337.81 171.87L337.81 52.49L333.85 55.49L329.88 52.49L325.91 55.49L321.94 52.49L317.97 55.49L314 52.49L310.03 55.49L306.06 52.49L302.1 55.49L298.13 52.49L294.16 55.49L290.19 52.49L286.22 55.49L282.25 52.49L278.28 55.49L274.31 52.49L274.31 171.87A31.75 7.62 0 0 0 337.81 171.87Z"/>
+  <line class="centre-line" x1="300" y1="40" x2="300" y2="468"/>
+  <line class="datum" x1="202.38" y1="179.49" x2="248.38" y2="179.49"/>
+  <text class="datum-label" x="198.38" y="184.49" text-anchor="end">Z0: the faced end P, .020 off</text>
+  <text class="datum-label" x="294" y="50" text-anchor="end">X0 Y0 the blank's axis</text>
+  <text class="label" x="470" y="79.49">1/2 in end mill on a middle pass,</text>
+  <text class="label" x="470" y="95.49">along X (into the page)</text>
+  <line class="leader" x1="468" y1="83.49" x2="337.81" y2="119.49"/>
+  <circle class="leader-dot" cx="337.81" cy="119.49" r="2"/>
+  <text class="label" x="470" y="250">Upright on two 1 in parallels, gripped</text>
+  <text class="label" x="470" y="266">on its wide faces, TOP at the fixed jaw;</text>
+  <text class="label" x="470" y="282">the 1-1/4 width along the jaws.</text>
+  <text class="label" x="470" y="390">1 in parallel against each jaw</text>
+  <line class="leader" x1="468" y1="386" x2="339.69" y2="410"/>
+  <circle class="leader-dot" cx="339.69" cy="410" r="2"/>
 </svg>
