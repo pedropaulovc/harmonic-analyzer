@@ -321,7 +321,7 @@ machine_kind = "other"
 title = "Saw the slice"
 machine = "Saw / bench"
 indexing = "none"
-diagram = { file = "diagrams/saw.svg", alt = "The 3/4 × 1-1/4 in brass bar lying on its wide face in the saw, gripped across its width in the saw's vise; the blade, as wide as its .125 kerf, cuts one slice {{process.blank_z_min_mm:in.2dot}}–{{process.blank_z_max_mm:in.2dot}} in thick off its end." }
+diagram = { file = "diagrams/saw.svg", alt = "The 3/4 × 1-1/4 in brass bar lying on its wide face in the saw, gripped across its width in the saw's vise; the blade, as wide as its {{process.kerf_in:.3dot}} kerf, cuts one slice {{process.blank_z_min_mm:in.2dot}}–{{process.blank_z_max_mm:in.2dot}} in thick off its end." }
 envelope = "other"
 vise_hold = "other"
 beam = "other"
@@ -664,7 +664,7 @@ gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.roof_chamfer_1_size_band_
 milling_cuts = [
   { name = "locating chamfer", kind = "side", phase = "finish", cutter_dia_mm = 6.35, axial_doc_mm = "{{process.chamfer_tip_depth_mm}}", radial_woc_mm = "{{process.chamfer_tip_depth_mm}}", stations_mm = "{{process.far_top_mm}}" },
 ]
-diagram = { file = "diagrams/chamfer-locating.svg", alt = "From the front: the 90° chamfer mill, to scale, its point .010 outside the top face and .050 below the locating end, cutting the roof's corner in one pass across the jaws, above the moving jaw." }
+diagram = { file = "diagrams/chamfer-locating.svg", alt = "From the front: the 90° chamfer mill, to scale, its point {{process.chamfer_offset_mm:in.3dot}} outside the top face and {{process.chamfer_tip_depth_mm:in.3dot}} below the locating end, cutting the roof's corner in one pass across the jaws, above the moving jaw." }
 
 [[setups]]
 machine_kind = "other"

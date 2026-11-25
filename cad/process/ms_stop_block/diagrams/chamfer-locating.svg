@@ -17,7 +17,7 @@
   <line class="leader" x1="416" y1="176" x2="260" y2="160"/>
   <text class="label" x="420" y="210">chamfer {{cad.roof_chamfer_1_size_in:.2dot}} × 45°</text>
   <line class="leader" x1="416" y1="206" x2="203" y2="163"/>
-  <text class="label" x="16.0" y="370.0">From the front: the chamfer mill's axis .010 outside the top face, its point .050 below the end;</text>
+  <text class="label" x="16.0" y="370.0">From the front: the chamfer mill's axis {{process.chamfer_offset_mm:in.3dot}} outside the top face, its point {{process.chamfer_tip_depth_mm:in.3dot}} below the end;</text>
   <text class="label" x="16.0" y="388.0">the point passes over both jaws at the pass's ends, 5.73 mm (.226) above their tops.</text>
   <text class="label" x="16.0" y="406.0">The back face is on the fixed jaw (behind), the mating face on the moving jaw.</text>
 </svg>

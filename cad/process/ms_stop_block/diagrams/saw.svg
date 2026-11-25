@@ -15,7 +15,7 @@
   <line class="dims" x1="40.0" y1="282.0" x2="40.0" y2="298.0"/>
   <line class="dims" x1="115.0" y1="282.0" x2="115.0" y2="298.0"/>
   <text class="label" x="40.0" y="312.0">{{process.blank_z_min_mm:in.2dot}}–{{process.blank_z_max_mm:in.2dot}} slice</text>
-  <text class="label" x="134.0" y="66.0">saw blade, .125 kerf</text>
+  <text class="label" x="134.0" y="66.0">saw blade, {{process.kerf_in:.3dot}} kerf</text>
   <text class="label" x="300.0" y="190.0">rest of the bar (MHA-PN-05 draws on it)</text>
   <text class="label" x="46.0" y="128.0">end L</text>
   <line class="dims" x1="30.0" y1="110.0" x2="30.0" y2="268.8"/>
