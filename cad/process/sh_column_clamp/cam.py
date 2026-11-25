@@ -1884,3 +1884,72 @@ def build(ctx: dict[str, Any], rt: Any) -> dict[str, Any]:
     ops.update(ctx["manual"])
     rt.generate(doc)
     return {"ops": ops}
+
+
+# The as-machined report (``cad/scripts/_as_machined.py``) only reports: it
+# never fails the task. "gate" would fail it on a difference over the noise
+# line or a rapid that cuts.
+AS_MACHINED_MODE = "report"
+
+
+def as_machined(ctx: dict[str, Any], inputs: Any) -> dict[str, Any]:
+    """What the as-machined report needs: each half's sawn blank (CC01's
+    stock box, the raw top at +skim, the sawn length below it at the plan's
+    band and its middle) and its route. A half runs the shared CC programs
+    in its own frames, then its own; the bolted pair (CB09) is posted in the
+    back's ``pair`` frame, where the front sits at its own model coordinates
+    (mating face on model X0, N ends and B faces flush, the bore on both
+    axes), which both exports must show. CB10 runs only when the gauge reads
+    the bore small, so the route leaves it out."""
+    halves = {
+        "front": _front_context(
+            inputs.features["front"], inputs.plan["front"], inputs.shop, inputs.steps["front"]
+        ),
+        "back": _back_context(
+            inputs.features["back"], inputs.plan["back"], inputs.shop, inputs.steps["back"]
+        ),
+    }
+    front, back = (inputs.features[h]["features"] for h in ("front", "back"))
+    same = (
+        math.isclose(front["near_side"]["plane"]["value"], back["near_side"]["plane"]["value"], abs_tol=1e-6)
+        and math.isclose(front["bottom_face"]["plane"]["value"], back["bottom_face"]["plane"]["value"], abs_tol=1e-6)
+        and front["mating_face"]["plane"]["value"] == 0.0
+        and front["bore"]["at"] == back["bore"]["at"]
+    )
+    if not same:
+        raise ValueError("the front is not at the back's model coordinates in the pair")
+    p = inputs.plan["front"]["parameters"]
+    lengths = {
+        "nominal": (p["blank_length_min_in"] + p["blank_length_max_in"]) / 2 * IN,
+        "min": p["blank_length_min_in"] * IN,
+        "max": p["blank_length_max_in"] * IN,
+    }
+    parts = {}
+    for half, own in halves.items():
+        frame_of = {op[0]: job["frame"] for job in own["jobs"] for op in job["ops"]}
+        route = []
+        for name, keys in PROGRAMS:
+            if name == "CB10_bore_open":
+                continue
+            flat = [key for item in keys for key in ((item,) if isinstance(item, str) else item)]
+            if name in SHARED:
+                route.append([name, f"{half}.{frame_of[SHARED[name]]}"])
+            elif name == "CB09_pair_bore":
+                route.append([name, "back.pair"])
+            elif all(key.startswith(f"{half}.") for key in flat):
+                found = {frame_of[key.partition(".")[2]] for key in flat if key.partition(".")[2] in frame_of}
+                route.append([name, f"{half}.{found.pop()}" if found else None])
+        stock = next(job["stock"] for job in own["jobs"] if job["ops"][0][0] == "first_end")
+        parts[half] = {
+            "blank": {
+                "frame": f"{half}.first_end",
+                "box": [stock[0], stock[1], [stock[2][1] - lengths["nominal"], stock[2][1]]],
+                "length": {"axis": "z", "keep": "max", "mm": lengths},
+            },
+            "route": route,
+        }
+    return {
+        "parts": parts,
+        "frames": {f"{h}.{key}": f for h, own in halves.items() for key, f in own["frames"].items()},
+        "skip": {"CB10_bore_open": "runs only when the gauge reads the bore small"},
+    }

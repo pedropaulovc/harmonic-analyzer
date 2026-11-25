@@ -492,7 +492,7 @@ that differs from the manifest, or a manifest recording any input other than
 the current one (the feature bundle, `plan.toml`, each shop file, the recipe or
 the runtime: `_cam_programs.cam_inputs`) fails the cut.
 
-A recipe has five parts:
+A recipe has five parts (and the as-machined declaration, below):
 
 - `PROGRAMS`: the file names, each listing its operations, flat (one FreeCAD
   Job, posted as it is) or in sections (one Job per tool and spindle speed,
@@ -554,6 +554,29 @@ caught a spot depth measured from the counterbore floor, a feed height below
 the stock top, a slot cut from the outside and an oversized radial step in the
 first recipe. A failed check removes every output. Fix the recipe, not the
 expectation.
+
+**As-machined report.** After the checks pass and the programs are in place,
+`cam:<stem>` cuts every posted move from the blank with OCC booleans in
+headless FreeCAD (`cad/scripts/_as_machined.py`, `_freecad_as_machined.py`)
+and compares the part those moves leave with the STEP. It writes
+`as_machined.json` beside the programs (per part and per blank length: volume,
+mass, centre-of-gravity offset, the material left over and gouged with each
+region's thickness, the material each program removed, each feed pass that
+removed nothing and each rapid that removed material), `as_machined.png` when
+a region is thicker than the noise line (`_as_machined.NOISE_MM`, 0.075 mm),
+and `as_machined.log`. These are not task outputs: no release ships them.
+The recipe declares what the report needs in `as_machined(ctx, inputs)`
+(`inputs` holds what `context` was given): the blank (a box or a bar
+section in one setup frame, at the plan's nominal length and at both limits
+of its band), and, only where the default is wrong, the route (default:
+each program in `PROGRAMS` order in its jobs' frame), the programs that cut
+no part (`skip`, with the reason) and a tool shape the jobs cannot describe.
+`AS_MACHINED_MODE = "report"` never fails the task on the report; `"gate"`
+fails it on a region over the noise line or a rapid that cuts. A recipe the
+report cannot hold says why in `AS_MACHINED_NOT_COVERED`; one that declares
+nothing is reported not covered, never skipped. The worked example is the
+column clamp family's `cam.py`. The seeded-fault controls are
+`cad/scripts/test_as_machined_freecad.py` (outside the gates: it runs FreeCAD).
 
 Milling speed rules (owner rulings 2026-11-16): "replace fusion with oss
 cam" moved the task from Autodesk Fusion Personal, which posted rapids at
