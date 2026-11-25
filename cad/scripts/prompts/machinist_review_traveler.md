@@ -172,7 +172,9 @@ setup and op or diagram for every finding, and say the fix):
   empty; minor entries alone still mean SHIP.
 - summary: one sentence.
 - blockers: every `contradiction`, `missing` and `unbuildable` finding.
-- over_specification: every `over_specification` finding, one entry each.
-- clarity: every `presentation` finding.
+- over_specification: every `over_specification` and `wasted_work` finding,
+  one entry each.
+- clarity: every `presentation`, `head_layout`, `common_sense` and `picture`
+  finding.
 - minor: every `shortfall` and `polish` finding.
 An empty list is a valid answer for any category. Never pad a category.

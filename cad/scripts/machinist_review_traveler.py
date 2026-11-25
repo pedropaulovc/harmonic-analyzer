@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import re
 import tomllib
+import unicodedata
 from html.parser import HTMLParser
 from pathlib import Path
 from typing import Sequence
@@ -209,10 +210,11 @@ def standing_pointer() -> str:
 
 def standing_converted(traveler_text: str) -> bool:
     """Whether a traveler's printed text carries the standing pointer. Compared
-    with all whitespace removed: a PDF text layer wraps the line and may split
-    a word where the HTML does not."""
+    in Unicode compatibility form (a PDF text layer may print the ligature
+    ``ﬁ`` for ``fi``) with all whitespace removed (it wraps the line and may
+    split a word where the HTML does not)."""
     def squeeze(text: str) -> str:
-        return "".join(text.split())
+        return "".join(unicodedata.normalize("NFKC", text).split())
 
     return squeeze(standing_pointer()) in squeeze(traveler_text)
 

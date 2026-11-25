@@ -116,7 +116,10 @@ and tape bond strength is not gated; judge it under rule T3.
   geometry depends on it).
 - The header states the traveler's default unit (`Inches unless mm`) and any
   job-wide machine state (such as a single spindle belt range or single-piece
-  flow across setups).
+  flow across setups). The shop standing instructions state the unit and the
+  standing machine state for every sheet that points to them (rule T18); such
+  a sheet states only a job-wide state the standing page does not (single-piece
+  flow) or a departure from it.
 
 ### Rule T2 — Every drawing requirement is made and accepted
 
@@ -213,7 +216,10 @@ and tape bond strength is not gated; judge it under rule T3.
 - On the CNC mill, the traveler makes clear how `Z0` ties to `M6` tool-length
   probing on the electronic tool setter, and when `G54` must be picked up or
   re-verified (once per vise/fixture installation, and after any fixture move,
-  controller reset, stall or E-stop). Any tool too wide for the 20 mm tool
+  controller reset, stall or E-stop). The shop standing instructions state the
+  tool-setter tie and the standing re-verify conditions for every sheet that
+  points to them (rule T18); such a sheet states each setup's own pick-up and
+  any departure at its step. Any tool too wide for the 20 mm tool
   setter pad (such as a large fly cutter) or that must never spin (`3D touch
   probe — SPINDLE OFF`) states its touch-off rule explicitly.
 - Whenever a setup claims `G54 unchanged`, every intervening action must leave
@@ -533,8 +539,8 @@ process for a route that works (rule T15).
 ### Rule T20 — Setup pictures show what the setup uses, to scale
 
 Owner 2026-11-25: "work stop does not appear in sketches ; cutter is a wide
-yellow rectangle even for 1/2 in end mills". Each check passes or fails on the
-sheet image (criteria P1–P8, `cad/process/README.md`, Plans):
+yellow rectangle even for 1/2 in end mills". Each check below passes or fails
+on the sheet image:
 
 - **P1 Named holding is drawn.** Every workholding element a setup's
   Holding, Datum or op text names (jaws, parallels or stacks, 1-2-3 block,

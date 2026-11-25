@@ -2841,6 +2841,10 @@ def test_shop_standing_pointer_is_read_from_the_shop() -> None:
     assert pointer.startswith("Shop standing instructions apply")
     assert machinist_review_traveler.standing_converted(f"Head\n{pointer}\nSetup 1")
     assert not machinist_review_traveler.standing_converted("Head\nSetup 1")
+    # A PDF text layer may print "fi" as the ligature U+FB01 (Codjiflo, #3593).
+    ligatured = pointer.replace("fi", "\ufb01").replace("ff", "\ufb00")
+    assert ligatured != pointer
+    assert machinist_review_traveler.standing_converted(f"Head\n{ligatured}\nSetup 1")
 
 
 def test_converted_traveler_prompts_carry_the_standing_page(
