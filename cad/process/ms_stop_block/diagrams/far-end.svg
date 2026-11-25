@@ -1,4 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 420" font-family="sans-serif" font-size="13">
+  <!-- To scale at 4 px/mm (the .485 depth = 48.8 px). The 1/2 in end mill Ø12.7 (milling_cuts "far end") = 50.8 px, on MS07's second pass, Y −5.850 (over the block), its end on the last level, Z 21.336 (the length); at least 1.00 in out of the collet (half_mill_projection_min_mm): drawn short, broken off. Its first pass, Y −12.196, runs over the moving jaw 1.79 mm above its top at this level. The far roof corner is chamfered lying, in Setup 9 (chamfer-far.svg). -->
   <rect class="paper" x="0" y="0" width="760" height="420"/>
   <text class="title" x="16" y="22">Setup 8 (MS07): face the far end to the length</text>
   <rect class="fixture-vise" x="101.6" y="330.0" width="156.8" height="22.0"/>
@@ -11,8 +12,8 @@
   <rect class="part-kept" x="155.6" y="143.1" width="48.8" height="85.3"/>
   <rect class="part-removed" x="155.6" y="122.2" width="48.8" height="20.8"/>
   <line class="active-face" x1="155.6" y1="143.1" x2="204.4" y2="143.1"/>
-  <rect class="cutter" x="145.9" y="80.2" width="50.8" height="40.0"/>
-  <text class="label" x="300.0" y="60.0">1/2 in end mill</text>
+  <path class="cutter" d="M155.6 44 L155.6 137 A25.4 6.1 0 0 0 206.4 137 L206.4 44 L200.1 40 L187.3 48 L174.7 40 L161.9 48 L155.6 44 Z"/>
+  <text class="label" x="300.0" y="60.0">1/2 in end mill; passes along the jaws</text>
   <line class="leader" x1="296.0" y1="56.0" x2="163.6" y2="98.2"/>
   <circle class="leader-dot" cx="163.6" cy="98.2" r="2.5"/>
   <text class="label" x="300.0" y="95.0">FAR END, faced in levels</text>

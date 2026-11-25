@@ -1,4 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 420" font-family="sans-serif" font-size="13">
+  <!-- To scale at 4 px/mm (the bar's 3/4 thickness = 76.2 px). The 1/2 in end mill Ø12.7 (milling_cuts "mating face") = 50.8 px, on MS02_mating's third pass, Y −10.737 (the one wholly over the slice), its end on the last level; at least 1.00 in out of the collet (half_mill_projection_min_mm): drawn short, broken off. -->
   <rect class="paper" x="0" y="0" width="760" height="420"/>
   <text class="title" x="16" y="22">Setup 3 (MS02): face the other sawn face down to the depth</text>
   <rect class="fixture-vise" x="107.9" y="330.0" width="184.2" height="22.0"/>
@@ -11,9 +12,9 @@
   <rect class="part-kept" x="161.9" y="128.8" width="76.2" height="48.8"/>
   <rect class="part-removed" x="161.9" y="116.6" width="76.2" height="12.2"/>
   <line class="active-face" x1="161.9" y1="128.8" x2="238.1" y2="128.8"/>
-  <rect class="cutter" x="150.5" y="70.6" width="50.8" height="44.0"/>
-  <line class="arrow" x1="207.3" y1="90.6" x2="274.1" y2="90.6"/>
-  <text class="label" x="440.0" y="70.0">1/2 in end mill; passes along the jaws</text>
+  <path class="cutter" d="M169.8 44 L169.8 122.7 A25.4 6.1 0 0 0 220.6 122.7 L220.6 44 L214.2 40 L201.5 48 L188.8 40 L176.1 48 L169.8 44 Z"/>
+  <line class="arrow" x1="226" y1="70" x2="266" y2="70"/>
+  <text class="label" x="440.0" y="70.0">1/2 in end mill; passes along the jaws, stepping over →</text>
   <line class="leader" x1="436.0" y1="66.0" x2="171.9" y2="86.6"/>
   <circle class="leader-dot" cx="171.9" cy="86.6" r="2.5"/>
   <text class="label" x="440.0" y="110.0">MATING face, faced in levels</text>

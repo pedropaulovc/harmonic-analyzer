@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Setup 4: the stick on its tape from above, two stretches at 10 px/mm (left X-150..-124, right X-22..0), ticks and numerals as MS03 and MS04 cut them; lower right: the groove in section at 200 px/mm. +X right, +Y up (rear). Hand-drawn; styles: prechips.palette. -->
+<!-- Setup 4: the stick on its tape from above, two stretches at 10 px/mm (left X-150..-124, right X-22..0), ticks and numerals as MS03 and MS04 cut them; lower right: the groove in section at 200 px/mm. +X right, +Y up (rear). T2, the 30° V engraving bit, is drawn at MS03's first tick, the 0 tick, at its full depth: from above its 1/8 in shank (the 1/8 collet the plan names; 2L P-125, shop tools.ms-stick-engraver) Ø3.175 = 31.75 px; in the section its 30° V (included_angle_deg) and .005 flat tip (tip_width_in; 25.4 px) at the tick's depth, .028 (tick_depth_mm), broken off above the face. Hand-drawn; styles: prechips.palette. -->
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 820 450" width="820" height="450" font-family="Arial, Helvetica, sans-serif" font-size="13">
   <text class="title" x="12" y="20">Setup 4: graduations MS03 and numerals MS04 (from above; two stretches of the stick)</text>
   <!-- Fixture bar top under the stick: Y-12.7..0 is 127 px; the stick Y-8.763..-0.762. -->
@@ -58,6 +58,9 @@
   <path class="leader" d="M655.7 190 L648 250"/>
   <text class="label" x="590" y="264">10 tick: X−{{cad.graduations_ten_station_ref_mm:.3f}}</text>
   <text class="label" x="30" y="330">every tick starts off the RULED EDGE</text>
+  <!-- T2 on the 0 tick, half way along it. -->
+  <circle class="cutter" cx="85.7" cy="175" r="15.9"/>
+  <text class="label-halo" x="106" y="220">T2 on the 0 tick (MS03's first)</text>
   <text class="label" x="30" y="346">and runs toward +Y</text>
   <text class="label" x="30" y="370">long ticks {{cad.graduations_full_length_in:.2dot}}, short ticks {{cad.graduations_minor_length_in:.2dot}},</text>
   <text class="label" x="30" y="386">{{cad.graduations_minor_pitch_in:.4dot}} apart</text>
@@ -67,8 +70,11 @@
   <rect class="section" x="400" y="296" width="200" height="150"/>
   <path class="paper" d="M449 296 L551 296 L512.5 438 L487.5 438 Z"/>
   <path class="dims" d="M449 296 L487.5 438 L512.5 438 L551 296"/>
-  <path class="dims" d="M449 290 L449 272 M551 290 L551 272 M449 278 L551 278"/>
-  <text class="label" x="454" y="268">{{process.tick_width_mm:in.3dot}} at the face</text>
+  <path class="dims" d="M449 280 L449 256 M551 280 L551 256 M449 262 L551 262"/>
+  <text class="label" x="454" y="252">{{process.tick_width_mm:in.3dot}} at the face</text>
+  <!-- T2's V in the groove, its flat tip at the tick's depth. -->
+  <path class="cutter" d="M446.6 284 L487.5 438 L512.5 438 L553.4 284 L540 280 L513.3 288 L486.7 280 L460 288 L446.6 284 Z"/>
+  <text class="label" x="560" y="282">T2, the V bit</text>
   <path class="dims" d="M557 296 L622 296 M518 438 L622 438 M614 296 L614 438"/>
   <text class="label" x="626" y="362">{{process.tick_depth_mm:in.3dot}} deep</text>
   <text class="label" x="626" y="378">(numerals {{process.numeral_depth_mm:in.3dot}})</text>

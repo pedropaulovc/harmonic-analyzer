@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 420" font-family="sans-serif" font-size="13">
+  <!-- Setup 7, MS06_locating_end after its M6 T4: the 1/4 in 90° chamfer mill's one pass along the roof's corner. Seen from the front (the operator's side, +Y into the page), to scale at 8 px/mm from the .56 height (113.8 px). The chamfer mill Ø6.35 (milling_cuts "locating chamfer") = 50.8 px, its 90° point (taken as sharp, as the plan does) 0.25 mm outside the top face (X −0.25) and 1.266 mm below the end (chamfer_tip_depth_mm), at Z 25.277 above the parallels; at least .50 in out of its collet (chamfer_projection_min_mm): drawn short, broken off. The moving jaw stands in front of the block up to its top, 19.545 mm above the parallels (upright_grip_mm): the block's lower part, the parallels and the fixed jaw are behind it. -->
+  <rect class="paper" x="0" y="0" width="760" height="420"/>
+  <text class="title" x="16" y="22">Setup 7 (MS06_locating_end, T4): chamfer the roof's corner at the locating end</text>
+  <path class="part-kept" d="M200 216 L200 168.1 L208.1 160 L313.8 160 L313.8 216 Z"/>
+  <path class="part-removed" d="M200 160 L208.1 160 L200 168.1 Z"/>
+  <line class="active-face" x1="200" y1="168.1" x2="208.1" y2="160"/>
+  <path class="clamp" d="M120 216 L400 216 L400 330 L365 326 L295 334 L225 326 L155 334 L120 330 Z"/>
+  <text class="label-on-clamp" x="134" y="242">moving jaw (in front of the block)</text>
+  <path class="cutter" d="M172.6 80 L172.6 144.7 L198 170.1 L223.4 144.7 L223.4 80 L217.1 76 L204.3 84 L191.7 76 L178.9 84 L172.6 80 Z"/>
+  <text class="label" x="232" y="96">1/4 in 90° chamfer mill</text>
+  <text class="label" x="232" y="112">one pass along the corner, along the jaws</text>
+  <line class="datum" x1="200" y1="156" x2="200" y2="216"/>
+  <text class="label" x="420" y="150">TOP face: X0 (left)</text>
+  <line class="leader" x1="416" y1="146" x2="202" y2="188"/>
+  <text class="label" x="420" y="180">LOCATING END up, faced</text>
+  <line class="leader" x1="416" y1="176" x2="260" y2="160"/>
+  <text class="label" x="420" y="210">chamfer {{cad.roof_chamfer_1_size_in:.2dot}} × 45°</text>
+  <line class="leader" x1="416" y1="206" x2="203" y2="163"/>
+  <text class="label" x="16.0" y="370.0">From the front: the chamfer mill's axis .010 outside the top face, its point .050 below the end;</text>
+  <text class="label" x="16.0" y="388.0">the point passes over both jaws at the pass's ends, 5.73 mm (.226) above their tops.</text>
+  <text class="label" x="16.0" y="406.0">The back face is on the fixed jaw (behind), the mating face on the moving jaw.</text>
+</svg>

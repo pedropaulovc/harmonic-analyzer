@@ -149,7 +149,7 @@ machine_kind = "other"
 title = "Blank from the sheet"
 machine = "Bench / saw"
 indexing = "none"
-diagram = { file = "diagrams/blank.svg", alt = "The brass sheet on the surface plate with a {{process.blank_x_in:.2f}} × {{process.blank_y_in:.2f}} in blank scribed off two of its straight edges; the saw cuts outside the lines." }
+diagram = { file = "diagrams/blank.svg", alt = "The brass sheet on the surface plate with a {{process.blank_x_in:.2f}} × {{process.blank_y_in:.2f}} in blank scribed off two of its straight edges; the saw cuts outside the lines; the 1-2-3 block it is scribed against and the saw's vise and scrap boards named, not drawn." }
 envelope = "other"
 vise_hold = "other"
 beam = "other"
@@ -177,7 +177,7 @@ machine_kind = "other"
 title = "File to size; roof chamfers"
 machine = "Bench vise with soft jaws"
 indexing = "none"
-diagram = { file = "diagrams/file.svg", alt = "The plate's outline: the locating end and locating edge filed square first and marked, then the far end to {{cad.far_end_length_in:.2f}} and the roof edge to {{cad.roof_edge_height_in:.2f}}, and the two {{cad.roof_chamfers_size_in:.2f}} × 45° roof chamfers." }
+diagram = { file = "diagrams/file.svg", alt = "The plate's outline: the locating end and locating edge filed square first and marked, then the far end to {{cad.far_end_length_in:.2f}} and the roof edge to {{cad.roof_edge_height_in:.2f}}, and the two {{cad.roof_chamfers_size_in:.2f}} × 45° roof chamfers; the bench vise's soft jaws and the 1-2-3 block named, not drawn." }
 envelope = "other"
 vise_hold = "other"
 beam = "other"
@@ -233,7 +233,7 @@ indexing = "none"
 machine_ref = "pm-30mv"
 holding = "A 1 in parallel against each jaw. The finished MHA-MS-02 block (from its traveler's Setup 11, all but its 2-56 taps) lying on them, its mating face up (the window open upward), its LOCATING END against the FIXED jaw. This plate on it, seating face down, its LOCATING END against the fixed jaw too. Close the jaws lightly across the .84 length, hold a 1-2-3 block against both locating edges and tap the plate until both edges touch it, then tighten. Never grip across the .56 height: it would bend the block's .09 window roof."
 datum = "Program MS01_pair_pilot (cam:ms_stop_plate). G54: X0 the locating edges (RIGHT side), the pair to −X; Y0 the fixed jaw's face (the locating ends), +Y toward it; Z0 the plate's top at its nominal {{cad.outer_face_thickness_in:.3dot}} above the block face. Holes at Y −{{cad.clearance_hole_1_station_in:.3f}} and −{{cad.clearance_hole_2_station_in:.3f}}, X −{{cad.clearance_hole_1_height_in:.3f}}. The file starts with an M6 for the centre drill; tool lengths from the tool setter."
-diagram = { file = "diagrams/pair.svg", alt = "The MHA-MS-02 block mating face up on two 1 in parallels with this plate on it, the two gripped across their length, locating ends on the fixed jaw and locating edges flush against a 1-2-3 block; the centre drill spots and the #49 drills both pilots through the plate into the block." }
+diagram = { file = "diagrams/pair.svg", alt = "The MHA-MS-02 block mating face up on two 1 in parallels with this plate on it, the two gripped across their length, locating ends on the fixed jaw; the #49 drill, to scale, at the end of its feed in the pilot by the locating ends, .300 into the block; the 1-2-3 block that flushed the locating edges is taken away before drilling (not shown)." }
 envelope = { x_span_mm = ["{{cad.envelope_y_mm}}", 5.08], y_span_mm = ["{{cad.envelope_x_mm}}", 5.08], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{process.stack_height_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{process.stack_height_mm}}", "{{process.pilot_tip_height_mm}}"], longest_tool_mm = ["{{process.drill_chuck_gauge_mm}}", "{{process.drill_49_oal_mm}}"], shortest_tool_mm = ["{{process.drill_chuck_gauge_mm}}", "{{process.centre_drill_oal_mm}}"] }
 vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{cad.envelope_x_mm}}", along_jaws_mm = "{{cad.envelope_y_mm}}", part_height_mm = "{{process.stack_height_mm}}", parallel_height_mm = "{{process.parallel_height_mm}}", overhang_mm = ["{{process.vise_inset_mm}}", "rest"], jaw_offset = "centred", fixed_jaw_face = "machined", moving_jaw_face = "machined", moving_jaw_contact = "flat" }
 beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{cad.envelope_y_mm}}"], clamp_mm = [0, "{{cad.envelope_y_mm}}"], section_mm = { y = "{{cad.envelope_x_mm}}", z = "{{process.stack_height_mm}}" }, vise_left = "start" }
@@ -304,7 +304,7 @@ indexing = "none"
 machine_ref = "pm-30mv"
 holding = "As Setup 3, but the plate turned over about its long axis: its seating face UP, its locating end still on the fixed jaw, its locating edge now on the LEFT, flush with the block's roof side: a 1-2-3 block held against both on the left, the plate tapped until both touch it. Its two pilots now stand over the block's open window (.336–.470 above the block's locating edge), so the #41 breaks into air. Look down each pilot before clamping: you see the window, not the block face."
 datum = "Program MS02_open. G54: X0 the plate's locating edge (LEFT side), the plate to +X; Y0 the fixed jaw's face; Z0 the plate's top (its seating face). Holes at Y −{{cad.clearance_hole_1_station_in:.3f}} and −{{cad.clearance_hole_2_station_in:.3f}}, X +{{cad.clearance_hole_1_height_in:.3f}}."
-diagram = { file = "diagrams/open.svg", alt = "The plate turned over on the same block, gripped as before; its two pilots over the block's window; the #41 opens both through into the window." }
+diagram = { file = "diagrams/open.svg", alt = "The plate turned over on the same block, gripped as before; its two pilots over the block's window; the #41 drill, to scale, at the end of its feed in the pilot by the locating ends, its point in the window, clear of the block." }
 envelope = { x_span_mm = ["{{cad.envelope_y_mm}}", 5.08], y_span_mm = ["{{cad.envelope_x_mm}}", 5.08], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{process.stack_height_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{process.stack_height_mm}}", "{{process.open_tip_height_mm}}"], longest_tool_mm = ["{{process.drill_chuck_gauge_mm}}", "{{process.drill_41_oal_mm}}"], shortest_tool_mm = ["{{process.drill_chuck_gauge_mm}}", "{{process.drill_41_oal_mm}}"] }
 vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{cad.envelope_x_mm}}", along_jaws_mm = "{{cad.envelope_y_mm}}", part_height_mm = "{{process.stack_height_mm}}", parallel_height_mm = "{{process.parallel_height_mm}}", overhang_mm = ["{{process.vise_inset_mm}}", "rest"], jaw_offset = "centred", fixed_jaw_face = "machined", moving_jaw_face = "machined", moving_jaw_contact = "flat" }
 beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{cad.envelope_y_mm}}"], clamp_mm = [0, "{{cad.envelope_y_mm}}"], section_mm = { y = "{{cad.envelope_x_mm}}", z = "{{process.stack_height_mm}}" }, vise_left = "start" }

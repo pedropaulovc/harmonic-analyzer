@@ -1,40 +1,52 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Setup 4: the plate turned over about its long axis on the same block, gripped as in Setup 3; left, looking along the plate's length at the block's open window under the pilot; right, the #41 opening a pilot through into the window. Hand-drawn at 200 px/in; styles: prechips.palette. -->
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 360" width="600" height="360" font-family="Arial, Helvetica, sans-serif" font-size="13">
+<!-- Setup 4: the plate turned over about its long axis on the same block, gripped as in Setup 3; the #41 at the end of its feed in the pilot near the locating ends (MS02_open opens it first). Left, across the block at that hole, from the front; right, looking along the jaws. Both to scale at 200 px/in (7.874 px/mm), from the block's .56 height (112 px) on the left and the .84 length (168 px) on the right; jaws and parallels broken off below. #41 Ø2.4384 (the plan's milling_cuts "plate open") = 19.2 px, its 118° point to Z −2.250 (open_tip_height_mm); the drill's length out of the chuck is not on record: broken off. Hand-drawn; styles: prechips.palette. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 400" width="600" height="400" font-family="Arial, Helvetica, sans-serif" font-size="13">
   <text class="title" x="12" y="20">Setup 4: open the holes, MS02_open (plate turned over on the block)</text>
-  <!-- Left: section across the block at a hole, seen from the front (operator); .56 wide (112 px), .48 deep (96 px), 200 px/in. -->
-  <text class="title" x="30" y="40">across the block at a hole, from the front</text>
+  <!-- Left: section across the block at the hole, seen from the front (operator); .56 wide (112 px), .48 deep (96 px). -->
+  <text class="title" x="20" y="40">across the block at the hole, from the front</text>
   <rect class="part-rest" x="60" y="132" width="112" height="96"/>
   <!-- Window: .336-.470 from the block's locating edge (now on the right), open upward, .330 deep (66 px). -->
   <rect class="paper" x="78" y="132" width="27" height="66"/>
   <rect class="hidden" x="78" y="132" width="27" height="66"/>
-  <path class="leader" d="M92 190 L100 260"/>
+  <!-- The block's own #49 pilot from Setup 3, .160 from its locating edge, .300 deep. -->
+  <path class="holes" d="M132.7 132 L147.3 132 L147.3 192 L140 196.4 L132.7 192 Z"/>
+  <path class="leader" d="M92 190 L100 262"/>
   <text class="label" x="30" y="278">MHA-MS-02 window</text>
   <!-- Plate turned over: its locating edge now on the LEFT (X0). -->
   <rect class="part-kept" x="60" y="124" width="112" height="8"/>
-  <!-- Pilot at .160 from the plate's locating edge: centre 32 px in, over the window. -->
-  <rect class="part-removed" x="87" y="124" width="10" height="8"/>
-  <rect class="cutter" x="87" y="64" width="10" height="56"/>
-  <path class="part-removed" d="M87 132 L92 140 L97 132 Z"/>
-  <line class="datum" x1="60" y1="64" x2="60" y2="136"/>
-  <text class="datum-label" x="20" y="58">X0 plate's locating edge</text>
+  <!-- The pilot at .160 from the plate's locating edge, centre 32 px in, over the window, opened to the #41's width. -->
+  <rect class="part-removed" x="82.4" y="124" width="19.2" height="8"/>
+  <path class="cutter" d="M82.4 90 L82.4 135.9 L92 141.7 L101.6 135.9 L101.6 90 L99.2 86 L94.4 94 L89.6 86 L84.8 94 L82.4 90 Z"/>
+  <line class="datum" x1="60" y1="84" x2="60" y2="136"/>
+  <text class="datum-label" x="12" y="78">X0 plate's locating edge</text>
   <line class="datum" x1="172" y1="132" x2="172" y2="228"/>
-  <text class="datum-label" x="130" y="300">block's locating edge</text>
+  <text class="datum-label" x="110" y="300">block's locating edge</text>
   <path class="leader" d="M172 220 L190 288"/>
-  <!-- Right: along the jaws, as Setup 3. -->
-  <text class="title" x="320" y="40">along the jaws (as Setup 3)</text>
-  <rect class="fixture-vise" x="300" y="300" width="280" height="24"/>
-  <rect class="clamp" x="300" y="120" width="40" height="180"/>
-  <rect class="clamp" x="526" y="120" width="54" height="180"/>
-  <rect class="fixture-support" x="340" y="214" width="14" height="86"/>
-  <rect class="fixture-support" x="512" y="214" width="14" height="86"/>
-  <rect class="part-rest" x="340" y="126" width="186" height="88"/>
-  <rect class="part-kept" x="340" y="118" width="186" height="8"/>
-  <rect class="part-removed" x="384" y="118" width="12" height="8"/>
-  <rect class="part-removed" x="490" y="118" width="12" height="8"/>
-  <rect class="cutter" x="490" y="56" width="12" height="58"/>
-  <line class="arrow" x1="478" y1="70" x2="478" y2="110"/>
-  <text class="label" x="380" y="80">#41, set 2800</text>
-  <text class="datum-label" x="346" y="108">Z0 plate top</text>
-  <text class="label" x="300" y="344">the #41 breaks into the window, never into the block</text>
+  <!-- Right: along the jaws, as Setup 3. Jaw tops 6.34 mm (50 px) above the plate's top. -->
+  <text class="title" x="330" y="40">along the jaws (as Setup 3)</text>
+  <path class="clamp" d="M300 100.1 L352 100.1 L352 300 L345.5 296 L332.5 304 L319.5 296 L306.5 304 L300 300 Z"/>
+  <path class="clamp" d="M520 100.1 L580 100.1 L580 300 L572.5 296 L557.5 304 L542.5 296 L527.5 304 L520 300 Z"/>
+  <text class="label-on-clamp" x="304" y="286" font-size="11">moving</text>
+  <text class="label-on-clamp" x="530" y="286" font-size="11">fixed</text>
+  <path class="fixture-support" d="M352 254 L377 254 L377 300 L373.9 297 L367.6 303 L361.4 297 L355.1 303 L352 300 Z"/>
+  <path class="fixture-support" d="M495 254 L520 254 L520 300 L516.9 297 L510.6 303 L504.4 297 L498.1 303 L495 300 Z"/>
+  <path class="leader" d="M365 290 L410 326 M507 290 L470 326"/>
+  <text class="label" x="400" y="340">1 in parallels</text>
+  <rect class="part-rest" x="352" y="158" width="168" height="96"/>
+  <!-- The block's window, open on its mating face, runs end to end under the plate's holes (hidden in this view). -->
+  <rect class="hidden" x="352" y="158" width="168" height="66"/>
+  <rect class="part-kept" x="352" y="150" width="168" height="8"/>
+  <rect class="part-removed" x="480.4" y="150" width="19.2" height="8"/>
+  <rect class="part-removed" x="372.4" y="150" width="19.2" height="8"/>
+  <path class="cutter" d="M480.4 50 L480.4 161.9 L490 167.7 L499.6 161.9 L499.6 50 L497.2 46 L492.4 54 L487.6 46 L482.8 54 L480.4 50 Z"/>
+  <line class="arrow" x1="466" y1="60" x2="466" y2="110"/>
+  <text class="label" x="372" y="76">#41 drill,</text>
+  <text class="label" x="372" y="92">set 2800</text>
+  <line class="datum" x1="520" y1="46" x2="520" y2="100"/>
+  <text class="datum-label" x="526" y="62">Y0</text>
+  <line class="datum" x1="358" y1="122" x2="358" y2="150"/>
+  <text class="datum-label" x="362" y="132">Z0 plate top</text>
+  <text class="label" x="12" y="360">the #41 breaks into the window, never into the block</text>
+  <text class="label" x="12" y="378">plate's and block's locating edges flushed against a 1-2-3 block on the left before</text>
+  <text class="label" x="12" y="394">tightening, then the block taken away (not shown)</text>
 </svg>

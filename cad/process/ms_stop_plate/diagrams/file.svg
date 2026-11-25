@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Setup 2: the plate filed to its outline, seating face up: locating edge and end first, then far end, roof edge and the two roof chamfers. Hand-drawn at 300 px/in; styles: prechips.palette. -->
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 560 330" width="560" height="330" font-family="Arial, Helvetica, sans-serif" font-size="13">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 560 366" width="560" height="366" font-family="Arial, Helvetica, sans-serif" font-size="13">
   <text class="title" x="12" y="20">Setup 2: file to size (outer face up, as the drawing)</text>
   <!-- Blank outline arriving, .90 x .62. -->
   <rect class="part-arriving" x="132" y="74" width="270" height="186"/>
@@ -25,4 +25,7 @@
   <path class="leader" d="M384 96 L460 70"/>
   <text class="label" x="464" y="70">2X {{cad.roof_chamfers_size_in:.2f}} × 45°</text>
   <text class="label" x="40" y="304">1 locating edge straight · 2 locating end square to it</text><text class="label" x="40" y="320">3 far end and roof edge to size · 4 roof chamfers</text>
+  <!-- Holding the setup's text names, not drawn in this outline view: the bench vise's soft jaws (filing) and the 1-2-3 block on the surface plate (scribing). -->
+  <text class="label" x="40" y="342">filed in the bench vise's soft jaws, at most 1/8 above them; scribed with</text>
+  <text class="label" x="40" y="358">the height gauge against a 1-2-3 block on the surface plate (neither shown)</text>
 </svg>
