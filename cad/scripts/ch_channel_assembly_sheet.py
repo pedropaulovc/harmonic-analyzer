@@ -30,10 +30,11 @@ from ch_channel_assembly_spec import (
     KEEPER_X_DIMENSION,
     LUG_SPAN_DIMENSION,
     TIP_PROUD_DIMENSION,
+    TOLERANCE_PRECISION,
     UNIT,
 )
 from ch_keeper_fitup import END_PLAY_MM, REAR_KEEPER_LEAF_MM
-from rocker_bank_layout import END_CLEARANCE_MIN, RUNNING_FLOOR
+from rocker_bank_layout import EAR_INNER_SPAN, END_CLEARANCE_MIN, RUNNING_FLOOR
 from ch_channel_explode_spec import (
     ARM,
     BAR,
@@ -56,6 +57,13 @@ from ch_channel_explode_spec import (
 REFERENCE_DIMENSIONS = frozenset({LUG_SPAN_DIMENSION, KEEPER_REAR_Z_DIMENSION})
 if set(DIMENSION_TOLERANCES) | REFERENCE_DIMENSIONS != set(DIMENSION_FEATURE):
     raise AssertionError("every marked dimension is toleranced or reference")
+# The ear span's upper limit as view D prints it, its nominal plus its band's
+# upper deviation: the right-hub remedy re-sets the right ear outward to it.
+EAR_SPAN_UPPER_TEXT = render_number(
+    (EAR_INNER_SPAN + DIMENSION_TOLERANCES[EAR_SPAN_DIMENSION][1]) / LENGTH_UNITS[UNIT],
+    UNIT,
+    TOLERANCE_PRECISION[EAR_SPAN_DIMENSION],
+)
 
 
 def _screw(thread: str, length_mm: float, kind: str) -> str:

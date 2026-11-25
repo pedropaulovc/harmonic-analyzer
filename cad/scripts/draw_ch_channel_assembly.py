@@ -1085,16 +1085,16 @@ def _fitup_text() -> dict[str, str]:
         # A press whose pin slides in by hand is bonded with LOCTITE 641, not
         # a replaced rod (owner ruling 2026-11-24, fit audit question 3): the
         # pin bond note on the detail sheet says how (one end only, the
-        # compound kept off the arm), and the bond is checked once cured.
-        # One action a step (rule 22): "THAT" ties each later step to the
-        # condition.
+        # compound kept off the arm), and the bond is checked once cured, one
+        # check a step as rod-pins-held and rod-arms-swing are. One action a
+        # step (rule 22): "THAT" ties each later step to the condition.
         "rod-pin-bonded": (
             f"IF AN {pin} SLID IN BY HAND, BOND IT PER THE PIN BOND NOTE "
             f"(SHEET {SHEET_NAMES.index(DETAIL_SHEET) + 1})."
         ),
-        "rod-pin-bond-checked": (
-            f"CURED, CHECK THAT {pin} DOES NOT SLIDE BY HAND AND ITS {arm} "
-            "SWINGS FREE BY ITS OWN WEIGHT."
+        "rod-pin-bond-held": f"CURED, CHECK THAT {pin} DOES NOT SLIDE BY HAND.",
+        "rod-pin-bond-swings": (
+            f"CHECK THAT {arm} SWINGS FREE ON ITS PIN BY ITS OWN WEIGHT."
         ),
         "rod-pin-return": (
             f"RETURN TO STEP {n('rod-pin-bonded')} IF {pin} SLIDES OR {arm} BINDS."
@@ -1182,8 +1182,12 @@ def _fitup_text() -> dict[str, str]:
             f"STEP {n('shaft-drawn-back')}."
         ),
         "right-hub-clamp-eased": f"RIGHT HUB: EASE THE CLAMP ON THE RIGHT {bracket}.",
+        # A right hub that fails sits too near its ear: the re-set moves the
+        # right ear outward, to the span's upper limit as view D prints it.
         "right-hub-return": (
-            f"RIGHT HUB: RETURN TO STEP {n('bare-shaft-through-ears')}."
+            f"RIGHT HUB: RETURN TO STEP {n('bare-shaft-through-ears')}; AT STEP "
+            f"{n('south-bracket-span-set')} SET THE EAR SPAN TO ITS UPPER LIMIT, "
+            f"{notes.EAR_SPAN_UPPER_TEXT}."
         ),
         "south-foot-transferred": (
             f"STILL CLAMPED, TRANSFER-DRILL THE RIGHT {bracket} FOOT HOLE INTO "
@@ -1293,9 +1297,9 @@ def _fitup_text() -> dict[str, str]:
             f"IF AN {bar_pin} SLID IN BY HAND, BOND IT PER THE PIN BOND NOTE "
             f"(SHEET {SHEET_NAMES.index(DETAIL_SHEET) + 1})."
         ),
-        "bar-pin-bond-checked": (
-            f"CURED, CHECK THAT {bar_pin} DOES NOT SLIDE BY HAND AND ITS {bar} "
-            "SWINGS FREE BY ITS OWN WEIGHT."
+        "bar-pin-bond-held": f"CURED, CHECK THAT {bar_pin} DOES NOT SLIDE BY HAND.",
+        "bar-pin-bond-swings": (
+            f"CHECK THAT {bar} SWINGS FREE ON ITS PIN BY ITS OWN WEIGHT."
         ),
         "bar-pin-return": (
             f"RETURN TO STEP {n('bar-pin-bonded')} IF {bar_pin} SLIDES OR {bar} BINDS."

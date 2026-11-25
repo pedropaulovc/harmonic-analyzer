@@ -258,9 +258,21 @@ def test_every_step_is_one_action_of_at_most_six_lines() -> None:
             assert _step_body(key).startswith(f"{side} HUB: "), key
     for prefix in ("rod", "bar"):
         assert _step_body(f"{prefix}-pin-bonded").startswith("IF AN ITEM ")
-        assert _step_body(f"{prefix}-pin-bond-checked").startswith(
+        assert _step_body(f"{prefix}-pin-bond-held").startswith(
             "CURED, CHECK THAT ITEM "
         )
+        assert " AND " not in _step_body(f"{prefix}-pin-bond-held")
+        assert " AND " not in _step_body(f"{prefix}-pin-bond-swings")
+    # #3563: the right-hub remedy says which way the right ear moves: out,
+    # to the span's upper limit as view D prints it (nominal plus band).
+    span_band = drawing.asm.DIMENSION_TOLERANCES[drawing.asm.EAR_SPAN_DIMENSION]
+    upper = (bank.EAR_INNER_SPAN + span_band[1]) / 25.4
+    assert drawing.notes.EAR_SPAN_UPPER_TEXT == f"{upper:.3f}" == "6.099"
+    assert _step_body("right-hub-return") == (
+        f"RIGHT HUB: RETURN TO STEP {steps.step_number('bare-shaft-through-ears')}; "
+        f"AT STEP {steps.step_number('south-bracket-span-set')} SET THE EAR SPAN "
+        "TO ITS UPPER LIMIT, 6.099."
+    )
 
 
 def test_the_steps_name_parts_by_bom_item() -> None:
@@ -345,8 +357,11 @@ def test_the_right_bracket_is_set_to_the_ear_span_and_the_end_hubs_checked() -> 
     )
     nominal = asm.PIVOT_CHAIN_Z[1] - asm.PIVOT_CHAIN_Z[0]
     assert nominal == pytest.approx(bank.EAR_INNER_SPAN)
+    # The steps never restate the nominal (view D prints it); the right-hub
+    # remedy prints only the band's upper limit (#3563), a different number.
     for text in (f"{nominal / 25.4:.3f}", f"{nominal / 25.4:.2f}"):
-        assert text not in drawing.FITUP_STEPS
+        assert not re.search(rf"(?<![\d.]){re.escape(text)}(?![\d])", drawing.FITUP_STEPS)
+    assert drawing.notes.EAR_SPAN_UPPER_TEXT in _step_body("right-hub-return")
     assert asm.DIMENSION_TOLERANCES[asm.EAR_SPAN_DIMENSION] == (
         -bank.EAR_SPAN_BAND,
         bank.EAR_SPAN_BAND,
@@ -1154,14 +1169,15 @@ def test_each_rod_fork_is_pinned_to_its_arm_at_the_bench_first() -> None:
     assert "FLUSH" in _step_body("rod-pins-dressed")
     for word in ("PEEN", "COUNTERSINK", "DRIVE OUT"):
         assert word not in drawing.FITUP_STEPS
-    # Positive control: only the pin steps name the rod pin; only the two
+    # Positive control: only the pin steps name the rod pin (the bond's swing
+    # check, like rod-arms-swing, names the arm on "ITS PIN"); only the two
     # pinning steps press.
     pin_steps = {
         steps.RODS_PINNED_KEY,
         "rod-pins-dressed",
         "rod-pins-held",
         *steps.ROD_PIN_REMEDY,
-    }
+    } - {"rod-pin-bond-swings"}
     pressing = {steps.RODS_PINNED_KEY, steps.BARS_PINNED_KEY}
     pin = drawing.item(drawing.explode.ROD_PIN)
     for key in steps.SEQUENCE:
@@ -1181,9 +1197,15 @@ def test_each_rod_fork_is_pinned_to_its_arm_at_the_bench_first() -> None:
             f"IF AN {drawing.item(host_pin)} SLID IN BY HAND, BOND IT PER THE "
             f"PIN BOND NOTE (SHEET {detail_sheet})."
         )
-        assert _step_body(f"{prefix}-pin-bond-checked") == (
-            f"CURED, CHECK THAT {drawing.item(host_pin)} DOES NOT SLIDE BY HAND "
-            f"AND ITS {drawing.item(mover)} SWINGS FREE BY ITS OWN WEIGHT."
+        # One check a step (#3563), as the main flow's held and swing checks.
+        assert _step_body(f"{prefix}-pin-bond-held") == (
+            f"CURED, CHECK THAT {drawing.item(host_pin)} DOES NOT SLIDE BY HAND."
+        )
+        assert _step_body(f"{prefix}-pin-bond-swings") == (
+            f"CHECK THAT {drawing.item(mover)} SWINGS FREE ON ITS PIN BY ITS OWN WEIGHT."
+        )
+        assert steps.step_number(f"{prefix}-pin-bond-swings") == (
+            steps.step_number(f"{prefix}-pin-bond-held") + 1
         )
         assert _step_body(f"{prefix}-pin-return") == (
             f"RETURN TO STEP {steps.step_number(f'{prefix}-pin-bonded')} IF "

@@ -85,16 +85,19 @@ RIGHT_HUB_REMEDY: tuple[str, ...] = (
 )
 # A pin that slid in by hand is bonded with LOCTITE 641 instead of its rod or
 # bar being replaced (owner ruling 2026-11-24, fit audit question 3), per the
-# sheet's pin bond note; once cured it is checked, and a failed bond goes
-# back to the bond, one action a step (rule 22).
+# sheet's pin bond note; once cured the pin is checked held and its arm or
+# bar free, one check a step as the main flow's two are (rule 22), and a
+# failed bond goes back to the bond.
 ROD_PIN_REMEDY: tuple[str, ...] = (
     "rod-pin-bonded",
-    "rod-pin-bond-checked",
+    "rod-pin-bond-held",
+    "rod-pin-bond-swings",
     "rod-pin-return",
 )
 BAR_PIN_REMEDY: tuple[str, ...] = (
     "bar-pin-bonded",
-    "bar-pin-bond-checked",
+    "bar-pin-bond-held",
+    "bar-pin-bond-swings",
     "bar-pin-return",
 )
 # Each arm's strap is accepted where it works, in its rod's fork: once the
