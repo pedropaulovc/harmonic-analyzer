@@ -9,10 +9,10 @@
 # single limit; the as-cast ±.03 is looser than the title block.
 necessity:
   - id: N-01
-    feature: "section F-F, 2X Ø.1240 +.0005/.0000 REAM (.50), PRESS FIT MHA-SM-VN-53 DOWEL"
+    feature: "section F-F, Ø.1240 2X REAM ↧ (.50), PRESS FIT MHA-SM-VN-53 DOWEL"
     kind: joint
     reason: "press alone holds the locating dowel; no bond or screw"
-    source: "sm_vn_knife_mount_dowel_spec PRESS_INTERFERENCE: .0006-.0013 on the .1251-.1253 dowel (owner ruling 2026-10-24, T+H3; fit audit 2026-11-23 MHA-FR-02.dowel_press_ream, keep)"
+    source: "sm_vn_knife_mount_dowel_spec PRESS_INTERFERENCE: .0006-.0013 on the .1251-.1253 dowel, the .1240 reamer's modelled cut +.0005/0 (REAM_H7, analysis only) (owner ruling 2026-10-24, T+H3; fit audit 2026-11-23 MHA-FR-02.dowel_press_ream, keep)"
   - id: N-02
     feature: "sheet 7, 2° +1°/0° DRAFT on the added-draft faces"
     kind: gap

@@ -280,9 +280,7 @@ from fr_top_frame_spec import (
     HANGER_PIN_HOLE_POINT_H,
     HANGER_PIN_HOLE_POINT_H_MAX,
     HANGER_PIN_HOLE_DIA,
-    HANGER_PIN_HOLE_DIA_BAND,
     HANGER_PIN_HOLE_DIA_MAX,
-    HANGER_PIN_HOLE_DIA_PLACES,
     HANGER_PIN_X,
     HANGER_PIN_X_TOL,
     HANGER_X,
@@ -4953,17 +4951,11 @@ def build(adapter) -> dict[str, str]:
         places=DRAWING_PRECISION["CapRecesses"]["CapRecessDepth"],
         display_unit=UNIT,
     )
-    # Explicit press band on both dowel reams (the dowel spec's
-    # REAM_H7 +.0005/0), printed at the nominal's four places.
-    for pin_dia_name in ("HangerPinHoleDia", "HangerPinHole1Dia"):
-        set_dimension_bilateral_tolerance(
-            adapter,
-            "HangerPinProfile",
-            pin_dia_name,
-            *deviations(HANGER_PIN_HOLE_DIA_BAND),
-            places=HANGER_PIN_HOLE_DIA_PLACES,
-            display_unit=UNIT,
-        )
+    # The dowel reams print the .1240 reamer's size and no band
+    # (drawing-guidelines rule 4, form 3): the bought MHA-SM-VN-53 dowel is
+    # the gauge.  HANGER_PIN_HOLE_DIA_BAND (REAM_H7, what the reamer cuts)
+    # stays the analysis band for the press and the walls, never a printed
+    # limit.
     # The reams' full-diameter depth prints as its single MIN limit (owner
     # decision 2026-11-19, #3124 item 3): the model value is the minimum.
     set_single_limit(

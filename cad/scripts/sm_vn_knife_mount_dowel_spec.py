@@ -134,9 +134,12 @@ HANGER_OFFSET_TOL = _XXX  # 0.127
 # ring), so the knockout stays.
 PRESS_DEPTH = 12.7  # .50 MIN, full diameter
 PRESS_DEPTH_PLACES = 2
-# The ream's explicit band, printed at four places: its mate and press are
-# the callout's (rule 4), the MHA-PD-18 latch-pin precedent.  The owned
-# .1240 chucking reamer (cad/process/shop/inventory.toml) at REAM_H7.
+# The ream prints the owned .1240 chucking reamer's size (cad/process/shop/
+# inventory.toml) at four places and no band (drawing-guidelines rule 4,
+# form 3: the bought pin is the gauge; the MHA-PD-18 latch-pin precedent,
+# fit audit question 9).  PRESS_HOLE_DIA_BAND is the analysis band, what
+# that reamer cuts (REAM_H7), which the press and the frame's walls consume;
+# never a printed limit.
 PRESS_HOLE_DIA = 3.1496  # .1240
 PRESS_HOLE_DIA_BAND = REAM_H7  # (upper, lower): +.0005/0
 PRESS_HOLE_DIA_PLACES = 4

@@ -3612,17 +3612,24 @@ def test_coaxial_step_guard_clears_only_a_step_alone() -> None:
     assert body.index("_coaxial_step_holders(") < body.index("display.SetText(")
 
 
-def test_ream_sketch_holds_two_driven_circles_and_the_press_band() -> None:
+def test_ream_sketch_holds_two_driven_circles_and_prints_no_band() -> None:
     # Two circles in one underside sketch (one per station, owner ruling
     # 2026-11-08 (Pedro), #2144 item 11.3), both driven by the
     # HangerPinHoleDia global; the rear one owns the marked name.  Each
-    # prints the dowel spec's stacked +.0005/-.0000; the symmetric band is
-    # the as-cast dimensions' alone.
+    # prints the .1240 reamer's size and no band (drawing-guidelines rule 4,
+    # form 3: the MHA-SM-VN-53 dowel is the gauge); REAM_H7 stays the
+    # analysis band, and on it the press holds; the symmetric band is the
+    # as-cast dimensions' alone.
     from _fit_deviations import deviations
+    import sm_vn_knife_mount_dowel_spec as dowel
 
     assert len(part.HANGER_PIN_CONTOURS) == 2
     assert part.swept_contours_disjoint(part.HANGER_PIN_CONTOURS)
     assert deviations(spec.HANGER_PIN_HOLE_DIA_BAND) == pytest.approx((0.0, 0.0127))
+    assert dowel.PRESS_INTERFERENCE_PRINTED == (0.0152, 0.0331)
+    build = Path(part.__file__).read_text(encoding="utf-8")
+    assert "deviations(HANGER_PIN_HOLE_DIA_BAND)" not in build
+    assert spec.DRAWING_PRECISION["HangerPinProfile"] == {"HangerPinHoleDia": 4}
     assert "HangerPinProfile" not in spec.AS_CAST_DIMENSIONS
 
 

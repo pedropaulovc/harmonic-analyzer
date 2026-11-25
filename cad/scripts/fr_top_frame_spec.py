@@ -358,8 +358,9 @@ if HANGER_WASHER_CONCENTRIC_ANNULUS_MIN <= 0.0:
     raise AssertionError("knife-hanger washer lacks a bearing annulus round its hole")
 # The dowel press reams: at each hanger station one blind ream, drilled and
 # reamed to a drill point, its full diameter KNIFE_DOWEL.PRESS_DEPTH MIN up
-# from the faced underside, to the dowel spec's press band, .1240 +.0005/0
-# printed .XXXX (press .0006-.0013 on the catalogue pin), two in all.  Owner
+# from the faced underside, on the .1240 reamer with no printed band (rule
+# 4, form 3; the dowel spec's analysis band +.0005/0 gives press .0006-.0013
+# on the catalogue pin), two in all.  Owner
 # ruling 2026-11-08 (Pedro), #2144 item 11.3: the -X ream at each station,
 # its position frame, its BASIC span and its knockout are deleted; the +X
 # ream stays.
@@ -815,8 +816,8 @@ DRAFT_ANGLE_DIMENSIONS: dict[str, tuple[str, tuple[float, float]]] = {
 # diameter the title block's .XXX (owner ruling 2026-11-06), the
 # gooseneck bore prints its 33/64 drill's exact decimal, the
 # finished grip prints .XXX (the rail height, that same thickness, prints its
-# reference at the grip's places), and the dowel press ream holds its own
-# +.0005/0 band at four places.
+# reference at the grip's places), and the dowel press ream prints its
+# reamer's size at four places.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "OuterProfile": {
         "Width": 3,

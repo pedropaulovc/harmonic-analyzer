@@ -971,8 +971,9 @@ HANGER_SECTION_CAPTION_XY = (0.120, 0.031)
 # band under the front rail, its leader landing left of the land-end
 # dimension's lines (LAND_END_TEXT_XY).
 _HUB_BOTTOM_M_PER_MM = HUB_BOTTOM_SCALE[0] / HUB_BOTTOM_SCALE[1] / 1000.0
-# The rear ream's size (the circle that owns HangerPinHoleDia), with its
-# stacked +0.000/-0.010 band and its one callout row: count, process, REF
+# The rear ream's size (the circle that owns HangerPinHoleDia), the .1240
+# reamer's with no band (rule 4, form 3: the MHA-SM-VN-53 dowel is the
+# gauge), and its one callout row: count, process, REF
 # depth, mate and fit.  Farm run 20261027T030041319Z printed the block
 # centred on its point: the 42-glyph row 112.5 mm wide (2.68 mm a glyph, as
 # estimated) on its shelf at y 247.5 mm, the shelf starting 1.5 mm left of
