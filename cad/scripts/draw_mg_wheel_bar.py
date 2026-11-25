@@ -148,9 +148,12 @@ FRONT_KEEP = {
     # +.042 the bond line (about 114 mm wide) overprinted the hanger hole's
     # callout, whose text ends about 6 mm left of the bore. 56 mm right puts
     # the block's left end past that text and the shelf's near end over the
-    # bore; 52 mm up lifts the wide line about 8 mm over the clamp callout's
-    # first line, which it now overlaps in x.
-    "AxleBoreDia": (AXLE_BORE_SHEET_X + 0.056, FRONT_CENTER[1] + 0.052),
+    # bore. Machinist review (run 20261124T175053911Z): at 52 mm up the
+    # block's shelf, under its widest line out to x 218 mm, ran at y 216 mm
+    # through the clamp callout's first line (2X at x 213, y 212-219 mm).
+    # 59 mm up puts the shelf at y 223 mm, 4 mm over that line's top, and the
+    # block's top at y 246 mm, 21 mm under the frame.
+    "AxleBoreDia": (AXLE_BORE_SHEET_X + 0.056, FRONT_CENTER[1] + 0.059),
 }
 # The bar depth (the extrude's model dimension at the title block's .XXX, a
 # three-place size naming its stack) under the end view, its text right of the

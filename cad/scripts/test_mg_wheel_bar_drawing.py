@@ -127,6 +127,21 @@ def test_station_rows_stack_shortest_nearest_under_the_bar() -> None:
     assert side_y < bar_bottom < bar_top < row_y
 
 
+def test_axle_bore_shelf_clears_the_clamp_callout() -> None:
+    """Machinist review (run 20261124T175053911Z): the axle bore's shelf,
+    under its four-line block (text centred on its keep point, rows 5.5 mm
+    apart), ran through the 2X of the clamp callout's first line, whose top
+    stood 8.8 mm over its callout point (measured on that run's PDF). The
+    shelf now stands at least 3 mm over that line, and the block's top
+    under the frame (y 266.7 mm)."""
+    row = 0.00554
+    axle_y = drawing.FRONT_KEEP["AxleBoreDia"][1]
+    shelf_y = axle_y - 2.0 * row
+    clamp_top = drawing.CLAMP_CALLOUT_XY[1] + 0.0088
+    assert shelf_y - clamp_top >= 0.003
+    assert axle_y + 2.0 * row + 0.005 < 0.2667
+
+
 def test_the_sheet_carries_no_general_notes() -> None:
     # Every hole callout says THRU; the holes' purposes were only polish.
     assert not hasattr(mg_wheel_bar_spec, "DRAWING_NOTES")
