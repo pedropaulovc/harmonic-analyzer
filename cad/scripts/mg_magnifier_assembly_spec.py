@@ -105,7 +105,9 @@ if not DRUM_RECESS_LIMITS[0] <= DRUM_RECESS < DRUM_RECESS_LIMITS[1]:
 # The axle's thread end (the dome's tangent) past the second nut's outer face:
 # the press's one acceptance (owner ruling 2026-11-06, Q1), read on the stack.
 # High: the axle's limit. Low: the locknut on full thread, i.e. at least the
-# dome's incomplete pitch past it (mg_wheel_group.LOCKNUT_THREAD_MARGIN).
+# dome's incomplete pitch past it (read at the trial and once the endshake is
+# set; mg_wheel_group.THREAD_PAST_LOCKNUT_MAX proves the flush start's long
+# corner under the high limit).
 LOCKNUT_FACE_D = _group.LOCKNUT_FACE_D
 THREAD_END_D = _pin.THREAD_END_Y
 THREAD_PAST_LOCKNUT_LIMITS = (_pin.TIP_INCOMPLETE, _pin.THREAD_PAST_LOCKNUT_LIMIT)

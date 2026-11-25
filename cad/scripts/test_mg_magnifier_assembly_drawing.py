@@ -166,12 +166,16 @@ def test_the_axle_is_set_to_the_trial_stack_and_accepted_at_the_nuts() -> None:
     gauge_callout = stack.SETTING_CALLOUTS[stack.FEATURE][stack.PRESS_GAUGE_DIMENSION][1]
     assert "SETTING" not in gauge_callout
     # The printed thread-end limits, in inches: the high side is the axle's
-    # own limit and passes the model stack's worst corner; the low side keeps
-    # the locknut on full thread, the dome's incomplete pitch past it.
+    # own limit and passes the flush start's long corner (the trial only
+    # slides the axle out), the slide's target sits in the window's middle;
+    # the low side keeps the locknut on full thread, the dome's incomplete
+    # pitch past it.
     low_limit, high_limit = stack.LIMIT_DIMENSIONS[stack.THREAD_PAST_LOCKNUT_DIMENSION]
     assert mg_wheel_group.THREAD_PAST_LOCKNUT_MAX <= high_limit
     assert low_limit == mg_wheel_axle_spec.TIP_INCOMPLETE
-    assert mg_wheel_group.LOCKNUT_THREAD_MARGIN >= 0.0
+    assert mg_wheel_group.TRIAL_SLIDE_TARGET == pytest.approx((low_limit + high_limit) / 2.0)
+    assert mg_wheel_group.NUT_RUNOUT_MARGIN >= 0.0
+    assert not hasattr(notes, "TRIAL_THREAD_PAST_LOCKNUT")
     assert "LOCKNUT ON FULL THREAD" not in drawing.PRESSED.label_text
     assert stack.SETTING_CALLOUTS[stack.FEATURE][stack.THREAD_PAST_LOCKNUT_DIMENSION][
         1

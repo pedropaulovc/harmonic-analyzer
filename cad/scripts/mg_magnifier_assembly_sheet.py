@@ -16,7 +16,6 @@ import math
 
 import ha_harmonic_analyzer_assembly_steps as _ha_steps
 import mg_magnifier_assembly_steps as _steps
-import mg_wheel_group as _group
 import sh_vn_clamp_screw_spec as _clamp_screw
 import mg_wheel_axle_spec as _axle
 import mg_vn_magnifying_bracket_screw_spec as _bracket_screw
@@ -32,7 +31,6 @@ from mg_magnifier_assembly_spec import (
     FEATURE,
     PRESS_GAUGE_DIMENSION,
     THREAD_PAST_LOCKNUT_DIMENSION,
-    THREAD_PAST_LOCKNUT_LIMITS,
     UNIT,
 )
 from _title_block_units import LENGTH_UNITS, render_number
@@ -89,35 +87,6 @@ if UNIT != "in":
     raise AssertionError("the endshake feeler check reads inch leaves")
 ENDSHAKE_GO_TEXT = render_number((ENDSHAKE - ENDSHAKE_TOL) / _INCH, UNIT, 3)
 ENDSHAKE_NO_GO_TEXT = render_number((ENDSHAKE + ENDSHAKE_TOL) / _INCH, UNIT, 3)
-# The trial fit (#3344) reads the thread end past the second nut before the
-# endshake is set, its nuts jammed over the go leaf (ENDSHAKE_GO_TEXT, the
-# band's low limit, ENDSHAKE_MIN: the spec asserts the band symmetric):
-# jammed "just free", about no endshake, a conforming stack read .115 against
-# DETAIL B's .114. At the go leaf both of the wheel group's corners land
-# inside DETAIL B's limits: the long one is mg_wheel_group's own, taken at
-# ENDSHAKE_MIN; the short one is its locknut corner, taken at ENDSHAKE_MAX.
-# The endshake set after the trial is never less, so the acceptance reads no
-# more than the trial did. It can read up to the band's width less: a
-# conforming stack still passes (.031 less .004), and a stack that passed the
-# trial low and fails there has its parts measured, not re-trialled
-# ("axle-reset", Codjiflo r1 of #3345).
-TRIAL_THREAD_PAST_LOCKNUT = (
-    _group.LOCKNUT_THREAD_MARGIN
-    + _axle.TIP_INCOMPLETE
-    + (_group.ENDSHAKE_MAX - _group.ENDSHAKE_MIN),
-    _group.THREAD_PAST_LOCKNUT_MAX,
-)  # .031 .. .113
-if not (
-    THREAD_PAST_LOCKNUT_LIMITS[0] - 1e-6
-    <= TRIAL_THREAD_PAST_LOCKNUT[0] - (_group.ENDSHAKE_MAX - _group.ENDSHAKE_MIN)
-    <= TRIAL_THREAD_PAST_LOCKNUT[1]
-    <= THREAD_PAST_LOCKNUT_LIMITS[1] + 1e-6
-):
-    raise AssertionError(
-        f"a conforming stack reads {TRIAL_THREAD_PAST_LOCKNUT} mm of thread past "
-        f"the second nut at the trial, outside {THREAD_PAST_LOCKNUT_LIMITS} at "
-        "the trial or once the endshake is set"
-    )
 
 # The summing lever (cad/config/parts/sm-summing-lever.yaml), the mate the
 # bracket screws to at MHA-HA-00; rule 4 names it by its drawing number.
