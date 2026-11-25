@@ -16,14 +16,14 @@
   <line class="datum" x1="240.95" y1="393.4" x2="276.95" y2="393.4"/>
   <text class="datum-label" x="236.95" y="398.4" text-anchor="end">Z0 the parallels' top (T)</text>
   <line class="datum" x1="240.95" y1="232.87" x2="276.95" y2="232.87"/>
-  <text class="datum-label" x="236.95" y="237.87" text-anchor="end">Z 1.580</text>
+  <text class="datum-label" x="236.95" y="237.87" text-anchor="end">Z {{cad.top_face_height_mm:in.3dot}}</text>
   <text class="label" x="420" y="142.87">1/2 in end mill at the last level,</text>
   <text class="label" x="420" y="158.87">second pass, along X (into the page)</text>
   <line class="leader" x1="440" y1="170.87" x2="329.75" y2="182.87"/>
   <circle class="leader-dot" cx="329.75" cy="182.87" r="2"/>
   <text class="label" x="470" y="230">T down on the 1 in parallels.</text>
-  <text class="label" x="470" y="246">Levels of .050 max down to</text>
-  <text class="label" x="470" y="262">the height 1.570-1.590.</text>
+  <text class="label" x="470" y="246">Levels of {{process.face_step_max_mm:in.3dot}} max down to</text>
+  <text class="label" x="470" y="262">the height {{cad.top_face_height_min_in:.3dot}}-{{cad.top_face_height_max_in:.3dot}}.</text>
   <text class="label" x="470" y="278">The faced end is B: the tap goes in it.</text>
   <text class="label" x="470" y="380">1 in parallel against each jaw</text>
   <line class="leader" x1="468" y1="376" x2="312.7" y2="455"/>

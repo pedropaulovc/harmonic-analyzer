@@ -8,7 +8,7 @@
   <rect class="clamp" x="180" y="244" width="120" height="70"/>
   <rect class="part-rest" x="180" y="240" width="120" height="4"/>
   <text class="label" x="70" y="370">4-jaw (schematic) on the flats over brass shims;</text>
-  <text class="label" x="70" y="386">indicate each pair of flats within .001 TIR</text>
+  <text class="label" x="70" y="386">indicate each pair of flats within {{process.indicate_tir_in:.3dot}} TIR</text>
   <path class="part-kept" d="M528.6 140L528.6 240L20 240L17 235.83L20 231.67L17 227.5L20 223.33L17 219.17L20 215L17 210.83L20 206.67L17 202.5L20 198.33L17 194.17L20 190L17 185.83L20 181.67L17 177.5L20 173.33L17 169.17L20 165L17 160.83L20 156.67L17 152.5L20 148.33L17 144.17L20 140Z"/>
   <rect class="part-removed" x="391.44" y="178.09" width="137.16" height="23.81"/>
   <path class="part-removed" d="M391.4 178.1L384.3 190L391.4 201.9Z"/>
@@ -20,10 +20,10 @@
   <line class="dims" x1="391.44" y1="204" x2="391.44" y2="276"/>
   <line class="dims" x1="528.6" y1="244" x2="528.6" y2="276"/>
   <line class="dims" x1="391.44" y1="270" x2="528.6" y2="270"/>
-  <text class="label" x="351.44" y="294">full diameter .26-.28 deep: the quill scale reads .384</text>
+  <text class="label" x="351.44" y="294">full diameter {{cad.stud_tap_drill_depth_min_in:.2dot}}-{{cad.stud_tap_drill_depth_max_in:.2dot}} deep: the quill scale reads {{process.drill_scale_in:.3dot}}</text>
   <text class="label" x="545" y="52">3/64 drill (Ø.0469) in the</text>
   <text class="label" x="545" y="68">tailstock chuck, short out</text>
-  <text class="label" x="545" y="84">of it; back out every .040</text>
+  <text class="label" x="545" y="84">of it; back out every {{process.peck_mm:in.3dot}}</text>
   <line class="leader" x1="600" y1="90" x2="660" y2="178.09"/>
   <circle class="leader-dot" cx="660" cy="178.09" r="2"/>
 </svg>

@@ -14,16 +14,16 @@
   <rect class="part-removed" x="200" y="187.91" width="44.45" height="10.16"/>
   <path class="cutter" d="M310.24 180.28L310.24 111.7L306.27 114.7L302.3 111.7L298.33 114.7L294.36 111.7L290.39 114.7L286.42 111.7L282.45 114.7L278.49 111.7L274.52 114.7L270.55 111.7L266.58 114.7L262.61 111.7L258.64 114.7L254.67 111.7L250.7 114.7L246.74 111.7L246.74 180.28A31.75 7.62 0 0 0 310.24 180.28Z"/>
   <line class="datum" x1="110" y1="187.91" x2="196" y2="187.91"/>
-  <text class="datum-label" x="106" y="192.91" text-anchor="end">Z.860, the pass</text>
+  <text class="datum-label" x="106" y="192.91" text-anchor="end">Z{{cad.body_back_depth_in:.3dot}}, the pass</text>
   <line class="arrow" x1="320.24" y1="127.91" x2="390.24" y2="127.91"/>
   <line class="datum" x1="20" y1="297.12" x2="156" y2="297.12"/>
   <text class="datum-label" x="20" y="273.12">Z0 the stacks'</text>
   <text class="datum-label" x="20" y="289.12">top (BACK)</text>
   <line class="datum" x1="200" y1="110.91" x2="200" y2="136.91"/>
   <text class="datum-label" x="194" y="126.91" text-anchor="end">X0 = P</text>
-  <text class="label" x="520" y="70">front faced in levels of .080 max</text>
-  <text class="label" x="520" y="86">to the depth .850-.870; then the front</text>
-  <text class="label" x="520" y="102">neck step .080 deep (hatched)</text>
+  <text class="label" x="520" y="70">front faced in levels of {{process.face_step_max_mm:in.3dot}} max</text>
+  <text class="label" x="520" y="86">to the depth {{cad.body_back_depth_min_in:.3dot}}-{{cad.body_back_depth_max_in:.3dot}}; then the front</text>
+  <text class="label" x="520" y="102">neck step {{cad.neck_front_station_in:.3dot}} deep (hatched)</text>
   <text class="label" x="20" y="237.12">back step, clear</text>
   <text class="label" x="20" y="253.12">of the stacks</text>
   <line class="leader" x1="80" y1="253.12" x2="220" y2="293.12"/>

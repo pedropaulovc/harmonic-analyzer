@@ -22,8 +22,8 @@
   <text class="label" x="184" y="169.49">front step</text>
   <text class="label" x="490" y="56">#43 drill (Ø.089) down to the bore's</text>
   <text class="label" x="490" y="72">axis (after the centre drill's spot)</text>
-  <line class="leader" x1="488" y1="64" x2="270.68" y2="137.49"/>
-  <circle class="leader-dot" cx="270.68" cy="137.49" r="2"/>
+  <line class="leader" x1="488" y1="64" x2="261.46" y2="137.49"/>
+  <circle class="leader-dot" cx="261.46" cy="137.49" r="2"/>
   <text class="label" x="490" y="293.02">pivot bore (Setup 7),</text>
   <text class="label" x="490" y="309.02">crosswise</text>
   <line class="leader" x1="488" y1="289.02" x2="264.68" y2="247.02"/>

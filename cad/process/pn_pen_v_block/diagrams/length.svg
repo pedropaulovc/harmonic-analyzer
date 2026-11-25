@@ -16,14 +16,14 @@
   <line class="datum" x1="202.38" y1="323" x2="248.38" y2="323"/>
   <text class="datum-label" x="198.38" y="328" text-anchor="end">Z0: the parallels' top (P)</text>
   <line class="datum" x1="202.38" y1="192.19" x2="248.38" y2="192.19"/>
-  <text class="datum-label" x="198.38" y="197.19" text-anchor="end">Z 1.030</text>
+  <text class="datum-label" x="198.38" y="197.19" text-anchor="end">Z {{cad.far_end_length_in:.3dot}}</text>
   <text class="label" x="470" y="92.19">1/2 in end mill on a middle pass,</text>
   <text class="label" x="470" y="108.19">along X (into the page)</text>
   <line class="leader" x1="468" y1="96.19" x2="337.81" y2="132.19"/>
   <circle class="leader-dot" cx="337.81" cy="132.19" r="2"/>
   <text class="label" x="470" y="250">P down on the 1 in parallels.</text>
-  <text class="label" x="470" y="266">Levels of .080 max down to</text>
-  <text class="label" x="470" y="282">the length 1.020-1.040.</text>
+  <text class="label" x="470" y="266">Levels of {{process.face_step_max_mm:in.3dot}} max down to</text>
+  <text class="label" x="470" y="282">the length {{cad.far_end_length_min_in:.3dot}}-{{cad.far_end_length_max_in:.3dot}}.</text>
   <text class="label" x="470" y="390">1 in parallel against each jaw</text>
   <line class="leader" x1="468" y1="386" x2="339.69" y2="410"/>
   <circle class="leader-dot" cx="339.69" cy="410" r="2"/>

@@ -21,10 +21,10 @@
   <line class="datum" x1="180" y1="140.55" x2="180" y2="166.55"/>
   <text class="datum-label" x="174" y="156.55" text-anchor="end">X0 = P</text>
   <text class="label" x="490" y="56">#32 drill through the top into</text>
-  <text class="label" x="490" y="72">the slot, 1 mm past its roof</text>
+  <text class="label" x="490" y="72">the slot, {{process.drill_past_mm:.0f}} mm past its roof</text>
   <text class="label" x="490" y="88">(after the centre drill's spot)</text>
-  <line class="leader" x1="488" y1="60" x2="268.68" y2="130.55"/>
-  <circle class="leader-dot" cx="268.68" cy="130.55" r="2"/>
+  <line class="leader" x1="488" y1="60" x2="263.52" y2="130.55"/>
+  <circle class="leader-dot" cx="263.52" cy="130.55" r="2"/>
   <text class="label" x="490" y="330">relief slot (from Setup 6), the</text>
   <text class="label" x="490" y="346">bore breaks into it; dashed:</text>
   <text class="label" x="490" y="362">the block's B and the slot's walls,</text>

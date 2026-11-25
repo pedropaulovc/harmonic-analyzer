@@ -14,7 +14,7 @@
   <text class="label" x="240" y="179" text-anchor="middle">relief slot (milled)</text>
   <text class="label" x="381.62" y="210">1/8 in end mill in the corner</text>
   <text class="label" x="381.62" y="226">at the step and the near wall:</text>
-  <text class="label" x="381.62" y="242">R.060-.070, to the floor</text>
+  <text class="label" x="381.62" y="242">R{{cad.relief_corner_r_min_in:.3dot}}-{{cad.relief_corner_r_max_in:.3dot}}, to the floor</text>
   <line class="leader" x1="379.62" y1="206" x2="182.78" y2="242.09"/>
   <circle class="leader-dot" cx="182.78" cy="242.09" r="2"/>
   <text class="label" x="381.62" y="110">hatched: the two corners</text>

@@ -20,8 +20,8 @@
   <text class="datum-label" x="20" y="289.12">Z0 the stacks' top</text>
   <line class="datum" x1="200" y1="108.38" x2="200" y2="134.38"/>
   <text class="datum-label" x="194" y="124.38" text-anchor="end">X0 = P</text>
-  <text class="label" x="520" y="70">back face: .020 skim; then the back</text>
-  <text class="label" x="520" y="86">neck step .080 deep, P to .350,</text>
+  <text class="label" x="520" y="70">back face: {{process.back_skim_mm:in.3dot}} skim; then the back</text>
+  <text class="label" x="520" y="86">neck step {{process.back_step_depth_mm:in.3dot}} deep, P to {{cad.neck_steps_station_in:.3dot}},</text>
   <text class="label" x="520" y="102">one pass across the jaws (hatched)</text>
   <text class="label" x="520" y="390">1/2 + 5/8 in parallels,</text>
   <text class="label" x="520" y="406">stacked against each jaw</text>

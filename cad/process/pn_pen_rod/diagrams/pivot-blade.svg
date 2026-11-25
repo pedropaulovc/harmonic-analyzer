@@ -8,7 +8,7 @@
   <rect class="clamp" x="180" y="244" width="120" height="70"/>
   <rect class="part-rest" x="180" y="240" width="120" height="4"/>
   <text class="label" x="70" y="390">4-jaw (schematic) on the flats over brass shims;</text>
-  <text class="label" x="70" y="406">indicate each pair of flats within .001 TIR</text>
+  <text class="label" x="70" y="406">indicate each pair of flats within {{process.indicate_tir_in:.3dot}} TIR</text>
   <path class="part-kept" d="M396.52 140L396.52 240L20 240L17 235.83L20 231.67L17 227.5L20 223.33L17 219.17L20 215L17 210.83L20 206.67L17 202.5L20 198.33L17 194.17L20 190L17 185.83L20 181.67L17 177.5L20 173.33L17 169.17L20 165L17 160.83L20 156.67L17 152.5L20 148.33L17 144.17L20 140Z"/>
   <rect class="part-kept" x="396.52" y="158.33" width="208.28" height="63.35"/>
   <rect class="part-removed" x="480.34" y="158.33" width="76.2" height="4.75"/>
@@ -20,12 +20,12 @@
   <text class="datum-label" x="610.8" y="80">Z0 pivot end</text>
   <line class="dims" x1="396.52" y1="108" x2="396.52" y2="154.33"/>
   <line class="dims" x1="396.52" y1="116" x2="604.8" y2="116"/>
-  <text class="label" x="406.52" y="110">shoulder at Z-.410</text>
+  <text class="label" x="406.52" y="110">shoulder at Z-{{cad.pivot_length_in:.3dot}}</text>
   <text class="label" x="456.52" y="300">1/16 P1 blade, its chuck-side face</text>
-  <text class="label" x="456.52" y="316">on Z-.410: plunged to the pivot's O.D.,</text>
-  <text class="label" x="456.52" y="332">the corner sharp (R.008 MAX)</text>
+  <text class="label" x="456.52" y="316">on Z-{{cad.pivot_length_in:.3dot}}: plunged to the pivot's O.D.,</text>
+  <text class="label" x="456.52" y="332">the corner sharp (R{{cad.pivot_corner_radius_max_mm:in.3dot}} MAX)</text>
   <text class="label" x="20" y="44">hatched: the groove, three plunges of the same blade next,</text>
-  <text class="label" x="20" y="60">.165-.315 from the shoulder, floor Ø.106</text>
+  <text class="label" x="20" y="60">{{cad.groove_station_in:.3dot}}-{{cad.groove_end_station_in:.3dot}} from the shoulder, floor Ø{{cad.groove_dia_in:.3dot}}</text>
   <line class="leader" x1="340" y1="64" x2="518.44" y2="164.33"/>
   <circle class="leader-dot" cx="518.44" cy="164.33" r="2"/>
 </svg>

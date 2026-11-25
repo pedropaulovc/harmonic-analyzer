@@ -14,11 +14,11 @@
   <line class="datum" x1="459.53" y1="278.55" x2="495.53" y2="278.55"/>
   <text class="datum-label" x="499.53" y="283.55">Z0 the stacks' top (TOP)</text>
   <text class="label" x="520" y="70">1/4 in 90° chamfer mill: its point</text>
-  <text class="label" x="520" y="86">sweeps the V's .080 flat at the last</text>
+  <text class="label" x="520" y="86">sweeps the V's {{cad.v_groove_flat_width_in:.3dot}} flat at the last</text>
   <text class="label" x="520" y="102">level, .196 below B</text>
   <line class="leader" x1="518" y1="80" x2="349.05" y2="117.2"/>
   <circle class="leader-dot" cx="349.05" cy="117.2" r="2"/>
-  <text class="label" x="520" y="330">the neck, .080 clear</text>
+  <text class="label" x="520" y="330">the neck, {{process.back_step_depth_mm:in.3dot}} clear</text>
   <text class="label" x="520" y="346">of each jaw</text>
   <line class="leader" x1="518" y1="326" x2="379.34" y2="230.55"/>
   <circle class="leader-dot" cx="379.34" cy="230.55" r="2"/>

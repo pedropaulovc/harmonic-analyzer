@@ -26,9 +26,9 @@
   <text class="label" x="184" y="169.49">front step</text>
   <text class="label" x="490" y="40">4-40 tap in the T-handle wrench, the tap</text>
   <text class="label" x="490" y="56">guide's spring point in its centre hole;</text>
-  <text class="label" x="490" y="72">its point .450-.480 below the front</text>
-  <line class="leader" x1="488" y1="72" x2="270.68" y2="137.49"/>
-  <circle class="leader-dot" cx="270.68" cy="137.49" r="2"/>
+  <text class="label" x="490" y="72">its point {{process.tap_reach_min_mm:in.3dot}}-{{process.tap_reach_max_mm:in.3dot}} below the front</text>
+  <line class="leader" x1="488" y1="72" x2="263.21" y2="137.49"/>
+  <circle class="leader-dot" cx="263.21" cy="137.49" r="2"/>
   <text class="label" x="490" y="293.02">pivot bore (Setup 7),</text>
   <text class="label" x="490" y="309.02">crosswise</text>
   <line class="leader" x1="488" y1="289.02" x2="264.68" y2="247.02"/>

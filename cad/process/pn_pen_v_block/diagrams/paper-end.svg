@@ -14,7 +14,7 @@
   <path class="cutter" d="M337.81 171.87L337.81 52.49L333.85 55.49L329.88 52.49L325.91 55.49L321.94 52.49L317.97 55.49L314 52.49L310.03 55.49L306.06 52.49L302.1 55.49L298.13 52.49L294.16 55.49L290.19 52.49L286.22 55.49L282.25 52.49L278.28 55.49L274.31 52.49L274.31 171.87A31.75 7.62 0 0 0 337.81 171.87Z"/>
   <line class="centre-line" x1="300" y1="40" x2="300" y2="468"/>
   <line class="datum" x1="202.38" y1="179.49" x2="248.38" y2="179.49"/>
-  <text class="datum-label" x="198.38" y="184.49" text-anchor="end">Z0: the faced end P, .020 off</text>
+  <text class="datum-label" x="198.38" y="184.49" text-anchor="end">Z0: the faced end P, {{process.end_skim_mm:in.3dot}} off</text>
   <text class="datum-label" x="294" y="50" text-anchor="end">X0 Y0 the blank's axis</text>
   <text class="label" x="470" y="79.49">1/2 in end mill on a middle pass,</text>
   <text class="label" x="470" y="95.49">along X (into the page)</text>

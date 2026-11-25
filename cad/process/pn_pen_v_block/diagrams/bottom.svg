@@ -15,7 +15,7 @@
   <line class="arrow" x1="42" y1="302.91" x2="252" y2="302.91"/>
   <text class="title" x="50" y="72">Plan (7 px/mm), the fixed jaw at the top</text>
   <text class="label" x="40" y="330">The jaws on the FRONT and BACK faces from the steps</text>
-  <text class="label" x="40" y="346">to the far end; the neck stands .08 clear of each.</text>
+  <text class="label" x="40" y="346">to the far end; the neck stands {{process.back_step_depth_mm:in.2dot}} clear of each.</text>
   <text class="label" x="40" y="362">Arrowed: the passes along X.</text>
   <rect class="fixture-vise" x="425.39" y="480" width="189.22" height="14"/>
   <rect class="clamp" x="425.39" y="255.27" width="40" height="224.73"/>

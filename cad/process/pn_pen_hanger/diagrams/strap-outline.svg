@@ -47,12 +47,12 @@
   <text class="label" x="449.16" y="535.28">each jaw</text>
   <line class="leader" x1="447.16" y1="515.28" x2="381.44" y2="529.28"/>
   <circle class="leader-dot" cx="381.44" cy="529.28" r="2"/>
-  <text class="label" x="449.16" y="442.7">the spoil plate, 1.40 wide</text>
+  <text class="label" x="449.16" y="442.7">the spoil plate, {{process.spoil_plate_width_mm:in.2dot}} wide</text>
   <line class="leader" x1="447.16" y1="438.7" x2="372.76" y2="450.7"/>
   <circle class="leader-dot" cx="372.76" cy="450.7" r="2"/>
   <text class="label-on-clamp" x="412.16" y="417.2" text-anchor="middle">fixed</text>
   <text class="label-on-clamp" x="225" y="417.2" text-anchor="middle">moving</text>
-  <text class="label" x="20" y="604">X0 the blank's left end; the strap's top end .315 in from it, its foot to the right. Tabs: the small</text>
+  <text class="label" x="20" y="604">X0 the blank's left end; the strap's top end {{process.strap_start_mm:in.3dot}} in from it, its foot to the right. Tabs: the small</text>
   <text class="label" x="20" y="620">frame-shaded bridges on both long edges (seven each), sawn off in Setup 4.</text>
-  <text class="label" x="20" y="636">Spoil plate under the top end and the hole, its left end .05–.15 inside the blank's; the foot is cut over air.</text>
+  <text class="label" x="20" y="636">Spoil plate under the top end and the hole, its left end {{process.spoil_plate_start_min_mm:in.2dot}}–{{process.spoil_plate_start_max_mm:in.2dot}} inside the blank's; the foot is cut over air.</text>
 </svg>

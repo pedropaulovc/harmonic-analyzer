@@ -14,7 +14,7 @@
   <path class="cutter" d="M282.08 168.38L282.08 74.4L278.11 77.4L274.14 74.4L270.17 77.4L266.2 74.4L262.24 77.4L258.27 74.4L254.3 77.4L250.33 74.4L246.36 77.4L242.39 74.4L238.42 77.4L234.45 74.4L230.49 77.4L226.52 74.4L222.55 77.4L218.58 74.4L218.58 168.38A31.75 7.62 0 0 0 282.08 168.38Z"/>
   <line class="arrow" x1="292.08" y1="106" x2="392.08" y2="106"/>
   <line class="datum" x1="60" y1="176" x2="146" y2="176"/>
-  <text class="datum-label" x="56" y="181" text-anchor="end">Z1.000</text>
+  <text class="datum-label" x="56" y="181" text-anchor="end">Z{{cad.right_face_width_in:.3dot}}</text>
   <line class="datum" x1="150" y1="116.79" x2="150" y2="142.79"/>
   <text class="datum-label" x="144" y="134.79" text-anchor="end">X0 (T)</text>
   <text class="label" x="356.66" y="134.79">B</text>
@@ -22,8 +22,8 @@
   <text class="datum-label" x="20" y="295">Z0 the parallels' top</text>
   <text class="label" x="296.08" y="96">passes along X, two across the 3/8</text>
   <text class="label" x="545" y="120">L down on the parallels; T now LEFT.</text>
-  <text class="label" x="545" y="136">Levels of .050 max down to</text>
-  <text class="label" x="545" y="152">the width .990-1.010.</text>
+  <text class="label" x="545" y="136">Levels of {{process.face_step_max_mm:in.3dot}} max down to</text>
+  <text class="label" x="545" y="152">the width {{cad.right_face_width_min_in:.3dot}}-{{cad.right_face_width_max_in:.3dot}}.</text>
   <text class="label" x="570" y="370">1 in parallels,</text>
   <text class="label" x="570" y="386">one against each jaw</text>
   <line class="leader" x1="568" y1="366" x2="530" y2="380"/>

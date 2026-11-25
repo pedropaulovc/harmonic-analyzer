@@ -13,7 +13,9 @@
   <circle class="cutter" cx="134.83" cy="230.33" r="7.94"/>
   <text class="title" x="100" y="78">Plan, fixed jaw at the top</text>
   <line class="datum" x1="110" y1="104" x2="110" y2="144"/>
-  <text class="datum-label" x="46" y="128" text-anchor="end">X0 Y0</text>
+  <text class="datum-label" x="80" y="100" text-anchor="end">X0 Y0</text>
+  <line class="leader" x1="82" y1="98" x2="110" y2="130"/>
+  <circle class="leader-dot" cx="110" cy="130" r="2"/>
   <rect class="fixture-vise" x="410" y="440" width="280.66" height="14"/>
   <rect class="clamp" x="410" y="215.27" width="40" height="224.73"/>
   <rect class="clamp" x="650.66" y="215.27" width="40" height="224.73"/>
@@ -29,8 +31,8 @@
   <line class="arrow" x1="212.17" y1="230" x2="212.17" y2="260"/>
   <text class="title" x="440" y="52">Across the jaws (fixed jaw at the right)</text>
   <text class="label" x="40" y="380">T to the fixed jaw. The slot round the window, clockwise,</text>
-  <text class="label" x="40" y="396">.003 inside its walls, in levels to .020 below BK; then</text>
+  <text class="label" x="40" y="396">{{process.window_finish_stock_mm:in.3dot}} inside its walls, in levels to {{process.window_run_past_mm:in.3dot}} below BK; then</text>
   <text class="label" x="40" y="412">the finish pass. The slug drops onto the bed between</text>
   <text class="label" x="40" y="428">the stacks.</text>
-  <text class="label" x="450" y="472">stacks under the ends, .24 from the window's walls</text>
+  <text class="label" x="450" y="472">stacks under the ends, {{cad.window_bottom_wall_in:.2dot}} from the window's walls</text>
 </svg>

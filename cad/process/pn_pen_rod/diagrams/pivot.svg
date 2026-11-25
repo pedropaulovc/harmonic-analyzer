@@ -8,7 +8,7 @@
   <rect class="clamp" x="180" y="244" width="120" height="70"/>
   <rect class="part-rest" x="180" y="240" width="120" height="4"/>
   <text class="label" x="70" y="390">4-jaw (schematic) on the flats over brass shims;</text>
-  <text class="label" x="70" y="406">indicate each pair of flats within .001 TIR</text>
+  <text class="label" x="70" y="406">indicate each pair of flats within {{process.indicate_tir_in:.3dot}} TIR</text>
   <path class="part-kept" d="M604.8 140L604.8 240L20 240L17 235.83L20 231.67L17 227.5L20 223.33L17 219.17L20 215L17 210.83L20 206.67L17 202.5L20 198.33L17 194.17L20 190L17 185.83L20 181.67L17 177.5L20 173.33L17 169.17L20 165L17 160.83L20 156.67L17 152.5L20 148.33L17 144.17L20 140Z"/>
   <rect class="part-removed" x="604.8" y="140" width="25.4" height="100"/>
   <rect class="part-removed" x="396.52" y="140" width="208.28" height="18.33"/>
@@ -22,11 +22,11 @@
   <text class="datum-label" x="610.8" y="80">Z0 pivot end</text>
   <line class="dims" x1="300" y1="108" x2="300" y2="136"/>
   <line class="dims" x1="300" y1="116" x2="604.8" y2="116"/>
-  <text class="label" x="310" y="110">.60 out of the jaw fronts</text>
+  <text class="label" x="310" y="110">{{process.pivot_stickout_in:.2dot}} out of the jaw fronts</text>
   <text class="label" x="564.8" y="340" text-anchor="end">AR tool (schematic): faces the end</text>
   <text class="label" x="564.8" y="356" text-anchor="end">to Z0, then turns the pivot</text>
-  <text class="label" x="20" y="44">hatched: cut in this setup: the pivot Ø.125 x .41,</text>
-  <text class="label" x="20" y="60">the groove .165-.315 from the shoulder (floor Ø.106)</text>
+  <text class="label" x="20" y="44">hatched: cut in this setup: the pivot Ø{{cad.pivot_dia_in:.3dot}} x {{cad.pivot_length_in:.2dot}},</text>
+  <text class="label" x="20" y="60">the groove {{cad.groove_station_in:.3dot}}-{{cad.groove_end_station_in:.3dot}} from the shoulder (floor Ø{{cad.groove_dia_in:.3dot}})</text>
   <line class="leader" x1="340" y1="64" x2="438.43" y2="150"/>
   <circle class="leader-dot" cx="438.43" cy="150" r="2"/>
 </svg>

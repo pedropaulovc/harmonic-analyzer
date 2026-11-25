@@ -1,37 +1,37 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 490" width="760" height="490" font-family="sans-serif" font-size="13">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 560" width="760" height="560" font-family="sans-serif" font-size="13">
   <!-- Hand picture, the frame and the tap's diameter to scale at 5 px/mm from the frame's depth (.310, 7.874 mm). 4-40 tap Ø.112 (the thread's major diameter, the hole it makes), its point at tap_reach_mm 10.16 below B (the aim of 9.271-11.43), its arc-ended near face 12 % of its diameter deep. The tap's length, the T-handle wrench and the tap guide's body are not on record: schematic (the guide's 3 1/8 in length bounds the stack, not the picture). Wrench and guide in the tool's colour: they travel with the tap. The window hidden, dashed. The vise jaws' thickness and the parallels' length are not on record: schematic. Jaw height 44.9453 mm (vise_jaw_height_mm). -->
-  <rect class="paper" x="0" y="0" width="760" height="490"/>
+  <rect class="paper" x="0" y="0" width="760" height="560"/>
   <text class="title" x="20" y="24">PF08: tap 4-40 by hand under the tap guide, the frame to scale (5 px/mm)</text>
-  <rect class="fixture-vise" x="220.31" y="470" width="219.37" height="14"/>
-  <rect class="clamp" x="220.31" y="245.27" width="90" height="224.73"/>
-  <rect class="clamp" x="349.69" y="245.27" width="90" height="224.73"/>
-  <rect class="fixture-support" x="310.31" y="343" width="15.88" height="127"/>
-  <rect class="fixture-support" x="333.81" y="343" width="15.88" height="127"/>
-  <rect class="part-kept" x="310.31" y="142.34" width="39.37" height="200.66"/>
-  <text class="label-on-clamp" x="265.31" y="265.27" text-anchor="middle">moving jaw</text>
-  <text class="label-on-clamp" x="394.69" y="265.27" text-anchor="middle">fixed jaw</text>
-  <rect class="hidden" x="310.31" y="172.82" width="39.37" height="139.7"/>
-  <path class="cutter" d="M337.11 191.43L337.11 80.34L322.89 80.34L322.89 191.43A7.11 1.71 0 0 0 337.11 191.43Z"/>
-  <rect class="cutter" x="240" y="68.34" width="180" height="12"/>
-  <rect class="cutter" x="318" y="64.34" width="24" height="24"/>
-  <path class="cutter" d="M330.0 64.3L318.0 42.3L342.0 42.3Z"/>
-  <path class="cutter" d="M308 42.34L308 46L311.67 43L315.33 46L319 43L322.67 46L326.33 43L330 46L333.67 43L337.33 46L341 43L344.67 46L348.33 43L352 46L352 42.34Z"/>
-  <line class="datum" x1="266.31" y1="142.34" x2="306.31" y2="142.34"/>
-  <text class="datum-label" x="262.31" y="147.34" text-anchor="end">Z0 (B)</text>
+  <rect class="fixture-vise" x="220.31" y="540" width="219.37" height="14"/>
+  <rect class="clamp" x="220.31" y="315.27" width="90" height="224.73"/>
+  <rect class="clamp" x="349.69" y="315.27" width="90" height="224.73"/>
+  <rect class="fixture-support" x="310.31" y="413" width="15.88" height="127"/>
+  <rect class="fixture-support" x="333.81" y="413" width="15.88" height="127"/>
+  <rect class="part-kept" x="310.31" y="212.34" width="39.37" height="200.66"/>
+  <text class="label-on-clamp" x="265.31" y="335.27" text-anchor="middle">moving jaw</text>
+  <text class="label-on-clamp" x="394.69" y="335.27" text-anchor="middle">fixed jaw</text>
+  <rect class="hidden" x="310.31" y="242.82" width="39.37" height="139.7"/>
+  <path class="cutter" d="M337.11 261.43L337.11 150.34L322.89 150.34L322.89 261.43A7.11 1.71 0 0 0 337.11 261.43Z"/>
+  <rect class="cutter" x="240" y="138.34" width="180" height="12"/>
+  <rect class="cutter" x="318" y="134.34" width="24" height="24"/>
+  <path class="cutter" d="M330.0 134.3L318.0 112.3L342.0 112.3Z"/>
+  <path class="cutter" d="M308 112.34L308 40L311.67 37L315.33 40L319 37L322.67 40L326.33 37L330 40L333.67 37L337.33 40L341 37L344.67 40L348.33 37L352 40L352 112.34Z"/>
+  <line class="datum" x1="266.31" y1="212.34" x2="306.31" y2="212.34"/>
+  <text class="datum-label" x="262.31" y="217.34" text-anchor="end">Z0 (B)</text>
   <text class="label" x="470" y="60">tap guide in the 1/2 in collet, spindle off;</text>
   <text class="label" x="470" y="76">its spring point in the wrench's centre hole</text>
-  <line class="leader" x1="468" y1="70" x2="352" y2="90"/>
-  <circle class="leader-dot" cx="352" cy="90" r="2"/>
-  <text class="label" x="470" y="102.34">T-handle tap wrench</text>
-  <line class="leader" x1="468" y1="98.34" x2="410" y2="78.34"/>
-  <circle class="leader-dot" cx="410" cy="78.34" r="2"/>
-  <text class="label" x="470" y="182.34">4-40 tap (Ø.112), its point</text>
-  <text class="label" x="470" y="198.34">.365-.450 below B (aim .400),</text>
-  <text class="label" x="470" y="214.34">in the window</text>
-  <line class="leader" x1="468" y1="192.34" x2="337.11" y2="182.34"/>
-  <circle class="leader-dot" cx="337.11" cy="182.34" r="2"/>
-  <text class="label" x="500" y="360">Upright on the 1 in parallels, B up,</text>
-  <text class="label" x="500" y="376">gripped on the front and back faces,</text>
-  <text class="label" x="500" y="392">BK at the fixed jaw, L on the RIGHT.</text>
-  <text class="label" x="500" y="408">Hole .500 from L, .155 from BK.</text>
+  <line class="leader" x1="468" y1="70" x2="352" y2="76"/>
+  <circle class="leader-dot" cx="352" cy="76" r="2"/>
+  <text class="label" x="470" y="172.34">T-handle tap wrench</text>
+  <line class="leader" x1="468" y1="168.34" x2="410" y2="148.34"/>
+  <circle class="leader-dot" cx="410" cy="148.34" r="2"/>
+  <text class="label" x="470" y="252.34">4-40 tap (Ø.112), its point</text>
+  <text class="label" x="470" y="268.34">{{process.tap_reach_min_mm:in.3dot}}-{{process.tap_reach_max_mm:in.3dot}} below B (aim {{process.tap_reach_mm:in.3dot}}),</text>
+  <text class="label" x="470" y="284.34">in the window</text>
+  <line class="leader" x1="468" y1="262.34" x2="337.11" y2="252.34"/>
+  <circle class="leader-dot" cx="337.11" cy="252.34" r="2"/>
+  <text class="label" x="500" y="430">Upright on the 1 in parallels, B up,</text>
+  <text class="label" x="500" y="446">gripped on the front and back faces,</text>
+  <text class="label" x="500" y="462">BK at the fixed jaw, L on the RIGHT.</text>
+  <text class="label" x="500" y="478">Hole {{cad.thumb_screw_tap_station_in:.3dot}} from L, {{cad.thumb_screw_tap_z_from_min_in:.3dot}} from BK.</text>
 </svg>

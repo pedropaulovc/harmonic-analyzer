@@ -18,7 +18,7 @@
   <text class="datum-label" x="294" y="50" text-anchor="end">Y0 the bar's axis</text>
   <text class="label" x="420" y="127.63">1/2 in end mill on the second pass,</text>
   <text class="label" x="420" y="143.63">Y1.088, along X (into the page):</text>
-  <text class="label" x="420" y="159.63">.020 off the sawn top; it becomes T</text>
+  <text class="label" x="420" y="159.63">{{process.end_skim_mm:in.3dot}} off the sawn top; it becomes T</text>
   <line class="leader" x1="440" y1="167.63" x2="329.75" y2="167.63"/>
   <circle class="leader-dot" cx="329.75" cy="167.63" r="2"/>
   <text class="label" x="470" y="230">Blank upright on two 1 in parallels,</text>

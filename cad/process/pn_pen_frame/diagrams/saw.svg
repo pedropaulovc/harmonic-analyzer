@@ -14,7 +14,7 @@
   <line class="dims" x1="40" y1="292" x2="40" y2="308"/>
   <line class="dims" x1="262.2" y1="292" x2="262.2" y2="308"/>
   <text class="label" x="151.1" y="318" text-anchor="middle">{{process.blank_length_min_in:.2f}}–{{process.blank_length_max_in:.2f}} blank</text>
-  <text class="label" x="286" y="336">saw blade in its .125 kerf</text>
+  <text class="label" x="286" y="336">saw blade in its {{process.kerf_in:.3dot}} kerf</text>
   <text class="label" x="560" y="190">rest of the 4 in bar,</text>
   <text class="label" x="560" y="206">clamped in the saw's vise</text>
   <text class="label" x="50" y="100">C36000 flat bar, 3/8 × 1-1/4 (seen from above)</text>

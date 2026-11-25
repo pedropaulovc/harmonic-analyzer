@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 930 470" width="930" height="470">
-  <!-- Hand picture, to scale at 150 px/in (5.906 px/mm) from the blank's Ø.250 (6.35 mm). #54 drill Ø1.397 mm (plan [parameters] drill_54_dia_mm, shop tools.drill-54), 118° point, its tip eye_drill_past_mm 0.5 mm past the blank's underside; drawn short to a break line (its chuck is not drawn: no size on record). The #1 centre drill's spot before it is not drawn. Parallel 1 x 4 in (riser_height_mm, parallel_length_mm), jaw 44.9453 mm high (vise_jaw_height_mm), jaw top 13.1953 mm over the O.D. (jaw_top_over_od_mm), overhang 6.35 mm (head_overhang_mm), eye .16 from the head end (the drawing). -->
+  <!-- Hand picture, to scale at 150 px/in (5.906 px/mm) from the blank's Ø.250 (6.35 mm). #54 drill Ø1.397 mm (plan [parameters] drill_54_dia_mm, shop tools.drill-54), 118° point, its full diameter eye_drill_past_mm 0.5 mm past the blank's underside, its point 0.92 mm past (eye_tip_height_mm -0.92); drawn short to a break line (its chuck is not drawn: no size on record). The #1 centre drill's spot before it is not drawn. Parallel 1 x 4 in (riser_height_mm, parallel_length_mm), jaw 44.9453 mm high (vise_jaw_height_mm), jaw top 13.1953 mm over the O.D. (jaw_top_over_od_mm), overhang 6.35 mm (head_overhang_mm), eye .16 from the head end (the drawing). -->
   <rect class="paper" x="0" y="0" width="930" height="470"/>
   <text class="title" x="20" y="24">Side view along the jaws, to scale (150 px/in): the #54 drill through the eye in the overhang</text>
   <path class="fixture-vise" d="M270 362.5L910 362.5L913 366.17L910 369.83L913 373.5L910 377.17L913 380.83L910 384.5L270 384.5Z"/>
@@ -8,8 +8,8 @@
   <rect class="part-kept" x="232.5" y="175" width="153" height="37.5"/>
   <rect class="part-rest" x="720" y="175" width="150" height="37.5"/>
   <rect class="part-removed" x="252.38" y="175" width="8.25" height="37.5"/>
-  <path class="cutter" d="M260.62 46L260.62 212.97L256.5 215.45L252.38 212.97L252.38 46L254.44 43L256.5 46L258.56 43Z"/>
-  <line class="centre-line" x1="256.5" y1="36" x2="256.5" y2="241.45"/>
+  <path class="cutter" d="M260.62 46L260.62 215.45L256.5 217.93L252.38 215.45L252.38 46L254.44 43L256.5 46L258.56 43Z"/>
+  <line class="centre-line" x1="256.5" y1="36" x2="256.5" y2="243.93"/>
   <line class="arrow" x1="232.5" y1="60" x2="232.5" y2="100"/>
   <line class="datum" x1="232.5" y1="145" x2="232.5" y2="422.5"/>
   <text class="datum-label" x="224.5" y="418.5" text-anchor="end">X0 head end</text>
@@ -17,12 +17,12 @@
   <text class="datum-label" x="186.5" y="180" text-anchor="end">Z0 the O.D. top</text>
   <line class="dims" x1="270" y1="384.5" x2="270" y2="414.5"/>
   <line class="dims" x1="232.5" y1="408.5" x2="270" y2="408.5"/>
-  <text class="label" x="278" y="413.5">.25 out past the jaws' left face</text>
-  <line class="dims" x1="256.5" y1="245.45" x2="256.5" y2="438.5"/>
+  <text class="label" x="278" y="413.5">{{process.head_overhang_mm:in.2dot}} out past the jaws' left face</text>
+  <line class="dims" x1="256.5" y1="247.93" x2="256.5" y2="438.5"/>
   <line class="dims" x1="232.5" y1="432.5" x2="256.5" y2="432.5"/>
-  <text class="label" x="264.5" y="437.5">.16 to the eye</text>
-  <text class="label" x="286.5" y="58">#54 drill, Ø.055, through into air: its point</text>
-  <text class="label" x="286.5" y="74">.5 mm past the underside (after the centre drill's spot)</text>
+  <text class="label" x="264.5" y="437.5">{{cad.cross_hole_station_in:.2dot}} to the eye</text>
+  <text class="label" x="286.5" y="58">#54 drill, Ø{{process.drill_54_dia_mm:in.3dot}}, through into air: its full diameter</text>
+  <text class="label" x="286.5" y="74">{{process.eye_drill_past_mm:.1f}} mm past the underside (after the centre drill's spot)</text>
   <line class="leader" x1="284.5" y1="66" x2="260.62" y2="90"/>
   <circle class="leader-dot" cx="260.62" cy="90" r="2"/>
   <text class="label-on-clamp" x="480" y="121.08">fixed jaw (behind) grips the O.D.; the moving jaw not shown</text>

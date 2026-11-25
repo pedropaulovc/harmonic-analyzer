@@ -17,8 +17,8 @@
   <line class="arrow" x1="304" y1="72.34" x2="304" y2="112.34"/>
   <line class="datum" x1="266.31" y1="142.34" x2="306.31" y2="142.34"/>
   <text class="datum-label" x="262.31" y="147.34" text-anchor="end">Z0 (B)</text>
-  <text class="label" x="440" y="70">#43 drill (Ø.089): its full diameter 1 mm</text>
-  <text class="label" x="440" y="86">past the .24 bottom rail into the window</text>
+  <text class="label" x="440" y="70">#43 drill (Ø.089): its full diameter {{process.tap_drill_past_mm:.0f}} mm</text>
+  <text class="label" x="440" y="86">past the {{cad.window_bottom_wall_in:.2dot}} bottom rail into the window</text>
   <text class="label" x="440" y="102">(after the centre drill's spot)</text>
   <line class="leader" x1="450" y1="106" x2="335.65" y2="102.34"/>
   <circle class="leader-dot" cx="335.65" cy="102.34" r="2"/>
@@ -28,5 +28,5 @@
   <text class="label" x="500" y="330">Upright on the 1 in parallels, B up,</text>
   <text class="label" x="500" y="346">gripped on the front and back faces,</text>
   <text class="label" x="500" y="362">BK at the fixed jaw, L on the RIGHT.</text>
-  <text class="label" x="500" y="378">Hole .500 from L, .155 from BK.</text>
+  <text class="label" x="500" y="378">Hole {{cad.thumb_screw_tap_station_in:.3dot}} from L, {{cad.thumb_screw_tap_z_from_min_in:.3dot}} from BK.</text>
 </svg>

@@ -13,7 +13,9 @@
   <circle class="cutter" cx="173" cy="225.23" r="31.75"/>
   <text class="title" x="100" y="78">Plan, fixed jaw at the top</text>
   <line class="datum" x1="110" y1="104" x2="110" y2="144"/>
-  <text class="datum-label" x="46" y="128" text-anchor="end">X0 Y0</text>
+  <text class="datum-label" x="80" y="100" text-anchor="end">X0 Y0</text>
+  <line class="leader" x1="82" y1="98" x2="110" y2="130"/>
+  <circle class="leader-dot" cx="110" cy="130" r="2"/>
   <rect class="fixture-vise" x="410" y="440" width="280.66" height="14"/>
   <rect class="clamp" x="410" y="215.27" width="40" height="224.73"/>
   <rect class="clamp" x="650.66" y="215.27" width="40" height="224.73"/>
@@ -23,14 +25,14 @@
   <rect class="part-removed" x="450" y="204.42" width="200.66" height="5.71"/>
   <path class="cutter" d="M587.19 202.51L587.19 83.13L583.22 86.13L579.25 83.13L575.28 86.13L571.31 83.13L567.34 86.13L563.37 83.13L559.4 86.13L555.44 83.13L551.47 86.13L547.5 83.13L543.53 86.13L539.56 83.13L535.59 86.13L531.62 83.13L527.65 86.13L523.69 83.13L523.69 202.51A31.75 7.62 0 0 0 587.19 202.51Z"/>
   <line class="datum" x1="690.66" y1="210.13" x2="720.66" y2="210.13"/>
-  <text class="datum-label" x="724.66" y="215.13">Z.310, the pass</text>
+  <text class="datum-label" x="724.66" y="215.13">Z{{cad.back_face_depth_in:.3dot}}, the pass</text>
   <line class="datum" x1="690.66" y1="249.5" x2="720.66" y2="249.5"/>
   <text class="datum-label" x="724.66" y="254.5">Z0 the</text>
   <text class="datum-label" x="724.66" y="270.5">stacks' top</text>
   <line class="arrow" x1="80" y1="265.23" x2="250" y2="265.23"/>
   <text class="title" x="440" y="52">Across the jaws (fixed jaw at the right)</text>
   <text class="label" x="40" y="390">BK down, T to the fixed jaw, L to the LEFT; vise snug.</text>
-  <text class="label" x="40" y="406">Face to the depth .300-.320 in one level; hatched:</text>
+  <text class="label" x="40" y="406">Face to the depth {{cad.back_face_depth_min_in:.3dot}}-{{cad.back_face_depth_max_in:.3dot}} in one level; hatched:</text>
   <text class="label" x="40" y="422">the window, cut next with the 1/8 in end mill.</text>
   <text class="label" x="450" y="472">1 in + 1/2 in parallels stacked, under each end</text>
 </svg>

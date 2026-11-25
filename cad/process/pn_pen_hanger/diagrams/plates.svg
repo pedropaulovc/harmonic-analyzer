@@ -41,7 +41,7 @@
   <text class="label" x="463.45" y="583.85">each jaw</text>
   <line class="leader" x1="461.45" y1="563.85" x2="394.31" y2="577.85"/>
   <circle class="leader-dot" cx="394.31" cy="577.85" r="2"/>
-  <text class="label" x="463.45" y="474.12">the spoil plate, 1.40 wide</text>
+  <text class="label" x="463.45" y="474.12">the spoil plate, {{process.spoil_plate_width_mm:in.2dot}} wide</text>
   <line class="leader" x1="461.45" y1="470.12" x2="383.45" y2="482.12"/>
   <circle class="leader-dot" cx="383.45" cy="482.12" r="2"/>
   <text class="label-on-clamp" x="426.45" y="436.75" text-anchor="middle">fixed</text>

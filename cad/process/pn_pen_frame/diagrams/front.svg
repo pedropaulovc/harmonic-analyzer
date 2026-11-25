@@ -12,7 +12,9 @@
   <circle class="cutter" cx="173" cy="225.23" r="31.75"/>
   <text class="title" x="100" y="78">Plan, fixed jaw at the top</text>
   <line class="datum" x1="110" y1="104" x2="110" y2="144"/>
-  <text class="datum-label" x="46" y="128" text-anchor="end">X0 Y0</text>
+  <text class="datum-label" x="80" y="100" text-anchor="end">X0 Y0</text>
+  <line class="leader" x1="82" y1="98" x2="110" y2="130"/>
+  <circle class="leader-dot" cx="110" cy="130" r="2"/>
   <rect class="fixture-vise" x="410" y="440" width="280.66" height="14"/>
   <rect class="clamp" x="410" y="215.27" width="40" height="224.73"/>
   <rect class="clamp" x="650.66" y="215.27" width="40" height="224.73"/>
@@ -22,7 +24,7 @@
   <rect class="part-removed" x="450" y="201.88" width="200.66" height="2.54"/>
   <path class="cutter" d="M587.19 196.8L587.19 77.42L583.22 80.42L579.25 77.42L575.28 80.42L571.31 77.42L567.34 80.42L563.37 77.42L559.4 80.42L555.44 77.42L551.47 80.42L547.5 77.42L543.53 80.42L539.56 77.42L535.59 80.42L531.62 77.42L527.65 80.42L523.69 77.42L523.69 196.8A31.75 7.62 0 0 0 587.19 196.8Z"/>
   <line class="datum" x1="690.66" y1="204.42" x2="720.66" y2="204.42"/>
-  <text class="datum-label" x="724.66" y="209.42">Z.355, the pass</text>
+  <text class="datum-label" x="724.66" y="209.42">Z{{process.face_level_mm:in.3dot}}, the pass</text>
   <line class="datum" x1="690.66" y1="249.5" x2="720.66" y2="249.5"/>
   <text class="datum-label" x="724.66" y="254.5">Z0 the</text>
   <text class="datum-label" x="724.66" y="270.5">stacks' top</text>
@@ -30,6 +32,6 @@
   <text class="label" x="40" y="368">Arrowed: the passes run along X, stepping across the jaws.</text>
   <text class="title" x="440" y="52">Across the jaws (fixed jaw at the right)</text>
   <text class="label" x="40" y="392">Gripped on the ends, B to the fixed jaw, L to the LEFT.</text>
-  <text class="label" x="40" y="408">Skim the face up to .355 above the stacks: BK.</text>
+  <text class="label" x="40" y="408">Skim the face up to {{process.face_level_mm:in.3dot}} above the stacks: BK.</text>
   <text class="label" x="450" y="472">1 in + 1/2 in parallels stacked, against each jaw</text>
 </svg>
