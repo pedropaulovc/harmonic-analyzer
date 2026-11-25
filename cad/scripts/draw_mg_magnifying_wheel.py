@@ -96,7 +96,6 @@ from mg_magnifying_wheel_geom import (
     SPOKE_TIP_WIDTH,
     SPOKE_X0,
     TIE1_CDRILL_DEPTH,
-    TIE1_CDRILL_DIA,
     TIE1_X,
     TIE1_Y,
 )
@@ -200,9 +199,10 @@ _SECTION_PLACEMENT_TOL = 1e-5
 # The Ø reads the whole callout on one line, size, process, then the depth
 # as REF (drawing-guidelines.md rule 26: "a depth is never deferred to a
 # view"; the REF is complete because B-B's .32 locates the shoulder, as
-# draw_fr_harmonic_base's spotface), and the face view's TIE 1 callout
-# points at B-B (machinist review of run 20261122T203050502Z, 3/3: the hole
-# was defined in two places, its depth only as a view dimension).
+# draw_fr_harmonic_base's spotface). The face view's TIE 1 callout names
+# the #50 and points at B-B for its Ø and depth, typing neither (Codjiflo
+# r1 of #3529: the simplicity policy forbids hard-coded text standing for
+# a native dimension, and B-B prints both associatively).
 # The cutting line runs along TIE 1's row from just outside the spigot
 # (whose chord on that row would stand a sliver over the drum face, under
 # the Ø's line) out past the boss into the 300-360 spoke window's air, drawn
@@ -449,14 +449,10 @@ WIRE_NUMBER = str(_config.parts("sh-vn-music-wire")["number"])
 # horizontal.  Each takes at most two lines of words under its process
 # (rule 7).  TIE 1's #60 names its drill (rule 12; dt_crank_pin's "#45 DRILL
 # THRU"); its #50 counter-drill, from the far (drum) side, follows it in the
-# same callout with B-B's own values read from the geometry (machinist review
-# r1 and r2, runs 20261124T092122388Z and 20261124T094658536Z: the whole
-# stepped hole in one callout, at the front view, Y14.5 hole order); B-B
-# stays as the section that shows the step's shape.
-_TIE1_CDRILL_LINE = (
-    f"<MOD-DIAM>{TIE1_CDRILL_DIA / 25.4:.3f} #50 DRILL <HOLE-DEPTH> "
-    f"{TIE1_CDRILL_DEPTH / 25.4:.2f} FAR SIDE"
-).replace(">0.", ">.").replace(" 0.", " .")
+# same callout (machinist review r1 and r2, runs 20261124T092122388Z and
+# 20261124T094658536Z: the whole stepped hole at the front view, Y14.5 hole
+# order), its Ø and depth left to section B-B's native dimensions.
+_TIE1_CDRILL_LINE = "#50 FAR SIDE, SEE SECTION B-B"
 TIE1_CALLOUT = f"#60 DRILL THRU\n{_TIE1_CDRILL_LINE}\nWIRE TIE HOLE"
 TIE2_CALLOUT = "DRILL THRU\nRADIAL WIRE TIE HOLE\nFROM GROOVE BOTTOM"
 # Each side of a centred tie block past the DRILL THRU line's half-width
