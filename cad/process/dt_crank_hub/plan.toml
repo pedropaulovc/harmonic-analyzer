@@ -13,9 +13,9 @@
 #   round, its barrel in the 3-jaw over a shim wrap, the parted end out:
 #   face to length from the miked length (Z0 the front face), turn the seat
 #   until the arm slides on by hand, back to the shoulder at the measured
-#   arm thickness less .005, then centre, drill L and 23/64 and ream .3760
-#   through from the tailstock in the same chucking, so the bore runs true
-#   to the seat the arm is bonded on.
+#   arm thickness less .005, then centre, drill L and the 3/8 drill through
+#   from the tailstock in the same chucking, so the bore runs true to the
+#   seat the arm is bonded on.
 # - Setup 3, PM-30MV, vise: the hub lying on two parallels, gripped on the
 #   barrel; CM01 spots and drills #14 through it at .53 from the front face.
 # - Setup 4, bench: deburr, check the length, oil.
@@ -25,10 +25,12 @@
 #
 # Owner ruling 2026-11-24, fit audit question 21: the seat is a slip fit in
 # the arm, bonded with LOCTITE 638, turned to the arm's bore until it slides
-# on by hand (no sizing plug, no B + .0009 press arithmetic). Fit audit
-# 2026-11-23, MHA-DT-31.bore: the bore is the .3760 reamer's, printed with no
-# band; MHA-DT-11's shank is turned to it, so nothing here gauges it (the
-# Class ZZ pins zz-pins-3760-3765 are dropped from this plan).
+# on by hand (no sizing plug, no B + .0009 press arithmetic). Delegated
+# ruling 2026-11-25 (Main), no owner number changed; owner review #2144
+# (D27): the bore is the 3/8 drill's, Ø.375 at DRILLED HOLES (.375-.379);
+# MHA-DT-11's shank is turned to its smallest measured reading, so nothing
+# here gauges it (the .3760 reamer, its 23/64 pilot and the Class ZZ pins
+# zz-pins-3760-3765 are dropped from this plan).
 #
 # NC (cad/process/dt_crank_hub/cam.py): CM01_pin_hole. Program names, the
 # [parameters] and the milling_cuts names are a contract with that recipe.
@@ -138,14 +140,9 @@ name = "L drill"
 ref = "drill-l"
 
 [[tools]]
-id = "drill-23-64"
-name = "23/64 drill"
-ref = "jig-drill-23-64"
-
-[[tools]]
-id = "reamer"
-name = ".3760 chucking reamer"
-ref = "reamer-0376"
+id = "drill-3-8"
+name = "3/8 drill"
+ref = "drill-3-8"
 
 [[tools]]
 id = "spot"
@@ -229,13 +226,13 @@ cut_diameter_mm = 25.4
 
 [[setups]]
 machine_kind = "lathe"
-title = "Turned round: face to length, turn the seat to the arm, ream the bore"
+title = "Turned round: face to length, turn the seat to the arm, drill the bore"
 machine = "PM-1127VF-LB lathe"
 indexing = "none"
 machine_ref = "pm-1127vf-lb"
 holding = "3-jaw over a shim wrap of brass shim on the barrel, {{process.regrip_grip_in:.2dot}} in of the hub in the jaws from the rear face (the relief end inward), the parted end {{process.regrip_out_mm:in.2dot}} in out. Nothing seats the hub axially: the jaw tips may stand proud of the chuck face."
 datum = "Z0: the front face, faced in Op 80 to {{process.length_target_in:.3dot}} from the rear face, preset from the length miked there."
-diagram = { file = "diagrams/regrip.svg", alt = "The hub turned round, its barrel in the jaws over a shim wrap, the parted end out: faced to length, the seat turned back to the shoulder, the bore drilled and reamed through from the tailstock." }
+diagram = { file = "diagrams/regrip.svg", alt = "The hub turned round, its barrel in the jaws over a shim wrap, the parted end out: faced to length, the seat turned back to the shoulder, the bore drilled through from the tailstock." }
 lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{cad.barrel_dia_mm}}", stock_diameter_mm = "{{cad.barrel_dia_mm}}", stickout_mm = "{{process.regrip_out_mm}}", minimum_diameter_mm = "{{cad.seat_dia_ref_mm}}", support = "none" }
 
 [[setups.operations]]
@@ -295,24 +292,14 @@ peck = { step_mm = 7.366, retract = "full" }
 [[setups.operations]]
 cut_kind = "other"
 speed_kind = "spindle"
-tool = "drill-23-64"
+tool = "drill-3-8"
 drilling = "twist_drill"
-sizing = "other"
-instruction = "Open it with the 23/64 drill: lips on the L hole's edge, zero the quill scale, drill through until it reads 1.15, backing fully out every .36. It leaves the reamer about .008 a side."
-settings = "lathe-drill-23-64-1018"
-cut_diameter_mm = 9.128125
-hole_depth_mm = 29.21
-peck = { step_mm = 9.128125, retract = "full" }
-
-[[setups.operations]]
-cut_kind = "other"
-speed_kind = "spindle"
-tool = "reamer"
-drilling = "none"
 sizing = { kind = "band", band_mm = "{{cad.bore_dia_band_mm}}" }
-instruction = "Ream .3760 through from the tailstock, spindle running: feed the reamer in until its lead chamfer meets the hole's mouth, zero the quill scale, feed slowly until it reads 1.10, and withdraw with the spindle still running."
-settings = "lathe-ream-3760-1018"
-cut_diameter_mm = "{{cad.bore_dia_mm}}"
+instruction = "Open it with the 3/8 drill (drawing: Ø.375 3/8 DRILL THRU): lips on the L hole's edge, zero the quill scale, drill through until it reads 1.15, backing fully out every .38; ease off as it breaks out of the rear face inside the jaws."
+settings = "lathe-drill-3-8-1018"
+cut_diameter_mm = 9.525
+hole_depth_mm = 29.21
+peck = { step_mm = 9.525, retract = "full" }
 
 [[setups]]
 machine_kind = "other"
@@ -321,7 +308,7 @@ machine = "PM-30MV CNC (FluidNC, CNCjs with the electronic tool setter) / vise, 
 indexing = "none"
 machine_ref = "pm-30mv"
 holding = "The PM 6 in vise (jaws {{process.vise_jaw_height_mm:in.2f}} tall above its seat). A 1 in parallel, 1/8 in thick, against each jaw. The hub lying along the jaws, centred on them, front face to the LEFT, its barrel on the parallels' inner top edges and gripped by the jaws; the seat and relief hang clear of both. Between the parallels a {{process.cross_parallel_gap_mm:in.3dot}} gap: the #14 runs out into it. Tap the barrel down onto both edges while closing the vise."
-datum = "Program CM01_pin_hole (cam:dt_crank_hub). G54: X0 the front face, +X toward the rear face; Y0 the barrel's axis, +Y toward the fixed (rear) jaw; Z0 the barrel's top line. Tool lengths from the tool setter at each M6; the jaw tops stand {{process.cross_jaw_top_mm:in.3dot}} above Z0. After any reset, alarm, stall or E-stop, or if the hub is disturbed in the vise: home ($H) and repeat Ops 150–170 before Cycle Start. At each M6 the program has stopped the spindle (M5) and shows the tool and speed: wait for the spindle to stop, change the tool, set the speed, then Cycle Start."
+datum = "Program CM01_pin_hole (cam:dt_crank_hub). G54: X0 the front face, +X toward the rear face; Y0 the barrel's axis, +Y toward the fixed (rear) jaw; Z0 the barrel's top line. Tool lengths from the tool setter at each M6; the jaw tops stand {{process.cross_jaw_top_mm:in.3dot}} above Z0. After any reset, alarm, stall or E-stop, or if the hub is disturbed in the vise: home ($H) and repeat Ops 140–160 before Cycle Start. At each M6 the program has stopped the spindle (M5) and shows the tool and speed: wait for the spindle to stop, change the tool, set the speed, then Cycle Start."
 diagram = { file = "diagrams/cross.svg", alt = "The hub lying in the vise on two parallels' edges, gripped on its barrel; the #14 drills down through the barrel and bore {{cad.pin_hole_station_in:.2dot}} from the front face, into the gap between the parallels." }
 envelope = "other"
 vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{cad.barrel_dia_mm}}", along_jaws_mm = "{{cad.envelope_y_mm}}", part_height_mm = "{{cad.barrel_dia_mm}}", parallel_height_mm = "{{process.parallel_height_mm}}", overhang_mm = [-66.7639, -66.7639], jaw_offset = "centred", fixed_jaw_face = "machined", moving_jaw_face = "machined", moving_jaw_contact = "rod" }
@@ -385,7 +372,7 @@ title = "Bench: deburr, check the length, oil"
 machine = "Bench"
 envelope = "other"
 indexing = "none"
-diagram = { file = "diagrams/inspect.svg", alt = "The finished hub: the seat turned to the arm, the barrel, the relief, the reamed bore and the #14 cross hole; its length from the front face to the rear face." }
+diagram = { file = "diagrams/inspect.svg", alt = "The finished hub: the seat turned to the arm, the barrel, the relief, the drilled bore and the #14 cross hole; its length from the front face to the rear face." }
 vise_hold = "other"
 beam = "other"
 
@@ -399,20 +386,20 @@ feed = "hand"
 
 [[setups.operations]]
 speed_kind = "other"
-tool = "reamer"
+tool = "drill-3-8"
 drilling = "none"
 sizing = "other"
-instruction = "Clear the #14's breakthrough burrs inside the bore: grip the .3760 reamer's shank upright in the bench vise between soft jaws, oil it, and turn the hub down over it by hand, always in the reamer's cutting direction, through the full length; lift it off turning the same way. Blow out and wipe the bore."
+instruction = "Clear the #14's breakthrough burrs inside the bore: grip the 3/8 drill's shank upright in the bench vise between soft jaws, oil it, and turn the hub down over it by hand, always in the drill's cutting direction, through the full length; lift it off turning the same way. Blow out and wipe the bore."
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Mike the length across the front and rear faces. The bore is the reamer's (drawing: Ø.3760 REAM THRU, no band): MHA-DT-11's shank is turned to it, so it is not gauged here."
+instruction = "Mike the length across the front and rear faces. The bore is the 3/8 drill's (drawing: Ø.375 3/8 DRILL THRU, DRILLED HOLES): MHA-DT-11's shank is turned to it, so it is not gauged here."
 inspection = "Length {{cad.rear_face_length_min_in:.3dot}}–{{cad.rear_face_length_max_in:.3dot}}, micrometer."
 gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.rear_face_length_band_mm}}" }]
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Length outside its band in Op 230: scrapped, not reworked; make another from Setup 1."
+instruction = "Length outside its band in Op 220: scrapped, not reworked; make another from Setup 1."
 feed = "hand"
 
 [[setups.operations]]

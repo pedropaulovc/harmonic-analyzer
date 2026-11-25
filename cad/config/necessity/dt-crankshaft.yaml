@@ -3,7 +3,10 @@
 # not on the sheet).  The fit audit's rows for MHA-DT-11 (2026-11-23,
 # each one kept stands on its entry below): the drive-pin holes reamed with no
 # band, the offsets, spigot and overall kept as drawn; the three turned fits
-# became REF under note 3 and are not tight bands.
+# became REF under note 3 and are not tight bands.  The (Ø.125) hole for pin
+# MHA-DT-29 (former N-06) is match-reamed through MHA-DT-10's pin hole at
+# assembly for the pin that joins them: drawing-guidelines rule 4, form 2
+# ("needs no register entry").
 necessity:
   - id: N-01
     feature: "sheet 1, END view, 2X Ø.0930 REAM .1555 drive-pin holes"
@@ -39,8 +42,3 @@ necessity:
     kind: joint
     reason: "the taper pin alone drives the crank"
     source: "fit audit 2026-11-23, MHA-DT-31_DT-11.taper_pin: kept as drawn (README, Kept as drawn)"
-  - id: N-06
-    feature: "sheet 1, (Ø.125) match-ream thru MHA-DT-10 pin hole for MHA-DT-29"
-    kind: gap
-    reason: "a loose drive pin walks out of the boss"
-    source: "fit audit 2026-11-23, MHA-DT-10_DT-11.pin_hole_MHA-DT-29 (unchanged); dt_crank_pinion_spec PIN_FIT_LINES"

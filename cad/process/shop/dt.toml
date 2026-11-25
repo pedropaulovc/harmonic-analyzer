@@ -50,6 +50,9 @@ diameter_mm = 7.493
 [tools.drill-v]  # Drills V
 description = "V (.3770 in) drill, 115-piece index"
 diameter_mm = 9.5758
+[tools.drill-3-8]  # 115-piece index (1/16-1/2 by 64ths); MHA-DT-31's 3/8 DRILL THRU bore (D27)
+description = "3/8 (.3750 in) drill, 115-piece index"
+diameter_mm = 9.525
 [tools.taper-pin-reamer]  # B-reamer-taper-pin
 description = "Taper-pin reamer 1:48 (No. 3) for MHA-DT-09"
 [tools.reamer-2510]  # B-reamer-.2510
@@ -177,18 +180,14 @@ feed = "tailstock quill by hand, a steady positive feed, cutting oil; back fully
 # Facing, turning, the L drill and parting take shop/lathe.toml's 1018 rows.
 # LittleMachineShop "Cutting Speeds" (read live 2026-11-22, lathe.toml
 # header), Drilling & Reaming, Plain carbon steels 1006-1026: drilling 60-100,
-# reaming 40-65 ft/min; each takes the low end (the 23/64 drill 637 rpm, the
-# .3760 reamer 406 rpm).
-[settings.lathe-drill-23-64-1018]
-tool = "jig-drill-23-64"
+# reaming 40-65 ft/min; each takes the low end (the 3/8 drill 611 rpm).  The
+# bore is the 3/8 drill's at DRILLED HOLES (delegated ruling 2026-11-25, D27),
+# so the hub takes no 23/64 pilot and no reamer.
+[settings.lathe-drill-3-8-1018]
+tool = "drill-3-8"
 material = "lathe-1018-cold-finished"
 sfm = 60
 feed = "tailstock quill by hand, steady, cutting oil"
-[settings.lathe-ream-3760-1018]
-tool = "reamer-0376"
-material = "lathe-1018-cold-finished"
-sfm = 40
-feed = "tailstock quill by hand, slow and steady, cutting oil; withdraw with the spindle running"
 
 # --- Stock the process plans name (stock_refs) ---------------------------------
 # One record per cad/config/shop-equipment/stock-*.toml key a plan names, so

@@ -8,25 +8,20 @@
 # .XX row: its reason, 64T engagement and T120 clearance, is no mesh centre
 # distance or run-out, and no check fails at .45-.47 (dt_crank_pinion_spec
 # FACE_WIDTH_BAND; machinist review r1, farm run 20261124T110807008Z;
-# drawing-guidelines rule 4: a register reason not of its kind).
+# drawing-guidelines rule 4: a register reason not of its kind).  The (Ø.125)
+# pin hole for MHA-DT-29 (former N-02) is match-drilled and reamed through
+# MHA-DT-11 at assembly for the pin that joins them: rule 4, form 2 ("needs no
+# register entry").  The tooth-face shoulder's R.016 MAX (former N-05) is a
+# single-limit corner radius, which rule 4 takes out of the tight-band test;
+# its limit keeps the 64T tips clear (dt_crank_pinion_spec SHOULDER_RADIUS_BAND).
 necessity:
   - id: N-01
     feature: "sheet 1, section A-A, Ø.3135 REAM THRU bore"
-    kind: trace
+    kind: mesh
     reason: "bore shake is pinion run-out in the 64T mesh"
-    source: "shaft_in_bushing clearance .0010-.0023 (BORE_DIAMETRAL_CLEARANCE); the .3135 reamer (to order: reamer-3135)"
-  - id: N-02
-    feature: "sheet 1, section A-A, (Ø.125) match drill and ream for pin MHA-DT-29"
-    kind: gap
-    reason: "a loose drive pin walks out of the boss"
-    source: "dt_crank_pinion_spec PIN_FIT_LINES (light hammer fit); the .1240 reamer"
+    source: "shaft_in_bushing clearance .0010-.0023 (BORE_DIAMETRAL_CLEARANCE); reamed with the owned adjustable set; MHA-DT-11's seat turned to the measured bore"
   - id: N-04
     feature: "sheet 1, section A-A, .33 +.000/-.010 full-OD shoulder length"
     kind: gap
     reason: "a longer shoulder closes the air to cone gear T120"
     source: "build_dt_drive_train_assembly T120 clearances (SHOULDER_LENGTH_BAND)"
-  - id: N-05
-    feature: "sheet 1, section A-A, tooth-face shoulder R.016 MAX"
-    kind: mesh
-    reason: "a larger fillet closes the air to the 64T tips"
-    source: "dt_crank_pinion_spec SHOULDER_RADIUS_BAND"

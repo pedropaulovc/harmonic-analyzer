@@ -23,7 +23,6 @@ from dt_crankshaft_spec import (
     PINION_SEAT_DIA,
     PINION_SEAT_DIA_BAND,
     SHAFT_DIA,
-    SHAFT_DIA_BAND,
     SURFACE_FINISHES,
 )
 
@@ -91,8 +90,9 @@ def _clearance(
 
 
 # Note 3: the three fit diameters.  The crankshaft is made last of the fit
-# pairs: each diameter is turned to its mate's bore (the bores are the
-# reamers', no band), so each prints as a REF and the acceptance prints here
+# pairs: each diameter is turned to its mate's bore (the reamers' bores, no
+# band, and MHA-DT-31's 3/8 drilled bore, D27), so each prints as a REF and
+# the acceptance prints here
 # once (fit audit 2026-11-23, MHA-DT-31.bore__MHA-DT-11.hub_shaft,
 # MHA-DT-11.journals and MHA-DT-10.bore__MHA-DT-11.pinion_seat; drawing-
 # guidelines rule 4 v2).  Each callout keeps the fit name above its value
@@ -107,7 +107,9 @@ FIT_CALLOUT = see_note(FIT_NOTE_NUMBER)
 SLIDING_FIT = "SLIDING FIT"
 JOURNAL_FIT = "2X RUNNING FIT"
 FIT_CLEARANCES = {
-    "MHA-DT-31": _clearance(hub.HUB_BORE_DIA, hub.HUB_BORE_BAND, SHAFT_DIA, SHAFT_DIA_BAND),
+    # The drilled hub bore is measured (its smallest reading) and the stub
+    # turned to it, so the clearance is the turning's own (D27).
+    "MHA-DT-31": (hub.SHAFT_CLEARANCE_MIN, hub.SHAFT_CLEARANCE_MAX),
     "MHA-DT-05": _clearance(JOURNAL_BORE_DIA, JOURNAL_BORE_BAND, JOURNAL_DIA, JOURNAL_DIA_BAND),
     "MHA-DT-10": _clearance(
         pinion.BORE_DIA, pinion.BORE_DIA_BAND, PINION_SEAT_DIA, PINION_SEAT_DIA_BAND

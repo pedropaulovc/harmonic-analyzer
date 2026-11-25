@@ -46,7 +46,7 @@ import math
 import _config
 from _inch_wall_limits import WALL_FLOOR_MM, WALL_TARGET_MM
 from _package_units import drawing_unit
-from _printed_tolerance import edge_break_chamfer_mm, printed_band_mm
+from _printed_tolerance import drilled_oversize_mm, edge_break_chamfer_mm, printed_band_mm
 from _title_block_units import render_number
 from dt_crank_handle_butt_cup_spec import (
     BODY_CHAMFER_MIN as CUP_BODY_CHAMFER_MIN,
@@ -56,7 +56,8 @@ from dt_crank_handle_butt_cup_spec import (
 )
 from dt_crank_handle_ferrule_spec import (
     BORE_DIA as FERRULE_BORE_DIA,
-    BORE_DIA_TOL as FERRULE_BORE_DIA_TOL,
+    BORE_DIA_MAX as FERRULE_BORE_DIA_MAX,
+    BORE_DIA_MIN as FERRULE_BORE_DIA_MIN,
     LENGTH as FERRULE_LENGTH,
     INSTALLED_OUTER_DIA as FERRULE_OUTER_DIA,
     STOCK_DIA_MIN as FERRULE_STOCK_DIA_MIN,
@@ -96,14 +97,16 @@ _GENERAL_2PL = printed_band_mm(2, unit=UNIT)
 # to the bore less .0050-.0075, trial hole in an oak offcut first" (it was
 # reamed .1610); owner ruling 2026-11-24, fit audit question 14: the
 # shoulder's own trial steps read the bore, no pins, and "handle stays DRILL
-# #20; DT-32 shoulder by trial, limits .1535-.1585".  A #20 cuts .1610 and up
-# (DRILLED HOLES +.004/0); the sheet caps the bore at .1635 MAX
-# (PIVOT_BORE_FIT_MAX, the walls' basis: a bore the shoulder's .1635 trial
-# step enters is rejected).  The band below is that accepted drilled range, an
-# analysis band for the walls and the shoulder's limits, not a printed one:
-# the sheet prints the drill and the cap, and MHA-DT-32 prints the fit.
+# #20; DT-32 shoulder by trial, limits .1535-.1585".  A #20 cuts .1610 and up,
+# and the sheet takes it at DRILLED HOLES (+.004/0, .1610-.1650): a plain
+# drilled hole, no cap of its own (delegated ruling 2026-11-25 (Main),
+# precedent: owner ruling 2026-11-24 merging the fit policy; RETIRES the
+# owner's fit-audit Q14 answer's trial step (the shoulder's .1635 trial must
+# not enter); owner review #2144 (D26)).  The band below is that drilled
+# range, an analysis band for the walls and the shoulder's limits, not a
+# printed one: the sheet prints the drill, and MHA-DT-32 prints the fit.
 PIVOT_BORE_DIA = 4.0894  # .1610
-PIVOT_BORE_BAND = (0.0635, 0.0)  # #20 drilled, accepted .1610-.1635
+PIVOT_BORE_BAND = (drilled_oversize_mm(unit=UNIT), 0.0)  # #20 drilled, .1610-.1650
 
 # The tenon shoulder is where the ferrule seats, FERRULE_LENGTH from the arm
 # face.  The oak leaves it flush with the ferrule's OD (user, handle2.png).
@@ -251,10 +254,10 @@ BUTT_WALL_MIN = round(
     6,
 )
 # The tenon is turned to suit the actual ferrule bore (Codex P1/P2 on #1139):
-# the largest banded bore with the tightest glue line gives the largest tenon,
-# and the smallest bore with the widest line the smallest.
-TENON_DIA_MAX = FERRULE_BORE_DIA + FERRULE_BORE_DIA_TOL - FERRULE_TENON_GLUE_LINE[0]
-TENON_DIA_MIN = FERRULE_BORE_DIA - FERRULE_BORE_DIA_TOL - FERRULE_TENON_GLUE_LINE[1]
+# the largest drilled bore with the tightest glue line gives the largest
+# tenon, and the smallest bore with the widest line the smallest.
+TENON_DIA_MAX = FERRULE_BORE_DIA_MAX - FERRULE_TENON_GLUE_LINE[0]
+TENON_DIA_MIN = FERRULE_BORE_DIA_MIN - FERRULE_TENON_GLUE_LINE[1]
 # The shoulder the ferrule seats on, radially, before the root relief: the oak
 # turned its .XX band small at the shoulder over the largest tenon.
 _SEAT_RADIAL_UNRELIEVED = ((2.0 * SHOULDER_R - _GENERAL_2PL) - TENON_DIA_MAX) / 2.0
@@ -277,7 +280,8 @@ FERRULE_SEAT_RADIAL_FLOOR = 0.5
 # pivot bore within BORE_ECCENTRICITY, and the shoulder is skimmed with
 # MHA-DT-34 after cure, true to it within the same again (codjiflo on PR
 # #1989).  Each limit is rounded inward to the printed thousandth; the leg
-# prints their mid-band, which must itself print at .XXX, as the band must.
+# prints the widest .XXX band inside them, centred on their mid-band rounded
+# down to the thousandth (the limits' span may be odd in thousandths).
 _RELIEF_TO_SKIM_OFFSET_MAX = 2.0 * BORE_ECCENTRICITY
 TENON_ROOT_ROUND_REACH = INSIDE_CORNER_R_MAX * (1.0 + math.sqrt(2.0))
 TENON_ROOT_RELIEF_PLACES = 3
@@ -297,8 +301,18 @@ if not TENON_ROOT_RELIEF_MIN < TENON_ROOT_RELIEF_MAX:
         "MHA-DT-08: no tenon-root relief keeps the root round behind the ferrule "
         "seat face and leaves the ferrule its shoulder"
     )
-TENON_ROOT_RELIEF = round((TENON_ROOT_RELIEF_MIN + TENON_ROOT_RELIEF_MAX) / 2.0, 6)
-TENON_ROOT_RELIEF_TOL = round((TENON_ROOT_RELIEF_MAX - TENON_ROOT_RELIEF_MIN) / 2.0, 6)
+TENON_ROOT_RELIEF = _to_grid(
+    (TENON_ROOT_RELIEF_MIN + TENON_ROOT_RELIEF_MAX) / 2.0,
+    TENON_ROOT_RELIEF_PLACES,
+    math.floor,
+)
+TENON_ROOT_RELIEF_TOL = round(
+    min(
+        TENON_ROOT_RELIEF - TENON_ROOT_RELIEF_MIN,
+        TENON_ROOT_RELIEF_MAX - TENON_ROOT_RELIEF,
+    ),
+    6,
+)
 if any(
     abs(_to_grid(value, TENON_ROOT_RELIEF_PLACES, round) - value) > 1e-6
     for value in (TENON_ROOT_RELIEF, TENON_ROOT_RELIEF_TOL)
@@ -311,7 +325,7 @@ if any(
 FERRULE_SEAT_RADIAL_MIN = (
     _SEAT_RADIAL_UNRELIEVED
     - _RELIEF_TO_SKIM_OFFSET_MAX
-    - TENON_ROOT_RELIEF_MAX
+    - (TENON_ROOT_RELIEF + TENON_ROOT_RELIEF_TOL)
     - EDGE_BREAK_MAX_MM
 )
 # The shortest tenon's unbroken bonded length inside the ferrule, less the
@@ -332,7 +346,7 @@ FERRULE_OFFSET_MAX = BORE_ECCENTRICITY
 FERRULE_SKIMMED_WALL_MIN = (
     (2.0 * SHOULDER_R - _GENERAL_2PL) / 2.0
     - BORE_ECCENTRICITY
-    - ((FERRULE_BORE_DIA + FERRULE_BORE_DIA_TOL) / 2.0 + FERRULE_OFFSET_MAX)
+    - (FERRULE_BORE_DIA_MAX / 2.0 + FERRULE_OFFSET_MAX)
 )
 # drawing-guidelines.md rule 17's wall floor, on an inch sheet .060.
 TENON_WALL_FLOOR_MM = WALL_FLOOR_MM
@@ -359,11 +373,10 @@ FERRULE_ARM_FACE_WALL_ACCEPTED_MM = 1.25
 TENON_END_GAP_MIN = round(
     (FERRULE_LENGTH - _GENERAL_2PL) - (TENON_LENGTH + _GENERAL_2PL), 6
 )
-# The largest bore the sheet accepts: its .1635 MAX cap on the #20 drilled
-# bore (owner ruling 2026-11-24, fit audit question 14: the shoulder's .1635
-# trial step must not enter), not the drill's .165.  MHA-DT-32's spec checks
-# this equals the top of the accepted drilled range.
-PIVOT_BORE_FIT_MAX = 4.1529  # .1635
+# The largest bore the sheet accepts: the #20's DRILLED HOLES upper limit
+# .165 (D26: the .1635 cap is retired).  MHA-DT-32's spec checks this equals
+# the top of the accepted drilled range.
+PIVOT_BORE_FIT_MAX = PIVOT_BORE_DIA + PIVOT_BORE_BAND[0]  # .1650
 # Oak between the smallest tenon and the largest fitted pivot bore.
 TENON_STRAIGHT_WALL_MIN = (TENON_DIA_MIN - PIVOT_BORE_FIT_MAX) / 2.0 - BORE_ECCENTRICITY
 # The governing tenon wall, at its free end: the outside edge and the pivot

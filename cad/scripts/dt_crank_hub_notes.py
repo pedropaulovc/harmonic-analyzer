@@ -54,11 +54,14 @@ def seat_callout(mate: str, name: str = "CRANK ARM") -> str:
     )
 
 
-# The bore comes off the owned .3760 reamer and prints that size with no
-# band; MHA-DT-11's shank is made last, turned to it, and carries the fit's
-# acceptance on its own sheet (fit audit 2026-11-23, MHA-DT-31.bore: the
-# acceptance prints once, on the member made last).
-BORE_CALLOUT = "REAM THRU\nMHA-DT-11 IS TURNED\nTO THIS BORE"
+# The bore is the named 3/8 drill's, Ø.375 at DRILLED HOLES (rule 3: a named
+# drill keeps its own decimal; delegated ruling 2026-11-25 (Main), no owner
+# number changed; owner review #2144 (D27)).  MHA-DT-11's shank is made last,
+# turned to the bore's smallest reading, and carries the fit's acceptance on
+# its own sheet (fit audit 2026-11-23, MHA-DT-31.bore: the acceptance prints
+# once, on the member made last).
+BORE_DRILL = "3/8"
+BORE_CALLOUT = f"{BORE_DRILL} DRILL THRU\nMHA-DT-11 IS TURNED\nTO THIS BORE"
 # The arm bore is made first and carries the band; this seat is turned to fit
 # it, so its nominal prints as a reference under the made-to-fit callout.
 SEAT_CALLOUT = seat_callout("MHA-DT-06")

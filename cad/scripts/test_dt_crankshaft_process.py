@@ -40,7 +40,7 @@ def test_the_program_drills_the_station_through_the_stub_into_air():
     centres = [k["centres"] for _p, check, k in ctx["expect"] if check == "holes"]
     assert centres == [[[round(-station, 3), 0.0]]] * 2
     bottoms = [k["z_bottom"] for _p, check, k in ctx["expect"] if check == "holes"]
-    assert min(bottoms) < -f["hub_shaft"]["nominal_dia"]
+    assert min(bottoms) < -f["hub_shaft"]["dia_ref"]
     # Its far limit still lies in the overhang, past the jaws' left face.
     assert f["cross_hole"]["station"][1] > p["jaw_left_from_f_mm"]
 

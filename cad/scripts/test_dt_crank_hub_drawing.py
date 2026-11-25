@@ -40,8 +40,9 @@ def test_u27_walls_hold_the_inch_wall_target_at_the_printed_bands() -> None:
     assert geometry.WALL_TARGET_MM == pytest.approx(0.080 * 25.4)
     # The seam hole is the 5/32 drill at its DRILLED HOLES maximum and the
     # seat may sit .003 under the arm bore's minimum (fit audit 2026-11-23,
-    # MHA-DT-06_DT-31.seam_pin; fit audit question 21).
-    assert geometry.SEAM_WEB_WORST_MM == pytest.approx(2.162, abs=1e-3)
+    # MHA-DT-06_DT-31.seam_pin; fit audit question 21); the bore at the 3/8
+    # drill's DRILLED HOLES .379 (D27, was the reamer's .3765: 2.162).
+    assert geometry.SEAM_WEB_WORST_MM == pytest.approx(2.130, abs=1e-3)
     assert geometry.ARM_CHEEK_WORST_MM == pytest.approx(2.362, abs=1e-3)
     assert min(geometry.SEAM_WEB_WORST_MM, geometry.ARM_CHEEK_WORST_MM) >= (
         geometry.WALL_TARGET_MM
@@ -124,8 +125,9 @@ def test_rear_relief_clears_the_t12_chain_plates_and_keeps_its_wall() -> None:
     assert dt_crank_hub_spec.DRAWING_PRECISION["HubProfile"]["ReliefLength"] == 2
     assert dt_crank_hub_spec.DRAWING_PRECISION["HubProfile"]["HubLength"] == 3
     assert dt_crank_hub_spec.DRAWING_PRECISION["HubProfile"]["ReliefDia"] == 2
-    # drawing-guidelines.md rule 17 (walls and webs) wall over the bore, edges broken.
-    assert geometry.RELIEF_WALL_WORST_MM == pytest.approx(2.838, abs=1e-3)
+    # drawing-guidelines.md rule 17 (walls and webs) wall over the bore, edges
+    # broken, at the drilled bore's .379 (D27, was 2.838 at .3765).
+    assert geometry.RELIEF_WALL_WORST_MM == pytest.approx(2.807, abs=1e-3)
     assert geometry.RELIEF_WALL_WORST_MM >= geometry.WALL_TARGET_MM
     # The MHA-DT-09 ream stays on the full barrel.
     assert (
@@ -214,18 +216,23 @@ def test_floated_stack_a_ignores_the_seat_and_hub_stations() -> None:
 
 
 def test_named_shaft_fit_class_bounds_the_through_bore() -> None:
-    shaft_limits = (
-        geometry.SHAFT_DIA + geometry.SHAFT_DIA_BAND[1],
-        geometry.SHAFT_DIA + geometry.SHAFT_DIA_BAND[0],
-    )
+    # D27 (delegated ruling 2026-11-25): the bore is the 3/8 drill's at
+    # DRILLED HOLES, .375-.379, and MHA-DT-11's stub is turned to its smallest
+    # reading less the catalogued shaft-in-bushing clearance.
     bore_limits = (
         geometry.HUB_BORE_DIA + geometry.HUB_BORE_BAND[1],
         geometry.HUB_BORE_DIA + geometry.HUB_BORE_BAND[0],
     )
-    clearances = (bore_limits[0] - shaft_limits[1], bore_limits[1] - shaft_limits[0])
-    assert clearances == pytest.approx(
+    assert bore_limits == pytest.approx((0.375 * 25.4, 0.379 * 25.4))
+    assert geometry.HUB_BORE_DIA_MAX == pytest.approx(0.379 * 25.4)
+    assert (geometry.SHAFT_CLEARANCE_MIN, geometry.SHAFT_CLEARANCE_MAX) == pytest.approx(
         tuple(_config.fit("shaft_in_bushing", "diametral_clearance_mm"))
     )
+    # The REF stub never stands over the smallest drilled bore.
+    assert geometry.SHAFT_DIA + geometry.SHAFT_DIA_BAND[0] <= bore_limits[0]
+    # The walls over the bore hold the .080 target at the .379 bore.
+    assert geometry.SEAM_WEB_WORST_MM >= geometry.WALL_TARGET_MM
+    assert geometry.RELIEF_WALL_WORST_MM >= geometry.WALL_TARGET_MM
 
 
 def test_seat_slip_fit_is_a_bondable_gap() -> None:
@@ -309,9 +316,9 @@ def test_matched_fits_and_distinct_pins_live_on_their_feature_callouts() -> None
 
     assert dt_crank_arm_spec.SEAM_BOND_CLEARANCE_TEXT in dt_crank_arm_spec.SEAM_NOTE
     assert "REAM" not in seam
-    # The bore is the .3760 reamer's, no band; the shank is turned to it.
+    # The bore is the 3/8 drill's (D27); the shank is turned to it.
     assert dt_crank_hub_notes.BORE_CALLOUT.splitlines() == [
-        "REAM THRU",
+        "3/8 DRILL THRU",
         "MHA-DT-11 IS TURNED",
         "TO THIS BORE",
     ]
