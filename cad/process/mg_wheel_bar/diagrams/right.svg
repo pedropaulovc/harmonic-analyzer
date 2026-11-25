@@ -24,7 +24,7 @@
   <text class="label" x="272" y="129">+Y, conventional</text>
   <line class="leader" x1="235" y1="160" x2="140" y2="96"/>
   <text class="label" x="20" y="74">1/2 in end mill's side on the right end,</text>
-  <text class="label" x="20" y="90">1.12 out of the collet, the full depth at once</text>
+  <text class="label" x="20" y="90">{{process.half_mill_projection_mm:in.2f}} out of the collet, the full depth at once</text>
   <line class="datum" x1="80" y1="250" x2="125" y2="250"/>
   <text class="datum-label" x="30" y="246">Z0 (F)</text>
   <line class="datum" x1="287.5" y1="190" x2="287.5" y2="216"/>
@@ -65,5 +65,5 @@
   <line class="dims" x1="742" y1="174" x2="742" y2="340"/>
   <text class="label" x="560" y="328">length {{process.length_target_mm:in.3f}}</text>
   <text class="label" x="400" y="370">right end: passes +Y (the arrow at the right); sawn</text>
-  <text class="label" x="400" y="386">end .50 out past the jaws. Each drill: its own op's picture.</text>
+  <text class="label" x="400" y="386">end {{process.end_overhang_mm:in.2dot}} out past the jaws. Each drill: its own op's picture.</text>
 </svg>

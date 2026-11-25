@@ -22,7 +22,7 @@
   <path class="cutter" d="M166.2 130.4L166.2 49.6L128.1 49.6L128.1 130.4A19.1 4.6 0 0 0 166.2 130.4Z"/>
   <line class="arrow" x1="173.8" y1="40" x2="147.2" y2="40"/>
   <text class="label" x="190" y="44">stepovers Y +1.908, −2.535, −6.977 mm (cutter centre), each pass along the blank</text>
-  <text class="label" x="190" y="72">1/2 in end mill, 1.12 out of the collet, on the first level</text>
+  <text class="label" x="190" y="72">1/2 in end mill, {{process.half_mill_projection_mm:in.2f}} out of the collet, on the first level</text>
   <line class="leader" x1="166" y1="141.1" x2="300" y2="141.1"/>
   <circle class="leader-dot" cx="166" cy="141.1" r="2"/>
   <text class="label" x="300" y="145.1">F: Z {{cad.outer_face_length_mm:in.4dot}} above the parallels, in {{process.width_level_mm:in.3dot}} levels</text>

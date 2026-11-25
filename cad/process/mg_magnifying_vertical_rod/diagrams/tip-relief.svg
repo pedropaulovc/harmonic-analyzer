@@ -26,5 +26,5 @@
   <line class="leader" x1="100" y1="166.5" x2="100" y2="70"/>
   <text class="label" x="40" y="62">the rest of the blank back in the jaws and the spindle bore</text>
   <text class="label" x="428.8" y="300">P1 blade 1/16 against the</text>
-  <text class="label" x="428.8" y="316">shoulder, to a Ø.068 floor</text>
+  <text class="label" x="428.8" y="316">shoulder, to a Ø{{process.relief_aim_dia_in:.3dot}} floor</text>
 </svg>

@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 400" font-family="sans-serif" font-size="13">
   <rect class="paper" x="0" y="0" width="760" height="400"/>
-  <text class="title" x="20" y="20">Setup 2: the stub end .40 out of the 3-jaw; Op 20 faces it (to scale, 300 px/in)</text>
+  <text class="title" x="20" y="20">Setup 2: the stub end {{process.end_stickout_in:.2dot}} out of the 3-jaw; Op 20 faces it (to scale, 300 px/in)</text>
   <!-- To scale, 300 px/in: the 1/4 rod (Ø.250, 75 px), .40 out of the jaw
        fronts, the stub's end faced .035 off, the Ø.18 pilot .20 long and the
        centre drill's countersink about Ø.09 it is cut to (the centre drill in
@@ -29,9 +29,9 @@
   <line class="dims" x1="480.0" y1="330" x2="600" y2="330"/>
   <line class="dims" x1="480.0" y1="277.5" x2="480.0" y2="336"/>
   <line class="dims" x1="600" y1="239.5" x2="600" y2="336"/>
-  <text class="label" x="520.0" y="324">.40 out</text>
+  <text class="label" x="520.0" y="324">{{process.end_stickout_in:.2dot}} out</text>
   <line class="leader" x1="570.0" y1="173.0" x2="550.0" y2="154"/>
-  <text class="label" x="450.0" y="150">pilot Ø.18 × .20</text>
+  <text class="label" x="450.0" y="150">pilot Ø{{process.pilot_dia_in:.2dot}} × {{process.pilot_length_in:.2dot}}</text>
   <text class="label" x="652.0" y="300">facing to the</text>
   <text class="label" x="652.0" y="316">centre, .035 off</text>
 </svg>

@@ -27,13 +27,13 @@
   <text class="label" x="262" y="129">−Y, conventional</text>
   <line class="leader" x1="225" y1="160" x2="120" y2="96"/>
   <text class="label" x="20" y="74">1/2 in end mill's side on the left end,</text>
-  <text class="label" x="20" y="90">1.12 out of the collet, the full depth at once</text>
+  <text class="label" x="20" y="90">{{process.half_mill_projection_mm:in.2f}} out of the collet, the full depth at once</text>
   <line class="datum" x1="80" y1="250" x2="125" y2="250"/>
   <text class="datum-label" x="30" y="246">Z0 (F)</text>
   <line class="datum" x1="191" y1="196" x2="191" y2="222"/>
   <text class="datum-label" x="120" y="200">Y0 (T)</text>
   <line class="leader" x1="236" y1="252" x2="236" y2="300"/>
-  <text class="label-halo" x="190" y="314">tip .020 under F</text>
+  <text class="label-halo" x="190" y="314">tip {{process.end_past_mm:in.3dot}} under F</text>
   <line class="leader" x1="281" y1="238" x2="330" y2="200"/>
   <text class="label" x="334" y="200">.125 pin at B</text>
   <line class="leader" x1="270" y1="370" x2="360" y2="370"/>
@@ -62,6 +62,6 @@
   <line class="dims" x1="521.5" y1="165" x2="521.5" y2="255"/>
   <text class="label" x="470" y="268">axle {{cad.axle_bore_station_mm:in.4f}}</text>
   <text class="label" x="430" y="300">hanger #15 at {{cad.hanger_hole_station_in:.3f}}; axle #17, ream .1865</text>
-  <text class="label" x="430" y="316">at {{cad.axle_bore_station_mm:in.4f}}, both from the left end, .197 from T;</text>
+  <text class="label" x="430" y="316">at {{cad.axle_bore_station_mm:in.4f}}, both from the left end, {{cad.axle_bore_height_in:.3dot}} from T;</text>
   <text class="label" x="430" y="332">each drill and the reamer: its own op's picture</text>
 </svg>

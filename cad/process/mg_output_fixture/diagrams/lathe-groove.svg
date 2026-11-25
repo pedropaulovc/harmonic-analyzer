@@ -1,9 +1,9 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 400" font-family="sans-serif" font-size="13">
   <rect class="paper" x="0" y="0" width="760" height="400"/>
-  <text class="title" x="20" y="20">Setup 1, Op 50: the R.024 groover forms the FULL R groove (to scale, 300 px/in)</text>
+  <text class="title" x="20" y="20">Setup 1, Op 50: the R{{process.form_half_width_in:.3dot}} groover forms the FULL R groove (to scale, 300 px/in)</text>
   <!-- To scale, 300 px/in along and across the axis: the hex across its
        corners (12.83 mm), the spigot Ø0.421 x .25, the FULL R groove
-       (the R.024 groover, root Ø.327) .138 from the face, the #43 hole
+       (the R{{process.form_half_width_in:.3dot}} groover, root Ø.327) .138 from the face, the #43 hole
        Ø.089 x .49. The 3-jaw's jaws and body are schematic (their sizes are
        not on record); the jaw fronts .95 behind the spigot face. The groover's height out of its holder is not on record: drawn short to a break line. -->
   <rect class="fixture-vise" x="215.0" y="60" width="60" height="280"/>
@@ -23,8 +23,8 @@
   <line class="datum" x1="600" y1="90" x2="600" y2="120"/>
   <text class="datum-label" x="560" y="84">Z0 spigot face</text>
   <line class="leader" x1="558.7" y1="134.9" x2="520" y2="100"/>
-  <text class="label" x="300" y="96">FULL R groove .138 from the face, root Ø.327</text>
+  <text class="label" x="300" y="96">FULL R groove {{cad.groove_station_in:.3dot}} from the face, root Ø{{cad.groove_root_dia_in:.3dot}}</text>
   <line class="leader" x1="551.5" y1="330" x2="470" y2="330"/>
-  <text class="label" x="300" y="334">R.024 groover, fed in radially</text>
+  <text class="label" x="300" y="334">R{{process.form_half_width_in:.3dot}} groover, fed in radially</text>
   <text class="label-halo" x="60" y="240">hex 7/16 in the 3-jaw, spigot turned</text>
 </svg>

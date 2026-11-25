@@ -21,7 +21,7 @@
   <path class="cutter" d="M248.0 170.8L248.0 64.8L198.0 64.8L198.0 170.8A25.0 6.0 0 0 0 248.0 170.8Z"/>
   <line class="arrow" x1="243" y1="52" x2="223" y2="52"/>
   <text class="label" x="258" y="56">stepover Y +1.338 to −3.675 mm (cutter centre), each pass along the bar</text>
-  <text class="label" x="258" y="84">1/2 in end mill, 1.12 out of the collet, on the first level</text>
+  <text class="label" x="258" y="84">1/2 in end mill, {{process.half_mill_projection_mm:in.2f}} out of the collet, on the first level</text>
   <line class="datum" x1="80" y1="256.25" x2="150" y2="256.25"/>
   <text class="datum-label" x="20" y="252">Z0 (T)</text>
   <line class="datum" x1="237.5" y1="180" x2="237.5" y2="210"/>

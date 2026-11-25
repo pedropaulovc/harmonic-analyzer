@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 400" font-family="sans-serif" font-size="13">
   <rect class="paper" x="0" y="0" width="760" height="400"/>
-  <text class="title" x="20" y="20">Setup 3: the bar back in the 3-jaw, spigot end .95 out; part off .72 long (to scale, 300 px/in)</text>
+  <text class="title" x="20" y="20">Setup 3: the bar back in the 3-jaw, spigot end {{process.stickout_in:.2dot}} out; part off {{cad.envelope_x_in:.2dot}} long (to scale, 300 px/in)</text>
   <!-- To scale, 300 px/in as Setup 1's picture; the 3-jaw schematic (its
        sizes are not on record). -->
   <rect class="fixture-vise" x="215.0" y="60" width="60" height="280"/>
@@ -25,10 +25,10 @@
   <line class="datum" x1="600" y1="90" x2="600" y2="120"/>
   <text class="label" x="560" y="84">spigot face</text>
   <line class="leader" x1="384.0" y1="300" x2="420" y2="300"/>
-  <text class="label" x="424" y="304">P1 blade's tailstock-side face at Z−.720</text>
+  <text class="label" x="424" y="304">P1 blade's tailstock-side face at Z−{{cad.envelope_x_in:.3dot}}</text>
   <line class="dims" x1="384.0" y1="340" x2="600" y2="340"/>
   <line class="dims" x1="600" y1="270" x2="600" y2="346"/>
-  <text class="label" x="480" y="334">.72</text>
+  <text class="label" x="480" y="334">{{cad.envelope_x_in:.2dot}}</text>
   <text class="label" x="393.0" y="116.2">F bore (Setup 2)</text>
   <text class="label" x="20" y="390">DRO Z set to the blade's width with its chuck-side face on the spigot face: the DRO reads its tailstock-side face.</text>
 </svg>

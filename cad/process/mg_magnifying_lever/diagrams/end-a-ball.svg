@@ -1,7 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 400" font-family="sans-serif" font-size="13">
   <rect class="paper" x="0" y="0" width="760" height="400"/>
-  <text class="title" x="20" y="20">Setup 7: the ball turner sweeps end A's SR.125 tip, its pivot .125 behind the faced plane (to scale, 300 px/in)</text>
-  <!-- To scale, 300 px/in: the rod and the SR.125 tip, the pivot on the axis
+  <text class="title" x="20" y="20">Setup 7: the ball turner sweeps end A's SR{{cad.dome_datum_radius_ref_in:.3dot}} tip, its pivot {{cad.dome_datum_form_radius_in:.3dot}} behind the faced plane (to scale, 300 px/in)</text>
+  <!-- To scale, 300 px/in: the rod and the SR{{cad.dome_datum_radius_ref_in:.3dot}} tip, the pivot on the axis
        one radius (37.5 px) behind the faced plane, the outer frame's arms
        .19 (57 px) either side of the pivot along Z (plan header). The bit's
        section and the frame's other sizes are not on record: schematic. The
@@ -28,5 +28,5 @@
   <text class="label" x="470" y="350">the outer frame under the work: its arms</text>
   <text class="label" x="470" y="366">.19 either side of the pivot (schematic)</text>
   <line class="leader" x1="518.5" y1="196" x2="462.5" y2="186"/>
-  <text class="label" x="262.5" y="182">pivot: .125 behind the faced plane</text>
+  <text class="label" x="262.5" y="182">pivot: {{cad.dome_datum_form_radius_in:.3dot}} behind the faced plane</text>
 </svg>

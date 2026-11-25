@@ -1,10 +1,10 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 400" font-family="sans-serif" font-size="13">
   <rect class="paper" x="0" y="0" width="760" height="400"/>
-  <text class="title" x="20" y="20">Setup 2: the tip end .58 out; Op 40 faces the sawn end .03 off (to scale, 300 px/in)</text>
+  <text class="title" x="20" y="20">Setup 2: the tip end {{process.tip_pull_in:.2dot}} out; Op 40 faces the sawn end .03 off (to scale, 300 px/in)</text>
   <!-- To scale, 300 px/in: the Ø.250 bar, the jaw fronts .45 behind Z0, the
        stub's faced end Z+.10, about .03 faced off the sawn end. The rest of
        this setup's removal shown hatched: the Ø.112 #4-40 blank to the
-       shoulder at Z-.30, the stub faced off to Z0, the tip's 45 deg chamfer
+       shoulder at Z{{cad.step_datum_out_far_z_mm:in.2dot}}, the stub faced off to Z0, the tip's 45 deg chamfer
        to the Ø.085 minor and the .0625 relief to Ø.068. The AR tool
        schematic (not on record). The dead centre drawn backed off: it comes
        up for Ops 60-80, after the centre drill. -->
@@ -38,9 +38,9 @@
   <line class="dims" x1="335.0" y1="330" x2="470" y2="330"/>
   <line class="dims" x1="335.0" y1="277.5" x2="335.0" y2="336"/>
   <line class="dims" x1="470" y1="239.5" x2="470" y2="336"/>
-  <text class="label" x="355.0" y="324">.45 out (tip)</text>
+  <text class="label" x="355.0" y="324">{{process.end_stickout_in:.2dot}} out (tip)</text>
   <line class="leader" x1="420.0" y1="220.8" x2="390.0" y2="290"/>
-  <text class="label" x="320.0" y="304">#4-40 blank, shoulder at Z-.30</text>
+  <text class="label" x="320.0" y="304">#4-40 blank, shoulder at Z{{cad.step_datum_out_far_z_mm:in.2dot}}</text>
   <text class="label" x="552.0" y="300">facing the sawn end,</text>
-  <text class="label" x="552.0" y="316">.03 off, to Z+.10</text>
+  <text class="label" x="552.0" y="316">.03 off, to Z+{{process.tip_stub_in:.2dot}}</text>
 </svg>

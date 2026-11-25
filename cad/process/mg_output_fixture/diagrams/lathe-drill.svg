@@ -28,7 +28,7 @@
   <line class="dims" x1="453.0" y1="320" x2="600" y2="320"/>
   <line class="dims" x1="453.0" y1="210" x2="453.0" y2="326"/>
   <line class="dims" x1="600" y1="270" x2="600" y2="326"/>
-  <text class="label" x="420" y="342">full diameter .49 deep (the quill scale),</text>
+  <text class="label" x="420" y="342">full diameter {{cad.tap_axis_depth_in:.2dot}} deep (the quill scale),</text>
   <text class="label" x="420" y="358">to where the rod bore's axis will be</text>
   <text class="label-halo" x="60" y="240">hex 7/16 in the 3-jaw, spigot and groove done</text>
 </svg>

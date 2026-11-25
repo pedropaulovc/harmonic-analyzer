@@ -1,7 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 400" font-family="sans-serif" font-size="13">
   <rect class="paper" x="0" y="0" width="760" height="400"/>
-  <text class="title" x="20" y="20">Setup 7: end A .40 out, faced to length with the AR tool (to scale, 300 px/in)</text>
-  <!-- To scale, 300 px/in: the Ø.250 rod, end A .40 out of the jaw fronts,
+  <text class="title" x="20" y="20">Setup 7: end A {{process.end_stickout_in:.2dot}} out, faced to length with the AR tool (to scale, 300 px/in)</text>
+  <!-- To scale, 300 px/in: the Ø.250 rod, end A {{process.end_stickout_in:.2dot}} out of the jaw fronts,
        about .085 faced off the sawn end; the SR.125 tip (the ball turner's
        own picture) shown as the rest of this setup's removal. -->
   <!-- The 3-jaw, schematic (its jaws' and body's sizes are not on record):
@@ -24,7 +24,7 @@
   <line class="dims" x1="440.0" y1="330" x2="560" y2="330"/>
   <line class="dims" x1="440.0" y1="277.5" x2="440.0" y2="336"/>
   <line class="dims" x1="560" y1="239.5" x2="560" y2="336"/>
-  <text class="label" x="480.0" y="324">.40 out</text>
+  <text class="label" x="480.0" y="324">{{process.end_stickout_in:.2dot}} out</text>
   <text class="label" x="612" y="300">facing in light skims,</text>
   <text class="label" x="612" y="316">sawn end about .085 off</text>
 </svg>

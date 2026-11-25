@@ -21,7 +21,7 @@
   <path class="cutter" d="M161.1 141.2L161.1 87.3L135.7 87.3L135.7 141.2A12.7 3.0 0 0 0 161.1 141.2Z"/>
   <line class="leader" x1="148.4" y1="100" x2="250" y2="64"/>
   <circle class="leader-dot" cx="148.4" cy="100" r="2"/>
-  <text class="label" x="250" y="60">1/2 in end mill, 1.12 out of the collet</text>
+  <text class="label" x="250" y="60">1/2 in end mill, {{process.half_mill_projection_mm:in.2f}} out of the collet</text>
   <line class="leader" x1="160" y1="144.2" x2="250" y2="100"/>
   <circle class="leader-dot" cx="160" cy="144.2" r="2"/>
   <text class="label" x="250" y="96">the seat: {{process.seat_skim_mm:in.3dot}} off the sawn end; Z0</text>

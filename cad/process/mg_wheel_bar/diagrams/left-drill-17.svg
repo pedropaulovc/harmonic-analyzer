@@ -32,7 +32,7 @@
   <text class="label" x="20" y="326">both 1 + 1/2 in</text>
   <text class="label" x="20" y="342">stacks, under B</text>
   <text class="label" x="356" y="90">#17 drill through the axle bore, no peck:</text>
-  <text class="label" x="356" y="106">its full diameter .039 past F, beside the stacks;</text>
+  <text class="label" x="356" y="106">its full diameter {{process.drill_past_mm:in.3dot}} past F, beside the stacks;</text>
   <text class="label" x="356" y="122">the .1865 reamer follows (its own picture)</text>
   <text class="title" x="430" y="270">Plan, fixed jaw at the top (1 in = 25 px)</text>
   <!-- Plan, fixed jaw at the top, 1 in = 25 px: X0 the milled left end. -->

@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 400" font-family="sans-serif" font-size="13">
   <rect class="paper" x="0" y="0" width="760" height="400"/>
-  <text class="title" x="20" y="20">Setup 3: between the 3-jaw and the dead centre, the threading bit at Z+.40 over the pilot (to scale, 300 px/in)</text>
+  <text class="title" x="20" y="20">Setup 3: between the 3-jaw and the dead centre, the threading bit at Z+{{process.thread_start_z_in:.2dot}} over the pilot (to scale, 300 px/in)</text>
   <!-- To scale, 300 px/in: the Ø.250 rod, end B's plane Z0, the stub to Z+.50
        with its Ø.18 pilot from Z+.30, the thread to Z-.72. The LMS 6685 bit
        is 5/16 square (tools.threading-bits-lms-6685): 93.75 px, its 60 deg
@@ -29,13 +29,13 @@
   <text class="datum-label" x="400" y="90">Z0 end B's plane</text>
   <line class="leader" x1="110" y1="273.5" x2="120" y2="352"/>
   <text class="label" x="20" y="366">3-jaw over a shim wrap on end A, .60 in the jaws</text>
-  <text class="label" x="150" y="140">the 7.2 in rod (break)</text>
+  <text class="label" x="150" y="140">the {{process.blank_length_in:.2f}} in rod (break)</text>
   <line class="dims" x1="254.0" y1="262" x2="470" y2="262"/>
   <line class="dims" x1="254.0" y1="239.5" x2="254.0" y2="268"/>
   <line class="dims" x1="470" y1="239.5" x2="470" y2="268"/>
-  <text class="label" x="254.0" y="284">thread .70–.72 from Z0, cut toward the chuck</text>
+  <text class="label" x="254.0" y="284">thread {{cad.thread_length_min_in:.2dot}}–{{cad.thread_length_max_in:.2dot}} from Z0, cut toward the chuck</text>
   <line class="leader" x1="580.0" y1="173.0" x2="560.0" y2="150"/>
-  <text class="label" x="520.0" y="146">pilot Ø.18</text>
+  <text class="label" x="520.0" y="146">pilot Ø{{process.pilot_dia_in:.2dot}}</text>
   <text class="label" x="270" y="312">LMS 6685 5/16 bit, its point at</text>
-  <text class="label" x="270" y="328">Z+.40 in air over the pilot</text>
+  <text class="label" x="270" y="328">Z+{{process.thread_start_z_in:.2dot}} in air over the pilot</text>
 </svg>

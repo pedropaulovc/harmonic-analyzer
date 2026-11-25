@@ -23,7 +23,7 @@
   <line class="leader" x1="100" y1="166.5" x2="100" y2="70"/>
   <text class="label" x="40" y="62">the rest of the blank back in the jaws and the spindle bore</text>
   <line class="dims" x1="500.0" y1="241.5" x2="500.0" y2="290"/>
-  <text class="label" x="460.0" y="306">the stub's faced end, Z+.10</text>
+  <text class="label" x="460.0" y="306">the stub's faced end, Z+{{process.tip_stub_in:.2dot}}</text>
   <text class="label" x="460.0" y="324">No. 1 centre drill to about Ø.08,</text>
   <text class="label" x="460.0" y="342">the hole inside the stub</text>
 </svg>

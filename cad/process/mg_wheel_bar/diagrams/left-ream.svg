@@ -33,7 +33,7 @@
   <text class="label" x="20" y="342">stacks, under B</text>
   <text class="label" x="356" y="90">the .1865 reamer through the #17's axle bore,</text>
   <text class="label" x="356" y="106">fed in and back out, spindle running;</text>
-  <text class="label" x="356" y="122">its tip .100 below F, beside the stacks</text>
+  <text class="label" x="356" y="122">its tip {{process.ream_past_mm:in.3dot}} below F, beside the stacks</text>
   <text class="title" x="430" y="270">Plan, fixed jaw at the top (1 in = 25 px)</text>
   <!-- Plan, fixed jaw at the top, 1 in = 25 px: X0 the milled left end. -->
   <rect class="clamp" x="471" y="280" width="156.2" height="30"/>

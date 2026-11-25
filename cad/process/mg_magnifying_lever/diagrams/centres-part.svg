@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 400" font-family="sans-serif" font-size="13">
   <rect class="paper" x="0" y="0" width="760" height="400"/>
-  <text class="title" x="20" y="20">Setup 3, Op 190: the 1/16 cutoff blade's last plunge at Z0, to the Ø.06 neck (to scale, 300 px/in)</text>
+  <text class="title" x="20" y="20">Setup 3, Op 190: the 1/16 cutoff blade's last plunge at Z0, to the Ø{{process.neck_dia_in:.2dot}} neck (to scale, 300 px/in)</text>
   <!-- To scale, 300 px/in: the P1 blade .0625 wide (tools.cutoff-blade-p1
        width_in: 18.75 px), its chuck-side face on end B's plane, down to the
        Ø.06 neck after the plunges at Z+.100 and Z+.050. Its 1/2 in height runs
@@ -28,9 +28,9 @@
   <text class="datum-label" x="400" y="90">Z0 end B's plane</text>
   <line class="leader" x1="110" y1="273.5" x2="120" y2="352"/>
   <text class="label" x="20" y="366">3-jaw over a shim wrap on end A, .60 in the jaws</text>
-  <text class="label" x="150" y="140">the 7.2 in rod (break)</text>
+  <text class="label" x="150" y="140">the {{process.blank_length_in:.2f}} in rod (break)</text>
   <line class="leader" x1="510.0" y1="166.5" x2="520.0" y2="156"/>
-  <text class="label" x="410.0" y="152">groove about .16 wide, Ø.06 neck</text>
+  <text class="label" x="410.0" y="152">groove about .16 wide, Ø{{process.neck_dia_in:.2dot}} neck</text>
   <text class="label" x="518.8" y="300">P1 blade 1/16, chuck-side</text>
   <text class="label" x="518.8" y="316">face on Z0, plunged last</text>
 </svg>

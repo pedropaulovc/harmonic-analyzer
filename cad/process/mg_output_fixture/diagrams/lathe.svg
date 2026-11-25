@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 400" font-family="sans-serif" font-size="13">
   <rect class="paper" x="0" y="0" width="760" height="400"/>
-  <text class="title" x="20" y="20">Setup 1: the 7/16 hex bar in the 3-jaw, .95 out; Op 10 faces the end (to scale, 300 px/in)</text>
+  <text class="title" x="20" y="20">Setup 1: the 7/16 hex bar in the 3-jaw, {{process.stickout_in:.2dot}} out; Op 10 faces the end (to scale, 300 px/in)</text>
   <!-- To scale, 300 px/in along and across the axis: the hex across its
        corners (12.83 mm), the spigot Ø0.421 x .25, the FULL R groove
        (the R.024 groover, root Ø.327) .138 from the face, the #43 hole
@@ -29,12 +29,12 @@
   <text class="datum-label" x="528" y="84">Z0 spigot face</text>
   <line class="dims" x1="315.0" y1="360" x2="600" y2="360"/>
   <line class="dims" x1="315.0" y1="317.8" x2="315.0" y2="366"/>
-  <text class="label" x="400" y="354">.95 out of the jaws</text>
+  <text class="label" x="400" y="354">{{process.stickout_in:.2dot}} out of the jaws</text>
   <line class="leader" x1="565" y1="140.9" x2="700" y2="73"/>
-  <text class="label" x="440" y="68">spigot Ø.42 × .25, FULL R groove .14 from the face</text>
+  <text class="label" x="440" y="68">spigot Ø{{cad.spigot_dia_in:.2dot}} × {{cad.spigot_length_in:.2dot}}, FULL R groove {{cad.groove_station_in:.2dot}} from the face</text>
   <line class="leader" x1="520" y1="200" x2="382" y2="42"/>
-  <text class="label" x="40" y="40">#43 .49 deep from the tailstock; 4-40 plug, then bottoming</text>
+  <text class="label" x="40" y="40">#43 {{cad.tap_axis_depth_in:.2dot}} deep from the tailstock; 4-40 plug, then bottoming</text>
   <text class="label" x="40" y="55">tap (each tool in its own op's picture)</text>
   <text class="label-halo" x="60" y="240">hex 7/16 (stock)</text>
-  <text class="label" x="40" y="385">The part (.72 long) is parted off in Setup 3, after the cross bore (Setup 2): the bar stays whole until then.</text>
+  <text class="label" x="40" y="385">The part ({{cad.envelope_x_in:.2dot}} long) is parted off in Setup 3, after the cross bore (Setup 2): the bar stays whole until then.</text>
 </svg>

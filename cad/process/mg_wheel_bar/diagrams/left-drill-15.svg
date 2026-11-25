@@ -35,7 +35,7 @@
   <text class="label" x="20" y="188">further in, not in</text>
   <text class="label" x="20" y="204">this section</text>
   <text class="label" x="356" y="74">#15 drill through the hanger hole, no peck:</text>
-  <text class="label" x="356" y="90">its full diameter .039 past F, into the air;</text>
+  <text class="label" x="356" y="90">its full diameter {{process.drill_past_mm:in.3dot}} past F, into the air;</text>
   <text class="label" x="356" y="106">the hole .244 out past the jaws' left side</text>
   <text class="title" x="430" y="270">Plan, fixed jaw at the top (1 in = 25 px)</text>
   <!-- Plan, fixed jaw at the top, 1 in = 25 px: X0 the milled left end. -->
