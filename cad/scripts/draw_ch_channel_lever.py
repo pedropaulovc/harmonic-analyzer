@@ -280,7 +280,13 @@ FRONT_KEEP = {
     # left rim, clear of the overall length's extension line below the hub
     # and of the drill leader, which lands from the upper right.
     "HubDia": (0.033, 0.165),
-    "FulcrumDia": (0.050, 0.190),
+    # The F drill's three rows centre on this point, ~87 mm wide (widest,
+    # RUNNING CLEARANCE ON MHA-CH-04; measured on run 6586e65b). At x .050
+    # the row and its shelf began at x 6.6 mm, left of the inner border at
+    # 12.7 (rule 13); at .059 they begin 15.6 mm, 2.9 mm inside, and end at
+    # ~103 mm, 50 mm short of the #47 callout. 2 mm higher, the leader still
+    # lands on the upper-right rim.
+    "FulcrumDia": (0.059, 0.192),
     # Above the bar on the taper start it measures, so its extension lines are
     # the kink's own vertices (#3113 r4 review: offset, it read as measured on
     # the slope), clear of the #47 leader to its left and the #21 leader's

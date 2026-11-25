@@ -59,6 +59,24 @@ def test_bands_are_native_on_the_model_from_named_constants() -> None:
     assert spec.BAR_PIN_X_TOLERANCE == spec.LEVER_SPRING_X_TOLERANCE == pytest.approx(0.127)
 
 
+def test_the_f_drill_callout_stands_inside_the_border() -> None:
+    """Rule 13 (#3536, run 6586e65b): the F drill's widest row, RUNNING
+    CLEARANCE ON MHA-CH-04, and its shelf, 86.8 mm wide centred on the keep
+    (measured on that run's PDF, x 6.6..93.4 mm about .050), began left of
+    the inner border at 12.7 mm. It now starts at least 1.5 mm inside, and
+    ends 1.5 mm or more short of the #47 callout's widest row (x 153.5 mm,
+    about BAR_PIN_CALLOUT_XY's .170)."""
+    border = 0.0127
+    half_width = 0.0434
+    x, _y = drawing.FRONT_KEEP["FulcrumDia"]
+    assert drawing.FRONT_CALLOUTS["FulcrumDia"].splitlines()[-1] == (
+        f"RUNNING CLEARANCE ON {drawing.SHAFT_NUMBER}"
+    )
+    assert x - half_width >= border + 0.0015
+    bar_pin_left = drawing.BAR_PIN_CALLOUT_XY[0] - (0.170 - 0.1535)
+    assert x + half_width + 0.0015 <= bar_pin_left
+
+
 def test_every_tight_band_names_its_mate_or_function() -> None:
     callouts = {**drawing.FRONT_CALLOUTS, **drawing.TOP_CALLOUTS}
     for name in ("FulcrumDia", "LeverThick", "HubLength", "PlateOffset"):
