@@ -39,14 +39,22 @@ Pass 1 — detection. Find every candidate item; classify nothing yet.
    first, and if companion part drawing sheets are attached, read their title
    block and views to inventory every feature, tolerance band, datum and
    `SHARP` / finish callout the traveler must satisfy (rules T1, T2).
-   **Sheet head (rule T18):** on `view_sheet`, count the printed words of
-   every paragraph, list item and table cell between the stock line and the
-   Tools table (over 60 is a finding); check that instructions are discrete
-   titled items, one idea each; that every collision, homing, re-zero and
-   Feed Hold / Reset rule is its own labelled item and a rule particular to
-   this job sits in a block of its own, never mid-paragraph; that no standing
-   shop rule is restated in different words or with a different value; and
-   note every head sentence that only repeats a setup page.
+   **Sheet head and cautions (rule T18):** read the SHOP STANDING
+   INSTRUCTIONS text supplied with the sheet first: everything it covers is
+   common sense in this shop. On `view_sheet`, check that sheet 1's head
+   (stock line to Tools table) holds the one pointer line to the standing
+   page and a `This job` overview, with no block over 60 printed words and no
+   sentence that only repeats a setup page. Then, through the whole sheet,
+   note every sentence or caution that repeats or re-words the standing page
+   (a different value or condition is a contradiction; a step stating its own
+   departure from a standing instruction is not a repeat), every caution
+   printed away from its step or repeated across setups, and every caution on
+   a step that is not critical, uncommon or confusing for this part. A
+   non-obvious hazard covered neither by the standing page nor at its step
+   is a blocker (rule T9). On every sheet image, check the running header
+   and footer in the page margin: project title, each part's slug and
+   drawing number, the revision against the drawing's title block, and
+   `SHEET n OF N` counting right.
 2. Walk the setups in execution order (`Setup 1 .. Setup N`, `Op 10 .. Op M`)
    as the builder at the machine:
    - **Prerequisites & stock gate (rules T3, T4):** Is every shop-made fixture,
@@ -63,7 +71,8 @@ Pass 1 — detection. Find every candidate item; classify nothing yet.
      and which edge touches the fence/stop.
    - **Operator handoffs & prove-out (rule T8, T16, T17):** Check every `M6`
      and `M0` for tool number, stickout (where critical), manual RPM setting,
-     hands-in safety, and `Cycle Start`, plus a first-article NC prove-out step.
+     hands-in safety, and `Cycle Start`, plus first-article NC prove-out (the
+     shop standing instructions state it for a sheet that points to them).
    - **Sequence & handling traps (rule T9):** Focus on qualitative shop traps
      the build gates do not model: thin-bar hogging without stress
      release, live edge clamps pinching parted waste into small end mills,
@@ -87,6 +96,13 @@ Pass 1 — detection. Find every candidate item; classify nothing yet.
      and inspection diagram to check leader landings (including whether an edge
      height leader lands on the centreline station where the band applies),
      legend fill consistency, clipping and overlaps.
+   - **Setup pictures (rule T20, P1–P8):** per setup, list the holding nouns
+     its text names and check each is drawn (P1) and nothing else is (P2);
+     measure each tool and locator against a part dimension in the same view
+     (P3, within 5 %); check each tool sits on a real pass or hole with its
+     direction (P4), unrecorded sizes are schematic and long tools broken
+     (P5), every role has a key entry (P6), a moving or confusing locator is
+     named once in its first picture (P7), and no clutter (P8).
    - **Route walk (rule T19):** once, in route order, ask of every op "does a
      later op cut, face or re-machine what this op worked on, or repeat it?"
      and "could this be done once, later?" Report each hit with both op

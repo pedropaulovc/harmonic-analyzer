@@ -9,7 +9,8 @@ The standard every process traveler (CNC setup sheet, manual-lathe traveler and
 saw/bench sheet) in this project is written to and reviewed against. Authors
 follow it. Each blind traveler review receives `drawing-guidelines.md` from its
 title down, then this file from its title down, followed by its own reviewer
-instructions.
+instructions, and with the sheet the text of the shop's standing instructions
+page (rule T18).
 
 Cite a traveler rule by its `T` number and title, for example "rule T10 (every
 check can be done as written)", and a shared drawing rule by its number and
@@ -257,10 +258,12 @@ and tape bond strength is not gated; judge it under rule T3.
 - Hands-in operator actions (measuring on the machine, unclamping, flipping,
   removing waste, wiping) happen **only** before `Cycle Start`, after program
   end, or at an explicit `M0`/`M6` stop.
-- **First-run prove-out:** a CNC traveler states once (in the header or first
-  CNC setup) that each program is proved before cutting metal on the first part
-  (for example, single-block / air pass with `Z` offset above the work and a
-  physical check that installed clamp/fence heights sit below the lowest cut).
+- **First-run prove-out:** each program is proved before cutting metal on the
+  first part (for example, single-block / air pass with `Z` offset above the
+  work and a physical check that installed clamp/fence heights sit below the
+  lowest cut). The shop standing instructions state it for every sheet that
+  points to them (rule T18); a sheet that does not states it once, in the
+  header or first CNC setup.
 
 ### Rule T9 — Sequence and handling traps that code gates do not model
 
@@ -449,36 +452,50 @@ paperwork and **not** a second engineering drawing:
 
 ## The sheet head and the route
 
-### Rule T18 — The sheet head reads at a glance
+### Rule T18 — The standing page is common sense; cautions only where they bite
 
-The head of a traveler is everything printed between the stock line and the
-Tools table on sheet 1. The builder reads it once before starting and comes
-back to it at every stop (owner 2026-11-25: "first page traveler has wall of
-text"). On the rendered sheet:
+The shop prints one **standing instructions** page for every traveler
+(`cad/process/shop/standing.toml`, shipped as
+`travelers/shop-standing-instructions.pdf`; owner 2026-11-25: "a generic
+instructions page with any disclaimers that apply to all travelers this way
+all reviewers are on the same page on what is common sense"). Every review
+receives its text with the sheet. Anything it covers is common sense in this
+shop: units and `G21`, speeds and belts, homing and when to home again, the
+re-check of a zero after homing, Feed Hold / Reset, tool changes at an `M6`,
+proving a file in air, burrs off before a face seats, the work stop and its rod
+before a touch-off, what "stop and tell the owner" means, the picture colours
+and the disclaimer that a traveler is not approval to machine. On the rendered
+sheet:
 
-- **No prose block over 60 words.** A block is one paragraph, one list item
-  or one table cell. Count the printed words on `view_sheet`; a block over 60
-  is a finding, and so is a head printed as one paragraph holding several
-  unrelated instructions, whatever its length.
-- **Discrete, titled items, one idea each.** Instructions print as short
-  items under a title or a row label (`This job`, `Switching on`, `Feed
-  Hold`), never as a run of sentences on different subjects.
-- **Safety-critical instructions are set apart and findable.** Collision
-  avoidance (a stop, rod, clamp or plug to clear before a move or touch-off),
-  re-zero and homing rules, Feed Hold / Reset and E-stop recovery each print
-  as their own labelled item or row, and a rule particular to this job is in
-  a block of its own (boxed, ruled or headed `STOP`), never mid-paragraph.
-- **Standing shop rules are stated once, in the shop's words.** Rules that
-  are the same on every mill sheet (units and `G21`, belt range, homing, the
-  re-check of a zero, Feed Hold / Reset, prove-out, burrs off before a face
-  seats) print as one shop-wide block. The head may not restate one of them
-  in different words elsewhere, or give a different value or condition.
-- **The head does not repeat a setup page.** A head sentence that only says
-  again what a setup's Holding, Datum or op already prints (a T-number list
-  the Tools table carries, a check or a mark an op makes) is a finding: cut
-  it, or point to the setup. An overview the setups do not give in one place
-  (which setups serve which part, program prefixes, where finished sizes are
-  tabled) belongs in the head.
+- **Nothing on the standing page is repeated or re-worded.** A sentence, row
+  or caution, in the head or in a step, that says again what the standing page
+  covers is a finding. A different value or condition is a contradiction. A
+  step that departs from a standing instruction says so at that step (`do not
+  home from here to the end of MS04`, `this file has no M6: console M6 T2
+  before running it again`): that is not a repeat.
+- **A caution prints at the step where it applies, and only when that step is
+  critical, uncommon or confusing for this part** (owner 2026-11-25: "too
+  common sense to be justified even in hobby mode; maybe add a note with that
+  on a setup that has this as a critical step or uncommon or confusing"). A
+  common-sense caution, a caution printed away from its step (in the head),
+  or the same caution repeated across setups is a finding.
+- **A non-obvious hazard covered neither by the standing page nor at its
+  step is a blocker,** as rule T9 describes.
+- **The head is the pointer and this job.** Sheet 1, between the stock line
+  and the Tools table, prints one line pointing to the standing page and a
+  `This job` overview the setups do not give in one place (which setups serve
+  which part, program prefixes, where finished sizes are tabled), plus a
+  job-specific note only if it passes the test above. No block (paragraph,
+  list item or table cell) over 60 printed words; items titled, one idea each;
+  no head sentence that only says again what a setup's Holding, Datum or op
+  prints. A sheet without the pointer line is a finding.
+- **Every printed page names its part** (owner 2026-11-25: "all traveler
+  pages must have header and footer with most info from drawing title bar").
+  A loose page on the bench must identify itself: each page's running header
+  and footer carry the project title, each part's slug and drawing number,
+  the revision, and `SHEET n OF N`. A page missing one of them, or one that
+  disagrees with the drawing's title block, is a finding (a disagreeing
+  drawing number or revision is a contradiction).
 
 ### Rule T19 — No wasted or repeated work in the route
 
@@ -512,3 +529,37 @@ is needed, it is not duplicated.
 A route that merely could be combined or reordered, with nothing
 undone or repeated, is a non-gating `polish` note; do not propose a different
 process for a route that works (rule T15).
+
+### Rule T20 — Setup pictures show what the setup uses, to scale
+
+Owner 2026-11-25: "work stop does not appear in sketches ; cutter is a wide
+yellow rectangle even for 1/2 in end mills". Each check passes or fails on the
+sheet image (criteria P1–P8, `cad/process/README.md`, Plans):
+
+- **P1 Named holding is drawn.** Every workholding element a setup's
+  Holding, Datum or op text names (jaws, parallels or stacks, 1-2-3 block,
+  V-block, angle plate, jack, work stop, screws, tap guide) has a drawn or
+  labelled shape in that setup's picture.
+- **P2 Nothing unnamed is drawn.** A drawn fixture the setup text does not
+  use (a work stop where the Datum says "No work stop here") fails.
+- **P3 Tools and locators to scale.** A cutter, drill, tap, tap guide or
+  locator (the stop's rod, a pin) is within 5 % of its recorded diameter at
+  the view's scale (taken from a part dimension in the same view); a fixed
+  glyph the same for every tool fails.
+- **P4 Where it works.** Each tool is drawn at a pass, station or hole the
+  program cuts, with its direction arrowed; a cutter floating over no pass,
+  or a drill with no hole under it, fails.
+- **P5 Unrecorded sizes are schematic.** A size with no record is drawn
+  schematic and says so, or stays out; a long tool or rod drawn short ends
+  in a break line.
+- **P6 One key for every role.** The sheet's picture key has an entry for
+  every colour and pattern the pictures use.
+- **P7 A confusing locator is named in the picture.** A locator that moves
+  between parts of one setup, or is uncommon or confusing (the work stop set
+  after the first blank's touch-offs; its rod moving from the left to the
+  right end), is named once, in the first picture that draws it, with when
+  it is set or moved, not in a page-1 box (rule T18).
+- **P8 No clutter.** Not drawn: touch-off tools in a cutting picture, every
+  pass of a multi-pass face (one pass and the stepover arrow suffice), the
+  same fixture labelled again in every later picture, dimensions the
+  setup's text does not use.

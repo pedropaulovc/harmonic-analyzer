@@ -20,6 +20,18 @@ from machinist_review_sheets_mcp import SheetStore
 
 GUIDELINES_FILE = CAD_ROOT / "docs" / "traveler-guidelines.md"
 PROCESS_ROOT = CAD_ROOT / "process"
+# The shop's one standing-instructions page: everything common to every
+# traveler, rendered once from ``cad/process/shop/`` and shipped per release as
+# ``travelers/shop-standing-instructions.pdf``. A traveler review reads it so
+# every reviewer and the judge share one definition of the shop's common sense.
+STANDING_HTML = (
+    CAD_ROOT / "out" / "travelers" / "shop-standing-instructions"
+    / "shop-standing-instructions.html"
+)
+STANDING_HEADING = (
+    "SHOP STANDING INSTRUCTIONS (common sense in this shop: the traveler must "
+    "not repeat or re-word any of it)"
+)
 
 
 def split_guidelines(text: str) -> tuple[int, str]:
@@ -145,6 +157,31 @@ def html_text(html: str) -> str:
     parser = _Extractor()
     parser.feed(html)
     return parser.result()
+
+
+def standing_missing(path: Path) -> str:
+    """Why a traveler review cannot run without the standing page at ``path``."""
+    return (
+        f"shop standing instructions page missing: {path}; a traveler review "
+        "reads it as common sense the traveler must not repeat. Render it with "
+        "cad/scripts/prechips_traveler.py (the shop standing render, "
+        "`prechips standing cad/process/shop`), or pass --standing-html."
+    )
+
+
+def standing_section(html: str) -> str:
+    """The standing page's text as the reviewers and the judge read it,
+    extracted exactly as a traveler HTML's text is."""
+    text = html_text(html)
+    if not text:
+        raise ValueError("shop standing instructions page has no text")
+    return (
+        f"\n{STANDING_HEADING}\n"
+        "Text of the shop's one standing-instructions page, printed once and "
+        "shipped beside every traveler (travelers/shop-standing-instructions.pdf), "
+        "one line per block or table row.\n"
+        f"{text}\n"
+    )
 
 
 def document_roles(

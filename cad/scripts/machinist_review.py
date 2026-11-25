@@ -201,6 +201,9 @@ class ReviewPackage:
     # A traveler package's last ``companion_count`` sources are its companion
     # part drawing (``--companion-pdf``), reference only.
     companion_count: int = 0
+    # A traveler package's shop standing instructions page (``--standing-html``):
+    # common sense the traveler must not repeat, read by reviewers and judge.
+    standing_html: Path | None = None
 
 
 @dataclass
@@ -459,6 +462,10 @@ def _review_prompt(
         prompt += machinist_review_traveler.document_roles(
             package.sources, package.companion_count, sheet_count
         )
+        if package.standing_html is not None:
+            prompt += machinist_review_traveler.standing_section(
+                package.standing_html.read_text(encoding="utf-8")
+            )
         if package.traveler_html is not None:
             html_text = machinist_review_traveler.html_text(
                 package.traveler_html.read_text(encoding="utf-8")
@@ -1777,9 +1784,20 @@ def _review_session(
             )
         snapshot_html = snapshot_dir / f"traveler-{package.traveler_html.name}"
         shutil.copyfile(package.traveler_html, snapshot_html)
+    snapshot_standing: Path | None = None
+    if package.kind == "traveler":
+        import machinist_review_traveler
+
+        standing = package.standing_html or machinist_review_traveler.STANDING_HTML
+        if package.standing_html is None or not standing.is_file():
+            raise FileNotFoundError(
+                f"{package.name}: {machinist_review_traveler.standing_missing(standing)}"
+            )
+        snapshot_standing = snapshot_dir / f"standing-{standing.name}"
+        shutil.copyfile(standing, snapshot_standing)
     snapshot = ReviewPackage(
         package.name, package.kind, tuple(snapshot_sources), snapshot_html,
-        package.companion_count,
+        package.companion_count, snapshot_standing,
     )
     mcp_catalog = _sheet_resource_manifest(snapshot.sources)
     neutral_resources = reviewer == "codex" and _resource_neutrality_permitted(mcp_catalog)
@@ -2108,6 +2126,13 @@ def _review_session(
             }}
             if snapshot.traveler_html is not None else {}
         ),
+        **(
+            {"standing_html": {
+                "path": str(package.standing_html),
+                "sha256": _sha256(snapshot.standing_html),
+            }}
+            if snapshot.standing_html is not None else {}
+        ),
         "sheets_viewed": successful["sheets_viewed"],
         "inspection_proven": inspection_proven,
         "crop_calls": evidence["crop_calls"],
@@ -2237,6 +2262,7 @@ def aggregate_package(
         source_dir = report_dir / package.name / "sources" / uuid.uuid4().hex
         sources: list[Path] = []
         snapshot_html: Path | None = None
+        snapshot_standing: Path | None = None
         snapshot_error = None
         try:
             source_dir.mkdir(parents=True, exist_ok=True)
@@ -2247,23 +2273,27 @@ def aggregate_package(
             if package.traveler_html is not None:
                 snapshot_html = source_dir / "traveler.html"
                 shutil.copyfile(package.traveler_html, snapshot_html)
+            if package.standing_html is not None:
+                snapshot_standing = source_dir / "standing.html"
+                shutil.copyfile(package.standing_html, snapshot_standing)
         except OSError as exc:
             snapshot_error = f"source snapshot failed: {type(exc).__name__}: {exc}"
         snapshot = ReviewPackage(
             package.name, package.kind, tuple(sources), snapshot_html,
-            package.companion_count,
+            package.companion_count, snapshot_standing,
         )
         source_sha = [_sha256(source) for source in sources]
-        traveler_html = None
-        if package.traveler_html is not None:
-            traveler_html = {
-                "path": str(package.traveler_html),
-                "sha256": (
-                    _sha256(snapshot_html)
-                    if snapshot_html is not None and snapshot_html.is_file()
-                    else None
-                ),
+
+        def html_record(original: Path | None, copy: Path | None) -> dict[str, Any] | None:
+            if original is None:
+                return None
+            return {
+                "path": str(original),
+                "sha256": _sha256(copy) if copy is not None and copy.is_file() else None,
             }
+
+        traveler_html = html_record(package.traveler_html, snapshot_html)
+        standing_html = html_record(package.standing_html, snapshot_standing)
 
         def run(run_id: str, on_first_response: Callable[[], None] | None = None) -> Review:
             directory = report_dir / package.name / "runs" / run_id
@@ -2432,6 +2462,7 @@ def aggregate_package(
             "sources": [str(source) for source in package.sources],
             "source_sha256": source_sha, "verdict": verdict,
             **({"traveler_html": traveler_html} if traveler_html else {}),
+            **({"standing_html": standing_html} if standing_html else {}),
             "gating_count": gating_count, "gating_min_runs": gating_min_runs,
             "confirmed": confirmed, "rejected": rejected,
             "runs": summaries, "judge": judge_info, "reviewer": reviewer,
@@ -2643,6 +2674,15 @@ def _parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         help="optional prechips HTML source for exact text alongside --kind traveler",
     )
     parser.add_argument(
+        "--standing-html",
+        type=Path,
+        help=(
+            "--kind traveler: the shop standing instructions HTML the traveler "
+            "must not repeat (default: cad/out/travelers/shop-standing-instructions/"
+            "shop-standing-instructions.html)"
+        ),
+    )
+    parser.add_argument(
         "--companion-pdf",
         type=Path,
         action="append",
@@ -2712,6 +2752,16 @@ def _parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
             parser.error("--traveler-html requires --kind traveler and --pdf")
         if args.traveler_html.suffix.casefold() not in (".html", ".htm"):
             parser.error(f"expected HTML input for --traveler-html, not {args.traveler_html}")
+    if args.standing_html is not None:
+        if args.kind != "traveler" or not args.pdf:
+            parser.error("--standing-html requires --kind traveler and --pdf")
+        if args.standing_html.suffix.casefold() not in (".html", ".htm"):
+            parser.error(f"expected HTML input for --standing-html, not {args.standing_html}")
+    elif args.kind == "traveler" and args.pdf:
+        # Imported here: only a traveler review reads the traveler module.
+        import machinist_review_traveler
+
+        args.standing_html = machinist_review_traveler.STANDING_HTML
     if args.companion_pdf:
         if args.kind != "traveler" or not args.pdf:
             parser.error("--companion-pdf requires --kind traveler and --pdf")
@@ -2731,12 +2781,21 @@ def main(argv: Sequence[str] | None = None) -> int:
     packages: list[ReviewPackage]
     if args.pdf:
         companions = tuple(path.resolve() for path in args.companion_pdf or ())
+        standing = (
+            args.standing_html.resolve() if args.standing_html is not None else None
+        )
+        if standing is not None and not standing.is_file():
+            import machinist_review_traveler
+
+            print(machinist_review_traveler.standing_missing(standing), file=sys.stderr)
+            return 2
         packages = [ReviewPackage(
             args.name,
             args.kind,
             (*(path.resolve() for path in args.pdf), *companions),
             args.traveler_html.resolve() if args.traveler_html is not None else None,
             len(companions),
+            standing,
         )]
     elif args.all:
         packages = all_packages()

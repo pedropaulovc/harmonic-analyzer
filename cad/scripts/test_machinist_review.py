@@ -2786,6 +2786,150 @@ def test_companion_pdf_requires_a_traveler_package(tmp_path: Path) -> None:
         ])
 
 
+_STANDING_HEADING = (
+    "\nSHOP STANDING INSTRUCTIONS (common sense in this shop: the traveler must "
+    "not repeat or re-word any of it)\n"
+)
+
+
+def _standing_page(path: Path, rule: str = "Feed Hold before reaching in.") -> Path:
+    path.write_text(
+        "<!doctype html><html><head><style>h1{color:#000}</style></head><body>"
+        f"<h1>Shop standing instructions</h1><ul><li>{rule}</li>"
+        "<li>Units: inch, G20.</li></ul></body></html>",
+        encoding="utf-8",
+    )
+    return path
+
+
+def test_standing_page_text_reaches_traveler_prompts_only(tmp_path: Path) -> None:
+    standing = _standing_page(tmp_path / "standing.html")
+    source = _png_source(tmp_path / "sheet.png")
+    traveler = mr.ReviewPackage("probe_part", "traveler", (source,), standing_html=standing)
+    for prefix in (mr.load_prompt("traveler"), mr.load_prompt("traveler", judge=True)):
+        prompt = mr._review_prompt(traveler, 1, prompt_text=prefix)
+        section = prompt.split(_STANDING_HEADING, 1)[1]
+        assert section.splitlines()[1:4] == [
+            "Shop standing instructions",
+            "Feed Hold before reaching in.",
+            "Units: inch, G20.",
+        ]
+        assert "h1{color:#000}" not in prompt
+    assert _STANDING_HEADING not in mr._review_prompt(
+        mr.ReviewPackage("probe_part", "traveler", (source,)), 1
+    )
+
+
+def test_standing_page_without_text_is_refused(tmp_path: Path) -> None:
+    standing = tmp_path / "standing.html"
+    standing.write_text("<html><body><svg>x</svg></body></html>", encoding="utf-8")
+    package = mr.ReviewPackage(
+        "probe_part", "traveler", (_png_source(tmp_path / "sheet.png"),),
+        standing_html=standing,
+    )
+    with pytest.raises(ValueError, match="standing instructions page has no text"):
+        mr._review_prompt(package, 1)
+
+
+def test_standing_html_defaults_for_traveler_and_is_traveler_only(tmp_path: Path) -> None:
+    import machinist_review_traveler
+
+    pdf = tmp_path / "t.pdf"
+    args = mr._parse_args(["--pdf", str(pdf), "--name", "probe", "--kind", "traveler"])
+    assert args.standing_html == machinist_review_traveler.STANDING_HTML
+    assert machinist_review_traveler.STANDING_HTML == (
+        mr.CAD_ROOT / "out" / "travelers" / "shop-standing-instructions"
+        / "shop-standing-instructions.html"
+    )
+    explicit = tmp_path / "standing.html"
+    args = mr._parse_args([
+        "--pdf", str(pdf), "--name", "probe", "--kind", "traveler",
+        "--standing-html", str(explicit),
+    ])
+    assert args.standing_html == explicit
+    assert mr._parse_args(["--pdf", str(pdf), "--name", "probe"]).standing_html is None
+    for argv in (
+        ["--pdf", str(pdf), "--name", "probe", "--standing-html", str(explicit)],
+        ["--pdf", str(pdf), "--name", "probe", "--kind", "traveler",
+         "--standing-html", str(tmp_path / "standing.pdf")],
+    ):
+        with pytest.raises(SystemExit):
+            mr._parse_args(argv)
+
+
+def test_missing_standing_page_fails_a_traveler_review_fast(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str],
+) -> None:
+    def forbidden(*_args: Any, **_kwargs: Any) -> None:
+        pytest.fail("a traveler review ran without its standing page")
+
+    monkeypatch.setattr(mr, "aggregate_package", forbidden)
+    monkeypatch.setattr(mr, "_run_reviewer", forbidden)
+    missing = tmp_path / "absent" / "shop-standing-instructions.html"
+    code = mr.main([
+        "--pdf", str(tmp_path / "t.pdf"), "--name", "probe", "--kind", "traveler",
+        "--standing-html", str(missing), "--report-dir", str(tmp_path / "reports"),
+    ])
+    assert code == 2
+    err = capsys.readouterr().err
+    assert str(missing.resolve()) in err
+    assert "cad/scripts/prechips_traveler.py" in err
+    # The programmatic path refuses a traveler package with no or a missing page.
+    source = _png_source(tmp_path / "sheet.png")
+    for standing in (None, missing):
+        with pytest.raises(FileNotFoundError, match="standing instructions page missing"):
+            mr._review_session(
+                mr.ReviewPackage("probe", "traveler", (source,), standing_html=standing),
+                reviewer="codex", report_dir=tmp_path / "reports", codex="codex-test",
+            )
+
+
+def test_standing_page_reaches_reviewer_and_judge_and_keys_the_review(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    prompts: list[tuple[bool, str]] = []
+
+    def reply(command: list[str], **kwargs: Any):
+        findings = _judge_inputs(kwargs["input"])
+        prompts.append((findings is not None, kwargs["input"]))
+        value = (
+            {"clusters": [_judge_cluster([item["id"] for item in findings])]}
+            if findings is not None else _finding_verdict()
+        )
+        return _session_reply(command, kwargs, value)
+
+    monkeypatch.setattr(mr, "_run_reviewer", reply)
+    source = _png_source(tmp_path / "sheet.png")
+    standing = _standing_page(tmp_path / "standing.html")
+
+    def review(directory: str, rule: str) -> dict[str, Any]:
+        prompts.clear()
+        aggregate = mr.aggregate_package(
+            mr.ReviewPackage("probe", "traveler", (source,), standing_html=standing),
+            reviewer="codex", judge_reviewer="codex", runs=1, retries=0,
+            report_dir=tmp_path / directory, codex="codex-test",
+        )
+        assert aggregate["error"] is None
+        assert [judge for judge, _ in prompts] == [False, True]
+        for _, prompt in prompts:
+            assert _STANDING_HEADING + "Text of the shop's" in prompt
+            assert f"\n{rule}\nUnits: inch, G20.\n" in prompt
+        return aggregate
+
+    first = review("a", "Feed Hold before reaching in.")
+    sha = mr._sha256(standing)
+    assert first["standing_html"] == {"path": str(standing), "sha256": sha}
+    run = json.loads(Path(first["runs"][0]["report"]).read_text(encoding="utf-8"))
+    assert run["extra"]["standing_html"]["sha256"] == sha
+
+    _standing_page(standing, "Stop and tell the owner.")
+    second = review("b", "Stop and tell the owner.")
+    assert second["standing_html"]["sha256"] == mr._sha256(standing) != sha
+    rerun = json.loads(Path(second["runs"][0]["report"]).read_text(encoding="utf-8"))
+    assert rerun["prompt_sha256"] != run["prompt_sha256"]
+    assert second["judge"]["prompt_sha256"] != first["judge"]["prompt_sha256"]
+
+
 # --- owner-declared machinist exceptions -------------------------------------
 
 
