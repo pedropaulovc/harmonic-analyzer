@@ -39,6 +39,14 @@ Pass 1 — detection. Find every candidate item; classify nothing yet.
    first, and if companion part drawing sheets are attached, read their title
    block and views to inventory every feature, tolerance band, datum and
    `SHARP` / finish callout the traveler must satisfy (rules T1, T2).
+   **Sheet head (rule T18):** on `view_sheet`, count the printed words of
+   every paragraph, list item and table cell between the stock line and the
+   Tools table (over 60 is a finding); check that instructions are discrete
+   titled items, one idea each; that every collision, homing, re-zero and
+   Feed Hold / Reset rule is its own labelled item and a rule particular to
+   this job sits in a block of its own, never mid-paragraph; that no standing
+   shop rule is restated in different words or with a different value; and
+   note every head sentence that only repeats a setup page.
 2. Walk the setups in execution order (`Setup 1 .. Setup N`, `Op 10 .. Op M`)
    as the builder at the machine:
    - **Prerequisites & stock gate (rules T3, T4):** Is every shop-made fixture,
@@ -79,6 +87,15 @@ Pass 1 — detection. Find every candidate item; classify nothing yet.
      and inspection diagram to check leader landings (including whether an edge
      height leader lands on the centreline station where the band applies),
      legend fill consistency, clipping and overlaps.
+   - **Route walk (rule T19):** once, in route order, ask of every op "does a
+     later op cut, face or re-machine what this op worked on, or repeat it?"
+     and "could this be done once, later?" Report each hit with both op
+     numbers (a deburr, edge break, wash or mark on a face that a later op
+     faces off; the same tap mouths deburred in two setups). Never report an
+     early op a later cut, seat or check depends on (burrs off before a face
+     seats; exits scraped flush and a no-rock check before a bolted pair is
+     bored; a mark later setups orient by), or one whose reason the sheet
+     prints.
 Record each candidate with its where (setup, op or diagram), the defect, its
 evidence (rendered crop + exact text), and the fix.
 
@@ -106,7 +123,9 @@ DO NOT ASK FOR
   simulations on the sheet.
 - **Alternative routes or throughput:** when the printed route works, do not
   propose a different process (tabs instead of tape, batching multiple blanks,
-  vise jaws instead of a sub-plate) or critique cycle/dwell time.
+  vise jaws instead of a sub-plate) or critique cycle/dwell time. Wasted or
+  repeated work under rule T19 (an op a later op provably undoes or repeats)
+  is not an alternative route: report it.
 - **Aerospace / 100% inspection or QA paperwork:** never ask for per-piece
   inspection of CNC-repeated `.X`/`.XX` contours/holes across a multi-piece
   hobby lot, itemizing ordinary home-shop hand tools on the Tools table, FAI /

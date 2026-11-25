@@ -1,9 +1,9 @@
 ---
 # Bump major_version when an edit should change traveler machinist-review
 # verdicts; other edits do not re-run cached reviews.
-major_version: 2
+major_version: 3
 ---
-# Traveler guidelines (machinist review v2)
+# Traveler guidelines (machinist review v3)
 
 The standard every process traveler (CNC setup sheet, manual-lathe traveler and
 saw/bench sheet) in this project is written to and reviewed against. Authors
@@ -444,3 +444,67 @@ paperwork and **not** a second engineering drawing:
 - Operations performed *at assembly* (match-drilling, reaming in place, Loctite
   assembly bonding) belong in the assembly package, not as uncontextualized
   steps on a standalone part traveler.
+
+---
+
+## The sheet head and the route
+
+### Rule T18 — The sheet head reads at a glance
+
+The head of a traveler is everything printed between the stock line and the
+Tools table on sheet 1. The builder reads it once before starting and comes
+back to it at every stop (owner 2026-11-25: "first page traveler has wall of
+text"). On the rendered sheet:
+
+- **No prose block over 60 words.** A block is one paragraph, one list item
+  or one table cell. Count the printed words on `view_sheet`; a block over 60
+  is a finding, and so is a head printed as one paragraph holding several
+  unrelated instructions, whatever its length.
+- **Discrete, titled items, one idea each.** Instructions print as short
+  items under a title or a row label (`This job`, `Switching on`, `Feed
+  Hold`), never as a run of sentences on different subjects.
+- **Safety-critical instructions are set apart and findable.** Collision
+  avoidance (a stop, rod, clamp or plug to clear before a move or touch-off),
+  re-zero and homing rules, Feed Hold / Reset and E-stop recovery each print
+  as their own labelled item or row, and a rule particular to this job is in
+  a block of its own (boxed, ruled or headed `STOP`), never mid-paragraph.
+- **Standing shop rules are stated once, in the shop's words.** Rules that
+  are the same on every mill sheet (units and `G21`, belt range, homing, the
+  re-check of a zero, Feed Hold / Reset, prove-out, burrs off before a face
+  seats) print as one shop-wide block. The head may not restate one of them
+  in different words elsewhere, or give a different value or condition.
+- **The head does not repeat a setup page.** A head sentence that only says
+  again what a setup's Holding, Datum or op already prints (a T-number list
+  the Tools table carries, a check or a mark an op makes) is a finding: cut
+  it, or point to the setup. An overview the setups do not give in one place
+  (which setups serve which part, program prefixes, where finished sizes are
+  tabled) belongs in the head.
+
+### Rule T19 — No wasted or repeated work in the route
+
+The owner asks reviewers to be skeptical that setups are efficient (owner
+2026-11-24: "ask agent to be skeptical if setups are efficient"). Walk the
+route once in order and ask of every op: *does a later op undo or repeat
+this?* and *could this be done once, later?* Report each hit with both op
+numbers:
+
+- **Wasted work:** a bench or finishing op (deburr, edge break, stone,
+  polish, wash, mark, finish coat) on a surface or edge that a later op cuts,
+  faces or re-machines, so the later op removes what the earlier one did.
+- **Duplicated hand work:** the same hand operation on the same feature in two
+  setups with no reason printed for the first (deburring the same tap mouths
+  twice, washing twice with no machining between).
+- **Cleaning before more machining:** a wash, degrease or finish-prep step
+  followed by further machining of the part before the finish it prepares for.
+- **Repeated inspection:** a measurement repeated with nothing changed between
+  (rule T10).
+
+**Not wasted (never report):** an early op that a later cut, seat or check
+depends on, even though a later op removes its surface: burrs filed off before
+a face seats on parallels, a fixed jaw or a mate (rule T9); tap or drill exits
+scraped flush and a no-rock seat check before a bolted pair is bored; a face
+mark or scribed datum later setups orient by; a skim that gives the next setup
+its datum. If the printed sheet says why the first op is needed, it is not
+duplicated. A route that merely could be combined or reordered, with nothing
+undone or repeated, is a non-gating `polish` note; do not propose a different
+process for a route that works (rule T15).
