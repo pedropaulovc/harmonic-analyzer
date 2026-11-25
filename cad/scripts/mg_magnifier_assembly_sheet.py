@@ -387,6 +387,13 @@ STEP_TEXT = {
     "drum-rebonded": (
         f"IF {_DRUM} WAS PULLED OFF, RETURN TO {_step(_steps.DRUM_BONDED_KEY)}."
     ),
+    # A wheel replaced in the trial's strip comes here for its drum first,
+    # the axle out of the bar for the V-block, then rejoins the trial at the
+    # spacer: the press sleeve is already made (independent read of #3601).
+    "drum-trial-resumed": (
+        f"IF {_WHEEL} WAS REPLACED AT {_step('stack-part-replaced')}, GO ON TO "
+        f"{_step(_steps.SPACER_FITTED_KEY)}."
+    ),
     # Owner ruling 2026-11-24, fit audit part 2, C11 ("Yes, set to the trial
     # stack"), with question 18's bond: the trial runs dry (the steps module
     # says why). The axle is pushed on its shoulder only, through the
@@ -464,8 +471,14 @@ STEP_TEXT = {
     "axle-replaced": (
         f"IF {_AXLE} WAS PUSHED OUT AND NO OTHER PART WAS REPLACED, REPLACE {_AXLE}."
     ),
+    # A new wheel has no drum, so it goes back through the drum bond, which
+    # rejoins the trial at the spacer; any other new part restarts there.
+    "new-wheel-drum-bonded": (
+        f"IF {_WHEEL} WAS REPLACED, RETURN TO {_step(_steps.DRUM_BONDED_KEY)}."
+    ),
     "trial-refitted": (
-        f"IF {_AXLE} WAS PUSHED OUT, RETURN TO {_step(_steps.SPACER_FITTED_KEY)}."
+        f"IF {_AXLE} WAS PUSHED OUT AND {_WHEEL} WAS NOT REPLACED, RETURN TO "
+        f"{_step(_steps.SPACER_FITTED_KEY)}."
     ),
     _steps.AXLE_SINK_RECORDED_KEY: (
         f"RECORD HOW FAR THE PLAIN END OF {_AXLE} STANDS INSIDE THE BORE "

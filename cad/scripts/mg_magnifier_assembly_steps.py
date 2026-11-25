@@ -67,6 +67,7 @@ STEPS: tuple[tuple[str, ...], ...] = (
         "drum-stripped",
         "drum-cleaned",
         "drum-rebonded",
+        "drum-trial-resumed",
     ),
     # The sleeve the axle is pushed through on its shoulder and the spacer
     # are their own steps (rule 22).
@@ -86,7 +87,8 @@ STEPS: tuple[tuple[str, ...], ...] = (
     # Any other failure strips the trial and pushes the axle out; a part out
     # of its limits (the bar's depth, the spacer's length, the hub's, the
     # washers' and nuts' thickness), else the axle, is replaced, and the
-    # trial restarts from the spacer.
+    # trial restarts from the spacer, a new wheel by way of its drum bond
+    # (step 1's last sub-step rejoins at the spacer, past the made sleeve).
     (AXLE_DRY_FITTED_KEY,),
     (
         AXLE_TRIAL_KEY,
@@ -103,6 +105,7 @@ STEPS: tuple[tuple[str, ...], ...] = (
         "stack-parts-measured",
         "stack-part-replaced",
         "axle-replaced",
+        "new-wheel-drum-bonded",
         "trial-refitted",
     ),
     (AXLE_SINK_RECORDED_KEY,),

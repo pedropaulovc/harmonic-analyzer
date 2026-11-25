@@ -223,6 +223,7 @@ def test_the_axle_is_set_to_the_trial_stack_and_accepted_at_the_nuts() -> None:
         "stack-parts-measured",
         "stack-part-replaced",
         "axle-replaced",
+        "new-wheel-drum-bonded",
         "trial-refitted",
     )
     feeler = f"THE {notes.ENDSHAKE_GO_TEXT} FEELER BETWEEN {notes._WASHER}"
@@ -287,8 +288,25 @@ def test_the_axle_is_set_to_the_trial_stack_and_accepted_at_the_nuts() -> None:
     )
     assert notes.STEP_TEXT["axle-replaced"].endswith(f"REPLACE {notes._AXLE}.")
     assert "MIDDLE OF" in sunk and "CALIPER DEPTH ROD" in sunk
-    assert notes.STEP_TEXT["trial-refitted"].endswith(
-        f"RETURN TO STEP {steps.step_number(steps.SPACER_FITTED_KEY)}."
+    # A new wheel has no drum: it goes back through the drum bond, whose last
+    # sub-step rejoins the trial at the spacer, past the already made press
+    # sleeve (independent read of #3601); any other new part restarts there.
+    assert order.index("new-wheel-drum-bonded") + 1 == order.index("trial-refitted")
+    assert notes.STEP_TEXT["new-wheel-drum-bonded"] == (
+        f"IF {notes._WHEEL} WAS REPLACED, RETURN TO "
+        f"STEP {steps.step_number(steps.DRUM_BONDED_KEY)}."
+    )
+    assert notes.STEP_TEXT["trial-refitted"] == (
+        f"{pushed_out} AND {notes._WHEEL} WAS NOT REPLACED, RETURN TO "
+        f"STEP {steps.step_number(steps.SPACER_FITTED_KEY)}."
+    )
+    assert notes.STEP_TEXT["drum-trial-resumed"] == (
+        f"IF {notes._WHEEL} WAS REPLACED AT "
+        f"STEP {steps.step_number('stack-part-replaced')}, GO ON TO "
+        f"STEP {steps.step_number(steps.SPACER_FITTED_KEY)}."
+    )
+    assert order.index(steps.DRUM_BONDED_KEY) < order.index("drum-trial-resumed") < (
+        order.index(steps.PRESS_SLEEVE_MADE_KEY)
     )
     assert "CALIPER DEPTH ROD" in notes.STEP_TEXT[steps.AXLE_SINK_RECORDED_KEY]
     # The spacer comes off with the trial stack before the bond (on the
@@ -403,6 +421,7 @@ def test_the_drum_is_bonded_centred_wet_and_accepted_once_cured() -> None:
         "drum-stripped",
         "drum-cleaned",
         "drum-rebonded",
+        "drum-trial-resumed",
     )
     bonded = notes.STEP_TEXT[steps.DRUM_BONDED_KEY]
     assert f"WITH {notes.BOND_GRADE}, {notes.BOND_NOTE_REF}" in bonded
