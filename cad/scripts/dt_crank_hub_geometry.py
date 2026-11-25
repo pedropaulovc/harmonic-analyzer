@@ -27,7 +27,12 @@ import _config
 import _sprocket_seat_geometry as seat_geometry
 from _inch_wall_limits import WALL_TARGET_MM
 from _package_units import drawing_unit
-from _printed_tolerance import drilled_oversize_mm, edge_break_chamfer_mm, printed_band_mm
+from _printed_tolerance import (
+    drilled_oversize_mm,
+    drilled_undersize_mm,
+    edge_break_chamfer_mm,
+    printed_band_mm,
+)
 from dt_crank_pin_spec import BIG_END_DIA as SERVICE_PIN_BIG_END_DIA
 
 # The matched arm/hub set prints in the hub's unit; dt_crank_arm_spec asserts
@@ -199,21 +204,22 @@ PHOTO_ARM_TO_HUB_RATIO = PHOTO_ARM / PHOTO_HUB
 SERVICE_PIN_STATION = 13.462  # .53
 CRANK_FACE_SHIFT = ARM_THICKNESS
 
-# Shared shaft-in-bushing fit class, re-expressed as a bore nominal/band against
-# the already released ground-shaft h band (0/-.0008 in).  The resulting
-# worst-case diametral clearance is exactly the catalogued .0010-.0023 in, and
-# the bore comes out .376 +.0005/.0000 in, the owned .3760 reamer's cut.  The
-# catalogue pair is restated, not read: _interference_contracts imports this
-# module into every assembly's recipe, and a fit-class read would make them
-# all depend on tolerances/shaft_in_bushing.yaml.  test_dt_crank_hub_drawing
-# pins it to the catalogue.
+# The bore is the named 3/8 drill's at DRILLED HOLES, .375-.379 (delegated
+# ruling 2026-11-25 (Main), no owner number changed; owner review #2144
+# (D27): the .3760 REAM failed rule 4's necessity test, since the crank is
+# stopped by eye and taper-pinned to MHA-DT-11, so bore shake reaches no
+# reading).  MHA-DT-11's stub is made last and turned to the bore's smallest
+# measured reading less the shaft-in-bushing class's catalogued .0010-.0023
+# in diametral clearance; SHAFT_DIA_BAND is that REF stub's analysis aim on
+# its .375 nominal.  The catalogue pair is restated, not read:
+# _interference_contracts imports this module into every assembly's recipe,
+# and a fit-class read would make them all depend on
+# tolerances/shaft_in_bushing.yaml.  test_dt_crank_hub_drawing pins it to
+# the catalogue.
 SHAFT_DIA_BAND = (0.0, -0.02032)
 SHAFT_CLEARANCE_MIN, SHAFT_CLEARANCE_MAX = 0.0254, 0.05842
-HUB_BORE_DIA = SHAFT_DIA + SHAFT_CLEARANCE_MIN
-HUB_BORE_BAND = (
-    SHAFT_CLEARANCE_MAX - (HUB_BORE_DIA - (SHAFT_DIA + SHAFT_DIA_BAND[1])),
-    0.0,
-)
+HUB_BORE_DIA = 0.375 * MM_PER_IN  # 3/8 drill
+HUB_BORE_BAND = (drilled_oversize_mm(unit=UNIT), -drilled_undersize_mm(unit=UNIT))
 
 # MHA-DT-VN-59 is an axial seam pin at six o'clock in the outboard view, cut
 # from a 5/32 x 1/2 alloy-steel dowel pin (McMaster-Carr 98381A487, Ø.1563
@@ -280,8 +286,13 @@ SERVICE_PIN_REAR_LIGAMENT_WORST_MM = (
 # smallest is the relief's wall over the bore.
 RELIEF_DIA_MAX = RELIEF_DIA + GENERAL_2PL_TOL_MM
 # The hub rides the shaft in its clearance bore, pinned wherever the
-# match-ream found it, so its relief can stand this far off the shaft axis.
-HUB_SHAFT_FLOAT = (HUB_BORE_DIA_MAX - (SHAFT_DIA + SHAFT_DIA_BAND[1])) / 2.0  # 0.0375
+# match-ream found it, so its relief can stand this far off the shaft axis:
+# the stub turned to the bore's smallest reading (as small as the drill's
+# .375) less the widest clearance, inside a drilled hole whose largest
+# diameter may reach .379 (a drilled hole is not round).
+HUB_SHAFT_FLOAT = (
+    HUB_BORE_DIA_MAX - (HUB_BORE_DIA + HUB_BORE_BAND[1] - SHAFT_CLEARANCE_MAX)
+) / 2.0  # 0.080
 # The barrel is printed at the title block's .XX: its smallest is what the
 # arm shoulder and the MHA-DT-09 ream's wall read.
 HUB_BARREL_DIA_MIN = HUB_BARREL_DIA - GENERAL_2PL_TOL_MM
@@ -349,7 +360,10 @@ if not HUB_BORE_DIA < RELIEF_DIA < HUB_BARREL_DIA:
     raise AssertionError("MHA-DT-31 relief is not a step between the bore and barrel")
 if SERVICE_PIN_STATION >= RELIEF_STATION:
     raise AssertionError("MHA-DT-09 station lies on the rear relief")
-if SHAFT_DIA + SHAFT_DIA_BAND[0] >= HUB_BORE_DIA + HUB_BORE_BAND[1]:
+# The stub is turned to the measured bore less at least SHAFT_CLEARANCE_MIN,
+# so it always withdraws; its REF model at .375 may sit line-on-line with the
+# 3/8 drill's nominal (coincident faces, not an interference) but never over.
+if SHAFT_CLEARANCE_MIN <= 0.0 or SHAFT_DIA + SHAFT_DIA_BAND[0] > HUB_BORE_DIA + HUB_BORE_BAND[1]:
     raise AssertionError("shaft dome cannot withdraw through the hub bore")
 if HUB_SHOULDER_STATION >= SERVICE_PIN_STATION:
     raise AssertionError("MHA-DT-09 is not behind the crank arm")

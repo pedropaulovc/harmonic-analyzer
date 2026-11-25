@@ -47,9 +47,12 @@
 # diameter prints as a REF turned to its mate's bore less .0010-.0023 (fit
 # audit 2026-11-23, MHA-DT-31.bore__MHA-DT-11.hub_shaft, MHA-DT-11.journals,
 # MHA-DT-10.bore__MHA-DT-11.pinion_seat). The mates' bores print no band and
-# no pin gauges them, and MHA-DT-10's is cut with the owned adjustable reamer
-# set (tools reamers-adjustable-lms-5948), whose size scatters: so no bore is
-# taken at its reamer's size. Setup 3 measures all three with the telescoping
+# no pin gauges them; MHA-DT-10's is cut with the owned adjustable reamer
+# set (tools reamers-adjustable-lms-5948), whose size scatters, and
+# MHA-DT-31's is the 3/8 drill's at DRILLED HOLES (.375-.379; delegated
+# ruling 2026-11-25, D27), which is not round: so no bore is taken at its
+# tool's size, and the stub is turned to the hub bore's smaller reading of
+# two orientations 90° apart. Setup 3 measures all three with the telescoping
 # gauge on the micrometer before any finishing pass (B31, B05, B10), turns
 # each diameter to its written bore less .0010-.0023 on the micrometer while
 # the shaft is still between the chuck and the centre, and tries the 16T and
@@ -471,13 +474,13 @@ tool = "telescoping-gauges-starrett-s579gz"
 drilling = "none"
 sizing = "other"
 feed = "hand"
-instruction = "Note 3, before any finishing pass: measure the three mates' bores; never take one at its reamer's size (MHA-DT-10's is cut with the adjustable reamer set and scatters). Lock a telescoping gauge across the bore, take it out square and read it on the 0–1 in micrometer; two readings 90° apart at each end of the bore. Write each bore's smallest reading: B31, the hub MHA-DT-31's bore (the stub's mate); B05, the smaller of the cone pivot post MHA-DT-05's two crank bores (the journals' mate); B10, the 16T MHA-DT-10's bore (the pinion seat's mate). Keep MHA-DT-10 and MHA-DT-05 at the lathe, clean and dry, for the trials below."
-inspection = "Each bore's four readings within .0003 of each other (round, straight); MHA-DT-05's two bores within .0013 of each other (note 3's {{cad.outboard_journal_diametral_clearance_min_in:.4dot}}–{{cad.outboard_journal_diametral_clearance_max_in:.4dot}} is .0013 wide, so one journal diameter serves both)."
+instruction = "Note 3, before any finishing pass: measure the three mates' bores; never take one at its tool's size (MHA-DT-10's is cut with the adjustable reamer set and scatters; MHA-DT-31's is drilled 3/8 and is not round). Lock a telescoping gauge across the bore, take it out square and read it on the 0–1 in micrometer; two readings 90° apart at each end of the bore. Write each bore's smallest reading: B31, the hub MHA-DT-31's bore (the stub's mate; the stub is turned to this smaller reading, never to the larger one 90° from it); B05, the smaller of the cone pivot post MHA-DT-05's two crank bores (the journals' mate); B10, the 16T MHA-DT-10's bore (the pinion seat's mate). Keep MHA-DT-10 and MHA-DT-05 at the lathe, clean and dry, for the trials below."
+inspection = "MHA-DT-05's and MHA-DT-10's four readings within .0003 of each other (round, straight); MHA-DT-31's four readings within .375–.379 (its 3/8 drill's DRILLED HOLES; they may spread, a drilled hole is not round); MHA-DT-05's two bores within .0013 of each other (note 3's {{cad.outboard_journal_diametral_clearance_min_in:.4dot}}–{{cad.outboard_journal_diametral_clearance_max_in:.4dot}} is .0013 wide, so one journal diameter serves both)."
 gauge_checks = "other"
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "A bore whose readings spread wider: read it again, the gauge rocked through square each time. MHA-DT-05's two bores still more than .0013 apart: stop before the journals are finished and tell the owner (one journal diameter cannot give both bores note 3's clearance); the other diameters may be finished."
+instruction = "A reamed bore whose readings spread wider: read it again, the gauge rocked through square each time. An MHA-DT-31 reading outside .375–.379: the hub is off its drawing; stop before the stub is finished and tell the owner. MHA-DT-05's two bores still more than .0013 apart: stop before the journals are finished and tell the owner (one journal diameter cannot give both bores note 3's clearance); the other diameters may be finished."
 
 [[setups.operations]]
 cut_kind = "other"

@@ -338,8 +338,13 @@ INDEXED_FIT_BANDS: dict[tuple[str, str], str] = {
         "dt_crankshaft_notes.FIT_CLEARANCES derives note 3's .0010-.0023 from it"
     ),
     ("dt_crank_hub_geometry", "SHAFT_DIA_BAND"): (
-        "analysis aim of MHA-DT-11's REF stub turned to MHA-DT-31's measured bore; "
-        "HUB_BORE_BAND and note 3's clearance are derived from it"
+        "analysis aim of MHA-DT-11's REF stub turned to MHA-DT-31's measured bore "
+        "(the 3/8 drill's, D27) less SHAFT_CLEARANCE, note 3's clearance"
+    ),
+    ("dt_crank_hub_geometry", "HUB_BORE_BAND"): (
+        "the 3/8 drilled hub bore's ANALYSIS band, the title block's "
+        "drilled-hole row (no native band; D27): indexed for the seam web, "
+        "the relief wall and the hub's float on the stub"
     ),
     ("dt_crank_handle_butt_cup_spec", "POCKET_DIA_BAND"): (
         "the pocket's own .248-.257 as deviations on the modelled .250; the sheet "
