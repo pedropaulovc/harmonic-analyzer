@@ -3,5 +3,5 @@ checks:
     check: "TENON_WALL_FLOOR_MM"
     kind: wall
     reason: "the oak tenon splits over the pivot bore"
-    source: "drawing-guidelines rule 17 (.060 floor), checked at the #20 drill's DRILLED HOLES .165 (tenon wall .0615): delegated ruling 2026-11-25 (Main), D26, retired the .1635 MAX cap; owner review #2144"
+    source: "drawing-guidelines rule 17 (.060 floor), checked at the #20 drill's DRILLED HOLES .165 (tenon wall .0615): delegated ruling 2026-11-25 (Main), precedent: owner ruling 2026-11-24 merging the fit policy; RETIRES the owner's fit-audit Q14 answer's trial step; owner review #2144 (D26), retired the .1635 MAX cap"
     basis: worst_case

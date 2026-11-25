@@ -22,24 +22,36 @@
 # - Setup 7, lathe, between the 3-jaw (on the head, over a brass shim wrap)
 #   and the tailstock dead centre, the follow rest behind the tool: rough the
 #   shaft from the bar, finish it whole length to the aim set by the
-#   measured strap bores (inside the spans' and lands' .3087-.3121), turn the Ø.28
+#   measured strap and drum bores (inside the spans' and lands' .3087-.3121), turn the Ø.28
 #   relief, step the SR.28 back crown from a DRO table, every station by the
 #   carriage DRO from the head's rear face.
 # - Setup 8, bench: deburr, check, oil, bag.
 #
 # Made to fit (note 1; owner ruling 2026-11-24, fit audit question 12): the
-# journals run in the MHA-DT-14 strap's two 5/16 drilled bores. Setup 7
-# measures both bores with the telescoping gauge and the micrometer before
-# the shaft is finished and aims the whole shaft at the smaller bore less
-# .002, never over .3117 (the drum and the collar still slide over it): the
-# journals then run at the drawing's .001-.003. No gauge pins on the
+# journals run in the two MHA-DT-14 straps' 5/16 drilled bores, and (owner
+# ruling 2026-11-25, option A) the MHA-DT-01 drum slides over both: its
+# front end leads from the back crown over the back journal and seats .19
+# min on the front one, so its whole bore passes the back journal and its
+# front end takes the front one. Setup 7 measures each strap's bore and the
+# drum's two ends with the telescoping gauge and the micrometer before the
+# shaft is finished; each journal's aim is its own strap's bore less .002,
+# held .0004 under the drum bore it must enter, never over .3117 (the collar
+# still slides over it): the journals then run at the drawing's .001-.003.
+# When no aim does both (the strap's bore more than .0022 over the drum's:
+# the .003 loosest clearance less the .0004 turning window and the .0004
+# the drum needs to slide), the front journal is turned to its strap alone
+# and the drum's front end is reamed to it + .001 with the owned adjustable
+# set, .30 deep (past the .23 the seat reaches): its wall stays .151 (rule
+# 17: .080 target) and the front land's gap under it at most .0042 (note 3:
+# .008). No ruling covers the back journal: there the fitter stops and
+# tells the owner. No gauge pins on the
 # journals. The bond lands are made to the MHA-DT-01 drum's 5/16 drilled
 # bore too (note 3; owner ruling 2026-11-24, fit audit question 13): Setup 7
-# measures its two ends and skims the lands only where the aim leaves the
-# drum less than .002 clear. The spans are made to the MHA-DT-33 collar's
+# skims the lands only where the aim leaves the drum less than .002 clear.
+# The spans are made to the MHA-DT-33 collar's
 # 5/16 drilled bore too (note 2; drawing-guidelines rule 4, form 2):
 # Setup 7's aim keeps them under its .3125 minimum, and Setup 8 slides the
-# collar over them by hand.
+# collar, then the drum, over them by hand.
 #
 # To order before Setup 4 runs: the .2510 reamer (tools.reamer-2510, owner
 # ruling #3073). No gauge pins: the MHA-DT-15 rod and the MHA-DT-VN-63 pin
@@ -179,9 +191,10 @@ ream_feed_per_min_mm = 40.64
 drill_feed_per_min_mm = 71.12
 # Setup 7: the 3-jaw on the head over the shim wrap, the back end on the
 # greased dead centre; the shaft roughed in passes of .040 per side from
-# Ø.625 to Ø.330, then finished whole length to the aim: the smaller
-# measured strap bore less journal_clearance_aim_in, never over
-# journal_aim_in (.3117, .0004 under the spans' .3121 top).
+# Ø.625 to Ø.330, then finished whole length to the aim A, the larger of the
+# two journals' aims (each its strap's measured bore less
+# journal_clearance_aim_in, never over journal_aim_in, .3117, .0004 under the
+# spans' .3121 top), the other journal skimmed to its own.
 # The follow rest bolts to the saddle's headstock side, its jaws a lead L
 # ahead of the tool, so it cannot reach the head: the stretch from the
 # shoulder to the joint at Z+3.20 (in the span between the front journal
@@ -216,20 +229,40 @@ pin_far_side_max_in = 1.5413
 # The rod's .001-.0035 play in the reamed hole tilts it at most .0011 over
 # .200, inside the window.
 pin_square_dti_mm = 0.089
-# Setup 7: the MHA-DT-14 strap's arbor bores, 5/16 drilled (.3125-.3165 at
-# the DRILLED HOLES row). The journals are accepted from A down to .0004
+# Setup 7: each MHA-DT-14 strap's arbor bore, 5/16 drilled (.3125-.3165 at
+# the DRILLED HOLES row). Each journal is accepted from its aim down to .0004
 # under it; strap_bore_max_fit_in is the largest bore for which that whole
 # window, at the journal_aim_in cap, stays inside the drawing's .001-.003
 # (.3117 + .003 - .0004). A bigger bore: stop and tell the owner.
 strap_bore_max_fit_in = 0.3143
 # Setup 7: the bond lands are made to the MHA-DT-01 drum's 5/16 drilled bore
 # (note 3, .002-.008 clear; owner ruling 2026-11-24, fit audit question 13):
-# they take the journals' aim A unless that leaves the drum's smaller end D
+# they take the shaft's aim A unless that leaves the drum's smaller end D
 # under .002 clear; then they are skimmed to D − land_clearance_aim_in. A D
 # under drum_bore_min_fit_in would put a skimmed land under the .3085 the
 # lands are modelled to (D − .003 − .0004).
 land_clearance_aim_in = 0.003
 drum_bore_min_fit_in = 0.3119
+# Setup 7: the drum slides over both journals (owner ruling 2026-11-25,
+# option A). Each journal's aim stays journal_drum_clearance_in under the
+# drum bore it enters (the spans' .0004 under the drum's and the collar's
+# 5/16): the front's under DF, the back's under D. A journal, its aim down to
+# .0004 under it, then stays .001-.003 in its strap only while the strap's
+# bore S is at most strap_over_drum_max_in over that drum bore
+# (.003 − .0004 − .0004). Over it at the front: the front journal is turned
+# to its strap alone and the drum's front end reamed to the miked journal +
+# drum_front_ream_over_in (the ruling's +.001), drum_front_ream_depth_in
+# deep, past the .23 the drum's front end reaches onto the journal
+# (dt_pinion_arbor_spec.DRUM_FRONT_END_ON_JOURNAL_MAX). At the journal_aim_in
+# cap that bore is .3127: the drum's wall to its tooth root (Ø.6145 min) is
+# .151 (rule 17 target .080), and the front land under the reamed length
+# (a land at least .3085) is at most .0042 clear, inside note 3's .008. An O
+# drill (.316, cutting to .320) would leave .0115 there, past LOCTITE 638's
+# .0098: the reamer only.
+journal_drum_clearance_in = 0.0004
+strap_over_drum_max_in = 0.0022
+drum_front_ream_over_in = 0.001
+drum_front_ream_depth_in = 0.3
 
 [[tools]]
 id = "saw"
@@ -276,6 +309,11 @@ id = "reamer"
 name = ".2510 reamer"
 ref = "reamer-2510"
 status = "to_order"
+
+[[tools]]
+id = "reamer-adj"
+name = "Adjustable reamer set, .250-.375 in (LMS 5948), in a tap wrench"
+ref = "reamers-adjustable-lms-5948"
 
 [[tools]]
 id = "drill-1-16"
@@ -688,8 +726,8 @@ cut_diameter_mm = "{{process.bar_dia_mm}}"
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Measure both arbor bores of the MHA-DT-14 strap (the journals' mate) with the telescoping gauge and the 0–1 in micrometer (reads .0001), at each end of each bore; write the smallest reading S here. The aim A for the whole shaft is S − {{process.journal_clearance_aim_in:.3dot}}, never over {{process.journal_aim_in:.4dot}}: write A. Then measure the MHA-DT-01 drum's bore the same way at each end (the bond lands' mate); write the smaller reading D."
-inspection = "S at most {{process.strap_bore_max_fit_in:.4dot}}. Over it (with A held at the {{process.journal_aim_in:.4dot}} limit, a journal .0004 under A would run more than .003 loose): stop and tell the owner; the journals are not finished. D at least {{process.drum_bore_min_fit_in:.4dot}}: under it, stop and tell the owner."
+instruction = "Measure each MHA-DT-14 strap's arbor bore (the journals' mates) with the telescoping gauge and the 0–1 in micrometer (reads .0001), at each end: write the smaller reading of the front strap SF and of the back strap SB. Then the MHA-DT-01 drum's bore the same way at each end (the journals pass into it, the bond lands bond in it): the end with the larger reading goes on first, toward the head; mark it with the felt pen and write its reading DF, and D, the smaller of the two ends. The drum slides over both journals (owner ruling 2026-11-25): the front journal's aim AF is the smallest of SF − {{process.journal_clearance_aim_in:.3dot}}, DF − {{process.journal_drum_clearance_in:.4dot}} and {{process.journal_aim_in:.4dot}}; the back journal's AB the smallest of SB − {{process.journal_clearance_aim_in:.3dot}}, D − {{process.journal_drum_clearance_in:.4dot}} and {{process.journal_aim_in:.4dot}} (the drum's whole bore passes over it). Write AF, AB and A, the larger of the two: the whole shaft is finished to A."
+inspection = "SF and SB each at most {{process.strap_bore_max_fit_in:.4dot}}. Over it (with the aim held at the {{process.journal_aim_in:.4dot}} limit, a journal .0004 under it would run more than .003 loose): stop and tell the owner; the journals are not finished. D at least {{process.drum_bore_min_fit_in:.4dot}}: under it, stop and tell the owner. Each aim at least its strap's reading less .0026, so the journal, the aim to .0004 under it, runs .001–.003 in its strap. AB under that (SB more than {{process.strap_over_drum_max_in:.4dot}} over D): stop and tell the owner. AF under that (SF more than {{process.strap_over_drum_max_in:.4dot}} over DF): write AF again as the smaller of SF − {{process.journal_clearance_aim_in:.3dot}} and {{process.journal_aim_in:.4dot}}, and open the drum's front end at the end of this setup."
 gauge_checks = [{ gauge = "telescoping-gauges-starrett-s579gz", band_mm = [7.9375, 8.0391] }]
 
 [[setups.operations]]
@@ -750,12 +788,12 @@ cut_diameter_mm = "{{cad.shaft_dia_mm}}"
 [[setups.operations]]
 cut_kind = "other"
 instruction = "Spindle stopped: mike the shaft at Z+2.2 and Z+8.6 (the journals) and at Z+1.0, Z+3.5, Z+7.5 and Z+9.2. Journals smooth to the nail, no chatter (Ra 63)."
-inspection = "Journals at both: A to .0004 under it, so .001–.003 under S (note 1: turned to the measured strap bores). The bond lands (Z+3.5 and Z+7.5): at least .002 under D, else skim them as below. Elsewhere Ø{{cad.shaft_dia_min_in:.4dot}}–{{cad.shaft_dia_max_in:.4dot}}."
+inspection = "Journals: the front AF and the back AB to .0004 under it, so .001–.003 under its strap's SF or SB (note 1: turned to the measured strap bores); the journal whose aim is under A is skimmed to it as below. The bond lands (Z+3.5 and Z+7.5): at least .002 under D, else skim them as below. Elsewhere Ø{{cad.shaft_dia_min_in:.4dot}}–{{cad.shaft_dia_max_in:.4dot}}."
 gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.shaft_dia_band_mm}}" }]
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "A journal over A, or a span or land over its band's top: spindle stopped, the follow rest lifted off; the AR tool's left edge on the head's rear face, DRO Z0 again. Bolt the rest back (jaws on the finished diameter) unless the stretch lies under Z+{{process.rest_joint_in:.2f}}."
+instruction = "A journal over its aim (AF or AB), or a span or land over its band's top: spindle stopped, the follow rest lifted off; the AR tool's left edge on the head's rear face, DRO Z0 again. Bolt the rest back (jaws on the finished diameter) unless the stretch lies under Z+{{process.rest_joint_in:.2f}}."
 feed = "hand"
 
 [[setups.operations]]
@@ -764,7 +802,7 @@ speed_kind = "spindle"
 tool = "ar"
 drilling = "none"
 sizing = "other"
-instruction = "Skim that stretch only to A, the cross slide in by half the miked excess per side: a journal Z+{{cad.front_journal_station_in:.2dot}} to Z+{{cad.front_journal_end_station_in:.2dot}} or Z+{{cad.back_journal_station_in:.2dot}} to Z+{{cad.back_journal_end_station_in:.2dot}}; a span or land from the journal's end to the next journal, shoulder or back end. Mike again. A journal more than .003 under S, or any other reading under its band's bottom: the arbor is scrap; start again from Setup 1."
+instruction = "Skim that stretch only to its aim, the cross slide in by half the miked excess per side: the front journal Z+{{cad.front_journal_station_in:.2dot}} to Z+{{cad.front_journal_end_station_in:.2dot}} to AF or the back Z+{{cad.back_journal_station_in:.2dot}} to Z+{{cad.back_journal_end_station_in:.2dot}} to AB; a span or land, to A, from the journal's end to the next journal, shoulder or back end. Mike again. A journal more than .003 under its strap's SF or SB, or any other reading under its band's bottom: the arbor is scrap; start again from Setup 1."
 settings = "lathe-ar-1018"
 cut_diameter_mm = "{{cad.shaft_dia_mm}}"
 
@@ -779,6 +817,17 @@ inspection = "Each land D − {{process.land_clearance_aim_in:.3dot}} to .0004 u
 gauge_checks = [{ gauge = "micrometers", band_mm = [7.8359, 7.9273] }]
 settings = "lathe-ar-1018"
 cut_diameter_mm = "{{cad.shaft_dia_mm}}"
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "other"
+tool = "reamer-adj"
+drilling = "none"
+sizing = "other"
+instruction = "Only if AF was written again from SF alone (owner ruling 2026-11-25: no journal size fits both bores): open the drum's front end to the front journal + {{process.drum_front_ream_over_in:.3dot}}. Mike the front journal at Z+2.2. Set the piece of the adjustable reamer set that spans that reading + {{process.drum_front_ream_over_in:.3dot}}, read with the micrometer over its blades. The drum in the bench vise's soft jaws, its marked front end up: turn the reamer in by hand in the tap wrench, with cutting oil, until its blades' full diameter stands {{process.drum_front_ream_depth_in:.2dot}} deep (past the .23 the drum's front end reaches onto the journal); turn it out the same way. Measure the front end with the telescoping gauge: that is DF now."
+inspection = "DF at least the front journal + {{process.drum_front_ream_over_in:.3dot}} and at most .3165 (the drilled top, which note 3's .008 reads over the front land); reamed {{process.drum_front_ream_depth_in:.2dot}} deep or more. Over .3165: stop and tell the owner."
+gauge_checks = [{ gauge = "telescoping-gauges-starrett-s579gz", band_mm = [7.9375, 8.0391] }]
+feed = "hand"
 
 [[setups.operations]]
 cut_kind = "other"
@@ -925,6 +974,12 @@ feed = "hand"
 [[setups.operations]]
 instruction = "Spans: slide the MHA-DT-33 collar (made before this arbor) on from the back crown, by hand, over the back stub and on to the pin hole; slide it off again."
 inspection = "MHA-DT-33 slides on by hand over both spans (note 2: turned to the collar's bore). A tight spot: chuck the arbor again as in Setup 7 and skim that span only to A."
+gauge_checks = "other"
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Drum: slide the MHA-DT-01 drum on from the back crown by hand, its marked front end leading, over the back journal and on until its front end stands 2.40 or less from the head's rear face (the calipers' depth rod from the head's rear face to the drum's front end); slide it off again."
+inspection = "MHA-DT-01 slides on by hand over both journals (note 1). A stop on a bond land: chuck the arbor again as in Setup 7 and skim that land to D − {{process.land_clearance_aim_in:.3dot}}. A stop on the front journal: open the drum's front end as in Setup 7 (owner ruling 2026-11-25). A stop on the back journal: stop and tell the owner."
 gauge_checks = "other"
 feed = "hand"
 

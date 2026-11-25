@@ -68,8 +68,9 @@ from dt_pinion_spring_section import WIDTH_PLACES as SPRING_W_PLACES
 
 # RIG_MARGIN_SPARE is a coordinator's planning margin (Main, restricted review
 # of #858): rig-scope margins stood this much over their floors at the worst
-# stack.  The owner's fit-up ranges (C7, below) override it: Main's C7 ruling
-# of 2026-11-24.  The rows those ranges size keep their floors only -- j = 19's
+# stack.  The owner's fit-up ranges (C7, below) override it: owner ruling
+# 2026-11-24 (C7): "Yes: ranges, longer flats, no leaf miking."  The rows
+# those ranges size keep their floors only -- j = 19's
 # full face, the drum's end play, the spring pad's air and the lift rod's
 # seat (build_dt_drive_train_assembly.OWNER_RANGED_RIG_MARGINS); the margins
 # no range sets still keep this spare.
@@ -361,7 +362,8 @@ if sum(TORQUE_SHAFT_BACK_BEARING_STACK.values()) < _BACK_BEARING_REQUIRED - 1e-9
 # -- no collar length, strap thickness or by-eye term -- and the follower pin
 # rides wherever that puts it (BACK_CAM_PIN_STATION, from the collar's front
 # face, on the model's .035 leaf).
-# Main's C7 ruling (2026-11-24) replaced the agent floor BACK_COLLAR_MIN_GAP
+# Owner ruling 2026-11-24 (C7): "Yes: ranges, longer flats, no leaf miking."
+# replaced the agent floor BACK_COLLAR_MIN_GAP
 # (0.5, #858: "the collar never lands on the block but as the stop") with what
 # the gap is for.  At zero the back collar's back face bears on the back
 # MHA-DT-18's inner face at the set pose: that is the rod's north stop, which

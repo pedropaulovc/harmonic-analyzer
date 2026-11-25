@@ -2963,7 +2963,8 @@ def _worst(nominal: float, *stacks: dict[str, float]) -> float:
 # stacks, the drum's gears and end play, and each clearance the rig's axial
 # stations set against its neighbours -- stood at least that much over its
 # floor.  The owner's fit-up ranges (2026-11-24, audit part 2 C7) override it
-# for the rows they size (Main's C7 ruling, 2026-11-24): those keep their
+# for the rows they size (owner ruling 2026-11-24 (C7): "Yes: ranges, longer
+# flats, no leaf miking."): those keep their
 # floors only.  name -> (worst value, floor).
 RIG_MARGINS = {
     "j = 19 past its full face (bank preloaded south)": (J19_FULL_FACE_MARGIN, 0.0),

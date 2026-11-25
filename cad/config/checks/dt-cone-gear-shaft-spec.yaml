@@ -6,5 +6,5 @@ checks:
     check: "TIP_END_RECESS_FLOOR_MM"
     kind: gap
     reason: "the shaft end stands past T024's north face"
-    source: "D4, delegated ruling 2026-11-24 (Main), no precedent; owner review #2144 (audit part 2 C7 row 1R): the 1R range's thin end keeps at least 0.03 mm of the shaft end inside T024's bore"
+    source: "delegated ruling 2026-11-24 (Main), precedent: owner ruling 2026-11-24 (C7, ranges); owner review #2144 (D4): the widest leaf range that keeps at least 0.03 mm of the shaft end inside T024's bore (audit part 2 C7 row 1R)"
     basis: worst_case

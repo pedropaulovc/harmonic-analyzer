@@ -522,7 +522,8 @@ def test_j19_keeps_its_full_face_at_the_worst_stack() -> None:
     assert math.isclose(min(backs) - g19_back, drive.J19_FULL_FACE_MARGIN, abs_tol=1e-9)
     # D, the two plays and their tolerances are the owner's ranges (C7): j = 19
     # keeps its full face, its floor (RIG_MARGIN_SPARE, a planning margin, is
-    # overridden here; Main's C7 ruling).
+    # overridden here; owner ruling 2026-11-24 (C7): "Yes: ranges, longer
+    # flats, no leaf miking.").
     import dt_feeler_leaves
 
     assert drive.J19_FULL_FACE_MARGIN >= 0.0
@@ -848,7 +849,8 @@ def _follower_stations() -> tuple[list[float], list[float]]:
         (0, 1),
     ):
         gap = _back_collar_gap(end)
-        # Main's C7 ruling: the collar's own floor is the rod's end play.
+        # Owner ruling 2026-11-24 (C7): "Yes: ranges, longer flats, no leaf
+        # miking.": the collar's own floor is the rod's end play.
         assert gap + _FEELER_BAND[0] >= RIG.LIFT_ROD_END_PLAY_MIN - 1e-9, end
         c_max = c_set + min(_hub_gap(), gap)
         set_station = dt_pinion_cam_geometry.CAM_LEN + gap - t / 2.0
@@ -1610,7 +1612,8 @@ def test_spring_is_stationed_from_the_block_on_its_pad_leaf() -> None:
 
     # Owner ruling C7: any one leaf .020 TO .040; the model's .026 is one of
     # them, and the thinnest keeps the pad's air (its floor; the planning
-    # spare went with the ranges, Main's C7 ruling).
+    # spare went with the ranges, owner ruling 2026-11-24 (C7): "Yes: ranges,
+    # longer flats, no leaf miking.").
     assert RIG.LARGE_LEAF_RANGE[0] <= RIG.SPRING_PAD_LEAF <= RIG.LARGE_LEAF_RANGE[1]
     assert RIG.SPRING_PAD_GAP == pytest.approx(RIG.BACK_COLLAR_GAP)
     aft = RIG.BACK_BLOCK_Z0 - RIG.SPRING_PAD_LEAF

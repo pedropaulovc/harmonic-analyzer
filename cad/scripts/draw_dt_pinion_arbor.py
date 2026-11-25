@@ -139,10 +139,14 @@ def _inch(value_mm: float) -> str:
 # rows at most, the rest in the numbered note it flags (SEE NOTE n).
 # The journals are made to fit (owner ruling 2026-11-24, fit audit question
 # 12): the size prints REF and note 1 the acceptance, turned last to the
-# 5/16 drilled MHA-DT-14 bores at .001-.003 clearance with the drum still
-# sliding over the back one; the MHA-DT-14 sheet names this part as turned
-# to its bore.  The clearance is the fit's own (JOURNAL_FIT_CLEARANCE), not
-# limits on both members of the pair.
+# 5/16 drilled MHA-DT-14 strap bores at .001-.003 clearance; the MHA-DT-14
+# sheet names this part as turned to its bore.  Owner ruling 2026-11-25
+# (pinion arbor, option A): the MHA-DT-01 drum slides over both journals,
+# its front end leading from the back crown over the back journal onto the
+# front one (dt_pinion_arbor_spec.DRUM_FRONT_END_ON_JOURNAL_MIN), so note 1
+# says BOTH; the traveler prints the remedy when no journal size fits both
+# bores.  The clearance is the fit's own (JOURNAL_FIT_CLEARANCE), not limits
+# on both members of the pair.
 JOURNAL_CLEARANCE = JOURNAL_FIT_CLEARANCE
 JOURNAL_CALLOUT = "SEE NOTE 1"
 # Every Ø5/16 span's size is on the view (round 3 of fan-out dt-fab-3).  The
@@ -192,17 +196,18 @@ CROSS_HOLE_CALLOUT = (
     f"BOND {RETAINING_COMPOUND}, CLEARANCE "
     f"{_inch(CROSSROD_CLEARANCE[0])}-{_inch(CROSSROD_CLEARANCE[1])}"
 )
-# Rule 7: the notes block stays at four short rows; the widest (66
-# characters, ~172 mm) ends ~24 mm left of the title block (x 0.216).
+# Rule 7: the notes block stays at four short rows; the widest (70
+# characters, ~182 mm) ends ~14 mm left of the title block (x 0.216).
 # Each 2X's second span carries a leadered SEE NOTE tag (SPAN_TAGS), so the
 # note says what the spans are, not where (#1038 r9 machinist review, rules
 # 1 and 26: "PIN-HOLE SPAN AND BACK-END SPAN" named them in words only).
+# Each mate prints with its registry name (STRAP, DRUM), as note 2's COLLAR.
 SHEET_NOTES = (
-    f"1. JOURNALS (2X): TURN LAST TO THE MEASURED BORES OF {STRAP_NUMBER},\n"
+    f"1. JOURNALS (2X): TURN LAST TO THE MEASURED {STRAP_NUMBER} STRAP BORES,\n"
     f"   CLEARANCE {_inch(JOURNAL_CLEARANCE[0])}-{_inch(JOURNAL_CLEARANCE[1])}; "
-    f"{DRUM_NUMBER} SLIDES OVER THE BACK ONE.\n"
+    f"{DRUM_NUMBER} DRUM SLIDES OVER BOTH.\n"
     f"2. SPANS (2X): TURN TO {COLLAR_NUMBER} COLLAR BORE: SLIDES ON BY HAND.\n"
-    f"3. LANDS: TURN TO {DRUM_NUMBER}, {RETAINING_COMPOUND} (CLEARANCE "
+    f"3. LANDS: TURN TO {DRUM_NUMBER} DRUM, {RETAINING_COMPOUND} (CLEARANCE "
     f"{_inch(BOND_CLEARANCE[0])}-{_inch(BOND_CLEARANCE[1])})."
 )
 # Under the property-linked inside-corner note (top-left at y 0.060).

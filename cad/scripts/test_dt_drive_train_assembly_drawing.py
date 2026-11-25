@@ -780,13 +780,19 @@ def test_cone_swing_check_requires_installed_stop_inspection_and_seating() -> No
     import dt_swing_stop_screw_spec as stop_screw
 
     check = " ".join(drawing.CHECKS.split("4. CONE SWING")[1].split("\n5.")[0].split())
-    # Owner ruling S1 (audit part 2): turns from first bite, the count less
-    # two lead pitches holding the 1.5D full-form floor.
+    # Owner ruling S1 (audit part 2): turns from first bite.  Codjiflo r3-5 on
+    # #3550: the count less the tip chamfer and the head-end runout holds the
+    # 1.5D full-form floor, one turn fewer does not, and the screw's thread
+    # can give the count before the head seats.
     turns = _assert_engagement_cites_its_count(
         check, "MHA-SH-VN-52", "stop-screw-engagement"
     )
-    assert (turns - 2) * stop_screw.THREAD_PITCH >= stop_screw.MIN_USEFUL_ENGAGEMENT_MM
-    assert (turns - 3) * stop_screw.THREAD_PITCH < stop_screw.MIN_USEFUL_ENGAGEMENT_MM
+    lead = stop_screw.TIP_CHAMFER + stop_screw.FULL_THREAD_START_MAX_MM
+    pitch = stop_screw.THREAD_PITCH
+    assert turns * pitch - lead >= stop_screw.MIN_USEFUL_ENGAGEMENT_MM
+    assert (turns - 1) * pitch - lead < stop_screw.MIN_USEFUL_ENGAGEMENT_MM
+    assert turns * pitch <= stop_screw.LENGTH_MIN_MM + 1e-9
+    assert turns == 10
     assert "CHECK THAT ITS HEAD IS FULLY SEATED" in check
     assert "CHECK THAT MHA-DT-20 AND THE MHA-DT-VN-52 SHOULDER STAY SEATED" in check
 
@@ -874,11 +880,14 @@ def test_cone_swing_check_requires_pivot_thread_engagement() -> None:
     turns = _assert_engagement_cites_its_count(
         check, "MHA-DT-VN-52", "pivot-screw-engagement"
     )
-    # The count less two lead pitches holds DT-04's 1D floor, and the
-    # screw's thread (9 turns) can give it before the shoulder seats.
-    assert (turns - 2) * PITCH >= pivot_screw.MIN_USEFUL_ENGAGEMENT_MM
-    assert (turns - 3) * PITCH < pivot_screw.MIN_USEFUL_ENGAGEMENT_MM
+    # The count less the tip chamfer and the runout under the shoulder holds
+    # DT-04's 1D floor (Codjiflo r3-5 on #3550), one turn fewer does not, and
+    # the screw's thread (9 turns) can give it before the shoulder seats.
+    lead = pivot_screw.TIP_CHAMFER + pivot_screw.FULL_THREAD_START
+    assert turns * PITCH - lead >= pivot_screw.MIN_USEFUL_ENGAGEMENT_MM
+    assert (turns - 1) * PITCH - lead < pivot_screw.MIN_USEFUL_ENGAGEMENT_MM
     assert turns * PITCH <= pivot_screw.THREAD_TAIL_LEN + 1e-9
+    assert turns == 8
     assert "MHA-DT-VN-52 SHOULDER STAY SEATED" in check
     # Owner ruling DT-04's location follows the minimum to its sheet 16 row
     # (Codjiflo on #3023), as DT-07's is pinned to its fact.
