@@ -153,8 +153,8 @@ make = "KBC - USA"
 sku = "5-018-0365"
 source = "https://www.kbctools.com/itemdetail/5-018-0365"
 status = "to_order"
-purchase = "KBC 5-018-0365, $32.80, 4 in stock (listing read live 2026-11-14); catalogue cutting band +.0002/-.0000, .0365-.0367, inside the hole's .0365-.0370 band."
-note = "Not owned: to buy. MHA-DT-12-TL-01 clock-pin hole, Ø.0365 +.0005/0 REAM .20 deep, press fit on TL-VN-51."
+purchase = "KBC 5-018-0365, $32.80, 4 in stock (listing read live 2026-11-14); catalogue cutting band +.0002/-.0000, .0365-.0367 (the hole prints no band; TL-VN-51 presses into it)."
+note = "Not owned: to buy (owner ruling 2026-11-25: \"A: buy the .0365 reamer; the sheet stays as drawn\"). MHA-DT-12-TL-01 clock-pin hole, Ø.0365 REAM .20 deep (no band), press fit on TL-VN-51."
 dia_in = [0.0365, 0.0367]
 
 # --- carrier (MHA-CH-06-TL-21) plan workholding, tools and gauges ---------

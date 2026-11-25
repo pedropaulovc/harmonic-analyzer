@@ -17,10 +17,7 @@ demoted:
   ch_rocker_arm: fit-batch-ch
   ch_rocker_strap: fit-batch-ch
   dt_cone_gear_tl_arbor_assembly: fit-batch-dt
-  dt_cone_gear_tl_arbor_key: fit-batch-dt
   dt_cone_gear_tl_index_plate: fit-batch-dt
-  dt_cone_gear_tl_phasing_comb: fit-batch-dt
-  dt_cone_tip_gear_tl_cutter_assembly: fit-batch-dt
   dt_drive_train_assembly: fit-batch-dt
   # dt_pinion_arbor was on this list from the owner's 2026-11-24 conversion
   # ruling ("Merge the policy now and demote the failing sheets to warn-only
@@ -30,7 +27,6 @@ demoted:
   dt_pinion_arbor: fit-batch-dt
   fr_frame_assembly: fit-batch-fr
   fr_top_frame: fit-batch-fr
-  ha_harmonic_analyzer_assembly: fit-batch-ha
   mg_magnifier_assembly: fit-batch-mg
   mg_magnifying_bracket: fit-batch-mg
   mg_magnifying_vertical_rod: fit-batch-mg
