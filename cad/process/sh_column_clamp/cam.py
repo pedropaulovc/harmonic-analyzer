@@ -587,6 +587,8 @@ def _front_context(
     lying_grip = p["vise_jaw_height_mm"] - p["riser_height_mm"]
     _agree(plan, "upright_grip_mm", upright_grip)
     _agree(plan, "lying_grip_mm", lying_grip)
+    # The setup pictures draw a face pass from the plan's restatement.
+    _agree(plan, "face_overhang_mm", FACE_OVERHANG_MM)
     t = p["parallel_thickness_mm"]
 
     numbers = _tool_numbers(plan, FRONT_TOOLS)
@@ -1112,6 +1114,8 @@ def _back_context(
     lying_grip = p["vise_jaw_height_mm"] - p["riser_height_mm"]
     _agree(plan, "upright_grip_mm", upright_grip)
     _agree(plan, "lying_grip_mm", lying_grip)
+    # The setup pictures draw a face pass from the plan's restatement.
+    _agree(plan, "face_overhang_mm", FACE_OVERHANG_MM)
     t = p["parallel_thickness_mm"]
     # The tap stack's ceiling (the tap guide's reach out of its collet plus
     # the tap's in its wrench): spindle-to-table maximum less the tool-change

@@ -203,6 +203,11 @@ bore_mill_projection_min_mm = 31.75
 # .01 in (cam.py checks it).
 tap_stack_max_mm = 270.002
 tap_wrench_reach_max_mm = 190.5
+# The tap guide (shop tools.tap-guide-fisher): its 1/2 in shank and 3/16 in
+# point, the sellers' sizes, for the tap picture (test_shop_equipment.py
+# holds them to the record).
+tap_guide_dia_mm = 12.7
+tap_guide_point_dia_mm = 4.7625
 
 # What both halves share: the blank, the skims and facing passes, the holding
 # and the machine-capacity inputs.
@@ -241,6 +246,10 @@ face_step_max_mm = 1.27
 # other pass climbs: that half is not measured.
 face_cutter_dia_mm = 12.7
 face_stepover_max_mm = 6.4
+# How far the facing passes reach past both edges of a face together: the
+# recipe's FACE_OVERHANG_MM (cam.py checks it), restated for the setup
+# pictures, which draw the end mill on one of those passes.
+face_overhang_mm = 0.5
 # Every drill's full diameter this far past the mating face, into the gap
 # between the parallels.
 drill_past_mm = 1.0
