@@ -119,7 +119,11 @@ hardware, fixtures); the work stop keeps its own entry. Template pictures
 (`data-cad-template`) are drawn by prechips; the column clamp's
 `clamp-half` takes `data-stop="rod"` or `"rod-labelled"`, and its
 `data-up="outside"` picture is `data-work="face"` for the setup, `"drill"` or
-`"tap"` for those operations.
+`"tap"` for those operations. Where a family's halves differ only in what a
+picture shows of them, one picture draws both (`data-halves="both"`: the
+mating skim's two views from above, the finished front and back) rather
+than a box each; a picture that only repeats what the drill or tap
+pictures and the text already say (the halves before the bore) is left out.
 
 ## Placeholder plans
 

@@ -629,7 +629,7 @@ machine_ref = "pm-30mv"
 holding = "The same stacks. The blank lying along the jaws, gripped on B and the top: B against the FIXED jaw, the two cold-finished faces left horizontal; the face up becomes the mating face. A front (F1–F3): the N end at the LEFT. A back (K1–K3): the N end at the RIGHT. Centred on the jaws; tap it down onto both stacks while closing the vise."
 programs = ["CF05_mating", "CB05_mating"]
 datum = "Program CF05_mating for a front, CB05_mating for a back: the two files differ, each cuts from its own X0. G54: X0 the N end, at the left for a front (the part to +X), at the right for a back (the part to −X); Y0 the fixed jaw's face (B), +Y toward it; Z0 the stacks' top. Each later blank: against the work stop; X0, Y0 and Z0 stand."
-diagram = { file = "diagrams/mating.svg", part = "front", alt = "A front lying on stacked parallels, gripped on its bottom and top faces, B at the fixed jaw, the near side N at the left; the 1/2 in end mill skims the face up, the mating face. From above: the work stop's rod against its LEFT end (N)." }
+diagram = { file = "diagrams/mating.svg", alt = "One half lying on stacked parallels, gripped on its bottom and top faces, B at the fixed jaw; the 1/2 in end mill skims the face up, the mating face; the work stop's rod not shown in this view. From above, a front: the near side N at the LEFT, the work stop's rod against it. From above, a back: N at the RIGHT, its X0 the right end, the rod against it." }
 # The capacity check's lowest cut is the lower of the two halves' faces, the
 # back's pre-face depth; both halves stand the blank's section above the stacks.
 envelope = { x_span_mm = ["{{cad.width_mm}}", "{{process.face_cutter_dia_mm}}", 5.08], y_span_mm = ["{{cad.height_mm}}", "{{process.face_cutter_dia_mm}}"], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{process.blank_section_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{cad.back.pre_face_depth_mm}}"], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_mm}}"] }
@@ -640,7 +640,6 @@ beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{cad.width_mm}}"], c
 instruction = "Work stop unlocked, its rod drawn back clear of the vise. G54 X0 the N end, Y0 the fixed jaw's face (B): edge finder (900 rpm), by the table's row for the half in the vise."
 instruction_detailed = "Work stop unlocked, its rod drawn back clear of the vise. Edge finder (900 rpm): on the fixed jaw's face beside the blank, G10 L20 P1 Y-2.540; then on the blank's N end, from the side and with the entry in the table's row for the half in the vise."
 feed = "hand"
-diagram = { file = "diagrams/mating.svg", part = "back", alt = "A back held the same way, the near side N at the right: its X0 is the right end, and the work stop's rod is against its RIGHT end." }
 table = { columns = ["Half", "Program", "N end (X0)", "Edge finder on the N end", "Z0 touch: MDI, then the feeler"], rows = [
   ["Front, F1–F3", "CF05_mating", "LEFT; the part to +X", "from the left: G10 L20 P1 X-2.540", "G0 X-12.700 Y-6.850 (the stack left of the blank)"],
   ["Back, K1–K3", "CB05_mating", "RIGHT; the part to −X", "from the right: G10 L20 P1 X2.540", "G0 X12.700 Y-6.850 (the stack right of the blank)"],
@@ -941,7 +940,6 @@ instruction = "Every half, burrs only (Setup 11 breaks the edges, once): scrape 
 feed = "hand"
 inspection = "Mating face down on the surface plate: it does not rock and no burr stands proud."
 gauge_checks = "other"
-diagram = { file = "diagrams/deburr.svg", part = "front", alt = "A front on the bench, mating face up: the drill exits scraped flush, no burr standing at an edge." }
 
 [[setups.operations]]
 instruction = "Only if it rocks or a burr stands proud: stone it again and check it again."
@@ -953,7 +951,6 @@ instruction = "Each back: mic the pre-face depth, mating face to outside face, a
 feed = "hand"
 inspection = "Pre-face depth {{cad.pre_face_depth_min_in:.3dot}}–{{cad.pre_face_depth_max_in:.3dot}} at both ends. Outside: stop and tell the owner."
 gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.pre_face_depth_band_mm}}" }]
-diagram = { file = "diagrams/deburr.svg", part = "back", alt = "A back on the bench, mating face up, at its pre-face depth: the tap exits scraped flush, no burr standing at an edge." }
 
 [[setups.operations]]
 instruction = "On the bench: bolt a back to a front (both checked as above), mating face to mating face, with the pair's own two MHA-SH-VN-53 screws (90280A201 #8-32 × 1-1/4 narrow fillisters; none in hand: stop, no substitute) through the front's ear holes into the back's taps, heads on the front's outside face."
@@ -1102,7 +1099,7 @@ machine_kind = "other"
 title = "Inspect, deburr, black enamel"
 machine = "Bench"
 indexing = "none"
-diagram = { file = "diagrams/inspect.svg", part = "front", alt = "The finished front, looking down the bore: the ear holes either side, the web between each and the bore, the bore's place from the N end." }
+diagram = { file = "diagrams/inspect.svg", alt = "The finished front, then the finished back below it, each looking down the bore and at its outside face: the front's ear holes either side, the web between each and the bore, the bore's place from the N end; the back's half bore, its tapped ear holes and the bore's place from N, the half bore's axis behind the mating face." }
 envelope = "other"
 vise_hold = "other"
 beam = "other"
@@ -1125,7 +1122,6 @@ gauge_checks = [
   { gauge = "calipers", band_mm = "{{cad.bore_location_band_mm}}" },
   { gauge = "calipers", band_mm = "{{cad.ear_station_band_mm}}" },
 ]
-diagram = { file = "diagrams/inspect.svg", part = "back", alt = "The finished back, looking down the half bore: the tapped ear holes either side, the bore's place from the N end." }
 
 [[setups.operations]]
 speed_kind = "other"
