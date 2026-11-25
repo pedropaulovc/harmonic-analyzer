@@ -1144,3 +1144,45 @@ def build(ctx: dict[str, Any], rt: Any) -> dict[str, Any]:
     ops.update(ctx["manual"])
     rt.generate(doc)
     return {"ops": ops}
+
+
+# The as-machined report (``cad/scripts/_as_machined.py``) only reports: it
+# never fails the task. "gate" would fail it on a difference over the noise
+# line or a rapid that cuts.
+AS_MACHINED_MODE = "report"
+
+
+def as_machined(ctx: dict[str, Any], inputs: Any) -> dict[str, Any]:
+    """The sawn blank in WB02's frame: its stock box (the bar's 3/8
+    thickness as supplied, its width at the widest the gate passes), the
+    sawn left end at -left_end_skim_mm staying put, the length along X at
+    the plan's blank_length_min_mm-blank_length_max_mm band and its middle
+    (the plan marks no nominal; the route says "about 9.35"). WB03 and WB04
+    run in the one lying frame (the jobs' "left" and "right" stocks, X0
+    picked up again on the milled left end), so the route is listed."""
+    p = inputs.plan["parameters"]
+    lengths = {
+        "nominal": (p["blank_length_min_mm"] + p["blank_length_max_mm"]) / 2,
+        "min": p["blank_length_min_mm"],
+        "max": p["blank_length_max_mm"],
+    }
+    stock = next(job["stock"] for job in ctx["jobs"] if job["frame"] == "top")
+    x0 = stock[0][0]
+    return {
+        "parts": {
+            "": {
+                "blank": {
+                    "frame": "top",
+                    "box": [[x0, x0 + lengths["nominal"]], list(stock[1]), list(stock[2])],
+                    "length": {"axis": "x", "keep": "min", "mm": lengths},
+                },
+                "route": [
+                    ["WB02_top", "top"],
+                    ["WB03_left", "lying"],
+                    ["WB04_right", "lying"],
+                    ["WB05_height", "height"],
+                ],
+            }
+        },
+        "skip": {},
+    }

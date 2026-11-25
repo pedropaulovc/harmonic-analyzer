@@ -1689,3 +1689,53 @@ def build(ctx: dict[str, Any], rt: Any) -> dict[str, Any]:
     ops.update(ctx["manual"])
     rt.generate(doc)
     return {"ops": ops}
+
+
+# The as-machined report (``cad/scripts/_as_machined.py``) only reports: it
+# never fails the task. "gate" would fail it on a difference over the noise
+# line or a rapid that cuts.
+AS_MACHINED_MODE = "report"
+
+
+def as_machined(ctx: dict[str, Any], inputs: Any) -> dict[str, Any]:
+    """What the as-machined report needs: the blank sawn off the 3/4 x 1-1/4
+    in bar, as VB01 holds it upright (its stock box: the bar's section, the
+    raw paper end the end skim above Z0), the sawn length below the raw end
+    at the plan's blank_x_in-blank_x_max_in band and its middle (the plan
+    marks no nominal). The paper end touches Z0 in VB01, so it stays put
+    and a longer blank reaches further down, which VB02 faces off. Every
+    program runs in its jobs' one frame; VB08 is the hand tap (no frame).
+    Two cutters the jobs do not describe: the chamfer mill, a 90° cone that
+    runs to a point (context() refuses one that does not), and the reamer,
+    taken flat-ended at its diameter: its 45° bevel lead runs past the
+    relief slot's roof into the slot, where there is no metal."""
+    p = inputs.plan["parameters"]
+    lengths = {
+        "nominal": (p["blank_x_in"] + p["blank_x_max_in"]) / 2 * IN,
+        "min": p["blank_x_in"] * IN,
+        "max": p["blank_x_max_in"] * IN,
+    }
+    stock = next(job["stock"] for job in ctx["jobs"] if job["ops"][0][0] == "paper_end")
+    top = stock[2][1]
+    dia = {job["tool"]: job["dia"] for job in ctx["jobs"]}
+    cone = dia["chamfer"] / 2
+    return {
+        "parts": {
+            "": {
+                "blank": {
+                    "frame": "paper_end",
+                    "box": [list(stock[0]), list(stock[1]), [top - lengths["nominal"], top]],
+                    "length": {"axis": "z", "keep": "max", "mm": lengths},
+                }
+            }
+        },
+        "skip": {},
+        "tools": {
+            ctx["numbers"]["chamfer"]: [[0.0, 0.0], [cone, cone]],
+            ctx["numbers"]["reamer"]: [[dia["reamer"] / 2, 0.0]],
+        },
+        "notes": [
+            "VB08 is the 4-40 tap by hand under the tap guide: the report cuts no thread",
+            "the reamer is taken flat-ended (its bevel lead ends in the relief slot)",
+        ],
+    }

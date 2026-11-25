@@ -1465,3 +1465,45 @@ def build(ctx: dict[str, Any], rt: Any) -> dict[str, Any]:
     ops.update(ctx["manual"])
     rt.generate(doc)
     return {"ops": ops}
+
+
+# The as-machined report (``cad/scripts/_as_machined.py``) only reports: it
+# never fails the task. "gate" would fail it on a difference over the noise
+# line or a rapid that cuts.
+AS_MACHINED_MODE = "report"
+
+
+def as_machined(ctx: dict[str, Any], inputs: Any) -> dict[str, Any]:
+    """The sawn blank in MB01's frame: its stock box (the bar's section at
+    the thickest and widest the saw's gate passes, the programs' own stock),
+    X0 the blank's seat end, the length along X at the plan's
+    blank_length_min_mm-blank_length_max_mm band and its middle (the plan
+    marks no nominal). Every program runs in its jobs' frame, in order; MB07
+    (the hand tap) cuts nothing. The bench saw that takes the nose waste off
+    between MB04 and MB05 is no posted move: the waste rides through MB05
+    until MB06's nose profile, through the neck, cuts it free."""
+    p = inputs.plan["parameters"]
+    lengths = {
+        "nominal": (p["blank_length_min_mm"] + p["blank_length_max_mm"]) / 2,
+        "min": p["blank_length_min_mm"],
+        "max": p["blank_length_max_mm"],
+    }
+    stock = next(job["stock"] for job in ctx["jobs"] if job["frame"] == "width")
+    return {
+        "parts": {
+            "": {
+                "blank": {
+                    "frame": "width",
+                    "box": [[0.0, lengths["nominal"]], list(stock[1]), list(stock[2])],
+                    "length": {"axis": "x", "keep": "min", "mm": lengths},
+                }
+            }
+        },
+        "skip": {},
+        "notes": [
+            "The nose waste is sawn off at the bench between MB04 and MB05 "
+            "(plan: saw off the nose waste): no posted move, so it stays on "
+            "the blank until MB06's through profile cuts it free (shed as an "
+            "offcut; MB06's removed volume carries it)."
+        ],
+    }

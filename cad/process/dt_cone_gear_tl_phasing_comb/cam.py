@@ -709,3 +709,36 @@ def build(ctx: dict[str, Any], rt: Any) -> dict[str, Any]:
     ops.update(ctx["manual"])
     rt.generate(doc)
     return {"ops": ops}
+
+
+# The as-machined report (``cad/scripts/_as_machined.py``) only reports: it
+# never fails the task. "gate" would fail it on a difference over the noise
+# line or a rapid that cuts.
+AS_MACHINED_MODE = "report"
+
+
+def as_machined(ctx: dict[str, Any], inputs: Any) -> dict[str, Any]:
+    """What the as-machined report needs: the snipped blank on the nominal
+    tape stack, at its steel-rule place on the plate (CB01's stock box:
+    blank_left_x_mm and blank_back_y_mm in from the plate's left end and
+    back edge), the sheet's thickness at the drawing's stock band
+    (``top.stock_thickness``) and its nominal (``stock_thickness_nominal``,
+    the .020 sheet as bought). The underside lies on the tape, so it stays
+    put and a thicker sheet stands higher; the tape stack's own band moves
+    the whole sheet and is not a blank size."""
+    top = inputs.features["features"]["top"]
+    lo, hi = top["stock_thickness"]
+    thickness = {"nominal": top["stock_thickness_nominal"], "min": lo, "max": hi}
+    x, y, (z0, _z1) = ctx["jobs"][0]["stock"]
+    return {
+        "parts": {
+            "": {
+                "blank": {
+                    "frame": "plate",
+                    "box": [list(x), list(y), [z0, z0 + thickness["nominal"]]],
+                    "length": {"axis": "z", "keep": "min", "mm": thickness},
+                }
+            }
+        },
+        "skip": {},
+    }

@@ -1187,3 +1187,49 @@ def build(ctx: dict[str, Any], rt: Any) -> dict[str, Any]:
     ops.update(ctx["manual"])
     rt.generate(doc)
     return {"ops": ops}
+
+
+# The as-machined report (``cad/scripts/_as_machined.py``) only reports: it
+# never fails the task. "gate" would fail it on a difference over the noise
+# line or a rapid that cuts.
+AS_MACHINED_MODE = "report"
+
+
+def as_machined(ctx: dict[str, Any], inputs: Any) -> dict[str, Any]:
+    """What the as-machined report needs: the 13 in length of the 1/2 x 6 in
+    bar SP01 holds on the table (its stock box: the sawn ends, the bar's
+    as-received front edge edge_stock_mm outside the plate's front edge and
+    its 6 in width behind it), in the model frame both mill programs run in
+    (``build()`` imports the STEP at the identity ``ctx["model"]``; the G54
+    of SP01 and SP02 is the model origin). The band is the bar's miked
+    thickness, .495-.505 (the programs are posted for the thickest), its
+    nominal the bar's marked .500; the underside lies on the blocks and the
+    parallels, so it stays put and a thicker bar stands higher. The sawn
+    length is taken at its nominal: the ends stay as sawn. The slot frees
+    the bar's remainder behind the plate (an offcut). The SP03 files are the
+    hand taps under the tap guide (no frame)."""
+    p = inputs.plan["parameters"]
+    thickness = {
+        "nominal": p["blank_thickness_in"] * IN,
+        "min": p["blank_thickness_min_in"] * IN,
+        "max": p["blank_thickness_max_in"] * IN,
+    }
+    (x0, _x1), y, (z0, _z1) = next(
+        job["stock"] for job in ctx["jobs"] if job["ops"][0][0] == "front_edge"
+    )
+    route = [[name, "model" if name in ("SP01_split_edges", "SP02_top") else None] for name, _ops in PROGRAMS]
+    return {
+        "parts": {
+            "": {
+                "blank": {
+                    "frame": "model",
+                    "box": [[x0, x0 + p["blank_length_in"] * IN], list(y), [z0, z0 + thickness["nominal"]]],
+                    "length": {"axis": "z", "keep": "min", "mm": thickness},
+                },
+                "route": route,
+            }
+        },
+        "frames": {"model": ctx["model"]},
+        "skip": {},
+        "notes": ["the SP03 files tap by hand under the tap guide: the report cuts no thread"],
+    }

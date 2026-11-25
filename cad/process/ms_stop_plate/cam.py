@@ -603,3 +603,39 @@ def build(ctx: dict[str, Any], rt: Any) -> dict[str, Any]:
     ops.update(ctx["manual"])
     rt.generate(doc)
     return {"ops": ops}
+
+
+# The as-machined report (``cad/scripts/_as_machined.py``) only reports: it
+# never fails the task. "gate" would fail it on a difference over the noise
+# line or a rapid that cuts.
+AS_MACHINED_MODE = "report"
+
+
+def as_machined(ctx: dict[str, Any], inputs: Any) -> dict[str, Any]:
+    """What the as-machined report needs: the plate as it comes to the mill,
+    sawn and filed to its outline at the bench (Setups 1-2; the filed roof
+    chamfers are not in a box), MS01's stock in the ``pair`` frame, its
+    thickness the sheet's as rolled: the outer face's band, nominal the
+    drawing's (the model's). The seating face lies on the block, so the
+    outer face (MS01's top) moves with the thickness. Both programs cut in
+    their own frames; the #49's run into the block below is not this part."""
+    g = _geometry(inputs.features)
+    band = inputs.features["features"]["outer_face"]["thickness"]
+    (x0, x1), (y0, y1), _z = next(job["stock"] for job in ctx["jobs"] if job["frame"] == "pair")
+    return {
+        "parts": {
+            "": {
+                "blank": {
+                    "frame": "pair",
+                    "box": [[x0, x1], [y0, y1], [-g["thickness"], 0.0]],
+                    "length": {
+                        "axis": "z",
+                        "keep": "min",
+                        "mm": {"nominal": g["thickness"], "min": band[0], "max": band[1]},
+                    },
+                }
+            }
+        },
+        "skip": {},
+        "notes": ["the outline and both roof chamfers are sawn and filed at the bench (Setups 1-2)"],
+    }

@@ -1372,3 +1372,57 @@ def build(ctx: dict[str, Any], rt: Any) -> dict[str, Any]:
     ops.update(ctx["manual"])
     rt.generate(doc)
     return {"ops": ops}
+
+
+# The as-machined report (``cad/scripts/_as_machined.py``) only reports: it
+# never fails the task. "gate" would fail it on a difference over the noise
+# line or a rapid that cuts.
+AS_MACHINED_MODE = "report"
+
+
+def as_machined(ctx: dict[str, Any], inputs: Any) -> dict[str, Any]:
+    """What the as-machined report needs: the sawn slice of the 3/4 × 1-1/4
+    bar, MS01's stock in the ``back`` frame (the bar's width along X, its
+    thickness along Y), the slice's thickness along Z at the plan's band
+    (``blank_z_min_mm``..``blank_z_max_mm``), nominal its middle (the .59 the
+    saw is marked at). MS01's Z0 is the sawn top less the skim, so the top
+    stays put and the slice's length shows at the mating face. MS02 faces the
+    mating face to ``thickness_aim_mm`` from the back face, not to the
+    model's depth, and MS05 (Z0) and MS08 (Y0, the fixed jaw) are set on that
+    faced mating face: their frames here stand on it, the ``rebate`` and
+    ``thumb`` frames moved along model Z. The tap files (MS09-MS11) are a tap
+    guide by hand and cut nothing; the plate holes' #49 pilots are drilled
+    from MHA-MS-03's MS01, not here."""
+    p = inputs.plan["parameters"]
+    (x0, x1), (y0, y1), (_z0, z1) = next(job["stock"] for job in ctx["jobs"] if job["frame"] == "back")
+    lo, hi = p["blank_z_min_mm"], p["blank_z_max_mm"]
+    nominal = (lo + hi) / 2
+    mating = ctx["frames"]["mating"]["origin"][2] - p["thickness_aim_mm"]
+    frames = {}
+    for key in ("rebate", "thumb"):
+        origin = ctx["frames"][key]["origin"]
+        frames[f"{key}_faced"] = {
+            "origin": [origin[0], origin[1], origin[2] + mating],
+            "axes": ctx["frames"][key]["axes"],
+        }
+    frame_of = {op[0]: job["frame"] for job in ctx["jobs"] for op in job["ops"]}
+    route = []
+    for name, keys in PROGRAMS:
+        found = {frame_of[k] for item in keys for k in ((item,) if isinstance(item, str) else item) if k in frame_of}
+        key = found.pop() if found else None
+        route.append([name, f"{key}_faced" if f"{key}_faced" in frames else key])
+    return {
+        "parts": {
+            "": {
+                "blank": {
+                    "frame": "back",
+                    "box": [[x0, x1], [y0, y1], [z1 - nominal, z1]],
+                    "length": {"axis": "z", "keep": "max", "mm": {"nominal": nominal, "min": lo, "max": hi}},
+                },
+                "route": route,
+            }
+        },
+        "frames": frames,
+        "skip": {},
+        "notes": ["the plate holes' pilots come from MHA-MS-03's MS01_pair_pilot; every thread is tapped by hand"],
+    }

@@ -1249,3 +1249,49 @@ def build(ctx: dict[str, Any], rt: Any) -> dict[str, Any]:
     ops.update(ctx["manual"])
     rt.generate(doc)
     return {"ops": ops}
+
+
+# The as-machined report (``cad/scripts/_as_machined.py``) only reports: it
+# never fails the task. "gate" would fail it on a difference over the noise
+# line or a rapid that cuts.
+AS_MACHINED_MODE = "report"
+
+
+def as_machined(ctx: dict[str, Any], inputs: Any) -> dict[str, Any]:
+    """What the as-machined report needs: the sawn brass blank bonded to the
+    fixture bar, in the ``stick`` frame. Its length along X at the plan's
+    sawn band (``blank_length_in``..``blank_length_max_in``), nominal the
+    scribed ``blank_scribe_in``; X0 is ``outline_trim_mm`` inside its right
+    end, so that end stays put. Across Y its rear edge at Y0 and the bar's
+    nominal ``blank_width_in``; its thickness the bar's as supplied, never
+    machined (the model's). MS01 faces the fixture bar, not the part. The
+    engraving bit is a V of the plan's tip flat and the graduations' angle,
+    which the jobs (a flat end mill of the shank) cannot describe."""
+    p = inputs.plan["parameters"]
+    g = _geometry(inputs.features)
+    trim = p["outline_trim_mm"]
+    lengths = {
+        "nominal": p["blank_scribe_in"] * IN,
+        "min": p["blank_length_in"] * IN,
+        "max": p["blank_length_max_mm"],
+    }
+    shank = next(job["dia"] for job in ctx["jobs"] if job["tool"] == "engraver") / 2
+    tip = p["engraver_tip_mm"] / 2
+    flank = math.tan(math.radians(g["grads"]["v_angle_deg"] / 2))
+    return {
+        "parts": {
+            "": {
+                "blank": {
+                    "frame": "stick",
+                    "box": [
+                        [trim - lengths["nominal"], trim],
+                        [-p["blank_width_in"] * IN, 0.0],
+                        [-g["thick"], 0.0],
+                    ],
+                    "length": {"axis": "x", "keep": "max", "mm": lengths},
+                }
+            }
+        },
+        "skip": {"MS01_fixture_face": "faces the fixture bar's top, not the stick"},
+        "tools": {ctx["numbers"]["engraver"]: [[tip, 0.0], [shank, (shank - tip) / flank]]},
+    }
