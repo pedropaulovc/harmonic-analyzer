@@ -805,8 +805,8 @@ def test_the_bow_ch00_accepts_keeps_the_mid_span_gap() -> None:
     leaf = asm.BAR_GAP["leaf"]
     assert bank.RUNNING_FLOOR <= leaf <= min(top, foot, bowed)
     assert leaf / 25.4 == pytest.approx(0.005)
-    # .006 is the widest bow on the .001 grid that still closes; .005 keeps a
-    # thousandth in hand.
+    # .006 is the widest bow on the .001 grid that still holds the floor (.007
+    # closes it); .005 keeps a thousandth in hand.
     assert mid - 2.0 * 0.006 * 25.4 >= bank.RUNNING_FLOOR
     assert mid - 2.0 * 0.007 * 25.4 < bank.RUNNING_FLOOR
 
