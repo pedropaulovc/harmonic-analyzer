@@ -279,8 +279,10 @@ plans in batches"; the column clamp is the worked example):
    - Feed Hold / Reset, including "(the controller keeps G54...)";
    - "(the tool setter measures it)" and "tool lengths from the tool setter";
    - the prove-in-air ops: delete the op (the method is the standing row
-     "A file's first part"); keep only a clearance the part itself makes
-     uncommon, such as a helix clearing screw heads;
+     "A file's first part", and its "watch every move ... clear the work,
+     the jaws, the parallels, any clamp and the stop" covers a list of what
+     a move clears, screw heads included); keep only a proof that departs
+     from the row (a partial file, another raise);
    - burrs off before a face seats;
    - the work stop's rod drawn back before a touch-off.
 3. Keep, at its own step, every departure from a standing row that is true
