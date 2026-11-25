@@ -152,6 +152,11 @@ cross_tip_height_mm = -4.794
 # .01 in.
 tap_stack_max_mm = 269.24
 tap_wrench_reach_max_mm = 189.73
+# The tap guide (shop tools.tap-guide-fisher): its 1/2 in shank and 3/16 in
+# point, the sellers' sizes, restated for the tap pictures
+# (test_shop_equipment.py holds them to the record).
+tap_guide_dia_mm = 12.7
+tap_guide_point_dia_mm = 4.7625
 
 [[tools]]
 id = "em-half"
