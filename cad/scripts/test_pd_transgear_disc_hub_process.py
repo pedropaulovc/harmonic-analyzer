@@ -99,7 +99,6 @@ def test_the_plan_is_an_enrolled_traveler_and_cam_stem() -> None:
     tools = {t["id"] for t in PLAN["tools"]}
     assert {
         "sharp",
-        "reamer-3135",
         "endmill",
         "reamer-0615",
     } <= {t["id"] for t in PLAN["tools"] if t.get("status") == "to_order"}
@@ -111,6 +110,27 @@ def test_the_plan_is_an_enrolled_traveler_and_cam_stem() -> None:
     body = "\n".join(line for line in text.splitlines() if not line.startswith("#"))
     for word in ("zz-pins", "GO pin", "NO-GO"):
         assert word not in body
+
+
+def test_the_bore_is_hand_reamed_with_the_owned_adjustable_set() -> None:
+    # Coordinator 2026-11-25 (D19 as amended): the bore's mate is turned to
+    # it, so no reamer is bought for it; the .314 pin keeps the bore under
+    # the .3140 the printed spigot wall is figured at.
+    text = _process_plans.plan_path(STEM).read_text(encoding="utf-8")
+    assert "reamer-3135" not in text
+    reamer = next(t for t in PLAN["tools"] if t["ref"] == "reamers-adjustable-lms-5948")
+    assert "status" not in reamer
+    reams = [
+        op
+        for op in PLAN["setups"][1]["operations"]
+        if op.get("tool") == reamer["id"]
+    ]
+    assert len(reams) == 2  # the trial piece's, then the hub's
+    for op in reams:
+        assert (op["speed_kind"], op["feed"]) == ("other", "hand")
+        assert "settings" not in op
+        assert ".313 pin passes through" in op["inspection"]
+        assert ".314 pin does not enter" in op["inspection"]
 
 
 def test_the_traveler_leaves_the_assembly_work_to_pd_00() -> None:
