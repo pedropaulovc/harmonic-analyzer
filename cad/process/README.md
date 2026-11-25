@@ -79,6 +79,53 @@ and bed height) repeat the shop's `workholding.vise-pm-6` (`shop/common.toml`), 
 plan bindings cannot read shop records; each such parameter names the shop
 field it repeats, and the two must be changed together.
 
+Setup pictures (owner 2026-11-25: "work stop does not appear in sketches;
+cutter is a wide yellow rectangle even for 1/2 in end mills"): every
+workholding element a setup's holding, datum or operation text names (vise
+jaws, parallels or stacks, 1-2-3 block, work stop, screws) appears in its
+picture, and none it does not name; cutters, drills, taps, the tap guide and
+locators such as the work stop's rod are drawn to scale from the plan's
+numbers (a tool's diameter, its stick-out, its point's depth), at the pass or
+station the picture shows, and end in a break line where drawn short. A
+round tool or rod seen from the side carries the cue that it is round (owner
+2026-11-25: "adding a round bottom"): its square end drawn as the near half
+of its end face, a shallow arc 12 % of its diameter deep, whose apex is the
+tool's true end, so its length and the cut depth still measure to scale; a
+drill keeps its point. A size with no record stays schematic and is said to
+be. A tool size a picture
+reads is a plan parameter restating its shop record, held to it by a test
+(`test_shop_equipment.py` for the tap guide) or by `cam.py`'s `_agree` (the
+face overhang). A picture shows one moment: every view in it shows the same
+tool at the same place, over the part (the face pass least past its edges, not
+the first pass, which hangs over the fixed jaw). The setup's picture shows its first
+cutting operation on the part (the first cut on the part, not a test plunge
+into waste); each later tool (a drill, a tap) is drawn in its own
+operation's picture, and a centre drill that spots the stations the next
+drill drills is not drawn (the drill's picture stands for it). The work stop
+is drawn as what it is, a round rod reaching in from its post beside the
+vise (its own key entry, not the supports' hatch), and named once, in the
+first picture that draws it, with when it is set. A locator that would lie
+across or behind the part in a view is left out of that view, which says so
+in a short callout (owner 2026-11-25: "rod is confusing on side view, better
+to replace with a callout saying its not shown"); it appears in at least one
+view of the picture, and a picture with only that view says in the callout
+which end the locator is on. Touch-off tools (the edge
+finder, the feeler) are not drawn in a cutting picture. Colour follows what
+moves (owner 2026-11-25: "shouldnt the tap t handle be yellow since it is
+arguably part of the cutter"): the tool's yellow covers the tool and all
+that turns or travels with it or is held in the spindle (cutter, drill, tap,
+the tap wrench or T-handle, the tap guide, a drill chuck where drawn, the
+edge finder); grey is the work's surroundings (the rest of the bar,
+hardware, fixtures); the work stop keeps its own entry. Template pictures
+(`data-cad-template`) are drawn by prechips; the column clamp's
+`clamp-half` takes `data-stop="rod"` or `"rod-labelled"`, and its
+`data-up="outside"` picture is `data-work="face"` for the setup, `"drill"` or
+`"tap"` for those operations. Where a family's halves differ only in what a
+picture shows of them, one picture draws both (`data-halves="both"`: the
+mating skim's two views from above, the finished front and back) rather
+than a box each; a picture that only repeats what the drill or tap
+pictures and the text already say (the halves before the bore) is left out.
+
 ## Placeholder plans
 
 Until its traveler is written, a made part without an enrolled plan has a
