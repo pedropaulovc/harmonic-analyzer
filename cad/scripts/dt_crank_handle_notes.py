@@ -14,7 +14,6 @@ from dt_crank_handle_spec import (
     CUP_NUMBER,
     FERRULE_NAME,
     FERRULE_NUMBER,
-    PIVOT_BORE_FIT_MAX,
     SCREW_NUMBER,
     TENON_GLUE_LINE,
     TENON_STRAIGHT_WALL_MIN,
@@ -41,12 +40,13 @@ def _floor_thou(value_mm: float) -> str:
 # MHA-DT-32 shoulder, made last, is turned to it: the fit's acceptance prints
 # once, on MHA-DT-32 (owner ruling 2026-11-23, tool audit Q14: "DRILL #20";
 # owner ruling 2026-11-24, fit audit question 14: "handle stays DRILL #20;
-# DT-32 shoulder by trial").  The .1635 MAX cap is the largest bore the
-# tenon walls are judged at (dt_crank_handle_spec.PIVOT_BORE_FIT_MAX; the
-# shoulder's .1635 trial step must not enter).
+# DT-32 shoulder by trial").  The bore is a plain #20 drilled hole at
+# DRILLED HOLES, .1610-.1650, which the tenon walls are judged at
+# (dt_crank_handle_spec.PIVOT_BORE_FIT_MAX; D26, delegated ruling 2026-11-25
+# (Main), retired the .1635 MAX cap and the shoulder's .1635 trial step).
 PIVOT_BORE_DRILL = "#20"
 PIVOT_BORE_CALLOUT = (
-    f"{PIVOT_BORE_DRILL} DRILL THRU, <MOD-DIAM>{inch_text(PIVOT_BORE_FIT_MAX, 4)} MAX\n"
+    f"{PIVOT_BORE_DRILL} DRILL THRU\n"
     f"{SCREW_NUMBER} SHOULDER IS\nTURNED TO THIS BORE"
 )
 TENON_NOTE_NUMBER = 1

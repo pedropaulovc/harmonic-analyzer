@@ -155,7 +155,8 @@ def test_u33_running_fit_end_play_and_engagement() -> None:
     # Handle numbers come from its own spec, the arm thickness from the shared
     # crank interface geometry.
     assert handle.PIVOT_BORE_DIA + handle.PIVOT_BORE_BAND[1] == pytest.approx(0.161 * 25.4)
-    assert handle.PIVOT_BORE_DIA + handle.PIVOT_BORE_BAND[0] == pytest.approx(0.1635 * 25.4)
+    # D26 (delegated ruling 2026-11-25): the #20's DRILLED HOLES .165, no cap.
+    assert handle.PIVOT_BORE_DIA + handle.PIVOT_BORE_BAND[0] == pytest.approx(0.165 * 25.4)
 
     # The fitted shoulder: the cup face on the handle's basic length less the
     # pocket is the bonded handle, plus the modelled end play.
@@ -163,16 +164,24 @@ def test_u33_running_fit_end_play_and_engagement() -> None:
     low, high = spec.END_PLAY_RANGE
     assert low < spec.END_PLAY_NOMINAL < high
     # The shoulder turned to the read bore less .0050-.0075: the clearance is
-    # the fit's, and the shoulder's limits hold it for every accepted bore.
+    # the fit's, and the owner's limits .1535-.1585 leave every bore up to
+    # .166 a window (the smallest bore its whole fit).
     assert (spec.DIAMETRAL_CLEARANCE_MIN, spec.DIAMETRAL_CLEARANCE_MAX) == pytest.approx(
         (0.0050 * 25.4, 0.0075 * 25.4)
+    )
+    assert (spec.SHOULDER_DIA_MIN, spec.SHOULDER_DIA_MAX) == pytest.approx(
+        (0.1535 * 25.4, 0.1585 * 25.4)
     )
     assert spec.SHOULDER_DIA_MIN == pytest.approx(
         spec.HANDLE_BORE_MIN - spec.DIAMETRAL_CLEARANCE_MAX
     )
-    assert spec.SHOULDER_DIA_MAX == pytest.approx(
-        spec.HANDLE_BORE_MAX - spec.DIAMETRAL_CLEARANCE_MIN
-    )
+    for thou_tenths in range(1610, 1661):
+        bore = thou_tenths / 10000.0 * 25.4
+        window = (
+            max(bore - spec.DIAMETRAL_CLEARANCE_MAX, spec.SHOULDER_DIA_MIN),
+            min(bore - spec.DIAMETRAL_CLEARANCE_MIN, spec.SHOULDER_DIA_MAX),
+        )
+        assert window[0] <= window[1] + 1e-9, bore / 25.4
     assert spec.DIAMETRAL_CLEARANCE_MIN > 0.0
     # The shortest threaded section always spans the stock arm.
     assert spec.THREAD_LENGTH_MIN >= spec.ARM_STOCK_THICKNESS

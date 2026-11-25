@@ -46,7 +46,7 @@ import math
 import _config
 from _inch_wall_limits import WALL_FLOOR_MM, WALL_TARGET_MM
 from _package_units import drawing_unit
-from _printed_tolerance import edge_break_chamfer_mm, printed_band_mm
+from _printed_tolerance import drilled_oversize_mm, edge_break_chamfer_mm, printed_band_mm
 from _title_block_units import render_number
 from dt_crank_handle_butt_cup_spec import (
     BODY_CHAMFER_MIN as CUP_BODY_CHAMFER_MIN,
@@ -97,14 +97,16 @@ _GENERAL_2PL = printed_band_mm(2, unit=UNIT)
 # to the bore less .0050-.0075, trial hole in an oak offcut first" (it was
 # reamed .1610); owner ruling 2026-11-24, fit audit question 14: the
 # shoulder's own trial steps read the bore, no pins, and "handle stays DRILL
-# #20; DT-32 shoulder by trial, limits .1535-.1585".  A #20 cuts .1610 and up
-# (DRILLED HOLES +.004/0); the sheet caps the bore at .1635 MAX
-# (PIVOT_BORE_FIT_MAX, the walls' basis: a bore the shoulder's .1635 trial
-# step enters is rejected).  The band below is that accepted drilled range, an
-# analysis band for the walls and the shoulder's limits, not a printed one:
-# the sheet prints the drill and the cap, and MHA-DT-32 prints the fit.
+# #20; DT-32 shoulder by trial, limits .1535-.1585".  A #20 cuts .1610 and up,
+# and the sheet takes it at DRILLED HOLES (+.004/0, .1610-.1650): a plain
+# drilled hole, no cap of its own (delegated ruling 2026-11-25 (Main),
+# precedent: owner ruling 2026-11-24 merging the fit policy; RETIRES the
+# owner's fit-audit Q14 answer's trial step (the shoulder's .1635 trial must
+# not enter); owner review #2144 (D26)).  The band below is that drilled
+# range, an analysis band for the walls and the shoulder's limits, not a
+# printed one: the sheet prints the drill, and MHA-DT-32 prints the fit.
 PIVOT_BORE_DIA = 4.0894  # .1610
-PIVOT_BORE_BAND = (0.0635, 0.0)  # #20 drilled, accepted .1610-.1635
+PIVOT_BORE_BAND = (drilled_oversize_mm(unit=UNIT), 0.0)  # #20 drilled, .1610-.1650
 
 # The tenon shoulder is where the ferrule seats, FERRULE_LENGTH from the arm
 # face.  The oak leaves it flush with the ferrule's OD (user, handle2.png).
@@ -371,11 +373,10 @@ FERRULE_ARM_FACE_WALL_ACCEPTED_MM = 1.25
 TENON_END_GAP_MIN = round(
     (FERRULE_LENGTH - _GENERAL_2PL) - (TENON_LENGTH + _GENERAL_2PL), 6
 )
-# The largest bore the sheet accepts: its .1635 MAX cap on the #20 drilled
-# bore (owner ruling 2026-11-24, fit audit question 14: the shoulder's .1635
-# trial step must not enter), not the drill's .165.  MHA-DT-32's spec checks
-# this equals the top of the accepted drilled range.
-PIVOT_BORE_FIT_MAX = 4.1529  # .1635
+# The largest bore the sheet accepts: the #20's DRILLED HOLES upper limit
+# .165 (D26: the .1635 cap is retired).  MHA-DT-32's spec checks this equals
+# the top of the accepted drilled range.
+PIVOT_BORE_FIT_MAX = PIVOT_BORE_DIA + PIVOT_BORE_BAND[0]  # .1650
 # Oak between the smallest tenon and the largest fitted pivot bore.
 TENON_STRAIGHT_WALL_MIN = (TENON_DIA_MIN - PIVOT_BORE_FIT_MAX) / 2.0 - BORE_ECCENTRICITY
 # The governing tenon wall, at its free end: the outside edge and the pivot

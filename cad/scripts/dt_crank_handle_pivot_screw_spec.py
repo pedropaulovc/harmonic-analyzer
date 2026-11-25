@@ -102,15 +102,17 @@ SLOT_WIDTH = 1.016  # .04
 SLOT_DEPTH = 1.016  # .04
 SLOT_DEPTH_TOL = _GENERAL_2PL
 
-# The running surface in the oak bore (#290 fit F12).  MHA-DT-08's bore is
-# drilled #20 and capped .1635 MAX; the shoulder is turned last to that bore
-# less .0050-.0075, its own trial steps reading the bore (owner ruling
-# 2026-11-24, fit audit question 14: "handle stays DRILL #20; DT-32 shoulder
-# by trial, limits .1535-.1585").  The limits are that fit's envelope over
-# every accepted bore (.1610 less .0075 to .1635 less .0050); the old
-# +.000/-.002 left a bore of .162 or more no window.  (upper, lower)
-# deviations; the model carries the band natively.  The tenon keeps the
-# rule-17 floor of oak over its bore.
+# The running surface in the oak bore (#290 fit F12).  MHA-DT-08's bore is a
+# plain #20 drilled hole at DRILLED HOLES, .1610-.1650 (D26, delegated ruling
+# 2026-11-25 (Main): the .1635 MAX cap and its trial step are retired); the
+# shoulder is turned last to that bore less .0050-.0075, its own trial steps
+# reading the bore (owner ruling 2026-11-24, fit audit question 14: "handle
+# stays DRILL #20; DT-32 shoulder by trial, limits .1535-.1585").  The limits
+# give every accepted bore a window: the smallest bore's whole fit (.1610
+# less .0075), and up to .1585 (.1650 less .0065, and a .1660 bore still
+# leaves .1585 at .0075); the old +.000/-.002 left a bore of .162 or more
+# no window.  (upper, lower) deviations; the model carries the band natively.
+# The tenon keeps the rule-17 floor of oak over its bore.
 SHOULDER_DIA = 3.9624  # .1560
 SHOULDER_DIA_BAND = (0.0635, -0.0635)  # .1535-.1585
 # The shoulder's thread-end face is the seat on the arm face.  Under the
@@ -272,8 +274,8 @@ def _limits(nominal: float, band: tuple[float, float]) -> tuple[float, float]:
 SHOULDER_DIA_MIN, SHOULDER_DIA_MAX = _limits(SHOULDER_DIA, SHOULDER_DIA_BAND)
 THREAD_LENGTH_MIN = round(THREAD_LENGTH - _GENERAL_2PL, 6)
 THREAD_LENGTH_MAX = round(THREAD_LENGTH + _GENERAL_2PL, 6)
-# The handle's #20 drilled bore as accepted (MHA-DT-08: .1610 up to its
-# .1635 MAX cap), an analysis band read only here and by the head checks.
+# The handle's #20 drilled bore as accepted (MHA-DT-08: DRILLED HOLES,
+# .1610-.1650), an analysis band read only here and by the head checks.
 _BORE_LOWER, _BORE_UPPER = deviations(PIVOT_BORE_BAND)
 HANDLE_BORE_MIN = round(PIVOT_BORE_DIA + _BORE_LOWER, 6)
 HANDLE_BORE_MAX = round(PIVOT_BORE_DIA + _BORE_UPPER, 6)
@@ -452,9 +454,12 @@ for _ok, _what in (
         abs(PIVOT_BORE_FIT_MAX - HANDLE_BORE_MAX) < 1e-6,
         "MHA-DT-08's tenon walls read a bore other than its largest accepted",
     ),
+    # Every accepted bore keeps a window inside the shoulder's limits: the
+    # smallest bore the fit's whole range, the largest at least the loosest
+    # clearance (the window narrows toward .165, D26).
     (
         SHOULDER_DIA_MIN <= HANDLE_BORE_MIN - DIAMETRAL_CLEARANCE_MAX + 1e-6
-        and SHOULDER_DIA_MAX >= HANDLE_BORE_MAX - DIAMETRAL_CLEARANCE_MIN - 1e-6,
+        and SHOULDER_DIA_MAX >= HANDLE_BORE_MAX - DIAMETRAL_CLEARANCE_MAX - 1e-6,
         "the shoulder's limits leave an accepted MHA-DT-08 bore no fit",
     ),
     (

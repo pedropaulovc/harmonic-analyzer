@@ -127,8 +127,10 @@ def test_every_profile_size_is_a_model_dimension() -> None:
     assert spec.REFERENCE_RADII == {"FlareR", "SConcaveR", "SConvexR", "DomeR"}
     assert spec.REFERENCE_RADII <= spec.DRAWING_DIMENSIONS["HandleProfile"]
     # Owner ruling 2026-11-24, fit audit question 14: the bore stays drilled
-    # #20, capped at the walls' .1635, and MHA-DT-32 is turned to it.
-    assert drawing.PIVOT_BORE_CALLOUT.startswith("#20 DRILL THRU, <MOD-DIAM>.1635 MAX\n")
+    # #20 and MHA-DT-32 is turned to it; D26 (delegated ruling 2026-11-25)
+    # retired the .1635 MAX cap: a plain drilled hole, no size in the callout.
+    assert drawing.PIVOT_BORE_CALLOUT.startswith("#20 DRILL THRU\n")
+    assert "MAX" not in drawing.PIVOT_BORE_CALLOUT
     assert "MHA-DT-32 SHOULDER IS\nTURNED TO THIS BORE" in drawing.PIVOT_BORE_CALLOUT
     # The fitted sizes and the small corner features print at three places,
     # the routine contour at the title block's two.
@@ -293,13 +295,21 @@ def test_tenon_and_counterbore_are_fitted_to_the_parts_they_take() -> None:
         spec.TENON_LENGTH - _XX - spec.EDGE_BREAK_MAX_MM - ferrule.SEAT_MOUTH_BREAK_MAX
     )
     assert spec.TENON_GLUE_LENGTH_MIN >= 3.5
-    # F12 (#290): the #20 drilled bore as accepted, .1610 to its .1635 MAX
-    # cap, the largest of which the walls are judged at.
+    # F12 (#290): the #20 drilled bore at DRILLED HOLES, .1610-.1650, the
+    # largest of which the walls are judged at (D26: no .1635 cap).
     assert spec.PIVOT_BORE_DIA == pytest.approx(0.161 * IN)
-    assert spec.PIVOT_BORE_BAND == pytest.approx((0.0025 * IN, 0.0))
+    assert spec.PIVOT_BORE_BAND == pytest.approx((0.004 * IN, 0.0))
+    assert spec.PIVOT_BORE_FIT_MAX == pytest.approx(0.165 * IN)
     assert spec.PIVOT_BORE_DIA + spec.PIVOT_BORE_BAND[0] == pytest.approx(
         spec.PIVOT_BORE_FIT_MAX
     )
+    # At the .165 bore: tenon wall .0615 over the .060 floor, .0415 at the
+    # tenon end over the accepted .040, the waist .0935.
+    assert spec.TENON_STRAIGHT_WALL_MIN == pytest.approx(0.0615 * IN)
+    assert spec.TENON_STRAIGHT_WALL_MIN >= spec.TENON_WALL_FLOOR_MM == pytest.approx(0.060 * IN)
+    assert spec.TENON_WALL_MIN == pytest.approx(0.0415 * IN)
+    assert spec.TENON_WALL_MIN >= spec.TENON_WALL_ACCEPTED_MM
+    assert spec.WAIST_WALL_MIN == pytest.approx(0.0935 * IN)
     # No run-out: the cup cures centred on the waxed MHA-DT-32 at assembly
     # (MHA-DT-08 machinist review of 2026-10-18 found 0.2 TIR over-spec).
     assert not hasattr(spec, "BORE_RUNOUT_TIR")
@@ -405,8 +415,8 @@ def test_tenon_wall_charges_both_breaks_at_its_free_end() -> None:
     # the pivot bore's mouth each take the title block's break, as the glue
     # length charges the end break; the governing wall is the straight one
     # less both.  Owner ruling 2026-11-08 (Pedro), #2144 item 7.2 (#2171, option C) accepts
-    # .040 there as RV-02; the straight wall stays RV-01 (.062 and .042 since
-    # MHA-DT-34 is drilled N at DRILLED HOLES, codjiflo 3548-1).  The fit note
+    # .040 there as RV-02; the straight wall stays RV-01 (.061 and .041 at the
+    # #20's DRILLED HOLES .165, D26, with MHA-DT-34 drilled N, codjiflo 3548-1).  The fit note
     # states each, matching its declaration.
     spec = dt_crank_handle_spec
     brk = spec.EDGE_BREAK_MAX_MM
@@ -425,7 +435,7 @@ def test_tenon_wall_charges_both_breaks_at_its_free_end() -> None:
         row["id"]: row for row in _config.parts("dt-crank-handle")["machinist_exceptions"]
     }
     assert {"RV-01", "RV-02"} <= set(exceptions)
-    for rule, text in (("RV-01", "WALL .062 MIN"), ("RV-02", "WALL .042 MIN AT TENON END")):
+    for rule, text in (("RV-01", "WALL .061 MIN"), ("RV-02", "WALL .041 MIN AT TENON END")):
         assert exceptions[rule]["where"] == "tenon callout: " + text
         assert text in notes.TENON_NOTE
 
