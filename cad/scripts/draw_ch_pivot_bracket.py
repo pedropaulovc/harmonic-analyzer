@@ -274,7 +274,7 @@ DIMENSION_CALLOUTS = {
     ),
     "HoleDia": "DRILL THRU",
     "CornerRadius": f"CLEARS HEAD OF\n{HOLD_DOWN_SCREW_NUMBER}",
-    "EarThick": f"HOLDS WALL {EAR_WALL_TEXT} MIN",
+    "EarThick": EAR_WALL_TEXT,
 }
 # The right view prints the corner radius and the ear thickness.
 RIGHT_KEEP_NAMES = ("CornerRadius", "EarThick")

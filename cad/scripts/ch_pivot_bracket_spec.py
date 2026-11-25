@@ -200,7 +200,7 @@ if min(SET_SCREW_WALLS_MIN.values()) < LIGAMENT_TARGET:
 # to 2.007 mm, under the target), so it states that wall once, floored to the
 # .001 reading unit so the MIN never overstates it.
 _EAR_WALL_IN = floor(SET_SCREW_WALLS_MIN["outboard face"] / 25.4 * 1000 + 1e-9) / 1000
-EAR_WALL_TEXT = f"{_EAR_WALL_IN:.3f}".removeprefix("0")  # .086
+EAR_WALL_TEXT = f"HOLDS WALL {_EAR_WALL_IN:.3f} MIN".replace(" 0.", " .")  # .086
 
 
 def _sag(radius: float) -> float:
