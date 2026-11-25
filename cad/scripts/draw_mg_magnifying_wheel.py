@@ -448,12 +448,13 @@ WIRE_NUMBER = str(_config.parts("sh-vn-music-wire")["number"])
 # centreline) through to the rim bore, clocked by its 43° from the
 # horizontal.  Each takes at most two lines of words under its process
 # (rule 7).  TIE 1's #60 names its drill (rule 12; dt_crank_pin's "#45 DRILL
-# THRU"); its #50 counter-drill, from the far (drum) side, follows it in the
-# same callout (machinist review r1 and r2, runs 20261124T092122388Z and
-# 20261124T094658536Z: the whole stepped hole at the front view, Y14.5 hole
-# order), its Ø and depth left to section B-B's native dimensions.
-_TIE1_CDRILL_LINE = "#50 FAR SIDE, SEE SECTION B-B"
-TIE1_CALLOUT = f"#60 DRILL THRU\n{_TIE1_CDRILL_LINE}\nWIRE TIE HOLE"
+# THRU"); its #50 counter-drill from the far (drum) side is defined once,
+# by section B-B's own native callout (size, process, depth REF) and depth
+# dimension.  The front callout names no part of it: a line naming the
+# drill and sending the reader to B-B for its size and depth deferred them
+# to another view (rules 9 and 26; machinist review r1 and r2, farm run
+# 20261125T172832344Z); B-B's cutting line through the hole links the two.
+TIE1_CALLOUT = "#60 DRILL THRU\nWIRE TIE HOLE"
 TIE2_CALLOUT = "DRILL THRU\nRADIAL WIRE TIE HOLE\nFROM GROOVE BOTTOM"
 # Each side of a centred tie block past the DRILL THRU line's half-width
 # (capitals about 2.6 mm a character; each text token prints one glyph), mm.
@@ -522,11 +523,11 @@ FRONT_KEEP = {
     # shoulder's near end (the shoulder runs 7.3 mm under the point).  Each
     # reads size, then process, then its plain name (rule 26), centred on
     # the point.  TIE 1's block stands below the wheel, its top 3.2 mm under
-    # the OD, its shoulder's near end 20 mm right of the bore's centre (the
-    # name line widens the block _TIE_BLOCK_WIDEN each side past the DRILL
-    # THRU width the 15.3 mm shoulder offset was set for), so the leader runs
-    # down-right from the hole, away from the X's extension line, and the
-    # block stays left of the section's overall row.
+    # the OD, its shoulder's near end 20 mm right of the bore's centre (its
+    # widest line, "#60 DRILL THRU", widens the block _TIE_BLOCK_WIDEN each
+    # side past the DRILL THRU width the 15.3 mm shoulder offset was set
+    # for), so the leader runs down-right from the hole, away from the X's
+    # extension line, and the block stays left of the section's overall row.
     "Tie1HoleDia": _face(
         20.0 + _CALLOUT_SHOULDER_LEFT + _TIE_BLOCK_WIDEN,
         -RIM_OUTER_DIA / 2.0
