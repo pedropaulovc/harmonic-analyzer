@@ -564,6 +564,12 @@ sheet image (criteria P1–P8, `cad/process/README.md`, Plans):
   measured for P3 to that apex; a drill keeps its point. A flat-ended
   rectangle, or an arc so deep that a square end mill reads as a ball nose,
   fails.
+- **P4c Colour follows what moves.** The tool colour (key "tool, T-handle,
+  edge finder") covers the tool and all that turns or travels with it or is
+  held in the spindle: cutter, drill, tap, the tap wrench or T-handle, the
+  tap guide, a drill chuck where drawn, the edge finder. Grey (rest of bar,
+  hardware) is the work's surroundings only; the work stop keeps its own
+  entry. A tap wrench, T-handle, chuck or guide drawn grey fails.
 - **P5 Unrecorded sizes are schematic.** A size with no record is drawn
   schematic and says so, or stays out; a long tool or rod drawn short ends
   in a break line.

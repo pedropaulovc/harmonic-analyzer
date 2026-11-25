@@ -103,7 +103,9 @@ Pass 1 — detection. Find every candidate item; classify nothing yet.
      sits on a real pass or hole, over the part not a jaw, with its direction
      (P4); every view of a picture shows one moment, and each later tool has
      its own op picture (P4a); round tools in side view end in a shallow arc,
-     drills in a point (P4b); unrecorded sizes are schematic and long tools
+     drills in a point (P4b); the tool colour covers all that moves with the
+     tool (tap wrench, T-handle, guide, chuck), grey only the surroundings
+     (P4c); unrecorded sizes are schematic and long tools
      broken (P5); every role has a key entry and the stop is a round rod (P6);
      a moving or confusing locator is named once in its first picture (P7);
      and no clutter (P8).
