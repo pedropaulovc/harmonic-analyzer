@@ -5,10 +5,10 @@ necessity:
     reason: "the hub stack sets the rear keeper over shaft flats"
     source: "ch_fulcrum_shaft_spec.FLAT_STATION_WINDOW_MM: .474 mm at this band, -2.066 at the title block's ±.005 (no shaft station seats both set-screw cups; -1.041 at +.005/.000), the rear keeper set to the stack over a .020 leaf (owner ruling 2026-11-24, fit audit part 2, C10; ch_keeper_fitup.LEVER_HUB_LENGTH_MM); build_fr_top_frame.KEEPER_FOOT_PRINTED_BOSS_MARGINS also goes to -.660 mm at +.005 (1.372 at this band). Delegated ruling 2026-11-24 (Main), no precedent, #2144 (rulings.md D16)"
   - id: N-02
-    feature: "plate thickness .118 +/-.002, in the MHA-CH-01 top notch"
+    feature: "plate thickness .118 +.002/-.004 SLIDING FIT IN NOTCH OF MHA-CH-01"
     kind: gap
-    reason: "thick plate closes the running gap in the notch"
-    source: "ch_amplitude_bar_spec.TOP_NOTCH_WIDTH (plate max plus the running floor); ch_channel_lever_spec.LEVER_THICKNESS_TOLERANCE"
+    reason: "thick closes notch running gap; thin closes bowed bar gap"
+    source: "delegated ruling 2026-11-25 (Main), no precedent, #2144 (rulings.md D23), each side by its derivation. Thick side, with MHA-CH-01's top notch held at .124 +.007/0 (ch_amplitude_bar_spec.TOP_NOTCH_WIDTH, plate max plus the running floor): side air .0508 mm at +.004 against the .10 floor; at +.005 .0254, also under test_channel_axial_budget.CHEEK_CLOSURE_LIMIT's .0330 worst lean. Thin side: ch_channel_assembly_spec.BAR_GAP mid_span_bowed is .0011 in over the .0039 running floor at -.004, .0006 at -.005, under the .001 the shop reads (D14's criterion, ch-amplitude-bar N-05). ch_channel_lever_spec.LEVER_THICKNESS_BAND"
   - id: N-03
     feature: "plate near face .091 +/-.002 from the hub face"
     kind: gap

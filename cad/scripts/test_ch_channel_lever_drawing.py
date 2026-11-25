@@ -52,7 +52,7 @@ def test_drawing_is_precision_migrated() -> None:
 def test_bands_are_native_on_the_model_from_named_constants() -> None:
     assert model_toleranced_dimensions(lever) == {
         ("Hub", "HubLength"): "*deviations(HUB_LENGTH_BAND)",
-        ("LeverBody", "LeverThick"): "LEVER_THICKNESS_TOLERANCE",
+        ("LeverBody", "LeverThick"): "*deviations(LEVER_THICKNESS_BAND)",
         ("PlateOffsetReference", "PlateOffset"): "PLATE_OFFSET_TOLERANCE",
     }
     # The drilled arms print plain, at the title block's .XXX row (Q1-A).
@@ -174,7 +174,58 @@ def test_twenty_long_hubs_still_float_between_the_keepers() -> None:
 
 
 def test_plate_band_is_the_notch_allowance() -> None:
-    assert ch_amplitude_bar_spec.LEVER_THICKNESS_TOLERANCE == spec.LEVER_THICKNESS_TOLERANCE
+    # The notch is derived from the plate's maximum only: the -.004 side
+    # (D23) leaves MHA-CH-01's .124 +.007/0 where it was.
+    assert spec.LEVER_THICKNESS_BAND == pytest.approx((0.002 * 25.4, -0.004 * 25.4))
+    assert ch_amplitude_bar_spec.LEVER_THICKNESS_BAND is spec.LEVER_THICKNESS_BAND
+    assert ch_amplitude_bar_spec.TOP_NOTCH_WIDTH == pytest.approx(0.124 * 25.4)
+
+
+def _bowed_margin_in(monkeypatch: pytest.MonkeyPatch, lower: float) -> float:
+    """BAR_GAP mid_span_bowed over the bar running floor, inch, with the
+    plate's lower deviation at ``lower`` (mm) and everything else as printed."""
+    import ch_channel_assembly_spec as asm
+    import sh_vn_pivot_pin_bar_spec as pin
+
+    monkeypatch.setattr(spec, "LEVER_THICKNESS_BAND", (spec.LEVER_THICKNESS_BAND[0], lower))
+    monkeypatch.setattr(asm, "_PIN_BUDGET", pin.joint_budget())
+    bowed = asm.bar_gap_budget()["mid_span_bowed"]
+    return (bowed - asm._BAR_RUNNING_FLOOR) / 25.4
+
+
+def test_each_side_of_the_plate_band_is_earned_by_its_named_check(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Necessity ch-channel-lever N-02 (delegated ruling 2026-11-25 (Main), no
+    precedent, #2144 (rulings.md D23)): the plate prints .118 +.002/-.004.
+    Thick side: the narrowest top notch keeps the running floor on the
+    thickest plate, and .002 more does not. Thin side: the bowed mid-span bar
+    gap keeps the .001 the shop reads over its floor (D14's criterion), and
+    .001 less does not. The register quotes these numbers."""
+    import ch_amplitude_bar_spec as bar
+    import machinist_necessity
+    import rocker_bank_layout as bank
+
+    upper, lower = spec.LEVER_THICKNESS_BAND
+    notch_min = bar.TOP_NOTCH_WIDTH + bar.TOP_NOTCH_WIDTH_BAND[1]
+    air = notch_min - (spec.LEVER_THICKNESS + upper)
+    air_loose = air - 0.002 * 25.4
+    assert air >= bank.RUNNING_FLOOR - 1e-9
+    assert air_loose < bank.RUNNING_FLOOR
+    assert air_loose == pytest.approx(0.0508, abs=1e-4)
+
+    reading_unit = 0.001
+    margin = _bowed_margin_in(monkeypatch, lower)
+    margin_loose = _bowed_margin_in(monkeypatch, lower - 0.001 * 25.4)
+    assert margin >= reading_unit
+    assert margin_loose < reading_unit
+    assert (round(margin, 4), round(margin_loose, 4)) == (0.0011, 0.0006)
+
+    config = Path(__file__).resolve().parents[1] / "config"
+    entries = {e.id: e for e in machinist_necessity.load_necessity(config, "ch-channel-lever")}
+    source = entries["N-02"].source
+    for quoted in (".0508", ".0011", ".0006"):
+        assert quoted in source, quoted
 
 
 def test_plate_is_located_from_one_hub_face() -> None:
@@ -327,7 +378,7 @@ def test_lever_feature_bands_are_the_printed_ones() -> None:
     )
     assert features["plate_near_face"]["offset_from"] == "hub_near_face"
     assert features["plate_far_face"]["thickness"] == pytest.approx(
-        [_in(0.116), _in(0.120)]
+        [_in(0.114), _in(0.120)]
     )
     assert features["hub"]["dia"] == pytest.approx([_in(0.47), _in(0.49)])
     outline = features["outline"]

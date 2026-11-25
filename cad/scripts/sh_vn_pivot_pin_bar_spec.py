@@ -60,7 +60,7 @@ PIN_INSTALLED_LENGTH = _bar.BAR_WIDTH  # dressed flush with both bar faces
 # stock both dressed ends share.
 PIN_LENGTH_LIMITS = _pin.PIN_LENGTH_LIMITS
 # Dressed ends stand nothing proud of the bar faces: at the .300 pitch the
-# top-notch stack below leaves 0.6858 against the 0.10 running floor (#1038;
+# top-notch stack below leaves 0.6350 against the 0.10 running floor (#1038;
 # owner rulings 2026-10-15 option 2 and 2026-11-11).
 PIN_END_PROUD_MAX = 0.0
 
@@ -129,7 +129,7 @@ def joint_budget() -> dict[str, float]:
     hole_min, hole_max = BAR_HOLE_LIMITS
     lever_hole_min = NUMBER_DRILL_MM[_lever.BAR_PIN_HOLE_SPEC.size]
     lever_hole_max = lever_hole_min + DRILLED_PLUS
-    lever_min = _lever.LEVER_THICKNESS - _lever.LEVER_THICKNESS_TOLERANCE
+    lever_min = _lever.LEVER_THICKNESS + _lever.LEVER_THICKNESS_BAND[1]
     notch_min, notch_max = _band(_bar.TOP_NOTCH_WIDTH, _bar.TOP_NOTCH_WIDTH_BAND)
     w_min, w_max = _bar.BAR_WIDTH - BAR_STOCK_UNDERSIZE, _bar.BAR_WIDTH
     length_min, length_max = PIN_LENGTH_LIMITS
@@ -226,6 +226,7 @@ if PIN_INSTALLED_LENGTH != _bar.BAR_WIDTH:
     raise AssertionError("the installed pin must be flush with both bar faces")
 if _bar.LEVER_THICKNESS != _lever.LEVER_THICKNESS:
     raise AssertionError("the bar's restated lever thickness drifted")
-# Re-run at the .300 pitch (#1038 re-pitch): neighbour_clearance_min 0.6858.
+# Re-run at the .300 pitch (#1038 re-pitch): neighbour_clearance_min 0.6350
+# on the .118 +.002/-.004 plate (D23).
 if not math.isclose(_lever.HUB_LENGTH, 7.62):
     raise AssertionError("the station pitch moved; re-run the #1038 gap budget")

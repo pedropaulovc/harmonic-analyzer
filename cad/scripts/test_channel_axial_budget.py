@@ -162,11 +162,11 @@ def test_every_rocker_follows_its_rod_inside_the_hub_gaps_and_the_ears(j: int) -
 
 # The bar slides on its pin across the lever plate, so its top notch closes
 # on the plate only when the lean over the notch's depth spends the notch's
-# least float: the least notch (.124, +.010/0) less the thickest plate (.118
-# +/-.002), .004. Past it a cheek rubs the plate as the lever rocks on the
+# least float: the least notch (.124, +.007/0) less the thickest plate (.118
+# +.002/-.004), .004. Past it a cheek rubs the plate as the lever rocks on the
 # pin (check register test-channel-axial-budget).
 CHEEK_CLOSURE_LIMIT = bar.TOP_NOTCH_WIDTH + bar.TOP_NOTCH_WIDTH_BAND[1] - (
-    lever.LEVER_THICKNESS + lever.LEVER_THICKNESS_TOLERANCE
+    lever.LEVER_THICKNESS + lever.LEVER_THICKNESS_BAND[0]
 )  # 0.1016
 
 

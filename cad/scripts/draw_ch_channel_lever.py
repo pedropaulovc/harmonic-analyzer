@@ -88,7 +88,7 @@ from ch_channel_lever_spec import (
     HUB_LENGTH_BAND,
     LEVER_SPRING_X,
     LEVER_THICKNESS,
-    LEVER_THICKNESS_TOLERANCE,
+    LEVER_THICKNESS_BAND,
     PIVOT_HOLE_BAND,
     PIVOT_HOLE_DIA,
     PIVOT_HOLE_SPEC,
@@ -357,7 +357,7 @@ part_metadata(
 )
 # The hub's two faces, the stack's pitch between them (TOP_KEEP "HubLength",
 # +.001/.000); the plate's near face .091 +/-.002 from the hub face at -Z
-# (TOP_KEEP "PlateOffset", note 1) and its far face .118 +/-.002 from it
+# (TOP_KEEP "PlateOffset", note 1) and its far face .118 +.002/-.004 from it
 # (TOP_KEEP "LeverThick"). The plate is centred in the hub.
 requirement(
     "hub_near_face",
@@ -423,14 +423,10 @@ requirement(
             (*_FRAME, (_SPEC, "LEVER_THICKNESS")),
         ),
         "thickness": (
-            limits(
-                LEVER_THICKNESS,
-                _P["LeverThick"],
-                (LEVER_THICKNESS_TOLERANCE, -LEVER_THICKNESS_TOLERANCE),
-            ),
+            limits(LEVER_THICKNESS, _P["LeverThick"], LEVER_THICKNESS_BAND),
             (
                 (_SPEC, "LEVER_THICKNESS"),
-                (_SPEC, "LEVER_THICKNESS_TOLERANCE"),
+                (_SPEC, "LEVER_THICKNESS_BAND"),
                 (_SELF, "TOP_KEEP"),
             ),
         ),

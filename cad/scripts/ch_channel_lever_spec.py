@@ -118,10 +118,16 @@ if not BAR_TALL < HUB_DIA:
 PIVOT_HOLE_BAND = (drilled_oversize_mm(unit=UNIT), 0.0)
 # The plate is straddled by the amplitude bar's top notch, whose minimum is
 # this band's maximum plus the running floor (ch_amplitude_bar_spec, which
-# restates it). The band is +/-.002 so the bar's float, with both ledges and
-# both plate offsets, leaves the bar-to-bar running gap (owner ruling
-# 2026-10-15, #1038 option 2).
-LEVER_THICKNESS_TOLERANCE = 0.0508  # +/-.002
+# restates it; owner ruling 2026-10-15, #1038 option 2). The plate prints
+# .118 +.002/-.004 (delegated ruling 2026-11-25 (Main), no precedent, #2144
+# (rulings.md D23)), each side earned by a named check (necessity
+# ch-channel-lever N-02): past +.002 the plate leaves less than the 0.10 mm
+# running floor in the narrowest notch (.0508 mm at +.004), and at +.005 the
+# bar's lean closes a cheek on it (CHEEK_CLOSURE_LIMIT .0254 mm against the
+# .0330 mm worst lean); past -.004 the bar float leaves BAR_GAP mid_span_bowed
+# .0006 in over the .0039 floor, under the .001 the shop reads (D14's
+# criterion; .0011 at -.004).
+LEVER_THICKNESS_BAND = (0.0508, -0.1016)  # +.002/-.004; (upper, lower) deviations
 # Both transfer arms are drilled holes located from the fulcrum bore the
 # lever turns about, so they print plain at the title block's .XXX row
 # (+/-.005, drawing-guidelines rule 3), the shop's drilled-hole location row.

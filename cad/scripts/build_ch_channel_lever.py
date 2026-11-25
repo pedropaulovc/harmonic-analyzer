@@ -106,7 +106,7 @@ from ch_channel_lever_spec import (
     HUB_LENGTH_BAND,
     LEVER_SPRING_X,
     LEVER_THICKNESS,
-    LEVER_THICKNESS_TOLERANCE,
+    LEVER_THICKNESS_BAND,
     PIVOT_HOLE_DIA,
     PLATE_OFFSET,
     PLATE_OFFSET_TOLERANCE,
@@ -521,8 +521,9 @@ def build(adapter) -> dict[str, str]:
     set_dimension_bilateral_tolerance(
         adapter, "Hub", "HubLength", *deviations(HUB_LENGTH_BAND), display_unit=UNIT
     )
-    set_dimension_symmetric_tolerance(
-        adapter, "LeverBody", "LeverThick", LEVER_THICKNESS_TOLERANCE, display_unit=UNIT
+    set_dimension_bilateral_tolerance(
+        adapter, "LeverBody", "LeverThick", *deviations(LEVER_THICKNESS_BAND),
+        display_unit=UNIT,
     )
     set_dimension_symmetric_tolerance(
         adapter, "PlateOffsetReference", "PlateOffset", PLATE_OFFSET_TOLERANCE,

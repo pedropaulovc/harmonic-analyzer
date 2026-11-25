@@ -118,9 +118,9 @@ blank_pitch_mm = 25.4
 # far face); B's facing takes at most the thickest blank less the hub.
 hub_thickness_mm = 7.6327
 plate_offset_mm = 2.3114
-plate_thickness_mm = 2.9972
+plate_thickness_mm = 2.9718
 pocket_b_floor_mm = 5.3213
-pocket_a_floor_mm = 5.3086
+pocket_a_floor_mm = 5.2832
 face_removal_max_mm = 0.3048
 # Face B's widest bite: the measured face setting
 # (settings.em-half-carbide-1018-3439-face, dechatter session of 2026-11-23,
@@ -593,7 +593,7 @@ sizing = "other"
 instruction = "Run CL05_pocket_a (M6 T1; set 2650): each blank's pocket in three rough levels and a .008 finish level to the web's far face, {{process.pocket_a_floor_mm:in.4dot}} above Z0, as in Setup 2."
 settings = "endmill-carbide-3fl-1-2-1018-cf"
 milling_cuts = [
-  { name = "pocket a rough", kind = "slot", phase = "rough", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", axial_doc_mm = 0.707, radial_woc_mm = "{{process.face_cutter_dia_mm}}", traverse_mm = [0, "{{process.blank_length_min_mm}}"] },
+  { name = "pocket a rough", kind = "slot", phase = "rough", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", axial_doc_mm = 0.7154, radial_woc_mm = "{{process.face_cutter_dia_mm}}", traverse_mm = [0, "{{process.blank_length_min_mm}}"] },
   { name = "pocket a", kind = "slot", phase = "finish", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", axial_doc_mm = "{{process.pocket_finish_mm}}", radial_woc_mm = "{{process.face_cutter_dia_mm}}", traverse_mm = [0, "{{process.blank_length_min_mm}}"] },
 ]
 
@@ -610,8 +610,8 @@ milling_cuts = [
 
 [[setups.operations]]
 instruction = "First load only, still clamped: the pocket's depth on the blank carrying H and O (the load's lowest number, now against the moving jaw)."
-inspection = "From the hub's A face down to the pocket's floor: H − O − .120 to H − O − .116 (the web .116–.120 on this blank). At H .3005 and O .091: .0895–.0935. The calipers' depth rod. Outside: stop and tell the owner before CL06."
-gauge_checks = [{ gauge = "calipers", band_mm = [2.2733, 2.3749] }]
+inspection = "From the hub's A face down to the pocket's floor: H − O − .120 to H − O − .114 (the web .114–.120 on this blank). At H .3005 and O .091: .0895–.0955. The calipers' depth rod. Outside: stop and tell the owner before CL06."
+gauge_checks = [{ gauge = "calipers", band_mm = [2.2733, 2.4257] }]
 
 [[setups]]
 machine_kind = "other"

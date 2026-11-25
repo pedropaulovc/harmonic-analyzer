@@ -694,12 +694,12 @@ def test_each_notch_minimum_clears_its_plate_at_max_material() -> None:
     # bars once two floating arms close hub on hub.
     assert spec.TOP_NOTCH_WIDTH_BAND == pytest.approx((0.007 * 25.4, 0.0))
     assert spec.BOTTOM_NOTCH_WIDTH_BAND == pytest.approx((0.006 * 25.4, 0.0))
-    for width, (_upper, lower), plate, tolerance in (
+    for width, (_upper, lower), plate, plate_upper in (
         (
             spec.TOP_NOTCH_WIDTH,
             spec.TOP_NOTCH_WIDTH_BAND,
             spec.LEVER_THICKNESS,
-            spec.LEVER_THICKNESS_TOLERANCE,
+            spec.LEVER_THICKNESS_BAND[0],
         ),
         (
             spec.BOTTOM_NOTCH_WIDTH,
@@ -709,8 +709,8 @@ def test_each_notch_minimum_clears_its_plate_at_max_material() -> None:
         ),
     ):
         least = width + lower
-        assert least >= plate + tolerance + bank.RUNNING_FLOOR - 1e-9
-        assert least - (plate + tolerance + bank.RUNNING_FLOOR) < 0.002 * 25.4
+        assert least >= plate + plate_upper + bank.RUNNING_FLOOR - 1e-9
+        assert least - (plate + plate_upper + bank.RUNNING_FLOOR) < 0.002 * 25.4
     assert spec.TOP_NOTCH_WIDTH == pytest.approx(0.124 * 25.4)
     assert spec.BOTTOM_NOTCH_WIDTH == pytest.approx(0.104 * 25.4)
     assert bar.TOP_NOTCH_WIDTH is spec.TOP_NOTCH_WIDTH
@@ -727,7 +727,7 @@ def test_each_notch_minimum_clears_its_plate_at_max_material() -> None:
 
 def test_top_notch_keeps_the_running_gap_at_the_printed_worst_case() -> None:
     """#1038 option 2 (owner ruling 2026-10-15): the top notch's float on the
-    .118 +/-.002 plate leaves the side gap its running floor; the full
+    .118 +.002/-.004 plate leaves the side gap its running floor; the full
     stack, with both ledges and plate offsets, is
     sh_vn_pivot_pin_bar_spec.joint_budget's neighbour_clearance_min."""
     import sh_vn_pivot_pin_bar_spec as pin
@@ -735,7 +735,7 @@ def test_top_notch_keeps_the_running_gap_at_the_printed_worst_case() -> None:
 
     spec = ch_amplitude_bar_spec
     float_max = (spec.TOP_NOTCH_WIDTH + spec.TOP_NOTCH_WIDTH_BAND[0]) - (
-        spec.LEVER_THICKNESS - spec.LEVER_THICKNESS_TOLERANCE
+        spec.LEVER_THICKNESS + spec.LEVER_THICKNESS_BAND[1]
     )
     assert bank.PITCH - spec.BAR_WIDTH - float_max >= bank.RUNNING_FLOOR
     assert pin.BUDGET["neighbour_clearance_min"] >= bank.RUNNING_FLOOR
@@ -795,9 +795,10 @@ def test_the_bow_ch00_accepts_keeps_the_mid_span_gap() -> None:
 
     top = pin.BUDGET["neighbour_clearance_min"]
     foot = _foot_gap(rocker.HUB_LENGTH_MIN)
-    assert top == pytest.approx(0.6858, abs=1e-9)
+    # The .118 +.002/-.004 plate (D23) at its thinnest.
+    assert top == pytest.approx(0.6350, abs=1e-9)
     mid = (top + foot) / 2.0
-    assert mid == pytest.approx(0.4064, abs=1e-9)
+    assert mid == pytest.approx(0.3810, abs=1e-9)
     assert asm.BAR_BOW_MAX_IN == 0.005
     bowed = mid - 2.0 * asm.BAR_BOW_MAX_MM
     assert bowed >= bank.RUNNING_FLOOR
@@ -805,10 +806,10 @@ def test_the_bow_ch00_accepts_keeps_the_mid_span_gap() -> None:
     leaf = asm.BAR_GAP["leaf"]
     assert bank.RUNNING_FLOOR <= leaf <= min(top, foot, bowed)
     assert leaf / 25.4 == pytest.approx(0.005)
-    # .006 is the widest bow on the .001 grid that still holds the floor (.007
-    # closes it); .005 keeps a thousandth in hand.
-    assert mid - 2.0 * 0.006 * 25.4 >= bank.RUNNING_FLOOR
-    assert mid - 2.0 * 0.007 * 25.4 < bank.RUNNING_FLOOR
+    # .005 is the widest bow on the .001 grid that still holds the floor (.006
+    # closes it), and it keeps the .001 the shop reads over the floor (D14).
+    assert (bowed - bank.RUNNING_FLOOR) / 25.4 >= 0.001
+    assert mid - 2.0 * 0.006 * 25.4 < bank.RUNNING_FLOOR
 
 
 def test_cropped_views_are_model_views_dimensioned_before_the_crop() -> None:
