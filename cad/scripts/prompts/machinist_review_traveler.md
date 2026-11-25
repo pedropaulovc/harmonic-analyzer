@@ -99,10 +99,14 @@ Pass 1 — detection. Find every candidate item; classify nothing yet.
    - **Setup pictures (rule T20, P1–P8):** per setup, list the holding nouns
      its text names and check each is drawn (P1) and nothing else is (P2);
      measure each tool and locator against a part dimension in the same view
-     (P3, within 5 %); check each tool sits on a real pass or hole with its
-     direction (P4), unrecorded sizes are schematic and long tools broken
-     (P5), every role has a key entry (P6), a moving or confusing locator is
-     named once in its first picture (P7), and no clutter (P8).
+     (P3, within 5 %, to the apex of a round tool's end arc); check each tool
+     sits on a real pass or hole, over the part not a jaw, with its direction
+     (P4); every view of a picture shows one moment, and each later tool has
+     its own op picture (P4a); round tools in side view end in a shallow arc,
+     drills in a point (P4b); unrecorded sizes are schematic and long tools
+     broken (P5); every role has a key entry and the stop is a round rod (P6);
+     a moving or confusing locator is named once in its first picture (P7);
+     and no clutter (P8).
    - **Route walk (rule T19):** once, in route order, ask of every op "does a
      later op cut, face or re-machine what this op worked on, or repeat it?"
      and "could this be done once, later?" Report each hit with both op

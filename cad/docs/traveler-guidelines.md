@@ -547,13 +547,30 @@ sheet image (criteria P1–P8, `cad/process/README.md`, Plans):
   the view's scale (taken from a part dimension in the same view); a fixed
   glyph the same for every tool fails.
 - **P4 Where it works.** Each tool is drawn at a pass, station or hole the
-  program cuts, with its direction arrowed; a cutter floating over no pass,
-  or a drill with no hole under it, fails.
+  program cuts, with its direction arrowed: a face cutter on a real pass,
+  standing over the part rather than over a jaw; a drill in its hole, its
+  point where the plan stops it. A cutter floating over no pass, a cutter
+  circle across a jaw seen from above, or a drill with no hole under it
+  fails.
+- **P4a One moment per picture.** Every view of a picture shows the same tool
+  at the same place. A setup's picture shows its first cutting op; each
+  later tool (drill, tap) is drawn in its own op's picture; a centre drill
+  spotting what the next drill drills is not drawn separately. One view with
+  one tool and another view with another, or a setup that drills with no
+  picture of the drill, fails.
+- **P4b A round tool in side view carries the arc.** A square-ended end mill,
+  tap, tap guide body, edge finder or the stop's rod seen from the side ends
+  in a shallow arc (10–15 % of its diameter deep) whose apex is its true end,
+  measured for P3 to that apex; a drill keeps its point. A flat-ended
+  rectangle, or an arc so deep that a square end mill reads as a ball nose,
+  fails.
 - **P5 Unrecorded sizes are schematic.** A size with no record is drawn
   schematic and says so, or stays out; a long tool or rod drawn short ends
   in a break line.
 - **P6 One key for every role.** The sheet's picture key has an entry for
-  every colour and pattern the pictures use.
+  every colour and pattern the pictures use, and a locator is drawn as what
+  it is: the work stop as a round rod reaching in from its post (end on, a
+  circle), with its own key entry, not the supports' hatch.
 - **P7 A confusing locator is named in the picture.** A locator that moves
   between parts of one setup, or is uncommon or confusing (the work stop set
   after the first blank's touch-offs; its rod moving from the left to the
