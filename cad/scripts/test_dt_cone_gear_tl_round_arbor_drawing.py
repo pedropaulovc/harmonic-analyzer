@@ -102,10 +102,10 @@ def test_the_seat_fits_t024_inside_the_tir_share() -> None:
     the largest bore."""
     low, high = spec.SEAT_CLEARANCE_MM
     assert low == 0.0
-    assert high == pytest.approx(0.001 * INCH)
+    assert high == pytest.approx(0.0013 * INCH)
     assert high <= spec.PLAY_SHARE * spec.TOOTH_RUNOUT_TIR_MM + 1e-9
     assert spec.SEAT_DIA == spec.BORE_MIN_MM
-    assert spec.SEAT_DIA_MIN == pytest.approx(0.2508 * INCH)
+    assert spec.SEAT_DIA_MIN == pytest.approx(0.2505 * INCH)
     assert spec.SEAT_DIA_MIN <= spec.SEAT_DIA
     assert spec.BLANK.bore[0] - spec.SEAT_DIA >= low - 1e-9
     assert spec.BLANK.bore[1] - spec.SEAT_DIA_MIN <= high + 1e-9
@@ -122,7 +122,7 @@ def test_the_note_names_t024_by_its_full_number() -> None:
     note = " ".join(spec.SHEET_NOTES.split())
     assert note == (
         "1. SEAT: SLIDING FIT, MATCHED TO THE BORE OF CONE GEAR MHA-DT-03-T024, "
-        "CLEARANCE .000-.001."
+        "CLEARANCE .0000-.0013."
     )
     assert len(spec.SHEET_NOTES.splitlines()) <= 4
     assert max(map(len, spec.SHEET_NOTES.splitlines())) <= 72

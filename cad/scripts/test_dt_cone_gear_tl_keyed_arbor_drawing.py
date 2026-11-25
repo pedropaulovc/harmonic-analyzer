@@ -68,10 +68,8 @@ def test_one_seat_fits_every_blank_inside_the_tir_share() -> None:
     assert spec.DRAWING_PRECISION_BY_NAME["SeatDia"] == 3
     assert ("SeatProfile", "SeatDia") not in spec.MODEL_BANDS_MM
     assert spec.CALLOUTS_BELOW["SeatDia"] == spec.SEAT_NOTE_FLAG
-    # Plain inch steps (machinist review r1, farm run 20261124T110807008Z).
-    assert high == pytest.approx(0.001 * INCH)
     assert (
-        "MATCHED" in spec.SHEET_NOTES and ".000-.001 IN EACH BORE" in spec.SHEET_NOTES
+        "MATCHED" in spec.SHEET_NOTES and ".0000-.0013 IN EACH BORE" in spec.SHEET_NOTES
     )
 
 
@@ -88,7 +86,7 @@ def test_the_note_names_every_mate_by_its_drawing_number() -> None:
     assert "LISTED ON" not in note and " TO MHA-" not in note
     assert (
         "MATCHED TO THE KEYED BORES OF CONE GEAR MHA-DT-03 AND CRANK DRIVE GEAR "
-        "MHA-DT-07, CLEARANCE .000-.001 IN EACH BORE;"
+        "MHA-DT-07, CLEARANCE .0000-.0013 IN EACH BORE;"
     ) in note
     assert spec.CONE_NUMBER == _config.parts("dt-cone-gear")["number"] == "MHA-DT-03"
     assert spec.CRANK_NUMBER == _config.parts("dt-crank-drive-gear")["number"]

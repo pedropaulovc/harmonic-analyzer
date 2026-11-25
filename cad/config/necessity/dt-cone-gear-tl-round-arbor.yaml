@@ -14,7 +14,7 @@
 # extra play.
 necessity:
   - id: N-01
-    feature: "sheet 1, side view, Ø.251 seat (SEE NOTE 1), CLEARANCE .000-.001"
+    feature: "sheet 1, side view, Ø.251 seat (SEE NOTE 1), CLEARANCE .0000-.0013"
     kind: mesh
     reason: "seat play becomes the cut teeth's runout"
     source: "cone_set_stack.NOMINAL_CONTACT_RATIO_MIN"

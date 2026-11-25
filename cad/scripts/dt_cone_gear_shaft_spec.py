@@ -217,13 +217,16 @@ BOND_NOTE = 2
 LAND_FLAG = f"SEE NOTE {LAND_NOTE}"
 BOND_FLAG = f"SEE NOTE {BOND_NOTE}"
 MADE_TO_FIT_DIAMETERS = ("Sec0Dia", "Sec1Dia", "Sec2Dia")
-# Two rows, one of words (machinist review r1, farm run 20261124T110807008Z,
-# r2: three rows of words under the callout broke rule 7); the reference
-# size already says the journal is made to its bore.
+# Two lines of words (rule 7; machinist review r1, farm run
+# 20261124T110807008Z, r2: three rows of words under the callout broke it);
+# the reference size already says the journal is made to its bore.  The
+# clearance prints bare: beside a REF size it is the requirement (rule 4,
+# form 2; machinist review run 2, 20261124T183904227Z, and Codjiflo
+# #3549-11: in parentheses it read as REF too, and nothing controlled).
 JOURNAL_FIT_CALLOUT = (
     "RUNNING FIT TO MHA-DT-05\n"
-    f"(CLEARANCE {inch_text(JOURNAL_DIAMETRAL_CLEARANCE_MM[0], 4)}"
-    f"-{inch_text(JOURNAL_DIAMETRAL_CLEARANCE_MM[1], 4)})"
+    f"CLEARANCE {inch_text(JOURNAL_DIAMETRAL_CLEARANCE_MM[0], 4)}"
+    f"-{inch_text(JOURNAL_DIAMETRAL_CLEARANCE_MM[1], 4)}"
 )
 SEAT_MATE_CALLOUTS = {
     "Sec0Dia": JOURNAL_FIT_CALLOUT,

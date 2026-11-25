@@ -21,7 +21,7 @@
 # so the blank no longer slides over the key (floor .0015, as MHA-DT-04's S).
 necessity:
   - id: N-01
-    feature: "sheet 1, front view, Ø.376 seat (SEE NOTE 1), CLEARANCE .000-.001 IN EACH BORE"
+    feature: "sheet 1, front view, Ø.376 seat (SEE NOTE 1), CLEARANCE .0000-.0013 IN EACH BORE"
     kind: mesh
     reason: "seat play becomes the cut teeth's runout"
     source: "cone_set_stack.NOMINAL_CONTACT_RATIO_MIN"

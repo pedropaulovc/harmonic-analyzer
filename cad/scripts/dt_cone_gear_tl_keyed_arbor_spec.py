@@ -149,18 +149,21 @@ PLAY_SHARE = 2.0 / 3.0
 # three places (the supply size, line to line with the smallest bore) and its
 # flag note states the fit (rule 4): a sliding fit matched to the keyed
 # bores, diametral clearance from line to line up to the share, floored onto
-# the plain .001 inch step (rule 4, "Bands are written in inch steps"; the
-# .0013 the .0001 grid gave read as converted mm: machinist review r1, farm
-# run 20261124T110807008Z), in every bore. Necessity register N-01 (mesh):
-# cone_set_stack books this play inside the gears' .002 TIR, and a seat at
-# the title block (.004 play) takes T030's contact ratio to 0.82 against
-# NOMINAL_CONTACT_RATIO_MIN 1.0 (drawing-guidelines rule 4, form 2;
-# cone_set_stack C-01 at .004 play gives CR 0.82).
+# the .0001 grid, in every bore: main's .0000-.0013. A stack never tightens
+# a fit (owner-level ruling, Codjiflo #3549-13, 2026-11-25: the plain .001
+# step left a .0002 seat window across the 17 bores); machinist review r1's
+# converted-mm note (farm run 20261124T110807008Z) is answered by the stack
+# itself: at the gears' .002 TIR, with this play inside it, T030's contact
+# ratio is 1.0546. Necessity register N-01 (mesh): cone_set_stack books this
+# play inside the gears' .002 TIR, and a seat at the title block (.004 play)
+# takes T030's contact ratio to 0.82 against NOMINAL_CONTACT_RATIO_MIN 1.0
+# (drawing-guidelines rule 4, form 2; cone_set_stack C-01 at .004 play gives
+# CR 0.82).
 SEAT_PLACES = 3
 SEAT_DIA = BORE_MIN_MM
 SEAT_CLEARANCE_MM = (
     0.0,
-    inch_grid_mm(PLAY_SHARE * TOOTH_RUNOUT_TIR_MM, 3, math.floor),
+    inch_grid_mm(PLAY_SHARE * TOOTH_RUNOUT_TIR_MM, 4, math.floor),
 )
 # The smallest seat the fit admits: the largest bore less the clearance.
 SEAT_DIA_MIN = BORE_MAX_MM - SEAT_CLEARANCE_MM[1]
@@ -699,7 +702,9 @@ KEY_NUMBER = str(_config.parts("dt-cone-gear-tl-arbor-key")["number"])
 KEY_BOND = "LOCTITE 638"
 SEAT_NOTE_NUMBER = 1
 SEAT_NOTE_FLAG = f"SEE NOTE {SEAT_NOTE_NUMBER}"
-SEAT_CLEARANCE_TEXT = "-".join(inch_text(value, 3) for value in SEAT_CLEARANCE_MM)
+SEAT_CLEARANCE_TEXT = "-".join(
+    inch_text(value, 4) if value > 1e-9 else ".0000" for value in SEAT_CLEARANCE_MM
+)
 # The bonded key's side clearance in the end mill's cut (rule 23: a bonded
 # fit prints its clearance, inside the compound's gap).
 KEY_CLEARANCE_MM = cone_land_key.KEYSEAT_SIDE_CLEARANCE_MM
