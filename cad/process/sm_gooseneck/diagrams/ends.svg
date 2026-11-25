@@ -3,35 +3,36 @@
      3.000 centreline radius (features.toml bend; 228.6 px). Hold C, ruling D33 (delegated,
      Main 2026-11-25): across the jaws the tube is .500 all along its planar bend, so the jaws
      grip it over their whole depth. The scribed line arm_line_mm 95.25 from the leg's outer
-     side, arm_straight_ref 11.92 mm above the bend's tangent; the tail 2 in (tube_tail_mm).
+     side: 95.25 - (76.2 + 6.35) = 12.70 mm (.500) above the bend's tangent (the finished
+     arm, filed to the reach, keeps arm_straight_ref 11.92); the tail 2 in (tube_tail_mm).
      Not on record, drawn schematic: the vise's jaw width (drawn 4 in) and depth (drawn 1 in),
      the jaw tops' 1 mm below the line, the screw and slide, the soft jaws' thickness, the
      junior hacksaw's blade and kerf, the packing's length. -->
   <rect class="paper" x="0" y="0" width="760" height="780"/>
   <text class="title" x="20" y="24">Setup 7: the arm in the soft jaws, the bend in their plane; the tail sawn off (to scale, 3 px/mm)</text>
-  <rect class="clamp" x="67.6" y="215.24" width="304.8" height="76.2"/>
-  <text class="label-on-clamp" x="190" y="233.24" text-anchor="middle">fixed jaw's face (soft jaw)</text>
-  <text class="label-on-clamp" x="190" y="249.24" text-anchor="middle">the moving jaw taken away</text>
-  <rect class="hidden" x="145" y="291.44" width="150" height="136.56"/>
-  <text class="label" x="151" y="315.44">screw and slide</text>
-  <text class="label" x="151" y="331.44">below the jaws</text>
-  <text class="label" x="151" y="347.44">(schematic)</text>
-  <rect class="fixture-support" x="67.6" y="215.24" width="38.1" height="76.2"/>
+  <rect class="clamp" x="67.6" y="212.9" width="304.8" height="76.2"/>
+  <text class="label-on-clamp" x="190" y="230.9" text-anchor="middle">fixed jaw's face (soft jaw)</text>
+  <text class="label-on-clamp" x="190" y="246.9" text-anchor="middle">the moving jaw taken away</text>
+  <rect class="hidden" x="145" y="289.1" width="150" height="138.9"/>
+  <text class="label" x="151" y="313.1">screw and slide</text>
+  <text class="label" x="151" y="329.1">below the jaws</text>
+  <text class="label" x="151" y="345.1">(schematic)</text>
+  <rect class="fixture-support" x="67.6" y="212.9" width="38.1" height="76.2"/>
   <text class="label" x="40" y="452">packing: a .500 piece of the trial tube at the</text>
   <text class="label" x="40" y="468">jaws' left end, to keep them square</text>
-  <line class="leader" x1="60" y1="440" x2="86.65" y2="285.44"/>
-  <circle class="leader-dot" cx="86.65" cy="285.44" r="2"/>
-  <path class="part-kept" d="M334.3 212.24L334.3 248A247.65 247.65 0 0 0 581.95 495.65L740 495.65L737 491.84L740 488.03L737 484.22L740 480.41L737 476.6L740 472.79L737 468.98L740 465.17L737 461.36L740 457.55L581.95 457.55A209.55 209.55 0 0 1 372.4 248L372.4 212.24Z"/>
-  <rect class="part-removed" x="334.3" y="59.84" width="38.1" height="152.4"/>
-  <text class="label" x="384.4" y="79.84">tail, 2 in, off</text>
-  <line class="datum" x1="320.3" y1="212.24" x2="386.4" y2="212.24"/>
-  <text class="datum-label" x="442.4" y="234.24">the scribed line, 3.750 in above the</text>
-  <text class="datum-label" x="442.4" y="250.24">leg's outer side; the jaw tops just below</text>
-  <line class="leader" x1="440.4" y1="230.24" x2="388.4" y2="212.24"/>
-  <circle class="leader-dot" cx="388.4" cy="212.24" r="2"/>
-  <path class="cutter" d="M483.35 204.74L483.35 207.74L223.35 207.74L220.35 206.99L223.35 206.24L220.35 205.49L223.35 204.74Z"/>
-  <text class="label" x="384.4" y="177.74">junior hacksaw blade (schematic): just</text>
-  <text class="label" x="384.4" y="193.74">outside the line, square to the arm</text>
+  <line class="leader" x1="60" y1="440" x2="86.65" y2="283.1"/>
+  <circle class="leader-dot" cx="86.65" cy="283.1" r="2"/>
+  <path class="part-kept" d="M334.3 209.9L334.3 248A247.65 247.65 0 0 0 581.95 495.65L740 495.65L737 491.84L740 488.03L737 484.22L740 480.41L737 476.6L740 472.79L737 468.98L740 465.17L737 461.36L740 457.55L581.95 457.55A209.55 209.55 0 0 1 372.4 248L372.4 209.9Z"/>
+  <rect class="part-removed" x="334.3" y="57.5" width="38.1" height="152.4"/>
+  <text class="label" x="384.4" y="77.5">tail, 2 in, off</text>
+  <line class="datum" x1="320.3" y1="209.9" x2="386.4" y2="209.9"/>
+  <text class="datum-label" x="442.4" y="231.9">the scribed line, 3.750 in above the</text>
+  <text class="datum-label" x="442.4" y="247.9">leg's outer side; the jaw tops just below</text>
+  <line class="leader" x1="440.4" y1="227.9" x2="388.4" y2="209.9"/>
+  <circle class="leader-dot" cx="388.4" cy="209.9" r="2"/>
+  <path class="cutter" d="M483.35 202.4L483.35 205.4L223.35 205.4L220.35 204.65L223.35 203.9L220.35 203.15L223.35 202.4Z"/>
+  <text class="label" x="384.4" y="175.4">junior hacksaw blade (schematic): just</text>
+  <text class="label" x="384.4" y="191.4">outside the line, square to the arm</text>
   <text class="label" x="521.95" y="521.65">the bend sweeps out past the jaws' right</text>
   <text class="label" x="521.95" y="537.65">end, clear of the screw and slide</text>
   <text class="title" x="40" y="505">Across the jaws (looking along them), 3 px/mm</text>

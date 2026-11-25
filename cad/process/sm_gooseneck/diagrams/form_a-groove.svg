@@ -1,10 +1,11 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 560" font-family="sans-serif" font-size="13">
-  <rect class="paper" x="0" y="0" width="760" height="560"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 580" font-family="sans-serif" font-size="13">
+  <rect class="paper" x="0" y="0" width="760" height="580"/>
   <!-- Hand picture, plan view, to scale at 2.1 px/mm from the plate's 9.0 in
      (228.6 mm drawn 480.1 px) and its 6.0 in width (320 px). Plate, 1-2-3
      blocks (3 x 2 in), stud holes, arc and groove from [parameters] and
      the GF01/GF02 NC. The 1/4 in ball end mill (ball_cutter_dia_mm 6.35) is drawn 13.3 px across,
-     at the groove's first plunge X57.059 Y50.504 (past the back edge).
+     at the groove's first plunge X57.059 Y50.504 (past the back edge), the centred
+     pass at Z-3.175 (cam.py groove: centred pass, then the steps alternating direction).
      The step clamps' straps and studs are not on record: drawn schematic.
      The edge finder is a touch-off tool and is not drawn; the two
      touch-off edges are marked as datums. -->
@@ -38,6 +39,7 @@
   <text class="label-halo" x="430.7" y="202.8">cove</text>
   <text class="label-halo" x="572.5" y="341.1">waste</text>
   <text class="label-halo" x="431.3" y="124.1">stud holes</text>
-  <text class="label" x="20.0" y="530.0">GF01_form_a, T2: each level plunges past the back edge, runs round the cove and along the channel to the</text>
-  <text class="label" x="20.0" y="548.0">tube stop (arrow), then back. The arc is through; the waste stays under its own clamp. To scale.</text>
+  <text class="label" x="20.0" y="530.0">GF01_form_a, T2: the first pass, centred on the groove's centre line, plunges past the back edge, runs round</text>
+  <text class="label" x="20.0" y="548.0">the cove and down the channel to the tube stop (arrow). Then steps round that line, each the other way:</text>
+  <text class="label" x="20.0" y="566.0">the form-side steps channel and cove, the outer-side steps the channel only. Waste under its own clamp. To scale.</text>
 </svg>

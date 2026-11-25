@@ -373,7 +373,7 @@ settings = "ball-endmill-carbide-2fl-1-4-6061-t6511"
 milling_cuts = [
   { name = "groove", kind = "slot", phase = "finish", cutter_dia_mm = "{{process.ball_cutter_dia_mm}}", flutes = 2, axial_doc_mm = "{{process.groove_depth_mm}}", radial_woc_mm = "{{process.ball_cutter_dia_mm}}", traverse_mm = ["{{process.a_groove_from_mm}}", "{{process.a_groove_to_mm}}"] },
 ]
-diagram = { file = "diagrams/form_a-groove.svg", alt = "Plan of plate A, to scale: the 1/4 in ball end mill plunged past the back edge; each level runs round the cove and along the channel to the tube stop. The arc is through, the waste under its own clamp." }
+diagram = { file = "diagrams/form_a-groove.svg", alt = "Plan of plate A, to scale: the 1/4 in ball end mill at its first plunge, past the back edge. Its first pass, centred on the groove's centre line, runs round the cove and down the channel to the tube stop; then it steps round that line, each step the other way, the form-side steps along the channel and round the cove, the outer-side steps along the channel only. The arc is through, the waste under its own clamp." }
 
 [[setups.operations]]
 speed_kind = "other"
@@ -455,7 +455,7 @@ settings = "ball-endmill-carbide-2fl-1-4-6061-t6511"
 milling_cuts = [
   { name = "groove b", kind = "slot", phase = "finish", cutter_dia_mm = "{{process.ball_cutter_dia_mm}}", flutes = 2, axial_doc_mm = "{{process.groove_depth_mm}}", radial_woc_mm = "{{process.ball_cutter_dia_mm}}", traverse_mm = ["{{process.b_groove_from_mm}}", "{{process.b_groove_to_mm}}"] },
 ]
-diagram = { file = "diagrams/form_b-groove.svg", alt = "Plan of plate B, to scale: the 1/4 in ball end mill plunged past the back edge; each level runs round the cove and along the channel to the tube stop at the right. The arc is through, the waste under its own clamp." }
+diagram = { file = "diagrams/form_b-groove.svg", alt = "Plan of plate B, to scale: the 1/4 in ball end mill at its first plunge, past the back edge. Its first pass, centred on the groove's centre line, runs round the cove and down the channel to the tube stop at the right; then it steps round that line, each step the other way, the form-side steps along the channel and round the cove, the outer-side steps along the channel only. The arc is through, the waste under its own clamp." }
 
 [[setups.operations]]
 speed_kind = "other"
@@ -608,14 +608,16 @@ instruction = "Lay the leg on the table, its outer side down, between two 1-2-3 
 feed = "hand"
 diagram = { file = "diagrams/ends-reach.svg", alt = "The gooseneck lying on its leg on the table, the arm up: the height gauge over the arm's end reads the reach from the leg's outer side; the two 1-2-3 blocks against the leg's sides not drawn." }
 
-# Sawing the tail: D33 (delegated ruling 2026-11-25, Main, no precedent). The
-# arm is gripped with the bend lying in the plane between the jaws: across
+# Sawing the tail: D33 (delegated ruling 2026-11-25 (Main), no precedent,
+# owner review #2144:
+# https://github.com/pedropaulovc/harmonic-analyzer/issues/2144#issuecomment-7171811160).
+# The arm is gripped with the bend lying in the plane between the jaws: across
 # the jaws the tube is .500 all along a planar bend, so the jaws grip it over
 # their whole depth and the jaw depth no longer matters (#3611; gripped the
-# other way, only the arm's .47 in of straight lies between the bend and the
-# line). The arm sits at one end of the jaws so the bend sweeps out past that
-# end, clear of the screw and slide; a packing of the same tube at the other
-# end keeps the jaws square.
+# other way, only the arm's .500 of straight lies between the bend and the
+# line, arm_line_mm less the bend's outside radius). The arm sits at one end
+# of the jaws so the bend sweeps out past that end, clear of the screw and
+# slide; a packing of the same tube at the other end keeps the jaws square.
 [[setups.operations]]
 speed_kind = "other"
 tool = "hacksaw"
