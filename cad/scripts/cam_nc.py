@@ -168,11 +168,16 @@ def _program(directory: Path, name: str, cache: dict[str, _gcode.Program]) -> _g
 
 
 # Posted files known to pass a cutter over a vise jaw with less air than the
-# shop floor (cad/config/shop-equipment cnc.jaw-clearance), by file name, each
-# naming its issue. verify reports their jaw_clearance findings as known (a
-# warning) instead of failing on them, and fails when a listed file no longer
-# falls under the floor: its owner empties its entry once fixed. Nothing else
-# exempts a file from the floor.
+# shop floor (cad/config/shop-equipment cnc.jaw-clearance: D32, delegated
+# ruling 2026-11-25 (Main), no precedent; the owner reviews it on #2144,
+# cad/docs/drawing-simplicity-policy.md "Named exceptions":
+# https://github.com/pedropaulovc/harmonic-analyzer/issues/2144#issuecomment-7171575340,
+# corrected at
+# https://github.com/pedropaulovc/harmonic-analyzer/issues/2144#issuecomment-7171657471),
+# by file name, each naming its issue. verify reports their jaw_clearance
+# findings as known (a warning) instead of failing on them, and fails when a
+# listed file no longer falls under the floor: its owner empties its entry once
+# fixed. Nothing else exempts a file from the floor.
 KNOWN_JAW_CLEARANCE_VIOLATIONS: dict[str, str] = {
     "CL01_face_b.nc": "#3607 (ch_channel_lever: 0.521 mm over the moving jaw); not to be run until fixed",
     "PG15_height.nc": "#3607 (pd_platen_guide: 0.521 mm over the fixed jaw); not to be run until fixed",

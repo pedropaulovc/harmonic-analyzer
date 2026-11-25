@@ -184,7 +184,12 @@ relief_floor_height_mm = 2.413
 # heights: MS06 above the parallels (upright); MS07b above the stacks (lying,
 # top face up), where the far corner's pass has the jaw tops lying_grip_mm
 # below it (issue #3607: upright, the finished far end left the point .525
-# over the jaws).
+# over the jaws, under the 1.0 mm jaw-clearance floor of D32: delegated ruling
+# 2026-11-25 (Main), no precedent; the owner reviews it on #2144,
+# cad/docs/drawing-simplicity-policy.md "Named exceptions":
+# https://github.com/pedropaulovc/harmonic-analyzer/issues/2144#issuecomment-7171575340,
+# corrected at
+# https://github.com/pedropaulovc/harmonic-analyzer/issues/2144#issuecomment-7171657471).
 chamfer_offset_mm = 0.25
 chamfer_tip_depth_mm = 1.266
 locating_chamfer_tip_mm = 25.277

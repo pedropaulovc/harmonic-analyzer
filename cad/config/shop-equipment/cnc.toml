@@ -62,9 +62,12 @@ cite = [
 # check, never lower it. It covers a tool-setter or touch-off error, a part
 # not fully down on its parallels and a chip under it. Census of the posted
 # NC on main (issue #3607): 22 of 46 recipes pass a cutter over a jaw, least
-# 0.521 mm; at 1.0 three were under it.
+# 0.521 mm; at 1.0 three were under it. The floor is D32, a delegated ruling
+# 2026-11-25 (Main) with no precedent: the owner reviews it first on #2144
+# (cad/docs/drawing-simplicity-policy.md, "Named exceptions"), posted there at
+# issuecomment-7171575340 and corrected at issuecomment-7171657471.
 [cnc.jaw-clearance]
 jaw_clearance_min_mm = 1.0
 cite = [
-  "D32, delegated ruling 2026-11-25 (Main), no precedent: a 1.0 mm (.040 in) floor between any cutter and a declared jaw/clamp box, an HA fact in cad/config/shop-equipment; issue #3607.",
+  "D32, delegated ruling 2026-11-25 (Main), no precedent: a 1.0 mm (.040 in) floor between any cutter and a declared jaw/clamp box, an HA fact in cad/config/shop-equipment; issue #3607. The owner reviews it on #2144 (cad/docs/drawing-simplicity-policy.md, \"Named exceptions\"): https://github.com/pedropaulovc/harmonic-analyzer/issues/2144#issuecomment-7171575340, corrected at https://github.com/pedropaulovc/harmonic-analyzer/issues/2144#issuecomment-7171657471.",
 ]
