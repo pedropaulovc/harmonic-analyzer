@@ -100,10 +100,15 @@ def test_the_journal_aim_gives_the_drawings_clearance_on_the_strap():
     assert low <= p["journal_aim_in"] <= high
     clearance = [v / IN for v in f["front_journal"]["diametral_clearance"]]
     assert clearance[0] < p["journal_clearance_aim_in"] < clearance[1]
-    # The largest strap bore the capped aim still fits at the loosest clearance.
+    # The largest strap bore for which Setup 7's whole acceptance window, A
+    # down to .0004 under it, stays inside the loosest clearance at the
+    # capped aim (Codjiflo 3547-7: at .3147 the window's foot ran .0034).
+    window = 0.0004
     assert p["strap_bore_max_fit_in"] == pytest.approx(
-        p["journal_aim_in"] + clearance[1], abs=1e-4
+        p["journal_aim_in"] + clearance[1] - window, abs=1e-4
     )
+    plan_text = _process_plans.plan_path(STEM).read_text(encoding="utf-8")
+    assert "A to .0004 under it, so .001–.003 under S" in plan_text
 
 
 def test_the_bench_gauges_read_inside_the_drawings_bands():

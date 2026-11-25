@@ -1248,9 +1248,10 @@ def test_tip_dowel_slip_hole_clears_the_pin_on_the_hold_down_line() -> None:
     assert spec.TIP_DOWEL_LOCAL_X == pytest.approx(spec.HOLDDOWN_LOCAL_X + block.DOWEL_FROM_TAP)
     assert spec.TIP_DOWEL_LOCAL_Z == spec.HOLDDOWN_LOCAL_Z
     # Chained from the hold-down hole on its own +/-.004 band, which the webs
-    # need; the hold-down hole itself takes the shop's +/-.005 drilled row.
+    # need; the hold-down hole itself takes the title block's grades.
     assert spec.TIP_DOWEL_STATION_TOL_MM == pytest.approx(0.004 * 25.4)
     assert spec.TIP_DOWEL_STATION_TOL_MM < spec.HOLDDOWN_STATION_TOL_MM
+    assert spec.TIP_DOWEL_STATION_TOL_MM < spec.HOLDDOWN_LATERAL_TOL_MM
     major = THREAD_MAJOR_MM[block.HOLDDOWN_THREAD]
     drilled = drilled_oversize_mm(unit=spec.UNIT)
     float_mm = (spec.HOLDDOWN_CLEARANCE_DIA + drilled - major) / 2.0

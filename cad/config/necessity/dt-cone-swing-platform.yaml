@@ -6,9 +6,15 @@
 # bought MHA-DT-VN-52 shoulder is its gauge (form 3). A 1/4 drill can cut size
 # for size on the shoulder and an F drill (.257 +.004/0) loses the cone tip's
 # air to gear 19: the bore's radial float is a term of that stack
-# (dt_cone_tip_air, "platform pivot bore on the shoulder"; least air 0.116 mm
-# at the reamer's .2515 analysis maximum with the #52 end-screw hole of fit
-# audit question 11).
+# (dt_cone_tip_air, "platform pivot bore on the shoulder"; least bushing air
+# 0.024 mm, full arithmetic (D18), at the reamer's .2515 analysis maximum
+# with the #52 end-screw hole of fit audit question 11 and HoldDownX at the
+# title block's .XX).
+# HoldDownX (.04, the hold-down hole across the cone line) has no entry: at
+# the .XX row's +/-.01 the bushing air stays 0.024 mm (0.053 at +/-.005),
+# step 23's .020 leaf still passes every in-print build (0.731 mm look air
+# against 0.508), the hold-down webs stay .326 in or more and the tip block
+# on the plate (0.764 mm against 0.50), so it prints at the title block.
 # The tip dowel's .228 +/-.004 station from the hold-down hole: the webs to
 # the hold-down counterbore here and to MHA-DT-21's +X face close on it
 # (dt_cone_swing_platform_checks.TIP_DOWEL_WEBS, dt_cone_tip_block_spec.

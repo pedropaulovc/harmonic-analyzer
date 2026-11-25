@@ -263,8 +263,9 @@ HOLDDOWN_STATION_TOL_MM = 0.127  # +/-.005
 # reads them still holds (the tip block's containment on the plate 0.764 mm
 # against 0.50, the hold-down and tip-dowel webs over .080, the end screw's
 # embed window, the tip lateral take-up, the pivot-head air), and the cone
-# tip's air to gear 19 no longer reads them (step 23's look erases the parts
-# frozen before it; owner ruling 2026-11-24, audit part 2 C9).
+# tip's air to gear 19 still closes with HoldDownX at +/-.01: the bushing
+# tier's full-arithmetic least air 0.024 mm (0.053 at +/-.005), and step
+# 23's .020 leaf passes every in-print build (look air 0.731 mm; D18).
 HOLDDOWN_LATERAL_TOL_MM = printed_band_mm(2, unit=UNIT)  # +/-.01
 # The same stacks run through the post-mount taps, whose placement dimensions
 # (PostMountWestX/WestZ/EastX/EastZ) print .XXX, so the title-block grade is

@@ -392,7 +392,10 @@ DETAIL_HOLDDOWN_X = DETAIL_CENTER[0] + HOLDDOWN_LOCAL_X * _DETAIL_S
 # HoldDownX's line runs a text height plus 1.1 mm lower, 1.3 mm over the top
 # relief's crown, and its outside arrow tails keep 1.5 mm over the relief's
 # arc.  Its frame's lower-left corner stands 1 mm off the circle and its
-# right end short of section C-C's padded box.
+# right end short of section C-C's padded box.  The text now prints no band
+# (" .04 ", HOLDDOWN_LATERAL_TOL_MM): the measured frame is kept as its
+# bound, the narrower text centred on the same keep x, so it only stands
+# further from the circle and from C-C's box.
 HOLDDOWN_X_TEXT_SIZE = (0.02196, 0.0035)
 HOLDDOWN_X_LINE_DROP = 0.00278
 # Rule-23 retention, owner ruling 2026-11-07 (MHA-DT-00 rubric sample, PR
