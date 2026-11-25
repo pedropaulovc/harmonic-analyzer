@@ -1275,7 +1275,8 @@ def test_drum_runs_in_the_shim_the_straps_were_drilled_on() -> None:
     # MHA-DT-00's SHAFT DRILL SET prints: any one leaf .010 TO .020 (owner
     # ruling 2026-11-24, audit part 2 C7).  The drum keeps its end-play floor
     # over the whole range and never binds (Main, #858); the planning spare
-    # went with the owner's range (Main's C7 ruling).  The rig's own stacks
+    # went with the owner's range (owner ruling 2026-11-24 (C7): "Yes: ranges,
+    # longer flats, no leaf miking.").  The rig's own stacks
     # and step wording are pinned by its tests, not here.
     import pinion_rig_layout as rig
 

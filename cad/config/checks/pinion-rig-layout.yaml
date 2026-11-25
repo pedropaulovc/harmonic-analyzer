@@ -9,7 +9,7 @@ checks:
     check: "MHA-DT-17 is clamped between its cams"
     kind: gap
     reason: "both cams bear on their blocks; MHA-DT-17 binds"
-    source: "Main's C7 ruling 2026-11-24: replaces the agent floor BACK_COLLAR_MIN_GAP (0.5, #858). At zero the back MHA-DT-23 is only the rod's north stop; the least end play is the two ranges' least gaps, owner ruling 2026-11-24, fit audit part 2 C7: \"Yes: ranges, longer flats, no leaf miking.\""
+    source: "owner ruling 2026-11-24 (C7): \"Yes: ranges, longer flats, no leaf miking.\" It replaces the agent floor BACK_COLLAR_MIN_GAP (0.5, #858): at zero the back MHA-DT-23 is only the rod's north stop; the least end play is the two ranges' least gaps"
     basis: after_setting
   - id: C-02
     check: "at the thinnest D the drum's back end passes gear 19's back face"
