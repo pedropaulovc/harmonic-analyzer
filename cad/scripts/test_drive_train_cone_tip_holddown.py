@@ -14,6 +14,7 @@ block, owner decision C1 keyed 2026-11-09, PR #1992) is proved here too.
 from __future__ import annotations
 
 import math
+import re
 
 import pytest
 
@@ -516,17 +517,47 @@ def test_cone_tip_keeps_air_to_g19_over_the_whole_swing() -> None:
 
 
 def test_step_23s_leaf_passes_every_in_print_build() -> None:
-    """D18 (delegated ruling 2026-11-24 (Main), no precedent; owner review
-    #2144): at the working pose the bushing's least air before the look,
-    every earlier source at its worst in print, takes the .020 leaf; the
-    3/64 drill shank it replaces would reject some of those builds."""
+    """Delegated ruling 2026-11-25 (Main), no precedent; replaces D18's .020;
+    owner review #2144 (Codjiflo 3549-r4-13).  Both directions of step 23C's
+    .010 leaf, at the working pose: (i) the worst in-print build, every
+    source present at the look at its worst, passes the leaf at its thickest
+    (LEAF_TOLERANCE charged); (ii) a build that just passes the nominal leaf
+    keeps positive air after the pivot's transfer, the only sources that act
+    after the look.  The 3/64 drill shank and the .020 leaf would reject
+    some in-print builds."""
+    import dt_cone_tip_air as air
+    import dt_feeler_leaves
+
+    assert air.LOOK_LEAF_MM == pytest.approx(0.010 * 25.4)
+    assert 0.010 in dt_feeler_leaves.LEAVES_IN
+    assert air.AFTER_LOOK_SOURCES == {
+        "pivot thread centring",
+        "base pivot seat transferred through the platform bore",
+        "platform pivot bore on the shoulder",
+    }
+    look = air.look_in_print_air_mm()
+    after = air.after_look_mm()
+    assert set(look) == set(after) == {fixed.name for fixed in air.DRUM_TIERS}
+    # (i)
+    assert min(look.values()) >= air.LOOK_LEAF_MM + dt_feeler_leaves.LEAF_TOLERANCE
+    assert min(look.values()) < 0.020 * 25.4 < 3.0 / 64.0 * 25.4
+    # (ii)
+    assert all(air.LOOK_LEAF_MM - transfer > 0.0 for transfer in after.values())
+
+
+def test_step_23c_prints_the_leaf_the_proof_sizes() -> None:
+    """Step 23C prints LOOK_LEAF_MM's size (lockstep: the drawing does not
+    import the proof), and its remedy names the parts the look sees."""
+    import draw_dt_drive_train_assembly as drawing
     import dt_cone_tip_air as air
 
-    assert air.LOOK_LEAF_MM == pytest.approx(0.020 * 25.4)
-    look = air.look_in_print_air_mm()
-    assert set(look) == {fixed.name for fixed in air.DRUM_TIERS}
-    assert min(look.values()) >= air.LOOK_LEAF_MM
-    assert min(look.values()) < 3.0 / 64.0 * 25.4
+    steps = " ".join(drawing.rig_steps(pivot_blocks=2, cams=2, slotted=4).split())
+    leaf = f".{round(air.LOOK_LEAF_MM / 25.4 * 1000):03d}"
+    assert f"A {leaf} FEELER LEAF PASSES BETWEEN MHA-DT-38 AND GEAR 19." in steps
+    (remedy,) = re.findall(r"IF IT DOES NOT, MEASURE [^.]*\.", steps)
+    for part in ("MHA-DT-04", "MHA-DT-05", "MHA-DT-12", "MHA-DT-20", "MHA-DT-21",
+                 "MHA-DT-38", "MHA-DT-39"):
+        assert part in remedy
 
 
 def test_tip_air_refuses_an_unclassified_source() -> None:

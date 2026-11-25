@@ -2157,13 +2157,19 @@ def rig_steps(*, pivot_blocks: int, cams: int, slotted: int) -> str:
         # on machinist review of point A ("WHERE NO GEAR BINDS" gave no pose
         # and no check).  Owner ruling 2026-11-24, audit part 2 C9 ("Yes: add
         # the look and relax the rest."), its wording changed by delegated
-        # ruling 2026-11-24 (Main), no precedent; owner review #2144 (D18): at
+        # ruling 2026-11-24 (Main), no precedent; owner review #2144 (D18),
+        # and its leaf by delegated ruling 2026-11-25 (Main), no precedent;
+        # replaces D18's .020; owner review #2144 (Codjiflo 3549-r4-13): at
         # that pose, before the clamp, the bushing's air to gear 19 is looked
-        # at with a .020 feeler leaf, which every build with its parts in
-        # print passes (0.730 mm least, dt_cone_tip_air.look_in_print_air_mm);
-        # the 3/64 drill shank (1.191 mm) rejected some.  The bushing keeps
-        # the full arithmetic stack.  The remedy is its own line (rule 22):
-        # the parts whose print errors close that air before the look.
+        # at with a .010 feeler leaf, which every build with its parts in
+        # print passes, the leaf's own tolerance charged (0.280 mm least
+        # against 0.267, dt_cone_tip_air.look_in_print_air_mm, every source
+        # present at the look booked); the 3/64 drill shank (1.191 mm) and
+        # the .020 leaf rejected some.  The bushing keeps the full arithmetic
+        # stack.  The remedy is its own line (rule 22): the parts whose print
+        # errors close that air before the look, now with gear 19's running
+        # fit on its MHA-DT-12 sheet and the MHA-DT-39 end screw (both seen
+        # by the look since the amendment).
         (
             "other-base-mounting",
             "CONE SET ON THE BASE: SLIDE MHA-DT-20 UNTIL GEARS 0 AND 19 SIT FULLY ON THEIR "
@@ -2171,9 +2177,9 @@ def rig_steps(*, pivot_blocks: int, cams: int, slotted: int) -> str:
             "SWING IT IN UNTIL THE GEARS AT BOTH ENDS JUST BIND.\n"
             f"EASE IT OUT SQUARE IN SMALL STEPS UNTIL {CONE_TURN_CRANK_TURNS} CRANK TURNS "
             "RUN FREE.\n"
-            "A .020 FEELER LEAF PASSES BETWEEN MHA-DT-38 AND GEAR 19.\n"
-            "IF IT DOES NOT, MEASURE MHA-DT-04, MHA-DT-05, MHA-DT-20, MHA-DT-21 AND "
-            "MHA-DT-38 AGAINST THEIR PRINTS.\n"
+            "A .010 FEELER LEAF PASSES BETWEEN MHA-DT-38 AND GEAR 19.\n"
+            "IF IT DOES NOT, MEASURE MHA-DT-04, MHA-DT-05, GEAR 19 (MHA-DT-12), MHA-DT-20, "
+            "MHA-DT-21, MHA-DT-38 AND MHA-DT-39 AGAINST THEIR PRINTS.\n"
             "CLAMP MHA-DT-20 TO MHA-FR-01.\n"
             "TRANSFER-PUNCH MHA-FR-01 THRU THE MHA-DT-20 PIVOT BORE.\n"
             "LIFT MHA-DT-20 OFF.\n"
