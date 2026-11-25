@@ -142,30 +142,34 @@ def test_the_steps_do_one_thing_each_and_check_every_joint_and_setting() -> None
         f"OFF ITEM {a}'S Ø.376 SEAT, LEAVING THE KEYSEAT FILLED",
         "CURE 24 H",
         f"CHECK: ITEM {k} DOES NOT MOVE BY HAND",
-        f"GRIP ITEM {a}'S Ø.62 END IN THE HEAD'S 3-JAW CHUCK AGAINST ITS STEP",
+        f"GRIP ITEM {a}'S Ø.62 END IN THE DIVIDING HEAD'S 3-JAW CHUCK AGAINST ITS STEP",
         f"UNTIL ITEM {k} POINTS AWAY FROM THE CUTTER, ROUGHLY LEVEL",
-        f"ZERO A TEST INDICATOR, HELD IN THE SPINDLE, ON ITEM {k}'S UPPER SIDE FACE",
+        f"ZERO A TEST INDICATOR, HELD IN THE MILL SPINDLE, ON ITEM {k}'S UPPER SIDE FACE",
         "NOTE THE Z DRO READING",
-        "TURN THE HEAD 180°.",
+        "TURN THE DIVIDING HEAD 180°.",
         f"CARRY THE INDICATOR OVER ITEM {a}",
         f"CHECK: THE INDICATOR READS ZERO WITHIN "
         f"{arbor.inch_text(spec.KEY_SIDE_READING, 3)}",
         f"IF STEP {spec.CHECK_STEP} FAILS",
-        f"IF ITEM {k} POINTS AWAY FROM THE CUTTER, TURN THE HEAD 180°",
-        "LOCK THE HEAD'S SPINDLE",
+        f"IF ITEM {k} POINTS AWAY FROM THE CUTTER, TURN THE DIVIDING HEAD 180°",
+        "LOCK THE DIVIDING HEAD'S SPINDLE",
         "SLIDE THE BLANK ONTO",
         "COLLAR (SETUP TABLE)",
         f"TIGHTEN ITEM {n}",
         "RUN THE TAILSTOCK CENTRE INTO ITEM",
         "CHECK: THE BLANK DOES NOT TURN OR SLIDE BY HAND",
-        "UNLOCK THE HEAD'S SPINDLE",
+        "UNLOCK THE DIVIDING HEAD'S SPINDLE",
         "FIRST INDEX (SETUP TABLE)",
     ]
     positions = [
         next(i for i, step in enumerate(flat) if words in step) for words in order
     ]
     assert positions == sorted(positions)
-    assert flat[-1].endswith("TURN THE HEAD BY THE BLANK'S FIRST INDEX (SETUP TABLE).")
+    assert flat[-1].endswith("TURN THE DIVIDING HEAD BY THE BLANK'S FIRST INDEX (SETUP TABLE).")
+    # Machinist round 1 (farm 20261125T180203935Z): the work holder is named
+    # in standard terms, never a bare "THE HEAD" or "THE SPINDLE".
+    assert not re.search(r"(?<!DIVIDING )HEAD\b", spec.ASSEMBLY_STEPS.replace("\n", " "))
+    assert " THE SPINDLE" not in " ".join(spec.ASSEMBLY_STEPS.split())
     assert len(steps) == spec.INDEX_STEP
     # The step numbers the steps cite are the zeroing, the DRO and the check.
     assert "ZERO A TEST INDICATOR" in flat[spec.ZERO_STEP - 1]
@@ -228,7 +232,7 @@ def _run_clock_steps(start_error_deg: float) -> float:
         step = steps[index]
         index += 1
         rough = re.fullmatch(
-            rf"TURN THE HEAD UNTIL ITEM {k} POINTS (.+), ROUGHLY LEVEL\.", step
+            rf"TURN THE DIVIDING HEAD UNTIL ITEM {k} POINTS (.+), ROUGHLY LEVEL\.", step
         )
         if rough:
             key_deg = spec.POINTING_DEG[rough[1]] + start_error_deg
@@ -237,7 +241,7 @@ def _run_clock_steps(start_error_deg: float) -> float:
             zero = _upper_face_height(key_deg, station)
         elif step == "NOTE THE Z DRO READING.":
             noted = station
-        elif step == "TURN THE HEAD 180°.":
+        elif step == "TURN THE DIVIDING HEAD 180°.":
             assert not locked
             key_deg += 180.0
         elif step.startswith(f"CARRY THE INDICATOR OVER ITEM {a}"):
@@ -249,20 +253,20 @@ def _run_clock_steps(start_error_deg: float) -> float:
         elif step.startswith(f"IF STEP {spec.CHECK_STEP} FAILS") and not passed:
             key_deg = _turn_until(zero + reading / 2.0, key_deg, station)
             index = spec.ZERO_STEP - 1
-        elif step == f"IF ITEM {k} POINTS AWAY FROM THE CUTTER, TURN THE HEAD 180°.":
+        elif step == f"IF ITEM {k} POINTS AWAY FROM THE CUTTER, TURN THE DIVIDING HEAD 180°.":
             assert not locked
             away = spec.POINTING_DEG["AWAY FROM THE CUTTER"]
             if math.cos(math.radians(key_deg - away)) > 0:
                 key_deg += 180.0
-        elif step == "LOCK THE HEAD'S SPINDLE.":
+        elif step == "LOCK THE DIVIDING HEAD'S SPINDLE.":
             locked = True
-        elif step == "UNLOCK THE HEAD'S SPINDLE.":
+        elif step == "UNLOCK THE DIVIDING HEAD'S SPINDLE.":
             locked = False
-        elif step.startswith("TURN THE HEAD BY THE BLANK'S FIRST INDEX"):
+        elif step.startswith("TURN THE DIVIDING HEAD BY THE BLANK'S FIRST INDEX"):
             assert not locked
             return key_deg
         else:
-            assert step.startswith("IF STEP") or not step.startswith("TURN THE HEAD")
+            assert step.startswith("IF STEP") or not step.startswith("TURN THE DIVIDING HEAD")
     raise AssertionError("the clocking steps never reach the index")
 
 

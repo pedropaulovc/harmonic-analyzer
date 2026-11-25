@@ -294,8 +294,8 @@ _SEAT_TEXT = "Ø" + arbor.inch_text(
 # printed index centres a tooth on the key at: each cone blank's mid-face.
 # The 64T row reads NONE under FIRST INDEX and NOT CLOCKED under DIRECTION
 # (fit audit part 2, B13; restoration round 1, 2026-11-25): its clock is read
-# by nothing, so it takes no index, and step 23's "TURN THE HEAD BY THE
-# BLANK'S FIRST INDEX" turns it by none. CRANK_FIRST_INDEX_DEG and
+# by nothing, so it takes no index, and step 23's "TURN THE DIVIDING HEAD BY
+# THE BLANK'S FIRST INDEX" turns it by none. CRANK_FIRST_INDEX_DEG and
 # CRANK_FIRST_INDEX_SENSE stay the model's phase (the test checks the cut
 # against them).
 SETUP_TABLE_TITLE = "\n".join(
@@ -339,11 +339,14 @@ _AWAY = "AWAY FROM THE CUTTER"
 if _AWAY not in POINTING_DEG:
     raise AssertionError("the steps' pointing words are not a declared direction")
 # The key's clock (above): set on its own two side faces before the blank
-# goes on, touched in turn by one test indicator at one height, the head
-# turned half a turn between them (the cutter's centre plane is nothing a
+# goes on, touched in turn by one test indicator at one height, the dividing
+# head turned half a turn between them (the cutter's centre plane is nothing a
 # builder can touch; machinist review of farm 20261113T204539922Z); then a
 # half turn, only if it points away, brings it to the cutter. Rule 26's
-# private phrases (BY EYE among them) appear in no step.
+# private phrases (BY EYE among them) appear in no step. The work holder is
+# the shop's BS-0 dividing head (shop-equipment machines.toml), named so in
+# every step, and the indicator rides the MILL SPINDLE (machinist round 1,
+# farm 20261125T180203935Z: "THE HEAD" and "THE SPINDLE" read either way).
 _FITTING: tuple[str, ...] = (
     f"DEGREASE ITEM {_K} AND ITEM {_A}'S KEYSEAT.",
     f"COAT ITEM {_K} WITH {arbor.KEY_BOND}.",
@@ -353,34 +356,35 @@ _FITTING: tuple[str, ...] = (
     "KEYSEAT FILLED.",
     "LET THE BOND CURE 24 H.",
     f"CHECK: ITEM {_K} DOES NOT MOVE BY HAND.",
-    f"GRIP ITEM {_A}'S Ø.62 END IN THE HEAD'S 3-JAW CHUCK AGAINST ITS STEP, "
-    f"ONLY ITEM {_K} ON IT.",
-    f"TURN THE HEAD UNTIL ITEM {_K} POINTS {_AWAY}, ROUGHLY LEVEL.",
-    f"ZERO A TEST INDICATOR, HELD IN THE SPINDLE, ON ITEM {_K}'S UPPER SIDE FACE.",
+    f"GRIP ITEM {_A}'S Ø.62 END IN THE DIVIDING HEAD'S 3-JAW CHUCK AGAINST ITS "
+    f"STEP, ONLY ITEM {_K} ON IT.",
+    f"TURN THE DIVIDING HEAD UNTIL ITEM {_K} POINTS {_AWAY}, ROUGHLY LEVEL.",
+    f"ZERO A TEST INDICATOR, HELD IN THE MILL SPINDLE, ON ITEM {_K}'S UPPER SIDE "
+    "FACE.",
 )
 ZERO_STEP = len(_FITTING)
 DRO_STEP = ZERO_STEP + 1
 _SETTING: tuple[str, ...] = (
     "NOTE THE Z DRO READING.",
-    "TURN THE HEAD 180°.",
+    "TURN THE DIVIDING HEAD 180°.",
     f"CARRY THE INDICATOR OVER ITEM {_A} TO ITEM {_K}'S UPPER SIDE FACE BY Y AND "
     f"Z ONLY, BACK AT THE STEP {DRO_STEP} Z DRO READING.",
     f"CHECK: THE INDICATOR READS ZERO WITHIN {_READING}.",
 )
 CHECK_STEP = ZERO_STEP + len(_SETTING)
 _SETTING += (
-    f"IF STEP {CHECK_STEP} FAILS, TURN THE HEAD UNTIL THE INDICATOR READS HALF "
-    f"ITS STEP {CHECK_STEP} READING AND REPEAT FROM STEP {ZERO_STEP}.",
-    f"IF ITEM {_K} POINTS {_AWAY}, TURN THE HEAD 180°.",
-    "LOCK THE HEAD'S SPINDLE.",
+    f"IF STEP {CHECK_STEP} FAILS, TURN THE DIVIDING HEAD UNTIL THE INDICATOR READS "
+    f"HALF ITS STEP {CHECK_STEP} READING AND REPEAT FROM STEP {ZERO_STEP}.",
+    f"IF ITEM {_K} POINTS {_AWAY}, TURN THE DIVIDING HEAD 180°.",
+    "LOCK THE DIVIDING HEAD'S SPINDLE.",
     f"SLIDE THE BLANK ONTO ITEM {_A} OVER ITEM {_K}, AGAINST ITEM {_A}'S SHOULDER.",
     f"SLIDE THE BLANK'S COLLAR (SETUP TABLE) ONTO ITEM {_A} AGAINST THE BLANK.",
     f"TIGHTEN ITEM {_N} AGAINST THE COLLAR.",
     f"FOR AN {CONE_NUMBER} BLANK, RUN THE TAILSTOCK CENTRE INTO ITEM {_A}'S "
     "THREADED-END CENTRE HOLE.",
     "CHECK: THE BLANK DOES NOT TURN OR SLIDE BY HAND.",
-    "UNLOCK THE HEAD'S SPINDLE.",
-    "TURN THE HEAD BY THE BLANK'S FIRST INDEX (SETUP TABLE).",
+    "UNLOCK THE DIVIDING HEAD'S SPINDLE.",
+    "TURN THE DIVIDING HEAD BY THE BLANK'S FIRST INDEX (SETUP TABLE).",
 )
 _STEPS: tuple[str, ...] = (*_FITTING, *_SETTING)
 INDEX_STEP = len(_STEPS)
