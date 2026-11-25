@@ -51,6 +51,7 @@ from dt_cone_swing_platform_spec import (
     HOLDDOWN_LOCAL_X,
     HOLDDOWN_LOCAL_Z,
     HOLDDOWN_STATION_TOL_MM,
+    HOLDDOWN_X_TOL_MM,
     PIVOT_BEARING_RELIEF_DEPTH,
     PIVOT_BEARING_RELIEF_DIAMETER,
     PIVOT_BEARING_THICKNESS,
@@ -122,8 +123,8 @@ if POST_MOUNT_HALF_PITCH + POST_MOUNT_TAP_DIA / 2.0 > _POST_R:
 # drawing-guidelines.md rule 17 (walls and webs) webs round the tip-block hold-down hole (user ruling 2026-09-29), at
 # print worst: the outline and relief at .XX, the counterbore at its
 # callout's .XXX, drilled holes at the DRILLED HOLES row, the hole's two
-# stations (HoldDownX, HoldDownZ) at their explicit bands; the post taps at
-# their explicit bands, judged at the thread major.
+# stations at their printed grades (HoldDownX .XX, HoldDownZ .XXX); the post
+# taps at their .XXX grade, judged at the thread major.
 # The relief is on the TOP face only (there the hole is the drilled
 # clearance), the counterbore on the UNDERSIDE only (there the pivot is the
 # bare drilled bore); each web is judged on the face both share.  The plan
@@ -135,7 +136,7 @@ _BASE_XX_MM = printed_band_mm(
     2, unit=drawing_unit("parts/fr-harmonic-base", _config.parts("fr-harmonic-base"))
 )
 _DRILL_OVERSIZE_MM = drilled_oversize_mm(unit=UNIT)
-_HOLDDOWN_SHIFT = math.hypot(HOLDDOWN_STATION_TOL_MM, HOLDDOWN_STATION_TOL_MM)
+_HOLDDOWN_SHIFT = math.hypot(HOLDDOWN_X_TOL_MM, HOLDDOWN_STATION_TOL_MM)
 _HOLDDOWN_THRU_R = (HOLDDOWN_CLEARANCE_DIA + _DRILL_OVERSIZE_MM) / 2.0
 _HOLDDOWN_CBORE_R = (HOLDDOWN_CBORE_DIA + printed_band_mm(3, unit=UNIT)) / 2.0
 _HOLDDOWN_PIVOT_DIST = math.hypot(HOLDDOWN_LOCAL_X, HOLDDOWN_LOCAL_Z)
@@ -196,7 +197,7 @@ if min(HOLDDOWN_WEBS.values()) < WALL_TARGET_MM:
 _DOWEL_R = (TIP_DOWEL_HOLE_DIA + max(TIP_DOWEL_HOLE_BAND)) / 2.0
 _DOWEL_XZ = (TIP_DOWEL_LOCAL_X, TIP_DOWEL_LOCAL_Z)
 _DOWEL_SHIFT = math.hypot(
-    HOLDDOWN_STATION_TOL_MM + TIP_DOWEL_STATION_TOL_MM,
+    HOLDDOWN_X_TOL_MM + TIP_DOWEL_STATION_TOL_MM,
     HOLDDOWN_STATION_TOL_MM + _XX_MM,
 )
 _DOWEL_PIVOT_DIST = math.hypot(*_DOWEL_XZ)

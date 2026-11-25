@@ -58,7 +58,7 @@ part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
 material = "1018 cold-finished steel, 3/8 x 1-1/4 in flat (drawing: {{cad.material_spec}})"
 stock = "3/8 x 1-1/4 in flat bar; one blank {{process.blank_length_min_in:.2f}}–{{process.blank_length_max_in:.2f}} in long makes both straps."
-note = "Inches unless mm; G-code and console entries in mm (the files and the controller run G21). Finished {{cad.broad_face_b_thickness_min_in:.3dot}}–{{cad.broad_face_b_thickness_max_in:.3dot}} thick (face A to face B); face A is the bar's cold-finished face, left as bought. Speeds on the PM-30MV low belt (100–2800 rpm): no belt change. Home the mill ($H) and touch off G54 at the start of every mill setup: a FluidNC reset loses home. After any controller reset, stall or E-stop, home and touch off again before Cycle Start (Op 110 alone keeps G54: its face is already cut). Every file is proved in air before its first cut. Not on hand, to buy before the job: the .2510 reamer and the seat's two Class ZZ pins (.157 plus, .160 minus)."
+note = "Inches unless mm; G-code and console entries in mm (the files and the controller run G21). Finished {{cad.broad_face_b_thickness_min_in:.3dot}}–{{cad.broad_face_b_thickness_max_in:.3dot}} thick (face A to face B); face A is the bar's cold-finished face, left as bought. Speeds on the PM-30MV low belt (100–2800 rpm): no belt change. Home the mill ($H) and touch off G54 at the start of every mill setup: a FluidNC reset loses home. After any controller reset, stall or E-stop, home and touch off again before Cycle Start (Op 90 alone keeps G54: its face is already cut). Every file is proved in air before its first cut. Not on hand, to buy before the job: the .2510 reamer and the seat's two Class ZZ pins (.157 plus, .160 minus)."
 shop = "../shop"
 stock_refs = ["1018-flat-3-8x1-1-4"]
 material_key = "rocker-1018-cold-finished"
@@ -511,7 +511,7 @@ feed = "hand"
 
 [[setups.operations]]
 instruction = "G54 Z0: the seat flank, touched with the 1/8 in end mill on the flank clear of the seat."
-instruction_detailed = "Console M6 T7 (1/8 in end mill; the tool setter measures it). MDI G0 X20.000 Y-{{cad.follower_seat_station_mm:.3f}}: over the flank between the seat and the arbor bore. Spindle stopped, its tip just dragging a .002 feeler leaf on the flank: G10 L20 P1 Z0.051."
+instruction_detailed = "Console M6 T6 (1/8 in end mill; the tool setter measures it). MDI G0 X20.000 Y-{{cad.follower_seat_station_mm:.3f}}: over the flank between the seat and the arbor bore. Spindle stopped, its tip just dragging a .002 feeler leaf on the flank: G10 L20 P1 Z0.051."
 feed = "hand"
 
 [[setups.operations]]
@@ -535,7 +535,7 @@ speed_kind = "spindle"
 tool = "drill-26"
 drilling = "twist_drill"
 sizing = "other"
-instruction = "Same file, M6 T8: #26 drill into the seat, its point {{process.seat_drill_floor_gap_mm:in.3dot}} above the floor at Z {{process.seat_floor_z_mm:in.3f}}, no peck; set 1550. Cutting oil."
+instruction = "Same file, M6 T7: #26 drill into the seat, its point {{process.seat_drill_floor_gap_mm:in.3dot}} above the floor at Z {{process.seat_floor_z_mm:in.3f}}, no peck; set 1550. Cutting oil."
 rpm = 1550
 feed = "{{process.drill_26_feed_per_min_mm:in.1f}} in/min"
 hole_depth_mm = "{{cad.follower_seat_depth_mm}}"
@@ -549,7 +549,7 @@ speed_kind = "spindle"
 tool = "em-eighth"
 drilling = "none"
 sizing = "other"
-instruction = "Same file, M6 T7: the 1/8 in end mill plunges to the seat's floor at Z {{process.seat_floor_z_mm:in.4f}}, circles once at Ø{{process.seat_floor_dia_mm:in.3dot}} and once at Ø{{process.seat_finish_dia_mm:in.4dot}}, the band's middle (a plunged 1/8 cuts only .125); set 2800."
+instruction = "Same file, M6 T6: the 1/8 in end mill plunges to the seat's floor at Z {{process.seat_floor_z_mm:in.4f}}, circles once at Ø{{process.seat_floor_dia_mm:in.3dot}} and once at Ø{{process.seat_finish_dia_mm:in.4dot}}, the band's middle (a plunged 1/8 cuts only .125); set 2800."
 settings = "endmill-carbide-3fl-1-8-1018-cf-tru-edge"
 milling_cuts = [
   { name = "seat", kind = "plunge", phase = "finish", cutter_dia_mm = 3.175, flutes = 3, stations_mm = "{{cad.follower_seat_y_from_min_mm}}" },

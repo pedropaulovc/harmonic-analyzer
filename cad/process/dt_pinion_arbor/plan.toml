@@ -217,9 +217,11 @@ pin_far_side_max_in = 1.5413
 # .200, inside the window.
 pin_square_dti_mm = 0.089
 # Setup 7: the MHA-DT-14 strap's arbor bores, 5/16 drilled (.3125-.3165 at
-# the DRILLED HOLES row). A bore over strap_bore_max_fit_in leaves the
-# journals more than .003 even at journal_aim_in: stop and tell the owner.
-strap_bore_max_fit_in = 0.3147
+# the DRILLED HOLES row). The journals are accepted from A down to .0004
+# under it; strap_bore_max_fit_in is the largest bore for which that whole
+# window, at the journal_aim_in cap, stays inside the drawing's .001-.003
+# (.3117 + .003 - .0004). A bigger bore: stop and tell the owner.
+strap_bore_max_fit_in = 0.3143
 # Setup 7: the bond lands are made to the MHA-DT-01 drum's 5/16 drilled bore
 # (note 3, .002-.008 clear; owner ruling 2026-11-24, fit audit question 13):
 # they take the journals' aim A unless that leaves the drum's smaller end D
@@ -533,7 +535,7 @@ inspection = "Cross-hole rod upright within {{process.pin_square_dti_mm:.3f}} mm
 gauge_checks = [{ gauge = "dti", band_mm = [0.0, "{{process.pin_square_dti_mm}}"] }]
 
 [[setups.operations]]
-instruction = "The pin hole's GO does not pass, or the rod in the cross hole reads over {{process.pin_square_dti_mm:.3f}} mm: the arbor is scrap (a 1/16 hole cannot be opened in band or turned square by hand); start again from Setup 1."
+instruction = "The MHA-DT-VN-63 pin enters the pin hole by hand, or the rod in the cross hole reads over {{process.pin_square_dti_mm:.3f}} mm: the arbor is scrap (a 1/16 hole cannot be made smaller or turned square by hand); start again from Setup 1."
 feed = "hand"
 
 [[setups]]
@@ -687,7 +689,7 @@ cut_diameter_mm = "{{process.bar_dia_mm}}"
 [[setups.operations]]
 cut_kind = "other"
 instruction = "Measure both arbor bores of the MHA-DT-14 strap (the journals' mate) with the telescoping gauge and the 0–1 in micrometer (reads .0001), at each end of each bore; write the smallest reading S here. The aim A for the whole shaft is S − {{process.journal_clearance_aim_in:.3dot}}, never over {{process.journal_aim_in:.4dot}}: write A. Then measure the MHA-DT-01 drum's bore the same way at each end (the bond lands' mate); write the smaller reading D."
-inspection = "S at most {{process.strap_bore_max_fit_in:.4dot}}. Over it (the journals would run more than .003 loose at the {{process.journal_aim_in:.4dot}} limit): stop and tell the owner; the journals are not finished. D at least {{process.drum_bore_min_fit_in:.4dot}}: under it, stop and tell the owner."
+inspection = "S at most {{process.strap_bore_max_fit_in:.4dot}}. Over it (with A held at the {{process.journal_aim_in:.4dot}} limit, a journal .0004 under A would run more than .003 loose): stop and tell the owner; the journals are not finished. D at least {{process.drum_bore_min_fit_in:.4dot}}: under it, stop and tell the owner."
 gauge_checks = [{ gauge = "telescoping-gauges-starrett-s579gz", band_mm = [7.9375, 8.0391] }]
 
 [[setups.operations]]
@@ -923,6 +925,7 @@ feed = "hand"
 [[setups.operations]]
 instruction = "Spans: slide the MHA-DT-33 collar (made before this arbor) on from the back crown, by hand, over the back stub and on to the pin hole; slide it off again."
 inspection = "MHA-DT-33 slides on by hand over both spans (note 2: turned to the collar's bore). A tight spot: chuck the arbor again as in Setup 7 and skim that span only to A."
+gauge_checks = "other"
 feed = "hand"
 
 [[setups.operations]]
