@@ -29,6 +29,7 @@ AXLE_DRY_FITTED_KEY = "axle-dry-fitted"
 AXLE_BONDED_KEY = "axle-bonded"
 AXLE_HELD_KEY = "axle-held"
 AXLE_TRIAL_KEY = "axle-trial-fitted"
+TRIAL_WASHER_SEATED_KEY = "trial-washer-seated"
 AXLE_NUT_ON_THREAD_KEY = "trial-nut-on-thread"
 AXLE_CHECKED_KEY = "axle-checked"
 AXLE_SINK_RECORDED_KEY = "axle-sink-recorded"
@@ -70,14 +71,17 @@ STEPS: tuple[tuple[str, ...], ...] = (
     # cannot be re-pressed, so C11's trial stack can only be set dry, before
     # the bond. The axle goes in with
     # its plain end flush on the surface plate, the expected setting; the
-    # trial accepts on C11's three things to see: the first nut on thread,
+    # trial accepts on C11's three things to see, the first nut on thread,
     # the thread end inside DETAIL B and (the flush start, never pushed
-    # further) the plain end not proud. A short thread end slides the axle
-    # out by the shortfall to the window's middle and trials again; a part
-    # out of its limits, else the axle, is replaced.
+    # further) the plain end not proud, and on the front washer seated on
+    # the hub, which reads the shank step inside it (mg_wheel_group
+    # TRIAL_STEP_INSIDE_HUB_MIN). A short thread end slides the axle out by
+    # the shortfall to the window's middle and trials again from the seat; a
+    # part out of its limits, else the axle, is replaced.
     (AXLE_DRY_FITTED_KEY,),
     (
         AXLE_TRIAL_KEY,
+        TRIAL_WASHER_SEATED_KEY,
         "trial-feeler-placed",
         "trial-nuts-jammed",
         AXLE_NUT_ON_THREAD_KEY,

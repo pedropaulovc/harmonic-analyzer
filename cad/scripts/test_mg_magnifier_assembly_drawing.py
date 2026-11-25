@@ -179,8 +179,9 @@ def test_the_axle_is_set_to_the_trial_stack_and_accepted_at_the_nuts() -> None:
     assert "SETTING" not in stack.SETTING_CALLOUTS[stack.FEATURE][
         stack.BACK_END_SUNK_DIMENSION
     ][1]
-    # C11's first check, the first nut on thread, keeps the shank step inside
-    # the wheel hub whatever the parts measure.
+    # The shank step inside the wheel hub is read by the washer seat check
+    # (Codjiflo r1 of #3529): a conforming set passes it at the flush start
+    # and after a slide to DETAIL B's middle.
     assert mg_wheel_group.TRIAL_STEP_INSIDE_HUB_MIN > 0.0
     assert mg_wheel_group.TRIAL_ENDSHAKE_DROP == pytest.approx(
         2.0 * stack.ENDSHAKE_TOL
@@ -203,6 +204,7 @@ def test_the_axle_is_set_to_the_trial_stack_and_accepted_at_the_nuts() -> None:
     # #3344: the trial jams its nuts over the endshake's go feeler.
     assert trial_step == (
         steps.AXLE_TRIAL_KEY,
+        steps.TRIAL_WASHER_SEATED_KEY,
         "trial-feeler-placed",
         "trial-nuts-jammed",
         steps.AXLE_NUT_ON_THREAD_KEY,
@@ -213,6 +215,9 @@ def test_the_axle_is_set_to_the_trial_stack_and_accepted_at_the_nuts() -> None:
         "axle-replaced",
     )
     feeler = f"THE {notes.ENDSHAKE_GO_TEXT} FEELER BETWEEN {notes._WASHER}"
+    seated = notes.STEP_TEXT[steps.TRIAL_WASHER_SEATED_KEY]
+    assert seated.startswith(f"CHECK {notes._WASHER} LIES ON THE SPIGOT FACE")
+    assert "NO LIGHT" in seated
     assert feeler in notes.STEP_TEXT["trial-feeler-placed"]
     assert "FEELER" in notes.STEP_TEXT["trial-nuts-jammed"]
     assert "FEELER" in notes.STEP_TEXT["trial-parts-removed"]
@@ -233,7 +238,10 @@ def test_the_axle_is_set_to_the_trial_stack_and_accepted_at_the_nuts() -> None:
         assert not re.search(r"\.\d{3}", notes.STEP_TEXT[key]), key
     sunk = notes.STEP_TEXT["axle-sunk"]
     assert sunk.startswith("IF ONLY THE THREAD END FELL SHORT, RETURN TO STEP ")
-    assert f"STEP {steps.step_number('trial-nuts-jammed')} " in sunk
+    assert f"STEP {steps.step_number(steps.TRIAL_WASHER_SEATED_KEY)} " in sunk
+    assert f"STEP {steps.step_number(steps.TRIAL_WASHER_SEATED_KEY)}, " in (
+        notes.STEP_TEXT["stack-part-replaced"]
+    )
     assert "MIDDLE OF" in sunk and "CALIPER DEPTH ROD" in sunk
     assert notes.STEP_TEXT["trial-refitted"].endswith(
         f"RETURN TO STEP {steps.step_number(steps.AXLE_TRIAL_KEY)}."

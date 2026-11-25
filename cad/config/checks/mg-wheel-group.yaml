@@ -4,9 +4,9 @@ checks:
   - id: C-01
     check: "TRIAL_STEP_INSIDE_HUB_MIN"
     kind: gap
-    reason: "pin step clears the hub; wheel runs on thread"
-    source: "the module computes it: FULL_THREAD_FROM_STEP_MAX less the go leaf's ENDSHAKE_MIN less the thickest front washer, .009 in; owner ruling 2026-11-24, fit audit C11 (the axle set to the trial stack)"
-    basis: worst_case
+    reason: "washer grounds on the pin step; endshake not set"
+    source: "the module computes it: the step inside the hub at the trial's two settings, the flush start (spacer, back washer and hub less the shank less the bar's depth, .032 in) and the slide to DETAIL B's middle (thread less .0695, the go leaf, the thickest washer and nuts, .0145 in), so the washer seat check rejects no conforming set; owner ruling 2026-11-24, fit audit C11 (the axle set to the trial stack); Codjiflo r1 of #3529"
+    basis: after_setting
   - id: C-02
     check: "BAR_BOND_GAP"
     kind: gap

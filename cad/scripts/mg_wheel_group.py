@@ -27,6 +27,8 @@ import mg_wheel_bar_geom as _bar
 import mg_vn_wheel_axle_back_washer_spec as _back
 import mg_vn_wheel_axle_front_washer_spec as _front
 import mg_vn_wheel_axle_nut_spec as _nut
+from _fit_deviations import deviations
+from _printed_tolerance import printed_deviations
 from _recording_geometry import PEN_Z_MID
 from _mg_wheel_rim_geometry import RIM_WIRE_R
 
@@ -117,21 +119,46 @@ if THREAD_PAST_LOCKNUT_MAX > _pin.THREAD_PAST_LOCKNUT_LIMIT:
         f"{THREAD_PAST_LOCKNUT_MAX:.4f} of thread past the locknut "
         f"> {_pin.THREAD_PAST_LOCKNUT_LIMIT}"
     )
-# The trial (C11) accepts on three things to see, at the go leaf's endshake
-# (ENDSHAKE_MIN): the first nut ran on full thread down to the front washer,
-# the thread end inside DETAIL B (TIP_INCOMPLETE .. THREAD_PAST_LOCKNUT_LIMIT)
-# and the plain end not proud. The first: the nut's inner face past the
-# thread's full start, so the step stands inside the hub by at least the
-# full-thread run less the go leaf and the thickest washer. The second
-# bounds the thread end; the set endshake (up to ENDSHAKE_MAX) lowers it by
-# at most TRIAL_ENDSHAKE_DROP and never raises it, so the re-read after the
-# locknut can only fall short, and closing the endshake to the go leaf
-# restores the trial's reading.
-TRIAL_STEP_INSIDE_HUB_MIN = _pin.FULL_THREAD_FROM_STEP_MAX - ENDSHAKE_MIN - _FRONT[1]
+# The trial (C11) accepts on things to see, at the go leaf's endshake
+# (ENDSHAKE_MIN): the front washer seated on the hub's spigot face with no
+# light under it, the first nut ran on full thread down to it, the thread
+# end inside DETAIL B (TIP_INCOMPLETE .. THREAD_PAST_LOCKNUT_LIMIT) and the
+# plain end not proud. The seat is the shank step inside the hub, read
+# directly: the front washer's bore is under the shank's, so a step outside
+# the hub's front face grounds the washer on it and shows light. The nut
+# check alone does not bound the step (Codjiflo r1 of #3529): full thread
+# may start at the relief's MIN width, .028, so a nut on thread over the go
+# leaf and the thickest washer leaves the step up to .006 outside the hub.
+# TRIAL_STEP_INSIDE_HUB_MIN proves the seat check rejects no conforming set
+# at either setting the trial reaches: the flush start (the plain end on the
+# plate, the step the shank less the bar's depth off the bar's front face),
+# and a slide out to DETAIL B's middle after a short thread end (the step
+# then hangs off the nut stack: the thread less that reading, the go leaf,
+# the thickest washer and the thickest nuts). The set endshake (up to
+# ENDSHAKE_MAX) lowers the thread end by at most TRIAL_ENDSHAKE_DROP and
+# never raises it, so the re-read after the locknut can only fall short, and
+# closing the endshake to the go leaf restores the trial's reading.
+_SHANK_DEV = printed_deviations(_pin.SHANK_LEN, _pin.SHANK_LEN_PLACES, unit=_pin.UNIT)
+_DEPTH_DEV = printed_deviations(
+    _pin.BAR_DEPTH, _bar.BAR_DEPTH_PLACES, deviations(_bar.BAR_DEPTH_BAND), unit=_bar.UNIT
+)
+_FLUSH_STEP = (
+    (_pin.SHANK_LEN + _SHANK_DEV[0]) - (_pin.BAR_DEPTH + _DEPTH_DEV[1]),
+    (_pin.SHANK_LEN + _SHANK_DEV[1]) - (_pin.BAR_DEPTH + _DEPTH_DEV[0]),
+)  # 1.461 .. 1.491
+_HUB_FRONT = (
+    _spacer.LENGTH_LIMITS[0] + _BACK[0] + _HUB[0],
+    _spacer.LENGTH_LIMITS[1] + _BACK[1] + _HUB[1],
+)  # 1.523 .. 1.557
+TRIAL_SLIDE_TARGET = (_pin.TIP_INCOMPLETE + _pin.THREAD_PAST_LOCKNUT_LIMIT) / 2.0  # .0695
+TRIAL_STEP_INSIDE_HUB_MIN = min(
+    _HUB_FRONT[0] - _FLUSH_STEP[1],  # .032, flush
+    _THREAD[0] - TRIAL_SLIDE_TARGET - ENDSHAKE_MIN - _FRONT[1] - _NUTS[1],  # .0145, slid
+)
 TRIAL_ENDSHAKE_DROP = ENDSHAKE_MAX - ENDSHAKE_MIN
 if TRIAL_STEP_INSIDE_HUB_MIN <= 0.0:
     raise AssertionError(
-        f"a trial nut on thread no longer keeps the step in the hub: {TRIAL_STEP_INSIDE_HUB_MIN:.4f}"
+        f"a conforming trial stack fails the washer seat check: {TRIAL_STEP_INSIDE_HUB_MIN:.4f}"
     )
 
 # --- fits on the pin ------------------------------------------------------------------

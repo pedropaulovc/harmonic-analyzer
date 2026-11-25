@@ -410,6 +410,14 @@ STEP_TEXT = {
         f"THE ARBOR PRESS, UNTIL ITS PLAIN END MEETS {_PLATE}."
     ),
     _steps.AXLE_TRIAL_KEY: f"TRIAL-FIT {_STACK} ON {_AXLE}, IN THAT ORDER.",
+    # The shank step inside the hub, read directly (mg_wheel_group
+    # TRIAL_STEP_INSIDE_HUB_MIN; Codjiflo r1 of #3529): the washer's bore is
+    # under the shank's, so a step standing past the spigot face grounds the
+    # washer on it and shows light, the S4 drum seat's way of seeing a seat.
+    _steps.TRIAL_WASHER_SEATED_KEY: (
+        f"CHECK {_WASHER} LIES ON THE SPIGOT FACE WITH NO LIGHT UNDER IT, "
+        f"{_WHEEL} PUSHED TOWARD {_BAR}."
+    ),
     # The trial reads the thread end at the go leaf's endshake (#3344).
     "trial-feeler-placed": (
         f"SLIDE THE {ENDSHAKE_GO_TEXT} FEELER BETWEEN {_WASHER} AND THE SPIGOT FACE, "
@@ -418,10 +426,9 @@ STEP_TEXT = {
     "trial-nuts-jammed": (
         f"JAM BOTH {_NUT} NUTS ON {_AXLE} WITH THE FEELER JUST NIPPED."
     ),
-    # C11's three things to see: the first nut on thread (it also keeps the
-    # shank step inside the hub, mg_wheel_group.TRIAL_STEP_INSIDE_HUB_MIN),
-    # the thread end inside DETAIL B, the plain end not proud (the flush
-    # start, never pushed further in).
+    # C11's three things to see: the first nut on thread, the thread end
+    # inside DETAIL B, the plain end not proud (the flush start, never pushed
+    # further in). The step inside the hub is the washer seat's.
     _steps.AXLE_NUT_ON_THREAD_KEY: (
         f"CHECK THE FIRST NUT RAN DOWN TO {_WASHER} ON THREAD ALL THE WAY, "
         "NOT SPINNING ON THE RELIEF NECK."
@@ -432,17 +439,18 @@ STEP_TEXT = {
     ),
     # The one setting remedy: a short thread end moves the axle out, its
     # plain end sunk by the shortfall to the window's middle, and the trial
-    # runs again from the jammed nuts.
+    # runs again from the washer seat.
     "axle-sunk": (
         f"IF ONLY THE THREAD END FELL SHORT, RETURN TO "
-        f"{_step('trial-nuts-jammed')} WITH THE NUTS BACKED OFF AND {_AXLE} "
-        f"SLID OUT BY ITS SHORTFALL TO THE MIDDLE OF {ENDSHAKE_DETAIL_TITLE} "
+        f"{_step(_steps.TRIAL_WASHER_SEATED_KEY)} WITH THE NUTS AND FEELER OFF AND "
+        f"{_AXLE} SLID OUT BY ITS SHORTFALL TO THE MIDDLE OF {ENDSHAKE_DETAIL_TITLE} "
         "(ITS PLAIN END THAT FAR INSIDE THE BORE, CALIPER DEPTH ROD)."
     ),
     # A part outside its own limits, else the axle (its thread length, the
     # stack's last term), is replaced, so the loop always ends on a new part.
     "stack-part-replaced": (
-        f"IF {_step(_steps.AXLE_NUT_ON_THREAD_KEY)} OR "
+        f"IF {_step(_steps.TRIAL_WASHER_SEATED_KEY)}, "
+        f"{_step(_steps.AXLE_NUT_ON_THREAD_KEY)} OR "
         f"{_step(_steps.AXLE_CHECKED_KEY)} FAILS ANY OTHER WAY, REPLACE WHICHEVER OF "
         f"{_STACK_PARTS} MEASURES OUTSIDE ITS DRAWING OR CATALOGUE LIMITS."
     ),
