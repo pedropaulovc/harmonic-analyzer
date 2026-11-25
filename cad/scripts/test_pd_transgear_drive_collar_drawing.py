@@ -380,7 +380,8 @@ def test_the_knob_reversal_play_costs_a_fraction_of_a_millimetre_of_paper() -> N
 def test_the_flat_pin_ream_keeps_its_walls_and_stays_in_the_body() -> None:
     # The web to the -Y drive-pin hole and the hole's wall to the pilot
     # shoulder fall short of the target, over the floor, each printed as a
-    # MIN note (the shoulder wall RV-06, D6); the O.D. wall meets the target.
+    # MIN note (the shoulder wall RV-06, accepted .075 MIN by Main's delegated
+    # ruling of 2026-11-25); the O.D. wall meets the target.
     assert spec.FLAT_PIN_WEB_WORST == pytest.approx(0.074 * 25.4)
     assert spec.WALL_FLOOR <= spec.FLAT_PIN_WEB_WORST < spec.WALL_TARGET_MM
     assert f"{_in(spec.FLAT_PIN_WEB_WORST)} MIN" in spec.DRAWING_NOTES
@@ -388,7 +389,8 @@ def test_the_flat_pin_ream_keeps_its_walls_and_stays_in_the_body() -> None:
     # Traveler review 2026-11-25 on #3569: the wall runs from the shoulder's
     # corner to the hole's end, which is the #53 pilot's full diameter .005
     # past the shallowest floor (at the reamed hole's largest radius) and its
-    # 118-degree point, not the floor's edge (.0796 there).
+    # 118-degree point, not the floor's edge (.0796 there, the figure D6 took
+    # and the 2026-11-25 ruling supersedes).
     inch = 25.4
     corner = (0.380 / 2.0 - (0.118 + 0.002 + 0.0012)) * inch
     radius = spec._FLAT_PIN_HOLE_R_MAX

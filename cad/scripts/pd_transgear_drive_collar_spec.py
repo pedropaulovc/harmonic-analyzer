@@ -654,15 +654,17 @@ FLAT_PIN_SHOULDER_WALL_WORST = _distance_to_segment(
     _SHOULDER_CORNER,
     (_FLAT_PIN_HOLE_R_MAX, FLAT_PIN_DRILL_STATION_MIN),
     (0.0, FLAT_PIN_DRILL_TIP_MIN),
-)  # .0752 (.0796 from the floor's edge alone)
+)  # .0752
 # Under the .080 target, over the .060 floor: printed as note SHOULDER_NOTE
-# (rule 20) and declared as registry exception RV-06.  Delegated ruling
-# 2026-11-24 (Main), D6, following the owner's 2026-11-01 thin-wall ruling
-# (owner review on #2144,
-# https://github.com/pedropaulovc/harmonic-analyzer/issues/2144#issuecomment-7139937225),
-# accepted .0796 with the reading bias charged; the pilot drill's lead
-# restates it here (rule 20).  The printed MIN never falls under what RV-06
-# declares.
+# (rule 20) and declared as registry exception RV-06, accepted at .075 MIN by
+# delegated ruling 2026-11-25 (Main), precedent: the owner's 2026-11-01
+# ruling accepting this collar's pin-hole-to-rim wall under the target (owner
+# review on #2144,
+# https://github.com/pedropaulovc/harmonic-analyzer/issues/2144#issuecomment-7139937225).
+# It supersedes D6's .0796, which was taken at the reamed floor's edge: the
+# #53 pilot runs full diameter .005 past the floor (the drill is not stopped
+# short), and no geometry escape exists without moving the pin.  The printed
+# MIN never falls under what RV-06 declares.
 FLAT_PIN_SHOULDER_WALL_ACCEPTED = 1.905  # .075
 FLAT_PIN_SHOULDER_WALL_PRINTED = floor_inch(FLAT_PIN_SHOULDER_WALL_WORST)
 # The holes run through the body beside the pilot, never into it.
@@ -1027,7 +1029,7 @@ FIT_UP_NOTE = "\n".join(
 # the drive-pin holes are located to the wheels' holes, the trial of the
 # three wheels their acceptance (MHA-PD-00 tries them on).  Note 5: the
 # wall from the flat-pin hole's end (its pilot drill's point) across to the
-# pilot shoulder, under the target: exception RV-06 (D6), advisory under
+# pilot shoulder, under the target: exception RV-06 (Main, 2026-11-25), advisory under
 # rule 20; worded as a WALL so it is not read as the floor's depth.  The
 # drawing appends the two fitted lengths as the next two notes with their
 # assembly steps (draw_pd_transgear_drive_collar.FIT_NOTES).
