@@ -104,7 +104,13 @@ drill drills is not drawn (the drill's picture stands for it). The work stop
 is drawn as what it is, a round rod reaching in from its post beside the
 vise (its own key entry, not the supports' hatch), and named once, in the
 first picture that draws it, with when it is set; touch-off tools (the edge
-finder, the feeler) are not drawn in a cutting picture. Template pictures
+finder, the feeler) are not drawn in a cutting picture. Colour follows what
+moves (owner 2026-11-25: "shouldnt the tap t handle be yellow since it is
+arguably part of the cutter"): the tool's yellow covers the tool and all
+that turns or travels with it or is held in the spindle (cutter, drill, tap,
+the tap wrench or T-handle, the tap guide, a drill chuck where drawn, the
+edge finder); grey is the work's surroundings (the rest of the bar,
+hardware, fixtures); the work stop keeps its own entry. Template pictures
 (`data-cad-template`) are drawn by prechips; the column clamp's
 `clamp-half` takes `data-stop="rod"` or `"rod-labelled"`, and its
 `data-up="outside"` picture is `data-work="face"` for the setup, `"drill"` or
