@@ -216,8 +216,8 @@ neck_rough_start_z_in = 0.7672
 relief_rough_start_z_in = 6.75
 # Bench: the pin hole's station is read over the 1/16 drill's shank (miked),
 # the hole in the shaft: the station plus half the shank. The hole has no
-# gauge pin: an MHA-DT-VN-63 must drive, not enter by hand (necessity N-02,
-# kind bought_seat; fit audit F15). The cross hole's station is read over the
+# gauge pin: an MHA-DT-VN-63 must drive, not enter by hand (the hole's
+# acceptance; fit audit F15). The cross hole's station is read over the
 # MHA-DT-15 rod itself, miked (fit audit F14: the rod is its gauge).
 pin_shank_in = 0.0625
 pin_far_side_min_in = 1.5213

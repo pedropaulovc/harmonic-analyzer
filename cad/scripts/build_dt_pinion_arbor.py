@@ -37,16 +37,14 @@ from _sketch_circle import define_circle
 from _drawing_dimension_insert import add_diametric_linear_dimension
 from _drawing_precision import _named_dimension, apply_drawing_precision
 from _drawing_marks import apply_drawing_properties, clear_dimensions_for_drawing, mark_dimensions_for_drawing
-from _drawing_tolerances import set_dimension_bilateral_tolerance
 from _drawing_prefix import set_dimension_prefix
-from _fit_deviations import deviations
 from _gtol_cylinder import CylinderFace
 from _gtol_face_read import face_geometry
 from _gtol_face_resolve import resolve_faces
 from _part_pmi import author_part_pmi
 from solidworks_mcp.adapters.pywin32_adapter import null_callout
 from _saved_part_guard import require_saved_drawing_properties
-from dt_pinion_arbor_pin_spec import PIN_HOLE_DIA, PIN_HOLE_DIA_BAND
+from dt_pinion_arbor_pin_spec import PIN_HOLE_DIA
 from dt_pinion_arbor_spec import (
     BACK_RIM_FROM_HEAD_REAR,
     BACK_CAP_R,
@@ -85,7 +83,6 @@ from dt_pinion_arbor_spec import (
     SHAFT_DIA,
     SHAFT_LEN,
     SURFACE_FINISHES,
-    UNIT,
 )
 # The sheet's marked set: the spec's plus the two plain spans' diameters
 # (dt_pinion_arbor_notes), so dt_pinion_arbor_spec's other readers keep theirs.
@@ -1167,14 +1164,10 @@ def build(adapter) -> dict[str, str]:
     # two spans outside the journals: they are made to fit the MHA-DT-33
     # collar's drilled bore (machinist review r1, farm run 20261124T110807008Z;
     # drawing-guidelines rule 4, form 2), REF size below.  The crossrod
-    # hole prints the .2510 reamer's size and no band (fit audit F14).
-    set_dimension_bilateral_tolerance(
-        adapter,
-        "PinHoleProfile",
-        "PinHoleDia",
-        *deviations(PIN_HOLE_DIA_BAND),
-        display_unit=UNIT,
-    )
+    # hole prints the .2510 reamer's size and no band (fit audit F14), and
+    # the collar pin hole the 1/16 drill under the title block's DRILLED
+    # HOLES, its acceptance the MHA-DT-VN-63 drive trial (machinist round 1,
+    # farm 20261125T180203935Z).
     # One size for both journal lands, a REFERENCE: they are made to fit the
     # MHA-DT-14 bores, so the size carries no band (dt_pinion_arbor_notes).
     set_dimension_prefix(

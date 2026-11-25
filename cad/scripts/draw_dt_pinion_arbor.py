@@ -870,14 +870,14 @@ DIAMETER_BLOCK_SIZE = (0.027, 0.014)
 # length, whose head-end witness it once passed 5 mm right of, no longer
 # prints: each land end is its own station below the shaft.)  The underline still starts right of
 # detail A's view box (x 0.1928).
-# The band is ASME B18.8.2's recommended hole for the 1/16 slotted spring
-# pin (.062-.065; the title block's DRILLED HOLES row would open it to
-# .0665), which the pin grips by compressing into.  Fit audit F15 (necessity
-# N-02, kind bought_seat): the callout is the shared one
-# (dt_pinion_arbor_pin_spec.PIN_HOLE_CALLOUT, "1/16 DRILL THRU; /
-# MHA-DT-VN-63 MUST DRIVE, / NOT ENTER BY HAND"): the pin is its own gauge,
-# and the drive it must take answers R5's reading of the band as a clearance
-# fit (run 20261117T111407559Z) without a printed interference.
+# The hole prints the 1/16 drill under the title block's DRILLED HOLES
+# (.0625-.0665) and no band of its own: the drive trial is its acceptance
+# (machinist round 1, farm 20261125T180203935Z; rule 4, form 2).  Fit audit
+# F15: the callout is the shared one (dt_pinion_arbor_pin_spec.
+# PIN_HOLE_CALLOUT, "1/16 DRILL THRU; / MHA-DT-VN-63 MUST DRIVE, / NOT ENTER
+# BY HAND"): the pin is its own gauge, and the drive it must take answers
+# R5's reading of a band as a clearance fit (run 20261117T111407559Z)
+# without a printed interference.
 PIN_HOLE_CALLOUT = _PIN_HOLE_CALLOUT
 PIN_HOLE_CALLOUT_ADVANCE = 0.00267
 PIN_HOLE_CALLOUT_CENTRE_DX = 0.00075

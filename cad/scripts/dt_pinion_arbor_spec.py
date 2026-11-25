@@ -182,7 +182,7 @@ REFERENCE_SKETCHES = (
 )
 
 # #290 decimal-inch places.  Four on the 5/16 lands and bond zone (their
-# sub-.001 bands print exactly) and the 1/16 pin hole (.0625 +.0025/.0000);
+# sub-.001 bands print exactly) and the 1/16 pin hole (the drill's .0625);
 # three on the bonded cross hole (.250 +.005/+.001); two (.XX) on every other
 # length, station, diameter and crown radius, because the land, drum, pin,
 # web and run-out stacks read them.  The crown sags, the overall and the drum

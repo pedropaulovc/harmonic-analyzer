@@ -16,8 +16,3 @@ necessity:
     kind: gap
     reason: "F drill's gap exceeds Loctite 638's limit; 1/4 refuses rod"
     source: "fit audit F14; dt_pinion_arbor_geometry.CROSSROD_MAX_CLEARANCE"
-  - id: N-02
-    feature: "Ø.0625 +.0025/.0000 collar pin hole (1/16 DRILL THRU; MHA-DT-VN-63 MUST DRIVE, NOT ENTER BY HAND)"
-    kind: bought_seat
-    reason: "B18.8.2's recommended hole for the MHA-DT-VN-63 spring pin"
-    source: "ASME B18.8.2 (.062-.065 for 1/16); fit audit F15 (keep the band, the pin is the gauge)"

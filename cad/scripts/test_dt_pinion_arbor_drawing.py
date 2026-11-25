@@ -195,9 +195,9 @@ def test_only_the_two_journal_lands_carry_the_finish_and_no_band() -> None:
     assert spec.JOURNAL_DIA_BAND == (-0.01016, -0.0762)
     assert geometry.BOND_LAND_DIA_BAND == (-0.01016, -0.1016)
     assert spec.SHAFT_DIA_BAND == (-0.01016, -0.09652)
-    assert model_toleranced_dimensions(part) == {
-        ("PinHoleProfile", "PinHoleDia"): "*deviations(PIN_HOLE_DIA_BAND)",
-    }
+    # Nor does the collar pin hole: the 1/16 drill under DRILLED HOLES
+    # (machinist round 1, farm 20261125T180203935Z).
+    assert model_toleranced_dimensions(part) == {}
     lands = {
         "front_journal": spec.FRONT_JOURNAL_Z,
         "back_journal": spec.BACK_JOURNAL_Z,
@@ -1399,19 +1399,24 @@ def test_head_neighbours_clear_the_integral_head() -> None:
 def test_collar_pin_hole_is_a_drilled_spring_pin_hole_clear_of_the_front_land() -> None:
     """R1a (user, 2026-09-24): the MHA-DT-33 collar's 1/16 in spring-pin hole.
 
-    It prints the rig's functional band (not the title block's drilled-hole
-    band), stands at a .XX station from the head rear face, never enters the
-    front land or its Ra 63 run-out at the worst corner, and leaves the .080
-    in web target of steel beside it.
+    It prints the 1/16 drill under the title block's DRILLED HOLES (the drive
+    trial is its acceptance), stands at a .XX station from the head rear face,
+    never enters the front land or its Ra 63 run-out at the worst corner, and
+    leaves the .080 in web target of steel beside it.
     """
     import dt_pinion_arbor_pin_spec as pin_hole
     import dt_vn_pinion_strap_pin_spec as strap_pin
 
     # One pin family and one drill for the whole rig (pinioncluster's E-a).
     assert pin_hole.PIN_HOLE_DIA == strap_pin.HOLE_DIA == pytest.approx(25.4 / 16.0)
-    assert pin_hole.PIN_HOLE_DIA_BAND == strap_pin.HOLE_BAND
-    # The hole names the pin it takes, which is why its band beats the
-    # title block's drilled-hole row (codex machinist pass on pc-r8).
+    # Machinist round 1 (farm 20261125T180203935Z; rule 4, form 2): no band
+    # of its own, the title block's DRILLED HOLES (.0625-.0665); a hole the
+    # pin enters by hand fails the drive trial.
+    from _printed_tolerance import drilled_oversize_mm
+
+    assert pin_hole.PIN_HOLE_DIA_BAND == (drilled_oversize_mm(unit=pin_hole.UNIT), 0.0)
+    assert pin_hole.PIN_HOLE_DIA_MAX / 25.4 == pytest.approx(0.0665)
+    assert pin_hole.PIN_HOLE_DIA_BAND != strap_pin.HOLE_BAND
     import _config
 
     assert pin_hole.PIN_NUMBER == _config.parts("dt-vn-pinion-strap-pin")["number"]
@@ -1450,7 +1455,7 @@ def test_collar_pin_dimensions_stand_above_the_shaft_clear_of_the_front_ra() -> 
 
 def test_collar_pin_hole_callout_makes_the_pin_its_own_gauge() -> None:
     """R5 machinist review (blocker, rule 4) read '.0625 +.0025/.0000' as a
-    clearance fit on a 1/16 pin.  Fit audit F15 (necessity N-02, kind bought_seat):
+    clearance fit on a 1/16 pin.  Fit audit F15 (the pin is the gauge):
     the pin must drive, never enter by hand, so the callout says so and the
     pin is the gauge (no gauge pin, no printed interference)."""
     assert drawing.DIMENSION_CALLOUTS["PinHoleDia"].splitlines() == [

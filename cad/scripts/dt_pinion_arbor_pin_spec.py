@@ -16,6 +16,8 @@ from __future__ import annotations
 
 import dt_vn_pinion_strap_pin_spec as _pin
 from _inch_wall_limits import WALL_TARGET_MM
+from _printed_tolerance import drilled_oversize_mm
+from dt_pinion_arbor_geometry import UNIT
 from dt_pinion_arbor_spec import (
     FRONT_JOURNAL_FROM_HEAD_REAR,
     LAND_FINISH_RUNOUT,
@@ -27,16 +29,20 @@ from dt_pinion_arbor_spec import (
     SHAFT_DIA_BAND,
 )
 
-PIN_HOLE_DIA = _pin.HOLE_DIA
-PIN_HOLE_DIA_BAND = _pin.HOLE_BAND
-PIN_HOLE_DIA_MAX = _pin.HOLE_MAX
 # The hole's function is the pin it takes: the stock MHA-DT-VN-63 (McMaster
 # 98296A027), the third of its BOM line.  Both sheets that drill for it,
 # MHA-DT-22 and the MHA-DT-33 collar, print this one callout.  Fit audit F15
-# (necessity entries on both sheets, kind bought_seat; its recommended form "1/16 DRILL THRU;
-# MHA-DT-VN-63 MUST DRIVE, NOT ENTER BY HAND"): the pin itself is the gauge,
-# so no gauge pin is needed.  The +.0025/.0000 band stays: it is ASME
-# B18.8.2's recommended hole for the pin (necessity register, bought_seat).
+# (its recommended form "1/16 DRILL THRU; MHA-DT-VN-63 MUST DRIVE, NOT ENTER
+# BY HAND"): the pin itself is the gauge, so no gauge pin is needed.
+# Machinist round 1 (farm 20261125T180203935Z; drawing-guidelines rule 4,
+# form 2): the drive trial is the hole's acceptance, so MHA-DT-22's hole
+# prints the named drill under the title block's DRILLED HOLES, .0625-.0665,
+# and no band of its own.  The pin's free diameter is .066-.069, and a hole
+# the pin enters by hand fails the trial.  (The collar's hole keeps the strap
+# pin spec's band.)
+PIN_HOLE_DIA = _pin.HOLE_DIA
+PIN_HOLE_DIA_BAND = (drilled_oversize_mm(unit=UNIT), 0.0)  # DRILLED HOLES
+PIN_HOLE_DIA_MAX = PIN_HOLE_DIA + PIN_HOLE_DIA_BAND[0]
 # Three rows, at most 24 characters, for the arbor's crowded detail.
 PIN_NUMBER = "MHA-DT-VN-63"
 PIN_DRIVE_ROWS = f"{PIN_NUMBER} MUST DRIVE,\nNOT ENTER BY HAND"
