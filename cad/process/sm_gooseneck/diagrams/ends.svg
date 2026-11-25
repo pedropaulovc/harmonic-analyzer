@@ -1,28 +1,55 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 560" width="760" height="560" font-family="sans-serif" font-size="13">
-  <!-- Hand picture, side view, to scale at 3 px/mm from the tube's .500 O.D. (38.1 px)
-     and its bend's 3.000 centreline radius (features.toml; 228.6 px). The scribed line
-     at arm_line_mm 95.25 from the leg's outer side; the straight arm below it
-     arm_straight_ref 11.92 mm; the tail 2 in beyond it (tube_tail_mm 50.8).
-     Not on record, drawn schematic: the vise's jaw width and depth, the soft jaws,
-     the junior hacksaw's blade and kerf. The jaws are drawn on the straight arm only;
-     a deeper jaw meets the inside of the bend (a finding). -->
-  <rect class="paper" x="0" y="0" width="760" height="560"/>
-  <text class="title" x="20" y="24">Setup 7: the arm in the bench vise's soft jaws, the tail sawn off just outside the line (to scale, 3 px/mm)</text>
-  <path class="part-kept" d="M40 519.05L171.4 519.05A247.65 247.65 0 0 0 419.05 271.4L419.05 233.3L380.95 233.3L380.95 271.4A209.55 209.55 0 0 1 171.4 480.95L40 480.95L43 484.76L40 488.57L43 492.38L40 496.19L43 500L40 503.81L43 507.62L40 511.43L43 515.24Z"/>
-  <rect class="part-removed" x="380.95" y="80.9" width="38.1" height="152.4"/>
-  <line class="datum" x1="350.95" y1="233.3" x2="449.05" y2="233.3"/>
-  <text class="datum-label" x="543.05" y="237.3">the scribed line, 3.750 in</text>
-  <text class="datum-label" x="543.05" y="253.3">above the leg's outer side</text>
-  <path class="clamp" d="M380.95 234.3L380.95 271.4L310.95 271.4L307.95 267.69L310.95 263.98L307.95 260.27L310.95 256.56L307.95 252.85L310.95 249.14L307.95 245.43L310.95 241.72L307.95 238.01L310.95 234.3Z"/>
-  <path class="clamp" d="M419.05 234.3L489.05 234.3L492.05 238.01L489.05 241.72L492.05 245.43L489.05 249.14L492.05 252.85L489.05 256.56L492.05 260.27L489.05 263.98L492.05 267.69L489.05 271.4L419.05 271.4Z"/>
-  <text class="label" x="449.05" y="311.4">bench vise soft jaws on the arm's .47 in of</text>
-  <text class="label" x="449.05" y="327.4">straight (arm_straight_ref 11.92 mm) between</text>
-  <text class="label" x="449.05" y="343.4">the bend and the line</text>
-  <line class="leader" x1="447.05" y1="307.4" x2="449.05" y2="265.4"/>
-  <circle class="leader-dot" cx="449.05" cy="265.4" r="2"/>
-  <path class="cutter" d="M529.05 224.8L529.05 228.8L270.95 228.8L267.95 227.8L270.95 226.8L267.95 225.8L270.95 224.8Z"/>
-  <text class="label" x="270.95" y="204.8">junior hacksaw blade (schematic), cut square to the arm</text>
-  <text class="label" x="433.05" y="110.9">tail, 2 in, off</text>
-  <text class="label" x="60" y="466.95">leg</text>
-  <text class="label" x="20" y="540">Then the foot: the leg in the same jaws, sawn just outside its mark. Each end then filed into its band.</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 780" width="760" height="780" font-family="sans-serif" font-size="13">
+  <!-- Hand picture, to scale at 3 px/mm from the tube's .500 O.D. (stock_od_in; 38.1 px) and the bend's
+     3.000 centreline radius (features.toml bend; 228.6 px). Hold C, ruling D33 (delegated,
+     Main 2026-11-25): across the jaws the tube is .500 all along its planar bend, so the jaws
+     grip it over their whole depth. The scribed line arm_line_mm 95.25 from the leg's outer
+     side, arm_straight_ref 11.92 mm above the bend's tangent; the tail 2 in (tube_tail_mm).
+     Not on record, drawn schematic: the vise's jaw width (drawn 4 in) and depth (drawn 1 in),
+     the jaw tops' 1 mm below the line, the screw and slide, the soft jaws' thickness, the
+     junior hacksaw's blade and kerf, the packing's length. -->
+  <rect class="paper" x="0" y="0" width="760" height="780"/>
+  <text class="title" x="20" y="24">Setup 7: the arm in the soft jaws, the bend in their plane; the tail sawn off (to scale, 3 px/mm)</text>
+  <rect class="clamp" x="67.6" y="215.24" width="304.8" height="76.2"/>
+  <text class="label-on-clamp" x="190" y="233.24" text-anchor="middle">fixed jaw's face (soft jaw)</text>
+  <text class="label-on-clamp" x="190" y="249.24" text-anchor="middle">the moving jaw taken away</text>
+  <rect class="hidden" x="145" y="291.44" width="150" height="136.56"/>
+  <text class="label" x="151" y="315.44">screw and slide</text>
+  <text class="label" x="151" y="331.44">below the jaws</text>
+  <text class="label" x="151" y="347.44">(schematic)</text>
+  <rect class="fixture-support" x="67.6" y="215.24" width="38.1" height="76.2"/>
+  <text class="label" x="40" y="452">packing: a .500 piece of the trial tube at the</text>
+  <text class="label" x="40" y="468">jaws' left end, to keep them square</text>
+  <line class="leader" x1="60" y1="440" x2="86.65" y2="285.44"/>
+  <circle class="leader-dot" cx="86.65" cy="285.44" r="2"/>
+  <path class="part-kept" d="M334.3 212.24L334.3 248A247.65 247.65 0 0 0 581.95 495.65L740 495.65L737 491.84L740 488.03L737 484.22L740 480.41L737 476.6L740 472.79L737 468.98L740 465.17L737 461.36L740 457.55L581.95 457.55A209.55 209.55 0 0 1 372.4 248L372.4 212.24Z"/>
+  <rect class="part-removed" x="334.3" y="59.84" width="38.1" height="152.4"/>
+  <text class="label" x="384.4" y="79.84">tail, 2 in, off</text>
+  <line class="datum" x1="320.3" y1="212.24" x2="386.4" y2="212.24"/>
+  <text class="datum-label" x="442.4" y="234.24">the scribed line, 3.750 in above the</text>
+  <text class="datum-label" x="442.4" y="250.24">leg's outer side; the jaw tops just below</text>
+  <line class="leader" x1="440.4" y1="230.24" x2="388.4" y2="212.24"/>
+  <circle class="leader-dot" cx="388.4" cy="212.24" r="2"/>
+  <path class="cutter" d="M483.35 204.74L483.35 207.74L223.35 207.74L220.35 206.99L223.35 206.24L220.35 205.49L223.35 204.74Z"/>
+  <text class="label" x="384.4" y="177.74">junior hacksaw blade (schematic): just</text>
+  <text class="label" x="384.4" y="193.74">outside the line, square to the arm</text>
+  <text class="label" x="521.95" y="521.65">the bend sweeps out past the jaws' right</text>
+  <text class="label" x="521.95" y="537.65">end, clear of the screw and slide</text>
+  <text class="title" x="40" y="505">Across the jaws (looking along them), 3 px/mm</text>
+  <rect class="clamp" x="100.95" y="583" width="60" height="76.2"/>
+  <rect class="clamp" x="199.05" y="583" width="60" height="76.2"/>
+  <rect class="hidden" x="100.95" y="659.2" width="158.1" height="40"/>
+  <path class="part-removed" d="M160.95 580L160.95 520L164.76 517L168.57 520L172.38 517L176.19 520L180 517L183.81 520L187.62 517L191.43 520L195.24 517L199.05 520L199.05 580Z"/>
+  <path class="part-kept" d="M199.05 580L199.05 696.2L195.24 699.2L191.43 696.2L187.62 699.2L183.81 696.2L180 699.2L176.19 696.2L172.38 699.2L168.57 696.2L164.76 699.2L160.95 696.2L160.95 580Z"/>
+  <path class="cutter" d="M249.05 572.5L249.05 575.5L110.95 575.5L107.95 574.75L110.95 574L107.95 573.25L110.95 572.5Z"/>
+  <line class="datum" x1="146.95" y1="580" x2="213.05" y2="580"/>
+  <text class="label" x="279.05" y="610">the .500 tube between the two soft jaws,</text>
+  <text class="label" x="279.05" y="626">gripped over the jaws' whole depth:</text>
+  <text class="label" x="279.05" y="642">the bend lies in the jaws' plane</text>
+  <line class="leader" x1="277.05" y1="606" x2="195.05" y2="620"/>
+  <circle class="leader-dot" cx="195.05" cy="620" r="2"/>
+  <text class="label" x="100.95" y="717.2">moving jaw</text>
+  <text class="label" x="100.95" y="733.2"></text>
+  <text class="label" x="100.95" y="749.2"></text>
+  <text class="label" x="259.05" y="717.2" text-anchor="end">fixed jaw</text>
+  <text class="label" x="20" y="768">Then the foot: the leg in the same jaws, sawn just outside its mark. Each end then filed into its band.</text>
 </svg>

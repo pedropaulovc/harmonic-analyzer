@@ -598,7 +598,7 @@ machine = "Bench / mill table"
 indexing = "none"
 holding = "Bench vise, soft jaws, for sawing and filing; the mill table as the flat for the height gauge."
 datum = "The leg's outer side (the side away from the arm) for the reach; the arm's top for the overall height."
-diagram = { file = "diagrams/ends.svg", alt = "Side view, to scale: the arm in the bench vise's soft jaws on its .47 in of straight between the bend and the scribed line; the junior hacksaw's blade square to the arm just outside the line, the 2 in tail coming off." }
+diagram = { file = "diagrams/ends.svg", alt = "To scale, from the front with the moving jaw taken away: the arm in the bench vise's soft jaws at their right end, turned so the bend lies in the jaws' plane and sweeps out past that end, clear of the screw and slide; a .500 packing of the trial tube at the jaws' left end; the jaw tops just below the scribed line; the junior hacksaw's blade square to the arm just outside the line, the 2 in tail coming off. A small view across the jaws: the .500 tube between them." }
 envelope = "other"
 vise_hold = "other"
 beam = "other"
@@ -608,12 +608,20 @@ instruction = "Lay the leg on the table, its outer side down, between two 1-2-3 
 feed = "hand"
 diagram = { file = "diagrams/ends-reach.svg", alt = "The gooseneck lying on its leg on the table, the arm up: the height gauge over the arm's end reads the reach from the leg's outer side; the two 1-2-3 blocks against the leg's sides not drawn." }
 
+# Sawing the tail: D33 (delegated ruling 2026-11-25, Main, no precedent). The
+# arm is gripped with the bend lying in the plane between the jaws: across
+# the jaws the tube is .500 all along a planar bend, so the jaws grip it over
+# their whole depth and the jaw depth no longer matters (#3611; gripped the
+# other way, only the arm's .47 in of straight lies between the bend and the
+# line). The arm sits at one end of the jaws so the bend sweeps out past that
+# end, clear of the screw and slide; a packing of the same tube at the other
+# end keeps the jaws square.
 [[setups.operations]]
 speed_kind = "other"
 tool = "hacksaw"
 drilling = "none"
 sizing = "other"
-instruction = "Arm in the bench vise's soft jaws. Saw the tail off just outside the line, square to the arm."
+instruction = "Arm in the bench vise's soft jaws, turned so the bend lies between the jaws, in their plane: the arm at one end of the jaws, the bend sweeping out past that end, clear of the screw and slide below. A {{process.stock_od_in:.3dot}} packing (a piece of the trial tube) between the jaws at their other end keeps them square. The jaw tops just below the line. Saw the tail off just outside the line, square to the arm."
 feed = "hand"
 
 [[setups.operations]]
