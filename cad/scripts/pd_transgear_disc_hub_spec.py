@@ -38,13 +38,14 @@ target, over the .060 floor; the bore's callout states the least
 floor, under the target: the hub is Ø.540 to hold it (package minor RV-03).
 
 Printed lengths, from the spigot's end and the flange's rear face: the
-overall, spigot end to hub front face, and the spigot (both terms of the
-disc cluster's stack, +/-.001 for the collar air and the recess; the shims
-set the end float, owner ruling 2026-11-01, #2124; ``transgear_cluster_fit``
-owns the overall), and
-the flange .094 .XXX (the screw-tip-to-platen stack reads it).  The hub
-body's own length is the remainder and is not printed.  Decimal inch
-(#290): every nominal is the exact millimetre value of its printed inch.
+overall, spigot end to hub front face (a term of the disc cluster's stack,
++/-.001 for the recess; the shims set the end float, owner ruling
+2026-11-01, #2124; ``transgear_cluster_fit`` owns it), the spigot .144, a
+term of the same stack at the title block's .XXX row
+(``pd_transgear_disc_hub_geometry``), and the flange .094 .XXX (the
+screw-tip-to-platen stack reads it).  The hub body's own length is the
+remainder and is not printed.  Decimal inch (#290): every nominal is the
+exact millimetre value of its printed inch.
 
 Local frame (the build's, and the one the assembly mates): the gear axis is
 Z through the origin (``Axis1``).  ``Front Plane`` (z = 0) is the flange's
@@ -134,7 +135,7 @@ HUB_DIA = 13.716  # .540: the wall over the key pin's chord hole holds the floor
 HUB_DIA_PLACES = 3
 # The spigot (``pd_transgear_disc_hub_geometry``): made to the disc's bore,
 # its size REF and its clearance the requirement; the band is the analysis
-# band of that fit, its length the cluster's printed band.
+# band of that fit, its length's the title block's row.
 SPIGOT_DIA_MIN = SPIGOT_DIA + SPIGOT_DIA_BAND[1]
 SPIGOT_LENGTH_MIN = SPIGOT_LENGTH - SPIGOT_LENGTH_BAND
 SPIGOT_LENGTH_MAX = SPIGOT_LENGTH + SPIGOT_LENGTH_BAND
@@ -539,7 +540,7 @@ def _ligament_worst(radius: float) -> float:
     )
 
 
-KEY_PIN_LIGAMENT_WORST = _ligament_worst(_KEY_PIN_HOLE_MAX_R)  # .103
+KEY_PIN_LIGAMENT_WORST = _ligament_worst(_KEY_PIN_HOLE_MAX_R)  # .099
 OIL_HOLE_LIGAMENT_NOMINAL = min(
     KEY_PIN_STATION, HUB_BODY_LENGTH - KEY_PIN_STATION
 ) - OIL_HOLE_DIA / 2.0
@@ -662,11 +663,10 @@ BORE_CALLOUT_BELOW = "\n".join(
     )
 )
 BORE_NOTE_TEXT = f"{SLEEVE_NUMBER} IS TURNED TO THIS BORE."
-# The overall and the spigot's length both print the disc cluster's band and
-# serve one stack (rule 4): one note, named once, linked from both.
+# The overall prints the disc cluster's band and names the stack it serves
+# (rule 4), in one note its callout links.
 STACK_TEXT = f"{STACK_NAME}: SETS {COLLAR_NUMBER} TO {DISC_NUMBER} CLEARANCE."
 HUB_LENGTH_CALLOUT = f"SEE NOTE {STACK_NOTE}"
-SPIGOT_LENGTH_CALLOUT = f"SEE NOTE {STACK_NOTE}"
 # The flange's .XXX thickness sets the disc screws' reach (the cut window
 # in pd_transgear_disc_screw_spec reads it).
 FLANGE_THICK_CALLOUT = f"SETS {SCREW_NAME}\n{SCREW_NUMBER} REACH"
@@ -738,8 +738,8 @@ REFERENCE_SKETCHES = ("KeyPinReference",)
 # hole's station on the axis it shares with the oil hole, and the oil hole's
 # size (drawing-guidelines.md rule 12 (hole and slot callouts say what to do)); face view: the bore,
 # and the screw holes on their bolt circle; section A-A: the key pin's chord
-# hole, its ream, knockout, offset and stop.  The overall and the spigot
-# print the disc cluster's +/-.001.
+# hole, its ream, knockout, offset and stop.  The overall prints the disc
+# cluster's +/-.001; the spigot's length the title block's row.
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "HubProfile": {
         "FlangeDia",

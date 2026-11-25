@@ -103,7 +103,6 @@ from pd_transgear_disc_hub_spec import (
     SCREW_HOLE_DIA,
     SPIGOT_DIA,
     SPIGOT_LENGTH,
-    SPIGOT_LENGTH_BAND,
     UNIT,
 )
 
@@ -780,9 +779,10 @@ def build(adapter) -> dict[str, str]:
     # (drawing-guidelines.md rule 4: the mate is the gauge); the key pin's
     # chord carries its own band (it keeps the pin's air to the sleeve's
     # flat) and its stop the title block's row; the spigot is made to the
-    # disc's bore and prints REF with no band.  The overall and spigot
-    # lengths carry the disc cluster stack's printed band.  Every other size
-    # is governed by its places, the holes by the title block's DRILLED HOLES
+    # disc's bore and prints REF with no band.  The overall carries the disc
+    # cluster stack's printed band; the spigot's length, a term of the same
+    # stack, takes the title block's row.  Every other size is
+    # governed by its places, the holes by the title block's DRILLED HOLES
     # row (the spec's DRAWING_PRECISION).  All print in inches.
     set_dimension_symmetric_tolerance(
         adapter,
@@ -793,9 +793,6 @@ def build(adapter) -> dict[str, str]:
     )
     set_dimension_symmetric_tolerance(
         adapter, "HubProfile", "HubLength", HUB_LENGTH_BAND, display_unit=UNIT
-    )
-    set_dimension_symmetric_tolerance(
-        adapter, "HubProfile", "SpigotLength", SPIGOT_LENGTH_BAND, display_unit=UNIT
     )
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     clear_dimensions_for_drawing(adapter)
