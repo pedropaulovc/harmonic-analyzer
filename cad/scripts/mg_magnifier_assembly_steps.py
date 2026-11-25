@@ -137,8 +137,10 @@ STEPS: tuple[tuple[str, ...], ...] = (
     (
         AXLE_ACCEPTED_KEY,
         "locknut-backed-off",
+        "endshake-feeler-placed",
         "axle-endshake-closed",
-        "endshake-reset",
+        "endshake-feeler-removed",
+        "locknut-rejammed",
     ),
     # Lever group.
     (LEVER_THREADED_KEY,),

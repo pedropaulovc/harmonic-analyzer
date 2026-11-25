@@ -302,27 +302,42 @@ def test_the_axle_is_set_to_the_trial_stack_and_accepted_at_the_nuts() -> None:
         assert f"AND {spacer}." not in notes.STEP_TEXT[key]
     # The final reading has its own remedy: the set endshake only lowers the
     # thread end from the trial's reading, so a short one closes the endshake
-    # back to the go leaf the trial read at.
+    # back to the go leaf the trial read at, then the feeler comes out and
+    # the locknut, its re-check and this reading run again on that setting
+    # (Codjiflo r1 P2 of #3601: no step undoes another).
     accepted = order.index(steps.AXLE_ACCEPTED_KEY)
     assert accepted > order.index(steps.LOCKNUT_JAMMED_KEY)
     assert notes.STEP_TEXT[steps.AXLE_ACCEPTED_KEY].startswith("CHECK ")
     assert f"STEP {steps.step_number(steps.AXLE_CHECKED_KEY)}" in (
         notes.STEP_TEXT[steps.AXLE_ACCEPTED_KEY]
     )
-    assert order[accepted + 1 : accepted + 4] == (
+    assert order[accepted + 1 : accepted + 6] == (
         "locknut-backed-off",
+        "endshake-feeler-placed",
         "axle-endshake-closed",
-        "endshake-reset",
+        "endshake-feeler-removed",
+        "locknut-rejammed",
     )
     assert notes.STEP_TEXT["locknut-backed-off"] == "IF IT FALLS SHORT, LOOSEN THE SECOND NUT."
-    closed = notes.STEP_TEXT["axle-endshake-closed"]
-    assert closed.startswith("IF THE SECOND NUT WAS LOOSENED, TIGHTEN THE FIRST NUT ")
-    assert f"THE {notes.ENDSHAKE_GO_TEXT} FEELER BETWEEN" in closed
-    assert closed.endswith("IS JUST NIPPED.")
-    assert notes.STEP_TEXT["endshake-reset"] == (
-        "IF THE SECOND NUT WAS LOOSENED, RETURN TO "
-        f"STEP {steps.step_number(steps.ENDSHAKE_SET_KEY)}."
+    placed = notes.STEP_TEXT["endshake-feeler-placed"]
+    assert placed.startswith(
+        f"IF THE SECOND NUT WAS LOOSENED, SLIDE THE {notes.ENDSHAKE_GO_TEXT} FEELER BETWEEN "
     )
+    assert placed.endswith(f"{notes._WHEEL} PUSHED TOWARD {notes._BAR}.")
+    assert notes.STEP_TEXT["axle-endshake-closed"] == (
+        "IF THE SECOND NUT WAS LOOSENED, TIGHTEN THE FIRST NUT UNTIL THE FEELER IS "
+        "JUST NIPPED."
+    )
+    assert notes.STEP_TEXT["endshake-feeler-removed"] == (
+        "IF THE SECOND NUT WAS LOOSENED, REMOVE THE FEELER."
+    )
+    assert notes.STEP_TEXT["locknut-rejammed"] == (
+        "IF THE SECOND NUT WAS LOOSENED, RETURN TO "
+        f"STEP {steps.step_number(steps.LOCKNUT_JAMMED_KEY)}."
+    )
+    # No remedy returns to the endshake set, which would reset the closing.
+    for key in order[accepted + 1 : accepted + 6]:
+        assert f"STEP {steps.step_number(steps.ENDSHAKE_SET_KEY)}." not in notes.STEP_TEXT[key]
     # The endshake callout keeps one reason line; the steps carry the method.
     assert stack.SETTING_CALLOUTS[stack.FEATURE][stack.ENDSHAKE_DIMENSION] == (
         4, "WHEEL FREE, NO RATTLE"

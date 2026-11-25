@@ -554,14 +554,22 @@ STEP_TEXT = {
     # never past the high limit: a short final reading closes the endshake
     # back to the go leaf, where it reads what the trial read (the drop is
     # bounded by mg_wheel_group.TRIAL_ENDSHAKE_DROP, so no new limit).
-    # Loosen, close, return: one action per step (rule 22).
+    # Loosen, place the go leaf, close, remove it, return to the locknut so
+    # the jam, the endshake re-check and this reading all run again on the
+    # closed setting: one action per step, none undoing another (rule 22;
+    # Codjiflo r1 P2 of #3601: returning to the endshake set reset it).
     "locknut-backed-off": "IF IT FALLS SHORT, LOOSEN THE SECOND NUT.",
-    "axle-endshake-closed": (
-        f"IF THE SECOND NUT WAS LOOSENED, TIGHTEN THE FIRST NUT UNTIL THE "
-        f"{ENDSHAKE_GO_TEXT} FEELER BETWEEN {_WASHER} AND THE SPIGOT FACE IS JUST NIPPED."
+    "endshake-feeler-placed": (
+        f"IF THE SECOND NUT WAS LOOSENED, SLIDE THE {ENDSHAKE_GO_TEXT} FEELER BETWEEN "
+        f"{_WASHER} AND THE SPIGOT FACE, {_WHEEL} PUSHED TOWARD {_BAR}."
     ),
-    "endshake-reset": (
-        f"IF THE SECOND NUT WAS LOOSENED, RETURN TO {_step(_steps.ENDSHAKE_SET_KEY)}."
+    "axle-endshake-closed": (
+        "IF THE SECOND NUT WAS LOOSENED, TIGHTEN THE FIRST NUT UNTIL THE FEELER IS "
+        "JUST NIPPED."
+    ),
+    "endshake-feeler-removed": "IF THE SECOND NUT WAS LOOSENED, REMOVE THE FEELER.",
+    "locknut-rejammed": (
+        f"IF THE SECOND NUT WAS LOOSENED, RETURN TO {_step(_steps.LOCKNUT_JAMMED_KEY)}."
     ),
     # The setting names the instrument that reads it (rule 22).
     _steps.LEVER_THREADED_KEY: (
