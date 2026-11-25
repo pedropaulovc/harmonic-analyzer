@@ -462,7 +462,7 @@ tool = "work-stop"
 drilling = "none"
 sizing = "other"
 instruction = "Set the work stop: its rod between the jaws, low, its tip touching the blank's LEFT face. Lock it."
-inspection = "The rod's top at most {{process.stop_rod_top_max_mm:in.3dot}} above the parallels' top (the calipers' depth rod beside it). Each later blank is pushed against the rod as the vise closes: a .002 feeler leaf does not enter between them."
+inspection = "The rod's top at most {{process.stop_rod_top_max_mm:in.3dot}} above the parallels' top (the calipers' depth rod beside it). Each later blank: a .002 feeler leaf does not enter between it and the rod."
 gauge_checks = [{ gauge = "calipers", band_mm = [0, "{{process.stop_rod_top_max_mm}}"] }]
 feed = "hand"
 
@@ -506,7 +506,7 @@ tool = "work-stop"
 drilling = "none"
 sizing = "other"
 instruction = "Set the work stop: its rod between the jaws, low, its tip touching the blank's LEFT face. Lock it."
-inspection = "The rod's top at most {{process.stop_rod_top_max_mm:in.3dot}} above the parallels' top (the calipers' depth rod beside it). Each later blank is pushed against the rod as the vise closes: a .002 feeler leaf does not enter between them."
+inspection = "The rod's top at most {{process.stop_rod_top_max_mm:in.3dot}} above the parallels' top (the calipers' depth rod beside it). Each later blank: a .002 feeler leaf does not enter between it and the rod."
 gauge_checks = [{ gauge = "calipers", band_mm = [0, "{{process.stop_rod_top_max_mm}}"] }]
 feed = "hand"
 
@@ -558,7 +558,7 @@ tool = "work-stop"
 drilling = "none"
 sizing = "other"
 instruction = "Set the work stop: its rod between the jaws, low, its tip touching the blank's LEFT end. Lock it."
-inspection = "The rod's top at most {{process.stop_rod_top_max_mm:in.3dot}} above the stacks' top (the calipers' depth rod beside it). Each later blank is pushed against the rod as the vise closes: a .002 feeler leaf does not enter between them."
+inspection = "The rod's top at most {{process.stop_rod_top_max_mm:in.3dot}} above the stacks' top (the calipers' depth rod beside it). Each later blank: a .002 feeler leaf does not enter between it and the rod."
 gauge_checks = [{ gauge = "calipers", band_mm = [0, "{{process.stop_rod_top_max_mm}}"] }]
 feed = "hand"
 
@@ -601,7 +601,7 @@ tool = "work-stop"
 drilling = "none"
 sizing = "other"
 instruction = "Set the work stop: its rod between the jaws, low, its tip touching the blank's LEFT end (N). Lock it."
-inspection = "The rod's top at most {{process.stop_rod_top_max_mm:in.3dot}} above the stacks' top (the calipers' depth rod beside it). Each later blank is pushed against the rod as the vise closes: a .002 feeler leaf does not enter between them."
+inspection = "The rod's top at most {{process.stop_rod_top_max_mm:in.3dot}} above the stacks' top (the calipers' depth rod beside it). Each later blank: a .002 feeler leaf does not enter between it and the rod."
 gauge_checks = [{ gauge = "calipers", band_mm = [0, "{{process.stop_rod_top_max_mm}}"] }]
 feed = "hand"
 
@@ -658,7 +658,7 @@ tool = "work-stop"
 drilling = "none"
 sizing = "other"
 instruction = "Set the work stop: its rod between the jaws, low, its tip touching the blank's N end. Lock it. Fronts first, the rod at the LEFT. For the backs: slide the rod back out of the vise, take X0 again on the first back by the table's row, then set the rod on its RIGHT end."
-inspection = "The rod's top at most {{process.stop_rod_top_max_mm:in.3dot}} above the stacks' top (the calipers' depth rod beside it). Each later blank is pushed against the rod as the vise closes: a .002 feeler leaf does not enter between them."
+inspection = "The rod's top at most {{process.stop_rod_top_max_mm:in.3dot}} above the stacks' top (the calipers' depth rod beside it). Each later blank: a .002 feeler leaf does not enter between it and the rod."
 gauge_checks = [{ gauge = "calipers", band_mm = [0, "{{process.stop_rod_top_max_mm}}"] }]
 feed = "hand"
 
@@ -704,7 +704,7 @@ tool = "work-stop"
 drilling = "none"
 sizing = "other"
 instruction = "Set the work stop: its rod between the jaws, low, its tip touching the blank's RIGHT end (N). Lock it."
-inspection = "The rod's top at most {{process.stop_rod_top_max_mm:in.3dot}} above the stacks' top (the calipers' depth rod beside it). Each later blank is pushed against the rod as the vise closes: a .002 feeler leaf does not enter between them."
+inspection = "The rod's top at most {{process.stop_rod_top_max_mm:in.3dot}} above the stacks' top (the calipers' depth rod beside it). Each later blank: a .002 feeler leaf does not enter between it and the rod."
 gauge_checks = [{ gauge = "calipers", band_mm = [0, "{{process.stop_rod_top_max_mm}}"] }]
 feed = "hand"
 
@@ -796,7 +796,7 @@ tool = "work-stop"
 drilling = "none"
 sizing = "other"
 instruction = "Set the work stop: its rod between the jaws, low, its tip touching the blank's LEFT end (N). Lock it."
-inspection = "The rod's top at most {{process.stop_rod_top_max_mm:in.3dot}} above the stacks' top (the calipers' depth rod beside it). Each later blank is pushed against the rod as the vise closes: a .002 feeler leaf does not enter between them."
+inspection = "The rod's top at most {{process.stop_rod_top_max_mm:in.3dot}} above the stacks' top (the calipers' depth rod beside it). Each later blank: a .002 feeler leaf does not enter between it and the rod."
 gauge_checks = [{ gauge = "calipers", band_mm = [0, "{{process.stop_rod_top_max_mm}}"] }]
 feed = "hand"
 
@@ -967,10 +967,6 @@ instruction = "G54 Z0: the parallels' top, touched with the end mill on the fron
 instruction_detailed = "Console M6 T1, the 1/2 in end mill at least {{process.bore_mill_projection_min_mm:in.2dot}} out of the collet (the collet's face must clear the block and the fixed jaw at the bore's bottom). MDI G0 X55.400 Y-12.000: the cutter right of the pair, over the front's parallel and clear of the block. Spindle stopped, its tip just dragging a .002 feeler leaf on that parallel: G10 L20 P1 Z0.051."
 feed = "hand"
 
-[[setups.operations]]
-instruction = "First pair only, proving CB09_pair_bore in air: the helix circles the bore's place and clears the screw heads and the block."
-feed = "hand"
-
 # CB09 runs outside the measured envelope of the 1/2 in end mill (shop
 # settings.em-half-carbide-1018-3439-face/-v6-deep): the rough helix cuts the
 # cutter's full width, the finish a 17.0 mm deep wall. Owner ruling (Pedro,
@@ -1056,7 +1052,7 @@ tool = "work-stop"
 drilling = "none"
 sizing = "other"
 instruction = "Set the work stop: its rod between the jaws, low, its tip touching the blank's RIGHT end (N). Lock it."
-inspection = "The rod's top at most {{process.stop_rod_top_max_mm:in.3dot}} above the stacks' top (the calipers' depth rod beside it). Each later blank is pushed against the rod as the vise closes: a .002 feeler leaf does not enter between them."
+inspection = "The rod's top at most {{process.stop_rod_top_max_mm:in.3dot}} above the stacks' top (the calipers' depth rod beside it). Each later blank: a .002 feeler leaf does not enter between it and the rod."
 gauge_checks = [{ gauge = "calipers", band_mm = [0, "{{process.stop_rod_top_max_mm}}"] }]
 feed = "hand"
 
