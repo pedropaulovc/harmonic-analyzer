@@ -202,19 +202,20 @@ def _plunge(xy: tuple[float, float], top: float, z: float, clear: float) -> list
 
 
 def _face(top: float, z: float, y: float, x: float, clear: float) -> list[str]:
-    """Two X passes at ``z``: the cutter's centre at Y +``y`` along +X, then
-    at Y -``y`` along -X, from and to ``x`` either side of the hub (off it);
-    both conventional, the hub on the cutter's right. The entry rapids to
+    """Two X passes at ``z``: the cutter's centre at Y +``y`` along -X, then
+    at Y -``y`` along +X, from and to ``x`` either side of the hub (off it);
+    both conventional with the M3 spindle, the hub on the cutter's left (the
+    side em-half-carbide-1018-3439-face was measured on). The entry rapids to
     SAFE_MM over ``top``, the end's highest, off the hub."""
     clear = _r(clear)
     return [
         f"G0 Z{clear:.3f}",
-        f"G0 X{_r(-x):.3f} Y{_r(y):.3f}",
+        f"G0 X{_r(x):.3f} Y{_r(y):.3f}",
         f"G0 Z{_r(top + SAFE_MM):.3f}",
         f"G1 Z{_r(z):.3f} F{{feed}}",
-        f"G1 X{_r(x):.3f}",
-        f"G1 Y{_r(-y):.3f}",
         f"G1 X{_r(-x):.3f}",
+        f"G1 Y{_r(-y):.3f}",
+        f"G1 X{_r(x):.3f}",
         f"G0 Z{clear:.3f}",
     ]
 
@@ -556,6 +557,19 @@ def context(
             ],
             ["rapids_clear", {"z_top": supply_top}],
             ["air_feed", {"z_top": supply_top}],
+            [
+                "engagement",
+                {
+                    "stock": [
+                        [-land_max / 2, land_max / 2],
+                        [-land_max / 2, land_max / 2],
+                        [_r(height), supply_top],
+                    ],
+                    "radius": radius,
+                    "max_radial": woc,
+                    "side": "conventional",
+                },
+            ],
             ["keep_out", {"radius": radius, "boxes": boxes}],
         ]
 

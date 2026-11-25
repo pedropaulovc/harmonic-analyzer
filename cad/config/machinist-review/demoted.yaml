@@ -9,6 +9,11 @@ demoted:
   ch_channel_assembly: fit-batch-ch
   ch_channel_lever: fit-batch-ch
   ch_pivot_bracket: fit-batch-ch
+  # Hand-over farm run 20261124T175053911Z on 4bce4b3e08 read FIX on its last
+  # review round (strap thickness .098 ±.001 to be made to the MHA-CH-03 fork,
+  # the same finding as ch_rocker_strap; issue #3583). Owner ruling
+  # 2026-11-24, main during fit conversion: "better to be able to cut
+  # releases with known issues than to hold unreleased code".
   ch_rocker_arm: fit-batch-ch
   ch_rocker_strap: fit-batch-ch
   dt_alignment_pinion: fit-batch-dt

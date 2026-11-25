@@ -22,10 +22,10 @@
   <text class="label" x="470" y="172">gap block</text>
   <text class="label" x="632" y="148">tip block</text>
   <!-- The two passes along X at Y +r and -r. -->
-  <line class="arrow" x1="350" y1="119" x2="410" y2="119"/>
-  <line class="arrow" x1="410" y1="141" x2="350" y2="141"/>
+  <line class="arrow" x1="410" y1="119" x2="350" y2="119"/>
+  <line class="arrow" x1="350" y1="141" x2="410" y2="141"/>
   <line class="leader" x1="410" y1="119" x2="440" y2="40"/>
-  <text class="label" x="444" y="40">cutter path: Y +{{process.face_pass_y_mm:in.3dot}} along +X, then Y −{{process.face_pass_y_mm:in.3dot}} along −X</text>
+  <text class="label" x="444" y="40">cutter path: Y +{{process.face_pass_y_mm:in.3dot}} along −X, then Y −{{process.face_pass_y_mm:in.3dot}} along +X (conventional)</text>
   <text class="label" x="20" y="200">X0 Y0: edge finder on the hub's top end, both sides each way. The arm may lie either end to the right.</text>
   <text class="label" x="20" y="232">Section through the hub</text>
   <!-- Gap blocks (broken: 2 in tall) under the strap. -->
