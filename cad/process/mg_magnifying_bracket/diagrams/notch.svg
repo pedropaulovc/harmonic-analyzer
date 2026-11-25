@@ -1,40 +1,61 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 400" font-family="sans-serif" font-size="13">
-  <!-- Setup 4: lying across the jaws on the stacks, L down, the seat on the fixed jaw, a rod at the sawn end; MB03 faces H and mills the notch's upper half. Left: from above, 2.3 px/mm; right: a section through the notch, 4 px/mm. -->
+  <!-- Setup 4: lying across the jaws on the stacks, L down, the seat on the fixed jaw, a rod at the sawn end; MB03 faces H and mills the notch's upper half. Left: from above, 1.8 px/mm; right: a section through the notch at the pass drawn, 4 px/mm. -->
   <rect class="paper" x="0" y="0" width="760" height="400"/>
   <text class="title" x="20" y="20">Setup 4 (MB03_notch): H, then the notch's upper half</text>
-  <rect class="clamp" x="60" y="40" width="205" height="20"/>
-  <text class="label-on-clamp" x="162.4" y="55" text-anchor="middle">fixed jaw</text>
-  <rect class="part-kept" x="100" y="60" width="124.8" height="279.2"/>
-  <rect class="part-removed" x="129.9" y="67.3" width="94.9" height="245.7"/>
-  <rect class="holes" x="201.1" y="60" width="6" height="9.6"/>
-  <rect class="holes" x="169.6" y="60" width="6" height="9.6"/>
-  <circle class="part-rest" cx="162.4" cy="346.5" r="7.3"/>
-  <rect class="clamp" x="60" y="353.8" width="205" height="20"/>
-  <text class="label-on-clamp" x="162.4" y="368.8" text-anchor="middle">moving jaw</text>
-  <circle class="datum" cx="100" cy="60" r="3.5"/>
-  <text class="datum-label" x="20" y="80">X0 O, Y0</text>
-  <text class="datum-label" x="20" y="96">the seat</text>
-  <line class="leader" x1="160" y1="200" x2="280" y2="120"/>
-  <circle class="leader-dot" cx="160" cy="200" r="2"/>
-  <text class="label" x="280" y="116">the notch, open at F (right)</text>
-  <line class="leader" x1="129.9" y1="250" x2="280" y2="250"/>
-  <circle class="leader-dot" cx="129.9" cy="250" r="2"/>
-  <text class="label" x="280" y="254">the neck's wall, {{process.neck_stock_mm:in.3dot}} full</text>
-  <line class="leader" x1="190" y1="67.3" x2="280" y2="80"/>
-  <circle class="leader-dot" cx="190" cy="67.3" r="2"/>
-  <text class="label" x="280" y="84">foot's underside: last a climb pass</text>
-  <line class="leader" x1="162.4" y1="346.5" x2="280" y2="346.5"/>
-  <circle class="leader-dot" cx="162.4" cy="346.5" r="2"/>
-  <text class="label" x="280" y="350.5">the rod, at the sawn end</text>
-  <text class="label" x="470" y="230">Section through the notch:</text>
+  <!-- From above, the fixed jaw at the top, 1.8 px/mm: the jaws to scale
+       (vise_jaw_width_mm 158.67), the blank 54.26 x 121.92 (the longest),
+       the 1 in + 1/2 in stacks 4 in long and 1/8 thick lying along the jaws
+       (one against the fixed jaw, one under the sawn end, flush with it),
+       showing past the blank's sides; the rod (rod_dia_mm 6.35) between the
+       sawn end and the moving jaw, under nothing. -->
+  <rect class="clamp" x="66.0" y="50" width="285.6" height="20"/>
+  <text class="label-on-clamp" x="208.8" y="64" text-anchor="middle">fixed jaw</text>
+  <rect class="fixture-support" x="117.4" y="70" width="182.9" height="5.7"/>
+  <rect class="fixture-support" x="117.4" y="283.7" width="182.9" height="5.7"/>
+  <rect class="part-kept" x="160" y="70" width="97.7" height="219.5"/>
+  <circle class="part-rest" cx="208.8" cy="295.2" r="5.71"/>
+  <rect class="clamp" x="66.0" y="300.9" width="285.6" height="20"/>
+  <text class="label-on-clamp" x="208.8" y="314.9" text-anchor="middle">moving jaw</text>
+  <rect class="part-removed" x="183.4" y="75.7" width="74.3" height="192.3"/>
+  <rect class="holes" x="239.1" y="70" width="4.75" height="5.7"/>
+  <rect class="holes" x="214.4" y="70" width="4.75" height="5.7"/>
+  <!-- The 1/2 in end mill to scale (face_cutter_dia_mm 12.7 = 22.9 px) on
+       H's face pass at Y -24.128, mid-way along it, passing -X; the same
+       place in the section. -->
+  <circle class="cutter" cx="208.6" cy="113.4" r="11.43"/>
+  <line class="arrow" x1="194.6" y1="113.4" x2="168.6" y2="113.4"/>
+  <circle class="datum" cx="160" cy="70" r="3.5"/>
+  <text class="datum-label" x="20" y="84">X0 O, Y0</text>
+  <text class="datum-label" x="20" y="100">the seat</text>
+  <line class="leader" x1="230" y1="220" x2="380" y2="150"/>
+  <circle class="leader-dot" cx="230" cy="220" r="2"/>
+  <line class="leader" x1="183.4" y1="250" x2="70" y2="334"/>
+  <circle class="leader-dot" cx="183.4" cy="250" r="2"/>
+  <text class="label" x="20" y="348">the neck's wall, {{process.neck_stock_mm:in.3dot}} full</text>
+  <line class="leader" x1="228.4" y1="76.0" x2="400" y2="80"/>
+  <circle class="leader-dot" cx="228.4" cy="76.0" r="2"/>
+  <line class="leader" x1="208.8" y1="295.2" x2="120" y2="372"/>
+  <text class="label" x="20" y="386">the rod Ø.25, at the sawn end</text>
+  <line class="leader" x1="125.4" y1="73.0" x2="70" y2="148"/>
+  <line class="leader" x1="125.4" y1="286.5" x2="70" y2="160"/>
+  <text class="label" x="20" y="144">1 in + 1/2 in</text>
+  <text class="label" x="20" y="174">stacks</text>
+  <text class="label" x="380" y="76">foot's underside:</text>
+  <text class="label" x="380" y="92">last a climb pass</text>
+  <text class="label" x="380" y="146">the notch, open at F</text>
+  <text class="label" x="380" y="196">1/2 in end mill, to scale,</text>
+  <text class="label" x="380" y="212">on H's pass at Y −24.1</text>
+  <line class="leader" x1="219.6" y1="117.4" x2="376" y2="200"/>
+  <text class="title" x="470" y="125">Section through the notch at that pass:</text>
   <rect class="part-kept" x="470" y="279.2" width="217" height="50.8"/>
   <rect class="part-removed" x="470" y="279.2" width="217" height="3.2"/>
   <rect class="part-removed" x="522" y="282.4" width="165" height="22.6"/>
   <line class="active-face" x1="470" y1="282.4" x2="687" y2="282.4"/>
   <line class="hidden" x1="470" y1="330" x2="687" y2="330"/>
+  <path class="cutter" d="M603.4 276.3L603.4 168.6L552.6 168.6L552.6 276.3A25.4 6.1 0 0 0 603.4 276.3Z"/>
   <text class="label" x="470" y="350">O</text>
   <text class="label" x="680" y="350">F</text>
-  <text class="label" x="470" y="270">H at Z {{process.high_level_mm:in.4dot}}</text>
+  <text class="label" x="620" y="270">H at Z {{process.high_level_mm:in.4dot}}</text>
   <text class="label" x="530" y="322">floor Z {{process.notch_split_mm:in.3dot}}</text>
   <text class="datum-label" x="470" y="380">Z0 the stacks' top (L)</text>
 </svg>

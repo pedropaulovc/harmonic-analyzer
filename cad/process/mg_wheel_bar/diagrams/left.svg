@@ -1,32 +1,44 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 780 430" font-family="sans-serif" font-size="13">
   <rect class="paper" x="0" y="0" width="780" height="430"/>
-  <text class="title" x="20" y="20">Setup 3, section across the jaws at a hole, from the RIGHT end (1 in = 100 px)</text>
+  <text class="title" x="20" y="20">Setup 3, from the LEFT end: the end mill in front of it (1 in = 100 px)</text>
   <line class="fixture-table" x1="60" y1="400" x2="400" y2="400"/>
+  <!-- Seen from the left end the fixed jaw is on the LEFT. The jaws grip
+       lying_grip_mm 6.845 of the bar's .375 (jaw tops 27 px above F). -->
   <rect class="clamp" x="131" y="223" width="60" height="177"/>
-  <rect class="clamp" x="275" y="223" width="60" height="177"/>
-  <text class="label-on-clamp" x="137" y="390">moving</text>
-  <text class="label-on-clamp" x="285" y="390">fixed</text>
-  <!-- Both 1 + 1/2 in stacks side by side against the moving jaw; the .125 pin on them at edge B. -->
-  <rect class="fixture-support" x="191" y="250" width="12.5" height="150"/>
-  <rect class="fixture-support" x="203.5" y="250" width="12.5" height="150"/>
-  <circle class="fixture-support" cx="197.25" cy="243.75" r="6.25"/>
-  <rect class="part-kept" x="203.5" y="212.5" width="71.5" height="37.5"/>
-  <rect class="holes" x="246" y="212.5" width="18.65" height="37.5"/>
-  <rect class="cutter" x="246.5" y="110" width="17.6" height="70"/>
-  <line class="arrow" x1="255.3" y1="90" x2="255.3" y2="108"/>
-  <line class="centre-line" x1="255.3" y1="200" x2="255.3" y2="275"/>
-  <line class="datum" x1="80" y1="250" x2="150" y2="250"/>
+  <rect class="clamp" x="287.5" y="223" width="60" height="177"/>
+  <text class="label-on-clamp" x="146" y="390">fixed</text>
+  <text class="label-on-clamp" x="291" y="390">moving</text>
+  <!-- Both 1 + 1/2 in stacks (1.5 in) side by side against the moving jaw;
+       the .125 pin on them at edge B; the bar .840 across (T at the fixed
+       jaw), .375 thick, F down. -->
+  <rect class="fixture-support" x="262.5" y="250" width="12.5" height="150"/>
+  <rect class="fixture-support" x="275" y="250" width="12.5" height="150"/>
+  <circle class="fixture-support" cx="281.25" cy="243.75" r="6.25"/>
+  <rect class="part-kept" x="191" y="212.5" width="84" height="37.5"/>
+  <!-- The 1/2 in end mill to scale (face_cutter_dia_mm 12.7 = 50 px),
+       half_mill_projection_mm 28.45 (112 px) out of the collet, in front of
+       the bar's end on its last side pass at X -6.35 (its side on X0),
+       mid-way across the bar (Y -10.668), its tip end_past_mm .020 under F,
+       passing -Y (toward the moving jaw). Square end drawn as the near half
+       of the end face, 12 % deep. The collet is not drawn (its size is not
+       on record). -->
+  <path class="cutter" d="M258.0 246.0L258.0 140.0L208.0 140.0L208.0 246.0A25.0 6.0 0 0 0 258.0 246.0Z"/>
+  <line class="arrow" x1="215" y1="125" x2="252" y2="125"/>
+  <text class="label" x="262" y="129">−Y, conventional</text>
+  <line class="leader" x1="225" y1="160" x2="120" y2="96"/>
+  <text class="label" x="20" y="74">1/2 in end mill's side on the left end,</text>
+  <text class="label" x="20" y="90">1.12 out of the collet, the full depth at once</text>
+  <line class="datum" x1="80" y1="250" x2="125" y2="250"/>
   <text class="datum-label" x="30" y="246">Z0 (F)</text>
-  <line class="datum" x1="275" y1="196" x2="275" y2="222"/>
-  <text class="datum-label" x="300" y="214">Y0 (T)</text>
-  <line class="dims" x1="255.3" y1="195" x2="275" y2="195"/>
-  <line class="leader" x1="265" y1="195" x2="298" y2="178"/>
-  <text class="label" x="300" y="182">holes {{cad.axle_bore_height_in:.3dot}} from T</text>
-  <line class="leader" x1="257" y1="262" x2="257" y2="410"/>
-  <text class="label" x="252" y="422" text-anchor="end">each drill exits here, in the air</text>
-  <line class="leader" x1="197" y1="237" x2="160" y2="200"/>
-  <text class="label" x="60" y="196">.125 pin at B</text>
-  <text class="label" x="262" y="422">both stacks at the moving jaw, under B</text>
+  <line class="datum" x1="191" y1="196" x2="191" y2="222"/>
+  <text class="datum-label" x="120" y="200">Y0 (T)</text>
+  <line class="leader" x1="236" y1="252" x2="236" y2="300"/>
+  <text class="label-halo" x="190" y="314">tip .020 under F</text>
+  <line class="leader" x1="281" y1="238" x2="330" y2="200"/>
+  <text class="label" x="334" y="200">.125 pin at B</text>
+  <line class="leader" x1="270" y1="370" x2="360" y2="370"/>
+  <text class="label" x="364" y="366">both 1 + 1/2 in stacks at the moving jaw,</text>
+  <text class="label" x="364" y="382">under B, inside the jaws' sides</text>
   <!-- Plan, fixed jaw at the top, 1 in = 25 px. -->
   <text class="title" x="430" y="60">Plan (fixed jaw at the top, 1 in = 25 px)</text>
   <rect class="clamp" x="472.5" y="110" width="156.2" height="30"/>
@@ -35,7 +47,8 @@
   <rect class="part-kept" x="461.5" y="140" width="232.25" height="21"/>
   <circle class="holes" cx="466.5" cy="144.9" r="2.3"/>
   <circle class="holes" cx="521.5" cy="144.9" r="2.3"/>
-  <circle class="cutter" cx="455.1" cy="150.5" r="6.35"/>
+  <!-- The same end mill, the same place: Ø.5 = 12.5 px. -->
+  <circle class="cutter" cx="455.25" cy="150.5" r="6.25"/>
   <line class="arrow" x1="442" y1="115" x2="442" y2="185"/>
   <text class="label" x="530" y="207">left end: passes −Y (the arrow)</text>
   <line class="datum" x1="461.5" y1="90" x2="461.5" y2="135"/>
@@ -48,6 +61,7 @@
   <line class="dims" x1="461.5" y1="250" x2="521.5" y2="250"/>
   <line class="dims" x1="521.5" y1="165" x2="521.5" y2="255"/>
   <text class="label" x="470" y="268">axle {{cad.axle_bore_station_mm:in.4f}}</text>
-  <text class="label" x="430" y="320">hanger #15 at {{cad.hanger_hole_station_in:.3f}}; axle #17, ream .1865 at {{cad.axle_bore_station_mm:in.4f}},</text>
-  <text class="label" x="430" y="338">both from the left end, inside the jaws' reach</text>
+  <text class="label" x="430" y="300">hanger #15 at {{cad.hanger_hole_station_in:.3f}}; axle #17, ream .1865</text>
+  <text class="label" x="430" y="316">at {{cad.axle_bore_station_mm:in.4f}}, both from the left end, .197 from T;</text>
+  <text class="label" x="430" y="332">each drill and the reamer: its own op's picture</text>
 </svg>

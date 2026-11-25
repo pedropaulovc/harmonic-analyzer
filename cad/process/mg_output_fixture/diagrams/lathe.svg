@@ -1,24 +1,40 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 400" font-family="sans-serif" font-size="13">
   <rect class="paper" x="0" y="0" width="760" height="400"/>
-  <text class="title" x="20" y="20">Setup 1: the 7/16 hex bar in the 3-jaw, .95 out; the spigot end made on the bar (lengths to scale)</text>
-  <rect class="fixture-vise" x="104" y="90" width="120" height="220"/>
-  <rect class="part-rest" x="40" y="138" width="64" height="124"/>
-  <rect class="part-rest" x="224" y="138" width="110" height="124"/>
-  <rect class="part-kept" x="334" y="138" width="226" height="124"/>
-  <rect class="part-kept" x="560" y="150" width="120" height="100"/>
-  <path class="part-removed" d="M 600 150 A 11 11 0 0 0 622 150 Z"/>
-  <path class="part-removed" d="M 600 250 A 11 11 0 0 1 622 250 Z"/>
-  <rect class="holes" x="445" y="191" width="235" height="18"/>
+  <text class="title" x="20" y="20">Setup 1: the 7/16 hex bar in the 3-jaw, .95 out; Op 10 faces the end (to scale, 300 px/in)</text>
+  <!-- To scale, 300 px/in along and across the axis: the hex across its
+       corners (12.83 mm), the spigot Ø0.421 x .25, the FULL R groove
+       (the R.024 groover, root Ø.327) .138 from the face, the #43 hole
+       Ø.089 x .49. The 3-jaw's jaws and body are schematic (their sizes are
+       not on record); the jaw fronts .95 behind the spigot face. The AR turning tool is schematic: its size is not on record. -->
+  <rect class="fixture-vise" x="215.0" y="60" width="60" height="280"/>
+  <rect class="clamp" x="275.0" y="84.2" width="40" height="40"/>
+  <rect class="clamp" x="275.0" y="275.8" width="40" height="40"/>
+  <rect class="part-rest" x="40" y="124.2" width="344.0" height="151.6"/>
+  <rect class="part-kept" x="384.0" y="124.2" width="141.0" height="151.6"/>
+  <rect class="part-kept" x="525.0" y="136.9" width="75" height="126.2"/>
+  <rect class="part-removed" x="525.0" y="124.2" width="81" height="12.7"/>
+  <rect class="part-removed" x="525.0" y="263.1" width="81" height="12.7"/>
+  <rect class="part-removed" x="600.0" y="136.9" width="6" height="126.2"/>
+  <path class="part-removed" d="M551.5 136.9L551.5 143.8A7.2 7.2 0 0 0 565.9 143.8L565.9 136.9Z"/>
+  <path class="part-removed" d="M551.5 263.1L551.5 256.2A7.2 7.2 0 0 1 565.9 256.2L565.9 263.1Z"/>
+  <path class="holes" d="M600.0 186.6L453.0 186.6L445.0 200.0L453.0 213.4L600.0 213.4Z"/>
   <line class="centre-line" x1="20" y1="200" x2="740" y2="200"/>
-  <line class="active-face" x1="680" y1="150" x2="680" y2="250"/>
-  <line class="datum" x1="680" y1="110" x2="680" y2="290"/>
-  <rect class="cutter" x="690" y="194" width="50" height="12"/>
-  <line class="dims" x1="224" y1="340" x2="680" y2="340"/>
-  <text class="label" x="420" y="334">.95 out of the jaws</text>
-  <text class="label" x="640" y="104">Z0 spigot face</text>
-  <text class="label" x="420" y="280">spigot Ø.42 × .25</text>
-  <text class="label" x="420" y="296">FULL R groove .14 from the face</text>
-  <text class="label" x="300" y="124">hex 7/16 (stock)</text>
-  <text class="label" x="240" y="316">#43 .49 deep from the tailstock; 4-40 plug, then bottoming tap</text>
-  <text class="label" x="40" y="375">The part (.72 long) is parted off in Setup 3, after the cross bore (Setup 2): the bar stays whole until then.</text>
+  <!-- Op 10, the setup's first cut: the AR tool facing the end toward the
+       centre, about .020 off (the removed strip at the face). Schematic. -->
+  <path class="cutter" d="M600 236L632 250L632 352L607 352L607 262Z"/>
+  <line class="arrow" x1="652" y1="336" x2="652" y2="262"/>
+  <text class="label" x="662" y="300">facing to</text>
+  <text class="label" x="662" y="316">the centre</text>
+  <line class="datum" x1="600" y1="90" x2="600" y2="120"/>
+  <text class="datum-label" x="560" y="84">Z0 spigot face</text>
+  <line class="dims" x1="315.0" y1="360" x2="600" y2="360"/>
+  <line class="dims" x1="315.0" y1="317.8" x2="315.0" y2="366"/>
+  <text class="label" x="400" y="354">.95 out of the jaws</text>
+  <line class="leader" x1="565" y1="140.9" x2="560" y2="96"/>
+  <text class="label" x="380" y="70">spigot Ø.42 × .25, FULL R groove .14 from the face</text>
+  <line class="leader" x1="520" y1="200" x2="480" y2="104"/>
+  <text class="label" x="240" y="100">#43 .49 deep from the tailstock; 4-40 plug, then bottoming</text>
+  <text class="label" x="240" y="116">tap (each tool in its own op's picture)</text>
+  <text class="label-halo" x="60" y="240">hex 7/16 (stock)</text>
+  <text class="label" x="40" y="385">The part (.72 long) is parted off in Setup 3, after the cross bore (Setup 2): the bar stays whole until then.</text>
 </svg>

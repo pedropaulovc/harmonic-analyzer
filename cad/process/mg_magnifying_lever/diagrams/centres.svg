@@ -1,33 +1,41 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 300" width="760" height="300">
-  <rect class="paper" x="0" y="0" width="760" height="300"/>
-  <text class="title" x="20" y="24">Between the 3-jaw and the dead centre: end B's thread cut toward the chuck (not to scale)</text>
-  <rect class="fixture-vise" x="20" y="60" width="70" height="180"/>
-  <rect class="clamp" x="90" y="110" width="50" height="27"/>
-  <rect class="clamp" x="90" y="163" width="50" height="27"/>
-  <rect class="part-kept" x="60" y="137" width="230" height="26"/>
-  <line class="dims" x1="290" y1="131" x2="302" y2="169"/>
-  <line class="dims" x1="302" y1="131" x2="314" y2="169"/>
-  <rect class="part-kept" x="314" y="137" width="96" height="26"/>
-  <rect class="part-threads" x="410" y="137" width="200" height="26"/>
-  <rect class="part-kept" x="610" y="143" width="40" height="14"/>
-  <path class="clamp" d="M640 150 L680 128 L740 128 L740 172 L680 172 Z"/>
-  <rect class="cutter" x="621" y="70" width="14" height="70"/>
-  <line class="centre-line" x1="10" y1="150" x2="750" y2="150"/>
-  <line class="datum" x1="530" y1="100" x2="530" y2="210"/>
-  <text class="datum-label" x="472" y="96">Z0 end B's plane</text>
-  <line class="dims" x1="410" y1="222" x2="530" y2="222"/>
-  <line class="dims" x1="410" y1="214" x2="410" y2="230"/>
-  <text class="label" x="380" y="248">thread .70–.72 from Z0</text>
-  <text class="label" x="548" y="240">stub: sawn off in Setup 4</text>
-  <line class="dims" x1="600" y1="228" x2="590" y2="165"/>
-  <text class="label" x="560" y="44">bit starts at Z+.40,</text>
-  <text class="label" x="560" y="60">over the pilot, in air</text>
-  <line class="dims" x1="600" y1="64" x2="621" y2="90"/>
-  <text class="label" x="628" y="200">dead centre, oiled</text>
-  <line class="dims" x1="700" y1="188" x2="710" y2="172"/>
-  <text class="label" x="640" y="92">pilot Ø.18</text>
-  <line class="dims" x1="650" y1="96" x2="640" y2="143"/>
-  <text class="label" x="20" y="270">3-jaw over a shim wrap on end A</text>
-  <line class="dims" x1="100" y1="258" x2="110" y2="190"/>
-  <text class="label" x="150" y="120">the 7.2 in rod (break)</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 400" font-family="sans-serif" font-size="13">
+  <rect class="paper" x="0" y="0" width="760" height="400"/>
+  <text class="title" x="20" y="20">Setup 3: between the 3-jaw and the dead centre, the threading bit at Z+.40 over the pilot (to scale, 300 px/in)</text>
+  <!-- To scale, 300 px/in: the Ø.250 rod, end B's plane Z0, the stub to Z+.50
+       with its Ø.18 pilot from Z+.30, the thread to Z-.72. The LMS 6685 bit
+       is 5/16 square (tools.threading-bits-lms-6685): 93.75 px, its 60 deg
+       point at the thread's minor (Ø.19) over the pilot at Z+.40, its right
+       side .025 past the stub's end. Its length out of the holder is not on
+       record (break line). The rod's 7.2 in shown with a break; the 3-jaw
+       and the dead centre's body schematic (not on record). -->
+  <!-- The 3-jaw, schematic (its jaws' and body's sizes are not on record):
+       its jaw fronts to scale from the part. -->
+  <rect class="fixture-vise" x="30.0" y="70" width="60" height="260"/>
+  <rect class="clamp" x="90.0" y="126.5" width="40" height="36"/>
+  <rect class="clamp" x="90.0" y="237.5" width="40" height="36"/>
+  <path class="part-kept" d="M40.0 162.5L190.0 162.5L193.0 166.7L190.0 170.8L193.0 175.0L190.0 179.2L193.0 183.3L190.0 187.5L193.0 191.7L190.0 195.8L193.0 200.0L190.0 204.2L193.0 208.3L190.0 212.5L193.0 216.7L190.0 220.8L193.0 225.0L190.0 229.2L193.0 233.3L190.0 237.5L40.0 237.5Z"/>
+  <path class="part-kept" d="M560.0 162.5L205.0 162.5L208.0 166.7L205.0 170.8L208.0 175.0L205.0 179.2L208.0 183.3L205.0 187.5L208.0 191.7L205.0 195.8L208.0 200.0L205.0 204.2L208.0 208.3L205.0 212.5L208.0 216.7L205.0 220.8L208.0 225.0L205.0 229.2L208.0 233.3L205.0 237.5L560.0 237.5Z"/>
+  <rect class="part-kept" x="560.0" y="173.0" width="60.0" height="54.0"/>
+  <rect class="part-threads" x="254.0" y="162.5" width="216.0" height="75.0"/>
+  <path class="holes" d="M620.0 186.5L596.6 200L620.0 213.5Z"/>
+  <path class="clamp" d="M602.6 200L654.6 170L744.6 170L744.6 230L654.6 230Z"/>
+  <line class="leader" x1="694.6" y1="170" x2="694.6" y2="134"/>
+  <text class="label" x="600" y="112">dead centre, oiled,</text>
+  <text class="label" x="600" y="128">in the stub's centre hole</text>
+  <path class="cutter" d="M590.0 228.5L627.5 293.5L627.5 380.0L623.6 383.0L619.7 380.0L615.8 383.0L611.9 380.0L608.0 383.0L604.1 380.0L600.2 383.0L596.2 380.0L592.3 383.0L588.4 380.0L584.5 383.0L580.6 380.0L576.7 383.0L572.8 380.0L568.9 383.0L565.0 380.0L561.1 383.0L557.2 380.0L553.3 383.0L549.4 380.0L545.5 383.0L541.6 380.0L537.7 383.0L533.8 325.9Z"/>
+  <line class="arrow" x1="523.8" y1="345" x2="463.8" y2="345"/>
+  <line class="centre-line" x1="20" y1="200" x2="740" y2="200"/>
+  <line class="datum" x1="470" y1="96" x2="470" y2="140"/>
+  <text class="datum-label" x="400" y="90">Z0 end B's plane</text>
+  <line class="leader" x1="110" y1="273.5" x2="120" y2="352"/>
+  <text class="label" x="20" y="366">3-jaw over a shim wrap on end A, .60 in the jaws</text>
+  <text class="label" x="150" y="140">the 7.2 in rod (break)</text>
+  <line class="dims" x1="254.0" y1="262" x2="470" y2="262"/>
+  <line class="dims" x1="254.0" y1="239.5" x2="254.0" y2="268"/>
+  <line class="dims" x1="470" y1="239.5" x2="470" y2="268"/>
+  <text class="label" x="254.0" y="284">thread .70–.72 from Z0, cut toward the chuck</text>
+  <line class="leader" x1="580.0" y1="173.0" x2="560.0" y2="150"/>
+  <text class="label" x="520.0" y="146">pilot Ø.18</text>
+  <text class="label" x="270" y="312">LMS 6685 5/16 bit, its point at</text>
+  <text class="label" x="270" y="328">Z+.40 in air over the pilot</text>
 </svg>

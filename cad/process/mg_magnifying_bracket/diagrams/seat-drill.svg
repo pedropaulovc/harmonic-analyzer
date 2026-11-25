@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 400" font-family="sans-serif" font-size="13">
+  <!-- Setup 3: the #37 drill down through the foot. Left: looking along the jaws from the right end, 2 px/mm, as the setup picture; right: the top of the blank at 8 px/mm, and the seat from above, 3 px/mm. -->
+  <rect class="paper" x="0" y="0" width="760" height="400"/>
+  <text class="title" x="20" y="20">Setup 3 (MB02_seat): the #37 drill through the foot, at mounting hole 1</text>
+  <rect class="fixture-vise" x="40" y="385" width="200" height="12"/>
+  <rect class="clamp" x="77" y="295.1" width="60" height="89.9"/>
+  <rect class="clamp" x="162.4" y="295.1" width="60" height="89.9"/>
+  <text class="label-on-clamp" x="107" y="312" text-anchor="middle">moving</text>
+  <text class="label-on-clamp" x="192.4" y="312" text-anchor="middle">fixed</text>
+  <rect class="part-kept" x="137" y="144.2" width="25.4" height="240.8"/>
+  <line class="hidden" x1="137" y1="150.5" x2="162.4" y2="150.5"/>
+  <!-- The #37 drill to scale (cutter_dia_mm 2.6416), its full diameter
+       mount_drill_past_mm 1.0 past the foot's underside, its 118 deg point
+       at mount_tip_z_mm -4.969; drawn short to a break line (its length out
+       of the chuck is not on record; drill_37_oal_mm 57.15 is its whole
+       length). -->
+  <path class="cutter" d="M151.8 90.0L151.8 152.6L149.1 154.1L146.5 152.6L146.5 90.0L147.8 87.0L149.1 90.0L150.4 87.0Z"/>
+  <text class="label" x="250" y="300">jaw tops: the lower {{process.vise_jaw_height_mm:in.2dot}} gripped</text>
+  <text class="label" x="250" y="380">on the vise bed, no parallels</text>
+  <!-- The top of the blank, 8 px/mm: L (the fixed jaw, Y0) on the right. -->
+  <text class="title" x="380" y="50">The top of the blank, 8 px/mm:</text>
+  <rect class="part-kept" x="480.0" y="110" width="101.6" height="100"/>
+  <line class="hidden" x1="480.0" y1="135.4" x2="581.6" y2="135.4"/>
+  <path class="cutter" d="M539.1 60.0L539.1 143.4L528.5 149.8L517.9 143.4L517.9 60.0L521.4 57.0L525.0 60.0L528.5 57.0L532.0 60.0L535.5 57.0Z"/>
+  <line class="arrow" x1="504.5" y1="64" x2="504.5" y2="96"/>
+  <line class="datum" x1="581.6" y1="100" x2="581.6" y2="210.0"/>
+  <text class="datum-label" x="587.6" y="122">Y0 (L)</text>
+  <line class="datum" x1="469.6" y1="110" x2="485.6" y2="110"/>
+  <text class="datum-label" x="431.6" y="114">Z0</text>
+  <line class="leader" x1="577.6" y1="135.4" x2="611.6" y2="150.0"/>
+  <text class="label" x="615.6" y="146.0">the foot's underside</text>
+  <text class="label" x="615.6" y="162.0">{{cad.foot_underside_thickness_in:.3dot}} down</text>
+  <line class="leader" x1="528.5" y1="149.8" x2="611.6" y2="190.0"/>
+  <text class="label" x="615.6" y="186.0">the point in the</text>
+  <text class="label" x="615.6" y="202.0">notch's waste</text>
+  <text class="label" x="380" y="236">#37 through the foot, one plunge, its full diameter</text>
+  <text class="label" x="380" y="252">{{process.mount_drill_past_mm:in.3dot}} past the underside; {{cad.mounting_hole_1_lateral_in:.3dot}} from L once L is faced</text>
+  <text class="label" x="470" y="286">The seat from above:</text>
+  <rect class="part-kept" x="470" y="300" width="162.8" height="38.1"/>
+  <line class="datum" x1="632.8" y1="294" x2="632.8" y2="344"/>
+  <text class="datum-label" x="638.8" y="342">X0: F</text>
+  <circle class="cutter" cx="605.8" cy="319.9" r="3.96"/>
+  <circle class="holes" cx="564.7" cy="319.9" r="3.96"/>
+  <line class="leader" x1="605.8" y1="324" x2="560" y2="370"/>
+  <text class="label" x="470" y="384">the #37 in hole 1; hole 2 the same</text>
+</svg>

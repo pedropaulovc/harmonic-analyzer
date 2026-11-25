@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 400" font-family="sans-serif" font-size="13">
+  <rect class="paper" x="0" y="0" width="760" height="400"/>
+  <text class="title" x="20" y="20">Setup 7: the ball turner sweeps end A's SR.125 tip, its pivot .125 behind the faced plane (to scale, 300 px/in)</text>
+  <!-- To scale, 300 px/in: the rod and the SR.125 tip, the pivot on the axis
+       one radius (37.5 px) behind the faced plane, the outer frame's arms
+       .19 (57 px) either side of the pivot along Z (plan header). The bit's
+       section and the frame's other sizes are not on record: schematic. The
+       bit drawn at 45 deg of its sweep from the apex toward you. -->
+  <!-- The 3-jaw, schematic (its jaws' and body's sizes are not on record):
+       its jaw fronts to scale from the part. -->
+  <rect class="fixture-vise" x="340.0" y="70" width="60" height="260"/>
+  <rect class="clamp" x="400.0" y="126.5" width="40" height="36"/>
+  <rect class="clamp" x="400.0" y="237.5" width="40" height="36"/>
+  <path class="part-removed" d="M522.5 162.5L560 162.5L560 237.5L522.5 237.5Z"/>
+  <path class="part-kept" d="M522.5 162.5L40.0 162.5L43.0 166.7L40.0 170.8L43.0 175.0L40.0 179.2L43.0 183.3L40.0 187.5L43.0 191.7L40.0 195.8L43.0 200.0L40.0 204.2L43.0 208.3L40.0 212.5L43.0 216.7L40.0 220.8L43.0 225.0L40.0 229.2L43.0 233.3L40.0 237.5L522.5 237.5A37.5 37.5 0 0 0 522.5 162.5Z"/>
+  <path class="cutter" d="M543.4 232.2L554.7 220.9L604.2 270.4L592.9 281.7Z"/>
+  <rect class="cutter" x="465.5" y="300" width="114.0" height="26"/>
+  <line class="hidden" x1="522.5" y1="200" x2="522.5" y2="300"/>
+  <circle class="datum" cx="522.5" cy="200" r="3"/>
+  <path class="arrow" d="M610.0 200.0A87.5 87.5 0 0 1 522.5 287.5" fill="none"/>
+  <line class="centre-line" x1="20" y1="200" x2="740" y2="200"/>
+  <line class="datum" x1="560" y1="110" x2="560" y2="150"/>
+  <text class="datum-label" x="490" y="104">end A's faced plane</text>
+  <line class="leader" x1="420.0" y1="273.5" x2="400.0" y2="352"/>
+  <text class="label" x="210.0" y="366">3-jaw over a shim wrap on plain rod</text>
+  <text class="label" x="40" y="150">end B's thread back in the spindle bore (off the page)</text>
+  <line class="leader" x1="562.5" y1="326" x2="562.5" y2="338"/>
+  <text class="label" x="470" y="350">the outer frame under the work: its arms</text>
+  <text class="label" x="470" y="366">.19 either side of the pivot (schematic)</text>
+  <line class="leader" x1="518.5" y1="196" x2="462.5" y2="186"/>
+  <text class="label" x="262.5" y="182">pivot: .125 behind the faced plane</text>
+</svg>

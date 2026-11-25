@@ -1,31 +1,56 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 400" font-family="sans-serif" font-size="13">
-  <!-- Setup 5: turned over, H down on the stacks, across the jaws as Setup 4, O to the right; MB04 faces L and mills the notch's lower half through to MB03's. A section through the notch, 5 px/mm, looking from the sawn end. -->
+  <!-- Setup 5: turned over, H down on the stacks, across the jaws as Setup 4, O to the right; MB04 faces L and mills the notch's lower half through to MB03's. Left: from above, 1.8 px/mm; right: a section through the notch at the pass drawn, 4 px/mm. -->
   <rect class="paper" x="0" y="0" width="760" height="400"/>
   <text class="title" x="20" y="20">Setup 5 (MB04_low): L to the width, then the notch through</text>
-  <rect class="part-removed" x="100" y="200.6" width="271.3" height="4.4"/>
-  <rect class="part-removed" x="100" y="205" width="206.3" height="28.1"/>
-  <rect class="part-kept" x="306.3" y="205" width="65" height="55"/>
-  <text class="label" x="40" y="60">Section through the notch, H down (MB03's half-notch now underneath, open):</text>
-  <line class="active-face" x1="100" y1="205" x2="371.3" y2="205"/>
-  <line class="hidden" x1="100" y1="233.1" x2="306.3" y2="233.1"/>
-  <line class="hidden" x1="80" y1="260" x2="400" y2="260"/>
-  <text class="label" x="100" y="280">F</text>
-  <text class="label" x="362" y="280">O</text>
-  <circle class="datum" cx="371.3" cy="260" r="3.5"/>
-  <text class="datum-label" x="380" y="300">X0 O, Z0 the stacks' top (H)</text>
-  <line class="leader" x1="360" y1="205" x2="430" y2="150"/>
-  <circle class="leader-dot" cx="360" cy="205" r="2"/>
-  <text class="label" x="430" y="146">L: Z {{cad.high_side_width_mm:in.4dot}}, {{process.low_skim_mm:in.3dot}} off</text>
-  <line class="leader" x1="200" y1="220" x2="430" y2="190"/>
-  <circle class="leader-dot" cx="200" cy="220" r="2"/>
-  <text class="label" x="430" y="186">the notch's other half, down to Z {{process.notch_through_mm:in.3dot}}</text>
-  <text class="label" x="430" y="202">({{process.notch_past_mm:in.3dot}} through MB03's floor)</text>
-  <line class="leader" x1="200" y1="246" x2="430" y2="240"/>
-  <circle class="leader-dot" cx="200" cy="246" r="2"/>
-  <text class="label" x="430" y="244">MB03's half: already open</text>
-  <line class="leader" x1="340" y1="232" x2="430" y2="270"/>
-  <circle class="leader-dot" cx="340" cy="232" r="2"/>
-  <text class="label" x="430" y="274">the neck, {{process.neck_stock_mm:in.3dot}} full until Setup 7</text>
-  <text class="label" x="40" y="350">Held as Setup 4: the seat against the fixed jaw, the rod at the sawn end. The notch runs</text>
-  <text class="label" x="40" y="366">below the jaw tops, between them: the foot and the waste keep the cutter off the jaws.</text>
+  <!-- From above, the fixed jaw at the top, 1.8 px/mm: the jaws to scale
+       (vise_jaw_width_mm 158.67), the blank 54.26 x 121.92 (the longest),
+       the 1 in + 1/2 in stacks 4 in long and 1/8 thick lying along the jaws
+       (one against the fixed jaw, one under the sawn end, flush with it),
+       showing past the blank's sides; the rod (rod_dia_mm 6.35) between the
+       sawn end and the moving jaw, under nothing. -->
+  <rect class="clamp" x="66.0" y="50" width="285.6" height="20"/>
+  <text class="label-on-clamp" x="208.8" y="64" text-anchor="middle">fixed jaw</text>
+  <rect class="fixture-support" x="117.4" y="70" width="182.9" height="5.7"/>
+  <rect class="fixture-support" x="117.4" y="283.7" width="182.9" height="5.7"/>
+  <rect class="part-kept" x="160" y="70" width="97.7" height="219.5"/>
+  <circle class="part-rest" cx="208.8" cy="295.2" r="5.71"/>
+  <rect class="clamp" x="66.0" y="300.9" width="285.6" height="20"/>
+  <text class="label-on-clamp" x="208.8" y="314.9" text-anchor="middle">moving jaw</text>
+  <rect class="part-removed" x="160" y="75.7" width="74.3" height="192.3"/>
+  <rect class="holes" x="173.8" y="70" width="4.75" height="5.7"/>
+  <rect class="holes" x="198.5" y="70" width="4.75" height="5.7"/>
+  <!-- The 1/2 in end mill to scale (face_cutter_dia_mm 12.7 = 22.9 px) on
+       L's face pass at Y -24.128, mid-way along it, passing -X; the same
+       place in the section. -->
+  <circle class="cutter" cx="209.1" cy="113.4" r="11.43"/>
+  <line class="arrow" x1="195.1" y1="113.4" x2="169.1" y2="113.4"/>
+  <circle class="datum" cx="257.7" cy="70" r="3.5"/>
+  <text class="datum-label" x="380" y="84">X0 O, Y0 the seat</text>
+  <line class="leader" x1="125.4" y1="73.0" x2="70" y2="148"/>
+  <line class="leader" x1="125.4" y1="286.5" x2="70" y2="160"/>
+  <text class="label" x="20" y="144">1 in + 1/2 in</text>
+  <text class="label" x="20" y="174">stacks</text>
+  <line class="leader" x1="208.8" y1="295.2" x2="120" y2="372"/>
+  <text class="label" x="20" y="386">the rod Ø.25, at the sawn end, as Setup 4</text>
+  <line class="leader" x1="190" y1="230" x2="376" y2="150"/>
+  <circle class="leader-dot" cx="190" cy="230" r="2"/>
+  <text class="label" x="380" y="146">the notch's other half, through</text>
+  <text class="label" x="380" y="196">1/2 in end mill, to scale,</text>
+  <text class="label" x="380" y="212">on L's pass at Y −24.1</text>
+  <line class="leader" x1="220.1" y1="117.4" x2="376" y2="200"/>
+  <text class="title" x="470" y="110">Section through the notch at that pass, H down:</text>
+  <rect class="part-kept" x="635.0" y="286.0" width="52.0" height="44.0"/>
+  <rect class="part-kept" x="470" y="286.0" width="165.0" height="22.5"/>
+  <rect class="part-removed" x="470" y="282.4" width="217" height="3.6"/>
+  <rect class="part-removed" x="470" y="286.0" width="165.0" height="22.5"/>
+  <rect class="hidden" x="470" y="307.5" width="165.0" height="22.5"/>
+  <line class="active-face" x1="470" y1="286.0" x2="687" y2="286.0"/>
+  <line class="hidden" x1="460" y1="330" x2="697" y2="330"/>
+  <path class="cutter" d="M604.4 279.9L604.4 172.2L553.6 172.2L553.6 279.9A25.4 6.1 0 0 0 604.4 279.9Z"/>
+  <text class="label" x="470" y="350">F</text>
+  <text class="label" x="680" y="350">O</text>
+  <text class="label" x="612" y="252">L: Z {{cad.high_side_width_mm:in.4dot}}, {{process.low_skim_mm:in.3dot}} off</text>
+  <text class="label" x="480" y="326">MB03's half, open</text>
+  <text class="label" x="470" y="372">notch down to Z {{process.notch_through_mm:in.3dot}}, {{process.notch_past_mm:in.3dot}} through MB03's floor</text>
+  <text class="datum-label" x="470" y="392">Z0 the stacks' top (H)</text>
 </svg>

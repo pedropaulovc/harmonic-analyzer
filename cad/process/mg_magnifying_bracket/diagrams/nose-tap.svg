@@ -3,20 +3,43 @@
   <rect class="paper" x="0" y="0" width="760" height="400"/>
   <text class="title" x="20" y="20">Setup 8 (MB07_lever_tap): tap 1/4-20 by hand under the tap guide</text>
   <rect class="fixture-support" x="40" y="300" width="160" height="80"/>
-  <line class="hidden" x1="40" y1="272.6" x2="200" y2="272.6"/>
-  <text class="label" x="40" y="266">jaw tops</text>
-  <line class="datum" x1="200" y1="240" x2="200" y2="390"/>
-  <text class="label" x="206" y="390">jaws' right side</text>
+  <!-- The jaws, in front of the part, as an outline: their tops
+       upright_grip_mm 19.545 above the parallels' top. -->
+  <line class="hidden" x1="40" y1="221.8" x2="200" y2="221.8"/>
+  <text class="label" x="30" y="215">jaw tops (outline), {{process.upright_grip_mm:in.3dot}} grip</text>
+  <line class="hidden" x1="200" y1="221.8" x2="200" y2="380"/>
+  <line class="datum" x1="200" y1="240" x2="200" y2="392"/>
+  <text class="label" x="206" y="392">jaws' right side</text>
+  <line class="leader" x1="120" y1="340" x2="120" y2="345"/>
+  <text class="label-halo" x="60" y="345">1 in parallels</text>
   <path class="part-kept" d="M40 250 H254.2 A22 22 0 0 1 254.2 300 H40 Z"/>
   <rect class="part-threads" x="241.5" y="250" width="25.4" height="50"/>
-  <line class="centre-line" x1="254.2" y1="160" x2="254.2" y2="320"/>
-  <rect class="part-rest" x="214.2" y="226" width="80" height="10"/>
-  <text class="label" x="300" y="236">T-handle wrench</text>
-  <rect class="part-rest" x="251.2" y="236" width="6" height="14"/>
-  <polygon class="cutter" points="242.2,140 266.2,140 254.2,220"/>
-  <text class="label" x="276" y="170">tap guide in the spindle, spindle OFF</text>
-  <text class="label" x="300" y="280">tap point {{process.tap_reach_min_mm:in.3dot}}–{{process.tap_reach_max_mm:in.3dot}} below the neck's face:</text>
-  <text class="label" x="300" y="296">the full thread out through O, into air</text>
+  <line class="centre-line" x1="254.2" y1="30" x2="254.2" y2="345"/>
+  <!-- The 1/4-20 plug tap to scale across (its major Ø.250 = 25.4 px), its
+       point tap_reach_min_mm 18.85 below the neck's face (.742: the full
+       thread out through O, into air), its end square with the round cue
+       (its lead is not on record). The tap's length and the T-handle
+       wrench are schematic (not on record). The Fisher tap guide
+       (tools.tap-guide-fisher): its 1/2 in shank (50.8 px) in the collet,
+       drawn short to a break line (3 1/8 in overall), its 3/16 in spring
+       point (19 px) seated in the wrench's centre hole. All yellow: the
+       tool and what moves with it. -->
+  <path class="cutter" d="M266.9 322.4L266.9 216.0L241.5 216.0L241.5 322.4A12.7 3.0 0 0 0 266.9 322.4Z"/>
+  <rect class="cutter" x="194.2" y="196" width="120" height="10"/>
+  <rect class="cutter" x="244.2" y="192" width="20" height="26"/>
+  <path class="cutter" d="M244.7 140L263.7 140L263.7 172L254.2 192L244.7 172Z"/>
+  <path class="cutter" d="M279.6 140.0L279.6 40.0L275.4 43.0L271.1 40.0L266.9 43.0L262.7 40.0L258.4 43.0L254.2 40.0L250.0 43.0L245.7 40.0L241.5 43.0L237.3 40.0L233.0 43.0L228.8 40.0L228.8 140.0Z"/>
+  <line class="leader" x1="314" y1="201" x2="340" y2="201"/>
+  <text class="label" x="344" y="205">T-handle wrench (schematic)</text>
+  <line class="leader" x1="264" y1="160" x2="340" y2="160"/>
+  <text class="label" x="344" y="156">the guide's 3/16 spring point in the</text>
+  <text class="label" x="344" y="172">wrench's centre hole (it travels .50)</text>
+  <line class="leader" x1="280" y1="90" x2="340" y2="90"/>
+  <text class="label" x="344" y="86">Fisher tap guide, its 1/2 in shank in the</text>
+  <text class="label" x="344" y="102">1/2 in collet, spindle OFF</text>
+  <line class="leader" x1="266" y1="319.4" x2="340" y2="296"/>
+  <text class="label" x="344" y="280">1/4-20 plug tap's point {{process.tap_reach_min_mm:in.3dot}}–{{process.tap_reach_max_mm:in.3dot}} below</text>
+  <text class="label" x="344" y="296">the neck's face: the full thread out through O, into air</text>
   <circle class="datum" cx="200" cy="300" r="3.5"/>
-  <text class="datum-label" x="40" y="398">Z0 the parallels' top (O)</text>
+  <text class="datum-label" x="344" y="330">Z0 the parallels' top (O)</text>
 </svg>

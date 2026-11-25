@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 400" font-family="sans-serif" font-size="13">
+  <rect class="paper" x="0" y="0" width="760" height="400"/>
+  <text class="title" x="20" y="20">Setup 2, the centre drill: No. 1 from the tailstock in the stub's end (to scale across, 300 px/in)</text>
+  <!-- The No. 1 centre drill (tools.centre-drills-carbide-60, for a 3/64
+       drill): its 3/64 pilot (14.1 px) and 60 deg countersink to about Ø.08
+       at the stub's end (the op's), to scale across. The pilot's length and
+       the body's Ø are not on record: the pilot drawn .06 long and the body
+       at the countersink's Ø.08, schematic, to a break line. -->
+  <!-- The 3-jaw, schematic (its jaws' and body's sizes are not on record):
+       its jaw fronts to scale from the part. -->
+  <rect class="fixture-vise" x="235.0" y="70" width="60" height="260"/>
+  <rect class="clamp" x="295.0" y="126.5" width="40" height="36"/>
+  <rect class="clamp" x="295.0" y="237.5" width="40" height="36"/>
+  <path class="part-kept" d="M500.0 162.5L40.0 162.5L43.0 166.7L40.0 170.8L43.0 175.0L40.0 179.2L43.0 183.3L40.0 187.5L43.0 191.7L40.0 195.8L43.0 200.0L40.0 204.2L43.0 208.3L40.0 212.5L43.0 216.7L40.0 220.8L43.0 225.0L40.0 229.2L43.0 233.3L40.0 237.5L500.0 237.5Z"/>
+  <path class="holes" d="M500.0 188.0L491.4 193.0L473.4 193.0L469.2 200L473.4 207.0L491.4 207.0L500.0 212.0Z"/>
+  <path class="cutter" d="M720.0 188.0L500.0 188.0L491.4 193.0L473.4 193.0L469.2 200.0L473.4 207.0L491.4 207.0L500.0 212.0L720.0 212.0L717.0 208.0L720.0 204.0L717.0 200.0L720.0 196.0L717.0 192.0Z"/>
+  <line class="arrow" x1="700" y1="166.0" x2="650" y2="166.0"/>
+  <line class="centre-line" x1="20" y1="200" x2="740" y2="200"/>
+  <line class="datum" x1="470" y1="100" x2="470" y2="150"/>
+  <text class="datum-label" x="410" y="94">Z0 the tip's finished plane</text>
+  <line class="leader" x1="315.0" y1="273.5" x2="295.0" y2="352"/>
+  <text class="label" x="105.0" y="366">3-jaw over a brass shim wrap on the 1/4 bar</text>
+  <line class="leader" x1="100" y1="166.5" x2="100" y2="70"/>
+  <text class="label" x="40" y="62">the rest of the blank back in the jaws and the spindle bore</text>
+  <line class="dims" x1="500.0" y1="241.5" x2="500.0" y2="290"/>
+  <text class="label" x="460.0" y="306">the stub's faced end, Z+.10</text>
+  <text class="label" x="460.0" y="324">No. 1 centre drill to about Ø.08,</text>
+  <text class="label" x="460.0" y="342">the hole inside the stub</text>
+</svg>

@@ -12,8 +12,16 @@
   <rect class="part-removed" x="137" y="141.2" width="25.4" height="3"/>
   <line class="active-face" x1="137" y1="144.2" x2="162.4" y2="144.2"/>
   <line class="hidden" x1="137" y1="150.5" x2="162.4" y2="150.5"/>
-  <rect class="holes" x="145.3" y="144.2" width="5.3" height="9.9"/>
-  <line class="centre-line" x1="147.9" y1="132" x2="147.9" y2="166"/>
+  <!-- The 1/2 in end mill to scale (face_cutter_dia_mm 12.7 = 25.4 px at
+       2 px/mm), half_mill_projection_mm 28.45 (57 px) out of the collet, on
+       MB02's seat skim (one level, Z0) on its pass at Y -6.977 (cutter
+       centre), the pass least past the blank's sides. Square end drawn as
+       the near half of the end face, 12 % deep. The collet is not drawn (its
+       size is not on record). The #37 holes: their own op's picture. -->
+  <path class="cutter" d="M161.1 141.2L161.1 87.3L135.7 87.3L135.7 141.2A12.7 3.0 0 0 0 161.1 141.2Z"/>
+  <line class="leader" x1="148.4" y1="100" x2="250" y2="64"/>
+  <circle class="leader-dot" cx="148.4" cy="100" r="2"/>
+  <text class="label" x="250" y="60">1/2 in end mill, 1.12 out of the collet</text>
   <line class="leader" x1="160" y1="144.2" x2="250" y2="100"/>
   <circle class="leader-dot" cx="160" cy="144.2" r="2"/>
   <text class="label" x="250" y="96">the seat: {{process.seat_skim_mm:in.3dot}} off the sawn end; Z0</text>
@@ -31,6 +39,10 @@
   <text class="datum-label" x="470" y="203">Y0: the fixed jaw (L)</text>
   <circle class="holes" cx="605.8" cy="229.9" r="4"/>
   <circle class="holes" cx="564.7" cy="229.9" r="4"/>
+  <!-- The same end mill, the same place: mid-way along its pass (X -27),
+       passing +X. -->
+  <circle class="cutter" cx="551.8" cy="230.9" r="19.05"/>
+  <line class="arrow" x1="574" y1="244" x2="598" y2="244"/>
   <text class="label" x="464" y="230" text-anchor="end">O</text>
   <text class="label" x="470" y="274">holes {{cad.mounting_hole_1_station_in:.3dot}} and {{cad.mounting_hole_2_station_in:.3dot}} from F,</text>
   <text class="label" x="470" y="290">{{cad.mounting_hole_1_lateral_in:.3dot}} from L once L is faced</text>

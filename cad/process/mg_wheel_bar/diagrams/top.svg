@@ -12,19 +12,29 @@
   <!-- The bar on edge, 3/8 across, B down; A faced from 1.25 to .840. -->
   <rect class="part-kept" x="200" y="209.75" width="37.5" height="84"/>
   <rect class="part-removed" x="200" y="168.75" width="37.5" height="41"/>
-  <rect class="cutter" x="212" y="100" width="50" height="60"/>
-  <line class="arrow" x1="245" y1="90" x2="215" y2="90"/>
+  <!-- The 1/2 in end mill to scale (face_cutter_dia_mm 12.7 = 50 px),
+       half_mill_projection_mm 28.45 (112 px) out of the collet, on WB02's
+       first level (Z 30.706, the widest bar) on its pass at Y -3.675
+       (cutter centre), the pass least past the bar's edges: .020 past the
+       moving-jaw edge. Its square end drawn as the near half of the end
+       face, 12 % deep. The collet is not drawn (its size is not on record). -->
+  <path class="cutter" d="M248.0 166.9L248.0 60.9L198.0 60.9L198.0 166.9A25.0 6.0 0 0 0 248.0 166.9Z"/>
+  <line class="arrow" x1="243" y1="48" x2="223" y2="48"/>
+  <text class="label" x="258" y="52">stepover Y +1.338 to −3.675 (cutter centre), each pass along the bar</text>
+  <text class="label" x="258" y="80">1/2 in end mill, 1.12 out of the collet, on the first level</text>
   <line class="datum" x1="80" y1="293.75" x2="150" y2="293.75"/>
   <text class="datum-label" x="20" y="289">Z0 (B)</text>
-  <line class="datum" x1="237.5" y1="140" x2="237.5" y2="166"/>
-  <text class="datum-label" x="242" y="150">Y0 (F)</text>
+  <line class="datum" x1="237.5" y1="178" x2="237.5" y2="206"/>
+  <text class="datum-label" x="244" y="197">Y0 (F)</text>
   <text class="label-halo" x="204" y="285">B</text>
-  <text class="label-halo" x="204" y="223">T</text>
-  <line class="leader" x1="236" y1="190" x2="320" y2="170"/>
-  <text class="label" x="322" y="168">edge A faced down to Z {{process.top_width_mm:in.4dot}} in levels: the top face T</text>
+  <text class="label-halo" x="204" y="228">T</text>
+  <line class="leader" x1="212" y1="190" x2="320" y2="150"/>
+  <text class="label" x="322" y="148">edge A faced down to Z {{process.top_width_mm:in.4dot}} in levels: the top face T</text>
   <line class="dims" x1="340" y1="209.75" x2="340" y2="293.75"/>
   <line class="dims" x1="330" y1="209.75" x2="350" y2="209.75"/>
   <line class="dims" x1="330" y1="293.75" x2="350" y2="293.75"/>
   <text class="label" x="355" y="255">.840 B to T, jaw tops .133 below T</text>
   <text class="label" x="330" y="320">F against the fixed jaw, ends 1.6 in out past the jaws</text>
+  <line class="leader" x1="231" y1="350" x2="330" y2="350"/>
+  <text class="label" x="335" y="354">a 1/2 + 9/16 in parallel stacked against each jaw</text>
 </svg>
