@@ -17,6 +17,7 @@ what it guards.
 from __future__ import annotations
 
 import copy
+import os
 import re
 import tomllib
 from pathlib import Path
@@ -227,6 +228,44 @@ def test_no_touch_off_is_taken_with_the_work_stop_between_the_jaws() -> None:
             if re.search(r"G54 [XZ]0|Repeat Setup \d's", operation["instruction"])
         ]
         assert zeros and max(zeros) < stop, setup["title"]
+
+
+def test_a_rewrite_inside_one_clock_tick_is_read_again(tmp_path) -> None:
+    # Codjiflo, 2026-11-25: the parse was cached on the file's mtime, which a
+    # rewrite inside one clock tick keeps.
+    plan = tmp_path / "pair" / "plan.toml"
+    plan.parent.mkdir()
+    row = '[[parts]]\nid = "a"\nfile = "../../out/features/{}/features.toml"\n'
+    plan.write_text(row.format("p_a"), encoding="utf-8")
+    stamp = plan.stat()
+    assert _process_plans.family_parts("pair", tmp_path) == {"a": "p_a"}
+    plan.write_text(row.format("p_b"), encoding="utf-8")
+    os.utime(plan, ns=(stamp.st_atime_ns, stamp.st_mtime_ns))
+    assert _process_plans.family_parts("pair", tmp_path) == {"a": "p_b"}
+
+
+def test_a_depth_remedy_puts_z0_back_only_after_the_file_has_drilled() -> None:
+    # Codjiflo, 2026-11-25: the depth is re-checked at the file's M6 T2 stop,
+    # before the holes; Z0 put back there would drill them from the wrong Z0.
+    remedies = [
+        operation["instruction"]
+        for setup in PLAN["setups"]
+        for operation in setup["operations"]
+        if operation["instruction"].startswith("Depth over")
+    ]
+    assert len(remedies) == 2
+    for text in remedies:
+        again = text.index("let it drill the holes")
+        assert again < text.index("After the file ends: G10 L2 P1 Z(the noted Z)")
+    # Both of Setup 3's texts put Z0 back after an oversize re-cut.
+    (width,) = [
+        operation
+        for setup in PLAN["setups"]
+        for operation in setup["operations"]
+        if "run CC02_length again" in operation["instruction"]
+    ]
+    assert "put G54 Z back for the next blank" in width["instruction"]
+    assert "Z0 goes back for the next blank" in width["instruction_detailed"]
 
 
 def test_a_peck_that_is_not_a_positive_step_is_refused() -> None:

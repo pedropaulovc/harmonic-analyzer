@@ -505,7 +505,7 @@ milling_cuts = [
 ]
 
 [[setups.operations]]
-instruction = "Over {{cad.width_max_in:.3dot}}: lower G54 Z by the reading less {{cad.width_mm:in.3dot}} and run CC02_length again. Under {{cad.width_min_in:.3dot}}: the blank is scrap."
+instruction = "Over {{cad.width_max_in:.3dot}}: lower G54 Z by the reading less {{cad.width_mm:in.3dot}} and run CC02_length again; then put G54 Z back for the next blank. Under {{cad.width_min_in:.3dot}}: the blank is scrap."
 instruction_detailed = "Over {{cad.width_max_in:.3dot}}: send $# and note the G54 line's Z; G10 L2 P1 Z(that Z − (the reading − {{cad.width_mm:in.3dot}}) × 25.4). Run CC02_length again and check again. Then G10 L2 P1 Z(the noted Z): Z0 goes back for the next blank. Under {{cad.width_min_in:.3dot}}: the blank is scrap."
 feed = "hand"
 
@@ -720,7 +720,7 @@ milling_cuts = [
 ]
 
 [[setups.operations]]
-instruction = "Depth over {{cad.depth_max_in:.3dot}}: stop the file there (the controller keeps G54: no homing, no new touch-off). Send $#, note the G54 line's Z; G10 L2 P1 Z(that Z − (the reading − {{cad.depth_mm:in.4dot}}) × 25.4); run CF06_bar_drill again from its start (the face, then the holes) and re-check. Then G10 L2 P1 Z(the noted Z): Z0 goes back for the next blank. Under {{cad.depth_min_in:.3dot}}: the half is scrap."
+instruction = "Depth over {{cad.depth_max_in:.3dot}}: stop the file there (the controller keeps G54: no homing, no new touch-off). Send $#, note the G54 line's Z; G10 L2 P1 Z(that Z − (the reading − {{cad.depth_mm:in.4dot}}) × 25.4); run CF06_bar_drill again from its start, re-check at the same stop and let it drill the holes. After the file ends: G10 L2 P1 Z(the noted Z), Z0 back for the next blank. Under {{cad.depth_min_in:.3dot}}: the half is scrap."
 feed = "hand"
 
 [[setups.operations]]
@@ -815,7 +815,7 @@ milling_cuts = [
 ]
 
 [[setups.operations]]
-instruction = "Depth over {{cad.pre_face_depth_max_in:.3dot}}: stop the file there (the controller keeps G54: no homing, no new touch-off). Send $#, note the G54 line's Z; G10 L2 P1 Z(that Z − (the reading − {{cad.pre_face_depth_mm:in.4dot}}) × 25.4); run CB06_back_drill again from its start (the face, then the holes) and re-check. Then G10 L2 P1 Z(the noted Z): Z0 goes back for the next blank. Under {{cad.pre_face_depth_min_in:.3dot}}: the half is scrap."
+instruction = "Depth over {{cad.pre_face_depth_max_in:.3dot}}: stop the file there (the controller keeps G54: no homing, no new touch-off). Send $#, note the G54 line's Z; G10 L2 P1 Z(that Z − (the reading − {{cad.pre_face_depth_mm:in.4dot}}) × 25.4); run CB06_back_drill again from its start, re-check at the same stop and let it drill the holes. After the file ends: G10 L2 P1 Z(the noted Z), Z0 back for the next blank. Under {{cad.pre_face_depth_min_in:.3dot}}: the half is scrap."
 feed = "hand"
 
 [[setups.operations]]
