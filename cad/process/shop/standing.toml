@@ -57,7 +57,11 @@ rows = [
   ["Speeds", "Low belt, 100–2800 rpm: no belt change. Set the rpm by hand when the step or the M6 stop names it."],
   ["Switching on", "Home the mill (`$H`) once. Every M6's trip to the tool setter and any file's G53 retract count from home."],
   ["Home again only after", "A power cycle or a controller restart, an E-stop, an alarm, a limit switch hit, a stall or a crash. Homing brings the stored G54 back."],
-  ["After homing again", "Check every zero of the setup again, X and Y with the edge finder and Z as its step touched it: each must read what its step set, within .001 in. Do what the setup's Datum says for a zero that does not; where it says nothing, or the part may have moved, take the setup again from its first step, the part out. They all read: run the interrupted file again from its start."],
+  # Correction after the owner's approval (Main, 2026-11-25; HomeOnce, from
+  # Codjiflo on #3521): a zero swept with an indicator in a bore cannot be
+  # re-checked with the edge finder. Was "X and Y with the edge finder and Z
+  # as its step touched it"; now each zero is checked the way its step set it.
+  ["After homing again", "Check every zero of the setup again, each the way its step set it: each must read what its step set, within .001 in. One does not, cannot be reached with the part in, or the part may have moved: do what that setup's Datum says for it; where the Datum says nothing, take the setup again from its first step, the part out. They all do: run the interrupted file again from its start."],
   ["Feed Hold", "Then Reset with the axes stopped: position and G54 are kept; no homing, no new zero. Run the interrupted file again from its start: its first M6 measures the tool, and cuts already made are cut in air."],
   ["Tool changes", "At an M6 the file stops the spindle and lifts the tool above the part; the tool setter measures the new tool. A console `M6 T<n>` does the same by hand."],
   ["A file's first part", "Prove each file in air on the first part it cuts: send `$#` and note the G54 line's Z; `G10 L2 P1 Z(that Z + 25.400)` raises Z0 1.000 in. Run the file and watch every move, through every M6, clear the work, the jaws, the parallels, any clamp and the stop. `G10 L2 P1 Z(the noted Z)` puts Z0 back."],
