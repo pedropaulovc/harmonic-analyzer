@@ -664,7 +664,7 @@ gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.roof_chamfer_1_size_band_
 milling_cuts = [
   { name = "locating chamfer", kind = "side", phase = "finish", cutter_dia_mm = 6.35, axial_doc_mm = "{{process.chamfer_tip_depth_mm}}", radial_woc_mm = "{{process.chamfer_tip_depth_mm}}", stations_mm = "{{process.far_top_mm}}" },
 ]
-diagram = { file = "diagrams/chamfer-locating.svg", alt = "From the front: the 90° chamfer mill, to scale, its point .010 outside the top face and .050 below the locating end, cutting the roof's corner in one pass along the jaws, above the moving jaw." }
+diagram = { file = "diagrams/chamfer-locating.svg", alt = "From the front: the 90° chamfer mill, to scale, its point .010 outside the top face and .050 below the locating end, cutting the roof's corner in one pass across the jaws, above the moving jaw." }
 
 [[setups]]
 machine_kind = "other"

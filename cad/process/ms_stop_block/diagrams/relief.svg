@@ -24,8 +24,8 @@
   <line class="leader" x1="221.0" y1="186.0" x2="104.0" y2="175.7"/>
   <circle class="leader-dot" cx="104.0" cy="175.7" r="2.5"/>
   <text class="label" x="225.0" y="220.0">relief beside the roof</text>
-  <line class="leader" x1="221.0" y1="216.0" x2="96.0" y2="222.0"/>
-  <circle class="leader-dot" cx="96.0" cy="222.0" r="2.5"/>
+  <line class="leader" x1="221.0" y1="216.0" x2="92.5" y2="219.5"/>
+  <circle class="leader-dot" cx="92.5" cy="219.5" r="2.5"/>
   <text class="label" x="225.0" y="250.0">BACK face on the stacks</text>
   <line class="leader" x1="221.0" y1="246.0" x2="175.2" y2="254.1"/>
   <circle class="leader-dot" cx="175.2" cy="254.1" r="2.5"/>

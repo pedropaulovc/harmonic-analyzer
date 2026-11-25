@@ -9,7 +9,7 @@
   <text class="label-on-clamp" x="134" y="242">moving jaw (in front of the block)</text>
   <path class="cutter" d="M172.6 80 L172.6 144.7 L198 170.1 L223.4 144.7 L223.4 80 L217.1 76 L204.3 84 L191.7 76 L178.9 84 L172.6 80 Z"/>
   <text class="label" x="232" y="96">1/4 in 90° chamfer mill</text>
-  <text class="label" x="232" y="112">one pass along the corner, along the jaws</text>
+  <text class="label" x="232" y="112">one pass along the corner, across the jaws</text>
   <line class="datum" x1="200" y1="156" x2="200" y2="216"/>
   <text class="label" x="420" y="150">TOP face: X0 (left)</text>
   <line class="leader" x1="416" y1="146" x2="202" y2="188"/>

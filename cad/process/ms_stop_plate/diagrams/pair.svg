@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Setup 3: looking along the jaws (+X into the page): the MHA-MS-02 block mating face up on two 1 in parallels, this plate on it, both gripped across their .84 length, locating ends on the fixed jaw; the #49 drill at the end of its feed in the pilot near the locating ends (MS01_pair_pilot drills it first). To scale at 300 px/in (11.811 px/mm) from the .84 length (252 px); jaws and parallels broken off below. #49 Ø1.8542 (the plan's milling_cuts "pair pilot") = 21.9 px, its 118° point to Z −9.193 (pilot_tip_height_mm); the drill's length out of the chuck is not on record: broken off. Hand-drawn; styles: prechips.palette. -->
+<!-- Setup 3: looking along the jaws (−X into the page, the fixed jaw on the right): the MHA-MS-02 block mating face up on two 1 in parallels, this plate on it, both gripped across their .84 length, locating ends on the fixed jaw; the #49 drill at the end of its feed in the pilot near the locating ends (MS01_pair_pilot drills it first). To scale at 300 px/in (11.811 px/mm) from the .84 length (252 px); jaws and parallels broken off below. #49 Ø1.8542 (the plan's milling_cuts "pair pilot") = 21.9 px, its 118° point to Z −9.193 (pilot_tip_height_mm); the drill's length out of the chuck is not on record: broken off. Hand-drawn; styles: prechips.palette. -->
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 440" width="600" height="440" font-family="Arial, Helvetica, sans-serif" font-size="13">
   <text class="title" x="12" y="20">Setup 3: pair pilot, MS01_pair_pilot (looking along the jaws)</text>
   <!-- Jaws: moving at the left, fixed at the right; tops 6.34 mm (.25) above the plate's top. -->
@@ -39,5 +39,5 @@
   <text class="label-halo" x="306" y="229" font-size="12">below the</text>
   <text class="label-halo" x="306" y="244" font-size="12">block face</text>
   <text class="label" x="12" y="418">locating edges flushed against a 1-2-3 block before tightening,</text>
-  <text class="label" x="12" y="434">then the block taken away (X0, the near side; not shown)</text>
+  <text class="label" x="12" y="434">then the 1-2-3 block taken away (X0, the near side; not shown)</text>
 </svg>

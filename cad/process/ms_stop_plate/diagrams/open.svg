@@ -22,6 +22,8 @@
   <line class="datum" x1="172" y1="132" x2="172" y2="228"/>
   <text class="datum-label" x="110" y="300">block's locating edge</text>
   <path class="leader" d="M172 220 L190 288"/>
+  <path class="leader" d="M60 214 L40 238"/>
+  <text class="label" x="12" y="252">block's roof side, flush</text>
   <!-- Right: along the jaws, as Setup 3, sectioned through the holes (X +0.160 from the plate's locating edge, .400 from the block's): the cut passes through the block's window, which runs end to end, .336-.470 from the block's locating edge and .330 (66 px) deep, so the #41's point (Z -2.250, 17.7 px under the plate's top: 9.7 px, 1.23 mm, under the block's mating face) lands in the window's air. Jaw tops 6.34 mm (50 px) above the plate's top. -->
   <text class="title" x="330" y="40">along the jaws, through the holes</text>
   <path class="clamp" d="M300 100.1 L352 100.1 L352 300 L345.5 296 L332.5 304 L319.5 296 L306.5 304 L300 300 Z"/>
@@ -49,6 +51,6 @@
   <line class="datum" x1="358" y1="122" x2="358" y2="150"/>
   <text class="datum-label" x="362" y="132">Z0 plate top</text>
   <text class="label" x="12" y="360">the #41 breaks into the window, never into the block</text>
-  <text class="label" x="12" y="378">plate's and block's locating edges flushed against a 1-2-3 block on the left before</text>
-  <text class="label" x="12" y="394">tightening, then the block taken away (not shown)</text>
+  <text class="label" x="12" y="378">plate's locating edge and block's roof side flushed against a 1-2-3 block (left),</text>
+  <text class="label" x="12" y="394">the plate tapped until both touch it, then tightened; the 1-2-3 block not shown</text>
 </svg>
