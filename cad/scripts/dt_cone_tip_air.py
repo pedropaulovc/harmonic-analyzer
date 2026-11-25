@@ -55,9 +55,10 @@ worst-case arithmetic over every source when that closes everywhere;
 otherwise the clearances arithmetic plus the RSS of the tolerances,
 everywhere (machining-dfm.md).  Either way ``check:recipe``
 (test_drive_train_cone_tip_holddown) fails if the governing air closes.
-MHA-DT-00 step 23 looks at the bushing after the set (A .020 FEELER LEAF
+MHA-DT-00 step 23 looks at the bushing after the set (A .010 FEELER LEAF
 PASSES BETWEEN MHA-DT-38 AND GEAR 19); the proof also refuses a look that
-an in-print build could fail (look_in_print_air_mm).
+an in-print build could fail, the leaf's own tolerance charged
+(look_in_print_air_mm).
 """
 
 from __future__ import annotations
@@ -88,6 +89,7 @@ from _printed_tolerance import (
 )
 from cone_stack_end_play import SHAFT_END_PLAY
 from dt_cone_swing_platform_checks import manufactured_p1_stop_enclosure
+from dt_feeler_leaves import LEAF_TOLERANCE
 
 Vector = tuple[float, float, float]
 
@@ -362,28 +364,36 @@ if IN_SERVICE_CLEARANCES & INDEPENDENT_TOLERANCES:
     raise AssertionError("a tip air source cannot be both a clearance and a tolerance")
 # Owner ruling 2026-11-24, audit part 2 C9: "Yes: add the look and relax the
 # rest."  Delegated ruling 2026-11-24 (Main), no precedent; owner review
-# #2144 (D18, changing C9's wording): the look is a .020 feeler leaf, not the
-# 3/64 drill shank, which (1.191 mm) rejects builds whose parts are all in
-# print, and the bushing keeps the full arithmetic stack.  MHA-DT-00 step 23
-# sets the cone set against the real bank and then looks: A .020 FEELER LEAF
-# PASSES BETWEEN MHA-DT-38 AND GEAR 19, at the working pose (the P1 sweep's
-# in end, where the swing is set); the next line is its remedy.  The leaf
-# sees every source fixed before it, at its worst in print: the chains tying
-# the bank and T006's face to the base and the parts already frozen at the
-# bushing.  The sources that act after the look (AFTER_LOOK_SOURCES:
-# SkepticDT2 j04 DTR.tip_air_g19) are not in what the leaf sees.
-LOOK_LEAF_MM = 0.020 * 25.4
+# #2144 (D18, changing C9's wording): the bushing keeps the full arithmetic
+# stack, and the look is a feeler leaf, not the 3/64 drill shank, which
+# (1.191 mm) rejects builds whose parts are all in print.  Delegated ruling
+# 2026-11-25 (Main), no precedent; replaces D18's .020; owner review #2144
+# (Codjiflo 3549-r4-13): the leaf is .010, its own LEAF_TOLERANCE charged.
+# MHA-DT-00 step 23 sets the cone set against the real bank and then looks
+# (23C): A .010 FEELER LEAF PASSES BETWEEN MHA-DT-38 AND GEAR 19, at the
+# working pose (the P1 sweep's in end, where the swing is set); the next
+# line is its remedy.  The leaf sees every source physically present at
+# 23C, at its worst in print: the chains tying the bank and T006's face to
+# the base, the parts already frozen at the bushing, the swing feel set
+# just done at 23A-23B, the end screw's thread and the pivot in its hole
+# (locked at step 3), and G19's cock and the post journal's running fits,
+# at their worst as the look is taken.  Only the pivot's transfer acts
+# after it (23E-23N): AFTER_LOOK_SOURCES, the three pivot-transfer terms.
+# At the working pose the least in-print air before the look is 0.280 mm
+# (tooth face) against the .010 leaf plus its tolerance, 0.267 mm (margin
+# 0.013 mm); the transfer terms total 0.249 mm, so a build that just passes
+# the nominal leaf keeps 0.005 mm after the transfer.  Known residual: a
+# leaf .0005 thin (still in LEAF_TOLERANCE) passes a build that is left
+# -0.008 mm after the transfer; the look does not cover that, the
+# arithmetic gate does (the bushing's air over every source, least
+# 0.026 mm: check register C-01, with the look's own guard C-02).
+LOOK_LEAF_MM = 0.010 * 25.4
 LOOK_TIER = "bushing"
 AFTER_LOOK_SOURCES = frozenset(
     {
-        "G19 cock in its running fit",
         "pivot thread centring",
         "base pivot seat transferred through the platform bore",
-        "end screw in its thread",
-        "swing feel set",
         "platform pivot bore on the shoulder",
-        "pivot in the end screw's hole",
-        "post running journal fit",
     }
 )
 if not AFTER_LOOK_SOURCES <= IN_SERVICE_CLEARANCES | INDEPENDENT_TOLERANCES:
@@ -745,10 +755,11 @@ def look_in_print_air_mm() -> dict[str, float]:
     """The least air step 23's look can find in an in-print build.
 
     At the working pose (the P1 sweep's in end), per drum tier: the
-    bushing's nominal less every source fixed before the look, each at its
-    worst in print.  Delegated ruling 2026-11-24 (Main), no precedent; owner
-    review #2144 (D18): the leaf must pass every such build, so this is at
-    least LOOK_LEAF_MM.
+    bushing's nominal less every source present at the look, each at its
+    worst in print.  Delegated ruling 2026-11-25 (Main), no precedent;
+    replaces D18's .020; owner review #2144: the leaf must pass every such
+    build, its own tolerance charged, so this is at least LOOK_LEAF_MM +
+    LEAF_TOLERANCE.
     """
     angle = P1_SWEEP_DEG[0]
     return {
@@ -757,6 +768,20 @@ def look_in_print_air_mm() -> dict[str, float]:
             value
             for name, value in closure_terms_mm(LOOK_TIER, fixed, angle).items()
             if name not in AFTER_LOOK_SOURCES
+        )
+        for fixed in DRUM_TIERS
+    }
+
+
+def after_look_mm() -> dict[str, float]:
+    """What the pivot's transfer (AFTER_LOOK_SOURCES) can still take from
+    the bushing's air after the look, at the working pose, per drum tier."""
+    angle = P1_SWEEP_DEG[0]
+    return {
+        fixed.name: sum(
+            value
+            for name, value in closure_terms_mm(LOOK_TIER, fixed, angle).items()
+            if name in AFTER_LOOK_SOURCES
         )
         for fixed in DRUM_TIERS
     }
@@ -780,10 +805,11 @@ def full_sweep_proof(*, intervals: int = 400) -> list[dict]:
     width = (upper - lower) / intervals
     half_rad = abs(math.radians(width)) / 2.0
     look_air = look_in_print_air_mm()
-    if min(look_air.values()) < LOOK_LEAF_MM:
+    if min(look_air.values()) < LOOK_LEAF_MM + LEAF_TOLERANCE:
         raise ValueError(
             f"step 23's look rejects an in-print build: {look_air} mm air "
-            f"at the working pose, leaf {LOOK_LEAF_MM:.3f} mm"
+            f"at the working pose, leaf {LOOK_LEAF_MM:.3f} mm "
+            f"+ {LEAF_TOLERANCE:.4f} mm"
         )
     stacks = []
     for index in range(intervals):
