@@ -188,16 +188,32 @@ def test_the_shared_programs_are_posted_once_and_cut_every_blank_alike(context) 
 def test_no_touch_off_is_taken_with_the_work_stop_between_the_jaws() -> None:
     # CodeRabbit, 2026-11-24: the rod left locked from the setup before can
     # lie under the end mill when it comes down beside the blank for Z0. No
-    # posted program's keep-out covers a hand move. Owner 2026-11-25: that
-    # rule is the shop's standing instruction, printed once on the standing
-    # page the sheet points to and not repeated in the setups; the stop is set
-    # only after a setup's touch-offs.
+    # posted program's keep-out covers a hand move. Owner 2026-11-25: "Nothing
+    # on the sheet; the standing page and the pictures carry it": printed
+    # once on the standing page the sheet points to, drawn in the pictures
+    # (whose alt text may say it), and not repeated in the setups' text; the
+    # stop is set only after a setup's touch-offs.
     assert PLAN["standing"] is True
     assert "standing-mill" in SHOP["standing"]["notes"]
     rows = dict(SHOP["notes"]["standing-mill"]["rows"])
     rule = "Slide the rod back out of the vise before any touch-off beside the work"
     assert rule in rows["Work stop"]
-    assert "drawn back" not in PLAN_TEXT
+
+    def printed(node: object) -> list[str]:
+        if isinstance(node, str):
+            return [node]
+        if isinstance(node, list):
+            return [text for item in node for text in printed(item)]
+        if isinstance(node, dict):
+            return [
+                text
+                for key, value in node.items()
+                if key != "diagram"
+                for text in printed(value)
+            ]
+        return []
+
+    assert not [text for text in printed(PLAN) if "drawn back" in text]
     mill = [setup for setup in PLAN["setups"] if setup.get("programs")]
     assert len(mill) == 9
     first_blank = "Before the first blank goes in"
