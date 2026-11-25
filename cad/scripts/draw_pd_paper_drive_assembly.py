@@ -3741,12 +3741,16 @@ def setting_table_rows(
         ),
         # The located step's one move of the table (owner ruling 2026-11-24,
         # audit part 2 question C1), whole DRO counts derived in
-        # pd_paper_drive_knob_setting_spec.
+        # pd_paper_drive_knob_setting_spec; S, ALONG and ACROSS are DETAIL
+        # K's, so the row points to its sheet (rule 22).  Necessity N-17.
         "trial-move": (
             s("arm-plate-located", 17),
-            f"TABLE MOVED TOWARD S FROM {KNOB_SETTING_VIEW_NAME}'S SETTING"
-            if KNOB_TRIAL_AWAY_MOVE_TEXT is None
-            else f"TABLE MOVED AWAY OR TOWARD S FROM {KNOB_SETTING_VIEW_NAME}'S SETTING",
+            (
+                f"TABLE MOVED TOWARD S FROM {KNOB_SETTING_VIEW_NAME}'S SETTING"
+                if KNOB_TRIAL_AWAY_MOVE_TEXT is None
+                else f"TABLE MOVED AWAY OR TOWARD S FROM {KNOB_SETTING_VIEW_NAME}'S SETTING"
+            )
+            + f" (SHEET {SHEET_NAMES.index(KNOB_SETTING_SHEET) + 1})",
             KNOB_TRIAL_MOVE_TEXT,
             "DRO",
         ),

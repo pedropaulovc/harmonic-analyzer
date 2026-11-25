@@ -2965,10 +2965,14 @@ def test_every_failure_branch_has_a_pass_exit() -> None:
     rows = drawing.setting_table_rows(operating_domain=_unit_operating_domain())
     (move_row,) = [row for row in rows if row[1] == s("arm-plate-located", 17)]
     assert move_row[0] == str(drawing.SETTING_ROW["trial-move"])
+    # S, ALONG and ACROSS are DETAIL K's, on sheet 7 (codjiflo r1 on #3560).
+    assert drawing.SHEET_NAMES.index(drawing.KNOB_SETTING_SHEET) + 1 == 7
     assert move_row[2] == (
-        f"TABLE MOVED TOWARD S FROM {drawing.KNOB_SETTING_VIEW_NAME}'S SETTING"
+        f"TABLE MOVED TOWARD S FROM {drawing.KNOB_SETTING_VIEW_NAME}'S SETTING (SHEET 7)"
     )
-    assert move_row[3] == drawing.KNOB_TRIAL_MOVE_TEXT
+    # Three .0002 counts of the installed DRO on each axis: a plain .0005 is
+    # not a reading it shows (pd_paper_drive_knob_setting_spec.DRO_COUNT_MM).
+    assert move_row[3] == drawing.KNOB_TRIAL_MOVE_TEXT == ".0006 ALONG AND .0006 ACROSS"
     assert move_row[4] == "DRO"
     # The re-indication reads N at the table's setting, DETAIL K's or as
     # moved, so a moved plate reaches the pass exit (Codjiflo r2 on #3539).

@@ -83,3 +83,8 @@ necessity:
     kind: gap
     reason: "an open seat closes the collar-to-disc air"
     source: "no longer required after fit audit question 5; loosening tracked in issue (pending). pd_transgear_knob_bush_geometry.SHOULDER_SEAT_GAP_MAX: at .004 (.002 looser) the MHA-PD-22 to MHA-PD-06 statistical air is 0.1601 mm against its 0.1016 floor (0.1880 at .002); loosening moves no gate, only paper_drive_arm_registration.S_/K_PROJECTED_HEIGHT_MM (printed on MHA-PD-18/19) by .002"
+  - id: N-17
+    feature: "step 12T and setting table row 10, table moved toward S from DETAIL K's setting (sheet 7) .0006 ALONG AND .0006 ACROSS, DRO"
+    kind: mesh
+    reason: "a larger move binds the reducer mesh"
+    source: "pd_paper_drive_knob_setting_spec.TRIAL_MOVE_TOWARD_MM (_trial_move): whole counts of the installed DRO (.0002 in inch mode, DRO_COUNT_MM), the pair nearest the ruled .001 along S-K whose setting, TRUE's .00078 error charged (TRUE_RADIAL_ERROR_MM), keeps N inside DETAIL K's -.001 and passes the no-bind gate (binds(): the two running fits pressed shut leave backlash; it fails below N -.00079) and every reducer mesh gate at the lowest N (TRIAL_LOWEST_MESH.require(): contact ratio 1.32 over its 1.2 floor, root clearance, interference). .0006 and .0006 are three counts each, .00085 along S-K, N no lower than -.00069. A plain .0005 is not a count the DRO shows (2.5 counts). Owner ruling 2026-11-24, fit audit part 2 C1: \"Yes, the trial may move the plate within those limits.\""
