@@ -26,12 +26,9 @@ from dt_crank_drive_gear_spec import inch_text
 # (delegated ruling 2026-11-24 (Main), no precedent; owner review #2144:
 # T024 on a .015-.020 leaf, the
 # creep term dropped) shrinks the cone set's north float 0.845 -> 0.771 mm,
-# so the widest backlash falls to 0.957428 mm.  MHA-DT-00's shaft end play
-# opened to the title block's .002-.012 (cone_stack_end_play SHAFT_END_PLAY
-# (0.05, 0.305), restoration round 1, 2026-11-25) lifts the north float to
-# 0.826 mm and the widest backlash to 0.958685 mm: it prints .0035 TO .0377
+# so the widest backlash falls to 0.957428 mm: it prints .0035 TO .0376
 # (accept_limits_text rounds inward).
-MESH_BACKLASH_REF_MM = (0.087891, 0.958685)
+MESH_BACKLASH_REF_MM = (0.087891, 0.957428)
 BACKLASH_LABEL = "TRANSVERSE BACKLASH WITH MHA-DT-10 (REF)"
 
 

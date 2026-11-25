@@ -451,11 +451,7 @@ END_SCREW_POINT_MAX_MM = 2.0 * ADJUSTER_PITCH_MM
 END_SCREW_HEAD_RUNOUT_MM = ADJUSTER_PITCH_MM
 if END_SCREW_LENGTH > 3.0 * _ADJ_MAJOR_MM:
     raise AssertionError("the end screw is past 3 D: B18.6.3's head runout is longer")
-# The model's end play: 0.15, the mid-play of the .002-.009 window it was
-# drawn at, kept as a literal when the window opened to .002-.012
-# (SHAFT_END_PLAY, restoration round 1, 2026-11-25) so the end screw's model
-# geometry does not move; still inside the window.
-END_SCREW_MODEL_END_PLAY_MM = 0.15
+END_SCREW_MODEL_END_PLAY_MM = (SHAFT_END_PLAY[0] + SHAFT_END_PLAY[1]) / 2.0  # 0.15
 END_SCREW_END_STATION = (
     T006_NORTH_FACE
     + cone_tip_cluster.TIP_SET_SHIFT_MM
