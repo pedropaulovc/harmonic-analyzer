@@ -2272,12 +2272,14 @@ CHECKS = _note_text(
         # (4L); the bank goes back on MHA-DT-VN-62 and 4G's X indicators are
         # read again against the same .015 (4M).  The 4A-4Z letters are full:
         # 4K takes the old swing-out, and 4Z carries the stop screw's turns
-        # and its seated head on one line.
+        # and its seated head on one line.  Codjiflo round 4 on #3550 (r4-9,
+        # rule 23's one-screw static clamp): 4M's acceptance also checks by
+        # hand that neither screwed MHA-DT-02 turns or moves (DT-09).
         "4J. CLAMPS ON: 11/64 TRANSFER-PUNCH EACH SEAT THRU ITS FOOT HOLE.",
         "4K. WITH THE CONE SET SWUNG OUT, LIFT THE PEDESTAL BANK OFF MHA-FR-01.",
         "4L. DRILL AND TAP THE SEATS PER MHA-FR-01: DECK AND FEET BLOWN CLEAN.",
-        "4M. REFIT THE BANK WITH MHA-DT-VN-62 IN PLACE OF THE CLAMPS: NEITHER "
-        "4G X INDICATOR READS OVER .015.",
+        "4M. REFIT THE BANK ON MHA-DT-VN-62 FOR THE CLAMPS: NEITHER 4G X "
+        "INDICATOR OVER .015, NEITHER MHA-DT-02 TURNS OR MOVES BY HAND.",
         "4N. SWING IN UNTIL A GEAR JUST BINDS.",
         f"4P. EASE OUT IN SMALL STEPS UNTIL {CONE_TURN_CRANK_TURNS} CRANK TURNS RUN FREE.",
         "4Q. TIGHTEN MHA-DT-VN-51 WITH THE CONE SET HELD THERE.",

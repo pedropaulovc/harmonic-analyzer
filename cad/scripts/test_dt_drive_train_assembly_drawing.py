@@ -717,7 +717,7 @@ def test_the_pedestals_are_set_by_feel_then_spotted_with_one_tripwire() -> None:
     (spot,) = re.findall(r"4J\. [^.]*\.", check)
     (lift,) = re.findall(r"4K\. [^.]*\.", check)
     (drill,) = re.findall(r"4L\. [^.]*\.", check)
-    (refit,) = re.findall(r"4M\. .*?\.015\.", check)
+    (refit,) = re.findall(r"4M\. .*? BY HAND\.", check)
     assert tripwire == "4G. NEITHER X INDICATOR READS OVER .015."
     pivot = steps.step_number("other-base-mounting")
     assert f"STEP {pivot}F-{pivot}J PIVOT SEAT" in remedy
@@ -729,7 +729,10 @@ def test_the_pedestals_are_set_by_feel_then_spotted_with_one_tripwire() -> None:
     assert spot.startswith("4J. CLAMPS ON:") and "TRANSFER-PUNCH" in spot and "FOOT HOLE" in spot
     assert "WITH THE CONE SET SWUNG OUT," in lift and "LIFT THE PEDESTAL BANK OFF" in lift
     assert "DRILL AND TAP" in drill and "PER MHA-FR-01" in drill and "BLOWN CLEAN" in drill
-    assert "MHA-DT-VN-62 IN PLACE OF THE CLAMPS" in refit and "4G X INDICATOR" in refit
+    assert "MHA-DT-VN-62 FOR THE CLAMPS" in refit and "NEITHER 4G X INDICATOR OVER .015" in refit
+    # Codjiflo round 4 on #3550 (r4-9, rule 23): the screwed pedestals get
+    # their hand check once MHA-DT-VN-62 holds them.
+    assert refit.endswith("NEITHER MHA-DT-02 TURNS OR MOVES BY HAND."), refit
     assert "Y ZERO" in clamp
     order = [check.index(text) for text in (clamp, tripwire, remedy, spot, lift, drill, refit)]
     assert order == sorted(order)
