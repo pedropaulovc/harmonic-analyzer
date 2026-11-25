@@ -1,6 +1,14 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 560" font-family="sans-serif" font-size="13">
   <rect class="paper" x="0" y="0" width="760" height="560"/>
-  <text class="title" x="20.0" y="18.0">Setup 3: plate A on the table, GF01_form_a (plan view, column at the top)</text>
+  <!-- Hand picture, plan view, to scale at 2.1 px/mm from the plate's 9.0 in
+     (228.6 mm drawn 480.1 px) and its 6.0 in width (320 px). Plate, 1-2-3
+     blocks (3 x 2 in), stud holes, arc and groove from [parameters] and
+     the GF01/GF02 NC. The 1/2 in end mill (half_cutter_dia_mm 12.7) is drawn 26.7 px across,
+     at the first stud hole X44.450 Y-25.400, as GF01/GF02 peck it first.
+     The step clamps' straps and studs are not on record: drawn schematic.
+     The edge finder is a touch-off tool and is not drawn; the two
+     touch-off edges are marked as datums. -->
+  <text class="title" x="20.0" y="18.0">Setup 3: plate A on the table, GF01_form_a T1 pecking the first stud hole (plan view, column at the top, 2.1 px/mm)</text>
   <rect class="fixture-table" x="0" y="28" width="760" height="482"/>
   <path class="part-kept" d="M133.6,410.0 L358.7,410.0 L358.7,343.5 A160.0,160.0 0 0 0 501.5,90.0 L133.6,90.0 Z"/>
   <path class="part-removed" d="M358.7,410.0 L385.3,410.0 L385.3,370.3 A186.7,186.7 0 0 0 533.3,90.0 L501.5,90.0 A160.0,160.0 0 0 1 358.7,343.5 Z"/>
@@ -16,15 +24,15 @@
   <circle class="holes" cx="465.3" cy="237.4" r="13.3"/>
   <circle class="holes" cx="465.3" cy="144.1" r="13.3"/>
   <path class="arrow" fill="none" d="M372.0,436.7 L372.0,357.4 A173.4,173.4 0 0 0 503.7,71.3"/>
-  <circle class="cutter" cx="372.0" cy="436.7" r="13.3"/>
+  <circle class="cutter" cx="465.3" cy="237.4" r="13.3"/>
   <line class="datum" x1="362.0" y1="184.1" x2="382.0" y2="184.1"/>
   <line class="datum" x1="372.0" y1="174.1" x2="372.0" y2="194.1"/>
   <text class="datum-label" x="314.0" y="230.1">X0 Y0</text>
-  <circle class="cutter" cx="127.6" cy="384.8" r="4.2"/>
-  <line class="leader" x1="123.6" y1="384.8" x2="103.6" y2="424.8"/>
-  <text class="label" x="109.6" y="438.8">left end: X here</text>
-  <circle class="cutter" cx="288.0" cy="84.0" r="4.2"/>
-  <text class="label" x="38.0" y="80.0">back edge: Y here (edge finder)</text>
+  <line class="datum" x1="133.6" y1="372.8" x2="133.6" y2="396.8"/>
+  <text class="datum-label" x="20.0" y="438.8">left end: X touched off here</text>
+  <line class="leader" x1="133.6" y1="396.8" x2="127.6" y2="426.8"/>
+  <line class="datum" x1="276.0" y1="90.0" x2="300.0" y2="90.0"/>
+  <text class="datum-label" x="288.0" y="80.0" text-anchor="middle">back edge: Y touched off here</text>
   <text class="label-halo" x="170.3" y="384.1">tube stop</text>
   <text class="label-halo" x="279.0" y="379.9">channel</text>
   <line class="leader" x1="510.7" y1="248.8" x2="460.7" y2="208.8"/>
@@ -32,7 +40,10 @@
   <text class="label-halo" x="430.7" y="202.8">cove</text>
   <text class="label-halo" x="572.5" y="341.1">waste</text>
   <text class="label-halo" x="431.3" y="124.1">stud holes</text>
-  <text class="label" x="332.0" y="470.7">1/2 in end mill: up the front at X0, round the arc</text>
-  <text class="label" x="20.0" y="530.0">GF01_form_a: T1 pecks the two stud holes, then cuts the arc through in four levels; T2, the 1/4 in ball,</text>
-  <text class="label" x="20.0" y="548.0">cuts the groove (dashed edges, centre line). 1-2-3 blocks dotted, under each strap. Plan view, to scale.</text>
+  <line class="leader" x1="636.0" y1="196.0" x2="477.3" y2="231.0"/>
+  <text class="label-halo" x="640.0" y="190.0">1/2 in end mill</text>
+  <text class="label-halo" x="640.0" y="205.0">(first stud hole)</text>
+  <text class="label" x="332.0" y="470.7">the arc next: up the front at X0, round the arc</text>
+  <text class="label" x="20.0" y="530.0">GF01_form_a: T1 pecks the two stud holes, then cuts the arc through in four levels (arrow); T2, the 1/4 in ball,</text>
+  <text class="label" x="20.0" y="548.0">then cuts the groove (dashed). 1-2-3 blocks dotted, a step clamp's strap over each. To scale.</text>
 </svg>

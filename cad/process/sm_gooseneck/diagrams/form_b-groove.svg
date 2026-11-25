@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 560" font-family="sans-serif" font-size="13">
+  <rect class="paper" x="0" y="0" width="760" height="560"/>
+  <!-- Hand picture, plan view, to scale at 2.1 px/mm from the plate's 9.0 in
+     (228.6 mm drawn 480.1 px) and its 6.0 in width (320 px). Plate, 1-2-3
+     blocks (3 x 2 in), stud holes, arc and groove from [parameters] and
+     the GF01/GF02 NC. The 1/4 in ball end mill (ball_cutter_dia_mm 6.35) is drawn 13.3 px across,
+     at the groove's first plunge X-57.059 Y50.504 (past the back edge).
+     The step clamps' straps and studs are not on record: drawn schematic.
+     The edge finder is a touch-off tool and is not drawn; the two
+     touch-off edges are marked as datums. -->
+  <text class="title" x="20.0" y="18.0">Setup 4, M6 T2: the 1/4 in ball end mill cuts plate B's groove (plan view, 2.1 px/mm)</text>
+  <rect class="fixture-table" x="0" y="28" width="760" height="482"/>
+  <path class="part-kept" d="M626.4,410.0 L401.3,410.0 L401.3,343.5 A160.0,160.0 0 0 1 258.5,90.0 L626.4,90.0 Z"/>
+  <path class="part-removed" d="M401.3,410.0 L374.7,410.0 L374.7,370.3 A186.7,186.7 0 0 1 226.7,90.0 L258.5,90.0 A160.0,160.0 0 0 0 401.3,343.5 Z"/>
+  <path class="part-waste" d="M374.7,410.0 L146.3,410.0 L146.3,90.0 L226.7,90.0 A186.7,186.7 0 0 0 374.7,370.3 Z"/>
+  <path class="hidden" d="M519.7,357.9 L388.0,357.9 M519.7,357.9 L519.7,330.2 L388.0,330.2 A146.2,146.2 0 0 1 276.1,90.0"/>
+  <path class="centre-line" d="M519.7,344.1 L388.0,344.1 A160.0,160.0 0 0 1 258.5,90.0"/>
+  <rect class="fixture-support" x="493.0" y="236.7" width="160.0" height="106.7"/>
+  <rect class="fixture-support" x="333.0" y="103.3" width="106.7" height="160.0"/>
+  <rect class="fixture-support" x="119.7" y="296.7" width="106.7" height="160.0"/>
+  <rect class="clamp" x="546.4" y="263.4" width="866.7" height="53.3"/>
+  <rect class="clamp" x="359.7" y="156.7" width="866.7" height="53.3"/>
+  <rect class="clamp" x="-667.0" y="350.0" width="866.7" height="53.3"/>
+  <circle class="holes" cx="294.7" cy="237.4" r="13.3"/>
+  <circle class="holes" cx="294.7" cy="144.1" r="13.3"/>
+  <path class="arrow" fill="none" d="M268.2,78.0 A160.0,160.0 0 0 0 388.0,344.1 L498.0,344.1"/>
+  <circle class="cutter" cx="268.2" cy="78.0" r="6.67"/>
+  <line class="leader" x1="204.0" y1="56.0" x2="261.2" y2="74.0"/>
+  <text class="label" x="200.0" y="46.0" text-anchor="end">1/4 in ball end mill: plunged</text>
+  <text class="label" x="200.0" y="60.0" text-anchor="end">past the back edge, Z-.125</text>
+  <line class="datum" x1="378.0" y1="184.1" x2="398.0" y2="184.1"/>
+  <line class="datum" x1="388.0" y1="174.1" x2="388.0" y2="194.1"/>
+  <text class="datum-label" x="400.0" y="230.1">X0 Y0</text>
+  <text class="label-halo" x="527.7" y="384.1">tube stop</text>
+  <text class="label-halo" x="421.0" y="379.9">channel</text>
+  <line class="leader" x1="249.3" y1="248.8" x2="299.3" y2="208.8"/>
+  <circle class="leader-dot" cx="249.3" cy="248.8" r="2.5"/>
+  <text class="label-halo" x="299.3" y="202.8">cove</text>
+  <text class="label-halo" x="137.5" y="341.1">waste</text>
+  <text class="label-halo" x="260.7" y="124.1">stud holes</text>
+  <text class="label" x="20.0" y="530.0">GF02_form_b, T2: each level plunges past the back edge, runs round the cove and along the channel to the</text>
+  <text class="label" x="20.0" y="548.0">tube stop (arrow), then back. The arc is through; the waste stays under its own clamp. To scale.</text>
+</svg>

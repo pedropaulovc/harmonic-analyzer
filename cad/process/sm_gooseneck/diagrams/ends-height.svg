@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 290" font-family="sans-serif" font-size="13">
+  <!-- Hand picture, side view, to scale (24.2 px/in, from the tube's .500 O.D. drawn 12.1 px),
+     split from the old two-moment ends.svg. The 1-2-3 block across the arm's top dotted. -->
+  <rect class="paper" x="0" y="0" width="760" height="290"/>
+  <text class="title" x="20.0" y="18.0">Setup 7: the foot marked to the overall height (side view, to scale)</text>
+  <g transform="translate(0,-260)">
+    <text class="label" x="20.0" y="300.0">B. Flat on the table: a 1-2-3 block across the arm&#8217;s top, the steel rule along the leg to the foot</text>
+    <path class="part-kept" d="M47.0,470.0 L442.7,470.0 L445.7,469.9 L448.8,469.8 L451.8,469.5 L454.9,469.1 L457.9,468.5 L460.9,467.9 L463.9,467.1 L466.9,466.2 L469.8,465.2 L472.6,464.1 L475.5,462.8 L478.2,461.5 L481.0,460.1 L483.6,458.5 L486.2,456.8 L488.7,455.1 L491.2,453.2 L493.6,451.3 L495.9,449.2 L498.1,447.1 L500.3,444.9 L502.3,442.6 L504.3,440.2 L506.1,437.8 L507.9,435.2 L509.5,432.7 L511.1,430.0 L512.6,427.3 L513.9,424.5 L515.2,421.7 L516.3,418.8 L517.3,415.9 L518.2,413.0 L519.0,410.0 L519.6,407.0 L520.2,404.0 L520.6,400.9 L520.9,397.8 L521.1,394.8 L521.2,391.7 L521.2,380.3 L509.1,380.3 L509.1,391.5 L509.1,394.1 L508.9,396.7 L508.7,399.3 L508.3,401.8 L507.9,404.4 L507.3,407.0 L506.6,409.5 L505.9,412.0 L505.0,414.4 L504.1,416.9 L503.1,419.3 L501.9,421.6 L500.7,423.9 L499.4,426.1 L498.0,428.3 L496.5,430.5 L494.9,432.6 L493.3,434.6 L491.6,436.5 L489.8,438.4 L487.9,440.2 L485.9,442.0 L483.9,443.6 L481.8,445.2 L479.7,446.7 L477.5,448.1 L475.3,449.4 L473.0,450.6 L470.6,451.8 L468.2,452.8 L465.8,453.8 L463.4,454.7 L460.9,455.4 L458.4,456.1 L455.8,456.6 L453.2,457.1 L450.7,457.5 L448.1,457.7 L445.5,457.9 L442.7,457.9 L47.0,457.9 Z"/>
+    <rect class="fixture-support" x="521.2" y="348.0" width="24.1" height="72.4"/>
+    <rect class="part-rest" x="41.8" y="479.2" width="479.4" height="5.7"/>
+    <line class="dims" x1="47.0" y1="500" x2="521.2" y2="500"/>
+    <text class="label" x="200.0" y="518.0">overall height: foot to the block&#8217;s face (48 in steel rule)</text>
+    <text class="label" x="41.0" y="430.0">foot</text>
+  </g>
+</svg>

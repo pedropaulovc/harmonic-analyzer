@@ -1,10 +1,16 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 270" font-family="sans-serif" font-size="13">
+  <!-- Hand picture: to scale along the tube only (48 in drawn 695 px).
+     The saw's vise jaws and the blade are schematic: jaw size and kerf
+     not on record. -->
   <rect class="paper" x="0" y="0" width="760" height="270"/>
-  <text class="title" x="20.0" y="18.0">Setup 1: the 48 in tube; check it, saw the blank off one end (to scale along the tube)</text>
+  <text class="title" x="20.0" y="18.0">Setup 1: the 48 in tube; saw the blank off one end, the tube flat in the saw&#8217;s vise (to scale along the tube)</text>
   <rect class="part-kept" x="30.0" y="94.6" width="354.7" height="30.9"/>
   <rect class="part-rest" x="387.7" y="94.6" width="337.3" height="30.9"/>
   <line class="cutter" x1="386.2" y1="76.0" x2="386.2" y2="144.0"/>
-  <text class="label" x="362.2" y="160.0">saw cut</text>
+  <rect class="clamp" x="392.0" y="80.6" width="120.0" height="14.0"/>
+  <rect class="clamp" x="392.0" y="125.5" width="120.0" height="14.0"/>
+  <text class="label" x="520.0" y="152.0">saw&#8217;s vise jaws (schematic)</text>
+  <text class="label" x="300.0" y="160.0">saw blade</text>
   <line class="leader" x1="49.3" y1="66.0" x2="49.3" y2="98.0"/>
   <circle class="leader-dot" cx="49.3" cy="98.0" r="2.5"/>
   <line class="leader" x1="705.6" y1="66.0" x2="705.6" y2="98.0"/>
