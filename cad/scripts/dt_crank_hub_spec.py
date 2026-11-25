@@ -74,7 +74,10 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
         # the drive train's chain-plate air reads.
         "ReliefDia": 2,
     },
-    # The 3/8 drill's own decimal, Ø.375 under DRILLED HOLES (rule 3, D27).
+    # The 3/8 drill's own decimal, Ø.375 under DRILLED HOLES (rule 3; D27,
+    # delegated ruling 2026-11-25 (Main), precedent: the fit-necessity rule of
+    # the owner-approved fit policy (owner ruling 2026-11-24); owner review
+    # #2144).
     "BoreProfile": {"BoreDia": 3},  # 9.525, .375 in
     # Two places from the faced outboard end: the .XX band, with the thickest
     # arm stock placing the shoulder (the seat length is a fit-up reference),

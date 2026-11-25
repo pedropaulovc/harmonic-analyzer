@@ -5,8 +5,10 @@
 # and bond are owner ruling 2026-11-24, fit audit question 21.  The bore is
 # the 3/8 drill's at DRILLED HOLES with MHA-DT-11's shank turned to it, so it
 # needs no entry: N-01 (the .3760 REAM, kind trace) is removed (delegated
-# ruling 2026-11-25 (Main), no owner number changed; owner review #2144
-# (D27)).
+# ruling 2026-11-25 (Main), precedent: the fit-necessity rule of the
+# owner-approved fit policy (drawing-simplicity-policy.md; owner ruling
+# 2026-11-24): a bore with no failing check takes the plain drill; no owner
+# number changed; owner review #2144 (D27)).
 necessity:
   - id: N-02
     feature: "sheet 1, .99 +.004 overall length"

@@ -155,7 +155,9 @@ def test_u33_running_fit_end_play_and_engagement() -> None:
     # Handle numbers come from its own spec, the arm thickness from the shared
     # crank interface geometry.
     assert handle.PIVOT_BORE_DIA + handle.PIVOT_BORE_BAND[1] == pytest.approx(0.161 * 25.4)
-    # D26 (delegated ruling 2026-11-25): the #20's DRILLED HOLES .165, no cap.
+    # Delegated ruling 2026-11-25 (Main), precedent: owner ruling 2026-11-24
+    # merging the fit policy; RETIRES the owner's fit-audit Q14 answer's trial
+    # step; owner review #2144 (D26): the #20's DRILLED HOLES .165, no cap.
     assert handle.PIVOT_BORE_DIA + handle.PIVOT_BORE_BAND[0] == pytest.approx(0.165 * 25.4)
 
     # The fitted shoulder: the cup face on the handle's basic length less the

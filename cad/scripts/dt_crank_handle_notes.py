@@ -42,8 +42,10 @@ def _floor_thou(value_mm: float) -> str:
 # owner ruling 2026-11-24, fit audit question 14: "handle stays DRILL #20;
 # DT-32 shoulder by trial").  The bore is a plain #20 drilled hole at
 # DRILLED HOLES, .1610-.1650, which the tenon walls are judged at
-# (dt_crank_handle_spec.PIVOT_BORE_FIT_MAX; D26, delegated ruling 2026-11-25
-# (Main), retired the .1635 MAX cap and the shoulder's .1635 trial step).
+# (dt_crank_handle_spec.PIVOT_BORE_FIT_MAX; delegated ruling 2026-11-25
+# (Main), precedent: owner ruling 2026-11-24 merging the fit policy; RETIRES
+# the owner's fit-audit Q14 answer's trial step; owner review #2144 (D26),
+# retired the .1635 MAX cap and the shoulder's .1635 trial step).
 PIVOT_BORE_DRILL = "#20"
 PIVOT_BORE_CALLOUT = (
     f"{PIVOT_BORE_DRILL} DRILL THRU\n"

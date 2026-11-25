@@ -205,8 +205,11 @@ SERVICE_PIN_STATION = 13.462  # .53
 CRANK_FACE_SHIFT = ARM_THICKNESS
 
 # The bore is the named 3/8 drill's at DRILLED HOLES, .375-.379 (delegated
-# ruling 2026-11-25 (Main), no owner number changed; owner review #2144
-# (D27): the .3760 REAM failed rule 4's necessity test, since the crank is
+# ruling 2026-11-25 (Main), precedent: the fit-necessity rule of the
+# owner-approved fit policy (drawing-simplicity-policy.md; owner ruling
+# 2026-11-24): a bore with no failing check takes the plain drill; no owner
+# number changed; owner review #2144 (D27): the .3760 REAM failed rule 4's
+# necessity test, since the crank is
 # stopped by eye and taper-pinned to MHA-DT-11, so bore shake reaches no
 # reading).  MHA-DT-11's stub is made last and turned to the bore's smallest
 # measured reading less the shaft-in-bushing class's catalogued .0010-.0023

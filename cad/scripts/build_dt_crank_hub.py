@@ -412,7 +412,9 @@ def build(adapter) -> dict[str, str]:
     )
     # The bore prints the 3/8 drill's Ø.375 under DRILLED HOLES, no native
     # band; MHA-DT-11 is turned to it (fit audit 2026-11-23, MHA-DT-31.bore;
-    # delegated ruling 2026-11-25, D27).
+    # D27, delegated ruling 2026-11-25 (Main), precedent: the fit-necessity
+    # rule of the owner-approved fit policy (owner ruling 2026-11-24); owner
+    # review #2144).
     # The overall places the rear face the removable and the drive-pin tips
     # clear, so it carries its functional limit on the side that closes an
     # air and keeps the .XX band's -.010 on the other (dt_crank_hub_geometry),

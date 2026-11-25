@@ -127,8 +127,10 @@ def test_every_profile_size_is_a_model_dimension() -> None:
     assert spec.REFERENCE_RADII == {"FlareR", "SConcaveR", "SConvexR", "DomeR"}
     assert spec.REFERENCE_RADII <= spec.DRAWING_DIMENSIONS["HandleProfile"]
     # Owner ruling 2026-11-24, fit audit question 14: the bore stays drilled
-    # #20 and MHA-DT-32 is turned to it; D26 (delegated ruling 2026-11-25)
-    # retired the .1635 MAX cap: a plain drilled hole, no size in the callout.
+    # #20 and MHA-DT-32 is turned to it; delegated ruling 2026-11-25 (Main),
+    # precedent: owner ruling 2026-11-24 merging the fit policy; RETIRES the
+    # owner's fit-audit Q14 answer's trial step; owner review #2144 (D26):
+    # the .1635 MAX cap is retired: a plain drilled hole, no size in the callout.
     assert drawing.PIVOT_BORE_CALLOUT.startswith("#20 DRILL THRU\n")
     assert "MAX" not in drawing.PIVOT_BORE_CALLOUT
     assert "MHA-DT-32 SHOULDER IS\nTURNED TO THIS BORE" in drawing.PIVOT_BORE_CALLOUT
@@ -227,9 +229,10 @@ def test_tenon_and_counterbore_are_fitted_to_the_parts_they_take() -> None:
     # the rest in the numbered note each flags.
     spec = dt_crank_handle_spec
     # The counterbore depth seats the cup face flush, so it is fitted too.
-    assert spec.REFERENCE_DIMENSIONS == {
-        "PivotBoreDia", "TenonDia", "CounterboreDia", "CounterboreDepth",
-    }
+    # The #20 drilled pivot bore is no reference: DRILLED HOLES controls it
+    # (D26, codjiflo 3548-r3-2).
+    assert spec.REFERENCE_DIMENSIONS == {"TenonDia", "CounterboreDia", "CounterboreDepth"}
+    assert "PivotBoreDia" not in spec.REFERENCE_DIMENSIONS
     assert spec.TENON_DIA == pytest.approx(ferrule.BORE_DIA - sum(spec.TENON_GLUE_LINE) / 2.0)
     assert spec.COUNTERBORE_DIA == pytest.approx(
         cup.BODY_DIA + sum(spec.COUNTERBORE_GLUE_LINE) / 2.0
