@@ -95,13 +95,14 @@ END_FLOAT = (
 )
 # Fit-up: the north ear's inner face is DRO-located off the located drum bank;
 # the south bracket is then set to the ears' inner-face span, +/-.004 in.
-# The DRO locate is booked at the title block's +/-.005 (MHA-DT-00 setting
-# row 5 prints 2.631-2.640: rule 4 opens it to the title block, since no
-# check it feeds falls under D28's 0.03 mm margin; END_CLEARANCE_MIN north
-# 0.254 against the 0.10 floor). It is this row's own band, not
-# cylinder_bank_layout's FRONT_STRAP_LOCATE_BAND (row 2, kept at 0.10 by
-# necessity N-01).
-NORTH_EAR_LOCATE_BAND = 0.127  # DRO edge-find on the ear's inner face, +/-.005
+# The DRO locate is booked at the title block's .010 window (MHA-DT-00
+# setting row 5 prints 2.631-2.641: rule 4 opens it to the title block, since
+# no check it feeds falls under D28's 0.03 mm margin; END_CLEARANCE_MIN north
+# 0.249 against the 0.10 floor). The nominal is off the .001 grid, so the
+# band is .0052 to print the title block's full .010 window (Codjiflo
+# 3550-r5). It is this row's own band, not cylinder_bank_layout's
+# FRONT_STRAP_LOCATE_BAND (row 2, kept at 0.10 by necessity N-01).
+NORTH_EAR_LOCATE_BAND = 0.132  # DRO edge-find on the ear's inner face, +/-.0052
 EAR_INNER_SPAN = NORTH_EAR_INNER_Z - SOUTH_EAR_INNER_Z
 EAR_SPAN_BAND = 0.1016  # +/-.004
 # Each ear's inner face off its nominal station, (south, north).

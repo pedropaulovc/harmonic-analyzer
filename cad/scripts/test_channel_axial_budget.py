@@ -162,7 +162,7 @@ def test_every_rocker_follows_its_rod_inside_the_hub_gaps_and_the_ears(j: int) -
 
 def test_the_end_hubs_never_reach_their_ears() -> None:
     south, north = rocker.END_CLEARANCE_MIN
-    assert (south, north) == pytest.approx((0.5588, 0.2540), abs=1e-4)
+    assert (south, north) == pytest.approx((0.5538, 0.2490), abs=1e-4)
     assert min(south, north) >= rocker.RUNNING_FLOOR
     assert rocker.END_FLOAT == pytest.approx((1.6764, 1.27))
     # The same from this test's own stack, the ear at its locate band.

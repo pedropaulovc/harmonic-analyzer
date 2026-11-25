@@ -56,14 +56,16 @@ def test_shared_rules_are_the_cylinder_bank_rules() -> None:
 def test_each_dro_locate_band_is_its_own_row() -> None:
     """The two DRO edge-finds off the one DRO zero are separate MHA-DT-00
     setting rows with their own bands and reasons. Row 5, the back MHA-CH-08
-    ear: rule 4 opens it to the title block's +/-.005, since no check it
+    ear: rule 4 opens it to the title block's .010 window, since no check it
     feeds falls under D28's 0.03 mm margin there. Row 2, the front MHA-DT-02
     strap: kept at 0.10 mm by necessity N-01 (delegated ruling 2026-11-25
     (Main), no precedent; owner review #2144 (D28)), the channel axial
     budget's 0.028 mm headroom."""
     import machinist_necessity
 
-    assert bank.NORTH_EAR_LOCATE_BAND == pytest.approx(0.005 * 25.4)
+    # The nominal is off the .001 grid, so .0052 prints the full .010
+    # (Codjiflo 3550-r5).
+    assert bank.NORTH_EAR_LOCATE_BAND == pytest.approx(0.132)
     assert min(bank.END_CLEARANCE_MIN) - bank.RUNNING_FLOOR >= 0.03
     assert drum_bank.FRONT_STRAP_LOCATE_BAND == pytest.approx(0.10)
     register = machinist_necessity.load_necessity(
@@ -321,7 +323,7 @@ def test_the_set_screws_bite_flats_clear_of_the_hubs() -> None:
         bracket.SET_SCREW_STATION_BAND + bracket.EAR_T_BAND,
     )
     assert bank.FLAT_RUN_MAX == pytest.approx(hub_free)
-    assert bank.FLAT_RUN_MAX == pytest.approx((4.572, 4.2164), abs=5e-4)
+    assert bank.FLAT_RUN_MAX == pytest.approx((4.567, 4.2114), abs=5e-4)
     for offset, error, run_max, band in zip(
         bank.FLAT_OFFSET_MAX, station_error, hub_free, tap_band, strict=True
     ):

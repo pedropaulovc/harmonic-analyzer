@@ -752,6 +752,17 @@ def test_the_pedestals_are_set_by_feel_then_spotted_with_one_tripwire() -> None:
     assert "FILL IN" not in check
 
 
+def test_the_back_ear_row_prints_the_title_block_s_full_window() -> None:
+    """Row 5's nominal is off the .001 grid, so its band is .0052 and the
+    inward-rounded limits still span the title block's full .010 (Codjiflo
+    3550-r5)."""
+    (row,) = (
+        r for r in drawing.SETTING_TABLE_ROWS if r[2].startswith("BACK MHA-CH-08 EAR INNER FACE")
+    )
+    low, high = (float(text) for text in row[4].split("-"))
+    assert high - low >= 0.010 - 1e-9, row
+
+
 def test_the_cone_set_is_accepted_through_a_turn_of_every_drum_gear() -> None:
     """The feel set guarantees no bind only where it was felt, so the
     acceptance turns the crank until the slowest MHA-DT-12 has made a turn."""
