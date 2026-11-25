@@ -377,8 +377,11 @@ def test_three_rib_size_clears_boss_witness_and_complete_neighbors() -> None:
 
 def test_the_knife_edge_prints_its_ridge_and_flanks_to_the_sides() -> None:
     """Code review C09 (owner ruling T1): Detail D holds the ridge sharp
-    .159 +/-.002 from each side face and each upper flank 122.4 +/-0.5 deg
-    to its side face, on both stubs; the width is a reference."""
+    .159 +/-.002 from each side face and each upper flank 122.4 deg to its
+    side face, on both stubs; the width is a reference.  The flank angle
+    prints at the title block's ±1° (rulings.md D24)."""
+    from _printed_tolerance import angular_band_deg
+
     spec = sm_summing_lever_spec
     knife = notes.DRAWING_DIMENSIONS["KnifeEnvelopeReference"]
     assert knife == {
@@ -405,7 +408,8 @@ def test_the_knife_edge_prints_its_ridge_and_flanks_to_the_sides() -> None:
     every_callout = notes.DIMENSION_CALLOUTS_BELOW
     assert "HexWidth" not in every_callout
     assert (spec.RIDGE_FROM_SIDE, spec.RIDGE_FROM_SIDE_TOL) == (4.040, 0.0508)
-    assert (spec.KNIFE_FLANK_TO_SIDE_DEG, spec.KNIFE_FLANK_TO_SIDE_TOL_DEG) == (122.4, 0.5)
+    assert spec.KNIFE_FLANK_TO_SIDE_DEG == 122.4
+    assert spec.KNIFE_FLANK_TO_SIDE_TOL_DEG == angular_band_deg(unit=spec.UNIT) == 1.0
     assert not hasattr(spec, "RIDGE_ANGLE_TOL_DEG")
     assert not hasattr(spec, "KNIFE_SHOULDER_RISE")
 
@@ -768,14 +772,13 @@ def test_back_projected_knife_detail_uses_model_owned_spans_and_exterior_angle()
         return f"{value / 25.4:.{places}f}".removeprefix("0")
 
     ridge_value = f"EACH STUB {inch(spec.RIDGE_FROM_SIDE)} ±{inch(spec.RIDGE_FROM_SIDE_TOL)}"
-    flank_band = f"{spec.KNIFE_FLANK_TO_SIDE_TOL_DEG:.1f}".removeprefix("0")
     blocks = {
         "HexWidth": _detail_block("HexWidth", f"EACH STUB ({inch(spec.HEX_W)})"),
         "HexHeight": _detail_block("HexHeight", f"EACH STUB {inch(spec.HEX_H)}"),
         "RidgeFromLeft": _detail_block("RidgeFromLeft", ridge_value),
         "RidgeFromRight": _detail_block("RidgeFromRight", ridge_value),
         "FlankToSide": _detail_block(
-            "FlankToSide", f"2X PER STUB {spec.KNIFE_FLANK_TO_SIDE_DEG:.1f}° ±{flank_band}°",
+            "FlankToSide", f"2X PER STUB {spec.KNIFE_FLANK_TO_SIDE_DEG:.1f}°",
         ),
         "KnifeRidgeRadius": _detail_block(
             "KnifeRidgeRadius", f"EACH STUB R{inch(spec.KNIFE_RIDGE_R, spec.KNIFE_RIDGE_R_PLACES)} max.",

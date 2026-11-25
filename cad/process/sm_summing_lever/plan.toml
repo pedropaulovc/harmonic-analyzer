@@ -43,13 +43,13 @@ id = "tap-6-32-plug"
 name = "#6-32 plug tap"
 ref = "tap-6-32-plug"  # Tap coverage #6-32 UNC
 
-# Tool audit 2026-11-23 (row sine-bar-5): the 122.4° ±.5° flank tilt is set
+# Tool audit 2026-11-23 (row sine-bar-5): the 122.4° ±1° flank tilt is set
 # with the owned digital angle gauge, zeroed on the table and read on the
 # part's large side face; no sine bar and no gauge-block stack for it.
 [[tools]]
 id = "digital-angle-gauge"
 name = "Digital angle gauge"
-ref = "digital-angle-gauge"  # F-digital-angle-gauge; sets the 122.4° ±.5° knife-edge flanks
+ref = "digital-angle-gauge"  # F-digital-angle-gauge; sets the 122.4° ±1° knife-edge flanks
 
 [[setups]]
 machine_kind = "other"

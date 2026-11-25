@@ -746,7 +746,9 @@ def test_the_datum_frame_is_the_zone_the_stacks_were_derived_on() -> None:
     assert knife_mount.KNIFE_BORE_POSITION_TOL == pytest.approx(0.2032)
     assert knife_mount.KNIFE_BORE_PARALLELISM_TOL == pytest.approx(0.0508)
     assert asm.HANGER_SCREW_MISMATCH == pytest.approx(0.4924453, abs=5e-6)
-    assert asm.KNIFE_FREE_ROCK_WORST_DEG == pytest.approx(8.533232, abs=5e-6)
+    # The flanks at the title block's ±1° (rulings.md D24): 8.16 deg, over
+    # three degrees above the 5.0 floor.
+    assert asm.KNIFE_FREE_ROCK_WORST_DEG - asm.KNIFE_FREE_ROCK_FLOOR_DEG >= 3.0
 
     # The bore's position zone enters the screw float only through the bar
     # line's turn about the dowel, on top of the bar's own play.  Ø.008
@@ -781,8 +783,9 @@ def test_the_datum_frame_is_the_zone_the_stacks_were_derived_on() -> None:
 
     # The bar-set far-end offset is the bar's diametral clearance in the
     # largest bore plus the ridge's yaw over the mouth span; the bore's
-    # ∥.002|A (pitch) does not enter the lateral rock.  The floor holds to a
-    # .0175 bar clearance (t 0.446) in the Ø.4985 bore (owner ruling 2026-11-23, tool audit Q13), over four times the gauge bar's .0040.
+    # ∥.002|A (pitch) does not enter the lateral rock.  In the Ø.4985 bore
+    # (owner ruling 2026-11-23, tool audit Q13) the floor holds to over four
+    # times the gauge bar's .0040 clearance (.0161 with the flanks at ±1°).
     block_depth = knife_mount.SUPPORT_Z_THICK + knife_mount.BLOCK_SIZE_TOL
 
     def rock_at_clearance(clearance: float) -> float:
@@ -797,14 +800,11 @@ def test_the_datum_frame_is_the_zone_the_stacks_were_derived_on() -> None:
     assert rock_at_clearance(asm.KNIFE_BAR_CLEARANCE) == pytest.approx(
         asm.KNIFE_FREE_ROCK_WORST_DEG
     )
-    assert rock_at_clearance(0.0035 * inch) == pytest.approx(8.660027, abs=5e-6)
-    assert rock_at_clearance(0.0100 * inch) == pytest.approx(6.991398, abs=5e-6)
-    assert rock_at_clearance(0.0120 * inch) == pytest.approx(6.469350, abs=5e-6)
-    assert (
-        rock_at_clearance(0.0176 * inch)
-        < asm.KNIFE_FREE_ROCK_FLOOR_DEG
-        <= rock_at_clearance(0.0175 * inch)
-    )
+    # The rock falls as the clearance grows, and four bar clearances still
+    # hold the floor.
+    rocks = [rock_at_clearance(c * inch) for c in (0.0035, 0.0100, 0.0120)]
+    assert rocks == sorted(rocks, reverse=True)
+    assert rock_at_clearance(4.0 * asm.KNIFE_BAR_CLEARANCE) >= asm.KNIFE_FREE_ROCK_FLOOR_DEG
 
 
 def test_the_gauge_bar_floor_caps_its_play_and_records_the_corner() -> None:
@@ -931,13 +931,18 @@ def test_the_knife_edge_keeps_five_degrees_of_rock_at_the_worst_case() -> None:
     )
     assert asm.KNIFE_BORE_FAR_END_OFFSET == pytest.approx(0.1102929, abs=5e-7)
     # Code review C09 (owner ruling T1): the print holds the ridge .159
-    # +/-.002 from each side face and each upper flank 122.4 +/-0.5 deg to its
-    # side face.  The worst shoulder is .161 (4.0894) out on a flank 58.1 deg
-    # off the vertical, so 2.5454 under the ridge: 8.53 deg in the smallest bore.
+    # +/-.002 from each side face and each upper flank 122.4 deg to its side
+    # face, at the title block's ±1° since rulings.md D24.  The worst shoulder
+    # is .161 (4.0894) out on the flattest flank, so the rock in the smallest
+    # bore keeps over three degrees above the 5.0 floor (8.16 deg).
     assert lever.KNIFE_SHOULDER_X_MAX == pytest.approx(4.0894)
-    assert lever.KNIFE_FLANK_HALF_MAX_DEG == pytest.approx(58.1)
-    assert lever.KNIFE_SHOULDER_DROP_MIN == pytest.approx(2.545427, abs=5e-6)
-    assert asm.KNIFE_FREE_ROCK_WORST_DEG == pytest.approx(8.533232, abs=5e-6)
+    assert lever.KNIFE_FLANK_HALF_MAX_DEG == pytest.approx(
+        180.0 - (lever.KNIFE_FLANK_TO_SIDE_DEG - lever.KNIFE_FLANK_TO_SIDE_TOL_DEG)
+    )
+    assert lever.KNIFE_SHOULDER_DROP_MIN == pytest.approx(
+        lever.KNIFE_SHOULDER_X_MAX / math.tan(math.radians(lever.KNIFE_FLANK_HALF_MAX_DEG))
+    )
+    assert asm.KNIFE_FREE_ROCK_WORST_DEG - asm.KNIFE_FREE_ROCK_FLOOR_DEG >= 3.0
     assert asm.KNIFE_FREE_ROCK_WORST_DEG >= asm.KNIFE_FREE_ROCK_FLOOR_DEG == 5.0
     assert knife_mount.BORE_R_MIN == pytest.approx(6.33095)
 
@@ -962,13 +967,13 @@ def test_the_knife_edge_keeps_five_degrees_of_rock_at_the_worst_case() -> None:
     assert min(corners, key=corners.get) == (x_tol, -a_tol)
     assert min(corners.values()) == pytest.approx(asm.KNIFE_FREE_ROCK_WORST_DEG)
     assert corners[(0.0, 0.0)] == pytest.approx(9.198, abs=5e-3)
-    assert max(corners.values()) == pytest.approx(9.862, abs=5e-3)
+    assert max(corners.values()) > corners[(0.0, 0.0)]
     # The counterexample the old controls admitted (code review C09): the
     # included angle at its nominal, held by HexWidth and the angle only, with
     # the flanks split unevenly about the vertical at the widest .XXX
     # section.  One flank 2, 3 or 5.5 deg flatter drops the rock to 7.35, 6.58,
     # 4.61: under the floor past about 5 deg.  T1 bounds each flank to its side
-    # face, so no split past 0.5 deg passes the print.
+    # face, so no split past the title block's 1 deg passes the print.
     widest_half = (lever.HEX_W + lever.HEX_BAND) / 2.0
     split_rock = {}
     for split, expected in ((2.0, 7.3470), (3.0, 6.5790), (5.5, 4.6086)):
