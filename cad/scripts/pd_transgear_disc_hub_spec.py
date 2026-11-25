@@ -379,10 +379,13 @@ if not KEY_PIN_DRILL_DIA + DRILL_OVERSIZE < KEY_PIN_HOLE_DIA:
 # the title block's (KEY_PIN_CHORD_BAND): .002 looser and the pin's side
 # closes on the sleeve's flat at one end (KEY_PIN_FLAT_AIR's least is
 # .0006) and the wall over the ream falls under the floor at the other.
-# The stop's from the axis along local -X takes the title block's row (rule
-# 4: nothing fails at the title block; it printed +/-.002): the
-# pin's ends stay under the O.D. and held in the wall at +/-.005
-# (KEY_PIN_END_RECESS_WORST, KEY_PIN_SUPPORT_WORST below).
+# The stop's from the axis along local -X takes the title block's .XXX row
+# (rule 4: nothing fails at it; it printed +/-.002).  The third place is
+# its function (rule 3): the pin, pressed to the stop, keeps its +X end
+# under the O.D., and the ream's corner at the deepest stop stays inside the
+# -X O.D. (KEY_PIN_END_RECESS_WORST below, positive at +/-.005); at the .XX
+# row's +/-.01 both break through.  The pin's ends stay held in the wall
+# (KEY_PIN_SUPPORT_WORST) at either row.
 KEY_PIN_CHORD_OFFSET = 4.4196  # .174
 KEY_PIN_STOP = 4.064  # .160
 KEY_PIN_STOP_X = -KEY_PIN_STOP
@@ -664,9 +667,14 @@ BORE_CALLOUT_BELOW = "\n".join(
 )
 BORE_NOTE_TEXT = f"{SLEEVE_NUMBER} IS TURNED TO THIS BORE."
 # The overall prints the disc cluster's band and names the stack it serves
-# (rule 4), in one note its callout links.
+# (rule 4); the spigot's length, the stack's other term on this part, is
+# held at the title block's .XXX row because at the .XX row the collar air
+# closes under its floor (pd_cluster_air.require_air; delegated ruling D21,
+# 2026-11-25), so its third place states that function (rule 3) by the same
+# note, which names both parts: one reason, once, linked from both.
 STACK_TEXT = f"{STACK_NAME}: SETS {COLLAR_NUMBER} TO {DISC_NUMBER} CLEARANCE."
 HUB_LENGTH_CALLOUT = f"SEE NOTE {STACK_NOTE}"
+SPIGOT_LENGTH_CALLOUT = f"SEE NOTE {STACK_NOTE}"
 # The flange's .XXX thickness sets the disc screws' reach (the cut window
 # in pd_transgear_disc_screw_spec reads it).
 FLANGE_THICK_CALLOUT = f"SETS {SCREW_NAME}\n{SCREW_NUMBER} REACH"
@@ -696,27 +704,39 @@ OIL_HOLE_CALLOUT_BELOW = "\n".join(
         "INTO BORE",
     )
 )
-# The chord hole prints in section A-A, cut through its station: the
-# reamer's size with no band and REAM beside it (the value's own row: the
-# air left of the ring holds rows of sixteen characters under it), then
-# the ream's depth, its stop past the hub axis, at the title block's
-# three-place band (rule 26: a hole reads size, process, depth, and the
-# depth is never left to a view; reviews 2026-11-24: a .160 dimension on
-# the view was gated bare for stating no function, then for the depth
-# missing from the callout, and faulted for the function words beside it),
-# then the pin and the link to its fit note: the press fit and its
-# acceptance by the pin (why the hole is reamed and its offset held to
-# +/-.002 is the registry's); the #56 knockout drilled through; the
-# chord's offset from the hub axis, a location that carries its value and
-# band only (rule 7).
+# The chord hole prints in section A-A, cut through its station, in rule
+# 26's form: the reamer's size with no band and REAM beside it (the value's
+# own row), then the depth with the Y14.5 symbol as REF, then the link to
+# its fit note.  The REF depth runs along the hole's axis from where that
+# axis meets the O.D. (KEY_PIN_ENTRY_X, on the chord) to the stop: a curved
+# entry gives no face to measure from, so the controlling dimension is the
+# stop's .160 from the hub axis on the section (the CNC's Z0 is the axis).
+# Reviews 2026-11-24/25: a bare .160 on the view was gated for stating no
+# function, a label on it faulted, and the depth as a sentence in the
+# callout ("TO .160 PAST AXIS") was not the standard form; a bare .144 was
+# gated 3/3 for no stated function.  So the stop's .160 links the pin's fit
+# note on its own row, as the overall and the spigot's length link the
+# stack's (rule 7: a linked note counts as being at the dimension), and the
+# note states, in rule 3's sense, what the third place keeps clear: the
+# pressed pin's end and the floor inside the O.D.  The note names the pin
+# and its press fit, so the ream's callout links it and no longer repeats
+# the pin.  Why the hole is reamed and its offset held to +/-.002 is the
+# registry's.  The #56 knockout is drilled through; the chord's offset from
+# the hub axis is a location that carries its value and band only (rule 7).
+KEY_PIN_ENTRY_X = math.sqrt((HUB_DIA / 2.0) ** 2 - KEY_PIN_CHORD_OFFSET**2)
+KEY_PIN_DEPTH_REF = KEY_PIN_ENTRY_X + KEY_PIN_STOP  # .366
 KEY_PIN_SUFFIX = " REAM"
-KEY_PIN_DEPTH_TEXT = (
-    f"TO {inch_text(KEY_PIN_STOP, KEY_PIN_LOCATION_PLACES)} PAST AXIS"
-)
 KEY_PIN_CALLOUT_BELOW = "\n".join(
-    (KEY_PIN_DEPTH_TEXT, f"PIN {KEY_PIN_NUMBER}", f"SEE NOTE {KEY_PIN_NOTE}")
+    (
+        f"<HOLE-DEPTH> ({inch_text(KEY_PIN_DEPTH_REF, KEY_PIN_LOCATION_PLACES)})",
+        f"SEE NOTE {KEY_PIN_NOTE}",
+    )
 )
-KEY_PIN_NOTE_TEXT = f"PRESS FIT ON {KEY_PIN_NUMBER}: THE PIN PRESSES IN."
+KEY_PIN_STOP_SUFFIX = f" SEE NOTE {KEY_PIN_NOTE}"
+KEY_PIN_NOTE_TEXT = (
+    f"PRESS FIT ON {KEY_PIN_NUMBER}, PRESSED IN TO THE FLOOR: "
+    "PIN END AND FLOOR STAY INSIDE THE O.D."
+)
 # The numbered notes, in order.
 NOTE_TEXTS = {
     STACK_NOTE: STACK_TEXT,
@@ -738,8 +758,9 @@ REFERENCE_SKETCHES = ("KeyPinReference",)
 # hole's station on the axis it shares with the oil hole, and the oil hole's
 # size (drawing-guidelines.md rule 12 (hole and slot callouts say what to do)); face view: the bore,
 # and the screw holes on their bolt circle; section A-A: the key pin's chord
-# hole, its ream, knockout, offset and stop.  The overall prints the disc
-# cluster's +/-.001; the spigot's length the title block's row.
+# hole, its ream, knockout, offset and its stop (the ream's floor) from the
+# hub axis.  The overall prints the disc cluster's +/-.001; the spigot's
+# length the title block's row.
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "HubProfile": {
         "FlangeDia",
@@ -752,7 +773,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "BoreProfile": {"BoreDia"},
     "ScrewHoleProfile": {"BoltCircleDia", "ScrewHoleDia"},
     "OilHoleProfile": {"OilHoleDia"},
-    "KeyPinProfile": {"KeyPinDia", "KeyPinDrillDia", "KeyPinChord"},
+    "KeyPinProfile": {"KeyPinDia", "KeyPinDrillDia", "KeyPinChord", "KeyPinStop"},
     "KeyPinReference": {"KeyPinStation"},
 }
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
@@ -774,6 +795,7 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
         "KeyPinDia": KEY_PIN_HOLE_PLACES,
         "KeyPinDrillDia": KEY_PIN_DRILL_PLACES,
         "KeyPinChord": KEY_PIN_LOCATION_PLACES,
+        "KeyPinStop": KEY_PIN_LOCATION_PLACES,
     },
     "KeyPinReference": {"KeyPinStation": KEY_PIN_STATION_PLACES},
 }

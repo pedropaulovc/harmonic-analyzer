@@ -102,6 +102,7 @@ from pd_transgear_disc_hub_spec import (
     KEY_PIN_DRILL_CALLOUT_BELOW,
     KEY_PIN_SUFFIX,
     KEY_PIN_STOP,
+    KEY_PIN_STOP_SUFFIX,
     KEY_PIN_Z,
     OIL_HOLE_CALLOUT_BELOW,
     SCREW_HOLE_CALLOUT_ABOVE,
@@ -109,6 +110,7 @@ from pd_transgear_disc_hub_spec import (
     SPIGOT_CALLOUT_BELOW,
     SPIGOT_DIA,
     SPIGOT_LENGTH,
+    SPIGOT_LENGTH_CALLOUT,
     STACK_TEXT,
 )
 
@@ -158,10 +160,10 @@ SPIGOT_END_X = _side_x(SPIGOT_LENGTH)
 _FLANGE_R = FLANGE_DIA / 2.0 * _S
 _SPIGOT_R = SPIGOT_DIA / 2.0 * _S
 
-# The numbered notes the callouts link (the stack the overall sets, and the
-# three fits: the bore's, the key pin's and the spigot's), one line each;
-# top-left anchored in the empty field above the face view, left of the
-# overall's callout.
+# The numbered notes the callouts link (the stack the overall and the
+# spigot's length set, and the three fits: the bore's, the key pin's and
+# the spigot's), one line each; top-left anchored in the empty field above
+# the face view, left of the overall's callout.
 _NOTE_WIDTH = 96
 # The spigot's root corner, its largest radius on a leader to the corner
 # itself (rule 16): the lower corner on the edge view, where the flange's
@@ -219,9 +221,10 @@ NOTES_XY = (0.020, 0.262)
 #   little low between its extension lines to leave the spigot end's frame
 #   room above it.  One row above: the key-pin hole's station from the hub
 #   front face, its text between its extension lines left of the flange, and
-#   the spigot's length from the flange's rear face, a plain title-block
-#   size, its text just right of the spigot end's extension line (the
-#   overall's rises through that row) and so clear of the flange's
+#   the spigot's length from the flange's rear face, at the title block's
+#   row, its text right of the spigot, its whole callout block (the stack
+#   note's link) right of the spigot end's extension line (the overall's
+#   rises through that row) and so clear of the flange's
 #   dimension line.  The overall, printed to the disc cluster stack's band, on the
 #   next row up, outermost, its text and stack callout right of the spigot end's
 #   extension line.  Its ends are the spigot's and the hub's +X corners, so
@@ -287,7 +290,7 @@ SIDE_KEEP = {
         (HUB_FRONT_X + _KEY_PIN_X) / 2.0,
         AXIS_Y + _FLANGE_R + 0.009,
     ),
-    "SpigotLength": (SPIGOT_END_X + 0.012, AXIS_Y + _FLANGE_R + 0.009),
+    "SpigotLength": (SPIGOT_END_X + 0.026, AXIS_Y + _FLANGE_R + 0.009),
     "HubLength": (SPIGOT_END_X + 0.056, AXIS_Y + _FLANGE_R + 0.026),
     "OilHoleDia": (
         _OIL_HOLE_SHOULDER[0] - OIL_HOLE_TEXT_BLOCK[0] / 2.0,
@@ -314,6 +317,7 @@ DIMENSION_CALLOUTS_BELOW = {
     "ScrewHoleDia": SCREW_HOLE_CALLOUT_BELOW,
     "OilHoleDia": OIL_HOLE_CALLOUT_BELOW,
     "SpigotDia": SPIGOT_CALLOUT_BELOW,
+    "SpigotLength": SPIGOT_LENGTH_CALLOUT,
     "HubLength": HUB_LENGTH_CALLOUT,
     "FlangeThick": FLANGE_THICK_CALLOUT,
 }
@@ -408,30 +412,48 @@ SECTION_CENTERLINE_OVERRUN_MM = 1.0
 _SECTION_REACH_MM = _HUB_R_MM + SECTION_CENTERLINE_OVERRUN_MM
 # The chord hole's dimensions, imported from its station-plane profile,
 # print left of the section, in the air between the flange thickness's
-# block and the ring: the ream's size, depth and fit beside the ream,
-# four rows under the Ø1.05's lower extension line (y .125), the
+# block and the ring: the ream's size, REF depth and note link beside the
+# ream, three rows under the Ø1.05's lower extension line (y .125), the
 # knockout's beside the knockout, their dimension lines running straight
 # across the hole; the chord offset above the ring, its text right of the
 # hub axis's extension line and clear of the chord hole's (r5 review: a
-# line ran into the .17).  The ream's stop prints as the depth in its
-# callout, not as a dimension on the view.
+# line ran into the .17).  The ream's stop, its floor from the hub axis,
+# controls the callout's REF depth (rule 26) and prints between the two
+# blocks as run 20261124T013305458Z printed it, the same model dimension:
+# SolidWorks set its arrows outside the 12 mm between its extension lines
+# (the hub axis's level and the floor's), centred its text on the arrows'
+# column between them and drew no line there, so the ream's dimension line,
+# 2.6 mm over the text, passes between the extension lines and crosses
+# nothing.  Its note link rides the value's row (a row under it would sit on
+# the floor's extension line), so the text runs 15 characters, centred 6 mm
+# left of that run's column to stay 5 mm off the ring; the ream's block keeps
+# that run's point, three rows as then (one row more had the stop's upper
+# arrow run through the callout text, run 20261124T050324452Z), now
+# narrower, its right end 4 mm left of the arrows.  The knockout's block
+# drops 2 mm so the stop's lower arrow ends 2.7 mm over its second row.
+SECTION_STOP_ARROW_X = 0.329
 SECTION_KEEP = {
     "KeyPinChord": (
         SECTION_CENTER[0] + 0.019,
         _section_xy(_SECTION_REACH_MM, 0.0)[1] + 0.004,
     ),
-    "KeyPinDia": (0.313, SECTION_CENTER[1] + 0.004),
+    "KeyPinStop": (
+        SECTION_STOP_ARROW_X,
+        _section_xy(-KEY_PIN_STOP / 2.0, 0.0)[1],
+    ),
+    "KeyPinDia": (0.3125, SECTION_CENTER[1] + 0.0065),
     "KeyPinDrillDia": (
         0.315,
-        _section_xy(-(KEY_PIN_STOP + _SECTION_REACH_MM) / 2.0, 0.0)[1],
+        _section_xy(-(KEY_PIN_STOP + _SECTION_REACH_MM) / 2.0, 0.0)[1] - 0.002,
     ),
 }
 SECTION_CALLOUTS_BELOW = {
     "KeyPinDia": KEY_PIN_CALLOUT_BELOW,
     "KeyPinDrillDia": KEY_PIN_DRILL_CALLOUT_BELOW,
 }
-# REAM stands beside the ream's size, on the value's own row.
-SECTION_SUFFIXES = {"KeyPinDia": KEY_PIN_SUFFIX}
+# REAM stands beside the ream's size, and the stop's note link beside the
+# stop, each on the value's own row.
+SECTION_SUFFIXES = {"KeyPinDia": KEY_PIN_SUFFIX, "KeyPinStop": KEY_PIN_STOP_SUFFIX}
 # Centrelines across the cut, each ending 1 mm past the O.D. where it crosses
 # it: the bore's two, the horizontal one the oil hole's axis, and the chord
 # hole's axis.  The section arrives centre-marked, the mark's arms running
@@ -481,8 +503,6 @@ _PLUS_MINUS = {
     "HubLength": (_spec.HUB_LENGTH_BAND, -_spec.HUB_LENGTH_BAND),
     "KeyPinChord": (_spec.KEY_PIN_CHORD_BAND, -_spec.KEY_PIN_CHORD_BAND),
 }
-# The chord ream enters the hub body's O.D. where its axis meets it (+X).
-KEY_PIN_ENTRY_X = math.sqrt((HUB_DIA / 2.0) ** 2 - KEY_PIN_CHORD_OFFSET**2)
 KEY_PIN_STOP_LIMITS = limits(
     KEY_PIN_STOP, _spec.KEY_PIN_LOCATION_PLACES, unit=_UNIT
 )
@@ -632,6 +652,8 @@ requirement(
         ),
         "length_nominal": (SPIGOT_LENGTH, ((_GEOM, "SPIGOT_LENGTH"),)),
         "length_end": ("flange_rear_face", ((_SELF, "SIDE_KEEP"),)),
+        "length_callout": (SPIGOT_LENGTH_CALLOUT, ("SPIGOT_LENGTH_CALLOUT",)),
+        "length_note": (STACK_TEXT, ("STACK_TEXT", (_SELF, "DRAWING_NOTES"))),
         "root_radius_max": (
             _spec.CORNER_RADIUS_MAX,
             ("CORNER_RADIUS_MAX", "SPIGOT_ROOT_CALLOUT", (_SELF, "SPIGOT_ROOT_XY")),
@@ -751,8 +773,8 @@ for _index, (_x, _y) in enumerate(_geom.screw_centres(), 1):
 # short of the -X O.D., a press fit for the MHA-PD-VN-69 pin, its chord
 # offset and stop from the hub axis, its station from the hub front face.
 # Its blind depth runs from the entry (the nominal O.D. meeting the chord) to
-# the printed stop's band: the depth a blind hole needs, derived from the
-# stop, not a size the sheet prints.
+# the printed stop's band: the callout prints its nominal as REF, and the
+# stop on the section controls it.
 requirement(
     "pin_ream",
     kind="hole",
@@ -760,13 +782,8 @@ requirement(
     requirements=("dia", "chord", "stop", "station", "depth"),
     fields={
         "at": (
-            [KEY_PIN_ENTRY_X, -KEY_PIN_CHORD_OFFSET, KEY_PIN_Z],
-            (
-                "HUB_DIA",
-                "KEY_PIN_CHORD_OFFSET",
-                "KEY_PIN_Z",
-                (_SELF, "KEY_PIN_ENTRY_X"),
-            ),
+            [_spec.KEY_PIN_ENTRY_X, -KEY_PIN_CHORD_OFFSET, KEY_PIN_Z],
+            ("HUB_DIA", "KEY_PIN_CHORD_OFFSET", "KEY_PIN_Z", "KEY_PIN_ENTRY_X"),
         ),
         "axis": ([-1.0, 0.0, 0.0], ("__frame__",)),
         "dia": (
@@ -782,8 +799,12 @@ requirement(
         "nominal_dia": (_spec.KEY_PIN_HOLE_DIA, ("KEY_PIN_HOLE_DIA",)),
         "process": ("ream", ("KEY_PIN_SUFFIX",)),
         "depth": (
-            [KEY_PIN_ENTRY_X + stop for stop in KEY_PIN_STOP_LIMITS],
-            ((_SELF, "KEY_PIN_ENTRY_X"), (_SELF, "KEY_PIN_STOP_LIMITS")),
+            [_spec.KEY_PIN_ENTRY_X + stop for stop in KEY_PIN_STOP_LIMITS],
+            ("KEY_PIN_ENTRY_X", (_SELF, "KEY_PIN_STOP_LIMITS")),
+        ),
+        "depth_nominal": (
+            _spec.KEY_PIN_DEPTH_REF,
+            ("KEY_PIN_DEPTH_REF", "KEY_PIN_CALLOUT_BELOW"),
         ),
         "chord": (
             limits(
@@ -799,17 +820,18 @@ requirement(
         "chord_axis": ("y", ("__frame__",)),
         "stop": (
             KEY_PIN_STOP_LIMITS,
-            ("KEY_PIN_STOP", (_GEOM, "UNIT"), "KEY_PIN_DEPTH_TEXT"),
+            ("KEY_PIN_STOP", (_GEOM, "UNIT"), (_SELF, "SECTION_KEEP")),
         ),
         "stop_nominal": (KEY_PIN_STOP, ("KEY_PIN_STOP",)),
         "stop_x": (-KEY_PIN_STOP, ("KEY_PIN_STOP_X",)),
+        "stop_callout": (KEY_PIN_STOP_SUFFIX.strip(), ("KEY_PIN_STOP_SUFFIX",)),
         "station": (
             limits(_spec.KEY_PIN_STATION, _P["KeyPinStation"], unit=_UNIT),
             ("KEY_PIN_STATION", (_GEOM, "UNIT"), (_SELF, "SIDE_KEEP")),
         ),
         "station_nominal": (_spec.KEY_PIN_STATION, ("KEY_PIN_STATION",)),
         "station_from": ("front_face", ((_SELF, "SIDE_KEEP"),)),
-        "mate": ("MHA-PD-VN-69", ("KEY_PIN_NUMBER", "KEY_PIN_CALLOUT_BELOW")),
+        "mate": ("MHA-PD-VN-69", ("KEY_PIN_NUMBER", "KEY_PIN_NOTE_TEXT")),
         "fit": ("press", ("KEY_PIN_NOTE_TEXT",)),
         "diametral_interference": (
             list(_spec.KEY_PIN_INTERFERENCE),
@@ -837,13 +859,8 @@ requirement(
     requirements=("dia",),
     fields={
         "at": (
-            [KEY_PIN_ENTRY_X, -KEY_PIN_CHORD_OFFSET, KEY_PIN_Z],
-            (
-                "HUB_DIA",
-                "KEY_PIN_CHORD_OFFSET",
-                "KEY_PIN_Z",
-                (_SELF, "KEY_PIN_ENTRY_X"),
-            ),
+            [_spec.KEY_PIN_ENTRY_X, -KEY_PIN_CHORD_OFFSET, KEY_PIN_Z],
+            ("HUB_DIA", "KEY_PIN_CHORD_OFFSET", "KEY_PIN_Z", "KEY_PIN_ENTRY_X"),
         ),
         "axis": ([-1.0, 0.0, 0.0], ("__frame__",)),
         "dia": (
