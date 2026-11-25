@@ -9,6 +9,7 @@ demoted:
   ch_channel_assembly: fit-batch-ch
   ch_channel_lever: fit-batch-ch
   ch_pivot_bracket: fit-batch-ch
+  ch_rocker_arm: fit-batch-ch
   ch_rocker_strap: fit-batch-ch
   dt_alignment_pinion: fit-batch-dt
   dt_arbor_pedestal: fit-batch-dt
