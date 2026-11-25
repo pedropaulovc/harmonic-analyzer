@@ -168,9 +168,10 @@ def test_the_tip_is_measured_dry_then_bonded_on_the_feeler_in_two_cures() -> Non
             "HOLDING MHA-DT-37 HOME, TAP ITS PIVOT TRUE",
             comb,
             "ONCE THE BONDS GRAB, MHA-DT-37 HELD HOME",
-            "RECORD THE RUNOUT ABOUT MHA-DT-04 OF THE MHA-DT-37 PIVOT",
+            "RECORD THE MHA-DT-37 PIVOT'S RUNOUT ABOUT MHA-DT-04",
+            "RECORD T012'S AND T018'S TOOTH RUNOUT IN THAT SETUP",
             "CLIPS OVER ALL FIVE GEARS",
-            "IF IT FAILS, OR A BONDED GEAR HESITATES IN CHECK 4S, AT 250 DEG C",
+            "IF IT FAILS, OR A BONDED GEAR HESITATES IN CHECK 5C, AT 250 DEG C",
             "SPIGOT, PIVOT",
             "REDO FROM 1L.",
             "ALIGN THE MHA-DT-05 COUNTERBORES",
@@ -185,8 +186,8 @@ def test_the_end_screw_sets_the_end_play_after_the_pivot_runs_free() -> None:
     """The tip's lateral error is taken up by turning MHA-DT-05 on its screws
     until T006's pivot runs free in MHA-DT-39
     (build_dt_drive_train_assembly.TIP_LATERAL_CAPACITY_MM); the post and the
-    block are tightened and the block doweled before MHA-DT-39 sets the end
-    play and the pinch screw locks it."""
+    block are tightened, and the block is doweled at step 3's head, before
+    MHA-DT-39 sets the end play and the pinch screw locks it."""
     placed = _step_body("post-and-tip-block")
     order = (
         "RUN BOTH MHA-DT-VN-61 IN, LOOSE ENOUGH TO TURN MHA-DT-05",
@@ -194,7 +195,6 @@ def test_the_end_screw_sets_the_end_play_after_the_pivot_runs_free() -> None:
         "THREAD MHA-DT-39 INTO MHA-DT-21",
         "TURN MHA-DT-05 ON ITS SCREWS UNTIL THE MHA-DT-37 PIVOT RUNS FREE",
         "TIGHTEN BOTH MHA-DT-VN-61 AND MHA-DT-VN-60",
-        "DRILL 1/16 UP THRU MHA-DT-20 INTO MHA-DT-21",
     )
     positions = [placed.find(phrase) for phrase in order]
     assert -1 not in positions, positions
@@ -202,10 +202,14 @@ def test_the_end_screw_sets_the_end_play_after_the_pivot_runs_free() -> None:
     assert "FEELER" not in placed
     fitup = _step_body("end-play-set")
     order = (
+        "DRILL 1/16 UP THRU MHA-DT-20 INTO MHA-DT-21",
+        "PUSH IT UP TO THE MHA-DT-21 FLOOR",
+        "WIPE THE MHA-DT-20 HOLE CLEAN",
+        "CHECK THAT MHA-DT-21 DOES NOT TURN ON MHA-DT-20 BY HAND",
         "THREAD MHA-DT-39 IN UNTIL MHA-DT-04 JUST STOPS SHUTTLING",
         "BACK MHA-DT-39 OFF 1/8 TURN",
         "TIGHTEN MHA-DT-VN-56",
-        "IF IT WAS LOOSE, REDO 3B-3C WITH MHA-DT-39 IN MORE, IF TIGHT LESS",
+        "IF IT WAS LOOSE, REDO 3H-3J WITH MHA-DT-39 IN MORE, IF TIGHT LESS",
         # Rule 23 (PR 2 machinist review round 10): the pinch lock's bench
         # acceptance comes once the end play is final.
         "CHECK THAT MHA-DT-39 DOES NOT TURN IN MHA-DT-21 BY HAND",
@@ -214,7 +218,7 @@ def test_the_end_screw_sets_the_end_play_after_the_pivot_runs_free() -> None:
     assert -1 not in positions, positions
     assert positions == sorted(positions)
     # #2726: the 3/4 end screw keeps rule 18's 1.5 D at the print-worst
-    # embed, so step 3A states no shortfall and DT-07 is retired.
+    # embed, so step 3G states no shortfall and DT-07 is retired.
     import build_dt_drive_train_assembly as assembly
     from machinist_exceptions import load_exceptions
 
@@ -230,12 +234,12 @@ def test_the_end_screw_sets_the_end_play_after_the_pivot_runs_free() -> None:
 def test_the_printed_shaft_end_play_is_the_band_the_stacks_book() -> None:
     """The end screw's embed and the bushing air book
     cone_stack_end_play.SHAFT_END_PLAY; the sheet prints that band, rounded
-    inward to the thousandth, as step 3C's sheet 16 row.  Fit audit part 2,
+    inward to the thousandth, as step 3J's sheet 16 row.  Fit audit part 2,
     B10, and Codjiflo round 1 of #3550 (delegated ruling 2026-11-24 (Main), no
     precedent; owner review #2144): the sheet prints
     the window or the feel, not both; the embed and the air need the window,
-    which a hand cannot read, so 3C measures it on the dial indicator, and
-    step 3A's 1/8 turn of the 1/4-28 end screw leaves a play inside it."""
+    which a hand cannot read, so 3J measures it on the dial indicator, and
+    step 3G's 1/8 turn of the 1/4-28 end screw leaves a play inside it."""
     body = _step_body("end-play-set")
     assert "MEASURE THE MHA-DT-04 END PLAY AT THE SHAFT END (" in body
     assert "FEEL" not in body

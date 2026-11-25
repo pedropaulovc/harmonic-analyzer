@@ -63,7 +63,7 @@ POST_SCREW_SHORT_TEXT = inch_max_text(
 
 
 # Owner ruling 2026-11-24, audit part 2 S1 ("all approved (ticked)"): checks
-# 4X and 4Z count turns from first bite, the screw run in to seated, in place
+# 5H and 5K count turns from first bite, the screw run in to seated, in place
 # of the lesser of two recorded depth readings.  Codjiflo r3-5 on #3550: the
 # count is derived from each screw's own thread.  N turns from first bite
 # advance the tip N pitches past where it first caught, which is no shallower
@@ -132,7 +132,7 @@ ACCEPTANCES = (
     ),
     (
         "post-screw-cut",
-        _step_ref("post-and-tip-block", "K"),
+        _step_ref("post-and-tip-block", "L"),
         "EACH MHA-DT-VN-61 CUT END TO THE MHA-DT-20 UNDERSIDE",
         f"FLUSH TO {POST_SCREW_SHORT_TEXT} SHORT",
         # Owner ruling 2026-11-24, fit audit part 2 S2: "Flush to .015 short
@@ -141,11 +141,11 @@ ACCEPTANCES = (
     ),
     (
         "shaft-end-play",
-        _step_ref("end-play-set", "C"),
+        _step_ref("end-play-set", "J"),
         # Fit audit 2026-11-23 part 2, B10; Codjiflo round 1 of #3550,
         # delegated ruling 2026-11-24 (Main), no precedent; owner review
         # #2144: the window, which the end screw's embed and the
-        # bushing air book (step 3C's comment), is read on the dial, not felt.
+        # bushing air book (step 3J's comment), is read on the dial, not felt.
         "MHA-DT-04 END PLAY AT THE SHAFT END",
         inch_window(SHAFT_END_PLAY, 3),
         "DIAL INDICATOR",
@@ -204,7 +204,7 @@ ACCEPTANCES = (
     ),
     (
         "tip-gap",
-        f"{_step_ref('rig-located', 'E')}, CHECK 7",
+        f"{_step_ref('rig-located', 'E')}, CHECK 8",
         "PARKED TIP GAP AT GEAR 0 AND AT GEAR 19",
         "SNUG TIP TO TIP",
         # Owner ruling 2026-11-24, audit part 2 C8: "Yes, a 3/32 rod."
@@ -217,20 +217,20 @@ ACCEPTANCES = (
         f"FLUSH {FLUSH_SET_TEXT}",
         "CALIPER DEPTH ROD",
     ),
-    # Attempt 1 review (run 20261117T133225781Z, rule 22): checks 4X and 4Z
+    # Attempt 1 review (run 20261117T133225781Z, rule 22): checks 5H and 5K
     # printed their engagement minimums only in check text.  Each is a count
     # of turns from first bite, recorded in step 23 as the screw goes in
     # (owner ruling S1, above).
     (
         "pivot-screw-engagement",
-        "CHECK 4X",
+        "CHECK 5H",
         "MHA-DT-VN-52 TURNS, FIRST BITE TO SHOULDER SEATED",
         f"{PIVOT_SCREW_TURNS} MIN",
         f"COUNTED AT {_step_ref('other-base-mounting', 'L')}",
     ),
     (
         "stop-screw-engagement",
-        "CHECK 4Z",
+        "CHECK 5K",
         "MHA-SH-VN-52 SWING STOP TURNS, FIRST BITE TO SEATED",
         f"{STOP_SCREW_TURNS} MIN",
         f"COUNTED AT {_step_ref('other-base-mounting', 'P')}",
@@ -272,10 +272,10 @@ ACCEPTANCES = (
     # has)". Owner ruling 2026-11-24, audit part 2 C5: "the after-cure
     # readings become a record only; strip and re-bond only if a gear
     # hesitates in the 80-turn running check", so the row records (nothing
-    # is set to it) and the hesitation in check 4S accepts.
+    # is set to it) and the hesitation in check 5C accepts.
     (
         "spigot-gear-runout",
-        _step_ref("post-and-tip-block", "E"),
+        _step_ref("post-and-tip-block", "F"),
         f"{' AND '.join(f'T{teeth:03d}' for teeth in cone_gear.SPIGOT_TEETH)}, "
         f"\u00d8{inch_text(cone_gear.over_pins_pin_dia_mm(cone_gear.SPIGOT_TEETH[0]), 3)} GAUGE PIN, "
         f"SETUP AS T{_LAND_2_TEETH:03d}",

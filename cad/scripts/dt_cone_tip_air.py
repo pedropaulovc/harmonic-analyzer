@@ -262,12 +262,12 @@ _PIVOT_IN_HOLE = (
     cluster.PIVOT_RUNNING_CLEARANCE_MM[1] / 2.0 + end_screw.END_HOLE_POSITION_MM
 )
 
-# MHA-DT-00 step 2H (user decision 2026-10-12) holds the post pushed toward
-# the tip block while it is turned (2J) and its screws are tightened (2K):
+# MHA-DT-00 step 2T (user decision 2026-10-12) holds the post pushed toward
+# the tip block while it is turned (2U) and its screws are tightened (2V):
 # its clearance can only carry the tip away from G19, so its along-shaft
 # share is booked 0 (the across-shaft and face-tilt shares stay booked in
-# full).  MHA-DT-21 is not slid on its snug hold-down (2F) but may sit
-# anywhere in its clearance when 2K tightens it, so that stays booked.
+# full).  MHA-DT-21 is not slid on its snug hold-down (2R) but may sit
+# anywhere in its clearance when 2V tightens it, so that stays booked.
 POST_SCREW_CLEARANCE_TAKEN_UP_MM = _POST_FLOAT
 
 # Along the shaft, from the post's mounting to T006's north face.

@@ -1975,7 +1975,7 @@ PIVOT_HEAD_WORST_GAP = tip_pivot_head_worst_gap_mm(TIP_NORTH_FACE_BAND_MM)
 #
 # The post's screw clearance is one-sided (#2697): MHA-DT-00 holds MHA-DT-05
 # pushed toward MHA-DT-21 along the shaft while it is turned and tightened
-# (steps 2S-2U, user decision 2026-10-12; dt_cone_tip_air books the same), so
+# (steps 2T-2V, user decision 2026-10-12; dt_cone_tip_air books the same), so
 # the clearance can only carry the shaft north of its centred station, by
 # anything from none (the post turned to the end of its clearance) to all of
 # it.  It makes the embed shallower, never deeper.

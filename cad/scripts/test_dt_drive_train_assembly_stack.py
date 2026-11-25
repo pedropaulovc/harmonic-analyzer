@@ -864,7 +864,7 @@ def _cone_pivot_screw(drive) -> None:
 
 def _tip_print_worst(drive) -> None:
     # Owner ruling 2026-11-20 (#2726): the 3/4 end screw keeps rule 18's 1.5 D
-    # at the print-worst embed, so MHA-DT-00 step 3A prints no shortfall.
+    # at the print-worst embed, so MHA-DT-00 step 3G prints no shortfall.
     assert drive.END_SCREW_ENGAGEMENT_FLOOR_D == 1.5
     assert drive.END_SCREW_ENGAGEMENT_WORST_D >= 1.5, (
         f"end screw print-worst full thread {drive.END_SCREW_ENGAGEMENT_WORST_D:.4f}D "
