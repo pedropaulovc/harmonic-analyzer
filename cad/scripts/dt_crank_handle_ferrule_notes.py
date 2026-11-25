@@ -57,9 +57,9 @@ ARM_FACE_WALL_MIN = _floor_3pl(FERRULE_ARM_FACE_WALL_MIN)
 # policy 1).  The N drill's .302-.306 sits inside the .298-.308 the tenon walls
 # were first judged at, so every wall gains (Q-ferrule-n-drill had read Ø.302
 # at the .XXX row, .297 at its smallest): delegated ruling 2026-11-25 (Main),
-# replaces D5 of 2026-11-24; owner review #2144.  No "BORE": owner ruling
-# 2026-11-24, fit audit question 15 ("BORE" had promised a boring bar no
-# traveler uses).
+# no precedent; replaces D5 of 2026-11-24; owner review #2144.  No "BORE":
+# owner ruling 2026-11-24, fit audit question 15 ("BORE" had promised a
+# boring bar no traveler uses).
 BORE_DRILL = "N"
 BORE_FIT_CALLOUT = "\n".join(
     (
