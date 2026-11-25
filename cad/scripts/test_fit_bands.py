@@ -327,6 +327,24 @@ INDEXED_FIT_BANDS: dict[tuple[str, str], str] = {
     ("dt_crankshaft_spec", "SEAT_COLLAR_BAND"): (
         "the seat face's station deviations, indexed for the hub-to-sprocket air"
     ),
+    # Codjiflo 3548-2: the three note-3 fits print REF and export dia_ref with
+    # the clearance; their turning aims stay as analysis bands only.
+    ("dt_crankshaft_spec", "JOURNAL_DIA_BAND"): (
+        "analysis aim of the REF journals turned to MHA-DT-05's measured bores; "
+        "dt_crankshaft_notes.FIT_CLEARANCES derives note 3's .0010-.0023 from it"
+    ),
+    ("dt_crankshaft_spec", "PINION_SEAT_DIA_BAND"): (
+        "analysis aim of the REF pinion seat turned to MHA-DT-10's measured bore; "
+        "dt_crankshaft_notes.FIT_CLEARANCES derives note 3's .0010-.0023 from it"
+    ),
+    ("dt_crank_hub_geometry", "SHAFT_DIA_BAND"): (
+        "analysis aim of MHA-DT-11's REF stub turned to MHA-DT-31's measured bore; "
+        "HUB_BORE_BAND and note 3's clearance are derived from it"
+    ),
+    ("dt_crank_handle_butt_cup_spec", "POCKET_DIA_BAND"): (
+        "the pocket's own .248-.257 as deviations on the modelled .250; the sheet "
+        "and export carry dia_ref and dia_max (POCKET_DIA_LIMITS), fit audit Q15"
+    ),
     ("_sprocket_seat_geometry", "PLATE_BAND"): (
         "the wheel plate's thickness deviations, indexed for the hub-to-sprocket "
         "air and the chain envelope's reach"
