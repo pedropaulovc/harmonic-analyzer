@@ -58,10 +58,9 @@ def test_each_dro_locate_band_is_its_own_row() -> None:
     setting rows with their own bands and reasons. Row 5, the back MHA-CH-08
     ear: rule 4 opens it to the title block's +/-.005, since no check it
     feeds falls under D28's 0.03 mm margin there. Row 2, the front MHA-DT-02
-    strap: kept at 0.10 mm by necessity N-01 (D28, delegated ruling
-    2026-11-25 (Main), precedent: D4/D14 (2026-11-24) and the owner's 'stay
-    as tight as today' on these settings; owner review #2144), the channel
-    axial budget's 0.028 mm headroom."""
+    strap: kept at 0.10 mm by necessity N-01 (delegated ruling 2026-11-25
+    (Main), no precedent; owner review #2144 (D28)), the channel axial
+    budget's 0.028 mm headroom."""
     import machinist_necessity
 
     assert bank.NORTH_EAR_LOCATE_BAND == pytest.approx(0.005 * 25.4)
