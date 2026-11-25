@@ -1578,13 +1578,14 @@ CONE_CRANK_STEPS = _note_text(
         # window, not both).  The window is needed by checks: the end screw's
         # embed (dt_cone_tip_block_spec END_SCREW_EMBED band) and its pivot's
         # proud length (dt_cone_tip_end_screw_spec) and the journal's free end
-        # (dt_cone_gear_shaft_spec) book SHAFT_END_PLAY[1], 0.25 mm (.009 in
-        # printed), and the bushing air (dt_cone_tip_air) books
+        # (dt_cone_gear_shaft_spec) book SHAFT_END_PLAY[1], 0.305 mm (.012 in
+        # printed, the title block's row since restoration round 1,
+        # 2026-11-25), and the bushing air (dt_cone_tip_air) books
         # SHAFT_END_PLAY[0], 0.05 mm (.002).  "Turns free, no felt shuttle"
-        # bounds neither: a hand cannot tell .009 from .012, nor .002 from
+        # bounds neither: a hand cannot tell .012 from .015, nor .002 from
         # .001.  So 3C reads the play on the dial indicator against the sheet
         # 16 row's window (owner ruling P2: .002 total on the .001 dial; the
-        # band is .007); C1's turn-set (3, 3A: 1/8 turn of 1/4-28, .0045)
+        # band is .010); C1's turn-set (3, 3A: 1/8 turn of 1/4-28, .0045)
         # lands inside it.
         "3C. MEASURE THE MHA-DT-04 END PLAY AT THE SHAFT END "
         f"({acceptance_ref('shaft-end-play')}).",

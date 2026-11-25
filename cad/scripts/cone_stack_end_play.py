@@ -65,9 +65,13 @@ STACK_FLOAT = (
 STACK_FEELER_BAND = max(STACK_FEELER - STACK_FLOAT[0], STACK_FLOAT[1] - STACK_FEELER)
 # (min, max) shaft end play at MHA-DT-00's end-screw step: the end screw is
 # run in until the shaft just stops shuttling, then backed off 1/8 turn
-# (0.113 on the 1/4-28).  0.05: the shaft never runs clamped.  0.25: the most
-# the tip air ledger and the drum's engaged-zone margin book for it.
-SHAFT_END_PLAY = (0.05, 0.25)
+# (0.113 on the 1/4-28).  0.05: the shaft never runs clamped.  0.305: the
+# title block's .XXX row (sheet 16 row 8 prints .002-.012; restoration
+# round 1, 2026-11-25, drawing-guidelines rule 4: no check fails at it: the
+# end screw's pivot engagement 1.401 -> 1.346 mm, its embed window margins
+# 3.218 -> 3.163 / 2.658 mm, the bushing air 0.024 mm and the look 0.731 mm
+# unchanged).  0.305, not 0.3048: the inward rounding then cannot print .011.
+SHAFT_END_PLAY = (0.05, 0.305)
 # The cone set's in-service float north of its layout stations along the
 # cone axis: the shaft at the far end of its play and the stack at the far
 # end of its own.  The bonded tip gears sit STACK_FEELER north of layout

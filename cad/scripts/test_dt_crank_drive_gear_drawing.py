@@ -339,7 +339,7 @@ def test_backlash_ref_is_the_crank_mesh_stack_range() -> None:
         (check.backlash_min_mm, check.backlash_max_mm), abs=1e-6
     )
     data = dict(line.partition(":")[::2] for line in notes.GEAR_DATA.splitlines()[1:])
-    assert data[notes.BACKLASH_LABEL].strip() == ".0035 TO .0376"
+    assert data[notes.BACKLASH_LABEL].strip() == ".0035 TO .0377"
     assert ".002 TO .007" not in notes.GEAR_DATA
 
 

@@ -229,15 +229,22 @@ def test_post_mount_stations_need_their_explicit_band() -> None:
 def test_pushed_post_only_makes_the_embed_shallower() -> None:
     """#2697: MHA-DT-00 holds MHA-DT-05 pushed toward MHA-DT-21 while it is
     turned and tightened, so its screw clearance moves the shaft north only:
-    the shallow extreme carries all of it, the deep one none."""
+    the shallow extreme carries all of it, the deep one none.  The model's
+    end play is a literal inside SHAFT_END_PLAY, not its middle (restoration
+    round 1, 2026-11-25), so each extreme also carries its own side of it."""
     import build_dt_drive_train_assembly as bdt
     import dt_cone_tip_block_spec as block
+    from cone_stack_end_play import SHAFT_END_PLAY
 
     band = bdt.END_SCREW_EMBED_BAND_MM
     push = bdt.END_SCREW_POST_PUSH_MM
     assert push == pytest.approx(bdt.POST_SCREW_FLOAT_MM)
     low, high = bdt.END_SCREW_EMBED_WORST_MM
-    assert block.END_SCREW_EMBED - low == pytest.approx(high - block.END_SCREW_EMBED + push)
+    shallow_play = SHAFT_END_PLAY[1] - block.END_SCREW_MODEL_END_PLAY_MM
+    deep_play = block.END_SCREW_MODEL_END_PLAY_MM - SHAFT_END_PLAY[0]
+    assert block.END_SCREW_EMBED - low - shallow_play == pytest.approx(
+        high - block.END_SCREW_EMBED - deep_play + push
+    )
     assert bdt.end_screw_embed_worst_mm(band, 0.0)[1] == pytest.approx(high)
     # More clearance than the shallow end's room drops its thread under 1.5 D.
     shallow_room = low - block.END_SCREW_EMBED_WINDOW[0]
