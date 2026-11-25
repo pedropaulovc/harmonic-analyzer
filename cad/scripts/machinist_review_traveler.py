@@ -9,6 +9,7 @@ review leaf, when one exists, keys it instead.
 from __future__ import annotations
 
 import re
+import tomllib
 from html.parser import HTMLParser
 from pathlib import Path
 from typing import Sequence
@@ -16,7 +17,7 @@ from typing import Sequence
 from _paths import CAD_ROOT
 from machinist_exceptions import MachinistException, load_exceptions_file
 from machinist_review_config import split_versioned_guidelines
-from machinist_review_sheets_mcp import SheetStore
+from machinist_review_sheets_mcp import PDFIUM_LOCK, SheetStore
 
 GUIDELINES_FILE = CAD_ROOT / "docs" / "traveler-guidelines.md"
 PROCESS_ROOT = CAD_ROOT / "process"
@@ -31,6 +32,20 @@ STANDING_HTML = (
 STANDING_HEADING = (
     "SHOP STANDING INSTRUCTIONS (common sense in this shop: the traveler must "
     "not repeat or re-word any of it)"
+)
+# A plan converted to the standing page (root ``standing = true``) prints this
+# file's ``[standing] pointer`` at its head. Plans convert batch by batch (owner
+# 2026-11-25): an unconverted plan's review neither reads the standing page nor
+# applies rule T18's standing-page items. When
+# cad/config/machinist-review/standing-unconverted.yaml empties, delete it,
+# STANDING_NOT_APPLIED and its branch in machinist_review._review_prompt.
+STANDING_TOML = PROCESS_ROOT / "shop" / "standing.toml"
+STANDING_NOT_APPLIED = (
+    "SHOP STANDING INSTRUCTIONS: NOT APPLIED (this plan is not yet converted to "
+    "the shop standing page; owner 2026-11-25: plans convert batch by batch). "
+    "Do not report rule T18 items about the standing page: repeated or "
+    "re-worded standing rules, the pointer line, or cautions in the head. Rule "
+    "T18's running page header/footer item and every other rule still apply."
 )
 
 
@@ -182,6 +197,47 @@ def standing_section(html: str) -> str:
         "one line per block or table row.\n"
         f"{text}\n"
     )
+
+
+def standing_pointer() -> str:
+    """The ``[standing] pointer`` line a converted plan prints at its head."""
+    pointer = tomllib.loads(STANDING_TOML.read_text(encoding="utf-8"))["standing"]["pointer"]
+    if not isinstance(pointer, str) or not pointer.strip():
+        raise ValueError(f"{STANDING_TOML}: [standing] pointer must be a non-empty string")
+    return pointer
+
+
+def standing_converted(traveler_text: str) -> bool:
+    """Whether a traveler's printed text carries the standing pointer. Compared
+    with all whitespace removed: a PDF text layer wraps the line and may split
+    a word where the HTML does not."""
+    def squeeze(text: str) -> str:
+        return "".join(text.split())
+
+    return squeeze(standing_pointer()) in squeeze(traveler_text)
+
+
+def pdf_text(paths: Sequence[Path]) -> str:
+    """The raw text layer of every PDF in ``paths``, page by page."""
+    import pypdfium2 as pdfium
+
+    pages = []
+    with PDFIUM_LOCK:
+        for path in paths:
+            if path.suffix.casefold() != ".pdf":
+                continue
+            document = pdfium.PdfDocument(str(path))
+            try:
+                for page in document:
+                    textpage = page.get_textpage()
+                    try:
+                        pages.append(textpage.get_text_range())
+                    finally:
+                        textpage.close()
+                        page.close()
+            finally:
+                document.close()
+    return "\n".join(pages)
 
 
 def document_roles(
