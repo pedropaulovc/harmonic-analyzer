@@ -26,6 +26,8 @@
   <rect class="part-removed" x="465.39" y="241.88" width="109.22" height="2.54"/>
   <rect class="part-removed" x="480.63" y="244.41" width="78.74" height="33.02"/>
   <path class="cutter" d="M554.32 236.79L554.32 117.41L550.35 120.41L546.38 117.41L542.41 120.41L538.45 117.41L534.48 120.41L530.51 117.41L526.54 120.41L522.57 117.41L518.6 120.41L514.63 117.41L510.66 120.41L506.7 117.41L502.73 120.41L498.76 117.41L494.79 120.41L490.82 117.41L490.82 236.79A31.75 7.62 0 0 0 554.32 236.79Z"/>
+  <line class="datum" x1="614.61" y1="244.41" x2="644.61" y2="244.41"/>
+  <text class="datum-label" x="648.61" y="249.41">Z.730, the pass</text>
   <text class="title" x="420" y="72">Across the jaws at X13 (5 px/mm), fixed jaw at the right</text>
   <line class="datum" x1="614.61" y1="337.12" x2="644.61" y2="337.12"/>
   <text class="datum-label" x="648.61" y="342.12">Z0 the</text>

@@ -13,6 +13,8 @@
   <rect class="part-removed" x="200" y="138.38" width="130.81" height="2.54"/>
   <rect class="part-removed" x="200" y="140.91" width="44.45" height="10.16"/>
   <path class="cutter" d="M303.7 133.29L303.7 52.02L299.73 55.02L295.76 52.02L291.79 55.02L287.82 52.02L283.85 55.02L279.88 52.02L275.91 55.02L271.95 52.02L267.98 55.02L264.01 52.02L260.04 55.02L256.07 52.02L252.1 55.02L248.13 52.02L244.16 55.02L240.2 52.02L240.2 133.29A31.75 7.62 0 0 0 303.7 133.29Z"/>
+  <line class="datum" x1="110" y1="140.91" x2="196" y2="140.91"/>
+  <text class="datum-label" x="106" y="145.91" text-anchor="end">Z1.230, the pass</text>
   <line class="arrow" x1="313.7" y1="80.91" x2="383.7" y2="80.91"/>
   <line class="datum" x1="20" y1="297.12" x2="156" y2="297.12"/>
   <text class="datum-label" x="20" y="289.12">Z0 the stacks' top</text>

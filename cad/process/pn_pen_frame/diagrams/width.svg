@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 470" width="760" height="470" font-family="sans-serif" font-size="13">
-  <!-- Hand picture, to scale at 5 px/mm from the blank's length (the height 1.580, 40.132 mm). 1/2 in end mill Ø12.7 mm (face_cutter_dia_mm, shop endmill-carbide-3fl-1-2), its square end drawn as the near half of its end face (an arc 12 % of its diameter deep, its lowest point the true end), drawn 1 in out to a break line (half_mill_projection_min_mm 25.4 is a least stick-out; the collet is not drawn). Shown on its pass at Y-3.675 (the other, at Y1.338, hangs over the fixed jaw), over the middle of the blank, the pass along X arrowed; the blank 1-1/4 in (31.75 mm) tall on the 1 in parallels. Drawn at PF04's last level, Z25.146 (the width .990); hatched: the levels from 31.242. The vise jaws' thickness and the parallels' length are not on record: schematic. Jaw height 44.9453 mm (vise_jaw_height_mm). -->
+  <!-- Hand picture, to scale at 5 px/mm from the blank's length (the height 1.580, 40.132 mm). 1/2 in end mill Ø12.7 mm (face_cutter_dia_mm, shop endmill-carbide-3fl-1-2), its square end drawn as the near half of its end face (an arc 12 % of its diameter deep, its lowest point the true end), drawn 1 in out to a break line (half_mill_projection_min_mm 25.4 is a least stick-out; the collet is not drawn). Shown on its pass at Y-3.675 (the other, at Y1.338, hangs over the fixed jaw), over the middle of the blank, the pass along X arrowed; the blank 1-1/4 in (31.75 mm) tall on the 1 in parallels. Drawn at PF04's last level, Z25.400 (the width 1.000, in its .990-1.010 band); hatched: the levels from 31.242. The vise jaws' thickness and the parallels' length are not on record: schematic. Jaw height 44.9453 mm (vise_jaw_height_mm). -->
   <rect class="paper" x="0" y="0" width="760" height="470"/>
   <text class="title" x="20" y="24">PF04, along the jaws, to scale (5 px/mm): L down, the right face faced to the width</text>
   <rect class="fixture-vise" x="90" y="430" width="430" height="14"/>
@@ -10,15 +10,17 @@
   <text class="label-on-clamp" x="512" y="225.27" text-anchor="end">fixed jaw (behind);</text>
   <text class="label-on-clamp" x="512" y="241.27" text-anchor="end">the moving jaw</text>
   <text class="label-on-clamp" x="512" y="257.27" text-anchor="end">not shown</text>
-  <rect class="part-removed" x="150" y="146.79" width="200.66" height="30.48"/>
-  <path class="cutter" d="M282.08 169.65L282.08 75.67L278.11 78.67L274.14 75.67L270.17 78.67L266.2 75.67L262.24 78.67L258.27 75.67L254.3 78.67L250.33 75.67L246.36 78.67L242.39 75.67L238.42 78.67L234.45 75.67L230.49 78.67L226.52 75.67L222.55 78.67L218.58 75.67L218.58 169.65A31.75 7.62 0 0 0 282.08 169.65Z"/>
-  <line class="arrow" x1="292.08" y1="107.27" x2="392.08" y2="107.27"/>
+  <rect class="part-removed" x="150" y="146.79" width="200.66" height="29.21"/>
+  <path class="cutter" d="M282.08 168.38L282.08 74.4L278.11 77.4L274.14 74.4L270.17 77.4L266.2 74.4L262.24 77.4L258.27 74.4L254.3 77.4L250.33 74.4L246.36 77.4L242.39 74.4L238.42 77.4L234.45 74.4L230.49 77.4L226.52 74.4L222.55 77.4L218.58 74.4L218.58 168.38A31.75 7.62 0 0 0 282.08 168.38Z"/>
+  <line class="arrow" x1="292.08" y1="106" x2="392.08" y2="106"/>
+  <line class="datum" x1="60" y1="176" x2="146" y2="176"/>
+  <text class="datum-label" x="56" y="181" text-anchor="end">Z1.000</text>
   <line class="datum" x1="150" y1="116.79" x2="150" y2="142.79"/>
   <text class="datum-label" x="144" y="134.79" text-anchor="end">X0 (T)</text>
   <text class="label" x="356.66" y="134.79">B</text>
   <line class="datum" x1="20" y1="303" x2="146" y2="303"/>
   <text class="datum-label" x="20" y="295">Z0 the parallels' top</text>
-  <text class="label" x="296.08" y="97.27">passes along X, two across the 3/8</text>
+  <text class="label" x="296.08" y="96">passes along X, two across the 3/8</text>
   <text class="label" x="545" y="120">L down on the parallels; T now LEFT.</text>
   <text class="label" x="545" y="136">Levels of .050 max down to</text>
   <text class="label" x="545" y="152">the width .990-1.010.</text>

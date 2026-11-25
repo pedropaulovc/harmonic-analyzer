@@ -13,6 +13,8 @@
   <rect class="part-removed" x="150" y="144.25" width="200.66" height="2.54"/>
   <path class="cutter" d="M282.08 139.17L282.08 45.19L278.11 48.19L274.14 45.19L270.17 48.19L266.2 45.19L262.24 48.19L258.27 45.19L254.3 48.19L250.33 45.19L246.36 48.19L242.39 45.19L238.42 48.19L234.45 45.19L230.49 48.19L226.52 45.19L222.55 48.19L218.58 45.19L218.58 139.17A31.75 7.62 0 0 0 282.08 139.17Z"/>
   <line class="arrow" x1="292.08" y1="76.79" x2="392.08" y2="76.79"/>
+  <line class="datum" x1="60" y1="146.79" x2="146" y2="146.79"/>
+  <text class="datum-label" x="56" y="151.79" text-anchor="end">Z1.230</text>
   <line class="datum" x1="150" y1="114.25" x2="150" y2="140.25"/>
   <text class="datum-label" x="144" y="132.25" text-anchor="end">X0 (B)</text>
   <text class="label" x="356.66" y="132.25">T</text>

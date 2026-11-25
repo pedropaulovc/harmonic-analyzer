@@ -1,14 +1,14 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 820 480" width="820" height="480" font-family="sans-serif" font-size="13">
-  <!-- Hand picture, both views to scale at 5 px/mm from the blank's width (1.000, 25.4 mm nominal, drawn at the finished .990). 1/2 in end mill Ø12.7 mm (face_cutter_dia_mm, shop endmill-carbide-3fl-1-2), its square end drawn as the near half of its end face (an arc 12 % of its diameter deep, its lowest point the true end), drawn 1 in out to a break line (half_mill_projection_min_mm 25.4 is a least stick-out; the collet is not drawn). The cutter on PF05's middle pass, Y-19.045, over the blank (its first pass, Y1.271, hangs over the fixed jaw), the same place in both views; the passes along X step across the jaws. Stacks: the 1 in and 1/2 in parallels of the 1/8 in set (riser_height_mm 38.1, parallel_thickness_mm). The vise jaws' thickness and the parallels' length are not on record: schematic. Jaw height 44.9453 mm (vise_jaw_height_mm). -->
+  <!-- Hand picture, both views to scale at 5 px/mm from the blank's width (1.000, 25.4 mm nominal, drawn at PF04's 1.000). 1/2 in end mill Ø12.7 mm (face_cutter_dia_mm, shop endmill-carbide-3fl-1-2), its square end drawn as the near half of its end face (an arc 12 % of its diameter deep, its lowest point the true end), drawn 1 in out to a break line (half_mill_projection_min_mm 25.4 is a least stick-out; the collet is not drawn). The cutter on PF05's middle pass, Y-19.045, over the blank (its first pass, Y1.271, hangs over the fixed jaw), the same place in both views; the passes along X step across the jaws. Stacks: the 1 in and 1/2 in parallels of the 1/8 in set (riser_height_mm 38.1, parallel_thickness_mm). The vise jaws' thickness and the parallels' length are not on record: schematic. Jaw height 44.9453 mm (vise_jaw_height_mm). -->
   <rect class="paper" x="0" y="0" width="820" height="480"/>
   <text class="title" x="20" y="24">PF05: the back face BK skimmed, to scale (5 px/mm)</text>
-  <path class="clamp" d="M50 114L295.73 114L298.73 118L295.73 122L298.73 126L295.73 130L50 130Z"/>
-  <text class="label-on-clamp" x="172.87" y="126" text-anchor="middle">fixed jaw</text>
-  <path class="clamp" d="M50 330.66L295.73 330.66L298.73 334.66L295.73 338.66L298.73 342.66L295.73 346.66L50 346.66Z"/>
-  <text class="label-on-clamp" x="172.87" y="342.66" text-anchor="middle">moving jaw</text>
-  <path class="fixture-support" d="M65 130L280.73 130L283.73 133.97L280.73 137.94L283.73 141.91L280.73 145.88L65 145.88Z"/>
-  <path class="fixture-support" d="M65 314.78L280.73 314.78L283.73 318.75L280.73 322.72L283.73 326.69L280.73 330.66L65 330.66Z"/>
-  <rect class="part-kept" x="110" y="130" width="125.73" height="200.66"/>
+  <path class="clamp" d="M50 114L297 114L300 118L297 122L300 126L297 130L50 130Z"/>
+  <text class="label-on-clamp" x="173.5" y="126" text-anchor="middle">fixed jaw</text>
+  <path class="clamp" d="M50 330.66L297 330.66L300 334.66L297 338.66L300 342.66L297 346.66L50 346.66Z"/>
+  <text class="label-on-clamp" x="173.5" y="342.66" text-anchor="middle">moving jaw</text>
+  <path class="fixture-support" d="M65 130L282 130L285 133.97L282 137.94L285 141.91L282 145.88L65 145.88Z"/>
+  <path class="fixture-support" d="M65 314.78L282 314.78L285 318.75L282 322.72L285 326.69L282 330.66L65 330.66Z"/>
+  <rect class="part-kept" x="110" y="130" width="127" height="200.66"/>
   <circle class="cutter" cx="173" cy="225.23" r="31.75"/>
   <text class="title" x="100" y="78">Plan, fixed jaw at the top</text>
   <line class="datum" x1="110" y1="104" x2="110" y2="144"/>
@@ -21,6 +21,8 @@
   <rect class="part-kept" x="450" y="201.88" width="200.66" height="47.62"/>
   <rect class="part-removed" x="450" y="201.88" width="200.66" height="2.54"/>
   <path class="cutter" d="M587.19 196.8L587.19 77.42L583.22 80.42L579.25 77.42L575.28 80.42L571.31 77.42L567.34 80.42L563.37 77.42L559.4 80.42L555.44 77.42L551.47 80.42L547.5 77.42L543.53 80.42L539.56 77.42L535.59 80.42L531.62 77.42L527.65 80.42L523.69 77.42L523.69 196.8A31.75 7.62 0 0 0 587.19 196.8Z"/>
+  <line class="datum" x1="690.66" y1="204.42" x2="720.66" y2="204.42"/>
+  <text class="datum-label" x="724.66" y="209.42">Z.355, the pass</text>
   <line class="datum" x1="690.66" y1="249.5" x2="720.66" y2="249.5"/>
   <text class="datum-label" x="724.66" y="254.5">Z0 the</text>
   <text class="datum-label" x="724.66" y="270.5">stacks' top</text>
