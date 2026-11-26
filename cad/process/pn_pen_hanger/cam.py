@@ -987,6 +987,8 @@ def context(
                 "z_top": t_max,
                 "passes": [{"offset": r8, "levels": levels}],
                 "tabs": strap_tabs,
+                "cut": "conventional",
+                "part": "left",
             },
         ],
     ]
@@ -1011,6 +1013,8 @@ def context(
                 "z_top": t_max,
                 "passes": [{"offset": r8, "levels": levels}],
                 "tabs": plate_tabs,
+                "cut": "conventional",
+                "part": "left",
             },
         ],
     ]

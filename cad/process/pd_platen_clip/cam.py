@@ -1000,6 +1000,8 @@ def context(
                 "passes": [{"offset": r, "levels": levels}],
                 "z_top": top,
                 "leads": leads,
+                "cut": "conventional",
+                "part": "left",
             },
         ],
         [name, "cleared", {"points": hole_centres, "radius": r, "z": levels[-1]}],

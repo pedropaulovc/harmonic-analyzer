@@ -2023,6 +2023,9 @@ def context(
                     }
                     for yc in centres
                 ],
+                # Clockwise inside the bore, the part outside it on the left.
+                "cut": "conventional",
+                "part": "left",
             },
         ],
         [name, "keep_out", {"radius": r, "boxes": jaws2}],
@@ -2173,6 +2176,8 @@ def context(
                 "z_top": shank_far,
                 "passes": [{"offset": r8, "levels": [_r(z) for z in out_levels]}],
                 "tabs": tabs,
+                "cut": "conventional",
+                "part": "left",
             },
         ],
         [f"{name}@0", "keep_out", {"radius": r8, "boxes": jaws2}],

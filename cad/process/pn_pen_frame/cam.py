@@ -1060,6 +1060,9 @@ def context(
                 ],
                 "z_top": D,
                 "clearing": [],
+                # The window: the frame outside it on the elements' left.
+                "cut": "conventional",
+                "part": "left",
             },
         ],
         ["keep_out", {"radius": r8, "boxes": window_keep}],

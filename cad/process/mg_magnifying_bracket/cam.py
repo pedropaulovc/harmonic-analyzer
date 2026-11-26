@@ -1384,7 +1384,18 @@ def context(
         (
             [
                 ["depth", {"z_min": _r(nose_bottom)}],
-                ["outline", {"elements": elements, "passes": passes, "z_top": neck}],
+                [
+                    "outline",
+                    {
+                        "elements": elements,
+                        "passes": passes,
+                        "z_top": neck,
+                        # Clockwise round the nose, the part on the right:
+                        # climb, as the module docstring says.
+                        "cut": "climb",
+                        "part": "right",
+                    },
+                ],
                 ["rapids_clear", {"z_top": neck}],
                 ["air_feed", {"z_top": neck}],
                 ["keep_out", {"radius": r, "boxes": keep["nose"]}],

@@ -656,6 +656,8 @@ def context(
                         "levels": levels,
                     }
                 ],
+                "cut": "conventional",
+                "part": "left",
             },
         ],
         [name, "keep_out", {"radius": r, "boxes": boxes}],

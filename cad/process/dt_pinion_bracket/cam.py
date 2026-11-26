@@ -1080,6 +1080,8 @@ def context(
                         "passes": [
                             {"offset": r8, "levels": [_r(z) for z in out_levels]}
                         ],
+                        "cut": "conventional",
+                        "part": "left",
                     },
                 ],
                 ["keep_out", {"radius": r8, "boxes": flat_keep}],

@@ -1370,6 +1370,10 @@ def context(
                     {"offset": finish_off, "levels": [_r(outline_bottom)]},
                 ],
                 "z_top": depth,
+                # Clockwise round the crown, the part on the right: climb, as
+                # the module docstring says (ball screws).
+                "cut": "climb",
+                "part": "right",
             },
         ],
         [name, "keep_out", {"radius": r, "boxes": outline_keep}],

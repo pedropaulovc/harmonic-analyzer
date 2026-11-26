@@ -1143,6 +1143,8 @@ def context(
                     {"offset": finish_offset, "levels": [bottom]},
                 ],
                 "z_top": t_max,
+                "cut": "conventional",
+                "part": "left",
             },
         ],
         [name, "rapids_clear", {"z_top": t_max}],

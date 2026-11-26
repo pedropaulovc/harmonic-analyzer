@@ -1783,6 +1783,9 @@ def context(
                         "levels": rough_levels,
                     }
                 ],
+                # "All conventional (G3)": the G2 at the concave corners too.
+                "cut": "conventional",
+                "part": "left",
             },
         ],
         [
