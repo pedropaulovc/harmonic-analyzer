@@ -50,8 +50,8 @@
   <text class="label-halo" x="752" y="304" text-anchor="end">from front</text>
   <text class="label-halo" x="486" y="134">W</text>
   <text class="label-halo" x="600" y="222">front face</text>
-  <text class="label" x="480" y="340">Bores: GO .2510 pin enters, NO-GO .2515</text>
-  <text class="label" x="480" y="356">does not; the GO pin is the pin for the</text>
-  <text class="label" x="480" y="372">bore positions, the #9 drill's shank</text>
-  <text class="label" x="480" y="388">for the hold-downs'.</text>
+  <text class="label" x="480" y="340">Bores: MHA-DT-19 enters the pivot bore</text>
+  <text class="label" x="480" y="356">and turns; the .250 set pin in it and</text>
+  <text class="label" x="480" y="372">the .257 in the lift bore for positions;</text>
+  <text class="label" x="480" y="388">#9 drill's shank for the hold-downs'.</text>
 </svg>

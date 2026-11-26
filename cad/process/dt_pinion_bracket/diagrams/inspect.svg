@@ -6,7 +6,7 @@
   <circle class="holes" cx="306" cy="150" r="27.9"/>
   <line class="centre-line" x1="40" y1="150" x2="376" y2="150"/>
   <text class="label-halo" x="110" y="222.5" text-anchor="middle">pivot bore .2510</text>
-  <text class="label-halo" x="306" y="222.5" text-anchor="middle">arbor bore .3135</text>
+  <text class="label-halo" x="306" y="222.5" text-anchor="middle">arbor bore 5/16 drilled</text>
   <rect class="part-kept" x="420" y="120" width="301" height="64"/>
   <line class="centre-line" x1="472.5" y1="108" x2="472.5" y2="196"/>
   <circle class="holes" cx="521.5" cy="152" r="14"/>
