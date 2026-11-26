@@ -16,6 +16,7 @@ It skips only when no FreeCAD 1.1+ is found.
 
 from __future__ import annotations
 
+import math
 import os
 import subprocess
 from types import SimpleNamespace
@@ -79,7 +80,7 @@ def step(freecadcmd, tmp_path_factory):
     return path
 
 
-def _report(freecadcmd, step, tmp_path, face=_FACE, hole=_HOLE, expected=()):
+def _report(freecadcmd, step, tmp_path, face=_FACE, hole=_HOLE, expected=(), tip_angle=118.0):
     (tmp_path / "P1_face.nc").write_text(face, encoding="utf-8")
     (tmp_path / "P2_hole.nc").write_text(hole, encoding="utf-8")
     recipe = SimpleNamespace(
@@ -94,7 +95,7 @@ def _report(freecadcmd, step, tmp_path, face=_FACE, hole=_HOLE, expected=()):
         "frames": {"top": IDENTITY},
         "jobs": [
             {"tool": "em", "frame": "top", "shape": "endmill", "dia": 12.7, "ops": [["face", "face", []]]},
-            {"tool": "drill", "frame": "top", "shape": "drill", "dia": 6.0, "tip_angle": 118.0, "ops": [["hole", "hole", []]]},
+            {"tool": "drill", "frame": "top", "shape": "drill", "dia": 6.0, "tip_angle": tip_angle, "ops": [["hole", "hole", []]]},
         ],
         "numbers": {"em": 1, "drill": 2},
         "manual": {},
@@ -157,6 +158,17 @@ def test_a_drill_deeper_into_the_air_below_a_through_hole_finds_nothing(freecadc
     out, variants = _report(freecadcmd, step, tmp_path, hole=_HOLE.replace("Z-3", "Z-4"))
     assert variants["nominal"]["over_noise"] == [] and variants["nominal"]["rapid_cuts"] == []
     assert am.failures(out) == []
+
+
+def test_a_tool_cone_taller_than_its_reach_above_the_blank_keeps_its_taper(freecadcmd, step, tmp_path):
+    """A 6 mm 30-degree point (cone 11.2 mm tall) spotted 3 mm into the faced
+    top: the tool's envelope ends CLEAR_MM above the blank, inside the cone,
+    so its profile stops at the radius there. It removes the 3 mm cone's
+    volume, not a cylinder's."""
+    out, variants = _report(freecadcmd, step, tmp_path, hole=_HOLE.replace("Z-3", "Z7"), tip_angle=30.0)
+    removed = {p["program"]: p["removed_mm3"] for p in variants["nominal"]["programs"]}
+    r = 3 * math.tan(math.radians(15))
+    assert removed["P2_hole"] == pytest.approx(math.pi * r * r * 3 / 3, rel=1e-3)
 
 
 def test_an_undrilled_hole_under_a_strip_left_shows_its_depth(freecadcmd, step, tmp_path):

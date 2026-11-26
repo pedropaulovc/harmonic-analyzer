@@ -580,7 +580,8 @@ size the program aims at inside its band (`aim`: the region must be
 counts the over-noise regions no entry explains, and names every entry no
 region matches any more: a clean recipe reads 0 unexplained.
 `AS_MACHINED_MODE = "report"` never fails the task on the report; `"gate"`
-fails it on an unexplained region, an expected difference that is gone or a
+fails it on a declaration that does not cover the recipe, an unexplained
+region, an expected difference that is gone, an aim outside its band or a
 rapid that cuts. A recipe the report cannot hold says why in
 `AS_MACHINED_NOT_COVERED`; one that declares nothing is reported not
 covered, never skipped. `HARMONIC_AS_MACHINED=skip` skips a report-mode

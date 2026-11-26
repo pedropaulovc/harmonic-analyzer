@@ -161,6 +161,20 @@ def test_pieces_of_plunges_ramps_helices_and_moves_above_the_blank(tmp_path):
     assert high == []
 
 
+def test_pieces_at_or_above_the_blank_top_are_dropped(tmp_path):
+    """A ramp in from above the top and a helix from above it: only what
+    runs below the top, the ramp's run capped at its two ends; the helix as
+    chords, since its upper Z (the one an arc is cut at) is above the top."""
+    program = _program(tmp_path, "\n".join([
+        "G90 G17", "G0 X0 Y0 Z0.5", "G1 X1 Z-0.05 F100", "G0 X5 Y0 Z1", "G2 X5 Y0 Z-1 I-5 J0",
+    ]))
+    ramp, _rapid, helix = (am.pieces(m, 0.0) for m in program.moves[1:])
+    assert len(ramp) == 3 and all(p["z"] < 0.0 for p in ramp)
+    assert [p["caps"] for p in ramp] == [[True, False], [False, False], [False, True]]
+    assert helix and {p["kind"] for p in helix} == {"seg"} and all(p["z"] < 0.0 for p in helix)
+    assert helix[0]["caps"][0] and helix[-1]["caps"][1]
+
+
 def test_the_tool_does_not_cut_again_where_it_already_stood(tmp_path):
     """Plunge and two strokes on from where it stood; a rise (it stood at
     its foot: nothing to cut) and a stroke at the new Z (never stood there);
@@ -273,6 +287,16 @@ def test_failures_name_unexplained_regions_gone_expectations_and_cutting_rapids(
     attrs = am.headline(_out(max_left_mm=0.2, air_passes=[{}, {}]))
     assert attrs["as_machined.max_left_mm"] == 0.2 and attrs["as_machined.air_passes"] == 2
     assert am.headline({"covered": False, "reason": "r", "seconds": 0.0})["as_machined.reason"] == "r"
+
+
+def test_a_gating_recipe_fails_when_not_covered_or_aimed_outside_its_band():
+    not_covered = {"stem": "s", "covered": False, "reason": "programs neither routed nor skipped: ['P9']"}
+    assert am.failures({**not_covered, "mode": am.MODE_REPORT}) == []
+    assert am.failures({**not_covered, "mode": am.MODE_GATE}) == [
+        "s: not covered: programs neither routed nor skipped: ['P9']"]
+    aim = {"band_mm": [98.0, 99.5], "cad_mm": 99.0, "aim_mm": 100.0, "in_band": False, "cad_in_band": True}
+    out = _out(expected=[{"name": "length aim", "kind": "left", "stale": False, "aim": aim}])
+    assert am.failures(out) == ["s nominal: expected 'length aim' aims at 100.0 outside its band [98.0, 99.5]"]
 
 
 def _region(kind, depth, box):

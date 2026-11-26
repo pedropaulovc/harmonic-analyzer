@@ -81,8 +81,12 @@ PARALLEL = 4
 # its moves (_freecad_as_machined). Its passes and rapids are then measured
 # against the part before and after it. Every milling program is under it.
 MOVE_CAP = 400
-# The tool's envelope reaches this far above the blank's top in each setup.
-CLEAR_MM = 5.0
+# The tool's envelope reaches this far above the blank's top in each setup:
+# clear of the top face (no coincident faces in the booleans), and no
+# farther, since nothing above the blank is cut. A V-bit's cone is as wide
+# as it is tall: at 5 mm, ms_stick's 0.5 mm deep numeral strokes swept
+# cones 3 mm across and their union ran past the 30 min timeout.
+CLEAR_MM = 0.5
 # A ramp is cut as flat pieces at their lower end, each dropping at most this.
 RAMP_DZ_MM = 0.02
 # An arc outside the XY plane is cut as chords of at most this angle.
@@ -411,17 +415,19 @@ def _lower(a, b):
 
 
 def pieces(move: _gcode.Move, top: float) -> list[dict[str, Any]]:
-    """The flat pieces a move's tool sweeps, in setup coordinates: a G17 arc
-    at its UPPER Z (a helix turn never cuts below its path; the next turn or
-    the flat bottom turns take what it leaves, and a helix that ends without
-    one leaves its floor up to one turn's drop, as a helical floor does), a
-    plunge standing at its lowest point, a flat line, a ramp in pieces each
-    at its lower end and dropping at most :data:`RAMP_DZ_MM`; an arc in
-    another plane as chords. Nothing for a move wholly at or above the
-    blank's ``top``, or of no length."""
+    """The flat pieces a move's tool sweeps below the blank's ``top``, in
+    setup coordinates: a G17 arc at its UPPER Z (a helix turn never cuts
+    below its path; the next turn or the flat bottom turns take what it
+    leaves, and a helix that ends without one leaves its floor up to one
+    turn's drop, as a helical floor does), a plunge standing at its lowest
+    point, a flat line, a ramp in pieces each at its lower end and dropping
+    at most :data:`RAMP_DZ_MM`; an arc in another plane, or a G17 helix
+    from at or above ``top``, as chords. Pieces at or above ``top`` cut
+    nothing and are dropped; nothing for a move wholly there, or of no
+    length."""
     if min(move.start[2], move.end[2], *(p[2] for p in move.extremes())) >= top:
         return []
-    if move.centre is not None and move.plane == 17:
+    if move.centre is not None and move.plane == 17 and max(move.start[2], move.end[2]) < top:
         _a, _b, radius, begin, sweep = move._arc()
         sense = -1.0 if move.motion is _gcode.Motion.ARC_CW else 1.0
         return [{"kind": "arc", "c": [move.centre[0], move.centre[1]], "r": radius, "a0": begin,
@@ -441,24 +447,31 @@ def pieces(move: _gcode.Move, top: float) -> list[dict[str, Any]]:
             points.append(tuple(p))
     else:
         points = [move.start, move.end]
-    out: list[dict[str, Any]] = []
+    out: list[dict[str, Any] | None] = []
     for s, e in zip(points, points[1:]):
         if math.dist(s[:2], e[:2]) < 1e-9:
             if abs(s[2] - e[2]) > 1e-9:
-                out.append({"kind": "stand", "x": s[0], "y": s[1], "z": _lower(s, e)})
+                out.append({"kind": "stand", "x": s[0], "y": s[1], "z": _lower(s, e)} if _lower(s, e) < top else None)
             continue
         # Less a hair, so a 0.1 mm drop is five 0.02 pieces, not six.
         n = max(1, math.ceil(abs(e[2] - s[2]) / RAMP_DZ_MM - 1e-9))
         sub = [tuple(s[i] + (e[i] - s[i]) * k / n for i in range(3)) for k in range(n + 1)]
         out += [{"kind": "seg", "a": [p[0], p[1]], "b": [q[0], q[1]], "z": _lower(p, q), "caps": [False, False]}
-                for p, q in zip(sub, sub[1:])]
-    # The tool standing at each end of a chain of pieces; a cap between two
-    # pieces is inside the pieces either side of it (to within one piece's
-    # drop), and every cap is a revolved solid in the one boolean.
-    segs = [piece for piece in out if piece["kind"] == "seg"]
-    if segs:
-        segs[0]["caps"][0] = segs[-1]["caps"][1] = True
-    return out
+                if _lower(p, q) < top else None for p, q in zip(sub, sub[1:])]
+    # The tool standing at each end of a chain of pieces (a run not broken
+    # by one dropped above ``top``); a cap between two pieces is inside the
+    # pieces either side of it (to within one piece's drop), and every cap is
+    # a revolved solid in the one boolean.
+    chains: list[list[dict[str, Any]]] = [[]]
+    for piece in out:
+        if piece is None:
+            chains.append([])
+        elif piece["kind"] == "seg":
+            chains[-1].append(piece)
+    for segs in chains:
+        if segs:
+            segs[0]["caps"][0] = segs[-1]["caps"][1] = True
+    return [piece for piece in out if piece is not None]
 
 
 def move_tools(program: _gcode.Program, entry_tool: int | None) -> list[int | None]:
@@ -550,38 +563,46 @@ def build_spec(decl: Declaration, nc_dir: Path, mesh_dir: Path) -> tuple[dict[st
     return {"marker": RESULT_MARKER, "noise_mm": NOISE_MM, "move_cap": MOVE_CAP, "mesh_dir": str(mesh_dir), "parts": parts}, kept
 
 
-def _run_unit(spec: dict[str, Any], freecadcmd: Path, work: Path, tag: str) -> tuple[dict[str, Any], str]:
+def _run_unit(spec: dict[str, Any], freecadcmd: Path, work: Path, tag: str) -> tuple[dict[str, Any] | None, str, str | None]:
+    """One freecadcmd: its result, its console output and what went wrong
+    (None when nothing did), so the caller logs the output either way."""
     path = work / f"spec-{tag}.json"
     path.write_text(json.dumps(spec), encoding="utf-8")
-    completed = subprocess.run(
-        [str(freecadcmd), str(_cam_programs.AS_MACHINED_RUNTIME_PATH)],
-        env={**os.environ, SPEC_ENV: str(path.resolve())},
-        cwd=work, capture_output=True, text=True, encoding="utf-8", errors="replace",
-        timeout=TIMEOUT_S, check=False,
-    )
+    try:
+        completed = subprocess.run(
+            [str(freecadcmd), str(_cam_programs.AS_MACHINED_RUNTIME_PATH)],
+            env={**os.environ, SPEC_ENV: str(path.resolve())},
+            cwd=work, capture_output=True, text=True, encoding="utf-8", errors="replace",
+            timeout=TIMEOUT_S, check=False,
+        )
+    except subprocess.TimeoutExpired as exc:
+        output = "".join(s if isinstance(s, str) else s.decode("utf-8", "replace") for s in (exc.stdout, exc.stderr) if s)
+        return None, output, f"FreeCAD as-machined for {tag} ran past {TIMEOUT_S} s"
     output = completed.stdout + completed.stderr
     lines = [line for line in output.splitlines() if line.startswith(RESULT_MARKER)]
     if len(lines) != 1:
-        raise RuntimeError(f"FreeCAD printed {len(lines)} as-machined result lines for {tag}: {output[-1500:]!r}")
+        return None, output, f"FreeCAD printed {len(lines)} as-machined result lines for {tag}: {output[-1500:]!r}"
     result = json.loads(lines[0].removeprefix(RESULT_MARKER))
     if "error" in result:
-        raise RuntimeError(f"FreeCAD as-machined failed for {tag}:\n{result['error']}")
-    return result, output
+        return None, output, f"FreeCAD as-machined failed for {tag}:\n{result['error']}"
+    return result, output, None
 
 
 def run_freecad(spec: dict[str, Any], freecadcmd: Path, work: Path, log: Path) -> dict[str, Any]:
     """One freecadcmd per part and blank length, :data:`PARALLEL` at a time
     (each cuts its own blank from scratch); their results merged in order.
-    Every console output goes to ``log``."""
+    Every console output goes to ``log``, before a failed unit raises."""
     units = [
         (i, {**spec, "parts": [{**part, "variants": [variant]}]}, f"{part['id'] or 'part'}-{variant['name']}")
         for i, part in enumerate(spec["parts"]) for variant in part["variants"]
     ]
     with ThreadPoolExecutor(max_workers=min(PARALLEL, len(units))) as pool:
         done = list(pool.map(lambda unit: _run_unit(unit[1], freecadcmd, work, unit[2]), units))
-    log.write_text("\n".join(f"===== {tag}\n{output}" for (_i, _s, tag), (_r, output) in zip(units, done)), encoding="utf-8")
+    log.write_text("\n".join(f"===== {tag}\n{output}" for (_i, _s, tag), (_r, output, _e) in zip(units, done)), encoding="utf-8")
+    if errors := [error for _r, _o, error in done if error is not None]:
+        raise RuntimeError("\n".join(errors))
     parts: list[dict[str, Any]] = []
-    for (i, _spec, _tag), (result, _output) in zip(units, done):
+    for (i, _spec, _tag), (result, _output, _error) in zip(units, done):
         found = result["parts"][0]
         if i == len(parts):
             parts.append({**found, "variants": []})
@@ -818,10 +839,13 @@ def headline(out: dict[str, Any]) -> dict[str, Any]:
 
 
 def failures(out: dict[str, Any]) -> list[str]:
-    """What a gating recipe fails on, by part and blank length: every region
-    over the noise line its recipe does not expect (and every region too
-    many to measure outside what it expects), every expected difference
-    that is gone, and every rapid that cut."""
+    """What a gating recipe fails on, by part and blank length: a
+    declaration that does not cover it, every region over the noise line
+    its recipe does not expect (and every region too many to measure
+    outside what it expects), every expected difference that is gone, every
+    aim outside its band, and every rapid that cut."""
+    if not out["covered"]:
+        return [f"{out['stem']}: not covered: {out['reason']}"] if out.get("mode") == MODE_GATE else []
     found = [f"{out['stem']}: the report failed: {out['error']}"] if "error" in out else []
     for pid, part in (out.get("parts") or {}).items():
         for name, v in part["variants"].items():
@@ -830,5 +854,7 @@ def failures(out: dict[str, Any]) -> list[str]:
                 depth = "unmeasured" if r["thickness_mm"] is None else f"{r['thickness_mm']:.3f} mm"
                 found.append(f"{where}: unexplained {r['kind']} {depth} in {r['extent_mm']}")
             found += [f"{where}: expected {row['name']!r} ({row['kind']}) is gone" for row in v["expected"] if row["stale"]]
+            found += [f"{where}: expected {row['name']!r} aims at {row['aim']['aim_mm']} outside its band {row['aim']['band_mm']}"
+                      for row in v["expected"] if "aim" in row and not row["aim"]["in_band"]]
             found += [f"{where}: rapid {r['program']} move {r['move']} removed {r['removed_mm3']:.3f} mm3" for r in v["rapid_cuts"]]
     return found

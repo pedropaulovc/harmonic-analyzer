@@ -411,7 +411,7 @@ def as_machined(stem: str, recipe: Any, ctx: dict[str, Any], inputs: SimpleNames
             span.set_attribute(key, value)
     if not out["covered"]:
         _telemetry.info(f"{stem}: as-machined not covered: {out['reason']}")
-        return []
+        return _as_machined.failures(out)
     found = _as_machined.failures(out)
     for line in found:
         _telemetry.warn(f"{stem}: as-machined {line}")

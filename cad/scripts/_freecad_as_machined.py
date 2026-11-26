@@ -73,10 +73,16 @@ def _clean(points):
 
 
 def _profile(profile, height):
-    """The tool's (r, h) half-profile from its tip, its last radius carried up
-    to ``height`` above the tip."""
+    """The tool's (r, h) half-profile from its tip up to ``height`` above it:
+    the radius at ``height`` interpolated on the profile's segment that
+    crosses it, its last radius carried up past its end."""
+    if height <= 0:
+        raise ValueError(f"a piece {-height:.3f} mm above the tool's envelope (the host drops those)")
     pts = [(r, h) for r, h in profile if h < height]
-    return pts + [(profile[-1][0] if not pts else pts[-1][0], height)]
+    if len(pts) == len(profile):
+        return pts + [(profile[-1][0], height)]
+    (r0, h0), (r1, h1) = profile[len(pts) - 1], profile[len(pts)]
+    return pts + [(r0 + (r1 - r0) * (height - h0) / (h1 - h0), height)]
 
 
 def standing(profile, x, y, z, top):
@@ -105,7 +111,14 @@ def segment(profile, a, b, z, top, caps=(True, True)):
 def arc(profile, c, radius, a0, sweep, z, top):
     cx, cy = c
     prof = _profile(profile, top - z)
-    inner = [(max(radius - r, 0.0), h) for r, h in prof]
+    # The inner side's radius, clamped at the axis; where the tool's radius
+    # crosses the arc's on a profile segment, the point it reaches the axis.
+    inner = []
+    for k, (r, h) in enumerate(prof):
+        if k and (prof[k - 1][0] - radius) * (r - radius) < 0:
+            r0, h0 = prof[k - 1]
+            inner.append((0.0, h0 + (h - h0) * (radius - r0) / (r - r0)))
+        inner.append((max(radius - r, 0.0), h))
     outer = [(radius + r, h) for r, h in prof]
     pts = _clean([V(cx + r, cy, z + h) for r, h in reversed(inner)] + [V(cx + r, cy, z + h) for r, h in outer])
     face = Part.Face(Part.makePolygon(pts + [pts[0]]))
@@ -187,13 +200,13 @@ def simulate(part, programs, profiles, cad, move_cap):
     """Cut every move from ``part`` in order. A program of at most ``move_cap``
     moves is cut move by move: each move's removed volume is exact. A longer
     one (engraving) is cut as two unions (:func:`_union`), its feed moves
-    then its rapids; each probed move (a pass or a rapid, as the host marks
-    them) is measured against the part before the program (a pass sharing
-    nothing with it removed nothing) or after its feed moves (a rapid
-    sharing material with that cut), bounds that miss only what the
-    program's own earlier moves cleared. Per program: the moves' volumes
-    (None where not measured), the total and the volume shed as loose
-    offcuts."""
+    then its rapids, and each probed move (a pass or a rapid, as the host
+    marks them) is measured on its own: a pass against the part before the
+    program (one sharing nothing with it removed nothing), a rapid against
+    the part after all the program's feed moves. So such a program's rapid
+    check misses a rapid through material any of its feed moves cleared,
+    earlier or later. Per program: the moves' volumes (None where not
+    measured), the total and the volume shed as loose offcuts."""
     out = []
     for program in programs:
         t0 = time.perf_counter()

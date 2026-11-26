@@ -1281,8 +1281,12 @@ def as_machined(ctx: dict[str, Any], inputs: Any) -> dict[str, Any]:
     # The engraved bands in model coordinates (the stick frame's X is model
     # x less the length): the ticks from the ruled edge in to the longest
     # tick the drawing allows, half a pitch past the end ticks; the numerals'
-    # ink box widened by half a stroke. CAD cuts square-section grooves of
-    # the printed width; the V bit leaves their corners and opens a V mouth.
+    # ink box widened by half a stroke. The plan cuts both wider and deeper
+    # than the model (plan.toml's FLAGGED note on the numerals' width): the
+    # ticks tick_width_mm wide and tick_depth_mm deep, the middle of the
+    # drawing's bands, against the modelled .016 MIN groove; the numerals
+    # numeral_width_mm wide against the model's near-sharp 0.24 V, which the
+    # bit's 0.1 tip cannot cut.
     grads, nums = g["grads"], g["numerals"]
     ticks = [t["x"] + g["length"] for t in ctx["ticks"]]
     pitch = grads["minor_pitch"]
@@ -1297,37 +1301,32 @@ def as_machined(ctx: dict[str, Any], inputs: Any) -> dict[str, Any]:
         [nums["y_span"][0] - num_w / 2, nums["y_span"][1] + num_w / 2],
         [0.0, p["numeral_depth_mm"]],
     ]
-    v_bit = "MS03/MS04 engrave with the 30° V bit (owner's engraver, plan Setup 3); the model's grooves are square-section"
+    v_bit = "MS03/MS04 engrave with the 30° V bit (owner's engraver, plan Setup 3)"
     expected = [
         {
-            "name": "graduation groove corners",
-            "kind": "left",
-            "within": tick_box,
-            "reason": f"{v_bit}: the V leaves each groove's bottom corners",
-            # A corner is at most the widest printed groove less the tip, halved.
-            "max_mm": (grads["width"][1] - p["engraver_tip_mm"]) / 2,
-        },
-        {
-            "name": "graduation V mouth",
+            "name": "graduations wider and deeper than modelled",
             "kind": "gouge",
             "within": tick_box,
-            "reason": f"{v_bit}: the V's mouth opens past the groove's square wall",
+            "reason": f"{v_bit} {tick_w} wide and {p['tick_depth_mm']} deep, the middle of the drawing's bands; "
+                      "the model's grooves are narrower (.016) and shallower",
             "max_mm": tick_w / 2,
         },
         {
-            "name": "numeral stroke corners",
-            "kind": "left",
+            "name": "numerals wider than modelled",
+            "kind": "gouge",
             "within": num_box,
-            "reason": f"{v_bit}: the V leaves each stroke's bottom corners",
-            # A corner is at most half the stroke the plan cuts.
+            "reason": f"{v_bit} {num_w} wide; the model's strokes are a near-sharp 0.24 V the bit's tip cannot cut",
             "max_mm": num_w / 2,
         },
         {
-            "name": "numeral V mouth",
-            "kind": "gouge",
-            "within": num_box,
-            "reason": f"{v_bit}: the V's mouth opens past the stroke's square wall",
-            "max_mm": num_w / 2,
+            "name": "engraving slivers past the report's cap",
+            "kind": "left",
+            "within": tick_box,
+            "reason": "slivers along the engraving, too many for the report to measure one by one; the largest, "
+                      "which it measures, are under the noise line",
+            # _as_machined.NOISE_MM: a sliver the report measures is never
+            # explained here, only those past its region cap.
+            "max_mm": 0.075,
         },
     ]
     return {
