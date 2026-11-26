@@ -50,7 +50,7 @@ part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
 material = "C36000 free-cutting brass, 7/16 in hex bar (drawing: {{cad.material_spec}})"
 stock = "{{process.blank_af_in:fraction}} in hex bar, the {{process.blank_x_in:g}} in piece on hand (at least {{process.bar_length_min_in:.2f}} in): one fixture off its end."
-note = "Inches unless mm; G-code and console entries in mm (the file and the controller run G21). Lathe PM-1127VF-LB, dry (C36000). Home the mill ($H) and touch off G54 at the start of the mill setup; after any controller reset, stall or E-stop, home and touch off again before Cycle Start. Prove the file in air first. Finish: as machined."
+note = "Inches unless mm; G-code and console entries in mm (the file and the controller run G21). Lathe PM-1127VF-LB, dry (C36000). Home the mill ($H) once, after switching it on: every M6's trip to the tool setter counts from home. Home again only after a power cycle or a controller restart, an E-stop, an alarm, a limit switch hit, a stall or a crash: homing brings the stored G54 back. Then check every zero of the setup again, each the way its step set it: each must read what its step set, within .001 in. One does not, cannot be reached with the part in, or the part may have moved: take the setup again from its first step, the part out. They all do: run the interrupted file again from its start. Feed Hold, then Reset with the axes stopped keeps position and G54: no homing, no new zero; run the interrupted file again from its start: its first M6 measures the tool, and cuts already made are cut in air. Prove the file in air first. Finish: as machined."
 shop = "../shop"
 stock_refs = ["c360-hex-7-16"]
 material_key = "lathe-c360"
@@ -332,8 +332,8 @@ instruction = "Bore gauges, before the setup: mike the F drill's shank, .2570–
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Home the mill first ($H). G54 Y0 the spigot's axis, between two touches on its sides; X0 the spigot face."
-instruction_detailed = "Home the mill first ($H). Edge finder (900 rpm), its tip level with the spigot's middle. On the spigot's front side (toward the moving jaw), from the front: G10 L20 P1 Y0. On its back side, from the back: G10 L20 P1 Y(half the DRO Y reading). On the spigot face from the left, at Y0: G10 L20 P1 X-2.540 (minus: the edge finder's centre is left of the face)."
+instruction = "G54 Y0 the spigot's axis, between two touches on its sides; X0 the spigot face."
+instruction_detailed = "Edge finder (900 rpm), its tip level with the spigot's middle. On the spigot's front side (toward the moving jaw), from the front: G10 L20 P1 Y0. On its back side, from the back: G10 L20 P1 Y(half the DRO Y reading). On the spigot face from the left, at Y0: G10 L20 P1 X-2.540 (minus: the edge finder's centre is left of the face)."
 feed = "hand"
 
 [[setups.operations]]

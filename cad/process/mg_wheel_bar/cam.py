@@ -1091,3 +1091,69 @@ def build(ctx: dict[str, Any], rt: Any) -> dict[str, Any]:
     ops.update(ctx["manual"])
     rt.generate(doc)
     return {"ops": ops}
+
+
+# The as-machined report (``cad/scripts/_as_machined.py``) only reports: it
+# never fails the task. "gate" would fail it on a difference over the noise
+# line or a rapid that cuts.
+AS_MACHINED_MODE = "report"
+
+
+def as_machined(ctx: dict[str, Any], inputs: Any) -> dict[str, Any]:
+    """The sawn blank in WB02's frame: its stock box (the bar's 3/8
+    thickness as supplied, its width at the widest the gate passes), the
+    sawn left end at -left_end_skim_mm staying put, the length along X at
+    the plan's blank_length_min_mm-blank_length_max_mm band and its middle
+    (the plan marks no nominal; the route says "about 9.35"). WB03 and WB04
+    run in the one lying frame (the jobs' "left" and "right" stocks, X0
+    picked up again on the milled left end), so the route is listed."""
+    p = inputs.plan["parameters"]
+    lengths = {
+        "nominal": (p["blank_length_min_mm"] + p["blank_length_max_mm"]) / 2,
+        "min": p["blank_length_min_mm"],
+        "max": p["blank_length_max_mm"],
+    }
+    stock = next(job["stock"] for job in ctx["jobs"] if job["frame"] == "top")
+    x0 = stock[0][0]
+    # The length aim: WB04 mills the right end to the middle of the printed
+    # length band (process.length_target_mm), the CAD sits at its nominal.
+    f = inputs.features["features"]
+    left, right = f["left_end"]["plane"]["value"], f["right_end"]["plane"]["value"]
+    aim = p["length_target_mm"]
+    ends = [
+        {
+            "name": "length aim",
+            "kind": "gouge",
+            "within": [
+                [left + aim, right],
+                [f["bottom_face"]["plane"]["value"], f["top_face"]["plane"]["value"]],
+                [f["front_face"]["plane"]["value"], f["back_face"]["plane"]["value"]],
+            ],
+            "reason": "WB04 mills the length to the middle of the printed band "
+            "(process.length_target_mm); the CAD is at the drawing's nominal",
+            "aim": {
+                "band_mm": list(f["right_end"]["length"]),
+                "cad_mm": right - left,
+                "aim_mm": aim,
+            },
+        }
+    ]
+    return {
+        "parts": {
+            "": {
+                "blank": {
+                    "frame": "top",
+                    "box": [[x0, x0 + lengths["nominal"]], list(stock[1]), list(stock[2])],
+                    "length": {"axis": "x", "keep": "min", "mm": lengths},
+                },
+                "expected": ends,
+                "route": [
+                    ["WB02_top", "top"],
+                    ["WB03_left", "lying"],
+                    ["WB04_right", "lying"],
+                    ["WB05_height", "height"],
+                ],
+            }
+        },
+        "skip": {},
+    }

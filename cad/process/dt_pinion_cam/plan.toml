@@ -49,7 +49,7 @@ part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
 material = "1018 cold-finished steel, 5/8 in round (drawing: {{cad.material_spec}})"
 stock = "{{process.bar_dia_in:fraction}} in round bar: saw one piece {{process.bar_length_min_in:.2f}}–3.00 in long off it, which makes both cams ({{process.quantity:d}} off); never chuck the whole bar (it would run out past the spindle's rear end)."
-note = "Inches unless mm; G-code and console entries in mm (the files and the controller run G21). Finished Ø{{cad.cam_od_dia_min_in:.3dot}}–{{cad.cam_od_dia_max_in:.3dot}} × {{cad.cam_od_length_min_in:.3dot}}–{{cad.cam_od_length_max_in:.3dot}} long; the bore Ø{{cad.bore_dia_min_in:.4dot}}–{{cad.bore_dia_max_in:.4dot}} {{cad.bore_eccentricity_min_in:.3dot}}–{{cad.bore_eccentricity_max_in:.3dot}} off the O.D. axis (thin wall {{cad.bore_thin_wall_min_mm:in.4dot}} min); the #2-56 set-screw hole opposite the thin side, {{cad.set_screw_tap_station_min_in:.3dot}}–{{cad.set_screw_tap_station_max_in:.3dot}} from the front face. Mill speeds on the PM-30MV low belt (100–2800 rpm). Home the mill ($H) and touch off G54 at the start of every mill setup; after any controller reset, stall or E-stop, home and touch off again before Cycle Start. Every file is proved in air on the first cam. Edges: R{{cad.edge_break_in:.3dot}} or chamfer {{cad.chamfer_max_in:.3dot}} max."
+note = "Inches unless mm; G-code and console entries in mm (the files and the controller run G21). Finished Ø{{cad.cam_od_dia_min_in:.3dot}}–{{cad.cam_od_dia_max_in:.3dot}} × {{cad.cam_od_length_min_in:.3dot}}–{{cad.cam_od_length_max_in:.3dot}} long; the bore Ø{{cad.bore_dia_min_in:.4dot}}–{{cad.bore_dia_max_in:.4dot}} {{cad.bore_eccentricity_min_in:.3dot}}–{{cad.bore_eccentricity_max_in:.3dot}} off the O.D. axis (thin wall {{cad.bore_thin_wall_min_mm:in.4dot}} min); the #2-56 set-screw hole opposite the thin side, {{cad.set_screw_tap_station_min_in:.3dot}}–{{cad.set_screw_tap_station_max_in:.3dot}} from the front face. Mill speeds on the PM-30MV low belt (100–2800 rpm). Home the mill ($H) once, after switching it on: every M6's trip to the tool setter and the tap files' G53 retract count from home. Home again only after a power cycle or a controller restart, an E-stop, an alarm, a limit switch hit, a stall or a crash: homing brings the stored G54 back. Then check every zero of the setup again, each the way its step set it: each must read what its step set, within .001 in. One does not, cannot be reached with the part in, or the part may have moved: take the setup again from its first step, the part out. They all do: run the interrupted file again from its start. Feed Hold, then Reset with the axes stopped keeps position and G54: no homing, no new zero; run the interrupted file again from its start: its first M6 measures the tool, and cuts already made are cut in air. Every file is proved in air on the first cam. Edges: R{{cad.edge_break_in:.3dot}} or chamfer {{cad.chamfer_max_in:.3dot}} max."
 shop = "../shop"
 stock_refs = ["1018-round-5-8"]
 material_key = "rocker-1018-cold-finished"
@@ -310,8 +310,8 @@ instruction = "Start only with the .2510 reamer (to order) and an MHA-DT-17 rod 
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Home the mill ($H). G54 Y0: the O.D. axis, half the miked O.D. from the fixed jaw. X0: the O.D. axis, midway between its left and right sides at Y0."
-instruction_detailed = "Home the mill ($H). Edge finder (900 rpm) on the fixed jaw's face beside the cam: G10 L20 P1 Y(half your O.D. reading in mm − 2.540); for .575, Y4.763. MDI G0 Y0. Edge finder down beside the O.D. between the jaws, on the LEFT side from the left: G10 L20 P1 X0. On the RIGHT side from the right: G10 L20 P1 X(half the DRO X reading)."
+instruction = "G54 Y0: the O.D. axis, half the miked O.D. from the fixed jaw. X0: the O.D. axis, midway between its left and right sides at Y0."
+instruction_detailed = "Edge finder (900 rpm) on the fixed jaw's face beside the cam: G10 L20 P1 Y(half your O.D. reading in mm − 2.540); for .575, Y4.763. MDI G0 Y0. Edge finder down beside the O.D. between the jaws, on the LEFT side from the left: G10 L20 P1 X0. On the RIGHT side from the right: G10 L20 P1 X(half the DRO X reading)."
 feed = "hand"
 
 [[setups.operations]]
@@ -386,8 +386,8 @@ vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{cad.cam_od_dia_mm}}", alon
 beam = { axis = "x", hold = "solid", extent_mm = [0, "{{cad.envelope_z_mm}}"], seat = "gripped full length across the O.D. in the vise jaws, on the parallels' edges", seat_mm = [0, "{{cad.envelope_z_mm}}"] }
 
 [[setups.operations]]
-instruction = "Home the mill ($H). G54 Y0: the O.D. axis, half the miked O.D. from the fixed jaw, as Setup 2."
-instruction_detailed = "Home the mill ($H). Edge finder (900 rpm) on the fixed jaw's face: G10 L20 P1 Y(half your O.D. reading in mm − 2.540)."
+instruction = "G54 Y0: the O.D. axis, half the miked O.D. from the fixed jaw, as Setup 2."
+instruction_detailed = "Edge finder (900 rpm) on the fixed jaw's face: G10 L20 P1 Y(half your O.D. reading in mm − 2.540)."
 feed = "hand"
 
 [[setups.operations]]

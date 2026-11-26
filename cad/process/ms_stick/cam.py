@@ -1249,3 +1249,101 @@ def build(ctx: dict[str, Any], rt: Any) -> dict[str, Any]:
     ops.update(ctx["manual"])
     rt.generate(doc)
     return {"ops": ops}
+
+
+# The as-machined report (``cad/scripts/_as_machined.py``) only reports: it
+# never fails the task. "gate" would fail it on a difference over the noise
+# line or a rapid that cuts.
+AS_MACHINED_MODE = "report"
+
+
+def as_machined(ctx: dict[str, Any], inputs: Any) -> dict[str, Any]:
+    """What the as-machined report needs: the sawn brass blank bonded to the
+    fixture bar, in the ``stick`` frame. Its length along X at the plan's
+    sawn band (``blank_length_in``..``blank_length_max_in``), nominal the
+    scribed ``blank_scribe_in``; X0 is ``outline_trim_mm`` inside its right
+    end, so that end stays put. Across Y its rear edge at Y0 and the bar's
+    nominal ``blank_width_in``; its thickness the bar's as supplied, never
+    machined (the model's). MS01 faces the fixture bar, not the part. The
+    engraving bit is a V of the plan's tip flat and the graduations' angle,
+    which the jobs (a flat end mill of the shank) cannot describe."""
+    p = inputs.plan["parameters"]
+    g = _geometry(inputs.features)
+    trim = p["outline_trim_mm"]
+    lengths = {
+        "nominal": p["blank_scribe_in"] * IN,
+        "min": p["blank_length_in"] * IN,
+        "max": p["blank_length_max_mm"],
+    }
+    shank = next(job["dia"] for job in ctx["jobs"] if job["tool"] == "engraver") / 2
+    tip = p["engraver_tip_mm"] / 2
+    flank = math.tan(math.radians(g["grads"]["v_angle_deg"] / 2))
+    # The engraved bands in model coordinates (the stick frame's X is model
+    # x less the length): the ticks from the ruled edge in to the longest
+    # tick the drawing allows, half a pitch past the end ticks; the numerals'
+    # ink box widened by half a stroke. The plan cuts both wider and deeper
+    # than the model (plan.toml's FLAGGED note on the numerals' width): the
+    # ticks tick_width_mm wide and tick_depth_mm deep, the middle of the
+    # drawing's bands, against the modelled .016 MIN groove; the numerals
+    # numeral_width_mm wide against the model's near-sharp 0.24 V, which the
+    # bit's 0.1 tip cannot cut.
+    grads, nums = g["grads"], g["numerals"]
+    ticks = [t["x"] + g["length"] for t in ctx["ticks"]]
+    pitch = grads["minor_pitch"]
+    tick_w, num_w = p["tick_width_mm"], p["numeral_width_mm"]
+    tick_box = [
+        [min(ticks) - pitch / 2, max(ticks) + pitch / 2],
+        [g["width"] - grads["half_length"][1] - tick_w / 2, g["width"]],
+        [0.0, p["tick_depth_mm"]],
+    ]
+    num_box = [
+        [nums["x_span"][0] - num_w / 2, nums["x_span"][1] + num_w / 2],
+        [nums["y_span"][0] - num_w / 2, nums["y_span"][1] + num_w / 2],
+        [0.0, p["numeral_depth_mm"]],
+    ]
+    v_bit = "MS03/MS04 engrave with the 30° V bit (owner's engraver, plan Setup 3)"
+    expected = [
+        {
+            "name": "graduations wider and deeper than modelled",
+            "kind": "gouge",
+            "within": tick_box,
+            "reason": f"{v_bit} {tick_w} wide and {p['tick_depth_mm']} deep, the middle of the drawing's bands; "
+                      "the model's grooves are narrower (.016) and shallower",
+            "max_mm": tick_w / 2,
+        },
+        {
+            "name": "numerals wider than modelled",
+            "kind": "gouge",
+            "within": num_box,
+            "reason": f"{v_bit} {num_w} wide; the model's strokes are a near-sharp 0.24 V the bit's tip cannot cut",
+            "max_mm": num_w / 2,
+        },
+        {
+            "name": "engraving slivers past the report's cap",
+            "kind": "left",
+            "within": tick_box,
+            "reason": "slivers along the engraving, too many for the report to measure one by one; the largest, "
+                      "which it measures, are under the noise line",
+            # _as_machined.NOISE_MM: a sliver the report measures is never
+            # explained here, only those past its region cap.
+            "max_mm": 0.075,
+        },
+    ]
+    return {
+        "parts": {
+            "": {
+                "blank": {
+                    "frame": "stick",
+                    "box": [
+                        [trim - lengths["nominal"], trim],
+                        [-p["blank_width_in"] * IN, 0.0],
+                        [-g["thick"], 0.0],
+                    ],
+                    "length": {"axis": "x", "keep": "max", "mm": lengths},
+                },
+                "expected": expected,
+            }
+        },
+        "skip": {"MS01_fixture_face": "faces the fixture bar's top, not the stick"},
+        "tools": {ctx["numbers"]["engraver"]: [[tip, 0.0], [shank, (shank - tip) / flank]]},
+    }

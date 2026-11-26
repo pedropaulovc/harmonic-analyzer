@@ -1372,3 +1372,123 @@ def build(ctx: dict[str, Any], rt: Any) -> dict[str, Any]:
     ops.update(ctx["manual"])
     rt.generate(doc)
     return {"ops": ops}
+
+
+# The as-machined report (``cad/scripts/_as_machined.py``) only reports: it
+# never fails the task. "gate" would fail it on a difference over the noise
+# line or a rapid that cuts.
+AS_MACHINED_MODE = "report"
+
+
+def as_machined(ctx: dict[str, Any], inputs: Any) -> dict[str, Any]:
+    """What the as-machined report needs: the sawn slice of the 3/4 × 1-1/4
+    bar, MS01's stock in the ``back`` frame (the bar's width along X, its
+    thickness along Y), the slice's thickness along Z at the plan's band
+    (``blank_z_min_mm``..``blank_z_max_mm``), nominal its middle (the .59 the
+    saw is marked at). MS01's Z0 is the sawn top less the skim, so the top
+    stays put and the slice's length shows at the mating face. MS02 faces the
+    mating face to ``thickness_aim_mm`` from the back face, not to the
+    model's depth, and MS05 (Z0) and MS08 (Y0, the fixed jaw) are set on that
+    faced mating face: their frames here stand on it, the ``rebate`` and
+    ``thumb`` frames moved along model Z. The tap files (MS09-MS11) are a tap
+    guide by hand and cut nothing; the plate holes' #49 pilots are drilled
+    from MHA-MS-03's MS01, not here."""
+    p = inputs.plan["parameters"]
+    (x0, x1), (y0, y1), (_z0, z1) = next(job["stock"] for job in ctx["jobs"] if job["frame"] == "back")
+    lo, hi = p["blank_z_min_mm"], p["blank_z_max_mm"]
+    nominal = (lo + hi) / 2
+    mating = ctx["frames"]["mating"]["origin"][2] - p["thickness_aim_mm"]
+    frames = {}
+    for key in ("rebate", "thumb"):
+        origin = ctx["frames"][key]["origin"]
+        frames[f"{key}_faced"] = {
+            "origin": [origin[0], origin[1], origin[2] + mating],
+            "axes": ctx["frames"][key]["axes"],
+        }
+    frame_of = {op[0]: job["frame"] for job in ctx["jobs"] for op in job["ops"]}
+    route = []
+    for name, keys in PROGRAMS:
+        found = {frame_of[k] for item in keys for k in ((item,) if isinstance(item, str) else item) if k in frame_of}
+        key = found.pop() if found else None
+        route.append([name, f"{key}_faced" if f"{key}_faced" in frames else key])
+    f = inputs.features["features"]
+
+    def plane(name: str) -> float:
+        return f[name]["plane"]["value"]
+
+    length, height, depth = plane("far_end"), plane("top_face"), plane("back_face")
+    ceiling, floor = plane("rebate_ceiling"), plane("rebate_floor")
+    shift = p["thickness_aim_mm"] - depth  # MS02's aim past the model's depth
+    thickness_aim = {
+        "band_mm": [p["thickness_min_mm"], p["thickness_max_mm"]],
+        "cad_mm": depth,
+        "aim_mm": p["thickness_aim_mm"],
+    }
+    plugs = [f[name] for name in ("plate_tap_1", "plate_tap_2")]
+    plug_r = max(h["dia"][1] for h in plugs) / 2
+    plug_bottom = max(h["drill_depth"][1] for h in plugs) + _point(2 * plug_r)
+    thumb = f["thumb_tap"]
+    thumb_r = thumb["dia"][1] / 2
+    expected = [
+        {
+            "name": "mating face thickness aim",
+            "kind": "left",
+            "within": [[0.0, length], [0.0, height], [-shift, 0.0]],
+            "reason": "MS02 faces to thickness_aim_mm, the middle of the window's band; the model sits at its .480 REF floor (owner ruling 2026-11-21)",
+            "aim": thickness_aim,
+        },
+        {
+            "name": "thumb hole from the faced mating face",
+            "kind": "left",
+            "within": [
+                [thumb["at"][0] - thumb_r, thumb["at"][0] + thumb_r],
+                [0.0, floor],
+                [thumb["at"][2] - thumb_r - shift, thumb["at"][2] + thumb_r + shift],
+            ],
+            "reason": "MS08 sets Y0 on the mating face MS02 faced to its aim, so the hole stands its printed .170 from that face, the aim's shift off the model's",
+            "aim": thickness_aim,
+        },
+        {
+            "name": "plate pilots plugged",
+            "kind": "left",
+            "within": [[0.0, length], [0.0, floor], [-shift, plug_bottom]],
+            "reason": "the two #2-56 holes are drilled #49 from MHA-MS-03's MS01_pair_pilot and tapped by hand (Setups 11-12); the plugs touch the mating-face aim strip, so the box is that strip's below the rebate",
+            "max_mm": plug_r,
+        },
+        {
+            "name": "rebate height aim",
+            "kind": "gouge",
+            "within": [[0.0, length], [0.0, floor], [0.0, plane("rebate_back")]],
+            "reason": "MS05 aims the rebate height at its band's middle (rebate_height_aim_mm); the model sits at the sliding fit's minimum (SEE NOTE 1). The thumb hole's near wall, shifted with the faced mating face, joins the floor's strip, so the box runs down to the locating edge",
+            "aim": {
+                "band_mm": f["rebate_floor"]["rebate_height"],
+                # The model's rebate height (ceiling − floor, 3.4035999 in
+                # floats), as the export states it.
+                "cad_mm": f["rebate_floor"]["rebate_height_nominal"],
+                "aim_mm": p["rebate_height_aim_mm"],
+            },
+        },
+        {
+            "name": "relief plunge ridges",
+            "kind": "left",
+            "within": [[0.0, length], [plane("relief_floor"), ceiling], [plane("rebate_back"), plane("relief_back")]],
+            "reason": "MS05_relief plunge-mills the relief (owner ruling 2026-11-21): a ridge of relief_scallop_mm stands between plunges",
+            "max_mm": p["relief_scallop_mm"],
+        },
+    ]
+    return {
+        "parts": {
+            "": {
+                "blank": {
+                    "frame": "back",
+                    "box": [[x0, x1], [y0, y1], [z1 - nominal, z1]],
+                    "length": {"axis": "z", "keep": "max", "mm": {"nominal": nominal, "min": lo, "max": hi}},
+                },
+                "route": route,
+                "expected": expected,
+            }
+        },
+        "frames": frames,
+        "skip": {},
+        "notes": ["the plate holes' pilots come from MHA-MS-03's MS01_pair_pilot; every thread is tapped by hand"],
+    }

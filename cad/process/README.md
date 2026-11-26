@@ -525,6 +525,60 @@ A traveler that passes is not permission to machine: shop measurements,
 physical setup verification and machining approval are still required. See the
 [feature/traveler contract](../docs/pipeline/features-travelers.md).
 
+### Homing and work offsets
+
+The mill is homed once a session, not once a setup (owner, Pedro, 2026-11-24:
+FluidNC "keeps G54 (work offsets are stored in non-volatile settings)" and "it
+should not be needed to rehome the mill $H on every setup ; only once at the
+beginning is enough"). Every plan with a PM-30MV setup says so once, in its
+`note` (`cad/scripts/test_home_once.py` holds every plan to
+it); no operation homes out of habit, and none re-touches a zero because a
+file was stopped. FluidNC's documentation, read 2026-11-24:
+
+- Work offsets persist: G54-G59 offsets "are stored in non volatile memory and
+  are automatically restored at startup"
+  (<http://wiki.fluidnc.com/en/features/supported_gcodes>).
+- A reset with the axes stopped loses nothing: "If reset while not in motion,
+  position is retained and re-homing is not required. If in hold mode, the
+  motion buffer is cleared and position is not lost"; "If reset while in
+  motion, Grbl will throw an alarm to indicate position may be lost"
+  (<http://wiki.fluidnc.com/en/features/commands_and_settings>). So a traveler
+  stops a file with Feed Hold first, then Reset.
+- Homing is a power-on act: "Homing is typically performed once when you power
+  on the machine" (<http://wiki.fluidnc.com/en/support/work_coordinates>); with
+  `start: must_home` (the default) the controller starts in a homing alarm
+  (<http://wiki.fluidnc.com/en/config/start_group>).
+- Position is lost, and the travelers home again, after a hard limit ("accurate
+  position is assumed to be lost. You must rehome":
+  <http://wiki.fluidnc.com/en/config/homing_and_limit_switches>), an E-stop or
+  fault input ("possibly losing position accuracy":
+  <http://wiki.fluidnc.com/en/config/control>), a power cycle or a controller
+  restart (machine position starts from wherever the table stands; logbook
+  2026-11-06), and a reset in motion. A stall or a crash is on the list as
+  shop practice (open-loop steppers lose steps), not from FluidNC's pages.
+- What needs the home: machine-coordinate moves. CNCjs expands each `M6` into
+  `G53` moves to its tool-change and tool-probe positions (cncjs v1.11.5
+  `GrblController.js`), and the hand-tap files retract with `G53 G0 Z`.
+- Not kept by a reset: a `G43.1` tool length offset (FluidNC v3.7.8
+  `GCode.cpp`, `gc_init` clears the parser state). Whether the shop's `M6`
+  sets one is not on record: the owner's probing widget
+  (pedropaulovc/cncjs-probe f1d00ee) writes work offsets with `G10 L20` and
+  only stores a measured tool length in CNCjs (`global.toolchange.TOOL_OFFSET`),
+  and CNCjs's `M6` follows its server setting `tool.toolChangePolicy` (`G10
+  L20`, `G43.1`, or custom commands), which lives on the shop PC
+  (pedropaulovc/cncjs-probe#4). So after a Reset, or a homing, the travelers
+  run the interrupted file again from its start: a file that loads a tool
+  opens with its `M6`, which measures the tool in the spindle again, right
+  under any of the three. A file with no `M6` (`cam.py`'s `LOAD_FIRST_TOOL`
+  leaves it out: `CL07_hub`, and the slitting-saw and notch files) says in
+  its plan what comes first: a console `M6` for the tool in the spindle, or
+  the saw's own touch-off.
+- After a homing the stored G54 comes back with the home, as near as the home
+  switches repeat, and that figure is not on record (#3581). So the travelers
+  check every zero of the setup again, each the way its step set it, and take
+  the setup again, the part out, if one reads off by more than .001 in, cannot
+  be reached with the part in, or the part may have moved.
+
 ## NC programs (FreeCAD CAM)
 
 A part with `<stem>/cam.py` (`cad/scripts/_cam_programs.py:CAM_STEMS`, derived
@@ -548,7 +602,7 @@ that differs from the manifest, or a manifest recording any input other than
 the current one (the feature bundle, `plan.toml`, each shop file, the recipe or
 the runtime: `_cam_programs.cam_inputs`) fails the cut.
 
-A recipe has five parts:
+A recipe has five parts (and the as-machined declaration, below):
 
 - `PROGRAMS`: the file names, each listing its operations, flat (one FreeCAD
   Job, posted as it is) or in sections (one Job per tool and spindle speed,
@@ -610,6 +664,41 @@ caught a spot depth measured from the counterbore floor, a feed height below
 the stock top, a slot cut from the outside and an oversized radial step in the
 first recipe. A failed check removes every output. Fix the recipe, not the
 expectation.
+
+**As-machined report.** After the checks pass and the programs are in place,
+`cam:<stem>` cuts every posted move from the blank with OCC booleans in
+headless FreeCAD (`cad/scripts/_as_machined.py`, `_freecad_as_machined.py`)
+and compares the part those moves leave with the STEP. It writes
+`as_machined.json` beside the programs (per part and per blank length: volume,
+mass, centre-of-gravity offset, the material left over and gouged with each
+region's thickness, the material each program removed, each feed pass that
+removed nothing and each rapid that removed material), `as_machined.png` when
+a region is thicker than the noise line (`_as_machined.NOISE_MM`, 0.075 mm),
+and `as_machined.log`. These are not task outputs: no release ships them.
+The recipe declares what the report needs in `as_machined(ctx, inputs)`
+(`inputs` holds what `context` was given): the blank (a box or a bar
+section in one setup frame, at the plan's nominal length and at both limits
+of its band), and, only where the default is wrong, the route (default:
+each program in `PROGRAMS` order in its jobs' frame), the programs that cut
+no part (`skip`, with the reason) and a tool shape the jobs cannot describe.
+Each part also declares the differences it expects (`expected`): each a
+name, a kind (left or gouge), the box its regions lie in, the reason (a hand
+tap, a later lathe operation, a bench edge break, a cutter's form) and,
+where it has one, a depth bound, the blank lengths it holds for, or the
+size the program aims at inside its band (`aim`: the region must be
+|aim − cad| deep; the report prints the aim against the band). The report
+counts the over-noise regions no entry explains, and names every entry no
+region matches any more: a clean recipe reads 0 unexplained.
+`AS_MACHINED_MODE = "report"` never fails the task on the report; `"gate"`
+fails it on a declaration that does not cover the recipe, an unexplained
+region, an expected difference that is gone, an aim outside its band or a
+rapid that cuts. A recipe the report cannot hold says why in
+`AS_MACHINED_NOT_COVERED`; one that declares nothing is reported not
+covered, never skipped. `HARMONIC_AS_MACHINED=skip` skips a report-mode
+recipe's report (an inner loop; builds and releases leave it unset). The
+worked example is the column clamp family's `cam.py`. The seeded-fault
+controls are `cad/scripts/test_as_machined_freecad.py` (outside the gates: it
+runs FreeCAD).
 
 Milling speed rules (owner rulings 2026-11-16): "replace fusion with oss
 cam" moved the task from Autodesk Fusion Personal, which posted rapids at

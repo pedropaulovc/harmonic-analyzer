@@ -427,3 +427,100 @@ def build(ctx: dict[str, Any], rt: Any) -> dict[str, Any]:
     ops.update(ctx["manual"])
     rt.generate(doc)
     return {"ops": ops}
+
+
+# The as-machined report (``cad/scripts/_as_machined.py``) only reports: it
+# never fails the task. "gate" would fail it on a difference over the noise
+# line or a rapid that cuts.
+AS_MACHINED_MODE = "report"
+# The turned spigot's round, as a polygon of this many sides inscribed in
+# it: each facet falls short of the CAD's round by r(1 - cos(180°/n)) =
+# 0.0016 mm, a gouge sliver under the report's 1e-3 mm3 region floor along
+# the spigot's longest plain run (72 sides left 33 slivers of 0.004 mm3,
+# past the report's 40 measured regions, so it could not call them explained).
+SPIGOT_SIDES = 128
+
+
+def as_machined(ctx: dict[str, Any], inputs: Any) -> dict[str, Any]:
+    """The bar as Setup 1's lathe leaves it, in MO01's frame: the hex prism
+    (the export's hex across flats, its corners on the frame's Z) from the
+    spigot's shoulder to the free end, joined to the turned spigot (its
+    nominal diameter, a SPIGOT_SIDES-gon run 1 mm into the hex, inside it)
+    from the spigot face to the shoulder. The groove and the axial #4-40
+    the lathe also makes are not in it: the report shows them as material
+    left. The bar beyond the free end (parted off afterwards, Setup 3) is
+    left out: MO01 drills only within the part. No sawn length to band."""
+    f = inputs.features["features"]
+    af = f["hex"]["af_ref"]
+    ac = 2 * af / math.sqrt(3)
+    spigot = f["spigot"]["length_nominal"]
+    length = f["spigot_face"]["plane"]["value"] - f["free_end"]["plane"]["value"]
+    if not math.isclose(spigot + f["hex"]["length_nominal"], length, abs_tol=1e-3):
+        raise ValueError("the spigot and the hex do not make the part's length")
+    r = f["spigot"]["nominal_dia"] / 2
+    hexagon = [
+        [0.0, 0.0],
+        [af / 2, -ac / 4],
+        [af / 2, -3 * ac / 4],
+        [0.0, -ac],
+        [-af / 2, -3 * ac / 4],
+        [-af / 2, -ac / 4],
+    ]
+    round_ = [
+        [r * math.cos(2 * math.pi * k / SPIGOT_SIDES), -ac / 2 + r * math.sin(2 * math.pi * k / SPIGOT_SIDES)]
+        for k in range(SPIGOT_SIDES)
+    ]
+    # The lathe's groove and axial #4-40 (Setup 1), not in the blank: model
+    # coordinates, the hex axis on model X, the spigot face at its plane.
+    face = f["spigot_face"]["plane"]["value"]
+    groove, tap = f["groove"], f["tap"]
+    spigot_r = f["spigot"]["dia"][1] / 2
+    tap_r = tap["dia"][1] / 2
+    expected = [
+        {
+            "name": "wire groove",
+            "kind": "left",
+            "within": [
+                [
+                    face - groove["station"][1] - groove["radius"][1],
+                    face - groove["station"][0] + groove["radius"][1],
+                ],
+                [-spigot_r, spigot_r],
+                [-spigot_r, spigot_r],
+            ],
+            "reason": "the full-radius wire groove is turned on the lathe in Setup 1 "
+            "(Spigot end: face, turn, groove, drill and tap)",
+            "max_mm": (f["spigot"]["dia"][1] - groove["root_dia"][0]) / 2,
+        },
+        {
+            "name": "axial #4-40",
+            "kind": "left",
+            "within": [
+                [face - tap["axis_depth"][1] - _point(2 * tap_r), face],
+                [-tap_r, tap_r],
+                [-tap_r, tap_r],
+            ],
+            "reason": "the axial #4-40 is drilled and tapped on the lathe in Setup 1 "
+            "(Spigot end: face, turn, groove, drill and tap)",
+            "max_mm": tap_r,
+        },
+    ]
+    return {
+        "parts": {
+            "": {
+                "blank": {
+                    "frame": "cross",
+                    "prism": [
+                        {"axis": "x", "polygon": hexagon, "span": [spigot, length]},
+                        {"axis": "x", "polygon": round_, "span": [0.0, spigot + 1.0]},
+                    ],
+                },
+                "expected": expected,
+            }
+        },
+        "skip": {},
+        "notes": [
+            "The blank is the lathe's (Setup 1) hex and spigot; its groove and "
+            "axial #4-40 tap are lathe work the route does not mill."
+        ],
+    }

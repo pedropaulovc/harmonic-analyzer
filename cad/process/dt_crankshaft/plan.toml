@@ -86,7 +86,7 @@ part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
 material = "1018 cold-finished steel, 1 in round (drawing: {{cad.material_spec}})"
 stock = "Qty {{process.quantity:g}}. {{process.bar_dia_in:fraction}} in round bar on hand: one blank {{process.blank_length_in:.2f}} in long and one {{process.slug_blank_in:.2f}} in proof-slug blank."
-note = "Inches unless mm; G-code and console entries in mm (the file and the controller run G21). Lathe PM-1127VF-LB (70–380 and 380–2000 rpm); cutting oil on the steel. Lathe cross-slide DRO in inch diameter mode for Setups 2–6 (Setup 7 switches it to mm radius). Every station is from the far end F. Inside corners R.010 max: finish each shoulder's corner with the sharp-nose tool. Each lathe tool sets its own DRO Z0 on the setup's datum face before it cuts a station. Mill speeds on the PM-30MV low belt (100–2800 rpm). Home the mill ($H) and touch off G54 before the mill setup; after any controller reset, stall or E-stop, home and touch off again before Cycle Start. Prove the file in air first. Not made here (drawing notes, at assembly): the Ø.125 pin hole match-reamed through MHA-DT-10 and the pinion seat, and the cross hole's 1:48 taper ream with MHA-DT-31; nothing is drilled for either on this traveler."
+note = "Inches unless mm; G-code and console entries in mm (the file and the controller run G21). Lathe PM-1127VF-LB (70–380 and 380–2000 rpm); cutting oil on the steel. Lathe cross-slide DRO in inch diameter mode for Setups 2–6 (Setup 7 switches it to mm radius). Every station is from the far end F. Inside corners R.010 max: finish each shoulder's corner with the sharp-nose tool. Each lathe tool sets its own DRO Z0 on the setup's datum face before it cuts a station. Mill speeds on the PM-30MV low belt (100–2800 rpm). Home the mill ($H) once, after switching it on: every M6's trip to the tool setter counts from home. Home again only after a power cycle or a controller restart, an E-stop, an alarm, a limit switch hit, a stall or a crash: homing brings the stored G54 back. Then check every zero of the setup again, each the way its step set it: each must read what its step set, within .001 in. One does not, cannot be reached with the part in, or the part may have moved: take the setup again from its first step, the part out. They all do: run the interrupted file again from its start. Feed Hold, then Reset with the axes stopped keeps position and G54: no homing, no new zero; run the interrupted file again from its start: its first M6 measures the tool, and cuts already made are cut in air. Prove the file in air first. Not made here (drawing notes, at assembly): the Ø.125 pin hole match-reamed through MHA-DT-10 and the pinion seat, and the cross hole's 1:48 taper ream with MHA-DT-31; nothing is drilled for either on this traveler."
 shop = "../shop"
 stock_refs = ["1018-round-1"]
 material_key = "lathe-1018-cold-finished"
@@ -1148,7 +1148,7 @@ instruction = "Take the .0930 plus pin out of the drive-pin hole."
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Home the mill ($H). G54 Y0 the stub's axis: edge finder (900 rpm)."
+instruction = "G54 Y0 the stub's axis: edge finder (900 rpm)."
 instruction_detailed = "Edge finder (900 rpm, Ø.200), its tip level with the stub's axis, on the stub between the spigot and the dome: from the −Y side, G10 L20 P1 Y0; jog Z up clear of the stub, then from the +Y side G10 L20 P1 Y(half the DRO's work Y reading)."
 feed = "hand"
 

@@ -325,18 +325,30 @@ if not all(0.0 < x < BAR_LENGTH for x in TAP_X):
 # Four stock 91794A055 #0-80 x 1/4 fillisters, untrimmed (owner ruling
 # 2026-11-13), their heads on the floor of the MHA-PD-27 rail's counterbores.
 # The floor (rail underside to counterbore floor) is the rail's .XXX height
-# less the native callout's .XXX counterbore depth from its top (MHA-PD-02's
-# convention: the depth controls, the floor follows), so it carries both
-# bands. It is the least that keeps the longest stock screw on the thinnest
-# floor at or above the least full thread, so no tip reaches the tap's lead.
+# less the native callout's counterbore depth from its top, which prints its
+# own .469 ±.005 (owner ruling 2026-11-25, #3620; at the wizard pocket's ±.01
+# of rule 3 this stack fails), so it carries both bands. It is the least that
+# keeps the longest stock screw on the thinnest floor at or above the least
+# full thread, so no tip reaches the tap's lead.
 SCREW_LENGTH = _screw.SHANK_LEN
 SCREW_LENGTH_MIN = SCREW_LENGTH - 0.03 * MM_PER_IN  # ASME B18.6.3 length band
 SCREW_FIRST_THREAD_LOSS = _screw.PITCH
-SCREW_FLOOR_BAND = 2.0 * TAP_BAND  # rail height + counterbore depth, each .XXX
+SCREW_FLOOR_BAND = 2.0 * TAP_BAND  # rail height .XXX + counterbore depth's own ±.005
 SCREW_FLOOR = _ceil_in(SCREW_LENGTH - TAP_THREAD_DEPTH_MIN + SCREW_FLOOR_BAND)  # .155
 SCREW_TIP_REACH_MAX = SCREW_LENGTH - (SCREW_FLOOR - SCREW_FLOOR_BAND)
-if SCREW_TIP_REACH_MAX > TAP_THREAD_DEPTH_MIN + 1e-9:
-    raise AssertionError("the longest rack screw can reach its tap's lead")
+# The margin is ZERO at the printed bands: the longest .250 screw on the
+# thinnest .145 floor reaches .105, the tap's least full thread exactly. The
+# owner chose this form knowing it: "b: Ø.110 +.004/−0 and depth .469 ±.005"
+# (owner ruling 2026-11-25, #3620), over option b's sketch line "tip short of
+# lead +0.0000" (cbore-band-audit-2026-11-25/bottom-guide-cbore-options.png).
+# The guard has no rounding and no epsilon: the difference is exactly 0.0 mm
+# here, and any negative fails.
+SCREW_TIP_MARGIN = TAP_THREAD_DEPTH_MIN - SCREW_TIP_REACH_MAX
+if not SCREW_TIP_MARGIN >= 0.0:
+    raise AssertionError(
+        "the longest rack screw can reach its tap's lead (margin is zero at the "
+        "printed bands; any negative fails)"
+    )
 # Full-thread engagement: shortest stock on the thickest floor, the screw's
 # first thread and the tap's mouth break lost (rule 18 counts full threads
 # only); nominal: the catalogue length on the nominal floor.

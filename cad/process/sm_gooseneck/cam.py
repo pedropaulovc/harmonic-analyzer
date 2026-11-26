@@ -748,3 +748,12 @@ def build(ctx: dict[str, Any], rt: Any) -> dict[str, Any]:
     ops.update(ctx["manual"])
     rt.generate(doc)
     return {"ops": ops}
+
+
+# The as-machined report (``cad/scripts/_as_machined.py``) cannot compare
+# these programs with the part: they cut the bend form, a shop fixture.
+AS_MACHINED_NOT_COVERED = (
+    "GF01/GF02 cut the bend form (fixtures.sm-gooseneck-bend-form, two 6061 plates),"
+    " not MHA-SM-01: the gooseneck is 1/2 in 4130 tube bent by hand on that form and"
+    " sawn to length; no CAD model of the form exists to compare with"
+)

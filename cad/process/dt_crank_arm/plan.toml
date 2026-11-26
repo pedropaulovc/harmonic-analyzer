@@ -45,7 +45,7 @@ part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
 material = "1018 cold-finished steel, 5/16 x 1 in flat (drawing: {{cad.material_spec}})"
 stock = "{{process.blank_thickness_in:fraction}} x {{process.blank_width_in:.0f}} in flat bar, the 12 in length: one {{process.blank_length_in:.2f}}–{{process.blank_length_max_in:.2f}} in blank and a 1.5 in spacer."
-note = "Inches unless mm; G-code and console entries in mm (the files and the controller run G21). Width and thickness are the bar's, as supplied (drawing note 1): no face or edge is machined. Mill speeds on the PM-30MV low belt (100–2800 rpm): no belt change. Home the mill ($H) at the start of every mill setup; after any E-stop, alarm, stall, controller reset or knock to the work, home again and repeat the setup's first op (its G54 pick-up) before resuming. The seam (5/32 drill .17 deep, note 3) is made at assembly, not here. Finish: {{cad.finish}}."
+note = "Inches unless mm; G-code and console entries in mm (the files and the controller run G21). Width and thickness are the bar's, as supplied (drawing note 1): no face or edge is machined. Mill speeds on the PM-30MV low belt (100–2800 rpm): no belt change. Home the mill ($H) once, after switching it on: every M6's trip to the tool setter and the tap files' G53 retract count from home. Home again only after a power cycle or a controller restart, an E-stop, an alarm, a limit switch hit, a stall or a crash: homing brings the stored G54 back. Then check every zero of the setup again, each the way its step set it: each must read what its step set, within .001 in. One does not, cannot be reached with the part in, or the part may have moved: take the setup again from its first step, the part out. They all do: run the interrupted file again from its start. Feed Hold, then Reset with the axes stopped keeps position and G54: no homing, no new zero; run the interrupted file again from its start: its first M6 measures the tool, and cuts already made are cut in air. The seam (5/32 drill .17 deep, note 3) is made at assembly, not here. Finish: {{cad.finish}}."
 shop = "../shop"
 stock_refs = ["1018-flat-5-16x1-12in"]
 material_key = "rocker-1018-cold-finished"
@@ -274,8 +274,8 @@ vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{cad.blank_width_mm}}", alo
 beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{process.blank_length_mm}}"], clamp_mm = ["{{process.overhang_mm}}", "{{process.blank_length_mm}}"], section_mm = { y = "{{cad.blank_width_mm}}", z = "{{process.blank_thickness_min_mm}}" }, vise_left = "start" }
 
 [[setups.operations]]
-instruction = "Home the mill ($H). G54 Y0 on the fixed jaw's face, X0 on the blank's left end (edge finder at 900 rpm). Console M6 T1 (3/8 in end mill, at least {{process.em_projection_min_mm:in.2f}} out of its collet). Z0: T1's end on a .002 leaf on the O face."
-instruction_detailed = "Home the mill ($H). Edge finder (900 rpm) on the fixed jaw's face from −Y: G10 L20 P1 Y−2.540. On the blank's left end from −X: G10 L20 P1 X−2.540. Console M6 T1 (3/8 in end mill, at least 1.00 in out of the collet; the tool setter measures it). MDI G0 X20 Y−12.7, spindle stopped, its end just dragging a .002 leaf on the O face: G10 L20 P1 Z0.051."
+instruction = "G54 Y0 on the fixed jaw's face, X0 on the blank's left end (edge finder at 900 rpm). Console M6 T1 (3/8 in end mill, at least {{process.em_projection_min_mm:in.2f}} out of its collet). Z0: T1's end on a .002 leaf on the O face."
+instruction_detailed = "Edge finder (900 rpm) on the fixed jaw's face from −Y: G10 L20 P1 Y−2.540. On the blank's left end from −X: G10 L20 P1 X−2.540. Console M6 T1 (3/8 in end mill, at least 1.00 in out of the collet; the tool setter measures it). MDI G0 X20 Y−12.7, spindle stopped, its end just dragging a .002 leaf on the O face: G10 L20 P1 Z0.051."
 feed = "hand"
 
 [[setups.operations]]
@@ -375,8 +375,8 @@ vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{cad.blank_width_mm}}", alo
 beam = { axis = "x", hold = "cantilever", extent_mm = [-104.14, 0], clamp_mm = [-77.47, 0], section_mm = { y = "{{cad.blank_width_mm}}", z = "{{process.blank_thickness_min_mm}}" }, vise_left = "start" }
 
 [[setups.operations]]
-instruction = "Home the mill ($H). G54 Y0 on the fixed jaw's face; X0 on the hub end's tip (edge finder from +X, at Y −.50, the tip's crown). Console M6 T1; Z0 as Setup 2, T1 on a .002 leaf on the O face at X −1.18 (solid face between the seat and the anchor hole)."
-instruction_detailed = "Home the mill ($H). Edge finder (900 rpm) on the fixed jaw's face from −Y: G10 L20 P1 Y−2.540. MDI G0 Y−12.7; edge finder on the hub end's tip from +X: G10 L20 P1 X2.540. Console M6 T1. MDI G0 X−30 Y−12.7 (the end mill over X −.99 to −1.37, clear of the seat's edge at −.88 and of the anchor hole), spindle stopped, its end just dragging a .002 leaf on the O face: G10 L20 P1 Z0.051."
+instruction = "G54 Y0 on the fixed jaw's face; X0 on the hub end's tip (edge finder from +X, at Y −.50, the tip's crown). Console M6 T1; Z0 as Setup 2, T1 on a .002 leaf on the O face at X −1.18 (solid face between the seat and the anchor hole)."
+instruction_detailed = "Edge finder (900 rpm) on the fixed jaw's face from −Y: G10 L20 P1 Y−2.540. MDI G0 Y−12.7; edge finder on the hub end's tip from +X: G10 L20 P1 X2.540. Console M6 T1. MDI G0 X−30 Y−12.7 (the end mill over X −.99 to −1.37, clear of the seat's edge at −.88 and of the anchor hole), spindle stopped, its end just dragging a .002 leaf on the O face: G10 L20 P1 Z0.051."
 feed = "hand"
 
 [[setups.operations]]

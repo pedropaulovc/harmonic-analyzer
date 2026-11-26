@@ -1,0 +1,11 @@
+# MHA-PD-26 feed rack: the rack screws' tip guard (tolerance-policy.md,
+# "Checks in spec modules and tests"; cad/scripts/check_register.py). Entered
+# 2026-11-25 when the MHA-PD-27 counterbore depth took its own printed ±.005
+# (#3620).
+checks:
+  - id: C-01
+    check: "SCREW_TIP_MARGIN"
+    kind: thread
+    reason: "a rack screw bottoms in its tap's lead"
+    source: "margin 0 (ZERO) at the printed bands: the longest stock .250 screw (_mcmaster_91794a055) on the thinnest floor, .155 less the rail height's .XXX ±.005 and the counterbore depth's own ±.005 = .145, reaches .105, TAP_THREAD_DEPTH_MIN exactly; the guard is >= 0.0 with no epsilon. The owner chose this form knowing it: owner ruling 2026-11-25 (#3620): \"b: Ø.110 +.004/−0 and depth .469 ±.005\", option b of cbore-band-audit-2026-11-25/bottom-guide-cbore-options.png, whose line reads \"tip short of lead +0.0000\""
+    basis: worst_case

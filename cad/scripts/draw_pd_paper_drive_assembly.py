@@ -2898,10 +2898,14 @@ def _step_text(
             f"POLYETHYLENE FILM, WHOSE HOLE CLEARS THE {pivot_screw.THREAD} THREAD, "
             f"NOT THE \u00d8{steps.inch_text(pivot_screw.SHOULDER_DIA, 4)} SHOULDER: "
             "THE SPACER SHOWS NO DAYLIGHT ON THE PLATE AND THE ARM SWINGS FREELY.",
-            # Bounded: the one renewal and the inspection that follows it
-            # are the step's own tail (Codjiflo r1 on #3487).
-            f"IF EITHER FAILS, DO {s('hanger-pivoted', 20)}-{s('hanger-pivoted', 23)}.",
+            # The spacer comes off by hand whatever the trial showed: a pass
+            # takes it to the bond, a failure to the step's one renewal, then
+            # the inspection (Codjiflo r1 on #3487). The trial cannot tell a
+            # spacer face out of square from the screw's shoulder end, so the
+            # renewal takes both; nothing is bonded yet, so no press (#3558).
             "LIFT THE SPACER OFF THE SHOULDER.",
+            f"IF {s('hanger-pivoted', 2)} FAILED, DO {s('hanger-pivoted', 20)}-"
+            f"{s('hanger-pivoted', 23)}.",
             # One action per sub-step (machinist review
             # 20261124T013305458Z, rule 22): coat, push on, wipe and clamp
             # each stand alone, and the cure is the wait before the screw is
@@ -2948,17 +2952,17 @@ def _step_text(
             # .SPACER_BOND_SHEAR_N) with no heat near the arm's other bonds;
             # screw and spacer are renewed anyway (delegated ruling 2026-11-24
             # (Main), D10: owner question Q7a, option B; no precedent, #2144).
-            # The dry trial's failure jumps here too, with the spacer only
-            # slipped on, where it lifts off by hand: the press is for a
-            # bonded one alone (Codjiflo r1 on #3569). The screw's head, proud
+            # The dry trial's failure jumps here too, its spacer already
+            # lifted off by hand: the press is for a bonded one alone
+            # (Codjiflo r1 on #3569; #3558). The screw's head, proud
             # of the arm's rear face, goes down in a slot of the press's
             # rotating plate (Central Machinery 59766 manual: the plate's
             # width settings); naming it would add a line past STEP_SLOTS.
             # In this sub-step, not a new one: the steps fill STEP_SLOTS.
-            "IF NOT YET RENEWED, PRESS A BONDED SPACER OFF THE SCREW ON THE ARBOR "
-            f"PRESS, ARM REAR FACE DOWN, AND REPEAT FROM {s('arm-plate-screws-cut', 6)} "
-            f"WITH A NEW {n['pd-vn-transgear-pivot-screw']} "
-            f"SCREW AND {n['pd-transgear-pivot-spacer']} SPACER.",
+            f"IF NOT YET RENEWED, REPEAT FROM {s('arm-plate-screws-cut', 6)} WITH A NEW "
+            f"{n['pd-vn-transgear-pivot-screw']} SCREW AND "
+            f"{n['pd-transgear-pivot-spacer']} SPACER, FIRST PRESSING ANY BONDED SPACER "
+            "OFF ON THE ARBOR PRESS, ARM REAR FACE DOWN.",
             f"IF ALREADY RENEWED, INSPECT THE {n['pd-support-bar']} BAR'S "
             f"TAP AND BACK FACE AND THE {n['pd-transgear-arm']} ARM'S BORE "
             "TO THEIR SHEETS.",

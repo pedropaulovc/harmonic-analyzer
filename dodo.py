@@ -3875,6 +3875,7 @@ def _executed_closure(cmd: list[str]) -> set[str]:
 _UNGATED = frozenset(
     {
         # Runs the local FreeCAD install, which no build dependency tracks.
+        "cad/scripts/test_as_machined_freecad.py",
         "cad/scripts/test_cam_nc_freecad.py",
         "cad/scripts/test_ch_rocker_strap_tl_sub_plate_cam_freecad.py",
     }
@@ -4641,9 +4642,12 @@ def _cam_task(stem: str) -> dict[str, Any]:
         stem, "--out", str(CAD_OUT),
     ]
     runtime = str(_cam_programs.RUNTIME_PATH.resolve())
-    # The inputs manifest.json records, which a release re-checks.
+    # The inputs manifest.json records, which a release re-checks, and the
+    # as-machined report's FreeCAD script (run after the post, not an input
+    # of the NC).
     deps = {
         *(str(p.resolve()) for p in _cam_programs.cam_inputs(stem, CAD_OUT).values()),
+        str(_cam_programs.AS_MACHINED_RUNTIME_PATH.resolve()),
         *_executed_closure(cmd),
     }
     return {

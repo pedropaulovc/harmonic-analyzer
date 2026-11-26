@@ -1204,3 +1204,56 @@ def build(ctx: dict[str, Any], rt: Any) -> dict[str, Any]:
     ops.update(ctx["manual"])
     rt.generate(doc)
     return {"ops": ops}
+
+
+# The as-machined report (``cad/scripts/_as_machined.py``) only reports: it
+# never fails the task. "gate" would fail it on a difference over the noise
+# line or a rapid that cuts.
+AS_MACHINED_MODE = "report"
+# The .4990 chucking reamer's 45° lead, taken at .020 (the longest the plan
+# allowed for datum B's reamer before B became drilled). KM08 reams the
+# knife bore through, so its tip ends out of the part and the lead's length
+# changes nothing the report measures. The jobs carry the reamer as a 118°
+# drill for FreeCAD.
+REAMER_LEAD_MM = 0.020 * IN
+
+
+def as_machined(ctx: dict[str, Any], inputs: Any) -> dict[str, Any]:
+    """What the as-machined report needs: the sawn 4140 blank in KM01's
+    ``back`` frame, its sawn length along X at the plan's band
+    (``blank_length_min_mm``..``blank_length_max_mm``), nominal its middle
+    (the saw is not marked at one size). X0 is the S end, which KM04 skims
+    from its high point, so it stays put. The bar's width (Y) and thickness
+    (Z) at their bands' middles: the thickness from the K face (KM01's Z0 is
+    the top less the skim), the width from the U edge (KM03's Z0 is the edge
+    less the skim), which the frames put where the widest bar has it. KM07 is
+    a tap guide by hand and cuts nothing. The .4990 reamer cuts with a 45°
+    lead of :data:`REAMER_LEAD_MM`, not a drill's point."""
+    p = inputs.plan["parameters"]
+    lengths = {
+        "nominal": (p["blank_length_min_mm"] + p["blank_length_max_mm"]) / 2,
+        "min": p["blank_length_min_mm"],
+        "max": p["blank_length_max_mm"],
+    }
+    width = (p["blank_width_min_mm"] + p["blank_width_max_mm"]) / 2
+    thickness = (p["blank_thickness_min_mm"] + p["blank_thickness_max_mm"]) / 2
+    _x, (y0, _y1), (_z0, z1) = next(job["stock"] for job in ctx["jobs"] if job["frame"] == "back")
+    tools = {}
+    for job in ctx["jobs"]:
+        if job["tool"].startswith("reamer-"):
+            r = job["dia"] / 2
+            tools[ctx["numbers"][job["tool"]]] = [[r - REAMER_LEAD_MM, 0.0], [r, REAMER_LEAD_MM]]
+    return {
+        "parts": {
+            "": {
+                "blank": {
+                    "frame": "back",
+                    "box": [[0.0, lengths["nominal"]], [y0, y0 + width], [z1 - thickness, z1]],
+                    "length": {"axis": "x", "keep": "min", "mm": lengths},
+                },
+            }
+        },
+        "skip": {},
+        "tools": tools,
+        "notes": ["the #10-24 thread is tapped by hand (KM07 brings the tap guide over it)"],
+    }
