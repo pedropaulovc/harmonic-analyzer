@@ -574,7 +574,12 @@ def context(
     )
     x_ceiling_pass = x_ceiling + e8_r
     x_floor_pass = x_floor - e8_r
-    x_relief = x_ceiling + e16_r
+    # The plunges' X is posted on the 0.001 grid toward the roof (−X), so the
+    # cutter's edge reaches the ceiling rather than stopping short of it:
+    # rounded the other way, a skin under a thousandth joins the ridges along
+    # the whole relief (the 1/16 in cutter's ceiling + radius lands .0003
+    # under a grid step).
+    x_relief = math.floor(round((x_ceiling + e16_r) * 1000, 6)) / 1000
     rough, end = _slot(x_centre, slot_ys, rebate_levels, None)
     # Finish both walls full depth, each climbing (ball screws): the floor
     # wall running +Y, the ceiling wall -Y, from whichever end the rough
