@@ -526,7 +526,7 @@ vise_hold = "other"
 beam = "other"
 
 [[setups.operations]]
-instruction = "Put on the chemical-resistant gloves and the safety glasses (to buy before this setup). Degrease the plates' B ends and the strap's front where each plate sits (from the foot end to 1.25 in up, and from 4.55 to 4.95 in below the top end) with the Birchwood Casey Cleaner-Degreaser (to buy), both faces of every joint, and let them dry; from here on touch none of them."
+instruction = "Put on the chemical-resistant gloves and the safety glasses. Degrease the plates' B ends and the strap's front where each plate sits (from the foot end to 1.25 in up, and from 4.55 to 4.95 in below the top end) with the Birchwood Casey Cleaner-Degreaser, both faces of every joint, and let them dry; from here on touch none of them."
 feed = "hand"
 
 [[setups.operations]]
@@ -659,7 +659,7 @@ vise_hold = "other"
 beam = "other"
 
 [[setups.operations]]
-instruction = "The drawing's finish: {{cad.finish}}, all over (no masking). Done in the shop by cold blackening with Birchwood Presto Black Steel PC9 (owner ruling 2026-11-21: accepted as the drawing's black oxide), by its maker's instructions as below. To buy before this setup (none on record): the PC9; the chemical-resistant gloves and safety glasses are those bought for Setup 5."
+instruction = "The drawing's finish: {{cad.finish}}, all over (no masking). Done in the shop by cold blackening with Birchwood Presto Black Steel PC9 (owner ruling 2026-11-21: accepted as the drawing's black oxide), by its maker's instructions as below."
 feed = "hand"
 
 [[setups.operations]]

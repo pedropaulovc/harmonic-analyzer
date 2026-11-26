@@ -615,7 +615,7 @@ speed_kind = "spindle"
 tool = "em-half"
 drilling = "none"
 sizing = "other"
-instruction = "Run VB06_top_bore (M6 T1; set 2800): face the top down to Z {{cad.top_face_height_mm:in.3dot}}. At the M6 T4 stop, confirm the spindle has stopped, then, still clamped, check the height before changing tools."
+instruction = "Run VB06_top_bore (M6 T1; set 2800): face the top down to Z {{cad.top_face_height_mm:in.3dot}}. At the M6 T4 stop, still clamped, check the height before changing tools."
 settings = "pn-em-half-c360"
 inspection = "Height {{cad.top_face_height_min_in:.3dot}}–{{cad.top_face_height_max_in:.3dot}} at the M6 T4 stop: the calipers' depth rod from the top to the fixed-jaw stack's top beside the block, at both ends."
 gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.top_face_height_band_mm}}" }]
