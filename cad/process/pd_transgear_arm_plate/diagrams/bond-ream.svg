@@ -9,7 +9,7 @@
   <path class="fixture-support" d="M425.71 320.56L440 320.56L440 415L432.86 412L425.71 415Z"/>
   <rect class="bond" x="268.55" y="205" width="171.45" height="1.26"/>
   <rect class="part-kept" x="268.55" y="182.48" width="171.45" height="22.52"/>
-  <rect class="holes" x="330.16" y="182.48" width="48.22" height="24.77"/>
+  <rect class="holes" x="330.16" y="182.48" width="48.22" height="31.52"/>
   <text class="label-on-clamp" x="72.1" y="403" text-anchor="middle">moving</text>
   <text class="label-on-clamp" x="465" y="403" text-anchor="middle">fixed</text>
   <line class="datum" x1="16" y1="205" x2="93.1" y2="205"/>
