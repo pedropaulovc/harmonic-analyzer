@@ -419,7 +419,7 @@ gauge_checks = [{ gauge = "calipers", band_mm = ["{{process.jaw_top_min_mm}}", "
 
 [[setups.operations]]
 instruction = "Open the vise a quarter turn, the jaws just off the plate: it stays on the parallels, the moving one under its milled edge (pushed out with the jaw: slide it back flush with that edge). Then G54 Z0 on the spoil plate's top with T1; the plate is not lifted again this lot."
-instruction_detailed = "Open the vise a quarter turn, the jaws just off the plate: it stays on the parallels, the moving one under its milled edge (pushed out with the jaw: slide it back flush with that edge). Spindle stopped, the T1 tip just dragging a .002 feeler leaf on the spoil plate's top: G10 L20 P1 Z0.051. This Z0 stays for every load and both sides (the tool setter measures each M6, holder swaps included); from here on the spoil plate is not lifted, only brushed and stoned in place, and never clamped: the jaws close on the blanks."
+instruction_detailed = "Open the vise a quarter turn, the jaws just off the plate: it stays on the parallels, the moving one under its milled edge (pushed out with the jaw: slide it back flush with that edge). Spindle stopped, the T1 tip just dragging a .002 feeler leaf on the spoil plate's top: G10 L20 P1 Z0.051. This Z0 stays for every load and both sides; from here on the spoil plate is not lifted, only brushed and stoned in place, and never clamped: the jaws close on the blanks."
 feed = "hand"
 
 [[setups.operations]]
@@ -495,7 +495,6 @@ gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.plate_near_face_offset_ba
 
 [[setups.operations]]
 instruction = "Swap to the drill chuck: console M6 T3, the #1 centre drill (G54 Z0 stays)."
-instruction_detailed = "Console M6 T3."
 feed = "hand"
 
 [[setups.operations]]
@@ -697,7 +696,7 @@ speed_kind = "spindle"
 tool = "em-eighth"
 drilling = "none"
 sizing = "other"
-instruction = "Run CL07_hub right after CL06_outline, T2 still in the spindle and the speed still set at 2800 (the file has no tool change): round each hub alone above the web and below it, in levels to .010 into the spoil plate: the lever then hangs on its tabs only. CL07_hub alone has no M6: before running it again, console M6 T2 (the tool setter measures it)."
+instruction = "Run CL07_hub right after CL06_outline, T2 still in the spindle and the speed still set at 2800 (the file has no tool change): round each hub alone above the web and below it, in levels to .010 into the spoil plate: the lever then hangs on its tabs only. CL07_hub alone has no M6: before running it again, console M6 T2."
 settings = "endmill-carbide-3fl-1-8-1018-cf-tru-edge"
 milling_cuts = [
   { name = "outline hub", kind = "slot", phase = "finish", cutter_dia_mm = "{{process.eighth_cutter_dia_mm}}", axial_doc_mm = "{{process.outline_level_max_mm}}", radial_woc_mm = "{{process.eighth_cutter_dia_mm}}", stations_mm = "{{process.hub_from_end_mm}}" },
