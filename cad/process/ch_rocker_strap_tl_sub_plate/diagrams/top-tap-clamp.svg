@@ -30,4 +30,9 @@
   <circle class="leader-dot" cx="279.84" cy="378.83" r="2"/>
   <text class="label" x="135" y="468.83">moving jaw</text>
   <text class="label" x="560" y="468.83">fixed jaw</text>
+  <text class="label" x="20" y="60">Drawn at hole 2 (X 107.950),</text>
+  <text class="label" x="20" y="76">inside the jaws. SP03_tap_clamp_1</text>
+  <text class="label" x="20" y="92">taps hole 1 first: X 25.400, in the</text>
+  <text class="label" x="20" y="108">overhang, 1.88 in past the left jaw;</text>
+  <text class="label" x="20" y="124">then _2, _3, _4 (X 279.400, overhang).</text>
 </svg>

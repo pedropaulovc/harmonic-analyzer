@@ -457,7 +457,7 @@ tool = "drill-43"
 drilling = "twist_drill"
 sizing = { kind = "tap_drill", tap = "tap-4-40" }
 instruction = "Same file, M6 T4 (#43 drill; set 2800): the {{cad.pocket_count:d}} clamp holes through the plate, full-retract pecks every {{process.peck_43_mm:in.3dot}}. Cutting oil."
-diagram = { file = "diagrams/top-drill-43.svg", alt = "Section across the jaws at a clamp hole: the #43 drill, to scale, through the pocket floor, its full diameter past the underside, between the parallels." }
+diagram = { file = "diagrams/top-drill-43.svg", alt = "Section across the jaws at clamp hole 2, inside the jaws: the #43 drill, to scale, through the pocket floor, its full diameter past the underside, between the parallels. The NC drills hole 1 first, at X 25.400 in the overhang past the left jaw, then holes 2, 3 and 4." }
 rpm = 2800
 feed = "{{process.drill_43_feed_per_min_mm:in.1f}} in/min"
 hole_depth_mm = "{{process.clamp_hole_depth_mm}}"
@@ -503,7 +503,7 @@ feed = "hand"
 
 [[setups.operations]]
 instruction = "4-40 tap in the T-handle wrench in the hole, tap fluid; jog Z down until the guide's point is in the wrench's centre hole and pushed fully home."
-diagram = { file = "diagrams/top-tap-clamp.svg", alt = "Section across the jaws at a clamp hole: the 4-40 tap, to scale across, in the T-handle wrench in the hole, the tap guide's 1/2 in shank in the collet, its spring point in the wrench's centre hole, all in the tool colour." }
+diagram = { file = "diagrams/top-tap-clamp.svg", alt = "Section across the jaws at clamp hole 2, inside the jaws: the 4-40 tap, to scale across, in the T-handle wrench in the hole, the tap guide's 1/2 in shank in the collet, its spring point in the wrench's centre hole, all in the tool colour. SP03_tap_clamp_1 taps hole 1 first, at X 25.400 in the overhang past the left jaw." }
 feed = "hand"
 
 [[setups.operations]]

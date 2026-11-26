@@ -27,4 +27,8 @@
   <circle class="leader-dot" cx="552.06" cy="332.83" r="2"/>
   <text class="label" x="135" y="394.83">moving jaw</text>
   <text class="label" x="560" y="394.83">fixed jaw</text>
+  <text class="label" x="20" y="60">Drawn at hole 2 (X 107.950), inside the jaws.</text>
+  <text class="label" x="20" y="76">The NC drills hole 1 first: X 25.400, in the</text>
+  <text class="label" x="20" y="92">overhang, 1.88 in past the left jaw; then</text>
+  <text class="label" x="20" y="108">holes 2, 3 and 4 (X 279.400, overhang).</text>
 </svg>
