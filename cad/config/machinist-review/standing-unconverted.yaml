@@ -40,9 +40,7 @@ unconverted:
   - dt_pinion_lift_rod
   - dt_pinion_pivot_block
   - dt_pinion_pivot_shaft
-  - ms_stick
   - ms_stop_block
-  - ms_stop_plate
   - pd_guide_lock
   - pd_platen
   - pd_platen_bottom_guide
@@ -61,8 +59,3 @@ unconverted:
   - pd_transgear_pivot_spacer
   - pd_transgear_rear_bushing
   - pd_transgear_thumbnut
-  - pn_pen_adjust_screw
-  - pn_pen_frame
-  - pn_pen_hanger
-  - pn_pen_rod
-  - pn_pen_v_block

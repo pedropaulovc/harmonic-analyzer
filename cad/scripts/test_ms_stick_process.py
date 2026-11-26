@@ -400,8 +400,8 @@ def test_the_outline_diagram_draws_the_posted_entries(ctx) -> None:
 
 
 def test_the_registration_band_is_the_edge_finders_radius() -> None:
-    """Op 230 reads the edge finder back on the datum end: its console band
-    is the offset Ops 50, 130 and 190 enter, the finder's radius, ±0.025."""
+    """Op 280 reads the edge finder back on the datum end: its console band
+    is the offset Ops 50, 160 and 240 enter, the finder's radius, ±0.025."""
     radius = PLAN["parameters"]["edge_finder_radius_mm"]
     bands = [
         check["band_mm"]
@@ -486,25 +486,25 @@ def test_a_model_engraved_elsewhere_stops_the_build(ctx, variant) -> None:
 # an operation inserted or removed above one shifts prechips' numbering (by
 # tens, in plan order) and leaves the reference naming its neighbour (#3626).
 OP_REFERENCES = {
-    ("Op 100", 190): "Note each work Z",
-    ("Op 190", 180): "the bar's bare faced top",
-    ("Op 190", 100): "Mic the blank's thickness",
-    ("Op 190", 200): "free the blank with a razor blade",
-    ("Op 200", 310): "Slide a single-edge razor blade",
-    ("Op 200", 320): "peel its tape",
-    ("Op 200", 330): "Residue",
-    ("Op 200", 110): "Clean: degrease",
-    ("Op 200", 160): "lower the blank onto the bar's tape",
-    ("Op 200", 170): "G54 Y0 the blank's rear edge",
-    ("Op 210", 190): "Note each work Z",
-    ("Setup 3 datum", 210): "T1's tip down on a .002 leaf on the RULED FACE",
-    ("Setup 4 datum", 260): "G54 X0 on the milled DATUM END",
-    ("Setup 4 datum", 270): "Console M6 T2",
+    ("Op 90", 180): "Note each work Z",
+    ("Op 180", 170): "the bar's bare faced top",
+    ("Op 180", 90): "Mic the blank's thickness",
+    ("Op 180", 190): "free the blank with a razor blade",
+    ("Op 190", 290): "Slide a single-edge razor blade",
+    ("Op 190", 300): "peel its tape",
+    ("Op 190", 310): "Residue",
+    ("Op 190", 100): "Clean: degrease",
+    ("Op 190", 150): "lower the blank onto the bar's tape",
+    ("Op 190", 160): "G54 Y0 the blank's rear edge",
+    ("Op 200", 180): "Note each work Z",
+    ("Setup 3 datum", 200): "T1's tip down on a .002 leaf on the RULED FACE",
+    ("Setup 4 datum", 240): "G54 X0 on the milled DATUM END",
+    ("Setup 4 datum", 250): "Console M6 T2",
     ("Setup 5 inspection", 10): "Mic the brass bar's thickness",
-    ("Setup 5 inspection", 380): "600-grit",
-    ("Setup 5 inspection", 260): "G54 X0 on the milled DATUM END",
-    ("Setup 5 inspection", 300): "find the DATUM END",
-    ("Setup 5 inspection", 270): "Console M6 T2",
+    ("Setup 5 inspection", 360): "600-grit",
+    ("Setup 5 inspection", 240): "G54 X0 on the milled DATUM END",
+    ("Setup 5 inspection", 280): "find the DATUM END",
+    ("Setup 5 inspection", 250): "Console M6 T2",
 }
 
 
