@@ -43,6 +43,12 @@ demoted:
   dt_pinion_lift_rod: fit-batch-dt
   dt_pinion_pivot_block: fit-batch-dt
   dt_pinion_pivot_shaft: fit-batch-dt
+  # Farm run 20261126T080856204Z on 02cf6d4332 read FIX on DETAIL A's
+  # label (issue #3658); the drum bond (#3630) no longer gates. Past the
+  # two-round machinist cap; owner's ruling 2026-11-24, main during fit
+  # conversion, "better to be able to cut releases with known issues than
+  # to hold unreleased code": stays here until #3658's fix reads SHIP.
+  mg_magnifier_assembly: fit-batch-ch
   pd_platen_bottom_guide: fit-batch-pd
   pd_platen_guide: fit-batch-pd
   pd_support_bar: fit-batch-pd
