@@ -15,6 +15,6 @@
   <text class="label" x="400" y="394.31">the first end (Op 20), flat and square, down</text>
   <line class="leader" x1="398" y1="390.31" x2="384" y2="410.31"/>
   <circle class="leader-dot" cx="384" cy="410.31" r="2"/>
-  <text class="label" x="30" y="420">filed down to {{cad.ring_developed_length_in:.3dot}} ±{{process.length_band_in:.3dot}} long, checked with the calipers</text>
-  <text class="label" x="30" y="436">between strokes (Op 20 filed the first end the same way, level with the jaws)</text>
+  <text class="label" x="30" y="430">filed down to {{cad.ring_developed_length_in:.3dot}} ±{{process.length_band_in:.3dot}} long, checked with the calipers</text>
+  <text class="label" x="30" y="446">between strokes (Op 20 filed the first end the same way, level with the jaws)</text>
 </svg>

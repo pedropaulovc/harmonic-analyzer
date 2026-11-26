@@ -1,25 +1,23 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 420" font-family="sans-serif" font-size="13">
-  <rect class="paper" x="0" y="0" width="760" height="420"/>
-  <text class="title" x="16" y="22">Setup 1: saw the strip off the bar's end</text>
-  <rect class="part-rest" x="60.0" y="90.0" width="220.0" height="171.4"/>
-  <rect class="part-kept" x="280.0" y="90.0" width="61.0" height="171.4"/>
-  <line class="dims" x1="280.0" y1="76.0" x2="341.0" y2="76.0"/>
-  <text class="label" x="310.5" y="70.0" text-anchor="middle">.80 wide</text>
-  <line class="arrow" x1="280.0" y1="60.0" x2="280.0" y2="291.4"/>
-  <text class="label" x="440.0" y="70.0">cut across the bar's full 2-1/4 in width</text>
-  <line class="leader" x1="436.0" y1="66.0" x2="280.0" y2="281.4"/>
-  <circle class="leader-dot" cx="280.0" cy="281.4" r="2.5"/>
-  <text class="label" x="440.0" y="110.0">the strip: mark N on this face (up)</text>
-  <line class="leader" x1="436.0" y1="106.0" x2="310.5" y2="175.7"/>
-  <circle class="leader-dot" cx="310.5" cy="175.7" r="2.5"/>
-  <text class="label" x="440.0" y="150.0">E: the strip's sawn face</text>
-  <line class="leader" x1="436.0" y1="146.0" x2="280.0" y2="132.9"/>
-  <circle class="leader-dot" cx="280.0" cy="132.9" r="2.5"/>
-  <text class="label" x="440.0" y="190.0">SEAT: one bar edge</text>
-  <line class="leader" x1="436.0" y1="186.0" x2="310.5" y2="261.4"/>
-  <circle class="leader-dot" cx="310.5" cy="261.4" r="2.5"/>
-  <text class="label" x="440.0" y="230.0">the bar (rest stays for DT-18, DT-16, MG-01)</text>
-  <line class="leader" x1="436.0" y1="226.0" x2="120.0" y2="175.7"/>
-  <circle class="leader-dot" cx="120.0" cy="175.7" r="2.5"/>
-  <text class="label" x="16.0" y="406.0">Seen from above, the bar lying on a wide face in the saw's vise. 3 px per mm.</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 300" width="760" height="300" font-family="sans-serif" font-size="13">
+  <!-- Seen from above, 3 px/mm: the 1/2 x 2-1/4 bar lying on a wide face in the saw's vise (2-1/4 = 171.5 px), a strip marked .80 (61 px) off its end; the miter saw's blade thickness not on record: drawn schematic on the waste side of the line, the cut across the full 2-1/4. -->
+  <rect class="paper" x="0" y="0" width="760" height="300"/>
+  <text class="title" x="20" y="22">Setup 1: saw a {{process.blank_x_in:.2dot}} strip off the bar's end, the bar on a wide face (from above, 3 px/mm)</text>
+  <rect class="part-rest" x="60" y="70" width="220" height="171.45"/>
+  <rect class="part-kept" x="285" y="70" width="60.96" height="171.45"/>
+  <path class="cutter" d="M280 50L285 50L285 261.45L282.5 258.45Z"/>
+  <text class="label" x="400" y="62">saw blade (schematic), the cut across the bar's full 2-1/4 width</text>
+  <line class="leader" x1="396" y1="58" x2="283" y2="60"/>
+  <circle class="leader-dot" cx="283" cy="60" r="2"/>
+  <text class="label" x="400" y="100">the strip, {{process.blank_x_in:.2dot}} wide: mark N on this face (up)</text>
+  <line class="leader" x1="396" y1="96" x2="315" y2="110"/>
+  <circle class="leader-dot" cx="315" cy="110" r="2"/>
+  <text class="label" x="400" y="140">E: the strip's sawn face</text>
+  <line class="leader" x1="396" y1="136" x2="346" y2="140"/>
+  <circle class="leader-dot" cx="346" cy="140" r="2"/>
+  <text class="label" x="400" y="180">SEAT: one bar edge</text>
+  <line class="leader" x1="396" y1="176" x2="325" y2="239.45"/>
+  <circle class="leader-dot" cx="325" cy="239.45" r="2"/>
+  <text class="label" x="400" y="280">the bar (rest stays for DT-18, DT-16, MG-01)</text>
+  <line class="leader" x1="396" y1="276" x2="160" y2="220"/>
+  <circle class="leader-dot" cx="160" cy="220" r="2"/>
 </svg>

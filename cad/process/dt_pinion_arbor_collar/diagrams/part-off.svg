@@ -1,7 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 380" width="760" height="380" font-family="sans-serif" font-size="13">
   <!-- Hand picture, from above (the cross-slide at the bottom), a section through the axis, to scale at 200 px/in: the blank back in the 3-jaw on its 5/8 end, the turned end out .95 (process.part_off_stickout_mm), face F at Z0; the Ø.59 x .80 turned end, the 5/16 bore (dotted outline beyond the part-off) and the 1/16 pin hole .33 from face F (cad.pin_hole_station_in). The 3-jaw's body and jaws are schematic (their sizes are not on record). The P1 blade to scale across (shop cutoff-blade-p1, 1/16 = 12.5 px), its tailstock-side face at Z-.660 (cad.far_end_length_in), cut in to the bore; its length runs on to a break line. Hatched: the kerf; dotted: the stub left on the blank, waste. -->
   <rect class="paper" x="0" y="0" width="760" height="380"/>
-  <text class="title" x="20" y="22">Setup 4, Op 150: the P1 blade parts the collar off .66 from face F (to scale, 200 px/in)</text>
+  <text class="title" x="20" y="22">Setup 4, Op 140: the P1 blade parts the collar off .66 from face F (to scale, 200 px/in)</text>
   <rect class="fixture-vise" x="308" y="81.5" width="56" height="217"/>
   <rect class="part-waste" x="204" y="127.5" width="236" height="125"/>
   <rect class="part-waste" x="440" y="131" width="15.5" height="118"/>

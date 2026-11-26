@@ -10,7 +10,7 @@
   <text class="label" x="20" y="50">MHA-DT-34 ferrule, outer face</text>
   <line class="leader" x1="80" y1="56" x2="122" y2="100"/>
   <circle class="leader-dot" cx="122" cy="100" r="2"/>
-  <text class="label" x="200" y="62">MHA-DT-08 handle and its bore</text>
+  <text class="label" x="225" y="62">MHA-DT-08 handle and its bore</text>
   <line class="leader" x1="300" y1="68" x2="300" y2="92"/>
   <circle class="leader-dot" cx="300" cy="92" r="2"/>
   <text class="label" x="520" y="44">MHA-DT-35 butt cup:</text>

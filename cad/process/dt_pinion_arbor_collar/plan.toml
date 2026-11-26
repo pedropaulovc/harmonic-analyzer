@@ -355,7 +355,7 @@ indexing = "none"
 machine_ref = "pm-1127vf-lb"
 holding = "3-jaw on the blank's 5/8 end, the turned end out, {{process.part_off_stickout_mm:in.2f}} in out of the jaw fronts (the turned shoulder .15 in out of them)."
 datum = "DRO Z set on face F (Op 20's datum end) through the blade, as Op 140 says: the collar is parted .66 from it."
-diagram = { file = "diagrams/part-off.svg", alt = "Op 150, to scale: the blank back in the 3-jaw, the turned end out; the P1 blade parts the collar off {{cad.far_end_length_in:.2dot}} from face F." }
+diagram = { file = "diagrams/part-off.svg", alt = "Op 140, to scale: the blank back in the 3-jaw, the turned end out; the P1 blade parts the collar off {{cad.far_end_length_in:.2dot}} from face F." }
 lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{process.bar_dia_mm}}", stock_diameter_mm = "{{process.bar_dia_mm}}", stickout_mm = "{{process.part_off_stickout_mm}}", minimum_diameter_mm = "{{cad.outer_dia_mm}}", support = "none" }
 
 [[setups.operations]]

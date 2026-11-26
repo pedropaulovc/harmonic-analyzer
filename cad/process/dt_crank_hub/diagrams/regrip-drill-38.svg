@@ -20,7 +20,7 @@
   <text class="label" x="420" y="360">through until the quill reads 1.15, backing fully out</text>
   <text class="label" x="420" y="376">to clear chips; ease off as the point breaks out of</text>
   <text class="label" x="420" y="392">the rear face inside the jaws</text>
-  <line class="leader" x1="418" y1="356" x2="460" y2="237.5"/>
+  <line class="leader" x1="418" y1="346" x2="460" y2="237.5"/>
   <circle class="leader-dot" cx="460" cy="237.5" r="2"/>
   <text class="label" x="30" y="44">seat turned until the arm slides on, back to the shoulder at Z−S</text>
   <line class="leader" x1="200" y1="48" x2="490" y2="124"/>

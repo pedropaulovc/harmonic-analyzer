@@ -1,7 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 300" width="760" height="300" font-family="sans-serif" font-size="13">
   <!-- Hand picture, schematic: the MHA-DT-01 drum in the bench vise's soft jaws, its marked front end up; its sizes are in its own plan, not this one. The adjustable reamer (tools.reamers-adjustable-lms-5948; the piece that spans the front journal + .001, process.drum_front_ream_over_in) in a tap wrench, turned in by hand to about .3 deep (process.drum_front_ream_depth_in); the reamer, its blades and the wrench are schematic (their sizes are not on record), in the cutter colour. -->
   <rect class="paper" x="0" y="0" width="760" height="300"/>
-  <text class="title" x="20" y="22">Setup 7, Op 540 (if called for): the adjustable reamer opens the drum's front end (schematic)</text>
+  <text class="title" x="20" y="22">Setup 7, Op 520 (if called for): the adjustable reamer opens the drum's front end (schematic)</text>
   <rect class="clamp" x="180" y="150" width="120" height="140"/>
   <rect class="clamp" x="460" y="150" width="120" height="140"/>
   <text class="label-on-clamp" x="190" y="172">soft jaw</text>

@@ -1,34 +1,35 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 420" font-family="sans-serif" font-size="13">
-  <rect class="paper" x="0" y="0" width="760" height="420"/>
-  <text class="title" x="16" y="22">Setup 2 (DT01): S faced to the depth, N down</text>
-  <rect class="fixture-vise" x="59.7" y="330.0" width="280.6" height="22.0"/>
-  <rect class="clamp" x="84.1" y="195.2" width="30.0" height="134.8"/>
-  <rect class="clamp" x="285.9" y="195.2" width="30.0" height="134.8"/>
-  <text class="label" x="99.1" y="368.0" text-anchor="middle">moving jaw</text>
-  <text class="label" x="300.9" y="368.0" text-anchor="middle">fixed jaw</text>
-  <rect class="fixture-support" x="114.1" y="215.7" width="9.5" height="114.3"/>
-  <rect class="fixture-support" x="276.4" y="215.7" width="9.5" height="114.3"/>
-  <line class="dims" x1="114.1" y1="291.9" x2="123.6" y2="291.9"/>
-  <line class="dims" x1="276.4" y1="291.9" x2="285.9" y2="291.9"/>
-  <rect class="part-kept" x="114.1" y="182.2" width="171.8" height="33.5"/>
-  <rect class="part-removed" x="114.1" y="177.4" width="171.8" height="4.7"/>
-  <line class="active-face" x1="114.1" y1="182.2" x2="285.9" y2="182.2"/>
-  <rect class="cutter" x="118.7" y="123.4" width="50.8" height="44.0"/>
-  <line class="arrow" x1="174.1" y1="145.4" x2="209.1" y2="145.4"/>
-  <text class="label" x="440.0" y="70.0">1/2 in end mill; levels to Z .4400</text>
-  <line class="leader" x1="436.0" y1="66.0" x2="144.1" y2="147.4"/>
-  <circle class="leader-dot" cx="144.1" cy="147.4" r="2.5"/>
-  <text class="label" x="440.0" y="110.0">becomes S</text>
-  <line class="leader" x1="436.0" y1="106.0" x2="200.0" y2="182.2"/>
-  <circle class="leader-dot" cx="200.0" cy="182.2" r="2.5"/>
-  <text class="label" x="440.0" y="150.0">N down on the stacks</text>
-  <line class="leader" x1="436.0" y1="146.0" x2="200.0" y2="215.7"/>
-  <circle class="leader-dot" cx="200.0" cy="215.7" r="2.5"/>
-  <text class="label" x="440.0" y="190.0">SEAT edge (fixed jaw)</text>
-  <line class="leader" x1="436.0" y1="186.0" x2="285.9" y2="198.9"/>
-  <circle class="leader-dot" cx="285.9" cy="198.9" r="2.5"/>
-  <text class="label" x="440.0" y="230.0">1 in + 1/2 in parallels stacked (1.5 in)</text>
-  <line class="leader" x1="436.0" y1="226.0" x2="279.9" y2="275.7"/>
-  <circle class="leader-dot" cx="279.9" cy="275.7" r="2.5"/>
-  <text class="label" x="16.0" y="406.0">Section across the jaws, E to the left. Z0 the stacks' top from the miked thickness.</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 440" width="760" height="440" font-family="sans-serif" font-size="13">
+  <!-- Across the jaws from the right end (+X toward you): +Y (toward the fixed jaw) right, +Z up, 5 px/mm. The strip lying N down on the 1 in + 1/2 in stacks (38.1), its 2-1/4 length across the jaws (285.8 px), SEAT on the fixed jaw; the jaws' tops lying_grip_mm 6.845 above the stacks. Z0 the stacks' top. The 1/2 in end mill (63.5 px; 28.45 out = 142 px) on DT01's first level, Z12.226, on the pass wholly over the strip at Y-28.961 (L39), running X29.972 to X-8.890: -X, into the page (away from you). The first level cuts air on a bar under 12.226. -->
+  <rect class="paper" x="0" y="0" width="760" height="440"/>
+  <text class="title" x="20" y="22">Setup 2 (DT01, T1): face the face up to the depth, N down on 1 + 1/2 in stacks (5 px/mm)</text>
+  <rect class="fixture-vise" x="164.25" y="406" width="425.75" height="14"/>
+  <rect class="clamp" x="184.25" y="181.27" width="50" height="224.73"/>
+  <rect class="clamp" x="520" y="181.27" width="50" height="224.73"/>
+  <rect class="fixture-support" x="234.25" y="279" width="15.88" height="127"/>
+  <rect class="fixture-support" x="504.12" y="279" width="15.88" height="127"/>
+  <rect class="fixture-support" x="234.25" y="215.5" width="15.88" height="63.5"/>
+  <rect class="fixture-support" x="504.12" y="215.5" width="15.88" height="63.5"/>
+  <text class="label-on-clamp" x="209.25" y="396" text-anchor="middle">moving</text>
+  <text class="label-on-clamp" x="545" y="396" text-anchor="middle">fixed</text>
+  <rect class="part-kept" x="234.25" y="159.62" width="285.75" height="55.88"/>
+  <rect class="part-removed" x="234.25" y="151.75" width="285.75" height="7.87"/>
+  <path class="cutter" d="M406.94 146.75L406.94 50L399.89 47L392.83 50L385.78 47L378.72 50L371.67 47L364.61 50L357.56 47L350.5 50L343.44 50L343.44 146.75A31.75 7.62 0 0 0 406.94 146.75Z"/>
+  <circle class="leader" cx="323.19" cy="124.37" r="7"/>
+  <line class="leader" x1="318.19" y1="119.37" x2="328.19" y2="129.37"/>
+  <line class="leader" x1="318.19" y1="129.37" x2="328.19" y2="119.37"/>
+  <line class="datum" x1="572" y1="215.5" x2="592" y2="215.5"/>
+  <text class="datum-label" x="596" y="219.5">Z0 the stacks' top (N)</text>
+  <text class="label" x="20" y="60">1/2 in end mill, first level Z12.226, the pass at</text>
+  <text class="label" x="20" y="76">Y-28.961 running −X (into the page);</text>
+  <text class="label" x="20" y="92">levels to Z{{process.depth_target_mm:in.4dot}}: this face becomes S</text>
+  <line class="leader" x1="250" y1="92" x2="345.19" y2="124.37"/>
+  <circle class="leader-dot" cx="345.19" cy="124.37" r="2"/>
+  <text class="label" x="20" y="380">1 in + 1/2 in parallels</text>
+  <text class="label" x="20" y="396">stacked (1.5 in)</text>
+  <line class="leader" x1="130" y1="376" x2="242.25" y2="310.5"/>
+  <circle class="leader-dot" cx="242.25" cy="310.5" r="2"/>
+  <text class="label" x="600" y="130">SEAT edge</text>
+  <text class="label" x="600" y="146">(fixed jaw)</text>
+  <line class="leader" x1="596" y1="136" x2="518" y2="175.5"/>
+  <circle class="leader-dot" cx="518" cy="175.5" r="2"/>
 </svg>

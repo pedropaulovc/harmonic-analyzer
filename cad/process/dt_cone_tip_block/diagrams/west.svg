@@ -1,38 +1,33 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 420" font-family="sans-serif" font-size="13">
-  <rect class="paper" x="0" y="0" width="760" height="420"/>
-  <text class="title" x="16" y="22">Setup 6 (DT06): W to the width; the pinch hole</text>
-  <rect class="fixture-vise" x="128.8" y="330.0" width="142.3" height="22.0"/>
-  <rect class="clamp" x="153.2" y="195.2" width="30.0" height="134.8"/>
-  <rect class="clamp" x="216.8" y="195.2" width="30.0" height="134.8"/>
-  <text class="label" x="168.2" y="368.0" text-anchor="middle">moving jaw</text>
-  <text class="label" x="231.8" y="368.0" text-anchor="middle">fixed jaw</text>
-  <rect class="fixture-support" x="183.2" y="215.7" width="9.5" height="114.3"/>
-  <rect class="fixture-support" x="207.2" y="215.7" width="9.5" height="114.3"/>
-  <line class="dims" x1="183.2" y1="291.9" x2="192.8" y2="291.9"/>
-  <line class="dims" x1="207.2" y1="291.9" x2="216.8" y2="291.9"/>
-  <rect class="part-kept" x="183.2" y="164.6" width="33.5" height="51.1"/>
-  <rect class="part-removed" x="183.2" y="154.7" width="33.5" height="9.9"/>
-  <line class="active-face" x1="183.2" y1="164.6" x2="216.8" y2="164.6"/>
-  <rect class="holes" x="196.6" y="164.6" width="6.8" height="51.1"/>
-  <rect class="holes" x="195.1" y="164.6" width="9.8" height="25.1"/>
-  <line class="hidden" x1="183.2" y1="189.7" x2="216.8" y2="189.7"/>
-  <line class="centre-line" x1="200.0" y1="154.6" x2="200.0" y2="227.7"/>
-  <rect class="cutter" x="195.1" y="36.7" width="9.8" height="107.1"/>
-  <polygon class="cutter" points="195.1,143.8 204.9,143.8 200.0,146.7"/>
-  <text class="label" x="440.0" y="70.0">end mill, centre drill, #43, then #30</text>
-  <line class="leader" x1="436.0" y1="66.0" x2="200.0" y2="104.7"/>
-  <circle class="leader-dot" cx="200.0" cy="104.7" r="2.5"/>
-  <text class="label" x="440.0" y="110.0">W faced to .670</text>
-  <line class="leader" x1="436.0" y1="106.0" x2="184.0" y2="164.6"/>
-  <circle class="leader-dot" cx="184.0" cy="164.6" r="2.5"/>
-  <text class="label" x="440.0" y="150.0">#30 to .330 (the slot's place)</text>
-  <line class="leader" x1="436.0" y1="146.0" x2="204.0" y2="182.6"/>
-  <circle class="leader-dot" cx="204.0" cy="182.6" r="2.5"/>
-  <text class="label" x="440.0" y="190.0">#43 through both halves, exits E between the stacks</text>
-  <line class="leader" x1="436.0" y1="186.0" x2="200.0" y2="215.7"/>
-  <circle class="leader-dot" cx="200.0" cy="215.7" r="2.5"/>
-  <text class="label" x="440.0" y="230.0">N (fixed jaw)</text>
-  <line class="leader" x1="436.0" y1="226.0" x2="214.8" y2="194.6"/>
-  <circle class="leader-dot" cx="214.8" cy="194.6" r="2.5"/>
-  <text class="label" x="16.0" y="406.0">Section across the jaws through the pinch hole, SEAT to the left. Z0 the stacks' top (E).</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 440" width="760" height="440" font-family="sans-serif" font-size="13">
+  <!-- Across the jaws from the right end (+X toward you): +Y (toward the fixed jaw) right, +Z up (the right end is TOP), 5 px/mm. The block on edge on the 1 in + 1/2 in stacks, E down, N on the fixed jaw; jaw tops 6.845 above the stacks. Z0 the stacks' top (E). The 1/2 in end mill (63.5 px) on DT06's first level Z19.660 (from west_raw_max_mm 20.32 to width_target_mm 17.018), on the pass least past the block, Y-5.850 (L28), running X61.468 to X-8.890: -X, into the page. The pinch hole comes next (its own pictures). -->
+  <rect class="paper" x="0" y="0" width="760" height="440"/>
+  <text class="title" x="20" y="22">Setup 6 (DT06, T1): face W to the width, the block on edge E down (5 px/mm)</text>
+  <rect class="fixture-vise" x="294.12" y="406" width="195.88" height="14"/>
+  <rect class="clamp" x="314.12" y="181.27" width="50" height="224.73"/>
+  <rect class="clamp" x="420" y="181.27" width="50" height="224.73"/>
+  <rect class="fixture-support" x="364.12" y="279" width="15.88" height="127"/>
+  <rect class="fixture-support" x="404.12" y="279" width="15.88" height="127"/>
+  <rect class="fixture-support" x="364.12" y="215.5" width="15.88" height="63.5"/>
+  <rect class="fixture-support" x="404.12" y="215.5" width="15.88" height="63.5"/>
+  <text class="label-on-clamp" x="339.12" y="396" text-anchor="middle">moving</text>
+  <text class="label-on-clamp" x="445" y="396" text-anchor="middle">fixed</text>
+  <rect class="part-kept" x="364.12" y="130.41" width="55.88" height="85.09"/>
+  <rect class="part-removed" x="364.12" y="117.71" width="55.88" height="12.7"/>
+  <path class="cutter" d="M422.5 109.58L422.5 40L415.44 37L408.39 40L401.33 37L394.28 40L387.22 37L380.17 40L373.11 37L366.06 40L359 40L359 109.58A31.75 7.62 0 0 0 422.5 109.58Z"/>
+  <circle class="leader" cx="334.75" cy="77.2" r="7"/>
+  <line class="leader" x1="329.75" y1="72.2" x2="339.75" y2="82.2"/>
+  <line class="leader" x1="329.75" y1="82.2" x2="339.75" y2="72.2"/>
+  <line class="datum" x1="472" y1="215.5" x2="492" y2="215.5"/>
+  <text class="datum-label" x="496" y="219.5">Z0 the stacks' top (E)</text>
+  <text class="label" x="470" y="60">1/2 in end mill, first level Z19.660; levels to</text>
+  <text class="label" x="470" y="76">Z{{process.width_target_mm:in.4dot}}: W; the pass at Y-5.850, −X</text>
+  <line class="leader" x1="466" y1="76" x2="422.75" y2="77.2"/>
+  <circle class="leader-dot" cx="422.75" cy="77.2" r="2"/>
+  <text class="label" x="540" y="120">N (fixed jaw)</text>
+  <line class="leader" x1="536" y1="116" x2="418" y2="165.5"/>
+  <circle class="leader-dot" cx="418" cy="165.5" r="2"/>
+  <text class="label" x="20" y="330">1 in + 1/2 in stacks,</text>
+  <text class="label" x="20" y="346">1/8 thick, one per jaw</text>
+  <line class="leader" x1="170" y1="334" x2="372.12" y2="290.5"/>
+  <circle class="leader-dot" cx="372.12" cy="290.5" r="2"/>
 </svg>

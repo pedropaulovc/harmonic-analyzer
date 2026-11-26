@@ -1,32 +1,33 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 420" font-family="sans-serif" font-size="13">
-  <rect class="paper" x="0" y="0" width="760" height="420"/>
-  <text class="title" x="16" y="22">Setup 4 (DT03): skim TOP, the strip upright</text>
-  <rect class="fixture-vise" x="128.8" y="330.0" width="142.3" height="22.0"/>
-  <rect class="clamp" x="153.2" y="195.2" width="30.0" height="134.8"/>
-  <rect class="clamp" x="216.8" y="195.2" width="30.0" height="134.8"/>
-  <text class="label" x="168.2" y="368.0" text-anchor="middle">moving jaw</text>
-  <text class="label" x="231.8" y="368.0" text-anchor="middle">fixed jaw</text>
-  <rect class="fixture-support" x="183.2" y="291.9" width="9.5" height="38.1"/>
-  <rect class="fixture-support" x="207.2" y="291.9" width="9.5" height="38.1"/>
-  <rect class="part-kept" x="183.2" y="126.9" width="33.5" height="165.0"/>
-  <rect class="part-removed" x="183.2" y="120.1" width="33.5" height="6.9"/>
-  <line class="active-face" x1="183.2" y1="126.9" x2="216.8" y2="126.9"/>
-  <rect class="cutter" x="174.6" y="72.1" width="50.8" height="44.0"/>
-  <line class="arrow" x1="230.0" y1="94.1" x2="265.0" y2="94.1"/>
-  <text class="label" x="440.0" y="70.0">1/2 in end mill; .090 in levels</text>
-  <line class="leader" x1="436.0" y1="66.0" x2="200.0" y2="94.1"/>
-  <circle class="leader-dot" cx="200.0" cy="94.1" r="2.5"/>
-  <text class="label" x="440.0" y="110.0">TOP, the bar edge up</text>
-  <line class="leader" x1="436.0" y1="106.0" x2="200.0" y2="126.9"/>
-  <circle class="leader-dot" cx="200.0" cy="126.9" r="2.5"/>
-  <text class="label" x="440.0" y="150.0">S (moving jaw)</text>
-  <line class="leader" x1="436.0" y1="146.0" x2="185.2" y2="171.9"/>
-  <circle class="leader-dot" cx="185.2" cy="171.9" r="2.5"/>
-  <text class="label" x="440.0" y="190.0">N (fixed jaw)</text>
-  <line class="leader" x1="436.0" y1="186.0" x2="214.8" y2="171.9"/>
-  <circle class="leader-dot" cx="214.8" cy="171.9" r="2.5"/>
-  <text class="label" x="440.0" y="230.0">SEAT edge down on the 1/2 in parallels</text>
-  <line class="leader" x1="436.0" y1="226.0" x2="200.0" y2="291.9"/>
-  <circle class="leader-dot" cx="200.0" cy="291.9" r="2.5"/>
-  <text class="label" x="16.0" y="406.0">Section across the jaws, W to the left. Z0 TOP skimmed: its high point less .090.</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 440" width="760" height="440" font-family="sans-serif" font-size="13">
+  <!-- Across the jaws from the right end (+X toward you): +Y (toward the fixed jaw) right, +Z up, 4 px/mm. The strip upright on the 1/2 in parallels, SEAT down, gripped on N and S (N on the fixed jaw); jaw tops upright_grip_mm 32.245 above the parallels; the 2-1/4 bar width (57.15) skimmed top_skim_mm 2.286: Z0 54.864 above the parallels. The 1/2 in end mill (50.8 px) on DT03's first level Z1.524 (of 1.524, .762, 0), on the pass at Y-5.850 (L31), -X, into the page. -->
+  <rect class="paper" x="0" y="0" width="760" height="440"/>
+  <text class="title" x="20" y="22">Setup 4 (DT03, T1): skim TOP, the strip upright on 1/2 in parallels (4 px/mm)</text>
+  <rect class="fixture-vise" x="305.3" y="406" width="184.7" height="14"/>
+  <rect class="clamp" x="325.3" y="226.22" width="50" height="179.78"/>
+  <rect class="clamp" x="420" y="226.22" width="50" height="179.78"/>
+  <rect class="fixture-support" x="375.3" y="355.2" width="12.7" height="50.8"/>
+  <rect class="fixture-support" x="407.3" y="355.2" width="12.7" height="50.8"/>
+  <text class="label-on-clamp" x="350.3" y="396" text-anchor="middle">moving</text>
+  <text class="label-on-clamp" x="445" y="396" text-anchor="middle">fixed</text>
+  <rect class="part-kept" x="375.3" y="135.74" width="44.7" height="219.46"/>
+  <rect class="part-removed" x="375.3" y="126.6" width="44.7" height="9.14"/>
+  <path class="cutter" d="M422 123.55L422 40L414.74 37L407.49 40L400.23 37L392.97 40L385.71 37L378.46 40L371.2 40L371.2 123.55A25.4 6.1 0 0 0 422 123.55Z"/>
+  <circle class="leader" cx="346.6" cy="89.65" r="7"/>
+  <line class="leader" x1="341.6" y1="84.65" x2="351.6" y2="94.65"/>
+  <line class="leader" x1="341.6" y1="94.65" x2="351.6" y2="84.65"/>
+  <line class="datum" x1="472" y1="135.74" x2="492" y2="135.74"/>
+  <text class="datum-label" x="496" y="139.74">Z0 TOP skimmed (high point less {{process.top_skim_mm:in.3dot}})</text>
+  <text class="label" x="470" y="60">1/2 in end mill, {{process.face_step_max_mm:in.3dot}} levels to Z0;</text>
+  <text class="label" x="470" y="76">the pass at Y-5.850 running −X (into the page)</text>
+  <line class="leader" x1="466" y1="76" x2="422.6" y2="99.65"/>
+  <circle class="leader-dot" cx="422.6" cy="99.65" r="2"/>
+  <text class="label" x="520" y="250">N (fixed jaw)</text>
+  <line class="leader" x1="516" y1="246" x2="418" y2="235.2"/>
+  <circle class="leader-dot" cx="418" cy="235.2" r="2"/>
+  <text class="label" x="120" y="250">S (moving jaw)</text>
+  <line class="leader" x1="220" y1="246" x2="377.3" y2="235.2"/>
+  <circle class="leader-dot" cx="377.3" cy="235.2" r="2"/>
+  <text class="label" x="520" y="360">SEAT edge down on the 1/2 in parallels</text>
+  <line class="leader" x1="516" y1="356" x2="416" y2="379.2"/>
+  <circle class="leader-dot" cx="416" cy="379.2" r="2"/>
 </svg>

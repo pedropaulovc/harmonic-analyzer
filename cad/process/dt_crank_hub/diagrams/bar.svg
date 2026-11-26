@@ -21,9 +21,9 @@
   <text class="label" x="470" y="386" text-anchor="end">DRO Z0 on it</text>
   <line class="leader" x1="472" y1="366" x2="578" y2="292"/>
   <circle class="leader-dot" cx="578" cy="292" r="2"/>
-  <text class="label" x="30" y="35">dashed: next, the barrel Ø{{cad.barrel_dia_in:.3dot}} back past the parting line,</text>
-  <text class="label" x="30" y="51">the relief Ø{{cad.relief_dia_in:.3dot}} x {{cad.relief_length_in:.3dot}}, the part-off at Z-{{process.part_off_in:.3dot}}</text>
-  <line class="leader" x1="200" y1="57" x2="380" y2="106"/>
+  <text class="label" x="30" y="40">dashed: next, the barrel Ø{{cad.barrel_dia_in:.3dot}} back past the parting line,</text>
+  <text class="label" x="30" y="56">the relief Ø{{cad.relief_dia_in:.3dot}} x {{cad.relief_length_in:.3dot}}, the part-off at Z-{{process.part_off_in:.3dot}}</text>
+  <line class="leader" x1="200" y1="62" x2="380" y2="106"/>
   <circle class="leader-dot" cx="380" cy="106" r="2"/>
   <text class="label" x="40" y="372">3-jaw on the Ø1 bar, {{process.stickout_mm:in.2dot}} out</text>
   <line class="leader" x1="140" y1="360" x2="294" y2="320"/>

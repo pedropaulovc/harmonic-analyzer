@@ -18,7 +18,7 @@
   <text class="label" x="470" y="410">#52 drilled {{cad.end_hole_depth_min_in:.2dot}}–{{cad.end_hole_depth_max_in:.2dot}} deep at full</text>
   <text class="label" x="470" y="426">diameter: quill run {{process.drill_depth_mm:in.3dot}} from the lips</text>
   <text class="label" x="470" y="442">on the spot's rim</text>
-  <line class="leader" x1="676" y1="404" x2="492.62" y2="229.53"/>
+  <line class="leader" x1="676" y1="396" x2="492.62" y2="229.53"/>
   <circle class="leader-dot" cx="492.62" cy="229.53" r="2"/>
   <text class="label" x="40" y="410">head behind the step, clear of the jaws</text>
   <line class="leader" x1="150" y1="398" x2="259.45" y2="278.1"/>

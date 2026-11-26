@@ -16,7 +16,7 @@
   <text class="datum-label" x="594" y="72" text-anchor="end">Z0 face F</text>
   <text class="label" x="470" y="330">5/16 drill, one steady feed: its full diameter</text>
   <text class="label" x="470" y="346">runs past the parting line</text>
-  <line class="leader" x1="468" y1="326" x2="520" y2="221.25"/>
+  <line class="leader" x1="500" y1="316" x2="520" y2="221.25"/>
   <circle class="leader-dot" cx="520" cy="221.25" r="2"/>
   <text class="label" x="200" y="330" text-anchor="end">parting line, .66 from face F</text>
   <line class="leader" x1="202" y1="326" x2="468" y2="261"/>

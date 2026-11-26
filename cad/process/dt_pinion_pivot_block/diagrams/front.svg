@@ -1,51 +1,57 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 440" font-family="sans-serif" font-size="13">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 440" width="760" height="440" font-family="sans-serif" font-size="13">
+  <!-- Plan 6 px/mm, fixed jaw at the top (+X right, +Y up). Section across the jaws 4 px/mm seen from the top face's side (+X out of the page), +Y (W, the fixed jaw) right. The 1/2 in end mill (76.2 px in the plan, 50.8 px in the section, 113.8 px out of the collet, 12 % end arc) on PB05's first level, Z 12.002 (0.825 under front_top_max_mm 12.827), pass Y -22.491 (wholly over the block), entering at B (X0), +X (NC line 35). Each stack is the 1 in and the 1/2 in parallel. The bores are drilled and reamed in Ops 390-410 (their own pictures). -->
   <rect class="paper" x="0" y="0" width="760" height="440"/>
-  <text class="title" x="20" y="22">Setup 6 (PB05): lying on the 1-1/2 in stacks, jaws on the two ends; front face, both bores</text>
+  <text class="title" x="20" y="22">Setup 6 (PB05): lying on the 1-1/2 in stacks, jaws on the two ends; face the front face</text>
   <text class="title" x="40" y="48">Plan, 6 px/mm (fixed jaw at the top)</text>
-  <text class="title" x="420" y="190">Across the jaws, 4 px/mm (fixed jaw at the right)</text>
-  <!-- Plan: W against the fixed jaw (Y0), B at the left (X0). -->
+  <text class="title" x="400" y="48">Across the jaws, 4 px/mm, from the top face (+X toward you)</text>
   <rect class="clamp" x="40" y="60" width="270" height="30"/>
   <rect class="clamp" x="40" y="329.3" width="270" height="30"/>
   <rect class="part-kept" x="100" y="90" width="150.9" height="239.3"/>
   <rect class="hidden" x="100" y="90" width="150.9" height="19.1"/>
   <rect class="hidden" x="100" y="310.2" width="150.9" height="19.1"/>
-  <circle class="holes" cx="200.4" cy="245.4" r="19.1"/>
-  <circle class="holes" cx="213.4" cy="134.4" r="19.1"/>
   <line class="centre-line" x1="170" y1="245.4" x2="232" y2="245.4"/>
   <line class="centre-line" x1="200.4" y1="214" x2="200.4" y2="277"/>
   <line class="centre-line" x1="183" y1="134.4" x2="244" y2="134.4"/>
   <line class="centre-line" x1="213.4" y1="103" x2="213.4" y2="166"/>
-  <circle class="cutter" cx="52" cy="131.1" r="38.1"/>
-  <line class="arrow" x1="90" y1="300" x2="240" y2="300"/>
   <line class="datum" x1="86" y1="90" x2="114" y2="90"/>
   <line class="datum" x1="100" y1="76" x2="100" y2="104"/>
   <text class="datum-label" x="104" y="104">X0 Y0</text>
   <text class="label-on-clamp" x="175" y="80" text-anchor="middle">fixed jaw: west end W</text>
   <text class="label-on-clamp" x="175" y="349" text-anchor="middle">moving jaw: east end E</text>
-  <text class="label-halo" x="94" y="220" text-anchor="end">B</text>
+  <text class="label-halo" x="94" y="178" text-anchor="end">B</text>
   <text class="label-halo" x="256" y="220">top</text>
   <text class="label-halo" x="236" y="128">lift bore</text>
   <text class="label-halo" x="224" y="268">pivot bore</text>
-  <text class="label-halo" x="165" y="294" text-anchor="middle">face passes</text>
-  <text class="label" x="104" y="380">Stacks under W and E (dashed): both bores</text>
-  <text class="label" x="104" y="396">fall between them. Spot, C drill, then</text>
-  <text class="label" x="104" y="412">ream .2510 through, fed in and out.</text>
-  <!-- Section: the block on the stacked parallels, front face up. -->
+  <circle class="hidden" cx="200.4" cy="245.4" r="19.1"/>
+  <circle class="hidden" cx="213.4" cy="134.4" r="19.1"/>
+  <circle class="cutter" cx="100" cy="224.95" r="38.1"/>
+  <line class="arrow" x1="112" y1="300" x2="190" y2="300"/>
+  <text class="label" x="196" y="304">+X, pass Y -22.491</text>
   <rect class="fixture-vise" x="400" y="420" width="300" height="14"/>
   <rect class="clamp" x="420" y="240.2" width="50" height="179.8"/>
   <rect class="clamp" x="629.5" y="240.2" width="50" height="179.8"/>
-  <rect class="fixture-support" x="470" y="267.6" width="12.7" height="152.4"/>
-  <rect class="fixture-support" x="616.8" y="267.6" width="12.7" height="152.4"/>
-  <rect class="part-kept" x="470" y="222.9" width="159.5" height="44.7"/>
-  <rect class="part-removed" x="470" y="216.3" width="159.5" height="6.6"/>
-  <rect class="holes" x="513.2" y="222.9" width="25.5" height="44.7"/>
-  <rect class="holes" x="587.2" y="222.9" width="25.5" height="44.7"/>
+  <rect class="fixture-support" x="470" y="267.6" width="12.7" height="101.6"/>
+  <rect class="fixture-support" x="470" y="369.2" width="12.7" height="50.8"/>
+  <rect class="fixture-support" x="616.8" y="267.6" width="12.7" height="101.6"/>
+  <rect class="fixture-support" x="616.8" y="369.2" width="12.7" height="50.8"/>
   <line class="datum" x1="500" y1="267.6" x2="600" y2="267.6"/>
   <text class="datum-label" x="550" y="290" text-anchor="middle">Z0 = K</text>
-  <text class="label-halo" x="550" y="212" text-anchor="middle">front face to the depth</text>
   <text class="label-on-clamp" x="654.5" y="410" text-anchor="middle">W</text>
   <text class="label-on-clamp" x="445" y="410" text-anchor="middle">E</text>
   <line class="leader" x1="684" y1="330" x2="626" y2="330"/>
-  <text class="label-halo" x="686" y="326">1-1/2 in</text>
+  <text class="label-halo" x="686" y="326">1 in + 1/2 in</text>
   <text class="label-halo" x="686" y="342">stacks</text>
+  <rect class="part-kept" x="470" y="222.9" width="159.5" height="44.7"/>
+  <rect class="part-removed" x="470" y="216.3" width="159.5" height="6.6"/>
+  <line class="centre-line" x1="525.9" y1="225" x2="525.9" y2="280"/>
+  <line class="centre-line" x1="599.9" y1="225" x2="599.9" y2="280"/>
+  <path class="cutter" d="M564.94 213.5L564.94 105.79L514.14 105.79L514.14 213.5A25.4 6.1 0 0 0 564.94 213.5Z"/>
+  <text class="label" x="570" y="80">1/2 in end mill, level 1</text>
+  <text class="label" x="570" y="96">(Z 12.002 mm): +X,</text>
+  <text class="label" x="570" y="112">out of the page</text>
+  <line class="leader" x1="566" y1="100" x2="556" y2="140"/>
+  <circle class="leader-dot" cx="556" cy="140" r="2"/>
+  <text class="label" x="104" y="380">Stacks under W and E (dashed): both bores</text>
+  <text class="label" x="104" y="396">fall between them; spot, C drill, F drill,</text>
+  <text class="label" x="104" y="412">.2510 reamer: each its own picture.</text>
 </svg>
