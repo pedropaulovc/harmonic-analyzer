@@ -1883,7 +1883,7 @@ KNOB_END_FLOAT_RANGE = (
 # stack's sub-step that coats the journal, which the BOM sheet's consumables
 # lines cite, and the cure before the knob is first turned, loaded or oiled
 # (Henkel's LOCTITE 641 TDS states its strength at 24 h, 22 °C).
-KNOB_CUP_BOND_SUB_STEP = 6
+KNOB_CUP_BOND_SUB_STEP = 9
 KNOB_CUP_BOND_CURE_H = 24
 # Rule 23's bond bullet for the MHA-PD-20 spacer on the MHA-PD-VN-57
 # shoulder (owner ruling 2026-11-24, fit audit question 6; LOCTITE 638,
@@ -2338,7 +2338,7 @@ def _step_text(
     )
     knob_cup_off_cited = (
         f"TAKE THE {n['pd-transgear-knob-cup']} CUP OFF AS "
-        f"{s('knob-stack-fitted', 14)}-{s('knob-stack-fitted', 15)}."
+        f"{s('knob-stack-fitted', 17)}-{s('knob-stack-fitted', 18)}."
     )
     knob_shaft_out = f"DRAW THE {n['pd-transgear-knob-shaft']} SHAFT OUT FORWARD."
     # The bonded spacer holds the arm captive on the shoulder, so the arm
@@ -2381,7 +2381,7 @@ def _step_text(
         f"FOR IT, DO THE SLIDE-OFF AND THE REPEATS IN {s('arm-plate-located', 21)} "
         "ON A NEW ONE.",
         f"FOR IT, REPEAT STEPS {steps.step_number('oil-hole-drilled')}-"
-        f"{steps.step_number('disc-cluster-shimmed')} AND {s('knob-stack-fitted', 18)}, "
+        f"{steps.step_number('disc-cluster-shimmed')} AND {s('knob-stack-fitted', 21)}, "
         f"THEN FROM {s('hanger-meshed', 0)}.",
     )
 
@@ -3213,6 +3213,21 @@ def _step_text(
             f"{row_cite('cup-set')}.",
             "IF THE PILOT ENDS SHALLOWER THAN THAT, MAKE A NEW "
             f"{n['pd-transgear-knob-cup']} CUP AND REPEAT {s('knob-stack-fitted', 3)}.",
+            # Fit audit part 2, B6: a dry trial before the bond, as the
+            # pivot spacer's (step 15), catches a mis-faced cup before the
+            # LOCTITE goes on rather than after the cure and a hot pull-off.
+            # The window stays .006 TO .010 (owner-accepted .008 ±.002,
+            # #2425, 2026-11-20). Faced too little the gap reads under; faced
+            # too far, over, and the cup is renewed.
+            f"CHECK, DRY: THE CUP'S PILOT ON THE JOURNAL END, THE "
+            f"{n['pd-vn-transgear-knob-cup-screw']} SCREW SEATED, SHAFT REARWARD AS "
+            f"{s('knob-stack-fitted', 1)}: THE GAP BETWEEN THE CUP'S FRONT AND THE "
+            f"BUSH'S REAR FACE READS {knob_window} ON FEELERS "
+            f"{row_cite('knob-end-float')}.",
+            "REMOVE THE SCREW AND THE CUP.",
+            f"IF {s('knob-stack-fitted', 5)} FAILED, REPEAT {s('knob-stack-fitted', 3)}-"
+            f"{s('knob-stack-fitted', 5)}, ON A NEW {n['pd-transgear-knob-cup']} CUP IF "
+            f"THE GAP READ OVER {steps.inch_text(KNOB_END_FLOAT_RANGE[1], 3)}.",
             "DEGREASE THE CUP'S PILOT, THE JOURNAL'S STAND-OUT AND REAR TAP, AND THE "
             f"{n['pd-vn-transgear-knob-cup-screw']} SCREW.",
             "COAT THE JOURNAL'S REAR END WITH LOCTITE 641, NOT THE CUP'S BLIND "
@@ -3227,8 +3242,8 @@ def _step_text(
             f"THE CUP'S FRONT AND THE BUSH'S REAR FACE READS {knob_window} ON FEELERS "
             f"{row_cite('knob-end-float')}.",
             "CHECK: SHAFT HELD, THE CUP DOES NOT TURN OR SLIDE ON THE JOURNAL BY HAND.",
-            f"IF BOTH CHECKS PASS, SKIP {s('knob-stack-fitted', 14)}-"
-            f"{s('knob-stack-fitted', 17)}.",
+            f"IF BOTH CHECKS PASS, SKIP {s('knob-stack-fitted', 17)}-"
+            f"{s('knob-stack-fitted', 20)}.",
             knob_cup_off[0],
             knob_cup_off[1],
             "CLEAN THE COMPOUND OFF THE JOURNAL END AND OUT OF ITS TAP.",
@@ -3853,7 +3868,8 @@ def setting_table_rows(
             "FEELER",
         ),
         "knob-end-float": (
-            f"{s('knob-stack-fitted', 11)}, {s('fitup-accepted', 1)}",
+            f"{s('knob-stack-fitted', 5)}, {s('knob-stack-fitted', 14)}, "
+            f"{s('fitup-accepted', 1)}",
             f"KNOB END FLOAT, CUP TO {n['pd-transgear-knob-bush']} REAR FACE",
             KNOB_END_FLOAT_WINDOW,
             "FEELERS",

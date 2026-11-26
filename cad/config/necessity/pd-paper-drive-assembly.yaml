@@ -24,7 +24,7 @@ necessity:
     reason: "sets the reducer mesh's backlash"
     source: "draw_pd_paper_drive_assembly.REDUCER_SHAKE_MAX_MM; owner ruling 2026-11-24, fit audit part 2 C2 (the .0005 floor retired)"
   - id: N-06
-    feature: "setting table row 22 (22M, 33B), knob end float .006 TO .010"
+    feature: "setting table row 22 (22F dry, 22Q, 33B), knob end float .006 TO .010"
     kind: gap
     reason: "keeps the knob shaft's end float open"
     source: "pd_transgear_knob_shaft_spec.END_FLOAT, END_FLOAT_SET_TOL"

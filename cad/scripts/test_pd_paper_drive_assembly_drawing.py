@@ -549,14 +549,14 @@ def test_a_feed_sleeve_found_outside_after_hanging_has_a_renewal_route() -> None
         f"{drawing.sub_step('arm-plate-located', 21)} ON A NEW ONE.",
         f"FOR IT, REPEAT STEPS {steps.step_number('oil-hole-drilled')}-"
         f"{steps.step_number('disc-cluster-shimmed')} AND "
-        f"{drawing.sub_step('knob-stack-fitted', 18)}, THEN FROM "
+        f"{drawing.sub_step('knob-stack-fitted', 21)}, THEN FROM "
         f"{drawing.sub_step('hanger-meshed', 0)}.",
     )
     # The sub-step it names is the one that slides the sleeve off and on.
     assert texts["arm-plate-located"][21].startswith(
         f"REPLACE A {sleeve} FOUND OUTSIDE: SLIDE THE HUB AND DISC OFF IT AS ONE"
     )
-    assert texts["knob-stack-fitted"][18].startswith(
+    assert texts["knob-stack-fitted"][21].startswith(
         f"SLIDE THE {_number('pd-transgear-drive-collar')} COLLAR ON"
     )
     assert (
@@ -1952,37 +1952,52 @@ def test_the_rear_cup_is_faced_bonded_and_screwed_and_the_nut_seats_on_the_faced
         in texts[3]
     )
     assert texts[4].startswith("IF THE PILOT ENDS SHALLOWER THAN THAT, MAKE A NEW")
+    # Fit audit part 2, B6: a dry trial of the end float before the bond, the
+    # window unchanged (owner-accepted .008 ±.002, #2425).
+    assert texts[5] == (
+        "CHECK, DRY: THE CUP'S PILOT ON THE JOURNAL END, THE "
+        f"{_number('pd-vn-transgear-knob-cup-screw')} SCREW SEATED, SHAFT REARWARD AS "
+        f"{s('knob-stack-fitted', 1)}: THE GAP BETWEEN THE CUP'S FRONT AND THE BUSH'S "
+        f"REAR FACE READS {drawing.KNOB_END_FLOAT_WINDOW} ON FEELERS "
+        f"{drawing.row_cite('knob-end-float')}."
+    )
+    assert texts[6] == "REMOVE THE SCREW AND THE CUP."
+    assert texts[7] == (
+        f"IF {s('knob-stack-fitted', 5)} FAILED, REPEAT {s('knob-stack-fitted', 3)}-"
+        f"{s('knob-stack-fitted', 5)}, ON A NEW {_number('pd-transgear-knob-cup')} CUP IF "
+        "THE GAP READ OVER .010."
+    )
     # Rule 23's bond bullet: grade by number, degrease, the compound on the
     # journal (the pin), not the blind pilot, kept off the running land, set
     # at once, the cure before load, and a bench acceptance.
-    assert texts[5].startswith("DEGREASE ")
+    assert texts[8].startswith("DEGREASE ")
     bond = texts[drawing.KNOB_CUP_BOND_SUB_STEP]
     assert "LOCTITE 641" in bond and "NOT THE CUP'S BLIND PILOT" in bond
     assert "OFF THE JOURNAL IN THE BUSH" in bond
-    assert texts[7].startswith("AT ONCE, ")
-    assert texts[8].startswith(f"SEAT THE {_number('pd-vn-transgear-knob-cup-screw')} SCREW")
-    assert f"CURE {drawing.KNOB_CUP_BOND_CURE_H} H BEFORE" in texts[10]
-    assert texts[11].startswith(f"CHECK: SHAFT REARWARD AS {s('knob-stack-fitted', 1)}")
+    assert texts[10].startswith("AT ONCE, ")
+    assert texts[11].startswith(f"SEAT THE {_number('pd-vn-transgear-knob-cup-screw')} SCREW")
+    assert f"CURE {drawing.KNOB_CUP_BOND_CURE_H} H BEFORE" in texts[13]
+    assert texts[14].startswith(f"CHECK: SHAFT REARWARD AS {s('knob-stack-fitted', 1)}")
     assert (
         f"THE CUP'S FRONT AND THE BUSH'S REAR FACE READS {drawing.KNOB_END_FLOAT_WINDOW} "
         "ON FEELERS"
-    ) in texts[11]
+    ) in texts[14]
     assert drawing.KNOB_END_FLOAT_WINDOW == ".006 TO .010"
-    assert texts[12] == "CHECK: SHAFT HELD, THE CUP DOES NOT TURN OR SLIDE ON THE JOURNAL BY HAND."
-    assert texts[13] == (
-        f"IF BOTH CHECKS PASS, SKIP {s('knob-stack-fitted', 14)}-{s('knob-stack-fitted', 17)}."
+    assert texts[15] == "CHECK: SHAFT HELD, THE CUP DOES NOT TURN OR SLIDE ON THE JOURNAL BY HAND."
+    assert texts[16] == (
+        f"IF BOTH CHECKS PASS, SKIP {s('knob-stack-fitted', 17)}-{s('knob-stack-fitted', 20)}."
     )
     # The cured bond lets go only hot (rule 23); the heat is kept off the
     # bush's oil (codjiflo review, #2425).  The screw comes out in its own
     # sub-step, and the later strips cite the pair (machinist review r10).
-    assert texts[14] == f"UNSCREW THE {_number('pd-vn-transgear-knob-cup-screw')} SCREW."
-    assert texts[15] == (
+    assert texts[17] == f"UNSCREW THE {_number('pd-vn-transgear-knob-cup-screw')} SCREW."
+    assert texts[18] == (
         f"PULL THE {_number('pd-transgear-knob-cup')} CUP OFF THE JOURNAL HOT, ABOUT "
         f"250\u00b0C, THE HEAT KEPT OFF THE {_number('pd-transgear-knob-bush')} BUSH'S OIL."
     )
     cited = (
         f"TAKE THE {_number('pd-transgear-knob-cup')} CUP OFF AS "
-        f"{s('knob-stack-fitted', 14)}-{s('knob-stack-fitted', 15)}."
+        f"{s('knob-stack-fitted', 17)}-{s('knob-stack-fitted', 18)}."
     )
     every = drawing._step_text(operating_domain=_unit_operating_domain())
     # Steps 28 and 33, and the rear-faced collar's renewal (29).
