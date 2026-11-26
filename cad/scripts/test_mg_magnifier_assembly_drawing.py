@@ -269,11 +269,19 @@ def test_the_axle_is_set_to_the_trial_stack_and_accepted_at_the_nuts() -> None:
         f"IF STEP {steps.step_number(steps.TRIAL_WASHER_SEATED_KEY)}, "
     )
     assert "FAILS ANY OTHER WAY, REMOVE " in stripped and f"AND {spacer} FROM" in stripped
-    assert notes.STEP_TEXT["trial-axle-withdrawn"].startswith(
-        f"IF {notes._SPACER} WAS REMOVED, PUSH "
+    # Each strip step names its trigger (the rendered chain read of #3601:
+    # step 8 pushes the axle out on every pass, so "WAS PUSHED OUT" read true
+    # on a clean one).
+    pushed_out = (
+        f"IF THE TRIAL WAS STRIPPED AT STEP {steps.step_number('trial-stripped')}"
     )
-    pushed_out = f"IF {notes._AXLE} WAS PUSHED OUT"
-    for key in ("stack-parts-measured", "axle-replaced", "trial-refitted"):
+    for key in (
+        "trial-axle-withdrawn",
+        "stack-parts-measured",
+        "axle-replaced",
+        "new-wheel-drum-bonded",
+        "trial-refitted",
+    ):
         assert notes.STEP_TEXT[key].startswith(pushed_out), key
     # The bar's depth and the spacer's length place the step under the flush
     # start, so they are measured with the washers, hub and nuts; the
@@ -292,12 +300,13 @@ def test_the_axle_is_set_to_the_trial_stack_and_accepted_at_the_nuts() -> None:
     # sub-step rejoins the trial at the spacer, past the already made press
     # sleeve (independent read of #3601); any other new part restarts there.
     assert order.index("new-wheel-drum-bonded") + 1 == order.index("trial-refitted")
+    replaced_at = f"REPLACED AT STEP {steps.step_number('stack-part-replaced')}"
     assert notes.STEP_TEXT["new-wheel-drum-bonded"] == (
-        f"IF {notes._WHEEL} WAS REPLACED, RETURN TO "
+        f"{pushed_out} AND {notes._WHEEL} WAS {replaced_at}, RETURN TO "
         f"STEP {steps.step_number(steps.DRUM_BONDED_KEY)}."
     )
     assert notes.STEP_TEXT["trial-refitted"] == (
-        f"{pushed_out} AND {notes._WHEEL} WAS NOT REPLACED, RETURN TO "
+        f"{pushed_out} AND {notes._WHEEL} WAS NOT {replaced_at}, RETURN TO "
         f"STEP {steps.step_number(steps.SPACER_FITTED_KEY)}."
     )
     assert notes.STEP_TEXT["drum-trial-resumed"] == (
@@ -337,21 +346,20 @@ def test_the_axle_is_set_to_the_trial_stack_and_accepted_at_the_nuts() -> None:
         "locknut-rejammed",
     )
     assert notes.STEP_TEXT["locknut-backed-off"] == "IF IT FALLS SHORT, LOOSEN THE SECOND NUT."
+    # Each step names its trigger, the final reading, so none fires on the
+    # next clean pass (rendered chain read of #3601).
+    short = f"IF STEP {steps.step_number(steps.AXLE_ACCEPTED_KEY)} FELL SHORT"
     placed = notes.STEP_TEXT["endshake-feeler-placed"]
     assert placed.startswith(
-        f"IF THE SECOND NUT WAS LOOSENED, SLIDE THE {notes.ENDSHAKE_GO_TEXT} FEELER BETWEEN "
+        f"{short}, SLIDE THE {notes.ENDSHAKE_GO_TEXT} FEELER BETWEEN "
     )
     assert placed.endswith(f"{notes._WHEEL} PUSHED TOWARD {notes._BAR}.")
     assert notes.STEP_TEXT["axle-endshake-closed"] == (
-        "IF THE SECOND NUT WAS LOOSENED, TIGHTEN THE FIRST NUT UNTIL THE FEELER IS "
-        "JUST NIPPED."
+        f"{short}, TIGHTEN THE FIRST NUT UNTIL THE FEELER IS JUST NIPPED."
     )
-    assert notes.STEP_TEXT["endshake-feeler-removed"] == (
-        "IF THE SECOND NUT WAS LOOSENED, REMOVE THE FEELER."
-    )
+    assert notes.STEP_TEXT["endshake-feeler-removed"] == f"{short}, REMOVE THE FEELER."
     assert notes.STEP_TEXT["locknut-rejammed"] == (
-        "IF THE SECOND NUT WAS LOOSENED, RETURN TO "
-        f"STEP {steps.step_number(steps.LOCKNUT_JAMMED_KEY)}."
+        f"{short}, RETURN TO STEP {steps.step_number(steps.LOCKNUT_JAMMED_KEY)}."
     )
     # No remedy returns to the endshake set, which would reset the closing.
     for key in order[accepted + 1 : accepted + 6]:

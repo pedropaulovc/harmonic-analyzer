@@ -381,11 +381,16 @@ STEP_TEXT = {
         f"IF {_step('drum-seated')} OR {_step(_steps.DRUM_HELD_KEY)} FAILS, PULL "
         f"{_DRUM} OFF {_WHEEL}."
     ),
+    # Each remedy names the check whose failure triggers it, so none fires on
+    # a clean pass after a return (rendered chain read of #3601, run
+    # 20261126T020952932Z: "WAS PULLED OFF" stayed true on the next pass).
     "drum-cleaned": (
-        f"IF {_DRUM} WAS PULLED OFF, CLEAN IT AND THE SPIGOT TO BARE METAL."
+        f"IF {_step('drum-seated')} OR {_step(_steps.DRUM_HELD_KEY)} FAILED, CLEAN "
+        f"{_DRUM} AND THE SPIGOT TO BARE METAL."
     ),
     "drum-rebonded": (
-        f"IF {_DRUM} WAS PULLED OFF, RETURN TO {_step(_steps.DRUM_BONDED_KEY)}."
+        f"IF {_step('drum-seated')} OR {_step(_steps.DRUM_HELD_KEY)} FAILED, RETURN TO "
+        f"{_step(_steps.DRUM_BONDED_KEY)}."
     ),
     # A wheel replaced in the trial's strip comes here for its drum first,
     # the axle out of the bar for the V-block, then rejoins the trial at the
@@ -462,22 +467,31 @@ STEP_TEXT = {
         f"{_step(_steps.AXLE_CHECKED_KEY)} FAILS ANY OTHER WAY, REMOVE {_TRIAL_OFF} "
         f"FROM {_AXLE}."
     ),
-    "trial-axle-withdrawn": f"IF {_SPACER} WAS REMOVED, PUSH {_AXLE} OUT OF {_BAR}.",
+    # Every strip step names its trigger, not a state a later pass still
+    # finds true (step 8 pushes the axle out on every pass).
+    "trial-axle-withdrawn": (
+        f"IF THE TRIAL WAS STRIPPED AT {_step('trial-stripped')}, PUSH {_AXLE} OUT "
+        f"OF {_BAR}."
+    ),
     "stack-parts-measured": (
-        f"IF {_AXLE} WAS PUSHED OUT, MEASURE {_STACK_PARTS} AGAINST THEIR DRAWING "
-        "OR CATALOGUE LIMITS (MICROMETER)."
+        f"IF THE TRIAL WAS STRIPPED AT {_step('trial-stripped')}, MEASURE "
+        f"{_STACK_PARTS} AGAINST THEIR DRAWING OR CATALOGUE LIMITS (MICROMETER)."
     ),
     "stack-part-replaced": "IF ONE MEASURES OUTSIDE ITS LIMITS, REPLACE IT.",
     "axle-replaced": (
-        f"IF {_AXLE} WAS PUSHED OUT AND NO OTHER PART WAS REPLACED, REPLACE {_AXLE}."
+        f"IF THE TRIAL WAS STRIPPED AT {_step('trial-stripped')} AND NO PART WAS "
+        f"REPLACED AT {_step('stack-part-replaced')}, REPLACE {_AXLE}."
     ),
     # A new wheel has no drum, so it goes back through the drum bond, which
     # rejoins the trial at the spacer; any other new part restarts there.
     "new-wheel-drum-bonded": (
-        f"IF {_WHEEL} WAS REPLACED, RETURN TO {_step(_steps.DRUM_BONDED_KEY)}."
+        f"IF THE TRIAL WAS STRIPPED AT {_step('trial-stripped')} AND {_WHEEL} WAS "
+        f"REPLACED AT {_step('stack-part-replaced')}, RETURN TO "
+        f"{_step(_steps.DRUM_BONDED_KEY)}."
     ),
     "trial-refitted": (
-        f"IF {_AXLE} WAS PUSHED OUT AND {_WHEEL} WAS NOT REPLACED, RETURN TO "
+        f"IF THE TRIAL WAS STRIPPED AT {_step('trial-stripped')} AND {_WHEEL} WAS NOT "
+        f"REPLACED AT {_step('stack-part-replaced')}, RETURN TO "
         f"{_step(_steps.SPACER_FITTED_KEY)}."
     ),
     _steps.AXLE_SINK_RECORDED_KEY: (
@@ -503,10 +517,12 @@ STEP_TEXT = {
     _steps.AXLE_HELD_KEY: f"CHECK {_AXLE} DOES NOT TURN OR SLIDE BY HAND.",
     "axle-stripped": f"IF IT DOES, PUSH {_AXLE} OUT OF {_BAR}.",
     "axle-cleaned": (
-        f"IF {_AXLE} WAS PUSHED OUT, CLEAN IT AND THE BORE OF {_BAR} TO BARE METAL."
+        f"IF {_step(_steps.AXLE_HELD_KEY)} FAILED, CLEAN {_AXLE} AND THE BORE OF "
+        f"{_BAR} TO BARE METAL."
     ),
     "axle-rebonded": (
-        f"IF {_AXLE} WAS PUSHED OUT, RETURN TO {_step(_steps.AXLE_BONDED_KEY)}."
+        f"IF {_step(_steps.AXLE_HELD_KEY)} FAILED, RETURN TO "
+        f"{_step(_steps.AXLE_BONDED_KEY)}."
     ),
     "column-clamps-fitted": (
         f"FIT {_item(CLAMP_FRONT)} AND {_item(CLAMP_BACK)} TO {_BAR} AS THE "
@@ -555,7 +571,8 @@ STEP_TEXT = {
     ),
     "locknut-loosened": "IF IT FAILS, LOOSEN THE SECOND NUT.",
     "locknut-reset": (
-        f"IF THE SECOND NUT WAS LOOSENED, RETURN TO {_step(_steps.ENDSHAKE_SET_KEY)}."
+        f"IF {_step('endshake-rechecked')} FAILED, RETURN TO "
+        f"{_step(_steps.ENDSHAKE_SET_KEY)}."
     ),
     _steps.AXLE_ACCEPTED_KEY: (
         "CHECK THE THREAD END PAST THE SECOND NUT AGAIN, AS IN "
@@ -573,16 +590,19 @@ STEP_TEXT = {
     # Codjiflo r1 P2 of #3601: returning to the endshake set reset it).
     "locknut-backed-off": "IF IT FALLS SHORT, LOOSEN THE SECOND NUT.",
     "endshake-feeler-placed": (
-        f"IF THE SECOND NUT WAS LOOSENED, SLIDE THE {ENDSHAKE_GO_TEXT} FEELER BETWEEN "
-        f"{_WASHER} AND THE SPIGOT FACE, {_WHEEL} PUSHED TOWARD {_BAR}."
+        f"IF {_step(_steps.AXLE_ACCEPTED_KEY)} FELL SHORT, SLIDE THE {ENDSHAKE_GO_TEXT} "
+        f"FEELER BETWEEN {_WASHER} AND THE SPIGOT FACE, {_WHEEL} PUSHED TOWARD {_BAR}."
     ),
     "axle-endshake-closed": (
-        "IF THE SECOND NUT WAS LOOSENED, TIGHTEN THE FIRST NUT UNTIL THE FEELER IS "
-        "JUST NIPPED."
+        f"IF {_step(_steps.AXLE_ACCEPTED_KEY)} FELL SHORT, TIGHTEN THE FIRST NUT "
+        "UNTIL THE FEELER IS JUST NIPPED."
     ),
-    "endshake-feeler-removed": "IF THE SECOND NUT WAS LOOSENED, REMOVE THE FEELER.",
+    "endshake-feeler-removed": (
+        f"IF {_step(_steps.AXLE_ACCEPTED_KEY)} FELL SHORT, REMOVE THE FEELER."
+    ),
     "locknut-rejammed": (
-        f"IF THE SECOND NUT WAS LOOSENED, RETURN TO {_step(_steps.LOCKNUT_JAMMED_KEY)}."
+        f"IF {_step(_steps.AXLE_ACCEPTED_KEY)} FELL SHORT, RETURN TO "
+        f"{_step(_steps.LOCKNUT_JAMMED_KEY)}."
     ),
     # The setting names the instrument that reads it (rule 22).
     _steps.LEVER_THREADED_KEY: (
@@ -669,8 +689,8 @@ STEP_TEXT = {
     "lever-wire-knots-held": "CHECK NEITHER KNOT SLIPS UNDER A LIGHT PULL BY HAND.",
     "lever-wire-cut-off": "IF ONE SLIPS, CUT THE WIRE OFF.",
     "lever-wire-renewed": (
-        f"IF IT WAS CUT OFF, RETURN TO {_step(_steps.WIRE_HOOKED_KEY)} WITH A NEW "
-        "LENGTH OF WIRE."
+        f"IF {_step('lever-wire-knots-held')} FAILED, RETURN TO "
+        f"{_step(_steps.WIRE_HOOKED_KEY)} WITH A NEW LENGTH OF WIRE."
     ),
     _steps.WIRE_TIED_KEY: "TRIM BOTH WIRE TAILS CLOSE TO THEIR KNOTS.",
 }
