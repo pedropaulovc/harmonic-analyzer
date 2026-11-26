@@ -61,11 +61,22 @@ part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
 material = "AISI 1018 cold-finished steel, 3/8 x 1 in flat, precision ground (drawing: {{cad.material_spec}})"
 stock = "{{process.blank_z_in:fraction}} x {{process.blank_y_in:.0f}} in precision-ground 1018 flat (Online Metals 12095), one 12 in length: one blank {{process.blank_length_min_mm:in.2f}}–{{process.blank_length_max_mm:in.2f}} in. Sub-plate: a 3.0 in piece sawn off the end of the 1/2 x 6 in 6061 flat."
-note = "Inches unless mm; G-code and console entries in mm (the files and the controller run G21). The bar is bought precision ground (Online Metals 12095, ±.001 thick), so face A (the front) and the rear face stay as supplied and are never machined; mark A in Setup 1 and keep it readable. Speeds on the PM-30MV low belt (100–2800 rpm): no belt change. Home the mill ($H) once, after switching it on: every M6's trip to the tool setter and the tap files' G53 retract count from home. Home again only after a power cycle or a controller restart, an E-stop, an alarm, a limit switch hit, a stall or a crash: homing brings the stored G54 back. Then check every zero of the setup again, each the way its step set it: each must read what its step set, within .001 in. One does not, cannot be reached with the part in, or the part may have moved: take the setup again from its first step, the part out. They all do: run the interrupted file again from its start. Feed Hold, then Reset with the axes stopped keeps position and G54: no homing, no new zero; run the interrupted file again from its start: its first M6 measures the tool, and cuts already made are cut in air. Each M6 is measured on the tool setter against G54 Z0. Pick G54 up again after any vise move. Prove each CNC file in air before its first cut. The 2X Ø.1240 dowel holes and the 2X 8-32 tapped holes' match work are made at assembly (MHA-PD-00), not here."
 shop = "../shop"
 stock_refs = ["1018-ground-flat-3-8x1", "6061-flat-1-2x6-54in"]
 material_key = "rocker-1018-cold-finished"
 milling_material = "steel_1018"
+
+# The shop's standing page carries what every traveler shares (units, speeds,
+# homing, Feed Hold, tool changes, proving a file); This job says what only
+# this arm needs.
+standing = true
+
+[[notes]]
+title = "This job"
+rows = [
+  ["Faces", "The bar is bought precision ground (Online Metals 12095, ±.001 thick), so face A (the front) and the rear face stay as supplied and are never machined; mark A in Setup 1 and keep it readable."],
+  ["Vise", "Pick G54 up again after any vise move."],
+]
 
 [cad]
 file = "../../out/features/pd_transgear_arm/features.toml"
@@ -303,17 +314,12 @@ beam = { axis = "x", hold = "solid", extent_mm = [0, "{{process.blank_length_min
 
 [[setups.operations]]
 instruction = "Blank out of the vise: G54 Z0 on the parallels' top and Y0 the fixed jaw's face."
-instruction_detailed = "Console M6 T1 (the #1 centre drill in the drill chuck; the tool setter measures it). The T1 tip just dragging a .002 feeler leaf on a parallel's top: G10 L20 P1 Z0.051. Edge finder (900 rpm) on the fixed jaw's face from −Y: G10 L20 P1 Y-2.540."
+instruction_detailed = "Console M6 T1 (the #1 centre drill in the drill chuck). The T1 tip just dragging a .002 feeler leaf on a parallel's top: G10 L20 P1 Z0.051. Edge finder (900 rpm) on the fixed jaw's face from −Y: G10 L20 P1 Y-2.540."
 feed = "hand"
 
 [[setups.operations]]
 instruction = "Load and clamp the blank as in Holding; G54 X0 on its left end."
 instruction_detailed = "Edge finder (900 rpm) on the blank's left end from the left, at its centre line (Y −.500), the tip at mid-thickness (the station Setup 3 picks up again before AR05): G10 L20 P1 X-2.540."
-feed = "hand"
-
-[[setups.operations]]
-instruction = "Prove AR01_holes in air, Z0 raised 1.000 in, through each M6; then Z0 back."
-instruction_detailed = "Send $# and note the G54 line's Z. G10 L2 P1 Z(that Z + 25.400). Run AR01_holes, watching every move clear the jaws. G10 L2 P1 Z(the noted Z) puts Z0 back."
 feed = "hand"
 
 [[setups.operations]]
@@ -413,7 +419,7 @@ gauge_checks = "other"
 
 [[setups.operations]]
 instruction = "The pin bore."
-inspection = "Pin bore (drawing: Ø.126 REAM THRU, MHA-PD-23 BONDED, TURNED TO THIS BORE): the pin-gauge set's .127 pin does not enter from either face, by hand, never forced (the upper end of the bond clearance on MHA-PD-23's drawing). The MHA-PD-23 pin is fitted to this bore on its own traveler. Its rear mouth shows an even ring of break all round; the break's .008 ±.002 size is not gauged: held by T7's programmed depth in op 130. The .127 pin enters: stop and tell the owner."
+inspection = "Pin bore (drawing: Ø.126 REAM THRU, MHA-PD-23 BONDED, TURNED TO THIS BORE): the pin-gauge set's .127 pin does not enter from either face, by hand, never forced (the upper end of the bond clearance on MHA-PD-23's drawing). The MHA-PD-23 pin is fitted to this bore on its own traveler. Its rear mouth shows an even ring of break all round; the break's .008 ±.002 size is not gauged: held by T7's programmed depth in op 120. The .127 pin enters: stop and tell the owner."
 gauge_checks = "other"
 
 [[setups.operations]]
@@ -496,7 +502,7 @@ speed_kind = "other"
 tool = "tap-guide"
 drilling = "none"
 sizing = "other"
-instruction = "Run AR03_tap_pivot: M6 T10, the tap guide in the 1/2 in collet, pointed end out (the tool setter measures it), spindle off; the file ends Idle at the machine top over the pivot hole. Tap #10-32 through the plate by hand, the guide's point kept home in the wrench by jogging Z down as the tap feeds; tapping fluid, back off each half turn. Jog Z up clear."
+instruction = "Run AR03_tap_pivot: M6 T10, the tap guide in the 1/2 in collet, pointed end out, spindle off; the file ends Idle at the machine top over the pivot hole. Tap #10-32 through the plate by hand, the guide's point kept home in the wrench by jogging Z down as the tap feeds; tapping fluid, back off each half turn. Jog Z up clear."
 diagram = { file = "diagrams/tap.svg", alt = "The bare sub-plate in the vise, the arm off; the tap in its T-handle wrench in the pivot hole, the spring tap guide in the spindle above it, spindle off." }
 feed = "hand"
 
@@ -523,16 +529,11 @@ instruction_detailed = "Edge finder (900 rpm), its tip at the arm's mid-thicknes
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Prove AR05_outline in air, Z0 raised 1.000 in; every move clears both screw heads and the jaws. Then Z0 back."
-instruction_detailed = "Console M6 T11 (1/4 in end mill, at least .75 in out of the collet; the tool setter measures it). Send $# and note the G54 line's Z. G10 L2 P1 Z(that Z + 25.400). Run AR05_outline, watching it pass round the screw heads. G10 L2 P1 Z(the noted Z) puts Z0 back."
-feed = "hand"
-
-[[setups.operations]]
 speed_kind = "spindle"
 tool = "em-quarter"
 drilling = "none"
 sizing = "other"
-instruction = "Run AR05_outline (M6 T11; set 2800): the rough pass .010 outside the outline in {{process.outline_levels:d}} levels to .010 into the plate, then the finish pass in one level at that depth, anticlockwise: the pivot round R.49, the two flanks, the square end. Each level starts with a slow plunge at the square end's middle. Air blast on the chips; no coolant on the plate."
+instruction = "Run AR05_outline (M6 T11: 1/4 in end mill, at least .75 in out of the collet; set 2800): the rough pass .010 outside the outline in {{process.outline_levels:d}} levels to .010 into the plate, then the finish pass in one level at that depth, anticlockwise: the pivot round R.49, the two flanks, the square end. Each level starts with a slow plunge at the square end's middle. Air blast on the chips; no coolant on the plate."
 settings = "endmill-carbide-3fl-1-4-1018-cf"
 milling_cuts = [
   { name = "outline rough", kind = "slot", phase = "rough", cutter_dia_mm = 6.35, axial_doc_mm = "{{process.outline_level_mm}}", radial_woc_mm = 6.35, stations_mm = "{{process.arm_length_mm}}" },
