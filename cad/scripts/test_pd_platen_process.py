@@ -415,3 +415,32 @@ def test_an_edge_pass_run_the_other_way_is_caught(ctx, tmp_path) -> None:
     assert {"engagement", "passes"} <= {
         finding.check for finding in _findings(seeded, tmp_path)
     }
+
+
+def test_the_counterbore_depth_band_reaches_the_bundle_and_the_plan() -> None:
+    """The drawing bands the depth on its callout's own variable
+    (draw_pd_platen._print_counterbore_depth_band); the features bundle
+    declares the same CBORE_DEPTH_BAND for every guide hole
+    (draw_pd_platen's requirement fields), and the plan's inspection and the
+    CAM read their limits from that bundle, never from a typed number."""
+    import pd_platen_spec as spec
+
+    upper, lower = spec.CBORE_DEPTH_BAND
+    expected = [spec.CBORE_DEPTH + lower, spec.CBORE_DEPTH + upper]
+    guides = {
+        name: feature
+        for name, feature in FEATURES["features"].items()
+        if name.startswith("guide_b")
+    }
+    assert len(guides) == 10
+    for name, feature in guides.items():
+        assert feature["cbore_depth"] == pytest.approx(expected, abs=1e-6), name
+    plan = _process_plans.plan_path(STEM).read_text(encoding="utf-8")
+    assert (
+        "counterbore depth {{cad.guide_b1_cbore_depth_min_in:.3dot}}–"
+        "{{cad.guide_b1_cbore_depth_max_in:.3dot}} from P"
+    ) in plan
+    assert 'band_mm = "{{cad.guide_b1_cbore_depth_band_mm}}"' in plan
+    # Comments may name the nominal; no instruction or check types a limit.
+    lines = [line for line in plan.splitlines() if not line.lstrip().startswith("#")]
+    assert not [line for line in lines if re.search(r"\.11[05]\b|\.120\b", line)]
