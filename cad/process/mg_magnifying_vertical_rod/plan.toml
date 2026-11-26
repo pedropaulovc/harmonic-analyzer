@@ -44,11 +44,16 @@ part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
 material = "C36000 free-machining brass rod, 1/4 in (drawing: brass)"
 stock = "Qty {{process.quantity:g}}. Ø{{process.stock_dia_in:.3dot}} C360 rod, 360-H02 extruded, the 48 in bar on hand (Online Metals part 1257); one blank {{process.blank_length_in:.2dot}} in long and a {{process.trial_offcut_in:.2dot}} in trial offcut for the ball turner."
-note = "Inches unless mm. Lathe PM-1127VF-LB (70–380 and 380–2000 rpm); brass cut dry. The body is the bar as bought (1/4 REF): grip it over a brass shim wrap and never cut it."
 shop = "../shop"
 stock_refs = ["c360-round-1-4"]
 material_key = "lathe-c360"
 turning_material = "brass"
+
+# The shop's standing page carries what every traveler shares (units, lathe
+# speeds, coolant). The old note's body rule prints where it applies: the
+# shim-wrap Holdings, the saw setup's mike op ("the body is left as bought")
+# and the bench op ("leave the body's O.D. ... untouched").
+standing = true
 
 [cad]
 file = "../../out/features/mg_magnifying_vertical_rod/features.toml"
