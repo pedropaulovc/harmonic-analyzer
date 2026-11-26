@@ -12,7 +12,7 @@ stock_refs = ["c675-round-5-8"]
 [[tools]]
 id = "pin-gauges"
 name = "Pin gauges .011-.500"
-ref = "pin-gauges"  # A1-pin-set-011-060; the T006 over-pins pair (.047); the stems are turned to their reamed holes, no pin read (fit audit 2026-11-23)
+ref = "pin-gauges"  # A1-pin-set-011-060; the T006 over-pins pair (.047); the stems print their bands, read with the micrometers (D50, D51 as amended)
 
 [[tools]]
 id = "dt-cone-tip-form-cutter"

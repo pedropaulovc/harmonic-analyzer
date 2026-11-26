@@ -62,13 +62,13 @@ def test_wall_holds_the_rule_17_target_at_the_worst_case() -> None:
 
 
 def test_bore_callout_names_process_fit_compound_and_mate() -> None:
-    # Rule 4, form 2: the reamer's size with no band; the pivot is turned to
-    # this bore and MHA-DT-37 prints the acceptance (fit audit 2026-11-23).
+    # The reamer's size with no band (the reamer is the gauge), then two
+    # lines of words (rule 7): MHA-DT-37 prints the pivot's band (D50), so
+    # the bond's clearance, derived from both, prints as REF.
     assert spec.BORE_CALLOUT.splitlines() == [
         "REAM THRU",
-        "BONDED FIT, LOCTITE 638:",
-        "MHA-DT-37 PIVOT IS",
-        "TURNED TO THIS BORE",
+        "BONDED FIT, LOCTITE 638",
+        "ON MHA-DT-37 PIVOT (CLEARANCE .0003-.0018)",
     ]
 
 

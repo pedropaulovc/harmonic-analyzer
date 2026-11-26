@@ -83,7 +83,6 @@ from dt_cone_tip_gear_notes import (
     CALLOUTS_ABOVE,
     CUTTER_DETAIL_SHEET,
     DIMENSION_CALLOUTS,
-    MADE_TO_FIT_STEMS,
     SHEET_NAMES,
     TEETH_NOTE_NUMBER,
 )
@@ -98,9 +97,11 @@ from dt_cone_tip_gear_spec import (
     OUTSIDE_DIA,
     OVERALL_LENGTH_MM,
     PART_NUMBER,
+    PIVOT_DIA_BAND,
     PIVOT_END_Z_MM,
     PIVOT_LENGTH_MM,
     PROFILE,
+    SPIGOT_DIA_BAND,
     SPIGOT_END_Z_MM,
     STEM_DIA_MM,
     SURFACE_FINISHES,
@@ -618,9 +619,9 @@ def _center_mark_pivot(adapter: Any, front: Any) -> None:
 
 
 def _assert_sheet_bands(adapter: Any, annotations: list[Any]) -> None:
-    """Prove the imported root-envelope LIMIT pair and the leaves' own blank
-    and tooth-thickness bands read back off the saved part; the stems carry
-    no band (fit audit 2026-11-23: turned last, printed as references)."""
+    """Prove the imported root-envelope LIMIT pair, the leaves' own blank
+    and tooth-thickness bands and the stems' bands read back off the saved
+    part (D50: both stems print their band)."""
     by_name = {}
     for annotation in annotations:
         by_name.setdefault(dimension_name(adapter, annotation), []).append(annotation)
@@ -628,6 +629,8 @@ def _assert_sheet_bands(adapter: Any, annotations: list[Any]) -> None:
         ("FloorDia", _TOL_LIMIT, FLOOR_DEVIATIONS_MM),
         ("BlankDia", None, deviations(BLANK_DIA_BAND)),
         ("ToothThickness", None, deviations(TOOTH_THICKNESS_BAND)),
+        ("SpigotDia", None, deviations(SPIGOT_DIA_BAND)),
+        ("PivotDia", None, deviations(PIVOT_DIA_BAND)),
     ):
         found = by_name.get(name, [])
         if len(found) != 1:
@@ -1018,12 +1021,6 @@ def build(adapter: Any) -> dict[str, str]:
     annotations = [*front_annotations, *side_annotations]
     _assert_sheet_bands(adapter, annotations)
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
-    for annotation in annotations:
-        name = dimension_name(adapter, annotation)
-        if name in MADE_TO_FIT_STEMS:
-            set_reference_dimension(
-                adapter, annotation, label=f"{name} made-to-fit reference", diameter=True
-            )
     set_dimension_callouts(adapter, annotations, CALLOUTS_ABOVE, location="above")
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
     printed = {dimension_name(adapter, annotation) for annotation in annotations}

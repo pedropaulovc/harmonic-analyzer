@@ -166,8 +166,10 @@ def inch_text(value_mm: float, places: int) -> str:
 # flag to note END_HOLE_NOTE, which names the mate by drawing number and
 # says it runs in the hole as drilled, and the wall shortfall as a plain
 # fact in rule 20's own form (RV-01; the hole's one wall is to the thread
-# root).  The hole is rule 4 form 1: MHA-DT-37 prints its pivot's own band,
-# set by its bonded fit in the reamed MHA-DT-38 bushing
+# root).  The hole is rule 4 form 1: MHA-DT-37 prints its pivot's own band
+# (D50 as amended, delegated ruling 2026-11-26 (Main), no precedent; owner
+# review #2144: owner form timed out), set by its
+# bonded fit in the reamed MHA-DT-38 bushing
 # (cone_tip_cluster.PIVOT_DIA_BAND), so the pivot is not turned to this
 # hole; the #52 hole clears it at every limit (PIVOT_CLEARANCE, .0013-.0063;
 # cone_tip_cluster asserts the running clearance positive).  The fit is a

@@ -62,12 +62,20 @@ TIP_SET_SHIFT_MM = STACK_FEELER
 # Ø.0625 stem stock: T006's spigot and pivot, T018/T012 bores, the socket.
 STEM_DIA_MM = 1.5875  # .0625
 # The spigot is turned between centres (L/D 12) and bonded: -.0003/-.0013,
-# the turned-diameter row's .0010 width held .0003 under the reamed bores'
+# .0010 wide (half the turned-diameter row's ±.001; finished to the
+# micrometer, MHA-DT-37 exception RV-03), held .0003 under the reamed bores'
 # low limit so the bond is never line to line, where the compound is wiped
-# off and T012/T018 may not slide on by hand (#2530).
+# off and T012/T018 may not slide on by hand (#2530).  Its .0018 bond
+# maximum bounds how far an uncorrected T012 sits off its drum: T012 and
+# T018 are accepted only by check 5C's running test (owner ruling 2026-11-24
+# C5), and one thou looser takes T012, read on its own part, from 1.0068 to
+# 0.9384 against the cone set's floor (necessity N-04).  MHA-DT-37 prints
+# the band, read with the micrometer.
 SPIGOT_DIA_BAND = (-0.00762, -0.03302)
 # The pivot is bonded in the bushing and runs in the end screw's hole: the
-# spigot's band (one stem stock, one turned-diameter row; #2469).
+# spigot's band (one stem stock; #2469), printed (D50 as amended, delegated
+# ruling 2026-11-26 (Main), no precedent; owner review #2144: owner form
+# timed out; exception RV-03); looser closes the tip air (necessity N-03).
 PIVOT_DIA_BAND = SPIGOT_DIA_BAND
 # Reamed on size with an owned chucking reamer: T018 and T012 bores, the
 # DT-04 socket.

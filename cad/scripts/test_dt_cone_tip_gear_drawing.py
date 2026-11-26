@@ -51,10 +51,12 @@ def test_the_part_is_the_family_t006_on_its_own_identity() -> None:
 def test_stems_are_the_clusters_and_clear_the_tooth_cutter() -> None:
     assert spec.STEM_DIA_MM == cluster.STEM_DIA_MM == pytest.approx(0.0625 * 25.4)
     assert spec.SPIGOT_DIA_BAND == cluster.SPIGOT_DIA_BAND
-    # Owner ruling 2026-11-20 (#2469): the pivot bonds in MHA-DT-38 on the
-    # shared .0625 reamer, so it turns on the spigot's band (#2530: never
-    # line to line) and prints it.
+    # Both stems print the one .0010 band (narrower than the turned row:
+    # exception RV-03) held .0003 under the .0625 reamed holes (#2530: never
+    # line to line; D50, D51 as amended): the pivot's bond and running clearances close the tip
+    # air when looser (N-03), the spigot's bond tilts T012 (N-04).
     assert spec.PIVOT_DIA_BAND == cluster.PIVOT_DIA_BAND == spec.SPIGOT_DIA_BAND
+    assert [d / 25.4 for d in spec.SPIGOT_DIA_BAND] == pytest.approx([-0.0003, -0.0013])
     assert spec.STEM_MAX_DIA_MM == spec.STEM_DIA_MM + max(spec.SPIGOT_DIA_BAND)
     assert spec.SPIGOT_LENGTH_MM == cluster.SPIGOT_LENGTH_MM
     assert spec.PIVOT_LENGTH_MM == cluster.PIVOT_LENGTH_MM
@@ -109,38 +111,41 @@ def test_callouts_and_notes_name_every_mate_once() -> None:
     callouts = notes.DIMENSION_CALLOUTS
     # Two lines of words at most (rule 7).
     assert all(len(text.splitlines()) <= 2 for text in callouts.values())
-    spigot = callouts["SpigotDia"]
-    for mate in ("MHA-DT-04", "MHA-DT-03-T012", "MHA-DT-03-T018"):
-        assert mate in spigot
-    # Rule 26's fit name: the bond with its compound, the one MHA-DT-04 prints;
-    # the spigot is turned last to its holes, so beside its REF size the
-    # bond's clearance is the requirement and prints bare (rule 4, form 2;
-    # rule 23).
-    assert spigot.startswith(f"BONDED FIT, {cluster.RETAINING_COMPOUND}, ")
-    low, high = cluster.SPIGOT_BOND_CLEARANCE_MM
-    assert f"CLEARANCE {spec.inch_text(low, 4)}-{spec.inch_text(high, 4)}" in spigot
-    assert "(" not in spigot
-    assert notes.MADE_TO_FIT_STEMS == ("SpigotDia", "PivotDia")
+    # Rule 26's fit name: the bond with its compound, the one MHA-DT-04
+    # prints, then the flag to note 4, which names the three mates.
+    assert callouts["SpigotDia"] == (
+        f"BONDED FIT, {cluster.RETAINING_COMPOUND}\n{notes.SPIGOT_NOTE_FLAG}"
+    )
     pivot = callouts["PivotDia"]
     assert pivot == f"BONDED AND RUNNING FIT\n{notes.PIVOT_NOTE_FLAG}"
     sheet = notes.sheet_notes().splitlines()
-    assert len(sheet) <= 6
-    # One reference pivot diameter: bonded in the bushing, its end running in
-    # the end screw's hole, turned last to both; both mates by number and
-    # name, and both clearances.
-    pivot_note = " ".join(" ".join(sheet[:3]).split())
+    assert len(sheet) == 7
+    # The banded pivot: bonded in the bushing, its end running in the end
+    # screw's hole; both mates by number and name, both clearances as REF
+    # beside the band (rule 4, form 4).
+    pivot_note = " ".join(" ".join(sheet[:2]).split())
     assert sheet[0].startswith(
         f"{notes.PIVOT_NOTE_NUMBER}. PIVOT: BONDED FIT, "
-        f"{cluster.RETAINING_COMPOUND}, IN MHA-DT-38"
+        f"{cluster.RETAINING_COMPOUND}, IN MHA-DT-38 CONE TIP BUSHING"
     )
     assert "MHA-DT-39 CONE TIP END SCREW" in pivot_note
-    assert "TURNED LAST TO SLIDE IN BOTH" in pivot_note
+    assert "TURNED" not in pivot_note
     for clearance in (cluster.BUSHING_BOND_CLEARANCE_MM, cluster.PIVOT_RUNNING_CLEARANCE_MM):
-        assert f"{spec.inch_text(clearance[0], 4)}-{spec.inch_text(clearance[1], 4)}" in pivot_note
-    assert "MEASURED" not in pivot_note
-    assert "(" not in pivot_note
-    assert sheet[3].startswith(f"{notes.TEETH_NOTE_NUMBER}. TEETH MESH WITH MHA-DT-12")
-    assert sheet[-1] == "3. CENTRES OK."
+        text = f"{spec.inch_text(clearance[0], 4)}-{spec.inch_text(clearance[1], 4)}"
+        assert f"(CLEARANCE {text})" in pivot_note
+    assert sheet[2].startswith(f"{notes.TEETH_NOTE_NUMBER}. TEETH MESH WITH MHA-DT-12")
+    assert sheet[4] == "3. CENTRES OK."
+    # Note 4: the banded spigot's bond, its three mates by number and name,
+    # its clearance REF.
+    spigot_note = " ".join(" ".join(sheet[5:]).split())
+    assert spigot_note.startswith(
+        f"{notes.SPIGOT_NOTE_NUMBER}. SPIGOT: BONDED FIT, {cluster.RETAINING_COMPOUND}, IN "
+        "MHA-DT-04 CONE GEAR SHAFT, MHA-DT-03-T012 AND MHA-DT-03-T018 CONE GEARS"
+    )
+    low, high = cluster.SPIGOT_BOND_CLEARANCE_MM
+    assert spigot_note.endswith(
+        f"(CLEARANCE {spec.inch_text(low, 4)}-{spec.inch_text(high, 4)})."
+    )
     # The width says at the dimension that it is the cone's seat pitch on its
     # shaft (rule 3's pitch-geometry exemption); each line is shorter than the
     # face it sits under.
@@ -167,13 +172,21 @@ def test_callouts_and_notes_name_every_mate_once() -> None:
     assert f"{spec.inch_text(minimum, 4)} TO {spec.inch_text(maximum, 4)}" in gear_data
 
 
-def test_yaml_carries_the_t006_tooth_band_and_face_width_rulings_only() -> None:
+def test_yaml_carries_the_tooth_band_face_width_and_stem_band_rulings_only() -> None:
     row = _config.parts(spec.PART_NAME)
     rows = row["machinist_exceptions"]
-    assert [entry["id"] for entry in rows] == ["RV-01", "RV-02"]
+    assert [entry["id"] for entry in rows] == ["RV-01", "RV-02", "RV-03"]
     assert "2026-11-09" in str(rows[0]) and "pull/1992" in str(rows[0])
     # Owner ruling 2026-11-20 (#2631): the shared .2934 face width.
     assert "#2631" in rows[1]["reason"] and ".2934" in rows[1]["where"]
+    # D50 as amended: the two stems' .0010 bands, narrower than the turned
+    # row, with both ends' necessity and why form 2 cannot be accepted.
+    stems = rows[2]
+    assert stems["kind"] == "accept"
+    for name in ("SpigotDia", "PivotDia"):
+        assert name in stems["where"]
+    for cited in ("D50 as amended", "no precedent", "owner review #2144", "N-03", "N-04", "D47"):
+        assert cited in stems["reason"]
 
 
 def test_custom_six_detail_reproduces_complete_finite_core_grinding_curves() -> None:

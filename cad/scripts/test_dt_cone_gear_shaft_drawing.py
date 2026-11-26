@@ -203,37 +203,48 @@ def test_every_tight_band_names_its_mate_and_fit_route():
         else:
             notes.append(line)
     assert [note.split(".")[0] for note in notes] == [
-        str(spec.LAND_NOTE), str(spec.BOND_NOTE), str(spec.STACK_NOTE)
+        str(spec.LAND_NOTE), str(spec.BOND_NOTE), str(spec.SOCKET_NOTE), str(spec.STACK_NOTE)
     ]
     # Land 1's mates and its key (owner decision 2026-11-09, PR #1992) by
     # number, and its acceptance by feel.
     for mate in ("dt-cone-gear", "dt-crank-drive-gear", "dt-vn-cone-shaft-key"):
         assert _config.parts(mate)["number"] in notes[0]
     assert "SLIDES ON, NO SHAKE" in notes[0]
-    # Land 2 and the socket are bonded fits: their mates by number, the fit
-    # named with its compound's grade (drawing-guidelines.md rule 26) and
-    # land 2's clearance inside the compound's gap (rule 23).
-    for mate in ("dt-cone-gear", "dt-cone-tip-gear"):
-        assert _config.parts(mate)["number"] in notes[1]
+    # Land 2 and the socket are bonded fits, each in its own note: their
+    # mates by number, the fit named with its compound's grade
+    # (drawing-guidelines.md rule 26) and the clearance inside the
+    # compound's gap (rule 23).  Land 2 is turned last, so its clearance is
+    # the requirement; the spigot prints its band and the socket its reamer,
+    # so the socket's clearance is derived and prints as REF.
+    assert _config.parts("dt-cone-gear")["number"] in notes[1]
     assert f"BONDED FIT, {cone_tip_cluster.RETAINING_COMPOUND}" in notes[1]
     low, high = spec.T024_BOND_CLEARANCE_MM
     assert 0.0 <= low < high <= cone_tip_cluster.RETAINING_COMPOUND_MAX_GAP_MM
     assert f"CLEARANCE {spec.inch_text(low, 4)}-{spec.inch_text(high, 4)}" in notes[1]
-    assert "MHA-DT-37 SPIGOT IS TURNED TO THE SOCKET" in notes[1]
+    assert _config.parts("dt-cone-tip-gear")["number"] not in notes[1]
+    socket_low, socket_high = cone_tip_cluster.SPIGOT_BOND_CLEARANCE_MM
+    assert notes[2] == (
+        f"{spec.SOCKET_NOTE}. SOCKET: BONDED FIT, {cone_tip_cluster.RETAINING_COMPOUND}, "
+        f"ON MHA-DT-37 SPIGOT (CLEARANCE {spec.inch_text(socket_low, 4)}-"
+        f"{spec.inch_text(socket_high, 4)})."
+    )
     # The three-place lengths name the stack they set once (rule 4).
     for mate in ("dt-cone-gear", "dt-crank-drive-gear"):
-        assert _config.parts(mate)["number"] in notes[2]
-    # Rule 7: notes carry no method; the only dimension is the bond's
-    # clearance range.
+        assert _config.parts(mate)["number"] in notes[3]
+    # Rule 7: notes carry no method; the only dimensions are the bonds'
+    # clearance ranges.
     assert re.findall(r"\d?\.\d{2,}", spec.DRAWING_NOTES) == [
-        spec.inch_text(low, 4), spec.inch_text(high, 4)
+        spec.inch_text(low, 4),
+        spec.inch_text(high, 4),
+        spec.inch_text(socket_low, 4),
+        spec.inch_text(socket_high, 4),
     ]
     for word in ("TAILSTOCK", "MILL", "TURN "):
         assert word not in spec.DRAWING_NOTES
     # The socket's callout (rule 12): the process, its .XX depth, its flag.
     assert spec.SOCKET_CALLOUT.split("\n") == [
         f"REAM <HOLE-DEPTH> {spec.inch_text(spec.SOCKET_DEPTH, 2)}",
-        f"SEE NOTE {spec.BOND_NOTE}",
+        f"SEE NOTE {spec.SOCKET_NOTE}",
     ]
     assert drawing.SOCKET_CALLOUTS == {"SocketDia": spec.SOCKET_CALLOUT}
     # Every suffix is one line; every below callout carries at most two lines
@@ -1139,11 +1150,12 @@ def test_shoulder_roots_are_modelled_not_noted() -> None:
         0.216 - drawing.NOTES_XY[0]
     )
     numbered = [line.split(".")[0] for line in notes.splitlines() if not line.startswith(" ")]
-    assert numbered == ["1", "2", "3"]
+    assert numbered == ["1", "2", "3", "4"]
     # Notes 1 and 2 each carry their acceptance on one continuation line
-    # (rule 4, form 2): five lines from y = 0.060 end above the frame.
-    assert len(notes.splitlines()) == 5
-    assert drawing.NOTES_XY[1] - 5 * 0.0035 > 0.020
+    # (rule 4, form 2), note 3 the socket's REF clearance on one: seven lines
+    # from y = 0.060 end above the frame.
+    assert len(notes.splitlines()) == 7
+    assert drawing.NOTES_XY[1] - 7 * 0.0035 > 0.020
     for forbidden in (
         "R0.",
         "MUST",

@@ -33,6 +33,9 @@ BUSHING_MATE_NUMBER = "MHA-DT-38"
 END_SCREW_MATE_NUMBER = "MHA-DT-39"
 BUSHING_MATE_TITLE = str(_config.parts("dt-cone-tip-bushing")["title"]).upper()
 END_SCREW_MATE_TITLE = str(_config.parts("dt-cone-tip-end-screw")["title"]).upper()
+SHAFT_MATE_TITLE = str(_config.parts("dt-cone-gear-shaft")["title"]).upper()
+# The MHA-DT-03 family has no title field; its description leads with it.
+STEM_BORE_MATE_TITLE = str(_config.parts("dt-cone-gear")["description"]).split(",")[0]
 
 # Sheet 2 is the T006 tooth space the DT6-FORM1 tool is ground to.
 SHEET_NAMES = ("T006", "DT6-FORM1")
@@ -44,17 +47,22 @@ TOOTH_EDGE_NOTE = "NO EDGE BREAK ON TEETH."
 
 # Numbered notes (rule 7): note 1 the pivot's two fits, linked from the
 # pivot diameter; note 2 the teeth's mesh and fit route, linked from the
-# tip, thickness and root; note 3 the turner's centres.
+# tip, thickness and root; note 3 the turner's centres; note 4 the spigot's
+# fit and its three mates by number and name (DT-37 machinist review, farm
+# run 20261126T132222616Z: the callout named them by number only).
 PIVOT_NOTE_NUMBER = 1
 TEETH_NOTE_NUMBER = 2
+SPIGOT_NOTE_NUMBER = 4
 PIVOT_NOTE_FLAG = f"SEE NOTE {PIVOT_NOTE_NUMBER}"
 TEETH_NOTE_FLAG = f"SEE NOTE {TEETH_NOTE_NUMBER}"
-# Both stems are turned last to the holes reamed with the one .0625 reamer
-# (fit audit 2026-11-23, MHA-DT-37.stems; rule 4, form 2): each prints its
-# size as a REFERENCE and its acceptance once, here, as the clearance the
-# analysis bands give (cone_tip_cluster); the holes' sheets say the stem is
-# turned to them.
-MADE_TO_FIT_STEMS = ("SpigotDia", "PivotDia")
+SPIGOT_NOTE_FLAG = f"SEE NOTE {SPIGOT_NOTE_NUMBER}"
+# Both stems print their own .0010 bands (rule 4, form 4, narrower than the
+# turned-diameter row: exception RV-03), finished to the micrometer, so the
+# clearances in their reamed holes are REF: D50 as amended and D51 as
+# amended (delegated rulings 2026-11-26 (Main), no precedent; owner review
+# #2144: owner form timed out; the spigot's widening withdrawn); necessity
+# N-03 and N-04.  Neither is made to fit any more (fit audit 2026-11-23
+# MHA-DT-37.stems, superseded; D47 withdrawn).
 
 
 def _clearance_text(clearance_mm: tuple[float, float]) -> str:
@@ -80,43 +88,40 @@ def sheet_notes() -> str:
     """The sheet's numbered notes.
 
     Note 1 is the pivot's two fits (rule 4): the bushing is bonded over its
-    root and the end screw's reamed hole runs on its end, one diameter for
+    root and the end screw's drilled hole runs on its end, one diameter for
     both (owner ruling 2026-11-20, #2469: a LOCTITE 638 bonded slip fit on
-    the shared .0625 reamer), the pivot turned last to slide in both with
-    the clearances the analysis bands give (fit audit 2026-11-23, form 2).
-    Note 2 names the mesh and the fit route of the tip, thickness and root
-    bands, with the teeth's do-not-cut. Note 3: the stems are turned between
-    centres, and a centre hole in either end harms nothing (rule 11).
+    the shared .0625 reamer). The pivot's printed band is the requirement,
+    so both clearances it gives print as REF (rule 4, form 4; D50). Note 2
+    names the mesh and the fit route of the tip, thickness and root bands,
+    with the teeth's do-not-cut. Note 3: the stems are turned between
+    centres, and a centre hole in either end harms nothing (rule 11). Note 4
+    is the spigot's bond in its three mates, each by number and name.
     """
     return "\n".join(
         (
             f"{PIVOT_NOTE_NUMBER}. PIVOT: BONDED FIT, {cone_tip_cluster.RETAINING_COMPOUND}, IN "
-            f"{BUSHING_MATE_NUMBER} {BUSHING_MATE_TITLE};",
-            f"   ITS END RUNNING FIT IN {END_SCREW_MATE_NUMBER} {END_SCREW_MATE_TITLE}; "
-            "TURNED LAST TO",
-            f"   SLIDE IN BOTH: CLEARANCE {PIVOT_BOND_CLEARANCE_TEXT} BONDED, "
-            f"{PIVOT_RUNNING_CLEARANCE_TEXT} RUNNING.",
+            f"{BUSHING_MATE_NUMBER} {BUSHING_MATE_TITLE} (CLEARANCE {PIVOT_BOND_CLEARANCE_TEXT});",
+            f"   ITS END RUNNING FIT IN {END_SCREW_MATE_NUMBER} {END_SCREW_MATE_TITLE} "
+            f"(CLEARANCE {PIVOT_RUNNING_CLEARANCE_TEXT}).",
             f"{TEETH_NOTE_NUMBER}. TEETH MESH WITH {CYLINDER_MATE_NUMBER}: ACCEPT OVER PINS, "
             "THEN BY FEEL AT ASSEMBLY,",
             f"   PER GEAR DATA. {TOOTH_EDGE_NOTE}",
             "3. CENTRES OK.",
+            f"{SPIGOT_NOTE_NUMBER}. SPIGOT: BONDED FIT, {cone_tip_cluster.RETAINING_COMPOUND}, IN "
+            f"{SHAFT_MATE_NUMBER} {SHAFT_MATE_TITLE}, {STEM_BORE_MATES[0]} AND",
+            f"   {STEM_BORE_MATES[1]} {STEM_BORE_MATE_TITLE}S (CLEARANCE {SPIGOT_CLEARANCE_TEXT}).",
         )
     )
 
 
 # Callouts under the value. A callout keeps at most two lines of words
 # (rule 7); a mate serving several dimensions is named once, in a flagged
-# note (rule 4).  Beside a REF stem size the clearance is the requirement
-# and prints bare (rule 4, form 2; Codjiflo #3549-12).
+# note (rule 4).
 DIMENSION_CALLOUTS = {
-    # The spigot is turned last to its three reamed holes: the bonded fit
-    # with its compound (rule 26's fit name, as MHA-DT-04's note prints it)
-    # and its bond clearance (rule 23), then its three mates.
-    "SpigotDia": (
-        f"BONDED FIT, {cone_tip_cluster.RETAINING_COMPOUND}, CLEARANCE {SPIGOT_CLEARANCE_TEXT}\n"
-        f"IN {SHAFT_MATE_NUMBER}, {STEM_BORE_MATES[0]}, {STEM_BORE_MATES[1]}"
-    ),
-    # One reference diameter carries both of note 1's fits.
+    # The spigot's bonded fit with its compound (rule 26's fit name, as
+    # MHA-DT-04's note prints it); its clearance and mates are note 4.
+    "SpigotDia": f"BONDED FIT, {cone_tip_cluster.RETAINING_COMPOUND}\n{SPIGOT_NOTE_FLAG}",
+    # One banded diameter carries both of note 1's fits.
     "PivotDia": f"BONDED AND RUNNING FIT\n{PIVOT_NOTE_FLAG}",
     "ToothThickness": TEETH_NOTE_FLAG,
     # The origin circle is an inspection witness, not the off-centre root arc.

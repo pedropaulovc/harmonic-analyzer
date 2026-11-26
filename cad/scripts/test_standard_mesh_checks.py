@@ -171,16 +171,19 @@ def test_the_cone_set_check_reads_both_ways() -> None:
         + cone_running_axis.seat_offset_mm(land_2, pivot)
     )
     assert _nominal_contact_ratio(land_2, uncentred) < 1.0
-    # T012 left to its part's .0015, its bond float and MHA-DT-37's tilt in a
-    # socket taken true to the journal holds; a socket .0005 in TIR off the
-    # journal, which no sheet limits, takes it under (Codjiflo review of
-    # #3374): so T012 and T018 are read about the journal, not the part.
+    # A record, not a check (its .0001 size margin is under the shop's
+    # reading, tolerance-policy.md): T012 left to its part's .0015, its bond
+    # float and MHA-DT-37's tilt in a socket taken true to the journal sits
+    # at 1.0068 on the .0018 spigot bond (0.9384 one thou looser, necessity
+    # dt-cone-tip-gear N-04); a socket .0005 in TIR off the journal, which no
+    # sheet limits, takes it under (Codjiflo review of #3374).  T012 and T018
+    # are accepted by check 5C's running test (owner ruling 2026-11-24 C5).
     spigot_true = (
         cone_set_stack.SPIGOT_TOOTH_SPACE_RUNOUT_TIR_MM / 2.0
         + cone_set_stack.bond_float_mm(12)
         + cone_running_axis.seat_offset_mm(12, pivot)
     )
-    assert _nominal_contact_ratio(12, spigot_true) >= 1.0
+    assert _nominal_contact_ratio(12, spigot_true) == pytest.approx(1.0068, abs=5e-4)
     socket_off = cone_running_axis.spigot_share(12) * (0.0005 * 25.4 / 2.0)
     assert _nominal_contact_ratio(12, spigot_true + socket_off) < 1.0
 
