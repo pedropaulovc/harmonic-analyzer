@@ -432,7 +432,7 @@ FLAT_PIN_REAR_MAX = max(FLAT_PIN_FLOOR_LIMITS) + max(FLAT_PIN_LENGTH_LIMITS)
 FLAT_PIN_BLANK_INSET_MIN = BODY_BLANK_LENGTH_MIN - FLAT_PIN_REAR_MAX
 # The reamer's pilot, a #53 drill, runs its full diameter FLAT_PIN_PILOT_LEAD
 # past the reamer's end so the reamer's bevel never meets the drill's point
-# (the traveler's Op 190), and the reamer's end may sit at the full-diameter
+# (the traveler's Op 180), and the reamer's end may sit at the full-diameter
 # floor itself (its bevel taken at none).  So the hole's deepest full
 # diameter stands FLAT_PIN_DRILL_STATION_MIN from the front face, at the
 # shallowest floor less that lead, and the drill's 118-degree point lies
@@ -1038,8 +1038,8 @@ DRAWING_NOTES = (
     f"{inch_text(DRIVE_PIN_COLLAR_RIM_WORST, 3)} MIN.\n"
     f"{WEB_NOTE}. PERMANENT PIN {FLAT_PIN_NUMBER}: HOLE TO DRIVE-PIN HOLE "
     f"{inch_text(FLAT_PIN_WEB_WORST, 3)} MIN.\n"
-    # A pin that enters by hand is a failed hole: the traveler (Ops 180,
-    # 210) scraps the collar and MHA-PD-00 step 20 renews it (rule 25: the
+    # A pin that enters by hand is a failed hole: the traveler (Ops 170,
+    # 200) scraps the collar and MHA-PD-00 step 20 renews it (rule 25: the
     # sheet and its procedures agree; no bonded salvage, whose clearance no
     # print could bound).
     f"{REAM_NOTE}. PRESS FIT: THE PIN IS THE GAUGE; NONE ENTERS ITS HOLE BY HAND.\n"
