@@ -1,6 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 780 600" width="780" height="600" font-family="sans-serif" font-size="13">
-  <!-- Hand picture, the elevation to scale at 4 px/mm, the plan at 1 px/mm, from the rail's sizes (the depth F to R 10.033 mm, 8.7630 mm across the jaws). 1/2 in end mill Ø12.7 mm (face_cutter_dia_mm, shop endmill-carbide-3fl-1-2), drawn 28.45 mm out (half_mill_projection_mm) to a break line, the collet not drawn; its square end drawn as the near half of its end face, an arc 12 % of its diameter deep whose lowest point is the true end. Drawn on PG05_ends_drill's last pass on the LEFT end, X-6.350 (its side on X0; the first, X-7.705, takes the sawn end's first 0.169 mm), its end at Z-0.508 (end_past_mm .508 under F), the pass +Y across the rail, the same place in both views. The rail's left end stands 57.061 mm out past the jaws' left side (vise_overhang_mm less the skim), the stacks 4 in long, centred on the jaws. One stack only: the 1 in + 1/2 in parallels against the MOVING jaw, under the top's edge; none at the fixed jaw (the hole exits fall .140 from U). The elevation is broken off on the right. The vise jaws' thickness is not on record: schematic. Jaw height 44.9453 mm (vise_jaw_height_mm), jaw width 158.6738 mm (vise_jaw_width_mm); the parallels 1/8 in thick (parallel_thickness_mm), 4 in long (fixtures.parallels-lms-6745), stacked 1 in + 1/2 in (riser_height_mm 38.1). -->
-  <rect class="paper" x="0" y="0" width="780" height="600"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 780 730" width="780" height="730" font-family="sans-serif" font-size="13">
+  <!-- Hand picture, the elevation to scale at 4 px/mm, the plan at 1 px/mm, from the rail's sizes (the depth F to R 10.033 mm, 8.7630 mm across the jaws). 1/2 in end mill Ø12.7 mm (face_cutter_dia_mm, shop endmill-carbide-3fl-1-2), drawn 28.45 mm out (half_mill_projection_mm) to a break line, the collet not drawn; its square end drawn as the near half of its end face, an arc 12 % of its diameter deep whose lowest point is the true end. Drawn on PG05_ends_drill's last pass on the LEFT end, X-6.350 (its side on X0; the first of its 9, X-7.705, takes the sawn end's first 0.169 mm), parsed from the posted NC: each left-end pass plunges at Y8.890, off the rail, to Z-0.508 (end_past_mm .508 under F; levels: Z-0.508) and runs -Y across the rail to Y-17.653; the 26 right-end passes plunge at Y-17.653 and run +Y to Y8.890, the last at X276.098. The same place in both views. The rail's left end stands 57.061 mm out past the jaws' left side (vise_overhang_mm less the skim), the stacks 4 in long, centred on the jaws. One stack only: the 1 in + 1/2 in parallels against the MOVING jaw, under the top's edge; none at the fixed jaw (the hole exits fall .140 from U). The elevation is broken off on the right. The vise jaws' thickness is not on record: schematic. Jaw height 44.9453 mm (vise_jaw_height_mm), jaw width 158.6738 mm (vise_jaw_width_mm); the parallels 1/8 in thick (parallel_thickness_mm), 4 in long (fixtures.parallels-lms-6745), stacked 1 in + 1/2 in (riser_height_mm 38.1). -->
+  <rect class="paper" x="0" y="0" width="780" height="730"/>
   <text class="title" x="20" y="24">PG05_ends_drill: the LEFT end milled to X0 with the cutter's side (to scale, 4 px/mm)</text>
   <path class="fixture-vise" d="M468.24 470L760 470L763 473.5L760 477L763 480.5L760 484L468.24 484Z"/>
   <path class="clamp" d="M468.24 290.22L760 290.22L763 294.3L760 298.39L763 302.48L760 306.56L763 310.65L760 314.73L763 318.82L760 322.91L763 326.99L760 331.08L763 335.16L760 339.25L763 343.34L760 347.42L763 351.51L760 355.59L763 359.68L760 363.77L763 367.85L760 371.94L763 376.02L760 380.11L763 384.2L760 388.28L763 392.37L760 396.45L763 400.54L760 404.63L763 408.71L760 412.8L763 416.88L760 420.97L763 425.05L760 429.14L763 433.23L760 437.31L763 441.4L760 445.48L763 449.57L760 453.66L763 457.74L760 461.83L763 465.91L760 470L468.24 470Z"/>
@@ -15,10 +15,10 @@
   <line class="datum" x1="144" y1="317.6" x2="184" y2="317.6"/>
   <text class="datum-label" x="136" y="322.6" text-anchor="end">Z0 the stack's top (F)</text>
   <text class="label" x="330" y="70">1/2 in end mill, its side on X0: PG05_ends_drill's last pass</text>
-  <text class="label" x="330" y="86">on the left end, X-6.350, across the rail +Y (into</text>
-  <text class="label" x="330" y="102">the page), its end {{process.end_past_mm:in.3dot}} under F; steps of</text>
+  <text class="label" x="330" y="86">on the left end, X-6.350, across the rail -Y (toward you),</text>
+  <text class="label" x="330" y="102">its end {{process.end_past_mm:in.3dot}} under F; steps of</text>
   <text class="label" x="330" y="118">{{process.end_step_max_mm:in.4dot}} into the end. The right end next, its</text>
-  <text class="label" x="330" y="134">passes -Y, to X {{process.length_target_mm:in.3f}}.</text>
+  <text class="label" x="330" y="134">passes +Y, to X {{process.length_target_mm:in.3f}}.</text>
   <line class="leader" x1="328" y1="82" x2="240" y2="259.63"/>
   <circle class="leader-dot" cx="240" cy="259.63" r="2"/>
   <text class="label" x="330" y="172">hatched: the sawn end's {{process.left_end_skim_mm:in.3dot}}</text>
@@ -30,13 +30,25 @@
   <line class="leader" x1="520" y1="500" x2="622.39" y2="440"/>
   <circle class="leader-dot" cx="622.39" cy="440" r="2"/>
   <text class="title" x="20" y="496">From above (1 px/mm), fixed jaw at the top</text>
-  <rect class="clamp" x="118.59" y="514" width="158.67" height="16"/>
-  <rect class="clamp" x="118.59" y="538.76" width="158.67" height="16"/>
-  <rect class="part-kept" x="60" y="530" width="275.84" height="8.76"/>
-  <rect class="part-removed" x="60" y="530" width="1.52" height="8.76"/>
-  <circle class="cutter" cx="55.17" cy="534.38" r="6.35"/>
-  <line class="arrow" x1="41.17" y1="556.38" x2="41.17" y2="512.38"/>
-  <line class="datum" x1="61.52" y1="508" x2="61.52" y2="560.76"/>
-  <text class="datum-label" x="65.52" y="572.76">X0</text>
-  <text class="label" x="370" y="576.76">Arrowed: the left end's passes run +Y; the right end's, -Y.</text>
+  <rect class="clamp" x="118.59" y="524" width="158.67" height="16"/>
+  <rect class="clamp" x="118.59" y="548.76" width="158.67" height="16"/>
+  <rect class="part-kept" x="60" y="540" width="275.84" height="8.76"/>
+  <rect class="part-removed" x="60" y="540" width="1.52" height="8.76"/>
+  <circle class="cutter" cx="55.17" cy="544.38" r="6.35"/>
+  <line class="datum" x1="61.52" y1="514" x2="61.52" y2="570.76"/>
+  <text class="datum-label" x="65.52" y="582.76">X0</text>
+  <text class="title" x="470" y="600">Left end from above, 3 px/mm</text>
+  <path class="part-kept" d="M700 606L775 606L778 610.38L775 614.76L778 619.14L775 623.53L778 627.91L775 632.29L700 632.29Z"/>
+  <rect class="part-removed" x="695.43" y="606" width="4.57" height="26.29"/>
+  <line class="datum" x1="700" y1="569.33" x2="700" y2="666.96"/>
+  <line class="centre-line" x1="680.95" y1="579.33" x2="680.95" y2="658.96"/>
+  <circle class="centre-line" cx="680.95" cy="579.33" r="19.05"/>
+  <circle class="cutter" cx="680.95" cy="619.14" r="19.05"/>
+  <line class="dims" x1="672.95" y1="658.96" x2="688.95" y2="658.96"/>
+  <line class="arrow" x1="651.9" y1="579.33" x2="651.9" y2="658.96"/>
+  <text class="datum-label" x="704" y="678.96">X0</text>
+  <text class="label" x="20" y="708">Inset: dashed circle, the cutter where each left-end pass plunges, Y0.350 in, off the rail;</text>
+  <text class="label" x="20" y="724">arrowed: it runs -Y across the rail to Y-0.695 in (tick). The right end's passes run +Y.</text>
+  <line class="leader" x1="500" y1="694" x2="667.62" y2="592.67"/>
+  <circle class="leader-dot" cx="667.62" cy="592.67" r="2"/>
 </svg>
