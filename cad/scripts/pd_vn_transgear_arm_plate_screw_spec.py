@@ -96,8 +96,9 @@ CUT_LENGTH = PLATE.THICKNESS_OVER_ARM + ARM.THICKNESS
 # joint stack read LENGTH as its length.
 LENGTH = CUT_LENGTH
 # The cut end's 45 deg deburr, its radial leg, as the model cuts it.  The
-# MHA-PD-00 cut step prints no limit of its own (fit audit part 2, B2), so
-# the title block's .010 edge break governs the shop's break; the model's
+# MHA-PD-00 cut step prints no limit of its own (drawing-guidelines rule 2;
+# fit audit part 2, B2), so the title block's .010 edge break governs the
+# shop's break; the model's
 # .004 is one break inside it.  The joint stack charges the same either way:
 # the break overlaps the arm tap's own exit break at the front face, whose
 # thread loss (ARM.PLATE_TAP_EXIT_LOSS_MAX_MM, .0102) is the larger, so the

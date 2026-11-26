@@ -233,7 +233,8 @@ RACK_CREST_TOL = bottom_guide.CREST_SET_BAND  # .002
 # crest drift along the run (radial: the crest set's band alone would let one
 # end of the engaged feed sit 2 x RACK_CREST_TOL higher than the other,
 # codjiflo P2 on 6fa30c1d3, so the first set also holds the two ends alike
-# within LEVEL_RACK_CREST_DRIFT, fit audit part 2, B4). The loosest feel set
+# within LEVEL_RACK_CREST_DRIFT: delegated ruling 2026-11-26 (Main), no
+# precedent; owner review #2144; D48, fit audit part 2, B4). The loosest feel set
 # books those from the later of the two
 # binds. Easing past the bind is not booked: the remedy eases the arm only
 # until the teeth just turn free at the tight spot, which keeps the set at that
@@ -267,8 +268,10 @@ _PRESSURE_ANGLE_TAN = math.tan(math.radians(feed_pinion.PRESSURE_ANGLE_DEG))
 # The rack's crests at the two ends of the run read alike within one .001
 # division of the height gauge's test indicator when the bottom guide is set
 # (draw_pd_paper_drive_assembly, "guides-screwed"), and again whenever it is
-# set again. Before fit audit part 2, B4 this held only in the steady-advance
-# rework; the first set allowed 2 x RACK_CREST_TOL (.004) of drift.
+# set again. Before the delegated ruling of 2026-11-26 (Main, no precedent;
+# owner review #2144; D48, fit audit part 2, B4) this held only in the
+# steady-advance rework; the first set allowed 2 x RACK_CREST_TOL (.004) of
+# drift.
 LEVEL_RACK_CREST_DRIFT = 0.0254  # one .001 height-gauge division
 # Each opening as tooth-centred backlash along the rack (a radial opening r
 # gives 2 r tan(PA)).
@@ -292,8 +295,9 @@ FEED_LOOSEST_BACKLASH_MM = FEED_FIRST_BIND_BACKLASH_MM + math.hypot(
     *FEED_LOOSE_TERMS_MM.values()
 )
 # Every term at its limit together: gated too, since the first set holds the
-# crests level (B4); before, with .004 of drift, it read 0.932 and was only
-# reported.
+# crests level (delegated ruling 2026-11-26 (Main), no precedent; owner review
+# #2144; D48, fit audit part 2, B4); before, with .004 of drift, it read 0.932
+# and was only reported.
 FEED_WORST_CASE_BACKLASH_MM = FEED_FIRST_BIND_BACKLASH_MM + math.fsum(
     FEED_LOOSE_TERMS_MM.values()
 )

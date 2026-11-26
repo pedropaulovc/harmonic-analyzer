@@ -12,14 +12,14 @@ necessity:
     feature: "steps 3B and 26P and setting table row 17, rack crests at the two ends WITHIN .001 of each other"
     kind: mesh
     reason: "crest drift takes the feed mesh's contact ratio under one"
-    source: "pd_paper_drive_assembly_steps.LEVEL_RACK_CREST_DRIFT, FEED_WORST_CASE_MESH: every loose term stacked, contact ratio 1.028 over the 1.0 floor with the ends level (0.932 with the ±.002 band's .004 of drift)"
+    source: "pd_paper_drive_assembly_steps.LEVEL_RACK_CREST_DRIFT, FEED_WORST_CASE_MESH: every loose term stacked, contact ratio 1.028 over the 1.0 floor with the ends level (0.932 with the ±.002 band's .004 of drift); checks/pd-paper-drive-assembly-steps.yaml C-03, C-04; delegated ruling 2026-11-26 (Main), no precedent; owner review #2144 (D48, fit audit part 2, B4)"
   - id: N-04
     feature: "sheet 7 DETAIL K, S to N 1.7242 +.002/-.001"
     kind: mesh
     reason: "sets the reducer mesh's centre distance"
     source: "pd_rack_pinion_spec.CENTRE_DISTANCE_SET_BAND_IN, CENTRE_DISTANCE_TRIAL_BAND_IN; owner ruling 2026-11-08, #2144 item 5.3; owner ruling 2026-11-24, fit audit part 2 C1 (the trial may move the plate within +.002/-.001)"
   - id: N-05
-    feature: "setting table row 9 (12N, 13W, 27K), disc shake (THE NEEDLE MOVES), .008 MAX at the tooth in mesh"
+    feature: "setting table row 9 (12N, 13W, 27J), disc shake (THE NEEDLE MOVES), .008 MAX at the tooth in mesh"
     kind: mesh
     reason: "sets the reducer mesh's backlash"
     source: "draw_pd_paper_drive_assembly.REDUCER_SHAKE_MAX_MM; owner ruling 2026-11-24, fit audit part 2 C2 (the .0005 floor retired)"
@@ -27,7 +27,7 @@ necessity:
     feature: "setting table row 22 (22F dry, 22Q, 33B), knob end float .006 TO .010"
     kind: gap
     reason: "keeps the knob shaft's end float open"
-    source: "pd_transgear_knob_shaft_spec.END_FLOAT, END_FLOAT_SET_TOL"
+    source: "pd_transgear_knob_shaft_spec.END_FLOAT, END_FLOAT_SET_TOL; the dry trial 22F before the bond: delegated ruling 2026-11-26 (Main), no precedent; owner review #2144 (D48, fit audit part 2, B6)"
   - id: N-07
     feature: "steps 9C, 9N and setting table row 6, MHA-PD-06 O.D. then tooth spaces .002 TIR MAX on the mandrel"
     kind: mesh

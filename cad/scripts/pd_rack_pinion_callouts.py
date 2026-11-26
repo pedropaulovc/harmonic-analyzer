@@ -107,10 +107,12 @@ DRAWING_NOTES = "\n".join(
 # laid between 48DP flanks (#2417), and MHA-PD-00 reads the mesh's shake on a
 # dial indicator (owner ruling 2026-11-24, audit part 2 question C2: "Yes.",
 # the feeler row deleted).  MHA-PD-08's GEAR DATA prints the same rows.  The
-# span prints on the face view with its limits, not again here.  Fit audit
-# part 2, B7: the limits are the cutting aim, the pair is accepted at the
-# trial mesh; the limits stay as printed (a wider band is unproven: the mesh
-# check reads the profiles derived from them, MHA-PD-06 RV-04).
+# span prints on the face view with its limits, not again here.  The SPAN row
+# says the limits are cut to and the trial mesh proves the pair (drawing-
+# guidelines rule 4 form 4: gear tooth data keep the gear data block's rules,
+# rule 7; fit audit part 2, B7); the limits stay as printed (a wider band is
+# unproven: the mesh check reads the profiles derived from them, MHA-PD-06
+# RV-04).  ACCEPTED is a word the sheet may not print (rule 20).
 _GEAR_DATA_ROWS = (
     ("NUMBER OF TEETH", f"{TEETH}"),
     ("DIAMETRAL PITCH", f"{DIAMETRAL_PITCH:.2f}"),
@@ -125,7 +127,7 @@ _GEAR_DATA_ROWS = (
         else f"#{CUTTER_NUMBER}, {CUTTER_TOOTH_RANGE[0]}-{CUTTER_TOOTH_RANGE[1]}T",
     ),
     ("MATES WITH", f"KNOB SHAFT {KNOB_NUMBER}, {MESH_PINION_TEETH}T"),
-    ("SPAN", f"CUT TO THE LIMITS SHOWN; ACCEPTED AT\n   {TRIAL_MESH_STEP} BY THE TRIAL MESH"),
+    ("SPAN", f"CUT TO THE LIMITS SHOWN; PROVED AT\n   {TRIAL_MESH_STEP} BY THE TRIAL MESH"),
     ("SPAN MATCHED FIT", "RUNS ON MATE WITH NO TIGHT SPOT"),
 )
 GEAR_DATA_NOTE = "\n".join(

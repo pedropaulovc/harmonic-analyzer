@@ -280,7 +280,10 @@ def test_the_bore_chamfer_is_modelled_and_sized_by_a_leadered_note_in_detail_b()
     radius = drawing.DETAIL_CROP_RADIUS
     cx, cy = drawing.DETAIL_CENTER
     assert cx - radius > 0.0127
-    assert cy + radius < drawing.GEAR_DATA_XY[1] - 9 * 0.0035
+    gear_data_bottom = (
+        drawing.GEAR_DATA_XY[1] - len(callouts.GEAR_DATA_NOTE.splitlines()) * 0.0035
+    )
+    assert cy + radius < gear_data_bottom
     assert drawing.DETAIL_LABEL_XY[1] - 0.010 > drawing.TAP_CALLOUT_XY[1]
     # The note, set off its nominal tip (section +Y up, -Z right, so the
     # detail lays z = 0 right of the focus), clears the circle on the right,
@@ -297,7 +300,7 @@ def test_the_bore_chamfer_is_modelled_and_sized_by_a_leadered_note_in_detail_b()
     assert box.ymin > drawing.DETAIL_LABEL_XY[1] + 0.002
     bore_shoulder = drawing.FRONT_KEEP["BoreDia"][0] - drawing.BORE_TEXT_BLOCK[0] / 2.0
     assert box.xmax < bore_shoulder - 0.010
-    assert box.ymax < drawing.GEAR_DATA_XY[1] - 9 * 0.0035
+    assert box.ymax < gear_data_bottom
     # The section's caption hangs under the thickness's text, clear of the
     # title block's top edge.
     assert 0.066 < drawing.SECTION_CAPTION_XY[1] - 0.006
@@ -383,7 +386,7 @@ def test_sheet_gear_data_names_the_mesh_once_with_its_acceptance() -> None:
     trial = steps.step_ref("arm-plate-located")
     assert trial == "MHA-PD-00 STEP 12"
     assert (
-        f"SPAN: CUT TO THE LIMITS SHOWN; ACCEPTED AT {trial} BY THE TRIAL MESH"
+        f"SPAN: CUT TO THE LIMITS SHOWN; PROVED AT {trial} BY THE TRIAL MESH"
         in " ".join(data.split())
     )
     assert max(map(len, data.splitlines())) == len(

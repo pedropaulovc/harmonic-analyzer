@@ -1,0 +1,31 @@
+# The feed rack mesh's checks (tolerance-policy.md, "Checks in spec modules
+# and tests"; cad/scripts/check_register.py). Fit audit part 2, B4: entered
+# when the first set took the crest level and the stacked case became a gate.
+# The mesh is set by feel at step 24 (after_setting); what the setting cannot
+# see is the rack's index, the feed's lateral terms, the pinion's toothspace
+# runout and the crests' drift along the run (FEED_LOOSE_TERMS_MM).
+checks:
+  - id: C-01
+    check: "FEED_CONTACT_RATIO_FLOOR"
+    kind: mesh
+    reason: "a tooth pair lets go; the feed hitches"
+    source: "delegated ruling 2026-11-11 (Main), under the owner direction on #2416, no precedent; owner review #2144 (continuous conjugate action is what 'paper advances at constant speed' asks)"
+    basis: after_setting
+  - id: C-02
+    check: "the loosest feel set leaves the feed mesh"
+    kind: mesh
+    reason: "at the loosest station a tooth pair lets go"
+    source: "FEED_LOOSE_TERMS_MM by root sum square from the felt bind (FEED_FIRST_BIND_BACKLASH_MM): delegated ruling 2026-11-11 (Main), under the owner direction on #2416, owner review #2144; confirmed by owner ruling 2026-11-24 (tolerance-policy.md, 'After the setting': what is left after the setting may be combined by root sum square, the plain sum beside it). Contact ratio 1.167 over 1.0"
+    basis: after_setting
+  - id: C-03
+    check: "every loose term stacked leaves the feed mesh"
+    kind: mesh
+    reason: "every residual at its limit, a tooth pair lets go"
+    source: "delegated ruling 2026-11-26 (Main), no precedent; owner review #2144 (D48, fit audit part 2, B4): the plain sum reported beside C-02 is also gated, so a build with every part inside its sheet passes step 26's steady-advance check without its rework. Contact ratio 1.028 over 1.0 with the crests level (C-04); 0.932 with the ±.002 band's .004 of drift"
+    basis: after_setting
+  - id: C-04
+    check: "LEVEL_RACK_CREST_DRIFT"
+    kind: mesh
+    reason: "one end's crests stand off; the feed mesh lets go"
+    source: "one .001 division of the height gauge's test indicator, read at the first set (MHA-PD-00 step 3B) and at every re-set (26P): delegated ruling 2026-11-26 (Main), no precedent; owner review #2144 (D48, fit audit part 2, B4). C-03 needs it; the ±.002 band alone allows .004"
+    basis: after_setting

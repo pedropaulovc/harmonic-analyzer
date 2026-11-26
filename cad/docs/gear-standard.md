@@ -252,7 +252,8 @@ looser by the rack's index error and the feed's lateral terms (along the rack),
 the pinion's toothspace runout and the rack's crest drift along the run, at
 most one .001 division (radial): the bottom rail is set with the rack's crests
 .100 ±.002 below the platen and both ends alike within .001 on the height
-gauge's test indicator (MHA-PD-00 step 3B; fit audit part 2, B4: before, the
+gauge's test indicator (MHA-PD-00 step 3B; delegated ruling 2026-11-26 (Main),
+no precedent; owner review #2144 (D48, fit audit part 2, B4): before, the
 first set allowed twice the ±.002 band, .004). These are independent, and
 the loose side takes their root sum square: 0.168 mm of backlash at the
 loosest feel set. Against coming loose and for a feed at constant speed, every

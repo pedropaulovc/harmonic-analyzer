@@ -290,10 +290,11 @@ THREAD_LINK = f"SEE NOTE {THREAD_NOTE}"
 # GEAR DATA block names (MATES WITH); their fit route is the block's last
 # row, as MHA-PD-06's block words it: the pair runs together with no tight
 # spot, tried at MHA-PD-00's trial mesh (the located step, 12K-12N), which
-# the row above it names.  Fit audit part 2, B7: the span limits are the
-# cutting aim and the pair is accepted at that trial; the limits stay as
-# printed (a wider band is unproven).  No backlash number prints (owner
-# ruling 2026-11-24, audit part 2 question C2: "Yes.", the feeler row
+# the row above it names.  The SPAN row says the limits are cut to and that
+# trial proves the pair (drawing-guidelines rule 4 form 4 and rule 7; fit
+# audit part 2, B7; ACCEPTED is a word the sheet may not print, rule 20); the
+# limits stay as printed (a wider band is unproven).  No backlash number
+# prints (owner ruling 2026-11-24, audit part 2 question C2: "Yes.", the feeler row
 # deleted: a leaf cannot be laid between 48DP flanks, #2417).  The span's
 # limits still print and control (the mesh check
 # derives its gates from SPAN_LIMITS), so the span is not a reference.
@@ -315,7 +316,7 @@ GEAR_DATA_ROWS = (
     ("MATES WITH", "\n   ".join(_mate_name(_config.parts("pd-rack-pinion")).rsplit(" ", 1))),
     (
         "SPAN",
-        f"CUT TO THE LIMITS SHOWN;\n   ACCEPTED AT {TRIAL_MESH_STEP}\n   BY THE TRIAL MESH",
+        f"CUT TO THE LIMITS SHOWN;\n   PROVED AT {TRIAL_MESH_STEP}\n   BY THE TRIAL MESH",
     ),
     ("SPAN MATCHED FIT", "RUNS ON\n   MATE WITH NO TIGHT SPOT"),
 )

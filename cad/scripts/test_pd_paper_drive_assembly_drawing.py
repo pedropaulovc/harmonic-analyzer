@@ -26,6 +26,7 @@ import draw_pd_paper_drive_assembly as drawing
 import dt_drive_train_steps
 import fr_harmonic_base_spec as base
 import fr_nameplate_spec as nameplate
+import machinist_necessity
 import paper_drive_geom as paper_geometry
 import paper_drive_rack_setup as rack_setup
 import pd_paper_drive_assembly_steps as steps
@@ -1964,8 +1965,8 @@ def test_the_rear_cup_is_faced_bonded_and_screwed_and_the_nut_seats_on_the_faced
     assert texts[6] == "REMOVE THE SCREW AND THE CUP."
     assert texts[7] == (
         f"IF {s('knob-stack-fitted', 5)} FAILED, REPEAT {s('knob-stack-fitted', 3)}-"
-        f"{s('knob-stack-fitted', 5)}, ON A NEW {_number('pd-transgear-knob-cup')} CUP IF "
-        "THE GAP READ OVER .010."
+        f"{s('knob-stack-fitted', 6)} UNTIL {s('knob-stack-fitted', 5)} PASSES, ON A NEW "
+        f"{_number('pd-transgear-knob-cup')} CUP WHENEVER THE GAP READS OVER .010."
     )
     # Rule 23's bond bullet: grade by number, degrease, the compound on the
     # journal (the pin), not the blind pilot, kept off the running land, set
@@ -5519,3 +5520,31 @@ def test_detail_h_text_stands_clear_of_its_extension_lines() -> None:
     line = drawing.SETTING_DETAILS_BY_LETTER["H"].lines[0]
     assert line.end[2] > line.start[2]
     assert line.text[2] - line.end[2] >= 1.0 + 1.0
+
+
+def test_the_necessity_register_cites_only_steps_and_rows_the_sheet_prints() -> None:
+    """The register's features name sub-steps and setting-table rows by
+    label. A step deleted or inserted shifts the letters after it, so a
+    register that names a label the sheet no longer prints (N-05's 27K after
+    27G was deleted, codjiflo P2 on 390ddbc582), or a row whose step column
+    lacks a label the feature puts beside it, fails here."""
+    texts = drawing._step_text(operating_domain=_unit_operating_domain())
+    # A step of one sub-step prints its number alone (16.), so no letter.
+    printed = {
+        f"{steps.step_number(key)}{drawing.SUB_STEP_LETTERS[index]}"
+        for key, subs in texts.items()
+        if len(subs) > 1
+        for index in range(len(subs))
+    }
+    rows = drawing.setting_table_rows(operating_domain=_unit_operating_domain())
+    label = re.compile(r"(?<![\w.-])(\d{1,2}[A-HJ-NP-Z])(?![\w-])")
+    entries = machinist_necessity.load_necessity(_config.CONFIG_DIR, "pd-paper-drive-assembly")
+    assert entries
+    for entry in entries:
+        cited = label.findall(entry.feature)
+        assert set(cited) <= printed, (entry.id, sorted(set(cited) - printed))
+        for first, last in re.findall(r"\brows? (\d+)(?:-(\d+))?", entry.feature):
+            assert 1 <= int(first) <= int(last or first) <= len(rows), (entry.id, first, last)
+        for number, inside in re.findall(r"\brow (\d+) \(([^)]*)\)", entry.feature):
+            step_cell = set(label.findall(rows[int(number) - 1][1]))
+            assert set(label.findall(inside)) <= step_cell, (entry.id, number, inside)

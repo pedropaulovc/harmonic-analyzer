@@ -936,7 +936,7 @@ def test_gear_data_span_fit_is_accepted_by_the_trial_with_the_mate() -> None:
     # trial that accepts the pair, MHA-PD-00's located step.
     span = " ".join(" ".join(drawing.GEAR_DATA_NOTE.splitlines()[-5:-2]).split())
     assert span == (
-        "SPAN: CUT TO THE LIMITS SHOWN; ACCEPTED AT MHA-PD-00 STEP 12 BY THE TRIAL MESH"
+        "SPAN: CUT TO THE LIMITS SHOWN; PROVED AT MHA-PD-00 STEP 12 BY THE TRIAL MESH"
     )
     assert drawing.TRIAL_MESH_STEP == steps.step_ref("arm-plate-located")
     assert "FEELER" not in drawing.GEAR_DATA_NOTE
