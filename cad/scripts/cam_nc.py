@@ -225,6 +225,36 @@ def ream_full_diameter_past_min_mm(plan: dict[str, Any], reamer: str) -> float:
     return float(rule["chamfer_length_mm"][ref]) + float(rule["past_margin_mm"])
 
 
+def ream_end_face_clear(
+    reamer: str,
+    tip_mm: float,
+    drill_full_mm: float,
+    far_face_mm: float,
+    solid_below_mm: float,
+) -> None:
+    """Refuse a ream whose flat end face would push into solid material.
+
+    A reamer cuts only on its 45° end chamfer; the face inside it is flat and
+    does not cut. Below its pre-drill's full diameter (``drill_full_mm``, Z)
+    the drill's 118° cone narrows below the reamer's diameter. No reamer we
+    buy publishes its chamfer, and a shorter one widens the face, so the face
+    is taken as the full diameter: it meets the cone at ``drill_full_mm``.
+    ``tip_mm`` is the reamer's tip (Z). Material is solid above the part's
+    far face ``far_face_mm`` (``-math.inf`` for a blind hole) and below
+    ``solid_below_mm`` (spoil or a fixture; ``-math.inf`` for air under the
+    part, the far face for spoil straight under it); between them is air.
+    The face's travel from ``drill_full_mm`` down to ``tip_mm`` must stay in
+    that air."""
+    if tip_mm < drill_full_mm and (
+        drill_full_mm > far_face_mm or tip_mm < solid_below_mm
+    ):
+        raise ValueError(
+            f"{reamer}: its flat end goes past the pre-drill's full diameter (Z{drill_full_mm:.3f}) "
+            f"to Z{tip_mm:.3f} in solid material (the part above Z{far_face_mm:.3f}, "
+            f"solid below Z{solid_below_mm:.3f})"
+        )
+
+
 def verify(expectations, directory: Path, known: dict[str, str] | None = None) -> list[_gcode.Finding]:
     """Run every expectation against its posted program or tool section.
 

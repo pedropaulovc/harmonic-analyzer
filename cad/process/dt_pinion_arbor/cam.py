@@ -350,6 +350,10 @@ def context(
         raise ValueError(
             "the reamer's full diameter does not reach the bar's underside (cnc.ream-full-diameter)"
         )
+    # The cross hole is in the overhang: the reamer's flat end runs out in air.
+    cam_nc.ream_end_face_clear(
+        "reamer", ream_tip, -(bar + p["drill_past_mm"]), -bar, -math.inf
+    )
     pin_tip = -(bar + p["pin_drill_past_mm"] + _point(tools["drill-1-16"]))
     _agree(plan, "cross_drill_tip_mm", drill_tip)
     _agree(plan, "cross_ream_tip_mm", ream_tip)

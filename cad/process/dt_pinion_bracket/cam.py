@@ -628,6 +628,10 @@ def context(
             "the reamer's full diameter does not reach the strap's far face"
             " (cnc.ream-full-diameter)"
         )
+    # The reamer's flat end runs out into the gap between the stacks.
+    cam_nc.ream_end_face_clear(
+        "reamer-2510", ream_tip, -p["drill_past_mm"], 0.0, -math.inf
+    )
 
     # The outline: the 1/8 in end mill in equal levels into the gap, round
     # all but the bridge at each arbor end.

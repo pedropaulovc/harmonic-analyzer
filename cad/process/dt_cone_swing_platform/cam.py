@@ -838,6 +838,9 @@ def context(
             "the reamer's full diameter does not reach the bar's underside (cnc.ream-full-diameter)"
         )
     redrill_tip = -(p["ream_past_mm"] + p["drill_past_mm"] + _point(db))
+    # The plate under the bar is solid from Z0 down: the reamer's flat end
+    # stays inside the B redrill's full diameter.
+    cam_nc.ream_end_face_clear("reamer", ream_tip, redrill_tip + _point(db), 0.0, 0.0)
     _agree(plan, "drill_31_tip_mm", tips["#31"])
     _agree(plan, "drill_b_tip_mm", tips["B"])
     _agree(plan, "drill_7_tip_mm", tips["#7"])

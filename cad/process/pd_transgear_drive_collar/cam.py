@@ -393,6 +393,10 @@ def context(
         raise ValueError(
             "the dowel reamer's full diameter does not reach the seat face (cnc.ream-full-diameter)"
         )
+    # The dowel reamer's flat end runs out into the gap between the stacks.
+    cam_nc.ream_end_face_clear(
+        "reamer-0930", dowel_ream_tip, seat - p["drill_past_mm"], seat, -math.inf
+    )
     bevel = p["ream_bevel_max_in"] * IN
     if p["ream_past_mm"] <= bevel or dowel_ream_tip <= dowel_drill_tip:
         raise ValueError(
@@ -417,6 +421,10 @@ def context(
     flat_drill_full = seat + drill_station
     flat_drill_tip = flat_drill_full - _point(d53)
     _agree(plan, "flat_drill_tip_mm", flat_drill_tip)
+    # The flat pin's hole is blind: the body is solid below the drilled hole.
+    cam_nc.ream_end_face_clear(
+        "reamer-0615", flat_ream_tip, flat_drill_full, -math.inf, -math.inf
+    )
     floor_low = ream_station + (body_min - body)
     floor_high = ream_station + (body_max - body) + bevel
     band = g["floor_band"]

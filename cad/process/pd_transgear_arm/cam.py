@@ -540,6 +540,8 @@ def context(
         raise ValueError(
             "the reamer's full diameter does not reach face A (cnc.ream-full-diameter)"
         )
+    # The reamer's flat end runs out between the parallels.
+    cam_nc.ream_end_face_clear("reamer-1260", ream_tip, -past, 0.0, -math.inf)
     # The parallels stand under the blank's edges: every drill and reamer
     # passes between them.
     gap = width / 2 - p["parallel_thickness_mm"]

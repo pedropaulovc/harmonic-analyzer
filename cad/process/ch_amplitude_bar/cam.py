@@ -895,6 +895,10 @@ def context(
         raise ValueError(
             "the reamer's full diameter does not reach the R face (cnc.ream-full-diameter)"
         )
+    # The reamer's flat end runs out in the air past the jaws.
+    cam_nc.ream_end_face_clear(
+        "reamer-0775", ream_tip, -p["drill_past_mm"], 0.0, -math.inf
+    )
     projection(
         "the centre drill",
         section - spot_depth,
