@@ -287,6 +287,9 @@ beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{process.blank_lengt
 [[setups.operations]]
 instruction = "Check the hold, the vise tightened: the .0015 leaf of the feeler set (shop feeler-gauges) tried between each jaw face and the spacer, at the spacer's right end; then each parallel pushed by hand at its right end."
 inspection = "The .0015 leaf enters at the spacer on neither jaw, and neither parallel slides (the blank is down on both). A leaf enters (the jaw plates do not reach the spacer on the bed) or a parallel slides: stop and tell the owner."
+# A fit-up, not a measured band: the leaf is the NO-GO for the jaw plates
+# bearing on the spacer (D49), the parallels' hold a hand check.
+gauge_checks = "other"
 feed = "hand"
 
 [[setups.operations]]
@@ -393,6 +396,7 @@ beam = { axis = "x", hold = "cantilever", extent_mm = [-104.14, 0], clamp_mm = [
 [[setups.operations]]
 instruction = "Check the hold as in Setup 2: the .0015 feeler leaf between each jaw face and the spacer at its right end; each parallel pushed by hand at its right end."
 inspection = "The .0015 leaf enters at the spacer on neither jaw, and neither parallel slides. A leaf enters or a parallel slides: stop and tell the owner."
+gauge_checks = "other"
 feed = "hand"
 
 [[setups.operations]]
