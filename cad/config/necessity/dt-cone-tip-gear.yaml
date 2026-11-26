@@ -2,7 +2,7 @@
 # rule 4; owner ruling 2026-11-24: "In the part's registry file, not on the
 # sheet."). Read by the machinist review only. The spigot and the pivot print
 # their own bands (form 4), read with the micrometer, their clearances REF
-# (D50 and D51, 2026-11-26; the fit audit 2026-11-23 MHA-DT-37.stems made them
+# (D50 and D51 as amended, 2026-11-26; the fit audit 2026-11-23 MHA-DT-37.stems made them
 # to fit, superseded).
 # Tooth data (tooth thickness, root envelope, runout, over pins) keep the
 # gear data block's rules. Fit batch DT, 2026-11-24.
@@ -23,7 +23,7 @@ necessity:
     reason: "line-to-line wipes the bond; looser closes the tip air"
     source: "D50, delegated ruling 2026-11-26 (Main), precedent: the band main printed until f4ba380152; owner form timed out; owner review #2144. Top .0622: .0003 bond clearance under MHA-DT-38's .0625 reamed bore, never line to line, where LOCTITE 638 is wiped off (#2530; cone_tip_cluster._require_bond). Bottom .0612: bond .0018 and running .0013-.0063 in MHA-DT-39's #52 hole; the bushing cures off its axis and cocked by the bond clearance and the pivot's running play adds, summed in dt_cone_tip_air: C-01 bushing air to G19 0.024 mm and C-02 step 23's look 0.2784 mm against the 0.254 mm leaf + 0.0127 mm. .001 looser (.0602, running .0073) C-02 rejects an in-print build (0.2550 mm)"
   - id: N-04
-    feature: "spigot Ø.0625 -.0003/-.0033 (.0592-.0622); note 4's REF clearance in MHA-DT-04, MHA-DT-03-T012, -T018"
+    feature: "spigot Ø.0625 -.0003/-.0013 (.0612-.0622); note 4's REF clearance in MHA-DT-04, MHA-DT-03-T012, -T018"
     kind: mesh
-    reason: "looser lets T006 clock off T030 past the phasing budget"
-    source: "D51, delegated ruling 2026-11-26 (Main), precedent: the fit-necessity rule of the owner-approved fit policy (drawing-simplicity-policy.md; owner ruling 2026-11-24); owner review #2144. Top .0622: .0003 bond clearance under the .0625 reamed bores (#2530; cone_tip_cluster._require_bond). Bottom .0592: bond .0038, where the spigot's float (0.0483 mm) ties T024's in the phasing comb (dt_cone_gear_tl_phasing_comb_spec.BOND_FLOAT_MM): margin zero to the comb's governing float, T006 phases to 0.865 mm against the booked 0.866 mm (check C-01 of checks/dt-cone-gear-tl-phasing-comb-spec.yaml). .001 looser (bond .0048) T006 phases to 0.9005 mm, past the budget; .002 looser 0.914 mm"
+    reason: "looser tilts T012 off its drum, read on its part"
+    source: "D51 as amended, delegated ruling 2026-11-26 (Main), precedent: the band main printed until f4ba380152, the widening withdrawn; owner review #2144. Top .0622: .0003 bond clearance under the .0625 reamed bores (#2530; cone_tip_cluster._require_bond). Bottom .0612: bond .0018, MHA-DT-37's float in the socket that tilts T012; no step reads T012 or T018 about the journal (after cure a record, owner ruling 2026-11-24 C5), so T012 read on its own part must hold the cone set's floor: 1.0068 against test_standard_mesh_checks.SPIGOT_OWN_PART_CONTACT_RATIO_MIN 1.0. .0001 looser (bond .0019) 0.99996, under"

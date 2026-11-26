@@ -78,10 +78,12 @@ from dt_cone_tip_gear_spec import (
     MM_PER_IN,
     OVERALL_LENGTH_MM,
     PATTERN_AXIS,
+    PIVOT_DIA_BAND,
     PIVOT_LENGTH_MM,
     PROFILE,
     REFERENCE_SKETCHES,
     SIMPLIFIED_FEATURES,
+    SPIGOT_DIA_BAND,
     SPIGOT_LENGTH_MM,
     STEM_DIA_MM,
     SURFACE_FINISHES,
@@ -360,13 +362,17 @@ def build(adapter: Any) -> dict[str, str]:
 
     # Bands on the model dimensions (millimetres; UNIT prints them in decimal
     # inch at the nominal's places), then the part-owned places.  The two
-    # stems carry no band: each is turned last to its reamed holes and
-    # prints as a reference with its clearance (fit audit 2026-11-23;
-    # cone_tip_cluster keeps their analysis bands).
+    # stems print their bands, read with the micrometer (D50, delegated
+    # ruling 2026-11-26 (Main), precedent: the band main printed until
+    # f4ba380152; owner form timed out; owner review #2144): the pivot
+    # bonded in MHA-DT-38 and running in MHA-DT-39, the spigot bonded in
+    # MHA-DT-04 and T012/T018 (necessity N-03, N-04).
     for feature, name, band in (
         (BLANK_DIA_REFERENCE_SKETCH, "BlankDia", BLANK_DIA_BAND),
         ("Blank", "FaceWidth", FACE_WIDTH_BAND),
         (TOOTH_REFERENCE_SKETCH, "ToothThickness", TOOTH_THICKNESS_BAND),
+        ("SpigotProfile", "SpigotDia", SPIGOT_DIA_BAND),
+        ("PivotProfile", "PivotDia", PIVOT_DIA_BAND),
     ):
         set_dimension_bilateral_tolerance(
             adapter,

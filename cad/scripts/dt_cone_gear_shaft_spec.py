@@ -209,7 +209,8 @@ def _gear(teeth: int) -> str:
 # enough to stand between the faced end and section A-A), land 1 by feel in
 # flag note LAND_NOTE, land 2 its bond clearance (rule 23) in flag note
 # BOND_NOTE.  The socket is reamed with the .0625 reamer and prints no band:
-# MHA-DT-37's spigot is turned to it (its sheet prints the acceptance).  The
+# MHA-DT-37's spigot is bonded in it and prints its own band and the bond's
+# clearance (D50, D51 as amended, 2026-11-26).  The
 # compound is named on the assembly sheet, where the joint is made (rule 23).
 # SECTION_DIA_BANDS stay the ANALYSIS bands every stack reads.
 LAND_NOTE = 1
@@ -451,7 +452,7 @@ DRAWING_NOTES = "\n".join(
         "   EACH SLIDES ON, NO SHAKE; KEY MHA-DT-VN-71 SLIDES IN THE KEYSEAT.",
         f"{BOND_NOTE}. BONDED FIT, {cone_tip_cluster.RETAINING_COMPOUND}: TURNED LAST TO MHA-DT-03 24T BORE,",
         f"   CLEARANCE {inch_text(T024_BOND_CLEARANCE_MM[0], 4)}-"
-        f"{inch_text(T024_BOND_CLEARANCE_MM[1], 4)}; MHA-DT-37 SPIGOT IS TURNED TO THE SOCKET.",
+        f"{inch_text(T024_BOND_CLEARANCE_MM[1], 4)}; MHA-DT-37 SPIGOT IS BONDED IN THE SOCKET.",
         f"{STACK_NOTE}. FLAGGED LENGTHS SET THE MHA-DT-07 AND MHA-DT-03 STACK.",
     )
 )

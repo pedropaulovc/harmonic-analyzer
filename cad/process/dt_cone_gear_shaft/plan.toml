@@ -27,7 +27,7 @@ ref = "drill-53"  # drawing cross-check 2026-11-19: pre-drill for the .0625 ream
 [[tools]]
 id = "reamer-0625"
 name = ".0625 reamer"
-ref = "reamer-0625"  # drawing cross-check 2026-11-19: .0625 REAM .20 (fit audit 2026-11-23: no band, MHA-DT-37 spigot turned to it)
+ref = "reamer-0625"  # drawing cross-check 2026-11-19: .0625 REAM .20 (fit audit 2026-11-23: no band; MHA-DT-37's spigot prints its band, D51 as amended)
 
 [[setups]]
 machine_kind = "other"

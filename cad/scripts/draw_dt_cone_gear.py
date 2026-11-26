@@ -352,13 +352,14 @@ def _land_text(teeth: int) -> str:
 
 
 def bonded_fit_note(teeth: int) -> str:
-    """Note 1 of a round-bored sheet: the bonded slip fit and its mate,
-    which is turned to this bore; the mate's sheet prints the acceptance
-    and the bond's clearance (rule 4, form 2; rule 23)."""
+    """Note 1 of a round-bored sheet: the bonded slip fit and its mate;
+    the mate's sheet prints the acceptance and the bond's clearance (rule 23).
+    T024's land is turned to this bore (rule 4, form 2); MHA-DT-37's spigot
+    prints its own band (form 4; D50, D51 as amended, 2026-11-26)."""
     if teeth in SPIGOT_TEETH:
         mate = f"{TIP_GEAR_NAME} {TIP_GEAR_MATE} SPIGOT"
-    else:
-        mate = f"{SHAFT_NAME} {SHAFT_MATE} {_land_text(teeth)}"
+        return f"{BORE_NOTE_NUMBER}. BONDED SLIP FIT ON {mate}."
+    mate = f"{SHAFT_NAME} {SHAFT_MATE} {_land_text(teeth)}"
     return f"{BORE_NOTE_NUMBER}. BONDED SLIP FIT: {mate} IS TURNED TO THIS BORE."
 
 

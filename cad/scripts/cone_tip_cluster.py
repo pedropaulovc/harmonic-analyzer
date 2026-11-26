@@ -61,23 +61,22 @@ TIP_SET_SHIFT_MM = STACK_FEELER
 
 # Ø.0625 stem stock: T006's spigot and pivot, T018/T012 bores, the socket.
 STEM_DIA_MM = 1.5875  # .0625
-# The spigot is turned between centres (L/D 12) and bonded: -.0003/-.0033,
-# held .0003 under the reamed bores' low limit so the bond is never line to
-# line, where the compound is wiped off and T012/T018 may not slide on by
-# hand (#2530), and open to a .0038 bond clearance, where its float ties
-# T024's in the phasing comb (dt_cone_gear_tl_phasing_comb_spec.BOND_FLOAT_MM;
-# .002 looser T006 phases past the booked cone_tip_bond_clock). D51,
-# delegated ruling 2026-11-26 (Main), precedent: the fit-necessity rule of
-# the owner-approved fit policy (drawing-simplicity-policy.md; owner ruling
-# 2026-11-24); owner review #2144.
-SPIGOT_DIA_BAND = (-0.00762, -0.08382)
+# The spigot is turned between centres (L/D 12) and bonded: -.0003/-.0013,
+# the turned-diameter row's .0010 width held .0003 under the reamed bores'
+# low limit so the bond is never line to line, where the compound is wiped
+# off and T012/T018 may not slide on by hand (#2530).  Its .0018 bond
+# maximum is what keeps T012, read on its own part with MHA-DT-37 tilted in
+# a true socket, at the cone set's contact-ratio floor: .0019 falls under
+# (test_standard_mesh_checks.SPIGOT_OWN_PART_CONTACT_RATIO_MIN; the after-cure
+# T012/T018 reading is a record only, owner ruling 2026-11-24 C5).
+# MHA-DT-37 prints the band, read with the micrometer (necessity N-04).
+SPIGOT_DIA_BAND = (-0.00762, -0.03302)
 # The pivot is bonded in the bushing and runs in the end screw's hole: the
-# turned-diameter row's .0010 width .0003 under the bushing's reamed bore
-# (#2469, #2530); its bond and running clearances close the tip air
-# (dt_cone_tip_air C-01) when looser. D50, delegated ruling 2026-11-26
-# (Main), precedent: the band main printed until f4ba380152; owner form
-# timed out; owner review #2144.
-PIVOT_DIA_BAND = (-0.00762, -0.03302)
+# spigot's band (one stem stock, one turned-diameter row; #2469), printed
+# (D50, delegated ruling 2026-11-26 (Main), precedent: the band main printed
+# until f4ba380152; owner form timed out; owner review #2144); looser closes
+# the tip air (necessity N-03).
+PIVOT_DIA_BAND = SPIGOT_DIA_BAND
 # Reamed on size with an owned chucking reamer: T018 and T012 bores, the
 # DT-04 socket.
 STEM_BORE_DIA_MM = STEM_DIA_MM

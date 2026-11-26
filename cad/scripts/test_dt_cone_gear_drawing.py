@@ -416,15 +416,18 @@ def test_numbered_notes_state_the_bore_fit_from_both_parts_limits() -> None:
             assert "MEASURED" not in text
             notes_from = 2
         else:
-            if teeth in spec.SPIGOT_TEETH:
-                mate = f"{str(tip_gear['title']).upper()} {tip_gear['number']} SPIGOT"
-            else:
-                land_name = f"\u00d8{spec.inch_text(spec.LAND_2_DIA, 4)} LAND"
-                mate = f"{shaft} MHA-DT-04 {land_name}"
             low, high = spec.bond_clearance_mm(teeth)
             # A bond: never interference, never past the compound's largest gap.
             assert 0.0 <= low < high <= cone_tip_cluster.RETAINING_COMPOUND_MAX_GAP_MM
-            assert lines[0] == f"1. BONDED SLIP FIT: {mate} IS TURNED TO THIS BORE."
+            if teeth in spec.SPIGOT_TEETH:
+                # MHA-DT-37 prints the spigot's band (D51 as amended): it
+                # is not turned to this bore.
+                mate = f"{str(tip_gear['title']).upper()} {tip_gear['number']} SPIGOT"
+                assert lines[0] == f"1. BONDED SLIP FIT ON {mate}."
+            else:
+                land_name = f"\u00d8{spec.inch_text(spec.LAND_2_DIA, 4)} LAND"
+                mate = f"{shaft} MHA-DT-04 {land_name}"
+                assert lines[0] == f"1. BONDED SLIP FIT: {mate} IS TURNED TO THIS BORE."
             assert drawing.KEY_MATE not in text
             # Rule 23: the mate's sheet gives the bond's clearance; the grade
             # and method are MHA-DT-00's bonding step's.

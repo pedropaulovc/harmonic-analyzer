@@ -52,7 +52,7 @@ def test_bond_on_the_pivot_clears_at_every_limit() -> None:
     assert spec.BOND_CLEARANCE == pytest.approx((least, most))
     assert least / IN == pytest.approx(0.0003)
     assert most / IN == pytest.approx(0.0018)
-    assert spec.BOND_CLEARANCE == pytest.approx(tip.BUSHING_BOND_CLEARANCE_MM)
+    assert spec.BOND_CLEARANCE == pytest.approx(tip.SPIGOT_BOND_CLEARANCE_MM)
 
 
 def test_wall_holds_the_rule_17_target_at_the_worst_case() -> None:

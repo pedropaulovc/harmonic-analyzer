@@ -51,14 +51,12 @@ def test_the_part_is_the_family_t006_on_its_own_identity() -> None:
 def test_stems_are_the_clusters_and_clear_the_tooth_cutter() -> None:
     assert spec.STEM_DIA_MM == cluster.STEM_DIA_MM == pytest.approx(0.0625 * 25.4)
     assert spec.SPIGOT_DIA_BAND == cluster.SPIGOT_DIA_BAND
-    # Both stems print their own bands, .0003 under the .0625 reamed holes
-    # (#2530: never line to line).  The pivot (D50): the turned-diameter
-    # row's .0010, its bond and running clearances closing the tip air
-    # (N-03).  The spigot (D51): open to a .0038 bond, where its float ties
-    # T024's in the phasing comb (N-04).
-    assert spec.PIVOT_DIA_BAND == cluster.PIVOT_DIA_BAND
-    assert [d / 25.4 for d in spec.PIVOT_DIA_BAND] == pytest.approx([-0.0003, -0.0013])
-    assert [d / 25.4 for d in spec.SPIGOT_DIA_BAND] == pytest.approx([-0.0003, -0.0033])
+    # Both stems print the one band, the turned-diameter row's .0010 held
+    # .0003 under the .0625 reamed holes (#2530: never line to line; D50,
+    # D51 as amended): the pivot's bond and running clearances close the tip
+    # air when looser (N-03), the spigot's bond tilts T012 (N-04).
+    assert spec.PIVOT_DIA_BAND == cluster.PIVOT_DIA_BAND == spec.SPIGOT_DIA_BAND
+    assert [d / 25.4 for d in spec.SPIGOT_DIA_BAND] == pytest.approx([-0.0003, -0.0013])
     assert spec.STEM_MAX_DIA_MM == spec.STEM_DIA_MM + max(spec.SPIGOT_DIA_BAND)
     assert spec.SPIGOT_LENGTH_MM == cluster.SPIGOT_LENGTH_MM
     assert spec.PIVOT_LENGTH_MM == cluster.PIVOT_LENGTH_MM
@@ -87,9 +85,9 @@ def test_the_fits_the_stems_make() -> None:
     # The spigot's bond: clearance at every limit, inside the compound's gap.
     low, high = spec.SPIGOT_BOND_CLEARANCE_MM
     assert 0.0 <= low < high <= cluster.RETAINING_COMPOUND_MAX_GAP_MM
-    assert low / inch == pytest.approx(0.0003, abs=5e-6)
-    assert high / inch == pytest.approx(0.0038, abs=5e-6)
-    # The bushing's bond on the pivot (#2469), at every limit.
+    # The bushing's bond on the pivot (#2469): the spigot's clearance, at
+    # every limit.
+    assert spec.PIVOT_BOND_CLEARANCE_MM == pytest.approx(spec.SPIGOT_BOND_CLEARANCE_MM)
     assert spec.PIVOT_BOND_CLEARANCE_MM[0] / inch == pytest.approx(0.0003, abs=5e-6)
     assert spec.PIVOT_BOND_CLEARANCE_MM[1] / inch == pytest.approx(0.0018, abs=5e-6)
     # The pivot runs in the end screw: clearance at every limit.
@@ -118,8 +116,6 @@ def test_callouts_and_notes_name_every_mate_once() -> None:
     assert callouts["SpigotDia"] == (
         f"BONDED FIT, {cluster.RETAINING_COMPOUND}\n{notes.SPIGOT_NOTE_FLAG}"
     )
-    # Both stems print their bands (D50, D51): nothing is made to fit.
-    assert notes.MADE_TO_FIT_STEMS == ()
     pivot = callouts["PivotDia"]
     assert pivot == f"BONDED AND RUNNING FIT\n{notes.PIVOT_NOTE_FLAG}"
     sheet = notes.sheet_notes().splitlines()

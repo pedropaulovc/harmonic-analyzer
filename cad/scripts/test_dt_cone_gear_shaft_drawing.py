@@ -219,7 +219,7 @@ def test_every_tight_band_names_its_mate_and_fit_route():
     low, high = spec.T024_BOND_CLEARANCE_MM
     assert 0.0 <= low < high <= cone_tip_cluster.RETAINING_COMPOUND_MAX_GAP_MM
     assert f"CLEARANCE {spec.inch_text(low, 4)}-{spec.inch_text(high, 4)}" in notes[1]
-    assert "MHA-DT-37 SPIGOT IS TURNED TO THE SOCKET" in notes[1]
+    assert "MHA-DT-37 SPIGOT IS BONDED IN THE SOCKET" in notes[1]
     # The three-place lengths name the stack they set once (rule 4).
     for mate in ("dt-cone-gear", "dt-crank-drive-gear"):
         assert _config.parts(mate)["number"] in notes[2]
