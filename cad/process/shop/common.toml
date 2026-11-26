@@ -262,6 +262,14 @@ description = "MT3 dead centre in the lathe tailstock"
 # spring-loaded point that retracts 1/2 in, 3 1/8 in overall (the sellers'
 # sizes); ownership (to confirm) and sources are cad/config/shop-equipment/,
 # same key.
+# The mill's work stop (owner ruling 2026-11-24: "Yes, use the work stop for
+# X0"; first used by cad/process/sh_column_clamp/plan.toml): on the table
+# beside the vise, its 3/8 in rod reaching between the jaws against the
+# blank's end. Ownership and source are cad/config/shop-equipment/
+# fixtures, same key.
+[tools.work-stop-hhip-3900-2125]
+description = "HHIP 3900-2125 universal work stop, 3/8 x 10 in rod, bolted to the mill table beside the vise"
+
 [tools.tap-guide-fisher]
 description = "Fisher spring tap guide (LittleMachineShop 1963), 1/2 in shank in the 1/2 in R8 collet; its point seats in the tap wrench's centre hole"
 

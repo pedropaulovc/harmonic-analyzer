@@ -9,7 +9,15 @@
   <rect class="part-kept" x="195" y="124" width="141" height="152"/>
   <rect class="part-rest" x="336" y="124" width="404" height="152"/>
   <rect class="holes" x="228.5" y="124" width="77" height="152"/>
-  <rect class="cutter" x="228.5" y="40" width="77" height="84"/>
+  <!-- The F drill to scale (cutter_dia_mm 6.5278 = 77.1 px at 300 px/in),
+       its full diameter cross_drill_past_mm 1.0 past the lower corner, its
+       118 deg point (1.961 mm) below that: the tip cross_tip_height_mm
+       4.336 under the parallels' tops, left of their ends. The centre
+       drill's spot under it is not drawn. Drawn short to a break line: it
+       stands at least 1.10 out of its chuck, the chuck not drawn (its size
+       is not on record). -->
+  <path class="cutter" d="M305.5 40.0L305.5 287.8L267.0 311.0L228.5 287.8L228.5 40.0L232.3 37.0L236.2 40.0L240.0 37.0L243.9 40.0L247.7 37.0L251.6 40.0L255.4 37.0L259.3 40.0L263.1 37.0L267.0 40.0L270.9 37.0L274.7 40.0L278.6 37.0L282.4 40.0L286.3 37.0L290.1 40.0L294.0 37.0L297.8 40.0L301.7 37.0Z"/>
+  <line class="arrow" x1="215" y1="60" x2="215" y2="100"/>
   <line class="centre-line" x1="100" y1="200" x2="740" y2="200"/>
   <line class="datum" x1="120" y1="100" x2="120" y2="300"/>
   <line class="datum" x1="100" y1="124" x2="228" y2="124"/>

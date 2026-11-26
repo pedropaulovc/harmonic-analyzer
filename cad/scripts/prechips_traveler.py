@@ -21,7 +21,14 @@ with uv's tool runner, from PyPI:
    size and margins, to ``<slug>-traveler.pdf`` beside it. Releases ship that
    PDF (owner ruling 2026-11-14).
 
-Only exit 0 from both runs and a printed PDF is success. Every previous
+A family plan (``_process_plans.family_parts``: one plan for several parts)
+renders the same three files for the shared sheet and then, for each part,
+``prechips traveler <plan> --placeholder <part id> --shared-file <the shared
+PDF's name>``: a one-page sheet that points to the shared one, printed to that
+part's own ``<part slug>-traveler.pdf`` beside it. A release ships the shared
+PDF once and each part's placeholder under the part's name.
+
+Only exit 0 from every run and every printed PDF is success. Every previous
 traveler is removed first, and a refusal from either run removes every output
 and returns that run's exit code (2 for a prechips refusal), so a refusal never
 leaves stale or half-paired files behind. uv's own failures exit 1 instead: a
@@ -156,6 +163,17 @@ def traveler_command(uv: str, version: str, plan: Path, profile: str, html: Path
     ]
 
 
+def placeholder_command(
+    uv: str, version: str, plan: Path, part_id: str, shared_pdf: str, html: Path,
+) -> list[str]:
+    """One family part's placeholder: the plan passes the same checks as its
+    ``PDF_PROFILE`` sheet, then prechips prints the pointer page instead."""
+    return [
+        *traveler_command(uv, version, plan, _process_plans.PDF_PROFILE, html),
+        "--placeholder", part_id, "--shared-file", shared_pdf,
+    ]
+
+
 def _fail(root, stem: str, exc: Exception, code: int, outputs: tuple[Path, ...]) -> int:
     """Remove every output, mark the pipeline span failed and return ``code``."""
     for path in outputs:
@@ -176,7 +194,12 @@ def main(argv: list[str] | None = None) -> int:
         plan = _process_plans.plan_path(args.stem)
         paths = _process_plans.traveler_paths(args.stem, args.out)
         pdf = _process_plans.traveler_pdf_path(args.stem, args.out)
-        outputs = (*paths, pdf)
+        # A plan that cannot be read has no parts to name: its own outputs go.
+        try:
+            placeholders = _process_plans.placeholder_paths(args.stem, args.out)
+        except (OSError, ValueError, KeyError):
+            placeholders = {}
+        outputs = (*paths, pdf, *(p for pair in placeholders.values() for p in pair))
         for path in outputs:
             path.unlink(missing_ok=True)
         if not plan.is_file():
@@ -192,8 +215,17 @@ def main(argv: list[str] | None = None) -> int:
         root.set_attribute("prechips.version", version)
         _telemetry.info(f"{args.stem}: prechips {version} (latest PyPI release)", prechips_version=version)
         paths[0].parent.mkdir(parents=True, exist_ok=True)
-        for profile, html in zip(_process_plans.TRAVELER_PROFILES.values(), paths, strict=True):
-            cmd = traveler_command(uv, version, plan, profile, html)
+        renders = [
+            (f"--profile {profile}", profile, traveler_command(uv, version, plan, profile, html))
+            for profile, html in zip(_process_plans.TRAVELER_PROFILES.values(), paths, strict=True)
+        ] + [
+            (
+                f"--placeholder {part_id}", _process_plans.PDF_PROFILE,
+                placeholder_command(uv, version, plan, part_id, pdf.name, html),
+            )
+            for part_id, (html, _pdf) in placeholders.items()
+        ]
+        for what, profile, cmd in renders:
             with _telemetry.span("prechips.traveler", stem=args.stem, profile=profile) as sp:
                 sp.set_attribute("prechips.version", version)
                 result = subprocess.run(
@@ -208,24 +240,26 @@ def main(argv: list[str] | None = None) -> int:
             diagnostic = uv_error(stderr)
             if diagnostic is None:
                 exc = RuntimeError(
-                    f"prechips {version} traveler --profile {profile} exited with code {code}"
+                    f"prechips {version} traveler {what} exited with code {code}"
                 )
                 return _fail(root, args.stem, exc, code, outputs)
             exc = RuntimeError(
-                f"uv could not run prechips {version} for --profile {profile} "
+                f"uv could not run prechips {version} for {what} "
                 f"(`uv tool run` exited {code}; not a prechips refusal): {diagnostic}"
             )
             return _fail(root, args.stem, exc, 1, outputs)
         sheets = dict(zip(_process_plans.TRAVELER_PROFILES.values(), paths, strict=True))
-        try:
-            with _telemetry.span(
-                "prechips.pdf", stem=args.stem, profile=_process_plans.PDF_PROFILE,
-                browser=Path(printer).name,
-            ):
-                print_pdf(printer, sheets[_process_plans.PDF_PROFILE], pdf)
-        except RuntimeError as exc:
-            return _fail(root, args.stem, exc, 1, outputs)
-        _telemetry.info(f"{args.stem}: printed {pdf.name}")
+        prints = [(sheets[_process_plans.PDF_PROFILE], pdf), *placeholders.values()]
+        for html, printed in prints:
+            try:
+                with _telemetry.span(
+                    "prechips.pdf", stem=args.stem, profile=_process_plans.PDF_PROFILE,
+                    browser=Path(printer).name,
+                ):
+                    print_pdf(printer, html, printed)
+            except RuntimeError as exc:
+                return _fail(root, args.stem, exc, 1, outputs)
+            _telemetry.info(f"{args.stem}: printed {printed.name}")
         return 0
 
 

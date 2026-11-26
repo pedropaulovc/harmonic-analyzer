@@ -1,29 +1,37 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 300" width="760" height="300">
-  <rect class="paper" x="0" y="0" width="760" height="300"/>
-  <text class="title" x="20" y="24">The stub end .40 out (not to scale): faced, turned to the pilot, centre-drilled</text>
-  <rect class="fixture-vise" x="200" y="60" width="90" height="180"/>
-  <rect class="clamp" x="290" y="92" width="40" height="45"/>
-  <rect class="clamp" x="290" y="163" width="40" height="45"/>
-  <rect class="part-kept" x="20" y="137" width="390" height="26"/>
-  <rect class="part-removed" x="410" y="137" width="80" height="6"/>
-  <rect class="part-removed" x="410" y="157" width="80" height="6"/>
-  <rect class="part-kept" x="410" y="143" width="80" height="14"/>
-  <path class="holes" d="M490 146 L476 150 L490 154 Z"/>
-  <line class="centre-line" x1="10" y1="150" x2="560" y2="150"/>
-  <line class="datum" x1="490" y1="110" x2="490" y2="200"/>
-  <text class="datum-label" x="498" y="118">Z0 the stub's faced end</text>
-  <line class="dims" x1="410" y1="215" x2="490" y2="215"/>
-  <line class="dims" x1="410" y1="207" x2="410" y2="223"/>
-  <text class="label" x="390" y="240">pilot Ø.18 × .20</text>
-  <line class="dims" x1="330" y1="262" x2="490" y2="262"/>
-  <line class="dims" x1="330" y1="254" x2="330" y2="270"/>
-  <line class="dims" x1="490" y1="254" x2="490" y2="270"/>
-  <text class="label" x="380" y="288">.40 out</text>
-  <text class="label" x="520" y="170">No. 1 centre drill's</text>
-  <text class="label" x="520" y="186">countersink, about Ø.09</text>
-  <line class="dims" x1="518" y1="168" x2="484" y2="151"/>
-  <text class="label" x="20" y="52">the rest of the rod back in the spindle bore</text>
-  <line class="dims" x1="60" y1="56" x2="60" y2="137"/>
-  <text class="label" x="150" y="270">3-jaw over a shim wrap</text>
-  <line class="dims" x1="230" y1="258" x2="300" y2="208"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 400" font-family="sans-serif" font-size="13">
+  <rect class="paper" x="0" y="0" width="760" height="400"/>
+  <text class="title" x="20" y="20">Setup 2: the stub end {{process.end_stickout_in:.2dot}} out of the 3-jaw; Op 20 faces it (to scale, 300 px/in)</text>
+  <!-- To scale, 300 px/in: the 1/4 rod (Ø.250, 75 px), .40 out of the jaw
+       fronts, the stub's end faced .035 off, the Ø.18 pilot .20 long and the
+       centre drill's countersink about Ø.09 it is cut to (the centre drill in
+       its own op's picture). -->
+  <!-- The 3-jaw, schematic (its jaws' and body's sizes are not on record):
+       its jaw fronts to scale from the part. -->
+  <rect class="fixture-vise" x="380.0" y="70" width="60" height="260"/>
+  <rect class="clamp" x="440.0" y="126.5" width="40" height="36"/>
+  <rect class="clamp" x="440.0" y="237.5" width="40" height="36"/>
+  <path class="part-kept" d="M600.0 162.5L40.0 162.5L43.0 166.7L40.0 170.8L43.0 175.0L40.0 179.2L43.0 183.3L40.0 187.5L43.0 191.7L40.0 195.8L43.0 200.0L40.0 204.2L43.0 208.3L40.0 212.5L43.0 216.7L40.0 220.8L43.0 225.0L40.0 229.2L43.0 233.3L40.0 237.5L600.0 237.5Z"/>
+  <rect class="part-removed" x="600.0" y="162.5" width="10.5" height="75.0"/>
+  <rect class="part-removed" x="540.0" y="162.5" width="60.0" height="10.5"/>
+  <rect class="part-removed" x="540.0" y="227.0" width="60.0" height="10.5"/>
+  <path class="holes" d="M600 186.5L600.0 213.5L576.6 200Z"/>
+  <line class="centre-line" x1="20" y1="200" x2="740" y2="200"/>
+  <!-- The AR turning tool, schematic (its size is not on record), its
+       point on the face, facing toward the centre. -->
+  <path class="cutter" d="M600.0 218.0L630.0 230.0L630.0 328.0L606.0 328.0L606.0 242.0Z"/>
+  <line class="arrow" x1="648.0" y1="313.0" x2="648.0" y2="248.0"/>
+  <line class="datum" x1="600" y1="110" x2="600" y2="150"/>
+  <text class="datum-label" x="540" y="104">Z0 the stub's faced end</text>
+  <line class="leader" x1="120" y1="166.5" x2="120" y2="96"/>
+  <text class="label" x="40" y="90">the rest of the rod back in the spindle bore</text>
+  <line class="leader" x1="460.0" y1="273.5" x2="420.0" y2="352"/>
+  <text class="label" x="280.0" y="366">3-jaw over a brass shim wrap</text>
+  <line class="dims" x1="480.0" y1="330" x2="600" y2="330"/>
+  <line class="dims" x1="480.0" y1="277.5" x2="480.0" y2="336"/>
+  <line class="dims" x1="600" y1="239.5" x2="600" y2="336"/>
+  <text class="label" x="520.0" y="324">{{process.end_stickout_in:.2dot}} out</text>
+  <line class="leader" x1="570.0" y1="173.0" x2="550.0" y2="154"/>
+  <text class="label" x="450.0" y="150">pilot Ø{{process.pilot_dia_in:.2dot}} × {{process.pilot_length_in:.2dot}}</text>
+  <text class="label" x="652.0" y="300">facing to the</text>
+  <text class="label" x="652.0" y="316">centre, .035 off</text>
 </svg>

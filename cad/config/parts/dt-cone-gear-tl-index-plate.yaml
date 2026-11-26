@@ -2,29 +2,36 @@ dt-cone-gear-tl-index-plate:
   title: Cone Gear Dividing Head Index Plate
   # Shop tooling: the parent MHA-DT-03 Number plus -TL-nn (subsystem-identities.md).
   # Indexes the 96T, 102T and 114T cone gears on the PM BS-0 dividing head,
-  # whose stock plates cannot. Every size is a best guess pending the owner's
-  # measurement of his BS-0 plate (#2157).
+  # whose stock plates cannot. The owner measured the index pin, the stock
+  # plate, the hub and the plate screws on 2026-11-24 (words in
+  # dt_cone_gear_tl_index_plate_spec.py); the hole circles stand within the
+  # stock plates' circle band, which the index arm reaches (#2157).
   number: MHA-DT-03-TL-01
-  material: 6061-T651 ALUMINUM
-  material_specification: 6061-T651 aluminum, owned 1/4 in plate
+  material: 6061-T6511 ALUMINUM
+  material_specification: 6061-T6511 aluminum, owned 1/4 x 5 in extruded bar
   finish: as machined
   quantity: 1
   tolerance_class: machined_block
   drawing_unit: in
-  process: "face owned 1/4 in 6061-T651 plate to .22; turn the Ø3.94 OD and bore Ø.829 to the BS-0 plate hub; drill and ream the 57-, 51- and 24-hole circles and the three countersunk #8 mounting holes on the mill DRO's bolt-hole-circle function; break edges"
+  process: "mike the owned 1/4 x 5 in 6061 bar: .240 to .260, else stop and tell the owner; use it at that thickness, faces as supplied; turn the Ø3.94 OD and bore Ø.827 to the BS-0 plate hub; spot and drill (#31) the 57-, 51- and 24-hole circles, drill (15/64) and counterbore the three mounting holes on the mill; break edges"
   machinist_exceptions:
     - id: "RV-01"
       kind: "minor"
-      where: "face view, the 132X index-hole callout: WEB .03 MIN"
-      finding: "webs between neighbouring holes of the 57- and 51-hole circles and between those two circles below the .060 floor (rules 17, 20)"
-      reason: "owner ruling 2026-11-02 (Pedro): accept webs down to .02 in on the 57- and 51-hole circles and between them, provisional until the #2157 measurements of the BS-0 plate and index pin land, when the pin diameter and circle radii are re-evaluated. Ø.157 pin holes on 57 and 51 holes inside the Ø3.94 plate leave about .03 at the worst drill band and position zone; there is no larger radius at the .080 edge target"
+      where: "face view, the 132X index-hole callout: WEB .06 MIN"
+      finding: "webs between neighbouring holes of the 57- and 51-hole circles and between those two circles below the .080 target (rules 17, 20)"
+      reason: "owner ruling 2026-11-02 (Pedro): accept webs down to .02 in on the 57- and 51-hole circles and between them, provisional until the #2157 measurements of the BS-0 plate and index pin land, when the pin diameter and circle radii are re-evaluated. Re-evaluated 2026-11-24 for the measured pin (owner fact: \"0.117 in dia dividing head pin\"), the #31 drilled holes of owner ruling 2026-11-23, tool audit Q15, and the stock plate's outermost circle (owner fact: \"rim to outermost hole edge 0.1030\", Ø3.614): at the worst drilled-hole band and the Ø.014 drilled-hole position zone the webs are .060 on the 51-hole circle, .061 on the 57-hole circle and .061 between them, at the .060 floor and under the .080 target; the 57-hole circle cannot stand outside the stock plate's outermost circle"
     - id: "RV-02"
       kind: "accept"
-      where: "face view: the 57-, 51- and 24-hole circle diameters boxed BASIC and the 132X position frame Ø.004 to datum A (the bore axis)"
+      where: "face view: the 57-, 51- and 24-hole circle diameters boxed BASIC and the 132X position frame Ø.014 to datum A (the bore axis)"
       finding: "geometric control (position frame, datum and basic dimensions) on a shop-tooling part (rule 5)"
-      reason: "owner ruling 2026-11-02 (Pedro): the index holes' angular spacing is the plate's function; without a position control the title block's ±1° on EQ SP would let neighbouring Ø.157 holes run together, so all 132 holes are held to a Ø.004 zone about their BASIC positions from the bore that pilots the plate on the BS-0 head"
+      reason: "owner ruling 2026-11-02 (Pedro): the index holes' angular spacing is the plate's function; without a position control the title block's ±1° on EQ SP would let neighbouring index holes run together, so all 132 holes are held to a position zone about their BASIC positions from the bore that pilots the plate on the BS-0 head. The zone was Ø.004 while the holes were reamed; drilled (owner ruling 2026-11-23, tool audit Q15) it is the shop's drilled-hole location from a datum bore, ±.005, Ø.014"
     - id: "RV-03"
       kind: "accept"
-      where: "face view: the bore, Ø1.500 BC and 132X index-hole callouts name BS-0 HEAD; note 1 names it in full"
+      where: "face view: the bore, 132X index-hole and 3X mounting-hole callouts name BS-0 HEAD (its hub, index pin and screws); note 1 names it in full"
       finding: "mate named without a drawing number (rule 4)"
       reason: "Owner ruling 2026-11-08 (Pedro), #2144 item 1.3: the PM BS-0 dividing head is shop equipment with no project identity; the sheet names it as PM BS-0 DIVIDING HEAD (SHOP EQUIPMENT) and no new identity is created"
+    - id: "RV-04"
+      kind: "minor"
+      where: "face view, the 3X mounting-hole callout: WALL .03 MIN"
+      finding: "wall between each screw counterbore and the bore below the .060 floor (rules 17, 20)"
+      reason: "owner ruling 2026-11-24 (Pedro): \"Accept the .04 wall as an exception, same as the maker's plate.\" The head's screw pattern fixes it: the owner measured .0415 on the stock BS-0 plate (\"screw hole edge to bore edge 0.0415\"); the made plate has .0415 nominal and .0315 at the worst case of the bore, counterbore and bolt-circle sizes"

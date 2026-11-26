@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import copy
 import math
+import re
 import tomllib
 from pathlib import Path
 from xml.etree import ElementTree
@@ -30,6 +31,7 @@ import export_features
 import gen_ms_stick_numerals_dxf as numeral_generator
 import ms_stick_callouts as callouts
 import ms_stick_spec as spec
+import test_process_op_references as op_references
 
 STEM = "ms_stick"
 PLAN = tomllib.loads(_process_plans.plan_path(STEM).read_text(encoding="utf-8"))
@@ -50,15 +52,25 @@ def ctx() -> dict:
 
 
 def _post(ctx: dict, out: Path) -> None:
-    """Each program as the runtime posts it: the grbl preamble, then per
+    """Each program as the runtime posts it: the header (its name, the plan's
+    comment, one ``(T<n> D=<dia> <name>)`` line per tool, so a tool name that
+    would close the comment early fails here), the grbl preamble, then per
     section an M6 block (M5, the operator's %msg, M6, M3) and its lines, the
     feeds in mm/min."""
     sections = {op[0]: job for job in ctx["jobs"] for op in job["ops"]}
     lines_of = {op[0]: op[2] for job in ctx["jobs"] for op in job["ops"]}
     for name, keys in RECIPE.PROGRAMS:
+        listed = {}
+        for key in keys:
+            job = sections[key]
+            number = ctx["numbers"][job["tool"]]
+            listed.setdefault(
+                number, f"(T{number} D={job['dia']:.3f} {ctx['names'][job['tool']]})"
+            )
         text = [
             f"({name})",
             f"({ctx['comment']})",
+            *listed.values(),
             "(Begin preamble)",
             "G17 G90",
             "G21",
@@ -121,14 +133,14 @@ def test_every_tick_is_cut_at_the_drawings_station(ctx) -> None:
 def test_the_plan_repeats_the_shop_inventory() -> None:
     p = PLAN["parameters"]
     grads = FEATURES["features"]["graduations"]
-    bit = EQUIPMENT["tools"]["ms-stick-engraver"]
-    assert p["engraver_tip_mm"] == pytest.approx(bit["tip_width_in"] * 25.4)
+    bit = EQUIPMENT["tools"]["engravers-esao-30-0-1"]
+    assert p["engraver_tip_mm"] == pytest.approx(bit["tip_width_mm"])
     assert bit["included_angle_deg"] == grads["v_angle_deg"]
     # The Tools table's line for the bit is the inventory's bit.
-    described = SHOP["tools"]["ms-stick-engraver"]["description"]
-    assert bit["sku"] in described
+    described = SHOP["tools"]["engravers-esao-30-0-1"]["description"]
+    assert bit["make"] in described
     assert f"{bit['included_angle_deg']:g}°" in described
-    assert f"{bit['tip_width_in']:.3f}"[1:] in described
+    assert f"{bit['tip_width_mm']:g} mm" in described
     # One strip of the hold's tape covers the bar's top (no seam): the plan
     # tapes each face with a single strip trimmed to width.
     hold = EQUIPMENT["consumables"]["hold-painters-tape-ca"]
@@ -285,11 +297,11 @@ def _seed(ctx: dict, key: str, old: str, new: str) -> dict:
         # The 0 tick .002 off its station.
         ("graduations", "G0 X-145.430 Y-9.513", "G0 X-145.380 Y-9.513", "cleared"),
         # The 0 tick left under its depth.
-        ("graduations", "G1 Z-0.711 F{feed}", "G1 Z-0.650 F{feed}", "cleared"),
+        ("graduations", "G1 Z-0.762 F{feed}", "G1 Z-0.700 F{feed}", "cleared"),
         # A tenth cut as long as a numbered tick.
         ("graduations", "G1 Y-7.239 F{feed}", "G1 Y-5.969 F{feed}", "keep_out"),
         # Three levels taken at once.
-        ("graduations", "G1 Z-0.110 F{feed}", "G1 Z-0.330 F{feed}", "passes"),
+        ("graduations", "G1 Z-0.119 F{feed}", "G1 Z-0.356 F{feed}", "passes"),
         # A rapid down into the brass instead of to the R plane.
         ("graduations", "G0 Z0.500", "G0 Z-0.200", "rapid"),
         # A stroke of the 0 off its line.
@@ -467,3 +479,65 @@ def test_the_model_is_engraved_where_the_recipe_engraves(ctx) -> None:
 def test_a_model_engraved_elsewhere_stops_the_build(ctx, variant) -> None:
     with pytest.raises(RuntimeError, match="not engraved where the recipe engraves"):
         RECIPE.probe(_model(**variant), ctx["probe"])
+
+
+# Each printed "Op <n>" in this plan, by where it is printed (the operation
+# it is in, or its setup's field), pinned to words of the operation it means:
+# an operation inserted or removed above one shifts prechips' numbering (by
+# tens, in plan order) and leaves the reference naming its neighbour (#3626).
+OP_REFERENCES = {
+    ("Op 100", 190): "Note each work Z",
+    ("Op 190", 180): "the bar's bare faced top",
+    ("Op 190", 100): "Mic the blank's thickness",
+    ("Op 190", 200): "free the blank with a razor blade",
+    ("Op 200", 310): "Slide a single-edge razor blade",
+    ("Op 200", 320): "peel its tape",
+    ("Op 200", 330): "Residue",
+    ("Op 200", 110): "Clean: degrease",
+    ("Op 200", 160): "lower the blank onto the bar's tape",
+    ("Op 200", 170): "G54 Y0 the blank's rear edge",
+    ("Op 210", 190): "Note each work Z",
+    ("Setup 3 datum", 210): "T1's tip down on a .002 leaf on the RULED FACE",
+    ("Setup 4 datum", 260): "G54 X0 on the milled DATUM END",
+    ("Setup 4 datum", 270): "Console M6 T2",
+    ("Setup 5 inspection", 10): "Mic the brass bar's thickness",
+    ("Setup 5 inspection", 380): "600-grit",
+    ("Setup 5 inspection", 260): "G54 X0 on the milled DATUM END",
+    ("Setup 5 inspection", 300): "find the DATUM END",
+    ("Setup 5 inspection", 270): "Console M6 T2",
+}
+
+
+def _printed_where(where: str, numbers: dict[tuple[int, int], int]) -> str:
+    """``plan.setups[i].operations[j]...`` -> "Op <n>";
+    ``plan.setups[i].<field>...`` -> "Setup <i+1> <field>"."""
+    m = re.match(r"plan\.setups\[(\d+)\]\.(?:operations\[(\d+)\]|(\w+))", where)
+    assert m, where
+    setup = int(m.group(1))
+    if m.group(2) is not None:
+        return f"Op {numbers[(setup, int(m.group(2)))]}"
+    return f"Setup {setup + 1} {m.group(3)}"
+
+
+def test_every_printed_op_reference_names_the_operation_it_means() -> None:
+    ops = op_references.op_numbers(PLAN)
+    numbers = {}
+    for s, setup in enumerate(PLAN["setups"]):
+        for o in range(len(setup.get("operations", []))):
+            numbers[(s, o)] = 10 * (len(numbers) + 1)
+    found = {
+        (_printed_where(where, numbers), number)
+        for where, number, _ in op_references.printed_references(PLAN)
+    }
+    assert found == OP_REFERENCES.keys()
+    for (where, number), words in OP_REFERENCES.items():
+        op = ops[number]
+        text = " ".join(
+            [op.get("instruction", "")]
+            + [
+                step.get("text", "")
+                for step in op.get("steps", [])
+                if isinstance(step, dict)
+            ]
+        )
+        assert words in text, f"{where}: Op {number} is not the one meant ({words!r})"

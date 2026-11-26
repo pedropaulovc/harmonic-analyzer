@@ -1,55 +1,36 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 640" font-family="sans-serif" font-size="13">
-  <rect class="paper" x="0" y="0" width="760" height="640"/>
-  <text class="title" x="20" y="22">VB05: plan (10 px/mm, fixed jaw at the top), B up, P left</text>
-  <!-- Jaws: fixed (BACK face) at the top, moving (FRONT) at the bottom; they bear on the body only. -->
-  <rect class="clamp" x="100" y="50" width="360" height="30"/>
-  <rect class="clamp" x="100" y="298.4" width="360" height="30"/>
-  <!-- The block: the neck (X0 to the steps, 17.78 deep) and the body (to the far end, 21.84 deep). -->
-  <polygon class="part-kept" points="150,100.3 238.9,100.3 238.9,80 411.6,80 411.6,298.4 238.9,298.4 238.9,278.1 150,278.1"/>
-  <!-- Relief slot, steps to the far end. -->
-  <rect class="part-removed" x="238.9" y="110.5" width="172.7" height="157.5"/>
-  <!-- The V: mouth and flat. -->
-  <rect class="part-removed" x="150" y="129.2" width="99.1" height="120"/>
-  <line class="hidden" x1="150" y1="179.1" x2="249.1" y2="179.1"/>
-  <line class="hidden" x1="150" y1="199.4" x2="249.1" y2="199.4"/>
-  <line class="centre-line" x1="120" y1="189.2" x2="440" y2="189.2"/>
-  <!-- 1/2 in end mill in the slot at its in-most pass; the chamfer mill beside P. -->
-  <circle class="cutter" cx="302.4" cy="204.5" r="63.5"/>
-  <line class="arrow" x1="380" y1="236" x2="430" y2="236"/>
-  <circle class="cutter" cx="93" cy="189.2" r="31.75"/>
-  <line class="arrow" x1="93" y1="189.2" x2="240" y2="189.2"/>
-  <line class="datum" x1="150" y1="64" x2="150" y2="92"/>
-  <line class="datum" x1="138" y1="80" x2="164" y2="80"/>
-  <text class="datum-label" x="20" y="112">X0 (P), Y0 {{cad.body_back_depth_in:.3dot}}</text>
-  <text class="datum-label" x="20" y="127">from FRONT</text>
-  <line class="leader" x1="100" y1="100" x2="146" y2="83"/>
-  <text class="label-halo" x="470" y="70">fixed jaw: BACK face</text>
-  <text class="label-halo" x="470" y="320">moving jaw: FRONT face</text>
-  <line class="leader" x1="466" y1="150" x2="412" y2="150"/>
-  <text class="label-halo" x="470" y="146">relief slot {{cad.relief_height_in:.3dot}} deep below B,</text>
-  <text class="label-halo" x="470" y="162">1/2 in end mill from the far end; 1/8</text>
-  <text class="label-halo" x="470" y="178">end mill in its two corners at the step, R.065</text>
-  <line class="leader" x1="466" y1="196" x2="250" y2="196"/>
-  <text class="label-halo" x="470" y="200">V groove: 1/4 in chamfer mill in 5 levels,</text>
-  <text class="label-halo" x="470" y="216">flat by its tip in fine passes (Y −.430 centre)</text>
-  <line class="leader" x1="40" y1="280" x2="75" y2="216"/>
-  <text class="label-halo" x="20" y="293">1/4 in chamfer mill, on the V's centre</text>
-  <!-- Section across the jaws through the neck, looking from P (5 px/mm, fixed jaw at the right). -->
-  <g transform="translate(0 80)">
-  <text class="title" x="20" y="285">Section through the neck (5 px/mm, fixed jaw at the right)</text>
-  <rect class="clamp" x="245.4" y="320.3" width="80" height="224.7"/>
-  <rect class="clamp" x="434.6" y="320.3" width="80" height="224.7"/>
-  <rect class="fixture-support" x="325.4" y="402" width="15.9" height="143"/>
-  <rect class="fixture-support" x="418.7" y="402" width="15.9" height="143"/>
-  <line class="fixture-table" x1="220" y1="545" x2="540" y2="545"/>
-  <rect class="hidden" x="325.4" y="309.3" width="109.2" height="92.7" fill="none"/>
-  <polygon class="part-kept" points="335.5,402 335.5,309.3 350,309.3 374.9,334.2 385.1,334.2 410,309.3 424.4,309.3 424.4,402"/>
-  <polygon class="part-removed" points="350,309.3 410,309.3 385.1,334.2 374.9,334.2"/>
-  <line class="datum" x1="200" y1="402" x2="325" y2="402"/>
-  <text class="datum-label" x="40" y="406">Z0 stacks' top (TOP face)</text>
-  <text class="label" x="540" y="330">jaw tops .085 below B</text>
-  <text class="label" x="540" y="430">body behind (dashed) is what</text>
-  <text class="label" x="540" y="446">the jaws grip; the neck stands</text>
-  <text class="label" x="540" y="462">.08 clear of each jaw</text>
-  </g>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 520" width="760" height="520" font-family="sans-serif" font-size="13">
+  <!-- Hand picture, to scale: the plan at 7 px/mm, the section at 5 px/mm, from the block's length (1.030). 1/2 in end mill Ø12.7 mm (face_cutter_dia_mm, shop endmill-carbide-3fl-1-2), its square end drawn as the near half of its end face (arc 12 % of its diameter deep, its lowest point the true end), drawn 1 in out (half_mill_projection_min_mm, a least stick-out) to a break line; the collet not drawn. Shown on its skim of B at Z18.542, the pass at Y-10.408 over the block (the first, Y0.764, hangs over the fixed jaw), at X13, the same place in both views. Hatched: the relief slot it mills next, .260 (6.604 mm) deep, from the steps (.350) to the far end, between .120 and .740 from the front (the drawing); in the plan also the V along the neck that the chamfer mill cuts after (its own picture). Stacks 1/2 + 5/8 in (stack_height_mm). The vise jaws' thickness and the parallels' length are not on record: schematic. Jaw height 44.9453 mm (vise_jaw_height_mm). -->
+  <rect class="paper" x="0" y="0" width="760" height="520"/>
+  <text class="title" x="20" y="24">VB05: bottom face B up, skimmed; the relief slot next (hatched), to scale</text>
+  <path class="clamp" d="M104.23 94L295.13 94L298.13 98L295.13 102L298.13 106L295.13 110L104.23 110Z"/>
+  <path class="clamp" d="M104.23 262.91L295.13 262.91L298.13 266.91L295.13 270.91L298.13 274.91L295.13 278.91L104.23 278.91Z"/>
+  <text class="label-on-clamp" x="196" y="106" text-anchor="middle">fixed jaw (BACK)</text>
+  <text class="label-on-clamp" x="196" y="274.91" text-anchor="middle">moving jaw (FRONT)</text>
+  <path class="part-kept" d="M70 124.22L132.23 124.22L132.23 110L253.13 110L253.13 262.91L132.23 262.91L132.23 248.68L70 248.68Z"/>
+  <rect class="part-removed" x="132.23" y="131.34" width="120.9" height="110.24"/>
+  <rect class="part-removed" x="70" y="144.45" width="62.23" height="84"/>
+  <circle class="cutter" cx="161" cy="182.86" r="44.45"/>
+  <line class="datum" x1="70" y1="96.22" x2="70" y2="120.22"/>
+  <text class="datum-label" x="66" y="110.22" text-anchor="end">X0 P</text>
+  <line class="arrow" x1="42" y1="302.91" x2="252" y2="302.91"/>
+  <text class="title" x="50" y="72">Plan (7 px/mm), the fixed jaw at the top</text>
+  <text class="label" x="40" y="330">The jaws on the FRONT and BACK faces from the steps</text>
+  <text class="label" x="40" y="346">to the far end; the neck stands {{process.back_step_depth_mm:in.2dot}} clear of each.</text>
+  <text class="label" x="40" y="362">Arrowed: the passes along X.</text>
+  <rect class="fixture-vise" x="425.39" y="480" width="189.22" height="14"/>
+  <rect class="clamp" x="425.39" y="255.27" width="40" height="224.73"/>
+  <rect class="clamp" x="574.61" y="255.27" width="40" height="224.73"/>
+  <rect class="fixture-support" x="465.39" y="337.12" width="15.88" height="142.88"/>
+  <rect class="fixture-support" x="558.74" y="337.12" width="15.88" height="142.88"/>
+  <rect class="part-kept" x="465.39" y="241.88" width="109.22" height="95.25"/>
+  <rect class="part-removed" x="465.39" y="241.88" width="109.22" height="2.54"/>
+  <rect class="part-removed" x="480.63" y="244.41" width="78.74" height="33.02"/>
+  <path class="cutter" d="M554.32 236.79L554.32 117.41L550.35 120.41L546.38 117.41L542.41 120.41L538.45 117.41L534.48 120.41L530.51 117.41L526.54 120.41L522.57 117.41L518.6 120.41L514.63 117.41L510.66 120.41L506.7 117.41L502.73 120.41L498.76 117.41L494.79 120.41L490.82 117.41L490.82 236.79A31.75 7.62 0 0 0 554.32 236.79Z"/>
+  <line class="datum" x1="614.61" y1="244.41" x2="644.61" y2="244.41"/>
+  <text class="datum-label" x="648.61" y="249.41">Z.730, the pass</text>
+  <text class="title" x="420" y="72">Across the jaws at X13 (5 px/mm), fixed jaw at the right</text>
+  <line class="datum" x1="614.61" y1="337.12" x2="644.61" y2="337.12"/>
+  <text class="datum-label" x="648.61" y="342.12">Z0 the</text>
+  <text class="datum-label" x="648.61" y="358.12">stacks' top</text>
+  <text class="label" x="420" y="508">1/2 + 5/8 in parallels stacked against each jaw</text>
 </svg>

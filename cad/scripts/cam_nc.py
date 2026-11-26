@@ -6,6 +6,9 @@
    ``features.toml`` and the STEP it binds), ``cad/process/<stem>/plan.toml``
    and the shop directory ``cad/process/shop/`` (merged), and has the recipe
    (``cad/process/<stem>/cam.py``) derive every number it needs from them.
+   A family plan's recipe posts for every part at once: it is given each
+   part's features, its reading of the plan (``_process_plans.part_view``)
+   and its STEP path, each as a dict by the part's id in the plan.
 2. Writes that context, the recipe's path and its programs to a JSON job spec
    in a fresh staging directory and runs ``freecadcmd`` on
    ``_freecad_cam_runtime.py``. FreeCAD imports the STEP, builds one CAM Job
@@ -46,6 +49,7 @@ from typing import Any
 import _cam_programs
 import _gcode
 import _process_plans
+import _shop_equipment
 import _telemetry
 
 FREECAD_ENV = "HARMONIC_FREECAD"
@@ -163,13 +167,64 @@ def _program(directory: Path, name: str, cache: dict[str, _gcode.Program]) -> _g
     return cache[file].tool_section(int(section)) if section else cache[file]
 
 
-def verify(expectations, directory: Path) -> list[_gcode.Finding]:
-    """Run every expectation against its posted program or tool section."""
+# Posted files known to pass a cutter over a vise jaw with less air than the
+# shop floor (cad/config/shop-equipment cnc.jaw-clearance: D32, delegated
+# ruling 2026-11-25 (Main), no precedent; the owner reviews it on #2144,
+# cad/docs/drawing-simplicity-policy.md "Named exceptions":
+# https://github.com/pedropaulovc/harmonic-analyzer/issues/2144#issuecomment-7171575340,
+# corrected at
+# https://github.com/pedropaulovc/harmonic-analyzer/issues/2144#issuecomment-7171657471),
+# by file name, each naming its issue. verify reports their jaw_clearance
+# findings as known (a warning) instead of failing on them, and fails when a
+# listed file no longer falls under the floor: its owner empties its entry once
+# fixed. Nothing else exempts a file from the floor.
+KNOWN_JAW_CLEARANCE_VIOLATIONS: dict[str, str] = {
+    "CL01_face_b.nc": "#3607 (ch_channel_lever: 0.521 mm over the moving jaw); not to be run until fixed",
+    "PG15_height.nc": "#3607 (pd_platen_guide: 0.521 mm over the fixed jaw); not to be run until fixed",
+}
+
+
+def jaw_clearance_min_mm() -> float:
+    """The shop's least air between a cutter and a jaw or clamp it passes over."""
+    return float(_shop_equipment.load()["cnc"]["jaw-clearance"]["jaw_clearance_min_mm"])
+
+
+def verify(expectations, directory: Path, known: dict[str, str] | None = None) -> list[_gcode.Finding]:
+    """Run every expectation against its posted program or tool section.
+
+    Every ``keep_out`` check runs with the shop's jaw-clearance floor; a
+    recipe's own ``clearance`` may raise it, not lower it. A listed file's
+    (``known``, by default :data:`KNOWN_JAW_CLEARANCE_VIOLATIONS`)
+    ``jaw_clearance`` findings are logged as known, not returned; a listed file
+    the expectations check with no such finding is a finding itself."""
+    known = KNOWN_JAW_CLEARANCE_VIOLATIONS if known is None else known
+    floor = jaw_clearance_min_mm()
     findings: list[_gcode.Finding] = []
     cache: dict[str, _gcode.Program] = {}
+    floored: set[str] = set()
     for program, check, kwargs in expectations:
+        if check == "keep_out":
+            own = kwargs.get("clearance", floor)
+            if own < floor:
+                raise ValueError(f"{program}: keep_out clearance {own} is under the shop floor {floor} mm")
+            kwargs = {**kwargs, "clearance": own}
+            floored.add(f"{program.partition('@')[0]}.nc")
         findings += getattr(_gcode, f"check_{check}")(_program(directory, program, cache), **kwargs)
-    return findings
+    kept: list[_gcode.Finding] = []
+    violating: set[str] = set()
+    for finding in findings:
+        file = finding.program.partition("@")[0]
+        if finding.check == "jaw_clearance" and file in known:
+            violating.add(file)
+            _telemetry.warn(f"known jaw-clearance violation ({known[file]}): {finding}")
+        else:
+            kept.append(finding)
+    for file in sorted((floored & known.keys()) - violating):
+        kept.append(_gcode.Finding(
+            file, "jaw_clearance",
+            f"listed in cam_nc.KNOWN_JAW_CLEARANCE_VIOLATIONS ({known[file]}) but clears the floor: remove its entry",
+        ))
+    return kept
 
 
 def cycle_times(expectations, directory: Path, rapid_mm_min: float = _gcode.RAPID_MM_MIN) -> dict[str, _gcode.CycleTime]:
@@ -245,7 +300,6 @@ def main(argv: list[str] | None = None) -> int:
         staging.mkdir(parents=True)
         inputs = _cam_programs.cam_inputs(stem, args.out)
         recipe_path, plan_path = inputs["recipe"], inputs["plan"]
-        features_path, step_path = inputs["features"], inputs["step"]
         try:
             recipe = _cam_programs.load_recipe(stem)
             programs = [directory / f"{name}.nc" for name, _ops in recipe.PROGRAMS]
@@ -253,12 +307,26 @@ def main(argv: list[str] | None = None) -> int:
             manifest_path = directory / _cam_programs.MANIFEST_NAME
             missing = [str(p) for p in inputs.values() if not Path(p).is_file()]
             if missing:
-                raise FileNotFoundError(f"missing inputs {missing}; run package:manifest:{stem} (or fetch_features.py {stem}) first")
-            features = _load_toml(features_path)
-            if features["step_sha256"] != sha256(step_path):
-                raise ValueError(f"{step_path.name} does not match features.toml step_sha256")
+                parts = " ".join(_process_plans.part_stems(stem))
+                raise FileNotFoundError(f"missing inputs {missing}; run package:manifest:<part> (or fetch_features.py {parts}) first")
+            plan = _load_toml(plan_path)
+            family = _process_plans.family_parts(stem)
+            bundles = {
+                part_id: (inputs[f"features/{part}"], inputs[f"step/{part}"])
+                for part_id, part in family.items()
+            } or {"": (inputs["features"], inputs["step"])}
+            features, steps = {}, {}
+            for part_id, (features_path, step_path) in bundles.items():
+                features[part_id] = _load_toml(features_path)
+                if features[part_id]["step_sha256"] != sha256(step_path):
+                    raise ValueError(f"{step_path.name} does not match its features.toml step_sha256")
+                steps[part_id] = str(step_path.resolve())
             with _telemetry.span("cam.context", stem=stem):
-                ctx = recipe.context(features, _load_toml(plan_path), _process_plans.load_shop(), str(step_path.resolve()))
+                if family:
+                    views = {part_id: _process_plans.part_view(plan, part_id) for part_id in family}
+                    ctx = recipe.context(features, views, _process_plans.load_shop(), steps)
+                else:
+                    ctx = recipe.context(features[""], plan, _process_plans.load_shop(), steps[""])
             with _telemetry.span("cam.freecad", stem=stem) as span:
                 freecadcmd = resolve_freecadcmd()
                 result = run_freecad(recipe_path, ctx, recipe.PROGRAMS, staging, freecadcmd, directory / LOG_NAME)

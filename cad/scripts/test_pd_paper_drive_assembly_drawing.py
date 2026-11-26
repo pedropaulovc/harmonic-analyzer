@@ -2862,10 +2862,15 @@ def test_every_screwed_setting_has_a_holding_check() -> None:
     # #3107: the screw and spacer are renewed once; a second failure sends
     # the bar and the arm to their sheets, and every outcome has a route: a
     # bar outside (with the arm if it is outside too), an arm outside or all
-    # inside, one action a step (rule 22).
+    # inside, one action a step (rule 22). The renewal frees the captive arm
+    # on the arbor press (D10, owner question Q7a, option B), a bonded spacer
+    # only: the dry trial's failure reaches it with the spacer slipped on
+    # (Codjiflo r1 on #3569).
     bar = _number("pd-support-bar")
+    assert pivot[3] == "IF EITHER FAILS, DO 15W-15Z."
     assert pivot[20:23] == (
-        f"IF NOT YET RENEWED, REPEAT FROM 14G WITH A NEW "
+        "IF NOT YET RENEWED, PRESS A BONDED SPACER OFF THE SCREW ON THE ARBOR "
+        "PRESS, ARM REAR FACE DOWN, AND REPEAT FROM 14G WITH A NEW "
         f"{_number('pd-vn-transgear-pivot-screw')} SCREW AND "
         f"{_number('pd-transgear-pivot-spacer')} SPACER.",
         f"IF ALREADY RENEWED, INSPECT THE {bar} BAR'S TAP AND BACK FACE AND THE "
@@ -2952,13 +2957,28 @@ def test_every_failure_branch_has_a_pass_exit() -> None:
     # Owner ruling 2026-11-24, audit part 2 question C1: the trial's move
     # before a part is inspected, toward S only (no away move is left inside
     # the limits once TRUE's error is charged); a tight spot or no shake
-    # takes the inspection (Codjiflo r2 on #3539).
+    # takes the inspection (Codjiflo r2 on #3539). The move itself is the
+    # setting table's row, cited, never typed into the step (rule 22;
+    # codjiflo r2 on #3539).
     assert located[17] == (
         f"IF ONLY {s('arm-plate-located', 12)} FAILED, ON SHAKE OVER .008, AT "
-        f"{drawing.KNOB_SETTING_VIEW_NAME}'S SETTING, MOVE THE TABLE "
-        f"{drawing.KNOB_TRIAL_MOVE_TEXT} TOWARD S, THEN FROM {s('arm-plate-located', 5)}."
+        f"{drawing.KNOB_SETTING_VIEW_NAME}'S SETTING, MOVE THE TABLE TOWARD S BY THE "
+        f"TRIAL MOVE {drawing.row_cite('trial-move')}, THEN FROM {s('arm-plate-located', 5)}."
     )
     assert "AWAY FROM S" not in located[17]
+    assert drawing.KNOB_TRIAL_MOVE_TEXT not in located[17]
+    rows = drawing.setting_table_rows(operating_domain=_unit_operating_domain())
+    (move_row,) = [row for row in rows if row[1] == s("arm-plate-located", 17)]
+    assert move_row[0] == str(drawing.SETTING_ROW["trial-move"])
+    # S, ALONG and ACROSS are DETAIL K's, on sheet 7 (codjiflo r1 on #3560).
+    assert drawing.SHEET_NAMES.index(drawing.KNOB_SETTING_SHEET) + 1 == 7
+    assert move_row[2] == (
+        f"TABLE MOVED TOWARD S FROM {drawing.KNOB_SETTING_VIEW_NAME}'S SETTING (SHEET 7)"
+    )
+    # Three .0002 counts of the installed DRO on each axis: a plain .0005 is
+    # not a reading it shows (pd_paper_drive_knob_setting_spec.DRO_COUNT_MM).
+    assert move_row[3] == drawing.KNOB_TRIAL_MOVE_TEXT == ".0006 ALONG AND .0006 ACROSS"
+    assert move_row[4] == "DRO"
     # The re-indication reads N at the table's setting, DETAIL K's or as
     # moved, so a moved plate reaches the pass exit (Codjiflo r2 on #3539).
     assert located[14].endswith(
@@ -3439,7 +3459,7 @@ def test_the_reducer_mesh_is_tried_before_the_plate_is_doweled() -> None:
         f"{steps.step_number('arm-plate-fitted')}." in located
     )
     assert located.index("PASSED, GO TO STEP") < located.index(
-        f"MOVE THE TABLE {drawing.KNOB_TRIAL_MOVE_TEXT}"
+        f"MOVE THE TABLE TOWARD S BY THE TRIAL MOVE {drawing.row_cite('trial-move')}"
     ) < located.index("IF NOT, INSPECT")
     # The restart follows the part, one sub-step each: a new plate is set
     # again from 12A, a new disc or sleeve is centred again; a new disc,

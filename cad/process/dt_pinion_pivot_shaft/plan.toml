@@ -26,10 +26,14 @@
 # outside the sphere.
 #
 # Flagged: the ball turner (shop/lathe.toml tools.ball-radius-turner-lms-2569)
-# is to order; 1/4 in 1018 ground round (stock-to-order.toml
-# 1018-ground-round-1-4) is to order. Lengths over 6 in are read with the
-# owned 0-12 in height gauge on the surface plate (the owned calipers stop at
-# 6 in).
+# is to order; the 1/4 in ground round (stock-to-order.toml
+# 1018-ground-round-1-4) is to order. The bar ruled and carted is ground
+# 12L14 (owner ruling 2026-11-24; McMaster 5227T232); the material line and
+# material_key below and the drawing still say 1018 until issue #3561 changes
+# them. 12L14 turns faster than 1018: the lathe-*-1018 settings this plan
+# uses are on the slow side for it and may be re-derived from the maker rows.
+# Lengths over 6 in are read with the owned 0-12 in height gauge on the
+# surface plate (the owned calipers stop at 6 in).
 title = "Pinion Pivot Shaft"
 part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"

@@ -39,7 +39,7 @@ id = "gear-cutters-48dp-20pa"
 name = "48DP 20PA gear cutter #1"
 ref = "gear-cutters-48dp-20pa"  # F-gear-cutter-10-289-481
 
-# Fit audit 2026-11-23, pending owner confirmation: the reamed Ø.501 bore
+# Rule 4, form 2 (drawing-guidelines): the reamed Ø.501 bore
 # prints no band and its mate, the MHA-PD-17 spigot, is turned to it,
 # so no telescoping gauge measures it; the set's .040 pin reads the
 # tooth-space runout.

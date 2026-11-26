@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 420" width="760" height="420" font-family="sans-serif" font-size="13">
+  <!-- Hand picture, to scale at 10 px/mm from the step's .350 (8.89 mm). 1/8 in end mill Ø3.175 mm (corner_cutter_dia_mm, shop endmill-carbide-3fl-1-8) at X10.478 Y-17.209 (VB05), in the slot's corner by the near wall at the step, its own R.0625 leaving the corner R.060-.070; in levels of .044 (corner_step_max_mm) to the slot's floor, .260 below B. Plan from above; the jaws as Setup 6's picture. The vise jaws' thickness and the parallels' length are not on record: schematic. Jaw height 44.9453 mm (vise_jaw_height_mm). -->
+  <rect class="paper" x="0" y="0" width="760" height="420"/>
+  <text class="title" x="20" y="24">VB05, M6 T3: the 1/8 in end mill in the relief slot's corner at the step, plan, to scale (10 px/mm)</text>
+  <path class="clamp" d="M108.9 54L501.62 54L504.62 58L501.62 62L504.62 66L501.62 70L108.9 70Z"/>
+  <path class="clamp" d="M108.9 288.44L501.62 288.44L504.62 292.44L501.62 296.44L504.62 300.44L501.62 304.44L108.9 304.44Z"/>
+  <path class="part-kept" d="M60 90.32L148.9 90.32L148.9 70L321.62 70L321.62 288.44L148.9 288.44L148.9 268.12L60 268.12Z"/>
+  <rect class="holes" x="148.9" y="100.48" width="172.72" height="157.48"/>
+  <rect class="part-removed" x="148.9" y="225.58" width="16.51" height="33.02"/>
+  <rect class="part-removed" x="148.9" y="99.84" width="16.51" height="33.02"/>
+  <circle class="cutter" cx="164.78" cy="242.09" r="15.88"/>
+  <text class="label-on-clamp" x="260" y="66" text-anchor="middle">fixed jaw (BACK)</text>
+  <text class="label-on-clamp" x="260" y="300.44" text-anchor="middle">moving jaw (FRONT)</text>
+  <text class="label" x="240" y="179" text-anchor="middle">relief slot (milled)</text>
+  <text class="label" x="381.62" y="210">1/8 in end mill in the corner</text>
+  <text class="label" x="381.62" y="226">at the step and the near wall:</text>
+  <text class="label" x="381.62" y="242">R{{cad.relief_corner_r_min_in:.3dot}}-{{cad.relief_corner_r_max_in:.3dot}}, to the floor</text>
+  <line class="leader" x1="379.62" y1="206" x2="182.78" y2="242.09"/>
+  <circle class="leader-dot" cx="182.78" cy="242.09" r="2"/>
+  <text class="label" x="381.62" y="110">hatched: the two corners</text>
+  <text class="label" x="381.62" y="126">it squares off to R.0625</text>
+  <line class="datum" x1="60" y1="62.32" x2="60" y2="86.32"/>
+  <text class="datum-label" x="56" y="76.32" text-anchor="end">X0 P</text>
+</svg>

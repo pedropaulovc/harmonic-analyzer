@@ -120,8 +120,9 @@ def test_seated_hanger_enclosure_uses_actual_spacer_face_grades() -> None:
 
 
 def test_the_spacer_bond_carries_the_spring_drag_and_push() -> None:
-    """LOCTITE 638 on the #12 bore over the shoulder (owner ruling 2026-11-24,
-    fit audit question 6): derated for brass and the widest gap, it
+    """LOCTITE 638 on the drilled bore over the shoulder (owner ruling
+    2026-11-24, fit audit question 6; the #11 by delegated ruling 2026-11-24
+    (Main), D17): derated for brass and the widest gap, it
     holds the spring's friction torque on the whole O.D. radius and the
     spring's push before the screw is seated, each with the margin."""
     land = spacer.BOND_LAND_MIN
@@ -136,6 +137,20 @@ def test_the_spacer_bond_carries_the_spring_drag_and_push() -> None:
         min(joints.SPACER_BOND_TORQUE_MARGIN, joints.SPACER_BOND_PUSH_MARGIN)
         >= joints.SPACER_BOND_MARGIN_MIN
     )
+
+
+def test_the_spacer_bond_margin_is_taken_at_the_widest_gap(monkeypatch) -> None:
+    """Delegated ruling 2026-11-24 (Main), D17: the #11 bore stands
+    only while the drag margin at its widest gap, .0085, stays at 2x or
+    more.  The 0.3 clearance factor is booked at 0.25 mm, so the margins are
+    those at any gap up to it; a gap past it is refused."""
+    assert joints.SPACER_BOND_GAP_WIDEST == pytest.approx(max(spacer.BOND_GAP))
+    assert joints.SPACER_BOND_GAP_WIDEST == pytest.approx(0.0085 * 25.4)
+    assert joints.SPACER_BOND_GAP_WIDEST <= joints.SPACER_BOND_CLEARANCE_FACTOR_GAP_MM
+    assert joints.SPACER_BOND_TORQUE_MARGIN >= joints.SPACER_BOND_MARGIN_MIN
+    monkeypatch.setattr(spacer, "BOND_GAP", (spacer.BOND_GAP[0], 0.26))
+    with pytest.raises(AssertionError, match="booked at"):
+        _reload_joints()
 
 
 def test_arm_and_plate_weight_inputs_are_actual_cut_geometry() -> None:

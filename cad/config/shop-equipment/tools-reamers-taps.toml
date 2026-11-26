@@ -409,16 +409,6 @@ kind = "reamer"
 status = "to_order"
 note = "Not owned: to buy. drawing cross-check 2026-11-19: MHA-SM-02 Ø.1280 ±.0007 REAM (.37), ending in a drill point (#3124)."
 
-[tools.reamer-1570]
-make = "Alvord-Polk"
-sku = "8930A35"
-source = "https://www.mcmaster.com/8930A35/"
-purchase = "McMaster-Carr 8930A35, .1570 in (wire gauge 22) HSS straight-flute chucking reamer (Alvord-Polk), $23.49 (read live 2026-11-22); stated diameter tolerance 0 to +.0002, 1 in flute, 4 in overall."
-kind = "reamer"
-status = "to_order"
-note = "Not owned: to buy. drawing cross-check 2026-11-19: MHA-DT-03-TL-01 132X .1570 +.0005/.0000 REAM THRU; MHA-DT-14 .1570 +.0005/.0000 FLAT-BOTTOM REAM."
-
-
 # Owner ruling 2026-11-23 (tool audit Q11): both MHA-DT-05 post bores become
 # Ø.4385 +.0005/0, "7/16 over reamer of the Shars set". Buy it when the
 # MHA-DT-05 spec and the dt_crankshaft plan carry the .4385 bore (the post is

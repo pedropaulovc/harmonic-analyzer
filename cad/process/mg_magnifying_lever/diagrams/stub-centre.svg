@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 400" font-family="sans-serif" font-size="13">
+  <rect class="paper" x="0" y="0" width="760" height="400"/>
+  <text class="title" x="20" y="20">Setup 2, the centre drill: No. 1 from the tailstock in the pilot's end (to scale across, 300 px/in)</text>
+  <!-- The No. 1 centre drill (tools.centre-drills-carbide-60, for a 3/64
+       drill): its 3/64 pilot (14.1 px) and 60 deg countersink to Ø.09 at the
+       face (the op's), to scale across. The pilot's length and the body's Ø
+       are not on record: the pilot drawn .06 long and the body at the
+       countersink's Ø.09, schematic, to a break line; the drill chuck not
+       drawn. -->
+  <!-- The 3-jaw, schematic (its jaws' and body's sizes are not on record):
+       its jaw fronts to scale from the part. -->
+  <rect class="fixture-vise" x="380.0" y="70" width="60" height="260"/>
+  <rect class="clamp" x="440.0" y="126.5" width="40" height="36"/>
+  <rect class="clamp" x="440.0" y="237.5" width="40" height="36"/>
+  <path class="part-kept" d="M540.0 162.5L40.0 162.5L43.0 166.7L40.0 170.8L43.0 175.0L40.0 179.2L43.0 183.3L40.0 187.5L43.0 191.7L40.0 195.8L43.0 200.0L40.0 204.2L43.0 208.3L40.0 212.5L43.0 216.7L40.0 220.8L43.0 225.0L40.0 229.2L43.0 233.3L40.0 237.5L540.0 237.5Z"/>
+  <rect class="part-kept" x="540.0" y="173.0" width="60.0" height="54.0"/>
+  <path class="holes" d="M600 186.5L588.8 193.0L570.8 193.0L566.6 200L570.8 207.0L588.8 207.0L600 213.5Z"/>
+  <line class="centre-line" x1="20" y1="200" x2="740" y2="200"/>
+  <path class="cutter" d="M720.0 186.5L600.0 186.5L588.8 193.0L570.8 193.0L566.6 200.0L570.8 207.0L588.8 207.0L600.0 213.5L720.0 213.5L717.0 209.0L720.0 204.5L717.0 200.0L720.0 195.5L717.0 191.0Z"/>
+  <line class="arrow" x1="700" y1="164.5" x2="650" y2="164.5"/>
+  <line class="datum" x1="600" y1="110" x2="600" y2="150"/>
+  <text class="datum-label" x="540" y="104">Z0 the stub's faced end</text>
+  <line class="leader" x1="460.0" y1="273.5" x2="420.0" y2="352"/>
+  <text class="label" x="280.0" y="366">3-jaw over a brass shim wrap</text>
+  <line class="leader" x1="640" y1="213.5" x2="640" y2="290"/>
+  <text class="label" x="480" y="306">No. 1 centre drill in the tailstock drill chuck,</text>
+  <text class="label" x="480" y="322">until the countersink is about Ø.09, half the pilot</text>
+</svg>

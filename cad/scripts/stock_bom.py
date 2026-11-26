@@ -10,7 +10,9 @@ point at what they need from their process plans, never the other way round:
 every plan under cad/process (``<stem>/plan.toml``: the enrolled plans of
 ``_process_plans.TRAVELER_STEMS`` and the placeholder plans that only list a
 part's tools until its traveler is written; the directory names the part,
-``<stem>`` with ``_`` for ``-``) names its stock in ``stock_refs`` (keys of the
+``<stem>`` with ``_`` for ``-``, or a family of parts made on one plan, which
+names each under ``[[parts]]``, ``_process_plans.family_parts``) names its
+stock in ``stock_refs`` (keys of the
 cad/config/shop-equipment/ ``[stock.<key>]`` rows) and its tools in
 ``[[tools]]``, whose ``ref`` is a ``tools`` key of the shop directory
 cad/process/shop/ (``_process_plans.load_shop``), and its gauges in the
@@ -278,18 +280,33 @@ def load_plans(
 
     for stem in plan_stems() if stems is None else stems:
         plan_file = _process_plans.plan_path(stem)
-        plan = tomllib.loads(plan_file.read_text(encoding="utf-8"))
+        whole = tomllib.loads(plan_file.read_text(encoding="utf-8"))
         name = plan_file.parent.name
-        tools = [
-            line(name, "tools", tool.get("ref", ""), tool["name"])
-            for tool in plan.get("tools", ())
-        ]
-        gauges = [line(name, "gauges", ref, ref) for ref in _gauge_refs(plan)]
-        by_part[stem.replace("_", "-")] = PlanRefs(
-            stock_keys=tuple(plan.get("stock_refs", ())),
-            tools=tuple(t for t in tools if t is not None),
-            gauges=tuple(g for g in gauges if g is not None),
-        )
+        # A family plan lists each of its parts with the tools and gauges
+        # of the setups and operations that part goes through.
+        family = _process_plans.family_parts(stem)
+        views = {
+            part: _process_plans.part_view(whole, part_id)
+            for part_id, part in family.items()
+        } or {stem: whole}
+        for part, plan in views.items():
+            used = {
+                operation["tool"]
+                for setup in plan.get("setups", ())
+                for operation in setup.get("operations", ())
+                if "tool" in operation
+            }
+            tools = [
+                line(name, "tools", tool.get("ref", ""), tool["name"])
+                for tool in plan.get("tools", ())
+                if not family or tool["id"] in used
+            ]
+            gauges = [line(name, "gauges", ref, ref) for ref in _gauge_refs(plan)]
+            by_part[part.replace("_", "-")] = PlanRefs(
+                stock_keys=tuple(plan.get("stock_refs", ())),
+                tools=tuple(t for t in tools if t is not None),
+                gauges=tuple(g for g in gauges if g is not None),
+            )
     if errors:
         raise InventoryError("; ".join(errors))
     return by_part

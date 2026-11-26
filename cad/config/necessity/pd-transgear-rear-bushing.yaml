@@ -1,7 +1,9 @@
 # Why the REAM stays on MHA-PD-24 (owner ruling 2026-11-24: "In the part's
 # registry file, not on the sheet. The sheet stays clean; the reviewer fails
 # a tight feature that has no registry reason."). Read by the machinist
-# review only. Fit audit 2026-11-23, pending owner confirmation.
+# review only. The bore is rule 4, form 2 (MHA-PD-23 is made to it); its
+# modelled cut and this part's length are the owner's ruling of 2026-11-24
+# on fit audit question 5.
 necessity:
   - id: N-01
     feature: "sheet 1, end view, Ø.126 REAM THRU bore, MHA-PD-23 IS TURNED TO THIS BORE"

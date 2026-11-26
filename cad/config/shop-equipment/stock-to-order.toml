@@ -57,24 +57,27 @@ cite = ["OnlineMetals part 7467 https://www.onlinemetals.com/en/buy/carbon-steel
 # 2026-11-20, #2346: "Buy ground rod; it costs little and leaves the fit
 # stacks alone"). Cold-finished round is about +.000/-.002 as drawn and can
 # miss the -.0008 limit. MHA-CH-04, MHA-CH-05, MHA-DT-13 and MHA-DT-17 read
-# GROUND STOCK OK; MHA-DT-19 does not, and its material (AISI 1018
-# cold-finished steel shafting) is the grade bought here. The grades are the
-# printed ones: 1018 for the 1/4 rows, 1018 or 1045 for MHA-DT-13.
+# GROUND STOCK OK; MHA-DT-19 does not. Owner ruling 2026-11-24 (form,
+# purchases), ground rounds: "12L14 (free-machining; drawings change
+# material)"; coordinator's ruling D11 by the owner's delegation of the same
+# day: "12L14 rounds: ground". The bars below are 12L14; the five drawings,
+# part records and plans still print AISI 1018 (1018 or 1045 for MHA-DT-13)
+# until issue #3561 changes them, so the row keys keep their 1018 names.
 [stock.1018-ground-round-1-4]
 form = "round_bar"
-material = "AISI 1018 steel, precision ground"
-note = "To order: 1/4 in AISI 1018 precision-ground round whose stated diameter tolerance lies inside +.0000/-.0008; used as supplied on the O.D. Allocation: ch-pivot-shaft (MHA-CH-05), ch-fulcrum-shaft (MHA-CH-04), dt-pinion-lift-rod (MHA-DT-17), dt-pinion-pivot-shaft (MHA-DT-19), cut lengths per each sheet. SKU, length and price not selected. Not owned."
+material = "12L14 free-machining carbon steel, precision ground"
+note = "To order: McMaster-Carr 5227T232, 1/4 in ground 12L14 round, 3 ft, $13.65 (in the cart 2026-11-24; read live: diameter tolerance -0.0005/0 in, inside the shafts' +.0000/-.0008; straightness 1/16 in per 3 ft); used as supplied on the O.D. Allocation, as the plans saw it: ch-fulcrum-shaft (MHA-CH-04) 7.07 in, ch-pivot-shaft (MHA-CH-05) 6.91 in, dt-pinion-lift-rod (MHA-DT-17) 8.26 in, dt-pinion-pivot-shaft (MHA-DT-19) 7.88 in, and a 1.00 in trial offcut for each: 34.12 in plus eight saw kerfs out of the 36 in bar. NOT YET AS PRINTED: the four drawings and plans name AISI 1018 (issue #3561). Not owned."
 dia_in = [0.25]
 status = "to_order"
 cite = ["issue #2346 owner ruling 2026-11-20", "ch_pivot_shaft and ch_fulcrum_shaft sheets: 1/4 GROUND STOCK OK; dt_pinion_lift_rod_spec.ROD_DIA_CALLOUT: 1/4 GROUND ROD, AS SUPPLIED", "registry material_specification: AISI 1018 (CH-04, CH-05, DT-17, DT-19)"]
 
 [stock.1018-or-1045-ground-round-3-8]
 form = "round_bar"
-material = "SAE 1018 or 1045 steel, precision ground"
-note = "To order: 3/8 in SAE 1018 or 1045 precision-ground round whose stated diameter tolerance lies inside +.0000/-.0008; used as supplied on the O.D. Allocation: dt-cylinder-gear-shaft (MHA-DT-13), cut length per its sheet. SKU, length and price not selected. Not owned."
+material = "12L14 free-machining carbon steel, precision ground"
+note = "To order: McMaster-Carr 5227T252, 3/8 in ground 12L14 round, 2 ft, $12.94 (in the cart 2026-11-24; read live: diameter tolerance -0.0005/0 in, inside the shaft's +.0000/-.0008; straightness 1/16 in per 3 ft; 1 ft is $7.70 and is too short); used as supplied on the O.D. Allocation: dt-cylinder-gear-shaft (MHA-DT-13), one piece 7.50 in as its plan saws it, and the setting mandrel (tools.setting-mandrel-375), an offcut of this same bar long enough to pass both MHA-DT-02 pedestals (about 7 in): about 14.5 in plus kerfs out of the 24 in bar. NOT YET AS PRINTED: the drawing and plan name SAE 1018 CF or 1045 (issue #3561). Not owned."
 dia_in = [0.375]
 status = "to_order"
-cite = ["issue #2346 owner ruling 2026-11-20", "dt_cylinder_gear_shaft_notes.SHAFT_DIA_CALLOUT: 3/8 GROUND STOCK OK", "dt-cylinder-gear-shaft registry material_specification: SAE 1018 CF or 1045 ground bar"]
+cite = ["issue #2346 owner ruling 2026-11-20", "Owner ruling 2026-11-24 (Pedro, form, purchases), ground rounds: \"12L14 (free-machining; drawings change material)\"", "McMaster-Carr 5227T252 (read live 2026-11-24): 3/8 in ground 12L14, 1 ft $7.70, 2 ft $12.94, 3 ft $17.86: https://www.mcmaster.com/5227T252/", "cad/process/shop/dt.toml tools.setting-mandrel-375: an offcut of this bar, \"ordered one mandrel length longer\"", "dt_cylinder_gear_shaft_notes.SHAFT_DIA_CALLOUT: 3/8 GROUND STOCK OK", "dt-cylinder-gear-shaft registry material_specification: SAE 1018 CF or 1045 ground bar"]
 
 # MHA-PD-07 support bar (owner ruling 2026-11-20 (Pedro), #2421 option B).
 [stock.1018-flat-3-8x1]

@@ -209,15 +209,36 @@ def test_a_seeded_fault_in_the_program_is_caught(
     assert {finding.check for finding in _findings(seeded, tmp_path)} >= {check}
 
 
-def test_the_flat_pin_centre_is_accepted_inside_the_band_less_the_reading_bias() -> None:
-    # Codjiflo round 2 on #3485: the loose pins read up to the bias off the
-    # true centre, so a reading inside the printed band less the bias each
-    # side is what proves the centre inside the print.
+def test_the_flat_pin_centre_is_accepted_as_printed_and_the_spec_charges_the_bias() -> None:
+    # D6 (delegated ruling 2026-11-24, Main): Op 260 accepts the
+    # sheet's .116-.120 as read, so the spec's worst cases charge the true
+    # centre that band widened by the loose pins' .0012 reading bias.
+    assert SPEC.FLAT_PIN_CENTRE_READ_BIAS == pytest.approx(0.0012 * 25.4)
+    lo, hi = SPEC._FLAT_PIN_CENTRE_LIMITS
+    widen = SPEC.FLAT_PIN_CENTRE_TOL + SPEC.FLAT_PIN_CENTRE_READ_BIAS
+    assert (lo, hi) == pytest.approx(
+        (SPEC.FLAT_PIN_CENTRE - widen, SPEC.FLAT_PIN_CENTRE + widen)
+    )
+    assert min(SPEC.FLAT_PIN_CREST_LIMITS) == pytest.approx(
+        lo - max(SPEC._FLAT_PIN_R_LIMITS)
+    )
     p = PLAN["parameters"]
-    bias_mm = p["over_pins_bias_in"] * 25.4
-    lo = SPEC.FLAT_PIN_CENTRE - SPEC.FLAT_PIN_CENTRE_TOL + bias_mm
-    hi = SPEC.FLAT_PIN_CENTRE + SPEC.FLAT_PIN_CENTRE_TOL - bias_mm
-    assert p["flat_centre_accept_min_in"] * 25.4 == pytest.approx(lo, abs=1e-6)
-    assert p["flat_centre_accept_max_in"] * 25.4 == pytest.approx(hi, abs=1e-6)
-    assert p["flat_centre_accept_min_mm"] == pytest.approx(lo, abs=1e-6)
-    assert p["flat_centre_accept_max_mm"] == pytest.approx(hi, abs=1e-6)
+    for retired in ("over_pins_bias_in", "flat_centre_accept_min_in", "flat_centre_accept_max_in"):
+        assert retired not in p
+    text = _process_plans.plan_path(STEM).read_text(encoding="utf-8")
+    accept = "{{cad.flat_pin_hole_centre_min_in:.3dot}}–{{cad.flat_pin_hole_centre_max_in:.3dot}}"
+    assert f"Flat pin's centre {accept} from the bore's axis" in text
+
+
+def test_the_pilot_drill_stops_where_the_shoulder_wall_charges_it() -> None:
+    # Traveler review 2026-11-25 on #3569: the #53's full diameter runs .005
+    # past the reamer's end; with the body at its shortest it stands nearest
+    # the seat face, and never nearer than the spec's wall to the pilot
+    # shoulder (note 5) charges it.
+    p = PLAN["parameters"]
+    nearest = p["flat_drill_station_in"] - (p["body_supply_in"] - p["body_min_in"])
+    assert nearest * 25.4 >= SPEC.FLAT_PIN_DRILL_STATION_MIN - 1e-9
+    lead = p["flat_ream_station_in"] - p["flat_drill_station_in"]
+    assert lead * 25.4 == pytest.approx(SPEC.FLAT_PIN_PILOT_LEAD)
+    assert SPEC.FLAT_PIN_PILOT_DRILL == "#53"
+    assert any(tool["ref"] == "drill-53" for tool in PLAN["tools"])

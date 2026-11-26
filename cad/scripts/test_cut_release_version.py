@@ -432,6 +432,69 @@ def test_release_notes_count_shared_member_files_not_part_documents() -> None:
     assert "plus 7 per-configuration STLs" not in notes
 
 
+def test_release_ships_a_family_traveler_once_and_a_placeholder_per_part(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import os
+
+    import _process_plans
+    import export_features
+
+    # Owner ruling 2026-11-24: a release ships "a placeholder pdf per part
+    # that points to shared one".
+    # Two feature-exporting parts under a synthetic family stem.
+    stem, parts = "smoke_pair", ("ch_rocker_arm", "ch_rocker_hub")
+    process = tmp_path / "process"
+    (process / stem).mkdir(parents=True)
+    (process / stem / "plan.toml").write_text(
+        'title = "Smoke pair"\n'
+        + "".join(
+            f'[[parts]]\nid = "{part[10:]}"\n'
+            f'file = "../../out/features/{part}/features.toml"\n'
+            for part in parts
+        ),
+        encoding="utf-8",
+    )
+    out = tmp_path / "cad" / "out"
+    monkeypatch.setattr(_process_plans, "PROCESS_ROOT", process)
+    monkeypatch.setattr(cut_release, "TRAVELER_STEMS", (stem,))
+    monkeypatch.setattr(cut_release, "CAD_ROOT", out.parent)
+    manifests = [export_features.bundle_paths(part, out)[0] for part in parts]
+    for manifest in manifests:
+        manifest.parent.mkdir(parents=True)
+        manifest.write_bytes(b'part = "fixture"\n')
+    pdfs = _process_plans.traveler_pdf_paths(stem, out)
+    names = [
+        "smoke-pair-traveler.pdf", "ch-rocker-arm-traveler.pdf", "ch-rocker-hub-traveler.pdf",
+    ]
+    assert [pdf.name for pdf in pdfs] == names
+    pdfs[0].parent.mkdir(parents=True)
+    for pdf in pdfs:
+        pdf.write_bytes(b"%PDF-1.4 " + pdf.name.encode())
+
+    stage = tmp_path / "stage"
+    assert cut_release.stage_travelers(stage) == [f"travelers/{name}" for name in names]
+    assert sorted(p.name for p in (stage / "travelers").iterdir()) == sorted(names)
+    assert (stage / "travelers" / names[1]).read_bytes() == b"%PDF-1.4 " + names[1].encode()
+
+    # The notes count the two parts, not the three PDFs or the one nc/ directory.
+    staged = [f"travelers/{name}" for name in names]
+    assert cut_release._traveler_part_count(staged) == 2
+    assert cut_release._nc_part_count([f"nc/{stem}/A.nc", f"nc/{stem}/B.nc"]) == 2
+    assert cut_release._nc_part_count(["nc/ch_rocker_arm/A.nc"]) == 1
+
+    # A missing placeholder, and any sheet older than either part's manifest,
+    # fails the cut.
+    pdfs[2].unlink()
+    with pytest.raises(RuntimeError, match="required traveler is missing.*ch-rocker-hub"):
+        cut_release.stage_travelers(tmp_path / "missing")
+    pdfs[2].write_bytes(b"%PDF-1.4 again")
+    newer = manifests[1].stat().st_mtime + 60
+    os.utime(manifests[1], (newer, newer))
+    with pytest.raises(RuntimeError, match="traveler is stale.*ch_rocker_hub"):
+        cut_release.stage_travelers(tmp_path / "stale")
+
+
 def test_release_stages_every_cam_output_under_nc_and_refuses_missing_or_stale_ones(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -451,10 +514,14 @@ def test_release_stages_every_cam_output_under_nc_and_refuses_missing_or_stale_o
     (process / "shop" / "common.toml").write_bytes(b"[tools]\n")
     runtime = tmp_path / "_freecad_cam_runtime.py"
     runtime.write_bytes(b"# runtime\n")
+    cnc = tmp_path / "shop-equipment" / "cnc.toml"
+    cnc.parent.mkdir()
+    cnc.write_bytes(b"[cnc.jaw-clearance]\njaw_clearance_min_mm = 1.0\n")
     out = tmp_path / "cad" / "out"
     monkeypatch.setattr(_cam_programs, "CAM_STEMS", (stem,))
     monkeypatch.setattr(_cam_programs, "PROCESS_ROOT", process)
     monkeypatch.setattr(_cam_programs, "RUNTIME_PATH", runtime)
+    monkeypatch.setattr(_cam_programs, "CNC_EQUIPMENT_PATH", cnc)
     monkeypatch.setattr(_process_plans, "PROCESS_ROOT", process)
     monkeypatch.setattr(_process_plans, "SHOP_DIR", process / "shop")
     monkeypatch.setattr(cut_release, "CAD_ROOT", out.parent)
@@ -473,7 +540,8 @@ def test_release_stages_every_cam_output_under_nc_and_refuses_missing_or_stale_o
     manifest = directory / _cam_programs.MANIFEST_NAME
     inputs = {
         "features": features, "step": step, "plan": process / stem / "plan.toml",
-        "shop/common.toml": process / "shop" / "common.toml", "recipe": recipe, "runtime": runtime,
+        "shop/common.toml": process / "shop" / "common.toml",
+        "shop-equipment/cnc.toml": cnc, "recipe": recipe, "runtime": runtime,
     }
 
     def sha(path: Path) -> str:

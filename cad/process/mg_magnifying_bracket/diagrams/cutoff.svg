@@ -6,6 +6,10 @@
   <path class="part-removed" d="M324.5 203.1 H335 V100 H363.5 V235.6 H324.5 Z"/>
   <rect class="part-removed" x="316.6" y="203.1" width="7.9" height="32.5"/>
   <line class="hidden" x1="308.9" y1="203.1" x2="308.9" y2="235.6"/>
+  <!-- The saw's vise jaws on the neck (the setup's holding), schematic: their size is not on record. -->
+  <rect class="clamp" x="130" y="181" width="130" height="22"/>
+  <rect class="clamp" x="130" y="235.6" width="130" height="20"/>
+  <text class="label-on-clamp" x="195" y="197" text-anchor="middle">saw vise</text>
   <line class="datum" x1="316.6" y1="180" x2="316.6" y2="255"/>
   <line class="dims" x1="60" y1="270" x2="316.6" y2="270"/>
   <line class="dims" x1="60" y1="260" x2="60" y2="280"/>
@@ -13,7 +17,7 @@
   <text class="label" x="120" y="296">{{process.nose_cut_in:.2f}} from the seat: scribe here, saw on the waste side</text>
   <text class="label" x="40" y="94">seat</text>
   <text class="label" x="70" y="160">foot</text>
-  <text class="label" x="150" y="226">neck</text>
+  <text class="label" x="80" y="226">neck</text>
   <line class="leader" x1="350" y1="150" x2="420" y2="130"/>
   <circle class="leader-dot" cx="350" cy="150" r="2"/>
   <text class="label" x="420" y="126">the offcut: keep it, the spacer of Setups 7 and 8</text>

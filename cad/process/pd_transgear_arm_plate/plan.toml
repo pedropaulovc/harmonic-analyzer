@@ -78,7 +78,7 @@
 # (gauges.pin-gauges): the .250 for the countersinks, the .450 for K's
 # chamfer and the .438 that stands in K as the plug the calipers read from.
 #
-# K (fit audit 2026-11-23, pending owner confirmation; the owner on the
+# K (rule 4, form 2, the bush made to the hole; the owner on the
 # audit: "can the holes not be reamed in the first place"): reamed with the
 # set's .4385 reamer and not gauged. The sheet prints the reamer's size and
 # no band; MHA-PD-28's press step is turned to this hole as measured (its
@@ -99,7 +99,7 @@ part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
 material = "1018 cold-finished steel, 1/4 x 1-1/2 in flat (drawing: {{cad.material_spec}})"
 stock = "{{process.blank_thickness_in:fraction}} x {{process.blank_width_in:fraction}} in flat bar, the 12 in length: one {{process.blank_length_min_mm:in.2f}}–{{process.blank_length_max_mm:in.2f}} in blank. Spoil block: a 3.5 in length of the 1 x 3 in 6061 bar."
-note = "Inches unless mm; G-code and console entries in mm (the files and the controller run G21). The two long edges are the bar's, as supplied: no cut touches them. Mill speeds on the PM-30MV low belt (100–2800 rpm): no belt change. Home the mill ($H) at the start of every mill setup; after any E-stop, alarm, stall or controller reset, home again and do what that setup's Datum says before resuming. The two Ø.1260 locating holes, the bush press and its ream are the assembly's (MHA-PD-00 steps 13A, 13E, 11K, 11Q). K is reamed with the over/under set's .4385 reamer and not gauged: MHA-PD-28 is turned to it. To buy before starting: the bar, the over/under reamer set (its .4385), the 3/8 in 82° countersink and the .250, .438 and .450 pin gauges (Setup 2 checks the countersinks while the blank is still bonded). Finish: {{cad.finish}}."
+note = "Inches unless mm; G-code and console entries in mm (the files and the controller run G21). The two long edges are the bar's, as supplied: no cut touches them. Mill speeds on the PM-30MV low belt (100–2800 rpm): no belt change. Home the mill ($H) at the start of every mill setup; after any E-stop, alarm, stall or controller reset, home again and do what that setup's Datum says before resuming. The two Ø.1260 locating holes, the bush press and its ream are the assembly's (MHA-PD-00 steps 13A, 13E, 11K, 11Q). K is reamed with the over/under set's .4385 reamer and not gauged: MHA-PD-28 is turned to it. To buy before starting: the bar, the over/under reamer set (its .4385), the 3/8 in 82° countersink and the .061-.500 pin gauge set (Setup 2 checks the countersinks while the blank is still bonded). Finish: {{cad.finish}}."
 shop = "../shop"
 stock_refs = ["1018-flat-1-4x1-1-2", "6061-flat-1x3"]
 material_key = "rocker-1018-cold-finished"
@@ -341,9 +341,11 @@ name = "Feeler gauges"
 ref = "feeler-gauges"
 [[tools]]
 id = "pin-gauges"
-name = "Pin gauges .250, .438 and .450, TO BUY"
+name = "Pin gauges, Class ZZ minus, .061-.500 set, TO BUY"
 ref = "pin-gauges"  # A1-pin-set-061-500-combined
-description = "Class ZZ pin gauges .250, .438 and .450 (plus or minus; mike each): the countersinks' rim (.250) and K's chamfer (.450) with the calipers' depth rod; the .438 minus pin stands in K as the plug the calipers read from"
+# Traveler review 2026-11-25 on #3569: the row names the whole set to buy
+# and the three pins this traveler uses, with no slug and no plus pair.
+description = "The whole .061-.500 set is bought; this traveler uses three of its pins, each miked before use: the .250 at the countersinks' rim and the .450 at K's chamfer, read with the calipers' depth rod, and the .438 stood in K as the plug the calipers read from"
 status = "to_order"
 [[tools]]
 id = "tape"

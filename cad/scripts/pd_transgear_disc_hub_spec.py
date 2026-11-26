@@ -160,9 +160,9 @@ HUB_FRONT_Z = SPIGOT_LENGTH - HUB_LENGTH
 
 # --- bore on the sleeve's boss (MHA-PD-10) ------------------------------------
 # Plain round, reamed through with the .3135 over reamer (tools.reamer-3135,
-# to order, not owned), and printed as that size with no band (fit audit
-# 2026-11-23, pending owner confirmation; drawing-guidelines.md rule 4, made
-# to fit): the sleeve's boss is turned last to this bore until the hub slides
+# to order, not owned), and printed as that size with no band
+# (drawing-guidelines.md rule 4, form 2, made to fit): the sleeve's boss is
+# turned last to this bore until the hub slides
 # on by hand with no rock, so the hub itself is the gauge and no pin is
 # bought for it.  BORE_BAND is the ANALYSIS band, what the reamer is taken
 # to cut (.3135-.3140, the old printed +.0010/+.0005 on .313), never a
@@ -354,9 +354,9 @@ _BAND = {places: printed_band_mm(places, unit=UNIT) for places in (1, 2, 3)}
 # "centred" is missing), .174 +/-.002 from the hub axis, and stops .160
 # past it at the title block's row.
 KEY_PIN_NUMBER = _config.parts("pd-vn-transgear-hub-key-pin")["number"]
-# The ream prints the reamer's size and no band (fit audit 2026-11-23,
-# pending owner confirmation; drawing-guidelines.md rule 4, reamed to the
-# bought mate): the MHA-PD-VN-69 dowel is the gauge (it does not enter by
+# The ream prints the reamer's size and no band (drawing-guidelines.md
+# rule 4, form 3, reamed to the bought mate): the MHA-PD-VN-69 dowel is the
+# gauge (it does not enter by
 # hand, it presses in).  KEY_PIN_HOLE_BAND is the ANALYSIS band, what the
 # reamer is taken to cut, never a printed limit.  What fails if the hole is
 # .002 looser, or drilled: the dowel, held by its press alone, is loose in
@@ -378,8 +378,8 @@ if not KEY_PIN_DRILL_DIA + DRILL_OVERSIZE < KEY_PIN_HOLE_DIA:
 # the title block's (KEY_PIN_CHORD_BAND): .002 looser and the pin's side
 # closes on the sleeve's flat at one end (KEY_PIN_FLAT_AIR's least is
 # .0006) and the wall over the ream falls under the floor at the other.
-# The stop's from the axis along local -X takes the title block's row (fit
-# audit 2026-11-23, pending owner confirmation; it printed +/-.002): the
+# The stop's from the axis along local -X takes the title block's row (rule
+# 4: nothing fails at the title block; it printed +/-.002): the
 # pin's ends stay under the O.D. and held in the wall at +/-.005
 # (KEY_PIN_END_RECESS_WORST, KEY_PIN_SUPPORT_WORST below).
 KEY_PIN_CHORD_OFFSET = 4.4196  # .174

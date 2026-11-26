@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 400" font-family="sans-serif" font-size="13">
+  <rect class="paper" x="0" y="0" width="760" height="400"/>
+  <text class="title" x="20" y="20">Setup 1, Op 110: the 4-40 bottoming tap, the same way (to scale across, 300 px/in)</text>
+  <!-- To scale, 300 px/in along and across the axis: the hex across its
+       corners (12.83 mm), the spigot Ø0.421 x .25, the FULL R groove
+       (the R.024 groover, root Ø.327) .138 from the face, the #43 hole
+       Ø.089 x .49. The 3-jaw's jaws and body are schematic (their sizes are
+       not on record); the jaw fronts .95 behind the spigot face. The tap's length, the T-handle wrench and the dead centre are schematic (their sizes are not on record). -->
+  <rect class="fixture-vise" x="215.0" y="60" width="60" height="280"/>
+  <rect class="clamp" x="275.0" y="84.2" width="40" height="40"/>
+  <rect class="clamp" x="275.0" y="275.8" width="40" height="40"/>
+  <rect class="part-rest" x="40" y="124.2" width="344.0" height="151.6"/>
+  <rect class="part-kept" x="384.0" y="124.2" width="141.0" height="151.6"/>
+  <rect class="part-kept" x="525.0" y="136.9" width="75" height="126.2"/>
+  <path class="paper" d="M551.5 136.9L551.5 143.8A7.2 7.2 0 0 0 565.9 143.8L565.9 136.9Z"/>
+  <path class="paper" d="M551.5 263.1L551.5 256.2A7.2 7.2 0 0 1 565.9 256.2L565.9 263.1Z"/>
+  <path class="holes" d="M600.0 186.6L453.0 186.6L445.0 200.0L453.0 213.4L600.0 213.4Z"/>
+  <line class="centre-line" x1="20" y1="200" x2="740" y2="200"/>
+  <!-- The bottoming tap to scale across: the 4-40 major Ø.112 (33.6 px), its
+       point .46 in from the spigot face where its pencil mark meets
+       the face (drawn with its end square and the round cue: its lead is not
+       on record). The wrench and the MT3 dead centre in its centre hole are
+       yellow: they travel with the tap. -->
+  <path class="cutter" d="M466.0 216.8L680.0 216.8L677.0 212.6L680.0 208.4L677.0 204.2L680.0 200.0L677.0 195.8L680.0 191.6L677.0 187.4L680.0 183.2L466.0 183.2A4.0 16.8 0 0 0 466.0 216.8Z"/>
+  <rect class="cutter" x="680" y="110" width="12" height="180"/>
+  <path class="cutter" d="M692 200L716 188L752 188L752 212L716 212Z"/>
+  <line class="leader" x1="686" y1="120" x2="680" y2="98"/>
+  <text class="label" x="640" y="92">T-handle wrench</text>
+  <line class="leader" x1="735" y1="214" x2="700" y2="346"/>
+  <text class="label" x="540" y="362">MT3 dead centre in the wrench's</text>
+  <text class="label" x="540" y="378">centre hole, wound in after the tap</text>
+  <line class="datum" x1="600" y1="110" x2="600" y2="140"/>
+  <text class="datum-label" x="420" y="84">Z0 spigot face: the mark</text>
+  <line class="dims" x1="462.0" y1="300" x2="600" y2="300"/>
+  <line class="dims" x1="462.0" y1="215" x2="462.0" y2="306"/>
+  <line class="dims" x1="600" y1="270" x2="600" y2="306"/>
+  <text class="label" x="452.0" y="318">bottoming tap's point .46 in, the chuck turned</text>
+  <text class="label" x="452.0" y="334">by hand, backed off each half turn</text>
+  <text class="label" x="60" y="380">spindle off, in neutral</text>
+</svg>

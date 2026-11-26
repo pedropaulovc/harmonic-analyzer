@@ -281,6 +281,11 @@ kind = "drill"
 status = "on_hand"
 note = "quotes-2026-11-17-rev3.xlsx Drills 15/32: owned in 115-pc index (quality unverified); not on the buy list."
 
+[tools.drill-15-64]
+kind = "drill"
+status = "on_hand"
+note = "Fractional 15/64 of the owned 115-pc index (1/16-1/2 by 64ths; quality unverified); not on the buy list. Drills the index plate's screw holes, the stock BS-0 plate's size (owner fact 2026-11-24: \"3x screw holes thru 15/64\")."
+
 [tools.drill-31-64]
 kind = "drill"
 status = "on_hand"

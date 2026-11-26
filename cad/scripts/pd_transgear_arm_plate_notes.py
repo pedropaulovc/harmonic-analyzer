@@ -29,7 +29,7 @@ from pd_transgear_arm_plate_spec import (
 )
 
 # The press hole is reamed with the .4385 set reamer and prints that size
-# with no band (fit audit 2026-11-23, pending owner confirmation): the
+# with no band (drawing-guidelines rule 4, form 2): the
 # MHA-PD-28 bush's press step is turned to this hole as measured, so the
 # interference is the bush sheet's requirement, not this one's.  REAM, the
 # face-A mouth's lead-in chamfer in the hole callout's size form (as the

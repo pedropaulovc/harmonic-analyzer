@@ -1,0 +1,14 @@
+# MHA-DT-03-TL-01 cone gear index plate: why each band tighter than the title
+# block stays (drawing-guidelines.md rule 4; owner ruling 2026-11-24: the
+# reason lives here, not on the sheet). Read by the machinist review only.
+# The sheet prints no REAM and no limits of size: the 132 pin holes are
+# drilled at the title block's DRILLED HOLES band (owner ruling 2026-11-23,
+# tool audit Q15) and the bore is bored to the BS-0 head's plate hub, which is
+# the gauge (rule 4, form 3). The walls under rule 17 are owner exceptions
+# RV-01 and RV-04 in the part's record.
+necessity:
+  - id: N-01
+    feature: "sheet 1, face view, 132X position frame Ø.014 to A on the BASIC Ø3.614, Ø3.217 and Ø2.700 hole circles"
+    kind: mesh
+    reason: "hole spacing becomes the cone gears' tooth spacing"
+    source: "dt_cone_gear_tl_index_plate_spec.INDEX_ERROR_TOOTH_FRACTION_MAX"

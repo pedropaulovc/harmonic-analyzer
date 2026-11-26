@@ -9,6 +9,7 @@
   <rect class="part-removed" x="278" y="124" width="3" height="40"/>
   <rect class="clamp" x="310" y="98" width="60" height="30"/>
   <rect class="clamp" x="310" y="161" width="60" height="30"/>
+  <text class="label-on-clamp" x="314" y="118">saw vise</text>
   <line class="dims" x1="40" y1="108" x2="278" y2="108"/>
   <line class="dims" x1="40" y1="102" x2="40" y2="124"/>
   <line class="dims" x1="278" y1="102" x2="278" y2="124"/>

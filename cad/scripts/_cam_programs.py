@@ -9,6 +9,13 @@ them to their inputs, under ``cad/out/nc/<stem>/``. FreeCAD is part of the
 build on the submitter: ``build`` and ``release`` run every enrolled part's
 ``cam:<stem>`` task there (no farm worker has FreeCAD), and a release ships the
 files under ``nc/<stem>/``.
+
+A family plan (``_process_plans.family_parts``) has **one** recipe, beside it,
+which posts every program of the family once: the programs every part runs
+and each part's own, into the one ``cad/out/nc/<family stem>/`` with one
+``cycle_times.json`` and one ``manifest.json`` that binds both parts' feature
+bundles. The family's parts have no recipe, task or ``nc/`` directory of their
+own; their placeholder travelers name the family's programs.
 """
 
 from __future__ import annotations
@@ -19,6 +26,7 @@ from pathlib import Path
 from types import ModuleType
 
 import _process_plans
+import _shop_equipment
 from export_features import OUT as CAD_OUT, bundle_paths
 
 PROCESS_ROOT = _process_plans.PROCESS_ROOT
@@ -40,6 +48,9 @@ if _untraveled := sorted(set(CAM_STEMS) - set(_process_plans.TRAVELER_STEMS)):
 SCRIPTS_DIR = Path(__file__).resolve().parent
 # Executed by freecadcmd, never imported on the host: an input of every cam task.
 RUNTIME_PATH = SCRIPTS_DIR / "_freecad_cam_runtime.py"
+# The shop inventory's CNC records, where cam_nc.verify's jaw-clearance floor
+# lives: an input of every cam task (the inventory's other files are not).
+CNC_EQUIPMENT_PATH = _shop_equipment.DIRECTORY / "cnc.toml"
 # The runtime reads its job spec's path from this variable (its own SPEC_ENV).
 SPEC_ENV = "HARMONIC_CAM_SPEC"
 CYCLE_TIMES_NAME = "cycle_times.json"
@@ -50,17 +61,33 @@ def recipe_path(stem: str) -> Path:
     return PROCESS_ROOT / stem / "cam.py"
 
 
+def cam_parts(stem: str) -> tuple[str, ...]:
+    """The registry parts a recipe posts for: its family plan's parts, else
+    its own stem. The plan is the one beside the recipe (``PROCESS_ROOT``),
+    the root ``CAM_STEMS`` was read from."""
+    return _process_plans.part_stems(stem, PROCESS_ROOT)
+
+
 def cam_inputs(stem: str, out: Path = CAD_OUT) -> dict[str, Path]:
     """Every file a posted set depends on, by the name ``manifest.json``
     records its SHA-256 under: the scoped feature bundle (``features``,
-    ``step``), the part's ``plan``, each shop file (``shop/<name>.toml``), the
-    ``recipe`` and the FreeCAD ``runtime``."""
-    features, step = bundle_paths(stem, out)
+    ``step``; a family's, one pair per part, ``features/<part stem>`` and
+    ``step/<part stem>``), the ``plan``, each shop file
+    (``shop/<name>.toml``), the shop inventory's ``shop-equipment/cnc.toml``
+    (``cam_nc.verify``'s jaw-clearance floor lives there; no other inventory
+    file is an input, so an unrelated record edit leaves every posted set
+    fresh), the ``recipe`` and the FreeCAD ``runtime``."""
+    family = _process_plans.family_parts(stem, PROCESS_ROOT)
+    bundles: dict[str, Path] = {}
+    for part in family.values():
+        bundles[f"features/{part}"], bundles[f"step/{part}"] = bundle_paths(part, out)
+    if not family:
+        bundles["features"], bundles["step"] = bundle_paths(stem, out)
     return {
-        "features": features,
-        "step": step,
+        **bundles,
         "plan": _process_plans.plan_path(stem),
         **{f"shop/{path.name}": path for path in _process_plans.shop_files()},
+        "shop-equipment/cnc.toml": CNC_EQUIPMENT_PATH,
         "recipe": recipe_path(stem),
         "runtime": RUNTIME_PATH,
     }

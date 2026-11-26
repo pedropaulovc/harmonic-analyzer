@@ -8,6 +8,11 @@
   <text class="label" x="210.8" y="185.4" text-anchor="middle">the blank</text>
   <line class="datum" x1="361.6" y1="100" x2="361.6" y2="262.9"/>
   <rect class="part-removed" x="361.6" y="110" width="7.9" height="142.9"/>
+  <!-- The saw's vise on the bar's long end (its jaws' size is not on
+       record: schematic). -->
+  <rect class="clamp" x="450" y="88" width="120" height="22"/>
+  <rect class="clamp" x="450" y="252.9" width="120" height="22"/>
+  <text class="label-on-clamp" x="510" y="104" text-anchor="middle">saw vise</text>
   <line class="dims" x1="60" y1="282.9" x2="361.6" y2="282.9"/>
   <line class="dims" x1="60" y1="272.9" x2="60" y2="292.9"/>
   <line class="dims" x1="361.6" y1="272.9" x2="361.6" y2="292.9"/>

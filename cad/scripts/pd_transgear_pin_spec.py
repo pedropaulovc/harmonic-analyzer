@@ -57,9 +57,11 @@ RUNNING_MATES = ("MHA-PD-10", "MHA-PD-24", FRONT_BUSHING_NUMBER)
 HEAD_SEAT_MACHINE_Z = round(ARM.FRONT_FACE_MACHINE_Z + ARM.THICKNESS, 6)  # -114.888
 
 # --- Shank: the bonded length and the running journal, one diameter -----------
-# Made to fit (fit audit 2026-11-23, pending owner confirmation; owner
-# 2026-11-23: "why do we need single micron level tolerance x class plug
-# gauges for a hobby machining project"): the sheet prints the size as a
+# Made to fit (rule 4, form 2; one diameter is the owner's ruling of
+# 2026-11-24 on fit audit question 4 and the modelled fit his ruling on
+# question 5; owner 2026-11-23: "why do we need single micron level
+# tolerance x class plug gauges for a hobby machining project"): the sheet
+# prints the size as a
 # reference and the acceptance by feel, the shank turned last to the three
 # reamed running bores (the sleeve's and both bushings', the set's .1260
 # reamer) until each turns free with no shake.  It prints no limits.

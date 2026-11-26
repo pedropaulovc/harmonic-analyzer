@@ -338,8 +338,8 @@ PLATE_TAP_PITCH_DIA_LIMITS_MM = tuple(value * 25.4 for value in (0.1437, 0.1475)
 # it does not enter by hand.  Permanent stop pin with no other fastener
 # (owner 2026-10-27, #1379: "should never come out").  The band is the
 # ANALYSIS band, what the reamer is modelled to cut (REAM_H7), for the walls
-# and the press range (fit audit 2026-11-23, pending owner confirmation;
-# was the same hole printed .1250 -.0005/-.0010).
+# and the press range (rule 4, form 3: reamed to the bought dowel; was the
+# same hole printed .1250 -.0005/-.0010).
 PIN_HOLE_DIA = 3.1496  # .1240
 PIN_HOLE_DIA_BAND = (0.0127, 0.0)
 # Owner decision 2026-11-19 (#3124 item 3): drilled and reamed to a drill

@@ -152,7 +152,7 @@ def test_real_d_core_thread_and_inch_g6_source() -> None:
     assert spec.CORE_DIA_BAND == pytest.approx((0.0035 * inch, -0.0023 * inch))
     assert spec.CORE_FLAT_FROM_AXIS == 2.1336 and spec.CORE_FLAT_PLACES == 3  # .084
     assert spec.CORE_FLAT_FIT_AIR == pytest.approx((0.0, 2.0 * spec.CORE_FLAT_FIT_STEP))
-    assert spec.CORE_FLAT_BAND == pytest.approx((0.00475 * inch, -0.00135 * inch))
+    assert spec.CORE_FLAT_BAND == pytest.approx((0.00595 * inch, -0.00255 * inch))
     assert spec.JOURNAL_DIA == 6.3246 and spec.JOURNAL_DIA_BAND == (-0.00508, -0.0127)
     # The thread length reads from the relief's shoulder (machinist review r8).
     assert spec.THREAD == "#8-32"
@@ -361,8 +361,8 @@ def test_d_flat_uses_signed_physical_round_tool_end_and_real_neck() -> None:
     assert spec.FRONT_CORNER_RADIUS == 0.1016
     assert spec.FRONT_CORNER_RADIUS_MAX == 0.1016
     assert spec.CORE_ACTIVE_LENGTH == pytest.approx(4.9276)
-    # One printed limit, .007 MAX from F (fit audit 2026-11-23, pending owner
-    # confirmation): modelled at it, accepted anywhere short of F.
+    # One printed limit, .007 MAX from F (rule 4: a single limit, set by the
+    # neck's air): modelled at it, accepted anywhere short of F.
     assert -spec.CORE_FLAT_CUT_END_Z == pytest.approx(0.1778)
     assert spec.CORE_FLAT_CUT_END_LIMITS == (0.0, 0.1778)
     assert spec.FRONT_RELIEF_WIDTH_MIN - 0.1778 >= 0.1016 - 1e-12

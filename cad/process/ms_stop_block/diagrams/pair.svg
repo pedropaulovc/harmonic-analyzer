@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 420" font-family="sans-serif" font-size="13">
   <rect class="paper" x="0" y="0" width="760" height="420"/>
-  <text class="title" x="16" y="22">Setup 11: pair pilot at MHA-MS-03 (its traveler, Setups 3-5)</text>
+  <text class="title" x="16" y="22">Setup 12: pair pilot at MHA-MS-03 (its traveler, Setups 3-5)</text>
   <rect class="part-arriving" x="30.0" y="40.0" width="328.7" height="229.1"/>
   <polygon class="part-kept" points="74.2,70.0 344.5,70.0 358.7,84.2 358.7,269.1 60.0,269.1 60.0,84.2"/>
   <rect class="holes" x="60.0" y="102.0" width="298.7" height="48.4"/>

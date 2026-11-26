@@ -9,9 +9,11 @@
 # one piece 7-1/2 long, deburr both ends, check the length, oil. No lathe
 # and no NC.
 #
-# Stock: 3/8 in 1018 or 1045 ground round is to order
+# Stock: the 3/8 in ground round is to order
 # (cad/config/shop-equipment/stock-to-order.toml 1018-or-1045-ground-round-3-8);
-# none is on hand.
+# none is on hand. The bar ruled and carted is ground 12L14 (owner ruling
+# 2026-11-24; McMaster 5227T252); the material line below and the drawing
+# still print 1018 or 1045 until issue #3561 changes them.
 title = "Cylinder Gear Shaft"
 part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"

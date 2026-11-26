@@ -4,7 +4,7 @@ The turned brass ring on the MHA-PD-VN-57 pivot screw's shoulder between the
 MHA-PD-07 support bar's back face and the MHA-PD-18 arm's front face
 (``pd_transgear_pivot_spacer_spec``; contract §3.4).  Its length sets the pivot
 head play, so it carries an explicit band; it is fitted as made, never faced
-(R9-6).  Its #12 drilled bore is a bonded slip fit (LOCTITE 638) on the
+(R9-6).  Its #11 drilled bore is a bonded slip fit (LOCTITE 638) on the
 shoulder, under the title block's DRILLED HOLES row.
 
 Layout: Front-plane annulus at the origin (O.D., bore) extruded +Z by the

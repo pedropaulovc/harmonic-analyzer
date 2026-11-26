@@ -70,9 +70,8 @@ def test_every_hand_tap_stop_leaves_room_for_the_tap_guide() -> None:
     # tap guide. A plan holding it measures only the tap in its wrench against
     # tap_wrench_reach_max_mm: its guide-and-tap stack less the guide's
     # overall length, rounded down to .01 in.
-    guide_mm = (
-        _shop_equipment.load()["tools"]["tap-guide-fisher"]["overall_length_in"] * 25.4
-    )
+    guide = _shop_equipment.load()["tools"]["tap-guide-fisher"]
+    guide_mm = guide["overall_length_in"] * 25.4
     holders = []
     for path in sorted((CAD_ROOT / "process").glob("*/plan.toml")):
         plan = tomllib.loads(path.read_text(encoding="utf-8"))
@@ -81,9 +80,28 @@ def test_every_hand_tap_stop_leaves_room_for_the_tap_guide() -> None:
         ):
             continue
         holders.append(path.parent.name)
-        parameters = plan["parameters"]
-        room = parameters["tap_stack_max_mm"] - guide_mm
-        assert 0 <= room - parameters["tap_wrench_reach_max_mm"] < 0.254, (
-            path.parent.name
-        )
+        # A family plan (cad/process/README.md) keeps the tapped part's
+        # numbers in that part's own table, laid over the plan's.
+        tables = [
+            plan["parameters"] | part.get("parameters", {})
+            for part in plan.get("parts", [{}])
+        ]
+        tapped = [table for table in tables if "tap_stack_max_mm" in table]
+        assert tapped, path.parent.name
+        for parameters in tapped:
+            room = parameters["tap_stack_max_mm"] - guide_mm
+            assert 0 <= room - parameters["tap_wrench_reach_max_mm"] < 0.254, (
+                path.parent.name
+            )
+            # A setup picture draws the guide from the plan's restatement of
+            # its shank and point, which must be the record's.
+            for key, field in (
+                ("tap_guide_dia_mm", "shank_dia_in"),
+                ("tap_guide_point_dia_mm", "point_dia_in"),
+            ):
+                if key in parameters:
+                    assert parameters[key] == pytest.approx(guide[field] * 25.4), (
+                        path.parent.name,
+                        key,
+                    )
     assert len(holders) >= 10, holders

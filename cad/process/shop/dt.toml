@@ -35,6 +35,9 @@ diameter_mm = 2.0828
 [tools.drill-26]  # Drills #26
 description = "#26 (.1470 in) drill, 115-piece index"
 diameter_mm = 3.7338
+[tools.drill-15-64]  # dt_cone_gear_tl_index_plate: the stock BS-0 plate's screw-hole drill (owner fact 2026-11-24)
+description = "15/64 (.2344 in) drill, 115-piece index"
+diameter_mm = 5.953125
 [tools.drill-20]  # Drills #20
 description = "#20 (.1610 in) drill, 115-piece index"
 diameter_mm = 4.0894
@@ -118,9 +121,6 @@ diameter_mm = 0.9271
 [tools.reamer-0625]  # MHA-DT-03 .0625 +.0005/.0000 REAM THRU (T012, T018); MHA-DT-04 .0625 +.0005/.0000 REAM .20; MHA-DT-38 .0625 +.0005/.0000 REAM THRU (#2469)
 description = ".0625 in HSS chucking reamer"
 diameter_mm = 1.5875
-[tools.reamer-1570]  # MHA-DT-03-TL-01 132X .1570 +.0005/.0000 REAM THRU
-description = ".1570 in HSS chucking reamer"
-diameter_mm = 3.9878
 [tools.chamfer-mill-3-16-90]  # MHA-DT-35 #20 hole's floor-side chamfer inside the pocket (inventory: to order)
 description = "3/16 in 90° pointed 2-flute carbide chamfer cutter (Harvey Tool 902345-C3)"
 diameter_mm = 4.7625

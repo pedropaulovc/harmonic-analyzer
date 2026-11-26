@@ -198,7 +198,7 @@ indexing = "none"
 machine_ref = "pm-1127vf-lb"
 holding = "6 in 4-jaw, each jaw on a flat over a brass shim, the top end {{process.top_stickout_in:.2dot}} in out of the jaw fronts, the rest of the blank back through the spindle bore. Indicate two adjacent flats next to the jaws with the dial test indicator, turning the chuck by hand, and adjust opposite jaws until each pair reads within {{process.indicate_tir_in:.3dot}} TIR."
 datum = "Z0 (carriage DRO) the top face, faced in Op 50. The tailstock quill's scale for the drill's depth, zeroed in Op 70."
-diagram = { file = "diagrams/top.svg", alt = "The square in the 4-jaw on its flats, the top end out: faced, spotted, drilled 3/64 and tapped #0-80 from the tailstock." }
+diagram = { file = "diagrams/top.svg", alt = "The square in the 4-jaw on its flats over brass shims, the top end .50 in out: the AR tool faces it to Z0, the top face. Drawn to scale but for the chuck and the tool." }
 lathe_hold = "other"
 turning_support = { kind = "chuck_only", chuck_z_mm = -12.7 }
 
@@ -241,6 +241,7 @@ hole_depth_mm = "{{cad.stud_tap_drill_depth_mm}}"
 peck = { step_mm = "{{process.peck_mm}}", retract = "full" }
 inspection = "Drill depth {{cad.stud_tap_drill_depth_min_in:.2dot}}–{{cad.stud_tap_drill_depth_max_in:.2dot}}: a .040 pin gauge dropped to the bottom reads its length less its stick-up above the top face (calipers' depth rod), about .002 past full diameter."
 gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.stud_tap_drill_depth_band_mm}}" }]
+diagram = { file = "diagrams/top-drill.svg", alt = "To scale: the 3/64 drill from the tailstock chuck in the top end, its full diameter .26–.28 deep, its point beyond." }
 
 [[setups.operations]]
 cut_kind = "other"
@@ -250,6 +251,7 @@ drilling = "none"
 sizing = "other"
 instruction = "Spindle off, in low range. Swap the drill chuck for the dead centre. Pencil-mark the plug tap {{process.plug_tap_reach_in:.2dot}} from its point. Start {{cad.stud_tap_thread}} with it in the T-handle tap wrench, the dead centre's point seated in the wrench's top centre hole. Hold the chuck still with one hand and turn the wrench with the other, a drop of cutting oil, backing off every half turn, the quill following; stop when the mark reaches the top face."
 feed = "hand"
+diagram = { file = "diagrams/top-tap.svg", alt = "The #0-80 plug tap in the T-handle wrench in the drilled hole, its pencil mark .15 from its point at the top face; the dead centre's point in the wrench's top centre hole. The blank and the tap's diameter to scale; the wrench and the dead centre schematic." }
 
 [[setups.operations]]
 cut_kind = "other"
@@ -288,7 +290,7 @@ indexing = "none"
 machine_ref = "pm-1127vf-lb"
 holding = "Turned round: the 4-jaw on the flats over the shims, the sawn pivot end {{process.pivot_stickout_in:.2dot}} + (L − {{process.overall_in:.2dot}}) in out of the jaw fronts (L from Op 120), set with the calipers' depth rod, the beam's end on the jaw fronts, so the faced end stands {{process.pivot_stickout_in:.2dot}} out; the tapped end back through the spindle bore; indicated again as Setup 2 to {{process.indicate_tir_in:.3dot}} TIR."
 datum = "Z0 (carriage DRO) the pivot end's finished plane, {{process.overall_in:.3dot}} from the top face: the DRO preset from L (Op 120) in Op 150, the blade touched on it again in Op 190. The shoulder at Z−{{process.pivot_len_in:.3dot}}."
-diagram = { file = "diagrams/pivot.svg", alt = "The square turned round in the 4-jaw, the pivot end out: faced to length, the Ø.125 pivot turned, its shoulder corner squared and the groove plunged with the cutoff blade." }
+diagram = { file = "diagrams/pivot.svg", alt = "The square turned round in the 4-jaw, the pivot end .60 in out: the AR tool faces it to Z0; the Ø.125 x .41 pivot and the groove it and the blade cut next hatched. Drawn to scale but for the chuck and the tool." }
 lathe_hold = "other"
 turning_support = { kind = "chuck_only", chuck_z_mm = "{{process.jaw_front_z_mm}}" }
 
@@ -349,6 +351,7 @@ sizing = "other"
 instruction = "Shoulder, R{{cad.pivot_corner_radius_max_mm:in.3dot}} MAX corner: the blade on centre height, square to the axis. Spindle stopped: with the .002 feeler leaf on the faced end, touch the blade's chuck-side face on it and set DRO Z to +.002. Bring the blade's chuck-side face on Z−{{process.pivot_len_in:.3dot}}, lock the carriage. Spindle on: plunge to the pivot's O.D., stopping as it marks: the shoulder face square, its corner sharp."
 settings = "lathe-part-c360"
 cut_diameter_mm = "{{process.square_corners_mm}}"
+diagram = { file = "diagrams/pivot-blade.svg", alt = "To scale: the 1/16 P1 blade's chuck-side face on the shoulder at Z−.410, plunged to the Ø.125 pivot's O.D.; the groove it plunges next hatched, .165–.315 from the shoulder." }
 
 [[setups.operations]]
 cut_kind = "other"
