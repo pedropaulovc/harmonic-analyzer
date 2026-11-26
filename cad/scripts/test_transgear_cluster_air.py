@@ -19,7 +19,7 @@ from _printed_tolerance import printed_band_mm
 from pd_cluster_stack_band import FIT_LENGTH_BAND_IN
 
 FIT_LENGTHS = (
-    FIT.PH, FIT.TR, FIT.FW, FIT.GS, FIT.OL, FIT.TL, FIT.SP, FIT.LHUB, FIT.LFB,
+    FIT.PH, FIT.TR, FIT.FW, FIT.GS, FIT.OL, FIT.TL, FIT.LHUB, FIT.LFB,
 )
 
 
@@ -28,13 +28,16 @@ def _worst(chain, sign):
 
 
 def test_stack_lengths_print_their_bands():
-    """The knob train and the lengths that set the collar air or the recess
-    print +/-.001; the rear bushing, which only feeds the shimmed end float,
-    prints at the title block."""
+    """The knob train and the lengths that set the recess or need the
+    collar air print +/-.001; the rear bushing, which only feeds the shimmed
+    end float, and the MHA-PD-17 spigot length, whose title-block band the
+    collar air still clears (delegated ruling D21, 2026-11-25), print at the
+    title block."""
     assert FIT_LENGTH_BAND_IN == pytest.approx(0.0254)  # .001 in
     for label, _, band in FIT_LENGTHS:
         assert band == pytest.approx(FIT_LENGTH_BAND_IN), label
     assert FIT.LRB[2] == printed_band_mm(3, unit=REAR_BUSHING.UNIT)
+    assert FIT.SP[2] == printed_band_mm(3, unit=HUB.UNIT)
     assert (FIT.HUB_LENGTH, FIT.FRONT_BUSHING_LENGTH, FIT.REAR_BUSHING_LENGTH) == (
         pytest.approx(13.6906),  # .539
         pytest.approx(5.7658),  # .227 (fit audit owner question 5: .005 back)

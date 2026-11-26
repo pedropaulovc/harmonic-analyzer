@@ -2827,6 +2827,12 @@ def test_no_step_solders_and_the_rack_rework_resets_its_guide() -> None:
     assert f"SET THE GUIDE AGAIN PER {drawing.sub_step('guides-screwed', 1)}" in rework
     level = f"WITHIN {steps.inch_text(steps.LEVEL_RACK_CREST_DRIFT, 3)} OF EACH OTHER"
     assert level in rework
+    # The .001 is read on an indicator, named in the step and in its row:
+    # a height gauge's own scale reads the located-step row only.
+    assert f"{level} BY TEST INDICATOR" in rework
+    rows = drawing.setting_table_rows(operating_domain=_unit_operating_domain())
+    (crest_row,) = (row for row in rows if row[2] == "RACK CRESTS, ONE END AGAINST THE OTHER")
+    assert crest_row[-1] == "TEST INDICATOR, HEIGHT GAUGE"
 
 
 def test_every_screwed_setting_has_a_holding_check() -> None:
@@ -3595,6 +3601,10 @@ def test_the_hub_key_pin_and_collar_flat_pin_are_fitted_and_kept() -> None:
     check = next(row for row in pressed if row.startswith(f"CHECK: THE {pin} PIN"))
     assert "DOES NOT MOVE BY HAND" in check
     assert check.endswith("COLLAR AND PIN ARE ONE PERMANENT UNIT.")
+    # The check says how the pin got there, so the balloon and BOM row have
+    # a step that cites the joint, and every renewed collar passes it too.
+    made = f"PRESSED IN AS EVERY {_number('pd-transgear-drive-collar')} COLLAR IS MADE"
+    assert made in check
     assert pressed[pressed.index(check) + 1].startswith("IF THE PIN MOVES, ")
     from pathlib import Path
 

@@ -3140,10 +3140,15 @@ def _step_text(
             # collar arrives with it and MHA-PD-08's D-flat, milled to that
             # pin (its note 2), is finished before the shaft is first used
             # at the arm-plate-located step (Codjiflo P2 on #3485: the flat
-            # needed a pin pressed at this later step).  This step checks
-            # the joint (rule 23: a bench acceptance).
-            f"CHECK: THE {n['pd-vn-transgear-collar-flat-pin']} PIN STANDS ON THE "
-            "BOTTOM OF THE COLLAR'S REAR BLIND HOLE AND DOES NOT MOVE BY HAND; "
+            # needed a pin pressed at this later step).  So no step here
+            # presses it: this one says how the pin got there, for the first
+            # collar and for every renewed one, which 20's renewal block
+            # sends back through it (machinist review of 1fcdca8ca6: the
+            # balloon and BOM row had no step that made or cited the joint),
+            # and checks the joint (rule 23: a bench acceptance).
+            f"CHECK: THE {n['pd-vn-transgear-collar-flat-pin']} PIN, PRESSED IN AS "
+            f"EVERY {n['pd-transgear-drive-collar']} COLLAR IS MADE, STANDS ON THE "
+            "BOTTOM OF ITS REAR BLIND HOLE AND DOES NOT MOVE BY HAND; "
             "COLLAR AND PIN ARE ONE PERMANENT UNIT.",
             "IF THE PIN MOVES, RENEW THE COLLAR PER "
             f"{s('collar-pins-pressed', 7)}-{s('collar-pins-pressed', 11)}.",
@@ -3337,10 +3342,16 @@ def _step_text(
             f"{steps.step_number('guides-screwed')} OR {s('hanger-meshed', 10)}.",
             f"IF NONE WAS FOUND, SLACKEN THE {n['pd-platen-bottom-guide']} BOTTOM "
             "GUIDE'S SCREWS.",
-            "WITH THE SCREWS SLACK, SET THE GUIDE AGAIN PER "
+            # The crests' .001 is read on the indicator the gauge carries: a
+            # height gauge's own scale is the located-step row (machinist
+            # review of 1fcdca8ca6).
+            # The step keeps its two printed lines (the columns are full): the
+            # sub-step before it slackens the screws, and the row names the
+            # gauge that carries the indicator.
+            "SET THE GUIDE AGAIN PER "
             f"{s('guides-screwed', 1)}, THE CRESTS AT THE TWO ENDS WITHIN "
-            f"{steps.inch_text(steps.LEVEL_RACK_CREST_DRIFT, 3)} OF EACH OTHER "
-            f"{row_cite('crest-level')}.",
+            f"{steps.inch_text(steps.LEVEL_RACK_CREST_DRIFT, 3)} OF EACH OTHER BY "
+            f"TEST INDICATOR {row_cite('crest-level')}.",
             "WITH THE GUIDE SET AGAIN, TIGHTEN ITS SCREWS.",
             f"REFIT PER {s('platen-hung', 9)}-{s('guide-locks-set', 3)}.",
             f"FIT A NEW UNDRILLED {n['pd-latch-hook']} HOOK PER "
@@ -3808,7 +3819,7 @@ def setting_table_rows(
             s("loaded-rack-geometry-checked", 13),
             "RACK CRESTS, ONE END AGAINST THE OTHER",
             f"WITHIN {steps.inch_text(steps.LEVEL_RACK_CREST_DRIFT, 3)}",
-            "HEIGHT GAUGE",
+            "TEST INDICATOR, HEIGHT GAUGE",
         ),
         "tooth-centred": (
             s("fitup-pose-set", 6),
