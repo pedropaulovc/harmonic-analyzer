@@ -2869,17 +2869,35 @@ def test_no_step_solders_and_the_rack_rework_resets_its_guide() -> None:
         assert "SOLDER" not in text and "BACKER" not in text
     rework = _step_body("loaded-rack-geometry-checked")
     assert f"SLACKEN THE {_number('pd-platen-bottom-guide')} BOTTOM GUIDE" in rework
-    # Machinist review r8: the re-set names its reference and band (3B's
-    # crest drop) and the level the mesh gate assumes.
-    assert f"SET THE GUIDE AGAIN PER {drawing.sub_step('guides-screwed', 1)}" in rework
-    level = f"WITHIN {steps.inch_text(steps.LEVEL_RACK_CREST_DRIFT, 3)} OF EACH OTHER"
-    assert level in rework
+    # Machinist review r8: the re-set names its reference (3B's crest drop
+    # and level). Fit audit part 2, B4: the level the mesh gate assumes is
+    # held at the first set, so the rework repeats 3B.
+    crest_level = drawing.row_cite("crest-level")
+    assert (
+        f"SET THE GUIDE AGAIN PER {drawing.sub_step('guides-screwed', 1)} {crest_level}."
+        in rework
+    )
+    first_set = drawing._step_text(operating_domain=_unit_operating_domain())[
+        "guides-screwed"
+    ][1]
+    level = f"BOTH ENDS ALIKE WITHIN {steps.inch_text(steps.LEVEL_RACK_CREST_DRIFT, 3)}"
     # The .001 is read on an indicator, named in the step and in its row:
-    # a height gauge's own scale reads the located-step row only.
-    assert f"{level} BY TEST INDICATOR" in rework
+    # a height gauge's own scale reads the .100 band only.
+    assert f"BY HEIGHT GAUGE, {level} ON ITS TEST INDICATOR" in first_set
+    assert first_set.endswith(f" {crest_level}.")
     rows = drawing.setting_table_rows(operating_domain=_unit_operating_domain())
     (crest_row,) = (row for row in rows if row[2] == "RACK CRESTS, ONE END AGAINST THE OTHER")
+    assert crest_row[1] == (
+        f"{drawing.sub_step('guides-screwed', 1)}, "
+        f"{drawing.sub_step('loaded-rack-geometry-checked', 13)}"
+    )
     assert crest_row[-1] == "TEST INDICATOR, HEIGHT GAUGE"
+    # Every term stacked, the level first set keeps the feed mesh's floor.
+    assert steps.FEED_WORST_CASE_MESH.contact_ratio_min == pytest.approx(1.0275, abs=1e-4)
+    assert steps.FEED_LOOSEST_MESH.contact_ratio_min == pytest.approx(1.1672, abs=1e-4)
+    assert steps.FEED_LOOSE_TERMS_MM["rack crest drift along the run"] == pytest.approx(
+        2.0 * steps.LEVEL_RACK_CREST_DRIFT * math.tan(math.radians(20.0))
+    )
 
 
 def test_every_screwed_setting_has_a_holding_check() -> None:

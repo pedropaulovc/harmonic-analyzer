@@ -5,14 +5,14 @@
 necessity:
   - id: N-01
     feature: "sheet 13 DETAIL J and step 3B, rack crests .100 ±.002 below the platen's bottom edge"
-    kind: mesh
-    reason: "sets the feed rack's mesh depth on the feed pinion"
-    source: "pd_paper_drive_assembly_steps.RACK_CREST_TOL (pd_platen_bottom_guide_spec.CREST_SET_BAND); the feed mesh's datum pitch-line distance sets the crest drop"
+    kind: gap
+    reason: "keeps the MHA-PD-27 platen-tap top wall over its .060 floor"
+    source: "pd_platen_bottom_guide_spec.CREST_SET_BAND in PLATEN_TAP_Y_BAND: the taps are spotted through the platen at this set, so the band moves the tap row; at .624 high the top wall is 1.540 mm over 1.524 (PLATEN_TAP_TOP_WALL_MIN), and at ±.005 it would be 1.464 (or the owner-ruled .469 counterbore moves). The mesh depth is felt at step 24, not set by this band"
   - id: N-02
-    feature: "step 26P and setting table row 17, rack crests at the two ends WITHIN .001 of each other"
+    feature: "steps 3B and 26P and setting table row 17, rack crests at the two ends WITHIN .001 of each other"
     kind: mesh
     reason: "crest drift takes the feed mesh's contact ratio under one"
-    source: "pd_paper_drive_assembly_steps.LEVEL_RACK_CREST_DRIFT, FEED_WORST_CASE_MESH: the one term the fitter controls when the steady-advance check fails with every part inside its sheet"
+    source: "pd_paper_drive_assembly_steps.LEVEL_RACK_CREST_DRIFT, FEED_WORST_CASE_MESH: every loose term stacked, contact ratio 1.028 over the 1.0 floor with the ends level (0.932 with the ±.002 band's .004 of drift)"
   - id: N-03
     feature: "step 27G and setting table row 18, disc tooth CENTRED WITHIN .002 in a knob pinion gap"
     kind: mesh

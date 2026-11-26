@@ -2458,10 +2458,16 @@ def _step_text(
             f"CLAMP THE {n['pd-platen-guide']} TOP GUIDE TO THE {n['pd-platen']} "
             "PLATEN'S BACK, ENDS FLUSH WITH THE PLATEN ENDS, ON THE UPPER ROW OF "
             f"\u00d8{steps.inch_text(platen.GUIDE_HOLE_DIA, 3)} PLATEN HOLES.",
+            # Fit audit part 2, B4: the first set also holds the two ends
+            # level, read on the test indicator the height gauge carries (the
+            # gauge's own scale reads only the .100 band); before, that was
+            # only 26P's rework (steps.LEVEL_RACK_CREST_DRIFT).
             f"CLAMP THE {n['pd-platen-bottom-guide']} BOTTOM GUIDE, RACK ON, TO THE "
             "PLATEN BACK, ENDS FLUSH, THE RACK'S CRESTS "
-            f"{steps.RACK_CREST_TEXT} BELOW THE PLATEN'S BOTTOM EDGE AT BOTH ENDS "
-            f"BY HEIGHT GAUGE {detail_cite('guides-screwed')}.",
+            f"{steps.RACK_CREST_TEXT} BELOW THE PLATEN'S BOTTOM EDGE "
+            "BY HEIGHT GAUGE, BOTH ENDS ALIKE WITHIN "
+            f"{steps.inch_text(steps.LEVEL_RACK_CREST_DRIFT, 3)} ON ITS TEST "
+            f"INDICATOR {detail_cite('guides-screwed')} {row_cite('crest-level')}.",
             "SPOT THE BOTTOM GUIDE THROUGH THE LOWER ROW OF PLATEN HOLES WITH A "
             f"{GUIDE_SPOT_PUNCH.numerator}/{GUIDE_SPOT_PUNCH.denominator} TRANSFER "
             "PUNCH.",
@@ -3331,12 +3337,10 @@ def _step_text(
             "THE MIDDLE OF THE FEED.",
             # Codjiflo P2s on 6abe1aa7f and aa3c6786c: any rework of the rack
             # or guides moves the rack against the match-drilled latch, so the
-            # mesh is set again by feel on a new hook. A feel set always lands
-            # at the run's tight-spot bind, so with every part inside its sheet
-            # the remedy takes out the one term the fitter controls, the crest
-            # drift, by setting the bottom guide again with the rack level
-            # (its screws float in the platen's holes); that the loop then
-            # ends is steps.FEED_LEVEL_RACK_WORST_CASE_MESH's gate. The platen
+            # mesh is set again by feel on a new hook. The bottom guide is set
+            # again per the first set, crests level (its screws float in the
+            # platen's holes); with every part inside its sheet the loop ends
+            # by steps.FEED_WORST_CASE_MESH's gate. The platen
             # comes off for the rework as in lock-seats-faced (codjiflo P3 on
             # 6c847adb0).
             # Machinist review r8 (59eb13ee2): a pass exit first, so a builder
@@ -3357,16 +3361,9 @@ def _step_text(
             f"{steps.step_number('guides-screwed')} OR {s('hanger-meshed', 10)}.",
             f"IF NONE WAS FOUND, SLACKEN THE {n['pd-platen-bottom-guide']} BOTTOM "
             "GUIDE'S SCREWS.",
-            # The crests' .001 is read on the indicator the gauge carries: a
-            # height gauge's own scale is the located-step row (machinist
-            # review of 1fcdca8ca6).
-            # The step keeps its two printed lines (the columns are full): the
-            # sub-step before it slackens the screws, and the row names the
-            # gauge that carries the indicator.
-            "SET THE GUIDE AGAIN PER "
-            f"{s('guides-screwed', 1)}, THE CRESTS AT THE TWO ENDS WITHIN "
-            f"{steps.inch_text(steps.LEVEL_RACK_CREST_DRIFT, 3)} OF EACH OTHER BY "
-            f"TEST INDICATOR {row_cite('crest-level')}.",
+            # The first set's levelling is repeated with it (fit audit part 2,
+            # B4).
+            f"SET THE GUIDE AGAIN PER {s('guides-screwed', 1)} {row_cite('crest-level')}.",
             "WITH THE GUIDE SET AGAIN, TIGHTEN ITS SCREWS.",
             f"REFIT PER {s('platen-hung', 9)}-{s('guide-locks-set', 3)}.",
             f"FIT A NEW UNDRILLED {n['pd-latch-hook']} HOOK PER "
@@ -3830,8 +3827,10 @@ def setting_table_rows(
             engaged_feed_window(operating_domain),
             "STEEL RULE",
         ),
+        # Checked at the first set and again in 26P's rework (fit audit part
+        # 2, B4); the row keeps its number so no other row moves.
         "crest-level": (
-            s("loaded-rack-geometry-checked", 13),
+            f"{s('guides-screwed', 1)}, {s('loaded-rack-geometry-checked', 13)}",
             "RACK CRESTS, ONE END AGAINST THE OTHER",
             f"WITHIN {steps.inch_text(steps.LEVEL_RACK_CREST_DRIFT, 3)}",
             "TEST INDICATOR, HEIGHT GAUGE",
