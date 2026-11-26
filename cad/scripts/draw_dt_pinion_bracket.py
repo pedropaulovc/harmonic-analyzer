@@ -7,10 +7,10 @@ Dimension import and curation live in ``_drawing_dimension_import``.
 Every nominal, decimal place and tolerance band is imported from the model.
 
 The print is deliberately plain (cad/docs/drawing-guidelines.md): a
-bracket carries no datums and no feature-control frames, and it carries no
-manufacturing-note block either -- the outline, the hole callouts (each fitted
-bore naming its mate and fit), one roughness symbol and the title block say
-everything.  Three bands survive, one per fitted bore, each from a named fit
+bracket carries no datums and no feature-control frames, and one flagged note,
+the follower seat's bonded fit (#3693); the outline, the hole callouts (each
+fitted bore naming its mate and fit), one roughness symbol and the title block
+say the rest.  Three bands survive, one per fitted bore, each from a named fit
 class, plus the cross hole's pin band.  Decimal-inch sheet (#290).
 
 Two orthographic views at the 2:1 sheet scale, a follower-seat section, plus
@@ -64,6 +64,7 @@ from _drawing_dimensions import (
 from _drawing_edge_dimensions import add_edge_dimension
 from _feature_requirements import part_metadata, requirement
 from _drawing_finish import add_surface_finish
+from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
 from _gtol_cylinder import CylinderFace
 from _gtol_planar import PlanarFace
@@ -334,9 +335,13 @@ OVERALL_XY = (0.040, 0.150)
 # The arbor symbol has a short leader to the bore's unobstructed left edge.
 ARBOR_FINISH_EDGE = (_front_x(-ARBOR_BORE / 2.0), _front_y(C2C))
 ARBOR_FINISH_XY = (0.155, 0.205)
+# Note 1 (the follower seat's bond, #3693): the clear field below the views
+# and the cross-hole and cap callouts, left of the title block.
+NOTES_XY = (0.020, 0.050)
 # A callout says only what a dimension cannot: how the feature is made, where
 # it stops, what it mates with and the fit it needs (rule 4).  The seat's
-# mate rides its size callout.  The seat's depth rides its callout as REF
+# mate, grade and clearance are note 1's, which its size callout flags.  The
+# seat's depth rides its callout as REF
 # (rule 26: never deferred to a view) while Section B-B's .16 controls the
 # floor; the floor-corner allowance is what the 1/8 end mill that finishes the
 # seat leaves (rule 16; tool audit Q8).  The pivot bore is reamed .2510 with
@@ -856,6 +861,7 @@ def build(adapter: Any) -> dict[str, str]:
         adapter, [*annotations, seat_depth], DRAWING_PRECISION_BY_NAME
     )
     _rim_only_bore_callouts(adapter, front_annotations)
+    add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_XY)
 
     return finalize_drawing(
         adapter,

@@ -77,6 +77,7 @@ from dt_pinion_bracket_spec import (
     CROSS_HOLE_BAND,
     CROSS_HOLE_DIA,
     DRAWING_DIMENSIONS,
+    DRAWING_NOTES,
     DRAWING_PRECISION,
     PIN_SEAT_DIA_BAND,
     SURFACE_FINISHES,
@@ -170,6 +171,7 @@ _SAVED_DRAWING_PROPERTIES = (
     "Material Specification",
     "Finish",
     "Quantity",
+    "Manufacturing Notes",
 )
 
 
@@ -544,7 +546,7 @@ def build(adapter) -> dict[str, str]:
     apply_material(adapter, MATERIAL)
     apply_color(adapter, POLISHED_STEEL)
     report_mass_properties(adapter)
-    apply_drawing_properties(adapter, PART_NAME)
+    apply_drawing_properties(adapter, PART_NAME, {"Manufacturing Notes": DRAWING_NOTES})
     blank_reference_geometry(
         adapter,
         (

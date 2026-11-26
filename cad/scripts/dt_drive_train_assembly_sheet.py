@@ -16,7 +16,6 @@ import math
 from _hole_spec import NUMBER_DRILL_MM
 from _printed_tolerance import drilled_oversize_mm
 
-import dt_crank_handle_spec as _handle
 import dt_crank_pinion_spec as pinion
 import dt_pinion_lever_geometry as _lever
 
@@ -60,15 +59,6 @@ def inch_min_text(limit_mm: float, places: int) -> str:
 
 # A feeler reading prints to the thousandth, a feeler gage's leaf step.
 FEELER_PLACES = 3
-
-# Owner ruling 2026-10-24 (#1900): MHA-DT-34 cures on a mandrel through the
-# MHA-DT-08 pivot bore.  Step 7 prints the requirement, the bore's offset off
-# that axis that MHA-DT-34's skimmed wall is budgeted on, not the mandrel;
-# MHA-DT-32 passes through the larger MHA-DT-34 bore and does not locate it.
-HANDLE_FERRULE_CURE = (
-    "THE MHA-DT-34 BORE CENTRED ON THE MHA-DT-08 PIVOT BORE WITHIN "
-    f"{inch_max_text(_handle.FERRULE_OFFSET_MAX, 3)}"
-)
 
 # Fit audit 2026-11-23 part 2, B9 (drawing-guidelines rule 4: no gauge where
 # nothing fails; no owner ruling touched): with every part at its print worst

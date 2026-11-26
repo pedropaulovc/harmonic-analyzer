@@ -46,7 +46,7 @@ its first-root position; no second general note restates that location.
      *and* fixturing-hostile from bar. Per §6 the edge should be a **separate hardened tool-steel
      insert**, not this parent — which also removes it from this part's machining hazard.
   3. **The bonded cone tip** (owner decision C1 keyed, 2026-11-09, PR #1992) — T024 bonded with LOCTITE 638
-     on round land 2 one 0.45 ±0.10 feeler off T030 (0.35–0.55 mm stack float); T018 and T012 bonded on the
+     on round land 2 one .019 feeler setting off T030 (0.37–0.52 mm stack float); T018 and T012 bonded on the
      MHA-DT-37 spigot, whose end is bonded in the reamed Ø.0625 × .20 in socket in MHA-DT-04's end; land 2
      ends .030 in inside T024's bore so T018 always butts T024. Degrease, phase each bonded gear to the keyed
      stack within the compound's fixture time with the MHA-DT-03-TL-02 phasing comb (owner rulings

@@ -100,11 +100,23 @@ def test_every_band_traces_to_a_named_fit_class() -> None:
     assert deviations(dt_pinion_bracket_spec.PIN_SEAT_DIA_BAND)[0] == 0.0
 
 
-def test_print_contract_carries_no_gdt_datums_or_note_block() -> None:
-    # drawing-guidelines.md rule 5 (avoid excessive GD&T) and drawing-guidelines.md rule 7 (notes: few, flagged, never a method): a bracket is not on the GD&T allowlist, and a note
-    # block that repeats the geometry is over-specification.
+def test_print_contract_carries_no_gdt_datums_and_one_flagged_note() -> None:
+    # drawing-guidelines.md rule 5 (avoid excessive GD&T) and rule 7 (notes:
+    # few, flagged, never a method): a bracket is not on the GD&T allowlist;
+    # its one note is the follower seat's bond, which the seat callout flags
+    # (#3693), naming the mate, the grade and the clearance as REF.
     assert dt_pinion_bracket_spec.GEOMETRIC_TOLERANCES_MM == {}
-    assert dt_pinion_bracket_spec.DRAWING_NOTES == ""
+    assert dt_pinion_bracket_spec.DRAWING_NOTES == (
+        "1. FOLLOWER SEAT: BONDED FIT ON MHA-DT-25, LOCTITE 638\n"
+        "   (CLEARANCE .0002-.0042)."
+    )
+    callout = dt_pinion_bracket_spec.PIN_SEAT_CALLOUT.splitlines()
+    assert callout == [
+        "<HOLE-DEPTH> (.16) FLAT BOTTOM",
+        "SEE NOTE 1",
+        "FLOOR CORNERS R.008 MAX",
+    ]
+    assert drawing.NOTES_XY[0] < drawing.LEFT_CENTER[0]
     assert not hasattr(dt_pinion_bracket_spec, "ISOMETRIC_VIEW_NOTE")
 
 
@@ -339,7 +351,8 @@ def test_set_pin_cross_hole_is_located_by_model_dimensions() -> None:
 
 def test_fitted_bores_name_their_mates_and_fits() -> None:
     # Rule 4 (r1 machinist review, #1007): every REAM band names the mate and
-    # the fit it needs at its own callout, by the parts registry's number.
+    # the fit it needs at its own callout, by the parts registry's number; the
+    # follower seat's callout flags note 1, which names its mate (#3693).
     # Location dimensions carry their value alone (rule 7).  The pinned pivot
     # bore runs on nothing, so it carries no roughness symbol (rule 6).
     import _config
@@ -352,12 +365,13 @@ def test_fitted_bores_name_their_mates_and_fits() -> None:
     expected = {
         "PivotBoreDia": (number("dt-pinion-pivot-shaft"),),
         "ArborBoreDia": (number("dt-pinion-arbor"),),
-        "PinSeatDia": (number("dt-pinion-cam-pin"), "<HOLE-DEPTH>"),
+        "PinSeatDia": ("SEE NOTE 1", "<HOLE-DEPTH>"),
     }
     for name, words in expected.items():
         text = " ".join(callouts[name].splitlines())
         for word in words:
             assert word in text, (name, word)
+    assert number("dt-pinion-cam-pin") in dt_pinion_bracket_spec.DRAWING_NOTES
     # Both seat stations are locations: value and band only (rule 7); their
     # .XXX bands ride the part's exception accepts.
     assert not {"PinSeatCy", "PinSeatCz"} & set(callouts)
