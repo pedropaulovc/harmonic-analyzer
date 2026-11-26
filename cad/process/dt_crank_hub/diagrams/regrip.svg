@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 400" width="760" height="400" font-family="sans-serif" font-size="13">
-  <!-- Hand picture, from above (the cross-slide at the bottom), a section through the axis, to scale at 200 px/in: the hub turned round, its barrel Ø.88 .40 in the jaws from the rear face (process.regrip_grip_in), the relief end inward, the parted end out; Z0 the front face, faced to .987 from the rear face (process.length_target_in). The 3-jaw's body and jaws are schematic (their sizes are not on record). The brass shim wrap's thickness is not on record: drawn 2 px; nothing seats the hub axially. The AR tool schematic (not on record). Hatched: the about .023 faced off (L0 less .987); dotted: this setup's later cuts, the seat (turned to the arm, back to the shoulder at Z-S, drawn S = .3075) and the 3/8 bore through. -->
+  <!-- Hand picture, from above (the cross-slide at the bottom), a section through the axis, to scale at 200 px/in: the hub turned round, its barrel Ø.88 .40 in the jaws from the rear face (process.regrip_grip_in), the relief end inward, the parted end out; Z0 the front face, faced to .987 from the rear face (process.length_target_in). The 3-jaw's body and jaws are schematic (their sizes are not on record). The brass shim wrap's thickness is not on record: drawn 2 px; nothing seats the hub axially. The AR tool schematic (not on record). Hatched: the about .023 faced off (L0 less .987); dashed: this setup's later cuts, the seat (turned to the arm, back to the shoulder at Z-S, drawn S = .3075) and the 3/8 bore through. -->
   <rect class="paper" x="0" y="0" width="760" height="400"/>
   <text class="title" x="20" y="22">Setup 2, Op 80: the AR tool faces the parted end to Z0, .987 from the rear face (to scale, 200 px/in)</text>
   <rect class="fixture-vise" x="262.6" y="64" width="56" height="272"/>
@@ -27,7 +27,7 @@
   <text class="label" x="30" y="56">the jaws, from the rear face</text>
   <line class="leader" x1="150" y1="60" x2="382.6" y2="109"/>
   <circle class="leader-dot" cx="382.6" cy="109" r="2"/>
-  <text class="label" x="30" y="332">dotted: the seat, to the arm, back to Z−S</text>
+  <text class="label" x="30" y="332">dashed: the seat, to the arm, back to Z−S</text>
   <text class="label" x="30" y="348">(S = T − .005), and the 3/8 bore</text>
   <line class="leader" x1="200" y1="322" x2="490" y2="276"/>
   <circle class="leader-dot" cx="490" cy="276" r="2"/>

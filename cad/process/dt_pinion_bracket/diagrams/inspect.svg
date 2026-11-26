@@ -14,13 +14,13 @@
   <line class="leader" x1="300" y1="288" x2="354" y2="226"/>
   <circle class="leader-dot" cx="354" cy="226" r="2"/>
   <text class="label" x="40" y="330">seat {{cad.follower_seat_height_in:.3dot}} from the pivot bore's axis</text>
-  <text class="label" x="40" y="346">(dotted: the seat, into the seat flank)</text>
+  <text class="label" x="40" y="346">(dashed: the seat, into the seat flank)</text>
   <line class="leader" x1="140" y1="318" x2="176" y2="160"/>
   <circle class="leader-dot" cx="176" cy="160" r="2"/>
   <rect class="part-kept" x="410" y="146.85" width="344" height="73.15"/>
   <circle class="holes" cx="526" cy="183.42" r="15.95"/>
   <line class="hidden" x1="470" y1="136.85" x2="470" y2="230"/>
-  <text class="label" x="410" y="246">face A (the bottom edge)</text>
+  <text class="label" x="550" y="246">face A (the bottom edge)</text>
   <text class="label" x="470" y="90">follower seat Ø{{cad.follower_seat_dia_min_in:.4dot}}–{{cad.follower_seat_dia_max_in:.4dot}}, {{cad.follower_seat_depth_in:.2dot}} deep</text>
   <line class="leader" x1="520" y1="96" x2="526" y2="175.42"/>
   <circle class="leader-dot" cx="526" cy="175.42" r="2"/>

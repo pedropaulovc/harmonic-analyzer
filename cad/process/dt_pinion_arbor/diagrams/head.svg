@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 360" width="760" height="360" font-family="sans-serif" font-size="13">
-  <!-- Hand picture, from above (the cross-slide at the bottom), a section through the axis, to scale at 200 px/in: the blank's head end 1.10 out of the jaw fronts (process.head_stickout_mm), the rest back through the spindle, to a break line; Z0 the faced head end (the crown's apex). The head Ø.59 (cad.head_dia_in) to Z-1.0072 (process.neck_end_z_in) first, then the neck Ø.41 (cad.neck_dia_in) from the head's rear face at Z-.5972 (process.head_rear_z_in) to Z-1.0072. The 3-jaw's body and jaws are schematic (their sizes are not on record). The AR tool schematic (not on record), on the finish pass at Ø.59, travelling toward the chuck. Hatched: the turned-off skin; dotted: the neck and the SR.43 crown to come. -->
+  <!-- Hand picture, from above (the cross-slide at the bottom), a section through the axis, to scale at 200 px/in: the blank's head end 1.10 out of the jaw fronts (process.head_stickout_mm), the rest back through the spindle, to a break line; Z0 the faced head end (the crown's apex). The head Ø.59 (cad.head_dia_in) to Z-1.0072 (process.neck_end_z_in) first, then the neck Ø.41 (cad.neck_dia_in) from the head's rear face at Z-.5972 (process.head_rear_z_in) to Z-1.0072. The 3-jaw's body and jaws are schematic (their sizes are not on record). The AR tool schematic (not on record), on the finish pass at Ø.59, travelling toward the chuck. Hatched: the turned-off skin; dashed: the neck and the SR.43 crown to come. -->
   <rect class="paper" x="0" y="0" width="760" height="360"/>
   <text class="title" x="20" y="22">Setup 6, Op 230: the AR tool turns the head Ø.59 from Z0 to Z-1.0072 (to scale, 200 px/in)</text>
   <rect class="fixture-vise" x="298" y="71.5" width="56" height="217"/>
@@ -20,7 +20,7 @@
   <text class="label" x="565" y="346">to Z-{{process.neck_end_z_in:.3dot}}</text>
   <line class="leader" x1="563" y1="326" x2="542" y2="299"/>
   <circle class="leader-dot" cx="542" cy="299" r="2"/>
-  <text class="label" x="150" y="60">dotted: the neck Ø{{cad.neck_dia_in:.2dot}} from the head's rear face at Z-{{process.head_rear_z_in:.4dot}}</text>
+  <text class="label" x="150" y="60">dashed: the neck Ø{{cad.neck_dia_in:.2dot}} from the head's rear face at Z-{{process.head_rear_z_in:.4dot}}</text>
   <line class="leader" x1="260" y1="66" x2="460" y2="139"/>
   <circle class="leader-dot" cx="460" cy="139" r="2"/>
 </svg>

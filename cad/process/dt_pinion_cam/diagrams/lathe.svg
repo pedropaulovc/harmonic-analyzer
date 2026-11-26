@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 380" width="760" height="380" font-family="sans-serif" font-size="13">
-  <!-- Hand picture, from above (the cross-slide at the bottom), a section through the axis, to scale at 200 px/in: the 5/8 bar (process.bar_dia_in) 1.25 out of the jaw fronts (process.stickout_mm), Z0 face F, the faced end. The 3-jaw's body and jaws are schematic (their sizes are not on record). The bar runs on into the chuck to a break line. The AR tool schematic (not on record), its point on the face, feeding to the centre. Hatched: the about .010 faced off; dotted: the O.D. Ø.575 to come, 1.00 long (process.turn_length_in), and the first part-off .35 from F (cad.cam_od_length_in). -->
+  <!-- Hand picture, from above (the cross-slide at the bottom), a section through the axis, to scale at 200 px/in: the 5/8 bar (process.bar_dia_in) 1.25 out of the jaw fronts (process.stickout_mm), Z0 face F, the faced end. The 3-jaw's body and jaws are schematic (their sizes are not on record). The bar runs on into the chuck to a break line. The AR tool schematic (not on record), its point on the face, feeding to the centre. Hatched: the about .010 faced off; dashed: the O.D. Ø.575 to come, 1.00 long (process.turn_length_in), and the first part-off .35 from F (cad.cam_od_length_in). -->
   <rect class="paper" x="0" y="0" width="760" height="380"/>
   <text class="title" x="20" y="22">Setup 1, Op 10: the AR tool faces the bar end clean: face F, Z0 (to scale, 200 px/in)</text>
   <rect class="fixture-vise" x="250" y="71.5" width="56" height="217"/>
@@ -19,7 +19,7 @@
   <text class="label" x="560" y="366" text-anchor="end">{{process.turn_rpm:d}} rpm</text>
   <line class="leader" x1="562" y1="346" x2="618" y2="270"/>
   <circle class="leader-dot" cx="618" cy="270" r="2"/>
-  <text class="label" x="150" y="42">dotted: the O.D. to Ø{{cad.cam_od_dia_in:.3dot}} over {{process.turn_length_in:.2f}} in,</text>
+  <text class="label" x="150" y="42">dashed: the O.D. to Ø{{cad.cam_od_dia_in:.3dot}} over {{process.turn_length_in:.2f}} in,</text>
   <text class="label" x="150" y="58">the first cam parted off {{cad.cam_od_length_in:.3dot}} from face F</text>
   <line class="leader" x1="400" y1="62" x2="480" y2="120"/>
   <circle class="leader-dot" cx="480" cy="120" r="2"/>

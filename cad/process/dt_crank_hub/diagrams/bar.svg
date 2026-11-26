@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 400" width="760" height="400" font-family="sans-serif" font-size="13">
-  <!-- Hand picture, from above (the cross-slide at the bottom), a section through the axis, to scale at 200 px/in: the Ø1 bar (process.bar_dia_in) 1.25 out of the jaw fronts (process.stickout_mm), Z0 its faced end, the hub's REAR face. The 3-jaw's body and jaws are schematic (their sizes are not on record). The bar runs on into the chuck to a break line. The AR tool schematic (not on record), its point on the faced end, feeding to the centre. Hatched: the .02 faced off (process.face_allowance_in); dotted: the rest of this setup's removal, the barrel Ø.88 back to Z-1.12 (process.barrel_run_in), the relief Ø.65 x .16 and the part-off at Z-1.01. -->
+  <!-- Hand picture, from above (the cross-slide at the bottom), a section through the axis, to scale at 200 px/in: the Ø1 bar (process.bar_dia_in) 1.25 out of the jaw fronts (process.stickout_mm), Z0 its faced end, the hub's REAR face. The 3-jaw's body and jaws are schematic (their sizes are not on record). The bar runs on into the chuck to a break line. The AR tool schematic (not on record), its point on the faced end, feeding to the centre. Hatched: the .02 faced off (process.face_allowance_in); dashed: the rest of this setup's removal, the barrel Ø.88 back to Z-1.12 (process.barrel_run_in), the relief Ø.65 x .16 and the part-off at Z-1.01. -->
   <rect class="paper" x="0" y="0" width="760" height="400"/>
   <text class="title" x="20" y="22">Setup 1, Op 10: the AR tool faces the bar end, the hub's rear face (to scale, 200 px/in)</text>
   <rect class="fixture-vise" x="212" y="54" width="56" height="292"/>
@@ -21,10 +21,10 @@
   <text class="label" x="470" y="386" text-anchor="end">DRO Z0 on it</text>
   <line class="leader" x1="472" y1="366" x2="578" y2="292"/>
   <circle class="leader-dot" cx="578" cy="292" r="2"/>
-  <text class="label" x="30" y="40">dotted: next, the barrel Ø{{cad.barrel_dia_in:.3dot}} back past the parting line,</text>
-  <text class="label" x="30" y="56">the relief Ø{{cad.relief_dia_in:.3dot}} x {{cad.relief_length_in:.3dot}}, the part-off at Z-{{process.part_off_in:.3dot}}</text>
-  <line class="leader" x1="312" y1="50" x2="440" y2="106"/>
-  <circle class="leader-dot" cx="440" cy="106" r="2"/>
+  <text class="label" x="30" y="35">dashed: next, the barrel Ø{{cad.barrel_dia_in:.3dot}} back past the parting line,</text>
+  <text class="label" x="30" y="51">the relief Ø{{cad.relief_dia_in:.3dot}} x {{cad.relief_length_in:.3dot}}, the part-off at Z-{{process.part_off_in:.3dot}}</text>
+  <line class="leader" x1="326" y1="48" x2="380" y2="106"/>
+  <circle class="leader-dot" cx="380" cy="106" r="2"/>
   <text class="label" x="40" y="372">3-jaw on the Ø1 bar, {{process.stickout_mm:in.2dot}} out</text>
   <line class="leader" x1="140" y1="360" x2="294" y2="320"/>
   <circle class="leader-dot" cx="294" cy="320" r="2"/>

@@ -236,7 +236,7 @@ indexing = "none"
 machine_ref = "pm-1127vf-lb"
 holding = "3-jaw on the rod, S (Setup 1) out of the jaw fronts, set with the calipers' depth rod, the beam's end on the jaw fronts; the rest in the jaws. The tailstock dead centre, greased, in the tip's centre hole for every cut but the die and the part-off: in for Ops 60–180 and 230–270, the quill backed off for each touch-off on the tip and for the readings (Ops 120, 130, 160, 180, 260) and brought back snug; out for the die (Ops 190–220, the quill squaring it) and the part-off (Op 280)."
 datum = "Z0 (carriage DRO) the tip's faced plane, set in Op 40; each tool touched on the tip again when it takes over (Ops 120, 130, 180, 280). The seat at Z−{{process.seat_z_in:.3dot}}; the under-head face at Z−U and the part-off at Z−P from Setup 1."
-diagram = { file = "diagrams/turn.svg", alt = "Op 40, to scale: the rod S out of the 3-jaw, the AR tool facing the tip square, about .03 off: Z0. Dotted: the head, the shoulder, the #4-40 blank to the seat at Z-{{process.seat_z_in:.3dot}} and the part-off at Z−P." }
+diagram = { file = "diagrams/turn.svg", alt = "Op 40, to scale: the rod S out of the 3-jaw, the AR tool facing the tip square, about .03 off: Z0. Dashed: the head, the shoulder, the #4-40 blank to the seat at Z-{{process.seat_z_in:.3dot}} and the part-off at Z−P." }
 lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{process.stock_dia_mm}}", stock_diameter_mm = "{{process.stock_dia_mm}}", stickout_mm = "{{process.stickout_mm}}", minimum_diameter_mm = "{{process.thread_dia_min_mm}}", support = "tailstock" }
 turning_support = { kind = "tailstock", chuck_z_mm = "{{process.jaw_front_z_mm}}", centre_z_mm = 0.0 }
 

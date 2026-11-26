@@ -213,7 +213,7 @@ indexing = "none"
 machine_ref = "pm-1127vf-lb"
 holding = "The 5/8 bar in the 3-jaw, {{process.stickout_mm:in.2f}} out. Both cams come from this one chucking."
 datum = "The faced end is each cam's FRONT face (the set-screw station is measured from it)."
-diagram = { file = "diagrams/lathe.svg", alt = "Op 10, to scale: the 5/8 bar {{process.stickout_mm:in.2f}} out of the 3-jaw, the AR tool facing its end clean, about .010 off: face F, Z0. Dotted: the O.D. Ø{{cad.cam_od_dia_in:.3dot}} over {{process.turn_length_in:.2f}} and the first cam's part-off {{cad.cam_od_length_in:.3dot}} from F." }
+diagram = { file = "diagrams/lathe.svg", alt = "Op 10, to scale: the 5/8 bar {{process.stickout_mm:in.2f}} out of the 3-jaw, the AR tool facing its end clean, about .010 off: face F, Z0. Dashed: the O.D. Ø{{cad.cam_od_dia_in:.3dot}} over {{process.turn_length_in:.2f}} and the first cam's part-off {{cad.cam_od_length_in:.3dot}} from F." }
 lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = 15.875, stock_diameter_mm = 15.875, stickout_mm = "{{process.stickout_mm}}", minimum_diameter_mm = "{{cad.cam_od_dia_mm}}", support = "none" }
 
 [[setups.operations]]

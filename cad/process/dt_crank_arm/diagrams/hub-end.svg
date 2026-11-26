@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 480" width="760" height="480" font-family="sans-serif" font-size="13">
-  <!-- Hand picture, to scale at 5 px/mm. Top: plan from above, +X right, +Y up toward the fixed jaw: the blank O face up, the T edge on the fixed jaw (Y0), its hub end LEFT, X0 its left end, overhanging the jaws' left ends 40.64 mm (process.overhang_mm); the two 1 in parallels, 1/8 thick, against the jaws dotted under it, their left ends at the jaws' left ends. The spacer at the jaws' right ends and the jaws' far ends are off the picture. Bottom: a section along the line marked in plan, seen from the front (looking +Y, +X right): the fixed jaw and its parallel behind, the jaw tops 11.608 mm over the O face (process.jaw_top_mm); the moving jaw and its parallel in front of the cut, not drawn. The jaw and parallel run on to break lines. The section at Y-12.7, through the seat. The 3/8 end mill (shop em, Ø9.525 mm) at X 21.399 Y-12.700, the +X point of its G2 helix (radius 4.8895, process.seat_path_radius_mm) about the seat's axis at X 16.51 (process.hub_waste_mm + R.50), on its level turn at Z-8.1915 (process.through_bottom_mm), 0.254 under the underside, travelling −Y (clockwise from above). Dotted: the seat Ø.76 and the R.50 round to come. In section it ends in its 12 % arc and runs up to a break line. -->
+  <!-- Hand picture, to scale at 5 px/mm. Top: plan from above, +X right, +Y up toward the fixed jaw: the blank O face up, the T edge on the fixed jaw (Y0), its hub end LEFT, X0 its left end, overhanging the jaws' left ends 40.64 mm (process.overhang_mm); the two 1 in parallels, 1/8 thick, against the jaws dashed under it, their left ends at the jaws' left ends. The spacer at the jaws' right ends and the jaws' far ends are off the picture. Bottom: a section along the line marked in plan, seen from the front (looking +Y, +X right): the fixed jaw and its parallel behind, the jaw tops 11.608 mm over the O face (process.jaw_top_mm); the moving jaw and its parallel in front of the cut, not drawn. The jaw and parallel run on to break lines. The section at Y-12.7, through the seat. The 3/8 end mill (shop em, Ø9.525 mm) at X 21.399 Y-12.700, the +X point of its G2 helix (radius 4.8895, process.seat_path_radius_mm) about the seat's axis at X 16.51 (process.hub_waste_mm + R.50), on its level turn at Z-8.1915 (process.through_bottom_mm), 0.254 under the underside, travelling −Y (clockwise from above). Dashed: the seat Ø.76 and the R.50 round to come. In section it ends in its 12 % arc and runs up to a break line. -->
   <rect class="paper" x="0" y="0" width="760" height="480"/>
   <text class="title" x="20" y="22">Setup 2, CA01 T1: the 3/8 end mill's G2 helix at the seat's bottom, Z-8.192, through into air (to scale, 5 px/mm)</text>
   <rect class="clamp" x="263.2" y="70" width="481.8" height="30"/>
@@ -10,7 +10,7 @@
   <line class="hidden" x1="263.2" y1="115.88" x2="745" y2="115.88"/>
   <line class="hidden" x1="263.2" y1="211.12" x2="745" y2="211.12"/>
   <line class="centre-line" x1="20" y1="163.5" x2="745" y2="163.5"/>
-  <text class="label" x="24" y="159.5">section</text>
+  <text class="label" x="4" y="159.5">section</text>
   <circle class="datum" cx="60" cy="100" r="3.5"/>
   <text class="datum-label" x="66" y="92">X0 Y0</text>
   <circle class="hidden" cx="142.55" cy="163.5" r="48.26"/>
@@ -25,6 +25,9 @@
   <text class="label-on-clamp" x="600" y="339.96">fixed jaw (behind)</text>
   <text class="label-halo" x="600" y="443.69">1 in parallel against</text>
   <text class="label-halo" x="600" y="459.69">the fixed jaw (behind)</text>
+  <line class="datum" x1="16" y1="380" x2="60" y2="380"/>
+  <line class="leader" x1="40" y1="431.69" x2="40" y2="382"/>
+  <circle class="leader-dot" cx="40" cy="382" r="2"/>
   <text class="datum-label" x="20" y="443.69">Z0 the O face (top)</text>
   <path class="cutter" d="M190.81 415.24L190.81 270L182.87 267L174.93 270L167 267L159.06 270L151.12 267L143.18 270L143.18 415.24A23.81 5.71 0 0 0 190.81 415.24Z"/>
   <text class="label" x="300" y="286">the seat Ø{{cad.hub_seat_dia_nominal_in:.2dot}} through into air,</text>

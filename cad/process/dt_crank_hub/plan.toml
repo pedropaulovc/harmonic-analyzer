@@ -170,7 +170,7 @@ indexing = "none"
 machine_ref = "pm-1127vf-lb"
 holding = "3-jaw on the Ø{{process.bar_dia_in:.3dot}} bar, {{process.stickout_mm:in.2dot}} in out of the jaw fronts (rule)."
 datum = "Z0 (carriage DRO): the bar end, faced in Op 10: the hub's REAR face (the relief end)."
-diagram = { file = "diagrams/bar.svg", alt = "Op 10, to scale: the 1 in bar 1.25 out of the 3-jaw, the AR tool facing its end square, about {{process.face_allowance_in:.2dot}} off: Z0, the hub's rear face. Dotted: the barrel Ø{{cad.barrel_dia_in:.3dot}} back past the parting line, the relief Ø{{cad.relief_dia_in:.3dot}} x {{cad.relief_length_in:.3dot}} and the part-off at Z-{{process.part_off_in:.3dot}}." }
+diagram = { file = "diagrams/bar.svg", alt = "Op 10, to scale: the 1 in bar 1.25 out of the 3-jaw, the AR tool facing its end square, about {{process.face_allowance_in:.2dot}} off: Z0, the hub's rear face. Dashed: the barrel Ø{{cad.barrel_dia_in:.3dot}} back past the parting line, the relief Ø{{cad.relief_dia_in:.3dot}} x {{cad.relief_length_in:.3dot}} and the part-off at Z-{{process.part_off_in:.3dot}}." }
 lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = 25.4, stock_diameter_mm = 25.4, stickout_mm = "{{process.stickout_mm}}", minimum_diameter_mm = "{{cad.relief_dia_mm}}", support = "none" }
 
 [[setups.operations]]
@@ -236,7 +236,7 @@ indexing = "none"
 machine_ref = "pm-1127vf-lb"
 holding = "3-jaw over a shim wrap of brass shim on the barrel, {{process.regrip_grip_in:.2dot}} in of the hub in the jaws from the rear face (the relief end inward), the parted end {{process.regrip_out_mm:in.2dot}} in out. Nothing seats the hub axially: the jaw tips may stand proud of the chuck face."
 datum = "Z0: the front face, faced in Op 80 to {{process.length_target_in:.3dot}} from the rear face, preset from the length miked there."
-diagram = { file = "diagrams/regrip.svg", alt = "Op 80, to scale: the hub turned round, its barrel {{process.regrip_grip_in:.2dot}} in the jaws over a shim wrap from the rear face, the parted end out; the AR tool faces it to Z0, {{process.length_target_in:.3dot}} from the rear face. Dotted: the seat and the 3/8 bore to come." }
+diagram = { file = "diagrams/regrip.svg", alt = "Op 80, to scale: the hub turned round, its barrel {{process.regrip_grip_in:.2dot}} in the jaws over a shim wrap from the rear face, the parted end out; the AR tool faces it to Z0, {{process.length_target_in:.3dot}} from the rear face. Dashed: the seat and the 3/8 bore to come." }
 lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{cad.barrel_dia_mm}}", stock_diameter_mm = "{{cad.barrel_dia_mm}}", stickout_mm = "{{process.regrip_out_mm}}", minimum_diameter_mm = "{{cad.seat_dia_ref_mm}}", support = "none" }
 
 [[setups.operations]]

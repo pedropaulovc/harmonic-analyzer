@@ -586,7 +586,7 @@ indexing = "none"
 machine_ref = "pm-1127vf-lb"
 holding = "3-jaw on the blank, the head end {{process.head_stickout_mm:in.2f}} in out of the jaw fronts (rule), the rest of the blank back through the chuck into the spindle bore."
 datum = "Z0 (carriage DRO) the head end faced in Setup 2 (the crown's apex), touched with the AR tool's point in the first op. The head's rear face is at Z-{{process.head_rear_z_in:.4dot}}."
-diagram = { file = "diagrams/head.svg", alt = "To scale: the head end {{process.head_stickout_mm:in.2f}} in out of the 3-jaw; the AR tool turns the head Ø{{cad.head_dia_min_in:.3dot}}–{{cad.head_dia_max_in:.3dot}} from Z0 to Z-{{process.neck_end_z_in:.3dot}}. Dotted: the neck Ø{{cad.neck_dia_in:.2dot}} from the head's rear face." }
+diagram = { file = "diagrams/head.svg", alt = "To scale: the head end {{process.head_stickout_mm:in.2f}} in out of the 3-jaw; the AR tool turns the head Ø{{cad.head_dia_min_in:.3dot}}–{{cad.head_dia_max_in:.3dot}} from Z0 to Z-{{process.neck_end_z_in:.3dot}}. Dashed: the neck Ø{{cad.neck_dia_in:.2dot}} from the head's rear face." }
 lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{process.bar_dia_mm}}", stock_diameter_mm = "{{process.bar_dia_mm}}", stickout_mm = "{{process.head_stickout_mm}}", minimum_diameter_mm = "{{cad.neck_dia_mm}}", support = "none" }
 
 [[setups.operations]]

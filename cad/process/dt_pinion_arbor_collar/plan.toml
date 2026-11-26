@@ -220,7 +220,7 @@ indexing = "none"
 machine_ref = "pm-1127vf-lb"
 holding = "3-jaw on the blank, {{process.stickout_mm:in.2f}} in out of the jaw fronts, measured with the rule; the rest of the blank in the jaws."
 datum = "Z0 (carriage DRO) the end faced in Op 20: the collar's datum end. The pin hole's station and the part-off run from it."
-diagram = { file = "diagrams/lathe.svg", alt = "Op 20, to scale: the blank 1.00 in out of the 3-jaw; the AR tool faces face F square, {{process.face_allowance_in:.2f}} off, to the centre: Z0. Dotted: the O.D. Ø.59 to come over {{process.turn_length_in:.2f}} and the bore." }
+diagram = { file = "diagrams/lathe.svg", alt = "Op 20, to scale: the blank 1.00 in out of the 3-jaw; the AR tool faces face F square, {{process.face_allowance_in:.2f}} off, to the centre: Z0. Dashed: the O.D. Ø.59 to come over {{process.turn_length_in:.2f}} and the bore." }
 lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{process.bar_dia_mm}}", stock_diameter_mm = "{{process.bar_dia_mm}}", stickout_mm = "{{process.stickout_mm}}", minimum_diameter_mm = "{{cad.outer_dia_mm}}", support = "none" }
 
 [[setups.operations]]
