@@ -1,36 +1,38 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 440" font-family="sans-serif" font-size="13">
-  <rect class="paper" x="0" y="0" width="760" height="440"/>
-  <text class="title" x="16" y="20">PF06, plan (fixed jaw at the top): front face to the depth, then the window</text>
-  <rect class="clamp" x="60.0" y="30.0" width="247.0" height="30.0"/>
-  <rect class="clamp" x="60.0" y="260.7" width="247.0" height="30.0"/>
-  <text class="label-on-clamp" x="183.5" y="50.0" text-anchor="middle">fixed jaw</text>
-  <text class="label-on-clamp" x="183.5" y="280.7" text-anchor="middle">moving jaw</text>
-  <rect class="part-kept" x="120.0" y="60.0" width="127.0" height="200.7"/>
-  <rect class="hidden" x="80.0" y="60.0" width="207.0" height="15.9"/>
-  <rect class="hidden" x="80.0" y="244.8" width="207.0" height="15.9"/>
-  <line class="datum" x1="120.0" y1="56.0" x2="120.0" y2="76.0"/>
-  <line class="leader" x1="74.0" y1="82.0" x2="120.0" y2="60.0"/>
-  <text class="datum-label" x="72.0" y="90.0" text-anchor="end">X0 Y0</text>
-  <rect class="part-removed" x="136.5" y="90.5" width="94.0" height="139.7" rx="5.0"/>
-  <rect class="part-waste" x="153.1" y="107.1" width="60.7" height="106.4"/>
-  <text class="label-halo" x="183.5" y="160.3" text-anchor="middle">slug</text>
-  <polyline class="arrow" fill="none" points="144.8,160.3 144.8,98.8 222.2,98.8 222.2,221.9"/>
-  <text class="label" x="317.0" y="120.0">1/8 slot round the window,</text>
-  <text class="label" x="317.0" y="136.0">clockwise, then its finish</text>
-  <text class="label" x="317.0" y="152.0">(corners R.065, .060-.070)</text>
-  <text class="label" x="183.5" y="310.7" text-anchor="middle">T at the fixed jaw, B at the moving jaw</text>
-  <text class="label" x="317.0" y="185.0">dashed: the parallel stacks under the ends</text>
-  <text class="title" x="470.0" y="262.0">Section across the jaws, 2/5 of the plan's scale</text>
-  <line class="fixture-table" x1="420.0" y1="420.0" x2="600.3" y2="420.0"/>
-  <rect class="clamp" x="430.0" y="330.1" width="40.0" height="89.9"/>
-  <rect class="clamp" x="550.3" y="330.1" width="40.0" height="89.9"/>
-  <rect class="fixture-support" x="470.0" y="343.8" width="6.3" height="76.2"/>
-  <rect class="fixture-support" x="543.9" y="343.8" width="6.3" height="76.2"/>
-  <rect class="part-kept" x="470.0" y="328.1" width="80.3" height="15.7"/>
-  <rect class="part-removed" x="470.0" y="324.8" width="80.3" height="3.3"/>
-  <text class="label" x="470.0" y="436.0">1 in + 1/2 in parallels stacked, under each end</text>
-  <rect class="part-removed" x="482.2" y="328.1" width="55.9" height="19.7"/>
-  <text class="label" x="317.0" y="208.0">BK down, T to the fixed jaw; vise snug.</text>
-  <text class="label" x="317.0" y="224.0">Depth {{cad.back_face_depth_min_in:.3dot}}–{{cad.back_face_depth_max_in:.3dot}}; window through</text>
-  <text class="label" x="317.0" y="240.0">{{process.window_run_past_mm:in.3dot}} below BK, between the stacks.</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 820 480" width="820" height="480" font-family="sans-serif" font-size="13">
+  <!-- Hand picture, both views to scale at 5 px/mm from the blank's width (1.000, 25.4 mm, PF04's last level). 1/2 in end mill Ø12.7 mm (face_cutter_dia_mm, shop endmill-carbide-3fl-1-2), its square end drawn as the near half of its end face (an arc 12 % of its diameter deep, its lowest point the true end), drawn 1 in out to a break line (half_mill_projection_min_mm 25.4 is a least stick-out; the collet is not drawn). The cutter on PF06's middle face pass, Y-19.045, at the depth Z7.874 (.310), over the blank, the same place in both views. Hatched in the plan: the window the 1/8 in end mill cuts next (its own picture), X3.302-22.098, Y-6.096 to -34.036 (window_right_mm, window_near_mm, window_far_mm, the side rails .13). Stacks: 1 in + 1/2 in parallels (riser_height_mm 38.1). The vise jaws' thickness and the parallels' length are not on record: schematic. Jaw height 44.9453 mm (vise_jaw_height_mm). -->
+  <rect class="paper" x="0" y="0" width="820" height="480"/>
+  <text class="title" x="20" y="24">PF06: the front face to the depth (the setup's first cut), to scale (5 px/mm)</text>
+  <path class="clamp" d="M50 114L297 114L300 118L297 122L300 126L297 130L50 130Z"/>
+  <text class="label-on-clamp" x="173.5" y="126" text-anchor="middle">fixed jaw</text>
+  <path class="clamp" d="M50 330.66L297 330.66L300 334.66L297 338.66L300 342.66L297 346.66L50 346.66Z"/>
+  <text class="label-on-clamp" x="173.5" y="342.66" text-anchor="middle">moving jaw</text>
+  <path class="fixture-support" d="M65 130L282 130L285 133.97L282 137.94L285 141.91L282 145.88L65 145.88Z"/>
+  <path class="fixture-support" d="M65 314.78L282 314.78L285 318.75L282 322.72L285 326.69L282 330.66L65 330.66Z"/>
+  <rect class="part-kept" x="110" y="130" width="127" height="200.66"/>
+  <rect class="part-removed" x="126.51" y="160.48" width="93.98" height="139.7"/>
+  <circle class="cutter" cx="173" cy="225.23" r="31.75"/>
+  <text class="title" x="100" y="78">Plan, fixed jaw at the top</text>
+  <line class="datum" x1="110" y1="104" x2="110" y2="144"/>
+  <text class="datum-label" x="80" y="100" text-anchor="end">X0 Y0</text>
+  <line class="leader" x1="82" y1="98" x2="110" y2="130"/>
+  <circle class="leader-dot" cx="110" cy="130" r="2"/>
+  <rect class="fixture-vise" x="410" y="440" width="280.66" height="14"/>
+  <rect class="clamp" x="410" y="215.27" width="40" height="224.73"/>
+  <rect class="clamp" x="650.66" y="215.27" width="40" height="224.73"/>
+  <rect class="fixture-support" x="450" y="249.5" width="15.88" height="190.5"/>
+  <rect class="fixture-support" x="634.79" y="249.5" width="15.88" height="190.5"/>
+  <rect class="part-kept" x="450" y="204.42" width="200.66" height="45.08"/>
+  <rect class="part-removed" x="450" y="204.42" width="200.66" height="5.71"/>
+  <path class="cutter" d="M587.19 202.51L587.19 83.13L583.22 86.13L579.25 83.13L575.28 86.13L571.31 83.13L567.34 86.13L563.37 83.13L559.4 86.13L555.44 83.13L551.47 86.13L547.5 83.13L543.53 86.13L539.56 83.13L535.59 86.13L531.62 83.13L527.65 86.13L523.69 83.13L523.69 202.51A31.75 7.62 0 0 0 587.19 202.51Z"/>
+  <line class="datum" x1="690.66" y1="210.13" x2="720.66" y2="210.13"/>
+  <text class="datum-label" x="724.66" y="215.13">Z{{cad.back_face_depth_in:.3dot}}, the pass</text>
+  <line class="datum" x1="690.66" y1="249.5" x2="720.66" y2="249.5"/>
+  <text class="datum-label" x="724.66" y="254.5">Z0 the</text>
+  <text class="datum-label" x="724.66" y="270.5">stacks' top</text>
+  <line class="arrow" x1="80" y1="265.23" x2="250" y2="265.23"/>
+  <text class="title" x="440" y="52">Across the jaws (fixed jaw at the right)</text>
+  <text class="label" x="40" y="390">BK down, T to the fixed jaw, L to the LEFT; vise snug.</text>
+  <text class="label" x="40" y="406">Face to the depth {{cad.back_face_depth_min_in:.3dot}}-{{cad.back_face_depth_max_in:.3dot}} in one level; hatched:</text>
+  <text class="label" x="40" y="422">the window, cut next with the 1/8 in end mill.</text>
+  <text class="label" x="450" y="472">1 in + 1/2 in parallels stacked, under each end</text>
 </svg>

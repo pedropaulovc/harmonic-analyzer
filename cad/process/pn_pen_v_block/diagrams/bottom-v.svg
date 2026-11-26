@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 470" width="760" height="470" font-family="sans-serif" font-size="13">
+  <!-- Hand picture, to scale at 6 px/mm from the neck's .700 (17.78 mm) width. 1/4 in 90° chamfer mill Ø6.35 mm (shop chamfer-mill-carbide-1-4-90; flute_length_mm 3.175: its 45° cone runs to a point), its point at the V's last level, the flat .196 (4.984 mm, flat_height_ref) below B, on the V's centre line .430 from the front (the drawing); drawn 1 in out to a break line, the collet not drawn (its stick-out is not on record). The V: mouth .194-.666 from the front, flat .080 wide (the drawing), hatched. The neck stands .080 clear of each jaw (the steps). Stacks 1/2 + 5/8 in (stack_height_mm). The vise jaws' thickness and the parallels' length are not on record: schematic. Jaw height 44.9453 mm (vise_jaw_height_mm). -->
+  <rect class="paper" x="0" y="0" width="760" height="470"/>
+  <text class="title" x="20" y="24">VB05, M6 T2: the chamfer mill sweeps the V's flat, across the neck, to scale (6 px/mm)</text>
+  <rect class="fixture-vise" x="204.47" y="450" width="251.06" height="14"/>
+  <rect class="clamp" x="204.47" y="180.33" width="60" height="269.67"/>
+  <rect class="clamp" x="395.53" y="180.33" width="60" height="269.67"/>
+  <rect class="fixture-support" x="264.47" y="278.55" width="19.05" height="171.45"/>
+  <rect class="fixture-support" x="376.48" y="278.55" width="19.05" height="171.45"/>
+  <path class="part-kept" d="M383.34 278.55L276.66 278.55L276.66 167.3L383.34 167.3Z"/>
+  <path class="part-removed" d="M366 167.3L294 167.3L323.9 197.2L336.1 197.2Z"/>
+  <path class="cutter" d="M349.05 75.28L349.05 178.15L330 197.2L310.95 178.15L310.95 75.28L314.76 72.28L318.57 75.28L322.38 72.28L326.19 75.28L330 72.28L333.81 75.28L337.62 72.28L341.43 75.28L345.24 72.28Z"/>
+  <line class="centre-line" x1="330" y1="40" x2="330" y2="460"/>
+  <line class="datum" x1="459.53" y1="278.55" x2="495.53" y2="278.55"/>
+  <text class="datum-label" x="499.53" y="283.55">Z0 the stacks' top (TOP)</text>
+  <text class="label" x="520" y="70">1/4 in 90° chamfer mill: its point</text>
+  <text class="label" x="520" y="86">sweeps the V's {{cad.v_groove_flat_width_in:.3dot}} flat at the last</text>
+  <text class="label" x="520" y="102">level, .196 below B</text>
+  <line class="leader" x1="518" y1="80" x2="349.05" y2="117.2"/>
+  <circle class="leader-dot" cx="349.05" cy="117.2" r="2"/>
+  <text class="label" x="520" y="330">the neck, {{process.back_step_depth_mm:in.3dot}} clear</text>
+  <text class="label" x="520" y="346">of each jaw</text>
+  <line class="leader" x1="518" y1="326" x2="379.34" y2="230.55"/>
+  <circle class="leader-dot" cx="379.34" cy="230.55" r="2"/>
+  <text class="label" x="520" y="400">1/2 + 5/8 in parallels</text>
+  <text class="label" x="520" y="416">stacked against each jaw</text>
+</svg>

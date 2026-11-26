@@ -1,23 +1,32 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 440" font-family="sans-serif" font-size="13">
-  <rect class="paper" x="0" y="0" width="760" height="440"/>
-  <text class="title" x="16" y="20">PF03, along the jaws (BK at the fixed jaw): the edge up skimmed: the left face L</text>
-  <line class="fixture-table" x1="60.0" y1="420.0" x2="520.0" y2="420.0"/>
-  <rect class="fixture-support" x="70.0" y="293.0" width="420.0" height="127.0"/>
-  <rect class="clamp" x="60.0" y="195.3" width="440.0" height="6.0"/>
-  <text class="label" x="330.7" y="189.3">jaw tops (fixed jaw behind;</text>
-  <text class="label" x="330.7" y="217.3">moving jaw cut away)</text>
-  <rect class="part-kept" x="120.0" y="136.8" width="200.7" height="156.2"/>
-  <rect class="part-removed" x="120.0" y="134.2" width="200.7" height="2.5"/>
-  <rect class="cutter" x="68.2" y="102.2" width="63.5" height="30.0"/>
-  <text class="label-halo" x="137.8" y="120.2"></text>
-  <line class="arrow" x1="100.0" y1="94.2" x2="360.7" y2="94.2"/>
-  <text class="label-halo" x="180.0" y="88.2">passes along X, two across the 3/8</text>
-  <line class="datum" x1="120.0" y1="301.0" x2="120.0" y2="285.0"/>
-  <text class="datum-label" x="116.0" y="317.0" text-anchor="middle">X0 (B)</text>
-  <text class="label" x="320.7" y="317.0" text-anchor="middle">T</text>
-  <text class="label" x="70.0" y="356.5">1 in parallel</text>
-  <text class="label" x="470.0" y="120.0">On edge on the 1 in parallels,</text>
-  <text class="label" x="470.0" y="138.0">gripped on the wide faces, B LEFT.</text>
-  <text class="label" x="470.0" y="156.0">Skim the edge up down to {{process.edge_level_mm:in.3dot}}</text>
-  <text class="label" x="470.0" y="174.0">above the parallels: it becomes L.</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 470" width="760" height="470" font-family="sans-serif" font-size="13">
+  <!-- Hand picture, to scale at 5 px/mm from the blank's length (the height 1.580, 40.132 mm). 1/2 in end mill Ø12.7 mm (face_cutter_dia_mm, shop endmill-carbide-3fl-1-2), its square end drawn as the near half of its end face (an arc 12 % of its diameter deep, its lowest point the true end), drawn 1 in out to a break line (half_mill_projection_min_mm 25.4 is a least stick-out; the collet is not drawn). Shown on its pass at Y-3.675 (the other, at Y1.338, hangs over the fixed jaw), over the middle of the blank, the pass along X arrowed; the blank 1-1/4 in (31.75 mm) tall on the 1 in parallels. Drawn at Z31.242 (edge_level_mm), .020 off the 1.250 bar, hatched. The vise jaws' thickness and the parallels' length are not on record: schematic. Jaw height 44.9453 mm (vise_jaw_height_mm). -->
+  <rect class="paper" x="0" y="0" width="760" height="470"/>
+  <text class="title" x="20" y="24">PF03, along the jaws, to scale (5 px/mm): the edge up skimmed: the left face L</text>
+  <rect class="fixture-vise" x="90" y="430" width="430" height="14"/>
+  <rect class="clamp" x="90" y="205.27" width="430" height="224.73"/>
+  <path class="paper" d="M60 303L560 303L563 306.97L560 310.94L563 314.91L560 318.88L563 322.84L560 326.81L563 330.78L560 334.75L563 338.72L560 342.69L563 346.66L560 350.62L563 354.59L560 358.56L563 362.53L560 366.5L563 370.47L560 374.44L563 378.41L560 382.38L563 386.34L560 390.31L563 394.28L560 398.25L563 402.22L560 406.19L563 410.16L560 414.12L563 418.09L560 422.06L563 426.03L560 430L60 430Z"/>
+  <path class="fixture-support" d="M60 303L560 303L563 306.97L560 310.94L563 314.91L560 318.88L563 322.84L560 326.81L563 330.78L560 334.75L563 338.72L560 342.69L563 346.66L560 350.62L563 354.59L560 358.56L563 362.53L560 366.5L563 370.47L560 374.44L563 378.41L560 382.38L563 386.34L560 390.31L563 394.28L560 398.25L563 402.22L560 406.19L563 410.16L560 414.12L563 418.09L560 422.06L563 426.03L560 430L60 430Z"/>
+  <rect class="part-kept" x="150" y="144.25" width="200.66" height="158.75"/>
+  <text class="label-on-clamp" x="512" y="225.27" text-anchor="end">fixed jaw (behind);</text>
+  <text class="label-on-clamp" x="512" y="241.27" text-anchor="end">the moving jaw</text>
+  <text class="label-on-clamp" x="512" y="257.27" text-anchor="end">not shown</text>
+  <rect class="part-removed" x="150" y="144.25" width="200.66" height="2.54"/>
+  <path class="cutter" d="M282.08 139.17L282.08 45.19L278.11 48.19L274.14 45.19L270.17 48.19L266.2 45.19L262.24 48.19L258.27 45.19L254.3 48.19L250.33 45.19L246.36 48.19L242.39 45.19L238.42 48.19L234.45 45.19L230.49 48.19L226.52 45.19L222.55 48.19L218.58 45.19L218.58 139.17A31.75 7.62 0 0 0 282.08 139.17Z"/>
+  <line class="arrow" x1="292.08" y1="76.79" x2="392.08" y2="76.79"/>
+  <line class="datum" x1="60" y1="146.79" x2="146" y2="146.79"/>
+  <text class="datum-label" x="56" y="151.79" text-anchor="end">Z{{process.edge_level_mm:in.3dot}}</text>
+  <line class="datum" x1="150" y1="114.25" x2="150" y2="140.25"/>
+  <text class="datum-label" x="144" y="132.25" text-anchor="end">X0 (B)</text>
+  <text class="label" x="356.66" y="132.25">T</text>
+  <line class="datum" x1="20" y1="303" x2="146" y2="303"/>
+  <text class="datum-label" x="20" y="295">Z0 the parallels' top</text>
+  <text class="label" x="296.08" y="66.79">passes along X, two across the 3/8</text>
+  <text class="label" x="545" y="120">On edge on the 1 in parallels,</text>
+  <text class="label" x="545" y="136">gripped on the wide faces, B LEFT.</text>
+  <text class="label" x="545" y="152">Skim the edge up down to {{process.edge_level_mm:in.3dot}}</text>
+  <text class="label" x="545" y="168">above the parallels: it becomes L.</text>
+  <text class="label" x="570" y="370">1 in parallels,</text>
+  <text class="label" x="570" y="386">one against each jaw</text>
+  <line class="leader" x1="568" y1="366" x2="530" y2="380"/>
+  <circle class="leader-dot" cx="530" cy="380" r="2"/>
 </svg>

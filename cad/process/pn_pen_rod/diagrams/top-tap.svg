@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 400" width="760" height="400">
+  <!-- Hand picture, the blank and the tap's diameter to scale at 20 px/mm from the 5 mm square (square_mm). #0-80 plug tap Ø.060 (the thread's major diameter, the hole it makes), its point .15 deep (plug_tap_reach_in). The tap's length, the T-handle wrench and the MT3 dead centre are not on record: schematic. The wrench and the dead centre are drawn in the tool's colour: they travel with the tap (the quill follows it). The 4-jaw and its shims are schematic. -->
+  <rect class="paper" x="0" y="0" width="760" height="400"/>
+  <text class="title" x="20" y="24">Top end, the blank to scale (20 px/mm): the plug tap by hand, the dead centre in the wrench</text>
+  <rect class="fixture-vise" x="70" y="65" width="110" height="250"/>
+  <rect class="clamp" x="180" y="66" width="120" height="70"/>
+  <rect class="part-rest" x="180" y="136" width="120" height="4"/>
+  <rect class="clamp" x="180" y="244" width="120" height="70"/>
+  <rect class="part-rest" x="180" y="240" width="120" height="4"/>
+  <text class="label" x="70" y="370">4-jaw (schematic) on the flats over brass shims;</text>
+  <text class="label" x="70" y="386">indicate each pair of flats within {{process.indicate_tir_in:.3dot}} TIR</text>
+  <path class="part-kept" d="M528.6 140L528.6 240L20 240L17 235.83L20 231.67L17 227.5L20 223.33L17 219.17L20 215L17 210.83L20 206.67L17 202.5L20 198.33L17 194.17L20 190L17 185.83L20 181.67L17 177.5L20 173.33L17 169.17L20 165L17 160.83L20 156.67L17 152.5L20 148.33L17 144.17L20 140Z"/>
+  <rect class="part-removed" x="391.44" y="178.09" width="137.16" height="23.81"/>
+  <line class="centre-line" x1="10" y1="190" x2="740" y2="190"/>
+  <path class="cutter" d="M456.06 174.76L626 174.76L626 205.24L456.06 205.24A3.66 15.24 0 0 1 456.06 174.76Z"/>
+  <rect class="cutter" x="626" y="168" width="28" height="44"/>
+  <rect class="cutter" x="633" y="120" width="14" height="140"/>
+  <path class="cutter" d="M654 190L680 178L750 178L750 202L680 202Z"/>
+  <line class="datum" x1="528.6" y1="80" x2="528.6" y2="136"/>
+  <text class="datum-label" x="522.6" y="100" text-anchor="end">Z0 top face</text>
+  <line class="dims" x1="452.4" y1="196" x2="452.4" y2="276"/>
+  <line class="dims" x1="528.6" y1="244" x2="528.6" y2="276"/>
+  <line class="dims" x1="452.4" y1="270" x2="528.6" y2="270"/>
+  <text class="label" x="392.4" y="294">pencil mark {{process.plug_tap_reach_in:.2dot}} from the point: stop at the top face</text>
+  <text class="label" x="545" y="52">#0-80 plug tap (Ø{{cad.stud_tap_thread_major_mm:in.3dot}}) in the</text>
+  <text class="label" x="545" y="68">T-handle wrench, turned by</text>
+  <text class="label" x="545" y="84">hand, the chuck held still</text>
+  <line class="leader" x1="580" y1="90" x2="580" y2="174.76"/>
+  <circle class="leader-dot" cx="580" cy="174.76" r="2"/>
+  <text class="label" x="560" y="330">dead centre's point in the</text>
+  <text class="label" x="560" y="346">wrench's top centre hole</text>
+  <line class="leader" x1="680" y1="318" x2="670" y2="198"/>
+  <circle class="leader-dot" cx="670" cy="198" r="2"/>
+</svg>
