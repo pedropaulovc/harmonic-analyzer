@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 420" width="760" height="420" font-family="sans-serif" font-size="13">
+  <!-- Section through the hold-down from the front, 4 px/mm. The #4-40 plug tap (major .112 = 11.4 px; length and lead schematic) through the blank's #31 hole (3.048, clear of the tap's .112) into the plate, tap_4_40_depth_mm 10.16 deep (16 turns); the Fisher tap guide and the T-handle wrench in the cutter colour. -->
+  <rect class="paper" x="0" y="0" width="760" height="420"/>
+  <text class="title" x="20" y="22">Op 350 (PL06): tap #4-40 into the plate down the hold-down hole (section, 4 px/mm)</text>
+  <rect class="fixture-plate" x="220" y="330" width="320" height="50.8"/>
+  <rect class="part-kept" x="220" y="304.6" width="320" height="25.4"/>
+  <rect class="holes" x="373.9" y="304.6" width="12.19" height="25.4"/>
+  <rect class="holes" x="369.33" y="315.98" width="21.34" height="14.02"/>
+  <rect class="part-threads" x="374.31" y="330" width="11.38" height="40.64"/>
+  <path class="cutter" d="M385.69 369.27L385.69 194.6L374.31 194.6L374.31 369.27A5.69 1.37 0 0 0 385.69 369.27Z"/>
+  <rect class="cutter" x="320" y="184.6" width="120" height="10"/>
+  <rect class="cutter" x="370" y="180.6" width="20" height="26"/>
+  <path class="cutter" d="M370.48 150.12L389.52 150.12L389.52 171.07L380 180.6L370.48 171.07Z"/>
+  <path class="cutter" d="M405.4 150.12L405.4 30L398.14 27L390.89 30L383.63 27L376.37 30L369.11 27L361.86 30L354.6 30L354.6 150.12Z"/>
+  <text class="datum-label" x="224" y="346">Z0 the plate's top</text>
+  <text class="label" x="470" y="80">Fisher tap guide in the 1/2 in collet, spindle</text>
+  <text class="label" x="470" y="96">off, its spring point in the wrench's centre hole</text>
+  <line class="leader" x1="466" y1="76" x2="392" y2="70"/>
+  <circle class="leader-dot" cx="392" cy="70" r="2"/>
+  <text class="label" x="470" y="190">T-handle wrench (schematic)</text>
+  <line class="leader" x1="466" y1="186" x2="440" y2="188.6"/>
+  <circle class="leader-dot" cx="440" cy="188.6" r="2"/>
+  <text class="label" x="470" y="280">#4-40 into the plate by hand, {{process.tap_4_40_turns:d}} turns past</text>
+  <text class="label" x="470" y="296">the first bite ({{process.tap_4_40_depth_mm:in.2f}} in), a half turn back each turn</text>
+  <line class="leader" x1="466" y1="276" x2="384" y2="350.32"/>
+  <circle class="leader-dot" cx="384" cy="350.32" r="2"/>
+</svg>

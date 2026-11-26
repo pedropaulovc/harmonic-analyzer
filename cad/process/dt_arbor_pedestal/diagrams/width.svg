@@ -1,29 +1,37 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 400" font-family="sans-serif" font-size="13">
-  <!-- Setup 2: lying on the 13/16 + 1/2 in stacks, W down, F at the fixed jaw; PA01 faces E to the width. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 400" width="760" height="400" font-family="sans-serif" font-size="13">
+  <!-- 4 px/mm. Across the jaws seen from the RIGHT end: +Y (the fixed jaw, F) right, +X out of the page; X0, the blank's left end, away from you. The 13/16 + 1/2 in stacks (riser_height_mm 33.3375) 1/8 in thick against each jaw. The 1/2 in end mill (50.8 px, 12 % end arc) on PA01's first level Z 24.638, on the pass Y -9.775 (wholly over the blank), running +X toward you (NC line 33); drawn short to a break (the collet not on record). -->
   <rect class="paper" x="0" y="0" width="760" height="400"/>
-  <text class="title" x="20" y="20">Setup 2 (PA01_width): face the top down to the width; it becomes E</text>
+  <text class="title" x="20" y="22">Setup 2 (PA01_width), 4 px/mm: face the top down to the width; it becomes E</text>
   <rect class="fixture-vise" x="111.5" y="360" width="277" height="14"/>
   <rect class="clamp" x="131.5" y="180.22" width="55" height="179.78"/>
   <rect class="clamp" x="313.5" y="180.22" width="55" height="179.78"/>
-  <text class="label-on-clamp" x="159" y="196.22" text-anchor="middle">moving</text>
-  <text class="label-on-clamp" x="341" y="196.22" text-anchor="middle">fixed</text>
-  <rect class="fixture-support" x="186.5" y="226.65" width="12.7" height="133.35"/>
-  <rect class="fixture-support" x="300.8" y="226.65" width="12.7" height="133.35"/>
+  <rect class="fixture-support" x="186.5" y="277.45" width="12.7" height="82.55"/>
+  <rect class="fixture-support" x="300.8" y="277.45" width="12.7" height="82.55"/>
+  <rect class="fixture-support" x="186.5" y="226.65" width="12.7" height="50.8"/>
+  <rect class="fixture-support" x="300.8" y="226.65" width="12.7" height="50.8"/>
+  <text class="label-on-clamp" x="159" y="350" text-anchor="middle">moving</text>
+  <text class="label-on-clamp" x="341" y="350" text-anchor="middle">fixed</text>
   <rect class="part-arriving" x="186.5" y="125.05" width="127" height="101.6"/>
   <rect class="part-kept" x="186.5" y="131.15" width="127" height="95.5"/>
   <rect class="part-removed" x="186.5" y="125.05" width="127" height="6.1"/>
   <line class="active-face" x1="186.5" y1="131.15" x2="313.5" y2="131.15"/>
-  <rect class="cutter" x="224.6" y="65.05" width="50.8" height="56"/>
-  <text class="label" x="281.4" y="95.05">1/2 in end mill</text>
+  <path class="cutter" d="M299.8 122L299.8 30L292.54 27L285.29 30L278.03 27L270.77 30L263.51 27L256.26 30L249 30L249 122A25.4 6.1 0 0 0 299.8 122Z"/>
   <line class="hidden" x1="116.5" y1="180.22" x2="383.5" y2="180.22"/>
   <text class="label" x="433.5" y="184.22">jaw tops</text>
-  <line class="leader" x1="303.5" y1="131.15" x2="500" y2="91.15"/>
+  <line class="leader" x1="500" y1="91.15" x2="303.5" y2="131.15"/>
   <circle class="leader-dot" cx="303.5" cy="131.15" r="2"/>
   <text class="label" x="504" y="95.15">E: Z {{cad.east_side_width_mm:in.4dot}}, levels of {{process.face_step_max_mm:in.3dot}} max</text>
+  <text class="label" x="20" y="70">1/2 in end mill, level 1 (Z 24.638 mm),</text>
+  <text class="label" x="20" y="86">pass Y -9.775: +X, toward you</text>
+  <line class="leader" x1="150" y1="92" x2="252" y2="100"/>
+  <circle class="leader-dot" cx="252" cy="100" r="2"/>
   <text class="label" x="250" y="216.65" text-anchor="middle">W down</text>
   <text class="label" x="307.5" y="161.15" text-anchor="end">F</text>
   <circle class="datum" cx="313.5" cy="226.65" r="3.5"/>
   <text class="datum-label" x="373.5" y="244.65">Y0 the fixed jaw (F); Z0 the stacks' top (W)</text>
-  <text class="label" x="470" y="290">Looking along the jaws from the right end:</text>
-  <text class="label" x="470" y="308">X0, the blank's left end, away from you.</text>
+  <line class="leader" x1="436" y1="290" x2="306" y2="300"/>
+  <circle class="leader-dot" cx="306" cy="300" r="2"/>
+  <text class="label" x="440" y="294">13/16 + 1/2 in stacks, 1/8 in thick, at each jaw</text>
+  <text class="label" x="440" y="330">Looking along the jaws from the right end:</text>
+  <text class="label" x="440" y="346">X0, the blank's left end, away from you.</text>
 </svg>

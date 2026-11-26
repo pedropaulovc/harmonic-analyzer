@@ -704,7 +704,7 @@ indexing = "none"
 machine_ref = "pm-1127vf-lb"
 holding = "3-jaw over a brass shim wrap on the Ø.59 head, its rear face .25 out of the jaw fronts and the shim (rule), the neck and the bar out of the jaws; the back end's centre hole on the MT3 dead centre, a dab of grease on its point, the quill snug and locked. The follow rest bolts to the saddle's headstock side, its jaws a lead L ahead of the tool's left edge: it goes on only after the head-end stretch (the shoulder to Z+{{process.rest_joint_in:.2f}}) is finished, and every touch-off on the head's rear face is made with it lifted off (two bolts) and bolted back after, its jaws reset. Recheck the centre snug before each pass: the shaft lengthens as it warms."
 datum = "Z0 (carriage DRO) the head's rear face (faced with the sharp-nose tool in Setup 6), touched with each tool's left edge, the follow rest off; every station is +Z from it."
-diagram = { file = "diagrams/shaft.svg", alt = "The blank between the 3-jaw on the head and the dead centre in the back end; the follow rest rides just ahead of the tool on the diameter not yet cut, from the back end to the joint at 3.20, as the shaft is turned to Ø.3117 its whole length, the Ø.28 relief between 4.20 and 6.80, the SR.28 back crown stepped at the tailstock end." }
+diagram = { file = "diagrams/shaft.svg", alt = "The blank between the 3-jaw on the head and the dead centre in the back end; the follow rest rides just ahead of the tool on the diameter not yet cut, from the back end to the joint at 3.20, as the shaft is turned to the aim A its whole length, the Ø.28 relief between 4.20 and 6.80, the SR.28 back crown stepped at the tailstock end." }
 lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{cad.head_dia_mm}}", stock_diameter_mm = "{{process.bar_dia_mm}}", stickout_mm = 241.8, minimum_diameter_mm = "{{cad.bond_relief_dia_mm}}", support = "tailstock" }
 
 [[setups.operations]]
@@ -834,7 +834,7 @@ feed = "hand"
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "The rest's jaws for the relief. L under 2.55: set on the diameter the last pass left (the Ø.3117 for the first); each later pass stops when they come .05 short of Z+{{cad.bond_relief_station_in:.2dot}}, then the jaws are backed off and the last stretch fed by hand. L 2.55 or more: on the Ø.3117 head-side of the relief for every pass."
+instruction = "The rest's jaws for the relief. L under 2.55: set on the diameter the last pass left (the finished A for the first); each later pass stops when they come .05 short of Z+{{cad.bond_relief_station_in:.2dot}}, then the jaws are backed off and the last stretch fed by hand. L 2.55 or more: on the finished A head-side of the relief for every pass."
 feed = "hand"
 
 [[setups.operations]]
@@ -894,7 +894,7 @@ speed_kind = "spindle"
 tool = "ar"
 drilling = "none"
 sizing = "other"
-instruction = "AR tool back. Spindle stopped, the follow rest lifted off: touch its left edge on the head's rear face, DRO Z0 again; the rest bolted back, its jaws on the Ø.3117. Step the SR.28 back crown from the rim at Z+{{cad.back_crown_rim_station_in:.2dot}}: at each line, carriage at the Z, face from the Ø out to the shaft's O.D.: Z+9.3602 from Ø.280; Z+9.3707 Ø.240; Z+9.3792 Ø.200; Z+9.3860 Ø.160; Z+9.3912 Ø.120. The dead centre's hole stays inside Ø.12."
+instruction = "AR tool back. Spindle stopped, the follow rest lifted off: touch its left edge on the head's rear face, DRO Z0 again; the rest bolted back, its jaws on the finished A. Step the SR.28 back crown from the rim at Z+{{cad.back_crown_rim_station_in:.2dot}}: at each line, carriage at the Z, face from the Ø out to the shaft's O.D.: Z+9.3602 from Ø.280; Z+9.3707 Ø.240; Z+9.3792 Ø.200; Z+9.3860 Ø.160; Z+9.3912 Ø.120. The dead centre's hole stays inside Ø.12."
 settings = "lathe-ar-1018"
 cut_diameter_mm = "{{cad.shaft_dia_mm}}"
 

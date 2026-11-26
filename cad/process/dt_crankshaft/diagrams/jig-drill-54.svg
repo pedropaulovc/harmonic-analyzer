@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 360" width="760" height="360" font-family="sans-serif" font-size="13">
+  <!-- As Op 630's picture. The #54 drill (1.397 = 11.2 px) knockout_stickout_in 1.63 out, from the reamed floor on through the spigot (6.909 thick) into the 1/8 gap, its point at Z-.32 (knockout_tip_in): 1.22 mm into the 3.175 mm gap, short of the jig face. -->
+  <rect class="paper" x="0" y="0" width="760" height="360"/>
+  <text class="title" x="20" y="22">Op 650: the #54 taper-length drill on through the spigot into the gap (8 px/mm)</text>
+  <line class="centre-line" x1="20" y1="150" x2="740" y2="150"/>
+  <rect class="part-kept" x="221.6" y="111.9" width="178.4" height="76.2"/>
+  <rect class="part-kept" x="400" y="80" width="55.27" height="140"/>
+  <path class="part-kept" d="M455.27 105.55L745 105.55L742 112.96L745 120.37L742 127.78L745 135.19L742 142.59L745 150L742 157.41L745 164.82L742 172.23L745 179.64L742 187.04L745 194.45L455.27 194.45Z"/>
+  <path class="fixture-plate" d="M480.67 48.4L745 48.4L742 55.41L745 62.41L742 69.42L745 76.43L742 83.43L745 90.44L742 97.45L745 104.46L742 111.46L745 118.47L742 125.48L745 132.48L742 139.49L745 146.5L742 153.5L745 160.51L742 167.52L745 174.52L742 181.53L745 188.54L742 195.54L745 202.55L742 209.56L745 216.57L742 223.57L745 230.58L742 237.59L745 244.59L745 251.6L480.67 251.6Z"/>
+  <path class="part-kept" d="M480.67 105.55L745 105.55L742 112.96L745 120.37L742 127.78L745 135.19L742 142.59L745 150L742 157.41L745 164.82L742 172.23L745 179.64L742 187.04L745 194.45L480.67 194.45Z"/>
+  <text class="label" x="490.67" y="40.4">jig (bore .4385), journal in it</text>
+  <text class="label" x="457.27" y="269.6">1/8 spacer gap</text>
+  <rect class="holes" x="400" y="200.41" width="55.27" height="11.18"/>
+  <path class="cutter" d="M133.81 200.41L461.67 200.41L465.02 206L461.67 211.59L133.81 211.59Z"/>
+  <rect class="cutter" x="73.81" y="166" width="60" height="80"/>
+  <text class="label" x="73.81" y="262">drill chuck (schematic)</text>
+  <line class="arrow" x1="680.67" y1="281.6" x2="620.67" y2="281.6"/>
+  <text class="label" x="520.67" y="301.6">carriage feeds the jig onto the cutter</text>
+  <text class="label" x="30" y="40">#54 drill {{process.knockout_stickout_in:.2f}} out: through the spigot into the gap,</text>
+  <text class="label" x="30" y="56">its tip to Z-{{process.knockout_tip_in:.2dot}}, pecking .02</text>
+  <line class="dims" x1="205.6" y1="150" x2="205.6" y2="206"/>
+  <text class="label" x="199.6" y="182" text-anchor="end">{{process.pin_x_mm:.3f}} mm</text>
+  <text class="datum-label" x="396" y="72" text-anchor="end">Z0 + H: the spigot face</text>
+  <text class="datum-label" x="199.6" y="142" text-anchor="end">X0 the stub's axis</text>
+</svg>

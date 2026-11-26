@@ -1,37 +1,26 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 330" font-family="sans-serif" font-size="13">
-  <rect class="paper" x="0" y="0" width="760" height="330"/>
-  <text class="title" x="20" y="22">The 1/16 square key stock in the bench vise's soft jaws, seen from the front (not to scale)</text>
-  <!-- Op 20: the rod's end filed square, 1/16 out -->
-  <text class="label" x="20" y="50">Op 20: file the bar end</text>
-  <rect class="fixture-vise" x="20" y="170" width="90" height="110"/>
-  <rect class="fixture-vise" x="126" y="170" width="90" height="110"/>
-  <rect class="part-rest" x="110" y="154" width="16" height="126"/>
-  <rect class="part-removed" x="110" y="146" width="16" height="8"/>
-  <line class="datum" x1="92" y1="154" x2="144" y2="154"/>
-  <rect class="cutter" x="68" y="128" width="100" height="10"/>
-  <text class="datum-label" x="20" y="160">filed end</text>
-  <line class="leader" x1="84" y1="156" x2="108" y2="155"/>
-  <circle class="leader-dot" cx="110" cy="155" r="2.5"/>
-  <text class="label" x="20" y="300">end 1/32 above the jaws</text>
-  <!-- Op 30: the .17 piece above the jaws, sawn at the mark -->
-  <text class="label" x="270" y="50">Op 30: saw the .17 piece off</text>
-  <rect class="fixture-vise" x="270" y="170" width="90" height="110"/>
-  <rect class="fixture-vise" x="376" y="170" width="90" height="110"/>
-  <rect class="part-rest" x="360" y="160" width="16" height="120"/>
-  <rect class="part-kept" x="360" y="70" width="16" height="86"/>
-  <line class="datum" x1="342" y1="70" x2="394" y2="70"/>
-  <line class="datum" x1="346" y1="158" x2="390" y2="158"/>
-  <rect class="cutter" x="320" y="161" width="110" height="4"/>
-  <text class="label" x="400" y="110">.17 piece</text>
-  <text class="label" x="236" y="132">blade just</text>
-  <text class="label" x="236" y="148">below the mark</text>
-  <text class="label" x="270" y="300">mark 1/32 above the jaws</text>
-  <!-- Op 40: the piece filed end down, the sawn end filed to length -->
-  <text class="label" x="530" y="50">Op 40: file the sawn end</text>
-  <rect class="fixture-vise" x="530" y="170" width="90" height="110"/>
-  <rect class="fixture-vise" x="636" y="170" width="90" height="110"/>
-  <rect class="part-kept" x="620" y="154" width="16" height="96"/>
-  <rect class="part-removed" x="620" y="146" width="16" height="8"/>
-  <rect class="cutter" x="578" y="128" width="100" height="10"/>
-  <text class="label" x="530" y="300">filed end down; .14–.16</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 420" width="760" height="420" font-family="sans-serif" font-size="13">
+  <!-- Scale 1 in = 800 px: the 1/16 key stock (blank_width_in .0625) is 50 px wide; its end stands 1/32 in (25 px) above the jaw tops (Op 20). The soft jaws and the file's section are not on record: drawn schematic. The file's stroke runs along its length, across the end; the bar below the jaws is broken (12 in bar). -->
+  <rect class="paper" x="0" y="0" width="760" height="420"/>
+  <text class="title" x="20" y="22">Setup 1, Op 20: file the bar end square, seen from the front (1 in = 800 px)</text>
+  <path class="fixture-vise" d="M195 380L195 250L305 250L305 380L297.67 377L290.33 380L283 377L275.67 380L268.33 377L261 380L253.67 377L246.33 380L239 377L231.67 380L224.33 377L217 380L209.67 377L202.33 380Z"/>
+  <path class="fixture-vise" d="M355 380L355 250L465 250L465 380L457.67 377L450.33 380L443 377L435.67 380L428.33 377L421 380L413.67 377L406.33 380L399 377L391.67 380L384.33 377L377 380L369.67 377L362.33 380Z"/>
+  <text class="label-on-clamp" x="207" y="366">soft jaw</text>
+  <text class="label-on-clamp" x="367" y="366">soft jaw</text>
+  <path class="part-rest" d="M305 406L305 229L355 229L355 406L347.86 403L340.71 406L333.57 403L326.43 406L319.29 403L312.14 406Z"/>
+  <rect class="part-removed" x="305" y="225" width="50" height="4"/>
+  <path class="cutter" d="M180 225L480 225L477 218L480 211L180 211L177 218Z"/>
+  <line class="arrow" x1="210" y1="193" x2="390" y2="193"/>
+  <text class="label" x="400" y="197">push stroke, light: the least that cleans the end up</text>
+  <line class="datum" x1="265" y1="229" x2="301" y2="229"/>
+  <text class="datum-label" x="259" y="245" text-anchor="end">filed end (the datum end)</text>
+  <line class="dims" x1="359" y1="229" x2="499" y2="229"/>
+  <line class="dims" x1="469" y1="250" x2="499" y2="250"/>
+  <line class="dims" x1="489" y1="229" x2="489" y2="250"/>
+  <text class="label" x="507" y="248">end 1/32 above the jaw tops,</text>
+  <text class="label" x="507" y="264">gripped on two opposite flats</text>
+  <text class="label" x="20" y="72">8 in smooth file (section schematic)</text>
+  <text class="label" x="20" y="88">flat across the end, square to the flats</text>
+  <line class="leader" x1="200" y1="84" x2="220" y2="218"/>
+  <circle class="leader-dot" cx="220" cy="218" r="2"/>
+  <text class="label" x="365" y="408">the 1/16 square bar, the rest below the jaws (broken)</text>
 </svg>

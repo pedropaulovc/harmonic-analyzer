@@ -1,27 +1,29 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 300" font-family="sans-serif" font-size="13">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 300" width="760" height="300" font-family="sans-serif" font-size="13">
+  <!-- Plan from above, 4 px/mm. The slug's journal (Ø.4375) in the 3-jaw over a brass shim wrap (thickness schematic), the centre-drilled end in the chuck, the parted stub end slug_face_stickout_mm 27.94 out. The AR tool (schematic) on a facing skim to the centre. -->
   <rect class="paper" x="0" y="0" width="760" height="300"/>
-  <text class="title" x="20" y="20">Setup 6: the slug on its journal over a brass shim, the parted stub end 1.10 out (not to scale)</text>
-  <rect class="fixture-vise" x="200" y="70" width="160" height="180"/>
-  <rect class="part-rest" x="60" y="137" width="300" height="46"/>
-  <rect class="part-rest" x="360" y="137" width="20" height="46"/>
-  <rect class="part-kept" x="380" y="122" width="45" height="76"/>
-  <rect class="part-kept" x="425" y="142" width="160" height="36"/>
-  <rect class="part-removed" x="585" y="142" width="8" height="36"/>
-  <line class="active-face" x1="585" y1="110" x2="585" y2="210"/>
-  <line class="centre-line" x1="40" y1="160" x2="720" y2="160"/>
-  <rect class="cutter" x="610" y="166" width="100" height="16"/>
-  <text class="label" x="20" y="50">journal (Ø.4375) in the chuck,</text>
-  <text class="label" x="20" y="66">centre-drilled end in</text>
-  <line class="leader" x1="120" y1="70" x2="120" y2="137"/>
-  <text class="label" x="360" y="100">spigot Ø.687</text>
-  <line class="leader" x1="400" y1="104" x2="400" y2="122"/>
-  <text class="label" x="440" y="240">stub (Ø.3750)</text>
-  <line class="leader" x1="480" y1="228" x2="480" y2="178"/>
-  <text class="datum-label" x="500" y="50">parted end faced</text>
-  <text class="datum-label" x="500" y="66">flat to the centre</text>
-  <line class="leader" x1="560" y1="70" x2="585" y2="140"/>
-  <text class="label" x="180" y="275">brass shim on the journal</text>
-  <line class="leader" x1="280" y1="263" x2="280" y2="184"/>
-  <line class="dims" x1="360" y1="215" x2="585" y2="215"/>
-  <text class="label" x="560" y="235">1.10 out</text>
+  <text class="title" x="20" y="22">Setup 6: face the slug's parted stub end (AR tool), on its journal over a brass shim (4 px/mm)</text>
+  <line class="centre-line" x1="20" y1="150" x2="740" y2="150"/>
+  <rect class="fixture-vise" x="308.24" y="75.78" width="60" height="148.45"/>
+  <rect class="clamp" x="368.24" y="91.78" width="40" height="34"/>
+  <rect class="clamp" x="368.24" y="174.22" width="40" height="34"/>
+  <text class="label" x="308.24" y="69.78">3-jaw (schematic)</text>
+  <rect class="part-rest" x="368.24" y="125.76" width="40" height="2"/>
+  <rect class="part-rest" x="368.24" y="172.24" width="40" height="2"/>
+  <rect class="part-kept" x="40" y="127.78" width="368.24" height="44.45"/>
+  <rect class="part-kept" x="408.24" y="115" width="27.64" height="70"/>
+  <rect class="part-kept" x="435.88" y="130.95" width="83.12" height="38.1"/>
+  <rect class="part-removed" x="519" y="130.95" width="1" height="38.1"/>
+  <path class="cutter" d="M520 158L530 184L530 248L523 245L516 248L509 245L502 248L502 178Z"/>
+  <line class="arrow" x1="550" y1="162" x2="550" y2="138"/>
+  <text class="label" x="560" y="70">parted end faced flat to the centre,</text>
+  <text class="label" x="560" y="86">light skims, .010 in all</text>
+  <line class="leader" x1="556" y1="76" x2="519.6" y2="134"/>
+  <circle class="leader-dot" cx="519.6" cy="134" r="2"/>
+  <text class="label" x="30" y="70">journal (Ø.4375) in the chuck over a</text>
+  <text class="label" x="30" y="86">brass shim, the centre-drilled end in</text>
+  <line class="leader" x1="140" y1="86" x2="200" y2="128"/>
+  <circle class="leader-dot" cx="200" cy="128" r="2"/>
+  <text class="label" x="150" y="270">spigot Ø{{cad.spigot_dia_in:.3dot}}; stub (Ø{{cad.hub_shaft_dia_ref_in:.4dot}}), {{process.slug_face_stickout_mm:in.2f}} out</text>
+  <line class="leader" x1="240" y1="258" x2="424" y2="184.8"/>
+  <circle class="leader-dot" cx="424" cy="184.8" r="2"/>
 </svg>

@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 420" width="760" height="420" font-family="sans-serif" font-size="13">
+  <!-- Scale 1 in = 800 px (key stock .0625 = 50 px). The piece, filed end down, gripped on two flats with nothing under it, its sawn end 1/32 in (25 px) above the jaw tops: blank_length_in .17 (136 px) as sawn, filed toward the .15 length. The soft jaws and the file's section are schematic (not on record). -->
+  <rect class="paper" x="0" y="0" width="760" height="420"/>
+  <text class="title" x="20" y="22">Op 40: file the sawn end to the cut length, from the front (1 in = 800 px)</text>
+  <path class="fixture-vise" d="M195 380L195 250L305 250L305 380L297.67 377L290.33 380L283 377L275.67 380L268.33 377L261 380L253.67 377L246.33 380L239 377L231.67 380L224.33 377L217 380L209.67 377L202.33 380Z"/>
+  <path class="fixture-vise" d="M355 380L355 250L465 250L465 380L457.67 377L450.33 380L443 377L435.67 380L428.33 377L421 380L413.67 377L406.33 380L399 377L391.67 380L384.33 377L377 380L369.67 377L362.33 380Z"/>
+  <text class="label-on-clamp" x="207" y="366">soft jaw</text>
+  <text class="label-on-clamp" x="367" y="366">soft jaw</text>
+  <rect class="part-kept" x="305" y="229" width="50" height="132"/>
+  <rect class="part-removed" x="305" y="225" width="50" height="4"/>
+  <path class="cutter" d="M180 225L480 225L477 218L480 211L180 211L177 218Z"/>
+  <line class="arrow" x1="210" y1="193" x2="390" y2="193"/>
+  <text class="label" x="400" y="197">push stroke; caliper between passes</text>
+  <text class="datum-label" x="185" y="366" text-anchor="end">filed end down</text>
+  <line class="leader" x1="189" y1="361" x2="305" y2="361"/>
+  <line class="dims" x1="359" y1="229" x2="499" y2="229"/>
+  <line class="dims" x1="469" y1="250" x2="499" y2="250"/>
+  <line class="dims" x1="469" y1="361" x2="499" y2="361"/>
+  <line class="dims" x1="489" y1="229" x2="489" y2="361"/>
+  <text class="label" x="507" y="248">sawn end 1/32 above the jaw tops;</text>
+  <text class="label" x="507" y="264">length {{cad.far_end_length_min_in:.2dot}}–{{cad.far_end_length_max_in:.2dot}} across both</text>
+  <text class="label" x="507" y="280">ends, nothing under the piece</text>
+  <text class="label" x="20" y="72">8 in smooth file (section schematic)</text>
+  <line class="leader" x1="200" y1="76" x2="220" y2="218"/>
+  <circle class="leader-dot" cx="220" cy="218" r="2"/>
+</svg>

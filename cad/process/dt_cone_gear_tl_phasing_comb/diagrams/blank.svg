@@ -1,16 +1,27 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 300" font-family="sans-serif" font-size="14">
-  <rect class="paper" x="0" y="0" width="760" height="300"/>
-  <text class="title" x="20" y="24">Setup 1: the blank in one corner of the 12 x 12 sheet (not to scale)</text>
-  <rect class="part-rest" x="60" y="50" width="420" height="230"/>
-  <text class="label" x="300" y="200">rest of the sheet: spare</text>
-  <rect class="part-kept" x="60" y="50" width="255" height="90"/>
-  <text class="label" x="110" y="100">blank 4.25 x 1.50</text>
-  <line class="cutter" x1="315" y1="50" x2="315" y2="140"/>
-  <line class="cutter" x1="60" y1="140" x2="315" y2="140"/>
-  <text class="label" x="325" y="80">snip cut 1</text>
-  <text class="label" x="150" y="162">snip cut 2</text>
-  <text class="label" x="510" y="70">two outer edges:</text>
-  <text class="label" x="510" y="88">the sheet's own</text>
-  <text class="label" x="510" y="130">snipped edges: curl pressed</text>
-  <text class="label" x="510" y="148">flat, burr filed off</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 470" width="760" height="470" font-family="sans-serif" font-size="13">
+  <!-- Scale 1 in = 25 px from the plan: the 12 x 12 sheet (stock) = 300 px, the blank blank_length_in 4.25 x blank_width_in 1.50 = 106.25 x 37.5 px in one corner, its two outer edges the sheet's own. The aviation snips (tools-hand aviation-snips-straight) have no recorded size: drawn schematic, part way along snip cut 1 from the sheet's edge, the flat blade on the blank's side so the curl goes into the sheet. Plan view. -->
+  <rect class="paper" x="0" y="0" width="760" height="470"/>
+  <text class="title" x="20" y="22">Setup 1, Op 20: snip the blank from a corner of the sheet (1 in = 25 px)</text>
+  <rect class="part-rest" x="40" y="140" width="300" height="300"/>
+  <text class="label" x="160" y="360">rest of the sheet: spare</text>
+  <rect class="part-kept" x="40" y="140" width="106.25" height="37.5"/>
+  <text class="label" x="46" y="164">blank {{process.blank_length_in:.2dot}} x {{process.blank_width_in:.2dot}}</text>
+  <line class="hidden" x1="146.25" y1="140" x2="146.25" y2="177.5"/>
+  <line class="hidden" x1="40" y1="177.5" x2="146.25" y2="177.5"/>
+  <path class="cutter" d="M145.25 156L138.25 126L145.25 126Z"/>
+  <path class="cutter" d="M147.25 156L147.25 126L154.25 126Z"/>
+  <path class="cutter" d="M138.25 126L112.25 36L122.25 36L145.25 126Z"/>
+  <path class="cutter" d="M147.25 126L170.25 36L180.25 36L154.25 126Z"/>
+  <line class="arrow" x1="160.25" y1="144" x2="160.25" y2="175.5"/>
+  <line class="leader" x1="190.25" y1="90" x2="152.25" y2="110"/>
+  <circle class="leader-dot" cx="152.25" cy="110" r="2"/>
+  <text class="label" x="194.25" y="64">aviation snips (schematic: size not on record) on</text>
+  <text class="label" x="194.25" y="80">snip cut 1, cutting in from the sheet's edge, the</text>
+  <text class="label" x="194.25" y="96">flat blade on the blank's side (the curl goes into</text>
+  <text class="label" x="194.25" y="112">the sheet); then snip cut 2 along the blank's long edge</text>
+  <text class="label" x="50" y="197.5">snip cut 2</text>
+  <text class="label" x="168.25" y="169.5">snip cut 1</text>
+  <text class="label" x="400" y="300">two outer edges: the sheet's own;</text>
+  <text class="label" x="400" y="316">snipped edges: curl pressed flat,</text>
+  <text class="label" x="400" y="332">burr filed off on the spoil plate (Op 30)</text>
 </svg>

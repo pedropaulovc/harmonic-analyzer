@@ -1,34 +1,36 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 420" font-family="sans-serif" font-size="13">
-  <rect class="paper" x="0" y="0" width="760" height="420"/>
-  <text class="title" x="16" y="22">Setup 3 (DT02): skim E</text>
-  <rect class="fixture-vise" x="128.8" y="330.0" width="142.3" height="22.0"/>
-  <rect class="clamp" x="153.2" y="195.2" width="30.0" height="134.8"/>
-  <rect class="clamp" x="216.8" y="195.2" width="30.0" height="134.8"/>
-  <text class="label" x="168.2" y="368.0" text-anchor="middle">moving jaw</text>
-  <text class="label" x="231.8" y="368.0" text-anchor="middle">fixed jaw</text>
-  <rect class="fixture-support" x="183.2" y="244.3" width="9.5" height="85.7"/>
-  <rect class="fixture-support" x="207.2" y="244.3" width="9.5" height="85.7"/>
-  <line class="dims" x1="183.2" y1="291.9" x2="192.8" y2="291.9"/>
-  <line class="dims" x1="207.2" y1="291.9" x2="216.8" y2="291.9"/>
-  <rect class="part-kept" x="183.2" y="185.6" width="33.5" height="58.7"/>
-  <rect class="part-removed" x="183.2" y="183.3" width="33.5" height="2.3"/>
-  <line class="active-face" x1="183.2" y1="185.6" x2="216.8" y2="185.6"/>
-  <rect class="cutter" x="174.6" y="133.3" width="50.8" height="44.0"/>
-  <line class="arrow" x1="230.0" y1="155.3" x2="265.0" y2="155.3"/>
-  <text class="label" x="440.0" y="70.0">1/2 in end mill; one .030 skim</text>
-  <line class="leader" x1="436.0" y1="66.0" x2="200.0" y2="153.3"/>
-  <circle class="leader-dot" cx="200.0" cy="153.3" r="2.5"/>
-  <text class="label" x="440.0" y="110.0">E, the sawn face up</text>
-  <line class="leader" x1="436.0" y1="106.0" x2="200.0" y2="185.6"/>
-  <circle class="leader-dot" cx="200.0" cy="185.6" r="2.5"/>
-  <text class="label" x="440.0" y="150.0">S (moving jaw)</text>
-  <line class="leader" x1="436.0" y1="146.0" x2="185.2" y2="214.9"/>
-  <circle class="leader-dot" cx="185.2" cy="214.9" r="2.5"/>
-  <text class="label" x="440.0" y="190.0">N (fixed jaw)</text>
-  <line class="leader" x1="436.0" y1="186.0" x2="214.8" y2="214.9"/>
-  <circle class="leader-dot" cx="214.8" cy="214.9" r="2.5"/>
-  <text class="label" x="440.0" y="230.0">other sawn face down on 5/8 + 1/2 in parallels</text>
-  <line class="leader" x1="436.0" y1="226.0" x2="200.0" y2="244.3"/>
-  <circle class="leader-dot" cx="200.0" cy="244.3" r="2.5"/>
-  <text class="label" x="16.0" y="406.0">Section across the jaws, the unmarked bar edge (TOP to be) to the left. Z0 E skimmed: its high point less .030.</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 440" width="760" height="440" font-family="sans-serif" font-size="13">
+  <!-- Across the jaws from the right end (+X toward you): +Y (toward the fixed jaw) right, +Z up, 6 px/mm. The strip on edge (N–S 11.176 across the jaws), the unmarked sawn face down on the 5/8 + 1/2 in stacks (28.575), N on the fixed jaw; jaw tops east_grip_mm 16.370 above the stacks; the .80 strip (20.32) skimmed east_skim_mm .762: Z0 19.558 above the stacks. The 1/2 in end mill (76.2 px) at Z0 on the pass least past the strip, Y-5.850 (L31: 1.0 mm past S, 0.5 mm over the fixed jaw, 3.19 above its top), running X66.167 to X-8.890: -X, into the page. -->
+  <rect class="paper" x="0" y="0" width="760" height="440"/>
+  <text class="title" x="20" y="22">Setup 3 (DT02, T1): skim E, the strip on edge on 5/8 + 1/2 in stacks (6 px/mm)</text>
+  <rect class="fixture-vise" x="282.94" y="406" width="207.06" height="14"/>
+  <rect class="clamp" x="302.94" y="136.33" width="50" height="269.67"/>
+  <rect class="clamp" x="420" y="136.33" width="50" height="269.67"/>
+  <rect class="fixture-support" x="352.94" y="310.75" width="19.05" height="95.25"/>
+  <rect class="fixture-support" x="400.95" y="310.75" width="19.05" height="95.25"/>
+  <rect class="fixture-support" x="352.94" y="234.55" width="19.05" height="76.2"/>
+  <rect class="fixture-support" x="400.95" y="234.55" width="19.05" height="76.2"/>
+  <text class="label-on-clamp" x="327.94" y="396" text-anchor="middle">moving</text>
+  <text class="label-on-clamp" x="445" y="396" text-anchor="middle">fixed</text>
+  <rect class="part-kept" x="352.94" y="117.2" width="67.06" height="117.35"/>
+  <rect class="part-removed" x="352.94" y="112.63" width="67.06" height="4.57"/>
+  <path class="cutter" d="M423 108.06L423 60L415.38 57L407.76 60L400.14 57L392.52 60L384.9 57L377.28 60L369.66 57L362.04 60L354.42 57L346.8 60L346.8 108.06A38.1 9.14 0 0 0 423 108.06Z"/>
+  <circle class="leader" cx="326.9" cy="87.2" r="7"/>
+  <line class="leader" x1="321.9" y1="82.2" x2="331.9" y2="92.2"/>
+  <line class="leader" x1="321.9" y1="92.2" x2="331.9" y2="82.2"/>
+  <line class="datum" x1="472" y1="117.2" x2="492" y2="117.2"/>
+  <text class="datum-label" x="496" y="121.2">Z0 E skimmed (high point less {{process.east_skim_mm:in.3dot}})</text>
+  <text class="label" x="20" y="110">1/2 in end mill: one {{process.east_skim_mm:in.3dot}} skim at Z0,</text>
+  <text class="label" x="20" y="126">the pass at Y-5.850 running −X (into the page)</text>
+  <line class="leader" x1="150" y1="100" x2="346.9" y2="77.2"/>
+  <circle class="leader-dot" cx="346.9" cy="77.2" r="2"/>
+  <text class="label" x="560" y="320">N (fixed jaw)</text>
+  <line class="leader" x1="556" y1="316" x2="416" y2="174.55"/>
+  <circle class="leader-dot" cx="416" cy="174.55" r="2"/>
+  <text class="label" x="20" y="230">S (moving jaw)</text>
+  <line class="leader" x1="120" y1="226" x2="356.94" y2="150.55"/>
+  <circle class="leader-dot" cx="356.94" cy="150.55" r="2"/>
+  <text class="label" x="20" y="330">other sawn face down on</text>
+  <text class="label" x="20" y="346">5/8 + 1/2 in parallels</text>
+  <line class="leader" x1="170" y1="334" x2="360.94" y2="282.55"/>
+  <circle class="leader-dot" cx="360.94" cy="282.55" r="2"/>
 </svg>
