@@ -1,4 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 420" font-family="sans-serif" font-size="13">
+  <!-- To scale at 4 px/mm (the .485 depth = 48.8 px). The 4-40 tap Ø.112 (the thread it cuts; 11.4 px), its point at the stop, .450 below the locating edge (thumb_tap_reach_mm), .020 under the roof; the tap guide (shop tools.tap-guide-fisher): body Ø.500 (shank_dia_in; 50.8 px), point Ø.1875 (point_dia_in; 19.1 px), its 3 1/8 in length broken off. Not on record, schematic: the T-handle wrench, the tap's length out of it, the guide point's cone and how far it stands out of the body. The tap, the wrench and the guide turn or travel together: tool colour. -->
   <rect class="paper" x="0" y="0" width="760" height="420"/>
   <text class="title" x="16" y="22">Setup 10 (MS09): tap the thumb hole by hand under the tap guide</text>
   <rect class="fixture-vise" x="101.6" y="330.0" width="156.8" height="22.0"/>
@@ -11,9 +12,13 @@
   <rect class="part-kept" x="155.6" y="120.7" width="48.8" height="56.9"/>
   <rect class="hidden" x="170.7" y="154.6" width="33.7" height="13.8"/>
   <rect class="part-threads" x="181.4" y="120.7" width="11.4" height="33.9"/>
-  <rect class="cutter" x="182.3" y="90.7" width="9.6" height="71.9"/>
-  <rect class="clamp" x="141.1" y="80.7" width="92.0" height="10.0"/>
-  <polygon class="cutter" points="178.1,40.7 196.1,40.7 187.1,78.7"/>
+  <path class="cutter" d="M181.4 90.7 L181.4 165.1 A5.7 1.4 0 0 0 192.8 165.1 L192.8 90.7 Z"/>
+  <rect class="cutter" x="141.1" y="80.7" width="92.0" height="10.0"/>
+  <path class="cutter" d="M177.6 48 L177.6 72 L187.1 82 L196.6 72 L196.6 48 Z"/>
+  <path class="cutter" d="M161.7 34 L161.7 45.9 A25.4 6.1 0 0 0 212.5 45.9 L212.5 34 L206.2 30 L193.4 38 L180.8 30 L168 38 L161.7 34 Z"/>
+  <text class="label" x="320.0" y="40.0">tap guide in the 1/2 in collet, spindle off</text>
+  <line class="leader" x1="316.0" y1="36.0" x2="208.0" y2="40.0"/>
+  <circle class="leader-dot" cx="208.0" cy="40.0" r="2.5"/>
   <text class="label" x="320.0" y="60.0">tap guide's point in the wrench</text>
   <line class="leader" x1="316.0" y1="56.0" x2="191.1" y2="60.7"/>
   <circle class="leader-dot" cx="191.1" cy="60.7" r="2.5"/>
@@ -38,5 +43,8 @@
   <text class="label" x="320.0" y="270.0">TOP face down on the stacks</text>
   <line class="leader" x1="316.0" y1="266.0" x2="163.6" y2="177.6"/>
   <circle class="leader-dot" cx="163.6" cy="177.6" r="2.5"/>
+  <text class="label" x="320.0" y="300.0">1 in + 1/2 in parallels stacked (1.5 in)</text>
+  <line class="leader" x1="316.0" y1="296.0" x2="198.0" y2="253.8"/>
+  <circle class="leader-dot" cx="198.0" cy="253.8" r="2.5"/>
   <text class="label" x="16.0" y="406.0">Section across the jaws through the thumb hole; the locating end faces you (X0 at the right end).</text>
 </svg>

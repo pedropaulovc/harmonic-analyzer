@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Setup 1: the .040 brass sheet on the surface plate; the blank scribed off two straight sheet edges and sawn outside the lines. Hand-drawn, about 3:1; styles: prechips.palette. -->
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 560 330" width="560" height="330" font-family="Arial, Helvetica, sans-serif" font-size="13">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 560 370" width="560" height="370" font-family="Arial, Helvetica, sans-serif" font-size="13">
   <text class="title" x="12" y="20">Setup 1: blank from the sheet (top view, on the surface plate)</text>
   <rect class="fixture-table" x="20" y="34" width="520" height="284"/>
   <text class="label" x="30" y="308">surface plate</text>
@@ -23,4 +23,7 @@
   <!-- Thickness, miked first. -->
   <text class="label" x="74" y="296">straight sheet edges (bottom, left)</text>
   <text class="label" x="74" y="60">mike .036–.044 thick first</text>
+  <!-- Holding the setup's text names, not drawn in this top view: the 1-2-3 block (scribing) and the saw's vise with its scrap boards (sawing). -->
+  <text class="label" x="20" y="342">scribe: the sheet stood on each straight edge against a 1-2-3 block on the plate</text>
+  <text class="label" x="20" y="360">saw: the sheet clamped flat between two scrap boards in the saw's vise (not shown)</text>
 </svg>
