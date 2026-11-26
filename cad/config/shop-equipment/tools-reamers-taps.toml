@@ -406,15 +406,6 @@ kind = "reamer"
 status = "to_order"
 note = "Not owned: to buy. drawing cross-check 2026-11-19: MHA-DT-31 (Ø.156) REAM .17 at assembly with MHA-DT-06; MHA-DT-06 (Ø.156) REAM .17 for dowel MHA-DT-VN-59."
 
-[tools.reamer-1570]
-make = "Alvord-Polk"
-sku = "8930A35"
-source = "https://www.mcmaster.com/8930A35/"
-purchase = "McMaster-Carr 8930A35, .1570 in (wire gauge 22) HSS straight-flute chucking reamer (Alvord-Polk), $23.49 (read live 2026-11-22); stated diameter tolerance 0 to +.0002, 1 in flute, 4 in overall."
-kind = "reamer"
-status = "to_order"
-note = "Not owned: to buy. drawing cross-check 2026-11-19: MHA-DT-03-TL-01 132X .1570 +.0005/.0000 REAM THRU; MHA-DT-14 .1570 +.0005/.0000 FLAT-BOTTOM REAM."
-
 [tools.reamer-2500]
 make = "Alvord-Polk"
 sku = "89485A45"
