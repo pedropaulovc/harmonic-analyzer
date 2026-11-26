@@ -1,10 +1,15 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 240" font-family="sans-serif" font-size="13">
-  <rect class="paper" x="0" y="0" width="760" height="240"/>
-  <text class="title" x="20" y="20">Setup 1: the 5/8 in bar on the saw (not to scale)</text>
-  <rect class="fixture-vise" x="460" y="80" width="200" height="30"/>
-  <rect class="part-rest" x="400" y="110" width="320" height="40"/>
-  <rect class="part-kept" x="40" y="110" width="350" height="40"/>
-  <rect class="cutter" x="390" y="40" width="10" height="130"/>
-  <text class="label" x="80" y="180">10.20 in blank (bar end)</text>
-  <text class="label" x="470" y="70">saw vise on the bar</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 260" width="760" height="260" font-family="sans-serif" font-size="13">
+  <!-- Hand picture, from above, to scale at 48 px/in: the 5/8 bar (process.bar_dia_in) flat on the saw bed, the blank 10.20 (process.blank_length_in) marked off its end and sawn on the waste side, the long end in the saw's vise (jaws schematic). The saw's kerf is not on record: the blade drawn as a heavy line. The bar runs on to a break line. -->
+  <rect class="paper" x="0" y="0" width="760" height="260"/>
+  <text class="title" x="20" y="22">Setup 1, Op 10: the 10.20 blank off the 5/8 bar, from above (to scale, 48 px/in)</text>
+  <rect class="fixture-table" x="20" y="55" width="720" height="140"/>
+  <rect class="part-kept" x="40" y="125" width="489.6" height="30"/>
+  <path class="part-rest" d="M529.6 125L730 125L727 132.5L730 140L727 147.5L730 155L529.6 155Z"/>
+  <rect class="clamp" x="619.6" y="91" width="130" height="34"/>
+  <rect class="clamp" x="619.6" y="155" width="130" height="34"/>
+  <text class="label-on-clamp" x="627.6" y="113">saw vise</text>
+  <text class="label" x="619.6" y="81">(jaws schematic)</text>
+  <rect class="cutter" x="529.6" y="100" width="3" height="80"/>
+  <text class="label" x="40" y="118">blank {{process.blank_length_in:.2f}} in, sawn on the waste side of the line</text>
+  <text class="label" x="40" y="220">pick the blank up only after the blade has stopped; file the burrs off both sawn ends</text>
 </svg>

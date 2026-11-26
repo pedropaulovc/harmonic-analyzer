@@ -1,38 +1,43 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 400" font-family="sans-serif" font-size="13">
-  <!-- Setup 3. Left: end view seen from the rear face (looking along -X, so +Y is to the right), 200 px to the inch: the barrel Ø.88 between the vise jaws on two 1 in parallels, 1/8 thick, against the jaws. Right: side view, 150 px to the inch, X0 the front face. Styles: prechips.palette. -->
-  <rect class="paper" x="0" y="0" width="760" height="400"/>
-  <text class="title" x="20" y="22">Setup 3: the hub lying in the vise on two parallels' edges; CM01 drills #14 through the barrel and bore</text>
-  <text class="label" x="20" y="40">left: end view, seen from the rear face</text>
-  <rect class="clamp" x="172" y="88" width="120" height="212"/>
-  <rect class="clamp" x="468" y="88" width="120" height="212"/>
-  <rect class="fixture-support" x="292" y="241" width="25" height="120"/>
-  <rect class="fixture-support" x="443" y="241" width="25" height="120"/>
-  <circle class="part-kept" cx="380" cy="180" r="88"/>
-  <circle class="part-kept" cx="380" cy="180" r="65"/>
-  <circle class="holes" cx="380" cy="180" r="37.6"/>
-  <polyline class="hidden" points="362,92 362,288"/>
-  <polyline class="hidden" points="398,92 398,288"/>
-  <rect class="cutter" x="362" y="36" width="36" height="52"/>
-  <line class="centre-line" x1="380" y1="30" x2="380" y2="380"/>
-  <line class="centre-line" x1="270" y1="180" x2="490" y2="180"/>
-  <line class="datum" x1="300" y1="92" x2="460" y2="92"/>
-  <text class="datum-label" x="20" y="60">Z0: the barrel's top line</text>
-  <line class="leader" x1="330" y1="92" x2="190" y2="64"/>
-  <line class="leader" x1="392" y1="382" x2="381" y2="340"/>
-  <text class="label" x="392" y="395">Y0: the barrel's axis (the vertical centre line)</text>
-  <line class="leader" x1="300" y1="300" x2="200" y2="360"/>
-  <text class="label" x="30" y="376">1 in parallels, 1/8 thick, against the jaws</text>
-  <text class="label" x="182" y="318">moving jaw</text>
-  <text class="label" x="488" y="80">fixed jaw (+Y)</text>
-  <text class="label" x="492" y="346">+Y →</text>
-  <line class="leader" x1="398" y1="60" x2="430" y2="44"/>
-  <text class="label" x="434" y="48">#14 through, into the gap</text>
-  <polygon class="part-kept" points="610,123 657,123 657,114 735,114 735,131 759,131 759,229 735,229 735,246 657,246 657,237 610,237"/>
-  <line class="centre-line" x1="600" y1="180" x2="760" y2="180"/>
-  <line class="datum" x1="610" y1="100" x2="610" y2="260"/>
-  <line class="leader" x1="610" y1="260" x2="600" y2="306"/>
-  <text class="datum-label" x="530" y="320">X0: the front face</text>
-  <line class="active-face" x1="689" y1="108" x2="689" y2="252"/>
-  <line class="leader" x1="689" y1="252" x2="700" y2="338"/>
-  <text class="label" x="650" y="352">#14 at {{cad.pin_hole_station_min_in:.2dot}}–{{cad.pin_hole_station_max_in:.2dot}}</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 470" width="760" height="470" font-family="sans-serif" font-size="13">
+  <!-- Hand picture, to scale. Left, 7 px/mm: a section at the hole (X 13.462, cad.pin_hole_station_mm), seen from the rear face looking −X, so +Y (the fixed jaw) is to the right and +X comes out of the page toward you. The barrel Ø.88 (cad.barrel_dia_mm) on the inner top edges of the two 1 in parallels, 1/8 thick, one against each jaw (process.parallel_height_mm, process.parallel_thickness_mm), 16.002 mm apart (process.cross_parallel_gap_mm); its axis 7.803 mm over their tops (process.cross_axis_height_mm), the jaw tops 0.566 mm over Z0 (process.cross_jaw_top_mm); the bore Ø.375 (cad.bore_dia_mm). The jaws' thickness and the vise bed are schematic. The #14 drill (shop drill-14, Ø4.623 mm) on Y0, its point at Z-24.741, CM01's posted depth: its full diameter 1.0 mm (process.drill_past_mm) past the barrel's bottom, in the gap; it runs up to a break line. Right, 4 px/mm: the hub from the front (looking +Y, +X to the right), front face (X0) to the LEFT, the same drill at X 13.462. The #2 centre drill's spot (T1) is under it and not drawn. -->
+  <rect class="paper" x="0" y="0" width="760" height="470"/>
+  <text class="title" x="20" y="22">Setup 3, CM01 T2: the #14 drills down through the barrel and bore into the gap (to scale, 7 and 4 px/mm)</text>
+  <rect class="clamp" x="161.77" y="116.04" width="60" height="314.62"/>
+  <text class="label-on-clamp" x="191.77" y="134.04" text-anchor="middle">moving</text>
+  <rect class="fixture-support" x="221.77" y="252.85" width="22.22" height="177.8"/>
+  <rect class="clamp" x="378.23" y="116.04" width="60" height="314.62"/>
+  <text class="label-on-clamp" x="408.23" y="134.04" text-anchor="middle">fixed</text>
+  <rect class="fixture-support" x="356.01" y="252.85" width="22.22" height="177.8"/>
+  <rect class="fixture-vise" x="161.77" y="430.65" width="276.46" height="12"/>
+  <circle class="part-kept" cx="300" cy="198.23" r="78.23"/>
+  <circle class="holes" cx="300" cy="198.23" r="33.34"/>
+  <rect class="holes" x="283.82" y="120" width="32.36" height="156.46"/>
+  <path class="cutter" d="M316.18 30L316.18 283.47L300 293.19L283.82 283.47L283.82 30L291.91 27L300 30L308.09 27Z"/>
+  <line class="arrow" x1="330" y1="40" x2="330" y2="80"/>
+  <line class="centre-line" x1="300" y1="24" x2="300" y2="434.65"/>
+  <line class="datum" x1="201.77" y1="120" x2="398.23" y2="120"/>
+  <text class="datum-label" x="155.77" y="114" text-anchor="end">Z0 top line</text>
+  <text class="datum-label" x="306" y="460.65">Y0 the barrel's axis</text>
+  <text class="label" x="10" y="300">1 in parallels,</text>
+  <text class="label" x="10" y="316">1/8 thick, against</text>
+  <text class="label" x="10" y="332">the jaws; the #14</text>
+  <text class="label" x="10" y="348">runs out into</text>
+  <text class="label" x="10" y="364">the gap</text>
+  <line class="leader" x1="120" y1="306" x2="232.88" y2="278.85"/>
+  <circle class="leader-dot" cx="232.88" cy="278.85" r="2"/>
+  <text class="label" x="442.23" y="202.23">+Y →</text>
+  <text class="label" x="10" y="40">#14 through the barrel</text>
+  <text class="label" x="10" y="56">and the bore, into the gap</text>
+  <line class="leader" x1="140" y1="62" x2="283.82" y2="70"/>
+  <circle class="leader-dot" cx="283.82" cy="70" r="2"/>
+  <path class="part-kept" d="M510 156.1L541.24 156.1L541.24 150L594.02 150L594.02 161.68L610.28 161.68L610.28 227.72L594.02 227.72L594.02 239.41L541.24 239.41L541.24 233.31L510 233.31Z"/>
+  <rect class="holes" x="554.6" y="150" width="18.49" height="89.41"/>
+  <path class="cutter" d="M573.09 60L573.09 243.41L563.85 248.96L554.6 243.41L554.6 60L563.85 57Z"/>
+  <line class="datum" x1="510" y1="120" x2="510" y2="269.41"/>
+  <text class="datum-label" x="506" y="285.41" text-anchor="middle">X0: the front face</text>
+  <text class="label" x="560" y="300">#14 at {{cad.pin_hole_station_min_in:.2dot}}–{{cad.pin_hole_station_max_in:.2dot}}</text>
+  <text class="label" x="560" y="316">from the front face</text>
+  <line class="leader" x1="600" y1="288" x2="565.85" y2="245.41"/>
+  <circle class="leader-dot" cx="565.85" cy="245.41" r="2"/>
+  <text class="label" x="470" y="40">from the front (+X →)</text>
 </svg>

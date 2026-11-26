@@ -1,29 +1,26 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 400" font-family="sans-serif" font-size="13">
-  <!-- Setup 2, seen from the operator's side, headstock at the left, to scale at 2 px/mm: the sawn blank (2.5 in across, 1/8 in thick) on the 6 in 4-jaw's steps, the jaws on its sawn edges (two of the four in section), the dead centre's point in the punch mark. -->
-  <rect class="paper" x="0" y="0" width="760" height="400"/>
-  <text class="title" x="20" y="22">Setup 2: the sawn blank in the 4-jaw on its sawn edges, faced, then spotted and drilled V</text>
-  <line class="centre-line" x1="20" y1="200" x2="560" y2="200"/>
-  <rect class="fixture-vise" x="40" y="48" width="100" height="304"/>
-  <path class="fixture-vise" d="M140,96 H173.2 V136.5 H170 V150 H140 Z"/>
-  <path class="fixture-vise" d="M140,304 H173.2 V263.5 H170 V250 H140 Z"/>
-  <rect class="part-kept" x="170" y="136.5" width="6.35" height="127"/>
-  <line class="datum" x1="170" y1="80" x2="170" y2="94"/>
-  <line class="datum" x1="170" y1="306" x2="170" y2="320"/>
-  <path class="part-rest" d="M176.35,200 L196,190 H300 V210 H196 Z"/>
-  <path class="cutter" d="M178,257 L186,251 L196,251 L196,336 L184,336 L184,265 Z"/>
-  <line class="leader" x1="90" y1="340" x2="90" y2="372"/>
-  <text class="label-halo" x="40" y="388">6 in 4-jaw (two jaws shown in section)</text>
-  <line class="leader" x1="176" y1="160" x2="250" y2="90"/>
-  <text class="label-halo" x="254" y="66">sawn blank, 1/8 thick: its edges in the jaws,</text>
-  <text class="label-halo" x="254" y="82">its back face (the datum end) on the jaw steps</text>
-  <line class="leader" x1="250" y1="196" x2="330" y2="140"/>
-  <text class="label-halo" x="334" y="128">MT3 dead centre in the tailstock, its point</text>
-  <text class="label-halo" x="334" y="144">in the punch mark while the jaws are tightened;</text>
-  <text class="label-halo" x="334" y="160">withdrawn, then the centre drill and the V drill</text>
-  <text class="label-halo" x="334" y="176">go in the tailstock for the hole</text>
-  <line class="leader" x1="190" y1="300" x2="300" y2="320"/>
-  <text class="label-halo" x="304" y="318">AR tool faces the out face to .100–.120,</text>
-  <text class="label-halo" x="304" y="334">centre out to Ø2.25 only, clear of the jaws</text>
-  <line class="leader" x1="170" y1="80" x2="170" y2="52"/>
-  <text class="datum-label" x="20" y="46">datum end: the back face, on the jaw steps</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 480" width="760" height="480" font-family="sans-serif" font-size="13">
+  <!-- Hand picture, a section through the axis from above (the cross-slide at the bottom), to scale at 5 px/mm (127 px/in): the sawn blank 2-1/2 in across its flats (process.blank_side_in; the section through two opposite jaws) and 1/8 thick (process.blank_axial_in), its back face on the jaw steps. The 6 in 4-jaw's jaws, steps and body are schematic (the steps' depth is not on record: drawn .12). The AR tool schematic (not on record), its point on the faced plane at Ø1.4, feeding out. Hatched: the .015 (cad.face_stock_in) faced off inside Ø2.25; the ring outside it is turned off in Setup 3. The MT3 dead centre that seated the punch mark while the jaws were tightened is withdrawn: a callout, not drawn. -->
+  <rect class="paper" x="0" y="0" width="760" height="480"/>
+  <text class="title" x="20" y="22">Setup 2, Op 50: the AR tool faces the out face from the centre out to Ø2.25 (to scale, 5 px/mm)</text>
+  <path class="clamp" d="M379.69 398.75L379.69 445.74L283.8 445.74L283.8 382.24L360 382.24L360 398.75Z"/>
+  <path class="clamp" d="M379.69 81.25L379.69 34.26L283.8 34.26L283.8 97.76L360 97.76L360 81.25Z"/>
+  <rect class="fixture-vise" x="223.8" y="34.26" width="60" height="411.48"/>
+  <rect class="part-kept" x="360" y="81.25" width="15.88" height="317.5"/>
+  <line class="centre-line" x1="150" y1="240" x2="740" y2="240"/>
+  <text class="datum-label" x="391.69" y="60">the back face (datum end), on the jaw steps</text>
+  <line class="leader" x1="389.69" y1="56" x2="361" y2="106.65"/>
+  <circle class="leader-dot" cx="361" cy="106.65" r="2"/>
+  <rect class="part-removed" x="373.97" y="97.12" width="1.9" height="285.75"/>
+  <path class="cutter" d="M373.97 328.9L403.97 340.9L403.97 428.9L395.97 425.9L387.97 428.9L379.97 428.9L379.97 352.9Z"/>
+  <line class="arrow" x1="419.97" y1="338.9" x2="419.97" y2="388.9"/>
+  <text class="label" x="430" y="300">AR tool: face the out face from the centre out</text>
+  <text class="label" x="430" y="316">to Ø2.25 only (Op 40's hand check; Ø2.20 if</text>
+  <text class="label" x="430" y="332">a jaw is in the way), never out to the jaws;</text>
+  <text class="label" x="430" y="348">to {{cad.length_min_in:.3dot}}–{{cad.length_max_in:.3dot}} thick by micrometer</text>
+  <line class="leader" x1="428" y1="296" x2="393.97" y2="398.9"/>
+  <circle class="leader-dot" cx="393.97" cy="398.9" r="2"/>
+  <text class="label" x="430" y="120">MT3 dead centre: its point in the punch mark</text>
+  <text class="label" x="430" y="136">while the jaws were tightened in turn;</text>
+  <text class="label" x="430" y="152">withdrawn before this cut (not drawn)</text>
+  <text class="label" x="150" y="470">6 in 4-jaw on the four sawn edges (two jaws shown in section)</text>
 </svg>

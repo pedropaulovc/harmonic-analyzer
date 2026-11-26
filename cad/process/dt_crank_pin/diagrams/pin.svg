@@ -1,17 +1,21 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 240" width="760" height="240">
-  <rect class="paper" x="0" y="0" width="760" height="240"/>
-  <text class="title" x="20" y="24">The bought No. 3 x 1-3/4 taper pin, as supplied (not to scale)</text>
-  <path class="part-kept" d="M120 96 L640 108 L640 132 L120 144 Z"/>
-  <path class="part-kept" d="M120 96 Q104 120 120 144 Z"/>
-  <line class="centre-line" x1="80" y1="120" x2="690" y2="120"/>
-  <line class="dims" x1="120" y1="180" x2="640" y2="180"/>
-  <line class="dims" x1="120" y1="172" x2="120" y2="188"/>
-  <line class="dims" x1="640" y1="172" x2="640" y2="188"/>
-  <text class="label" x="320" y="204">1-3/4 REF, 1:48 taper on Ø</text>
-  <text class="label" x="20" y="70">big end Ø.219: mike it</text>
-  <line class="dims" x1="90" y1="76" x2="118" y2="98"/>
-  <text class="label" x="20" y="224">crowned end, about .03 high at the axis</text>
-  <line class="dims" x1="60" y1="212" x2="108" y2="124"/>
-  <text class="label" x="560" y="70">small end Ø.183 REF</text>
-  <line class="dims" x1="620" y1="76" x2="638" y2="106"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 250" width="760" height="250" font-family="sans-serif" font-size="13">
+  <!-- Hand picture, the pin from the side, to scale at 12 px/mm: the big end Ø5.5626 (cad.taper_dia_ref, .219), 1-3/4 long (cad.taper_length_ref), the 1:48 taper on the diameter to the small end Ø4.637 (cad.taper_small_dia_ref); the big end's ASME crown drawn as a spherical cap about .03 high (the plan's station note: radius .215). -->
+  <rect class="paper" x="0" y="0" width="760" height="250"/>
+  <text class="title" x="20" y="22">Setup 1: the bought No. 3 x 1-3/4 taper pin, as supplied (to scale, 12 px/mm)</text>
+  <path class="part-kept" d="M100 86.62L633.4 92.18L633.4 147.82L100 153.38Z"/>
+  <path class="part-kept" d="M100.00 86.62A65.48 65.48 0 0 0 100.00 153.38Z"/>
+  <line class="centre-line" x1="60" y1="120" x2="680" y2="120"/>
+  <line class="dims" x1="100" y1="180" x2="633.4" y2="180"/>
+  <line class="dims" x1="100" y1="172" x2="100" y2="188"/>
+  <line class="dims" x1="633.4" y1="172" x2="633.4" y2="188"/>
+  <text class="label" x="366.7" y="200" text-anchor="middle">1-3/4 REF, 1:48 taper on Ø</text>
+  <text class="label" x="40" y="50">big end Ø.219: mike it just in from its rim</text>
+  <line class="leader" x1="150" y1="56" x2="106" y2="86.62"/>
+  <circle class="leader-dot" cx="106" cy="86.62" r="2"/>
+  <text class="label" x="40" y="236">crowned end, about .03 high at the axis</text>
+  <line class="leader" x1="120" y1="224" x2="94" y2="124"/>
+  <circle class="leader-dot" cx="94" cy="124" r="2"/>
+  <text class="label" x="520" y="60">small end Ø.183 REF</text>
+  <line class="leader" x1="600" y1="66" x2="629.4" y2="92.18"/>
+  <circle class="leader-dot" cx="629.4" cy="92.18" r="2"/>
 </svg>

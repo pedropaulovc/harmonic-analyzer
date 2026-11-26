@@ -1,37 +1,20 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 330" font-family="sans-serif" font-size="13">
-  <rect class="paper" x="0" y="0" width="760" height="330"/>
-  <text class="title" x="20" y="22">Bench vise, soft jaws, seen from the front (not to scale)</text>
-  <!-- Op 20: the rod's end filed square, 1/16 out -->
-  <text class="label" x="20" y="50">Op 20: file the rod end</text>
-  <rect class="fixture-vise" x="20" y="170" width="90" height="110"/>
-  <rect class="fixture-vise" x="126" y="170" width="90" height="110"/>
-  <rect class="part-rest" x="110" y="154" width="16" height="126"/>
-  <rect class="part-removed" x="110" y="146" width="16" height="8"/>
-  <line class="datum" x1="92" y1="154" x2="144" y2="154"/>
-  <rect class="cutter" x="68" y="128" width="100" height="10"/>
-  <text class="datum-label" x="20" y="160">filed end</text>
-  <line class="leader" x1="84" y1="156" x2="108" y2="155"/>
-  <circle class="leader-dot" cx="110" cy="155" r="2.5"/>
-  <text class="label" x="20" y="300">end 1/16 above the jaws</text>
-  <!-- Op 30: the .65 piece above the jaws, sawn at the mark -->
-  <text class="label" x="270" y="50">Op 30: saw the .65 piece off</text>
-  <rect class="fixture-vise" x="270" y="170" width="90" height="110"/>
-  <rect class="fixture-vise" x="376" y="170" width="90" height="110"/>
-  <rect class="part-rest" x="360" y="160" width="16" height="120"/>
-  <rect class="part-kept" x="360" y="70" width="16" height="86"/>
-  <line class="datum" x1="342" y1="70" x2="394" y2="70"/>
-  <line class="datum" x1="346" y1="158" x2="390" y2="158"/>
-  <rect class="cutter" x="320" y="161" width="110" height="4"/>
-  <text class="label" x="400" y="110">.65 piece</text>
-  <text class="label" x="236" y="132">blade just</text>
-  <text class="label" x="236" y="148">below the mark</text>
-  <text class="label" x="270" y="300">mark 1/16 above the jaws</text>
-  <!-- Op 40: the piece filed end down, the sawn end filed to length -->
-  <text class="label" x="530" y="50">Op 40: file the sawn end</text>
-  <rect class="fixture-vise" x="530" y="170" width="90" height="110"/>
-  <rect class="fixture-vise" x="636" y="170" width="90" height="110"/>
-  <rect class="part-kept" x="620" y="154" width="16" height="96"/>
-  <rect class="part-removed" x="620" y="146" width="16" height="8"/>
-  <rect class="cutter" x="578" y="128" width="100" height="10"/>
-  <text class="label" x="530" y="300">filed end down; .62–.64</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 340" width="760" height="340" font-family="sans-serif" font-size="13">
+  <!-- Hand picture, the bench vise from the front, to scale at 300 px/in: the Ø1/16 rod (process.stock_dia_in, 18.75 px). The bench vise's soft jaws are schematic (their size is not on record), seen from the front. The 8 in smooth file and the junior hacksaw's blade are schematic (their widths and thicknesses are not on record); the rod below the jaws runs on to a break line. The rod's end 1/16 above the jaw tops (Op 20); hatched: about .01 filed off (process.face_allowance_in). The file drawn at the filed end, coming across from the right. -->
+  <rect class="paper" x="0" y="0" width="760" height="340"/>
+  <text class="title" x="20" y="22">Setup 1, Op 20: the rod end 1/16 above the soft jaws, filed square (to scale, 300 px/in)</text>
+  <rect class="clamp" x="250.62" y="200" width="120" height="130"/>
+  <rect class="clamp" x="389.38" y="200" width="120" height="130"/>
+  <text class="label-on-clamp" x="260.62" y="222">soft jaw</text>
+  <text class="label-on-clamp" x="399.38" y="222">soft jaw</text>
+  <path class="part-rest" d="M370.62 338L370.62 181.25L389.38 181.25L389.38 338L380 335Z"/>
+  <rect class="part-removed" x="370.62" y="178.25" width="18.75" height="3"/>
+  <rect class="cutter" x="389.38" y="172.25" width="290.62" height="9"/>
+  <line class="arrow" x1="540" y1="147.25" x2="440" y2="147.25"/>
+  <line class="datum" x1="330" y1="181.25" x2="366.62" y2="181.25"/>
+  <text class="datum-label" x="324" y="185.25" text-anchor="end">filed end: the datum end</text>
+  <text class="label" x="440" y="131.25">smooth file, light strokes across the end</text>
+  <text class="label" x="521.38" y="216">rod end 1/16 above the jaw tops</text>
+  <text class="label" x="521.38" y="232">(the thin rod bends under the file)</text>
+  <text class="label" x="30" y="80">The datum end the length runs from:</text>
+  <text class="label" x="30" y="96">about {{process.face_allowance_in:.2dot}} filed off, square to the rod.</text>
 </svg>

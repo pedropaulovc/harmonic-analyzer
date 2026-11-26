@@ -1,34 +1,22 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 360" font-family="sans-serif" font-size="14">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 360" width="760" height="360" font-family="sans-serif" font-size="13">
+  <!-- Hand picture, the bench vise from the front, to scale at 200 px/in: the 27/64 drill (shop drill-27-64, Ø10.716 mm, 84.4 px) gripped by its flutes, its plain shank standing up to a break line (its length out of the jaws is not on record); the Ø.040 wire (8 px) wound once round the shank, square to it, its two filed ends meeting at the front. The bench vise's soft jaws are schematic (their size is not on record), seen from the front. -->
   <rect class="paper" x="0" y="0" width="760" height="360"/>
-  <text class="title" x="20" y="24">Left: the wire wound once on the 27/64 drill's shank. Right: the closed ring (not to scale)</text>
-  <rect class="fixture-vise" x="40" y="240" width="280" height="80"/>
-  <rect class="clamp" x="60" y="220" width="90" height="70"/>
-  <rect class="clamp" x="210" y="220" width="90" height="70"/>
-  <text class="label-on-clamp" x="70" y="262">soft jaw</text>
-  <text class="label-on-clamp" x="220" y="262">soft jaw</text>
-  <rect class="clamp" x="150" y="80" width="60" height="210"/>
-  <line class="leader" x1="190" y1="100" x2="240" y2="70"/>
-  <circle class="leader-dot" cx="190" cy="100" r="3"/>
-  <text class="label" x="244" y="66">27/64 drill: flutes in the jaws, shank up</text>
-  <ellipse class="part-kept" cx="180" cy="150" rx="36" ry="10"/>
-  <line class="leader" x1="216" y1="150" x2="240" y2="190"/>
-  <circle class="leader-dot" cx="216" cy="150" r="3"/>
-  <text class="label" x="244" y="196">one turn, square to</text>
-  <text class="label" x="244" y="212">the shank</text>
-  <circle class="part-kept" cx="560" cy="200" r="86" fill="none" stroke-width="10"/>
-  <line class="dims" x1="479" y1="200" x2="641" y2="200"/>
-  <line class="dims" x1="560" y1="119" x2="560" y2="281"/>
-  <rect class="paper" x="636" y="196" width="22" height="6"/>
-  <line class="leader" x1="652" y1="196" x2="670" y2="168"/>
-  <circle class="leader-dot" cx="652" cy="196" r="3"/>
-  <text class="label" x="664" y="128">butt joint:</text>
-  <text class="label" x="664" y="144">ends square,</text>
-  <text class="label" x="664" y="160">not soldered</text>
-  <line class="leader" x1="520" y1="200" x2="440" y2="300"/>
-  <circle class="leader-dot" cx="520" cy="200" r="3"/>
-  <text class="label" x="380" y="318">ID across the joint</text>
-  <line class="leader" x1="560" y1="250" x2="640" y2="310"/>
-  <circle class="leader-dot" cx="560" cy="250" r="3"/>
-  <text class="label" x="600" y="328">ID at 90° to it</text>
-  <text class="label" x="20" y="350">Close the ends by twisting sideways with the pliers, never by pulling them apart.</text>
+  <text class="title" x="20" y="22">Setup 2, Op 60: the wire wound one turn on the 27/64 drill's shank, flutes in the jaws (to scale, 200 px/in)</text>
+  <rect class="clamp" x="217.81" y="280" width="120" height="70"/>
+  <rect class="clamp" x="422.19" y="280" width="120" height="70"/>
+  <text class="label-on-clamp" x="227.81" y="302">soft jaw</text>
+  <text class="label-on-clamp" x="432.19" y="302">soft jaw</text>
+  <path class="cutter" d="M337.81 356L337.81 70L344.84 67L351.88 70L358.91 67L365.94 70L372.97 67L380 70L387.03 67L394.06 70L401.09 67L408.12 70L415.16 67L422.19 70L422.19 356Z"/>
+  <rect class="part-kept" x="329.81" y="170" width="100.38" height="8"/>
+  <line class="leader" x1="380" y1="170" x2="380" y2="178"/>
+  <text class="label" x="462.19" y="140">one turn, square to the shank (not a helix);</text>
+  <text class="label" x="462.19" y="156">the two filed ends meet here</text>
+  <text class="label" x="462.19" y="172">(the wire's length sets the size: the</text>
+  <text class="label" x="462.19" y="188">ring stands slightly loose when closed)</text>
+  <line class="leader" x1="460.19" y1="144" x2="382" y2="174"/>
+  <circle class="leader-dot" cx="382" cy="174" r="2"/>
+  <text class="label" x="550.19" y="260">27/64 drill: flutes in</text>
+  <text class="label" x="550.19" y="276">the jaws, shank up</text>
+  <line class="leader" x1="548.19" y1="256" x2="416.19" y2="240"/>
+  <circle class="leader-dot" cx="416.19" cy="240" r="2"/>
 </svg>

@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 520" width="760" height="520" font-family="sans-serif" font-size="13">
+  <!-- Hand picture, to scale at 10 px/mm. Left: a section at Y-4.572 through the seat, seen from the front (looking +Y, +X to the right): the strap on edge, the far flank down on the 1 in + 1/2 in stacks (process.riser_height_mm), the seat flank up at Z0, the pivot end LEFT with X0 on the pivot bore's axis, face A against the fixed jaw (behind), the lower 6.845 mm of its 15 mm width in the jaws (process.grip_mm): the jaw tops dashed. Right: a section at the seat (X 7.000, cad.follower_seat_height_mm) seen from the right end looking −X, so +Y (the fixed jaw, face A, Y0) is to the right and +X comes toward you: the strap 9.144 thick between the jaws on the two 1/8 thick stacks' tops (process.parallel_thickness_mm). The stacks run down to break lines. The #26 hole drilled. The 1/8 end mill (shop endmill-carbide-3fl-1-8, Ø3.175 mm) plunged at X 7.000 Y-4.572 to the floor at Z-4.064, PB04's posted depth, drawn on its finishing circle at Ø4.026 (process.seat_finish_dia_mm; PB04 T6: G2 arcs, clockwise from above), here at the circle's −X side; it ends in its 12 % arc and runs up to a break line. -->
+  <rect class="paper" x="0" y="0" width="760" height="520"/>
+  <text class="title" x="20" y="22">Setup 4, PB04 T6: the 1/8 end mill at the floor, Z-4.064, circling to Ø.1585 (to scale, 10 px/mm)</text>
+  <path class="fixture-support" d="M30 300L550 300L547 307.27L550 314.55L547 321.82L550 329.09L547 336.36L550 343.64L547 350.91L550 358.18L547 365.45L550 372.73L547 380L550 387.27L547 394.55L550 401.82L547 409.09L550 416.36L547 423.64L550 430.91L547 438.18L550 445.45L547 452.73L550 460L542.97 457L535.95 460L528.92 457L521.89 460L514.86 457L507.84 460L500.81 457L493.78 460L486.76 457L479.73 460L472.7 457L465.68 460L458.65 457L451.62 460L444.59 457L437.57 460L430.54 457L423.51 460L416.49 457L409.46 460L402.43 457L395.41 460L388.38 457L381.35 460L374.32 457L367.3 460L360.27 457L353.24 460L346.22 457L339.19 460L332.16 457L325.14 460L318.11 457L311.08 460L304.05 457L297.03 460L290 457L282.97 460L275.95 457L268.92 460L261.89 457L254.86 460L247.84 457L240.81 460L233.78 457L226.76 460L219.73 457L212.7 460L205.68 457L198.65 460L191.62 457L184.59 460L177.57 457L170.54 460L163.51 457L156.49 460L149.46 457L142.43 460L135.41 457L128.38 460L121.35 457L114.32 460L107.3 457L100.27 460L93.24 457L86.22 460L79.19 457L72.16 460L65.14 457L58.11 460L51.08 457L44.05 460L37.03 457L30 460L27 452.73L30 445.45L27 438.18L30 430.91L27 423.64L30 416.36L27 409.09L30 401.82L27 394.55L30 387.27L27 380L30 372.73L27 365.45L30 358.18L27 350.91L30 343.64L27 336.36L30 329.09L27 321.82L30 314.55L27 307.27Z"/>
+  <line class="hidden" x1="30" y1="231.55" x2="560" y2="231.55"/>
+  <path class="part-kept" d="M200.0 150.0L480.0 150.0A75.0 75.0 0 0 1 480.0 300.0L200.0 300.0A75.0 75.0 0 0 1 200.0 150.0Z"/>
+  <circle class="holes" cx="200" cy="225" r="31.88"/>
+  <circle class="holes" cx="480" cy="225" r="39.69"/>
+  <text class="label" x="40" y="478">1 in + 1/2 in parallels stacked, the far flank on them</text>
+  <line class="leader" x1="120" y1="466" x2="140" y2="430"/>
+  <circle class="leader-dot" cx="140" cy="430" r="2"/>
+  <text class="label" x="10" y="209.55">jaw tops</text>
+  <text class="label" x="10" y="225.55">(dashed, behind)</text>
+  <text class="datum-label" x="196" y="277" text-anchor="middle">X0 the pivot bore's axis</text>
+  <line class="datum" x1="200" y1="221" x2="200" y2="261"/>
+  <text class="datum-label" x="117" y="138" text-anchor="end">Z0 the</text>
+  <text class="datum-label" x="117" y="154" text-anchor="end">seat flank</text>
+  <path class="clamp" d="M700 231.55L750 231.55L750 460L742.86 457L735.71 460L728.57 457L721.43 460L714.29 457L707.14 460L700 460Z"/>
+  <path class="fixture-support" d="M668.25 300L700 300L700 460L692.06 457L684.12 460L676.19 457L668.25 460Z"/>
+  <path class="clamp" d="M608.56 231.55L558.56 231.55L558.56 460L565.7 457L572.85 460L579.99 457L587.13 460L594.27 457L601.42 460L608.56 460Z"/>
+  <path class="fixture-support" d="M608.56 300L640.31 300L640.31 460L632.37 457L624.43 460L616.5 457L608.56 460Z"/>
+  <rect class="part-kept" x="608.56" y="150" width="91.44" height="150"/>
+  <text class="label-on-clamp" x="704" y="249.55">fixed</text>
+  <text class="label-on-clamp" x="558.56" y="249.55">mov.</text>
+  <text class="datum-label" x="750" y="480" text-anchor="end">Y0 face A, at the fixed jaw</text>
+  <text class="label" x="750" y="498" text-anchor="end">+Y →</text>
+  <rect class="holes" x="249.87" y="150" width="40.26" height="40.64"/>
+  <path class="cutter" d="M281.62 186.83L281.62 30L273.68 27L265.75 30L257.81 27L249.87 30L249.87 186.83A15.88 3.81 0 0 0 281.62 186.83Z"/>
+  <rect class="holes" x="634.15" y="150" width="40.26" height="40.64"/>
+  <path class="cutter" d="M670.15 186.83L670.15 30L662.22 27L654.28 30L646.34 27L638.4 30L638.4 186.83A15.88 3.81 0 0 0 670.15 186.83Z"/>
+  <line class="arrow" x1="300" y1="40" x2="300" y2="80"/>
+  <text class="label" x="320" y="50">1/8 end mill at the floor: once round at Ø{{process.seat_floor_dia_mm:in.3dot}},</text>
+  <text class="label" x="320" y="66">once at Ø{{process.seat_finish_dia_mm:in.4dot}}; seat Ø{{cad.follower_seat_dia_min_in:.4dot}}–{{cad.follower_seat_dia_max_in:.4dot}}</text>
+  <text class="label" x="508.56" y="506" text-anchor="end">seat {{cad.follower_seat_station_in:.3dot}} from face A</text>
+  <line class="leader" x1="510.56" y1="502" x2="654.28" y2="192.64"/>
+  <circle class="leader-dot" cx="654.28" cy="192.64" r="2"/>
+</svg>

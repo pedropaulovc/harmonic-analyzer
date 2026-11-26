@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 380" width="760" height="380" font-family="sans-serif" font-size="13">
+  <!-- Hand picture, from above (the cross-slide at the bottom), a section through the axis, to scale at 200 px/in: the Ø5/8 blank (process.bar_dia_in) 1.00 out of the jaw fronts (process.stickout_mm), Z0 its faced end, face F. The 3-jaw's body and jaws are schematic (their sizes are not on record). The rest of the 2.00 blank is in the jaws, drawn to its end. The O.D. turned to Ø.59 (cad.outer_dia_in) .80 long. The 5/16 drill (shop block-drill-5-16, Ø7.9375 mm, 62.5 px) with its 118° point: the quill zeroed with its lips on the Ø.20 spot's rim (Op 60) and run .80 (process.drill_run_in), so its full diameter stands 0.766 deep and its point 0.860; the parting line (dashed) at .66 (cad.far_end_length_in). It runs on to a break line (its length is not on record). The No. 3 centre drill's spot is under it and not drawn. -->
+  <rect class="paper" x="0" y="0" width="760" height="380"/>
+  <text class="title" x="20" y="22">Setup 2, Op 70: the 5/16 drill from the tailstock, .80 on the quill: past the parting line (to scale, 200 px/in)</text>
+  <rect class="fixture-vise" x="302" y="81.5" width="56" height="217"/>
+  <rect class="part-kept" x="204" y="127.5" width="236" height="125"/>
+  <rect class="part-kept" x="440" y="131" width="160" height="118"/>
+  <rect class="clamp" x="358" y="93.5" width="46" height="34"/>
+  <rect class="clamp" x="358" y="252.5" width="46" height="34"/>
+  <path class="holes" d="M600 158.75L446.76 158.75L427.98 190L446.76 221.25L600 221.25Z"/>
+  <path class="cutter" d="M745 158.75L446.76 158.75L427.98 190L446.76 221.25L745 221.25L742 213.44L745 205.62L742 197.81L745 190L742 182.19L745 174.38L742 166.56Z"/>
+  <line class="hidden" x1="468" y1="117" x2="468" y2="263"/>
+  <line class="centre-line" x1="20" y1="190" x2="740" y2="190"/>
+  <line class="arrow" x1="720" y1="140" x2="660" y2="140"/>
+  <line class="datum" x1="600" y1="60" x2="600" y2="110"/>
+  <text class="datum-label" x="594" y="72" text-anchor="end">Z0 face F</text>
+  <text class="label" x="470" y="330">5/16 drill, one steady feed: its full diameter</text>
+  <text class="label" x="470" y="346">runs past the parting line</text>
+  <line class="leader" x1="500" y1="316" x2="520" y2="221.25"/>
+  <circle class="leader-dot" cx="520" cy="221.25" r="2"/>
+  <text class="label" x="200" y="330" text-anchor="end">parting line, .66 from face F</text>
+  <line class="leader" x1="202" y1="326" x2="468" y2="261"/>
+  <circle class="leader-dot" cx="468" cy="261" r="2"/>
+  <text class="label" x="150" y="70">O.D. Ø{{cad.outer_dia_min_in:.3dot}}–{{cad.outer_dia_max_in:.3dot}}, {{process.turn_length_in:.2f}} long</text>
+  <line class="leader" x1="250" y1="76" x2="480" y2="131"/>
+  <circle class="leader-dot" cx="480" cy="131" r="2"/>
+</svg>

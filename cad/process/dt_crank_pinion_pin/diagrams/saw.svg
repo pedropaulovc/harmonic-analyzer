@@ -1,20 +1,18 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 300" font-family="sans-serif" font-size="14">
-  <rect class="paper" x="0" y="0" width="760" height="300"/>
-  <text class="title" x="20" y="24">Plan of the saw bed: the pin's .58 piece off the rod's faced end (not to scale)</text>
-  <rect class="fixture-table" x="10" y="50" width="740" height="200"/>
-  <rect class="clamp" x="420" y="100" width="300" height="34"/>
-  <rect class="clamp" x="420" y="166" width="300" height="34"/>
-  <rect class="part-kept" x="120" y="138" width="200" height="24"/>
-  <rect class="part-rest" x="330" y="138" width="410" height="24"/>
-  <rect class="cutter" x="322" y="70" width="8" height="160"/>
-  <line class="datum" x1="120" y1="120" x2="120" y2="180"/>
-  <text class="datum-label" x="40" y="116">faced end (Op 10)</text>
-  <line class="dims" x1="120" y1="200" x2="320" y2="200"/>
-  <line class="dims" x1="120" y1="192" x2="120" y2="208"/>
-  <line class="dims" x1="320" y1="192" x2="320" y2="208"/>
-  <text class="label" x="90" y="246">scribe line .58 from the faced end</text>
-  <text class="label" x="124" y="132">the pin's piece: let it drop clear</text>
-  <text class="label" x="300" y="66">blade on the far side of the line</text>
-  <text class="label" x="470" y="92">saw vise: the long end of the 1/8 rod</text>
-  <text class="label" x="20" y="280">Ø1/8 drill rod; file the burr off the sawn end</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 260" width="760" height="260" font-family="sans-serif" font-size="13">
+  <!-- Hand picture, from above, to scale at 200 px/in: the Ø.125 rod (process.stock_dia_in), the scribe .58 (process.saw_length_in) from the end faced in Op 10, the blade on its far side. The saw's vise jaws are schematic (not on record); the blade's kerf is not on record: drawn as a heavy line at the cut. The rod runs on to a break line. -->
+  <rect class="paper" x="0" y="0" width="760" height="260"/>
+  <text class="title" x="20" y="22">Setup 2, Op 20: the pin's .58 piece off the rod's faced end, from above (to scale, 200 px/in)</text>
+  <rect class="fixture-table" x="20" y="57.5" width="720" height="135"/>
+  <rect class="part-kept" x="120" y="127.5" width="116" height="25"/>
+  <path class="part-rest" d="M236 127.5L730 127.5L727 135.83L730 144.17L730 152.5L236 152.5Z"/>
+  <rect class="clamp" x="326" y="93.5" width="130" height="34"/>
+  <rect class="clamp" x="326" y="152.5" width="130" height="34"/>
+  <text class="label-on-clamp" x="334" y="115.5">saw vise</text>
+  <text class="label" x="326" y="83.5">saw vise on the long end (jaws schematic)</text>
+  <rect class="cutter" x="237" y="95" width="3" height="90"/>
+  <line class="datum" x1="120" y1="112" x2="120" y2="168"/>
+  <text class="datum-label" x="124" y="88">faced end (Op 10)</text>
+  <text class="label" x="120" y="206">scribe line {{process.saw_length_in:.2dot}} from the faced end; the blade on its far side;</text>
+  <text class="label" x="120" y="222">the piece drops clear onto the saw base: pick it up only once the blade stops</text>
+  <text class="label" x="120" y="246">Ø1/8 drill rod; file the burr off the sawn end</text>
 </svg>
