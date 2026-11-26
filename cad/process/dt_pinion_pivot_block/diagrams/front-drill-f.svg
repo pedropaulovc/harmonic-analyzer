@@ -1,7 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 440" width="760" height="440" font-family="sans-serif" font-size="13">
-  <!-- As Setup 6's picture. The F drill, cutter_dia_mm 6.5278 (26.1 px in the section, 39.2 px in the plan), 118 deg point, in the lift bore (X 18.892, Y -7.408, NC line 112) at the bottom of its one feed: point Z -2.961 (lift_tip_height_mm), full diameter 1.0 past K, between the stacks. Drawn short to a break. The pivot bore drilled (Op 390). -->
+  <!-- As Setup 6's picture. The F drill, cutter_dia_mm 6.5278 (26.1 px in the section, 39.2 px in the plan), 118 deg point, in the lift bore (X 18.892, Y -7.408, NC line 112) at the bottom of its one feed: point Z -2.961 (lift_tip_height_mm), full diameter 1.0 past K, between the stacks. Drawn short to a break. The pivot bore drilled (Op 340). -->
   <rect class="paper" x="0" y="0" width="760" height="440"/>
-  <text class="title" x="20" y="22">Op 400, F drill (PB05 T5): the lift bore, to size, through past K</text>
+  <text class="title" x="20" y="22">Op 350, F drill (PB05 T5): the lift bore, to size, through past K</text>
   <text class="title" x="40" y="48">Plan, 6 px/mm (fixed jaw at the top)</text>
   <text class="title" x="400" y="48">Across the jaws, 4 px/mm, from the top face (+X toward you)</text>
   <rect class="clamp" x="40" y="60" width="270" height="30"/>

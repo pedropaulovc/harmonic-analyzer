@@ -1,7 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 440" width="760" height="440" font-family="sans-serif" font-size="13">
   <!-- As Setup 6's picture. The .2510 reamer, cutter_dia_mm 6.3754 (25.5 px in the section, 38.3 px in the plan), in the pivot bore (NC line 129) at the bottom of its feed: its end at Z -1.778 (ream_tip_height_mm), then fed back out to Z 12.176 spindle running. Its 45 deg lead is not on record: drawn schematic (0.1 x its diameter). Drawn short to a break; the drill chuck is not drawn. Both bores drilled. -->
   <rect class="paper" x="0" y="0" width="760" height="440"/>
-  <text class="title" x="20" y="22">Op 410, .2510 reamer (PB05 T6): the pivot bore, fed in and fed out</text>
+  <text class="title" x="20" y="22">Op 360, .2510 reamer (PB05 T6): the pivot bore, fed in and fed out</text>
   <text class="title" x="40" y="48">Plan, 6 px/mm (fixed jaw at the top)</text>
   <text class="title" x="400" y="48">Across the jaws, 4 px/mm, from the top face (+X toward you)</text>
   <rect class="clamp" x="40" y="60" width="270" height="30"/>

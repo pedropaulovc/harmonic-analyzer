@@ -4008,10 +4008,12 @@ def _check_recipe_spec(pytest_cmd: list[str]) -> dict[str, Any]:
             # test_cam_nc loads each CAM recipe by path (importlib, outside
             # cad/scripts); process tests read every plan at runtime, and a
             # plan's presence enrols it (_process_plans.enrolled_stems).
+            # test_process_op_references also reads every plan's picture SVGs.
             *(str(_cam_programs.recipe_path(stem).resolve()) for stem in _cam_programs.CAM_STEMS),
             *(
                 str(path.resolve())
-                for path in sorted(_process_plans.PROCESS_ROOT.glob("*/plan.toml"))
+                for pattern in ("*/plan.toml", "*/diagrams/*.svg")
+                for path in sorted(_process_plans.PROCESS_ROOT.glob(pattern))
             ),
             # module_deps_of only walks cad/scripts; comparison tests import
             # sibling tools (and load render_diff via importlib) outside it.

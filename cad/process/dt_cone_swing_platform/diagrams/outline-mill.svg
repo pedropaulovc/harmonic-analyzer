@@ -1,7 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 340" width="760" height="340" font-family="sans-serif" font-size="13">
   <!-- Plan from above, 2.5 px/mm, as Setup 4's picture. The 1/4 in end mill (6.35 = 15.9 px) on PL08's first posted pass (L28-L29): plunged in air beside E at X-240.672 Y6.794, Z5.604 (level 1 of 8, 0.746 below the blank's top), running to X-232.509 Y-20.900 (+X, -Y) along the chamfer, taking the blank's SE corner. Then the rough pass round the outline 0.254 outside the line, anticlockwise (G3, conventional), 8 levels to Z-0.508, and the finish pass on the line. -->
   <rect class="paper" x="0" y="0" width="760" height="340"/>
-  <text class="title" x="20" y="22">Op 390 (PL08, T1): the 1/4 in end mill's first pass, clearing the chamfer corner, Z5.604 (plan 2.5 px/mm)</text>
+  <text class="title" x="20" y="22">Op 350 (PL08, T1): the 1/4 in end mill's first pass, clearing the chamfer corner, Z5.604 (plan 2.5 px/mm)</text>
   <rect class="fixture-plate" x="35" y="50" width="650" height="205"/>
   <rect class="part-removed" x="50.01" y="71.81" width="611.6" height="158.75"/>
   <path class="part-kept" d="M632.5 230.56A24.77 24.77 0 0 0 657.25 206.6L657.84 188.35A19.68 19.68 0 0 0 641.16 168.25L92.59 83.97L91.32 91.01A9.84 9.84 0 0 1 79.89 98.95A9.84 9.84 0 0 1 71.95 87.52L73.13 80.98L69.47 80.42A12.7 12.7 0 0 0 54.85 92.56L52.51 164.56L71.96 230.56Z"/>

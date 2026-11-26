@@ -1,7 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 400" width="760" height="400" font-family="sans-serif" font-size="13">
   <!-- From the front (+X right, +Z up), 3 px/mm, the left overhang. The 1/4-20 plug tap (major .250 = 19 px; its length and lead not on record: round cue) in the farther post hole (X29.328 Y-35.649), the T-handle wrench (schematic) and the Fisher tap guide (1/2 in shank, 3/16 point, tools.tap-guide-fisher) in the 1/2 in collet, its spring point in the wrench's centre hole: all turning or travelling with the tap, in the cutter colour. The hole through into air; the jaws' left ends at X44.23. -->
   <rect class="paper" x="0" y="0" width="760" height="400"/>
-  <text class="title" x="20" y="22">Ops 140-150 (PL02): tap 1/4-20 by hand under the tap guide, the farther post hole (from the front, 3 px/mm)</text>
+  <text class="title" x="20" y="22">Ops 130-140 (PL02): tap 1/4-20 by hand under the tap guide, the farther post hole (from the front, 3 px/mm)</text>
   <rect class="part-kept" x="123" y="300" width="360" height="19.05"/>
   <rect class="fixture-support" x="252.7" y="319.05" width="240" height="38.1"/>
   <rect class="hidden" x="252.7" y="260.03" width="240" height="97.12"/>

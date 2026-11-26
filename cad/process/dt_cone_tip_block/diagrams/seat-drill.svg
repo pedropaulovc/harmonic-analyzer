@@ -1,7 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 440" width="760" height="440" font-family="sans-serif" font-size="13">
   <!-- Across the jaws from the right end (+X toward you): +Y (toward the fixed jaw) right, +Z up, 4 px/mm, as Setup 5's picture. The #43 (2.2606 = 9 px, 118 deg) at Y-5.588 (X7.620, DT04 L75 on), at its last peck: its point at Z40.723 (foot_tip_height_mm), full diameter foot_tap_drill_depth .440 below SEAT. The centre drill spotted it (not drawn). -->
   <rect class="paper" x="0" y="0" width="760" height="440"/>
-  <text class="title" x="20" y="22">Op 270 (DT04, T3): the #43 drills the foot hole {{cad.foot_tap_drill_depth_in:.3dot}} below SEAT (4 px/mm)</text>
+  <text class="title" x="20" y="22">Op 230 (DT04, T3): the #43 drills the foot hole {{cad.foot_tap_drill_depth_in:.3dot}} below SEAT (4 px/mm)</text>
   <rect class="fixture-vise" x="305.3" y="406" width="184.7" height="14"/>
   <rect class="clamp" x="325.3" y="226.22" width="50" height="179.78"/>
   <rect class="clamp" x="420" y="226.22" width="50" height="179.78"/>

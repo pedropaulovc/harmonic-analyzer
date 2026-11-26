@@ -1,7 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 440" width="760" height="440" font-family="sans-serif" font-size="13">
   <!-- Across the jaws from the right end (+X toward you): +Y (toward the fixed jaw) right, +Z up, 5 px/mm, as Setup 8's picture. The 1/4 in 90 deg chamfer mill (Ø6.35 = 31.8 px, at least .50 out of its collet; drawn to a break) at Y-8.636 (X38.100, L73), its point at Z8.576 (csk_tip_height_mm, 2.6 below N); it then circles r .6639 about the axis (climb, in X and Y): countersink Ø.257 x 90 deg at N. -->
   <rect class="paper" x="0" y="0" width="760" height="440"/>
-  <text class="title" x="20" y="22">Op 640 (DT08, T6): the chamfer mill circles the adjuster's countersink at N (5 px/mm)</text>
+  <text class="title" x="20" y="22">Op 580 (DT08, T6): the chamfer mill circles the adjuster's countersink at N (5 px/mm)</text>
   <rect class="fixture-vise" x="284.91" y="406" width="225.09" height="14"/>
   <rect class="clamp" x="304.91" y="181.27" width="50" height="224.73"/>
   <rect class="clamp" x="440" y="181.27" width="50" height="224.73"/>
