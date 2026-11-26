@@ -1,4 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 420" font-family="sans-serif" font-size="13">
+  <!-- To scale at 4 px/mm (the .84 length = 85.3 px). The 2-56 tap Ø.086 (the thread it cuts; 8.7 px) in hole 1, its point at the stop, .280 below the mating face (plate_tap_reach_mm); the tap guide (shop tools.tap-guide-fisher): body Ø.500 (shank_dia_in; 50.8 px), point Ø.1875 (point_dia_in; 19.1 px), its 3 1/8 in length broken off. Not on record, schematic: the T-handle wrench, the tap's length out of it, the guide point's cone and how far it stands out of the body. The tap, the wrench and the guide turn or travel together: tool colour. -->
   <rect class="paper" x="0" y="0" width="760" height="420"/>
   <text class="title" x="16" y="22">Setup 13 (MS10, MS11): tap both plate holes by hand under the tap guide</text>
   <rect class="fixture-vise" x="83.3" y="330.0" width="193.3" height="22.0"/>
@@ -12,9 +13,13 @@
   <rect class="part-threads" x="203.1" y="128.8" width="8.7" height="25.4"/>
   <rect class="holes" x="203.7" y="154.2" width="7.4" height="5.1"/>
   <rect class="holes" x="148.8" y="128.8" width="7.4" height="30.5"/>
-  <rect class="cutter" x="203.4" y="98.8" width="8.0" height="58.4"/>
-  <rect class="clamp" x="161.4" y="88.8" width="92.0" height="10.0"/>
-  <polygon class="cutter" points="198.4,48.8 216.4,48.8 207.4,86.8"/>
+  <path class="cutter" d="M203 98.8 L203 156.2 A4.4 1 0 0 0 211.8 156.2 L211.8 98.8 Z"/>
+  <rect class="cutter" x="161.4" y="88.8" width="92.0" height="10.0"/>
+  <path class="cutter" d="M197.9 56 L197.9 80 L207.4 90 L216.9 80 L216.9 56 Z"/>
+  <path class="cutter" d="M182 40 L182 53.9 A25.4 6.1 0 0 0 232.8 53.9 L232.8 40 L226.5 36 L213.8 44 L201.1 36 L188.3 44 L182 40 Z"/>
+  <text class="label" x="320.0" y="40.0">tap guide in the 1/2 in collet, spindle off</text>
+  <line class="leader" x1="316.0" y1="36.0" x2="228.0" y2="46.0"/>
+  <circle class="leader-dot" cx="228.0" cy="46.0" r="2.5"/>
   <text class="label" x="320.0" y="60.0">tap guide's point in the wrench</text>
   <line class="leader" x1="316.0" y1="56.0" x2="211.4" y2="68.8"/>
   <circle class="leader-dot" cx="211.4" cy="68.8" r="2.5"/>

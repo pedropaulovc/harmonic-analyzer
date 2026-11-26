@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Setup 1: the 1/8 x 3/8 in brass bar from above, the blank marked off its gated end and sawn. Hand-drawn: 56 px/in along the bar, the width drawn three times over; styles: prechips.palette. -->
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 700 250" width="700" height="250" font-family="Arial, Helvetica, sans-serif" font-size="13">
+<!-- Setup 1: the 1/8 x 3/8 in brass bar from above, the blank marked off its gated end and sawn. Hand-drawn: 56 px/in along the bar, the width drawn three times over; the saw kerf is schematic (no kerf on record for this plan). Holding the setup names but this view does not draw: the 1-2-3 block (scribing) and the saw's vise with its scrap board (sawing): named in the callout. Styles: prechips.palette. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 700 290" width="700" height="290" font-family="Arial, Helvetica, sans-serif" font-size="13">
   <text class="title" x="12" y="20">Setup 1: the blank off the brass bar (from above; width drawn 3× over)</text>
   <!-- The rest of the 24 in bar, broken off at the right. -->
   <path class="part-rest" d="M514 96 L668 96 L660 112 L672 128 L664 159 L514 159 Z"/>
@@ -26,4 +26,6 @@
   <path class="leader" d="M300 96 L300 62"/>
   <text class="label" x="150" y="56">thickness {{cad.back_face_thickness_min_in:.3dot}}–{{cad.back_face_thickness_max_in:.3dot}}, width {{process.blank_width_min_mm:in.3dot}}–{{process.blank_width_max_mm:in.3dot}}</text>
   <text class="label" x="150" y="40">gated before the saw (Op 10):</text>
+  <text class="label" x="12" y="262">scribe: the bar stood on its gated end against a 1-2-3 block on the surface plate</text>
+  <text class="label" x="12" y="280">saw: the bar clamped against a scrap board in the saw's vise (neither shown)</text>
 </svg>

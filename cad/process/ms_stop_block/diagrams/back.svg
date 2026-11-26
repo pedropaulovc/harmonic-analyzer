@@ -1,4 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 420" font-family="sans-serif" font-size="13">
+  <!-- To scale at 4 px/mm (the bar's 3/4 thickness = 76.2 px). The 1/2 in end mill Ø12.7 (milling_cuts "back face") = 50.8 px, on MS01_back's third pass, Y −10.737 (the one wholly over the slice), its end on the skimmed face; at least 1.00 in out of the collet (half_mill_projection_min_mm): drawn short, broken off. -->
   <rect class="paper" x="0" y="0" width="760" height="420"/>
   <text class="title" x="16" y="22">Setup 2 (MS01): skim the sawn top; it becomes the back face</text>
   <rect class="fixture-vise" x="107.9" y="330.0" width="184.2" height="22.0"/>
@@ -11,9 +12,9 @@
   <rect class="part-kept" x="161.9" y="116.6" width="76.2" height="61.0"/>
   <rect class="part-removed" x="161.9" y="114.6" width="76.2" height="2.0"/>
   <line class="active-face" x1="161.9" y1="116.6" x2="238.1" y2="116.6"/>
-  <rect class="cutter" x="150.5" y="68.6" width="50.8" height="44.0"/>
-  <line class="arrow" x1="207.3" y1="88.6" x2="274.1" y2="88.6"/>
-  <text class="label" x="440.0" y="70.0">1/2 in end mill; passes along the jaws</text>
+  <path class="cutter" d="M169.8 44 L169.8 110.5 A25.4 6.1 0 0 0 220.6 110.5 L220.6 44 L214.2 40 L201.5 48 L188.8 40 L176.1 48 L169.8 44 Z"/>
+  <line class="arrow" x1="226" y1="70" x2="266" y2="70"/>
+  <text class="label" x="440.0" y="70.0">1/2 in end mill; passes along the jaws, stepping over →</text>
   <line class="leader" x1="436.0" y1="66.0" x2="171.9" y2="84.6"/>
   <circle class="leader-dot" cx="171.9" cy="84.6" r="2.5"/>
   <text class="label" x="440.0" y="110.0">BACK face, skimmed</text>

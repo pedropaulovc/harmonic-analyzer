@@ -1,6 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 420" font-family="sans-serif" font-size="13">
+  <!-- To scale at 4 px/mm (the .485 depth = 48.8 px). The #43 drill Ø2.2606 (milling_cuts "thumb drill") = 9.0 px at Y −4.318, its 118° point at the end of its feed, Z 4.51 above the stacks (thumb_tip_height_mm), inside the rebate and short of the roof. The centre drill's spot before it is not drawn (the drill stands for it). The drill's length out of the chuck is not on record: broken off. -->
   <rect class="paper" x="0" y="0" width="760" height="420"/>
-  <text class="title" x="16" y="22">Setup 10 (MS08): spot and drill the thumb hole into the rebate</text>
+  <text class="title" x="16" y="22">Setup 10 (MS08): drill the thumb hole into the rebate</text>
   <rect class="fixture-vise" x="101.6" y="330.0" width="156.8" height="22.0"/>
   <rect class="clamp" x="125.6" y="150.2" width="30.0" height="179.8"/>
   <rect class="clamp" x="204.4" y="150.2" width="30.0" height="179.8"/>
@@ -10,14 +11,14 @@
   <rect class="fixture-support" x="191.7" y="177.6" width="12.7" height="152.4"/>
   <rect class="part-kept" x="155.6" y="120.7" width="48.8" height="56.9"/>
   <rect class="hidden" x="170.7" y="154.6" width="33.7" height="13.8"/>
-  <rect class="holes" x="182.6" y="120.7" width="9.0" height="44.3"/>
-  <rect class="cutter" x="182.6" y="70.7" width="9.0" height="94.3"/>
-  <text class="label" x="320.0" y="60.0">#43 drill, after the centre drill's spot</text>
+  <rect class="holes" x="182.6" y="120.7" width="9.0" height="36.1"/>
+  <path class="cutter" d="M182.6 44 L182.6 156.8 L187.1 159.6 L191.6 156.8 L191.6 44 L190.5 40.7 L188.2 47.3 L186 40.7 L183.7 47.3 L182.6 44 Z"/>
+  <text class="label" x="320.0" y="60.0">#43 drill (the centre drill spots first)</text>
   <line class="leader" x1="316.0" y1="56.0" x2="189.1" y2="90.7"/>
   <circle class="leader-dot" cx="189.1" cy="90.7" r="2.5"/>
   <text class="label" x="320.0" y="120.0">its point stops in the rebate</text>
-  <line class="leader" x1="316.0" y1="116.0" x2="187.1" y2="165.0"/>
-  <circle class="leader-dot" cx="187.1" cy="165.0" r="2.5"/>
+  <line class="leader" x1="316.0" y1="116.0" x2="187.1" y2="159.6"/>
+  <circle class="leader-dot" cx="187.1" cy="159.6" r="2.5"/>
   <text class="label" x="320.0" y="150.0">LOCATING EDGE up</text>
   <line class="leader" x1="316.0" y1="146.0" x2="161.6" y2="120.7"/>
   <circle class="leader-dot" cx="161.6" cy="120.7" r="2.5"/>
@@ -33,5 +34,8 @@
   <text class="label" x="320.0" y="270.0">TOP face down on the stacks</text>
   <line class="leader" x1="316.0" y1="266.0" x2="163.6" y2="177.6"/>
   <circle class="leader-dot" cx="163.6" cy="177.6" r="2.5"/>
+  <text class="label" x="320.0" y="300.0">1 in + 1/2 in parallels stacked (1.5 in)</text>
+  <line class="leader" x1="316.0" y1="296.0" x2="198.0" y2="253.8"/>
+  <circle class="leader-dot" cx="198.0" cy="253.8" r="2.5"/>
   <text class="label" x="16.0" y="406.0">Section across the jaws through the thumb hole; the locating end faces you (X0 at the right end).</text>
 </svg>
