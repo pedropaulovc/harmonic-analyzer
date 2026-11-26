@@ -9,6 +9,5 @@
 # branch (machinist_review_traveler.STANDING_NOT_APPLIED) and the test
 # (owner 2026-11-25).
 unconverted:
-  - ch_channel_lever
   - dt_arbor_pedestal
   - dt_crank_arm
