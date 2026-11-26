@@ -128,9 +128,9 @@ def _band_rack_screw_counterbores(adapter) -> None:
         value = float(_com_invoke(raw, "IDimension", "SystemValue")) * 1000.0
         seen.append((str(_com_invoke(raw, "IDimension", "FullName")), value))
         dimensions.append((value, raw))
-    for label, nominal, band in (
-        ("diameter", SCREW_CBORE_DIA, SCREW_CBORE_DIA_BAND),
-        ("depth", SCREW_CBORE_DEPTH, SCREW_CBORE_DEPTH_BAND),
+    for label, nominal, (lower, upper) in (
+        ("diameter", SCREW_CBORE_DIA, deviations(SCREW_CBORE_DIA_BAND)),
+        ("depth", SCREW_CBORE_DEPTH, deviations(SCREW_CBORE_DEPTH_BAND)),
     ):
         matches = [raw for value, raw in dimensions if abs(value - nominal) < 1e-4]
         if len(matches) != 1:
@@ -138,7 +138,6 @@ def _band_rack_screw_counterbores(adapter) -> None:
                 f"RackScrewHoles: {len(matches)} dimensions read the counterbore "
                 f"{label} {nominal} mm, not 1; dimensions {seen!r}"
             )
-        lower, upper = deviations(band)
         dimension = _bind(matches[0], "IDimension")
         tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
         tolerance.Type = _TOL_BILATERAL
