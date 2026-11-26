@@ -423,7 +423,8 @@ def test_numbered_notes_state_the_bore_fit_from_both_parts_limits() -> None:
                 # MHA-DT-37 prints the spigot's band (D51 as amended): it
                 # is not turned to this bore.
                 mate = f"{str(tip_gear['title']).upper()} {tip_gear['number']} SPIGOT"
-                assert lines[0] == f"1. BONDED SLIP FIT ON {mate}."
+                clearance = f"{spec.inch_text(low, 4)}-{spec.inch_text(high, 4)}"
+                assert lines[0] == f"1. BONDED SLIP FIT ON {mate} (CLEARANCE {clearance})."
             else:
                 land_name = f"\u00d8{spec.inch_text(spec.LAND_2_DIA, 4)} LAND"
                 mate = f"{shaft} MHA-DT-04 {land_name}"

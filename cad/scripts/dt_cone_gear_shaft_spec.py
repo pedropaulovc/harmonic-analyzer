@@ -215,8 +215,14 @@ def _gear(teeth: int) -> str:
 # SECTION_DIA_BANDS stay the ANALYSIS bands every stack reads.
 LAND_NOTE = 1
 BOND_NOTE = 2
+# The socket's own note (DT-04 machinist review, farm run
+# 20261126T152648224Z: one note flagged to two bonded joints).  MHA-DT-37's
+# spigot prints its band and the socket its reamer, so the bond's clearance
+# is derived from both and prints as REF (D51 as amended).
+SOCKET_NOTE = 3
 LAND_FLAG = f"SEE NOTE {LAND_NOTE}"
 BOND_FLAG = f"SEE NOTE {BOND_NOTE}"
+SOCKET_FLAG = f"SEE NOTE {SOCKET_NOTE}"
 MADE_TO_FIT_DIAMETERS = ("Sec0Dia", "Sec1Dia", "Sec2Dia")
 # Two lines of words (rule 7; machinist review r1, farm run
 # 20261124T110807008Z, r2: three rows of words under the callout broke it);
@@ -313,7 +319,7 @@ SOCKET_DEPTH_PLACES = 2
 SOCKET_CALLOUT = "\n".join(
     (
         f"REAM <HOLE-DEPTH> {inch_text(SOCKET_DEPTH, SOCKET_DEPTH_PLACES)}",
-        BOND_FLAG,
+        SOCKET_FLAG,
     )
 )
 
@@ -436,7 +442,8 @@ SURFACE_FINISHES = (
 # owner decision 2026-11-09, PR #1992); the keyseat and its clock are the
 # section's and the title block's angle (error_budget.yaml books it as
 # cone_flat_clock).  Note BOND_NOTE gives land 2's acceptance and bond
-# clearance (rule 23) and names the spigot bonded in the socket.  Note
+# clearance (rule 23); note SOCKET_NOTE the spigot bonded in the socket,
+# its clearance REF.  Note
 # STACK_NOTE names, once, the stack the three-place lengths set (rule 4): the
 # step stands SEAT_STEP_SETBACK behind T024's south face (the proof below),
 # the tip station keeps the end inside T024's bore so T018 butts T024 (the
@@ -444,7 +451,7 @@ SURFACE_FINISHES = (
 # stack's origin.  The 2026-09-28 flats' matched-fit line and U40's
 # tailstock line went with the flats and the tip land (C1 keyed supersedes
 # both).
-STACK_NOTE = 3
+STACK_NOTE = 4
 T024_BOND_CLEARANCE_MM = cone_gear_bond_clearance_mm(24)
 DRAWING_NOTES = "\n".join(
     (
@@ -452,7 +459,11 @@ DRAWING_NOTES = "\n".join(
         "   EACH SLIDES ON, NO SHAKE; KEY MHA-DT-VN-71 SLIDES IN THE KEYSEAT.",
         f"{BOND_NOTE}. BONDED FIT, {cone_tip_cluster.RETAINING_COMPOUND}: TURNED LAST TO MHA-DT-03 24T BORE,",
         f"   CLEARANCE {inch_text(T024_BOND_CLEARANCE_MM[0], 4)}-"
-        f"{inch_text(T024_BOND_CLEARANCE_MM[1], 4)}; MHA-DT-37 SPIGOT IS BONDED IN THE SOCKET.",
+        f"{inch_text(T024_BOND_CLEARANCE_MM[1], 4)}.",
+        f"{SOCKET_NOTE}. SOCKET: BONDED FIT, {cone_tip_cluster.RETAINING_COMPOUND}, "
+        "ON MHA-DT-37 SPIGOT",
+        f"   (CLEARANCE {inch_text(cone_tip_cluster.SPIGOT_BOND_CLEARANCE_MM[0], 4)}-"
+        f"{inch_text(cone_tip_cluster.SPIGOT_BOND_CLEARANCE_MM[1], 4)}).",
         f"{STACK_NOTE}. FLAGGED LENGTHS SET THE MHA-DT-07 AND MHA-DT-03 STACK.",
     )
 )

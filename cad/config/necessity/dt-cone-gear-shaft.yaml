@@ -14,7 +14,7 @@
 # check books the keyseat's side play). N-03 keeps its id.
 necessity:
   - id: N-01
-    feature: "sheet 1, tip end view, Ø.0625 REAM .20 socket (SEE NOTE 2)"
+    feature: "sheet 1, tip end view, Ø.0625 REAM .20 socket (SEE NOTE 3)"
     kind: mesh
     reason: "spigot float tilts T012 and T018 off the running axis"
     source: "cone_running_axis (MHA-DT-37 cures off-centre and tilted in the socket); the MHA-DT-37 spigot prints its own band and is bonded in this socket (D51 as amended, 2026-11-26)"

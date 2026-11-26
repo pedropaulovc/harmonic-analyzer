@@ -357,8 +357,13 @@ def bonded_fit_note(teeth: int) -> str:
     T024's land is turned to this bore (rule 4, form 2); MHA-DT-37's spigot
     prints its own band (form 4; D50, D51 as amended, 2026-11-26)."""
     if teeth in SPIGOT_TEETH:
+        # The clearance is derived from the reamed bore and the spigot's
+        # printed band, so it prints as REF (DT-03 machinist review, farm run
+        # 20261126T152648224Z: the note gave no clearance).
         mate = f"{TIP_GEAR_NAME} {TIP_GEAR_MATE} SPIGOT"
-        return f"{BORE_NOTE_NUMBER}. BONDED SLIP FIT ON {mate}."
+        low, high = dt_cone_gear_spec.bond_clearance_mm(teeth)
+        clearance = f"{inch_text(low, 4)}-{inch_text(high, 4)}"
+        return f"{BORE_NOTE_NUMBER}. BONDED SLIP FIT ON {mate} (CLEARANCE {clearance})."
     mate = f"{SHAFT_NAME} {SHAFT_MATE} {_land_text(teeth)}"
     return f"{BORE_NOTE_NUMBER}. BONDED SLIP FIT: {mate} IS TURNED TO THIS BORE."
 
