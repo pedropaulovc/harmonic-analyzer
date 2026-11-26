@@ -12,10 +12,13 @@ edge passes with full-length returns, one-way facing.
 from __future__ import annotations
 
 import math
+import re
+import tomllib
 from pathlib import Path
 
 import pytest
 
+import _cam_programs
 import _gcode
 import cam_nc
 
@@ -218,6 +221,60 @@ def test_a_climb_roughing_pass_is_caught(tmp_path):
     program = _program(tmp_path, "G0 X0 Y-8 Z5\nG1 Z-7 F100\nG1 X400\nG1 Y-6.35\nG1 X0\nG0 Z5\nG0 X0\nG1 Z-7\nG1 X400\nG0 Z5\n")
     kwargs = {"axis": "Y", "final": -6.35, "raw": -9.0, "max_step": 2.0, "direction": 1.0, "span": 200.0, "below_z": 0.0}
     assert [f.detail for f in _gcode.check_side_passes(program, **kwargs)] == ["Y -6.350 Z -7.000: pass does not run +X"]
+
+
+# A left end milled with the cutter's side (pd_platen_guide PG05, #3669): the
+# passes step from raw X-7.62 toward final X-6.35, so the rail lies +X of them.
+_END_KWARGS = {"axis": "X", "final": -6.35, "raw": -7.62, "max_step": 1.27, "span": 20.0, "below_z": 10.0}
+_END_DOWN = "G0 X-6.35 Y8.89 Z15\nG1 Z-0.5 F500\nG1 Y-17.65\nG0 Z15\n"
+_END_UP = "G0 X-6.35 Y-17.65 Z15\nG1 Z-0.5 F500\nG1 Y8.89\nG0 Z15\n"
+
+
+def test_a_declared_conventional_side_pass_is_judged_from_its_path_stock_side_and_spindle(tmp_path):
+    # Under M3 (clockwise seen from above) a -Y pass has the rail on the
+    # cutter's left: conventional. The same pass reversed has it on the right:
+    # climb, which the posted PG05 and PB05 cut while their recipes said
+    # conventional (#3669).
+    down = _program(tmp_path, "M3 S2650\n" + _END_DOWN)
+    assert _gcode.check_side_passes(down, direction=-1.0, cut="conventional", **_END_KWARGS) == []
+    up = _program(tmp_path, "M3 S2650\n" + _END_UP)
+    assert [f.detail for f in _gcode.check_side_passes(up, direction=1.0, cut="conventional", **_END_KWARGS)] == [
+        "X -6.350 Z -0.500: pass runs +Y with the stock on the cutter's right under M3: climb, declared conventional"
+    ]
+    assert _gcode.check_side_passes(up, direction=1.0, cut="climb", **_END_KWARGS) == []
+
+
+def test_the_counter_clockwise_spindle_reverses_the_cut_direction(tmp_path):
+    down = _program(tmp_path, "M4 S2650\n" + _END_DOWN)
+    assert [f.detail for f in _gcode.check_side_passes(down, direction=-1.0, cut="conventional", **_END_KWARGS)] == [
+        "X -6.350 Z -0.500: pass runs -Y with the stock on the cutter's left under M4: climb, declared conventional"
+    ]
+    up = _program(tmp_path, "M4 S2650\n" + _END_UP)
+    assert _gcode.check_side_passes(up, direction=1.0, cut="conventional", **_END_KWARGS) == []
+    # The turn in force at each pass counts: M5 then M3 before the pass is M3.
+    restarted = _program(tmp_path, "M4 S2650\nM5\nM3 S2650\n" + _END_DOWN)
+    assert _gcode.check_side_passes(restarted, direction=-1.0, cut="conventional", **_END_KWARGS) == []
+
+
+def test_an_edge_pass_along_x_is_judged_the_same_way(tmp_path):
+    # The stock +Y of passes stepping from Y-9 to Y-6.35: a +X pass has it on
+    # the cutter's left (conventional under M3), a -X pass on its right.
+    kwargs = {"axis": "Y", "final": -6.35, "raw": -9.0, "max_step": 3.0, "span": 200.0, "below_z": 0.0}
+    plus = _program(tmp_path, "M3 S2000\nG0 X0 Y-6.35 Z5\nG1 Z-7 F100\nG1 X400\nG0 Z5\n")
+    assert _gcode.check_side_passes(plus, direction=1.0, cut="conventional", **kwargs) == []
+    minus = _program(tmp_path, "M3 S2000\nG0 X400 Y-6.35 Z5\nG1 Z-7 F100\nG1 X0\nG0 Z5\n")
+    assert [f.check for f in _gcode.check_side_passes(minus, direction=-1.0, cut="conventional", **kwargs)] == ["cut"]
+
+
+def test_an_undeclared_side_cut_is_not_judged_and_a_stopped_spindle_fails_a_declared_one(tmp_path):
+    up = _program(tmp_path, "M3 S2650\n" + _END_UP)
+    assert _gcode.check_side_passes(up, direction=1.0, **_END_KWARGS) == []
+    stopped = _program(tmp_path, _END_DOWN)
+    assert [f.detail for f in _gcode.check_side_passes(stopped, direction=-1.0, cut="conventional", **_END_KWARGS)] == [
+        "X -6.350 Z -0.500: spindle stopped (no M3/M4 in force), declared conventional"
+    ]
+    with pytest.raises(ValueError, match="cut 'up'"):
+        _gcode.check_side_passes(up, direction=1.0, cut="up", **_END_KWARGS)
 
 
 def test_side_pass_deeper_than_the_measured_stepdown_is_caught(tmp_path):
@@ -781,6 +838,40 @@ def test_cnc_toml_alone_of_the_inventory_is_a_cam_input():
     assert [k for k in inputs if k.startswith("shop-equipment/")] == ["shop-equipment/cnc.toml"]
     assert inputs["shop-equipment/cnc.toml"] == _shop_equipment.DIRECTORY / "cnc.toml"
     assert "jaw-clearance" in _shop_equipment.merge([inputs["shop-equipment/cnc.toml"]])["cnc"]
+
+
+# CL01_face_b leaves KNOWN_JAW_CLEARANCE_VIOLATIONS with #3647, which makes it
+# clear the jaws; until then it is listed without a stop. The exemption counts
+# only while the file is listed, so the test passes on main, here, and after
+# either PR merges first, with no edit.
+_STOP_PENDING = {"CL01_face_b.nc": "#3647"}
+
+
+def test_a_listed_jaw_clearance_violation_is_stopped_in_the_op_that_runs_it():
+    """Every file on KNOWN_JAW_CLEARANCE_VIOLATIONS opens each op that runs it
+    (its instruction says "Run <program>") with cam_nc.DO_NOT_RUN_STOP, citing
+    the shop floor; no op carries that stop for a file off the list."""
+    floor = f"{cam_nc.jaw_clearance_min_mm():.1f} mm floor"
+    listed = cam_nc.KNOWN_JAW_CLEARANCE_VIOLATIONS
+    stopped: dict[str, int] = {}
+    wrong = []
+    for stem in _cam_programs.CAM_STEMS:
+        plan = tomllib.loads(_cam_programs.cam_inputs(stem)["plan"].read_text(encoding="utf-8"))
+        names = _cam_programs.program_names(stem)
+        for setup in plan["setups"]:
+            for op in setup["operations"]:
+                texts = [op[key] for key in ("instruction", "instruction_detailed") if key in op]
+                runs = [f"{n}.nc" for n in names if re.search(rf"\bRun {re.escape(n)}\b", op.get("instruction", ""))]
+                stops = [t.startswith(cam_nc.DO_NOT_RUN_STOP) for t in texts]
+                for file in runs:
+                    if file in listed and file not in _STOP_PENDING:
+                        if not all(stops) or not all(floor in t for t in texts):
+                            wrong.append(f"{stem}: an op running listed {file} does not open with the stop citing the {floor}")
+                        stopped[file] = stopped.get(file, 0) + 1
+                if any(stops) and (not runs or any(file not in listed for file in runs)):
+                    wrong.append(f"{stem}: an op running {runs or 'no program'} carries the stop, off the list")
+    assert wrong == []
+    assert sorted(stopped) == sorted(listed.keys() - _STOP_PENDING.keys())
 
 
 def test_the_floor_is_read_from_cnc_toml_alone(tmp_path, monkeypatch):

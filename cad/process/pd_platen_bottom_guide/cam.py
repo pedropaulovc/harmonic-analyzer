@@ -736,8 +736,9 @@ def context(
                 ],
             }
         )
-    # Ends: the left one passes +Y and the right one -Y, both conventional
-    # with the spindle's M3 (the cutter outside each end).
+    # Ends: the left one passes -Y and the right one +Y, the rail on the
+    # cutter's left: conventional with the spindle's M3 (the cutter outside
+    # each end).
     beside = (-height - r - APPROACH_MM, r + APPROACH_MM)
     left_xs = [x - r for x in left_faces]
     right_xs = [x + r for x in right_faces]
@@ -755,8 +756,8 @@ def context(
                     "ends",
                     "mill both ends to the length",
                     [f"G0 Z{_r(depth + CLEAR_MM):.3f}"]
-                    + _end(left_xs, beside, end_z, depth)
-                    + _end(right_xs, beside[::-1], end_z, depth),
+                    + _end(left_xs, beside[::-1], end_z, depth)
+                    + _end(right_xs, beside, end_z, depth),
                 ]
             ],
         }
@@ -930,7 +931,8 @@ def context(
                 "final": _r(-r),
                 "raw": _r(-left_skim - r),
                 "max_step": end_step,
-                "direction": 1.0,
+                "direction": -1.0,
+                "cut": "conventional",
                 "span": height,
                 "below_z": depth,
             },
@@ -942,7 +944,8 @@ def context(
                 "final": _r(length + r),
                 "raw": _r(right_raw + r),
                 "max_step": end_step,
-                "direction": -1.0,
+                "direction": 1.0,
+                "cut": "conventional",
                 "span": height,
                 "below_z": depth,
             },
