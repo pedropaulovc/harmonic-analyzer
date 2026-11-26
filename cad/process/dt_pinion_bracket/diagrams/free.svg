@@ -1,25 +1,29 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 290" font-family="sans-serif" font-size="13">
-  <rect class="paper" x="0" y="0" width="760" height="290"/>
-  <text class="title" x="20" y="20">Setup 3: saw across each bridge, then file the stub to the round</text>
-  <rect class="part-waste" x="60" y="60" width="590.5" height="158.8"/>
-  <path class="holes" d="M145,86 L285,86 A53.4,53.4 0 0 1 285,192.8 L145,192.8 A53.4,53.4 0 0 1 145,86 Z"/>
-  <path class="part-kept" d="M145,101.9 L285,101.9 A37.5,37.5 0 0 1 285,176.9 L145,176.9 A37.5,37.5 0 0 1 145,101.9 Z"/>
-  <circle class="holes" cx="145" cy="139.4" r="15.9"/>
-  <circle class="holes" cx="285" cy="139.4" r="19.9"/>
-  <rect class="part-kept" x="320.5" y="131.9" width="17" height="15"/>
-  <rect class="part-removed" x="330" y="60" width="12" height="158.8"/>
-  <line class="datum" x1="330" y1="46" x2="330" y2="232.8"/>
-  <text class="label-halo" x="330" y="250.8" text-anchor="middle">saw line 1</text>
-  <text class="label-halo" x="215" y="143.4" text-anchor="middle">strap 1</text>
-  <path class="holes" d="M410,86 L550,86 A53.4,53.4 0 0 1 550,192.8 L410,192.8 A53.4,53.4 0 0 1 410,86 Z"/>
-  <path class="part-kept" d="M410,101.9 L550,101.9 A37.5,37.5 0 0 1 550,176.9 L410,176.9 A37.5,37.5 0 0 1 410,101.9 Z"/>
-  <circle class="holes" cx="410" cy="139.4" r="15.9"/>
-  <circle class="holes" cx="550" cy="139.4" r="19.9"/>
-  <rect class="part-kept" x="585.5" y="131.9" width="17" height="15"/>
-  <rect class="part-removed" x="595" y="60" width="12" height="158.8"/>
-  <line class="datum" x1="595" y1="46" x2="595" y2="232.8"/>
-  <text class="label-halo" x="595" y="250.8" text-anchor="middle">saw line 2</text>
-  <text class="label-halo" x="480" y="143.4" text-anchor="middle">strap 2</text>
-  <text class="label" x="20" y="268">Each saw line just past an arbor end's apex, across the slot at the bridge, the kerf on its far side from the strap;</text>
-  <text class="label" x="20" y="284">the stub left on the arbor end is filed back to the round.</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 330" width="760" height="330" font-family="sans-serif" font-size="13">
+  <!-- Hand picture, from above, to scale at 5 px/mm: the cut blank face B up, X0 its left end; each strap round within its 1/8 slot, held by its 3.0 mm bridge at the arbor end (process.bridge_width_mm). Each saw line 1.5 mm past an arbor end's apex (process.saw_offset_mm: X 54.0 and 107.0), the saw's 2.4 mm kerf (process.saw_kerf_mm) on its far side from the strap, to scale: the stub left on the arbor end is 1.5 mm, filed back to the round (Op 40). The blank is clamped flat in the saw's vise: not drawn, it would hide the straps (a callout says so). The blade over saw line 1, its kerf; line 2 hatched. -->
+  <rect class="paper" x="0" y="0" width="760" height="330"/>
+  <text class="title" x="20" y="22">Setup 3: the saw across each bridge, the kerf on the line's far side from the strap (to scale, 5 px/mm)</text>
+  <rect class="part-rest" x="50" y="110" width="584.2" height="158.75"/>
+  <path class="holes" d="M135.00 136.00L275.00 136.00A53.38 53.38 0 0 1 275.00 242.75L135.00 242.75A53.38 53.38 0 0 1 135.00 136.00Z"/>
+  <path class="part-kept" d="M135.00 151.88L275.00 151.88A37.50 37.50 0 0 1 275.00 226.88L135.00 226.88A37.50 37.50 0 0 1 135.00 151.88Z"/>
+  <rect class="part-kept" x="310" y="181.88" width="20.88" height="15"/>
+  <circle class="holes" cx="135" cy="189.38" r="15.94"/>
+  <circle class="holes" cx="275" cy="189.38" r="19.84"/>
+  <rect class="cutter" x="320" y="90" width="12" height="198.75"/>
+  <line class="datum" x1="320" y1="84" x2="320" y2="294.75"/>
+  <text class="datum-label" x="328" y="80">saw line 1</text>
+  <text class="label" x="115" y="100">strap 1</text>
+  <path class="holes" d="M400.00 136.00L540.00 136.00A53.38 53.38 0 0 1 540.00 242.75L400.00 242.75A53.38 53.38 0 0 1 400.00 136.00Z"/>
+  <path class="part-kept" d="M400.00 151.88L540.00 151.88A37.50 37.50 0 0 1 540.00 226.88L400.00 226.88A37.50 37.50 0 0 1 400.00 151.88Z"/>
+  <rect class="part-kept" x="575" y="181.88" width="20.88" height="15"/>
+  <circle class="holes" cx="400" cy="189.38" r="15.94"/>
+  <circle class="holes" cx="540" cy="189.38" r="19.84"/>
+  <rect class="part-removed" x="585" y="110" width="12" height="158.75"/>
+  <line class="datum" x1="585" y1="84" x2="585" y2="294.75"/>
+  <text class="datum-label" x="593" y="80">saw line 2</text>
+  <text class="label" x="380" y="100">strap 2</text>
+  <text class="label" x="40" y="50">clamped flat in the saw's vise (not drawn: it would hide the straps)</text>
+  <text class="label" x="40" y="300">each line {{process.saw_offset_mm:in.3dot}} past an arbor end's apex, across the bridge, the kerf on its far</text>
+  <text class="label" x="40" y="316">side from the strap: the strap drops free; file the stub back to the round</text>
+  <line class="leader" x1="300" y1="282" x2="316.25" y2="219.38"/>
+  <circle class="leader-dot" cx="316.25" cy="219.38" r="2"/>
 </svg>

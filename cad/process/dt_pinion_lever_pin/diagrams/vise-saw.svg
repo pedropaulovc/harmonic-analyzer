@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 360" width="760" height="360" font-family="sans-serif" font-size="13">
+  <!-- Hand picture, the bench vise from the front, to scale at 300 px/in: the Ø1/16 rod (process.stock_dia_in, 18.75 px). The bench vise's soft jaws are schematic (their size is not on record), seen from the front. The 8 in smooth file and the junior hacksaw's blade are schematic (their widths and thicknesses are not on record); the rod below the jaws runs on to a break line. The mark .65 (process.saw_length_in) below the filed end, 1/16 above the jaw tops; the blade just below the mark, on the jaw (waste) side. -->
+  <rect class="paper" x="0" y="0" width="760" height="360"/>
+  <text class="title" x="20" y="22">Setup 1, Op 30: the mark 1/16 above the jaws, the junior hacksaw just below it (to scale, 300 px/in)</text>
+  <rect class="clamp" x="250.62" y="300" width="120" height="52"/>
+  <rect class="clamp" x="389.38" y="300" width="120" height="52"/>
+  <text class="label-on-clamp" x="260.62" y="322">soft jaw</text>
+  <text class="label-on-clamp" x="399.38" y="322">soft jaw</text>
+  <path class="part-rest" d="M370.62 358L370.62 281.25L389.38 281.25L389.38 358L380 355Z"/>
+  <rect class="part-kept" x="370.62" y="86.25" width="18.75" height="195"/>
+  <line class="datum" x1="340" y1="281.25" x2="420" y2="281.25"/>
+  <line class="datum" x1="340" y1="86.25" x2="420" y2="86.25"/>
+  <text class="datum-label" x="426" y="90.25">the filed end</text>
+  <text class="datum-label" x="426" y="275.25">the mark, {{process.saw_length_in:.2dot}} from it</text>
+  <rect class="cutter" x="180" y="283.25" width="400" height="4"/>
+  <line class="arrow" x1="190" y1="269.25" x2="270" y2="269.25"/>
+  <text class="label" x="350" y="183.75" text-anchor="end">the .65 piece, held between</text>
+  <text class="label" x="350" y="199.75" text-anchor="end">finger and thumb</text>
+  <line class="leader" x1="352" y1="179.75" x2="370.62" y2="183.75"/>
+  <circle class="leader-dot" cx="370.62" cy="183.75" r="2"/>
+  <text class="label" x="30" y="311.25">hacksaw blade just below</text>
+  <text class="label" x="30" y="327.25">the mark, on the jaw side</text>
+  <text class="label" x="30" y="343.25">(the kerf out of the rod)</text>
+  <line class="leader" x1="150" y1="299.25" x2="230" y2="287.25"/>
+  <circle class="leader-dot" cx="230" cy="287.25" r="2"/>
+</svg>

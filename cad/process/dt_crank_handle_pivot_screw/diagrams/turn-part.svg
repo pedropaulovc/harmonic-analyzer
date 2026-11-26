@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 380" width="760" height="380" font-family="sans-serif" font-size="13">
+  <!-- Hand picture, from above (the cross-slide at the bottom), to scale at 200 px/in along and across the axis: the Ø1/4 rod (process.stock_dia_in) 3.067 out of the jaw fronts (process.stickout_mm: S = P + .33 for the drawn M), Z0 the tip; the head Ø.236 (process.head_aim_dia_mm), the shoulder Ø.156 (process.shoulder_aim_dia_mm) to the under-head face at Z-2.463 (process.under_head_z_mm, U for the drawn M), the #4-40 blank Ø.1085 (process.thread_aim_dia_mm) to the seat at Z-.380 (process.seat_z_in), the part-off at Z-2.620 (process.part_off_z_mm, P). The 3-jaw's body and jaws are schematic (their sizes are not on record). The MT3 dead centre is schematic (its sizes are not on record). Turned, threaded and relieved; the tailstock away. The P1 blade to scale across (1/16 = 12.5 px), its tailstock-side face at Z-2.620 (P), cut in near the centre; its length runs on to a break line. Hatched: the kerf. -->
+  <rect class="paper" x="0" y="0" width="760" height="380"/>
+  <text class="title" x="20" y="22">Setup 3, Op 280: the P1 blade parts the screw off, its tailstock-side face at Z−P (to scale, 200 px/in)</text>
+  <rect class="fixture-vise" x="-19.39" y="123" width="56" height="134"/>
+  <path class="part-rest" d="M40 165L146.69 165L146.69 215L40 215L37 207.86L40 200.71L37 193.57L40 186.43L37 179.29L40 172.14Z"/>
+  <rect class="part-kept" x="146.69" y="166.4" width="19.31" height="47.2"/>
+  <rect class="part-kept" x="166" y="166.4" width="31.4" height="47.2"/>
+  <rect class="part-kept" x="197.4" y="174.4" width="416.6" height="31.2"/>
+  <rect class="part-threads" x="614" y="179.13" width="76" height="21.73"/>
+  <rect class="clamp" x="36.61" y="135" width="40" height="30"/>
+  <rect class="clamp" x="36.61" y="215" width="40" height="30"/>
+  <line class="centre-line" x1="20" y1="190" x2="740" y2="190"/>
+  <rect class="paper" x="614" y="179.13" width="18" height="3.87"/>
+  <rect class="paper" x="614" y="197" width="18" height="3.87"/>
+  <rect class="part-removed" x="153.5" y="166.4" width="12.5" height="47.2"/>
+  <path class="cutter" d="M153.5 375L153.5 194L166 194L166 375L159.75 372Z"/>
+  <line class="arrow" x1="186" y1="365" x2="186" y2="325"/>
+  <line class="datum" x1="690" y1="60" x2="690" y2="96"/>
+  <text class="datum-label" x="684" y="72" text-anchor="end">Z0 the tip</text>
+  <text class="label" x="206" y="330">P1 blade: its tailstock-side face on Z−P; let the screw</text>
+  <text class="label" x="206" y="346">fall: pick it up once the spindle has stopped</text>
+  <text class="label" x="380" y="110">#4-40 at the tip, the relief at the seat</text>
+  <line class="leader" x1="420" y1="116" x2="650" y2="179.13"/>
+  <circle class="leader-dot" cx="650" cy="179.13" r="2"/>
+</svg>

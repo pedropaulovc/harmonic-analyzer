@@ -68,7 +68,7 @@ machine = "Bench vise, soft jaws"
 indexing = "none"
 holding = "The wire upright between the soft jaws, the end to be filed level with the jaws' top: the jaws back the wire right at the file."
 datum = "The jaws' top: each end is filed down flush with it."
-diagram = { file = "diagrams/cut.svg", alt = "The brass wire held upright in the soft vise jaws, its end level with the jaws' top, the smooth file stroking flat across the jaws to leave the end square." }
+diagram = { file = "diagrams/cut.svg", alt = "Op 10, to scale: the brass wire upright in the soft vise jaws, the smooth file stroking flat across the jaws' top to cut the piece flush with them." }
 envelope = "other"
 vise_hold = "other"
 beam = "other"
@@ -96,6 +96,7 @@ drilling = "none"
 sizing = "other"
 feed = "hand"
 instruction = "Turn the piece over, clamp it with the other end standing just above the jaws' top and file it down, checking with the calipers, to the developed length {{cad.ring_developed_length_in:.3dot}} (the wire's centreline round the closed ring, less the butt gap)."
+diagram = { file = "diagrams/cut-length.svg", alt = "Op 30, to scale: the piece turned over, its other end just above the jaws' top, filed down flush to the developed length {{cad.ring_developed_length_in:.3dot}}." }
 inspection = "Length {{cad.ring_developed_length_in:.3dot}} ±{{process.length_band_in:.3dot}} (calipers)."
 gauge_checks = "other"
 
@@ -124,7 +125,7 @@ machine = "Bench vise, soft jaws"
 indexing = "none"
 holding = "The 27/64 drill gripped by its flutes in the soft jaws, the plain shank standing up out of the jaws."
 datum = "The two filed ends: the ring is closed when they meet square."
-diagram = { file = "diagrams/wind.svg", alt = "The 27/64 drill held by its flutes in the soft jaws with its shank up; the wire piece wound once round the shank, its two filed ends meeting square; beside it the finished ring with its inside diameter and the butt joint marked." }
+diagram = { file = "diagrams/wind.svg", alt = "Op 60, to scale: the 27/64 drill held by its flutes in the soft jaws, its shank up; the wire wound once round the shank, its two filed ends meeting square." }
 envelope = "other"
 vise_hold = "other"
 beam = "other"
@@ -144,6 +145,7 @@ drilling = "none"
 sizing = "other"
 feed = "hand"
 instruction = "Slide the ring off the shank. With the pliers on the wire either side of the joint, twist the ends sideways (never pull them apart radially, which opens the circle into an oval) until they line up and press them together end to end: a butt joint, ends square, NOT soldered (the drawing's note). Round the ring with the fingers if it has gone oval."
+diagram = { file = "diagrams/close.svg", alt = "Op 70, to scale, from above: the ring off the shank, the pliers either side of the joint twisting the ends sideways into a square butt joint." }
 
 [[setups.operations]]
 speed_kind = "other"

@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 440" width="760" height="440" font-family="sans-serif" font-size="13">
+  <!-- Hand picture, the bench vise from the front, to scale at 300 px/in: the Ø1/16 rod (process.stock_dia_in, 18.75 px). The bench vise's soft jaws are schematic (their size is not on record), seen from the front. The 8 in smooth file and the junior hacksaw's blade are schematic (their widths and thicknesses are not on record); the rod below the jaws runs on to a break line. The piece filed end down, the sawn end 1/16 above the jaw tops; it is at least .65 sawn, filed to .62–.64 (cad.length_min_in–cad.length_max_in): hatched, the about .02 filed off. The piece drawn to its .63 length; the file at the finished end, coming across from the right. -->
+  <rect class="paper" x="0" y="0" width="760" height="440"/>
+  <text class="title" x="20" y="22">Setup 1, Op 40: the piece filed end down, its sawn end filed toward the .63 length (to scale, 300 px/in)</text>
+  <rect class="clamp" x="250.62" y="200" width="120" height="220"/>
+  <rect class="clamp" x="389.38" y="200" width="120" height="220"/>
+  <text class="label-on-clamp" x="260.62" y="222">soft jaw</text>
+  <text class="label-on-clamp" x="399.38" y="222">soft jaw</text>
+  <rect class="part-kept" x="370.62" y="187.25" width="18.75" height="189"/>
+  <rect class="part-removed" x="370.62" y="181.25" width="18.75" height="6"/>
+  <rect class="cutter" x="389.38" y="178.25" width="290.62" height="9"/>
+  <line class="arrow" x1="540" y1="151.25" x2="440" y2="151.25"/>
+  <text class="label" x="440" y="135.25">smooth file, square across the sawn end</text>
+  <text class="label" x="30" y="100">sawn end 1/16 above the jaws; between passes, out</text>
+  <text class="label" x="30" y="116">and calipered: stop inside {{cad.length_min_in:.2dot}}–{{cad.length_max_in:.2dot}}</text>
+  <line class="leader" x1="250" y1="116" x2="370.62" y2="185.25"/>
+  <circle class="leader-dot" cx="370.62" cy="185.25" r="2"/>
+  <text class="label" x="30" y="430">the filed end down, gripped between the jaws</text>
+</svg>

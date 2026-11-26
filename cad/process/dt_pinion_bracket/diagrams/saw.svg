@@ -1,11 +1,17 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 240" font-family="sans-serif" font-size="13">
-  <rect class="paper" x="0" y="0" width="760" height="240"/>
-  <text class="title" x="20" y="20">Setup 1: one blank off the 3/8 x 1-1/4 in flat, long enough for both straps</text>
-  <rect class="part-rest" x="40" y="70" width="320" height="127"/>
-  <rect class="part-arriving" x="370" y="70" width="354" height="127"/>
-  <line class="datum" x1="365" y1="58" x2="365" y2="209"/>
-  <text class="label-halo" x="390" y="137.5">blank: both straps end to end</text>
-  <text class="label" x="40" y="227">bar (rest)</text>
-  <text class="label" x="330" y="52">saw kerf</text>
-  <text class="label" x="370" y="227">face A down (marked A), as bought</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 280" width="760" height="280" font-family="sans-serif" font-size="13">
+  <!-- Hand picture, from above, to scale at 60 px/in: the 3/8 x 1-1/4 1018 flat (process.blank_x_in) lying flat, face A down, and one blank drawn 4.60 long, the middle of process.blank_length_min_in–max_in: both straps end to end. The saw's kerf 2.4 mm (process.saw_kerf_mm) to scale on the bar's side of the line. The saw's vise jaws are schematic. The bar runs on to a break line. -->
+  <rect class="paper" x="0" y="0" width="760" height="280"/>
+  <text class="title" x="20" y="22">Setup 1, Op 10: one blank 4.55–4.65 off the 3/8 x 1-1/4 flat, from above (to scale, 60 px/in)</text>
+  <rect class="fixture-table" x="20" y="42.5" width="720" height="185"/>
+  <rect class="part-kept" x="40" y="112.5" width="276" height="75"/>
+  <rect class="part-removed" x="316" y="112.5" width="5.67" height="75"/>
+  <path class="part-rest" d="M321.67 112.5L730 112.5L727 120L730 127.5L727 135L730 142.5L727 150L730 157.5L727 165L730 172.5L727 180L730 187.5L321.67 187.5Z"/>
+  <rect class="clamp" x="411.67" y="78.5" width="130" height="34"/>
+  <rect class="clamp" x="411.67" y="187.5" width="130" height="34"/>
+  <text class="label-on-clamp" x="419.67" y="100.5">saw vise</text>
+  <text class="label" x="411.67" y="68.5">saw vise on the long end (jaws schematic)</text>
+  <rect class="cutter" x="316" y="90" width="5.67" height="120"/>
+  <text class="label" x="40" y="98">blank {{process.blank_length_min_in:.2f}}–{{process.blank_length_max_in:.2f}} in: both straps end to end</text>
+  <text class="label" x="40" y="240">face A down (marked A), as bought; the kerf on the bar's side of the line;</text>
+  <text class="label" x="40" y="256">file the burr off both ends and the four long edges (Op 20)</text>
 </svg>

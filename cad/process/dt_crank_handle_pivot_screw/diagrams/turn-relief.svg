@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 380" width="760" height="380" font-family="sans-serif" font-size="13">
+  <!-- Hand picture, from above (the cross-slide at the bottom), to scale at 200 px/in along and across the axis: the Ø1/4 rod (process.stock_dia_in) 3.067 out of the jaw fronts (process.stickout_mm: S = P + .33 for the drawn M), Z0 the tip; the head Ø.236 (process.head_aim_dia_mm), the shoulder Ø.156 (process.shoulder_aim_dia_mm) to the under-head face at Z-2.463 (process.under_head_z_mm, U for the drawn M), the #4-40 blank Ø.1085 (process.thread_aim_dia_mm) to the seat at Z-.380 (process.seat_z_in), the part-off at Z-2.620 (process.part_off_z_mm, P). The 3-jaw's body and jaws are schematic (their sizes are not on record). The MT3 dead centre is schematic (its sizes are not on record). The thread cut (Ops 210–220); the first plunge (Op 230) made with the blade's chuck-side face on the seat face, to Ø.094 (process.lead_outer_dia_in). The P1 blade to scale across (1/16 = 12.5 px), its chuck-side face .0275 (process.relief_step_in) toward the tip from the seat face, plunged to Ø.070 (process.relief_aim_dia_in). The dead centre back in. -->
+  <rect class="paper" x="0" y="0" width="760" height="380"/>
+  <text class="title" x="20" y="22">Setup 3, Op 240: the blade's second plunge, .0275 toward the tip, to the Ø.070 relief floor (to scale, 200 px/in)</text>
+  <rect class="fixture-vise" x="-19.39" y="123" width="56" height="134"/>
+  <path class="part-rest" d="M40 165L146.69 165L146.69 215L40 215L37 207.86L40 200.71L37 193.57L40 186.43L37 179.29L40 172.14Z"/>
+  <rect class="part-kept" x="146.69" y="166.4" width="19.31" height="47.2"/>
+  <rect class="part-kept" x="166" y="166.4" width="31.4" height="47.2"/>
+  <rect class="part-kept" x="197.4" y="174.4" width="416.6" height="31.2"/>
+  <rect class="part-threads" x="614" y="179.13" width="76" height="21.73"/>
+  <rect class="clamp" x="36.61" y="135" width="40" height="30"/>
+  <rect class="clamp" x="36.61" y="215" width="40" height="30"/>
+  <line class="centre-line" x1="20" y1="190" x2="740" y2="190"/>
+  <rect class="part-removed" x="614" y="179.13" width="12.5" height="1.47"/>
+  <rect class="part-removed" x="614" y="199.4" width="12.5" height="1.47"/>
+  <rect class="part-removed" x="619.5" y="179.13" width="12.5" height="3.87"/>
+  <rect class="part-removed" x="619.5" y="197" width="12.5" height="3.87"/>
+  <path class="clamp" d="M684 190L725.57 166L750 166L750 214L725.57 214Z"/>
+  <path class="cutter" d="M619.5 375L619.5 197L632 197L632 375L625.75 372Z"/>
+  <line class="arrow" x1="603.5" y1="365" x2="603.5" y2="325"/>
+  <line class="datum" x1="690" y1="60" x2="690" y2="96"/>
+  <text class="datum-label" x="684" y="72" text-anchor="end">Z0 the tip</text>
+  <text class="label" x="579.5" y="330" text-anchor="end">P1 blade, its chuck-side face at Z−{{process.seat_z_in:.3dot}} + {{process.relief_step_in:.4dot}},</text>
+  <text class="label" x="579.5" y="346" text-anchor="end">fed in to the Ø{{process.relief_aim_dia_in:.3dot}} floor; Op 250 cuts the 45° lead</text>
+  <text class="label" x="300" y="110">seat face at Z-{{process.seat_z_in:.3dot}}</text>
+  <line class="leader" x1="360" y1="116" x2="614" y2="174.4"/>
+  <circle class="leader-dot" cx="614" cy="174.4" r="2"/>
+</svg>

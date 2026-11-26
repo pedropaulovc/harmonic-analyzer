@@ -1,10 +1,17 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 240" font-family="sans-serif" font-size="13">
-  <rect class="paper" x="0" y="0" width="760" height="240"/>
-  <text class="title" x="20" y="20">Setup 1: the 1/2 in bar on the saw (not to scale)</text>
-  <rect class="fixture-vise" x="460" y="80" width="200" height="30"/>
-  <rect class="part-rest" x="250" y="110" width="470" height="40"/>
-  <rect class="part-kept" x="40" y="110" width="190" height="40"/>
-  <rect class="cutter" x="232" y="40" width="10" height="130"/>
-  <text class="label" x="60" y="180">{{process.bar_length_in:g}} in piece (bar end): the one cup</text>
-  <text class="label" x="470" y="70">saw vise on the bar</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 250" width="760" height="250" font-family="sans-serif" font-size="13">
+  <!-- Hand picture, from above, to scale at 60 px/in: the Ø1/2 bar (process.stock_dia_in), the 3 in piece (process.bar_length_in) marked off its end and sawn on the waste side of the line. The saw's vise jaws are schematic (not on record); the blade's kerf is not on record: drawn as a heavy line at the cut. The bar's length is not on record: it runs on to a break line. -->
+  <rect class="paper" x="0" y="0" width="760" height="250"/>
+  <text class="title" x="20" y="22">Setup 1, Op 10: one 3 in piece off the 1/2 in bar, from above (to scale, 60 px/in)</text>
+  <rect class="fixture-table" x="20" y="55" width="720" height="140"/>
+  <rect class="part-kept" x="40" y="125" width="180" height="30"/>
+  <path class="part-rest" d="M220 125L730 125L727 132.5L730 140L727 147.5L730 155L220 155Z"/>
+  <rect class="clamp" x="310" y="91" width="130" height="34"/>
+  <rect class="clamp" x="310" y="155" width="130" height="34"/>
+  <text class="label-on-clamp" x="318" y="113">saw vise</text>
+  <text class="label" x="310" y="81">saw vise on the long end (jaws schematic)</text>
+  <rect class="cutter" x="220" y="85" width="3" height="110"/>
+  <text class="label" x="40" y="96">{{process.bar_length_in:g}} in piece (bar end):</text>
+  <text class="label" x="40" y="112">the one cup</text>
+  <text class="label" x="40" y="216">blade on the waste side of the scribe; the piece drops clear: pick it up only once the blade stops;</text>
+  <text class="label" x="40" y="232">Ø{{process.stock_dia_in:.3dot}} bar; file the burrs off the sawn ends</text>
 </svg>

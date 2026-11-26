@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 380" width="760" height="380" font-family="sans-serif" font-size="13">
+  <!-- Hand picture, the ring flat, from above, to scale at 300 px/in: ID Ø.43 (cad.ring_inside_dia_in, 129 px), the Ø.040 wire (12 px). The pliers' jaws are schematic (their size is not on record), drawn either side of the joint at the right. -->
+  <rect class="paper" x="0" y="0" width="760" height="380"/>
+  <text class="title" x="20" y="22">Setup 2, Op 70: the ring off the shank, its ends butted with the pliers, from above (to scale, 300 px/in)</text>
+  <circle class="part-kept" cx="300" cy="200" r="76.5"/>
+  <circle class="paper" cx="300" cy="200" r="64.5"/>
+  <rect class="paper" x="362.5" y="199" width="16" height="2"/>
+  <path class="cutter" d="M358.5 190L382.5 190L502.5 150L502.5 132L358.5 168Z"/>
+  <path class="cutter" d="M358.5 210L382.5 210L502.5 250L502.5 268L358.5 232Z"/>
+  <text class="label" x="524.5" y="110">pliers on the wire either side</text>
+  <text class="label" x="524.5" y="126">of the joint: twist the ends</text>
+  <text class="label" x="524.5" y="142">sideways until they line up, press</text>
+  <text class="label" x="524.5" y="158">them end to end; never pull them</text>
+  <text class="label" x="524.5" y="174">apart radially</text>
+  <line class="leader" x1="522.5" y1="124" x2="416.5" y2="170"/>
+  <circle class="leader-dot" cx="416.5" cy="170" r="2"/>
+  <text class="label" x="510.5" y="310">butt joint: ends square, NOT soldered</text>
+  <line class="leader" x1="508.5" y1="306" x2="370.5" y2="202"/>
+  <circle class="leader-dot" cx="370.5" cy="202" r="2"/>
+  <text class="label" x="40" y="360">Round the ring with the fingers if it has gone oval; Op 80 calipers its ID across the joint and at 90° to it.</text>
+</svg>

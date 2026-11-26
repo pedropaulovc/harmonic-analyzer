@@ -1,28 +1,34 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 260" font-family="sans-serif" font-size="13">
-  <rect class="paper" x="0" y="0" width="760" height="260"/>
-  <text class="title" x="20" y="20">The finished arbor (not to scale)</text>
-  <path class="part-kept" d="M40,130 Q20,110 40,90 Z"/>
-  <rect class="part-kept" x="40" y="90" width="50" height="40"/>
-  <rect class="part-kept" x="90" y="98" width="40" height="24"/>
-  <rect class="part-kept" x="130" y="102" width="237" height="16"/>
-  <rect class="part-kept" x="367" y="104" width="163" height="12"/>
-  <rect class="part-kept" x="530" y="102" width="160" height="16"/>
-  <path class="part-kept" d="M690,102 Q705,110 690,118 Z"/>
-  <rect class="holes" x="60" y="90" width="10" height="40"/>
-  <rect class="holes" x="200" y="102" width="4" height="16"/>
-  <line class="centre-line" x1="15" y1="110" x2="720" y2="110"/>
-  <text class="label" x="20" y="70">.2510 reamed cross hole, .23 from the rear face</text>
-  <line class="leader" x1="65" y1="74" x2="65" y2="90"/>
-  <text class="label" x="120" y="160">1/16 pin hole at 1.50</text>
-  <line class="leader" x1="202" y1="148" x2="202" y2="118"/>
-  <line class="dims" x1="218" y1="128" x2="268" y2="128"/>
-  <line class="dims" x1="621" y1="128" x2="670" y2="128"/>
-  <text class="label" x="200" y="200">journals 1.82–2.61</text>
-  <line class="leader" x1="243" y1="188" x2="243" y2="130"/>
-  <text class="label" x="560" y="200">and 8.25–9.04</text>
-  <line class="leader" x1="645" y1="188" x2="645" y2="130"/>
-  <text class="label" x="360" y="80">Ø.28 relief 4.20–6.80</text>
-  <line class="leader" x1="448" y1="84" x2="448" y2="104"/>
-  <text class="label" x="560" y="60">SR.28 crown, rim at 9.35</text>
-  <line class="leader" x1="697" y1="64" x2="697" y2="104"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 300" width="760" height="300" font-family="sans-serif" font-size="13">
+  <!-- Hand picture, to scale at 68 px/in: the arbor from the side, the head LEFT, stations from the crown's apex (left end): the head Ø.59 (cad.head_dia_in) x .48 (cad.head_length_in) with its SR.43 crown, the cross hole Ø.2510 .23 from the head's rear face (cad.cross_hole_station_mm), the neck Ø.41 x .41, the shaft Ø.3104 (cad.shaft_dia_in) with the 1/16 pin hole 1.50 from the rear face (cad.pin_hole_station_mm), the journals 1.82–2.61 and 8.25–9.04, the Ø.28 relief 4.20–6.80 and the SR.28 back crown's rim at 9.35, all from the head's rear face. -->
+  <rect class="paper" x="0" y="0" width="760" height="300"/>
+  <text class="title" x="20" y="22">Setup 8: the finished arbor (to scale, 68 px/in)</text>
+  <rect class="part-kept" x="60" y="139.94" width="40.61" height="40.12"/>
+  <rect class="part-kept" x="100.61" y="146.06" width="27.88" height="27.88"/>
+  <rect class="part-kept" x="128.49" y="149.45" width="611.16" height="21.11"/>
+  <rect class="paper" x="386.21" y="149.45" width="176.8" height="1.03"/>
+  <rect class="paper" x="386.21" y="169.52" width="176.8" height="1.03"/>
+  <rect class="datum" x="224.37" y="174.55" width="53.72" height="3"/>
+  <rect class="datum" x="661.61" y="174.55" width="53.72" height="3"/>
+  <rect class="holes" x="76.43" y="139.94" width="17.08" height="40.12"/>
+  <rect class="holes" x="200.42" y="149.45" width="4.39" height="21.11"/>
+  <text class="label" x="40" y="60">.2510 reamed cross hole, {{cad.cross_hole_station_in:.2dot}} from the rear face</text>
+  <line class="leader" x1="140" y1="66" x2="84.97" y2="139.94"/>
+  <circle class="leader-dot" cx="84.97" cy="139.94" r="2"/>
+  <text class="label" x="200" y="100">1/16 pin hole at {{cad.pin_hole_station_in:.2f}}</text>
+  <line class="leader" x1="250" y1="106" x2="202.61" y2="149.45"/>
+  <circle class="leader-dot" cx="202.61" cy="149.45" r="2"/>
+  <text class="label" x="150" y="230">journals {{cad.front_journal_station_in:.2f}}–{{cad.front_journal_end_station_in:.2f}}</text>
+  <line class="leader" x1="250" y1="218" x2="250.21" y2="176.55"/>
+  <circle class="leader-dot" cx="250.21" cy="176.55" r="2"/>
+  <text class="label" x="520" y="230" text-anchor="end">and {{cad.back_journal_station_in:.2f}}–{{cad.back_journal_end_station_in:.2f}}</text>
+  <line class="leader" x1="522" y1="226" x2="685.41" y2="176.55"/>
+  <circle class="leader-dot" cx="685.41" cy="176.55" r="2"/>
+  <text class="label" x="360" y="100">Ø{{cad.bond_relief_dia_in:.2dot}} relief {{cad.bond_relief_station_in:.2f}}–{{cad.bond_relief_end_station_in:.2f}}</text>
+  <line class="leader" x1="420" y1="106" x2="474.61" y2="150.48"/>
+  <circle class="leader-dot" cx="474.61" cy="150.48" r="2"/>
+  <text class="label" x="560" y="60">SR.28 crown, rim at {{cad.back_crown_rim_station_in:.2f}}</text>
+  <line class="leader" x1="640" y1="66" x2="736.41" y2="149.45"/>
+  <circle class="leader-dot" cx="736.41" cy="149.45" r="2"/>
+  <text class="label" x="40" y="270">stations from the head's rear face; the journals marked under the shaft</text>
+  <text class="label" x="40" y="290">held: the bench vise's soft jaws on the head (not drawn: they would hide it)</text>
 </svg>
