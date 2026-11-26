@@ -24,8 +24,14 @@
    ``cycle_times.json``, then writes ``manifest.json``: the SHA-256 of every
    input and output, the FreeCAD version and the post file FreeCAD loaded.
    freecadcmd's console output stays in ``freecadcmd.log`` beside them.
+5. Reports the part those programs cut against its CAD (``_as_machined``):
+   ``as_machined.json`` (and ``as_machined.png`` over the noise line) beside
+   them. The report is no task output; a recipe in report mode
+   (``AS_MACHINED_MODE``) never fails on it, one in gate mode does.
+   ``HARMONIC_AS_MACHINED=skip`` skips a report-mode recipe's report.
 
-Exit 0 only when every program posted and every check passed. Any failure
+Exit 0 only when every program posted and every check passed (and, for a
+gate-mode recipe, its as-machined report found nothing). Any failure
 removes every output and exits 1, so a stale or unchecked program is never
 left beside a manifest. FreeCAD (1.1 or later) is ``$HARMONIC_FREECAD`` or the
 newest discovered install; the task fails loud when there is none.
@@ -44,8 +50,10 @@ import subprocess
 import tomllib
 import uuid
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
 
+import _as_machined
 import _cam_programs
 import _gcode
 import _process_plans
@@ -296,6 +304,9 @@ def main(argv: list[str] | None = None) -> int:
     with _telemetry.run_pipeline_span("cam_nc", stem=stem) as root:
         directory = _cam_programs.nc_dir(stem, args.out)
         _remove_outputs(directory)
+        # A previous run's report must not sit beside programs it did not read.
+        for name in _as_machined.OUTPUT_NAMES:
+            (directory / name).unlink(missing_ok=True)
         # FreeCAD posts into a fresh staging directory; files reach ``directory``
         # only after every check passed.
         staging_root = directory / STAGING_DIR
@@ -326,11 +337,14 @@ def main(argv: list[str] | None = None) -> int:
                     raise ValueError(f"{step_path.name} does not match its features.toml step_sha256")
                 steps[part_id] = str(step_path.resolve())
             with _telemetry.span("cam.context", stem=stem):
+                shop = _process_plans.load_shop()
                 if family:
                     views = {part_id: _process_plans.part_view(plan, part_id) for part_id in family}
-                    ctx = recipe.context(features, views, _process_plans.load_shop(), steps)
+                    ctx = recipe.context(features, views, shop, steps)
+                    inputs_seen = SimpleNamespace(features=features, plan=views, shop=shop, steps=steps)
                 else:
-                    ctx = recipe.context(features[""], plan, _process_plans.load_shop(), steps[""])
+                    ctx = recipe.context(features[""], plan, shop, steps[""])
+                    inputs_seen = SimpleNamespace(features=features[""], plan=plan, shop=shop, steps=steps)
             with _telemetry.span("cam.freecad", stem=stem) as span:
                 freecadcmd = resolve_freecadcmd()
                 result = run_freecad(recipe_path, ctx, recipe.PROGRAMS, staging, freecadcmd, directory / LOG_NAME)
@@ -375,7 +389,41 @@ def main(argv: list[str] | None = None) -> int:
         for line in time_table(times).splitlines():
             _telemetry.info(line)
         _telemetry.info(f"{stem}: posted {len(programs)} programs, {len(checks)} checks passed (FreeCAD {result['freecad_version']})")
+        if (os.environ.get(_as_machined.SKIP_ENV) == "skip"
+                and getattr(recipe, "AS_MACHINED_MODE", None) != _as_machined.MODE_GATE):
+            _telemetry.info(f"{stem}: as-machined report skipped ({_as_machined.SKIP_ENV}=skip)")
+            return 0
+        failed = as_machined(stem, recipe, ctx, inputs_seen, directory, lambda: freecadcmd)
+        if failed and getattr(recipe, "AS_MACHINED_MODE", None) == _as_machined.MODE_GATE:
+            return _fail(root, stem, RuntimeError("as-machined report:\n  " + "\n  ".join(failed)), directory)
         return 0
+
+
+def as_machined(stem: str, recipe: Any, ctx: dict[str, Any], inputs: SimpleNamespace, directory: Path,
+                freecadcmd) -> list[str]:
+    """Write the as-machined report beside the programs, under one span
+    carrying its numbers; what a gating recipe fails on. Never raises: a
+    report-mode recipe's task does not fail on its report."""
+    with _telemetry.span("cam.as_machined", stem=stem) as span:
+        try:
+            out = _as_machined.report(stem, recipe, ctx, inputs, directory, freecadcmd)
+        except Exception as exc:  # noqa: BLE001 -- the report never breaks the post
+            span.record_exception(exc)
+            _telemetry.warn(f"{stem}: as-machined report failed: {exc}")
+            return [f"{stem}: the report failed: {exc}"]
+        for key, value in _as_machined.headline(out).items():
+            span.set_attribute(key, value)
+    if not out["covered"]:
+        _telemetry.info(f"{stem}: as-machined not covered: {out['reason']}")
+        return _as_machined.failures(out)
+    found = _as_machined.failures(out)
+    for line in found:
+        _telemetry.warn(f"{stem}: as-machined {line}")
+    explained = sum(1 for part in (out.get("parts") or {}).values() for v in part["variants"].values()
+                    for r in v["over_noise"] if r["expected"])
+    _telemetry.info(f"{stem}: as-machined report ({out['mode']}) in {out['seconds']:.1f} s: "
+                    f"{explained} expected differences, {len(found)} unexplained or gone")
+    return found
 
 
 if __name__ == "__main__":
