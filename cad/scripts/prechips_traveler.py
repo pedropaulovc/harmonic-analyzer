@@ -55,12 +55,14 @@ from __future__ import annotations
 
 import argparse
 import os
-import re
 import shutil
 import subprocess
 import sys
 import tempfile
 from pathlib import Path
+
+from pypdf import PdfReader
+from pypdf.errors import PdfReadError
 
 import _telemetry
 import _process_plans
@@ -152,12 +154,12 @@ def print_pdf(browser_path: str, html: Path, pdf: Path) -> None:
         )
 
 
-_PDF_PAGE = re.compile(rb"/Type\s*/Page(?![a-zA-Z])")
-
-
 def pdf_sheets(pdf: Path) -> int:
-    """The printed sheets in a browser-printed PDF: its ``/Type /Page`` objects."""
-    return len(_PDF_PAGE.findall(pdf.read_bytes()))
+    """The printed sheets in a browser-printed PDF, read by pypdf."""
+    try:
+        return len(PdfReader(pdf).pages)
+    except PdfReadError as exc:
+        raise RuntimeError(f"{pdf.name} is not a readable PDF: {exc}") from exc
 
 
 def latest_version(uv: str) -> str:
@@ -286,7 +288,7 @@ def _standing(out: Path) -> int:
             with _telemetry.span("prechips.pdf", stem=STANDING_STEM, browser=Path(printer).name):
                 print_pdf(printer, html, pdf)
             sheets = pdf_sheets(pdf)
-            if sheets > 1:
+            if sheets != 1:
                 raise RuntimeError(
                     f"the page prints on {sheets} sheets; the owner's design "
                     "is one sheet (shorten a row, or tighten prechips' standing layout)"

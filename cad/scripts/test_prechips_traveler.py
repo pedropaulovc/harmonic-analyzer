@@ -3,11 +3,13 @@ a browser: every ``uv tool run`` and browser call is stubbed at ``subprocess.run
 
 from __future__ import annotations
 
+import io
 import subprocess
 import tomllib
 from pathlib import Path
 
 import pytest
+from pypdf import PdfReader, PdfWriter
 
 import prechips_traveler as wrapper
 import _process_plans as plans
@@ -44,7 +46,7 @@ def _uv_stub(monkeypatch, *, probe=None, traveler=None, standing=None, printed=T
         if cmd[0] != _UV:
             if printed:
                 pdf = next(arg for arg in cmd if arg.startswith("--print-to-pdf="))
-                Path(pdf.split("=", 1)[1]).write_bytes(b"%PDF-1.4 " + cmd[-1].encode())
+                Path(pdf.split("=", 1)[1]).write_bytes(_pdf(cmd[-1]))
             return subprocess.CompletedProcess(cmd, 0, "", "")
         if f"{wrapper.PACKAGE}@latest" in cmd:
             return probe(cmd) if probe else subprocess.CompletedProcess(cmd, 0, f"{_VERSION}\n", "")
@@ -61,6 +63,22 @@ def _uv_stub(monkeypatch, *, probe=None, traveler=None, standing=None, printed=T
 
     monkeypatch.setattr(wrapper.subprocess, "run", run)
     return calls
+
+
+def _pdf(printed: str, sheets: int = 1) -> bytes:
+    """A real PDF of ``sheets`` blank Letter pages whose subject names the page printed."""
+    writer = PdfWriter()
+    for _ in range(sheets):
+        writer.add_blank_page(612, 792)
+    writer.add_metadata({"/Subject": printed})
+    buffer = io.BytesIO()
+    writer.write(buffer)
+    return buffer.getvalue()
+
+
+def _printed(pdf: Path) -> str:
+    """The page the stubbed browser printed into ``pdf``."""
+    return PdfReader(pdf).metadata["/Subject"]
 
 
 def test_latest_release_renders_pro_then_hobby_then_prints_hobby_pdf(process, monkeypatch):
@@ -82,7 +100,7 @@ def test_latest_release_renders_pro_then_hobby_then_prints_hobby_pdf(process, mo
     pdf = plans.traveler_pdf_path("smoke_part", out)
     assert pdf == hobby.parent / "smoke-part-traveler.pdf"
     assert printing[-1] == hobby.resolve().as_uri()
-    assert pdf.read_bytes() == b"%PDF-1.4 " + hobby.resolve().as_uri().encode()
+    assert _printed(pdf) == hobby.resolve().as_uri()
 
 
 _FAMILY = '''title = "Smoke pair"
@@ -124,7 +142,7 @@ def test_family_plan_adds_a_placeholder_pdf_per_part_pointing_to_the_shared_one(
     assert [pdf.name for pdf in pdfs] == [
         shared, "smoke-left-traveler.pdf", "smoke-right-traveler.pdf",
     ]
-    assert all(pdf.read_bytes().startswith(b"%PDF-1.4 ") for pdf in pdfs)
+    assert [_printed(pdf) for pdf in pdfs] == [cmd[-1] for cmd in printing]
     assert set(plans.traveler_outputs("smoke_pair", out)) == {
         *plans.traveler_paths("smoke_pair", out), *pdfs,
         directory / "smoke-left-traveler.html", directory / "smoke-right-traveler.html",
@@ -274,7 +292,7 @@ def test_standing_renders_the_shop_page_and_prints_it_beside(process, shop, monk
     ]
     assert html.read_text(encoding="utf-8") == "standing"
     assert printing[-1] == html.resolve().as_uri()
-    assert pdf.read_bytes() == b"%PDF-1.4 " + html.resolve().as_uri().encode()
+    assert _printed(pdf) == html.resolve().as_uri()
 
 
 def _previous_standing(out: Path) -> tuple[Path, Path]:
@@ -326,22 +344,27 @@ def test_standing_failed_print_removes_the_page(process, shop, monkeypatch):
     assert not any(path.exists() for path in wrapper.standing_paths(out))
 
 
-def test_standing_on_two_sheets_fails_and_removes_the_page(process, shop, monkeypatch):
+@pytest.mark.parametrize(("printed", "error"), [
+    (lambda uri: _pdf(uri, sheets=2), "the page prints on 2 sheets; the owner's design is one "
+     "sheet (shorten a row, or tighten prechips' standing layout)"),
+    (lambda uri: _pdf(uri, sheets=0), "the page prints on 0 sheets; the owner's design is one "
+     "sheet (shorten a row, or tighten prechips' standing layout)"),
+    (lambda uri: b"%PDF-1.4 " + uri.encode(), "shop-standing-instructions.pdf is not a readable PDF"),
+])
+def test_standing_not_on_exactly_one_sheet_fails_and_removes_the_page(
+    process, shop, monkeypatch, printed, error,
+):
     out, _author = process
     _uv_stub(monkeypatch)
     errors = []
     monkeypatch.setattr(wrapper._telemetry, "error", lambda message, **_: errors.append(message))
-
-    def two_sheets(_browser, _html, pdf):
-        pdf.write_bytes(b"%PDF-1.4 <</Type /Pages>> <</Type /Page>> <</Type/Page>>")
-
-    monkeypatch.setattr(wrapper, "print_pdf", two_sheets)
+    monkeypatch.setattr(
+        wrapper, "print_pdf",
+        lambda _browser, html, pdf: pdf.write_bytes(printed(html.resolve().as_uri())),
+    )
     assert wrapper.main(["--standing", "--out", str(out)]) == 1
     assert not any(path.exists() for path in wrapper.standing_paths(out))
-    assert errors == [
-        "standing: the page prints on 2 sheets; the owner's design "
-        "is one sheet (shorten a row, or tighten prechips' standing layout)"
-    ]
+    assert len(errors) == 1 and errors[0].startswith(f"standing: {error}")
 
 
 def test_standing_without_shop_files_fails_without_running_uv(process, tmp_path, monkeypatch):
@@ -398,7 +421,7 @@ def test_shop_files_are_the_directory_tomls_prechips_reads(tmp_path):
 
 def test_standing_tool_changes_row_says_hands_clear():
     """The shop page carries the M6-stop safety sentence once, so a converted
-    sheet need not (delegated ruling 2026-11-26, owner review #2144)."""
+    sheet need not (delegated ruling 2026-11-26, Main, no precedent, owner review #2144)."""
     page = tomllib.loads((plans.PROCESS_ROOT / "shop" / "standing.toml").read_text(encoding="utf-8"))
     rows = dict(page["notes"]["standing-mill"]["rows"])
     assert rows["Tool changes"].endswith("Press Cycle Start only with hands clear.")
