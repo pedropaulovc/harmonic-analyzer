@@ -548,7 +548,7 @@ inspection = "Before the stack comes out: the lower plate flush with the foot en
 gauge_checks = "other"
 
 [[setups.operations]]
-instruction = "After 1 h: slide the 1.000 block out gently, without disturbing the plates or the strap, and peel its paper off; paper held at the joint line: tear it away and scrape the residue off the foot end and the lower plate's outer face with the deburring tool, keeping them flush. Wipe the gauge stack and the block with the degreaser, then oil them. Leave the vise closed and untouched for the rest of the 24 h cure."
+instruction = "After 1 h: slide the 1.000 block out gently, without disturbing the plates or the strap, and peel its paper off; paper held at the joint line: tear it away and scrape the residue off the foot end and the lower plate's outer face with the deburring tool, keeping them flush. Wipe the gauge stack and the block with the degreaser, then oil them. Leave the vise closed and untouched for the rest of the 24 h cure, the shop at room temperature (a cold shop cures far slower: Loctite 638 TDS)."
 feed = "hand"
 
 [[setups.operations]]
@@ -633,7 +633,7 @@ gauge_checks = [
 
 [[setups.operations]]
 instruction = "Drawing note 1: the bond, by hand."
-inspection = "The lower plate flush with the strap's foot end and both corners (a fingernail drawn across each feels no step); neither plate moves when pushed hard by hand each way along and across the strap. A plate moves: stop and tell the owner (do not re-bond over cured 638)."
+inspection = "The lower plate flush with the strap's foot end and both corners (a fingernail drawn across each feels no step); neither plate moves when pushed hard by hand each way along and across the strap. A plate moves or a step is felt: scrap the hanger, strap and plates, and make a new one from Setup 1 (cured 638 parts only hot, at about 250 °C, and the slots, cut in line through both plates, cannot be cut again on re-bonded plates)."
 gauge_checks = "other"
 
 [[setups.operations]]
@@ -681,5 +681,5 @@ feed = "hand"
 [[setups.operations]]
 instruction = "Seal: wipe on the stone lubricant (a light oil; the maker: clear coat, wax or oil), leave it a few minutes, wipe off the excess."
 feed = "hand"
-inspection = "Even black all over, no bare spot and no wiping-off coating. Fit after blackening: the pen rod MHA-PN-04 still slides down through both slots under its own weight; neither plate moves by hand. Tight or a plate moves: stop and tell the owner."
+inspection = "Even black all over, no bare spot and no wiping-off coating. Fit after blackening: the pen rod MHA-PN-04 still slides down through both slots under its own weight; neither plate moves by hand. A plate moves: scrap the hanger as in Setup 7. Tight: stop and tell the owner."
 gauge_checks = "other"
