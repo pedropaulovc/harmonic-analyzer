@@ -724,12 +724,17 @@ def test_a_reamer_must_pass_by_its_recorded_chamfer_plus_the_margin():
         "tools": [
             {"id": "pin", "ref": "reamer-0775"},
             {"id": "new", "ref": "reamer-9999"},
+            {"id": "adj", "ref": "reamers-adjustable-lms-5948"},
         ]
     }
     # W.C. Chapman's .0070 in chamfer for a .0775 reamer, plus 0.25 mm.
     assert cam_nc.ream_full_diameter_past_min_mm(plan, "pin") == pytest.approx(0.4278)
     with pytest.raises(ValueError, match="reamer-9999: no end chamfer recorded"):
         cam_nc.ream_full_diameter_past_min_mm(plan, "new")
+    # The adjustable hand set is exempt (hand reamed only), so no recipe may
+    # ream a programmed through hole with it.
+    with pytest.raises(ValueError, match="reams no through hole: a hand-type"):
+        cam_nc.ream_full_diameter_past_min_mm(plan, "adj")
 
 
 _JAW = {"name": "fixed jaw", "x": (0.0, 20.0), "y": (0.0, 25.4), "z_top": 6.0}
