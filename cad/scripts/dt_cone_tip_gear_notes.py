@@ -80,17 +80,10 @@ def sheet_notes() -> str:
     """The sheet's numbered notes.
 
     Note 1 is the pivot's two fits (rule 4): the bushing is bonded over its
-    root and the end screw's drilled #52 hole runs on its end (owner ruling
-    2026-11-20, #2469: a LOCTITE 638 bonded slip fit on the shared .0625
-    reamer; owner ruling 2026-11-24, fit audit question 11: the end hole #52
-    as drilled). One diameter is turned last to both holes, each clearance
-    the analysis bands give (fit audit 2026-11-23, form 2). D47, delegated
-    ruling 2026-11-26 (Main), precedent: the owner's question-11 ruling
-    2026-11-24 and the made-to-fit form of the owner-approved fit policy;
-    owner review #2144, amended 2026-11-26: the DT-39 hole is pin-read as h
-    (the largest pin entering) and the pivot, slid in MHA-DT-38 for the bond,
-    mikes h-.0053 to h-.0013 (necessity N-03); a diameter meeting both
-    clearances always exists (test_dt_cone_tip_gear_drawing.PIVOT_FIT_WINDOW_MIN_MM).
+    root and the end screw's reamed hole runs on its end, one diameter for
+    both (owner ruling 2026-11-20, #2469: a LOCTITE 638 bonded slip fit on
+    the shared .0625 reamer), the pivot turned last to slide in both with
+    the clearances the analysis bands give (fit audit 2026-11-23, form 2).
     Note 2 names the mesh and the fit route of the tip, thickness and root
     bands, with the teeth's do-not-cut. Note 3: the stems are turned between
     centres, and a centre hole in either end harms nothing (rule 11).
@@ -100,8 +93,8 @@ def sheet_notes() -> str:
             f"{PIVOT_NOTE_NUMBER}. PIVOT: BONDED FIT, {cone_tip_cluster.RETAINING_COMPOUND}, IN "
             f"{BUSHING_MATE_NUMBER} {BUSHING_MATE_TITLE};",
             f"   ITS END RUNNING FIT IN {END_SCREW_MATE_NUMBER} {END_SCREW_MATE_TITLE}; "
-            "ONE DIAMETER,",
-            f"   TURNED LAST TO BOTH: CLEARANCE {PIVOT_BOND_CLEARANCE_TEXT} BONDED, "
+            "TURNED LAST TO",
+            f"   SLIDE IN BOTH: CLEARANCE {PIVOT_BOND_CLEARANCE_TEXT} BONDED, "
             f"{PIVOT_RUNNING_CLEARANCE_TEXT} RUNNING.",
             f"{TEETH_NOTE_NUMBER}. TEETH MESH WITH {CYLINDER_MATE_NUMBER}: ACCEPT OVER PINS, "
             "THEN BY FEEL AT ASSEMBLY,",

@@ -144,5 +144,5 @@ instruction = "Break the hole's mouth, a {{cad.chamfer_max_in:.3dot}} max chamfe
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Finish (drawing: as supplied, passivated): wash off the cutting oil and dry the screw; nothing else is applied. Keep it with MHA-DT-37's blank and MHA-DT-38: the pivot is turned last to both, this hole and MHA-DT-38's bore (MHA-DT-37 note 1)."
+instruction = "Finish (drawing: as supplied, passivated): wash off the cutting oil and dry the screw; nothing else is applied."
 feed = "hand"

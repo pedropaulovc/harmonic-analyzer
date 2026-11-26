@@ -14,7 +14,7 @@
 # Bench: deburr the bore's ends.
 #
 # The bore prints the .0625 reamer's size with no band: MHA-DT-37's pivot is
-# turned last to it and to MHA-DT-39's hole at once (D47; fit audit 2026-11-23, F10 and MHA-DT-37.stems;
+# turned last to slide in it (fit audit 2026-11-23, F10 and MHA-DT-37.stems;
 # drawing-guidelines rule 4, form 2), so no gauge reads it here and the Class
 # ZZ pins (zz-pins-0625-0630) are no longer this part's. Not on hand
 # (cad/config/shop-equipment/, to order): the .0625 reamer
@@ -262,5 +262,5 @@ instruction = "Deburr: break both ends of the bore, R{{cad.edge_break_in:.3dot}}
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Finish (drawing: bright machined, oiled): wipe the bushing clean and give its outside a light coat of light machine oil; keep the bore dry and oil-free for the Loctite 638 bond on MHA-DT-37, and keep the bushing with MHA-DT-37's blank and MHA-DT-39: the pivot is turned last to both, this bore and MHA-DT-39's hole (MHA-DT-37 note 1)."
+instruction = "Finish (drawing: bright machined, oiled): wipe the bushing clean and give its outside a light coat of light machine oil; keep the bore dry and oil-free for the Loctite 638 bond on MHA-DT-37, and keep the bushing with MHA-DT-37's blank: its pivot is turned last to slide in this bore."
 feed = "hand"
