@@ -1429,6 +1429,16 @@ def context(
                 "z_top": foot_top,
             },
         ],
+        # The counterbore climbs (G3 inside it), as the module docstring says.
+        [
+            "arcs",
+            {
+                "z_top": foot_top,
+                "centres": [cbore_xy],
+                "part": "outside",
+                "cut": "climb",
+            },
+        ],
         [
             "cleared",
             {"points": cbore_points, "radius": em8 / 2, "z": _r(cbore_floor)},

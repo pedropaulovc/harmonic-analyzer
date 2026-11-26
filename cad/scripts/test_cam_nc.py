@@ -521,6 +521,37 @@ def test_a_concave_corner_arc_of_an_anticlockwise_outline_is_still_conventional(
     assert [f.check for f in found] == ["cut"]
 
 
+# A bore's finish circle and a boss's round about the same axis (5, 5).
+_BORE_G2 = "G0 X7 Y5 Z5\nG1 Z-1 F100\nG2 X7 Y5 I-2 J0\nG0 Z5\n"
+_ROUND_G3 = "G0 X15 Y5 Z5\nG1 Z-1 F100\nG3 X15 Y5 I-10 J0\nG0 Z5\n"
+
+
+def test_an_arc_is_judged_from_its_sense_and_the_declared_part_side(tmp_path):
+    bore = _program(tmp_path, "M3 S2000\n" + _BORE_G2)
+    # Clockwise inside a bore (the part outside the circle): the wall on the
+    # cutter's left, conventional under M3; climb under M4.
+    assert _gcode.check_arcs(bore, 0.0, [(5.0, 5.0)], part="outside", cut="conventional") == []
+    assert [f.detail for f in _gcode.check_arcs(bore, 0.0, [(5.0, 5.0)], part="outside", cut="climb")] == [
+        "line 4 G2 about X5.000 Y5.000 to Z-1.000, the part outside it, under M3: conventional, declared climb"
+    ]
+    m4 = _program(tmp_path, "M4 S2000\n" + _BORE_G2)
+    assert _gcode.check_arcs(m4, 0.0, [(5.0, 5.0)], part="outside", cut="climb") == []
+    # Anticlockwise round a boss (the part inside): conventional too.
+    both = _program(tmp_path, "M3 S2000\n" + _BORE_G2 + _ROUND_G3)
+    assert _gcode.check_arcs(both, 0.0, [(5.0, 5.0)], part="inside", cut="conventional", radius=10.0) == []
+    assert _gcode.check_arcs(both, 0.0, [(5.0, 5.0)], part="outside", cut="conventional", radius=2.0) == []
+    # Unfiltered, both circles are read with one part side: the bore's turns climb.
+    assert len(_gcode.check_arcs(both, 0.0, [(5.0, 5.0)], part="inside", cut="conventional")) == 1
+    stopped = _program(tmp_path, _BORE_G2)
+    assert "spindle stopped" in _gcode.check_arcs(stopped, 0.0, [(5.0, 5.0)], part="outside", cut="conventional")[0].detail
+    assert [f.detail for f in _gcode.check_arcs(bore, 0.0, [(6.0, 5.0)], part="outside", cut="conventional")] == [
+        "no arc fed below Z0.000 about X6.000 Y5.000"
+    ]
+    for kwargs in ({"part": "left", "cut": "climb"}, {"part": "inside", "cut": "up"}):
+        with pytest.raises(ValueError):
+            _gcode.check_arcs(bore, 0.0, [(5.0, 5.0)], **kwargs)
+
+
 def test_outline_passes_run_in_order_after_the_clearing(tmp_path):
     passes = [{"offset": 1.0, "levels": [-1.0]}, {"offset": 1.0, "levels": [-2.0]}]
     # Waste 4 from the bottom edge, cleared +X (the bottom's way) at Z-2.

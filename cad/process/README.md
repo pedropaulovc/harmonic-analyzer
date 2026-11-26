@@ -674,10 +674,14 @@ A recipe has five parts (and the as-machined declaration, below):
   the elements' running way the part lies on): every pass point's cutter
   centre must lie off the part's side of its nearest element, and the part's
   side of the travel with the spindle's turn gives the way it cuts (#3690).
-  A pass judged by the stock it meets, a bore's circles or a wall's finish,
-  declares `check_engagement(..., cut=...)` with its stock box: every
-  selected move that meets stock meets it on the declared side under the
-  turn in force; one that meets it on both sides (a slot) fails.
+  A bore's or a round's circles declare `check_arcs(..., centres=...,
+  part="outside", cut=...)` (`"inside"` round a boss; `radius` picks one
+  circle where a seat and a round share an axis): every G17 arc fed about a
+  centre turns the declared way under the spindle in force. A pass judged by
+  the stock it meets, a wall's finish, declares
+  `check_engagement(..., cut=...)` with its stock box: every selected move
+  that meets stock meets it on the declared side under the turn in force;
+  one that meets it on both sides (a slot) fails.
 
 CAM can produce toolpaths that look valid yet are wrong; the expectations
 caught a spot depth measured from the counterbore floor, a feed height below

@@ -1253,6 +1253,19 @@ def context(
                 },
             ]
         )
+    # The counterbore circles, clockwise inside each: conventional.
+    expect.append(
+        [
+            f"{name}@4",
+            "arcs",
+            {
+                "z_top": thick,
+                "centres": guides,
+                "part": "outside",
+                "cut": "conventional",
+            },
+        ]
+    )
     for k, key in enumerate(sorted(manual), 5):
         expect += [
             [

@@ -1142,6 +1142,16 @@ def context(
                         "z_top": 0.0,
                     },
                 ],
+                # The seat's turns clockwise inside it: conventional.
+                [
+                    "arcs",
+                    {
+                        "z_top": 0.0,
+                        "centres": [seat_xy],
+                        "part": "outside",
+                        "cut": "conventional",
+                    },
+                ],
                 ["rapids_clear", {"z_top": 0.0}],
                 ["air_feed", {"z_top": 0.0}],
                 ["keep_out", {"radius": r8, "boxes": edge_keep}],

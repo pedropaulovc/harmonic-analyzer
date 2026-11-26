@@ -1596,6 +1596,17 @@ def context(
             },
         ],
         ["PL01_holes@3", "air_feed", {"z_top": 0.0}],
+        # The counterbore's helix, clockwise inside it: conventional.
+        [
+            "PL01_holes@3",
+            "arcs",
+            {
+                "z_top": 0.0,
+                "centres": [holes2["holddown"]],
+                "part": "outside",
+                "cut": "conventional",
+            },
+        ],
     ]
     for k in (1, 2, 4, 5):
         opened = {
@@ -1829,6 +1840,17 @@ def context(
                 "z_min": 0.0,
                 "arc": "G2",
                 "z_top": relief_top,
+            },
+        ],
+        # The relief, clockwise round the pivot with the part outside it.
+        [
+            "PL09_relief",
+            "arcs",
+            {
+                "z_top": relief_top,
+                "centres": [(0.0, 0.0)],
+                "part": "outside",
+                "cut": "conventional",
             },
         ],
     ]

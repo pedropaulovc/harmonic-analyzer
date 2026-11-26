@@ -1060,6 +1060,55 @@ def _judge_cut(
         wrong.setdefault(what, []).append(where)
 
 
+def check_arcs(
+    program: Program,
+    z_top: float,
+    centres: Iterable[tuple[float, float]],
+    part: str,
+    cut: str,
+    radius: float | None = None,
+) -> list[Finding]:
+    """The G17 arcs fed below ``z_top`` about each of ``centres`` (XY, a bore's
+    or a round's axis; with ``radius``, only the cutter-centre circle of that
+    radius about it) cut the declared way. ``part`` says where the part
+    lies from the arc's circle, as the recipe states: ``"outside"`` (a bore,
+    a counterbore: the wall beyond the cutter's outer edge) or ``"inside"``
+    (a round, a boss: the wall inside its inner edge). The part is on the
+    cutter's left when it lies outside a clockwise (G2) arc or inside an
+    anticlockwise (G3) one: under M3 conventional, else climb (M4 the
+    reverse). An arc with the spindle stopped fails, and so does a centre
+    no arc is fed about. Straight moves (entries, plunges) are not judged."""
+    if cut not in CUT_DIRECTIONS:
+        raise ValueError(f"cut {cut!r} is not one of {CUT_DIRECTIONS}")
+    if part not in ("inside", "outside"):
+        raise ValueError(f"part {part!r} is not 'inside' or 'outside'")
+    findings: list[Finding] = []
+    for centre in centres:
+        arcs = [
+            m for m in program.cutting
+            if m.centre is not None and m.plane == 17 and min(m.start[2], m.end[2]) < z_top - _TOL_MM
+            and _close(m.centre[0], centre[0]) and _close(m.centre[1], centre[1])
+            and (radius is None or abs(math.dist(m.start[:2], m.centre[:2]) - radius) <= _ENTRY_TOL_MM)
+        ]
+        if not arcs:
+            about = f"X{centre[0]:.3f} Y{centre[1]:.3f}" + ("" if radius is None else f" at R{radius:.3f}")
+            findings.append(Finding(program.name, "cut", f"no arc fed below Z{z_top:.3f} about {about}"))
+        for m in arcs:
+            code = "G2" if m.motion is Motion.ARC_CW else "G3"
+            where = f"line {m.line} {code} about X{centre[0]:.3f} Y{centre[1]:.3f} to Z{m.end[2]:.3f}"
+            if m.spindle == 0:
+                findings.append(Finding(program.name, "cut", f"{where}: spindle stopped (no M3/M4 in force), declared {cut}"))
+                continue
+            left = (part == "outside") == (m.motion is Motion.ARC_CW)
+            ran = CUT_DIRECTIONS[0] if (1 if left else -1) * m.spindle > 0 else CUT_DIRECTIONS[1]
+            if ran != cut:
+                findings.append(Finding(
+                    program.name, "cut",
+                    f"{where}, the part {part} it, under M{3 if m.spindle > 0 else 4}: {ran}, declared {cut}",
+                ))
+    return findings
+
+
 def check_outline(
     program: Program,
     elements: Sequence[dict],

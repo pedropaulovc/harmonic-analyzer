@@ -809,6 +809,30 @@ def context(
             "cleared",
             {"points": hub_corners, "radius": dem / 2, "z": _r(bottom)},
         ],
+        # The seat's helix clockwise inside it, the boss round anticlockwise
+        # outside it: both conventional (module docstring).
+        [
+            "CA01_hub_end@0",
+            "arcs",
+            {
+                "z_top": 0.0,
+                "centres": [hub],
+                "radius": seat_r,
+                "part": "outside",
+                "cut": "conventional",
+            },
+        ],
+        [
+            "CA01_hub_end@0",
+            "arcs",
+            {
+                "z_top": 0.0,
+                "centres": [hub],
+                "radius": round_r,
+                "part": "inside",
+                "cut": "conventional",
+            },
+        ],
         [
             "CA01_hub_end@1",
             "holes",
@@ -875,6 +899,17 @@ def context(
             "CA03_handle_end@0",
             "cleared",
             {"points": handle_corners, "radius": dem / 2, "z": _r(bottom)},
+        ],
+        [
+            "CA03_handle_end@0",
+            "arcs",
+            {
+                "z_top": 0.0,
+                "centres": [pivot],
+                "radius": round_r,
+                "part": "inside",
+                "cut": "conventional",
+            },
         ],
         [
             "CA03_handle_end@1",
