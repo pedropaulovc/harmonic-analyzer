@@ -21,6 +21,6 @@
   <line class="leader" x1="255.1" y1="326" x2="213.1" y2="284.13"/>
   <circle class="leader-dot" cx="213.1" cy="284.13" r="2"/>
   <text class="label" x="480" y="120">dead centre in the stub's centre hole</text>
-  <line class="leader" x1="560" y1="126" x2="700" y2="167"/>
-  <circle class="leader-dot" cx="700" cy="167" r="2"/>
+  <line class="leader" x1="560" y1="126" x2="711.9" y2="196"/>
+  <circle class="leader-dot" cx="711.9" cy="196" r="2"/>
 </svg>

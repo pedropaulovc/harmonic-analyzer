@@ -1,16 +1,16 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 400" width="760" height="400" font-family="sans-serif" font-size="13">
-  <!-- To scale, 300 px/in along and across the axis, from above (the cross-slide at the bottom): the Ø.625 bar (stock_dia_in), the jaw fronts 1.298 behind Z0 (cad.jaw_z_mm), the hub Ø.520 (cad.outer_dia_mm) back to Z-1.238 (cad.run_end_z_mm), the press diameter Ø.4389 (cad.step_dia_mm) to the shoulder at Z-.334 (cad.step_far_out_far_z_mm), the part-off face at Z-1.163 (cad.part_off_in) with the 1/16 blade's kerf behind it. The 3-jaw's body and jaws are schematic (their sizes are not on record). The AR tool is schematic (its holder's size is not on record), its point on Z0 part way in, facing toward the axis. Hatched: this setup's whole removal (the face, the hub and press diameters, the B hole, the kerf). -->
+  <!-- To scale, 300 px/in along and across the axis, from above (the cross-slide at the bottom): the Ø.625 bar (stock_dia_in), the jaw fronts 1.298 behind Z0 (cad.jaw_z_mm), the hub Ø.520 (cad.outer_dia_mm) back to Z-1.238 (cad.run_end_z_mm), the press diameter Ø.4385 (cad.step_dia_mm) to the shoulder at Z-.334 (cad.step_far_out_far_z_mm), the part-off face at Z-1.163 (cad.part_off_in) with the 1/16 blade's kerf behind it. The 3-jaw's body and jaws are schematic (their sizes are not on record). The AR tool is schematic (its holder's size is not on record), its point on Z0 part way in, facing toward the axis. Hatched: this setup's whole removal (the face, the hub and press diameters, the B hole, the kerf). -->
   <rect class="paper" x="0" y="0" width="760" height="400"/>
   <text class="title" x="20" y="22">Setup 2, Op 50: the AR tool faces the rear face to Z0 (to scale, 300 px/in)</text>
   <rect class="fixture-vise" x="114.6" y="65.25" width="56" height="279.5"/>
   <path class="part-rest" d="M30 111.25L232.35 111.25L232.35 298.75L30 298.75L27 291.54L30 284.33L27 277.12L30 269.9L27 262.69L30 255.48L27 248.27L30 241.06L27 233.85L30 226.63L27 219.42L30 212.21L27 205L30 197.79L27 190.58L30 183.37L27 176.15L30 168.94L27 161.73L30 154.52L27 147.31L30 140.1L27 132.88L30 125.67L27 118.46Z"/>
   <rect class="part-kept" x="251.1" y="127" width="248.7" height="156"/>
-  <rect class="part-kept" x="499.8" y="139.16" width="100.2" height="131.67"/>
+  <rect class="part-kept" x="499.8" y="139.22" width="100.2" height="131.55"/>
   <rect class="part-removed" x="600" y="111.25" width="4.5" height="187.5"/>
   <rect class="part-removed" x="228.6" y="111.25" width="271.2" height="15.75"/>
   <rect class="part-removed" x="228.6" y="283" width="271.2" height="15.75"/>
-  <rect class="part-removed" x="499.8" y="111.25" width="100.2" height="27.91"/>
-  <rect class="part-removed" x="499.8" y="270.84" width="100.2" height="27.91"/>
+  <rect class="part-removed" x="499.8" y="111.25" width="100.2" height="27.98"/>
+  <rect class="part-removed" x="499.8" y="270.77" width="100.2" height="27.98"/>
   <rect class="part-removed" x="232.35" y="127" width="18.75" height="156"/>
   <rect class="part-removed" x="228.6" y="169.3" width="371.4" height="71.4"/>
   <rect class="clamp" x="170.6" y="77.25" width="40" height="34"/>

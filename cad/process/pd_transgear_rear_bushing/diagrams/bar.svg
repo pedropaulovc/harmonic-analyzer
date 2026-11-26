@@ -1,17 +1,17 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 400" width="760" height="400" font-family="sans-serif" font-size="13">
-  <!-- To scale, 300 px/in along and across the axis, from above (the cross-slide at the bottom): the Ø.500 bar (stock_dia_in), the jaw fronts 0.389 behind Z0 (cad.jaw_z_mm), the outside Ø0.350 (cad.outer_dia_mm) back to Z-0.289 (cad.run_end_z_mm), the part-off face at Z-0.214 (cad.part_off_in) with the 1/16 blade's kerf behind it. The 3-jaw's body and jaws are schematic (their sizes are not on record). The AR tool is schematic (its holder's size is not on record), its point on Z0 part way in, facing toward the axis. Hatched: this setup's whole removal (the face, the outside skin, the bore, the kerf). -->
+  <!-- To scale, 300 px/in along and across the axis, from above (the cross-slide at the bottom): the Ø.500 bar (stock_dia_in), the jaw fronts 0.384 behind Z0 (cad.jaw_z_mm), the outside Ø0.350 (cad.outer_dia_mm) back to Z-0.284 (cad.run_end_z_mm), the part-off face at Z-0.209 (cad.part_off_in) with the 1/16 blade's kerf behind it. The 3-jaw's body and jaws are schematic (their sizes are not on record). The AR tool is schematic (its holder's size is not on record), its point on Z0 part way in, facing toward the axis. Hatched: this setup's whole removal (the face, the outside skin, the bore, the kerf). -->
   <rect class="paper" x="0" y="0" width="760" height="400"/>
   <text class="title" x="20" y="22">Setup 1, Op 10: the AR tool faces the bar end to Z0, the thrust face (to scale, 300 px/in)</text>
-  <rect class="fixture-vise" x="227.3" y="84" width="56" height="242"/>
-  <path class="part-rest" d="M30 130L357.05 130L357.05 280L30 280L27 272.86L30 265.71L27 258.57L30 251.43L27 244.29L30 237.14L27 230L30 222.86L27 215.71L30 208.57L27 201.43L30 194.29L27 187.14L30 180L27 172.86L30 165.71L27 158.57L30 151.43L27 144.29L30 137.14Z"/>
-  <rect class="part-kept" x="375.8" y="152.5" width="64.2" height="105"/>
+  <rect class="fixture-vise" x="228.8" y="84" width="56" height="242"/>
+  <path class="part-rest" d="M30 130L358.55 130L358.55 280L30 280L27 272.86L30 265.71L27 258.57L30 251.43L27 244.29L30 237.14L27 230L30 222.86L27 215.71L30 208.57L27 201.43L30 194.29L27 187.14L30 180L27 172.86L30 165.71L27 158.57L30 151.43L27 144.29L30 137.14Z"/>
+  <rect class="part-kept" x="377.3" y="152.5" width="62.7" height="105"/>
   <rect class="part-removed" x="440" y="130" width="6" height="150"/>
-  <rect class="part-removed" x="353.3" y="130" width="86.7" height="22.5"/>
-  <rect class="part-removed" x="353.3" y="257.5" width="86.7" height="22.5"/>
-  <rect class="part-removed" x="357.05" y="152.5" width="18.75" height="105"/>
-  <rect class="part-removed" x="353.3" y="186.1" width="86.7" height="37.8"/>
-  <rect class="clamp" x="283.3" y="96" width="40" height="34"/>
-  <rect class="clamp" x="283.3" y="280" width="40" height="34"/>
+  <rect class="part-removed" x="354.8" y="130" width="85.2" height="22.5"/>
+  <rect class="part-removed" x="354.8" y="257.5" width="85.2" height="22.5"/>
+  <rect class="part-removed" x="358.55" y="152.5" width="18.75" height="105"/>
+  <rect class="part-removed" x="354.8" y="186.1" width="85.2" height="37.8"/>
+  <rect class="clamp" x="284.8" y="96" width="40" height="34"/>
+  <rect class="clamp" x="284.8" y="280" width="40" height="34"/>
   <line class="centre-line" x1="20" y1="205" x2="740" y2="205"/>
   <path class="cutter" d="M440 253L470 265L470 373L462 370L454 373L446 373L446 277Z"/>
   <line class="arrow" x1="484" y1="303" x2="484" y2="259"/>
@@ -22,14 +22,14 @@
   <line class="leader" x1="520" y1="326" x2="454" y2="293"/>
   <circle class="leader-dot" cx="454" cy="293" r="2"/>
   <text class="label" x="20" y="384">3-jaw on the Ø{{process.stock_dia_in:.3dot}} bar, {{cad.stickout_in:.2dot}} out of the jaw fronts (before facing)</text>
-  <line class="leader" x1="200" y1="372" x2="303.3" y2="310"/>
-  <circle class="leader-dot" cx="303.3" cy="310" r="2"/>
+  <line class="leader" x1="200" y1="372" x2="304.8" y2="310"/>
+  <circle class="leader-dot" cx="304.8" cy="310" r="2"/>
   <text class="label" x="470" y="56">hatched: the rest of this setup's removal: the</text>
   <text class="label" x="470" y="72">outside to Ø{{cad.outer_dia_mm:in.3dot}}, the bore, the parting kerf</text>
   <line class="leader" x1="468" y1="72" x2="443" y2="145"/>
   <circle class="leader-dot" cx="443" cy="145" r="2"/>
   <text class="label" x="40" y="56">the bushing: Z0 to the part-off</text>
   <text class="label" x="40" y="72">face at Z-{{cad.part_off_in:.3dot}}</text>
-  <line class="leader" x1="150" y1="64" x2="407.9" y2="166.5"/>
-  <circle class="leader-dot" cx="407.9" cy="166.5" r="2"/>
+  <line class="leader" x1="150" y1="64" x2="408.65" y2="166.5"/>
+  <circle class="leader-dot" cx="408.65" cy="166.5" r="2"/>
 </svg>

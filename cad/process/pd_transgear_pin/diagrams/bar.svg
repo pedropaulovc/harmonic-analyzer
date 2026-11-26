@@ -20,20 +20,20 @@
   <rect class="clamp" x="90" y="142.5" width="40" height="30"/>
   <rect class="clamp" x="90" y="227.5" width="40" height="30"/>
   <line class="centre-line" x1="20" y1="200" x2="740" y2="200"/>
-  <path class="clamp" d="M729.1 200L786.26 167L760 167L760 233L786.26 233Z"/>
+  <path class="clamp" d="M729.1 200L760 182.16L760 217.84Z"/>
   <path class="cutter" d="M698.7 213.2L728.7 225.2L728.7 323.2L720.7 320.2L712.7 323.2L704.7 323.2L704.7 237.2Z"/>
   <line class="arrow" x1="738.7" y1="273.2" x2="738.7" y2="227.2"/>
   <line class="datum" x1="654.7" y1="50" x2="654.7" y2="92"/>
   <text class="datum-label" x="648.7" y="60" text-anchor="end">Z0 the tip plane</text>
   <text class="label" x="500" y="372" text-anchor="end">AR facing the sawn end .02 off:</text>
   <text class="label" x="500" y="388" text-anchor="end">the stub's end, Z+{{process.centre_stub_in:.2dot}}</text>
-  <line class="leader" x1="502" y1="368" x2="708.7" y2="330"/>
-  <circle class="leader-dot" cx="708.7" cy="330" r="2"/>
+  <line class="leader" x1="502" y1="368" x2="716.7" y2="293.2"/>
+  <circle class="leader-dot" cx="716.7" cy="293.2" r="2"/>
   <text class="label" x="560" y="110">dead centre, backed off:</text>
   <text class="label" x="560" y="126">in the stub from Op 60</text>
   <text class="label" x="560" y="142">until Op 180 cuts it off</text>
-  <line class="leader" x1="712" y1="136" x2="724" y2="173"/>
-  <circle class="leader-dot" cx="724" cy="173" r="2"/>
+  <line class="leader" x1="712" y1="136" x2="751.1" y2="196"/>
+  <circle class="leader-dot" cx="751.1" cy="196" r="2"/>
   <text class="label" x="20" y="384">3-jaw on the Ø{{cad.stock_dia_mm:in.3dot}} bar, {{cad.stickout_in:.2dot}} out</text>
   <line class="leader" x1="110" y1="372" x2="110" y2="247.5"/>
   <circle class="leader-dot" cx="110" cy="247.5" r="2"/>
