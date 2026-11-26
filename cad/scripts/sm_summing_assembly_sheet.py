@@ -272,13 +272,22 @@ DOWEL_PROUD = _length(knife_dowel.PROUD, 3)
 BOND_NOTE_A = (
     f"BOND NOTE A, {BOND_GRADE} (STEPS 1E-1G): DEGREASE DOWEL AND HOLE; COAT "
     "THE DOWEL, NEVER THE BLIND HOLE; SEAT IT WITHIN THE FIXTURE TIME AND "
-    "LEAVE IT UNDISTURBED; CURE 24 H BEFORE STEP 5. ACCEPT AT STEP 1H."
+    "LEAVE IT UNDISTURBED; CURE 24 H AT ROOM TEMPERATURE BEFORE STEP 5. "
+    "ACCEPT AT STEP 1H."
 )
+# Note B's acceptance is step 8C's, once the cured plug carries the seated
+# shoulder screw, with its remedy at 8D (8B keeps its number for the screw
+# that sm-summing.yaml and joint_retention cite): a
+# plug that turns or pulls out is not held, so it still comes out and is
+# bonded again (delegated ruling 2026-11-26 (Main), precedent: D38 (MG-00
+# drum bond wording); owner review #2144 (D54); #3646).  The cure is 24 h at
+# room temperature (LOCTITE 638 TDS, May 2024: about 85-90 % of full
+# strength at 24 h on steel at 22-23 C, gap 0.05 mm or less).
 BOND_NOTE_B = (
     "BOND NOTE B, LOCTITE 638 (STEP 8): DEGREASE THE MHA-SM-05 SPIGOT AND THE "
     "MHA-SM-01 BORE; COAT THE SPIGOT; PUSH IT IN UNTIL THE HEAD SEATS SQUARE "
-    "AND FLUSH ON THE TUBE'S FACED END; CURE 24 H BEFORE STEP 8A. ACCEPT: IT "
-    "DOES NOT TURN OR PULL OUT BY HAND."
+    "AND FLUSH ON THE TUBE'S FACED END; CURE 24 H AT ROOM TEMPERATURE BEFORE "
+    "STEP 8A. ACCEPT AT STEP 8C."
 )
 # The fitter's order; sm_summing_explode_spec.EXPLODE_STEPS runs it backwards.
 # A step does one thing (rule 22): a numbered step's own sub-steps carry a
@@ -380,6 +389,9 @@ ASSEMBLY_STEPS = (
     "8A. PASS MHA-SM-VN-56 THROUGH THE UPPER LOOP OF MHA-SM-VN-51.",
     "8B. TURN MHA-SM-VN-56 INTO MHA-SM-05 UNTIL ITS SHOULDER SEATS ON THE END "
     "FACE; NO THREADLOCKER.",
+    "8C. CHECK THAT MHA-SM-05 DOES NOT TURN OR PULL OUT OF MHA-SM-01 BY HAND.",
+    "8D. IF IT DOES, TAKE MHA-SM-VN-56 OUT, PULL MHA-SM-05, CLEAN IT AND THE "
+    "BORE TO BARE METAL AND REDO FROM STEP 8.",
     "9. AT FINAL ASSEMBLY (MHA-HA-00): DROP THE MHA-SM-01 POST INTO THE "
     "FRAME'S GOOSENECK HUB WITH THE HUB SET SCREW MHA-FR-VN-52 (FITTED PER "
     "MHA-FR-00) BACKED CLEAR.",

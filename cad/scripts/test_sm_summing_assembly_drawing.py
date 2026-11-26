@@ -384,19 +384,27 @@ def test_a_caption_pushed_into_the_title_block_is_refused() -> None:
 
 def test_the_shoulder_screw_goes_in_after_the_end_plug_bond() -> None:
     # Owner rulings 2026-11-08 (Pedro), #2315: step 8 bonds the end plug per
-    # bond note B, so the shoulder screw goes in at 8A-8B.
+    # bond note B, so the shoulder screw goes in at 8A-8B; the cured plug is
+    # accepted at 8C, with its remedy at 8D (#3646, D54).
     steps = {step.split(". ", 1)[0]: step for step in notes.ASSEMBLY_STEPS}
     assert steps["8"].startswith("8. BOND MHA-SM-05 INTO MHA-SM-01 PER BOND NOTE B")
     assert steps["8A"].startswith("8A. PASS MHA-SM-VN-56")
     assert steps["8B"].startswith("8B. TURN MHA-SM-VN-56 INTO MHA-SM-05")
+    assert steps["8C"] == (
+        "8C. CHECK THAT MHA-SM-05 DOES NOT TURN OR PULL OUT OF MHA-SM-01 BY HAND."
+    )
+    assert steps["8D"].startswith(
+        "8D. IF IT DOES, TAKE MHA-SM-VN-56 OUT, PULL MHA-SM-05"
+    )
+    assert steps["8D"].endswith("REDO FROM STEP 8.")
     assert steps["10A"].startswith("10A. TIGHTEN THE HUB SET SCREW MHA-FR-VN-52")
     assert "SNUG, 9 IN-LB MAX" in steps["10A"]
     bond_note = notes.BOND_NOTE_B
     assert bond_note in notes.ASSEMBLY_CHECKS
-    assert "CURE 24 H BEFORE STEP 8A" in bond_note
+    assert "CURE 24 H AT ROOM TEMPERATURE BEFORE STEP 8A" in bond_note
     # Bench acceptance, as bond note A's dowel bond (machinist review, run
-    # 20261109T142156827Z, rule 23).
-    assert bond_note.endswith("ACCEPT: IT DOES NOT TURN OR PULL OUT BY HAND.")
+    # 20261109T142156827Z, rule 23), made a step with its remedy (#3646).
+    assert bond_note.endswith("ACCEPT AT STEP 8C.")
 
 
 def test_a_bonded_loose_dowel_is_held_at_its_proud_and_re_read_after_cure() -> None:
@@ -427,7 +435,9 @@ def test_a_bonded_loose_dowel_is_held_at_its_proud_and_re_read_after_cure() -> N
     assert "(STEPS 1E-1G)" in bond_note
     for action in ("PRESS", "LIFT", "STAND", "LOWER", "GAUGE BLOCKS", "PARALLELS"):
         assert action not in bond_note, action
-    assert bond_note.endswith("CURE 24 H BEFORE STEP 5. ACCEPT AT STEP 1H.")
+    assert bond_note.endswith(
+        "CURE 24 H AT ROOM TEMPERATURE BEFORE STEP 5. ACCEPT AT STEP 1H."
+    )
 
 
 def _step_group(number: str) -> list[str]:
