@@ -62,7 +62,6 @@ title = "This job"
 rows = [
   ["Finished", "{{cad.far_end_length_min_in:.2f}}–{{cad.far_end_length_max_in:.2f}} long (locating end to far end), {{cad.roof_edge_height_min_in:.2f}}–{{cad.roof_edge_height_max_in:.2f}} high (locating edge to roof edge), {{cad.outer_face_thickness_min_in:.3dot}}–{{cad.outer_face_thickness_max_in:.3dot}} thick as the sheet comes."],
   ["Pair", "A matched pair with MHA-MS-02: Setups 3 and 4 need that block finished by its own traveler through its Setup 11 (all but its two 2-56 taps, which its Setup 13 cuts after Setup 4 here)."],
-  ["Finish", "Brass black, the last setup, once the Brass Black is bought; until then the plate stays bare, tagged AWAITING BRASS BLACK."],
 ]
 
 [cad]
@@ -332,7 +331,7 @@ speed_kind = "spindle"
 tool = "drill-41"
 drilling = "twist_drill"
 sizing = { kind = "band", band_mm = "{{cad.clearance_hole_1_dia_band_mm}}" }
-instruction = "Prove in air: the #41 comes down over each pilot's centre. Run MS02_open (M6 T3, #41; set 2800): open both holes through the plate, the #41's full diameter {{process.open_past_mm:in.3dot}} past the plate into the block's window."
+instruction = "The plate was turned over: in the air run the #41 comes down over each pilot's centre. Run MS02_open (M6 T3, #41; set 2800): open both holes through the plate, the #41's full diameter {{process.open_past_mm:in.3dot}} past the plate into the block's window."
 rpm = 2800
 feed = "{{process.hole_feed_per_min_mm:in.1f}} in/min"
 hole_depth_mm = "{{cad.outer_face_thickness_mm}}"
