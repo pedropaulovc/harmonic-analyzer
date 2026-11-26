@@ -483,7 +483,7 @@ def test_the_end_hub_leaf_is_the_least_worst_case_air_floored() -> None:
     assert _setting_table_row("end-hubs-clear")[2:] == (
         f"{drawing.item('ch-rocker-arm')} HUB TO EAR",
         "-",
-        ".011 MIN",
+        ".009 MIN",
         "FEELER LEAF",
     )
 

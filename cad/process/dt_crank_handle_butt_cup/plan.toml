@@ -1,13 +1,12 @@
 # Crank handle butt cup MHA-DT-35, one off, turned on the manual
 # PM-1127VF-LB (owner ruling 2026-11-21: turned parts get lathe travelers, no
 # NC). Route chosen for speed, two chuckings of the 1/2 in 1018 bar on hand.
-# Order of manufacture: this cup and its pocket first, the MHA-DT-32 screw's
-# head second. Owner ruling 2026-11-23 (tool audit Q6): "B. End-mill the
-# pocket with the owned 1/4 carbide end mill and turn the MHA-DT-32 head to
-# it (pocket less .012 +/-.004); no boring bar." So the pocket is plunged
-# with the 1/4 end mill and pinned, and the MHA-DT-32 traveler turns the head
-# to that reading (note 1's running fit, clearance .008-.016, is kept by the
-# head instead of the pocket; the head's own band is .231-.241). First the
+# Order of manufacture: this cup first (bonded into the handle), the MHA-DT-32
+# screw last. Owner ruling 2026-11-23 (tool audit Q6): "End-mill the pocket
+# with the owned 1/4 carbide end mill ... no boring bar." Owner ruling
+# 2026-11-24, fit audit question 15 (no matching): the pocket keeps its own
+# limits .248-.257 and is not read for the screw; the MHA-DT-32 head is
+# turned to its own .231-.241 and clears any such pocket. First the
 # MHA-DT-08 counterbore is measured (note 2 turns the body to it). Setup 1
 # saws a 3 in piece off the bar: the lathe never runs the whole bar, whose
 # length behind the jaws would pass the spindle's rear end (#3424; limit
@@ -16,24 +15,19 @@
 # counterbore less its clearance, spot, drill #20 through past the parting
 # line, drill #1 short of the pocket floor, then plunge the pocket to the
 # floor depth with the 1/4 carbide square end mill from the tailstock (its
-# square corner leaves the floor corner inside R.004 MAX) and pin it (the
-# reading C goes on the cup's tag for MHA-DT-32). A 3/16 in 90° chamfer
+# square corner leaves the floor corner inside R.003 MAX) and check its
+# upper limit with one pin. A 3/16 in 90° chamfer
 # cutter chamfers the #20 hole's edge on the floor. Part off .02 long. Setup
 # 3, the cup turned round on its body over a shim wrap: mike its length,
 # touch the AR on the parted end and preset the DRO from that length (nothing
 # seats the cup axially), face the far end to length and chamfer its outside
 # edge. Bench: deburr and check.
 #
-# Pocket window: the end mill is 1/4 in -.002/0 (McMaster 88815A43's page,
-# common.toml tools.endmill-carbide-3fl-1-4), so the pocket reads .248 or
-# over; a pocket reading C (the largest minus pin that enters, true size C
-# -.0002 to C +.001) needs a head of C -.015 to C -.009 for the true
-# clearance to stay .008-.016, aimed at C -.012; MHA-DT-32 clips that window
-# to the head's own .231-.241. The aim lies inside both for C .248-.253 (C
-# -.012 at most .241), so the cup accepts C .248-.253: the .248 pin enters
-# to the floor, the .254 does not. The wall
-# at the face, (.417 - .254)/2 less the two .010 edge breaks, is .0615, over
-# note 1's .060 MIN.
+# Pocket: the end mill is 1/4 in -.002/0 (McMaster 88815A43's page,
+# common.toml tools.endmill-carbide-3fl-1-4), so the pocket comes out .248 or
+# over; run-out in the chuck could open it, so the .257 pin of the set, the
+# sheet's upper limit, must not enter. The wall at the face at that limit,
+# (.417 - .257)/2 less the two .010 edge breaks, is .060, note 1's .060 MIN.
 #
 # Not on hand (cad/config/shop-equipment/tools-cutting.toml, to order): the
 # Harvey Tool 902345-C3 3/16 in chamfer cutter.
@@ -42,7 +36,7 @@ part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
 material = "AISI 1018 cold-finished steel rod, 1/2 in"
 stock = "Ø{{process.stock_dia_in:.3dot}} bar, on hand; Setup 1 saws one {{process.bar_length_in:g}} in piece off it, which makes the one cup ({{cad.pitch_in:.2dot}} in of it)."
-note = "Inches unless mm. Lathe PM-1127VF-LB (70–380 and 380–2000 rpm); cutting oil on steel. To order (not on hand): the 3/16 in 90° chamfer cutter and the Class ZZ pin-gauge set (.061–.500 minus) for the pocket reading and the #20 hole check. Make this cup before the MHA-DT-32 screw: its head is turned to this pocket."
+note = "Inches unless mm. Lathe PM-1127VF-LB (70–380 and 380–2000 rpm); cutting oil on steel. To order (not on hand): the 3/16 in 90° chamfer cutter and the Class ZZ pin-gauge set (.061–.500 minus) for the pocket's upper limit and the #20 hole check. Make this cup before the MHA-DT-32 screw, which is fitted to the bonded handle."
 shop = "../shop"
 stock_refs = ["1018-round-1-2"]
 material_key = "lathe-1018-cold-finished"
@@ -267,9 +261,9 @@ gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.pocket_depth_band_mm}}" }
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Spindle stopped, the pocket blown clean: try the .248 pin, then each larger pin of the set by .001, to the floor. Write C on this sheet and on the cup's tag: the largest pin that enters to the floor."
-inspection = "The .248 pin enters to the floor and the .254 does not (C .248–.253): MHA-DT-32 then turns its head to C − .012, which keeps note 1's clearance .008–.016. .248 tight: clear the chips, feed the end mill to the floor once more and pin again; still tight: stop and report. .254 enters: stop and report (the end mill is running out in the chuck)."
-gauge_checks = [{ gauge = "pin-gauges", band_mm = [6.2992, 6.4516] }]
+instruction = "Spindle stopped, the pocket blown clean: try the .257 pin of the set in the pocket by hand, clean and dry, no force."
+inspection = "The .257 pin does not enter (the pocket under its drawn .257 limit; the 1/4 end mill cuts .248 or over). It enters: stop and report (the end mill is running out in the chuck)."
+gauge_checks = [{ gauge = "pin-gauges", band_mm = [6.2992, 6.5278] }]
 
 [[setups.operations]]
 cut_kind = "other"
@@ -277,7 +271,7 @@ speed_kind = "spindle"
 tool = "chamfer-mill"
 drilling = "none"
 sizing = "other"
-instruction = "Chamfer the #20 hole's edge on the pocket floor with the 3/16 90° chamfer cutter from the tailstock: touch the edge, then feed {{cad.chamfer_bore_leg_in:.4dot}} ({{cad.chamfer_bore_leg_min_in:.3dot}}–{{cad.chamfer_bore_leg_max_in:.3dot}} × 45°) by the quill scale."
+instruction = "Chamfer the #20 hole's edge on the pocket floor with the 3/16 90° chamfer cutter from the tailstock: touch the edge, then feed about .007 by the quill scale (drawn {{cad.chamfer_bore_leg_min_in:.3dot}} MIN × 45°; the title block's chamfer {{cad.chamfer_bore_leg_max_in:.3dot}} max caps it)."
 settings = "lathe-chamfer-3-16-1018"
 cut_diameter_mm = 4.7625
 
@@ -359,5 +353,5 @@ instruction = "A cup long in Op 160 goes back to Op 130 (a new L0, chucked, touc
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Oil the pocket, the pocket-end face and the #20 hole lightly with light machine oil (drawing finish: bright turned, oiled), the faces that show in the handle's butt; leave the body and the far end dry and clean for the epoxy into the MHA-DT-08 counterbore. Tag it with the recorded counterbore and C: it goes to that handle, and the MHA-DT-32 head is turned to C."
+instruction = "Oil the pocket, the pocket-end face and the #20 hole lightly with light machine oil (drawing finish: bright turned, oiled), the faces that show in the handle's butt; leave the body and the far end dry and clean for the epoxy into the MHA-DT-08 counterbore. Tag it with the recorded counterbore: it goes to that handle."
 feed = "hand"

@@ -85,9 +85,12 @@ def test_the_plan_is_an_enrolled_traveler_and_cam_stem() -> None:
     assert PLAN["revision"] != "placeholder"
     assert STEM in _process_plans.enrolled_stems()
     assert STEM in _cam_programs.CAM_STEMS
-    assert {"pins"} <= {
-        t["id"] for t in PLAN["tools"] if t.get("status") == "to_order"
-    }
+    # Fit audit 2026-11-23 (MHA-DT-31.bore, question 21): the reamed bore is
+    # not gauged and the seat is fitted to the arm by trial, so no pins and
+    # no sizing plug.
+    refs = {t["ref"] for t in PLAN["tools"]}
+    assert not any(ref.startswith("zz-pins") for ref in refs)
+    assert "plug_length_in" not in PLAN["parameters"]
 
 
 def test_the_recipes_program_passes_every_check_it_declares(ctx, tmp_path) -> None:

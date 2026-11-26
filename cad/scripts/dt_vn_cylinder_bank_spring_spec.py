@@ -44,11 +44,13 @@ WORKING_DEFLECTION = 0.026 * MM_PER_IN  # 0.6604
 WORKING_LOAD_N = 1.5 * N_PER_LBF  # 6.672
 # [INFERENCE: linear] The page gives one load point, no rate.
 RATE_N_PER_MM = WORKING_LOAD_N / WORKING_DEFLECTION  # 10.10
-# The set gap between gear 19's north face and the north strap: .037, a pair
-# of inch feeler leaves (cylinder_bank_layout.BANK_SPRING_SET; 0.95 on the
-# metric set, #3042). Load there 3.3 N,
+# The set gap between gear 19's north face and the north strap: .035, one inch
+# feeler leaf (cylinder_bank_layout.BANK_SPRING_SET; fit audit 2026-11-23
+# part 2, B11: was .037, two leaves, .035 + the .002 foil; drawing-guidelines
+# "What the shop holds" assembly row, owner ruling P2: one owned leaf as a
+# single limit). Load there 3.8 N (3.3 at .037),
 # (FREE_HEIGHT - INSTALLED_HEIGHT) x RATE [INFERENCE: linear].
-INSTALLED_HEIGHT = round(0.037 * MM_PER_IN, 4)  # 0.9398
+INSTALLED_HEIGHT = round(0.035 * MM_PER_IN, 4)  # 0.889
 # The model shows the installed state.
 MODEL_HEIGHT = INSTALLED_HEIGHT
 

@@ -97,10 +97,9 @@ def test_context_accepts_the_plan_and_numbers_the_tools(ctx) -> None:
         "em-half": 1,
         "spot": 2,
         "drill-15": 3,
-        "drill-23-64": 4,
-        "reamer": 5,
-        "drill-43": 6,
-        "tap-guide": 7,
+        "drill-v": 4,
+        "drill-43": 5,
+        "tap-guide": 6,
     }
     assert RECIPE.LOAD_FIRST_TOOL == tuple(name for name, _ops in RECIPE.PROGRAMS)
     # The tap stop stands over the hole PA05 drilled, in the same frame.
@@ -111,7 +110,7 @@ def test_context_accepts_the_plan_and_numbers_the_tools(ctx) -> None:
     )
     stop = ctx["manual"]["tap_apex"]
     assert apex_holes == [stop["at"]]
-    assert stop["tool"] == 7
+    assert stop["tool"] == 6
     assert stop["gcode"][0] == "G53 G0 Z0.000" and stop["gcode"][-1] == "M30"
 
 
@@ -207,16 +206,9 @@ def _seed(ctx: dict, key: str, pick, change) -> dict:
         # The bore drilled short of the strap's far side.
         (
             "bore_drill",
-            lambda line: line == "G1 Z-3.742 F{feed}",
+            lambda line: line == "G1 Z-3.877 F{feed}",
             lambda line: "G1 Z2.000 F{feed}",
             "holes",
-        ),
-        # The reamer rapided out of the bore.
-        (
-            "bore_ream",
-            lambda line: line.startswith("G1 Z12.684"),
-            lambda line: "G0 Z12.684",
-            "feed_out",
         ),
         # The crown cut conventional (G3).
         (

@@ -42,9 +42,6 @@ from sh_vn_arbor_set_screw_spec import THREAD as _ARBOR_SET_SCREW_THREAD
 from _sprocket_seat_geometry import DRIVE_PIN_DIA as _SEAT_PIN_DIA
 from _sprocket_seat_geometry import DRIVE_PIN_HOLE_DIA as _SEAT_PIN_HOLE_DIA
 from dt_vn_crank_seat_drive_pin_spec import PRESS_DEPTH as _CRANK_SEAT_PIN_DEPTH
-from dt_cone_tip_block_spec import DOWEL_HOLE_DEPTH as _TIP_DOWEL_PRESS_DEPTH
-from dt_vn_locating_pin_spec import DIA as _LOCATING_PIN_DIA
-from dt_vn_locating_pin_spec import PRESS_HOLE_DIA as _LOCATING_PIN_PRESS_HOLE_DIA
 
 
 # Crank taper pin in its PILOT holes (ch11 p.14): released drawings drill the
@@ -138,8 +135,10 @@ ALLOWED_PAIRS: Mapping[frozenset[str], float] = {
         ("dt-vn-cone-tip-block-screw-1", "dt-cone-tip-block-1")
     ): _TIP_HOLDDOWN_GATE_LIMIT_MM3,
     # The LOCTITE 638 bonded slip fits (T024 on land 2, T018/T012 on the
-    # spigot, the spigot in MHA-DT-04's socket, MHA-DT-38 on the pivot, #2469)
-    # are modelled line-to-line at their nominal sizes and need no allowance.
+    # spigot, the spigot in MHA-DT-04's socket, MHA-DT-38 on the pivot, #2469;
+    # the MHA-DT-VN-69 tip dowel in the MHA-DT-21 foot's 1/16 drilled hole,
+    # fit audit question 11) are modelled line-to-line at their nominal sizes
+    # and need no allowance.
     # U30 (I22): each MHA-DT-VN-61 (1/4-20 MSC 40923906, major 6.35) in its #7
     # (5.105) MHA-DT-20 tap, as deep as the cut length runs past the post's
     # grip (the counterbore floor).  The smooth-annulus upper bound until the
@@ -177,18 +176,6 @@ ALLOWED_PAIRS: Mapping[frozenset[str], float] = {
         "dt-crankshaft",
         smooth_annulus_limit_mm3(
             _SEAT_PIN_DIA, _SEAT_PIN_HOLE_DIA, _CRANK_SEAT_PIN_DEPTH
-        ),
-    ),
-    # The MHA-DT-VN-69 tip dowel (rule-23 retention, owner ruling 2026-11-07
-    # (MHA-DT-00 rubric sample, PR #2248)) pressed up to the floor
-    # of the MHA-DT-21 foot's blind .0620 ream: the press fit over the ream's
-    # depth.  Its lower end is a slip fit in the MHA-DT-20 plate.
-    **numbered_pairs(
-        "dt-vn-locating-pin",
-        range(1, 2),
-        "dt-cone-tip-block",
-        smooth_annulus_limit_mm3(
-            _LOCATING_PIN_DIA, _LOCATING_PIN_PRESS_HOLE_DIA, _TIP_DOWEL_PRESS_DEPTH
         ),
     ),
 }

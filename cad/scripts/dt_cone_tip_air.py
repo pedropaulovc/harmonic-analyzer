@@ -50,11 +50,15 @@ Each physical source enters the stack once, with its full projected effect,
 and every source is in exactly one of two sets: in-service clearances the
 parts can take up together (IN_SERVICE_CLEARANCES, arithmetic) or independent
 printed manufacturing and set tolerances (INDEPENDENT_TOLERANCES, RSS); an
-unclassified source is refused.  The whole sweep is worst-case arithmetic
-over every source when that closes everywhere; otherwise the clearances
-arithmetic plus the RSS of the tolerances, everywhere (machining-dfm.md).
-Either way ``check:recipe`` (test_drive_train_cone_tip_holddown) fails if the
-governing air closes.
+unclassified source is refused.  Every tier's sweep, the bushing's too, is
+worst-case arithmetic over every source when that closes everywhere;
+otherwise the clearances arithmetic plus the RSS of the tolerances,
+everywhere (machining-dfm.md).  Either way ``check:recipe``
+(test_drive_train_cone_tip_holddown) fails if the governing air closes.
+MHA-DT-00 step 23 looks at the bushing after the set (A .010 FEELER LEAF
+PASSES BETWEEN MHA-DT-38 AND GEAR 19); the proof also refuses a look that
+an in-print build could fail, the leaf's own tolerance charged
+(look_in_print_air_mm).
 """
 
 from __future__ import annotations
@@ -85,6 +89,7 @@ from _printed_tolerance import (
 )
 from cone_stack_end_play import SHAFT_END_PLAY
 from dt_cone_swing_platform_checks import manufactured_p1_stop_enclosure
+from dt_feeler_leaves import LEAF_TOLERANCE
 
 Vector = tuple[float, float, float]
 
@@ -257,12 +262,12 @@ _PIVOT_IN_HOLE = (
     cluster.PIVOT_RUNNING_CLEARANCE_MM[1] / 2.0 + end_screw.END_HOLE_POSITION_MM
 )
 
-# MHA-DT-00 step 2H (user decision 2026-10-12) holds the post pushed toward
-# the tip block while it is turned (2J) and its screws are tightened (2K):
+# MHA-DT-00 step 2T (user decision 2026-10-12) holds the post pushed toward
+# the tip block while it is turned (2U) and its screws are tightened (2V):
 # its clearance can only carry the tip away from G19, so its along-shaft
 # share is booked 0 (the across-shaft and face-tilt shares stay booked in
-# full).  MHA-DT-21 is not slid on its snug hold-down (2F) but may sit
-# anywhere in its clearance when 2K tightens it, so that stays booked.
+# full).  MHA-DT-21 is not slid on its snug hold-down (2R) but may sit
+# anywhere in its clearance when 2V tightens it, so that stays booked.
 POST_SCREW_CLEARANCE_TAKEN_UP_MM = _POST_FLOAT
 
 # Along the shaft, from the post's mounting to T006's north face.
@@ -270,10 +275,10 @@ AXIAL_TERMS_MM = {
     "post platform tap station": plate.POST_MOUNT_STATION_TOL_MM,
     "post screw clearance": _POST_FLOAT - POST_SCREW_CLEARANCE_TAKEN_UP_MM,
     "post counterbore pattern": _MOUNT_X_BAND * _SIN_I,
-    "post cone boss length": printed_band_mm(
-        post.DRAWING_PRECISION_BY_NAME["ConeBossLen"], unit=post.UNIT
-    )
-    / 2.0,
+    # The collar face's station, at the title block since owner ruling
+    # 2026-11-24, audit part 2 C9 (booked in full for every tier: D18,
+    # delegated ruling 2026-11-24 (Main), no precedent; owner review #2144).
+    "post cone boss north face": post.CONE_BOSS_NORTH_STATION_TOLERANCE_MM,
     "shaft thrust collar width": shaft.printed_band("CollarWidth"),
     "gear stack T006 north face": -stack.face_band(stack.COUNT - 1, "north")[1],
 }
@@ -285,7 +290,7 @@ POST_END_TERMS_MM = {
     "post running journal fit": _JOURNAL_FLOAT,
 }
 TIP_END_TERMS_MM = {
-    "tip platform hold-down station": plate.HOLDDOWN_STATION_TOL_MM,
+    "tip platform hold-down station": plate.HOLDDOWN_LATERAL_TOL_MM,
     "tip hold-down screw clearance": _TIP_FLOAT,
     "tip block foot tap station": tip.FOOT_TAP_X_TOL_MM,
     "tip passage centre": tip.printed_band_mm(tip.PASSAGE_CENTER_PLACES),
@@ -306,7 +311,7 @@ BLOCK_AXIAL_TERMS_MM = {
 # ... and across it in plan (the same stations; its width band only brings
 # the +X face in).
 BLOCK_LATERAL_TERMS_MM = {
-    "tip platform hold-down station": plate.HOLDDOWN_STATION_TOL_MM,
+    "tip platform hold-down station": plate.HOLDDOWN_LATERAL_TOL_MM,
     "tip hold-down screw clearance": _TIP_FLOAT,
     "tip block foot tap station": tip.FOOT_TAP_X_TOL_MM,
 }
@@ -336,7 +341,7 @@ INDEPENDENT_TOLERANCES = frozenset(
     {
         "post platform tap station",
         "post counterbore pattern",
-        "post cone boss length",
+        "post cone boss north face",
         "shaft thrust collar width",
         "gear stack T006 north face",
         "tip platform hold-down station",
@@ -357,6 +362,42 @@ INDEPENDENT_TOLERANCES = frozenset(
 )
 if IN_SERVICE_CLEARANCES & INDEPENDENT_TOLERANCES:
     raise AssertionError("a tip air source cannot be both a clearance and a tolerance")
+# Owner ruling 2026-11-24, audit part 2 C9: "Yes: add the look and relax the
+# rest."  Delegated ruling 2026-11-24 (Main), no precedent; owner review
+# #2144 (D18, changing C9's wording): the bushing keeps the full arithmetic
+# stack, and the look is a feeler leaf, not the 3/64 drill shank, which
+# (1.191 mm) rejects builds whose parts are all in print.  Delegated ruling
+# 2026-11-25 (Main), no precedent; replaces D18's .020; owner review #2144
+# (Codjiflo 3549-r4-13): the leaf is .010, its own LEAF_TOLERANCE charged.
+# MHA-DT-00 step 23 sets the cone set against the real bank and then looks
+# (23C): A .010 FEELER LEAF PASSES BETWEEN MHA-DT-38 AND GEAR 19, at the
+# working pose (the P1 sweep's in end, where the swing is set); the next
+# line is its remedy.  The leaf sees every source physically present at
+# 23C, at its worst in print: the chains tying the bank and T006's face to
+# the base, the parts already frozen at the bushing, the swing feel set
+# just done at 23A-23B, the end screw's thread and the pivot in its hole
+# (locked at step 3), and G19's cock and the post journal's running fits,
+# at their worst as the look is taken.  Only the pivot's transfer acts
+# after it (23E-23N): AFTER_LOOK_SOURCES, the three pivot-transfer terms.
+# At the working pose the least in-print air before the look is 0.278 mm
+# (tooth face) against the .010 leaf plus its tolerance, 0.267 mm (margin
+# 0.012 mm); the transfer terms total 0.249 mm, so a build that just passes
+# the nominal leaf keeps 0.005 mm after the transfer.  Known residual: a
+# leaf .0005 thin (still in LEAF_TOLERANCE) passes a build that is left
+# -0.008 mm after the transfer; the look does not cover that, the
+# arithmetic gate does (the bushing's air over every source, least
+# 0.024 mm: check register C-01, with the look's own guard C-02).
+LOOK_LEAF_MM = 0.010 * 25.4
+LOOK_TIER = "bushing"
+AFTER_LOOK_SOURCES = frozenset(
+    {
+        "pivot thread centring",
+        "base pivot seat transferred through the platform bore",
+        "platform pivot bore on the shoulder",
+    }
+)
+if not AFTER_LOOK_SOURCES <= IN_SERVICE_CLEARANCES | INDEPENDENT_TOLERANCES:
+    raise AssertionError("an after-look source is not a booked tip air source")
 # Sources only some tiers carry.
 _TIER_ONLY_SOURCES = frozenset(
     {name for tier in TIERS for name in tier.limits}
@@ -710,22 +751,66 @@ class AirStack:
         }
 
 
+def look_in_print_air_mm() -> dict[str, float]:
+    """The least air step 23's look can find in an in-print build.
+
+    At the working pose (the P1 sweep's in end), per drum tier: the
+    bushing's nominal less every source present at the look, each at its
+    worst in print.  Delegated ruling 2026-11-25 (Main), no precedent;
+    replaces D18's .020; owner review #2144: the leaf must pass every such
+    build, its own tolerance charged, so this is at least LOOK_LEAF_MM +
+    LEAF_TOLERANCE.
+    """
+    angle = P1_SWEEP_DEG[0]
+    return {
+        fixed.name: projection_nominal_mm(LOOK_TIER, fixed, angle)
+        - sum(
+            value
+            for name, value in closure_terms_mm(LOOK_TIER, fixed, angle).items()
+            if name not in AFTER_LOOK_SOURCES
+        )
+        for fixed in DRUM_TIERS
+    }
+
+
+def after_look_mm() -> dict[str, float]:
+    """What the pivot's transfer (AFTER_LOOK_SOURCES) can still take from
+    the bushing's air after the look, at the working pose, per drum tier."""
+    angle = P1_SWEEP_DEG[0]
+    return {
+        fixed.name: sum(
+            value
+            for name, value in closure_terms_mm(LOOK_TIER, fixed, angle).items()
+            if name in AFTER_LOOK_SOURCES
+        )
+        for fixed in DRUM_TIERS
+    }
+
+
 def full_sweep_proof(*, intervals: int = 400) -> list[dict]:
     """Every tip tier against both drum tiers over closed P1 intervals.
 
     Each row is one interval's midpoint; the arc term bounds the poses
     between midpoints.  A block row exists only where some block material
     stands over that drum tier (elsewhere the block clears it in plan, even
-    shifted by its tolerances).  The whole sweep is worst-case arithmetic
-    when that closes everywhere; otherwise "statistical" everywhere: the
+    shifted by its tolerances).  The sweep is worst-case arithmetic when
+    that closes everywhere; otherwise "statistical" everywhere: the
     clearances arithmetic plus the RSS of the printed tolerances.  Raises if
-    the governing air closes anywhere.
+    the governing air closes anywhere, or if step 23's look would reject a
+    build whose parts are all in print (look_in_print_air_mm).
     """
     if type(intervals) is not int or intervals < 1:
         raise ValueError("tip swing proof requires at least one closed interval")
     lower, upper = P1_SWEEP_DEG
     width = (upper - lower) / intervals
     half_rad = abs(math.radians(width)) / 2.0
+    look_air = look_in_print_air_mm()
+    if min(look_air.values()) < LOOK_LEAF_MM + LEAF_TOLERANCE:
+        raise ValueError(
+            f"step 23's look rejects an in-print build: {look_air} mm air "
+            f"at the working pose, leaf {LOOK_LEAF_MM:.3f} mm "
+            f"+ {LEAF_TOLERANCE:.4f} mm"
+        )
     stacks = []
     for index in range(intervals):
         angle = lower + (index + 0.5) * width
@@ -754,9 +839,7 @@ def full_sweep_proof(*, intervals: int = 400) -> list[dict]:
                     )
                 )
     method = (
-        "arithmetic"
-        if all(s.arithmetic_mm > 0.0 for _, s in stacks)
-        else "statistical"
+        "arithmetic" if all(s.arithmetic_mm > 0.0 for _, s in stacks) else "statistical"
     )
     rows = []
     for index, s in stacks:
@@ -764,8 +847,9 @@ def full_sweep_proof(*, intervals: int = 400) -> list[dict]:
         if not math.isfinite(air) or air <= 0.0:
             raise ValueError(
                 f"cone tip {s.tier} can reach G19 at P1 {s.angle_deg:.3f} deg: "
-                f"{s.drum_tier} nominal {s.nominal_mm:.3f}, arithmetic "
-                f"{s.arithmetic_mm:.3f}, statistical {s.statistical_mm:.3f}: {s.terms}"
+                f"{s.drum_tier} nominal {s.nominal_mm:.3f}, {method} {air:.3f}, "
+                f"arithmetic {s.arithmetic_mm:.3f}, statistical {s.statistical_mm:.3f}: "
+                f"{s.terms}"
             )
         rows.append(
             {

@@ -19,3 +19,8 @@ dt-pinion-bracket:
       where: "left side view: the .180 station of the Ø.157 follower seat and Ø.0625 cross hole from broad face A"
       finding: ".XXX location band tighter than the .XX row with no mate named (rules 4, 7)"
       reason: "owner ruling (a) 2026-09-25 (Codex #858 P2): the seat's station prints from face A at .XXX for the seat's web to the far broad face; at the .XX row that web is about .078 in (at the .160 seat max of owner ruling 2026-11-23, tool audit Q8), under the .080 target (rule 17, PIN_SEAT_WEB_WORST). Recorded as an exception under Owner ruling 2026-11-08 (Pedro), #2144 item 6.4"
+    - id: "RV-03"
+      kind: "accept"
+      where: "section B-B: the Ø.157 +.003/.000 follower seat, <HOLE-DEPTH> (.16) FLAT BOTTOM, BONDED FIT ON MHA-DT-25"
+      finding: "band narrower than the title block with no necessity entry (rule 4): nothing fails at +.004 or +.005"
+      reason: "Owner ruling 2026-11-23, tool audit Q8 (option A): \"Re-band to +.003/0, finish with the 1/8 end mill, check with .157/.160 pins\"; this owner exception keeps the band (drawing-guidelines rule 4, \"An owner exception keeps what it names\"), and fit audit F18 left it as is. Re-derived (batch-dt/rig/derive_f18.py): at +.005 the webs are .0820 far face, .0619 to the pivot bore (floor .060) and the MHA-DT-25 bond gap .0062 under LOCTITE 638's .0098, so the band is the owner's, not a stack's"

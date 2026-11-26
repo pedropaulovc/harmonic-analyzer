@@ -6,7 +6,7 @@ defines the reamed pivot bore; section A-A exposes the shallow pivot-head
 relief and plate thickness in solid lines.  Display precision comes from the
 model.
 
-The platform is an asymmetric steel wedge with a 1/4-in reamed H7 pivot
+The platform is an asymmetric steel wedge with a .2510 reamed pivot
 bore on the stock screw shoulder, paired 1/4-20 post-mount taps, an open
 west-edge lock notch, three rounded plan corners, the chamfered south-east
 corner and the counterbored #4
@@ -68,7 +68,6 @@ from _drawing_hole_callout import (
     add_native_hole_callout,
     set_hole_callout_precision,
 )
-from _drawing_tolerances import _tolerance_places
 from _drawing_leader_notes import add_leader_note
 from _drawing_notes import add_property_linked_note
 from _drawing_projection import model_point_in_view
@@ -108,7 +107,9 @@ from dt_cone_swing_platform_drawing_spec import (
     HOLDDOWN_CALLOUT_BELOW,
     HOLDDOWN_PROCESS,
     PIVOT_BORE_CALLOUT_BELOW,
+    PIVOT_CALLOUT_PLACES,
     PIVOT_PROCESS,
+    PIVOT_SHOULDER_NUMBER,
     POST_MOUNT_LOCATING_CALLOUT,
     TOP_FACE_LABEL,
     UNDERSIDE_LABEL,
@@ -391,7 +392,10 @@ DETAIL_HOLDDOWN_X = DETAIL_CENTER[0] + HOLDDOWN_LOCAL_X * _DETAIL_S
 # HoldDownX's line runs a text height plus 1.1 mm lower, 1.3 mm over the top
 # relief's crown, and its outside arrow tails keep 1.5 mm over the relief's
 # arc.  Its frame's lower-left corner stands 1 mm off the circle and its
-# right end short of section C-C's padded box.
+# right end short of section C-C's padded box.  The text now prints no band
+# (" .04 ", HOLDDOWN_LATERAL_TOL_MM): the measured frame is kept as its
+# bound, the narrower text centred on the same keep x, so it only stands
+# further from the circle and from C-C's box.
 HOLDDOWN_X_TEXT_SIZE = (0.02196, 0.0035)
 HOLDDOWN_X_LINE_DROP = 0.00278
 # Rule-23 retention, owner ruling 2026-11-07 (MHA-DT-00 rubric sample, PR
@@ -466,29 +470,32 @@ _TIP_DOWEL_X_TEXT_X = (
     - TIP_DOWEL_X_TEXT_SIZE[0] / 2.0
 )
 # Rule-23 retention, owner ruling 2026-11-07 (MHA-DT-00 rubric sample, PR
-# #2248).  The tip-block locating dowel's slip ream, under its
-# banded diameter in detail B, for MHA-DT-00 step post-and-tip-block ("DRILL
-# AND REAM UP THRU MHA-DT-20 INTO MHA-DT-21 PER THEIR CALLOUTS"): the
-# process, then the flag to the numbered note that states the fit, the part
-# that goes in the hole and where it is match-reamed (machinist review of
-# round 6, #7; two rows under the size, rule 7; round 8, #2: the order of
-# operations is MHA-DT-00 step 2's, not this sheet's).
+# #2248).  The tip-block locating dowel's #52 slip hole (owner ruling
+# 2026-11-24, fit audit question 11), under its untoleranced size in detail
+# B, for MHA-DT-00 step end-play-set (the dowel block at its head): the drill,
+# then the flag to the numbered note that states the fit, the part that goes
+# in the hole and where it is drilled (machinist review of round 6, #7; round
+# 8, #2: the order of operations is MHA-DT-00 step 3's, not this sheet's).  No wall
+# row: owner ruling 2026-11-25, "C: counterbore Ø.210, web .080, no
+# shortfall (recommended)" (dt_cone_swing_platform_checks.TIP_DOWEL_WEBS).
 TIP_DOWEL_PIN_NUMBER = _config.parts("dt-vn-locating-pin")["number"]
 TIP_DOWEL_NOTE_NUMBER = 3
 TIP_DOWEL_CALLOUT = "\n".join(
     (
-        "MATCH-REAM THRU",
+        f"{_sp.TIP_DOWEL_HOLE_DRILL} DRILL THRU",
         f"SEE NOTE {TIP_DOWEL_NOTE_NUMBER}",
     )
 )
 # The note the callout flags (the lift rod's made-at-assembly precedent,
 # dt_pinion_lift_rod_spec.PIN_HOLE_CALLOUT): the hole slips over the dowel
-# MHA-DT-21 holds pressed, and is reamed to size through with the block on,
-# after MHA-DT-21's press ream has been drilled and reamed up through this
-# plate.  Its banded spacing from the hold-down hole matches the block's own
-# tap-to-dowel spacing (dt_cone_tip_block_spec.DOWEL_FROM_TAP), so the note
-# names that mate (rule 4); words on the .228 itself read as a location
-# carrying words (rule 7; proof run 20261109T134133430Z, 3 of 3 runs).  Two
+# MHA-DT-21 holds bonded, and is opened to #52 through with the block on,
+# after MHA-DT-21's 1/16 hole has been drilled up through this plate.  The
+# banded station from the hold-down hole is where BOTH parts are drilled at
+# MHA-DT-00 step 3 (the block's own spacing, dt_cone_tip_block_spec.
+# DOWEL_FROM_TAP, prints REF), so the note names the block as drilled
+# through here (rule 4) and does not read as a match to an existing hole
+# (run 8 review, 3 of 3 runs; RV-05, D37); words on the .228 itself read as
+# a location carrying words (rule 7; proof run 20261109T134133430Z).  Two
 # rows of at most TIP_DOWEL_NOTE_WIDTH characters under a hanging indent; the
 # step reference never breaks across rows.  Round 7's layout audit measured
 # 62 characters at 107.7 mm (x 221.6..329.3 mm), 7.6 mm into the box of the
@@ -499,8 +506,8 @@ TIP_DOWEL_NOTE_WIDTH = 55
 TIP_BLOCK_NUMBER = _config.parts("dt-cone-tip-block")["number"]
 _NBSP = "\u00a0"
 TIP_DOWEL_NOTE = textwrap.fill(
-    f"SLIDING FIT ON {TIP_DOWEL_PIN_NUMBER}, SPACED TO MATCH {TIP_BLOCK_NUMBER}. "
-    f"MATCH-REAM THRU AT {step_ref('post-and-tip-block').replace(' ', _NBSP)}.",
+    f"SLIDING FIT ON {TIP_DOWEL_PIN_NUMBER}. DRILLED THRU INTO {TIP_BLOCK_NUMBER} "
+    f"AT THIS STATION, {step_ref('end-play-set').replace(' ', _NBSP)}.",
     width=TIP_DOWEL_NOTE_WIDTH,
     initial_indent=f"{TIP_DOWEL_NOTE_NUMBER}. ",
     subsequent_indent="   ",
@@ -515,9 +522,16 @@ TIP_DOWEL_NOTE_ROW_HEIGHT = 0.0044
 # in the band between the title block (top 0.066) and note 2 (ink from
 # 0.0760, as on the r6 render), left-aligned with it.
 TIP_DOWEL_NOTE_XY = (0.222, 0.0745)
-TIP_DOWEL_CALLOUT_SIZE = (0.0475, 0.0210)
+# The callout's block: two rows under the drill's untoleranced size (one
+# row; the r6 ream's stacked band took 8.4 mm), at the r6 render's 5.45 mm a
+# row and its 1.7 mm underline and 3.6 mm top margin, 16.2 mm tall.  Its
+# bottom stands 2.3 mm over TipDowelPivotX's text: run
+# 20261124T110807008Z printed the drilled block's Ø.0635 row 1.08 mm over
+# the (.188) at a 1.5 mm offset (layout audit text-clearance, 1.78 mm
+# needed).
+TIP_DOWEL_CALLOUT_SIZE = (0.0475, 0.0162)
 _TIP_DOWEL_CALLOUT_BOTTOM = (
-    TIP_DOWEL_PIVOT_X_LINE_Y + TIP_DOWEL_PIVOT_X_TEXT_SIZE[1] + 0.0015
+    TIP_DOWEL_PIVOT_X_LINE_Y + TIP_DOWEL_PIVOT_X_TEXT_SIZE[1] + 0.0023
 )
 TIP_DOWEL_CALLOUT_LOWER_LEFT = (
     DETAIL_CENTER[0]
@@ -1565,34 +1579,32 @@ def _rewrite_hole_callout(
     print(f"{label} callout: definitions={persisted!r} resolved={resolved!r}")
 
 
-@_telemetry.traced("drawing.cone_swing_platform.pivot_band_places")
-def _print_pivot_band_exactly(display: Any) -> None:
-    """Print the pivot ream's size and band at the places they need, natively.
+@_telemetry.traced("drawing.cone_swing_platform.pivot_size_places")
+def _print_pivot_reamer_size(display: Any) -> None:
+    """Print the pivot ream's size at the reamer's own places, natively.
 
-    The callout's ``<hw-diam>`` shows the Hole Wizard feature's band at the
-    template's tolerance places, so the H7 band read "+.00/.00".
-    ``SetPrecision3`` cannot set a hole callout's places;
-    ``ICalloutLengthVariable`` can: the reamed .2500 and its band print the
-    band's four places.
+    The bore carries no band (owner ruling 2026-11-24, fit audit question
+    10: the .2510 reamer, the shoulder as the gauge), so the callout's
+    ``<hw-diam>`` prints only the reamer's size, .251.  ``SetPrecision3``
+    cannot set a hole callout's places; ``ICalloutLengthVariable`` can.
 
     This render-time precision write is the declared exception RV-01 in
     ``cad/config/parts/dt-cone-swing-platform.yaml`` (Owner ruling
     2026-11-08 (Pedro), #2144 item 1.2): a hole callout does not inherit the
-    part's places.  With the Hole Wizard diameter's tolerance precision
-    authored as 4 on the part (read back 4), the callout's ``<hw-diam>``
-    still reported -1, the document default (farm run 20261102T230110877Z).
-    The places come from the part's band, never a literal.
+    part's places.  With the Hole Wizard diameter's precision authored on
+    the part (read back), the callout's ``<hw-diam>`` still reported -1, the
+    document default (farm run 20261102T230110877Z).  The places come from
+    the drawing spec's PIVOT_CALLOUT_PLACES, never a literal.
     """
     from win32com.client.dynamic import Dispatch as dynamic_dispatch  # noqa: PLC0415
 
-    places = _tolerance_places(*_part.PIVOT_HOLE_BAND, display_unit=UNIT)
+    places = PIVOT_CALLOUT_PLACES
     for raw in display.GetHoleCalloutVariables() or ():
         if str(dynamic_dispatch(raw._oleobj_).VariableName) != "hw-diam":
             continue
         length = _early_bound(raw, "ICalloutLengthVariable")
         length.Precision = places
-        length.TolerancePrecision = places
-        if (int(length.Precision), int(length.TolerancePrecision)) != (places, places):
+        if int(length.Precision) != places:
             raise RuntimeError("pivot reamed bore: places did not persist")
         return
     raise RuntimeError("pivot reamed bore: callout has no <hw-diam> variable")
@@ -2466,7 +2478,7 @@ def _place_holes_sheet(adapter: Any) -> list[Any]:
         pivot_callout_definitions,
         label="pivot reamed bore",
     )
-    _print_pivot_band_exactly(pivot_callout)
+    _print_pivot_reamer_size(pivot_callout)
     post_mount_callout = add_native_hole_callout(
         adapter,
         plan,
@@ -2565,8 +2577,10 @@ _SE_START_X = _geo.SE_CHAMFER_RUN - _geo.EAST_HALF_S
 _NOTCH_N = (_geo.SLOT_TZ, 0.0, -_geo.SLOT_TX)
 _NOTCH_MID = _NOTCH_N[0] * _geo.SLOT_E_X + _NOTCH_N[2] * _geo.SLOT_E_Z
 _RELIEF_HALF = _sp.PIVOT_BEARING_RELIEF_DIAMETER / 2.0
-_HOLDDOWN_BAND = (_sp.HOLDDOWN_STATION_TOL_MM, -_sp.HOLDDOWN_STATION_TOL_MM)
 _DOWEL_BAND = (_sp.TIP_DOWEL_STATION_TOL_MM, -_sp.TIP_DOWEL_STATION_TOL_MM)
+# The hold-down counterbore's wizard Ø and depth: three places, the .XX
+# grade (rule 3; dt_cone_swing_platform_spec.HOLDDOWN_CBORE_BAND_MM).
+_CBORE_BAND = (_sp.HOLDDOWN_CBORE_BAND_MM, -_sp.HOLDDOWN_CBORE_BAND_MM)
 
 part_metadata(
     fields={"material.thickness": (_T, ("PLATE_THICKNESS", "PLATE_STOCK_CALLOUT"))},
@@ -2619,29 +2633,31 @@ requirement(
     },
     precision={"finish_ra": 1},
 )
-# The pivot bore, the layout origin: a native 1/4 Hole Wizard hole reamed
-# .2500 +.0005/.0000 THRU (PIVOT_HOLE_BAND, four places), a running fit on
-# the MHA-DT-VN-52 shoulder.
+# The pivot bore, the layout origin: a native 1/4 Hole Wizard hole at the
+# .2510 reamer's size, REAM THRU, no band; the MHA-DT-VN-52 shoulder is the
+# gauge (owner ruling 2026-11-24, fit audit question 10).  ``dia`` is the
+# spec's ANALYSIS band (what the reamer is modelled to cut), carried for the
+# traveler's reamer check only; it is not a requirement.
 requirement(
     "pivot_bore",
     kind="hole",
     faces=(CylinderFace(PIVOT_HOLE_DIA),),
-    requirements=("dia", "thru", "process"),
+    requirements=("thru", "process", "mate"),
     fields={
         "at": ([0.0, _T, 0.0], (_FRAME, "PLATE_THICKNESS")),
         "axis": (_DOWN, (_FRAME,)),
         "dia": (
             limits(PIVOT_HOLE_DIA, 4, _pv.PIVOT_HOLE_BAND),
-            (
-                (_PIVOT, "PIVOT_HOLE_DIA"),
-                (_PIVOT, "PIVOT_HOLE_BAND"),
-                (_SELF, "_print_pivot_band_exactly"),
-            ),
+            ((_PIVOT, "PIVOT_HOLE_DIA"), (_PIVOT, "PIVOT_HOLE_BAND")),
         ),
         "dia_nominal": (PIVOT_HOLE_DIA, ((_PIVOT, "PIVOT_HOLE_DIA"),)),
         "thru": (True, ((_PIVOT, "PIVOT_HOLE_SPEC"),)),
         "process": (PIVOT_PROCESS.lower(), ((_DSPEC, "PIVOT_PROCESS"),)),
-        "fit": (PIVOT_BORE_CALLOUT_BELOW[0], ((_DSPEC, "PIVOT_BORE_CALLOUT_BELOW"),)),
+        "mate": (PIVOT_SHOULDER_NUMBER, ((_DSPEC, "PIVOT_SHOULDER_NUMBER"),)),
+        "acceptance": (
+            " ".join(PIVOT_BORE_CALLOUT_BELOW),
+            ((_DSPEC, "PIVOT_BORE_CALLOUT_BELOW"),),
+        ),
     },
     precision={"dia": 4},
 )
@@ -2870,10 +2886,10 @@ for _name, _xz, _x_dim, _z_dim, _xz_name in (
         },
         precision={"dia": 3, "x_from_pivot": _P[_x_dim], "z_from_pivot": _P[_z_dim]},
     )
-# The tip-block hold-down: Ø.120 DRILL THRU, Ø.219 counterbore .138 deep
+# The tip-block hold-down: Ø.120 DRILL THRU, Ø.210 counterbore .138 deep
 # FROM UNDERSIDE (HOLDDOWN_CALLOUT_PRECISION, three places), located from
-# the pivot along (.XXX) and .04 across at its own ±.005
-# (HOLDDOWN_STATION_TOL_MM, detail B).
+# the pivot along (.XXX) and .04 across, both at the title block
+# (HOLDDOWN_STATION_TOL_MM, HOLDDOWN_LATERAL_TOL_MM, detail B).
 requirement(
     "holddown",
     kind="hole",
@@ -2902,19 +2918,29 @@ requirement(
         "thru": (True, ("HOLDDOWN_HOLE_SPEC",)),
         "process": (HOLDDOWN_PROCESS.lower(), ((_DSPEC, "HOLDDOWN_PROCESS"),)),
         "cbore_dia": (
-            limits(HOLDDOWN_CBORE_DIA, 3, unit=UNIT),
-            ("HOLDDOWN_CBORE_DIA", _UNIT, (_SELF, "HOLDDOWN_CALLOUT_PRECISION")),
+            limits(HOLDDOWN_CBORE_DIA, 3, _CBORE_BAND, unit=UNIT),
+            (
+                "HOLDDOWN_CBORE_DIA",
+                "HOLDDOWN_CBORE_BAND_MM",
+                _UNIT,
+                (_SELF, "HOLDDOWN_CALLOUT_PRECISION"),
+            ),
         ),
         "cbore_dia_nominal": (HOLDDOWN_CBORE_DIA, ("HOLDDOWN_CBORE_DIA",)),
         "cbore_depth": (
-            limits(_sp.HOLDDOWN_CBORE_DEPTH, 3, unit=UNIT),
-            ("HOLDDOWN_CBORE_DEPTH", _UNIT, (_SELF, "HOLDDOWN_CALLOUT_PRECISION")),
+            limits(_sp.HOLDDOWN_CBORE_DEPTH, 3, _CBORE_BAND, unit=UNIT),
+            (
+                "HOLDDOWN_CBORE_DEPTH",
+                "HOLDDOWN_CBORE_BAND_MM",
+                _UNIT,
+                (_SELF, "HOLDDOWN_CALLOUT_PRECISION"),
+            ),
         ),
         "cbore_depth_nominal": (_sp.HOLDDOWN_CBORE_DEPTH, ("HOLDDOWN_CBORE_DEPTH",)),
         "cbore_depth_from": ("underside", ((_DSPEC, "HOLDDOWN_CALLOUT_BELOW"),)),
         "x_from_pivot": (
-            limits(-HOLDDOWN_LOCAL_X, _P["HoldDownX"], _HOLDDOWN_BAND),
-            ("HOLDDOWN_LOCAL_X", "HOLDDOWN_STATION_TOL_MM", (_SELF, "DETAIL_KEEP")),
+            limits(-HOLDDOWN_LOCAL_X, _P["HoldDownX"], unit=UNIT),
+            ("HOLDDOWN_LOCAL_X", "HOLDDOWN_LATERAL_TOL_MM", _UNIT, (_SELF, "DETAIL_KEEP")),
         ),
         "x_from_pivot_nominal": (-HOLDDOWN_LOCAL_X, ("HOLDDOWN_LOCAL_X",)),
         "x_from_pivot_from": ("pivot_bore", ((_SELF, "DETAIL_KEEP"),)),
@@ -2934,10 +2960,10 @@ requirement(
         "z_from_pivot": _P["HoldDownZ"],
     },
 )
-# The tip-block dowel's slip ream, Ø.0630 +.0005/.0000 MATCH-REAM THRU at
-# assembly (note 3), so this part's traveler does not make it: .228 ±.004
-# from the hold-down hole on its line (TIP_DOWEL_STATION_TOL_MM), (.188)
-# from the pivot a reference (detail B).
+# The tip-block dowel's slip hole, Ø.0635 #52 DRILL THRU at assembly (note
+# 3; owner ruling 2026-11-24, fit audit question 11), so this part's
+# traveler does not make it: .228 ±.004 from the hold-down hole on its line
+# (TIP_DOWEL_STATION_TOL_MM), (.188) from the pivot a reference (detail B).
 requirement(
     "tip_dowel",
     kind="hole",
@@ -2950,12 +2976,14 @@ requirement(
         ),
         "axis": (_Y, (_FRAME,)),
         "dia": (
-            limits(_sp.TIP_DOWEL_HOLE_DIA, _P["TipDowelDia"], _sp.TIP_DOWEL_HOLE_BAND),
+            drilled_limits(_sp.TIP_DOWEL_HOLE_DIA, _P["TipDowelDia"], unit=UNIT),
             ("TIP_DOWEL_HOLE_DIA", "TIP_DOWEL_HOLE_BAND", (_SELF, "DETAIL_KEEP")),
         ),
         "dia_nominal": (_sp.TIP_DOWEL_HOLE_DIA, ("TIP_DOWEL_HOLE_DIA",)),
         "thru": (True, ((_SELF, "TIP_DOWEL_CALLOUT"),)),
-        "process": ("ream", ((_SELF, "TIP_DOWEL_CALLOUT"),)),
+        "process": ("drill", ((_SELF, "TIP_DOWEL_CALLOUT"),)),
+        "drill": (_sp.TIP_DOWEL_HOLE_DRILL, ((_SELF, "TIP_DOWEL_CALLOUT"),)),
+        "mate": (TIP_DOWEL_PIN_NUMBER, ((_SELF, "TIP_DOWEL_NOTE"),)),
         "x_from_holddown": (
             limits(_sp.TIP_DOWEL_FROM_HOLDDOWN, _P["TipDowelX"], _DOWEL_BAND),
             ("TIP_DOWEL_FROM_HOLDDOWN", "TIP_DOWEL_STATION_TOL_MM", (_SELF, "DETAIL_KEEP")),

@@ -1,0 +1,38 @@
+# MHA-DT-20 cone swing platform: why each REAM and each band tighter than
+# the title block stays (drawing-guidelines.md rule 4; owner ruling
+# 2026-11-24: the reason lives here, not on the sheet). Read by the machinist
+# review only.
+# The pivot bore is reamed with the set's .2510 reamer and prints no band; the
+# bought MHA-DT-VN-52 shoulder is its gauge (form 3). A 1/4 drill can cut size
+# for size on the shoulder and an F drill (.257 +.004/0) loses the cone tip's
+# air to gear 19: the bore's radial float is a term of that stack
+# (dt_cone_tip_air, "platform pivot bore on the shoulder"; least bushing air
+# 0.024 mm, full arithmetic (D18, delegated ruling 2026-11-24 (Main), no
+# precedent; owner review #2144), at the reamer's .2515 analysis maximum
+# with the #52 end-screw hole of fit audit question 11 and HoldDownX at the
+# title block's .XX).
+# HoldDownX (.04, the hold-down hole across the cone line) has no entry: at
+# the .XX row's +/-.01 the bushing air stays 0.024 mm (0.053 at +/-.005),
+# step 23's .010 leaf still passes every in-print build (0.278 mm look air
+# against the .010 leaf, its tolerance charged; D18 as amended 2026-11-25),
+# the hold-down webs stay .326 in or more and the tip block
+# on the plate (0.764 mm against 0.50), so it prints at the title block.
+# The tip dowel's .228 +/-.004 station from the hold-down hole: the webs to
+# the hold-down counterbore here and to MHA-DT-21's +X face close on it
+# (dt_cone_swing_platform_checks.TIP_DOWEL_WEBS, dt_cone_tip_block_spec.
+# WORST_DOWEL_WEBS_MM): .0803 (the Ø.210 counterbore at its .XX largest,
+# owner ruling 2026-11-25: "C: counterbore Ø.210, web .080, no shortfall
+# (recommended)") and .0788 with the drilled pair, the second the value the
+# owner accepted under the .080 target; at the .XXX row's +/-.005 they fall
+# to .0793 and .0778.
+necessity:
+  - id: N-01
+    feature: "sheet 1, plan, Ø.251 REAM THRU pivot bore (MHA-DT-VN-52 SHOULDER ENTERS, SWINGS FREE)"
+    kind: gap
+    reason: "pivot float closes the cone tip's air to gear 19"
+    source: "owner ruling 2026-11-24, fit audit question 10"
+  - id: N-02
+    feature: "sheet 2, detail B, .228 ±.004 tip dowel station from the hold-down hole"
+    kind: gap
+    reason: "looser, the plate and MHA-DT-21 dowel webs fall short"
+    source: "owner ruling 2026-11-24, fit audit question 11; owner ruling 2026-11-25 (Ø.210 counterbore)"

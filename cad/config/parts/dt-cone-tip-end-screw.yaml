@@ -9,11 +9,11 @@ dt-cone-tip-end-screw:
   finish: as supplied (passivated)
   quantity: 1
   tolerance_class: machined_block
-  process: "purchased McMaster-Carr 91794A559 screw; one added operation: drill and ream the pivot hole concentric in the threaded end"
+  process: "purchased McMaster-Carr 91794A559 screw; one added operation: drill the #52 pivot hole concentric in the threaded end"
   drawing_unit: in
   machinist_exceptions:
     - id: "RV-01"
       kind: "minor"
-      where: "sheet 1 end view, the reamed pivot hole's callout: WALL .067 MIN"
-      finding: "wall from the reamed pivot hole to the external thread's root under the .080 target (rule 17)"
-      reason: "Owner ruling 2026-11-09 via PR #1992 (https://github.com/pedropaulovc/harmonic-analyzer/pull/1992), C1 keyed: the end screw is McMaster 91794A558 (1/4-28 x 5/8 slotted fillister) with a Ø1/16 reamed pivot hole in its threaded end; the research quotes a .072 wall as a rule 17 minor. Owner ruling 2026-11-20 (#2726, \"B\"): the stock is now the 3/4 McMaster 91794A559, the same 1/4-28 UNF-2A thread and hole, so the wall is unchanged. At the print worst case (dt_cone_tip_end_screw_spec.END_HOLE_WALL_WORST) the 1/4-28 UNF-2A minimum minor (0.1993 in, derived: pitch-diameter minimum 0.2225 less 0.649519 P) less the largest reamed hole (.0635), with the hole .0005 off the thread axis (the shop table's .001 runout), leaves .0674, printed .067 MIN: above the .060 floor, under the .080 target. This accepts no other wall, band or callout departure."
+      where: "sheet 1 end view, the #52 drilled pivot hole's callout: WALL .065 MIN"
+      finding: "wall from the drilled pivot hole to the external thread's root under the .080 target (rule 17)"
+      reason: "Owner ruling 2026-11-09 via PR #1992 (https://github.com/pedropaulovc/harmonic-analyzer/pull/1992), C1 keyed: the end screw is McMaster 91794A558 (1/4-28 x 5/8 slotted fillister) with a Ø1/16 pivot hole in its threaded end; the research quotes a .072 wall as a rule 17 minor. Owner ruling 2026-11-20 (#2726, \"B\"): the stock is now the 3/4 McMaster 91794A559, the same 1/4-28 UNF-2A thread. Owner ruling 2026-11-24, fit audit question 11 (\"end-screw hole drilled #52 (wall .065 MIN)\", approved as recommended): the hole is drilled #52, no longer reamed .0630. At the print worst case (dt_cone_tip_end_screw_spec.END_HOLE_WALL_WORST) the 1/4-28 UNF-2A minimum minor (0.1993 in, derived: pitch-diameter minimum 0.2225 less 0.649519 P) less the largest drilled hole (.0675, the DRILLED HOLES row's +.004 on .0635), with the hole .0005 off the thread axis (the shop table's .001 runout), leaves .0654, printed .065 MIN: above the .060 floor, under the .080 target. This accepts no other wall, band or callout departure."

@@ -49,6 +49,8 @@ OUTER_DIA = tip.BUSHING_OD_MM  # .228
 LENGTH = tip.BUSHING_LENGTH_MM  # .160
 SIZE_PLACES = tip.BUSHING_PLACES  # .XXX
 BORE_DIA = tip.BUSHING_BORE_DIA_MM  # .0625 reamer
+# The reamer's cut, the ANALYSIS band the wall and bond read; the sheet
+# prints the reamer's size with no band (fit audit 2026-11-23, F10).
 BORE_DIA_BAND = tip.BUSHING_BORE_BAND  # (upper, lower) +.0005/-.0000
 BORE_PLACES = 4
 
@@ -109,14 +111,16 @@ def _floor_text(value_mm: float, places: int) -> str:
     return inch_text(scaled / 10**places * MM_PER_IN, places)
 
 
-# Rule 4: REAM, the fit name with its compound (rule 26, as MHA-DT-37's
-# spigot prints it) and its mate by drawing number, in the press callout's
-# three rows and narrower than them.  THRU: the section shows it.
+# Rule 4, form 2: REAM with no band, the fit name with its compound (rule
+# 26, as MHA-DT-37's spigot prints it) and its mate by drawing number, which
+# is turned last to this bore; MHA-DT-37 prints the acceptance (fit audit
+# 2026-11-23, F10 and MHA-DT-37.stems).  THRU: the section shows it.
 BORE_CALLOUT = "\n".join(
     (
         "REAM THRU",
-        f"BONDED FIT, {tip.RETAINING_COMPOUND},",
-        f"ON {PIVOT_NUMBER} PIVOT",
+        f"BONDED FIT, {tip.RETAINING_COMPOUND}:",
+        f"{PIVOT_NUMBER} PIVOT IS",
+        "TURNED TO THIS BORE",
     )
 )
 OUTER_DIA_CALLOUT = f"HOLDS WALL {_floor_text(WALL_WORST, 3)} MIN"

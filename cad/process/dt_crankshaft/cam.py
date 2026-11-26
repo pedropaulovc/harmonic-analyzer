@@ -200,7 +200,8 @@ def _geometry(features: dict[str, Any]) -> dict[str, Any]:
         raise ValueError("cross_hole: expected a through hole stationed from far_end")
     if hole["axis"] != [1.0, 0.0, 0.0] or hole["at"][2] != 0.0:
         raise ValueError("cross_hole: expected along model +X, on the axis")
-    radius = stub["nominal_dia"] / 2
+    # The stub and journals print as REFs turned to their mates (note 3).
+    radius = stub["dia_ref"] / 2
     if not math.isclose(hole["at"][0], -radius, abs_tol=1e-6):
         raise ValueError("cross_hole: expected to enter on the stub's -X side")
     if not math.isclose(far_y - hole["at"][1], hole["station_nominal"], abs_tol=1e-6):
@@ -210,8 +211,8 @@ def _geometry(features: dict[str, Any]) -> dict[str, Any]:
     return {
         "far_y": far_y,
         "apex_y": apex_y,
-        "stub": stub["nominal_dia"],
-        "journal": f["outboard_journal"]["nominal_dia"],
+        "stub": stub["dia_ref"],
+        "journal": f["outboard_journal"]["dia_ref"],
         "hole": {
             "at": hole["at"],
             "station": hole["station_nominal"],

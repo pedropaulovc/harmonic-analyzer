@@ -70,33 +70,23 @@ HANDLE_FERRULE_CURE = (
     f"{inch_max_text(_handle.FERRULE_OFFSET_MAX, 3)}"
 )
 
-# The check's feeler rounds to the thousandth but never under the air it
-# proves; the band and shoulder minima round up.
-T120_FITUP_FEELER_TEXT = inch_text(pinion.T120_FITUP_FEELER_MM, FEELER_PLACES)
-if float(T120_FITUP_FEELER_TEXT) * MM_PER_IN < pinion.T120_FITUP_FEELER_MM - 1e-9:
-    raise AssertionError("the printed T120 fit-up feeler is thinner than its check")
-# A check and its remedy are separate steps, and each check does one thing
-# (drawing-guidelines rule 22): push, then the band, then the shoulder.
-T120_FITUP_PUSH = (
-    f"PUSH {pinion.T120_FITUP_PUSHED[0]} AND {pinion.T120_FITUP_PUSHED[1]} TOWARD EACH OTHER."
+# Fit audit 2026-11-23 part 2, B9 (drawing-guidelines rule 4: no gauge where
+# nothing fails; no owner ruling touched): with every part at its print worst
+# MHA-DT-10's turned band keeps pinion.T120_TURNED_BAND_RADIAL_WORST (1.67 mm)
+# to the T120 tips and its shoulder never overlaps T120 axially, so the pair
+# is checked by a look for daylight through one turn: no feeler, no push and
+# no fit-up cut.  No daylight means a part is out of print, hence the remedy
+# (a check and its remedy are separate steps, rule 22).
+# [INFERENCE] A look tells daylight from contact reliably down to a few tenths
+# of a millimetre; the guard keeps the premise at 1 mm, so a change that eats
+# the air brings back a gauged check.
+if min(pinion.T120_TURNED_BAND_RADIAL_WORST, pinion.T120_SHOULDER_AIR_WORST) < 1.0:
+    raise AssertionError("MHA-DT-10's least air to T120 is too small to check by a look")
+T120_DAYLIGHT_CHECK = (
+    "TURN MHA-DT-07 SLOWLY ONE FULL TURN: DAYLIGHT MUST SHOW ALL ROUND BETWEEN MHA-DT-10 "
+    "AND T120."
 )
-T120_FITUP_BAND_CHECK = (
-    f"TURN MHA-DT-07 SLOWLY BY HAND: A {T120_FITUP_FEELER_TEXT} FEELER PASSES ALL ROUND "
-    "BETWEEN THE MHA-DT-10 BAND AND THE T120 TIPS."
-)
-T120_FITUP_SHOULDER_CHECK = (
-    f"TURN IT AGAIN: THE {T120_FITUP_FEELER_TEXT} FEELER PASSES ALL ROUND BETWEEN THE "
-    "MHA-DT-10 SHOULDER AND THE T120 FRONT FACE."
-)
-T120_FITUP_BAND_REMEDY = (
-    "IF IT STOPS AT THE BAND, TURN MHA-DT-10'S BAND DOWN, "
-    f"Ø{inch_min_text(pinion.TURNED_DIA_FITUP_MIN, 3)} MIN."
-)
-# The limit names its dimension (machinist review of #3023, rule 26).
-T120_FITUP_SHOULDER_REMEDY = (
-    "IF IT STOPS AT THE SHOULDER, FACE THE SHOULDER BACK: MHA-DT-10 SHOULDER LENGTH "
-    f"{inch_min_text(pinion.SHOULDER_LENGTH_FITUP_MIN, 3)} MIN."
-)
+T120_DAYLIGHT_REMEDY = "IF IT DOES NOT, MEASURE MHA-DT-10 AND T120 AGAINST THEIR PRINTS."
 
 # The lever and lift-rod prints defer this hole to assembly. The pin contract
 # specifies a stock 1/16 in slip fit retained by peening, not a reamed press fit.

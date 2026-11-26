@@ -1,0 +1,16 @@
+# MHA-DT-18 pinion pivot block: why each REAM and each band tighter than
+# the title block stays (drawing-guidelines.md rule 4; owner ruling
+# 2026-11-24: the reason lives here, not on the sheet). Read by the machinist
+# review only.
+# The pivot bore is reamed with the set's .2510 reamer and prints no band; the
+# MHA-DT-19 shaft is its gauge (form 3). An F drill's .007-.012 clearance in
+# the two blocks lets the shaft seat on opposite sides of its bores and tilt
+# the 6 in pinion in mesh, one end deeper than the other; the owner chose the
+# reamer (fit audit question 12, option B). The lift bore is F drilled
+# (fit audit F26): no entry.
+necessity:
+  - id: N-01
+    feature: "Ø.251 REAM THRU pivot bore (MHA-DT-19 ENTERS, TURNS BY HAND)"
+    kind: mesh
+    reason: "drilled clearance tilts the pinion's mesh end to end"
+    source: "owner ruling 2026-11-24, fit audit question 12"

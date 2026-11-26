@@ -141,7 +141,14 @@ PLAY_SHARE = 2.0 / 3.0
 # The seat prints at the title block's three places (line to line with the
 # bore's low limit) and its flag note states the fit (rule 4): a sliding fit
 # matched to T024's bore, diametral clearance from line to line up to the
-# share, floored onto the .0001 grid.
+# share, floored onto the .0001 grid: main's .0000-.0013, as the keyed
+# arbor's (a stack never tightens a fit: owner-level ruling, Codjiflo
+# #3549-13, 2026-11-25; at the gears' .002 TIR T024's contact ratio is
+# 1.0436). Necessity register N-01 (mesh): cone_set_stack books this play
+# inside T024's .002 TIR, and a seat at the title block (.004 play) takes
+# T024's contact ratio to 0.92 against NOMINAL_CONTACT_RATIO_MIN 1.0
+# (drawing-guidelines rule 4, form 2; cone_set_stack C-01 at .004 play gives
+# T024 CR 0.92).
 SEAT_PLACES = 3
 SEAT_DIA = BORE_MIN_MM
 SEAT_CLEARANCE_MM = (

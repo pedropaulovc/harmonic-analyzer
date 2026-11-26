@@ -54,14 +54,15 @@ def test_the_pin_hole_program_drills_the_station_in_the_overhang_into_air():
 
 
 def test_the_bench_gauges_read_inside_the_drawings_bands():
-    p = _plan()["parameters"]
+    plan = _plan()
+    p = plan["parameters"]
     hole = _features()["features"]["pin_hole"]
-    low, high = (v / IN for v in hole["dia"])
-    assert (
-        p["go_pin_in"] == pytest.approx(low, abs=1e-6)
-        and p["nogo_pin_in"] <= high + 1e-9
-    )
+    # Fit audit F15: the MHA-DT-VN-63 pin is the pin hole's gauge (it must
+    # drive, not enter by hand); no gauge pin is bought for it.
+    assert not {t["ref"] for t in plan["tools"]} & {"gauge-pin-0625", "pin-gauges"}
+    low, _high = (v / IN for v in hole["dia"])
+    assert p["shank_in"] == pytest.approx(low, abs=1e-6)
     station = [v / IN for v in hole["station"]]
-    half = p["go_pin_in"] / 2
+    half = p["shank_in"] / 2
     assert p["station_far_side_min_in"] == pytest.approx(station[0] + half, abs=1e-4)
     assert p["station_far_side_max_in"] == pytest.approx(station[1] + half, abs=1e-4)

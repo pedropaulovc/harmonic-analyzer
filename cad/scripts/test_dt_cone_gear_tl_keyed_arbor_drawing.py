@@ -96,7 +96,9 @@ def test_the_note_names_every_mate_by_its_drawing_number() -> None:
             blank.number == spec.CRANK_NUMBER
         ), blank.tag
         assert blank.number in (row[0] for row in kit.SETUP_TABLE_ROWS), blank.tag
-    assert f"KEY {spec.KEY_NUMBER} BONDED WITH {spec.KEY_BOND}" in note
+    assert (
+        f"KEY {spec.KEY_NUMBER} SLIDES IN, BONDED WITH {spec.KEY_BOND}, CLEARANCE .000-.004."
+    ) in note
     assert f"COAT ITEM 5 WITH {spec.KEY_BOND}." in kit.ASSEMBLY_STEPS
     assert len(spec.SHEET_NOTES.splitlines()) <= 4
     assert max(map(len, spec.SHEET_NOTES.splitlines())) <= 72
@@ -250,6 +252,13 @@ def test_the_tight_bands_live_on_the_model_dimensions() -> None:
     assert set(spec.DRAWING_PRECISION_BY_NAME) == marked
     assert set(spec.DRAWING_VALUES_BY_NAME) == marked
     assert set(spec.CALLOUTS_BELOW) <= marked
+    # The keyseat width is a reference: no band on the model, parenthesized;
+    # S keeps its band (necessity register N-02).
+    assert set(spec.MODEL_BANDS_MM) == {(spec.KEYSEAT_SKETCH, "KeyseatS")}
+    assert (
+        spec.DIMENSION_PREFIXES["KeyseatWidth"],
+        spec.DIMENSION_SUFFIXES["KeyseatWidth"],
+    ) == ("(", ")")
     assert spec.SHEET_NOTES.startswith(f"{spec.SEAT_NOTE_NUMBER}. SEAT:")
     for callout in spec.CALLOUTS_BELOW.values():
         assert len(callout.splitlines()) <= 2

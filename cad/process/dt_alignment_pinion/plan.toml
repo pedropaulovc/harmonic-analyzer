@@ -10,14 +10,9 @@ shop = "../shop"
 stock_refs = ["c360-round-gear-blanks"]
 
 [[tools]]
-id = "drill-n"
-name = "N drill"
-ref = "drill-n"  # Drills N
-
-[[tools]]
-id = "reamer-3135"
-name = ".3135 reamer"
-ref = "reamer-3135"  # B-reamer-.3135
+id = "block-drill-5-16"
+name = "5/16 drill"
+ref = "block-drill-5-16"  # Drills 5/16; the bore drilled from both ends (owner ruling 2026-11-24, fit audit question 13)
 
 [[tools]]
 id = "gear-cutter-arbor-7-8"
@@ -33,11 +28,6 @@ ref = "gear-cutters-48dp-20pa"  # F-gear-cutter-10-289-484
 id = "feeler-gauges"
 name = "Feeler gauges (Pittsburgh 32-pc)"
 ref = "feeler-gauges"  # F-feeler-66MA; repointed from the Starrett 66MA (owner 2026-11-19)
-
-[[tools]]
-id = "pin-gauges"
-name = "Pin gauges .011-.500"
-ref = "pin-gauges"  # A1-pin-set-061-500-combined, A1-pin-set-251-500
 
 [[setups]]
 machine_kind = "other"

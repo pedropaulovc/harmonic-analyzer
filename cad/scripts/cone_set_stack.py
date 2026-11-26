@@ -11,7 +11,7 @@ ease out in small steps and stop at the first free run, and lock
 the cone-lock-knob (MHA-DT-VN-51). Nothing is gauged, so no setting
 reading is booked.
 
-The ease out of the bind (check 4N) is neither printed nor measured, and no
+The ease out of the bind (check 5A) is neither printed nor measured, and no
 number is booked for it: delegated ruling 2026-11-12 (Main), following the
 owner's direction of 2026-11-11 on #2416 (the gears must not bind and must
 not come loose; backlash is not a function); owner review #2144, pending
@@ -33,29 +33,66 @@ the holding pairs are wherever the binds fall, and a gear past a hold lies on
 the line's extension, higher by the line's slope times its overhang. Its
 function (gears that do not come loose) was ruled on #2584 (owner ruling
 2026-11-14, option A: accepted and stated on the sheet, exception DT-08 in
-assemblies/dt-drive-train.yaml); no allowance is booked for it here. A pair
-then runs looser than that at the far phase of its running runout: the drum
-``TOOTH_RUNOUT_TIR_MM`` about its bore and each cone gear its eccentricity
-about the set's running axis (``cone_eccentricity_mm``), which runs from
-MHA-DT-04's journal to MHA-DT-37's pivot. The keyed gears' seat floats, the
-pivot's translation and the arbor's float are taken up the same way under
-the mesh load at the set as in running, so they do not move a pair off its
-set. A bonded gear's float is not: the gear cures off its seat by up to half
-its bond clearance and keeps that offset (#3292). T024 is centred while its
-bond is wet, and T012, T018 and T024 are each accepted after cure on their
-tooth runout about MHA-DT-04's journal, which reads the float, the tooth
-runout and the seat's own runout to the journal together.
+assemblies/dt-drive-train.yaml); no allowance is booked for it here.
+
+What acts after the set (owner ruling 2026-11-24, audit part 2 P1: "A. Yes;
+what is left after the setting may be combined by root sum square, with the
+plain sum printed beside it; runouts of gears turning at different speeds
+still add."; tolerance-policy.md, "Checks in spec modules and tests", basis
+after_setting). The set itself is not a term: ``SET_OFFSET_MAX_MM`` is where
+it leaves a pair at that pair's tightest phase. Three things then open the
+pair's centre, none of which the swing can see:
+
+* the running runout, ``running_runout_span_mm``: the drum
+  ``TOOTH_RUNOUT_TIR_MM`` about its bore and twice the cone gear's
+  eccentricity about the set's running axis (``cone_eccentricity_mm``,
+  MHA-DT-04's journal to MHA-DT-37's pivot). The cone and the drum turn at
+  different speeds, so their far phases meet: the two add, as one term;
+* the cone gear's seat float, ``seat_float_mm``: a keyed gear rides the mesh
+  load to the far side of land 1 in running, but only the pair that holds
+  the line had its float taken up at the set. The holder may be a bonded tip
+  gear, which has no float, so a keyed gear runs looser by its whole radial
+  float (``CONE_SEAT_FLOAT_MM``). A bonded gear's float is in its
+  eccentricity (it cures off its seat), so it books none here;
+* the drum gear's seat float: every drum floats on MHA-DT-13, so a pair runs
+  looser than the holder by the spread of the drum floats
+  (``DRUM_SEAT_FLOAT_SPREAD_MM``).
+
+Their sizes are independent: the gate takes their root sum square
+(``after_set_opening_mm``) and reports the plain sum beside it
+(``after_set_opening_plain_mm``); ``ConeCentre`` carries both ceilings. The
+pivot's translation and the arbor's float in its pedestals move every pair
+alike, so the set takes them up. The floats enter at the analysis bands of
+the reamed bores and their lands (gear_seat_fit, dt_cylinder_gear_spec):
+turning land 1 last to the reamed gears narrows them, and the check does not
+count on it.
+
+T024 and MHA-DT-37's pivot are each tapped true on an indicator while the
+LOCTITE 638 is wet (#3292, #2473) to their sheet 16 limit, the value booked
+as their reading below; T012 and T018 are not set, and their booked .0030 is
+the analysis figure that check 5C's running test alone accepts. After cure
+the readings are a record only (owner ruling 2026-11-24, audit part 2 C5:
+"B. Keep the wet tap-true steps; the after-cure readings become a record
+only; strip and re-bond only if a gear hesitates in the 80-turn running
+check."): what the compound does as it cures is not booked, and MHA-DT-00
+check 5C's running turns are its acceptance. A bonded gear that hesitates
+there is stripped and re-bonded (2H); a keyed one, not bonded, is checked
+to its sheet, remade if it fails, and the cone redone (3P-3S; delegated
+ruling 2026-11-24 (Main), no precedent; owner review #2144).
 
 The journal's axis is not the running axis (#2473, cone_running_axis):
 MHA-DT-37's spigot cures off-centre and tilted in MHA-DT-04's socket, so its
 pivot sits off MHA-DT-04's axis and MHA-DT-04 wobbles about the
-journal-to-pivot line. MHA-DT-00 reads the pivot after cure, MHA-DT-04
-turning in a V-block on its journal, before the post is assembled
+journal-to-pivot line. MHA-DT-00 taps the pivot true, MHA-DT-04 turning in a
+V-block on its journal, before the post is assembled
 (``PIVOT_RUNOUT_TIR_MM``); half that reading reaches each gear by its plane's
-share of the journal-to-pivot span. Every term is taken at the same phase.
-T006 has no assembled reading (#971): it books its printed runout and
-MHA-DT-37's tilt in the socket. Not booked, because MHA-DT-04 prints no
-runout of land 1 to its journal: that runout, under the keyed gears.
+share of the journal-to-pivot span. The terms of one gear's eccentricity
+turn together and are taken at the same phase. T006 has no reading (#971):
+it books its printed runout and MHA-DT-37's tilt in the socket. Not booked,
+because MHA-DT-04 prints no runout of land 1 to its journal: that runout,
+under the keyed gears. Owner ruling 2026-11-24 on #3402: "Route note only
+(rough the journal in the same chucking as the land, dial it true in the
+4-jaw before finishing); no reading." The route rides MHA-DT-04's traveler.
 
 The CAD places the cone line ``SET_ABOVE_STANDARD_MM`` above standard at
 every cone; the feel set runs T120 tighter than that, by
@@ -88,7 +125,7 @@ from standard_mesh_checks import PlaneGear, backlash, interference_margin, plane
 
 SET_ABOVE_STANDARD_MM = float(_config.fit("cone_drum_oblique_mesh", "edge_slack_mm"))
 # The D1 pivot seat in MHA-FR-01 is transfer-punched through MHA-DT-20's
-# reamed pivot bore with the plate at check 4's feel-set pose, then spotted,
+# reamed pivot bore with the plate at check 5's feel-set pose, then spotted,
 # drilled and tapped with the base still on the mill (MHA-DT-00 step 23,
 # owner ruling 2026-11-08). The seat is never located from the MHA-DT-02
 # pedestal seats, so it carries no band from them (#2366): it lands off the
@@ -124,31 +161,36 @@ def cone_tooth_runout_tir_mm(teeth: int) -> float:
     return TOOTH_RUNOUT_TIR_MM
 
 
-# T024 is centred on land 2 while its LOCTITE 638 is wet and accepted after
-# cure on its tooth runout about MHA-DT-04 (MHA-DT-00 sheet 16). Owner ruling
-# 2026-11-21 (Pedro), #3292: "options 2 + 4 together. At assembly, while the
-# LOCTITE 638 is wet, indicate T024 teeth on the shaft and tap it central,
-# then cure; the assembly sheet gets a check after cure: tooth runout about
-# the shaft .0045 TIR max. No part change."
+# T024 is tapped true on land 2 while its LOCTITE 638 is wet, reading its
+# tooth runout about MHA-DT-04 (MHA-DT-00 sheet 16). Owner ruling 2026-11-21
+# (Pedro), #3292: "options 2 + 4 together. At assembly, while the LOCTITE 638
+# is wet, indicate T024 teeth on the shaft and tap it central, then cure; the
+# assembly sheet gets a check after cure: tooth runout about the shaft .0045
+# TIR max. No part change." The after-cure reading is a record since the
+# owner's C5 ruling of 2026-11-24 (module docstring); the limit is the wet
+# setting's.
 LAND_2_ASSEMBLED_RUNOUT_TIR_MM = 0.0045 * 25.4
 # MHA-DT-37's bare pivot, read over a full turn with MHA-DT-04 in the V-block
-# after the tip's bonds cure and before the post is assembled (MHA-DT-00
-# sheet 16). Owner ruling 2026-11-22 (Pedro), #2473, option G: "one reading
-# remains: the pivot, .0025 TIR max in the V-block after cure and before the
-# post is assembled, with a step that taps the pivot true while the adhesive
-# is wet." The limit, same day, after T012 fell under the gate at .0025 with
-# the spigot at its least engagement: "pivot .0020 TIR MAX, booked at the
-# least spigot engagement (worst case)".
+# before the post is assembled (MHA-DT-00 sheet 16). Owner ruling 2026-11-22
+# (Pedro), #2473, option G: "one reading remains: the pivot, .0025 TIR max in
+# the V-block after cure and before the post is assembled, with a step that
+# taps the pivot true while the adhesive is wet." The limit, same day, after
+# T012 fell under the gate at .0025 with the spigot at its least engagement:
+# "pivot .0020 TIR MAX, booked at the least spigot engagement (worst case)".
+# Since C5 (2026-11-24) it is the wet tap-true's limit; after cure, a record.
 PIVOT_RUNOUT_TIR_MM = 0.0020 * 25.4
-# T012 and T018, read after cure in the pivot's setup (MHA-DT-00 sheet 16).
-# The pivot's reading does not see MHA-DT-04's socket standing off its
-# journal, which tilts MHA-DT-37 with the pivot true (Codjiflo review of
-# #3374: .00034 in TIR of it took T012 under the gate). Owner ruling
+# T012 and T018, recorded in the pivot's setup (MHA-DT-00 sheet 16, RECORD
+# EACH SPACE). The pivot's reading does not see MHA-DT-04's socket standing
+# off its journal, which tilts MHA-DT-37 with the pivot true (Codjiflo review
+# of #3374: .00034 in TIR of it took T012 under the gate). Owner ruling
 # 2026-11-22 (Pedro), #2473: "Add an after-cure reading of the 12- and
 # 18-tooth gears in the same setup: Ø.040 pin in each tooth space, shaft on
-# end on the V-block, .0030 TIR MAX (as the 24-tooth already has)".
+# end on the V-block, .0030 TIR MAX (as the 24-tooth already has)". Since C5
+# (2026-11-24) that reading is a record, and no step sets or checks T012 or
+# T018 to .0030 (1S taps only T024, 2B only the pivot): the .0030 is the
+# booked analysis figure, accepted only by check 5C's running test.
 SPIGOT_ASSEMBLED_RUNOUT_TIR_MM = 0.0030 * 25.4
-# Read after cure about MHA-DT-04's journal: gear -> its TIR limit.
+# Read about MHA-DT-04's journal: gear -> its TIR limit.
 ASSEMBLED_RUNOUT_TIR_MM = {
     **{teeth: LAND_2_ASSEMBLED_RUNOUT_TIR_MM for teeth in cone.LAND_2_TEETH},
     **{teeth: SPIGOT_ASSEMBLED_RUNOUT_TIR_MM for teeth in cone.SPIGOT_TEETH},
@@ -157,10 +199,11 @@ ASSEMBLED_RUNOUT_TIR_MM = {
 
 def bond_float_mm(teeth: int) -> float:
     """How far a bonded cone gear's bore can cure off its seat: half its own
-    bond clearance; zero for the keyed gears, which take their float up under
-    mesh load.  dt_cone_gear_tl_phasing_comb_spec.BOND_FLOAT_MM is a different
-    quantity: one common float, the largest of these and the spigot's half
-    clearance in MHA-DT-04's socket, about T030's key rather than the axis."""
+    bond clearance; zero for the keyed gears, whose float is
+    ``seat_float_mm``.  dt_cone_gear_tl_phasing_comb_spec.BOND_FLOAT_MM is a
+    different quantity: one common float, the largest of these and the
+    spigot's half clearance in MHA-DT-04's socket, about T030's key rather
+    than the axis."""
     if teeth in cone.ROUND_BORE_TEETH:
         return cone.bond_clearance_mm(teeth)[1] / 2.0
     return 0.0
@@ -202,6 +245,15 @@ ARBOR_RUNNING_FLOAT_MM = (
 ) / 2.0
 CONE_SEAT_FLOAT_MM = GEAR_SEAT_CLEARANCE[1] / 2.0
 DRUM_SEAT_FLOAT_MM = DRUM_SEAT_CLEARANCE[1] / 2.0
+# The spread of the drum gears' radial floats on MHA-DT-13: the most a pair's
+# drum floats beyond the holding pair's.
+DRUM_SEAT_FLOAT_SPREAD_MM = (DRUM_SEAT_CLEARANCE[1] - DRUM_SEAT_CLEARANCE[0]) / 2.0
+
+# The not-coming-loose gate: nominal contact ratio at the loosest running
+# centre after the set (dt_mesh_checks.cone_check; checks/cone-set-stack.yaml).
+# Delegated ruling 2026-11-12 (Main), following the owner's direction of
+# 2026-11-11 on #2416 (module docstring).  T006 is exempt (#971).
+NOMINAL_CONTACT_RATIO_MIN = 1.0
 
 
 def pivot_distance_mm(teeth: int) -> float:
@@ -269,18 +321,44 @@ def first_bind_offsets_mm(teeth: int) -> tuple[float, ...]:
 
 
 # The highest first bind of any pair: check 4 lays the arbor line on a bind
-# near each end and swings the set in to the first bind.  Every pair taken to
-# lie between the pairs that hold the line sits no higher than this at its
-# tightest phase; a gear past a hold is accepted by the owner's #2584 ruling
-# (option A, exception DT-08; see the module docstring).
+# near each end and check 5 swings the set in to the first bind.  Every pair
+# taken to lie between the pairs that hold the line sits no higher than this
+# at its tightest phase; a gear past a hold is accepted by the owner's #2584
+# ruling (option A, exception DT-08; see the module docstring).
 SET_OFFSET_MAX_MM = max(max(first_bind_offsets_mm(t)) for t in cone.CONE_TEETH)
 
 
 def running_runout_span_mm(teeth: int) -> float:
     """The far phase of the running runout: the set is felt at the tightest
     phase of a full turn, and the cone's eccentricity and the drum's (TIR / 2)
-    each open the centre by twice their size at the opposite phase."""
+    each open the centre by twice their size at the opposite phase.  The two
+    gears turn at different speeds, so the far phases meet and the two add."""
     return 2.0 * cone_eccentricity_mm(teeth) + TOOTH_RUNOUT_TIR_MM
+
+
+def seat_float_mm(teeth: int) -> float:
+    """How much looser than the holding pair cone ``teeth``'s own seat float
+    runs it: a keyed gear's whole radial float on land 1 (the holder may be a
+    bonded gear, with none); nothing for a bonded gear or T006, whose float
+    is in ``cone_eccentricity_mm``."""
+    return CONE_SEAT_FLOAT_MM if teeth in cone.KEYED_TEETH else 0.0
+
+
+def after_set_terms_mm(teeth: int) -> tuple[float, float, float]:
+    """What opens cone ``teeth``'s centre past where the set leaves it:
+    (running runout, cone seat float, drum seat float spread), in mm."""
+    return running_runout_span_mm(teeth), seat_float_mm(teeth), DRUM_SEAT_FLOAT_SPREAD_MM
+
+
+def after_set_opening_mm(teeth: int) -> float:
+    """The gated opening: the root sum square of the independent terms (owner
+    ruling 2026-11-24, audit part 2 P1)."""
+    return math.hypot(*after_set_terms_mm(teeth))
+
+
+def after_set_opening_plain_mm(teeth: int) -> float:
+    """The plain sum of the same terms, reported beside the gated opening."""
+    return sum(after_set_terms_mm(teeth))
 
 
 @dataclass(frozen=True)
@@ -290,7 +368,8 @@ class ConeCentre:
     teeth: int
     floor_mm: float  # its own least first bind: never tighter, at any phase
     set_max_mm: float  # the loosest the set holds it, at its tightest phase
-    ceiling_mm: float  # set_max_mm at the far phase of its running runout
+    ceiling_mm: float  # set_max_mm opened by the root sum square after the set
+    ceiling_plain_mm: float  # REF: set_max_mm opened by the plain sum
 
     @property
     def range_mm(self) -> tuple[float, float]:
@@ -304,7 +383,8 @@ def cone_centre(teeth: int) -> ConeCentre:
         teeth,
         std + min(first_bind_offsets_mm(teeth)),
         set_max,
-        set_max + running_runout_span_mm(teeth),
+        set_max + after_set_opening_mm(teeth),
+        set_max + after_set_opening_plain_mm(teeth),
     )
 
 

@@ -36,14 +36,16 @@ if {name for names in DRAWING_DIMENSIONS.values() for name in names} != set(
     raise AssertionError("every marked MHA-DT-VN-59 dimension needs authored places")
 
 # The fit and its mates (by drawing number, rule 4) sit under the diameter
-# they govern, in two lines of words (rule 7); the seam's match-drill/ream is
-# the arm's and hub's callout, and the .17 seam keeps the cut pin out of the
-# hub bore.  Which end goes out and the flush acceptance are assembly facts:
-# MHA-DT-00 drives the pin (rule 7 narration, fan-out screen
+# they govern, in two lines of words (rule 7); the seam's 5/32 drill is the
+# arm's and hub's callout, the pin bonded in it (fit audit 2026-11-23,
+# MHA-DT-06_DT-31.seam_pin: the hub joint is bonded under question 21, so the
+# seam's reamed drive fit and its .1562 reamer go), and the .17 seam keeps the cut pin out of the hub
+# bore.  Which end goes out and the flush acceptance are assembly facts:
+# MHA-DT-00 bonds the pin (rule 7 narration, fan-out screen
 # 20261107T081227004Z).
 PIN_DIA_CALLOUT = "\n".join(
     (
-        "PRESS FIT IN HOLE ACROSS JOINT",
+        "BONDED IN HOLE ACROSS JOINT",
         "OF MHA-DT-06 AND MHA-DT-31",
     )
 )
