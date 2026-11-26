@@ -49,11 +49,21 @@ part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
 material = "AISI 1018 cold-finished steel, precision-ground round, 1/4 in"
 stock = "Ø{{process.stock_dia_in:.4dot}} ground bar (to order, not on hand); one blank {{process.blank_length_in:.2dot}} in long and one {{process.trial_offcut_in:.2dot}} in trial offcut (allow two saw kerfs)."
-note = "Inches unless mm; G-code and console entries in mm (the files and the controller run G21). Lathe PM-1127VF-LB (70–380 and 380–2000 rpm); cutting oil. The O.D. is left as supplied: grip it over a brass shim wrap (lathe) and never cut it. Home the mill ($H) once, after switching it on: every M6's trip to the tool setter counts from home. Home again only after a power cycle or a controller restart, an E-stop, an alarm, a limit switch hit, a stall or a crash: homing brings the stored G54 back. Then check every zero of the setup again, each the way its step set it: each must read what its step set, within .001 in. One does not, cannot be reached with the part in, or the part may have moved: take the setup again from its first step, the part out. They all do: run the interrupted file again from its start. Feed Hold, then Reset with the axes stopped keeps position and G54: no homing, no new zero; run the interrupted file again from its start: its first M6 measures the tool, and cuts already made are cut in air. Prove the file in air first."
 shop = "../shop"
 stock_refs = ["1018-ground-round-1-4"]  # 1/4 GROUND STOCK OK (owner ruling 2026-11-20, #2346)
 material_key = "lathe-1018-cold-finished"
 milling_material = "steel_1018"
+
+# The shop's standing page carries what every traveler shares (units, speeds,
+# coolant, homing, Feed Hold, tool changes, proving a file); This job says
+# what only this shaft needs.
+standing = true
+
+[[notes]]
+title = "This job"
+rows = [
+  ["O.D.", "The O.D. is left as supplied: grip it over a brass shim wrap (lathe) and never cut it."],
+]
 
 [cad]
 file = "../../out/features/ch_pivot_shaft/features.toml"
@@ -410,7 +420,7 @@ machine = "PM-30MV CNC (FluidNC, CNCjs with the electronic tool setter) / vise, 
 indexing = "none"
 machine_ref = "pm-30mv"
 holding = "The PM 6 in vise (jaws {{process.vise_jaw_height_mm:in.2dot}} high). One 1 in parallel of the 1/8 in thick set standing on edge, centred between the jaws, 1/16 in clear of each. The shaft lying on its top edge along the jaws, gripped on its O.D.: the datum-end tip {{process.vise_jaw_from_x0_mm:in.2dot}} in out past the left jaw side, the far-end tip just out past the right. Tap it down onto the parallel while closing the vise. Its top stands {{process.jaw_top_over_od_mm:in.3dot}} under the jaw tops. The datum-end flat lies wholly left of the jaws."
-datum = "Program PS01_flat (cam:ch_pivot_shaft). G54: X0 the datum-end tip (the datum-end dome's apex), +X along the shaft; Y0 the shaft's axis; Z0 the top of the O.D. The file starts with an M6 for the end mill; tool lengths from the tool setter."
+datum = "Program PS01_flat (cam:ch_pivot_shaft). G54: X0 the datum-end tip (the datum-end dome's apex), +X along the shaft; Y0 the shaft's axis; Z0 the top of the O.D. The file starts with an M6 for the end mill."
 diagram = { file = "diagrams/flats.svg", alt = "The domed shaft lying along the vise jaws on a parallel, the datum-end tip out at the left; the 1/8 in end mill cuts the datum-end flat on top, left of the jaws." }
 envelope = { x_span_mm = ["{{cad.length_mm}}", "{{process.em_eighth_dia_mm}}"], y_span_mm = ["{{cad.stock_dia_mm}}", "{{process.em_eighth_dia_mm}}"], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{cad.stock_dia_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{cad.flat_north_across_mm}}"], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.em_eighth_projection_min_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.em_eighth_projection_min_mm}}"] }
 vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{cad.stock_dia_mm}}", along_jaws_mm = "{{cad.length_mm}}", part_height_mm = "{{cad.stock_dia_mm}}", parallel_height_mm = "{{process.riser_height_mm}}", overhang_mm = ["{{process.vise_jaw_from_x0_mm}}", "rest"], jaw_offset = "centred", fixed_jaw_face = "as_bought", moving_jaw_face = "as_bought", moving_jaw_contact = "flat" }
@@ -423,12 +433,7 @@ feed = "hand"
 
 [[setups.operations]]
 instruction = "G54 Z0: the top of the O.D., touched with the end mill over the axis."
-instruction_detailed = "Console M6 T1 (1/8 in end mill, at least {{process.em_eighth_projection_min_mm:in.3dot}} in out of the collet; the tool setter measures it). MDI G0 X5.000 Y0.000: over the O.D. left of the jaws, past the dome. Spindle stopped, its tip just dragging a .002 feeler leaf on the O.D. top: G10 L20 P1 Z0.051."
-feed = "hand"
-
-[[setups.operations]]
-instruction = "Prove PS01_flat in air, Z0 raised 1.000 in; every move clears the jaws. Then Z0 back."
-instruction_detailed = "Send $# and note the G54 line's Z. G10 L2 P1 Z(that Z + 25.400) raises Z0 1.000 in. Run PS01_flat: at its M6 prompt T1 is already in, so continue; the spindle runs at 2800 in air. Watch each move clear the jaws. G10 L2 P1 Z(the noted Z) puts Z0 back."
+instruction_detailed = "Console M6 T1 (1/8 in end mill, at least {{process.em_eighth_projection_min_mm:in.3dot}} in out of the collet). MDI G0 X5.000 Y0.000: over the O.D. left of the jaws, past the dome. Spindle stopped, its tip just dragging a .002 feeler leaf on the O.D. top: G10 L20 P1 Z0.051."
 feed = "hand"
 
 [[setups.operations]]
@@ -456,8 +461,8 @@ title = "Mill the far-end flat, in line with the datum-end one"
 machine = "PM-30MV CNC (FluidNC, CNCjs with the electronic tool setter) / vise, swivel off"
 indexing = "none"
 machine_ref = "pm-30mv"
-holding = "As Setup 6, reversed end for end: the far-end tip {{process.vise_jaw_from_x0_mm:in.2dot}} in out past the left jaw side, the datum-end flat up: the datum-end tip then stands about .05 in past the jaws' right side (6.85 less .55 less the 6.25 jaws), so that flat (.10–.34 from its tip) lies between the jaws at their right end. Close the vise snug, not tight, until Op 390."
-datum = "Program PS01_flat again. G54: X0 the far-end tip (the far-end dome's apex), +X along the shaft; Y0 the shaft's axis; Z0 the top of the O.D. The datum-end flat set level first (Ops 370–390), so the far-end flat is cut in line with it."
+holding = "As Setup 6, reversed end for end: the far-end tip {{process.vise_jaw_from_x0_mm:in.2dot}} in out past the left jaw side, the datum-end flat up: the datum-end tip then stands about .05 in past the jaws' right side (6.85 less .55 less the 6.25 jaws), so that flat (.10–.34 from its tip) lies between the jaws at their right end. Close the vise snug, not tight, until Op 380."
+datum = "Program PS01_flat again. G54: X0 the far-end tip (the far-end dome's apex), +X along the shaft; Y0 the shaft's axis; Z0 the top of the O.D. The datum-end flat set level first (Ops 360–380), so the far-end flat is cut in line with it."
 diagram = { file = "diagrams/flats-south.svg", alt = "The shaft reversed end for end, the far-end tip out at the left, the datum-end flat up between the jaws at the right; the end mill cuts the far-end flat, left of the jaws." }
 envelope = { x_span_mm = ["{{cad.length_mm}}", "{{process.em_eighth_dia_mm}}"], y_span_mm = ["{{cad.stock_dia_mm}}", "{{process.em_eighth_dia_mm}}"], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{cad.stock_dia_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{cad.flat_south_across_mm}}"], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.em_eighth_projection_min_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.em_eighth_projection_min_mm}}"] }
 vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{cad.stock_dia_mm}}", along_jaws_mm = "{{cad.length_mm}}", part_height_mm = "{{cad.stock_dia_mm}}", parallel_height_mm = "{{process.riser_height_mm}}", overhang_mm = ["{{process.vise_jaw_from_x0_mm}}", "rest"], jaw_offset = "centred", fixed_jaw_face = "as_bought", moving_jaw_face = "as_bought", moving_jaw_contact = "flat" }
@@ -469,10 +474,10 @@ inspection = "The two Z readings within 0.025 mm (.001 in) of each other: the fl
 gauge_checks = "other"
 
 [[setups.operations]]
-instruction = "Readings further apart: raise the bit, roll the shaft a touch about its axis in the snug jaws to lower the high side, and repeat Op 370."
+instruction = "Readings further apart: raise the bit, roll the shaft a touch about its axis in the snug jaws to lower the high side, and repeat Op 360."
 
 [[setups.operations]]
-instruction = "Tighten the vise, tap the shaft down onto the parallel, and repeat Op 370's two readings: still within 0.025 mm, else back to Op 380."
+instruction = "Tighten the vise, tap the shaft down onto the parallel, and repeat Op 360's two readings: still within 0.025 mm, else back to Op 370."
 
 [[setups.operations]]
 instruction = "G54 Y0 the shaft's axis and X0 the far-end tip: edge finder (900 rpm), as Op 310."
@@ -485,7 +490,7 @@ instruction_detailed = "Console M6 T1. MDI G0 X5.000 Y0.000: over the O.D. left 
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Prove PS01_flat in air, Z0 raised 1.000 in, as Op 330. Then Z0 back."
+instruction = "Prove PS01_flat in air, Z0 raised 1.000 in (the standing page's console entries). Then Z0 back."
 feed = "hand"
 
 [[setups.operations]]
@@ -500,7 +505,7 @@ milling_cuts = [
 ]
 
 [[setups.operations]]
-instruction = "Unclamp and read the far-end flat across as Op 350."
+instruction = "Unclamp and read the far-end flat across as Op 340."
 inspection = "Far-end flat across {{cad.flat_south_across_min_in:.3dot}}–{{cad.flat_south_across_max_in:.3dot}}."
 gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.flat_south_across_band_mm}}" }]
 
