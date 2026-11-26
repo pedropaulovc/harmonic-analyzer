@@ -35,7 +35,7 @@ part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
 material = "1018 cold-finished steel, 5/8 in round (drawing: {{cad.material_name}})"
 stock = "Qty {{process.quantity:g}}. {{process.bar_dia_in:fraction}} in round bar on hand: one blank {{process.blank_length_in:.2f}} in long, and a 1 in offcut for the mill setup's spacer."
-note = "Inches unless mm; G-code and console entries in mm (the file and the controller run G21). Lathe PM-1127VF-LB (70–380 and 380–2000 rpm); cutting oil on the steel. Finished Ø{{cad.outer_dia_min_in:.2dot}}–{{cad.outer_dia_max_in:.2dot}} × {{cad.far_end_length_min_in:.2dot}}–{{cad.far_end_length_max_in:.2dot}} long, the Ø{{process.bore_print_min_in:.3dot}}–{{process.bore_print_max_in:.3dot}} drilled bore through, the 1/16 pin hole through both walls {{cad.pin_hole_station_min_in:.2dot}}–{{cad.pin_hole_station_max_in:.2dot}} from the faced (datum) end. Mill speeds on the PM-30MV low belt (100–2800 rpm). Home the mill ($H) and touch off G54 before the mill setup; after any controller reset, stall or E-stop, home and touch off again before Cycle Start. Prove the file in air first."
+note = "Inches unless mm; G-code and console entries in mm (the file and the controller run G21). Lathe PM-1127VF-LB (70–380 and 380–2000 rpm); cutting oil on the steel. Finished Ø{{cad.outer_dia_min_in:.2dot}}–{{cad.outer_dia_max_in:.2dot}} × {{cad.far_end_length_min_in:.2dot}}–{{cad.far_end_length_max_in:.2dot}} long, the Ø{{process.bore_print_min_in:.3dot}}–{{process.bore_print_max_in:.3dot}} drilled bore through, the 1/16 pin hole through both walls {{cad.pin_hole_station_min_in:.2dot}}–{{cad.pin_hole_station_max_in:.2dot}} from the faced (datum) end. Mill speeds on the PM-30MV low belt (100–2800 rpm). Home the mill ($H) once, after switching it on: every M6's trip to the tool setter counts from home. Home again only after a power cycle or a controller restart, an E-stop, an alarm, a limit switch hit, a stall or a crash: homing brings the stored G54 back. Then check every zero of the setup again, each the way its step set it: each must read what its step set, within .001 in. One does not, cannot be reached with the part in, or the part may have moved: take the setup again from its first step, the part out. They all do: run the interrupted file again from its start. Feed Hold, then Reset with the axes stopped keeps position and G54: no homing, no new zero; run the interrupted file again from its start: its first M6 measures the tool, and cuts already made are cut in air. Prove the file in air first."
 shop = "../shop"
 stock_refs = ["1018-round-5-8"]
 material_key = "lathe-1018-cold-finished"
@@ -308,8 +308,8 @@ vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{process.bar_dia_mm}}", alo
 beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{process.blank_length_mm}}"], clamp_mm = ["{{process.end_overhang_mm}}", "{{process.blank_length_mm}}"], section_mm = { diameter = "{{cad.outer_dia_mm}}" }, vise_left = "start" }
 
 [[setups.operations]]
-instruction = "Home the mill first ($H). G54 Y0 the turned O.D.'s axis: edge finder (900 rpm)."
-instruction_detailed = "Home the mill first ($H). Edge finder (900 rpm, Ø.200), its tip level with the blank's axis, on the turned O.D. in the overhang: from the −Y side, G10 L20 P1 Y0; MDI G0 Z clear of the blank, then from the +Y side G10 L20 P1 Y(half the DRO's work Y reading)."
+instruction = "G54 Y0 the turned O.D.'s axis: edge finder (900 rpm)."
+instruction_detailed = "Edge finder (900 rpm, Ø.200), its tip level with the blank's axis, on the turned O.D. in the overhang: from the −Y side, G10 L20 P1 Y0; MDI G0 Z clear of the blank, then from the +Y side G10 L20 P1 Y(half the DRO's work Y reading)."
 feed = "hand"
 
 [[setups.operations]]

@@ -60,7 +60,7 @@ part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
 material = "1018 cold-finished steel, 3/8 x 1-1/4 in flat: a plain carbon steel (drawing: {{cad.material_spec}})"
 stock = "3/8 x 1-1/4 in flat bar; {{process.quantity:d}} × {{process.blank_length_in:.2f}}–{{process.blank_length_max_in:.2f}} in blank."
-note = "Inches unless mm; G-code and console entries in mm (the files and the controller run G21). Finished {{cad.right_end_length_min_in:.2f}}–{{cad.right_end_length_max_in:.2f}} long (left end to right end), {{cad.bottom_face_height_min_in:.3dot}}–{{cad.bottom_face_height_max_in:.3dot}} high (top face to bottom face), {{cad.back_face_depth_min_in:.3dot}}–{{cad.back_face_depth_max_in:.3dot}} deep (the bar's 3/8 thickness as supplied). Speeds on the PM-30MV low belt (100–2800 rpm): no belt change. Home the mill ($H) and touch off G54 at the start of every mill setup: a FluidNC reset loses home. After any controller reset, stall or E-stop, home and touch off again before Cycle Start. Every file is proved in air before it cuts. To buy before Setup 3: the .1865 reamer, the .1865/.1870 plug gauge pair and the pin gauge set (its .125 pin seats Setups 3 and 4)."
+note = "Inches unless mm; G-code and console entries in mm (the files and the controller run G21). Finished {{cad.right_end_length_min_in:.2f}}–{{cad.right_end_length_max_in:.2f}} long (left end to right end), {{cad.bottom_face_height_min_in:.3dot}}–{{cad.bottom_face_height_max_in:.3dot}} high (top face to bottom face), {{cad.back_face_depth_min_in:.3dot}}–{{cad.back_face_depth_max_in:.3dot}} deep (the bar's 3/8 thickness as supplied). Speeds on the PM-30MV low belt (100–2800 rpm): no belt change. Home the mill ($H) once, after switching it on: every M6's trip to the tool setter counts from home. Home again only after a power cycle or a controller restart, an E-stop, an alarm, a limit switch hit, a stall or a crash: homing brings the stored G54 back. Then check every zero of the setup again, each the way its step set it: each must read what its step set, within .001 in. One does not, cannot be reached with the part in, or the part may have moved: take the setup again from its first step, the part out. They all do: run the interrupted file again from its start. Feed Hold, then Reset with the axes stopped keeps position and G54: no homing, no new zero; run the interrupted file again from its start: its first M6 measures the tool, and cuts already made are cut in air. Every file is proved in air before it cuts. To buy before Setup 3: the .1865 reamer, the .1865/.1870 plug gauge pair and the pin gauge set (its .125 pin seats Setups 3 and 4)."
 shop = "../shop"
 stock_refs = ["1018-flat-3-8x1-1-4"]
 material_key = "rocker-1018-cold-finished"
@@ -319,8 +319,8 @@ vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{process.blank_thickness_mm
 beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{process.blank_length_max_mm}}"], clamp_mm = ["{{process.vise_overhang_mm}}", "{{process.vise_clamp_end_mm}}"], section_mm = { y = "{{cad.back_face_depth_mm}}", z = "{{process.top_width_mm}}" }, vise_left = "start" }
 
 [[setups.operations]]
-instruction = "Before clamping: mic edge B to edge A at the blank's middle and write it down (mm = in × 25.4). Home the mill ($H). G54 Y0 the bare fixed jaw's face, then clamp it as Holding says; X0 {{process.left_end_skim_mm:in.3dot}} right of the LEFT end: edge finder (900 rpm)."
-instruction_detailed = "Before clamping: mic B to A at the blank's middle; write it down in mm (in × 25.4). Home the mill ($H). Edge finder (900 rpm), the vise empty: on the fixed jaw's face, G10 L20 P1 Y-2.540. Clamp it as Holding says. Edge finder, its tip below the jaw tops, on the blank's LEFT end from the left: G10 L20 P1 X-4.064 (its .100 radius plus the {{process.left_end_skim_mm:in.3dot}} end skim)."
+instruction = "Before clamping: mic edge B to edge A at the blank's middle and write it down (mm = in × 25.4). G54 Y0 the bare fixed jaw's face, then clamp it as Holding says; X0 {{process.left_end_skim_mm:in.3dot}} right of the LEFT end: edge finder (900 rpm)."
+instruction_detailed = "Before clamping: mic B to A at the blank's middle; write it down in mm (in × 25.4). Edge finder (900 rpm), the vise empty: on the fixed jaw's face, G10 L20 P1 Y-2.540. Clamp it as Holding says. Edge finder, its tip below the jaw tops, on the blank's LEFT end from the left: G10 L20 P1 X-4.064 (its .100 radius plus the {{process.left_end_skim_mm:in.3dot}} end skim)."
 feed = "hand"
 
 [[setups.operations]]
@@ -391,8 +391,8 @@ instruction = "Only if the reamer read under the GO pin's reading (otherwise ski
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Before clamping: mic F to the back face at the blank's middle and write it down (mm = in × 25.4). Home the mill ($H). G54 Y0 on the bare fixed jaw's face (it becomes T's) with the edge finder."
-instruction_detailed = "Before clamping: mic F to the back face at the blank's middle; write it down in mm (in × 25.4). Home the mill ($H). Edge finder (900 rpm), the vise empty: on the fixed jaw's face, G10 L20 P1 Y-2.540."
+instruction = "Before clamping: mic F to the back face at the blank's middle and write it down (mm = in × 25.4). G54 Y0 on the bare fixed jaw's face (it becomes T's) with the edge finder."
+instruction_detailed = "Before clamping: mic F to the back face at the blank's middle; write it down in mm (in × 25.4). Edge finder (900 rpm), the vise empty: on the fixed jaw's face, G10 L20 P1 Y-2.540."
 feed = "hand"
 
 [[setups.operations]]
@@ -519,8 +519,8 @@ vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{process.top_width_mm}}", a
 beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{process.blank_length_max_mm}}"], clamp_mm = ["{{process.right_clamp_start_mm}}", "{{process.right_clamp_end_mm}}"], section_mm = { y = "{{process.top_width_mm}}", z = "{{cad.back_face_depth_mm}}" }, vise_left = "start" }
 
 [[setups.operations]]
-instruction = "Before clamping: mic F to the back face at the bar's middle and write it down (mm = in × 25.4). Home the mill ($H). G54 Y0 on the bare fixed jaw's face with the edge finder."
-instruction_detailed = "Before clamping: mic F to the back face at the bar's middle; write it down in mm (in × 25.4). Home the mill ($H). Edge finder (900 rpm), the vise empty: on the fixed jaw's face, G10 L20 P1 Y-2.540."
+instruction = "Before clamping: mic F to the back face at the bar's middle and write it down (mm = in × 25.4). G54 Y0 on the bare fixed jaw's face with the edge finder."
+instruction_detailed = "Before clamping: mic F to the back face at the bar's middle; write it down in mm (in × 25.4). Edge finder (900 rpm), the vise empty: on the fixed jaw's face, G10 L20 P1 Y-2.540."
 feed = "hand"
 
 [[setups.operations]]
@@ -615,8 +615,8 @@ vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{cad.back_face_depth_mm}}",
 beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{process.length_target_mm}}"], clamp_mm = ["{{process.vise_overhang_mm}}", "{{process.vise_clamp_end_mm}}"], section_mm = { y = "{{cad.back_face_depth_mm}}", z = "{{process.height_target_mm}}" }, vise_left = "start" }
 
 [[setups.operations]]
-instruction = "Before clamping: mic T to edge B at the bar's middle and write it down (mm = in × 25.4). Home the mill ($H). G54 Y0 the bare fixed jaw's face, then clamp it as Holding says; X0 the milled LEFT end: edge finder (900 rpm)."
-instruction_detailed = "Before clamping: mic T to B at the bar's middle; write it down in mm (in × 25.4). Home the mill ($H). Edge finder (900 rpm), the vise empty: on the fixed jaw's face, G10 L20 P1 Y-2.540. Clamp it as Holding says. Edge finder, its tip below the jaw tops, on the LEFT end from the left: G10 L20 P1 X-2.540."
+instruction = "Before clamping: mic T to edge B at the bar's middle and write it down (mm = in × 25.4). G54 Y0 the bare fixed jaw's face, then clamp it as Holding says; X0 the milled LEFT end: edge finder (900 rpm)."
+instruction_detailed = "Before clamping: mic T to B at the bar's middle; write it down in mm (in × 25.4). Edge finder (900 rpm), the vise empty: on the fixed jaw's face, G10 L20 P1 Y-2.540. Clamp it as Holding says. Edge finder, its tip below the jaw tops, on the LEFT end from the left: G10 L20 P1 X-2.540."
 feed = "hand"
 
 [[setups.operations]]

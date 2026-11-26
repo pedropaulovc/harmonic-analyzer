@@ -49,7 +49,7 @@ part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
 material = "AISI 1018 cold-finished steel, precision-ground round, 1/4 in"
 stock = "Ø{{process.stock_dia_in:.4dot}} ground bar (to order, not on hand); one blank {{process.blank_length_in:.2dot}} in long and one {{process.trial_offcut_in:.2dot}} in trial offcut (allow two saw kerfs)."
-note = "Inches unless mm; G-code and console entries in mm (the files and the controller run G21). Lathe PM-1127VF-LB (70–380 and 380–2000 rpm); cutting oil. The O.D. is left as supplied: grip it over a brass shim wrap (lathe) and never cut it. Home the mill ($H) and touch off G54 before the mill setup; after any controller reset, stall or E-stop, home and touch off again before Cycle Start. Prove the file in air first."
+note = "Inches unless mm; G-code and console entries in mm (the files and the controller run G21). Lathe PM-1127VF-LB (70–380 and 380–2000 rpm); cutting oil. The O.D. is left as supplied: grip it over a brass shim wrap (lathe) and never cut it. Home the mill ($H) once, after switching it on: every M6's trip to the tool setter counts from home. Home again only after a power cycle or a controller restart, an E-stop, an alarm, a limit switch hit, a stall or a crash: homing brings the stored G54 back. Then check every zero of the setup again, each the way its step set it: each must read what its step set, within .001 in. One does not, cannot be reached with the part in, or the part may have moved: take the setup again from its first step, the part out. They all do: run the interrupted file again from its start. Feed Hold, then Reset with the axes stopped keeps position and G54: no homing, no new zero; run the interrupted file again from its start: its first M6 measures the tool, and cuts already made are cut in air. Prove the file in air first."
 shop = "../shop"
 stock_refs = ["1018-ground-round-1-4"]  # 1/4 GROUND STOCK OK (owner ruling 2026-11-20, #2346)
 material_key = "lathe-1018-cold-finished"
@@ -415,8 +415,8 @@ vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{cad.stock_dia_mm}}", along
 beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{cad.length_mm}}"], clamp_mm = ["{{process.vise_jaw_from_x0_mm}}", "{{process.vise_jaw_to_x0_mm}}"], section_mm = { diameter = "{{cad.stock_dia_mm}}" }, vise_left = "start" }
 
 [[setups.operations]]
-instruction = "Home the mill first ($H). G54 Y0 the shaft's axis and X0 the datum-end tip: edge finder (900 rpm)."
-instruction_detailed = "Home the mill first ($H). Edge finder (900 rpm), its tip level with the shaft's axis. Y: on the O.D. from the moving-jaw side, left of the jaws, G10 L20 P1 Y-(the miked O.D./2 + 2.540) in mm; for .2500, Y-5.715. X: on the datum-end tip from the left, Y0, G10 L20 P1 X-2.540."
+instruction = "G54 Y0 the shaft's axis and X0 the datum-end tip: edge finder (900 rpm)."
+instruction_detailed = "Edge finder (900 rpm), its tip level with the shaft's axis. Y: on the O.D. from the moving-jaw side, left of the jaws, G10 L20 P1 Y-(the miked O.D./2 + 2.540) in mm; for .2500, Y-5.715. X: on the datum-end tip from the left, Y0, G10 L20 P1 X-2.540."
 feed = "hand"
 
 [[setups.operations]]

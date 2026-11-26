@@ -48,7 +48,7 @@ part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
 material = "Brass sheet .040 (drawing: {{cad.material_spec}}; alloy not specified; not on record: to buy)"
 stock = "Brass sheet or strip {{cad.outer_face_thickness_min_in:.3dot}}–{{cad.outer_face_thickness_max_in:.3dot}} thick as rolled; {{process.quantity:d}} blank {{process.blank_x_in:.2f}} × {{process.blank_y_in:.2f}} in sawn from it."
-note = "Inches unless mm; G-code and console entries in mm (the files and the controller run G21). Finished {{cad.far_end_length_min_in:.2f}}–{{cad.far_end_length_max_in:.2f}} long (locating end to far end), {{cad.roof_edge_height_min_in:.2f}}–{{cad.roof_edge_height_max_in:.2f}} high (locating edge to roof edge), {{cad.outer_face_thickness_min_in:.3dot}}–{{cad.outer_face_thickness_max_in:.3dot}} thick as the sheet comes. A matched pair with MHA-MS-02: Setups 3 and 4 need that block finished by its own traveler through its Setup 10 (all but its two 2-56 taps, which its Setup 12 cuts after Setup 4 here). Speeds on the PM-30MV low belt (100–2800 rpm): no belt change. Home the mill ($H) and touch off G54 at the start of every mill setup: a FluidNC reset loses home (logbook 2026-11-06). After any controller reset, stall or E-stop, home and touch off again before Cycle Start. Finish: brass black, the last setup, once the Brass Black is bought; until then the plate stays bare, tagged AWAITING BRASS BLACK."
+note = "Inches unless mm; G-code and console entries in mm (the files and the controller run G21). Finished {{cad.far_end_length_min_in:.2f}}–{{cad.far_end_length_max_in:.2f}} long (locating end to far end), {{cad.roof_edge_height_min_in:.2f}}–{{cad.roof_edge_height_max_in:.2f}} high (locating edge to roof edge), {{cad.outer_face_thickness_min_in:.3dot}}–{{cad.outer_face_thickness_max_in:.3dot}} thick as the sheet comes. A matched pair with MHA-MS-02: Setups 3 and 4 need that block finished by its own traveler through its Setup 10 (all but its two 2-56 taps, which its Setup 12 cuts after Setup 4 here). Speeds on the PM-30MV low belt (100–2800 rpm): no belt change. Home the mill ($H) once, after switching it on: every M6's trip to the tool setter counts from home. Home again only after a power cycle or a controller restart, an E-stop, an alarm, a limit switch hit, a stall or a crash: homing brings the stored G54 back. Then check every zero of the setup again, each the way its step set it: each must read what its step set, within .001 in. One does not, cannot be reached with the part in, or the part may have moved: take the setup again from its first step, the part out. They all do: run the interrupted file again from its start. Feed Hold, then Reset with the axes stopped keeps position and G54: no homing, no new zero; run the interrupted file again from its start: its first M6 measures the tool, and cuts already made are cut in air. Finish: brass black, the last setup, once the Brass Black is bought; until then the plate stays bare, tagged AWAITING BRASS BLACK."
 shop = "../shop"
 material_key = "ms-stop-plate-brass-sheet"
 milling_material = "brass"
@@ -243,8 +243,8 @@ instruction = "Before clamping, mike the block's and the plate's lengths. If the
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Home the mill first ($H). G54 X0 the locating edges, Y0 the fixed jaw's face: edge finder (900 rpm)."
-instruction_detailed = "Home the mill first ($H). Edge finder (900 rpm): on the fixed jaw's face beside the stack, its tip .10 below the jaw top, G10 L20 P1 Y-2.540; on the plate's and block's locating edges from the right, G10 L20 P1 X2.540 (plus: the finder's centre is right of the edges)."
+instruction = "G54 X0 the locating edges, Y0 the fixed jaw's face: edge finder (900 rpm)."
+instruction_detailed = "Edge finder (900 rpm): on the fixed jaw's face beside the stack, its tip .10 below the jaw top, G10 L20 P1 Y-2.540; on the plate's and block's locating edges from the right, G10 L20 P1 X2.540 (plus: the finder's centre is right of the edges)."
 feed = "hand"
 
 [[setups.operations]]
@@ -310,8 +310,8 @@ vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{cad.envelope_x_mm}}", alon
 beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{cad.envelope_y_mm}}"], clamp_mm = [0, "{{cad.envelope_y_mm}}"], section_mm = { y = "{{cad.envelope_x_mm}}", z = "{{process.stack_height_mm}}" }, vise_left = "start" }
 
 [[setups.operations]]
-instruction = "Home the mill first ($H). G54 X0 the plate's locating edge (now on the left), Y0 the fixed jaw's face: edge finder (900 rpm)."
-instruction_detailed = "Home the mill first ($H). Edge finder (900 rpm): on the fixed jaw's face beside the stack, G10 L20 P1 Y-2.540; on the plate's locating edge from the left, its tip in the plate's thickness only, G10 L20 P1 X-2.540."
+instruction = "G54 X0 the plate's locating edge (now on the left), Y0 the fixed jaw's face: edge finder (900 rpm)."
+instruction_detailed = "Edge finder (900 rpm): on the fixed jaw's face beside the stack, G10 L20 P1 Y-2.540; on the plate's locating edge from the left, its tip in the plate's thickness only, G10 L20 P1 X-2.540."
 feed = "hand"
 
 [[setups.operations]]
