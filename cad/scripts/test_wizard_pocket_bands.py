@@ -190,3 +190,67 @@ def test_bottom_guide_guards_hold_at_the_printed_bands() -> None:
         + guide._TAP_MAJOR / 2.0
     )
     assert guide.SCREW_HOLE_TAP_WALL_MIN <= tap_wall + TOL
+
+
+def test_support_bar_round_counterbores_hold_at_the_printed_bands() -> None:
+    """MHA-PD-07's round clamp counterbores keep the owner's own band on the
+    Ø (#2422, Ø.3125 +.010/0, put on the ClampHoles Hole Wizard feature) and
+    the wizard's .XX on the depth. The guard is recomputed from the exported
+    limits, and the wizard .XX on the Ø is shown to fail it, the failure
+    necessity/pd-support-bar.yaml N-01 registers (D52)."""
+    import build_pd_support_bar as bar
+    import machinist_necessity
+    import pd_support_bar_drawing_spec as bar_sheet
+    import pd_support_bar_spec as bar_spec
+    from _inch_wall_limits import WALL_TARGET_MM
+    from _paths import CAD_ROOT
+    from _printed_tolerance import printed_deviations
+    from sh_vn_clamp_screw_spec import HEAD_DIA, HEAD_H, SHANK_DIA
+
+    shop_reads = 0.001 * INCH
+    lower, upper = bar_sheet.CLAMP_CBORE_DIA_LIMITS
+    assert "CLAMP_CBORE_DIA_LIMITS" in _names_in(bar)
+    features = _features("pd_support_bar")
+    for name in ("clamp_hole_1", "clamp_hole_2"):
+        hole = features[name]
+        assert hole["cbore_dia"] == pytest.approx(
+            [bar.CLAMP_CBORE_DIA + lower, bar.CLAMP_CBORE_DIA + upper], abs=1e-6
+        ), name
+        assert hole["cbore_depth"] == pytest.approx(
+            [
+                bar.CLAMP_CBORE_DEPTH - WIZARD_POCKET_BAND_MM,
+                bar.CLAMP_CBORE_DEPTH + WIZARD_POCKET_BAND_MM,
+            ],
+            abs=1e-6,
+        ), name
+        dia_min = hole["cbore_dia"][0]
+        depth_min, depth_max = hole["cbore_depth"]
+        float_max = (hole["dia"][1] - SHANK_DIA) / 2.0
+        # The head, its shank floated across the widest hole, in the
+        # narrowest pocket: +.0032 at .3125. The builder's guard floats it in
+        # the printed .196's limits, the export in the model's .19598's.
+        radial = (dia_min - HEAD_DIA) / 2.0 - float_max
+        assert bar.clamp_round_head_clearance() == pytest.approx(radial, abs=5e-4)
+        assert radial >= shop_reads - TOL
+        assert radial / INCH == pytest.approx(0.00325, abs=1e-5)
+        # The same at the wizard's .XX on the three printed places (.313,
+        # .303 at least): the head meets the wall by .0015.
+        row_lower, _ = printed_deviations(
+            bar.CLAMP_CBORE_DIA,
+            3,
+            (-WIZARD_POCKET_BAND_MM, WIZARD_POCKET_BAND_MM),
+            unit="in",
+        )
+        row = (bar.CLAMP_CBORE_DIA + row_lower - HEAD_DIA) / 2.0 - float_max
+        assert row / INCH == pytest.approx(-0.0015, abs=1e-5)
+        # The head below the front face the platen slides across, and the
+        # floor under the deepest pocket in the thinnest bar.
+        assert depth_min - HEAD_H >= shop_reads - TOL
+        assert bar_spec.BAR_DEPTH_MIN - depth_max >= WALL_TARGET_MM
+    necessity = {
+        entry.id: entry
+        for entry in machinist_necessity.load_necessity(CAD_ROOT / "config", "pd_support_bar")
+    }
+    assert necessity["N-01"].kind == "gap"
+    assert "Ø.3125 +.0100/.0000" in necessity["N-01"].feature
+    assert "#2422" in necessity["N-01"].source

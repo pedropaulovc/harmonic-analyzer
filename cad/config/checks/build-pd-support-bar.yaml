@@ -1,0 +1,11 @@
+# MHA-PD-07 support bar: the checks build_pd_support_bar asserts
+# (check_register.py; tolerance-policy.md, "Checks in spec modules and tests").
+# Entered 2026-11-26 with necessity/pd-support-bar.yaml N-01, which this guard
+# answers (D52).
+checks:
+  - id: C-01
+    check: "MHA-SH-VN-53 heads reach past the round counterbores' walls"
+    kind: gap
+    reason: "a clamp-screw head fouls its counterbore wall"
+    source: "owner ruling 2026-11-20 (Pedro), #2422: the 5/16 plunge Ø.3125 +.010/0; head Ø.270 (sh_vn_clamp_screw_spec.HEAD_DIA, McMaster 90280A201) on a .164 shank in the #8 Ø.196 at DRILLED HOLES +.004/0 (float .018); computed in build_pd_support_bar.clamp_round_head_clearance: +.0032 at .3125, -.0015 at the .XX row's .303"
+    basis: worst_case
