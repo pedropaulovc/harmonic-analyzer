@@ -376,7 +376,7 @@ speed_kind = "other"
 tool = "files"
 drilling = "none"
 sizing = "other"
-instruction = "Unclamped: file the burr off U's two long edges and both ends with the smooth file, stroking along each edge, never across U (the slide face); wipe it clean. A burr left on U lifts it off the stacks in Setup 3."
+instruction = "Unclamped: file the burr off U's two long edges and both ends with the smooth file, stroking along each edge, never across U (the slide face); wipe it clean."
 feed = "hand"
 
 [[setups]]
@@ -419,14 +419,6 @@ milling_cuts = [
 instruction = "Over .347 or a patch left: wipe U and the stacks clean (a chip under it is the usual cause), then repeat this setup from its first op with the new middle reading (it sets Z0 again) and run PG02_top again. Under .343: tell the owner (Setup 6's stack clearance is set for .345)."
 feed = "hand"
 
-[[setups.operations]]
-speed_kind = "other"
-tool = "files"
-drilling = "none"
-sizing = "other"
-instruction = "Top within its band: file the burr off the top's two long edges and both ends with the smooth file, stroking along each edge, never across a face; wipe it clean. A burr left on it tilts the top against the fixed jaw in Setup 4."
-feed = "hand"
-
 [[setups]]
 machine_kind = "other"
 title = "Front face"
@@ -460,14 +452,6 @@ settings = "em-half-carbide-1018-3439-face"
 milling_cuts = [
   { name = "front face", kind = "end", phase = "finish", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", axial_doc_mm = "{{process.front_step_max_mm}}", radial_woc_mm = "{{process.face_stepover_max_mm}}", traverse_mm = ["{{process.left_end_skim_mm}}", "{{process.right_end_station_mm}}"] },
 ]
-
-[[setups.operations]]
-speed_kind = "other"
-tool = "files"
-drilling = "none"
-sizing = "other"
-instruction = "Unclamped: file the burr off F's two long edges and both ends with the smooth file, stroking along each edge, never across a face; wipe it clean. A burr left on F lifts it off the stacks in Setups 5 and 6."
-feed = "hand"
 
 [[setups]]
 machine_kind = "other"
@@ -507,14 +491,6 @@ milling_cuts = [
 
 [[setups.operations]]
 instruction = "Over {{cad.rear_face_depth_max_in:.3dot}}: wipe F and the stacks clean (a chip under it is the usual cause), then repeat this setup from its first op with the new middle reading (it sets Z0 again) and run PG04_depth again; it faces only what stands above Z {{process.depth_target_mm:in.4dot}}. Under {{cad.rear_face_depth_min_in:.3dot}}: the rail is scrap."
-feed = "hand"
-
-[[setups.operations]]
-speed_kind = "other"
-tool = "files"
-drilling = "none"
-sizing = "other"
-instruction = "Depth within its band: file the burr off R's two long edges and both ends with the smooth file, stroking along each edge, never across a face; wipe it clean. A burr at R's edge stands past U, which goes against the fixed jaw in Setup 6."
 feed = "hand"
 
 [[setups]]
@@ -667,7 +643,7 @@ speed_kind = "other"
 tool = "deburring-set"
 drilling = "none"
 sizing = "other"
-instruction = "Before clamping: scrape the tap burrs on F and R flush with a scraper from the deburring set, and file the burr off both milled ends' edges, stroking along each edge; wipe the rail clean. Setup 7 grips F and R and seats U: a burr there tilts it."
+instruction = "Before clamping: scrape the tap burrs on F and R flush with a scraper from the deburring set; wipe the rail clean."
 feed = "hand"
 
 [[setups.operations]]

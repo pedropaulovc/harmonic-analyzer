@@ -89,7 +89,6 @@ standing = true
 title = "This job"
 rows = [
   ["Finished", "{{cad.right_end_length_min_in:.2f}}–{{cad.right_end_length_max_in:.2f}} long (left end to right end), {{cad.top_face_height_min_in:.3dot}}–{{cad.top_face_height_max_in:.3dot}} high (underside to top), {{cad.rear_face_depth_min_in:.3dot}}–{{cad.rear_face_depth_max_in:.3dot}} deep (front face to rear face)."],
-  ["Not made here", "The five platen taps (from MHA-PD-02) and the four rack-screw holes (from MHA-PD-26) are made at MHA-PD-00, not here."],
 ]
 
 [cad]

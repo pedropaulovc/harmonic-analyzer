@@ -445,16 +445,6 @@ milling_cuts = [
 instruction = "Over {{cad.bottom_face_height_max_in:.3dot}}: wipe the bottom edge and the parallels clean (a chip under the bar is the usual cause), repeat this setup from its second op with the new middle reading and run SB02_top again. Under {{cad.bottom_face_height_min_in:.3dot}}, or marking fluid left on T: stop and tell the owner."
 feed = "hand"
 
-[[setups.operations]]
-speed_kind = "other"
-tool = "files"
-drilling = "none"
-sizing = "other"
-instruction = "File the milling burr off T's two long edges (T to F and T to the back face), a light stroke of the smooth file along each: T seats against the fixed jaw in Setups 3 to 5."
-feed = "hand"
-inspection = "No burr stands proud along T's edges (a fingernail drawn across). Proud: file it again."
-gauge_checks = "other"
-
 [[setups]]
 machine_kind = "other"
 title = "END A; clamp holes 1 and 2; the pivot hole"
