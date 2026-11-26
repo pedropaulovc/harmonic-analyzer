@@ -23,7 +23,7 @@ skims the sawn back face, MS02 faces the mating face to the depth; MS03 skims
 the locating edge, MS04 faces the top to the height. Mating face up, gripped
 across the bar's as-bought 1-1/4 ends (the waste beyond both final ends):
 MS05_rebate mills the rebate with the 1/8 in end mill, MS05_relief plunge-mills
-its corner relief with the 1/16 in long-reach end mill, both stopping short of the bar's ends, so the
+its corner relief with the 1/16 in end mill, both stopping short of the bar's ends, so the
 roof is never squeezed by the jaws. Upright, gripped on the mating and back
 faces: MS06 faces the locating end and chamfers its roof corner, MS07 the
 far end to the length. Lying as for MS04 again, the locating edge down and
@@ -492,6 +492,15 @@ def context(
         raise ValueError(
             f"the relief cutter Ø{e16} is outside the relief height band {relief_height}"
         )
+    # Its flutes run from the tip to its 1/8 in shank, wider than the relief
+    # and the roof's gap beside it: they reach past the relief's bottom, so
+    # the shank stays above the mating face.
+    e16_flutes = _shop_tool(plan, shop, "em-sixteenth")["flute_length_mm"]
+    if e16_flutes < p["relief_bottom_mm"]:
+        raise ValueError(
+            f"the relief cutter's {e16_flutes} mm of flutes stop short of the "
+            f"relief's bottom {p['relief_bottom_mm']} mm below the mating face"
+        )
     if e8 >= slot_height:
         raise ValueError("the rebate cutter is not under the rebate height")
     woc = p["face_stepover_max_mm"]
@@ -565,7 +574,12 @@ def context(
     )
     x_ceiling_pass = x_ceiling + e8_r
     x_floor_pass = x_floor - e8_r
-    x_relief = x_ceiling + e16_r
+    # The plunges' X is posted on the 0.001 grid toward the roof (−X), so the
+    # cutter's edge reaches the ceiling rather than stopping short of it:
+    # rounded the other way, a skin under a thousandth joins the ridges along
+    # the whole relief (the 1/16 in cutter's ceiling + radius lands .0003
+    # under a grid step).
+    x_relief = math.floor(round((x_ceiling + e16_r) * 1000, 6)) / 1000
     rough, end = _slot(x_centre, slot_ys, rebate_levels, None)
     # Finish both walls full depth, each climbing (ball screws): the floor
     # wall running +Y, the ceiling wall -Y, from whichever end the rough
@@ -587,7 +601,7 @@ def context(
         ]
     rebate_lines = [f"G0 Z{CLEAR_MM:.3f}", *rough, *walls, f"G0 Z{CLEAR_MM:.3f}"]
     # The relief is plunge-milled (owner ruling 2026-11-21, relayed by
-    # CncBlockA): the 1/16 in long-reach end mill plunges straight down past
+    # CncBlockA): the 1/16 in end mill plunges straight down past
     # the rebate's back at stations no more than half its diameter apart, its
     # load along its axis. Between two plunges a ridge stands on each side:
     # its height (the scallop) is the cutter radius less the half-chord, and

@@ -5,9 +5,11 @@
 # bar's 1-1/4 width becomes the .84 length X, its 3/4 thickness the .56
 # height Y, the sawn slice the (.48) depth Z, so the least brass is milled.
 # Six faces squared with the 1/2 in carbide end mill, the rebate milled with
-# the 1/8 in end mill and its corner relief PLUNGE-milled with a 1/16 in
-# long-reach stub-flute end mill (Harvey Tool 34662, to buy; owner ruling 2026-11-21:
-# plunging keeps Harvey's chip load and loads the long tool along its axis),
+# the 1/8 in end mill and its corner relief PLUNGE-milled with a plain 1/16 in
+# end mill with 1/2 in of flutes (MSC 35497056, to buy; owner ruling 2026-11-21:
+# plunging keeps the table's chip load and loads the long tool along its axis;
+# the owner chose the plain cutters, #3568; the cutter: delegated ruling
+# 2026-11-24 (Main), no precedent; owner review #2144),
 # the roof corners chamfered with the 90° chamfer mill, the
 # #4-40 thumb hole drilled #43 and hand-tapped under the tap guide. The two
 # #2-56 plate holes are pair-piloted #49 from MHA-MS-03 by that part's
@@ -53,14 +55,14 @@
 # MS10_plate_tap_1, MS11_plate_tap_2. Program names, the [parameters] and the milling_cuts names
 # are a contract with that recipe. Tool numbers are the places in the tools
 # list among the mill's tools: T1 1/2 in end mill, T2 1/8 in end mill, T3
-# 1/16 in long-reach end mill, T4 chamfer mill, T5 centre drill, T6 #43, T7
+# 1/16 in end mill, T4 chamfer mill, T5 centre drill, T6 #43, T7
 # the tap guide (the taps are turned by hand).
 title = "Stop block"
 part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
 material = "C36000 free-machining brass, 3/4 × 1-1/4 in flat (drawing: {{cad.material_spec}})"
 stock = "{{process.blank_y_in:fraction}} × {{process.blank_x_in:fraction}} in flat bar; {{process.quantity:d}} slice {{process.blank_z_min_mm:in.2dot}}–{{process.blank_z_max_mm:in.2dot}} in thick sawn off its end."
-note = "Inches unless mm; G-code and console entries in mm (the files and the controller run G21). Finished {{cad.far_end_length_min_in:.3dot}}–{{cad.far_end_length_max_in:.3dot}} long (locating end to far end), {{cad.top_face_height_min_in:.3dot}}–{{cad.top_face_height_max_in:.3dot}} high (locating edge to top face), ({{cad.envelope_z_in:.2dot}}) deep (mating face to back face). Every cutting speed is 2800 rpm (the edge finder runs at 900), all on the PM-30MV low belt (100–2800 rpm): no belt change. Home the mill ($H) once, after switching it on: every M6's trip to the tool setter and the tap files' G53 retract count from home. Home again only after a power cycle or a controller restart, an E-stop, an alarm, a limit switch hit, a stall or a crash: homing brings the stored G54 back. Then check every zero of the setup again, each the way its step set it: each must read what its step set, within .001 in. One does not, cannot be reached with the part in, or the part may have moved: take the setup again from its first step, the part out. They all do: run the interrupted file again from its start. Feed Hold, then Reset with the axes stopped keeps position and G54: no homing, no new zero; run the interrupted file again from its start: its first M6 measures the tool, and cuts already made are cut in air. Every cutting file is proved in air first. At every M6 stop the file has stopped the spindle and lifted the tool clear; press Cycle Start only with hands clear. The 1/16 in long-reach end mill (Harvey Tool 34662) is TO BUY: not owned; Setup 6 stops at its relief until it is in hand. The plate holes are pair-piloted by MHA-MS-03's traveler; keep this block with its plate from then on. Finish: brass black, the last setup, once the solution is bought."
+note = "Inches unless mm; G-code and console entries in mm (the files and the controller run G21). Finished {{cad.far_end_length_min_in:.3dot}}–{{cad.far_end_length_max_in:.3dot}} long (locating end to far end), {{cad.top_face_height_min_in:.3dot}}–{{cad.top_face_height_max_in:.3dot}} high (locating edge to top face), ({{cad.envelope_z_in:.2dot}}) deep (mating face to back face). Every cutting speed is 2800 rpm (the edge finder runs at 900), all on the PM-30MV low belt (100–2800 rpm): no belt change. Home the mill ($H) once, after switching it on: every M6's trip to the tool setter and the tap files' G53 retract count from home. Home again only after a power cycle or a controller restart, an E-stop, an alarm, a limit switch hit, a stall or a crash: homing brings the stored G54 back. Then check every zero of the setup again, each the way its step set it: each must read what its step set, within .001 in. One does not, cannot be reached with the part in, or the part may have moved: take the setup again from its first step, the part out. They all do: run the interrupted file again from its start. Feed Hold, then Reset with the axes stopped keeps position and G54: no homing, no new zero; run the interrupted file again from its start: its first M6 measures the tool, and cuts already made are cut in air. Every cutting file is proved in air first. At every M6 stop the file has stopped the spindle and lifted the tool clear; press Cycle Start only with hands clear. The 1/16 in end mill with 1/2 in of flutes (MSC 35497056) is TO BUY: not owned; Setup 6 stops at its relief until it is in hand. The plate holes are pair-piloted by MHA-MS-03's traveler; keep this block with its plate from then on. Finish: brass black, the last setup, once the solution is bought."
 shop = "../shop"
 stock_refs = ["c360-flat-3-4x1-1-4"]
 material_key = "stop-c360"
@@ -122,13 +124,13 @@ face_stepover_max_mm = 6.35
 # slotting), then finishes each wall full depth, each taking rebate_wall_mm.
 # Both stop rebate_tab_mm short of the bar's ends, in the waste MS06 and MS07
 # face off.
-# The relief is plunge-milled: the 1/16 in long-reach end mill plunges
+# The relief is plunge-milled: the 1/16 in end mill plunges
 # straight down from the rebate's back to relief_bottom_mm at 36 stations
 # relief_plunge_step_mm (.0287) apart. Between two plunges a ridge stands on
 # each side of the relief, the cutter's radius less the half-chord:
-# relief_scallop_mm (.0035) for the .0620 cutter. The relief's clear height
-# between the ridges is √(D² − s²) for a cutter D at the step s, .0550 for
-# the .0620 cutter, inside the printed .05–.07. The least cutter that keeps
+# relief_scallop_mm (.0035) for the .0625 cutter. The relief's clear height
+# between the ridges is √(D² − s²) for a cutter D at the step s, .0555 for
+# the .0625 cutter, inside the printed .05–.07. The least cutter that keeps
 # it there is relief_cutter_min_mm = hypot(.050, s) = .0577, and the step is
 # held to half of that (s ≤ .050/√3), so any cutter the traveler accepts
 # plunges no more than half itself apart. The relief's depth is the plunges'
@@ -142,7 +144,7 @@ rebate_centre_x_mm = 4.0513
 rebate_wall_mm = 0.1778
 rebate_step_mm = 0.508
 relief_plunge_step_mm = 0.7293
-relief_scallop_mm = 0.0895
+relief_scallop_mm = 0.0887
 relief_cutter_min_mm = 1.4645
 relief_cutter_max_mm = 1.778
 # The ceiling's Ra in microinches, the inch drawing's unit (cam.py checks it
@@ -150,7 +152,7 @@ relief_cutter_max_mm = 1.778
 ceiling_ra_uin = 63
 rebate_tab_mm = 1.524
 slot_cutter_dia_mm = 3.175
-relief_cutter_dia_mm = 1.5748
+relief_cutter_dia_mm = 1.5875
 # Setup 6's test plunges gauge each 3-flute cutter by its cut (three flutes
 # cannot be miked across): the 1/8 in cut's band is the rebate band less the
 # two wall passes; the 1/16 in cut's is the relief cutter band. Read with the
@@ -238,8 +240,8 @@ vise_length_inset_mm = -68.6689
 r8_collet_gauge_mm = 6.3         # HA: holders.r8-collets-lms-4860.gauge_len_mm.
 drill_chuck_gauge_mm = 95.0      # Archive holders.drill-chuck-r8.gauge_len_mm.
 # Each end mill set out of its collet at least this far: the 1/2 in 1.00 in;
-# the 1/8 in and the 1/16 in long-reach .60 in (their cuts reach .38 below
-# the mating face; the 1/16's shank starts .50 up); the chamfer mill .50 in.
+# the 1/8 in and the 1/16 in .60 in (their cuts reach .385 below the mating
+# face; the 1/16's flutes run .50 up to its shank); the chamfer mill .50 in.
 half_mill_projection_min_mm = 25.4
 small_mill_projection_min_mm = 15.24
 chamfer_projection_min_mm = 12.7
@@ -273,8 +275,8 @@ name = "1/8 in carbide end mill"
 ref = "endmill-carbide-3fl-1-8"
 [[tools]]
 id = "em-sixteenth"
-name = "1/16 in long-reach carbide end mill, to buy"
-ref = "endmill-carbide-3fl-1-16-reach-1-2"
+name = "1/16 in carbide end mill, 1/2 in of flutes, to buy"
+ref = "endmill-carbide-3fl-1-16-loc-1-2"
 [[tools]]
 id = "chamfer"
 name = "1/4 in 90° chamfer mill"
@@ -570,7 +572,7 @@ instruction = "Rebate shallow (under {{cad.rebate_back_rebate_width_min_in:.3dot
 feed = "hand"
 
 [[setups.operations]]
-instruction = "The relief is file MS05_relief, cut by the 1/16 in long-reach stub-flute end mill (Harvey Tool 34662), TO BUY: not owned. Without it, stop here: unclamp, tag the block RELIEF TO CUT. With it in hand later, clamp and zero the block again as this setup (X0, Y0; Z0 on the mating face with the 1/8 in end mill) and go on."
+instruction = "The relief is file MS05_relief, cut by the 1/16 in end mill with 1/2 in of flutes (MSC 35497056), TO BUY: not owned. Without it, stop here: unclamp, tag the block RELIEF TO CUT. With it in hand later, clamp and zero the block again as this setup (X0, Y0; Z0 on the mating face with the 1/8 in end mill) and go on."
 feed = "hand"
 
 [[setups.operations]]
@@ -608,7 +610,7 @@ settings = "stop-em-sixteenth-c360"
 milling_cuts = [
   { name = "relief", kind = "plunge", phase = "finish", cutter_dia_mm = "{{process.relief_cutter_dia_mm}}", stations_mm = "{{process.rebate_centre_x_mm}}" },
 ]
-diagram = { file = "diagrams/relief.svg", alt = "The same clamping: the 1/16 in long-reach end mill, to scale, plunged to the relief's bottom beside the roof, past the rebate's back; its 1/8 shank starts .50 above its tip, clear of the mating face; it steps along the rebate end to end." }
+diagram = { file = "diagrams/relief.svg", alt = "The same clamping: the 1/16 in end mill, to scale, plunged to the relief's bottom beside the roof, past the rebate's back; its 1/8 shank starts .50 above its tip, clear of the mating face; it steps along the rebate end to end." }
 
 [[setups.operations]]
 instruction = "Look along the rebate: the relief runs end to end beside the roof, its walls lightly ridged. Its depth ({{cad.relief_back_relief_depth_min_in:.3dot}}–{{cad.relief_back_relief_depth_max_in:.3dot}}) is the file's Z and its height the cutter's, held by its pin-gauged test cut above: neither is gauged here."

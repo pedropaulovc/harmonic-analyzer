@@ -157,7 +157,10 @@ def test_the_recipes_programs_pass_every_check_they_declare(ctx, tmp_path) -> No
         ("cbore_path_radius_mm", 0.4, "cbore_path_radius_mm"),
         ("cbore_depth_mm", 2.3, "cbore_depth_mm"),
         ("cbore_projection_min_mm", 25.0, "cbore_projection_min_mm"),
-        ("long_reach_mm", 25.4, "the end mill reaches"),
+        # The stick-out's ceiling: the end mill's length less the collet grip.
+        ("cbore_projection_max_mm", 50.0, "cbore_projection_max_mm"),
+        ("cbore_mill_oal_mm", 63.5, "cbore_projection_max_mm"),
+        ("holder_grip_min_mm", 6.35, "cbore_projection_max_mm"),
         ("foot_hole_station_from_i_mm", 12.5, "foot_hole_station_from_i_mm"),
         # The setting's centre feed on the helix: 6.0x the chip load at the edge.
         ("cbore_feed_per_min_mm", 213.36, "cbore_feed_per_min_mm"),
@@ -168,6 +171,16 @@ def test_a_plan_number_off_the_model_or_shop_is_refused(key, value, detail) -> N
     plan = copy.deepcopy(PLAN)
     plan["parameters"][key] = value
     with pytest.raises(ValueError, match=detail):
+        _context(plan)
+
+
+def test_an_end_mill_too_short_to_grip_at_the_stick_out_is_refused() -> None:
+    """The 1-1/2 in stock 1/8 in end mill, gripped 1/2 in, cannot stand the
+    counterbore's stick-out out of the collet."""
+    plan = copy.deepcopy(PLAN)
+    plan["parameters"]["cbore_mill_oal_mm"] = 38.1
+    plan["parameters"]["cbore_projection_max_mm"] = 38.1 - 12.7
+    with pytest.raises(ValueError, match="the counterbore needs"):
         _context(plan)
 
 
