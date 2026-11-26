@@ -293,7 +293,7 @@ make = "Vermont Gage"
 status = "to_order"
 source = "https://www.mscdirect.com/product/details/88931357"
 purchase = "MSC 88931357 (.3135 plus, $4.48): Vermont Gage Class ZZ steel plug gages, 2 in long, in stock."
-note = "MHA-DT-14; also MHA-PD-17 GO gauge (owner ruling 2026-11-26). GO: ZZ .3135 plus single. NO-GO: the .314 minus pin of the sets (gauges.pin-gauges). Each pin is miked before first use and its size written on its tag."
+note = "MHA-PD-17 hub bore GO gauge (owner ruling 2026-11-26: \"1: ZZ .3135 plus pin as GO (already on the buy list), set's .314 minus pin as NO-GO\"); no MHA-DT plan names it since the DT fit stack (main a808d8123c). GO: ZZ .3135 plus single. NO-GO: the .314 minus pin of the sets (gauges.pin-gauges). Each pin is miked before first use and its size written on its tag."
 
 # --- Bands the 2026-11-23 rulings re-cut (tool audit Q7, Q8, Q11, Q13, Q14) ---
 # Same policy as the zz-pins records above: a plus single is the GO; where the
