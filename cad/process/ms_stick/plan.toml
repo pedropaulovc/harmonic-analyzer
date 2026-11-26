@@ -265,7 +265,7 @@ name = "T1 1/2 in carbide end mill"
 ref = "endmill-carbide-3fl-1-2"
 [[tools]]
 id = "engraver"
-name = "T2 30° V engraving bit, 0.1 mm tip (ESAO, on hand)"
+name = "T2 30° V engraving bit, 0.1 mm tip, ESAO, on hand"
 ref = "engravers-esao-30-0-1"
 [[tools]]
 id = "tape"
