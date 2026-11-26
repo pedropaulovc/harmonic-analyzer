@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 780 500" width="780" height="500" font-family="sans-serif" font-size="13">
-  <!-- Hand picture, the section to scale at 4 px/mm (101.6 px/in), the plan at 1 px/mm, from the rail's sizes: 10.0330 mm across the jaws, 7.3660 mm above the stacks after the cut. 1/2 in end mill Ø12.7 mm (face_cutter_dia_mm, shop endmill-carbide-3fl-1-2), drawn 28.45 mm out (half_mill_projection_mm) to a break line, the collet not drawn; its square end drawn as the near half of its end face, an arc 12 % of its diameter deep whose lowest point is the true end. Drawn on PG15_height's pass Y-4.183 (-X) at Z7.366, the same place in both views: its last level (five, Z8.484 to 7.366); both its passes cross a jaw. Hatched: what the cut takes, from 8.7630 mm above the stacks. The section is seen from the RIGHT end, the fixed jaw on the right. The vise jaws' thickness is not on record: schematic. Jaw height 44.9453 mm (vise_jaw_height_mm), jaw width 158.6738 mm (vise_jaw_width_mm); the parallels 1/8 in thick (parallel_thickness_mm), 4 in long (fixtures.parallels-lms-6745), stacked 1 in + 1/2 in (riser_height_mm 38.1). Drawn true, a finding (#3607): at PG15's last level, Z7.366, the end mill's end stands 0.5207 mm (height_jaw_clear_mm) over both jaw tops (6.8453 mm over the stacks: 44.9453 - 38.1) and its pass Y-4.183 reaches Y2.167, 2.167 mm over the fixed jaw, and Y-10.533, .500 mm past the moving jaw's face; the other pass, Y1.083, stands 7.433 mm over the fixed jaw. Under the 1.0 mm the conventions allow. Not to be run until #3607 is fixed; the NC is not changed here. -->
+  <!-- Hand picture, the section to scale at 4 px/mm (101.6 px/in), the plan at 1 px/mm, from the rail's sizes: 10.0330 mm across the jaws, 7.3660 mm above the stacks after the cut. 1/2 in end mill Ø12.7 mm (face_cutter_dia_mm, shop endmill-carbide-3fl-1-2), drawn 28.45 mm out (half_mill_projection_mm) to a break line, the collet not drawn; its square end drawn as the near half of its end face, an arc 12 % of its diameter deep whose lowest point is the true end. Drawn on PG15_height's pass Y-4.183 (-X) at Z7.366, the same place in both views: its last level (five, Z8.484 to 7.366); both its passes cross a jaw. Hatched: what the cut takes, from 8.7630 mm above the stacks. The section is seen from the RIGHT end, the fixed jaw on the right. The vise jaws' thickness is not on record: schematic. Jaw height 44.9453 mm (vise_jaw_height_mm), jaw width 158.6738 mm (vise_jaw_width_mm); the parallels 1/8 in thick (parallel_thickness_mm), 4 in long (fixtures.parallels-lms-6745), stacked 1 in + 1/2 in (riser_height_mm 38.1). Drawn true (the plan owner's issue #3607, not printed): at PG15's last level, Z7.366, the end mill's end stands 0.5207 mm (height_jaw_clear_mm) over both jaw tops (6.8453 mm over the stacks: 44.9453 - 38.1) and its pass Y-4.183 reaches Y2.167, 2.167 mm over the fixed jaw, and Y-10.533, .500 mm past the moving jaw's face; the other pass, Y1.083, stands 7.433 mm over the fixed jaw. The NC is not changed here. The detail's end mill is a section at the pass: its end is flat (the 12 % arc is the side-view sign). -->
   <rect class="paper" x="0" y="0" width="780" height="500"/>
   <text class="title" x="20" y="24">PG15: U down, gripped on F and R, the top faced to the height (to scale, 4 px/mm)</text>
   <rect class="fixture-vise" x="169.87" y="470" width="220.13" height="14"/>
@@ -45,7 +45,7 @@
   <circle class="leader-dot" cx="293.65" cy="430" r="2"/>
   <rect class="part-kept" x="20" y="209.59" width="90" height="24"/>
   <rect class="clamp" x="110" y="220" width="60" height="18"/>
-  <rect class="cutter" x="20" y="149.59" width="133.34" height="60"/>
+  <path class="cutter" d="M153.34 209.59L153.34 149.59L149.42 152.59L145.5 149.59L141.57 152.59L137.65 149.59L133.73 152.59L129.81 149.59L125.89 152.59L121.97 149.59L118.04 152.59L114.12 149.59L110.2 152.59L106.28 149.59L102.36 152.59L98.44 149.59L94.51 152.59L90.59 149.59L86.67 152.59L82.75 149.59L78.83 152.59L74.9 149.59L70.98 152.59L67.06 149.59L63.14 152.59L59.22 149.59L55.3 152.59L51.37 149.59L47.45 152.59L43.53 149.59L39.61 152.59L35.69 149.59L31.77 152.59L27.84 149.59L23.92 152.59L20 149.59L23 153.34L20 157.09L23 160.84L20 164.59L23 168.34L20 172.09L23 175.84L20 179.59L23 183.34L20 187.09L23 190.84L20 194.59L23 198.34L20 202.09L23 205.84L20 209.59Z"/>
   <line class="dims" x1="159.34" y1="209.59" x2="193.34" y2="209.59"/>
   <line class="dims" x1="159.34" y1="220" x2="193.34" y2="220"/>
   <line class="dims" x1="183.34" y1="195.59" x2="183.34" y2="234"/>
@@ -53,10 +53,8 @@
   <line class="dims" x1="110" y1="250" x2="153.34" y2="250"/>
   <text class="label" x="131.67" y="266" text-anchor="middle">2.167 mm</text>
   <text class="label-on-clamp" x="140" y="234" text-anchor="middle">fixed jaw</text>
-  <text class="label" x="20" y="141.59">Detail at the fixed jaw's top, 20 px/mm</text>
-  <text class="label" x="20" y="62">FINDING (#3607): drawn true, the end mill's end</text>
-  <text class="label" x="20" y="78">passes {{process.height_jaw_clear_mm:in.4dot}} over both jaw tops, under</text>
-  <text class="label" x="20" y="94">the 1.0 mm allowed, 2.167 mm over the fixed jaw</text>
-  <text class="label" x="20" y="110">and 0.500 mm past the moving jaw's face.</text>
-  <text class="label" x="20" y="126">Not to be run until #3607 is fixed.</text>
+  <text class="label" x="20" y="141.59">Detail at the fixed jaw's top, 20 px/mm: the end mill's flat end</text>
+  <text class="label" x="20" y="62">Drawn true: on this pass the end mill's end passes</text>
+  <text class="label" x="20" y="78">{{process.height_jaw_clear_mm:in.4dot}} over both jaw tops, 2.167 mm over the</text>
+  <text class="label" x="20" y="94">fixed jaw and 0.500 mm past the moving jaw's face.</text>
 </svg>

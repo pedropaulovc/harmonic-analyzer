@@ -16,11 +16,11 @@
   <path class="cutter" d="M291.47 331.98L291.47 207.47L280.09 207.47L280.09 331.98A5.69 1.37 0 0 0 291.47 331.98Z"/>
   <rect class="cutter" x="205.78" y="195.47" width="160" height="12"/>
   <rect class="cutter" x="275.78" y="185.47" width="20" height="22"/>
-  <path class="cutter" d="M285.78 185.47L276.25 168.96L276.25 145.47L295.3 145.47L295.3 168.96Z"/>
-  <path class="cutter" d="M260.38 145.47L260.38 60L264.61 57L268.84 60L273.08 57L277.31 60L281.54 57L285.78 60L290.01 57L294.24 60L298.48 57L302.71 60L306.94 57L311.18 60L311.18 145.47Z"/>
+  <path class="cutter" d="M285.78 185.47L276.25 168.96L276.25 139.37L295.3 139.37L295.3 168.96Z"/>
+  <path class="cutter" d="M311.18 139.37L311.18 60L306.94 63L302.71 60L298.48 63L294.24 60L290.01 63L285.78 60L281.54 63L277.31 60L273.08 63L268.84 60L264.61 63L260.38 60L260.38 139.37A25.4 6.1 0 0 0 311.18 139.37Z"/>
   <line class="centre-line" x1="285.78" y1="50" x2="285.78" y2="345.35"/>
   <line class="datum" x1="138.95" y1="317.6" x2="170.95" y2="317.6"/>
-  <text class="datum-label" x="134.95" y="322.6" text-anchor="end">Z0 the stacks'</text>
+  <text class="datum-label" x="134.95" y="322.6" text-anchor="end">Z0 the stack's</text>
   <text class="datum-label" x="134.95" y="338.6" text-anchor="end">top (F)</text>
   <text class="label" x="440" y="80">tap guide in the 1/2 in collet, spindle off;</text>
   <text class="label" x="440" y="96">its spring point in the wrench's centre hole</text>

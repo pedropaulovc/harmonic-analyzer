@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 780 500" width="780" height="500" font-family="sans-serif" font-size="13">
-  <!-- Hand picture, to scale at 4 px/mm from the rail's sizes (the depth F to R 10.033 mm, 8.7630 mm across the jaws). #43 drill Ø2.2606 mm (milling_cuts cutter_dia_mm, shop jig-drill-43), 118° point, at the first hole's Y-3.556 (PG05_ends_drill), its full diameter drill_past_mm 1.0 past F, its point at drill_tip_height_mm -1.679 (Z0 the stacks' top, F); drawn short to a break line, the chuck not drawn (no size on record). The #2 centre drill's spot before it is not drawn (the drill stands for it). Section seen from the RIGHT end, the fixed jaw on the right. The vise jaws' thickness is not on record: schematic. Jaw height 44.9453 mm (vise_jaw_height_mm), jaw width 158.6738 mm (vise_jaw_width_mm); the parallels 1/8 in thick (parallel_thickness_mm), 4 in long (fixtures.parallels-lms-6745), stacked 1 in + 1/2 in (riser_height_mm 38.1). -->
+  <!-- Hand picture, to scale at 4 px/mm from the rail's sizes (the depth F to R 10.033 mm, 8.7630 mm across the jaws). #43 drill Ø2.2606 mm (milling_cuts cutter_dia_mm, shop jig-drill-43), 118° point, at the first hole's Y-3.556 (PG05_ends_drill), its full diameter drill_past_mm 1.0 past F, its point at drill_tip_height_mm -1.679 (Z0 the top of the stack, F); drawn short to a break line, the chuck not drawn (no size on record). The #2 centre drill's spot before it is not drawn (the drill stands for it). Section seen from the RIGHT end, the fixed jaw on the right. The vise jaws' thickness is not on record: schematic. Jaw height 44.9453 mm (vise_jaw_height_mm), jaw width 158.6738 mm (vise_jaw_width_mm); the parallels 1/8 in thick (parallel_thickness_mm), 4 in long (fixtures.parallels-lms-6745), stacked 1 in + 1/2 in (riser_height_mm 38.1). -->
   <rect class="paper" x="0" y="0" width="780" height="500"/>
   <text class="title" x="20" y="24">PG05_ends_drill: the #43 drill through a hole, across the jaws (to scale, 4 px/mm)</text>
   <rect class="fixture-vise" x="174.95" y="470" width="215.05" height="14"/>
@@ -17,7 +17,7 @@
   <line class="centre-line" x1="285.78" y1="145.47" x2="285.78" y2="410"/>
   <line class="arrow" x1="269.78" y1="167.47" x2="269.78" y2="207.47"/>
   <line class="datum" x1="138.95" y1="317.6" x2="170.95" y2="317.6"/>
-  <text class="datum-label" x="134.95" y="322.6" text-anchor="end">Z0 the stacks'</text>
+  <text class="datum-label" x="134.95" y="322.6" text-anchor="end">Z0 the stack's</text>
   <text class="datum-label" x="134.95" y="338.6" text-anchor="end">top (F)</text>
   <text class="label" x="440" y="120">#43 drill (Ø.089), pecked {{process.peck_mm:in.3dot}},</text>
   <text class="label" x="440" y="136">its full diameter {{process.drill_past_mm:in.3dot}} past F</text>

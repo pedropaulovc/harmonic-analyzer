@@ -36,6 +36,14 @@
   <circle class="cutter" cx="457.72" cy="245.69" r="12.5"/>
   <line class="arrow" x1="473.72" y1="245.69" x2="527.72" y2="245.69"/>
   <text class="label-halo" x="475.72" y="275.69">1/2 in end mill, PL04's pass Y-63.849, +X</text>
+  <rect class="clamp" x="-53.5" y="190.54" width="137.5" height="26"/>
+  <rect class="clamp" x="826.5" y="190.54" width="137.5" height="26"/>
+  <rect class="clamp" x="-53.5" y="288.96" width="137.5" height="26"/>
+  <rect class="clamp" x="826.5" y="288.96" width="137.5" height="26"/>
+  <text class="label" x="640" y="84">step clamps on studs, as Setup 2</text>
+  <text class="label" x="640" y="100">(schematic; the bar's ends run off the page)</text>
+  <line class="leader" x1="700" y1="104" x2="865.5" y2="190.54"/>
+  <circle class="leader-dot" cx="865.5" cy="190.54" r="2"/>
   <line class="datum" x1="190" y1="80" x2="190" y2="397.5"/>
   <text class="datum-label" x="194" y="90">X0, the left edge</text>
   <line class="datum" x1="-2.5" y1="120" x2="733" y2="120"/>
@@ -52,6 +60,8 @@
   <text class="title" x="20" y="460">Section across the bar at X136, seen from the left end (1 in = 50 px): back on the left</text>
   <line class="fixture-table" x1="150" y1="720" x2="600" y2="720"/>
   <rect class="fixture-support" x="275" y="670" width="150" height="50"/>
+  <rect class="fixture-support" x="440" y="670" width="20" height="50"/>
+  <rect class="fixture-support" x="240" y="670" width="20" height="50"/>
   <rect class="fixture-plate" x="200" y="645" width="300" height="25"/>
   <rect class="bond" x="200" y="641" width="300" height="4"/>
   <rect class="part-removed" x="200" y="631.88" width="300" height="9.13"/>
@@ -69,6 +79,9 @@
   <line class="leader" x1="576" y1="644" x2="492.84" y2="662.13"/>
   <circle class="leader-dot" cx="492.84" cy="662.13" r="2"/>
   <text class="label" x="580" y="648">fixture bar on its 1-2-3 blocks</text>
+  <line class="leader" x1="576" y1="688" x2="460" y2="704.25"/>
+  <circle class="leader-dot" cx="460" cy="704.25" r="2"/>
+  <text class="label" x="580" y="692">screw jack, near each long edge (schematic)</text>
   <line class="leader" x1="180" y1="506" x2="330.44" y2="609.4"/>
   <circle class="leader-dot" cx="330.44" cy="609.4" r="2"/>
   <text class="label" x="20" y="510">1/2 in end mill at</text>

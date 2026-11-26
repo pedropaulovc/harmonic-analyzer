@@ -6,7 +6,7 @@
   <path class="part-kept" d="M40.0 110.0 Q358.6176 94.0 677.2352 110.0 L677.2352 74.44 Q358.6176 58.44 40.0 74.44Z"/>
   <text class="label-halo" x="358.62" y="92.22" text-anchor="middle">F</text>
   <text class="label" x="198.62" y="56.44">T up (the edge it rocked on, bowed outward)</text>
-  <rect class="fixture-support" x="355.62" y="108" width="30" height="2"/>
+  <path class="leader" d="M355.6176 108.0 h30 v2 h-30 Z"/>
   <text class="label" x="418.62" y="144">the {{process.bow_max_mm:in.3dot}} feeler leaf must not enter under the middle;</text>
   <text class="label" x="418.62" y="160">enters: stop and tell the owner</text>
   <line class="leader" x1="414.62" y1="140" x2="368.62" y2="109"/>

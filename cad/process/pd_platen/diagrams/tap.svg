@@ -12,8 +12,8 @@
   <path class="cutter" d="M308.6 484.94L308.6 345.6L291.4 345.6L291.4 484.94A8.6 2.06 0 0 0 308.6 484.94Z"/>
   <rect class="cutter" x="190" y="329.6" width="220" height="16"/>
   <rect class="cutter" x="286" y="305.6" width="28" height="40"/>
-  <path class="cutter" d="M300 305.6L281.25 273.1L281.25 245.6L318.75 245.6L318.75 273.1Z"/>
-  <path class="cutter" d="M250 245.6L250 50L254.17 47L258.33 50L262.5 47L266.67 50L270.83 47L275 50L279.17 47L283.33 50L287.5 47L291.67 50L295.83 47L300 50L304.17 47L308.33 50L312.5 47L316.67 50L320.83 47L325 50L329.17 47L333.33 50L337.5 47L341.67 50L345.83 47L350 50L350 245.6Z"/>
+  <path class="cutter" d="M300 305.6L281.25 273.1L281.25 233.6L318.75 233.6L318.75 273.1Z"/>
+  <path class="cutter" d="M350 233.6L350 50L345.83 53L341.67 50L337.5 53L333.33 50L329.17 53L325 50L320.83 53L316.67 50L312.5 53L308.33 50L304.17 53L300 50L295.83 53L291.67 50L287.5 53L283.33 50L279.17 53L275 50L270.83 53L266.67 50L262.5 53L258.33 50L254.17 53L250 50L250 233.6A50 12 0 0 0 350 233.6Z"/>
   <line class="centre-line" x1="300" y1="40" x2="300" y2="530"/>
   <text class="label" x="440" y="80">tap guide in the 1/2 in collet, spindle off;</text>
   <text class="label" x="440" y="96">its spring point in the wrench's centre hole</text>

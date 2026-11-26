@@ -34,6 +34,7 @@
   <text class="label" x="224" y="376">scribed line {{process.blank_left_mm:in.2f}} from the left end</text>
   <line class="dims" x1="814" y1="93.8" x2="814" y2="320"/>
   <line class="dims" x1="806" y1="320" x2="822" y2="320"/>
+  <line class="dims" x1="806" y1="93.8" x2="822" y2="93.8"/>
   <text class="label" x="826" y="206.9">Y0 {{process.y0_from_bar_front_mm:in.3f}}</text>
   <text class="label" x="826" y="222.9">behind the</text>
   <text class="label" x="826" y="238.9">front edge</text>

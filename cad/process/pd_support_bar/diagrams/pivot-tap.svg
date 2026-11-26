@@ -23,8 +23,8 @@
   <path class="cutter" d="M310.33 338.46L310.33 209.5L293.67 209.5L293.67 338.46A8.33 2 0 0 0 310.33 338.46Z"/>
   <rect class="cutter" x="222" y="197.5" width="160" height="12"/>
   <rect class="cutter" x="292" y="187.5" width="20" height="22"/>
-  <path class="cutter" d="M302 187.5L292.48 170.99L292.48 147.5L311.52 147.5L311.52 170.99Z"/>
-  <path class="cutter" d="M276.6 147.5L276.6 50L280.83 47L285.07 50L289.3 47L293.53 50L297.77 47L302 50L306.23 47L310.47 50L314.7 47L318.93 50L323.17 47L327.4 50L327.4 147.5Z"/>
+  <path class="cutter" d="M302 187.5L292.48 170.99L292.48 141.4L311.52 141.4L311.52 170.99Z"/>
+  <path class="cutter" d="M327.4 141.4L327.4 50L323.17 53L318.93 50L314.7 53L310.47 50L306.23 53L302 50L297.77 53L293.53 50L289.3 53L285.07 50L280.83 53L276.6 50L276.6 141.4A25.4 6.1 0 0 0 327.4 141.4Z"/>
   <line class="centre-line" x1="302" y1="40" x2="302" y2="352.46"/>
   <text class="label" x="480" y="60">tap guide in the 1/2 in collet,</text>
   <text class="label" x="480" y="76">spindle off; its spring point in</text>

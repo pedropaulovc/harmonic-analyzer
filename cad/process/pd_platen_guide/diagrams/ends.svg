@@ -13,7 +13,7 @@
   <line class="datum" x1="240" y1="237.47" x2="240" y2="347.6"/>
   <text class="datum-label" x="244" y="361.6">X0, the LEFT end as milled</text>
   <line class="datum" x1="144" y1="317.6" x2="184" y2="317.6"/>
-  <text class="datum-label" x="136" y="322.6" text-anchor="end">Z0 the stacks' top (F)</text>
+  <text class="datum-label" x="136" y="322.6" text-anchor="end">Z0 the stack's top (F)</text>
   <text class="label" x="330" y="70">1/2 in end mill, its side on X0: PG05_ends_drill's last pass</text>
   <text class="label" x="330" y="86">on the left end, X-6.350, across the rail +Y (into</text>
   <text class="label" x="330" y="102">the page), its end {{process.end_past_mm:in.3dot}} under F; steps of</text>

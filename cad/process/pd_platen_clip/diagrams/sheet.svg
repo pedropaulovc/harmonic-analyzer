@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1180 658" font-family="sans-serif" font-size="14">
-  <!-- Hand picture. The plan to scale at 4 px/mm (main's drawing: the spoil plate 152.4 x 127 mm, plate_length_mm and plate_width_mm, the blanks 91.44 x 50.8 mm and the part outlines from the feature bundle). PC01_sheet's first cut drawn: the 1/32 in downcut end mill Ø0.7874 mm (sheet_cutter_dia_mm) at its first plunge, X11.606 Y-10.795 (posted NC), in clip 1's left hole (centre X11.252), which it then opens by two clockwise circles; the detail at 20 px/mm. The section across the jaws at 2 px/mm, seen from the plate's right end, the fixed jaw on the right: the 1 in parallels (parallel_height_mm 25.4, 1/8 in thick, parallel_thickness 3.175), the 1/2 in plate (plate_thickness_mm 12.7), the jaw tops 6.845 mm above it (jaw_top_over_plate_mm); the tape stack .23-.33 mm and the .81 mm blanks are under 1 px apart at this scale, drawn as one line and named. The vise jaws' thickness is not on record: schematic. -->
+  <!-- Hand picture. The plan to scale at 4 px/mm (main's drawing: the spoil plate 152.4 x 127 mm, plate_length_mm and plate_width_mm, the blanks 91.44 x 50.8 mm and the part outlines from the feature bundle). PC01_sheet's first cut drawn: the 1/32 in downcut end mill Ø0.7874 mm (sheet_cutter_dia_mm) at its first plunge, X11.606 Y-10.795 (posted NC), in clip 1's left hole (centre X11.252), which it then opens by two clockwise circles; the detail at 20 px/mm. The section across the jaws at 2 px/mm, seen from the plate's right end, the fixed jaw on the right: the 1 in parallels (parallel_height_mm 25.4, 1/8 in thick, parallel_thickness 3.175), the 1/2 in plate (plate_thickness_mm 12.7), the jaw tops 6.845 mm above it (jaw_top_over_plate_mm); the tape stack .23-.33 mm and the .81 mm blanks are under 1 px apart at this scale, drawn as one line and named. The vise jaws' thickness is not on record: schematic. In the section the same end mill at the same plunge, Y-10.795, its end at the first level, Z0.870 (posted NC; Z0 the plate's top): its Ø0.7874 cutting end and its 1/8 in (3.175 mm) shank; the flute length is not on record, drawn 3 mm (schematic), and the shank broken off. -->
   <rect class="paper" x="0" y="0" width="1180" height="658"/>
   <text class="title" x="20" y="24">Setup 2: spoil plate in the vise, blanks A and B taped on, PC01_sheet (plan to scale, 4 px/mm; section 2 px/mm)</text>
   <rect class="clamp" x="50" y="30" width="630" height="40"/>
@@ -73,16 +73,25 @@
   <rect class="fixture-support" x="1103.65" y="549.2" width="6.35" height="50.8"/>
   <rect class="fixture-plate" x="856" y="523.8" width="254" height="25.4"/>
   <rect class="part-kept" x="906.55" y="521.8" width="203.45" height="2"/>
+  <path class="cutter" d="M1089.2 521.87L1089.2 516.06L1087.62 516.06L1087.62 521.87A0.79 0.19 0 0 0 1089.2 521.87Z"/>
+  <path class="cutter" d="M1091.59 515.3L1091.59 452.06L1090 455.06L1088.41 452.06L1086.82 455.06L1085.24 452.06L1085.24 515.3A3.17 0.76 0 0 0 1091.59 515.3Z"/>
+  <line class="arrow" x1="1076.41" y1="456.06" x2="1076.41" y2="482.06"/>
+  <text class="label" x="1112" y="372">1/32 in</text>
+  <text class="label" x="1112" y="388">end mill,</text>
+  <text class="label" x="1112" y="404">its first</text>
+  <text class="label" x="1112" y="420">plunge</text>
+  <line class="leader" x1="1110" y1="428" x2="1091.59" y2="476.06"/>
+  <circle class="leader-dot" cx="1091.59" cy="476.06" r="2"/>
   <text class="label-on-clamp" x="831" y="590" text-anchor="middle">moving</text>
   <text class="label-on-clamp" x="1135" y="590" text-anchor="middle">fixed</text>
-  <text class="label" x="1000" y="410">blanks A and B, .032,</text>
-  <text class="label" x="1000" y="426">on the tape stack</text>
-  <text class="label" x="1000" y="442">{{process.tape_stack_min_mm:in.3dot}}–{{process.tape_stack_max_mm:in.3dot}}: one line</text>
-  <line class="leader" x1="1040" y1="450" x2="1040" y2="521.8"/>
+  <text class="label" x="962" y="410">blanks A and B, .032,</text>
+  <text class="label" x="962" y="426">on the tape stack</text>
+  <text class="label" x="962" y="442">{{process.tape_stack_min_mm:in.3dot}}–{{process.tape_stack_max_mm:in.3dot}}: one line</text>
+  <line class="leader" x1="1000" y1="450" x2="1040" y2="521.8"/>
   <circle class="leader-dot" cx="1040" cy="521.8" r="2"/>
-  <text class="label" x="790" y="410">spoil plate 1/2 in, its</text>
-  <text class="label" x="790" y="426">back edge on the fixed</text>
-  <text class="label" x="790" y="442">jaw; jaw tops {{process.jaw_top_over_plate_mm:in.3dot}} above</text>
+  <text class="label" x="782" y="410">spoil plate 1/2 in, its</text>
+  <text class="label" x="782" y="426">back edge on the fixed</text>
+  <text class="label" x="782" y="442">jaw; jaw tops {{process.jaw_top_over_plate_mm:in.3dot}} above</text>
   <line class="leader" x1="880" y1="450" x2="896" y2="533.8"/>
   <circle class="leader-dot" cx="896" cy="533.8" r="2"/>
   <text class="label" x="880" y="640">1 in parallels, one at each jaw</text>
