@@ -904,6 +904,18 @@ def context(
     drill_tip = -(p["drill_past_mm"] + _point(tools["drill-49"]))
     _agree(plan, "drill_tip_mm", drill_tip)
     ream_tip = -p["ream_past_mm"]
+    # Its full diameter reaches the fork's far face: past by its chamfer +
+    # the margin.
+    import cam_nc
+
+    if p["ream_past_mm"] <= cam_nc.ream_full_diameter_past_min_mm(plan, "reamer-0775"):
+        raise ValueError(
+            "the reamer's full diameter does not reach the far face (cnc.ream-full-diameter)"
+        )
+    # The reamer's flat end runs out in the air past the plate's end.
+    cam_nc.ream_end_face_clear(
+        "reamer-0775", ream_tip, -p["drill_past_mm"], 0.0, -math.inf
+    )
     spot_rpm, spot_feed = _setting(plan, shop, "pin spot")
     drill_rpm, drill_feed = _setting(plan, shop, "pin drill")
     ream_rpm, ream_feed = _setting(plan, shop, "pin ream")

@@ -631,10 +631,25 @@ def context(
         raise ValueError(
             f"drill tip Z {drill_tip:.3f} / reamer tip Z {ream_tip:.3f}: the full diameter does not pass the strap's underside"
         )
+    import cam_nc
+
+    if -ream_tip <= cam_nc.ream_full_diameter_past_min_mm(plan, "hub-reamer"):
+        raise ValueError(
+            f"reamer tip Z {ream_tip:.3f}: its full diameter does not reach the strap's underside (cnc.ream-full-diameter)"
+        )
     # The relief is a counterbore with the bushing screw's tapped hole in its
     # floor: both tips stop the plan's clearance above that floor.
     relief_floor = -p["hub_relief_depth_mm"]
     lowest_tip = relief_floor + p["relief_floor_clearance_mm"]
+    # Both ends run out into the relief, wider than either; its floor is the
+    # first solid below them.
+    cam_nc.ream_end_face_clear(
+        "hub-reamer",
+        ream_tip,
+        drill_tip + drill_dia / 2 / math.tan(math.radians(59)),
+        0.0,
+        relief_floor,
+    )
     if min(drill_tip, ream_tip) < lowest_tip:
         raise ValueError(
             f"drill tip Z {drill_tip:.3f} / reamer tip Z {ream_tip:.3f} below Z {lowest_tip:.3f}, the relief floor {relief_floor:.3f} plus its clearance"

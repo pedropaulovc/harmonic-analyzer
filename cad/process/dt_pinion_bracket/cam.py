@@ -621,6 +621,17 @@ def context(
     ream_rpm, ream_feed = _setting(plan, shop, "pivot ream")
     ream = {"tool": "reamer-2510", "dia": reamer_dia, "rpm": ream_rpm, "feed": ream_feed}
     ream_tip = -p["ream_past_mm"]
+    import cam_nc
+
+    if p["ream_past_mm"] <= cam_nc.ream_full_diameter_past_min_mm(plan, "reamer-2510"):
+        raise ValueError(
+            "the reamer's full diameter does not reach the strap's far face"
+            " (cnc.ream-full-diameter)"
+        )
+    # The reamer's flat end runs out into the gap between the stacks.
+    cam_nc.ream_end_face_clear(
+        "reamer-2510", ream_tip, -p["drill_past_mm"], 0.0, -math.inf
+    )
 
     # The outline: the 1/8 in end mill in equal levels into the gap, round
     # all but the bridge at each arbor end.

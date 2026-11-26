@@ -607,6 +607,11 @@ def context(
     pilot_tip = stop - _point(d53)
     _agree(plan, "pilot_tip_mm", pilot_tip)
     _agree(plan, "ream_tip_mm", stop)
+    # Blind: the posted ream ends at the #53's full diameter (the corrective
+    # rerun above is a hand MDI, outside this file).
+    import cam_nc
+
+    cam_nc.ream_end_face_clear("reamer-0615", stop, stop, -math.inf, -math.inf)
     _agree(plan, "stop_shallow_mm", -g["stop"][0])
     _agree(plan, "stop_deep_mm", -g["stop"][1])
     pilot_top = _height(r_max, chord - d53 / 2)

@@ -220,15 +220,25 @@ rough_arc_radius_mm = 24.5
 # drill (on its countersink, under the #1). The #1 (.228) through all three,
 # one plunge each (L/D under 1); the 27/64 (.4219) opens K; the .4385 reamer
 # through K, fed in and
-# out. Every tip drill_past_mm full diameter under face A, into the spoil
-# block; the reamer ream_past_mm (its bevel lead allowed for). Both clear the
-# stack at its thickest (tape_stack_max_mm). cam.py checks the tips.
+# out. The #1's tip drill_past_mm full diameter under face A, into the spoil
+# block; the reamer's tip ream_past_mm, past its end chamfer plus the shop's
+# margin (cad/config/shop-equipment cnc.toml cnc.ream-full-diameter, D45).
+# Its chamfer is an ESTIMATE (.0352 in, 0.894 mm), and 1.5 is under three
+# times it, so the ream op has the chamfer measured at first use: over .049
+# (1.5 less the 0.25 margin) the full diameter would stop short of face A.
+# The 27/64 opens K to k_drill_past_mm full diameter under face A, past the
+# reamer's tip by drill_past_mm, so the reamer's flat end (Ø.368 at the
+# estimated chamfer) never meets the drill's cone in the solid block: at a
+# .5 full diameter the cone narrows to Ø.368 at Z-0.91 and the end would
+# push 0.59 into solid 6061 (Codjiflo on #3696). All clear the stack at its
+# thickest (tape_stack_max_mm). cam.py checks the tips.
 spot_dia_mm = 3.048
 drill_past_mm = 0.5
-ream_past_mm = 1.0
+ream_past_mm = 1.5
+k_drill_past_mm = 2.0
 drill_1_tip_mm = -2.2399
-drill_2764_tip_mm = -3.7193
-ream_tip_mm = -1.0
+drill_2764_tip_mm = -5.2193
+ream_tip_mm = -1.5
 # The countersinks: the 82° countersink's point on each screw hole's axis
 # sink_tip_mm above face A, its cone reaching Ø.312 (sink_dia_mm) at the
 # faced rear face (cam.py).
@@ -547,8 +557,8 @@ speed_kind = "spindle"
 tool = "drill-27-64"
 drilling = "twist_drill"
 sizing = "other"
-instruction = "Same file, M6 T4 (27/64 drill in the drill chuck; set 600): open K through in one plunge, the full diameter {{process.drill_past_mm:in.3dot}} under face A. It leaves .016 on the diameter for the reamer."
-diagram = { file = "diagrams/bond-drill-k.svg", alt = "To scale, the same section at K: the 27/64 drill opening K through, its full diameter {{process.drill_past_mm:in.3dot}} under face A." }
+instruction = "Same file, M6 T4 (27/64 drill in the drill chuck; set 600): open K through in one plunge, the full diameter {{process.k_drill_past_mm:in.3dot}} under face A. It leaves .016 on the diameter for the reamer."
+diagram = { file = "diagrams/bond-drill-k.svg", alt = "To scale, the same section at K: the 27/64 drill opening K through, its full diameter {{process.k_drill_past_mm:in.3dot}} under face A." }
 rpm = 600
 feed = "{{process.drill_2764_feed_per_min_mm:in.1f}} in/min"
 hole_depth_mm = "{{process.thickness_target_mm}}"
@@ -562,8 +572,8 @@ speed_kind = "spindle"
 tool = "reamer"
 drilling = "none"
 sizing = { kind = "band", band_mm = "{{cad.press_hole_dia_band_mm}}" }
-instruction = "Same file, M6 T5 (the set's .4385 reamer in the drill chuck; set 400, cutting oil on the reamer only, a drop, wiped so none runs to the tape): ream K through, fed in and fed out, spindle running, {{process.ream_past_mm:in.3dot}} under face A. The file ends there. K is not gauged: MHA-PD-28's traveler turns the bush to this hole."
-diagram = { file = "diagrams/bond-ream.svg", alt = "To scale, the same section at K: the .4385 reamer through K, its end {{process.ream_past_mm:in.3dot}} under face A; its lead chamfer drawn schematic (no size on record)." }
+instruction = "Same file, M6 T5 (the set's .4385 reamer in the drill chuck; set 400, cutting oil on the reamer only, a drop, wiped so none runs to the tape): ream K through, fed in and fed out, spindle running, {{process.ream_past_mm:in.3dot}} under face A. The first time this reamer is used, measure its end chamfer's length along the reamer first: over .049, stop and tell the owner (its full diameter would stop short of face A). The file ends there. K is not gauged: MHA-PD-28's traveler turns the bush to this hole."
+diagram = { file = "diagrams/bond-ream.svg", alt = "To scale, the same section at K: the .4385 reamer through K, its end {{process.ream_past_mm:in.3dot}} under face A; its lead chamfer drawn schematic (its length an estimate, measured at first use)." }
 rpm = 400
 feed = "{{process.ream_feed_per_min_mm:in.1f}} in/min, in and out"
 milling_cuts = [
