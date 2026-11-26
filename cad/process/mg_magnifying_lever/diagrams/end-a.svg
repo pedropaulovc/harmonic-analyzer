@@ -1,36 +1,30 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 300" width="760" height="300">
-  <rect class="paper" x="0" y="0" width="760" height="300"/>
-  <text class="title" x="20" y="24">Turned round, end A out (not to scale): faced to length, then the SR.125 tip swept by the ball turner</text>
-  <rect class="fixture-vise" x="200" y="60" width="90" height="180"/>
-  <rect class="clamp" x="290" y="92" width="80" height="45"/>
-  <rect class="clamp" x="290" y="163" width="80" height="45"/>
-  <rect class="part-threads" x="20" y="137" width="120" height="26"/>
-  <rect class="part-removed" x="597" y="137" width="64" height="26"/>
-  <rect class="part-kept" x="140" y="137" width="457" height="26"/>
-  <path class="part-kept" d="M597 137 A13 13 0 0 1 597 163 Z"/>
-  <line class="centre-line" x1="10" y1="150" x2="740" y2="150"/>
-  <line class="datum" x1="610" y1="100" x2="610" y2="200"/>
-  <text class="datum-label" x="470" y="92">end A's faced plane</text>
-  <line class="dims" x1="370" y1="236" x2="610" y2="236"/>
-  <line class="dims" x1="370" y1="228" x2="370" y2="244"/>
-  <line class="dims" x1="610" y1="228" x2="610" y2="244"/>
-  <text class="label" x="400" y="262">.40 out of the jaw fronts</text>
-  <text class="label" x="520" y="290">sawn end, about .085 faced off</text>
-  <line class="dims" x1="640" y1="278" x2="650" y2="165"/>
-  <path class="hidden" d="M610 150 A13 13 0 0 0 597 137" fill="none"/>
-  <circle class="datum" cx="597" cy="150" r="3"/>
-  <path class="cutter" d="M606 141 L638 109 L632 103 L600 135 Z"/>
-  <rect class="clamp" x="638" y="100" width="70" height="18" transform="rotate(-45 638 109)"/>
-  <text class="label" x="700" y="112">ball</text>
-  <text class="label" x="700" y="126">turner</text>
-  <line class="dims" x1="698" y1="104" x2="680" y2="86"/>
-  <text class="label" x="380" y="196">pivot: .125 behind the faced plane</text>
-  <line class="dims" x1="590" y1="186" x2="597" y2="154"/>
-  <text class="label" x="20" y="40">The frame's arms reach .19 each side of the pivot along Z: the tip's centre stands .275 out of the jaws.</text>
-  <text class="label" x="20" y="56">LMS 2569 ball turner: the bit swept by hand from 0° (at the apex) to 90°.</text>
-  <text class="label" x="20" y="214">end B's thread, back</text>
-  <text class="label" x="20" y="232">in the spindle bore</text>
-  <line class="dims" x1="70" y1="200" x2="70" y2="165"/>
-  <text class="label" x="160" y="290">3-jaw over a shim wrap on plain rod</text>
-  <line class="dims" x1="240" y1="278" x2="320" y2="208"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 400" font-family="sans-serif" font-size="13">
+  <rect class="paper" x="0" y="0" width="760" height="400"/>
+  <text class="title" x="20" y="20">Setup 7: end A {{process.end_stickout_in:.2dot}} out, faced to length with the AR tool (to scale, 300 px/in)</text>
+  <!-- To scale, 300 px/in: the Ø.250 rod, end A {{process.end_stickout_in:.2dot}} out of the jaw fronts,
+       about .085 faced off the sawn end; the SR.125 tip (the ball turner's
+       own picture) shown as the rest of this setup's removal. -->
+  <!-- The 3-jaw, schematic (its jaws' and body's sizes are not on record):
+       its jaw fronts to scale from the part. -->
+  <rect class="fixture-vise" x="340.0" y="70" width="60" height="260"/>
+  <rect class="clamp" x="400.0" y="126.5" width="40" height="36"/>
+  <rect class="clamp" x="400.0" y="237.5" width="40" height="36"/>
+  <rect class="part-removed" x="522.5" y="162.5" width="63.0" height="75.0"/>
+  <path class="part-kept" d="M522.5 162.5L40.0 162.5L43.0 166.7L40.0 170.8L43.0 175.0L40.0 179.2L43.0 183.3L40.0 187.5L43.0 191.7L40.0 195.8L43.0 200.0L40.0 204.2L43.0 208.3L40.0 212.5L43.0 216.7L40.0 220.8L43.0 225.0L40.0 229.2L43.0 233.3L40.0 237.5L522.5 237.5A37.5 37.5 0 0 0 522.5 162.5Z"/>
+  <!-- The AR turning tool, schematic (its size is not on record), its
+       point on the face, facing toward the centre. -->
+  <path class="cutter" d="M560.0 218.0L590.0 230.0L590.0 328.0L566.0 328.0L566.0 242.0Z"/>
+  <line class="arrow" x1="608.0" y1="313.0" x2="608.0" y2="248.0"/>
+  <line class="centre-line" x1="20" y1="200" x2="740" y2="200"/>
+  <line class="datum" x1="560" y1="110" x2="560" y2="150"/>
+  <text class="datum-label" x="490" y="104">end A's faced plane</text>
+  <line class="leader" x1="420.0" y1="273.5" x2="400.0" y2="352"/>
+  <text class="label" x="210.0" y="366">3-jaw over a shim wrap on plain rod</text>
+  <text class="label" x="40" y="150">end B's thread back in the spindle bore (off the page)</text>
+  <line class="dims" x1="440.0" y1="330" x2="560" y2="330"/>
+  <line class="dims" x1="440.0" y1="277.5" x2="440.0" y2="336"/>
+  <line class="dims" x1="560" y1="239.5" x2="560" y2="336"/>
+  <text class="label" x="480.0" y="324">{{process.end_stickout_in:.2dot}} out</text>
+  <text class="label" x="612" y="300">facing in light skims,</text>
+  <text class="label" x="612" y="316">sawn end about .085 off</text>
 </svg>

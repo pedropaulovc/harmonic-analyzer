@@ -6,17 +6,28 @@
   <rect class="fixture-support" x="144.7" y="300" width="254" height="95.3"/>
   <line class="hidden" x1="112.9" y1="282.9" x2="509.6" y2="282.9"/>
   <line class="hidden" x1="112.9" y1="282.9" x2="112.9" y2="395.3"/>
-  <text class="label" x="532" y="287">jaw tops: {{process.lying_grip_mm:in.3dot}} gripped</text>
+  <text class="label" x="532" y="287">the jaws (outline, in front): their tops,</text>
+  <text class="label" x="532" y="303">{{process.lying_grip_mm:in.3dot}} gripped; L at the fixed jaw</text>
+  <line class="leader" x1="300" y1="360" x2="532" y2="370"/>
+  <circle class="leader-dot" cx="300" cy="360" r="2"/>
+  <text class="label" x="536" y="374">1 in + 1/2 in stacks against each jaw</text>
   <path class="part-kept" d="M100 164.4 H107.9 V268.75 H360.4 V300 H100 Z"/>
   <rect class="part-removed" x="107.9" y="267.5" width="252.5" height="1.25"/>
   <path class="part-removed" d="M107.9 251.6 V267.5 H123.8 A15.9 15.9 0 0 1 107.9 251.6 Z"/>
   <rect class="fixture-support" x="466.7" y="259.7" width="42.9" height="135.6"/>
-  <line class="leader" x1="488" y1="330" x2="532" y2="330"/>
-  <circle class="leader-dot" cx="488" cy="330" r="2"/>
-  <text class="label" x="532" y="326">the offcut on the bed,</text>
-  <text class="label" x="532" y="342">F to O up</text>
-  <polygon class="cutter" points="107.9,151.25 139.6,151.25 139.6,268.75 107.9,268.75"/>
-  <rect class="part-rest" x="96" y="121" width="55.4" height="30.25"/>
+  <line class="leader" x1="488" y1="336" x2="532" y2="336"/>
+  <circle class="leader-dot" cx="488" cy="336" r="2"/>
+  <text class="label" x="532" y="332">the offcut on the bed,</text>
+  <text class="label" x="532" y="348">F to O up</text>
+  <!-- The 1/2 in end mill to scale (face_cutter_dia_mm 12.7 = 31.75 px at
+       2.5 px/mm), neck_mill_projection_min_mm 46.99 (117.5 px) out of the
+       collet, on MB05's last level (the neck's face) at the end of a pass,
+       X 9.525: its side on the foot's underside. Square end drawn as the
+       near half of the end face, 12 % deep. The collet is yellow (it turns
+       with the cutter) and schematic: its size is not on record. -->
+  <path class="cutter" d="M139.7 264.9L139.7 151.2L107.9 151.2L107.9 264.9A15.9 3.8 0 0 0 139.7 264.9Z"/>
+  <rect class="cutter" x="96" y="121" width="55.4" height="30.25"/>
+  <line class="arrow" x1="180" y1="200" x2="145" y2="200"/>
   <line class="leader" x1="151.4" y1="128" x2="250" y2="114"/>
   <circle class="leader-dot" cx="151.4" cy="128" r="2"/>
   <text class="label" x="254" y="118">the collet: the end mill {{process.neck_mill_projection_min_mm:in.2dot}}–2.00 out, so it passes above the foot</text>

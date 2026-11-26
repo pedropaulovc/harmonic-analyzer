@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 400" font-family="sans-serif" font-size="13">
+  <!-- Setup 8, MB06: the #7 tap drill through the neck at the tap's centre. Looking at the moving jaw, 4 px/mm, as the tap's picture. -->
+  <rect class="paper" x="0" y="0" width="760" height="400"/>
+  <text class="title" x="20" y="20">Setup 8 (MB06_nose): the #7 tap drill through the neck, past O into air</text>
+  <rect class="fixture-support" x="40" y="300" width="160" height="80"/>
+  <!-- The jaws, in front of the part, as an outline: their tops
+       upright_grip_mm 19.545 above the parallels' top. -->
+  <line class="hidden" x1="40" y1="221.8" x2="200" y2="221.8"/>
+  <text class="label" x="30" y="215">jaw tops (outline), {{process.upright_grip_mm:in.3dot}} grip</text>
+  <line class="hidden" x1="200" y1="221.8" x2="200" y2="380"/>
+  <line class="datum" x1="200" y1="240" x2="200" y2="392"/>
+  <text class="label" x="206" y="392">jaws' right side</text>
+  <line class="leader" x1="120" y1="340" x2="120" y2="345"/>
+  <text class="label-halo" x="60" y="345">1 in parallels</text>
+  <path class="part-kept" d="M40 250 H259.4 V300 H40 Z"/>
+  <!-- The nose: a half-cylinder about the tap's axis (R.217, 22 px), seen
+       side on as a rectangle; the axis nose_jaw_back_mm 9.35 (37.4 px) past
+       the jaws' right side. -->
+  <line class="centre-line" x1="237.4" y1="140" x2="237.4" y2="330"/>
+  <!-- The #7 drill to scale (cutter_dia_mm 5.1054 = 20.4 px), its full
+       diameter tap_drill_past_mm 1.0 below O, its 118 deg point at
+       tap_tip_z_mm -2.534; drawn short to a break line (its length out of
+       the chuck is not on record; drill_7_oal_mm 92.075 is its whole
+       length). The centre drill's spot under it is not drawn. -->
+  <path class="cutter" d="M247.6 150.0L247.6 304.0L237.4 310.1L227.2 304.0L227.2 150.0L230.6 147.0L234.0 150.0L237.4 147.0L240.8 150.0L244.2 147.0Z"/>
+  <line class="arrow" x1="208.2" y1="160" x2="208.2" y2="195"/>
+  <text class="label" x="290" y="200">#7 drill, to scale, one plunge through the neck:</text>
+  <text class="label" x="290" y="216">its full diameter {{process.tap_drill_past_mm:in.3dot}} past O, nothing under the nose</text>
+  <text class="label" x="290" y="232">X {{cad.lever_tap_height_mm:.3f}}, Y −{{cad.lever_tap_lateral_mm:.3f}} mm</text>
+  <circle class="datum" cx="200" cy="300" r="3.5"/>
+  <text class="datum-label" x="290" y="330">Z0 the parallels' top (O)</text>
+</svg>

@@ -214,7 +214,7 @@ indexing = "none"
 machine_ref = "pm-1127vf-lb"
 holding = "The rod back through the spindle bore, 3-jaw over a brass shim wrap, one sawn end {{process.end_stickout_in:.2dot}} in out: that end is the stub, stock allowance sawn off in Setup 4."
 datum = "Z0 (carriage DRO) the stub's end, faced in Op 20."
-diagram = { file = "diagrams/stub.svg", alt = "The rod in the 3-jaw, the stub end out: faced, turned to a Ø.18 pilot .20 long and centre-drilled." }
+diagram = { file = "diagrams/stub.svg", alt = "To scale: the rod in the 3-jaw over a shim wrap, the stub end .40 out; the AR tool facing it .035 off; the Ø.18 pilot .20 long and the centre hole to come." }
 lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{cad.stock_dia_mm}}", stock_diameter_mm = "{{cad.stock_dia_mm}}", stickout_mm = "{{cad.end_stickout_mm}}", minimum_diameter_mm = "{{process.pilot_dia_mm}}", support = "none" }
 
 [[setups.operations]]
@@ -244,6 +244,7 @@ tool = "centre"
 drilling = "none"
 sizing = "other"
 instruction = "The No. 1 centre drill in the tailstock drill chuck: drill the pilot's end until the countersink is about Ø.09 across, half the pilot."
+diagram = { file = "diagrams/stub-centre.svg", alt = "To scale across: the No. 1 centre drill from the tailstock in the pilot's end, its countersink about Ø.09." }
 settings = "lathe-centre-c360"
 cut_diameter_mm = 1.191
 
@@ -255,7 +256,7 @@ indexing = "none"
 machine_ref = "pm-1127vf-lb"
 holding = "Not turned round: draw the rod out of the spindle bore toward the tailstock until only the other end's .60 in (end A) is in the jaws; 3-jaw over the shim wrap there; the MT3 dead centre in the tailstock, its point oiled, in the stub's centre hole, the quill just snug and locked (the centre seated and locked in the quill's MT3 taper). Re-oil the point every few passes."
 datum = "Z0 (carriage DRO) end B's plane, {{process.stub_in:.3dot}} in from the stub's faced end: the AR tool (Op 60) and the threading bit (Op 90) are touched on the stub's end and set to Z+{{process.stub_in:.3dot}}; the cutoff blade as Op 190 sets it on the pilot's shoulder."
-diagram = { file = "diagrams/centres.svg", alt = "The rod between the 3-jaw and the dead centre in the stub: end B's thread cut toward the chuck from over the pilot." }
+diagram = { file = "diagrams/centres.svg", alt = "To scale: the rod between the 3-jaw on end A and the dead centre in the stub; the 5/16 threading bit's point at Z+.40 over the Ø.18 pilot, cutting end B's thread .70–.72 toward the chuck." }
 lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{cad.stock_dia_mm}}", stock_diameter_mm = "{{cad.stock_dia_mm}}", stickout_mm = "{{process.centre_stickout_mm}}", minimum_diameter_mm = "{{process.pilot_dia_mm}}", support = "tailstock" }
 
 [[setups.operations]]
@@ -335,6 +336,7 @@ tool = "part"
 drilling = "none"
 sizing = "other"
 instruction = "The cutoff blade on centre height, square: touch its chuck-side face on the pilot's shoulder, just gripping a cigarette paper, and set DRO Z+.301 (the paper). Plunge at Z+.100, then at Z+.050, each to a Ø{{process.neck_dia_in:.2dot}} neck; then at DRO Z0 (its chuck-side face on end B's plane) to the same neck, last: a groove about .16 wide with the {{process.blade_width_in:.4dot}} blade, room for the saw. Back out for chips; the dead centre stays in."
+diagram = { file = "diagrams/centres-part.svg", alt = "To scale: the 1/16 cutoff blade's last plunge, its chuck-side face on end B's plane, down to the Ø.06 neck; the dead centre still in the stub." }
 settings = "lathe-part-c360"
 cut_diameter_mm = "{{cad.stock_dia_mm}}"
 
@@ -466,7 +468,7 @@ indexing = "none"
 machine_ref = "pm-1127vf-lb"
 holding = "Turned round: 3-jaw over the shim wrap on plain rod, end A's faced plane {{process.end_stickout_in:.2dot}} in out of the jaws (the sawn end about .085 beyond it); the threaded end back through the jaws into the spindle bore."
 datum = "End A's length is read with the height gauge (Op 360). For the tip the DRO Z is zeroed with the ball turner's tip on the faced end in Op 390."
-diagram = { file = "diagrams/end-a.svg", alt = "The rod turned round, end A out .40: faced to length, its corner chamfered, then the SR.125 tip swept by the ball turner, its pivot one radius behind the faced end." }
+diagram = { file = "diagrams/end-a.svg", alt = "To scale: the rod turned round in the 3-jaw over a shim wrap, end A .40 out, the AR tool facing it to length; the SR.125 tip to come." }
 lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{cad.stock_dia_mm}}", stock_diameter_mm = "{{cad.stock_dia_mm}}", stickout_mm = "{{cad.end_stickout_mm}}", minimum_diameter_mm = "{{cad.stock_dia_mm}}", support = "none" }
 
 [[setups.operations]]
@@ -514,6 +516,7 @@ tool = "ball"
 drilling = "none"
 sizing = "other"
 instruction = "Spindle on. Cross slide in until the bit just touches the chamfer somewhere in the sweep. Sweep from parallel to the axis round toward you to {{cad.dome_datum_form_sweep_deg:.0f}}°, never toward the chuck; cross slide in .003 at most, sweep again. The last sweeps take .001."
+diagram = { file = "diagrams/end-a-ball.svg", alt = "To scale: the ball turner's bit sweeping end A's SR.125 tip, its pivot on the axis .125 behind the faced plane, the frame's arms .19 either side of it." }
 settings = "lathe-ball-turner-c360"
 cut_diameter_mm = "{{cad.stock_dia_mm}}"
 
