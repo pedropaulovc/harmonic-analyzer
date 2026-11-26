@@ -1061,13 +1061,18 @@ SETTING_TABLE_ROWS = (
         STACK_WINDOW,
         "INDICATOR ON BLOCKS",
     ),
+    # DT-00 machinist round 1, Main's ruling (b): the .007 window stays and
+    # the row names the route 8R sets it by: the mill's Y DRO (MagXact
+    # MX-100M, cad/config/shop-equipment/dro.toml; gauges.mill-y-dro reads
+    # 0.005 mm, .0002 in) from its zero on the MHA-FR-01 Y datum face at
+    # 8P, the face found with the edge finder (tools.edge-finder).
     (
         "2",
         f"{_step_ref('cylinder-stack-accepted', 'Q')}-{_step_ref('cylinder-stack-accepted', 'R')}",
         "FRONT MHA-DT-02 INNER FACE, DRO Y",
         "W = MHA-DT-26 THICKNESS",
         FRONT_STRAP_Y_WINDOW,
-        "DRO, EDGE FINDER",
+        f"DRO Y FROM {_step_ref('cylinder-stack-accepted', 'P')} ZERO, EDGE FINDER",
     ),
     (
         "3",
@@ -1816,7 +1821,8 @@ BANK_STEPS = _note_text(
         "8N. EDGE-FIND BOTH MHA-FR-01 HOLE-TABLE DATUM FACES (SEE ITS PRINT).",
         f"{DRO_ZERO_STEP}. ZERO DRO X AND Y THERE.",
         f"8Q. MIC MHA-DT-26: ITS THICKNESS IS W (SETTING TABLE ROW 2, SHEET {SETTING_SHEET}).",
-        "8R. SET THE FRONT MHA-DT-02 INNER FACE TO ITS Y (SETTING TABLE ROW 2).",
+        "8R. SET THE FRONT MHA-DT-02 INNER FACE TO ITS Y (SETTING TABLE ROW 2)",
+        f"   BY EDGE FINDER ON THE DRO Y ZEROED AT {DRO_ZERO_STEP}.",
         "8S. SET THE MANDREL CENTRE TO ITS X (ROW 3), EDGE-FOUND BOTH SIDES.",
         # Owner ruling 2026-11-24, fit audit part 2 C6 ("Yes: set by feel,
         # spot the holes after, tripwire .015."): the pedestal is clamped at

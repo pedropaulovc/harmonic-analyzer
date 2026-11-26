@@ -801,6 +801,34 @@ def test_the_back_ear_row_prints_the_title_block_s_full_window() -> None:
     assert high - low >= 0.010 - 1e-9, row
 
 
+def test_the_front_pedestal_row_names_its_route_and_an_owned_instrument() -> None:
+    """DT-00 machinist round 1, Main's ruling (b): row 2 keeps its .007
+    window and names how 8R sets it: the mill's Y DRO from its 8P zero on
+    the MHA-FR-01 Y datum, the face found by the edge finder.  The DRO is
+    owned and reads finer than .0005."""
+    import tomllib
+
+    (row,) = (r for r in drawing.SETTING_TABLE_ROWS if r[0] == "2")
+    assert row[4] == "W + 8.612 TO W + 8.619"
+    assert row[-1] == f"DRO Y FROM {drawing.DRO_ZERO_STEP} ZERO, EDGE FINDER"
+    steps = " ".join(drawing.BANK_STEPS.split())
+    assert (
+        "8R. SET THE FRONT MHA-DT-02 INNER FACE TO ITS Y (SETTING TABLE ROW 2) BY EDGE"
+        f" FINDER ON THE DRO Y ZEROED AT {drawing.DRO_ZERO_STEP}."
+    ) in steps
+    assert f"{drawing.DRO_ZERO_STEP}. ZERO DRO X AND Y THERE." in steps
+    cad = Path(drawing.__file__).resolve().parents[1]
+    equipment = cad / "config" / "shop-equipment"
+    dro = tomllib.loads((equipment / "dro.toml").read_text(encoding="utf-8"))["dro"]
+    assert dro["pm-30mv"]["status"] == "on_hand"
+    hand = tomllib.loads((equipment / "tools-hand.toml").read_text(encoding="utf-8"))
+    assert hand["tools"]["edge-finder"]["status"] == "on_hand"
+    gauges = tomllib.loads((cad / "process" / "shop" / "common.toml").read_text(encoding="utf-8"))
+    assert gauges["gauges"]["mill-y-dro"]["resolution_mm"] <= 0.0005 * 25.4
+    # The window's far end stays on the Y scale with W at MHA-DT-26's .110.
+    assert (8.619 + 0.110) * 25.4 <= gauges["gauges"]["mill-y-dro"]["range_mm"][1]
+
+
 def test_the_cone_set_is_accepted_through_a_turn_of_every_drum_gear() -> None:
     """The feel set guarantees no bind only where it was felt, so the
     acceptance turns the crank until the slowest MHA-DT-12 has made a turn."""
