@@ -110,6 +110,9 @@ vise_jaw_to_x0_mm = 183.448
 # crosses each flat's width at X stations no more than half the cutter apart.
 em_eighth_dia_mm = 3.175
 flat_stepover_max_mm = 1.5875
+# The same end mill's diameter, restated for the vise picture's end view,
+# which draws it to scale on the flat; cam.py checks it.
+flat_mill_dia_mm = 3.175
 # Machine-capacity inputs (mm): heights from the table, tool lengths from
 # spindle nose to tip.
 r8_collet_gauge_mm = 6.3         # HA: holders.r8-collets-lms-4860.gauge_len_mm.

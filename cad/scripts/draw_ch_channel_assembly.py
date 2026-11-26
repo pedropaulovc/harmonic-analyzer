@@ -1150,9 +1150,13 @@ def _fitup_text() -> dict[str, str]:
         "rod-pin-bond-swings": (
             f"BONDED PIN: CHECK {arm} SWINGS FREE ON ITS PIN BY ITS OWN WEIGHT."
         ),
+        # LOCTITE 641 TDS (disassembly): about 250 C, then out while hot.
+        # drawing-guidelines.md bars that heat next to wood, epoxy or paint;
+        # the tines' neighbours are the black-oxided rod and arm and the bare
+        # pin, none of them (D38's CH check, #3630).
         "rod-pin-pushed-out": (
             f"BONDED PIN: IF {pin} SLIDES OR {arm} BINDS, PUSH THAT PIN OUT, "
-            "HEATING THE TINES."
+            "HEATING THE TINES TO ABOUT 250°C."
         ),
         "rod-replaced": f"PIN PUSHED OUT: REPLACE THAT {rod}.",
         "rod-pin-return": (
@@ -1372,9 +1376,10 @@ def _fitup_text() -> dict[str, str]:
         "bar-pin-bond-swings": (
             f"BONDED PIN: CHECK {bar} SWINGS FREE ON ITS PIN UNDER ITS OWN WEIGHT."
         ),
+        # As the tines: the cheeks' neighbours are the bare bar, lever and pin.
         "bar-pin-pushed-out": (
             f"BONDED PIN: IF {bar_pin} SLIDES OR {bar} BINDS, PUSH THAT PIN OUT, "
-            "HEATING THE CHEEKS."
+            "HEATING THE CHEEKS TO ABOUT 250°C."
         ),
         "bar-replaced": f"PIN PUSHED OUT: REPLACE THAT {bar} BAR.",
         "bar-pin-return": (
@@ -1458,7 +1463,7 @@ def _pin_bond_note() -> str:
         f"PIN BOND (STEPS {steps.step_number('rod-pin-bonded')} AND "
         f"{steps.step_number('bar-pin-bonded')}): AN {pin} OR {bar_pin} THAT "
         "SLID IN BY HAND.",
-        "1. PUSH IT OUT, HEATING THE TINES OR CHEEKS IF IT WAS BONDED.",
+        "1. PUSH IT OUT, HEATING THE TINES OR CHEEKS TO ABOUT 250°C IF IT WAS BONDED.",
         "2. DEGREASE THE PIN AND BOTH HOLES IT SLID IN.",
         "3. COAT ONE END WITH LOCTITE 641, NO FURTHER IN THAN HALF THE "
         "TINE OR CHEEK IT STOPS IN; NONE ON THE MIDDLE.",

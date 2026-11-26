@@ -40,6 +40,10 @@ RAPID_MM_MIN = 2540.0
 # cross the top, so they are never wholly above it; this allowance only admits
 # the short entry a post may split off a plunge. Anything longer is air at feed.
 AIR_FEED_MAX_MM = 2.0
+# The milling directions a recipe may declare for a side cut: conventional,
+# each tooth's chip thin to thick (the stock on the cutter's left of its
+# travel under M3), and climb, thick to thin.
+CUT_DIRECTIONS = ("conventional", "climb")
 # Principal plane -> (first, second) in-plane axes, ordered so their cross
 # product is the plane normal (+Z, +Y, +X): G2 runs clockwise viewed from it.
 _PLANE_AXES = {17: (0, 1), 18: (2, 0), 19: (1, 2)}
@@ -65,6 +69,9 @@ class Move:
     plane: int = 17
     # The file line the move is on (1-based; 0 when built by hand).
     line: int = 0
+    # The spindle's turn in force: +1 under M3 (clockwise seen from above),
+    # -1 under M4, 0 when stopped (M5) or before either.
+    spindle: int = 0
 
     def _arc(self) -> tuple[int, int, float, float, float]:
         """In-plane axes, radius, start angle and swept angle (always positive)."""
@@ -219,7 +226,7 @@ def read_program(path: Path) -> Program:
     incremental = False
     plane = 17
     feed: float | None = None
-    spindle_on = False
+    rotation = 0
     moves: list[Move] = []
     stops: list[Stop] = []
     spindle: list[tuple[int, float]] = []
@@ -246,11 +253,11 @@ def read_program(path: Path) -> Program:
             if code in mcodes:
                 comment = previous[1:-1].strip() if previous.startswith("(") and previous.endswith(")") else None
                 tool = next((int(v) for letter, v in words if letter == "T"), None) if code == 6 else None
-                stops.append(Stop(number, kind, comment, (position[0], position[1], position[2]), len(moves), tool, spindle_on))
+                stops.append(Stop(number, kind, comment, (position[0], position[1], position[2]), len(moves), tool, rotation != 0))
         if mcodes & {3, 4}:
-            spindle_on = True
+            rotation = 1 if 3 in mcodes else -1
         if 5 in mcodes:
-            spindle_on = False
+            rotation = 0
         if raw.strip():
             previous = raw.strip()
         for letter, value in words:
@@ -277,7 +284,7 @@ def read_program(path: Path) -> Program:
         if probing or 10 in codes:
             if 10 in codes and (("L", 20.0) not in words or ("P", 1.0) not in words):
                 raise ValueError(f"{Path(path).name}:{number}: only G10 L20 P1 is modelled: {raw.strip()}")
-            probes.append(Probe(number, probing[0] if probing else 10.0, len(moves), tuple(axes.items()), spindle_on))
+            probes.append(Probe(number, probing[0] if probing else 10.0, len(moves), tuple(axes.items()), rotation != 0))
             for i, axis in enumerate("XYZ"):
                 if axis in axes:
                     position[i] = None if probing else axes[axis]
@@ -304,7 +311,7 @@ def read_program(path: Path) -> Program:
             moves.append(Move(
                 motion, start, tuple(target),  # type: ignore[arg-type]
                 feed=None if motion is Motion.RAPID else feed, centre=centre, plane=plane,
-                line=number,
+                line=number, spindle=rotation,
             ))
         position = target
     return Program(Path(path), tuple(moves), tuple(stops), tuple(spindle), tuple(machine_moves), tuple(probes))
@@ -696,6 +703,7 @@ def check_side_passes(
     below_z: float,
     finish: float | None = None,
     max_stepdown: float | None = None,
+    cut: str | None = None,
 ) -> list[Finding]:
     """Straight side-cut passes along the other axis, longer than ``span``, at
     constant ``axis`` coordinate and below ``below_z``: the last pass sits at
@@ -705,7 +713,17 @@ def check_side_passes(
     just touches the raw face, so each step is the distance between consecutive
     pass positions, starting from ``raw``. With ``finish``, the final pass
     removes no more than that finishing step. With ``max_stepdown``, the pass
-    depths step down from ``below_z`` (the stock top) by no more than that."""
+    depths step down from ``below_z`` (the stock top) by no more than that.
+
+    With ``cut`` ("conventional" or "climb", the recipe's declaration), every
+    pass cuts that way: the stock lies on the side of the passes that ``raw``
+    steps toward ``final`` (each pass cuts into it), and under the spindle's
+    turn in force at the pass (M3 clockwise seen from above) stock on the
+    cutter's left of its travel is conventional, on its right climb (M4 the
+    reverse). A pass with the spindle stopped fails. Without ``cut`` the
+    passes' milling direction is not judged."""
+    if cut not in (None, *CUT_DIRECTIONS):
+        raise ValueError(f"cut {cut!r} is not one of {CUT_DIRECTIONS}")
     a = "XY".index(axis)
     b = 1 - a
     passes = [
@@ -745,6 +763,34 @@ def check_side_passes(
             findings.append(Finding(
                 program.name, "passes",
                 f"{axis} {m.end[a]:.3f} Z {m.end[2]:.3f}: pass does not run {sign}{'XY'[b]}",
+            ))
+    if cut is not None:
+        findings += _cut_direction_findings(program, passes, a, toward, cut)
+    return findings
+
+
+def _cut_direction_findings(program: Program, passes: list[Move], a: int, toward: float, cut: str) -> list[Finding]:
+    """Each straight pass along axis ``1 - a`` with the stock ``toward`` along
+    axis ``a``: the way it cuts against the declared ``cut``."""
+    b = 1 - a
+    findings = []
+    for m in passes:
+        travel = [0.0, 0.0]
+        travel[b] = math.copysign(1.0, m.end[b] - m.start[b])
+        stock = [0.0, 0.0]
+        stock[a] = toward
+        # Seen from above (+Z): the stock is on the travel's left when travel x stock points up.
+        left = travel[0] * stock[1] - travel[1] * stock[0] > 0
+        where = f"{'XY'[a]} {m.end[a]:.3f} Z {m.end[2]:.3f}"
+        if m.spindle == 0:
+            findings.append(Finding(program.name, "cut", f"{where}: spindle stopped (no M3/M4 in force), declared {cut}"))
+            continue
+        ran = CUT_DIRECTIONS[0] if (1 if left else -1) * m.spindle > 0 else CUT_DIRECTIONS[1]
+        if ran != cut:
+            findings.append(Finding(
+                program.name, "cut",
+                f"{where}: pass runs {'+' if travel[b] > 0 else '-'}{'XY'[b]} with the stock on the cutter's "
+                f"{'left' if left else 'right'} under M{3 if m.spindle > 0 else 4}: {ran}, declared {cut}",
             ))
     return findings
 

@@ -42,10 +42,10 @@
   <circle class="holes" cx="652.7" cy="151.65" r="1.6"/>
   <circle class="cutter" cx="451.75" cy="147.8" r="6.35"/>
   <circle class="cutter" cx="733.75" cy="147.8" r="6.35"/>
-  <line class="arrow" x1="442" y1="185" x2="442" y2="115"/>
-  <line class="arrow" x1="744" y1="115" x2="744" y2="185"/>
-  <text class="label" x="430" y="205">left end: passes +Y</text>
-  <text class="label" x="640" y="205">right end: passes −Y</text>
+  <line class="arrow" x1="442" y1="115" x2="442" y2="185"/>
+  <line class="arrow" x1="744" y1="185" x2="744" y2="115"/>
+  <text class="label" x="430" y="205">left end: passes −Y</text>
+  <text class="label" x="640" y="205">right end: passes +Y</text>
   <line class="datum" x1="460" y1="90" x2="460" y2="135"/>
   <text class="datum-label" x="430" y="85">X0, the milled LEFT end</text>
   <line class="dims" x1="460" y1="235" x2="532.7" y2="235"/>

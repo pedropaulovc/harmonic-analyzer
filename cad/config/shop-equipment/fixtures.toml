@@ -35,7 +35,8 @@ kind = "parallels_set"
 make = "LittleMachineShop"
 sku = "6745"
 status = "on_hand"
-note = "Possession: photo and LittleMachineShop package (archived inventory source.by)."
+note = "Possession: photo and LittleMachineShop package (archived inventory source.by). The set (LittleMachineShop 6745 page, read 2026-11-26): parallels 1/8 in thick and 4 in long, nine matched pairs 1/2 to 1 in high in 1/16 in steps, and two shim pairs 9/64 and 5/32 in. MHA-CH-02 Setup 2 uses the 15/16 in pair under its spoil plate and the 1 in pair stacked on the 1/2 in pair to face it (#3607)."
+cite = ["LittleMachineShop 6745, Thin Parallels, 4\" Long, 11 Pairs, Premium, https://littlemachineshop.com/products/thin-parallels-4-long-11-pairs-sized-by-16ths (read 2026-11-26): \"Parallels are 1/8\\\" thick and 4\\\" long\"; \"Heights are 1/2\\\", 9/16\\\", 5/8\\\", 11/16\\\", 3/4\\\", 13/16\\\", 7/8\\\", 15/16\\\", 1\\\"\"; \"Two pairs of shims are 9/64\\\" and 5/32\\\"\""]
 
 # Owner (Pedro) 2026-11-24, verbatim: "add to inventory 2 v blocks 1.5 x 2 in
 # with 2 clamps". Brand, accuracy, whether the two are a matched pair, and
