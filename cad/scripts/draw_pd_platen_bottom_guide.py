@@ -191,6 +191,7 @@ part_metadata(
     precision_sources=(
         "DRAWING_PRECISION",
         "DRAWING_PRECISION_BY_NAME",
+        (_SELF, "SCREW_CBORE_PLACES"),
         (_SELF, "build"),
     ),
 )
@@ -365,11 +366,13 @@ for _index, _x in enumerate(SCREW_HOLE_X, 1):
             "thru": (True, ("SCREW_HOLE_SPEC", *_CALLOUT)),
             "cbore_dia": (
                 limits(SCREW_CBORE_DIA, SCREW_CBORE_PLACES["hw-cbdia"], SCREW_CBORE_DIA_BAND, unit=UNIT),
-                ("SCREW_CBORE_DIA", "SCREW_CBORE_DIA_BAND", "UNIT", *_CALLOUT),
+                ("SCREW_CBORE_DIA", "SCREW_CBORE_DIA_BAND", "UNIT", (_SELF, "SCREW_CBORE_PLACES"),
+                 (_SELF, "_print_counterbore_bands"), *_CALLOUT),
             ),
             "cbore_depth": (
                 limits(SCREW_CBORE_DEPTH, SCREW_CBORE_PLACES["hw-cbdepth"], SCREW_CBORE_DEPTH_BAND, unit=UNIT),
-                ("SCREW_CBORE_DEPTH", "SCREW_CBORE_DEPTH_BAND", "UNIT", *_CALLOUT),
+                ("SCREW_CBORE_DEPTH", "SCREW_CBORE_DEPTH_BAND", "UNIT", (_SELF, "SCREW_CBORE_PLACES"),
+                 (_SELF, "_print_counterbore_bands"), *_CALLOUT),
             ),
             "made_at": ("assembly", ((_SELF, "SCREW_CALLOUT_BELOW"),)),
             "transfer": (SCREW_CALLOUT_BELOW, ((_SELF, "SCREW_CALLOUT_BELOW"),)),

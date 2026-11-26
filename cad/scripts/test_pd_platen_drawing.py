@@ -640,3 +640,22 @@ def test_plate_feature_bands_are_the_printed_ones() -> None:
     assert guide["cbore_dia"] == pytest.approx([0.25 * inch, 0.27 * inch], abs=1e-3)
     assert guide["cbore_depth"] == pytest.approx([0.110 * inch, 0.120 * inch], abs=1e-3)
     assert guide["cbore_depth_from"] == "paper_face"
+
+
+def test_the_hole_table_check_ignores_only_the_hidden_size_tolerance_stack() -> None:
+    """Farm run 20261126T030547930Z (627833b504): after the MATE column's
+    rebuild the hidden SIZE cell of each guide hole carried the counterbore
+    depth's ±.005 stack, and the whole-cell compare refused the sheet."""
+    header = ("TAG", "X LOC", "Y LOC", "SIZE")
+    plain = "<MOD-DIAM> .14 THRU ALL\r\n<HOLE-SPOT><MOD-DIAM> .26 <HOLE-DEPTH> .12"
+    banded = f"{plain}<STACK divider=no>+ .01<OVER>- .01</STACK>"
+    generated = (header, ("B1", "1.062", ".553", plain))
+    now = (header + ("MATE",), ("B1", "1.062", ".553", banded, "MHA-PD-11"))
+    assert draw._changed_generated_cells(generated, now) == ()
+    # Anything else the insertion changes still refuses: a moved location, a
+    # retagged row, other SIZE text, a lost row.
+    for cell, value in ((2, ".554"), (0, "B2"), (3, banded.replace(".26", ".27"))):
+        moved = list(now[1])
+        moved[cell] = value
+        assert draw._changed_generated_cells(generated, (now[0], tuple(moved)))
+    assert draw._changed_generated_cells(generated, now[:1])

@@ -1,6 +1,9 @@
 # MHA-PD-27 platen bottom guide: why each band tighter than the title block
 # stays (drawing-guidelines.md rule 4; owner ruling 2026-11-24: the reason
-# lives here, not on the sheet). Read by the machinist review only.
+# lives here, not on the sheet). Read by the machinist review only. N-01 is
+# kept for the rail depth's band (.40/.39 here; .387 +.000/-.007 under the
+# held platen-rails change, #3540 C4, which creates this file with that N-01
+# entry), so the two files join without renumbering whichever lands second.
 necessity:
   - id: N-02
     feature: "sheet 1, the four rack-screw counterbores' Ø.110 +.004/-.000 (4X Ø.067 THRU ALL ⌴Ø.110 +.004/.000 ↧.469 ±.005): a wizard pocket's Ø is otherwise .XX, ±.01 (rule 3)"
