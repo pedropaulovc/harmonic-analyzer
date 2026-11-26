@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 400" font-family="sans-serif" font-size="13">
+  <!-- Setup 2, section through the axis, headstock left, about 4 px per .01 in radially compressed: the slice .12 in the jaws, .22 out. -->
+  <rect class="paper" x="0" y="0" width="760" height="400"/>
+  <text class="title" x="20" y="22">Setup 2: chucking 1, the slice .12 in the 3-jaw: cam face, Ø1.92 boss, rim face, bore</text>
+  <rect class="fixture-vise" x="200" y="50" width="60" height="70"/>
+  <rect class="fixture-vise" x="200" y="290" width="60" height="70"/>
+  <rect class="part-kept" x="230" y="70" width="60" height="270"/>
+  <rect class="part-kept" x="290" y="110" width="80" height="190"/>
+  <rect class="part-removed" x="290" y="70" width="80" height="40"/>
+  <rect class="part-removed" x="290" y="300" width="80" height="40"/>
+  <rect class="part-removed" x="370" y="70" width="8" height="270"/>
+  <rect class="holes" x="230" y="196" width="140" height="18"/>
+  <line class="centre-line" x1="180" y1="205" x2="460" y2="205"/>
+  <line class="active-face" x1="370" y1="110" x2="370" y2="300"/>
+  <line class="active-face" x1="290" y1="70" x2="290" y2="110"/>
+  <rect class="cutter" x="400" y="80" width="40" height="22"/>
+  <line class="leader" x1="370" y1="150" x2="470" y2="140"/>
+  <text class="label" x="474" y="144">cam face (faced first)</text>
+  <line class="leader" x1="330" y1="110" x2="470" y2="170"/>
+  <text class="label" x="474" y="174">boss Ø1.92 ±.01</text>
+  <line class="leader" x1="290" y1="90" x2="470" y2="200"/>
+  <text class="label" x="474" y="204">rim face (shoulder), .181-.183 from the cam face</text>
+  <line class="leader" x1="300" y1="205" x2="470" y2="260"/>
+  <text class="label" x="474" y="264">23/64 drilled, .3760 reamed through</text>
+  <line class="leader" x1="230" y1="60" x2="150" y2="40"/>
+  <text class="label" x="30" y="40">jaws: .12 of the slice</text>
+  <text class="label" x="30" y="385">Bore edge broken .010 max at the cam face.</text>
+</svg>

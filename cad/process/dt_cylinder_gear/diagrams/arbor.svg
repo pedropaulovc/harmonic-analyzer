@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 400" font-family="sans-serif" font-size="13">
+  <!-- Setup 4, side view, headstock left, 100 px per in along the axis, radii x2: the 5/8 bar .50 in the jaws, the dead centre in the tail end. -->
+  <rect class="paper" x="0" y="0" width="760" height="400"/>
+  <text class="title" x="20" y="22">Setup 4 (once; skip if on hand): the gang arbor, every diameter in one chucking on the dead centre</text>
+  <rect class="fixture-vise" x="20" y="140" width="50" height="40"/>
+  <rect class="fixture-vise" x="20" y="220" width="50" height="40"/>
+  <rect class="part-rest" x="20" y="180" width="50" height="40"/>
+  <rect class="part-kept" x="70" y="181" width="250" height="38"/>
+  <rect class="part-kept" x="320" y="188" width="294" height="24"/>
+  <rect class="part-kept" x="614" y="191" width="39" height="18"/>
+  <rect class="part-threads" x="653" y="192" width="47" height="16"/>
+  <rect class="part-removed" x="320" y="186" width="6" height="2"/>
+  <polygon class="fixture-support" points="700,200 740,185 740,215"/>
+  <line class="centre-line" x1="10" y1="200" x2="750" y2="200"/>
+  <line class="datum" x1="320" y1="150" x2="320" y2="250"/>
+  <text class="datum-label" x="252" y="145">shoulder</text>
+  <line class="leader" x1="190" y1="219" x2="160" y2="290"/>
+  <text class="label" x="80" y="305">body Ø.600 × 2.50</text>
+  <line class="leader" x1="460" y1="212" x2="420" y2="290"/>
+  <text class="label" x="300" y="305">journal fitted to the blanks × 2.94</text>
+  <line class="leader" x1="630" y1="209" x2="600" y2="330"/>
+  <text class="label" x="470" y="345">pilot Ø.275 × .21</text>
+  <line class="leader" x1="676" y1="192" x2="676" y2="86"/>
+  <text class="label" x="470" y="80">1/4-28 × .65 (Ø.180 relief), tail centre</text>
+  <line class="leader" x1="323" y1="186" x2="380" y2="110"/>
+  <text class="label" x="384" y="110">relief .010 deep at the shoulder (P1 blade)</text>
+  <line class="leader" x1="722" y1="212" x2="715" y2="248"/>
+  <text class="label" x="672" y="262">dead centre</text>
+  <text class="label" x="20" y="385">Journal miked at both ends and the middle; a reamed blank slides its length with no shake.</text>
+</svg>

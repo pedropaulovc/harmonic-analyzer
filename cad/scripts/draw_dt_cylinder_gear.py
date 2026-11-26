@@ -45,29 +45,66 @@ from _drawing_notes import add_property_linked_note
 from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed, set_hidden_lines_visible
+from _feature_requirements import part_metadata, requirement
 from _gear_drawing_entities import visible_circle_edge
+from _gtol_cylinder import CylinderFace
 from _gtol_face_read import face_geometry
+from _gtol_planar import PlanarFace
 from _machinist_review_mode import MachinistReviewMode
 from _part_properties import part_drawing_unit
 from _paths import CAD_ROOT
+from _printed_limits import limits
 from _session import run_build
 from _surface_finish import surface_finish_by_key
 import _telemetry
-from dt_cylinder_gear_notes import BORE_FIT_CALLOUT, CAM_WALL_NOTE
-from dt_cylinder_gear_phase_band import CAM_CENTER_XY
+from dt_cylinder_gear_notes import (
+    BORE_FIT_CALLOUT,
+    CAM_WALL_NOTE,
+    TOOTH_RUNOUT_TIR_MM,
+)
+from dt_cylinder_gear_phase_band import (
+    CAM_CENTER_XY,
+    CAM_LOBE_OFFSET_DEG,
+    CAM_NOTCH_PHASE_DEG,
+    NOTCH_PHASE_TOLERANCE_DEG,
+)
 from dt_cylinder_gear_spec import (
     BORE_DIA,
+    BORE_DIA_BAND,
+    BORE_DIAMETRAL_CLEARANCE_MM,
     CAM_DIA,
+    CAM_DIA_BAND,
     CAM_THICKNESS,
+    CAM_WALL_MIN_MM,
+    CUTTER_NUMBER,
+    CUTTER_TEETH_RANGE,
+    DIAMETRAL_PITCH,
     DRAWING_PRECISION_BY_NAME,
     DRAWING_REFERENCE_PRECISION,
+    ECCENTRICITY,
+    ECCENTRICITY_TOLERANCE_MM,
     FACE_WIDTH,
+    FACE_WIDTH_TOLERANCE_MM,
     NOTCH_CENTER_X,
+    NOTCH_DEPTH,
     NOTCH_FLOOR_RADIUS,
+    NOTCH_WIDTH,
+    OUTSIDE_DIA,
     OVERALL_THICKNESS,
+    OVERALL_THICKNESS_BAND,
     PATTERN_NOTCH_REF_ANGLE_DEG,
+    PITCH_DIA,
+    PITCH_TOOTH_THICKNESS_MM,
+    PRESSURE_ANGLE_DEG,
+    ROOT_ENVELOPE_DIA_MM,
     SURFACE_FINISHES,
+    TEETH,
     TIP_RADIUS,
+    UNIT,
+    WHOLE_DEPTH,
+    WHOLE_DEPTH_PLACES,
+    outside_dia_limits_mm,
+    whole_depth_limits_mm,
 )
 
 CAM_X, CAM_Y = CAM_CENTER_XY  # the lobe stands half a pitch clockwise of +Y
@@ -202,6 +239,267 @@ def _project_mm(
         tuple(value / 1000.0 for value in xyz_mm),
         label=label,
     )
+
+
+# Feature-export declarations (export_features; cad/docs/pipeline/
+# features-travelers.md): what this sheet prints, beside the constants of the
+# code that prints it, in the part frame (build_dt_cylinder_gear: the bore
+# axis is model Z through the origin; the gear's back face is Z0, the rim's
+# cam-side face Z = FACE_WIDTH and the cam's end face Z = OVERALL_THICKNESS;
+# +Y is a tooth crest, the cam's axis stands CAM_LOBE_OFFSET_DEG clockwise of
+# it at the throw, and the notch kerf is a slot parallel to Y in the first
+# root counter-clockwise of +Y, walls square to X, floor square to Y). The
+# bands are the part's native ones on the exact model nominal, except the
+# kerf depth (title block .XX on its printed nominal). The declarations
+# print nothing.
+# The sheet prints no numbered note: every requirement is a dimension, its
+# band, its native callout or the GEAR DATA block, so the feature manifest's
+# notes are empty. Kept here, not in dt_cylinder_gear_notes, because the part
+# build imports that module (export_features._notes_module).
+DRAWING_NOTES = ""
+_P = DRAWING_PRECISION_BY_NAME
+_SELF = "draw_dt_cylinder_gear"
+_BUILD = "build_dt_cylinder_gear"
+_FRAME = (_BUILD, "__frame__")
+_NOTES = "dt_cylinder_gear_notes"
+_PHASE = "dt_cylinder_gear_phase_band"
+_BORE_FINISH = surface_finish_by_key(SURFACE_FINISHES, "cylinder_gear_bore")
+_CAM_FINISH = surface_finish_by_key(SURFACE_FINISHES, "cam_follower")
+_CONE_NUMBER = "MHA-DT-03"
+_SHAFT_NUMBER = "MHA-DT-13"
+_ROD_NUMBER = "MHA-CH-03"
+
+
+def _plane(value: float) -> dict[str, Any]:
+    return {"frame": "model", "axis": "z", "value": value}
+
+
+part_metadata(
+    model_sources=(
+        _FRAME,
+        "OUTSIDE_DIA",
+        "FACE_WIDTH",
+        "OVERALL_THICKNESS",
+        "ECCENTRICITY",
+        (_PHASE, "CAM_CENTER_XY"),
+    ),
+    precision_sources=("DRAWING_PRECISION", "DRAWING_PRECISION_BY_NAME"),
+)
+# The back face (Z0): the face the gear stacks on and every axial size runs
+# from.
+requirement(
+    "back_face",
+    kind="face",
+    faces=(PlanarFace((0.0, 0.0, -1.0), 0.0),),
+    requirements=("plane",),
+    fields={"plane": (_plane(0.0), (_FRAME,))},
+)
+# The rim's cam-side face: face width .118 ±.002 from the back face
+# (RIGHT_KEEP "FaceWidth"), the length the MHA-CH-03 ring runs beside.
+requirement(
+    "rim_face",
+    kind="face",
+    faces=(PlanarFace((0.0, 0.0, 1.0), FACE_WIDTH),),
+    requirements=("plane", "face_width"),
+    fields={
+        "plane": (_plane(FACE_WIDTH), (_FRAME, "FACE_WIDTH")),
+        "face_width": (
+            limits(
+                FACE_WIDTH,
+                _P["FaceWidth"],
+                (FACE_WIDTH_TOLERANCE_MM, -FACE_WIDTH_TOLERANCE_MM),
+                unit=UNIT,
+            ),
+            ("FACE_WIDTH", "FACE_WIDTH_TOLERANCE_MM", "UNIT", (_SELF, "RIGHT_KEEP")),
+        ),
+        "face_width_nominal": (FACE_WIDTH, ("FACE_WIDTH",)),
+        "face_width_from": ("back_face", ((_SELF, "RIGHT_KEEP"),)),
+    },
+    precision={"face_width": _P["FaceWidth"]},
+)
+# The cam's end face: the stacking thickness .3000 ±.0010 from the back face
+# (RIGHT_KEEP "OverallThickness"), the channel station pitch.
+requirement(
+    "cam_face",
+    kind="face",
+    faces=(PlanarFace((0.0, 0.0, 1.0), OVERALL_THICKNESS),),
+    requirements=("plane", "thickness"),
+    fields={
+        "plane": (_plane(OVERALL_THICKNESS), (_FRAME, "OVERALL_THICKNESS")),
+        "thickness": (
+            limits(
+                OVERALL_THICKNESS,
+                _P["OverallThickness"],
+                OVERALL_THICKNESS_BAND,
+                unit=UNIT,
+            ),
+            (
+                "OVERALL_THICKNESS",
+                "OVERALL_THICKNESS_BAND",
+                "UNIT",
+                (_SELF, "RIGHT_KEEP"),
+            ),
+        ),
+        "thickness_nominal": (OVERALL_THICKNESS, ("OVERALL_THICKNESS",)),
+        "thickness_from": ("back_face", ((_SELF, "RIGHT_KEEP"),)),
+    },
+    precision={"thickness": _P["OverallThickness"]},
+)
+# The teeth: tip Ø2.536 +.000/-.004 (RIGHT_KEEP "OutsideDia") over the rim,
+# and the GEAR DATA block's cutting requirements: 120 teeth, 48 DP, 20°, the
+# #2 stock form cutter plunged .0440 +.0020/0 from the tip, and the finished
+# tooth runout to the bore (TOOTH RUNOUT TO BORE .002 TIR MAX). The tip lands
+# are the blank cylinder's surviving patches.
+requirement(
+    "teeth",
+    kind="outside_cylinder",
+    faces=(CylinderFace(OUTSIDE_DIA),),
+    requirements=("dia", "plunge", "count", "tooth_runout_tir_max"),
+    fields={
+        "at": ([0.0, 0.0, 0.0], (_FRAME,)),
+        "axis": ((0.0, 0.0, 1.0), (_FRAME,)),
+        "dia": (
+            [round(value, 12) for value in outside_dia_limits_mm()],
+            ("OUTSIDE_DIA", "OUTSIDE_DIA_BAND", "outside_dia_limits_mm", (_SELF, "RIGHT_KEEP")),
+        ),
+        "nominal_dia": (OUTSIDE_DIA, ("OUTSIDE_DIA",)),
+        "length_nominal": (FACE_WIDTH, ("FACE_WIDTH",)),
+        "count": (TEETH, ("TEETH", (_NOTES, "GEAR_DATA"))),
+        "diametral_pitch": (float(DIAMETRAL_PITCH), ("DIAMETRAL_PITCH", (_NOTES, "GEAR_DATA"))),
+        "pressure_angle_deg": (PRESSURE_ANGLE_DEG, ("PRESSURE_ANGLE_DEG", (_NOTES, "GEAR_DATA"))),
+        "pitch_dia_mm": (PITCH_DIA, ("PITCH_DIA", (_NOTES, "GEAR_DATA"))),
+        "root_dia_ref_mm": (
+            sum(ROOT_ENVELOPE_DIA_MM) / 2.0,
+            ("ROOT_ENVELOPE_DIA_MM", (_NOTES, "GEAR_DATA")),
+        ),
+        "pitch_tooth_thickness_mm": (
+            PITCH_TOOTH_THICKNESS_MM,
+            ("PITCH_TOOTH_THICKNESS_MM", (_NOTES, "GEAR_DATA")),
+        ),
+        "plunge": (
+            [round(value, 12) for value in whole_depth_limits_mm()],
+            ("WHOLE_DEPTH", "WHOLE_DEPTH_BAND", "whole_depth_limits_mm", (_NOTES, "GEAR_DATA")),
+        ),
+        "plunge_nominal": (WHOLE_DEPTH, ("WHOLE_DEPTH",)),
+        "cutter_number": (CUTTER_NUMBER, ("CUTTER_NUMBER", (_NOTES, "GEAR_DATA"))),
+        "cutter_range": (
+            f"{CUTTER_TEETH_RANGE[0]}-{CUTTER_TEETH_RANGE[1]}",
+            ("CUTTER_TEETH_RANGE", (_NOTES, "GEAR_DATA")),
+        ),
+        "tooth_runout_tir_max": (
+            TOOTH_RUNOUT_TIR_MM,
+            ((_NOTES, "TOOTH_RUNOUT_TIR_MM"), (_NOTES, "GEAR_DATA")),
+        ),
+        "callout": (
+            DIMENSION_CALLOUTS["OutsideDia"],
+            ((_SELF, "DIMENSION_CALLOUTS"),),
+        ),
+        "mates": (_CONE_NUMBER, ((_SELF, "DIMENSION_CALLOUTS"),)),
+    },
+    precision={"dia": _P["OutsideDia"], "plunge": WHOLE_DEPTH_PLACES},
+)
+# The integral eccentric cam: Ø1.205 +.000/-.002 (FRONT_KEEP "CamDia"), its
+# axis the throw .3402 ±.0020 off the bore's (FRONT_KEEP "CamCy"), standing
+# CAM_LOBE_OFFSET_DEG clockwise of the +Y crest; the lobe-to-notch angle
+# 3° ±.7° (FRONT_KEEP "NotchPhase"); Ra 63 on its OD; the crescent wall to
+# the bore .071 MIN (CAM_WALL_NOTE). Its length is the rim-to-cam-face
+# reference (.182).
+requirement(
+    "cam",
+    kind="outside_cylinder",
+    faces=(_CAM_FINISH.face,),
+    requirements=("dia", "throw", "notch_phase_deg", "notch_phase_tol_deg", "wall_min", "finish_ra"),
+    fields={
+        "at": ([CAM_X, CAM_Y, FACE_WIDTH], (_FRAME, (_PHASE, "CAM_CENTER_XY"), "FACE_WIDTH")),
+        "axis": ((0.0, 0.0, 1.0), (_FRAME,)),
+        "dia": (
+            limits(CAM_DIA, _P["CamDia"], CAM_DIA_BAND, unit=UNIT),
+            ("CAM_DIA", "CAM_DIA_BAND", "UNIT", (_SELF, "FRONT_KEEP")),
+        ),
+        "nominal_dia": (CAM_DIA, ("CAM_DIA",)),
+        "length_nominal": (CAM_THICKNESS, ("CAM_THICKNESS",)),
+        "throw": (
+            limits(
+                ECCENTRICITY,
+                _P["CamCy"],
+                (ECCENTRICITY_TOLERANCE_MM, -ECCENTRICITY_TOLERANCE_MM),
+                unit=UNIT,
+            ),
+            ("ECCENTRICITY", "ECCENTRICITY_TOLERANCE_MM", "UNIT", (_SELF, "FRONT_KEEP")),
+        ),
+        "throw_nominal": (ECCENTRICITY, ("ECCENTRICITY",)),
+        "lobe_offset_deg": (CAM_LOBE_OFFSET_DEG, ((_PHASE, "CAM_LOBE_OFFSET_DEG"),)),
+        "notch_phase_deg": (CAM_NOTCH_PHASE_DEG, ((_PHASE, "CAM_NOTCH_PHASE_DEG"), (_SELF, "FRONT_KEEP"))),
+        "notch_phase_tol_deg": (
+            NOTCH_PHASE_TOLERANCE_DEG,
+            ((_PHASE, "NOTCH_PHASE_TOLERANCE_DEG"), (_SELF, "FRONT_KEEP")),
+        ),
+        "wall_min": (CAM_WALL_MIN_MM, ("CAM_WALL_MIN_MM", (_NOTES, "CAM_WALL_NOTE"))),
+        "finish_ra": (_CAM_FINISH.roughness_um, ("SURFACE_FINISHES",)),
+        "callout": (DIMENSION_CALLOUTS["CamDia"], ((_SELF, "DIMENSION_CALLOUTS"),)),
+        "mates": (_ROD_NUMBER, ((_SELF, "DIMENSION_CALLOUTS"),)),
+    },
+    precision={"dia": _P["CamDia"], "throw": _P["CamCy"], "finish_ra": 1},
+)
+# The bore on the origin, Ø.3760 REAM THRU, MHA-DT-13 ENTERS, NO SHAKE
+# (FRONT_KEEP "BoreDia" with BORE_FIT_CALLOUT), Ra 63. The sheet prints the
+# reamer's size and no band (fit audit 2026-11-23, rule 4 form 3): "dia" is
+# the spec's analysis band, what the .3760 reamer is expected to cut, which
+# the route sizes its reaming and its fit and runout arithmetic to; the
+# callout is the acceptance.
+requirement(
+    "bore",
+    kind="hole",
+    faces=(_BORE_FINISH.face,),
+    requirements=("dia", "thru", "finish_ra"),
+    fields={
+        "at": ([0.0, 0.0, 0.0], (_FRAME,)),
+        "axis": ((0.0, 0.0, 1.0), (_FRAME,)),
+        "dia": (
+            limits(BORE_DIA, _P["BoreDia"], BORE_DIA_BAND, unit=UNIT),
+            ("BORE_DIA", "BORE_DIA_BAND", "UNIT", (_SELF, "FRONT_KEEP")),
+        ),
+        "nominal_dia": (BORE_DIA, ("BORE_DIA",)),
+        "thru": (True, ((_NOTES, "BORE_FIT_CALLOUT"),)),
+        "process": ("ream", ((_NOTES, "BORE_FIT_CALLOUT"),)),
+        "finish_ra": (_BORE_FINISH.roughness_um, ("SURFACE_FINISHES",)),
+        "callout": (BORE_FIT_CALLOUT, ((_NOTES, "BORE_FIT_CALLOUT"),)),
+        "mates": (_SHAFT_NUMBER, ((_NOTES, "BORE_FIT_CALLOUT"),)),
+        "diametral_clearance": (
+            list(BORE_DIAMETRAL_CLEARANCE_MM),
+            ("BORE_DIAMETRAL_CLEARANCE_MM",),
+        ),
+    },
+    precision={"dia": _P["BoreDia"], "finish_ra": 1},
+)
+# The alignment notch (Detail A): a saw kerf .016 MAX wide (NotchWidth,
+# swTolMAX), .12 deep from the tip (NotchDepth, title block .XX), in a tooth
+# root; the cam is clocked to it (the lobe-to-notch angle is the cam's).
+requirement(
+    "notch",
+    kind="notch",
+    faces=(
+        PlanarFace((1.0, 0.0, 0.0), NOTCH_CENTER_X - NOTCH_WIDTH / 2.0),
+        PlanarFace((-1.0, 0.0, 0.0), -(NOTCH_CENTER_X + NOTCH_WIDTH / 2.0)),
+        PlanarFace((0.0, 1.0, 0.0), NOTCH_FLOOR_RADIUS),
+    ),
+    requirements=("width_max", "depth"),
+    fields={
+        "at": (
+            [NOTCH_CENTER_X, NOTCH_FLOOR_RADIUS, 0.0],
+            (_FRAME, "NOTCH_CENTER_X", "NOTCH_FLOOR_RADIUS"),
+        ),
+        "width_max": (NOTCH_WIDTH, ("NOTCH_WIDTH", "NOTCH_WIDTH_BAND", "NOTCH_WIDTH_TOL_TYPE")),
+        "depth": (
+            limits(NOTCH_DEPTH, _P["NotchDepth"], unit=UNIT),
+            ("NOTCH_DEPTH", "UNIT", (_SELF, "NOTCH_DETAIL_DIMENSIONS")),
+        ),
+        "depth_nominal": (NOTCH_DEPTH, ("NOTCH_DEPTH",)),
+        "in_root": (True, ("NOTCH_PHASE_DEG", "TOOTH_PATTERN_GAP_RAD")),
+        "callout": (DIMENSION_CALLOUTS["NotchWidth"], ((_SELF, "DIMENSION_CALLOUTS"),)),
+    },
+    precision={"width_max": _P["NotchWidth"], "depth": _P["NotchDepth"]},
+)
 
 
 def _notch_detail(adapter: Any, front: Any) -> Any:

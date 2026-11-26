@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 400" font-family="sans-serif" font-size="13">
+  <!-- Setup 1, side view, not to scale: the 2-5/8 bar in the saw's vise, slices .34 thick marked off its end; the 5/8 arbor bar below. -->
+  <rect class="paper" x="0" y="0" width="760" height="400"/>
+  <text class="title" x="20" y="22">Setup 1: saw 20 slices .34 thick off the 2-5/8 in C360 bar; once, 7 in of the 5/8 in 1018 bar</text>
+  <rect class="fixture-vise" x="60" y="70" width="90" height="40"/>
+  <rect class="fixture-vise" x="60" y="190" width="90" height="40"/>
+  <rect class="part-kept" x="40" y="110" width="400" height="80"/>
+  <rect class="part-removed" x="440" y="110" width="22" height="80"/>
+  <rect class="part-waste" x="462" y="110" width="6" height="80"/>
+  <rect class="cutter" x="468" y="60" width="6" height="150"/>
+  <line class="centre-line" x1="20" y1="150" x2="520" y2="150"/>
+  <line class="leader" x1="451" y1="110" x2="520" y2="80"/>
+  <text class="label" x="524" y="80">slice .34-.37 thick, calipers mark</text>
+  <line class="leader" x1="471" y1="210" x2="520" y2="235"/>
+  <text class="label" x="524" y="240">saw blade</text>
+  <line class="leader" x1="105" y1="90" x2="160" y2="52"/>
+  <text class="label" x="164" y="52">saw vise</text>
+  <rect class="part-kept" x="40" y="300" width="300" height="20"/>
+  <line class="leader" x1="340" y1="310" x2="380" y2="310"/>
+  <text class="label" x="384" y="314">5/8 in 1018 bar, 7.0 in (gang arbor, once)</text>
+  <text class="label" x="40" y="370">Burrs filed off; each slice miked at three places, .34 or over.</text>
+</svg>

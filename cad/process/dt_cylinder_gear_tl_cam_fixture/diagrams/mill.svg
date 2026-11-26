@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 400" font-family="sans-serif" font-size="13">
+  <rect class="paper" x="0" y="0" width="760" height="400"/>
+  <text class="title" x="20" y="20">Setup 2 (plan view): disc face F up on two 1 in parallels, gripped across the register; CF01 stub hole, CF02 clock-pin hole</text>
+  <rect class="clamp" x="60" y="40" width="560" height="45"/>
+  <rect class="clamp" x="60" y="315" width="560" height="45"/>
+  <circle class="part-kept" cx="340" cy="200" r="115"/>
+  <circle class="holes" cx="316" cy="200" r="13"/>
+  <circle class="holes" cx="405" cy="195" r="3"/>
+  <line class="centre-line" x1="210" y1="200" x2="470" y2="200"/>
+  <line class="centre-line" x1="340" y1="75" x2="340" y2="325"/>
+  <circle class="datum" cx="340" cy="200" r="4"/>
+  <text class="label" x="630" y="68">fixed jaw (+Y)</text>
+  <text class="label" x="630" y="342">moving jaw</text>
+  <line class="leader" x1="200" y1="292" x2="312" y2="208"/>
+  <text class="label" x="20" y="308">stub hole X−.3402 (−8.641 mm), Y0</text>
+  <line class="leader" x1="520" y1="150" x2="408" y2="193"/>
+  <text class="label" x="470" y="140">clock-pin hole X+.9246, Y+.0704</text>
+  <line class="leader" x1="520" y1="250" x2="344" y2="203"/>
+  <text class="label" x="490" y="262">X0 Y0: register axis</text>
+  <text class="label" x="20" y="390">Z0 face F (up), above the jaw tops; +X along the jaws. The stub drill runs out between the parallels.</text>
+</svg>

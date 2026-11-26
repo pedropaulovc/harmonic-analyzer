@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 400" font-family="sans-serif" font-size="13">
+  <!-- Setup 7, top view, BS-0 chuck at the left, operator at the bottom (-Y), not to scale: the slotting saw flat at the axis height in space 1, one pass toward the chuck. -->
+  <rect class="paper" x="0" y="0" width="760" height="400"/>
+  <text class="title" x="20" y="22">Setup 7: GP03, the .014 saw flat at Z0 through space 1 to .12 from the tips, toward the chuck</text>
+  <rect class="fixture-table" x="20" y="60" width="130" height="190"/>
+  <rect class="fixture-vise" x="150" y="110" width="30" height="90"/>
+  <rect class="part-rest" x="180" y="145" width="80" height="20"/>
+  <rect class="part-kept" x="260" y="95" width="300" height="120"/>
+  <rect class="part-removed" x="260" y="203" width="300" height="12"/>
+  <rect class="clamp" x="560" y="130" width="24" height="50"/>
+  <rect class="part-threads" x="584" y="148" width="40" height="14"/>
+  <rect class="fixture-support" x="624" y="125" width="90" height="60"/>
+  <line class="centre-line" x1="140" y1="155" x2="740" y2="155"/>
+  <circle class="cutter" cx="600" cy="290" r="85"/>
+  <line class="arrow" x1="480" y1="385" x2="300" y2="385"/>
+  <line class="leader" x1="400" y1="209" x2="400" y2="60"/>
+  <text class="label" x="404" y="56">notch .12 (.11-.13) through space 1, all ten rims</text>
+  <line class="leader" x1="665" y1="245" x2="695" y2="234"/>
+  <text class="label" x="698" y="232">saw, M3</text>
+  <line class="leader" x1="260" y1="215" x2="230" y2="300"/>
+  <text class="label" x="120" y="315">ends over blank 1's back face</text>
+  <text class="label" x="20" y="360">Head locked on space 1, as GP02 left it.</text>
+</svg>

@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 400" font-family="sans-serif" font-size="13">
+  <!-- Setup 10, end view, not to scale: the finished gear on the setting mandrel in the V-blocks, the dial indicator on the cam's O.D. -->
+  <rect class="paper" x="0" y="0" width="760" height="400"/>
+  <text class="title" x="20" y="22">Setup 10: throw on the setting mandrel; cam edge broken; final check</text>
+  <rect class="fixture-support" x="180" y="310" width="160" height="50"/>
+  <circle class="part-kept" cx="260" cy="190" r="110"/>
+  <circle class="part-rest" cx="260" cy="150" r="52"/>
+  <circle class="holes" cx="260" cy="190" r="16"/>
+  <circle class="fixture-support" cx="260" cy="187" r="14"/>
+  <rect class="cutter" x="254" y="58" width="12" height="40"/>
+  <line class="leader" x1="266" y1="78" x2="380" y2="70"/>
+  <text class="label" x="384" y="74">dial indicator on the cam: swing .6764-.6844</text>
+  <line class="leader" x1="312" y1="150" x2="420" y2="150"/>
+  <text class="label" x="424" y="154">cam O.D. edge at the cam face R.010 / .010 max</text>
+  <line class="leader" x1="260" y1="187" x2="420" y2="220"/>
+  <text class="label" x="424" y="224">3/8 setting mandrel</text>
+  <line class="leader" x1="300" y1="335" x2="420" y2="340"/>
+  <text class="label" x="424" y="344">V-blocks</text>
+</svg>

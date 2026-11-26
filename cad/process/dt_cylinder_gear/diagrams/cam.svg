@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 400" font-family="sans-serif" font-size="13">
+  <!-- Setup 9, section through the bore and the cam's centre, headstock left, not to scale: the gear on the TL-01 fixture in the 4-jaw, the cam turned eccentric to the bore down to the rim face. -->
+  <rect class="paper" x="0" y="0" width="760" height="400"/>
+  <text class="title" x="20" y="22">Setup 9: each gear on the cam fixture (TL-00 steps 15-19); cam turned to Ø1.203-1.205</text>
+  <rect class="fixture-vise" x="60" y="60" width="70" height="60"/>
+  <rect class="fixture-vise" x="60" y="290" width="70" height="60"/>
+  <rect class="fixture-plate" x="130" y="50" width="120" height="310"/>
+  <rect class="part-kept" x="250" y="60" width="40" height="300"/>
+  <rect class="part-kept" x="290" y="150" width="60" height="150"/>
+  <rect class="part-removed" x="290" y="300" width="60" height="30"/>
+  <rect class="part-removed" x="290" y="120" width="60" height="30"/>
+  <rect class="fixture-support" x="230" y="226" width="140" height="18"/>
+  <line class="centre-line" x1="40" y1="225" x2="560" y2="225"/>
+  <line class="centre-line" x1="40" y1="235" x2="560" y2="235"/>
+  <rect class="cutter" x="380" y="120" width="40" height="22"/>
+  <line class="leader" x1="320" y1="150" x2="460" y2="100"/>
+  <text class="label" x="464" y="104">cam Ø1.203-1.205, to the rim face</text>
+  <line class="leader" x1="270" y1="60" x2="300" y2="45"/>
+  <text class="label" x="304" y="45">gear's rim (back face on the fixture body)</text>
+  <line class="leader" x1="190" y1="300" x2="190" y2="380"/>
+  <text class="label" x="120" y="390">fixture body of MHA-DT-12-TL-01 (TL-00 item 1) in the 4-jaw (set once)</text>
+  <line class="leader" x1="360" y1="240" x2="460" y2="280"/>
+  <text class="label" x="464" y="284">stub in the bore; clock pin in the notch</text>
+</svg>

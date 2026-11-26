@@ -747,6 +747,8 @@ description = "5 mm hex bit or socket for the torque wrench"
 description = "7/8 stub arbor, 3/4 straight shank"
 [tools.gear-cutters-48dp-20pa]  # F-gear-cutter-10-289-481 to -488
 description = "48DP 20PA involute gear cutters #1 to #8"
+# 1-3/4 in (cad/config/shop-equipment/ tools-gear-cutting, same key, dia_in).
+diameter_mm = 44.45
 [tools.depth-micrometer]  # F-depth-micrometer
 description = "Depth micrometer, inch"
 [tools.pin-gauges]  # A1-pin-set-011-060, A1-pin-set-061-500-combined; ownership: inventory gauges.pin-gauges
@@ -773,7 +775,7 @@ description = "Steel rule, 48 in, finest graduation 1/64 in (Insize 7110-1200)"
 [tools.transfer-punches]  # F-transfer-punches-fractional
 description = "Transfer punch set, fractional 3/32-1/2 by 64ths"
 [tools.v-blocks]  # F-v-blocks
-description = "V-blocks, two, 1.5 x 2 in, with two clamps (owner 2026-11-24; matched or not: not stated)"
+description = "V-blocks, two, 1.5 x 2 in, with two clamps"
 
 # --- Drawing cross-check additions (2026-11-19) -------------------------------
 # Tools the v50 drawings call for that the quote workbook left out, from the

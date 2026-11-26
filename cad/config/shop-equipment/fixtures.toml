@@ -201,6 +201,47 @@ pieces = 3
 backing_disc_dia_in = 3.00
 journal_dia_in = 0.501
 
+# --- MHA-DT-12 cylinder gear gang arbor (cnc/gear-pilot) -------------------
+
+# The 20 cylinder gears (MHA-DT-12, 120T 48DP, .118 rims on Ø1.92 cam
+# bosses) are cut ten to a load on this arbor (route R2, owner ruling
+# 2026-11-22, relayed by Main). Special to this part, not owned. It has no
+# drawing: it is
+# made by Setup 4 of the gear traveler (cad/process/dt_cylinder_gear/
+# plan.toml), which also states its sizes; it carries no part identity or
+# feature bundle, so it has no traveler of its own (the amplitude-bar riser
+# precedent: workholding made inside its part's traveler, "skip if on
+# hand"). The tail end takes the MHA-DT-03-TL-04 1.75 in backing collar and
+# the cone kit's 1/4-28 arbor nut (tools.dt-cone-gear-cutting-arbor), which
+# the cone gears' kit makes anyway.
+[fixtures.dt-cylinder-gear-gang-arbor]
+name = "MHA-DT-12 gang cutting arbor for ten cylinder gears, shop-made"
+kind = "gear_blank_arbor"
+status = "to_make"
+supply = "shop_made"
+purchase = "Make from the 5/8 in 1018 CF bar on hand (stock.1018-round-5-8), 7 in: Setup 4 of cad/process/dt_cylinder_gear/plan.toml. In one chucking on the lathe's dead centre: a Ø.600 body 2.50 long to a square shoulder, a journal 2.94 long turned to fit the reamed gear blanks (they slide on it with no shake; .3758 at least by the micrometer), a Ø.275 pilot .21 long for the TL-04 collar's .290 bore, a 1/4-28 UNF thread .65 long whose first 1/16 is a Ø.180 relief (the nut runs full threads onto the collar) and the 60° tail centre."
+note = "Workholding for cutting the MHA-DT-12 teeth and notches (gear traveler Setups 5-7): ten gear blanks on the journal, back faces toward the shoulder, the TL-04 Ø1.75 collar and nut on the tail. In the lathe (stack O.D.) and in the BS-0 (teeth, notch) the chuck grips the turned body and the tail centre takes the dead centre or the BS-0 tailstock; indicate the body, and the stack's O.D. on the BS-0, within .001 TIR before cutting. Fit: the journal is made to fit the reamed bores (fit policy, PR #3513), never under .3758; its clearance is booked in the gears' .002 tooth runout budget (cad/process/dt_cylinder_gear/cam.py)."
+pieces = 1
+journal_dia_in = 0.3759
+
+# The BS-0's own tailstock, which supports the gang arbor's tail (Main's
+# ruling 2026-11-22: the stack is supported at its outboard end). On hand:
+# owner (Pedro) 2026-11-24. The head's manual gives the tailstock's overall
+# sizes only (table "Semi-Universal Index B&S Type No.0 No.1", BS-0 row: A1
+# 175, B1 87, H1 102, h 100, a1 130, b1 92, g1 16 mm); its width at centre
+# height near the point is not recorded, and the gear traveler measures it
+# before the first load.
+[fixtures.bs-0-tailstock]
+name = "BS-0 dividing head tailstock, fixed, with its dead centre"
+kind = "tailstock"
+make = "Precision Matthews"
+source = "https://www.precisionmatthews.com/products/dividinghead-bs-0"
+status = "on_hand"
+centre_height_mm = 100.0
+base_width_mm = 87.0
+note = "On hand (owner, 2026-11-24). Its width at centre height near the point is not recorded: the gear traveler (MHA-DT-12 Setup 6) measures it, 2.00 in or under, and dry-runs the cutter past it with the spindle stopped."
+cite = ["Owner (Pedro) 2026-11-24, relayed by Main, verbatim: \"has tailstock, dead center flange plate 3 jaw chuck all 3 plates etc\"; \"everything in manual is accounted\"", "BS-0 manual, Semi-Universal Dividing Head, ENCLOSURE item 1 \"Fixed tailstock\" and table \"Semi-Universal Index B&S Type No.0 No.1\", BS-0 row: A1 175, B1 87, H1 102, h 100, a1 130, b1 92, g1 16 (mm); owner photos research/shop-evidence/2026-11-24/bs0-manual-p01.jpg and bs0-manual-p02.jpg, read 2026-11-24"]
+
 # --- carrier (MHA-CH-06-TL-21) plan workholding, tools and gauges ---------
 
 # The carrier plan's table setups (cad/process/ch_rocker_arm_tl_oblique_carrier):

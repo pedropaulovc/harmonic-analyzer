@@ -38,6 +38,9 @@ note = "Not owned: to buy (route A, owner ruling 2026-11-14, #2356)."
 diametral_pitch = 48
 pressure_angle_deg = 20.0
 bore_in = 0.875
+# Travers 10-289-482 page, Product Specifications (read 2026-11-22):
+# "Cutter Diameter 1-3/4""; the page gives no tooth count or width.
+dia_in = 1.75
 
 [tools.gear-cutters-48dp-20pa.members]
 1 = { sku = "10-289-481", teeth = [135, 100000], price_usd = 126.48, note = "pd-rack-pinion 150T" }

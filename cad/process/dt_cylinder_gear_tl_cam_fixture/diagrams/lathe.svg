@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 400" font-family="sans-serif" font-size="13">
+  <rect class="paper" x="0" y="0" width="760" height="400"/>
+  <text class="title" x="20" y="20">Setup 1: the 4 in bar in the 3-jaw; register turned, face F faced, disc parted off in one chucking</text>
+  <rect class="fixture-vise" x="40" y="60" width="120" height="280"/>
+  <rect class="part-rest" x="160" y="80" width="150" height="240"/>
+  <rect class="part-removed" x="310" y="80" width="200" height="18"/>
+  <rect class="part-removed" x="310" y="302" width="200" height="18"/>
+  <rect class="part-removed" x="510" y="80" width="12" height="240"/>
+  <rect class="part-waste" x="310" y="98" width="27" height="204"/>
+  <rect class="part-kept" x="337" y="98" width="173" height="204"/>
+  <line class="centre-line" x1="140" y1="200" x2="640" y2="200"/>
+  <line class="active-face" x1="510" y1="98" x2="510" y2="302"/>
+  <rect class="cutter" x="326" y="320" width="11" height="60"/>
+  <line class="leader" x1="560" y1="76" x2="512" y2="110"/>
+  <text class="label" x="530" y="70">face F (FRONT), faced first: DRO Z0</text>
+  <text class="label" x="350" y="215">disc Ø3.25 × 1.00</text>
+  <text class="label" x="345" y="375">P1 blade: part off 1.00 from F</text>
+  <text class="label" x="170" y="345">Ø4 rest, kept for a remake</text>
+  <text class="label" x="40" y="395">Register Ø3.25 ±.01 turned 1.15 long from F; F-to-register edge broken; the parted face is the BACK face.</text>
+</svg>

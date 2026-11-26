@@ -39,8 +39,12 @@ from _drawing_notes import add_property_linked_note
 from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
+from _feature_requirements import part_metadata, requirement
+from _gtol_cylinder import CylinderFace
+from _gtol_planar import PlanarFace
 from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
+from _printed_limits import limits
 from _session import run_build
 from solidworks_mcp.adapters.pywin32_adapter import null_callout
 from solidworks_mcp.adapters.solidworks.drawing import (
@@ -108,6 +112,183 @@ _CENTER_MARK_HANDLES = (0, 1, 2, 3)
 CENTRE_LINE_OVERRUN_MM = 0.5
 # Each ream's arms run this far past its rim.
 HOLE_ARM_OVERRUN_MM = 1.0
+
+# Feature-export declarations (export_features; cad/docs/pipeline/
+# features-travelers.md): what this sheet prints, beside the constants of the
+# code that prints it, in the part frame (build_dt_cylinder_gear_tl_cam_fixture:
+# the register axis is model Z through the origin, the back face Z0 faces the
+# chuck and the front face Z = THICKNESS seats the gear; the stub's through
+# ream stands on -Y, the clock pin's blind ream on +Y left of the vertical
+# centreline). Both reams are made from the front face, so each hole's entry
+# is on it and its axis runs -Z into the body. The register's diameter and the
+# thickness take the title block's .XX row on their printed nominal; each
+# hole station its printed +/-.0020 (spec POSITION_BAND) from the register
+# axis, unsigned (the side is the hole's `at`); each ream prints its reamer's
+# size and no band (fit audit 2026-11-23, rule 4 form 3: the pressed pin is
+# the gauge), so its "dia" is the spec's analysis band (REAM_H7, what the
+# reamer cuts) and its callout the acceptance; the pin hole's depth the .XX
+# row. The sheet prints no numbered
+# note and no roughness symbol (finish "as machined"); edge breaks are the
+# title block's general row. The declarations print nothing.
+_P = part.DRAWING_PRECISION_BY_NAME
+_SELF = "draw_dt_cylinder_gear_tl_cam_fixture"
+_BUILD = "build_dt_cylinder_gear_tl_cam_fixture"
+_FRAME = (_BUILD, "__frame__")
+_UNIT = part.UNIT
+_STATION_BAND = (part.POSITION_BAND, -part.POSITION_BAND)
+_STUB_AT = [0.0, -part.STUB_OFFSET, part.THICKNESS]
+_PIN_AT = [part.PIN_X, part.PIN_Y, part.THICKNESS]
+_INTO_BODY = (0.0, 0.0, -1.0)
+
+
+def _plane(value: float) -> dict[str, Any]:
+    return {"frame": "model", "axis": "z", "value": value}
+
+
+part_metadata(
+    model_sources=(_FRAME, "BODY_DIA", "THICKNESS", "STUB_OFFSET", "PIN_X", "PIN_Y"),
+    precision_sources=("DRAWING_PRECISION", "DRAWING_PRECISION_BY_NAME"),
+)
+# Both faces, square to the register: the back face (Z0) goes to the chuck;
+# the front face (Z = THICKNESS) seats the gear and both reams enter it.
+requirement(
+    "back_face",
+    kind="face",
+    faces=(PlanarFace((0.0, 0.0, -1.0), 0.0),),
+    requirements=("plane",),
+    fields={"plane": (_plane(0.0), (_FRAME,))},
+)
+requirement(
+    "front_face",
+    kind="face",
+    faces=(PlanarFace((0.0, 0.0, 1.0), part.THICKNESS),),
+    requirements=("plane",),
+    fields={"plane": (_plane(part.THICKNESS), (_FRAME, "THICKNESS"))},
+)
+# The turned register, Ø3.25 (BODY_DIA_ON_EDGE, moved off the face view), its
+# length the 1.00 thickness (EDGE_KEEP "BodyThick"): the OD TL-00 indicates
+# true in the 4-jaw, and every hole station's datum.
+requirement(
+    "register",
+    kind="outside_cylinder",
+    faces=(CylinderFace(part.BODY_DIA),),
+    requirements=("dia", "length"),
+    fields={
+        "at": ([0.0, 0.0, 0.0], (_FRAME,)),
+        "axis": ((0.0, 0.0, 1.0), (_FRAME,)),
+        "dia": (
+            limits(part.BODY_DIA, _P["BodyDia"], unit=_UNIT),
+            ("BODY_DIA", "UNIT", (_SELF, "BODY_DIA_ON_EDGE")),
+        ),
+        "nominal_dia": (part.BODY_DIA, ("BODY_DIA",)),
+        "length": (
+            limits(part.THICKNESS, _P["BodyThick"], unit=_UNIT),
+            ("THICKNESS", "UNIT", (_SELF, "EDGE_KEEP")),
+        ),
+        "length_nominal": (part.THICKNESS, ("THICKNESS",)),
+    },
+    precision={"dia": _P["BodyDia"], "length": _P["BodyThick"]},
+)
+# The stub's press ream (FACE_KEEP "StubHoleDia" with CALLOUTS_BELOW: REAM
+# THRU, press fit on the TL-VN-50 dowel), .3402 below the register axis on
+# the vertical centreline (FACE_KEEP "StubOffset").
+_STUB_CALLOUT = ("CALLOUTS_BELOW", (_SELF, "FACE_KEEP"))
+requirement(
+    "stub_hole",
+    kind="hole",
+    faces=(CylinderFace(part.STUB_HOLE_DIA),),
+    requirements=("dia", "thru", "station_y"),
+    fields={
+        "at": (_STUB_AT, (_FRAME, "STUB_OFFSET", "THICKNESS")),
+        "axis": (_INTO_BODY, (_FRAME,)),
+        "dia": (
+            limits(
+                part.STUB_HOLE_DIA,
+                _P["StubHoleDia"],
+                part.STUB_HOLE_DEVIATIONS[::-1],
+                unit=_UNIT,
+            ),
+            ("STUB_HOLE_DIA", "STUB_HOLE_DEVIATIONS", "UNIT", (_SELF, "FACE_KEEP")),
+        ),
+        "nominal_dia": (part.STUB_HOLE_DIA, ("STUB_HOLE_DIA",)),
+        "thru": (True, _STUB_CALLOUT),
+        "process": ("ream", _STUB_CALLOUT),
+        "callout": (part.CALLOUTS_BELOW["StubHoleDia"], _STUB_CALLOUT),
+        "mates": (part.STUB_NUMBER, ("STUB_NUMBER",)),
+        "diametral_interference": (
+            list(part.STUB_PRESS_INTERFERENCE),
+            ("STUB_PRESS_INTERFERENCE",),
+        ),
+        "station_y": (
+            limits(part.STUB_OFFSET, _P["StubOffset"], _STATION_BAND, unit=_UNIT),
+            ("STUB_OFFSET", "POSITION_BAND", "UNIT", (_SELF, "FACE_KEEP")),
+        ),
+        "station_y_nominal": (part.STUB_OFFSET, ("STUB_OFFSET",)),
+        "station_y_from": ("register", ((_SELF, "FACE_KEEP"),)),
+        "station_y_axis": ("y", (_FRAME,)),
+    },
+    precision={"dia": _P["StubHoleDia"], "station_y": _P["StubOffset"]},
+)
+# The clock pin's blind press ream (FACE_KEEP "PinHoleDia" with
+# CALLOUTS_BELOW: REAM .20 deep, press fit on the TL-VN-51 pin, a permanent
+# pair), .9246 above the register axis (FACE_KEEP "PinY") and .0704 left of
+# it (FACE_KEEP "PinX"). The model's floor is flat at the .20.
+_PIN_CALLOUT = ("CALLOUTS_BELOW", (_SELF, "FACE_KEEP"))
+requirement(
+    "pin_hole",
+    kind="hole",
+    faces=(
+        CylinderFace(part.PIN_HOLE_DIA),
+        PlanarFace((0.0, 0.0, 1.0), part.THICKNESS - part.PIN_HOLE_DEPTH),
+    ),
+    requirements=("dia", "depth", "station_x", "station_y"),
+    fields={
+        "at": (_PIN_AT, (_FRAME, "PIN_X", "PIN_Y", "THICKNESS")),
+        "axis": (_INTO_BODY, (_FRAME,)),
+        "dia": (
+            limits(
+                part.PIN_HOLE_DIA,
+                _P["PinHoleDia"],
+                part.PIN_HOLE_DEVIATIONS[::-1],
+                unit=_UNIT,
+            ),
+            ("PIN_HOLE_DIA", "PIN_HOLE_DEVIATIONS", "UNIT", (_SELF, "FACE_KEEP")),
+        ),
+        "nominal_dia": (part.PIN_HOLE_DIA, ("PIN_HOLE_DIA",)),
+        "process": ("ream", _PIN_CALLOUT),
+        "depth": (
+            limits(part.PIN_HOLE_DEPTH, part.PIN_HOLE_DEPTH_PLACES, unit=_UNIT),
+            ("PIN_HOLE_DEPTH", "PIN_HOLE_DEPTH_PLACES", "UNIT", *_PIN_CALLOUT),
+        ),
+        "depth_nominal": (part.PIN_HOLE_DEPTH, ("PIN_HOLE_DEPTH",)),
+        "callout": (part.CALLOUTS_BELOW["PinHoleDia"], _PIN_CALLOUT),
+        "mates": (part.CLOCK_PIN_NUMBER, ("CLOCK_PIN_NUMBER",)),
+        "diametral_interference": (
+            list(part.PIN_PRESS_INTERFERENCE),
+            ("PIN_PRESS_INTERFERENCE",),
+        ),
+        "station_x": (
+            limits(-part.PIN_X, _P["PinX"], _STATION_BAND, unit=_UNIT),
+            ("PIN_X", "POSITION_BAND", "UNIT", (_SELF, "FACE_KEEP")),
+        ),
+        "station_x_nominal": (-part.PIN_X, ("PIN_X",)),
+        "station_x_from": ("register", ((_SELF, "FACE_KEEP"),)),
+        "station_x_axis": ("x", (_FRAME,)),
+        "station_y": (
+            limits(part.PIN_Y, _P["PinY"], _STATION_BAND, unit=_UNIT),
+            ("PIN_Y", "POSITION_BAND", "UNIT", (_SELF, "FACE_KEEP")),
+        ),
+        "station_y_nominal": (part.PIN_Y, ("PIN_Y",)),
+        "station_y_from": ("register", ((_SELF, "FACE_KEEP"),)),
+        "station_y_axis": ("y", (_FRAME,)),
+    },
+    precision={
+        "dia": _P["PinHoleDia"],
+        "depth": part.PIN_HOLE_DEPTH_PLACES,
+        "station_x": _P["PinX"],
+        "station_y": _P["PinY"],
+    },
+)
 
 
 def _centre_mark(

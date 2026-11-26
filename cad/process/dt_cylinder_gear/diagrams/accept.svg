@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 400" font-family="sans-serif" font-size="13">
+  <!-- Setup 8, end views, not to scale: left, a gear hanging on the 3/8 setting mandrel in the V-blocks, a .040 pin in the top space under the DTI; right, two .040 pins in opposite spaces under the micrometer. -->
+  <rect class="paper" x="0" y="0" width="760" height="400"/>
+  <text class="title" x="20" y="22">Setup 8: each gear on its own: runout to its bore, over pins</text>
+  <rect class="fixture-support" x="110" y="300" width="140" height="50"/>
+  <circle class="part-kept" cx="180" cy="190" r="100"/>
+  <circle class="holes" cx="180" cy="190" r="16"/>
+  <circle class="fixture-support" cx="180" cy="187" r="14"/>
+  <circle class="clamp" cx="180" cy="86" r="5"/>
+  <rect class="cutter" x="174" y="40" width="12" height="40"/>
+  <line class="leader" x1="186" y1="60" x2="260" y2="60"/>
+  <text class="label" x="264" y="64">DTI on a .040 pin, every 10th space</text>
+  <line class="leader" x1="180" y1="187" x2="282" y2="215"/>
+  <text class="label" x="286" y="219">setting mandrel, bore on top</text>
+  <line class="leader" x1="200" y1="325" x2="300" y2="330"/>
+  <text class="label" x="304" y="334">V-blocks</text>
+  <circle class="part-kept" cx="590" cy="190" r="100"/>
+  <circle class="clamp" cx="590" cy="86" r="5"/>
+  <circle class="clamp" cx="590" cy="294" r="5"/>
+  <rect class="fixture-vise" x="580" y="56" width="20" height="25"/>
+  <rect class="fixture-vise" x="580" y="299" width="20" height="25"/>
+  <line class="leader" x1="600" y1="68" x2="660" y2="50"/>
+  <text class="label" x="600" y="45">micrometer over two pins</text>
+  <text class="label" x="400" y="370">Over pins less O.D. .0252-.0291; runout .002 TIR max.</text>
+</svg>

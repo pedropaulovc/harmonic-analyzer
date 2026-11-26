@@ -1,43 +1,434 @@
-# Placeholder process plan (owner 2026-11-19): the tools this part needs, from
-# the drawing cross-check of 2026-11-19, until its traveler is written. Not
-# enrolled in _process_plans.TRAVELER_STEMS; see cad/process/README.md, "Placeholder plans".
-title = "Cylinder Gear Cam Turning Fixture"
-part = "MHA-DT-12-TL-01 Cylinder Gear Cam Turning Fixture"
-revision = "placeholder"
-material = "low-carbon cold-finished steel round, 3-1/2 in, ASTM A108 (1018)"
-stock = "To be written"
+# Cylinder gear cam turning fixture body MHA-DT-12-TL-01 (qty 1), from the
+# 4 in round 1018 CF piece on hand. Route, chosen for speed (owner ruling
+# 2026-11-21: the agent picks the faster route and says why; the owner
+# corrects afterwards):
+# - Setup 1, PM-1127VF-LB lathe, 6 in 3-jaw, manual (turned setups get no NC,
+#   owner 2026-11-21): one chucking, as the registry's process row says.
+#   Face face F (the front face, which seats the gear), turn the Ø3.25
+#   register 1.15 long, break the edge, part off 1.00 from F on the P1 blade:
+#   the parted face is the back face, so the register and face F are square
+#   to each other from one cut and no second chucking bruises the register
+#   TL-00 indicates. The stock is the on-hand 4 in round x 3 in piece
+#   (stock.1018-round-4, freed when MHA-MG-05 became a casting): nothing to
+#   order, and its rest makes a second disc if the first is scrapped. The
+#   3-1/2 in round the registry names is not on hand.
+# - Setup 2, PM-30MV CNC, vise: the disc back face down on 1 in parallels,
+#   gripped across the register. X0 is edge-found on both sides of the
+#   register (no diameter in it), Y0 from the fixed jaw by half the
+#   calipered register; the throw line runs along X so the two long
+#   stations (.3402 and .9246) ride on the both-sides pick-up. CF01 spots,
+#   drills 23/64 and reams .3740 through for the stub; CF02 spots, drills #65
+#   and reams .0365 .20 deep for the clock pin. The touch probe is not
+#   wired, so the edge finder picks up the register.
+# - Setup 3, bench: deburr, oil. The stub and clock pin are pressed at
+#   MHA-DT-12-TL-00, not here.
+# To order before Setup 2 runs: the .3740 reamer (tools.reamer-3740,
+# McMaster 3087A55), the #65 drill (tools.drill-65), the .0365 reamer
+# (tools.reamer-0365, KBC 5-018-0365), and the two pressed parts tried at
+# the holes: the stub dowel MHA-DT-12-TL-VN-50 and the clock pin
+# MHA-DT-12-TL-VN-51.
+# Fits (owner 2026-11-23/24; fit audit fit-audit-2026-11-23 README, "the
+# fixture's stub and clock-pin holes are presses, and the press is the
+# check"; policy PR #3513, tracking issue #3511): no plug gauge pair is
+# bought. Each hole is reamed with its reamer and tried with its own pin,
+# which must not enter by hand. The sheet prints the same, each reamer's
+# size and no band (#3524): PRESS FIT ON TL-VN-50, DOES NOT TURN BY HAND and
+# PRESS FIT ON TL-VN-51, PERMANENT PAIR. Those are read after the press, at
+# MHA-DT-12-TL-00; here each hole is proved a press before the disc leaves
+# the vise. cad.stub_hole_dia_* and cad.pin_hole_dia_* are the spec's
+# analysis bands (what each reamer cuts).
+# Mill speeds are the spindle's stops, 107.7 rpm apart (#3439): 1831, 646,
+# 323, 2800, 1400 and, for the edge finder, 969.
+#
+# NC (cam:dt_cylinder_gear_tl_cam_fixture, cad/process/
+# dt_cylinder_gear_tl_cam_fixture/cam.py): CF01_stub_hole, CF02_pin_hole.
+# Program names, the [parameters] and the milling_cuts names are a contract
+# with that recipe. Tool numbers are the places in the tools list among the
+# mill's tools: T1 centre drill, T2 23/64 drill, T3 .3740 reamer, T4 #65
+# drill, T5 .0365 reamer.
+title = "Cylinder gear cam turning fixture body"
+part = "{{cad.drawing_number}}"
+revision = "{{cad.revision}}"
+material = "1018 cold-finished steel, 4 in round (drawing: {{cad.material_name}})"
+stock = "{{process.bar_dia_in:.2f}} in round 1018 CF, the {{process.bar_length_in:.2f}} in piece on hand: one disc ({{process.quantity:d}} off) from one chucking; the rest is kept for a remake."
+note = "Inches unless mm; G-code and console entries in mm (the files and the controller run G21). Finished Ø{{cad.register_dia_min_in:.3dot}}–{{cad.register_dia_max_in:.3dot}} × {{cad.register_length_min_in:.3dot}}–{{cad.register_length_max_in:.3dot}} thick; the stub hole Ø{{cad.stub_hole_dia_min_in:.4dot}} reamed through (press fit on the stub dowel), the clock-pin hole Ø{{cad.pin_hole_dia_min_in:.4dot}} reamed (press fit on the clock pin) × {{cad.pin_hole_depth_min_in:.3dot}}–{{cad.pin_hole_depth_max_in:.3dot}} deep, both from face F. Lathe on its low range (70–380 rpm); mill speeds on the PM-30MV low belt (100–2800 rpm). Home the mill ($H) and touch off G54 at the start of the mill setup; after any controller reset, stall or E-stop, home and touch off again before Cycle Start. Every file is proved in air first. Cutting oil on the steel. Edges: R{{cad.edge_break_in:.3dot}} or chamfer {{cad.chamfer_max_in:.3dot}} max."
 shop = "../shop"
 stock_refs = ["1018-round-4"]
+material_key = "rocker-1018-cold-finished"
+milling_material = "steel_1018"
+
+[cad]
+file = "../../out/features/dt_cylinder_gear_tl_cam_fixture/features.toml"
+adapter = "drilled_block"
+part = "dt-cylinder-gear-tl-cam-fixture"
+
+[parameters]
+quantity = 1
+bar_dia_in = 4.0
+bar_length_in = 3.0
+# The P1 cutoff blade's width: its record (cad/config/shop-equipment/
+# tools-cutting.toml tools.cutoff-blade-p1 width_in, the makers' 1/16 in),
+# and the kerf it cuts, a little over it for wander.
+blade_width_in = 0.0625
+part_kerf_in = 0.075
+# The 3-jaw grips 1.00 of the 3.00 piece: 2.00 out. The register is turned
+# 1.15 from face F (the 1.00 disc, the P1 kerf and room past it), so the Ø4
+# shoulder behind it stays .85 clear of the jaw fronts.
+stickout_mm = 50.8
+grip_in = 1.0
+turn_length_in = 1.15
+# The blank a disc is cut from (stock_fit: envelope X, Y, Z): the bar's
+# diameter, and face F's .030 clean-up, the 1.00 disc and the kerf.
+blank_x_in = 4.0
+blank_y_in = 4.0
+blank_z_in = 1.11
+# Turning (A R Warner AR holder, TCMT insert, carbide): LittleMachineShop
+# "Cutting Speeds" (read 2026-11-20), plain carbon steels with carbide well
+# over 300 ft/min; 200 rpm on the Ø4 bar is 209 ft/min, the author's choice
+# for a hobby lathe on an interrupted sawn end. Parting at 80 rpm: 68 ft/min
+# at Ø3.25, HSS's low end (the same table), falling toward the axis.
+turn_rpm = 200
+part_rpm = 80
+# The P1 blade stands out of the No. 7 holder 1.75 in: the Ø3.25 radius
+# (1.625) and .125 to spare.
+blade_out_in = 1.75
+# CF01/CF02: the disc back face down on the 1 in parallels, 1/8 in thick,
+# one against each jaw; the jaws grip the register over the jaw height less
+# the parallels, and face F stands above the jaw tops.
+parallel_height_mm = 25.4
+parallel_thickness_mm = 3.175
+vise_jaw_height_mm = 44.9453     # Shop workholding.vise-pm-6.jaw_height_mm.
+vise_jaw_width_mm = 158.6738     # Shop workholding.vise-pm-6.jaw_width_mm.
+vise_bed_height_mm = 73.3044     # Shop workholding.vise-pm-6.bed_height_mm.
+grip_mm = 19.5453
+jaw_top_below_z0_mm = 5.8547
+# Gap between the parallels under the disc (register less two parallels):
+# the stub drill and reamer run out into it.
+parallel_gap_mm = 76.2
+# The stub hole: spot Ø.160 with the #2 centre drill (under the 23/64, no
+# chamfer at the press mouth), 23/64 (.3594) through in one feed (L/D 2.8,
+# under prechips' chip-break L/D 3), its full diameter 1.0 mm past the back face; then
+# the .3740 reamer through, 1.5 mm past it, fed in and fed out with the
+# spindle running. Tips below face F (Z0): the drill 25.4 + 1.0 + its 118°
+# point 2.742; the reamer 25.4 + 1.5. cam.py checks both.
+stub_spot_dia_mm = 4.064
+drill_past_mm = 1.0
+ream_past_mm = 1.5
+stub_drill_tip_mm = -29.142
+stub_ream_tip_mm = -26.9
+# The clock-pin hole: spot Ø.030 with the centre drill's pilot point only
+# (under the #65's .0350), #65 in pecks of .020 with full retracts, its full
+# diameter to .230 below face F (.025 under the reamer's end); then the
+# .0365 reamer, its end at .205, so its full diameter passes .200 whatever
+# its short 45° lead. cam.py checks both against the depth band.
+pin_spot_dia_mm = 0.762
+pin_peck_mm = 0.508
+pin_drill_full_mm = 5.842
+pin_drill_tip_mm = -6.109
+pin_ream_tip_mm = -5.207
+# Speeds and feeds, authored in the operations: LittleMachineShop "Cutting
+# Speeds", Drilling & Reaming, Plain carbon steels 1006-1026 (read
+# 2026-11-20): drilling 60-100 ft/min; AutoDrill "Suggested drilling feed
+# rates" (read 2026-11-20), row Stl, Carbon: 1/16 in .001, 3/8 in .006 in/rev.
+# Centre drill 1831 rpm × .001 = 1.8 in/min (the pinion cam's spot); 23/64 at
+# 646 rpm (61 ft/min) × .0043 = 2.8 in/min; the .3740 reamer at 323 rpm
+# (32 ft/min, half the drilling speed) × .0056 = 1.8 in/min. The #65
+# (.035) at the spindle's 2800 (26 ft/min, the most the mill turns) × .0005
+# = 1.4 in/min, under the 1/16 column; the pilot spot the same; the .0365
+# reamer at 1400 rpm × .0005 = .7 in/min.
+stub_spot_feed_per_min_mm = 45.72
+drill_23_64_feed_per_min_mm = 71.12
+ream_3740_feed_per_min_mm = 45.72
+pin_spot_feed_per_min_mm = 35.56
+drill_65_feed_per_min_mm = 35.56
+ream_0365_feed_per_min_mm = 17.78
+# The pick-up check: the edge finder read back on both of the register's
+# sides at Y0 must give equal and opposite X readings; their sum is twice the
+# centre's error, held to .0005 in (a centre off by .00025, an eighth of the
+# stations' ±.002).
+pickup_check_mm = 0.0127
+# The air prove-out lifts Z0 1.50 in: the deepest tip (the 23/64's, 1.147 in
+# below face F) then stops .353 above it. cam.py checks it.
+prove_raise_mm = 38.1
 
 [[tools]]
-id = "jig-drill-23-64"
+id = "turn"
+name = "AR carbide turning tool"
+ref = "lathe-ar"
+[[tools]]
+id = "cutoff"
+name = "P1 HSS cutoff blade"
+ref = "cutoff-blade-p1"
+[[tools]]
+id = "spot"
+name = "#2 centre drill"
+ref = "jig-spot"
+[[tools]]
+id = "drill-23-64"
 name = "23/64 drill"
-ref = "jig-drill-23-64"  # drawing cross-check 2026-11-19: pre-drill for the .3740 ream (spec)
-
+ref = "jig-drill-23-64"
 [[tools]]
 id = "reamer-3740"
 name = ".3740 reamer"
-ref = "reamer-3740"  # drawing cross-check 2026-11-19: stub hole Ø.3740 +.0005 REAM (spec)
-
+ref = "reamer-3740"
+status = "to_order"
 [[tools]]
 id = "drill-65"
 name = "#65 drill"
-ref = "drill-65"  # Codjiflo round 1: pre-drill for the .0365 clock-pin ream (spec PIN_HOLE)
-
+ref = "drill-65"
+status = "to_order"
 [[tools]]
 id = "reamer-0365"
 name = ".0365 reamer"
-ref = "reamer-0365"  # drawing cross-check 2026-11-19: clock-pin hole Ø.0365 +.0005 REAM .20 (spec)
-
+ref = "reamer-0365"
+status = "to_order"
 [[tools]]
-id = "gauge-blocks-mitutoyo"
-name = "Gauge blocks"
-ref = "gauge-blocks-mitutoyo"  # drawing cross-check 2026-11-19: throw set .1004 + .130 + .450 (spec)
+id = "files"
+name = "Files"
+ref = "jig-files"
+[[tools]]
+id = "deburr"
+name = "Deburring scraper and countersink set"
+ref = "deburring-set"
+
+[[setups]]
+machine_kind = "lathe"
+title = "Turn the register, face F and part off"
+machine = "PM-1127VF-LB lathe / 6 in 3-jaw"
+indexing = "none"
+machine_ref = "pm-1127vf-lb"
+holding = "The 4 in bar in the 3-jaw, gripped {{process.grip_in:.2f}} in, {{process.stickout_mm:in.2f}} in out of the jaw fronts, its sawn end out. The disc comes from this one chucking."
+datum = "Z0 (carriage DRO) the bar end faced in Op 10: face F, the FRONT face (it seats the gear; both holes enter it)."
+diagram = { file = "diagrams/lathe.svg", alt = "The 4 in bar in the 3-jaw: face F faced, the register turned to Ø3.25 for 1.15 in, the disc parted off 1.00 from F; the Ø4 rest stays in the jaws." }
+lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = 101.6, stock_diameter_mm = 101.6, stickout_mm = "{{process.stickout_mm}}", minimum_diameter_mm = "{{cad.register_dia_mm}}", support = "none" }
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "turn"
+drilling = "none"
+sizing = "other"
+instruction = "Face the sawn end clean, about .030 off; {{process.turn_rpm:d}} rpm, cutting oil. Touch the tool on the faced end and set DRO Z0 there. Mark it F with a marker dot near its centre: it is the FRONT face."
+rpm = 200
+feed = "hand"
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "turn"
+drilling = "none"
+sizing = "other"
+instruction = "Turn the O.D. from F to DRO Z-{{process.turn_length_in:.2f}}: rough at .040 a side to Ø3.270, then one finish pass at .003 in/rev power feed to Ø{{cad.register_dia_min_in:.3dot}}–{{cad.register_dia_max_in:.3dot}} (aim {{cad.register_dia_in:.3dot}}); {{process.turn_rpm:d}} rpm, cutting oil. This O.D. is the register."
+rpm = 200
+feed = "0.003 in/rev"
+inspection = "Register Ø{{cad.register_dia_min_in:.3dot}}–{{cad.register_dia_max_in:.3dot}}, calipers, at both ends of the turned length."
+gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.register_dia_band_mm}}" }]
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "files"
+drilling = "none"
+sizing = "other"
+instruction = "Break the F-to-register edge with a smooth file held flat, {{cad.chamfer_max_in:.3dot}} max; 70 rpm."
+rpm = 70
+feed = "hand"
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "other"
+tool = "cutoff"
+drilling = "none"
+sizing = "other"
+instruction = "P1 blade in the No. 7 holder, {{process.blade_out_in:.2f}} in out (it reaches the axis with .125 to spare), square to the axis, its edge on centre. Bring the blade's chuck-side face onto face F and set DRO Z there to the blade's width, miked across its cutting edge ({{process.blade_width_in:.4dot}} nominal): the DRO then reads the blade's tailstock-side face."
+feed = "hand"
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "cutoff"
+drilling = "none"
+sizing = "other"
+instruction = "Part off with that face at Z-{{cad.register_length_in:.3dot}}; {{process.part_rpm:d}} rpm, cutting oil, a steady hand feed that never stops in the cut. Hands clear: let the disc fall; pick it up from the bed or the chip tray only after the spindle has stopped. The parted face is the BACK face."
+rpm = 80
+feed = "hand"
+inspection = "Thickness {{cad.register_length_min_in:.3dot}}–{{cad.register_length_max_in:.3dot}}, calipers, at three places round the rim."
+gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.register_length_band_mm}}" }]
+
+[[setups.operations]]
+cut_kind = "other"
+instruction = "Register or thickness out of band: the disc is scrap, not reworked. Make another by repeating Setup 1 on the rest of the bar (about 1.9 in), gripped .60 in, 1.30 in out."
+feed = "hand"
 
 [[setups]]
 machine_kind = "other"
-machine = "To be written"
-title = "Traveler to come"
+title = "Drill and ream the stub and clock-pin holes"
+machine = "PM-30MV CNC (FluidNC, CNCjs with the electronic tool setter) / vise, swivel off"
+indexing = "none"
+machine_ref = "pm-30mv"
+holding = "The PM 6 in vise (jaws {{process.vise_jaw_height_mm:in.2f}} tall above its seat; check with the calipers). A 1 in parallel, 1/8 in thick, against each jaw. The disc on both, BACK face down, face F up, gripped across the register, centred on the jaws, at any turn about its axis (nothing on it locates it yet): its lower {{process.grip_mm:in.3dot}} is in the jaws, face F {{process.jaw_top_below_z0_mm:in.3dot}} above the jaw tops. Tap it down onto both parallels while closing the vise. Both holes lie in the {{process.parallel_gap_mm:in.2f}} gap between the parallels."
+datum = "Programs CF01_stub_hole and CF02_pin_hole (cam:dt_cylinder_gear_tl_cam_fixture). G54: X0 Y0 the register axis, Z0 face F; +X along the jaws, +Y toward the fixed jaw. The stub hole at X-{{cad.stub_hole_station_y_mm:.3f}} Y0, the clock-pin hole at X{{cad.pin_hole_station_y_mm:.3f}} Y{{cad.pin_hole_station_x_mm:.3f}} (mm). Tool lengths from the tool setter at each M6."
+diagram = { file = "diagrams/mill.svg", alt = "The disc face F up in the vise on two parallels, gripped across its register; the stub hole {{cad.stub_hole_station_y_in:.4dot}} one way along the jaws from the register axis, the clock-pin hole {{cad.pin_hole_station_y_in:.4dot}} the other way and {{cad.pin_hole_station_x_in:.4dot}} toward the fixed jaw." }
+envelope = "other"
+vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{cad.register_dia_mm}}", along_jaws_mm = "{{cad.register_dia_mm}}", part_height_mm = "{{cad.envelope_z_mm}}", parallel_height_mm = "{{process.parallel_height_mm}}", overhang_mm = [-38.0619, "rest"], jaw_offset = "centred", fixed_jaw_face = "machined", moving_jaw_face = "machined", moving_jaw_contact = "rod" }
+beam = { axis = "z", hold = "cantilever", extent_mm = [0, "{{cad.envelope_z_mm}}"], clamp_mm = [0, "{{process.grip_mm}}"], section_mm = { diameter = "{{cad.register_dia_mm}}" }, vise_left = "other" }
 
 [[setups.operations]]
-instruction = "Process not written yet."
+speed_kind = "other"
+tool = "files"
+drilling = "none"
+sizing = "other"
+instruction = "Before loading, at the bench vise (soft jaws): file the parting pip on the back face flush and break the back edge, {{cad.chamfer_max_in:.3dot}} max, so the back face sits flat on the parallels."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Start only with the .3740 and .0365 reamers, the #65 drill, the stub dowel MHA-DT-12-TL-VN-50 and the clock pin MHA-DT-12-TL-VN-51 in hand (all to order). Caliper the register across three diameters and write the mean on a tag."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Home the mill ($H) if it has not been homed this session. G54 Y0: the register axis, half the tagged register from the fixed jaw."
+instruction_detailed = "Home the mill ($H) if it has not been homed this session. Edge finder (set 969) on the fixed jaw's face beside the disc: G10 L20 P1 Y(half the tagged register in mm − 2.540); for 3.250, Y38.735. MDI G0 Y0."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "G54 X0: the register axis, midway between its left and right sides at Y0."
+instruction_detailed = "Edge finder down beside the register at Y0, on its LEFT side from the left: G10 L20 P1 X0. On its RIGHT side from the right: G10 L20 P1 X(half the DRO X reading)."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Check the pick-up: at Y0 edge-find the register's left side from the left, then its right side from the right, and add the two DRO X readings."
+feed = "hand"
+inspection = "The sum within {{process.pickup_check_mm:.4f}} mm ({{process.pickup_check_mm:in.4dot}} in) of 0."
+gauge_checks = [{ gauge = "mill-x-dro", band_mm = [0.0, "{{process.pickup_check_mm}}"] }]
+
+[[setups.operations]]
+instruction = "Sum off by more: repeat Op 100 and this check. The hole stations are not gauged after cutting: they are the programs' coordinates from this pick-up."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "G54 Z0: face F, the centre drill's point on a .002 feeler leaf at X0 Y-20.000; Z set before any Z move."
+instruction_detailed = "Console M6 T1 (#2 centre drill; the tool setter measures it). MDI G0 X0 Y-20.000 (X and Y only, at the homed Z; on face F, clear of both holes). Spindle stopped, jog Z down until its point just drags a .002 leaf there: G10 L20 P1 Z0.051. Only then MDI G0 Z5."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Prove CF01_stub_hole and CF02_pin_hole in air with Z0 raised {{process.prove_raise_mm:in.2f}} in, more than the deepest tip (the 23/64's, Z{{process.stub_drill_tip_mm:.3f}} mm), watching each move clear the jaws. Then put Z0 back."
+instruction_detailed = "Send $# and note the G54 line's Z. G10 L2 P1 Z(that Z + {{process.prove_raise_mm:.3f}}): the deepest tip, the 23/64's Z{{process.stub_drill_tip_mm:.3f}}, then stops above face F. Run each file through every M6. G10 L2 P1 Z(the noted Z) puts Z0 back."
+feed = "hand"
+
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "spot"
+drilling = "none"
+sizing = "other"
+instruction = "Run CF01_stub_hole (M6 T1, centre drill; set 1831): spot Ø{{process.stub_spot_dia_mm:in.3dot}} at X-{{cad.stub_hole_station_y_mm:.3f}} Y0, under the 23/64 drill."
+rpm = 1831
+feed = "{{process.stub_spot_feed_per_min_mm:in.1f}} in/min"
+milling_cuts = [
+  { name = "stub spot", kind = "drill", phase = "rough", cutter_dia_mm = "{{process.stub_spot_dia_mm}}", flutes = 2, rpm = 1831, feed_mm_min = "{{process.stub_spot_feed_per_min_mm}}", stations_mm = "{{cad.envelope_z_mm}}" },
+]
+
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "drill-23-64"
+drilling = "twist_drill"
+sizing = "other"
+instruction = "Same file, M6 T2 (set 646): 23/64 drill through in one feed (L/D 2.8), its full diameter {{process.drill_past_mm:in.3dot}} past the back face into the gap. Cutting oil."
+rpm = 646
+feed = "{{process.drill_23_64_feed_per_min_mm:in.1f}} in/min"
+hole_depth_mm = "{{cad.envelope_z_mm}}"
+peck = "none"
+milling_cuts = [
+  { name = "stub drill", kind = "drill", phase = "rough", cutter_dia_mm = 9.128125, flutes = 2, rpm = 646, feed_mm_min = "{{process.drill_23_64_feed_per_min_mm}}", stations_mm = "{{cad.envelope_z_mm}}" },
+]
+
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "reamer-3740"
+drilling = "none"
+sizing = { kind = "band", band_mm = "{{cad.stub_hole_dia_band_mm}}" }
+instruction = "Same file, M6 T3 (set 323): .3740 reamer through, {{process.ream_past_mm:in.3dot}} past the back face, fed in and fed back out with the spindle running: no rapid leaves the hole. Plenty of cutting oil."
+rpm = 323
+feed = "{{process.ream_3740_feed_per_min_mm:in.1f}} in/min"
+milling_cuts = [
+  { name = "stub ream", kind = "drill", phase = "finish", cutter_dia_mm = 9.4996, flutes = 6, rpm = 323, feed_mm_min = "{{process.ream_3740_feed_per_min_mm}}", stations_mm = "{{cad.envelope_z_mm}}" },
+]
+inspection = "Stub hole, before unclamping: reamed clean through (visual), and the stub dowel MHA-DT-12-TL-VN-50, offered to the hole's mouth by hand, does not enter (it is pressed in at MHA-DT-12-TL-00; pressed home there, it does not turn by hand)."
+gauge_checks = "other"
+
+[[setups.operations]]
+instruction = "The stub dowel enters by hand: the hole is oversize and the disc is scrap; make another from Setup 1."
+feed = "hand"
+
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "spot"
+drilling = "none"
+sizing = "other"
+instruction = "Run CF02_pin_hole (M6 T1, centre drill; set 2800): spot Ø{{process.pin_spot_dia_mm:in.3dot}} with the pilot's point only at X{{cad.pin_hole_station_y_mm:.3f}} Y{{cad.pin_hole_station_x_mm:.3f}}, under the #65."
+rpm = 2800
+feed = "{{process.pin_spot_feed_per_min_mm:in.1f}} in/min"
+milling_cuts = [
+  { name = "pin spot", kind = "drill", phase = "rough", cutter_dia_mm = "{{process.pin_spot_dia_mm}}", flutes = 2, rpm = 2800, feed_mm_min = "{{process.pin_spot_feed_per_min_mm}}", stations_mm = "{{cad.envelope_z_mm}}" },
+]
+
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "drill-65"
+drilling = "twist_drill"
+sizing = "other"
+instruction = "Same file, M6 T4 (set 2800): #65 drill in pecks of {{process.pin_peck_mm:in.3dot}} with full retracts, its full diameter {{process.pin_drill_full_mm:in.3dot}} below face F. Cutting oil; a #65 breaks easily: stop at any squeal."
+rpm = 2800
+feed = "{{process.drill_65_feed_per_min_mm:in.1f}} in/min"
+hole_depth_mm = "{{process.pin_drill_full_mm}}"
+peck = { step_mm = 0.508, retract = "full" }
+milling_cuts = [
+  { name = "pin drill", kind = "drill", phase = "rough", cutter_dia_mm = 0.889, flutes = 2, rpm = 2800, feed_mm_min = "{{process.drill_65_feed_per_min_mm}}", stations_mm = "{{cad.envelope_z_mm}}" },
+]
+
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "reamer-0365"
+drilling = "none"
+sizing = { kind = "band", band_mm = "{{cad.pin_hole_dia_band_mm}}" }
+instruction = "Same file, M6 T5 (set 1400): .0365 reamer down to Z{{process.pin_ream_tip_mm:.3f}} (its end), fed in and fed back out with the spindle running. Cutting oil."
+rpm = 1400
+feed = "{{process.ream_0365_feed_per_min_mm:in.1f}} in/min"
+milling_cuts = [
+  { name = "pin ream", kind = "drill", phase = "finish", cutter_dia_mm = 0.9271, flutes = 4, rpm = 1400, feed_mm_min = "{{process.ream_0365_feed_per_min_mm}}", stations_mm = "{{cad.envelope_z_mm}}" },
+]
+inspection = "Pin hole, before unclamping: the clock pin MHA-DT-12-TL-VN-51, offered to the hole's mouth by hand, does not enter (it is pressed in for good at MHA-DT-12-TL-00). Reamed depth {{cad.pin_hole_depth_min_in:.3dot}}–{{cad.pin_hole_depth_max_in:.3dot}}: take the .0365 reamer out of its holder, mike its length, stand it flutes down in the hole by finger until it stops on the end of its own bore (the #65 hole below is too small for it), and caliper its stand-out above face F; the length less the stand-out is the depth."
+gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.pin_hole_depth_band_mm}}" }]
+
+[[setups.operations]]
+instruction = "The clock pin enters by hand, or the depth is out: the disc is scrap; make another from Setup 1."
+feed = "hand"
+
+[[setups]]
+machine_kind = "other"
+title = "Deburr and oil"
+machine = "Bench"
+indexing = "none"
+diagram = { file = "diagrams/inspect.svg", alt = "The finished disc, face F up: the stub hole through on one side of the register axis, the clock-pin hole on the other; every edge broken." }
+envelope = "other"
+vise_hold = "other"
+beam = "other"
+
+[[setups.operations]]
+speed_kind = "other"
+tool = "deburr"
+drilling = "none"
+sizing = "other"
+instruction = "Take the burr off both stub-hole mouths and the clock-pin hole's mouth with the scraper, a light turn only: no chamfer over {{cad.chamfer_max_in:.3dot}}. Blow the chips out of both holes."
+feed = "hand"
+
+[[setups.operations]]
+speed_kind = "other"
+tool = "files"
+drilling = "none"
+sizing = "other"
+instruction = "Check every edge of the register and both faces is broken, R{{cad.edge_break_in:.3dot}} or chamfer {{cad.chamfer_max_in:.3dot}} max; touch up with the smooth file."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Wipe on ISO VG 32 oil. The disc leaves bare: the stub (TL-VN-50) and the clock pin (TL-VN-51) are pressed at MHA-DT-12-TL-00, not here."
+feed = "hand"

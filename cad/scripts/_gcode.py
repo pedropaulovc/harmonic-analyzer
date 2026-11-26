@@ -147,6 +147,11 @@ class Program:
     probes: tuple[Probe, ...] = ()
     # Set on the slices :meth:`tool_sections` returns.
     section: int | None = None
+    # Every M3/M4 in file order, as (line, moves before it).
+    starts: tuple[tuple[int, int], ...] = ()
+    # Moves of the whole program before ``moves[0]``: stops and starts count
+    # moves from the program's start, on a section too.
+    first_move: int = 0
 
     @property
     def name(self) -> str:
@@ -188,6 +193,8 @@ class Program:
                 tuple(n for n in self.machine_moves if first <= n < last),
                 tuple(p for p in self.probes if first <= p.line < last),
                 index,
+                starts=tuple(s for s in self.starts if first <= s[0] < last),
+                first_move=start,
             ))
         return sections
 
@@ -221,6 +228,7 @@ def read_program(path: Path) -> Program:
     moves: list[Move] = []
     stops: list[Stop] = []
     spindle: list[tuple[int, float]] = []
+    starts: list[tuple[int, int]] = []
     machine_moves: list[int] = []
     probes: list[Probe] = []
     previous = ""
@@ -247,6 +255,7 @@ def read_program(path: Path) -> Program:
                 stops.append(Stop(number, kind, comment, (position[0], position[1], position[2]), len(moves), tool, spindle_on))
         if mcodes & {3, 4}:
             spindle_on = True
+            starts.append((number, len(moves)))
         if 5 in mcodes:
             spindle_on = False
         if raw.strip():
@@ -304,7 +313,7 @@ def read_program(path: Path) -> Program:
                 feed=None if motion is Motion.RAPID else feed, centre=centre, plane=plane,
             ))
         position = target
-    return Program(Path(path), tuple(moves), tuple(stops), tuple(spindle), tuple(machine_moves), tuple(probes))
+    return Program(Path(path), tuple(moves), tuple(stops), tuple(spindle), tuple(machine_moves), tuple(probes), starts=tuple(starts))
 
 
 @dataclass(frozen=True)
@@ -775,6 +784,74 @@ def check_no_return(program: Program, axis: str, span: float) -> list[Finding]:
         for m in program.moves
         if m.motion is Motion.RAPID and abs(m.end[i] - m.start[i]) > span
     ]
+
+
+def check_indexed_passes(
+    program: Program,
+    ends: tuple[float, float],
+    y: float,
+    first: float,
+    messages: Sequence[str],
+    rapid_y_max: float,
+    z: float = 0.0,
+) -> list[Finding]:
+    """Tooth spaces cut one per dividing-head index by a disc cutter lying in
+    the XY plane at ``z`` (the work's axis height). One straight X pass per
+    space between ``ends`` (both X clear of the work), every pass at the one
+    depth ``y`` (Y does not move between spaces, so the axis's repeatability
+    stays out of the depth), alternating direction from ``first`` (+1/-1):
+    each pass ends where the next begins and no form cutter is drawn back
+    through a cut space. Between passes one ``M0`` with the spindle off, the
+    cutter at the end that pass reached, its operator comment ``messages[i]``
+    in order (the index to make), and an ``M3``/``M4`` (the spindle restarted)
+    after it and before the next pass's first move. Every feed move is a pass or a Y move at an end;
+    every rapid stays at or below ``rapid_y_max`` (outside the work)."""
+    name = program.name
+    findings: list[Finding] = []
+    passes: list[tuple[int, Move]] = []
+    for index, m in enumerate(program.moves, program.first_move):
+        if m.length <= _TOL_MM:
+            continue
+        where = f"X{m.start[0]:.3f} Y{m.start[1]:.3f} Z{m.start[2]:.3f} -> X{m.end[0]:.3f} Y{m.end[1]:.3f} Z{m.end[2]:.3f}"
+        if not (_close(m.start[2], z) and _close(m.end[2], z)):
+            findings.append(Finding(name, "indexed_passes", f"{m.motion.name} off the axis height Z{z:.3f}: {where}"))
+        if m.motion is Motion.RAPID:
+            if max(m.start[1], m.end[1]) > rapid_y_max + _TOL_MM:
+                findings.append(Finding(name, "indexed_passes", f"rapid past Y{rapid_y_max:.3f} into the work: {where}"))
+            continue
+        along = not _close(m.start[0], m.end[0])
+        if along and _close(m.start[1], m.end[1]):
+            if not _close(m.start[1], y):
+                findings.append(Finding(name, "indexed_passes", f"pass at Y{m.start[1]:.3f}, not the depth Y{y:.3f}: {where}"))
+            if sorted((round(m.start[0], 3), round(m.end[0], 3))) != sorted(round(e, 3) for e in ends):
+                findings.append(Finding(name, "indexed_passes", f"pass not end to end X{ends[0]:.3f}..X{ends[1]:.3f}: {where}"))
+            passes.append((index, m))
+        elif along or not any(_close(m.start[0], e) for e in ends):
+            findings.append(Finding(name, "indexed_passes", f"feed move neither a pass nor a Y move at an end: {where}"))
+    if len(passes) != len(messages) + 1:
+        findings.append(Finding(name, "indexed_passes", f"{len(passes)} passes, expected {len(messages) + 1} (one per index, and the first)"))
+    for k, (_index, m) in enumerate(passes):
+        want = first if k % 2 == 0 else -first
+        if (m.end[0] - m.start[0]) * want <= 0:
+            findings.append(Finding(name, "indexed_passes", f"pass {k + 1} runs {'+' if m.end[0] > m.start[0] else '-'}X, expected {'+' if want > 0 else '-'}X (alternating)"))
+    stops = program.pauses
+    if len(stops) != len(messages):
+        findings.append(Finding(name, "indexed_passes", f"{len(stops)} M0 stops, expected {len(messages)}"))
+    for k, (stop, message) in enumerate(zip(stops, messages)):
+        if k + 1 < len(passes) and not passes[k][0] < stop.moves_before <= passes[k + 1][0]:
+            findings.append(Finding(name, "indexed_passes", f"line {stop.line}: stop {k + 1} is not between passes {k + 1} and {k + 2}"))
+        if k < len(passes):
+            x_end, y_at = stop.position[0], stop.position[1]
+            if x_end is None or y_at is None or not (_close(x_end, passes[k][1].end[0]) and _close(y_at, y)):
+                findings.append(Finding(name, "indexed_passes", f"line {stop.line}: stop {k + 1} at X{x_end} Y{y_at}, not where pass {k + 1} ended"))
+        if stop.comment != message:
+            findings.append(Finding(name, "indexed_passes", f"line {stop.line}: stop {k + 1} says {stop.comment!r}, expected {message!r}"))
+        if stop.spindle_on:
+            findings.append(Finding(name, "indexed_passes", f"line {stop.line}: stop {k + 1} with the spindle on (no M5 before it)"))
+        before = passes[k + 1][0] if k + 1 < len(passes) else program.first_move + len(program.moves)
+        if not any(stop.line < line and moves <= before for line, moves in program.starts):
+            findings.append(Finding(name, "indexed_passes", f"line {stop.line}: no M3/M4 restarts the spindle after stop {k + 1} before the next pass"))
+    return findings
 
 
 def check_face_passes(
