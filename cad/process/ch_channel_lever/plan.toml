@@ -401,7 +401,7 @@ feed = "hand"
 
 [[setups.operations]]
 instruction = "Every lot, still clamped: the spoil plate's thickness after facing."
-inspection = ".578–.588 (the micrometers at both ends, the anvil under the plate's end): on the 15/16 in pair this puts the jaws' top .244–.254 above it. Over .588: jog down the excess and face again. Under .578: saw a new plate and start again from the width op."
+inspection = ".578–.588 (the micrometers at both ends, the anvil under the plate's end): on the 15/16 in pair this puts the jaws' top .244–.254 above it. Over .588: face it again as in the op before (touch over the leaf, clear past the RIGHT end, start the spindle, Z in mm, face, lift Z clear and stop the spindle), with the thicker reading in place of T, and recheck. Under .578: saw a new plate and start again from the width op."
 gauge_checks = [{ gauge = "micrometers", band_mm = ["{{process.spoil_plate_thickness_min_mm}}", "{{process.spoil_plate_thickness_max_mm}}"] }]
 
 [[setups.operations]]
