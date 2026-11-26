@@ -326,6 +326,24 @@ def test_standing_failed_print_removes_the_page(process, shop, monkeypatch):
     assert not any(path.exists() for path in wrapper.standing_paths(out))
 
 
+def test_standing_on_two_sheets_fails_and_removes_the_page(process, shop, monkeypatch):
+    out, _author = process
+    _uv_stub(monkeypatch)
+    errors = []
+    monkeypatch.setattr(wrapper._telemetry, "error", lambda message, **_: errors.append(message))
+
+    def two_sheets(_browser, _html, pdf):
+        pdf.write_bytes(b"%PDF-1.4 <</Type /Pages>> <</Type /Page>> <</Type/Page>>")
+
+    monkeypatch.setattr(wrapper, "print_pdf", two_sheets)
+    assert wrapper.main(["--standing", "--out", str(out)]) == 1
+    assert not any(path.exists() for path in wrapper.standing_paths(out))
+    assert errors == [
+        "standing: the page prints on 2 sheets; the owner's design "
+        "is one sheet (shorten a row, or tighten prechips' standing layout)"
+    ]
+
+
 def test_standing_without_shop_files_fails_without_running_uv(process, tmp_path, monkeypatch):
     out, _author = process
     monkeypatch.setattr(plans, "SHOP_DIR", tmp_path / "empty-shop")

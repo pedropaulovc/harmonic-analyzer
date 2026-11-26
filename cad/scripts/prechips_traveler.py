@@ -35,7 +35,9 @@ standing cad/process/shop --out cad/out/travelers/shop-standing-instructions/
 shop-standing-instructions.html`` and prints that page to
 ``shop-standing-instructions.pdf`` beside it; a release ships the PDF under
 ``travelers/``. A resolved prechips without the ``standing`` command (argparse
-``invalid choice``) exits 1 with a message naming the release it needs.
+``invalid choice``) exits 1 with a message naming the release it needs. The
+page is one sheet by the owner's design: a print on more sheets exits 1 and
+removes both files, so a row that grows the page fails loudly.
 
 Only exit 0 from every run and every printed PDF is success. Every previous
 traveler is removed first, and a refusal from either run removes every output
@@ -53,6 +55,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -147,6 +150,14 @@ def print_pdf(browser_path: str, html: Path, pdf: Path) -> None:
         raise RuntimeError(
             f"{name} did not print {html.name} to PDF (exit {result.returncode}): {output}"
         )
+
+
+_PDF_PAGE = re.compile(rb"/Type\s*/Page(?![a-zA-Z])")
+
+
+def pdf_sheets(pdf: Path) -> int:
+    """The printed sheets in a browser-printed PDF: its ``/Type /Page`` objects."""
+    return len(_PDF_PAGE.findall(pdf.read_bytes()))
 
 
 def latest_version(uv: str) -> str:
@@ -274,6 +285,12 @@ def _standing(out: Path) -> int:
         try:
             with _telemetry.span("prechips.pdf", stem=STANDING_STEM, browser=Path(printer).name):
                 print_pdf(printer, html, pdf)
+            sheets = pdf_sheets(pdf)
+            if sheets > 1:
+                raise RuntimeError(
+                    f"the page prints on {sheets} sheets; the owner's design "
+                    "is one sheet (shorten a row, or tighten prechips' standing layout)"
+                )
         except RuntimeError as exc:
             return _fail(root, STANDING_STEM, exc, 1, outputs)
         _telemetry.info(f"{STANDING_STEM}: printed {pdf.name}")
