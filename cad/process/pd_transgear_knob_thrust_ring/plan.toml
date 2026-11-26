@@ -23,11 +23,20 @@ part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
 material = "C36000 free-machining brass round bar, 5/8 in"
 stock = "Lot: {{process.quantity:d}} ring. Ø{{process.stock_dia_in:.3dot}} bar, on hand (a {{process.bar_length_in:g}} in piece); the ring takes {{cad.pitch_in:.2dot}} in of it."
-note = "Inches unless mm. Lathe PM-1127VF-LB (70–380 and 380–2000 rpm); brass cut dry. To order (not on hand): the .257 and .261 pin gauges (pin-gauge set) for the bore check."
 shop = "../shop"
 stock_refs = ["c360-round-5-8"]
 material_key = "lathe-c360"
 turning_material = "brass"
+
+# The shop's standing page carries what every traveler shares (units, speeds,
+# coolant); This job says what only this ring needs.
+standing = true
+
+[[notes]]
+title = "This job"
+rows = [
+  ["To order", "To order (not on hand): the .257 and .261 pin gauges (pin-gauge set) for the bore check."],
+]
 
 [cad]
 file = "../../out/features/pd_transgear_knob_thrust_ring/features.toml"

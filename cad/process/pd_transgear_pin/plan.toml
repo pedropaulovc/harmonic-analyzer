@@ -84,11 +84,20 @@ part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
 material = "AISI 1018 cold-finished round, 1/4 in (drawing: Plain Carbon Steel)"
 stock = "Ø{{process.stock_dia_in:.4dot}} × {{process.bar_length_in:g}} in blank sawn off the 72 in 1018 bar on hand; the pin takes {{cad.pitch_in:.2dot}} in of it. For the split bush that holds it: a {{process.bush_length_in:.2dot}} in piece of the Ø{{process.bush_dia_in:.2dot}} C360 brass bar on hand."
-note = "Inches. Lathe PM-1127VF-LB (70–380 and 380–2000 rpm); cutting oil. One pin, fitted to the reamed MHA-PD-18 arm and to MHA-PD-10, MHA-PD-24 and MHA-PD-25: make and ream them first and have them at the lathe."
 shop = "../shop"
 stock_refs = ["1018-round-1-4", "c360-round-1-2"]  # owner 2026-11-19: the owned 1018 bar (registry alloy text: #3124); the brass is the split bush's (#3500)
 material_key = "lathe-1018-cold-finished"
 turning_material = "steel_1018"
+
+# The shop's standing page carries what every traveler shares (units, speeds,
+# coolant); This job says what only this pin needs.
+standing = true
+
+[[notes]]
+title = "This job"
+rows = [
+  ["Made first", "One pin, fitted to the reamed MHA-PD-18 arm and to MHA-PD-10, MHA-PD-24 and MHA-PD-25: make and ream them first."],
+]
 
 [cad]
 file = "../../out/features/pd_transgear_pin/features.toml"
