@@ -1,0 +1,9 @@
+# What fails past each numeric check ch_amplitude_bar_notes asserts
+# (check_register.py, tolerance-policy.md "Checks in spec modules and tests").
+checks:
+  - id: C-01
+    check: "LEDGE_CHEEK_MIN"
+    kind: wall
+    reason: "a notch's near cheek falls under the wall floor"
+    source: "drawing-guidelines.md rule 17 (walls and webs), .060 in floor; the module computes the thinner ledge less ch_amplitude_bar_spec.NOTCH_OFFSET_TOLERANCE_MM, .061 (MHA-CH-01 RV-05)"
+    basis: worst_case

@@ -26,10 +26,18 @@ def _wall_row(bore: str) -> str:
     return f"WALL {render_number(WALL_CALLOUT_MIN_IN[bore], 'in', 3)} MIN"
 
 
-# The reamed bore names its standard fit on the axle by number (rule 4); the
-# interference prints once, as REF on the axle's own sheet, keeping this
-# callout to two lines of words (rule 7).
-AXLE_BORE_CALLOUT = "REAM THRU\nPRESS FIT ON MHA-MG-07 AXLE\n" + _wall_row("axle bore")
+# The 3/16 drilled bore (owner ruling 2026-11-24, fit audit question 18)
+# names its bonded fit on the axle by number with the clearance the drill's
+# DRILLED HOLES row leaves over the drill rod's band (rule 4 form 1 and rule
+# 23: a bonded seat prints its clearance, inside the LOCTITE 638 grade's gap;
+# mg_wheel_group.BAR_BOND_GAP's upper limit, a literal here so the axle stays
+# out of this part's recipe), once, on this sheet. .0042 is inch arithmetic
+# (.1875 + .004 - .1873), not a converted millimetre value; machinist review
+# r2 (run 20261124T094658536Z) gated its absence.
+AXLE_BORE_CALLOUT = (
+    "3/16 DRILL THRU\nBONDED ON MHA-MG-07 (CLEARANCE .0042 MAX)\n"
+    + _wall_row("axle bore")
+)
 # The depth's .XXX is a three-place size given a function: it sets the stack
 # that places the pressed axle's end under the back face, so it names that
 # stack once (rules 3 and 4); the end's range is the MHA-MG-00 assembly

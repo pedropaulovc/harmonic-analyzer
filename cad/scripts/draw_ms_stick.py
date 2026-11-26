@@ -283,7 +283,8 @@ requirement(
     fields={"plane": (_plane("y", 0.0), _FRAME)},
 )
 # The width .315 at .XXX, SEE NOTE 1: the sliding fit in the MHA-MS-02 stop
-# block's rebate (FRONT_KEEP "BodyWidth").
+# block's rebate, note 1 giving its acceptance (STICK SLIDES FULL LENGTH;
+# rule 4) (FRONT_KEEP "BodyWidth").
 requirement(
     "ruled_edge",
     kind="face",
@@ -309,8 +310,10 @@ requirement(
     requirements=("plane",),
     fields={"plane": (_plane("z", 0.0), _FRAME)},
 )
-# The thickness .125 at .XXX, SEE NOTE 1: the 1/8 flat as supplied (owner
-# ruling 2026-11-20, #2441; TOP_KEEP "BodyThickness").
+# The thickness (.125) as a reference over 1/8 FLAT AS SUPPLIED, SEE NOTE 1:
+# the 1/8 flat as supplied (owner ruling 2026-11-20, #2441; rule 4, stock
+# that is good enough stays stock; TOP_KEEP "BodyThickness"). The limits are
+# the receiving gate, the title block's .XXX standing in for the mill's band.
 requirement(
     "back_face",
     kind="face",
@@ -324,8 +327,21 @@ requirement(
         ),
         "thickness_nominal": (part.BODY_THICKNESS, ("BODY_THICKNESS",)),
         "thickness_from": ("ruled_face", ((_SELF, "TOP_KEEP"),)),
-        "as_supplied": (True, ("BODY_THICKNESS",)),
-        "callout": (callouts.REBATE_LINK, (("ms_stick_callouts", "REBATE_LINK"),)),
+        "as_supplied": (
+            True,
+            ("BODY_THICKNESS", ("ms_stick_callouts", "THICKNESS_STOCK")),
+        ),
+        "dimension_type": (
+            "reference",
+            (("ms_stick_callouts", "PREFIXES"), ("ms_stick_callouts", "SUFFIXES")),
+        ),
+        "callout": (
+            callouts.CALLOUTS["BodyThickness"],
+            (
+                ("ms_stick_callouts", "THICKNESS_STOCK"),
+                ("ms_stick_callouts", "REBATE_LINK"),
+            ),
+        ),
     },
     precision={"thickness": _P["BodyThickness"]},
 )

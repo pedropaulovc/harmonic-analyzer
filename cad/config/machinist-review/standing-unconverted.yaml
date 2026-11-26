@@ -1,0 +1,90 @@
+# TEMPORARY: exists only while plans convert to the shop standing page batch
+# by batch (owner 2026-11-25). Each stem names an enrolled process plan
+# (cad/process/<stem>/plan.toml, not a placeholder) whose root has no
+# `standing = true`: its traveler does not print the shop's [standing] pointer
+# (cad/process/shop/standing.toml), so its machinist review does not apply rule
+# T18's standing-page items. Convert a plan, then remove its line here; a new
+# plan starts converted. test_machinist_review.py checks this list against the
+# plans. When the list is empty, delete this file, the review's not-converted
+# branch (machinist_review_traveler.STANDING_NOT_APPLIED) and the test
+# (owner 2026-11-25).
+unconverted:
+  - ch_amplitude_bar
+  - ch_channel_lever
+  - ch_connecting_rod
+  - ch_fulcrum_keeper
+  - ch_fulcrum_shaft
+  - ch_pivot_bracket
+  - ch_pivot_shaft
+  - ch_rocker_arm
+  - ch_rocker_hub
+  - ch_rocker_strap
+  - ch_rocker_strap_tl_hub_plug
+  - ch_rocker_strap_tl_sub_plate
+  - dt_arbor_pedestal
+  - dt_cone_gear_tl_arbor_collar
+  - dt_cone_gear_tl_arbor_key
+  - dt_cone_gear_tl_phasing_comb
+  - dt_cone_swing_platform
+  - dt_cone_tip_block
+  - dt_cone_tip_bushing
+  - dt_cone_tip_end_screw
+  - dt_crank_arm
+  - dt_crank_handle_butt_cup
+  - dt_crank_handle_ferrule
+  - dt_crank_handle_pivot_screw
+  - dt_crank_hub
+  - dt_crank_pin
+  - dt_crank_pin_ring
+  - dt_crank_pinion_pin
+  - dt_crankshaft
+  - dt_cylinder_end_disc
+  - dt_cylinder_gear_shaft
+  - dt_pinion_arbor
+  - dt_pinion_arbor_collar
+  - dt_pinion_bracket
+  - dt_pinion_cam
+  - dt_pinion_cam_pin
+  - dt_pinion_handle
+  - dt_pinion_lever_pin
+  - dt_pinion_lift_rod
+  - dt_pinion_pivot_block
+  - dt_pinion_pivot_shaft
+  - mg_magnifying_bracket
+  - mg_magnifying_clamp
+  - mg_magnifying_lever
+  - mg_magnifying_vertical_rod
+  - mg_output_fixture
+  - mg_wheel_axle
+  - mg_wheel_axle_spacer
+  - mg_wheel_bar
+  - mg_wheel_drum
+  - ms_stick
+  - ms_stop_block
+  - ms_stop_plate
+  - pd_guide_lock
+  - pd_platen
+  - pd_platen_bottom_guide
+  - pd_platen_clip
+  - pd_platen_guide
+  - pd_support_bar
+  - pd_transgear_arm
+  - pd_transgear_arm_plate
+  - pd_transgear_disc_hub
+  - pd_transgear_drive_collar
+  - pd_transgear_front_bushing
+  - pd_transgear_knob_bush
+  - pd_transgear_knob_cup
+  - pd_transgear_knob_thrust_ring
+  - pd_transgear_pin
+  - pd_transgear_pivot_spacer
+  - pd_transgear_rear_bushing
+  - pd_transgear_thumbnut
+  - pn_pen_adjust_screw
+  - pn_pen_frame
+  - pn_pen_hanger
+  - pn_pen_rod
+  - pn_pen_v_block
+  - sm_gooseneck
+  - sm_gooseneck_end_plug
+  - sm_knife_mount

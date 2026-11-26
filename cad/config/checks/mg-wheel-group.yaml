@@ -1,0 +1,27 @@
+# What fails past each numeric check mg_wheel_group asserts
+# (check_register.py, tolerance-policy.md "Checks in spec modules and tests").
+checks:
+  - id: C-01
+    check: "TRIAL_STEP_INSIDE_HUB_MIN"
+    kind: gap
+    reason: "washer grounds on the pin step; endshake not set"
+    source: "the module computes it: the step inside the hub at the trial's two settings, the flush start (spacer, back washer and hub less the shank less the bar's depth, .032 in) and the slide to DETAIL B's middle (thread less .0695, the go leaf, the thickest washer and nuts, .0145 in), so the washer seat check rejects no conforming set; owner ruling 2026-11-24, fit audit C11 (the axle set to the trial stack); Codjiflo r1 of #3529"
+    basis: after_setting
+  - id: C-02
+    check: "BAR_BOND_GAP"
+    kind: gap
+    reason: "638 does not fill the gap; axle works loose"
+    source: "the module computes it: the 3/16 drill's DRILLED HOLES row over the drill rod's band, -.0002 to .0042 in, against LOCTITE_638_GAP_MAX (Henkel 638 TDS, 0.25 mm diametral); owner ruling 2026-11-24, fit audit question 18"
+    basis: worst_case
+  - id: C-03
+    check: "NUT_RUNOUT_MARGIN"
+    kind: thread
+    reason: "first nut reaches the relief; trial nut check fails"
+    source: "the module computes it: the first nut's inner face past the latest full-thread start (FULL_THREAD_FROM_STEP_MAX, .043) at the trial's flush start (.009 in) and after the slide to DETAIL B's middle (.0055 in); drawing-guidelines.md rule 18 (full threads only); owner ruling 2026-11-24, fit audit C11"
+    basis: after_setting
+  - id: C-04
+    check: "THREAD_PAST_LOCKNUT_MAX"
+    kind: gap
+    reason: "thread end runs past DETAIL B's maximum at flush"
+    source: "the module computes it: the flush start's long corner at the go leaf, .108 in, against THREAD_PAST_LOCKNUT_LIMIT .114 (the user's option (c) of 2026-10-12); the trial only slides the axle out (owner ruling 2026-11-24, fit audit C11)"
+    basis: after_setting

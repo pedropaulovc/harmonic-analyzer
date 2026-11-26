@@ -259,19 +259,15 @@ feed = "1.4 in/min"
 
 # --- MHA-PD-17 disc hub (cad/process/pd_transgear_disc_hub/plan.toml) --------
 # Lathe: facing, turning, the centre drill, the N drill and parting take
-# shop/lathe.toml's C360 rows. The .3135 reamer (to buy) takes the
-# LittleMachineShop drilling and reaming row for brass (lathe.toml header,
-# 160-175 ft/min) at its low end. The sharp-nose finishing tool is HSS (its
-# R.003-.004 nose): the same page's HSS turning row for brass, 300-350
-# ft/min, at its low end. Its feed is not the page's .004 in/rev roughing
-# reference: the PM-1127's finest longitudinal power feed, .0025 in/rev
-# (shop machines.pm-1127vf-lb longitudinal_feed_mm_rev), whose cusp the
-# hub plan charges against the spigot's band (Codjiflo #3407 P2).
-[settings.lathe-ream-3135-c360]
-tool = "reamer-3135"
-material = "lathe-c360"
-sfm = 160
-feed = "tailstock quill by hand, slow and steady, dry; withdraw with the spindle running"
+# shop/lathe.toml's C360 rows. The bore is reamed by hand with the owned
+# adjustable reamer (dt.toml tools.reamers-adjustable-lms-5948), the
+# spindle stopped, so it takes no setting. The sharp-nose finishing tool is
+# HSS (its R.003-.004 nose): the LittleMachineShop HSS turning row for brass
+# (lathe.toml header), 300-350 ft/min, at its low end. Its feed is not the
+# page's .004 in/rev roughing reference: the PM-1127's finest longitudinal
+# power feed, .0025 in/rev (shop machines.pm-1127vf-lb
+# longitudinal_feed_mm_rev), whose cusp the hub plan charges against the
+# spigot's band (Codjiflo #3407 P2).
 [settings.lathe-sharp-nose-c360]
 tool = "lathe-tool-sharp-nose"
 material = "lathe-c360"

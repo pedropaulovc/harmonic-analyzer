@@ -1,0 +1,9 @@
+# What fails past each numeric check ch_fulcrum_shaft_spec asserts
+# (check_register.py, tolerance-policy.md "Checks in spec modules and tests").
+checks:
+  - id: C-01
+    check: "FLAT_STATION_WINDOW_MM"
+    kind: gap
+    reason: "no shaft station seats both set-screw cups"
+    source: "the module computes it: the least window over every pair of high and low stack limits, above zero; .474 mm"
+    basis: worst_case

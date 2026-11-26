@@ -388,12 +388,28 @@ def test_every_tight_band_states_its_function() -> None:
     assert spec.DRAWING_TOLERANCES == {}
     # The station table's band links the stations' note.
     assert callouts.STATION_LINK in callouts.STATION_TABLE_TITLE
-    # The bar's section slides in the stop rebate: .XXX (+/-.005) from the
-    # title block, and each links that fit's note.
+    # The bar's section slides in the stop rebate: the width .XXX (+/-.005)
+    # from the title block, the thickness the 1/8 flat's as supplied, printed
+    # as a reference over its stock (#2441); each links that fit's note,
+    # which gives the acceptance (rule 4: a fit name alone is incomplete).
     for name in ("BodyWidth", "BodyThickness"):
         assert spec.DRAWING_PRECISION_BY_NAME[name] == 3, name
         assert name not in spec.DRAWING_TOLERANCES, name
-        assert callouts.CALLOUTS[name] == callouts.REBATE_LINK, name
+        assert callouts.CALLOUTS[name].splitlines()[-1] == callouts.REBATE_LINK, name
+    assert callouts.CALLOUTS["BodyWidth"] == callouts.REBATE_LINK
+    assert (
+        callouts.CALLOUTS["BodyThickness"]
+        == f"1/8 FLAT AS SUPPLIED\n{callouts.REBATE_LINK}"
+    )
+    assert spec.BODY_THICKNESS == pytest.approx(25.4 / 8)
+    assert (callouts.PREFIXES["BodyThickness"], callouts.SUFFIXES["BodyThickness"]) == (
+        "(",
+        ")",
+    )
+    assert "BodyWidth" not in callouts.PREFIXES and "BodyWidth" not in callouts.SUFFIXES
+    assert callouts.DRAWING_NOTES.splitlines()[0] == (
+        "1. SLIDING FIT IN MHA-MS-02 STOP BLOCK REBATE: STICK SLIDES FULL LENGTH"
+    )
     # Rule 7: no callout carries more than two lines of words.
     assert all(len(text.splitlines()) <= 2 for text in callouts.CALLOUTS.values())
     for name in ("BodyLength", "FullTickLength", "MinorTickLength", "HalfTickLength",

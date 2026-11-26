@@ -13,6 +13,6 @@
   <text class="label" x="40.0" y="290.0">foot</text>
   <text class="label" x="580.0" y="290.0">top end</text>
   <text class="label" x="20.0" y="312.0">Front view (top): the strap from the foot (left, .480 wide) to the top end (right, .630); the #15 hole; the plates.</text>
-  <text class="label" x="20.0" y="330.0">Side view (below it): the plates standing .970 from the strap's front, the slots .200 x .420 in their far ends.</text>
+  <text class="label" x="20.0" y="330.0">Side view (below it): the plates standing .970 from the strap's front, the slots ({{cad.slots_width_nominal_in:.3dot}}) x {{cad.slots_depth_in:.3dot}} in their far ends.</text>
   <text class="label" x="20" y="353">The lower plate flush with the strap's foot end and both foot corners.</text>
 </svg>

@@ -14,9 +14,7 @@ from solidworks_mcp.adapters.solidworks.drawing import (
     view_name,
 )
 
-import _config
 from _machinist_review_mode import MachinistReviewMode
-import _surface_finish
 import ch_pivot_shaft_spec as shaft
 import rocker_bank_layout as bank
 from _feature_requirements import part_metadata, requirement
@@ -35,7 +33,6 @@ from _drawing_common import (
 )
 from _drawing_dimension_import import curate_view_dimensions
 from _drawing_dimensions import assert_imported_precision, set_dimension_callouts
-from _drawing_finish import add_surface_finish
 from _drawing_notes import add_property_linked_note
 from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -43,7 +40,7 @@ from _drawing_view_display import set_hidden_lines_removed
 from _part_properties import part_drawing_unit
 from _paths import CAD_ROOT
 from _session import run_build
-from _surface_finish import surface_finish_by_key
+from _supplier_dimensions import supplier_reference_dimension
 import _telemetry
 from ch_pivot_shaft_spec import (
     DOME_CALLOUT,
@@ -54,7 +51,7 @@ from ch_pivot_shaft_spec import (
     FLAT_STATION_CALLOUT,
     NORTH_FLAT_STATION,
     SHAFT_DIA,
-    SURFACE_FINISHES,
+    SHAFT_DIA_FRACTION_DENOMINATOR,
 )
 from rocker_bank_layout import PIVOT_SHAFT_LENGTH
 
@@ -120,7 +117,7 @@ def _left_of_witness(witness_x: float, callout: str) -> float:
 FLATS_CALLOUT = "2X"
 
 _P = shaft.DRAWING_PRECISION_BY_NAME
-part_metadata(precision_sources=("DRAWING_PRECISION_BY_NAME", ("_surface_finish", "ra")))
+part_metadata(precision_sources=("DRAWING_PRECISION_BY_NAME",))
 # Feature-export declarations (export_features; cad/docs/pipeline/
 # features-travelers.md), as the turned shafts declare theirs: the north dome
 # is the datum end (its apex z = +DOME_HEIGHT, the part origin on the north
@@ -152,38 +149,34 @@ for _side, _station in zip(("south", "north"), bank.PIVOT_SHAFT_FLAT_STATIONS, s
         }, precision={"across": _P["FlatAF"], "length": _P["FlatLength"], "station": _P["FlatStation"]},
     )
 
-# The O.D.'s band is for the 20 rocker hubs it runs in; the callout names
-# them (drawing-guidelines.md rule 4 (tighten only for function, and name the
-# mate)) and, the band being narrower than the shop's turned-diameter row,
-# its route at the feature: bought ground stock (fan-out F1, delegated ruling
-# 2026-11-07). Two lines of words (rule 7), each short enough to end clear of
-# DETAIL A's fence.
-SHAFT_FIT_CALLOUT = (
-    f"RUNNING FIT IN {_config.parts('ch-rocker-arm')['number']}\n1/4 GROUND STOCK OK"
-)
+# The O.D. is the bought 1/4 ground rod, never cut: it prints the stock as a
+# fraction reference with this line under it, not limits of size
+# (drawing-guidelines.md rule 4; owner ruling 2026-11-20, #2346: buy ground
+# rod). The rocker and bracket bores name this shaft as their mate (owner
+# ruling 2026-11-24, fit audit question 1), so it carries no fit statement.
+SHAFT_DIA_CALLOUT = "GROUND ROD, AS SUPPLIED"
 
 PROFILE_KEEP = {
     # Over the bar, centred: the overall length, tip to tip.
     "OverallLength": (PROFILE_CENTER[0], 0.242),
     # Right of the south end and under the bar's lower flank: inside the
-    # witness pair the toleranced text and its fit callout sat on the lower
-    # extension line (baseline machinist review). Low enough that the mate's
-    # row, the widest, passes under DETAIL A's fence.
+    # witness pair the text and its callout sat on the lower extension line
+    # (baseline machinist review). Low enough that the callout passes under
+    # DETAIL A's fence.
     "ShaftDia": (SOUTH_END_X + 0.030, PROFILE_CENTER[1] - 0.020),
 }
 
 requirement(
-    "outer", kind="diameter", faces=(shaft.SURFACE_FINISHES[0].face,),
-    requirements=("dia", "finish_ra"), fields={
+    "outer", kind="diameter", faces=(shaft.BEARING_FACE,),
+    requirements=("stock",), fields={
         "axis": ([0.0, 0.0, 1.0], ("__frame__",)),
         "at": ([0.0, 0.0, 0.0], ("__frame__",)),
         # The cylinder's extent, root to root; the domes run on to the tips.
         "span": ([round(-bank.PIVOT_SHAFT_LENGTH, 12), 0.0], (("rocker_bank_layout", "PIVOT_SHAFT_LENGTH"),)),
-        "dia": (_band(shaft.SHAFT_DIA, _P["ShaftDia"], shaft.SHAFT_DIA_BAND), ("SHAFT_DIA", "SHAFT_DIA_BAND")),
-        "dia_nominal": (shaft.SHAFT_DIA, ("SHAFT_DIA",)),
-        "callout": (SHAFT_FIT_CALLOUT, (("draw_ch_pivot_shaft", "SHAFT_FIT_CALLOUT"),)),
-        "finish_ra": (_surface_finish.MACHINED_UM, ("SURFACE_FINISHES",)),
-    }, precision={"dia": _P["ShaftDia"], "finish_ra": 1},
+        "dia_ref": (shaft.SHAFT_DIA, ("SHAFT_DIA", "SHAFT_DIA_FRACTION_DENOMINATOR")),
+        "stock": (SHAFT_DIA_CALLOUT, (("draw_ch_pivot_shaft", "SHAFT_DIA_CALLOUT"),)),
+        "callout": (SHAFT_DIA_CALLOUT, (("draw_ch_pivot_shaft", "SHAFT_DIA_CALLOUT"),)),
+    }, precision={"dia_ref": _P["ShaftDia"]},
 )
 
 # DETAIL A: the north flat (.24 long, .04 deep), its station and the dome are
@@ -276,14 +269,6 @@ for _name, _tip, _centre in (
             **_overall,
         }, precision={"height": _P["DomeHeight"], **({"length": _P["OverallLength"]} if _far else {})},
     )
-# Ra on the running face: the body the 20 hubs rock on and the two ears
-# journal. A revolved flank is a drawing SILHOUETTE, not a model edge, so the
-# pick names that entity type; the straight leader keeps off the geometry.
-# Note text height, as on the other part sheets: at the template default the
-# symbols printed ~18 mm tall (r743-2R render).
-FINISH_CHAR_HEIGHT = 0.0025
-BEARING_FINISH_EDGE = (PROFILE_CENTER[0] + 0.030, SHAFT_FLANK_Y)
-BEARING_FINISH_SYMBOL = (BEARING_FINISH_EDGE[0], 0.206)
 
 
 def _north_end_detail(adapter: Any, profile: Any) -> Any:
@@ -471,7 +456,24 @@ def build(adapter: Any) -> dict[str, str]:
             "DomeHeight": DOME_CALLOUT,
         },
     )
-    set_dimension_callouts(adapter, profile_annotations, {"ShaftDia": SHAFT_FIT_CALLOUT})
+    # The bought rod's diameter: an untoleranced fraction reference with its
+    # stock line (rule 4), as draw_dt_crank_pinion_pin prints its rod.
+    (shaft_dia,) = (
+        annotation
+        for annotation in profile_annotations
+        if dimension_name(adapter, annotation) == "ShaftDia"
+    )
+    supplier_reference_dimension(
+        adapter,
+        _early_bound(shaft_dia, "IAnnotation").GetSpecificAnnotation(),
+        label="pivot shaft rod diameter",
+        units="in",
+        precision=_P["ShaftDia"],
+        expected_mm=SHAFT_DIA,
+        presentation="diameter",
+        fraction_denominator=SHAFT_DIA_FRACTION_DENOMINATOR,
+        callout=SHAFT_DIA_CALLOUT,
+    )
     radius_annotations = [
         annotation
         for annotation in detail_annotations
@@ -489,16 +491,6 @@ def build(adapter: Any) -> dict[str, str]:
         profile,
         face_xy=(PROFILE_CENTER[0] - 0.030, PROFILE_CENTER[1]),
         label="pivot shaft axis centerline",
-    )
-    add_surface_finish(
-        adapter,
-        profile,
-        edge_xy=BEARING_FINISH_EDGE,
-        entity_type="SILHOUETTE",
-        symbol_xy=BEARING_FINISH_SYMBOL,
-        control=surface_finish_by_key(SURFACE_FINISHES, "pivot_bearing"),
-        label="pivot bearing finish",
-        char_height=FINISH_CHAR_HEIGHT,
     )
     # Re-assert the detail's hidden-lines-removed display now its annotations
     # have landed: left as placed, the 5:1 dome printed as straight segments

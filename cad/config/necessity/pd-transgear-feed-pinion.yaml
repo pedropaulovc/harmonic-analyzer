@@ -2,15 +2,20 @@
 # (owner ruling 2026-11-24: "In the part's registry file, not on the sheet.
 # The sheet stays clean; the reviewer fails a tight feature that has no
 # registry reason."). Read by the machinist review only. The gear's outside
-# diameter and its tooth data keep the gear data block's rules. The bore and
-# the boss are rule 4, form 2 (their mates are made to them); the bore's
-# modelled cut is the owner's ruling of 2026-11-24 on fit audit question 5.
+# diameter and its tooth data keep the gear data block's rules. The boss is
+# rule 4, form 2 (its mate is made to it). The bore is form 3: the MHA-PD-23
+# pin passes through this bore, MHA-PD-24's and MHA-PD-25's and is turned to
+# them, so the three take one reamer; its modelled cut is the owner's ruling
+# of 2026-11-24 on fit audit question 5. The collar-to-disc air is one budget
+# (delegated ruling 2026-11-25 (Main), D21, #2144): the MHA-PD-17 spigot
+# length spends it at the title block and the bores keep it;
+# cad/scripts/test_pd_collar_air_necessity.py derives the airs N-01 quotes.
 necessity:
   - id: N-01
     feature: "sheet 1, section B-B, Ø.126 REAM THRU bore, MHA-PD-23 IS TURNED TO THIS BORE"
     kind: gap
     reason: "cocked on the pin, MHA-PD-06 closes its air to MHA-PD-22"
-    source: "no longer required after fit audit question 5; loosening tracked in issue (pending). With this bore alone .002 looser, pd_cluster_air.COLLAR_AIR statistical 0.1189 mm against its 0.1016 floor (0.1880 as modelled), PLATEN_AIR 0.1428 against 0.03; no gate trips; MHA-PD-00 step 24C's engaged feed would print .167 TO 10.443 (.166 TO 10.444)"
+    source: "pd_cluster_air.COLLAR_AIR, statistical, floor 0.1016 mm: 0.1366 as modelled; with this bore's clearance on the pin .002 looser the sleeve cocks further and the air is 0.0675, under the floor (test_pd_collar_air_necessity)"
   - id: N-02
     feature: "sheet 1, section B-B, tooth length .535 ±.001 to the step (SEATS MHA-PD-17 SPIGOT)"
     kind: gap

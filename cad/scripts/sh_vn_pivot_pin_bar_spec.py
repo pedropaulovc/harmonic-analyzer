@@ -19,7 +19,10 @@ for anything proud (issue #1038). Press-fit retention is the user's choice
 (2026-10): the bar's 1.60 cheeks leave no bearing land under a countersink,
 and a pressed pin drives out with a punch. The RodPin member
 (``sh_vn_pivot_pin_rod_spec``) follows it (user ruling 2026-10-09, PR #1292
-review F1).
+review F1). Owner ruling 2026-11-24, fit audit question 3: the cheek holes
+are reamed .0775 with no band and the pin is their gauge; a pin that enters
+by hand is bonded with LOCTITE 641 at MHA-CH-00, on the cheek it ends in
+only, and comes out hot (the removable grade) for channel service.
 
 Frame (part): pin axis = part Z, axial mid-plane = Front Plane (z = 0); the
 member is the INSTALLED pin -- a Ø PIN_DIA cylinder PIN_INSTALLED_LENGTH
@@ -57,14 +60,20 @@ PIN_INSTALLED_LENGTH = _bar.BAR_WIDTH  # dressed flush with both bar faces
 # stock both dressed ends share.
 PIN_LENGTH_LIMITS = _pin.PIN_LENGTH_LIMITS
 # Dressed ends stand nothing proud of the bar faces: at the .300 pitch the
-# top-notch stack below leaves 0.6858 against the 0.10 running floor (#1038;
+# top-notch stack below leaves 0.6350 against the 0.10 running floor (#1038;
 # owner rulings 2026-10-15 option 2 and 2026-11-11).
 PIN_END_PROUD_MAX = 0.0
 
 # --- The bar's reamed press hole (the bar spec owns it; restated here so the
-# budget reads one place). ---
+# budget reads one place): the reamer's size, which the sheet prints, and the
+# ANALYSIS band the reamer is modelled to cut. ---
 BAR_HOLE_DIA = _bar.TOP_PIN_HOLE_DIA
 BAR_HOLE_LIMITS = _bar.TOP_PIN_HOLE_LIMITS
+if BAR_HOLE_LIMITS != _pin.HOLE_REAMED_LIMITS:
+    raise AssertionError("the bar's restated reamer cut drifted from the pin's")
+# The largest hole accepted: one the pin entered by hand, bonded, that the
+# set's .079 pin does not enter (sh_vn_pivot_pin_spec.BOND_HOLE_MAX).
+BAR_HOLE_ACCEPTED_MAX = _pin.BOND_HOLE_MAX
 # 1/4 in cold-finished square bar (the bar spec owns the stock band). The
 # bar's section prints only as the stock's reference size, so the stock band,
 # not the title block's .XX, bounds it.
@@ -106,8 +115,9 @@ def joint_budget() -> dict[str, float]:
     """Worst-case values of every fit the joint must hold (all mm).
 
     Every term is at the worst case of its printed band (drawing-guidelines.md rule 17 (walls and webs)): the
-    purchased pin's 0/+.0002 in, the reamed cheek hole (the bar's
-    TOP_PIN_HOLE_LIMITS), the lever's #47 hole at the lever sheet's DRILLED
+    purchased pin's 0/+.0002 in, the reamed cheek hole (the reamer's
+    modelled cut, TOP_PIN_HOLE_LIMITS; for its walls, the largest hole
+    accepted bonded), the lever's #47 hole at the lever sheet's DRILLED
     HOLES row, the lever thickness and plate offset at their bands, the top
     notch and its ledge, the bar stock +0/-0.051, the hole's offset from the
     back face at the bar sheet's .XXX band, the hubs that set the pitch never
@@ -119,7 +129,7 @@ def joint_budget() -> dict[str, float]:
     hole_min, hole_max = BAR_HOLE_LIMITS
     lever_hole_min = NUMBER_DRILL_MM[_lever.BAR_PIN_HOLE_SPEC.size]
     lever_hole_max = lever_hole_min + DRILLED_PLUS
-    lever_min = _lever.LEVER_THICKNESS - _lever.LEVER_THICKNESS_TOLERANCE
+    lever_min = _lever.LEVER_THICKNESS + _lever.LEVER_THICKNESS_BAND[1]
     notch_min, notch_max = _band(_bar.TOP_NOTCH_WIDTH, _bar.TOP_NOTCH_WIDTH_BAND)
     w_min, w_max = _bar.BAR_WIDTH - BAR_STOCK_UNDERSIZE, _bar.BAR_WIDTH
     length_min, length_max = PIN_LENGTH_LIMITS
@@ -161,13 +171,17 @@ def joint_budget() -> dict[str, float]:
         "notch_roof_clearance_min": roof_below_pin_min - lever_reach_max,
         # The reamed hole's wall to the bar's front/back faces: its offset
         # from the back face at either end of its band, on the narrowest
-        # stock (the far face is the nearer one when the offset runs long).
+        # stock (the far face is the nearer one when the offset runs long),
+        # the hole at the largest a bonded pin is accepted in.
         "hole_face_wall_min": min(
-            _bar.BAR_DEPTH / 2.0 - HOLE_LOCATION_TOLERANCE - hole_max / 2.0,
+            _bar.BAR_DEPTH / 2.0 - HOLE_LOCATION_TOLERANCE - BAR_HOLE_ACCEPTED_MAX / 2.0,
             w_min
             - (_bar.BAR_DEPTH / 2.0 + HOLE_LOCATION_TOLERANCE)
-            - hole_max / 2.0,
+            - BAR_HOLE_ACCEPTED_MAX / 2.0,
         ),
+        # A pin that entered by hand, bonded: the diametral gap the
+        # compound fills, at the largest hole accepted.
+        "bond_gap_max": BAR_HOLE_ACCEPTED_MAX - pin_min,
         # The cheek the pin presses into. The printed ledge is the near-side
         # cheek; the far cheek is what the widest notch leaves of the
         # narrowest stock beside the widest ledge -- the owner-approved #1038
@@ -197,10 +211,13 @@ if BUDGET["neighbour_clearance_min"] < RUNNING_FLOOR - 1e-9:
     raise AssertionError("a pin end can close the bar-to-bar running gap")
 if BUDGET["notch_roof_clearance_min"] < RUNNING_FLOOR - 1e-9:
     raise AssertionError("the lever's lower edge can reach the top notch's roof")
-# The hole's far-face wall is .079 on the narrowest stock: under the .080
-# target, over the .060 floor (MHA-CH-01 RV-06, owner ruling 2026-11-01).
+# The hole's far-face wall is .0785 on the narrowest stock at the largest
+# bonded hole (.079): under the .080 target, over the .060 floor (MHA-CH-01
+# RV-06, owner ruling 2026-11-01; printed .078 MIN).
 if BUDGET["hole_face_wall_min"] < RULE12_WALL_FLOOR - 1e-9:
     raise AssertionError("reamed hole to bar face under the drawing-guidelines.md rule 17 (walls and webs) floor")
+if BUDGET["bond_gap_max"] > _pin.LOCTITE_641_GAP_MAX:
+    raise AssertionError("a bonded bar pin's gap passes LOCTITE 641's gap fill")
 if BUDGET["length_excess_min"] <= 0.0:
     raise AssertionError("the shortest supplied pin cannot dress flush at both faces")
 if BUDGET["dress_stock_per_end_min"] < 0.0:
@@ -209,6 +226,7 @@ if PIN_INSTALLED_LENGTH != _bar.BAR_WIDTH:
     raise AssertionError("the installed pin must be flush with both bar faces")
 if _bar.LEVER_THICKNESS != _lever.LEVER_THICKNESS:
     raise AssertionError("the bar's restated lever thickness drifted")
-# Re-run at the .300 pitch (#1038 re-pitch): neighbour_clearance_min 0.6858.
+# Re-run at the .300 pitch (#1038 re-pitch): neighbour_clearance_min 0.6350
+# on the .118 +.002/-.004 plate (D23).
 if not math.isclose(_lever.HUB_LENGTH, 7.62):
     raise AssertionError("the station pitch moved; re-run the #1038 gap budget")

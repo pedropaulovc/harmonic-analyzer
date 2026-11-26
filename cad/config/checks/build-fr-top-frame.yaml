@@ -1,0 +1,15 @@
+# MHA-FR-02 top frame: the checks build_fr_top_frame asserts
+# (check_register.py; tolerance-policy.md, "Checks in spec modules and tests").
+checks:
+  - id: C-01
+    check: "washer bearing width round the hole"
+    kind: gap
+    reason: "washer rim meets the hole edge; clamp loses its seat"
+    source: "owner ruling 2026-11-24, fit audit part 2 C12: \"A. The ring is not needed: the rule becomes the washer's bearing width (1.47 mm, 1.64 today) and question 19 stands.\"; computed in build_fr_top_frame"
+    basis: worst_case
+  - id: C-02
+    check: "keeper receiver leaves less than D15's accepted .076 with drill wander"
+    kind: wall
+    reason: "keeper's 2-56 tap breaks into the rail web's side"
+    source: "delegated ruling 2026-11-24 (Main), precedent: owner ruling 2026-11-01 (thin walls accepted as minor); no owner number changed, #2144 (rulings.md D15): .0767 at the printed lug centre .114, accepted under the .080 target (MHA-FR-02 RV-14); computed in build_fr_top_frame"
+    basis: worst_case

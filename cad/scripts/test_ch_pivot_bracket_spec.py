@@ -44,16 +44,18 @@ def test_set_screw_cup_is_the_vendors_point() -> None:
 def test_apex_tap_keeps_its_walls_to_both_ear_faces() -> None:
     # Q2-A/L2 (delegated ruling 2026-11-07, owner review #2144): the tap
     # station prints .16 at the title block's +/-.01, so the walls are taken
-    # at that band's worst end.
+    # at that band's worst end; the ear thickness at the title block's
+    # +/-.005 (fit audit census; 2.3367 / 2.2351 at +/-.004).
     assert bracket.SET_SCREW_WALLS_MIN == pytest.approx(
-        {"inboard face": 2.3367, "outboard face": 2.2351}
+        {"inboard face": 2.324, "outboard face": 2.197}
     )
     assert min(bracket.SET_SCREW_WALLS_MIN.values()) >= bracket.LIGAMENT_TARGET
     assert bracket.LIGAMENT_TARGET == pytest.approx(2.032)  # .080 in
 
 
 def test_web_over_the_bore_keeps_the_floor() -> None:
-    assert bracket.BORE_LIGAMENT == pytest.approx(6.6008)
+    # .2594 over the F-drilled bore (fit audit question 1; .2599 at .256).
+    assert bracket.BORE_LIGAMENT == pytest.approx(6.588)
     assert bracket.BORE_LIGAMENT >= bracket.LIGAMENT_FLOOR
     assert bracket.LIGAMENT_FLOOR == pytest.approx(1.524)  # .060 in
 
@@ -73,8 +75,9 @@ def test_set_screw_keeps_one_and_a_half_diameters_of_full_thread() -> None:
     assert bracket.SET_SCREW_WALL_TERMS["apex over the bore at its minimum"] == (
         pytest.approx(bracket.EAR_TOP_Y - bracket.HEIGHT_BAND - (0.99 + 0.01) * 25.4)
     )
-    assert bracket.SET_SCREW_FULL_THREAD_MIN == pytest.approx(5.009, abs=1e-3)
-    assert bracket.SET_SCREW_ENGAGEMENT_D == pytest.approx(1.761, abs=1e-3)
+    # The F-drilled bore (fit audit question 1): 5.009 / 1.761D at the old .256.
+    assert bracket.SET_SCREW_FULL_THREAD_MIN == pytest.approx(4.998, abs=1e-3)
+    assert bracket.SET_SCREW_ENGAGEMENT_D == pytest.approx(1.757, abs=1e-3)
     assert bracket.SET_SCREW_ENGAGEMENT_D >= bracket.SET_SCREW_MIN_ENGAGEMENT_D == 1.5
 
 

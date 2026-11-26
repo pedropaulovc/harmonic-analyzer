@@ -11,11 +11,7 @@ assembly import.
 
 from __future__ import annotations
 
-from _title_block_units import render_number
 from mg_wheel_axle_spec import (
-    BAR_BORE_LIMITS,
-    BAR_BORE_PLACES,
-    MM_PER_IN,
     PIN_DIA,
     PIN_DIA_TOL,
     THREAD,
@@ -29,37 +25,22 @@ CALLOUT_BELOW = 4  # swDimensionTextCalloutBelow
 BAR = "MHA-MG-08 WHEEL BAR"
 WHEEL = "MHA-MG-05 MAGNIFYING WHEEL"
 
-
-def _limits(low_mm: float, high_mm: float) -> str:
-    """``.XXXX-.XXXX``: an inch limit pair at the four places fits print."""
-    return "-".join(
-        render_number(value / MM_PER_IN, "in", BAR_BORE_PLACES)
-        for value in (low_mm, high_mm)
-    )
-
-
 # The shank's stock Ø is an untoleranced REF (the drill rod's supplier limits
 # govern; purchased precision stock is its fit route). Its callout names both
-# fits by their standard names with each range as REF, each mate by number
-# and name (drawing-guidelines.md rule 4; v49 machinist review), one line each
-# (rule 7): the press in the bar's reamed bore, whose
-# limits print on the bar's own sheet, and the wheel that runs on it, which is
-# what the journal's Ra 63 uin marks (rule 6). The press follows from the
-# stock and the bore limits; the running clearance is mg_wheel_group.HUB_RUNNING,
-# a literal so the wheel stays out of this part's recipe
-# (test_mg_wheel_axle_drawing pins it).
+# fits, each mate by number and name (drawing-guidelines.md rule 4; v49
+# machinist review), one line each (rule 7): the bond in the bar's 3/16
+# drilled bore (owner ruling 2026-11-24, fit audit question 18), whose
+# clearance prints once, on the bar's own sheet, and the wheel that runs on
+# it, which is what the journal's Ra 63 uin marks (rule 6). The bond's gap
+# (the stock over the bore's drilled limits) is mg_wheel_group.BAR_BOND_GAP,
+# inside LOCTITE 638's. The wheel's bore is reamed with no band and accepted
+# on this axle once, on the wheel's sheet (MHA-MG-05 note 1, rule 4 form 3),
+# so no clearance prints here.
 PIN_LIMITS = (PIN_DIA - PIN_DIA_TOL, PIN_DIA + PIN_DIA_TOL)
-PRESS_LIMITS = (
-    PIN_LIMITS[0] - BAR_BORE_LIMITS[1],
-    PIN_LIMITS[1] - BAR_BORE_LIMITS[0],
-)
-if PRESS_LIMITS[0] <= 0.0:
-    raise AssertionError(f"axle stock is not a press fit in the bar: {PRESS_LIMITS}")
-RUNNING_CLEARANCE_TEXT = ".0008-.0017"
 PIN_DIA_CALLOUT = "\n".join(
     (
-        f"PRESS FIT IN {BAR} (INTERFERENCE {_limits(*PRESS_LIMITS)})",
-        f"RUNNING FIT IN {WHEEL} (CLEARANCE {RUNNING_CLEARANCE_TEXT})",
+        f"BONDED IN {BAR}",
+        f"RUNNING FIT IN {WHEEL}",
     )
 )
 # The lengths carry their values and bands only (rule 7): the extension lines

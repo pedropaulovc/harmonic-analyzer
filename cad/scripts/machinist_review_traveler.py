@@ -9,6 +9,8 @@ review leaf, when one exists, keys it instead.
 from __future__ import annotations
 
 import re
+import tomllib
+import unicodedata
 from html.parser import HTMLParser
 from pathlib import Path
 from typing import Sequence
@@ -16,10 +18,36 @@ from typing import Sequence
 from _paths import CAD_ROOT
 from machinist_exceptions import MachinistException, load_exceptions_file
 from machinist_review_config import split_versioned_guidelines
-from machinist_review_sheets_mcp import SheetStore
+from machinist_review_sheets_mcp import PDFIUM_LOCK, SheetStore
 
 GUIDELINES_FILE = CAD_ROOT / "docs" / "traveler-guidelines.md"
 PROCESS_ROOT = CAD_ROOT / "process"
+# The shop's one standing-instructions page: everything common to every
+# traveler, rendered once from ``cad/process/shop/`` and shipped per release as
+# ``travelers/shop-standing-instructions.pdf``. A traveler review reads it so
+# every reviewer and the judge share one definition of the shop's common sense.
+STANDING_HTML = (
+    CAD_ROOT / "out" / "travelers" / "shop-standing-instructions"
+    / "shop-standing-instructions.html"
+)
+STANDING_HEADING = (
+    "SHOP STANDING INSTRUCTIONS (common sense in this shop: the traveler must "
+    "not repeat or re-word any of it)"
+)
+# A plan converted to the standing page (root ``standing = true``) prints this
+# file's ``[standing] pointer`` at its head. Plans convert batch by batch (owner
+# 2026-11-25): an unconverted plan's review neither reads the standing page nor
+# applies rule T18's standing-page items. When
+# cad/config/machinist-review/standing-unconverted.yaml empties, delete it,
+# STANDING_NOT_APPLIED and its branch in standing_block.
+STANDING_TOML = PROCESS_ROOT / "shop" / "standing.toml"
+STANDING_NOT_APPLIED = (
+    "SHOP STANDING INSTRUCTIONS: NOT APPLIED (this plan is not yet converted to "
+    "the shop standing page; owner 2026-11-25: plans convert batch by batch). "
+    "Do not report rule T18 items about the standing page: repeated or "
+    "re-worded standing rules, the pointer line, or cautions in the head. Rule "
+    "T18's running page header/footer item and every other rule still apply."
+)
 
 
 def split_guidelines(text: str) -> tuple[int, str]:
@@ -147,7 +175,99 @@ def html_text(html: str) -> str:
     return parser.result()
 
 
+def standing_missing(path: Path) -> str:
+    """Why a traveler review cannot run without the standing page at ``path``."""
+    return (
+        f"shop standing instructions page missing: {path}; a traveler review "
+        "reads it as common sense the traveler must not repeat. Render it with "
+        "cad/scripts/prechips_traveler.py --standing "
+        "(`prechips standing cad/process/shop`)."
+    )
+
+
+def standing_section(html: str) -> str:
+    """The standing page's text as the reviewers and the judge read it,
+    extracted exactly as a traveler HTML's text is."""
+    text = html_text(html)
+    if not text:
+        raise ValueError("shop standing instructions page has no text")
+    return (
+        f"\n{STANDING_HEADING}\n"
+        "Text of the shop's one standing-instructions page, printed once and "
+        "shipped beside every traveler (travelers/shop-standing-instructions.pdf), "
+        "one line per block or table row.\n"
+        f"{text}\n"
+    )
+
+
+def standing_pointer() -> str:
+    """The ``[standing] pointer`` line a converted plan prints at its head."""
+    pointer = tomllib.loads(STANDING_TOML.read_text(encoding="utf-8"))["standing"]["pointer"]
+    if not isinstance(pointer, str) or not pointer.strip():
+        raise ValueError(f"{STANDING_TOML}: [standing] pointer must be a non-empty string")
+    return pointer
+
+
+def standing_converted(traveler_text: str) -> bool:
+    """Whether a traveler's printed text carries the standing pointer. Compared
+    in Unicode compatibility form (a PDF text layer may print the ligature
+    ``ﬁ`` for ``fi``) with all whitespace removed (it wraps the line and may
+    split a word where the HTML does not)."""
+    def squeeze(text: str) -> str:
+        return "".join(unicodedata.normalize("NFKC", text).split())
+
+    return squeeze(standing_pointer()) in squeeze(traveler_text)
+
+
+def pdf_text(paths: Sequence[Path]) -> str:
+    """The raw text layer of every PDF in ``paths``, page by page."""
+    import pypdfium2 as pdfium
+
+    pages = []
+    with PDFIUM_LOCK:
+        for path in paths:
+            if path.suffix.casefold() != ".pdf":
+                continue
+            document = pdfium.PdfDocument(str(path))
+            try:
+                for page in document:
+                    textpage = page.get_textpage()
+                    try:
+                        pages.append(textpage.get_text_range())
+                    finally:
+                        textpage.close()
+                        page.close()
+            finally:
+                document.close()
+    return "\n".join(pages)
+
+
 def document_roles(
+    sources: Sequence[Path], companion_count: int, sheet_count: int
+) -> str:
+    """The traveler review's own prompt block, for the reviewers and the judge
+    alike: which sheets are the traveler and which the companion part drawing,
+    then the shop standing page (``standing_block``). Everything a traveler
+    review adds lives here, so ``machinist_review.py`` (a key input of every
+    drawing review) stays as it is."""
+    return _companion_roles(sources, companion_count, sheet_count) + standing_block(
+        sources[: len(sources) - companion_count]
+    )
+
+
+def standing_block(traveler_sources: Sequence[Path], standing: Path | None = None) -> str:
+    """A converted plan's traveler (its printed text carries the standing
+    pointer) gets the standing page's text, refused when the page is missing;
+    an unconverted one gets STANDING_NOT_APPLIED."""
+    if not standing_converted(pdf_text(traveler_sources)):
+        return f"\n{STANDING_NOT_APPLIED}\n"
+    standing = STANDING_HTML if standing is None else standing
+    if not standing.is_file():
+        raise FileNotFoundError(standing_missing(standing))
+    return standing_section(standing.read_text(encoding="utf-8"))
+
+
+def _companion_roles(
     sources: Sequence[Path], companion_count: int, sheet_count: int
 ) -> str:
     """Which sheets are the traveler and which the companion part drawing:

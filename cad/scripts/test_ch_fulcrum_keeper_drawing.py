@@ -64,16 +64,17 @@ def test_geometry_matches_the_top_frame_contract() -> None:
     assert spec.KEEPER_INNER_FACE_SPAN_MM == pytest.approx(153.416)
     assert spec.KEEPER_SCREW_Z_OFF == pytest.approx(spec.KEEPER_Z_OFF + spec.SCREW_X)
     assert spec.KEEPER_SCREW_Z_OFF == pytest.approx(88.646)
-    # Plain reamed bore on the plain Ø.2500 shaft, each keeper reamed alone
-    # (#2338) with the stock .2560 chucking reamer the levers use (owner
-    # ruling 2026-11-23, tool audit Q7): a slip band whose least clearance
-    # covers both keepers' bore heights, tilts and the rail seats.
-    assert spec.BORE_DIA == pytest.approx(0.2560 * 25.4)
-    assert spec.BORE_DIA_BAND == (0.0254, 0.0)  # (upper, lower)
-    # The stock reamer's ANSI cutting band lies inside the bore band.
-    low, high = spec.BORE_REAMER_DIA_RANGE_MM
-    assert spec.BORE_DIA + spec.BORE_DIA_BAND[1] <= low < high
-    assert high <= spec.BORE_DIA + spec.BORE_DIA_BAND[0]
+    # Plain F-drilled bore on the plain Ø.2500 shaft, each keeper drilled
+    # alone (#2338; owner ruling 2026-11-24, fit audit question 1, reversing
+    # tool audit Q7's .2560 reamer): the DRILLED HOLES row, whose least
+    # clearance covers both keepers' bore heights, tilts and the rail seats.
+    from _hole_spec import LETTER_DRILL_MM
+
+    assert spec.BORE_HOLE_SPEC.size == "F"
+    assert spec.BORE_DIA == LETTER_DRILL_MM["F"]
+    assert spec.BORE_DIA_BAND == pytest.approx((0.1016, 0.0))  # (upper, lower)
+    assert spec.DRAWING_PRECISION["ShaftBoreProfile"]["BoreDia"] == 3
+    assert not hasattr(spec, "BORE_REAMER_DIA_RANGE_MM")
 
 
 def test_crown_set_screw_tap_stops_at_the_bore() -> None:
@@ -98,12 +99,12 @@ def test_rule_12_worst_case_walls_and_thread() -> None:
     # Owner ruling Q10-B: the bore stands within +-.012 of the width's centre
     # plane, so each side wall is half the least .XX width less that band.
     assert spec.BORE_SIDE_WALL_MM >= WALL_TARGET_MM
-    assert round(spec.BORE_SIDE_WALL_MM, 3) == 3.289
+    assert round(spec.BORE_SIDE_WALL_MM, 3) == 3.238
     assert round(spec.SET_SCREW_WEB_MM, 3) == 2.629
-    assert round(spec.FOOT_TIP_WALL_MM, 3) == 2.362
+    assert round(spec.FOOT_TIP_WALL_MM, 3) == 2.349  # 2.362 at +.004/0 (D25)
     # Owner ruling 2026-10-28: the outer lug face sits .65 - .32 off the
-    # tip, both bands, so the counterbore keeps 1.092 off it.
-    assert round(spec.FOOT_CBORE_LUG_CLEARANCE_MM, 3) == 1.092
+    # tip, both bands, so the counterbore keeps 1.080 off it (D25's Ø.155).
+    assert spec.FOOT_CBORE_LUG_CLEARANCE_MM == pytest.approx(1.0795, abs=1e-4)
     assert round(spec.FOOT_SCREW_ENGAGEMENT_D, 2) == 2.27
     # The native counterbore callout prints .XXX with its own limits; the
     # engagement and bottoming stacks take that printed band (.078-.088).
@@ -122,9 +123,18 @@ def test_rule_12_worst_case_walls_and_thread() -> None:
     assert spec.KEEPER_SCREW_TRANSVERSE_BAND_MM == spec._BAND_BY_PLACES[3]
 
 
-def test_counterbore_prints_the_owner_ruled_limits() -> None:
-    # Owner ruling 2026-11-22 (#3367): the callout prints Ø.150-.154 x
-    # .078-.088, and the RV-04 tip wall stands on that printed band.
+def test_counterbore_prints_the_title_block_limits() -> None:
+    # Owner ruling 2026-11-22 (#3367): the callout prints the counterbore's
+    # limits; D25 (delegated ruling 2026-11-25 (Main), precedent: the
+    # fit-necessity rule of the owner-approved fit policy
+    # (drawing-simplicity-policy.md; owner ruling 2026-11-24): a band stays
+    # tighter than the title block only when a named check fails at the
+    # looser size, and at Ø.150 ±.005 the four checks hold at Ø.145 and Ø.155;
+    # changes the owner's 2026-11-22 #3367 number, #2144 (rulings.md D25))
+    # opened them to the title block's ±.005, Ø.145-.155 x .078-.088, and the
+    # RV-04 tip wall stands on that printed band.
+    from ch_vn_frame_side_screw_spec import HEAD_DIA
+
     spec = ch_fulcrum_keeper_spec
     dia = [
         spec.CBORE_DIA_MM + spec.CBORE_DIA_BAND[1],
@@ -134,15 +144,25 @@ def test_counterbore_prints_the_owner_ruled_limits() -> None:
         spec.CBORE_DEPTH_MM + spec.CBORE_DEPTH_BAND[1],
         spec.CBORE_DEPTH_MM + spec.CBORE_DEPTH_BAND[0],
     ]
-    assert [round(v / 25.4, 3) for v in dia] == [0.150, 0.154]
+    assert [round(v / 25.4, 3) for v in dia] == [0.145, 0.155]
     assert [round(v / 25.4, 3) for v in depth] == [0.078, 0.088]
     assert spec._CBORE_MAX_RADIUS == pytest.approx(dia[1] / 2.0)
-    assert spec.FOOT_TIP_WALL_WORST_MM / 25.4 == pytest.approx(0.0725, abs=5e-5)
+    # At Ø.155: the tip wall against the .080 target, its full worst case
+    # still floored to the printed .072, and the lug's outer face clear.
+    assert spec.FOOT_TIP_WALL_MM / 25.4 == pytest.approx(0.0925, abs=5e-5)
+    assert spec.FOOT_TIP_WALL_MM >= 0.080 * 25.4
+    assert spec.FOOT_TIP_WALL_WORST_MM / 25.4 == pytest.approx(0.0720, abs=5e-5)
     assert spec.FOOT_TIP_WALL_TEXT == ".072"
+    assert spec.FOOT_CBORE_LUG_CLEARANCE_MM == pytest.approx(1.0795, abs=1e-4)
+    assert spec.FOOT_CBORE_LUG_CLEARANCE_MM > 0.0
+    # At Ø.145: the MHA-CH-VN-52's Ø.140 head still clears.
+    assert HEAD_DIA == pytest.approx(0.140 * 25.4)
+    assert dia[0] - HEAD_DIA == pytest.approx(0.005 * 25.4)
+    assert dia[0] - HEAD_DIA > 0.0
     rows = _config.parts("ch-fulcrum-keeper")["machinist_exceptions"]
     exception = {row["id"]: row for row in rows}["RV-04"]
-    assert ".0725" in exception["finding"]
-    assert "\u00d8.150-.154 x .078-.088" in exception["reason"]
+    assert ".0720" in exception["finding"]
+    assert "\u00d8.145-.155 x .078-.088" in exception["reason"]
 
 
 def test_side_station_names_the_frame_tap_and_the_web_needs_xx() -> None:
@@ -212,8 +232,8 @@ def test_overall_length_is_real_and_the_bore_centred_on_the_width() -> None:
     assert "OverallLength" in drawing.FRONT_KEEP
 
 
-def test_each_keeper_is_reamed_alone_and_the_pair_still_lines_up() -> None:
-    # #2338: no pair ream at assembly. Two bores reamed apart stand up to both
+def test_each_keeper_is_drilled_alone_and_the_pair_still_lines_up() -> None:
+    # #2338: no pair ream at assembly. Two bores drilled apart stand up to both
     # .XX LugRise bands plus the rail seats' budget apart in height; the shaft
     # through both spends the thickest printed lug x (seat pitch + that
     # slope) of each bore's clearance, plus each bore's own tilt to its seat
@@ -244,7 +264,12 @@ def test_each_keeper_is_reamed_alone_and_the_pair_still_lines_up() -> None:
         ch_fulcrum_keeper_notes.SET_SCREW_QUALIFIER,
     ):
         assert "ASSEMBLY" not in text
-    assert "REAM" in ch_fulcrum_keeper_notes.BORE_CALLOUT
+    assert ch_fulcrum_keeper_notes.BORE_CALLOUT.splitlines()[0] == "F DRILL THRU"
+    assert "REAM" not in ch_fulcrum_keeper_notes.BORE_CALLOUT
+    assert not any(
+        ch.isdigit()
+        for ch in ch_fulcrum_keeper_notes.BORE_CALLOUT.replace("MHA-CH-04", "")
+    )
 
 
 def test_crown_prints_a_full_round_reference_radius() -> None:
@@ -284,7 +309,7 @@ def test_crown_prints_a_full_round_reference_radius() -> None:
     assert terms["least crown over the bore axis"] + terms[
         "crown fall across the thread"
     ] == pytest.approx(spec.crown_least_height(spec._THREAD_HALF_MAJOR))
-    assert round(spec.SET_SCREW_ENGAGEMENT_D, 3) == 1.616
+    assert round(spec.SET_SCREW_ENGAGEMENT_D, 3) == 1.589
     # The sheet keeps it radial: no near-side diameter style, arrow outside,
     # no solid leader on through the bore to the centre (MR-fleet r6 eye pass).
     assert "CrownRadius" not in drawing.NEAR_SIDE_DIAMETERS
@@ -371,8 +396,17 @@ def test_fitup_exports_for_the_top_frame() -> None:
     from frame_column_stations import COLUMN_X
 
     spec = ch_fulcrum_keeper_spec
-    assert spec.KEEPER_FITUP_LOCATION_BAND_MM == 0.0254
-    assert spec.KEEPER_FITUP_PLACES == 2
+    # MHA-CH-00 prints the lug centre (.114 ±.004) at these places, and the
+    # frame's stacks charge that printed value (delegated ruling 2026-11-24
+    # (Main), precedent: owner ruling 2026-11-01 (thin walls accepted as
+    # minor); no owner number changed, #2144 (rulings.md D15)).
+    import ch_channel_assembly_spec as asm
+
+    assert spec.KEEPER_FITUP_PLACES == 3
+    assert (
+        asm.DRAWING_PRECISION[asm.KEEPER_PLAN_FEATURE][asm.KEEPER_X_DIMENSION]
+        == spec.KEEPER_FITUP_PLACES
+    )
     # The lug centres stand on the fulcrum line, off the column (web) line.
     assert COLUMN_X + spec.KEEPER_FITUP_X_FROM_WEB_MM == pytest.approx(
         LEVER_FULCRUM_XY[0]
@@ -973,8 +1007,8 @@ def test_keeper_feature_bands_are_the_printed_ones() -> None:
     assert features["foot_tip"]["length"] == pytest.approx([_in(0.64), _in(0.66)])
     assert features["far_side"]["width"] == pytest.approx([_in(0.54), _in(0.56)])
     bore = features["bore"]
-    assert bore["dia"] == pytest.approx([_in(0.2560), _in(0.2570)])
-    assert bore["process"] == "ream" and bore["thru"] is True
+    assert bore["dia"] == pytest.approx([6.528, 6.6296])  # F, +.004/0
+    assert bore["process"] == "drill" and bore["drill"] == "F" and bore["thru"] is True
     assert bore["height"] == pytest.approx([_in(0.98), _in(1.00)])
     assert bore["off_centre"] == pytest.approx([_in(-0.012), _in(0.012)])
     tap = features["crown_tap"]
@@ -982,7 +1016,7 @@ def test_keeper_feature_bands_are_the_printed_ones() -> None:
     assert tap["station"] == pytest.approx([_in(0.15), _in(0.17)])
     hole = features["foot_hole"]
     assert hole["dia"] == pytest.approx([_in(0.094), _in(0.098)], abs=1e-3)
-    assert hole["cbore_dia"] == pytest.approx([_in(0.150), _in(0.154)])
+    assert hole["cbore_dia"] == pytest.approx([_in(0.145), _in(0.155)])
     assert hole["cbore_depth"] == pytest.approx([_in(0.078), _in(0.088)], abs=1e-3)
     assert hole["station"] == pytest.approx([_in(0.17), _in(0.19)])
     assert hole["lateral"] == pytest.approx([_in(0.270), _in(0.280)])

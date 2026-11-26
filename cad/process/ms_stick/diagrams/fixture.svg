@@ -1,7 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Setup 2: the fixture bar on edge in the vise, its top faced (MS01_fixture_face). Left: seen from the bar's right end (looking toward -X), so +Y and the fixed jaw are on the right; 6 px/mm. Right: from above, 1.2 px/mm. Hand-drawn; styles: prechips.palette. -->
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 420" width="800" height="420" font-family="Arial, Helvetica, sans-serif" font-size="13">
+<!-- Setup 2: the fixture bar on edge in the vise, its top faced (MS01_fixture_face). Left: seen from the bar's right end (looking toward -X), so +Y and the fixed jaw are on the right; 6 px/mm. Right: from above, 1.2 px/mm. Both views show T1 on MS01's second pass, Y −9.525 (pass 1 hangs over the fixed jaw's side): the 1/2 in end mill Ø12.7 (face_cutter_dia_mm) = 76.2 px left, 15.2 px right, its end on the faced top, Z −0.254; it stands 1.50 in out of the collet (half_mill_projection_mm), drawn short and broken off. Hand-drawn; styles: prechips.palette. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 520" width="800" height="520" font-family="Arial, Helvetica, sans-serif" font-size="13">
   <text class="title" x="12" y="20">Setup 2: fixture bar, top faced by MS01 (left: seen from its right end; right: from above)</text>
+  <g transform="translate(0,100)">
   <!-- LEFT: view from the right end. Vise bed. -->
   <rect class="fixture-vise" x="30" y="366" width="300" height="26"/>
   <!-- Jaws 44.95 mm tall (270 px): moving on the left, fixed on the right. -->
@@ -16,11 +17,11 @@
   <rect class="fixture-plate" x="142" y="62" width="76" height="152"/>
   <text class="label-halo" x="150" y="150">6061 bar</text>
   <text class="label-halo" x="150" y="166">1/2 × 1</text>
-  <!-- The 1/2 in end mill over the top. -->
-  <rect class="cutter" x="123" y="22" width="76" height="38"/>
+  <!-- The 1/2 in end mill on pass 2, its end on the faced top. -->
+  <path class="cutter" d="M122.8 -62 L122.8 54.4 A38.1 9.1 0 0 0 198.9 54.4 L198.9 -62 L189.4 -66 L170.4 -58 L151.3 -66 L132.3 -58 L122.8 -62 Z"/>
   <text class="label" x="40" y="46">T1 1/2 in</text>
   <!-- Faced layer. -->
-  <rect class="part-removed" x="142" y="62" width="76" height="4"/>
+  <rect class="part-removed" x="142" y="62" width="76" height="1.5"/>
   <!-- Datums. -->
   <line class="datum" x1="218" y1="30" x2="218" y2="96"/>
   <text class="datum-label" x="226" y="46">Y0 bar's rear face</text>
@@ -32,6 +33,7 @@
   <path class="leader" d="M170 290 L152 290"/>
   <path class="leader" d="M190 290 L208 290"/>
   <text class="label-halo" x="150" y="310">parallels</text>
+  </g>
   <!-- RIGHT: from above. Jaws 158.67 mm (190 px) along X; the bar 304.8 mm (366 px), 73 mm (88 px) past each jaw side. -->
   <rect class="clamp" x="478" y="120" width="190" height="60"/>
   <text class="label-on-clamp" x="530" y="150">fixed jaw (rear)</text>
@@ -41,6 +43,8 @@
   <!-- The two facing passes: right to left, then left to right. -->
   <line class="arrow" x1="770" y1="184" x2="380" y2="184"/>
   <line class="arrow" x1="380" y1="191" x2="770" y2="191"/>
+  <!-- T1 on pass 2, over the bar's left overhang. -->
+  <circle class="cutter" cx="440" cy="191.4" r="7.6"/>
   <path class="leader" d="M430 184 L474 100"/>
   <text class="label" x="470" y="94">pass 1, then pass 2: whole top, {{process.fixture_face_mm:in.3dot}} deep</text>
   <!-- Datum X0: the bar's right end. -->

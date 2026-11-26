@@ -5,7 +5,7 @@ part's exported ``features.toml`` and the plan/shop TOML, then runs
 :func:`build` inside headless FreeCAD (``freecadcmd``) with that context and
 checks the posted G-code against :func:`expectations`. The block's sizes come
 from the feature export (its width, height and depth, the reamed knife bore,
-the reamed datum-B hole and the #10-24 tap hole); the blank, the skims, face
+the #30 drilled datum-B hole and the #10-24 tap hole); the blank, the skims, face
 levels, spots, pecks, tips, the parallels and the position bands from
 ``plan.toml`` ``[parameters]`` and ``milling_cuts``; cutter diameters, speeds
 and feeds from the shop (``shop/``). Every path is written here
@@ -23,7 +23,7 @@ to the back face K; KM02 (turned over) faces the front face F to the depth.
 KM03 (on edge, A down, F at the fixed jaw) skims the underside U. KM04
 (upright, S up) skims the S end; KM05 (S down) faces the N end to the width.
 KM06 (on edge, U down, S at the left) faces the top seat A to the height,
-spots, drills #31 and reams the .1280 datum-B hole, and drills the #25 tap
+spots, drills datum B #30 (owner ruling 2026-11-24, fit audit OQ19), and drills the #25 tap
 hole; KM07 brings the tap guide over the tap hole and ends. KM08 (lying, K
 down, gripped on the ends, S at the fixed jaw, A at the left) spots, pilots
 #25, drills 31/64 and reams the .4990 knife bore through (owner ruling
@@ -71,7 +71,6 @@ PROGRAMS: tuple[tuple[str, tuple[Any, ...]], ...] = (
             ("top_face",),
             ("top_spot",),
             ("dowel_drill",),
-            ("dowel_ream",),
             ("tap_drill",),
         ),
     ),
@@ -87,8 +86,7 @@ LOAD_FIRST_TOOL = tuple(name for name, _ops in PROGRAMS)
 CAM_TOOLS = (
     "em-half",
     "spot",
-    "drill-31",
-    "reamer-1280",
+    "drill-30",
     "drill-25",
     "drill-31-64",
     "reamer-4990",
@@ -389,10 +387,10 @@ def _geometry(features: dict[str, Any]) -> dict[str, Any]:
     if (
         dowel["axis"] != [0.0, -1.0, 0.0]
         or not math.isclose(dowel["at"][1], top, abs_tol=1e-3)
-        or dowel["process"] != "ream"
+        or dowel["process"] != "drill"
         or dowel.get("thru")
     ):
-        raise ValueError("dowel_hole: expected reamed blind from the top seat along -Y")
+        raise ValueError("dowel_hole: expected drilled blind from the top seat along -Y")
     tap = f["stud_tap"]
     if tap["axis"] != [0.0, -1.0, 0.0] or not math.isclose(
         tap["at"][1], top, abs_tol=1e-3
@@ -452,26 +450,23 @@ def context(
     _agree(plan, "end_top_max_mm", end_top)
 
     em = _shop_tool(plan, shop, "em-half")["diameter_mm"]
-    d31 = _shop_tool(plan, shop, "drill-31")["diameter_mm"]
+    d30 = _shop_tool(plan, shop, "drill-30")["diameter_mm"]
     d25 = _shop_tool(plan, shop, "drill-25")["diameter_mm"]
     d3164 = _shop_tool(plan, shop, "drill-31-64")["diameter_mm"]
-    r128 = _shop_tool(plan, shop, "reamer-1280")["diameter_mm"]
     r4990 = _shop_tool(plan, shop, "reamer-4990")["diameter_mm"]
     r = em / 2
-    if not dowel["dia"][0] <= r128 <= dowel["dia"][1]:
-        raise ValueError(
-            f".1280 reamer Ø{r128} is outside datum B's band {dowel['dia']}"
-        )
+    # Datum B is the #30 drill at the DRILLED HOLES row (owner ruling
+    # 2026-11-24, fit audit OQ19): the drill is the band's low end.
+    if not math.isclose(d30, dowel["dia"][0], abs_tol=1e-6):
+        raise ValueError(f"#30 Ø{d30} is not datum B's drilled size {dowel['dia'][0]}")
     if not bore["dia"][0] <= r4990 <= bore["dia"][1]:
         raise ValueError(
             f".4990 reamer Ø{r4990} is outside the knife bore's band {bore['dia']}"
         )
     if not tap["dia"][0] <= d25 <= tap["dia"][1]:
         raise ValueError(f"#25 Ø{d25} is outside the tap drill's band {tap['dia']}")
-    if not p["spot_dia_mm"] < d31 < r128:
-        raise ValueError(
-            "the spot, the #31 and the .1280 reamer are not in rising order"
-        )
+    if not p["spot_dia_mm"] < d30:
+        raise ValueError("the spot is not under the #30")
     if not d25 < d3164 < r4990:
         raise ValueError(
             "the #25 pilot, the 31/64 drill and the .4990 reamer are not in rising order"
@@ -504,14 +499,13 @@ def context(
     width_levels = _levels(end_top, width, level_max)
     height_levels = _levels(top_top, height, level_max)
 
-    # Holes. KM06: spot both, #31 pecked and the .1280 reamer fed in and out
-    # for datum B, #25 pecked for the tap. KM08: spot, #25 pilot pecked, the
-    # 31/64 drill in one feed, the .4990 reamer fed in and out.
+    # Holes. KM06: spot both, #30 pecked for datum B, #25 pecked for the
+    # tap. KM08: spot, #25 pilot pecked, the 31/64 drill in one feed, the
+    # .4990 reamer fed in and out.
     spot_rpm, spot_feed = _setting(plan, shop, "top spot")
     if _setting(plan, shop, "bore spot") != (spot_rpm, spot_feed):
         raise ValueError("'bore spot' runs at another setting than 'top spot'")
-    d31_rpm, d31_feed = _setting(plan, shop, "dowel drill")
-    r128_rpm, r128_feed = _setting(plan, shop, "dowel ream")
+    d30_rpm, d30_feed = _setting(plan, shop, "dowel drill")
     d25_rpm, d25_feed = _setting(plan, shop, "tap drill")
     if _setting(plan, shop, "bore pilot") != (d25_rpm, d25_feed):
         raise ValueError("'bore pilot' runs at another setting than 'tap drill'")
@@ -523,8 +517,7 @@ def context(
         ):
             raise ValueError(f"'{name}' cutter_dia_mm is not process.spot_dia_mm")
     for name, dia in (
-        ("dowel drill", d31),
-        ("dowel ream", r128),
+        ("dowel drill", d30),
         ("tap drill", d25),
         ("bore pilot", d25),
         ("bore drill", d3164),
@@ -552,19 +545,11 @@ def context(
     if depth / d3164 > 3:
         raise ValueError("the 31/64 drill's L/D is over 3: it would need pecks")
     past = p["drill_past_mm"]
-    # Datum B (KM06, Z0 = U): the reamer's tip dowel_ream_past_mm past the
-    # drawing's depth; the #31's full diameter past that by drill_past_mm.
+    # Datum B (KM06, Z0 = U): the #30's full diameter at the drawing's depth,
+    # as the tap drill's (the band .36-.38 takes the drill's point).
     dowel_depth = dowel["depth_nominal"]
-    ream_tip_depth = dowel_depth + p["dowel_ream_past_mm"]
-    lead_max = dowel["depth"][1] - dowel_depth
-    if not 0 < p["dowel_ream_past_mm"] <= lead_max + 1e-6:
-        raise ValueError(
-            "the .1280 reamer's tip leaves B's full diameter outside its depth band"
-        )
-    dowel_ream_tip = height - ream_tip_depth
-    dowel_drill_tip = height - (ream_tip_depth + past + _point(d31))
+    dowel_drill_tip = height - (dowel_depth + _point(d30))
     tap_drill_tip = height - (tap["drill_depth_nominal"] + _point(d25))
-    _agree(plan, "dowel_ream_tip_height_mm", dowel_ream_tip)
     _agree(plan, "dowel_drill_tip_height_mm", dowel_drill_tip)
     _agree(plan, "tap_drill_tip_height_mm", tap_drill_tip)
     # The knife bore (KM08, Z0 = K).
@@ -581,10 +566,6 @@ def context(
     _agree(plan, "bore_ream_clear_mm", depth + CLEAR_MM)
     # The sheet's re-ream MDI feeds at the reamer's setting.
     _agree(plan, "bore_ream_feed_mm_min", r4990_feed)
-    # And B's re-ream MDI (KM06, Z0 = U): over the top, at the .1280's setting.
-    _agree(plan, "dowel_ream_r_plane_mm", height + SAFE_MM)
-    _agree(plan, "dowel_ream_clear_mm", height + CLEAR_MM)
-    _agree(plan, "dowel_ream_feed_mm_min", r128_feed)
 
     # Hand tap (KM07): the bottoming tap's chamfer may be at most the drill's
     # shallowest full-diameter depth less the thread depth; the plug tap's
@@ -729,16 +710,18 @@ def context(
     _agree(plan, "bore_y_mm", -bore_xy[1])
     if not math.isclose(-bore_xy[1] - b_xy[0], bore["basic_from_b"], abs_tol=1e-3):
         raise ValueError("the bore is not its BASIC from B")
-    # The bore's two readings, on the height gauge over GO pins: each axis's
-    # error is the pins' play (each pin rests on its hole's low side: half
-    # the hole's band) plus the gauge's count (half a count for the reading
-    # from A; a full count for the bore from B, the difference of two
-    # readings). Each reading's band is the zone's radius less its error
-    # about its BASIC (outside it no bore is in the zone); the radial test,
-    # each axis's error added, then accepts the bore.
+    # The bore's two readings, on the height gauge over pins: each axis's
+    # error is the pins' play (each pin rests on its hole's low side) plus
+    # the gauge's count (half a count for the reading from A; a full count
+    # for the bore from B, the difference of two readings). The bore's GO pin
+    # plays half the bore's band; drilled B takes the largest pin of the
+    # .001-step pin-gauge sets that enters it, which plays at most half a
+    # step (b_pin_step_mm). Each reading's band is the zone's radius less its
+    # error about its BASIC (outside it no bore is in the zone); the radial
+    # test, each axis's error added, then accepts the bore.
     count = shop["gauges"]["height-gauge"]["resolution_mm"]
     bore_play = (bore["dia"][1] - bore["dia"][0]) / 2
-    b_play = (dowel["dia"][1] - dowel["dia"][0]) / 2
+    b_play = p["b_pin_step_mm"] / 2
     err_a = bore_play + count / 2
     err_b = bore_play + b_play + count
     _agree(plan, "bore_err_a_mm", err_a)
@@ -758,9 +741,9 @@ def context(
         _agree(plan, f"{key}_min_mm", basic - half)
         _agree(plan, f"{key}_max_mm", basic + half)
     # The tap's spacing to B, a gross check only: wider than half the zone
-    # plus the pins' clearance (B's largest Ø less the GO; the #25 hole's
+    # plus the pins' clearance (B's set pin's step; the #25 hole's
     # drill-point wander allowed as much again).
-    pin_play = dowel["dia"][1] - dowel["dia"][0]
+    pin_play = p["b_pin_step_mm"]
     if TAP_SPACING_GROSS_MM < tap["position_dia"] / 2 + 2 * pin_play:
         raise ValueError("the tap spacing's gross band is inside the pins' play")
     _agree(plan, "tap_from_b_min_mm", tap["basic_from_b"] - TAP_SPACING_GROSS_MM)
@@ -768,13 +751,13 @@ def context(
     # KM07's reference station on A: the tap's point (no wider than its drill)
     # stands on solid A between B and the tap drill.
     ref_x = plan["parameters"]["tap_ref_x_mm"]
-    if not (b_xy[0] + r128 / 2 + d25 / 2 < ref_x < tap_xy[0] - d25):
+    if not (b_xy[0] + dowel["dia"][1] / 2 + d25 / 2 < ref_x < tap_xy[0] - d25):
         raise ValueError(
             f"the tap's reference station X {ref_x} is not on solid A between B and the tap drill"
         )
     # Metal left between each blind hole's drill point and the knife bore.
     for name, hole, tip_depth, dia in (
-        ("datum B", dowel, height - dowel_drill_tip, d31),
+        ("datum B", dowel, height - dowel_drill_tip, d30),
         ("the tap", tap, height - tap_drill_tip, d25),
     ):
         tip_y = g["top"] - tip_depth
@@ -822,8 +805,7 @@ def context(
     spot_tool = drill_tool(
         "spot", CENTRE_DRILL["body_mm"], spot_rpm, spot_feed, CENTRE_DRILL["point_deg"]
     )
-    d31_tool = drill_tool("drill-31", d31, d31_rpm, d31_feed, DRILL_POINT_DEG)
-    r128_tool = drill_tool("reamer-1280", r128, r128_rpm, r128_feed, DRILL_POINT_DEG)
+    d30_tool = drill_tool("drill-30", d30, d30_rpm, d30_feed, DRILL_POINT_DEG)
     d25_tool = drill_tool("drill-25", d25, d25_rpm, d25_feed, DRILL_POINT_DEG)
     d3164_tool = drill_tool("drill-31-64", d3164, d3164_rpm, d3164_feed, DRILL_POINT_DEG)
     r4990_tool = drill_tool("reamer-4990", r4990, r4990_rpm, r4990_feed, DRILL_POINT_DEG)
@@ -922,18 +904,11 @@ def context(
             ],
         ),
         (
-            d31_tool,
+            d30_tool,
             "top",
             "dowel_drill",
-            "drill datum B #31",
+            "drill datum B #30",
             _pecked(b_xy, height, dowel_drill_tip, dowel_peck, top_clear),
-        ),
-        (
-            r128_tool,
-            "top",
-            "dowel_ream",
-            "ream datum B .1280",
-            _ream(b_xy, height, dowel_ream_tip, top_clear),
         ),
         (
             d25_tool,
@@ -1115,8 +1090,7 @@ def context(
                 "tools": [
                     tn["em-half"],
                     tn["spot"],
-                    tn["drill-31"],
-                    tn["reamer-1280"],
+                    tn["drill-30"],
                     tn["drill-25"],
                 ],
                 "loads_first": True,
@@ -1125,7 +1099,7 @@ def context(
         [
             name,
             "spindle",
-            {"rpm": [[face_rpm], [spot_rpm], [d31_rpm], [r128_rpm], [d25_rpm]]},
+            {"rpm": [[face_rpm], [spot_rpm], [d30_rpm], [d25_rpm]]},
         ],
         [name, "pauses", {"z_top": top_top, "count": 0}],
         [name, "depth", {"z_min": _r(min(dowel_drill_tip, tap_drill_tip))}],
@@ -1134,11 +1108,7 @@ def context(
         (
             face_checks("top_face"),
             hole_checks([b_xy, tap_xy], height, height - spot_depth, spot_r, top_keep),
-            hole_checks([b_xy], height, dowel_drill_tip, d31 / 2, top_keep),
-            [
-                *hole_checks([b_xy], height, dowel_ream_tip, r128 / 2, top_keep),
-                ["feed_out", {"z_top": height}],
-            ],
+            hole_checks([b_xy], height, dowel_drill_tip, d30 / 2, top_keep),
             hole_checks([tap_xy], height, tap_drill_tip, d25 / 2, top_keep),
         )
     ):

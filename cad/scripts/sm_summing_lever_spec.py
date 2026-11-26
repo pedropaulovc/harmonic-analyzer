@@ -29,6 +29,7 @@ from _hole_spec import THREAD_MAJOR_MM, HoleSpec
 from _inch_wall_limits import WALL_TARGET_MM
 from _package_units import drawing_unit
 from _printed_tolerance import (
+    angular_band_deg,
     inside_corner_radius_mm,
     printed_band_mm,
     printed_deviations,
@@ -99,13 +100,21 @@ KNIFE_RIDGE_TANGENT_XY = (
 # HexWidth and HexHeight left the ridge's position between the sides and each
 # flank's own angle free; one flank could take the whole angle band.  Detail D
 # instead holds, on both stubs, the ridge sharp RIDGE_FROM_SIDE from EACH side
-# face and each upper flank KNIFE_FLANK_TO_SIDE_DEG to its side face, both
-# toleranced explicitly; HexWidth becomes a reference.  The worst shoulder is
+# face and each upper flank KNIFE_FLANK_TO_SIDE_DEG to its side face; HexWidth
+# becomes a reference.  The ridge offset carries its own band; the flank angle
+# prints at the title block's ±1° (delegated ruling 2026-11-25 (Main),
+# precedent: the fit-necessity rule of the owner-approved fit policy
+# (drawing-simplicity-policy.md; owner ruling 2026-11-24): a band stays
+# tighter than the title block only when a named check fails at the looser
+# size, and none fails at ±1°; changes the owner's 2026-10-17 T1 number,
+# #2144 (rulings.md D24)): at ±1° the worst
+# knife rock is 8.16° against the 5.0° floor (8.53° at T1's ±.5°), so no check
+# earns the tighter band.  The worst shoulder is
 # the farthest from the ridge with the flattest flank: KNIFE_SHOULDER_X_MAX
 # out and KNIFE_SHOULDER_DROP_MIN down, on a flank KNIFE_FLANK_HALF_MAX_DEG
 # off the vertical.  The edge is gray iron as machined, not hardened (#1611).
 KNIFE_FLANK_TO_SIDE_DEG = round(180.0 - RIDGE_ANGLE_DEG / 2.0, 1)  # 122.4 printed
-KNIFE_FLANK_TO_SIDE_TOL_DEG = 0.5
+KNIFE_FLANK_TO_SIDE_TOL_DEG = angular_band_deg(unit=UNIT)  # the title block's ±1°
 RIDGE_FROM_SIDE = HEX_W / 2.0  # 4.040 from each side face, printed .159
 RIDGE_FROM_SIDE_TOL = 0.0508  # +/-.002
 # The worst shoulder at the printed limit: .159 + .002 = .161 (4.0894).

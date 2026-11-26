@@ -200,17 +200,18 @@ note = "1/4-20 tapped holes: the dt_cone_swing_platform, fr_harmonic_base, fr_to
 
 # --- MHA-CH-13 rocker strap on the CNC (cad/process/ch_rocker_strap) ---------
 
-# Hub-hole reamer for MHA-CH-13: Ø.4000 +.0005/0 REAM THRU, a press fit on
-# MHA-CH-12. To purchase: not owned; no make, price or stock read. Cutting
+# Hub-hole reamer for MHA-CH-13: Ø.400 REAM THRU, no band; MHA-CH-12 is
+# turned to slide into it and bonded (owner ruling 2026-11-24, fit audit
+# question 2). To purchase: not owned; no make, price or stock read. Cutting
 # band as tools.reamer-2550: the stated 0/+.0002, so it cuts .4000-.4002,
-# inside the bore's .4000-.4005 band (#3083 row 3); gauge the first hole
-# before the lot. Its sizing data is cad/process/shop/ tools.reamer-4000.
+# inside the .4000-.4005 the specs take it to cut (ch_rocker_hub_fit). Its
+# sizing data is cad/process/shop/ tools.reamer-4000.
 [tools.reamer-4000]
 name = ".4000 in HSS straight-flute chucking reamer"
 kind = "reamer"
 status = "to_order"
 purchase = "One .4000 in (decimal size) HSS straight-flute straight-shank chucking reamer; stated cutting band 0/+.0002 (.4000-.4002)."
-note = "Cuts the MHA-CH-13 hub hole in 1018 after a 25/64 drill, 400 rpm, cutting oil, fed in and out. Checked with the go/no-go pair gauges.plug-gauges-4000-4005 (first hole before the lot, then every part): the shop owns no pin gauges (owner 2026-11-17), and the owned Starrett telescoping gauges read on the micrometer repeat to about the whole .0005 in band. Not owned: to buy."
+note = "Cuts the MHA-CH-13 hub hole in 1018 after a 25/64 drill, 400 rpm, cutting oil, fed in and out. Checked by a .400 minus pin of the pin-gauge set entering, then by the MHA-CH-12 land sliding in (cad/process/ch_rocker_hub). Not owned: to buy."
 
 # --- Owner inventory 2026-11-17: Zoro order, shop photos, reamers ----------
 
@@ -343,11 +344,6 @@ kind = "reamer"
 status = "to_order"
 note = "quotes-2026-11-17-rev3.xlsx B-reamer-.1260: recommended Shars 404-7564."
 
-[tools.reamer-1865]
-kind = "reamer"
-status = "to_order"
-note = "quotes-2026-11-17-rev3.xlsx B-reamer-.1865: recommended Shars 404-7565."
-
 [tools.reamer-1885]
 kind = "reamer"
 status = "to_order"
@@ -362,11 +358,6 @@ note = "quotes-2026-11-17-rev3.xlsx B-reamer-.2490: recommended Shars 404-7567."
 kind = "reamer"
 status = "to_order"
 note = "quotes-2026-11-17-rev3.xlsx B-reamer-.2510 (optional tier there): recommended Zoro G3924812. To buy: owner ruling 2026-11-20 (#3073) buys a fixed reamer for each running/press fit rather than setting the adjustable set; REAM_SLIDE is a running fit. The workbook took it as owned (cad/scripts/_fit_ream_slide.py: the owned over reamers), but the owner's inventory of 2026-11-17 owns only tools.reamers-adjustable-lms-5948 and tools.reamer-0376."
-
-[tools.reamer-2560]
-kind = "reamer"
-status = "to_order"
-note = "quotes-2026-11-17-rev3.xlsx B-reamer-.2560: recommended McMaster-Carr 8803A491. Buy this, not the workbook's B-reamer-.2559 (6.5 mm, Drill America DWRR6.5MM): a 6.5 mm reamer at its stated band can cut .0001 under the .2560 minimum of the MHA-CH lever bore (#3083 row 4, owner ruling 2026-11-20)."
 
 [tools.reamer-3135]
 kind = "reamer"
@@ -409,15 +400,6 @@ purchase = "McMaster-Carr 8803A197, .0930 in HSS straight-flute chucking reamer 
 kind = "reamer"
 status = "to_order"
 note = "Not owned: to buy. drawing cross-check 2026-11-19: MHA-DT-11 2X .0930 +.0005/.0000 REAM .1555; MHA-PD-22 Ø.0930 2X REAM THRU, no band, its MHA-PD-VN-54 dowels the gauges (fit audit 2026-11-23). MHA-PD-18's locating holes are .1240 since fit audit question 9 (owner ruling 2026-11-24)."
-
-[tools.reamer-1280]
-make = "Alvord-Polk"
-sku = "8803A257"
-source = "https://www.mcmaster.com/8803A257/"
-purchase = "McMaster-Carr 8803A257, .1280 in HSS straight-flute chucking reamer (Alvord-Polk), $19.80 (read live 2026-11-22); stated diameter tolerance 0 to +.0002, 7/8 in flute, 3-1/2 in overall."
-kind = "reamer"
-status = "to_order"
-note = "Not owned: to buy. drawing cross-check 2026-11-19: MHA-SM-02 Ø.1280 ±.0007 REAM (.37), ending in a drill point (#3124)."
 
 [tools.reamer-1562]
 kind = "reamer"

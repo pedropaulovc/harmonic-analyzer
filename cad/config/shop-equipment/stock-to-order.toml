@@ -56,7 +56,9 @@ cite = ["OnlineMetals part 7467 https://www.onlinemetals.com/en/buy/carbon-steel
 # Ground rod for the five Ø.2500/Ø.3750 +.0000/-.0008 shafts (owner ruling
 # 2026-11-20, #2346: "Buy ground rod; it costs little and leaves the fit
 # stacks alone"). Cold-finished round is about +.000/-.002 as drawn and can
-# miss the -.0008 limit. MHA-CH-04, MHA-CH-05, MHA-DT-13 and MHA-DT-17 read
+# miss the -.0008 limit. MHA-CH-04 and MHA-CH-05 read 1/4 REF, GROUND ROD, AS
+# SUPPLIED (the bores they run in drilled letter F, .257: owner ruling
+# 2026-11-24, fit audit question 1); MHA-DT-13 and MHA-DT-17 read
 # GROUND STOCK OK; MHA-DT-19 does not. Owner ruling 2026-11-24 (form,
 # purchases), ground rounds: "12L14 (free-machining; drawings change
 # material)"; coordinator's ruling D11 by the owner's delegation of the same
@@ -69,7 +71,7 @@ material = "12L14 free-machining carbon steel, precision ground"
 note = "To order: McMaster-Carr 5227T232, 1/4 in ground 12L14 round, 3 ft, $13.65 (in the cart 2026-11-24; read live: diameter tolerance -0.0005/0 in, inside the shafts' +.0000/-.0008; straightness 1/16 in per 3 ft); used as supplied on the O.D. Allocation, as the plans saw it: ch-fulcrum-shaft (MHA-CH-04) 7.07 in, ch-pivot-shaft (MHA-CH-05) 6.91 in, dt-pinion-lift-rod (MHA-DT-17) 8.26 in, dt-pinion-pivot-shaft (MHA-DT-19) 7.88 in, and a 1.00 in trial offcut for each: 34.12 in plus eight saw kerfs out of the 36 in bar. NOT YET AS PRINTED: the four drawings and plans name AISI 1018 (issue #3561). Not owned."
 dia_in = [0.25]
 status = "to_order"
-cite = ["issue #2346 owner ruling 2026-11-20", "ch_pivot_shaft and ch_fulcrum_shaft sheets: 1/4 GROUND STOCK OK; dt_pinion_lift_rod_spec: 1/4 IN GROUND STOCK OK", "registry material_specification: AISI 1018 (CH-04, CH-05, DT-17, DT-19)"]
+cite = ["issue #2346 owner ruling 2026-11-20", "ch_pivot_shaft and ch_fulcrum_shaft sheets: 1/4 REF, GROUND ROD, AS SUPPLIED; dt_pinion_lift_rod_spec: 1/4 IN GROUND STOCK OK", "registry material_specification: AISI 1018 (CH-04, CH-05, DT-17, DT-19)"]
 
 [stock.1018-or-1045-ground-round-3-8]
 form = "round_bar"

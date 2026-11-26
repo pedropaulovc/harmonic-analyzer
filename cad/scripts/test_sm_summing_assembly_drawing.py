@@ -471,14 +471,14 @@ def test_step_five_runs_each_hanger_bolt_home_by_hand_then_sets_the_gauge_bar() 
     # both bores sets the front mount's yaw before its bolt is tightened, and
     # it must slide back out (check 5).  Owner ruling 2026-11-10 (Pedro), #2334, S2:
     # the tool is an 8.0 in bar that spans both mounts, not a class ZZ pin,
-    # with a fit route (rule 4): a matched fit to the bores it gauges, whose
-    # maximum is the clearance the rock budget charges.  That fit is the
-    # bar's own make record; the step states only the fitter's hand check
-    # (rule 22, PR #2717: no number that needs an instrument).  Owner ruling
-    # 2026-11-20 (Pedro), #2499: "Follow recommendations unless noted
-    # otherwise" -- the fit widens to .0026-.0041 so the bar passes two
-    # conforming bores; such a bar shakes, so the hand check is that it
-    # slides, and its reference size is the two places every such bar rounds to.
+    # with a fit route (rule 4): made to the bores it gauges.  Owner ruling
+    # 2026-11-24, fit audit S6: its make record reads "TURN THE BAR UNTIL IT
+    # SLIDES THROUGH BOTH MOUNTS; DIA .496 MIN", the floor capping the play
+    # the rock budget charges; the step states only the fitter's hand check
+    # (rule 22, PR #2717; owner, #3203: "Accepted when the bar is made; the
+    # assembly sheet says nothing more").  Such a bar shakes, so the hand
+    # check is that it slides, and its reference size is the two places
+    # every such bar rounds to.
     step = " ".join(_step_group("5"))
     assert step.startswith("5. ")
     assert "MHA-SM-VN-52" in step
@@ -499,22 +499,25 @@ def test_step_five_runs_each_hanger_bolt_home_by_hand_then_sets_the_gauge_bar() 
     assert re.search(r"\.\d{4}\b", bar_step.replace(notes.KNIFE_GAUGE_BAR, "")) is None
     record = _shop_equipment.load()["gauges"]["gauge-bar-0472x8"]
     assert "(Ø.49) x 8.0 in" in record["name"]
-    low, high = builder.knife_mount.KNIFE_GAUGE_BAR_CLEARANCE_IN
-    assert f"{low:.4f}".lstrip("0") in record["purchase"]
-    assert f"{high:.4f}".lstrip("0") in record["purchase"]
-    # Every bar so cut, Ø.4944-.4974 under the Ø.4985 +.0015/0 bores (owner
-    # ruling 2026-11-23, tool audit Q13), floors to the printed (Ø.49), which
-    # stays under the bores' smallest Ø (no stock 1/2 in rod reading).
-    assert notes.KNIFE_GAUGE_BAR_SIZES_IN == pytest.approx((0.4944, 0.4974))
-    assert notes.KNIFE_GAUGE_BAR_REF_DIA_IN == 0.49
-    assert "Ø.4944-.4974" in record["purchase"]
-    assert max(builder.knife_mount.KNIFE_GAUGE_BAR_CLEARANCE_IN) * 25.4 == pytest.approx(
-        builder.KNIFE_BAR_CLEARANCE
+    assert (
+        "TURN THE BAR UNTIL IT SLIDES THROUGH BOTH MOUNTS; DIA .496 MIN"
+        in record["purchase"]
     )
-    # The minimum is what two conforming bores need, rounded up to .0001.
-    assert low == pytest.approx(builder.KNIFE_BAR_FIT_MIN_IN) == pytest.approx(0.0026)
-    assert low * 25.4 >= builder.KNIFE_BAR_FIT_NEED
-    assert (high - low) * 25.4 == pytest.approx(max(builder.knife_mount.BORE_DIA_BAND))
+    assert builder.knife_mount.KNIFE_GAUGE_BAR_DIA_MIN_IN == 0.496
+    assert not hasattr(builder.knife_mount, "KNIFE_GAUGE_BAR_CLEARANCE_IN")
+    # Every bar from the .496 floor up to just under the largest Ø.5000 bore
+    # (owner ruling 2026-11-23, tool audit Q13) floors to the printed
+    # (Ø.49), which stays under the bores' smallest Ø (no stock 1/2 in rod
+    # reading).
+    assert notes.KNIFE_GAUGE_BAR_SIZES_IN == pytest.approx((0.4960, 0.5000))
+    assert notes.KNIFE_GAUGE_BAR_REF_DIA_IN == 0.49
+    # The floor's play in the largest bore is the clearance every stack
+    # charges.
+    assert builder.KNIFE_BAR_CLEARANCE == pytest.approx(0.0040 * 25.4)
+    # The recorded corner: the floor stands .00005 over the largest straight
+    # bar the smallest conforming pair passes, under the .001 reading unit.
+    assert builder.KNIFE_BAR_CORNER_SHORTFALL_IN == pytest.approx(0.0000517, abs=5e-8)
+    assert builder.KNIFE_BAR_CORNER_SHORTFALL_IN < builder.KNIFE_BAR_READING_UNIT_IN
     assert builder.KNIFE_GAUGE_BAR_LENGTH > builder.KNIFE_MOUNT_OUTER_SPAN_MAX
     # The mounts' outer span grew .25 in with the front station (#1038).
     assert builder.KNIFE_MOUNT_OUTER_SPAN_MAX / 25.4 == pytest.approx(7.665, abs=1e-3)

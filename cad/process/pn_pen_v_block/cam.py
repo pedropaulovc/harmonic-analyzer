@@ -6,7 +6,7 @@ part's exported ``features.toml`` and the plan/shop TOML, then runs
 checks the posted G-code against :func:`expectations`. The block's sizes come
 from the feature export (its faces, the neck steps, the V groove, the relief
 slot, the pivot bore and the set-screw tap); the blank, the skims, face and
-cut levels, spots, pecks, the reamer's run past the slot roof and the vise
+cut levels, spots, pecks, the #30 drill's run past the slot roof and the vise
 holds from ``plan.toml`` ``[parameters]``; cutter diameters, the chamfer
 mill's cone, speeds and feeds from the shop (``shop/``). Every path is
 written here (``rt.custom``): straight lines a recipe can state exactly.
@@ -23,7 +23,8 @@ VB02 (turned over) faces the far end to the length. Lying on the 1/2 in +
 step, VB04 (back down) faces the front to the depth and cuts the front neck
 step, VB05 (bottom up) skims the bottom face B, mills the relief slot, the V
 groove and their corners, VB06 (B down) faces the top to the height, then
-drills, reams and chamfers the pivot bore down into the slot and breaks the
+drills the pivot bore #30 (owner ruling 2026-11-24, fit audit question 20)
+and chamfers it down into the slot and breaks the
 neck's two top edges with the same chamfer mill, VB07 (front
 up) drills the set-screw tap hole into the bore and VB08 is its hand-tap
 stop.
@@ -75,7 +76,6 @@ PROGRAMS: tuple[tuple[str, tuple[Any, ...]], ...] = (
             ("top",),
             ("bore_spot",),
             ("bore_drill",),
-            ("bore_ream",),
             ("bore_chamfer", "neck_breaks"),
         ),
     ),
@@ -93,8 +93,7 @@ CAM_TOOLS = (
     "chamfer",
     "em-eighth",
     "spot",
-    "drill-32",
-    "reamer",
+    "drill-30",
     "drill-43",
     "tap-guide",
 )
@@ -294,20 +293,6 @@ def _spot(xy: tuple[float, float], top: float, z: float, clear: float) -> list[s
         f"G0 Z{r_plane:.3f}",
         f"G1 Z{_r(z):.3f} F{{feed}}",
         f"G0 Z{r_plane:.3f}",
-        f"G0 Z{clear:.3f}",
-    ]
-
-
-def _fed(xy: tuple[float, float], top: float, z: float, clear: float) -> list[str]:
-    """A plunge fed in and fed back out to the R plane (a reamer: a rapid
-    out of a finished bore can score it)."""
-    clear, r_plane = _r(clear), _r(top + SAFE_MM)
-    return [
-        f"G0 Z{clear:.3f}",
-        f"G0 X{xy[0]:.3f} Y{xy[1]:.3f}",
-        f"G0 Z{r_plane:.3f}",
-        f"G1 Z{_r(z):.3f} F{{feed}}",
-        f"G1 Z{r_plane:.3f} F{{feed}}",
         f"G0 Z{clear:.3f}",
     ]
 
@@ -685,8 +670,7 @@ def context(
     eighth = _shop_tool(plan, shop, "em-eighth")
     e8 = eighth["diameter_mm"]
     r8 = e8 / 2
-    d32 = _shop_tool(plan, shop, "drill-32")["diameter_mm"]
-    ream = _shop_tool(plan, shop, "reamer")["diameter_mm"]
+    d30 = _shop_tool(plan, shop, "drill-30")["diameter_mm"]
     d43 = _shop_tool(plan, shop, "drill-43")["diameter_mm"]
     # Owner ruling 2026-11-23, tool audit Q9: the slot's step corners print
     # R.065 (.060-.070) and the 1/8 in end mill leaves them at its radius.
@@ -698,10 +682,10 @@ def context(
         )
     if eighth["flute_length_mm"] < g["relief_height"]:
         raise ValueError("the 1/8 in end mill's flutes do not reach the slot's floor")
-    if not g["bore_dia"][0] <= ream <= g["bore_dia"][1]:
-        raise ValueError(f"reamer Ø{ream} is outside the bore band {g['bore_dia']}")
-    if not d32 < ream:
-        raise ValueError("the #32 is not under the reamer")
+    # The #30 is the bore's finish (owner ruling 2026-11-24, fit audit
+    # question 20): its nominal is the drilled bore's model size.
+    if not g["bore_dia"][0] <= d30 <= g["bore_dia"][1]:
+        raise ValueError(f"#30 Ø{d30} is outside the drilled bore band {g['bore_dia']}")
     if not g["tap_dia"][0] - MODEL_TOL_MM <= d43 <= g["tap_dia"][1] + MODEL_TOL_MM:
         raise ValueError(f"#43 Ø{d43} is outside the tap drill band {g['tap_dia']}")
     for name, dia in (
@@ -739,13 +723,11 @@ def context(
     spot_rpm, spot_feed = _setting(plan, shop, "bore spot")
     if _setting(plan, shop, "tap spot") != (spot_rpm, spot_feed):
         raise ValueError("'tap spot' runs at another setting than 'bore spot'")
-    d32_rpm, d32_feed = _setting(plan, shop, "bore drill")
-    ream_rpm, ream_feed = _setting(plan, shop, "bore ream")
+    d30_rpm, d30_feed = _setting(plan, shop, "bore drill")
     d43_rpm, d43_feed = _setting(plan, shop, "tap drill")
     for key, value in (
         ("spot_feed_per_min_mm", spot_feed),
-        ("drill_32_feed_per_min_mm", d32_feed),
-        ("ream_feed_per_min_mm", ream_feed),
+        ("drill_30_feed_per_min_mm", d30_feed),
         ("drill_43_feed_per_min_mm", d43_feed),
     ):
         if not math.isclose(p[key], value, abs_tol=PLAN_TOL_MM):
@@ -893,19 +875,17 @@ def context(
     # Pivot bore and set screw.
     spot_bore = _spot_depth(p["spot_bore_dia_mm"])
     spot_tap = _spot_depth(p["spot_tap_dia_mm"])
-    if p["spot_bore_dia_mm"] >= d32:
-        raise ValueError("the bore spot is not under the #32 drill")
+    if p["spot_bore_dia_mm"] >= d30:
+        raise ValueError("the bore spot is not under the #30 drill")
     if p["spot_tap_dia_mm"] >= d43:
         raise ValueError(
             "the tap spot is not under the #43 drill: it would chamfer the tap"
         )
     roof = g["relief_height"]
-    bore_tip = roof - p["drill_past_mm"] - _point(d32)
+    bore_tip = roof - p["drill_past_mm"] - _point(d30)
     _agree(plan, "bore_tip_height_mm", bore_tip)
-    ream_tip = roof - p["ream_past_mm"]
-    _agree(plan, "ream_tip_height_mm", ream_tip)
     if bore_tip <= 0:
-        raise ValueError("the #32's point reaches the stacks' level")
+        raise ValueError("the #30's point reaches the stacks' level")
     chamfer_mid = (g["chamfer"][0] + g["chamfer"][1]) / 2
     bore_mid = (g["bore_dia"][0] + g["bore_dia"][1]) / 2
     chamfer_depth = bore_mid / 2 + chamfer_mid  # the pointed 45° cone's plunge
@@ -957,7 +937,7 @@ def context(
     _agree(plan, "bore_drill_depth_mm", height - (roof - p["drill_past_mm"]))
     _agree(plan, "tap_drill_depth_mm", depth - axis)
     for cut, depth_key, peck_key in (
-        ("bore drill", "bore_drill_depth_mm", "peck_32_mm"),
+        ("bore drill", "bore_drill_depth_mm", "peck_30_mm"),
         ("tap drill", "tap_drill_depth_mm", "peck_43_mm"),
     ):
         op = _op_with_cut(plan, cut)[0]
@@ -1059,10 +1039,9 @@ def context(
         spot_feed,
         tip_angle=CENTRE_DRILL["point_deg"],
     )
-    d32_tool = tool(
-        "drill-32", d32, "drill", d32_rpm, d32_feed, tip_angle=DRILL_POINT_DEG
+    d30_tool = tool(
+        "drill-30", d30, "drill", d30_rpm, d30_feed, tip_angle=DRILL_POINT_DEG
     )
-    ream_tool = tool("reamer", ream, "reamer", ream_rpm, ream_feed)
     d43_tool = tool(
         "drill-43", d43, "drill", d43_rpm, d43_feed, tip_angle=DRILL_POINT_DEG
     )
@@ -1170,16 +1149,10 @@ def context(
             _spot(bore_xy, height, height - spot_bore, height + CLEAR_MM),
         ),
         "bore_drill": (
-            d32_tool,
+            d30_tool,
             "top",
-            "drill the pivot bore #32",
-            _pecked(bore_xy, height, bore_tip, p["peck_32_mm"], height + CLEAR_MM),
-        ),
-        "bore_ream": (
-            ream_tool,
-            "top",
-            "ream the pivot bore",
-            _fed(bore_xy, height, ream_tip, height + CLEAR_MM),
+            "drill the pivot bore #30",
+            _pecked(bore_xy, height, bore_tip, p["peck_30_mm"], height + CLEAR_MM),
         ),
         "bore_chamfer": (
             chamfer_tool,
@@ -1489,8 +1462,7 @@ def context(
                 "tools": [
                     tn["em-half"],
                     tn["spot"],
-                    tn["drill-32"],
-                    tn["reamer"],
+                    tn["drill-30"],
                     tn["chamfer"],
                 ],
                 "loads_first": True,
@@ -1499,7 +1471,7 @@ def context(
         [
             name,
             "spindle",
-            {"rpm": [[face_rpm], [spot_rpm], [d32_rpm], [ream_rpm], [v_rpm]]},
+            {"rpm": [[face_rpm], [spot_rpm], [d30_rpm], [v_rpm]]},
         ],
         [name, "pauses", {"z_top": raw_top, "count": 0}],
         [name, "depth", {"z_min": _r(bore_tip)}],
@@ -1521,13 +1493,8 @@ def context(
         ],
         *[
             [f"{name}@2", c, k]
-            for c, k in hole_checks(bore_xy, height, bore_tip, d32 / 2, keep["top"])
+            for c, k in hole_checks(bore_xy, height, bore_tip, d30 / 2, keep["top"])
         ],
-        *[
-            [f"{name}@3", c, k]
-            for c, k in hole_checks(bore_xy, height, ream_tip, ream / 2, keep["top"])
-        ],
-        [f"{name}@3", "feed_out", {"z_top": height}],
         # The bore chamfer, then the neck breaks on the same tool: one
         # section.  The chamfer is the only hole; the breaks enter on ramps
         # beside P.  Below the top the point moves sideways only along the
@@ -1536,20 +1503,20 @@ def context(
         # cutter, 0.01); the cone stands under the jaws' tops by its reach
         # there at the breaks' depth, the most it ever does.
         [
-            f"{name}@4",
+            f"{name}@3",
             "holes",
             {"centres": [list(bore_xy)], "z_bottom": _r(height - chamfer_depth)},
         ],
-        [f"{name}@4", "rapids_clear", {"z_top": height, "open_holes": [list(bore_xy)]}],
-        [f"{name}@4", "air_feed", {"z_top": height}],
-        [f"{name}@4", "depth", {"z_min": _r(height - max(leg, chamfer_depth))}],
+        [f"{name}@3", "rapids_clear", {"z_top": height, "open_holes": [list(bore_xy)]}],
+        [f"{name}@3", "air_feed", {"z_top": height}],
+        [f"{name}@3", "depth", {"z_min": _r(height - max(leg, chamfer_depth))}],
         [
-            f"{name}@4",
+            f"{name}@3",
             "keep_out",
             {"radius": max(0.0, lying_grip - (height - leg)), "boxes": keep["top"]},
         ],
         [
-            f"{name}@4",
+            f"{name}@3",
             "keep_out",
             {
                 "radius": 0.01,
@@ -1576,7 +1543,7 @@ def context(
             },
         ],
         [
-            f"{name}@4",
+            f"{name}@3",
             "cleared",
             {
                 "points": [

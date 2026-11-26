@@ -27,7 +27,7 @@
   <text class="label-halo" x="240" y="250">support block</text>
   <text class="label" x="545.69" y="262">screw jack under the strap</text>
   <text class="label" x="545.69" y="278">(about 4.3 in from the foot)</text>
-  <text class="label" x="20" y="318">Side view from the moving jaw: X0 the foot end (left), Z0 the plates' far ends; slots {{cad.slots_width_mm:in.3dot}} x {{cad.slots_depth_mm:in.3dot}}</text>
+  <text class="label" x="20" y="318">Side view from the moving jaw: X0 the foot end (left), Z0 the plates' far ends; slots ({{cad.slots_width_nominal_in:.3dot}}) x {{cad.slots_depth_mm:in.3dot}}</text>
   <text class="label" x="20" y="334">hatched. Plan as Setup 5 (same clamping); Y0 the fixed jaw; the 1/2 in parallel beside the strap is</text>
   <text class="label" x="20" y="350">behind it in this view. T4 at least {{process.slot_projection_min_mm:in.2dot}} out; oil brushed on before Cycle Start.</text>
 </svg>

@@ -193,8 +193,12 @@ KNOWN_JAW_CLEARANCE_VIOLATIONS: dict[str, str] = {
 
 
 def jaw_clearance_min_mm() -> float:
-    """The shop's least air between a cutter and a jaw or clamp it passes over."""
-    return float(_shop_equipment.load()["cnc"]["jaw-clearance"]["jaw_clearance_min_mm"])
+    """The shop's least air between a cutter and a jaw or clamp it passes over.
+
+    Read from ``cnc.toml`` alone, the one inventory file ``cam_inputs``
+    declares, so no other inventory file can reach the check."""
+    cnc = _shop_equipment.merge([_cam_programs.CNC_EQUIPMENT_PATH])
+    return float(cnc["cnc"]["jaw-clearance"]["jaw_clearance_min_mm"])
 
 
 def verify(expectations, directory: Path, known: dict[str, str] | None = None) -> list[_gcode.Finding]:

@@ -632,8 +632,11 @@ requirement(
     },
 )
 # The reamed press hole across the top notch, through both cheeks
-# (TOP_SIDE_KEEP): its limits and REAM THRU / SEE NOTE 1 callout, its offset
-# from the back face (.XXX, HOLE WALL MIN) and its drop from the top end.
+# (TOP_SIDE_KEEP): the .0775 reamer's size, no band, and REAM THRU / SEE NOTE
+# 1 callout (owner ruling 2026-11-24, fit audit question 3), its offset from
+# the back face (.XXX, HOLE WALL MIN) and its drop from the top end. "dia" is
+# the spec's ANALYSIS band (what the reamer is modelled to cut), not a
+# printed limit.
 _HOLE_SOURCES = ((_NOTES, "DIMENSION_CALLOUTS"), (_SELF, "TOP_SIDE_KEEP"))
 requirement(
     "top_pin_hole",

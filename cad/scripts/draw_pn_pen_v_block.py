@@ -35,7 +35,7 @@ face); every feature is located across the depth from the body's front face
   bore.  It carries the stations from the paper end and the overall length
   under it, the neck's two faces and the
   body's back face from the body's front face (right of the paper end, where
-  the neck's step is an outline change) and the pivot bore's reamed, banded
+  the neck's step is an outline change) and the pivot bore's #30 drilled
   diameter.
 * section A-A through the pivot-bore axis: bore, tap and relief in one cut,
   looking toward the free end as the paper-end view does (front face on the
@@ -124,7 +124,6 @@ from pn_pen_v_block_spec import (
     NECK_BREAK_FULL_X,
     NECK_EDGE_BREAK,
     NECK_DEPTH,
-    PIVOT_BORE_BAND,
     PIVOT_BORE_DIA,
     PIVOT_BORE_TOP_CHAMFER,
     PIVOT_BORE_X,
@@ -183,7 +182,7 @@ _S = VIEW_SCALE[0] / VIEW_SCALE[1] / 1000.0  # sheet metres per model mm
 # 18 x 18 chamfered block computed 38.2 wide against the 38.3 farm
 # 20261014T005925878Z measured); at 3:2, 52.5 x 52.4.  Centred at (0.315,
 # 0.097), its ink centred 1.8 mm under it as measured, it fills x
-# 0.289..0.341, y 0.069..0.121: 78 mm right of the reamed diameter's callout
+# 0.289..0.341, y 0.069..0.121: 78 mm right of the drilled diameter's callout
 # (to x ~0.213), 4 mm over the title block (top 0.0651), under the flank
 # angle's text (x ~0.2815..0.2955, from y ~0.134).
 # Its scale note (top-left anchor, ~58 mm wide) beside it at mid-height, from
@@ -366,9 +365,10 @@ RIGHT_KEEP = {
 #   step's corner on the body's front edge (x 0.119) through the air in front
 #   of the neck; the depth's from the body's back corner at the step (y
 #   0.039) through the air behind it.
-# * the reamed diameter's callout below them, wholly right of the paper end,
+# * the drilled diameter's callout below them, wholly right of the paper end,
 #   its single arrow on the near rim (set_near_side_diameter), so no leader
-#   crosses the bore.  Five rows, ~34 mm wide and ~32 mm tall about its keep:
+#   crosses the bore.  Measured as the reamed callout's five rows (the drilled
+#   one prints three inside them), ~34 mm wide and ~32 mm tall about its keep:
 #   x ~0.178..0.212, y ~0.025..0.057, 2.5 mm right of the depth's line (x
 #   0.175) and 1 mm right of its extension line's end (~0.1765), 4 mm left of
 #   the title block (x 0.216) and 12 mm over the border.  Its leader, from
@@ -379,6 +379,23 @@ RIGHT_KEEP = {
 #   dimension line.
 _PAPER_ROW = 0.0065
 _NECK_ROW_X = _fx(0.0) + 0.0055
+# The step corners' 2X R.065, off the part (rule 14; fan-out 2b-final: inside
+# the slot it sat in the silhouette with the sheet beside the view empty), in
+# the free sheet right of the view over the title block.  Its three rows,
+# ~41 x 15 mm about the keep (measured on the 2b sheet), start 7.5 mm right of
+# the depth's line: x ~0.180..0.222, y ~0.112..0.130, 10 mm under the
+# paper-end view's rows and left of the iso.  Its leader leaves the shelf's
+# left end (~7.7 mm under the keep) on the radius of the near corner, rising
+# 3 degrees from its centre: it meets the arc at the step wall and runs out
+# through the neck over its first long edge (1 to 3 mm clear), under the
+# ".08"'s lower arrow (~2 mm) to the text, crossing the ".78" and ".86"
+# lines on the way.  Steeper, it would cross the ".08"; any other way out of
+# the slot corner crosses the view.
+_CORNER_CENTRE = (_fx(RELIEF_X0 + RELIEF_CORNER_R), _bz(RELIEF_Z0 + RELIEF_CORNER_R))
+_CORNER_TEXT_HALF_W = 0.0207
+_CORNER_SHELF_DROP = 0.0077
+_CORNER_LEADER_RISE_DEG = 3.0
+_CORNER_TEXT_LEFT = _NECK_ROW_X + _END_ROW + 0.008 + 0.0075
 BOTTOM_KEEP = {
     "ReliefX0": (_fx(RELIEF_X0 / 2.0), _bz(BODY_Z1) - _PAPER_ROW),
     "PivotX": (_fx(PIVOT_BORE_X / 2.0), _bz(BODY_Z1) - 2 * _PAPER_ROW),
@@ -390,9 +407,13 @@ BOTTOM_KEEP = {
         (_bz(NECK_DEPTH) + _bz(DEPTH_MID_Z)) / 2.0,
     ),
     "PivotDia": (_fx(0.0) + 0.040, _bz(NECK_DEPTH) - 0.0067),
-    # The step corners' 2X R.065 inside the slot's open bottom, left of the
-    # step and the bore, its leader up-right to the near wall's corner.
-    "ReliefCornerR": (_fx(RELIEF_X0) - 0.040, _bz(RELIEF_Z0) - 0.012),
+    "ReliefCornerR": (
+        _CORNER_TEXT_LEFT + _CORNER_TEXT_HALF_W,
+        _CORNER_CENTRE[1]
+        + (_CORNER_TEXT_LEFT - _CORNER_CENTRE[0])
+        * math.tan(math.radians(_CORNER_LEADER_RISE_DEG))
+        + _CORNER_SHELF_DROP,
+    ),
 }
 # Section A-A looks the same way as the paper-end view beside it: the body's
 # front face at x 0.306 on the LEFT, the bottom face at y 0.156, the top at
@@ -609,7 +630,7 @@ def build(adapter: Any) -> dict[str, str]:
             0: "Pen V-Block Manufacturing Drawing",
             1: "Harmonic Analyzer hobby-machinist book drawing",
             2: "Harmonic Analyzer Project",
-            3: "pen v-block; brass; grip V, body relief, reamed pivot bore",
+            3: "pen v-block; brass; grip V, body relief, drilled pivot bore",
             4: "Generated from the project-owned ASME B drawing standard",
         },
     )
@@ -697,12 +718,12 @@ def build(adapter: Any) -> dict[str, str]:
     set_dimension_callouts(
         adapter, annotations, DIMENSION_CALLOUTS_ABOVE, location="above"
     )
-    # Natively the reamed diameter's leader runs rim to rim through the bore
+    # Natively the drilled diameter's leader runs rim to rim through the bore
     # and across its centre mark; one arrow on the near rim keeps it outside.
     pivot_dia = [a for a in annotations if dimension_name(adapter, a) == "PivotDia"]
     if len(pivot_dia) != 1:
         raise RuntimeError(f"expected one PivotDia dimension, found {len(pivot_dia)}")
-    set_near_side_diameter(pivot_dia[0], "reamed pivot-bore diameter")
+    set_near_side_diameter(pivot_dia[0], "drilled pivot-bore diameter")
     # The flanks' angle: its short arc at the back mouth corner, out of the
     # view, and its text offset right of the view.
     _place_flank_angle(adapter, annotations)
@@ -783,9 +804,10 @@ _DEFINITION_TO_WRITABLE = {5: 1, 6: 2, 7: 3, 8: 4}
 # the paper end, height +Y from the bottom face, depth Z with z 0 the neck's
 # front face; every depth station prints from the body's front face, z
 # BODY_Z0, the print's one depth datum). Bands are the title block's rows at
-# the places the sheet prints (DRAWING_PRECISION_BY_NAME), the reamed bore
-# and the two single-limit dimensions their native bands, the tap drill the
-# DRILLED HOLES row at TAP_DRILL_PLACES. Inside corners print nothing (the
+# the places the sheet prints (DRAWING_PRECISION_BY_NAME), the two
+# single-limit dimensions their native bands, the drilled pivot bore and the
+# tap drill the DRILLED HOLES row (the tap drill at TAP_DRILL_PLACES). Inside
+# corners print nothing (the
 # title block's R.040 MAX). The declarations print nothing.
 _P = DRAWING_PRECISION_BY_NAME
 _SELF = "draw_pn_pen_v_block"
@@ -809,7 +831,6 @@ part_metadata(
     precision_sources=(
         "DRAWING_PRECISION",
         "DRAWING_PRECISION_BY_NAME",
-        "DRAWING_BANDS",
         (_SELF, "TAP_DRILL_PLACES"),
     ),
 )
@@ -1065,14 +1086,16 @@ requirement(
         "corner_r": _P["ReliefCornerR"],
     },
 )
-# The pivot bore, reamed down from the top face through into the relief:
-# Ø.1260 +.0005/0 REAM THRU, SLIDING FIT ON MHA-PN-04 PIVOT, .49 from the
-# paper end and .43 from the body's front face, its top edge chamfered .012
-# MIN X 45° (CLEARS ROD MHA-PN-04 FILLET).
+# The pivot bore, drilled #30 down from the top face through into the relief
+# (owner ruling 2026-11-24, fit audit question 20): Ø.1285 #30 DRILL THRU,
+# MHA-PN-04 PIVOT, .49 from the paper end and .43 from the body's front face,
+# its top edge chamfered .012 MIN X 45° (CLEARS ROD MHA-PN-04 FILLET).
 requirement(
     "pivot_bore",
     kind="hole",
-    faces=(CylinderFace(PIVOT_BORE_DIA),),
+    # The #30's Ø.1285 lies within the selector's .05 of the relief corners'
+    # R.065 arcs (Ø.130): the bore's station names it alone.
+    faces=(CylinderFace(PIVOT_BORE_DIA, contains_x_mm=PIVOT_BORE_X),),
     requirements=("dia", "thru", "station", "depth_station", "top_chamfer"),
     fields={
         "at": (
@@ -1080,10 +1103,10 @@ requirement(
             ("PIVOT_BORE_X", "BLOCK_HEIGHT", "DEPTH_MID_Z"),
         ),
         "axis": ((0.0, -1.0, 0.0), (_FRAME,)),
-        "process": ("ream", ("PIVOT_BORE_DIA", "DIMENSION_CALLOUTS")),
+        "process": ("drill", ("PIVOT_BORE_DIA", "DIMENSION_CALLOUTS")),
         "dia": (
-            limits(PIVOT_BORE_DIA, _P["PivotDia"], PIVOT_BORE_BAND, unit=UNIT),
-            ("PIVOT_BORE_DIA", "PIVOT_BORE_BAND", "DRAWING_BANDS"),
+            drilled_limits(PIVOT_BORE_DIA, _P["PivotDia"], unit=UNIT),
+            ("PIVOT_BORE_DIA", "PIVOT_BORE_BAND", "DIMENSION_CALLOUTS"),
         ),
         "nominal_dia": (PIVOT_BORE_DIA, ("PIVOT_BORE_DIA",)),
         "thru": (True, ("DIMENSION_CALLOUTS",)),

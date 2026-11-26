@@ -117,7 +117,6 @@ from _drawing_marks import (
 from _drawing_dimension_insert import add_angular_reference_dimension
 from _drawing_tolerances import (
     set_dimension_basic_tolerance,
-    set_dimension_symmetric_angular_tolerance,
     set_dimension_symmetric_tolerance,
 )
 from _drawing_precision import (
@@ -164,7 +163,6 @@ from sm_summing_lever_spec import (
     HEX_Z_OUTER_PLUS,
     KNIFE_SEAT_Z_MINUS,
     KNIFE_SEAT_Z_PLUS,
-    KNIFE_FLANK_TO_SIDE_TOL_DEG,
     KNIFE_ENVELOPE_PLACES,
     KNIFE_RIDGE_R,
     KNIFE_RIDGE_R_BAND,
@@ -2309,9 +2307,10 @@ def _drawing_dimension_contract(adapter) -> None:
     """Size and mark every dimension the print imports (DRAWING_DIMENSIONS)."""
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     # The knife-edge controls the free-rock check assumes (code review C09):
-    # the ridge from each side face and the flank-to-side angle carry their
-    # own tolerances; the vertex height the title block's .XXX (the envelope's
-    # places are DRAWING_PRECISION's).
+    # the ridge from each side face carries its own tolerance; the
+    # flank-to-side angle prints at the title block's ±1° (rulings.md D24) and
+    # the vertex height at its .XXX (the envelope's places are
+    # DRAWING_PRECISION's).
     set_dimension_display_precision(adapter, "KnifeEnvelopeReference", "FlankToSide", 1)
     set_dimension_display_precision(adapter, "KnifeEnvelopeReference", "LowerFlankToSide", 1)
     for name in ("RidgeFromLeft", "RidgeFromRight"):
@@ -2319,13 +2318,6 @@ def _drawing_dimension_contract(adapter) -> None:
             adapter, "KnifeEnvelopeReference", name, RIDGE_FROM_SIDE_TOL,
             places=KNIFE_ENVELOPE_PLACES, display_unit=UNIT,
         )
-    set_dimension_symmetric_angular_tolerance(
-        adapter,
-        "KnifeEnvelopeReference",
-        "FlankToSide",
-        KNIFE_FLANK_TO_SIDE_TOL_DEG,
-        require_driven=True,
-    )
     _hex_width_reference(adapter)
     for (feature_name, name), prefix in DIMENSION_PREFIXES.items():
         set_dimension_prefix(adapter, feature_name, name, prefix)

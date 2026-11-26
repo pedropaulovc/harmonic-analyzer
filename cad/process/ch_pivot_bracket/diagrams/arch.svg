@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 400" font-family="sans-serif" font-size="13">
-  <!-- Setup 5: lying, I up, seat to the right (X0); PB04 profiles the arch and drills and reams the bore, above the jaw tops. -->
+  <!-- Setup 5: lying, I up, seat to the right (X0); PB04 profiles the arch and drills the bore (D, then F), above the jaw tops. -->
   <rect class="paper" x="0" y="0" width="760" height="400"/>
   <text class="title" x="20" y="20">Setup 5 (PB04_arch_bore): the arch and the bore, I up</text>
   <text class="label" x="20" y="45">From above (the fixed jaw at the top, the seat at the right):</text>
@@ -18,7 +18,7 @@
   <text class="datum-label" x="490" y="84">X0 the seat; Y0 W</text>
   <line class="leader" x1="281.4" y1="124.7" x2="490" y2="130.7"/>
   <circle class="leader-dot" cx="281.4" cy="124.7" r="2"/>
-  <text class="label" x="490" y="134.7">bore: spot, D drill, ream .2560</text>
+  <text class="label" x="490" y="134.7">bore: spot, D drill, F drill</text>
   <line class="leader" x1="240.63" y1="156" x2="490" y2="187.41"/>
   <circle class="leader-dot" cx="240.63" cy="156" r="2"/>
   <text class="label" x="490" y="191.41">arch R{{cad.arch_radius_in:.2dot}}: climb (G2), E side to W side</text>

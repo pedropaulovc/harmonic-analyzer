@@ -1,0 +1,9 @@
+# What fails past each numeric check test_pn_pen_carriage_geom asserts
+# (check_register.py, tolerance-policy.md "Checks in spec modules and tests").
+checks:
+  - id: C-01
+    check: "rod_set_screw.POINT_LENGTH > reach"
+    kind: gap
+    reason: "cup misses the groove floor; pivot loose in bore"
+    source: "the module computes it: the point's crossing of the bore wall .01575 (the deepest printed groove floor in the largest #30 bore, .1325) plus the pivot pushed off by its whole float there (Ø.1325 less the smallest pivot, halved, .00425) = .0200 in, against the vendor's one-pitch cup point sh_vn_arbor_set_screw_spec.POINT_LENGTH, .025 in (4-40); owner ruling 2026-11-24, fit audit question 20 (the bore drilled #30, the pivot unchanged)"
+    basis: worst_case

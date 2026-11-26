@@ -6,30 +6,36 @@
 # at a time from 20 sawn slugs. Setup 1 saws a 10 in piece off the bar for
 # the lathe (#3424: the whole bar would run out past the spindle's rear end;
 # limit cad/config/shop-equipment/ machines.pm-1127vf-lb
-# bar_behind_jaw_fronts_max_in); it makes all 20. Each pull: face the bar end (Z0), rough and
-# finish the land over both hubs to the lot's land window, spot, drill D
-# through both and past the second parting line, part off the first hub, face
-# the new end to Z0 again, part off the second. The land is turned before the
-# drill (the turning-deflection screen models solid round). The drawing's
-# matched fit governs the land (owner ruling 2026-11-21, "matched fit only"):
-# (Ø.400) REF, TURN TO MEASURED STRAP HOLE / .0004-.0013 DIAMETRAL
-# INTERFERENCE ON MHA-CH-13. Op 20 reads every MHA-CH-13 hub hole with four
-# Class X plug gauges, .4000, .4002, .4004 and .4005 (the .4000/.4005 pair,
-# plug-gauges-4000-4005, plus the two steps plug-gauges-4002-4004; all to
-# buy). Owner ruling 2026-11-23 (tool audit Q2), verbatim: "B. Four reading
-# pins (.4000, .4002, .4004, .4005)." It replaces the six pins by .0001
-# (plug-gauges-4001-4004). The largest pin that enters is the hole's reading
-# R; the hole lies under the next pin up, so in R to R + .0002 for R = .4000
-# or .4002, and in .4004 to .4005 for R = .4004 (the uneven last step). Every
-# hole takes .0004-.0013 when the land runs from the largest R + .0006 (Ø.4009
-# when the largest R is .4004) to the smallest R + .0013: a window of .0007
-# less the lot's spread of readings, never under .0004 (largest .4004,
-# smallest .4000: .4009-.4013), so it cannot close and the hubs need no
-# pairing. (Six pins left .0008 less the spread, also never under .0004.)
-# Acceptance is that interference:
-# land miked against the plug-gauged holes. The hubs part .02 long over the
-# .32 MIN supply length: the drawing's note 1 finishes bore and length after
-# joining, on MHA-CH-06. Bench: deburr, check land and length.
+# bar_behind_jaw_fronts_max_in); it makes all 20. Each pull: face the bar end
+# (Z0), rough and finish the land over both hubs, spot, drill D through both
+# and past the second parting line, part off the first hub, face the new end
+# to Z0 again, part off the second. The land is turned before the drill (the
+# turning-deflection screen models solid round). The drawing's made-to-fit
+# land governs (owner ruling 2026-11-24, fit audit question 2, approved as
+# recommended: "ream .400 with no band; hub turned until it slides in
+# (clearance .0005-.0030); bond"): (Ø.400) REF, TURN TO SLIDE INTO MHA-CH-13
+# HOLE / .0005-.0030 CLEARANCE, LOCTITE 638 (rule 4, form 2). The lathe turns
+# every land into one micrometer aim, land_min_in-land_max_in
+# (ch_rocker_hub_fit.LAND_WINDOW, which test_ch_rocker_hub_drawing binds):
+# the largest hole the .4000 reamer (tools.reamer-4000) is taken to cut less
+# the greatest clearance, to the smallest less the least
+# (ch_rocker_hub_fit.STRAP_HOLE_BAND, BOND_CLEARANCE), so a land in the aim
+# holds the drawing's clearance in every strap of the lot. The made-to-fit
+# check on the lathe: the land slides by hand into a finished strap's reamed
+# hole with no shake. The pair actually bonded is accepted where it is
+# joined, at the rocker arm traveler's dry fit (cad/process/ch_rocker_arm,
+# Setup 1): hub n into strap n, slides by hand, no force, no shake; a hub
+# that fits no strap of the lot goes to the owner. Traveler review r2
+# (2026-11-24) retired the telescoping hole reading and the numbering of
+# straps by it: the reading's .0005 repeatability left a window narrower than
+# the turned row. The matched press (owner ruling 2026-11-21), its four
+# Class X reading pins (tool audit Q2, 2026-11-23) and the .4000/.4005 pair
+# stay retired. The hubs part .02 long over the .32 MIN supply length: the
+# drawing's note 1 finishes bore and length after joining, on MHA-CH-06.
+# Bench: deburr, check length. Each hub has one lathe-faced end (Op 20 or
+# Op 90); the other is parted. The rocker arm traveler stands each hub on
+# its lathe-faced end, bonds it into its own strap (LOCTITE 638) and faces
+# both ends from the strap.
 title = "Rocker Hub"
 part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
@@ -48,20 +54,12 @@ part = "ch-rocker-hub"
 
 [parameters]
 quantity = 20
-# The land's least excess over a hole's reading R: the drawing's least
-# interference (.0004) plus the plug gauges' .0002 step, since the hole may
-# lie up to one step over R (owner ruling 2026-11-23, tool audit Q2: pins
-# .4000, .4002, .4004, .4005). test_ch_rocker_hub_drawing binds it to
-# ch_rocker_hub_fit.PRESS_INTERFERENCE.
-land_over_reading_min_in = 0.0006
-# The same for R = .4004, whose hole lies under the .4005 pin: the least
-# interference plus the .0001 last step, so the land's low end is .4009.
-land_over_top_reading_min_in = 0.0005
-top_reading_in = 0.4004
-# The narrowest lot window: smallest R .4000 + .0013 = .4013 less the land's
-# low end for a largest R of .4004 (.4004 + .0005 = .4009). The other lots
-# give .0005-.0008 (test_ch_rocker_hub_drawing works every pair through).
-land_window_min_in = 0.0004
+# The micrometer aim for the land: the drawing's clearance over every hole
+# the reamer is taken to cut, the largest hole less the greatest clearance to
+# the smallest less the least (ch_rocker_hub_fit.LAND_WINDOW;
+# test_ch_rocker_hub_drawing binds both).
+land_min_in = 0.3975
+land_max_in = 0.3995
 stock_dia_in = 0.5
 # The piece Setup 1 saws off the bar: it makes the 20 hubs (prechips'
 # parts_per_bar) and, at the first pull, leaves about 9 in behind the jaw
@@ -149,30 +147,10 @@ machine = "PM-1127VF-LB lathe"
 indexing = "none"
 machine_ref = "pm-1127vf-lb"
 holding = "3-jaw on the Ø{{process.stock_dia_in:.2dot}} piece from Setup 1, the rest of it back in the spindle bore; pull {{cad.stickout_in:.2dot}} in out of the jaw fronts each time."
-datum = "Z0 (carriage DRO) the bar end faced in Op 60, set again on the parted end in Op 130."
+datum = "Z0 (carriage DRO) the bar end faced in Op 20, set again on the parted end in Op 90."
 diagram = { file = "diagrams/bar.svg", alt = "The 1/2 in bar in the 3-jaw with two hubs out: the end faced, the land turned over both, the D hole drilled through both past the second parting line, each hub parted off {{cad.part_off_in:.2dot}} from its faced end." }
 lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{cad.stock_dia_mm}}", stock_diameter_mm = "{{cad.stock_dia_mm}}", stickout_mm = "{{cad.stickout_mm}}", minimum_diameter_mm = "{{cad.outer_dia_mm}}", support = "none" }
 turning_support = { kind = "chuck_only", chuck_z_mm = "{{cad.jaw_z_mm}}" }
-
-[[setups.operations]]
-cut_kind = "other"
-instruction = "Before the first pull, read the holes the land is turned to (drawing: TURN TO MEASURED STRAP HOLE). Try the four plug gauges .4000, .4002, .4004 and .4005 in every MHA-CH-13 strap's hub hole, smallest first, and write beside each strap the largest that enters: its reading R (.4000, .4002 or .4004)."
-inspection = "Every strap hole .4000–.4005: .4000 enters, .4005 does not; each R written."
-# The pair gauges the hole's band; the two steps read it inside the pair,
-# .4002 and .4004.
-gauge_checks = [{ gauge = "plug-gauges-4000-4005", band_mm = [10.16, 10.1727] }, { gauge = "plug-gauges-4002-4004", band_mm = [10.16508, 10.17016] }]
-
-[[setups.operations]]
-cut_kind = "other"
-instruction = "A strap hole the .4005 enters or the .4000 does not is outside MHA-CH-13's own .4000–.4005 hole band, the strap traveler's hub-hole check: that strap is nonconforming, so leave it out of the readings and make no hub for it. Set it aside and tell the owner: the strap is remade, not fitted with a hub turned to it."
-
-[[setups.operations]]
-cut_kind = "other"
-instruction = "Work out the lot's land window and write it on this sheet: from Ø(largest R + {{process.land_over_reading_min_in:.4dot}}), or Ø{{process.top_reading_in:.4dot}} + {{process.land_over_top_reading_min_in:.4dot}} if the largest R is {{process.top_reading_in:.4dot}}, to Ø(smallest R + {{cad.outer_interference_max_in:.4dot}}). A hole lies under the next pin up, so every hole then takes the drawing's {{cad.outer_interference_min_in:.4dot}}–{{cad.outer_interference_max_in:.4dot}} diametral interference."
-
-[[setups.operations]]
-cut_kind = "other"
-instruction = "The window is at least {{process.land_window_min_in:.4dot}} wide for any lot (smallest R .4000, largest .4004), so it never closes and no lot is split. A window under {{process.land_window_min_in:.4dot}} on the sheet is a misread or a slip in the sum: read the holes again (Op 20) before turning."
 
 [[setups.operations]]
 cut_kind = "other"
@@ -206,15 +184,15 @@ speed_kind = "spindle"
 tool = "ar"
 drilling = "none"
 sizing = "other"
-instruction = "Finish the land over the same length to the lot's land window (Op 40) in light passes, miking each hub's length of land between passes; over the window, take another pass."
+instruction = "Finish the land over the same length in light passes. Before each micrometer reading, stop the spindle and put the lathe in neutral; then mike each hub's length of land. Turn each land to the aim Ø{{process.land_min_in:.4dot}}–{{process.land_max_in:.4dot}}, the turning target that holds the drawing's clearance in every hole the .4000 reamer cuts. Once a land is in the aim, spindle stopped and lathe in neutral, slide a finished MHA-CH-13 strap (any one) onto the bar end and over that hub's land by hand."
 settings = "lathe-ar-1018"
 cut_diameter_mm = "{{cad.outer_dia_mm}}"
-inspection = "Land inside the Op 40 window on both hubs, micrometer: then every hole of the lot takes {{cad.outer_interference_min_in:.4dot}}–{{cad.outer_interference_max_in:.4dot}}."
+inspection = "The made-to-fit check: the strap slides over each hub's land by hand, no force, no shake (the drawing's {{cad.outer_clearance_min_in:.4dot}}–{{cad.outer_clearance_max_in:.4dot}} clearance in the reamed hole). The pair that is bonded is accepted at the rocker arm traveler's dry fit (MHA-CH-06, Setup 1), hub n in strap n."
 gauge_checks = "other"
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "A land under the Op 40 window: part both hubs off and scrap them; pull the piece and start the pair again from Op 60. If the piece runs short, saw another (Setup 1)."
+instruction = "The strap will not slide over a land: take another light pass and try again. It slides but shakes: part both hubs off and scrap them; pull the piece and start the pair again from Op 20 (if the piece runs short, saw another, Setup 1)."
 
 [[setups.operations]]
 cut_kind = "other"
@@ -254,7 +232,7 @@ speed_kind = "spindle"
 tool = "ar"
 drilling = "none"
 sizing = "other"
-instruction = "Face the parted end {{process.face_allowance_in:.2dot}} in with the AR tool; set DRO Z0 on it again. Bring the blade's chuck-side face onto the new faced end and set DRO Z there to the blade's width, as in Op 120: the DRO again reads the blade's tailstock-side face."
+instruction = "Face the parted end {{process.face_allowance_in:.2dot}} in with the AR tool; set DRO Z0 on it again. Bring the blade's chuck-side face onto the new faced end and set DRO Z there to the blade's width, as in Op 80: the DRO again reads the blade's tailstock-side face."
 settings = "lathe-ar-1018"
 cut_diameter_mm = "{{cad.outer_dia_mm}}"
 
@@ -264,7 +242,7 @@ speed_kind = "spindle"
 tool = "cutoff"
 drilling = "none"
 sizing = "other"
-instruction = "Part off the second hub with the blade's tailstock-side face at Z-{{cad.part_off_in:.2dot}}. Hands clear: let it fall; pick it up from the bed or the chip tray only after the spindle has stopped. Pull the piece for the next two and repeat from Op 60 until there is a hub for every strap kept in Op 30."
+instruction = "Part off the second hub with the blade's tailstock-side face at Z-{{cad.part_off_in:.2dot}}. Hands clear: let it fall; pick it up from the bed or the chip tray only after the spindle has stopped. Pull the piece for the next two and repeat from Op 20 until there are {{process.quantity:d}} hubs."
 settings = "lathe-part-1018"
 cut_diameter_mm = "{{cad.stock_dia_mm}}"
 
@@ -287,11 +265,11 @@ instruction = "Deburr each hub: file the parting burr off the parted face, break
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Each hub: length across the faces at least {{cad.length_min_in:.2dot}}, calipers; land inside the Op 40 window again after deburring, micrometer."
-inspection = "Length {{cad.length_min_in:.2dot}} min; land inside the Op 40 window (written on this sheet in Op 40)."
+instruction = "Each hub: length across the faces at least {{cad.length_min_in:.2dot}}, calipers; run a fingertip along the land: no burr stands on it."
+inspection = "Length {{cad.length_min_in:.2dot}} min; no burr on the land."
 gauge_checks = [{ gauge = "calipers", band_mm = ["{{cad.length_min_mm}}", "{{cad.part_off_mm}}"] }]
 feed = "hand"
 
 [[setups.operations]]
-instruction = "A hub under the length or outside the land window in Op 160 is scrapped, not reworked: the next pull makes another (if the piece runs short, saw another, Setup 1)."
+instruction = "A hub under the length in Op 120 is scrapped, not reworked: a later pull makes another (if the piece runs short, saw another, Setup 1)."
 feed = "hand"

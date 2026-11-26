@@ -1,0 +1,36 @@
+# Why each REAM and each band under the title block stays on MHA-CH-03
+# (owner ruling 2026-11-24: "In the part's registry file, not on the sheet.
+# The sheet stays clean; the reviewer fails a tight feature that has no
+# registry reason."). Read by the machinist review only. Each band was
+# re-derived .002 looser on the spec chain (fit audit 2026-11-23, lane 2).
+necessity:
+  - id: N-01
+    feature: "sheet 1, fork detail, Ø.0775 REAM THRU pivot-pin hole through both tines (note 1: press fit on MHA-SH-VN-58)"
+    kind: joint
+    reason: "press, or bond if loose, alone holds pin MHA-SH-VN-58"
+    source: "owner ruling 2026-11-24, fit audit question 3 (reamed, no band, the pin is the gauge; a pin that enters by hand is bonded at MHA-CH-00); sh_vn_pivot_pin_rod_spec.BUDGET interference_min/max"
+  - id: N-02
+    feature: "sheet 1, fork detail, fork slot .106 ±.002 (note 2)"
+    kind: gap
+    reason: "wide slot thickens the fork until neighbouring forks touch"
+    source: "sh_vn_pivot_pin_rod_spec: 'neighbouring forks can touch in the inter-arm gap' at ±.003 (.015 against the .014 floor at ±.002); at ±.004 the slot also closes on the thickest arm"
+  - id: N-03
+    feature: "sheet 1, fork detail, 2X tine wall .067 ±.002 (note 2)"
+    kind: gap
+    reason: "thick tines let neighbouring forks touch"
+    source: "sh_vn_pivot_pin_rod_spec: 'neighbouring forks can touch in the inter-arm gap' at ±.003 (.015 against the .014 floor at ±.002)"
+  - id: N-04
+    feature: "sheet 1, left view, ring near face .035 ±.002 (note 3)"
+    kind: gap
+    reason: "shank face stands proud of ring, rubs tooth disc"
+    source: "ch_connecting_rod_spec: 'a shank face can stand proud of its ring face' at ±.003 (SHANK_INSIDE_RING_MIN)"
+  - id: N-05
+    feature: "sheet 1, left view, ring thickness .170 ±.002 (note 3)"
+    kind: gap
+    reason: "shank face stands proud of ring, rubs tooth disc"
+    source: "ch_connecting_rod_spec: 'a shank face can stand proud of its ring face' at ±.003 (SHANK_INSIDE_RING_MIN)"
+  - id: N-06
+    feature: "sheet 1, front view, Ø1.213 +.005/0 strap bore (datum A), RUNNING FIT ON MHA-DT-12 (CLEARANCE .008-.015)"
+    kind: trace
+    reason: "bore play is lost motion in the channel's stroke"
+    source: "owner ruling 2026-11-21 (+.003 -> +.005 with the next MHA-CH-03 change); error_budget lost_motion: .015 most = 4.4 % of the 8.64 mm throw at a load sign change, .017 (4.9 %) at +.007"

@@ -681,14 +681,25 @@ _PLAN_LUG = KEEPER_PLAN.plan_xy(asm.KEEPER_LUG_X, asm.KEEPER_SOCKET_XZ[1])
 _PLAN_FACES = tuple(
     KEEPER_PLAN.plan_xy(asm.KEEPER_LUG_X, z) for z in asm.LUG_INNER_FACE_Z
 )
-# The X text above the boss, its dimension line clear of the boss top and
+# The X text right of the boss, its dimension line clear of the boss top and
 # off the inner-face dimensions' shared extension line on the socket line
 # (5d5245a review); each Z text centred on its own dimension line west of
 # the keepers, the rear's inside the front's so neither text sits on the
 # other's line (the front line stops at the front face, above the rear text;
-# the front text clears the rear line by 3 mm).
+# the front text clears the rear line by 3 mm). The X text is a three-row
+# block (callout, value, the rail web wall under it): SolidWorks centres a
+# block on its text position and hangs the dimension line under its last
+# row (MHA-FR-02 sheet 7's draft callout, farm run 20261125T172832344Z), so
+# the third row lowers that line half a row, about 3 mm; the text rises 3 mm
+# to keep the line where the two-row block left it (y 0.1347 on that run's
+# sheet 5, over the boss top at 0.1345). The wall row is the block's widest,
+# about 75 mm (MHA-FR-02's 28-character HOLDS 2-56 TAP WALL .076 MIN
+# measured 68.4 mm), 86 mm at the note glyph width; centred 0.050 east of
+# the lug it runs from about 0.125 (0.119 at most), east of both extension
+# lines at 0.112, to 0.200 (0.205 at most), short of the steps column at
+# 0.222.
 PLAN_KEEP = {
-    asm.KEEPER_X_DIMENSION: (_PLAN_LUG[0] + 0.016, KEEPER_PLAN_SOCKET_Y + 0.017),
+    asm.KEEPER_X_DIMENSION: (_PLAN_LUG[0] + 0.050, KEEPER_PLAN_SOCKET_Y + 0.020),
     asm.KEEPER_REAR_Z_DIMENSION: (
         _PLAN_LUG[0] + 0.035,
         (KEEPER_PLAN_SOCKET_Y + _PLAN_FACES[1][1]) / 2.0,
@@ -888,6 +899,7 @@ DETAIL_POINTERS = tuple(
 LUG_KEEP = {asm.LUG_SPAN_DIMENSION: LEVER_BANK.sheet_xy(_LUG_MID, _FULCRUM_Y + 32.0)}
 # swDimensionTextParts_e compartments.
 CALLOUT_TEXT_PART = 3  # swDimensionTextCalloutAbove
+CALLOUT_BELOW_PART = 4  # swDimensionTextCalloutBelow
 REFERENCE_PREFIX_PART = 1  # swDimensionTextPrefix
 REFERENCE_SUFFIX_PART = 2  # swDimensionTextSuffix
 BROKEN_LINE_ALIGNED_TEXT = 3  # swDisplayDimensionLeaderText_e.swBrokenLeaderAlignedText
@@ -898,6 +910,7 @@ DIMENSION_CALLOUTS = {
 }
 if any("\n" in text for text in DIMENSION_CALLOUTS.values()):
     raise AssertionError("an above-callout with a line break does not print")
+DIMENSION_BELOW_CALLOUTS = dict(notes.DIMENSION_BELOW_CALLOUTS)
 
 
 if not asm.KEEPER_SOCKET_XZ[1] < asm.LUG_INNER_FACE_Z[0] < asm.LUG_INNER_FACE_Z[1]:
@@ -921,23 +934,44 @@ class StepColumn:
 
 _RIGHT_FOOT = _TEMPLATE.title_block_top_m + STEPS_FOOT_CLEARANCE
 _BORDER_FOOT = BORDER + STEPS_FOOT_CLEARANCE
-# Sheet 3: right of view D. Sheet 4: the full-height left column, detail A
-# right of it. Sheet 5: right of views E and F. Sheet 6: the full-height left
-# column, then the setting table under view G's label on the right (round 1
-# review: balanced sheets, no lone step in an empty half). Each right column
-# runs down to the title block: with every remedy one action a step (rule
-# 22) the rocker bank needs both of its columns' full height, and the
-# end-hub check and its remedy blocks print together beside detail A.
+# Sheet 3: right of view D, then under view D's caption. Sheet 4: the
+# full-height left column, then under detail A's caption. Sheet 5: right of
+# views E and F. Sheet 6: the full-height left column, then the setting table
+# under view G's label on the right (round 1 review: balanced sheets, no lone
+# step in an empty half). Each right column runs down to the title block.
+# With every remedy one action a step (rule 22), the bonded-pin blocks ending
+# in a replaced part and the strap check back in its own bank, the rocker
+# bank needs the two short columns as well; a check and its remedy block
+# print in one column (ROCKER_BLOCKS), so the end-hub check and both hub
+# blocks print together beside detail A.
 _HOOKUP_LABEL_FOOT = (
     HOOKUP_BOTTOM_Y - 0.004 - len(HOOKUP.label_text.splitlines()) * NOTE_LINE_PITCH
 )
+# View D's caption foot: the farm render (chms-r3, 2026-11-21) prints its two
+# lines under the outline from about y 0.114 to 0.105; the column starts a
+# line and more below it, and _dimensioned_bank refuses a caption that
+# reaches it.
+ROCKER_UNDER_VIEW_TOP = 0.095
+# Detail A's caption (under its circle) ends here; the column starts a line
+# below it.
+_DETAIL_LABEL_FOOT = (
+    SOUTH_END.crop_label_xy[1] - len(SOUTH_END.label_text.splitlines()) * NOTE_LINE_PITCH
+)
 ROCKER_COLUMNS = (
     StepColumn(SHEET_NAMES[2], (STEPS_RIGHT_X, STEPS_TOP_Y), _RIGHT_FOOT),
+    StepColumn(SHEET_NAMES[2], (STEPS_LEFT_X, ROCKER_UNDER_VIEW_TOP), _BORDER_FOOT),
     StepColumn(SHEET_NAMES[3], (STEPS_LEFT_X, STEPS_TOP_Y), _BORDER_FOOT),
+    StepColumn(
+        SHEET_NAMES[3],
+        (STEPS_RIGHT_X, _DETAIL_LABEL_FOOT - NOTE_LINE_PITCH),
+        _RIGHT_FOOT,
+    ),
 )
-LEVER_COLUMNS = (
-    StepColumn(SHEET_NAMES[4], (STEPS_RIGHT_X, STEPS_TOP_Y), _RIGHT_FOOT),
-    StepColumn(SHEET_NAMES[5], (STEPS_LEFT_X, STEPS_TOP_Y), _BORDER_FOOT),
+# Each check with the remedy block that follows it prints in one column.
+ROCKER_BLOCKS = (
+    ("rod-arms-swing", *steps.ROD_PIN_REMEDY),
+    ("end-hubs-clear", *steps.LEFT_HUB_REMEDY, *steps.RIGHT_HUB_REMEDY),
+    ("straps-shake-in-forks", *steps.STRAP_SHAKE_REMEDY),
 )
 
 
@@ -966,19 +1000,29 @@ def flow_steps(
     keys: tuple[str, ...],
     text: dict[str, str],
     columns: tuple[StepColumn, ...],
+    together: tuple[tuple[str, ...], ...] = (),
 ) -> tuple[tuple[StepColumn, str], ...]:
     """Flow ``keys``' wrapped steps down ``columns`` in order: one blank line
     between consecutive steps (user request), a step never split, each
     column headed by ``heading`` (its continuations ``heading (CONT.)``).
-    Columns left over stay empty."""
+    Each run of keys in ``together`` (consecutive in ``keys``) prints in one
+    column. Columns left over stay empty."""
+    wrapped = {key: _wrapped_step(key, text[key]) for key in keys}
+    run_lines: dict[str, int] = {}
+    for run in together:
+        start = keys.index(run[0])
+        if keys[start : start + len(run)] != run:
+            raise AssertionError(f"{run[0]!r}'s block is not consecutive")
+        run_lines[run[0]] = sum(len(wrapped[key]) for key in run) + len(run) - 1
     blocks: list[tuple[StepColumn, str]] = []
     remaining = iter(columns)
     column = next(remaining)
     lines = [heading]
     for key in keys:
-        step = _wrapped_step(key, text[key])
+        step = wrapped[key]
         gap = [""] if len(lines) > 1 else []
-        if len(lines) + len(gap) + len(step) > column.capacity:
+        need = run_lines.get(key, len(step))
+        if len(lines) + len(gap) + need > column.capacity:
             if len(lines) == 1:
                 raise AssertionError(f"step {key!r} does not fit an empty column")
             blocks.append((column, "\n".join(lines)))
@@ -986,6 +1030,8 @@ def flow_steps(
             if column is None:
                 raise AssertionError(f"{heading} overflows its columns at {key!r}")
             lines, gap = [f"{heading} (CONT.)"], []
+            if len(lines) + need > column.capacity:
+                raise AssertionError(f"step {key!r} does not fit an empty column")
         lines += gap + step
     blocks.append((column, "\n".join(lines)))
     return tuple(blocks)
@@ -1027,6 +1073,14 @@ if _planned[2] > _TEMPLATE.width_m - BORDER - 0.003:
     raise AssertionError("the setting table runs past the right border")
 if _planned[1] < _TEMPLATE.title_block_top_m + 0.003:
     raise AssertionError("the setting table runs into the title block")
+# C10 (the rear keeper set to the bare stack) adds a step and threads the
+# levers at the keepers' fit-up: the lever steps run on under the setting
+# table, down to the title block.
+LEVER_COLUMNS = (
+    StepColumn(SHEET_NAMES[4], (STEPS_RIGHT_X, STEPS_TOP_Y), _RIGHT_FOOT),
+    StepColumn(SHEET_NAMES[5], (STEPS_LEFT_X, STEPS_TOP_Y), _BORDER_FOOT),
+    StepColumn(SHEET_NAMES[5], (STEPS_RIGHT_X, _planned[1] - 0.006), _RIGHT_FOOT),
+)
 
 
 def _fitup_text() -> dict[str, str]:
@@ -1078,17 +1132,31 @@ def _fitup_text() -> dict[str, str]:
         "rod-arms-swing": (
             f"CHECK EACH {arm} SWINGS FREE ON ITS PIN BY ITS OWN WEIGHT."
         ),
-        # A press whose part slides in by hand is a slip fit (rule 23). The pin
-        # is bought (sh_vn_pivot_pin_rod_spec), so the press-fit ruling is kept
-        # by a new rod, its fork hole reamed to the measured pin. One action a
-        # step (rule 22): "THAT" ties each later step to the condition.
-        "rod-pin-pressed-out": (
-            f"IF AN {pin} SLID IN BY HAND, ITS FORK HOLE IS OVER SIZE: PRESS "
-            "THAT PIN OUT."
+        # A press whose pin slides in by hand is bonded with LOCTITE 641, not
+        # a replaced rod (owner ruling 2026-11-24, fit audit question 3): the
+        # pin bond note on the detail sheet says how (one end only, the
+        # compound kept off the arm), and the bond is checked once cured, one
+        # check a step as rod-pins-held and rod-arms-swing are. One action a
+        # step (rule 22); every step after the bond opens "BONDED PIN:", as
+        # the hub blocks open "LEFT HUB:", so none reads as main flow. A bond
+        # that fails is not bonded again: the pin comes out hot (641 is the
+        # removable grade, the pin bond note's step 1) and the rod is replaced,
+        # as main replaced it, the new one going back to the pinning step.
+        "rod-pin-bonded": (
+            f"IF AN {pin} SLID IN BY HAND, BOND IT PER THE PIN BOND NOTE "
+            f"(SHEET {SHEET_NAMES.index(DETAIL_SHEET) + 1})."
         ),
-        "rod-replaced": f"REPLACE THAT {rod}.",
+        "rod-pin-bond-held": f"BONDED PIN: CURED, CHECK {pin} DOES NOT SLIDE BY HAND.",
+        "rod-pin-bond-swings": (
+            f"BONDED PIN: CHECK {arm} SWINGS FREE ON ITS PIN BY ITS OWN WEIGHT."
+        ),
+        "rod-pin-pushed-out": (
+            f"BONDED PIN: IF {pin} SLIDES OR {arm} BINDS, PUSH THAT PIN OUT, "
+            "HEATING THE TINES."
+        ),
+        "rod-replaced": f"PIN PUSHED OUT: REPLACE THAT {rod}.",
         "rod-pin-return": (
-            f"RETURN TO STEP {n(steps.RODS_PINNED_KEY)} WITH THE NEW {rod}."
+            f"PIN PUSHED OUT: RETURN TO STEP {n(steps.RODS_PINNED_KEY)} WITH THE NEW {rod}."
         ),
         # The fitter leaves this list after the rod pins for the drive train's
         # cylinder stack through its north-bracket set, then comes back here
@@ -1173,6 +1241,13 @@ def _fitup_text() -> dict[str, str]:
             f"STEP {n('shaft-drawn-back')}."
         ),
         "right-hub-clamp-eased": f"RIGHT HUB: EASE THE CLAMP ON THE RIGHT {bracket}.",
+        # A right hub that fails sits too near its ear: the re-set moves the
+        # right ear outward, to the span's upper limit as view D prints it.
+        # One action a step (rule 22): the span's new setting, then the return.
+        "right-hub-span-to-upper-limit": (
+            f"RIGHT HUB: AT STEP {n('south-bracket-span-set')}, SET THE EAR SPAN TO "
+            f"ITS UPPER LIMIT, {notes.EAR_SPAN_UPPER_TEXT}."
+        ),
         "right-hub-return": (
             f"RIGHT HUB: RETURN TO STEP {n('bare-shaft-through-ears')}."
         ),
@@ -1218,17 +1293,27 @@ def _fitup_text() -> dict[str, str]:
             f"WITH {top_frame} ON THE MILL, STAND BOTH {keeper} ON ITS RAIL AS "
             f"{plan_view} SHOWS, FEET OUTWARD."
         ),
+        # C10 (ch_channel_assembly_spec REAR_KEEPER_LEAF_MM): the rear keeper
+        # is set to the bare levers, so they go on with the shaft.
         "fulcrum-shaft-through-keepers": (
-            f"PUSH {fulcrum_shaft} THROUGH BOTH {keeper} BORES."
+            f"PUSH {fulcrum_shaft} THROUGH BOTH {keeper} AND {COUNT} BARE {lever} "
+            "LEVERS."
         ),
         steps.KEEPERS_SET_KEY: (
             f"BY DRO, SET EACH LUG CENTRE OFF THE RAIL WEB CENTRE, TO {plan_view}."
         ),
         "keeper-faces-set": (
-            "BY DRO, SET THE LUG INNER FACES OFF THE LINE OF THE UPPER SOCKET "
-            f"CENTRES, TO {plan_view}."
+            "BY DRO, SET THE RIGHT LUG INNER FACE OFF THE LINE OF THE UPPER "
+            f"SOCKET CENTRES, TO {plan_view}."
+        ),
+        "rear-keeper-to-stack": (
+            f"HOLDING THE RIGHT {keeper}, PUSH THE LEFT ONE UP TO THE {lever} "
+            f"HUBS ON THE FEELER LEAF OF {notes.setting_row('rear-keeper-to-stack')}."
         ),
         "keepers-clamped-on-frame": f"CLAMP BOTH {keeper} TO THE RAIL.",
+        # The leaf set the left keeper's station; it comes out before the
+        # keepers are drilled, not when the shaft is drawn.
+        "rear-keeper-leaf-removed": "REMOVE THE FEELER LEAF.",
         "keeper-feet-transferred": (
             f"TRANSFER-DRILL EACH {keeper} FOOT HOLE INTO THE RAIL."
         ),
@@ -1238,11 +1323,19 @@ def _fitup_text() -> dict[str, str]:
         ),
         "keepers-unclamped": "REMOVE THE CLAMPS.",
         "keepers-held": f"CHECK EACH {keeper} DOES NOT TURN BY HAND.",
-        # #2338: each keeper is reamed alone to its print; the bore's band
+        # #2338: each keeper is drilled letter F alone to its print (owner
+        # ruling 2026-11-24, fit audit Q1); the bore's band
         # covers both bore heights and the rail seats, so the shaft slides
         # with both screwed down (ch_fulcrum_shaft_spec ALIGNED_MIN_CLEARANCE_MM).
         "keeper-bores-checked": (
             f"CHECK {fulcrum_shaft} SLIDES FREELY THROUGH BOTH {keeper} BORES."
+        ),
+        # The levers ride the shaft between the screwed keepers, so each
+        # comes off as the shaft leaves its hub (#3571): they go to the bench
+        # for their bars with the shaft out.
+        "fulcrum-shaft-withdrawn": (
+            f"DRAW {fulcrum_shaft} OUT OF BOTH {keeper} TO THE LEFT ({lever_view}), "
+            f"CATCHING EACH {lever} LEVER AS IT COMES OFF."
         ),
         "bars-straight": (
             f"LAY EACH {bar} BAR ON THE SURFACE PLATE ON EACH SIDE FACE IN TURN: "
@@ -1269,14 +1362,23 @@ def _fitup_text() -> dict[str, str]:
         ),
         "bar-pins-held": f"CHECK EACH {bar_pin} DOES NOT SLIDE IN ITS BAR BY HAND.",
         "bars-swing": f"CHECK EACH {bar} SWINGS FREE ON ITS PIN UNDER ITS OWN WEIGHT.",
-        "bar-pin-pressed-out": (
-            f"IF AN {bar_pin} SLID IN BY HAND, ITS CHEEK HOLE IS OVER SIZE: PRESS "
-            "THAT PIN OUT."
+        "bar-pin-bonded": (
+            f"IF AN {bar_pin} SLID IN BY HAND, BOND IT PER THE PIN BOND NOTE "
+            f"(SHEET {SHEET_NAMES.index(DETAIL_SHEET) + 1})."
         ),
-        "bar-replaced": f"REPLACE THAT {bar}.",
-        "bar-pin-return": f"RETURN TO STEP {n('bars-straight')} WITH THE NEW {bar}.",
-        "fulcrum-shaft-withdrawn": (
-            f"DRAW {fulcrum_shaft} OUT OF BOTH {keeper} TO THE LEFT ({lever_view})."
+        "bar-pin-bond-held": (
+            f"BONDED PIN: CURED, CHECK {bar_pin} DOES NOT SLIDE BY HAND."
+        ),
+        "bar-pin-bond-swings": (
+            f"BONDED PIN: CHECK {bar} SWINGS FREE ON ITS PIN UNDER ITS OWN WEIGHT."
+        ),
+        "bar-pin-pushed-out": (
+            f"BONDED PIN: IF {bar_pin} SLIDES OR {bar} BINDS, PUSH THAT PIN OUT, "
+            "HEATING THE CHEEKS."
+        ),
+        "bar-replaced": f"PIN PUSHED OUT: REPLACE THAT {bar} BAR.",
+        "bar-pin-return": (
+            f"PIN PUSHED OUT: RETURN TO STEP {n('bars-straight')} WITH THE NEW {bar} BAR."
         ),
         steps.LEVER_BANK_THREADED_KEY: (
             f"PUSH {fulcrum_shaft} BACK THROUGH THE LEFT {keeper}, THEN THROUGH "
@@ -1325,9 +1427,72 @@ FITUP_TEXT = _fitup_text()
 if tuple(FITUP_TEXT) != steps.SEQUENCE:
     raise AssertionError("the step text must follow ch_channel_assembly_steps.SEQUENCE")
 FITUP_NOTES = flow_steps(
-    "ROCKER BANK FIT-UP", steps.ROCKER_SEQUENCE, FITUP_TEXT, ROCKER_COLUMNS
+    "ROCKER BANK FIT-UP",
+    steps.ROCKER_SEQUENCE,
+    FITUP_TEXT,
+    ROCKER_COLUMNS,
+    ROCKER_BLOCKS,
 ) + flow_steps("LEVER BANK FIT-UP", steps.LEVER_SEQUENCE, FITUP_TEXT, LEVER_COLUMNS)
 FITUP_STEPS = "\n".join(text for _column, text in FITUP_NOTES)
+
+
+def _pin_bond_note() -> str:
+    """The pin bond the rod-pin-bonded and bar-pin-bonded steps point to.
+
+    Owner ruling 2026-11-24, fit audit question 3: a pivot pin that enters
+    its reamed fork or bar hole by hand is bonded with LOCTITE 641 instead of
+    its rod or bar being replaced. Rule 23 (and part 1's second pass on the
+    audit): degrease, the compound kept off the running joint beside it, the
+    pin held square while it cures, and the cure before load. The pin runs in
+    the arm or lever between the two tines or cheeks, .002-.0075 off each
+    face, so only the trailing end is coated, no further in than half the
+    tine or cheek it stops in: the hole's mouth scrapes the excess outboard,
+    and nothing coated ever passes the arm or lever. The far hole holds the
+    pin square, and the cure lies coated end down so nothing runs inward. A
+    pin bonded in 641 (the removable grade) comes out with heat. As a note,
+    the bond stays one action of its step (the MHA-PD-00 bond note's form).
+    """
+    pin, bar_pin = item(explode.ROD_PIN), item(explode.BAR_PIN)
+    arm, lever = item("ch-rocker-arm"), item("ch-channel-lever")
+    lines = (
+        f"PIN BOND (STEPS {steps.step_number('rod-pin-bonded')} AND "
+        f"{steps.step_number('bar-pin-bonded')}): AN {pin} OR {bar_pin} THAT "
+        "SLID IN BY HAND.",
+        "1. PUSH IT OUT, HEATING THE TINES OR CHEEKS IF IT WAS BONDED.",
+        "2. DEGREASE THE PIN AND BOTH HOLES IT SLID IN.",
+        "3. COAT ONE END WITH LOCTITE 641, NO FURTHER IN THAN HALF THE "
+        "TINE OR CHEEK IT STOPS IN; NONE ON THE MIDDLE.",
+        "4. AT ONCE PUSH IT BACK, COATED END LAST, FLUSH WITH BOTH FACES: "
+        f"THE COMPOUND STAYS OFF THE {arm} OR {lever} BETWEEN THEM.",
+        "5. WIPE THAT FACE.",
+        "6. CURE 24 H, COATED END DOWN, THE FAR HOLE HOLDING THE PIN SQUARE.",
+    )
+    wrapped: list[str] = []
+    for line in lines:
+        wrapped += textwrap.wrap(
+            _REFERENCE_SPACE.sub(rf"\1{_UNBROKEN_SPACE}", line),
+            width=STEPS_LINE_WIDTH,
+            subsequent_indent="   ",
+            break_on_hyphens=False,
+        )
+    return "\n".join(line.replace(_UNBROKEN_SPACE, " ") for line in wrapped)
+
+
+# The note stands at the top of the detail sheet's right half, over detail
+# A's hub label (its text top 0.033 above the detail's centre), which it
+# clears by at least a line.
+PIN_BOND_NOTE = _pin_bond_note()
+PIN_BOND_NOTE_XY = (STEPS_RIGHT_X, STEPS_TOP_Y)
+_PIN_BOND_NOTE_FOOT = (
+    PIN_BOND_NOTE_XY[1] - len(PIN_BOND_NOTE.splitlines()) * NOTE_LINE_PITCH
+)
+if _PIN_BOND_NOTE_FOOT < SOUTH_END.centre[1] + 0.033 + NOTE_LINE_PITCH:
+    raise AssertionError("the pin bond note runs into detail A's hub label")
+if (
+    PIN_BOND_NOTE_XY[0] + STEPS_LINE_WIDTH * NOTE_CHAR_WIDTH
+    > _TEMPLATE.width_m - BORDER
+):
+    raise AssertionError("the pin bond note runs past the right border")
 
 
 def _activate_sheet(adapter: Any, name: str) -> Any:
@@ -2217,6 +2382,12 @@ def _dimensioned_bank(
     _activate_view(adapter, view, label=bank.title)
     if add_note(adapter, bank.label_text, x0, y0) is None:
         raise RuntimeError(f"failed to label {bank.title}")
+    label_foot = y0 - len(bank.label_text.splitlines()) * NOTE_LINE_PITCH
+    if bank == ROCKER_BANK and label_foot < ROCKER_UNDER_VIEW_TOP + NOTE_LINE_PITCH:
+        raise RuntimeError(
+            f"{bank.title}'s caption ends at y {label_foot:.4f}, into the step "
+            f"column under it (top {ROCKER_UNDER_VIEW_TOP})"
+        )
     for text, text_xy, tip in pointers:
         add_leader_note(
             adapter,
@@ -2265,6 +2436,9 @@ def _assert_settings(displays: dict[str, Any]) -> None:
         text = str(display.GetText(CALLOUT_TEXT_PART) or "").replace("\r\n", "\n")
         if text != DIMENSION_CALLOUTS[name]:
             raise RuntimeError(f"{name}: callout reads {text!r}")
+        below = str(display.GetText(CALLOUT_BELOW_PART) or "").replace("\r\n", "\n")
+        if below != DIMENSION_BELOW_CALLOUTS.get(name, ""):
+            raise RuntimeError(f"{name}: below-callout reads {below!r}")
 
 
 def _place_steps(adapter: Any, sheet: str) -> None:
@@ -2288,6 +2462,9 @@ def _place_fitup_sheets(adapter: Any) -> Callable[[], None]:
         adapter, SOUTH_END, {}, pointers=DETAIL_POINTERS
     )
     _place_steps(adapter, DETAIL_SHEET)
+    _add_note_block(
+        adapter, DETAIL_SHEET, PIN_BOND_NOTE, PIN_BOND_NOTE_XY, label="pin bond note"
+    )
 
     _activate_sheet(adapter, SHEET_NAMES[4])
     annotations += _dimensioned_bank(adapter, LEVER_BANK, LUG_KEEP)
@@ -2298,6 +2475,9 @@ def _place_fitup_sheets(adapter: Any) -> Callable[[], None]:
 
     for name, text in DIMENSION_CALLOUTS.items():
         set_dimension_callouts(adapter, annotations, {name: text}, location="above")
+    set_dimension_callouts(
+        adapter, annotations, DIMENSION_BELOW_CALLOUTS, location="below"
+    )
     displays = _displays(adapter, annotations)
     for annotation in annotations:
         name = dimension_name(adapter, annotation)

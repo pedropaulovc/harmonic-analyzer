@@ -115,11 +115,11 @@ def test_dowel_hole_depth_is_dimensioned_on_the_section_not_a_hidden_edge() -> N
 
     assert not hasattr(sm_knife_mount_spec, "PIN_DEPTH_CALLOUT")
     assert "PinHoleDepth" not in drawing.DIMENSION_CALLOUTS
-    assert drawing.PIN_HOLE_CALLOUT.splitlines()[0] == "REAM <HOLE-DEPTH> (.37)"
+    assert drawing.PIN_HOLE_CALLOUT.splitlines()[0] == "#30 DRILL <HOLE-DEPTH> (.37)"
     assert "FLAT BOTTOM" not in drawing.PIN_HOLE_CALLOUT
     assert not hasattr(sm_knife_mount_spec, "DOWEL_HOLE_FLOOR_CORNER_R_MAX")
-    assert sm_knife_mount_spec.PIN_HOLE_POINT_H == pytest.approx(0.97676, abs=1e-5)
-    assert sm_knife_mount_spec.PIN_HOLE_BORE_WEB == pytest.approx(6.2534, abs=1e-4)
+    assert sm_knife_mount_spec.PIN_HOLE_POINT_H == pytest.approx(0.98057, abs=1e-5)
+    assert sm_knife_mount_spec.PIN_HOLE_BORE_WEB == pytest.approx(6.2282, abs=1e-4)
     assert sm_knife_mount_spec.PIN_HOLE_BORE_WEB >= sm_knife_mount_spec.STUD_TAP_WEB_MIN
     assert drawing.DEPTH_TEXT_ROWS == 1
     assert sm_knife_mount_spec.PIN_HOLE_DEPTH == pytest.approx(9.398)  # .37
@@ -546,10 +546,12 @@ def test_spec_geometry_mirrors_the_build_source() -> None:
         assert not hasattr(part, gone), gone
     dia = sm_knife_mount_spec.PIN_HOLE_DIA
     depth = sm_knife_mount_spec.PIN_HOLE_DEPTH
-    assert dia == pytest.approx(3.2512)  # .1280
+    assert dia == pytest.approx(3.2639)  # .1285, the #30 drill
     assert part.V_PIN == pytest.approx(math.pi * (dia / 2.0) ** 2 * depth, abs=1e-9)
-    # B's Ø carries the symmetric slip band, one row (.1280 +/-.0007).
-    assert sm_knife_mount_spec.PIN_HOLE_DIA_BAND == pytest.approx((0.01778, -0.01778))
+    # B's Ø is the title block's DRILLED HOLES row (owner ruling 2026-11-24,
+    # fit audit OQ19): no native band.
+    assert sm_knife_mount_spec.PIN_HOLE_DRILL == "#30"
+    assert sm_knife_mount_spec.PIN_HOLE_DIA_BAND == pytest.approx((0.1016, 0.0))
 
 
 def test_the_sheet_carries_no_notes_block() -> None:
@@ -560,8 +562,8 @@ def test_the_sheet_carries_no_notes_block() -> None:
     assert not hasattr(sm_knife_mount_spec, "DRAWING_NOTES")
     assert not hasattr(sm_knife_mount_spec, "STUD_SCREW_NUMBER")
     # No quantity rides above B's Ø (the 2X pattern is gone); the slip
-    # hole's callout names its fit on its mate (rule 4) and its flat floor;
-    # the section's depth prints its value alone.
+    # hole's callout names its drill and its mate; the section's depth
+    # prints its value alone.
     assert not hasattr(drawing, "CALLOUTS_ABOVE")
     assert drawing.DIMENSION_CALLOUTS == {
         "BoreDia": drawing.BORE_CALLOUT,
@@ -569,29 +571,19 @@ def test_the_sheet_carries_no_notes_block() -> None:
     }
     dowel_number = _config.parts("sm-vn-knife-mount-dowel")["number"]
     assert sm_knife_mount_spec.DOWEL_NUMBER == dowel_number
-    # The printed clearance band, in inch, rounds the dowel's slip band
-    # outward to four places.
-    import sm_vn_knife_mount_dowel_spec as dowel
-
-    low = math.floor(dowel.SLIP_CLEARANCE_MIN / 25.4 * 1e4 + 1e-6) / 1e4
-    high = math.ceil(dowel.SLIP_CLEARANCE_MAX / 25.4 * 1e4 - 1e-6) / 1e4
-    assert sm_knife_mount_spec.PIN_SLIP_PRINTED == pytest.approx((low, high))
-    assert low * 25.4 - 1e-9 <= dowel.SLIP_CLEARANCE_MIN < (low + 0.0001) * 25.4
-    assert (high - 0.0001) * 25.4 < dowel.SLIP_CLEARANCE_MAX <= high * 25.4 + 1e-9
-    # B's hole is a matched fit: it names its route on the dowel and the
-    # clearance as its acceptance, once; also its process and REF depth.
-    # The callout keeps few enough rows for the layout audit's limit with
-    # its value row.
+    # B is a #30 drill (owner ruling 2026-11-24, fit audit OQ19): the
+    # DRILLED HOLES row accepts it, so the callout names the drill and the
+    # dowel it takes, no fit name and no clearance window (the Q20
+    # precedent, "#30 DRILL THRU / MHA-PN-04 PIVOT").
     from _layout_audit import TEXT_ROW_LIMIT
 
-    window = f"CLEARANCE {low:.4f}-{high:.4f}".replace("0.", ".")
+    assert not hasattr(sm_knife_mount_spec, "PIN_SLIP_PRINTED")
     hole = drawing.PIN_HOLE_CALLOUT
-    assert hole.count(window) == 1
-    assert hole.count(f"{dowel_number} SLIDING FIT") == 1
+    assert hole.splitlines() == ["#30 DRILL <HOLE-DEPTH> (.37)", f"{dowel_number} DOWEL"]
+    assert "FIT" not in hole and "CLEARANCE" not in hole
     assert "TO SUIT" not in hole  # rule 26 private phrase (round 2)
     assert "REF)" not in hole
     assert 1 + len(hole.splitlines()) <= TEXT_ROW_LIMIT
-    assert "DIAMETRAL" not in hole
     assert not any(
         "PRESS" in text or "INTERFERENCE" in text
         for text in drawing.DIMENSION_CALLOUTS.values()
@@ -1015,8 +1007,11 @@ def test_the_slip_seat_holds_its_webs() -> None:
         "SLOT_BORE_WEB",
     ):
         assert not hasattr(spec, gone), gone
-    # The slip band holds the dowel at 0.02..0.10 diametral clearance.
-    assert 0.02 <= dowel.SLIP_CLEARANCE_MIN < dowel.SLIP_CLEARANCE_MAX <= 0.10
+    # The #30 drill (owner ruling 2026-11-24, fit audit OQ19) holds the dowel
+    # at 0.0813..0.1880 diametral clearance: positive at the drill's own size.
+    assert dowel.SLIP_CLEARANCE_MIN == pytest.approx(0.08128)
+    assert dowel.SLIP_CLEARANCE_MAX == pytest.approx(0.18796)
+    assert 0.0 < dowel.SLIP_CLEARANCE_MIN < dowel.SLIP_CLEARANCE_MAX
     assert spec.PIN_HOLE_DIA == dowel.SLIP_HOLE_DIA
     assert spec.PIN_HOLE_DIA_BAND == dowel.SLIP_HOLE_DIA_BAND
 
