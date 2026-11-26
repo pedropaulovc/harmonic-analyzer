@@ -105,7 +105,7 @@ part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
 material = "1018 cold-finished steel, 1/4 x 2-1/2 in flat (drawing: {{cad.material_spec}})"
 stock = "{{process.blank_thickness_in:fraction}} x {{process.blank_width_in:.1f}} in flat bar (36 in length on hand): one blank {{process.blank_length_in:.2f}}–{{process.blank_length_max_in:.2f}} in. Spoil plate: the 1/2 x 6 x 18 in 6061 bar, whole."
-note = "Inches unless mm; G-code and console entries in mm (the files and the controller run G21). Thickness and edge E are the bar's, as supplied: neither face is machined. Mill speeds on the PM-30MV low belt (100–2800 rpm): no belt change. Home the mill ($H) at the start of every mill setup; after any E-stop, alarm, stall, controller reset or knock to the work, home again and repeat the setup's G54 pick-up before resuming. Prove each cutting program in air on its first run (the setups' prove ops); the tap-guide files (PL02, PL03, PL06, PL07) only carry the guide in Idle over a hole: watch their first run, a hand on feed hold. Made at assembly (MHA-DT-00), not here: the Ø.0630 tip-dowel hole (step 2) and, on a bar thinner than the VN-52 shoulder, the steel shim washers under its head (owner ruling 2026-11-22; GitHub issue 3363 adds them to the assembly's hardware). Finish: {{cad.finish}}."
+note = "Inches unless mm; G-code and console entries in mm (the files and the controller run G21). Thickness and edge E are the bar's, as supplied: neither face is machined. Mill speeds on the PM-30MV low belt (100–2800 rpm): no belt change. Home the mill ($H) once, after switching it on: every M6's trip to the tool setter and the tap files' G53 retract count from home. Home again only after a power cycle or a controller restart, an E-stop, an alarm, a limit switch hit, a stall or a crash: homing brings the stored G54 back. Then check every zero of the setup again, each the way its step set it: each must read what its step set, within .001 in. One does not, cannot be reached with the part in, or the part may have moved: take the setup again from its first step, the part out. They all do: run the interrupted file again from its start. Feed Hold, then Reset with the axes stopped keeps position and G54: no homing, no new zero; run the interrupted file again from its start: its first M6 measures the tool, and cuts already made are cut in air. Prove each cutting program in air on its first run (the setups' prove ops); the tap-guide files (PL02, PL03, PL06, PL07) only carry the guide in Idle over a hole: watch their first run, a hand on feed hold. Made at assembly (MHA-DT-00), not here: the Ø.0630 tip-dowel hole (step 2) and, on a bar thinner than the VN-52 shoulder, the steel shim washers under its head (owner ruling 2026-11-22; GitHub issue 3363 adds them to the assembly's hardware). Finish: {{cad.finish}}."
 shop = "../shop"
 stock_refs = ["1018-flat-1-4x2-1-2", "6061-flat-1-2x6-18in"]
 material_key = "rocker-1018-cold-finished"
@@ -450,8 +450,8 @@ vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{cad.blank_width_mm}}", alo
 beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{process.blank_length_mm}}"], clamp_mm = ["{{process.s2_overhang_mm}}", 202.9078], section_mm = { y = "{{cad.blank_width_mm}}", z = "{{process.blank_thickness_min_mm}}" }, vise_left = "start" }
 
 [[setups.operations]]
-instruction = "Home the mill ($H). G54 Y0 on the fixed jaw's face, X0 on the blank's marked end (edge finder at 900 rpm). Console M6 T1 (1/4 in end mill, at least {{process.quarter_projection_min_mm:in.3dot}} out of its collet). Z0: T1's end on a .002 leaf on the underside."
-instruction_detailed = "Home the mill ($H). Edge finder (900 rpm) on the fixed jaw's face from −Y: G10 L20 P1 Y−2.540. MDI G0 Y−31.75; on the blank's marked end from −X: G10 L20 P1 X−2.540. Console M6 T1 (the tool setter measures it). MDI G0 X120 Y−31.75, spindle stopped, its end just dragging a .002 leaf on the underside: G10 L20 P1 Z0.051."
+instruction = "G54 Y0 on the fixed jaw's face, X0 on the blank's marked end (edge finder at 900 rpm). Console M6 T1 (1/4 in end mill, at least {{process.quarter_projection_min_mm:in.3dot}} out of its collet). Z0: T1's end on a .002 leaf on the underside."
+instruction_detailed = "Edge finder (900 rpm) on the fixed jaw's face from −Y: G10 L20 P1 Y−2.540. MDI G0 Y−31.75; on the blank's marked end from −X: G10 L20 P1 X−2.540. Console M6 T1 (the tool setter measures it). MDI G0 X120 Y−31.75, spindle stopped, its end just dragging a .002 leaf on the underside: G10 L20 P1 Z0.051."
 feed = "hand"
 
 [[setups.operations]]
@@ -589,8 +589,8 @@ vise_hold = "other"
 beam = { axis = "x", hold = "between", extent_mm = [0, "{{process.spoil_plate_length_mm}}"], supports_mm = [76.2, 190.5], section_mm = { y = "{{process.spoil_plate_width_mm}}", z = "{{process.spoil_plate_thickness_mm}}" } }
 
 [[setups.operations]]
-instruction = "Home the mill ($H). G54 Y0 on the plate's front edge, X0 on its left end (edge finder, 900 rpm). Console M6 T1 (1/4 in end mill); Z0: its end on a .002 leaf on the plate top near its middle."
-instruction_detailed = "Home the mill ($H). Edge finder (900 rpm) on the front edge from −Y: G10 L20 P1 Y−2.540; on the left end from −X: G10 L20 P1 X−2.540. Console M6 T1. MDI G0 X228.6 Y76.2, spindle stopped, its end just dragging a .002 leaf on the plate top: G10 L20 P1 Z0.051."
+instruction = "G54 Y0 on the plate's front edge, X0 on its left end (edge finder, 900 rpm). Console M6 T1 (1/4 in end mill); Z0: its end on a .002 leaf on the plate top near its middle."
+instruction_detailed = "Edge finder (900 rpm) on the front edge from −Y: G10 L20 P1 Y−2.540; on the left end from −X: G10 L20 P1 X−2.540. Console M6 T1. MDI G0 X228.6 Y76.2, spindle stopped, its end just dragging a .002 leaf on the plate top: G10 L20 P1 Z0.051."
 feed = "hand"
 
 [[setups.operations]]
@@ -650,7 +650,7 @@ instruction = "This sheet accepts a bore the GO pin enters and the NO-GO pin doe
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Only if the reamer read under the GO pin, before seating the blank: a 2 in offcut of the 1/4 in flat on the plate's top beside the L holes, held by a step clamp as Setup 3's, clear of every hole. Home the mill ($H). Console M6 T5 (B drill); jog over the offcut's middle; spindle stopped, its point on a .002 leaf on the offcut: G10 L20 P1 X0 Y0 Z0.051."
+instruction = "Only if the reamer read under the GO pin, before seating the blank: a 2 in offcut of the 1/4 in flat on the plate's top beside the L holes, held by a step clamp as Setup 3's, clear of every hole. Console M6 T5 (B drill); jog over the offcut's middle; spindle stopped, its point on a .002 leaf on the offcut: G10 L20 P1 X0 Y0 Z0.051."
 feed = "hand"
 
 [[setups.operations]]
@@ -672,8 +672,8 @@ inspection = "E reads within .001 end to end (the tram's target). Over: loosen, 
 gauge_checks = [{ gauge = "dti", band_mm = [0.0, 0.0254] }]
 
 [[setups.operations]]
-instruction = "Home the mill ($H). Stand the B drill shank down in the pivot hole. Edge finder (900 rpm) on its shank's two sides along X and along Y: G54 X0 Y0 its axis. Lift the drill out. Console M6 T1 (1/4 in end mill, at least {{process.quarter_projection_min_mm:in.2f}} out); Z0: its end on a .002 leaf on the plate's top beside the blank."
-instruction_detailed = "Home the mill ($H). The B drill shank down in the pivot hole. Edge finder (900 rpm) on the shank from −X, note X; from +X, note X; MDI G0 X(their mean); G10 L20 P1 X0. Same along Y from −Y and +Y: G10 L20 P1 Y0. Lift the drill out. Console M6 T1. MDI G0 X25 Y0 (plate top past the blank's pivot end), spindle stopped, its end dragging a .002 leaf: G10 L20 P1 Z0.051."
+instruction = "Stand the B drill shank down in the pivot hole. Edge finder (900 rpm) on its shank's two sides along X and along Y: G54 X0 Y0 its axis. Lift the drill out. Console M6 T1 (1/4 in end mill, at least {{process.quarter_projection_min_mm:in.2f}} out); Z0: its end on a .002 leaf on the plate's top beside the blank."
+instruction_detailed = "The B drill shank down in the pivot hole. Edge finder (900 rpm) on the shank from −X, note X; from +X, note X; MDI G0 X(their mean); G10 L20 P1 X0. Same along Y from −Y and +Y: G10 L20 P1 Y0. Lift the drill out. Console M6 T1. MDI G0 X25 Y0 (plate top past the blank's pivot end), spindle stopped, its end dragging a .002 leaf: G10 L20 P1 Z0.051."
 feed = "hand"
 
 [[setups.operations]]

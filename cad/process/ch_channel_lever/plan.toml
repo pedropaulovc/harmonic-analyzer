@@ -75,7 +75,7 @@ part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
 material = "1018 cold-finished steel, 5/16 x 1 in flat (drawing: {{cad.material_spec}})"
 stock = "{{process.blank_thickness_in:fraction}} x {{process.blank_width_in:.0f}} in flat bar: two 72 in lengths and one 36 in; {{process.quantity:d}} × {{process.blank_length_in:.2f}}–{{process.blank_length_max_in:.2f}} in blanks. Spoil plate: a new 3.9 x 6 in piece of the 1/2 x 6 in 6061 flat every lot."
-note = "Inches unless mm; G-code and console entries in mm (the files and the controller run G21). Faces: B, the hub's near face, is faced in Setup 2; A, the far face, stays as bought. Mark A on each blank in Setup 1 and keep it readable. Words: the spoil plate is the aluminium plate the blanks lie on (Z0); the web is the lever's thin section along its bar (the drawing's plate, .114–.120 thick). Speeds on the PM-30MV low belt (100–2800 rpm): no belt change. Home the mill ($H) at the start of every mill setup. Order: Setup 2 for all the loads; then Setups 3 and 4 back to back on each load (the same clamping) before the next load. The spoil plate, the parallels, G54 Z0 and the noted Setup 2 G54 Y stay for every load and both sides, while the vise, parallels and spoil plate have not moved (moved: stop and tell the owner); X0 is picked up on every load. After a reset, E-stop or stall: home ($H), console M6 for the tool in the spindle (the tool setter measures it again), pick up X0 again with the edge finder, then restart the program from its start."
+note = "Inches unless mm; G-code and console entries in mm (the files and the controller run G21). Faces: B, the hub's near face, is faced in Setup 2; A, the far face, stays as bought. Mark A on each blank in Setup 1 and keep it readable. Words: the spoil plate is the aluminium plate the blanks lie on (Z0); the web is the lever's thin section along its bar (the drawing's plate, .114–.120 thick). Speeds on the PM-30MV low belt (100–2800 rpm): no belt change. Home the mill ($H) once, after switching it on: every M6's trip to the tool setter counts from home. Home again only after a power cycle or a controller restart, an E-stop, an alarm, a limit switch hit, a stall or a crash: homing brings the stored G54 back. Then check every zero of the setup again, each the way its step set it: each must read what its step set, within .001 in. One does not, cannot be reached with the part in, or the part may have moved: take the setup again from its first step, the part out. They all do: run the interrupted file again from its start. Feed Hold, then Reset with the axes stopped keeps position and G54: no homing, no new zero; run the interrupted file again from its start: its first M6 measures the tool, and cuts already made are cut in air. CL07_hub alone has no M6: before running it again, console M6 T2 (the tool setter measures it). Order: Setup 2 for all the loads; then Setups 3 and 4 back to back on each load (the same clamping) before the next load. The spoil plate, the parallels, G54 Z0 and the noted Setup 2 G54 Y stay for every load and both sides, while the vise, parallels and spoil plate have not moved (moved: stop and tell the owner); X0 is picked up on every load."
 shop = "../shop"
 stock_refs = ["1018-flat-5-16x1-72in", "1018-flat-5-16x1-36in", "6061-flat-1-2x6-54in"]
 material_key = "rocker-1018-cold-finished"
@@ -334,8 +334,8 @@ vise_hold = { vise = "vise-pm-6", across_jaws_mm = 101.6, along_jaws_mm = "{{pro
 beam = { axis = "x", hold = "between", extent_mm = [0, "{{process.blank_length_min_mm}}"], supports_mm = ["{{process.jaw_start_mm}}", "{{process.jaw_end_mm}}"], section_mm = { y = "{{process.blank_pitch_mm}}", z = "{{process.blank_thickness_min_mm}}" } }
 
 [[setups.operations]]
-instruction = "Every lot, before the first load: Home ($H); console M6 T1. Clamp the new spoil plate alone on the parallels and face its top .005, once."
-instruction_detailed = "Home the mill ($H). Console M6 T1 (1/2 in end mill, {{process.half_mill_projection_mm:in.2f}} in out of the collet; the tool setter measures it). Clamp the new spoil plate alone across the jaws on the parallels, its LEFT edge to the left. Set 2650 and face its top .005 by hand jog in overlapping passes, once: a second facing could lift the jaws' top over the band below."
+instruction = "Every lot, before the first load: console M6 T1. Clamp the new spoil plate alone on the parallels and face its top .005, once."
+instruction_detailed = "Console M6 T1 (1/2 in end mill, {{process.half_mill_projection_mm:in.2f}} in out of the collet; the tool setter measures it). Clamp the new spoil plate alone across the jaws on the parallels, its LEFT edge to the left. Set 2650 and face its top .005 by hand jog in overlapping passes, once: a second facing could lift the jaws' top over the band below."
 feed = "hand"
 
 [[setups.operations]]
@@ -564,7 +564,7 @@ inspection = "A 6 in rule laid across the spoil plate at both ends and the middl
 gauge_checks = "other"
 
 [[setups.operations]]
-instruction = "Every load: Home ($H) if the mill was reset. Edge finder (900 rpm): G54 X0 on the left end of the blank against the fixed jaw, from the left."
+instruction = "Every load: edge finder (900 rpm): G54 X0 on the left end of the blank against the fixed jaw, from the left."
 instruction_detailed = "Edge finder (900 rpm), its tip .10 below the blanks' top, on the left end of the blank against the fixed jaw, from the left: G10 L20 P1 X-2.540."
 feed = "hand"
 

@@ -525,6 +525,60 @@ A traveler that passes is not permission to machine: shop measurements,
 physical setup verification and machining approval are still required. See the
 [feature/traveler contract](../docs/pipeline/features-travelers.md).
 
+### Homing and work offsets
+
+The mill is homed once a session, not once a setup (owner, Pedro, 2026-11-24:
+FluidNC "keeps G54 (work offsets are stored in non-volatile settings)" and "it
+should not be needed to rehome the mill $H on every setup ; only once at the
+beginning is enough"). Every plan with a PM-30MV setup says so once, in its
+`note` (`cad/scripts/test_home_once.py` holds every plan to
+it); no operation homes out of habit, and none re-touches a zero because a
+file was stopped. FluidNC's documentation, read 2026-11-24:
+
+- Work offsets persist: G54-G59 offsets "are stored in non volatile memory and
+  are automatically restored at startup"
+  (<http://wiki.fluidnc.com/en/features/supported_gcodes>).
+- A reset with the axes stopped loses nothing: "If reset while not in motion,
+  position is retained and re-homing is not required. If in hold mode, the
+  motion buffer is cleared and position is not lost"; "If reset while in
+  motion, Grbl will throw an alarm to indicate position may be lost"
+  (<http://wiki.fluidnc.com/en/features/commands_and_settings>). So a traveler
+  stops a file with Feed Hold first, then Reset.
+- Homing is a power-on act: "Homing is typically performed once when you power
+  on the machine" (<http://wiki.fluidnc.com/en/support/work_coordinates>); with
+  `start: must_home` (the default) the controller starts in a homing alarm
+  (<http://wiki.fluidnc.com/en/config/start_group>).
+- Position is lost, and the travelers home again, after a hard limit ("accurate
+  position is assumed to be lost. You must rehome":
+  <http://wiki.fluidnc.com/en/config/homing_and_limit_switches>), an E-stop or
+  fault input ("possibly losing position accuracy":
+  <http://wiki.fluidnc.com/en/config/control>), a power cycle or a controller
+  restart (machine position starts from wherever the table stands; logbook
+  2026-11-06), and a reset in motion. A stall or a crash is on the list as
+  shop practice (open-loop steppers lose steps), not from FluidNC's pages.
+- What needs the home: machine-coordinate moves. CNCjs expands each `M6` into
+  `G53` moves to its tool-change and tool-probe positions (cncjs v1.11.5
+  `GrblController.js`), and the hand-tap files retract with `G53 G0 Z`.
+- Not kept by a reset: a `G43.1` tool length offset (FluidNC v3.7.8
+  `GCode.cpp`, `gc_init` clears the parser state). Whether the shop's `M6`
+  sets one is not on record: the owner's probing widget
+  (pedropaulovc/cncjs-probe f1d00ee) writes work offsets with `G10 L20` and
+  only stores a measured tool length in CNCjs (`global.toolchange.TOOL_OFFSET`),
+  and CNCjs's `M6` follows its server setting `tool.toolChangePolicy` (`G10
+  L20`, `G43.1`, or custom commands), which lives on the shop PC
+  (pedropaulovc/cncjs-probe#4). So after a Reset, or a homing, the travelers
+  run the interrupted file again from its start: a file that loads a tool
+  opens with its `M6`, which measures the tool in the spindle again, right
+  under any of the three. A file with no `M6` (`cam.py`'s `LOAD_FIRST_TOOL`
+  leaves it out: `CL07_hub`, and the slitting-saw and notch files) says in
+  its plan what comes first: a console `M6` for the tool in the spindle, or
+  the saw's own touch-off.
+- After a homing the stored G54 comes back with the home, as near as the home
+  switches repeat, and that figure is not on record (#3581). So the travelers
+  check every zero of the setup again, each the way its step set it, and take
+  the setup again, the part out, if one reads off by more than .001 in, cannot
+  be reached with the part in, or the part may have moved.
+
 ## NC programs (FreeCAD CAM)
 
 A part with `<stem>/cam.py` (`cad/scripts/_cam_programs.py:CAM_STEMS`, derived
