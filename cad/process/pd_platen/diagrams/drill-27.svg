@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 780 560" width="780" height="560" font-family="sans-serif" font-size="13">
+  <!-- Hand picture. Section across the bar seen from the left end, to scale at 200 px/in (7.874 px/mm) from the plate's thickness_target_mm 3.8608 and the bar's 1/2 in; the tape stack (tape_stack_mm .28) drawn 4 px thick. The bar drawn short, to a break line. #27 drill Ø3.6576 mm (milling_cuts cutter_dia_mm, shop drill-27), 118° point, at guide hole B1 (X26.975 Y-14.056), its point at guide_tip_height_mm -1.599 (Z0 the underside), through the tape into the fixture bar, as the plan has it (a backed exit); drawn short to a break line, the chuck not drawn (no size on record). -->
+  <rect class="paper" x="0" y="0" width="780" height="560"/>
+  <text class="title" x="20" y="24">PL04, same file: the #27 drill through a guide hole, into the bar (to scale, 200 px/in)</text>
+  <path class="fixture-plate" d="M530 470L530 540L526.03 543L522.07 540L518.1 543L514.14 540L510.17 543L506.21 540L502.24 543L498.28 540L494.31 543L490.34 540L486.38 543L482.41 540L478.45 543L474.48 540L470.52 543L466.55 540L462.59 543L458.62 540L454.66 543L450.69 540L446.72 543L442.76 540L438.79 543L434.83 540L430.86 543L426.9 540L422.93 543L418.97 540L415 543L411.03 540L407.07 543L403.1 540L399.14 543L395.17 540L391.21 543L387.24 540L383.28 543L379.31 540L375.34 543L371.38 540L367.41 543L363.45 540L359.48 543L355.52 540L351.55 543L347.59 540L343.62 543L339.66 540L335.69 543L331.72 540L327.76 543L323.79 540L319.83 543L315.86 540L311.9 543L307.93 540L303.97 543L300 540L296.03 543L292.07 540L288.1 543L284.14 540L280.17 543L276.21 540L272.24 543L268.28 540L264.31 543L260.34 540L256.38 543L252.41 540L248.45 543L244.48 540L240.52 543L236.55 540L232.59 543L228.62 540L224.66 543L220.69 540L216.72 543L212.76 540L208.79 543L204.83 540L200.86 543L196.9 540L192.93 543L188.97 540L185 543L181.03 540L177.07 543L173.1 540L169.14 543L165.17 540L161.21 543L157.24 540L153.28 543L149.31 540L145.34 543L141.38 540L137.41 543L133.45 540L129.48 543L125.52 540L121.55 543L117.59 540L113.62 543L109.66 540L105.69 543L101.72 540L97.76 543L93.79 540L89.83 543L85.86 540L81.9 543L77.93 540L73.97 543L70 540L70 470Z"/>
+  <rect class="bond" x="70" y="466" width="460" height="4"/>
+  <rect class="part-kept" x="70" y="435.6" width="460" height="30.4"/>
+  <rect class="holes" x="285.6" y="435.6" width="28.8" height="30.4"/>
+  <rect class="holes" x="285.6" y="466" width="28.8" height="3.94"/>
+  <path class="cutter" d="M314.4 285.6L314.4 469.94L300 478.59L285.6 469.94L285.6 285.6L289.2 282.6L292.8 285.6L296.4 282.6L300 285.6L303.6 282.6L307.2 285.6L310.8 282.6Z"/>
+  <line class="arrow" x1="260" y1="295.6" x2="260" y2="345.6"/>
+  <line class="centre-line" x1="300" y1="40" x2="300" y2="530"/>
+  <text class="label" x="440" y="120">#27 drill (Ø.144), one plunge: its full</text>
+  <text class="label" x="440" y="136">diameter {{process.drill_past_mm:in.3dot}} under the plate,</text>
+  <text class="label" x="440" y="152">through the tape into the bar (a backed exit)</text>
+  <line class="leader" x1="438" y1="132" x2="314.4" y2="375.6"/>
+  <circle class="leader-dot" cx="314.4" cy="375.6" r="2"/>
+  <text class="label" x="560" y="439.6">platen, P up</text>
+  <text class="label" x="560" y="455.6">(guide hole B1)</text>
+  <line class="leader" x1="556" y1="435.6" x2="528" y2="450.6"/>
+  <circle class="leader-dot" cx="528" cy="450.6" r="2"/>
+  <text class="label" x="560" y="486">its point at Z{{process.guide_tip_height_mm:in.3dot}}</text>
+  <text class="label" x="560" y="502">(Z0 the underside), in the bar</text>
+  <line class="leader" x1="556" y1="482" x2="304" y2="477.02"/>
+  <circle class="leader-dot" cx="304" cy="477.02" r="2"/>
+  <text class="label" x="560" y="530">fixture bar: the #27</text>
+  <text class="label" x="560" y="546">comes out into it</text>
+  <line class="leader" x1="556" y1="526" x2="500" y2="500"/>
+  <circle class="leader-dot" cx="500" cy="500" r="2"/>
+</svg>

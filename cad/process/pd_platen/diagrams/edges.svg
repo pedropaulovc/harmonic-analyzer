@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 490" width="900" height="490" font-family="sans-serif" font-size="13">
+  <!-- Hand picture, plan, to scale at 50 px/in (1.969 px/mm) from the platen's 10.62 x 5.31 (length_target_mm, height_target_mm). 1/2 in end mill Ø12.7 mm (face_cutter_dia_mm), seen from above, drawn on the left edge's last pass, X-6.350 (its side on X0), -Y, down to Z-0.152 (outline_breakthrough_mm, into the tape stack). The other three edges' passes arrowed in their order. P already faced; the holes come next in the file (not drawn). The blank's margin hatched: all to chips. -->
+  <rect class="paper" x="0" y="0" width="900" height="490"/>
+  <text class="title" x="20" y="24">PL04, same file: the four edges to size with the cutter's side (to scale, 1 in = 50 px)</text>
+  <rect class="fixture-plate" x="5.5" y="92.75" width="900" height="300"/>
+  <rect class="part-removed" x="180.55" y="92.75" width="550" height="300"/>
+  <rect class="part-kept" x="190" y="110" width="531" height="265.5"/>
+  <circle class="cutter" cx="177.5" cy="247.8" r="12.5"/>
+  <line class="arrow" x1="155.5" y1="188.74" x2="155.5" y2="306.85"/>
+  <text class="label" x="147.5" y="251.8" text-anchor="end">1 left: −Y</text>
+  <line class="arrow" x1="755.5" y1="306.85" x2="755.5" y2="188.74"/>
+  <text class="label" x="763.5" y="251.8">2 right: +Y</text>
+  <line class="arrow" x1="406.54" y1="410" x2="504.96" y2="410"/>
+  <text class="label" x="514.8" y="414">3 front: +X</text>
+  <line class="arrow" x1="504.96" y1="75.5" x2="406.54" y2="75.5"/>
+  <text class="label" x="396.69" y="79.5" text-anchor="end">4 back: −X</text>
+  <line class="datum" x1="190" y1="70" x2="190" y2="387.5"/>
+  <text class="datum-label" x="194" y="66">X0, the left edge</text>
+  <line class="datum" x1="-2.5" y1="110" x2="733" y2="110"/>
+  <text class="datum-label" x="308.11" y="104">Y0, the bottom edge as drawn (at the back)</text>
+  <text class="label-halo" x="197.5" y="149.37">1/2 in end mill, its side on X0</text>
+  <text class="label-halo" x="197.5" y="165.37">(the left edge's last pass)</text>
+  <line class="leader" x1="195.5" y1="161.37" x2="186.25" y2="239.05"/>
+  <circle class="leader-dot" cx="186.25" cy="239.05" r="2"/>
+  <text class="label" x="40" y="452">The plate stays on the cutter's left in every pass (conventional with M3); steps of {{process.outline_step_max_mm:in.3dot}},</text>
+  <text class="label" x="40" y="468">the last {{process.outline_finish_mm:in.3dot}}, down to {{process.outline_breakthrough_mm:in.3dot}} under Z0. Back of the table at the top.</text>
+</svg>

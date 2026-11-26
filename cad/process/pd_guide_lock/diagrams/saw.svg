@@ -1,20 +1,24 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 300" font-family="sans-serif" font-size="14">
-  <rect class="paper" x="0" y="0" width="760" height="300"/>
-  <text class="title" x="20" y="24">Plan of the saw table: a .95 piece off the 1/16 x 5/8 strip (not to scale)</text>
-  <rect class="fixture-table" x="10" y="50" width="740" height="200"/>
-  <rect class="clamp" x="420" y="96" width="300" height="34"/>
-  <rect class="clamp" x="420" y="170" width="300" height="34"/>
-  <rect class="part-kept" x="150" y="130" width="170" height="40"/>
-  <rect class="part-rest" x="330" y="130" width="410" height="40"/>
-  <rect class="cutter" x="322" y="70" width="8" height="150"/>
-  <line class="datum" x1="150" y1="112" x2="150" y2="188"/>
-  <text class="datum-label" x="40" y="108">strip's squared end</text>
-  <line class="dims" x1="150" y1="210" x2="320" y2="210"/>
-  <line class="dims" x1="150" y1="202" x2="150" y2="218"/>
-  <line class="dims" x1="320" y1="202" x2="320" y2="218"/>
-  <text class="label" x="150" y="244">scribe line .95 from the end</text>
-  <text class="label" x="156" y="154">piece: drops clear</text>
-  <text class="label" x="290" y="66">blade on the waste side of the line</text>
-  <text class="label" x="470" y="90">saw vise: the long end of the strip, flat</text>
-  <text class="label" x="20" y="282">1/16 x 5/8 1018 strip, flat on the table; five pieces; file the burr off each</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 780 350" width="780" height="350" font-family="sans-serif" font-size="13">
+  <!-- Hand picture, from above, to scale at 200 px/in (7.874 px/mm) from the strip's 5/8 in width (blank_width_in) and the piece's .95 length (blank_length_in). The saw's kerf is not on record (the plan gives no kerf_in): drawn schematic, 8 px, on the waste side of the scribe line, the blade cut short to break lines (its 14 in diameter runs off the picture). The saw's vise jaws' size is not on record: schematic. The strip's long end is drawn short, to a break line. -->
+  <rect class="paper" x="0" y="0" width="780" height="350"/>
+  <text class="title" x="20" y="24">Setup 1: a {{process.blank_length_in:.2dot}} piece off the strip, from above (to scale, 200 px/in)</text>
+  <rect class="fixture-table" x="10" y="50" width="760" height="230"/>
+  <path class="part-rest" d="M318 130L760 130L763 133.91L760 137.81L763 141.72L760 145.62L763 149.53L760 153.44L763 157.34L760 161.25L763 165.16L760 169.06L763 172.97L760 176.88L763 180.78L760 184.69L763 188.59L760 192.5L763 196.41L760 200.31L763 204.22L760 208.12L763 212.03L760 215.94L763 219.84L760 223.75L763 227.66L760 231.56L763 235.47L760 239.38L763 243.28L760 247.19L763 251.09L760 255L318 255Z"/>
+  <rect class="part-kept" x="120" y="130" width="190" height="125"/>
+  <rect class="part-waste" x="310" y="130" width="8" height="125"/>
+  <rect class="clamp" x="408" y="100" width="260" height="30"/>
+  <rect class="clamp" x="408" y="255" width="260" height="30"/>
+  <text class="label-on-clamp" x="538" y="120" text-anchor="middle">saw vise (schematic)</text>
+  <path class="cutter" d="M310 70L312 67L314 70L316 67L318 70L318 315L316 318L314 315L312 318L310 315Z"/>
+  <line class="datum" x1="120" y1="106" x2="120" y2="279"/>
+  <text class="datum-label" x="114" y="122" text-anchor="end">the strip's</text>
+  <text class="datum-label" x="114" y="138" text-anchor="end">squared end</text>
+  <line class="dims" x1="120" y1="289" x2="310" y2="289"/>
+  <line class="dims" x1="120" y1="281" x2="120" y2="297"/>
+  <line class="dims" x1="310" y1="281" x2="310" y2="297"/>
+  <text class="label" x="215" y="311" text-anchor="middle">scribe line {{process.blank_length_in:.2dot}} from the end</text>
+  <text class="label" x="324" y="80">blade on the waste side of the line (kerf schematic)</text>
+  <text class="label-halo" x="130" y="197.5">piece: drops clear</text>
+  <text class="label-halo" x="328" y="197.5">1/16 x 5/8 strip</text>
+  <text class="label" x="20" y="334">The strip flat on the saw table, its long end in the saw's vise; five pieces; file the burr off each.</text>
 </svg>

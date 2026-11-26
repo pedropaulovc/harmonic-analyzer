@@ -1,17 +1,29 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 280" font-family="sans-serif" font-size="14">
-  <rect class="paper" x="0" y="0" width="760" height="280"/>
-  <text class="title" x="20" y="24">Setup 1: two blanks off the end of the strip (not to scale)</text>
-  <rect class="part-rest" x="60" y="70" width="660" height="110"/>
-  <rect class="part-kept" x="60" y="70" width="198" height="110"/>
-  <rect class="part-kept" x="258" y="70" width="198" height="110"/>
-  <text class="label" x="110.0" y="130.0">blank A 3.60</text>
-  <text class="label" x="308.0" y="130.0">blank B 3.60</text>
-  <text class="label" x="470.0" y="130.0">rest (over 4.7): kept for MHA-PD-14</text>
-  <line class="cutter" x1="258" y1="62" x2="258" y2="188"/>
-  <line class="cutter" x1="456" y1="62" x2="456" y2="188"/>
-  <text class="label" x="188.0" y="206.0">saw cut 1</text>
-  <text class="label" x="386.0" y="206.0">saw cut 2</text>
-  <text class="label" x="40.0" y="60.0">bought end</text>
-  <text class="label" x="60.0" y="240.0">2 x 12 x .032 C26000 H02 strip, full 2 in width: mike it 1 in in from each end.</text>
-  <text class="label" x="60.0" y="258.0">Junior hacksaw, the strip between wood blocks in the bench vise; file off each sawn end's burr.</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 780 450" width="780" height="450" font-family="sans-serif" font-size="13">
+  <!-- Hand picture, to scale at 55 px/in (2.165 px/mm). Top: the 2 x 12 in strip laid out, blanks A and B 3.60 in (blank_length_in) off its bought end. Below, from above, the strip on edge between the two wood blocks in the bench vise at saw cut 1: the blocks about 3/4 in thick and 9 in long (the plan's 'about': drawn at those sizes), the strip .032 thick (blank_thickness_in) between them, the line 3.60 in from the flush end and 1/2 in out past the vise jaws. The hacksaw blade's kerf and the bench vise's jaws are not on record: schematic; the blade is drawn on the line's side away from the flush end, cut short to break lines. -->
+  <rect class="paper" x="0" y="0" width="780" height="450"/>
+  <text class="title" x="20" y="24">Setup 1: blank A sawn off the strip's bought end (to scale, 55 px/in)</text>
+  <path class="part-rest" d="M436 60L700 60L703 63.93L700 67.86L703 71.79L700 75.71L703 79.64L700 83.57L703 87.5L700 91.43L703 95.36L700 99.29L703 103.21L700 107.14L703 111.07L700 115L703 118.93L700 122.86L703 126.79L700 130.71L703 134.64L700 138.57L703 142.5L700 146.43L703 150.36L700 154.29L703 158.21L700 162.14L703 166.07L700 170L436 170Z"/>
+  <rect class="part-kept" x="40" y="60" width="198" height="110"/>
+  <rect class="part-kept" x="238" y="60" width="198" height="110"/>
+  <text class="label-halo" x="139" y="120" text-anchor="middle">blank A</text>
+  <text class="label-halo" x="337" y="120" text-anchor="middle">blank B</text>
+  <text class="label-halo" x="568" y="120" text-anchor="middle">rest: for MHA-PD-14</text>
+  <text class="label" x="238" y="188" text-anchor="middle">each {{process.blank_length_in:.2dot}} long, the strip's full 2 in wide</text>
+  <text class="label" x="40" y="52">bought end</text>
+  <text class="label" x="696" y="52" text-anchor="end">2 x 12 x .032 C26000 H02 strip, laid out</text>
+  <text class="title" x="20" y="206.75">From above: the strip on edge between the wood blocks in the bench vise, at saw cut 1</text>
+  <rect class="fixture-support" x="40" y="258.75" width="495" height="41.25"/>
+  <rect class="fixture-support" x="40" y="302" width="495" height="41.25"/>
+  <rect class="part-kept" x="40" y="300" width="198" height="2"/>
+  <rect class="part-rest" x="238" y="300" width="297" height="2"/>
+  <rect class="clamp" x="265.5" y="236.75" width="220" height="22"/>
+  <rect class="clamp" x="265.5" y="343.25" width="220" height="22"/>
+  <text class="label-on-clamp" x="375.5" y="252.75" text-anchor="middle">bench vise jaw (schematic)</text>
+  <path class="cutter" d="M238 218.75L238.75 215.75L239.5 218.75L240.25 215.75L241 218.75L241 383.25L240.25 386.25L239.5 383.25L238.75 386.25L238 383.25Z"/>
+  <line class="datum" x1="40" y1="218.75" x2="40" y2="383.25"/>
+  <text class="datum-label" x="44" y="399.25">the flush end</text>
+  <text class="label" x="246" y="399.25">hacksaw blade on the line, its kerf away from the flush end (kerf schematic)</text>
+  <text class="label" x="543" y="290">wood blocks, about</text>
+  <text class="label" x="543" y="306">3/4 x 3 x 9 in</text>
+  <text class="label" x="20" y="430">The line squared across the top block {{process.blank_length_in:.2dot}} in from the flush end, 1/2 in out past the jaws.</text>
 </svg>

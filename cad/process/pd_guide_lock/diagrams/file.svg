@@ -10,12 +10,12 @@
   <text class="datum-label" x="40" y="232">(filed square</text>
   <text class="datum-label" x="40" y="250">to the guide edge)</text>
   <line class="dims" x1="200" y1="336" x2="556" y2="336"/>
-  <text class="label" x="330" y="354">.89 width</text>
+  <text class="label" x="378" y="354" text-anchor="middle">width {{cad.right_end_width_min_in:.2dot}}–{{cad.right_end_width_max_in:.2dot}}</text>
   <line class="dims" x1="600" y1="120" x2="600" y2="300"/>
-  <text class="label" x="606" y="214">.45 height</text>
+  <text class="label" x="606" y="214">height {{cad.far_edge_height_min_in:.2dot}}–{{cad.far_edge_height_max_in:.2dot}}</text>
   <line class="leader" x1="548" y1="128" x2="640" y2="80"/>
   <circle class="leader-dot" cx="548" cy="128" r="3"/>
-  <text class="label" x="600" y="72">4X R.07 corners</text>
+  <text class="label" x="600" y="72">4X R{{cad.corners_radius_nominal_in:.2dot}} corners</text>
   <circle class="hidden" cx="280" cy="210" r="25"/>
   <circle class="hidden" cx="476" cy="210" r="25"/>
   <text class="label" x="300" y="180">2X Ø.125: drilled at assembly, not here</text>

@@ -364,7 +364,7 @@ machine_kind = "other"
 title = "Gate the bar; saw the blank"
 machine = "Saw / bench"
 indexing = "none"
-diagram = { file = "diagrams/saw.svg", alt = "The 3/8 x 1 in flat bar with one blank {{process.blank_length_in:.2f}}–{{process.blank_length_max_in:.2f}} in long marked off its end; the blank's marks: T on the top edge, F on the front face, END A at the right end seen from F with T up." }
+diagram = { file = "diagrams/saw.svg", alt = "To scale, from above: the 3/8 x 1 in flat bar lying on a 1 in face in the saw's vise, one blank {{process.blank_length_in:.2f}}–{{process.blank_length_max_in:.2f}} in long off its end, the saw blade in its kerf (the kerf drawn schematic); the rest of the bar in the vise." }
 envelope = "other"
 vise_hold = "other"
 beam = "other"
@@ -391,11 +391,13 @@ gauge_checks = "other"
 [[setups.operations]]
 instruction = "Find the top edge. Stand the blank on each long edge in turn on the clean mill table, along the land between two T-slots. The edge it rocks on (bowed outward) becomes the top face: mark it T with marking fluid. No rock on either edge: mark either one T."
 inspection = "The blank standing on its other edge (T up): the .003 feeler leaf does not enter under its middle. Enters: stop and tell the owner (the skim would not clean T's ends)."
+diagram = { file = "diagrams/bow.svg", alt = "The blank standing on its bottom edge on the mill table, seen on F, T up, the bow drawn large: the {{process.bow_max_mm:in.3dot}} feeler leaf at the middle must not enter under it." }
 gauge_checks = "other"
 feed = "hand"
 
 [[setups.operations]]
 instruction = "Mark the front face and END A with marking fluid. F, the front face (the counterbores go in it; it slides on MHA-PD-02): the cleaner of the two 1 in faces. END A (every station counts from it): the RIGHT end when you look at F with T up. The other 1 in face is the back face, the other edge the bottom edge, the other end the far end."
+diagram = { file = "diagrams/marks.svg", alt = "To scale, the blank seen on F with T up: T marked on the top edge (the one it rocked on), F on the front face, END A at the right end; the back face is the 1 in face behind F." }
 feed = "hand"
 inspection = "F as supplied is the drawing's {{cad.front_face_finish_ra_uin:d}} µin Ra slide face (any process): the cold-finished skin smooth and bright from end to end, by eye and fingernail, with no rust pit, dent or score the nail catches. Neither 1 in face passes: stop and tell the owner."
 gauge_checks = "other"
@@ -408,7 +410,7 @@ indexing = "none"
 machine_ref = "pm-30mv"
 holding = "One 1 in parallel of the set ({{process.parallel_thickness_mm:in.3dot}} thick) against each jaw; the jaws' faces and the blank wiped clean (F stays as supplied). The blank on edge on them, T up, the bottom edge down, the back face against the FIXED jaw, F toward the moving jaw, END A to the RIGHT, the sawn END A {{process.top_out_mm:in.2f}} in (5 13/16) out past the jaws' right side (the rule); the far end stands about as far out past their left side. Tap it down onto both parallels while closing the vise. The lower {{process.top_grip_mm:in.3dot}} of its width is in the jaws."
 datum = "Program SB02_top. G54: X0 {{process.end_a_skim_mm:in.3dot}} left of the sawn END A (where Setup 3 mills it), +X to the right, so the bar runs toward −X; Y0 the fixed jaw's face (the back face), +Y toward it; Z0 the parallels' top (the bottom edge), set from the miked width. The file starts with an M6 for the end mill."
-diagram = { file = "diagrams/top.svg", alt = "The blank on edge on a 1 in parallel at each jaw, the back face at the fixed jaw; the 1/2 in end mill skims T in two passes along the bar. In plan the blank stands 5.8 in out past the jaws at both ends, END A at the right." }
+diagram = { file = "diagrams/top.svg", alt = "To scale, across the jaws and from above: the blank on edge on a 1 in parallel at each jaw, the back face at the fixed jaw, F at the moving jaw; the 1/2 in end mill on SB02's pass Y-3.675, going −X, at its last level, T to Z {{process.height_target_mm:in.4dot}}, its end {{process.top_jaw_clear_mm:in.3dot}} over the jaw tops. In plan the sawn END A {{process.top_out_mm:in.2f}} in out past the jaws' right side." }
 envelope = { x_span_mm = ["{{process.blank_length_max_mm}}", "{{process.face_cutter_dia_mm}}", 5.08], y_span_mm = ["{{process.blank_thickness_mm}}", "{{process.face_cutter_dia_mm}}"], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.top_riser_height_mm}}", "{{process.bar_width_max_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.top_riser_height_mm}}", "{{process.height_target_mm}}"], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_mm}}"] }
 vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{process.blank_thickness_mm}}", along_jaws_mm = "{{process.blank_length_max_mm}}", part_height_mm = "{{process.bar_width_max_mm}}", parallel_height_mm = "{{process.top_riser_height_mm}}", overhang_mm = ["rest", "{{process.top_out_mm}}"], jaw_offset = "centred", fixed_jaw_face = "as_bought", moving_jaw_face = "as_bought", moving_jaw_contact = "flat" }
 beam = { axis = "x", hold = "cantilever", extent_mm = ["{{process.sawn_end_a_mm}}", "{{process.bar_length_max_mm}}"], clamp_mm = ["{{process.pickup_out_mm}}", "{{process.b_clamp_end_mm}}"], section_mm = { y = "{{cad.back_face_depth_mm}}", z = "{{process.height_target_mm}}" }, vise_left = "end" }
@@ -453,7 +455,7 @@ indexing = "none"
 machine_ref = "pm-30mv"
 holding = "Three stacks of the {{process.parallel_thickness_mm:in.3dot}} thick parallels, 1.5 in high, centred along the jaws: a 1 in on a 1/2 in against the FIXED jaw; a 1 in on a 1/2 in and, outside it against the MOVING jaw, the two 3/4 in (thicker ones would stand under the holes). The bar lying on them, F up, T against the FIXED jaw, END A to the RIGHT, the sawn END A {{process.end_overhang_mm:in.2dot}} out past the jaws' right side (the rule), the rest out past their left side in the air. The .125 pin of the pin-gauge set along the bottom edge between it and the moving jaw, on the outer stack, so the jaw seats T flat on the fixed jaw. Tap the bar down onto the stacks while closing the vise. The lower {{process.lying_grip_mm:in.3dot}} of its thickness is in the jaws."
 datum = "Program SB03_end_a. G54: X0 {{process.end_a_skim_mm:in.3dot}} left of the sawn END A (where SB03 mills it), the stations counting toward −X; Y0 the fixed jaw's face (T), +Y toward it; Z0 the front face F. Clamp holes 1 and 2 at X −{{cad.clamp_hole_1_station_in:.3dot}} and −{{cad.clamp_hole_2_station_in:.3dot}}, Y −{{cad.clamp_hole_1_height_in:.3dot}}; the pivot hole at X −{{cad.pivot_tap_station_in:.3dot}}, Y −{{cad.pivot_tap_height_in:.3dot}} in."
-diagram = { file = "diagrams/end-a.svg", alt = "The bar lying front face up on three stacks, the top face at the fixed jaw, END A just out past the jaws' right side; the 1/2 in end mill's side mills END A, the centre drill spots, the #9 drills clamp holes 1 and 2 through between the stacks, the 5/16 in end mill counterbores them, the #29 drills the pivot hole and the chamfer mill countersinks its mouth." }
+diagram = { file = "diagrams/end-a.svg", alt = "To scale, along the jaws and from above: the bar lying F up on three 1.5 in stacks, T at the fixed jaw, the .125 pin along the bottom edge on the outer stack under the moving jaw, the sawn END A {{process.end_overhang_mm:in.2dot}} out past the jaws' right side; the 1/2 in end mill's side on END A's last pass, at X0, going +Y across the bar, its end {{process.end_past_mm:in.3dot}} under the back face. The holes drilled later in the file dashed." }
 envelope = { x_span_mm = ["{{process.blank_length_max_mm}}", "{{process.face_cutter_dia_mm}}", 5.08], y_span_mm = ["{{process.height_target_mm}}", "{{process.face_cutter_dia_mm}}", 5.08], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{process.blank_thickness_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{process.blank_thickness_mm}}", "{{process.drill_9_tip_mm}}"], longest_tool_mm = ["{{process.drill_chuck_gauge_mm}}", "{{process.drill_9_oal_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.chamfer_projection_min_mm}}"] }
 vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{process.height_target_mm}}", along_jaws_mm = "{{process.blank_length_max_mm}}", part_height_mm = "{{cad.back_face_depth_mm}}", parallel_height_mm = "{{process.riser_height_mm}}", overhang_mm = ["rest", "{{process.end_overhang_mm}}"], jaw_offset = "centred", fixed_jaw_face = "machined", moving_jaw_face = "as_bought", moving_jaw_contact = "rod" }
 beam = { axis = "x", hold = "cantilever", extent_mm = ["{{process.sawn_end_a_mm}}", "{{process.bar_length_max_mm}}"], clamp_mm = ["{{process.a_clamp_start_mm}}", "{{process.a_clamp_end_mm}}"], section_mm = { y = "{{process.height_target_mm}}", z = "{{cad.back_face_depth_mm}}" }, vise_left = "end" }
@@ -510,6 +512,7 @@ tool = "drill-9"
 drilling = "twist_drill"
 sizing = { kind = "band", band_mm = "{{cad.clamp_hole_1_dia_band_mm}}" }
 instruction = "Same file, M6 T3: #9 drill through clamp holes 1 and 2, its full diameter {{process.drill_past_mm:in.3dot}} past the back face, between the stacks, no peck; set 1150. Cutting oil."
+diagram = { file = "diagrams/drill-9.svg", alt = "To scale, a section across the jaws at clamp hole 1: the #9 drill through F and the back face, its point at Z{{process.drill_9_tip_mm:in.3dot}}, in the air between the stacks; the .125 pin on the outer stack under the moving jaw." }
 rpm = 1150
 feed = "{{process.drill_9_feed_per_min_mm:in.2f}} in/min"
 hole_depth_mm = "{{cad.back_face_depth_mm}}"
@@ -524,6 +527,7 @@ tool = "cbore"
 drilling = "none"
 sizing = { kind = "band", band_mm = "{{cad.clamp_hole_1_cbore_dia_band_mm}}" }
 instruction = "Same file, M6 T4 (5/16 in 2-flute end mill, in the 3/8 collet: its shank is 3/8): counterbore clamp holes 1 and 2, fed straight down the #9 holes to {{cad.clamp_hole_1_cbore_depth_mm:in.3dot}} below F; set 750. Cutting oil."
+diagram = { file = "diagrams/cbore.svg", alt = "To scale, a section across the jaws at clamp hole 1: the 5/16 in end mill down the #9 hole, its end at the counterbore's floor {{cad.clamp_hole_1_cbore_depth_mm:in.3dot}} below F." }
 rpm = 750
 feed = "{{process.cbore_feed_per_min_mm:in.1f}} in/min"
 milling_cuts = [
@@ -536,6 +540,7 @@ tool = "drill-29"
 drilling = "twist_drill"
 sizing = { kind = "tap_drill", tap = "tap-8-32" }
 instruction = "Same file, M6 T5: #29 drill through the pivot hole (the 8-32 tap drill), its full diameter {{process.drill_past_mm:in.3dot}} past the back face, no peck; set 1700. Cutting oil."
+diagram = { file = "diagrams/drill-29.svg", alt = "To scale, a section across the jaws at the pivot hole: the #29 drill through F and the back face, its point at Z{{process.drill_29_tip_mm:in.3dot}}, in the air between the stacks." }
 rpm = 1700
 feed = "{{process.drill_29_feed_per_min_mm:in.1f}} in/min"
 hole_depth_mm = "{{cad.back_face_depth_mm}}"
@@ -550,6 +555,7 @@ tool = "chamfer"
 drilling = "none"
 sizing = "other"
 instruction = "Same file, M6 T6 (1/4 in 90° chamfer mill, at least .50 out of its collet): countersink the pivot hole's mouth in F to Ø{{process.csk_dia_mm:in.3dot}} (the file feeds the point half that below F), under the drawing's Ø{{cad.pivot_tap_csk_dia_max_in:.3dot}} MAX; set 2000."
+diagram = { file = "diagrams/csk-front.svg", alt = "To scale, a section across the jaws at the pivot hole: the 1/4 in 90° chamfer mill's point at Z{{process.csk_tip_mm:in.3dot}} (Z0 F), opening the hole's mouth to Ø{{process.csk_dia_mm:in.3dot}}." }
 rpm = 2000
 feed = "{{process.csk_feed_per_min_mm:in.1f}} in/min"
 milling_cuts = [
@@ -574,7 +580,7 @@ indexing = "none"
 machine_ref = "pm-30mv"
 holding = "As Setup 3, the bar slid along the jaws to the right: the same three stacks, F up, T against the FIXED jaw, the .125 pin along the bottom edge on the outer stack, END A to the RIGHT, the milled END A {{process.pickup_out_mm:in.2f}} in (5 3/4) out past the jaws' right side (the rule), in the air; the far end, where the slots go, stands about 5.8 in out past their left side. Tap the bar down onto the stacks while closing the vise."
 datum = "Program SB04_slots. G54: X0 the milled END A (the pickup: the same end Setup 3 cut to X0), the stations counting toward −X; Y0 the fixed jaw's face (T), +Y toward it; Z0 the front face F. Slot 3 at X −{{cad.clamp_slot_3_station_in:.3dot}} and slot 4 at X −{{cad.clamp_slot_4_station_in:.3dot}}, Y −{{cad.clamp_slot_3_height_in:.3dot}} in. The file starts with an M6 for the 1/8 in end mill."
-diagram = { file = "diagrams/slots.svg", alt = "The bar slid along the jaws, END A out past their right side in the air where the edge finder picks up X0, the far end out past their left side; there the 1/8 in end mill ramps round each slot's racetrack clockwise, through the bar, then round its counterbore." }
+diagram = { file = "diagrams/slots.svg", alt = "Enlarged from above, to scale: slot 3, hatched, with the 1/8 in end mill at its first point, the cutter's centre path round the racetrack clockwise (+X along the top), its counterbore dashed (later in the file). Plan: the bar slid along the jaws, END A {{process.pickup_out_mm:in.2f}} in out past their right side, the slots out past their left side in the air, the .125 pin along the bottom edge." }
 envelope = { x_span_mm = ["{{process.bar_length_max_mm}}", "{{process.slot_cutter_dia_mm}}", 10.16], y_span_mm = ["{{process.height_target_mm}}", "{{process.slot_cutter_dia_mm}}", 5.08], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{process.blank_thickness_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{process.blank_thickness_mm}}", "{{process.slot_bottom_mm}}"], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.eighth_mill_projection_max_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.eighth_mill_projection_min_mm}}"] }
 vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{process.height_target_mm}}", along_jaws_mm = "{{process.bar_length_max_mm}}", part_height_mm = "{{cad.back_face_depth_mm}}", parallel_height_mm = "{{process.riser_height_mm}}", overhang_mm = ["rest", "{{process.pickup_out_mm}}"], jaw_offset = "centred", fixed_jaw_face = "machined", moving_jaw_face = "as_bought", moving_jaw_contact = "rod" }
 beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{process.bar_length_max_mm}}"], clamp_mm = ["{{process.pickup_out_mm}}", "{{process.b_clamp_end_mm}}"], section_mm = { y = "{{process.height_target_mm}}", z = "{{cad.back_face_depth_mm}}" }, vise_left = "end" }
@@ -644,7 +650,7 @@ indexing = "none"
 machine_ref = "pm-30mv"
 holding = "The same three stacks, wiped clean with the pin and F (F goes down on them: a chip would score the slide face). The bar turned over end for end: the back face up, F down on the stacks, T again against the FIXED jaw, the .125 pin along the bottom edge on the outer stack, END A now to the LEFT, the milled END A {{process.pickup_out_mm:in.2f}} in (5 3/4) out past the jaws' left side (the rule). Tap the bar down onto the stacks while closing the vise."
 datum = "Programs SB05_back_csk and SB06_tap. G54: X0 the milled END A (the pickup, now at the left), +X along the bar; Y0 the fixed jaw's face (T), +Y toward it; Z0 the back face. The pivot hole at X {{cad.pivot_tap_station_in:.3dot}}, Y −{{cad.pivot_tap_height_in:.3dot}} in. Each file starts with an M6."
-diagram = { file = "diagrams/pivot.svg", alt = "The bar turned over, back face up, the top face at the fixed jaw, END A at the left out past the jaws; the chamfer mill countersinks the pivot hole's back mouth, then the 8-32 tap in its T-handle wrench is turned by hand under the tap guide in the spindle, its point to go {{process.tap_point_depth_mm:in.2dot}} below the back face." }
+diagram = { file = "diagrams/pivot.svg", alt = "To scale, a section across the jaws at the pivot hole and the plan: the bar turned over end for end, the back face up, F down on the three stacks, T at the fixed jaw, the .125 pin on the outer stack, END A {{process.pickup_out_mm:in.2f}} in out past the jaws' left side; the 1/4 in chamfer mill's point at Z{{process.csk_tip_mm:in.3dot}} (Z0 the back face), countersinking the hole's mouth." }
 envelope = { x_span_mm = ["{{process.bar_length_max_mm}}", 10.16], y_span_mm = ["{{process.height_target_mm}}", 5.08], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{process.blank_thickness_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{process.blank_thickness_mm}}", "{{process.csk_tip_mm}}"], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.tap_stack_max_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.chamfer_projection_min_mm}}"] }
 vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{process.height_target_mm}}", along_jaws_mm = "{{process.bar_length_max_mm}}", part_height_mm = "{{cad.back_face_depth_mm}}", parallel_height_mm = "{{process.riser_height_mm}}", overhang_mm = ["{{process.pickup_out_mm}}", "rest"], jaw_offset = "centred", fixed_jaw_face = "machined", moving_jaw_face = "as_bought", moving_jaw_contact = "rod" }
 beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{process.bar_length_max_mm}}"], clamp_mm = ["{{process.pickup_out_mm}}", "{{process.b_clamp_end_mm}}"], section_mm = { y = "{{process.height_target_mm}}", z = "{{cad.back_face_depth_mm}}" }, vise_left = "start" }
@@ -698,6 +704,7 @@ tool = "tap-8-32"
 drilling = "none"
 sizing = "other"
 instruction = "Tap {{cad.pivot_tap_thread}} through by hand under the tap guide, spindle off, cutting oil: the tap's point in the hole, jog Z down until the guide's point is pushed fully home in the wrench. Turn the wrench, a half turn back each turn; jog the guide down again before the tap has gone 1/2 in. Stop when the tap's mark reaches the back face: the full thread is through F."
+diagram = { file = "diagrams/pivot-tap.svg", alt = "Section at the pivot hole, the bar and the tap to scale: the 8-32 plug tap in the T-handle wrench in the hole, the tap guide in the spindle, its spring point in the wrench's centre hole; the tap's point {{process.tap_point_depth_mm:in.2dot}} below the back face when its mark reaches it, through F, between the stacks. The wrench and the tap's length schematic." }
 feed = "hand"
 
 [[setups.operations]]

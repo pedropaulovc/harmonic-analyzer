@@ -1,33 +1,42 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 780 430" font-family="sans-serif" font-size="13">
-  <rect class="paper" x="0" y="0" width="780" height="430"/>
-  <text class="title" x="20" y="20">Section across the jaws at a lock hole, from the LEFT end (1 in = 100 px)</text>
-  <line class="fixture-table" x1="60" y1="400" x2="400" y2="400"/>
-  <rect class="clamp" x="152.6" y="223" width="60" height="177"/>
-  <rect class="clamp" x="275" y="223" width="60" height="177"/>
-  <rect class="fixture-support" x="250" y="250" width="12.5" height="150"/>
-  <rect class="fixture-support" x="262.5" y="250" width="12.5" height="150"/>
-  <rect class="part-kept" x="212.6" y="210.5" width="62.4" height="39.5"/>
-  <rect class="part-threads" x="222.8" y="210.5" width="11.2" height="39.5"/>
-  <!-- The tap through the rail, its point .550 below R. -->
-  <rect class="cutter" x="224" y="140" width="8.8" height="125.5"/>
-  <polygon class="cutter" points="224,265.5 232.8,265.5 228.4,276"/>
-  <!-- T-handle wrench and the tap guide's point in its centre hole. -->
-  <rect class="part-rest" x="168" y="122" width="121" height="12"/>
-  <rect class="part-rest" x="220" y="110" width="17" height="30"/>
-  <polygon class="clamp" points="221,60 236,60 236,95 228.4,108 221,95"/>
-  <line class="centre-line" x1="228.4" y1="40" x2="228.4" y2="290"/>
-  <line class="datum" x1="80" y1="250" x2="150" y2="250"/>
-  <text class="datum-label" x="30" y="246">Z0 (F)</text>
-  <line class="leader" x1="240" y1="78" x2="320" y2="70"/>
-  <text class="label" x="325" y="74">tap guide in the spindle, spindle OFF</text>
-  <line class="leader" x1="290" y1="128" x2="320" y2="110"/>
-  <text class="label" x="325" y="110">T-handle wrench, centre hole on the point</text>
-  <line class="leader" x1="234" y1="230" x2="345" y2="200"/>
-  <text class="label" x="350" y="200">{{cad.lock_tap_1_thread}} spiral-point tap, through</text>
-  <line class="dims" x1="380" y1="210.5" x2="380" y2="276"/>
-  <line class="dims" x1="370" y1="210.5" x2="390" y2="210.5"/>
-  <line class="dims" x1="370" y1="276" x2="390" y2="276"/>
-  <text class="label" x="395" y="248">point {{process.tap_point_depth_mm:in.3dot}} below R</text>
-  <line class="leader" x1="231" y1="280" x2="231" y2="410"/>
-  <text class="label" x="237" y="422">the point stands below F here, in the air</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 780 500" width="780" height="500" font-family="sans-serif" font-size="13">
+  <!-- Hand picture, the rail, the tap's diameter and the tap guide's body to scale at 4 px/mm (the depth F to R 10.033 mm). #4-40 tap Ø.112 (2.845 mm, the thread's major diameter), its point at tap_point_depth_mm 13.97 below R (3.937 mm below F), its end drawn as the near half of its end face (an arc 12 % of its diameter deep). Tap guide (tools.tap-guide-fisher): body Ø.5 (shank_dia_in) drawn to a break line, its point Ø.1875 (point_dia_in). The tap's length, the T-handle wrench and how far the point stands out are not on record: schematic. The wrench and the guide in the tool's colour: they turn or travel with the tap. Section seen from the RIGHT end, the fixed jaw on the right. The vise jaws' thickness is not on record: schematic. Jaw height 44.9453 mm (vise_jaw_height_mm), jaw width 158.6738 mm (vise_jaw_width_mm); the parallels 1/8 in thick (parallel_thickness_mm), 4 in long (fixtures.parallels-lms-6745), stacked 1 in + 1/2 in (riser_height_mm 38.1). -->
+  <rect class="paper" x="0" y="0" width="780" height="500"/>
+  <text class="title" x="20" y="24">PB06: the 4-40 tap by hand under the tap guide (rail to scale, 4 px/mm)</text>
+  <rect class="fixture-vise" x="146.6" y="470" width="243.4" height="14"/>
+  <rect class="clamp" x="146.6" y="290.22" width="90" height="179.78"/>
+  <rect class="clamp" x="300" y="290.22" width="90" height="179.78"/>
+  <rect class="fixture-support" x="274.6" y="317.6" width="12.7" height="152.4"/>
+  <rect class="fixture-support" x="287.3" y="317.6" width="12.7" height="152.4"/>
+  <rect class="part-kept" x="236.6" y="277.47" width="63.4" height="40.13"/>
+  <text class="label-on-clamp" x="191.6" y="458" text-anchor="middle">moving jaw</text>
+  <text class="label-on-clamp" x="345" y="458" text-anchor="middle">fixed jaw</text>
+  <line class="datum" x1="300" y1="288.22" x2="300" y2="334.22"/>
+  <text class="datum-label" x="396" y="304.22">Y0 the fixed</text>
+  <text class="datum-label" x="396" y="320.22">jaw's face</text>
+  <rect class="part-threads" x="246.97" y="277.47" width="11.38" height="40.13"/>
+  <path class="cutter" d="M258.35 331.98L258.35 207.47L246.97 207.47L246.97 331.98A5.69 1.37 0 0 0 258.35 331.98Z"/>
+  <rect class="cutter" x="172.66" y="195.47" width="160" height="12"/>
+  <rect class="cutter" x="242.66" y="185.47" width="20" height="22"/>
+  <path class="cutter" d="M252.66 185.47L243.13 168.96L243.13 139.37L262.18 139.37L262.18 168.96Z"/>
+  <path class="cutter" d="M278.06 139.37L278.06 60L273.82 63L269.59 60L265.36 63L261.12 60L256.89 63L252.66 60L248.42 63L244.19 60L239.96 63L235.72 60L231.49 63L227.26 60L227.26 139.37A25.4 6.1 0 0 0 278.06 139.37Z"/>
+  <line class="centre-line" x1="252.66" y1="50" x2="252.66" y2="345.35"/>
+  <line class="datum" x1="110.6" y1="317.6" x2="142.6" y2="317.6"/>
+  <text class="datum-label" x="106.6" y="322.6" text-anchor="end">Z0 the stacks'</text>
+  <text class="datum-label" x="106.6" y="338.6" text-anchor="end">top (F)</text>
+  <text class="label" x="440" y="80">tap guide in the 1/2 in collet, spindle off;</text>
+  <text class="label" x="440" y="96">its spring point in the wrench's centre hole</text>
+  <line class="leader" x1="438" y1="84" x2="278.06" y2="110"/>
+  <circle class="leader-dot" cx="278.06" cy="110" r="2"/>
+  <text class="label" x="440" y="177.47">T-handle tap wrench</text>
+  <line class="leader" x1="438" y1="173.47" x2="322.66" y2="201.47"/>
+  <circle class="leader-dot" cx="322.66" cy="201.47" r="2"/>
+  <text class="label" x="440" y="257.47">{{cad.lock_tap_1_thread}} spiral-point tap, its point</text>
+  <text class="label" x="440" y="273.47">{{process.tap_point_depth_mm:in.3dot}} below R: through F, in the air</text>
+  <line class="leader" x1="438" y1="261.47" x2="258.35" y2="247.47"/>
+  <circle class="leader-dot" cx="258.35" cy="247.47" r="2"/>
+  <text class="label" x="440" y="360">F down on the stacks, U against the</text>
+  <text class="label" x="440" y="376">FIXED jaw, R up, LEFT end to the left.</text>
+  <text class="label" x="440" y="430">the stacks</text>
+  <line class="leader" x1="438" y1="426" x2="280.95" y2="430"/>
+  <circle class="leader-dot" cx="280.95" cy="430" r="2"/>
 </svg>

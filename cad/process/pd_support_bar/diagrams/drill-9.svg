@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 780 500" width="780" height="500" font-family="sans-serif" font-size="13">
+  <!-- Hand picture, to scale at 4 px/mm, a section across the jaws at clamp hole 1, seen from the end on the right of the plan, the fixed jaw on the right; the bar 9.525 mm thick (blank_thickness_mm), 25.2222 mm across (height_target_mm). #9 drill Ø4.9784 mm (milling_cuts cutter_dia_mm, shop riser-drill-9), 118° point, at clamp hole 1 (X-11.557 Y-14.000, posted NC), its point at drill_9_tip_mm -12.021 below F; drawn short to a break line, the chuck not drawn. The #2 centre drill's spot before it is not drawn. Three stacks 1.5 in high (riser_height_mm 38.1): 1 in + 1/2 in at the fixed jaw, 1 in + 1/2 in under the bottom edge and the two 3/4 in outside it under the .125 pin (Ø3.175 mm), the moving jaw on the pin. The vise jaws' thickness is not on record: schematic. Jaw height 44.9453 mm (vise_jaw_height_mm), jaw width 158.6738 mm (vise_jaw_width_mm); the parallels 1/8 in thick (parallel_thickness_mm), 4 in long (fixtures.parallels-lms-6745). -->
+  <rect class="paper" x="0" y="0" width="780" height="500"/>
+  <text class="title" x="20" y="24">SB03, same file: the #9 drill through clamp hole 1 (to scale, 4 px/mm)</text>
+  <rect class="fixture-vise" x="156.41" y="470" width="293.59" height="14"/>
+  <rect class="clamp" x="156.41" y="290.22" width="90" height="179.78"/>
+  <rect class="clamp" x="360" y="290.22" width="90" height="179.78"/>
+  <rect class="fixture-support" x="347.3" y="317.6" width="12.7" height="152.4"/>
+  <rect class="fixture-support" x="259.11" y="317.6" width="12.7" height="152.4"/>
+  <rect class="fixture-support" x="246.41" y="317.6" width="12.7" height="152.4"/>
+  <circle class="fixture-support" cx="252.76" cy="311.25" r="6.35"/>
+  <rect class="part-kept" x="259.11" y="279.5" width="100.89" height="38.1"/>
+  <text class="label-on-clamp" x="201.41" y="458" text-anchor="middle">moving jaw</text>
+  <text class="label-on-clamp" x="405" y="458" text-anchor="middle">fixed jaw</text>
+  <text class="label-halo" x="350" y="295.5" text-anchor="middle">T</text>
+  <line class="datum" x1="360" y1="288.22" x2="360" y2="334.22"/>
+  <text class="datum-label" x="456" y="304.22">Y0 the fixed</text>
+  <text class="datum-label" x="456" y="320.22">jaw's face (T)</text>
+  <line class="datum" x1="120.41" y1="279.5" x2="152.41" y2="279.5"/>
+  <text class="datum-label" x="116.41" y="284.5" text-anchor="end">Z0 the front</text>
+  <text class="datum-label" x="116.41" y="300.5" text-anchor="end">face F</text>
+  <rect class="holes" x="294.04" y="279.5" width="19.91" height="38.1"/>
+  <path class="cutter" d="M313.96 139.5L313.96 321.6L304 327.58L294.04 321.6L294.04 139.5L299.02 136.5L304 139.5L308.98 136.5Z"/>
+  <line class="centre-line" x1="304" y1="127.5" x2="304" y2="430"/>
+  <line class="arrow" x1="282" y1="159.5" x2="282" y2="199.5"/>
+  <text class="label" x="480" y="90">#9 drill (Ø.196), one plunge, no</text>
+  <text class="label" x="480" y="106">peck: its full diameter {{process.drill_past_mm:in.3dot}} past</text>
+  <text class="label" x="480" y="122">the back face; the centre drill's</text>
+  <text class="label" x="480" y="138">spot first, not drawn</text>
+  <line class="leader" x1="478" y1="102" x2="313.96" y2="209.5"/>
+  <circle class="leader-dot" cx="313.96" cy="209.5" r="2"/>
+  <text class="label" x="480" y="370">its point at Z{{process.drill_9_tip_mm:in.3dot}},</text>
+  <text class="label" x="480" y="386">in the air between the stacks</text>
+  <line class="leader" x1="478" y1="366" x2="306" y2="325.58"/>
+  <circle class="leader-dot" cx="306" cy="325.58" r="2"/>
+  <text class="label" x="480" y="430">three 1.5 in stacks; the .125 pin on</text>
+  <text class="label" x="480" y="446">the outer one, the moving jaw on it</text>
+  <line class="leader" x1="478" y1="426" x2="252.76" y2="430"/>
+  <circle class="leader-dot" cx="252.76" cy="430" r="2"/>
+  <line class="leader" x1="478" y1="426" x2="256.76" y2="311.25"/>
+  <circle class="leader-dot" cx="256.76" cy="311.25" r="2"/>
+</svg>
