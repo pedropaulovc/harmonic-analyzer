@@ -63,7 +63,11 @@ rows = [
   # as its step touched it"; now each zero is checked the way its step set it.
   ["After homing again", "Check every zero of the setup again, each the way its step set it: each must read what its step set, within .001 in. One does not, cannot be reached with the part in, or the part may have moved: do what that setup's Datum says for it; where the Datum says nothing, take the setup again from its first step, the part out. They all do: run the interrupted file again from its start."],
   ["Feed Hold", "Then Reset with the axes stopped: position and G54 are kept; no homing, no new zero. Run the interrupted file again from its start: its first M6 measures the tool, and cuts already made are cut in air."],
-  ["Tool changes", "At an M6 the file stops the spindle and lifts the tool above the part; the tool setter measures the new tool. A console `M6 T<n>` does the same by hand."],
+  # "Press Cycle Start only with hands clear": delegated ruling 2026-11-26
+  # (Main), no precedent, owner review #2144 (D43). The sentence was in the
+  # plans' notes (ms_stop_block: "At every M6 stop ... press Cycle Start only
+  # with hands clear."), and the page had no row for it.
+  ["Tool changes", "At an M6 the file stops the spindle and lifts the tool above the part; the tool setter measures the new tool. A console `M6 T<n>` does the same by hand. Press Cycle Start only with hands clear."],
   ["A file's first part", "Prove each file in air on the first part it cuts: send `$#` and note the G54 line's Z; `G10 L2 P1 Z(that Z + 25.400)` raises Z0 1.000 in. Run the file and watch every move, through every M6, clear the work, the jaws, the parallels, any clamp and the stop. `G10 L2 P1 Z(the noted Z)` puts Z0 back."],
   ["Work stop", "HHIP universal stop bolted to the table beside the vise; its 3/8 in rod reaches between the jaws. Take a setup's touch-offs first, then set the rod against the first part and lock it; each later part goes in against it. Slide the rod back out of the vise before any touch-off beside the work (the edge finder, or the end mill coming down on a parallel): it is still where the last setup locked it."],
 ]

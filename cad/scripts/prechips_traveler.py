@@ -35,7 +35,9 @@ standing cad/process/shop --out cad/out/travelers/shop-standing-instructions/
 shop-standing-instructions.html`` and prints that page to
 ``shop-standing-instructions.pdf`` beside it; a release ships the PDF under
 ``travelers/``. A resolved prechips without the ``standing`` command (argparse
-``invalid choice``) exits 1 with a message naming the release it needs.
+``invalid choice``) exits 1 with a message naming the release it needs. The
+page is one sheet by the owner's design: a print on more sheets exits 1 and
+removes both files, so a row that grows the page fails loudly.
 
 Only exit 0 from every run and every printed PDF is success. Every previous
 traveler is removed first, and a refusal from either run removes every output
@@ -58,6 +60,9 @@ import subprocess
 import sys
 import tempfile
 from pathlib import Path
+
+from pypdf import PdfReader
+from pypdf.errors import PdfReadError
 
 import _telemetry
 import _process_plans
@@ -147,6 +152,14 @@ def print_pdf(browser_path: str, html: Path, pdf: Path) -> None:
         raise RuntimeError(
             f"{name} did not print {html.name} to PDF (exit {result.returncode}): {output}"
         )
+
+
+def pdf_sheets(pdf: Path) -> int:
+    """The printed sheets in a browser-printed PDF, read by pypdf."""
+    try:
+        return len(PdfReader(pdf).pages)
+    except PdfReadError as exc:
+        raise RuntimeError(f"{pdf.name} is not a readable PDF: {exc}") from exc
 
 
 def latest_version(uv: str) -> str:
@@ -274,6 +287,12 @@ def _standing(out: Path) -> int:
         try:
             with _telemetry.span("prechips.pdf", stem=STANDING_STEM, browser=Path(printer).name):
                 print_pdf(printer, html, pdf)
+            sheets = pdf_sheets(pdf)
+            if sheets != 1:
+                raise RuntimeError(
+                    f"the page prints on {sheets} sheets; the owner's design "
+                    "is one sheet (shorten a row, or tighten prechips' standing layout)"
+                )
         except RuntimeError as exc:
             return _fail(root, STANDING_STEM, exc, 1, outputs)
         _telemetry.info(f"{STANDING_STEM}: printed {pdf.name}")
