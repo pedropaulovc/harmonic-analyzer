@@ -474,7 +474,7 @@ milling_cuts = [
 [[setups.operations]]
 steps = [
   { kind = "action", text = "While PC01_sheet runs, dry: air blast the chips off as it goes; no flood or mist coolant and no water (the paper tape soaks and lets go)." },
-  { kind = "stop", text = "The cut smokes or smells hot (CA softens with heat): Feed Hold; jog Z up clear and wait until the blank is cool to a finger." },
+  { kind = "stop", text = "The cut smokes or smells hot (CA softens with heat): Feed Hold, then Reset (the spindle stops); jog Z up clear and wait until the blank is cool to a finger." },
 ]
 feed = "hand"
 
