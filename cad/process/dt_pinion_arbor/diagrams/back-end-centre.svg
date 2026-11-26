@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 360" width="760" height="360" font-family="sans-serif" font-size="13">
+  <!-- Hand picture, from above (the cross-slide at the bottom), a section through the axis, to scale at 200 px/in: the 5/8 bar (process.bar_dia_in) 1.00 out of the jaw fronts (process.end_stickout_mm), the rest of the blank back through the chuck into the spindle bore, to a break line. The 3-jaw's body and jaws are schematic (their sizes are not on record). The back end faced to length. The No. 1 centre drill (tools.centre-drills-carbide-60, for a 3/64 drill) from the tailstock chuck: its 3/64 pilot and 60° countersink to about Ø.08, inside the crown's Ø.12 step, to scale across; the pilot's length and the body's Ø are not on record: the pilot drawn .04 long and the body at Ø.08, schematic, to a break line. -->
+  <rect class="paper" x="0" y="0" width="760" height="360"/>
+  <text class="title" x="20" y="22">Setup 3, Op 60: the No. 1 centre drill in the back end, to about Ø.08 (to scale, 200 px/in)</text>
+  <rect class="fixture-vise" x="298" y="71.5" width="56" height="217"/>
+  <path class="part-kept" d="M40 117.5L600 117.5L600 242.5L40 242.5L37 235.15L40 227.79L37 220.44L40 213.09L37 205.74L40 198.38L37 191.03L40 183.68L37 176.32L40 168.97L37 161.62L40 154.26L37 146.91L40 139.56L37 132.21L40 124.85Z"/>
+  <rect class="clamp" x="354" y="83.5" width="46" height="34"/>
+  <rect class="clamp" x="354" y="242.5" width="46" height="34"/>
+  <line class="centre-line" x1="20" y1="180" x2="740" y2="180"/>
+  <path class="cutter" d="M745 172L600 172L594.27 175.31L586.27 175.31L583.45 180L586.27 184.69L594.27 184.69L600 188L745 188L742 180Z"/>
+  <line class="arrow" x1="730" y1="146" x2="690" y2="146"/>
+  <line class="datum" x1="600" y1="50" x2="600" y2="84"/>
+  <text class="datum-label" x="606" y="62">Z0 the back end</text>
+  <text class="label" x="420" y="320">No. 1 centre drill from the tailstock chuck,</text>
+  <text class="label" x="420" y="336">about Ø.08 across the countersink</text>
+  <line class="leader" x1="520" y1="308" x2="630" y2="188"/>
+  <circle class="leader-dot" cx="630" cy="188" r="2"/>
+</svg>

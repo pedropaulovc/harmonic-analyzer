@@ -351,7 +351,7 @@ indexing = "none"
 envelope = "other"
 vise_hold = "other"
 beam = "other"
-diagram = { file = "diagrams/saw.svg", alt = "The 5/8 in bar on the saw: a 10.20 in blank off its end." }
+diagram = { file = "diagrams/saw.svg", alt = "Op 10, to scale: the {{process.blank_length_in:.2f}} in blank marked off the 5/8 bar and sawn on the waste side, the long end in the saw's vise." }
 
 [[setups.operations]]
 speed_kind = "other"
@@ -369,7 +369,7 @@ indexing = "none"
 machine_ref = "pm-1127vf-lb"
 holding = "3-jaw on the blank, one end {{process.end_stickout_mm:in.2f}} in out of the jaw fronts (rule), the rest of the blank back through the chuck into the spindle bore. That end is the head end from here on: mark the bar beside it with a felt pen."
 datum = "The faced head end is the crown's apex: every later station is read from it until the head's rear face is turned (Setup 6)."
-diagram = { file = "diagrams/head-face.svg", alt = "The blank in the 3-jaw, the head end out 1.00 in, faced square." }
+diagram = { file = "diagrams/head-face.svg", alt = "To scale: the blank {{process.end_stickout_mm:in.2f}} in out of the 3-jaw, the rest back through the spindle; the AR tool faces the head end square, {{process.face_allowance_in:.2dot}} off: the crown's apex." }
 lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{process.bar_dia_mm}}", stock_diameter_mm = "{{process.bar_dia_mm}}", stickout_mm = "{{process.end_stickout_mm}}", minimum_diameter_mm = "{{process.bar_dia_mm}}", support = "none" }
 
 [[setups.operations]]
@@ -390,7 +390,7 @@ indexing = "none"
 machine_ref = "pm-1127vf-lb"
 holding = "Turned round: 3-jaw on the blank's 5/8 bar, the back end {{process.end_stickout_mm:in.2f}} in out of the jaw fronts, the head end back through the chuck into the spindle bore."
 datum = "Z0 (carriage DRO) the back end faced in the first op; the length is read from the faced head end with the height gauge."
-diagram = { file = "diagrams/back-end.svg", alt = "The blank turned round, the back end out: faced to length from the head's rear face and centre-drilled for the tailstock." }
+diagram = { file = "diagrams/back-end.svg", alt = "To scale: the blank turned round, the back end {{process.end_stickout_mm:in.2f}} in out; the AR tool faces it in light skims toward the length, DRO Z0 on the last." }
 lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{process.bar_dia_mm}}", stock_diameter_mm = "{{process.bar_dia_mm}}", stickout_mm = "{{process.end_stickout_mm}}", minimum_diameter_mm = "{{process.bar_dia_mm}}", support = "none" }
 
 [[setups.operations]]
@@ -420,6 +420,7 @@ tool = "centre-1"
 drilling = "none"
 sizing = "other"
 instruction = "Chucked again as in this setup's first op: centre-drill the back end with the No. 1 centre drill from the tailstock chuck, to about Ø.08 across the countersink (inside the crown's Ø.12 step)."
+diagram = { file = "diagrams/back-end-centre.svg", alt = "To scale: the No. 1 centre drill from the tailstock chuck in the back end, to about Ø.08 across the countersink." }
 settings = "lathe-centre-1018"
 cut_diameter_mm = 1.191
 
@@ -431,7 +432,7 @@ indexing = "none"
 machine_ref = "pm-30mv"
 holding = "The PM 6 in vise. One 1 in, 4 in long parallel of the 1/8 in thick set standing on edge, centred between the jaws, its left end flush with the jaws' left face (a rule across both). The blank (still 5/8 bar its whole length) on its top edge along the jaws, the marked head end to the LEFT, {{process.cross_jaw_left_mm:in.2f}} in out past the jaws' left face (calipers' depth rod), never under .70 nor over .80; the blank runs on past the jaws' right end. Tap it down onto the parallel while closing the vise. Under the hole nothing but air."
 datum = "Program PA01_cross_hole (cam:dt_pinion_arbor). G54: X0 the faced head end (Setup 2), +X toward the back end; Y0 the bar's axis; Z0 the top of the 5/8 bar. The file starts with an M6 for the centre drill."
-diagram = { file = "diagrams/cross-hole.svg", alt = "The blank along the vise jaws on a parallel on edge, the faced head end out .75 past the jaws' left face; the cross hole .367 from it, through the 5/8 bar into air." }
+diagram = { file = "diagrams/cross-hole.svg", alt = "PA01 T2, to scale: a section along the bar from the front, the bar on a 1 in parallel on edge, the head end {{process.cross_jaw_left_mm:in.2f}} in past the jaws' left face; the C drill at X{{process.cross_x_mm:.3f}} mm, its point at Z{{process.cross_drill_tip_mm:.3f}}, into air left of the jaws and the parallel. Beside it, the bar end-on from the head end, the fixed jaw on the left." }
 envelope = "other"
 vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{process.bar_dia_mm}}", along_jaws_mm = "{{process.part_length_mm}}", part_height_mm = "{{process.bar_dia_mm}}", parallel_height_mm = "{{process.riser_height_mm}}", overhang_mm = ["{{process.cross_jaw_left_mm}}", "rest"], jaw_offset = "centred", fixed_jaw_face = "as_bought", moving_jaw_face = "as_bought", moving_jaw_contact = "flat" }
 beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{process.part_length_mm}}"], clamp_mm = ["{{process.cross_jaw_left_mm}}", "{{process.cross_clamp_end_mm}}"], section_mm = { diameter = "{{process.bar_dia_mm}}" }, vise_left = "start" }
@@ -483,6 +484,7 @@ tool = "reamer"
 drilling = "none"
 sizing = "other"
 instruction = "Same file, M6 T3: .2510 reamer through the bar, {{process.ream_past_mm:in.3dot}} past its underside, fed in and fed back out with the spindle running; set 400. Plenty of cutting oil."
+diagram = { file = "diagrams/cross-ream.svg", alt = "PA01 T3, to scale: the .2510 reamer through the C hole, its end at Z{{process.cross_ream_tip_mm:.3f}}, {{process.ream_past_mm:in.3dot}} under the bar." }
 rpm = 400
 feed = "{{process.ream_feed_per_min_mm:in.1f}} in/min"
 milling_cuts = [
@@ -506,7 +508,7 @@ indexing = "none"
 machine_ref = "pm-30mv"
 holding = "As Setup 4, but the marked head end {{process.jaw_left_x_mm:in.2f}} in out past the jaws' left face (calipers' depth rod), never under 2.22 nor over 2.28. Before closing the vise, push an MHA-DT-15 rod (or an offcut of its 1/4 bar) through the cross hole (it stands proud above and below the bar) and roll the bar until the rod stands upright by eye; the next op proves it. Under the pin hole nothing but air."
 datum = "Program PA02_pin_hole (cam:dt_pinion_arbor). G54 as Setup 4, picked up again: X0 the faced head end, Y0 the bar's axis, Z0 the top of the 5/8 bar. The file starts with an M6 for the centre drill."
-diagram = { file = "diagrams/holes.svg", alt = "The blank along the vise jaws on a parallel on edge, the faced head end out 2.25 past the jaws' left face; the pin hole 2.097 from it, through the 5/8 bar into air." }
+diagram = { file = "diagrams/holes.svg", alt = "PA02 T4, to scale: the head end {{process.jaw_left_x_mm:in.2f}} in past the jaws' left face, the reamed cross hole at X{{process.cross_x_mm:.3f}} mm; the 1/16 drill at X{{process.pin_x_mm:.3f}} mm, its point at Z{{process.pin_drill_tip_mm:.3f}}, into air left of the jaws. Beside it, end-on from the head end." }
 envelope = "other"
 vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{process.bar_dia_mm}}", along_jaws_mm = "{{process.part_length_mm}}", part_height_mm = "{{process.bar_dia_mm}}", parallel_height_mm = "{{process.riser_height_mm}}", overhang_mm = ["{{process.left_overhang_mm}}", "rest"], jaw_offset = "centred", fixed_jaw_face = "as_bought", moving_jaw_face = "as_bought", moving_jaw_contact = "flat" }
 beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{process.part_length_mm}}"], clamp_mm = ["{{process.left_overhang_mm}}", "{{process.clamp_end_mm}}"], section_mm = { diameter = "{{process.bar_dia_mm}}" }, vise_left = "start" }
@@ -582,7 +584,7 @@ indexing = "none"
 machine_ref = "pm-1127vf-lb"
 holding = "3-jaw on the blank, the head end {{process.head_stickout_mm:in.2f}} in out of the jaw fronts (rule), the rest of the blank back through the chuck into the spindle bore."
 datum = "Z0 (carriage DRO) the head end faced in Setup 2 (the crown's apex), touched with the AR tool's point in the first op. The head's rear face is at Z-{{process.head_rear_z_in:.4dot}}."
-diagram = { file = "diagrams/head.svg", alt = "The blank in the 3-jaw, the head end out: faced, the Ø.59 head and the Ø.41 neck turned, the SR.43 crown stepped from the table and filed." }
+diagram = { file = "diagrams/head.svg", alt = "To scale: the head end {{process.head_stickout_mm:in.2f}} in out of the 3-jaw; the AR tool turns the head Ø{{cad.head_dia_min_in:.3dot}}–{{cad.head_dia_max_in:.3dot}} from Z0 to Z-{{process.neck_end_z_in:.3dot}}. Dashed: the neck Ø{{cad.neck_dia_in:.2dot}} from the head's rear face." }
 lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{process.bar_dia_mm}}", stock_diameter_mm = "{{process.bar_dia_mm}}", stickout_mm = "{{process.head_stickout_mm}}", minimum_diameter_mm = "{{cad.neck_dia_mm}}", support = "none" }
 
 [[setups.operations]]
@@ -617,6 +619,7 @@ tool = "sharp"
 drilling = "none"
 sizing = "other"
 instruction = "Sharp-nose tool. First, spindle stopped: touch its left side on the faced head end, set DRO Z0 there (the AR tool's zero does not carry over), and mike its tip's width. Then turn off the .17 step the AR passes left beside the head's rear face, .010 per side per pass down to Ø.420, each fed toward the head and stopped at −({{process.head_rear_z_in:.4dot}} + the tip's width)."
+diagram = { file = "diagrams/head-sharp.svg", alt = "To scale: the neck roughed; the sharp-nose tool finishes the neck Ø{{cad.neck_dia_min_in:.3dot}}–{{cad.neck_dia_max_in:.3dot}}, its right side squaring the head's rear face. The sharp-nose tool is schematic." }
 rpm = 400
 feed = "hand, light"
 
@@ -704,7 +707,7 @@ indexing = "none"
 machine_ref = "pm-1127vf-lb"
 holding = "3-jaw over a brass shim wrap on the Ø.59 head, its rear face .25 out of the jaw fronts and the shim (rule), the neck and the bar out of the jaws; the back end's centre hole on the MT3 dead centre, a dab of grease on its point, the quill snug and locked. The follow rest bolts to the saddle's headstock side, its jaws a lead L ahead of the tool's left edge: it goes on only after the head-end stretch (the shoulder to Z+{{process.rest_joint_in:.2f}}) is finished, and every touch-off on the head's rear face is made with it lifted off (two bolts) and bolted back after, its jaws reset. Recheck the centre snug before each pass: the shaft lengthens as it warms."
 datum = "Z0 (carriage DRO) the head's rear face (faced with the sharp-nose tool in Setup 6), touched with each tool's left edge, the follow rest off; every station is +Z from it."
-diagram = { file = "diagrams/shaft.svg", alt = "The blank between the 3-jaw on the head and the dead centre in the back end; the follow rest rides just ahead of the tool on the diameter not yet cut, from the back end to the joint at 3.20, as the shaft is turned to Ø.3117 its whole length, the Ø.28 relief between 4.20 and 6.80, the SR.28 back crown stepped at the tailstock end." }
+diagram = { file = "diagrams/shaft.svg", alt = "To scale: the blank between the 3-jaw on the head (over a brass shim) and the MT3 dead centre in the back end, Z0 the head's rear face; the AR tool roughs the head-end stretch from Z+{{process.rest_joint_in:.2f}} toward the shoulder, the follow rest OFF for this stretch." }
 lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{cad.head_dia_mm}}", stock_diameter_mm = "{{process.bar_dia_mm}}", stickout_mm = 241.8, minimum_diameter_mm = "{{cad.bond_relief_dia_mm}}", support = "tailstock" }
 
 [[setups.operations]]
@@ -755,6 +758,7 @@ tool = "sharp"
 drilling = "none"
 sizing = "other"
 instruction = "Sharp-nose tool. First, spindle stopped: touch its left side on the head's rear face and set DRO Z0 there (the AR tool's zero does not carry over). Then finish the inside corner at the bar's shoulder, Z+{{cad.neck_length_in:.3dot}}, to R.010 max, and face the shoulder square down to the shaft."
+diagram = { file = "diagrams/shaft-sharp.svg", alt = "To scale: the head-end stretch finished; the sharp-nose tool's left side at Z+{{cad.neck_length_in:.3dot}}, squaring the bar's shoulder down to the shaft." }
 rpm = 400
 feed = "hand, light"
 
@@ -770,6 +774,7 @@ tool = "ar"
 drilling = "none"
 sizing = "other"
 instruction = "AR tool back (re-zero it on the rear face if its holder was moved, the rest off for the touch). Rough from the back end toward Z+{{process.rest_joint_in:.2f}} in cuts of {{process.rough_doc_in:.3dot}} per side to Ø{{process.rough_dia_in:.3dot}}, the follow rest's jaws, ahead of the tool, set on the diameter the last pass left; stop each pass at Z+{{process.rest_joint_in:.2f}}."
+diagram = { file = "diagrams/shaft-rest.svg", alt = "To scale: the AR tool roughing from the back end toward Z+{{process.rest_joint_in:.2f}}, the follow rest bolted to the saddle, its jaws L ahead of the tool on the diameter the last pass left." }
 settings = "lathe-ar-1018"
 cut_diameter_mm = "{{process.bar_dia_mm}}"
 
@@ -823,6 +828,7 @@ tool = "reamer-adj"
 drilling = "none"
 sizing = "other"
 instruction = "Only if AF was written again from SF alone (owner ruling 2026-11-25: no journal size fits both bores): open the drum's front end to the front journal + {{process.drum_front_ream_over_in:.3dot}}. Mike the front journal at Z+2.2. Set the piece of the adjustable reamer set that spans that reading + {{process.drum_front_ream_over_in:.3dot}}, read with the micrometer over its blades. The drum in the bench vise's soft jaws, its marked front end up: turn the reamer in by hand in the tap wrench, with cutting oil, until its blades' full diameter stands {{process.drum_front_ream_depth_in:.2dot}} deep (past the .23 the drum's front end reaches onto the journal); turn it out the same way. Measure the front end with the telescoping gauge: that is DF now."
+diagram = { file = "diagrams/drum-ream.svg", alt = "Schematic: the MHA-DT-01 drum in the bench vise's soft jaws, front end up; the adjustable reamer in a tap wrench, turned in by hand to about {{process.drum_front_ream_depth_in:.1f}} deep." }
 inspection = "DF at least the front journal + {{process.drum_front_ream_over_in:.3dot}} and at most .3165 (the drilled top, which note 3's .008 reads over the front land); reamed {{process.drum_front_ream_depth_in:.2dot}} deep or more. Over .3165: stop and tell the owner."
 gauge_checks = [{ gauge = "telescoping-gauges-starrett-s579gz", band_mm = [7.9375, 8.0391] }]
 feed = "hand"
@@ -834,7 +840,7 @@ feed = "hand"
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "The rest's jaws for the relief. L under 2.55: set on the diameter the last pass left (the Ø.3117 for the first); each later pass stops when they come .05 short of Z+{{cad.bond_relief_station_in:.2dot}}, then the jaws are backed off and the last stretch fed by hand. L 2.55 or more: on the Ø.3117 head-side of the relief for every pass."
+instruction = "The rest's jaws for the relief. L under 2.55: set on the diameter the last pass left (the finished A for the first); each later pass stops when they come .05 short of Z+{{cad.bond_relief_station_in:.2dot}}, then the jaws are backed off and the last stretch fed by hand. L 2.55 or more: on the finished A head-side of the relief for every pass."
 feed = "hand"
 
 [[setups.operations]]
@@ -894,7 +900,7 @@ speed_kind = "spindle"
 tool = "ar"
 drilling = "none"
 sizing = "other"
-instruction = "AR tool back. Spindle stopped, the follow rest lifted off: touch its left edge on the head's rear face, DRO Z0 again; the rest bolted back, its jaws on the Ø.3117. Step the SR.28 back crown from the rim at Z+{{cad.back_crown_rim_station_in:.2dot}}: at each line, carriage at the Z, face from the Ø out to the shaft's O.D.: Z+9.3602 from Ø.280; Z+9.3707 Ø.240; Z+9.3792 Ø.200; Z+9.3860 Ø.160; Z+9.3912 Ø.120. The dead centre's hole stays inside Ø.12."
+instruction = "AR tool back. Spindle stopped, the follow rest lifted off: touch its left edge on the head's rear face, DRO Z0 again; the rest bolted back, its jaws on the finished A. Step the SR.28 back crown from the rim at Z+{{cad.back_crown_rim_station_in:.2dot}}: at each line, carriage at the Z, face from the Ø out to the shaft's O.D.: Z+9.3602 from Ø.280; Z+9.3707 Ø.240; Z+9.3792 Ø.200; Z+9.3860 Ø.160; Z+9.3912 Ø.120. The dead centre's hole stays inside Ø.12."
 settings = "lathe-ar-1018"
 cut_diameter_mm = "{{cad.shaft_dia_mm}}"
 
@@ -947,7 +953,7 @@ indexing = "none"
 envelope = "other"
 vise_hold = "other"
 beam = "other"
-diagram = { file = "diagrams/inspect.svg", alt = "The finished arbor: the Ø.59 head with its SR.43 crown and the .2510 reamed cross hole .23 from its rear face, the Ø.41 neck, the Ø.3125 shaft with the 1/16 pin hole at 1.50, the journals at 1.82–2.61 and 8.25–9.04, the Ø.28 relief at 4.20–6.80, the SR.28 back crown at 9.35." }
+diagram = { file = "diagrams/inspect.svg", alt = "To scale: the finished arbor, head left: the Ø.59 head with its SR.43 crown and the .2510 cross hole {{cad.cross_hole_station_in:.2dot}} from its rear face, the Ø.41 neck, the shaft with the 1/16 pin hole at {{cad.pin_hole_station_in:.2f}}, the journals {{cad.front_journal_station_in:.2f}}–{{cad.front_journal_end_station_in:.2f}} and {{cad.back_journal_station_in:.2f}}–{{cad.back_journal_end_station_in:.2f}}, the Ø.28 relief {{cad.bond_relief_station_in:.2f}}–{{cad.bond_relief_end_station_in:.2f}}, the SR.28 back crown's rim at {{cad.back_crown_rim_station_in:.2f}}, all from the head's rear face." }
 
 [[setups.operations]]
 speed_kind = "other"

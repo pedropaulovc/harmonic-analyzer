@@ -201,7 +201,7 @@ indexing = "none"
 envelope = "other"
 vise_hold = "other"
 beam = "other"
-diagram = { file = "diagrams/handle.svg", alt = "The bonded handle in section: the screw's shoulder runs from the ferrule's outer face to the butt cup's floor; the calipers' depth rod reads that stack." }
+diagram = { file = "diagrams/handle.svg", alt = "Schematic: the bonded handle in section, the MHA-DT-34 ferrule at one end, the MHA-DT-35 butt cup's pocket at the other; M is the overall length, ferrule face to the cup's outer end, less the pocket's depth." }
 
 [[setups.operations]]
 instruction = "Read the handle's overall length with the calipers' jaws, from the MHA-DT-34 ferrule's outer face to the MHA-DT-35 butt cup's outer end; then the pocket's depth with the depth rod, the beam's end on the cup's outer end, the rod onto the pocket's floor. M = the length less the depth. Read both three times, turning the handle between; write the largest M on this sheet."
@@ -222,7 +222,7 @@ indexing = "none"
 envelope = "other"
 vise_hold = "other"
 beam = "other"
-diagram = { file = "diagrams/saw.svg", alt = "The 1/4 in steel rod on the saw: one blank sawn a little over the screw's length plus the chucking length." }
+diagram = { file = "diagrams/saw.svg", alt = "Op 30, to scale: the blank B = P + {{process.blank_over_p_in:.2dot}} marked off the 1/4 rod and sawn on the waste side of the scribe." }
 
 [[setups.operations]]
 speed_kind = "other"
@@ -240,7 +240,7 @@ indexing = "none"
 machine_ref = "pm-1127vf-lb"
 holding = "3-jaw on the rod, S (Setup 1) out of the jaw fronts, set with the calipers' depth rod, the beam's end on the jaw fronts; the rest in the jaws. The tailstock dead centre, greased, in the tip's centre hole for every cut but the die and the part-off: in for Ops 60–180 and 230–270, the quill backed off for each touch-off on the tip and for the readings (Ops 120, 130, 160, 180, 260) and brought back snug; out for the die (Ops 190–220, the quill squaring it) and the part-off (Op 280)."
 datum = "Z0 (carriage DRO) the tip's faced plane, set in Op 40; each tool touched on the tip again when it takes over (Ops 120, 130, 180, 280). The seat at Z−{{process.seat_z_in:.3dot}}; the under-head face at Z−U and the part-off at Z−P from Setup 1."
-diagram = { file = "diagrams/turn.svg", alt = "The rod in the 3-jaw on the dead centre at the tip: the head turned to Ø.236 next to the jaws, the long shoulder turned to Ø.1535–.1585, the #4-40 thread at the tip; the relief at the seat; the part-off at the head's face." }
+diagram = { file = "diagrams/turn.svg", alt = "Op 40, to scale: the rod S out of the 3-jaw, the AR tool facing the tip square, about .03 off: Z0. Dashed: the head, the shoulder, the #4-40 blank to the seat at Z-{{process.seat_z_in:.3dot}} and the part-off at Z−P." }
 lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{process.stock_dia_mm}}", stock_diameter_mm = "{{process.stock_dia_mm}}", stickout_mm = "{{process.stickout_mm}}", minimum_diameter_mm = "{{process.thread_dia_min_mm}}", support = "tailstock" }
 turning_support = { kind = "tailstock", chuck_z_mm = "{{process.jaw_front_z_mm}}", centre_z_mm = 0.0 }
 
@@ -261,6 +261,7 @@ tool = "centre-drill"
 drilling = "none"
 sizing = "other"
 instruction = "Centre-drill the tip with the No. 1 centre drill from the tailstock chuck, to about Ø.07 at the countersink (inside the #4-40 blank; the drawing allows the centre at the tip)."
+diagram = { file = "diagrams/turn-centre.svg", alt = "Op 50, to scale: the No. 1 centre drill from the tailstock chuck, to about Ø.07 in the tip: the dead centre's hole." }
 settings = "lathe-centre-1018"
 cut_diameter_mm = 1.191
 
@@ -326,6 +327,7 @@ tool = "part"
 drilling = "none"
 sizing = "other"
 instruction = "Under-head corner, R{{cad.shoulder_corner_radius_max_mm:in.3dot}} MAX: the blade on centre height, square to the axis. Spindle stopped: back the quill until the centre clears the tip. With the .002 feeler leaf on the faced tip, touch the blade's chuck-side face on it and set DRO Z to +.002; bring the centre back snug. Bring the blade's chuck-side face on Z−U, lock the carriage. Spindle on: plunge to the shoulder's O.D., stopping as it marks."
+diagram = { file = "diagrams/turn-corner.svg", alt = "Op 120, to scale: the head and the shoulder finished, the dead centre in the tip; the P1 blade's chuck-side face on Z−U, plunged to the shoulder's O.D. to square the under-head corner." }
 settings = "lathe-part-1018"
 cut_diameter_mm = "{{process.head_aim_dia_mm}}"
 
@@ -396,6 +398,7 @@ tool = "die"
 drilling = "none"
 sizing = "other"
 instruction = "Start the die square on the tip's end (its own lead starts the thread; the tip's chamfer is filed in Setup 4), turning the die stock by hand with cutting oil, a half turn forward and a quarter back, the quill following; run it on until it stops at the seat, then back it off."
+diagram = { file = "diagrams/turn-die.svg", alt = "Op 210, to scale: the dead centre out; the #4-40 round die in the die stock, squared on the quill's face, run on by hand toward the seat, the thread cut behind it." }
 feed = "hand"
 
 [[setups.operations]]
@@ -424,6 +427,7 @@ tool = "part"
 drilling = "none"
 sizing = "other"
 instruction = "Relief, second plunge: unlock the carriage and move it {{process.relief_step_in:.4dot}} toward the tip (DRO Z−{{process.seat_z_in:.3dot}} + {{process.relief_step_in:.4dot}}); lock it and feed in (the blank miked in Op 140 − {{process.relief_aim_dia_in:.3dot}})/2 on the radius from the crest zero, to the Ø{{process.relief_aim_dia_in:.3dot}} floor; back out for chips, cutting oil."
+diagram = { file = "diagrams/turn-relief.svg", alt = "Op 240, to scale: the thread cut and the first plunge made at the seat face; the P1 blade moved {{process.relief_step_in:.4dot}} toward the tip, fed in to the Ø{{process.relief_aim_dia_in:.3dot}} relief floor, the dead centre back in." }
 settings = "lathe-part-1018"
 cut_diameter_mm = "{{process.thread_aim_dia_mm}}"
 
@@ -454,6 +458,7 @@ tool = "part"
 drilling = "none"
 sizing = "other"
 instruction = "Part off: tailstock away, compound square, holder re-squared. Spindle stopped: with the .002 feeler leaf on the tip, touch the blade's chuck-side face on it and set DRO Z to +(.002 + the blade's width): the DRO reads its tailstock-side face. The blade's tailstock-side face on Z−P. Spindle on: cutting oil, steady, backing out for chips. Hands clear: let the screw fall; pick it up from the bed or the chip tray only after the spindle has stopped."
+diagram = { file = "diagrams/turn-part.svg", alt = "Op 280, to scale: the tailstock away; the P1 blade, its tailstock-side face on Z−P, parting the screw off." }
 settings = "lathe-part-1018"
 cut_diameter_mm = "{{process.head_aim_dia_mm}}"
 
@@ -466,7 +471,7 @@ indexing = "none"
 envelope = "other"
 vise_hold = "other"
 beam = "other"
-diagram = { file = "diagrams/slot.svg", alt = "The screw upright in the soft jaws, the head up: the slot sawn across the head face to a scribed depth." }
+diagram = { file = "diagrams/slot.svg", alt = "Op 290, to scale: the screw upright in the soft jaws over a paper wrap on the shoulder, the head just clear of them; the smooth file flat across the head face, filing the part-off pip flat." }
 
 [[setups.operations]]
 speed_kind = "other"
@@ -493,6 +498,7 @@ tool = "hacksaw"
 drilling = "none"
 sizing = "other"
 instruction = "Saw the slot across the head face through its centre, the blade square to the face, light strokes, until the floor lies between the two scribed lines on both sides."
+diagram = { file = "diagrams/slot-saw.svg", alt = "Op 330, to scale: the head's face scribed {{cad.slot_depth_min_in:.3dot}} and {{cad.slot_depth_max_in:.3dot}} below it; the hacksaw blade through the head's centre, the slot's floor between the lines." }
 feed = "hand"
 
 [[setups.operations]]

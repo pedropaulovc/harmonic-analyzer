@@ -1,29 +1,38 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 360" width="760" height="360">
-  <rect class="paper" x="0" y="0" width="760" height="360"/>
-  <text class="title" x="20" y="24">Side view along the jaws: the big end out past the jaws, the hole drilled in the overhang (not to scale)</text>
-  <rect class="fixture-vise" x="258" y="276" width="462" height="30"/>
-  <rect class="clamp" x="258" y="120" width="462" height="96"/>
-  <rect class="clamp" x="258" y="216" width="430" height="60"/>
-  <path class="part-kept" d="M150 180 L470 184 L470 212 L150 216 Z"/>
-  <path class="part-kept" d="M150 180 Q140 198 150 216 Z"/>
-  <rect class="clamp" x="600" y="150" width="88" height="66"/>
-  <rect class="cutter" x="196" y="96" width="14" height="84"/>
-  <line class="centre-line" x1="203" y1="70" x2="203" y2="240"/>
-  <line class="datum" x1="150" y1="150" x2="150" y2="250"/>
-  <text class="datum-label" x="30" y="146">X0 the big end's rim</text>
-  <line class="dims" x1="150" y1="320" x2="258" y2="320"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 430" width="760" height="430" font-family="sans-serif" font-size="13">
+  <!-- Hand picture, the vise from the front (the operator's side, looking +Y): +X to the right, +Z up, the fixed jaw (paper folded over it) behind the pin; the moving jaw, in front, is not drawn. To scale at 5 px/mm: the pin (cad.taper_dia_ref, cad.taper_length_ref, 1:48), big end to the LEFT, its rim (X0) .25 past the jaws' left face (process.big_end_overhang_mm), lying on the 1 in x 4 in parallel on edge (process.riser_height_mm, process.parallel_length_mm) whose left end is flush with the jaws; the spacer S, two wrung gauge blocks 1.375 x .35 (process.spacer_length_mm, process.spacer_height_mm), on its right end; the jaw tops 14.062 mm over Z0 (process.jaw_top_over_pin_mm), the jaw's height from process.vise_jaw_height_mm, its length to a break line; the paper's thickness is not drawn. The #45 drill (process.drill_45_dia_mm, 10.4 px) at X 3.810 (cad.ring_hole_station_mm), its point at Z-6.609, DP01's posted depth: its full diameter 0.5 mm (process.hole_drill_past_mm) under the pin, in air. The #1 centre drill's spot (T1) is under it and not drawn. -->
+  <rect class="paper" x="0" y="0" width="760" height="430"/>
+  <text class="title" x="20" y="22">Setup 2, DP01 T2: the #45 drill pecks the ring hole through the overhang, seen from the front (to scale, 5 px/mm)</text>
+  <path class="clamp" d="M181.75 79.69L745 79.69L742 86.71L745 93.73L742 100.76L745 107.78L742 114.8L745 121.83L742 128.85L745 135.87L742 142.89L745 149.92L742 156.94L745 163.96L742 170.98L745 178.01L742 185.03L745 192.05L742 199.08L745 206.1L742 213.12L745 220.14L742 227.17L745 234.19L742 241.21L745 248.23L742 255.26L745 262.28L742 269.3L745 276.33L742 283.35L745 290.37L742 297.39L745 304.42L181.75 304.42Z"/>
+  <rect class="fixture-vise" x="181.75" y="304.42" width="563.25" height="14"/>
+  <rect class="fixture-support" x="181.75" y="177.42" width="508" height="127"/>
+  <rect class="part-rest" x="515.12" y="132.97" width="174.62" height="44.45"/>
+  <path class="part-kept" d="M150 149.6L372.25 154.23L372.25 177.42L150 177.42Z"/>
+  <path class="part-kept" d="M150.00 149.60A27.28 27.28 0 0 0 150.00 177.42Z"/>
+  <rect class="holes" x="163.84" y="150" width="10.41" height="27.42"/>
+  <path class="cutter" d="M174.26 40L174.26 179.92L169.05 183.04L163.84 179.92L163.84 40L169.05 37Z"/>
+  <line class="arrow" x1="187.05" y1="50" x2="187.05" y2="90"/>
+  <line class="datum" x1="150" y1="124" x2="150" y2="284.42"/>
+  <text class="datum-label" x="144" y="296.42" text-anchor="end">X0 the big end's rim</text>
+  <line class="datum" x1="90" y1="150" x2="199.05" y2="150"/>
+  <text class="datum-label" x="86" y="154" text-anchor="end">Z0 pin top</text>
+  <text class="label" x="200" y="40">#45 at {{cad.ring_hole_station_in:.3dot}} from the rim, on the axis (Y0, edge-found on both</text>
+  <text class="label" x="200" y="56">sides of the overhang), pecked through into air</text>
+  <line class="leader" x1="198" y1="50" x2="175.05" y2="74"/>
+  <circle class="leader-dot" cx="175.05" cy="74" r="2"/>
+  <text class="label" x="260" y="410">1 in x 4 in parallel on edge, centred, its left end flush with the jaws</text>
+  <line class="leader" x1="360" y1="398" x2="381.75" y2="284.42"/>
+  <circle class="leader-dot" cx="381.75" cy="284.42" r="2"/>
+  <text class="label-halo" x="560" y="260" text-anchor="middle">spacer S: two gauge blocks</text>
+  <text class="label-halo" x="560" y="276" text-anchor="middle">wrung, on the parallel's right end</text>
+  <line class="leader" x1="560" y1="248" x2="604.75" y2="137.42"/>
+  <circle class="leader-dot" cx="604.75" cy="137.42" r="2"/>
+  <text class="label-on-clamp" x="470" y="96">fixed jaw (behind), paper folded over it;</text>
+  <text class="label-on-clamp" x="470" y="112">the moving jaw, in front, not drawn</text>
+  <line class="dims" x1="150" y1="320" x2="181.75" y2="320"/>
   <line class="dims" x1="150" y1="312" x2="150" y2="328"/>
-  <line class="dims" x1="258" y1="312" x2="258" y2="328"/>
-  <text class="label" x="120" y="344">.25 out past the jaws</text>
-  <text class="label" x="216" y="80">#45 at .15 from the rim, through into air</text>
-  <text class="label-on-clamp" x="290" y="252">1 in parallel on edge</text>
-  <text class="label" x="470" y="100">spacer S: two gauge blocks wrung</text>
-  <line class="dims" x1="600" y1="104" x2="640" y2="150"/>
-  <text class="label-on-clamp" x="290" y="140">fixed jaw behind the pin, paper folded over it</text>
-  <text class="label" x="600" y="330">vise body</text>
-  <line class="dims" x1="630" y1="318" x2="630" y2="306"/>
-  <text class="datum-label" x="40" y="176">Z0 pin top</text>
-  <line class="dims" x1="112" y1="172" x2="196" y2="180"/>
-  <text class="datum-label" x="10" y="290">Y0 its axis (both sides)</text>
-  <line class="dims" x1="110" y1="278" x2="175" y2="200"/>
+  <line class="dims" x1="181.75" y1="312" x2="181.75" y2="328"/>
+  <text class="label" x="20" y="360">{{process.big_end_overhang_mm:in.2dot}} past the</text>
+  <text class="label" x="20" y="376">jaws' left face</text>
+  <line class="leader" x1="60" y1="348" x2="165.88" y2="322"/>
+  <circle class="leader-dot" cx="165.88" cy="322" r="2"/>
 </svg>

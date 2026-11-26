@@ -1,18 +1,22 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 310" width="760" height="310">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 310" width="760" height="310" font-family="sans-serif" font-size="13">
+  <!-- Hand picture, schematic: the bonded handle MHA-DT-08 with its MHA-DT-34 ferrule and MHA-DT-35 butt cup in section; their sizes are in their own plans, not this one, so nothing here is to scale. M is read as the overall length less the pocket's depth (Op 10). -->
   <rect class="paper" x="0" y="0" width="760" height="310"/>
-  <text class="title" x="20" y="24">The bonded handle in section: M, the ferrule's face to the pocket's floor (not to scale)</text>
+  <text class="title" x="20" y="22">Setup 1: the bonded handle in section: M, the ferrule's face to the pocket's floor (schematic)</text>
   <rect class="part-rest" x="150" y="90" width="430" height="80"/>
   <rect class="paper" x="150" y="122" width="470" height="16"/>
   <rect class="part-rest" x="120" y="96" width="30" height="68"/>
   <rect class="part-rest" x="580" y="80" width="60" height="100"/>
   <rect class="paper" x="600" y="104" width="40" height="52"/>
-  <text class="label" x="20" y="44">MHA-DT-34 ferrule, outer face</text>
-  <line class="dims" x1="120" y1="48" x2="120" y2="96"/>
-  <text class="label" x="200" y="62">MHA-DT-08 handle and its bore</text>
-  <line class="dims" x1="300" y1="66" x2="300" y2="90"/>
+  <text class="label" x="20" y="50">MHA-DT-34 ferrule, outer face</text>
+  <line class="leader" x1="80" y1="56" x2="122" y2="100"/>
+  <circle class="leader-dot" cx="122" cy="100" r="2"/>
+  <text class="label" x="225" y="62">MHA-DT-08 handle and its bore</text>
+  <line class="leader" x1="300" y1="68" x2="300" y2="92"/>
+  <circle class="leader-dot" cx="300" cy="92" r="2"/>
   <text class="label" x="520" y="44">MHA-DT-35 butt cup:</text>
-  <line class="dims" x1="610" y1="64" x2="610" y2="80"/>
   <text class="label" x="520" y="60">its pocket opens outward</text>
+  <line class="leader" x1="600" y1="64" x2="615" y2="104"/>
+  <circle class="leader-dot" cx="615" cy="104" r="2"/>
   <line class="dims" x1="120" y1="226" x2="600" y2="226"/>
   <line class="dims" x1="120" y1="218" x2="120" y2="234"/>
   <line class="dims" x1="600" y1="160" x2="600" y2="234"/>

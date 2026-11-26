@@ -1,13 +1,19 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 240" font-family="sans-serif" font-size="13">
-  <rect class="paper" x="0" y="0" width="760" height="240"/>
-  <text class="title" x="20" y="20">Setup 1: the 5/8 in bar on the saw (not to scale)</text>
-  <rect class="fixture-vise" x="460" y="80" width="200" height="30"/>
-  <rect class="part-rest" x="330" y="110" width="390" height="40"/>
-  <rect class="part-kept" x="40" y="110" width="170" height="40"/>
-  <rect class="part-kept" x="230" y="110" width="80" height="40"/>
-  <rect class="cutter" x="212" y="40" width="10" height="130"/>
-  <rect class="cutter" x="315" y="40" width="10" height="130"/>
-  <text class="label" x="60" y="180">2.00 in blank (bar end)</text>
-  <text class="label" x="230" y="180">1 in offcut (spacer)</text>
-  <text class="label" x="470" y="70">saw vise on the bar</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 250" width="760" height="250" font-family="sans-serif" font-size="13">
+  <!-- Hand picture, from above, to scale at 60 px/in: the Ø5/8 bar (process.bar_dia_in), the 2.00 in blank (process.blank_length_in) and a 1 in offcut (Setup 3's spacer) marked off its end, each sawn on the waste side of its line. The saw's vise jaws are schematic (not on record); the blade's kerf is not on record: the first cut drawn as a heavy line, the second (after it) as the line between the offcut and the bar. -->
+  <rect class="paper" x="0" y="0" width="760" height="250"/>
+  <text class="title" x="20" y="22">Setup 1, Op 10: a 2.00 in blank off the 5/8 bar, then a 1 in offcut, from above (to scale, 60 px/in)</text>
+  <rect class="fixture-table" x="20" y="51.25" width="720" height="147.5"/>
+  <rect class="part-kept" x="40" y="121.25" width="120" height="37.5"/>
+  <rect class="part-kept" x="160" y="121.25" width="60" height="37.5"/>
+  <path class="part-rest" d="M220 121.25L730 121.25L727 128.75L730 136.25L727 143.75L730 151.25L730 158.75L220 158.75Z"/>
+  <rect class="clamp" x="310" y="87.25" width="130" height="34"/>
+  <rect class="clamp" x="310" y="158.75" width="130" height="34"/>
+  <text class="label-on-clamp" x="318" y="109.25">saw vise</text>
+  <text class="label" x="310" y="77.25">saw vise on the long end (jaws schematic)</text>
+  <rect class="cutter" x="160" y="95" width="3" height="90"/>
+  <text class="label" x="40" y="92">2.00 in blank</text>
+  <text class="label" x="40" y="108">(bar end)</text>
+  <text class="label" x="166" y="172">1 in offcut (spacer)</text>
+  <text class="label" x="40" y="212">saw on the waste side of the line; the blank drops clear: pick it up only once the blade stops;</text>
+  <text class="label" x="40" y="228">file the burrs off the sawn ends</text>
 </svg>

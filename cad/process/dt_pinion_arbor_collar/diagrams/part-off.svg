@@ -1,22 +1,30 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 300" font-family="sans-serif" font-size="13">
-  <rect class="paper" x="0" y="0" width="760" height="300"/>
-  <text class="title" x="20" y="20">Setup 4: the blank back in the 3-jaw, the turned end out (not to scale)</text>
-  <rect class="fixture-vise" x="40" y="70" width="140" height="190"/>
-  <rect class="part-rest" x="180" y="120" width="60" height="90"/>
-  <rect class="part-waste" x="240" y="124" width="60" height="82"/>
-  <rect class="part-removed" x="300" y="124" width="24" height="82"/>
-  <rect class="part-kept" x="324" y="124" width="260" height="82"/>
-  <rect class="holes" x="240" y="150" width="344" height="30"/>
-  <rect class="holes" x="449" y="124" width="10" height="82"/>
-  <line class="centre-line" x1="160" y1="165" x2="680" y2="165"/>
-  <line class="active-face" x1="584" y1="124" x2="584" y2="206"/>
-  <rect class="cutter" x="300" y="215" width="24" height="60"/>
-  <text class="label" x="590" y="110">face F</text>
-  <line class="dims" x1="600" y1="114" x2="584" y2="126"/>
-  <text class="label" x="340" y="250">P1 blade: its tailstock-side face at Z-.660</text>
-  <text class="label" x="420" y="100">pin hole, .33 from face F</text>
-  <line class="dims" x1="454" y1="104" x2="454" y2="124"/>
-  <text class="label" x="460" y="288">5/16 bore: the blade breaks into it</text>
-  <line class="dims" x1="660" y1="276" x2="660" y2="230"/>
-  <line class="dims" x1="660" y1="230" x2="560" y2="178"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 380" width="760" height="380" font-family="sans-serif" font-size="13">
+  <!-- Hand picture, from above (the cross-slide at the bottom), a section through the axis, to scale at 200 px/in: the blank back in the 3-jaw on its 5/8 end, the turned end out .95 (process.part_off_stickout_mm), face F at Z0; the Ø.59 x .80 turned end, the 5/16 bore (dotted outline beyond the part-off) and the 1/16 pin hole .33 from face F (cad.pin_hole_station_in). The 3-jaw's body and jaws are schematic (their sizes are not on record). The P1 blade to scale across (shop cutoff-blade-p1, 1/16 = 12.5 px), its tailstock-side face at Z-.660 (cad.far_end_length_in), cut in to the bore; its length runs on to a break line. Hatched: the kerf; dotted: the stub left on the blank, waste. -->
+  <rect class="paper" x="0" y="0" width="760" height="380"/>
+  <text class="title" x="20" y="22">Setup 4, Op 140: the P1 blade parts the collar off .66 from face F (to scale, 200 px/in)</text>
+  <rect class="fixture-vise" x="308" y="81.5" width="56" height="217"/>
+  <rect class="part-waste" x="204" y="127.5" width="236" height="125"/>
+  <rect class="part-waste" x="440" y="131" width="15.5" height="118"/>
+  <rect class="part-removed" x="455.5" y="131" width="12.5" height="118"/>
+  <rect class="part-kept" x="468" y="131" width="132" height="118"/>
+  <rect class="clamp" x="364" y="93.5" width="46" height="34"/>
+  <rect class="clamp" x="364" y="252.5" width="46" height="34"/>
+  <rect class="holes" x="468" y="158.75" width="132" height="62.5"/>
+  <rect class="part-removed" x="455.5" y="158.75" width="12.5" height="62.5"/>
+  <rect class="holes" x="527.75" y="131" width="12.5" height="118"/>
+  <line class="centre-line" x1="20" y1="190" x2="740" y2="190"/>
+  <path class="cutter" d="M455.5 375L455.5 221.25L468 221.25L468 375L461.75 372Z"/>
+  <line class="arrow" x1="488" y1="360" x2="488" y2="320"/>
+  <line class="datum" x1="600" y1="60" x2="600" y2="110"/>
+  <text class="datum-label" x="594" y="72" text-anchor="end">face F (Z0)</text>
+  <text class="label" x="508" y="330">P1 blade: its tailstock-side</text>
+  <text class="label" x="508" y="346">face at Z-{{cad.far_end_length_in:.3dot}}; it breaks</text>
+  <text class="label" x="508" y="362">into the bore: no pip</text>
+  <text class="label" x="250" y="46">pin hole, {{cad.pin_hole_station_in:.2dot}} from face F</text>
+  <line class="leader" x1="330" y1="52" x2="534" y2="131"/>
+  <circle class="leader-dot" cx="534" cy="131" r="2"/>
+  <text class="label" x="40" y="350">3-jaw on the 5/8 end, {{process.part_off_stickout_mm:in.2f}} out</text>
+  <text class="label" x="40" y="366">(the turned shoulder .15 out)</text>
+  <line class="leader" x1="140" y1="338" x2="390" y2="272.5"/>
+  <circle class="leader-dot" cx="390" cy="272.5" r="2"/>
 </svg>

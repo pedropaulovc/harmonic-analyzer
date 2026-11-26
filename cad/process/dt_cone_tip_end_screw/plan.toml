@@ -85,7 +85,7 @@ machine_ref = "pm-1127vf-lb"
 holding = "6 in 4-jaw on the threaded shank over a wrap of brass shim (it keeps the jaws off the thread), on the jaws' front step only: the head sits behind that step, clear of the jaws, and the threaded end stands {{process.stickout_in:.2dot}} in out of the jaw fronts. Jaws snug, then dialled in (Op 10) and tightened in turn."
 datum = "The threaded end face as bought: the hole's depth is measured from it (the tailstock quill scale zeroed on it)."
 lathe_hold = "other"
-diagram = { file = "diagrams/lathe.svg", alt = "The bought screw in the 4-jaw on the jaws' front step over brass shim, the head behind the step clear of the jaws, the threaded end .40 out: the crests dialled in, the end hole spotted and drilled #52 from the tailstock." }
+diagram = { file = "diagrams/lathe.svg", alt = "Op 30, to scale: the bought screw in the 4-jaw on the jaws' front step over brass shim, the head behind the step, the threaded end .40 out; the #52 drill from the tailstock, its full diameter .118 deep in the end." }
 
 [[setups.operations]]
 cut_kind = "other"

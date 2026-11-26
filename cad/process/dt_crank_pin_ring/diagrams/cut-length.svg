@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 470" width="760" height="470" font-family="sans-serif" font-size="13">
+  <!-- Hand picture, the bench vise from the front, to scale at 200 px/in: the Ø.040 brass wire (cad.ring_dia_in, 8 px). The bench vise's soft jaws are schematic (their size is not on record), seen from the front. The smooth file is schematic (its width and thickness are not on record). The piece turned over, its filed end down, the other end just above the jaws' top (drawn .010); filed down to the developed length 1.472 (cad.ring_developed_length_in), the piece drawn to that length below the jaws' top. -->
+  <rect class="paper" x="0" y="0" width="760" height="470"/>
+  <text class="title" x="20" y="22">Setup 1, Op 30: turned over, the other end filed down flush to the developed length (to scale, 200 px/in)</text>
+  <rect class="clamp" x="256" y="120" width="120" height="110"/>
+  <rect class="clamp" x="384" y="120" width="120" height="110"/>
+  <text class="label-on-clamp" x="266" y="142">soft jaw</text>
+  <text class="label-on-clamp" x="394" y="142">soft jaw</text>
+  <rect class="part-kept" x="376" y="120" width="8" height="294.31"/>
+  <rect class="part-removed" x="376" y="118" width="8" height="2"/>
+  <rect class="cutter" x="384" y="111" width="296" height="9"/>
+  <line class="arrow" x1="540" y1="96" x2="440" y2="96"/>
+  <line class="datum" x1="180" y1="120" x2="373" y2="120"/>
+  <text class="datum-label" x="180" y="114">jaws' top</text>
+  <text class="label" x="400" y="394.31">the first end (Op 20), flat and square, down</text>
+  <line class="leader" x1="398" y1="390.31" x2="384" y2="410.31"/>
+  <circle class="leader-dot" cx="384" cy="410.31" r="2"/>
+  <text class="label" x="30" y="430">filed down to {{cad.ring_developed_length_in:.3dot}} ±{{process.length_band_in:.3dot}} long, checked with the calipers</text>
+  <text class="label" x="30" y="446">between strokes (Op 20 filed the first end the same way, level with the jaws)</text>
+</svg>

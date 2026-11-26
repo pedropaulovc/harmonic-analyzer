@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 400" width="760" height="400" font-family="sans-serif" font-size="13">
+  <!-- Hand picture, from above (the cross-slide at the bottom), a section through the axis, to scale at 200 px/in: the Ø1 bar (process.bar_dia_in) 1.25 out of the jaw fronts (process.stickout_mm), Z0 its faced end, the hub's REAR face. The 3-jaw's body and jaws are schematic (their sizes are not on record). The bar runs on into the chuck to a break line. The barrel Ø.88 (cad.barrel_dia_in) and the relief Ø.65 x .16 (cad.relief_dia_in, cad.relief_length_in) turned. The P1 blade to scale across (shop cutoff-blade-p1, 1/16 = 12.5 px), its tailstock-side face at Z-1.010 (process.part_off_in: .02 over length for Setup 2), cut in near the centre; its length runs on to a break line. Hatched: the kerf. -->
+  <rect class="paper" x="0" y="0" width="760" height="400"/>
+  <text class="title" x="20" y="22">Setup 1, Op 60: the P1 blade parts the hub off, its tailstock-side face at Z-1.010 (to scale, 200 px/in)</text>
+  <rect class="fixture-vise" x="212" y="54" width="56" height="292"/>
+  <path class="part-rest" d="M40 100L336 100L336 300L40 300L37 292.86L40 285.71L37 278.57L40 271.43L37 264.29L40 257.14L37 250L40 242.86L37 235.71L40 228.57L37 221.43L40 214.29L37 207.14L40 200L37 192.86L40 185.71L37 178.57L40 171.43L37 164.29L40 157.14L37 150L40 142.86L37 135.71L40 128.57L37 121.43L40 114.29L37 107.14Z"/>
+  <rect class="part-rest" x="336" y="112" width="9.5" height="176"/>
+  <rect class="part-removed" x="345.5" y="112" width="12.5" height="176"/>
+  <rect class="part-kept" x="358" y="112" width="170" height="176"/>
+  <rect class="part-kept" x="528" y="135" width="32" height="130"/>
+  <rect class="part-removed" x="345.5" y="196" width="12.5" height="8"/>
+  <rect class="clamp" x="268" y="66" width="46" height="34"/>
+  <rect class="clamp" x="268" y="300" width="46" height="34"/>
+  <line class="centre-line" x1="20" y1="200" x2="740" y2="200"/>
+  <path class="cutter" d="M345.5 395L345.5 204L358 204L358 395L351.75 392Z"/>
+  <line class="arrow" x1="378" y1="380" x2="378" y2="340"/>
+  <line class="datum" x1="560" y1="60" x2="560" y2="92"/>
+  <text class="datum-label" x="554" y="70" text-anchor="end">Z0: the rear face</text>
+  <text class="label" x="398" y="370">P1 blade: its tailstock-side face at Z-{{process.part_off_in:.3dot}};</text>
+  <text class="label" x="398" y="386">let the hub fall: pick it up once the spindle stops</text>
+  <text class="label" x="570" y="44">relief Ø{{cad.relief_dia_min_in:.3dot}}–{{cad.relief_dia_max_in:.3dot}},</text>
+  <text class="label" x="570" y="60">{{cad.relief_length_min_in:.3dot}}–{{cad.relief_length_max_in:.3dot}} long</text>
+  <line class="leader" x1="572" y1="64" x2="544" y2="135"/>
+  <circle class="leader-dot" cx="544" cy="135" r="2"/>
+  <text class="label" x="40" y="44">barrel Ø{{cad.barrel_dia_min_in:.3dot}}–{{cad.barrel_dia_max_in:.3dot}}, back past the parting line</text>
+  <line class="leader" x1="200" y1="50" x2="440" y2="112"/>
+  <circle class="leader-dot" cx="440" cy="112" r="2"/>
+</svg>

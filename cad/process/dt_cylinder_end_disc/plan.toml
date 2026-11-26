@@ -106,7 +106,7 @@ machine_kind = "other"
 title = "Saw the blank"
 machine = "Saw / bench"
 indexing = "none"
-diagram = { file = "diagrams/saw.svg", alt = "The 1/8 x 2-1/2 in flat with a 2-1/2 in square marked off its end, both diagonals scribed and centre-punched where they cross, each corner sawn off .8 in back; the finished Ø2.17 disc fits inside." }
+diagram = { file = "diagrams/saw.svg", alt = "Op 10, to scale, from above: a {{process.blank_side_in:g}} in length marked off the 1/8 x 2-1/2 flat lying against the fence and sawn on the waste side of the line." }
 envelope = "other"
 vise_hold = "other"
 beam = "other"
@@ -125,6 +125,7 @@ tool = "saw"
 drilling = "none"
 sizing = "other"
 instruction = "Saw each corner off: the square flat on the bed, an edge on the fence, the head at 45°, the square clamped in the saw's vise, the blade on the marks. Deburr the sawn edges."
+diagram = { file = "diagrams/saw-corners.svg", alt = "Op 20, to scale, from above: the square flat on the bed, an edge on the fence, the head at 45°; a corner sawn off on the marks, the finished Ø2.17 disc inside the corners left." }
 feed = "hand"
 
 [[setups.operations]]
@@ -141,7 +142,7 @@ indexing = "none"
 machine_ref = "pm-1127vf-lb"
 holding = "6 in 4-jaw on the blank's four sawn edges, seated flat on the jaw steps, jaws snug only. The MT3 dead centre in the tailstock: run its point into the centre-punch mark, then tighten the jaws in turn, a pair at a time, keeping the point seated in the mark; withdraw the tailstock."
 datum = "The face against the jaw steps; the out face is faced to the thickness from it."
-diagram = { file = "diagrams/block.svg", alt = "The sawn blank in the 4-jaw, its sawn edges in the jaws and its back face on the jaw steps; the dead centre's point in the punch mark; the AR tool faces the out face to thickness." }
+diagram = { file = "diagrams/block.svg", alt = "Op 50, to scale: a section through the 4-jaw, the sawn blank's back face on the jaw steps; the AR tool faces the out face from the centre out to Ø2.25 (the dead centre that seated the punch mark withdrawn)." }
 lathe_hold = "other"
 
 [[setups.operations]]
@@ -178,6 +179,7 @@ tool = "drill-v"
 drilling = "twist_drill"
 sizing = { kind = "band", band_mm = "{{cad.bore_dia_band_mm}}" }
 instruction = "Drill V through from the tailstock, dry, feeding gently as the point breaks through (brass grabs): the hole is the mandrel's in Setup 3."
+diagram = { file = "diagrams/block-drill.svg", alt = "Op 70, to scale: the V drill through the blank from the tailstock, its point breaking through the back face clear of the jaw steps." }
 settings = "lathe-drill-v-c360"
 cut_diameter_mm = "{{cad.bore_dia_mm}}"
 hole_depth_mm = 6.0
@@ -191,7 +193,7 @@ indexing = "none"
 machine_ref = "pm-1127vf-lb"
 holding = "On the 3/8-16 x 1-1/2 in fully threaded bolt, head outboard: head, fender washer, the blank (its V hole on the bolt), fender washer, nut, the nut tight. The bolt's threaded end in the 3-jaw up to the nut, the jaws on the threads."
 datum = "The disc's faces between the washers; only the outside is cut."
-diagram = { file = "diagrams/mandrel.svg", alt = "The blank on the bolt, head outboard, a fender washer each side and the nut toward the chuck, the bolt's threads in the 3-jaw: the outside turned to Ø2.16–2.18." }
+diagram = { file = "diagrams/mandrel.svg", alt = "Op 80, to scale: the blank on the 3/8-16 bolt between fender washers, head outboard, the nut toward the chuck, the bolt's threads in the 3-jaw; the AR tool turns the outside to Ø{{cad.outer_dia_min_in:.2dot}}–{{cad.outer_dia_max_in:.2dot}}." }
 lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{process.bolt_dia_mm}}", stock_diameter_mm = "{{process.blank_swing_mm}}", stickout_mm = "{{process.mandrel_stickout_mm}}", minimum_diameter_mm = "{{process.bolt_root_mm}}", support = "none" }
 
 [[setups.operations]]

@@ -1,18 +1,17 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 300" font-family="sans-serif" font-size="14">
-  <rect class="paper" x="0" y="0" width="760" height="300"/>
-  <text class="title" x="20" y="24">Plan of the saw bed: a 2.60 piece off the end of the 72 in bar (not to scale)</text>
-  <rect class="fixture-table" x="10" y="50" width="740" height="200"/>
-  <rect class="clamp" x="420" y="98" width="300" height="36"/>
-  <rect class="clamp" x="420" y="166" width="300" height="36"/>
-  <rect class="part-kept" x="80" y="136" width="300" height="28"/>
-  <rect class="part-rest" x="390" y="136" width="350" height="28"/>
-  <rect class="cutter" x="382" y="70" width="8" height="160"/>
-  <line class="dims" x1="80" y1="200" x2="380" y2="200"/>
-  <line class="dims" x1="80" y1="192" x2="80" y2="208"/>
-  <line class="dims" x1="380" y1="192" x2="380" y2="208"/>
-  <text class="label" x="100" y="246">scribe line 2.60 from the bar end</text>
-  <text class="label" x="120" y="128">the rod's piece</text>
-  <text class="label" x="350" y="66">blade on the far side of the line</text>
-  <text class="label" x="450" y="90">saw vise: the rest of the 1/4 bar</text>
-  <text class="label" x="20" y="280">Ø1/4 cold-finished bar; file the burrs off both sawn ends</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 250" width="760" height="250" font-family="sans-serif" font-size="13">
+  <!-- Hand picture, from above, to scale at 60 px/in: the Ø1/4 bar (process.stock_dia_in), a 2.60 piece (process.saw_length_in) marked off its end, the blade on the far side of the line. The saw's vise jaws are schematic (not on record); the blade's kerf is not on record: drawn as a heavy line at the cut. The bar's length is not on record: it runs on to a break line. -->
+  <rect class="paper" x="0" y="0" width="760" height="250"/>
+  <text class="title" x="20" y="22">Setup 1, Op 10: a 2.60 piece off the 1/4 bar, from above (to scale, 60 px/in)</text>
+  <rect class="fixture-table" x="20" y="62.5" width="720" height="125"/>
+  <rect class="part-kept" x="40" y="132.5" width="156" height="15"/>
+  <path class="part-rest" d="M196 132.5L730 132.5L727 140L730 147.5L196 147.5Z"/>
+  <rect class="clamp" x="286" y="98.5" width="130" height="34"/>
+  <rect class="clamp" x="286" y="147.5" width="130" height="34"/>
+  <text class="label-on-clamp" x="294" y="120.5">saw vise</text>
+  <text class="label" x="286" y="88.5">saw vise on the long end (jaws schematic)</text>
+  <rect class="cutter" x="196" y="90" width="3" height="100"/>
+  <text class="label" x="40" y="126">the rod's piece</text>
+  <text class="label" x="40" y="212">scribe line {{process.saw_length_in:.2dot}} from the bar end; the blade on its far side;</text>
+  <text class="label" x="40" y="228">the piece drops clear onto the saw base: pick it up only once the blade stops</text>
+  <text class="label" x="40" y="244">Ø1/4 cold-finished bar; file the burrs off both sawn ends</text>
 </svg>

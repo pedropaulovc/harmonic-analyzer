@@ -1,28 +1,31 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 400" font-family="sans-serif" font-size="13">
-  <!-- Setup 1, section through the axis, 200 px to the inch: the 1 in bar 1.25 out of the 3-jaw; Z0 the faced rear end at the right. Styles: prechips.palette. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 400" width="760" height="400" font-family="sans-serif" font-size="13">
+  <!-- Hand picture, from above (the cross-slide at the bottom), a section through the axis, to scale at 200 px/in: the Ø1 bar (process.bar_dia_in) 1.25 out of the jaw fronts (process.stickout_mm), Z0 its faced end, the hub's REAR face. The 3-jaw's body and jaws are schematic (their sizes are not on record). The bar runs on into the chuck to a break line. The AR tool schematic (not on record), its point on the faced end, feeding to the centre. Hatched: the .02 faced off (process.face_allowance_in); dashed: the rest of this setup's removal, the barrel Ø.88 back to Z-1.12 (process.barrel_run_in), the relief Ø.65 x .16 and the part-off at Z-1.01. -->
   <rect class="paper" x="0" y="0" width="760" height="400"/>
-  <text class="title" x="20" y="22">Setup 1: the 1 in bar in the 3-jaw; Z0 the faced rear end; barrel and relief turned, the hub parted off long</text>
-  <rect class="fixture-vise" x="30" y="60" width="80" height="280"/>
-  <rect class="clamp" x="110" y="70" width="40" height="30"/>
-  <rect class="clamp" x="110" y="300" width="40" height="30"/>
-  <rect class="part-rest" x="110" y="100" width="76" height="200"/>
-  <rect class="part-removed" x="176" y="100" width="192" height="12"/>
-  <rect class="part-removed" x="176" y="288" width="192" height="12"/>
-  <rect class="part-removed" x="368" y="100" width="32" height="35"/>
-  <rect class="part-removed" x="368" y="265" width="32" height="35"/>
-  <rect class="part-waste" x="186" y="112" width="12" height="176"/>
-  <polygon class="part-kept" points="198,112 368,112 368,135 400,135 400,265 368,265 368,288 198,288"/>
-  <line class="centre-line" x1="100" y1="200" x2="560" y2="200"/>
-  <line class="active-face" x1="400" y1="135" x2="400" y2="265"/>
-  <rect class="cutter" x="186" y="300" width="12" height="70"/>
-  <line class="leader" x1="400" y1="160" x2="470" y2="150"/>
-  <text class="label" x="474" y="154">Z0: the rear face, faced in Op 10</text>
-  <line class="leader" x1="300" y1="112" x2="330" y2="60"/>
-  <text class="label" x="300" y="54">barrel Ø{{cad.barrel_dia_min_in:.3dot}}–{{cad.barrel_dia_max_in:.3dot}}, back past the parting line</text>
-  <line class="leader" x1="384" y1="135" x2="470" y2="104"/>
-  <text class="label" x="474" y="100">relief Ø{{cad.relief_dia_min_in:.3dot}}–{{cad.relief_dia_max_in:.3dot}}</text>
-  <text class="label" x="474" y="116">{{cad.relief_length_min_in:.3dot}}–{{cad.relief_length_max_in:.3dot}} long</text>
-  <line class="leader" x1="198" y1="370" x2="240" y2="380"/>
-  <text class="label" x="244" y="384">blade's tailstock-side face at Z-{{process.part_off_in:.3dot}}</text>
-  <text class="label" x="30" y="384">3-jaw</text>
+  <text class="title" x="20" y="22">Setup 1, Op 10: the AR tool faces the bar end, the hub's rear face (to scale, 200 px/in)</text>
+  <rect class="fixture-vise" x="212" y="54" width="56" height="292"/>
+  <path class="part-kept" d="M40 100L560 100L560 300L40 300L37 292.86L40 285.71L37 278.57L40 271.43L37 264.29L40 257.14L37 250L40 242.86L37 235.71L40 228.57L37 221.43L40 214.29L37 207.14L40 200L37 192.86L40 185.71L37 178.57L40 171.43L37 164.29L40 157.14L37 150L40 142.86L37 135.71L40 128.57L37 121.43L40 114.29L37 107.14Z"/>
+  <rect class="part-removed" x="560" y="100" width="4" height="200"/>
+  <rect class="clamp" x="268" y="66" width="46" height="34"/>
+  <rect class="clamp" x="268" y="300" width="46" height="34"/>
+  <rect class="hidden" x="336" y="100" width="192" height="12"/>
+  <rect class="hidden" x="336" y="288" width="192" height="12"/>
+  <rect class="hidden" x="528" y="100" width="32" height="35"/>
+  <rect class="hidden" x="528" y="265" width="32" height="35"/>
+  <line class="hidden" x1="358" y1="112" x2="358" y2="288"/>
+  <line class="centre-line" x1="20" y1="200" x2="740" y2="200"/>
+  <path class="cutter" d="M560 212L590 224L590 312L582 309L574 312L566 312L566 236Z"/>
+  <line class="arrow" x1="608" y1="282" x2="608" y2="232"/>
+  <line class="datum" x1="560" y1="60" x2="560" y2="92"/>
+  <text class="datum-label" x="554" y="70" text-anchor="end">Z0: the rear face, faced in Op 10</text>
+  <text class="label" x="470" y="370" text-anchor="end">AR tool: face square, about {{process.face_allowance_in:.2dot}} off;</text>
+  <text class="label" x="470" y="386" text-anchor="end">DRO Z0 on it</text>
+  <line class="leader" x1="472" y1="366" x2="578" y2="292"/>
+  <circle class="leader-dot" cx="578" cy="292" r="2"/>
+  <text class="label" x="30" y="40">dashed: next, the barrel Ø{{cad.barrel_dia_in:.3dot}} back past the parting line,</text>
+  <text class="label" x="30" y="56">the relief Ø{{cad.relief_dia_in:.3dot}} x {{cad.relief_length_in:.3dot}}, the part-off at Z-{{process.part_off_in:.3dot}}</text>
+  <line class="leader" x1="200" y1="62" x2="380" y2="106"/>
+  <circle class="leader-dot" cx="380" cy="106" r="2"/>
+  <text class="label" x="40" y="372">3-jaw on the Ø1 bar, {{process.stickout_mm:in.2dot}} out</text>
+  <line class="leader" x1="140" y1="360" x2="294" y2="320"/>
+  <circle class="leader-dot" cx="294" cy="320" r="2"/>
 </svg>

@@ -1,26 +1,37 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 340" font-family="sans-serif" font-size="13">
-  <rect class="paper" x="0" y="0" width="760" height="340"/>
-  <text class="title" x="20" y="22">Setup 5: side view along the jaws, the 5/8 blank, the pin hole in the overhang (not to scale)</text>
-  <rect class="fixture-vise" x="300" y="260" width="440" height="30"/>
-  <rect class="clamp" x="300" y="100" width="440" height="90"/>
-  <rect class="fixture-support" x="300" y="190" width="300" height="70"/>
-  <rect class="part-rest" x="40" y="150" width="700" height="40"/>
-  <rect class="holes" x="78" y="150" width="10" height="40"/>
-  <rect class="part-removed" x="246" y="150" width="6" height="40"/>
-    <rect class="cutter" x="246" y="60" width="6" height="84"/>
-  <line class="datum" x1="40" y1="120" x2="40" y2="215"/>
-  <text class="datum-label" x="20" y="240">X0 the faced head end</text>
-  <line class="leader" x1="40" y1="228" x2="40" y2="210"/>
-  <line class="datum" x1="120" y1="150" x2="290" y2="150"/>
-  <text class="datum-label" x="100" y="84">Z0 the bar's top</text>
-  <line class="leader" x1="200" y1="88" x2="200" y2="150"/>
-  <text class="label" x="20" y="50">cross hole (Setup 4)</text>
-  <text class="label" x="300" y="50">PA02: 1/16 at 2.097</text>
-  <line class="leader" x1="60" y1="54" x2="82" y2="150"/>
-  <line class="leader" x1="320" y1="54" x2="252" y2="165"/>
-  <text class="label" x="400" y="72">jaw (behind) grips the 5/8 bar</text>
-  <text class="label" x="320" y="320">1 in parallel on edge, from the jaws' left face</text>
-  <line class="leader" x1="420" y1="308" x2="420" y2="230"/>
-  <line class="dims" x1="40" y1="300" x2="300" y2="300"/>
-  <text class="label" x="70" y="290">2.25 (2.22–2.28) to the jaws</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 400" width="760" height="400" font-family="sans-serif" font-size="13">
+  <!-- Hand picture, to scale at 6 px/mm. Left: a section along the bar's axis (Y0) seen from the front (looking +Y, +X to the right): the blank on the top edge of one 1 in parallel standing on edge between the jaws (process.riser_height_mm, process.parallel_thickness_mm), its left end flush with the jaws' left face; the fixed jaw behind the cut, its top 3.670 mm over the bar's top (process.jaw_top_over_bar_mm); X0 the faced head end, Z0 the bar's top. The bar, jaw and parallel run on to break lines. Right: the bar end-on, seen from the head end looking +X, so +Y (the fixed jaw) is to the LEFT and −X comes toward you: the 5/8 bar between the jaws on the parallel's 1/8 top edge. In the end view the parallel is dashed: it starts at the jaws' left face, behind the drill in X, so the drill runs out into air in front of it. The head end 2.25 past the jaws' left face (process.jaw_left_x_mm); the reamed cross hole at X 9.326. The 1/16 drill (Ø1.588 mm, process.drill_1_16_dia_mm) at X 53.268 (process.pin_x_mm) Y0, its point at Z-16.852, PA02's posted depth: its full diameter 0.5 mm (process.pin_drill_past_mm) under the bar, in air left of the jaws and the parallel. It runs up to a break line. The T1 spot is not drawn. -->
+  <rect class="paper" x="0" y="0" width="760" height="400"/>
+  <text class="title" x="20" y="22">Setup 5, PA02 T4: the 1/16 drill pecks the pin hole at X 53.268, its point at Z-16.852 (6 px/mm)</text>
+  <path class="clamp" d="M412.9 117.98L520 117.98L517 125.02L520 132.06L517 139.1L520 146.14L517 153.18L520 160.22L517 167.26L520 174.3L517 181.34L520 188.38L517 195.42L520 202.46L517 209.49L520 216.53L517 223.57L520 230.61L517 237.65L520 244.69L517 251.73L520 258.77L517 265.81L520 272.85L517 279.89L520 286.93L517 293.97L520 301.01L517 308.05L520 315.09L517 322.13L520 329.17L517 336.21L512.86 340.25L505.72 343.25L498.58 340.25L491.44 343.25L484.3 340.25L477.16 343.25L470.02 340.25L462.88 343.25L455.74 340.25L448.6 343.25L441.46 340.25L434.32 343.25L427.18 340.25L420.04 343.25L412.9 343.25Z"/>
+  <path class="fixture-support" d="M412.9 235.25L520 235.25L517 242.45L520 249.65L517 256.85L520 264.05L517 271.25L520 278.45L517 285.65L520 292.85L517 300.05L520 307.25L517 314.45L520 321.65L517 328.85L520 336.05L512.86 340.25L505.72 343.25L498.58 340.25L491.44 343.25L484.3 340.25L477.16 343.25L470.02 340.25L462.88 343.25L455.74 340.25L448.6 343.25L441.46 340.25L434.32 343.25L427.18 340.25L420.04 343.25L412.9 343.25Z"/>
+  <path class="part-kept" d="M70 140L520 140L517 147.33L520 154.65L517 161.98L520 169.31L517 176.63L520 183.96L517 191.29L520 198.62L517 205.94L520 213.27L517 220.6L520 227.92L520 235.25L70 235.25Z"/>
+  <rect class="holes" x="106.83" y="140" width="38.25" height="95.25"/>
+  <rect class="holes" x="384.84" y="140" width="9.52" height="95.25"/>
+  <text class="label" x="416.9" y="111.98">fixed jaw (behind)</text>
+  <text class="label" x="330" y="361.25">1 in parallel on edge (cut), under the bar</text>
+  <text class="datum-label" x="66" y="134" text-anchor="end">X0</text>
+  <text class="datum-label" x="20" y="275.25">Z0 the bar's top</text>
+  <line class="leader" x1="60" y1="263.25" x2="74" y2="141"/>
+  <circle class="leader-dot" cx="74" cy="141" r="2"/>
+  <rect class="clamp" x="546.38" y="117.98" width="46" height="225.27"/>
+  <text class="label-on-clamp" x="550.38" y="133.98">fixed</text>
+  <rect class="clamp" x="687.62" y="117.98" width="46" height="225.27"/>
+  <text class="label-on-clamp" x="691.62" y="133.98">mov.</text>
+  <rect class="hidden" x="630.48" y="235.25" width="19.05" height="108"/>
+  <text class="label" x="594" y="375.25">parallel (dashed):</text>
+  <text class="label" x="594" y="391.25">behind, at the jaws</text>
+  <line class="leader" x1="636" y1="363.25" x2="640" y2="323.25"/>
+  <circle class="leader-dot" cx="640" cy="323.25" r="2"/>
+  <circle class="part-kept" cx="640" cy="187.62" r="47.62"/>
+  <text class="label" x="542.38" y="109.98">← +Y</text>
+  <line class="datum" x1="572.38" y1="140" x2="707.62" y2="140"/>
+  <path class="cutter" d="M394.37 30L394.37 238.25L389.61 241.11L384.84 238.25L384.84 30L389.61 27Z"/>
+  <rect class="holes" x="635.24" y="140" width="9.52" height="95.25"/>
+  <path class="cutter" d="M644.76 30L644.76 238.25L640 241.11L635.24 238.25L635.24 30L640 27Z"/>
+  <line class="arrow" x1="415.61" y1="40" x2="415.61" y2="80"/>
+  <text class="label" x="375.61" y="52" text-anchor="end">1/16 drill, {{process.pin_peck_mm:in.3dot}} pecks, full retract,</text>
+  <text class="label" x="375.61" y="68" text-anchor="end">through into air</text>
+  <text class="label" x="20" y="392">head end {{process.jaw_left_x_mm:in.2f}} in past the jaws' left face</text>
+  <line class="leader" x1="60" y1="380" x2="410.9" y2="239.25"/>
+  <circle class="leader-dot" cx="410.9" cy="239.25" r="2"/>
 </svg>

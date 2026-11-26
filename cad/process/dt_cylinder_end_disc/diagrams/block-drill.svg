@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 480" width="760" height="480" font-family="sans-serif" font-size="13">
+  <!-- Hand picture, a section through the axis from above (the cross-slide at the bottom), to scale at 5 px/mm (127 px/in): the sawn blank 2-1/2 in across its flats (process.blank_side_in; the section through two opposite jaws) and 1/8 thick (process.blank_axial_in), its back face on the jaw steps. The 6 in 4-jaw's jaws, steps and body are schematic (the steps' depth is not on record: drawn .12). The out face faced to .11 (cad.length_in). The V drill (shop drill-v, Ø9.576 mm, 47.9 px) with its 118° point, its full diameter drawn .02 past the back face, into the clear centre of the jaw steps; it runs on to a break line (its length is not on record). The No. 3 centre drill's spot (Op 60) is under the drill and not drawn. -->
+  <rect class="paper" x="0" y="0" width="760" height="480"/>
+  <text class="title" x="20" y="22">Setup 2, Op 70: the V drill through from the tailstock (to scale, 5 px/mm)</text>
+  <path class="clamp" d="M379.69 398.75L379.69 445.74L283.8 445.74L283.8 382.24L360 382.24L360 398.75Z"/>
+  <path class="clamp" d="M379.69 81.25L379.69 34.26L283.8 34.26L283.8 97.76L360 97.76L360 81.25Z"/>
+  <rect class="fixture-vise" x="223.8" y="34.26" width="60" height="411.48"/>
+  <rect class="part-kept" x="360" y="81.25" width="13.97" height="317.5"/>
+  <line class="centre-line" x1="150" y1="240" x2="740" y2="240"/>
+  <text class="datum-label" x="391.69" y="60">the back face (datum end), on the jaw steps</text>
+  <line class="leader" x1="389.69" y1="56" x2="361" y2="106.65"/>
+  <circle class="leader-dot" cx="361" cy="106.65" r="2"/>
+  <rect class="holes" x="360" y="216.06" width="13.97" height="47.88"/>
+  <path class="cutter" d="M740 216.06L357.46 216.06L343.08 240L357.46 263.94L740 263.94L737 255.96L740 247.98L737 240L740 232.02L737 224.04Z"/>
+  <line class="arrow" x1="700" y1="190" x2="640" y2="190"/>
+  <text class="label" x="430" y="330">V drill through, dry, feeding gently as the</text>
+  <text class="label" x="430" y="346">point breaks through (brass grabs):</text>
+  <text class="label" x="430" y="362">the mandrel's hole</text>
+  <line class="leader" x1="428" y1="326" x2="398.1" y2="263.94"/>
+  <circle class="leader-dot" cx="398.1" cy="263.94" r="2"/>
+  <text class="label" x="150" y="470">6 in 4-jaw on the four sawn edges (two jaws shown in section)</text>
+</svg>
