@@ -22,11 +22,14 @@ part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
 material = "6061-T6511 extruded aluminium round, 9/16 in"
 stock = "Ø{{process.stock_dia_in:.4dot}} 6061-T6511 extruded round, a {{process.bar_length_in:g}} in piece (to order, not on hand); lot: one plug, which takes {{cad.pitch_in:.2dot}} in of it."
-note = "Inches unless mm. Lathe PM-1127VF-LB (70–380 and 380–2000 rpm); cutting oil on aluminium."
 shop = "../shop"
 stock_refs = ["6061-round-9-16"]
 material_key = "lathe-6061"
 turning_material = "aluminum_6061"
+
+# The shop's standing page carries what every traveler shares (units, lathe
+# speeds, coolant).
+standing = true
 
 [cad]
 file = "../../out/features/ch_rocker_strap_tl_hub_plug/features.toml"
