@@ -401,7 +401,8 @@ top_notch_light_mm = 1.397
 # Pin hole: spot Ø.065 with the #1 carbide centre drill (under the #49, so no
 # chamfer at the mouth), the #49 through in pecks of .050 with full retracts,
 # its full diameter .5 mm past the down face, then the .0775 reamer through,
-# its full diameter 1.0 mm past it, in and out at feed.
+# its tip 1.0 mm past it (its full diameter past by more than its chamfer +
+# 0.25: cnc.toml cnc.ream-full-diameter, D45), in and out at feed.
 spot_dia_mm = 1.651
 peck_mm = 1.27
 drill_past_mm = 0.5
@@ -1051,7 +1052,7 @@ speed_kind = "spindle"
 tool = "reamer-0775"
 drilling = "none"
 sizing = { kind = "band", band_mm = "{{cad.top_pin_hole_dia_band_mm}}" }
-instruction = "Same file, M6 T5: change to the .0775 reamer (to buy) {{process.ream_projection_mm:in.2f}} out of the chuck, set 2000, Cycle Start. It reams each hole through, in and out at feed, its full diameter {{process.ream_past_mm:in.3dot}} past the R face. Cutting oil."
+instruction = "Same file, M6 T5: change to the .0775 reamer (to buy) {{process.ream_projection_mm:in.2f}} out of the chuck, set 2000, Cycle Start. It reams each hole through, in and out at feed, its tip {{process.ream_past_mm:in.3dot}} past the R face (its full diameter through). Cutting oil."
 rpm = 2000
 feed = "{{process.ream_feed_per_min_mm:in.1f}} in/min, in and out"
 milling_cuts = [

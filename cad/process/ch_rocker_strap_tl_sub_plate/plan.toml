@@ -116,6 +116,11 @@ sp02_z_check_mm = 1.9304
 # in.
 tap_stack_max_mm = 281.94
 tap_wrench_reach_max_mm = 202.43
+# The tap guide (shop tools.tap-guide-fisher): its 1/2 in shank and 3/16 in
+# point, the sellers' sizes, restated for the tap pictures
+# (test_shop_equipment.py holds them to the record).
+tap_guide_dia_mm = 12.7
+tap_guide_point_dia_mm = 4.7625
 # SP01, on the table. The front edge loses edge_stock_mm off the as-received
 # bar edge (an extruded edge; .040 in cleans its corner radius and width
 # spread, the author's allowance): a rough pass edge_rough_woc_mm and a
