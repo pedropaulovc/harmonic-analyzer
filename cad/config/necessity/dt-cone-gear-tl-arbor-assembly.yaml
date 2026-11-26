@@ -1,0 +1,22 @@
+# Why step 13's key level stays at .001 on MHA-DT-03-TL-05, the keyed arbor
+# kit (drawing-guidelines rule 4; owner ruling 2026-11-24: the reason lives
+# in the registry, not on the sheet). Read by the machinist review only.
+# Restoration round 1, 2026-11-25.
+#
+# The reading is 2 r sin(e) about the cutting axis (r at least .1850, the
+# keyseat edge, dt_cone_gear_tl_arbor_assembly_spec KEY_SIDE_LEVER_MIN): it
+# turns the blank about the axis it is indexed and cut on, so it adds no
+# tooth runout and no lead to the cut gears, only the keyed cone gears'
+# keyway-to-tooth clock. The gear sheets hold that clock at the title
+# block's 1.0 deg (error_budget.yaml cone_flat_clock, a channel phase term);
+# the blank's play on the key takes 0.610 deg (KEY_CLOCK_PLAY_DEG), leaving
+# a 0.390 deg setting allowance, half of it (0.195 deg) for the key. At .001
+# the key takes 0.155 deg (worst cut clock 0.764 deg); at the title block's
+# .005 it takes 0.774 deg and the cut clock reaches 1.384 deg. The reading
+# is no narrower than its shop row (lever test indicator, .0005).
+necessity:
+  - id: N-01
+    feature: "sheet 2, fitting step 13: CHECK: THE INDICATOR READS ZERO WITHIN .001 (item 5 key level)"
+    kind: trace
+    reason: "key clock becomes the cone gears' tooth clock"
+    source: "cone_flat_clock (error_budget.yaml, 1.0 deg title-block keyway-to-tooth clock): the key's clock from the reading, KEY_CLOCK_FROM_READING_DEG, 0.155 deg of the 0.195 deg half allowance at .001 (the spec raises past half); at .005 0.774 deg, and with the blank's 0.610 deg play on the key the cut clock is 1.384 deg against cone_flat_clock's 1.0 deg"

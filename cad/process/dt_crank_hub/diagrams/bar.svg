@@ -13,13 +13,10 @@
   <rect class="part-waste" x="186" y="112" width="12" height="176"/>
   <polygon class="part-kept" points="198,112 368,112 368,135 400,135 400,265 368,265 368,288 198,288"/>
   <line class="centre-line" x1="100" y1="200" x2="560" y2="200"/>
-  <rect class="part-kept" x="600" y="180" width="60" height="154"/>
-  <text class="label" x="560" y="352">sizing plug, Ops 20-40:</text>
-  <text class="label" x="560" y="368">parted off first, kept</text>
   <line class="active-face" x1="400" y1="135" x2="400" y2="265"/>
   <rect class="cutter" x="186" y="300" width="12" height="70"/>
   <line class="leader" x1="400" y1="160" x2="470" y2="150"/>
-  <text class="label" x="474" y="154">Z0: the rear face, faced in Op 50</text>
+  <text class="label" x="474" y="154">Z0: the rear face, faced in Op 10</text>
   <line class="leader" x1="300" y1="112" x2="330" y2="60"/>
   <text class="label" x="300" y="54">barrel Ø{{cad.barrel_dia_min_in:.3dot}}–{{cad.barrel_dia_max_in:.3dot}}, back past the parting line</text>
   <line class="leader" x1="384" y1="135" x2="470" y2="104"/>

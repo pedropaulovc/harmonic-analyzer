@@ -26,11 +26,10 @@ dt-crankshaft:
       where: "end view, under the 2X #54 DRILL Ø.055 THRU ALL DRIVE-PIN KNOCKOUT callout: WALL .036 MIN"
       finding: "wall from each drive-pin knockout to the Ø.689 seat-spigot rim below the .060 floor (rules 17, 20)"
       reason: "Owner ruling 2026-11-13 (Pedro), #1679, \"D but keep the knockouts\": the two #54 knockouts stay on the drive-pin holes' axes and their .036 MIN wall (smallest printed spigot Ø.685, the location at +.0009, the drill at Ø.059) is printed and accepted for good; the pin circle cannot move (RV-02). Accepts this wall only, no other departure (owner-ruled shortfall)"
-    - id: "RV-03"
-      kind: "accept"
-      where: "front view: the Ø.3750 (SLIDING FIT, in MHA-DT-31), 2X Ø.4375 (RUNNING FIT, in MHA-DT-05; owner ruling 2026-11-23, tool audit Q11: \"both journals .4375 0/-.0008\", was Ø.4490) and Ø.3125 (SLIDING FIT, in MHA-DT-10) limits +.0000/-.0008, each flagged SEE NOTE 3 (turn to the measured mate bore, CLEARANCE .0010-.0023)"
-      finding: "-.0008 is a converted millimetre band, not a plain inch step (rule 4)"
-      reason: "Delegated ruling 2026-11-07 (Main), no precedent; owner review #2144 (fan-out ruling F5). The limits come from fleet-shared fit constants (dt_crank_hub_geometry.SHAFT_DIA_BAND and the shaft_in_bushing fit class behind JOURNAL_DIA_BAND), which are restated in inch steps at the next re-key of that family; the matched-fit route to each measured bore is printed at its callout. Accepts the -.0008 notation on these three diameters only, no other band or callout departure."
+    # RV-03 (the three fit diameters' -.0008 converted band) retired: fit
+    # audit 2026-11-23 (MHA-DT-31.bore__MHA-DT-11.hub_shaft, MHA-DT-11.journals,
+    # MHA-DT-10.bore__MHA-DT-11.pinion_seat) prints them as REF, each turned
+    # to its mate's reamed bore under note 3, so no band prints.
     - id: "RV-04"
       kind: "accept"
       where: "end view: the 2X .2756 ±.0009 locations of the 2X REAM Ø.0930 drive-pin holes from the axis"

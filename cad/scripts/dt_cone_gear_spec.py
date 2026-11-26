@@ -365,7 +365,7 @@ def over_pins_limits_mm(teeth: int) -> tuple[float, float]:
     )
 
 
-BORE_DIA = cone_land_key.LAND_DIA_MM  # 3/8 (.3750) at T120; smaller on the tip gears
+BORE_DIA = cone_land_key.LAND_DIA_MM  # land 1's 3/8 (.3750); its gears ream .3760
 # Face width (user ruling 2026-09-28): the cone set is a solid stack.  Every
 # gear is one seat pitch thick, so each bears on its neighbour
 # (dt_cone_gear_stack).  That ruling's "no gear is bonded" is superseded by
@@ -430,21 +430,23 @@ def gap_floor_deviations_mm(teeth: int) -> tuple[float, float]:
 
 
 def bore_dia_mm(teeth: int) -> float:
-    """Return the configured bore: T012/T018 reamed for MHA-DT-37's spigot,
-    T024 for land 2 of MHA-DT-04, T030..T120 for the keyed land 1."""
+    """Return the configured bore, the reamer's size: T012/T018 reamed for
+    MHA-DT-37's spigot (.0625), T024 for land 2 of MHA-DT-04 (.2510),
+    T030..T120 for the keyed land 1 (.3760)."""
     _require_member(teeth)
     if teeth <= 18:
         return cone_tip_cluster.STEM_BORE_DIA_MM  # .0625
     if teeth == 24:
-        return 6.35  # 1/4 (.2500)
-    return BORE_DIA
+        return land_seat_reamer_mm(LAND_2_DIA)
+    return land_seat_reamer_mm(BORE_DIA)
 
 
 def bore_dia_band(teeth: int) -> tuple[float, float]:
-    """(upper, lower) band of the configuration's bore: the stem reamer's on
-    T012/T018, the gear-seat class (BORE_DIA_BAND) on every land."""
+    """(upper, lower) ANALYSIS band of the configuration's bore about its
+    reamer's size: the stem reamer's on T012/T018, the seat class's spread
+    (LAND_SEAT_BORE_BAND) on every land.  The sheet prints no band."""
     _require_member(teeth)
-    return cone_tip_cluster.STEM_BORE_BAND if teeth <= 18 else BORE_DIA_BAND
+    return cone_tip_cluster.STEM_BORE_BAND if teeth <= 18 else LAND_SEAT_BORE_BAND
 
 
 def material_specification(teeth: int) -> str:
@@ -467,15 +469,19 @@ WEB_EXCEPTIONS_MM: dict[int, float] = {12: 1.71196}  # T012: .0674
 if min(WEB_EXCEPTIONS_MM.values()) < MACHINED_WEB_FLOOR_MM:
     raise AssertionError("a bore web exception falls under rule 17's .060 floor")
 
-# Printed inch places of the bore band (model-owned): four hold the
-# +.0018/+.0010 in seat class, the reamer's +.0005/-.0000 and the
-# .0625/.2500/.3750 nominals exactly.
+# Printed inch places of the bore (model-owned): four spell the reamers'
+# sizes, .0625, .2510 and .3760, exactly.
 BORE_BAND_PLACES = 4
 
 # The land seat class (gear_seat_fit): T024's bore on the round land 2 and
-# the keyed bores on land 1 share GEAR_SEAT_BAND, so one band serves both
-# BoreCutDia (T024) and KeyedBoreDia.  The inch class is authored as exact
-# millimetre decimals, so it rides the model unrounded.
+# the keyed bores on land 1 share GEAR_SEAT_BAND.  Each bore is reamed with
+# the owned over reamer (.2510 on T024, .3760 on T030..T120) and prints that
+# size with NO band (drawing-guidelines rule 4, form 2; fit audit 2026-11-23,
+# MHA-DT-03.keyed_bore and .T024_bore): MHA-DT-04's land is turned last to
+# the reamed gears.  BORE_DIA_BAND, the seat class on the land's nominal, is
+# the ANALYSIS band: the reamer is modelled to cut from its size to .0008
+# over (LAND_SEAT_BORE_BAND about the reamer's size), the limits the bore
+# printed before; every stack reads it, unchanged.
 BORE_DIA_BAND = seat_bore_band(GEAR_SEAT_BAND)
 BORE_BAND_FIT_UPPER, BORE_BAND_LOWER = BORE_DIA_BAND
 BORE_BAND_MIN_WIDTH_MM = 0.02032  # .0008
@@ -484,6 +490,14 @@ if BORE_DIA_BAND[0] - BORE_DIA_BAND[1] < BORE_BAND_MIN_WIDTH_MM - 1e-9:
         f"cone-gear seat bore band +{inch_text(BORE_DIA_BAND[0], 4)}/"
         f"+{inch_text(BORE_DIA_BAND[1], 4)} is under .0008 wide"
     )
+LAND_2_DIA = 6.35  # 1/4 (.2500), MHA-DT-04's round land 2 (T024's seat)
+LAND_SEAT_BORE_BAND = (round(BORE_DIA_BAND[0] - BORE_DIA_BAND[1], 6), 0.0)
+
+
+def land_seat_reamer_mm(land_dia_mm: float) -> float:
+    """The over reamer a land's gears are reamed with: the land's nominal
+    plus the seat class's lower deviation (.2510 on land 2, .3760 on land 1)."""
+    return round(land_dia_mm + BORE_DIA_BAND[1], 6)
 
 
 # --- Round bonded bores and keyed bores (owner decision 2026-11-09) ----------
@@ -522,7 +536,7 @@ def bonded_mate(teeth: int) -> tuple[float, tuple[float, float]]:
     if teeth in SPIGOT_TEETH:
         return cone_tip_cluster.SPIGOT
     if teeth in LAND_2_TEETH:
-        return bore_dia_mm(teeth), GEAR_SEAT_BAND
+        return LAND_2_DIA, GEAR_SEAT_BAND
     raise ValueError(f"T{teeth:03d} rides the key, it is not bonded")
 
 
@@ -603,7 +617,9 @@ for _teeth in KEYED_TEETH:
 def _keyway_web_mm(teeth: int, root_min_dia_mm: float) -> float:
     """Print-worst ligament from the root envelope to the keyway's top corner
     (cone_land_key: T at its maximum, the bore at its minimum)."""
-    corner = cone_land_key.hub_keyway_corner_radius_max_mm(bore_dia_mm(teeth) + BORE_DIA_BAND[1])
+    corner = cone_land_key.hub_keyway_corner_radius_max_mm(
+        bore_dia_mm(teeth) + bore_dia_band(teeth)[1]
+    )
     return root_min_dia_mm / 2.0 - corner
 
 

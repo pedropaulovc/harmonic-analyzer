@@ -14,15 +14,17 @@ import _cone_axis_constants as cone_axis
 # inch post sheet prints (#290).
 POST_BODY_HEIGHT_MM = 94.742  # 3.73
 POST_MOUNT_COUNTERBORE_DEPTH_MM = 6.0198
-# .005 in: with the screw's cut end at the title block's .010 edge break, the
-# thinnest plate holds 0.88D (dt_vn_post_mount_screw_spec).
-CUT_TO_FIT_SHORT_MM = 0.127  # .005 in
+# Owner ruling 2026-11-24, fit audit part 2 S2 ("all approved (ticked)"):
+# each screw is cut flush to .015 short and checked by straightedge; with the
+# cut end at the title block's .010 edge break the thinnest plate holds 0.84D
+# (dt_vn_post_mount_screw_spec).  Was .005 short and 0.88D.
+CUT_TO_FIT_SHORT_MM = 0.381  # .015 in
 # MHA-DT-VN-61's cut end takes its inch title block's general edge break; the
 # platform's engagement stack spends it at the plate underside.
 SCREW_CUT_END_BREAK_MM = 0.254  # .010 in
 # MHA-DT-20's tapped post holes take its title block's general edge break at
-# both ends: no local deburr limit (Main, 2026-11-01; owner accepted the 0.87D
-# this leaves, MHA-DT-VN-61's RV-01).
+# both ends: no local deburr limit (Main, 2026-11-01; owner accepted the 0.84D
+# this leaves, MHA-DT-VN-61's RV-01, 2026-11-24 S2).
 PLATE_TAP_EDGE_BREAK_MM = 0.254  # .010 in
 # MHA-DT-VN-61 prints its reference cut length in inches at these places (#290).
 CUT_LENGTH_PLACES = 2

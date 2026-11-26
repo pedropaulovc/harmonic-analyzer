@@ -104,13 +104,15 @@ def test_cam_frame_puts_the_od_below_the_bore_and_the_tap_on_the_heavy_side() ->
 def test_cam_feature_bands_are_the_printed_ones() -> None:
     features = export_features.requirement_manifest(_STEM)["features"]
     od = features["cam_od"]
-    # Ø.575 ±.002 and .35 (title block .XX ±.01), Ra 63 µin on the OD.
-    _native_band(od["dia"], 0.573, 0.577, 3)
+    # Ø.575 at the title block's ±.005 (fit audit S3) and .35 (title block
+    # .XX ±.01), Ra 63 µin on the OD.
+    _native_band(od["dia"], 0.570, 0.580, 3)
     assert od["length"] == pytest.approx([_in(0.34), _in(0.36)])
     assert od["finish_ra"] == 1.6 and od["mates"] == "MHA-DT-25"
-    assert od["callout"] == drawing.DIMENSION_CALLOUTS["CollarOd"] == "SEE NOTE 1"
+    assert "callout" not in od and "CollarOd" not in drawing.DIMENSION_CALLOUTS
     bore = features["bore"]
-    # Ø.2510 +.0005/.0000 REAM THRU, sliding fit on the MHA-DT-17 rod.
+    # Ø.2510 REAM THRU, the MHA-DT-17 rod slides in by hand (fit audit F19);
+    # dia and clearance are the reamer's ANALYSIS band.
     assert bore["dia"] == pytest.approx([_in(0.2510), _in(0.2515)])
     assert bore["process"] == "ream" and bore["thru"] is True
     assert bore["callout"] == drawing.DIMENSION_CALLOUTS["BoreDia"]
@@ -118,11 +120,12 @@ def test_cam_feature_bands_are_the_printed_ones() -> None:
     assert bore["diametral_clearance"] == pytest.approx(
         [_in(0.0010), _in(0.0023)], abs=_in(0.00005)
     )
-    # .079 ±.002 from the OD's axis (SEE NOTE 1); the thin side .0797 MIN.
-    _native_band(bore["eccentricity"], 0.077, 0.081, 3)
+    # .079 at the title block's ±.005 from the OD's axis (fit audit S3); the
+    # thin side .0752 MIN.
+    _native_band(bore["eccentricity"], 0.074, 0.084, 3)
     assert bore["eccentricity_from"] == "cam_od" and bore["eccentricity_axis"] == "y"
-    assert bore["eccentricity_callout"] == drawing.DIMENSION_CALLOUTS["CollarCy"]
-    assert bore["thin_wall_min"] == pytest.approx(_in(0.0797))
+    assert "eccentricity_callout" not in bore
+    assert bore["thin_wall_min"] == pytest.approx(_in(0.0752))
     assert bore["thin_wall_callout"] == drawing.DIMENSION_CALLOUTS["ThinWallMin"]
     tap = features["set_screw_tap"]
     # Ø.070 TAP DRILL THRU TO BORE #2-56 UNC at the DRILLED HOLES +.004/0, .16
@@ -141,10 +144,9 @@ def test_cam_manifest_notes_are_the_sheets() -> None:
     notes = manifest["notes"]["manufacturing"]
     assert notes == spec.DRAWING_NOTES.split("\n")
     assert notes == [
-        "1. \N{LATIN CAPITAL LETTER O WITH STROKE}.575 AND .079 SET THE LIFT OF "
-        "FOLLOWER PIN MHA-DT-25.",
-        "2. SUPPLY ASME B18.3 #2-56 UNC X 3/16 FLAT-POINT SOCKET SET SCREW LOOSE.",
+        "1. SUPPLY ASME B18.3 #2-56 UNC X 3/16 FLAT-POINT SOCKET SET SCREW LOOSE.",
     ]
     features = manifest["features"]
-    assert features["cam_od"]["note"] == notes[0]
-    assert features["set_screw_tap"]["hardware_note"] == notes[1]
+    # Fit audit S3: the OD's lift note (old note 1) is gone.
+    assert "note" not in features["cam_od"]
+    assert features["set_screw_tap"]["hardware_note"] == notes[0]

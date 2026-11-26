@@ -13,7 +13,7 @@ dt-cone-swing-platform:
   # Delegated ruling 2026-11-21 (Main), owner review #2144: no MIL spec on the
   # finish; the owner ruled cold blackening (Presto Black PC9) acceptable as the
   # drawing's black oxide.
-  finish: matte black oxide, oil sealed; Ø.0630 hole bare, oiled
+  finish: matte black oxide, oil sealed; #52 hole bare, oiled
   quantity: 1
   tolerance_class: machined_block
   process: "machined from supplied steel flat bar"
@@ -21,16 +21,21 @@ dt-cone-swing-platform:
   machinist_exceptions:
     - id: "RV-01"
       kind: "accept"
-      where: "the pivot reamed bore's native Hole Wizard callout only: its hw-diam callout variable's tolerance places, written as 4 at drawing time from PIVOT_HOLE_BAND by draw_dt_cone_swing_platform._print_pivot_band_exactly (ICalloutLengthVariable.TolerancePrecision)"
-      finding: "a drawing script writes a banded hole callout's tolerance precision at render time instead of importing part-authored places (drawing-simplicity-policy.md model ownership, rules 3 and 4)"
-      reason: "Owner ruling 2026-11-08 (Pedro), #2144 item 1.2: drawing-side ICalloutLengthVariable precision is the established merged pattern (33 uses on main, e.g. draw_ch_rocker_arm_tl_oblique_base_bar.py:876). Native experiment run 20261102T230110877Z: part-authored HW diameter precision 4 did not reach the callout (read -1). This accepts no other precision, band, callout or package departure."
+      where: "the pivot reamed bore's native Hole Wizard callout only: its hw-diam callout variable's places, written as 3 at drawing time from dt_cone_swing_platform_drawing_spec.PIVOT_CALLOUT_PLACES by draw_dt_cone_swing_platform._print_pivot_reamer_size (ICalloutLengthVariable.Precision); the bore prints the .2510 reamer's size with no band (owner ruling 2026-11-24, fit audit question 10)"
+      finding: "a drawing script writes a hole callout's places at render time instead of importing part-authored places (drawing-simplicity-policy.md model ownership, rules 3 and 4)"
+      reason: "Owner ruling 2026-11-08 (Pedro), #2144 item 1.2: drawing-side ICalloutLengthVariable precision is the established merged pattern (33 uses on main, e.g. draw_ch_rocker_arm_tl_oblique_base_bar.py:876). Native experiment run 20261102T230110877Z: part-authored HW diameter precision 4 did not reach the callout (read -1). Re-scoped 2026-11-24 from the .2500 +.0005 band's four tolerance places to the .2510 reamer's three size places (owner ruling 2026-11-24, fit audit question 10). This accepts no other precision, band, callout or package departure."
     - id: "RV-02"
       kind: "minor"
-      where: "sheet 1, the note for the 2X 1/4-20 UNC THRU ALL post taps: 1/4-20 THREAD ENGAGEMENT 0.88D MIN."
+      where: "sheet 1, the note for the 2X 1/4-20 UNC THRU ALL post taps: 1/4-20 THREAD ENGAGEMENT 0.84D MIN."
       finding: "thread engagement below 1.5D (rule 18)"
-      reason: "Owner ruling 2026-11-01: MHA-DT-VN-61 post-mount thread engagement 0.87D MIN (0.88D after #2107) accepted as a minor exception; #1019's 0.90D target not met. These taps are that joint's receiver (MHA-DT-VN-61's RV-01)"
+      reason: "Owner ruling 2026-11-01: MHA-DT-VN-61 post-mount thread engagement 0.87D MIN (0.88D after #2107) accepted as a minor exception; #1019's 0.90D target not met. Owner ruling 2026-11-24, fit audit part 2 S2 (\"all approved (ticked)\"): the screws cut flush to .015 short by straightedge, 0.84D MIN. These taps are that joint's receiver (MHA-DT-VN-61's RV-01)"
     - id: "RV-03"
       kind: "accept"
       where: "the tip-block hold-down counterbored hole's (at its C1 keyed station, HoldDownZ .654 from the pivot bore, with MHA-DT-21) and the post-mount tapped holes' native Hole Wizard callouts only: their hw-thruholedia, hw-cbdia, hw-cbdepth and hw-thrutapdrldia callout variables' decimal places, written as 3 at drawing time from draw_dt_cone_swing_platform.HOLDDOWN_CALLOUT_PRECISION and POST_MOUNT_CALLOUT_PRECISION by draw_dt_cone_swing_platform.build (ICalloutLengthVariable.Precision)"
       finding: "a drawing script writes Hole Wizard callout places at render time instead of importing part-authored places (drawing-simplicity-policy.md model ownership, rules 3 and 4)"
       reason: "Owner ruling 2026-11-08 (Pedro), #2144 item 1.2: drawing-side ICalloutLengthVariable precision is the established merged pattern (22 call sites on main, e.g. draw_ch_rocker_arm_tl_oblique_base_bar.py:876). Native experiment run 20261102T230110877Z: part-authored HW diameter precision 4 did not reach the callout (read -1). Re-scoped to the hold-down hole moved .329 south (.409 to .738 from the pivot bore) with MHA-DT-21: owner ruling 2026-11-09 via PR #1992 (https://github.com/pedropaulovc/harmonic-analyzer/pull/1992); the same hole stood .731 from the pivot bore after #2697 (.007 north, same callouts; delegated ruling 2026-11-13 (Main), precedent: this owner ruling, listed on #2144) and stands .654 since the .44 MHA-DT-21 was re-stationed under owner ruling 2026-11-20 on #2726 (\"B\"; same callouts, the platform's HoldDownZ follows the block). This accepts no other precision, band, callout or package departure."
+    - id: "RV-05"
+      kind: "accept"
+      where: "sheet 2, detail B: the .228 ±.004 station of the #52 DRILL THRU tip-dowel hole from the hold-down hole (SEE NOTE 3)"
+      finding: "a printed band (rule 4 form 4) on a hole drilled at assembly, which reads as a match-drilled joint (form 1)"
+      reason: "delegated ruling 2026-11-25 (Main), no precedent; owner review #2144 (D37): the station lays out the assembly drilling of both parts at MHA-DT-00 step 3 (the 1/16 drill goes up through this plate into MHA-DT-21, whose own station prints REF), so no mate hole exists to try first; the band keeps the dowel webs at the .080 target (N-02; owner ruling 2026-11-25 C: counterbore web .0803 at ±.004, .0793 at ±.005). Band on main since ee5ff300ff (2026-11-06, merged with #2248 on 2026-11-09); not new in #3547. Accepts this station only."

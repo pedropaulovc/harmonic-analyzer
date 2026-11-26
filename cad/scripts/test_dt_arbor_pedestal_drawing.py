@@ -65,27 +65,25 @@ def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
 def test_the_part_owns_every_printed_decimal_place() -> None:
     """drawing-simplicity-policy.md `How the repository implements the guidelines`: places are the tolerance, so the .SLDPRT carries them."""
     by_name = dt_arbor_pedestal_spec.DRAWING_PRECISION_BY_NAME
-    # Inch sheet: every size and location .XX; the reamed bore's own band
-    # needs four places.
+    # Inch sheet: every size and location .XX; the V-drilled bore prints the
+    # drill's size at three places (fit audit F01).
     assert by_name == {
-        name: (4 if name == "BoreDia" else 2)
+        name: (3 if name == "BoreDia" else 2)
         for name in set().union(*dt_arbor_pedestal_spec.DRAWING_DIMENSIONS.values())
     }
     assert Path(drawing.__file__).name in PRECISION_MIGRATED_DRAWINGS
 
 
-def test_only_the_running_bore_asks_for_a_third_decimal() -> None:
-    """cad/docs/tolerance-policy.md reserves extra places for mating sizes:
-    the journal bore is the only one on this post."""
+def test_only_the_drilled_bore_asks_for_a_third_decimal() -> None:
+    """The bore prints the V drill's .377 (fit audit F01: no band, the
+    DRILLED HOLES row); nothing else on this post needs a third place."""
     places = {
         **dt_arbor_pedestal_spec.DRAWING_PRECISION_BY_NAME,
         **dt_arbor_pedestal_spec.DRAWING_REFERENCE_PRECISION,
     }
     assert {name for name, value in places.items() if value > 2} == {"BoreDia"}
-    assert max(places.values()) == 4
-    assert model_toleranced_dimensions(part) == {
-        ("BoreProfile", "BoreDia"): "*deviations(BORE_DIA_BAND)"
-    }
+    assert max(places.values()) == 3
+    assert model_toleranced_dimensions(part) == {}
 
 
 def test_crown_radius_is_the_dome_radius_the_part_drives() -> None:
@@ -201,24 +199,24 @@ def test_reference_lines_restate_the_geometry_their_equations_drive() -> None:
         assert plane == ("Front" if name == "BoreLateral" else "Top")
 
 
-def test_arbor_bore_closes_the_configured_running_fit() -> None:
+def test_arbor_bore_is_drilled_v_and_names_its_arbor_and_clamp() -> None:
     import _config
 
-    assert dt_arbor_pedestal_spec.BORE_DIA == 9.525
-    # Rule 4: the REAM bore's callout names its mate and the fit it needs.
+    # Fit audit F01 (drawing-guidelines rule 4, form 1): V DRILL (.377) THRU; the arbor
+    # enters by hand and the apex set screw clamps it (rule 4 v2 form 1).
+    assert dt_arbor_pedestal_spec.BORE_DIA == 9.5758
+    assert dt_arbor_pedestal_spec.BORE_DIA_BAND == (0.1016, 0.0)
     arbor = str(_config.parts("dt-cylinder-gear-shaft")["number"])
-    bore_callout = drawing.DIMENSION_CALLOUTS["BoreDia"]
-    assert bore_callout.startswith("REAM THRU\n")
-    assert "FIT ON" in bore_callout
-    assert bore_callout.endswith(arbor)
-    shaft_limits = (9.50468, 9.525)
-    bore_limits = (9.5504, 9.5631)
-    clearances = (
-        bore_limits[0] - shaft_limits[1],
-        bore_limits[1] - shaft_limits[0],
+    screw = str(_config.parts("sh-vn-arbor-set-screw")["number"])
+    assert drawing.DIMENSION_CALLOUTS["BoreDia"] == (
+        f"V DRILL THRU\nARBOR {arbor} ENTERS BY HAND,\nCLAMPED BY {screw}"
     )
-    expected = tuple(_config.fit("shaft_in_bushing", "diametral_clearance_mm"))
-    assert tuple(round(value, 5) for value in clearances) == expected
+    # The arbor (3/8 ground, .3742-.3750) enters every drilled bore
+    # (.377-.381) by hand: .0020 least clearance, .0068 at most.
+    shaft_limits = (9.50468, 9.525)
+    bore_limits = (9.5758, 9.6774)
+    assert round(bore_limits[0] - shaft_limits[1], 5) == 0.0508
+    assert round(bore_limits[1] - shaft_limits[0], 5) == 0.17272
 
 
 def test_screw_hole_contract_is_part_owned() -> None:
@@ -275,10 +273,11 @@ def test_feature_callouts_do_not_repeat_dimension_values() -> None:
     source = _drawing_source()
     # The only free text left is digit-free and tied to the dimension it
     # qualifies (a reaming instruction, a concentricity/tangency statement),
-    # bar the part number that names a mate (rule 7).
+    # bar the part numbers that name a mate and the clamp (rule 7).
     assert not re.search(r'SetText\(\d+,\s*"[^"]*\d', source)
     for text in drawing.DIMENSION_CALLOUTS.values():
         text = text.replace(drawing.ARBOR_NUMBER, "")
+        text = text.replace(drawing.SET_SCREW_NUMBER, "")
         assert not re.search(r"\d", text), text
 
 
@@ -286,11 +285,11 @@ def test_pedestal_has_no_gdt_or_basic_dimensions() -> None:
     assert not hasattr(dt_arbor_pedestal_spec, "GEOMETRIC_TOLERANCES_MM")
 
 
-def test_running_bore_and_mating_foot_seat_carry_surface_finish_controls() -> None:
+def test_only_the_mating_foot_seat_carries_a_surface_finish_control() -> None:
     by_key = {c.key: c for c in dt_arbor_pedestal_spec.SURFACE_FINISHES}
-    assert set(by_key) == {"arbor_bore", "foot_seat"}
-    assert by_key["arbor_bore"].roughness_um == 1.6
-    assert by_key["arbor_bore"].face.contains_y_mm == dt_arbor_pedestal_spec.BORE_HEIGHT
+    # The drilled bore (fit audit F01) is a clamp seat: no symbol (rule 6;
+    # machinist review r1, farm run 20261124T110807008Z).
+    assert set(by_key) == {"foot_seat"}
     # The seat is the only face that MUST be cut on a part the title block
     # otherwise leaves CAST/MACHINED; it is the y=0 plane facing -Y.
     assert by_key["foot_seat"].roughness_um == 3.2
@@ -546,7 +545,8 @@ def test_apex_set_screw_tap_keeps_1_5d_only_at_r11() -> None:
     through the crown onto the arbor. At the printed worst case (crown radius
     .XX low, bore at its maximum, both sags across the thread and a one-pitch
     entry lost) the photographed R10 crown would leave under 1.5D of full
-    thread and fail drawing-guidelines.md rule 18; R.43 leaves 1.74D."""
+    thread and fail drawing-guidelines.md rule 18; R.43 leaves 1.72D at the
+    V-drilled bore's .381 analysis maximum (fit audit F01)."""
     spec = dt_arbor_pedestal_spec
     assert spec.TOP_RADIUS == pytest.approx(0.43 * 25.4)
     assert spec.SET_SCREW_THREAD == "#4-40"
@@ -554,8 +554,8 @@ def test_apex_set_screw_tap_keeps_1_5d_only_at_r11() -> None:
     # Through-next: the tap stops in the bore, never drills on into the strap.
     assert spec.SET_SCREW_HOLE_SPEC.end == "through_next"
     assert spec.set_screw_engagement_d(10.0) < 1.5 <= spec.SET_SCREW_ENGAGEMENT_D
-    assert round(spec.SET_SCREW_ENGAGEMENT_D, 2) == 1.74
-    assert round(spec.SET_SCREW_FULL_THREAD_MM, 2) == 4.94
+    assert round(spec.SET_SCREW_ENGAGEMENT_D, 2) == 1.72
+    assert round(spec.SET_SCREW_FULL_THREAD_MM, 2) == 4.89
     terms = spec.set_screw_wall_terms(spec.TOP_RADIUS)
     assert terms["crown radius at .XX minimum"] == pytest.approx(spec.TOP_RADIUS - 0.254)
     assert all(v < 0 for k, v in terms.items() if k != "crown radius at .XX minimum")

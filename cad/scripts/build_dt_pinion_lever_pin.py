@@ -52,7 +52,6 @@ from _drawing_marks import (
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
 )
-from _drawing_tolerances import set_dimension_symmetric_tolerance
 from _document_units import apply_package_model_units
 from _part_properties import part_drawing_unit
 from _configuration_material import require_material_in_every_configuration
@@ -64,9 +63,7 @@ from dt_pinion_lever_pin_spec import (
     DRAWING_PRECISION,
     ISOMETRIC_VIEW_NOTE,
     PIN_DIA,
-    PIN_DIA_BAND,
     PIN_LEN,
-    UNIT,
 )
 
 PART_NAME = "dt-pinion-lever-pin"
@@ -166,20 +163,19 @@ def build(adapter) -> dict[str, str]:
     force_rebuild(adapter)
     volume_check(adapter, "driven pin (equations neutral)", volume, 0.005 * V_PIN)
 
-    # Every edit to the model -- the drawing support (the stock band, the
-    # marked set, the model-owned decimal places), the material and the
-    # appearance -- precedes the INSTALLED split.  Each one made after it
-    # touched only the active configuration and left INSTALLED stale
+    # Every edit to the model -- the drawing support (the marked set, the
+    # model-owned decimal places), the material and the appearance --
+    # precedes the INSTALLED split.  Each one made after it touched only the
+    # active configuration and left INSTALLED stale
     # (IConfiguration.NeedsRebuild) in the saved part, so drive-train opened
-    # NeedsRebuild2=1: set_dimension_symmetric_tolerance (pc-lever-pin-diag)
+    # NeedsRebuild2=1: once a symmetric tolerance here (pc-lever-pin-diag)
     # and, once that moved, apply_material, which sets the ACTIVE
     # configuration's material (pc-lever-pin-diag2).  Made before the split,
     # INSTALLED is copied from a finished Default and both configurations'
     # rebuilds below are the last model edits.  #928's save guard still
-    # rebuilds any stale configuration; this keeps its happy path clean.
-    set_dimension_symmetric_tolerance(
-        adapter, "PinProfile", "PinDia", PIN_DIA_BAND[0], display_unit=UNIT
-    )
+    # rebuilds any stale configuration; this keeps its happy path clean.  The
+    # diameter carries no band: it is the drill rod as supplied, printed REF
+    # (machinist review r1, farm run 20261124T110807008Z).
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)

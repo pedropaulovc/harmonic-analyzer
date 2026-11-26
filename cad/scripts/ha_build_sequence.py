@@ -140,7 +140,7 @@ MATCH_LOCATED: tuple[tuple[ModuleType, str], ...] = (
     (fr_steps, fr_steps.LOWER_HOLES_MARKED_KEY),
     (fr_steps, "upper-holes-marked"),
     (fr_steps, fr_steps.NAMEPLATE_SPOTTED_KEY),
-    (dt_steps, "post-and-tip-block"),
+    (dt_steps, "end-play-set"),
     (dt_steps, "crank-hub-fitted"),
     (dt_steps, "crank-handle-fitted"),
     (dt_steps, ch_steps.CYLINDER_STACK_KEY),

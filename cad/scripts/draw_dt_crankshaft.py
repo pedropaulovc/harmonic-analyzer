@@ -113,11 +113,8 @@ from dt_crankshaft_spec import (
     DRIVE_PIN_KNOCKOUT_RIM_WORST,
     DRIVE_PIN_OFFSET_TOL,
     DRIVE_PIN_SPIGOT_RIM_WORST,
-    JOURNAL_DIA_BAND,
     NECK_DIA_TOL,
-    PINION_SEAT_DIA_BAND,
     RELIEF_DIA,
-    SHAFT_DIA_BAND,
     SHAFT_LENGTH_BAND,
     SPIGOT_DIA_BAND,
     UNIT,
@@ -320,26 +317,23 @@ requirement(
     },
     precision={"height": _P["DomeHeight"], "radius": _P["DomeSphereRadius"]},
 )
-# The Ø.3750 sliding fit in the MHA-DT-31 crank hub (note 3), from the dome
-# root to the collar's seat face.
+# The (Ø.3750) sliding fit in the MHA-DT-31 crank hub, from the dome root to
+# the collar's seat face: a REF turned to the hub's measured bore, note 3's
+# clearance the requirement (drawing-guidelines rule 4, form 2).
 requirement(
     "hub_shaft",
     kind="outside_cylinder",
     faces=(CylinderFace(SHAFT_DIA, contains_y_mm=SEAT_COLLAR / 2.0),),
-    requirements=("dia",),
+    requirements=("dia_ref", "diametral_clearance"),
     fields={
         "at": ([0.0, 0.0, 0.0], (_FRAME,)),
         "axis": ([0.0, 1.0, 0.0], (_FRAME,)),
-        "dia": (
-            limits(SHAFT_DIA, _P["ShaftDiaDim"], SHAFT_DIA_BAND, unit=UNIT),
-            (_SD, (_HUB, "SHAFT_DIA_BAND"), *_PRINT),
-        ),
-        "nominal_dia": (SHAFT_DIA, (_SD,)),
+        "dia_ref": (SHAFT_DIA, (_SD, "REFERENCE_DIMENSIONS", *_PRINT)),
         "length_nominal": (SEAT_COLLAR, ("SEAT_COLLAR",)),
         "mates": ("MHA-DT-31", _FIT),
         "diametral_clearance": (list(FIT_CLEARANCES["MHA-DT-31"]), _FIT),
     },
-    precision={"dia": _P["ShaftDiaDim"]},
+    precision={"dia_ref": _P["ShaftDiaDim"]},
 )
 # The Ø.689 seat spigot (note 2): its seat face (dome side, where the drive
 # pins enter) and its rear face (Ra 63, bears on MHA-DT-05), each a .XXX
@@ -439,21 +433,18 @@ requirement(
     },
     precision={"dia": _P["NeckDiaDim"]},
 )
-# The 2X Ø.4375 running fits in MHA-DT-05 (note 3, Ra 63): each end a .XX
-# station from the far end, ``station`` the end nearer the far end.
+# The 2X (Ø.4375) running fits in MHA-DT-05 (note 3, Ra 63), REFs turned to
+# its measured crank bores: each end a .XX station from the far end,
+# ``station`` the end nearer the far end.
 requirement(
     "outboard_journal",
     kind="journal",
     faces=(surface_finish_by_key(SURFACE_FINISHES, "outboard_journal").face,),
-    requirements=("dia", "station", "end_station", "finish_ra"),
+    requirements=("dia_ref", "diametral_clearance", "station", "end_station", "finish_ra"),
     fields={
         "at": ([0.0, RELIEF_START, 0.0], ("RELIEF_START",)),
         "axis": ([0.0, -1.0, 0.0], (_FRAME,)),
-        "dia": (
-            limits(JOURNAL_DIA, _P["JournalDiaDim"], JOURNAL_DIA_BAND, unit=UNIT),
-            ("JOURNAL_DIA", "JOURNAL_DIA_BAND", *_PRINT),
-        ),
-        "nominal_dia": (JOURNAL_DIA, ("JOURNAL_DIA",)),
+        "dia_ref": (JOURNAL_DIA, ("JOURNAL_DIA", "REFERENCE_DIMENSIONS", *_PRINT)),
         "station": (
             _far_station(RELIEF_START, "ReliefOutboardStation"),
             ("RELIEF_OUTBOARD_STATION", *_PRINT),
@@ -473,7 +464,7 @@ requirement(
         "diametral_clearance": (list(FIT_CLEARANCES["MHA-DT-05"]), _FIT),
     },
     precision={
-        "dia": _P["JournalDiaDim"],
+        "dia_ref": _P["JournalDiaDim"],
         "station": _P["ReliefOutboardStation"],
         "end_station": _P["JournalOutboardStation"],
         "finish_ra": 1,
@@ -483,15 +474,11 @@ requirement(
     "inboard_journal",
     kind="journal",
     faces=(surface_finish_by_key(SURFACE_FINISHES, "inboard_journal").face,),
-    requirements=("dia", "station", "end_station", "finish_ra"),
+    requirements=("dia_ref", "diametral_clearance", "station", "end_station", "finish_ra"),
     fields={
         "at": ([0.0, JOURNAL_END, 0.0], ("JOURNAL_END",)),
         "axis": ([0.0, -1.0, 0.0], (_FRAME,)),
-        "dia": (
-            limits(JOURNAL_DIA, _P["JournalDiaDim"], JOURNAL_DIA_BAND, unit=UNIT),
-            ("JOURNAL_DIA", "JOURNAL_DIA_BAND", *_PRINT),
-        ),
-        "nominal_dia": (JOURNAL_DIA, ("JOURNAL_DIA",)),
+        "dia_ref": (JOURNAL_DIA, ("JOURNAL_DIA", "REFERENCE_DIMENSIONS", *_PRINT)),
         "station": (
             _far_station(JOURNAL_END, "JournalInboardStation"),
             ("JOURNAL_INBOARD_STATION", *_PRINT),
@@ -511,7 +498,7 @@ requirement(
         "diametral_clearance": (list(FIT_CLEARANCES["MHA-DT-05"]), _FIT),
     },
     precision={
-        "dia": _P["JournalDiaDim"],
+        "dia_ref": _P["JournalDiaDim"],
         "station": _P["JournalInboardStation"],
         "end_station": _P["ReliefInboardStation"],
         "finish_ra": 1,
@@ -531,27 +518,24 @@ requirement(
     },
     precision={"dia": _P["ReliefDiaDim"]},
 )
-# The Ø.3125 sliding fit in the MHA-DT-10 pinion (note 3), from its step (a
-# .XX station from the far end) to the far end.
+# The (Ø.3125) sliding fit in the MHA-DT-10 pinion, from its step (a .XX
+# station from the far end) to the far end: a REF turned to the pinion's
+# measured bore, note 3's clearance the requirement.
 requirement(
     "pinion_seat",
     kind="outside_cylinder",
     faces=(CylinderFace(PINION_SEAT_DIA),),
-    requirements=("dia",),
+    requirements=("dia_ref", "diametral_clearance"),
     fields={
         "at": ([0.0, SEAT_STEP, 0.0], ("SEAT_STEP",)),
         "axis": ([0.0, 1.0, 0.0], (_FRAME,)),
-        "dia": (
-            limits(PINION_SEAT_DIA, _P["PinionSeatDiaDim"], PINION_SEAT_DIA_BAND, unit=UNIT),
-            ("PINION_SEAT_DIA", "PINION_SEAT_DIA_BAND", *_PRINT),
-        ),
-        "nominal_dia": (PINION_SEAT_DIA, ("PINION_SEAT_DIA",)),
+        "dia_ref": (PINION_SEAT_DIA, ("PINION_SEAT_DIA", "REFERENCE_DIMENSIONS", *_PRINT)),
         "length_nominal": (SHAFT_LENGTH - SEAT_STEP, ("SEAT_STEP", *_FAR)),
         "mates": ("MHA-DT-10", _FIT),
         "diametral_clearance": (list(FIT_CLEARANCES["MHA-DT-10"]), _FIT),
         "match_ream_callout": (PINION_PIN_CALLOUT, ((_NOTES, "PINION_PIN_CALLOUT"),)),
     },
-    precision={"dia": _P["PinionSeatDiaDim"]},
+    precision={"dia_ref": _P["PinionSeatDiaDim"]},
 )
 requirement(
     "seat_step",

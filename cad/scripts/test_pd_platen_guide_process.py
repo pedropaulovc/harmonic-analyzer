@@ -196,16 +196,17 @@ def _seed(ctx: dict, key: str, pick, change) -> dict:
         # The left end's first pass dropped: the second takes both steps.
         (
             "ends",
-            lambda line: line == "G0 X-7.705 Y-17.653",
-            lambda line: "G0 X-7.535 Y-17.653",
+            lambda line: line == "G0 X-7.705 Y8.890",
+            lambda line: "G0 X-7.535 Y8.890",
             "passes",
         ),
-        # A right-end pass run the other way: climb, not conventional.
+        # A right-end pass run the other way (-Y, the rail on the cutter's
+        # right under M3): climb, where the recipe declares conventional.
         (
             "ends",
-            lambda line: line == "G1 Y-17.653 F{feed}",
-            lambda line: "G1 Y30.000 F{feed}",
-            "passes",
+            lambda line: line == "G1 Y8.890 F{feed}",
+            lambda line: "G1 Y-30.000 F{feed}",
+            "cut",
         ),
         # A hole drilled short of its exit.
         (

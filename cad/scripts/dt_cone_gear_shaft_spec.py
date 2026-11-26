@@ -16,6 +16,7 @@ from _surface_finish import MACHINED_UM, SurfaceFinishControl
 
 from dt_cone_gear_spec import FACE_WIDTH as CONE_GEAR_FACE_WIDTH, SEAT_PITCH, outside_dia_mm
 from dt_cone_gear_spec import FACE_WIDTH_BAND as CONE_GEAR_FACE_WIDTH_BAND
+from dt_cone_gear_spec import bond_clearance_mm as cone_gear_bond_clearance_mm
 from dt_cone_gear_stack import PITCH_LOCKSTEP_TOLERANCE, face_band
 from _cone_axis_constants import GEAR_AXIS_SHIFT
 from dt_cone_pivot_post_spec import JOURNAL_BORE_BAND as POST_JOURNAL_BORE_BAND
@@ -197,36 +198,49 @@ def _gear(teeth: int) -> str:
     return f"T{teeth:03d}"
 
 
-# Each tight band names its mate and fit route (drawing-guidelines.md rule
-# 4).  The journal's .0008 band is under the turned-diameter row, so it is a
-# matched running fit to the MHA-DT-05 bore, the form the reviewer accepted
-# on MHA-DT-19's pivot shaft, its clearance the printed limits'
-# (JOURNAL_DIAMETRAL_CLEARANCE_MM) as a REF row of its own: two lines of
-# words (rule 7) narrow enough to stand between the faced end and section
-# A-A (round 3's 33-character line crowded section A's letter).  Land 1
-# slides in the bores of the gears it carries (MHA-DT-03, MHA-DT-07 and the
-# MHA-DT-VN-71 key): flag note LAND_NOTE, linked from its diameter and the
-# keyseat.  Land 2 and the socket are bonded fits (owner decision C1 keyed,
-# 2026-11-09, PR #1992; cone_tip_cluster): flag note BOND_NOTE names their
-# mates, linked from land 2's diameter and the socket's.  The compound is
-# named on the assembly sheet, where the joint is made (rule 23).
+# Every fit on this shaft is made here, last (drawing-guidelines rule 4,
+# form 2; fit audit 2026-11-23): the journal is turned to MHA-DT-05's reamed
+# bore (F02), land 1 to the reamed bores of the gears it carries (MHA-DT-03
+# keyed bores and MHA-DT-07, one diameter for all of them, and the
+# MHA-DT-VN-71 key; MHA-DT-03.keyed_bore) and land 2 to T024's reamed bore
+# (MHA-DT-03.T024_bore).  Each prints its size as a REFERENCE
+# (MADE_TO_FIT_DIAMETERS) and the acceptance once, here: the journal its
+# running clearance as its callout (two lines of words, rule 7, narrow
+# enough to stand between the faced end and section A-A), land 1 by feel in
+# flag note LAND_NOTE, land 2 its bond clearance (rule 23) in flag note
+# BOND_NOTE.  The socket is reamed with the .0625 reamer and prints no band:
+# MHA-DT-37's spigot is turned to it (its sheet prints the acceptance).  The
+# compound is named on the assembly sheet, where the joint is made (rule 23).
+# SECTION_DIA_BANDS stay the ANALYSIS bands every stack reads.
 LAND_NOTE = 1
 BOND_NOTE = 2
 LAND_FLAG = f"SEE NOTE {LAND_NOTE}"
 BOND_FLAG = f"SEE NOTE {BOND_NOTE}"
+MADE_TO_FIT_DIAMETERS = ("Sec0Dia", "Sec1Dia", "Sec2Dia")
+# Two lines of words (rule 7; machinist review r1, farm run
+# 20261124T110807008Z, r2: three rows of words under the callout broke it);
+# the reference size already says the journal is made to its bore.  The
+# clearance prints bare: beside a REF size it is the requirement (rule 4,
+# form 2; machinist review run 2, 20261124T183904227Z, and Codjiflo
+# #3549-11: in parentheses it read as REF too, and nothing controlled).
 JOURNAL_FIT_CALLOUT = (
-    "RUNNING FIT, MATCHED\n"
-    "TO MHA-DT-05 BORE\n"
-    f"(CLEARANCE {inch_text(JOURNAL_DIAMETRAL_CLEARANCE_MM[0], 4)}"
-    f"-{inch_text(JOURNAL_DIAMETRAL_CLEARANCE_MM[1], 4)})"
+    "RUNNING FIT TO MHA-DT-05\n"
+    f"CLEARANCE {inch_text(JOURNAL_DIAMETRAL_CLEARANCE_MM[0], 4)}"
+    f"-{inch_text(JOURNAL_DIAMETRAL_CLEARANCE_MM[1], 4)}"
 )
 SEAT_MATE_CALLOUTS = {
     "Sec0Dia": JOURNAL_FIT_CALLOUT,
     "Sec1Dia": LAND_FLAG,
 }
-SEAT_MATE_SUFFIXES = {"Sec2Dia": f" {BOND_FLAG}"}
-# The keyseat width is centred on its section; it carries the bare flag.
-KEYSEAT_MATE_SUFFIXES = {"Sec1KeyseatWidth": f" NOTE {LAND_NOTE}"}
+# A reference diameter closes its parenthesis before the flag.
+SEAT_MATE_SUFFIXES = {"Sec2Dia": f") {BOND_FLAG}"}
+# The keyseat width is centred on its section.  It prints (.0625) REF, cut
+# by one pass of a standard 1/16 end mill: note 1's key trial is its
+# requirement (machinist review r1, farm run 20261124T110807008Z: a band and
+# an acceptance on one feature).  The reference closes its parenthesis
+# before the bare flag.
+KEYSEAT_MATE_SUFFIXES = {"Sec1KeyseatWidth": f") NOTE {LAND_NOTE}"}
+KEYSEAT_REFERENCES = ("Sec1KeyseatWidth",)
 
 # Station layout.  Every cone gear station was laid out on a 6.5 reference
 # face one exact-tracking seat pitch (dt_cone_gear_spec.SEAT_PITCH) from the next;
@@ -415,24 +429,29 @@ SURFACE_FINISHES = (
 )
 
 # The sheet's numbered flag notes (drawing-guidelines.md rule 7: few,
-# flagged, never a method).  Note LAND_NOTE names land 1's mates once by
-# drawing number (rule 4; section A-A cuts the keyed land, owner decision
-# 2026-11-09, PR #1992); the keyseat and its clock are the section's and the
-# title block's angle (error_budget.yaml books it as cone_flat_clock).  Note
-# BOND_NOTE names the bonded mates of land 2 and the socket.  Note STACK_NOTE
-# names, once, the stack the three-place lengths set (rule 4): the step
-# stands SEAT_STEP_SETBACK behind T024's south face (the proof below), the
-# tip station keeps the end inside T024's bore so T018 butts T024 (the
+# flagged, never a method).  Note LAND_NOTE gives land 1's acceptance by its
+# mates, named once by drawing number (rule 4, form 2: the land is turned
+# last, one diameter for every gear on it; section A-A cuts the keyed land,
+# owner decision 2026-11-09, PR #1992); the keyseat and its clock are the
+# section's and the title block's angle (error_budget.yaml books it as
+# cone_flat_clock).  Note BOND_NOTE gives land 2's acceptance and bond
+# clearance (rule 23) and names the spigot made to the socket.  Note
+# STACK_NOTE names, once, the stack the three-place lengths set (rule 4): the
+# step stands SEAT_STEP_SETBACK behind T024's south face (the proof below),
+# the tip station keeps the end inside T024's bore so T018 butts T024 (the
 # recess proof below), and the collar web is the MHA-DT-07 station and the
-# stack's origin.  The
-# 2026-09-28 flats' matched-fit line and U40's tailstock line went with the
-# flats and the tip land (C1 keyed supersedes both).
+# stack's origin.  The 2026-09-28 flats' matched-fit line and U40's
+# tailstock line went with the flats and the tip land (C1 keyed supersedes
+# both).
 STACK_NOTE = 3
+T024_BOND_CLEARANCE_MM = cone_gear_bond_clearance_mm(24)
 DRAWING_NOTES = "\n".join(
     (
-        f"{LAND_NOTE}. SLIDING FIT: MHA-DT-03 30T-120T GEARS, MHA-DT-07, KEY MHA-DT-VN-71.",
-        f"{BOND_NOTE}. BONDED FIT, {cone_tip_cluster.RETAINING_COMPOUND}: MHA-DT-03 24T GEAR,"
-        " MHA-DT-37 SPIGOT.",
+        f"{LAND_NOTE}. SLIDING FIT: TURNED LAST TO MHA-DT-03 30T-120T AND MHA-DT-07 BORES,",
+        "   EACH SLIDES ON, NO SHAKE; KEY MHA-DT-VN-71 SLIDES IN THE KEYSEAT.",
+        f"{BOND_NOTE}. BONDED FIT, {cone_tip_cluster.RETAINING_COMPOUND}: TURNED LAST TO MHA-DT-03 24T BORE,",
+        f"   CLEARANCE {inch_text(T024_BOND_CLEARANCE_MM[0], 4)}-"
+        f"{inch_text(T024_BOND_CLEARANCE_MM[1], 4)}; MHA-DT-37 SPIGOT IS TURNED TO THE SOCKET.",
         f"{STACK_NOTE}. FLAGGED LENGTHS SET THE MHA-DT-07 AND MHA-DT-03 STACK.",
     )
 )
@@ -631,7 +650,14 @@ TIP_END_RECESS_LIMITS_MM = (
 _FACE_WIDTH_LIMITS = _limits(CONE_GEAR_FACE_WIDTH, CONE_GEAR_FACE_WIDTH_BAND)
 # T024's bonded length on land 2 at its least.
 T024_BOND_LENGTH_MIN_MM = _FACE_WIDTH_LIMITS[0] - TIP_END_RECESS_LIMITS_MM[1]
-if TIP_END_RECESS_LIMITS_MM[0] <= 0.0 or T024_BOND_LENGTH_MIN_MM <= 0.0:
+# The least the shaft end stands inside T024's bore (D4, delegated ruling
+# 2026-11-24 (Main), no precedent; owner review #2144: the 1R leaf range's
+# thin end keeps it).
+TIP_END_RECESS_FLOOR_MM = 0.03
+if (
+    TIP_END_RECESS_LIMITS_MM[0] < TIP_END_RECESS_FLOOR_MM
+    or T024_BOND_LENGTH_MIN_MM <= 0.0
+):
     raise AssertionError(
         f"the shaft end leaves T024's bore: recess {TIP_END_RECESS_LIMITS_MM}, "
         f"bond length {T024_BOND_LENGTH_MIN_MM:.4f} mm"

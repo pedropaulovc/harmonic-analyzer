@@ -97,8 +97,10 @@ from dt_cone_gear_shaft_spec import (
     DRAWING_REFERENCE_PRECISION,
     KEYED_LAND,
     KEYSEAT_MATE_SUFFIXES,
+    KEYSEAT_REFERENCES,
     LAND_NOTE,
     JOURNAL_DIA,
+    MADE_TO_FIT_DIAMETERS,
     SEAT_MATE_CALLOUTS,
     SEAT_MATE_SUFFIXES,
     STACK_NOTE,
@@ -232,9 +234,9 @@ SIDE_DIAMETERS = {
     # proved it hangs RIGHT of its line (r2 render 20261107T104940656Z: ink
     # from 0.2575).  Dragged onto the journal instead (round 3, 0.2190) the
     # proof's box hung LEFT, 0.1325..0.2041, onto section A's lower letter.
-    # Its widest line, "(CLEARANCE .0010-.0023)", boxes 23 x 2.17 mm in the
+    # Its widest line, "RUNNING FIT TO MHA-DT-05", boxes 24 x 2.17 mm in the
     # proof's estimator (round 3: 33 characters 0.0716 wide), so the block
-    # ends ~0.307, 6.7 mm short of section A-A's box (x 0.3141).  The round 3
+    # ends ~0.310, 4.5 mm short of section A-A's box (x 0.3141).  The round 3
     # box stood 10.1 mm below and 9.1 mm above the text position over four
     # rows; at 0.1785 a fifth row of 5.3 mm, grown either way, stays 7 mm
     # above the journal's upper extension line (0.1561) and 7 mm below the
@@ -360,8 +362,16 @@ class DSection(NamedTuple):
 # 25 mm) move to 0.1345..0.1409, and Sec1End's text (SIDE_KEEP) moves 6 mm
 # right with them.
 A_CUT_FROM_STEP_MM = 31.0
+# A-A's centre x: the journal's running-fit callout (Sec0Dia, its mate and
+# clearance on two rows since round 1 of the fit audit) prints wider than the
+# proof's estimate.  Machinist review r2 (farm run 20261124T125542720Z,
+# clarity, gating) read its "MHA-DT-05" row running into the S value: the row
+# inked 0.2579..0.3175 and S's block started ~0.317, hiding S's decimal
+# point.  At 0.3451 (8 mm right of 0.3371) S's block starts 0.3250, 7.5 mm
+# clear of that row; the width's text ends ~0.387, inside the frame.
+A_SECTION_CENTRE_X = 0.3451
 D_SECTIONS = (
-    DSection(1, "A", SECTION_ENDS[1] - A_CUT_FROM_STEP_MM, 0.0150, (0.3371, 0.165), (2, 1)),
+    DSection(1, "A", SECTION_ENDS[1] - A_CUT_FROM_STEP_MM, 0.0150, (A_SECTION_CENTRE_X, 0.165), (2, 1)),
 )
 # The dimensions each section prints; the first is centred over its section
 # (A-A's S shifted at build time, below).
@@ -971,6 +981,15 @@ def _add_d_sections(adapter: Any, side: Any, sign: int) -> list[PlacedSection]:
             (section.centre[0], face[1] - SECTION_CAPTION_GAP),
             label=f"section {section.label} caption",
         )
+        # The keyseat width prints as a reference (machinist review r1, farm
+        # run 20261124T110807008Z); its suffix below closes the parenthesis.
+        for name, dimension in zip(names, kept):
+            if name in KEYSEAT_REFERENCES:
+                set_reference_dimension(
+                    adapter,
+                    dimension,
+                    label=f"section {section.label} {name} reference",
+                )
         _set_dimension_suffixes(
             adapter,
             kept,
@@ -1384,6 +1403,15 @@ def build(adapter: Any) -> dict[str, str]:
     if collar is None:
         raise RuntimeError("the donor view gave no CollarDia dimension")
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
+    # The journal and both lands are turned last to their mates: their sizes
+    # print as references (rule 4, form 2); a suffix written after this
+    # (land 2's flag) closes the parenthesis itself.
+    for annotation in annotations:
+        name = dimension_name(adapter, annotation)
+        if name in MADE_TO_FIT_DIAMETERS:
+            set_reference_dimension(
+                adapter, annotation, label=f"{name} made-to-fit reference", diameter=True
+            )
     _set_dimension_suffixes(adapter, annotations, DIMENSION_SUFFIXES)
     sign = _axis_sign(adapter, side)
     sections = _add_d_sections(adapter, side, sign)

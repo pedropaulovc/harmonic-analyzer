@@ -18,10 +18,11 @@ from dt_pinion_lever_pin_geometry import UNIT as UNIT
 LEVER_NUMBER = "MHA-DT-16"
 LIFT_ROD_NUMBER = "MHA-DT-17"
 
-# Stock 1/16 in drill rod, held +/-.0003 as supplied (#290 fit F15).  The pin
-# rides a .064 drilled hole (title-block DRILLED HOLES +.004/0), so it is
-# retained by the peened heads, not by an interference: the band only says
-# "use the stock", and the largest pin still clears the smallest hole by .0012.
+# Stock 1/16 in drill rod, +/-.0003 as supplied: the supplier's catalogue
+# band, kept as data only (no printed band).  The pin rides a .064 drilled
+# hole (title-block DRILLED HOLES +.004/0), so it is retained by the peened
+# heads, not by an interference, and the largest pin still clears the
+# smallest hole by .0012.
 PIN_DIA_BAND = (0.00762, -0.00762)
 
 # drawing-guidelines.md rule 11 (turned parts read like the lathe) (turned parts): both dimensions live on the revolved half-profile, so
@@ -61,14 +62,19 @@ ASSEMBLY_STEP = "\n".join(
         "TRIM BOTH ENDS AND PEEN FLUSH WITH HUB.",
     )
 )
-# drawing-guidelines.md rule 4 (tighten only for function, and name the mate):
-# the stock band names the hole the pin slips into and says the stock holds
-# it; the overlength cut points at the step that trims it (rule 19).  That
-# pointer comes from the MHA-DT-00 step registry, which part scripts must not
-# reach (test_part_isolation), so the drawing composes it.
+# drawing-guidelines.md rule 4: a diameter bought to size and never cut
+# prints the stock, not limits of size, so the size prints REF, "(Ø.0625)",
+# with "1/16 DRILL ROD, AS SUPPLIED" under it, and the callout still names
+# the hole the pin slips into.  Machinist review r1 (farm run
+# 20261124T110807008Z, over-specification): the ±.0003 banded the bought
+# rod.  Fit audit F22's "keep" carries no owner ruling, so the stock form
+# stands (drawing-guidelines rule 4, form 4's bought-to-size clause).  The overlength cut
+# points at the step that trims it (rule 19).  That pointer comes from the
+# MHA-DT-00 step registry, which part scripts must not reach
+# (test_part_isolation), so the drawing composes it.
 PIN_DIA_CALLOUT = "\n".join(
     (
-        "1/16 DRILL ROD, STOCK OK",
+        "1/16 DRILL ROD, AS SUPPLIED;",
         f"SLIDING FIT IN {LEVER_NUMBER} AND {LIFT_ROD_NUMBER}",
     )
 )

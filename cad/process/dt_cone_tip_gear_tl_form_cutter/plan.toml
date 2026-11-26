@@ -9,11 +9,6 @@ stock = "To be written"
 shop = "../shop"
 
 [[tools]]
-id = "pin-gauges"
-name = "Pin gauges .011-.500"
-ref = "pin-gauges"  # A1-pin-set-011-060
-
-[[tools]]
 id = "needle-files-swiss"
 name = "Swiss needle files"
 ref = "needle-files-swiss"  # drawing cross-check 2026-11-19: file the tooth-space form (.0114-.0323)
