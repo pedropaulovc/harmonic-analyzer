@@ -353,6 +353,14 @@ def _seed(ctx: dict, key: str, pick, change) -> dict:
             lambda line: "G1 Y-100.000 F{feed}",
             "passes",
         ),
+        # The foot end's pass run +Y, the ends on the end mill's right:
+        # climb, where the recipe declares conventional (#3680).
+        (
+            "foot_end",
+            lambda line: line.startswith("G1 Y"),
+            lambda line: "G1 Y60.000 F{feed}",
+            "cut",
+        ),
         # The deepest pass started over the load instead of beside it: the
         # saw comes down flat onto the bars' tops.
         (
