@@ -28,6 +28,15 @@ PDF's name>``: a one-page sheet that points to the shared one, printed to that
 part's own ``<part slug>-traveler.pdf`` beside it. A release ships the shared
 PDF once and each part's placeholder under the part's name.
 
+``--standing`` (in place of a stem) renders the shop's standing instructions
+instead: the one page of rules common to every traveler, which no traveler
+repeats. With the same version resolution and print path it runs ``prechips
+standing cad/process/shop --out cad/out/travelers/shop-standing-instructions/
+shop-standing-instructions.html`` and prints that page to
+``shop-standing-instructions.pdf`` beside it; a release ships the PDF under
+``travelers/``. A resolved prechips without the ``standing`` command (argparse
+``invalid choice``) exits 1 with a message naming the release it needs.
+
 Only exit 0 from every run and every printed PDF is success. Every previous
 traveler is removed first, and a refusal from either run removes every output
 and returns that run's exit code (2 for a prechips refusal), so a refusal never
@@ -67,6 +76,17 @@ _BROWSER_INSTALLS = (
 )
 # A traveler prints in ~3 s; this bounds a browser that never exits.
 PRINT_TIMEOUT_S = 120
+# The pseudo-stem of the shop's standing page (``prechips:standing`` in doit)
+# and the name its HTML, PDF and released file carry.
+STANDING_STEM = "standing"
+STANDING_NAME = "shop-standing-instructions"
+
+
+def standing_paths(out: Path = _process_plans.CAD_OUT) -> tuple[Path, Path]:
+    """The standing page's HTML and the PDF printed beside it, the file a
+    release ships as ``travelers/shop-standing-instructions.pdf``."""
+    directory = Path(out) / "travelers" / STANDING_NAME
+    return directory / f"{STANDING_NAME}.html", directory / f"{STANDING_NAME}.pdf"
 
 
 def _uv() -> str:
@@ -174,6 +194,37 @@ def placeholder_command(
     ]
 
 
+def standing_command(uv: str, version: str, shop: Path, html: Path) -> list[str]:
+    return [
+        uv, "tool", "run", "--from", f"{PACKAGE}=={version}", PACKAGE, "standing",
+        str(shop), "--out", str(html),
+    ]
+
+
+def _run_prechips(cmd: list[str]) -> tuple[int, str]:
+    """Run one pinned prechips render; its stderr (refusal text) still reaches
+    the operator. Returns the exit code and that stderr."""
+    result = subprocess.run(
+        cmd, env=_telemetry.inject_env(), stderr=subprocess.PIPE,
+        encoding="utf-8", errors="replace", check=False,
+    )
+    stderr = result.stderr or ""
+    sys.stderr.write(stderr)
+    return result.returncode, stderr
+
+
+def _render_failure(version: str, what: str, code: int, stderr: str) -> tuple[RuntimeError, int]:
+    """A failed render's error and exit code: prechips' own code for its
+    refusal, 1 for a ``uv tool run`` that failed before prechips ran."""
+    diagnostic = uv_error(stderr)
+    if diagnostic is None:
+        return RuntimeError(f"prechips {version} {what} exited with code {code}"), code
+    return RuntimeError(
+        f"uv could not run prechips {version} for {what} "
+        f"(`uv tool run` exited {code}; not a prechips refusal): {diagnostic}"
+    ), 1
+
+
 def _fail(root, stem: str, exc: Exception, code: int, outputs: tuple[Path, ...]) -> int:
     """Remove every output, mark the pipeline span failed and return ``code``."""
     for path in outputs:
@@ -184,12 +235,65 @@ def _fail(root, stem: str, exc: Exception, code: int, outputs: tuple[Path, ...])
     return code
 
 
+def _standing(out: Path) -> int:
+    """Render and print the shop's standing page; see the module docstring."""
+    with _telemetry.run_pipeline_span("prechips_traveler", stem=STANDING_STEM) as root:
+        html, pdf = standing_paths(out)
+        outputs = (html, pdf)
+        for path in outputs:
+            path.unlink(missing_ok=True)
+        shop = _process_plans.SHOP_DIR
+        if not _process_plans.shop_files(shop):
+            exc = FileNotFoundError(f"{STANDING_STEM}: no shop .toml files in {shop}")
+            return _fail(root, STANDING_STEM, exc, 2, outputs)
+        try:
+            uv = _uv()
+            printer = browser()
+            with _telemetry.span("prechips.resolve", stem=STANDING_STEM):
+                version = latest_version(uv)
+        except RuntimeError as exc:
+            return _fail(root, STANDING_STEM, exc, 1, outputs)
+        root.set_attribute("prechips.version", version)
+        _telemetry.info(
+            f"{STANDING_STEM}: prechips {version} (latest PyPI release)", prechips_version=version,
+        )
+        html.parent.mkdir(parents=True, exist_ok=True)
+        with _telemetry.span("prechips.standing", stem=STANDING_STEM) as sp:
+            sp.set_attribute("prechips.version", version)
+            code, stderr = _run_prechips(standing_command(uv, version, shop, html))
+        if code != 0:
+            if "invalid choice: 'standing'" in stderr:
+                exc = RuntimeError(
+                    f"prechips {version} has no `standing` command; the shop standing "
+                    "page needs the first prechips release that adds `prechips standing` "
+                    f"(newer than {version})"
+                )
+                return _fail(root, STANDING_STEM, exc, 1, outputs)
+            exc, code = _render_failure(version, "standing", code, stderr)
+            return _fail(root, STANDING_STEM, exc, code, outputs)
+        try:
+            with _telemetry.span("prechips.pdf", stem=STANDING_STEM, browser=Path(printer).name):
+                print_pdf(printer, html, pdf)
+        except RuntimeError as exc:
+            return _fail(root, STANDING_STEM, exc, 1, outputs)
+        _telemetry.info(f"{STANDING_STEM}: printed {pdf.name}")
+        return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("stem")
+    parser.add_argument("stem", nargs="?")
+    parser.add_argument(
+        "--standing", action="store_true",
+        help="render the shop's standing instructions page instead of a traveler",
+    )
     parser.add_argument("--out", type=Path, default=_process_plans.CAD_OUT)
     args = parser.parse_args(argv)
+    if args.standing == (args.stem is not None):
+        parser.error("name one traveler stem, or --standing")
     _telemetry.set_service("prechips-traveler")
+    if args.standing:
+        return _standing(args.out)
     with _telemetry.run_pipeline_span("prechips_traveler", stem=args.stem) as root:
         plan = _process_plans.plan_path(args.stem)
         paths = _process_plans.traveler_paths(args.stem, args.out)
@@ -228,26 +332,10 @@ def main(argv: list[str] | None = None) -> int:
         for what, profile, cmd in renders:
             with _telemetry.span("prechips.traveler", stem=args.stem, profile=profile) as sp:
                 sp.set_attribute("prechips.version", version)
-                result = subprocess.run(
-                    cmd, env=_telemetry.inject_env(), stderr=subprocess.PIPE,
-                    encoding="utf-8", errors="replace", check=False,
-                )
-            code, stderr = result.returncode, result.stderr or ""
-            # prechips' own refusal text still reaches the operator.
-            sys.stderr.write(stderr)
-            if code == 0:
-                continue
-            diagnostic = uv_error(stderr)
-            if diagnostic is None:
-                exc = RuntimeError(
-                    f"prechips {version} traveler {what} exited with code {code}"
-                )
+                code, stderr = _run_prechips(cmd)
+            if code != 0:
+                exc, code = _render_failure(version, f"traveler {what}", code, stderr)
                 return _fail(root, args.stem, exc, code, outputs)
-            exc = RuntimeError(
-                f"uv could not run prechips {version} for {what} "
-                f"(`uv tool run` exited {code}; not a prechips refusal): {diagnostic}"
-            )
-            return _fail(root, args.stem, exc, 1, outputs)
         sheets = dict(zip(_process_plans.TRAVELER_PROFILES.values(), paths, strict=True))
         prints = [(sheets[_process_plans.PDF_PROFILE], pdf), *placeholders.values()]
         for html, printed in prints:

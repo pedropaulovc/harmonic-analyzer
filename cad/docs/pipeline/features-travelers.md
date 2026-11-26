@@ -520,6 +520,7 @@ outputs, before `doit -s release`
 ([`DEVELOPING.md`](../../../DEVELOPING.md#farm-releases)); the farm run's
 `build` already posted the NC programs on that submitter, so they arrive with
 the restored outputs.
+With any traveler staged the release also ships `prechips:standing`'s shop standing instructions page as `travelers/shop-standing-instructions.pdf`; a missing one, or one older than a `cad/process/shop/*.toml`, fails the cut too.
 
 The publisher's only tracked-source update is `cad/config/release.yaml`
 `next_revision`; it does not edit process plans. The generated-only follow-up

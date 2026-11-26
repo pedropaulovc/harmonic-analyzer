@@ -43,7 +43,9 @@ What it does, in order:
      ``png/`` + ``pdf/`` + ``diff/`` + ``features/`` + ``travelers/`` + ``nc/``).
      Records the SW revision. ``travelers/`` holds each enrolled part's hobby prechips
      traveler printed to ``<slug>-traveler.pdf`` by its ``prechips:<stem>``
-     task, and ``nc/<stem>/`` each enrolled part's NC programs, cycle times and
+     task, beside it ``shop-standing-instructions.pdf`` (the shop's standing
+     instructions, common to every traveler) by ``prechips:standing``, and
+     ``nc/<stem>/`` each enrolled part's NC programs, cycle times and
      CAM manifest posted by its ``cam:<stem>`` task; a missing one fails the cut.
      (Build logs ship as a SEPARATE logs asset, not in this zip.)
   4. diff: render the changed-parts highlight (this staged bundle vs the previous
@@ -111,9 +113,11 @@ from _drawing_registry import DRAWINGS
 from _process_plans import (
     TRAVELER_STEMS,
     part_stems,
+    shop_files,
     traveler_pdf_name,
     traveler_pdf_paths,
 )
+from prechips_traveler import STANDING_STEM, standing_paths
 from _release_artwork import ARTWORK_DIR, NOTED_ARTWORK
 from _release_drawing_diff import extract_release_pdfs, previous_published_release
 from export_models import stage_release_neutral
@@ -775,12 +779,14 @@ def stage_drawings(stage: Path) -> dict[str, str]:
 
 def _traveler_part_count(staged: list[str]) -> int:
     """Parts with a staged traveler: a family's shared sheet is no part's
-    own, each of its placeholders is one part's."""
+    own, each of its placeholders is one part's, and the shop's standing page
+    is no part's."""
     shared = {
         f"travelers/{traveler_pdf_name(stem)}"
         for stem in TRAVELER_STEMS
         if part_stems(stem) != (stem,)
     }
+    shared.add(f"travelers/{standing_paths()[1].name}")
     return len(set(staged) - shared)
 
 
@@ -804,6 +810,11 @@ def stage_travelers(stage: Path) -> list[str]:
     ``features/<part>/features.toml`` it was rendered from, the plan's own
     part's or any of a family's (the same mtime refusal ``stage_comparisons``
     applies to the gallery).
+
+    With any traveler staged, the shop's standing instructions page, the
+    output of ``prechips:standing``, ships beside them as
+    ``travelers/shop-standing-instructions.pdf``; a missing, empty or stale
+    one (older than a ``cad/process/shop/*.toml`` file) fails the cut too.
     """
     from export_features import bundle_paths
 
@@ -829,6 +840,18 @@ def stage_travelers(stage: Path) -> list[str]:
             destination_dir.mkdir(parents=True, exist_ok=True)
             shutil.copy2(source, destination_dir / source.name)
             staged.append(f"travelers/{source.name}")
+    if staged:
+        source = standing_paths(out)[1]
+        rerun = f"run `doit -s prechips:{STANDING_STEM}`"
+        if not source.is_file() or source.stat().st_size == 0:
+            raise RuntimeError(f"required traveler is missing: {source} ({rerun})")
+        for shop in shop_files():
+            if source.stat().st_mtime < shop.stat().st_mtime:
+                raise RuntimeError(
+                    f"traveler is stale: {source} is older than its shop file {shop} ({rerun})"
+                )
+        shutil.copy2(source, destination_dir / source.name)
+        staged.append(f"travelers/{source.name}")
     return staged
 
 
@@ -1393,7 +1416,9 @@ def release_notes(version: str, facts: dict[str, Any]) -> str:
         f"({facts['pngs']} images)\n"
         + (
             f"- `travelers/` -- hobby process travelers as `<slug>-traveler.pdf` "
-            f"({_traveler_part_count(facts['travelers'])} parts), rendered by prechips\n"
+            f"({_traveler_part_count(facts['travelers'])} parts), rendered by prechips, "
+            "with `shop-standing-instructions.pdf`, the shop's standing instructions "
+            "common to every traveler\n"
             if facts.get("travelers")
             else ""
         )
