@@ -22,6 +22,6 @@
   <text class="label" x="199.6" y="182" text-anchor="end">{{process.pin_x_mm:.3f}} mm</text>
   <text class="datum-label" x="396" y="72" text-anchor="end">Z0 + H: the spigot face</text>
   <text class="datum-label" x="199.6" y="142" text-anchor="end">X0 the stub's axis</text>
-  <text class="label" x="30" y="300">the shaft later the same way: its stub and dome stand 1.21</text>
+  <text class="label" x="30" y="300">the shaft later the same way: its stub and dome stand {{cad.collar_seat_y_from_min_in:.2f}}</text>
   <text class="label" x="30" y="316">proud of the spigot face; the chuck's nose stays .10 clear of the apex</text>
 </svg>
