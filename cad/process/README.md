@@ -571,12 +571,23 @@ section in one setup frame, at the plan's nominal length and at both limits
 of its band), and, only where the default is wrong, the route (default:
 each program in `PROGRAMS` order in its jobs' frame), the programs that cut
 no part (`skip`, with the reason) and a tool shape the jobs cannot describe.
+Each part also declares the differences it expects (`expected`): each a
+name, a kind (left or gouge), the box its regions lie in, the reason (a hand
+tap, a later lathe operation, a bench edge break, a cutter's form) and,
+where it has one, a depth bound, the blank lengths it holds for, or the
+size the program aims at inside its band (`aim`: the region must be
+|aim − cad| deep; the report prints the aim against the band). The report
+counts the over-noise regions no entry explains, and names every entry no
+region matches any more: a clean recipe reads 0 unexplained.
 `AS_MACHINED_MODE = "report"` never fails the task on the report; `"gate"`
-fails it on a region over the noise line or a rapid that cuts. A recipe the
-report cannot hold says why in `AS_MACHINED_NOT_COVERED`; one that declares
-nothing is reported not covered, never skipped. The worked example is the
-column clamp family's `cam.py`. The seeded-fault controls are
-`cad/scripts/test_as_machined_freecad.py` (outside the gates: it runs FreeCAD).
+fails it on an unexplained region, an expected difference that is gone or a
+rapid that cuts. A recipe the report cannot hold says why in
+`AS_MACHINED_NOT_COVERED`; one that declares nothing is reported not
+covered, never skipped. `HARMONIC_AS_MACHINED=skip` skips a report-mode
+recipe's report (an inner loop; builds and releases leave it unset). The
+worked example is the column clamp family's `cam.py`. The seeded-fault
+controls are `cad/scripts/test_as_machined_freecad.py` (outside the gates: it
+runs FreeCAD).
 
 Milling speed rules (owner rulings 2026-11-16): "replace fusion with oss
 cam" moved the task from Autodesk Fusion Personal, which posted rapids at
