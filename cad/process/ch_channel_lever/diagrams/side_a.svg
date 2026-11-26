@@ -5,7 +5,7 @@
 <text class="label" x="20" y="20">Side A up: outline on tabs (top view)</text>
 <rect class="clamp" x="89" y="34" width="413" height="26"/>
 <text class="label" x="510" y="51">fixed jaw</text>
-<rect class="fixture-plate" x="40" y="62" width="396" height="260" fill-opacity="0.4"/>
+<rect class="fixture-plate" x="40" y="60" width="396" height="260.9" fill-opacity="0.4"/>
 <rect class="part-rest" x="40" y="60.0" width="511.8" height="66.0"/>
 <path class="part-kept" d="M80.3 80.8 L433.9 80.8 L526.0 82.0 A11.0 11.0 0 0 1 526.0 104.0 L433.9 105.2 L80.3 105.2 A15.5 15.5 0 1 1 80.3 80.8 Z"/>
 <circle class="holes" cx="70.7" cy="93.0" r="8.5"/>
@@ -29,9 +29,9 @@
 <rect class="clamp" x="89" y="324" width="413" height="26"/>
 <text class="label" x="510" y="341">moving jaw</text>
 <line class="datum" x1="40" y1="30" x2="40" y2="354"/>
-<rect x="40" y="62" width="396" height="260" fill="none" stroke="#333" stroke-width="1.5" stroke-dasharray="6 4"/>
+<rect x="40" y="60" width="396" height="260.9" fill="none" stroke="#333" stroke-width="1.5" stroke-dasharray="6 4"/>
 <text class="label" x="10" y="370">X0 left ends</text>
-<text class="label" x="130" y="370">spoil plate (dashed outline, 6 x 3.9 in); A up</text>
+<text class="label" x="130" y="370">spoil plate (dashed outline, 6 x 3.95 in); A up</text>
 <text class="label" x="10" y="390">outline on 7 tabs per lever (small squares)</text>
 <rect class="clamp" x="51.2" y="89.0" width="5" height="8"/>
 <rect class="clamp" x="119.4" y="73.6" width="6.6" height="6"/>

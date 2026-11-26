@@ -285,6 +285,15 @@ length_in = [1.5]
 status = "to_order"
 cite = ["cad/config/parts/dt-cone-gear-tl-arbor-collar.yaml material_specification, default_configuration, configuration_quantities", "cad/scripts/dt_cone_gear_tl_arbor_collar_spec.py OD_BY_CONFIGURATION", "cad/scripts/dt_cone_gear_tl_keyed_arbor_spec.py COLLAR_LENGTH"]
 
+[stock.6061-flat-5-8x4]
+form = "flat_bar"
+material = "6061 aluminium"
+note = "To order: 6061 aluminium flat bar, 5/8 x 4 in, at least 12 in: the MHA-CH-02 channel lever's spoil plate is a new 6 in piece every lot of 20 (cad/process/ch_channel_lever, Setup 1), so 12 in gives the first lot's plate and a spare. Setup 2 mills one long edge to 3.940-3.960 and faces the top to .578-.588, so the bar's own tolerances need only leave it over 3.960 wide and over .588 thick. Allocation: ch-channel-lever (MHA-CH-02) spoil plate, delegated ruling 2026-11-26 (Main), no precedent, owner review #2144 (D44, #3607); the purchase is the owner's. Supplier, SKU and price not read. Not owned."
+section_mm = [101.6, 15.875]
+length_mm = 304.8
+status = "to_order"
+cite = ["cad/process/ch_channel_lever/plan.toml [parameters] spoil_plate_bought_mm, spoil_plate_width_min_mm, spoil_plate_thickness_max_mm", "https://github.com/pedropaulovc/harmonic-analyzer/issues/3607"]
+
 [stock.6061-round-9-16]
 form = "round_bar"
 material = "6061-T6511 aluminium"

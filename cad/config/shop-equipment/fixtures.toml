@@ -35,24 +35,8 @@ kind = "parallels_set"
 make = "LittleMachineShop"
 sku = "6745"
 status = "on_hand"
-note = "Possession: photo and LittleMachineShop package (archived inventory source.by)."
-
-# Owner (Pedro) 2026-11-26, ruling #3607 option A, relayed by Main: "own
-# https://www.globalindustrial.com/p/4-piece-steel-shim-stock-assortment-6-inch-x-50-inch-rolls".
-# The page (read 2026-11-26): Precision Brand 16690, Global Industrial model
-# WBB512944, 6 in x 50 in rolls, one each .001, .002, .003 and .005 in,
-# 1008-1010 full hard cold-rolled steel. MHA-CH-02 cuts its five support
-# sheets from the .005 roll (cad/process/ch_channel_lever, D41).
-[fixtures.shim-stock-steel-assortment-16690]
-name = "Steel shim stock assortment, 4 rolls 6 x 50 in: .001, .002, .003, .005 in"
-kind = "shim"
-make = "Precision Brand"
-sku = "16690"
-source = "https://www.globalindustrial.com/p/4-piece-steel-shim-stock-assortment-6-inch-x-50-inch-rolls"
-status = "on_hand"
-pieces = 4
-cite = ["Owner (Pedro) 2026-11-26, #3607 ruling relayed by Main: \"own https://www.globalindustrial.com/p/4-piece-steel-shim-stock-assortment-6-inch-x-50-inch-rolls\"", "Global Industrial WBB512944 product page (read 2026-11-26): \"Assortment of 6\\\" wide by 50\\\" long rolls contains 1 each of the following thicknesses: 0.001\\\", 0.002\\\", 0.003\\\", and 0.005\\\".\" MPN 16690, 1008-1010 Full Hard Steel"]
-note = "Owned. MHA-CH-02 Setup 2 stands its spoil plate on five .005 sheets across its 1 in parallels (#3607)."
+note = "Possession: photo and LittleMachineShop package (archived inventory source.by). The set (LittleMachineShop 6745 page, read 2026-11-26): parallels 1/8 in thick and 4 in long, nine matched pairs 1/2 to 1 in high in 1/16 in steps, and two shim pairs 9/64 and 5/32 in. MHA-CH-02 Setup 2 uses the 15/16 in pair under its spoil plate and the 1 in pair stacked on the 1/2 in pair to face it (#3607)."
+cite = ["LittleMachineShop 6745, Thin Parallels, 4\" Long, 11 Pairs, Premium, https://littlemachineshop.com/products/thin-parallels-4-long-11-pairs-sized-by-16ths (read 2026-11-26): \"Parallels are 1/8\\\" thick and 4\\\" long\"; \"Heights are 1/2\\\", 9/16\\\", 5/8\\\", 11/16\\\", 3/4\\\", 13/16\\\", 7/8\\\", 15/16\\\", 1\\\"\"; \"Two pairs of shims are 9/64\\\" and 5/32\\\"\""]
 
 # Owner (Pedro) 2026-11-24, verbatim: "add to inventory 2 v blocks 1.5 x 2 in
 # with 2 clamps". Brand, accuracy, whether the two are a matched pair, and
