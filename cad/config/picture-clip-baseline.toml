@@ -11,7 +11,7 @@
 # place on the sheet, appended when two pictures on the sheet share it) | the
 # text clipped or crossed ("a / b" for two overlapping texts). Entries count:
 # a finding occurring twice in one picture is listed twice. Recorded from
-# dd4db4bb29, every enrolled plan rendered on prechips 0.11.52, 2026-11-26:
+# 52b3709d61 with main db73d3fde2 merged, every enrolled plan rendered on prechips 0.11.53, 2026-11-26:
 # 58 findings (58 LEADER) on 26 plans.
 
 [plans.ch_fulcrum_keeper]
@@ -124,7 +124,7 @@ findings = [
 [plans.pd_transgear_arm_plate]
 findings = [
   "LEADER | To scale, a section across the jaws and a view from above: the spoil block across the vise jaws on two parallels, its top over the jaw tops; the blank on the tape stack, its C edge flush with the block's fixed-jaw edge, R end to the right; the 3/8 in end mill on a facing pass at the first level, Z.224, passing -X. From above: X0 Y0 at K, the plate's outline and holes dashed (cut later). | block's fixed-jaw edge",
-  "LEADER | To scale, the same section at K: the 27/64 drill opening K through, its full diameter .020 under face A. | .020 under face A: it leaves .016 for the reamer",
+  "LEADER | To scale, the same section at K: the 27/64 drill opening K through, its full diameter .079 under face A. | .079 under face A: it leaves .016 for the reamer",
 ]
 
 [plans.pd_transgear_front_bushing]
