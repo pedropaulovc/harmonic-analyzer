@@ -11,7 +11,7 @@ part marks and drawing keeps in lockstep (``test_dt_pinion_lever_drawing.py``).
 
 from __future__ import annotations
 
-from _fit_ream_slide import REAM_SLIDE
+from _fit_deviations import deviations
 from _inch_wall_limits import WALL_TARGET_MM
 from _printed_tolerance import printed_deviations
 from dt_pinion_lever_geometry import (
@@ -39,10 +39,18 @@ from dt_pinion_lever_geometry import (
 LIFT_ROD_NUMBER = "MHA-DT-17"
 
 # U36: the pin carries the torque, so the hub only has to slide onto the h-band
-# 1/4 in lift rod.  Codex P2 (#844): the former band's minimum met the rod's
-# maximum line-to-line; REAM_SLIDE (+.0015/+.0010, the fit MHA-DT-14 and
-# MHA-DT-18 hold on the same shafts) guarantees .0010 of clearance.
-BORE_BAND = REAM_SLIDE
+# 1/4 in lift rod.  Fit audit F23 (drawing-guidelines rule 4, form 1
+# (drilled; pinned at assembly); batch-dt/rig/derive_f23.py): the bore is F DRILL
+# (.257, form 1), no band, the MHA-DT-17 rod entering by hand its
+# acceptance.  No checked stack needs more: with the F drill the throw plane
+# keeps 1.78 mm of air to MHA-DT-19's front end against the 0.50 required,
+# and the hub can tilt 2.1 deg on the rod over the .32 bore before it is
+# pinned (fit-audit batch-dt/rig/derive_f23.py); MHA-DT-00's lever-pin step
+# holds the lever square to the rod while the Ø.064 is match-drilled, so the
+# pin fixes it square.  BORE_BAND is the F drill's ANALYSIS band, the title
+# block's DRILLED HOLES row (.257-.261: .0070-.0118 on the rod), not a
+# printed limit.
+BORE_BAND = (0.1016, 0.0)  # ANALYSIS (upper, lower) deviations
 # drawing-guidelines.md rule 17 (walls .080 target / .060 floor at the worst
 # printed bands): the end wall behind the blind bore is what the two .XX
 # baselines from face B leave -- the overall length to the crown apex less
@@ -55,7 +63,7 @@ END_WALL_ON_AXIS_WORST = (
 # Off the axis the dome falls away: at the floor's corner (the largest bore)
 # it drops most on the smallest printed SR.
 _CAP_R_MIN = CAP_RADIUS + printed_deviations(CAP_RADIUS, 2, unit=UNIT)[0]
-_FLOOR_CORNER_R = BORE / 2.0 + BORE_BAND[0]
+_FLOOR_CORNER_R = BORE / 2.0 + deviations(BORE_BAND)[1]
 END_WALL_AT_FLOOR_CORNER_WORST = END_WALL_ON_AXIS_WORST - (
     _CAP_R_MIN - (_CAP_R_MIN**2 - _FLOOR_CORNER_R**2) ** 0.5
 )
@@ -91,13 +99,13 @@ REFERENCE_SKETCHES = (
 )
 
 # Decimal places ARE the tolerance statement (drawing-simplicity-policy.md `How the repository implements the guidelines`); the part authors
-# them and the drawing reads them back.  Four on the banded bore (fit F10,
-# .2500 +.0015/+.0010); three on the drilled pin hole, which takes the title
+# them and the drawing reads them back.  Three on the F drilled bore (.257,
+# fit audit F23) and on the drilled pin hole, which take the title
 # block's DRILLED HOLES row (Ø.064, +.004/0); two, the inch .XX row,
 # everywhere else: the rig's stacks read the grip stations, and no feature on
 # the lever is routine enough for .X.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
-    "BarrelProfile": {"HubOd": 2, "HubBore": 4},
+    "BarrelProfile": {"HubOd": 2, "HubBore": 3},
     "RodProfile": {"RodTipY": 2, "RodDia": ROD_DIA_PLACES},
     "CapProfile": {"CapR": 2},
     "PinHoleProfile": {"PinHoleDia": 3},

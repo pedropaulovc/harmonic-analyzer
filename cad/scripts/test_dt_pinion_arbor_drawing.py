@@ -11,7 +11,6 @@ import pytest
 
 import _sketch
 
-import _fit_ream_slide
 import build_dt_pinion_arbor as part
 import draw_dt_pinion_arbor as drawing
 import dt_pinion_arbor_geometry as geometry
@@ -133,11 +132,14 @@ def test_integral_head_owns_the_crossrod_interface() -> None:
     assert spec.NECK_LEN == pytest.approx(spec.NECK_END_Z - spec.HEAD_REAR_Z)
     callout = drawing.DIMENSION_CALLOUTS["CrossHoleDia"]
     assert callout is drawing.CROSS_HOLE_CALLOUT
-    # Rule 4: a bonded fit names its mate by number and its LOCTITE grade;
-    # rule 23: with the clearance its limits give, in two rows (rule 7).
-    assert (
-        callout
-        == "REAM THRU, BONDED FIT ON MHA-DT-15,\nLOCTITE 638 (CLEARANCE .0010-.0070)"
+    # Fit audit F14 (drawing-guidelines rule 4, form 3, recommended form): the reamed
+    # hole prints no band; the rod entering by hand is its acceptance and
+    # the compound is named (rule 4 v2), in two rows (rule 7).  Rule 23: the
+    # bond's diametral clearance prints too (machinist review r1, farm run
+    # 20261124T110807008Z, blocker).
+    assert callout == (
+        "REAM THRU; MHA-DT-15 ROD ENTERS BY HAND;\n"
+        "BOND LOCTITE 638, CLEARANCE .0010-.0035"
     )
     # Machinist review r1 of #1685 (blocker): the band names its mate, and
     # every mate a callout names is the registry's part number.
@@ -154,18 +156,15 @@ def test_integral_head_owns_the_crossrod_interface() -> None:
 
 def test_crossrod_is_a_bonded_slip_fit_not_a_press() -> None:
     """R1 (U27 precedent): as-received bar cannot make a press, so the rod is
-    bonded.  #2106 final review (Main ruling): the hole's band is the joint's
-    function, .250 +.005/+.001: the largest 1/4 rod enters with .001, the
-    loosest pair stays inside Loctite 638's gap, and the owned .2510 over
-    reamer still cuts inside it."""
-    assert spec.CROSS_HOLE_DIA == pytest.approx(6.35)
-    assert spec.CROSS_HOLE_DIA_BAND == pytest.approx((0.127, 0.0254))
-    assert spec.DRAWING_PRECISION["CrossHoleProfile"]["CrossHoleDia"] == 3
-    assert crossrod.ROD_DIA == pytest.approx(spec.CROSS_HOLE_DIA)  # line to line
-    assert (
-        model_toleranced_dimensions(part)[("CrossHoleProfile", "CrossHoleDia")]
-        == "*deviations(CROSS_HOLE_DIA_BAND)"
-    )
+    bonded.  Fit audit F14: the hole is the owned .2510 reamer's size with no
+    printed band; its ANALYSIS band (.2510-.2515) still lets the largest 1/4
+    rod enter with .001 and keeps the loosest pair inside Loctite 638's gap."""
+    reamer = geometry.OWNED_CROSS_HOLE_REAMER_MM
+    assert spec.CROSS_HOLE_DIA == pytest.approx(reamer) == pytest.approx(6.3754)
+    assert spec.CROSS_HOLE_DIA_BAND == pytest.approx((0.0127, 0.0))
+    assert spec.DRAWING_PRECISION["CrossHoleProfile"]["CrossHoleDia"] == 4
+    assert crossrod.ROD_DIA == pytest.approx(6.35)
+    assert ("CrossHoleProfile", "CrossHoleDia") not in model_toleranced_dimensions(part)
     tightest = (spec.CROSS_HOLE_DIA + spec.CROSS_HOLE_DIA_BAND[1]) - (
         crossrod.ROD_DIA + rod_geometry.ROD_DIA_BAND[0]
     )
@@ -175,34 +174,30 @@ def test_crossrod_is_a_bonded_slip_fit_not_a_press() -> None:
     assert spec.CROSSROD_MIN_CLEARANCE == pytest.approx(tightest)
     assert spec.CROSSROD_MAX_CLEARANCE == pytest.approx(loosest)
     assert tightest == pytest.approx(0.0254)  # .001 in: the rod always enters
-    assert loosest == pytest.approx(0.1778)  # .007 in
+    assert loosest == pytest.approx(0.0889)  # .0035 in
     assert loosest <= spec.RETAINING_COMPOUND_MAX_GAP_MM
-    reamer = geometry.OWNED_CROSS_HOLE_REAMER_MM
-    assert (
-        spec.CROSS_HOLE_DIA + spec.CROSS_HOLE_DIA_BAND[1]
-        <= reamer
-        <= spec.CROSS_HOLE_DIA + spec.CROSS_HOLE_DIA_BAND[0]
-    )
-    # The callout names the function, the mate, the compound and the
-    # clearance the limits give (rule 23).
-    assert drawing.CROSS_HOLE_CALLOUT.endswith("(CLEARANCE .0010-.0070)")
     assert "INTO MHA-DT-22 HEAD WITH LOCTITE 638" in crossrod.ASSEMBLY_STEP
     for retired in ("MATCH-REAM", "PRESS", "INTERNAL SHOULDERS SHARP"):
-        assert retired not in spec.DRAWING_NOTES
         assert retired not in drawing.CROSS_HOLE_CALLOUT
+    # The printed clearance is the analysis pair, at least .001 wide and
+    # inside the compound's gap.
+    assert drawing.CROSSROD_CLEARANCE == (tightest, loosest)
+    assert loosest - tightest >= 0.0254
+    for retired in ("MATCH-REAM", "PRESS", "INTERNAL SHOULDERS SHARP"):
+        assert retired not in spec.DRAWING_NOTES
 
 
-def test_only_the_two_journal_lands_carry_the_running_band_and_finish() -> None:
-    assert spec.JOURNAL_DIA_BAND == (-0.01016, -0.03048)
+def test_only_the_two_journal_lands_carry_the_finish_and_no_band() -> None:
+    # Owner ruling 2026-11-24, fit audit questions 12 and 13: the journals are
+    # made to fit the drilled MHA-DT-14 bores and the bond lands the drilled
+    # MHA-DT-01 bore, so their sizes are REFs with no band; the analysis
+    # bands span what each fit turns over the drilled range.
+    assert spec.JOURNAL_DIA_BAND == (-0.01016, -0.0762)
+    assert geometry.BOND_LAND_DIA_BAND == (-0.01016, -0.1016)
     assert spec.SHAFT_DIA_BAND == (-0.01016, -0.09652)
-    assert model_toleranced_dimensions(part) == {
-        ("BondZoneReference", "BondZoneDia"): "*deviations(SHAFT_DIA_BAND)",
-        ("BackBondReference", "BackBondDia"): "*deviations(SHAFT_DIA_BAND)",
-        ("BackStubReference", "BackStubDia"): "*deviations(SHAFT_DIA_BAND)",
-        ("CrossHoleProfile", "CrossHoleDia"): "*deviations(CROSS_HOLE_DIA_BAND)",
-        ("PinHoleProfile", "PinHoleDia"): "*deviations(PIN_HOLE_DIA_BAND)",
-        ("BackJournalReference", "BackJournalDia"): "*deviations(JOURNAL_DIA_BAND)",
-    }
+    # Nor does the collar pin hole: the 1/16 drill under DRILLED HOLES
+    # (machinist round 1, farm 20261125T180203935Z).
+    assert model_toleranced_dimensions(part) == {}
     lands = {
         "front_journal": spec.FRONT_JOURNAL_Z,
         "back_journal": spec.BACK_JOURNAL_Z,
@@ -216,22 +211,27 @@ def test_only_the_two_journal_lands_carry_the_running_band_and_finish() -> None:
     assert set(drawing.JOURNAL_FINISHES) == set(lands)
     for key, (station_z, _symbol_xy, _flank) in drawing.JOURNAL_FINISHES.items():
         assert lands[key] < station_z < lands[key] + spec.JOURNAL_LEN
-    # The journals' .0008 band is narrower than the turned row, so the
-    # callout flags note 1: the running fit, the matched route (turn to the
-    # measured MHA-DT-14 bore) and the clearance the limits give.  The fit is
-    # named once, in the note (machinist review of 2f918b81c8).
+    # The callout flags note 1: the made-to-fit acceptance (turned last to the
+    # measured MHA-DT-14 strap bores, the clearance, and the drum sliding over
+    # both journals: owner ruling 2026-11-25, option A).
     assert drawing.JOURNAL_CALLOUT == "SEE NOTE 1"
     # #1038 sheet decision: one 2X diameter on the back land sizes both lands; the
-    # front land prints only its two stations.
+    # front land prints only its two stations.  The size is a REFERENCE.
     assert drawing.DIMENSION_CALLOUTS["BackJournalDia"] is drawing.JOURNAL_CALLOUT
-    assert sheet.JOURNAL_DIA_PREFIX == "2X <MOD-DIAM>"
+    assert (sheet.JOURNAL_DIA_PREFIX, sheet.JOURNAL_DIA_SUFFIX) == ("2X (<MOD-DIAM>", ")")
     assert "FrontJournalDia" not in sheet.DRAWING_PRECISION_BY_NAME
     assert "FrontJournalDia" not in drawing.DIMENSION_CALLOUTS
     note_1 = " ".join(drawing.SHEET_NOTES.split("\n2. ")[0].split())
     assert note_1 == (
-        "1. JOURNALS (2X): RUNNING FIT IN MHA-DT-14 PINION BRACKET STRAP, "
-        "TURN TO MEASURED BORE (CLEARANCE .0014-.0027)."
+        "1. JOURNALS (2X): TURN LAST TO THE MEASURED MHA-DT-14 STRAP BORES, "
+        "CLEARANCE .0010-.0030; MHA-DT-01 DRUM SLIDES OVER BOTH."
     )
+    # Each mate by its registry name (cad/config/parts).
+    import _config
+
+    assert "STRAP" in _config.parts("dt-pinion-bracket")["title"].upper()
+    assert "DRUM" in _config.parts("dt-alignment-pinion")["title"].upper()
+    assert "BACK" not in note_1
     # Rule 7: four short rows at most, left of the title block (x 0.216).
     rows = drawing.SHEET_NOTES.replace("<MOD-DIAM>", "Ø").splitlines()
     assert len(rows) <= 4
@@ -263,22 +263,34 @@ def test_journal_and_bond_zone_bands_leave_the_intended_fits() -> None:
 
     journal_upper, journal_lower = spec.JOURNAL_DIA_BAND
     strap_upper, strap_lower = strap.ARBOR_BORE_BAND
-    # Running fit of each land in its MHA-DT-14 REAM_SLIDE bore.
-    assert strap.ARBOR_BORE_BAND is _fit_ream_slide.REAM_SLIDE
-    assert strap_lower - journal_upper == pytest.approx(0.03556)
-    assert strap_upper - journal_lower == pytest.approx(0.06858)
+    # Owner ruling 2026-11-24, fit audit question 12: the strap bores are
+    # drilled 5/16 (the DRILLED HOLES row is their analysis band) and the
+    # journals are turned to them at .001-.003; the journals' analysis band
+    # runs from the smallest bore less the loosest clearance up to .0004
+    # under 5/16, so the drum still passes.
+    assert strap.ARBOR_BORE_BAND == pytest.approx((0.1016, 0.0))
+    assert drawing.JOURNAL_CLEARANCE == pytest.approx((0.0254, 0.0762))
+    assert journal_lower == pytest.approx(strap_lower - drawing.JOURNAL_CLEARANCE[1])
+    assert journal_upper == pytest.approx(-0.01016)
+    assert strap_lower - journal_upper > 0.0
     # Every bore slides on from the back crown, so no zone may exceed 5/16.
-    # The drum's REAM_SLIDE bore clears the bond zone by 0.03556 for a
-    # guaranteed slide, and the worst gap stays inside Loctite 638's 0.25.
+    # Owner ruling 2026-11-24, fit audit question 13: the drum bore is
+    # drilled 5/16 and the bond lands are turned to it (made to fit), so the
+    # lands' analysis band tops out .0004 under 5/16, as the journals', and
+    # its loosest pair is the fit's .008, inside Loctite 638's 0.25.
     shaft_upper, shaft_lower = spec.SHAFT_DIA_BAND
     assert shaft_upper == pytest.approx(-0.01016)
+    land_upper, land_lower = geometry.BOND_LAND_DIA_BAND
     drum_upper, drum_lower = drum.ARBOR_BORE_BAND
-    assert drum_lower - shaft_upper == pytest.approx(0.03556)
-    assert drum_upper - shaft_lower <= 0.20 + 1e-9
-    # The drum passes over the back land on its way on, so "SLIDES BY HAND"
-    # must hold there too: every Ø5/16 zone it crosses stays 0.010 under its bore.
-    assert drum_lower - journal_upper == pytest.approx(0.03556)
-    assert min(drum_lower - journal_upper, drum_lower - shaft_upper) >= 0.010 - 1e-9
+    assert drum.ARBOR_BORE_BAND == pytest.approx((0.1016, 0.0))
+    assert land_upper == pytest.approx(-0.01016)
+    assert drum_upper - land_lower == pytest.approx(geometry.BOND_FIT_CLEARANCE[1])
+    assert drum_upper - land_lower <= 0.25
+    # The drum passes over the back journal on its way on (note 1), and the
+    # collar over the lands (bore .3125 min): every Ø5/16 zone they cross
+    # stays .0004 under 5/16.
+    assert drum_lower - journal_upper == pytest.approx(0.01016)
+    assert min(drum_lower - journal_upper, drum_lower - land_upper) > 0.0
 
 
 def test_retired_socket_and_retention_pin_are_not_exported() -> None:
@@ -527,14 +539,19 @@ def test_back_bond_land_carries_its_own_diameter_under_the_shaft() -> None:
     line under the shaft, between the 6.80 and 8.25 station witnesses and
     over the 8.25 row."""
     # #1038 r11 machinist review (rule 26, all 3 runs): both lands carry the
-    # same fit name with its LOCTITE grade, through note 3; farm run
-    # 20261117T130901535Z r2 (rule 23): with the clearance the drum's
-    # REAM_SLIDE bore and the land band give.
+    # LOCTITE grade through note 3; farm run 20261117T130901535Z r2 (rule
+    # 23): with the clearance.  Owner ruling 2026-11-24, fit audit question
+    # 13: the lands are turned to the drilled drum bore, size REF, so note 3
+    # prints the made-to-fit acceptance (drawing-guidelines rule 4, form 2).
     assert drawing.DIMENSION_CALLOUTS["BackBondDia"] == drawing.BOND_CALLOUT
     assert drawing.DIMENSION_CALLOUTS["BondZoneDia"] == drawing.BOND_CALLOUT
     assert drawing.BOND_CALLOUT == "SEE NOTE 3"
+    assert (sheet.BOND_LAND_DIA_PREFIX, sheet.BOND_LAND_DIA_SUFFIX) == (
+        "(<MOD-DIAM>",
+        ")",
+    )
     note_3 = drawing.SHEET_NOTES.split("\n3. ")[1]
-    assert note_3 == "LANDS BONDED IN MHA-DT-01, LOCTITE 638 (CLEARANCE .0014-.0053)."
+    assert note_3 == "LANDS: TURN TO MHA-DT-01 DRUM, LOCTITE 638 (CLEARANCE .0020-.0080)."
     assert max(drawing.BOND_CLEARANCE) <= spec.RETAINING_COMPOUND_MAX_GAP_MM
     assert min(drawing.BOND_CLEARANCE) > 0.0
     assert sheet.DRAWING_PRECISION_BY_NAME["BackBondDia"] == 4
@@ -847,26 +864,27 @@ def test_spans_outside_the_journals_share_one_2x_diameter_and_mate() -> None:
     }
     stub = stations["BackStubReference"]
     assert back_land_end < stub and stub + lengths["BackStubReference"] < rim
-    assert sheet.BACK_STUB_DIA_PREFIX == "2X <MOD-DIAM>"
+    assert (sheet.BACK_STUB_DIA_PREFIX, sheet.BACK_STUB_DIA_SUFFIX) == ("2X (<MOD-DIAM>", ")")
     assert drawing.DIMENSION_CALLOUTS["BackStubDia"] == "SEE NOTE 2"
     assert sheet.DRAWING_PRECISION_BY_NAME["BackStubDia"] == 4
     assert not any("CollarSpan" in name for name in drawing.PRINCIPAL_KEEP)
     note_2 = drawing.SHEET_NOTES.split("\n2. ")[1].split("\n")[0]
     # #1038 r9 machinist review (rules 1 and 26): a leadered tag, not the
-    # note's words, reaches the second span (SPAN_TAGS).  One row: the mate
-    # by number (rule 7), so note 3 fits in the four rows.
-    assert note_2 == "SPANS (2X): SLIDING FIT IN MHA-DT-33 (CLEARANCE .0004-.0078)."
-    # The clearance from both parts' printed limits; its minimum is the
-    # collar spec's own slide-on clearance.
+    # note's words, reaches the second span (SPAN_TAGS).  Machinist review r1
+    # (farm run 20261124T110807008Z): the spans are made to fit MHA-DT-33
+    # (drawing-guidelines rule 4, form 2), size REF, one acceptance and
+    # no printed clearance beside it.
+    assert note_2 == "SPANS (2X): TURN TO MHA-DT-33 COLLAR BORE: SLIDES ON BY HAND."
+    assert "CLEARANCE" not in note_2
+    # The analysis clearance's minimum is the collar spec's own slide-on
+    # clearance.
     assert drawing.COLLAR_CLEARANCE[0] == pytest.approx(collar.SLIDE_CLEARANCE_MIN)
-    # The title block's .XX or .XXX on the back stub would stop the collar
-    # and the drum passing over it, so it keeps the band (L2 not met).
+    # The traveler's aim (the analysis band's top) stays under the smaller of
+    # the collar's and the drum's drilled bores, so both pass the spans.
     smallest_bore = min(
         collar.BORE + collar.BORE_BAND[1], drum.BORE_DIA + drum.ARBOR_BORE_BAND[1]
     )
     assert spec.SHAFT_DIA + spec.SHAFT_DIA_BAND[0] < smallest_bore
-    for title_block_max_in in (0.31 + 0.01, 0.312 + 0.005):
-        assert title_block_max_in * 25.4 > smallest_bore
     # Placement: the stub's line inside the back land's crown end, and its
     # 2X block, which SolidWorks runs right of its line (rounds 4-6), clear
     # of every known line.
@@ -876,7 +894,7 @@ def test_spans_outside_the_journals_share_one_2x_diameter_and_mate() -> None:
     assert "right" not in _crossed_either_side(stub_xy, _DIA_BLOCK_RUN_MM + _COUNT_PREFIX_MM)
     rows = drawing.SHEET_NOTES.replace("<MOD-DIAM>", "Ø").splitlines()
     assert len(rows) <= 4
-    assert max(map(len, rows)) <= 66
+    assert max(map(len, rows)) <= 70
 
 
 def test_each_2x_second_span_carries_a_leadered_tag_in_its_pocket() -> None:
@@ -938,14 +956,15 @@ def test_bond_zone_diameter_is_a_flank_dimension_on_the_drum() -> None:
     assert "ShaftProfile" not in spec.DRAWING_DIMENSIONS
     assert spec.DRAWING_DIMENSIONS["BondZoneReference"] == {"BondZoneDia"}
     assert drawing.DIMENSION_CALLOUTS["BondZoneDia"] is drawing.BOND_CALLOUT
-    # The bonded fit, its mate and its grade print once, on note 3, which
-    # both bond lands' callouts link (#1038 r11 machinist review, rule 26).
+    # The bond's mate and its grade print once, on note 3, which both bond
+    # lands' callouts link (#1038 r11 machinist review, rule 26); note 1 names
+    # the drum only as the journals' slide-over acceptance.
     words = drawing.SHEET_NOTES.split("\n3. ")[1].split()
-    assert "BONDED" in words and "MHA-DT-01," in words and "638" in words
-    assert drawing.SHEET_NOTES.count("MHA-DT-01") == 1
+    assert "LOCTITE" in words and "MHA-DT-01" in words and "DRUM," in words and "638" in words
+    assert "BONDED" not in drawing.SHEET_NOTES.split("\n2. ")[0]
     import _config
 
-    assert _config.parts("dt-pinion-bracket")["title"].upper() == drawing.STRAP_NAME
+    assert _config.parts("dt-pinion-bracket")["number"] == drawing.STRAP_NUMBER
     assert _config.parts("dt-pinion-arbor-collar")["number"] == drawing.COLLAR_NUMBER
     # Machinist review r3 of #1685 (blocker): the drum station falls on the
     # front land; each drum end rests on its land at every printed limit.
@@ -968,6 +987,11 @@ def test_bond_zone_diameter_is_a_flank_dimension_on_the_drum() -> None:
     assert spec.DRUM_FRONT_END_ON_JOURNAL_MIN == pytest.approx(front_min)
     assert spec.DRUM_BACK_END_ON_JOURNAL_MIN == pytest.approx(back_min)
     assert min(front_min, back_min) > 0.0
+    # Owner ruling 2026-11-25 (option A): the drum's front end seats .19 min
+    # (.23 max) on the front journal, which the traveler's remedy reams past.
+    assert spec.DRUM_FRONT_END_ON_JOURNAL_MIN / 25.4 == pytest.approx(0.19)
+    assert spec.DRUM_FRONT_END_ON_JOURNAL_MAX / 25.4 == pytest.approx(0.23)
+    assert spec.DRUM_FRONT_END_ON_JOURNAL_MIN >= spec.DRUM_FRONT_SEAT_FLOOR - 1e-9
     # So the drum covers exactly the span between the journals, and the
     # collar's span by the head (its pin hole) lies outside the drum.
     front_land_end = spec.FRONT_JOURNAL_END_FROM_HEAD_REAR
@@ -1031,10 +1055,7 @@ def test_drum_station_stack_derives_the_land_length_and_station_band() -> None:
     import pinion_rig_layout as rig
     from _printed_tolerance import printed_band_mm
 
-    assert (spec.END_PLAY, spec.END_PLAY_SET_ERROR) == (
-        rig.DRUM_END_SHIM,
-        rig.DRUM_END_SHIM_SET_ERROR,
-    )
+    assert (spec.END_PLAY, spec.END_PLAY_RANGE) == (rig.DRUM_END_SHIM, rig.DRUM_END_GAP)
     assert spec.LINEAR_XX_BAND == printed_band_mm(2, unit="in")
     assert spec.HEAD_LEN_BAND == printed_band_mm(2, unit="in")
     assert geometry.DRUM_LEN == rig.DRUM_LEN
@@ -1055,12 +1076,11 @@ def test_drum_station_stack_derives_the_land_length_and_station_band() -> None:
         assert set(margins) == set(spec.LAND_ENDS)
         assert min(margins.values()) >= spec.LAND_OVER_STRAP_REQUIRED - 1e-9
     # The drum never binds between the straps.
-    assert spec.END_PLAY - spec.END_PLAY_SET_ERROR >= 0.1
-    # The drum-end airs are the shim the pinned straps were drilled on.
-    assert spec.drum_total_air() == (
-        pytest.approx(spec.END_PLAY - spec.END_PLAY_SET_ERROR),
-        pytest.approx(spec.END_PLAY + spec.END_PLAY_SET_ERROR),
-    )
+    assert spec.END_PLAY_RANGE[0] >= 0.1
+    # The drum-end airs are the owner's range for the shim the pinned straps
+    # were drilled on (C7: any leaf .010 TO .020).
+    assert spec.drum_total_air() == spec.END_PLAY_RANGE
+    assert spec.END_PLAY_RANGE[0] <= spec.END_PLAY <= spec.END_PLAY_RANGE[1]
     # The lands are centred on their straps (to the printed .01 in) with the
     # drum mid-way through its play.
     air = spec.END_PLAY / 2.0
@@ -1252,24 +1272,22 @@ def test_drum_runs_in_the_shim_the_straps_were_drilled_on() -> None:
     # Main (#858, ruling 3): the E-a pins freeze the strap spacing where the
     # shaft is match-drilled, so the drum's running clearance is whatever the
     # drilling set-up leaves: the rig's shim at the drum's front end, which
-    # MHA-DT-00's SHAFT DRILL SET prints.  The drum keeps its end-play floor
-    # with RIG_MARGIN_SPARE to spare and never binds (Main, #858).  The rig's
-    # own stacks and step wording are pinned by its tests, not here.
+    # MHA-DT-00's SHAFT DRILL SET prints: any one leaf .010 TO .020 (owner
+    # ruling 2026-11-24, audit part 2 C7).  The drum keeps its end-play floor
+    # over the whole range and never binds (Main, #858); the planning spare
+    # went with the owner's range (owner ruling 2026-11-24 (C7): "Yes: ranges,
+    # longer flats, no leaf miking.").  The rig's own stacks
+    # and step wording are pinned by its tests, not here.
     import pinion_rig_layout as rig
 
-    assert spec.drum_total_air() == pytest.approx(
-        (
-            rig.DRUM_END_SHIM - rig.DRUM_END_SHIM_SET_ERROR,
-            rig.DRUM_END_SHIM + rig.DRUM_END_SHIM_SET_ERROR,
-        )
-    )
+    assert spec.drum_total_air() == pytest.approx(rig.DRUM_END_GAP)
     assert spec.drum_total_air()[0] >= spec.MIN_END_PLAY
     assert rig.STRAP_Z_INNER[1] - rig.STRAP_Z_INNER[0] == pytest.approx(
         rig.DRUM_LEN + rig.DRUM_END_SHIM, abs=1e-9
     )
     assert rig.DRUM_BACK_Z == rig.STRAP_Z_INNER[1]
-    assert rig.DRUM_END_SHIM_SET_ERROR == rig.FRONT_BLOCK_FEELER_BAND
-    assert spec.drum_total_air()[0] - spec.MIN_END_PLAY >= rig.RIG_MARGIN_SPARE - 1e-9
+    assert rig.DRUM_END_GAP == rig.FRONT_BLOCK_GAP == rig.leaf_gap(rig.SMALL_LEAF_RANGE)
+    assert spec.drum_total_air()[0] - spec.MIN_END_PLAY == pytest.approx(0.1413, abs=5e-4)
     assert rig.DRUM_FRONT_Z - rig.STRAP_Z_INNER[0] == pytest.approx(rig.DRUM_END_SHIM)
 
 
@@ -1381,19 +1399,24 @@ def test_head_neighbours_clear_the_integral_head() -> None:
 def test_collar_pin_hole_is_a_drilled_spring_pin_hole_clear_of_the_front_land() -> None:
     """R1a (user, 2026-09-24): the MHA-DT-33 collar's 1/16 in spring-pin hole.
 
-    It prints the rig's functional band (not the title block's drilled-hole
-    band), stands at a .XX station from the head rear face, never enters the
-    front land or its Ra 63 run-out at the worst corner, and leaves the .080
-    in web target of steel beside it.
+    It prints the 1/16 drill under the title block's DRILLED HOLES (the drive
+    trial is its acceptance), stands at a .XX station from the head rear face,
+    never enters the front land or its Ra 63 run-out at the worst corner, and
+    leaves the .080 in web target of steel beside it.
     """
     import dt_pinion_arbor_pin_spec as pin_hole
     import dt_vn_pinion_strap_pin_spec as strap_pin
 
     # One pin family and one drill for the whole rig (pinioncluster's E-a).
     assert pin_hole.PIN_HOLE_DIA == strap_pin.HOLE_DIA == pytest.approx(25.4 / 16.0)
-    assert pin_hole.PIN_HOLE_DIA_BAND == strap_pin.HOLE_BAND
-    # The hole names the pin it takes, which is why its band beats the
-    # title block's drilled-hole row (codex machinist pass on pc-r8).
+    # Machinist round 1 (farm 20261125T180203935Z; rule 4, form 2): no band
+    # of its own, the title block's DRILLED HOLES (.0625-.0665); a hole the
+    # pin enters by hand fails the drive trial.
+    from _printed_tolerance import drilled_oversize_mm
+
+    assert pin_hole.PIN_HOLE_DIA_BAND == (drilled_oversize_mm(unit=pin_hole.UNIT), 0.0)
+    assert pin_hole.PIN_HOLE_DIA_MAX / 25.4 == pytest.approx(0.0665)
+    assert pin_hole.PIN_HOLE_DIA_BAND != strap_pin.HOLE_BAND
     import _config
 
     assert pin_hole.PIN_NUMBER == _config.parts("dt-vn-pinion-strap-pin")["number"]
@@ -1430,21 +1453,17 @@ def test_collar_pin_dimensions_stand_above_the_shaft_clear_of_the_front_ra() -> 
     assert min(station_y, dia_y) > axis_y
 
 
-def test_collar_pin_hole_callout_names_the_press_fit_and_its_interference() -> None:
-    """R5 machinist review (blocker, rule 4): '.0625 +.0025/.0000 ... PRESS FIT
-    ON MHA-DT-VN-63' read as a clearance fit on a 1/16 pin.  The slotted pin
-    is .066-.069 before it is driven (ASME B18.8.2), so the callout prints
-    the interference the hole band gives it as a reference."""
+def test_collar_pin_hole_callout_makes_the_pin_its_own_gauge() -> None:
+    """R5 machinist review (blocker, rule 4) read '.0625 +.0025/.0000' as a
+    clearance fit on a 1/16 pin.  Fit audit F15 (the pin is the gauge):
+    the pin must drive, never enter by hand, so the callout says so and the
+    pin is the gauge (no gauge pin, no printed interference)."""
     assert drawing.DIMENSION_CALLOUTS["PinHoleDia"].splitlines() == [
-        "1/16 DRILL THRU",
-        "PRESS FIT ON MHA-DT-VN-63",
-        "(INTERFERENCE .0010-.0065)",
+        "1/16 DRILL THRU;",
+        "MHA-DT-VN-63 MUST DRIVE,",
+        "NOT ENTER BY HAND",
     ]
-    low, high = drawing.PIN_HOLE_INTERFERENCE
-    assert low > 0.0
-    assert (low, high) == pytest.approx(
-        ((0.066 - 0.065) * 25.4, (0.069 - 0.0625) * 25.4)
-    )
+    assert not hasattr(drawing, "PIN_HOLE_INTERFERENCE")
 
 
 # pc-r10 (37495ac47) layout audit, sheet mm: the three-line collar-pin

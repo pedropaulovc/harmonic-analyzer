@@ -115,8 +115,8 @@ a feel set leaves (`cone_set_stack`, `dt_mesh_checks`,
 `test_standard_mesh_checks`):
 
 - No binding is what the feel set itself guarantees. Check 4 swings the set
-  in until a gear just binds and holds it there, taps each pedestal in or out
-  until the gears at its end just bind, then swings the set in
+  in until a gear just binds and holds it there and taps each pedestal in or
+  out until the gears at its end just bind; check 5 then swings the set in
   until a gear just binds and eases it out in small steps to the first free
   run. No pair runs tighter than its own first bind, so at the tightest gear
   the backlash is at least zero (`cone_check` reports it; it is not a separate
@@ -128,11 +128,11 @@ a feel set leaves (`cone_set_stack`, `dt_mesh_checks`,
   wherever the binds fall near each end, and a gear past a hold rides the
   line's extension, higher by its slope times the overhang. Whether that may
   let a gear come loose was asked on #2584: owner ruling 2026-11-14 (Pedro,
-  option A) accepts it (dt-drive-train.yaml DT-08); MHA-DT-00 check 4R states
+  option A) accepts it (dt-drive-train.yaml DT-08); MHA-DT-00 check 5C states
   it as a plain fact: a gear outside the two 4E binds may shake, and no gear
   may bind. The stack's contact ratio ≥ 1 holds for pairs
   between the holds; an end-side gear past a hold may run below it. No
-  allowance is booked for it. Check 4N stops easing at the first free run, an
+  allowance is booked for it. Check 5A stops easing at the first free run, an
   observable stop; the ease is neither printed nor measured, and no number is
   booked for it (delegated ruling 2026-11-12, Main, following the owner's
   direction of 2026-11-11 on #2416; owner review
@@ -151,7 +151,7 @@ a feel set leaves (`cone_set_stack`, `dt_mesh_checks`,
   gear binds.
 - The crank pair has a fixed centre. It must reach a contact ratio of at least
   1.0 at the nominal centre (1.088), and it is accepted by hand at assembly:
-  MHA-DT-00 step 4N turns MHA-DT-07 a full revolution before the 16T is
+  MHA-DT-00 step 4J turns MHA-DT-07 a full revolution before the 16T is
   pinned, and if the teeth bind the 16T is recut, every tooth gap .004 in
   wider with the cutter moved sideways at the same depth (delegated ruling
   2026-11-17 on
@@ -282,7 +282,7 @@ mesh. As on the original, where a knob is loosened to swing the cone set
 out for zeroing and back in, the operator swings the set in and out many
 times and locks it by feel where the gears do not bind (owner direction
 2026-11-11, #2365). No feeler, gauge or engaged stop is used. The order,
-from MHA-DT-00 check 4 (CONE SWING SET):
+from MHA-DT-00 checks 4 (PEDESTALS SEATED) and 5 (CONE SWING SET):
 
 1. Ease the arbor-pedestal screws until the pedestals move under light taps.
 2. Hold the cone set swung in at the first bind and tap each pedestal in or
@@ -295,7 +295,7 @@ from MHA-DT-00 check 4 (CONE SWING SET):
    gear binds. If one does, loosen the knob there and ease out again.
 5. Do not loosen the pedestals after the set. If you do, redo both settings.
 
-The zeroing (check 5) ends by setting the swing the same way and cranking on
+The zeroing (check 6) ends by setting the swing the same way and cranking on
 until every notch is back: 80 crank turns turn every MHA-DT-12 a whole number
 of times, so the zero returns. The set
 absorbs the pivot's play and the gears' seat floats, which take the mesh

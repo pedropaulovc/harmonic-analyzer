@@ -12,9 +12,9 @@ dt-pinion-pivot-shaft:
   machinist_exceptions:
     - id: "RV-01"
       kind: "accept"
-      where: "front view: Ø.2500 +.0000/-.0008 journal, callout RUNNING FIT, MATCHED TO MHA-DT-18 PIVOT BLOCK BORES (CLEARANCE .0010-.0023)"
+      where: "front view: Ø.2500 +.0000/-.0008 journal, callout RUNS IN MHA-DT-18 PIVOT BLOCK BORES"
       finding: "band narrower than the turned-diameter row, or -.0008 a converted-millimetre deviation (rules 4, 26)"
-      reason: "Delegated ruling 2026-11-07 (Main), no precedent; owner review #2144 (fan-out rulings F1/F5). The band is the fleet-shared _fit_shaft_h.SHAFT_H (shaft_in_bushing fit class), restated in inch steps at the next re-key of that family; the matched running fit to the MHA-DT-18 pivot block bores is printed at the callout. Accepts the -.0008 notation and band on this diameter only, no other band or callout departure."
+      reason: "Delegated ruling 2026-11-07 (Main), no precedent; owner review #2144 (fan-out rulings F1/F5). The band is the fleet-shared _fit_shaft_h.SHAFT_H (shaft_in_bushing fit class), the bought ground bar's, restated in inch steps at the next re-key of that family (fit audit F22: kept as bought). The MHA-DT-18 bores are reamed .2510 with this shaft as their gauge and print the acceptance (owner ruling 2026-11-24, fit audit question 12); this callout names the mate only. Accepts the -.0008 notation and band on this diameter only, no other band or callout departure."
     - id: "RV-02"
       kind: "accept"
       where: "front view: 7.71 CYLINDRICAL BODY length between the SR.18 crown rims, with the reference overall (7.81) tip to tip"

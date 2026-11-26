@@ -49,6 +49,22 @@ PIVOT_NOTE_NUMBER = 1
 TEETH_NOTE_NUMBER = 2
 PIVOT_NOTE_FLAG = f"SEE NOTE {PIVOT_NOTE_NUMBER}"
 TEETH_NOTE_FLAG = f"SEE NOTE {TEETH_NOTE_NUMBER}"
+# Both stems are turned last to the holes reamed with the one .0625 reamer
+# (fit audit 2026-11-23, MHA-DT-37.stems; rule 4, form 2): each prints its
+# size as a REFERENCE and its acceptance once, here, as the clearance the
+# analysis bands give (cone_tip_cluster); the holes' sheets say the stem is
+# turned to them.
+MADE_TO_FIT_STEMS = ("SpigotDia", "PivotDia")
+
+
+def _clearance_text(clearance_mm: tuple[float, float]) -> str:
+    low, high = clearance_mm
+    return f"{spec.inch_text(low, 4)}-{spec.inch_text(high, 4)}"
+
+
+SPIGOT_CLEARANCE_TEXT = _clearance_text(cone_tip_cluster.SPIGOT_BOND_CLEARANCE_MM)
+PIVOT_BOND_CLEARANCE_TEXT = _clearance_text(cone_tip_cluster.BUSHING_BOND_CLEARANCE_MM)
+PIVOT_RUNNING_CLEARANCE_TEXT = _clearance_text(cone_tip_cluster.PIVOT_RUNNING_CLEARANCE_MM)
 # The gear width's callout: the .2934 nominal is the cone's seat pitch on
 # MHA-DT-04 (cone_pitch.SEAT_PITCH, floored to four millimetre places), the
 # stack closure of the touching faces that dt_cone_gear_spec records as not
@@ -65,17 +81,21 @@ def sheet_notes() -> str:
 
     Note 1 is the pivot's two fits (rule 4): the bushing is bonded over its
     root and the end screw's reamed hole runs on its end, one diameter for
-    both, each fit set by the printed limits (owner ruling 2026-11-20, #2469:
-    a LOCTITE 638 bonded slip fit on the shared .0625 reamer). Note 2 names
-    the mesh and the fit route of the tip, thickness and root bands, with the
-    teeth's do-not-cut. Note 3: the stems are turned between centres, and a
-    centre hole in either end harms nothing (rule 11).
+    both (owner ruling 2026-11-20, #2469: a LOCTITE 638 bonded slip fit on
+    the shared .0625 reamer), the pivot turned last to slide in both with
+    the clearances the analysis bands give (fit audit 2026-11-23, form 2).
+    Note 2 names the mesh and the fit route of the tip, thickness and root
+    bands, with the teeth's do-not-cut. Note 3: the stems are turned between
+    centres, and a centre hole in either end harms nothing (rule 11).
     """
     return "\n".join(
         (
             f"{PIVOT_NOTE_NUMBER}. PIVOT: BONDED FIT, {cone_tip_cluster.RETAINING_COMPOUND}, IN "
             f"{BUSHING_MATE_NUMBER} {BUSHING_MATE_TITLE};",
-            f"   ITS END RUNNING FIT IN {END_SCREW_MATE_NUMBER} {END_SCREW_MATE_TITLE}.",
+            f"   ITS END RUNNING FIT IN {END_SCREW_MATE_NUMBER} {END_SCREW_MATE_TITLE}; "
+            "TURNED LAST TO",
+            f"   SLIDE IN BOTH: CLEARANCE {PIVOT_BOND_CLEARANCE_TEXT} BONDED, "
+            f"{PIVOT_RUNNING_CLEARANCE_TEXT} RUNNING.",
             f"{TEETH_NOTE_NUMBER}. TEETH MESH WITH {CYLINDER_MATE_NUMBER}: ACCEPT OVER PINS, "
             "THEN BY FEEL AT ASSEMBLY,",
             f"   PER GEAR DATA. {TOOTH_EDGE_NOTE}",
@@ -86,16 +106,17 @@ def sheet_notes() -> str:
 
 # Callouts under the value. A callout keeps at most two lines of words
 # (rule 7); a mate serving several dimensions is named once, in a flagged
-# note (rule 4).
+# note (rule 4).  Beside a REF stem size the clearance is the requirement
+# and prints bare (rule 4, form 2; Codjiflo #3549-12).
 DIMENSION_CALLOUTS = {
-    # The spigot's band is the turned-diameter row's width, so it needs no
-    # fit route: the bonded fit with its compound (rule 26's fit name, as
-    # MHA-DT-04's note prints it) and its three mates.
+    # The spigot is turned last to its three reamed holes: the bonded fit
+    # with its compound (rule 26's fit name, as MHA-DT-04's note prints it)
+    # and its bond clearance (rule 23), then its three mates.
     "SpigotDia": (
-        f"BONDED FIT, {cone_tip_cluster.RETAINING_COMPOUND}, IN {SHAFT_MATE_NUMBER} SOCKET\n"
-        f"AND {STEM_BORE_MATES[0]}, {STEM_BORE_MATES[1]}"
+        f"BONDED FIT, {cone_tip_cluster.RETAINING_COMPOUND}, CLEARANCE {SPIGOT_CLEARANCE_TEXT}\n"
+        f"IN {SHAFT_MATE_NUMBER}, {STEM_BORE_MATES[0]}, {STEM_BORE_MATES[1]}"
     ),
-    # One banded diameter carries both of note 1's fits.
+    # One reference diameter carries both of note 1's fits.
     "PivotDia": f"BONDED AND RUNNING FIT\n{PIVOT_NOTE_FLAG}",
     "ToothThickness": TEETH_NOTE_FLAG,
     # The origin circle is an inspection witness, not the off-centre root arc.
@@ -171,8 +192,8 @@ def gear_data() -> str:
         ),
         ("TOOTH FORM", tooth_form()),
         ("MATE", f"{CYLINDER_MATE_NUMBER}, 120T"),
-        # Reference only: MHA-DT-00 check 4 sets the mesh by feel and
-        # measures no backlash (#2586).
+        # Reference only: MHA-DT-00 checks 4-5 set the mesh by feel and
+        # measure no backlash (#2586).
         (
             "BACKLASH WITH MATE (REF), FEEL SET AT ASSEMBLY",
             f"{inch(minimum, 3)} TO {inch(maximum, 3)}",

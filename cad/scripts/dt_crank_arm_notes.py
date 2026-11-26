@@ -14,22 +14,23 @@ from dt_crank_hub_geometry import AXIAL_PIN_DIA, FIDUCIAL_MODEL_DIA, SEAM_DEPTH
 from dt_crank_hub_notes import inch_text as _inch
 
 
-# The bore is made first and keeps its printed band; the hub is made to the
-# measured bore, and the interference it is made to is the fit's acceptance,
-# flagged to note 2 (rule 4: the standard fit name, its mate by name and
-# number).  The faces-flush stop is the MHA-DT-00 press step's (rule 7).
+# The bore is made first and keeps its printed band; the hub is turned to it
+# and the joint bonded (owner ruling 2026-11-24, fit audit question 21),
+# flagged to note 2 (rule 4: the fit, its mate by name and number).  The
+# faces-flush stop is the MHA-DT-00 bond step's (rule 7).
 # Rows <= 24 characters: the block is centred under the diameter, so its
 # widest row sets how close to the left border the hub-end dimension stands.
-HUB_SEAT_CALLOUT = "PRESS FIT ON CRANK HUB\nMHA-DT-31, SEE NOTE 2"
+HUB_SEAT_CALLOUT = "BONDED ON CRANK HUB\nMHA-DT-31, SEE NOTE 2"
 # The MHA-DT-VN-59 seam: size, process and depth (rule 26: a depth is never
-# deferred), then the flag to note 3, which carries the assembly-made ream,
-# its mate, pin and fit and the permanent pair (rules 4 and 7).  The depth
-# is the model's SeamDepth global, from the front face the front view shows.
-# Its station from the bore axis is a reference dimension on the view (rule
-# 26: a location is a dimension).
+# deferred), then the flag to note 3, which carries the assembly-made hole,
+# its mate, pin and bond and the permanent pair (rules 4 and 7).  Drilled
+# 5/32, the named drill (fit audit 2026-11-23, MHA-DT-06_DT-31.seam_pin).  The depth is the model's
+# SeamDepth global, from the front face the front view shows.  Its station
+# from the bore axis is a reference dimension on the view (rule 26: a
+# location is a dimension).
 SEAM_CALLOUT = "\n".join(
     (
-        f"(<MOD-DIAM>{_inch(AXIAL_PIN_DIA, 3)}) REAM <HOLE-DEPTH> "
+        f"(<MOD-DIAM>{_inch(AXIAL_PIN_DIA, 3)}) 5/32 DRILL <HOLE-DEPTH> "
         f"{_inch(SEAM_DEPTH, 2)}",
         "SEE NOTE 3",
     )

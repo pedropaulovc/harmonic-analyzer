@@ -2,7 +2,7 @@ r"""Create the curated manufacturing drawing for MHA-DT-VN-59.
 
 The pin is a McMaster-Carr 98381A487 dowel cut to length.  Its diameter
 prints as the supplier's fraction reference, its length at the title block's
-.XX; the linked assembly note defines the match-reamed light drive fit and
+.XX; the linked assembly note defines the drilled, bonded (LOCTITE 638) fit and
 six-o'clock axial installation without inventing independent receiver sizes.
 """
 

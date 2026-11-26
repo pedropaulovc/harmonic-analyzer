@@ -51,13 +51,18 @@ def test_each_bore_takes_its_mates_size_and_band() -> None:
         assert spec.bore_dia_mm(teeth) == cone_tip_cluster.STEM_BORE_DIA_MM
         assert spec.bore_dia_band(teeth) == cone_tip_cluster.STEM_BORE_BAND
         assert spec.bonded_mate(teeth) == cone_tip_cluster.SPIGOT
-    assert spec.bore_dia_mm(24) == pytest.approx(6.35)
-    assert spec.bonded_mate(24) == (spec.bore_dia_mm(24), lands.GEAR_SEAT_BAND)
+    # Land seats: the owned over reamer's size, the seat class's spread as
+    # the analysis band about it (fit audit 2026-11-23: no printed band).
+    assert spec.bore_dia_mm(24) == pytest.approx(6.35 + spec.BORE_DIA_BAND[1])
+    assert spec.bonded_mate(24) == (spec.LAND_2_DIA, lands.GEAR_SEAT_BAND)
     assert spec.BORE_DIA_BAND == seat_bore_band(lands.GEAR_SEAT_BAND)
+    spread = spec.BORE_DIA_BAND[0] - spec.BORE_DIA_BAND[1]
     for teeth in (24, *spec.KEYED_TEETH):
-        assert spec.bore_dia_band(teeth) == spec.BORE_DIA_BAND
+        assert spec.bore_dia_band(teeth) == pytest.approx((spread, 0.0))
     for teeth in spec.KEYED_TEETH:
-        assert spec.bore_dia_mm(teeth) == cone_land_key.LAND_DIA_MM
+        assert spec.bore_dia_mm(teeth) == pytest.approx(
+            cone_land_key.LAND_DIA_MM + spec.BORE_DIA_BAND[1]
+        )
         with pytest.raises(ValueError):
             spec.bonded_mate(teeth)
 
@@ -149,7 +154,7 @@ def test_every_keyed_web_is_proved_at_the_keyway_corner() -> None:
         1
     ]
     for teeth in spec.KEYED_TEETH:
-        bore_min = spec.bore_dia_mm(teeth) + spec.BORE_DIA_BAND[1]
+        bore_min = spec.bore_dia_mm(teeth) + spec.bore_dia_band(teeth)[1]
         corner = math.hypot(t_max - bore_min / 2.0, width_max / 2.0)
         web = spec.floor_limits_mm(teeth)[0] / 2.0 - corner
         assert spec.keyway_web_min_mm(teeth) == pytest.approx(web)
