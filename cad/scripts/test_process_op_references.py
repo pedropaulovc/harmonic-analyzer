@@ -224,3 +224,31 @@ def test_every_picture_names_its_own_operation_and_setup(stem: str) -> None:
     path = _process_plans.plan_path(stem)
     plan = tomllib.loads(path.read_text(encoding="utf-8"))
     assert picture_problems(path.parent, plan) == []
+
+
+def test_a_picture_naming_another_operation_is_caught(tmp_path: Path) -> None:
+    # dt_cone_swing_platform before this test: a conversion dropped an op above
+    # the #31's, and its picture still said Op 80 for the Op 70 it shows.
+    svg = '<svg xmlns="http://www.w3.org/2000/svg"><text class="title">{}</text></svg>'
+    (tmp_path / "drill.svg").write_text(svg.format("Op 80 (PL01, T4): the #31"), encoding="utf-8")
+    (tmp_path / "cbore.svg").write_text(svg.format("Op 80 (PL01, T2): the counterbore"), encoding="utf-8")
+    plan = {
+        "setups": [
+            {"operations": [{"instruction": f"Step {n}."} for n in range(6)]},
+            {
+                "operations": [
+                    {"instruction": "Same file, M6 T4: the #31.", "diagram": {"file": "drill.svg", "alt": "The #31."}},
+                    {
+                        "instruction": "Same file, M6 T2: counterbore.",
+                        "diagram": {"file": "cbore.svg", "alt": "As Op 80's picture: the 1/8 in end mill."},
+                    },
+                ]
+            },
+        ]
+    }
+    assert picture_problems(tmp_path, plan) == [
+        "drill.svg (Setup 2, Op 70) title opens with 'Op 80', not its own Op 70",
+        "cbore.svg (Setup 2, Op 80) alt: 'Op 80's picture' names this picture",
+    ]
+    (tmp_path / "drill.svg").write_text(svg.format("Op 70 (PL01, T2): the #31"), encoding="utf-8")
+    assert picture_problems(tmp_path, plan)[0] == "drill.svg (Setup 2, Op 70) title names T2; its Op 70 loads T4"
