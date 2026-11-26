@@ -28,12 +28,15 @@
   <text class="label" x="330" y="304">1 in parallels, one against each jaw</text>
   <text class="label" x="330" y="324">W at the fixed jaw (right); I at the far end (X0)</text>
   <text class="label" x="330" y="344">jaw tops {{process.upright_grip_mm:in.2dot}} over the parallels</text>
-  <text class="label" x="580" y="160">The seat from above:</text>
-  <rect class="part-kept" x="580" y="175" width="95.25" height="81.28"/>
-  <circle class="holes" cx="643.5" cy="215.64" r="11.43"/>
-  <line class="datum" x1="580" y1="169" x2="580" y2="262.28"/>
-  <line class="datum" x1="574" y1="175" x2="681.25" y2="175"/>
-  <text class="datum-label" x="576" y="274.28" text-anchor="end">X0: I</text>
-  <text class="datum-label" x="683.25" y="179">Y0: W</text>
-  <text class="label" x="560" y="296.28">hole X {{cad.hold_down_station_mm:.3f}}, Y −{{cad.hold_down_lateral_mm:.3f}} mm</text>
+  <text class="label" x="540" y="136">The seat from above (5 px/mm):</text>
+  <rect class="part-kept" x="560" y="155" width="95.25" height="81.28"/>
+  <rect class="part-removed" x="560" y="155" width="95.25" height="81.28"/>
+  <circle class="cutter" cx="607.5" cy="207.03" r="31.75"/>
+  <line class="arrow" x1="619.5" y1="207.03" x2="647.5" y2="207.03"/>
+  <line class="datum" x1="560" y1="149" x2="560" y2="242.28"/>
+  <line class="datum" x1="554" y1="155" x2="661.25" y2="155"/>
+  <text class="datum-label" x="556" y="254.28" text-anchor="end">X0: I</text>
+  <text class="datum-label" x="663.25" y="159">Y0: W</text>
+  <text class="label" x="540" y="272.28">1/2 in end mill, Y −10.406 mm</text>
+  <text class="label" x="540" y="288.28">pass, +X; .020 past E</text>
 </svg>

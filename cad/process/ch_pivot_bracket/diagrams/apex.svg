@@ -2,7 +2,7 @@
   <!-- Setup 7. Hand picture at 6 px/mm, looking at the moving jaw (its outline only: the jaw tops, 19.545 mm over the parallels, upright_grip_mm); W at the fixed jaw, behind. The bracket upright on the 1 in parallels (parallel_height_mm 25.4), the seat down, I on the right at X0: the foot 17.78 from I (.7000), 6.10 up from the seat (.240), the ear 8.128 thick (.3200), the apex 35.05 over the seat (1.380), the bore Ø.257 at 25.2 (Setup 5). The #43 drill to scale (cutter_dia_mm 2.2606; plan tool drill-43), 118 deg point, at X -4.064, Y -8.128, its point at Z 27.083 (apex_tip_height_mm, PB06's last peck): its full diameter 0.5 mm past the bore's wall (apex_drill_past_mm). Drawn short to a break line (its chuck is not drawn). The centre drill's spot before it is not drawn. -->
   <rect class="paper" x="0" y="0" width="760" height="400"/>
   <text class="title" x="20" y="24">Setup 7, PB06 T6, the #43 drill, from the front (6 px/mm)</text>
-  <path class="fixture-support" d="M320 380L320 406L315.93 409L311.85 406L307.78 409L303.7 406L299.63 409L295.55 406L291.48 409L287.4 406L283.33 409L279.26 406L275.18 409L271.11 406L267.03 409L262.96 406L258.88 409L254.81 406L250.73 409L246.66 406L242.59 409L238.51 406L234.44 409L230.36 406L226.29 409L222.21 406L218.14 409L214.06 406L209.99 409L205.92 406L201.84 409L197.77 406L193.69 409L189.62 406L185.54 409L181.47 406L177.39 409L173.32 406L173.32 380Z"/>
+  <path class="fixture-support" d="M320 380L320 392L315.93 395L311.85 392L307.78 395L303.7 392L299.63 395L295.55 392L291.48 395L287.4 392L283.33 395L279.26 392L275.18 395L271.11 392L267.03 395L262.96 392L258.88 395L254.81 392L250.73 395L246.66 392L242.59 395L238.51 392L234.44 395L230.36 392L226.29 395L222.21 392L218.14 395L214.06 392L209.99 395L205.92 392L201.84 395L197.77 392L193.69 395L189.62 392L185.54 395L181.47 392L177.39 395L173.32 392L173.32 380Z"/>
   <path class="part-kept" d="M300 380L193.32 380L193.32 343.42L251.23 343.42L251.23 169.69L300 169.69Z"/>
   <rect class="holes" x="251.23" y="209.22" width="48.77" height="39.17"/>
   <text class="label" x="245.23" y="233.8" text-anchor="end">bore</text>
@@ -13,8 +13,8 @@
   <circle class="datum" cx="300" cy="380" r="3.5"/>
   <text class="datum-label" x="308" y="376">Z0 the parallels' top (the seat)</text>
   <text class="label" x="364" y="320">1 in parallels</text>
-  <line class="leader" x1="360" y1="316" x2="288" y2="394"/>
-  <circle class="leader-dot" cx="288" cy="394" r="2"/>
+  <line class="leader" x1="360" y1="316" x2="288" y2="386"/>
+  <circle class="leader-dot" cx="288" cy="386" r="2"/>
   <line class="centre-line" x1="275.62" y1="20" x2="275.62" y2="228.8"/>
   <rect class="holes" x="268.83" y="169.69" width="13.56" height="39.53"/>
   <path class="cutter" d="M282.4 40L282.4 213.43L275.62 217.5L268.83 213.43L268.83 40L272.23 37L275.62 40L279.01 37Z"/>

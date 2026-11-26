@@ -21,7 +21,7 @@
   <line class="arrow" x1="284" y1="108.67" x2="324" y2="108.67"/>
   <text class="label" x="328" y="112.67">+X</text>
   <text class="label" x="20" y="378">The 1/2 in end mill rows each ring zone and shank band along X, first</text>
-  <text class="label" x="20" y="394">row at Y −21.946, to Z {{process.ring_rough_1_mm:in.3dot}} (Z0 face D); blank 2 the same;</text>
+  <text class="label" x="20" y="394">row at Y −21.946 mm, to Z {{process.ring_rough_1_mm:in.3dot}} in (Z0 face D); blank 2 the same;</text>
   <text class="label" x="20" y="410">the 1/8 in band round each ring has its own picture. The 1-2-3 block</text>
   <text class="label" x="20" y="426">flushes the left ends with the plate's edge, then is taken away.</text>
   <rect class="fixture-vise" x="531.76" y="406.68" width="272.64" height="16"/>
@@ -37,7 +37,7 @@
   <text class="label" x="531.76" y="438.68">moving jaw</text>
   <text class="title" x="531.76" y="52">Section at X 100.0, from the right end</text>
   <text class="label" x="531.76" y="70">through the shank band; the plate's top</text>
-  <text class="label" x="531.76" y="86">6.35 below Z0 (face D)</text>
+  <text class="label" x="531.76" y="86">1/4 in below Z0 (face D)</text>
   <text class="label" x="668.08" y="458.68" text-anchor="middle">support plate on two 1 in parallels</text>
   <line class="leader" x1="668.08" y1="446.68" x2="668.08" y2="345.72"/>
   <circle class="leader-dot" cx="668.08" cy="345.72" r="2"/>

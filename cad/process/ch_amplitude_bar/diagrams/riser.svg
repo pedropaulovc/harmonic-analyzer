@@ -17,7 +17,7 @@
   <text class="datum-label" x="66" y="84" text-anchor="middle">X0</text>
   <line class="datum" x1="34" y1="120" x2="68" y2="120"/>
   <text class="datum-label" x="34" y="114">Y0</text>
-  <line class="leader" x1="141.34" y1="246" x2="181.34" y2="189"/>
+  <line class="leader" x1="141.34" y1="280" x2="181.34" y2="189"/>
   <circle class="leader-dot" cx="181.34" cy="189" r="2"/>
   <text class="label" x="74" y="292">the 1/2 in end mill on the Y −1.500 pass, +X;</text>
   <text class="label" x="74" y="308">13 passes .250 apart, Y0 to −3.000, past both jaw sides</text>
@@ -48,8 +48,8 @@
   <text class="label" x="618" y="120">{{process.half_mill_projection_min_mm:in.2dot}} out (drawn short);</text>
   <text class="label" x="618" y="136">the tops .23 over the jaws</text>
   <text class="label" x="590" y="304" text-anchor="middle">1 in parallels, one at each jaw</text>
-  <line class="leader" x1="498" y1="290" x2="465" y2="280"/>
-  <circle class="leader-dot" cx="465" cy="280" r="2"/>
+  <line class="leader" x1="498" y1="290" x2="475" y2="280"/>
+  <circle class="leader-dot" cx="475" cy="280" r="2"/>
   <line class="leader" x1="682" y1="290" x2="705" y2="280"/>
   <circle class="leader-dot" cx="705" cy="280" r="2"/>
   <text class="label-halo" x="590" y="225" text-anchor="middle">TOP up, 3 in across the jaws</text>

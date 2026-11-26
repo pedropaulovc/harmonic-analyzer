@@ -29,7 +29,7 @@
   <text class="label" x="20" y="56">tram station, X −100.08 (−3.94 in)</text>
   <line class="leader" x1="596.7" y1="87.5" x2="620" y2="40"/>
   <circle class="leader-dot" cx="596.7" cy="87.5" r="1.5"/>
-  <text class="label" x="470" y="36">X +100.08: Y within 0.05 of X −100.08's</text>
+  <text class="label" x="420" y="36">X +100.08: Y within 0.05 mm (.002 in) of X −100.08's</text>
   <line class="leader" x1="714" y1="138" x2="712" y2="128"/>
   <text class="label" x="690" y="150">tip block</text>
   <line class="leader" x1="380" y1="137" x2="340" y2="180"/>

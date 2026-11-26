@@ -2,7 +2,7 @@
   <!-- Setup 7. Hand picture at 6 px/mm, looking at the moving jaw (its outline only: the jaw tops, 19.545 mm over the parallels, upright_grip_mm); W at the fixed jaw, behind. The bracket upright on the 1 in parallels (parallel_height_mm 25.4), the seat down, I on the right at X0: the foot 17.78 from I (.7000), 6.10 up from the seat (.240), the ear 8.128 thick (.3200), the apex 35.05 over the seat (1.380), the bore Ø.257 at 25.2 (Setup 5). The 4-40 plug tap to scale across its major Ø.112 (the 4-40 thread), its end square with the round cue (its lead is not on record), its point drawn at tap_reach_min_mm 10.089 below the apex. The T-handle wrench is schematic (not on record); the tap's length is schematic. The Fisher tap guide from the shop record (tools.tap-guide-fisher: shank Ø.500, 3 1/8 in overall, point Ø.1875; this plan does not restate them): its shank in the 1/2 in collet drawn short to a break line, its spring point in the wrench's centre hole. Tap, wrench and guide all in the tool colour. -->
   <rect class="paper" x="0" y="0" width="760" height="400"/>
   <text class="title" x="20" y="24">Setup 7, PB07: the 4-40 tap under the tap guide, from the front (6 px/mm)</text>
-  <path class="fixture-support" d="M320 380L320 406L315.93 409L311.85 406L307.78 409L303.7 406L299.63 409L295.55 406L291.48 409L287.4 406L283.33 409L279.26 406L275.18 409L271.11 406L267.03 409L262.96 406L258.88 409L254.81 406L250.73 409L246.66 406L242.59 409L238.51 406L234.44 409L230.36 406L226.29 409L222.21 406L218.14 409L214.06 406L209.99 409L205.92 406L201.84 409L197.77 406L193.69 409L189.62 406L185.54 409L181.47 406L177.39 409L173.32 406L173.32 380Z"/>
+  <path class="fixture-support" d="M320 380L320 392L315.93 395L311.85 392L307.78 395L303.7 392L299.63 395L295.55 392L291.48 395L287.4 392L283.33 395L279.26 392L275.18 395L271.11 392L267.03 395L262.96 392L258.88 395L254.81 392L250.73 395L246.66 392L242.59 395L238.51 392L234.44 395L230.36 392L226.29 395L222.21 392L218.14 395L214.06 392L209.99 395L205.92 392L201.84 395L197.77 392L193.69 395L189.62 392L185.54 395L181.47 392L177.39 395L173.32 392L173.32 380Z"/>
   <path class="part-kept" d="M300 380L193.32 380L193.32 343.42L251.23 343.42L251.23 169.69L300 169.69Z"/>
   <rect class="holes" x="251.23" y="209.22" width="48.77" height="39.17"/>
   <text class="label" x="245.23" y="233.8" text-anchor="end">bore</text>
@@ -13,15 +13,15 @@
   <circle class="datum" cx="300" cy="380" r="3.5"/>
   <text class="datum-label" x="308" y="376">Z0 the parallels' top (the seat)</text>
   <text class="label" x="364" y="320">1 in parallels</text>
-  <line class="leader" x1="360" y1="316" x2="288" y2="394"/>
-  <circle class="leader-dot" cx="288" cy="394" r="2"/>
+  <line class="leader" x1="360" y1="316" x2="288" y2="386"/>
+  <circle class="leader-dot" cx="288" cy="386" r="2"/>
   <line class="centre-line" x1="275.62" y1="20" x2="275.62" y2="228.8"/>
   <rect class="part-threads" x="267.08" y="169.69" width="17.07" height="39.53"/>
   <path class="cutter" d="M284.15 228.17L284.15 139.69L267.08 139.69L267.08 228.17A8.53 2.05 0 0 0 284.15 228.17Z"/>
   <rect class="cutter" x="215.62" y="131.69" width="120" height="8"/>
   <rect class="cutter" x="266.62" y="117.69" width="18" height="22"/>
-  <path class="cutter" d="M261.33 83.69L289.9 83.69L289.9 105.69L275.62 117.69L261.33 105.69Z"/>
-  <path class="cutter" d="M313.72 83.69L313.72 30L309.91 33L306.1 30L302.29 33L298.48 30L294.67 33L290.86 30L287.05 33L283.24 30L279.43 33L275.62 30L271.81 33L268 30L264.19 33L260.38 30L256.57 33L252.76 30L248.95 33L245.14 30L241.33 33L237.52 30L237.52 83.69Z"/>
+  <path class="cutter" d="M313.72 74.54L313.72 30L309.91 33L306.1 30L302.29 33L298.48 30L294.67 33L290.86 30L287.05 33L283.24 30L279.43 33L275.62 30L271.81 33L268 30L264.19 33L260.38 30L256.57 33L252.76 30L248.95 33L245.14 30L241.33 33L237.52 30L237.52 74.54A38.1 9.14 0 0 0 313.72 74.54Z"/>
+  <path class="cutter" d="M261.33 82.69L289.9 82.69L289.9 105.69L275.62 117.69L261.33 105.69Z"/>
   <text class="label" x="364" y="50">Fisher tap guide, its 1/2 in shank in the</text>
   <text class="label" x="364" y="66">1/2 in collet, spindle OFF</text>
   <line class="leader" x1="360" y1="56" x2="313.72" y2="56"/>

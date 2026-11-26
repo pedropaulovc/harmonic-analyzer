@@ -45,7 +45,7 @@
   <path class="cutter" d="M438 346.38L438 290L433.77 293L429.53 290L425.3 293L421.07 290L416.83 293L412.6 290L408.37 293L404.13 290L399.9 293L395.67 290L391.43 293L387.2 290L387.2 346.38A25.4 6.1 0 0 0 438 346.38Z"/>
   <text class="label" x="500" y="300">1/2 in end mill, to scale, the fence top's</text>
   <text class="label" x="500" y="316">third pass (Y +5.850), its tip at</text>
-  <text class="label" x="500" y="332">Z {{cad.fence_height_mm:.3f}}; fed +X (into the page)</text>
+  <text class="label" x="500" y="332">Z {{cad.fence_height_in:.3dot}}; fed +X (into the page)</text>
   <line class="leader" x1="498" y1="316" x2="438" y2="316"/>
   <circle class="leader-dot" cx="438" cy="316" r="2"/>
   <text class="label" x="500" y="372">Z0 (plate top) .146 above the jaws</text>

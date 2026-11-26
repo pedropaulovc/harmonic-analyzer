@@ -18,7 +18,7 @@
   <path class="hidden" d="M149.28 140.96A52.88 52.88 0 1 0 43.52 140.96A52.88 52.88 0 1 0 149.28 140.96"/>
   <circle class="cutter" cx="149.28" cy="140.96" r="3.81"/>
   <line class="arrow" x1="159.28" y1="138.96" x2="159.28" y2="110.96"/>
-  <text class="label" x="20" y="378">The 1/8 in end mill (T2) round ring 1's band to its floor, Z 5.080,</text>
+  <text class="label" x="20" y="378">The 1/8 in end mill (T2) round ring 1's band to its floor, Z 5.080 mm,</text>
   <text class="label" x="20" y="394">anticlockwise seen from above (G3), in levels; ring 2 the same.</text>
   <text class="label" x="20" y="410">Drawn at the band's right point (X 45.534), where it starts.</text>
   <rect class="fixture-vise" x="531.76" y="391.44" width="272.64" height="16"/>

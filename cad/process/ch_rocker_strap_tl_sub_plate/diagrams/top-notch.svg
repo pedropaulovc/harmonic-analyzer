@@ -21,8 +21,8 @@
   <path class="part-removed" d="M200 364.96L386.94 364.96L386.94 380L200 380Z"/>
   <path class="cutter" d="M225.4 367.91L225.4 290L221.17 293L216.94 290L212.7 293L208.47 290L204.24 293L200 290L200 367.91A12.7 3.05 0 0 0 225.4 367.91Z"/>
   <line class="arrow" x1="232.7" y1="310" x2="272.7" y2="310"/>
-  <text class="label" x="440" y="316">1/8 in end mill, to scale, first level Z 1.130,</text>
-  <text class="label" x="440" y="332">fed +X; then Z0, {{process.eighth_step_mm:in.3dot}} levels max</text>
+  <text class="label" x="440" y="316">1/8 in end mill, to scale, first level Z 1.130 mm,</text>
+  <text class="label" x="440" y="332">fed +X; then Z0, {{process.eighth_step_mm:in.3dot}} in levels max</text>
   <line class="leader" x1="438" y1="320" x2="225.7" y2="330"/>
   <circle class="leader-dot" cx="225.7" cy="330" r="2"/>
   <text class="label" x="92.4" y="376.48" text-anchor="end">stop</text>

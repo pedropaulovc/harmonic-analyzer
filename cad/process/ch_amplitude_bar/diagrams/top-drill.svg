@@ -6,7 +6,7 @@
   <text class="label-on-clamp" x="30" y="117.15">fixed jaw (behind)</text>
   <path class="part-kept" d="M380 255L380 330L20 330L17 325.83L20 321.67L17 317.5L20 313.33L17 309.17L20 305L17 300.83L20 296.67L17 292.5L20 288.33L17 284.17L20 280L17 275.83L20 271.67L17 267.5L20 263.33L17 259.17L20 255Z"/>
   <rect class="part-removed" x="215" y="273.3" width="165" height="37.8"/>
-  <rect class="holes" x="294.05" y="255" width="21.9" height="18.9"/>
+  <rect class="holes" x="294.05" y="311.1" width="21.9" height="18.9"/>
   <rect class="holes" x="294.05" y="255" width="21.9" height="18.3"/>
   <line class="centre-line" x1="305" y1="45" x2="305" y2="390"/>
   <path class="cutter" d="M315.95 90L315.95 335.9L305 342.48L294.05 335.9L294.05 90L297.7 87L301.35 90L305 87L308.65 90L312.3 87Z"/>
@@ -35,5 +35,6 @@
   <circle class="cutter" cx="675" cy="202.45" r="3.65"/>
   <text class="label" x="706" y="207.45">P1</text>
   <text class="label" x="560" y="351.6">the same at P2–P4, {{process.bar_pitch_mm:in.4dot}}</text>
-  <text class="label" x="560" y="367.6">apart; each hole .25 from the top end</text>
+  <text class="label" x="560" y="367.6">apart; each hole .25 from</text>
+  <text class="label" x="560" y="383.6">the top end</text>
 </svg>

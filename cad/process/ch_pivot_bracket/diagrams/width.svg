@@ -10,15 +10,15 @@
   <rect class="fixture-support" x="214.27" y="196" width="14.29" height="171.45"/>
   <rect class="fixture-support" x="285.71" y="196" width="14.29" height="171.45"/>
   <rect class="part-kept" x="214.27" y="122.85" width="85.73" height="73.15"/>
-  <rect class="part-removed" x="214.27" y="110.27" width="85.73" height="12.57"/>
+  <rect class="part-removed" x="214.27" y="115.99" width="85.73" height="6.86"/>
   <line class="active-face" x1="214.27" y1="122.85" x2="300" y2="122.85"/>
   <path class="cutter" d="M291.17 112.56L291.17 56.42L287.09 59.42L283.01 56.42L278.92 59.42L274.84 56.42L270.76 59.42L266.68 56.42L262.6 59.42L258.51 56.42L254.43 59.42L250.35 56.42L246.27 59.42L242.19 56.42L238.1 59.42L234.02 56.42L234.02 112.56A28.57 6.86 0 0 0 291.17 112.56Z"/>
   <line class="arrow" x1="228.02" y1="83.42" x2="204.02" y2="83.42"/>
   <circle class="datum" cx="300" cy="196" r="3.5"/>
   <text class="label" x="301.17" y="46">1/2 in end mill, each pass along the blank,</text>
   <text class="label" x="301.17" y="62">this one toward you (+X); stepping −Y</text>
-  <line class="leader" x1="380" y1="116" x2="291" y2="116.56"/>
-  <circle class="leader-dot" cx="291" cy="116.56" r="2"/>
+  <line class="leader" x1="380" y1="116" x2="291" y2="119.42"/>
+  <circle class="leader-dot" cx="291" cy="119.42" r="2"/>
   <text class="label" x="384" y="120">faced in levels to Z {{cad.east_side_width_mm:in.4dot}}: this face becomes E</text>
   <line class="leader" x1="380" y1="190" x2="286.5" y2="191.5"/>
   <circle class="leader-dot" cx="286.5" cy="191.5" r="2"/>

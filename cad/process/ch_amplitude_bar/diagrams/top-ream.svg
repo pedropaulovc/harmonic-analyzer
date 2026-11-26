@@ -6,7 +6,7 @@
   <text class="label-on-clamp" x="30" y="117.15">fixed jaw (behind)</text>
   <path class="part-kept" d="M380 255L380 330L20 330L17 325.83L20 321.67L17 317.5L20 313.33L17 309.17L20 305L17 300.83L20 296.67L17 292.5L20 288.33L17 284.17L20 280L17 275.83L20 271.67L17 267.5L20 263.33L17 259.17L20 255Z"/>
   <rect class="part-removed" x="215" y="273.3" width="165" height="37.8"/>
-  <rect class="holes" x="293.38" y="255" width="23.25" height="18.9"/>
+  <rect class="holes" x="293.38" y="311.1" width="23.25" height="18.9"/>
   <rect class="holes" x="293.38" y="255" width="23.25" height="18.3"/>
   <line class="centre-line" x1="305" y1="45" x2="305" y2="390"/>
   <path class="cutter" d="M316.62 339.02L316.62 90L312.75 93L308.88 90L305 93L301.12 90L297.25 93L293.38 90L293.38 339.02A11.62 2.79 0 0 0 316.62 339.02Z"/>
@@ -17,7 +17,7 @@
   <text class="datum-label" x="476" y="335">Z0 (R)</text>
   <text class="label" x="329" y="69">.0775 reamer, {{process.ream_projection_mm:in.2f}} out of the chuck (drawn short):</text>
   <text class="label" x="329" y="85">through both cheeks, in and out at feed,</text>
-  <text class="label" x="329" y="101">its full diameter {{process.ream_past_mm:in.3dot}} past R, into the air</text>
+  <text class="label" x="329" y="101">its tip {{process.ream_past_mm:in.3dot}} past R (its full diameter through)</text>
   <line class="leader" x1="205" y1="374" x2="245" y2="292.2"/>
   <circle class="leader-dot" cx="245" cy="292.2" r="2"/>
   <text class="label" x="163" y="388">the top notch (CA04),</text>
@@ -35,5 +35,6 @@
   <circle class="cutter" cx="675" cy="202.45" r="3.88"/>
   <text class="label" x="706" y="207.45">P1</text>
   <text class="label" x="560" y="351.6">the same at P2–P4, {{process.bar_pitch_mm:in.4dot}}</text>
-  <text class="label" x="560" y="367.6">apart; each hole .25 from the top end</text>
+  <text class="label" x="560" y="367.6">apart; each hole .25 from</text>
+  <text class="label" x="560" y="383.6">the top end</text>
 </svg>

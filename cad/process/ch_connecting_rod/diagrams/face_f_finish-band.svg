@@ -7,13 +7,11 @@
   <path class="part-removed" fill-rule="evenodd" d="M 435.34 98.62 L 476.47 98.62 A 42.37 42.37 0 0 1 488.39 100.36 L 488.39 181.63 A 42.37 42.37 0 0 1 476.47 183.37 L 435.34 183.37 Z M 435.34 129.08 L 476.47 129.08 A 11.92 11.92 0 0 1 476.47 152.83 L 435.34 152.83 Z"/>
   <rect class="part-removed" x="488.39" y="80" width="5.71" height="121.9"/>
   <path class="part-kept" d="M 445.1 129.08 L 476.47 129.08 A 11.92 11.92 0 0 1 476.47 152.83 L 445.1 152.83 Z"/>
-  <circle class="holes" cx="96.36" cy="140.99" r="36.99"/>
   <rect class="part-rest" x="40" y="201.9" width="454.1" height="121.9"/>
   <path class="part-removed" d="M 40 206.21 L 167.53 206.21 L 167.53 239.23 L 445.1 239.23 L 445.1 286.48 L 167.53 286.48 L 167.53 319.59 L 40 319.59 Z"/>
   <path class="part-removed" fill-rule="evenodd" d="M 435.34 220.52 L 476.47 220.52 A 42.37 42.37 0 0 1 488.39 222.26 L 488.39 303.53 A 42.37 42.37 0 0 1 476.47 305.27 L 435.34 305.27 Z M 435.34 250.98 L 476.47 250.98 A 11.92 11.92 0 0 1 476.47 274.73 L 435.34 274.73 Z"/>
   <rect class="part-removed" x="488.39" y="201.9" width="5.71" height="121.9"/>
   <path class="part-kept" d="M 445.1 250.98 L 476.47 250.98 A 11.92 11.92 0 0 1 476.47 274.73 L 445.1 274.73 Z"/>
-  <circle class="holes" cx="96.36" cy="262.9" r="36.99"/>
   <rect class="clamp" x="68.8" y="65.6" width="380.82" height="14.4"/>
   <rect class="clamp" x="68.8" y="323.84" width="380.82" height="14.4"/>
   <text class="label-on-clamp" x="232" y="76.6" text-anchor="middle">fixed jaw</text>
@@ -26,7 +24,7 @@
   <path class="hidden" d="M149.28 140.96A52.88 52.88 0 1 0 43.52 140.96A52.88 52.88 0 1 0 149.28 140.96"/>
   <circle class="cutter" cx="149.28" cy="140.96" r="3.81"/>
   <line class="arrow" x1="159.28" y1="138.96" x2="159.28" y2="110.96"/>
-  <text class="label" x="20" y="378">The 1/8 in end mill (T2) round ring 1's band to its floor, Z 4.572,</text>
+  <text class="label" x="20" y="378">The 1/8 in end mill (T2) round ring 1's band to its floor, Z 4.572 mm,</text>
   <text class="label" x="20" y="394">anticlockwise seen from above (G3), in levels; ring 2 the same.</text>
   <text class="label" x="20" y="410">Drawn at the band's right point (X 45.534), where it starts.</text>
   <rect class="fixture-vise" x="531.76" y="391.44" width="272.64" height="16"/>

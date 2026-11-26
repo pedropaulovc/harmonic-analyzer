@@ -6,12 +6,10 @@
   <path class="part-kept" d="M 30 77.87 L 115.02 77.87 L 115.02 99.88 L 300.07 99.88 L 300.07 87.41 L 320.98 87.41 A 28.25 28.25 0 0 1 328.92 88.57 L 328.92 142.75 A 28.25 28.25 0 0 1 320.98 143.91 L 300.07 143.91 L 300.07 131.39 L 115.02 131.39 L 115.02 153.46 L 30 153.46 Z"/>
   <path class="holes" fill-rule="evenodd" d="M 293.56 87.41 L 320.98 87.41 A 28.25 28.25 0 0 1 328.92 88.57 L 328.92 142.75 A 28.25 28.25 0 0 1 320.98 143.91 L 293.56 143.91 Z M 293.56 107.72 L 320.98 107.72 A 7.94 7.94 0 0 1 320.98 123.55 L 293.56 123.55 Z"/>
   <circle class="holes" cx="67.57" cy="115.66" r="24.66"/>
-  <circle class="holes" cx="320.98" cy="115.66" r="1.6"/>
   <rect class="part-rest" x="30" y="156.27" width="298.92" height="81.27"/>
   <path class="part-kept" d="M 30 159.14 L 115.02 159.14 L 115.02 181.15 L 300.07 181.15 L 300.07 168.68 L 320.98 168.68 A 28.25 28.25 0 0 1 328.92 169.84 L 328.92 224.02 A 28.25 28.25 0 0 1 320.98 225.18 L 300.07 225.18 L 300.07 212.66 L 115.02 212.66 L 115.02 234.72 L 30 234.72 Z"/>
   <path class="holes" fill-rule="evenodd" d="M 293.56 168.68 L 320.98 168.68 A 28.25 28.25 0 0 1 328.92 169.84 L 328.92 224.02 A 28.25 28.25 0 0 1 320.98 225.18 L 293.56 225.18 Z M 293.56 188.99 L 320.98 188.99 A 7.94 7.94 0 0 1 320.98 204.82 L 293.56 204.82 Z"/>
   <circle class="holes" cx="67.57" cy="196.93" r="24.66"/>
-  <circle class="holes" cx="320.98" cy="196.93" r="1.6"/>
   <rect class="clamp" x="49.2" y="65.4" width="253.88" height="9.6"/>
   <rect class="clamp" x="49.2" y="237.56" width="253.88" height="9.6"/>
   <text class="label" x="158" y="61.4" text-anchor="middle">fixed jaw</text>
@@ -43,10 +41,10 @@
   <text class="datum-label" x="578.37" y="192.4" text-anchor="end">crown</text>
   <text class="label-halo" x="660.29" y="170" text-anchor="middle">arbor</text>
   <text class="label-halo" x="660.29" y="246.16" text-anchor="middle">cap</text>
-  <text class="label" x="470" y="318">the jaws end at X 170.7 and the plate at 152.4,</text>
-  <text class="label" x="470" y="334">both behind: the fork overhangs; the cap passes</text>
-  <text class="label" x="470" y="350">beyond the crown, below its level, in the air</text>
-  <text class="label" x="470" y="366">(the saw drawn short at the right edge)</text>
+  <text class="label" x="470" y="318">the jaws end at X 170.7 mm and the plate at</text>
+  <text class="label" x="470" y="334">152.4 mm, both behind: the fork overhangs; the</text>
+  <text class="label" x="470" y="350">cap passes beyond the crown, below its level,</text>
+  <text class="label" x="470" y="366">in the air</text>
   <line class="datum" x1="470" y1="230" x2="494" y2="230"/>
   <text class="datum-label" x="464" y="234" text-anchor="end">Z0</text>
 </svg>
