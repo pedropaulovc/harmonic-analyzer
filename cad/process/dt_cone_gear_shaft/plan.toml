@@ -17,7 +17,7 @@ ref = "keyseat-endmill-1-16"  # F-keyseat-endmill
 [[tools]]
 id = "pin-gauges"
 name = "Pin gauges .011-.500"
-ref = "pin-gauges"  # A1-pin-set-061-250, A1-pin-set-061-500-combined
+ref = "pin-gauges"  # A1-pin-set-061-250, A1-pin-set-061-500-combined; reads the MHA-DT-03 24T and MHA-DT-05 bores the journal and land 2 are turned to
 
 [[tools]]
 id = "drill-53"
@@ -27,7 +27,7 @@ ref = "drill-53"  # drawing cross-check 2026-11-19: pre-drill for the .0625 ream
 [[tools]]
 id = "reamer-0625"
 name = ".0625 reamer"
-ref = "reamer-0625"  # drawing cross-check 2026-11-19: .0625 +.0005/.0000 REAM .20
+ref = "reamer-0625"  # drawing cross-check 2026-11-19: .0625 REAM .20 (fit audit 2026-11-23: no band, MHA-DT-37 spigot turned to it)
 
 [[setups]]
 machine_kind = "other"
@@ -36,3 +36,10 @@ title = "Traveler to come"
 
 [[setups.operations]]
 instruction = "Process not written yet."
+
+# Route note, owner ruling 2026-11-24 on #3402: "Route note only (rough the
+# journal in the same chucking as the land, dial it true in the 4-jaw before
+# finishing); no reading." Land 1's runout to the journal stays unprinted and
+# unbooked (cone_set_stack); the traveler carries the route.
+[[setups.operations]]
+instruction = "Rough the journal in the same chucking as land 1; before finishing, dial the roughed journal true in the 4-jaw. No reading is recorded."

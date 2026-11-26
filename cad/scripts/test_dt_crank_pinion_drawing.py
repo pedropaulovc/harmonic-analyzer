@@ -11,7 +11,6 @@ lives in the gear-data block.
 from __future__ import annotations
 
 import math
-import re
 from pathlib import Path
 
 import pytest
@@ -89,7 +88,10 @@ def test_the_blank_sizes_are_native_model_dimensions() -> None:
         spec.DRAWING_PRECISION_BY_NAME["OutsideDia"],
     )
     assert spec.FACE_WIDTH == part.FACE_WIDTH
-    assert spec.BORE_DIA == pytest.approx(part.BORE_DIAMETER)
+    # The bore is modelled at the owned .3135 reamer's size, no band (fit
+    # audit 2026-11-23, MHA-DT-10.bore).
+    assert part.BORE_DIAMETER == pytest.approx(0.3135 * 25.4)
+    assert part.BORE_DIAMETER == pytest.approx(spec.BORE_DIA + min(spec.BORE_DIA_BAND))
     assert "OUTSIDE DIAMETER" not in notes.GEAR_DATA
     assert "FACE WIDTH" not in notes.GEAR_DATA
     # The printed face width is the lower witness's, driven from the same
@@ -142,6 +144,23 @@ def test_grown_teeth_keep_the_south_seat_and_boss_length() -> None:
     )
 
 
+def test_face_width_takes_the_title_block_row_and_the_mesh_still_closes() -> None:
+    # Machinist review r1 (farm run 20261124T110807008Z): the +.000/-.010
+    # band's register reason was not of its kind, so the face prints at the
+    # .XX row with no band; the short limit is unchanged and the long one
+    # still closes the mesh and the T120 air.
+    import crank_mesh_stack
+
+    assert spec.FACE_WIDTH_BAND == pytest.approx((0.254, -0.254))
+    assert spec.FACE_WIDTH + spec.FACE_WIDTH_LIMITS[0] == pytest.approx(0.45 * 25.4)
+    mesh = crank_mesh_stack.standard_check()
+    assert mesh.backlash_min_mm > 0.0 and mesh.root_clearance_min_mm > 0.25
+    assert spec.T120_TURNED_BAND_RADIAL_WORST >= 0.25
+    register = Path(__file__).resolve().parents[1] / "config" / "necessity"
+    text = (register / "dt-crank-pinion.yaml").read_text(encoding="utf-8")
+    assert "face width" not in text.split("necessity:", 1)[1]
+
+
 def test_the_boss_is_the_root_circle_and_the_pin_hole_stays_in_its_wall() -> None:
     # ch12 p.19: the hub boss is the tooth-root cylinder carried on past the
     # face, so the boss needs no second turned diameter and the tooth root
@@ -176,7 +195,7 @@ def test_pin_hole_callout_links_the_pins_drive_fit_note() -> None:
     # matched fit. Screen of the novice rubric (#2223): the callout is its
     # reference size, the process with its mate and one link (rule 7: at most
     # two lines of words); the pin's fit takes its standard name with the
-    # acceptance in note 4 (rules 4 and 26: LIGHT HAMMER FIT is no standard
+    # acceptance in note 3 (rules 4 and 26: LIGHT HAMMER FIT is no standard
     # name). FLUSH BOTH SIDES is an assembly instruction (rule 7): MHA-DT-00's
     # pin step carries it.
     import draw_dt_drive_train_assembly as assembly
@@ -188,12 +207,12 @@ def test_pin_hole_callout_links_the_pins_drive_fit_note() -> None:
         f"SEE NOTE {notes.PIN_FIT_NOTE_NUMBER}",
     ]
     assert _note(notes.PIN_FIT_NOTE_NUMBER) == (
-        f"4. DRIVE FIT ON PIN {spec.PIN_NUMBER}; NOT REMOVABLE BY HAND."
+        f"3. DRIVE FIT ON PIN {spec.PIN_NUMBER}; NOT REMOVABLE BY HAND."
     )
     for text in (notes.DRAWING_NOTES, *drawing.DIMENSION_CALLOUTS.values()):
         assert "LIGHT HAMMER FIT" not in text and "FLUSH" not in text
     assert "FLUSH BOTH SIDES" in spec.PIN_FIT_LINES[1]
-    # MHA-DT-00's 4U-4W: tapped in flush, then the hand check its remedy needs.
+    # MHA-DT-00's 4P-4R: tapped in flush, then the hand check its remedy needs.
     assert f"TAP {spec.PIN_NUMBER} IN FLUSH BOTH SIDES." in assembly.CONE_CRANK_STEPS
     assert f"CHECK THAT {spec.PIN_NUMBER} IS NOT REMOVABLE BY HAND." in assembly.CONE_CRANK_STEPS
     assert drawing.REFERENCE_DIMENSIONS == ("PinHoleDia",)
@@ -289,28 +308,26 @@ def test_callouts_link_the_numbered_note_that_names_their_mate() -> None:
         "ShoulderRadius",
     }
     mesh_link = f"SEE NOTE {notes.MESH_NOTE_NUMBER}"
-    for name in ("OutsideDia", "ShoulderLength", "FaceWidth"):
+    # Fit audit part 2, B9: the turned band links note 1 (its T120 clearance);
+    # its fit-up note is gone with the feeler check.
+    for name in ("OutsideDia", "TurnedDia", "ShoulderLength", "FaceWidth"):
         assert callouts[name] == mesh_link, name
-    assert callouts["TurnedDia"] == f"SEE NOTE {notes.TURNED_DIA_NOTE_NUMBER}"
+    assert not hasattr(notes, "TURNED_DIA_NOTE_NUMBER")
     assert spec.BORE_PROCESS_CALLOUT == "REAM THRU"
     assert callouts["BoreDia"] == f"REAM THRU\nSEE NOTE {notes.BORE_FIT_NOTE_NUMBER}"
     assert spec.MESH_GEAR_NUMBER in callouts["ShoulderRadius"]
     assert _note(notes.MESH_NOTE_NUMBER) == (
         "1. MESH WITH CRANK DRIVE GEAR MHA-DT-07; CLEARANCE TO 120T CONE GEAR MHA-DT-03."
     )
-    low, high = spec.BORE_DIAMETRAL_CLEARANCE
+    # Fit audit 2026-11-23, MHA-DT-10.bore: MHA-DT-11's seat is made last,
+    # to this reamed bore; the acceptance prints on the crankshaft's sheet.
     assert _note(notes.BORE_FIT_NOTE_NUMBER) == (
-        f"3. SLIDING FIT ON CRANKSHAFT {spec.CRANKSHAFT_NUMBER} "
-        f"(CLEARANCE {spec.inch_text(low, 4)}-{spec.inch_text(high, 4)})."
+        f"2. CRANKSHAFT {spec.CRANKSHAFT_NUMBER} SEAT IS TURNED TO THIS BORE."
     )
-    # Each mate is named once among the notes, except the 120T cone gear:
-    # notes 1 (its clearance) and 2 (the feeler check the Ø.730 flags) each
-    # name it, since a mate must sit in the note its callout links (fan-out
-    # r2, rule 4).
-    for number in (spec.MESH_GEAR_NUMBER, spec.CRANKSHAFT_NUMBER):
+    # Each mate is named once among the notes (rule 4).
+    for number in (spec.MESH_GEAR_NUMBER, spec.CRANKSHAFT_NUMBER, spec.CONE_GEAR_NUMBER):
         assert notes.DRAWING_NOTES.count(number) == 1, number
-    assert notes.DRAWING_NOTES.count(spec.CONE_GEAR_NUMBER) == 2
-    assert spec.CONE_GEAR_NUMBER in _note(notes.TURNED_DIA_NOTE_NUMBER)
+    assert "FITTED AT ASSEMBLY" not in notes.DRAWING_NOTES
     printed = (notes.DRAWING_NOTES, notes.GEAR_DATA, *callouts.values())
     for private in ("T120", "BORE LIMITS GOVERN", "DIA CLR", "MATE SHAFT"):
         assert not any(private in text for text in printed), private
@@ -383,12 +400,13 @@ def test_tooth_system_and_pair_acceptance_match_current_geometry() -> None:
     assert data[notes.SPAN_LABEL].strip() == mate_notes.accept_limits_text(
         spec.BASE_TANGENT_SPAN_LIMITS_MM, 4
     )
-    assert notes.BACKLASH_LABEL == (
-        f"TRANSVERSE BACKLASH WITH {spec.MESH_GEAR_NUMBER}, ACCEPT AT ASSEMBLY"
-    )
+    # Fit audit question 16: the backlash is the mesh's REF range; the mesh
+    # is accepted by turning free by hand (the mate row below).
+    assert notes.BACKLASH_LABEL == f"TRANSVERSE BACKLASH WITH {spec.MESH_GEAR_NUMBER} (REF)"
     assert labels.index(notes.BACKLASH_LABEL) == labels.index(notes.SPAN_LABEL) + 1
     backlash = data[notes.BACKLASH_LABEL].strip()
-    assert backlash == mate_notes.accept_limits_text(mate_notes.GEAR_MESH_BACKLASH_MM, 3)
+    assert backlash == mate_notes.accept_limits_text(mate_notes.MESH_BACKLASH_REF_MM, 4)
+    assert "ACCEPT AT ASSEMBLY" not in notes.GEAR_DATA
     mate_data = dict(
         line.partition(":")[::2] for line in mate_notes.GEAR_DATA.splitlines()[1:]
     )
@@ -591,9 +609,6 @@ def test_w15_boss_walls_the_pin_and_the_shaft_end_stands_proud_at_every_limit() 
     import dt_feeler_leaves
 
     assert dt_feeler_leaves.leaf_stack(spec.SEAT_FEELER_MM) == (spec.SEAT_FEELER_MM,)
-    assert dt_feeler_leaves.leaf_stack(spec.T120_FITUP_FEELER_MM) == (
-        spec.T120_FITUP_FEELER_MM,
-    )
     concentric = bdt.PINION_T120_CONCENTRIC
     assert concentric["shoulder air"] >= bdt.T120_PINION_AIR_FLOOR
     assert concentric["turned band radial"] >= bdt.T120_TURNED_BAND_RADIAL_FLOOR
@@ -837,7 +852,6 @@ def test_t120_clearance_facts_match_the_ordinary_floors_without_a_waiver() -> No
         assert longer["shoulder air"] < spec.T120_SHOULDER_AIR_WORST
     else:
         assert air == math.inf
-        assert "NO AXIAL OVERLAP" in spec.T120_FITUP_ASSEMBLY_CHECK
 
 
 def test_t120_shoulder_air_bounds_every_reachable_south_rim_point() -> None:
@@ -905,111 +919,6 @@ def test_t120_search_never_looks_outside_the_section() -> None:
     assert nowhere[0] == math.inf
 
 
-def test_t120_fit_up_closes_and_both_sheets_state_it() -> None:
-    # Either fit-up cut, taken to its limit, passes the feeler at every
-    # corner of the same stack; the minimum band is an actual size.
-    import build_dt_drive_train_assembly as bdt
-    import draw_dt_drive_train_assembly as drawing
-    import dt_drive_train_assembly_sheet as sheet
-    import dt_drive_train_steps
-
-    feeler = spec.T120_FITUP_FEELER_MM
-    turned_down = bdt.t120_fitup_reading(
-        turned_dia=spec.TURNED_DIA_FITUP_MIN - 2.0 * bdt._PINION_TURNED_RADIUS_UP
-    )
-    faced_back = bdt.t120_fitup_reading(shoulder_length=spec.SHOULDER_LENGTH_FITUP_MIN)
-    assert turned_down["turned band radial"] >= feeler
-    assert faced_back["shoulder air"] >= feeler
-    # The shoulder's fit-up limit is its printed short limit.
-    assert spec.SHOULDER_LENGTH_FITUP_MIN == pytest.approx(
-        spec.SHOULDER_LENGTH + spec.SHOULDER_LENGTH_LIMITS[0]
-    )
-    # The part sheet permits the turn-down to its floor, in the numbered note
-    # the turned diameter links.
-    # Both sheets print decimal inch; the assembly's minimum rounds up.
-    turn_down = f"Ø{sheet.inch_min_text(spec.TURNED_DIA_FITUP_MIN, 3)} MIN"
-    assert (
-        f"Ø{spec.inch_text(spec.TURNED_DIA_FITUP_MIN, spec.TURNED_DIA_PLACES)} MIN"
-        in _note(notes.TURNED_DIA_NOTE_NUMBER)
-    )
-    # The drive-train crank step checks the pair before the pin is drilled.
-    number = dt_drive_train_steps.step_number("crank-mesh-checked")
-    step = drawing.CONE_CRANK_STEPS.split(f"\n{number}. ", 1)[1]
-    step = " ".join(step.split(f"\n{number + 1}. ")[0].split())
-    check = step.index(f"{sheet.T120_FITUP_FEELER_TEXT} FEELER")
-    drill = step.index("MATCH-DRILL")
-    # The push names both parts the check closes on, before the reading; the
-    # wording around them is free (Codex P3 on #1154, review 4). It is its
-    # own sub-step, one sentence (rule 22).
-    push = step.index("PUSH")
-    sentence = step[push : step.index(".", push)]
-    assert all(part in sentence for part in spec.T120_FITUP_PUSHED)
-    assert push < check < drill
-    assert check < step.index(turn_down) < drill
-    shoulder = f"{sheet.inch_min_text(spec.SHOULDER_LENGTH_FITUP_MIN, 3)} MIN"
-    assert check < step.index(shoulder) < drill
-
-
-def test_t120_fit_up_stops_a_band_that_would_pass_and_then_close() -> None:
-    # Codex P2 on #1154 (review 2): a check that took up only MHA-DT-11's play
-    # passed a Ø16.043 band with the cone shaft centred in the post boss; once
-    # that play closed the band kept 0.018.  The check pushes MHA-DT-10 and
-    # T120 toward each other, so it reads that band as it runs.
-    import build_dt_drive_train_assembly as bdt
-
-    feeler = spec.T120_FITUP_FEELER_MM
-    up = bdt._PINION_TURNED_RADIUS_UP
-
-    def radial(read, dia: float) -> float:
-        return read(turned_dia=dia - 2.0 * up)["turned band radial"]
-
-    def cone_centred(**geometry) -> dict[str, float]:
-        return bdt.t120_fitup_reading(pushed=(spec.PINION_NUMBER,), **geometry)
-
-    # The actual band that just passes with the cone shaft centred.
-    passing = spec.TURNED_DIA + 2.0 * (radial(cone_centred, spec.TURNED_DIA) - feeler)
-    assert passing > spec.PITCH_DIA
-    assert radial(cone_centred, passing) == pytest.approx(feeler, abs=1e-9)
-    in_service = radial(bdt.pinion_t120_clearances, passing)
-    cone_play = bdt.T120_POSE_TERMS["cone shaft float in the post boss"][0]
-    assert in_service == pytest.approx(feeler - cone_play, abs=1e-9)
-    # The printed check reads it at that service worst and stops the feeler.
-    assert radial(bdt.t120_fitup_reading, passing) == pytest.approx(
-        in_service, abs=1e-9
-    )
-    assert radial(bdt.t120_fitup_reading, passing) < feeler
-
-
-def test_t120_turn_down_height_and_actual_fitup_row_are_separate_gates() -> None:
-    # Retain the physical feeler-height transition, and require the exact
-    # independently measured turned-fitup row instead of interpolating lengths.
-    import build_dt_drive_train_assembly as bdt
-
-    feeler = spec.T120_FITUP_FEELER_MM
-    height = bdt.T120_BAND_CHECK_CRANK_HEIGHT
-    low, high = bdt._CRANK_HEIGHT_BAND
-    assert low <= height <= high
-
-    def band_reading(crank_height: float) -> float:
-        return bdt.t120_fitup_reading(crank_heights=(crank_height,))[
-            "turned band radial"
-        ]
-
-    if band_reading(low) >= feeler:
-        assert height == pytest.approx(low, abs=1e-12)
-        assert band_reading(high) >= feeler
-    elif band_reading(high) < feeler:
-        assert height == pytest.approx(high, abs=1e-12)
-    else:
-        assert band_reading(height) == pytest.approx(feeler, abs=1e-9)
-        assert band_reading(height + 0.01) > feeler > band_reading(height - 0.01)
-
-
-def _sentences(text: str) -> list[str]:
-    """The sentences of sheet text, whatever its line breaks."""
-    return [part for part in re.split(r"[.;]\s+|[.;]$", " ".join(text.split())) if part]
-
-
 # MHA-DT-00's crank step, which carries the T120 check.  The part spec never
 # reads the step registry (test_part_isolation), so the key lives here.
 _T120_CHECK_STEP_KEY = "crank-mesh-checked"
@@ -1024,104 +933,26 @@ def _crank_step() -> str:
     return step.split(f"\n{number + 1}. ")[0]
 
 
-def test_each_t120_cut_answers_only_its_own_failed_reading() -> None:
-    # A passing band's reading must never trigger its cut merely because
-    # the independent shoulder reading fails.
-    import build_dt_drive_train_assembly as bdt
-
-    # Exercise every cut combination independently of whether the current
-    # configuration needs a cut at any height.
-    feeler = spec.T120_FITUP_FEELER_MM
-    failing = math.nextafter(feeler, -math.inf)
-    for reading, expected in (
-        ({"turned band radial": feeler, "shoulder air": failing}, {"shoulder air"}),
-        (
-            {"turned band radial": failing, "shoulder air": feeler},
-            {"turned band radial"},
-        ),
-        (
-            {"turned band radial": failing, "shoulder air": failing},
-            {"turned band radial", "shoulder air"},
-        ),
-        ({"turned band radial": feeler, "shoulder air": math.inf}, set()),
-    ):
-        assert bdt.t120_fitup_cuts(reading) == expected
-    low, high = bdt._CRANK_HEIGHT_BAND
-    heights = [low + (high - low) * i / 40.0 for i in range(41)]
-    witnesses = [
-        (height, bdt.t120_fitup_reading(crank_heights=(height,))) for height in heights
-    ]
-    shoulder_only = [
-        (height, reading)
-        for height, reading in witnesses
-        if reading["turned band radial"] >= spec.T120_FITUP_FEELER_MM
-        and reading["shoulder air"] < spec.T120_FITUP_FEELER_MM
-    ]
-    if not shoulder_only:
-        assert all(reading["shoulder air"] >= feeler for _, reading in witnesses)
-    for height, witness in shoulder_only:
-        assert bdt.t120_fitup_cuts(witness) == {"shoulder air"}
-        faced = bdt.t120_fitup_reading(
-            crank_heights=(height,), shoulder_length=spec.SHOULDER_LENGTH_FITUP_MIN
-        )
-        assert bdt.t120_fitup_cuts(faced) == frozenset()
-    # The physical cut-height domain is separate from stock-contact evidence.
-    low, high = bdt._CRANK_HEIGHT_BAND
-    turned = [
-        height
-        for height in (low + (high - low) * i / 40.0 for i in range(41))
-        if "turned band radial"
-        in bdt.t120_fitup_cuts(bdt.t120_fitup_reading(crank_heights=(height,)))
-    ]
-    assert max(turned, default=low) <= bdt.T120_BAND_CHECK_CRANK_HEIGHT + 1e-12
-    if not turned:
-        assert all(reading["turned band radial"] >= feeler for _, reading in witnesses)
-    # Both sheets give each cut its own condition: the turn-down floor is
-    # stated with the band and its check only, the facing floor with the
-    # shoulder only.  The part sheet states the turn-down in numbered note 2,
-    # which the turned diameter alone links, and points at the MHA-DT-00
-    # feeler check to the 120T gear, which carries the band-only condition,
-    # by name and never by step number (a sequence edit must not re-key the
-    # part).
-    turn_down = f"Ø{spec.TURNED_DIA_FITUP_MIN:.2f} MIN"
-    face_back = f"{spec.SHOULDER_LENGTH_FITUP_MIN:.2f} MIN"
-    for floor, own, other in (
-        (turn_down, "BAND", "SHOULDER"),
-        (face_back, "SHOULDER", "BAND"),
-    ):
-        for sentence in _sentences(_crank_step()):
-            if floor in sentence:
-                assert own in sentence and other not in sentence, sentence
-    note = _note(notes.TURNED_DIA_NOTE_NUMBER)
-    assert drawing.DIMENSION_CALLOUTS["TurnedDia"] == f"SEE NOTE {notes.TURNED_DIA_NOTE_NUMBER}"
-    assert "SHOULDER" not in note and face_back not in note
-    for text in (notes.DRAWING_NOTES, *drawing.DIMENSION_CALLOUTS.values()):
-        assert face_back not in text
-    import dt_drive_train_steps
-
-    assert f"Ø{spec.inch_text(spec.TURNED_DIA_FITUP_MIN, spec.TURNED_DIA_PLACES)} MIN" in note
-    assert dt_drive_train_steps.DRAWING_NUMBER in note and "120T GEAR" in note
-    assert turn_down not in notes.DRAWING_NOTES
-    assert not re.search(r"STEP\s+\d", note)
-
-
-def test_crank_step_runs_free_only_after_the_t120_check_closes() -> None:
-    # Codex P2 on #1154 (review 3): the step asked for a full revolution that
-    # must never bind before the T120 check, yet the unadjusted pair may rub
-    # (-0.10 / -0.12).  The seat is set and the check closed first; the
-    # free-running revolution follows, then the match-drill.
+def test_crank_step_looks_for_t120_daylight_before_the_free_turn() -> None:
+    # Fit audit 2026-11-23 part 2, B9: at print worst the band keeps
+    # T120_TURNED_BAND_RADIAL_WORST to the T120 tips and the shoulder never
+    # overlaps T120, so the step looks for daylight through one turn after the
+    # seat is set, then runs the free-turn mesh check, then match-drills; no
+    # feeler and no fit-up cut remain on either sheet.
     import draw_dt_drive_train_assembly as drawing
     import dt_drive_train_assembly_sheet as sheet
 
+    assert spec.T120_TURNED_BAND_RADIAL_WORST >= 1.0
+    assert spec.T120_SHOULDER_AIR_WORST == math.inf
     step = " ".join(_crank_step().split())
     seat = step.index(f"{sheet.inch_text(drawing.PINION_SEAT_FEELER, sheet.FEELER_PLACES)} OFF")
-    check = step.index(f"{sheet.T120_FITUP_FEELER_TEXT} FEELER")
-    cuts = max(
-        step.index(f"Ø{sheet.inch_min_text(spec.TURNED_DIA_FITUP_MIN, 3)} MIN"),
-        step.index(f"{sheet.inch_min_text(spec.SHOULDER_LENGTH_FITUP_MIN, 3)} MIN"),
-    )
-    free = step.index("BIND")
-    assert seat < check < cuts < free < step.index("MATCH-DRILL")
+    look = step.index(" ".join(sheet.T120_DAYLIGHT_CHECK.split()))
+    remedy = step.index(sheet.T120_DAYLIGHT_REMEDY)
+    free = step.index("NEVER BIND")
+    assert seat < look < remedy < free < step.index("MATCH-DRILL")
+    assert "TURN MHA-DT-10'S BAND DOWN" not in step and "FACE THE SHOULDER" not in step
+    for name in ("T120_FITUP_FEELER_MM", "TURNED_DIA_FITUP_MIN", "SHOULDER_LENGTH_FITUP_MIN"):
+        assert not hasattr(spec, name), name
 
 
 def test_pinion_seed_puts_its_gap_on_the_64t_tooth_at_the_pitch_point():

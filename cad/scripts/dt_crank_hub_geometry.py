@@ -27,7 +27,12 @@ import _config
 import _sprocket_seat_geometry as seat_geometry
 from _inch_wall_limits import WALL_TARGET_MM
 from _package_units import drawing_unit
-from _printed_tolerance import edge_break_chamfer_mm, printed_band_mm
+from _printed_tolerance import (
+    drilled_oversize_mm,
+    drilled_undersize_mm,
+    edge_break_chamfer_mm,
+    printed_band_mm,
+)
 from dt_crank_pin_spec import BIG_END_DIA as SERVICE_PIN_BIG_END_DIA
 
 # The matched arm/hub set prints in the hub's unit; dt_crank_arm_spec asserts
@@ -78,15 +83,20 @@ ARM_THICKNESS = ARM_STOCK_THICKNESS
 PHOTO_HUB_SEAT_DIA = round(PHOTO_HUB * PHOTO_MM_PER_UNIT * OUTBOARD_SCALE, 1)
 HUB_SEAT_DIA = 19.304  # .76
 HUB_SEAT_LENGTH = ARM_THICKNESS
-# Seat-in-arm press (B1, Main 2026-09-25): the seat is turned to suit the
-# MHA-DT-06 bore as measured, for a light press.  A 1018 hub in a 1018 arm,
-# 5/16 long and keyed by MHA-DT-VN-59 on the seam, needs the press only to hold the
-# hub square and stop it turning while the seam is match-drilled.  The band
-# sits inside ISO 286 H7/p6 at 18-30 mm (0.001-0.035 diametral, the
-# locational-interference fit); its line-to-line end is raised to 0.010
-# because the hub is turned to a measured bore, not drawn from stock.  The
-# model seats line-to-line; the shoulder land below reads the largest seat.
-SEAT_PRESS_INTERFERENCE = (0.01016, 0.03048)  # diametral (min, max): .0004-.0012 in
+# Seat in the arm (owner ruling 2026-11-24, fit audit question 21; reverses
+# B1, Main 2026-09-25, the light press): a bonded slip fit.  The seat is
+# turned last to the MHA-DT-06 bore as made, the arm sliding on by hand, and
+# the joint is bonded with LOCTITE 638, which holds the hub square and stops
+# it turning while the seam is drilled.  .0005-.003 diametral: the arm slides
+# on by hand at the tight end, and the loose end's .0015 a side is far inside
+# the compound's 0.25 mm gap limit (RETAINING_COMPOUND_MAX_GAP_MM in
+# dt_pinion_arbor_geometry; restated, not imported: this module is in every
+# assembly's recipe).  The model seats line-to-line; the shoulder land below
+# reads the largest seat.
+SEAT_SLIP_CLEARANCE = (0.0127, 0.0762)  # diametral (min, max): .0005-.003 in
+_LOCTITE_638_MAX_GAP_MM = 0.25
+if SEAT_SLIP_CLEARANCE[1] > _LOCTITE_638_MAX_GAP_MM:
+    raise AssertionError("the MHA-DT-31 seat's slip gap is past LOCTITE 638's limit")
 # CONTRACT-crank MHA-DT-31: the barrel behind the arm (observed Ø≈20, review
 # Q4) is turned to its own size, narrower than the 1-in arm, and the hub
 # runs from the arm shoulder to a flat rear face clear of the MHA-PD-09
@@ -194,31 +204,36 @@ PHOTO_ARM_TO_HUB_RATIO = PHOTO_ARM / PHOTO_HUB
 SERVICE_PIN_STATION = 13.462  # .53
 CRANK_FACE_SHIFT = ARM_THICKNESS
 
-# Shared shaft-in-bushing fit class, re-expressed as a bore nominal/band against
-# the already released ground-shaft h band (0/-.0008 in).  The resulting
-# worst-case diametral clearance is exactly the catalogued .0010-.0023 in, and
-# the bore comes out .376 +.0005/.0000 in, the owned .3760 reamer's cut.  The
-# catalogue pair is restated, not read: _interference_contracts imports this
-# module into every assembly's recipe, and a fit-class read would make them
-# all depend on tolerances/shaft_in_bushing.yaml.  test_dt_crank_hub_drawing
-# pins it to the catalogue.
+# The bore is the named 3/8 drill's at DRILLED HOLES, .375-.379 (delegated
+# ruling 2026-11-25 (Main), precedent: the fit-necessity rule of the
+# owner-approved fit policy (drawing-simplicity-policy.md; owner ruling
+# 2026-11-24): a bore with no failing check takes the plain drill; no owner
+# number changed; owner review #2144 (D27): the .3760 REAM failed rule 4's
+# necessity test, since the crank is
+# stopped by eye and taper-pinned to MHA-DT-11, so bore shake reaches no
+# reading).  MHA-DT-11's stub is made last and turned to the bore's smallest
+# measured reading less the shaft-in-bushing class's catalogued .0010-.0023
+# in diametral clearance; SHAFT_DIA_BAND is that REF stub's analysis aim on
+# its .375 nominal.  The catalogue pair is restated, not read:
+# _interference_contracts imports this module into every assembly's recipe,
+# and a fit-class read would make them all depend on
+# tolerances/shaft_in_bushing.yaml.  test_dt_crank_hub_drawing pins it to
+# the catalogue.
 SHAFT_DIA_BAND = (0.0, -0.02032)
 SHAFT_CLEARANCE_MIN, SHAFT_CLEARANCE_MAX = 0.0254, 0.05842
-HUB_BORE_DIA = SHAFT_DIA + SHAFT_CLEARANCE_MIN
-HUB_BORE_BAND = (
-    SHAFT_CLEARANCE_MAX - (HUB_BORE_DIA - (SHAFT_DIA + SHAFT_DIA_BAND[1])),
-    0.0,
-)
+HUB_BORE_DIA = 0.375 * MM_PER_IN  # 3/8 drill
+HUB_BORE_BAND = (drilled_oversize_mm(unit=UNIT), -drilled_undersize_mm(unit=UNIT))
 
 # MHA-DT-VN-59 is an axial seam pin at six o'clock in the outboard view, cut
 # from a 5/32 x 1/2 alloy-steel dowel pin (McMaster-Carr 98381A487, Ø.1563
 # +.0001/+.0003; 1.3x the photograph's 3.405 is 4.43, and 5/32 is the stock
-# size below it).  It is match-drilled/reamed into both parts with its axis on
-# the nominal hub-seat seam, parallel to the crankshaft, and driven flush with
-# the outboard face: the hole runs deeper than the cut pin at every printed
-# limit, so the pin always seats before it bottoms.
+# size below it).  Its hole is drilled 5/32 into both parts at assembly with
+# its axis on the nominal hub-seat seam, parallel to the crankshaft, and the
+# pin is bonded in (LOCTITE 638) flush with the outboard face (fit audit
+# 2026-11-23, MHA-DT-06_DT-31.seam_pin; the .1562 reamer is retired): the hole
+# runs deeper than the cut pin at every printed limit, so the pin always
+# seats before it bottoms.
 AXIAL_PIN_DIA = 3.96875  # 5/32
-AXIAL_PIN_DIA_STOCK_MAX = 3.97637  # .1563 + .0003
 AXIAL_PIN_LENGTH = 3.81  # .15, cut length
 SEAM_DEPTH = 4.318  # .17
 if SEAM_DEPTH - GENERAL_2PL_TOL_MM < AXIAL_PIN_LENGTH + GENERAL_2PL_TOL_MM - 1e-9:
@@ -235,8 +250,14 @@ SHAFT_FIDUCIAL_RADIUS = 2.5
 # U27: the two thin walls of the matched arm/hub/pin set -- the hub web between
 # the seam pin and the bore, and the arm cheek around the hub seat -- are judged
 # at the worst case of the printed bands after both edge breaks.  The seat's
-# printed band is MHA-DT-06's .XX bore; MHA-DT-31's seat is turned to suit it for a
-# press, so it is never under the bore's minimum.
+# printed band is MHA-DT-06's .XX bore; MHA-DT-31's seat is turned to it less
+# the slip clearance, so at worst it is the bore's minimum less the widest
+# slip, and the seam hole is the 5/32 drill at its DRILLED HOLES maximum.
+SEAM_HOLE_DIA_MAX = AXIAL_PIN_DIA + drilled_oversize_mm(unit=UNIT)
+# The bonded pin's widest gap: the drilled hole at its maximum round the pin
+# at its nominal (98381A487 is +.0001/+.0003, never under).
+if SEAM_HOLE_DIA_MAX - AXIAL_PIN_DIA > _LOCTITE_638_MAX_GAP_MM:
+    raise AssertionError("the seam pin's drilled gap is past LOCTITE 638's limit")
 HUB_SEAT_DIA_MIN_GENERAL = HUB_SEAT_DIA - GENERAL_2PL_TOL_MM
 HUB_SEAT_DIA_MAX_GENERAL = HUB_SEAT_DIA + GENERAL_2PL_TOL_MM
 HUB_BORE_DIA_MAX = HUB_BORE_DIA + HUB_BORE_BAND[0]
@@ -268,8 +289,13 @@ SERVICE_PIN_REAR_LIGAMENT_WORST_MM = (
 # smallest is the relief's wall over the bore.
 RELIEF_DIA_MAX = RELIEF_DIA + GENERAL_2PL_TOL_MM
 # The hub rides the shaft in its clearance bore, pinned wherever the
-# match-ream found it, so its relief can stand this far off the shaft axis.
-HUB_SHAFT_FLOAT = (HUB_BORE_DIA_MAX - (SHAFT_DIA + SHAFT_DIA_BAND[1])) / 2.0  # 0.0375
+# match-ream found it, so its relief can stand this far off the shaft axis:
+# the stub turned to the bore's smallest reading (as small as the drill's
+# .375) less the widest clearance, inside a drilled hole whose largest
+# diameter may reach .379 (a drilled hole is not round).
+HUB_SHAFT_FLOAT = (
+    HUB_BORE_DIA_MAX - (HUB_BORE_DIA + HUB_BORE_BAND[1] - SHAFT_CLEARANCE_MAX)
+) / 2.0  # 0.080
 # The barrel is printed at the title block's .XX: its smallest is what the
 # arm shoulder and the MHA-DT-09 ream's wall read.
 HUB_BARREL_DIA_MIN = HUB_BARREL_DIA - GENERAL_2PL_TOL_MM
@@ -285,7 +311,7 @@ def wall_after_edge_break(outer_dia: float, inner_dia: float) -> float:
 
 
 SEAM_WEB_WORST_MM = wall_after_edge_break(
-    HUB_SEAT_DIA_MIN_GENERAL - AXIAL_PIN_DIA_STOCK_MAX, HUB_BORE_DIA_MAX
+    HUB_SEAT_DIA_MIN_GENERAL - SEAT_SLIP_CLEARANCE[1] - SEAM_HOLE_DIA_MAX, HUB_BORE_DIA_MAX
 )
 ARM_CHEEK_WORST_MM = wall_after_edge_break(
     ARM_WIDTH - ARM_WIDTH_STOCK_MINUS, HUB_SEAT_DIA_MAX_GENERAL
@@ -308,15 +334,15 @@ for _wall, _label in (
 ):
     if _wall < WALL_TARGET_MM:
         raise AssertionError(f"{_label} is only {_wall:.3f} mm at worst case")
-# The arm is pressed to the barrel's front face (FACES FLUSH), which carries
-# the press and then holds the arm square.  The face it bears on runs from
-# the arm bore's broken edge to the barrel's broken corner, and the seat is
-# turned to the bore it meets, so at worst the largest bore (.X) plus the
-# tightest press stands inside the smallest barrel.  The land must stay one
-# title-block edge break wide: a flat a fitter can see and gauge the press
-# against, not a knife edge left between two chamfers.
+# The arm is bonded to the barrel's front face (FACES FLUSH), which takes the
+# arm's push on assembly and then holds the arm square while the compound
+# cures.  The face it bears on runs from the arm bore's broken edge to the
+# barrel's broken corner, and the seat is turned to the bore it meets, so at
+# worst the largest bore (.XX) less the tightest slip stands inside the
+# smallest barrel.  The land must stay one title-block edge break wide: a
+# flat a fitter can see, not a knife edge left between two chamfers.
 SHOULDER_LAND_WORST_MIN = EDGE_BREAK_MAX_MM
-HUB_SEAT_DIA_MAX_MATCHED = HUB_SEAT_DIA_MAX_GENERAL + SEAT_PRESS_INTERFERENCE[1]
+HUB_SEAT_DIA_MAX_MATCHED = HUB_SEAT_DIA_MAX_GENERAL - SEAT_SLIP_CLEARANCE[0]
 
 
 def shoulder_land(barrel_dia_min: float, seat_dia_max: float) -> float:
@@ -337,7 +363,10 @@ if not HUB_BORE_DIA < RELIEF_DIA < HUB_BARREL_DIA:
     raise AssertionError("MHA-DT-31 relief is not a step between the bore and barrel")
 if SERVICE_PIN_STATION >= RELIEF_STATION:
     raise AssertionError("MHA-DT-09 station lies on the rear relief")
-if SHAFT_DIA + SHAFT_DIA_BAND[0] >= HUB_BORE_DIA + HUB_BORE_BAND[1]:
+# The stub is turned to the measured bore less at least SHAFT_CLEARANCE_MIN,
+# so it always withdraws; its REF model at .375 may sit line-on-line with the
+# 3/8 drill's nominal (coincident faces, not an interference) but never over.
+if SHAFT_CLEARANCE_MIN <= 0.0 or SHAFT_DIA + SHAFT_DIA_BAND[0] > HUB_BORE_DIA + HUB_BORE_BAND[1]:
     raise AssertionError("shaft dome cannot withdraw through the hub bore")
 if HUB_SHOULDER_STATION >= SERVICE_PIN_STATION:
     raise AssertionError("MHA-DT-09 is not behind the crank arm")

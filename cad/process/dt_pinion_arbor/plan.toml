@@ -21,29 +21,41 @@
 #   table and file it smooth.
 # - Setup 7, lathe, between the 3-jaw (on the head, over a brass shim wrap)
 #   and the tailstock dead centre, the follow rest behind the tool: rough the
-#   shaft from the bar, finish it whole length to the journals' band
-#   .3113-.3121 (inside the spans' and lands' .3087-.3121), turn the Ø.28
+#   shaft from the bar, finish it whole length to the aim set by the
+#   measured strap and drum bores (inside the spans' and lands' .3087-.3121), turn the Ø.28
 #   relief, step the SR.28 back crown from a DRO table, every station by the
 #   carriage DRO from the head's rear face.
 # - Setup 8, bench: deburr, check, oil, bag.
 #
-# Matched fit (note 1): the journals run in the MHA-DT-14 strap's two .3135-
-# .3140 reamed bores; Setup 7 mikes the band's two Class ZZ pins, .3135 plus
-# (GO) and .3140 minus (NO-GO), and gauges both bores with them before the
-# journals are finished: a strap bore the GO pin enters and the NO-GO pin
-# does not lies between the two pins' readings, so inside .3135-.3140, and a
-# journal in .3113-.3121 gives the drawing's .0014-.0027 clearance (no
-# constant here assumed the old pair's size). The spans' sliding fit in
-# MHA-DT-33 and the lands' bond in MHA-DT-01 are fixed bands.
+# Made to fit (note 1; owner ruling 2026-11-24, fit audit question 12): the
+# journals run in the two MHA-DT-14 straps' 5/16 drilled bores, and (owner
+# ruling 2026-11-25, option A) the MHA-DT-01 drum slides over both: its
+# front end leads from the back crown over the back journal and seats .19
+# min on the front one, so its whole bore passes the back journal and its
+# front end takes the front one. Setup 7 measures each strap's bore and the
+# drum's two ends with the telescoping gauge and the micrometer before the
+# shaft is finished; each journal's aim is its own strap's bore less .002,
+# held .0004 under the drum bore it must enter, never over .3117 (the collar
+# still slides over it): the journals then run at the drawing's .001-.003.
+# When no aim does both (the strap's bore more than .0022 over the drum's:
+# the .003 loosest clearance less the .0004 turning window and the .0004
+# the drum needs to slide), the front journal is turned to its strap alone
+# and the drum's front end is reamed to it + .001 with the owned adjustable
+# set, .30 deep (past the .23 the seat reaches): its wall stays .151 (rule
+# 17: .080 target) and the front land's gap under it at most .0042 (note 3:
+# .008). No ruling covers the back journal: there the fitter stops and
+# tells the owner. No gauge pins on the
+# journals. The bond lands are made to the MHA-DT-01 drum's 5/16 drilled
+# bore too (note 3; owner ruling 2026-11-24, fit audit question 13): Setup 7
+# skims the lands only where the aim leaves the drum less than .002 clear.
+# The spans are made to the MHA-DT-33 collar's
+# 5/16 drilled bore too (note 2; drawing-guidelines rule 4, form 2):
+# Setup 7's aim keeps them under its .3125 minimum, and Setup 8 slides the
+# collar, then the drum, over them by hand.
 #
 # To order before Setup 4 runs: the .2510 reamer (tools.reamer-2510, owner
-# ruling #3073); pin gauges (gauges.pin-gauges); before Setup 7, the strap
-# band's .3135 plus Class ZZ pin (GO; the .314 NO-GO is the Class ZZ minus
-# box's), shop common.toml zz-pins-3135-3140. Owner ruling 2026-11-23 (tool
-# audit Q1, re-answered on the corrected facts), verbatim: "ZZ singles per
-# the record: 29 pins (17 plus GO, 12 minus NO-GO), about $130. Accept that
-# good holes near a limit may be refused; the traveler mikes each pin so the
-# real window is known per pin."
+# ruling #3073). No gauge pins: the MHA-DT-15 rod and the MHA-DT-VN-63 pin
+# gauge their holes (fit audit F14, F15).
 #
 # NC (cam:dt_pinion_arbor, cad/process/dt_pinion_arbor/cam.py):
 # PA01_cross_hole, PA02_pin_hole. The program names, the [parameters] and the
@@ -179,7 +191,10 @@ ream_feed_per_min_mm = 40.64
 drill_feed_per_min_mm = 71.12
 # Setup 7: the 3-jaw on the head over the shim wrap, the back end on the
 # greased dead centre; the shaft roughed in passes of .040 per side from
-# Ø.625 to Ø.330, then finished whole length to .3113-.3121, aiming .3117.
+# Ø.625 to Ø.330, then finished whole length to the aim A, the larger of the
+# two journals' aims (each its strap's measured bore less
+# journal_clearance_aim_in, never over journal_aim_in, .3117, .0004 under the
+# spans' .3121 top), the other journal skimmed to its own.
 # The follow rest bolts to the saddle's headstock side, its jaws a lead L
 # ahead of the tool, so it cannot reach the head: the stretch from the
 # shoulder to the joint at Z+3.20 (in the span between the front journal
@@ -188,6 +203,7 @@ drill_feed_per_min_mm = 71.12
 rough_doc_in = 0.04
 rough_dia_in = 0.33
 journal_aim_in = 0.3117
+journal_clearance_aim_in = 0.002
 relief_aim_in = 0.28
 rest_joint_in = 3.2
 # The AR holder's TCMT insert (60° included) has a trailing edge at 30° or
@@ -198,37 +214,55 @@ rest_joint_in = 3.2
 # its 6.80 end (.028 + .016); the sharp-nose tool turns off what is left.
 neck_rough_start_z_in = 0.7672
 relief_rough_start_z_in = 6.75
-# Bench: the pins over which the holes' stations are read: the cross hole's
-# .251 GO (gauges.pin-gauges, class ZZ minus); the pin hole's GO the .0625
-# class ZZ gauge pin (tools.gauge-pin-0625, the band's bottom), its NO-GO the
-# set's .065. The cross hole lies in the head, toward the apex from the rear
-# face: the depth rod reads to the pin's near side, the station less half the
-# pin. The pin hole lies in the shaft: the station plus half the pin.
-cross_go_pin_in = 0.251
-cross_nogo_pin_in = 0.255
-pin_go_pin_in = 0.0625
-pin_nogo_pin_in = 0.065
-cross_near_side_min_in = 0.0945
-cross_near_side_max_in = 0.1145
+# Bench: the pin hole's station is read over the 1/16 drill's shank (miked),
+# the hole in the shaft: the station plus half the shank. The hole has no
+# gauge pin: an MHA-DT-VN-63 must drive, not enter by hand (the hole's
+# acceptance; fit audit F15). The cross hole's station is read over the
+# MHA-DT-15 rod itself, miked (fit audit F14: the rod is its gauge).
+pin_shank_in = 0.0625
 pin_far_side_min_in = 1.5213
 pin_far_side_max_in = 1.5413
-# Setup 5: the cross hole's .251 GO pin set upright before the pin hole is
-# drilled (the drawing's two holes parallel, the title block's ±1° on
-# angles): the spindle DTI (shop gauges.dti) on the pin over .200 of Z,
-# .200 × tan 1° = .0035 in = 0.089 mm.
+# Setup 5: a 1/4 rod (MHA-DT-15 or an offcut of its bar) set upright in the
+# cross hole before the pin hole is drilled (the drawing's two holes
+# parallel, the title block's ±1° on angles): the spindle DTI (shop
+# gauges.dti) on the rod over .200 of Z, .200 × tan 1° = .0035 in = 0.089 mm.
+# The rod's .001-.0035 play in the reamed hole tilts it at most .0011 over
+# .200, inside the window.
 pin_square_dti_mm = 0.089
-# Setup 7: the MHA-DT-14 strap's arbor bores, Ø.3125 +.0015/+.0010 =
-# .3135-.3140 (dt_pinion_bracket_spec.py REAM_SLIDE; shop common.toml
-# gauges.zz-pins-3135-3140 range_mm). Their Class ZZ pins (owner ruling
-# 2026-11-23, tool audit Q1): GO a plus pin at the low limit, true size
-# .3135 to .3137; NO-GO the box's .314 minus pin, .3138 to .3140 (one pin's
-# ZZ tolerance, .0002, is the record's resolution_mm 0.00508). The largest
-# GO pin and the smallest NO-GO pin the sheet may use: with both pins there,
-# a bore is sure to pass only between them, the middle .0001 of the band.
-strap_bore_min_in = 0.3135
-strap_bore_max_in = 0.314
-strap_go_pin_max_in = 0.3137
-strap_nogo_pin_min_in = 0.3138
+# Setup 7: each MHA-DT-14 strap's arbor bore, 5/16 drilled (.3125-.3165 at
+# the DRILLED HOLES row). Each journal is accepted from its aim down to .0004
+# under it; strap_bore_max_fit_in is the largest bore for which that whole
+# window, at the journal_aim_in cap, stays inside the drawing's .001-.003
+# (.3117 + .003 - .0004). A bigger bore: stop and tell the owner.
+strap_bore_max_fit_in = 0.3143
+# Setup 7: the bond lands are made to the MHA-DT-01 drum's 5/16 drilled bore
+# (note 3, .002-.008 clear; owner ruling 2026-11-24, fit audit question 13):
+# they take the shaft's aim A unless that leaves the drum's smaller end D
+# under .002 clear; then they are skimmed to D − land_clearance_aim_in. A D
+# under drum_bore_min_fit_in would put a skimmed land under the .3085 the
+# lands are modelled to (D − .003 − .0004).
+land_clearance_aim_in = 0.003
+drum_bore_min_fit_in = 0.3119
+# Setup 7: the drum slides over both journals (owner ruling 2026-11-25,
+# option A). Each journal's aim stays journal_drum_clearance_in under the
+# drum bore it enters (the spans' .0004 under the drum's and the collar's
+# 5/16): the front's under DF, the back's under D. A journal, its aim down to
+# .0004 under it, then stays .001-.003 in its strap only while the strap's
+# bore S is at most strap_over_drum_max_in over that drum bore
+# (.003 − .0004 − .0004). Over it at the front: the front journal is turned
+# to its strap alone and the drum's front end reamed to the miked journal +
+# drum_front_ream_over_in (the ruling's +.001), drum_front_ream_depth_in
+# deep, past the .23 the drum's front end reaches onto the journal
+# (dt_pinion_arbor_spec.DRUM_FRONT_END_ON_JOURNAL_MAX). At the journal_aim_in
+# cap that bore is .3127: the drum's wall to its tooth root (Ø.6145 min) is
+# .151 (rule 17 target .080), and the front land under the reamed length
+# (a land at least .3085) is at most .0042 clear, inside note 3's .008. An O
+# drill (.316, cutting to .320) would leave .0115 there, past LOCTITE 638's
+# .0098: the reamer only.
+journal_drum_clearance_in = 0.0004
+strap_over_drum_max_in = 0.0022
+drum_front_ream_over_in = 0.001
+drum_front_ream_depth_in = 0.3
 
 [[tools]]
 id = "saw"
@@ -277,21 +311,19 @@ ref = "reamer-2510"
 status = "to_order"
 
 [[tools]]
+id = "reamer-adj"
+name = "Adjustable reamer set, .250-.375 in (LMS 5948), in a tap wrench"
+ref = "reamers-adjustable-lms-5948"
+
+[[tools]]
 id = "drill-1-16"
 name = "1/16 drill"
 ref = "drill-1-16"
 
 [[tools]]
-id = "strap-pins"
-name = "Class ZZ pins: .3135 plus (GO) and .3140 minus (NO-GO)"
-ref = "zz-pins-3135-3140"
-status = "to_order"
-
-[[tools]]
-id = "gauge-pin"
-name = "Gauge pin .0625, class ZZ"
-ref = "gauge-pin-0625"
-status = "to_order"
+id = "telescoping-gauges"
+name = "Telescoping gauges (Starrett S579GZ)"
+ref = "telescoping-gauges-starrett-s579gz"
 
 [[tools]]
 id = "file"
@@ -447,7 +479,7 @@ milling_cuts = [
 speed_kind = "spindle"
 tool = "reamer"
 drilling = "none"
-sizing = { kind = "band", band_mm = "{{cad.cross_hole_dia_band_mm}}" }
+sizing = "other"
 instruction = "Same file, M6 T3: .2510 reamer through the bar, {{process.ream_past_mm:in.3dot}} past its underside, fed in and fed back out with the spindle running; set 400. Plenty of cutting oil."
 rpm = 400
 feed = "{{process.ream_feed_per_min_mm:in.1f}} in/min"
@@ -456,12 +488,12 @@ milling_cuts = [
 ]
 
 [[setups.operations]]
-instruction = "PA01_cross_hole has ended: its last lines lift T3 to Z8.670 (.34 in over the bar's top) and stop the spindle (M5). Confirm the spindle is stopped; jog Z up clear, X and Y untouched. Then the .251 pin (GO) passes through the cross hole, the .255 pin (NO-GO) does not enter."
-inspection = "Cross hole Ø{{cad.cross_hole_dia_min_in:.3dot}}–{{cad.cross_hole_dia_max_in:.3dot}}."
-gauge_checks = [{ gauge = "pin-gauges", band_mm = "{{cad.cross_hole_dia_band_mm}}" }]
+instruction = "PA01_cross_hole has ended: its last lines lift T3 to Z8.670 (.34 in over the bar's top) and stop the spindle (M5). Confirm the spindle is stopped; jog Z up clear, X and Y untouched. Blow the chips out: an MHA-DT-15 rod (or an offcut of its 1/4 bar) enters the cross hole by hand and passes through the bar."
+inspection = "MHA-DT-15's 1/4 rod enters the cross hole by hand (fit audit F14: .2510 REAM THRU, the rod is the gauge)."
+gauge_checks = "other"
 
 [[setups.operations]]
-instruction = "The GO does not pass: T3 still in, MDI G0 X{{process.cross_x_mm:.3f}} Y0 Z1, M3 S400, G1 Z{{process.cross_ream_tip_mm:.3f}} F{{process.ream_feed_per_min_mm:.1f}}, G1 Z0 F{{process.ream_feed_per_min_mm:.1f}}, G0 Z10, M5; gauge again. Still tight, or the NO-GO enters: the arbor is scrap; start again from Setup 1."
+instruction = "The rod does not enter: T3 still in, MDI G0 X{{process.cross_x_mm:.3f}} Y0 Z1, M3 S400, G1 Z{{process.cross_ream_tip_mm:.3f}} F{{process.ream_feed_per_min_mm:.1f}}, G1 Z0 F{{process.ream_feed_per_min_mm:.1f}}, G0 Z10, M5; try the rod again. Still tight: stop and tell the owner."
 feed = "hand"
 
 [[setups]]
@@ -470,7 +502,7 @@ title = "Mill: the pin hole"
 machine = "PM-30MV CNC (FluidNC, CNCjs with the electronic tool setter) / vise, swivel off"
 indexing = "none"
 machine_ref = "pm-30mv"
-holding = "As Setup 4, but the marked head end {{process.jaw_left_x_mm:in.2f}} in out past the jaws' left face (calipers' depth rod), never under 2.22 nor over 2.28. Before closing the vise, push the {{process.cross_go_pin_in:.3dot}} GO pin through the cross hole (it stands proud above and below the bar) and roll the bar until the pin stands upright by eye; the next op proves it. Under the pin hole nothing but air."
+holding = "As Setup 4, but the marked head end {{process.jaw_left_x_mm:in.2f}} in out past the jaws' left face (calipers' depth rod), never under 2.22 nor over 2.28. Before closing the vise, push an MHA-DT-15 rod (or an offcut of its 1/4 bar) through the cross hole (it stands proud above and below the bar) and roll the bar until the rod stands upright by eye; the next op proves it. Under the pin hole nothing but air."
 datum = "Program PA02_pin_hole (cam:dt_pinion_arbor). G54 as Setup 4, picked up again: X0 the faced head end, Y0 the bar's axis, Z0 the top of the 5/8 bar. The file starts with an M6 for the centre drill."
 diagram = { file = "diagrams/holes.svg", alt = "The blank along the vise jaws on a parallel on edge, the faced head end out 2.25 past the jaws' left face; the pin hole 2.097 from it, through the 5/8 bar into air." }
 envelope = "other"
@@ -478,8 +510,8 @@ vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{process.bar_dia_mm}}", alo
 beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{process.part_length_mm}}"], clamp_mm = ["{{process.left_overhang_mm}}", "{{process.clamp_end_mm}}"], section_mm = { diameter = "{{process.bar_dia_mm}}" }, vise_left = "start" }
 
 [[setups.operations]]
-instruction = "The cross hole upright (the pin hole must run parallel to it, ±1°): the DTI in the spindle, its tip on the GO pin's −Y side above the bar; jog Z down .200: the reading changes by no more than {{process.pin_square_dti_mm:.3f}} mm (.0035 in over .200 is 1°). Write the reading."
-inspection = "Cross-hole pin upright within {{process.pin_square_dti_mm:.3f}} mm over .200 of Z (±1°)."
+instruction = "The cross hole upright (the pin hole must run parallel to it, ±1°): the DTI in the spindle, its tip on the rod's −Y side above the bar; jog Z down .200: the reading changes by no more than {{process.pin_square_dti_mm:.3f}} mm (.0035 in over .200 is 1°). Write the reading."
+inspection = "Cross-hole rod upright within {{process.pin_square_dti_mm:.3f}} mm over .200 of Z (±1°)."
 gauge_checks = [{ gauge = "dti", band_mm = [0.0, "{{process.pin_square_dti_mm}}"] }]
 feed = "hand"
 
@@ -488,7 +520,7 @@ instruction = "Over {{process.pin_square_dti_mm:.3f}} mm: open the vise a little
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Take the .251 GO pin out of the cross hole."
+instruction = "Take the 1/4 rod out of the cross hole."
 feed = "hand"
 
 [[setups.operations]]
@@ -531,17 +563,17 @@ milling_cuts = [
 ]
 
 [[setups.operations]]
-instruction = "PA02_pin_hole has ended: its last lines lift T4 to Z8.670 (.34 in over the bar's top) and stop the spindle (M5). Confirm the spindle is stopped; jog Z up clear, X and Y untouched. Before unclamping: the {{process.pin_go_pin_in:.4dot}} gauge pin (GO) passes through the pin hole, the {{process.pin_nogo_pin_in:.3dot}} pin (NO-GO) does not enter."
-inspection = "Pin hole Ø{{cad.pin_hole_dia_min_in:.4dot}}–{{cad.pin_hole_dia_max_in:.4dot}}."
-gauge_checks = [{ gauge = "pin-gauges", band_mm = "{{cad.pin_hole_dia_band_mm}}" }]
+instruction = "PA02_pin_hole has ended: its last lines lift T4 to Z8.670 (.34 in over the bar's top) and stop the spindle (M5). Confirm the spindle is stopped; jog Z up clear, X and Y untouched. Before unclamping: an MHA-DT-VN-63 pin, tried by hand, does not enter the pin hole."
+inspection = "MHA-DT-VN-63 must drive, not enter by hand (fit audit F15); the 1/16 drill cuts the hole."
+gauge_checks = "other"
 
 [[setups.operations]]
-instruction = "Still before unclamping: the {{process.cross_go_pin_in:.3dot}} GO pin back in the cross hole, read it with the DTI over .200 of Z as in this setup's first op: the bar has not rolled while drilling."
-inspection = "Cross-hole pin upright within {{process.pin_square_dti_mm:.3f}} mm over .200 of Z (the holes parallel ±1°)."
+instruction = "Still before unclamping: the 1/4 rod back in the cross hole, read it with the DTI over .200 of Z as in this setup's first op: the bar has not rolled while drilling."
+inspection = "Cross-hole rod upright within {{process.pin_square_dti_mm:.3f}} mm over .200 of Z (the holes parallel ±1°)."
 gauge_checks = [{ gauge = "dti", band_mm = [0.0, "{{process.pin_square_dti_mm}}"] }]
 
 [[setups.operations]]
-instruction = "The pin hole's GO does not pass, or the cross-hole pin reads over {{process.pin_square_dti_mm:.3f}} mm: the arbor is scrap (a 1/16 hole cannot be opened in band or turned square by hand); start again from Setup 1."
+instruction = "The MHA-DT-VN-63 pin enters the pin hole by hand, or the rod in the cross hole reads over {{process.pin_square_dti_mm:.3f}} mm: the arbor is scrap (a 1/16 hole cannot be made smaller or turned square by hand); start again from Setup 1."
 feed = "hand"
 
 [[setups]]
@@ -694,19 +726,9 @@ cut_diameter_mm = "{{process.bar_dia_mm}}"
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "On the 0–1 in micrometer (reads .0001; trust a reading to ±.00005), mike the strap's {{process.strap_bore_min_in:.4dot}} GO pin and {{process.strap_bore_max_in:.4dot}} NO-GO pin (Class ZZ). Write both readings here and each on its pin's tag."
-inspection = "GO pin reads {{process.strap_bore_min_in:.4dot}}–{{process.strap_go_pin_max_in:.4dot}}, NO-GO pin {{process.strap_nogo_pin_min_in:.4dot}}–{{process.strap_bore_max_in:.4dot}}: a pin outside its range is not used."
-gauge_checks = [{ gauge = "micrometers", band_mm = [7.9629, 7.9756] }]
-
-[[setups.operations]]
-cut_kind = "other"
-instruction = "Gauge both bores of the MHA-DT-14 strap (the journals' mate): the GO pin enters each, the NO-GO pin enters neither; write the result here. A bore passing lies between the two readings: GO reading ≤ bore < NO-GO reading. Only {{process.strap_go_pin_max_in:.4dot}}–{{process.strap_nogo_pin_min_in:.4dot}} is sure to pass; a good bore within .0002 of a limit may be refused (owner ruling 2026-11-23)."
-inspection = "GO enters, NO-GO does not: strap bores Ø{{process.strap_bore_min_in:.4dot}}–{{process.strap_bore_max_in:.4dot}}, both."
-gauge_checks = [{ gauge = "zz-pins-3135-3140", band_mm = [7.9629, 7.9756] }]
-
-[[setups.operations]]
-cut_kind = "other"
-instruction = "A strap bore the GO pin does not enter, or the NO-GO pin enters: stop; the strap goes back to its own traveler, and the journals are not finished until it gauges in band."
+instruction = "Measure each MHA-DT-14 strap's arbor bore (the journals' mates) with the telescoping gauge and the 0–1 in micrometer (reads .0001), at each end: write the smaller reading of the front strap SF and of the back strap SB. Then the MHA-DT-01 drum's bore the same way at each end (the journals pass into it, the bond lands bond in it): the end with the larger reading goes on first, toward the head; mark it with the felt pen and write its reading DF, and D, the smaller of the two ends. The drum slides over both journals (owner ruling 2026-11-25): the front journal's aim AF is the smallest of SF − {{process.journal_clearance_aim_in:.3dot}}, DF − {{process.journal_drum_clearance_in:.4dot}} and {{process.journal_aim_in:.4dot}}; the back journal's AB the smallest of SB − {{process.journal_clearance_aim_in:.3dot}}, D − {{process.journal_drum_clearance_in:.4dot}} and {{process.journal_aim_in:.4dot}} (the drum's whole bore passes over it). Write AF, AB and A, the larger of the two: the whole shaft is finished to A."
+inspection = "SF and SB each at most {{process.strap_bore_max_fit_in:.4dot}}. Over it (with the aim held at the {{process.journal_aim_in:.4dot}} limit, a journal .0004 under it would run more than .003 loose): stop and tell the owner; the journals are not finished. D at least {{process.drum_bore_min_fit_in:.4dot}}: under it, stop and tell the owner. Each aim at least its strap's reading less .0026, so the journal, the aim to .0004 under it, runs .001–.003 in its strap. AB under that (SB more than {{process.strap_over_drum_max_in:.4dot}} over D): stop and tell the owner. AF under that (SF more than {{process.strap_over_drum_max_in:.4dot}} over DF): write AF again as the smaller of SF − {{process.journal_clearance_aim_in:.3dot}} and {{process.journal_aim_in:.4dot}}, and open the drum's front end at the end of this setup."
+gauge_checks = [{ gauge = "telescoping-gauges-starrett-s579gz", band_mm = [7.9375, 8.0391] }]
 
 [[setups.operations]]
 cut_kind = "other"
@@ -714,9 +736,9 @@ speed_kind = "spindle"
 tool = "ar"
 drilling = "none"
 sizing = "other"
-instruction = "The follow rest still off. Trial cut first: spindle running, skim .25 in at Z+{{process.rest_joint_in:.2f}} at a setting .002 over the aim; stop the spindle, mike it, and move the cross slide in by half the difference from {{process.journal_aim_in:.4dot}}."
+instruction = "The follow rest still off. Trial cut first: spindle running, skim .25 in at Z+{{process.rest_joint_in:.2f}} at a setting .002 over the aim; stop the spindle, mike it, and move the cross slide in by half the difference from the written aim A."
 settings = "lathe-ar-1018"
-cut_diameter_mm = "{{cad.front_journal_dia_mm}}"
+cut_diameter_mm = "{{cad.shaft_dia_mm}}"
 
 [[setups.operations]]
 cut_kind = "other"
@@ -724,9 +746,9 @@ speed_kind = "spindle"
 tool = "ar"
 drilling = "none"
 sizing = "other"
-instruction = "Then finish the head-end stretch from Z+{{process.rest_joint_in:.2f}} to Z+{{cad.neck_length_in:.3dot}} in one pass at the settings column's power feed to Ø{{cad.front_journal_dia_min_in:.4dot}}–{{cad.front_journal_dia_max_in:.4dot}}, aiming {{process.journal_aim_in:.4dot}} (the front journal's band, inside the span's {{cad.shaft_dia_min_in:.4dot}}–{{cad.shaft_dia_max_in:.4dot}}). Write the cross-slide DRO's reading for this finish setting."
+instruction = "Then finish the head-end stretch from Z+{{process.rest_joint_in:.2f}} to Z+{{cad.neck_length_in:.3dot}} in one pass at the settings column's power feed, aiming A (the journals made to the strap, inside the span's {{cad.shaft_dia_min_in:.4dot}}–{{cad.shaft_dia_max_in:.4dot}}). Write the cross-slide DRO's reading for this finish setting."
 settings = "lathe-ar-1018"
-cut_diameter_mm = "{{cad.front_journal_dia_mm}}"
+cut_diameter_mm = "{{cad.shaft_dia_mm}}"
 
 [[setups.operations]]
 cut_kind = "other"
@@ -759,19 +781,19 @@ speed_kind = "spindle"
 tool = "ar"
 drilling = "none"
 sizing = "other"
-instruction = "Finish from the back end to Z+{{process.rest_joint_in:.2f}} in one pass at the settings column's power feed, aiming {{process.journal_aim_in:.4dot}}, the follow rest's jaws, ahead of the tool, set on the roughed Ø{{process.rough_dia_in:.3dot}}. First, spindle running, skim .25 in at the back end at the written finish reading, stop, mike it, and move the cross slide by half the difference from {{process.journal_aim_in:.4dot}} (the AR holder may have moved since); then the pass. Stop at Z+{{process.rest_joint_in:.2f}}, where it meets the head-end stretch."
+instruction = "Finish from the back end to Z+{{process.rest_joint_in:.2f}} in one pass at the settings column's power feed, aiming A, the follow rest's jaws, ahead of the tool, set on the roughed Ø{{process.rough_dia_in:.3dot}}. First, spindle running, skim .25 in at the back end at the written finish reading, stop, mike it, and move the cross slide by half the difference from A (the AR holder may have moved since); then the pass. Stop at Z+{{process.rest_joint_in:.2f}}, where it meets the head-end stretch."
 settings = "lathe-ar-1018"
-cut_diameter_mm = "{{cad.front_journal_dia_mm}}"
+cut_diameter_mm = "{{cad.shaft_dia_mm}}"
 
 [[setups.operations]]
 cut_kind = "other"
 instruction = "Spindle stopped: mike the shaft at Z+2.2 and Z+8.6 (the journals) and at Z+1.0, Z+3.5, Z+7.5 and Z+9.2. Journals smooth to the nail, no chatter (Ra 63)."
-inspection = "Journals Ø{{cad.front_journal_dia_min_in:.4dot}}–{{cad.front_journal_dia_max_in:.4dot}} at both; elsewhere Ø{{cad.shaft_dia_min_in:.4dot}}–{{cad.shaft_dia_max_in:.4dot}}."
-gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.front_journal_dia_band_mm}}" }, { gauge = "micrometers", band_mm = "{{cad.shaft_dia_band_mm}}" }]
+inspection = "Journals: the front AF and the back AB to .0004 under it, so .001–.003 under its strap's SF or SB (note 1: turned to the measured strap bores); the journal whose aim is under A is skimmed to it as below. The bond lands (Z+3.5 and Z+7.5): at least .002 under D, else skim them as below. Elsewhere Ø{{cad.shaft_dia_min_in:.4dot}}–{{cad.shaft_dia_max_in:.4dot}}."
+gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.shaft_dia_band_mm}}" }]
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "A journal, span or land over its band's top: spindle stopped, the follow rest lifted off; the AR tool's left edge on the head's rear face, DRO Z0 again. Bolt the rest back (jaws on the finished diameter) unless the stretch lies under Z+{{process.rest_joint_in:.2f}}."
+instruction = "A journal over its aim (AF or AB), or a span or land over its band's top: spindle stopped, the follow rest lifted off; the AR tool's left edge on the head's rear face, DRO Z0 again. Bolt the rest back (jaws on the finished diameter) unless the stretch lies under Z+{{process.rest_joint_in:.2f}}."
 feed = "hand"
 
 [[setups.operations]]
@@ -780,9 +802,32 @@ speed_kind = "spindle"
 tool = "ar"
 drilling = "none"
 sizing = "other"
-instruction = "Skim that stretch only to Ø{{process.journal_aim_in:.4dot}}, the cross slide in by half the miked excess per side: a journal Z+{{cad.front_journal_station_in:.2dot}} to Z+{{cad.front_journal_end_station_in:.2dot}} or Z+{{cad.back_journal_station_in:.2dot}} to Z+{{cad.back_journal_end_station_in:.2dot}}; a span or land from the journal's end to the next journal, shoulder or back end. Mike again. Any reading under its band's bottom: the arbor is scrap; start again from Setup 1."
+instruction = "Skim that stretch only to its aim, the cross slide in by half the miked excess per side: the front journal Z+{{cad.front_journal_station_in:.2dot}} to Z+{{cad.front_journal_end_station_in:.2dot}} to AF or the back Z+{{cad.back_journal_station_in:.2dot}} to Z+{{cad.back_journal_end_station_in:.2dot}} to AB; a span or land, to A, from the journal's end to the next journal, shoulder or back end. Mike again. A journal more than .003 under its strap's SF or SB, or any other reading under its band's bottom: the arbor is scrap; start again from Setup 1."
 settings = "lathe-ar-1018"
-cut_diameter_mm = "{{cad.front_journal_dia_mm}}"
+cut_diameter_mm = "{{cad.shaft_dia_mm}}"
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "ar"
+drilling = "none"
+sizing = "other"
+instruction = "Only if A is over D − .002 (the drum would not slide on): skim both bond lands to D − {{process.land_clearance_aim_in:.3dot}}, the same way, the front land from Z+{{cad.front_journal_end_station_in:.2dot}} to Z+{{cad.bond_relief_station_in:.2dot}} and the back land from Z+{{cad.bond_relief_end_station_in:.2dot}} to Z+{{cad.back_journal_station_in:.2dot}}, the journals untouched. Mike both lands."
+inspection = "Each land D − {{process.land_clearance_aim_in:.3dot}} to .0004 under it (note 3: turned to MHA-DT-01, .002–.008 clear)."
+gauge_checks = [{ gauge = "micrometers", band_mm = [7.8359, 7.9273] }]
+settings = "lathe-ar-1018"
+cut_diameter_mm = "{{cad.shaft_dia_mm}}"
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "other"
+tool = "reamer-adj"
+drilling = "none"
+sizing = "other"
+instruction = "Only if AF was written again from SF alone (owner ruling 2026-11-25: no journal size fits both bores): open the drum's front end to the front journal + {{process.drum_front_ream_over_in:.3dot}}. Mike the front journal at Z+2.2. Set the piece of the adjustable reamer set that spans that reading + {{process.drum_front_ream_over_in:.3dot}}, read with the micrometer over its blades. The drum in the bench vise's soft jaws, its marked front end up: turn the reamer in by hand in the tap wrench, with cutting oil, until its blades' full diameter stands {{process.drum_front_ream_depth_in:.2dot}} deep (past the .23 the drum's front end reaches onto the journal); turn it out the same way. Measure the front end with the telescoping gauge: that is DF now."
+inspection = "DF at least the front journal + {{process.drum_front_ream_over_in:.3dot}} and at most .3165 (the drilled top, which note 3's .008 reads over the front land); reamed {{process.drum_front_ream_depth_in:.2dot}} deep or more. Over .3165: stop and tell the owner."
+gauge_checks = [{ gauge = "telescoping-gauges-starrett-s579gz", band_mm = [7.9375, 8.0391] }]
+feed = "hand"
 
 [[setups.operations]]
 cut_kind = "other"
@@ -853,7 +898,7 @@ drilling = "none"
 sizing = "other"
 instruction = "AR tool back. Spindle stopped, the follow rest lifted off: touch its left edge on the head's rear face, DRO Z0 again; the rest bolted back, its jaws on the Ø.3117. Step the SR.28 back crown from the rim at Z+{{cad.back_crown_rim_station_in:.2dot}}: at each line, carriage at the Z, face from the Ø out to the shaft's O.D.: Z+9.3602 from Ø.280; Z+9.3707 Ø.240; Z+9.3792 Ø.200; Z+9.3860 Ø.160; Z+9.3912 Ø.120. The dead centre's hole stays inside Ø.12."
 settings = "lathe-ar-1018"
-cut_diameter_mm = "{{cad.front_journal_dia_mm}}"
+cut_diameter_mm = "{{cad.shaft_dia_mm}}"
 
 [[setups.operations]]
 cut_kind = "other"
@@ -915,15 +960,27 @@ instruction = "Deburr both ends of the cross hole and of the pin hole with the s
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Cross hole: the {{process.cross_go_pin_in:.3dot}} GO pin passes, the {{process.cross_nogo_pin_in:.3dot}} NO-GO enters neither end; with the GO in it, the calipers' depth end of the beam on the head's rear face beside the neck, the depth rod along the head's O.D. onto the pin's near side, {{process.cross_near_side_min_in:.4dot}}–{{process.cross_near_side_max_in:.4dot}}."
-inspection = "Cross hole Ø{{cad.cross_hole_dia_min_in:.3dot}}–{{cad.cross_hole_dia_max_in:.3dot}}, {{cad.cross_hole_station_min_in:.2dot}}–{{cad.cross_hole_station_max_in:.2dot}} from the head's rear face."
-gauge_checks = [{ gauge = "pin-gauges", band_mm = "{{cad.cross_hole_dia_band_mm}}" }, { gauge = "calipers", band_mm = "{{cad.cross_hole_station_band_mm}}" }]
+instruction = "Cross hole: an MHA-DT-15 rod (or an offcut of its 1/4 bar) enters by hand through it; mike the rod. With it in the hole, the calipers' depth end of the beam on the head's rear face beside the neck, the depth rod along the head's O.D. onto the rod's near side: that reading plus half the miked rod is the station."
+inspection = "MHA-DT-15's 1/4 rod enters the cross hole by hand (fit audit F14); the cross hole {{cad.cross_hole_station_min_in:.2dot}}–{{cad.cross_hole_station_max_in:.2dot}} from the head's rear face."
+gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.cross_hole_station_band_mm}}" }]
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Pin hole: the {{process.pin_go_pin_in:.4dot}} GO gauge pin passes, the {{process.pin_nogo_pin_in:.3dot}} NO-GO enters neither end; with the GO in it, the calipers' step faces (both faces point to the back end): the beam's end on the head's rear face, the slider's step on the pin's far side, {{process.pin_far_side_min_in:.4dot}}–{{process.pin_far_side_max_in:.4dot}}."
-inspection = "Pin hole Ø{{cad.pin_hole_dia_min_in:.4dot}}–{{cad.pin_hole_dia_max_in:.4dot}}, {{cad.pin_hole_station_min_in:.2dot}}–{{cad.pin_hole_station_max_in:.2dot}} from the head's rear face."
-gauge_checks = [{ gauge = "pin-gauges", band_mm = "{{cad.pin_hole_dia_band_mm}}" }, { gauge = "calipers", band_mm = "{{cad.pin_hole_station_band_mm}}" }]
+instruction = "Pin hole: an MHA-DT-VN-63 pin, tried by hand at each end, does not enter (it must be driven at assembly; fit audit F15). Mike the 1/16 drill's shank; with the shank in the hole, the calipers' step faces (both faces point to the back end): the beam's end on the head's rear face, the slider's step on the shank's far side, {{process.pin_far_side_min_in:.4dot}}–{{process.pin_far_side_max_in:.4dot}} for a {{process.pin_shank_in:.4dot}} shank (a smaller shank reads half its shortfall less)."
+inspection = "MHA-DT-VN-63 does not enter the pin hole by hand; the pin hole {{cad.pin_hole_station_min_in:.2dot}}–{{cad.pin_hole_station_max_in:.2dot}} from the head's rear face."
+gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.pin_hole_station_band_mm}}" }]
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Spans: slide the MHA-DT-33 collar (made before this arbor) on from the back crown, by hand, over the back stub and on to the pin hole; slide it off again."
+inspection = "MHA-DT-33 slides on by hand over both spans (note 2: turned to the collar's bore). A tight spot: chuck the arbor again as in Setup 7 and skim that span only to A."
+gauge_checks = "other"
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Drum: slide the MHA-DT-01 drum on from the back crown by hand, its marked front end leading, over the back journal and on until its front end stands 2.40 or less from the head's rear face (the calipers' depth rod from the head's rear face to the drum's front end); slide it off again."
+inspection = "MHA-DT-01 slides on by hand over both journals (note 1). A stop on a bond land: chuck the arbor again as in Setup 7 and skim that land to D − {{process.land_clearance_aim_in:.3dot}}. A stop on the front journal: open the drum's front end as in Setup 7 (owner ruling 2026-11-25). A stop on the back journal: stop and tell the owner."
+gauge_checks = "other"
 feed = "hand"
 
 [[setups.operations]]
@@ -933,7 +990,7 @@ gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.neck_length_band_mm}}" }]
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Out of any limit in the three checks above: the arbor is scrap; make another from Setup 1."
+instruction = "Out of any limit in the station and length checks above: the arbor is scrap; make another from Setup 1."
 feed = "hand"
 
 [[setups.operations]]

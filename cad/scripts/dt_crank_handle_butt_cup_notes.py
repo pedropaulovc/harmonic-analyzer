@@ -14,10 +14,7 @@ three tight dimensions share one numbered flag note.
 
 from __future__ import annotations
 
-from dt_crank_handle_butt_cup_spec import (
-    POCKET_CLEARANCE,
-    POCKET_WALL_MIN,
-)
+from dt_crank_handle_butt_cup_spec import POCKET_WALL_MIN
 from dt_crank_handle_spec import COUNTERBORE_GLUE_LINE
 from _title_block_units import MM_PER_INCH, render_number
 
@@ -34,23 +31,24 @@ SCREW_NUMBER = "MHA-DT-32"
 SCREW_NAME = "PIVOT SCREW"
 
 FLOOR_HOLE_CALLOUT = "DRILL THRU"
-# The pocket is one feature with three tight dimensions (its reference
-# diameter, its depth and its floor corner): it names its mate once, on one
-# numbered flag note linked to all three (drawing-guidelines.md rule 4).  The
-# matched fit on the first-made MHA-DT-32 head states the diametral clearance
-# as REF; the largest head plus the widest clearance is the largest bore, so
-# no separate cap prints (#290 review of eb22a22f1 called a Ø MAX row
-# over-specification).  The governing wall the bore leaves, at the face with
-# both edges broken (#2170), is stated as a plain fact on the bore's own
-# callout (rule 20; RV-01).
+# The pocket is one feature with three tight dimensions (its limits, its
+# depth and its floor corner): it names its mate once, on one numbered flag
+# note linked to all three (drawing-guidelines.md rule 4).  Cut to its own
+# limits, it clears the MHA-DT-32 head at its own band: no matching, no
+# clearance to read (owner ruling 2026-11-24, fit audit question 15; the note
+# had bored the pocket to the head while the travelers turned the head to the
+# pocket).  The tool (the 1/4 end mill, plunged) is the traveler's, not the
+# note's (rule 7; machinist review r1, farm run 20261124T110807008Z).  Notes
+# carry no dimensions.  The governing wall the pocket's upper limit leaves,
+# at the face with both edges broken (#2170), is stated as a plain fact on
+# the pocket's own callout (rule 20; RV-01).
 POCKET_NOTE = 1
 POCKET_FLAG = f"SEE NOTE {POCKET_NOTE}"
 POCKET_FIT_CALLOUT = "\n".join((POCKET_FLAG, f"WALL {inch_text(POCKET_WALL_MIN, 3)} MIN"))
 POCKET_NOTE_TEXT = "\n".join(
     (
-        f"{POCKET_NOTE}. POCKET FOR {SCREW_NUMBER} {SCREW_NAME} HEAD: BORE TO THE",
-        "   MEASURED HEAD, RUNNING FIT (CLEARANCE "
-        f"{inch_text(POCKET_CLEARANCE[0], 3)}-{inch_text(POCKET_CLEARANCE[1], 3)}).",
+        f"{POCKET_NOTE}. POCKET: CLEARS {SCREW_NUMBER}",
+        f"   {SCREW_NAME} HEAD.",
     )
 )
 # The bottom chamfer's band reason: it clears the rounded corner of the

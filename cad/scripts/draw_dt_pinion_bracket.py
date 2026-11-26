@@ -73,14 +73,14 @@ from _drawing_view_display import set_hidden_lines_removed
 from _machinist_review_mode import MachinistReviewMode
 from _part_properties import part_drawing_unit
 from _paths import CAD_ROOT
-from _printed_limits import limits
+from _printed_limits import drilled_limits, limits
 from _session import run_build
 from _surface_finish import surface_finish_by_key
 import _telemetry
 from dt_pinion_bracket_geometry import CROSS_HOLE_CZ
 from dt_pinion_bracket_spec import (
     ARBOR_BORE,
-    ARBOR_BORE_BAND,
+    ARBOR_BORE_BAND as ARBOR_BORE_BAND,
     C2C,
     CROSS_HOLE_BAND,
     CROSS_HOLE_DIA,
@@ -339,9 +339,13 @@ ARBOR_FINISH_XY = (0.155, 0.205)
 # mate rides its size callout.  The seat's depth rides its callout as REF
 # (rule 26: never deferred to a view) while Section B-B's .16 controls the
 # floor; the floor-corner allowance is what the 1/8 end mill that finishes the
-# seat leaves (rule 16; tool audit Q8).  The pivot bore is a sliding fit so the strap goes
-# onto the shaft for fit-up, then pinned (option E-a); the arbor runs in its
-# bore; the follower stud slips into its seat and is bonded (LOCTITE 638,
+# seat leaves (rule 16; tool audit Q8).  The pivot bore is reamed .2510 with
+# no band, the MHA-DT-19 shaft its gauge (fit audit F16): the strap goes onto
+# the shaft for fit-up, then is pinned (option E-a).  The arbor bores are
+# drilled 5/16 and the MHA-DT-22 journals are turned to them, so this sheet
+# names the mate and that it is made to the bore; MHA-DT-22's note 1 prints
+# the acceptance (owner ruling 2026-11-24, fit audit question 12).  The
+# follower stud slips into its seat and is bonded (LOCTITE 638,
 # dt_pinion_cam_pin_spec's bond gap).  Both seat stations print bare (rule 7):
 # their .XXX bands (the follower height on the MHA-DT-23 cam, and owner
 # ruling (a) for the seat's webs to the broad faces) are accepted in the
@@ -353,15 +357,17 @@ ARBOR_FINISH_XY = (0.155, 0.205)
 # SHAFT DRILL SET names the drill.  The pin is its own BOM line
 # (MHA-DT-VN-63), so the callout names it instead of supplying one loose with
 # each strap; test_dt_pinion_bracket_drawing keeps both numbers in step with
-# the parts registry.  The band is tighter than DRILLED HOLES, so the callout
-# also names the fit (rule 4; r2 review): a slotted spring pin grips its hole
-# by compression.  Rule 7 allows the process line and two lines of words
-# (machinist review, farm run 20261121T170909507Z: four lines gated), as
-# MHA-DT-19's own pin-hole callout words it.
-CROSS_HOLE_CALLOUT = "MATCH-DRILL THRU\nWITH MHA-DT-19 AT ASSEMBLY\nPRESS FIT ON MHA-DT-VN-63"
+# the parts registry.  The band is tighter than DRILLED HOLES: it is ASME
+# B18.8.2's recommended hole, which the slotted pin grips by compression, so
+# the pin is its own gauge (fit audit F15: "MHA-DT-VN-63 MUST DRIVE, NOT
+# ENTER BY HAND"; drawing-guidelines rule 4, form 2: on a match-drilled
+# hole the row reads "MHA-DT-VN-63 MUST DRIVE", keeping rule 7's process line
+# and two lines of words (machinist review, farm run 20261121T170909507Z:
+# four lines gated), as MHA-DT-19's own pin-hole callout words it.
+CROSS_HOLE_CALLOUT = "MATCH-DRILL THRU\nWITH MHA-DT-19 AT ASSEMBLY\nMHA-DT-VN-63 MUST DRIVE"
 DIMENSION_CALLOUTS = {
-    "PivotBoreDia": "REAM THRU\nSLIDING FIT ON\nSHAFT MHA-DT-19",
-    "ArborBoreDia": "REAM THRU\nRUNNING FIT ON\nARBOR MHA-DT-22",
+    "PivotBoreDia": "REAM THRU\nMHA-DT-19 ENTERS,\nTURNS BY HAND",
+    "ArborBoreDia": "5/16 DRILL THRU\nMHA-DT-22 IS TURNED\nTO THIS BORE",
     "PinSeatDia": PIN_SEAT_CALLOUT,
     "CrossHoleDia": CROSS_HOLE_CALLOUT,
 }
@@ -489,33 +495,36 @@ for _name, _y, _extreme_y, _radius, _extra, _extra_precision in (
         },
         precision={"radius": _P[_radius], **_extra_precision},
     )
-# The two reamed through bores, entered from face A, each with its fit and
-# mate callout (DIMENSION_CALLOUTS): the pivot bore's sliding fit on the
-# MHA-DT-19 shaft and the arbor bore's running fit on the MHA-DT-22 arbor, its
-# Ra (SURFACE_FINISHES "arbor_bore") and the 1.10 centre distance from the
-# pivot bore (FRONT_KEEP "ArborBoreCz").
-_REAMED_THRU = ((_SELF, "DIMENSION_CALLOUTS"),)
+# The reamed pivot bore and the drilled arbor bore, entered from face A, each
+# with its mate callout (DIMENSION_CALLOUTS): the pivot bore at the .2510
+# reamer's size, the MHA-DT-19 shaft its gauge (fit audit F16), and the arbor
+# bore drilled 5/16, the MHA-DT-22 journals turned to it (owner ruling
+# 2026-11-24, fit audit question 12), its Ra (SURFACE_FINISHES "arbor_bore")
+# and the 1.10 centre distance from the pivot bore (FRONT_KEEP
+# "ArborBoreCz").  The pivot bore's ``dia`` is the spec's ANALYSIS band (what
+# the reamer is modelled to cut), not a requirement.
+_BORE_CALLOUTS = ((_SELF, "DIMENSION_CALLOUTS"),)
 requirement(
     "pivot_bore",
     kind="hole",
     faces=(CylinderFace(PIVOT_BORE),),
-    requirements=("dia", "thru"),
+    # ``dia`` (the reamer's ANALYSIS band) stays a traveler requirement, as
+    # #3492's MHA-PD-18 bore keeps it: prechips' drilled_block adapter refuses
+    # a hole without one ("pivot_bore.dia: missing drawing requirement"). The
+    # sheet prints the reamer's size and no band.
+    requirements=("dia", "thru", "process", "mate"),
     fields={
         "at": ([0.0, 0.0, 0.0], (_FRAME,)),
         "axis": ((0.0, 0.0, 1.0), (_FRAME,)),
         "dia": (
             limits(PIVOT_BORE, _P["PivotBoreDia"], PIVOT_BORE_BAND, unit=UNIT),
-            (
-                (_GEOM, "PIVOT_BORE"),
-                "PIVOT_BORE_BAND",
-                ("_fit_ream_slide", "REAM_SLIDE"),
-                (_SELF, "FRONT_KEEP"),
-            ),
+            ((_GEOM, "PIVOT_BORE"), (_GEOM, "PIVOT_BORE_BAND"), (_SELF, "FRONT_KEEP")),
         ),
         "nominal_dia": (PIVOT_BORE, ((_GEOM, "PIVOT_BORE"),)),
-        "thru": (True, _REAMED_THRU),
-        "process": ("ream", _REAMED_THRU),
-        "callout": (DIMENSION_CALLOUTS["PivotBoreDia"], _REAMED_THRU),
+        "thru": (True, _BORE_CALLOUTS),
+        "process": ("ream", _BORE_CALLOUTS),
+        "mate": ("MHA-DT-19", _BORE_CALLOUTS),
+        "callout": (DIMENSION_CALLOUTS["PivotBoreDia"], _BORE_CALLOUTS),
     },
     precision={"dia": _P["PivotBoreDia"]},
 )
@@ -523,23 +532,20 @@ requirement(
     "arbor_bore",
     kind="hole",
     faces=(CylinderFace(ARBOR_BORE),),
-    requirements=("dia", "thru", "center_distance", "finish_ra"),
+    requirements=("dia", "thru", "process", "mate", "center_distance", "finish_ra"),
     fields={
         "at": ([0.0, C2C, 0.0], (_FRAME, (_GEOM, "C2C"))),
         "axis": ((0.0, 0.0, 1.0), (_FRAME,)),
         "dia": (
-            limits(ARBOR_BORE, _P["ArborBoreDia"], ARBOR_BORE_BAND, unit=UNIT),
-            (
-                (_GEOM, "ARBOR_BORE"),
-                "ARBOR_BORE_BAND",
-                ("_fit_ream_slide", "REAM_SLIDE"),
-                (_SELF, "FRONT_KEEP"),
-            ),
+            drilled_limits(ARBOR_BORE, _P["ArborBoreDia"], unit=UNIT),
+            ((_GEOM, "ARBOR_BORE"), "ARBOR_BORE_BAND", (_SELF, "FRONT_KEEP")),
         ),
         "nominal_dia": (ARBOR_BORE, ((_GEOM, "ARBOR_BORE"),)),
-        "thru": (True, _REAMED_THRU),
-        "process": ("ream", _REAMED_THRU),
-        "callout": (DIMENSION_CALLOUTS["ArborBoreDia"], _REAMED_THRU),
+        "thru": (True, _BORE_CALLOUTS),
+        "process": ("drill", _BORE_CALLOUTS),
+        "drill": ("5/16", _BORE_CALLOUTS),
+        "mate": ("MHA-DT-22", _BORE_CALLOUTS),
+        "callout": (DIMENSION_CALLOUTS["ArborBoreDia"], _BORE_CALLOUTS),
         "center_distance": (
             limits(C2C, _P["ArborBoreCz"], unit=UNIT),
             ((_GEOM, "C2C"), _UNIT, (_SELF, "FRONT_KEEP")),

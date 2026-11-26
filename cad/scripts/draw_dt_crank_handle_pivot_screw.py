@@ -72,10 +72,10 @@ from _paths import CAD_ROOT
 from _session import run_build
 from _surface_finish import surface_finish_by_key
 import _telemetry
-from _limit_tolerance import SW_TOL_LIMIT as LIMIT_TOL_TYPE
 from dt_crank_handle_head_seat_spec import (
     HEAD_CHAMFER,
     HEAD_CHAMFER_LIMITS,
+    HEAD_CHAMFER_TOL_TYPE,
     SCREW_DRAWING_DIMENSIONS as DRAWING_DIMENSIONS,
     SCREW_DRAWING_PRECISION_BY_NAME as DRAWING_PRECISION_BY_NAME,
     UNDER_HEAD_RADIUS_BAND,
@@ -94,8 +94,6 @@ from dt_crank_handle_pivot_screw_notes import (
     UNDER_HEAD_RADIUS_CALLOUT,
 )
 from dt_crank_handle_pivot_screw_spec import (
-    DIAMETRAL_CLEARANCE_MAX,
-    DIAMETRAL_CLEARANCE_MIN,
     END_PLAY_RANGE,
     HEAD_DIA,
     HEAD_LENGTH,
@@ -515,7 +513,8 @@ requirement(
 )
 # The head: Ø.236 and .157 at the .XXX row (SIDE_KEEP "HeadDia",
 # "HeadLength"), each clearing MHA-DT-35; its under-head edge broken
-# .005-.010 X 45 (DETAIL_B_KEEP "HeadChamfer").
+# .005 MIN X 45, the title block's edge break its cap (DETAIL_B_KEEP
+# "HeadChamfer").
 requirement(
     "head",
     kind="outside_cylinder",
@@ -577,8 +576,9 @@ requirement(
     },
     precision={"width": _P["SlotWidth"], "depth": _P["SlotDepth"]},
 )
-# The running shoulder: Ø.156 +.000/-.002, a running fit in MHA-DT-08's
-# reamed bore (SIDE_KEEP "ShoulderDia"), Ra 63 (SURFACE_FINISHES
+# The running shoulder: Ø.1535-.1585, the owner's fit-audit Q14 limits, a
+# running fit in MHA-DT-08's bore (SHOULDER_FIT_CALLOUT), no matched fit
+# (SIDE_KEEP "ShoulderDia"), Ra 63 (SURFACE_FINISHES
 # "pivot_shoulder"); its under-head corner R.004 MAX (DETAIL_B_KEEP
 # "UnderHeadRadius").  Its length is the fitted reference above.
 requirement(
@@ -596,10 +596,6 @@ requirement(
         "nominal_dia": (SHOULDER_DIA, ("SHOULDER_DIA",)),
         "length_nominal": (SHOULDER_LENGTH, ("SHOULDER_LENGTH",)),
         "callout": (SHOULDER_FIT_CALLOUT, ((_NOTES, "SHOULDER_FIT_CALLOUT"),)),
-        "diametral_clearance": (
-            [DIAMETRAL_CLEARANCE_MIN, DIAMETRAL_CLEARANCE_MAX],
-            ("DIAMETRAL_CLEARANCE_MIN", "DIAMETRAL_CLEARANCE_MAX"),
-        ),
         "finish_ra": (_SHOULDER_FINISH.roughness_um, ("SURFACE_FINISHES",)),
         "corner_radius_max": (
             UNDER_HEAD_RADIUS_MAX,
@@ -698,7 +694,8 @@ def _dress_head_seat(adapter: Any, annotations: list[Any]) -> None:
     """Prove detail B's imports print the model's head seat (#1757): the
     under-head radius as a radial R.004 MAX, its leader reaching the arc
     through an arc extension (its text stands on the round's centre side,
-    off the arc's span), and the head break as its two native limits."""
+    off the arc's span), and the head break as its single MIN limit, the
+    title block's edge break its native upper deviation."""
     by_name = {dimension_name(adapter, a): a for a in annotations}
     for name in ("UnderHeadRadius", "HeadChamfer"):
         if name not in by_name:
@@ -744,7 +741,7 @@ def _dress_head_seat(adapter: Any, annotations: list[Any]) -> None:
     )
     if (
         not math.isclose(nominal, HEAD_CHAMFER, abs_tol=1e-6)
-        or int(tolerance.Type) != LIMIT_TOL_TYPE
+        or int(tolerance.Type) != HEAD_CHAMFER_TOL_TYPE
         or any(
             not math.isclose(actual, expected, abs_tol=1e-6)
             for actual, expected in zip(limits, HEAD_CHAMFER_LIMITS, strict=True)

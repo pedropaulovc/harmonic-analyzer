@@ -2,13 +2,12 @@
 # (owner ruling 2026-11-21: turned parts get lathe travelers, no NC). Route
 # chosen for speed: one chucking on 9/16 in C36000 rod, its outside left as
 # supplied (drawing: ROD AS SUPPLIED, skimmed with MHA-DT-08 after cure):
-# mike the rod, face the end (Z0), spot, drill N (.302, inside the drawing's
-# .298-.308 BORE THRU) past the parting line, part off .28 from the faced
+# mike the rod, face the end (Z0), spot, drill N (the drawing's N DRILL Ø.302
+# THRU at DRILLED HOLES, .302-.306) past the parting line, part off .28 from the faced
 # end; the parted face is the ferrule's other face, held to the .27-.29 band
-# by the DRO. A drill, not a boring bar: no boring bar under 3/8 in is on
-# record (cad/process/shop), and N lands inside the band. Bench: deburr,
-# check length and hole, and tag the hole's pin size for MHA-DT-08, whose
-# tenon is turned to it.
+# by the DRO. Owner ruling 2026-11-24, fit audit question 15: the hole is the
+# N drill's, no pin reading and no tag; MHA-DT-08's tenon is turned to the
+# hole at the handle. Bench: deburr and check the length.
 #
 # Stock: 9/16 in C36000 rod is to order (cad/config/shop-equipment/
 # stock-to-order.toml c360-round-9-16, 1.5 in); none is on hand.
@@ -114,7 +113,7 @@ speed_kind = "spindle"
 tool = "drill-n"
 drilling = "twist_drill"
 sizing = { kind = "band", band_mm = "{{cad.bore_dia_band_mm}}" }
-instruction = "Feed the N (.302) drill in until its lips just touch the spot's rim and zero the tailstock quill scale there. Drill until the scale reads {{cad.run_in:.2dot}}: the drill's full diameter then runs through the ferrule and past the parting line (a BORE callout: the .XXX ±.005 row, Ø{{cad.bore_dia_min_in:.3dot}}–{{cad.bore_dia_max_in:.3dot}})."
+instruction = "Feed the N (.302) drill in until its lips just touch the spot's rim and zero the tailstock quill scale there. Drill until the scale reads {{cad.run_in:.2dot}}: the drill's full diameter then runs through the ferrule and past the parting line (the drawing's N DRILL THRU, Ø{{cad.bore_dia_min_in:.3dot}}–{{cad.bore_dia_max_in:.3dot}} at DRILLED HOLES: the hole is the drill's, not read)."
 settings = "lathe-drill-n-c360"
 cut_diameter_mm = 7.6708
 hole_depth_mm = "{{cad.run_mm}}"
@@ -132,7 +131,7 @@ cut_diameter_mm = "{{cad.outer_dia_mm}}"
 
 [[setups]]
 machine_kind = "other"
-title = "Bench: deburr, inspect and tag the bore"
+title = "Bench: deburr and inspect"
 machine = "Bench"
 envelope = "other"
 indexing = "none"
@@ -149,17 +148,13 @@ instruction = "Deburr: file the parting burr off the parted face flat on the smo
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Length {{cad.length_min_in:.2dot}}–{{cad.length_max_in:.2dot}} across the faces, calipers; the hole takes the {{cad.bore_dia_min_in:.3dot}} pin gauge and not the {{cad.bore_dia_max_in:.3dot}}."
-inspection = "Length {{cad.length_min_in:.2dot}}–{{cad.length_max_in:.2dot}}; hole Ø{{cad.bore_dia_min_in:.3dot}}–{{cad.bore_dia_max_in:.3dot}}."
-gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.length_band_mm}}" }, { gauge = "pin-gauges", band_mm = "{{cad.bore_dia_band_mm}}" }]
+instruction = "Length {{cad.length_min_in:.2dot}}–{{cad.length_max_in:.2dot}} across the faces, calipers."
+inspection = "Length {{cad.length_min_in:.2dot}}–{{cad.length_max_in:.2dot}}."
+gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.length_band_mm}}" }]
 feed = "hand"
 
 [[setups.operations]]
-instruction = "A ferrule that fails a check in Op 70 is scrapped, not reworked: make another by repeating Setup 1 and Ops 60–70."
-feed = "hand"
-
-[[setups.operations]]
-instruction = "Tag the ferrule with the largest pin that enters its hole: {{cad.bore_mate}} is turned to that size less {{cad.bore_clearance_ref_min_in:.3dot}}–{{cad.bore_clearance_ref_max_in:.3dot}}."
+instruction = "A ferrule that fails the check in Op 70 is scrapped, not reworked: make another by repeating Setup 1 and Ops 60–70."
 feed = "hand"
 
 [[setups.operations]]

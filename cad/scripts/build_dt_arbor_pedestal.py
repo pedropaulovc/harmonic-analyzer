@@ -60,12 +60,9 @@ from _sketch_chains import define_rectilinear_chain
 from _sketch_circle import define_circle
 from _drawing_precision import apply_drawing_precision
 from _drawing_marks import apply_drawing_properties, clear_dimensions_for_drawing, mark_dimensions_for_drawing
-from _drawing_tolerances import set_dimension_bilateral_tolerance
-from _fit_deviations import deviations
 from _part_pmi import author_part_pmi
 from dt_arbor_pedestal_spec import (
     BORE_DIA,
-    BORE_DIA_BAND,
     BORE_HEIGHT,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
@@ -86,7 +83,6 @@ from dt_arbor_pedestal_spec import (
     TAPER_TANGENT_X,
     TAPER_TANGENT_Y,
     TOP_RADIUS,
-    UNIT,
 )
 from _hole_spec import blind_cut_dia_mm
 from _visibility import blank_reference_geometry
@@ -530,14 +526,6 @@ def build(adapter) -> dict[str, str]:
     # Decimal places are the tolerance statement, so the PART carries them
     # (drawing-simplicity-policy.md `How the repository implements the guidelines`); the drawing reads them back instead of rewriting them.
     apply_drawing_precision(adapter, DRAWING_PRECISION)
-    set_dimension_bilateral_tolerance(
-        adapter,
-        "BoreProfile",
-        "BoreDia",
-        *deviations(BORE_DIA_BAND),
-        places=DRAWING_PRECISION["BoreProfile"]["BoreDia"],
-        display_unit=UNIT,
-    )
 
     apply_material(adapter, MATERIAL)
     apply_color(adapter, CAD_APPEARANCE)

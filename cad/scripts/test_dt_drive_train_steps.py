@@ -11,7 +11,6 @@ import _config
 import dt_cone_gear_stack
 import cone_stack_end_play
 import draw_dt_drive_train_assembly as drawing
-import dt_drive_train_acceptance_assembly_sheet as acceptance_sheet
 import dt_drive_train_assembly_sheet as sheet
 import dt_drive_train_steps as steps
 import pinion_rig_tip_gap as tip_gap
@@ -22,7 +21,7 @@ SEQUENCE_BLOCKS = (
     drawing.BANK_STEPS,
     drawing.rig_steps(pivot_blocks=2, cams=2, slotted=4),
 )
-TIP_GAP_FEELER = f"{tip_gap.TIP_GAP_SETTING_TEXT} FEELER"
+TIP_GAP_ROD = f"A {tip_gap.TIP_GAP_ROD_TEXT} IS SNUG"
 STEP_HEAD = re.compile(r"^\s*(\d+)\. ", re.MULTILINE)
 
 
@@ -60,7 +59,7 @@ def test_a_key_resolves_to_its_position_and_prints_a_pointer() -> None:
 
 @pytest.mark.parametrize(
     ("text", "key", "phrase"),
-    ((drawing.CHECKS, "rig-located", TIP_GAP_FEELER),),
+    ((drawing.CHECKS, "rig-located", TIP_GAP_ROD),),
 )
 def test_each_typed_step_cite_names_the_step_that_does_it(
     text: str, key: str, phrase: str
@@ -104,7 +103,9 @@ def test_the_cone_stack_step_prints_measured_limits() -> None:
 def test_the_tip_is_measured_dry_then_bonded_on_the_feeler_in_two_cures() -> None:
     """Owner decision C1 keyed (2026-11-09, PR #1992): the stack is measured
     dry, MHA-DT-38 is bonded on the loose MHA-DT-37 (owner ruling
-    2026-11-20, #2469), and only then is T024 bonded one STACK_FEELER off
+    2026-11-20, #2469), and only then is T024 bonded on one leaf of
+    STACK_FEELER_RANGE (D4, delegated ruling 2026-11-24 (Main), no precedent;
+    owner review #2144) off
     T030 with the bonded gears phased to T030 by the MHA-DT-03-TL-02 phasing
     comb, T030's blade beside the key (owner rulings 2026-11-09 and
     2026-11-10).  #2470: T024's joint is degreased, the faces its squeeze-out
@@ -116,7 +117,10 @@ def test_the_tip_is_measured_dry_then_bonded_on_the_feeler_in_two_cures() -> Non
     the comb's check.  Each failed acceptance parts its bonds, cleans the
     film out and redoes the round, the second from MHA-DT-38's bond, which
     the heat undoes."""
-    feeler = sheet.inch_text(cone_stack_end_play.STACK_FEELER, sheet.FEELER_PLACES)
+    feeler = " TO ".join(
+        sheet.inch_text(end, sheet.FEELER_PLACES)
+        for end in cone_stack_end_play.STACK_FEELER_RANGE
+    )
     comb = "CLIP MHA-DT-03-TL-02"
 
     def in_order(text: str, phrases: tuple[str, ...]) -> list[int]:
@@ -140,7 +144,7 @@ def test_the_tip_is_measured_dry_then_bonded_on_the_feeler_in_two_cures() -> Non
             "BOND MHA-DT-38 ON THE MHA-DT-37 PIVOT",
             "DEGREASE T024",
             "PASTE WAX",
-            f"BOND T024 ON THE LAND, {feeler} FEELER ON T030",
+            f"BOND T024 ON ONE LEAF {feeler} ON T030",
             comb,
             "ONCE THE BOND GRABS",
             "24 H CURE",
@@ -164,9 +168,10 @@ def test_the_tip_is_measured_dry_then_bonded_on_the_feeler_in_two_cures() -> Non
             "HOLDING MHA-DT-37 HOME, TAP ITS PIVOT TRUE",
             comb,
             "ONCE THE BONDS GRAB, MHA-DT-37 HELD HOME",
+            "RECORD ONLY, NO ACCEPTANCE: MHA-DT-37 PIVOT RUNOUT ABOUT MHA-DT-04",
+            "RECORD ONLY, NO ACCEPTANCE: T012 AND T018 TOOTH RUNOUT, SAME SETUP",
             "CLIPS OVER ALL FIVE GEARS",
-            "CHECK THE RUNOUT ABOUT MHA-DT-04 OF THE MHA-DT-37 PIVOT",
-            "IF ANY CHECK FAILS, AT 250 DEG C",
+            "IF IT FAILS, OR A BONDED GEAR HESITATES IN CHECK 5C, AT 250 DEG C",
             "SPIGOT, PIVOT",
             "REDO FROM 1L.",
             "ALIGN THE MHA-DT-05 COUNTERBORES",
@@ -181,8 +186,8 @@ def test_the_end_screw_sets_the_end_play_after_the_pivot_runs_free() -> None:
     """The tip's lateral error is taken up by turning MHA-DT-05 on its screws
     until T006's pivot runs free in MHA-DT-39
     (build_dt_drive_train_assembly.TIP_LATERAL_CAPACITY_MM); the post and the
-    block are tightened and the block doweled before MHA-DT-39 sets the end
-    play and the pinch screw locks it."""
+    block are tightened, and the block is doweled at step 3's head, before
+    MHA-DT-39 sets the end play and the pinch screw locks it."""
     placed = _step_body("post-and-tip-block")
     order = (
         "RUN BOTH MHA-DT-VN-61 IN, LOOSE ENOUGH TO TURN MHA-DT-05",
@@ -190,7 +195,6 @@ def test_the_end_screw_sets_the_end_play_after_the_pivot_runs_free() -> None:
         "THREAD MHA-DT-39 INTO MHA-DT-21",
         "TURN MHA-DT-05 ON ITS SCREWS UNTIL THE MHA-DT-37 PIVOT RUNS FREE",
         "TIGHTEN BOTH MHA-DT-VN-61 AND MHA-DT-VN-60",
-        "DRILL AND REAM UP THRU MHA-DT-20 INTO MHA-DT-21",
     )
     positions = [placed.find(phrase) for phrase in order]
     assert -1 not in positions, positions
@@ -198,10 +202,14 @@ def test_the_end_screw_sets_the_end_play_after_the_pivot_runs_free() -> None:
     assert "FEELER" not in placed
     fitup = _step_body("end-play-set")
     order = (
+        "DRILL 1/16 UP THRU MHA-DT-20 INTO MHA-DT-21",
+        "PUSH IT UP TO THE MHA-DT-21 FLOOR",
+        "WIPE THE MHA-DT-20 HOLE CLEAN",
+        "CHECK THAT MHA-DT-21 DOES NOT TURN ON MHA-DT-20 BY HAND",
         "THREAD MHA-DT-39 IN UNTIL MHA-DT-04 JUST STOPS SHUTTLING",
         "BACK MHA-DT-39 OFF 1/8 TURN",
         "TIGHTEN MHA-DT-VN-56",
-        "IF IT READ OVER, REDO 3B-3C WITH MHA-DT-39 IN MORE, IF UNDER LESS",
+        "IF IT READ OVER, REDO 3H-3J WITH MHA-DT-39 IN MORE, IF UNDER LESS",
         # Rule 23 (PR 2 machinist review round 10): the pinch lock's bench
         # acceptance comes once the end play is final.
         "CHECK THAT MHA-DT-39 DOES NOT TURN IN MHA-DT-21 BY HAND",
@@ -210,7 +218,7 @@ def test_the_end_screw_sets_the_end_play_after_the_pivot_runs_free() -> None:
     assert -1 not in positions, positions
     assert positions == sorted(positions)
     # #2726: the 3/4 end screw keeps rule 18's 1.5 D at the print-worst
-    # embed, so step 3A states no shortfall and DT-07 is retired.
+    # embed, so step 3G states no shortfall and DT-07 is retired.
     import build_dt_drive_train_assembly as assembly
     from machinist_exceptions import load_exceptions
 
@@ -226,15 +234,28 @@ def test_the_end_screw_sets_the_end_play_after_the_pivot_runs_free() -> None:
 def test_the_printed_shaft_end_play_is_the_band_the_stacks_book() -> None:
     """The end screw's embed and the bushing air book
     cone_stack_end_play.SHAFT_END_PLAY; the sheet prints that band, rounded
-    inward to the thousandth, as step 3C's sheet 16 row."""
+    inward to the thousandth, as step 3J's sheet 16 row.  Fit audit part 2,
+    B10, and Codjiflo round 1 of #3550 (delegated ruling 2026-11-24 (Main), no
+    precedent; owner review #2144): the sheet prints
+    the window or the feel, not both; the embed and the air need the window,
+    which a hand cannot read, so 3J measures it on the dial indicator, and
+    step 3G's 1/8 turn of the 1/4-28 end screw leaves a play inside it."""
     body = _step_body("end-play-set")
-    assert "INDICATE THE MHA-DT-04 END PLAY AT THE SHAFT END (" in body
+    assert "MEASURE THE MHA-DT-04 END PLAY AT THE SHAFT END (" in body
+    assert "FEEL" not in body
+    number = str(drawing.ACCEPTANCE_ROW_NUMBERS["shaft-end-play"])
+    (row,) = (row for row in drawing.ACCEPTANCE_TABLE_ROWS if row[0] == number)
+    assert row[drawing.ACCEPTANCE_TABLE_HEADER.index("SETTING")] == "MHA-DT-04 END PLAY AT THE SHAFT END"
+    assert row[drawing.ACCEPTANCE_TABLE_HEADER.index("CHECK WITH")] == "DIAL INDICATOR"
     match = re.fullmatch(r"(\.\d{3})-(\.\d{3})", _accept("shaft-end-play", cites=body))
     assert match is not None
     low, high = (float(value) * 25.4 for value in match.groups())
     least, most = cone_stack_end_play.SHAFT_END_PLAY
     assert least <= low < least + 0.0254 and most - 0.0254 < high <= most
     assert 0.0 < low < high
+    eighth_turn = 25.4 / 28 / 8
+    assert "BACK MHA-DT-39 OFF 1/8 TURN" in body
+    assert low < eighth_turn < high
 
 
 def test_post_screws_keep_spec_owned_stock_and_cut_to_fit_acceptance() -> None:
@@ -281,31 +302,32 @@ def test_post_screws_keep_spec_owned_stock_and_cut_to_fit_acceptance() -> None:
     assert drawing.POST_MOUNT_ENGAGEMENT_ASSEMBLY_FACT in declared["DT-02"].where
 
 
-def test_crank_fit_reads_t120_before_the_full_turn_and_retention_drilling() -> None:
+def test_crank_fit_looks_at_t120_before_the_full_turn_and_retention_drilling() -> None:
     import dt_crank_pinion_spec as pinion
 
     fitup = _step_body("crank-mesh-checked")
+    # Fit audit 2026-11-23 part 2, B9: a look for daylight replaces the .004
+    # feeler, the push and both fit-up cuts.
     order = (
         "SLIDE MHA-DT-10 ON WITHOUT ITS PIN",
         f"SET MHA-DT-10 {sheet.inch_text(pinion.SEAT_FEELER_MM, sheet.FEELER_PLACES)} OFF",
-        "PUSH MHA-DT-10 AND T120 TOWARD EACH OTHER",
-        f"A {sheet.T120_FITUP_FEELER_TEXT} FEELER PASSES ALL ROUND",
-        "BETWEEN THE MHA-DT-10 BAND AND THE T120 TIPS",
-        "BETWEEN THE MHA-DT-10 SHOULDER AND THE T120 FRONT FACE",
-        "IF IT STOPS AT THE BAND, TURN MHA-DT-10'S BAND DOWN",
-        f"Ø{sheet.inch_min_text(pinion.TURNED_DIA_FITUP_MIN, 3)} MIN",
-        "IF IT STOPS AT THE SHOULDER, FACE THE SHOULDER BACK",
-        f"{sheet.inch_min_text(pinion.SHOULDER_LENGTH_FITUP_MIN, 3)} MIN",
-        "REPEAT 4E-4J",
-        "TURN MHA-DT-07 ONE FULL REVOLUTION BY HAND: IT MUST NEVER BIND",
-        "MATCH-DRILL THE MHA-DT-10",
-        "TURN MHA-DT-07 ONE FULL REVOLUTION AGAIN: NO BINDING",
+        "4G. TURN MHA-DT-07 SLOWLY ONE FULL TURN: DAYLIGHT MUST SHOW ALL ROUND BETWEEN MHA-DT-10",
+        "4H. IF IT DOES NOT, MEASURE MHA-DT-10 AND T120 AGAINST THEIR PRINTS",
+        "4J. TURN MHA-DT-07 ONE FULL REVOLUTION BY HAND: IT MUST NEVER BIND",
+        "4K. IF THE TEETH BIND, RECUT MHA-DT-10",
+        "4L. AFTER A RECUT, REPEAT FROM 4D",
+        "4M. MATCH-DRILL THE MHA-DT-10",
+        "4S. TURN MHA-DT-07 ONE FULL REVOLUTION AGAIN: NO BINDING",
+        "4T. CHECK MHA-DT-11'S END IS NOT BELOW MHA-DT-10",
+        "4U. DO NOT FACE THAT END",
     )
     positions = [fitup.index(phrase) for phrase in order]
     assert positions == sorted(positions)
     assert "FLUSH BOTH SIDES" in fitup
     assert "BACKLASH" not in fitup
     assert "WORST-CASE" not in fitup
+    assert "FEELER PASSES" not in fitup and "PUSH MHA-DT-10" not in fitup
+    assert "4V." not in fitup
 
 
 def test_full_turn_checks_use_the_spec_ratio_and_clear_the_unrelieved_platform() -> None:
@@ -347,17 +369,15 @@ def test_step_four_holds_the_collar_on_the_boss_and_leaves_the_end_proud() -> No
         f"SET MHA-DT-10 {sheet.inch_text(pinion.SEAT_FEELER_MM, sheet.FEELER_PLACES)} "
         "OFF THE BOSS BACK FACE WITH A FEELER",
         "MATCH-DRILL THE MHA-DT-10",
-        f"END STANDS PROUD OF MHA-DT-10 ({drawing.acceptance_ref('crank-end-proud')}).",
+        "END IS NOT BELOW MHA-DT-10 (STRAIGHTEDGE).",
         "DO NOT FACE",
     )
     positions = [fitup.index(phrase) for phrase in order]
     assert positions == sorted(positions)
-    # A stack result the fitter cannot adjust: every accepted part set,
-    # including both extremes, must fall inside the printed range.
-    printed = _accept("crank-end-proud", cites=fitup)
-    assert printed == acceptance_sheet.inch_envelope((least, most), 3)
-    low, high = (float(limit) * 25.4 for limit in printed.split("-"))
-    assert low <= least and most <= high
+    # Owner ruling 2026-11-24, audit part 2 S5: the end is never below the
+    # 16T at any accepted part set (least >= 0 above), so the check is a
+    # straightedge with no printed window and no setting-table row.
+    assert "crank-end-proud" not in drawing.ACCEPTANCE_ROW_NUMBERS
     assert "SHIM" not in fitup and "MHA-CH-VN-57" not in fitup
 
 
@@ -373,7 +393,7 @@ def test_step_four_holds_the_collar_before_the_feeler_and_the_pin() -> None:
 
 def test_a_cite_to_the_wrong_step_is_caught() -> None:
     """Positive control: RIG SET sets the rig along the bank, not its tip gap."""
-    assert TIP_GAP_FEELER not in _step_body("rig-set")
+    assert TIP_GAP_ROD not in _step_body("rig-set")
 
 
 

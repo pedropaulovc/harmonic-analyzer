@@ -138,7 +138,7 @@ def gear_data(teeth: int) -> str:
         ("MATE", f"{CYLINDER_MATE_NUMBER}, 120T"),
         # The fit route of the tip, thickness and root bands (drawing-
         # guidelines "What the shop holds"): the cone mesh is set at assembly
-        # (MHA-DT-00 check 4), which measures no backlash, so the range is
+        # (MHA-DT-00 checks 4-5), which measure no backlash, so the range is
         # reference only, from no binding to the loosest running centre
         # (#2586). "FEEL SET" read as a private phrase (machinist review of
         # #3324 r1, 2 of 3 runs) and "SET AT ASSEMBLY" as a backlash to set

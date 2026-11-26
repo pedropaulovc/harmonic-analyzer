@@ -8,19 +8,21 @@ and each is real model geometry printed by its own native dimension:
   of ``R.004 MAX``.  Left to the title block's INSIDE CORNERS R.040 MAX, a
   turning-tool nose could leave a radius ten times larger, which rides on the
   floor hole's edge and stands the head off the floor;
-* the cup's floor-hole mouth on the pocket side: a 45-degree break between
-  two limits, so even the largest under-head radius, with the shoulder pushed
-  against the hole wall, lands in the break and not on its edge;
-* the head's outer edge on the under-head side: a 45-degree break between the
-  same limits, so it clears the cup's ``R.004 MAX`` pocket-floor corner with
+* the cup's floor-hole mouth on the pocket side: a 45-degree break of at
+  least a printed minimum, so even the largest under-head radius, with the
+  shoulder pushed against the hole wall, lands in the break and not on its
+  edge;
+* the head's outer edge on the under-head side: a 45-degree break of the
+  same minimum, so it clears the cup's ``R.003 MAX`` pocket-floor corner with
   the head pushed against the pocket wall.
 
 The owner's millimetre ruling on #1757 and its delegated inch adaptation sit
 beside the constants they govern, here and in the cup's
-``dt_crank_handle_butt_cup_seat_spec``.  Each break's minimum exceeds the
-radius it clears, and the maxima equal the title block's edge break, so the
-screw spec's worst-case bearing annulus (``HEAD_BEARING_RADIAL_MIN``), which
-budgets that break on both edges, stays the one figure for the flat seat.
+``dt_crank_handle_butt_cup_seat_spec``.  Each break prints its minimum
+alone (``.005 MIN``), which exceeds the radius it clears; the title block's
+edge break caps it, so the screw spec's worst-case bearing annulus
+(``HEAD_BEARING_RADIAL_MIN``), which budgets that break on both edges, stays
+the one figure for the flat seat.
 
 Split from both part specs: the crank arm, the handle and the keeper chain
 import those, so the seat's numbers living there re-keyed parts that never
@@ -44,15 +46,24 @@ from dt_crank_handle_butt_cup_seat_spec import FLOOR_HOLE_CHAMFER_LIMITS
 # R0.1 MAX and head outer 0.11-0.26 X 45 (#1694 proof), at this inch
 # package's three places.  The radius prints the single limit R.004 MAX
 # (swTolMAX: the modelled radius IS the printed limit, sharp allowed); the
-# 1.6 um over R0.1 is swallowed by the larger break minima.  The break prints
-# .005-.010 (0.127-0.254) as two limits (swTolLIMIT), modelled at their
-# middle: its larger minimum only adds air over the cup's R.004 MAX floor
-# corner, and its maximum is the title block's edge break.  (min, max) legs.
+# 1.6 um over R0.1 is swallowed by the larger break minima.  The break's
+# larger minimum only adds air over the cup's R.003 MAX floor corner, and its
+# maximum is the title block's edge break.
+#
+# The break prints the single limit .005 MIN (swTolMIN, modelled at it), as
+# the cup's floor-hole mouth does: the stacked .010/.005 was a band .005 wide
+# with no register entry (machinist review r1, farm run 20261124T110807008Z;
+# drawing-guidelines rule 4: a single-limit edge break is not a tight band).  The title block's .010 chamfer
+# MAX is its upper limit, so the limits below are the analysis band the
+# proofs read.  A single size at the .XXX row would not serve: .005 +/-.005
+# can come out sharp on the R.003 corner, and .010 +/-.005 breaks .015, past
+# the edge break the bearing annulus budgets.  (min, max) legs.
 UNDER_HEAD_RADIUS_MAX = 0.1016  # .004
 UNDER_HEAD_RADIUS_BAND = (0.0, -UNDER_HEAD_RADIUS_MAX)  # (upper, lower)
 UNDER_HEAD_RADIUS_TOL_TYPE = 6  # swTolType_e.swTolMAX
-HEAD_CHAMFER_LIMITS = (0.127, 0.254)  # .005-.010
-HEAD_CHAMFER = round(sum(HEAD_CHAMFER_LIMITS) / 2.0, 6)
+HEAD_CHAMFER_TOL_TYPE = 5  # swTolType_e.swTolMIN
+HEAD_CHAMFER_LIMITS = (0.127, screw.EDGE_BREAK_MAX_MM)  # .005-.010
+HEAD_CHAMFER = HEAD_CHAMFER_LIMITS[0]
 
 # Corner air at the worst case, normal to each break, with the mating corner
 # pushed against its wall (zero radial gap).  A radius R fills its corner out

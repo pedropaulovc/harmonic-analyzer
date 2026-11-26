@@ -119,11 +119,15 @@ BORE_DIA = 11.1379  # .4385 in
 # cone-shaft spec derives that largest break (THRUST_EDGE_BREAK_MAX); it
 # imports this spec, so the value is restated here and the post's sheet
 # asserts the two agree.  The model breaks both rims AT the maximum, a
-# 45-degree chamfer, and prints its leg as the single limit .004 MAX on a
-# dimension whose extension lines touch the rim (the title block's .010
-# would take the ring under its floor).
+# 45-degree chamfer, and the sheet prints it as a leader note on the far rim
+# in Section A-A, BREAK .004 MAX / BOTH BORE RIMS (the title block's .010
+# would take the ring under its floor; machinist review r1, farm run
+# 20261124T110807008Z: a 20:1 detail for one break was over-specification).
 JOURNAL_RIM_BREAK = 0.1016  # .004 MAX
-JOURNAL_RIM_BREAK_BAND = (0.0, -JOURNAL_RIM_BREAK)
+# The sheet's leader note on that rim: the single limit and which rims.
+JOURNAL_RIM_BREAK_NOTE = (
+    f"BREAK .{round(JOURNAL_RIM_BREAK / 25.4 * 1000.0):03d} MAX\nBOTH BORE RIMS"
+)
 # The harvested 1.654 face-to-face: MHA-DT-04's bearing length, which the
 # cone shaft's stations and the gear stack close on.  It is its own value, not
 # the body's Ø.
@@ -195,15 +199,20 @@ if MOUNT_HEAD_WEB_WORST < WALL_TARGET_MM:
 
 # The cone shaft MHA-DT-04's collar bears on the NORTH cone-boss end face, so
 # the print locates that face from the post axis (rule 10) instead of calling
-# the boss symmetric in a note.  The drive-train stacks book that face half the
-# face-to-face band off the post axis (dt_cone_gear_shaft_spec,
-# crank_boss_rim, build_dt_drive_train_assembly); the station's own band is the
-# largest .001 in band inside that half, so no stack moves.
+# the boss symmetric in a note.  Owner ruling 2026-11-24, audit part 2 C9
+# ("Yes: add the look and relax the rest."): the face takes the title
+# block's .XXX band (it was +/-.002, the largest .001 band inside half the
+# face-to-face band).  Step 23's look at the bushing erases it from the tip
+# air; the drive-train stacks that place the collar, the 64T and T120 from
+# it book the station's printed limits (CONE_BOSS_NORTH_STATION_DEVIATIONS_MM:
+# build_dt_drive_train_assembly, crank_boss_rim, dt_cone_tip_air).
 CONE_BOSS_NORTH_STATION = CONE_BOSS_LENGTH / 2.0
-_CONE_BOSS_HALF_BAND = printed_band_mm(3, unit=UNIT) / 2.0  # ConeBossLen .XXX
-CONE_BOSS_NORTH_STATION_TOLERANCE_MM = (
-    math.floor(_CONE_BOSS_HALF_BAND / MM_PER_IN * 1000.0 + 1e-9) / 1000.0 * MM_PER_IN
-)  # +/-.002
+CONE_BOSS_NORTH_STATION_DEVIATIONS_MM = printed_deviations(
+    CONE_BOSS_NORTH_STATION, 3, unit=UNIT
+)
+CONE_BOSS_NORTH_STATION_TOLERANCE_MM = max(
+    abs(deviation) for deviation in CONE_BOSS_NORTH_STATION_DEVIATIONS_MM
+)
 # Both cone bosses stand clear of the body at every printed limit (#2756):
 # the north face at its station's least, the far face at the face-to-face's
 # least less the north station's greatest, each against the body's largest
@@ -212,12 +221,7 @@ CONE_BOSS_NORTH_STATION_TOLERANCE_MM = (
 _BODY_RADIUS_MAX = _printed_limits(BODY_DIA, 2)[1] / 2.0
 _NORTH_STATION_LIMITS = tuple(
     CONE_BOSS_NORTH_STATION + deviation
-    for deviation in printed_deviations(
-        CONE_BOSS_NORTH_STATION,
-        3,
-        (-CONE_BOSS_NORTH_STATION_TOLERANCE_MM, CONE_BOSS_NORTH_STATION_TOLERANCE_MM),
-        unit=UNIT,
-    )
+    for deviation in CONE_BOSS_NORTH_STATION_DEVIATIONS_MM
 )
 CONE_BOSS_STANDOFF_WORST_MM = {
     "north": _NORTH_STATION_LIMITS[0] - _BODY_RADIUS_MAX,
@@ -234,10 +238,6 @@ for _name, _standoff in CONE_BOSS_STANDOFF_WORST_MM.items():
             f"the {_name} cone boss stands {_standoff:.3f} mm off the body at the "
             f"printed limits, under the {CONE_BOSS_STANDOFF_FLOOR_MM:.3f} mm edge break"
         )
-if CONE_BOSS_NORTH_STATION_TOLERANCE_MM > _CONE_BOSS_HALF_BAND:
-    raise AssertionError(
-        "north cone-boss face station band exceeds the stacks' half band"
-    )
 
 # Final solid volume, the sum of the per-feature analytic terms the build
 # checks natively one feature at a time (build_dt_cone_pivot_post.py asserts
@@ -471,7 +471,6 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "CrankBossStationReference": {"CrankBossStartZ"},
     "ConeBossStationReference": {"ConeBossNorthZ"},
     "BoreSpacingReference": {"CrankAboveCone"},
-    "JournalRimBreakReference": {"JournalRimBreak"},
 }
 
 # Decimal places are product definition: they select the title-block general
@@ -494,8 +493,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # printed to .001.  The basic plan angle feeds the retained crank-bore angularity frame;
 # its four places spell the configured geometry, not a tighter general
 # angular band.  The two reamed running bores take four, the places their
-# size limits are written in.  The journal rims' break prints its .004 MAX
-# to three places.
+# size limits are written in.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "MainBodyProfile": {"MainBodyDia": 2},
     "MainBody": {"MainBodyHt": 2},
@@ -514,7 +512,6 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "CrankBossStationReference": {"CrankBossStartZ": 3},
     "ConeBossStationReference": {"ConeBossNorthZ": 3},
     "BoreSpacingReference": {"CrankAboveCone": 3},
-    "JournalRimBreakReference": {"JournalRimBreak": 3},
 }
 
 _PRECISION_NAMES = [

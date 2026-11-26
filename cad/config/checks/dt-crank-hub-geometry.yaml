@@ -1,0 +1,13 @@
+checks:
+  - id: C-01
+    check: "the MHA-DT-31 seat's slip gap is past LOCTITE 638's limit"
+    kind: joint
+    reason: "LOCTITE 638 cannot fill it; the hub turns in MHA-DT-06"
+    source: "LOCTITE 638 TDS, 0.25 mm max diametral gap; owner ruling 2026-11-24, fit audit question 21 (seat turned last to the MHA-DT-06 bore, slip .0005-.003, bonded)"
+    basis: measured
+  - id: C-02
+    check: "the seam pin's drilled gap is past LOCTITE 638's limit"
+    kind: joint
+    reason: "LOCTITE 638 cannot fill the gap; the seam pin walks"
+    source: "LOCTITE 638 TDS, 0.25 mm max diametral gap; the 5/32 drill at DRILLED HOLES +.004/0 round pin 98381A487 at its nominal (fit audit 2026-11-23, MHA-DT-06_DT-31.seam_pin)"
+    basis: worst_case

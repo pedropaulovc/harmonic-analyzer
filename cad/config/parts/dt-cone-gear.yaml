@@ -26,21 +26,20 @@ dt-cone-gear:
   # the D-bores only), RV-04 (T006's web; T006 is MHA-DT-37). RV-05 (the
   # T006 tooth bands) moved to MHA-DT-37 with its sheet. The 2026-09-28
   # ruling "one flat per gear land; no keys, no solder, no retaining compound;
-  # no gear bonded" is superseded by C1 keyed.
+  # no gear bonded" is superseded by C1 keyed. RV-06 (the converted
+  # +.0018/+.0010 bore band) retired with fit audit 2026-11-23
+  # (MHA-DT-03.keyed_bore, .T024_bore): every bore prints its reamer's size
+  # with no band, MHA-DT-04's land turned last to it; RV-03 and RV-07 name
+  # the bores as printed, their webs at the reamer's modelled largest cut.
   machinist_exceptions:
     - id: "RV-03"
       kind: "minor"
-      where: "sheet T012, front view: the root-to-bore web stated by the native .0674 MIN dimension (WebMin) from the Ø.0625 +.0005/-.0000 reamed bore to the root envelope MIN"
+      where: "sheet T012, front view: the root-to-bore web stated by the native .0674 MIN dimension (WebMin) from the Ø.0625 REAM THRU bore (largest modelled cut .0630) to the root envelope MIN"
       finding: "the T012 web is .0674 in (1.7120 mm) at the printed worst case (largest bore .0630, smallest root envelope .1979): .0126 in under the .080 in target (rule 17), .0074 in over the .060 in floor"
       reason: "Owner ruling 2026-11-09 via PR #1992 (https://github.com/pedropaulovc/harmonic-analyzer/pull/1992), C1 keyed: T012 is reamed round Ø.0625 and bonded on MHA-DT-37's Ø.0625 spigot, which must stand under T006's root so the DT6-FORM1 cutter runs off; the cutter-native T012 root fixes the web (research: drive-train-cone-tip-options.md, option C), ruled at .0646. It replaces the 2026-11-01 ruling's .0797 on the retired .031 terminal land. Owner ruling 2026-11-22 (Pedro, #2473, option G) made T012's tooth thickness +.003/-0 at the same cutter and depth, so the cutter no longer sinks to a thin limit and the root envelope MIN rises from .1922 to .1979: the web is .0674, thicker than ruled. Anything thinner than .0674 must be ruled again"
-    - id: "RV-06"
-      kind: "accept"
-      where: "sheets T024-T120: the bore Ø +.0018/+.0010 (REAM THRU; BoreCutDia on T024's front view, KeyedBoreDia in DETAIL A on T030-T120), flagged SEE NOTE 1"
-      finding: "+.0018/+.0010 is a converted millimetre band, not a plain inch step (rule 4)"
-      reason: "Delegated ruling 2026-11-07 (Main), no precedent; owner review #2144 (fan-out rulings F2 and F5). The limits come from the fleet-shared gear_seat_fit seat class on MHA-DT-04's GEAR_SEAT_BAND, restated in inch steps at that family's next re-key. Re-scoped by owner ruling 2026-11-09 via PR #1992 (https://github.com/pedropaulovc/harmonic-analyzer/pull/1992): no D-bore or across-flat band remains, and T012/T018 take the reamer's plain +.0005/-.0000. Accepts this notation only, no other band or callout departure."
     - id: "RV-07"
       kind: "minor"
-      where: "sheet T030, GEAR DATA: WEB MIN (REF): .0631, root envelope to the hub keyway's top corner (KeyedBoreProfile: Ø.3750 +.0018/+.0010 bore, KeywayWidth .0625 +.0020/-.0000, KeywayT .4025 ±.003, printed as limits .4055/.3995)"
+      where: "sheet T030, GEAR DATA: WEB MIN (REF): .0631, root envelope to the hub keyway's top corner (KeyedBoreProfile: Ø.3760 REAM THRU bore, smallest modelled cut .3760; KeywayWidth .0625 +.0020/-.0000, KeywayT .4025 ±.003, printed as limits .4055/.3995)"
       finding: "the T030 web is .0631 in at the printed worst case (root envelope MIN .5661, keyway corner at T MAX .4055 from the far side of the smallest bore .3760, keyway at its widest .0645): .0169 in under the .080 in target (rule 17), .0031 in over the .060 in floor"
       reason: "Owner ruling 2026-11-09 via PR #1992 (https://github.com/pedropaulovc/harmonic-analyzer/pull/1992), C1 keyed: land 1 takes a 1/16 square key (MHA-DT-VN-71) and T030-T120 are broached for it, replacing the land's D-flat. The research's .0641 is at the keyway's centreline; the corner, nearer the root, governs. ANSI B17.1's 3/32 key would leave T030 .052, under the floor, so the owner took the 1/16 key; T036 up keep .124 or more. Anything thinner must be ruled again"
     - id: "RV-08"

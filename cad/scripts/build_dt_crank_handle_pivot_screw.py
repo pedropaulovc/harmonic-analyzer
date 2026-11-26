@@ -44,7 +44,6 @@ from _rebuild import (
     assert_saved_configurations_regenerate,
     force_rebuild,
 )
-from _limit_tolerance import set_limits
 from _session import run_build
 from _single_limit_tolerance import set_single_limit
 from _sketch import (
@@ -69,6 +68,7 @@ from _visibility import blank_reference_geometry
 from dt_crank_handle_head_seat_spec import (
     HEAD_CHAMFER,
     HEAD_CHAMFER_LIMITS,
+    HEAD_CHAMFER_TOL_TYPE,
     SCREW_DRAWING_DIMENSIONS as DRAWING_DIMENSIONS,
     SCREW_DRAWING_PRECISION as DRAWING_PRECISION,
     UNDER_HEAD_RADIUS_BAND,
@@ -480,7 +480,8 @@ def build(adapter) -> dict[str, str]:
         tol_type=TIP_CHAMFER_TOL_TYPE,
     )
     # The head seat (#1757): the under-head radius as its single limit
-    # R.004 MAX, the head's break as its two limits.
+    # R.004 MAX, the head's break as its single limit .005 MIN (the title
+    # block's edge break caps it).
     set_single_limit(
         adapter,
         "ScrewProfile",
@@ -489,13 +490,13 @@ def build(adapter) -> dict[str, str]:
         band=UNDER_HEAD_RADIUS_BAND,
         tol_type=UNDER_HEAD_RADIUS_TOL_TYPE,
     )
-    set_limits(
+    set_single_limit(
         adapter,
         "ScrewProfile",
         "HeadChamfer",
-        limits=HEAD_CHAMFER_LIMITS,
-        places=DRAWING_PRECISION["ScrewProfile"]["HeadChamfer"],
-        display_unit=UNIT,
+        limit=HEAD_CHAMFER,
+        band=(HEAD_CHAMFER_LIMITS[1] - HEAD_CHAMFER, 0.0),
+        tol_type=HEAD_CHAMFER_TOL_TYPE,
     )
 
     # Every model edit -- the material, the appearance, the drawing marks, the

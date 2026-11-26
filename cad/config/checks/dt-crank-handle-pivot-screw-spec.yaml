@@ -1,0 +1,31 @@
+checks:
+  - id: C-01
+    check: "shoulder can bind in the oak bore"
+    kind: gap
+    reason: "the largest shoulder binds in the smallest MHA-DT-08 bore"
+    source: "SHOULDER_CLEARANCE_MIN = HANDLE_BORE_MIN - SHOULDER_DIA_MAX = .1610 - .1585 = .0025; owner ruling 2026-11-24, fit audit question 14 (limits .1535-.1585); delegated ruling 2026-11-25 (Main), no precedent; owner review #2144 (D35: MHA-DT-32's shoulder keeps owner Q14's .1535-.1585 as a necessity band; Q14's trial retired with D26)"
+    basis: worst_case
+  - id: C-02
+    check: "MHA-DT-08's tenon walls read a bore other than its largest accepted"
+    kind: wall
+    reason: "the tenon wall is judged at an unaccepted bore"
+    source: "dt_crank_handle_spec PIVOT_BORE_FIT_MAX, the #20's DRILLED HOLES .165; delegated ruling 2026-11-25 (Main), precedent: owner ruling 2026-11-24 merging the fit policy; RETIRES the owner's fit-audit Q14 answer's trial step; owner review #2144 (D26)"
+    basis: worst_case
+  - id: C-03
+    check: "the MHA-DT-35 pocket at its .257 limit leaves under its .060 "
+    kind: wall
+    reason: "the cup's face wall falls under the rule-17 floor"
+    source: "owner ruling B on #1375; owner ruling 2026-11-24, fit audit question 15"
+    basis: worst_case
+  - id: C-04
+    check: "the MHA-DT-35 pocket clearance is not the head's band in the pocket's limits"
+    kind: gap
+    reason: "the head binds in the smallest pocket"
+    source: "owner ruling 2026-11-24, fit audit question 15"
+    basis: worst_case
+  - id: C-05
+    check: "the shoulder's seat on the arm face is under 0.2 radial"
+    kind: wall
+    reason: "the smallest shoulder leaves too little seat on the arm"
+    source: "SEAT_RADIAL_MIN = (SHOULDER_DIA_MIN - 2 x SEAT_EDGE_BREAK_MAX - SEAT_CONTACT_INNER_DIA) / 2 - THREAD_FIT_OFFSET_MAX: 0.215 mm at .1535, 0.183 mm at the title block's .151 (necessity N-01's lower end); local reviews of 1f3067ef2, fbf82ad96, 21bb244c5 and aed772158"
+    basis: worst_case

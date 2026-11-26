@@ -37,7 +37,7 @@ from _hole_spec import FRACTIONAL_DRILL_MM, HoleSpec
 from _inch_wall_limits import WALL_TARGET_MM
 from _package_units import drawing_unit
 from _printed_tolerance import drilled_oversize_mm, printed_band_mm, printed_deviations
-from dt_crank_drive_gear_spec import floor_inch_mm, inch_text
+from dt_crank_drive_gear_spec import floor_inch_mm
 from _surface_finish import SurfaceFinishControl
 from stock_form_cutter import (
     StockFormProfile,
@@ -79,10 +79,11 @@ CUTTER_TEMPLATE = template_for_teeth(TEETH, DIAMETRAL_PITCH, PRESSURE_ANGLE_DEG)
 CUTTER_NUMBER = CUTTER_TEMPLATE.cutter_number
 CUTTER_TEETH_RANGE = CUTTER_TEMPLATE.teeth_range
 
-# The blank tip circles retain the ruled turning band, +/-.004 in. The
-# fixed-centre mesh's nonbinding stack, rather than an eccentric fit-up, owns
-# tip/root air.
-OUTSIDE_DIA_TOLERANCE_MM = 0.1016
+# The blank tip circle takes the title block's .XXX band, +/-.005 in (fit
+# audit 2026-11-23, MHA-DT-10.outside_dia: the ruled +/-.004 turning band
+# bought nothing the mesh needs). The fixed-centre mesh's nonbinding stack,
+# rather than an eccentric fit-up, owns tip/root air.
+OUTSIDE_DIA_TOLERANCE_MM = 0.127
 OUTSIDE_DIA_PLACES = 3
 # Same retained critical cutting setup as the mate, indicated to this bore;
 # no datum frame or general part-runout tolerance is implied.
@@ -183,19 +184,19 @@ STOCK_PROFILE_CORNERS = tuple(
 )
 
 # The crankshaft's .3125 in step and matching bore (#290, inch fit row K11:
-# the owned .3135 reamer cuts the bore). The seat keeps the through shaft's
+# the .3135 reamer cuts the bore). The seat keeps the through shaft's
 # size band and fit, while the live boss wall guard checks the standard
 # full-depth root over that bore.
 SEAT_DIA = 7.9375  # .3125
 
-# The bore over the crankshaft's seat is the part's one critical fit, and the
-# only reason anything here prints a third decimal: a slip fit exists only if
-# the size limits on BOTH mating features are narrower than the clearance band
-# it claims (tolerance-policy.md step 6b). The feature callout names the mate
-# and publishes the required diametral-clearance range; the dimensional band is
-# DERIVED -- never a per-part number -- from that named fit class and the
-# seat's own published limits: bore_min = seat_max + clearance_min,
-# bore_max = seat_min + clearance_max. Move either input and this moves with it.
+# The bore over the crankshaft's seat is the part's one critical fit. It is
+# reamed .3135 with the owned adjustable reamer set (D19;
+# reamers-adjustable-lms-5948, no tool bought) and prints that size with no band; the
+# crankshaft's seat is made last, turned to this bore less the named fit
+# class's clearance (fit audit 2026-11-23, MHA-DT-10.bore; drawing-guidelines
+# rule 4). BORE_DIA_BAND is the ANALYSIS band, never printed: what the
+# reamer cuts over the seat's nominal (bore_min = seat_max + clearance_min,
+# bore_max = seat_min + clearance_max), which the boss wall consumes.
 BORE_DIA = SEAT_DIA
 BORE_DIAMETRAL_CLEARANCE = tuple(
     _config.fit("shaft_in_bushing")["diametral_clearance_mm"]
@@ -209,17 +210,27 @@ BORE_DIA_BAND = (  # (upper, lower) deviations
 
 FACE_WIDTH = 11.684  # .46: teeth grown north past the 64T row; south face stays seated
 # The retained south-face datum and full tooth length still locate the boss
-# step. FaceWidth remains the native GearBlank extrusion with its existing
-# +.000/-.010 functional band, not the general .XX grade. Actual stock-form
+# step. FaceWidth is the native GearBlank extrusion at the title block's .XX
+# row, .45-.47 (machinist review r1, farm run 20261124T110807008Z: its
+# +.000/-.010 band's register reason, 64T engagement and T120 clearance, is
+# not a mesh centre distance or run-out; drawing-guidelines rule 4: a
+# register reason not of its kind).  No check needs the tighter band: the short limit is
+# unchanged, so the 64T row engagement is too, and at the long limit the
+# standard mesh check keeps .0035 backlash and .016 root clearance and the
+# turned band stays 1.67 mm radially off T120 (the tooth end grows north,
+# away from the seated south face; crank_mesh_stack and
+# build_dt_drive_train_assembly read these limits). Actual stock-form
 # acceptance must prove at least the source-owned row engagement fraction
 # at every manufactured/pose case. The former ideal-profile slice calculation
-# is not a certificate for this cutter-native pinion. The long limit also
-# bounds the turned band's physical T120 clearance independently of contact.
-FACE_WIDTH_BAND = (0.0, -0.254)  # (upper, lower) deviations: +.000/-.010
+# is not a certificate for this cutter-native pinion.
+FACE_WIDTH_BAND = (
+    printed_band_mm(2, unit=UNIT),
+    -printed_band_mm(2, unit=UNIT),
+)  # (upper, lower) deviations: the .XX row, +/-.01
 FACE_WIDTH_LIMITS = deviations(FACE_WIDTH_BAND)  # (lower, upper)
 # Full-OD shoulder: OutsideDia over SHOULDER_LENGTH from the south face,
 # with its +.000/-.010 band. The assembly retains the 0.25-mm T120
-# air floor, all axis/fit offsets, the fit-up feeler and the row contact gate.
+# air floor, all axis/fit offsets and the row contact gate.
 # The toothed south face is set directly off the restored MHA-DT-05 north
 # boss face with the assembly step-4 feeler. There is no spot-face retreat
 # or eccentric sleeve in this stack.
@@ -234,25 +245,25 @@ SHOULDER_LENGTH_LIMITS = deviations(SHOULDER_LENGTH_BAND)
 # Retain a real north band below the actual finite-supported full blank.
 # guards check its upper size against T120 and its lower size over the row.
 TURNED_DIA = 18.542  # .730
-TURNED_DIA_TOLERANCE_MM = 0.1016  # +/-.004
+# The title block's .XXX band, +/-.005 (fit audit 2026-11-23,
+# MHA-DT-10.turned_band, bundled with the tip circle's).
+TURNED_DIA_TOLERANCE_MM = 0.127
 TURNED_LENGTH = FACE_WIDTH - SHOULDER_LENGTH
 # T120 envelope facts are checked against the assembly's exact printed-corner
 # calculation. Finite clearance is rounded down to 0.01; positive infinity
 # means that no T120 section reaches the full-tip shoulder envelope.
 # Both sheets describe that absence rather than printing an infinite size.
 T120_SHOULDER_AIR_WORST = math.inf
-# 1.6890 exact with the cone swing set 0.20 above standard (edge slack moves
-# X_PITCH; user ruling 2026-10-10), the inch running fits and the inch-printed
-# turned band (#290), floored to 1.68; the ordinary floor is 0.25.
-T120_TURNED_BAND_RADIAL_WORST = 1.68
-# The independent fit-up feeler check remains: MHA-DT-10 and T120 are
-# pushed toward each other to take up every running play. A band that stops
-# the feeler is turned down, never under TURNED_DIA_FITUP_MIN; a shoulder
-# that stops it is faced back, never under its printed short limit. The
-# assembly proves the fit-up limits clear the feeler and retain engagement.
-T120_FITUP_FEELER_MM = 0.1016  # .004, one inch feeler leaf (#3042; was 0.10)
-TURNED_DIA_FITUP_MIN = 18.2372  # .718
-SHOULDER_LENGTH_FITUP_MIN = SHOULDER_LENGTH + SHOULDER_LENGTH_LIMITS[0]
+# 1.6761 exact with the cone swing set 0.20 above standard (edge slack moves
+# X_PITCH; user ruling 2026-10-10), the inch running fits and the turned band
+# at the title block's +/-.005 (fit audit 2026-11-23; 1.6890 at the former
+# +/-.004), floored to 1.67; the ordinary floor is 0.25.
+T120_TURNED_BAND_RADIAL_WORST = 1.67
+# Fit audit 2026-11-23 part 2, B9: at these worst cases MHA-DT-00 checks the
+# pair by a look for daylight through one turn (dt_drive_train_assembly_sheet
+# T120_DAYLIGHT_CHECK); the .004 feeler and its fit-up cuts (band turned down
+# to .718, shoulder faced back) are gone, so the band and shoulder stay at
+# their printed limits.
 
 # --- Hub boss + retention pin (ch. 12 p. 19, page002_img02 / img06) ---------
 #
@@ -364,8 +375,8 @@ FACE_WIDTH_PLACES = 2
 SHOULDER_LENGTH_PLACES = FACE_WIDTH_PLACES  # stated like FaceWidth
 TURNED_DIA_PLACES = 3  # stated like the OutsideDia it cuts into
 OVERALL_LENGTH_GRADE_MM = printed_band_mm(OVERALL_LENGTH_PLACES, unit=UNIT)
-# W15 sizes the boss for a face accepted anywhere in the .XX row. The printed
-# band sits inside that row, so every W15 stack only gains margin.
+# W15 sizes the boss for a face accepted anywhere in the .XX row, the row
+# the face prints at.
 W15_FACE_ALLOWANCE_MM = printed_band_mm(FACE_WIDTH_PLACES, unit=UNIT)
 _FACE_LOWER, _FACE_UPPER = FACE_WIDTH_LIMITS
 if _FACE_LOWER < -W15_FACE_ALLOWANCE_MM - 1e-9 or _FACE_UPPER > W15_FACE_ALLOWANCE_MM:
@@ -404,7 +415,6 @@ for _name, _value, _places in (
     ("OVERALL_LENGTH", OVERALL_LENGTH, OVERALL_LENGTH_PLACES),
     ("SHOULDER_LENGTH", SHOULDER_LENGTH, SHOULDER_LENGTH_PLACES),
     ("TURNED_DIA", TURNED_DIA, TURNED_DIA_PLACES),
-    ("TURNED_DIA_FITUP_MIN", TURNED_DIA_FITUP_MIN, TURNED_DIA_PLACES),
 ):
     if not prints_exactly(_value, _places):
         raise AssertionError(f"{_name} {_value!r} does not print exactly at {_places} places")
@@ -418,9 +428,6 @@ if not (
     and TURNED_DIA + TURNED_DIA_TOLERANCE_MM < OUTSIDE_DIA - OUTSIDE_DIA_TOLERANCE_MM
 ):
     raise AssertionError("the 16T turned band must lie between the root and the tip")
-# The fit-up turn-down leaves stub teeth: above the pitch circle, below the band.
-if not PITCH_DIA < TURNED_DIA_FITUP_MIN < TURNED_DIA - TURNED_DIA_TOLERANCE_MM:
-    raise AssertionError("the 16T fit-up turn-down must stay over the pitch circle")
 PIN_STATION = FACE_WIDTH + BOSS_LENGTH / 2.0
 PIN_AXIAL_LIGAMENT_WORST = pin_axial_ligament_worst(BOSS_LENGTH)
 if PIN_AXIAL_LIGAMENT_WORST < PIN_EDGE_MIN_WORST - 1e-9:
@@ -552,15 +559,6 @@ PIN_NUMBER = "MHA-DT-29"
 MESH_GEAR_NUMBER = "MHA-DT-07"
 CONE_GEAR_NUMBER = "MHA-DT-03"
 BORE_PROCESS_CALLOUT = "REAM THRU"
-BORE_FIT_CALLOUT = "\n".join(
-    (
-        "BORE LIMITS GOVERN",
-        f"MATE SHAFT {CRANKSHAFT_NUMBER}",
-        f"(\N{DIAMETER SIGN}{inch_text(SEAT_DIA, 4)} "
-        f"+{inch_text(_SHAFT_UPPER, 4)}/{inch_text(_SHAFT_LOWER, 4)})",
-        f"(DIA CLR {inch_text(_CLEARANCE_MIN, 4)}-{inch_text(_CLEARANCE_MAX, 4)})",
-    )
-)
 # One matched-fit note, printed on BOTH sheets (machinist review of 4d4e038e3):
 # a sheet stands alone, so each carries all four facts --
 # match drill at assembly, ream to fit the named pin, the fit's acceptance,
@@ -639,12 +637,13 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # ``GetPrimaryPrecision2()`` back off the sheet.
 #
 # Inch sheet (#290). The bore is the only size fit on the part and prints
-# four places with its derived band. The outside diameter prints three with
-# its own +/-.004. The face width prints two places with its own +.000/-.010
-# (FACE_WIDTH_BAND): the assembly proves the 64T row overlap at its short
-# limit and the turned band's T120 clearance at its long one. The shoulder
-# length prints two places and the turned diameter three, each with the band
-# its reason is recorded at above. The boss diameter is routine .XX, not a
+# the .3135 reamer's size at four places, no band. The outside diameter
+# prints three at the title block's .XXX row. The face width prints two places
+# at the title block's .XX row (FACE_WIDTH_BAND): the assembly proves the 64T
+# row overlap at its short limit and the turned band's T120 clearance at its
+# long one. The shoulder
+# length prints two places with its band, and the turned diameter three at
+# the title block's row. The boss diameter is routine .XX, not a
 # running surface. The match-drilled hole prints its reference size at three
 # places and its station from the boss's north face at three
 # (PIN_FROM_BOSS_END). The overall length prints two places like the face,
@@ -684,34 +683,6 @@ for _feature, _dimensions in DRAWING_PRECISION.items():
             f"{_feature}: precision authored for unmarked dimensions {_unmarked}"
         )
 
-
-
-# The drive-train fit-up may turn the band down past its printed band (the
-# T120 feeler check, MHA-DT-00's crank step), and only when the band itself
-# fails that check (a shoulder failure is the shoulder's to correct); the
-# sheet permits it only as that check directs and states the floor, so the
-# part stays conforming after the fit-up cut.  Codex P1 on #1154 (review 3).
-# The worst-case clearances to T120 are a design-check result, so only the
-# assembly's crank step prints them (T120_FITUP_ASSEMBLY_CHECK).  The sheet
-# names the check, not its step number: a part never reads the step registry
-# (Main's TbPB ruling 2; test_part_isolation).  The allowance rides the
-# turned diameter's own callout, so it cannot be read against the tip
-# diameter (machinist review r1 of #1652), and says who turns it, when and
-# on what result (r2: "MAY TURN" named neither).
-T120_SHOULDER_CLEARANCE_TEXT = (
-    "NO AXIAL OVERLAP"
-    if T120_SHOULDER_AIR_WORST == math.inf
-    else f"{T120_SHOULDER_AIR_WORST:.2f}"
-)
-TURNED_DIA_FITUP_CALLOUT = "\n".join(
-    (
-        f"{CONE_GEAR_NUMBER} T120 CLR",
-        "IF MHA-DT-00 T120",
-        "FEELER CHECK FAILS,",
-        "TURN AT ASSY TO CLEAR,",
-        f"Ø{inch_text(TURNED_DIA_FITUP_MIN, TURNED_DIA_PLACES)} MIN",
-    )
-)
 # Section A-A cuts through a tooth, so the band reads as a solid ring and the
 # spaces seem to stop against it (machinist review of the stack build). They
 # do not: the band is the teeth turned down, and the spaces run the whole face
@@ -724,27 +695,3 @@ TOOTH_RUNOUT_NOTE = (
 if not BOSS_DIA <= ROOT_DIA_MIN:
     raise AssertionError("the 16T boss must be turned to the root for the cutter runout")
 DRAWING_NOTES = TOOTH_RUNOUT_NOTE
-# The MHA-DT-00 crank step's T120 check (user, 2026-09-30, #1154), printed by
-# draw_dt_drive_train_assembly: the pinion on its seat feeler, MHA-DT-10 and T120
-# pushed toward each other (taking up every running play), turned by hand and
-# read all round before the step's free-running revolution (it may rub until
-# the check closes: Codex P2 on #1154, review 3).  Each cut answers its own
-# reading only (build_dt_drive_train_assembly.t120_fitup_cuts).  Either fit-up
-# limit passes the feeler at every corner (build_dt_drive_train_assembly asserts
-# it), so the check always closes.  Its last line is short: the step carries
-# on after it on the same line.
-T120_FITUP_PUSHED = (PINION_NUMBER, "T120")
-T120_FITUP_ASSEMBLY_CHECK = "\n".join(
-    (
-        f"   WORST-CASE T120 CLEARANCE: TURNED BAND {T120_TURNED_BAND_RADIAL_WORST:.2f}, "
-        f"SHOULDER {T120_SHOULDER_CLEARANCE_TEXT}. PUSH",
-        f"   {T120_FITUP_PUSHED[0]} AND {T120_FITUP_PUSHED[1]} TOWARD EACH OTHER; "
-        "TURN MHA-DT-07 SLOWLY BY HAND,",
-        f"   READING A {T120_FITUP_FEELER_MM:.2f} FEELER ALL ROUND. BAND TO T120 TIPS: "
-        "IF THE FEELER",
-        "   STOPS, TURN BAND DOWN, "
-        f"Ø{TURNED_DIA_FITUP_MIN:.2f} MIN. SHOULDER TO T120 SOUTH FACE: IF",
-        "   THE FEELER STOPS, FACE SHOULDER BACK, "
-        f"{SHOULDER_LENGTH_FITUP_MIN:.2f} MIN. RESET, RECHECK.",
-    )
-)
