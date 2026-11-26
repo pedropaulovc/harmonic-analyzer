@@ -2331,6 +2331,50 @@ def test_the_plate_screws_are_cut_to_the_limit_the_lock_sweep_clears() -> None:
     assert "CUT" not in _step_body("arm-plate-fitted")
 
 
+def test_the_cut_plate_screw_edge_takes_the_title_block_break() -> None:
+    """Fit audit part 2, B2: the cut edge's break prints no limit of its
+    own; the title block's .010 governs and the model and the engagement
+    stack carry it. The arm tap's exit break already costs the larger
+    thread loss, so the worst engagement is unchanged (1.91D)."""
+    texts = drawing._step_text(operating_domain=_unit_operating_domain())
+    assert texts["arm-plate-screws-cut"][2] == "BREAK THE CUT EDGE."
+    import pd_vn_transgear_arm_plate_screw_spec as plate_screw
+    import transgear_hanger_joints as hanger_joints
+    from _printed_tolerance import edge_break_chamfer_mm
+
+    assert plate_screw.CUT_END_BREAK_MAX == pytest.approx(edge_break_chamfer_mm(unit="in"))
+    assert steps_arm.PLATE_TAP_EXIT_LOSS_MAX_MM >= plate_screw.CUT_END_BREAK_MAX
+    assert hanger_joints.PLATE_SCREW_ENGAGEMENT_WORST_D == pytest.approx(1.909, abs=0.001)
+
+
+def test_the_disc_screw_tips_are_dressed_flush_and_accepted_by_a_straightedge() -> None:
+    """Fit audit part 2, B3: step 16 and its row print FLUSH, accepted by a
+    straightedge lying flat; the window's shallow end. Its .008 deep end is
+    not printed and not widened: the disc tap's worst engagement charges it
+    and holds 1.5D by .001."""
+    import pd_transgear_disc_screw_spec as disc_screw
+
+    screw = drawing._N[explode.DISC_SCREW]
+    texts = drawing._step_text(operating_domain=_unit_operating_domain())
+    (step,) = texts["disc-screws-cut"]
+    assert step == (
+        f"DRESS EACH {screw} TIP FLUSH WITH THE DISC REAR FACE "
+        f"{drawing.row_cite('disc-screw-tips')}."
+    )
+    rows = drawing.setting_table_rows(operating_domain=_unit_operating_domain())
+    row = rows[drawing.SETTING_ROW["disc-screw-tips"] - 1]
+    assert row[1:] == (
+        str(steps.step_number("disc-screws-cut")),
+        f"{screw} TIPS AT THE DISC REAR FACE",
+        "FLUSH",
+        "STRAIGHTEDGE LIES FLAT",
+    )
+    assert ".008" not in step and ".008" not in " ".join(row)
+    assert disc_screw.TIP_BELOW_REAR_FACE == pytest.approx((0.0, 0.008 * 25.4))
+    assert disc_screw.ENGAGEMENT_WORST == pytest.approx(0.091 * 25.4, abs=1e-9)
+    assert disc_screw.ENGAGEMENT_WORST_D >= 1.5
+
+
 def _spare_world_point(monkeypatch, local):
     """Exercise the production row-vector transform without a COM connection."""
     transform = [value for row in assembly.ROT_X_NEG90 for value in row]

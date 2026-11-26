@@ -82,6 +82,7 @@ from _surface_finish import surface_finish_by_key
 import _telemetry
 from paper_drive_stock_drawing import add_toothspace_callout, require_source_control
 import pd_transgear_knob_bush_geometry as BUSH
+from pd_paper_drive_assembly_steps import step_ref
 from pd_transgear_knob_shaft_spec import (
     CORE_DIA,
     CORE_FRONT_Z,
@@ -288,7 +289,10 @@ THREAD_LINK = f"SEE NOTE {THREAD_NOTE}"
 # The gear's tip and span bands are set by the mesh with MHA-PD-06, which the
 # GEAR DATA block names (MATES WITH); their fit route is the block's last
 # row, as MHA-PD-06's block words it: the pair runs together with no tight
-# spot, tried at MHA-PD-00's trial mesh.  No backlash number prints (owner
+# spot, tried at MHA-PD-00's trial mesh (the located step, 12K-12N), which
+# the row above it names.  Fit audit part 2, B7: the span limits are the
+# cutting aim and the pair is accepted at that trial; the limits stay as
+# printed (a wider band is unproven).  No backlash number prints (owner
 # ruling 2026-11-24, audit part 2 question C2: "Yes.", the feeler row
 # deleted: a leaf cannot be laid between 48DP flanks, #2417).  The span's
 # limits still print and control (the mesh check
@@ -296,9 +300,11 @@ THREAD_LINK = f"SEE NOTE {THREAD_NOTE}"
 # What a machinist needs to cut and check the teeth (Main ruling 2026-10-10):
 # the cutting rows, the mate and the acceptance that is the span
 # band's fit route (rule 4).  The span prints in VIEW C with its limits, not
-# again here.  The mate's number and the last row's tail wrap so the block
-# ends left of the overall's rear witness line (REAR_X): on the 3/8 arm's
-# longer shaft (#2019) the one-line mate ran under it (machinist review r1).
+# again here.  The mate's number and the last two rows' tails wrap so the
+# block ends left of the overall's rear witness line (REAR_X): on the 3/8
+# arm's longer shaft (#2019) the one-line mate ran under it (machinist
+# review r1).
+TRIAL_MESH_STEP = step_ref("arm-plate-located")
 GEAR_DATA_ROWS = (
     ("NUMBER OF TEETH", f"{TEETH}"),
     ("DIAMETRAL PITCH", f"{DIAMETRAL_PITCH:.2f}"),
@@ -307,6 +313,10 @@ GEAR_DATA_ROWS = (
     ("WHOLE DEPTH (REF)", inch_text(WHOLE_DEPTH, 4)),
     ("CUTTER", f"#{CUTTER_NUMBER}, {CUTTER_TOOTH_RANGE[0]}-{CUTTER_TOOTH_RANGE[1]}T"),
     ("MATES WITH", "\n   ".join(_mate_name(_config.parts("pd-rack-pinion")).rsplit(" ", 1))),
+    (
+        "SPAN",
+        f"CUT TO THE SPAN AIM;\n   ACCEPTED AT {TRIAL_MESH_STEP}\n   BY THE TRIAL MESH",
+    ),
     ("SPAN MATCHED FIT", "RUNS ON\n   MATE WITH NO TIGHT SPOT"),
 )
 GEAR_DATA_NOTE = "\n".join(

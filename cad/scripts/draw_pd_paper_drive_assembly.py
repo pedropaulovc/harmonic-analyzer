@@ -2206,6 +2206,15 @@ DISC_TIR_TEXT = steps.inch_text(
 # control's, so the two sheets read the same spaces.
 DISC_TIR_SAMPLE_SPACES = disc.TOOTH_SPACE_SAMPLE_SPACES
 DISC_TIR_SAMPLE_STRIDES = disc.TOOTH_SPACE_SAMPLE_STRIDES
+# Step 16 dresses the disc screw tips flush and the setting table accepts
+# them by a straightedge lying flat on the disc rear face (fit audit part 2,
+# B3): that is the cut window's shallow end, .000, so the sheet prints FLUSH.
+# The window's deep end (.008) is not printed and not widened: it is the
+# dressing allowance the disc tap's worst engagement charges, which holds
+# 1.5D by .001 (pd_transgear_disc_screw_spec.ENGAGEMENT_WORST).
+if disc_screw.TIP_BELOW_REAR_FACE[0] != 0.0:
+    raise AssertionError("the disc screw window's shallow end is not flush")
+DISC_SCREW_TIP_TEXT = "FLUSH"
 # The setting table's rows, in step order; each step cites its row by number.
 SETTING_ROW_KEYS = (
     "bar-top",
@@ -2846,9 +2855,11 @@ def _step_text(
             "CUT EACH TIP FLUSH TO "
             f"{steps.inch_text(joints.PLATE_SCREW_CUT_PROUD_MAX, 3)} PROUD OF THE "
             f"ARM {row_cite('plate-screw-tips')}.",
-            "BREAK THE CUT EDGE "
-            f"{steps.inch_max_text(plate_screw.CUT_END_BREAK_MAX, 3)} TO KEEP THE TAP'S "
-            "LAST THREAD.",
+            # The title block's edge break governs (fit audit part 2, B2): the
+            # arm tap's own exit break already costs more thread than any
+            # title-block break of the cut end, so the worst engagement is the
+            # same 1.91D either way (transgear_hanger_joints).
+            "BREAK THE CUT EDGE.",
             "REFIT THE SAME SCREWS IN THE SAME HOLES, TIGHT.",
             # A check and its remedy are separate steps (rule 22; r10).
             "CHECK: ROCKED BY HAND, THE PLATE HAS NO SHAKE AND NO DAYLIGHT.",
@@ -3056,10 +3067,10 @@ def _step_text(
             f"{s('disc-taps-transferred', 12)}-{s('disc-taps-transferred', 15)}.",
             "MATCH-MARK DISC AND HUB.",
         ),
+        # Fit audit part 2, B3: the tips are dressed flush and accepted by a
+        # straightedge lying flat (DISC_SCREW_TIP_TEXT).
         "disc-screws-cut": (
-            f"CUT THE {n[explode.DISC_SCREW]} TIPS "
-            f"{steps.inch_window(disc_screw.TIP_BELOW_REAR_FACE, 3, ' TO ')} BELOW "
-            "THE DISC REAR FACE "
+            f"DRESS EACH {n[explode.DISC_SCREW]} TIP FLUSH WITH THE DISC REAR FACE "
             f"{row_cite('disc-screw-tips')}.",
         ),
         "oil-hole-drilled": (
@@ -3797,9 +3808,9 @@ def setting_table_rows(
         ),
         "disc-screw-tips": (
             str(steps.step_number("disc-screws-cut")),
-            f"{n[explode.DISC_SCREW]} TIPS BELOW THE DISC REAR FACE",
-            steps.inch_window(disc_screw.TIP_BELOW_REAR_FACE, 3, " TO "),
-            "STRAIGHTEDGE AND FEELERS",
+            f"{n[explode.DISC_SCREW]} TIPS AT THE DISC REAR FACE",
+            DISC_SCREW_TIP_TEXT,
+            "STRAIGHTEDGE LIES FLAT",
         ),
         "collar-pilot": (
             s("pilot-faced-to-fit", 0),

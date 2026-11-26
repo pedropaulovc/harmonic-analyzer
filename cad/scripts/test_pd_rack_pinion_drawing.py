@@ -14,6 +14,7 @@ import pytest
 import _config
 import build_pd_rack_pinion as part
 import draw_pd_rack_pinion as drawing
+import pd_paper_drive_assembly_steps as steps
 import pd_rack_pinion_callouts as callouts
 import pd_rack_pinion_spec as spec
 import pd_transgear_feed_pinion_spec as feed_spec
@@ -364,7 +365,8 @@ def test_sheet_gear_data_names_the_mesh_once_with_its_acceptance() -> None:
         f"MATES WITH:  KNOB SHAFT MHA-PD-08, {spec.MESH_PINION_TEETH}T",
     ):
         assert row in rows
-    assert len(rows) == 9
+    # The heading, nine rows and the B7 span row's continuation line.
+    assert len(rows) == 11
     assert spec.CUTTER_NUMBER == 1
     assert spec.CUTTER_REFERENCE_TEETH == 135 != spec.TEETH == 150
     assert spec.CUTTER_TOOTH_RANGE == (135, None)
@@ -376,6 +378,17 @@ def test_sheet_gear_data_names_the_mesh_once_with_its_acceptance() -> None:
     for limit in spec.SPAN_LIMITS:
         assert f"{limit / 25.4:.4f}".lstrip("0") not in data
     assert "SPAN MATCHED FIT:  RUNS ON MATE WITH NO TIGHT SPOT" in rows
+    # Fit audit part 2, B7: the limits are the cutting aim; the pair is
+    # accepted at MHA-PD-00's trial mesh, the located step.
+    trial = steps.step_ref("arm-plate-located")
+    assert trial == "MHA-PD-00 STEP 12"
+    assert (
+        f"SPAN: CUT TO THE SPAN AIM; ACCEPTED AT {trial} BY THE TRIAL MESH"
+        in " ".join(data.split())
+    )
+    assert max(map(len, data.splitlines())) == len(
+        "SPAN MATCHED FIT:  RUNS ON MATE WITH NO TIGHT SPOT"
+    )
     assert "FEELER" not in data and "BACKLASH" not in data
     # Rule 4: the teeth's one mate is named once on the sheet; span and tip
     # link the block.

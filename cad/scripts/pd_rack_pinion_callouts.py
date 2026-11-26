@@ -35,6 +35,11 @@ from pd_rack_pinion_spec import (
     WHOLE_DEPTH,
     inch_text,
 )
+from pd_paper_drive_assembly_steps import step_ref
+
+# The trial mesh is MHA-PD-00's located step (12K-12N), where the pair runs
+# together on its real seats before the plate is doweled.
+TRIAL_MESH_STEP = step_ref("arm-plate-located")
 
 KNOB_NUMBER = "MHA-PD-08"
 SCREW_NUMBER = "MHA-SH-VN-59"
@@ -101,8 +106,11 @@ DRAWING_NOTES = "\n".join(
 # MHA-PD-00's trial mesh.  No backlash number prints: a feeler leaf cannot be
 # laid between 48DP flanks (#2417), and MHA-PD-00 reads the mesh's shake on a
 # dial indicator (owner ruling 2026-11-24, audit part 2 question C2: "Yes.",
-# the feeler row deleted).  MHA-PD-08's GEAR DATA prints the same row.  The
-# span prints on the face view with its limits, not again here.
+# the feeler row deleted).  MHA-PD-08's GEAR DATA prints the same rows.  The
+# span prints on the face view with its limits, not again here.  Fit audit
+# part 2, B7: the limits are the cutting aim, the pair is accepted at the
+# trial mesh; the limits stay as printed (a wider band is unproven: the mesh
+# check reads the profiles derived from them, MHA-PD-06 RV-04).
 _GEAR_DATA_ROWS = (
     ("NUMBER OF TEETH", f"{TEETH}"),
     ("DIAMETRAL PITCH", f"{DIAMETRAL_PITCH:.2f}"),
@@ -117,6 +125,7 @@ _GEAR_DATA_ROWS = (
         else f"#{CUTTER_NUMBER}, {CUTTER_TOOTH_RANGE[0]}-{CUTTER_TOOTH_RANGE[1]}T",
     ),
     ("MATES WITH", f"KNOB SHAFT {KNOB_NUMBER}, {MESH_PINION_TEETH}T"),
+    ("SPAN", f"CUT TO THE SPAN AIM; ACCEPTED AT\n   {TRIAL_MESH_STEP} BY THE TRIAL MESH"),
     ("SPAN MATCHED FIT", "RUNS ON MATE WITH NO TIGHT SPOT"),
 )
 GEAR_DATA_NOTE = "\n".join(
