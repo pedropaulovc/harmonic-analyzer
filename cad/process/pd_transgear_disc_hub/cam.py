@@ -12,8 +12,8 @@ drills', the end mill's and the reamer's diameters and the speeds from the
 shop (``shop/``). Every path is written here (``rt.custom``): straight lines
 a recipe can state exactly. Typed here, because no record carries them: the
 #2 centre drill's catalogue geometry (it sets the spot depth), the twist
-drills' 118° point, the 1/16 end mill's 1/8 in shank (Harvey Tool 34662's
-listing), the approach, safe and clearance heights and the vise
+drills' 118° point, the 1/16 end mill's 1/8 in shank (MSC 35497056's
+listing, #3568), the approach, safe and clearance heights and the vise
 jaws' depth (keep-out shapes only).
 
 Route (plan text in ``plan.toml``): the hub is turned, faced and its bore
@@ -67,7 +67,7 @@ CENTRE_DRILL = {
 }
 # Jobber drills' point (the shop records give the diameter only).
 DRILL_POINT_DEG = 118.0
-# The 1/16 end mill's shank (Harvey Tool 34662: 1/8 in).
+# The 1/16 end mill's shank (MSC 35497056, read 2026-11-24, #3568: 1/8 in).
 ENDMILL_SHANK_MM = IN / 8
 # The flat's floor this far under the O.D. at the end mill's outer edge.
 FLAT_UNDER_MM = 0.2
@@ -579,6 +579,13 @@ def context(
     if p["endmill_reach_min_in"] * IN < shank_top - flat:
         raise ValueError(
             "process.endmill_reach_min_in: the end mill's shank reaches the body"
+        )
+    # No neck: the flutes run from the tip to the shank, so the shop
+    # record's flute length is the end mill's reach.
+    flutes = _shop_tool(plan, shop, "endmill")["flute_length_mm"]
+    if flutes < p["endmill_reach_min_in"] * IN:
+        raise ValueError(
+            "process.endmill_reach_min_in: the end mill's flutes are shorter"
         )
     # The knockout: its full diameter knockout_past_mm past the underside at
     # the hole's inner edge; its point clear above the parallel (the body's
