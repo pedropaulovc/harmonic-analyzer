@@ -344,6 +344,12 @@ def context(
     # past it by its lead.
     drill_tip = -(bar + p["drill_past_mm"] + _point(tools["drill-c"]))
     ream_tip = -(bar + p["ream_past_mm"])
+    import cam_nc
+
+    if p["ream_past_mm"] <= cam_nc.ream_full_diameter_past_min_mm(plan, "reamer"):
+        raise ValueError(
+            "the reamer's full diameter does not reach the bar's underside (cnc.ream-full-diameter)"
+        )
     pin_tip = -(bar + p["pin_drill_past_mm"] + _point(tools["drill-1-16"]))
     _agree(plan, "cross_drill_tip_mm", drill_tip)
     _agree(plan, "cross_ream_tip_mm", ream_tip)

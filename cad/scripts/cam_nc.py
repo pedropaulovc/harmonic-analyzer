@@ -208,6 +208,23 @@ def jaw_clearance_min_mm() -> float:
 DO_NOT_RUN_STOP = "Do not run this file:"
 
 
+def ream_full_diameter_past_min_mm(plan: dict[str, Any], reamer: str) -> float:
+    """How far past a through hole's far face the plan tool ``reamer``'s tip
+    must go for its full diameter to reach that face: its recorded end
+    chamfer plus the shop's margin (``cnc.toml`` cnc.ream-full-diameter, the
+    one inventory file ``cam_inputs`` declares). A reamer the record exempts
+    (blind holes only) or with no recorded chamfer is refused, so a new one is
+    recorded before it reams through."""
+    ref = next(tool["ref"] for tool in plan["tools"] if tool["id"] == reamer)
+    cnc = _shop_equipment.merge([_cam_programs.CNC_EQUIPMENT_PATH])
+    rule = cnc["cnc"]["ream-full-diameter"]
+    if ref in rule["exempt"]:
+        raise ValueError(f"{ref} reams no through hole: {rule['exempt'][ref]}")
+    if ref not in rule["chamfer_length_mm"]:
+        raise ValueError(f"{ref}: no end chamfer recorded in cnc.ream-full-diameter")
+    return float(rule["chamfer_length_mm"][ref]) + float(rule["past_margin_mm"])
+
+
 def verify(expectations, directory: Path, known: dict[str, str] | None = None) -> list[_gcode.Finding]:
     """Run every expectation against its posted program or tool section.
 

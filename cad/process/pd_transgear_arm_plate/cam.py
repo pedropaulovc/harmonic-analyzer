@@ -438,6 +438,12 @@ def context(
     _agree(plan, "drill_1_tip_mm", drill_1_tip)
     _agree(plan, "drill_2764_tip_mm", drill_2764_tip)
     _agree(plan, "ream_tip_mm", -p["ream_past_mm"])
+    import cam_nc
+
+    if p["ream_past_mm"] <= cam_nc.ream_full_diameter_past_min_mm(plan, "reamer"):
+        raise ValueError(
+            "the reamer's full diameter does not reach face A (cnc.ream-full-diameter)"
+        )
     for name in ("screw drill", "press drill"):
         if _op_with_cut(plan, name)[0]["peck"] != "none":
             raise ValueError(f"'{name}' is one plunge (L/D under 1): peck = \"none\"")

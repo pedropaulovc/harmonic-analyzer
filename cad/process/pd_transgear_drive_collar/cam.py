@@ -387,6 +387,12 @@ def context(
     _agree(plan, "dowel_drill_tip_mm", dowel_drill_tip)
     dowel_ream_tip = seat - p["ream_past_mm"]
     _agree(plan, "dowel_ream_tip_mm", dowel_ream_tip)
+    import cam_nc
+
+    if p["ream_past_mm"] <= cam_nc.ream_full_diameter_past_min_mm(plan, "reamer-0930"):
+        raise ValueError(
+            "the dowel reamer's full diameter does not reach the seat face (cnc.ream-full-diameter)"
+        )
     bevel = p["ream_bevel_max_in"] * IN
     if p["ream_past_mm"] <= bevel or dowel_ream_tip <= dowel_drill_tip:
         raise ValueError(

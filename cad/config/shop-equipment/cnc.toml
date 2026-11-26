@@ -71,3 +71,27 @@ jaw_clearance_min_mm = 1.0
 cite = [
   "D32, delegated ruling 2026-11-25 (Main), no precedent: a 1.0 mm (.040 in) floor between any cutter and a declared jaw/clamp box, an HA fact in cad/config/shop-equipment; issue #3607. The owner reviews it on #2144 (cad/docs/drawing-simplicity-policy.md, \"Named exceptions\"): https://github.com/pedropaulovc/harmonic-analyzer/issues/2144#issuecomment-7171575340, corrected at https://github.com/pedropaulovc/harmonic-analyzer/issues/2144#issuecomment-7171657471.",
 ]
+
+# A machine reamer cuts its full diameter only above its 45° end chamfer, so
+# a reamed through hole is full size at its far face only when the programmed
+# tip passes that face by more than the chamfer's axial length plus
+# past_margin_mm (a touch-off error, a part not fully down, the chamfer's
+# own tolerance). Each recipe that reams a through hole checks it through
+# cam_nc.ream_full_diameter_past_min_mm. The rule and its 0.25 mm margin
+# are a delegated ruling 2026-11-26 (Main), no precedent; owner review #2144.
+# chamfer_length_mm is keyed by the cad/process/shop/ tool record. No vendor
+# of a bought SKU publishes it (McMaster, Shars, Zoro, Alvord-Polk and the
+# ASME B94.2 tables read 2026-11-26 give the 45° angle only). The values are
+# W.C. Chapman's same-size miniature chucking reamers (RSB series), whose
+# catalogue lists each chamfer length. .4000, .4385 and .4990 are past that
+# catalogue's range: they take its ratio (chamfer about 0.08 D), rounded up
+# to the next .0001 in. Measure each on receipt (ESTIMATE in its cite).
+[cnc.ream-full-diameter]
+past_margin_mm = 0.25
+chamfer_length_mm = { "reamer-0775" = 0.1778, "reamer-0930" = 0.21336, "reamer-1260" = 0.28702, "reamer-2510" = 0.51054, "reamer-4000" = 0.81534, "reamer-4385" = 0.89408, "reamer-4990" = 1.016 }
+cite = [
+  "Delegated ruling 2026-11-26 (Main), no precedent; owner review #2144: the tip passes a through hole's far face by more than the reamer's recorded chamfer + 0.25 mm.",
+  "W.C. Chapman, Miniature Reamers, complete size list (https://shop.wcchapman.com/holemaking-threading/available-sizes/miniature-reamers/), read 2026-11-26, column \"Chamfer Length\": RSB0775 0.0775\" 0.0070\"; RSB0930 0.0930\" 0.0084\"; RSB1260 0.1260\" 0.0113\"; RSB2510 0.2510\" 0.0201\"; largest listed RSB3760 0.3760\" 0.0301\".",
+  "ESTIMATE, measure on receipt: reamer-4000 .0321 in, reamer-4385 .0352 in, reamer-4990 .0400 in, each 0.08005 D (W.C. Chapman's ratio, .0301/.3760) rounded up to the next .0001 in, as no maker lists these sizes' chamfer.",
+  "45° chamfer: MSC reamer buying guide (https://www.mscdirect.com/resources/buying-guides/reamers), \"45° chamfer angle for smooth entry into existing holes\"; ICS catalogue p.188 (https://www.icscuttingtools.com/catalog/page_188.pdf), \"The cutting edge is ground with a 45° chamfer angle for easy hole entry.\"",
+]
