@@ -88,9 +88,11 @@
 # pocket on the ream's axis is .0005 over the .0615-.0620 band's top
 # (.00025 a side), over the pocket's own depth only: 0.20 mm at its outer
 # edge to 1.64 mm at its inner on the largest O.D. (1.57 on the nominal),
-# the mouth of a 10.6 mm hole; the reamer and the dowel's press fit hold
-# the ream below it. Its outer edge meets the O.D. lower, so the flat goes
-# one peck deeper.
+# the mouth of a 10.6 mm hole, so at least 8.96 mm of press length stays in
+# band; the reamer and the dowel's press fit are unchanged. Accepted as a
+# mouth relief: delegated ruling 2026-11-26 (Main), no precedent; owner
+# review #2144 (rulings.md D40). Its outer edge meets the O.D. lower, so the
+# flat goes one peck deeper.
 #
 # NC (cad/process/pd_transgear_disc_hub/cam.py): CM01_flange_holes,
 # CM02_pin_hole, CM03_pin_ream. Program names, the [parameters] and the
