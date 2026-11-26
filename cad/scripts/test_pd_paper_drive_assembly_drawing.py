@@ -651,8 +651,23 @@ def test_the_critical_matched_dowels_locate_and_the_plate_screws_only_clamp() ->
     assert "FRONT UP" in located
     assert steps.step_number("pin-pressed") < steps.step_number("arm-plate-located")
     assert steps.step_number("arm-plate-fitted") < steps.step_number("hanger-pivoted")
-    # "True" is a stated null-reading acceptance, the budget's centring bound.
-    assert drawing.KNOB_SETTING_TRUE in located
+    # "True" is a stated null-reading acceptance, the budget's centring bound:
+    # a setting-table row 12C cites (rule 22), not step prose, and no second
+    # limit (the .004 circle and the S to N band are its consequences).
+    true_row = drawing.row_cite("true-sweep")
+    assert f"TRUE ON ONE DRO AXIS {true_row}." in located
+    assert "S TO N BAND" not in located and "WITHIN .004" not in located
+    rows = drawing.setting_table_rows(operating_domain=_unit_operating_domain())
+    assert rows[drawing.SETTING_ROW["true-sweep"] - 1][1:] == (
+        drawing.sub_step("arm-plate-located", 2),
+        f"PIVOT-BORE GAUGE PIN, {_number('pd-transgear-pin')} SHANK S, KNOB BORE N: SWEEP",
+        "UNDER .0005",
+        "TEST INDICATOR",
+    )
+    # In step order: after 11Q's reamed bore, before 12N's shake.
+    keys = drawing.SETTING_ROW_KEYS
+    assert keys.index("bush-reamed") + 1 == keys.index("true-sweep")
+    assert keys.index("true-sweep") + 1 == keys.index("reducer-shake")
 
 
 def test_view_k_carries_the_set_coordinates_as_assembly_model_dimensions() -> None:
@@ -992,7 +1007,7 @@ def test_the_plate_recheck_names_its_bore_and_acceptance() -> None:
     (integration review, run 20261109T062834910Z)."""
     sheet = drawing.SHEET_NAMES.index(drawing.KNOB_SETTING_SHEET) + 1
     defined = drawing.sub_step("arm-plate-located", 2)
-    assert drawing.KNOB_SETTING_TRUE in _step_body("arm-plate-located")
+    assert drawing.row_cite("true-sweep") in _step_body("arm-plate-located")
     assert (
         f"CHECK: RE-INDICATED, {_number('pd-transgear-knob-bush')} KNOB BORE "
         f"{drawing.KNOB_BORE_LETTER} IS STILL TRUE PER {defined} (SHEET {sheet})."
@@ -5524,10 +5539,11 @@ def test_detail_h_text_stands_clear_of_its_extension_lines() -> None:
 
 def test_the_necessity_register_cites_only_steps_and_rows_the_sheet_prints() -> None:
     """The register's features name sub-steps and setting-table rows by
-    label. A step deleted or inserted shifts the letters after it, so a
-    register that names a label the sheet no longer prints (N-05's 27K after
-    27G was deleted, codjiflo P2 on 390ddbc582), or a row whose step column
-    lacks a label the feature puts beside it, fails here."""
+    label. A step deleted or inserted shifts the letters after it, and a row
+    inserted shifts the numbers after it, so a register that names a label
+    the sheet no longer prints (N-05's 27K after 27G was deleted, codjiflo P2
+    on 390ddbc582), or one row whose step column lacks a sub-step the feature
+    names beside it, fails here."""
     texts = drawing._step_text(operating_domain=_unit_operating_domain())
     # A step of one sub-step prints its number alone (16.), so no letter.
     printed = {
@@ -5545,6 +5561,7 @@ def test_the_necessity_register_cites_only_steps_and_rows_the_sheet_prints() -> 
         assert set(cited) <= printed, (entry.id, sorted(set(cited) - printed))
         for first, last in re.findall(r"\brows? (\d+)(?:-(\d+))?", entry.feature):
             assert 1 <= int(first) <= int(last or first) <= len(rows), (entry.id, first, last)
-        for number, inside in re.findall(r"\brow (\d+) \(([^)]*)\)", entry.feature):
-            step_cell = set(label.findall(rows[int(number) - 1][1]))
-            assert set(label.findall(inside)) <= step_cell, (entry.id, number, inside)
+        (row,) = re.findall(r"\brow (\d+)\b", entry.feature) or (None,)
+        if row is not None:
+            step_cell = set(label.findall(rows[int(row) - 1][1]))
+            assert set(cited) <= step_cell, (entry.id, row, sorted(set(cited) - step_cell))

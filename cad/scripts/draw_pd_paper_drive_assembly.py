@@ -123,7 +123,6 @@ from _hole_spec import NUMBER_DRILL_MM, TAP_DRILL_MM, blind_cut_dia_mm
 from _printed_tolerance import printed_deviations
 from _recording_geometry import RECORDING_PAPER_HEIGHT_MM, RECORDING_PAPER_WIDTH_MM
 import paper_drive_mesh_check as mesh_check
-import paper_drive_arm_registration as registration
 import pd_latch_hook_geometry as hook_geometry
 import paper_drive_rack_setup as rack_setup
 import pd_paper_drive_assembly_steps as steps
@@ -597,16 +596,18 @@ KNOB_SETTING_INSTANCES = frozenset(
 # indicator's unknown accuracy over its range (codjiflo P2 on 8e8d5d5): a
 # sweep under .0005 puts each centre within .00025. The shop's 1 um lever
 # indicator (shop.toml gauges.dti, owner 2026-11-17) reads it with room to
-# spare. It names what it holds (machinist review round 5 read a finer sweep
-# as finer than the .002 S-K band needs, rule 4): K's worst case must stay
-# inside its Ø.008 setting circle
+# spare. Why that sweep (exception PD-00-knob-setting-true): K's worst case
+# must stay inside its Ø.008 setting circle
 # (paper_drive_arm_registration.REDUCER_AXIS_SETUP_RADIUS_MM; owner ruling
 # 2026-11-08 (Pedro), #2144 item 5.3). The pivot lever amplifies the across
 # error, so a .0005 sweep puts K up to .0022 off, inside the .004 radius
 # (test_the_jig_bored_k_lands_in_the_set_band_with_margin_at_both_ends).
 # The radial part of that worst case (.0008) keeps N inside the S to N set
-# band, which governs along S-N; the .004 circle bounds the rest. TRUE names
-# both, so it no longer reads as wider than DETAIL K's S to N limits (#2417).
+# band, which governs along S-N; the .004 circle bounds the rest. Both are
+# consequences of the sweep, not readings: no step measures N against the
+# circle, so the sheet prints the sweep alone, as a setting-table row step
+# 12C cites (rule 22; the machinist review of 0ecf59d001 read the printed
+# "SO N LANDS ... WITHIN .004" as a second acceptance with no row).
 # The trial mesh may move the table only so far that N, indicated TRUE with
 # that radial error, stays within those limits (owner ruling 2026-11-24, audit
 # part 2 question C1; pd_paper_drive_knob_setting_spec derives the moves).
@@ -616,16 +617,7 @@ KNOB_SETTING_INSTANCES = frozenset(
 # meant both the view and the bore).
 KNOB_BORE_LETTER = "N"
 KNOB_SETTING_SWEEP_IN = knob_setting.TRUE_SWEEP_IN
-_KNOB_SETTING_SWEEP_TEXT = f"{KNOB_SETTING_SWEEP_IN:g}".lstrip("0")
-KNOB_SETTING_CIRCLE_TEXT = (
-    f"WITHIN {steps.inch_text(registration.REDUCER_AXIS_SETUP_RADIUS_MM, 3)} OF ITS "
-    f"{KNOB_SETTING_VIEW_NAME} SETTING"
-)
-KNOB_SETTING_TRUE = (
-    f"TRUE: SWEEP UNDER {_KNOB_SETTING_SWEEP_TEXT} ON THE TEST INDICATOR, SO "
-    f"{KNOB_BORE_LETTER} LANDS INSIDE "
-    f"THE S TO {KNOB_BORE_LETTER} BAND, {KNOB_SETTING_CIRCLE_TEXT}"
-)
+KNOB_SETTING_SWEEP_TEXT = f"UNDER {f'{KNOB_SETTING_SWEEP_IN:g}'.lstrip('0')}"
 # The trial moves of the table, in DRO counts on DETAIL K's two axes
 # (pd_paper_drive_knob_setting_spec): one toward S for a shake over the
 # ceiling; away from S only where the limit leaves the mill a settable move
@@ -2222,6 +2214,7 @@ SETTING_ROW_KEYS = (
     "disc-tir",
     "bush-seated",
     "bush-reamed",
+    "true-sweep",
     "reducer-shake",
     "trial-move",
     "plate-screw-tips",
@@ -2646,10 +2639,12 @@ def _step_text(
             f"THE {n['pd-transgear-knob-shaft']} SHAFT'S REAR END.",
             # #2432: a test indicator's contact cannot sweep the small pivot
             # bore squarely, so it sweeps a snug gauge pin standing in it.
+            # TRUE's sweep is the setting table's row (rule 22); 12F, 12H and
+            # 12Q read TRUE per this step.
             "WITH A TEST INDICATOR IN THE SPINDLE, INDICATE A SNUG GAUGE PIN IN "
             f"THE ARM'S PIVOT BORE AND THE {n['pd-transgear-pin']} PIN'S "
             "SHANK IN ITS PIN BORE S, AT THE HEIGHT THE DISC WILL RUN, TRUE ON ONE DRO "
-            f"AXIS ({KNOB_SETTING_TRUE}).",
+            f"AXIS {row_cite('true-sweep')}.",
             # 12D and 12E can print on the sheet after DETAIL K's key: they
             # point to the key's sheet (review of run
             # 20261117T152142787Z-3d98e09383ba4ebea17fbf039b2b0697).
@@ -3787,6 +3782,17 @@ def setting_table_rows(
             "TURNS FREE, NO SHAKE",
             f"{n['pd-transgear-knob-shaft']} JOURNAL",
         ),
+        # The located step's TRUE (12C), which 12F, 12H and 12Q read per
+        # 12C: the step column cites 12C alone, as those steps do, because
+        # the table stands 2 mm inside its width limit and a four-step cell
+        # would push it 12 mm past (format_step_notes).
+        "true-sweep": (
+            s("arm-plate-located", 2),
+            f"PIVOT-BORE GAUGE PIN, {n['pd-transgear-pin']} SHANK S, KNOB BORE "
+            f"{KNOB_BORE_LETTER}: SWEEP",
+            KNOB_SETTING_SWEEP_TEXT,
+            "TEST INDICATOR",
+        ),
         "reducer-shake": (
             f"{s('arm-plate-located', 12)}, {s('arm-plate-fitted', 20)}, "
             f"{s('fitup-pose-set', 8)}",
@@ -3846,7 +3852,7 @@ def setting_table_rows(
             "STEEL RULE",
         ),
         # Checked at the first set and again in 26P's rework (fit audit part
-        # 2, B4); the row keeps its number so no other row moves.
+        # 2, B4); the row stays where it was so the rows after it keep theirs.
         "crest-level": (
             f"{s('guides-screwed', 1)}, {s('loaded-rack-geometry-checked', 13)}",
             "RACK CRESTS, ONE END AGAINST THE OTHER",
