@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 420" font-family="sans-serif" font-size="13">
-  <!-- Setup 6, MS05_relief, same clamping as the rebate picture. Left: to scale at 11 px/mm (the .56 height = 156.5 px); right: 6 px/mm (the bar's 1-1/4 = 190.5 px). The 1/16 in long-reach end mill (Harvey Tool 34662, shop tools.endmill-carbide-3fl-1-16-reach-1-2): cutting Ø1.5748 (relief_cutter_dia_mm) = 17.3 px left, 9.4 px right, at X 3.073 beside the roof, its end at the plunge's bottom, Z −9.779 (relief_bottom_mm); its 1/8 shank starts .500 above its tip (the record's reach; 139.7 px). The neck's diameter between the flutes and the shank is not on record: drawn as the cutting diameter, schematic. The shank is drawn short, broken off. -->
+  <!-- Setup 6, MS05_relief, same clamping as the rebate picture. Left: to scale at 11 px/mm (the .56 height = 156.5 px); right: 6 px/mm (the bar's 1-1/4 = 190.5 px). The 1/16 in end mill with 1/2 in of flutes (MSC 35497056, shop tools.endmill-carbide-3fl-1-16-loc-1-2): cutting Ø1.5875 (relief_cutter_dia_mm) = 17.5 px left, 9.5 px right (drawn 17.3 and 9.4, within a pixel), at X 3.079 beside the roof (ceiling + radius, posted toward the roof), its end at the plunge's bottom, Z −9.779 (relief_bottom_mm); its 1/8 shank starts .500 above its tip (the record's flute length; 139.7 px). No neck: the flutes run at the cutting diameter up to the shank. The shank is drawn short, broken off. -->
   <rect class="paper" x="0" y="0" width="760" height="420"/>
   <text class="title" x="16" y="22">Setup 6 (MS05_relief): plunge the relief beside the roof</text>
   <rect class="fixture-support" x="44.0" y="254.1" width="168.5" height="20.0"/>
@@ -10,7 +10,7 @@
   <line class="active-face" x1="75.1" y1="226.5" x2="92.5" y2="226.5"/>
   <line class="active-face" x1="92.5" y1="212.8" x2="92.5" y2="226.5"/>
   <path class="cutter" d="M66.3 60 L66.3 86.8 L75.1 86.8 L75.1 224.4 A8.7 2.1 0 0 0 92.5 224.4 L92.5 86.8 L101.2 86.8 L101.2 60 L96.9 56 L88.2 64 L79.4 56 L70.7 64 L66.3 60 Z"/>
-  <text class="label" x="110.0" y="52.0">1/16 in long-reach end mill (to buy),</text>
+  <text class="label" x="110.0" y="52.0">1/16 in end mill, 1/2 in flutes (to buy),</text>
   <text class="label" x="110.0" y="68.0">its 1/8 shank .50 above its tip</text>
   <text class="label" x="50.0" y="292.1">Section across the rebate</text>
   <text class="label" x="50.0" y="308.1">(looking toward the fixed jaw)</text>
