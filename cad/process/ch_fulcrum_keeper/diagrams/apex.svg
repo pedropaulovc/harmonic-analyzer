@@ -23,7 +23,7 @@
   <text class="label" x="396" y="138.64">apex at Z {{cad.crown_overall_height_ref:.3f}} mm, the hole {{cad.crown_tap_station_in:.3dot}} from I</text>
   <line class="leader" x1="258" y1="330" x2="392" y2="300"/>
   <text class="label" x="396" y="298">counterbore Ø{{cad.foot_hole_cbore_dia_in:.3dot}} × {{cad.foot_hole_cbore_depth_in:.3dot}} from the foot top:</text>
-  <text class="label" x="396" y="316">the long-reach 1/8 in end mill, a helix then a circle</text>
+  <text class="label" x="396" y="316">the 2-1/4 in long 1/8 in end mill, a helix then a circle</text>
   <text class="label" x="396" y="334">foot hole {{process.foot_hole_station_from_i_mm:in.3dot}} from I (drilled in Setup 4)</text>
   <text class="label" x="20" y="40">Looking at the moving jaw; F at the fixed jaw behind.</text>
 </svg>

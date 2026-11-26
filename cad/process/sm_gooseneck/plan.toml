@@ -61,9 +61,13 @@ material = "{{cad.material_spec}}"
 material_key = "6061-t6511"
 milling_material = "aluminum_6061"
 stock = "Qty {{process.quantity:d}}. 4130-N tube, 48 in (to order, not on hand): one {{process.blank_length_in:.1f}} in blank; the rest checks the bend form, then is the trial bend. The form: two {{process.plate_length_in:.1f}} in lengths of the owned 1/2 x 6 in 6061 bar."
-note = "Inches unless mm; G-code and console entries in mm (the files and the controller run G21). Speeds on the PM-30MV low belt (100–2800 rpm): no belt change. Each CNC file is proved once in air, Z0 raised 1.000 in, before it cuts metal. Tool lengths from the tool setter at each M6; at every M6 stop the file has stopped the spindle and lifted the tool clear of the plate and straps: change the tool, set the speed, Cycle Start. Home the mill ($H) once, after switching it on: every M6's trip to the tool setter counts from home. Home again only after a power cycle or a controller restart, an E-stop, an alarm, a limit switch hit, a stall or a crash: homing brings the stored G54 back. Then check every zero of the setup again, each the way its step set it: each must read what its step set, within .001 in. One does not, cannot be reached with the part in, or the part may have moved: do what that setup's Datum says for it; where the Datum says nothing, take the setup again from its first step, the part out. They all do: run the interrupted file again from its start. Feed Hold, then Reset with the axes stopped keeps position and G54: no homing, no new zero; run the interrupted file again from its start: its first M6 measures the tool, and cuts already made are cut in air. Finish: {{cad.finish}}."
 shop = "../shop"
 stock_refs = ["4130n-tube-1-2x0065", "6061-flat-1-2x6-54in"]
+
+# The shop's standing page carries what every traveler shares (units, speeds,
+# homing, Feed Hold, tool changes, proving a file, burrs). The note's finish
+# (polished bare, oiled) is Setup 7's own ops, so there is no This job block.
+standing = true
 
 [cad]
 file = "../../out/features/sm_gooseneck/features.toml"
@@ -315,7 +319,7 @@ machine = "PM-30MV CNC (FluidNC, CNCjs with the electronic tool setter) / table,
 indexing = "none"
 machine_ref = "pm-30mv"
 holding = "Vise off. Plate A, its A face up and its back edge toward the column, on three 1-2-3 blocks lying flat (1 in up), one under each step clamp (LMS 1268): left {{process.clamp_left_from_end_mm:in.2f}} in from the left end and {{process.clamp_left_from_back_mm:in.2f}} in from the back edge (block 3 in along X); middle {{process.clamp_mid_from_end_mm:in.2f}} and {{process.clamp_mid_from_back_mm:in.2f}} (block 2 in along X); waste {{process.clamp_waste_from_end_mm:in.2f}} and {{process.clamp_waste_from_back_mm:in.3f}} (block 2 in along X, half under the plate). The left and middle straps from studs beyond the left end, the waste strap from a stud beyond the right end."
-datum = "Program GF01_form_a (cam:sm_gooseneck). G54: X0 Y0 the arc's centre, {{process.arc_from_end_mm:in.3f}} in from the left end and {{process.form_back_y_mm:in.3f}} in in front of the back edge; Z0 the plate top. +Y toward the column. Tool lengths from the tool setter at each M6. After homing again (the note says when), the plate not moved: check X, Y and Z as this setup's touch-off operation set them, each within 0.025 mm; once the arc is cut through, the back edge is taken on the form, left of the arc. All good: run the file again from its start. One off, or the plate moved once cutting has begun: stop and tell the owner. The plate moved before any cut: clamp it again and repeat the touch-off operation."
+datum = "Program GF01_form_a (cam:sm_gooseneck). G54: X0 Y0 the arc's centre, {{process.arc_from_end_mm:in.3f}} in from the left end and {{process.form_back_y_mm:in.3f}} in in front of the back edge; Z0 the plate top. +Y toward the column. After homing again (the standing page says when), once the arc is cut through, the back edge is taken on the form, left of the arc. One off, or the plate moved once cutting has begun: stop and tell the owner. The plate moved before any cut: clamp it again and repeat the touch-off operation."
 diagram = { file = "diagrams/form_a.svg", alt = "Plan of plate A on the table, to scale (2.1 px/mm): three 1-2-3 blocks and three step clamps, two on the form from the left, one on the waste corner from the right; the left end and back edge touched off. The 1/2 in end mill pecking the first stud hole; the arc it cuts next, up the front at X0 and round to the back edge, arrowed; the groove dashed." }
 envelope = { x_span_mm = ["{{process.plate_length_mm}}", "{{process.half_cutter_dia_mm}}"], y_span_mm = ["{{process.tool_y_span_mm}}", "{{process.half_cutter_dia_mm}}"], work_top_mm = ["{{process.block_height_mm}}", "{{process.plate_top_max_mm}}"], deepest_cut_mm = ["{{process.block_height_mm}}", "{{process.tip_over_underside_mm}}"], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.ball_projection_mm}}"] }
 vise_hold = "other"
@@ -330,14 +334,6 @@ feed = "hand"
 [[setups.operations]]
 instruction = "Console M6 T1 (1/2 in end mill, {{process.half_mill_projection_mm:in.2f}} out of the collet). Its tip just dragging a .002 feeler leaf on the plate top: G10 L20 P1 Z{{process.z_set_mm:.3f}}. Edge finder on the left end: G10 L20 P1 X{{process.x_set_mm:.3f}}; on the back edge: G10 L20 P1 Y{{process.y_set_mm:.3f}}."
 instruction_detailed = "Console M6 T1 (1/2 in end mill, {{process.half_mill_projection_mm:in.2f}} out of the collet). Its tip just dragging a .002 feeler leaf on the plate top: G10 L20 P1 Z{{process.z_set_mm:.3f}}. Edge finder (900 rpm): on the left end from the left, 1/2 in behind the front edge, clear of the left block: G10 L20 P1 X{{process.x_set_mm:.3f}}; on the back edge from behind: G10 L20 P1 Y{{process.y_set_mm:.3f}} (entries allow for its .100 radius). Edge finder out."
-feed = "hand"
-
-[[setups.operations]]
-steps = [
-  { kind = "action", text = "Prove GF01_form_a in air: console M6 T1 (1/2 in end mill; the tool setter measures it), its tip on the same feeler leaf, G10 L20 P1 Z-25.349 (Z0 1.000 in high). Run the file through, both tools." },
-  { kind = "check", text = "Every move clears the three straps; the end mill comes down in front of the plate and behind it, never over the plate but at the stud holes." },
-  { kind = "action", text = "Then Z0 back: console M6 T1 (the tool setter measures it); its tip dragging the leaf on the plate top, G10 L20 P1 Z{{process.z_set_mm:.3f}}." },
-]
 feed = "hand"
 
 [[setups.operations]]
@@ -368,7 +364,7 @@ speed_kind = "spindle"
 tool = "ball"
 drilling = "none"
 sizing = "other"
-instruction = "Same file, at its M6 T2: the 1/4 in ball end mill, {{process.ball_projection_mm:in.2f}} out of the collet (the tool setter measures it); set 2800. The groove, {{process.groove_radius_mm:in.3dot}} radius: one pass centred on its centre line, then steps round that line: the channel from the tube stop to X0, then the cove round the arc's top edge."
+instruction = "Same file, at its M6 T2: the 1/4 in ball end mill, {{process.ball_projection_mm:in.2f}} out of the collet; set 2800. The groove, {{process.groove_radius_mm:in.3dot}} radius: one pass centred on its centre line, then steps round that line: the channel from the tube stop to X0, then the cove round the arc's top edge."
 settings = "ball-endmill-carbide-2fl-1-4-6061-t6511"
 milling_cuts = [
   { name = "groove", kind = "slot", phase = "finish", cutter_dia_mm = "{{process.ball_cutter_dia_mm}}", flutes = 2, axial_doc_mm = "{{process.groove_depth_mm}}", radial_woc_mm = "{{process.ball_cutter_dia_mm}}", traverse_mm = ["{{process.a_groove_from_mm}}", "{{process.a_groove_to_mm}}"] },
@@ -399,7 +395,7 @@ machine = "PM-30MV CNC (FluidNC, CNCjs with the electronic tool setter) / table,
 indexing = "none"
 machine_ref = "pm-30mv"
 holding = "As plate A, mirrored: plate B, its B face up and its back edge toward the column, on three 1-2-3 blocks under three step clamps (LMS 1268): the form's clamps {{process.clamp_left_from_end_mm:in.2f}} and {{process.clamp_mid_from_end_mm:in.2f}} in from the right end, from studs beyond the right end; the waste's {{process.clamp_waste_from_end_mm:in.2f}} in from the right end, from a stud beyond the left end. Distances from the back edge as plate A's."
-datum = "Program GF02_form_b (cam:sm_gooseneck). G54: X0 Y0 the arc's centre, {{process.arc_from_end_mm:in.3f}} in from the right end and {{process.form_back_y_mm:in.3f}} in in front of the back edge; Z0 the plate top. +Y toward the column. Tool lengths from the tool setter at each M6. After homing again (the note says when), the plate not moved: check X, Y and Z as this setup's touch-off operation set them, each within 0.025 mm; once the arc is cut through, the back edge is taken on the form, right of the arc. All good: run the file again from its start. One off, or the plate moved once cutting has begun: stop and tell the owner. The plate moved before any cut: clamp it again and repeat the touch-off operation."
+datum = "Program GF02_form_b (cam:sm_gooseneck). G54: X0 Y0 the arc's centre, {{process.arc_from_end_mm:in.3f}} in from the right end and {{process.form_back_y_mm:in.3f}} in in front of the back edge; Z0 the plate top. +Y toward the column. After homing again (the standing page says when), once the arc is cut through, the back edge is taken on the form, right of the arc. One off, or the plate moved once cutting has begun: stop and tell the owner. The plate moved before any cut: clamp it again and repeat the touch-off operation."
 diagram = { file = "diagrams/form_b.svg", alt = "Plan of plate B on the table, to scale (2.1 px/mm), plate A mirrored: the form's two clamps from the right, the waste corner's from the left; the right end and back edge touched off. The 1/2 in end mill pecking the first stud hole; the arc it cuts next, up the front at X0 and round to the left to the back edge, arrowed; the groove dashed." }
 envelope = { x_span_mm = ["{{process.plate_length_mm}}", "{{process.half_cutter_dia_mm}}"], y_span_mm = ["{{process.tool_y_span_mm}}", "{{process.half_cutter_dia_mm}}"], work_top_mm = ["{{process.block_height_mm}}", "{{process.plate_top_max_mm}}"], deepest_cut_mm = ["{{process.block_height_mm}}", "{{process.tip_over_underside_mm}}"], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.ball_projection_mm}}"] }
 vise_hold = "other"
@@ -412,14 +408,6 @@ feed = "hand"
 [[setups.operations]]
 instruction = "Console M6 T1 (1/2 in end mill, {{process.half_mill_projection_mm:in.2f}} out of the collet). Its tip just dragging a .002 feeler leaf on the plate top: G10 L20 P1 Z{{process.z_set_mm:.3f}}. Edge finder on the right end: G10 L20 P1 X{{process.x_set_b_mm:.3f}}; on the back edge: G10 L20 P1 Y{{process.y_set_mm:.3f}}."
 instruction_detailed = "Console M6 T1 (1/2 in end mill, {{process.half_mill_projection_mm:in.2f}} out of the collet). Its tip just dragging a .002 feeler leaf on the plate top: G10 L20 P1 Z{{process.z_set_mm:.3f}}. Edge finder (900 rpm): on the right end from the right, 1/2 in behind the front edge, clear of the right block: G10 L20 P1 X{{process.x_set_b_mm:.3f}}; on the back edge from behind: G10 L20 P1 Y{{process.y_set_mm:.3f}} (entries allow for its .100 radius). Edge finder out."
-feed = "hand"
-
-[[setups.operations]]
-steps = [
-  { kind = "action", text = "Prove GF02_form_b in air: console M6 T1 (1/2 in end mill; the tool setter measures it), its tip on the same feeler leaf, G10 L20 P1 Z-25.349 (Z0 1.000 in high). Run the file through, both tools." },
-  { kind = "check", text = "Every move clears the three straps; the end mill comes down in front of the plate and behind it, never over the plate but at the stud holes." },
-  { kind = "action", text = "Then Z0 back: console M6 T1 (the tool setter measures it); its tip dragging the leaf on the plate top, G10 L20 P1 Z{{process.z_set_mm:.3f}}." },
-]
 feed = "hand"
 
 [[setups.operations]]
