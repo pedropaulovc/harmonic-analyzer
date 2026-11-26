@@ -19,9 +19,10 @@ part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
 material = "SAE 1018 CF or 1045 precision-ground round bar, 3/8 in"
 stock = "Ø{{process.stock_dia_in:.4dot}} ground bar (to order, not on hand); one piece {{process.blank_length_in:.2dot}} in long."
-note = "Inches. The bar's O.D. is left as supplied; the arbor's final length, both domes and the set-screw spots are made at assembly (MHA-DT-00)."
 shop = "../shop"
 stock_refs = ["1018-or-1045-ground-round-3-8"]
+
+standing = true
 
 [cad]
 file = "../../out/features/dt_cylinder_gear_shaft/features.toml"

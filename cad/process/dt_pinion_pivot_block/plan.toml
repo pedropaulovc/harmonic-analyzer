@@ -64,11 +64,20 @@ part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
 material = "1018 cold-finished steel, 1/2 × 2-1/4 in flat (drawing: {{cad.material_spec}})"
 stock = "1/2 × 2-1/4 in flat bar; {{process.quantity:d}} × {{process.blank_length_min_in:.2f}}–{{process.blank_length_max_in:.2f}} in blanks."
-note = "Inches unless mm; G-code and console entries in mm (the files and the controller run G21). Finished {{cad.east_end_width_min_in:.3dot}}–{{cad.east_end_width_max_in:.3dot}} wide (west end W to east end E), {{cad.top_face_height_min_in:.3dot}}–{{cad.top_face_height_max_in:.3dot}} high (bottom face B to the top), {{cad.front_face_depth_min_in:.3dot}}–{{cad.front_face_depth_max_in:.3dot}} deep (back face K, left as bought, to the front face). Speeds on the PM-30MV low belt (100–2800 rpm): no belt change. Home the mill ($H) once, after switching it on: every M6's trip to the tool setter counts from home. Home again only after a power cycle or a controller restart, an E-stop, an alarm, a limit switch hit, a stall or a crash: homing brings the stored G54 back. Then check every zero of the setup again, each the way its step set it: each must read what its step set, within .001 in. One does not, cannot be reached with the part in, or the part may have moved: take the setup again from its first step, the part out. They all do: run the interrupted file again from its start. Feed Hold, then Reset with the axes stopped keeps position and G54: no homing, no new zero; run the interrupted file again from its start: its first M6 measures the tool, and cuts already made are cut in air. Every file is proved in air on the first blank. Marks: K the back face, E the east bar edge (later the east end), B the bottom face; keep them readable until Setup 7. To buy: the .2510 reamer (Setup 6 waits for it); the Presto Black Steel PC9, gloves and safety glasses (Setup 8 waits for them)."
 shop = "../shop"
 stock_refs = ["1018-flat-1-2x2-1-4"]
 material_key = "rocker-1018-cold-finished"
 milling_material = "steel_1018"
+
+standing = true
+
+[[notes]]
+title = "This job"
+rows = [
+  ["Finished", "Finished {{cad.east_end_width_min_in:.3dot}}–{{cad.east_end_width_max_in:.3dot}} wide (west end W to east end E), {{cad.top_face_height_min_in:.3dot}}–{{cad.top_face_height_max_in:.3dot}} high (bottom face B to the top), {{cad.front_face_depth_min_in:.3dot}}–{{cad.front_face_depth_max_in:.3dot}} deep (back face K, left as bought, to the front face)."],
+  ["Marks", "K the back face, E the east bar edge (later the east end), B the bottom face; keep them readable until Setup 7."],
+  ["To buy", "The .2510 reamer (Setup 6 waits for it); the Presto Black Steel PC9, gloves and safety glasses (Setup 8 waits for them)."],
+]
 
 [cad]
 file = "../../out/features/dt_pinion_pivot_block/features.toml"
@@ -282,7 +291,7 @@ machine = "PM-30MV CNC (FluidNC, CNCjs with the electronic tool setter) / vise, 
 indexing = "none"
 machine_ref = "pm-30mv"
 holding = "A 1 in parallel against each jaw. The blank on edge on them, a sawn face up, gripped across the bar's two cold-finished 2-1/4 in faces, centred on the jaws. The numbered face against the FIXED jaw: it becomes the back face K; mark it K now (it is never cut). The bar edge at the LEFT end becomes the east end: mark it E. Tap the blank down onto both parallels while closing the vise. The lower {{process.edge_grip_mm:in.2dot}} of it is in the jaws."
-datum = "Program PB01_bottom (cam:dt_pinion_pivot_block). G54: X0 the left end (E), Y0 the fixed jaw's face (K), Z0 the faced bottom face B; +Y toward the fixed jaw. The file starts with an M6 for the end mill; tool lengths from the tool setter."
+datum = "Program PB01_bottom (cam:dt_pinion_pivot_block). G54: X0 the left end (E), Y0 the fixed jaw's face (K), Z0 the faced bottom face B; +Y toward the fixed jaw. The file starts with an M6 for the end mill."
 diagram = { file = "diagrams/bottom.svg", alt = "The blank on edge on two 1 in parallels, the back face K against the fixed jaw, a sawn face up; the 1/2 in end mill skims it to the bottom face B." }
 envelope = { x_span_mm = ["{{process.blank_width_max_mm}}", "{{process.face_cutter_dia_mm}}", "{{process.face_cutter_dia_mm}}", 5.08], y_span_mm = ["{{process.blank_thickness_max_mm}}", "{{process.face_cutter_dia_mm}}"], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{process.blank_length_max_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{cad.top_face_height_mm}}"], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_mm}}"] }
 vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{process.blank_thickness_max_mm}}", along_jaws_mm = "{{process.blank_width_max_mm}}", part_height_mm = "{{process.blank_length_max_mm}}", parallel_height_mm = "{{process.parallel_height_mm}}", overhang_mm = ["{{process.vise_bar_inset_mm}}", "rest"], jaw_offset = "centred", fixed_jaw_face = "as_bought", moving_jaw_face = "as_bought", moving_jaw_contact = "flat" }
@@ -295,12 +304,7 @@ feed = "hand"
 
 [[setups.operations]]
 instruction = "G54 Z0: the faced B, the sawn top's high point less the {{process.bottom_skim_mm:in.3dot}} skim."
-instruction_detailed = "Console M6 T1 (1/2 in end mill, {{process.half_mill_projection_mm:in.2f}} in out of the collet; the tool setter measures it). Spindle stopped, its tip just dragging a .002 feeler leaf on the highest point of the sawn top: G10 L20 P1 Z1.067 (the {{process.bottom_skim_mm:in.3dot}} skim plus the .002 leaf)."
-feed = "hand"
-
-[[setups.operations]]
-instruction = "First blank only: prove PB01_bottom in air, Z0 raised 1.000 in; every move clears the jaws. Then Z0 back."
-instruction_detailed = "First blank only: send $# and note the G54 line's Z. G10 L2 P1 Z(that Z + 25.400) raises Z0 1.000 in. Run PB01_bottom, watching each move clear the jaws. G10 L2 P1 Z(the noted Z) puts Z0 back."
+instruction_detailed = "Console M6 T1 (1/2 in end mill, {{process.half_mill_projection_mm:in.2f}} in out of the collet). Spindle stopped, its tip just dragging a .002 feeler leaf on the highest point of the sawn top: G10 L20 P1 Z1.067 (the {{process.bottom_skim_mm:in.3dot}} skim plus the .002 leaf)."
 feed = "hand"
 
 [[setups.operations]]
@@ -331,7 +335,7 @@ machine = "PM-30MV CNC (FluidNC, CNCjs with the electronic tool setter) / vise, 
 indexing = "none"
 machine_ref = "pm-30mv"
 holding = "A 1 in parallel against each jaw (1/8 in thick: the holes fall between them). The blank on edge, B down on both parallels, turned so the jaws grip the bar's two narrow edges (the end waste): E against the FIXED jaw, K at the LEFT. Centred on the jaws; tap it down onto both parallels while closing the vise. The lower {{process.edge_grip_mm:in.2dot}} of it is in the jaws."
-datum = "Program PB02_top_holds. G54: X0 the back face K (the left), Y0 the fixed jaw's face (E), Z0 the parallels' top (B); +Y toward the fixed jaw. Hold-down holes at X {{cad.west_hold_down_z_mm:in.3f}} in (from K), Y {{process.hold_west_y_mm:in.3f}} (west) and {{process.hold_east_y_mm:in.3f}} in (east) from E: the drawing's stations from W, taken from E at the finished width, plus the {{process.east_skim_mm:in.3dot}} that Setup 4 takes off E. Tool lengths from the tool setter at each M6; at every M6 stop the file has stopped the spindle and lifted the tool above the part."
+datum = "Program PB02_top_holds. G54: X0 the back face K (the left), Y0 the fixed jaw's face (E), Z0 the parallels' top (B); +Y toward the fixed jaw. Hold-down holes at X {{cad.west_hold_down_z_mm:in.3f}} in (from K), Y {{process.hold_west_y_mm:in.3f}} (west) and {{process.hold_east_y_mm:in.3f}} in (east) from E: the drawing's stations from W, taken from E at the finished width, plus the {{process.east_skim_mm:in.3dot}} that Setup 4 takes off E."
 diagram = { file = "diagrams/top.svg", alt = "The blank on edge on two 1 in parallels, gripped on its two bar edges, B down; the 1/2 in end mill faces the top to the height, then the centre drill and the #9 drill both hold-down holes through between the parallels." }
 envelope = { x_span_mm = ["{{process.blank_thickness_max_mm}}", "{{process.face_cutter_dia_mm}}", "{{process.face_cutter_dia_mm}}", 5.08], y_span_mm = ["{{process.blank_width_max_mm}}", "{{process.face_cutter_dia_mm}}"], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{process.edge_top_max_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{process.hold_tip_height_mm}}"], longest_tool_mm = ["{{process.drill_chuck_gauge_mm}}", "{{process.drill_9_oal_mm}}"], shortest_tool_mm = ["{{process.drill_chuck_gauge_mm}}", "{{process.centre_drill_oal_mm}}"] }
 vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{process.blank_width_max_mm}}", along_jaws_mm = "{{process.blank_thickness_max_mm}}", part_height_mm = "{{process.edge_top_max_mm}}", parallel_height_mm = "{{process.parallel_height_mm}}", overhang_mm = ["{{process.vise_thick_inset_mm}}", "rest"], jaw_offset = "centred", fixed_jaw_face = "as_bought", moving_jaw_face = "as_bought", moving_jaw_contact = "flat" }
@@ -339,16 +343,12 @@ beam = { axis = "z", hold = "cantilever", extent_mm = [0, "{{process.edge_top_ma
 
 [[setups.operations]]
 instruction = "Before each blank goes in, G54 Z0: the parallels' top (B), touched with the end mill on the fixed-jaw parallel, the jaws open."
-instruction_detailed = "Before each blank goes in, the parallels in place and the jaws open: console M6 T1 (the tool setter measures it). Jog it over the fixed-jaw parallel, its edge clear of the jaw. Spindle stopped, its tip just dragging a .002 feeler leaf on the parallel: G10 L20 P1 Z0.051. Raise Z. Not with the blank in: the collet would meet the blank before the tip reached the parallel."
+instruction_detailed = "Before each blank goes in, the parallels in place and the jaws open: console M6 T1. Jog it over the fixed-jaw parallel, its edge clear of the jaw. Spindle stopped, its tip just dragging a .002 feeler leaf on the parallel: G10 L20 P1 Z0.051. Raise Z. Not with the blank in: the collet would meet the blank before the tip reached the parallel."
 feed = "hand"
 
 [[setups.operations]]
 instruction = "The blank clamped as Holding says: G54 X0 the back face K (left), Y0 the fixed jaw's face (E): edge finder (900 rpm)."
 instruction_detailed = "The blank clamped as Holding says. Edge finder (900 rpm): on the fixed jaw's face beside the blank, G10 L20 P1 Y-2.540; its tip .10 below the blank's top, on K from the left, G10 L20 P1 X-2.540."
-feed = "hand"
-
-[[setups.operations]]
-instruction = "First blank only: prove PB02_top_holds in air, Z0 raised 1.000 in; every move clears the jaws, through every M6. Then Z0 back."
 feed = "hand"
 
 [[setups.operations]]
@@ -369,7 +369,7 @@ instruction = "A sawn patch left on the top: stop and tell the owner (the blank 
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Height over {{cad.top_face_height_max_in:.3dot}}: stop the file there (the controller keeps G54: no homing, no new touch-off); send $#, note the G54 line's Z; G10 L2 P1 Z(that Z − (the reading − {{cad.top_face_height_mm:in.4dot}}) × 25.4); run PB02_top_holds again from its start and re-check. Under {{cad.top_face_height_min_in:.3dot}}: the blank is scrap."
+instruction = "Height over {{cad.top_face_height_max_in:.3dot}}: stop the file there; send $#, note the G54 line's Z; G10 L2 P1 Z(that Z − (the reading − {{cad.top_face_height_mm:in.4dot}}) × 25.4); run PB02_top_holds again from its start and re-check. Under {{cad.top_face_height_min_in:.3dot}}: the blank is scrap."
 feed = "hand"
 
 [[setups.operations]]
@@ -418,11 +418,7 @@ feed = "hand"
 
 [[setups.operations]]
 instruction = "G54 Z0: the east end, E's high point less the {{process.east_skim_mm:in.3dot}} skim. This skim places the hold-downs drilled in Setup 3: touch the high point carefully."
-instruction_detailed = "Console M6 T1 (the tool setter measures it). Spindle stopped, its tip just dragging a .002 feeler leaf on the highest point of E: G10 L20 P1 Z2.591 (the {{process.east_skim_mm:in.3dot}} skim plus the .002 leaf). This skim places the hold-downs drilled in Setup 3 at their stations from the ends: touch the high point carefully."
-feed = "hand"
-
-[[setups.operations]]
-instruction = "First blank only: prove PB03_east_end in air, Z0 raised 1.000 in. Then Z0 back."
+instruction_detailed = "Console M6 T1. Spindle stopped, its tip just dragging a .002 feeler leaf on the highest point of E: G10 L20 P1 Z2.591 (the {{process.east_skim_mm:in.3dot}} skim plus the .002 leaf). This skim places the hold-downs drilled in Setup 3 at their stations from the ends: touch the high point carefully."
 feed = "hand"
 
 [[setups.operations]]
@@ -473,10 +469,6 @@ instruction = "The block clamped as Holding says: repeat Setup 4's edge-finder X
 feed = "hand"
 
 [[setups.operations]]
-instruction = "First blank only: prove PB04_width in air, Z0 raised 1.000 in. Then Z0 back."
-feed = "hand"
-
-[[setups.operations]]
 speed_kind = "spindle"
 tool = "em-half"
 drilling = "none"
@@ -510,14 +502,14 @@ machine = "PM-30MV CNC (FluidNC, CNCjs with the electronic tool setter) / vise, 
 indexing = "none"
 machine_ref = "pm-30mv"
 holding = "The 1 in and the 1/2 in parallels of the set stacked against each jaw (1.5 in; 1/8 in thick: the bores fall between them). The block lying on them, K down, gripped across its two finished ends: the west end W against the FIXED jaw, B at the LEFT. Centred on the jaws; tap it down onto both stacks while closing the vise. The lower {{process.lying_grip_mm:in.3dot}} of it is in the jaws."
-datum = "Program PB05_front_bores. G54: X0 the bottom face B (the left), Y0 the fixed jaw's face (W), Z0 the stacks' top (K); +Y toward the fixed jaw. Bores at X {{cad.pivot_bore_y_from_min_mm:in.3f}} (pivot) and {{cad.lift_bore_y_from_min_mm:in.3f}} in (lift) from B, Y −{{cad.pivot_bore_x_from_min_mm:in.3f}} and −{{cad.lift_bore_x_from_min_mm:in.3f}} in from W. Tool lengths from the tool setter at each M6; at every M6 stop the file has stopped the spindle and lifted the tool above the part."
+datum = "Program PB05_front_bores. G54: X0 the bottom face B (the left), Y0 the fixed jaw's face (W), Z0 the stacks' top (K); +Y toward the fixed jaw. Bores at X {{cad.pivot_bore_y_from_min_mm:in.3f}} (pivot) and {{cad.lift_bore_y_from_min_mm:in.3f}} in (lift) from B, Y −{{cad.pivot_bore_x_from_min_mm:in.3f}} and −{{cad.lift_bore_x_from_min_mm:in.3f}} in from W."
 diagram = { file = "diagrams/front.svg", alt = "The block lying on stacked parallels, K down, gripped on its two ends, W at the fixed jaw; the 1/2 in end mill faces the front face to the depth, then the centre drill spots both bores, the C drill and the .2510 reamer make the pivot bore and the F drill the lift bore, through between the stacks." }
 envelope = { x_span_mm = ["{{cad.top_face_height_mm}}", "{{process.face_cutter_dia_mm}}", "{{process.face_cutter_dia_mm}}", 5.08], y_span_mm = ["{{cad.east_end_width_mm}}", "{{process.face_cutter_dia_mm}}"], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{process.front_top_max_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{process.lift_tip_height_mm}}"], longest_tool_mm = ["{{process.drill_chuck_gauge_mm}}", "{{process.reamer_oal_mm}}"], shortest_tool_mm = ["{{process.drill_chuck_gauge_mm}}", "{{process.centre_drill_oal_mm}}"] }
 vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{cad.east_end_width_mm}}", along_jaws_mm = "{{cad.top_face_height_mm}}", part_height_mm = "{{process.front_top_max_mm}}", parallel_height_mm = "{{process.riser_height_mm}}", overhang_mm = ["{{process.vise_lying_inset_mm}}", "rest"], jaw_offset = "centred", fixed_jaw_face = "machined", moving_jaw_face = "machined", moving_jaw_contact = "flat" }
 beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{cad.top_face_height_mm}}"], clamp_mm = [0, "{{cad.top_face_height_mm}}"], section_mm = { y = "{{cad.east_end_width_mm}}", z = "{{process.front_top_max_mm}}" }, vise_left = "start" }
 
 [[setups.operations]]
-instruction = "Start only with the .2510 reamer in hand (to buy) and an MHA-DT-19 pinion pivot shaft beside the mill: the shaft is the pivot bore's gauge (fit audit F25)."
+instruction = "Start only with the .2510 reamer in hand and an MHA-DT-19 pinion pivot shaft beside the mill: the shaft is the pivot bore's gauge (fit audit F25)."
 feed = "hand"
 
 [[setups.operations]]
@@ -527,11 +519,7 @@ feed = "hand"
 
 [[setups.operations]]
 instruction = "G54 Z0: the stacks' top (K), touched with the end mill on the fixed-jaw stack left of the block."
-instruction_detailed = "Console M6 T1 (the tool setter measures it). MDI G0 X-8.000 Y-6.850: the cutter left of the block, its edge .02 off the fixed jaw, over that jaw's stack. Spindle stopped, its tip just dragging a .002 feeler leaf on the stack: G10 L20 P1 Z0.051."
-feed = "hand"
-
-[[setups.operations]]
-instruction = "First blank only: prove PB05_front_bores in air, Z0 raised 1.000 in; every move clears the jaws, through every M6. Then Z0 back."
+instruction_detailed = "Console M6 T1. MDI G0 X-8.000 Y-6.850: the cutter left of the block, its edge .02 off the fixed jaw, over that jaw's stack. Spindle stopped, its tip just dragging a .002 feeler leaf on the stack: G10 L20 P1 Z0.051."
 feed = "hand"
 
 [[setups.operations]]
@@ -548,7 +536,7 @@ milling_cuts = [
 ]
 
 [[setups.operations]]
-instruction = "Depth over {{cad.front_face_depth_max_in:.3dot}}: stop the file there (the controller keeps G54: no homing, no new touch-off); send $#, note the G54 line's Z; G10 L2 P1 Z(that Z − (the reading − {{cad.front_face_depth_mm:in.4dot}}) × 25.4); run PB05_front_bores again from its start and re-check. Under {{cad.front_face_depth_min_in:.3dot}}: the block is scrap."
+instruction = "Depth over {{cad.front_face_depth_max_in:.3dot}}: stop the file there; send $#, note the G54 line's Z; G10 L2 P1 Z(that Z − (the reading − {{cad.front_face_depth_mm:in.4dot}}) × 25.4); run PB05_front_bores again from its start and re-check. Under {{cad.front_face_depth_min_in:.3dot}}: the block is scrap."
 feed = "hand"
 
 [[setups.operations]]

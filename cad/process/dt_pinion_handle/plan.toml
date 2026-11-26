@@ -16,10 +16,11 @@ part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
 material = "1018 cold-finished steel round, 1/4 in (drawing: 1018, 1020 or 12L14 CF, 1/4 in)"
 stock = "Qty {{process.quantity:g}}. Ø{{process.stock_dia_in:.3dot}} bar, the 72 in bar on hand; the rod takes a {{process.saw_length_in:.2dot}} in piece of it."
-note = "Inches unless mm. Lathe PM-1127VF-LB (70–380 and 380–2000 rpm); cutting oil on the steel."
 shop = "../shop"
 stock_refs = ["1018-round-1-4"]
 material_key = "lathe-1018-cold-finished"
+
+standing = true
 
 [cad]
 file = "../../out/features/dt_pinion_handle/features.toml"
