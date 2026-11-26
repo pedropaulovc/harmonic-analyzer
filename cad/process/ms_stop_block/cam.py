@@ -1411,6 +1411,71 @@ def as_machined(ctx: dict[str, Any], inputs: Any) -> dict[str, Any]:
         found = {frame_of[k] for item in keys for k in ((item,) if isinstance(item, str) else item) if k in frame_of}
         key = found.pop() if found else None
         route.append([name, f"{key}_faced" if f"{key}_faced" in frames else key])
+    f = inputs.features["features"]
+
+    def plane(name: str) -> float:
+        return f[name]["plane"]["value"]
+
+    length, height, depth = plane("far_end"), plane("top_face"), plane("back_face")
+    ceiling, floor = plane("rebate_ceiling"), plane("rebate_floor")
+    shift = p["thickness_aim_mm"] - depth  # MS02's aim past the model's depth
+    thickness_aim = {
+        "band_mm": [p["thickness_min_mm"], p["thickness_max_mm"]],
+        "cad_mm": depth,
+        "aim_mm": p["thickness_aim_mm"],
+    }
+    plugs = [f[name] for name in ("plate_tap_1", "plate_tap_2")]
+    plug_r = max(h["dia"][1] for h in plugs) / 2
+    plug_bottom = max(h["drill_depth"][1] for h in plugs) + _point(2 * plug_r)
+    thumb = f["thumb_tap"]
+    thumb_r = thumb["dia"][1] / 2
+    expected = [
+        {
+            "name": "mating face thickness aim",
+            "kind": "left",
+            "within": [[0.0, length], [0.0, height], [-shift, 0.0]],
+            "reason": "MS02 faces to thickness_aim_mm, the middle of the window's band; the model sits at its .480 REF floor (owner ruling 2026-11-21)",
+            "aim": thickness_aim,
+        },
+        {
+            "name": "thumb hole from the faced mating face",
+            "kind": "left",
+            "within": [
+                [thumb["at"][0] - thumb_r, thumb["at"][0] + thumb_r],
+                [0.0, floor],
+                [thumb["at"][2] - thumb_r - shift, thumb["at"][2] + thumb_r + shift],
+            ],
+            "reason": "MS08 sets Y0 on the mating face MS02 faced to its aim, so the hole stands its printed .170 from that face, the aim's shift off the model's",
+            "aim": thickness_aim,
+        },
+        {
+            "name": "plate pilots plugged",
+            "kind": "left",
+            "within": [[0.0, length], [0.0, floor], [-shift, plug_bottom]],
+            "reason": "the two #2-56 holes are drilled #49 from MHA-MS-03's MS01_pair_pilot and tapped by hand (Setups 11-12); the plugs touch the mating-face aim strip, so the box is that strip's below the rebate",
+            "max_mm": plug_r,
+        },
+        {
+            "name": "rebate height aim",
+            "kind": "gouge",
+            "within": [[0.0, length], [0.0, floor], [0.0, plane("rebate_back")]],
+            "reason": "MS05 aims the rebate height at its band's middle (rebate_height_aim_mm); the model sits at the sliding fit's minimum (SEE NOTE 1). The thumb hole's near wall, shifted with the faced mating face, joins the floor's strip, so the box runs down to the locating edge",
+            "aim": {
+                "band_mm": f["rebate_floor"]["rebate_height"],
+                # The model's rebate height (ceiling − floor, 3.4035999 in
+                # floats), as the export states it.
+                "cad_mm": f["rebate_floor"]["rebate_height_nominal"],
+                "aim_mm": p["rebate_height_aim_mm"],
+            },
+        },
+        {
+            "name": "relief plunge ridges",
+            "kind": "left",
+            "within": [[0.0, length], [plane("relief_floor"), ceiling], [plane("rebate_back"), plane("relief_back")]],
+            "reason": "MS05_relief plunge-mills the relief (owner ruling 2026-11-21): a ridge of relief_scallop_mm stands between plunges",
+            "max_mm": p["relief_scallop_mm"],
+        },
+    ]
     return {
         "parts": {
             "": {
@@ -1420,6 +1485,7 @@ def as_machined(ctx: dict[str, Any], inputs: Any) -> dict[str, Any]:
                     "length": {"axis": "z", "keep": "max", "mm": {"nominal": nominal, "min": lo, "max": hi}},
                 },
                 "route": route,
+                "expected": expected,
             }
         },
         "frames": frames,

@@ -1278,6 +1278,58 @@ def as_machined(ctx: dict[str, Any], inputs: Any) -> dict[str, Any]:
     shank = next(job["dia"] for job in ctx["jobs"] if job["tool"] == "engraver") / 2
     tip = p["engraver_tip_mm"] / 2
     flank = math.tan(math.radians(g["grads"]["v_angle_deg"] / 2))
+    # The engraved bands in model coordinates (the stick frame's X is model
+    # x less the length): the ticks from the ruled edge in to the longest
+    # tick the drawing allows, half a pitch past the end ticks; the numerals'
+    # ink box widened by half a stroke. CAD cuts square-section grooves of
+    # the printed width; the V bit leaves their corners and opens a V mouth.
+    grads, nums = g["grads"], g["numerals"]
+    ticks = [t["x"] + g["length"] for t in ctx["ticks"]]
+    pitch = grads["minor_pitch"]
+    tick_w, num_w = p["tick_width_mm"], p["numeral_width_mm"]
+    tick_box = [
+        [min(ticks) - pitch / 2, max(ticks) + pitch / 2],
+        [g["width"] - grads["half_length"][1] - tick_w / 2, g["width"]],
+        [0.0, p["tick_depth_mm"]],
+    ]
+    num_box = [
+        [nums["x_span"][0] - num_w / 2, nums["x_span"][1] + num_w / 2],
+        [nums["y_span"][0] - num_w / 2, nums["y_span"][1] + num_w / 2],
+        [0.0, p["numeral_depth_mm"]],
+    ]
+    v_bit = "MS03/MS04 engrave with the 30° V bit (owner's engraver, plan Setup 3); the model's grooves are square-section"
+    expected = [
+        {
+            "name": "graduation groove corners",
+            "kind": "left",
+            "within": tick_box,
+            "reason": f"{v_bit}: the V leaves each groove's bottom corners",
+            # A corner is at most the widest printed groove less the tip, halved.
+            "max_mm": (grads["width"][1] - p["engraver_tip_mm"]) / 2,
+        },
+        {
+            "name": "graduation V mouth",
+            "kind": "gouge",
+            "within": tick_box,
+            "reason": f"{v_bit}: the V's mouth opens past the groove's square wall",
+            "max_mm": tick_w / 2,
+        },
+        {
+            "name": "numeral stroke corners",
+            "kind": "left",
+            "within": num_box,
+            "reason": f"{v_bit}: the V leaves each stroke's bottom corners",
+            # A corner is at most half the stroke the plan cuts.
+            "max_mm": num_w / 2,
+        },
+        {
+            "name": "numeral V mouth",
+            "kind": "gouge",
+            "within": num_box,
+            "reason": f"{v_bit}: the V's mouth opens past the stroke's square wall",
+            "max_mm": num_w / 2,
+        },
+    ]
     return {
         "parts": {
             "": {
@@ -1289,7 +1341,8 @@ def as_machined(ctx: dict[str, Any], inputs: Any) -> dict[str, Any]:
                         [-g["thick"], 0.0],
                     ],
                     "length": {"axis": "x", "keep": "max", "mm": lengths},
-                }
+                },
+                "expected": expected,
             }
         },
         "skip": {"MS01_fixture_face": "faces the fixture bar's top, not the stick"},

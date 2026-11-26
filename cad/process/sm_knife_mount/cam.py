@@ -1271,6 +1271,33 @@ def as_machined(ctx: dict[str, Any], inputs: Any) -> dict[str, Any]:
         if job["tool"].startswith("reamer-"):
             r = job["dia"] / 2
             tools[ctx["numbers"][job["tool"]]] = [[r - REAMER_LEAD_MM, 0.0], [r, REAMER_LEAD_MM]]
+    g = _geometry(inputs.features)
+    dowel = g["dowel"]
+    bx, top, bz = dowel["at"]
+    dia = {job["tool"]: job["dia"] for job in ctx["jobs"]}
+    ream_tip = top - (dowel["depth_nominal"] + p["dowel_ream_past_mm"])
+    drill_tip = g["under"] + p["dowel_drill_tip_height_mm"]
+    # The OCC solids' facets stand off a round wall by up to the report's
+    # 0.075 mm noise line; the boxes round a hole take that much more.
+    facets = 0.075
+    r31 = dia["drill-31"] / 2 + facets
+    r128 = dia["reamer-1280"] / 2 + facets
+    expected = [
+        {
+            "name": "datum B reamer lead",
+            "kind": "left",
+            "within": [[bx - r128, bx + r128], [ream_tip, ream_tip + REAMER_LEAD_MM + facets], [bz - r128, bz + r128]],
+            "reason": "the .1280 chucking reamer's 45° lead at its tip, dowel_ream_past_mm past the drawing's depth: the full diameter still reaches the depth band (plan holes note)",
+            "max_mm": REAMER_LEAD_MM,
+        },
+        {
+            "name": "datum B #31 past the reamer",
+            "kind": "gouge",
+            "within": [[bx - r31, bx + r31], [drill_tip - facets, top - dowel["depth_nominal"]], [bz - r31, bz + r31]],
+            "reason": "KM06 drills the #31 drill_past_mm past the reamer's tip by design (plan holes note), deeper than the model's drill point",
+            "max_mm": ream_tip - drill_tip,
+        },
+    ]
     return {
         "parts": {
             "": {
@@ -1278,7 +1305,8 @@ def as_machined(ctx: dict[str, Any], inputs: Any) -> dict[str, Any]:
                     "frame": "back",
                     "box": [[0.0, lengths["nominal"]], [y0, y0 + width], [z1 - thickness, z1]],
                     "length": {"axis": "x", "keep": "min", "mm": lengths},
-                }
+                },
+                "expected": expected,
             }
         },
         "skip": {},
