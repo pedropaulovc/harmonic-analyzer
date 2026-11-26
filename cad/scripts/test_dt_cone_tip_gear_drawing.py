@@ -51,10 +51,14 @@ def test_the_part_is_the_family_t006_on_its_own_identity() -> None:
 def test_stems_are_the_clusters_and_clear_the_tooth_cutter() -> None:
     assert spec.STEM_DIA_MM == cluster.STEM_DIA_MM == pytest.approx(0.0625 * 25.4)
     assert spec.SPIGOT_DIA_BAND == cluster.SPIGOT_DIA_BAND
-    # Owner ruling 2026-11-20 (#2469): the pivot bonds in MHA-DT-38 on the
-    # shared .0625 reamer, so it turns on the spigot's band (#2530: never
-    # line to line) and prints it.
-    assert spec.PIVOT_DIA_BAND == cluster.PIVOT_DIA_BAND == spec.SPIGOT_DIA_BAND
+    # Both stems print their own bands, .0003 under the .0625 reamed holes
+    # (#2530: never line to line).  The pivot (D50): the turned-diameter
+    # row's .0010, its bond and running clearances closing the tip air
+    # (N-03).  The spigot (D51): open to a .0038 bond, where its float ties
+    # T024's in the phasing comb (N-04).
+    assert spec.PIVOT_DIA_BAND == cluster.PIVOT_DIA_BAND
+    assert [d / 25.4 for d in spec.PIVOT_DIA_BAND] == pytest.approx([-0.0003, -0.0013])
+    assert [d / 25.4 for d in spec.SPIGOT_DIA_BAND] == pytest.approx([-0.0003, -0.0033])
     assert spec.STEM_MAX_DIA_MM == spec.STEM_DIA_MM + max(spec.SPIGOT_DIA_BAND)
     assert spec.SPIGOT_LENGTH_MM == cluster.SPIGOT_LENGTH_MM
     assert spec.PIVOT_LENGTH_MM == cluster.PIVOT_LENGTH_MM
@@ -83,9 +87,9 @@ def test_the_fits_the_stems_make() -> None:
     # The spigot's bond: clearance at every limit, inside the compound's gap.
     low, high = spec.SPIGOT_BOND_CLEARANCE_MM
     assert 0.0 <= low < high <= cluster.RETAINING_COMPOUND_MAX_GAP_MM
-    # The bushing's bond on the pivot (#2469): the spigot's clearance, at
-    # every limit.
-    assert spec.PIVOT_BOND_CLEARANCE_MM == pytest.approx(spec.SPIGOT_BOND_CLEARANCE_MM)
+    assert low / inch == pytest.approx(0.0003, abs=5e-6)
+    assert high / inch == pytest.approx(0.0038, abs=5e-6)
+    # The bushing's bond on the pivot (#2469), at every limit.
     assert spec.PIVOT_BOND_CLEARANCE_MM[0] / inch == pytest.approx(0.0003, abs=5e-6)
     assert spec.PIVOT_BOND_CLEARANCE_MM[1] / inch == pytest.approx(0.0018, abs=5e-6)
     # The pivot runs in the end screw: clearance at every limit.
@@ -109,38 +113,43 @@ def test_callouts_and_notes_name_every_mate_once() -> None:
     callouts = notes.DIMENSION_CALLOUTS
     # Two lines of words at most (rule 7).
     assert all(len(text.splitlines()) <= 2 for text in callouts.values())
-    spigot = callouts["SpigotDia"]
-    for mate in ("MHA-DT-04", "MHA-DT-03-T012", "MHA-DT-03-T018"):
-        assert mate in spigot
-    # Rule 26's fit name: the bond with its compound, the one MHA-DT-04 prints;
-    # the spigot is turned last to its holes, so beside its REF size the
-    # bond's clearance is the requirement and prints bare (rule 4, form 2;
-    # rule 23).
-    assert spigot.startswith(f"BONDED FIT, {cluster.RETAINING_COMPOUND}, ")
-    low, high = cluster.SPIGOT_BOND_CLEARANCE_MM
-    assert f"CLEARANCE {spec.inch_text(low, 4)}-{spec.inch_text(high, 4)}" in spigot
-    assert "(" not in spigot
-    assert notes.MADE_TO_FIT_STEMS == ("SpigotDia", "PivotDia")
+    # Rule 26's fit name: the bond with its compound, the one MHA-DT-04
+    # prints, then the flag to note 4, which names the three mates.
+    assert callouts["SpigotDia"] == (
+        f"BONDED FIT, {cluster.RETAINING_COMPOUND}\n{notes.SPIGOT_NOTE_FLAG}"
+    )
+    # Both stems print their bands (D50, D51): nothing is made to fit.
+    assert notes.MADE_TO_FIT_STEMS == ()
     pivot = callouts["PivotDia"]
     assert pivot == f"BONDED AND RUNNING FIT\n{notes.PIVOT_NOTE_FLAG}"
     sheet = notes.sheet_notes().splitlines()
-    assert len(sheet) <= 6
-    # One reference pivot diameter: bonded in the bushing, its end running in
-    # the end screw's hole, turned last to both; both mates by number and
-    # name, and both clearances.
-    pivot_note = " ".join(" ".join(sheet[:3]).split())
+    assert len(sheet) == 7
+    # The banded pivot: bonded in the bushing, its end running in the end
+    # screw's hole; both mates by number and name, both clearances as REF
+    # beside the band (rule 4, form 4).
+    pivot_note = " ".join(" ".join(sheet[:2]).split())
     assert sheet[0].startswith(
         f"{notes.PIVOT_NOTE_NUMBER}. PIVOT: BONDED FIT, "
-        f"{cluster.RETAINING_COMPOUND}, IN MHA-DT-38"
+        f"{cluster.RETAINING_COMPOUND}, IN MHA-DT-38 CONE TIP BUSHING"
     )
     assert "MHA-DT-39 CONE TIP END SCREW" in pivot_note
-    assert "TURNED LAST TO SLIDE IN BOTH" in pivot_note
+    assert "TURNED" not in pivot_note
     for clearance in (cluster.BUSHING_BOND_CLEARANCE_MM, cluster.PIVOT_RUNNING_CLEARANCE_MM):
-        assert f"{spec.inch_text(clearance[0], 4)}-{spec.inch_text(clearance[1], 4)}" in pivot_note
-    assert "MEASURED" not in pivot_note
-    assert "(" not in pivot_note
-    assert sheet[3].startswith(f"{notes.TEETH_NOTE_NUMBER}. TEETH MESH WITH MHA-DT-12")
-    assert sheet[-1] == "3. CENTRES OK."
+        text = f"{spec.inch_text(clearance[0], 4)}-{spec.inch_text(clearance[1], 4)}"
+        assert f"(CLEARANCE {text})" in pivot_note
+    assert sheet[2].startswith(f"{notes.TEETH_NOTE_NUMBER}. TEETH MESH WITH MHA-DT-12")
+    assert sheet[4] == "3. CENTRES OK."
+    # Note 4: the banded spigot's bond, its three mates by number and name,
+    # its clearance REF.
+    spigot_note = " ".join(" ".join(sheet[5:]).split())
+    assert spigot_note.startswith(
+        f"{notes.SPIGOT_NOTE_NUMBER}. SPIGOT: BONDED FIT, {cluster.RETAINING_COMPOUND}, IN "
+        "MHA-DT-04 CONE GEAR SHAFT, MHA-DT-03-T012 AND MHA-DT-03-T018 CONE GEARS"
+    )
+    low, high = cluster.SPIGOT_BOND_CLEARANCE_MM
+    assert spigot_note.endswith(
+        f"(CLEARANCE {spec.inch_text(low, 4)}-{spec.inch_text(high, 4)})."
+    )
     # The width says at the dimension that it is the cone's seat pitch on its
     # shaft (rule 3's pitch-geometry exemption); each line is shorter than the
     # face it sits under.

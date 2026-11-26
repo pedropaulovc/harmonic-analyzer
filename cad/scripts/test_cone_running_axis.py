@@ -90,7 +90,8 @@ def test_a_true_pivot_still_leaves_the_spigot_its_tilt() -> None:
     # With the pivot dead true MHA-DT-37 still pivots about it inside the
     # socket's float: the mouth offset u and the inner-end offset (1 + r) u
     # both stay within the float.
-    assert axis.SPIGOT_FLOAT_MM == pytest.approx(0.0009 * IN, abs=1e-4)
+    # D51: the spigot's bond opens to .0038, its float half that.
+    assert axis.SPIGOT_FLOAT_MM == pytest.approx(0.0019 * IN, abs=1e-4)
     assert axis.spigot_stand_off_mm(0.0) == pytest.approx(
         axis.SPIGOT_FLOAT_MM / (1.0 + _RATIO)
     )

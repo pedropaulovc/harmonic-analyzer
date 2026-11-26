@@ -111,16 +111,18 @@ def _floor_text(value_mm: float, places: int) -> str:
     return inch_text(scaled / 10**places * MM_PER_IN, places)
 
 
-# Rule 4, form 2: REAM with no band, the fit name with its compound (rule
-# 26, as MHA-DT-37's spigot prints it) and its mate by drawing number, which
-# is turned last to this bore; MHA-DT-37 prints the acceptance (fit audit
-# 2026-11-23, F10 and MHA-DT-37.stems).  THRU: the section shows it.
+# REAM with no band (the reamer is the gauge, fit audit 2026-11-23 F10),
+# then rule 7's two lines of words: the fit name with its compound (rule 26,
+# as MHA-DT-37's spigot prints it) and its mate by drawing number.  MHA-DT-37
+# prints its pivot's own band and the bond's clearance as REF (D50, delegated
+# ruling 2026-11-26 (Main), precedent: the band main printed until
+# f4ba380152; owner form timed out; owner review #2144).  THRU: the section
+# shows it.
 BORE_CALLOUT = "\n".join(
     (
         "REAM THRU",
-        f"BONDED FIT, {tip.RETAINING_COMPOUND}:",
-        f"{PIVOT_NUMBER} PIVOT IS",
-        "TURNED TO THIS BORE",
+        f"BONDED FIT, {tip.RETAINING_COMPOUND}",
+        f"ON {PIVOT_NUMBER} PIVOT",
     )
 )
 OUTER_DIA_CALLOUT = f"HOLDS WALL {_floor_text(WALL_WORST, 3)} MIN"

@@ -172,17 +172,17 @@ def test_the_cone_set_check_reads_both_ways() -> None:
     )
     assert _nominal_contact_ratio(land_2, uncentred) < 1.0
     # T012 left to its part's .0015, its bond float and MHA-DT-37's tilt in a
-    # socket taken true to the journal holds; a socket .0005 in TIR off the
-    # journal, which no sheet limits, takes it under (Codjiflo review of
-    # #3374): so T012 and T018 are read about the journal, not the part.
+    # socket taken true to the journal falls under once the spigot's bond
+    # opens to .0038 (D51; 1.0068 on the .0018 bond, which a socket .0005 in
+    # TIR off the journal also took under, Codjiflo review of #3374): so T012
+    # and T018 are read about the journal after cure, not the part, and the
+    # gate above books that reading.
     spigot_true = (
         cone_set_stack.SPIGOT_TOOTH_SPACE_RUNOUT_TIR_MM / 2.0
         + cone_set_stack.bond_float_mm(12)
         + cone_running_axis.seat_offset_mm(12, pivot)
     )
-    assert _nominal_contact_ratio(12, spigot_true) >= 1.0
-    socket_off = cone_running_axis.spigot_share(12) * (0.0005 * 25.4 / 2.0)
-    assert _nominal_contact_ratio(12, spigot_true + socket_off) < 1.0
+    assert _nominal_contact_ratio(12, spigot_true) == pytest.approx(0.8705, abs=5e-4)
 
     def read_about_the_journal(teeth: int, reading_tir_in: float, pivot_mm: float) -> float:
         return _nominal_contact_ratio(

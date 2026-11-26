@@ -1,0 +1,9 @@
+# What fails past each numeric check dt_cone_gear_tl_phasing_comb_spec asserts
+# (check_register.py, tolerance-policy.md "Checks in spec modules and tests").
+checks:
+  - id: C-01
+    check: "BOND_CLOCK_TOLERANCE_MM"
+    kind: mesh
+    reason: "a bonded gear clocks off T030; the set loses phase"
+    source: "error_budget.yaml critical_features.cone_tip_bond_clock (0.866 mm pitch arc; owner decision C1 keyed 2026-11-09, PR #1992; the comb MHA-DT-03-TL-02, owner rulings 2026-11-10, 2026-11-13, 2026-11-14 #2734). Worst today T006 at 0.865 mm, margin 0.001 mm; T012 0.641, T018 0.518, T024 0.398"
+    basis: worst_case
