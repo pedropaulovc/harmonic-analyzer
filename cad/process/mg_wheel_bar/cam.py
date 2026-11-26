@@ -1168,6 +1168,29 @@ def as_machined(ctx: dict[str, Any], inputs: Any) -> dict[str, Any]:
     }
     stock = next(job["stock"] for job in ctx["jobs"] if job["frame"] == "top")
     x0 = stock[0][0]
+    # The length aim: WB04 mills the right end to the middle of the printed
+    # length band (process.length_target_mm), the CAD sits at its nominal.
+    f = inputs.features["features"]
+    left, right = f["left_end"]["plane"]["value"], f["right_end"]["plane"]["value"]
+    aim = p["length_target_mm"]
+    ends = [
+        {
+            "name": "length aim",
+            "kind": "gouge",
+            "within": [
+                [left + aim, right],
+                [f["bottom_face"]["plane"]["value"], f["top_face"]["plane"]["value"]],
+                [f["front_face"]["plane"]["value"], f["back_face"]["plane"]["value"]],
+            ],
+            "reason": "WB04 mills the length to the middle of the printed band "
+            "(process.length_target_mm); the CAD is at the drawing's nominal",
+            "aim": {
+                "band_mm": list(f["right_end"]["length"]),
+                "cad_mm": right - left,
+                "aim_mm": aim,
+            },
+        }
+    ]
     return {
         "parts": {
             "": {
@@ -1176,6 +1199,7 @@ def as_machined(ctx: dict[str, Any], inputs: Any) -> dict[str, Any]:
                     "box": [[x0, x0 + lengths["nominal"]], list(stock[1]), list(stock[2])],
                     "length": {"axis": "x", "keep": "min", "mm": lengths},
                 },
+                "expected": ends,
                 "route": [
                     ["WB02_top", "top"],
                     ["WB03_left", "lying"],

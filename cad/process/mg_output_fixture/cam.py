@@ -433,9 +433,12 @@ def build(ctx: dict[str, Any], rt: Any) -> dict[str, Any]:
 # never fails the task. "gate" would fail it on a difference over the noise
 # line or a rapid that cuts.
 AS_MACHINED_MODE = "report"
-# The turned spigot's round, as a polygon of this many sides (its radius
-# off the round by r(1 - cos(180°/n)), 0.005 mm: under the noise line).
-SPIGOT_SIDES = 72
+# The turned spigot's round, as a polygon of this many sides inscribed in
+# it: each facet falls short of the CAD's round by r(1 - cos(180°/n)) =
+# 0.0016 mm, a gouge sliver under the report's 1e-3 mm3 region floor along
+# the spigot's longest plain run (72 sides left 33 slivers of 0.004 mm3,
+# past the report's 40 measured regions, so it could not call them explained).
+SPIGOT_SIDES = 128
 
 
 def as_machined(ctx: dict[str, Any], inputs: Any) -> dict[str, Any]:
@@ -467,6 +470,41 @@ def as_machined(ctx: dict[str, Any], inputs: Any) -> dict[str, Any]:
         [r * math.cos(2 * math.pi * k / SPIGOT_SIDES), -ac / 2 + r * math.sin(2 * math.pi * k / SPIGOT_SIDES)]
         for k in range(SPIGOT_SIDES)
     ]
+    # The lathe's groove and axial #4-40 (Setup 1), not in the blank: model
+    # coordinates, the hex axis on model X, the spigot face at its plane.
+    face = f["spigot_face"]["plane"]["value"]
+    groove, tap = f["groove"], f["tap"]
+    spigot_r = f["spigot"]["dia"][1] / 2
+    tap_r = tap["dia"][1] / 2
+    expected = [
+        {
+            "name": "wire groove",
+            "kind": "left",
+            "within": [
+                [
+                    face - groove["station"][1] - groove["radius"][1],
+                    face - groove["station"][0] + groove["radius"][1],
+                ],
+                [-spigot_r, spigot_r],
+                [-spigot_r, spigot_r],
+            ],
+            "reason": "the full-radius wire groove is turned on the lathe in Setup 1 "
+            "(Spigot end: face, turn, groove, drill and tap)",
+            "max_mm": (f["spigot"]["dia"][1] - groove["root_dia"][0]) / 2,
+        },
+        {
+            "name": "axial #4-40",
+            "kind": "left",
+            "within": [
+                [face - tap["axis_depth"][1] - _point(2 * tap_r), face],
+                [-tap_r, tap_r],
+                [-tap_r, tap_r],
+            ],
+            "reason": "the axial #4-40 is drilled and tapped on the lathe in Setup 1 "
+            "(Spigot end: face, turn, groove, drill and tap)",
+            "max_mm": tap_r,
+        },
+    ]
     return {
         "parts": {
             "": {
@@ -476,7 +514,8 @@ def as_machined(ctx: dict[str, Any], inputs: Any) -> dict[str, Any]:
                         {"axis": "x", "polygon": hexagon, "span": [spigot, length]},
                         {"axis": "x", "polygon": round_, "span": [0.0, spigot + 1.0]},
                     ],
-                }
+                },
+                "expected": expected,
             }
         },
         "skip": {},
