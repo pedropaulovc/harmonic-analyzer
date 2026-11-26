@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 430" width="760" height="430" font-family="sans-serif" font-size="13">
+  <!-- Hand picture, to scale, 10 px/mm: a section through the spindle axis in the plane of the arm's mid-thickness (parallel to face A, .188 from it), seen from above; the chuck to the left, the tailstock to the right. The square end .55 wide (cad.end_face_width_mm) stands .25 out of the 4-jaw's jaws; the flanks taper away from it at 2.45 deg (cad.flanks_angle_ref_deg), drawn true; the two jaws on the flanks cut in this section, the two on the faces above and below it, not drawn. The 4-jaw's body and jaws, the spindle bore and the drill chuck are not on record: schematic. The arm runs on through the chuck into the spindle bore, drawn short to a break line. The .1240 reamer to scale (shop reamer-1240, Ø3.1496 mm = 31.5 px), its end at the quill reading .400 + .020 (latch_ream_depth_mm + latch_ream_lead_mm), its 45 deg lead chamfer .020 (latch_ream_lead_mm); drawn short to a break line. The #32 hole (white). -->
+  <rect class="paper" x="0" y="0" width="760" height="430"/>
+  <text class="title" x="20" y="22">Setup 4: the .1240 reamer into the latch-pin hole (to scale, 10 px/mm)</text>
+  <rect class="fixture-vise" x="250" y="40" width="120" height="360"/>
+  <path class="part-kept" d="M60 128.58L560 149.94L560 290.06L60 311.42L57 304.39L60 297.35L57 290.32L60 283.29L57 276.26L60 269.22L57 262.19L60 255.16L57 248.13L60 241.1L57 234.06L60 227.03L57 220L60 212.97L57 205.94L60 198.9L57 191.87L60 184.84L57 177.81L60 170.78L57 163.74L60 156.71L57 149.68L60 142.65L57 135.61Z"/>
+  <path class="clamp" d="M370 141.82L496.5 147.22L496.5 70L370 70Z"/>
+  <path class="clamp" d="M370 298.18L496.5 292.78L496.5 370L370 370Z"/>
+  <path class="holes" d="M560 205.27L443.16 205.27L434.31 220L443.16 234.73L560 234.73Z"/>
+  <line class="centre-line" x1="40" y1="220" x2="740" y2="220"/>
+  <text class="label" x="60" y="60">the arm, its pivot end</text>
+  <text class="label" x="60" y="76">through the chuck into</text>
+  <text class="label" x="60" y="92">the spindle bore</text>
+  <line class="leader" x1="120" y1="94" x2="150" y2="138.43"/>
+  <circle class="leader-dot" cx="150" cy="138.43" r="2"/>
+  <text class="label" x="390" y="398">4-jaw: the jaws on the flanks shown</text>
+  <line class="leader" x1="440" y1="386" x2="466.5" y2="350"/>
+  <circle class="leader-dot" cx="466.5" cy="350" r="2"/>
+  <text class="label" x="570" y="330">the square end</text>
+  <text class="label" x="570" y="346">.25 out of the jaws</text>
+  <line class="leader" x1="568" y1="326" x2="556" y2="286.06"/>
+  <circle class="leader-dot" cx="556" cy="286.06" r="2"/>
+  <path class="cutter" d="M740 204.25L458.4 204.25L453.32 209.33L453.32 230.67L458.4 235.75L740 235.75L737 227.87L740 220L737 212.13Z"/>
+  <line class="arrow" x1="700" y1="180" x2="650" y2="180"/>
+  <text class="label" x="600" y="90">.1240 reamer, slowly, to</text>
+  <text class="label" x="600" y="106">{{process.latch_ream_depth_mm:in.3dot}} plus its .020 chamfer;</text>
+  <text class="label" x="600" y="122">out with the spindle running</text>
+  <line class="leader" x1="640" y1="136" x2="660" y2="204"/>
+  <circle class="leader-dot" cx="660" cy="204" r="2"/>
+</svg>

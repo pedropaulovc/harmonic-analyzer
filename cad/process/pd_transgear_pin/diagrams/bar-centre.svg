@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 400" width="760" height="400" font-family="sans-serif" font-size="13">
+  <!-- To scale, 220 px/in along and across the axis, from above (the cross-slide at the bottom): the Ø.250 bar (cad.stock_dia_mm), the jaw fronts 2.385 behind Z0, the tip plane (cad.jaw_z_mm); the sawn end .22 out (cad.face_allowance_mm), faced to the .20 stub's end (centre_stub_in); the journal Ø.125 (cad.outer_dia_mm) from Z+.10 (turn_start_z_mm) to the seat at Z-2.08 (cad.outer_far_out_far_z_mm), the head Ø.20 (cad.step_head_dia_mm) back to Z-2.29 (head_turn_end_z_mm), the groove Ø.096 x .021 .157 from the tip plane (cad.groove_far_out_*). The 3-jaw's body and jaws are schematic (their sizes are not on record); the MT3 dead centre is schematic (its sizes are not on record), the bar's rest runs on into the chuck. The No. 1 centre drill (tools.centre-drills-carbide-60, for a 3/64 drill): its 3/64 pilot (10.3 px) and 60 deg countersink to about Ø.08 at the stub's end, to scale across; the pilot's length and the body's Ø are not on record: the pilot drawn .04 long and the body at the countersink's Ø.08, schematic, to a break line. -->
+  <rect class="paper" x="0" y="0" width="760" height="400"/>
+  <text class="title" x="20" y="22">Setup 1, Op 50: the No. 1 centre drill from the tailstock in the stub's end (to scale, 220 px/in)</text>
+  <rect class="fixture-vise" x="34" y="130.5" width="56" height="139"/>
+  <path class="part-rest" d="M20 172.5L698.7 172.5L698.7 227.5L20 227.5L17 219.64L20 211.79L17 203.93L20 196.07L17 188.21L20 180.36Z"/>
+  <rect class="clamp" x="90" y="142.5" width="40" height="30"/>
+  <rect class="clamp" x="90" y="227.5" width="40" height="30"/>
+  <line class="centre-line" x1="20" y1="200" x2="740" y2="200"/>
+  <path class="cutter" d="M740 191.2L698.7 191.2L692.39 194.84L683.59 194.84L680.49 200L683.59 205.16L692.39 205.16L698.7 208.8L740 208.8L737 200Z"/>
+  <line class="arrow" x1="730" y1="170" x2="680" y2="170"/>
+  <line class="datum" x1="654.7" y1="50" x2="654.7" y2="92"/>
+  <text class="datum-label" x="648.7" y="60" text-anchor="end">Z0 the tip plane</text>
+  <text class="label" x="400" y="330">No. 1 centre drill to about Ø.08 at the countersink:</text>
+  <text class="label" x="400" y="346">the hole stays inside the stub (Z0 to Z+{{process.centre_stub_in:.2dot}})</text>
+  <line class="leader" x1="560" y1="318" x2="718.7" y2="208.8"/>
+  <circle class="leader-dot" cx="718.7" cy="208.8" r="2"/>
+  <text class="label" x="20" y="384">3-jaw on the Ø{{cad.stock_dia_mm:in.3dot}} bar, {{cad.stickout_in:.2dot}} out</text>
+  <line class="leader" x1="110" y1="372" x2="110" y2="247.5"/>
+  <circle class="leader-dot" cx="110" cy="247.5" r="2"/>
+</svg>

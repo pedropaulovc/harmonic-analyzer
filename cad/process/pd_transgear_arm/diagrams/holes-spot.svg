@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 430" width="760" height="430" font-family="sans-serif" font-size="13">
+  <!-- Hand picture, to scale. Left: a section across the jaws, from the RIGHT end, 7 px/mm (the fixed jaw on the right, Y0 its face): the two 1 in parallels, 1/8 thick (parallel_height_mm, parallel_thickness_mm), against the jaws; the blank 1.00 x .375 (blank_width_mm, rear_face_thickness_stock) face A down on them, its centre line at Y-.500; the jaw tops 19.545 mm over face A (holes_jaw_top_mm). The jaws' thickness and the parallels' length are not on record; the jaws and parallels drawn short to a break line toward the bed. Right: from above, 2.2 px/mm, X0 the blank's left end, the arm's outline (cut in Setup 3) dashed. The 1/2 in end mill to scale (endmill-carbide-3fl-1-2, Ø12.7 mm = 88.9 px), its end at Z6.9 (cad.spot_face_floor_mm, the posted T4 depth), its square end drawn as the near half of the end face, 12 % deep; 6.35 mm from each jaw face; drawn short to a break line (at least .75 in out of the collet). The #14 hole under it (white). -->
+  <rect class="paper" x="0" y="0" width="760" height="430"/>
+  <text class="title" x="20" y="22">Setup 2, AR01 T4: the 1/2 in end mill plunges the spot face on B (to scale, 7 px/mm)</text>
+  <path class="clamp" d="M102.2 153.18L152.2 153.18L152.2 415L145.06 412L137.91 415L130.77 412L123.63 415L116.49 412L109.34 415L102.2 415Z"/>
+  <path class="clamp" d="M330 153.18L380 153.18L380 415L372.86 412L365.71 415L358.57 412L351.43 415L344.29 412L337.14 415L330 415Z"/>
+  <path class="fixture-support" d="M152.2 290L174.43 290L174.43 415L167.02 412L159.61 415L152.2 415Z"/>
+  <path class="fixture-support" d="M307.77 290L330 290L330 415L322.59 412L315.18 415L307.77 415Z"/>
+  <rect class="part-kept" x="152.2" y="223.32" width="177.8" height="66.67"/>
+  <rect class="holes" x="224.92" y="223.32" width="32.36" height="66.67"/>
+  <text class="label-on-clamp" x="127.2" y="403" text-anchor="middle">moving</text>
+  <text class="label-on-clamp" x="355" y="403" text-anchor="middle">fixed</text>
+  <line class="datum" x1="20" y1="290" x2="98.2" y2="290"/>
+  <text class="datum-label" x="20" y="284">Z0 face A</text>
+  <text class="label" x="241.1" y="339" text-anchor="middle">1 in parallels,</text>
+  <text class="label" x="241.1" y="355" text-anchor="middle">1/8 thick</text>
+  <line class="leader" x1="211.1" y1="349" x2="174.43" y2="365"/>
+  <circle class="leader-dot" cx="174.43" cy="365" r="2"/>
+  <line class="leader" x1="271.1" y1="349" x2="307.77" y2="365"/>
+  <circle class="leader-dot" cx="307.77" cy="365" r="2"/>
+  <text class="title" x="20" y="44">section at the pivot (X13.9), from the RIGHT end (7 px/mm)</text>
+  <path class="cutter" d="M285.55 231.03L285.55 56L278.14 53L270.73 56L263.33 53L255.92 56L248.51 53L241.1 56L233.69 53L226.28 56L218.88 53L211.47 56L204.06 53L196.65 56L196.65 231.03A44.45 10.67 0 0 0 285.55 231.03Z"/>
+  <line class="arrow" x1="183.1" y1="76" x2="183.1" y2="116"/>
+  <text class="label" x="20" y="76">1/2 in end mill, one plunge</text>
+  <text class="label" x="20" y="92">to {{cad.spot_face_floor_in:.4dot}} above face A:</text>
+  <text class="label" x="20" y="108">the Ø.50 spot face</text>
+  <line class="leader" x1="140" y1="106" x2="197.1" y2="140"/>
+  <circle class="leader-dot" cx="197.1" cy="140" r="2"/>
+  <rect class="clamp" x="394.72" y="88" width="349.08" height="22"/>
+  <rect class="clamp" x="394.72" y="165.88" width="349.08" height="22"/>
+  <rect class="part-kept" x="410" y="110" width="319.91" height="55.88"/>
+  <path class="hidden" d="M441.75 110.47L724.16 122.53L724.16 153.35L441.75 165.41A27.5 27.5 0 1 1 441.75 110.47Z"/>
+  <circle class="holes" cx="591.97" cy="137.94" r="3.24"/>
+  <circle class="cutter" cx="440.58" cy="137.94" r="13.97"/>
+  <text class="title" x="410" y="44">from above (2.2 px/mm)</text>
+  <text class="label" x="410" y="232">fixed jaw at the top; X0 the blank's left end,</text>
+  <text class="label" x="410" y="248">Y0 the fixed jaw's face; dashed: the outline</text>
+  <text class="label" x="410" y="264">(Setup 3)</text>
+  <text class="label-on-clamp" x="696" y="103" text-anchor="middle">fixed jaw</text>
+</svg>

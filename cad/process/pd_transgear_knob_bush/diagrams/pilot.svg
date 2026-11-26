@@ -1,25 +1,26 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 320" font-family="sans-serif" font-size="13">
-  <rect class="paper" x="0" y="0" width="760" height="320"/>
-  <text class="title" x="20" y="20">Setup 1: a pilot on the bar's end, fitted to MHA-PD-19's hole (not to scale)</text>
-  <rect class="fixture-vise" x="40" y="70" width="140" height="200"/>
-  <rect class="part-rest" x="180" y="125" width="300" height="90"/>
-  <rect class="part-waste" x="480" y="135" width="40" height="70"/>
-  <rect class="part-removed" x="480" y="125" width="40" height="10"/>
-  <rect class="part-removed" x="480" y="205" width="40" height="10"/>
-  <line class="centre-line" x1="160" y1="170" x2="720" y2="170"/>
-  <rect class="cutter" x="486" y="216" width="28" height="54"/>
-  <rect class="part-arriving" x="600" y="75" width="26" height="60"/>
-  <rect class="part-arriving" x="600" y="205" width="26" height="60"/>
-  <text class="label" x="75" y="60">3-jaw</text>
-  <text class="label" x="250" y="160">Ø{{process.stock_dia_in:.3dot}} bar</text>
-  <text class="label" x="262" y="100">pilot: the first {{process.pilot_length_in:.2dot}} in of the end</text>
-  <line class="leader" x1="472" y1="104" x2="498" y2="135"/>
-  <text class="label" x="330" y="50">MHA-PD-19: its hole offered by hand, chamfered side first</text>
-  <line class="leader" x1="612" y1="55" x2="613" y2="75"/>
-  <text class="label" x="560" y="300">Mike the pilot: PILOT = ______</text>
-  <line class="leader" x1="552" y1="292" x2="521" y2="200"/>
-  <text class="label" x="215" y="255">Op 40 faces the pilot off to here</text>
-  <line class="leader" x1="425" y1="243" x2="480" y2="214"/>
-  <text class="label" x="296" y="292">AR, then the strip on the file</text>
-  <line class="leader" x1="478" y1="286" x2="490" y2="270"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 360" width="760" height="360" font-family="sans-serif" font-size="13">
+  <!-- To scale, 300 px/in, from above (the cross-slide at the bottom): the Ø.625 bar about 1 in out (pilot_stickout_in; jaw fronts drawn .985 behind the squared end), the pilot Ø.44 (pilot_rough_dia_in) .06 long (pilot_length_in). The AR tool is schematic (not on record), its point at the pilot's diameter at the end of its pass, feeding toward the chuck. The 3-jaw's body and jaws are schematic. MHA-PD-19 is offered to the pilot in Op 20 (a later moment) and is not drawn. -->
+  <rect class="paper" x="0" y="0" width="760" height="360"/>
+  <text class="title" x="20" y="22">Setup 1, Op 10: the AR tool turns the pilot on the bar's end (to scale, 300 px/in)</text>
+  <rect class="fixture-vise" x="168.5" y="45.25" width="56" height="279.5"/>
+  <path class="part-rest" d="M30 91.25L542 91.25L542 278.75L30 278.75L27 271.54L30 264.33L27 257.12L30 249.9L27 242.69L30 235.48L27 228.27L30 221.06L27 213.85L30 206.63L27 199.42L30 192.21L27 185L30 177.79L27 170.58L30 163.37L27 156.15L30 148.94L27 141.73L30 134.52L27 127.31L30 120.1L27 112.88L30 105.67L27 98.46Z"/>
+  <rect class="part-rest" x="542" y="119" width="18" height="132"/>
+  <rect class="part-removed" x="542" y="91.25" width="18" height="27.75"/>
+  <rect class="part-removed" x="542" y="251" width="18" height="27.75"/>
+  <rect class="clamp" x="224.5" y="57.25" width="40" height="34"/>
+  <rect class="clamp" x="224.5" y="278.75" width="40" height="34"/>
+  <line class="centre-line" x1="20" y1="185" x2="740" y2="185"/>
+  <path class="cutter" d="M542 251L572 263L572 351L564 348L556 351L548 351L548 275Z"/>
+  <line class="arrow" x1="612" y1="311" x2="582" y2="311"/>
+  <text class="label" x="522" y="296" text-anchor="end">AR: face the sawn end, then turn the first</text>
+  <text class="label" x="522" y="312" text-anchor="end">{{process.pilot_length_in:.2dot}} to Ø{{process.pilot_rough_dia_in:.4dot}}, feeding toward the chuck</text>
+  <line class="leader" x1="524" y1="292" x2="554" y2="301"/>
+  <circle class="leader-dot" cx="554" cy="301" r="2"/>
+  <text class="label" x="380" y="48">the pilot, left over MHA-PD-19's hole; Op 20 brings it down</text>
+  <text class="label" x="380" y="64">with the 220 strip on the file, Op 40 faces it off</text>
+  <line class="leader" x1="470" y1="64" x2="551" y2="125"/>
+  <circle class="leader-dot" cx="551" cy="125" r="2"/>
+  <text class="label" x="20" y="344">3-jaw on the Ø{{process.stock_dia_in:.3dot}} bar, about {{process.pilot_stickout_in:g}} in out</text>
+  <line class="leader" x1="140" y1="332" x2="244.5" y2="302.75"/>
+  <circle class="leader-dot" cx="244.5" cy="302.75" r="2"/>
 </svg>

@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 430" width="760" height="430" font-family="sans-serif" font-size="13">
+  <!-- Hand picture, to scale. Left: a section across the jaws, from the RIGHT end, 4.5 px/mm (the fixed jaw on the right, Y0 its face): the two 1 in parallels (1/8 thick, parallel_thickness_mm) against the jaws, the 1/2 x 3 in 6061 sub-plate (plate_thickness_mm, plate_width_mm) on them, its top Z0, the jaw tops 6.845 mm over it (plate_jaw_top_mm). The jaws' thickness and the parallels' length are not on record; jaws and parallels drawn short to a break line toward the bed. Right: from above, 1.6 px/mm, the plate's left end X0, the pivot at X18.0, Y-38.1 (pivot_on_plate_x_mm). The arm off. The #43 drill (shop jig-drill-43) to scale (Ø2.2606 mm = 10.2 px), 118 deg point, its full diameter 1.0 mm under the plate (plate_drill_past_mm), its point at Z-14.379 (plate_drill_43_tip_mm, the posted AR02 depth), in the gap between the parallels; drawn short to a break line. -->
+  <rect class="paper" x="0" y="0" width="760" height="430"/>
+  <text class="title" x="20" y="22">Setup 3, AR02 T9: the #43 drill through the sub-plate at the pin station (to scale)</text>
+  <path class="clamp" d="M37.1 199.2L87.1 199.2L87.1 415L79.96 412L72.81 415L65.67 412L58.53 415L51.39 412L44.24 415L37.1 415Z"/>
+  <path class="clamp" d="M430 199.2L480 199.2L480 415L472.86 412L465.71 415L458.57 412L451.43 415L444.29 412L437.14 415L430 415Z"/>
+  <path class="fixture-support" d="M87.1 287.15L101.39 287.15L101.39 415L94.24 412L87.1 415Z"/>
+  <path class="fixture-support" d="M415.71 287.15L430 287.15L430 415L422.86 412L415.71 415Z"/>
+  <rect class="fixture-plate" x="87.1" y="230" width="342.9" height="57.15"/>
+  <text class="label-on-clamp" x="62.1" y="403" text-anchor="middle">moving</text>
+  <text class="label-on-clamp" x="455" y="403" text-anchor="middle">fixed</text>
+  <line class="datum" x1="344.5" y1="230" x2="416.5" y2="230"/>
+  <text class="datum-label" x="416.5" y="224" text-anchor="end">Z0 plate top</text>
+  <text class="label" x="258.55" y="347.15" text-anchor="middle">1 in parallels, 1/8 thick</text>
+  <line class="leader" x1="178.55" y1="343.15" x2="101.39" y2="327.15"/>
+  <circle class="leader-dot" cx="101.39" cy="327.15" r="2"/>
+  <line class="leader" x1="338.55" y1="343.15" x2="415.71" y2="327.15"/>
+  <circle class="leader-dot" cx="415.71" cy="327.15" r="2"/>
+  <text class="label-halo" x="198.55" y="262.57" text-anchor="middle">6061 sub-plate</text>
+  <text class="title" x="20" y="44">section at the pin station (X86.815), from the RIGHT end (4.5 px/mm)</text>
+  <path class="cutter" d="M263.64 56L263.64 291.65L258.55 294.71L253.46 291.65L253.46 56L258.55 53Z"/>
+  <line class="arrow" x1="228.55" y1="76" x2="228.55" y2="116"/>
+  <text class="label" x="20" y="76">#43 drill (the #4-40 tap drill),</text>
+  <text class="label" x="20" y="92">pecks of .080, through the plate</text>
+  <line class="leader" x1="220" y1="100" x2="253.46" y2="120"/>
+  <circle class="leader-dot" cx="253.46" cy="120" r="2"/>
+  <rect class="clamp" x="494.98" y="92" width="253.88" height="18"/>
+  <rect class="clamp" x="494.98" y="231.92" width="253.88" height="18"/>
+  <rect class="fixture-plate" x="500" y="110" width="243.84" height="121.92"/>
+  <circle class="holes" cx="528.8" cy="170.96" r="3.23"/>
+  <circle class="cutter" cx="638.9" cy="170.96" r="1.81"/>
+  <text class="title" x="500" y="44">from above (1.6 px/mm)</text>
+  <text class="label" x="500" y="290">fixed jaw at the top; the arm off;</text>
+  <text class="label" x="500" y="306">the plate's left end X0</text>
+</svg>

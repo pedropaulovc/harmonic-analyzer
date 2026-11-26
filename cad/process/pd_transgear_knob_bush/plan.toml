@@ -221,7 +221,7 @@ indexing = "none"
 machine_ref = "pm-1127vf-lb"
 holding = "3-jaw on the Ø{{process.stock_dia_in:.3dot}} bar, {{process.chuck_grip_in:.2dot}} in in the jaws; about {{process.pilot_stickout_in:g}} in out of the jaw fronts."
 datum = "None kept: the pilot is cut on the bar's end and Op 40 faces it off."
-diagram = { file = "diagrams/pilot.svg", alt = "The 5/8 in bar in the 3-jaw, about 1 in out: a short pilot turned on its end, MHA-PD-19's hole offered to it by hand; the pilot is miked and then faced off." }
+diagram = { file = "diagrams/pilot.svg", alt = "To scale: the 5/8 in bar in the 3-jaw, about 1 in out; the AR tool turning the pilot, the first {{process.pilot_length_in:.2dot}} in of the end, to Ø{{process.pilot_rough_dia_in:.4dot}}, left over MHA-PD-19's hole for Op 20 to fit." }
 lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{cad.stock_dia_mm}}", stock_diameter_mm = "{{cad.stock_dia_mm}}", stickout_mm = "{{process.pilot_stickout_mm}}", minimum_diameter_mm = "{{process.pilot_min_dia_mm}}", support = "none" }
 
 [[setups.operations]]
@@ -268,7 +268,7 @@ indexing = "none"
 machine_ref = "pm-1127vf-lb"
 holding = "The bar pulled out: 3-jaw on the Ø{{process.stock_dia_in:.3dot}} bar, {{process.chuck_grip_in:.2dot}} in in the jaws; {{cad.stickout_in:.2dot}} in out of the jaw fronts. The bar stays in the jaws from Op 50 to Op 200: the press diameter, the shoulder and the B hole share this chucking."
 datum = "Z0 (carriage DRO): the bar end faced in Op 50, the bush's rear face. The shoulder (datum A) is at Z{{cad.step_far_out_far_z_mm:in.3dot}}, the hub face {{cad.length_in:.3dot}} in."
-diagram = { file = "diagrams/bar.svg", alt = "The 5/8 in bar in the 3-jaw, rear end out: the rear face faced, the hub turned back past the parting line, the press diameter turned back to the shoulder, the B hole drilled through past the parting line; the bush parted off .02 long." }
+diagram = { file = "diagrams/bar.svg", alt = "To scale: the 5/8 in bar in the 3-jaw, {{cad.stickout_in:.2dot}} out, rear end out; the AR tool facing the rear face to Z0; hatched, the rest of the setup's removal: the hub and the press diameter back to the shoulder, the B hole and the parting kerf." }
 lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{cad.stock_dia_mm}}", stock_diameter_mm = "{{cad.stock_dia_mm}}", stickout_mm = "{{cad.stickout_mm}}", minimum_diameter_mm = "{{cad.step_turn_min_mm}}", support = "none" }
 turning_support = { kind = "chuck_only", chuck_z_mm = "{{cad.jaw_z_mm}}" }
 
@@ -356,6 +356,7 @@ tool = "cutoff"
 drilling = "none"
 sizing = "other"
 instruction = "Spindle running, cutting oil: plunge until DRO X reads the Op 90 reading, no further. The blade cuts only the AR's fillet out of the root, leaving its own corner: the sheet's R{{cad.shoulder_root_r_max_in:.3dot}} MAX, which the AR's nose cannot form. Back the blade out in X and unlock the carriage."
+diagram = { file = "diagrams/bar-relief.svg", alt = "To scale: the 1/16 P1 blade's chuck-side face on the shoulder, its tip plunged to the press diameter, cutting the AR's fillet out of the root." }
 settings = "lathe-part-1018"
 cut_diameter_mm = "{{cad.step_dia_mm}}"
 inspection = "Root: square to the eye, no fillet, step or groove at the press diameter's end; the press diameter by micrometer next to the root as Op 90 (PILOT plus {{process.press_over_pilot_min_in:.4dot}}–{{cad.step_interference_max_in:.4dot}})."
@@ -383,6 +384,7 @@ tool = "drill-b"
 drilling = "twist_drill"
 sizing = "other"
 instruction = "Feed the B drill in until its lips just touch the spot's rim and zero the tailstock quill scale there. Drill until the scale reads {{cad.run_in:.2dot}}, cutting oil, backing fully out to clear chips and re-oil every .24 in (once its diameter): through the bush and past the parting line, in the chucking that turned the press diameter and the shoulder. MHA-PD-00 step 11 reams this hole after pressing."
+diagram = { file = "diagrams/bar-drill.svg", alt = "To scale: the B drill from the tailstock, its full diameter at the quill reading {{cad.run_in:.2dot}}, through the bush and past the parting line." }
 settings = "lathe-drill-b-1018"
 cut_diameter_mm = 6.0452
 hole_depth_mm = "{{cad.run_mm}}"
@@ -429,6 +431,7 @@ tool = "cutoff"
 drilling = "none"
 sizing = "other"
 instruction = "Bring the blade's chuck-side face onto the faced end and set DRO Z there to the blade's width, miked across its cutting edge ({{process.blade_width_in:.4dot}} nominal): the DRO then reads the blade's tailstock-side face. Part off with that face at Z-{{cad.part_off_in:.3dot}}, cutting oil: {{process.regrip_allowance_in:.2dot}} over length, for Setup 3. Hands clear: let the bush fall; pick it up from the bed or the chip tray only after the spindle has stopped."
+diagram = { file = "diagrams/bar-part.svg", alt = "To scale: the 1/16 P1 blade, its tailstock-side face at Z-{{cad.part_off_in:.3dot}}, its tip at the B hole." }
 settings = "lathe-part-1018"
 cut_diameter_mm = "{{cad.outer_dia_mm}}"
 

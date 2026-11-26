@@ -1,11 +1,20 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="520" height="150" viewBox="0 0 520 150" font-family="sans-serif" font-size="12">
-<rect width="520" height="150" fill="#fff"/>
-<path d="M484.2,59.0 L99.1,42.5 A37.5,37.5 0 1 0 99.1,117.5 L484.2,101.0 Z" fill="none" stroke="#000" stroke-width="1.5"/>
-<circle cx="97.5" cy="80.0" r="7.4" fill="#fff" stroke="#000" stroke-width="1.2"/>
-<circle cx="97.5" cy="80" r="19.049999999999997" fill="none" stroke="#000" stroke-dasharray="3 2"/>
-<circle cx="303.9" cy="80.0" r="4.8" fill="#fff" stroke="#000" stroke-width="1.2"/>
-<circle cx="478.20000000000005" cy="80" r="3" fill="#f9c"/>
-<text x="97.5" y="130" text-anchor="middle">pivot B</text>
-<text x="303.945" y="130" text-anchor="middle">pin bore C</text>
-<text x="484.20000000000005" y="130" text-anchor="end">latch-pin hole</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 300" width="760" height="300" font-family="sans-serif" font-size="13">
+  <!-- Hand picture, to scale, 4.5 px/mm, from above, the rear face up: the outline (the pivot round R.49, cad.pivot_end_radius_mm; the flanks; the square end .55 wide, cad.end_face_width_mm, at 5.075 from B, cad.end_face_x_mm), the bore B Ø.198 (#9, cad.pivot_bore_dia_mm) in its Ø.50 spot face, the pin bore C Ø.126 at 2.709 from B (cad.pin_bore_x_mm), the latch-pin hole in the square end's face, hidden, dashed. -->
+  <rect class="paper" x="0" y="0" width="760" height="300"/>
+  <text class="title" x="20" y="22">The finished arm, rear face up (to scale, 4.5 px/mm)</text>
+  <path class="part-kept" d="M118.65 83.8L696.3 108.47L696.3 171.53L118.65 196.2A56.25 56.25 0 1 1 118.65 83.8Z"/>
+  <circle class="holes" cx="116.25" cy="140" r="28.57"/>
+  <circle class="section" cx="116.25" cy="140" r="11.2"/>
+  <circle class="holes" cx="116.25" cy="140" r="11.2"/>
+  <circle class="holes" cx="425.92" cy="140" r="7.2"/>
+  <rect class="hidden" x="652.87" y="132.91" width="43.43" height="14.17"/>
+  <text class="label" x="96.25" y="230" text-anchor="start">bore B in its Ø.50 spot face</text>
+  <line class="leader" x1="98.25" y1="220" x2="116.25" y2="167"/>
+  <circle class="leader-dot" cx="116.25" cy="167" r="2"/>
+  <text class="label" x="405.92" y="230">pin bore C</text>
+  <line class="leader" x1="407.92" y1="220" x2="425.92" y2="143"/>
+  <circle class="leader-dot" cx="425.92" cy="143" r="2"/>
+  <text class="label" x="566.3" y="230">latch-pin hole (hidden)</text>
+  <line class="leader" x1="636.3" y1="220" x2="676.3" y2="145"/>
+  <circle class="leader-dot" cx="676.3" cy="145" r="2"/>
 </svg>

@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 400" width="760" height="400" font-family="sans-serif" font-size="13">
+  <!-- To scale, 220 px/in along and across the axis, from above (the cross-slide at the bottom): the Ø.250 bar (cad.stock_dia_mm), the jaw fronts 2.385 behind Z0, the tip plane (cad.jaw_z_mm); the sawn end .22 out (cad.face_allowance_mm), faced to the .20 stub's end (centre_stub_in); the journal Ø.125 (cad.outer_dia_mm) from Z+.10 (turn_start_z_mm) to the seat at Z-2.08 (cad.outer_far_out_far_z_mm), the head Ø.20 (cad.step_head_dia_mm) back to Z-2.29 (head_turn_end_z_mm), the groove Ø.096 x .021 .157 from the tip plane (cad.groove_far_out_*). The 3-jaw's body and jaws are schematic (their sizes are not on record); the MT3 dead centre is schematic (its sizes are not on record), the bar's rest runs on into the chuck. The P1 blade to scale across (shop cutoff-blade-p1, 1/16 = 13.75 px), its chuck-side face at Z+.005 (tip_cut_in 2.085 from the seat), cut in to about Ø.04 before the tailstock comes back; its length runs on past the break line (not on record). Hatched: the kerf; dotted: the stub, waste. -->
+  <rect class="paper" x="0" y="0" width="760" height="400"/>
+  <text class="title" x="20" y="22">Setup 1, Op 180: the P1 blade cuts the stub off at the tip, the centre still in (to scale, 220 px/in)</text>
+  <rect class="fixture-vise" x="34" y="130.5" width="56" height="139"/>
+  <path class="part-rest" d="M20 172.5L150.9 172.5L150.9 227.5L20 227.5L17 219.64L20 211.79L17 203.93L20 196.07L17 188.21L20 180.36Z"/>
+  <rect class="part-kept" x="150.9" y="178" width="46.2" height="44"/>
+  <rect class="part-kept" x="197.1" y="186.25" width="479.6" height="27.5"/>
+  <rect class="part-kept" x="676.7" y="172.5" width="22" height="55"/>
+  <rect class="paper" x="615.54" y="186.25" width="4.62" height="3.19"/>
+  <rect class="paper" x="615.54" y="210.56" width="4.62" height="3.19"/>
+  <rect class="clamp" x="90" y="142.5" width="40" height="30"/>
+  <rect class="clamp" x="90" y="227.5" width="40" height="30"/>
+  <line class="centre-line" x1="20" y1="200" x2="740" y2="200"/>
+  <path class="clamp" d="M689.9 200L747.06 167L760 167L760 233L747.06 233Z"/>
+  <rect class="part-waste" x="669.55" y="186.25" width="7.15" height="27.5"/>
+  <rect class="part-waste" x="676.7" y="172.5" width="22" height="55"/>
+  <rect class="part-removed" x="655.8" y="186.25" width="13.75" height="27.5"/>
+  <path class="clamp" d="M689.9 200L747.06 167L760 167L760 233L747.06 233Z"/>
+  <path class="cutter" d="M655.8 390L655.8 204.4L669.55 204.4L669.55 390L662.67 387Z"/>
+  <line class="arrow" x1="639.8" y1="380" x2="639.8" y2="330"/>
+  <line class="datum" x1="654.7" y1="50" x2="654.7" y2="92"/>
+  <text class="datum-label" x="648.7" y="60" text-anchor="end">Z0 the tip plane</text>
+  <text class="label" x="614.7" y="330" text-anchor="end">P1 blade, its chuck-side face {{process.tip_cut_in:.3dot}}</text>
+  <text class="label" x="614.7" y="346" text-anchor="end">from the seat, in to about Ø.04;</text>
+  <text class="label" x="614.7" y="362" text-anchor="end">then the centre back, cut through</text>
+  <line class="leader" x1="616.7" y1="326" x2="655.8" y2="320"/>
+  <circle class="leader-dot" cx="655.8" cy="320" r="2"/>
+  <text class="label" x="480" y="120">the stub, waste</text>
+  <line class="leader" x1="540" y1="126" x2="687.7" y2="176.5"/>
+  <circle class="leader-dot" cx="687.7" cy="176.5" r="2"/>
+</svg>

@@ -1,25 +1,40 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<!-- Turned round, the shank in the split bush in the 3-jaw, the head out: faced, its R.18 dome stepped from the table and filed. Hand-drawn, not to scale (#3500). -->
-<svg xmlns="http://www.w3.org/2000/svg" width="540" height="290" viewBox="0 0 540 290" font-family="sans-serif" font-size="12">
-<rect width="540" height="290" fill="#fff"/>
-<rect x="20" y="30" width="40" height="230" fill="#ccc" stroke="#000"/>
-<rect x="60" y="30" width="150" height="40" fill="#ccc" stroke="#000"/>
-<rect x="60" y="220" width="150" height="40" fill="#ccc" stroke="#000"/>
-<rect x="60" y="70" width="225" height="150" fill="#ec9" stroke="#000"/>
-<rect x="24" y="126" width="285" height="38" fill="#cde" stroke="#000"/>
-<rect x="309" y="115" width="36" height="60" fill="#cde" stroke="#000"/>
-<path d="M285 70 l-8 0 l4 8 z" fill="#000"/>
-<line x1="10" y1="145" x2="530" y2="145" stroke="#000" stroke-dasharray="12 3 2 3" stroke-width="0.6"/>
-<line x1="285" y1="225" x2="285" y2="262" stroke="#000" stroke-width="0.6"/>
-<line x1="345" y1="180" x2="345" y2="262" stroke="#000" stroke-width="0.6"/>
-<line x1="285" y1="256" x2="345" y2="256" stroke="#000" stroke-width="0.6"/>
-<text x="315" y="274" text-anchor="middle">.20 out of the bush</text>
-<text x="360" y="120" text-anchor="start">head: face to thickness,</text>
-<text x="360" y="135" text-anchor="start">step and file the R.18 dome</text>
-<line x1="358" y1="125" x2="346" y2="135" stroke="#000" stroke-width="0.6"/>
-<text x="300" y="66" text-anchor="start">nick at jaw 1</text>
-<line x1="298" y1="62" x2="283" y2="72" stroke="#000" stroke-width="0.6"/>
-<text x="135" y="22" text-anchor="middle">3-jaw on the bush, never on the pin</text>
-<text x="172" y="205" text-anchor="middle">split bush</text>
-<text x="40" y="282" text-anchor="start">the shank runs on into the chuck</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 400" width="760" height="400" font-family="sans-serif" font-size="13">
+  <!-- To scale, 300 px/in, from above (the cross-slide at the bottom): the split bush Ø.500 x .75 (bush_dia_in, bush_length_in) in the 3-jaw on .50 (bush_grip_in), its nick at jaw 1; the pin's head Ø.20 (cad.step_head_dia_mm) out .20 from the bush's face (cad.outer_stickout_datum_mm), the seat .12 behind the faced end, the Ø.125 shank inside the bush (hidden) and on into the chuck. The jaws and the chuck's body schematic (their sizes are not on record). The AR tool schematic (not on record), its point on the face. Hatched: this setup's removal, the face's .005 and the R.18 dome's corners (cad.dome_datum_radius_mm, meeting the head .030 behind the apex), stepped in Op 310 and filed in Op 320. -->
+  <rect class="paper" x="0" y="0" width="760" height="400"/>
+  <text class="title" x="20" y="22">Setup 3, Op 290: the pin in the split bush, head out; the AR tool faces the head (to scale, 300 px/in)</text>
+  <rect class="fixture-vise" x="219" y="70" width="56" height="260"/>
+  <rect class="clamp" x="275" y="125" width="225" height="150"/>
+  <rect class="clamp" x="275" y="91" width="150" height="34"/>
+  <rect class="clamp" x="275" y="275" width="150" height="34"/>
+  <path class="datum" d="M494 126L500.5 126L500.5 132Z"/>
+  <rect class="part-kept" x="523.91" y="170" width="36.09" height="60"/>
+  <rect class="part-kept" x="500" y="181.25" width="23.91" height="37.5"/>
+  <rect class="part-removed" x="560" y="170" width="1.5" height="60"/>
+  <path class="part-removed" d="M560 200L560 170L550.9 170A54 54 0 0 1 560 200Z"/>
+  <path class="part-removed" d="M560 200L560 230L550.9 230A54 54 0 0 0 560 200Z"/>
+  <line class="hidden" x1="500" y1="181.25" x2="30" y2="181.25"/>
+  <line class="hidden" x1="500" y1="218.75" x2="30" y2="218.75"/>
+  <line class="centre-line" x1="20" y1="200" x2="740" y2="200"/>
+  <path class="cutter" d="M560 221L590 233L590 341L582 338L574 341L566 341L566 245Z"/>
+  <line class="arrow" x1="604" y1="277" x2="604" y2="231"/>
+  <line class="datum" x1="560" y1="52" x2="560" y2="96"/>
+  <text class="datum-label" x="566" y="62">Z0 the head's faced end</text>
+  <text class="label" x="610" y="330">AR, light skims,</text>
+  <text class="label" x="610" y="346">about .005 off</text>
+  <line class="leader" x1="608" y1="326" x2="578" y2="313"/>
+  <circle class="leader-dot" cx="578" cy="313" r="2"/>
+  <text class="label" x="14" y="40">the split bush in the</text>
+  <text class="label" x="14" y="56">3-jaw on {{process.bush_grip_in:.2dot}}, its nick</text>
+  <text class="label" x="14" y="72">at jaw 1: the jaws</text>
+  <text class="label" x="14" y="88">never touch the pin</text>
+  <line class="leader" x1="170" y1="52" x2="380" y2="105"/>
+  <circle class="leader-dot" cx="380" cy="105" r="2"/>
+  <text class="label" x="20" y="384">the shank (dashed) through the bush and on into the chuck</text>
+  <line class="leader" x1="200" y1="372" x2="200" y2="218.75"/>
+  <circle class="leader-dot" cx="200" cy="218.75" r="2"/>
+  <text class="label" x="590" y="150">hatched: the R{{cad.dome_datum_radius_in:.2dot}} dome's</text>
+  <text class="label" x="590" y="166">corners, stepped (Op 310)</text>
+  <text class="label" x="590" y="182">and filed (Op 320)</text>
+  <line class="leader" x1="588" y1="146" x2="557" y2="173"/>
+  <circle class="leader-dot" cx="557" cy="173" r="2"/>
 </svg>

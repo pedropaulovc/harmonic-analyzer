@@ -1,32 +1,37 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 400" font-family="sans-serif" font-size="13">
-  <!-- Setup 1, section through the axis, 300 px to the inch: the 7/8 in bar .60 out of the 3-jaw, front end out; Z0 the faced front end at the right. Styles: prechips.palette. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 400" width="760" height="400" font-family="sans-serif" font-size="13">
+  <!-- To scale, 250 px/in along and across the axis, from above (the cross-slide at the bottom): the Ø.875 bar (bar_dia_in), the jaw fronts .58 behind Z0 (stickout_mm 15.24 less the .02 faced off), the outside Ø.44 (cad.outside_dia_mm) back to Z-.48 (outside_run_in), the pilot Ø.250 (the 1/4 end mill, pilot_cutter_dia_mm) .152 deep (cad.pilot_depth_in), the #33 hole to the quill reading .30 (web_drill_depth_in), the part-off face at Z-.38 (part_off_in) with the 1/16 blade's kerf behind it. The 3-jaw's body and jaws are schematic (their sizes are not on record). The AR tool schematic (not on record), its point on Z0 part way in, facing toward the axis. Hatched: this setup's whole removal (the face, the outside, the pilot, the #33 hole, the kerf). -->
   <rect class="paper" x="0" y="0" width="760" height="400"/>
-  <text class="title" x="20" y="22">Setup 1: the 7/8 in bar in the 3-jaw, front end out; the outside turned, web hole, pilot; parted off long</text>
-  <rect class="fixture-vise" x="20" y="60" width="50" height="280"/>
-  <rect class="clamp" x="70" y="40" width="80" height="29"/>
-  <rect class="clamp" x="70" y="331" width="80" height="29"/>
-  <rect class="part-rest" x="70" y="69" width="116" height="262"/>
-  <rect class="part-removed" x="186" y="69" width="144" height="65"/>
-  <rect class="part-removed" x="186" y="266" width="144" height="65"/>
-  <rect class="part-removed" x="324" y="134" width="6" height="132"/>
-  <rect class="part-waste" x="193" y="134" width="23" height="132"/>
-  <rect class="part-rest" x="186" y="134" width="7" height="132"/>
-  <rect class="part-kept" x="216" y="134" width="108" height="132"/>
-  <rect class="holes" x="284" y="162" width="40" height="76"/>
-  <rect class="holes" x="234" y="183" width="50" height="34"/>
-  <line class="centre-line" x1="60" y1="200" x2="560" y2="200"/>
-  <line class="active-face" x1="324" y1="134" x2="324" y2="266"/>
-  <line class="leader" x1="324" y1="155" x2="420" y2="146"/>
-  <text class="datum-label" x="424" y="150">Z0: the front face as supplied</text>
-  <line class="leader" x1="300" y1="134" x2="330" y2="96"/>
-  <text class="label" x="334" y="92">outside Ø{{cad.outside_dia_min_in:.3dot}}–{{cad.outside_dia_max_in:.3dot}}, past the parting line</text>
-  <line class="leader" x1="304" y1="230" x2="420" y2="250"/>
-  <text class="label" x="424" y="246">pilot Ø{{process.pilot_cutter_dia_mm:in.3dot}} REF, 1/4 end mill,</text>
-  <text class="label" x="424" y="262">{{cad.pilot_depth_min_in:.3dot}}–{{cad.pilot_depth_max_in:.3dot}} deep, flat floor</text>
-  <line class="leader" x1="250" y1="210" x2="420" y2="300"/>
-  <text class="label" x="424" y="304">#33 hole through the web, on past</text>
-  <text class="label" x="424" y="320">the pocket floor (cut in Setup 2)</text>
-  <rect class="cutter" x="193" y="331" width="23" height="40"/>
-  <text class="label" x="222" y="370">part off at Z-{{process.part_off_in:.3dot}}</text>
-  <text class="label" x="20" y="380">3-jaw</text>
+  <text class="title" x="20" y="22">Setup 1, Op 10: the AR tool faces the bar end to Z0, the front face (to scale, 250 px/in)</text>
+  <rect class="fixture-vise" x="259" y="58.62" width="56" height="302.75"/>
+  <path class="part-rest" d="M30 100.62L389.38 100.62L389.38 319.38L30 319.38L27 312.32L30 305.26L27 298.21L30 291.15L27 284.09L30 277.04L27 269.98L30 262.92L27 255.87L30 248.81L27 241.75L30 234.7L27 227.64L30 220.58L27 213.53L30 206.47L27 199.42L30 192.36L27 185.3L30 178.25L27 171.19L30 164.13L27 157.08L30 150.02L27 142.96L30 135.91L27 128.85L30 121.79L27 114.74L30 107.68Z"/>
+  <rect class="part-kept" x="405" y="155" width="95" height="110"/>
+  <rect class="part-removed" x="500" y="100.62" width="5" height="218.75"/>
+  <rect class="part-removed" x="380" y="100.62" width="120" height="54.38"/>
+  <rect class="part-removed" x="380" y="265" width="120" height="54.38"/>
+  <rect class="part-removed" x="389.38" y="155" width="15.62" height="110"/>
+  <rect class="part-removed" x="425" y="195.88" width="75" height="28.25"/>
+  <rect class="part-removed" x="462" y="178.75" width="38" height="62.5"/>
+  <rect class="clamp" x="315" y="70.62" width="40" height="30"/>
+  <rect class="clamp" x="315" y="319.38" width="40" height="30"/>
+  <line class="centre-line" x1="20" y1="210" x2="740" y2="210"/>
+  <path class="cutter" d="M500 285L530 297L530 365L522 362L514 365L506 365L506 309Z"/>
+  <line class="arrow" x1="544" y1="331" x2="544" y2="291"/>
+  <line class="datum" x1="500" y1="40" x2="500" y2="76"/>
+  <text class="datum-label" x="506" y="50">Z0 the front face</text>
+  <text class="label" x="564" y="384">AR facing, {{process.face_allowance_in:.2dot}} off</text>
+  <line class="leader" x1="562" y1="380" x2="518" y2="357"/>
+  <circle class="leader-dot" cx="518" cy="357" r="2"/>
+  <text class="label" x="20" y="390">3-jaw on the Ø{{process.bar_dia_in:.3dot}} bar, {{process.stickout_mm:in.2dot}} out (before facing)</text>
+  <line class="leader" x1="120" y1="378" x2="335" y2="341.38"/>
+  <circle class="leader-dot" cx="335" cy="341.38" r="2"/>
+  <text class="label" x="560" y="210">hatched: the rest of this</text>
+  <text class="label" x="560" y="226">setup's removal: the outside</text>
+  <text class="label" x="560" y="242">to Ø{{cad.outside_dia_in:.2dot}}, the pilot, the</text>
+  <text class="label" x="560" y="258">#33 hole, the kerf</text>
+  <line class="leader" x1="558" y1="206" x2="502.5" y2="135"/>
+  <circle class="leader-dot" cx="502.5" cy="135" r="2"/>
+  <text class="label" x="560" y="120">the cup: Z0 to the</text>
+  <text class="label" x="560" y="136">part-off face at Z-{{process.part_off_in:.3dot}}</text>
+  <line class="leader" x1="558" y1="116" x2="425" y2="167"/>
+  <circle class="leader-dot" cx="425" cy="167" r="2"/>
 </svg>

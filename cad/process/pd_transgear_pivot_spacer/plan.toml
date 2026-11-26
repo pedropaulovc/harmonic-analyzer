@@ -239,7 +239,7 @@ indexing = "none"
 machine_ref = "pm-1127vf-lb"
 holding = "The bar left in the 3-jaw from Setup 1, the jaws not opened: a stub mandrel turned on its end runs true to the spindle. The spacer pushed onto the mandrel's pilot by a flat pusher in the tailstock drill chuck, spindle stopped, until its front face (faced in Setup 1) seats on the mandrel's shoulder; its rim overhangs the shoulder all round."
 datum = "Z0 (carriage DRO): the spacer's rear face as finished in Op 150, {{cad.length_in:.3dot}} out from the mandrel's shoulder: set by touching the AR on the shoulder, faced in Op 100, and setting DRO Z-{{cad.length_in:.3dot}} there. The P1 blade (Ops 110, 160) works from its own holder: the AR's holder comes off and goes back on the toolpost dovetail with its height nut untouched. Op 160's micrometer reading, not the DRO, accepts the length."
-diagram = { file = "diagrams/mandrel.svg", alt = "The bar stub in the 3-jaw turned into a stub mandrel: shoulder faced, body stepped down behind it, pilot with a root relief; the spacer pushed on, front face to the shoulder, its rear face faced to Z0." }
+diagram = { file = "diagrams/mandrel.svg", alt = "To scale: the bar stub in the 3-jaw turned into a stub mandrel (body Ø{{process.mandrel_body_dia_in:.2dot}}, pilot with a root relief); the spacer pushed on, front face to the shoulder, the AR tool facing its rear face to Z0, {{cad.length_in:.3dot}} out from the shoulder." }
 lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{cad.stock_dia_mm}}", stock_diameter_mm = "{{cad.stock_dia_mm}}", stickout_mm = 8.38, minimum_diameter_mm = 4.318, support = "none" }
 
 [[setups.operations]]
@@ -271,6 +271,7 @@ tool = "cutoff"
 drilling = "none"
 sizing = "other"
 instruction = "Relieve the pilot's root: the blade's chuck-side face on the shoulder (touch it, then back off .0005), plunge to Ø{{process.relief_dia_in:.2dot}}, under the pilot. It takes out the AR's nose radius in the corner, so the spacer's face can seat on the shoulder."
+diagram = { file = "diagrams/mandrel-relief.svg", alt = "To scale: the 1/16 P1 blade's chuck-side face on the mandrel's shoulder, plunged to Ø{{process.relief_dia_in:.2dot}} under the pilot." }
 settings = "lathe-part-c360"
 cut_diameter_mm = "{{cad.bore_dia_mm}}"
 
