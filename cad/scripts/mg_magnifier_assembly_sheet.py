@@ -366,30 +366,58 @@ STEP_TEXT = {
         f"AT ONCE, BEFORE IT GRABS, TAP {_DRUM} ON ITS RIM UNTIL AN INDICATOR ON "
         f"THE RIM SWINGS LEAST, {_WHEEL} TURNING ON {_AXLE} CLAMPED ON A V-BLOCK."
     ),
-    "drum-bond-cured": f"LEAVE {_DRUM} UNDISTURBED 24 H TO CURE.",
     # Owner ruling 2026-11-24, fit audit part 2, S4: the seat is seen, not
     # read (DETAIL B prints the drum face's window as REF); the semicolon of
     # the approved text is a comma here (rule 22's one-clause lint). Its own
-    # check (rule 22, machinist review of run 20261125T172832344Z r2), with
-    # the hand check sharing the strip below.
+    # check (rule 22, machinist review of run 20261125T172832344Z r2).
+    # Delegated ruling 2026-11-26 (Main), no precedent; owner review #2144
+    # (rulings.md D38, issue #3630): it is first made wet, while a wrong seat
+    # still pulls off. LOCTITE 638 TDS (May 2024, cure speed vs. substrate
+    # and vs. bond gap, steel at 23 C): no strength before about 10 min at a
+    # 0.05 mm gap, longer at wider ones; the drum's radial gap on the spigot
+    # is under that (mg_magnifying_wheel_geom.DRUM_BOND_CLEARANCE), so 5 min
+    # from the bond is before it grabs.
     "drum-seated": (
-        f"CHECK {_DRUM} IS HARD AGAINST THE BOSS: NO LIGHT UNDER THE DRUM, NOT "
-        "PROUD OF THE SPIGOT END (STRAIGHTEDGE)."
+        f"WITHIN 5 MIN OF {_step(_steps.DRUM_BONDED_KEY)}, BEFORE IT GRABS, CHECK "
+        f"{_DRUM} IS HARD AGAINST THE BOSS: NO LIGHT UNDER THE DRUM, NOT PROUD OF "
+        "THE SPIGOT END (STRAIGHTEDGE)."
+    ),
+    "drum-wet-stripped": f"IF {_step('drum-seated')} FAILS, PULL {_DRUM} OFF {_WHEEL} AT ONCE.",
+    "drum-wet-cleaned": (
+        f"IF {_step('drum-seated')} FAILED, CLEAN {_DRUM} AND THE SPIGOT TO BARE METAL."
+    ),
+    "drum-wet-rebonded": (
+        f"IF {_step('drum-seated')} FAILED, RETURN TO {_step(_steps.DRUM_BONDED_KEY)}."
+    ),
+    "drum-bond-cured": f"LEAVE {_DRUM} UNDISTURBED 24 H TO CURE.",
+    "drum-seat-rechecked": (
+        f"CHECK {_DRUM} IS STILL HARD AGAINST THE BOSS AS IN {_step('drum-seated')}."
+    ),
+    # A cured 638 bond comes apart only hot, at about 250 C (LOCTITE 638 TDS,
+    # disassembly), and drawing-guidelines.md bars that heat next to paint:
+    # the wheel is enamelled (mg-magnifying-wheel finish), so a drum cured
+    # off its seat is not released; wheel and drum are scrapped together
+    # (D38).
+    "drum-pair-scrapped": (
+        f"IF {_step('drum-seat-rechecked')} FAILS, SCRAP {_WHEEL} AND {_DRUM} TOGETHER."
+    ),
+    "drum-pair-renewed": (
+        f"IF {_step('drum-seat-rechecked')} FAILED, RETURN TO "
+        f"{_step(_steps.DRUM_BONDED_KEY)} WITH A NEW {_WHEEL} AND A NEW {_DRUM}."
     ),
     _steps.DRUM_HELD_KEY: f"CHECK {_DRUM} DOES NOT TURN OR SLIDE BY HAND.",
-    "drum-stripped": (
-        f"IF {_step('drum-seated')} OR {_step(_steps.DRUM_HELD_KEY)} FAILS, PULL "
-        f"{_DRUM} OFF {_WHEEL}."
-    ),
+    # A drum that turns is not held, so it still pulls off (owner ruling
+    # 2026-11-24, fit audit question 17: stripped and bonded again).
+    "drum-stripped": f"IF {_step(_steps.DRUM_HELD_KEY)} FAILS, PULL {_DRUM} OFF {_WHEEL}.",
     # Each remedy names the check whose failure triggers it, so none fires on
     # a clean pass after a return (rendered chain read of #3601, run
     # 20261126T020952932Z: "WAS PULLED OFF" stayed true on the next pass).
     "drum-cleaned": (
-        f"IF {_step('drum-seated')} OR {_step(_steps.DRUM_HELD_KEY)} FAILED, CLEAN "
-        f"{_DRUM} AND THE SPIGOT TO BARE METAL."
+        f"IF {_step(_steps.DRUM_HELD_KEY)} FAILED, CLEAN {_DRUM} AND THE SPIGOT TO "
+        "BARE METAL."
     ),
     "drum-rebonded": (
-        f"IF {_step('drum-seated')} OR {_step(_steps.DRUM_HELD_KEY)} FAILED, RETURN TO "
+        f"IF {_step(_steps.DRUM_HELD_KEY)} FAILED, RETURN TO "
         f"{_step(_steps.DRUM_BONDED_KEY)}."
     ),
     # A wheel replaced in the trial's strip comes here for its drum first,
@@ -482,12 +510,19 @@ STEP_TEXT = {
         f"IF THE TRIAL WAS STRIPPED AT {_step('trial-stripped')} AND NO PART WAS "
         f"REPLACED AT {_step('stack-part-replaced')}, REPLACE {_AXLE}."
     ),
-    # A new wheel has no drum, so it goes back through the drum bond, which
-    # rejoins the trial at the spacer; any other new part restarts there.
+    # A replaced wheel carries its cured drum, which is not released (D38,
+    # #3618): it is scrapped with the wheel, and the new wheel gets a new
+    # drum by way of the drum bond, which rejoins the trial at the spacer;
+    # any other new part restarts there.
+    "new-wheel-drum-scrapped": (
+        f"IF THE TRIAL WAS STRIPPED AT {_step('trial-stripped')} AND {_WHEEL} WAS "
+        f"REPLACED AT {_step('stack-part-replaced')}, SCRAP THE OLD {_DRUM} WITH THE "
+        f"OLD {_WHEEL}."
+    ),
     "new-wheel-drum-bonded": (
         f"IF THE TRIAL WAS STRIPPED AT {_step('trial-stripped')} AND {_WHEEL} WAS "
         f"REPLACED AT {_step('stack-part-replaced')}, RETURN TO "
-        f"{_step(_steps.DRUM_BONDED_KEY)}."
+        f"{_step(_steps.DRUM_BONDED_KEY)} WITH A NEW {_DRUM}."
     ),
     "trial-refitted": (
         f"IF THE TRIAL WAS STRIPPED AT {_step('trial-stripped')} AND {_WHEEL} WAS NOT "

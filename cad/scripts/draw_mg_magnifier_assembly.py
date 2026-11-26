@@ -570,9 +570,6 @@ class StackDetail:
     centre: tuple[float, float]
     stems: frozenset[str]
     ink_drop_mm: float
-    # The parts the detail sets, named under its title (a blind reviewer of
-    # run 20261012T192552713Z could not tell what the gauge presses).
-    parts: str = ""
     orientation: str = stack.DRAWING_LEFT_VIEW
     # The detail's letter stands outside its boundary on the right side view,
     # toward this corner (x, y signs).
@@ -610,8 +607,7 @@ class StackDetail:
 
     @property
     def label_text(self) -> str:
-        lines = (self.title, self.parts, f"SCALE {self.scale[0]} : {self.scale[1]}")
-        return "\n".join(line for line in lines if line)
+        return f"{self.title}\nSCALE {self.scale[0]} : {self.scale[1]}"
 
     @property
     def label_xy(self) -> tuple[float, float]:

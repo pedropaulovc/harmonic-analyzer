@@ -55,14 +55,25 @@ STEPS: tuple[tuple[str, ...], ...] = (
     # bonded on a spigot turned to slide in its drilled bore, centred on an
     # indicator while wet; a drum that turns once cured is stripped and
     # bonded again. Rule 22 (machinist review of run 20261125T172832344Z,
-    # r2 and r3): one action per step, a check apart from its remedy, so the
-    # S4 seat is its own check after the cure and the strip runs as pull
-    # off, clean, return.
+    # r2 and r3): one action per step, a check apart from its remedy.
+    # Delegated ruling 2026-11-26 (Main), no precedent; owner review #2144
+    # (rulings.md D38; issue #3630, machinist review of run
+    # 20261126T031815939Z): the S4 seat is checked wet, while the drum still
+    # pulls off, and again once cured, where a wrong seat scraps wheel and
+    # drum together (a cured bond comes off only at about 250 C, never next
+    # to the wheel's enamel: drawing-guidelines.md, LOCTITE 638 TDS); a drum
+    # that turns once cured is not held and still pulls off.
     (
         DRUM_BONDED_KEY,
         "drum-centred",
-        "drum-bond-cured",
         "drum-seated",
+        "drum-wet-stripped",
+        "drum-wet-cleaned",
+        "drum-wet-rebonded",
+        "drum-bond-cured",
+        "drum-seat-rechecked",
+        "drum-pair-scrapped",
+        "drum-pair-renewed",
         DRUM_HELD_KEY,
         "drum-stripped",
         "drum-cleaned",
@@ -105,6 +116,7 @@ STEPS: tuple[tuple[str, ...], ...] = (
         "stack-parts-measured",
         "stack-part-replaced",
         "axle-replaced",
+        "new-wheel-drum-scrapped",
         "new-wheel-drum-bonded",
         "trial-refitted",
     ),

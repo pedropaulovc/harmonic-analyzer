@@ -283,7 +283,8 @@ def test_every_step_is_one_action_of_at_most_six_lines() -> None:
         # replaced (main's remedy), the new part back to its starting step.
         assert _step_body(f"{prefix}-pin-pushed-out").endswith(
             "PUSH THAT PIN OUT, HEATING THE "
-            + ("TINES." if prefix == "rod" else "CHEEKS.")
+            + ("TINES" if prefix == "rod" else "CHEEKS")
+            + " TO ABOUT 250°C."
         )
         # The replace and return steps carry the push-out's own condition, so a
         # bonded pin that passed its cured checks never reaches them.
@@ -1268,7 +1269,8 @@ def test_each_rod_fork_is_pinned_to_its_arm_at_the_bench_first() -> None:
         )
         assert _step_body(f"{prefix}-pin-pushed-out") == (
             f"BONDED PIN: IF {drawing.item(host_pin)} SLIDES OR "
-            f"{drawing.item(mover)} BINDS, PUSH THAT PIN OUT, HEATING THE {faces}."
+            f"{drawing.item(mover)} BINDS, PUSH THAT PIN OUT, HEATING THE {faces} TO "
+            "ABOUT 250°C."
         )
         assert _step_body(f"{prefix}-replaced") == f"PIN PUSHED OUT: REPLACE THAT {host}."
         assert _step_body(f"{prefix}-pin-return") == (
@@ -1295,7 +1297,7 @@ def test_the_pin_bond_note_keeps_the_compound_off_the_running_joint() -> None:
         f"{drawing.item('ch-channel-lever')}",
         "CURE 24 H",
         "HOLDING THE PIN SQUARE",
-        "HEATING THE TINES OR CHEEKS IF IT WAS BONDED",
+        "HEATING THE TINES OR CHEEKS TO ABOUT 250°C IF IT WAS BONDED",
     ):
         assert words in flat, words
     assert flat.startswith(
