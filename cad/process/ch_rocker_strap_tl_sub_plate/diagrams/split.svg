@@ -1,6 +1,12 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 440" font-family="sans-serif" font-size="13">
+  <!-- Setup 2. Plan, 2 px/mm (1 in = 50.8 px): the 13.0 x 6 in bar, the four
+       1-2-3 blocks lying flat (3 x 2 in footprint) and the step clamps (their
+       size schematic: not on record). The first cut drawn: the 1/2 in end mill
+       to scale (half_cutter_dia_mm 12.7 = 25.4 px) on SP01's first pass, the
+       front edge's rough level, centre Y -70.104 at Z -4.661, fed +X from X
+       -21.590 to 328.930; drawn at X +30, on the part. -->
   <rect class="paper" x="0" y="0" width="760" height="440"/>
-  <text class="title" x="20" y="16">SP01, plan (back of the table at the top): split the plate off, mill both its long edges</text>
+  <text class="title" x="20" y="16">SP01, plan (back of the table at the top, 2 px/mm): split the plate off, mill both its long edges</text>
   <rect class="fixture-table" x="0" y="24" width="760" height="380"/>
   <!-- The bar: remainder at the back, the slot, the plate at the front. -->
   <rect class="part-rest" x="40" y="50" width="660" height="124.46"/>
@@ -18,18 +24,20 @@
   <rect class="clamp" x="561.4" y="260.7" width="198.6" height="31.75"/>
   <rect class="clamp" x="0" y="84.93" width="179" height="31.75"/>
   <rect class="clamp" x="561.4" y="84.93" width="198.6" height="31.75"/>
-  <!-- The 1/2 in end mill at the front edge's start; its passes. -->
-  <circle class="cutter" cx="22.2" cy="365.5" r="12.7"/>
-  <line class="arrow" x1="44" y1="384" x2="690" y2="384"/>
+  <!-- The 1/2 in end mill on the front edge's first pass; its passes. -->
+  <circle class="cutter" cx="125.4" cy="365.5" r="12.7"/>
+  <line class="arrow" x1="146" y1="384" x2="690" y2="384"/>
+  <text class="label-halo" x="95" y="320">1-2-3 block, 1 in up</text>
+  <text class="label-on-clamp" x="600" y="281">step clamp</text>
   <line class="arrow" x1="690" y1="187.4" x2="80" y2="187.4"/>
   <line class="arrow" x1="80" y1="187.4" x2="690" y2="187.4"/>
   <!-- Y0: 2.540 in behind the as-received front edge (Setup 3's fence face). -->
   <line class="datum" x1="65.4" y1="215.77" x2="65.4" y2="235.77"/>
   <line class="datum" x1="55" y1="225.77" x2="76" y2="225.77"/>
   <text class="datum-label" x="44" y="249">X0 Y0</text>
-  <text class="label" x="250" y="400">cutter path, front edge: .030 rough + .010 finish, cutter moving +X</text>
-  <text class="label-halo" x="200" y="182">cutter path: slot .50 through, levels alternate; then the back edge .010, −X</text>
+  <text class="label" x="200" y="400">1/2 in end mill, front edge: {{process.edge_rough_woc_mm:in.3dot}} rough + {{process.edge_finish_mm:in.3dot}} finish, cutter moving +X</text>
+  <text class="label-halo" x="200" y="182">cutter path: slot .50 through, levels alternate; then the back edge {{process.edge_finish_mm:in.3dot}}, −X</text>
   <text class="label-halo" x="300" y="280">plate, 3.00 wide</text>
   <text class="label-halo" x="300" y="116">bar remainder</text>
-  <text class="label" x="44" y="432">LEFT end: X0 is .500 in in from it. Blocks under each piece; no step clamp over an edge the cutter runs along.</text>
+  <text class="label" x="44" y="432">LEFT end: X0 is {{cad.stop_width_mm:in.3dot}} in in from it. Blocks under each piece; no step clamp over an edge the cutter runs along.</text>
 </svg>

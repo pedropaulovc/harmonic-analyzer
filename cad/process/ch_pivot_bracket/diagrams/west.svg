@@ -1,36 +1,33 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 400" font-family="sans-serif" font-size="13">
-  <!-- Setup 2: lying on the stacks, I at the fixed jaw; PB01 skims the face up, W. -->
+  <!-- Setup 2. Hand picture at 4.5 px/mm. The 3/4 in blank (blank_section_mm 19.05) on a 1 in + 1/2 in stack of parallels against each jaw (riser_height_mm 38.1, parallel_thickness_mm 3.175), the jaw tops 6.845 mm over the stacks (lying_grip_mm). Jaws' depth and the vise body are not on record: drawn schematic. Parallels 1/8 in thick (parallel_thickness_mm). The 1/2 in end mill to scale (face_cutter_dia_mm 12.7), its square end drawn as the near half of the end face, 12 % deep; drawn short to a break line, 1.12 in out of the collet (half_mill_projection_mm 28.45; the collet is not drawn, its size is not on record). PB01's pass at Y -8.312 (cutter centre), the one wholly over the blank, its tip at Z 17.780 (west_skim_mm 1.27 off the top), fed +X (toward you); the passes at Y +1.462, -3.425 and -13.200 (4.888 apart, lying_stepover_mm) are not drawn. -->
   <rect class="paper" x="0" y="0" width="760" height="400"/>
-  <text class="title" x="20" y="20">Setup 2 (PB01_west): skim W</text>
-  <rect class="fixture-vise" x="100" y="360" width="275.25" height="18"/>
-  <rect class="clamp" x="130" y="135.27" width="60" height="224.73"/>
-  <rect class="clamp" x="285.25" y="135.27" width="60" height="224.73"/>
-  <rect class="fixture-support" x="190" y="169.5" width="15.88" height="190.5"/>
-  <rect class="fixture-support" x="269.38" y="169.5" width="15.88" height="190.5"/>
-  <text class="label-on-clamp" x="160" y="151.27" text-anchor="middle">moving</text>
-  <text class="label-on-clamp" x="315.25" y="151.27" text-anchor="middle">fixed</text>
-  <rect class="part-arriving" x="190" y="74.25" width="95.25" height="95.25"/>
-  <rect class="part-kept" x="190" y="80.6" width="95.25" height="88.9"/>
-  <rect class="part-removed" x="190" y="74.25" width="95.25" height="6.35"/>
-  <line class="active-face" x1="190" y1="80.6" x2="285.25" y2="80.6"/>
-  <rect class="cutter" x="205.88" y="16.25" width="63.5" height="48"/>
-  <text class="label" x="197.62" y="40.25" text-anchor="end">1/2 in end mill</text>
-  <line class="leader" x1="281.25" y1="77.43" x2="375.25" y2="65.25"/>
-  <circle class="leader-dot" cx="281.25" cy="77.43" r="2"/>
-  <text class="label" x="375.25" y="69.25">skim {{process.west_skim_mm:in.3dot}}</text>
-  <line class="leader" x1="275.25" y1="94.6" x2="375.25" y2="106.6"/>
-  <circle class="leader-dot" cx="275.25" cy="94.6" r="2"/>
-  <text class="label" x="375.25" y="110.6">this face becomes W</text>
-  <line class="leader" x1="275.25" y1="163.5" x2="375.25" y2="190.5"/>
-  <circle class="leader-dot" cx="275.25" cy="163.5" r="2"/>
-  <text class="label" x="375.25" y="194.5">the opposite face on the stacks</text>
-  <text class="label" x="375.25" y="234.5">I against the fixed jaw (right)</text>
-  <text class="label" x="375.25" y="254.5">jaw tops {{process.lying_grip_mm:in.3dot}} above the stacks</text>
-  <text class="label" x="375.25" y="274.5">stacks: 1 in + 1/2 in parallels, one per jaw</text>
-  <circle class="datum" cx="285.25" cy="169.5" r="3.5"/>
-  <text class="datum-label" x="291.25" y="163.5"></text>
-  <line class="leader" x1="285.25" y1="169.5" x2="375.25" y2="305.5"/>
-  <circle class="leader-dot" cx="285.25" cy="169.5" r="2"/>
-  <text class="datum-label" x="375.25" y="309.5">Y0 the fixed jaw; Z0 the stacks' top</text>
-  <text class="label" x="20" y="392">Seen from the right end, looking −X: X0, the blank's left end, is the far end.</text>
+  <text class="title" x="20" y="24">Setup 2, PB01_west, from the right end (4.5 px/mm)</text>
+  <rect class="fixture-vise" x="169.27" y="367.45" width="175.72" height="16"/>
+  <rect class="clamp" x="300" y="165.2" width="45" height="202.25"/>
+  <rect class="clamp" x="169.27" y="165.2" width="45" height="202.25"/>
+  <text class="label-on-clamp" x="322.5" y="181.2" text-anchor="middle">fixed</text>
+  <text class="label-on-clamp" x="191.77" y="181.2" text-anchor="middle">moving</text>
+  <rect class="fixture-support" x="214.27" y="196" width="14.29" height="171.45"/>
+  <rect class="fixture-support" x="285.71" y="196" width="14.29" height="171.45"/>
+  <rect class="part-kept" x="214.27" y="115.99" width="85.73" height="80.01"/>
+  <rect class="part-removed" x="214.27" y="110.27" width="85.73" height="5.71"/>
+  <line class="active-face" x1="214.27" y1="115.99" x2="300" y2="115.99"/>
+  <path class="cutter" d="M291.17 109.13L291.17 52.99L287.09 55.99L283.01 52.99L278.92 55.99L274.84 52.99L270.76 55.99L266.68 52.99L262.6 55.99L258.51 52.99L254.43 55.99L250.35 52.99L246.27 55.99L242.19 52.99L238.1 55.99L234.02 52.99L234.02 109.13A28.57 6.86 0 0 0 291.17 109.13Z"/>
+  <line class="arrow" x1="228.02" y1="79.99" x2="204.02" y2="79.99"/>
+  <circle class="datum" cx="300" cy="196" r="3.5"/>
+  <text class="label" x="301.17" y="46">1/2 in end mill, each pass along the blank,</text>
+  <text class="label" x="301.17" y="62">this one toward you (+X); stepping −Y</text>
+  <line class="leader" x1="380" y1="116" x2="291" y2="112.98"/>
+  <circle class="leader-dot" cx="291" cy="112.98" r="2"/>
+  <text class="label" x="384" y="120">skim {{process.west_skim_mm:in.3dot}}: this face becomes W</text>
+  <line class="leader" x1="380" y1="190" x2="286.5" y2="191.5"/>
+  <circle class="leader-dot" cx="286.5" cy="191.5" r="2"/>
+  <text class="label" x="384" y="194">the opposite face on the stacks</text>
+  <text class="label" x="384" y="234">I against the fixed jaw (right)</text>
+  <text class="label" x="384" y="254">jaw tops {{process.lying_grip_mm:in.3dot}} above the stacks</text>
+  <text class="label" x="384" y="274">stacks: 1 in + 1/2 in parallels, one per jaw</text>
+  <line class="leader" x1="380" y1="305" x2="300" y2="196"/>
+  <circle class="leader-dot" cx="300" cy="196" r="2"/>
+  <text class="datum-label" x="384" y="309">Y0 the fixed jaw; Z0 the stacks' top</text>
+  <text class="label" x="20" y="397">Seen from the right end, looking −X: X0, the blank's left end, is the far end.</text>
 </svg>

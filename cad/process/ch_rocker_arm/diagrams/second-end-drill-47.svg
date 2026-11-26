@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 470" width="760" height="470" font-family="sans-serif" font-size="13">
+  <!-- Setup 3, the #47. Section at Y +8.456 along X through the rod-pin hole, from the front, 1 in = 200 px, Z0 the strap's top at y 330: the strap .098 thick out to its tip (strap_tip_x_mm 145.978), the tip block from X 136.525 (tip_block_x_mm; a 1-2-3 block 2 in up, broken), the right gap block's end at 82.550 and the clamp's toe near X 63.5 out of the view to the left. The #47 drill to scale (cutter_dia_mm 1.9939 = 15.7 px; plan tool drill-47), 118 deg point, at X 133.067 (RA02), its point at Z -3.588 (rod_tip_z_mm): its full diameter 0.5 mm past the underside (rod_drill_past_mm), in the air .135 in short of the tip block. Drawn short to a break line (its chuck is not drawn). The #2 centre drill's spot before it is not drawn. -->
+  <rect class="paper" x="0" y="0" width="760" height="470"/>
+  <text class="title" x="20" y="24">Setup 3, RA02 T4, the #47 drill: section along the strap at the rod-pin hole (1 in = 200 px)</text>
+  <path class="part-kept" d="M422.66 330L422.66 349.6L20 349.6L17 344.7L20 339.8L17 334.9L20 330Z"/>
+  <path class="fixture-support" d="M740 349.6L740 459.6L736 462.6L732 459.6L728.01 462.6L724.01 459.6L720.01 462.6L716.01 459.6L712.02 462.6L708.02 459.6L704.02 462.6L700.02 459.6L696.03 462.6L692.03 459.6L688.03 462.6L684.03 459.6L680.03 462.6L676.04 459.6L672.04 462.6L668.04 459.6L664.04 462.6L660.05 459.6L656.05 462.6L652.05 459.6L648.05 462.6L644.06 459.6L640.06 462.6L636.06 459.6L632.06 462.6L628.07 459.6L624.07 462.6L620.07 459.6L616.07 462.6L612.07 459.6L608.08 462.6L604.08 459.6L600.08 462.6L596.08 459.6L592.09 462.6L588.09 459.6L584.09 462.6L580.09 459.6L576.1 462.6L572.1 459.6L568.1 462.6L564.1 459.6L560.1 462.6L556.11 459.6L552.11 462.6L548.11 459.6L544.11 462.6L540.12 459.6L536.12 462.6L532.12 459.6L528.12 462.6L524.13 459.6L520.13 462.6L516.13 459.6L512.13 462.6L508.14 459.6L504.14 462.6L500.14 459.6L496.14 462.6L492.14 459.6L488.15 462.6L484.15 459.6L480.15 462.6L476.15 459.6L472.16 462.6L468.16 459.6L464.16 462.6L460.16 459.6L456.17 462.6L452.17 459.6L448.17 462.6L444.17 459.6L440.17 462.6L436.18 459.6L432.18 462.6L428.18 459.6L424.18 462.6L420.19 459.6L416.19 462.6L412.19 459.6L408.19 462.6L404.2 459.6L400.2 462.6L396.2 459.6L392.2 462.6L388.21 459.6L384.21 462.6L380.21 459.6L376.21 462.6L372.21 459.6L368.22 462.6L364.22 459.6L360.22 462.6L356.22 459.6L352.23 462.6L348.23 459.6L348.23 349.6Z"/>
+  <rect class="holes" x="313.15" y="330" width="15.7" height="19.6"/>
+  <path class="cutter" d="M328.85 180L328.85 353.54L321 358.25L313.15 353.54L313.15 180L317.08 177L321 180L324.93 177Z"/>
+  <line class="centre-line" x1="321" y1="170" x2="321" y2="372.25"/>
+  <line class="arrow" x1="291" y1="190" x2="291" y2="220"/>
+  <text class="label" x="21" y="150">#47 drill, one plunge through the strap,</text>
+  <text class="label" x="21" y="166">its full diameter {{process.rod_drill_past_mm:in.3dot}} past the underside,</text>
+  <text class="label" x="21" y="182">into the air short of the tip block</text>
+  <line class="leader" x1="221" y1="172" x2="313.15" y2="200"/>
+  <circle class="leader-dot" cx="313.15" cy="200" r="2"/>
+  <text class="label-halo" x="358.23" y="380">tip block, 2 in up (broken)</text>
+  <text class="label" x="30" y="320">strap, face 2 up</text>
+  <line class="datum" x1="20" y1="330" x2="60" y2="330"/>
+  <text class="datum-label" x="30" y="366">Z0, the strap's top</text>
+  <text class="label" x="20" y="56">#47 at X {{cad.rod_hole_from_bore_x_in:.4dot}}, Y {{cad.rod_hole_from_bore_y_in:.4dot}} from the bore;</text>
+  <text class="label" x="20" y="72">between the right gap block and the tip block, .135 from the tip block's end</text>
+</svg>

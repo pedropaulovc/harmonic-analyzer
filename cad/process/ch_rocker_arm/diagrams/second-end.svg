@@ -2,34 +2,39 @@
   <!-- Setup 3. Plan (top): 1 in = 55 px, X0 Y0 the hub's axis at (380, 130),
        +Y up the page (the back, the strap's concave edge). Section (bottom):
        through the hub's axis from the front, 1 in = 200 px, Z0 the strap's
-       top at y 330. -->
+       top at y 330. RA02's first cut: the 1/2 in end mill to scale
+       (face_cutter_dia_mm 12.7: 27.5 px in plan, 100 px in section) on its
+       first pass, Y +5.080 (face_pass_y_mm), Z 2.286, fed -X from X +14.000
+       to -14.000; drawn at X 0, over the hub. Its square end drawn as the
+       near half of the end face, 12 % deep; drawn short to a break line,
+       1.12 in out of the collet (half_mill_projection_mm 28.45; the collet
+       is not drawn). The edge finder that trams the strap is not drawn (a
+       touch-off tool); the F drill and the #47 have their own pictures. -->
   <rect class="paper" x="0" y="0" width="760" height="470"/>
-  <text class="title" x="20" y="18">Setup 3: strap face 2 up; face the second end, F through the hub, #47 through the strap</text>
+  <text class="title" x="20" y="18">Setup 3: strap face 2 up; face the second end (plan 1 in = 55 px; section 1 in = 200 px)</text>
   <text class="label" x="20" y="38">Plan</text>
   <rect class="fixture-support" x="201.3" y="102.5" width="164.95" height="55"/>
   <rect class="fixture-support" x="393.75" y="102.5" width="164.95" height="55"/>
   <rect class="fixture-support" x="675.6" y="73" width="74.4" height="55"/>
   <path class="part-kept" d="M63.9 83.0 A1731.5 1731.5 0 0 0 696.1 83.0 L696.1 118.2 A1766.2 1766.2 0 0 1 63.9 118.2 Z"/>
   <circle class="part-kept" cx="380" cy="130" r="11"/>
-  <circle class="holes" cx="380" cy="130" r="7.1"/>
-  <circle class="holes" cx="668.1" cy="111.7" r="2.2"/>
+  <circle class="hidden" cx="380" cy="130" r="6.8"/>
+  <circle class="cutter" cx="380" cy="119" r="13.75"/>
+  <line class="arrow" x1="364" y1="119" x2="336" y2="119"/>
   <rect class="clamp" x="231.7" y="44" width="21.6" height="74"/>
   <rect class="clamp" x="506.7" y="44" width="21.6" height="74"/>
-  <!-- Tram: the edge finder on the concave edge at X -3.94 and +3.94. -->
-  <circle class="cutter" cx="163.3" cy="93" r="5.5"/>
-  <circle class="cutter" cx="596.7" cy="93" r="5.5"/>
+  <!-- Tram: the edge finder's stations on the concave edge, X -3.94 and +3.94 (not drawn). -->
   <line class="leader" x1="163.3" y1="87.5" x2="120" y2="60"/>
-  <text class="label" x="20" y="56">edge finder, X −100.08 (−3.94 in)</text>
+  <circle class="leader-dot" cx="163.3" cy="87.5" r="1.5"/>
+  <text class="label" x="20" y="56">tram station, X −100.08 (−3.94 in)</text>
   <line class="leader" x1="596.7" y1="87.5" x2="620" y2="40"/>
-  <text class="label" x="470" y="36">X +100.08: Y within 0.05 of X −100.08's</text>
-  <line class="leader" x1="668.1" y1="111.7" x2="640" y2="170"/>
-  <circle class="leader-dot" cx="668.1" cy="111.7" r="1.5"/>
-  <text class="label" x="520" y="184">#47 at X {{cad.rod_hole_from_bore_x_in:.4dot}}, Y {{cad.rod_hole_from_bore_y_in:.4dot}}</text>
+  <circle class="leader-dot" cx="596.7" cy="87.5" r="1.5"/>
+  <text class="label" x="420" y="36">X +100.08: Y within 0.05 mm (.002 in) of X −100.08's</text>
   <line class="leader" x1="714" y1="138" x2="712" y2="128"/>
   <text class="label" x="690" y="150">tip block</text>
-  <line class="leader" x1="380" y1="130" x2="340" y2="180"/>
-  <text class="label" x="250" y="194">F through the hub at X0 Y0</text>
-  <text class="label" x="20" y="214">The #47 lies between the right gap block and the tip block, .135 from the tip block's end.</text>
+  <line class="leader" x1="380" y1="137" x2="340" y2="180"/>
+  <text class="label" x="200" y="194">the hub's Ø{{process.hub_pilot_bore_in:.3dot}} pilot bore (hidden); the F drill opens it later</text>
+  <text class="label" x="20" y="214">1/2 in end mill on the first pass along −X, then Y −{{process.face_pass_y_mm:in.3dot}} along +X, as in Setup 2.</text>
   <text class="label" x="20" y="240">Section through the hub</text>
   <rect class="fixture-support" x="150" y="349.6" width="180" height="70"/>
   <rect class="fixture-support" x="430" y="349.6" width="180" height="70"/>
@@ -41,10 +46,11 @@
   <rect class="part-removed" x="340" y="302.9" width="80" height="9.1"/>
   <line class="hidden" x1="355.4" y1="302.9" x2="355.4" y2="367.6"/>
   <line class="hidden" x1="404.6" y1="302.9" x2="404.6" y2="367.6"/>
-  <!-- F drill: through, its point into the gap. -->
-  <polygon class="cutter" points="354.3,236 405.7,236 405.7,382 380,397 354.3,382"/>
-  <text class="label" x="200" y="270">F drill (after the facing)</text>
-  <line class="leader" x1="300" y1="266" x2="354" y2="280"/>
+  <!-- The 1/2 in end mill on RA02's first pass, at the end's height. -->
+  <path class="cutter" d="M430 300L430 236L425.83 239L421.67 236L417.5 239L413.33 236L409.17 239L405 236L400.83 239L396.67 236L392.5 239L388.33 236L384.17 239L380 236L375.83 239L371.67 236L367.5 239L363.33 236L359.17 239L355 236L350.83 239L346.67 236L342.5 239L338.33 236L334.17 239L330 236L330 300A50 12 0 0 0 430 300Z"/>
+  <text class="label" x="440" y="256">1/2 in end mill, to scale, {{process.half_mill_projection_mm:in.2f}} out</text>
+  <text class="label" x="440" y="272">of the collet (drawn short), on the Y +{{process.face_pass_y_mm:in.3dot}} pass</text>
+  <line class="arrow" x1="324" y1="296" x2="296" y2="296"/>
   <line class="dims" x1="455" y1="312" x2="455" y2="330"/>
   <line class="leader" x1="420" y1="312" x2="470" y2="312"/>
   <text class="label" x="475" y="316">{{cad.hub_end_height_in:.3dot}} over the strap (Z0 its top)</text>

@@ -562,7 +562,7 @@ machine_kind = "other"
 title = "Saw, mic, bow-check and straighten the blanks; saw the riser"
 machine = "Saw / bench / surface plate / arbor press"
 indexing = "none"
-diagram = { file = "diagrams/saw.svg", alt = "A 72 in length of the 1/4 in square bar with two blanks marked off it, a kerf between; below, a blank on the surface plate with a .005 feeler leaf at its side face." }
+diagram = { file = "diagrams/saw.svg", alt = "A 72 in length of the 1/4 in square bar with two blanks marked off it, a kerf after each, the bar in the saw's vise; below, a blank on the surface plate with a .005 feeler leaf at its side face." }
 envelope = "other"
 vise_hold = "other"
 beam = "other"
@@ -633,7 +633,7 @@ indexing = "none"
 machine_ref = "pm-30mv"
 holding = "Skip this setup if the riser is on hand. The two new blocks in the PM 6 in vise on the 1 in pair from the parallel set, one parallel against each jaw. Each block stands across the jaws, TOP up, its 3 in length between them: the bar's as-bought edges against the jaws, never a sawn face, and it rests on both parallels. The two side by side along the jaws, centred. Their tops stand about .2 above the jaw tops; the jaws grip their lower .77 in."
 datum = "Program CA00_riser_face (end mill). G54: X0 the vise's left jaw side, Y0 the fixed jaw's face, Z0 the higher riser top. +X along the jaws to the right, +Y toward the fixed jaw."
-diagram = { file = "diagrams/riser.svg", alt = "Two riser blocks side by side along the jaws, each standing across the jaws on the two 1 in parallels, their tops above the jaw tops; the end mill faces both tops in passes along the jaws." }
+diagram = { file = "diagrams/riser.svg", alt = "From above: the two riser blocks side by side along the jaws, on a 1 in parallel at each jaw; the 1/2 in end mill, to scale, on a pass over both blocks, travelling along the jaws. From the left: one block across the jaws on the two parallels, its top above the jaw tops, the end mill facing it." }
 envelope = { x_span_mm = ["{{process.vise_jaw_width_mm}}", "{{process.face_cutter_dia_mm}}", 5.08], y_span_mm = ["{{process.riser_length_max_mm}}", "{{process.face_cutter_dia_mm}}"], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_parallel_height_mm}}", "{{process.riser_blank_height_max_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_parallel_height_mm}}", "{{process.riser_height_min_mm}}"], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_min_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_min_mm}}"] }
 vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{process.riser_length_max_mm}}", along_jaws_mm = "{{process.riser_pair_width_max_mm}}", part_height_mm = "{{process.riser_blank_height_max_mm}}", parallel_height_mm = "{{process.riser_parallel_height_mm}}", overhang_mm = ["{{process.riser_face_overhang_mm}}", "rest"], jaw_offset = "centred", fixed_jaw_face = "as_bought", moving_jaw_face = "as_bought", moving_jaw_contact = "flat" }
 beam = { axis = "y", hold = "cantilever", extent_mm = [0, "{{process.riser_length_max_mm}}"], clamp_mm = [0, "{{process.riser_length_max_mm}}"], section_mm = { x = "{{process.riser_width_min_mm}}", z = "{{process.riser_height_min_mm}}" }, vise_left = "other" }
@@ -687,7 +687,7 @@ indexing = "none"
 machine_ref = "pm-30mv"
 holding = "The riser (made in Setups 1 and 2, then kept): its two blocks end to end on the bed of the PM 6 in vise (jaws 6.247 long: the two 3 in blocks fit inside both jaw sides), TOP up, a sawn face of each against the fixed jaw, centred along the jaws, neither past a jaw side, never clamped: the jaws close on the bars above it. Four blanks of any numbers side by side across the jaws on the riser, in positions P1 (against the fixed jaw) to P4 (against the moving jaw). Each on its L face, its F face toward the fixed jaw, foot ends to the LEFT. Before closing the vise, hold a 1-2-3 block's 2 in face across the four foot ends and its 1 in face along the P4 bar, and push the ends against it so they are flush; then slide the four together until the foot ends stand {{process.end_protrusion_mm:in.2dot}} past the left jaw side (the calipers' depth rod). Tap each blank down onto the riser while closing the vise. The rest of each blank, about 25 in, hangs past the right jaw side."
 datum = "Programs CA01_foot_end (end mill) and CA02_foot_notch (saw). G54: X0 the faced foot end, Y0 the fixed jaw's face, Z0 the bars' down face (on the riser). +X toward the jaws, +Y toward the fixed jaw."
-diagram = { file = "diagrams/foot.svg", alt = "Four bars side by side across the jaws on the riser's two blocks, foot ends past the left jaw side; the end mill faces the ends, then the slitting saw, horizontal, cuts the notch across all four." }
+diagram = { file = "diagrams/foot.svg", alt = "From the front: the four bars on the riser, L face down, foot ends past the left jaw side; the 1/2 in end mill, to scale, beside the ends, its side on X0 and its tip just under L. From above: the end mill at the ends of the four bars, fed along +Y; the 1-2-3 block that set the ends flush is taken away." }
 # The saw arbor is now the shortest tool: its saw's lower face is at least
 # the saw's own thickness below the nose (the shoulder's height below the
 # nose is not on record: at most .90, the record's 1.4 less the cap).
@@ -817,6 +817,7 @@ tool = "saw"
 drilling = "none"
 sizing = "other"
 instruction = "Same file, after Cycle Start: two more passes along −Y, {{process.foot_notch_depth_mm:in.3dot}} deep: the first with the saw's lower face at the ledge, {{cad.foot_notch_ledge_in:.3dot}} above the L face, the second {{process.foot_notch_rise_mm:in.3dot}} higher, widening the notch to {{process.foot_notch_width_mm:in.4dot}}."
+diagram = { file = "diagrams/foot-saw.svg", alt = "From the front: the slitting saw, to scale, horizontal on the stepped arbor, its lower face at the ledge, its rim in the foot ends; the arbor's cap below and body above it clear of the ends. From above: the saw across the four foot ends, fed along −Y." }
 rpm = 100
 feed = "{{process.saw_feed_per_min_mm:in.1f}} in/min"
 milling_cuts = [
@@ -890,7 +891,7 @@ indexing = "none"
 machine_ref = "pm-30mv"
 holding = "The riser as left in Setup 3 (two blocks end to end on the vise bed against the fixed jaw, neither past a jaw side, unclamped; brushed clean). The four bars of one load (sorted by x in Setup 4, any blank numbers) side by side across the jaws on the riser in positions P1 (against the fixed jaw) to P4 (against the moving jaw), each on its R face, its B face toward the fixed jaw, top ends to the RIGHT: each bar as in Setup 3, rolled over about its length (L face up) and slid left along the jaws. At the far (foot) ends, beyond the table, hold the 1-2-3 block's 2 in face across the four foot ends and its 1 in face along the P4 bar, and push the ends flush against it; slide the four together until the top ends stand {{process.end_protrusion_mm:in.2dot}} past the right jaw side. Tap each down onto the riser while closing the vise."
 datum = "Programs CA03_top_end (end mill), CA04_top_notch (saw), CA05_pin_hole (centre drill, drill, reamer). G54: X0 the top end at the length, Y0 the fixed jaw's face, Z0 the bars' down face (R, on the riser). +X toward the top ends, +Y toward the fixed jaw."
-diagram = { file = "diagrams/top.svg", alt = "Four bars side by side across the jaws on the riser's two blocks, top ends past the right jaw side; the end mill faces them to length, the slitting saw cuts the top notch across all four, and the pin hole is drilled down through both cheeks of each bar." }
+diagram = { file = "diagrams/top.svg", alt = "From the front: the four bars on the riser, R face down, top ends past the right jaw side; the 1/2 in end mill, to scale, on its last pass, its side on X0 (the length) and its tip just under R. From above: the end mill at the four top ends, fed along −Y." }
 envelope = { x_span_mm = ["{{process.saw_dia_mm}}", "{{process.top_notch_depth_mm}}", 5.0], y_span_mm = ["{{process.saw_dia_mm}}", "{{process.load_width_mm}}", 4.0], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_max_mm}}", "{{cad.envelope_width_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_min_mm}}", "{{process.drill_tip_height_mm}}"], longest_tool_mm = ["{{process.drill_chuck_gauge_mm}}", "{{process.reamer_oal_mm}}"], shortest_tool_mm = "{{process.saw_thickness_mm}}" }
 vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{process.load_width_mm}}", along_jaws_mm = "{{cad.envelope_length_mm}}", part_height_mm = "{{cad.envelope_thickness_mm}}", parallel_height_mm = "{{process.riser_height_min_mm}}", overhang_mm = ["rest", "{{process.end_protrusion_mm}}"], jaw_offset = "centred", fixed_jaw_face = "as_bought", moving_jaw_face = "as_bought", moving_jaw_contact = "flat" }
 beam = { axis = "x", hold = "cantilever", extent_mm = ["{{process.top_extent_start_mm}}", 0], clamp_mm = ["{{process.top_clamp_start_mm}}", "{{process.top_clamp_end_mm}}"], section_mm = { y = "{{process.bar_section_min_mm}}", z = "{{process.bar_section_min_mm}}" }, vise_left = "start" }
@@ -992,6 +993,7 @@ tool = "saw"
 drilling = "none"
 sizing = "other"
 instruction = "Same file, after Cycle Start: at each of two levels, passes along +Y stepping {{process.top_notch_step_mm:in.3dot}} deeper into the ends each time to {{process.top_notch_depth_mm:in.3dot}}: the first level with the saw's lower face at the ledge, {{cad.top_notch_ledge_in:.3dot}} above the R face, the second {{process.top_notch_rise_mm:in.4dot}} higher, widening the notch to {{process.top_notch_width_mm:in.4dot}}."
+diagram = { file = "diagrams/top-saw.svg", alt = "From the front: the slitting saw, to scale, horizontal on the stepped arbor, its lower face at the ledge, its rim at the full notch depth in the top ends; the cap and body clear of the ends. From above: the saw across the four top ends, fed along +Y." }
 rpm = 100
 feed = "{{process.saw_feed_per_min_mm:in.1f}} in/min"
 milling_cuts = [
@@ -1038,6 +1040,7 @@ tool = "drill-49"
 drilling = "twist_drill"
 sizing = "other"
 instruction = "Same file, M6 T4: change to the #49 {{process.drill_projection_mm:in.2f}} out of the chuck, set 2800, Cycle Start. It drills both cheeks of each bar, pecks of {{process.peck_mm:in.3dot}}, full retract, full diameter {{process.drill_past_mm:in.3dot}} past R. Cutting oil."
+diagram = { file = "diagrams/top-drill.svg", alt = "Section along the P1 bar at its pin hole: the #49 drill, to scale, through both cheeks either side of the top notch, its point just under R, in the air past the jaws. From above: the drill in the P1 hole; the P2 to P4 holes the same." }
 rpm = 2800
 feed = "{{process.drill_feed_per_min_mm:in.1f}} in/min"
 hole_depth_mm = "{{cad.envelope_thickness_mm}}"
@@ -1052,6 +1055,7 @@ tool = "reamer-0775"
 drilling = "none"
 sizing = { kind = "band", band_mm = "{{cad.top_pin_hole_dia_band_mm}}" }
 instruction = "Same file, M6 T5: change to the .0775 reamer (to buy) {{process.ream_projection_mm:in.2f}} out of the chuck, set 2000, Cycle Start. It reams each hole through, in and out at feed, its full diameter {{process.ream_past_mm:in.3dot}} past the R face. Cutting oil."
+diagram = { file = "diagrams/top-ream.svg", alt = "Section along the P1 bar at its pin hole: the .0775 reamer, to scale, through both cheeks, its end just under R, in the air past the jaws. From above: the reamer in the P1 hole; the P2 to P4 holes the same." }
 rpm = 2000
 feed = "{{process.ream_feed_per_min_mm:in.1f}} in/min, in and out"
 milling_cuts = [

@@ -1,66 +1,51 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<!-- Setup 5: four bars rolled over, side by side on the riser (two blocks end to end on the vise bed against the fixed jaw), top ends .75 past the right jaw side; CA03 faces them to length, CA04 saws the top notch, CA05 spots, drills and reams the pin holes. Top view and an end view of the load. Styles: prechips.palette. -->
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 400" width="640" height="400" font-family="sans-serif" font-size="12">
-<rect class="paper" width="640" height="400"/>
-<text class="label" x="20" y="20">Top view</text>
-<rect class="clamp" x="190" y="30" width="200" height="40"/>
-<text class="label" x="216" y="24">fixed jaw, 6.247 long</text>
-<rect class="clamp" x="190" y="126" width="200" height="40"/>
-<text class="label" x="200" y="182">moving jaw</text>
-<rect class="part-kept" x="0" y="70" width="440" height="14"/>
-<rect class="part-kept" x="0" y="84" width="440" height="14"/>
-<rect class="part-kept" x="0" y="98" width="440" height="14"/>
-<rect class="part-kept" x="0" y="112" width="440" height="14"/>
-<rect class="hidden" x="194" y="70" width="96" height="53"/>
-<rect class="hidden" x="290" y="70" width="96" height="53"/>
-<text class="label" x="100" y="60">P1</text>
-<path class="leader" d="M114 64 L114 76"/>
-<text class="label" x="100" y="146">P4</text>
-<path class="leader" d="M114 134 L114 120"/>
-<circle class="cutter" cx="500" cy="98" r="80" fill-opacity="0.75"/>
-<circle class="holes" cx="425" cy="77" r="3"/>
-<circle class="holes" cx="425" cy="91" r="3"/>
-<circle class="holes" cx="425" cy="105" r="3"/>
-<circle class="holes" cx="425" cy="119" r="3"/>
-<text class="label" x="474" y="12">slitting saw</text>
-<path class="arrow" d="M600 236 V206"/>
-<text class="label" x="530" y="228">feed +Y</text>
-<line class="datum" x1="440" y1="64" x2="440" y2="132"/>
-<text class="label" x="456" y="212">X0 = length</text>
-<path class="leader" d="M466 200 L442 134"/>
-<path class="dims" d="M390 196 H440"/>
-<text class="label" x="392" y="192">{{process.end_protrusion_mm:in.2dot}}</text>
-<text class="label" x="20" y="212">foot ends flush, past the table</text>
-<text class="label" x="236" y="214">riser: two 3 in blocks (hidden)</text>
-<path class="leader" d="M340 202 L340 120"/>
-<path class="axis" d="M560 370 H610"/><text class="label" x="614" y="374">+X</text>
-<path class="axis" d="M560 370 V320"/><text class="label" x="552" y="316">+Y</text>
-<text class="label" x="20" y="256">End view from the top end, fixed jaw on the right (riser drawn short)</text>
-<rect class="clamp" x="40" y="264" width="30" height="120"/>
-<text class="label" x="22" y="396">moving jaw</text>
-<rect class="part-kept" x="70" y="270" width="36" height="36"/>
-<rect class="part-removed" x="70" y="278.25" width="36" height="18.75"/>
-<rect class="part-kept" x="106" y="270" width="36" height="36"/>
-<rect class="part-removed" x="106" y="278.25" width="36" height="18.75"/>
-<rect class="part-kept" x="142" y="270" width="36" height="36"/>
-<rect class="part-removed" x="142" y="278.25" width="36" height="18.75"/>
-<rect class="part-kept" x="178" y="270" width="36" height="36"/>
-<rect class="part-removed" x="178" y="278.25" width="36" height="18.75"/>
-<line class="centre-line" x1="88" y1="264" x2="88" y2="312"/>
-<line class="centre-line" x1="124" y1="264" x2="124" y2="312"/>
-<line class="centre-line" x1="160" y1="264" x2="160" y2="312"/>
-<line class="centre-line" x1="196" y1="264" x2="196" y2="312"/>
-<rect class="fixture-support" x="78" y="306" width="136" height="78"/>
-<rect class="clamp" x="214" y="264" width="30" height="120"/>
-<text class="label" x="190" y="396">fixed jaw</text>
-<line class="active-face" x1="70" y1="306" x2="214" y2="306"/>
-<text class="label" x="254" y="276">pin hole down through both cheeks</text>
-<path class="leader" d="M250 272 L198 268"/>
-<text class="label" x="254" y="298">notch {{process.top_notch_width_mm:in.4dot}} wide, ledge {{cad.top_notch_ledge_in:.3dot}} above R</text>
-<path class="leader" d="M250 294 L216 294"/>
-<text class="label" x="254" y="320">R faces on the riser (Z0)</text>
-<text class="label" x="254" y="340">riser {{process.riser_width_min_mm:in.2dot}}–{{process.riser_width_max_mm:in.2dot}} wide, against</text>
-<text class="label" x="254" y="354">the fixed jaw, not clamped: the</text>
-<text class="label" x="254" y="368">moving jaw grips the P4 bar</text>
-<path class="leader" d="M250 344 L210 344"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 780 430" width="780" height="430" font-family="sans-serif" font-size="13">
+  <!-- Setup 5. Sizes from the plan's [parameters]: bars 1/4 in square (blank_width_in), riser 1 in tall (riser_parallel_height_mm) and .92-.96 wide (riser_width_min/max_mm, drawn .94), two 3 in blocks end to end centred on the 6.247 in jaws (vise_jaw_width_mm), jaws 1.770 in tall (vise_jaw_height_mm), the ends .75 in past the jaw side (end_protrusion_mm). The jaws' depth across the vise and the vise body are not on record: drawn schematic. The 1/2 in end mill to scale (face_cutter_dia_mm 12.7 = 50 px in front, 25 px above), its square end drawn as the near half of the end face, 12 % deep; drawn short to a break line (2.00 in out of the collet, half_mill_projection_min_mm; the collet is not drawn, its size is not on record). CA03's last pass: cutter centre X +6.350, its side on X0 (the length), tip Z -0.100, fed -Y from +8.890 to -34.188; drawn at Y -12.649, the load's middle. The four passes before it, .020 apart from X +8.382 (end_step_max_mm 0.508, top_excess_max_mm 2.54), are not drawn. The 1-2-3 block that sets the ends flush is taken away before the vise closes: a callout, not drawn. No work stop in this setup. -->
+  <rect class="paper" x="0" y="0" width="780" height="430"/>
+  <text class="title" x="20" y="24">Setup 5, CA03: from the front, the moving jaw as an outline (1 in = 100 px); from above (1 in = 50 px)</text>
+  <path class="fixture-vise" d="M325 380L325 398L20 398L17 393.5L20 389L17 384.5L20 380Z"/>
+  <path class="clamp" d="M325 203.05L325 380L20 380L17 375.98L20 371.96L17 367.94L20 363.91L17 359.89L20 355.87L17 351.85L20 347.83L17 343.81L20 339.78L17 335.76L20 331.74L17 327.72L20 323.7L17 319.68L20 315.65L17 311.63L20 307.61L17 303.59L20 299.57L17 295.55L20 291.52L17 287.5L20 283.48L17 279.46L20 275.44L17 271.42L20 267.4L17 263.37L20 259.35L17 255.33L20 251.31L17 247.29L20 243.27L17 239.24L20 235.22L17 231.2L20 227.18L17 223.16L20 219.14L17 215.11L20 211.09L17 207.07L20 203.05Z"/>
+  <path class="fixture-support" d="M312.65 280L312.65 380L20 380L17 375.83L20 371.67L17 367.5L20 363.33L17 359.17L20 355L17 350.83L20 346.67L17 342.5L20 338.33L17 334.17L20 330L17 325.83L20 321.67L17 317.5L20 313.33L17 309.17L20 305L17 300.83L20 296.67L17 292.5L20 288.33L17 284.17L20 280Z"/>
+  <path class="part-kept" d="M400 255L400 280L20 280L17 275.83L20 271.67L17 267.5L20 263.33L17 259.17L20 255Z"/>
+  <rect class="part-removed" x="400" y="255" width="10" height="25"/>
+  <path class="hidden" d="M325 203.05L20 203.05L20 380L325 380Z"/>
+  <path class="cutter" d="M450 274.39L450 170L445.83 173L441.67 170L437.5 173L433.33 170L429.17 173L425 170L420.83 173L416.67 170L412.5 173L408.33 170L404.17 173L400 170L400 274.39A25 6 0 0 0 450 274.39Z"/>
+  <line class="datum" x1="400" y1="218" x2="400" y2="320"/>
+  <text class="datum-label" x="394" y="328" text-anchor="end">X0</text>
+  <line class="datum" x1="454" y1="280" x2="500" y2="280"/>
+  <text class="datum-label" x="454" y="274">Z0 (R)</text>
+  <line class="dims" x1="400" y1="325" x2="400" y2="418"/>
+  <line class="dims" x1="325" y1="398" x2="325" y2="418"/>
+  <line class="dims" x1="400" y1="412" x2="325" y2="412"/>
+  <text class="label" x="319" y="417" text-anchor="end">{{process.end_protrusion_mm:in.2dot}} past the jaws' right side</text>
+  <text class="label" x="20" y="60">1/2 in end mill, {{process.half_mill_projection_min_mm:in.2dot}} out of the collet (drawn short):</text>
+  <text class="label" x="20" y="76">its side faces the four top ends to X0 (the length), the tip</text>
+  <text class="label" x="20" y="92">{{process.end_tip_below_mm:.1f}} mm under R, in passes along −Y {{process.end_step_max_mm:in.3dot}} apart,</text>
+  <text class="label" x="20" y="108">from {{process.top_excess_max_mm:in.3dot}} out; the last pass drawn</text>
+  <text class="label" x="319" y="175" text-anchor="end">fixed jaw behind; the moving</text>
+  <text class="label" x="319" y="191" text-anchor="end">jaw, in front, as an outline</text>
+  <text class="label-halo" x="260" y="330" text-anchor="end">riser as in Setup 3, not clamped</text>
+  <text class="label-halo" x="315" y="272.5" text-anchor="end">top ends RIGHT, R down</text>
+  <path class="clamp" d="M662.5 225L662.5 250L540 250L537 245.83L540 241.67L537 237.5L540 233.33L537 229.17L540 225Z"/>
+  <path class="clamp" d="M662.5 299.8L662.5 324.8L540 324.8L537 320.63L540 316.47L537 312.3L540 308.13L537 303.97L540 299.8Z"/>
+  <path class="part-kept" d="M700 250L700 262.45L540 262.45L537 259.34L540 256.23L537 253.11L540 250Z"/>
+  <path class="part-kept" d="M700 262.45L700 274.9L540 274.9L537 271.79L540 268.67L537 265.56L540 262.45Z"/>
+  <path class="part-kept" d="M700 274.9L700 287.35L540 287.35L537 284.24L540 281.12L537 278.01L540 274.9Z"/>
+  <path class="part-kept" d="M700 287.35L700 299.8L540 299.8L537 296.69L540 293.58L537 290.46L540 287.35Z"/>
+  <path class="hidden" d="M656.32 250L540 250L540 297L656.32 297"/>
+  <circle class="cutter" cx="712.5" cy="274.9" r="12.5"/>
+  <line class="arrow" x1="734.5" y1="262.9" x2="734.5" y2="286.9"/>
+  <text class="label" x="740.5" y="279.9">−Y</text>
+  <line class="datum" x1="700" y1="212.5" x2="700" y2="322.5"/>
+  <text class="datum-label" x="700" y="336.5" text-anchor="middle">X0</text>
+  <text class="label" x="682.5" y="230.5" text-anchor="middle">P1</text>
+  <line class="leader" x1="682.5" y1="234.5" x2="682.5" y2="256.23"/>
+  <circle class="leader-dot" cx="682.5" cy="256.23" r="2"/>
+  <text class="label" x="682.5" y="329.3" text-anchor="middle">P4</text>
+  <line class="leader" x1="682.5" y1="315.3" x2="682.5" y2="293.57"/>
+  <circle class="leader-dot" cx="682.5" cy="293.57" r="2"/>
+  <text class="label" x="540" y="191">From above, fixed jaw at the top:</text>
+  <text class="label" x="540" y="361">B toward the fixed jaw; riser hidden</text>
+  <text class="label" x="540" y="377">The 1-2-3 block that set the foot</text>
+  <text class="label" x="540" y="393">ends flush (beyond the table) is</text>
+  <text class="label" x="540" y="409">taken away before the vise closes</text>
 </svg>

@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 400" width="760" height="400" font-family="sans-serif" font-size="13">
+  <!-- Setup 3. Section across the jaws at X 107.950, 5 px/mm, front at the left, Z0 the plate top at y 250: the plate 3.00 wide between the jaws, its underside 10.566 below Z0, the fence 1.880 up at the back. The #43 drill to scale (cutter_dia_mm 2.2606; plan tool drill-43), 118 deg point, in clamp hole 2 (X 107.950, Y -41.910), its point at Z -11.746 (SP02's last peck): its full diameter 0.5 mm past the underside (drill_breakthrough_mm), between the parallels. Drawn at hole 2, the first inside the jaws (holes 1 and 4 lie in the plate's overhang). The #2 centre drill's spots before it are not drawn. Drawn short to a break line (its chuck is not drawn: no size on record). Jaws' depth and the vise body are not on record: drawn schematic. Parallels 1/8 in thick (the shaft plans' parallel_thickness_mm; this plan does not restate it), 1 in + 1/2 in stacked (parallel_height_mm 38.1), broken.  -->
+  <rect class="paper" x="0" y="0" width="760" height="400"/>
+  <text class="title" x="20" y="24">Setup 3, SP02 T4, the #43 drill: section across the jaws at clamp hole 2 (5 px/mm)</text>
+  <rect class="clamp" x="139" y="268.54" width="40" height="114.29"/>
+  <rect class="clamp" x="560" y="268.54" width="40" height="114.29"/>
+  <path class="fixture-support" d="M194.88 302.83L194.88 382.83L190.91 385.83L186.94 382.83L182.97 385.83L179 382.83L179 302.83Z"/>
+  <path class="fixture-support" d="M560 302.83L560 382.83L556.03 385.83L552.06 382.83L548.09 385.83L544.12 382.83L544.12 302.83Z"/>
+  <path class="part-kept" d="M179 302.83L179 250L258.38 250L258.38 267.78L306 267.78L306 250L496.5 250L496.5 240.6L560 240.6L560 302.83Z"/>
+  <rect class="holes" x="281.3" y="267.78" width="11.3" height="35.05"/>
+  <path class="cutter" d="M292.6 110L292.6 305.33L286.95 308.73L281.3 305.33L281.3 110L284.12 107L286.95 110L289.78 107Z"/>
+  <line class="centre-line" x1="286.95" y1="100" x2="286.95" y2="322.73"/>
+  <line class="arrow" x1="256.95" y1="120" x2="256.95" y2="155"/>
+  <text class="label" x="316.95" y="60">#43 drill through the pocket floor, full-retract</text>
+  <text class="label" x="316.95" y="76">pecks of {{process.peck_43_mm:in.3dot}}, its full diameter {{process.drill_breakthrough_mm:in.3dot}}</text>
+  <text class="label" x="316.95" y="92">past the underside</text>
+  <line class="leader" x1="314.95" y1="96" x2="292.6" y2="130"/>
+  <circle class="leader-dot" cx="292.6" cy="130" r="2"/>
+  <text class="label" x="610" y="254">Z0, the plate top</text>
+  <line class="leader" x1="606" y1="250" x2="471.5" y2="250"/>
+  <circle class="leader-dot" cx="471.5" cy="250" r="2"/>
+  <text class="label" x="610" y="226.6">fence</text>
+  <text class="label" x="608" y="330">1 in + 1/2 in</text>
+  <text class="label" x="608" y="346">parallels (broken),</text>
+  <text class="label" x="608" y="362">clear of the holes</text>
+  <line class="leader" x1="606" y1="326" x2="552.06" y2="332.83"/>
+  <circle class="leader-dot" cx="552.06" cy="332.83" r="2"/>
+  <text class="label" x="135" y="394.83">moving jaw</text>
+  <text class="label" x="560" y="394.83">fixed jaw</text>
+  <text class="label" x="20" y="60">Drawn at hole 2 (X 107.950), inside the jaws.</text>
+  <text class="label" x="20" y="76">The NC drills hole 1 first: X 25.400, in the</text>
+  <text class="label" x="20" y="92">overhang, 1.88 in past the left jaw; then</text>
+  <text class="label" x="20" y="108">holes 2, 3 and 4 (X 279.400, overhang).</text>
+</svg>

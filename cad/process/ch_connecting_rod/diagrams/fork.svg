@@ -1,36 +1,50 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<!-- Setup 5: same load; the slitting saw slots both forks in one sweep; spot, drill and ream the pin holes. Styles: prechips.palette. -->
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 545" width="900" height="545" font-family="sans-serif" font-size="12">
-<rect class="paper" width="900" height="545"/>
-<text class="title" x="20" y="22">Face F up: fork slot and pin hole (top view)</text>
-<rect class="clamp" x="85" y="46" width="460" height="24"/>
-<text class="label" x="270" y="62">fixed jaw</text>
-<rect class="fixture-plate" x="50" y="76" width="442" height="283" fill-opacity="0.35"/>
-<circle class="cutter" cx="650" cy="359" r="101"/>
-<rect class="part-rest" x="50" y="70.0" width="541.8" height="147.3"/>
-<path class="part-kept" d="M50.0 75.2 L204.1 75.2 L204.1 115.1 L539.5 115.1 L539.5 92.5 L577.4 92.5 A51.2 51.2 0 0 1 591.8 94.6 L591.8 192.8 A51.2 51.2 0 0 1 577.4 194.9 L539.5 194.9 L539.5 172.2 L204.1 172.2 L204.1 212.2 L50.0 212.2 Z"/>
-<path class="holes" fill-rule="evenodd" d="M527.7 92.5 L577.4 92.5 A51.2 51.2 0 0 1 591.8 94.6 L591.8 192.8 A51.2 51.2 0 0 1 577.4 194.9 L527.7 194.9 Z M527.7 129.3 L577.4 129.3 A14.4 14.4 0 0 1 577.4 158.0 L527.7 158.0 Z"/>
-<circle class="holes" cx="118.1" cy="143.7" r="44.7"/>
-<circle class="holes" cx="577.4" cy="143.7" r="2.9"/>
-<text class="label" x="38" y="84.0">1</text>
-<rect class="part-rest" x="50" y="217.3" width="541.8" height="147.3"/>
-<path class="part-kept" d="M50.0 222.5 L204.1 222.5 L204.1 262.4 L539.5 262.4 L539.5 239.8 L577.4 239.8 A51.2 51.2 0 0 1 591.8 241.9 L591.8 340.1 A51.2 51.2 0 0 1 577.4 342.2 L539.5 342.2 L539.5 319.5 L204.1 319.5 L204.1 359.5 L50.0 359.5 Z"/>
-<path class="holes" fill-rule="evenodd" d="M527.7 239.8 L577.4 239.8 A51.2 51.2 0 0 1 591.8 241.9 L591.8 340.1 A51.2 51.2 0 0 1 577.4 342.2 L527.7 342.2 Z M527.7 276.6 L577.4 276.6 A14.4 14.4 0 0 1 577.4 305.3 L527.7 305.3 Z"/>
-<circle class="holes" cx="118.1" cy="291.0" r="44.7"/>
-<circle class="holes" cx="577.4" cy="291.0" r="2.9"/>
-<text class="label" x="38" y="231.3">2</text>
-<rect class="clamp" x="85" y="365" width="460" height="24"/>
-<text class="label" x="270" y="381">moving jaw</text>
-<line class="datum" x1="50" y1="36" x2="50" y2="399"/>
-<text class="datum-label" x="10" y="415">X0 left ends</text>
-<text class="label" x="170" y="415">F up; support plate (6061) on two 1 in parallels</text>
-<line class="hidden" x1="549.1" y1="129.3" x2="549.1" y2="158.0"/>
-<line class="hidden" x1="549.1" y1="276.6" x2="549.1" y2="305.3"/>
-<path class="arrow" d="M830 345 V60"/>
-<text class="label" x="840" y="66">+Y</text>
-<circle class="cutter" cx="684.4" cy="143.7" r="101.3"/>
-<text class="label" x="170" y="477">fork ends round, already cut through round them (CR04, Setup 4)</text>
-<text class="label" x="170" y="495">this setup: the slot between the tines (hidden, floor dashed) and the pin hole</text>
-<text class="label" x="170" y="513">touch-off: the upper saw over fork 1, where CR05 parks, its rim .118 in over the crown</text>
-<text class="label" x="170" y="531">saw along +Y at two heights (lower saw); spot, #49, ream</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 840 430" width="840" height="430" font-family="sans-serif" font-size="13">
+  <!-- Setup 5. Hand picture, from above at 1.6 px/mm, the section at 2.4 px/mm. From the plan's [parameters]: blanks 2 x 1/4 in (blank_width_in, blank_thickness_max_mm), two side by side across the jaws, 50.8 mm apart (blank_pitch_mm); the jaws X 12.0 to 170.674 (jaw_start_mm, jaw_end_mm), their tops 6.845 mm over the plate (jaw_top_mm); the support plate 99.06 x 152.4 x 12.7 mm (support_plate_*_mm) from X0, centred across the load (its place across is not stated), on two 1 in parallels (parallel_height_mm), 1/8 in thick (the parallel set's thickness as the shaft plans' parallel_thickness_mm restates it). Not on record, drawn schematic: the jaws' depth (6 mm drawn), the vise body, the parallels' length (drawn jaw to jaw). The part outline in the view from above is main's picture, rescaled. Z0 the plate's top (face D), touched from the saw. CR06's first cut on the part: the slitting saw to scale (saw_dia_mm 69.85, saw_thickness_mm 1.6256; shop tools.slitting-saw-2-75-064), horizontal on the R8 stepped arbor (body and cap Ø1.25, saw_arbor_body_dia_mm, saw_arbor_cap_dia_mm; cap .50 thick, saw_arbor_cap_thickness_mm; all in the tool colour, the body drawn short to a break line; the screw head under the cap not drawn, its stand past the cap is measured in the setup). The light pass: centre X 219.289 (its rim slot_light_mm 2.455 into the crowns, crown_x_mm 186.819), lower face Z 1.702 (saw_low_mm), fed +Y from Y -139.065 to +37.465; drawn at Y -25.400, fork 1. The six passes after it (slot_step_mm 4.911, to the slot floor X 172.087 at Z 1.702 and Z 2.769) are not drawn. -->
+  <rect class="paper" x="0" y="0" width="840" height="430"/>
+  <text class="title" x="20" y="24">Setup 5, CR06's first pass: from above (1.6 px/mm); section along fork 1 (2.4 px/mm)</text>
+  <rect class="part-rest" x="30" y="75" width="298.92" height="81.27"/>
+  <path class="part-kept" d="M 30 77.87 L 115.02 77.87 L 115.02 99.88 L 300.07 99.88 L 300.07 87.41 L 320.98 87.41 A 28.25 28.25 0 0 1 328.92 88.57 L 328.92 142.75 A 28.25 28.25 0 0 1 320.98 143.91 L 300.07 143.91 L 300.07 131.39 L 115.02 131.39 L 115.02 153.46 L 30 153.46 Z"/>
+  <path class="holes" fill-rule="evenodd" d="M 293.56 87.41 L 320.98 87.41 A 28.25 28.25 0 0 1 328.92 88.57 L 328.92 142.75 A 28.25 28.25 0 0 1 320.98 143.91 L 293.56 143.91 Z M 293.56 107.72 L 320.98 107.72 A 7.94 7.94 0 0 1 320.98 123.55 L 293.56 123.55 Z"/>
+  <circle class="holes" cx="67.57" cy="115.66" r="24.66"/>
+  <rect class="part-rest" x="30" y="156.27" width="298.92" height="81.27"/>
+  <path class="part-kept" d="M 30 159.14 L 115.02 159.14 L 115.02 181.15 L 300.07 181.15 L 300.07 168.68 L 320.98 168.68 A 28.25 28.25 0 0 1 328.92 169.84 L 328.92 224.02 A 28.25 28.25 0 0 1 320.98 225.18 L 300.07 225.18 L 300.07 212.66 L 115.02 212.66 L 115.02 234.72 L 30 234.72 Z"/>
+  <path class="holes" fill-rule="evenodd" d="M 293.56 168.68 L 320.98 168.68 A 28.25 28.25 0 0 1 328.92 169.84 L 328.92 224.02 A 28.25 28.25 0 0 1 320.98 225.18 L 293.56 225.18 Z M 293.56 188.99 L 320.98 188.99 A 7.94 7.94 0 0 1 320.98 204.82 L 293.56 204.82 Z"/>
+  <circle class="holes" cx="67.57" cy="196.93" r="24.66"/>
+  <rect class="clamp" x="49.2" y="65.4" width="253.88" height="9.6"/>
+  <rect class="clamp" x="49.2" y="237.56" width="253.88" height="9.6"/>
+  <text class="label" x="158" y="61.4" text-anchor="middle">fixed jaw</text>
+  <text class="label" x="158" y="260.16" text-anchor="middle">moving jaw</text>
+  <path class="hidden" d="M30 77.03H273.84V235.53H30Z"/>
+  <line class="datum" x1="30" y1="55.8" x2="30" y2="253.56"/>
+  <text class="datum-label" x="28" y="266.56" text-anchor="middle">X0</text>
+  <text class="label" x="16" y="119.64" text-anchor="middle">1</text>
+  <text class="label" x="16" y="200.92" text-anchor="middle">2</text>
+  <circle class="cutter" cx="380.86" cy="115.64" r="55.88"/>
+  <circle class="cutter" cx="380.86" cy="115.64" r="25.4"/>
+  <line class="arrow" x1="380.86" y1="123.64" x2="380.86" y2="91.64"/>
+  <text class="label-halo" x="388.86" y="109.64">+Y</text>
+  <text class="label" x="20" y="300">The slitting saw's light pass along +Y across both</text>
+  <text class="label" x="20" y="316">crowns, {{process.slot_light_mm:in.3dot}} in, its lower face {{process.saw_low_mm:in.4dot}} over Z0;</text>
+  <text class="label" x="20" y="332">then steps of {{process.slot_step_mm:in.3dot}} to the slot's floor, at two</text>
+  <text class="label" x="20" y="348">heights. The #49 drill and the reamer have their own</text>
+  <text class="label" x="20" y="364">pictures; the centre drill's spot is not drawn.</text>
+  <text class="title" x="470" y="52">Section along fork 1 (Y −25.4), from the front</text>
+  <path class="clamp" d="M543.62 213.57L543.62 289.28L539.53 292.28L535.44 289.28L531.35 292.28L527.26 289.28L523.17 292.28L519.08 289.28L514.99 292.28L510.9 289.28L506.81 292.28L502.72 289.28L498.63 292.28L494.54 289.28L490.45 292.28L486.36 289.28L482.27 292.28L478.18 289.28L474.09 292.28L470 289.28L470 213.57Z"/>
+  <rect class="fixture-plate" x="470" y="230" width="29.76" height="30.48"/>
+  <path class="fixture-support" d="M543.62 260.48L543.62 289.28L539.53 292.28L535.44 289.28L531.35 292.28L527.26 289.28L523.17 292.28L519.08 289.28L514.99 292.28L510.9 289.28L506.81 292.28L502.72 289.28L498.63 292.28L494.54 289.28L490.45 292.28L486.36 289.28L482.27 292.28L478.18 289.28L474.09 292.28L470 289.28L470 260.48Z"/>
+  <path class="part-kept" d="M582.37 215.37L582.37 230L470 230L467 226.34L470 222.68L467 219.03L470 215.37Z"/>
+  <rect class="part-removed" x="576.47" y="222.01" width="5.89" height="3.9"/>
+  <rect class="cutter" x="622.19" y="225.92" width="76.2" height="30.48"/>
+  <rect class="cutter" x="576.47" y="222.01" width="167.64" height="3.9"/>
+  <path class="cutter" d="M622.19 222.01L698.39 222.01L698.39 134L694.58 137L690.77 134L686.96 137L683.15 134L679.34 137L675.53 134L671.72 137L667.91 134L664.1 137L660.29 134L656.48 137L652.67 134L648.86 137L645.05 134L641.24 137L637.43 134L633.62 137L629.81 134L626 137L622.19 134Z"/>
+  <line class="datum" x1="582.37" y1="196.4" x2="582.37" y2="244.4"/>
+  <text class="datum-label" x="578.37" y="192.4" text-anchor="end">crown</text>
+  <text class="label-halo" x="660.29" y="170" text-anchor="middle">arbor</text>
+  <text class="label-halo" x="660.29" y="246.16" text-anchor="middle">cap</text>
+  <text class="label" x="470" y="318">the jaws end at X 170.7 mm and the plate at</text>
+  <text class="label" x="470" y="334">152.4 mm, both behind: the fork overhangs; the</text>
+  <text class="label" x="470" y="350">cap passes beyond the crown, below its level,</text>
+  <text class="label" x="470" y="366">in the air</text>
+  <line class="datum" x1="470" y1="230" x2="494" y2="230"/>
+  <text class="datum-label" x="464" y="234" text-anchor="end">Z0</text>
 </svg>
