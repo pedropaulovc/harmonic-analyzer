@@ -51,10 +51,15 @@ revision = "{{cad.revision}}"
 material = "AISI O1 or W1 drill rod, 3/16 in, ground, annealed as supplied"
 stock = "Ø{{process.stock_dia_in:.4dot}} drill rod (McMaster 8893K178, on hand); one blank {{process.blank_length_in:.2dot}} in long."
 stock_refs = ["o1-drill-rod-3-16"]
-note = "Inches. Lathe PM-1127VF-LB (70–380 and 380–2000 rpm); cutting oil. The shank is the drill rod as supplied: grip it over a brass shim wrap and never cut it."
 shop = "../shop"
 material_key = "lathe-o1-drill-rod"
 turning_material = "steel_o1"
+
+# The shop's standing page carries what every traveler shares (units, lathe
+# speeds, coolant). The old note's shank rule prints where it applies: the
+# shim-wrap Holdings, the saw setup's mike op ("the shank is left as
+# supplied") and the bench op ("leave the shank's O.D. ... untouched").
+standing = true
 
 [cad]
 file = "../../out/features/mg_wheel_axle/features.toml"
