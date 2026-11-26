@@ -77,7 +77,6 @@ title = "This job"
 rows = [
   ["Finished", "{{cad.far_end_length_min_in:.3dot}}–{{cad.far_end_length_max_in:.3dot}} long (locating end to far end), {{cad.top_face_height_min_in:.3dot}}–{{cad.top_face_height_max_in:.3dot}} high (locating edge to top face), ({{cad.envelope_z_in:.2dot}}) deep (mating face to back face)."],
   ["To buy", "The 1/16 in end mill with 1/2 in of flutes (MSC 35497056) is TO BUY: not owned; Setup 6 stops at its relief until it is in hand."],
-  ["M6 stops", "At every M6 stop press Cycle Start only with hands clear."],
 ]
 
 [cad]
@@ -373,8 +372,8 @@ instruction_detailed = "Edge finder (900 rpm): on the fixed jaw's face beside th
 feed = "hand"
 
 [[setups.operations]]
-instruction = "G54 Z0: the faced back face, the sawn top's high point less the {{process.back_skim_mm:in.3dot}} skim."
-instruction_detailed = "Console M6 T1 (1/2 in end mill, at least 1.00 in out of the collet). Spindle stopped, its tip just dragging a .002 feeler leaf on the highest point of the sawn top: G10 L20 P1 Z0.559 (the {{process.back_skim_mm:in.3dot}} skim plus the .002 leaf)."
+instruction = "G54 Z0: the faced back face, the sawn top's high point less the {{process.back_skim_mm:in.3dot}} skim. At every M6 stop press Cycle Start only with hands clear."
+instruction_detailed = "Console M6 T1 (1/2 in end mill, at least 1.00 in out of the collet). At every M6 stop press Cycle Start only with hands clear. Spindle stopped, its tip just dragging a .002 feeler leaf on the highest point of the sawn top: G10 L20 P1 Z0.559 (the {{process.back_skim_mm:in.3dot}} skim plus the .002 leaf)."
 feed = "hand"
 
 [[setups.operations]]
@@ -704,7 +703,7 @@ vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{cad.envelope_z_mm}}", alon
 beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{cad.envelope_x_mm}}"], clamp_mm = [0, "{{cad.envelope_x_mm}}"], section_mm = { y = "{{cad.envelope_z_mm}}", z = "{{cad.envelope_y_mm}}" }, vise_left = "start" }
 
 [[setups.operations]]
-instruction = "Before the block goes in, G54 Z0: the stacks' top, touched with the 1/2 in end mill on the fixed-jaw stack, the jaws open, as Setup 5: console M6 T1; jog it over the fixed-jaw stack, its edge clear of the jaw; spindle stopped, its tip just dragging a .002 feeler leaf on the stack: G10 L20 P1 Z0.051. Raise Z. MS07b_far_chamfer's M6 T4 then measures the chamfer mill against it."
+instruction = "Before the block goes in, G54 Z0: the stacks' top, touched with the 1/2 in end mill on the fixed-jaw stack, the jaws open, as Setup 5: console M6 T1; jog it over the fixed-jaw stack, its edge clear of the jaw; spindle stopped, its tip just dragging a .002 feeler leaf on the stack: G10 L20 P1 Z0.051. Raise Z."
 feed = "hand"
 
 [[setups.operations]]
@@ -740,7 +739,7 @@ beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{cad.envelope_x_mm}}
 
 [[setups.operations]]
 instruction = "Before the block goes in, G54 Z0: the stacks' top, touched with the 1/8 in end mill on the fixed-jaw stack, the jaws open."
-instruction_detailed = "Before the block goes in, the stacks in place and the jaws open: console M6 T2 (the 1/8 in end mill). Jog it over the fixed-jaw stack, clear of the jaw. Spindle stopped, its tip just dragging a .002 feeler leaf on the stack: G10 L20 P1 Z0.051. Raise Z. MS08_thumb's M6 T5 then measures the centre drill against it. Not with the block in: the collet would reach the block first."
+instruction_detailed = "Before the block goes in, the stacks in place and the jaws open: console M6 T2 (the 1/8 in end mill). Jog it over the fixed-jaw stack, clear of the jaw. Spindle stopped, its tip just dragging a .002 feeler leaf on the stack: G10 L20 P1 Z0.051. Raise Z. Not with the block in: the collet would reach the block first."
 feed = "hand"
 
 [[setups.operations]]
