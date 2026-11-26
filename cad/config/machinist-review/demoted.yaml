@@ -50,7 +50,7 @@ demoted:
   # fit conversion, "better to be able to cut releases with known issues than
   # to hold unreleased code": a sheet that reads FIX at its batch's last run
   # stays here with an issue until that issue's fix reads SHIP; no owner
-  # number changed; #2144.
+  # number changed; #2144 (rulings.md D39).
   mg_magnifier_assembly: fit-batch-ch
   pd_paper_drive_assembly: fit-batch-pd
   pd_platen_bottom_guide: fit-batch-pd
