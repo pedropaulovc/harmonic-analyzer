@@ -517,7 +517,7 @@ tool = "reamer"
 drilling = "none"
 sizing = "other"
 instruction = "Ream .1260 right through from the tailstock, spindle running, in one slow feed; withdraw with the spindle still running."
-diagram = { file = "diagrams/bush-ream.svg", alt = "To scale: the .1260 reamer from the tailstock right through the #31 hole." }
+diagram = { file = "diagrams/bush-ream.svg", alt = "To scale: the .1260 reamer from the tailstock right through the #31 hole; its lead chamfer drawn schematic (no size on record)." }
 rpm = 600
 feed = "tailstock quill by hand, slow and light, dry; withdraw with the spindle running"
 cut_diameter_mm = 3.2004

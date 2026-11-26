@@ -557,7 +557,7 @@ tool = "reamer"
 drilling = "none"
 sizing = { kind = "band", band_mm = "{{cad.press_hole_dia_band_mm}}" }
 instruction = "Same file, M6 T5 (the set's .4385 reamer in the drill chuck; set 400, cutting oil on the reamer only, a drop, wiped so none runs to the tape): ream K through, fed in and fed out, spindle running, {{process.ream_past_mm:in.3dot}} under face A. The file ends there. K is not gauged: MHA-PD-28's traveler turns the bush to this hole."
-diagram = { file = "diagrams/bond-ream.svg", alt = "To scale, the same section at K: the .4385 reamer through K, its end {{process.ream_past_mm:in.3dot}} under face A." }
+diagram = { file = "diagrams/bond-ream.svg", alt = "To scale, the same section at K: the .4385 reamer through K, its end {{process.ream_past_mm:in.3dot}} under face A; its lead chamfer drawn schematic (no size on record)." }
 rpm = 400
 feed = "{{process.ream_feed_per_min_mm:in.1f}} in/min, in and out"
 milling_cuts = [

@@ -412,7 +412,7 @@ tool = "reamer-0930"
 drilling = "none"
 sizing = "other"
 instruction = "Same file, M6 T3 (the .0930 reamer, to buy): ream both dowel holes through, its end {{process.ream_past_mm:in.3dot}} past the seat face, fed in and fed out, no peck; set 1400. At the M6 T4 stop (spindle stopped by the file's M5, the reamer raised clear: confirm both before reaching in), still clamped, offer a MHA-PD-VN-54 dowel to each hole's mouth by hand."
-diagram = { file = "diagrams/mill-ream-dowel.svg", alt = "To scale, the same section: the .0930 reamer through dowel hole A, its end {{process.ream_past_mm:in.3dot}} past the seat face." }
+diagram = { file = "diagrams/mill-ream-dowel.svg", alt = "To scale, the same section: the .0930 reamer through dowel hole A, its end {{process.ream_past_mm:in.3dot}} past the seat face; its lead chamfer drawn schematic (no size on record)." }
 settings = "pd-collar-ream-0930-c360"
 inspection = "Dowel holes: the MHA-PD-VN-54 dowel is the gauge. It does not enter either hole by hand past its lead."
 gauge_checks = "other"
@@ -444,7 +444,7 @@ tool = "reamer-0615"
 drilling = "none"
 sizing = "other"
 instruction = "Same file, M6 T5 (the .0615 reamer, to buy): ream the flat pin's hole blind, the reamer's end {{process.flat_ream_station_in:.3dot}} from the seat face (Z{{process.flat_ream_tip_mm:.3f}} mm in the file), fed in and fed out; set 1400. The file ends with the spindle stopped and the reamer raised clear. Still clamped, offer the MHA-PD-VN-70 pin to the hole's mouth by hand."
-diagram = { file = "diagrams/mill-ream-flat.svg", alt = "To scale, the same section: the .0615 reamer in the flat pin's hole, its end {{process.flat_ream_station_in:.3dot}} from the seat face." }
+diagram = { file = "diagrams/mill-ream-flat.svg", alt = "To scale, the same section: the .0615 reamer in the flat pin's hole, its end {{process.flat_ream_station_in:.3dot}} from the seat face; its lead chamfer drawn schematic (no size on record)." }
 settings = "pd-collar-ream-0615-c360"
 inspection = "Flat pin's hole: the MHA-PD-VN-70 pin is the gauge. It does not enter by hand past its lead."
 gauge_checks = "other"

@@ -192,7 +192,7 @@ tool = "reamer"
 drilling = "none"
 sizing = { kind = "band", band_mm = "{{cad.bore_dia_band_mm}}" }
 instruction = "Ream .1260 from the tailstock, spindle running: feed the reamer in until its lead chamfer meets the hole's mouth and zero the quill scale there; feed slowly until it reads {{cad.run_in:.2dot}} (past the parting line), and withdraw with the spindle still running. The bore runs on the MHA-PD-23 pin: Ra 63."
-diagram = { file = "diagrams/bar-ream.svg", alt = "To scale: the .1260 reamer from the tailstock in the #31 hole, to the quill reading {{cad.run_in:.2dot}}." }
+diagram = { file = "diagrams/bar-ream.svg", alt = "To scale: the .1260 reamer from the tailstock in the #31 hole, to the quill reading {{cad.run_in:.2dot}}; its lead chamfer drawn schematic (no size on record)." }
 settings = "lathe-ream-1260-c360"
 cut_diameter_mm = "{{cad.bore_dia_mm}}"
 

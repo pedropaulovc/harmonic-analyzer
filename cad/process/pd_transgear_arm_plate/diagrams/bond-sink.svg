@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 430" width="760" height="430" font-family="sans-serif" font-size="13">
-  <!-- Hand picture, to scale. Left: a section across the jaws, from the RIGHT end, 4.5 px/mm (the fixed jaw on the right): the two 1 in parallels against the jaws (1/8 thick, as the other PD plans' parallel_thickness_mm; the parallels' and jaws' length and the jaws' thickness are not on record), the 6061 spoil block 3 x 1 in (spoil_width_mm, spoil_height_mm) on them, its top 5.85 mm over the jaw tops (spoil_over_jaws_mm), the tape stack .28 mm (tape_stack_mm), the blank 1.5 in wide (C edge flush with the block's fixed-jaw edge) and 6.3 mm thick (the bar as supplied); the jaws, parallels and block drawn short to a break line toward the bed. The 1-2-3 block that set the C edge is taken away before any cut and is not drawn. The 3/8 in 82 deg countersink to scale (riser-countersink, cutter_dia_mm 9.525 = 42.9 px), its point Z.4456 above face A (sink_tip_mm, the posted AP02 depth) on the screw hole at Y-10.875 (posted first; then Y+4.125): the rim Ø.312 (sink_dia_mm) at the rear face; drawn short to a break line. Both screw holes drilled #1 (white). -->
+  <!-- Hand picture, to scale. Left: a section across the jaws, from the RIGHT end, 4.5 px/mm (the fixed jaw on the right): the two 1 in parallels against the jaws (1/8 thick, as the other PD plans' parallel_thickness_mm; the parallels' and jaws' length and the jaws' thickness are not on record), the 6061 spoil block 3 x 1 in (spoil_width_mm, spoil_height_mm) on them, its top 5.85 mm over the jaw tops (spoil_over_jaws_mm), the tape stack .28 mm (tape_stack_mm), the blank 1.5 in wide (C edge flush with the block's fixed-jaw edge) and 6.3 mm thick (the bar as supplied); the jaws, parallels and block drawn short to a break line toward the bed. The 1-2-3 block that set the C edge is taken away before any cut and is not drawn. From above, the block's tape is drawn as the tape op lays it: two 1.41 in strips about 3 in long from 1/4 in in from the block's right end, 1/4 in past the blank's R end. The 3/8 in 82 deg countersink to scale (riser-countersink, cutter_dia_mm 9.525 = 42.9 px), its point Z.4456 above face A (sink_tip_mm, the posted AP02 depth) on the screw hole at Y-10.875 (posted first; then Y+4.125): the rim Ø.312 (sink_dia_mm) at the rear face; drawn short to a break line. Both screw holes drilled #1 (white). -->
   <rect class="paper" x="0" y="0" width="760" height="430"/>
   <text class="title" x="20" y="22">Setup 2, AP02 T6: the 82 deg countersink on screw hole 1 (to scale)</text>
   <path class="clamp" d="M47.1 232.61L97.1 232.61L97.1 415L89.96 412L82.81 415L75.67 412L68.53 415L61.39 412L54.24 415L47.1 415Z"/>
@@ -32,7 +32,7 @@
   <rect class="clamp" x="520" y="106.53" width="168" height="16.8"/>
   <rect class="clamp" x="520" y="230.01" width="168" height="16.8"/>
   <rect class="fixture-plate" x="539.3" y="123.33" width="124.46" height="106.68"/>
-  <rect class="bond" x="558.92" y="123.33" width="87.08" height="53.34"/>
+  <rect class="bond" x="548.19" y="123.33" width="106.68" height="100.28"/>
   <rect class="part-kept" x="558.92" y="123.33" width="87.08" height="53.34"/>
   <path class="hidden" d="M565.61 176.67 L609.98 176.67 L632.62 165.67 A17.42 17.42 0 0 0 632.62 134.33 L609.98 123.33 L567.75 123.33 Z"/>
   <circle class="hidden" cx="625" cy="150" r="7.8"/>
@@ -40,7 +40,11 @@
   <circle class="hidden" cx="581.98" cy="144.22" r="4.05"/>
   <circle class="cutter" cx="581.98" cy="165.22" r="6.67"/>
   <text class="title" x="520" y="44">from above (1.4 px/mm)</text>
-  <text class="label" x="520" y="270">fixed jaw at the top (jaws drawn short);</text>
-  <text class="label" x="520" y="286">X0 Y0 at K; dashed: the outline (AP03)</text>
-  <text class="label" x="520" y="302">and the holes, cut later</text>
+  <text class="label" x="520" y="264">blue tape on the block,</text>
+  <text class="label" x="520" y="280">1/4 in past the blank</text>
+  <line class="leader" x1="540" y1="254" x2="648.8" y2="206"/>
+  <circle class="leader-dot" cx="648.8" cy="206" r="2"/>
+  <text class="label" x="520" y="306">fixed jaw at the top (jaws drawn short);</text>
+  <text class="label" x="520" y="322">X0 Y0 at K; dashed: the outline (AP03)</text>
+  <text class="label" x="520" y="338">and the holes, cut later</text>
 </svg>

@@ -392,7 +392,7 @@ tool = "reamer-1260"
 drilling = "none"
 sizing = { kind = "band", band_mm = "{{cad.pin_bore_dia_band_mm}}" }
 instruction = "Same file, M6 T6: the .1260 reamer through the pin bore, in and out at feed; set 1200. Cutting oil."
-diagram = { file = "diagrams/holes-ream.svg", alt = "To scale, the section at the pin bore C: the .1260 reamer through, its end {{process.ream_past_mm:in.3dot}} past face A." }
+diagram = { file = "diagrams/holes-ream.svg", alt = "To scale, the section at the pin bore C: the .1260 reamer through, its end {{process.ream_past_mm:in.3dot}} past face A; its lead chamfer drawn schematic (no size on record)." }
 rpm = 1200
 feed = "3.6 in/min"
 milling_cuts = [
