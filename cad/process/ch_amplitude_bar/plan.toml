@@ -795,10 +795,6 @@ instruction = "G54 Z0 again, from the saw's lower face: spindle stopped, turn th
 feed = "hand"
 
 [[setups.operations]]
-instruction = "First load only: prove CA02_foot_notch in air, Z0 raised {{process.saw_proof_raise_mm:in.3f}} in (send $#, then G10 L2 P1 Z(the G54 line's Z + {{process.saw_proof_raise_mm:.3f}})); it rises straight to its clear height before any X or Y move, and the saw, the arbor's body, the cap and the screw clear the jaws and the four bars' ends; Cycle Start again at its M0 stop. Then Z0 back."
-feed = "hand"
-
-[[setups.operations]]
 speed_kind = "spindle"
 tool = "saw"
 drilling = "none"
@@ -974,10 +970,6 @@ instruction = "G54 Z0 again, from the saw's lower face: spindle stopped, turn th
 feed = "hand"
 
 [[setups.operations]]
-instruction = "First load only: prove CA04_top_notch in air, Z0 raised {{process.saw_proof_raise_mm:in.3f}} in (send $#, then G10 L2 P1 Z(the G54 line's Z + {{process.saw_proof_raise_mm:.3f}})); it rises straight to its clear height before any X or Y move, and the saw, the arbor's body, the cap and the screw clear the jaws and the four bars' ends; Cycle Start again at its M0 stop. Then Z0 back."
-feed = "hand"
-
-[[setups.operations]]
 speed_kind = "spindle"
 tool = "saw"
 drilling = "none"
@@ -1025,7 +1017,7 @@ instruction = "Jog Z only, up (X and Y untouched), until the clamped saw clears 
 feed = "hand"
 
 [[setups.operations]]
-instruction = "G54 Z0 again with T3: console M6 T3 (the tool setter measures it; T4 and T5 are measured against it at their M6), spindle stopped, its tip on a .002 leaf on the P1 bar's top inside the jaws, G10 L20 P1 Z(that bar's top-end L-to-R reading × 25.4 + 0.051)."
+instruction = "G54 Z0 again with T3: console M6 T3, spindle stopped, its tip on a .002 leaf on the P1 bar's top inside the jaws, G10 L20 P1 Z(that bar's top-end L-to-R reading × 25.4 + 0.051)."
 feed = "hand"
 
 [[setups.operations]]
@@ -1045,7 +1037,7 @@ speed_kind = "spindle"
 tool = "drill-49"
 drilling = "twist_drill"
 sizing = "other"
-instruction = "Same file, M6 T4: change to the #49 {{process.drill_projection_mm:in.2f}} out of the chuck, set 2800, Cycle Start: the M6 measures it on the tool setter against T3's Z0 (do not touch off again). It drills both cheeks of each bar, pecks of {{process.peck_mm:in.3dot}}, full retract, full diameter {{process.drill_past_mm:in.3dot}} past R. Cutting oil."
+instruction = "Same file, M6 T4: change to the #49 {{process.drill_projection_mm:in.2f}} out of the chuck, set 2800, Cycle Start. It drills both cheeks of each bar, pecks of {{process.peck_mm:in.3dot}}, full retract, full diameter {{process.drill_past_mm:in.3dot}} past R. Cutting oil."
 rpm = 2800
 feed = "{{process.drill_feed_per_min_mm:in.1f}} in/min"
 hole_depth_mm = "{{cad.envelope_thickness_mm}}"
@@ -1059,7 +1051,7 @@ speed_kind = "spindle"
 tool = "reamer-0775"
 drilling = "none"
 sizing = { kind = "band", band_mm = "{{cad.top_pin_hole_dia_band_mm}}" }
-instruction = "Same file, M6 T5: change to the .0775 reamer (to buy) {{process.ream_projection_mm:in.2f}} out of the chuck, set 2000, Cycle Start: the M6 measures it on the tool setter against T3's Z0 (do not touch off again). It reams each hole through, in and out at feed, its full diameter {{process.ream_past_mm:in.3dot}} past the R face. Cutting oil."
+instruction = "Same file, M6 T5: change to the .0775 reamer (to buy) {{process.ream_projection_mm:in.2f}} out of the chuck, set 2000, Cycle Start. It reams each hole through, in and out at feed, its full diameter {{process.ream_past_mm:in.3dot}} past the R face. Cutting oil."
 rpm = 2000
 feed = "{{process.ream_feed_per_min_mm:in.1f}} in/min, in and out"
 milling_cuts = [

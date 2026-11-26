@@ -490,10 +490,6 @@ instruction_detailed = "Console M6 T1. MDI G0 X5.000 Y0.000: over the O.D. left 
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Prove PS01_flat in air, Z0 raised 1.000 in (the standing page's console entries). Then Z0 back."
-feed = "hand"
-
-[[setups.operations]]
 speed_kind = "spindle"
 tool = "em-eighth"
 drilling = "none"

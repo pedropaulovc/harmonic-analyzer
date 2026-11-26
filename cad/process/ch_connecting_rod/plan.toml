@@ -125,8 +125,7 @@ standing = true
 title = "This job"
 rows = [
   ["Faces", "D, the datum face (the fork's near face), stays as bought; F, the fork's far face, is skimmed in Setup 2. Mark D on each blank in Setup 1 and keep it readable."],
-  ["G54 X and Y", "Pick up G54 X and Y once, in Setup 2, and again after any other controller reset, an alarm, a stall or an E-stop (FluidNC loses home: home first), except with the saw mounted (Setup 5): there $H brings the stored G54 back, the edge finder not fitting with the arbor in."],
-  ["Kept through", "The vise, the parallels and the plate stay put, so X and Y carry through Setups 2 to 6."],
+  ["G54 X and Y", "Pick up G54 X and Y once, in Setup 2: the vise, the parallels and the plate stay put, so X and Y carry through Setups 2 to 6."],
   ["Order", "Setups 2 and 3 each run for all the loads in turn before the next; Setups 4, 5 and 6 are one clamping, run through on each load before the next load is clamped."],
   ["To buy", "To buy before Setup 5: the .0775 reamer and the .061-.500 pin-gauge set (its .079 pin). The slitting saw and its R8 stepped saw arbor are owned."],
 ]
@@ -835,7 +834,7 @@ machine = "PM-30MV CNC (FluidNC, CNCjs with the electronic tool setter) / vise, 
 indexing = "none"
 machine_ref = "pm-30mv"
 holding = "Unchanged from Setup 4: the same load, F up, still clamped."
-datum = "Programs CR06_slot (the saw) and CR07_pin (T3, T4, T5). G54 X0 and Y0 unchanged; Z0 touched again from the saw, then from T3."
+datum = "Programs CR06_slot (the saw) and CR07_pin (T3, T4, T5). G54 X0 and Y0 unchanged; Z0 touched again from the saw, then from T3. With the saw mounted, $H brings the stored G54 back, the edge finder not fitting with the arbor in."
 diagram = { file = "diagrams/fork.svg", alt = "The pair F up, the forks past the jaws' right end: the slitting saw, horizontal, slots both forks in one sweep along the jaws; the pin holes are drilled and reamed down through the forks." }
 # The saw arbor is the shortest tool: its saw's lower face is at least the
 # saw's own thickness below the nose (the shoulder's height below the nose
@@ -908,10 +907,6 @@ feed = "hand"
 
 [[setups.operations]]
 instruction = "G54 Z0 again, from the saw's lower face: spindle stopped, turn the saw by hand until the tooth marked LOW is over the fork against the fixed jaw, the rim .118 in over its crown. Jog Z only, down in CNCjs (.001 in steps near the leaf), until a .002 feeler leaf just drags under the saw on the fork's F face; G10 L20 P1 Z{{process.fork_touch_z_mm:.3f}} (the fork's {{process.fork_thickness_mm:.3f}} plus the leaf). CR06 loads no tool."
-feed = "hand"
-
-[[setups.operations]]
-instruction = "First load only: prove CR06_slot in air, Z0 raised 1.000 in: it rises straight to its clear height before any X or Y move and between its passes; the saw, the arbor's body, the cap and the screw clear the jaws, the frames' ends and both crowns; Cycle Start again at its M0 stop. Then Z0 back."
 feed = "hand"
 
 [[setups.operations]]
