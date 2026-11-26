@@ -61,11 +61,12 @@ OUTPUT_NAMES = (REPORT_NAME, PICTURE_NAME, LOG_NAME)
 TIMEOUT_S = 1800
 # freecadcmd processes at once: each part and blank length is one.
 PARALLEL = 4
-# A program of more moves is cut in one boolean, not move by move (one move's
-# boolean on the growing part costs ~0.3 s: ms_stick's 1900 engraving
-# strokes ran past the 30 min timeout). Its passes and rapids are then
-# measured against the part before and after it (_freecad_as_machined).
-MOVE_CAP = 200
+# A program of more moves is not cut move by move (one move's boolean costs
+# more as the part grows: ms_stick's 540 numeral strokes take 300 s so, its
+# 2400 graduation strokes ran past the 30 min timeout) but as one union of
+# its moves (_freecad_as_machined). Its passes and rapids are then measured
+# against the part before and after it. Every milling program is under it.
+MOVE_CAP = 400
 # The tool's envelope reaches this far above the blank's top in each setup.
 CLEAR_MM = 5.0
 # A ramp is cut as flat pieces at their lower end, each dropping at most this.
@@ -405,19 +406,44 @@ def is_pass(move: _gcode.Move, profile: list[tuple[float, float]]) -> bool:
             and move.length >= 2 * max(r for r, _h in profile))
 
 
+def drop_stood(found: list[dict[str, Any]], tool: int, last: tuple | None) -> tuple[list[dict[str, Any]], tuple | None]:
+    """Drop what the tool already cut standing where the program's previous
+    piece left it (the same tool, point and Z): a line's start cap, and a
+    retract's standing (a rise stands at its lowest point, its start). The
+    removal is unchanged; ms_stick's numerals: the strokes' coincident caps
+    doubled the booleans' time, and its 707 retracts out of the strokes
+    cost a boolean each. Also where this move leaves the tool."""
+    kept = []
+    for piece in found:
+        if piece["kind"] == "seg":
+            if piece["caps"][0] and last == (tool, *piece["a"], piece["z"]):
+                piece["caps"][0] = False
+            last = (tool, *piece["b"], piece["z"])
+        elif piece["kind"] == "stand":
+            here = (tool, piece["x"], piece["y"], piece["z"])
+            if here == last:
+                continue
+            last = here
+        else:
+            last = None
+        kept.append(piece)
+    return kept, last
+
+
 def program_moves(program: _gcode.Program, setup: Setup, top: float, profiles) -> tuple[list[dict], int]:
     """The program's moves FreeCAD cuts (those of a tool with a profile that
     can reach the blank), and how many moves of tools without a cutting
     shape (tap guides, probes) were left out. Rapids and passes are marked
     ``probe``: what a program too long to cut move by move still measures."""
-    spec, uncut = [], 0
+    spec, uncut, last = [], 0, None
     for index, (move, tool) in enumerate(zip(program.moves, move_tools(program, setup.entry_tool))):
         if move.start == move.end and move.centre is None:
             continue
         if tool not in profiles:
-            uncut += 1
+            uncut, last = uncut + 1, None
             continue
-        if found := pieces(move, top):
+        found, last = drop_stood(pieces(move, top), tool, last)
+        if found:
             probe = "rapid" if move.motion is _gcode.Motion.RAPID else "pass" if is_pass(move, profiles[tool]) else None
             spec.append({"index": index, "tool": tool, "pieces": found, "probe": probe})
     return spec, uncut

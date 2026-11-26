@@ -43,6 +43,8 @@ REMOVED_EPS_MM3 = 1e-6
 REGION_MIN_MM3 = 1e-3
 # The largest regions measured one by one, per side.
 REGION_CAP = 40
+# Solids fused at once when a long program's moves are joined (_union).
+UNION_CHUNK = 50
 # Tessellation points per region whose distance to the other solid is measured.
 THICKNESS_POINTS = 400
 # Points sampled across each region face, per parameter direction.
@@ -162,10 +164,23 @@ def _common(cutter, part):
     return sum(part.common(solid).Volume for solid in cutter.Solids if solid.BoundBox.intersect(part.BoundBox))
 
 
+def _union(cutters, part):
+    """The union of the cutters' solids that reach ``part``'s bound box:
+    UNION_CHUNK at a time, then the chunks pairwise. One boolean of them all
+    meets every stroke's neighbours at once; ms_stick's 540 numeral strokes:
+    one cut each 300 s, in chunks of 20 moves 57 s, as this union 43 s."""
+    solids = [s for c in cutters for s in c.Solids if s.BoundBox.intersect(part.BoundBox)]
+    level = [solids[k].fuse(solids[k + 1:k + UNION_CHUNK]) if len(solids[k:k + UNION_CHUNK]) > 1 else solids[k]
+             for k in range(0, len(solids), UNION_CHUNK)]
+    while len(level) > 1:
+        level = [level[i].fuse(level[i + 1]) if i + 1 < len(level) else level[i] for i in range(0, len(level), 2)]
+    return level[0] if level else None
+
+
 def simulate(part, programs, profiles, cad, move_cap):
     """Cut every move from ``part`` in order. A program of at most ``move_cap``
     moves is cut move by move: each move's removed volume is exact. A longer
-    one (engraving, long finishing) is cut in two booleans, its feed moves
+    one (engraving) is cut as two unions (:func:`_union`), its feed moves
     then its rapids; each probed move (a pass or a rapid, as the host marks
     them) is measured against the part before the program (a pass sharing
     nothing with it removed nothing) or after its feed moves (a rapid
@@ -204,12 +219,11 @@ def simulate(part, programs, profiles, cad, move_cap):
             cutters = [_cutter(move, profiles, program["top"], place) for move in moves]
             initial = part
             for rapid in (False, True):
-                solids = [solid for move, cutter in zip(moves, cutters) if (move.get("probe") == "rapid") == rapid
-                          for solid in cutter.Solids]
                 if rapid:
                     fed = part
-                if solids:
-                    cut = part.cut(solids)
+                union = _union([c for move, c in zip(moves, cutters) if (move.get("probe") == "rapid") == rapid], part)
+                if union is not None:
+                    cut = part.cut(union)
                     if not cut.Solids:
                         raise RuntimeError(f"{program['name']} cut the whole part away")
                     part, loose = _keep(cut, cad)

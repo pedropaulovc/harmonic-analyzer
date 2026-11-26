@@ -161,6 +161,20 @@ def test_pieces_of_plunges_ramps_helices_and_moves_above_the_blank(tmp_path):
     assert high == []
 
 
+def test_the_tool_does_not_cut_again_where_it_already_stood(tmp_path):
+    """Plunge and two strokes on from where it stood; a rise (it stood at
+    its foot: nothing to cut) and a stroke at the new Z (never stood there);
+    the stroke back with another tool."""
+    program = _program(tmp_path, "\n".join([
+        "G90 G17", "G0 X0 Y0 Z5", "G1 Z-1 F100", "G1 X10", "G1 Y10", "G1 Z-0.5", "G1 X0",
+        "M6 T2", "G1 X10 Y10 Z-0.5",
+    ]))
+    setup = SimpleNamespace(entry_tool=1)
+    moves, _uncut = am.program_moves(program, setup, 0.0, {1: [(3.0, 0.0)], 2: [(3.0, 0.0)]})
+    caps = [(m["index"], [p.get("caps") for p in m["pieces"]]) for m in moves]
+    assert caps == [(1, [None]), (2, [[False, True]]), (3, [[False, True]]), (5, [[True, True]]), (6, [[True, True]])]
+
+
 def test_moves_run_with_the_tool_of_the_last_tool_change(tmp_path):
     program = _program(tmp_path, "G0 X0 Y0 Z5\nG1 Z1 F10\nM6 T3\nG1 Z0\nM6 T4\nG1 Z-1\n")
     assert am.move_tools(program, 9) == [9, 9, 3, 4]
