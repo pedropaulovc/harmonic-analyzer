@@ -15,7 +15,7 @@ the approach, safe and clearance heights and the vise jaws' depth
 (keep-out shapes only).
 
 Route (plan text in ``plan.toml``): four 5/16 x 1 in blanks per load, side by
-side across the jaws on a faced 1/2 in aluminium spoil plate on 1 in
+side across the jaws on a faced 5/8 in aluminium spoil plate on 15/16 in
 parallels. Side B up: CL01 faces B to the hub's thickness, CL02 pockets B
 down to the plate's near face (the 1/2 in end mill's slot and its arc round
 the hub, then the 1/8 in end mill's rings into the bar-to-hub roots), CL03
@@ -491,30 +491,91 @@ def context(
     _agree(plan, "pocket_b_floor_mm", floor_b)
     _agree(plan, "pocket_a_floor_mm", floor_a)
 
-    # Holding: the spoil plate on the parallels; the jaws' top above Z0.
-    # The traveler gauges the jaws' top above the faced plate against a band
-    # (jaw_top_min_mm-jaw_top_max_mm); the guards and the keep-outs run at
-    # that band's ends, so any plate the band accepts is proved. The
-    # as-bought plate, before and after its one facing, must land inside it.
-    support = p["parallel_height_mm"] + p["spoil_plate_thickness_mm"]
+    # Holding: the spoil plate on the 15/16 in parallels; the jaws' top above
+    # Z0. The traveler gauges the jaws' top above the faced plate, clamped
+    # alone, against a band (jaw_top_min_mm-jaw_top_max_mm); the guards and
+    # the keep-outs run at that band's ends, so any plate the band accepts is
+    # proved. The plate's faced thickness band must land inside it (#3607,
+    # D44).
+    import cam_nc
+
+    floor = cam_nc.jaw_clearance_min_mm()
+    under = p["parallel_height_mm"]
+    support = under + p["spoil_plate_thickness_mm"]
     _agree(plan, "support_height_mm", support)
+    _agree(
+        plan,
+        "spoil_plate_thickness_mm",
+        (p["spoil_plate_thickness_min_mm"] + p["spoil_plate_thickness_max_mm"]) / 2,
+    )
     jaw_top_min, jaw_top_max = p["jaw_top_min_mm"], p["jaw_top_max_mm"]
-    if jaw_top_min < shop["limits"]["vise_grip_min_mm"]:
+    grip_min = shop["limits"]["vise_grip_min_mm"]
+    if jaw_top_min < grip_min:
         raise ValueError("the jaws grip the blanks less than the shop's minimum")
-    if jaw_top_max >= hub_t - 0.5:
+    # CL01 faces B over the moving jaw: the band's high end leaves the shop's
+    # jaw-clearance floor (cad/config/shop-equipment cnc.toml) under the
+    # faced hub (#3607).
+    if hub_t - jaw_top_max < floor - 1e-6:
         raise ValueError("the faced blanks do not stand clear of the jaws' top")
     for plate_t_now in (
-        p["spoil_plate_thickness_mm"],
-        p["spoil_plate_thickness_mm"] - p["spoil_plate_face_mm"],
+        p["spoil_plate_thickness_min_mm"],
+        p["spoil_plate_thickness_max_mm"],
     ):
-        jaw_top_now = p["vise_jaw_height_mm"] - p["parallel_height_mm"] - plate_t_now
+        jaw_top_now = p["vise_jaw_height_mm"] - under - plate_t_now
         if not jaw_top_min <= jaw_top_now <= jaw_top_max:
             raise ValueError(
                 f"a {plate_t_now:.3f} mm spoil plate puts the jaws' top "
                 f"{jaw_top_now:.3f} mm above it, outside the traveler's band"
             )
     # The thinnest plate the band accepts.
-    plate_t_min = p["vise_jaw_height_mm"] - p["parallel_height_mm"] - jaw_top_max
+    plate_t_min = p["vise_jaw_height_mm"] - under - jaw_top_max
+    # The plate is faced alone on the 1 in and 1/2 in parallels stacked: the
+    # jaws grip it at least the shop's minimum and its faced top stands the
+    # jaw-clearance floor over them, so the cutter runs off every edge and
+    # leaves no lip at the jaws. It is bought thicker than the band.
+    stack = p["facing_stack_mm"]
+    if p["vise_jaw_height_mm"] - stack < grip_min:
+        raise ValueError(
+            "the jaws grip the spoil plate on its stack less than the shop's minimum"
+        )
+    if (
+        stack + p["spoil_plate_thickness_min_mm"] - p["vise_jaw_height_mm"]
+        < floor - 1e-6
+    ):
+        raise ValueError(
+            "the spoil plate's faced top does not stand clear over the jaws on its stack"
+        )
+    if p["spoil_plate_bought_mm"] <= p["spoil_plate_thickness_max_mm"]:
+        raise ValueError("the bought spoil plate leaves nothing to face")
+    # Its width, one edge milled: under the narrowest load, so the jaws grip
+    # the blanks, not the plate; over the widest load less a parallel, so its
+    # far edge stays on the moving parallel even pushed against its jaw.
+    _agree(
+        plan,
+        "spoil_plate_width_mm",
+        (p["spoil_plate_width_min_mm"] + p["spoil_plate_width_max_mm"]) / 2,
+    )
+    load_min = n_blanks * p["blank_width_min_mm"]
+    load_max = n_blanks * p["blank_width_max_mm"]
+    if p["spoil_plate_width_max_mm"] >= load_min:
+        raise ValueError("the jaws would grip the spoil plate, not the narrowest load")
+    if p["spoil_plate_width_min_mm"] <= load_max - p["parallel_thickness_mm"]:
+        raise ValueError(
+            "the spoil plate misses the moving parallel on the widest load"
+        )
+    # The width op stands the bought plate on edge on the set's shim pair:
+    # the jaws grip at least the shop's fraction of its width, and its top
+    # edge stands the jaw-clearance floor over them.
+    edge_grip = p["vise_jaw_height_mm"] - p["edge_shim_height_mm"]
+    if (
+        edge_grip
+        < shop["limits"]["vise_grip_fraction_min"] * p["spoil_plate_width_max_mm"]
+    ):
+        raise ValueError(
+            "the jaws grip the spoil plate on edge less than the shop's fraction"
+        )
+    if p["spoil_plate_width_min_mm"] - edge_grip < floor:
+        raise ValueError("the spoil plate's edge does not stand clear over the jaws")
     jaw_w = p["vise_jaw_width_mm"]
     jaw_x0 = (p["blank_length_in"] * IN - jaw_w) / 2
     _agree(plan, "jaw_start_mm", jaw_x0)
