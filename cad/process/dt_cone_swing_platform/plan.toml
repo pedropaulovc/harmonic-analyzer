@@ -497,7 +497,7 @@ tool = "em-eighth"
 drilling = "none"
 sizing = "other"
 instruction = "Same file, M6 T2 (1/8 in end mill, at least {{process.eighth_projection_min_mm:in.2f}} out of its collet; set 2800): counterbore the hold-down from the underside, a G2 helix of {{process.cbore_path_radius_mm:in.4dot}} radius about its axis, {{process.cbore_helix_pitch_mm:.1f}} mm a turn to {{cad.holddown_cbore_depth_nominal_in:.3dot}} deep, one level turn there: Ø{{cad.holddown_cbore_dia_nominal_in:.3dot}}."
-diagram = { file = "diagrams/holes-cbore.svg", alt = "As Op 80's picture: the 1/8 in end mill at the last turn of its G2 helix, the counterbore Ø{{cad.holddown_cbore_dia_nominal_in:.3dot}} and {{cad.holddown_cbore_depth_nominal_in:.3dot}} deep from the underside." }
+diagram = { file = "diagrams/holes-cbore.svg", alt = "As Op 70's picture: the 1/8 in end mill at the last turn of its G2 helix, the counterbore Ø{{cad.holddown_cbore_dia_nominal_in:.3dot}} and {{cad.holddown_cbore_depth_nominal_in:.3dot}} deep from the underside." }
 settings = "endmill-carbide-3fl-1-8-1018-cf-tru-edge"
 rpm = 2800
 feed = "{{process.em_eighth_feed_per_min_mm:in.1f}} in/min"
@@ -511,7 +511,7 @@ tool = "drill-b"
 drilling = "twist_drill"
 sizing = "other"
 instruction = "Same file, M6 T5 (B drill, at least {{process.drill_projection_min_mm:in.2f}} out of the chuck; set 1200, cutting oil): the pivot through in one feed, into air. Setup 4 reams it, the bar flat on the spoil plate."
-diagram = { file = "diagrams/holes-drill-b.svg", alt = "As Op 80's picture: the B drill through the pivot in one feed, into air." }
+diagram = { file = "diagrams/holes-drill-b.svg", alt = "As Op 70's picture: the B drill through the pivot in one feed, into air." }
 rpm = 1200
 feed = "{{process.drill_b_feed_per_min_mm:in.1f}} in/min"
 hole_depth_mm = "{{process.blank_thickness_max_mm}}"

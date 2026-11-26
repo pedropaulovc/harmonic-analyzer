@@ -32,7 +32,7 @@
   <text class="label" x="20" y="122">down to the height</text>
   <line class="leader" x1="200" y1="130" x2="252.45" y2="150"/>
   <circle class="leader-dot" cx="252.45" cy="150" r="2"/>
-  <text class="label" x="432" y="334">hold-downs: Op 180</text>
+  <text class="label" x="432" y="334">hold-downs: Op 160</text>
   <text class="label" x="432" y="350">(centre lines)</text>
   <rect class="clamp" x="510" y="115" width="150" height="25"/>
   <rect class="clamp" x="510" y="368.6" width="150" height="25"/>

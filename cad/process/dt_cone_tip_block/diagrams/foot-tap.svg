@@ -1,7 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 440" width="760" height="440" font-family="sans-serif" font-size="13">
   <!-- Across the jaws from the right end (+X toward you): +Y (toward the fixed jaw) right, +Z up, 4 px/mm. The 4-40 plug tap (major .112 = 11.4 px; length and lead not on record: round cue) in the foot hole, its point foot_plug_reach_mm 10.414 below SEAT (the bottoming tap's 9.398), the T-handle wrench (schematic) and the Fisher tap guide (1/2 in shank, 3/16 point), all in the cutter colour; spindle off. -->
   <rect class="paper" x="0" y="0" width="760" height="440"/>
-  <text class="title" x="20" y="22">Ops 310-350 (DT05): tap the foot hole 4-40 by hand under the tap guide (4 px/mm)</text>
+  <text class="title" x="20" y="22">Ops 270-310 (DT05): tap the foot hole 4-40 by hand under the tap guide (4 px/mm)</text>
   <rect class="fixture-vise" x="305.3" y="406" width="184.7" height="14"/>
   <rect class="clamp" x="325.3" y="226.22" width="50" height="179.78"/>
   <rect class="clamp" x="420" y="226.22" width="50" height="179.78"/>
