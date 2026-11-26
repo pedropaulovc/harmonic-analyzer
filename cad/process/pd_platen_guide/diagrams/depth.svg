@@ -1,29 +1,45 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 780 430" font-family="sans-serif" font-size="13">
-  <rect class="paper" x="0" y="0" width="780" height="430"/>
-  <text class="title" x="20" y="20">Section across the jaws, from the LEFT end (1 in = 100 px)</text>
-  <line class="fixture-table" x1="60" y1="400" x2="420" y2="400"/>
-  <rect class="clamp" x="155" y="223" width="60" height="177"/>
-  <rect class="clamp" x="250" y="223" width="60" height="177"/>
-  <text class="label-on-clamp" x="160" y="390">moving</text>
-  <text class="label-on-clamp" x="260" y="390">fixed</text>
-  <rect class="fixture-support" x="215" y="250" width="12.5" height="150"/>
-  <rect class="fixture-support" x="237.5" y="250" width="12.5" height="150"/>
-  <rect class="part-kept" x="215" y="210.5" width="35" height="39.5"/>
-  <rect class="part-removed" x="215" y="205" width="35" height="5.5"/>
-  <rect class="cutter" x="225" y="140" width="50" height="60"/>
-  <line class="arrow" x1="250" y1="130" x2="220" y2="130"/>
-  <line class="datum" x1="80" y1="250" x2="150" y2="250"/>
-  <text class="datum-label" x="30" y="246">Z0 (F)</text>
-  <line class="datum" x1="250" y1="180" x2="250" y2="200"/>
-  <text class="datum-label" x="300" y="214">Y0 (U)</text>
-  <text class="label-on-clamp" x="168" y="244">top →</text>
-  <text class="label-on-clamp" x="262" y="244">← U</text>
-  <line class="leader" x1="252" y1="207" x2="320" y2="165"/>
-  <text class="label" x="300" y="160">rear face R faced to Z {{process.depth_target_mm:in.4dot}} in levels</text>
-  <line class="dims" x1="380" y1="210.5" x2="380" y2="250"/>
-  <line class="dims" x1="370" y1="210.5" x2="390" y2="210.5"/>
-  <line class="dims" x1="370" y1="250" x2="390" y2="250"/>
-  <text class="label" x="395" y="234">depth {{cad.rear_face_depth_min_in:.3dot}}–{{cad.rear_face_depth_max_in:.3dot}}, miked</text>
-  <text class="label" x="345" y="300">turned over about its length: F down,</text>
-  <text class="label" x="345" y="318">U now at the fixed jaw, LEFT end still left</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 780 500" width="780" height="500" font-family="sans-serif" font-size="13">
+  <!-- Hand picture, the section to scale at 4 px/mm (101.6 px/in), the plan at 1 px/mm, from the rail's sizes: 8.7630 mm across the jaws, 10.0330 mm above the stacks after the cut. 1/2 in end mill Ø12.7 mm (face_cutter_dia_mm, shop endmill-carbide-3fl-1-2), drawn 28.45 mm out (half_mill_projection_mm) to a break line, the collet not drawn; its square end drawn as the near half of its end face, an arc 12 % of its diameter deep whose lowest point is the true end. Drawn on PG04_depth's pass Y-2.913 (-X) at Z10.033, the same place in both views: its last level (four, Z11.119 to 10.033), from the thickest bar (depth_raw_max_mm 11.4808); the pass least past the rail's edges (.500 mm past the moving-jaw side); the other, Y1.718, hangs 8.07 mm over the fixed jaw. Hatched: what the cut takes, from 11.4808 mm above the stacks. The section is seen from the RIGHT end, the fixed jaw on the right. The vise jaws' thickness is not on record: schematic. Jaw height 44.9453 mm (vise_jaw_height_mm), jaw width 158.6738 mm (vise_jaw_width_mm); the parallels 1/8 in thick (parallel_thickness_mm), 4 in long (fixtures.parallels-lms-6745), stacked 1 in + 1/2 in (riser_height_mm 38.1). -->
+  <rect class="paper" x="0" y="0" width="780" height="500"/>
+  <text class="title" x="20" y="24">PG04: F down, the rear face R faced to the depth (to scale, 4 px/mm)</text>
+  <rect class="fixture-vise" x="174.95" y="470" width="215.05" height="14"/>
+  <rect class="clamp" x="174.95" y="290.22" width="90" height="179.78"/>
+  <rect class="clamp" x="300" y="290.22" width="90" height="179.78"/>
+  <rect class="fixture-support" x="264.95" y="317.6" width="12.7" height="152.4"/>
+  <rect class="fixture-support" x="287.3" y="317.6" width="12.7" height="152.4"/>
+  <rect class="part-kept" x="264.95" y="277.47" width="35.05" height="40.13"/>
+  <text class="label-on-clamp" x="219.95" y="458" text-anchor="middle">moving jaw</text>
+  <text class="label-on-clamp" x="345" y="458" text-anchor="middle">fixed jaw</text>
+  <line class="datum" x1="300" y1="288.22" x2="300" y2="334.22"/>
+  <text class="datum-label" x="396" y="304.22">Y0 the fixed</text>
+  <text class="datum-label" x="396" y="320.22">jaw's face</text>
+  <rect class="part-removed" x="264.95" y="271.68" width="35.05" height="5.79"/>
+  <path class="cutter" d="M313.75 271.37L313.75 163.67L309.51 166.67L305.28 163.67L301.05 166.67L296.81 163.67L292.58 166.67L288.35 163.67L284.11 166.67L279.88 163.67L275.65 166.67L271.41 163.67L267.18 166.67L262.95 163.67L262.95 271.37A25.4 6.1 0 0 0 313.75 271.37Z"/>
+  <line class="centre-line" x1="288.35" y1="149.67" x2="288.35" y2="289.47"/>
+  <line class="datum" x1="138.95" y1="317.6" x2="170.95" y2="317.6"/>
+  <text class="datum-label" x="134.95" y="322.6" text-anchor="end">Z0 the stacks'</text>
+  <text class="datum-label" x="134.95" y="338.6" text-anchor="end">top (F)</text>
+  <line class="datum" x1="138.95" y1="277.47" x2="170.95" y2="277.47"/>
+  <text class="datum-label" x="134.95" y="282.47" text-anchor="end">Z{{process.depth_target_mm:in.4dot}}</text>
+  <text class="label-halo" x="293.6" y="317.8" text-anchor="middle">U</text>
+  <text class="title" x="440" y="50">From above (1 px/mm), fixed jaw at the top</text>
+  <rect class="clamp" x="518.59" y="70" width="158.67" height="16"/>
+  <rect class="clamp" x="518.59" y="94.76" width="158.67" height="16"/>
+  <rect class="part-kept" x="460" y="86" width="275.84" height="8.76"/>
+  <circle class="cutter" cx="581.52" cy="88.91" r="6.35"/>
+  <line class="arrow" x1="601.52" y1="124.76" x2="531.52" y2="124.76"/>
+  <line class="datum" x1="461.52" y1="64" x2="461.52" y2="116.76"/>
+  <text class="datum-label" x="461.52" y="60" text-anchor="middle">X0</text>
+  <text class="label" x="440" y="146.76">Arrowed: this pass runs -X, along the rail;</text>
+  <text class="label" x="440" y="162.76">the passes zigzag across it, end to end.</text>
+  <text class="label" x="440" y="186.76">1/2 in end mill, PG04's pass Y-2.913,</text>
+  <text class="label" x="440" y="202.76">its last level, Z{{process.depth_target_mm:in.4dot}}</text>
+  <line class="leader" x1="438" y1="182.76" x2="313.75" y2="237.47"/>
+  <circle class="leader-dot" cx="313.75" cy="237.47" r="2"/>
+  <text class="label" x="440" y="232.76">F down, turned over about its length:</text>
+  <text class="label" x="440" y="248.76">U now at the fixed jaw, LEFT end left.</text>
+  <text class="label" x="440" y="264.76">Mic F to R: {{cad.rear_face_depth_min_in:.3dot}}–{{cad.rear_face_depth_max_in:.3dot}}.</text>
+  <text class="label" x="440" y="440">the same stacks, one against each jaw</text>
+  <line class="leader" x1="438" y1="436" x2="293.65" y2="430"/>
+  <circle class="leader-dot" cx="293.65" cy="430" r="2"/>
 </svg>

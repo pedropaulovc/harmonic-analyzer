@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 780 150" width="780" height="150" font-family="sans-serif" font-size="13">
+  <!-- Hand picture, the blank seen on F with T up, to scale at 1.4 px/mm (35.56 px/in), drawn at its longest, blank_length_max_mm 455.168, 25.4 mm (1 in) high. Marks: T on the top edge (the edge the bow check found), F on the front face, END A at the right end. -->
+  <rect class="paper" x="0" y="0" width="780" height="150"/>
+  <text class="title" x="20" y="24">Setup 1: the blank's marks, looking at F with T up (to scale, 1.4 px/mm)</text>
+  <rect class="part-kept" x="40" y="60" width="637.24" height="35.56"/>
+  <text class="label-halo" x="358.62" y="82.78" text-anchor="middle">F, the front face (marked)</text>
+  <line class="datum" x1="677.24" y1="46" x2="677.24" y2="109.56"/>
+  <text class="datum-label" x="683.24" y="82.78">END A</text>
+  <text class="label" x="140" y="50">T, the top edge (the one it rocked on)</text>
+  <line class="leader" x1="138" y1="46" x2="120" y2="60"/>
+  <circle class="leader-dot" cx="120" cy="60" r="2"/>
+  <text class="label" x="40" y="115.56">far end</text>
+  <text class="label" x="240" y="117.56">bottom edge; the back face is the 1 in face behind F</text>
+</svg>

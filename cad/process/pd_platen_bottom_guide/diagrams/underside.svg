@@ -1,35 +1,45 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 780 430" font-family="sans-serif" font-size="13">
-  <rect class="paper" x="0" y="0" width="780" height="430"/>
-  <text class="title" x="20" y="20">Section across the jaws, from the LEFT end (1 in = 100 px)</text>
-  <line class="fixture-table" x1="60" y1="400" x2="420" y2="400"/>
-  <rect class="clamp" x="140" y="223" width="60" height="177"/>
-  <rect class="clamp" x="275" y="223" width="60" height="177"/>
-  <text class="label-on-clamp" x="146" y="390">moving</text>
-  <text class="label-on-clamp" x="285" y="390">fixed</text>
-  <rect class="fixture-support" x="200" y="250" width="12.5" height="150"/>
-  <rect class="fixture-support" x="262.5" y="250" width="12.5" height="150"/>
-  <rect class="part-kept" x="200" y="180" width="75" height="70"/>
-  <rect class="part-removed" x="200" y="175" width="75" height="5"/>
-  <rect class="cutter" x="225" y="120" width="50" height="55"/>
-  <line class="arrow" x1="240" y1="110" x2="210" y2="110"/>
-  <line class="datum" x1="186" y1="180" x2="196" y2="180"/>
-  <text class="datum-label" x="118" y="184">Z0</text>
-  <line class="datum" x1="275" y1="196" x2="275" y2="222"/>
-  <text class="datum-label" x="300" y="214">Y0</text>
-  <line class="leader" x1="280" y1="177" x2="340" y2="140"/>
-  <text class="label" x="300" y="135">skim {{process.underside_skim_mm:in.3dot}}: becomes U</text>
-  <line class="leader" x1="270" y1="320" x2="345" y2="300"/>
-  <text class="label" x="345" y="296">1 in + 1/2 in parallels, one stack at each jaw</text>
-  <text class="label" x="345" y="252">{{process.lying_grip_mm:in.3dot}} in the jaws</text>
-  <text class="label" x="205" y="230">CF</text>
-  <!-- Plan, fixed jaw at the top. -->
-  <text class="title" x="440" y="60">Plan (fixed jaw at the top, 1 in = 25 px)</text>
-  <rect class="clamp" x="517.5" y="110" width="156" height="30"/>
-  <rect class="clamp" x="517.5" y="159" width="156" height="30"/>
-  <rect class="part-kept" x="460" y="140" width="271" height="19"/>
-  <line class="arrow" x1="450" y1="205" x2="745" y2="205"/>
-  <text class="label" x="470" y="225">zigzag passes along the rail, end to end</text>
-  <line class="datum" x1="461.5" y1="126" x2="461.5" y2="172"/>
-  <text class="datum-label" x="440" y="100">X0 {{process.left_end_skim_mm:in.3dot}} in from the LEFT end</text>
-  <text class="label" x="560" y="260">both ends about 2.3 in past the jaws</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 780 500" width="780" height="500" font-family="sans-serif" font-size="13">
+  <!-- Hand picture, the section to scale at 4 px/mm (101.6 px/in), the plan at 1 px/mm, from the rail's sizes: 19.0500 mm across the jaws, 17.8308 mm above the stacks after the cut. 1/2 in end mill Ø12.7 mm (face_cutter_dia_mm, shop endmill-carbide-3fl-1-2), drawn 28.45 mm out (half_mill_projection_mm) to a break line, the collet not drawn; its square end drawn as the near half of its end face, an arc 12 % of its diameter deep whose lowest point is the true end. Drawn on PB01_underside's pass Y-8.312 (+X) at Z17.831, the same place in both views: its one level; a middle pass, wholly on the rail (Y-14.662 to -1.962); the first, Y1.463, hangs 7.81 mm over the fixed jaw. Hatched: what the cut takes, from 19.1008 mm above the stacks. The section is seen from the RIGHT end, the fixed jaw on the right. The vise jaws' thickness is not on record: schematic. Jaw height 44.9453 mm (vise_jaw_height_mm), jaw width 158.6738 mm (vise_jaw_width_mm); the parallels 1/8 in thick (parallel_thickness_mm), 4 in long (fixtures.parallels-lms-6745), stacked 1 in + 1/2 in (riser_height_mm 38.1). -->
+  <rect class="paper" x="0" y="0" width="780" height="500"/>
+  <text class="title" x="20" y="24">PB01: the face up skimmed {{process.underside_skim_mm:in.3dot}}: it becomes the underside U (to scale, 4 px/mm)</text>
+  <rect class="fixture-vise" x="133.8" y="470" width="256.2" height="14"/>
+  <rect class="clamp" x="133.8" y="290.22" width="90" height="179.78"/>
+  <rect class="clamp" x="300" y="290.22" width="90" height="179.78"/>
+  <rect class="fixture-support" x="223.8" y="317.6" width="12.7" height="152.4"/>
+  <rect class="fixture-support" x="287.3" y="317.6" width="12.7" height="152.4"/>
+  <rect class="part-kept" x="223.8" y="246.28" width="76.2" height="71.32"/>
+  <text class="label-on-clamp" x="178.8" y="458" text-anchor="middle">moving jaw</text>
+  <text class="label-on-clamp" x="345" y="458" text-anchor="middle">fixed jaw</text>
+  <line class="datum" x1="300" y1="288.22" x2="300" y2="334.22"/>
+  <text class="datum-label" x="396" y="304.22">Y0 the fixed</text>
+  <text class="datum-label" x="396" y="320.22">jaw's face</text>
+  <rect class="part-removed" x="223.8" y="241.2" width="76.2" height="5.08"/>
+  <path class="cutter" d="M292.15 240.18L292.15 132.48L287.92 135.48L283.69 132.48L279.45 135.48L275.22 132.48L270.99 135.48L266.75 132.48L262.52 135.48L258.29 132.48L254.05 135.48L249.82 132.48L245.59 135.48L241.35 132.48L241.35 240.18A25.4 6.1 0 0 0 292.15 240.18Z"/>
+  <line class="centre-line" x1="266.75" y1="118.48" x2="266.75" y2="258.28"/>
+  <line class="datum" x1="97.8" y1="246.28" x2="129.8" y2="246.28"/>
+  <text class="datum-label" x="93.8" y="251.28" text-anchor="end">Z0, the</text>
+  <text class="datum-label" x="93.8" y="267.28" text-anchor="end">skimmed</text>
+  <text class="datum-label" x="93.8" y="283.28" text-anchor="end">face (U)</text>
+  <text class="title" x="440" y="50">From above (1 px/mm), fixed jaw at the top</text>
+  <rect class="clamp" x="518.46" y="70" width="158.67" height="16"/>
+  <rect class="clamp" x="518.46" y="105.05" width="158.67" height="16"/>
+  <rect class="part-kept" x="460" y="86" width="275.59" height="19.05"/>
+  <circle class="cutter" cx="581.52" cy="94.31" r="6.35"/>
+  <line class="arrow" x1="561.52" y1="135.05" x2="631.52" y2="135.05"/>
+  <line class="datum" x1="461.52" y1="64" x2="461.52" y2="127.05"/>
+  <text class="datum-label" x="461.52" y="60" text-anchor="middle">X0</text>
+  <text class="label" x="440" y="157.05">Arrowed: this pass runs +X, along the rail;</text>
+  <text class="label" x="440" y="173.05">the passes zigzag across it, end to end.</text>
+  <text class="label" x="440" y="197.05">1/2 in end mill, PB01's pass Y-8.312,</text>
+  <text class="label" x="440" y="213.05">its one level: {{process.underside_skim_mm:in.3dot}} off</text>
+  <line class="leader" x1="438" y1="193.05" x2="292.15" y2="206.28"/>
+  <circle class="leader-dot" cx="292.15" cy="206.28" r="2"/>
+  <text class="label" x="440" y="243.05">Gripped across two cold-finished faces,</text>
+  <text class="label" x="440" y="259.05">centred on the jaws, both ends about</text>
+  <text class="label" x="440" y="275.05">2.3 in out past them. The face up</text>
+  <text class="label" x="440" y="291.05">becomes U.</text>
+  <text class="label" x="440" y="440">1 in + 1/2 in parallels, one stack</text>
+  <text class="label" x="440" y="456">against each jaw; {{process.lying_grip_mm:in.3dot}} in the jaws</text>
+  <line class="leader" x1="438" y1="436" x2="293.65" y2="430"/>
+  <circle class="leader-dot" cx="293.65" cy="430" r="2"/>
 </svg>

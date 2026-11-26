@@ -1,65 +1,44 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 780 620" font-family="sans-serif" font-size="13">
-  <rect class="paper" x="0" y="0" width="780" height="620"/>
-  <text class="title" x="20" y="20">Setup 4, one clamp slot from above, fixed jaw at the top (enlarged)</text>
-  <!-- A patch of the bar round the slot; the counterbore, the through
-       slot, the cutter on the through path's +Y straight. -->
-  <rect class="part-kept" x="40" y="100" width="260" height="180"/>
-  <rect class="part-removed" x="88.83" y="129.81" width="162.34" height="120.39" rx="60.19" ry="60.19"/>
-  <rect class="holes" x="113.64" y="154.61" width="112.73" height="70.77" rx="35.39" ry="35.39"/>
-  <path class="centre-line" d="M149.02 176.84 L190.98 176.84 A13.16 13.16 0 0 1 190.98 203.16 L149.02 203.16 A13.16 13.16 0 0 1 149.02 176.84 Z"/>
-  <circle class="cutter" cx="170" cy="176.84" r="22.23"/>
-  <line class="arrow" x1="120" y1="142" x2="220" y2="142"/>
-  <line class="arrow" x1="220" y1="238" x2="120" y2="238"/>
-  <line class="centre-line" x1="149.02" y1="110" x2="149.02" y2="304"/>
-  <line class="centre-line" x1="190.98" y1="110" x2="190.98" y2="304"/>
-  <line class="dims" x1="149.02" y1="298" x2="190.98" y2="298"/>
-  <line class="leader" x1="170" y1="298" x2="186" y2="318"/>
-  <text class="label" x="60" y="332">{{cad.clamp_slot_3_run_in:.3dot}} between the two end centres</text>
-  <line class="axis" x1="60" y1="90" x2="60" y2="52"/>
-  <text class="label" x="68" y="62">+Y, toward the fixed jaw</text>
-  <line class="leader" x1="190" y1="170" x2="326" y2="96"/>
-  <text class="label" x="330" y="100">1/8 in end mill, going round clockwise: the wall on its left</text>
-  <text class="label" x="330" y="117">(conventional), a little deeper each lap, then one level lap</text>
-  <line class="leader" x1="222" y1="200" x2="326" y2="160"/>
-  <text class="label" x="330" y="164">the slot, through: {{cad.clamp_slot_3_width_min_in:.3dot}}–{{cad.clamp_slot_3_width_max_in:.3dot}} wide</text>
-  <text class="label" x="330" y="181">({{process.slot_step_max_mm:in.3dot}} a lap, to {{process.slot_past_mm:in.2dot}} under the back face)</text>
-  <line class="leader" x1="240" y1="214" x2="326" y2="224"/>
-  <text class="label" x="330" y="228">its counterbore: {{cad.clamp_slot_4_cbore_width_min_in:.3dot}}–{{cad.clamp_slot_4_cbore_width_max_in:.3dot}} wide,</text>
-  <text class="label" x="330" y="245">{{cad.clamp_slot_4_cbore_depth_min_in:.2dot}}–{{cad.clamp_slot_4_cbore_depth_max_in:.2dot}} deep from F ({{process.slot_cbore_step_max_mm:in.3dot}} a lap)</text>
-  <text class="label" x="330" y="290">The file cuts slot 3 through, then slot 4 through,</text>
-  <text class="label" x="330" y="307">then both counterbores.</text>
-  <!-- Plan, fixed jaw at the top, 1 in = 40 px; X0 (the milled END A) at
-       x = 745. -->
-  <text class="title" x="20" y="390">Plan (fixed jaw at the top, 1 in = 40 px)</text>
-  <rect class="clamp" x="265.1" y="450" width="249.9" height="30"/>
-  <rect class="clamp" x="265.1" y="524.7" width="249.9" height="30"/>
-  <text class="label-on-clamp" x="350" y="470">fixed jaw</text>
-  <text class="label-on-clamp" x="350" y="545">moving jaw</text>
-  <rect class="fixture-support" x="350" y="519.7" width="80" height="5"/>
-  <rect class="part-kept" x="33" y="480" width="712" height="39.7"/>
-  <circle class="holes" cx="726.8" cy="502.05" r="6.25"/>
-  <circle class="holes" cx="726.8" cy="502.05" r="3.92"/>
-  <circle class="holes" cx="671.7" cy="502.05" r="6.25"/>
-  <circle class="holes" cx="671.7" cy="502.05" r="3.92"/>
-  <circle class="holes" cx="480.3" cy="502.83" r="2.72"/>
-  <rect class="part-removed" x="97.17" y="495.28" width="18.26" height="13.54" rx="6.77" ry="6.77"/>
-  <rect class="holes" x="100" y="498.07" width="12.6" height="7.96" rx="3.98" ry="3.98"/>
-  <rect class="part-removed" x="42.07" y="495.28" width="18.26" height="13.54" rx="6.77" ry="6.77"/>
-  <rect class="holes" x="44.9" y="498.07" width="12.6" height="7.96" rx="3.98" ry="3.98"/>
-  <text class="label-halo" x="120" y="494">3</text>
-  <text class="label-halo" x="64" y="494">4</text>
-  <circle class="cutter" cx="749" cy="510" r="4"/>
-  <circle class="cutter" cx="29" cy="510" r="4"/>
-  <line class="datum" x1="745" y1="440" x2="745" y2="560"/>
-  <text class="datum-label" x="741" y="444" text-anchor="end">X0: the milled END A</text>
-  <line class="dims" x1="515" y1="425" x2="745" y2="425"/>
-  <line class="dims" x1="515" y1="420" x2="515" y2="450"/>
-  <line class="dims" x1="745" y1="420" x2="745" y2="440"/>
-  <text class="label" x="530" y="418">END A {{process.pickup_out_mm:in.2f}} in out past the jaws</text>
-  <line class="leader" x1="751" y1="514" x2="700" y2="574"/>
-  <text class="label" x="776" y="590" text-anchor="end">edge finder on END A for X0</text>
-  <line class="leader" x1="29" y1="514" x2="40" y2="574"/>
-  <text class="label" x="20" y="590">edge finder on the far end: the length check</text>
-  <text class="label" x="40" y="470">3, 4: the slots, in the air</text>
-  <text class="label" x="20" y="608">slot 3 at X {{cad.clamp_slot_3_station_in:.3dot}}, slot 4 at X {{cad.clamp_slot_4_station_in:.3dot}} left of X0</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 780 560" width="780" height="560" font-family="sans-serif" font-size="13">
+  <!-- Hand picture from above. The enlarged view to scale at 14 px/mm, the plan at 1.5 px/mm. 1/8 in end mill Ø3.175 mm (slot_cutter_dia_mm, shop endmill-carbide-3fl-1-8), drawn at SB04_slots' first point on slot 3, X-407.061 Y-13.060 (posted NC), where it starts its ramp round the racetrack clockwise: centre path radius 0.94 mm about the slot's end centres X-407.061/-404.063, Y-14.000. The slot 5.055 wide (slot_width_mm) and its counterbore 8.599 wide (slot_cbore_width_mm, cut later in the file) drawn to size. The bar slid along the jaws, END A 146.05 mm (pickup_out_mm) out past their right side; the slots stand about 100 mm out past their left side, in the air. Three stacks 1.5 in high (riser_height_mm 38.1): 1 in + 1/2 in at the fixed jaw, 1 in + 1/2 in under the bottom edge and the two 3/4 in outside it under the .125 pin (Ø3.175 mm), the moving jaw on the pin. The pin's length is not on record: drawn 2 in, schematic. The vise jaws' thickness is not on record: schematic. Jaw height 44.9453 mm (vise_jaw_height_mm), jaw width 158.6738 mm (vise_jaw_width_mm); the parallels 1/8 in thick (parallel_thickness_mm), 4 in long (fixtures.parallels-lms-6745). -->
+  <rect class="paper" x="0" y="0" width="780" height="560"/>
+  <text class="title" x="20" y="24">SB04: slot 3, the 1/8 in end mill's first lap (enlarged 14 px/mm; plan 1.5 px/mm)</text>
+  <rect class="part-kept" x="60" y="50" width="280" height="280"/>
+  <path class="hidden" d="M179.01399999999967 129.80700000000002 L220.98600000000033 129.80700000000002 A60.193 60.193 0 0 1 220.98600000000033 250.19300000000004 L179.01399999999967 250.19300000000004 A60.193 60.193 0 0 1 179.01399999999967 129.80700000000002Z"/>
+  <path class="part-removed" d="M179.01399999999967 154.615 L220.98600000000033 154.615 A35.385 35.385 0 0 1 220.98600000000033 225.385 L179.01399999999967 225.385 A35.385 35.385 0 0 1 179.01399999999967 154.615Z"/>
+  <path class="centre-line" d="M179.01399999999967 176.84 L220.98600000000033 176.84 A13.16 13.16 0 0 1 220.98600000000033 203.16 L179.01399999999967 203.16 A13.16 13.16 0 0 1 179.01399999999967 176.84Z"/>
+  <circle class="cutter" cx="179.01" cy="176.84" r="22.22"/>
+  <line class="arrow" x1="169.01" y1="115.81" x2="230.99" y2="115.81"/>
+  <text class="label" x="400" y="80">1/8 in end mill at its first point on slot 3; it ramps</text>
+  <text class="label" x="400" y="96">round clockwise (the wall on its left, conventional),</text>
+  <text class="label" x="400" y="112">{{process.slot_step_max_mm:in.3dot}} deeper a lap, to {{process.slot_past_mm:in.3dot}} past the back face</text>
+  <line class="leader" x1="398" y1="92" x2="195.01" y2="162.84"/>
+  <circle class="leader-dot" cx="195.01" cy="162.84" r="2"/>
+  <text class="label" x="400" y="160">hatched: the slot these laps cut, through, {{process.slot_width_mm:in.4dot}} wide</text>
+  <line class="leader" x1="398" y1="156" x2="252.37" y2="194"/>
+  <circle class="leader-dot" cx="252.37" cy="194" r="2"/>
+  <text class="label" x="400" y="200">dashed: its counterbore, later in the file, {{process.slot_cbore_width_mm:in.4dot}}</text>
+  <text class="label" x="400" y="216">wide, {{cad.clamp_slot_3_cbore_depth_mm:in.3dot}} below F</text>
+  <line class="leader" x1="398" y1="196" x2="275.18" y2="220"/>
+  <circle class="leader-dot" cx="275.18" cy="220" r="2"/>
+  <text class="label" x="400" y="250">toolpath: the cutter's centre, 0.94 mm about</text>
+  <text class="label" x="400" y="266">the slot's two end centres</text>
+  <line class="leader" x1="398" y1="246" x2="234.15" y2="190"/>
+  <circle class="leader-dot" cx="234.15" cy="190" r="2"/>
+  <text class="title" x="20" y="366">From above (1.5 px/mm), the fixed jaw at the top</text>
+  <rect class="clamp" x="277.91" y="382" width="238.01" height="18"/>
+  <rect class="clamp" x="277.91" y="442.6" width="238.01" height="18"/>
+  <text class="label-on-clamp" x="396.92" y="395" text-anchor="middle">fixed jaw</text>
+  <text class="label-on-clamp" x="396.92" y="456.6" text-anchor="middle">moving jaw</text>
+  <rect class="part-kept" x="54.53" y="400" width="680.47" height="37.83"/>
+  <rect class="fixture-support" x="358.82" y="437.83" width="76.2" height="4.76"/>
+  <rect class="holes" x="120.62" y="417.21" width="12.08" height="7.58"/>
+  <rect class="holes" x="68.12" y="417.21" width="12.08" height="7.58"/>
+  <circle class="cutter" cx="124.41" cy="419.59" r="2.38"/>
+  <line class="leader" x1="140" y1="507.83" x2="126.66" y2="425"/>
+  <circle class="leader-dot" cx="126.66" cy="425" r="2"/>
+  <text class="label" x="20" y="521.83">slot 3 (the cutter here), then slot 4, left</text>
+  <line class="datum" x1="735" y1="376" x2="735" y2="467.83"/>
+  <text class="datum-label" x="731" y="479.83" text-anchor="end">X0 the milled END A</text>
+  <text class="label" x="300" y="521.83">END A {{process.pickup_out_mm:in.2f}} in out past the jaws; the .125 pin</text>
+  <text class="label" x="300" y="537.83">along the bottom edge (length schematic)</text>
 </svg>

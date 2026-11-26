@@ -1,67 +1,54 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 780 660" font-family="sans-serif" font-size="13">
-  <rect class="paper" x="0" y="0" width="780" height="660"/>
-  <text class="title" x="20" y="20">Setup 5, section across the jaws at the pivot hole, seen from the right, from the far end (1 in = 100 px)</text>
-  <line class="fixture-table" x1="60" y1="390" x2="470" y2="390"/>
-  <rect class="clamp" x="150" y="213" width="60" height="177"/>
-  <rect class="clamp" x="321.8" y="213" width="60" height="177"/>
-  <text class="label-on-clamp" x="158" y="380">moving</text>
-  <text class="label-on-clamp" x="334" y="380">fixed</text>
-  <rect class="fixture-support" x="210" y="240" width="12.5" height="150"/>
-  <rect class="fixture-support" x="222.5" y="240" width="12.5" height="150"/>
-  <rect class="fixture-support" x="309.3" y="240" width="12.5" height="150"/>
-  <circle class="fixture-support" cx="216.25" cy="233.75" r="6.25"/>
-  <!-- The bar lying, the back face up, T against the fixed jaw. -->
-  <rect class="part-kept" x="222.5" y="202.5" width="99.3" height="37.5"/>
-  <rect class="holes" x="257.9" y="202.5" width="13.6" height="37.5"/>
-  <!-- The tap guide, the T-handle wrench and the 8-32 tap, its point .60
-       below the back face. -->
-  <rect class="cutter" x="239.7" y="50" width="50" height="40"/>
-  <polygon class="cutter" points="258,90 271.4,90 264.7,104"/>
-  <rect class="part-rest" x="215" y="104" width="99.4" height="9"/>
-  <rect class="part-rest" x="253" y="113" width="23.4" height="20"/>
-  <rect class="cutter" x="259.5" y="133" width="10.4" height="47"/>
-  <rect class="part-threads" x="256.5" y="180" width="16.4" height="82.5"/>
-  <text class="label-halo" x="303" y="226">T</text>
-  <line class="datum" x1="110" y1="202.5" x2="222.5" y2="202.5"/>
-  <text class="datum-label" x="20" y="196">Z0: the back face</text>
-  <line class="datum" x1="321.8" y1="150" x2="321.8" y2="240"/>
-  <text class="datum-label" x="328" y="166">Y0: the fixed jaw's face (T against it)</text>
-  <line class="leader" x1="289.7" y1="70" x2="396" y2="62"/>
-  <text class="label" x="400" y="66">tap guide in the 1/2 in collet, the spindle off</text>
-  <line class="leader" x1="314.4" y1="108" x2="396" y2="94"/>
-  <text class="label" x="400" y="98">T-handle wrench, the guide's point in its centre hole</text>
-  <line class="leader" x1="270" y1="150" x2="396" y2="126"/>
-  <text class="label" x="400" y="130">8-32 plug tap, turned by hand</text>
-  <line class="leader" x1="272.5" y1="204" x2="396" y2="196"/>
-  <text class="label" x="400" y="200">the mouth countersunk first (SB05), {{process.csk_dia_mm:in.3dot}} across</text>
-  <line class="leader" x1="264.7" y1="262.5" x2="264.7" y2="406"/>
-  <text class="label" x="120" y="422">the tap's point, {{process.tap_point_depth_mm:in.2dot}} below the back face when its mark reaches it</text>
-  <text class="label" x="400" y="280">F is down on the stacks, the same three</text>
-  <text class="label" x="400" y="297">stacks and pin as Setups 3 and 4.</text>
-  <!-- Plan, fixed jaw at the top, 1 in = 40 px; X0 (the milled END A) at
-       x = 35, the bar toward +X. -->
-  <text class="title" x="20" y="470">Plan (fixed jaw at the top, 1 in = 40 px): the back face up, END A at the left</text>
-  <rect class="clamp" x="265" y="510" width="249.9" height="30"/>
-  <rect class="clamp" x="265" y="584.7" width="249.9" height="30"/>
-  <text class="label-on-clamp" x="380" y="530">fixed jaw</text>
-  <text class="label-on-clamp" x="380" y="605">moving jaw</text>
-  <rect class="fixture-support" x="350" y="579.7" width="80" height="5"/>
-  <rect class="part-kept" x="35" y="540" width="712" height="39.7"/>
-  <circle class="holes" cx="53.2" cy="562.05" r="3.92"/>
-  <circle class="holes" cx="108.3" cy="562.05" r="3.92"/>
-  <rect class="holes" x="667.4" y="558.07" width="12.6" height="7.96" rx="3.98" ry="3.98"/>
-  <rect class="holes" x="722.5" y="558.07" width="12.6" height="7.96" rx="3.98" ry="3.98"/>
-  <circle class="holes" cx="299.7" cy="562.83" r="2.72"/>
-  <line class="centre-line" x1="299.7" y1="548" x2="299.7" y2="577"/>
-  <line class="centre-line" x1="285" y1="562.83" x2="314" y2="562.83"/>
-  <text class="label-halo" x="306" y="557">P</text>
-  <circle class="cutter" cx="31" cy="570" r="4"/>
-  <line class="datum" x1="35" y1="500" x2="35" y2="620"/>
-  <text class="datum-label" x="40" y="504">X0: the milled END A</text>
-  <line class="dims" x1="35" y1="632" x2="265" y2="632"/>
-  <line class="dims" x1="265" y1="614.7" x2="265" y2="637"/>
-  <text class="label" x="48" y="627">END A {{process.pickup_out_mm:in.2f}} in out</text>
-  <line class="leader" x1="29" y1="573" x2="24" y2="640"/>
-  <text class="label" x="14" y="654">edge finder on END A for X0</text>
-  <text class="label" x="530" y="627">P: the pivot hole, at X {{cad.pivot_tap_station_in:.3dot}} right of X0</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 780 680" width="780" height="680" font-family="sans-serif" font-size="13">
+  <!-- Hand picture, the section to scale at 4 px/mm at the pivot hole (X168.060 Y-14.500, posted SB05_back_csk), seen from the far end (on the right in the plan), the fixed jaw on the right; the plan at 1.5 px/mm. The bar turned over end for end, the back face up (Z0), F down. 1/4 in 90° chamfer mill (shop chamfer-mill-carbide-1-4-90): body Ø6.35 mm, its 90° point at csk_tip_mm -2.007, drawn as a sharp point (the tip's flat is not on record), short to a break line, the collet not drawn. The #29 hole and F's countersink from Setup 3 drawn. Three stacks 1.5 in high (riser_height_mm 38.1): 1 in + 1/2 in at the fixed jaw, 1 in + 1/2 in under the bottom edge and the two 3/4 in outside it under the .125 pin (Ø3.175 mm), the moving jaw on the pin. The pin's length is not on record: drawn 2 in, schematic. The vise jaws' thickness is not on record: schematic. Jaw height 44.9453 mm (vise_jaw_height_mm), jaw width 158.6738 mm (vise_jaw_width_mm); the parallels 1/8 in thick (parallel_thickness_mm), 4 in long (fixtures.parallels-lms-6745). -->
+  <rect class="paper" x="0" y="0" width="780" height="680"/>
+  <text class="title" x="20" y="24">SB05: the chamfer mill countersinks the pivot hole's back mouth (to scale, 4 px/mm; plan 1.5 px/mm)</text>
+  <rect class="fixture-vise" x="156.41" y="470" width="293.59" height="14"/>
+  <rect class="clamp" x="156.41" y="290.22" width="90" height="179.78"/>
+  <rect class="clamp" x="360" y="290.22" width="90" height="179.78"/>
+  <rect class="fixture-support" x="347.3" y="317.6" width="12.7" height="152.4"/>
+  <rect class="fixture-support" x="259.11" y="317.6" width="12.7" height="152.4"/>
+  <rect class="fixture-support" x="246.41" y="317.6" width="12.7" height="152.4"/>
+  <circle class="fixture-support" cx="252.76" cy="311.25" r="6.35"/>
+  <rect class="part-kept" x="259.11" y="279.5" width="100.89" height="38.1"/>
+  <text class="label-on-clamp" x="201.41" y="458" text-anchor="middle">moving jaw</text>
+  <text class="label-on-clamp" x="405" y="458" text-anchor="middle">fixed jaw</text>
+  <text class="label-halo" x="350" y="295.5" text-anchor="middle">T</text>
+  <line class="datum" x1="360" y1="288.22" x2="360" y2="334.22"/>
+  <text class="datum-label" x="456" y="304.22">Y0 the fixed</text>
+  <text class="datum-label" x="456" y="320.22">jaw's face (T)</text>
+  <line class="datum" x1="120.41" y1="279.5" x2="152.41" y2="279.5"/>
+  <text class="datum-label" x="116.41" y="284.5" text-anchor="end">Z0 the back</text>
+  <text class="datum-label" x="116.41" y="300.5" text-anchor="end">face</text>
+  <rect class="holes" x="295.09" y="279.5" width="13.82" height="38.1"/>
+  <path class="cutter" d="M302 287.53L314.7 274.83L314.7 274.83L314.7 159.5L310.47 162.5L306.23 159.5L302 162.5L297.77 159.5L293.53 162.5L289.3 159.5L289.3 274.83Z"/>
+  <line class="centre-line" x1="302" y1="147.5" x2="302" y2="329.6"/>
+  <line class="arrow" x1="276" y1="179.5" x2="276" y2="219.5"/>
+  <text class="label" x="480" y="90">1/4 in 90° chamfer mill, its point at</text>
+  <text class="label" x="480" y="106">Z{{process.csk_tip_mm:in.3dot}} (Z0 the back face): the</text>
+  <text class="label" x="480" y="122">mouth Ø{{process.csk_dia_mm:in.3dot}}, under Ø{{cad.pivot_tap_csk_dia_max_in:.3dot}} MAX</text>
+  <line class="leader" x1="478" y1="102" x2="314.7" y2="229.5"/>
+  <circle class="leader-dot" cx="314.7" cy="229.5" r="2"/>
+  <text class="label" x="480" y="340">the #29 hole (Setup 3)</text>
+  <line class="leader" x1="478" y1="336" x2="306.91" y2="327.6"/>
+  <circle class="leader-dot" cx="306.91" cy="327.6" r="2"/>
+  <text class="label" x="480" y="400">three 1.5 in stacks; the .125 pin on</text>
+  <text class="label" x="480" y="416">the outer one, the moving jaw on it</text>
+  <line class="leader" x1="478" y1="396" x2="252.76" y2="430"/>
+  <circle class="leader-dot" cx="252.76" cy="430" r="2"/>
+  <line class="leader" x1="478" y1="396" x2="256.76" y2="311.25"/>
+  <circle class="leader-dot" cx="256.76" cy="311.25" r="2"/>
+  <text class="title" x="20" y="526">From above (1.5 px/mm), the fixed jaw at the top; END A now at the left</text>
+  <rect class="clamp" x="264.08" y="542" width="238.01" height="18"/>
+  <rect class="clamp" x="264.08" y="602.6" width="238.01" height="18"/>
+  <text class="label-on-clamp" x="383.08" y="555" text-anchor="middle">fixed jaw</text>
+  <text class="label-on-clamp" x="383.08" y="616.6" text-anchor="middle">moving jaw</text>
+  <rect class="part-kept" x="45" y="560" width="680.47" height="37.83"/>
+  <rect class="fixture-support" x="344.98" y="597.83" width="76.2" height="4.76"/>
+  <circle class="cutter" cx="297.09" cy="581.75" r="4.76"/>
+  <line class="datum" x1="45" y1="536" x2="45" y2="627.83"/>
+  <text class="datum-label" x="49" y="639.83">X0 the milled END A</text>
+  <text class="label" x="300" y="657.83">P: the pivot hole, X {{cad.pivot_tap_station_in:.3dot}} (the chamfer mill here);</text>
+  <text class="label" x="300" y="673.83">END A {{process.pickup_out_mm:in.2f}} in out past the jaws' left side</text>
+  <line class="leader" x1="298" y1="653.83" x2="301.09" y2="585.75"/>
+  <circle class="leader-dot" cx="301.09" cy="585.75" r="2"/>
 </svg>

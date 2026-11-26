@@ -1,44 +1,37 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 780 550" font-family="sans-serif" font-size="13">
-  <rect class="paper" x="0" y="0" width="780" height="550"/>
-  <text class="title" x="20" y="20">Section through a socket (1 in = 200 px; the tape stack drawn thicker)</text>
-  <rect class="fixture-plate" x="80" y="470" width="440" height="60"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 780 560" width="780" height="560" font-family="sans-serif" font-size="13">
+  <!-- Hand picture. Section across the bar seen from the left end, to scale at 200 px/in (7.874 px/mm) from the plate's thickness_target_mm 3.8608 and the bar's 1/2 in; the tape stack (tape_stack_mm .28) drawn 4 px thick. The bar drawn short, to a break line. #2-56 plug tap Ø.086 (2.184 mm, the thread's major diameter), its point at tap_point_depth_mm 6.5278 below P, in the relief pocket, its end drawn as the near half of its end face (an arc 12 % of its diameter deep). Tap guide (tools.tap-guide-fisher): body Ø.5 (shank_dia_in) to a break line, its point Ø.1875 (point_dia_in). The tap's length, the T-handle wrench and how far the point stands out are not on record: schematic. Wrench and guide in the tool's colour: they turn or travel with the tap. -->
+  <rect class="paper" x="0" y="0" width="780" height="560"/>
+  <text class="title" x="20" y="24">PL05: the #2-56 tap by hand under the tap guide, in socket A1 (to scale, 200 px/in)</text>
+  <path class="fixture-plate" d="M530 470L530 540L526.03 543L522.07 540L518.1 543L514.14 540L510.17 543L506.21 540L502.24 543L498.28 540L494.31 543L490.34 540L486.38 543L482.41 540L478.45 543L474.48 540L470.52 543L466.55 540L462.59 543L458.62 540L454.66 543L450.69 540L446.72 543L442.76 540L438.79 543L434.83 540L430.86 543L426.9 540L422.93 543L418.97 540L415 543L411.03 540L407.07 543L403.1 540L399.14 543L395.17 540L391.21 543L387.24 540L383.28 543L379.31 540L375.34 543L371.38 540L367.41 543L363.45 540L359.48 543L355.52 540L351.55 543L347.59 540L343.62 543L339.66 540L335.69 543L331.72 540L327.76 543L323.79 540L319.83 543L315.86 540L311.9 543L307.93 540L303.97 543L300 540L296.03 543L292.07 540L288.1 543L284.14 540L280.17 543L276.21 540L272.24 543L268.28 540L264.31 543L260.34 540L256.38 543L252.41 540L248.45 543L244.48 540L240.52 543L236.55 540L232.59 543L228.62 540L224.66 543L220.69 540L216.72 543L212.76 540L208.79 543L204.83 540L200.86 543L196.9 540L192.93 543L188.97 540L185 543L181.03 540L177.07 543L173.1 540L169.14 543L165.17 540L161.21 543L157.24 540L153.28 543L149.31 540L145.34 543L141.38 540L137.41 543L133.45 540L129.48 543L125.52 540L121.55 543L117.59 540L113.62 543L109.66 540L105.69 543L101.72 540L97.76 543L93.79 540L89.83 543L85.86 540L81.9 543L77.93 540L73.97 543L70 540L70 470Z"/>
   <rect class="paper" x="250" y="470" width="100" height="30"/>
-  <line class="dims" x1="250" y1="470" x2="250" y2="500"/>
-  <line class="dims" x1="350" y1="470" x2="350" y2="500"/>
-  <line class="dims" x1="250" y1="500" x2="350" y2="500"/>
-  <rect class="bond" x="80" y="466" width="170" height="4"/>
-  <rect class="bond" x="350" y="466" width="170" height="4"/>
-  <rect class="bond" x="250" y="466" width="43" height="2"/>
-  <rect class="bond" x="307" y="466" width="43" height="2"/>
-  <rect class="part-kept" x="80" y="435.6" width="440" height="30.4"/>
-  <rect class="holes" x="293" y="435.6" width="14" height="30.4"/>
-  <rect class="cutter" x="291.4" y="285.6" width="17.2" height="193.4"/>
-  <polygon class="cutter" points="291.4,479 308.6,479 300,487"/>
-  <rect class="clamp" x="286" y="225.6" width="28" height="62"/>
-  <rect class="clamp" x="190" y="209.6" width="220" height="16"/>
-  <rect class="cutter" x="250" y="55.6" width="100" height="110"/>
-  <polygon class="cutter" points="282,165.6 318,165.6 300,209.6"/>
-  <line class="centre-line" x1="300" y1="43.6" x2="300" y2="514"/>
-  <line class="leader" x1="350" y1="105.6" x2="450" y2="95.6"/>
-  <text class="label" x="454" y="99.6">tap guide in the 1/2 in collet, spindle off</text>
-  <line class="leader" x1="312" y1="185.6" x2="450" y2="155.6"/>
-  <text class="label" x="454" y="159.6">its spring point in the wrench's centre hole</text>
-  <line class="leader" x1="410" y1="217.6" x2="450" y2="219.6"/>
-  <text class="label" x="454" y="223.6">T-handle tap wrench</text>
-  <line class="leader" x1="308.6" y1="345.6" x2="450" y2="325.6"/>
-  <text class="label" x="454" y="329.6">{{cad.socket_a1_thread}} plug tap</text>
-  <line class="leader" x1="500" y1="450.8" x2="540" y2="440.8"/>
-  <text class="label" x="544" y="444.8">platen, P up</text>
-  <line class="leader" x1="500" y1="468" x2="540" y2="476"/>
-  <text class="label" x="544" y="480">tape stack; over the pocket</text>
-  <text class="label" x="544" y="496">only the platen's tape</text>
-  <line class="leader" x1="344" y1="494" x2="540" y2="510"/>
-  <text class="label" x="544" y="514">relief pocket in the bar</text>
-  <line class="dims" x1="60" y1="435.6" x2="60" y2="487"/>
-  <line class="dims" x1="291.4" y1="435.6" x2="55" y2="435.6"/>
-  <line class="dims" x1="291.4" y1="487" x2="55" y2="487"/>
-  <text class="label" x="66" y="465.3" text-anchor="start"></text>
-  <text class="label" x="52" y="465.3" text-anchor="end">point</text>
-  <text class="label" x="52" y="481.3" text-anchor="end">{{process.tap_point_depth_mm:in.3dot}}</text>
-  <text class="label" x="52" y="497.3" text-anchor="end">below P</text>
+  <rect class="bond" x="70" y="466" width="180" height="4"/>
+  <rect class="bond" x="350" y="466" width="180" height="4"/>
+  <rect class="bond" x="250" y="466" width="100" height="2"/>
+  <rect class="part-kept" x="70" y="435.6" width="460" height="30.4"/>
+  <rect class="part-threads" x="291.4" y="435.6" width="17.2" height="30.4"/>
+  <path class="cutter" d="M308.6 484.94L308.6 345.6L291.4 345.6L291.4 484.94A8.6 2.06 0 0 0 308.6 484.94Z"/>
+  <rect class="cutter" x="190" y="329.6" width="220" height="16"/>
+  <rect class="cutter" x="286" y="305.6" width="28" height="40"/>
+  <path class="cutter" d="M300 305.6L281.25 273.1L281.25 245.6L318.75 245.6L318.75 273.1Z"/>
+  <path class="cutter" d="M250 245.6L250 50L254.17 47L258.33 50L262.5 47L266.67 50L270.83 47L275 50L279.17 47L283.33 50L287.5 47L291.67 50L295.83 47L300 50L304.17 47L308.33 50L312.5 47L316.67 50L320.83 47L325 50L329.17 47L333.33 50L337.5 47L341.67 50L345.83 47L350 50L350 245.6Z"/>
+  <line class="centre-line" x1="300" y1="40" x2="300" y2="530"/>
+  <text class="label" x="440" y="80">tap guide in the 1/2 in collet, spindle off;</text>
+  <text class="label" x="440" y="96">its spring point in the wrench's centre hole</text>
+  <line class="leader" x1="438" y1="84" x2="350" y2="110"/>
+  <circle class="leader-dot" cx="350" cy="110" r="2"/>
+  <text class="label" x="440" y="315.6">T-handle tap wrench</text>
+  <line class="leader" x1="438" y1="311.6" x2="400" y2="335.6"/>
+  <circle class="leader-dot" cx="400" cy="335.6" r="2"/>
+  <text class="label" x="440" y="385.6">{{cad.socket_a1_thread}} plug tap, its point</text>
+  <text class="label" x="440" y="401.6">{{process.tap_point_depth_mm:in.3dot}} below P, in the pocket</text>
+  <line class="leader" x1="438" y1="389.6" x2="308.6" y2="395.6"/>
+  <circle class="leader-dot" cx="308.6" cy="395.6" r="2"/>
+  <text class="label" x="560" y="439.6">platen, P up</text>
+  <text class="label" x="560" y="455.6">(socket A1)</text>
+  <line class="leader" x1="556" y1="435.6" x2="528" y2="450.6"/>
+  <circle class="leader-dot" cx="528" cy="450.6" r="2"/>
+  <text class="label" x="560" y="530">relief pocket; over it</text>
+  <text class="label" x="560" y="546">only the platen's tape</text>
+  <line class="leader" x1="556" y1="526" x2="340" y2="484"/>
+  <circle class="leader-dot" cx="340" cy="484" r="2"/>
 </svg>
