@@ -62,11 +62,22 @@ part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
 material = "C36000 free-machining brass, 3/4 × 1-1/4 in flat (drawing: {{cad.material_spec}})"
 stock = "{{process.blank_y_in:fraction}} × {{process.blank_x_in:fraction}} in flat bar; {{process.quantity:d}} slice {{process.blank_z_min_mm:in.2dot}}–{{process.blank_z_max_mm:in.2dot}} in thick sawn off its end."
-note = "Inches unless mm; G-code and console entries in mm (the files and the controller run G21). Finished {{cad.far_end_length_min_in:.3dot}}–{{cad.far_end_length_max_in:.3dot}} long (locating end to far end), {{cad.top_face_height_min_in:.3dot}}–{{cad.top_face_height_max_in:.3dot}} high (locating edge to top face), ({{cad.envelope_z_in:.2dot}}) deep (mating face to back face). Every cutting speed is 2800 rpm (the edge finder runs at 900), all on the PM-30MV low belt (100–2800 rpm): no belt change. Home the mill ($H) once, after switching it on: every M6's trip to the tool setter and the tap files' G53 retract count from home. Home again only after a power cycle or a controller restart, an E-stop, an alarm, a limit switch hit, a stall or a crash: homing brings the stored G54 back. Then check every zero of the setup again, each the way its step set it: each must read what its step set, within .001 in. One does not, cannot be reached with the part in, or the part may have moved: take the setup again from its first step, the part out. They all do: run the interrupted file again from its start. Feed Hold, then Reset with the axes stopped keeps position and G54: no homing, no new zero; run the interrupted file again from its start: its first M6 measures the tool, and cuts already made are cut in air. Every cutting file is proved in air first. At every M6 stop the file has stopped the spindle and lifted the tool clear; press Cycle Start only with hands clear. The 1/16 in end mill with 1/2 in of flutes (MSC 35497056) is TO BUY: not owned; Setup 6 stops at its relief until it is in hand. The plate holes are pair-piloted by MHA-MS-03's traveler; keep this block with its plate from then on. Finish: brass black, the last setup, once the solution is bought."
 shop = "../shop"
 stock_refs = ["c360-flat-3-4x1-1-4"]
 material_key = "stop-c360"
 milling_material = "brass"
+
+# The shop's standing page carries what every traveler shares (units, speeds,
+# homing, Feed Hold, tool changes, proving a file, burrs); This job says what
+# only this block needs. Every op prints its own rpm.
+standing = true
+
+[[notes]]
+title = "This job"
+rows = [
+  ["Finished", "{{cad.far_end_length_min_in:.3dot}}–{{cad.far_end_length_max_in:.3dot}} long (locating end to far end), {{cad.top_face_height_min_in:.3dot}}–{{cad.top_face_height_max_in:.3dot}} high (locating edge to top face), ({{cad.envelope_z_in:.2dot}}) deep (mating face to back face)."],
+  ["To buy", "The 1/16 in end mill with 1/2 in of flutes (MSC 35497056) is TO BUY: not owned; Setup 6 stops at its relief until it is in hand."],
+]
 
 [cad]
 file = "../../out/features/ms_stop_block/features.toml"
@@ -349,7 +360,7 @@ machine = "PM-30MV CNC (FluidNC, CNCjs with the electronic tool setter) / vise, 
 indexing = "none"
 machine_ref = "pm-30mv"
 holding = "The 1 in and the 1/2 in parallels of the set stacked against each jaw (1.5 in). The slice lying flat on them, a sawn face up, gripped across the bar's 3/4 thickness (its two as-bought wide faces), its 1-1/4 width along the jaws, end L to the LEFT, centred on the jaws. Tap it down onto both stacks with a soft mallet while closing the vise. The lower {{process.lying_grip_mm:in.3dot}} of it is in the jaws; the sawn top stands at most {{process.blank_z_max_mm:in.3dot}} above the stacks."
-datum = "Program MS01_back (cam:ms_stop_block). G54: X0 the slice's LEFT end (L), Y0 the fixed jaw's face, Z0 the faced back face; +Y toward the fixed jaw. The file starts with an M6 for the end mill; tool lengths from the tool setter."
+datum = "Program MS01_back (cam:ms_stop_block). G54: X0 the slice's LEFT end (L), Y0 the fixed jaw's face, Z0 the faced back face; +Y toward the fixed jaw. The file starts with an M6 for the end mill."
 diagram = { file = "diagrams/back.svg", alt = "The slice lying flat on stacked parallels, a sawn face up, gripped across its 3/4 thickness; the 1/2 in end mill skims the sawn top, which becomes the back face." }
 envelope = { x_span_mm = ["{{process.bar_width_mm}}", "{{process.face_cutter_dia_mm}}", "{{process.face_cutter_dia_mm}}", 5.08], y_span_mm = ["{{process.bar_thickness_mm}}", "{{process.face_cutter_dia_mm}}"], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{process.blank_z_max_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{process.mating_top_max_mm}}"], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_min_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_min_mm}}"] }
 vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{process.bar_thickness_mm}}", along_jaws_mm = "{{process.bar_width_mm}}", part_height_mm = "{{process.blank_z_max_mm}}", parallel_height_mm = "{{process.riser_height_mm}}", overhang_mm = ["{{process.vise_bar_inset_mm}}", "rest"], jaw_offset = "centred", fixed_jaw_face = "as_bought", moving_jaw_face = "as_bought", moving_jaw_contact = "flat" }
@@ -362,12 +373,7 @@ feed = "hand"
 
 [[setups.operations]]
 instruction = "G54 Z0: the faced back face, the sawn top's high point less the {{process.back_skim_mm:in.3dot}} skim."
-instruction_detailed = "Console M6 T1 (1/2 in end mill, at least 1.00 in out of the collet; the tool setter measures it). Spindle stopped, its tip just dragging a .002 feeler leaf on the highest point of the sawn top: G10 L20 P1 Z0.559 (the {{process.back_skim_mm:in.3dot}} skim plus the .002 leaf)."
-feed = "hand"
-
-[[setups.operations]]
-instruction = "Prove MS01_back in air, Z0 raised 1.000 in; every move clears the jaws. Then Z0 back."
-instruction_detailed = "Send $# and note the G54 line's Z. G10 L2 P1 Z(that Z + 25.400) raises Z0 1.000 in. Run MS01_back, watching each move clear the jaws. G10 L2 P1 Z(the noted Z) puts Z0 back."
+instruction_detailed = "Console M6 T1 (1/2 in end mill, at least 1.00 in out of the collet). Spindle stopped, its tip just dragging a .002 feeler leaf on the highest point of the sawn top: G10 L20 P1 Z0.559 (the {{process.back_skim_mm:in.3dot}} skim plus the .002 leaf)."
 feed = "hand"
 
 [[setups.operations]]
@@ -375,7 +381,7 @@ speed_kind = "spindle"
 tool = "em-half"
 drilling = "none"
 sizing = "other"
-instruction = "Run MS01_back (M6 T1, 1/2 in end mill; set 2800): skim the sawn top {{process.back_skim_mm:in.3dot}} off its high point at Z0, in passes no wider than {{process.face_stepover_max_mm:in.3dot}}. A sawn patch left: send $#, note the G54 line's Z, G10 L2 P1 Z(that Z − 0.254) (Z0 .010 lower) and run it again. Unclamp; mark this face BACK."
+instruction = "Run MS01_back (M6 T1, 1/2 in end mill; set 2800): skim the sawn top {{process.back_skim_mm:in.3dot}} off its high point at Z0, in passes no wider than {{process.face_stepover_max_mm:in.3dot}}. At every M6 stop press Cycle Start only with hands clear. A sawn patch left: send $#, note the G54 line's Z, G10 L2 P1 Z(that Z − 0.254) (Z0 .010 lower) and run it again. Unclamp; mark this face BACK."
 settings = "stop-em-half-c360"
 milling_cuts = [
   { name = "back face", kind = "end", phase = "finish", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", axial_doc_mm = "{{process.back_skim_mm}}", radial_woc_mm = "{{process.face_stepover_max_mm}}", traverse_mm = [0, "{{process.bar_width_mm}}"] },
@@ -400,11 +406,7 @@ feed = "hand"
 
 [[setups.operations]]
 instruction = "G54 Z0: the stacks' top, touched with the end mill on the fixed-jaw stack left of the slice."
-instruction_detailed = "Console M6 T1 (the tool setter measures it). MDI G0 X-12.700 Y-6.850: the cutter left of the slice, its edge .02 off the fixed jaw, over that jaw's stack. Spindle stopped, its tip just dragging a .002 feeler leaf on the stack: G10 L20 P1 Z0.051."
-feed = "hand"
-
-[[setups.operations]]
-instruction = "Prove MS02_mating in air, Z0 raised 1.000 in. Then Z0 back."
+instruction_detailed = "Console M6 T1. MDI G0 X-12.700 Y-6.850: the cutter left of the slice, its edge .02 off the fixed jaw, over that jaw's stack. Spindle stopped, its tip just dragging a .002 feeler leaf on the stack: G10 L20 P1 Z0.051."
 feed = "hand"
 
 [[setups.operations]]
@@ -443,11 +445,7 @@ feed = "hand"
 
 [[setups.operations]]
 instruction = "G54 Z0: the faced locating edge, the top's high point less the {{process.edge_skim_mm:in.3dot}} skim."
-instruction_detailed = "Console M6 T1 (the tool setter measures it). Spindle stopped, its tip just dragging a .002 feeler leaf on the highest point of the top: G10 L20 P1 Z0.559."
-feed = "hand"
-
-[[setups.operations]]
-instruction = "Prove MS03_edge in air, Z0 raised 1.000 in. Then Z0 back."
+instruction_detailed = "Console M6 T1. Spindle stopped, its tip just dragging a .002 feeler leaf on the highest point of the top: G10 L20 P1 Z0.559."
 feed = "hand"
 
 [[setups.operations]]
@@ -475,15 +473,11 @@ vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{cad.envelope_z_mm}}", alon
 beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{process.bar_width_mm}}"], clamp_mm = [0, "{{process.bar_width_mm}}"], section_mm = { y = "{{cad.envelope_z_mm}}", z = "{{process.height_top_mm}}" }, vise_left = "start" }
 
 [[setups.operations]]
-instruction = "Before the slice goes in, G54 Z0: the stacks' top, touched with the 1/2 in end mill on the fixed-jaw stack, the jaws open. Console M6 T1 (the tool setter measures it); jog it over the fixed-jaw stack, its edge clear of the jaw; spindle stopped, its tip just dragging a .002 feeler leaf on the stack: G10 L20 P1 Z0.051. Raise Z. Not with the slice in: the collet would meet the slice before the tip reached the stack."
+instruction = "Before the slice goes in, G54 Z0: the stacks' top, touched with the 1/2 in end mill on the fixed-jaw stack, the jaws open. Console M6 T1; jog it over the fixed-jaw stack, its edge clear of the jaw; spindle stopped, its tip just dragging a .002 feeler leaf on the stack: G10 L20 P1 Z0.051. Raise Z. Not with the slice in: the collet would meet the slice before the tip reached the stack."
 feed = "hand"
 
 [[setups.operations]]
 instruction = "The slice clamped as Holding says: repeat Setup 2's edge finder X0 (left end L) and Y0 (fixed jaw, now on the mating face)."
-feed = "hand"
-
-[[setups.operations]]
-instruction = "Prove MS04_height in air, Z0 raised 1.000 in. Then Z0 back."
 feed = "hand"
 
 [[setups.operations]]
@@ -523,7 +517,7 @@ feed = "hand"
 
 [[setups.operations]]
 instruction = "G54 Z0: the mating face, touched with the 1/8 in end mill."
-instruction_detailed = "Console M6 T2 (1/8 in end mill, at least .60 out of its collet; the tool setter measures it). MDI G0 X7.000 Y-15.875 (over the middle of the slice). Spindle stopped, its tip just dragging a .002 feeler leaf on the mating face: G10 L20 P1 Z0.051."
+instruction_detailed = "Console M6 T2 (1/8 in end mill, at least .60 out of its collet). MDI G0 X7.000 Y-15.875 (over the middle of the slice). Spindle stopped, its tip just dragging a .002 feeler leaf on the mating face: G10 L20 P1 Z0.051."
 feed = "hand"
 
 [[setups.operations]]
@@ -540,12 +534,7 @@ inspection = "By pins: the {{process.slot_go_pin_in:.3dot}} (GO) enters the test
 gauge_checks = [{ gauge = "pin-gauges", band_mm = ["{{process.slot_cut_min_mm}}", "{{process.slot_cut_max_mm}}"] }]
 
 [[setups.operations]]
-instruction = "Only if either pin failed: set another 1/8 in end mill at least .60 out, console M6 T2 (the tool setter measures it), and repeat the test plunge and the pins at X{{process.slot_test_x_mm:.3f}} Y-{{process.test_far_y_mm:.3f}} (the waste end by the moving jaw). That fails too: stop and tell the owner."
-feed = "hand"
-
-[[setups.operations]]
-instruction = "Prove MS05_rebate in air, Z0 raised 1.000 in; every move stays between the jaws. Then Z0 back."
-instruction_detailed = "Send $# and note the G54 line's Z. G10 L2 P1 Z(that Z + 25.400) raises Z0 1.000 in. Run MS05_rebate, watching each move stay between the jaws. G10 L2 P1 Z(the noted Z) puts Z0 back."
+instruction = "Only if either pin failed: set another 1/8 in end mill at least .60 out, console M6 T2, and repeat the test plunge and the pins at X{{process.slot_test_x_mm:.3f}} Y-{{process.test_far_y_mm:.3f}} (the waste end by the moving jaw). That fails too: stop and tell the owner."
 feed = "hand"
 
 [[setups.operations]]
@@ -572,11 +561,11 @@ instruction = "Rebate shallow (under {{cad.rebate_back_rebate_width_min_in:.3dot
 feed = "hand"
 
 [[setups.operations]]
-instruction = "The relief is file MS05_relief, cut by the 1/16 in end mill with 1/2 in of flutes (MSC 35497056), TO BUY: not owned. Without it, stop here: unclamp, tag the block RELIEF TO CUT. With it in hand later, clamp and zero the block again as this setup (X0, Y0; Z0 on the mating face with the 1/8 in end mill) and go on."
+instruction = "The relief is file MS05_relief, cut by the 1/16 in end mill with 1/2 in of flutes (MSC 35497056). Without it, stop here: unclamp, tag the block RELIEF TO CUT. With it in hand later, clamp and zero the block again as this setup (X0, Y0; Z0 on the mating face with the 1/8 in end mill) and go on."
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Set the 1/16 in end mill at least .60 out of its collet: its shank starts .50 above its tip, and it reaches {{process.relief_bottom_mm:in.3dot}} below the mating face. Console M6 T3: the tool setter measures it."
+instruction = "Set the 1/16 in end mill at least .60 out of its collet: its shank starts .50 above its tip, and it reaches {{process.relief_bottom_mm:in.3dot}} below the mating face. Console M6 T3."
 feed = "hand"
 
 [[setups.operations]]
@@ -593,11 +582,7 @@ inspection = "By pins: the {{process.relief_go_pin_in:.3dot}} (GO) enters the te
 gauge_checks = [{ gauge = "pin-gauges", band_mm = ["{{process.relief_cutter_min_mm}}", "{{process.relief_cutter_max_mm}}"] }]
 
 [[setups.operations]]
-instruction = "Only if a pin failed. The GO did not enter: the relief would be under its {{cad.relief_floor_relief_height_min_in:.3dot}}; stop and tell the owner. The NO-GO entered: set another 1/16 in end mill at least .60 out, console M6 T3 (the tool setter measures it), and repeat the test plunge and the pins at X{{process.relief_test_x_mm:.3f}} Y-{{process.test_far_y_mm:.3f}}; that fails too: stop and tell the owner."
-feed = "hand"
-
-[[setups.operations]]
-instruction = "Prove MS05_relief in air as MS05_rebate was, Z0 raised 1.000 in. Then Z0 back."
+instruction = "Only if a pin failed. The GO did not enter: the relief would be under its {{cad.relief_floor_relief_height_min_in:.3dot}}; stop and tell the owner. The NO-GO entered: set another 1/16 in end mill at least .60 out, console M6 T3, and repeat the test plunge and the pins at X{{process.relief_test_x_mm:.3f}} Y-{{process.test_far_y_mm:.3f}}; that fails too: stop and tell the owner."
 feed = "hand"
 
 [[setups.operations]]
@@ -631,16 +616,12 @@ beam = { axis = "z", hold = "cantilever", extent_mm = [0, "{{process.bar_width_m
 
 [[setups.operations]]
 instruction = "Before the slice goes in, G54 Z0: the parallels' top, touched with the 1/2 in end mill on the fixed-jaw parallel, the jaws open."
-instruction_detailed = "Before the slice goes in, the parallels in place and the jaws open: console M6 T1 (the tool setter measures it). Jog it over the fixed-jaw parallel, its edge clear of the jaw. Spindle stopped, its tip just dragging a .002 feeler leaf on the parallel: G10 L20 P1 Z0.051. Raise Z. Not with the slice in: the collet would meet the slice and the jaw tops before the tip reached the parallel."
+instruction_detailed = "Before the slice goes in, the parallels in place and the jaws open: console M6 T1. Jog it over the fixed-jaw parallel, its edge clear of the jaw. Spindle stopped, its tip just dragging a .002 feeler leaf on the parallel: G10 L20 P1 Z0.051. Raise Z. Not with the slice in: the collet would meet the slice and the jaw tops before the tip reached the parallel."
 feed = "hand"
 
 [[setups.operations]]
 instruction = "The slice clamped as Holding says: G54 X0 the top face (left), Y0 the fixed jaw's face: edge finder (900 rpm)."
 instruction_detailed = "The slice clamped as Holding says. Edge finder (900 rpm): on the fixed jaw's face beside the slice, G10 L20 P1 Y-2.540; on the TOP face from the left, its tip .10 below the slice's top, G10 L20 P1 X-2.540."
-feed = "hand"
-
-[[setups.operations]]
-instruction = "Prove MS06_locating_end in air, Z0 raised 1.000 in, through the M6. Then Z0 back."
 feed = "hand"
 
 [[setups.operations]]
@@ -686,10 +667,6 @@ instruction = "Before the slice goes back in, repeat Setup 7's Z0: M6 T1, its ti
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Prove MS07_far_end in air, Z0 raised 1.000 in. Then Z0 back."
-feed = "hand"
-
-[[setups.operations]]
 speed_kind = "spindle"
 tool = "em-half"
 drilling = "none"
@@ -703,7 +680,7 @@ milling_cuts = [
 ]
 
 [[setups.operations]]
-instruction = "Length over {{cad.far_end_length_max_in:.3dot}}, still clamped (the controller keeps G54: no homing, no new touch-off): send $#, note the G54 line's Z; G10 L2 P1 Z(that Z − (the reading − {{cad.far_end_length_in:.3dot}}) × 25.4); run MS07_far_end again from its start and re-check. Under {{cad.far_end_length_min_in:.3dot}}: the block is scrap."
+instruction = "Length over {{cad.far_end_length_max_in:.3dot}}, still clamped: send $#, note the G54 line's Z; G10 L2 P1 Z(that Z − (the reading − {{cad.far_end_length_in:.3dot}}) × 25.4); run MS07_far_end again from its start and re-check. Under {{cad.far_end_length_min_in:.3dot}}: the block is scrap."
 feed = "hand"
 
 [[setups.operations]]
@@ -726,16 +703,12 @@ vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{cad.envelope_z_mm}}", alon
 beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{cad.envelope_x_mm}}"], clamp_mm = [0, "{{cad.envelope_x_mm}}"], section_mm = { y = "{{cad.envelope_z_mm}}", z = "{{cad.envelope_y_mm}}" }, vise_left = "start" }
 
 [[setups.operations]]
-instruction = "Before the block goes in, G54 Z0: the stacks' top, touched with the 1/2 in end mill on the fixed-jaw stack, the jaws open, as Setup 5: console M6 T1; jog it over the fixed-jaw stack, its edge clear of the jaw; spindle stopped, its tip just dragging a .002 feeler leaf on the stack: G10 L20 P1 Z0.051. Raise Z. MS07b_far_chamfer's M6 T4 then measures the chamfer mill against it."
+instruction = "Before the block goes in, G54 Z0: the stacks' top, touched with the 1/2 in end mill on the fixed-jaw stack, the jaws open, as Setup 5: console M6 T1; jog it over the fixed-jaw stack, its edge clear of the jaw; spindle stopped, its tip just dragging a .002 feeler leaf on the stack: G10 L20 P1 Z0.051. Raise Z."
 feed = "hand"
 
 [[setups.operations]]
 instruction = "The block clamped as Holding says: G54 X0 the far end (right), Y0 the fixed jaw's face: edge finder (900 rpm)."
 instruction_detailed = "The block clamped as Holding says. Edge finder (900 rpm): on the fixed jaw's face beside the block, G10 L20 P1 Y-2.540; on the far end (RIGHT) from the right, G10 L20 P1 X2.540 (plus: the finder's centre is right of the end)."
-feed = "hand"
-
-[[setups.operations]]
-instruction = "Prove MS07b_far_chamfer in air, Z0 raised 1.000 in. Then Z0 back."
 feed = "hand"
 
 [[setups.operations]]
@@ -766,16 +739,12 @@ beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{cad.envelope_x_mm}}
 
 [[setups.operations]]
 instruction = "Before the block goes in, G54 Z0: the stacks' top, touched with the 1/8 in end mill on the fixed-jaw stack, the jaws open."
-instruction_detailed = "Before the block goes in, the stacks in place and the jaws open: console M6 T2 (the 1/8 in end mill). Jog it over the fixed-jaw stack, clear of the jaw. Spindle stopped, its tip just dragging a .002 feeler leaf on the stack: G10 L20 P1 Z0.051. Raise Z. MS08_thumb's M6 T5 then measures the centre drill against it. Not with the block in: the collet would reach the block first."
+instruction_detailed = "Before the block goes in, the stacks in place and the jaws open: console M6 T2 (the 1/8 in end mill). Jog it over the fixed-jaw stack, clear of the jaw. Spindle stopped, its tip just dragging a .002 feeler leaf on the stack: G10 L20 P1 Z0.051. Raise Z. Not with the block in: the collet would reach the block first."
 feed = "hand"
 
 [[setups.operations]]
 instruction = "The block clamped as Holding says: G54 X0 the locating end (right), Y0 the fixed jaw's face: edge finder (900 rpm)."
 instruction_detailed = "The block clamped as Holding says. Edge finder (900 rpm): on the fixed jaw's face beside the block, G10 L20 P1 Y-2.540; on the locating end (RIGHT) from the right, G10 L20 P1 X2.540 (plus: the finder's centre is right of the end)."
-feed = "hand"
-
-[[setups.operations]]
-instruction = "Prove MS08_thumb in air, Z0 raised 1.000 in, through the M6. Then Z0 back."
 feed = "hand"
 
 [[setups.operations]]
@@ -823,7 +792,7 @@ speed_kind = "other"
 tool = "tap-guide"
 drilling = "none"
 sizing = "other"
-instruction = "Run MS09_thumb_tap: M6 T7, the tap guide in the 1/2 in collet, pointed end out (the tool setter measures it), spindle off; the file ends Idle at the machine top over the hole."
+instruction = "Run MS09_thumb_tap: M6 T7, the tap guide in the 1/2 in collet, pointed end out, spindle off; the file ends Idle at the machine top over the hole."
 diagram = { file = "diagrams/thumb-tap.svg", alt = "The block lying locating edge up; the 4-40 tap in the T-handle wrench in the thumb hole, the tap guide in the spindle, its spring point in the wrench's centre hole; the tap's point to stop {{process.thumb_tap_reach_mm:in.3dot}} below the locating edge, inside the rebate and short of the roof." }
 
 [[setups.operations]]

@@ -71,11 +71,24 @@ part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
 material = "1018 cold-finished steel, 3/8 x 1 in flat: this traveler's stock, a plain carbon steel as the drawing's MATERIAL asks (the part's record: {{cad.material_spec}})"
 stock = "3/8 x 1 in flat bar; {{process.quantity:d}} × {{process.blank_length_in:.2f}}–{{process.blank_length_max_in:.2f}} in blank."
-note = "Inches unless mm; G-code and console entries in mm (the files and the controller run G21). Finished {{cad.far_end_length_min_in:.1f}}–{{cad.far_end_length_max_in:.1f}} long (END A to the far end), {{cad.bottom_face_height_min_in:.3dot}}–{{cad.bottom_face_height_max_in:.3dot}} high (top face to bottom face), {{cad.back_face_depth_min_in:.3dot}}–{{cad.back_face_depth_max_in:.3dot}} thick (the bar's 3/8 as supplied). Two slide faces, {{cad.front_face_finish_ra_uin:d}} µin Ra: the top face T, milled here, and the front face F, the bar's cold-finished skin, never cut: keep F off chips and grit. Speeds on the PM-30MV low belt (100–2800 rpm): no belt change. Home the mill ($H) once, after switching it on: every M6's trip to the tool setter and the tap files' G53 retract count from home. Home again only after a power cycle or a controller restart, an E-stop, an alarm, a limit switch hit, a stall or a crash: homing brings the stored G54 back. Then check every zero of the setup again, each the way its step set it: each must read what its step set, within .001 in. One does not, cannot be reached with the part in, or the part may have moved: take the setup again from its first step, the part out. They all do: run the interrupted file again from its start. Feed Hold, then Reset with the axes stopped keeps position and G54: no homing, no new zero; run the interrupted file again from its start: its first M6 measures the tool, and cuts already made are cut in air. Every file is proved in air before it cuts. Not made here: the 2X #4-40 UNC tapped holes (the drawing: spotted through MHA-PD-14 at assembly). To buy: the 3/8 x 1 in bar before Setup 1; the pin-gauge sets before Setup 3."
 shop = "../shop"
 stock_refs = ["1018-flat-3-8x1"]
 material_key = "rocker-1018-cold-finished"
 milling_material = "steel_1018"
+
+# The shop's standing page carries what every traveler shares (units, speeds,
+# homing, Feed Hold, tool changes, proving a file); This job says what only
+# this bar needs.
+standing = true
+
+[[notes]]
+title = "This job"
+rows = [
+  ["Finished", "{{cad.far_end_length_min_in:.1f}}–{{cad.far_end_length_max_in:.1f}} long (END A to the far end), {{cad.bottom_face_height_min_in:.3dot}}–{{cad.bottom_face_height_max_in:.3dot}} high (top face to bottom face), {{cad.back_face_depth_min_in:.3dot}}–{{cad.back_face_depth_max_in:.3dot}} thick (the bar's 3/8 as supplied)."],
+  ["Slide faces", "Two slide faces, {{cad.front_face_finish_ra_uin:d}} µin Ra: the top face T, milled here, and the front face F, the bar's cold-finished skin, never cut: keep F off chips and grit."],
+  ["Not made here", "The 2X #4-40 UNC tapped holes (the drawing: spotted through MHA-PD-14 at assembly)."],
+  ["To buy", "The 3/8 x 1 in bar before Setup 1; the pin-gauge sets before Setup 3."],
+]
 
 [cad]
 file = "../../out/features/pd_support_bar/features.toml"
@@ -396,7 +409,7 @@ machine = "PM-30MV CNC (FluidNC, CNCjs with the electronic tool setter) / vise, 
 indexing = "none"
 machine_ref = "pm-30mv"
 holding = "One 1 in parallel of the set ({{process.parallel_thickness_mm:in.3dot}} thick) against each jaw; the jaws' faces and the blank wiped clean (F stays as supplied). The blank on edge on them, T up, the bottom edge down, the back face against the FIXED jaw, F toward the moving jaw, END A to the RIGHT, the sawn END A {{process.top_out_mm:in.2f}} in (5 13/16) out past the jaws' right side (the rule); the far end stands about as far out past their left side. Tap it down onto both parallels while closing the vise. The lower {{process.top_grip_mm:in.3dot}} of its width is in the jaws."
-datum = "Program SB02_top. G54: X0 {{process.end_a_skim_mm:in.3dot}} left of the sawn END A (where Setup 3 mills it), +X to the right, so the bar runs toward −X; Y0 the fixed jaw's face (the back face), +Y toward it; Z0 the parallels' top (the bottom edge), set from the miked width. The file starts with an M6 for the end mill; tool lengths from the tool setter."
+datum = "Program SB02_top. G54: X0 {{process.end_a_skim_mm:in.3dot}} left of the sawn END A (where Setup 3 mills it), +X to the right, so the bar runs toward −X; Y0 the fixed jaw's face (the back face), +Y toward it; Z0 the parallels' top (the bottom edge), set from the miked width. The file starts with an M6 for the end mill."
 diagram = { file = "diagrams/top.svg", alt = "To scale, across the jaws and from above: the blank on edge on a 1 in parallel at each jaw, the back face at the fixed jaw, F at the moving jaw; the 1/2 in end mill on SB02's pass Y-3.675, going −X, at its last level, T to Z {{process.height_target_mm:in.4dot}}, its end {{process.top_jaw_clear_mm:in.3dot}} over the jaw tops. In plan the sawn END A {{process.top_out_mm:in.2f}} in out past the jaws' right side." }
 envelope = { x_span_mm = ["{{process.blank_length_max_mm}}", "{{process.face_cutter_dia_mm}}", 5.08], y_span_mm = ["{{process.blank_thickness_mm}}", "{{process.face_cutter_dia_mm}}"], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.top_riser_height_mm}}", "{{process.bar_width_max_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.top_riser_height_mm}}", "{{process.height_target_mm}}"], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_mm}}"] }
 vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{process.blank_thickness_mm}}", along_jaws_mm = "{{process.blank_length_max_mm}}", part_height_mm = "{{process.bar_width_max_mm}}", parallel_height_mm = "{{process.top_riser_height_mm}}", overhang_mm = ["rest", "{{process.top_out_mm}}"], jaw_offset = "centred", fixed_jaw_face = "as_bought", moving_jaw_face = "as_bought", moving_jaw_contact = "flat" }
@@ -414,12 +427,7 @@ feed = "hand"
 
 [[setups.operations]]
 instruction = "G54 Z0: the parallels' top (the bottom edge), from that reading and the end mill touched on T at the blank's middle."
-instruction_detailed = "Console M6 T1 (1/2 in end mill, {{process.half_mill_projection_mm:in.2f}} in out of the collet; the tool setter measures it); MDI G0 X{{process.z_touch_b_x_mm:.3f}} Y{{process.z_touch_top_y_mm:.3f}} (the blank's middle, over T). Spindle stopped, its tip just dragging a .002 feeler leaf on T: G10 L20 P1 Z(the reading in mm + 0.051)."
-feed = "hand"
-
-[[setups.operations]]
-instruction = "Prove SB02_top in air: Z0 raised 1.000 in; every move clears the jaws and the table reaches both ends of the blank. Then Z0 back. A travel alarm: the vise sits too far off the table's middle; move it and start this setup again."
-instruction_detailed = "Send $# and note the G54 line's Z. G10 L2 P1 Z(that Z + 25.400) raises Z0 1.000 in. Run SB02_top, watching each move clear the jaws and the table reach both ends of the blank. G10 L2 P1 Z(the noted Z) puts Z0 back. A travel alarm: the vise sits too far off the table's middle; move it and start this setup again."
+instruction_detailed = "Console M6 T1 (1/2 in end mill, {{process.half_mill_projection_mm:in.2f}} in out of the collet); MDI G0 X{{process.z_touch_b_x_mm:.3f}} Y{{process.z_touch_top_y_mm:.3f}} (the blank's middle, over T). Spindle stopped, its tip just dragging a .002 feeler leaf on T: G10 L20 P1 Z(the reading in mm + 0.051)."
 feed = "hand"
 
 [[setups.operations]]
@@ -427,7 +435,7 @@ speed_kind = "spindle"
 tool = "em-half"
 drilling = "none"
 sizing = "other"
-instruction = "Paint T with marking fluid. Run SB02_top (M6 T1, 1/2 in end mill; set 2450: the display rests near 2485, not 2380): skim T down to Z {{process.height_target_mm:in.4dot}} in levels no deeper than {{process.face_step_max_mm:in.4dot}} from {{process.bar_width_max_mm:in.3dot}} (the widest bar: a narrower one cuts air first), two passes along the bar per level, each no wider than {{process.face_stepover_max_mm:in.3dot}}. Unclamp."
+instruction = "Paint T with marking fluid. Run SB02_top (M6 T1, 1/2 in end mill; set 2450: the display rests near 2485, not 2380): skim T down to Z {{process.height_target_mm:in.4dot}} in levels no deeper than {{process.face_step_max_mm:in.4dot}} from {{process.bar_width_max_mm:in.3dot}} (the widest bar: a narrower one cuts air first), two passes along the bar per level, each no wider than {{process.face_stepover_max_mm:in.3dot}}. A travel alarm: the vise sits too far off the table's middle; move it and start this setup again. Unclamp."
 settings = "em-half-carbide-1018-3439-face"
 inspection = "Height, T to the bottom edge, {{cad.bottom_face_height_min_in:.3dot}}–{{cad.bottom_face_height_max_in:.3dot}}, miked at both ends and the middle; T bright from end to end, no marking fluid left (the top face, {{cad.top_face_finish_ra_uin:d}} µin Ra: the end mill's cut)."
 gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.bottom_face_height_band_mm}}" }]
@@ -439,16 +447,6 @@ milling_cuts = [
 instruction = "Over {{cad.bottom_face_height_max_in:.3dot}}: wipe the bottom edge and the parallels clean (a chip under the bar is the usual cause), repeat this setup from its second op with the new middle reading and run SB02_top again. Under {{cad.bottom_face_height_min_in:.3dot}}, or marking fluid left on T: stop and tell the owner."
 feed = "hand"
 
-[[setups.operations]]
-speed_kind = "other"
-tool = "files"
-drilling = "none"
-sizing = "other"
-instruction = "File the milling burr off T's two long edges (T to F and T to the back face), a light stroke of the smooth file along each: T seats against the fixed jaw in Setups 3 to 5."
-feed = "hand"
-inspection = "No burr stands proud along T's edges (a fingernail drawn across). Proud: file it again."
-gauge_checks = "other"
-
 [[setups]]
 machine_kind = "other"
 title = "END A; clamp holes 1 and 2; the pivot hole"
@@ -456,7 +454,7 @@ machine = "PM-30MV CNC (FluidNC, CNCjs with the electronic tool setter) / vise, 
 indexing = "none"
 machine_ref = "pm-30mv"
 holding = "Three stacks of the {{process.parallel_thickness_mm:in.3dot}} thick parallels, 1.5 in high, centred along the jaws: a 1 in on a 1/2 in against the FIXED jaw; a 1 in on a 1/2 in and, outside it against the MOVING jaw, the two 3/4 in (thicker ones would stand under the holes). The bar lying on them, F up, T against the FIXED jaw, END A to the RIGHT, the sawn END A {{process.end_overhang_mm:in.2dot}} out past the jaws' right side (the rule), the rest out past their left side in the air. The .125 pin of the pin-gauge set along the bottom edge between it and the moving jaw, on the outer stack, so the jaw seats T flat on the fixed jaw. Tap the bar down onto the stacks while closing the vise. The lower {{process.lying_grip_mm:in.3dot}} of its thickness is in the jaws."
-datum = "Program SB03_end_a. G54: X0 {{process.end_a_skim_mm:in.3dot}} left of the sawn END A (where SB03 mills it), the stations counting toward −X; Y0 the fixed jaw's face (T), +Y toward it; Z0 the front face F. Clamp holes 1 and 2 at X −{{cad.clamp_hole_1_station_in:.3dot}} and −{{cad.clamp_hole_2_station_in:.3dot}}, Y −{{cad.clamp_hole_1_height_in:.3dot}}; the pivot hole at X −{{cad.pivot_tap_station_in:.3dot}}, Y −{{cad.pivot_tap_height_in:.3dot}} in. At every M6 stop the file has stopped the spindle and lifted the tool above the bar; tool lengths from the tool setter."
+datum = "Program SB03_end_a. G54: X0 {{process.end_a_skim_mm:in.3dot}} left of the sawn END A (where SB03 mills it), the stations counting toward −X; Y0 the fixed jaw's face (T), +Y toward it; Z0 the front face F. Clamp holes 1 and 2 at X −{{cad.clamp_hole_1_station_in:.3dot}} and −{{cad.clamp_hole_2_station_in:.3dot}}, Y −{{cad.clamp_hole_1_height_in:.3dot}}; the pivot hole at X −{{cad.pivot_tap_station_in:.3dot}}, Y −{{cad.pivot_tap_height_in:.3dot}} in."
 diagram = { file = "diagrams/end-a.svg", alt = "To scale, along the jaws and from above: the bar lying F up on three 1.5 in stacks, T at the fixed jaw, the .125 pin along the bottom edge on the outer stack under the moving jaw, the sawn END A {{process.end_overhang_mm:in.2dot}} out past the jaws' right side; the 1/2 in end mill's side on END A's last pass, at X0, going +Y across the bar, its end {{process.end_past_mm:in.3dot}} under the back face. The holes drilled later in the file dashed." }
 envelope = { x_span_mm = ["{{process.blank_length_max_mm}}", "{{process.face_cutter_dia_mm}}", 5.08], y_span_mm = ["{{process.height_target_mm}}", "{{process.face_cutter_dia_mm}}", 5.08], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{process.blank_thickness_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{process.blank_thickness_mm}}", "{{process.drill_9_tip_mm}}"], longest_tool_mm = ["{{process.drill_chuck_gauge_mm}}", "{{process.drill_9_oal_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.chamfer_projection_min_mm}}"] }
 vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{process.height_target_mm}}", along_jaws_mm = "{{process.blank_length_max_mm}}", part_height_mm = "{{cad.back_face_depth_mm}}", parallel_height_mm = "{{process.riser_height_mm}}", overhang_mm = ["rest", "{{process.end_overhang_mm}}"], jaw_offset = "centred", fixed_jaw_face = "machined", moving_jaw_face = "as_bought", moving_jaw_contact = "rod" }
@@ -474,12 +472,7 @@ feed = "hand"
 
 [[setups.operations]]
 instruction = "G54 Z0: the front face F, the end mill touched on it over the jaws."
-instruction_detailed = "Console M6 T1 (1/2 in end mill, {{process.half_mill_projection_mm:in.2f}} in out of the collet; the tool setter measures it); MDI G0 X{{process.z_touch_a_x_mm:.3f}} Y{{process.z_touch_lying_y_mm:.3f}} (over the middle of the jaws). Spindle stopped, its tip just dragging a .002 feeler leaf on F: G10 L20 P1 Z0.051."
-feed = "hand"
-
-[[setups.operations]]
-instruction = "Prove SB03_end_a in air, Z0 raised 1.000 in; every move clears the jaws, through every M6. Then Z0 back."
-instruction_detailed = "Send $# and note the G54 line's Z. G10 L2 P1 Z(that Z + 25.400) raises Z0 1.000 in. Run SB03_end_a through every M6, watching each move clear the jaws. G10 L2 P1 Z(the noted Z) puts Z0 back."
+instruction_detailed = "Console M6 T1 (1/2 in end mill, {{process.half_mill_projection_mm:in.2f}} in out of the collet); MDI G0 X{{process.z_touch_a_x_mm:.3f}} Y{{process.z_touch_lying_y_mm:.3f}} (over the middle of the jaws). Spindle stopped, its tip just dragging a .002 feeler leaf on F: G10 L20 P1 Z0.051."
 feed = "hand"
 
 # Not measured (#3427): END A's side cut is deeper than the 1/2 in end
@@ -586,7 +579,7 @@ machine = "PM-30MV CNC (FluidNC, CNCjs with the electronic tool setter) / vise, 
 indexing = "none"
 machine_ref = "pm-30mv"
 holding = "As Setup 3, the bar slid along the jaws to the right: the same three stacks, F up, T against the FIXED jaw, the .125 pin along the bottom edge on the outer stack, END A to the RIGHT, the milled END A {{process.pickup_out_mm:in.2f}} in (5 3/4) out past the jaws' right side (the rule), in the air; the far end, where the slots go, stands about 5.8 in out past their left side. Tap the bar down onto the stacks while closing the vise."
-datum = "Program SB04_slots. G54: X0 the milled END A (the pickup: the same end Setup 3 cut to X0), the stations counting toward −X; Y0 the fixed jaw's face (T), +Y toward it; Z0 the front face F. Slot 3 at X −{{cad.clamp_slot_3_station_in:.3dot}} and slot 4 at X −{{cad.clamp_slot_4_station_in:.3dot}}, Y −{{cad.clamp_slot_3_height_in:.3dot}} in. The file starts with an M6 for the 1/8 in end mill; tool lengths from the tool setter."
+datum = "Program SB04_slots. G54: X0 the milled END A (the pickup: the same end Setup 3 cut to X0), the stations counting toward −X; Y0 the fixed jaw's face (T), +Y toward it; Z0 the front face F. Slot 3 at X −{{cad.clamp_slot_3_station_in:.3dot}} and slot 4 at X −{{cad.clamp_slot_4_station_in:.3dot}}, Y −{{cad.clamp_slot_3_height_in:.3dot}} in. The file starts with an M6 for the 1/8 in end mill."
 diagram = { file = "diagrams/slots.svg", alt = "Enlarged from above, to scale: slot 3, hatched, with the 1/8 in end mill at its first point, the cutter's centre path round the racetrack clockwise (+X along the top), its counterbore dashed (later in the file). Plan: the bar slid along the jaws, END A {{process.pickup_out_mm:in.2f}} in out past their right side, the slots out past their left side in the air, the .125 pin along the bottom edge." }
 envelope = { x_span_mm = ["{{process.bar_length_max_mm}}", "{{process.slot_cutter_dia_mm}}", 10.16], y_span_mm = ["{{process.height_target_mm}}", "{{process.slot_cutter_dia_mm}}", 5.08], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{process.blank_thickness_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{process.blank_thickness_mm}}", "{{process.slot_bottom_mm}}"], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.eighth_mill_projection_max_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.eighth_mill_projection_min_mm}}"] }
 vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{process.height_target_mm}}", along_jaws_mm = "{{process.bar_length_max_mm}}", part_height_mm = "{{cad.back_face_depth_mm}}", parallel_height_mm = "{{process.riser_height_mm}}", overhang_mm = ["rest", "{{process.pickup_out_mm}}"], jaw_offset = "centred", fixed_jaw_face = "machined", moving_jaw_face = "as_bought", moving_jaw_contact = "rod" }
@@ -610,16 +603,11 @@ gauge_checks = [{ gauge = "mill-x-dro", band_mm = "{{cad.far_end_length_band_mm}
 
 [[setups.operations]]
 instruction = "G54 Z0: the front face F, the 1/8 in end mill touched on it over the jaws."
-instruction_detailed = "Console M6 T7 (1/8 in end mill, {{process.eighth_mill_projection_min_mm:in.2dot}}–{{process.eighth_mill_projection_max_mm:in.2dot}} in out of its collet; the tool setter measures it); MDI G0 X{{process.z_touch_b_x_mm:.3f}} Y{{process.z_touch_lying_y_mm:.3f}} (over the middle of the jaws). Spindle stopped, its tip just touching a .002 feeler leaf on F: G10 L20 P1 Z0.051."
+instruction_detailed = "Console M6 T7 (1/8 in end mill, {{process.eighth_mill_projection_min_mm:in.2dot}}–{{process.eighth_mill_projection_max_mm:in.2dot}} in out of its collet); MDI G0 X{{process.z_touch_b_x_mm:.3f}} Y{{process.z_touch_lying_y_mm:.3f}} (over the middle of the jaws). Spindle stopped, its tip just touching a .002 feeler leaf on F: G10 L20 P1 Z0.051."
 feed = "hand"
 
 [[setups.operations]]
 instruction = "Pickup check before cutting: MDI G0 Z5.000, then G0 X-{{cad.clamp_hole_2_station_mm:.3f}} Y-{{cad.clamp_hole_2_height_mm:.3f}} and G0 Z1.000: the end mill's tip stands centred over clamp hole 2 (look across it from the front and from the side). Off by a visible amount: stop and set X0 again."
-feed = "hand"
-
-[[setups.operations]]
-instruction = "Prove SB04_slots in air, Z0 raised 1.000 in; the cutter stays over the bar's far end, clear of the jaws. Then Z0 back."
-instruction_detailed = "Send $# and note the G54 line's Z. G10 L2 P1 Z(that Z + 25.400) raises Z0 1.000 in. Run SB04_slots, watching the cutter stay over the bar's far end, clear of the jaws. G10 L2 P1 Z(the noted Z) puts Z0 back."
 feed = "hand"
 
 [[setups.operations]]
@@ -661,7 +649,7 @@ machine = "PM-30MV CNC (FluidNC, CNCjs with the electronic tool setter) / vise, 
 indexing = "none"
 machine_ref = "pm-30mv"
 holding = "The same three stacks, wiped clean with the pin and F (F goes down on them: a chip would score the slide face). The bar turned over end for end: the back face up, F down on the stacks, T again against the FIXED jaw, the .125 pin along the bottom edge on the outer stack, END A now to the LEFT, the milled END A {{process.pickup_out_mm:in.2f}} in (5 3/4) out past the jaws' left side (the rule). Tap the bar down onto the stacks while closing the vise."
-datum = "Programs SB05_back_csk and SB06_tap. G54: X0 the milled END A (the pickup, now at the left), +X along the bar; Y0 the fixed jaw's face (T), +Y toward it; Z0 the back face. The pivot hole at X {{cad.pivot_tap_station_in:.3dot}}, Y −{{cad.pivot_tap_height_in:.3dot}} in. Each file starts with an M6; tool lengths from the tool setter."
+datum = "Programs SB05_back_csk and SB06_tap. G54: X0 the milled END A (the pickup, now at the left), +X along the bar; Y0 the fixed jaw's face (T), +Y toward it; Z0 the back face. The pivot hole at X {{cad.pivot_tap_station_in:.3dot}}, Y −{{cad.pivot_tap_height_in:.3dot}} in. Each file starts with an M6."
 diagram = { file = "diagrams/pivot.svg", alt = "To scale, a section across the jaws at the pivot hole and the plan: the bar turned over end for end, the back face up, F down on the three stacks, T at the fixed jaw, the .125 pin on the outer stack, END A {{process.pickup_out_mm:in.2f}} in out past the jaws' left side; the 1/4 in chamfer mill's point at Z{{process.csk_tip_mm:in.3dot}} (Z0 the back face), countersinking the hole's mouth." }
 envelope = { x_span_mm = ["{{process.bar_length_max_mm}}", 10.16], y_span_mm = ["{{process.height_target_mm}}", 5.08], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{process.blank_thickness_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{process.blank_thickness_mm}}", "{{process.csk_tip_mm}}"], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.tap_stack_max_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.chamfer_projection_min_mm}}"] }
 vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{process.height_target_mm}}", along_jaws_mm = "{{process.bar_length_max_mm}}", part_height_mm = "{{cad.back_face_depth_mm}}", parallel_height_mm = "{{process.riser_height_mm}}", overhang_mm = ["{{process.pickup_out_mm}}", "rest"], jaw_offset = "centred", fixed_jaw_face = "machined", moving_jaw_face = "as_bought", moving_jaw_contact = "rod" }
@@ -679,7 +667,7 @@ feed = "hand"
 
 [[setups.operations]]
 instruction = "G54 Z0: the back face, the chamfer mill's point touched on it over the jaws."
-instruction_detailed = "Console M6 T6 (1/4 in 90° chamfer mill, at least .50 out of its collet; the tool setter measures it); MDI G0 X{{process.z_touch_c_x_mm:.3f}} Y{{process.z_touch_lying_y_mm:.3f}} (over the middle of the jaws). Spindle stopped, its point just touching a .002 feeler leaf on the back face, the last .010 in .001 steps: G10 L20 P1 Z0.051."
+instruction_detailed = "Console M6 T6 (1/4 in 90° chamfer mill, at least .50 out of its collet); MDI G0 X{{process.z_touch_c_x_mm:.3f}} Y{{process.z_touch_lying_y_mm:.3f}} (over the middle of the jaws). Spindle stopped, its point just touching a .002 feeler leaf on the back face, the last .010 in .001 steps: G10 L20 P1 Z0.051."
 feed = "hand"
 
 [[setups.operations]]
@@ -691,7 +679,7 @@ speed_kind = "spindle"
 tool = "chamfer"
 drilling = "none"
 sizing = "other"
-instruction = "Prove SB05_back_csk in air (Z0 raised 1.000 in, then back). Run it (M6 T6; set 2000): countersink the pivot hole's mouth in the back face to Ø{{process.csk_dia_mm:in.3dot}} (the file feeds the point half that below the face), under the drawing's Ø{{cad.pivot_tap_csk_dia_max_in:.3dot}} MAX."
+instruction = "Run SB05_back_csk (M6 T6; set 2000): countersink the pivot hole's mouth in the back face to Ø{{process.csk_dia_mm:in.3dot}} (the file feeds the point half that below the face), under the drawing's Ø{{cad.pivot_tap_csk_dia_max_in:.3dot}} MAX."
 rpm = 2000
 feed = "{{process.csk_feed_per_min_mm:in.1f}} in/min"
 milling_cuts = [
@@ -707,7 +695,7 @@ speed_kind = "other"
 tool = "tap-guide"
 drilling = "none"
 sizing = "other"
-instruction = "Run SB06_tap: M6 T8, the tap guide in the 1/2 in collet, pointed end out (the tool setter measures it), spindle off; the file ends Idle at the machine top over the pivot hole."
+instruction = "Run SB06_tap: M6 T8, the tap guide in the 1/2 in collet, pointed end out, spindle off; the file ends Idle at the machine top over the pivot hole."
 feed = "hand"
 
 [[setups.operations]]
