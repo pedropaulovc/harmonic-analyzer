@@ -9,18 +9,8 @@
 # branch (machinist_review_traveler.STANDING_NOT_APPLIED) and the test
 # (owner 2026-11-25).
 unconverted:
-  - ch_amplitude_bar
   - ch_channel_lever
-  - ch_connecting_rod
   - ch_fulcrum_keeper
-  - ch_fulcrum_shaft
-  - ch_pivot_bracket
-  - ch_pivot_shaft
-  - ch_rocker_arm
-  - ch_rocker_hub
-  - ch_rocker_strap
-  - ch_rocker_strap_tl_hub_plug
-  - ch_rocker_strap_tl_sub_plate
   - dt_arbor_pedestal
   - dt_cone_gear_tl_arbor_collar
   - dt_cone_gear_tl_arbor_key
