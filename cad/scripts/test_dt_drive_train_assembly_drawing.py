@@ -719,7 +719,6 @@ def test_the_pedestals_are_set_by_feel_then_spotted_with_one_tripwire() -> None:
     seat, which it clears with the pivot seat's whole error and the DRO set
     band."""
     import cone_set_stack
-    import cylinder_bank_layout
     import dt_drive_train_steps as steps
 
     check = _cone_checks()
@@ -780,7 +779,12 @@ def test_the_pedestals_are_set_by_feel_then_spotted_with_one_tripwire() -> None:
         + cone_set_stack.PIVOT_THREAD_CENTRING_MM
         + cone_set_stack.PIVOT_BORE_FLOAT_MM
     )
-    assert follow + cylinder_bank_layout.FRONT_STRAP_LOCATE_BAND < 0.015 * 25.4
+    # Row 3's own window (D42) books against the tripwire, .0007 in to spare.
+    assert follow + drawing.BANK_X_LOCATE_BAND < 0.015 * 25.4
+    assert (0.015 * 25.4 - follow - drawing.BANK_X_LOCATE_BAND) / 25.4 == pytest.approx(
+        0.0007, abs=5e-5
+    )
+    assert drawing.BANK_X_LIMITS == "6.618-6.626"
     # The bank steps clamp; no seat is cut and nothing is recorded there.
     assert "8T. CLAMP THE FRONT MHA-DT-02 TO MHA-FR-01 THERE." in drawing.BANK_STEPS
     assert "9F. CLAMP IT TO MHA-FR-01." in drawing.BANK_STEPS

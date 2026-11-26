@@ -44,3 +44,8 @@ necessity:
     kind: mesh
     reason: "pivot runout tilts the cone gears off centre"
     source: "delegated ruling 2026-11-25 (Main), no precedent; owner review #2144 (D28); owner ruling 2026-11-22, #2473 option G: cone gate C-01 (NOMINAL_CONTACT_RATIO_MIN 1.0): least contact ratio T012 1.022 at today's .0020 TIR, 1.001 at .0025, 0.899 at .005"
+  - id: N-05
+    feature: "sheet 7 step 1R and the sheet 15 FEELER STACKS row: BOND T024 ON ONE LEAF .015 TO .020 ON T030 (any one leaf of the range)"
+    kind: gap
+    reason: "keeps stack end play and the shaft end in T024"
+    source: "delegated ruling 2026-11-24 (Main), no precedent; owner review #2144 (D4, under owner ruling 2026-11-24, audit part 2 C7: ranges; the thick end .020 is C7's). Thin end: cone_stack_end_play MIN_END_PLAY 0.10 + MARGIN_SPARE 0.25 = 0.35 mm; .015 at its -.0005 leaf tolerance gives 0.368 mm (margin 0.018 mm), the .014 leaf 0.343 mm fails. Width: check C-01 of cad/config/checks/dt-cone-gear-shaft-spec.yaml (TIP_END_RECESS_FLOOR_MM 0.03): the shaft end stands 0.036 mm inside T024's bore at today's .015-.020 (STACK_FEELER_BAND .0045 in about the model's .019 leaf); at the title block's .010 width, .015-.025, it stands -0.015 mm (the .019 model leaf) or 0.011 mm (the model leaf moved to .020), both under 0.03."

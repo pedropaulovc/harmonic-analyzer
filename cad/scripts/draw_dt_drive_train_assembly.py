@@ -996,9 +996,17 @@ def _plus_w_window(low: float, high: float, nominal_w: float, sign: int) -> str:
 
 
 _BANK_X = cone_line.X_DRUM + base.BOTTOM_LENGTH / 2.0
-BANK_X_LIMITS = _inward_limits(
-    _BANK_X - bank.FRONT_STRAP_LOCATE_BAND, _BANK_X + bank.FRONT_STRAP_LOCATE_BAND
-)
+# Row 3 is only the pedestals' starting position: check 4E re-sets each
+# MHA-DT-02 in X by feel and check 4G records the X readings against .015 MAX.
+# Its window is opened to the shop's DRO row for a location more than 6 in from
+# its datum (drawing-guidelines, ±.004): .0045 either way off the 6.6223
+# nominal prints 6.618-6.626, and the 4G tripwire keeps .0007 in of margin.
+# D42: delegated ruling 2026-11-26 (Main), precedent: the fit-necessity rule
+# of the owner-approved fit policy (drawing-simplicity-policy.md; owner ruling
+# 2026-11-24); owner review #2144. Row 2 keeps cylinder_bank_layout's
+# FRONT_STRAP_LOCATE_BAND (necessity N-01).
+BANK_X_LOCATE_BAND = 0.1143  # +/-.0045
+BANK_X_LIMITS = _inward_limits(_BANK_X - BANK_X_LOCATE_BAND, _BANK_X + BANK_X_LOCATE_BAND)
 # A thick front disc moves its strap to the front, hence PLUS its measured
 # excess in the base's rear-face Y coordinate (cylinder_bank_layout).
 _FRONT_STRAP_Y = base.BOTTOM_REAR_Z - bank.FRONT_STRAP_INNER_Z
