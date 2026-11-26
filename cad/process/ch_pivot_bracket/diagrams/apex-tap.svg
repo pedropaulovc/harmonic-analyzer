@@ -13,8 +13,8 @@
   <circle class="datum" cx="300" cy="380" r="3.5"/>
   <text class="datum-label" x="308" y="376">Z0 the parallels' top (the seat)</text>
   <text class="label" x="364" y="320">1 in parallels</text>
-  <line class="leader" x1="360" y1="316" x2="288" y2="388"/>
-  <circle class="leader-dot" cx="288" cy="388" r="2"/>
+  <line class="leader" x1="360" y1="316" x2="288" y2="394"/>
+  <circle class="leader-dot" cx="288" cy="394" r="2"/>
   <line class="centre-line" x1="275.62" y1="20" x2="275.62" y2="228.8"/>
   <rect class="part-threads" x="267.08" y="169.69" width="17.07" height="39.53"/>
   <path class="cutter" d="M284.15 228.17L284.15 139.69L267.08 139.69L267.08 228.17A8.53 2.05 0 0 0 284.15 228.17Z"/>
@@ -24,17 +24,17 @@
   <path class="cutter" d="M313.72 83.69L313.72 30L309.91 33L306.1 30L302.29 33L298.48 30L294.67 33L290.86 30L287.05 33L283.24 30L279.43 33L275.62 30L271.81 33L268 30L264.19 33L260.38 30L256.57 33L252.76 30L248.95 33L245.14 30L241.33 33L237.52 30L237.52 83.69Z"/>
   <text class="label" x="364" y="50">Fisher tap guide, its 1/2 in shank in the</text>
   <text class="label" x="364" y="66">1/2 in collet, spindle OFF</text>
-  <line class="leader" x1="313.72" y1="56" x2="360" y2="56"/>
-  <circle class="leader-dot" cx="360" cy="56" r="2"/>
+  <line class="leader" x1="360" y1="56" x2="313.72" y2="56"/>
+  <circle class="leader-dot" cx="313.72" cy="56" r="2"/>
   <text class="label" x="364" y="91.69">its 3/16 spring point in the</text>
   <text class="label" x="364" y="107.69">wrench's centre hole</text>
-  <line class="leader" x1="289.9" y1="99.69" x2="360" y2="99.69"/>
-  <circle class="leader-dot" cx="360" cy="99.69" r="2"/>
+  <line class="leader" x1="360" y1="99.69" x2="289.9" y2="99.69"/>
+  <circle class="leader-dot" cx="289.9" cy="99.69" r="2"/>
   <text class="label" x="364" y="139.69">T-handle wrench (schematic)</text>
-  <line class="leader" x1="335.62" y1="135.69" x2="360" y2="133.69"/>
-  <circle class="leader-dot" cx="360" cy="133.69" r="2"/>
+  <line class="leader" x1="360" y1="133.69" x2="335.62" y2="135.69"/>
+  <circle class="leader-dot" cx="335.62" cy="135.69" r="2"/>
   <text class="label" x="364" y="234.22">4-40 plug tap's point {{process.tap_reach_min_mm:in.3dot}}–{{process.tap_reach_max_mm:in.3dot}}</text>
   <text class="label" x="364" y="250.22">below the apex: into the bore</text>
-  <line class="leader" x1="284.15" y1="230.22" x2="360" y2="230.22"/>
-  <circle class="leader-dot" cx="360" cy="230.22" r="2"/>
+  <line class="leader" x1="360" y1="230.22" x2="284.15" y2="230.22"/>
+  <circle class="leader-dot" cx="284.15" cy="230.22" r="2"/>
 </svg>

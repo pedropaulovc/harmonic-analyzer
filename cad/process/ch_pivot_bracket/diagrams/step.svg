@@ -21,14 +21,14 @@
   <text class="label" x="426.42" y="191.76">foot end Z {{cad.foot_end_length_mm:in.4dot}}</text>
   <text class="label" x="426.42" y="268.98">outboard face Z {{cad.outboard_face_thickness_mm:in.4dot}}</text>
   <text class="label" x="426.42" y="287.24">jaw tops (the moving jaw, in front)</text>
-  <line class="leader" x1="178.77" y1="242" x2="422.42" y2="242"/>
-  <circle class="leader-dot" cx="422.42" cy="242" r="2"/>
+  <line class="leader" x1="422.42" y1="242" x2="178.77" y2="242"/>
+  <circle class="leader-dot" cx="178.77" cy="242" r="2"/>
   <text class="label" x="426.42" y="246">foot top X {{cad.foot_top_height_mm:in.3dot}}: the step's wall</text>
-  <line class="leader" x1="337.6" y1="306" x2="422.42" y2="306"/>
-  <circle class="leader-dot" cx="422.42" cy="306" r="2"/>
+  <line class="leader" x1="422.42" y1="306" x2="337.6" y2="306"/>
+  <circle class="leader-dot" cx="337.6" cy="306" r="2"/>
   <text class="label" x="426.42" y="310">bore (Setup 5)</text>
-  <line class="leader" x1="154" y1="228.4" x2="110" y2="228.4"/>
-  <circle class="leader-dot" cx="110" cy="228.4" r="2"/>
+  <line class="leader" x1="110" y1="228.4" x2="154" y2="228.4"/>
+  <circle class="leader-dot" cx="154" cy="228.4" r="2"/>
   <text class="label" x="106" y="232.4" text-anchor="end">hold-down hole</text>
   <text class="datum-label" x="138" y="352">X0 the seat; Z0 the stacks' top (I); stacks as in Setup 5</text>
 </svg>

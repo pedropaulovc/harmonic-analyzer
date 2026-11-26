@@ -18,10 +18,11 @@
   <text class="label" x="329" y="69">.0775 reamer, {{process.ream_projection_mm:in.2f}} out of the chuck (drawn short):</text>
   <text class="label" x="329" y="85">through both cheeks, in and out at feed,</text>
   <text class="label" x="329" y="101">its full diameter {{process.ream_past_mm:in.3dot}} past R, into the air</text>
-  <line class="leader" x1="245" y1="366" x2="245" y2="292.2"/>
+  <line class="leader" x1="205" y1="374" x2="245" y2="292.2"/>
   <circle class="leader-dot" cx="245" cy="292.2" r="2"/>
-  <text class="label" x="245" y="382" text-anchor="middle">the top notch (CA04), between the two cheeks</text>
-  <text class="label" x="560" y="110">From above, fixed jaw at the top:</text>
+  <text class="label" x="163" y="388">the top notch (CA04),</text>
+  <text class="label" x="163" y="404">between the two cheeks</text>
+  <text class="label" x="560" y="134">From above, fixed jaw at the top:</text>
   <path class="clamp" d="M625 150L625 190L560 190L557 186L560 182L557 178L560 174L557 170L560 166L557 162L560 158L557 154L560 150Z"/>
   <path class="clamp" d="M625 289.6L625 329.6L560 329.6L557 325.6L560 321.6L557 317.6L560 313.6L557 309.6L560 305.6L557 301.6L560 297.6L557 293.6L560 289.6Z"/>
   <path class="part-kept" d="M700 190L700 214.9L560 214.9L557 210.75L560 206.6L557 202.45L560 198.3L557 194.15L560 190Z"/>

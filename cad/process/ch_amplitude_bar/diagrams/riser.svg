@@ -21,8 +21,8 @@
   <circle class="leader-dot" cx="181.34" cy="189" r="2"/>
   <text class="label" x="74" y="292">the 1/2 in end mill on the Y −1.500 pass, +X;</text>
   <text class="label" x="74" y="308">13 passes .250 apart, Y0 to −3.000, past both jaw sides</text>
-  <line class="leader" x1="238.54" y1="160" x2="278.54" y2="160"/>
-  <circle class="leader-dot" cx="278.54" cy="160" r="2"/>
+  <line class="leader" x1="278.54" y1="160" x2="228.54" y2="160"/>
+  <circle class="leader-dot" cx="228.54" cy="160" r="2"/>
   <text class="label" x="282.54" y="150">two blocks, TOP up, each</text>
   <text class="label" x="282.54" y="166">{{process.riser_width_min_mm:in.2dot}}–{{process.riser_width_max_mm:in.2dot}} along the jaws</text>
   <line class="axis" x1="22" y1="276" x2="56" y2="276"/>

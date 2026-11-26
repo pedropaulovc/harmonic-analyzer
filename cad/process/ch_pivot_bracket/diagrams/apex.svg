@@ -13,8 +13,8 @@
   <circle class="datum" cx="300" cy="380" r="3.5"/>
   <text class="datum-label" x="308" y="376">Z0 the parallels' top (the seat)</text>
   <text class="label" x="364" y="320">1 in parallels</text>
-  <line class="leader" x1="360" y1="316" x2="288" y2="388"/>
-  <circle class="leader-dot" cx="288" cy="388" r="2"/>
+  <line class="leader" x1="360" y1="316" x2="288" y2="394"/>
+  <circle class="leader-dot" cx="288" cy="394" r="2"/>
   <line class="centre-line" x1="275.62" y1="20" x2="275.62" y2="228.8"/>
   <rect class="holes" x="268.83" y="169.69" width="13.56" height="39.53"/>
   <path class="cutter" d="M282.4 40L282.4 213.43L275.62 217.5L268.83 213.43L268.83 40L272.23 37L275.62 40L279.01 37Z"/>

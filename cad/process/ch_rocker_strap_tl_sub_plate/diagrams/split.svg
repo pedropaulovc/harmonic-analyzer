@@ -28,7 +28,7 @@
   <circle class="cutter" cx="125.4" cy="365.5" r="12.7"/>
   <line class="arrow" x1="146" y1="384" x2="690" y2="384"/>
   <text class="label-halo" x="95" y="320">1-2-3 block, 1 in up</text>
-  <text class="label-halo" x="600" y="254">step clamp</text>
+  <text class="label-on-clamp" x="600" y="281">step clamp</text>
   <line class="arrow" x1="690" y1="187.4" x2="80" y2="187.4"/>
   <line class="arrow" x1="80" y1="187.4" x2="690" y2="187.4"/>
   <!-- Y0: 2.540 in behind the as-received front edge (Setup 3's fence face). -->

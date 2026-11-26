@@ -15,15 +15,15 @@
   <path class="cutter" d="M401.25 213.5L401.25 30L397.28 33L393.31 30L389.34 33L385.38 30L381.41 33L377.44 30L373.47 33L369.5 30L365.53 33L361.56 30L357.59 33L353.62 30L349.66 33L345.69 30L341.72 33L337.75 30L337.75 213.5Z"/>
   <text class="label" x="433.5" y="50">Fisher tap guide, its 1/2 in shank in</text>
   <text class="label" x="433.5" y="66">the 1/2 in collet, spindle OFF</text>
-  <line class="leader" x1="401.25" y1="56" x2="429.5" y2="56"/>
-  <circle class="leader-dot" cx="429.5" cy="56" r="2"/>
+  <line class="leader" x1="429.5" y1="56" x2="401.25" y2="56"/>
+  <circle class="leader-dot" cx="401.25" cy="56" r="2"/>
   <text class="label" x="433.5" y="225.5">its 3/16 spring point in the</text>
   <text class="label" x="433.5" y="241.5">wrench's centre hole</text>
-  <line class="leader" x1="381.41" y1="233.5" x2="429.5" y2="233.5"/>
-  <circle class="leader-dot" cx="429.5" cy="233.5" r="2"/>
+  <line class="leader" x1="429.5" y1="233.5" x2="381.41" y2="233.5"/>
+  <circle class="leader-dot" cx="381.41" cy="233.5" r="2"/>
   <text class="label" x="503.5" y="281.5">T-handle wrench (schematic)</text>
-  <line class="leader" x1="439.5" y1="277.5" x2="499.5" y2="277.5"/>
-  <circle class="leader-dot" cx="499.5" cy="277.5" r="2"/>
+  <line class="leader" x1="499.5" y1="277.5" x2="439.5" y2="277.5"/>
+  <circle class="leader-dot" cx="439.5" cy="277.5" r="2"/>
   <text class="label" x="20" y="262.83">#10-32 plug tap, by hand, through,</text>
   <text class="label" x="20" y="278.83">its point drawn at the underside</text>
   <line class="leader" x1="60" y1="282.83" x2="357.44" y2="378.83"/>

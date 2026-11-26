@@ -17,17 +17,17 @@
   <circle class="datum" cx="300" cy="196" r="3.5"/>
   <text class="label" x="301.17" y="46">1/2 in end mill, each pass along the blank,</text>
   <text class="label" x="301.17" y="62">this one toward you (+X); stepping −Y</text>
-  <line class="leader" x1="291" y1="116.56" x2="380" y2="116"/>
-  <circle class="leader-dot" cx="380" cy="116" r="2"/>
+  <line class="leader" x1="380" y1="116" x2="291" y2="116.56"/>
+  <circle class="leader-dot" cx="291" cy="116.56" r="2"/>
   <text class="label" x="384" y="120">faced in levels to Z {{cad.east_side_width_mm:in.4dot}}: this face becomes E</text>
-  <line class="leader" x1="286.5" y1="191.5" x2="380" y2="190"/>
-  <circle class="leader-dot" cx="380" cy="190" r="2"/>
+  <line class="leader" x1="380" y1="190" x2="286.5" y2="191.5"/>
+  <circle class="leader-dot" cx="286.5" cy="191.5" r="2"/>
   <text class="label" x="384" y="194">W on the stacks</text>
   <text class="label" x="384" y="234">I against the fixed jaw (right)</text>
   <text class="label" x="384" y="254">jaw tops {{process.lying_grip_mm:in.3dot}} above the stacks</text>
   <text class="label" x="384" y="274">stacks: 1 in + 1/2 in parallels, one per jaw</text>
-  <line class="leader" x1="300" y1="196" x2="380" y2="305"/>
-  <circle class="leader-dot" cx="380" cy="305" r="2"/>
+  <line class="leader" x1="380" y1="305" x2="300" y2="196"/>
+  <circle class="leader-dot" cx="300" cy="196" r="2"/>
   <text class="datum-label" x="384" y="309">Y0 the fixed jaw; Z0 the stacks' top</text>
   <text class="label" x="20" y="397">Seen from the right end, looking −X: X0, the blank's left end, is the far end.</text>
 </svg>

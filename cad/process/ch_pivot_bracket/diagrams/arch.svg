@@ -26,13 +26,14 @@
   <path class="cutter" d="M239.98 280.95L239.98 224.81L235.9 227.81L231.82 224.81L227.73 227.81L223.65 224.81L219.57 227.81L215.49 224.81L211.41 227.81L207.32 224.81L203.24 227.81L199.16 224.81L195.08 227.81L190.99 224.81L186.91 227.81L182.83 224.81L182.83 280.95A28.57 6.86 0 0 0 239.98 280.95Z"/>
   <circle class="datum" cx="400" cy="353" r="3.5"/>
   <text class="label" x="20" y="216">From the front (the moving jaw toward you):</text>
-  <text class="datum-label" x="410" y="357">Z0 the stacks' top</text>
+  <text class="datum-label" x="410" y="369">Z0 the stacks' top</text>
   <text class="label" x="434" y="307.85">outboard face's plane (Setup 6)</text>
   <text class="label" x="434" y="336.2">jaw tops: the jaws grip waste only</text>
   <text class="label" x="434" y="271.27">I up; the arch cut {{process.arch_past_mm:in.3dot}} past</text>
   <text class="label" x="434" y="287.27">the outboard plane</text>
-  <text class="label" x="20" y="250">1/2 in end mill on the first level,</text>
-  <text class="label" x="20" y="266">at the arch's left point</text>
-  <line class="leader" x1="200" y1="262" x2="182.83" y2="267.81"/>
+  <text class="label" x="20" y="244">1/2 in end mill on</text>
+  <text class="label" x="20" y="260">the first level, at the</text>
+  <text class="label" x="20" y="276">arch's left point</text>
+  <line class="leader" x1="150" y1="262" x2="182.83" y2="267.81"/>
   <circle class="leader-dot" cx="182.83" cy="267.81" r="2"/>
 </svg>

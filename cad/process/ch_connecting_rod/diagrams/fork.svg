@@ -14,8 +14,8 @@
   <circle class="holes" cx="320.98" cy="196.93" r="1.6"/>
   <rect class="clamp" x="49.2" y="65.4" width="253.88" height="9.6"/>
   <rect class="clamp" x="49.2" y="237.56" width="253.88" height="9.6"/>
-  <text class="label-on-clamp" x="158" y="76.4" text-anchor="middle">fixed jaw</text>
-  <text class="label-on-clamp" x="158" y="248.56" text-anchor="middle">moving jaw</text>
+  <text class="label" x="158" y="61.4" text-anchor="middle">fixed jaw</text>
+  <text class="label" x="158" y="260.16" text-anchor="middle">moving jaw</text>
   <path class="hidden" d="M30 77.03H273.84V235.53H30Z"/>
   <line class="datum" x1="30" y1="55.8" x2="30" y2="253.56"/>
   <text class="datum-label" x="28" y="266.56" text-anchor="middle">X0</text>
@@ -24,7 +24,7 @@
   <circle class="cutter" cx="380.86" cy="115.64" r="55.88"/>
   <circle class="cutter" cx="380.86" cy="115.64" r="25.4"/>
   <line class="arrow" x1="380.86" y1="123.64" x2="380.86" y2="91.64"/>
-  <text class="label" x="386.86" y="97.64">+Y</text>
+  <text class="label-halo" x="388.86" y="109.64">+Y</text>
   <text class="label" x="20" y="300">The slitting saw's light pass along +Y across both</text>
   <text class="label" x="20" y="316">crowns, {{process.slot_light_mm:in.3dot}} in, its lower face {{process.saw_low_mm:in.4dot}} over Z0;</text>
   <text class="label" x="20" y="332">then steps of {{process.slot_step_mm:in.3dot}} to the slot's floor, at two</text>
@@ -43,10 +43,10 @@
   <text class="datum-label" x="578.37" y="192.4" text-anchor="end">crown</text>
   <text class="label-halo" x="660.29" y="170" text-anchor="middle">arbor</text>
   <text class="label-halo" x="660.29" y="246.16" text-anchor="middle">cap</text>
-  <text class="label" x="470" y="300">the jaws end at X 170.7 and the plate at 152.4,</text>
-  <text class="label" x="470" y="316">both behind: the fork overhangs; the cap passes</text>
-  <text class="label" x="470" y="332">beyond the crown, below its level, in the air</text>
-  <text class="label" x="470" y="348">(the saw drawn short at the right edge)</text>
+  <text class="label" x="470" y="318">the jaws end at X 170.7 and the plate at 152.4,</text>
+  <text class="label" x="470" y="334">both behind: the fork overhangs; the cap passes</text>
+  <text class="label" x="470" y="350">beyond the crown, below its level, in the air</text>
+  <text class="label" x="470" y="366">(the saw drawn short at the right edge)</text>
   <line class="datum" x1="470" y1="230" x2="494" y2="230"/>
-  <text class="datum-label" x="474" y="246">Z0</text>
+  <text class="datum-label" x="464" y="234" text-anchor="end">Z0</text>
 </svg>

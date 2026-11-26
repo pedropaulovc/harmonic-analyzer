@@ -23,7 +23,7 @@
   <line class="arrow" x1="256.6" y1="226.77" x2="256.6" y2="258.27"/>
   <circle class="datum" cx="400" cy="353" r="3.5"/>
   <text class="label" x="20" y="216">Section along the bore's centre line (Y −8.128):</text>
-  <text class="datum-label" x="410" y="357">Z0 the stacks' top</text>
+  <text class="datum-label" x="410" y="369">Z0 the stacks' top</text>
   <text class="label" x="434" y="307.85">outboard face's plane (Setup 6)</text>
   <text class="label" x="434" y="336.2">jaw tops: the jaws grip waste only</text>
   <text class="label" x="434" y="271.27">I up; the drill through the ear, its full</text>

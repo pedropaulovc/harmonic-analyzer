@@ -16,15 +16,15 @@
   <path class="cutter" d="M212.96 93.6L212.96 45.4L209.15 48.4L205.34 45.4L201.53 48.4L197.72 45.4L193.91 48.4L190.1 45.4L186.29 48.4L182.48 45.4L178.67 48.4L174.86 45.4L171.05 48.4L167.24 45.4L163.43 48.4L159.62 45.4L159.62 93.6A26.67 6.4 0 0 0 212.96 93.6Z"/>
   <line class="arrow" x1="153.62" y1="66.4" x2="129.62" y2="66.4"/>
   <text class="label" x="330" y="64">the seat: {{process.seat_skim_mm:in.3dot}} off the sawn end; Z0</text>
-  <line class="leader" x1="167.72" y1="98.74" x2="326" y2="60"/>
-  <circle class="leader-dot" cx="326" cy="60" r="2"/>
+  <line class="leader" x1="326" y1="60" x2="167.72" y2="98.74"/>
+  <circle class="leader-dot" cx="167.72" cy="98.74" r="2"/>
   <text class="label" x="330" y="84">1/2 in end mill: each pass along X (toward you on</text>
   <text class="label" x="330" y="100">this one), stepping −Y; the #15 drill has its own picture</text>
-  <line class="leader" x1="221.6" y1="125.6" x2="326" y2="140"/>
-  <circle class="leader-dot" cx="326" cy="140" r="2"/>
+  <line class="leader" x1="326" y1="140" x2="221.6" y2="125.6"/>
+  <circle class="leader-dot" cx="221.6" cy="125.6" r="2"/>
   <text class="label" x="330" y="144">foot top, {{cad.foot_top_height_in:.2dot}} below the seat (hidden)</text>
-  <line class="leader" x1="223.33" y1="204.84" x2="326" y2="300"/>
-  <circle class="leader-dot" cx="326" cy="300" r="2"/>
+  <line class="leader" x1="326" y1="300" x2="223.33" y2="308.58"/>
+  <circle class="leader-dot" cx="223.33" cy="308.58" r="2"/>
   <text class="label" x="330" y="304">1 in parallels, one against each jaw</text>
   <text class="label" x="330" y="324">W at the fixed jaw (right); I at the far end (X0)</text>
   <text class="label" x="330" y="344">jaw tops {{process.upright_grip_mm:in.2dot}} over the parallels</text>

@@ -32,7 +32,7 @@
   <circle class="cutter" cx="635.44" cy="279.9" r="68.75"/>
   <circle class="cutter" cx="635.44" cy="279.9" r="31.25"/>
   <line class="arrow" x1="635.44" y1="269.9" x2="635.44" y2="305.9"/>
-  <text class="label" x="641.44" y="305.9">−Y</text>
+  <text class="label-halo" x="641.44" y="291.9">−Y</text>
   <line class="datum" x1="700" y1="195" x2="700" y2="335"/>
   <text class="datum-label" x="700" y="349" text-anchor="middle">X0</text>
   <text class="label" x="540" y="130">From above, fixed jaw at the top:</text>

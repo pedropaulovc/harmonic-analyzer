@@ -15,7 +15,7 @@
   <text class="label-on-clamp" x="28" y="233">Z0: D, the plate's top level</text>
   <line class="leader" x1="248" y1="287" x2="248" y2="191"/>
   <circle class="leader-dot" cx="248" cy="191" r="2"/>
-  <text class="label" x="248" y="301" text-anchor="middle">the slot (CR06), between the tines</text>
+  <text class="label" x="211.39" y="301">the slot (CR06), between the tines</text>
   <text class="label" x="308.93" y="87">.0775 reamer, through both tines,</text>
   <text class="label" x="308.93" y="103">in and out at feed;</text>
   <text class="label" x="308.93" y="119">its tip {{process.ream_past_mm:in.3dot}} past D</text>

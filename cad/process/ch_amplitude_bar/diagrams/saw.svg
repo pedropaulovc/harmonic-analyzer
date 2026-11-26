@@ -9,10 +9,13 @@
   <rect class="part-removed" x="566" y="36" width="6" height="22"/>
   <rect class="clamp" x="300" y="26" width="40" height="14"/>
   <rect class="clamp" x="300" y="54" width="40" height="14"/>
-  <line class="leader" x1="342" y1="64" x2="380" y2="100"/>
-  <circle class="leader-dot" cx="380" cy="100" r="2"/>
+  <line class="leader" x1="380" y1="100" x2="342" y2="64"/>
+  <circle class="leader-dot" cx="342" cy="64" r="2"/>
   <text class="label" x="384" y="104">saw vise (schematic), the next cut at its left</text>
-  <text class="label" x="80" y="80">{{process.blank_length_in:.2f}}–{{process.blank_length_max_in:.2f}}</text>
+  <line class="dims" x1="20" y1="64" x2="290" y2="64"/>
+  <line class="dims" x1="20" y1="58" x2="20" y2="70"/>
+  <line class="dims" x1="290" y1="58" x2="290" y2="70"/>
+  <text class="label" x="80" y="82">{{process.blank_length_in:.2f}}–{{process.blank_length_max_in:.2f}}</text>
   <text class="label" x="120" y="104">kerfs</text>
   <line class="leader" x1="150" y1="94" x2="292" y2="58"/>
   <circle class="leader-dot" cx="292" cy="58" r="2"/>

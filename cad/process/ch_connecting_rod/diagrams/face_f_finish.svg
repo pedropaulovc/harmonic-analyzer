@@ -1,6 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 840 430" width="840" height="430" font-family="sans-serif" font-size="13">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 840 490" width="840" height="490" font-family="sans-serif" font-size="13">
   <!-- Setup 4. Hand picture, both views at 2.4 px/mm (61 px/in). From the plan's [parameters]: blanks 2 x 1/4 in (blank_width_in, blank_thickness_max_mm), two side by side across the jaws, 50.8 mm apart (blank_pitch_mm); the jaws X 12.0 to 170.674 (jaw_start_mm, jaw_end_mm), their tops 6.845 mm over the plate (jaw_top_mm); the support plate 99.06 x 152.4 x 12.7 mm (support_plate_*_mm) from X0, centred across the load (its place across is not stated), on two 1 in parallels (parallel_height_mm), 1/8 in thick (the parallel set's thickness as the shaft plans' parallel_thickness_mm restates it). Not on record, drawn schematic: the jaws' depth (6 mm drawn), the vise body, the parallels' length (drawn jaw to jaw). The part outline in the view from above is main's picture, rescaled. Z0 the plate's top (face D). CR04a's first cut on the part: T1, the 1/2 in end mill to scale (face_cutter_dia_mm 12.7 = 30.5 px), on its last pass, centre X 193.169 (its side on the crown, crown_x_mm 186.819), Z -0.250 (end_trim_run_past_mm), fed +Y from Y -110.490 to +8.890; drawn at Y -25.400, fork 1. The pass before it, 1.587 mm out (end_trim_step_mm, X 194.755), is not drawn. Its square end 12 % deep; drawn short to a break line (1.12 in out of the collet; the collet is not drawn). -->
-  <rect class="paper" x="0" y="0" width="840" height="430"/>
+  <rect class="paper" x="0" y="0" width="840" height="490"/>
   <text class="title" x="20" y="24">Setup 4, CR04a trims the right ends: from above (2.4 px/mm)</text>
   <rect class="part-rest" x="40" y="80" width="454.1" height="121.9"/>
   <path class="part-removed" d="M 40 84.3 L 167.53 84.3 L 167.53 117.32 L 445.1 117.32 L 445.1 164.58 L 167.53 164.58 L 167.53 197.68 L 40 197.68 Z"/>
@@ -43,9 +43,12 @@
   <text class="title" x="531.76" y="52">Section at X 193.2, from the right end</text>
   <text class="label" x="531.76" y="70">through the cutter, past the fork ends;</text>
   <text class="label" x="531.76" y="86">the forks, jaws and plate stand behind</text>
-  <line class="leader" x1="670" y1="379.44" x2="670" y2="315.24"/>
-  <circle class="leader-dot" cx="670" cy="315.24" r="2"/>
+  <text class="label" x="668.08" y="443.44" text-anchor="middle">support plate on two 1 in parallels</text>
+  <line class="leader" x1="668.08" y1="431.44" x2="668.08" y2="330.48"/>
+  <circle class="leader-dot" cx="668.08" cy="330.48" r="2"/>
+  <line class="leader" x1="628.08" y1="431.44" x2="549.97" y2="360.96"/>
+  <circle class="leader-dot" cx="549.97" cy="360.96" r="2"/>
   <path class="cutter" d="M744.28 296.94L744.28 239.15L740.47 242.15L736.66 239.15L732.85 242.15L729.04 239.15L725.23 242.15L721.42 239.15L717.61 242.15L713.8 239.15L713.8 296.94A15.24 3.66 0 0 0 744.28 296.94Z"/>
   <line class="datum" x1="501.76" y1="300" x2="527.76" y2="300"/>
-  <text class="datum-label" x="499.76" y="304" text-anchor="end">Z0</text>
+  <text class="datum-label" x="525.76" y="316" text-anchor="end">Z0</text>
 </svg>

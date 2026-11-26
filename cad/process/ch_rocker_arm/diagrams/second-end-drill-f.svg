@@ -20,7 +20,7 @@
   <line class="leader" x1="420" y1="312" x2="470" y2="312"/>
   <text class="label" x="620" y="372">end G, faced in Setup 2</text>
   <line class="leader" x1="420" y1="367.6" x2="616" y2="367.6"/>
-  <text class="label" x="20" y="330">strap MHA-CH-13</text>
+  <text class="label" x="20" y="322">strap MHA-CH-13</text>
   <text class="label" x="20" y="60">From above: the F drill at X0 Y0 (1 in = 55 px)</text>
   <rect class="part-kept" x="40" y="112.68" width="160" height="34.65"/>
   <text class="label" x="210" y="134">the strap, the hub in it</text>

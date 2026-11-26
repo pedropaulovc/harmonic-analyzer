@@ -20,8 +20,8 @@
   <circle class="part-threads" cx="370.2" cy="136.2" r="5.1"/>
   <circle class="cutter" cx="465.4" cy="73.7" r="12.7"/>
   <line class="arrow" x1="481.4" y1="73.7" x2="690" y2="73.7"/>
-  <line class="leader" x1="471.4" y1="62.7" x2="548" y2="46"/>
-  <circle class="leader-dot" cx="548" cy="46" r="2"/>
+  <line class="leader" x1="548" y1="46" x2="471.4" y2="62.7"/>
+  <circle class="leader-dot" cx="471.4" cy="62.7" r="2"/>
   <text class="label" x="550" y="50">1/2 in end mill, on the fence top</text>
   <line class="datum" x1="65.4" y1="72" x2="65.4" y2="100"/>
   <line class="datum" x1="52" y1="85.4" x2="80" y2="85.4"/>
