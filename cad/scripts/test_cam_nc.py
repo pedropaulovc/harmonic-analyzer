@@ -783,6 +783,27 @@ def test_cnc_toml_alone_of_the_inventory_is_a_cam_input():
     assert "jaw-clearance" in _shop_equipment.merge([inputs["shop-equipment/cnc.toml"]])["cnc"]
 
 
+def test_the_floor_is_read_from_cnc_toml_alone(tmp_path, monkeypatch):
+    """No other inventory file reaches cam_nc: a broken or duplicating file
+    beside cnc.toml leaves the floor (and verify) as cnc.toml says (#3635)."""
+    import _cam_programs
+    import _shop_equipment
+
+    directory = tmp_path / "shop-equipment"
+    directory.mkdir()
+    cnc = directory / "cnc.toml"
+    cnc.write_text("[cnc.jaw-clearance]\njaw_clearance_min_mm = 1.5\n", encoding="utf-8")
+    # Malformed, and a duplicate of cnc.toml's record: either breaks a load()
+    # of the whole directory.
+    (directory / "other.toml").write_text(
+        "[cnc.jaw-clearance]\njaw_clearance_min_mm = 0.1\n[stock\n", encoding="utf-8"
+    )
+    monkeypatch.setattr(_shop_equipment, "DIRECTORY", directory)
+    monkeypatch.setattr(_cam_programs, "CNC_EQUIPMENT_PATH", cnc)
+    assert cam_nc.jaw_clearance_min_mm() == 1.5
+    assert cam_nc.verify([], tmp_path) == []
+
+
 def test_a_reamer_rapided_out_of_its_bore_is_caught(tmp_path):
     fed = _program(tmp_path, "G0 X10 Y5 Z5\nG0 Z1\nG1 Z-7 F80\nG1 Z1 F80\nG0 Z5\n")
     assert _gcode.check_feed_out(fed, 0.0) == []
