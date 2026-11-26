@@ -381,7 +381,7 @@ speed_kind = "spindle"
 tool = "em-half"
 drilling = "none"
 sizing = "other"
-instruction = "Run MS01_back (M6 T1, 1/2 in end mill; set 2800): skim the sawn top {{process.back_skim_mm:in.3dot}} off its high point at Z0, in passes no wider than {{process.face_stepover_max_mm:in.3dot}}. At every M6 stop press Cycle Start only with hands clear. A sawn patch left: send $#, note the G54 line's Z, G10 L2 P1 Z(that Z − 0.254) (Z0 .010 lower) and run it again. Unclamp; mark this face BACK."
+instruction = "Run MS01_back (M6 T1, 1/2 in end mill; set 2800): skim the sawn top {{process.back_skim_mm:in.3dot}} off its high point at Z0, in passes no wider than {{process.face_stepover_max_mm:in.3dot}}. A sawn patch left: send $#, note the G54 line's Z, G10 L2 P1 Z(that Z − 0.254) (Z0 .010 lower) and run it again. Unclamp; mark this face BACK."
 settings = "stop-em-half-c360"
 milling_cuts = [
   { name = "back face", kind = "end", phase = "finish", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", axial_doc_mm = "{{process.back_skim_mm}}", radial_woc_mm = "{{process.face_stepover_max_mm}}", traverse_mm = [0, "{{process.bar_width_mm}}"] },
