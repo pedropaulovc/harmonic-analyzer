@@ -70,7 +70,9 @@ from pd_platen_bottom_guide_spec import (
     PLATEN_TAP_X,
     PLATEN_TAP_Y,
     SCREW_CBORE_DEPTH,
+    SCREW_CBORE_DEPTH_BAND,
     SCREW_CBORE_DIA,
+    SCREW_CBORE_DIA_BAND,
     SCREW_CBORE_FRONT_WALL_TEXT,
     SCREW_HOLE_DIA,
     SCREW_HOLE_X,
@@ -150,6 +152,15 @@ PLATEN_CALLOUT_BELOW = f"TRANSFER FROM {PLATEN_NUMBER} AT ASSEMBLY"
 SCREW_CALLOUT_BELOW = (
     f"TRANSFER FROM {RACK_NUMBER} AT ASSEMBLY\n{SCREW_CBORE_FRONT_WALL_TEXT}"
 )
+# The counterbore prints its own bands (owner ruling 2026-11-25, #3620: "b:
+# Ø.110 +.004/−0 and depth .469 ±.005"; build_pd_platen_bottom_guide puts them
+# on the Hole Wizard feature, _print_counterbore_bands their places). It names
+# no function: a dimension with its own band needs none (rule 3), the floor's
+# reason is already the height's (HEIGHT_CALLOUT: the floor is the height less
+# this depth), and one reason on two dimensions is narration (rule 7). Its two
+# word lines are the transfer and the stated wall (rule 7: at most two).
+# The callout's three places print the bands' deviations too.
+SCREW_CBORE_PLACES = {"hw-cbdia": 3, "hw-cbdepth": 3}
 TAPPED_HOLE_NOTE = "Tapped Hole"
 _TAP_DRILL = blind_cut_dia_mm(LOCK_TAP_SPEC)
 
@@ -180,6 +191,7 @@ part_metadata(
     precision_sources=(
         "DRAWING_PRECISION",
         "DRAWING_PRECISION_BY_NAME",
+        (_SELF, "SCREW_CBORE_PLACES"),
         (_SELF, "build"),
     ),
 )
@@ -353,20 +365,22 @@ for _index, _x in enumerate(SCREW_HOLE_X, 1):
             "nominal_dia": (SCREW_HOLE_DIA, ("SCREW_HOLE_DIA",)),
             "thru": (True, ("SCREW_HOLE_SPEC", *_CALLOUT)),
             "cbore_dia": (
-                drilled_limits(SCREW_CBORE_DIA, _HOLE_PLACES, unit=UNIT),
-                ("SCREW_CBORE_DIA", "UNIT", *_CALLOUT),
+                limits(SCREW_CBORE_DIA, SCREW_CBORE_PLACES["hw-cbdia"], SCREW_CBORE_DIA_BAND, unit=UNIT),
+                ("SCREW_CBORE_DIA", "SCREW_CBORE_DIA_BAND", "UNIT", (_SELF, "SCREW_CBORE_PLACES"),
+                 (_SELF, "_print_counterbore_bands"), *_CALLOUT),
             ),
             "cbore_depth": (
-                limits(SCREW_CBORE_DEPTH, _HOLE_PLACES, unit=UNIT),
-                ("SCREW_CBORE_DEPTH", "UNIT", *_CALLOUT),
+                limits(SCREW_CBORE_DEPTH, SCREW_CBORE_PLACES["hw-cbdepth"], SCREW_CBORE_DEPTH_BAND, unit=UNIT),
+                ("SCREW_CBORE_DEPTH", "SCREW_CBORE_DEPTH_BAND", "UNIT", (_SELF, "SCREW_CBORE_PLACES"),
+                 (_SELF, "_print_counterbore_bands"), *_CALLOUT),
             ),
             "made_at": ("assembly", ((_SELF, "SCREW_CALLOUT_BELOW"),)),
             "transfer": (SCREW_CALLOUT_BELOW, ((_SELF, "SCREW_CALLOUT_BELOW"),)),
         },
         precision={
             "dia": _HOLE_PLACES,
-            "cbore_dia": _HOLE_PLACES,
-            "cbore_depth": _HOLE_PLACES,
+            "cbore_dia": SCREW_CBORE_PLACES["hw-cbdia"],
+            "cbore_depth": SCREW_CBORE_PLACES["hw-cbdepth"],
         },
     )
 
@@ -403,6 +417,64 @@ def _set_callout_below(display: Any, text: str, *, label: str) -> None:
         str(display.GetText(part) or "") != definitions[part] for part in (5, 6, 7)
     ):
         raise RuntimeError(f"{label} callout rows did not persist")
+
+
+_TOL_BILATERAL = 2  # swTolType_e.swTolBILAT
+_TOL_SYMMETRIC = 4  # swTolType_e.swTolSYMMETRIC
+
+
+@_telemetry.traced("drawing.bottom_guide.counterbore_bands")
+def _print_counterbore_bands(display: Any) -> None:
+    """Print the rack-screw counterbore's own bands (owner ruling 2026-11-25,
+    #3620: Ø.110 +.004/-.000, depth .469 ±.005) on its native callout. The
+    bands live on the part's RackScrewHoles Hole Wizard feature
+    (build_pd_platen_bottom_guide._band_rack_screw_counterbores) and
+    ``<hw-cbdia>`` / ``<hw-cbdepth>`` display them; this sets only their
+    tolerance places (SCREW_CBORE_PLACES), as
+    draw_ch_fulcrum_keeper._print_counterbore_band does, and reads each
+    displayed band back so a band that did not reach the callout fails here."""
+    from win32com.client.dynamic import Dispatch as dynamic_dispatch  # noqa: PLC0415
+
+    # The depth's mirrored band is symmetric on the part, so it prints ±.005
+    # as ruled; the one-sided Ø is bilateral, +.004/.000.
+    wanted = {
+        "hw-cbdia": (SCREW_CBORE_DIA, SCREW_CBORE_DIA_BAND, _TOL_BILATERAL),
+        "hw-cbdepth": (SCREW_CBORE_DEPTH, SCREW_CBORE_DEPTH_BAND, _TOL_SYMMETRIC),
+    }
+    found: dict[str, list[tuple[Any, Any]]] = {name: [] for name in wanted}
+    for raw in display.GetHoleCalloutVariables() or ():
+        variable = dynamic_dispatch(raw._oleobj_)
+        name = str(variable.VariableName)
+        if name in found:
+            found[name].append((raw, variable))
+    for name, (nominal, band, kind) in wanted.items():
+        if len(found[name]) != 1:
+            raise RuntimeError(
+                f"rack-screw callout carries {len(found[name])} {name} variables, not 1"
+            )
+        raw, variable = found[name][0]
+        length = _early_bound(raw, "ICalloutLengthVariable")
+        actual = float(length.Length) * 1000.0
+        if abs(actual - nominal) > 1e-5:
+            raise RuntimeError(
+                f"rack-screw callout {name} reads {actual:g}, expected {nominal:g} mm"
+            )
+        places = SCREW_CBORE_PLACES[name]
+        length.TolerancePrecision = places
+        upper, lower = band
+        if (
+            int(variable.ToleranceType) != kind
+            or abs(float(variable.ToleranceMin) * 1000.0 - lower) > 1e-5
+            or abs(float(variable.ToleranceMax) * 1000.0 - upper) > 1e-5
+            or int(length.TolerancePrecision) != places
+        ):
+            raise RuntimeError(
+                f"rack-screw callout {name} does not display the part's band: wanted "
+                f"swTolType_e {kind}, deviations {(lower, upper)} mm at {places} places; read "
+                f"{int(variable.ToleranceType)}, {float(variable.ToleranceMin)!r}, "
+                f"{float(variable.ToleranceMax)!r}, {int(length.TolerancePrecision)}"
+            )
+        _telemetry.info(f"rack-screw callout {name} {nominal:g} mm, band {band} mm")
 
 
 def build(adapter: Any) -> dict[str, str]:
@@ -486,7 +558,8 @@ def build(adapter: Any) -> dict[str, str]:
         (front, PLATEN_TAP_X[PLATEN_CALLOUT_HOLE], _TAP_DRILL, PLATEN_CALLOUT_XY,
          PLATEN_CALLOUT_BELOW,
          f"platen-screw taps ({PLATEN_TAP_SPEC.size})"),
-        (top, SCREW_HOLE_X[0], SCREW_CBORE_DIA, SCREW_CALLOUT_XY, SCREW_CALLOUT_BELOW,
+        (top, SCREW_HOLE_X[0], SCREW_CBORE_DIA, SCREW_CALLOUT_XY,
+         SCREW_CALLOUT_BELOW,
          "rack-screw counterbores"),
     ):
         callout = add_native_hole_callout(
@@ -498,6 +571,8 @@ def build(adapter: Any) -> dict[str, str]:
         )
         if "tap" in label:
             omit_title_block_thread_class(callout, label=label)
+        else:
+            _print_counterbore_bands(callout)
         _set_callout_below(callout, below, label=label)
     rebuild_drawing(adapter, label="bottom-guide hole callouts")
     removed = remove_notes_matching(adapter, TAPPED_HOLE_NOTE)

@@ -153,7 +153,8 @@ if min(PLATEN_TAP_TOP_WALL_MIN, PLATEN_TAP_BOTTOM_WALL_MIN, LOCK_TAP_TOP_WALL_MI
 # strip's centreline: FRONT_BEHIND_PLATEN plus half the strip's face width
 # from the front face. #51 through (close to the .060 screw), counterbored
 # Ø.110 from the top to the rack spec's floor (rail height less the
-# callout's counterbore depth: both .XXX, pd_feed_rack_spec.SCREW_FLOOR_BAND).
+# counterbore depth: the height's .XXX and the depth's own ±.005,
+# pd_feed_rack_spec.SCREW_FLOOR_BAND).
 # The rail is placed Ry180 (its native Front on the platen, as MHA-PD-11), so
 # its local x runs from the platen's +X end while the strip's runs from its
 # -X end: the stations mirror about the rail's length.
@@ -162,6 +163,19 @@ SCREW_HOLE_Z = rack.FRONT_BEHIND_PLATEN + rack.TAP_Z  # from the front face
 SCREW_HOLE_DIA = NUMBER_DRILL_MM["#51"]  # .067
 SCREW_CBORE_DIA = 0.110 * MM_PER_IN  # #35
 SCREW_CBORE_DEPTH = GUIDE_HEIGHT - rack.SCREW_FLOOR  # .469
+# The counterbore's printed bands, (upper, lower) in mm: owner ruling
+# 2026-11-25 (#3620), "b: Ø.110 +.004/−0 and depth .469 ±.005". With no band of
+# its own each would be a Hole Wizard pocket at the .XX grade, ±.01 (rule 3,
+# _wizard_pocket_band), and at ±.01 the Ø.096 #0 head can hang on a Ø.100
+# pocket (SCREW_HEAD_ENTRY_MIN -.003), the longest screw on the thinnest floor
+# runs .005 into the rack tap's lead (pd_feed_rack_spec.SCREW_TIP_REACH_MAX),
+# the engagement falls to .0275 under MHA-PD-26's printed .032 MIN
+# (ENGAGEMENT_WORST) and the front wall to .0417 under the printed .044 MIN
+# (SCREW_CBORE_FRONT_WALL_MIN). The part puts both bands on the RackScrewHoles
+# Hole Wizard feature (build_pd_platen_bottom_guide._band_rack_screw_counterbores)
+# so the native callout displays them.
+SCREW_CBORE_DIA_BAND = (0.1016, 0.0)  # Ø.110 +.004/-.000
+SCREW_CBORE_DEPTH_BAND = (0.127, -0.127)  # .469 +.005/-.005
 SCREW_HOLE_SPEC = HoleSpec(
     "counterbore_fillister",
     "#0",
@@ -171,20 +185,34 @@ SCREW_HOLE_SPEC = HoleSpec(
         "CounterBoreDepth": SCREW_CBORE_DEPTH,
     },
 )
-if rack.SCREW_FLOOR_BAND != 2.0 * BAND or rack.TAP_BAND != BAND:
-    raise AssertionError("the rack's floor band is not this rail's two .XXX rows")
+# The floor between the counterbore and the underside carries the height's
+# .XXX row and the depth's own band.
+if not (
+    math.isclose(rack.SCREW_FLOOR_BAND, BAND + SCREW_CBORE_DEPTH_BAND[0])
+    and -SCREW_CBORE_DEPTH_BAND[1] == SCREW_CBORE_DEPTH_BAND[0]
+    and math.isclose(rack.TAP_BAND, BAND)
+):
+    raise AssertionError(
+        "the rack's floor band is not this rail's .XXX height and counterbore depth bands"
+    )
 # The screws find their holes: each hole was struck from its own tap, so the
 # shank's float in #51 need only carry the transfer.
 SCREW_FLOAT_RADIAL = (SCREW_HOLE_DIA - _screw.SHANK_DIA) / 2.0
 if SCREW_FLOAT_RADIAL < math.hypot(HOLE_TRANSFER_BAND, HOLE_TRANSFER_BAND):
     raise AssertionError("the rack screws cannot find their struck holes")
-# The head clears the counterbore (picked up on the #51 hole) and bears on
-# its floor outside the hole.
-if not (SCREW_HOLE_DIA < _screw.HEAD_DIA < SCREW_CBORE_DIA - 2.0 * SCREW_FLOAT_RADIAL):
+# The head enters the narrowest printed counterbore (picked up on the #51
+# hole) with the shank anywhere in that float (which bounds the transfer the
+# head actually follows), and bears on its floor outside the hole. The least
+# margin the shop reads is .001 in (tolerance-policy.md, "Checks in spec
+# modules and tests").
+SCREW_HEAD_ENTRY_MIN = (
+    SCREW_CBORE_DIA + SCREW_CBORE_DIA_BAND[1] - 2.0 * SCREW_FLOAT_RADIAL - _screw.HEAD_DIA
+)
+if not (SCREW_HOLE_DIA < _screw.HEAD_DIA and SCREW_HEAD_ENTRY_MIN >= 0.0254 - 1e-9):
     raise AssertionError("the rack-screw head does not seat in its counterbore")
 # The counterbore's wall to the front face at the top edge (rule 17; RV-01):
 # the hole follows the strip (front set, the tap's .XXX place across it, the
-# transfer), the counterbore at its drilled oversize, the .010 edge break.
+# transfer), the counterbore at its printed largest, the .010 edge break.
 # The strip lies Rx180 (build_pd_paper_drive_assembly), so the face its taps
 # are located from is the machine-rear one: a strip narrower by its receiving
 # room brings the taps that much nearer the rail's front face.
@@ -195,7 +223,7 @@ _SCREW_HOLE_Z_BAND = (
 SCREW_CBORE_FRONT_WALL_MIN = (
     SCREW_HOLE_Z
     - _SCREW_HOLE_Z_BAND
-    - (SCREW_CBORE_DIA + drilled_oversize_mm(unit=UNIT)) / 2.0
+    - (SCREW_CBORE_DIA + SCREW_CBORE_DIA_BAND[0]) / 2.0
     - EDGE_BREAK
 )
 SCREW_CBORE_FRONT_WALL_NOMINAL = SCREW_HOLE_Z - SCREW_CBORE_DIA / 2.0
@@ -213,7 +241,8 @@ if SCREW_CBORE_FRONT_WALL_MIN < WALL_FLOOR_MM:
     ):
         raise AssertionError("pd-platen-bottom-guide: no minor RV-01 declares the counterbore wall")
 # The stepped holes keep clear of every through tap along the rail: the
-# stations' half-pitch slip, the transfers and each feature's radius.
+# stations' half-pitch slip, the transfers and each feature's radius, the
+# counterbore's at its printed largest.
 SCREW_HOLE_TAP_WALL_MIN = min(
     abs(x - t)
     for x in SCREW_HOLE_X
@@ -222,7 +251,7 @@ SCREW_HOLE_TAP_WALL_MIN = min(
     rack.TAP_STATION_SLIP_MAX
     + 2.0 * HOLE_TRANSFER_BAND
     + BAND
-    + SCREW_CBORE_DIA / 2.0
+    + (SCREW_CBORE_DIA + SCREW_CBORE_DIA_BAND[0]) / 2.0
     + _TAP_MAJOR / 2.0
 )
 if SCREW_HOLE_TAP_WALL_MIN < WALL_FLOOR_MM:

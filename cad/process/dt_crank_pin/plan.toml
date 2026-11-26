@@ -31,7 +31,7 @@ part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
 material = "{{cad.material_spec}}"
 stock = "Qty {{process.quantity:g}}. A bought {{cad.taper_stock}} ({{cad.taper_standard}}; to order, not on hand: pack of 25)."
-note = "Inches unless mm; G-code and console entries in mm (the file and the controller run G21). Home the mill ($H) and touch off G54 before the mill setup; after any controller reset, stall or E-stop, home and touch off again before Cycle Start. Prove the file in air first. Leave the pin as supplied except the hole and its deburr (Op 100); never grip it bare in steel jaws (paper in the mill vise's jaws, soft jaws at the bench)."
+note = "Inches unless mm; G-code and console entries in mm (the file and the controller run G21). Home the mill ($H) once, after switching it on: every M6's trip to the tool setter counts from home. Home again only after a power cycle or a controller restart, an E-stop, an alarm, a limit switch hit, a stall or a crash: homing brings the stored G54 back. Then check every zero of the setup again, each the way its step set it: each must read what its step set, within .001 in. One does not, cannot be reached with the part in, or the part may have moved: take the setup again from its first step, the part out. They all do: run the interrupted file again from its start. Feed Hold, then Reset with the axes stopped keeps position and G54: no homing, no new zero; run the interrupted file again from its start: its first M6 measures the tool, and cuts already made are cut in air. Prove the file in air first. Leave the pin as supplied except the hole and its deburr (Op 100); never grip it bare in steel jaws (paper in the mill vise's jaws, soft jaws at the bench)."
 shop = "../shop"
 # A bought taper pin, cross-drilled only (owner ruling 2026-11-20, #2368).
 # prechips needs a stock row for the traveler's receiving step, so the pack
@@ -173,8 +173,8 @@ vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{cad.envelope_y_mm}}", alon
 beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{cad.envelope_x_mm}}"], clamp_mm = ["{{process.big_end_overhang_mm}}", "{{cad.envelope_x_mm}}"], section_mm = { diameter = "{{cad.taper_small_dia_ref}}" }, vise_left = "start" }
 
 [[setups.operations]]
-instruction = "Home the mill first ($H). G54 X0 the big end's rim: edge finder (900 rpm)."
-instruction_detailed = "Home the mill ($H); the Ø.200 edge finder in the collet. Spindle stopped: centre it by eye over the pin's axis at the big end, then lower its tip onto a .002 feeler leaf on the pin's top; note that machine Z, and keep Y there. Raise, move left of the big end; at 900 rpm lower the tip to .007 under the noted Z (the crown there stands about .003 proud of the rim). Touch the big end from the left: G10 L20 P1 X-2.616 (finder radius + .003)."
+instruction = "G54 X0 the big end's rim: edge finder (900 rpm)."
+instruction_detailed = "The Ø.200 edge finder in the collet. Spindle stopped: centre it by eye over the pin's axis at the big end, then lower its tip onto a .002 feeler leaf on the pin's top; note that machine Z, and keep Y there. Raise, move left of the big end; at 900 rpm lower the tip to .007 under the noted Z (the crown there stands about .003 proud of the rim). Touch the big end from the left: G10 L20 P1 X-2.616 (finder radius + .003)."
 feed = "hand"
 
 [[setups.operations]]
