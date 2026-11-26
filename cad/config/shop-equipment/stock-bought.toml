@@ -354,7 +354,7 @@ cite = ["Online Metals order 1021751700 confirmation (PO harmonic-analyzer-02, 2
 [stock.6061-flat-1-4x5]
 form = "flat_bar"
 material = "6061-T6511 aluminium"
-note = "Bought (Online Metals order 1021751700, PO harmonic-analyzer-02, 2026-11-03): part 1148, 1/4 x 5 in rectangle 6061, 1 x 12 in, $22.34. Item notes: Drawing Number: MHA-DT-03-TL-01 | Custom Part: dt-cone-gear-tl-index-plate."
+note = "Bought (Online Metals order 1021751700, PO harmonic-analyzer-02, 2026-11-03): part 1148, 1/4 x 5 in rectangle 6061, 1 x 12 in, $22.34. Item notes: Drawing Number: MHA-DT-03-TL-01 | Custom Part: dt-cone-gear-tl-index-plate. Supplied thickness .250 ±.008 (Online Metals aluminium tolerance table, https://www.onlinemetals.com/en/aluminum-tolerances, rectangle bar, extruded, .250 to .499 thick); the index plate uses it at that thickness (owner ruling 2026-11-25)."
 section_mm = [127, 6.35]
 length_mm = 304.8
 status = "on_hand"
