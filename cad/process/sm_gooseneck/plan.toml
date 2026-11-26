@@ -236,7 +236,7 @@ machine_kind = "other"
 title = "Check the tube; saw the blank"
 machine = "Bench / saw"
 indexing = "none"
-diagram = { file = "diagrams/tube.svg", alt = "The 48 in tube: the micrometer across its O.D. near each end, the calipers' jaw tips across its wall at one end, and the 24.6 in blank sawn off one end; the rest, about 23 in, kept for the groove checks and the trial bend." }
+diagram = { file = "diagrams/tube.svg", alt = "The 48 in tube flat in the saw's vise, the blade at the cut: the 24.6 in blank off one end, the rest, about 23 in, kept for the groove checks and the trial bend; where the micrometer reads the O.D. near each end, and the calipers' jaw tips across the wall at one end. To scale along the tube; the vise and blade schematic." }
 envelope = "other"
 vise_hold = "other"
 beam = "other"
@@ -316,7 +316,7 @@ indexing = "none"
 machine_ref = "pm-30mv"
 holding = "Vise off. Plate A, its A face up and its back edge toward the column, on three 1-2-3 blocks lying flat (1 in up), one under each step clamp (LMS 1268): left {{process.clamp_left_from_end_mm:in.2f}} in from the left end and {{process.clamp_left_from_back_mm:in.2f}} in from the back edge (block 3 in along X); middle {{process.clamp_mid_from_end_mm:in.2f}} and {{process.clamp_mid_from_back_mm:in.2f}} (block 2 in along X); waste {{process.clamp_waste_from_end_mm:in.2f}} and {{process.clamp_waste_from_back_mm:in.3f}} (block 2 in along X, half under the plate). The left and middle straps from studs beyond the left end, the waste strap from a stud beyond the right end."
 datum = "Program GF01_form_a (cam:sm_gooseneck). G54: X0 Y0 the arc's centre, {{process.arc_from_end_mm:in.3f}} in from the left end and {{process.form_back_y_mm:in.3f}} in in front of the back edge; Z0 the plate top. +Y toward the column. Tool lengths from the tool setter at each M6. After any move of the plate, reset, stall or E-stop: home ($H) and touch off X, Y and Z again."
-diagram = { file = "diagrams/form_a.svg", alt = "Plan of plate A on the table: three 1-2-3 blocks and three step clamps, two on the form from the left, one on the waste corner from the right. The 1/2 in end mill's path comes up the front at X0 and round the arc to the back edge; the groove runs from the tube stop along the channel to X0 and round the arc's edge to the back edge; two stud holes inside the arc." }
+diagram = { file = "diagrams/form_a.svg", alt = "Plan of plate A on the table, to scale (2.1 px/mm): three 1-2-3 blocks and three step clamps, two on the form from the left, one on the waste corner from the right; the left end and back edge touched off. The 1/2 in end mill pecking the first stud hole; the arc it cuts next, up the front at X0 and round to the back edge, arrowed; the groove dashed." }
 envelope = { x_span_mm = ["{{process.plate_length_mm}}", "{{process.half_cutter_dia_mm}}"], y_span_mm = ["{{process.tool_y_span_mm}}", "{{process.half_cutter_dia_mm}}"], work_top_mm = ["{{process.block_height_mm}}", "{{process.plate_top_max_mm}}"], deepest_cut_mm = ["{{process.block_height_mm}}", "{{process.tip_over_underside_mm}}"], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.ball_projection_mm}}"] }
 vise_hold = "other"
 # The plate between its left and waste clamps (the blocks only push up), at
@@ -373,6 +373,7 @@ settings = "ball-endmill-carbide-2fl-1-4-6061-t6511"
 milling_cuts = [
   { name = "groove", kind = "slot", phase = "finish", cutter_dia_mm = "{{process.ball_cutter_dia_mm}}", flutes = 2, axial_doc_mm = "{{process.groove_depth_mm}}", radial_woc_mm = "{{process.ball_cutter_dia_mm}}", traverse_mm = ["{{process.a_groove_from_mm}}", "{{process.a_groove_to_mm}}"] },
 ]
+diagram = { file = "diagrams/form_a-groove.svg", alt = "Plan of plate A, to scale: the 1/4 in ball end mill at its first plunge, past the back edge. Its first pass, centred on the groove's centre line, runs round the cove and down the channel to the tube stop; then it steps round that line, each step the other way, the form-side steps along the channel and round the cove, the outer-side steps along the channel only. The arc is through, the waste under its own clamp." }
 
 [[setups.operations]]
 speed_kind = "other"
@@ -399,7 +400,7 @@ indexing = "none"
 machine_ref = "pm-30mv"
 holding = "As plate A, mirrored: plate B, its B face up and its back edge toward the column, on three 1-2-3 blocks under three step clamps (LMS 1268): the form's clamps {{process.clamp_left_from_end_mm:in.2f}} and {{process.clamp_mid_from_end_mm:in.2f}} in from the right end, from studs beyond the right end; the waste's {{process.clamp_waste_from_end_mm:in.2f}} in from the right end, from a stud beyond the left end. Distances from the back edge as plate A's."
 datum = "Program GF02_form_b (cam:sm_gooseneck). G54: X0 Y0 the arc's centre, {{process.arc_from_end_mm:in.3f}} in from the right end and {{process.form_back_y_mm:in.3f}} in in front of the back edge; Z0 the plate top. +Y toward the column. Tool lengths from the tool setter at each M6. After any move of the plate, reset, stall or E-stop: home ($H) and touch off X, Y and Z again."
-diagram = { file = "diagrams/form_b.svg", alt = "Plan of plate B on the table, plate A mirrored: the form's two clamps from the right, the waste corner's from the left; the end mill's path up the front at X0 and round the arc to the left to the back edge; the groove from the tube stop at the right, along the channel and round the arc's edge; the two stud holes." }
+diagram = { file = "diagrams/form_b.svg", alt = "Plan of plate B on the table, to scale (2.1 px/mm), plate A mirrored: the form's two clamps from the right, the waste corner's from the left; the right end and back edge touched off. The 1/2 in end mill pecking the first stud hole; the arc it cuts next, up the front at X0 and round to the left to the back edge, arrowed; the groove dashed." }
 envelope = { x_span_mm = ["{{process.plate_length_mm}}", "{{process.half_cutter_dia_mm}}"], y_span_mm = ["{{process.tool_y_span_mm}}", "{{process.half_cutter_dia_mm}}"], work_top_mm = ["{{process.block_height_mm}}", "{{process.plate_top_max_mm}}"], deepest_cut_mm = ["{{process.block_height_mm}}", "{{process.tip_over_underside_mm}}"], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.ball_projection_mm}}"] }
 vise_hold = "other"
 beam = { axis = "x", hold = "between", extent_mm = [0, "{{process.plate_length_mm}}"], supports_mm = ["{{process.b_support_left_mm}}", "{{process.b_support_right_mm}}"], section_mm = { y = "{{process.form_section_y_mm}}", z = "{{process.plate_thickness_min_mm}}" } }
@@ -454,6 +455,7 @@ settings = "ball-endmill-carbide-2fl-1-4-6061-t6511"
 milling_cuts = [
   { name = "groove b", kind = "slot", phase = "finish", cutter_dia_mm = "{{process.ball_cutter_dia_mm}}", flutes = 2, axial_doc_mm = "{{process.groove_depth_mm}}", radial_woc_mm = "{{process.ball_cutter_dia_mm}}", traverse_mm = ["{{process.b_groove_from_mm}}", "{{process.b_groove_to_mm}}"] },
 ]
+diagram = { file = "diagrams/form_b-groove.svg", alt = "Plan of plate B, to scale: the 1/4 in ball end mill at its first plunge, past the back edge. Its first pass, centred on the groove's centre line, runs round the cove and down the channel to the tube stop at the right; then it steps round that line, each step the other way, the form-side steps along the channel and round the cove, the outer-side steps along the channel only. The arc is through, the waste under its own clamp." }
 
 [[setups.operations]]
 speed_kind = "other"
@@ -596,7 +598,7 @@ machine = "Bench / mill table"
 indexing = "none"
 holding = "Bench vise, soft jaws, for sawing and filing; the mill table as the flat for the height gauge."
 datum = "The leg's outer side (the side away from the arm) for the reach; the arm's top for the overall height."
-diagram = { file = "diagrams/ends.svg", alt = "The gooseneck lying on its leg on the table, the arm up: the height gauge over the arm's end reads the reach from the leg's outer side. Then flat: a 1-2-3 block on the arm's top, the steel rule along the leg to the foot for the overall height." }
+diagram = { file = "diagrams/ends.svg", alt = "To scale, from the front with the moving jaw taken away: the arm in the bench vise's soft jaws at their right end, turned so the bend lies in the jaws' plane and sweeps out past that end, clear of the screw and slide; a .500 packing of the trial tube at the jaws' left end; the jaw tops just below the scribed line; the junior hacksaw's blade square to the arm just outside the line, the 2 in tail coming off. A small view across the jaws: the .500 tube between them." }
 envelope = "other"
 vise_hold = "other"
 beam = "other"
@@ -604,13 +606,24 @@ beam = "other"
 [[setups.operations]]
 instruction = "Lay the leg on the table, its outer side down, between two 1-2-3 blocks set against its sides, the arm up. Set the height gauge's scriber to {{process.arm_line_mm:in.3f}}; rock the arm through upright and scribe the line on its side at the top of the swing."
 feed = "hand"
+diagram = { file = "diagrams/ends-reach.svg", alt = "The gooseneck lying on its leg on the table, the arm up: the height gauge over the arm's end reads the reach from the leg's outer side; the two 1-2-3 blocks against the leg's sides not drawn." }
 
+# Sawing the tail: D33 (delegated ruling 2026-11-25 (Main), no precedent,
+# owner review #2144:
+# https://github.com/pedropaulovc/harmonic-analyzer/issues/2144#issuecomment-7171811160).
+# The arm is gripped with the bend lying in the plane between the jaws: across
+# the jaws the tube is .500 all along a planar bend, so the jaws grip it over
+# their whole depth and the jaw depth no longer matters (#3611; gripped the
+# other way, only the arm's .500 of straight lies between the bend and the
+# line, arm_line_mm less the bend's outside radius). The arm sits at one end
+# of the jaws so the bend sweeps out past that end, clear of the screw and
+# slide; a packing of the same tube at the other end keeps the jaws square.
 [[setups.operations]]
 speed_kind = "other"
 tool = "hacksaw"
 drilling = "none"
 sizing = "other"
-instruction = "Arm in the bench vise's soft jaws. Saw the tail off just outside the line, square to the arm."
+instruction = "Arm in the bench vise's soft jaws, turned so the bend lies between the jaws, in their plane: the arm at one end of the jaws, the bend sweeping out past that end, clear of the screw and slide below. A {{process.stock_od_in:.3dot}} packing (a piece of the trial tube) between the jaws at their other end keeps them square. The jaw tops just below the line. Saw the tail off just outside the line, square to the arm."
 feed = "hand"
 
 [[setups.operations]]
@@ -626,6 +639,7 @@ feed = "hand"
 [[setups.operations]]
 instruction = "Lay the gooseneck flat on the table. Hold a 1-2-3 block square across the arm's top; lay the steel rule along the leg from the block's face. Mark the leg at {{process.foot_line_mm:in.2f}}."
 feed = "hand"
+diagram = { file = "diagrams/ends-height.svg", alt = "The gooseneck flat on the table: a 1-2-3 block across the arm's top, the steel rule along the leg to the foot for the overall height." }
 
 [[setups.operations]]
 speed_kind = "other"
