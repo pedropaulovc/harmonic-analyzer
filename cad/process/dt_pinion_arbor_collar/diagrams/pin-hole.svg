@@ -1,29 +1,31 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 340" font-family="sans-serif" font-size="13">
-  <rect class="paper" x="0" y="0" width="760" height="340"/>
-  <text class="title" x="20" y="24">Side view along the jaws: the turned end out past the jaws, the pin hole drilled in the overhang (not to scale)</text>
-  <rect class="fixture-vise" x="258" y="260" width="462" height="30"/>
-  <rect class="clamp" x="258" y="100" width="462" height="90"/>
-  <rect class="fixture-support" x="258" y="190" width="296" height="70"/>
-  <rect class="part-kept" x="120" y="152" width="160" height="38"/>
-  <rect class="part-rest" x="280" y="150" width="140" height="40"/>
-  <rect class="part-rest" x="480" y="150" width="74" height="40"/>
-  <rect class="part-removed" x="196" y="152" width="8" height="38"/>
-  <rect class="cutter" x="196" y="60" width="8" height="86"/>
-  <line class="centre-line" x1="200" y1="50" x2="200" y2="210"/>
-  <line class="datum" x1="120" y1="130" x2="120" y2="215"/>
-  <text class="datum-label" x="20" y="238">X0 face F</text>
-  <line class="dims" x1="80" y1="230" x2="120" y2="212"/>
-  <line class="datum" x1="110" y1="152" x2="250" y2="152"/>
-  <text class="datum-label" x="225" y="84">Z0 the turned O.D. top</text>
-  <line class="dims" x1="240" y1="88" x2="240" y2="152"/>
-  <line class="dims" x1="120" y1="300" x2="200" y2="300"/>
-  <text class="label" x="110" y="322">.33 to the pin hole</text>
-  <line class="dims" x1="120" y1="250" x2="258" y2="250"/>
-  <text class="label" x="150" y="270">.50 out</text>
-  <text class="label" x="20" y="48">centre drill, then 1/16 through both walls</text>
-  <text class="label" x="420" y="72">jaw (behind) grips the blank's 5/8 end</text>
-  <text class="label" x="300" y="325">4 in parallel on edge, centred</text>
-  <line class="dims" x1="380" y1="313" x2="380" y2="230"/>
-  <text class="label" x="520" y="325">offcut spacer on the parallel's right end</text>
-  <line class="dims" x1="580" y1="313" x2="520" y2="185"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 420" width="760" height="420" font-family="sans-serif" font-size="13">
+  <!-- Hand picture, the vise from the front (the operator's side, looking +Y): +X to the right, +Z up, the fixed jaw behind the blank; the moving jaw, in front, is not drawn. To scale at 5 px/mm: the blank 1.98 long (process.blank_length_in less the facing), Ø5/8 (process.bar_dia_in) with its turned Ø.59 x .80 end (cad.outer_dia_in, process.turn_length_in) to the LEFT, face F (X0) .50 past the jaws' left face (process.end_overhang_mm); the jaw tops 4.115 mm over the turned top (process.jaw_top_over_od_mm); the 1 in x 4 in parallel (process.riser_height_mm, process.parallel_length_mm) on edge, its left end flush with the jaws; the 1 in offcut on its right end. The jaw's height is from process.vise_jaw_height_mm; its length runs on to a break line; the vise bed is schematic. The 1/16 drill (process.drill_1_16_dia_mm, 7.9 px) at X 8.382 (cad.pin_hole_station_mm), its point at Z-15.963, PC01's posted depth: its full diameter 0.5 mm (process.pin_drill_past_mm) past the bottom wall, in air; it runs up to a break line. Dashed: the 5/16 bore. The #1 centre drill's spot (PC01 T1) is under it and not drawn. -->
+  <rect class="paper" x="0" y="0" width="760" height="420"/>
+  <text class="title" x="20" y="22">Setup 3, PC01 T2: the 1/16 drill pecks the pin hole through both walls, seen from the front (to scale, 5 px/mm)</text>
+  <path class="clamp" d="M153.5 119.43L745 119.43L742 126.45L745 133.47L742 140.49L745 147.52L742 154.54L745 161.56L742 168.58L745 175.61L742 182.63L745 189.65L742 196.68L745 203.7L742 210.72L745 217.74L742 224.77L745 231.79L742 238.81L745 245.83L742 252.86L745 259.88L742 266.9L745 273.93L742 280.95L745 287.97L742 294.99L745 302.02L742 309.04L745 316.06L742 323.08L745 330.11L742 337.13L745 344.15L153.5 344.15Z"/>
+  <rect class="fixture-vise" x="153.5" y="344.15" width="591.5" height="14"/>
+  <rect class="fixture-support" x="153.5" y="217.15" width="508" height="127"/>
+  <rect class="part-kept" x="90" y="140" width="101.6" height="74.93"/>
+  <rect class="part-kept" x="191.6" y="137.78" width="149.86" height="79.38"/>
+  <rect class="part-rest" x="534.5" y="137.78" width="127" height="79.38"/>
+  <path class="hidden" d="M90 157.62L187.31 157.62L199.23 177.47L187.31 197.31L90 197.31"/>
+  <rect class="holes" x="127.94" y="140" width="7.94" height="74.93"/>
+  <path class="cutter" d="M135.88 50L135.88 217.43L131.91 219.81L127.94 217.43L127.94 50L131.91 47Z"/>
+  <line class="arrow" x1="149.91" y1="60" x2="149.91" y2="100"/>
+  <line class="datum" x1="90" y1="110" x2="90" y2="244.93"/>
+  <text class="datum-label" x="86" y="260.93">X0 face F</text>
+  <line class="datum" x1="50" y1="140" x2="191.6" y2="140"/>
+  <text class="datum-label" x="46" y="144" text-anchor="end">Z0</text>
+  <text class="label" x="168" y="40">1/16 drill at X {{cad.pin_hole_station_mm:.3f}} mm (.33 from face F), pecks through the top wall,</text>
+  <text class="label" x="168" y="56">the bore and the bottom wall into the air under it</text>
+  <line class="leader" x1="164" y1="44" x2="134.91" y2="80"/>
+  <circle class="leader-dot" cx="134.91" cy="80" r="2"/>
+  <text class="label" x="220" y="400">1 in x 4 in parallel on edge, centred, its left end flush with the jaws</text>
+  <line class="leader" x1="330" y1="388" x2="353.5" y2="324.15"/>
+  <circle class="leader-dot" cx="353.5" cy="324.15" r="2"/>
+  <text class="label-on-clamp" x="534.5" y="131.78">1 in offcut, on the parallel</text>
+  <text class="label" x="470" y="86">fixed jaw (behind); the moving jaw,</text>
+  <text class="label" x="470" y="102">in front, not drawn</text>
+  <text class="label" x="20" y="300">face F {{process.end_overhang_mm:in.2f}}</text>
+  <text class="label" x="20" y="316">past the jaws' left face</text>
 </svg>

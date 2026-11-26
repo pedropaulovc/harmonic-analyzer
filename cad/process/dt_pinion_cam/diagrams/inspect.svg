@@ -1,12 +1,26 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 400" font-family="sans-serif" font-size="13">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 400" width="760" height="400" font-family="sans-serif" font-size="13">
+  <!-- Hand picture, to scale at 12 px/mm: the cam end-on, lying on its O.D. on the surface plate, thick side down (the bore 2.000 mm above the O.D.'s centre at the highest reading, cad.bore_eccentricity_mm), the Ø1/4 drill shank (6.35 mm) in the bore Ø.2510 (cad.bore_dia_mm). H is the height gauge's highest reading over the shank as the cam is rolled. The height gauge and the plate are schematic (their sizes are not on record). -->
   <rect class="paper" x="0" y="0" width="760" height="400"/>
-  <text class="title" x="20" y="20">Setup 4: eccentricity over the 1/4 shank on the surface plate</text>
-  <rect class="fixture-table" x="40" y="320" width="680" height="30"/>
-  <circle class="part-kept" cx="300" cy="210" r="110"/>
-  <circle class="holes" cx="300" cy="180" r="48"/>
-  <circle class="part-rest" cx="300" cy="180" r="46"/>
-  <rect class="cutter" x="300" y="120" width="260" height="14"/>
-  <line class="dims" x1="580" y1="134" x2="580" y2="320"/>
-  <text class="label" x="590" y="230">H over the 1/4 shank</text>
-  <text class="label" x="20" y="385">Ecc = H − O.D./2 − R/2: {{cad.bore_eccentricity_min_in:.3dot}}–{{cad.bore_eccentricity_max_in:.3dot}}; thin wall = O.D./2 − ecc − {{cad.bore_dia_max_in:.4dot}}/2 (R: shank reading).</text>
+  <text class="title" x="20" y="22">Setup 4: the eccentricity read over the 1/4 shank on the surface plate (to scale, 12 px/mm)</text>
+  <rect class="fixture-table" x="40" y="360" width="680" height="20"/>
+  <text class="label" x="50" y="375">surface plate</text>
+  <circle class="part-kept" cx="300" cy="272.4" r="87.6"/>
+  <circle class="holes" cx="300" cy="248.4" r="38.25"/>
+  <circle class="cutter" cx="300" cy="248.4" r="38.1"/>
+  <rect class="clamp" x="560" y="60" width="30" height="300"/>
+  <rect class="clamp" x="430" y="202.3" width="130" height="8"/>
+  <line class="dims" x1="620" y1="360" x2="620" y2="210.3"/>
+  <line class="dims" x1="612" y1="210.3" x2="628" y2="210.3"/>
+  <line class="dims" x1="612" y1="360" x2="628" y2="360"/>
+  <text class="label" x="636" y="285.15">H</text>
+  <text class="label" x="40" y="60">eccentricity = H − O.D./2 − R/2</text>
+  <text class="label" x="40" y="76">(R: the shank, miked), {{cad.bore_eccentricity_min_in:.3dot}}–{{cad.bore_eccentricity_max_in:.3dot}}</text>
+  <text class="label" x="40" y="120">1/4 drill's shank in the bore</text>
+  <line class="leader" x1="200" y1="124" x2="261.9" y2="248.4"/>
+  <circle class="leader-dot" cx="261.9" cy="248.4" r="2"/>
+  <text class="label" x="40" y="330">thick side down; roll it slowly,</text>
+  <text class="label" x="40" y="346">read the highest point</text>
+  <line class="leader" x1="200" y1="326" x2="238.68" y2="333.72"/>
+  <circle class="leader-dot" cx="238.68" cy="333.72" r="2"/>
+  <text class="label" x="600" y="50">height gauge (schematic)</text>
 </svg>

@@ -285,7 +285,7 @@ machine_kind = "other"
 title = "Saw the blank"
 machine = "Saw / bench"
 indexing = "none"
-diagram = { file = "diagrams/saw.svg", alt = "The 3/8 x 1-1/4 in flat bar with one blank marked off its end, long enough for two straps end to end." }
+diagram = { file = "diagrams/saw.svg", alt = "Op 10, to scale: one blank {{process.blank_length_min_in:.2f}}–{{process.blank_length_max_in:.2f}} marked off the 3/8 x 1-1/4 flat, face A down, sawn with the kerf on the bar's side: both straps end to end." }
 envelope = "other"
 vise_hold = "other"
 beam = "other"
@@ -334,7 +334,7 @@ indexing = "none"
 machine_ref = "pm-30mv"
 holding = "The 1 in and the 1/2 in parallels of the 4 in long, 1/8 in thick parallel set (LMS 6745) stacked against each jaw (1.5 in), both stacks centred along the jaws (their ends level with each other). The blank lying flat on them along the jaws, face A down, gripped across the bar's two 1-1/4 in edges, centred on the jaws over the stacks, the end marked L at the LEFT: check with the rule that it overhangs the stacks' ends equally, at least {{process.overhang_min_mm:in.3dot}} each end, so the micrometer's .250 anvil reaches under each end for the thickness check. Tap it down onto both stacks while closing the vise. Face B stands {{process.blank_top_mm:in.3dot}} above the stacks, the lower {{process.grip_mm:in.3dot}} of it in the jaws."
 datum = "Program PB02_flat (cam:dt_pinion_bracket). G54: X0 the blank's LEFT end, Y0 the fixed jaw's face, Z0 face A on the stacks' top, set from face B and the blank's thickness; +Y toward the fixed jaw. Pivot bores at X {{process.pivot_1_x_mm:in.3f}} and {{process.pivot_2_x_mm:in.3f}} in, arbor bores at X {{process.arbor_1_x_mm:in.3f}} and {{process.arbor_2_x_mm:in.3f}} in, all on the blank's centre line. Tool lengths from the tool setter at each M6; at every M6 stop the file has stopped the spindle and lifted the tool above the part."
-diagram = { file = "diagrams/flat.svg", alt = "The blank lying on stacked parallels in the vise; two straps end to end along it: both bores of each drilled and reamed, then the 1/8 in end mill cuts round each strap through into the gap between the parallels, leaving a bridge at each arbor end." }
+diagram = { file = "diagrams/flat.svg", alt = "PB02 T1, to scale: plan from above, the blank on the stacks between the jaws, the L end at the left, the fixed jaw at the top; the 1/2 end mill on its fourth pass at Y-15.150 travelling −X, with the six pass lanes dotted. Below, a section seen from the right end, the fixed jaw at the right: the end mill's end at Z {{cad.broad_face_b_thickness_mm:in.4dot}}, face B skimmed {{process.face_b_skim_mm:in.3dot}}." }
 envelope = { x_span_mm = ["{{process.blank_length_max_mm}}", "{{process.face_cutter_dia_mm}}", "{{process.face_cutter_dia_mm}}", 5.08], y_span_mm = ["{{cad.blank_x_mm}}", "{{process.face_cutter_dia_mm}}"], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{process.blank_top_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{process.arbor_drill_tip_mm}}"], longest_tool_mm = ["{{process.drill_chuck_gauge_mm}}", "{{process.reamer_long_oal_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.eighth_mill_projection_min_mm}}"] }
 vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{cad.blank_x_mm}}", along_jaws_mm = "{{process.blank_length_max_mm}}", part_height_mm = "{{process.blank_top_mm}}", parallel_height_mm = "{{process.riser_height_mm}}", overhang_mm = ["{{process.vise_blank_inset_mm}}", "rest"], jaw_offset = "centred", fixed_jaw_face = "as_bought", moving_jaw_face = "as_bought", moving_jaw_contact = "flat" }
 beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{process.blank_length_max_mm}}"], clamp_mm = [0, "{{process.blank_length_max_mm}}"], section_mm = { y = "{{cad.blank_x_mm}}", z = "{{cad.broad_face_b_thickness_mm}}" }, vise_left = "start" }
@@ -389,6 +389,7 @@ tool = "drill-c"
 drilling = "twist_drill"
 sizing = "other"
 instruction = "Same file, M6 T3: C drill through both pivot bores, its full diameter {{process.drill_past_mm:in.3dot}} past face A into the gap between the stacks, no peck; set 950. Cutting oil."
+diagram = { file = "diagrams/flat-drill-c.svg", alt = "PB02 T3, to scale: a section along the straps' centre line from the front; the C drill through the pivot bore at X {{process.pivot_1_x_mm:.3f}} mm, its point at Z{{process.pivot_drill_tip_mm:.3f}} in the gap between the stacks." }
 rpm = 950
 feed = "{{process.drill_c_feed_per_min_mm:in.1f}} in/min"
 hole_depth_mm = "{{cad.broad_face_b_thickness_mm}}"
@@ -403,6 +404,7 @@ tool = "drill-5-16"
 drilling = "twist_drill"
 sizing = { kind = "band", band_mm = "{{cad.arbor_bore_dia_band_mm}}" }
 instruction = "Same file, M6 T4: 5/16 drill through both arbor bores the same way, to size; set 750. Cutting oil."
+diagram = { file = "diagrams/flat-drill-516.svg", alt = "PB02 T4, to scale: the 5/16 drill through the arbor bore at X {{process.arbor_1_x_mm:.3f}} mm, its point at Z{{process.arbor_drill_tip_mm:.3f}}." }
 rpm = 750
 feed = "{{process.drill_5_16_feed_per_min_mm:in.1f}} in/min"
 hole_depth_mm = "{{cad.broad_face_b_thickness_mm}}"
@@ -417,6 +419,7 @@ tool = "reamer-2510"
 drilling = "none"
 sizing = "other"
 instruction = "Same file, M6 T5: ream both pivot bores through, .2510 reamer in the drill chuck, its tip to {{process.ream_past_mm:in.3dot}} below face A; set 450. Cutting oil. The file feeds the reamer in and back out, spindle running: no rapid leaves a bore."
+diagram = { file = "diagrams/flat-ream.svg", alt = "PB02 T5, to scale: the .2510 reamer through the pivot bore, its end {{process.ream_past_mm:in.3dot}} below face A." }
 rpm = 450
 feed = "{{process.ream_2510_feed_per_min_mm:in.1f}} in/min, in and out"
 milling_cuts = [
@@ -429,6 +432,7 @@ tool = "em-eighth"
 drilling = "none"
 sizing = "other"
 instruction = "Same file, M6 T6 (1/8 in end mill, at least .63 in out of the collet): cut round each strap anticlockwise from its bridge — arbor end, seat flank, pivot end, far flank, back round the arbor end — in equal levels no deeper than {{process.outline_step_max_mm:in.3dot}}, through to {{process.outline_past_mm:in.3dot}} below face A; set 2800. Each strap stays held by its {{process.bridge_width_mm:in.3dot}} wide bridge at the arbor end."
+diagram = { file = "diagrams/flat-outline.svg", alt = "PB02 T6, to scale: plan, the bores done; the 1/8 end mill starting strap 1's outline on the arbor end's round, anticlockwise, the bridge left at the arbor end. Below, a section across the flanks: the slot through to {{process.outline_past_mm:in.3dot}} below face A, clear of the stacks." }
 settings = "endmill-carbide-3fl-1-8-1018-cf-tru-edge"
 milling_cuts = [
   { name = "outline", kind = "slot", phase = "finish", cutter_dia_mm = 3.175, axial_doc_mm = "{{process.outline_step_max_mm}}", radial_woc_mm = 3.175, traverse_mm = [0, "{{process.blank_length_max_mm}}"] },
@@ -452,7 +456,7 @@ machine_kind = "other"
 title = "Saw each strap free; file the stubs"
 machine = "Saw / bench"
 indexing = "none"
-diagram = { file = "diagrams/free.svg", alt = "The cut blank from above: a saw cut across it just past each arbor end, through the bridge; each strap comes free with a short stub on its arbor end, filed back to the round." }
+diagram = { file = "diagrams/free.svg", alt = "To scale, from above: each saw line {{process.saw_offset_mm:in.3dot}} past an arbor end's apex, across the bridge, the {{process.saw_kerf_mm:in.3dot}} kerf on its far side from the strap; the blade in line 1. The saw's vise is not drawn (it would hide the straps)." }
 envelope = "other"
 vise_hold = "other"
 beam = "other"
@@ -499,7 +503,7 @@ indexing = "none"
 machine_ref = "pm-30mv"
 holding = "The same stacks. One strap on edge, its far flank down on both stacks, the seat flank up, face A against the FIXED jaw, gripped across faces A and B, its pivot end at the LEFT, centred on the jaws. Tap it down onto both stacks while closing the vise. The lower {{process.grip_mm:in.3dot}} of its width is in the jaws; both round ends' apexes stand above the jaw tops."
 datum = "Program PB04_edge. G54: X0 the pivot bore's axis, Y0 the fixed jaw's face (face A), +Y toward it; Z0 the seat flank. Seat at X {{cad.follower_seat_height_in:.3f}}, Y −{{cad.follower_seat_station_in:.3f}} in. Tool lengths from the tool setter at each M6; at every M6 stop the file has stopped the spindle and lifted the tool above the part."
-diagram = { file = "diagrams/edge.svg", alt = "The strap on edge on stacked parallels, seat flank up, face A at the fixed jaw, pivot end at the left: the centre drill, the #26 and the 1/8 in end mill make the follower seat." }
+diagram = { file = "diagrams/edge.svg", alt = "PB04 T7, to scale: a section through the seat from the front, the strap on edge on the stacks, the seat flank up at Z0, the pivot end at the left (X0 on its bore), face A at the fixed jaw behind; the #26 at X {{cad.follower_seat_height_mm:.3f}} mm, its point {{process.seat_drill_floor_gap_mm:in.3dot}} above the floor. Beside it, a section at the seat seen from the right end, face A at the fixed jaw on the right." }
 envelope = { x_span_mm = ["{{cad.envelope_y_mm}}", 5.08], y_span_mm = ["{{cad.broad_face_b_thickness_mm}}", 5.08], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{process.strap_width_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{process.strap_width_mm}}", "{{process.seat_floor_z_mm}}"], longest_tool_mm = ["{{process.drill_chuck_gauge_mm}}", "{{process.drill_26_oal_mm}}"], shortest_tool_mm = ["{{process.drill_chuck_gauge_mm}}", "{{process.centre_drill_oal_mm}}"] }
 vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{cad.broad_face_b_thickness_mm}}", along_jaws_mm = "{{cad.envelope_y_mm}}", part_height_mm = "{{process.strap_width_mm}}", parallel_height_mm = "{{process.riser_height_mm}}", overhang_mm = ["{{process.vise_strap_inset_mm}}", "rest"], jaw_offset = "centred", fixed_jaw_face = "machined", moving_jaw_face = "machined", moving_jaw_contact = "flat" }
 beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{cad.envelope_y_mm}}"], clamp_mm = [0, "{{cad.envelope_y_mm}}"], section_mm = { y = "{{cad.broad_face_b_thickness_mm}}", z = "{{process.strap_width_mm}}" }, vise_left = "start" }
@@ -550,6 +554,7 @@ tool = "em-eighth"
 drilling = "none"
 sizing = "other"
 instruction = "Same file, M6 T6: the 1/8 in end mill plunges to the seat's floor at Z {{process.seat_floor_z_mm:in.4f}}, circles once at Ø{{process.seat_floor_dia_mm:in.3dot}} and once at Ø{{process.seat_finish_dia_mm:in.4dot}}, the band's middle (a plunged 1/8 cuts only .125); set 2800."
+diagram = { file = "diagrams/edge-mill.svg", alt = "PB04 T6, to scale: the 1/8 end mill at the seat's floor, Z{{process.seat_floor_z_mm:.3f}}, on its Ø{{process.seat_finish_dia_mm:in.4dot}} finishing circle." }
 settings = "endmill-carbide-3fl-1-8-1018-cf-tru-edge"
 milling_cuts = [
   { name = "seat", kind = "plunge", phase = "finish", cutter_dia_mm = 3.175, flutes = 3, stations_mm = "{{cad.follower_seat_y_from_min_mm}}" },
@@ -576,7 +581,7 @@ machine_kind = "other"
 title = "Deburr, inspect, oil"
 machine = "Bench"
 indexing = "none"
-diagram = { file = "diagrams/inspect.svg", alt = "The finished strap: the reamed pivot bore and the drilled arbor bore through its faces, the round ends about them, the follower seat in the seat flank; no cross hole (drilled at assembly)." }
+diagram = { file = "diagrams/inspect.svg", alt = "To scale: the finished strap, face A view: the reamed pivot bore and the 5/16 arbor bore {{cad.arbor_bore_center_distance_in:.2dot}} apart, the round ends; seat flank view: the follower seat {{cad.follower_seat_station_in:.3dot}} from face A and {{cad.follower_seat_height_in:.3dot}} from the pivot bore's axis. No cross hole: it is match-drilled at assembly." }
 envelope = "other"
 vise_hold = "other"
 beam = "other"

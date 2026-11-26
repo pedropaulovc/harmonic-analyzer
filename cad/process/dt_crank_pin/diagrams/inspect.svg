@@ -1,15 +1,19 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 260" width="760" height="260">
-  <rect class="paper" x="0" y="0" width="760" height="260"/>
-  <text class="title" x="20" y="24">The finished pin: the station read from the rim to a pin gauge in the hole (not to scale)</text>
-  <path class="part-kept" d="M120 106 L640 118 L640 142 L120 154 Z"/>
-  <path class="part-kept" d="M120 106 Q104 130 120 154 Z"/>
-  <line class="centre-line" x1="80" y1="130" x2="690" y2="130"/>
-  <rect class="clamp" x="176" y="70" width="14" height="120"/>
-  <line class="datum" x1="120" y1="60" x2="120" y2="200"/>
-  <text class="datum-label" x="60" y="56">big end's rim</text>
-  <line class="dims" x1="120" y1="216" x2="190" y2="216"/>
-  <line class="dims" x1="120" y1="208" x2="120" y2="224"/>
-  <line class="dims" x1="190" y1="208" x2="190" y2="224"/>
-  <text class="label" x="60" y="244">calipers: rim to the largest pin gauge D, far side; station = reading − D/2</text>
-  <text class="label" x="200" y="66">pin gauge D through the hole: the largest that enters</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 300" width="760" height="300" font-family="sans-serif" font-size="13">
+  <!-- Hand picture, the pin from the side, to scale at 12 px/mm (as Setup 1), the #45 hole at .150 (cad.ring_hole_station_mm) drawn through; the largest pin gauge D (about the hole's .084, cad.ring_hole_dia_mm) through it, standing out (its length is not on record: break lines). -->
+  <rect class="paper" x="0" y="0" width="760" height="300"/>
+  <text class="title" x="20" y="22">Setup 3: the finished pin, the station read from the rim to a pin gauge in the hole (to scale, 12 px/mm)</text>
+  <path class="part-kept" d="M160 116.62L693.4 122.18L693.4 177.82L160 183.38Z"/>
+  <path class="part-kept" d="M160.00 116.62A65.48 65.48 0 0 0 160.00 183.38Z"/>
+  <rect class="holes" x="193.22" y="117.1" width="24.99" height="65.8"/>
+  <rect class="part-rest" x="193.22" y="60" width="24.99" height="180"/>
+  <line class="centre-line" x1="100" y1="150" x2="720" y2="150"/>
+  <line class="datum" x1="160" y1="50" x2="160" y2="250"/>
+  <text class="datum-label" x="154" y="46" text-anchor="end">big end's rim</text>
+  <line class="dims" x1="160" y1="262" x2="218.22" y2="262"/>
+  <line class="dims" x1="160" y1="254" x2="160" y2="270"/>
+  <line class="dims" x1="218.22" y1="254" x2="218.22" y2="270"/>
+  <text class="label" x="40" y="290">calipers: the rim to the largest pin gauge D's far side; station = reading − D/2, {{process.station_min_in:.3dot}}–{{process.station_max_in:.3dot}}</text>
+  <text class="label" x="260" y="76">pin gauge D through the hole: the largest that enters</text>
+  <line class="leader" x1="258" y1="72" x2="218.22" y2="80"/>
+  <circle class="leader-dot" cx="218.22" cy="80" r="2"/>
 </svg>

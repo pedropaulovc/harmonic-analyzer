@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 300" width="760" height="300" font-family="sans-serif" font-size="13">
+  <!-- Hand picture, schematic: the MHA-DT-01 drum in the bench vise's soft jaws, its marked front end up; its sizes are in its own plan, not this one. The adjustable reamer (tools.reamers-adjustable-lms-5948; the piece that spans the front journal + .001, process.drum_front_ream_over_in) in a tap wrench, turned in by hand to about .3 deep (process.drum_front_ream_depth_in); the reamer, its blades and the wrench are schematic (their sizes are not on record), in the cutter colour. -->
+  <rect class="paper" x="0" y="0" width="760" height="300"/>
+  <text class="title" x="20" y="22">Setup 7, Op 540 (if called for): the adjustable reamer opens the drum's front end (schematic)</text>
+  <rect class="clamp" x="180" y="150" width="120" height="140"/>
+  <rect class="clamp" x="460" y="150" width="120" height="140"/>
+  <text class="label-on-clamp" x="190" y="172">soft jaw</text>
+  <text class="label-on-clamp" x="470" y="172">soft jaw</text>
+  <rect class="part-kept" x="300" y="110" width="160" height="180"/>
+  <rect class="holes" x="368" y="110" width="24" height="180"/>
+  <rect class="cutter" x="368" y="60" width="24" height="74"/>
+  <rect class="cutter" x="300" y="52" width="160" height="8"/>
+  <line class="arrow" x1="410" y1="40" x2="410" y2="80"/>
+  <text class="label" x="480" y="60">adjustable reamer in a tap wrench, by hand,</text>
+  <text class="label" x="480" y="76">to about {{process.drum_front_ream_depth_in:.1f}} deep</text>
+  <line class="leader" x1="478" y1="64" x2="392" y2="100"/>
+  <circle class="leader-dot" cx="392" cy="100" r="2"/>
+  <text class="label" x="20" y="100">MHA-DT-01 drum, front end up,</text>
+  <text class="label" x="20" y="116">in soft jaws</text>
+</svg>

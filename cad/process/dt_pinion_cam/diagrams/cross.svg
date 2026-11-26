@@ -1,20 +1,48 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 400" font-family="sans-serif" font-size="13">
-  <rect class="paper" x="0" y="0" width="760" height="400"/>
-  <text class="title" x="20" y="20">Setup 3 (side view): cam lying along the jaws, thick wall up, face F left; CM02 drills #50 into the bore</text>
-  <rect class="clamp" x="120" y="58" width="300" height="290"/>
-  <rect class="fixture-support" x="120" y="253" width="300" height="95"/>
-  <rect class="part-kept" x="240" y="120" width="90" height="146"/>
-  <rect class="hidden" x="240" y="181" width="90" height="64"/>
-  <rect class="holes" x="277" y="120" width="9" height="93"/>
-  <rect class="cutter" x="277" y="40" width="9" height="78"/>
-  <line class="centre-line" x1="200" y1="193" x2="470" y2="193"/>
-  <rect class="part-rest" x="330" y="207" width="190" height="12"/>
-  <line class="datum" x1="240" y1="110" x2="240" y2="280"/>
-  <line class="datum" x1="230" y1="120" x2="345" y2="120"/>
-  <line class="leader" x1="520" y1="213" x2="560" y2="170"/>
-  <text class="label" x="530" y="160">1/4 drill shank (orienting only)</text>
-  <text class="label" x="430" y="70">jaw tops .245 above Z0</text>
-  <text class="label" x="430" y="300">1 in parallels, 1/8 thick</text>
-  <text class="label" x="300" y="45">#50, .16 from F, to the bore axis</text>
-  <text class="label" x="140" y="380">X0 face F; Z0 the O.D. top line. Bore (dashed) below the O.D. axis: thick wall up.</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 470" width="760" height="470" font-family="sans-serif" font-size="13">
+  <!-- Hand picture, to scale at 7 px/mm. Left: a section at the hole (X 4.100, cad.set_screw_tap_station_mm), seen from the jaws' right ends looking −X, so +Y (the fixed jaw) is to the right and +X comes out of the page toward you. The cam on the inner top edges of the two 1 in parallels, 1/8 thick, one against each jaw (process.parallel_height_mm, process.parallel_thickness_mm), its O.D. axis 6.023 mm over their tops (process.cross_axis_height_mm); the jaw tops 6.223 mm over Z0 (process.cross_jaw_top_mm); the bore Ø.2510 (cad.bore_dia_mm) 2.000 below the O.D.'s centre (thick wall up). The 1/4 orienting shank is out of the bore (op 200). The jaws' thickness and the bed are schematic. Right: from the front (looking +Y, +X right), face F (X0) LEFT, the rear face 6.35 mm in from the jaws' right ends (process.cross_jaw_end_mm); the balance cam at the jaws' left ends is off the picture. The #50 drill (shop drill-50, Ø1.778 mm) on Y0 at X 4.100, its point at Z-9.834, CM02's posted depth: its full diameter at the bore's axis, 9.30 mm below the top line (cad.set_screw_tap_into_axis_mm); it runs up to a break line. The T1 centre drill's spot is under it and not drawn. -->
+  <rect class="paper" x="0" y="0" width="760" height="470"/>
+  <text class="title" x="20" y="22">Setup 3, CM02 T4: the #50 down into the bore, its full diameter at the bore's axis (to scale, 7 px/mm)</text>
+  <rect class="clamp" x="118.9" y="86.44" width="60" height="314.62"/>
+  <text class="label-on-clamp" x="148.9" y="391.06" text-anchor="middle">moving</text>
+  <rect class="fixture-support" x="178.9" y="223.26" width="22.22" height="177.8"/>
+  <rect class="clamp" x="281.1" y="86.44" width="60" height="314.62"/>
+  <text class="label-on-clamp" x="311.1" y="391.06" text-anchor="middle">fixed</text>
+  <rect class="fixture-support" x="258.88" y="223.26" width="22.22" height="177.8"/>
+  <rect class="fixture-vise" x="118.9" y="401.06" width="222.2" height="12"/>
+  <circle class="part-kept" cx="230" cy="181.1" r="51.1"/>
+  <circle class="holes" cx="230" cy="195.1" r="22.31"/>
+  <line class="datum" x1="158.9" y1="130" x2="301.1" y2="130"/>
+  <text class="datum-label" x="112.9" y="134" text-anchor="end">Z0 the top line</text>
+  <text class="label" x="345.1" y="185.1">+Y →</text>
+  <text class="label" x="10" y="283.26">1 in parallels,</text>
+  <text class="label" x="10" y="299.26">1/8 thick,</text>
+  <text class="label" x="10" y="315.26">against the jaws</text>
+  <line class="leader" x1="100" y1="283.26" x2="190.01" y2="263.26"/>
+  <circle class="leader-dot" cx="190.01" cy="263.26" r="2"/>
+  <line class="centre-line" x1="230" y1="24" x2="230" y2="405.06"/>
+  <rect class="clamp" x="420" y="86.44" width="187.45" height="314.62"/>
+  <text class="label-on-clamp" x="426" y="391.06">fixed jaw (behind)</text>
+  <rect class="part-kept" x="500" y="130" width="63" height="102.2"/>
+  <rect class="hidden" x="500" y="172.79" width="63" height="44.63"/>
+  <text class="label" x="615.45" y="173.1">X0: face F,</text>
+  <text class="label" x="615.45" y="189.1">on the left</text>
+  <line class="leader" x1="613.45" y1="169.1" x2="500" y2="181.1"/>
+  <circle class="leader-dot" cx="500" cy="181.1" r="2"/>
+  <text class="label" x="615.45" y="351.06">the jaws' right ends,</text>
+  <text class="label" x="615.45" y="367.06">{{process.cross_jaw_end_mm:in.2f}} past</text>
+  <text class="label" x="615.45" y="383.06">the rear face</text>
+  <line class="leader" x1="613.45" y1="347.06" x2="607.45" y2="341.06"/>
+  <circle class="leader-dot" cx="607.45" cy="341.06" r="2"/>
+  <rect class="holes" x="223.78" y="130" width="12.45" height="65.1"/>
+  <path class="cutter" d="M236.22 40L236.22 195.1L230 198.84L223.78 195.1L223.78 40L230 37Z"/>
+  <line class="arrow" x1="254" y1="50" x2="254" y2="90"/>
+  <rect class="holes" x="522.48" y="130" width="12.45" height="65.1"/>
+  <path class="cutter" d="M534.92 40L534.92 195.1L528.7 198.84L522.48 195.1L522.48 40L528.7 37Z"/>
+  <text class="label" x="10" y="50">#50 down into the bore, pecks</text>
+  <text class="label" x="10" y="66">of {{process.peck_50_mm:in.3dot}}, full retract</text>
+  <line class="leader" x1="150" y1="66" x2="223.78" y2="74"/>
+  <circle class="leader-dot" cx="223.78" cy="74" r="2"/>
+  <text class="label" x="564.92" y="46">#50 at X {{cad.set_screw_tap_station_mm:.3f}} mm from face F</text>
+  <line class="leader" x1="562.92" y1="50" x2="534.92" y2="70"/>
+  <circle class="leader-dot" cx="534.92" cy="70" r="2"/>
 </svg>

@@ -1,11 +1,18 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 330" font-family="sans-serif" font-size="13">
-  <rect class="paper" x="0" y="0" width="760" height="330"/>
-  <text class="title" x="20" y="20">Setup 1: saw the blank and the spacer off the 5/16 x 1 in bar</text>
-  <rect class="part-rest" x="30" y="120" width="672" height="56"/>
-  <rect class="part-kept" x="30" y="120" width="238" height="56"/>
-  <rect class="part-kept" x="275" y="120" width="84" height="56"/>
-  <text class="label" x="86" y="198">blank 4.20–4.30 (aim 4.25)</text>
-  <text class="label" x="276" y="110">spacer ~1.5</text>
-  <text class="label" x="422" y="198">rest of the 12 in bar</text>
-  <text class="label" x="20" y="318">Mark O on the better face and T on the straighter edge at the hub (left) end.</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 280" width="760" height="280" font-family="sans-serif" font-size="13">
+  <!-- Hand picture, from above, to scale at 50 px/in: the 12 in length of 5/16 x 1 flat (process.blank_width_in, process.blank_thickness_in) lying flat, the blank marked off 4.25 (the aim inside process.blank_length_in–max_in), then the spacer about 1.5; each line sawn on its waste side. The saw's kerf is not on record: the blade drawn as a heavy line; the saw's vise jaws are schematic. The bar runs on to a break line. -->
+  <rect class="paper" x="0" y="0" width="760" height="280"/>
+  <text class="title" x="20" y="22">Setup 1, Op 10: the blank 4.25 and the spacer about 1.5 off the 5/16 x 1 flat, from above (to scale, 50 px/in)</text>
+  <rect class="fixture-table" x="20" y="55" width="720" height="160"/>
+  <rect class="part-kept" x="40" y="125" width="212.5" height="50"/>
+  <rect class="part-kept" x="252.5" y="125" width="75" height="50"/>
+  <path class="part-rest" d="M327.5 125L730 125L727 132.14L730 139.29L727 146.43L730 153.57L727 160.71L730 167.86L730 175L327.5 175Z"/>
+  <rect class="clamp" x="417.5" y="91" width="130" height="34"/>
+  <rect class="clamp" x="417.5" y="175" width="130" height="34"/>
+  <text class="label-on-clamp" x="425.5" y="113">saw vise</text>
+  <text class="label" x="417.5" y="81">saw vise on the long end (jaws schematic)</text>
+  <rect class="cutter" x="327.5" y="100" width="3" height="100"/>
+  <text class="label" x="40" y="112">blank {{process.blank_length_in:.2f}}–{{process.blank_length_max_in:.2f}} (aim 4.25)</text>
+  <text class="label" x="258.5" y="112">spacer ~1.5</text>
+  <text class="label" x="40" y="236">the blank first, then the spacer; file the burrs off every sawn end. Mark O on the</text>
+  <text class="label" x="40" y="252">better face and T on the straighter edge at the hub (left) end.</text>
 </svg>

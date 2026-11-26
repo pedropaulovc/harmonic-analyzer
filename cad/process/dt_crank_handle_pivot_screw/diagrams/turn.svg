@@ -1,29 +1,28 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 320" width="760" height="320">
-  <rect class="paper" x="0" y="0" width="760" height="320"/>
-  <text class="title" x="20" y="24">Lathe: the screw turned between the 3-jaw and the dead centre (not to scale)</text>
-  <rect class="fixture-vise" x="20" y="80" width="40" height="160"/>
-  <rect class="clamp" x="40" y="114" width="70" height="26"/>
-  <rect class="clamp" x="40" y="180" width="70" height="26"/>
-  <rect class="part-kept" x="40" y="140" width="150" height="40"/>
-  <rect class="part-kept" x="190" y="148" width="370" height="24"/>
-  <rect class="part-kept" x="560" y="155" width="16" height="10"/>
-  <rect class="part-threads" x="576" y="152" width="114" height="16"/>
-  <path class="clamp" d="M690 160 L715 148 L745 148 L745 172 L715 172 Z"/>
-  <line class="centre-line" x1="10" y1="160" x2="755" y2="160"/>
-  <rect class="cutter" x="140" y="76" width="10" height="64"/>
-  <text class="label" x="160" y="70">part-off at Z−P: the blade's tailstock-side face on it</text>
-  <line class="dims" x1="170" y1="180" x2="110" y2="248"/>
-  <text class="label" x="14" y="264">head Ø.231–.241</text>
-  <line class="dims" x1="190" y1="172" x2="190" y2="272"/>
-  <text class="label" x="150" y="290">under-head face at Z−U, squared by the blade (R.004 MAX)</text>
-  <line class="dims" x1="380" y1="172" x2="380" y2="224"/>
-  <text class="label" x="320" y="240">shoulder Ø T − .006 (Op 130), Ra 63 µin</text>
-  <line class="dims" x1="568" y1="165" x2="560" y2="118"/>
-  <text class="label" x="470" y="110">relief at the seat</text>
-  <line class="dims" x1="640" y1="152" x2="640" y2="142"/>
-  <text class="label" x="580" y="138">#4-40 at the tip</text>
-  <line class="dims" x1="725" y1="172" x2="725" y2="210"/>
-  <text class="label" x="600" y="226">dead centre in the tip</text>
-  <line class="datum" x1="690" y1="80" x2="690" y2="116"/>
-  <text class="datum-label" x="670" y="74">Z0 tip</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 380" width="760" height="380" font-family="sans-serif" font-size="13">
+  <!-- Hand picture, from above (the cross-slide at the bottom), to scale at 200 px/in along and across the axis: the Ø1/4 rod (process.stock_dia_in) 3.067 out of the jaw fronts (process.stickout_mm: S = P + .33 for the drawn M), Z0 the tip; the head Ø.236 (process.head_aim_dia_mm), the shoulder Ø.156 (process.shoulder_aim_dia_mm) to the under-head face at Z-2.463 (process.under_head_z_mm, U for the drawn M), the #4-40 blank Ø.1085 (process.thread_aim_dia_mm) to the seat at Z-.380 (process.seat_z_in), the part-off at Z-2.620 (process.part_off_z_mm, P). The 3-jaw's body and jaws are schematic (their sizes are not on record). The MT3 dead centre is schematic (its sizes are not on record). The AR tool schematic (not on record). Hatched: the about .03 faced off; dotted: this setup's turned outline. The dead centre goes in from Op 60 (after the centre drill): not drawn here. -->
+  <rect class="paper" x="0" y="0" width="760" height="380"/>
+  <text class="title" x="20" y="22">Setup 3, Op 40: the AR tool faces the tip square, about .03 off: Z0 (to scale, 200 px/in)</text>
+  <rect class="fixture-vise" x="-19.39" y="123" width="56" height="134"/>
+  <path class="part-kept" d="M40 165L690 165L690 215L40 215L37 207.86L40 200.71L37 193.57L40 186.43L37 179.29L40 172.14Z"/>
+  <rect class="clamp" x="36.61" y="135" width="40" height="30"/>
+  <rect class="clamp" x="36.61" y="215" width="40" height="30"/>
+  <line class="centre-line" x1="20" y1="190" x2="740" y2="190"/>
+  <rect class="part-removed" x="690" y="165" width="6" height="50"/>
+  <path class="hidden" d="M146.69 166.4L197.4 166.4L197.4 174.4L614 174.4L614 179.13L690 179.13"/>
+  <line class="hidden" x1="166" y1="166.4" x2="166" y2="213.6"/>
+  <path class="cutter" d="M690 198L720 210L720 298L712 295L704 298L696 298L696 222Z"/>
+  <line class="arrow" x1="738" y1="268" x2="738" y2="218"/>
+  <line class="datum" x1="690" y1="60" x2="690" y2="96"/>
+  <text class="datum-label" x="684" y="72" text-anchor="end">Z0 the tip</text>
+  <text class="label" x="480" y="350" text-anchor="end">AR tool: face the tip square, about .03 off,</text>
+  <text class="label" x="480" y="366" text-anchor="end">to the centre, no pip; DRO Z0 on it</text>
+  <line class="leader" x1="482" y1="346" x2="708" y2="278"/>
+  <circle class="leader-dot" cx="708" cy="278" r="2"/>
+  <text class="label" x="100" y="110">dotted: the head Ø{{cad.head_dia_min_in:.3dot}}–{{cad.head_dia_max_in:.3dot}}, the shoulder, the #4-40</text>
+  <text class="label" x="100" y="126">blank to the seat at Z-{{process.seat_z_in:.3dot}}; the part-off at Z−P</text>
+  <line class="leader" x1="250" y1="116" x2="410" y2="170.4"/>
+  <circle class="leader-dot" cx="410" cy="170.4" r="2"/>
+  <text class="label" x="40" y="290">3-jaw on the rod, S out (calipers' depth rod)</text>
+  <line class="leader" x1="140" y1="278" x2="58.61" y2="233"/>
+  <circle class="leader-dot" cx="58.61" cy="233" r="2"/>
 </svg>

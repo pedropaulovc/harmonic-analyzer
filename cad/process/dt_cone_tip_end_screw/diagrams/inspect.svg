@@ -1,17 +1,18 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 360" font-family="sans-serif" font-size="13">
-  <!-- The finished screw, section through its axis, about 300 px to the inch: the bought 1/4-28 x 3/4 fillister screw and the one added hole. Styles: prechips.palette. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 360" width="760" height="360" font-family="sans-serif" font-size="13">
+  <!-- Hand picture, a section through the screw's axis, to scale at 300 px/in: the head Ø.414 x .237, the 1/4-28 shank .75 (cad.head_dia_ref_in, cad.head_length_mm, cad.envelope_y_mm); the #52 hole (cad.end_hole_dia_mm) drawn 0.118 deep at full diameter with its 118° point, the mouth's .010 max break too small to draw. -->
   <rect class="paper" x="0" y="0" width="760" height="360"/>
-  <text class="title" x="20" y="22">The finished screw: the bought 91794A559 and its drilled end hole</text>
-  <rect class="part-kept" x="120" y="118" width="71" height="124"/>
-  <rect class="part-threads" x="191" y="142" width="225" height="76"/>
-  <rect class="part-removed" x="380" y="170" width="36" height="20"/>
-  <polyline class="hidden" points="416,171 371,171 365,180 371,189 416,189"/>
-  <line class="centre-line" x1="90" y1="180" x2="470" y2="180"/>
-  <line class="datum" x1="416" y1="130" x2="416" y2="230"/>
-  <text class="datum-label" x="422" y="126">end face (as bought)</text>
-  <line class="leader" x1="398" y1="190" x2="460" y2="262"/>
-  <text class="label" x="464" y="268">#52 × {{cad.end_hole_depth_min_in:.2dot}}–{{cad.end_hole_depth_max_in:.2dot}} deep</text>
-  <text class="label" x="464" y="286">mouth broken, {{cad.chamfer_max_in:.3dot}} chamfer max</text>
-  <line class="leader" x1="300" y1="218" x2="300" y2="300"/>
-  <text class="label" x="200" y="318">1/4-28 UNF-2A thread, head and slot: as bought</text>
+  <text class="title" x="20" y="22">The finished screw: the bought 91794A559 and its drilled end hole (to scale, 300 px/in)</text>
+  <rect class="part-kept" x="263.9" y="117.9" width="71.1" height="124.2"/>
+  <rect class="part-threads" x="335" y="142.5" width="225" height="75"/>
+  <path class="holes" d="M560 170.47L524.62 170.47L518.89 180L524.62 189.53L560 189.53Z"/>
+  <line class="centre-line" x1="100" y1="180" x2="640" y2="180"/>
+  <line class="datum" x1="560" y1="120" x2="560" y2="240"/>
+  <text class="datum-label" x="566" y="116">end face (as bought)</text>
+  <text class="label" x="560" y="290">#52 × {{cad.end_hole_depth_min_in:.2dot}}–{{cad.end_hole_depth_max_in:.2dot}} deep</text>
+  <text class="label" x="560" y="306">mouth broken, {{cad.chamfer_max_in:.3dot}} chamfer max</text>
+  <line class="leader" x1="600" y1="280" x2="534.62" y2="189.53"/>
+  <circle class="leader-dot" cx="534.62" cy="189.53" r="2"/>
+  <text class="label" x="200" y="330">1/4-28 UNF-2A thread, head and slot: as bought</text>
+  <line class="leader" x1="300" y1="318" x2="440" y2="217.5"/>
+  <circle class="leader-dot" cx="440" cy="217.5" r="2"/>
 </svg>

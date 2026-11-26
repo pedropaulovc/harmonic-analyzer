@@ -1,19 +1,29 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 340" font-family="sans-serif" font-size="13">
-  <rect class="paper" x="0" y="0" width="760" height="340"/>
-  <text class="title" x="20" y="20">Setup 2: the blank in the 3-jaw, 1.00 in out (not to scale)</text>
-  <rect class="fixture-vise" x="40" y="80" width="140" height="200"/>
-  <rect class="part-rest" x="180" y="135" width="80" height="90"/>
-  <rect class="part-kept" x="260" y="139" width="330" height="82"/>
-  <rect class="part-removed" x="260" y="135" width="330" height="4"/>
-  <rect class="part-removed" x="260" y="221" width="330" height="4"/>
-  <rect class="part-removed" x="300" y="164" width="290" height="32"/>
-  <line class="centre-line" x1="160" y1="180" x2="700" y2="180"/>
-  <line class="active-face" x1="590" y1="135" x2="590" y2="225"/>
-  <rect class="cutter" x="600" y="168" width="110" height="24"/>
-  <text class="label" x="470" y="100">face F (datum end), DRO Z0</text>
-  <line class="dims" x1="560" y1="104" x2="590" y2="135"/>
-  <text class="label" x="300" y="120">O.D. turned to Ø.59, .80 long</text>
-  <text class="label" x="560" y="250">5/16 drill, .80 deep</text>
-  <line class="dims" x1="600" y1="238" x2="620" y2="192"/>
-  <text class="label" x="40" y="315">The collar stays on the blank; the pin hole is drilled next (Setup 3), then it is parted off (Setup 4).</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 380" width="760" height="380" font-family="sans-serif" font-size="13">
+  <!-- Hand picture, from above (the cross-slide at the bottom), a section through the axis, to scale at 200 px/in: the Ø5/8 blank (process.bar_dia_in) 1.00 out of the jaw fronts (process.stickout_mm), Z0 its faced end, face F. The 3-jaw's body and jaws are schematic (their sizes are not on record). The rest of the 2.00 blank is in the jaws, drawn to its end. The AR tool schematic (not on record), its point on the faced end, feeding to the centre. Hatched: the .02 faced off (process.face_allowance_in); dotted: the rest of this setup's removal, the O.D. to Ø.59 .80 long (process.turn_length_in) and the 5/16 bore, drawn to its point. -->
+  <rect class="paper" x="0" y="0" width="760" height="380"/>
+  <text class="title" x="20" y="22">Setup 2, Op 20: the AR tool faces face F square, .02 off, to the centre (to scale, 200 px/in)</text>
+  <rect class="fixture-vise" x="302" y="81.5" width="56" height="217"/>
+  <rect class="part-kept" x="204" y="127.5" width="396" height="125"/>
+  <rect class="part-removed" x="600" y="127.5" width="4" height="125"/>
+  <rect class="clamp" x="358" y="93.5" width="46" height="34"/>
+  <rect class="clamp" x="358" y="252.5" width="46" height="34"/>
+  <rect class="hidden" x="440" y="127.5" width="160" height="3.5"/>
+  <rect class="hidden" x="440" y="249" width="160" height="3.5"/>
+  <path class="hidden" d="M600 158.75L446.76 158.75L427.98 190L446.76 221.25L600 221.25"/>
+  <line class="centre-line" x1="20" y1="190" x2="740" y2="190"/>
+  <path class="cutter" d="M600 200L630 212L630 310L622 307L614 310L606 310L606 224Z"/>
+  <line class="arrow" x1="648" y1="270" x2="648" y2="220"/>
+  <line class="datum" x1="600" y1="60" x2="600" y2="110"/>
+  <text class="datum-label" x="594" y="72" text-anchor="end">Z0 face F (datum end): mark it</text>
+  <text class="label" x="460" y="350" text-anchor="end">AR tool: face square, {{process.face_allowance_in:.2f}} off,</text>
+  <text class="label" x="460" y="366" text-anchor="end">to the centre, no pip; DRO Z0 on it</text>
+  <line class="leader" x1="462" y1="346" x2="618" y2="280"/>
+  <circle class="leader-dot" cx="618" cy="280" r="2"/>
+  <text class="label" x="30" y="44">dotted: next, the O.D. to Ø{{cad.outer_dia_in:.3dot}} {{process.turn_length_in:.2f}} long</text>
+  <text class="label" x="30" y="60">and the 5/16 bore, 0.80 on the quill</text>
+  <line class="leader" x1="200" y1="64" x2="500" y2="129.25"/>
+  <circle class="leader-dot" cx="500" cy="129.25" r="2"/>
+  <text class="label" x="40" y="350">3-jaw on the blank, {{process.stickout_mm:in.2f}} out (rule)</text>
+  <line class="leader" x1="140" y1="338" x2="384" y2="272.5"/>
+  <circle class="leader-dot" cx="384" cy="272.5" r="2"/>
 </svg>

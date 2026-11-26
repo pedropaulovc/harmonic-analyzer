@@ -1,13 +1,55 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 400" font-family="sans-serif" font-size="13">
-  <rect class="paper" x="0" y="0" width="760" height="400"/>
-  <text class="title" x="20" y="20">Setup 3: CM03 brings the tap guide over the hole; tap #2-56 by hand</text>
-  <rect class="part-kept" x="240" y="200" width="160" height="160"/>
-  <rect class="hidden" x="240" y="300" width="160" height="40"/>
-  <rect class="part-threads" x="300" y="200" width="14" height="110"/>
-  <rect class="cutter" x="302" y="120" width="10" height="90"/>
-  <rect class="cutter" x="220" y="108" width="174" height="14"/>
-  <polygon class="cutter" points="300,70 314,70 307,100"/>
-  <line class="arrow" x1="420" y1="60" x2="320" y2="90"/>
-  <text class="label" x="425" y="60">tap guide's point in the wrench</text>
-  <text class="label" x="20" y="385">Spindle off; the guide's spring follows the tap. Point to the bore's axis (.366 below the top line).</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 560" width="760" height="560" font-family="sans-serif" font-size="13">
+  <!-- Hand picture, to scale at 7 px/mm. Left: a section at the hole (X 4.100, cad.set_screw_tap_station_mm), seen from the jaws' right ends looking −X, so +Y (the fixed jaw) is to the right and +X comes out of the page toward you. The cam on the inner top edges of the two 1 in parallels, 1/8 thick, one against each jaw (process.parallel_height_mm, process.parallel_thickness_mm), its O.D. axis 6.023 mm over their tops (process.cross_axis_height_mm); the jaw tops 6.223 mm over Z0 (process.cross_jaw_top_mm); the bore Ø.2510 (cad.bore_dia_mm) 2.000 below the O.D.'s centre (thick wall up). The 1/4 orienting shank is out of the bore (op 200). The jaws' thickness and the bed are schematic. Right: from the front (looking +Y, +X right), face F (X0) LEFT, the rear face 6.35 mm in from the jaws' right ends (process.cross_jaw_end_mm); the balance cam at the jaws' left ends is off the picture. The #2-56 plug tap to scale across its .086 major Ø (the #2-56 thread; its own sizes are not on record), its end square with the round cue, its point at the bore's axis (the noted Z less 9.30 mm, cad.set_screw_tap_into_axis_mm). The tap's length and the T-handle wrench are schematic (not on record). The Fisher tap guide from the shop record (tap-guide-fisher: 1/2 shank, 3/16 point), its spring point in the wrench's centre hole, in the 1/2 collet to a break line; the tap, the wrench and the guide in the tool colour. Spindle off. -->
+  <rect class="paper" x="0" y="0" width="760" height="560"/>
+  <text class="title" x="20" y="22">Setup 3: the #2-56 tap by hand under the tap guide, its point to the bore's axis (7 px/mm; tap length schematic)</text>
+  <rect class="clamp" x="118.9" y="176.44" width="60" height="314.62"/>
+  <text class="label-on-clamp" x="148.9" y="481.06" text-anchor="middle">moving</text>
+  <rect class="fixture-support" x="178.9" y="313.26" width="22.22" height="177.8"/>
+  <rect class="clamp" x="281.1" y="176.44" width="60" height="314.62"/>
+  <text class="label-on-clamp" x="311.1" y="481.06" text-anchor="middle">fixed</text>
+  <rect class="fixture-support" x="258.88" y="313.26" width="22.22" height="177.8"/>
+  <rect class="fixture-vise" x="118.9" y="491.06" width="222.2" height="12"/>
+  <circle class="part-kept" cx="230" cy="271.1" r="51.1"/>
+  <circle class="holes" cx="230" cy="285.1" r="22.31"/>
+  <line class="datum" x1="158.9" y1="220" x2="301.1" y2="220"/>
+  <text class="datum-label" x="112.9" y="224" text-anchor="end">Z0 the top line</text>
+  <text class="label" x="345.1" y="275.1">+Y →</text>
+  <text class="label" x="10" y="373.26">1 in parallels,</text>
+  <text class="label" x="10" y="389.26">1/8 thick,</text>
+  <text class="label" x="10" y="405.26">against the jaws</text>
+  <line class="leader" x1="100" y1="373.26" x2="190.01" y2="353.26"/>
+  <circle class="leader-dot" cx="190.01" cy="353.26" r="2"/>
+  <line class="centre-line" x1="230" y1="24" x2="230" y2="495.06"/>
+  <rect class="clamp" x="420" y="176.44" width="187.45" height="314.62"/>
+  <text class="label-on-clamp" x="426" y="481.06">fixed jaw (behind)</text>
+  <rect class="part-kept" x="500" y="220" width="63" height="102.2"/>
+  <rect class="hidden" x="500" y="262.79" width="63" height="44.63"/>
+  <text class="label" x="615.45" y="263.1">X0: face F,</text>
+  <text class="label" x="615.45" y="279.1">on the left</text>
+  <line class="leader" x1="613.45" y1="259.1" x2="500" y2="271.1"/>
+  <circle class="leader-dot" cx="500" cy="271.1" r="2"/>
+  <text class="label" x="615.45" y="441.06">the jaws' right ends,</text>
+  <text class="label" x="615.45" y="457.06">{{process.cross_jaw_end_mm:in.2f}} past</text>
+  <text class="label" x="615.45" y="473.06">the rear face</text>
+  <line class="leader" x1="613.45" y1="437.06" x2="607.45" y2="431.06"/>
+  <circle class="leader-dot" cx="607.45" cy="431.06" r="2"/>
+  <rect class="holes" x="223.78" y="220" width="12.45" height="65.1"/>
+  <rect class="part-threads" x="222.35" y="220" width="15.29" height="65.1"/>
+  <path class="cutter" d="M237.65 283.27L237.65 146.44L222.35 146.44L222.35 283.27A7.65 1.83 0 0 0 237.65 283.27Z"/>
+  <rect class="cutter" x="170" y="138.44" width="120" height="8"/>
+  <rect class="cutter" x="221" y="124.44" width="18" height="22"/>
+  <path class="cutter" d="M213.33 100.44L246.67 100.44L246.67 107.77L230 124.44L213.33 107.77Z"/>
+  <path class="cutter" d="M185.55 100.44L274.45 100.44L274.45 36L267.04 33L259.63 36L252.22 33L244.82 36L237.41 33L230 36L222.59 33L215.18 36L207.78 33L200.37 36L192.96 33L185.55 36Z"/>
+  <text class="label" x="330" y="60">Fisher tap guide, 1/2 shank in the 1/2 collet;</text>
+  <text class="label" x="330" y="76">its 3/16 spring point in the wrench's centre hole</text>
+  <line class="leader" x1="328" y1="56" x2="274.45" y2="68.22"/>
+  <circle class="leader-dot" cx="274.45" cy="68.22" r="2"/>
+  <text class="label" x="10" y="116.44">T-handle wrench (schematic)</text>
+  <line class="leader" x1="110" y1="120.44" x2="170" y2="142.44"/>
+  <circle class="leader-dot" cx="170" cy="142.44" r="2"/>
+  <text class="label" x="330" y="136.44">#2-56 tap, a half turn back each turn; stop at</text>
+  <text class="label" x="330" y="152.44">the noted Z less {{cad.set_screw_tap_into_axis_mm:.3f}} mm: its point at the bore's axis</text>
+  <line class="leader" x1="328" y1="132.44" x2="237.65" y2="215.77"/>
+  <circle class="leader-dot" cx="237.65" cy="215.77" r="2"/>
+  <rect class="part-threads" x="521.05" y="220" width="15.29" height="65.1"/>
 </svg>

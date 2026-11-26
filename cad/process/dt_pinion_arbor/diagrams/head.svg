@@ -1,20 +1,26 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 320" font-family="sans-serif" font-size="13">
-  <rect class="paper" x="0" y="0" width="760" height="320"/>
-  <text class="title" x="20" y="20">Setup 6: the head end out of the 3-jaw (not to scale)</text>
-  <rect class="fixture-vise" x="40" y="70" width="140" height="200"/>
-  <rect class="part-rest" x="180" y="125" width="200" height="90"/>
-  <rect class="part-removed" x="380" y="125" width="240" height="90"/>
-  <rect class="part-kept" x="380" y="145" width="120" height="50"/>
-  <rect class="part-kept" x="500" y="130" width="100" height="80"/>
-  <path class="part-kept" d="M600,130 Q640,170 600,210 Z"/>
-  <line class="centre-line" x1="160" y1="170" x2="700" y2="170"/>
-  <line class="active-face" x1="620" y1="125" x2="620" y2="215"/>
-  <rect class="cutter" x="650" y="160" width="80" height="20"/>
-  <text class="label" x="560" y="100">crown apex: DRO Z0</text>
-  <line class="leader" x1="610" y1="104" x2="620" y2="168"/>
-  <text class="label" x="420" y="250">Ø.41 neck, .41 long</text>
-  <line class="leader" x1="440" y1="238" x2="440" y2="196"/>
-  <text class="label" x="510" y="290">Ø.59 head, .48 long; SR.43 crown</text>
-  <line class="leader" x1="550" y1="278" x2="550" y2="211"/>
-  <text class="label" x="200" y="110">bar back through the spindle</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 360" width="760" height="360" font-family="sans-serif" font-size="13">
+  <!-- Hand picture, from above (the cross-slide at the bottom), a section through the axis, to scale at 200 px/in: the blank's head end 1.10 out of the jaw fronts (process.head_stickout_mm), the rest back through the spindle, to a break line; Z0 the faced head end (the crown's apex). The head Ø.59 (cad.head_dia_in) to Z-1.0072 (process.neck_end_z_in) first, then the neck Ø.41 (cad.neck_dia_in) from the head's rear face at Z-.5972 (process.head_rear_z_in) to Z-1.0072. The 3-jaw's body and jaws are schematic (their sizes are not on record). The AR tool schematic (not on record), on the finish pass at Ø.59, travelling toward the chuck. Hatched: the turned-off skin; dotted: the neck and the SR.43 crown to come. -->
+  <rect class="paper" x="0" y="0" width="760" height="360"/>
+  <text class="title" x="20" y="22">Setup 6, Op 230: the AR tool turns the head Ø.59 from Z0 to Z-1.0072 (to scale, 200 px/in)</text>
+  <rect class="fixture-vise" x="298" y="71.5" width="56" height="217"/>
+  <path class="part-rest" d="M40 117.5L418.56 117.5L418.56 242.5L40 242.5L37 235.15L40 227.79L37 220.44L40 213.09L37 205.74L40 198.38L37 191.03L40 183.68L37 176.32L40 168.97L37 161.62L40 154.26L37 146.91L40 139.56L37 132.21L40 124.85Z"/>
+  <rect class="part-kept" x="418.56" y="121" width="201.44" height="118"/>
+  <rect class="part-removed" x="520" y="117.5" width="100" height="3.5"/>
+  <rect class="part-removed" x="520" y="239" width="100" height="3.5"/>
+  <rect class="clamp" x="354" y="83.5" width="46" height="34"/>
+  <rect class="clamp" x="354" y="242.5" width="46" height="34"/>
+  <rect class="hidden" x="418.56" y="121" width="82" height="18"/>
+  <rect class="hidden" x="418.56" y="221" width="82" height="18"/>
+  <line class="centre-line" x1="20" y1="180" x2="740" y2="180"/>
+  <path class="cutter" d="M520 239L550 251L550 339L542 336L534 339L526 339L526 263Z"/>
+  <line class="arrow" x1="500" y1="309" x2="450" y2="309"/>
+  <line class="datum" x1="620" y1="50" x2="620" y2="84"/>
+  <text class="datum-label" x="626" y="62">Z0 the crown's apex</text>
+  <text class="label" x="565" y="330">AR tool: the head Ø{{cad.head_dia_min_in:.3dot}}–{{cad.head_dia_max_in:.3dot}},</text>
+  <text class="label" x="565" y="346">to Z-{{process.neck_end_z_in:.3dot}}</text>
+  <line class="leader" x1="563" y1="326" x2="542" y2="299"/>
+  <circle class="leader-dot" cx="542" cy="299" r="2"/>
+  <text class="label" x="150" y="60">dotted: the neck Ø{{cad.neck_dia_in:.2dot}} from the head's rear face at Z-{{process.head_rear_z_in:.4dot}}</text>
+  <line class="leader" x1="260" y1="66" x2="460" y2="139"/>
+  <circle class="leader-dot" cx="460" cy="139" r="2"/>
 </svg>

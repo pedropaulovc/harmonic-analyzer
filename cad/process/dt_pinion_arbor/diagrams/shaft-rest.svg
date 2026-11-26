@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 330" width="760" height="330" font-family="sans-serif" font-size="13">
+  <!-- Hand picture, from above (the cross-slide at the bottom), to scale at 68 px/in along and across the axis: the 3-jaw over a brass shim wrap on the Ø.59 head (its rear face .25 out of the jaw fronts and the shim), Z0 the head's rear face, the neck Ø.41 x .41 (cad.neck_length_in), the shaft to the back end at Z+9.40 on the MT3 dead centre (schematic). The 3-jaw's body and jaws are schematic (their sizes are not on record). The shim's thickness is not on record: drawn 2 px. The head-end stretch finished to the aim A (drawn Ø.3117, process.journal_aim_in) up to Z+3.20. The AR tool schematic (not on record) on the first rough pass from the back end, .040 per side to Ø.545 (hatched behind it), drawn at Z+6.0 travelling toward the chuck; the follow rest (schematic, its sizes are not on record) bolted to the saddle, its jaws L ahead of the tool's left edge, drawn L = 2.0 (the plan's limit is under 2.75), on the diameter the last pass left (here the 5/8 bar). The rest travels with the tool: in the cutter colour. -->
+  <rect class="paper" x="0" y="0" width="760" height="330"/>
+  <text class="title" x="20" y="22">Setup 7, Op 340: the AR tool roughs from the back end, the follow rest's jaws L ahead (to scale, 68 px/in)</text>
+  <rect class="fixture-vise" x="-7" y="113.26" width="56" height="113.48"/>
+  <rect class="part-kept" x="49.39" y="149.94" width="40.61" height="40.12"/>
+  <rect class="part-kept" x="90" y="156.06" width="27.88" height="27.88"/>
+  <rect class="part-kept" x="117.88" y="159.4" width="189.72" height="21.2"/>
+  <rect class="part-kept" x="307.6" y="148.75" width="421.44" height="42.5"/>
+  <rect class="clamp" x="49" y="125.26" width="24" height="24"/>
+  <rect class="clamp" x="49" y="190.74" width="24" height="24"/>
+  <line class="centre-line" x1="20" y1="170" x2="745" y2="170"/>
+  <path class="clamp" d="M723.04 170L743.04 158L750 158L750 182L743.04 182Z"/>
+  <text class="label" x="650" y="120">MT3 dead centre</text>
+  <line class="datum" x1="90" y1="60" x2="90" y2="96"/>
+  <text class="datum-label" x="96" y="72">Z0 the head's rear face</text>
+  <rect class="part-removed" x="498" y="148.75" width="231.04" height="2.72"/>
+  <rect class="part-removed" x="498" y="188.53" width="231.04" height="2.72"/>
+  <path class="cutter" d="M498 188.53L528 200.53L528 278.53L520 275.53L512 278.53L504 278.53L504 212.53Z"/>
+  <rect class="cutter" x="356" y="118.75" width="12" height="30"/>
+  <rect class="cutter" x="356" y="191.25" width="12" height="30"/>
+  <rect class="cutter" x="356" y="221.25" width="148" height="8"/>
+  <line class="arrow" x1="478" y1="261.25" x2="428" y2="261.25"/>
+  <text class="label" x="140" y="300">follow rest's jaws L ahead of the tool, on the diameter the last pass left;</text>
+  <text class="label" x="140" y="316">each pass stops at Z+{{process.rest_joint_in:.2f}}</text>
+  <line class="leader" x1="300" y1="288" x2="362" y2="211.25"/>
+  <circle class="leader-dot" cx="362" cy="211.25" r="2"/>
+  <text class="label" x="345" y="56">finished to A, Ø{{cad.shaft_dia_min_in:.4dot}}–{{cad.shaft_dia_max_in:.4dot}}</text>
+  <line class="leader" x1="380" y1="62" x2="239.6" y2="159.4"/>
+  <circle class="leader-dot" cx="239.6" cy="159.4" r="2"/>
+</svg>

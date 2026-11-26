@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 400" width="760" height="400" font-family="sans-serif" font-size="13">
+  <!-- Hand picture, from above (the cross-slide at the bottom), a section through the axis, to scale at 200 px/in: the hub turned round, its barrel Ø.88 .40 in the jaws from the rear face (process.regrip_grip_in), the relief end inward, the parted end out; Z0 the front face, faced to .987 from the rear face (process.length_target_in). The 3-jaw's body and jaws are schematic (their sizes are not on record). The brass shim wrap's thickness is not on record: drawn 2 px; nothing seats the hub axially. The seat turned to the arm (drawn Ø.76, cad.seat_dia_ref_in, S = .3075). The L drill (shop drill-l, Ø7.366 mm, 58 px): the quill zeroed with its lips on the Ø.20 spot's rim (Op 110) and run 1.15, so its full diameter stands 1.123 from Z0, 0.136 past the rear face, its point 1.210: it breaks out inside the jaws. It runs on to a break line (its length is not on record). -->
+  <rect class="paper" x="0" y="0" width="760" height="400"/>
+  <text class="title" x="20" y="22">Setup 2, Op 120: the L drill through from the tailstock, 1.15 on the quill (to scale, 200 px/in)</text>
+  <rect class="fixture-vise" x="262.6" y="64" width="56" height="272"/>
+  <rect class="part-kept" x="322.6" y="135" width="32" height="130"/>
+  <rect class="part-kept" x="354.6" y="112" width="103.9" height="176"/>
+  <rect class="part-kept" x="458.5" y="124" width="61.5" height="152"/>
+  <rect class="clamp" x="318.6" y="76" width="84" height="34"/>
+  <rect class="clamp" x="318.6" y="290" width="84" height="34"/>
+  <rect class="fixture-support" x="352.6" y="110" width="50" height="180"/>
+  <rect class="part-kept" x="352.6" y="112" width="50" height="176"/>
+  <line class="centre-line" x1="20" y1="200" x2="740" y2="200"/>
+  <rect class="holes" x="322.6" y="171" width="197.4" height="58"/>
+  <path class="cutter" d="M745 171L295.41 171L277.98 200L295.41 229L745 229L742 221.75L745 214.5L742 207.25L745 200L742 192.75L745 185.5L742 178.25Z"/>
+  <line class="arrow" x1="720" y1="140" x2="660" y2="140"/>
+  <line class="datum" x1="520" y1="60" x2="520" y2="92"/>
+  <text class="datum-label" x="526" y="70">Z0: the front face</text>
+  <text class="label" x="420" y="360">through until the quill reads 1.15, backing fully out</text>
+  <text class="label" x="420" y="376">to clear chips; ease off as the point breaks out of</text>
+  <text class="label" x="420" y="392">the rear face inside the jaws</text>
+  <line class="leader" x1="418" y1="356" x2="460" y2="229"/>
+  <circle class="leader-dot" cx="460" cy="229" r="2"/>
+  <text class="label" x="30" y="44">seat turned until the arm slides on, back to the shoulder at Z−S</text>
+  <line class="leader" x1="200" y1="48" x2="490" y2="124"/>
+  <circle class="leader-dot" cx="490" cy="124" r="2"/>
+</svg>

@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 480" width="760" height="480" font-family="sans-serif" font-size="13">
+  <!-- Hand picture, to scale at 5 px/mm. Top: plan from above, +X right, +Y up toward the fixed jaw: the arm turned end for end, O face up, the bottom edge on the fixed jaw (Y0), the T edge on the moving jaw, the handle end LEFT; X0 the hub end's tip, the arm at −X; the jaws' left ends 77.47 mm from the tip (process.handle_jaw_end_mm), the seat and the anchor hole in the jaws; the two 1 in parallels dotted under it, their left ends at the jaws' left ends. The spacer at the jaws' right ends is off the picture. Bottom: a section through the pivot (Y-12.7) seen from the front (looking +Y, +X right): the fixed jaw and its parallel behind, the jaw tops 11.608 mm over the O face (process.jaw_top_mm); the moving jaw and its parallel in front, not drawn. The jaw and the parallel run on to break lines. The pivot hole drilled #43. The 1/4 90° chamfer mill (shop sink, Ø6.35 mm, its 45° cone to a point) on the pivot's axis, its point at Z-1.397, CA03's posted depth (process.sink_tip_mm): the countersink Ø2.794 on the O face (process.sink_dia_mm). It runs up to a break line. -->
+  <rect class="paper" x="0" y="0" width="760" height="480"/>
+  <text class="title" x="20" y="22">Setup 3, CA03 T5: the 1/4 90° chamfer mill countersinks the pivot, its point at Z-1.397 (to scale, 5 px/mm)</text>
+  <rect class="clamp" x="292.65" y="70" width="452.35" height="30"/>
+  <rect class="clamp" x="292.65" y="227" width="452.35" height="30"/>
+  <text class="label-on-clamp" x="298.65" y="90">fixed jaw (the bottom edge on it)</text>
+  <text class="label-on-clamp" x="298.65" y="247">moving jaw</text>
+  <path class="part-kept" d="M241.85 100L222.02 103.17L214.17 106.35L208.4 109.53L203.75 112.7L199.85 115.88L196.5 119.05L193.59 122.22L191.05 125.4L188.82 128.57L186.86 131.75L185.14 134.93L183.65 138.1L182.37 141.27L181.27 144.45L180.37 147.62L179.63 150.8L179.07 153.97L178.67 157.15L178.43 160.32L178.35 163.5L178.43 166.68L178.67 169.85L179.07 173.02L179.63 176.2L180.37 179.38L181.27 182.55L182.37 185.72L183.65 188.9L185.14 192.07L186.86 195.25L188.82 198.43L191.05 201.6L193.59 204.77L196.5 207.95L199.85 211.12L203.75 214.3L208.4 217.47L214.17 220.65L222.02 223.82L241.85 227L616.5 227L636.33 223.82L644.18 220.65L649.95 217.47L654.6 214.3L658.5 211.12L661.85 207.95L664.76 204.77L667.3 201.6L669.53 198.43L671.49 195.25L673.21 192.07L674.7 188.9L675.98 185.72L677.08 182.55L677.98 179.38L678.72 176.2L679.28 173.02L679.68 169.85L679.92 166.68L680 163.5L679.92 160.32L679.68 157.15L679.28 153.97L678.72 150.8L677.98 147.62L677.08 144.45L675.98 141.27L674.7 138.1L673.21 134.93L671.49 131.75L669.53 128.57L667.3 125.4L664.76 122.22L661.85 119.05L658.5 115.88L654.6 112.7L649.95 109.53L644.18 106.35L636.33 103.17L616.5 100Z"/>
+  <circle class="holes" cx="616.5" cy="163.5" r="48.26"/>
+  <circle class="holes" cx="516.17" cy="213.03" r="4.45"/>
+  <circle class="holes" cx="241.85" cy="163.5" r="5.65"/>
+  <line class="hidden" x1="292.65" y1="115.88" x2="745" y2="115.88"/>
+  <line class="hidden" x1="292.65" y1="211.12" x2="745" y2="211.12"/>
+  <line class="centre-line" x1="20" y1="163.5" x2="745" y2="163.5"/>
+  <text class="label" x="24" y="159.5">section</text>
+  <circle class="datum" cx="680" cy="100" r="3.5"/>
+  <text class="datum-label" x="674" y="114" text-anchor="end">X0 Y0</text>
+  <path class="clamp" d="M292.65 321.96L745 321.96L742 329.07L745 336.18L742 343.29L745 350.4L742 357.51L745 364.62L742 371.72L745 378.83L742 385.94L745 393.05L742 400.16L745 407.27L742 414.38L745 421.49L742 428.6L745 435.71L742 442.82L745 449.92L742 457.03L745 464.14L742 471.25L745 478.36L742 485.47L745 492.58L737.93 496.69L730.86 499.69L723.8 496.69L716.73 499.69L709.66 496.69L702.59 499.69L695.52 496.69L688.46 499.69L681.39 496.69L674.32 499.69L667.25 496.69L660.18 499.69L653.12 496.69L646.05 499.69L638.98 496.69L631.91 499.69L624.84 496.69L617.78 499.69L610.71 496.69L603.64 499.69L596.57 496.69L589.5 499.69L582.44 496.69L575.37 499.69L568.3 496.69L561.23 499.69L554.16 496.69L547.1 499.69L540.03 496.69L532.96 499.69L525.89 496.69L518.83 499.69L511.76 496.69L504.69 499.69L497.62 496.69L490.55 499.69L483.49 496.69L476.42 499.69L469.35 496.69L462.28 499.69L455.21 496.69L448.15 499.69L441.08 496.69L434.01 499.69L426.94 496.69L419.87 499.69L412.81 496.69L405.74 499.69L398.67 496.69L391.6 499.69L384.53 496.69L377.47 499.69L370.4 496.69L363.33 499.69L356.26 496.69L349.19 499.69L342.13 496.69L335.06 499.69L327.99 496.69L320.92 499.69L313.85 496.69L306.79 499.69L299.72 496.69L292.65 499.69Z"/>
+  <path class="fixture-support" d="M292.65 419.69L745 419.69L742 426.96L745 434.23L742 441.51L745 448.78L742 456.05L745 463.32L742 470.6L745 477.87L742 485.14L745 492.41L737.93 496.69L730.86 499.69L723.8 496.69L716.73 499.69L709.66 496.69L702.59 499.69L695.52 496.69L688.46 499.69L681.39 496.69L674.32 499.69L667.25 496.69L660.18 499.69L653.12 496.69L646.05 499.69L638.98 496.69L631.91 499.69L624.84 496.69L617.78 499.69L610.71 496.69L603.64 499.69L596.57 496.69L589.5 499.69L582.44 496.69L575.37 499.69L568.3 496.69L561.23 499.69L554.16 496.69L547.1 499.69L540.03 496.69L532.96 499.69L525.89 496.69L518.83 499.69L511.76 496.69L504.69 499.69L497.62 496.69L490.55 499.69L483.49 496.69L476.42 499.69L469.35 496.69L462.28 499.69L455.21 496.69L448.15 499.69L441.08 496.69L434.01 499.69L426.94 496.69L419.87 499.69L412.81 496.69L405.74 499.69L398.67 496.69L391.6 499.69L384.53 496.69L377.47 499.69L370.4 496.69L363.33 499.69L356.26 496.69L349.19 499.69L342.13 496.69L335.06 499.69L327.99 496.69L320.92 499.69L313.85 496.69L306.79 499.69L299.72 496.69L292.65 499.69Z"/>
+  <rect class="part-kept" x="178.35" y="380" width="501.65" height="39.69"/>
+  <rect class="holes" x="236.2" y="380" width="11.3" height="39.69"/>
+  <text class="label-on-clamp" x="600" y="339.96">fixed jaw (behind)</text>
+  <text class="label-halo" x="600" y="443.69">1 in parallel against</text>
+  <text class="label-halo" x="600" y="459.69">the fixed jaw (behind)</text>
+  <text class="datum-label" x="20" y="443.69">Z0 the O face (top)</text>
+  <path class="holes" d="M234.86 380L248.83 380L241.85 386.99Z"/>
+  <path class="cutter" d="M257.72 270L257.72 371.11L241.85 386.99L225.97 371.11L225.97 270L233.91 267L241.85 270L249.79 267Z"/>
+  <line class="arrow" x1="271.85" y1="276" x2="271.85" y2="306"/>
+  <text class="label" x="285.85" y="286">chamfer mill plunged: countersink Ø{{process.sink_dia_mm:in.3dot}},</text>
+  <text class="label" x="285.85" y="302">under the drawing's Ø{{cad.pivot_tap_countersink_dia_max_in:.3dot}} max</text>
+  <line class="leader" x1="283.85" y1="282" x2="245.85" y2="374"/>
+  <circle class="leader-dot" cx="245.85" cy="374" r="2"/>
+</svg>

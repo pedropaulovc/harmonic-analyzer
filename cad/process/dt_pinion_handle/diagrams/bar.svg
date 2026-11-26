@@ -1,22 +1,29 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 300" font-family="sans-serif" font-size="14">
-  <rect class="paper" x="0" y="0" width="760" height="300"/>
-  <text class="title" x="20" y="24">The 2.60 piece in the 3-jaw over a brass shim wrap, .28 out; the rest back into the spindle bore (not to scale)</text>
-  <rect class="fixture-vise" x="40" y="60" width="90" height="180"/>
-  <rect class="clamp" x="300" y="86" width="200" height="44"/>
-  <rect class="clamp" x="300" y="170" width="200" height="44"/>
-  <rect class="fixture-support" x="300" y="130" width="200" height="4"/>
-  <rect class="fixture-support" x="300" y="166" width="200" height="4"/>
-  <rect class="part-kept" x="110" y="136" width="494" height="28"/>
-  <rect class="part-removed" x="604" y="136" width="8" height="28"/>
-  <line class="centre-line" x1="30" y1="150" x2="720" y2="150"/>
-  <line class="datum" x1="604" y1="114" x2="604" y2="186"/>
-  <text class="datum-label" x="590" y="106">Z0</text>
-  <rect class="cutter" x="616" y="168" width="20" height="44"/>
-  <text class="label" x="560" y="232">AR tool: face .02 off</text>
-  <line class="dims" x1="500" y1="250" x2="604" y2="250"/>
-  <line class="dims" x1="500" y1="242" x2="500" y2="258"/>
-  <line class="dims" x1="604" y1="242" x2="604" y2="258"/>
-  <text class="label" x="470" y="276">.28 out of the jaw fronts</text>
-  <text class="label" x="310" y="80">3-jaw over the shim wrap on the Ø1/4 piece</text>
-  <text class="label" x="20" y="256">chuck body; the far end in the spindle bore</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 360" width="760" height="360" font-family="sans-serif" font-size="13">
+  <!-- Hand picture, from above (the cross-slide at the bottom), to scale at 200 px/in along and across the axis: the Ø.250 piece (cad.stock_dia_mm), 2.60 sawn (process.saw_length_in), the jaw fronts 0.26 behind Z0 (cad.outer_regrip_jaw_z_datum_mm), the sawn end .28 out (cad.outer_stickout_datum_mm). The AR holder and insert are schematic (no size on record), its point on the face it cuts. The 3-jaw's body and jaws are schematic (their sizes are not on record). The brass shim wrap's thickness is not on record: drawn 2 px. The piece's far end runs on through the jaws into the spindle bore. Hatched: the .02 faced off (process.face_allowance_in). -->
+  <rect class="paper" x="0" y="0" width="760" height="360"/>
+  <text class="title" x="20" y="22">Setup 2, Op 20: the AR tool faces the sawn end square, .02 off (to scale, 200 px/in)</text>
+  <rect class="fixture-vise" x="492" y="107" width="56" height="146"/>
+  <path class="part-kept" d="M40 155L640 155L640 205L40 205L37 197.86L40 190.71L37 183.57L40 176.43L37 169.29L40 162.14Z"/>
+  <rect class="part-removed" x="640" y="155" width="4" height="50"/>
+  <rect class="clamp" x="548" y="119" width="40" height="34"/>
+  <rect class="clamp" x="548" y="207" width="40" height="34"/>
+  <rect class="fixture-support" x="548" y="153" width="40" height="54"/>
+  <rect class="part-kept" x="548" y="155" width="40" height="50"/>
+  <line class="centre-line" x1="20" y1="180" x2="740" y2="180"/>
+  <path class="cutter" d="M640 188L670 200L670 298L662 295L654 298L646 298L646 212Z"/>
+  <line class="arrow" x1="688" y1="258" x2="688" y2="208"/>
+  <line class="datum" x1="640" y1="70" x2="640" y2="120"/>
+  <text class="datum-label" x="634" y="82" text-anchor="end">Z0 the faced end</text>
+  <text class="label" x="480" y="330" text-anchor="end">AR tool: face the sawn end square,</text>
+  <text class="label" x="480" y="346" text-anchor="end">{{process.face_allowance_in:.2dot}} off; DRO Z0 on it</text>
+  <line class="leader" x1="482" y1="326" x2="658" y2="268"/>
+  <circle class="leader-dot" cx="658" cy="268" r="2"/>
+  <text class="label" x="260" y="60">3-jaw over a brass shim wrap on the Ø{{process.stock_dia_in:.3dot}} piece,</text>
+  <text class="label" x="260" y="76">{{cad.outer_stickout_datum_mm:in.2dot}} out of the jaw fronts</text>
+  <line class="leader" x1="330" y1="74" x2="568" y2="123"/>
+  <circle class="leader-dot" cx="568" cy="123" r="2"/>
+  <text class="label" x="40" y="300">the rest of the piece back through the jaws</text>
+  <text class="label" x="40" y="316">into the spindle bore</text>
+  <line class="leader" x1="150" y1="288" x2="200" y2="201"/>
+  <circle class="leader-dot" cx="200" cy="201" r="2"/>
 </svg>

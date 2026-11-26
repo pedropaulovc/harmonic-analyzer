@@ -1,22 +1,34 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 360" font-family="sans-serif" font-size="13">
-  <rect class="paper" x="0" y="0" width="760" height="360"/>
-  <text class="title" x="20" y="20">Setup 2 (plan view): hub end overhanging; seat, R.50 round, anchor hole, mark spot</text>
-  <rect class="clamp" x="142" y="94" width="438" height="26"/>
-  <rect class="clamp" x="142" y="190" width="438" height="26"/>
-  <rect class="part-kept" x="30" y="120" width="298" height="70"/>
-  <path class="part-removed" d="M 30 120 L 76 120 A 35 35 0 0 0 76 190 L 30 190 Z"/>
-  <circle class="holes" cx="76" cy="155" r="27"/>
-  <circle class="holes" cx="131" cy="128" r="3"/>
-  <circle class="holes" cx="54" cy="133" r="2"/>
-  <rect class="fixture-support" x="474" y="120" width="105" height="70"/>
-  <line class="leader" x1="527" y1="240" x2="527" y2="155"/>
-  <text class="label" x="488" y="254">spacer at the jaws' right ends</text>
-  <line class="leader" x1="161" y1="60" x2="131" y2="128"/>
-  <text class="label" x="165" y="58">anchor #50</text>
-  <line class="leader" x1="48" y1="60" x2="54" y2="133"/>
-  <text class="label" x="20" y="54">mark spot</text>
-  <line class="leader" x1="373" y1="60" x2="373" y2="107"/>
-  <text class="label" x="377" y="58">fixed jaw (T edge against it)</text>
-  <text class="label" x="30" y="286">X0 the blank's left end; it overhangs the jaws' left ends 1.55–1.65</text>
-  <text class="label" x="20" y="348">Hatched: removed in CA01; holes white. Every cut lies left of the jaws and the parallels.</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 480" width="760" height="480" font-family="sans-serif" font-size="13">
+  <!-- Hand picture, to scale at 5 px/mm. Top: plan from above, +X right, +Y up toward the fixed jaw: the blank O face up, the T edge on the fixed jaw (Y0), its hub end LEFT, X0 its left end, overhanging the jaws' left ends 40.64 mm (process.overhang_mm); the two 1 in parallels, 1/8 thick, against the jaws dotted under it, their left ends at the jaws' left ends. The spacer at the jaws' right ends and the jaws' far ends are off the picture. Bottom: a section along the line marked in plan, seen from the front (looking +Y, +X right): the fixed jaw and its parallel behind, the jaw tops 11.608 mm over the O face (process.jaw_top_mm); the moving jaw and its parallel in front of the cut, not drawn. The jaw and parallel run on to break lines. The section at Y-12.7, through the seat. The 3/8 end mill (shop em, Ø9.525 mm) at X 21.399 Y-12.700, the +X point of its G2 helix (radius 4.8895, process.seat_path_radius_mm) about the seat's axis at X 16.51 (process.hub_waste_mm + R.50), on its level turn at Z-8.1915 (process.through_bottom_mm), 0.254 under the underside, travelling −Y (clockwise from above). Dotted: the seat Ø.76 and the R.50 round to come. In section it ends in its 12 % arc and runs up to a break line. -->
+  <rect class="paper" x="0" y="0" width="760" height="480"/>
+  <text class="title" x="20" y="22">Setup 2, CA01 T1: the 3/8 end mill's G2 helix at the seat's bottom, Z-8.192, through into air (to scale, 5 px/mm)</text>
+  <rect class="clamp" x="263.2" y="70" width="481.8" height="30"/>
+  <rect class="clamp" x="263.2" y="227" width="481.8" height="30"/>
+  <text class="label-on-clamp" x="269.2" y="90">fixed jaw (the T edge on it)</text>
+  <text class="label-on-clamp" x="269.2" y="247">moving jaw</text>
+  <path class="part-kept" d="M60 100L60 103.17L60 106.35L60 109.53L60 112.7L60 115.88L60 119.05L60 122.22L60 125.4L60 128.57L60 131.75L60 134.93L60 138.1L60 141.27L60 144.45L60 147.62L60 150.8L60 153.97L60 157.15L60 160.32L60 163.5L60 166.68L60 169.85L60 173.02L60 176.2L60 179.38L60 182.55L60 185.72L60 188.9L60 192.07L60 195.25L60 198.43L60 201.6L60 204.77L60 207.95L60 211.12L60 214.3L60 217.47L60 220.65L60 223.82L60 227L599.75 227L599.75 223.82L599.75 220.65L599.75 217.47L599.75 214.3L599.75 211.12L599.75 207.95L599.75 204.77L599.75 201.6L599.75 198.43L599.75 195.25L599.75 192.07L599.75 188.9L599.75 185.72L599.75 182.55L599.75 179.38L599.75 176.2L599.75 173.02L599.75 169.85L599.75 166.68L599.75 163.5L599.75 160.32L599.75 157.15L599.75 153.97L599.75 150.8L599.75 147.62L599.75 144.45L599.75 141.27L599.75 138.1L599.75 134.93L599.75 131.75L599.75 128.57L599.75 125.4L599.75 122.22L599.75 119.05L599.75 115.88L599.75 112.7L599.75 109.53L599.75 106.35L599.75 103.17L599.75 100Z"/>
+  <line class="hidden" x1="263.2" y1="115.88" x2="745" y2="115.88"/>
+  <line class="hidden" x1="263.2" y1="211.12" x2="745" y2="211.12"/>
+  <line class="centre-line" x1="20" y1="163.5" x2="745" y2="163.5"/>
+  <text class="label" x="24" y="159.5">section</text>
+  <circle class="datum" cx="60" cy="100" r="3.5"/>
+  <text class="datum-label" x="66" y="92">X0 Y0</text>
+  <circle class="hidden" cx="142.55" cy="163.5" r="48.26"/>
+  <path class="hidden" d="M142.5 100.0A63.5 63.5 0 0 0 142.5 227.0"/>
+  <circle class="cutter" cx="167" cy="163.5" r="23.81"/>
+  <line class="arrow" x1="201" y1="149.5" x2="201" y2="179.5"/>
+  <text class="label" x="211" y="155.5">3/8 end mill: G2 helix, 0.8 mm a turn</text>
+  <path class="clamp" d="M263.2 321.96L745 321.96L742 329.07L745 336.18L742 343.29L745 350.4L742 357.51L745 364.62L742 371.72L745 378.83L742 385.94L745 393.05L742 400.16L745 407.27L742 414.38L745 421.49L742 428.6L745 435.71L742 442.82L745 449.92L742 457.03L745 464.14L742 471.25L745 478.36L742 485.47L745 492.58L737.91 496.69L730.83 499.69L723.74 496.69L716.66 499.69L709.57 496.69L702.49 499.69L695.4 496.69L688.32 499.69L681.23 496.69L674.15 499.69L667.06 496.69L659.98 499.69L652.89 496.69L645.81 499.69L638.72 496.69L631.64 499.69L624.55 496.69L617.46 499.69L610.38 496.69L603.29 499.69L596.21 496.69L589.12 499.69L582.04 496.69L574.95 499.69L567.87 496.69L560.78 499.69L553.7 496.69L546.61 499.69L539.53 496.69L532.44 499.69L525.36 496.69L518.27 499.69L511.19 496.69L504.1 499.69L497.01 496.69L489.93 499.69L482.84 496.69L475.76 499.69L468.67 496.69L461.59 499.69L454.5 496.69L447.42 499.69L440.33 496.69L433.25 499.69L426.16 496.69L419.08 499.69L411.99 496.69L404.91 499.69L397.82 496.69L390.74 499.69L383.65 496.69L376.56 499.69L369.48 496.69L362.39 499.69L355.31 496.69L348.22 499.69L341.14 496.69L334.05 499.69L326.97 496.69L319.88 499.69L312.8 496.69L305.71 499.69L298.63 496.69L291.54 499.69L284.46 496.69L277.37 499.69L270.29 496.69L263.2 499.69Z"/>
+  <path class="fixture-support" d="M263.2 419.69L745 419.69L742 426.96L745 434.23L742 441.51L745 448.78L742 456.05L745 463.32L742 470.6L745 477.87L742 485.14L745 492.41L737.91 496.69L730.83 499.69L723.74 496.69L716.66 499.69L709.57 496.69L702.49 499.69L695.4 496.69L688.32 499.69L681.23 496.69L674.15 499.69L667.06 496.69L659.98 499.69L652.89 496.69L645.81 499.69L638.72 496.69L631.64 499.69L624.55 496.69L617.46 499.69L610.38 496.69L603.29 499.69L596.21 496.69L589.12 499.69L582.04 496.69L574.95 499.69L567.87 496.69L560.78 499.69L553.7 496.69L546.61 499.69L539.53 496.69L532.44 499.69L525.36 496.69L518.27 499.69L511.19 496.69L504.1 499.69L497.01 496.69L489.93 499.69L482.84 496.69L475.76 499.69L468.67 496.69L461.59 499.69L454.5 496.69L447.42 499.69L440.33 496.69L433.25 499.69L426.16 496.69L419.08 499.69L411.99 496.69L404.91 499.69L397.82 496.69L390.74 499.69L383.65 496.69L376.56 499.69L369.48 496.69L362.39 499.69L355.31 496.69L348.22 499.69L341.14 496.69L334.05 499.69L326.97 496.69L319.88 499.69L312.8 496.69L305.71 499.69L298.63 496.69L291.54 499.69L284.46 496.69L277.37 499.69L270.29 496.69L263.2 499.69Z"/>
+  <rect class="part-kept" x="60" y="380" width="539.75" height="39.69"/>
+  <rect class="holes" x="94.29" y="380" width="96.52" height="39.69"/>
+  <text class="label-on-clamp" x="600" y="339.96">fixed jaw (behind)</text>
+  <text class="label-halo" x="600" y="443.69">1 in parallel against</text>
+  <text class="label-halo" x="600" y="459.69">the fixed jaw (behind)</text>
+  <text class="datum-label" x="20" y="443.69">Z0 the O face (top)</text>
+  <path class="cutter" d="M190.81 415.24L190.81 270L182.87 267L174.93 270L167 267L159.06 270L151.12 267L143.18 270L143.18 415.24A23.81 5.71 0 0 0 190.81 415.24Z"/>
+  <text class="label" x="300" y="286">the seat Ø{{cad.hub_seat_dia_nominal_in:.2dot}} through into air,</text>
+  <text class="label" x="300" y="302">then the R.50 round about it (G3)</text>
+  <line class="leader" x1="298" y1="282" x2="190.81" y2="374"/>
+  <circle class="leader-dot" cx="190.81" cy="374" r="2"/>
 </svg>

@@ -1,34 +1,35 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 400" font-family="sans-serif" font-size="13">
-  <!-- Section through the screw's axis, about 300 px to the inch: the head Ø.414 x .237, the 1/4-28 shank .75 long, .40 of it out of the jaws' front step. Styles: prechips.palette. -->
-  <rect class="paper" x="0" y="0" width="760" height="400"/>
-  <text class="title" x="20" y="22">Setup 1: the bought screw in the 4-jaw, on the jaws' front step over brass shim; the end hole drilled #52 from the tailstock</text>
-  <rect class="fixture-vise" x="40" y="60" width="90" height="280"/>
-  <polygon class="clamp" points="130,70 240,70 240,100 330,100 330,159 240,159 240,125 130,125"/>
-  <polygon class="clamp" points="130,330 240,330 240,300 330,300 330,241 240,241 240,275 130,275"/>
-  <rect class="fixture-support" x="240" y="159" width="90" height="3"/>
-  <rect class="fixture-support" x="240" y="238" width="90" height="3"/>
-  <rect class="part-kept" x="154" y="138" width="71" height="124"/>
-  <rect class="part-threads" x="225" y="162" width="225" height="76"/>
-  <rect class="part-removed" x="414" y="190" width="36" height="20"/>
-  <polyline class="hidden" points="450,191 405,191 399,200 405,209 450,209"/>
-  <line class="centre-line" x1="140" y1="200" x2="700" y2="200"/>
-  <line class="active-face" x1="450" y1="162" x2="450" y2="238"/>
-  <rect class="cutter" x="472" y="194" width="150" height="12"/>
-  <rect class="fixture-support" x="345" y="132" width="105" height="30"/>
-  <line class="leader" x1="398" y1="132" x2="430" y2="76"/>
-  <text class="label" x="434" y="60">.100 gauge block across the crests,</text>
-  <text class="label" x="434" y="76">the DTI's tip on it: .0005 TIR max</text>
-  <line class="leader" x1="190" y1="262" x2="190" y2="372"/>
-  <text class="label" x="70" y="388">head behind the step, clear of the jaws</text>
-  <line class="leader" x1="285" y1="241" x2="320" y2="364"/>
-  <text class="label" x="300" y="380">brass shim on the thread, front step only</text>
-  <line class="leader" x1="432" y1="210" x2="470" y2="262"/>
-  <text class="label" x="474" y="268">#52 drilled {{cad.end_hole_depth_min_in:.2dot}}–{{cad.end_hole_depth_max_in:.2dot}} deep</text>
-  <line class="leader" x1="450" y1="160" x2="520" y2="140"/>
-  <text class="label" x="524" y="138">end face as bought: quill scale zero</text>
-  <text class="label" x="630" y="190">#52 drill</text>
-  <line class="dims" x1="330" y1="250" x2="450" y2="250"/>
-  <line class="dims" x1="330" y1="242" x2="330" y2="258"/>
-  <line class="dims" x1="450" y1="240" x2="450" y2="258"/>
-  <text class="label" x="350" y="270">.40 out of the jaws</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 460" width="760" height="460" font-family="sans-serif" font-size="13">
+  <!-- Hand picture, a section through the screw's axis from above (the cross-slide at the bottom), to scale at 300 px/in: the bought 1/4-28 x 3/4 fillister screw (91794A559): the head Ø.414 x .237 (cad.head_dia_ref_in, cad.head_length_mm), the 1/4 shank .75 long (cad.envelope_y_mm less the head), its threaded end .40 (process.stickout_in) out of the jaws' front step. The 6 in 4-jaw's jaws and body are schematic (their sizes and the step's depth are not on record); the brass shim's thickness is not on record: drawn 2 px. The #52 drill (cad.end_hole_dia_mm 1.6129, 19.05 px) with its 118° point; the quill zeroed with the lips on the Ø.04 spot's rim (Op 20) and run 0.125 (process.drill_depth_mm), so its full diameter stands 0.118 deep and its point 0.137: inside the band .11–.13. The drill runs on to a break line (its length is not on record). The No. 1 centre drill's spot (Op 20) is under the drill and is not drawn. -->
+  <rect class="paper" x="0" y="0" width="760" height="460"/>
+  <text class="title" x="20" y="22">Setup 1, Op 30: the #52 drill from the tailstock, its full diameter .118 deep in the threaded end (to scale, 300 px/in)</text>
+  <path class="clamp" d="M400 259.6L400 355L133.9 355L133.9 310L346 310L346 259.6Z"/>
+  <path class="clamp" d="M400 180.4L400 85L133.9 85L133.9 130L346 130L346 180.4Z"/>
+  <rect class="fixture-vise" x="73.9" y="64" width="60" height="312"/>
+  <rect class="part-kept" x="223.9" y="157.9" width="71.1" height="124.2"/>
+  <rect class="part-threads" x="295" y="182.5" width="225" height="75"/>
+  <rect class="fixture-support" x="346" y="180.4" width="54" height="79.2"/>
+  <rect class="part-threads" x="346" y="182.5" width="54" height="75"/>
+  <rect class="holes" x="484.62" y="210.47" width="35.38" height="19.05"/>
+  <path class="cutter" d="M740 210.47L484.62 210.47L478.89 220L484.62 229.53L740 229.53L737 220Z"/>
+  <line class="centre-line" x1="80" y1="220" x2="750" y2="220"/>
+  <line class="arrow" x1="700" y1="190" x2="640" y2="190"/>
+  <line class="datum" x1="520" y1="70" x2="520" y2="120"/>
+  <text class="datum-label" x="526" y="82">end face as bought: quill scale zero</text>
+  <text class="label" x="470" y="410">#52 drilled {{cad.end_hole_depth_min_in:.2dot}}–{{cad.end_hole_depth_max_in:.2dot}} deep at full</text>
+  <text class="label" x="470" y="426">diameter: quill run {{process.drill_depth_mm:in.3dot}} from the lips</text>
+  <text class="label" x="470" y="442">on the spot's rim</text>
+  <line class="leader" x1="520" y1="400" x2="492.62" y2="229.53"/>
+  <circle class="leader-dot" cx="492.62" cy="229.53" r="2"/>
+  <text class="label" x="40" y="410">head behind the step, clear of the jaws</text>
+  <line class="leader" x1="150" y1="398" x2="259.45" y2="278.1"/>
+  <circle class="leader-dot" cx="259.45" cy="278.1" r="2"/>
+  <text class="label" x="40" y="440">brass shim on the thread, front step only</text>
+  <line class="leader" x1="300" y1="432" x2="373" y2="259.6"/>
+  <circle class="leader-dot" cx="373" cy="259.6" r="2"/>
+  <text class="label" x="330" y="44">Op 10 dialled the crests in to .0005 TIR on the .100 gauge</text>
+  <text class="label" x="330" y="60">block (DTI); the block and the DTI are not drawn here</text>
+  <line class="dims" x1="400" y1="370" x2="520" y2="370"/>
+  <line class="dims" x1="400" y1="362" x2="400" y2="378"/>
+  <line class="dims" x1="520" y1="362" x2="520" y2="378"/>
+  <text class="label" x="460" y="364" text-anchor="middle">{{process.stickout_in:.2dot}} out of the jaws</text>
 </svg>

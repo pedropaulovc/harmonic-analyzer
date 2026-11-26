@@ -202,7 +202,7 @@ indexing = "none"
 envelope = "other"
 vise_hold = "other"
 beam = "other"
-diagram = { file = "diagrams/saw.svg", alt = "The 5/8 in bar on the saw: a 2.00 in blank off its end, then a 1 in offcut." }
+diagram = { file = "diagrams/saw.svg", alt = "Op 10, to scale: a {{process.blank_length_in:.2f}} in blank marked off the 5/8 bar and sawn on the waste side, then a 1 in offcut for the mill's balance." }
 
 [[setups.operations]]
 speed_kind = "other"
@@ -220,7 +220,7 @@ indexing = "none"
 machine_ref = "pm-1127vf-lb"
 holding = "3-jaw on the blank, {{process.stickout_mm:in.2f}} in out of the jaw fronts, measured with the rule; the rest of the blank in the jaws."
 datum = "Z0 (carriage DRO) the end faced in Op 20: the collar's datum end. The pin hole's station and the part-off run from it."
-diagram = { file = "diagrams/lathe.svg", alt = "The blank in the 3-jaw, 1.00 in out: the end faced, the O.D. turned to Ø.59 .80 in long, the 5/16 drill run .80 in deep." }
+diagram = { file = "diagrams/lathe.svg", alt = "Op 20, to scale: the blank 1.00 in out of the 3-jaw; the AR tool faces face F square, {{process.face_allowance_in:.2f}} off, to the centre: Z0. Dotted: the O.D. Ø.59 to come over {{process.turn_length_in:.2f}} and the bore." }
 lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{process.bar_dia_mm}}", stock_diameter_mm = "{{process.bar_dia_mm}}", stickout_mm = "{{process.stickout_mm}}", minimum_diameter_mm = "{{cad.outer_dia_mm}}", support = "none" }
 
 [[setups.operations]]
@@ -270,6 +270,7 @@ tool = "drill-5-16"
 drilling = "twist_drill"
 sizing = { kind = "band", band_mm = "{{cad.bore_dia_band_mm}}" }
 instruction = "Feed the 5/16 drill in until its lips just touch the spot's rim and zero the tailstock quill scale there. Drill in one steady feed until the scale reads {{process.drill_run_in:.2f}}: the drill's full diameter then runs past the parting line."
+diagram = { file = "diagrams/lathe-drill.svg", alt = "Op 70, to scale: the O.D. turned; the 5/16 drill from the tailstock, run {{process.drill_run_in:.2f}} on the quill from the spot's rim: its full diameter past the parting line." }
 settings = "lathe-drill-5-16-1018"
 cut_diameter_mm = "{{cad.bore_dia_mm}}"
 hole_depth_mm = "{{process.drill_run_mm}}"
@@ -293,7 +294,7 @@ indexing = "none"
 machine_ref = "pm-30mv"
 holding = "The PM 6 in vise. One 1 in, 4 in long parallel of the 1/8 in thick set standing on edge, centred between the jaws, its left end flush with the jaws' left face (a rule across both). The blank on its top edge along the jaws, the turned end to the LEFT, set {{process.end_overhang_mm:in.2f}} in out past the jaws' left face with the calipers' depth rod, never under .45; the jaws close on the blank's 5/8 end. The 1 in offcut (Op 10) on the parallel's right end, so the moving jaw closes square. Tap both down onto the parallel while closing the vise. Under the pin hole nothing but air."
 datum = "Program PC01_pin_hole (cam:dt_pinion_arbor_collar). G54: X0 face F (faced in Op 20), +X along the blank; Y0 the turned O.D.'s axis, +Y toward the fixed jaw; Z0 the top of the turned O.D. The file starts with an M6 for the centre drill; tool lengths from the tool setter at each M6; at the M6 stop the file has stopped the spindle and lifted the tool above the jaws."
-diagram = { file = "diagrams/pin-hole.svg", alt = "The blank on a 4 in parallel along the vise jaws, its turned end out past the jaws' left face; the centre drill spots the top and the 1/16 drill pecks through both walls into air, .33 in from face F; an offcut on the parallel's right end balances the jaws." }
+diagram = { file = "diagrams/pin-hole.svg", alt = "PC01 T2, to scale, from the front: the blank on the 1 in x 4 in parallel on edge, face F {{process.end_overhang_mm:in.2f}} past the jaws' left face, the 1 in offcut on the parallel's right end; the 1/16 drill {{cad.pin_hole_station_in:.2dot}} from face F through both walls and the bore into the air under it." }
 envelope = { x_span_mm = ["{{process.blank_length_mm}}", 3.175], y_span_mm = ["{{process.bar_dia_mm}}", 3.175], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{process.bar_dia_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{process.pin_tip_height_mm}}"], longest_tool_mm = ["{{process.drill_chuck_gauge_mm}}", "{{process.drill_1_16_oal_mm}}"], shortest_tool_mm = ["{{process.drill_chuck_gauge_mm}}", "{{process.centre_drill_oal_mm}}"] }
 vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{process.bar_dia_mm}}", along_jaws_mm = "{{process.blank_length_mm}}", part_height_mm = "{{process.bar_dia_mm}}", parallel_height_mm = "{{process.riser_height_mm}}", overhang_mm = ["{{process.end_overhang_mm}}", "rest"], jaw_offset = "balanced", balance = "spacer", fixed_jaw_face = "as_bought", moving_jaw_face = "as_bought", moving_jaw_contact = "flat" }
 beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{process.blank_length_mm}}"], clamp_mm = ["{{process.end_overhang_mm}}", "{{process.blank_length_mm}}"], section_mm = { diameter = "{{cad.outer_dia_mm}}" }, vise_left = "start" }
@@ -352,7 +353,7 @@ indexing = "none"
 machine_ref = "pm-1127vf-lb"
 holding = "3-jaw on the blank's 5/8 end, the turned end out, {{process.part_off_stickout_mm:in.2f}} in out of the jaw fronts (the turned shoulder .15 in out of them)."
 datum = "DRO Z set on face F (Op 20's datum end) through the blade, as Op 150 says: the collar is parted .66 from it."
-diagram = { file = "diagrams/part-off.svg", alt = "The blank back in the 3-jaw, the turned end out; the P1 blade parts the collar off .66 from face F." }
+diagram = { file = "diagrams/part-off.svg", alt = "Op 150, to scale: the blank back in the 3-jaw, the turned end out; the P1 blade parts the collar off {{cad.far_end_length_in:.2dot}} from face F." }
 lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{process.bar_dia_mm}}", stock_diameter_mm = "{{process.bar_dia_mm}}", stickout_mm = "{{process.part_off_stickout_mm}}", minimum_diameter_mm = "{{cad.outer_dia_mm}}", support = "none" }
 
 [[setups.operations]]

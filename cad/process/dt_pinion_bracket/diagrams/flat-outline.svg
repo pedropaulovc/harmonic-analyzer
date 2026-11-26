@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 540" width="760" height="540" font-family="sans-serif" font-size="13">
+  <!-- Hand picture, to scale at 5 px/mm. Top: plan from above, +X right, +Y up toward the fixed jaw (at the top): the blank 4.60 long (drawn at the band's middle), 1.25 across the jaws, face B up; X0 its left end (marked L), Y0 the fixed jaw's face. The 1 in + 1/2 in parallel stacks, 1/8 thick, against each jaw, dotted under it (process.riser_height_mm, process.parallel_thickness_mm); the jaws run on past the picture. Bottom, 8 px/mm: a section across the jaws (at X 60 for the face pass, across strap 1's flanks at X 31 for the outline), seen from the right end looking −X, so +Y (the fixed jaw) is to the right and +X comes toward you; Z0 face A on the stacks, the jaw tops 6.845 mm over it (process.vise_jaw_height_mm less the 1.5 in stacks); the stacks run down to a break line. The bores drilled and reamed. The 1/8 end mill (shop endmill-carbide-3fl-1-8, Ø3.175 mm) drawn on strap 1's outline at its start, X 53.547 Y-12.787 on the arbor end's round, travelling anticlockwise (PB02 T6: G3 arcs), at its last level, its end 0.254 below face A (process.outline_past_mm) in the gap between the stacks: its outer edge 2.03 mm inside the stacks' inner faces (the 25.4 gap less the strap's 15 and two cutter Ø). Strap 2's outline (dotted) is cut the same way. Each strap stays on its 3.0 mm bridge (process.bridge_width_mm) at the arbor end. In the section the end mill ends in its 12 % arc and runs up to a break line. -->
+  <rect class="paper" x="0" y="0" width="760" height="540"/>
+  <text class="title" x="20" y="22">Setup 2, PB02 T6: the 1/8 end mill round strap 1 anticlockwise, its last level 0.254 below face A (5 and 8 px/mm)</text>
+  <rect class="clamp" x="20" y="50" width="720" height="30"/>
+  <rect class="clamp" x="20" y="238.75" width="720" height="30"/>
+  <text class="label-on-clamp" x="28" y="70">fixed jaw</text>
+  <text class="label-on-clamp" x="28" y="258.75">moving jaw</text>
+  <rect class="part-kept" x="70" y="80" width="584.2" height="158.75"/>
+  <line class="hidden" x1="108.1" y1="95.88" x2="616.1" y2="95.88"/>
+  <line class="hidden" x1="108.1" y1="222.88" x2="616.1" y2="222.88"/>
+  <path class="holes" d="M155.00 106.00L295.00 106.00A53.38 53.38 0 0 1 295.00 212.75L155.00 212.75A53.38 53.38 0 0 1 155.00 106.00Z"/>
+  <path class="part-kept" d="M155.00 121.88L295.00 121.88A37.50 37.50 0 0 1 295.00 196.88L155.00 196.88A37.50 37.50 0 0 1 155.00 121.88Z"/>
+  <rect class="part-kept" x="330" y="151.88" width="20.88" height="15"/>
+  <circle class="holes" cx="155" cy="159.38" r="15.94"/>
+  <circle class="holes" cx="295" cy="159.38" r="19.84"/>
+  <circle class="holes" cx="420" cy="159.38" r="15.94"/>
+  <circle class="holes" cx="560" cy="159.38" r="19.84"/>
+  <circle class="datum" cx="70" cy="80" r="3.5"/>
+  <text class="datum-label" x="76" y="94">X0 Y0</text>
+  <path class="hidden" d="M420.00 113.94L560.00 113.94A45.44 45.44 0 0 1 560.00 204.81L420.00 204.81A45.44 45.44 0 0 1 420.00 113.94Z"/>
+  <circle class="cutter" cx="337.74" cy="143.94" r="7.94"/>
+  <path class="arrow" d="M330.0 110.0A50.0 50.0 0 0 0 285.0 105.0"/>
+  <text class="label-on-clamp" x="350" y="70">1/8 end mill: anticlockwise round each strap, from its bridge</text>
+  <text class="label-halo" x="155" y="218.75">strap 1</text>
+  <path class="clamp" d="M507 355.24L567 355.24L567 522L507 522Z"/>
+  <rect class="fixture-support" x="481.6" y="410" width="25.4" height="112"/>
+  <path class="clamp" d="M253 355.24L193 355.24L193 522L253 522Z"/>
+  <rect class="fixture-support" x="253" y="410" width="25.4" height="112"/>
+  <line class="hidden" x1="193" y1="511.6" x2="567" y2="511.6"/>
+  <rect class="part-kept" x="253" y="336.85" width="254" height="73.15"/>
+  <text class="label-on-clamp" x="513" y="373.24">fixed</text>
+  <text class="label-on-clamp" x="197" y="373.24">moving</text>
+  <text class="datum-label" x="183" y="414" text-anchor="end">Z0 face A</text>
+  <text class="label" x="577" y="458">1 in + 1/2 in parallels</text>
+  <text class="label" x="577" y="474">stacked, 1/8 thick,</text>
+  <text class="label" x="577" y="490">against each jaw</text>
+  <line class="leader" x1="575" y1="454" x2="494.3" y2="458"/>
+  <circle class="leader-dot" cx="494.3" cy="458" r="2"/>
+  <rect class="holes" x="440" y="336.85" width="25.4" height="73.15"/>
+  <rect class="holes" x="294.6" y="336.85" width="25.4" height="73.15"/>
+  <path class="cutter" d="M465.4 408.98L465.4 285L456.93 282L448.47 285L440 285L440 408.98A12.7 3.05 0 0 0 465.4 408.98Z"/>
+  <text class="label" x="577" y="309.24">section at the flanks:</text>
+  <text class="label" x="577" y="325.24">the slot through,</text>
+  <text class="label" x="577" y="341.24">{{process.outline_past_mm:in.3dot}} below face A,</text>
+  <text class="label" x="577" y="357.24">clear of the stacks</text>
+  <line class="leader" x1="575" y1="305.24" x2="465.4" y2="413"/>
+  <circle class="leader-dot" cx="465.4" cy="413" r="2"/>
+</svg>

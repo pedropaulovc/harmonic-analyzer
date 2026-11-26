@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 520" width="760" height="520" font-family="sans-serif" font-size="13">
+  <!-- Hand picture, to scale at 10 px/mm. Left: a section at Y-4.572 through the seat, seen from the front (looking +Y, +X to the right): the strap on edge, the far flank down on the 1 in + 1/2 in stacks (process.riser_height_mm), the seat flank up at Z0, the pivot end LEFT with X0 on the pivot bore's axis, face A against the fixed jaw (behind), the lower 6.845 mm of its 15 mm width in the jaws (process.grip_mm): the jaw tops dashed. Right: a section at the seat (X 7.000, cad.follower_seat_height_mm) seen from the right end looking −X, so +Y (the fixed jaw, face A, Y0) is to the right and +X comes toward you: the strap 9.144 thick between the jaws on the two 1/8 thick stacks' tops (process.parallel_thickness_mm). The stacks run down to break lines. The #26 hole drilled. The 1/8 end mill (shop endmill-carbide-3fl-1-8, Ø3.175 mm) plunged at X 7.000 Y-4.572 to the floor at Z-4.064, PB04's posted depth, drawn on its finishing circle at Ø4.026 (process.seat_finish_dia_mm; PB04 T6: G2 arcs, clockwise from above), here at the circle's −X side; it ends in its 12 % arc and runs up to a break line. -->
+  <rect class="paper" x="0" y="0" width="760" height="520"/>
+  <text class="title" x="20" y="22">Setup 4, PB04 T6: the 1/8 end mill at the floor, Z-4.064, circling to Ø.1585 (to scale, 10 px/mm)</text>
+  <rect class="fixture-support" x="30" y="300" width="520" height="160"/>
+  <line class="hidden" x1="30" y1="231.55" x2="560" y2="231.55"/>
+  <path class="part-kept" d="M200.0 150.0L480.0 150.0A75.0 75.0 0 0 1 480.0 300.0L200.0 300.0A75.0 75.0 0 0 1 200.0 150.0Z"/>
+  <circle class="holes" cx="200" cy="225" r="31.88"/>
+  <circle class="holes" cx="480" cy="225" r="39.69"/>
+  <text class="label" x="40" y="478">1 in + 1/2 in parallels stacked, the far flank on them</text>
+  <line class="leader" x1="120" y1="466" x2="140" y2="430"/>
+  <circle class="leader-dot" cx="140" cy="430" r="2"/>
+  <text class="label" x="10" y="209.55">jaw tops</text>
+  <text class="label" x="10" y="225.55">(dashed, behind)</text>
+  <text class="datum-label" x="196" y="277" text-anchor="middle">X0 the pivot bore's axis</text>
+  <line class="datum" x1="200" y1="221" x2="200" y2="261"/>
+  <text class="datum-label" x="117" y="138" text-anchor="end">Z0 the</text>
+  <text class="datum-label" x="117" y="154" text-anchor="end">seat flank</text>
+  <path class="clamp" d="M700 231.55L750 231.55L750 460L700 460Z"/>
+  <rect class="fixture-support" x="668.25" y="300" width="31.75" height="160"/>
+  <path class="clamp" d="M608.56 231.55L558.56 231.55L558.56 460L608.56 460Z"/>
+  <rect class="fixture-support" x="608.56" y="300" width="31.75" height="160"/>
+  <rect class="part-kept" x="608.56" y="150" width="91.44" height="150"/>
+  <text class="label-on-clamp" x="704" y="249.55">fixed</text>
+  <text class="label-on-clamp" x="558.56" y="249.55">mov.</text>
+  <text class="datum-label" x="700" y="480" text-anchor="end">Y0 face A, at the fixed jaw</text>
+  <text class="label" x="700" y="498" text-anchor="end">+Y →</text>
+  <rect class="holes" x="249.87" y="150" width="40.26" height="40.64"/>
+  <path class="cutter" d="M281.62 186.83L281.62 30L273.68 27L265.75 30L257.81 27L249.87 30L249.87 186.83A15.88 3.81 0 0 0 281.62 186.83Z"/>
+  <rect class="holes" x="634.15" y="150" width="40.26" height="40.64"/>
+  <path class="cutter" d="M670.15 186.83L670.15 30L662.22 27L654.28 30L646.34 27L638.4 30L638.4 186.83A15.88 3.81 0 0 0 670.15 186.83Z"/>
+  <line class="arrow" x1="300" y1="40" x2="300" y2="80"/>
+  <text class="label" x="320" y="50">1/8 end mill at the floor: once round at Ø{{process.seat_floor_dia_mm:in.3dot}},</text>
+  <text class="label" x="320" y="66">once at Ø{{process.seat_finish_dia_mm:in.4dot}}; seat Ø{{cad.follower_seat_dia_min_in:.4dot}}–{{cad.follower_seat_dia_max_in:.4dot}}</text>
+  <text class="label" x="508.56" y="506" text-anchor="end">seat {{cad.follower_seat_station_in:.3dot}} from face A</text>
+  <line class="leader" x1="510.56" y1="502" x2="654.28" y2="192.64"/>
+  <circle class="leader-dot" cx="654.28" cy="192.64" r="2"/>
+</svg>

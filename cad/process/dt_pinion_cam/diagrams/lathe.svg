@@ -1,17 +1,29 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 400" font-family="sans-serif" font-size="13">
-  <rect class="paper" x="0" y="0" width="760" height="400"/>
-  <text class="title" x="20" y="20">Setup 1: the 5/8 bar in the 3-jaw; both cams turned and parted from one chucking</text>
-  <rect class="fixture-vise" x="40" y="90" width="120" height="220"/>
-  <rect class="part-rest" x="160" y="150" width="60" height="100"/>
-  <rect class="part-waste" x="220" y="150" width="380" height="100"/>
-  <rect class="part-kept" x="230" y="154" width="140" height="92"/>
-  <rect class="part-kept" x="430" y="154" width="140" height="92"/>
-  <rect class="part-removed" x="370" y="150" width="60" height="100"/>
-  <line class="centre-line" x1="140" y1="200" x2="640" y2="200"/>
-  <line class="active-face" x1="570" y1="154" x2="570" y2="246"/>
-  <rect class="cutter" x="380" y="270" width="40" height="70"/>
-  <text class="label" x="580" y="140">face F (front), faced first</text>
-  <text class="label" x="430" y="290">part off {{cad.cam_od_length_in:.3dot}} from F</text>
-  <text class="label" x="230" y="140">second cam</text>
-  <text class="label" x="40" y="380">O.D. turned Ø.575 ±.002 over both (1.00 long); edge broken; parted face is the rear face.</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 380" width="760" height="380" font-family="sans-serif" font-size="13">
+  <!-- Hand picture, from above (the cross-slide at the bottom), a section through the axis, to scale at 200 px/in: the 5/8 bar (process.bar_dia_in) 1.25 out of the jaw fronts (process.stickout_mm), Z0 face F, the faced end. The 3-jaw's body and jaws are schematic (their sizes are not on record). The bar runs on into the chuck to a break line. The AR tool schematic (not on record), its point on the face, feeding to the centre. Hatched: the about .010 faced off; dotted: the O.D. Ø.575 to come, 1.00 long (process.turn_length_in), and the first part-off .35 from F (cad.cam_od_length_in). -->
+  <rect class="paper" x="0" y="0" width="760" height="380"/>
+  <text class="title" x="20" y="22">Setup 1, Op 10: the AR tool faces the bar end clean: face F, Z0 (to scale, 200 px/in)</text>
+  <rect class="fixture-vise" x="250" y="71.5" width="56" height="217"/>
+  <path class="part-kept" d="M40 117.5L600 117.5L600 242.5L40 242.5L37 235.15L40 227.79L37 220.44L40 213.09L37 205.74L40 198.38L37 191.03L40 183.68L37 176.32L40 168.97L37 161.62L40 154.26L37 146.91L40 139.56L37 132.21L40 124.85Z"/>
+  <rect class="part-removed" x="600" y="117.5" width="2" height="125"/>
+  <rect class="clamp" x="306" y="83.5" width="46" height="34"/>
+  <rect class="clamp" x="306" y="242.5" width="46" height="34"/>
+  <rect class="hidden" x="400" y="117.5" width="200" height="5"/>
+  <rect class="hidden" x="400" y="237.5" width="200" height="5"/>
+  <line class="hidden" x1="530" y1="122.5" x2="530" y2="237.5"/>
+  <line class="centre-line" x1="20" y1="180" x2="740" y2="180"/>
+  <path class="cutter" d="M600 190L630 202L630 290L622 287L614 290L606 290L606 214Z"/>
+  <line class="arrow" x1="648" y1="260" x2="648" y2="210"/>
+  <line class="datum" x1="600" y1="50" x2="600" y2="84"/>
+  <text class="datum-label" x="606" y="62">Z0: face F (mark it)</text>
+  <text class="label" x="560" y="350" text-anchor="end">AR tool: face clean, about .010 off,</text>
+  <text class="label" x="560" y="366" text-anchor="end">{{process.turn_rpm:d}} rpm</text>
+  <line class="leader" x1="562" y1="346" x2="618" y2="270"/>
+  <circle class="leader-dot" cx="618" cy="270" r="2"/>
+  <text class="label" x="150" y="42">dotted: the O.D. to Ø{{cad.cam_od_dia_in:.3dot}} over {{process.turn_length_in:.2f}} in,</text>
+  <text class="label" x="150" y="58">the first cam parted off {{cad.cam_od_length_in:.3dot}} from face F</text>
+  <line class="leader" x1="400" y1="62" x2="480" y2="120"/>
+  <circle class="leader-dot" cx="480" cy="120" r="2"/>
+  <text class="label" x="40" y="350">3-jaw on the 5/8 bar, {{process.stickout_mm:in.2f}} out</text>
+  <line class="leader" x1="140" y1="338" x2="332" y2="262.5"/>
+  <circle class="leader-dot" cx="332" cy="262.5" r="2"/>
 </svg>

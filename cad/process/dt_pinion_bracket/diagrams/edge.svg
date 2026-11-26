@@ -1,37 +1,38 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 520" font-family="sans-serif" font-size="13">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 520" width="760" height="520" font-family="sans-serif" font-size="13">
+  <!-- Hand picture, to scale at 10 px/mm. Left: a section at Y-4.572 through the seat, seen from the front (looking +Y, +X to the right): the strap on edge, the far flank down on the 1 in + 1/2 in stacks (process.riser_height_mm), the seat flank up at Z0, the pivot end LEFT with X0 on the pivot bore's axis, face A against the fixed jaw (behind), the lower 6.845 mm of its 15 mm width in the jaws (process.grip_mm): the jaw tops dashed. Right: a section at the seat (X 7.000, cad.follower_seat_height_mm) seen from the right end looking −X, so +Y (the fixed jaw, face A, Y0) is to the right and +X comes toward you: the strap 9.144 thick between the jaws on the two 1/8 thick stacks' tops (process.parallel_thickness_mm). The stacks run down to break lines. The #26 drill (shop drill-26, Ø3.734 mm) at X 7.000 Y-4.572 (cad.follower_seat_station_mm), its point at Z-4.014, PB04's posted depth, 0.05 mm (process.seat_drill_floor_gap_mm) above the floor at Z-4.064 (process.seat_floor_z_mm). It runs up to a break line. The T2 centre drill's spot is not drawn. -->
   <rect class="paper" x="0" y="0" width="760" height="520"/>
-  <text class="title" x="20" y="20">PB04, front view: pivot end at the left, seat flank up, face A against the fixed jaw (behind)</text>
-  <rect class="fixture-support" x="106" y="220" width="336" height="60"/>
-  <line class="hidden" x1="10" y1="178.9" x2="425" y2="178.9"/>
-  <path class="part-kept" d="M190,130 L358,130 A45,45 0 0 1 358,220 L190,220 A45,45 0 0 1 190,130 Z"/>
-  <circle class="holes" cx="190" cy="175" r="19.1"/>
-  <circle class="holes" cx="358" cy="175" r="23.9"/>
-  <rect class="holes" x="220" y="130" width="24" height="24.4"/>
-  <line class="active-face" x1="190" y1="130" x2="358" y2="130"/>
-  <rect class="cutter" x="220" y="64" width="24" height="58"/>
-  <line class="arrow" x1="268" y1="70" x2="268" y2="120"/>
-  <text class="label-halo" x="278" y="86">follower seat: spot, #26, 1/8 in end mill plunged and circled to Ø.1585</text>
-  <text class="label-halo" x="278" y="104">no cross hole here: match-drilled at assembly</text>
-  <line class="datum" x1="190" y1="284" x2="190" y2="296"/>
-  <text class="datum-label" x="200" y="300">X0: pivot bore axis</text>
-  <line class="datum" x1="85" y1="130" x2="105" y2="130"/>
-  <text class="datum-label" x="20" y="124">Z0: seat flank</text>
-  <circle class="cutter" cx="129.8" cy="175" r="15.2"/>
-  <line class="leader" x1="129.8" y1="190.2" x2="40" y2="306"/>
-  <text class="label-halo" x="20" y="320">edge finder on the pivot end's apex</text>
-  <text class="label" x="470" y="182.9">jaw tops (dashed, behind)</text>
-  <line class="leader" x1="465" y1="246" x2="436" y2="246"/>
-  <text class="label" x="470" y="250">1 in + 1/2 in parallels stacked</text>
-  <text class="title" x="20" y="344">Section at the pivot bore's axis, across the jaws (fixed jaw at the right)</text>
-  <rect class="clamp" x="243.4" y="425.2" width="50" height="84.8"/>
-  <rect class="clamp" x="366.6" y="425.2" width="50" height="84.8"/>
-  <rect class="fixture-support" x="293.4" y="480" width="25.4" height="30"/>
-  <rect class="fixture-support" x="341.2" y="480" width="25.4" height="30"/>
-  <rect class="section" x="293.4" y="360" width="73.2" height="120"/>
-  <rect class="holes" x="293.4" y="394.5" width="73.2" height="51"/>
-  <text class="label" x="426.6" y="441.2">face A at the fixed jaw: Y0</text>
-  <text class="label" x="83.4" y="441.2">face B at the moving jaw</text>
-  <line class="leader" x1="422" y1="420" x2="362" y2="410"/>
-  <text class="label" x="426.6" y="424">pivot bore</text>
-  <text class="label" x="426.6" y="502">1/8 in parallels, the far flank on them</text>
+  <text class="title" x="20" y="22">Setup 4, PB04 T7: the #26 drill into the seat, its point at Z-4.014, 0.05 above the floor (to scale, 10 px/mm)</text>
+  <rect class="fixture-support" x="30" y="300" width="520" height="160"/>
+  <line class="hidden" x1="30" y1="231.55" x2="560" y2="231.55"/>
+  <path class="part-kept" d="M200.0 150.0L480.0 150.0A75.0 75.0 0 0 1 480.0 300.0L200.0 300.0A75.0 75.0 0 0 1 200.0 150.0Z"/>
+  <circle class="holes" cx="200" cy="225" r="31.88"/>
+  <circle class="holes" cx="480" cy="225" r="39.69"/>
+  <text class="label" x="40" y="478">1 in + 1/2 in parallels stacked, the far flank on them</text>
+  <line class="leader" x1="120" y1="466" x2="140" y2="430"/>
+  <circle class="leader-dot" cx="140" cy="430" r="2"/>
+  <text class="label" x="10" y="209.55">jaw tops</text>
+  <text class="label" x="10" y="225.55">(dashed, behind)</text>
+  <text class="datum-label" x="196" y="277" text-anchor="middle">X0 the pivot bore's axis</text>
+  <line class="datum" x1="200" y1="221" x2="200" y2="261"/>
+  <text class="datum-label" x="117" y="138" text-anchor="end">Z0 the</text>
+  <text class="datum-label" x="117" y="154" text-anchor="end">seat flank</text>
+  <path class="clamp" d="M700 231.55L750 231.55L750 460L700 460Z"/>
+  <rect class="fixture-support" x="668.25" y="300" width="31.75" height="160"/>
+  <path class="clamp" d="M608.56 231.55L558.56 231.55L558.56 460L608.56 460Z"/>
+  <rect class="fixture-support" x="608.56" y="300" width="31.75" height="160"/>
+  <rect class="part-kept" x="608.56" y="150" width="91.44" height="150"/>
+  <text class="label-on-clamp" x="704" y="249.55">fixed</text>
+  <text class="label-on-clamp" x="558.56" y="249.55">mov.</text>
+  <text class="datum-label" x="700" y="480" text-anchor="end">Y0 face A, at the fixed jaw</text>
+  <text class="label" x="700" y="498" text-anchor="end">+Y →</text>
+  <rect class="holes" x="251.33" y="150" width="37.34" height="28.92"/>
+  <path class="cutter" d="M288.67 30L288.67 178.92L270 190.14L251.33 178.92L251.33 30L258.8 27L266.27 30L273.73 27L281.2 30Z"/>
+  <rect class="holes" x="635.61" y="150" width="37.34" height="28.92"/>
+  <path class="cutter" d="M672.95 30L672.95 178.92L654.28 190.14L635.61 178.92L635.61 30L643.08 27L650.55 30L658.01 27L665.48 30Z"/>
+  <line class="arrow" x1="300" y1="40" x2="300" y2="80"/>
+  <text class="label" x="320" y="50">#26 into the seat, no peck: its point</text>
+  <text class="label" x="320" y="66">{{process.seat_drill_floor_gap_mm:in.3dot}} above the floor</text>
+  <text class="label" x="508.56" y="506" text-anchor="end">seat {{cad.follower_seat_station_in:.3dot}} from face A</text>
+  <line class="leader" x1="510.56" y1="502" x2="654.28" y2="192.64"/>
+  <circle class="leader-dot" cx="654.28" cy="192.64" r="2"/>
 </svg>
