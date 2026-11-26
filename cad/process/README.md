@@ -270,7 +270,9 @@ plans in batches"; the column clamp is the worked example):
    job needs (parts and marks, which setups serve which part, program
    prefixes, where finished sizes are tabled) goes into a `[[notes]]` block
    titled `This job`, one `[label, text]` row per idea, 60 printed words at
-   most each; nothing a setup's Holding, Datum or op already prints.
+   most each; nothing a setup's Holding, Datum or op already prints, unless it
+   matters before that setup is reached (a lead-time fact such as "To buy
+   before Setup 6: ...", which Setup 6's op prints too late).
 2. Delete every sentence anywhere in the plan (head, Holding, Datum, op
    text, detail, steps, inspection) that says again what a standing row says:
    - units and G21;
