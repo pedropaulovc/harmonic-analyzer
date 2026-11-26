@@ -101,36 +101,59 @@ def test_the_plan_is_an_enrolled_traveler_and_cam_stem() -> None:
         "sharp",
         "endmill",
         "reamer-0615",
+        "zz-3135",
     } <= {t["id"] for t in PLAN["tools"] if t.get("status") == "to_order"}
     # Fit audit 2026-11-23: the reamed holes print no band, so no Class ZZ
     # pin gauges them; the ream's mate (the MHA-PD-VN-69 dowel) accepts it.
-    assert not {"zz-3135", "zz-0615"} & tools
-    assert not any("zz-pins" in t.get("ref", "") for t in PLAN["tools"])
-    text = _process_plans.plan_path(STEM).read_text(encoding="utf-8")
-    body = "\n".join(line for line in text.splitlines() if not line.startswith("#"))
-    for word in ("zz-pins", "GO pin", "NO-GO"):
-        assert word not in body
+    # The bore is the one exception (owner ruling 2026-11-26: the ZZ .3135
+    # plus GO, the set's .314 minus NO-GO); the chord ream keeps the rule.
+    assert "zz-0615" not in tools
+    assert {t["ref"] for t in PLAN["tools"] if "zz-pins" in t.get("ref", "")} == {
+        "zz-pins-3135-3140"
+    }
+    for index, setup in enumerate(PLAN["setups"]):
+        if index == 1:  # Setup 2 reams and gauges the bore
+            continue
+        for op in setup["operations"]:
+            words = f"{op.get('instruction', '')} {op.get('inspection', '')} {op.get('gauge_checks', '')}"
+            for word in ("zz-pins", "GO pin", "NO-GO"):
+                assert word not in words
 
 
 def test_the_bore_is_hand_reamed_with_the_owned_adjustable_set() -> None:
-    # Coordinator 2026-11-25 (D19 as amended): the bore's mate is turned to
-    # it, so no reamer is bought for it; the .314 pin keeps the bore under
-    # the .3140 the printed spigot wall is figured at.
+    # Coordinator 2026-11-25 (D19 as amended): the bore is made to fit, so no
+    # fixed reamer is bought for it. Owner ruling 2026-11-26 gauges it to the
+    # printed Ø.3135: the ZZ .3135 plus GO (MHA-PD-10's boss wall) and the
+    # set's .314 minus NO-GO (the spigot's WALL .071 MIN at .3140).
     text = _process_plans.plan_path(STEM).read_text(encoding="utf-8")
     assert "reamer-3135" not in text
     reamer = next(t for t in PLAN["tools"] if t["ref"] == "reamers-adjustable-lms-5948")
     assert "status" not in reamer
-    reams = [
-        op
-        for op in PLAN["setups"][1]["operations"]
-        if op.get("tool") == reamer["id"]
-    ]
+    ops = PLAN["setups"][1]["operations"]
+    reams = [op for op in ops if op.get("tool") == reamer["id"]]
     assert len(reams) == 2  # the trial piece's, then the hub's
     for op in reams:
         assert (op["speed_kind"], op["feed"]) == ("other", "hand")
         assert "settings" not in op
-        assert ".313 pin passes through" in op["inspection"]
-        assert ".314 pin does not enter" in op["inspection"]
+        assert "the GO passes through, the NO-GO does not enter" in op["inspection"]
+        assert ".313" not in op["inspection"]
+    assert reams[1]["gauge_checks"] == [
+        {"gauge": "zz-pins-3135-3140", "band_mm": "{{cad.bore_dia_band_mm}}"}
+    ]
+    # The first op of the setup holds the bore until both pins are in hand.
+    first = ops[0]["instruction"]
+    assert ".3135 plus GO pin (to buy)" in first and ".314 minus NO-GO" in first
+    assert "the bore cannot be accepted" in first
+
+
+def test_the_flange_face_is_set_from_the_miked_length_not_the_spigot_nominal() -> None:
+    # Codjiflo #3592 r1: with the spigot at the title block's ±.005, a fixed
+    # Z-.144 leaves the flange .086-.102 against its .089-.099; Z-F (F = T
+    # less the flange's .094) keeps the flange at size and F inside .139-.149.
+    sharp = next(op for op in PLAN["setups"][1]["operations"] if op.get("tool") == "sharp")
+    assert "spigot_length_mm" not in sharp["instruction"]
+    assert "less {{cad.flange_front_face_thickness_mm:in.3dot}}" in sharp["instruction"]
+    assert sharp["instruction"].count("Z-F") == 2
 
 
 def test_the_traveler_leaves_the_assembly_work_to_pd_00() -> None:

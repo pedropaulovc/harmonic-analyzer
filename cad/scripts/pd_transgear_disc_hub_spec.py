@@ -160,14 +160,18 @@ HUB_BODY_LENGTH = HUB_LENGTH - SPIGOT_LENGTH - FLANGE_THICK
 HUB_FRONT_Z = SPIGOT_LENGTH - HUB_LENGTH
 
 # --- bore on the sleeve's boss (MHA-PD-10) ------------------------------------
-# Plain round, reamed through with the .3135 over reamer (tools.reamer-3135,
-# to order, not owned), and printed as that size with no band
+# Plain round, reamed through to .3135 (the owned adjustable reamer set,
+# tools.reamers-adjustable-lms-5948; delegated ruling D19 as amended
+# 2026-11-25, in the process plan), and printed as that size with no band
 # (drawing-guidelines.md rule 4, form 2, made to fit): the sleeve's boss is
 # turned last to this bore until the hub slides
-# on by hand with no rock, so the hub itself is the gauge and no pin is
-# bought for it.  BORE_BAND is the ANALYSIS band, what the reamer is taken
+# on by hand with no rock, so the hub itself is the boss's gauge.  BORE_BAND
+# is the ANALYSIS band, what the reamer is taken
 # to cut (.3135-.3140, the old printed +.0010/+.0005 on .313), never a
-# printed limit.  What fails if the fit is .002 looser: the hub's rock on
+# printed limit; the plan accepts the bore inside it with a .3135 GO and a
+# .314 NO-GO pin (owner ruling 2026-11-26), because the spigot's WALL .071
+# MIN and the MHA-PD-10 boss wall both lean on it.
+# What fails if the fit is .002 looser: the hub's rock on
 # the boss (ROCK_ANGLE_MAX below) triples and the MHA-PD-22 collar to
 # MHA-PD-06 disc air closes (pd_cluster_air.COLLAR_AIR charges it at the
 # collar rim).  The hub does not drive through its bore: the key pin
