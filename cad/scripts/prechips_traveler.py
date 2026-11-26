@@ -61,13 +61,17 @@ each named.
 from __future__ import annotations
 
 import argparse
+from collections.abc import Iterator
+from contextlib import contextmanager
 import os
 import shutil
 import subprocess
 import sys
 import tempfile
+import time
 from pathlib import Path
 
+from filelock import FileLock, Timeout
 from pypdf import PdfReader
 from pypdf.errors import PdfReadError
 
@@ -87,8 +91,14 @@ _BROWSER_INSTALLS = (
     ("ProgramFiles(x86)", "Google/Chrome/Application/chrome.exe"),
     ("LOCALAPPDATA", "Google/Chrome/Application/chrome.exe"),
 )
-# A traveler prints in ~3 s; this bounds a browser that never exits.
+# A traveler prints in ~3 s; this bounds a browser that never exits. It times
+# the print alone, never the wait for a print slot.
 PRINT_TIMEOUT_S = 120
+# Headless prints on one host share it: v51's gate printed 80 travelers at
+# -n 8 beside FreeCAD posts on a loaded submitter, and 21 ran past the limit
+# (#3460). Every print, from any worktree or build, takes one of these slots.
+PRINT_SLOTS = 2
+PRINT_LOCK_ENV = "HARMONIC_TRAVELER_PRINT_LOCK"
 # The pseudo-stem of the shop's standing page (``prechips:standing`` in doit)
 # and the name its HTML, PDF and released file carry.
 STANDING_STEM = "standing"
@@ -141,11 +151,62 @@ def print_command(browser_path: str, html: Path, pdf: Path, profile: Path) -> li
     ]
 
 
+def print_lock_path() -> Path:
+    """The host-wide print slots' lock path; slot ``i`` locks ``<path>.<i>``."""
+    override = os.environ.get(PRINT_LOCK_ENV)
+    if override:
+        return Path(override)
+    base = os.environ.get("PROGRAMDATA") or tempfile.gettempdir()
+    return Path(base) / "harmonic-analyzer" / "traveler-print.lock"
+
+
+def _free_slot(path: Path) -> FileLock | None:
+    """Acquire the first free print slot, or None while every slot is held."""
+    for index in range(PRINT_SLOTS):
+        lock = FileLock(f"{path}.{index}")
+        try:
+            lock.acquire(timeout=0)
+        except Timeout:
+            continue
+        return lock
+    return None
+
+
+@contextmanager
+def print_slot(poll_s: float = 0.25) -> Iterator[None]:
+    """Hold one of the host's ``PRINT_SLOTS`` while a headless browser prints.
+
+    The wait is its own span, so a ``prechips.pdf`` span still measures the
+    print; a long wait logs the lock path every 30 s."""
+    path = print_lock_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    next_log = time.monotonic()
+    with _telemetry.span(
+        "prechips.print.wait",
+        lock_path=str(path),
+        print_slots=PRINT_SLOTS,
+    ):
+        while (lock := _free_slot(path)) is None:
+            if time.monotonic() >= next_log:
+                _telemetry.info(f"waiting for a traveler print slot at {path}")
+                next_log = time.monotonic() + 30
+            time.sleep(poll_s)
+    try:
+        yield
+    finally:
+        lock.release()
+
+
 def print_pdf(browser_path: str, html: Path, pdf: Path) -> None:
     """Print ``html`` to ``pdf``; raise unless a PDF file results."""
     pdf.unlink(missing_ok=True)
     name = Path(browser_path).name
-    with tempfile.TemporaryDirectory(prefix="ha-traveler-pdf-", ignore_cleanup_errors=True) as profile:
+    with (
+        print_slot(),
+        tempfile.TemporaryDirectory(
+            prefix="ha-traveler-pdf-", ignore_cleanup_errors=True
+        ) as profile,
+    ):
         cmd = print_command(browser_path, html, pdf, Path(profile))
         try:
             result = subprocess.run(

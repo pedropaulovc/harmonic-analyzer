@@ -6,9 +6,11 @@ from __future__ import annotations
 import base64
 import io
 import subprocess
+import threading
 import tomllib
 from pathlib import Path
 
+from filelock import FileLock, Timeout
 import pytest
 from pypdf import PdfReader, PdfWriter
 
@@ -27,6 +29,7 @@ def process(tmp_path, monkeypatch):
     printer = tmp_path / "browser-under-test.exe"
     printer.write_bytes(b"")
     monkeypatch.setenv(wrapper.BROWSER_ENV, str(printer))
+    monkeypatch.setenv(wrapper.PRINT_LOCK_ENV, str(tmp_path / "locks" / "print.lock"))
 
     def author(stem: str) -> None:
         plans.plan_path(stem).parent.mkdir(parents=True)
@@ -196,6 +199,64 @@ def test_failed_print_removes_every_traveler(process, monkeypatch):
     _uv_stub(monkeypatch, printed=False)
     assert wrapper.main(["smoke_part", "--out", str(out)]) == 1
     assert not any(path.exists() for path in plans.traveler_outputs("smoke_part", out))
+
+
+def test_the_browser_prints_inside_a_host_print_slot(process, monkeypatch, tmp_path):
+    monkeypatch.setattr(wrapper, "PRINT_SLOTS", 1)
+    held = []
+
+    def run(cmd, **kwargs):
+        with pytest.raises(Timeout):
+            FileLock(f"{wrapper.print_lock_path()}.0").acquire(timeout=0)
+        held.append(kwargs["timeout"])
+        pdf = next(arg for arg in cmd if arg.startswith("--print-to-pdf="))
+        Path(pdf.split("=", 1)[1]).write_bytes(_pdf(cmd[-1]))
+        return subprocess.CompletedProcess(cmd, 0, "", "")
+
+    monkeypatch.setattr(wrapper.subprocess, "run", run)
+    html = tmp_path / "sheet.html"
+    html.write_text("<p>sheet</p>", encoding="utf-8")
+    wrapper.print_pdf(str(tmp_path / "browser.exe"), html, tmp_path / "sheet.pdf")
+    assert held == [wrapper.PRINT_TIMEOUT_S]
+    # The slot is free again once the print returns.
+    FileLock(f"{wrapper.print_lock_path()}.0").acquire(timeout=0).lock.release()
+
+
+def test_a_print_waits_while_every_host_slot_is_held(process, monkeypatch):
+    # Concurrent prints on a loaded submitter ran past the limit (#3460).
+    path = wrapper.print_lock_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    others = [FileLock(f"{path}.{index}") for index in range(wrapper.PRINT_SLOTS)]
+    for lock in others:
+        lock.acquire(timeout=0)
+    refused = threading.Event()
+    entered = threading.Event()
+    free_slot = wrapper._free_slot
+
+    def observed(lock_path):
+        lock = free_slot(lock_path)
+        if lock is None:
+            refused.set()
+        return lock
+
+    monkeypatch.setattr(wrapper, "_free_slot", observed)
+
+    def printer():
+        with wrapper.print_slot(poll_s=0.01):
+            entered.set()
+
+    thread = threading.Thread(target=printer, daemon=True)
+    thread.start()
+    try:
+        # Generous hang guards, not timing windows: the refusal is observed.
+        assert refused.wait(60)
+        assert not entered.is_set()
+        others[-1].release()
+        assert entered.wait(60)
+    finally:
+        for lock in others:
+            lock.release(force=True)
+        thread.join(60)
 
 
 def test_a_picture_finding_not_in_the_baseline_refuses_before_printing(

@@ -642,8 +642,12 @@ traveler first.
   README image files. It may merge immediately. Plan or shop changes, code,
   prose, docs, README markup/layout or any other change stays in an ordinary PR
   and MUST satisfy the ordinary PR requirements.
-- For a farm release, run only `build export package:release` through
-  `farm_build.py run` (`build` supplies drawing and check gates). On success copy
+- For a farm release, run only
+  `build export package:release package:manifest check:features_bound` through
+  `farm_build.py run` (`build` supplies drawing and check gates; it binds only
+  the enrolled parts' `features.toml`, and `release` needs every bundle's, which
+  `package:manifest` binds and `check:features_bound` checks on the submitter
+  with no extra leaf, #3469). On success copy
   the run's complete `out/` (`status` → `outputs`) over the owning worktree's
   `cad/out`, then run `uv run --frozen python -m doit -s gallery`,
   `uv run --frozen python -m doit -s prechips` (every enrolled traveler, from the

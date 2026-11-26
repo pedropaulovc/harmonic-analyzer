@@ -1110,8 +1110,12 @@ executors, cache contracts or release checks.
 
 `farm_build.py run` refuses the `release` target: it would run in a disposable
 snapshot, and cleanup would discard the publisher's post-release tracked image
-and `release.yaml` updates. Run `build export package:release`
-(`build` supplies drawing and check gates). Once successful, copy the run's
+and `release.yaml` updates. Run
+`build export package:release package:manifest check:features_bound`
+(`build` supplies drawing and check gates but binds only the enrolled parts'
+`features.toml`; the release stages every feature bundle, so `package:manifest`
+binds the rest and `check:features_bound` checks them, both on the submitter
+and with no extra farm leaf, #3469). Once successful, copy the run's
 complete `out/` (`status` → `outputs`) over the owning worktree's `cad/out`.
 Then run `uv run --frozen python -m doit -s gallery`,
 `uv run --frozen python -m doit -s prechips` (every enrolled traveler, rendered
@@ -1121,6 +1125,27 @@ arrive with the restored `out/`: the run's `build` posts them on the submitter,
 which therefore needs FreeCAD 1.1+. This keeps the
 gallery, travelers and publish in the owning worktree without local COM
 redispatch; the cut fails if any traveler PDF or NC program is missing.
+
+If the run was launched without `package:manifest check:features_bound`, its
+restored `out/` lacks the other parts' `features.toml` (or, over a `cad/out`
+that cut an earlier release, keeps that release's stale ones) and the cut stops
+at `release.features_stage`. Bind every bundle seat-free in the owning worktree
+before the cut. One `doit -s` invocation takes every task named on its command
+line (doit clears each selected task's `task_dep`), so list them all at once
+rather than one invocation per stem. Never run `doit -s` with no task named: it
+would run the default `build` locally, SolidWorks included.
+
+```powershell
+$stems = @(Get-ChildItem cad/out/features -Directory | ForEach-Object Name)
+if ($stems.Count -eq 0) { throw 'no feature bundles under cad/out/features' }
+uv run --frozen python -m doit -s @($stems | ForEach-Object { "package:manifest:$_" })
+if ($LASTEXITCODE -ne 0) { throw 'package:manifest failed' }
+uv run --frozen python -m doit -s check:features_bound
+```
+
+Binding the 52 missing manifests of the 6d349882fd outputs with the tasks'
+`export_features.py` took 226 s (about 4.3 s each), so all 133 take about ten
+minutes; the doit invocation adds one graph load of about a minute.
 
 Every release also prepares and attaches
 `harmonic-analyzer-vNN-drawing-diff.zip`, separately from the main CAD bundle,

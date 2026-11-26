@@ -227,8 +227,10 @@ merge. The release manager continuously full-builds main, and daily releases
 still require green main and successful release checks for the released commit.
 
 For a farm release, never run the `release` target in the disposable snapshot
-(`farm_build.py` refuses it). Run `build export package:release`
-(`build` supplies the drawing and check gates), then copy the successful run's
+(`farm_build.py` refuses it). Run
+`build export package:release package:manifest check:features_bound`
+(`build` supplies the drawing and check gates; the other two bind and check
+every feature bundle's `features.toml`, #3469), then copy the successful run's
 complete `out/` (`status` → `outputs`) over the owning worktree's `cad/out`.
 There, run `uv run --frozen python -m doit -s gallery` followed by
 `uv run --frozen python -m doit -s release -- vNN`. This keeps the gallery and
