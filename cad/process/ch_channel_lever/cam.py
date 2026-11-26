@@ -491,13 +491,13 @@ def context(
     _agree(plan, "pocket_b_floor_mm", floor_b)
     _agree(plan, "pocket_a_floor_mm", floor_a)
 
-    # Holding: the spoil plate on the shim strips on the parallels; the jaws'
+    # Holding: the spoil plate on the shim sheets on the parallels; the jaws'
     # top above Z0. The traveler gauges the jaws' top above the faced plate
     # against a band (jaw_top_min_mm-jaw_top_max_mm); the guards and the
     # keep-outs run at that band's ends, so any plate the band accepts is
     # proved. The as-bought plate, before and after its one facing, must land
     # inside it.
-    shim = p["support_shim_strips"] * p["support_shim_leaf_in"] * IN
+    shim = p["support_shim_sheets"] * p["support_shim_leaf_in"] * IN
     _agree(plan, "support_shim_mm", shim)
     under = p["parallel_height_mm"] + shim
     support = under + p["spoil_plate_thickness_mm"]
