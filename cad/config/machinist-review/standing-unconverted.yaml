@@ -16,6 +16,7 @@ unconverted:
   - ch_fulcrum_shaft
   - ch_pivot_bracket
   - ch_pivot_shaft
+  - ch_rocker_arm
   - ch_rocker_hub
   - ch_rocker_strap
   - ch_rocker_strap_tl_hub_plug
