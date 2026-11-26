@@ -8,7 +8,6 @@ from pathlib import Path
 
 import pytest
 
-import sh_vn_pivot_pin_bar_spec as pin_spec
 import ch_amplitude_bar_notes
 import ch_amplitude_bar_spec
 import draw_ch_amplitude_bar as drawing
@@ -71,45 +70,36 @@ def test_part_geometry_matches_the_spec() -> None:
     assert bar.BAR_LENGTH is ch_amplitude_bar_spec.BAR_LENGTH
     assert ch_amplitude_bar_spec.BAR_WIDTH == bar.BAR_WIDTH
     assert bar.TOP_PIN_HOLE_DIA is ch_amplitude_bar_spec.TOP_PIN_HOLE_DIA
-    assert bar.TOP_PIN_HOLE_LIMITS is ch_amplitude_bar_spec.TOP_PIN_HOLE_LIMITS
     assert bar.BAR_DEPTH == ch_amplitude_bar_spec.BAR_DEPTH
 
 
 def test_top_pin_hole_is_the_reamed_press_hole_for_the_bar_pivot_pin() -> None:
     """User ruling 2026-10: the BarPin member of MHA-SH-VN-58 is pressed into
-    both top-notch cheeks (sh_vn_pivot_pin_bar_spec holds the fit), so the hole is reamed to a
-    band of its own, native on TopPinDia. Machinist round 1 (#1293): the hole
-    was only words in a note; it now prints in the top end's right side view,
-    its REAM THRU callout at the diameter, flagged to note 1."""
+    both top-notch cheeks (sh_vn_pivot_pin_bar_spec holds the fit). Owner
+    ruling 2026-11-24, fit audit question 3: the hole is reamed .0775 and
+    prints the reamer's size with no band, the pin itself the gauge.
+    Machinist round 1 (#1293): the hole prints in the top end's right side
+    view, its REAM THRU callout at the diameter, flagged to note 1."""
     from _drawing_contract import model_toleranced_dimensions
 
     notes = ch_amplitude_bar_notes
-    # Owner decision 2026-11-19 (#3124 item 5, limit-form follow-up): the
-    # .0775-.0779 limits the pin budget holds print as the two limits
-    # (swTolLIMIT), with the model mid-band; the delegated acceptance of the
-    # old +.0009/+.0005 step (RV-07) is withdrawn and no exception replaces it.
+    # The .0775-.0779 band is the ANALYSIS band, what the reamer is modelled
+    # to cut; the model and the print are the reamer's size, and no
+    # tolerance call touches TopPinDia.
     spec = ch_amplitude_bar_spec
     assert tuple(limit / 25.4 for limit in spec.TOP_PIN_HOLE_LIMITS) == pytest.approx(
         (0.0775, 0.0779), abs=1e-12
     )
-    assert spec.TOP_PIN_HOLE_DIA == pytest.approx(sum(spec.TOP_PIN_HOLE_LIMITS) / 2.0)
     assert "RV-07" not in {
         row["id"] for row in parts("ch-amplitude-bar")["machinist_exceptions"]
     }
     assert ("TopPinProfile", "TopPinDia") not in model_toleranced_dimensions(bar)
     tree = ast.parse(Path(bar.__file__).read_text(encoding="utf-8"))
-    limits = [
+    assert not [
         node
         for node in ast.walk(tree)
         if isinstance(node, ast.Call) and getattr(node.func, "id", None) == "set_limits"
     ]
-    assert len(limits) == 1
-    assert [ast.unparse(a) for a in limits[0].args[1:]] == ["'TopPinProfile'", "'TopPinDia'"]
-    assert {k.arg: ast.unparse(k.value) for k in limits[0].keywords} == {
-        "limits": "TOP_PIN_HOLE_LIMITS",
-        "places": "DRAWING_PRECISION['TopPinProfile']['TopPinDia']",
-        "display_unit": "UNIT",
-    }
     assert notes.TOP_PIN_NUMBER == parts("sh-vn-pivot-pin")["number"]
     assert notes.DRAWING_DIMENSIONS["TopPinProfile"] == {
         "BarSection",
@@ -118,38 +108,38 @@ def test_top_pin_hole_is_the_reamed_press_hole_for_the_bar_pivot_pin() -> None:
         "TopPinDia",
     }
     assert set(drawing.TOP_SIDE_KEEP) == notes.DRAWING_DIMENSIONS["TopPinProfile"]
-    # Fan-out screen 2026-11-07: size, then process (rule 26); the band is
-    # narrower than the reamer row, so the callout links the matched press fit
-    # in note 1, which names the pin by name and number with its acceptance
-    # (rules 4 and 7; owner decision 2026-11-19, #3124 item 5).
+    # Fan-out screen 2026-11-07: size, then process (rule 26). Owner ruling
+    # 2026-11-24, fit audit question 3: the reamer's size with no band; the
+    # callout links note 1, which names the pin by name and number and gives
+    # its acceptance, the pin itself the gauge (rules 4 and 7).
     assert notes.DIMENSION_CALLOUTS["TopPinDia"] == (
         "REAM THRU\nSEE NOTE 1"
     )
     assert notes.DRAWING_NOTES.splitlines() == [
-        "1. MATCHED PRESS FIT ON BAR PIVOT PIN MHA-SH-VN-58:",
-        "    REAM .0002-.0008 UNDER THE MEASURED PIN.",
+        "1. PRESS FIT ON BAR PIVOT PIN MHA-SH-VN-58:",
+        "    THE PIN DOES NOT ENTER BY HAND.",
     ]
     assert notes.TOP_PIN_NAME == "BAR PIVOT PIN"
-    # The acceptance stays inside the FN2 window the pin budget is held to.
-    assert float(notes.PIN_FIT_INTERFERENCE[1]) * 25.4 <= pin_spec.PRESS_INTERFERENCE_MAX
+    assert spec.TOP_PIN_HOLE_DIA == pytest.approx(0.0775 * 25.4)
     precision = notes.DRAWING_PRECISION["TopPinProfile"]
     assert precision == {"BarSection": 2, "TopPinX": 3, "TopPinDrop": 2, "TopPinDia": 4}
     # Machinist round 1: the three-place location states its function, the
     # hole's worst-case face wall, which the pin's joint budget holds too:
-    # .125 +/-.005 on the narrowest stock leaves the far wall .079, over the
-    # .060 floor and under the .080 target (RV-06).
+    # .125 +/-.005 on the narrowest stock, at the largest hole a bonded pin
+    # is accepted in (.079), leaves the far wall .078, over the .060 floor and
+    # under the .080 target (RV-06).
     import sh_vn_pivot_pin_bar_spec as pin
 
-    assert notes.DIMENSION_CALLOUTS["TopPinX"] == "HOLE WALL .079 MIN"
+    assert notes.DIMENSION_CALLOUTS["TopPinX"] == "HOLE WALL .078 MIN"
     wall = pin.BUDGET["hole_face_wall_min"]
-    assert notes.PIN_HOLE_WALL_MIN == pytest.approx(0.079 * 25.4)
+    assert notes.PIN_HOLE_WALL_MIN == pytest.approx(0.078 * 25.4)
     assert notes.PIN_HOLE_WALL_MIN <= wall < notes.PIN_HOLE_WALL_MIN + 0.0254
     assert WALL_FLOOR_MM <= wall < WALL_TARGET_MM
     row = _exception("RV-06")
     assert row["kind"] == "minor"
     assert row["reason"].startswith(OWNER_THIN_WALL_RULING)
-    assert "HOLE WALL .079 MIN" in row["where"]
-    assert "TopPinX location .125 under HOLE WALL .079 MIN" in _exception("RV-03")["where"]
+    assert "HOLE WALL .078 MIN" in row["where"]
+    assert "TopPinX location .125 under HOLE WALL .078 MIN" in _exception("RV-03")["where"]
 
 
 def test_pin_hole_is_a_native_sketch_located_from_the_top_edge() -> None:
@@ -697,17 +687,19 @@ def test_each_notch_minimum_clears_its_plate_at_max_material() -> None:
     ) == rocker.ARM_THICKNESS_BAND
     assert spec.STRADDLE_RUNNING_FLOOR == bank.RUNNING_FLOOR
 
-    # #1038 option 2 (owner ruling 2026-10-15): the top notch +.007/.000. The
-    # foot +.006/.000 (#3114): the float left to the bars once two floating
-    # arms close hub on hub.
+    # #1038 option 2 (owner ruling 2026-10-15): the top notch +.007/.000
+    # (necessity N-05: +.010 leaves the mid-span bar gap under a thousandth,
+    # delegated ruling 2026-11-24 (Main), no precedent; no owner number
+    # changed, #2144 (rulings.md D14)). The foot +.006/.000 (#3114): the
+    # float left to the bars once two floating arms close hub on hub.
     assert spec.TOP_NOTCH_WIDTH_BAND == pytest.approx((0.007 * 25.4, 0.0))
     assert spec.BOTTOM_NOTCH_WIDTH_BAND == pytest.approx((0.006 * 25.4, 0.0))
-    for width, (_upper, lower), plate, tolerance in (
+    for width, (_upper, lower), plate, plate_upper in (
         (
             spec.TOP_NOTCH_WIDTH,
             spec.TOP_NOTCH_WIDTH_BAND,
             spec.LEVER_THICKNESS,
-            spec.LEVER_THICKNESS_TOLERANCE,
+            spec.LEVER_THICKNESS_BAND[0],
         ),
         (
             spec.BOTTOM_NOTCH_WIDTH,
@@ -717,8 +709,8 @@ def test_each_notch_minimum_clears_its_plate_at_max_material() -> None:
         ),
     ):
         least = width + lower
-        assert least >= plate + tolerance + bank.RUNNING_FLOOR - 1e-9
-        assert least - (plate + tolerance + bank.RUNNING_FLOOR) < 0.002 * 25.4
+        assert least >= plate + plate_upper + bank.RUNNING_FLOOR - 1e-9
+        assert least - (plate + plate_upper + bank.RUNNING_FLOOR) < 0.002 * 25.4
     assert spec.TOP_NOTCH_WIDTH == pytest.approx(0.124 * 25.4)
     assert spec.BOTTOM_NOTCH_WIDTH == pytest.approx(0.104 * 25.4)
     assert bar.TOP_NOTCH_WIDTH is spec.TOP_NOTCH_WIDTH
@@ -735,7 +727,7 @@ def test_each_notch_minimum_clears_its_plate_at_max_material() -> None:
 
 def test_top_notch_keeps_the_running_gap_at_the_printed_worst_case() -> None:
     """#1038 option 2 (owner ruling 2026-10-15): the top notch's float on the
-    .118 +/-.002 plate leaves the side gap its running floor; the full
+    .118 +.002/-.004 plate leaves the side gap its running floor; the full
     stack, with both ledges and plate offsets, is
     sh_vn_pivot_pin_bar_spec.joint_budget's neighbour_clearance_min."""
     import sh_vn_pivot_pin_bar_spec as pin
@@ -743,7 +735,7 @@ def test_top_notch_keeps_the_running_gap_at_the_printed_worst_case() -> None:
 
     spec = ch_amplitude_bar_spec
     float_max = (spec.TOP_NOTCH_WIDTH + spec.TOP_NOTCH_WIDTH_BAND[0]) - (
-        spec.LEVER_THICKNESS - spec.LEVER_THICKNESS_TOLERANCE
+        spec.LEVER_THICKNESS + spec.LEVER_THICKNESS_BAND[1]
     )
     assert bank.PITCH - spec.BAR_WIDTH - float_max >= bank.RUNNING_FLOOR
     assert pin.BUDGET["neighbour_clearance_min"] >= bank.RUNNING_FLOOR
@@ -803,9 +795,10 @@ def test_the_bow_ch00_accepts_keeps_the_mid_span_gap() -> None:
 
     top = pin.BUDGET["neighbour_clearance_min"]
     foot = _foot_gap(rocker.HUB_LENGTH_MIN)
-    assert top == pytest.approx(0.6858, abs=1e-9)
+    # The .118 +.002/-.004 plate (D23) at its thinnest.
+    assert top == pytest.approx(0.6350, abs=1e-9)
     mid = (top + foot) / 2.0
-    assert mid == pytest.approx(0.4064, abs=1e-9)
+    assert mid == pytest.approx(0.3810, abs=1e-9)
     assert asm.BAR_BOW_MAX_IN == 0.005
     bowed = mid - 2.0 * asm.BAR_BOW_MAX_MM
     assert bowed >= bank.RUNNING_FLOOR
@@ -813,10 +806,10 @@ def test_the_bow_ch00_accepts_keeps_the_mid_span_gap() -> None:
     leaf = asm.BAR_GAP["leaf"]
     assert bank.RUNNING_FLOOR <= leaf <= min(top, foot, bowed)
     assert leaf / 25.4 == pytest.approx(0.005)
-    # .006 is the widest bow on the .001 grid that still closes; .005 keeps a
-    # thousandth in hand.
-    assert mid - 2.0 * 0.006 * 25.4 >= bank.RUNNING_FLOOR
-    assert mid - 2.0 * 0.007 * 25.4 < bank.RUNNING_FLOOR
+    # .005 is the widest bow on the .001 grid that still holds the floor (.006
+    # closes it), and it keeps the .001 the shop reads over the floor (D14).
+    assert (bowed - bank.RUNNING_FLOOR) / 25.4 >= 0.001
+    assert mid - 2.0 * 0.006 * 25.4 < bank.RUNNING_FLOOR
 
 
 def test_cropped_views_are_model_views_dimensioned_before_the_crop() -> None:
@@ -860,8 +853,9 @@ def test_every_printed_dimension_reads_its_inch_value() -> None:
         "BarSection": (spec.BAR_DEPTH, 0.25),
         "TopPinX": (spec.BAR_DEPTH / 2.0, 0.125),
         "TopPinDrop": (spec.TOP_PIN_DROP, 0.25),
-        # The model sits mid-band; the sheet prints the two limits instead.
-        "TopPinDia": (spec.TOP_PIN_HOLE_DIA, 0.0777),
+        # The model is the reamer's size, printed with no band (owner ruling
+        # 2026-11-24, fit audit question 3).
+        "TopPinDia": (spec.TOP_PIN_HOLE_DIA, 0.0775),
     }
     assert set(printed) == set(places)
     exact = {"BarLength", "BottomNotchHeight"}

@@ -1,0 +1,9 @@
+# What fails past each numeric check ch_rocker_arm_spec asserts
+# (check_register.py, tolerance-policy.md "Checks in spec modules and tests").
+checks:
+  - id: C-01
+    check: "HUB_ROOT_RADIUS_MAX"
+    kind: gap
+    reason: "the root fillet hits the bar's foot cheeks"
+    source: "the module's .008: under the MHA-CH-01 foot cheeks' .0152 radial air over the hub (test_rocker_bank_layout pins the worst case); Opus #1020 r2 C2"
+    basis: worst_case

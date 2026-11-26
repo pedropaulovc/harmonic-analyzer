@@ -561,11 +561,26 @@ def context(
                 "less process.holder_grip_min_mm"
             )
 
-    # Notches: each band's middle, and the saw's reach.
+    # Notches: each band's middle in depth. In width each notch is two saw
+    # passes, the second level a rise above the first; the two kerfs must
+    # overlap (the saw's swept thickness at least the rise), else a fin
+    # stands between them. So the rise is the middle's, unless that is over
+    # half the band's least width: then that half, which lets the least saw
+    # that still reaches the least width overlap exactly (the top notch: .124
+    # least, rise .062, target .126).
     foot, top = g["foot"], g["top"]
-    _agree(plan, "foot_notch_width_mm", _mid(foot["width"]))
+    for name, notch in (("foot", foot), ("top", top)):
+        # The plan's rise against the least saw that still reaches the least
+        # width (that width less the rise); Setup 3 accepts no thinner.
+        planned = p[f"{name}_notch_width_mm"] - p["saw_thickness_mm"]
+        if notch["width"][0] - planned < planned - 1e-9:
+            raise ValueError(
+                f"process.{name}_notch_width_mm: the least accepted saw leaves a "
+                "fin in the notch, its two kerfs not overlapping"
+            )
+        rise = min(_mid(notch["width"]) - p["saw_thickness_mm"], notch["width"][0] / 2)
+        _agree(plan, f"{name}_notch_width_mm", p["saw_thickness_mm"] + rise)
     _agree(plan, "foot_notch_depth_mm", _mid(foot["depth"]))
-    _agree(plan, "top_notch_width_mm", _mid(top["width"]))
     _agree(plan, "top_notch_depth_mm", _mid(top["depth"]))
     # The P2-P4 bars' ledges are cut from the P1 bar's saw Z0: each is off by
     # the touch-off's error, by its down face's height against P1's where the
@@ -695,49 +710,47 @@ def context(
     # is the second level's rise above the first plus the saw's swept
     # thickness (its miked thickness plus its axial runout at the rim), which
     # may run from the width's least less the rise to its most less the rise
-    # and the margin. Radial: the passes are laid out on the saw's catalogue
-    # diameter, so the deepest tooth cuts the floor deeper than the depth's
-    # target (its band's middle) by half the tips' total swing plus half the
-    # saw's excess over that diameter (the calipers read it on the first
-    # load): their sum within twice the depth's most less its target less
-    # the margin, either way. Both setups read to the foot notch's limits,
-    # which lie inside the top notch's.
+    # and the margin, and never under the rise (the kerfs overlap). One saw
+    # cuts both notches, so Setup 3 accepts the window both allow. Radial:
+    # the passes are laid out on the saw's catalogue diameter, so the
+    # deepest tooth cuts the floor deeper than the depth's target (its band's
+    # middle) by half the tips' total swing plus half the saw's excess over
+    # that diameter (the calipers read it on the first load): their sum
+    # within twice the depth's most less its target less the margin, either
+    # way. Setup 3 reads to the foot notch's swing, which lies inside the top
+    # notch's.
     _agree(
         plan, "saw_axial_reading_per_in_mm", IN * (radius - RUNOUT_INSET_MM) / radius
     )
-    swept, swing = {}, {}
+    swept_min, swept_max = 0.0, math.inf
+    rises, swing = {}, {}
     for name, notch in (("foot", foot), ("top", top)):
-        rise = p[f"{name}_notch_width_mm"] - thick
-        _agree(plan, f"{name}_notch_rise_mm", rise, RUNOUT_TOL_MM)
-        swept[name] = (
-            notch["width"][0] - rise,
-            notch["width"][1] - rise - p["saw_swept_margin_mm"],
+        rises[name] = p[f"{name}_notch_width_mm"] - thick
+        _agree(plan, f"{name}_notch_rise_mm", rises[name], RUNOUT_TOL_MM)
+        swept_min = max(swept_min, notch["width"][0] - rises[name])
+        swept_max = min(
+            swept_max, notch["width"][1] - rises[name] - p["saw_swept_margin_mm"]
         )
-        _agree(plan, f"{name}_saw_swept_min_mm", swept[name][0], RUNOUT_TOL_MM)
-        _agree(plan, f"{name}_saw_swept_max_mm", swept[name][1], RUNOUT_TOL_MM)
-        if not swept[name][0] <= thick < swept[name][1]:
-            raise ValueError(
-                f"the {name} notch's width leaves the saw's nominal thickness no "
-                "axial runout"
-            )
         swing[name] = 2 * (
             notch["depth"][1]
             - p[f"{name}_notch_depth_mm"]
             - p["saw_depth_margin_mm"]
         )
         _agree(plan, f"{name}_saw_radial_tir_max_mm", swing[name], RUNOUT_TOL_MM)
-    if not (
-        swept["top"][0] <= swept["foot"][0]
-        and swept["foot"][1] <= swept["top"][1]
-        and swing["foot"] <= swing["top"]
-    ):
+    _agree(plan, "saw_swept_min_mm", swept_min, RUNOUT_TOL_MM)
+    _agree(plan, "saw_swept_max_mm", swept_max, RUNOUT_TOL_MM)
+    if not swept_min <= thick < swept_max:
         raise ValueError(
-            "Setup 3's runout limits (the foot notch's) do not cover the top notch's"
+            "the notches' widths leave the saw's nominal thickness no axial runout"
+        )
+    if swing["foot"] > swing["top"]:
+        raise ValueError(
+            "Setup 3's radial runout limit (the foot notch's) does not cover the top notch's"
         )
     _agree(
         plan,
-        "foot_saw_axial_nominal_mm",
-        (swept["foot"][1] - thick) / IN * p["saw_axial_reading_per_in_mm"],
+        "saw_axial_nominal_mm",
+        (swept_max - thick) / IN * p["saw_axial_reading_per_in_mm"],
         RUNOUT_TOL_MM,
     )
     # The touch-off station: the saw's rim TOUCH_IN_MM in over the ends, over

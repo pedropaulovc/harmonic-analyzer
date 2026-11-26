@@ -104,14 +104,13 @@ def test_context_accepts_the_plan_and_numbers_the_tools(ctx) -> None:
         "chamfer": 2,
         "em-eighth": 3,
         "spot": 4,
-        "drill-32": 5,
-        "reamer": 6,
-        "drill-43": 7,
-        "tap-guide": 8,
+        "drill-30": 5,
+        "drill-43": 6,
+        "tap-guide": 7,
     }
     assert RECIPE.LOAD_FIRST_TOOL == tuple(name for name, _ops in RECIPE.PROGRAMS)
     stop = ctx["manual"]["tap"]
-    assert stop["tool"] == 8 and stop["at"] == [12.446, -11.938]
+    assert stop["tool"] == 7 and stop["at"] == [12.446, -11.938]
     assert stop["gcode"][0] == "G53 G0 Z0.000" and stop["gcode"][-1] == "M30"
 
 
@@ -234,10 +233,9 @@ def test_every_v_level_plunges_beside_p(stepover) -> None:
     [
         ({"upright_top_max_mm": 30.0}, "upright_top_max_mm"),
         ({"blank_x_in": 1.0}, "under the length"),
-        ({"spot_bore_dia_mm": 3.0}, "not under the #32"),
+        ({"spot_bore_dia_mm": 3.3}, "not under the #30"),
         ({"spot_tap_dia_mm": 1.9}, "between the pilot"),
         ({"bore_tip_height_mm": 5.5}, "bore_tip_height_mm"),
-        ({"ream_tip_height_mm": 6.0}, "ream_tip_height_mm"),
         ({"tap_tip_height_mm": 11.0}, "tap_tip_height_mm"),
         ({"tap_reach_min_mm": 10.5}, "bottoming tap's chamfer"),
         ({"bore_drill_depth_mm": 12.0}, "bore_drill_depth_mm"),
@@ -248,7 +246,7 @@ def test_every_v_level_plunges_beside_p(stepover) -> None:
         ({"bar_width_max_mm": 32.5}, "bar_width_max_mm"),
         ({"bar_skim_max_mm": 2.5}, "one face level"),
         ({"back_step_depth_mm": 2.54}, "back_step_depth_mm"),
-        ({"drill_32_feed_per_min_mm": 100.0}, "not its setting"),
+        ({"drill_30_feed_per_min_mm": 100.0}, "not its setting"),
         ({"lying_grip_mm": 17.0}, "lying_grip_mm"),
         ({"v_level_mm": 0.8}, "level step"),
         ({"corner_cutter_dia_mm": 2.38125}, "the tool is"),
@@ -332,10 +330,8 @@ def _seed(ctx: dict, key: str, old: str, new: str) -> dict:
             "G1 X10.478 Y-18.300 F{feed}",
             "keep_out",
         ),
-        # The #32 stopped short of the slot.
-        ("bore_drill", "G1 Z4.719 F{feed}", "G1 Z6.000 F{feed}", "holes"),
-        # The reamer rapided out of the bore.
-        ("bore_ream", "G1 Z19.000 F{feed}", "G0 Z19.000", "feed_out"),
+        # The #30 stopped short of the slot.
+        ("bore_drill", "G1 Z4.623 F{feed}", "G1 Z6.000 F{feed}", "holes"),
         # A #43 peck re-entry rapided past the depth already drilled.
         ("tap_drill", "G0 Z20.312", "G0 Z18.000", "rapid"),
         # A neck break run on past its stop, into the body.

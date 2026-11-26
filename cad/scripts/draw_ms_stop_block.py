@@ -131,10 +131,14 @@ COVER_HOLE_MATCH_DRILL = (
 # The 4-40 runs from the underside through the floor and opens into the
 # rebate; THRU alone does not say which wall it stops at (rules 1, 12).
 THUMB_HOLE_END = "INTO REBATE; ROOF NOT DRILLED"
-# Hole Wizard length variables of each tap callout, by native name.
-COVER_TAP_PRECISION = dict.fromkeys(
-    ("hw-tapdrldia", "hw-tapdrldepth", "hw-threaddepth"), part.HOLE_CALLOUT_PRECISION,
-)
+# Hole Wizard length variables of each tap callout, by native name: the tap
+# drill .XXX under DRILLED HOLES, the tap-drill and thread depths .XX (rule 3;
+# ms_stop_spec.TAP_DEPTH_PRECISION).
+COVER_TAP_PRECISION = {
+    "hw-tapdrldia": part.HOLE_CALLOUT_PRECISION,
+    "hw-tapdrldepth": part.TAP_DEPTH_PRECISION,
+    "hw-threaddepth": part.TAP_DEPTH_PRECISION,
+}
 THUMB_TAP_PRECISION = {"hw-tapdrldia": part.HOLE_CALLOUT_PRECISION}
 # Ra 63 uin symbol left of the right view's open rebate mouth, below the mating
 # face label; its leader enters the mouth to the ceiling's mouth-side quarter.
@@ -198,6 +202,7 @@ part_metadata(
     precision_sources=(
         _PRECISION,
         (_SPEC, "HOLE_CALLOUT_PRECISION"),
+        (_SPEC, "TAP_DEPTH_PRECISION"),
         (_SELF, "COVER_TAP_PRECISION"),
         (_SELF, "THUMB_TAP_PRECISION"),
     ),
@@ -567,14 +572,14 @@ requirement(
         "location_from_mating_face": _P["ThumbFromPlate"],
     },
 )
-# The two #2-56 blind plate taps (2X Ø.073 ↧.300, 2-56 UNC ↧.250 and
+# The two #2-56 blind plate taps (2X Ø.073 ↧.30, 2-56 UNC ↧.25 and
 # COVER_HOLE_MATCH_DRILL): the tap drill is match-drilled through the stop
 # plate MHA-MS-03, its master, clamped with the locating ends and edges flush,
 # in that plate's traveler (``made_at = "pair_drill"``); this part's traveler
 # taps them (bottoming tap, PLATE_TAP_SPEC). Depths run from the mating face
-# and print .XXX (COVER_TAP_PRECISION). Their stations print as references
-# (.150)/(.690) from the locating end and (.160) from the locating edge: the
-# plate's bands locate them.
+# and print .XX, the drill .XXX (COVER_TAP_PRECISION). Their stations print
+# as references (.150)/(.690) from the locating end and (.160) from the
+# locating edge: the plate's bands locate them.
 _COVER_SOURCES = (
     (_SPEC, "PLATE_TAP_SPEC"),
     *_TAP_CALLOUT,

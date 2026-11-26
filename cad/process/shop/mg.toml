@@ -128,41 +128,25 @@ feed = "9.6 in/min"
 
 # --- MHA-MG-10 wheel drum (cad/process/mg_wheel_drum/plan.toml) -------------
 # Facing, turning and parting take shop/lathe.toml's C360 rows. The V pilot
-# and the 31/64 drill run blind into the bar past the parting line, so their
+# and the 1/2 drill run blind into the bar past the parting line, so their
 # feed cue is the quill scale, not a breakthrough. LittleMachineShop "Cutting Speeds" (read live
 # 2026-11-22, shop/lathe.toml header), Drilling & Reaming, Brass (C36000):
-# drilling 160-175 ft/min, reaming 160-175 ft/min; both take the low end (the
-# V drill 1622 rpm, the 31/64 drill 1262 rpm, the .4990 reamer 1225 rpm).
+# drilling 160-175 ft/min; it takes the low end (the V drill 1622 rpm, the
+# 1/2 drill 1222 rpm). The bore is the 1/2 drill's (owner ruling 2026-11-24,
+# fit audit question 17): no reamer, no pins.
 [settings.lathe-drill-v-blind-c360]
 tool = "drill-v"
 material = "lathe-c360"
 sfm = 160
 feed = "tailstock quill by hand, steady, dry; ease off as the scale nears the depth"
-[settings.lathe-drill-31-64-c360]
-tool = "drill-31-64"
+[settings.lathe-drill-1-2-c360]
+tool = "drill-1-2"
 material = "lathe-c360"
 sfm = 160
 feed = "tailstock quill by hand, steady, dry"
-[settings.lathe-ream-4990-c360]
-tool = "reamer-4990"
-material = "lathe-c360"
-sfm = 160
-feed = "tailstock quill by hand, slow and steady, dry; withdraw with the spindle running"
-
-# The MHA-MG-10 drum bore's Class ZZ pins (owner ruling 2026-11-23, tool audit
-# Q1, re-answered, verbatim: "ZZ singles per the record: 29 pins (17 plus GO,
-# 12 minus NO-GO), about $130. Accept that good holes near a limit may be
-# refused; the traveler mikes each pin so the real window is known per
-# pin."). They replace the Class X .4990/.4995 pair the bore was first
-# gauged with. Ø.4990 +.0005/.0000: GO a .4990 plus single (.4990-.4992),
-# NO-GO a .4995 minus single (.4993-.4995; .4995 is off the .001 box). Range: the
-# band, 12.6746-12.6873 mm; resolution: one pin's Class ZZ tolerance, .0002
-# in = 0.00508 mm.
-[gauges.zz-pins-4990-4995]
-range_mm = [12.6746, 12.6873]
-resolution_mm = 0.00508
-[tools.zz-pins-4990-4995]
-description = "Class ZZ pins for .4990-.4995: GO .4990 plus (single), NO-GO .4995 minus (single)"
+[tools.drill-1-2]  # Drills 1/2; MHA-MG-10 1/2 DRILL THRU
+description = "1/2 (.5000 in) drill, 115-piece index"
+diameter_mm = 12.7
 
 # --- Placeholder process plans' tools (quotes-2026-11-17-rev3.xlsx) ----------
 # The tools the placeholder plans name (cad/process/<stem>/plan.toml with
@@ -178,35 +162,22 @@ diameter_mm = 1.016
 [tools.drill-37]  # Drills #37
 description = "#37 (.1040 in) drill, 115-piece index"
 diameter_mm = 2.6416
-[tools.drill-17]  # Drills #17
-description = "#17 (.1730 in) drill, 115-piece index"
-diameter_mm = 4.3942
 [tools.drill-16]  # Drills #16
 description = "#16 (.1770 in) drill, 115-piece index"
 diameter_mm = 4.4958
 [tools.drill-10]  # Drills #10
 description = "#10 (.1935 in) drill, 115-piece index"
 diameter_mm = 4.9149
-[tools.reamer-1865]  # B-reamer-.1865
-description = ".1865 in HSS chucking reamer"
-diameter_mm = 4.7371
 [tools.reamer-1885]  # B-reamer-.1885
 description = ".1885 in HSS chucking reamer"
 diameter_mm = 4.7879
 
 # --- MHA-MG-08 wheel bar (cad/process/mg_wheel_bar/plan.toml) ---
-# The axle bore's Class ZZ pins (owner ruling 2026-11-23, tool audit Q1,
-# re-answered; quoted at gauges.zz-pins-4990-4995 above). They replace the
-# Class X .1865/.1870 pair the bore was first gauged with. Ø.1865
-# +.0005/.0000: GO a .1865 plus single (.1865-.1867), NO-GO the .187 minus
-# pin of the .061-.500 minus box (gauges.pin-gauges; .1868-.1870). Range: the
-# band, 4.7371-4.7498 mm; resolution: one pin's Class ZZ tolerance, .0002 in
-# = 0.00508 mm.
-[gauges.zz-pins-1865-1870]
-range_mm = [4.7371, 4.7498]
-resolution_mm = 0.00508
-[tools.zz-pins-1865-1870]
-description = "Class ZZ pins for .1865-.1870: GO .1865 plus (single), NO-GO .187 minus (the .061-.500 box)"
+# The axle bore's drill (owner ruling 2026-11-24, fit audit question 18: the
+# axle is bonded in a 3/16 drilled bore; no reamer, no Class ZZ pins).
+[tools.drill-3-16]  # Drills 3/16; MHA-MG-08 3/16 DRILL THRU
+description = "3/16 (.1875 in) drill, 115-piece index"
+diameter_mm = 4.7625
 
 # --- Drawing cross-check additions (2026-11-19) -------------------------------
 # Tools the v50 drawings call for that the quote workbook left out, from the

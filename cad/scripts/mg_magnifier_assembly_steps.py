@@ -21,14 +21,18 @@ from __future__ import annotations
 
 DRAWING_NUMBER = "MHA-MG-00"
 
-DRUM_PRESSED_KEY = "drum-pressed"
+DRUM_BONDED_KEY = "drum-bonded"
 DRUM_HELD_KEY = "drum-held"
 PRESS_SLEEVE_MADE_KEY = "press-sleeve-made"
 SPACER_FITTED_KEY = "spacer-fitted"
-AXLE_PRESSED_KEY = "axle-pressed"
+AXLE_DRY_FITTED_KEY = "axle-dry-fitted"
+AXLE_BONDED_KEY = "axle-bonded"
 AXLE_HELD_KEY = "axle-held"
 AXLE_TRIAL_KEY = "axle-trial-fitted"
+TRIAL_WASHER_SEATED_KEY = "trial-washer-seated"
+AXLE_NUT_ON_THREAD_KEY = "trial-nut-on-thread"
 AXLE_CHECKED_KEY = "axle-checked"
+AXLE_SINK_RECORDED_KEY = "axle-sink-recorded"
 AXLE_ACCEPTED_KEY = "axle-accepted"
 COLUMN_CLAMP_STARTED_KEY = "column-clamp-started"
 ENDSHAKE_SET_KEY = "endshake-set"
@@ -45,56 +49,85 @@ WIRE_TIED_KEY = "lever-wire-tied"
 
 # One tuple per numbered step: its action, then its lettered sub-steps.
 STEPS: tuple[tuple[str, ...], ...] = (
-    # Wheel group. Each press is accepted at the bench before anything else
-    # goes on it (rule 23): it does not turn or slide by hand, and a slip fit
-    # has its own single-action remedies.
+    # Wheel group. Each fixed joint is accepted at the bench before anything
+    # else goes on it (rule 23): it does not turn or slide by hand.
+    # Owner ruling 2026-11-24, fit audit question 17: the drum is always
+    # bonded on a spigot turned to slide in its drilled bore, centred on an
+    # indicator while wet; a drum that turns once cured is stripped and
+    # bonded again. Rule 22 (machinist review of run 20261125T172832344Z,
+    # r2 and r3): one action per step, a check apart from its remedy, so the
+    # S4 seat is its own check after the cure and the strip runs as pull
+    # off, clean, return.
     (
-        DRUM_PRESSED_KEY,
-        DRUM_HELD_KEY,
-        "drum-pulled-off",
-        "drum-bonded",
+        DRUM_BONDED_KEY,
+        "drum-centred",
         "drum-bond-cured",
+        "drum-seated",
+        DRUM_HELD_KEY,
+        "drum-stripped",
+        "drum-cleaned",
+        "drum-rebonded",
+        "drum-trial-resumed",
     ),
-    # The press's sleeve, the spacer it gauges from and the oil are their own
-    # steps (rule 22).
+    # The sleeve the axle is pushed through on its shoulder and the spacer
+    # are their own steps (rule 22).
     (PRESS_SLEEVE_MADE_KEY,),
     (SPACER_FITTED_KEY,),
-    ("axle-plain-end-oiled",),
-    (
-        AXLE_PRESSED_KEY,
-        AXLE_HELD_KEY,
-        "axle-pressed-out",
-        "axle-cleaned",
-        "axle-bonded",
-        "axle-spacer-refitted",
-        "axle-bond-set",
-        "axle-bond-cured",
-    ),
-    # The press setting is the axle's one position (owner ruling 2026-11-21):
-    # with it and every part in its drawing band the stack lands the thread
-    # end inside its acceptance (mg_wheel_group), so a failed trial reads the
-    # setting again, then replaces the stack part outside its limits, and
-    # with none the axle itself, whose thread length is the stack's last term.
-    # The trial's nuts jam over the endshake's go feeler, where the stack
-    # lands the thread end inside its acceptance (#3344).
+    # Owner ruling 2026-11-24, fit audit part 2, C11 ("Yes, set to the trial
+    # stack") with fit audit question 18 (the axle is bonded): a cured bond
+    # cannot be re-pressed, so C11's trial stack can only be set dry, before
+    # the bond. The axle goes in with
+    # its plain end flush on the surface plate, the expected setting; the
+    # trial accepts on C11's three things to see, the first nut on thread,
+    # the thread end inside DETAIL B and (the flush start, never pushed
+    # further) the plain end not proud, and on the front washer seated on
+    # the hub, which reads the shank step inside it (mg_wheel_group
+    # TRIAL_STEP_INSIDE_HUB_MIN). A short thread end slides the axle out by
+    # the shortfall to the window's middle and trials again from the seat.
+    # Any other failure strips the trial and pushes the axle out; a part out
+    # of its limits (the bar's depth, the spacer's length, the hub's, the
+    # washers' and nuts' thickness), else the axle, is replaced, and the
+    # trial restarts from the spacer, a new wheel by way of its drum bond
+    # (step 1's last sub-step rejoins at the spacer, past the made sleeve).
+    (AXLE_DRY_FITTED_KEY,),
     (
         AXLE_TRIAL_KEY,
+        TRIAL_WASHER_SEATED_KEY,
         "trial-feeler-placed",
         "trial-nuts-jammed",
+        AXLE_NUT_ON_THREAD_KEY,
         AXLE_CHECKED_KEY,
-        "trial-parts-removed-to-press",
-        "axle-press-rechecked",
-        "axle-repressed",
-        "axle-rechecked",
+        "trial-nuts-off",
+        "axle-sunk",
+        "trial-rerun",
+        "trial-stripped",
+        "trial-axle-withdrawn",
+        "stack-parts-measured",
         "stack-part-replaced",
-        "trial-refitted",
-        "axle-pressed-out-to-replace",
         "axle-replaced",
+        "new-wheel-drum-bonded",
+        "trial-refitted",
     ),
+    (AXLE_SINK_RECORDED_KEY,),
+    # The spacer comes off with the trial stack: on the shank during the
+    # bond it would sit in the squeeze-out at the bar's face.
     ("trial-parts-removed",),
+    ("axle-withdrawn",),
+    # Bonded to the trial's setting, squared to the bar while wet (nothing
+    # else squares a bonded axle), cured, then accepted by hand (rule 23).
+    (
+        AXLE_BONDED_KEY,
+        "axle-squared",
+        "axle-bond-cured",
+        AXLE_HELD_KEY,
+        "axle-stripped",
+        "axle-cleaned",
+        "axle-rebonded",
+    ),
     ("column-clamps-fitted",),
     (COLUMN_CLAMP_STARTED_KEY, "column-clamp-screws-left-loose"),
     ("axle-oiled",),
+    ("spacer-refitted",),
     ("wheel-stacked",),
     (
         ENDSHAKE_SET_KEY,
@@ -104,7 +137,14 @@ STEPS: tuple[tuple[str, ...], ...] = (
         "endshake-repeated",
     ),
     (LOCKNUT_JAMMED_KEY, "endshake-rechecked", "locknut-loosened", "locknut-reset"),
-    (AXLE_ACCEPTED_KEY, "axle-stack-removed", "axle-reset"),
+    (
+        AXLE_ACCEPTED_KEY,
+        "locknut-backed-off",
+        "endshake-feeler-placed",
+        "axle-endshake-closed",
+        "endshake-feeler-removed",
+        "locknut-rejammed",
+    ),
     # Lever group.
     (LEVER_THREADED_KEY,),
     ("clamp-thumb-screw-started",),

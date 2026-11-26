@@ -19,19 +19,19 @@ ch-channel-lever:
   # apart, so nothing else rubs. The route keeps the bought bar (#2173) and
   # cuts the plate so it stays flat: equal stock off both faces, a release
   # before the finish passes, and hand setting (no furnace for stress relief).
-  process: "machined from the bought 5/16 x 1 in 1018 cold-finish flat (#2173): hub and plate faces, the reamed fulcrum bore and the drilled holes; the flat is .3125 +.000/-.004 thick (ASTM A108 cold-drawn flats, the 1 in width governs), so facing the hub to .300 +.001/.000 takes .0075 to .0125 off its two faces. The plate comes off both faces equally, about .097 each, cut as a pocket inside the bar's uncut edges, which carry the part on its second side: rough the two faces in turns to .020 over, release the part and reseat it, then take the finish passes on both faces; cut the outline free last and drill and ream after it. A plate that leaves its thickness or plate-offset band once free is set straight by hand on the surface plate and rechecked, or exchanged"
+  process: "machined from the bought 5/16 x 1 in 1018 cold-finish flat (#2173): hub and plate faces, the F-drilled fulcrum bore and the drilled holes; the flat is .3125 +.000/-.004 thick (ASTM A108 cold-drawn flats, the 1 in width governs), so facing the hub to .300 +.001/.000 takes .0075 to .0125 off its two faces. The plate comes off both faces equally, about .097 each, cut as a pocket inside the bar's uncut edges, which carry the part on its second side: rough the two faces in turns to .020 over, release the part and reseat it, then take the finish passes on both faces; cut the outline free last and drill after it. A plate that leaves its thickness or plate-offset band once free is set straight by hand on the surface plate and rechecked, or exchanged"
   drawing_unit: in
   machinist_exceptions:
     - id: "RV-02"
       kind: "accept"
       where: "the hub width .300 +.001/.000 (SETS PITCH OF 20X STACK ON MHA-CH-04)"
       finding: "20-hub face-to-face stack with no fit-up allowance or shim (rule 19)"
-      reason: "the hubs set the station pitch with no shim by design; the stack's end float is proven at the channel assembly, not on this part (owner-accepted)"
+      reason: "the hubs set the station pitch with no shim by design. Since the owner's C10 (2026-11-24, fit audit part 2: \"Yes: rear keeper set to the stack over a .020 leaf.\") the rear keeper follows the stack, so the stack's end play is that leaf whatever the hubs measure; what the hub band still holds is the rear keeper's station over the fulcrum shaft's flats (necessity N-01, delegated ruling 2026-11-24 (Main), no precedent; no owner number changed, #2144 (rulings.md D16))"
     - id: "RV-03"
       kind: "accept"
       where: "the hub width .300 +.001/.000 (SETS PITCH OF 20X STACK ON MHA-CH-04)"
       finding: "band .001 total, narrower than the milled/turned width row (+/-.001), with no fit route at the callout (rule 4)"
-      reason: "the band can neither open nor take a route on this sheet: twenty hubs at +.001 must still float between the MHA-CH-07 keepers on the .010 end-play leaf at the shortest lug span (MHA-CH-00 lever-bank-slides), and +.002 would close that play; at the .300 pitch the bar-to-bar top gap is 0.686 mm at the band (sh_vn_pivot_pin_bar_spec neighbour_clearance_min), so the 20X stack is measured at the channel assembly (RV-02). Delegated ruling 2026-11-07 (Main), no precedent; owner review #2144"
+      reason: "restated by delegated ruling 2026-11-24 (Main), no precedent; no owner number changed, #2144 (rulings.md D16), superseding the 2026-11-07 end-play reason (#2144) that the owner's C10 (2026-11-24) made moot: the rear keeper is set to the bare stack over a .020 leaf, so the band no longer guards end play. It still cannot open: at the title block's +/-.005 the twenty-hub stack moves the rear keeper off the fulcrum shaft's set-screw flats (ch_fulcrum_shaft_spec.FLAT_STATION_WINDOW_MM .474 mm at this band, -2.066 at +/-.005) and its foot onto the rail boss (build_fr_top_frame KEEPER_FOOT_PRINTED_BOSS_MARGINS -.660 mm at +.005), necessity N-01; the 20X stack is still measured at the channel assembly (RV-02)"
     - id: "RV-04"
       kind: "minor"
       where: "front view, the R.167 tip about the #21 spring-eye hole (callout HOLDS WALL .060 MIN)"

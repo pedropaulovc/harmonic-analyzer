@@ -66,10 +66,6 @@ LOCAL_BAND_SOURCES: dict[tuple[str, str], tuple[str, str]] = {
         " (drilled_oversize_mm(unit='in'), -drilled_undersize_mm(unit='in')))",
         "each",
     ),
-    # Builders apply the same bands their specs publish on the sheet.
-    ("build_pn_pen_hanger", "band"): ("DRAWING_BANDS", "values"),
-    ("build_pn_pen_rod", "band"): ("DRAWING_BANDS", "values"),
-    ("build_pn_pen_v_block", "band"): ("DRAWING_BANDS", "values"),
     # for (feature, name), band in spec.MODEL_BANDS_MM.items(): deviations(band)
     ("build_dt_cone_gear_tl_keyed_arbor", "band"): ("spec.MODEL_BANDS_MM", "values"),
     ("build_dt_cylinder_gear_tl_cam_fixture", "deviations"): ("MODEL_BANDS_MM", "values"),
@@ -274,8 +270,36 @@ INDEXED_FIT_BANDS: dict[tuple[str, str], str] = {
     ("mg_wheel_axle_spec", "THREAD_LEN_BAND"): (
         "equal band indexed into the native symmetric (+/-) tolerance"
     ),
-    ("mg_magnifying_wheel_geom", "HUB_LEN_BAND"): (
-        "equal band indexed into the native symmetric (+/-) tolerance"
+    # Owner ruling 2026-11-24, fit audit question 17: an analysis band, not a
+    # printed limit.
+    ("mg_wheel_drum_geom", "DRUM_BORE_BAND"): (
+        "title-block drilled-hole deviations (the 1/2 DRILL THRU callout's row, "
+        "no native band); indexed for the drum's worst wall and the spigot's "
+        "least size under the bond clearance (SPIGOT_DIA_MIN)"
+    ),
+    # Owner ruling 2026-11-24, fit audit question 18: likewise.
+    ("mg_wheel_bar_geom", "AXLE_BORE_BAND"): (
+        "title-block drilled-hole deviations (the 3/16 DRILL THRU callout's row, "
+        "no native band); indexed for the bar's row walls and the axle's bond "
+        "gap (mg_wheel_group.BAR_BOND_GAP)"
+    ),
+    # Owner ruling 2026-11-24, fit audit question 20: an analysis band, not a
+    # printed limit.
+    ("pn_pen_v_block_spec", "PIVOT_BORE_BAND"): (
+        "title-block drilled-hole deviations (the #30 DRILL THRU callout's row, "
+        "no native band); indexed for the step clearance, the neck break's wall "
+        "and the set screw's reach to the pivot's groove"
+    ),
+    # Owner ruling 2026-11-24, fit audit OQ19 (A): MHA-SM-02 datum B is a #30
+    # drill; its band is an analysis band, not a printed limit.
+    ("sm_vn_knife_mount_dowel_spec", "SLIP_HOLE_DIA_BAND"): (
+        "title-block drilled-hole deviations (the #30 DRILL callout's row, no "
+        "native band); indexed for the dowel's slip, the tilt allowance and "
+        "the knife-hanger bolt float"
+    ),
+    ("sm_knife_mount_spec", "PIN_HOLE_DIA_BAND"): (
+        "the dowel spec's #30 drilled-hole deviations, re-exported; indexed "
+        "for the block's webs round datum B"
     ),
     ("pd_transgear_feed_pinion_spec", "FLAT_TO_AXIS_BAND"): (
         "equal band indexed into the native symmetric (+/-) tolerance and the "
@@ -382,8 +406,8 @@ INDEXED_FIT_BANDS: dict[tuple[str, str], str] = {
         "pose's pivot float and the assembly's pivot air"
     ),
     ("ch_rocker_arm_spec", "PIVOT_HOLE_BAND"): (
-        "indexed into the hub's wall floor (HUB_DIA_MIN); the build also "
-        "sets it natively on PivotDia"
+        "title-block drilled-hole deviations (the F DRILL THRU row, no native "
+        "band); indexed into the hub's wall floor (HUB_DIA_MIN) and wall note"
     ),
     ("pd_transgear_knob_cup_spec", "HOLE_BAND"): (
         "title-block drilled-hole deviations (the web's #33 DRILL THRU row, no "
@@ -565,9 +589,7 @@ def _resolve(use: BandUse) -> list[tuple[str, Any]]:
 @pytest.mark.parametrize(
     ("module_name", "expected"),
     [
-        ("build_pn_pen_hanger", "DRAWING_BANDS"),
-        ("build_pn_pen_rod", "DRAWING_BANDS"),
-        ("build_pn_pen_v_block", "DRAWING_BANDS"),
+        ("build_dt_cone_gear_tl_keyed_arbor", "spec.MODEL_BANDS_MM"),
     ],
 )
 def test_local_sources_cover_every_band(module_name: str, expected: str) -> None:

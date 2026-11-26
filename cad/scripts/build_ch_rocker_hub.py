@@ -3,8 +3,8 @@ r"""Reproduction script: rocker hub (MHA-CH-12; 20 used, one per rocker arm).
 The turned 1018 hub of the built-up rocker arm MHA-CH-06
 (``ch_rocker_arm_notes.BUILT_UP_PERMISSION_NOTE``), as SUPPLIED to the joint
 (``ch_rocker_hub_spec``): the Ø.400 land at its finished size, a reference
-turned to the MHA-CH-13 strap's measured hole for the press
-(``ch_rocker_hub_fit``), the bore drilled under the finished ream and the
+turned to slide into the MHA-CH-13 strap's hole for the LOCTITE 638 bond
+(``ch_rocker_hub_fit``), the bore drilled under the finished F drill and the
 length left long, both finished on the joined part to the MHA-CH-06 print.
 
 Layout: Front-plane annulus at the origin (land, bore) extruded mid-plane, so
@@ -99,7 +99,7 @@ def _supply_length_min_limit(adapter) -> None:
 
 @_telemetry.traced("part.reference_dimensions")
 def _author_reference_dimensions(adapter) -> None:
-    """Bracket the land Ø's value only, so its callout (the interference that
+    """Bracket the land Ø's value only, so its callout (the clearance that
     governs) does not read as reference too: a "(" prefix carrying
     SolidWorks' "<MOD-DIAM>" token and a ")" suffix
     (build_ch_rocker_strap_tl_hub_plug)."""
@@ -184,9 +184,9 @@ def build(adapter) -> dict[str, str]:
 
     apply_material(adapter, MATERIAL)
     report_mass_properties(adapter)
-    # The land is a reference turned to the measured strap hole (owner ruling
-    # 2026-11-21, matched fit only): no band of its own, its interference
-    # rides below it. The supply bore takes the title block's DRILLED HOLES
+    # The land is a reference turned to slide into the strap hole (owner
+    # ruling 2026-11-24, fit audit question 2): no band of its own, its bond
+    # clearance rides below it. The supply bore takes the title block's DRILLED HOLES
     # row; the supply length is a single MIN limit (it only has to leave
     # facing stock, ch_rocker_hub_spec.FACE_STOCK).
     _supply_length_min_limit(adapter)

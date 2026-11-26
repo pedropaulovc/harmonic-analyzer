@@ -40,13 +40,12 @@ DIMENSION_PREFIXES: dict[tuple[str, str], str] = {
 # rows, never restated here (rule 2); the four shank corners print their own
 # R.065 (SHANK_CORNER_R).
 #
-# Note 1 is the reamed pin hole's matched press fit, linked from its
-# callout: its limits, .0004 apart, are narrower than the shop's reamer row,
-# so the hole is reamed to its pin. The acceptance is the ANSI FN2 window the
-# pin budget is held to (sh_vn_pivot_pin_rod_spec.PRESS_INTERFERENCE_MAX),
-# rounded inward.
-# Owner decision 2026-11-19 (#3124 item 5): this note, a first-article press
-# and the MHA-CH-00 slide-by-hand check are the hole's controls; no gauge.
+# Note 1 is the reamed pin hole's press fit, linked from its callout. Owner
+# ruling 2026-11-24, fit audit question 3: the hole is reamed .0775 and
+# prints the reamer's size with no band (drawing-guidelines.md rule 4, form
+# 3: reamed to the bought mate); the pin itself is the gauge: it presses in,
+# it does not enter by hand. A pin that does enter by hand is bonded at
+# MHA-CH-00, not a scrapped rod; no gauge pins.
 #
 # Notes 2 and 3 each name one mate for two tight bands that serve it (fan-out
 # rounds 1-2: named at both callouts it printed twice, named at one the other
@@ -63,12 +62,10 @@ CAM_NUMBER = "MHA-DT-12"
 PIN_FIT_NOTE_NUMBER = 1
 SLOT_FIT_NOTE_NUMBER = 2
 CAM_SLOT_NOTE_NUMBER = 3
-PIN_FIT_INTERFERENCE = (".0002", ".0008")
 DRAWING_NOTES = "\n".join(
     (
-        f"{PIN_FIT_NOTE_NUMBER}. MATCHED PRESS FIT ON {PIN_NAME} {PIN_NUMBER}:",
-        f"    REAM {PIN_FIT_INTERFERENCE[0]}-{PIN_FIT_INTERFERENCE[1]}"
-        " UNDER THE MEASURED PIN.",
+        f"{PIN_FIT_NOTE_NUMBER}. PRESS FIT ON {PIN_NAME} {PIN_NUMBER}:",
+        "    THE PIN DOES NOT ENTER BY HAND.",
         f"{SLOT_FIT_NOTE_NUMBER}. FORK SLOT: RUNNING FIT ON ARM {ARM_NUMBER}.",
         f"{CAM_SLOT_NOTE_NUMBER}. RING: SLIDING FIT IN {CAM_NUMBER} CAM SLOT; LOCATES ROD.",
     )
@@ -108,7 +105,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # place there over-specified) and take the title block's .XX: that band
 # keeps both shank faces inside the ring's
 # (ch_connecting_rod_spec.SHANK_INSIDE_RING_MIN). The strap bore prints 1.213
-# at three with its +.003/.000; the reamed press hole at four; the shank's
+# at three with its +.005/.000; the reamed press hole at four; the shank's
 # four corners R.065 at three (the title block's .XXX is their .060-.070).
 # The ring OD, shank width, fork width, slot depth and boss length take the
 # title block's .XX too.

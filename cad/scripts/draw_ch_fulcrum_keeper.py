@@ -74,6 +74,7 @@ from ch_fulcrum_keeper_spec import (
     BORE_CENTRE_CALLOUT,
     BORE_DIA,
     BORE_DIA_BAND,
+    BORE_HOLE_SPEC,
     BORE_FROM_SIDE,
     CBORE_DEPTH_BAND,
     CBORE_DEPTH_MM,
@@ -159,7 +160,7 @@ TAP_R_SHEET = blind_cut_dia_mm(SET_SCREW_HOLE_SPEC) * SHEET_SCALE[0] / 2000.0
 # the through row reads "Ø .094 DRILL THRU" (FOOT_HOLE_THRU_ROW), then the
 # counterbore, then the two mate rows (FOOT_HOLE_MATE, widest last); four
 # rows. The counterbore row now carries its own limits (owner ruling
-# 2026-11-22, #3367), stacked +.004/.000 and +.005/-.005, so it is the
+# 2026-11-22, #3367), stacked +.005/-.005 twice (D25), so it is the
 # block's widest row (x 104..172 centred at x 138, layout audit of farm run
 # 20261122T220015080Z) and its left end stood right of the shoulder's: the
 # leader rising from x 102 to the hole at x 116 ran 3.4 mm through the
@@ -226,7 +227,7 @@ DIMENSION_CALLOUTS = {
 # 2026-10-28, review exception RV-03) and off the -Z side face, the latter's
 # text and function under its extension lines right of the foot tip, clear
 # of the foot-hole callout.  The end view carries the width plus the
-# shaft-axis / crown stack, the reamed bore and the bore's reference place
+# shaft-axis / crown stack, the F-drilled bore and the bore's reference place
 # off a side face with its centre-plane band above it.
 FRONT_KEEP = {
     "LugThickness": (0.080, 0.086),
@@ -300,7 +301,7 @@ REFERENCE_WITNESS_LEN_TOL = 0.01  # mm; the lines are fully defined sketch lengt
 # code that prints it, in the part frame (ch_fulcrum_keeper_spec: +X along the
 # shaft, outboard, x 0 the lug mid-plane; +Y up from the seat; +Z across the
 # width, z 0 its centre plane). Bands are the title block's rows at the places
-# the part authors (DRAWING_PRECISION), the reamed bore its own BORE_DIA_BAND,
+# the part authors (DRAWING_PRECISION), the F-drilled bore the DRILLED HOLES row,
 # the drilled holes and the tap drill the DRILLED HOLES row at their callouts'
 # three places. The (1.27) height, the (R.275) crown and the (.275) bore
 # station are references: the crown follows the width's .XX band and the bore
@@ -457,12 +458,13 @@ requirement(
         "overall_height_ref": _P["OverallHeight"],
     },
 )
-# The shaft bore, reamed through the lug from its outer face: Ø.2560
-# +.0010/.0000 REAM THRU, SLIDING FIT ON MHA-CH-04 (RIGHT_KEEP "BoreDia"); its
-# axis .99 off the seat (RIGHT_KEEP "LugRise") and on the width's centre
-# plane within ±.012 (RIGHT_KEEP "BoreFromSide": the (.275) reference off the
-# -Z side face with BORE_CENTRE_CALLOUT).
-_REAM = ((_SELF, "DIMENSION_CALLOUTS"),)
+# The shaft bore, F-drilled through the lug from its outer face: Ø.257
+# F DRILL THRU, SLIDING CLEARANCE ON MHA-CH-04 (RIGHT_KEEP "BoreDia"; owner
+# ruling 2026-11-24, fit audit question 1); its axis .99 off the seat
+# (RIGHT_KEEP "LugRise") and on the width's centre plane within ±.012
+# (RIGHT_KEEP "BoreFromSide": the (.275) reference off the -Z side face with
+# BORE_CENTRE_CALLOUT).
+_BORE_CALLOUT = ((_SELF, "DIMENSION_CALLOUTS"),)
 requirement(
     "bore",
     kind="hole",
@@ -476,9 +478,12 @@ requirement(
             ("BORE_DIA", "BORE_DIA_BAND", (_SELF, "RIGHT_KEEP")),
         ),
         "nominal_dia": (BORE_DIA, ("BORE_DIA",)),
-        "process": ("ream", _REAM),
-        "thru": (True, _REAM),
-        "callout": (BORE_CALLOUT, ((_NOTES, "BORE_CALLOUT"), *_REAM)),
+        "drill": (BORE_HOLE_SPEC.size, ("BORE_HOLE_SPEC",)),
+        # The drilled-block adapter's process is "drill" or "ream"; the
+        # letter rides "drill" (prechips cad_drilled_block).
+        "process": ("drill", _BORE_CALLOUT),
+        "thru": (True, _BORE_CALLOUT),
+        "callout": (BORE_CALLOUT, ((_NOTES, "BORE_CALLOUT"), *_BORE_CALLOUT)),
         "height": (
             limits(SHAFT_AXIS_H, _P["LugRise"], unit=UNIT),
             ("SHAFT_AXIS_H", "UNIT", (_SELF, "RIGHT_KEEP")),
@@ -547,7 +552,7 @@ requirement(
 )
 # The foot hole, drilled through the foot from its top with a flush
 # counterbore for the #2-56 fillister (the native callout: Ø.094 DRILL THRU,
-# Ø.150 +.004/.000 ↧ .083 +.005/-.005, FOR MHA-CH-VN-52; CENTERS MHA-FR-02 TAP:
+# Ø.150 +.005/-.005 ↧ .083 +.005/-.005, FOR MHA-CH-VN-52; CENTERS MHA-FR-02 TAP:
 # the counterbore's own limits, owner ruling 2026-11-22, #3367), its station .18
 # off the foot tip and .275 off the -Z side face (TOP_KEEP "ScrewFromTip",
 # "ScrewFromSide"); note 2 states the tip wall's worst case.
@@ -865,7 +870,7 @@ _TOL_BILATERAL = 2  # swTolType_e.swTolBILAT
 @_telemetry.traced("drawing.fulcrum_keeper.counterbore_band")
 def _print_counterbore_band(display: Any) -> None:
     """Print the counterbore's limits (owner ruling 2026-11-22, #3367:
-    Ø.150-.154 x .078-.088) on its native callout. The bands live on the
+    Ø.145-.155 x .078-.088, D25) on its native callout. The bands live on the
     part's Hole Wizard feature (build_ch_fulcrum_keeper._band_foot_counterbore)
     and ``<hw-cbdia>`` / ``<hw-cbdepth>`` display them; this sets only their
     tolerance places, the nominals' (FOOT_HOLE_CALLOUT_PRECISION), as

@@ -24,7 +24,7 @@ from _title_block_units import LENGTH_UNITS, render_number
 from sm_knife_mount_spec import (
     BORE_R_MAX as KNIFE_BORE_R_MAX,
     BORE_R_MIN as KNIFE_BORE_R_MIN,
-    KNIFE_GAUGE_BAR_CLEARANCE_IN,
+    KNIFE_GAUGE_BAR_DIA_MIN_IN,
     KNIFE_GAUGE_BAR_LENGTH_IN,
 )
 from sm_summing_assembly_spec import (
@@ -113,35 +113,32 @@ HUB_SET_SCREW_TORQUE = (
 # 11.3): a tool named in the steps, not a BOM part.  Owner ruling 2026-11-10
 # (Pedro), #2334, S2: an 8.0 in bar, long enough to pass both mounts (outer
 # faces 7.67 apart), not a 2 in class ZZ pin.  No gauge class comes that
-# long, so the bar is made to the mounts it gauges: its .0026-.0041
-# diametral clearance in each bore (the maximum the rock budget charges,
-# the minimum what two conforming bores need: owner ruling 2026-11-20
-# (Pedro), #2499, "Follow recommendations unless noted otherwise") is
-# the bar's own make record, shop-equipment gauges.gauge-bar-0472x8, the
-# tool list's TO MAKE row.  The step states no number that needs an
+# long, so the bar is made to the mounts it gauges.  Owner ruling 2026-11-24,
+# fit audit S6: its make record (shop-equipment gauges.gauge-bar-0472x8, the
+# tool list's TO MAKE row) reads "TURN THE BAR UNTIL IT SLIDES THROUGH BOTH
+# MOUNTS; DIA .496 MIN", the floor capping the play the rock budget charges
+# (.0040 in the largest bore); the matched .0026-.0041 fit of owner ruling
+# 2026-11-20 (Pedro), #2499 is gone.  Owner, #3203 (2026-11-24): "Accepted
+# when the bar is made; the assembly sheet says nothing more".  The step
+# states no number that needs an
 # instrument, only the fitter's hand check (rule 22; Main on PR #2717's
 # gating clarity finding, 2026-11-13: no gauge ceremony for a setting bar).
-# A bar .0026-.0041 under the Ø.4985-.5000 bores (owner ruling 2026-11-23,
-# tool audit Q13; the former Ø.4720-.4735 bores took a Ø.4679-.4709 bar) is
-# Ø.4944-.4974, which straddles a two-place rounding (.49/.50); a (Ø.50)
+# A bar from Ø.4960 up to just under the largest Ø.5000 bore (owner ruling
+# 2026-11-23, tool audit Q13) floors to (Ø.49) at two places; a (Ø.50)
 # reads as stock 1/2 in rod, which cannot pass a Ø.4985 bore (Codjiflo r1
 # on PR #3444). So the reference is the two places at or under every
 # conforming bar, under the bores' smallest Ø, and it shakes in the bores:
 # the hand check is that it slides through both, not that it does not shake.
-KNIFE_GAUGE_BAR_SIZES_IN = (
-    2.0 * KNIFE_BORE_R_MIN / 25.4 - max(KNIFE_GAUGE_BAR_CLEARANCE_IN),
-    2.0 * KNIFE_BORE_R_MAX / 25.4 - min(KNIFE_GAUGE_BAR_CLEARANCE_IN),
-)
-KNIFE_GAUGE_BAR_REF_DIA_IN = math.floor(min(KNIFE_GAUGE_BAR_SIZES_IN) * 100.0 + 1e-9) / 100.0
+# The sizes run from the floor up to, not including, the largest bore.
+KNIFE_GAUGE_BAR_SIZES_IN = (KNIFE_GAUGE_BAR_DIA_MIN_IN, 2.0 * KNIFE_BORE_R_MAX / 25.4)
+KNIFE_GAUGE_BAR_REF_DIA_IN = math.floor(KNIFE_GAUGE_BAR_SIZES_IN[0] * 100.0 + 1e-9) / 100.0
 if (
-    any(
-        math.floor(size * 100.0 + 1e-9) / 100.0 != KNIFE_GAUGE_BAR_REF_DIA_IN
-        for size in KNIFE_GAUGE_BAR_SIZES_IN
-    )
+    math.floor(KNIFE_GAUGE_BAR_SIZES_IN[1] * 100.0 - 1e-6) / 100.0
+    != KNIFE_GAUGE_BAR_REF_DIA_IN
     or KNIFE_GAUGE_BAR_REF_DIA_IN * 25.4 >= 2.0 * KNIFE_BORE_R_MIN
 ):
     raise AssertionError(
-        f"gauge bars Ø{KNIFE_GAUGE_BAR_SIZES_IN[0]:.4f}-{KNIFE_GAUGE_BAR_SIZES_IN[1]:.4f} "
+        f"gauge bars Ø{KNIFE_GAUGE_BAR_SIZES_IN[0]:.4f} up to Ø{KNIFE_GAUGE_BAR_SIZES_IN[1]:.4f} "
         f"do not all floor to a (Ø{KNIFE_GAUGE_BAR_REF_DIA_IN:.2f}) reference under the bore"
     )
 KNIFE_GAUGE_BAR = (

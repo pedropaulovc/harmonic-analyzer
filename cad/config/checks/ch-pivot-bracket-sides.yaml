@@ -1,0 +1,9 @@
+# What fails past each numeric check ch_pivot_bracket_sides asserts
+# (check_register.py, tolerance-policy.md "Checks in spec modules and tests").
+checks:
+  - id: C-01
+    check: "HEAD_TO_EAR_FACE_MIN"
+    kind: gap
+    reason: "the hold-down screw head hits the ear face"
+    source: "the module computes it: the hold-down hole's place and the fillister head's diameter at the bands' worst case, above zero; .0239 at the .XXX ear thickness"
+    basis: worst_case

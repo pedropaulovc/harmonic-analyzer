@@ -308,7 +308,7 @@ beam = "other"
 
 [[setups.operations]]
 instruction = "Mic the brass bar's thickness and calipers its width at three places along the 8.25 in at one end."
-inspection = "Thickness {{cad.back_face_thickness_min_in:.3dot}}–{{cad.back_face_thickness_max_in:.3dot}} (drawing {{cad.back_face_thickness_in:.3dot}} SEE NOTE 1; the brass bar as supplied, never machined); width {{process.blank_width_min_mm:in.3dot}}–{{process.blank_width_max_mm:in.3dot}}, so both edges clean up.\nStop: Outside: gate the brass bar's other end instead; outside there too: stop and tell the owner."
+inspection = "Thickness {{cad.back_face_thickness_min_in:.3dot}}–{{cad.back_face_thickness_max_in:.3dot}} (drawing ({{cad.back_face_thickness_in:.3dot}}) 1/8 FLAT AS SUPPLIED, SEE NOTE 1; never machined); width {{process.blank_width_min_mm:in.3dot}}–{{process.blank_width_max_mm:in.3dot}}, so both edges clean up.\nStop: Outside: gate the brass bar's other end instead; outside there too: stop and tell the owner."
 gauge_checks = [
   { gauge = "micrometers", band_mm = "{{cad.back_face_thickness_band_mm}}" },
   { gauge = "calipers", band_mm = ["{{process.blank_width_min_mm}}", "{{process.blank_width_max_mm}}"] },

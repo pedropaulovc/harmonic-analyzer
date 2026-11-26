@@ -214,10 +214,11 @@ def test_the_tap_bands_are_the_printed_ones(manifest: dict) -> None:
     for index, station in ((1, 0.150), (2, 0.690)):
         tap = features[f"plate_tap_{index}"]
         assert tap["thread"] == "#2-56 UNC-2B"
-        # The #49 tap drill at DRILLED HOLES +.004/0, ↧.300; thread ↧.250.
+        # The #49 tap drill at DRILLED HOLES +.004/0, ↧.30; thread ↧.25
+        # (rule 3: tap and tap-drill depths at .XX).
         assert tap["dia"] == pytest.approx([_in(0.073), _in(0.077)], abs=1e-3)
-        assert tap["drill_depth"] == pytest.approx([_in(0.295), _in(0.305)])
-        assert tap["thread_depth"] == pytest.approx([_in(0.245), _in(0.255)])
+        assert tap["drill_depth"] == pytest.approx([_in(0.29), _in(0.31)])
+        assert tap["thread_depth"] == pytest.approx([_in(0.24), _in(0.26)])
         assert tap["axis"] == [0.0, 0.0, 1.0] and "thru" not in tap
         # Drilled with the plate in its traveler; tapped in this one.
         assert tap["made_at"] == "pair_drill"

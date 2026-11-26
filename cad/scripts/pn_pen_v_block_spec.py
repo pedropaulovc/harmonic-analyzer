@@ -23,15 +23,15 @@ brief (``balance_options.png`` panel C):
   along the body, so only the grip touches the block.  The body is wider
   than the neck so both slot walls hold the rule 17 .080 target at the
   title block's .XX band.
-* The rod's turned pivot end drops into a reamed pivot bore just past the
+* The rod's turned pivot end drops into a #30 drilled pivot bore just past the
   step; the rod's square shoulder rests on the block top, and a #4-40 set
   screw from the body's front face locks the pen's angle to the paper (book:
   "a small set screw that adjusts the angle of the pen").
 * The block's length trims the carriage CG onto the rod axis
   (``pn_pen_carriage_geom`` solves and asserts).
 
-Drawing contract: the pivot bore is a sketched, reamed cut (its toleranced
-diameter is a marked sketch dimension, banded to the rod pivot); the set-screw
+Drawing contract: the pivot bore is a sketched, drilled cut (its diameter a
+marked sketch dimension under the title block's DRILLED HOLES row); the set-screw
 tap is a Hole Wizard feature whose size prints as a native hole callout and
 whose station prints as its marked placement dimensions.
 The bore's top-edge chamfer prints as a native single MIN limit: it must clear
@@ -49,7 +49,6 @@ import math
 from typing import NamedTuple
 
 import _config
-from _fit_ream_h7 import REAM_H7
 from _hole_spec import HoleSpec, TAP_DRILL_MM, THREAD_MAJOR_MM
 from _inch_wall_limits import WALL_FLOOR_MM, WALL_TARGET_MM
 from _milled_corner_limit import (
@@ -62,6 +61,7 @@ from _milled_corner_limit import (
 from _package_units import drawing_unit
 from _printed_tolerance import (
     angular_band_deg,
+    drilled_oversize_mm,
     inside_corner_radius_mm,
     printed_deviations,
 )
@@ -155,7 +155,7 @@ V_APEX_FILLET_AREA = (
 V_GROOVE_SECTION = V_GROOVE_AREA - V_APEX_FILLET_AREA
 
 # --- Relief slot (body clearance), x RELIEF_X0..BLOCK_LENGTH ---
-# The step stands far enough toward the paper end that the reamed pivot bore
+# The step stands far enough toward the paper end that the drilled pivot bore
 # drops wholly into the slot at the printed limits (guard below): at 10.0 the
 # bore's edge stood 0.5 off the step, and at the limits the ream broke into
 # the step wall in a crescent (machinist review final4).  The V, and so the
@@ -184,10 +184,15 @@ if not (RELIEF_Z0 < V_MOUTH_Z0 and V_MOUTH_Z1 < RELIEF_Z1 and V_APEX_Y < RELIEF_
     raise AssertionError("past the step the V must lie inside the relief slot")
 
 # --- Pivot bore (rod's turned end): a sketched cut from the top face down
-# into the relief slot, reamed with the owned .1260 chucking reamer (#290
-# owner ruling: the 4 mm pivot becomes .126) ---
-PIVOT_BORE_DIA = 3.2004  # .126 reamed
-PIVOT_BORE_BAND = REAM_H7  # +.0005/.0000
+# into the relief slot. Owner ruling 2026-11-24, fit audit question 20
+# ("APPROVED as recommended", option A): drilled #30 with the rod left as it
+# is (#290's .126 pivot unchanged): the set screw clamps the pivot and
+# nothing turns in the bore, so the reamed .1260 +.0005/0 gave nothing the
+# clamp needs. The band is the title block's DRILLED HOLES row, analysis
+# only (no native band) ---
+PIVOT_BORE_DRILL = "#30"
+PIVOT_BORE_DIA = 3.2639  # .1285, a #30 drill
+PIVOT_BORE_BAND = (drilled_oversize_mm(unit=UNIT), 0.0)  # (upper, lower): +.004/0
 # Just past the step (guard below); the CG solve sets the length.
 PIVOT_BORE_X = 12.446  # .49
 # 45 deg chamfer on the bore's TOP edge, where the rod's square shoulder seats:
@@ -406,7 +411,7 @@ TAP_WALL_MIN_PLACES = 3
 # the title block's +/-1); the flat's height the flanks leave is a reference,
 # driven in the sketch, at the mouth stations' and flat's two places, so it
 # reads what they close to.  The bore chamfer prints its single limit at three
-# places, the reamed bore its +.0005 band at four; the relief's step corners
+# places, the drilled bore its #30 size at four; the relief's step corners
 # their R.065 at three (.060-.070), the neck's edge breaks their .080 at three
 # (.075-.085); the V's apex rounds print nothing (the title block's R.040 MAX).
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
@@ -509,14 +514,14 @@ if (
 # The widest neck the print allows, for the stirrup's window.
 NECK_WIDTH_PRINTED_MAX = NECK_DEPTH + _dev("NeckZ1")[1] - _dev("NeckZ0")[0]  # 18.288
 # The pivot bore must leave the brass wholly into the slot: its paper-side
-# edge (station and reamed diameter at their limits) stays past the step at
-# its far limit, or the ream breaks into the step wall in a crescent.
+# edge (station and drilled diameter at their limits) stays past the step at
+# its far limit, or the drill breaks into the step wall in a crescent.
 PIVOT_BORE_STEP_CLEARANCE_PRINTED_MIN = (
     PIVOT_BORE_X
     + _dev("PivotX")[0]
     - (PIVOT_BORE_DIA + PIVOT_BORE_BAND[0]) / 2.0
     - (RELIEF_X0 + _dev("ReliefX0")[1])
-)  # 1.441
+)  # 1.365
 if PIVOT_BORE_STEP_CLEARANCE_PRINTED_MIN < 0.0:
     raise AssertionError("at its printed limits the pivot bore breaks the step wall")
 # The tap enters the body's front face just past the step, so over the
@@ -785,22 +790,18 @@ if V_CONTACT_MARGIN_PRINTED_MIN <= 0.0:
     raise AssertionError("at its printed limits a grip contact leaves its flank")
 if V_FLAT_STRAIGHT_PRINTED_MIN <= 0.0:
     raise AssertionError("at its printed limits the apex rounds meet across the flat")
-# (feature, dimension) -> (upper, lower) native band.
-DRAWING_BANDS: dict[tuple[str, str], tuple[float, float]] = {
-    ("PivotBoreProfile", "PivotDia"): PIVOT_BORE_BAND,
-}
-# Every tight band or limit names its mate on the dimension it governs.  The
+# Every tight limit names its mate on the dimension it governs.  The
 # chamfer reads ".012 MIN" over its angle; why it has a floor rides above it,
 # clear of the extension lines below (draw_pn_pen_v_block's SECTION_KEEP).
-# The reamed diameter's mate: the standard fit name and the mate's number in
-# two short rows of words under REAM THRU (rule 7: at most two lines of words;
-# the fit's clearance is the rod's note 1, the pin turned to its own band).
+# The drilled diameter names its drill and its mate (rule 4: a drilled hole
+# prints the named drill; owner ruling 2026-11-24, fit audit question 20),
+# in two short rows; the set screw's own tap callout says what holds it.
 # Its callout stands in the bottom view's corner, between the neck's
 # depth dimensions and the title block (draw_pn_pen_v_block's BOTTOM_KEEP).
 PEN_ROD_NUMBER = _config.parts("pn-pen-rod")["number"]
 PEN_FRAME_NUMBER = _config.parts("pn-pen-frame")["number"]
 DIMENSION_CALLOUTS: dict[str, str] = {
-    "PivotDia": f"REAM THRU\nSLIDING FIT ON\n{PEN_ROD_NUMBER} PIVOT",
+    "PivotDia": f"{PIVOT_BORE_DRILL} DRILL THRU\n{PEN_ROD_NUMBER} PIVOT",
     "PivotChamferSize": "X 45°",
     "TapWallMin": "TAP WALL",
     "ReliefCornerR": CORNER_REASON,
@@ -829,7 +830,7 @@ DIMENSION_PREFIXES: dict[tuple[str, str], str] = {
 
 # Material and finish ride the title block; nothing else needs saying.
 DRAWING_NOTES = ""
-# The pictorial runs 3:2: at 1:1 the 2.26 tap mouth and the reamed bore read as
+# The pictorial runs 3:2: at 1:1 the 2.26 tap mouth and the drilled bore read as
 # polygons (machinist review r5; pn_pen_frame_spec's 2:1 fix).  2:1 does not
 # fit between section A-A and the title block (draw_pn_pen_v_block).
 ISOMETRIC_VIEW_SCALE = (3, 2)

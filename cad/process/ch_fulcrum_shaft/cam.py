@@ -57,6 +57,8 @@ CLEAR_MM = 5.0
 JAW_DEPTH_MM = IN
 # A plan number the recipe recomputes must agree to this (its rounding).
 PLAN_TOL_MM = 0.01
+# The owned mechanical edge finder's tip Ø (shop-equipment tools.edge-finder).
+EDGE_FINDER_DIA_IN = 0.200
 
 
 def _plan_operations(plan: dict[str, Any]):
@@ -167,7 +169,7 @@ def context(
     outer = f["outer"]
     if outer["axis"] != [0.0, 0.0, 1.0] or outer["at"] != [0.0, 0.0, 0.0]:
         raise ValueError("outer: expected the model Z axis")
-    dia = outer["dia_nominal"]
+    dia = outer["dia_ref"]  # the bought rod, as supplied
     radius = dia / 2
 
     def apex(name: str) -> float:
@@ -187,6 +189,10 @@ def context(
     length = abs(apex("far_end") - apex("datum_end"))
     if not math.isclose(p["stock_dia_in"] * IN, dia, abs_tol=1e-6):
         raise ValueError(f"process.stock_dia_in is not the O.D. Ø{dia:.4f}")
+    # Setup 6's Y0 pick-up: the owned .200 edge finder (shop-equipment
+    # tools.edge-finder, "Mechanical edge finder, .200 in") on the bought O.D.
+    _agree(plan, "edge_finder_radius_mm", EDGE_FINDER_DIA_IN * IN / 2)
+    _agree(plan, "y0_edge_find_mm", radius + EDGE_FINDER_DIA_IN * IN / 2)
 
     em = _shop_tool(plan, shop, "em-eighth")["diameter_mm"]
     cutter = em / 2

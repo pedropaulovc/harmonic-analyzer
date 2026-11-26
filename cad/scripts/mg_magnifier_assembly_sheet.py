@@ -16,7 +16,6 @@ import math
 
 import ha_harmonic_analyzer_assembly_steps as _ha_steps
 import mg_magnifier_assembly_steps as _steps
-import mg_wheel_group as _group
 import sh_vn_clamp_screw_spec as _clamp_screw
 import mg_wheel_axle_spec as _axle
 import mg_vn_magnifying_bracket_screw_spec as _bracket_screw
@@ -32,7 +31,6 @@ from mg_magnifier_assembly_spec import (
     FEATURE,
     PRESS_GAUGE_DIMENSION,
     THREAD_PAST_LOCKNUT_DIMENSION,
-    THREAD_PAST_LOCKNUT_LIMITS,
     UNIT,
 )
 from _title_block_units import LENGTH_UNITS, render_number
@@ -47,10 +45,11 @@ from mg_magnifying_wheel_geom import TIE1_X as _TIE1_X
 from mg_magnifying_wheel_geom import TIE1_Y as _TIE1_Y
 
 # The axle-stack dimensions DETAIL A and DETAIL B import (the builder marks
-# the banded and limit ones, DIMENSION_TOLERANCES and LIMIT_DIMENSIONS).
-# DETAIL A: the press gauge and the plain end below the bar's far face;
-# DETAIL B: the drum face below the spigot end, the endshake and the thread
-# end past the second nut.
+# the banded and limit ones, DIMENSION_TOLERANCES and LIMIT_DIMENSIONS, and
+# the references). DETAIL A: the step station past the spacer face and the
+# plain end below the bar's far face, both REF; DETAIL B: the drum face
+# below the spigot end (REF), the endshake and the thread end past the
+# second nut.
 PRESS_DETAIL_DIMENSIONS = frozenset({PRESS_GAUGE_DIMENSION, BACK_END_SUNK_DIMENSION})
 ENDSHAKE_DETAIL_DIMENSIONS = frozenset(
     {DRUM_RECESS_DIMENSION, ENDSHAKE_DIMENSION, THREAD_PAST_LOCKNUT_DIMENSION}
@@ -88,35 +87,6 @@ if UNIT != "in":
     raise AssertionError("the endshake feeler check reads inch leaves")
 ENDSHAKE_GO_TEXT = render_number((ENDSHAKE - ENDSHAKE_TOL) / _INCH, UNIT, 3)
 ENDSHAKE_NO_GO_TEXT = render_number((ENDSHAKE + ENDSHAKE_TOL) / _INCH, UNIT, 3)
-# The trial fit (#3344) reads the thread end past the second nut before the
-# endshake is set, its nuts jammed over the go leaf (ENDSHAKE_GO_TEXT, the
-# band's low limit, ENDSHAKE_MIN: the spec asserts the band symmetric):
-# jammed "just free", about no endshake, a conforming stack read .115 against
-# DETAIL B's .114. At the go leaf both of the wheel group's corners land
-# inside DETAIL B's limits: the long one is mg_wheel_group's own, taken at
-# ENDSHAKE_MIN; the short one is its locknut corner, taken at ENDSHAKE_MAX.
-# The endshake set after the trial is never less, so the acceptance reads no
-# more than the trial did. It can read up to the band's width less: a
-# conforming stack still passes (.031 less .004), and a stack that passed the
-# trial low and fails there has its parts measured, not re-trialled
-# ("axle-reset", Codjiflo r1 of #3345).
-TRIAL_THREAD_PAST_LOCKNUT = (
-    _group.LOCKNUT_THREAD_MARGIN
-    + _axle.TIP_INCOMPLETE
-    + (_group.ENDSHAKE_MAX - _group.ENDSHAKE_MIN),
-    _group.THREAD_PAST_LOCKNUT_MAX,
-)  # .031 .. .113
-if not (
-    THREAD_PAST_LOCKNUT_LIMITS[0] - 1e-6
-    <= TRIAL_THREAD_PAST_LOCKNUT[0] - (_group.ENDSHAKE_MAX - _group.ENDSHAKE_MIN)
-    <= TRIAL_THREAD_PAST_LOCKNUT[1]
-    <= THREAD_PAST_LOCKNUT_LIMITS[1] + 1e-6
-):
-    raise AssertionError(
-        f"a conforming stack reads {TRIAL_THREAD_PAST_LOCKNUT} mm of thread past "
-        f"the second nut at the trial, outside {THREAD_PAST_LOCKNUT_LIMITS} at "
-        "the trial or once the endshake is set"
-    )
 
 # The summing lever (cad/config/parts/sm-summing-lever.yaml), the mate the
 # bracket screws to at MHA-HA-00; rule 4 names it by its drawing number.
@@ -257,24 +227,32 @@ _CLAMP, _THUMB, _ROD, _FIXTURE = _item(CLAMP), _item(THUMB_SCREW), _item(ROD), _
 _WIRE = _item(WIRE)
 _SPACER = _item(SPACER)
 # The wheel stack on the axle past the spacer, bar side first (sheet 2 shows
-# the order). The spacer goes on at the press, which is gauged from its outer
-# face (owner ruling 2026-11-21), and stays on.
+# the order). The spacer goes on before the dry trial, comes off with the
+# trial stack before the bond and goes back on before the wheel stack.
 _STACK = (
     f"ITEMS {ITEM_NUMBERS[BACK_WASHER]}, "
     f"{ITEM_NUMBERS[WHEEL]} ({_DRUM} AWAY FROM {_BAR}) AND {ITEM_NUMBERS[FRONT_WASHER]}"
 )
-# The parts on the axle whose printed or catalogue thickness is a term of the
-# thread end's stack (mg_wheel_group), for the failed-trial remedy.
+# What the trial puts on the axle, outermost first, as it comes off.
+_TRIAL_OFF = (
+    f"THE NUTS, THE FEELER AND ITEMS {ITEM_NUMBERS[FRONT_WASHER]}, "
+    f"{ITEM_NUMBERS[WHEEL]}, {ITEM_NUMBERS[BACK_WASHER]} AND {ITEM_NUMBERS[SPACER]}"
+)
+# Every part whose size is a term of the trial's stack under the flush start
+# (mg_wheel_group): the bar's depth and the spacer's length place the step
+# and the hub's front face, the hub and the washers and nuts their own
+# thickness (the axle's lengths are the axle's own replacement). Each reads
+# on a micrometer against its own sheet or catalogue band.
 _STACK_PARTS = (
-    f"ITEMS {ITEM_NUMBERS[BACK_WASHER]}, {ITEM_NUMBERS[WHEEL]}, "
-    f"{ITEM_NUMBERS[FRONT_WASHER]} AND {ITEM_NUMBERS[NUT]}"
+    f"{_BAR} (DEPTH), {_SPACER} (LENGTH), {_WHEEL} (HUB LENGTH) AND ITEMS "
+    f"{ITEM_NUMBERS[BACK_WASHER]}, {ITEM_NUMBERS[FRONT_WASHER]} AND "
+    f"{ITEM_NUMBERS[NUT]} (THICKNESS)"
 )
 
 # Rule 23: a specified anaerobic bond equals a press fit. The package bonds
-# a press that went in slack: the drum on the wheel's spigot (owner ruling
-# 2026-11-07) and the axle in the bar (owner ruling 2026-11-11, #2541 and
-# #2523, amending the 2026-11-07 "a slip axle is remade": a remade axle cut
-# from the same as-supplied rod comes out the same size). Its degrease,
+# the drum on the wheel's spigot (owner ruling 2026-11-24, fit audit
+# question 17) and the axle in the bar's drilled bore (question 18), both
+# always. Its degrease,
 # coated length, squeeze-out, cure and acceptance rules print once, as a
 # general note with the checks in ASSEMBLY.md. The axle's coat stays on the
 # length inside the bar and its squeeze-out is wiped off at once, since the
@@ -287,10 +265,11 @@ BOND_NOTE = (
     "LOAD OR OIL. ACCEPT: NO TURN OR SLIDE BY HAND."
 )
 
-# #2399: the axle presses in plain end first, so the press would push on its
-# threaded end and drive the band's interference (.0003-.0012) through the
-# relief neck (Ø.066-.076, .0034-.0045 sq in), which yields under 250 lbf in
-# annealed drill rod (about 55 ksi), short of any press in the band. The press
+# #2399: the axle goes in plain end first, so a push on its threaded end at
+# the bore's tightest corner (a .0002 light press since question 18; the
+# old .0003-.0012 press band, which the bearing check below still covers)
+# would load the relief neck (Ø.066-.076, .0034-.0045 sq in), which yields
+# under 250 lbf in annealed drill rod (about 55 ksi). The push
 # pushes on the shank step instead, through a sleeve over the thread: its
 # drilled bore clears the thread's major Ø and stays on the step's flat inside
 # the shank's title-block edge break, its OD covers the step, and it stands
@@ -318,11 +297,10 @@ if not (
 # .88 kip). The worst annulus (the sleeve's bore at the drilled limit, the
 # step's flat inside a full edge break) carries it at about 83 ksi, under the
 # 1.8 x yield static bearing on a finished face takes (AISC 360-16 J7), so at
-# worst the step's rim coins. The step is the face the press setting reads,
-# over the sleeve that bears on it (owner ruling 2026-11-21), so a coined rim
-# reads the axle that much deeper and leaves the thread end that much farther
-# out; the press is still accepted at the thread end past the nuts, and the
-# step locates no part (the wheel hub overhangs it, STEP_INSIDE_HUB).
+# worst the step's rim coins. Since C11 the setting is read at the plain end
+# and accepted at the thread end past the nuts, so a coined rim moves
+# nothing either reads, and the step locates no part (the wheel hub
+# overhangs it, mg_wheel_group.TRIAL_STEP_INSIDE_HUB_MIN).
 PRESS_FRICTION_OILED = 0.10
 PRESS_HUB_PRESSURE_KSI = 40.0
 AXLE_YIELD_KSI = 55.0  # annealed O1/W1 drill rod
@@ -359,81 +337,90 @@ PRESS_SLEEVE = (
 # leader and in the steps; MHA-MG-05 keys it as TIE 1 on its own sheet.
 WIRE_TIE_HOLE = "WIRE TIE HOLE"
 _TIE_HOLE = f"THE {WIRE_TIE_HOLE}"
-# How the press setting is read (Codjiflo r1 of #3334): the shoulder stands
-# past the spacer face with the thread rising from it, so a depth rod cannot
-# rest on it. The press sleeve sits on the shoulder over the thread and
-# stands past the dome; its top is the face the beam rests on, the rod comes
-# down beside it (the sleeve's .25 OD inside the spacer's) onto the spacer
-# face, and the sleeve's own length comes off the reading.
-_PRESS_READ = (
-    f"(CALIPER DEPTH ROD FROM THE TOP OF THE {_step(_steps.PRESS_SLEEVE_MADE_KEY)} "
-    "SLEEVE ON THE SHOULDER, LESS ITS MEASURED LENGTH)"
-)
+# The axle's setting is read at its plain end (owner ruling 2026-11-24, fit
+# audit part 2, C11): the bar stands on the surface plate on its far face, so
+# a plain end on the plate is flush, and a caliper depth rod from that face
+# reads how far the end stands inside the bore.
+_PLATE = f"THE SURFACE PLATE {_BAR} STANDS ON"
 STEP_TEXT = {
-    _steps.DRUM_PRESSED_KEY: (
-        f"PRESS {_DRUM} ONTO THE SPIGOT OF {_WHEEL} UNTIL IT IS HARD AGAINST THE "
-        f"BOSS, ITS OUTER FACE BELOW THE END OF THE SPIGOT AS {ENDSHAKE_DETAIL_TITLE} "
-        "SETS IT (CALIPER DEPTH ROD)."
+    # Owner ruling 2026-11-24, fit audit question 17: the drum is bonded on
+    # the spigot MHA-MG-05 is turned to slide in its drilled bore (rule 23:
+    # the step gives the grade and the stop, its own check the acceptance;
+    # NOTE 1 the degrease, coat and cure). The boss face squares it; none of
+    # the compound goes in the wheel's bore, which runs on the axle.
+    _steps.DRUM_BONDED_KEY: (
+        f"BOND {_DRUM} ON THE SPIGOT OF {_WHEEL} WITH {BOND_GRADE}, {BOND_NOTE_REF}, "
+        "NONE IN THE BORE, UNTIL IT IS HARD AGAINST THE BOSS."
+    ),
+    # A slip fit cures wherever it sits in its clearance, so the drum is
+    # centred while wet (fit audit question 17, as the cone gears' wet
+    # tap-true of #3292 on MHA-DT-00): the wheel turns on its own axle, held
+    # on an owned V-block, under an owned dial indicator on its magnetic
+    # base, the setup of MHA-DT-00's wet tap-true. The approved form (fit
+    # audit question 17: "centred on an indicator while wet") carries no
+    # reading, so none is
+    # added: the drum is tapped until the needle swings least, which tells
+    # the builder when he is done (machinist review r1, run
+    # 20261124T092122388Z) without a new instrument limit.
+    "drum-centred": (
+        f"AT ONCE, BEFORE IT GRABS, TAP {_DRUM} ON ITS RIM UNTIL AN INDICATOR ON "
+        f"THE RIM SWINGS LEAST, {_WHEEL} TURNING ON {_AXLE} CLAMPED ON A V-BLOCK."
+    ),
+    "drum-bond-cured": f"LEAVE {_DRUM} UNDISTURBED 24 H TO CURE.",
+    # Owner ruling 2026-11-24, fit audit part 2, S4: the seat is seen, not
+    # read (DETAIL B prints the drum face's window as REF); the semicolon of
+    # the approved text is a comma here (rule 22's one-clause lint). Its own
+    # check (rule 22, machinist review of run 20261125T172832344Z r2), with
+    # the hand check sharing the strip below.
+    "drum-seated": (
+        f"CHECK {_DRUM} IS HARD AGAINST THE BOSS: NO LIGHT UNDER THE DRUM, NOT "
+        "PROUD OF THE SPIGOT END (STRAIGHTEDGE)."
     ),
     _steps.DRUM_HELD_KEY: f"CHECK {_DRUM} DOES NOT TURN OR SLIDE BY HAND.",
-    # A press that goes on by hand is a slip fit (rule 23). Owner ruling
-    # 2026-11-07: a bond equals a press, so a slip drum is bonded rather than
-    # the wheel remade (BOND_NOTE). As the axle's (#2579): the slip clause
-    # names an unbonded drum, and a bonded one comes back through the hold
-    # check once cured, before anything oils or loads it.
-    "drum-pulled-off": f"IF IT DOES, OR AN UNBONDED {_DRUM} SLID ON BY HAND, PULL {_DRUM} OFF.",
-    "drum-bonded": f"IF IT CAME OFF, BOND IT ON WITH {BOND_GRADE}, {BOND_NOTE_REF}.",
-    "drum-bond-cured": (
-        f"IF IT WAS BONDED, RETURN TO {_step(_steps.DRUM_HELD_KEY)} ONCE IT HAS "
-        "CURED 24 H."
+    "drum-stripped": (
+        f"IF {_step('drum-seated')} OR {_step(_steps.DRUM_HELD_KEY)} FAILS, PULL "
+        f"{_DRUM} OFF {_WHEEL}."
     ),
-    # The press goes to its setting: the shoulder past the outer face of the
-    # spacer slid on the shank against the bar (owner ruling 2026-11-21, fit
-    # at assembly: the spacer's length leaves the nut stack), read with a
-    # depth rod where DETAIL A dimensions it. That setting is the axle's one
-    # position; the thread end past the second nut stays its acceptance (owner
-    # ruling 2026-11-06 Q1), dimensioned on DETAIL B, which draws the nuts.
-    # With the press in its band and every stack part in its own, the thread
-    # end lands inside DETAIL B (mg_wheel_group), so a failed acceptance is
-    # never pressed past the setting to pass. The press goes in oiled and
-    # pushes only on the shank step, through PRESS_SLEEVE (#2399); the
-    # sleeve, the spacer and the oil are steps of their own (rule 22).
+    # Each remedy names the check whose failure triggers it, so none fires on
+    # a clean pass after a return (rendered chain read of #3601, run
+    # 20261126T020952932Z: "WAS PULLED OFF" stayed true on the next pass).
+    "drum-cleaned": (
+        f"IF {_step('drum-seated')} OR {_step(_steps.DRUM_HELD_KEY)} FAILED, CLEAN "
+        f"{_DRUM} AND THE SPIGOT TO BARE METAL."
+    ),
+    "drum-rebonded": (
+        f"IF {_step('drum-seated')} OR {_step(_steps.DRUM_HELD_KEY)} FAILED, RETURN TO "
+        f"{_step(_steps.DRUM_BONDED_KEY)}."
+    ),
+    # A wheel replaced in the trial's strip comes here for its drum first,
+    # the axle out of the bar for the V-block, then rejoins the trial at the
+    # spacer: the press sleeve is already made (independent read of #3601).
+    "drum-trial-resumed": (
+        f"IF {_WHEEL} WAS REPLACED AT {_step('stack-part-replaced')}, GO ON TO "
+        f"{_step(_steps.SPACER_FITTED_KEY)}."
+    ),
+    # Owner ruling 2026-11-24, fit audit part 2, C11 ("Yes, set to the trial
+    # stack"), with question 18's bond: the trial runs dry (the steps module
+    # says why). The axle is pushed on its shoulder only, through the
+    # sleeve, over the thread (#2399); at the drilled bore's tightest corner
+    # (a .0002 light press) the arbor press pushes it, the sleeve between.
     _steps.PRESS_SLEEVE_MADE_KEY: f"MAKE {PRESS_SLEEVE} FOR {_AXLE}.",
     _steps.SPACER_FITTED_KEY: f"SLIDE {_SPACER} ONTO THE SHANK OF {_AXLE}.",
-    "axle-plain-end-oiled": f"WIPE LIGHT MACHINE OIL ON THE PLAIN END OF {_AXLE}.",
-    _steps.AXLE_PRESSED_KEY: (
-        f"PRESS {_AXLE} INTO {_BAR}, THREADED END OUT, ON ITS SHOULDER ONLY "
-        f"THROUGH THE {_step(_steps.PRESS_SLEEVE_MADE_KEY)} SLEEVE, UNTIL THE "
-        f"SHOULDER STANDS PAST THE OUTER FACE OF {_SPACER}, HELD AGAINST "
-        f"{_BAR}, AS {PRESS_DETAIL_TITLE} SETS IT {_PRESS_READ}."
-    ),
-    _steps.AXLE_HELD_KEY: f"CHECK {_AXLE} DOES NOT TURN OR SLIDE BY HAND.",
-    # Owner ruling 2026-11-11 (#2541, #2523; amends 2026-11-07): a slip axle
-    # is bonded, not remade, under NOTE 1 as the drum is: clean, bond, put
-    # the spacer back on (the setting reads from its face; NOTE 1 has the
-    # squeeze-out wiped first), set before it grabs to the DETAIL A setting,
-    # its one position, then the hold check again once cured. The slip clause
-    # names an unbonded axle, so the bonded one passes back through the hold
-    # check.
-    "axle-pressed-out": (
-        f"IF IT DOES, OR AN UNBONDED {_AXLE} SLID IN BY HAND, PRESS {_AXLE} OUT."
-    ),
-    "axle-cleaned": f"IF {_AXLE} CAME OUT, CLEAN IT AND THE BORE IN {_BAR} TO BARE METAL.",
-    "axle-bonded": f"IF IT WAS CLEANED, BOND IT IN WITH {BOND_GRADE}, {BOND_NOTE_REF}.",
-    "axle-spacer-refitted": (
-        f"IF IT WAS BONDED, SLIDE {_SPACER} ONTO ITS SHANK AGAINST {_BAR}."
-    ),
-    "axle-bond-set": (
-        f"IF IT WAS BONDED, SET IT AT ONCE, {_SPACER} HELD AGAINST {_BAR}, AS "
-        f"{PRESS_DETAIL_TITLE} SETS IT {_PRESS_READ}."
-    ),
-    "axle-bond-cured": (
-        f"IF IT WAS BONDED, RETURN TO {_step(_steps.AXLE_HELD_KEY)} ONCE IT HAS "
-        "CURED 24 H."
+    _steps.AXLE_DRY_FITTED_KEY: (
+        f"PUSH {_AXLE} DRY INTO {_BAR}, THREADED END OUT, ON ITS SHOULDER "
+        f"THROUGH THE {_step(_steps.PRESS_SLEEVE_MADE_KEY)} SLEEVE BY HAND OR IN "
+        f"THE ARBOR PRESS, UNTIL ITS PLAIN END MEETS {_PLATE}."
     ),
     _steps.AXLE_TRIAL_KEY: f"TRIAL-FIT {_STACK} ON {_AXLE}, IN THAT ORDER.",
-    # The trial reads the thread end at the go leaf's endshake, where both
-    # stack corners land inside DETAIL B (TRIAL_THREAD_PAST_LOCKNUT, #3344).
+    # The shank step inside the hub, read directly (mg_wheel_group
+    # TRIAL_STEP_INSIDE_HUB_MIN; Codjiflo r1 of #3529): the washer's bore is
+    # under the shank's, so a step standing past the spigot face grounds the
+    # washer on it and shows light, the S4 drum seat's way of seeing a seat.
+    _steps.TRIAL_WASHER_SEATED_KEY: (
+        f"CHECK {_WASHER} LIES ON THE SPIGOT FACE WITH NO LIGHT UNDER IT, "
+        f"{_WHEEL} PUSHED TOWARD {_BAR}."
+    ),
+    # The trial reads the thread end at the go leaf's endshake (#3344).
     "trial-feeler-placed": (
         f"SLIDE THE {ENDSHAKE_GO_TEXT} FEELER BETWEEN {_WASHER} AND THE SPIGOT FACE, "
         f"{_WHEEL} PUSHED TOWARD {_BAR}."
@@ -441,45 +428,102 @@ STEP_TEXT = {
     "trial-nuts-jammed": (
         f"JAM BOTH {_NUT} NUTS ON {_AXLE} WITH THE FEELER JUST NIPPED."
     ),
+    # C11's three things to see: the first nut on thread, the thread end
+    # inside DETAIL B, the plain end not proud (the flush start, never pushed
+    # further in). The step inside the hub is the washer seat's.
+    _steps.AXLE_NUT_ON_THREAD_KEY: (
+        f"CHECK THE FIRST NUT RAN DOWN TO {_WASHER} ON THREAD ALL THE WAY, "
+        "NOT SPINNING ON THE RELIEF NECK."
+    ),
     _steps.AXLE_CHECKED_KEY: (
         f"CHECK THE THREAD END STANDS PAST THE SECOND NUT AS "
         f"{ENDSHAKE_DETAIL_TITLE} SETS IT (CALIPER DEPTH ROD)."
     ),
-    "trial-parts-removed-to-press": (
-        f"IF IT FAILS, REMOVE THE TRIAL NUTS, FEELER AND PARTS FROM {_AXLE}."
+    # The one setting remedy: a short thread end moves the axle out, its
+    # plain end sunk by the shortfall to the window's middle, and the trial
+    # runs again from the washer seat. One action per step (rule 22).
+    "trial-nuts-off": (
+        f"IF ONLY THE THREAD END FELL SHORT, REMOVE THE NUTS AND THE FEELER FROM "
+        f"{_AXLE}."
     ),
-    "axle-press-rechecked": (
-        f"IF THEY WERE REMOVED, CHECK THE SHOULDER OF {_AXLE} STANDS PAST "
-        f"{_SPACER}, HELD AGAINST {_BAR}, AS {PRESS_DETAIL_TITLE} SETS IT {_PRESS_READ}."
+    "axle-sunk": (
+        f"IF ONLY THE THREAD END FELL SHORT, SLIDE {_AXLE} OUT BY ITS SHORTFALL TO "
+        f"THE MIDDLE OF {ENDSHAKE_DETAIL_TITLE}, READ AT ITS PLAIN END INSIDE THE "
+        "BORE (CALIPER DEPTH ROD)."
     ),
-    "axle-repressed": (
-        f"IF IT FAILS, PRESS {_AXLE} TO THAT SETTING: IN ON ITS SHOULDER "
-        f"THROUGH THE {_step(_steps.PRESS_SLEEVE_MADE_KEY)} SLEEVE, OR OUT "
-        "TOWARD ITS THREADED END."
+    "trial-rerun": (
+        f"IF ONLY THE THREAD END FELL SHORT, RETURN TO "
+        f"{_step(_steps.TRIAL_WASHER_SEATED_KEY)}."
     ),
-    # A re-press goes back through the hold check before the trial fit.
-    "axle-rechecked": (
-        f"IF {_AXLE} WAS PRESSED AGAIN, RETURN TO {_step(_steps.AXLE_HELD_KEY)}."
+    # Any other failure: the trial comes off and the axle out, so a replaced
+    # bar, spacer or axle restarts at the spacer like any other part. A part
+    # outside its own limits, else the axle (its lengths, the stack's last
+    # terms), is replaced, so the loop always ends on a new part. Each
+    # sub-step is conditioned on the failure, so a passed trial skips them;
+    # the measurement and the replacement are separate steps (rule 22).
+    "trial-stripped": (
+        f"IF {_step(_steps.TRIAL_WASHER_SEATED_KEY)}, "
+        f"{_step(_steps.AXLE_NUT_ON_THREAD_KEY)} OR "
+        f"{_step(_steps.AXLE_CHECKED_KEY)} FAILS ANY OTHER WAY, REMOVE {_TRIAL_OFF} "
+        f"FROM {_AXLE}."
     ),
-    # The setting in its band: a stack part outside its own limits, else the
-    # axle (its thread length, the stack's last term), is replaced, so the
-    # loop always ends on a new part.
-    "stack-part-replaced": (
-        f"IF {_step('axle-press-rechecked')} PASSED, REPLACE WHICHEVER OF "
-        f"{_STACK_PARTS} MEASURES OUTSIDE ITS DRAWING OR CATALOGUE LIMITS."
+    # Every strip step names its trigger, not a state a later pass still
+    # finds true (step 8 pushes the axle out on every pass).
+    "trial-axle-withdrawn": (
+        f"IF THE TRIAL WAS STRIPPED AT {_step('trial-stripped')}, PUSH {_AXLE} OUT "
+        f"OF {_BAR}."
+    ),
+    "stack-parts-measured": (
+        f"IF THE TRIAL WAS STRIPPED AT {_step('trial-stripped')}, MEASURE "
+        f"{_STACK_PARTS} AGAINST THEIR DRAWING OR CATALOGUE LIMITS (MICROMETER)."
+    ),
+    "stack-part-replaced": "IF ONE MEASURES OUTSIDE ITS LIMITS, REPLACE IT.",
+    "axle-replaced": (
+        f"IF THE TRIAL WAS STRIPPED AT {_step('trial-stripped')} AND NO PART WAS "
+        f"REPLACED AT {_step('stack-part-replaced')}, REPLACE {_AXLE}."
+    ),
+    # A new wheel has no drum, so it goes back through the drum bond, which
+    # rejoins the trial at the spacer; any other new part restarts there.
+    "new-wheel-drum-bonded": (
+        f"IF THE TRIAL WAS STRIPPED AT {_step('trial-stripped')} AND {_WHEEL} WAS "
+        f"REPLACED AT {_step('stack-part-replaced')}, RETURN TO "
+        f"{_step(_steps.DRUM_BONDED_KEY)}."
     ),
     "trial-refitted": (
-        f"IF A PART WAS REPLACED, RETURN TO {_step(_steps.AXLE_TRIAL_KEY)}."
+        f"IF THE TRIAL WAS STRIPPED AT {_step('trial-stripped')} AND {_WHEEL} WAS NOT "
+        f"REPLACED AT {_step('stack-part-replaced')}, RETURN TO "
+        f"{_step(_steps.SPACER_FITTED_KEY)}."
     ),
-    "axle-pressed-out-to-replace": (
-        f"IF {_step('axle-press-rechecked')} PASSED AND NO PART WAS REPLACED, "
-        f"PRESS {_AXLE} OUT."
+    _steps.AXLE_SINK_RECORDED_KEY: (
+        f"RECORD HOW FAR THE PLAIN END OF {_AXLE} STANDS INSIDE THE BORE "
+        "(CALIPER DEPTH ROD, NONE WHEN FLUSH)."
     ),
-    "axle-replaced": (
-        f"IF IT WAS PRESSED OUT, RETURN TO {_step(_steps.SPACER_FITTED_KEY)} "
-        f"WITH A NEW {_AXLE}."
+    "trial-parts-removed": f"REMOVE {_TRIAL_OFF} FROM {_AXLE}.",
+    "axle-withdrawn": f"PUSH {_AXLE} OUT OF {_BAR}.",
+    # Rule 23 for the bond: the grade and the stop here, NOTE 1 the degrease,
+    # the coat on the length inside the bar only and the cure; held square
+    # to the bar while wet with owned equipment (the surface plate and the
+    # combination square), cured untouched, then accepted by hand.
+    _steps.AXLE_BONDED_KEY: (
+        f"BOND {_AXLE} INTO {_BAR} WITH {BOND_GRADE}, {BOND_NOTE_REF}, THE SAME "
+        f"WAY AS {_step(_steps.AXLE_DRY_FITTED_KEY)}, UNTIL ITS PLAIN END STANDS AT "
+        f"THE {_step(_steps.AXLE_SINK_RECORDED_KEY)} READING (CALIPER DEPTH ROD)."
     ),
-    "trial-parts-removed": f"REMOVE THE TRIAL NUTS, FEELER AND PARTS FROM {_AXLE}.",
+    "axle-squared": (
+        f"AT ONCE, BEFORE IT GRABS, SQUARE {_AXLE} TO A SQUARE STANDING ON "
+        "THE SURFACE PLATE AT TWO PLACES A QUARTER TURN APART."
+    ),
+    "axle-bond-cured": f"LEAVE {_AXLE} UNDISTURBED 24 H TO CURE.",
+    _steps.AXLE_HELD_KEY: f"CHECK {_AXLE} DOES NOT TURN OR SLIDE BY HAND.",
+    "axle-stripped": f"IF IT DOES, PUSH {_AXLE} OUT OF {_BAR}.",
+    "axle-cleaned": (
+        f"IF {_step(_steps.AXLE_HELD_KEY)} FAILED, CLEAN {_AXLE} AND THE BORE OF "
+        f"{_BAR} TO BARE METAL."
+    ),
+    "axle-rebonded": (
+        f"IF {_step(_steps.AXLE_HELD_KEY)} FAILED, RETURN TO "
+        f"{_step(_steps.AXLE_BONDED_KEY)}."
+    ),
     "column-clamps-fitted": (
         f"FIT {_item(CLAMP_FRONT)} AND {_item(CLAMP_BACK)} TO {_BAR} AS THE "
         "SHEET 2 EXPLODED VIEW SHOWS."
@@ -496,6 +540,9 @@ STEP_TEXT = {
         "TO TIGHTEN."
     ),
     "axle-oiled": f"WIPE LIGHT MACHINE OIL ON {_AXLE}.",
+    # The spacer the trial set the axle with, off for the bond (NOTE 1 wipes
+    # the squeeze-out at the bar's face), back on the shank against the bar.
+    "spacer-refitted": f"SLIDE {_SPACER} ONTO THE SHANK OF {_AXLE} AGAIN, AGAINST {_BAR}.",
     # The stack the washer and nut sheets once described in INSTALLATION
     # notes (F6): the order here, the nut and locknut in the next two steps.
     "wheel-stacked": f"SLIDE {_STACK} ONTO {_AXLE}, IN THAT ORDER.",
@@ -524,24 +571,38 @@ STEP_TEXT = {
     ),
     "locknut-loosened": "IF IT FAILS, LOOSEN THE SECOND NUT.",
     "locknut-reset": (
-        f"IF THE SECOND NUT WAS LOOSENED, RETURN TO {_step(_steps.ENDSHAKE_SET_KEY)}."
+        f"IF {_step('endshake-rechecked')} FAILED, RETURN TO "
+        f"{_step(_steps.ENDSHAKE_SET_KEY)}."
     ),
     _steps.AXLE_ACCEPTED_KEY: (
         "CHECK THE THREAD END PAST THE SECOND NUT AGAIN, AS IN "
         f"{_step(_steps.AXLE_CHECKED_KEY)}."
     ),
-    # The final reading's own remedy: strip the stack back to the bare axle
-    # (machinist review, stab-split s2) and take the failed trial's remedies
-    # from the press re-check: a stack that read low at the trial's endshake
-    # and fails at a larger set one would pass the trial again (Codjiflo r1
-    # of #3345), so its parts are measured, and with none out, the axle goes.
-    "axle-stack-removed": (
-        f"IF IT FAILS, REMOVE ITEMS {ITEM_NUMBERS[NUT]}, "
-        f"{ITEM_NUMBERS[FRONT_WASHER]}, {ITEM_NUMBERS[WHEEL]} AND "
-        f"{ITEM_NUMBERS[BACK_WASHER]}."
+    # The final reading's own remedy. The axle is bonded at a setting the
+    # trial accepted at the go leaf's endshake, so the set endshake can only
+    # lower the thread end (by up to mg_wheel_group.TRIAL_ENDSHAKE_DROP) and
+    # never past the high limit: a short final reading closes the endshake
+    # back to the go leaf, where it reads what the trial read (the drop is
+    # bounded by mg_wheel_group.TRIAL_ENDSHAKE_DROP, so no new limit).
+    # Loosen, place the go leaf, close, remove it, return to the locknut so
+    # the jam, the endshake re-check and this reading all run again on the
+    # closed setting: one action per step, none undoing another (rule 22;
+    # Codjiflo r1 P2 of #3601: returning to the endshake set reset it).
+    "locknut-backed-off": "IF IT FALLS SHORT, LOOSEN THE SECOND NUT.",
+    "endshake-feeler-placed": (
+        f"IF {_step(_steps.AXLE_ACCEPTED_KEY)} FELL SHORT, SLIDE THE {ENDSHAKE_GO_TEXT} "
+        f"FEELER BETWEEN {_WASHER} AND THE SPIGOT FACE, {_WHEEL} PUSHED TOWARD {_BAR}."
     ),
-    "axle-reset": (
-        f"IF THEY WERE REMOVED, RETURN TO {_step('axle-press-rechecked')}."
+    "axle-endshake-closed": (
+        f"IF {_step(_steps.AXLE_ACCEPTED_KEY)} FELL SHORT, TIGHTEN THE FIRST NUT "
+        "UNTIL THE FEELER IS JUST NIPPED."
+    ),
+    "endshake-feeler-removed": (
+        f"IF {_step(_steps.AXLE_ACCEPTED_KEY)} FELL SHORT, REMOVE THE FEELER."
+    ),
+    "locknut-rejammed": (
+        f"IF {_step(_steps.AXLE_ACCEPTED_KEY)} FELL SHORT, RETURN TO "
+        f"{_step(_steps.LOCKNUT_JAMMED_KEY)}."
     ),
     # The setting names the instrument that reads it (rule 22).
     _steps.LEVER_THREADED_KEY: (
@@ -628,8 +689,8 @@ STEP_TEXT = {
     "lever-wire-knots-held": "CHECK NEITHER KNOT SLIPS UNDER A LIGHT PULL BY HAND.",
     "lever-wire-cut-off": "IF ONE SLIPS, CUT THE WIRE OFF.",
     "lever-wire-renewed": (
-        f"IF IT WAS CUT OFF, RETURN TO {_step(_steps.WIRE_HOOKED_KEY)} WITH A NEW "
-        "LENGTH OF WIRE."
+        f"IF {_step('lever-wire-knots-held')} FAILED, RETURN TO "
+        f"{_step(_steps.WIRE_HOOKED_KEY)} WITH A NEW LENGTH OF WIRE."
     ),
     _steps.WIRE_TIED_KEY: "TRIM BOTH WIRE TAILS CLOSE TO THEIR KNOTS.",
 }
@@ -642,7 +703,7 @@ ASSEMBLY_STEPS = tuple(
 # step; the wire group's title states when its steps run, so no step carries
 # a precondition clause. Steps cite the drawing's sheets, views and BOM items.
 STEP_GROUPS = (
-    ("WHEEL GROUP (EXPLODED ON SHEET 2):", _steps.DRUM_PRESSED_KEY),
+    ("WHEEL GROUP (EXPLODED ON SHEET 2):", _steps.DRUM_BONDED_KEY),
     ("LEVER GROUP (EXPLODED ON SHEET 3):", _steps.LEVER_THREADED_KEY),
     (
         "LEVER WIRE, ON THE MACHINE, AFTER MHA-HA-00 HAS CLAMPED "

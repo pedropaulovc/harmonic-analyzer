@@ -21,13 +21,12 @@ from __future__ import annotations
 import math
 
 import _config
-from _hole_spec import HoleSpec
+from _hole_spec import HoleSpec, blind_cut_dia_mm
 from _inch_wall_limits import WALL_FLOOR_MM
 from _package_units import drawing_unit
-from _printed_tolerance import printed_band_mm
+from _printed_tolerance import drilled_oversize_mm, printed_band_mm
 import _rocker_interface
-from _gtol_cylinder import CylinderFace
-from _surface_finish import MACHINED_UM, SurfaceFinishControl
+from _surface_finish import SurfaceFinishControl
 
 UNIT = drawing_unit("parts/ch-rocker-arm", _config.parts("ch-rocker-arm"))
 
@@ -53,14 +52,18 @@ ARM_THICKNESS_BAND = (0.0254, -0.0254)  # (upper, lower) deviations, +/-.001
 BOOK_TOP_ARC_LEN = 292.1
 BOOK_BOT_ARC_LEN = 266.7
 BOOK_TIP_FACE = 5.588
-PIVOT_HOLE_DIA = 6.5024  # .256, rides the .250 pivot shaft
+# The pivot bore runs on the .250 pivot shaft MHA-CH-05: drilled F (.257) at
+# the title block's DRILLED HOLES row (owner ruling 2026-11-24, fit audit
+# question 1: all 44 bores on the two 1/4 in shafts are F-drilled, no reamer).
+PIVOT_HOLE_SPEC = HoleSpec("drilled_letter", "F")
+PIVOT_HOLE_DIA = blind_cut_dia_mm(PIVOT_HOLE_SPEC)  # .257
 ROD_HOLE_SPEC = HoleSpec("drilled_number", "#47")
 
-SURFACE_FINISHES = (
-    SurfaceFinishControl(
-        "pivot_bore", MACHINED_UM, CylinderFace(PIVOT_HOLE_DIA), display_unit=UNIT,
-    ),
-)
+# drawing-guidelines.md rule 6: no surface carries a roughness symbol. The
+# pivot bore only rocks a few degrees against one side of its clearance, so
+# it takes none (owner ruling 2026-11-24, fit audit question 1: the 63
+# microinch symbol comes off the 40 pivots).
+SURFACE_FINISHES: tuple[SurfaceFinishControl, ...] = ()
 
 # --- Derived spans (equations of the primitives; mirror build_ch_rocker_arm). ---
 R_TOP = _rocker_interface.CURVE_RADIUS
@@ -200,7 +203,9 @@ GEOMETRIC_TOLERANCES_MM: dict[str, float] = {
 _PROFILE_HALF = GEOMETRIC_TOLERANCES_MM["top edge surface profile"] / 2.0
 TOP_EDGE_BAND = (_PROFILE_HALF, -_PROFILE_HALF)
 BOTTOM_EDGE_BAND = (_PROFILE_HALF, -_PROFILE_HALF)
-PIVOT_HOLE_BAND = (0.0254, 0.0)  # (upper, lower) +.0010/.0000: reamed; native on PivotDia
+# The bore's analysis band: the title block's DRILLED HOLES row (+.004/0),
+# printed by the row, not on PivotDia.
+PIVOT_HOLE_BAND = (drilled_oversize_mm(unit=UNIT), 0.0)  # (upper, lower)
 RULE12_WALL_FLOOR = WALL_FLOOR_MM  # drawing-guidelines.md rule 17 (walls and webs)
 # Authoritative diametral zone; the hub OD's position frame prints it.
 HUB_COAXIALITY_DIA = GEOMETRIC_TOLERANCES_MM["hub OD position to bore"]
@@ -211,7 +216,7 @@ _HUB_FLOOR = (
     + 2.0 * (RULE12_WALL_FLOOR + HUB_COAXIALITY_DIA / 2.0)
     + LINEAR_2PL
 )
-HUB_DIA_MIN = math.ceil(round(_HUB_FLOOR * 100.0, 9)) / 100.0  # 9.94
+HUB_DIA_MIN = math.ceil(round(_HUB_FLOOR * 100.0, 9)) / 100.0  # 10.04
 HUB_DIA = 10.16  # .400
 if HUB_DIA < HUB_DIA_MIN:
     raise AssertionError(

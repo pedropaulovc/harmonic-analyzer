@@ -8,7 +8,7 @@ it imports a constant from, so the drawing contract must NOT live here.
 
 A gray-iron spider (ch21 pp.50-53): turned hub, bore and rim, six tapered
 cast spokes. The hub carries an integral spigot on its front (pen) side; the
-brass drum (``mg_wheel_drum_geom``) is pressed on it.
+brass drum (``mg_wheel_drum_geom``) is bonded on it.
 
 Part frame: wheel axis local Z, origin on the spokes' mid-plane, local +Z
 toward the wheel bar (machine +z; the wheel is placed at identity). Front
@@ -76,21 +76,23 @@ SPIGOT_LEN = 9.0  # prints .354; the drum's .344 face sits .010 under it
 HUB_STEP_Z = round(HUB_BACK_Z - (HUB_LEN - SPIGOT_LEN), 6)  # -6.51, boss front face
 HUB_FRONT_Z = round(HUB_BACK_Z - HUB_LEN, 6)  # -15.51, spigot front face
 DRUM_MID_Z = round((HUB_STEP_Z + HUB_FRONT_Z) / 2.0, 6)  # -11.01, the drum wire lane
-# The drum is pressed hard against the boss: its installed centre is half its
+# The drum is bonded hard against the boss: its installed centre is half its
 # own (shorter) length off the boss face, not the spigot's midpoint.
 DRUM_SEATED_MID_Z = HUB_STEP_Z - DRUM_LEN / 2.0
-# Reamed on the owned .1885 reamer to a stated running clearance on the
-# finished axle (mg_wheel_group HUB_RUNNING), so the Ø prints as a reference
-# nominal.
+# Reamed on the set's .1885 reamer (to order, shop-equipment
+# tools.reamer-1885) with no band, the finished axle its gauge (MHA-MG-05
+# note 1; mg_wheel_group HUB_RUNNING is the analysis band), so the Ø prints
+# as a reference nominal.
 BORE_DIA = 4.7879  # .1885
 
-# Printed bands, (upper, lower) deviations.  The overall sets the axle's
-# locknut stack (mg_wheel_group reads HUB_LEN_LIMITS).
+# The overall is a term of the axle's locknut stack (mg_wheel_group reads
+# HUB_LEN_LIMITS) at the title block's .XXX: the +/-.004 it carried is gone
+# (fit audit MHA-MG-05.hub_length; owner ruling 2026-11-24, fit audit part 2,
+# C11 sets the axle to the trial stack, which takes up the hub's length).
 HUB_LEN_PLACES = 3
-HUB_LEN_BAND = (0.1016, -0.1016)  # +/-.004, the mm sheet's +/-0.10 restated
-HUB_LEN_LIMITS = printed_limits(HUB_LEN, HUB_LEN_PLACES, HUB_LEN_BAND)  # .768-.776
+HUB_LEN_LIMITS = printed_limits(HUB_LEN, HUB_LEN_PLACES)  # .767-.777
 # Spigot length against the drum's length, both on the title block's .XXX
-# row: the drum, pressed to the boss, never stands proud of the spigot face,
+# row: the drum, bonded hard against the boss, never stands proud of the spigot face,
 # so the front washer bears on the spigot (the iron), never on the drum: the
 # drum's .344 stands .010 (both parts' .005) under the spigot's .354.  Both
 # print .XXX, so the comparison is between printed limits.
@@ -102,14 +104,21 @@ DRUM_RECESS = (
 )  # .000 .. .020: the drum face below the spigot face
 if DRUM_RECESS[0] < -1e-9:
     raise AssertionError(f"the drum can stand proud of the spigot: {DRUM_RECESS}")
-# Matched fit (drawing-guidelines.md rule 4 (tighten only for function, and name the mate)): the drum is reamed first, and the
-# spigot is turned to this diametral interference in that finished bore, so
-# the spigot's Ø prints as a reference nominal (#290 owner ruling, M3).
-DRUM_PRESS = (0.00508, 0.03302)  # .0002-.0013
-if DRUM_PRESS[0] <= 0.0:
-    raise AssertionError(f"the drum is not a press fit on the spigot: {DRUM_PRESS}")
-# The finished spigot over every reamed bore: its smallest in the smallest bore.
-SPIGOT_DIA_MIN = DRUM_BORE + DRUM_BORE_BAND[1] + DRUM_PRESS[0]  # .4992
+# Made to fit (drawing-guidelines.md rule 4, form 2; owner ruling 2026-11-24,
+# fit audit question 17): the drum's 1/2 bore is drilled first and the
+# spigot is turned last to slide in that finished bore with this diametral
+# clearance, bonded with LOCTITE 638 and centred on an indicator while wet
+# (MHA-MG-00), so the spigot's Ø prints as a reference nominal.  The range
+# is .002 wide (rule 4: no narrower than .001) and inside the 638 TDS gap.
+LOCTITE_638_GAP_MAX = 0.25  # 638 TDS diametral gap limit (dt_pinion_arbor_geometry)
+DRUM_BOND_CLEARANCE = (0.0127, 0.0635)  # .0005-.0025
+if not 0.0 < DRUM_BOND_CLEARANCE[0] < DRUM_BOND_CLEARANCE[1] <= LOCTITE_638_GAP_MAX:
+    raise AssertionError(
+        f"the drum's bond gap on the spigot leaves LOCTITE 638's: {DRUM_BOND_CLEARANCE}"
+    )
+# The finished spigot under every drilled bore: its smallest in the smallest
+# bore at the loosest clearance.
+SPIGOT_DIA_MIN = DRUM_BORE + DRUM_BORE_BAND[1] - DRUM_BOND_CLEARANCE[1]  # .4975
 
 # --- spokes ------------------------------------------------------------------------
 # The as-cast sizes (spokes, fillets, rim bore, the web's plane) print .XX

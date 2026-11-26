@@ -79,7 +79,6 @@ from _drawing_marks import apply_drawing_properties, clear_dimensions_for_drawin
 from _drawing_prefix import set_dimension_prefix
 from _drawing_tolerances import set_dimension_bilateral_tolerance, set_dimension_symmetric_tolerance
 from _fit_deviations import deviations
-from _limit_tolerance import set_limits
 from _milled_corner_limit import (
     corner_r_limits,
     line_circle_fillet_area,
@@ -106,7 +105,6 @@ from ch_connecting_rod_spec import (
     FORK_WIDTH,
     INSIDE_CORNER_R,
     PIN_HOLE_DIA,
-    PIN_HOLE_LIMITS,
     RING_BORE_DIA,
     RING_BORE_DIA_BAND,
     RING_FACE_BAND,
@@ -991,17 +989,9 @@ def build(adapter) -> dict[str, str]:
     set_dimension_symmetric_tolerance(
         adapter, "Ring", "RingThick", thick_upper, display_unit=UNIT
     )
-    # The reamed press hole prints its two limits natively on its diameter
-    # (swTolLIMIT); the front view imports Ø.0779/.0775 at the four places
-    # DRAWING_PRECISION gives PinHoleDia.
-    set_limits(
-        adapter,
-        "PinHoleProfile",
-        "PinHoleDia",
-        limits=PIN_HOLE_LIMITS,
-        places=DRAWING_PRECISION["PinHoleProfile"]["PinHoleDia"],
-        display_unit=UNIT,
-    )
+    # The reamed press hole prints the .0775 reamer's size and no band (owner
+    # ruling 2026-11-24, fit audit question 3): the pin is its gauge (note 1).
+    # Its four places come from DRAWING_PRECISION.
     apply_drawing_precision(adapter, DRAWING_PRECISION)
 
     apply_material(adapter, MATERIAL)

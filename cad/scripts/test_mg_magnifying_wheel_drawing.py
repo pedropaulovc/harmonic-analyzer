@@ -90,7 +90,6 @@ def test_tight_bands_sit_on_the_model_dimensions() -> None:
     # The boss Ø and TIE 1's two coordinates ride the title block's .XX: the
     # boss is sized for TIE 1's wall, so none carries a band of its own.
     assert model_toleranced_dimensions(part) == {
-        ("HubProfile", "HubLength"): "HUB_LEN_BAND[0]",
         ("feature_name", "dimension_name"): "CAST_TOL",
     }
     # The as-cast sizes carry the explicit +/-.03 casting band.
@@ -146,9 +145,9 @@ def test_walls_and_groove_hold_at_the_printed_bands() -> None:
     assert geom.CAST_ROUND_R == pytest.approx(0.03 * inch)
     assert not hasattr(geom, "CAST_ROUND_BAND")
     assert spec.ROUND_TEXT_SUFFIX == " MAX"
-    # The matched fits' worst pair: the smallest spigot (.4990 bore + .0002
-    # press) over the largest bore (.1877 pin + .0017 running clearance).
-    assert spec.WALLS["spigot_to_bore"] == pytest.approx((0.4992 - 0.1894) * inch / 2.0)
+    # The fits' worst pair: the smallest spigot (.500 drilled drum bore less
+    # the .0025 bond clearance) over the largest bore (.1877 pin + .0017).
+    assert spec.WALLS["spigot_to_bore"] == pytest.approx((0.4975 - 0.1894) * inch / 2.0)
     assert "RimRounds" not in spec.DRAWING_DIMENSIONS
     assert geom.TIE2_CLOCK_DEG == -43.0
     # The Ø.008 pen wire seats at every printed groove corner: the narrowest
@@ -257,7 +256,10 @@ def test_tie1_section_b_b_cuts_through_tie1_clear_of_the_spigot() -> None:
     )
     # The counter-drill's Ø reads the whole callout: size, process, depth REF.
     assert drawing.TIE1_SECTION_SUFFIX == " #50 DRILL <HOLE-DEPTH> (.32)"
-    assert drawing.TIE1_CALLOUT.splitlines()[-1] == "SEE SECTION B-B"
+    # B-B's own callout alone defines the counter-drill: the front callout
+    # names no part of it and defers nothing to B-B (rules 9 and 26;
+    # machinist review, farm run 20261125T172832344Z).
+    assert "#50" not in drawing.TIE1_CALLOUT and "SEE" not in drawing.TIE1_CALLOUT
     precision = mg_magnifying_wheel_spec.DRAWING_PRECISION["Tie1CdrillProfile"]
     assert precision == {"Tie1CdrillDia": 3, "Tie1CdrillDepth": 2}
     assert drawing.TIE1_SECTION_SCALE == (2, 1)
@@ -382,9 +384,7 @@ def test_linked_notes_specify_the_fits_the_ties_and_the_angle_the_spokes() -> No
     # Each tie hole is named plainly at its own callout (rule 26: WIRE TIE
     # HOLE, no coined label), size before process, at most two lines of
     # words (rule 7): no project label, so no key.
-    assert drawing.DIMENSION_CALLOUTS["Tie1HoleDia"] == (
-        "#60 DRILL THRU\nWIRE TIE HOLE\nSEE SECTION B-B"
-    )
+    assert drawing.DIMENSION_CALLOUTS["Tie1HoleDia"] == "#60 DRILL THRU\nWIRE TIE HOLE"
     # TIE 2 states where it runs: radial, from the groove's bottom.
     assert drawing.DIMENSION_CALLOUTS["Tie2HoleDia"] == (
         "DRILL THRU\nRADIAL WIRE TIE HOLE\nFROM GROOVE BOTTOM"
@@ -399,8 +399,8 @@ def test_linked_notes_specify_the_fits_the_ties_and_the_angle_the_spokes() -> No
     # interference as REF (rule 4).  The groove's two tight bands serve one
     # mate, named once in a note both link (rule 4).
     assert lines == [
-        "1. RUNNING FIT ON AXLE MHA-MG-07 (CLEARANCE .0008-.0017).",
-        "2. PRESS FIT IN DRUM MHA-MG-10 (INTERFERENCE .0002-.0013).",
+        "1. RUNNING FIT ON AXLE MHA-MG-07: AXLE TURNS FREE, NO SHAKE.",
+        "2. BONDED FIT IN DRUM MHA-MG-10: TURN TO ITS BORE (CLEARANCE .0005-.0025).",
         "3. GROOVE SEATS PEN WIRE OF MHA-SH-VN-56.",
     ]
     assert "DIAMETRAL" not in notes
@@ -444,7 +444,7 @@ def test_linked_notes_specify_the_fits_the_ties_and_the_angle_the_spokes() -> No
 
 def test_no_gdt_frames_and_one_sheet_dimension() -> None:
     # drawing-guidelines.md rule 6 (roughness symbols only where a surface runs, slides or locates): the running bore takes the machined grade; the
-    # spigot is pressed into the drum and takes none.
+    # spigot is bonded in the drum and takes none.
     finishes = {
         control.key: control.roughness_um
         for control in mg_magnifying_wheel_spec.SURFACE_FINISHES

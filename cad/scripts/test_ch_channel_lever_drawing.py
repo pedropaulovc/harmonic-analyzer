@@ -51,13 +51,30 @@ def test_drawing_is_precision_migrated() -> None:
 
 def test_bands_are_native_on_the_model_from_named_constants() -> None:
     assert model_toleranced_dimensions(lever) == {
-        ("FulcrumProfile", "FulcrumDia"): "*deviations(PIVOT_HOLE_BAND)",
         ("Hub", "HubLength"): "*deviations(HUB_LENGTH_BAND)",
-        ("LeverBody", "LeverThick"): "LEVER_THICKNESS_TOLERANCE",
+        ("LeverBody", "LeverThick"): "*deviations(LEVER_THICKNESS_BAND)",
         ("PlateOffsetReference", "PlateOffset"): "PLATE_OFFSET_TOLERANCE",
     }
     # The drilled arms print plain, at the title block's .XXX row (Q1-A).
     assert spec.BAR_PIN_X_TOLERANCE == spec.LEVER_SPRING_X_TOLERANCE == pytest.approx(0.127)
+
+
+def test_the_f_drill_callout_stands_inside_the_border() -> None:
+    """Rule 13 (#3536, run 6586e65b): the F drill's widest row, RUNNING
+    CLEARANCE ON MHA-CH-04, and its shelf, 86.8 mm wide centred on the keep
+    (measured on that run's PDF, x 6.6..93.4 mm about .050), began left of
+    the inner border at 12.7 mm. It now starts at least 1.5 mm inside, and
+    ends 1.5 mm or more short of the #47 callout's widest row (x 153.5 mm,
+    about BAR_PIN_CALLOUT_XY's .170)."""
+    border = 0.0127
+    half_width = 0.0434
+    x, _y = drawing.FRONT_KEEP["FulcrumDia"]
+    assert drawing.FRONT_CALLOUTS["FulcrumDia"].splitlines()[-1] == (
+        f"RUNNING CLEARANCE ON {drawing.SHAFT_NUMBER}"
+    )
+    assert x - half_width >= border + 0.0015
+    bar_pin_left = drawing.BAR_PIN_CALLOUT_XY[0] - (0.170 - 0.1535)
+    assert x + half_width + 0.0015 <= bar_pin_left
 
 
 def test_every_tight_band_names_its_mate_or_function() -> None:
@@ -65,7 +82,12 @@ def test_every_tight_band_names_its_mate_or_function() -> None:
     for name in ("FulcrumDia", "LeverThick", "HubLength", "PlateOffset"):
         assert callouts[name]
     assert drawing.SHAFT_NUMBER in callouts["FulcrumDia"]
-    assert "REAM" in callouts["FulcrumDia"]
+    # Fit audit question 1 (owner ruling 2026-11-24): the bore is drilled F
+    # and its callout carries no number; the 63 microinch symbol is gone.
+    assert callouts["FulcrumDia"].startswith("F DRILL THRU\n")
+    assert "REAM" not in callouts["FulcrumDia"]
+    assert not any(ch.isdigit() for ch in callouts["FulcrumDia"].split(drawing.SHAFT_NUMBER)[0])
+    assert spec.SURFACE_FINISHES == ()
     assert drawing.BAR_NUMBER in callouts["LeverThick"]
     assert drawing.SHAFT_NUMBER in callouts["HubLength"]
     # The plate's tight offset names the bars it spaces (rule 4), in the
@@ -78,9 +100,11 @@ def test_every_tight_band_names_its_mate_or_function() -> None:
     # Rule 7: a hole location carries its value and band only.
     for location in ("BarPinCx", "SpringCx"):
         assert location not in callouts
-    # .256 +.0010/.0000 on the .250 (.0000/-.0008) shaft: .0060-.0078 in.
-    assert drawing._CLEARANCE_LEAST == pytest.approx(0.1524)
-    assert drawing._CLEARANCE_MOST == pytest.approx(0.19812)
+    # F (.257, +.004/0 DRILLED HOLES) on the .250 (.0000/-.0008) shaft: the
+    # constant offset the spring takes up is .0070-.0118 in of clearance.
+    least = spec.PIVOT_HOLE_DIA + spec.PIVOT_HOLE_BAND[1] - 6.35
+    most = spec.PIVOT_HOLE_DIA + spec.PIVOT_HOLE_BAND[0] - (6.35 - 0.02032)
+    assert (least / 25.4, most / 25.4) == pytest.approx((0.0070, 0.0118), abs=1e-5)
 
 
 def test_walls_clear_the_floor_at_worst_case() -> None:
@@ -114,22 +138,22 @@ def test_root_corners_print_r065_and_judge_r070() -> None:
     # The fillet's edges: where the bar's edges meet the hub's round.
     half, hub_r = spec.BAR_TALL / 2.0, spec.HUB_DIA / 2.0
     assert math.hypot(notes.ROOT_CORNER_X, half) == pytest.approx(hub_r)
-    assert notes.ROOT_CORNER_ANGLE_DEG == pytest.approx(141.93, abs=0.01)
+    assert notes.ROOT_CORNER_ANGLE_DEG == pytest.approx(140.43, abs=0.01)
     # At R.070 each corner stays inside the hub's square: under its top
-    # (the calipers still read the .47 across the round) and short of its
+    # (the calipers still read the .48 across the round) and short of its
     # side, in the plate's own thickness.
     assert (notes.ROOT_CORNER_REACH_X, notes.ROOT_CORNER_REACH_Y) == pytest.approx(
-        (4.2502, 4.9905), abs=1e-4
+        (4.4775, 5.0145), abs=1e-4
     )
-    assert notes.ROOT_CORNER_HUB_TOP_MARGIN == pytest.approx(0.9785, abs=1e-4)
+    assert notes.ROOT_CORNER_HUB_TOP_MARGIN == pytest.approx(1.0815, abs=1e-4)
     # The root gains metal on its bisector at every radius in the band over
     # the sharp corner the title block allowed, and over its R.040 MAX.
     gain_min = notes.root_bisector_metal(notes.ROOT_CORNER_R_MIN)
-    assert gain_min == pytest.approx(0.0777, abs=1e-4)
+    assert gain_min == pytest.approx(0.0844, abs=1e-4)
     assert gain_min > notes.root_bisector_metal(_in(0.040)) + 0.02
     # Both corners' metal, against the builder's analytic volume.
     assert notes.root_corner_volume(notes.ROOT_CORNER_R) == pytest.approx(
-        0.1606, abs=1e-4
+        0.1816, abs=1e-4
     )
 
 
@@ -168,7 +192,59 @@ def test_twenty_long_hubs_still_float_between_the_keepers() -> None:
 
 
 def test_plate_band_is_the_notch_allowance() -> None:
-    assert ch_amplitude_bar_spec.LEVER_THICKNESS_TOLERANCE == spec.LEVER_THICKNESS_TOLERANCE
+    # The notch is derived from the plate's maximum only: the -.004 side
+    # (D23) leaves MHA-CH-01's .124 +.007/0 where it was.
+    assert spec.LEVER_THICKNESS_BAND == pytest.approx((0.002 * 25.4, -0.004 * 25.4))
+    assert ch_amplitude_bar_spec.LEVER_THICKNESS_BAND is spec.LEVER_THICKNESS_BAND
+    assert ch_amplitude_bar_spec.TOP_NOTCH_WIDTH == pytest.approx(0.124 * 25.4)
+
+
+def _bowed_margin_in(monkeypatch: pytest.MonkeyPatch, lower: float) -> float:
+    """BAR_GAP mid_span_bowed over the bar running floor, inch, with the
+    plate's lower deviation at ``lower`` (mm) and everything else as printed."""
+    import ch_channel_assembly_spec as asm
+    import sh_vn_pivot_pin_bar_spec as pin
+
+    monkeypatch.setattr(spec, "LEVER_THICKNESS_BAND", (spec.LEVER_THICKNESS_BAND[0], lower))
+    monkeypatch.setattr(asm, "_PIN_BUDGET", pin.joint_budget())
+    bowed = asm.bar_gap_budget()["mid_span_bowed"]
+    return (bowed - asm._BAR_RUNNING_FLOOR) / 25.4
+
+
+def test_each_side_of_the_plate_band_is_earned_by_its_named_check(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Necessity ch-channel-lever N-02 (delegated ruling 2026-11-25 (Main), no
+    precedent; no owner number changed, #2144 (rulings.md D23)): the plate
+    prints .118 +.002/-.004.
+    Thick side: the narrowest top notch keeps the running floor on the
+    thickest plate, and .002 more does not. Thin side: the bowed mid-span bar
+    gap keeps the .001 the shop reads over its floor (D14's criterion), and
+    .001 less does not. The register quotes these numbers."""
+    import ch_amplitude_bar_spec as bar
+    import machinist_necessity
+    import rocker_bank_layout as bank
+
+    upper, lower = spec.LEVER_THICKNESS_BAND
+    notch_min = bar.TOP_NOTCH_WIDTH + bar.TOP_NOTCH_WIDTH_BAND[1]
+    air = notch_min - (spec.LEVER_THICKNESS + upper)
+    air_loose = air - 0.002 * 25.4
+    assert air >= bank.RUNNING_FLOOR - 1e-9
+    assert air_loose < bank.RUNNING_FLOOR
+    assert air_loose == pytest.approx(0.0508, abs=1e-4)
+
+    reading_unit = 0.001
+    margin = _bowed_margin_in(monkeypatch, lower)
+    margin_loose = _bowed_margin_in(monkeypatch, lower - 0.001 * 25.4)
+    assert margin >= reading_unit
+    assert margin_loose < reading_unit
+    assert (round(margin, 4), round(margin_loose, 4)) == (0.0011, 0.0006)
+
+    config = Path(__file__).resolve().parents[1] / "config"
+    entries = {e.id: e for e in machinist_necessity.load_necessity(config, "ch-channel-lever")}
+    source = entries["N-02"].source
+    for quoted in (".0508", ".0011", ".0006"):
+        assert quoted in source, quoted
 
 
 def test_plate_is_located_from_one_hub_face() -> None:
@@ -321,9 +397,9 @@ def test_lever_feature_bands_are_the_printed_ones() -> None:
     )
     assert features["plate_near_face"]["offset_from"] == "hub_near_face"
     assert features["plate_far_face"]["thickness"] == pytest.approx(
-        [_in(0.116), _in(0.120)]
+        [_in(0.114), _in(0.120)]
     )
-    assert features["hub"]["dia"] == pytest.approx([_in(0.46), _in(0.48)])
+    assert features["hub"]["dia"] == pytest.approx([_in(0.47), _in(0.49)])
     outline = features["outline"]
     assert outline["bar_height"] == pytest.approx([_in(0.36), _in(0.38)])
     assert outline["taper_start"] == pytest.approx([_in(5.49), _in(5.51)])
@@ -333,8 +409,9 @@ def test_lever_feature_bands_are_the_printed_ones() -> None:
     assert outline["root_corner_count"] == 2
     assert outline["root_corner_callout"] == drawing.FRONT_CALLOUTS["RootCornerR"]
     bore = features["fulcrum_bore"]
-    assert bore["dia"] == pytest.approx([_in(0.2560), _in(0.2570)])
-    assert bore["process"] == "ream" and bore["finish_ra"] == pytest.approx(1.6)
+    assert bore["dia"] == pytest.approx([_in(0.2570), _in(0.2610)], abs=1e-3)
+    assert bore["process"] == "F DRILL" and bore["drill"] == "F"
+    assert "finish_ra" not in bore
     pin, spring = features["bar_pin_hole"], features["spring_hole"]
     # The model drill diameter is the drill's mm size, .0785 to 1e-3 mm.
     assert pin["dia"] == pytest.approx([_in(0.0785), _in(0.0825)], abs=1e-3)

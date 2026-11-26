@@ -30,17 +30,13 @@ from ch_channel_assembly_spec import (
     KEEPER_X_DIMENSION,
     LUG_SPAN_DIMENSION,
     TIP_PROUD_DIMENSION,
+    TOLERANCE_PRECISION,
     UNIT,
 )
-from ch_channel_lever_spec import (
-    HUB_LENGTH as LEVER_HUB_LENGTH,
-    HUB_LENGTH_BAND as LEVER_HUB_LENGTH_BAND,
-)
-from ch_fulcrum_keeper_spec import (
-    KEEPER_FITUP_LOCATION_BAND_MM,
-    KEEPER_INNER_FACE_SPAN_MM,
-)
-from rocker_bank_layout import COUNT, END_CLEARANCE_MIN, RUNNING_FLOOR
+from ch_fulcrum_keeper_spec import KEEPER_TAP_SPEC
+from fr_top_frame_spec import KEEPER_TAP_WALL_ACCEPTED_MM
+from ch_keeper_fitup import END_PLAY_MM, REAR_KEEPER_LEAF_MM
+from rocker_bank_layout import EAR_INNER_SPAN, END_CLEARANCE_MIN, RUNNING_FLOOR
 from ch_channel_explode_spec import (
     ARM,
     BAR,
@@ -57,10 +53,19 @@ from ch_channel_explode_spec import (
     ROD_PIN,
 )
 
-# The lug span prints as a reference: the pair is set off the top frame.
-REFERENCE_DIMENSIONS = frozenset({LUG_SPAN_DIMENSION})
+# The lug span prints as a reference: the pair is set off the top frame. The
+# rear lug inner face too: the rear keeper is set to the lever stack (C10,
+# ch_channel_assembly_spec REAR_KEEPER_LEAF_MM).
+REFERENCE_DIMENSIONS = frozenset({LUG_SPAN_DIMENSION, KEEPER_REAR_Z_DIMENSION})
 if set(DIMENSION_TOLERANCES) | REFERENCE_DIMENSIONS != set(DIMENSION_FEATURE):
     raise AssertionError("every marked dimension is toleranced or reference")
+# The ear span's upper limit as view D prints it, its nominal plus its band's
+# upper deviation: the right-hub remedy re-sets the right ear outward to it.
+EAR_SPAN_UPPER_TEXT = render_number(
+    (EAR_INNER_SPAN + DIMENSION_TOLERANCES[EAR_SPAN_DIMENSION][1]) / LENGTH_UNITS[UNIT],
+    UNIT,
+    TOLERANCE_PRECISION[EAR_SPAN_DIMENSION],
+)
 
 
 def _screw(thread: str, length_mm: float, kind: str) -> str:
@@ -91,6 +96,24 @@ DIMENSION_CALLOUTS = {
 if set(DIMENSION_CALLOUTS) != set(DIMENSION_FEATURE):
     raise AssertionError("every marked dimension carries a callout")
 
+# Rule 20: the lug centre's band holds the wall of the keeper's transferred
+# foot tap in the MHA-FR-02 rail web at the accepted .076, under rule 17's
+# .080 target (necessity N-01; fr_top_frame_spec KEEPER_TAP_WALL_ACCEPTED_MM,
+# the .0767 floored, as MHA-FR-02 sheet 7 prints it). The shortfall is this
+# package's minor exception CH-00-rail-web-tap-wall (ch-channel.yaml), the
+# same wall as MHA-FR-02 RV-14. Stated once, as a plain fact, under the lug
+# centre's value (machinist review of farm run 20261125T172832344Z, r1 and
+# r2).
+KEEPER_TAP_WALL_PLACES = 3
+KEEPER_TAP_WALL_TEXT = (
+    f"RAIL WEB {KEEPER_TAP_SPEC.size.lstrip('#')} TAP WALL "
+    f"{render_number(KEEPER_TAP_WALL_ACCEPTED_MM / LENGTH_UNITS[UNIT], UNIT, KEEPER_TAP_WALL_PLACES)}"
+    " MIN"
+)
+DIMENSION_BELOW_CALLOUTS = {KEEPER_X_DIMENSION: KEEPER_TAP_WALL_TEXT}
+if not set(DIMENSION_BELOW_CALLOUTS) <= set(DIMENSION_FEATURE):
+    raise AssertionError("a below-callout names no marked dimension")
+
 # --- sheet 6: the setting table ------------------------------------------------
 # R5 machinist review (rule 22): the feeler acceptances printed only in their
 # steps. None is one model dimension (a leaf that must pass between each end
@@ -118,20 +141,19 @@ def _inch(mm: float) -> str:
     return render_number(mm / LENGTH_UNITS[UNIT], UNIT, FEELER_LEAF_PLACES)
 
 
-# The lever bank is never set to its lugs: the bars on the arms
-# locate it, and twenty hubs at the top of their band still leave end play
-# between the lugs at the extremes of both inner-face bands (#1660 r2). The
-# lever-bank-slides check gauges that play on a feeler leaf: the worst case
-# rounded down to .01 in, so a bank inside its bands always passes (moved here
-# from the MHA-CH-02 hub callout, FoChFab2 round 1).
-_LEVER_STACK_MAX = COUNT * (LEVER_HUB_LENGTH + LEVER_HUB_LENGTH_BAND[0])
-_LUG_SPAN_MIN = KEEPER_INNER_FACE_SPAN_MM - 2.0 * KEEPER_FITUP_LOCATION_BAND_MM
-_END_PLAY_MIN_IN = (_LUG_SPAN_MIN - _LEVER_STACK_MAX) / LENGTH_UNITS[UNIT]
+# The lever bank is never set to its stations: each lever floats between its
+# neighbours and the lugs, and its bar leans to the arm below it
+# (test_channel_axial_budget). The rear keeper is set to the bare stack over
+# a leaf (C10, ch_keeper_fitup), so the bank's end play is that leaf; the
+# lever-bank-slides check gauges it on a feeler leaf: the leaf less the
+# push's settle, rounded down to .01 in, so a bank set to its leaf always
+# passes (moved here from the MHA-CH-02 hub callout, FoChFab2 round 1).
+_END_PLAY_MIN_IN = END_PLAY_MM[0] / LENGTH_UNITS[UNIT]
 END_PLAY_LEAF_MM = math.floor(_END_PLAY_MIN_IN * 100.0) / 100.0 * LENGTH_UNITS[UNIT]
 if END_PLAY_LEAF_MM <= 0.0:
     raise AssertionError(
-        "the lever bank must slide between the lugs, but the longest hubs "
-        "leave no gaugeable play in the shortest lug span"
+        "the lever bank must slide between the lugs, but the rear keeper's "
+        "leaf leaves no gaugeable play"
     )
 # #3114: the rocker arms float, each located by its rod, so the ears' span is
 # the bank's only setting; each end hub is accepted clear of its ear on a
@@ -169,6 +191,13 @@ SETTINGS = (
         None,
         "LEVER END PLAY",
         f"{_inch(END_PLAY_LEAF_MM)} MIN",
+        "FEELER LEAF",
+    ),
+    (
+        "rear-keeper-to-stack",
+        None,
+        "LEFT LUG TO LAST HUB",
+        _inch(REAR_KEEPER_LEAF_MM),
         "FEELER LEAF",
     ),
 )

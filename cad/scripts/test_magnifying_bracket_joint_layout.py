@@ -616,15 +616,14 @@ def test_assembly_places_the_two_screws_head_out_shank_into_the_lever() -> None:
     assert shank_axis == (0.0, 0.0, 1.0)
 
 
-def test_wheel_pin_press_pair_pins_the_pin_and_bar_bore() -> None:
+def test_the_bonded_wheel_pin_overlaps_nothing_in_the_bar_bore() -> None:
+    # Owner ruling 2026-11-24, fit audit question 18: the pin is bonded in a
+    # 3/16 drilled bore modelled at the drill's size, line to line with the
+    # drill rod, so no overlap is allowed for the pair.
     import mg_wheel_axle_spec as pin
     import mg_wheel_bar_geom as bar
 
-    pairs = magnifier_interference.ALLOWED_PAIRS
-    limit = pairs[frozenset(("mg-wheel-axle-1", "mg-wheel-bar-1"))]
-    # The pin stands in the bore over its nominal 8.91 (back end 0.59 inside
-    # the 9.5 bar), inside the contract's 9.0.
+    assert bar.AXLE_BORE_DIA == pytest.approx(pin.PIN_DIA)
     assert -pin.BACK_Y <= 9.0 < BAR_DEPTH
-    assert limit == pytest.approx(
-        smooth_annulus_limit_mm3(pin.PIN_DIA, bar.AXLE_BORE_DIA, 9.0)
-    )
+    pairs = magnifier_interference.ALLOWED_PAIRS
+    assert frozenset(("mg-wheel-axle-1", "mg-wheel-bar-1")) not in pairs

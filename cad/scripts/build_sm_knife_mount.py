@@ -40,7 +40,7 @@ block rises from below the bore up to the top-frame casting's faced underside
 threads into a .375 +/-.005 full-thread bottoming tap (drill .438) on the bore's
 vertical centreline, whose charged pilot (Ø3.924, past the accepted Ø3.7973-3.8989)
 at its sharpest accepted point leaves the .080 rule-17 target of metal over
-the bore crown at worst case; the dowel's blind flat-floored round slip hole
+the bore crown at worst case; the dowel's blind #30 drilled round slip hole
 (datum B) sits .300 +X of the tap axis, in a block 1.00 across.
 
 The named "knife axis" is the contact ridge line itself (part origin); the
@@ -114,7 +114,6 @@ from sm_knife_mount_spec import (
     ISOMETRIC_VIEW_NOTE,
     PIN_HOLE_DEPTH,
     PIN_HOLE_DIA,
-    PIN_HOLE_DIA_BAND,
     PIN_HOLE_X,
     STUD_TAP_DIA,
     STUD_TAP_DRILL_DEPTH,
@@ -609,15 +608,8 @@ def build(adapter) -> dict[str, str]:
     apply_color(adapter, HARDENED_STEEL)
     report_mass_properties(adapter)
 
-    # Explicit slip band on datum B's Ø (its station and depth are governed
-    # by their places).  The band is equal either side, so it prints +/- on
-    # one row (ASME Y14.5 equal-bilateral form): .1280 +/-.0007.
-    lower, upper = deviations(PIN_HOLE_DIA_BAND)
-    if lower != -upper:
-        raise AssertionError("the knife mount's PinHoleDia band must be symmetric")
-    set_dimension_symmetric_tolerance(
-        adapter, "PinHoleProfile", "PinHoleDia", upper, display_unit=UNIT
-    )
+    # Datum B's Ø is a #30 drill (owner ruling 2026-11-24, fit audit OQ19):
+    # no native band, the title block's DRILLED HOLES row accepts it.
     # B's row from the front face: the .XX band, printed at the row's three
     # places (.275 +/-.010), on the reference line's own dimension.
     set_dimension_symmetric_tolerance(

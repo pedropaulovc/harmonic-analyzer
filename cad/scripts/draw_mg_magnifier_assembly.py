@@ -8,16 +8,18 @@ group's two operator settings, the clamp station and the fixture drop. Every
 other view carries a letter (drawing-guidelines.md rules 9 and 26), its
 boundary circle or viewing arrow drawn on the right side view:
 - DETAIL A (2:1) shows only the bar, the axle and the spacer on its shank.
-  It prints the press gauge, the press's setting, from the spacer's outer
-  face to the shank step (owner ruling 2026-11-21; the wheel hub hides the
-  step once it is fitted) and, as a reference, the axle's plain end below
-  the bar's far face, where that press leaves it. A broken-out window to the
-  axle's mid-plane shows the plain end, sunk in the bar's bore, as the
-  visible edge that reference ends on.
-- DETAIL B (4:1) shows the stack. It prints, as limits, the drum's face below
-  the wheel's spigot end and the axle's thread end past the second nut (the
-  press's acceptance), and the endshake between the spigot face and the
-  front washer.
+  It prints, as references, the model's shank-step station from the
+  spacer's outer face (owner ruling 2026-11-24, fit audit part 2, C11: the
+  axle is set to the trial stack; the wheel hub hides the step once it is
+  fitted) and the axle's plain end below the bar's far face, where that
+  setting leaves it. A broken-out window to the axle's mid-plane shows the
+  plain end, sunk in the bar's bore, as the visible edge that reference
+  ends on.
+- DETAIL B (4:1) shows the stack. It prints the drum's face below the
+  wheel's spigot end as a reference (fit audit part 2, S4: seen, not read),
+  the axle's thread end past the second nut as limits (the trial's
+  acceptance), and the endshake between the spigot face and the front
+  washer.
 - VIEW C (4:1) looks at the flat threaded lever tip beyond the far bracket
   face, with the single imported ThreadProjection setting.
 - VIEW D (2:1, sheet 5) looks at the wheel hub at rest: TIE 1 and its angle
@@ -133,6 +135,8 @@ from mg_magnifying_clamp_geom import HEX_AF as CLAMP_HEX_AF
 from mg_magnifying_wheel_geom import TIE1_CDRILL_DIA, TIE1_X, TIE1_Y
 from mg_magnifying_vertical_rod_geom import ROD_DIA as VROD_DIA
 from mg_magnifying_vertical_rod_geom import SHOULDER_X as VROD_SHOULDER_X
+from mg_wheel_axle_spec import PIN_DIA as AXLE_PIN_DIA
+from mg_wheel_axle_spec import STEP_STATION as AXLE_STEP_STATION
 from mg_wheel_axle_spec import TIP_Y
 from mg_wheel_bar_geom import BAR_LENGTH, BAR_TOP_ABOVE_ROW, BORE_ROW_HEIGHT, WHEEL_BAR_X0
 
@@ -487,6 +491,18 @@ LOCKNUT_BALLOON_POINT_MM = (
     0.0,
 )
 LOCKNUT_INSTANCE = "mg-vn-wheel-axle-nut-2"
+# Machinist review r1 (run 20261124T092122388Z, 3/3): the walked axle anchor
+# landed on the plain end's rim, sunk in the bar's bore, so 12's arrow read as
+# item 1. 12 takes the shank's step edge instead, the end of the shank that
+# stands out of the bar. The axle is Rx(-90) in the assembly (local x = X,
+# y = -Z, z = +Y), so its step ring lies square to machine Z, and the fitter
+# isometric looks down (1, 1, 1): the ring point at 45 deg in the machine XY
+# plane faces it, on the shank's lit side.
+AXLE_BALLOON_POINT_MM = (
+    AXLE_PIN_DIA / 2.0 * math.cos(math.radians(45.0)),
+    AXLE_STEP_STATION,
+    AXLE_PIN_DIA / 2.0 * math.sin(math.radians(45.0)),
+)
 # Machinist review of run 20261101T025747277Z moved the wheel group's front
 # stack off the wheel (mg_magnifier_explode_spec) so 14's leader reaches the
 # back washer clear of the rim. The walked wheel anchor then landed on the
@@ -510,6 +526,7 @@ BALLOON_ANCHORS = {stem: BalloonAnchor() for stem in BOM_COMPONENTS} | {
     ),
     "mg-vn-wheel-axle-front-washer": BalloonAnchor(point_mm=FRONT_WASHER_BALLOON_POINT_MM),
     "mg-magnifying-wheel": BalloonAnchor(point_mm=WHEEL_BALLOON_POINT_MM),
+    "mg-wheel-axle": BalloonAnchor(point_mm=AXLE_BALLOON_POINT_MM),
     "mg-vn-wheel-axle-nut": BalloonAnchor(
         point_mm=LOCKNUT_BALLOON_POINT_MM, instance=LOCKNUT_INSTANCE
     ),
@@ -795,13 +812,10 @@ PRESSED = StackDetail(
     (0.342, 0.200),
     frozenset({"mg-wheel-bar", "mg-wheel-axle", "mg-wheel-axle-spacer"}),
     BORE_ROW_HEIGHT,
-    # The BOM items it shows (machinist review r1); the rest are left out.
-    # One clause a line: on one line the spacer clause ran over the border.
-    f"ITEM {notes.ITEM_NUMBERS['mg-wheel-axle']} PRESSED INTO "
-    f"ITEM {notes.ITEM_NUMBERS['mg-wheel-bar']},\n"
-    f"ITEM {notes.ITEM_NUMBERS['mg-wheel-axle-spacer']} ON "
-    f"ITEM {notes.ITEM_NUMBERS['mg-wheel-axle']},\n"
-    "OTHER PARTS NOT SHOWN",
+    # Its label is the title and scale only, as DETAIL B's: the letter,
+    # boundary and break-out say what the view shows, and the bond lives in
+    # steps 9-9F and NOTE 1 (rule 9; machinist review, run
+    # 20261126T020952932Z: the parts prose under the title gated as clarity).
     letter_corner=(-1, 1),
     break_out=True,
 )

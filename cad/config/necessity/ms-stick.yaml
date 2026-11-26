@@ -1,0 +1,20 @@
+# MHA-MS-01 measuring stick: why each band tighter than the title block stays
+# (drawing-guidelines.md rule 4; owner ruling 2026-11-24: the reason lives
+# here, not on the sheet). Read by the machinist review only.
+# Fit audit 2026-11-23 rows MHA-MS-01.graduation_stations and
+# .graduation_width: keep as is. The stations set every amplitude-bar station
+# through the READOUT table (ms_stick_spec, the station table's +/-.002 from
+# the end face nearest the 10); the graduation's .016 MIN face width and .024
+# MAX ceiling keep neighbouring grooves on the .0559 minor pitch apart
+# (coordinator ruling 2026-10-23, on codjiflo's #1905 review).
+necessity:
+  - id: N-01
+    feature: "sheet 1, station table, every graduation ±.002 from the end face nearest the 10"
+    kind: trace
+    reason: "a misplaced graduation shifts the amplitude-bar station it sets"
+    source: "ms_stick_spec station table band; READOUT stick-reading column"
+  - id: N-02
+    feature: "sheet 1, graduation width .016 MIN, .024 MAX"
+    kind: gap
+    reason: "wider grooves merge on the .0559 minor pitch"
+    source: "ms_stick_spec TICK_WIDTH and GRADUATION_WIDTH_MAX_MM; coordinator ruling 2026-10-23 (#1905)"

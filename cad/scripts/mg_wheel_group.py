@@ -9,8 +9,9 @@ Axial stations ``d`` run from the wheel bar's FRONT face toward the pen
 (machine z = BAR_FRONT_Z - d): bar -9..0, spacer, back washer, wheel hub
 (spokes' mid-plane on the pen-rod line ``_recording_geometry.PEN_Z_MID``),
 endshake, front washer, nut, locknut, then the pin's thread end and domed tip.
-The pin is pressed to a gauge from the spacer's outer face, its back end
-inside the bar's bore. The spacer's length is derived from the pen line
+The model sets the pin at its nominal station past the spacer's outer face
+(the bench sets it to a dry trial of the stack, C11), its back end inside the
+bar's bore. The spacer's length is derived from the pen line
 (``mg_wheel_axle_spacer_spec``), so the wheel mid-plane is the pen line by
 construction; the closure is asserted below.
 """
@@ -27,6 +28,8 @@ import mg_wheel_bar_geom as _bar
 import mg_vn_wheel_axle_back_washer_spec as _back
 import mg_vn_wheel_axle_front_washer_spec as _front
 import mg_vn_wheel_axle_nut_spec as _nut
+from _fit_deviations import deviations
+from _printed_tolerance import printed_deviations
 from _recording_geometry import PEN_Z_MID
 from _mg_wheel_rim_geometry import RIM_WIRE_R
 
@@ -55,20 +58,18 @@ if not math.isclose(_SPOKE_MID_Z, WHEEL_MID_Z, abs_tol=1e-9):
         f"off the pen line {WHEEL_MID_Z}"
     )
 
-# --- stack corners (the printed and catalogue bands) -----------------------------------
-# Owner ruling 2026-11-21 (tight-tolerance audit, row 3): "fit at assembly".
-# MHA-MG-00 presses the pin with the spacer on its shank against the bar's
-# front face and gauges the step from the spacer's OUTER face, so neither
-# the bar's depth nor the spacer's length is in the stack: they set only
-# where the back end lands (mg_wheel_axle_spec.BACK_END_SUNK_MIN /
-# BACK_END_SUNK_MAX). Each corner runs from the spacer's outer face, where
-# the back washer seats. The gauge and the hub keep millimetre nominals and
+# --- stack corners at the trial (the printed and catalogue bands) ---------------------
+# Owner ruling 2026-11-24, fit audit part 2, C11 ("Yes, set to the trial
+# stack"): MHA-MG-00 no longer gauges the step, so the old .768 +/-.002
+# press gauge is no term here (DETAIL A prints the station REF). The axle
+# goes in with its plain end flush and the trial only slides it out, to
+# DETAIL B's middle after a short thread end; every corner below runs at
+# those two settings. The hub and the spacer keep millimetre nominals and
 # print rounded: each term is its printed limits.
-_GAUGE = _pin.PRESS_GAUGE_LIMITS
 _BACK = (_back.THICKNESS_MIN, _back.THICKNESS_MAX)
 _HUB = _wheel.HUB_LEN_LIMITS
-# Step to thread end: printed from the gauged step itself, so its own band
-# is the whole of it (the shank's tolerance only places the back end).
+# Step to thread end: printed from the step itself, so its own band is the
+# whole of it.
 _THREAD = (
     _pin.THREAD_LEN + _pin.THREAD_LEN_BAND[1],
     _pin.THREAD_LEN + _pin.THREAD_LEN_BAND[0],
@@ -76,63 +77,104 @@ _THREAD = (
 _FRONT = (_front.THICKNESS_MIN, _front.THICKNESS_MAX)
 _NUTS = (2.0 * _nut.THICKNESS_MIN, 2.0 * _nut.THICKNESS_MAX)
 
-# (a) The pin's shank-to-thread step stays inside the hub's front face, so the
-# wheel runs on the full shank and the front washer sits on the thread.
-STEP_INSIDE_HUB = (_BACK[0] + _HUB[0]) - _GAUGE[1]  # .027
-# (b) The locknut sits on FULL thread (drawing-guidelines.md rule 18 (thread engagement) counts full threads only): the
-# thread less the incomplete pitch the dome cuts runs past its outer face,
-# and the first nut's inner face sits past the step's thread relief (or the
-# die's run-out, were the relief cut narrower than the die's lead).
-LOCKNUT_THREAD_MARGIN = (_GAUGE[0] + _THREAD[0] - _pin.TIP_INCOMPLETE) - (
-    _BACK[1] + _HUB[1] + ENDSHAKE_MAX + _FRONT[1] + _NUTS[1]
-)  # .002
-NUT_RUNOUT_MARGIN = (_BACK[0] + _HUB[0] + ENDSHAKE_MIN + _FRONT[0]) - (
-    _GAUGE[1] + _pin.FULL_THREAD_FROM_STEP_MAX
-)  # .004
-# (c) At most .114 of thread, incomplete pitch included, stands past the
-# locknut: the user's option (c) of 2026-10-12 (2.9 mm, floored to the inch
-# grid), superseding the rev-10 "dome + 1.3 at every corner" (the washers'
-# and nuts' catalogue bands alone set a floor near it with the thread length
-# exact).
-# The long corner at ENDSHAKE_MIN is also the MHA-MG-00 trial fit's: its
-# nuts jam over the endshake's go feeler before the endshake is set
-# (#3344; mg_magnifier_assembly_sheet asserts the trial corners).
-# Rounded to the micron: the corner can sit on the limit.
-THREAD_PAST_LOCKNUT_MAX = round(
-    (_GAUGE[1] + _THREAD[1])
-    - (_BACK[0] + _HUB[0] + ENDSHAKE_MIN + _FRONT[0] + _NUTS[0]),
-    6,
-)  # .113
-THREAD_PAST_LOCKNUT_NOMINAL = _pin.THREAD_END_Y - LOCKNUT_FACE_D  # .067
-if STEP_INSIDE_HUB <= 0.0:
-    raise AssertionError(f"pin step clears the hub front face: {STEP_INSIDE_HUB:.4f}")
-if LOCKNUT_THREAD_MARGIN < 0.0:
+# The trial (C11) accepts on things to see, at the go leaf's endshake
+# (ENDSHAKE_MIN): the front washer seated on the hub's spigot face with no
+# light under it, the first nut ran on full thread down to it, the thread
+# end inside DETAIL B (TIP_INCOMPLETE .. THREAD_PAST_LOCKNUT_LIMIT) and the
+# plain end not proud. The seat is the shank step inside the hub, read
+# directly: the front washer's bore is under the shank's, so a step outside
+# the hub's front face grounds the washer on it and shows light. The nut
+# check alone does not bound the step (Codjiflo r1 of #3529): full thread
+# may start at the relief's MIN width, .028, so a nut on thread over the go
+# leaf and the thickest washer leaves the step up to .006 outside the hub.
+# TRIAL_STEP_INSIDE_HUB_MIN proves the seat check rejects no conforming set
+# at either setting the trial reaches: the flush start (the plain end on the
+# plate, the step the shank less the bar's depth off the bar's front face),
+# and a slide out to DETAIL B's middle after a short thread end (the step
+# then hangs off the nut stack: the thread less that reading, the go leaf,
+# the thickest washer and the thickest nuts). The set endshake (up to
+# ENDSHAKE_MAX) lowers the thread end by at most TRIAL_ENDSHAKE_DROP and
+# never raises it, so the re-read after the locknut can only fall short, and
+# closing the endshake to the go leaf restores the trial's reading.
+_SHANK_DEV = printed_deviations(_pin.SHANK_LEN, _pin.SHANK_LEN_PLACES, unit=_pin.UNIT)
+_DEPTH_DEV = printed_deviations(
+    _pin.BAR_DEPTH, _bar.BAR_DEPTH_PLACES, deviations(_bar.BAR_DEPTH_BAND), unit=_bar.UNIT
+)
+_FLUSH_STEP = (
+    (_pin.SHANK_LEN + _SHANK_DEV[0]) - (_pin.BAR_DEPTH + _DEPTH_DEV[1]),
+    (_pin.SHANK_LEN + _SHANK_DEV[1]) - (_pin.BAR_DEPTH + _DEPTH_DEV[0]),
+)  # 1.461 .. 1.491
+_HUB_FRONT = (
+    _spacer.LENGTH_LIMITS[0] + _BACK[0] + _HUB[0],
+    _spacer.LENGTH_LIMITS[1] + _BACK[1] + _HUB[1],
+)  # 1.523 .. 1.557
+# The step inside the hub at the flush start; and the slide's target, its
+# least step inside the hub hanging off the nut stack.
+_FLUSH_INSIDE_MIN = _HUB_FRONT[0] - _FLUSH_STEP[1]  # .032
+TRIAL_SLIDE_TARGET = (_pin.TIP_INCOMPLETE + _pin.THREAD_PAST_LOCKNUT_LIMIT) / 2.0  # .0695
+_SLID_INSIDE_MIN = (
+    _THREAD[0] - TRIAL_SLIDE_TARGET - ENDSHAKE_MIN - _FRONT[1] - _NUTS[1]
+)  # .0145
+TRIAL_STEP_INSIDE_HUB_MIN = min(_FLUSH_INSIDE_MIN, _SLID_INSIDE_MIN)  # .0145
+TRIAL_ENDSHAKE_DROP = ENDSHAKE_MAX - ENDSHAKE_MIN
+if TRIAL_STEP_INSIDE_HUB_MIN <= 0.0:
     raise AssertionError(
-        f"locknut runs off the full thread: {LOCKNUT_THREAD_MARGIN:.4f}"
+        f"a conforming trial stack fails the washer seat check: {TRIAL_STEP_INSIDE_HUB_MIN:.4f}"
     )
+# The first nut's inner face sits past the latest full-thread start (the
+# relief's MAX width, or the die's run-out were the relief cut narrower than
+# its lead) at both settings, so a conforming set passes the trial's nut
+# check (drawing-guidelines.md rule 18 (thread engagement) counts full
+# threads only): at the flush start, the step inside the hub, the go leaf
+# and the thinnest washer; slid, the thread less the target and the thickest
+# nuts. The set endshake only moves the nut further out.
+NUT_RUNOUT_MARGIN = (
+    min(
+        _FLUSH_INSIDE_MIN + ENDSHAKE_MIN + _FRONT[0],
+        _THREAD[0] - TRIAL_SLIDE_TARGET - _NUTS[1],
+    )
+    - _pin.FULL_THREAD_FROM_STEP_MAX
+)  # .0055
 if NUT_RUNOUT_MARGIN < 0.0:
     raise AssertionError(f"nut reaches the thread relief: {NUT_RUNOUT_MARGIN:.4f}")
+# At most .114 of thread, incomplete pitch included, stands past the locknut:
+# the user's option (c) of 2026-10-12 (2.9 mm, floored to the inch grid). The
+# trial can only slide the axle out from flush, never push it further in, so
+# the flush start's long corner (at the go leaf, ENDSHAKE_MIN, the trial's
+# endshake) must already read inside DETAIL B: a conforming set never needs
+# the plain end proud. The slide's target is DETAIL B's middle, under it.
+# The locknut on full thread is DETAIL B's low limit (TIP_INCOMPLETE), read
+# at the trial and again once the endshake is set, each with its remedy.
+THREAD_PAST_LOCKNUT_MAX = _THREAD[1] - (
+    _FLUSH_INSIDE_MIN + ENDSHAKE_MIN + _FRONT[0] + _NUTS[0]
+)  # .108
+THREAD_PAST_LOCKNUT_NOMINAL = _pin.THREAD_END_Y - LOCKNUT_FACE_D  # .067
 if THREAD_PAST_LOCKNUT_MAX > _pin.THREAD_PAST_LOCKNUT_LIMIT:
     raise AssertionError(
-        f"{THREAD_PAST_LOCKNUT_MAX:.4f} of thread past the locknut "
-        f"> {_pin.THREAD_PAST_LOCKNUT_LIMIT}"
+        f"{THREAD_PAST_LOCKNUT_MAX:.4f} of thread past the locknut at the flush "
+        f"start > {_pin.THREAD_PAST_LOCKNUT_LIMIT}"
     )
 
 # --- fits on the pin ------------------------------------------------------------------
 _PIN = (_pin.PIN_DIA - _pin.PIN_DIA_TOL, _pin.PIN_DIA + _pin.PIN_DIA_TOL)
-# Press in the bar's reamed bore (interference, both corners > 0).
-BAR_PRESS = (
-    _PIN[0] - (_bar.AXLE_BORE_DIA + _bar.AXLE_BORE_BAND[0]),
-    _PIN[1] - (_bar.AXLE_BORE_DIA + _bar.AXLE_BORE_BAND[1]),
-)  # .0003 .. .0012
+# Bonded in the bar's 3/16 drilled bore (owner ruling 2026-11-24, fit audit
+# question 18): the drill's DRILLED HOLES row over the drill rod's supplier
+# band leaves a diametral gap inside LOCTITE 638's. Its tight corner is a
+# light press (.0002 at most), which the compound takes as well; the step
+# pushes the axle in on its shoulder through the sleeve.
+BAR_BOND_GAP = (
+    (_bar.AXLE_BORE_DIA + _bar.AXLE_BORE_BAND[1]) - _PIN[1],
+    (_bar.AXLE_BORE_DIA + _bar.AXLE_BORE_BAND[0]) - _PIN[0],
+)  # -.0002 .. .0042
 # Running fit (drawing-guidelines.md rule 4 (tighten only for function, and
-# name the mate)): the wheel's owned-reamer .1885 bore (+.0005/0) on the
+# name the mate)): the wheel's .1885 reamed bore (+.0005/0; the reamer is to
+# order, shop-equipment tools.reamer-1885) on the
 # drill rod's supplier band.
 HUB_RUNNING = (0.02032, 0.04318)  # (.0008, .0017)
 # The largest finished bore: the loosest clearance on the largest pin.
 WHEEL_BORE_MAX = _PIN[1] + HUB_RUNNING[1]  # .1894
-if min(BAR_PRESS) <= 0.0:
-    raise AssertionError(f"pin is not a press fit in the bar: {BAR_PRESS}")
+if BAR_BOND_GAP[1] > _wheel.LOCTITE_638_GAP_MAX:
+    raise AssertionError(f"axle gap in the bar exceeds LOCTITE 638's: {BAR_BOND_GAP}")
 if min(HUB_RUNNING) <= 0.0:
     raise AssertionError(f"wheel does not run free on the pin: {HUB_RUNNING}")
 if not (

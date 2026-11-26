@@ -29,6 +29,7 @@ from _export_feature_faces import FeatureFaceError
 from _test_feature_bundles import IdSelector, bind_manifest, rewrite_step, write_bundle
 from _feature_requirements import discover_parts, metadata_for, requirements_for, source_tree
 from _gtol_face import FaceGeometry
+from _hole_spec import drill_process
 from _printed_tolerance import drilled_oversize_mm, edge_break_radius_mm, printed_band_mm
 
 
@@ -326,10 +327,15 @@ def _assert_rocker_print_authority() -> None:
         for node in ast.walk(dressing) if isinstance(node, ast.Assign)
         for target in node.targets if isinstance(target, ast.Name)
     }
-    # Size, then process, then depth (rule 26): REAM THRU follows the limits.
-    suffix = eval(compile(ast.Expression(assignments["ream_suffix"]), draw.__file__, "eval"), {}, {"suffix": ""})
-    assert suffix.split()[0] == pivot["process"].upper(), "pivot process drifted from its native dimension text"
-    assert pivot["thru"] and "THRU" in suffix, "hole end drifted from its native dimension text"
+    # Size, then process, then depth (rule 26): F DRILL THRU follows the size
+    # (owner ruling 2026-11-24, fit audit question 1).
+    suffix = eval(
+        compile(ast.Expression(assignments["drill_suffix"]), draw.__file__, "eval"),
+        {"drill_process": drill_process, "rocker": rocker},
+        {"suffix": ""},
+    ).strip()
+    assert suffix.removesuffix(" THRU") == pivot["process"].upper(), "pivot process drifted from its native dimension text"
+    assert pivot["thru"] and suffix.endswith(" THRU"), "hole end drifted from its native dimension text"
     # Both ends are dimensioned on the views (J and K LAND rows, both tapers,
     # 2X 5.59): the symmetry is cited to those natives, not a mirror note.
     assert features["profile_outer"]["mirror_symmetric"] and "MIRROR" not in rocker_notes.DRAWING_NOTES
@@ -408,7 +414,8 @@ def test_rocker_bands_respect_native_nominals_and_displayed_general_rows() -> No
     assert features["rod_hole"]["dia"] == [1.994, 2.0956]
     assert features["rod_hole"]["nominal_dia"] == 1.994
     assert features["rod_hole"]["precision"]["dia"] == 4
-    assert features["pivot_bore"]["dia"] == [6.5024, 6.5278]
+    # F-drilled (fit audit question 1): the DRILLED HOLES row, +.004/0.
+    assert features["pivot_bore"]["dia"] == [6.528, 6.6296]
     assert features["rod_hole"]["at"] == pytest.approx([133.06740213488345, 16.456064115939025, 0.0])
 
 
@@ -441,7 +448,8 @@ def test_unknown_requirements_and_references_do_not_acquire_acceptance_bands() -
     assert "length" not in shaft["features"]["outer"]["requirements"]
     assert shaft["datums"] == {}
     assert set(shaft["features"]) == {"outer", "flat_north", "flat_south", "datum_end", "far_end"}
-    assert shaft["features"]["outer"]["requirements"] == ["dia", "finish_ra"]
+    # The bought rod prints as its stock (drawing-guidelines.md rule 4).
+    assert shaft["features"]["outer"]["requirements"] == ["stock"]
 
 
 def test_rocker_profile_zones_export_the_printed_frames_and_govern_their_own_basics() -> None:
@@ -659,7 +667,7 @@ def test_shaft_axial_extents_tile_the_turned_axis() -> None:
     assert [low, high] == pytest.approx([-bank.PIVOT_SHAFT_LENGTH, 0.0])
     assert low < selectors["outer"][0].contains_z_mm < high
     # Each dome runs from the O.D.'s end circle to its apex, the end's plane.
-    radius_od = features["outer"]["dia_nominal"] / 2
+    radius_od = features["outer"]["dia_ref"] / 2
     for name, root in (("datum_end", high), ("far_end", low)):
         sphere = selectors[name][0]
         radius, centre = sphere.diameter_mm / 2, sphere.center_mm[2]

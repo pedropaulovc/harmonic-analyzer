@@ -95,9 +95,12 @@ def test_plate_feature_bands_are_the_printed_ones() -> None:
     features = export_features.requirement_manifest("ms_stop_plate")["features"]
     assert features["far_end"]["length"] == pytest.approx([_in(0.83), _in(0.85)])
     assert features["roof_edge"]["height"] == pytest.approx([_in(0.55), _in(0.57)])
-    assert features["outer_face"]["thickness"] == pytest.approx(
-        [_in(0.036), _in(0.044)]
-    )
+    # The sheet's (.040) prints as a reference over SHEET AS SUPPLIED; its
+    # band is the receiving range, the title block's .XXX.
+    outer = features["outer_face"]
+    assert outer["thickness"] == pytest.approx([_in(0.035), _in(0.045)])
+    assert outer["dimension_type"] == "reference" and outer["as_supplied"] is True
+    assert outer["callout"] == "SHEET AS SUPPLIED"
     chamfers = features["roof_chamfers"]
     assert chamfers["size"] == pytest.approx([_in(0.03), _in(0.05)])
     assert chamfers["angle_deg"] == pytest.approx([44.0, 46.0])
@@ -106,14 +109,18 @@ def test_plate_feature_bands_are_the_printed_ones() -> None:
         # #2 close clearance at the title block's DRILLED HOLES +.004/0.
         assert hole["dia"] == pytest.approx([_in(0.094), _in(0.098)], abs=1e-3)
         assert hole["thru"] is True and hole["axis"] == [0.0, 0.0, 1.0]
+        # The locations print as references (rule 4 form 2: made with
+        # MHA-MS-02 in the pair drill); the band is the one the web proofs
+        # take for the pair drill's places.
+        assert hole["dimension_type"] == "reference"
         assert hole["station"] == pytest.approx(
             [_in(station - 0.005), _in(station + 0.005)], abs=1e-3
         )
         assert hole["height"] == pytest.approx([_in(0.155), _in(0.165)], abs=1e-3)
-        # The pair's #49 pilot, to MHA-MS-02's .300 below its mating face.
+        # The pair's #49 pilot, to MHA-MS-02's .30 (.XX) below its mating face.
         assert hole["pair_pilot_dia"] == pytest.approx(_in(0.073))
         assert hole["pair_pilot_depth_in_mate"] == pytest.approx(
-            [_in(0.295), _in(0.305)], abs=1e-3
+            [_in(0.29), _in(0.31)], abs=1e-3
         )
         assert hole["callout"] == drawing.NOTE_LINK
 
@@ -123,6 +130,5 @@ def test_the_matched_pair_note_is_the_one_the_sheet_prints() -> None:
     assert notes.DRAWING_NOTES == notes.MATCHED_PAIR_NOTE
     assert notes.MATCHED_PAIR_NOTE.splitlines() == [
         "1. MATCHED PAIR WITH MHA-MS-02 STOP BLOCK: LOCATING ENDS AND EDGES FLUSH.",
-        "    2X MHA-MS-VN-51 SCREWS ENTER FREELY; THICKNESS SETS THEIR REACH IN",
-        "    MHA-MS-02 TAPS.",
+        "    2X MHA-MS-VN-51 SCREWS ENTER FREELY INTO MHA-MS-02 TAPS.",
     ]

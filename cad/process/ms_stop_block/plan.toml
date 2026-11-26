@@ -868,7 +868,7 @@ feed = "hand"
 [[setups.operations]]
 instruction = "The mating face must lie flat on MHA-MS-03: stone it lightly on a flat stone and wipe it. Wash off the oil. Keep L, EDGE and MATING readable."
 feed = "hand"
-inspection = "Mating face down on the surface plate: it does not rock and no burr stands proud. Rocks: stone it again. If the MHA-MS-01 stick is at hand, it slides through the rebate end to end without shake or binding (NOTE 1)."
+inspection = "Mating face down on the surface plate: it does not rock and no burr stands proud. Rocks: stone it again. If the MHA-MS-01 stick is at hand, it slides through the rebate end to end without binding (NOTE 1; MHA-MS-01 NOTE 1: STICK SLIDES FULL LENGTH)."
 gauge_checks = "other"
 
 [[setups.operations]]
@@ -886,7 +886,7 @@ vise_hold = "other"
 beam = "other"
 
 [[setups.operations]]
-instruction = "MHA-MS-03's traveler, Setup 3: the block lying mating face up, its plate on it, LOCATING ENDS AND EDGES FLUSH, gripped across the .84 length (never across the .56); it spots and drills #49 through the plate into the block, {{cad.plate_tap_1_drill_depth_in:.3dot}} below the mating face ({{cad.plate_tap_1_drill_depth_min_in:.3dot}}–{{cad.plate_tap_1_drill_depth_max_in:.3dot}}). Its Setup 4 opens only the plate's holes; Setup 5 scribes the pair mark across the locating corner onto this mating face. The block comes back piloted; keep it with its plate."
+instruction = "MHA-MS-03's traveler, Setup 3: the block lying mating face up, its plate on it, LOCATING ENDS AND EDGES FLUSH, gripped across the .84 length (never across the .56); it spots and drills #49 through the plate into the block, {{cad.plate_tap_1_drill_depth_in:.2dot}} below the mating face ({{cad.plate_tap_1_drill_depth_min_in:.2dot}}–{{cad.plate_tap_1_drill_depth_max_in:.2dot}}). Its Setup 4 opens only the plate's holes; Setup 5 scribes the pair mark across the locating corner onto this mating face. The block comes back piloted; keep it with its plate."
 feed = "hand"
 
 [[setups]]
@@ -940,7 +940,7 @@ speed_kind = "other"
 tool = "tap-2-56-bottoming"
 drilling = "none"
 sizing = "other"
-instruction = "Same hole, the 2-56 bottoming tap in the wrench: start it by hand in the plug tap's thread, jog Z down to push the guide's point fully home in the wrench, and tap under the tap guide to the same DRO Z (the noted Z less {{process.plate_tap_reach_mm:in.3dot}}), read with the point pushed fully home; never past it: the pilot is only {{cad.plate_tap_1_drill_depth_min_in:.3dot}} deep. Jog Z up clear, send G21, back the tap out, blow the hole out."
+instruction = "Same hole, the 2-56 bottoming tap in the wrench: start it by hand in the plug tap's thread, jog Z down to push the guide's point fully home in the wrench, and tap under the tap guide to the same DRO Z (the noted Z less {{process.plate_tap_reach_mm:in.3dot}}), read with the point pushed fully home; never past it: the pilot is only {{cad.plate_tap_1_drill_depth_min_in:.2dot}} deep. Jog Z up clear, send G21, back the tap out, blow the hole out."
 feed = "hand"
 
 [[setups.operations]]
@@ -951,8 +951,8 @@ sizing = "other"
 instruction = "Run MS11_plate_tap_2 (hole 2) and repeat the four steps above on it: centre the tap guide, the depth reference, the plug tap, the bottoming tap."
 
 [[setups.operations]]
-instruction = "The thread depth ({{cad.plate_tap_1_thread_depth_min_in:.3dot}}–{{cad.plate_tap_1_thread_depth_max_in:.3dot}}) is held by the bottoming tap run to its DRO Z in the {{cad.plate_tap_1_drill_depth_min_in:.3dot}}–{{cad.plate_tap_1_drill_depth_max_in:.3dot}} pilot, not gauged. In each hole run a 2-56 screw (at least 3/8 under the head) in by hand to its stop; mark it at the mating face; out, read the mark to its end."
-inspection = "Each hole takes the screw at least {{cad.plate_tap_1_thread_depth_min_in:.3dot}} deep (calipers, mark to end). The plate's screws run in by hand and seat."
+instruction = "The thread depth ({{cad.plate_tap_1_thread_depth_min_in:.2dot}}–{{cad.plate_tap_1_thread_depth_max_in:.2dot}}) is held by the bottoming tap run to its DRO Z in the {{cad.plate_tap_1_drill_depth_min_in:.2dot}}–{{cad.plate_tap_1_drill_depth_max_in:.2dot}} pilot, not gauged. In each hole run a 2-56 screw (at least 3/8 under the head) in by hand to its stop; mark it at the mating face; out, read the mark to its end."
+inspection = "Each hole takes the screw at least {{cad.plate_tap_1_thread_depth_min_in:.2dot}} deep (calipers, mark to end). The plate's screws run in by hand and seat."
 gauge_checks = "other"
 
 [[setups.operations]]
@@ -983,7 +983,7 @@ feed = "hand"
 
 [[setups.operations]]
 instruction = "Final check, the sizes accepted at their setups: length (Setup 8), height (Setup 5), the rebate and back wall (Setup 6), the chamfers (Setups 7, 9), the thumb hole (Setup 10), the plate threads (Setup 13)."
-inspection = "The plate screws its two 2-56 screws down flat, the locating ends and edges flush; a 4-40 thumbscrew runs into the rebate; if the MHA-MS-01 stick is at hand, the block slides along it without shake (NOTE 1). Any failure: stop and tell the owner."
+inspection = "The plate screws its two 2-56 screws down flat, the locating ends and edges flush; a 4-40 thumbscrew runs into the rebate; if the MHA-MS-01 stick is at hand, the block slides along its full length (NOTE 1; MHA-MS-01 NOTE 1). Any failure: stop and tell the owner."
 gauge_checks = "other"
 
 [[setups.operations]]

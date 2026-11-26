@@ -106,8 +106,7 @@ from ch_channel_lever_spec import (
     HUB_LENGTH_BAND,
     LEVER_SPRING_X,
     LEVER_THICKNESS,
-    LEVER_THICKNESS_TOLERANCE,
-    PIVOT_HOLE_BAND,
+    LEVER_THICKNESS_BAND,
     PIVOT_HOLE_DIA,
     PLATE_OFFSET,
     PLATE_OFFSET_TOLERANCE,
@@ -430,8 +429,8 @@ def build(adapter) -> dict[str, str]:
     volume_check(adapter, "root corners", v_lever_hub + v_roots, 0.2 * v_roots)
     expected += v_roots
 
-    # Fulcrum hole (Ø.256 reamed, rides the fulcrum shaft): a bearing bore, kept
-    # a plain circle cut. On the origin, so only its diameter is a dim.
+    # Fulcrum hole (Ø.257 F drill, rides the fulcrum shaft): kept a plain
+    # circle cut. On the origin, so only its diameter is a dim.
     fulcrum = SketchDims()
     check("create_sketch fulcrum hole", adapter.create_sketch("Front"))
     define_circle(
@@ -514,19 +513,17 @@ def build(adapter) -> dict[str, str]:
     blank_reference_sketches(adapter, ("PlateOffsetReference",))
 
     # Bands ride natively on the model dimensions the print imports
-    # (drawing-simplicity-policy.md): the reamed fulcrum bore, the plate the
-    # bar's top notch straddles, the hub faces that set the station pitch, and
-    # the two gain arms from the fulcrum bore. The bands are millimetres; UNIT
-    # prints them in inches.
-    set_dimension_bilateral_tolerance(
-        adapter, "FulcrumProfile", "FulcrumDia", *deviations(PIVOT_HOLE_BAND),
-        display_unit=UNIT,
-    )
+    # (drawing-simplicity-policy.md): the plate the bar's top notch
+    # straddles, the hub faces that set the station pitch, and the two gain
+    # arms from the fulcrum bore. The bands are millimetres; UNIT prints them
+    # in inches. The F-drilled fulcrum bore carries no band of its own: its
+    # DRILL THRU callout takes the title block's DRILLED HOLES row.
     set_dimension_bilateral_tolerance(
         adapter, "Hub", "HubLength", *deviations(HUB_LENGTH_BAND), display_unit=UNIT
     )
-    set_dimension_symmetric_tolerance(
-        adapter, "LeverBody", "LeverThick", LEVER_THICKNESS_TOLERANCE, display_unit=UNIT
+    set_dimension_bilateral_tolerance(
+        adapter, "LeverBody", "LeverThick", *deviations(LEVER_THICKNESS_BAND),
+        display_unit=UNIT,
     )
     set_dimension_symmetric_tolerance(
         adapter, "PlateOffsetReference", "PlateOffset", PLATE_OFFSET_TOLERANCE,
@@ -534,7 +531,6 @@ def build(adapter) -> dict[str, str]:
     )
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     for feature_name, dimension_name in (
-        ("FulcrumProfile", "FulcrumDia"),
         ("Hub", "HubLength"),
         ("LeverBody", "LeverThick"),
         ("PlateOffsetReference", "PlateOffset"),

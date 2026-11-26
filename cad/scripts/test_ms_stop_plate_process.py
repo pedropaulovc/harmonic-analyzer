@@ -141,7 +141,7 @@ def _seed(ctx: dict, key: str, old: str, new: str) -> dict:
         # The #49 pilot stopped short of the block's tap drill depth.
         ("pair_pilot", "G1 Z-9.193 F{feed}", "G1 Z-8.500 F{feed}", "holes"),
         # The #41 stopped inside the plate: the hole is not open through.
-        ("plate_open", "G1 Z-2.250 F{feed}", "G1 Z-0.800 F{feed}", "holes"),
+        ("plate_open", "G1 Z-2.276 F{feed}", "G1 Z-0.800 F{feed}", "holes"),
         # A rapid down into the plate instead of to the R plane.
         ("pair_spot", "G0 Z1.000", "G0 Z-0.500", "rapid"),
     ],
