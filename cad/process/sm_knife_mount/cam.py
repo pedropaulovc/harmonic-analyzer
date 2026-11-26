@@ -1210,9 +1210,11 @@ def build(ctx: dict[str, Any], rt: Any) -> dict[str, Any]:
 # never fails the task. "gate" would fail it on a difference over the noise
 # line or a rapid that cuts.
 AS_MACHINED_MODE = "report"
-# The chucking reamers' 45° lead, at the longest the plan allows for (its
-# holes note: "its 45° lead leaves the full diameter .36-.38 deep for any
-# lead up to .020"); the jobs carry the reamers as 118° drills for FreeCAD.
+# The .4990 chucking reamer's 45° lead, taken at .020 (the longest the plan
+# allowed for datum B's reamer before B became drilled). KM08 reams the
+# knife bore through, so its tip ends out of the part and the lead's length
+# changes nothing the report measures. The jobs carry the reamer as a 118°
+# drill for FreeCAD.
 REAMER_LEAD_MM = 0.020 * IN
 
 
@@ -1225,7 +1227,7 @@ def as_machined(ctx: dict[str, Any], inputs: Any) -> dict[str, Any]:
     (Z) at their bands' middles: the thickness from the K face (KM01's Z0 is
     the top less the skim), the width from the U edge (KM03's Z0 is the edge
     less the skim), which the frames put where the widest bar has it. KM07 is
-    a tap guide by hand and cuts nothing. The two reamers cut with a 45°
+    a tap guide by hand and cuts nothing. The .4990 reamer cuts with a 45°
     lead of :data:`REAMER_LEAD_MM`, not a drill's point."""
     p = inputs.plan["parameters"]
     lengths = {
@@ -1241,33 +1243,6 @@ def as_machined(ctx: dict[str, Any], inputs: Any) -> dict[str, Any]:
         if job["tool"].startswith("reamer-"):
             r = job["dia"] / 2
             tools[ctx["numbers"][job["tool"]]] = [[r - REAMER_LEAD_MM, 0.0], [r, REAMER_LEAD_MM]]
-    g = _geometry(inputs.features)
-    dowel = g["dowel"]
-    bx, top, bz = dowel["at"]
-    dia = {job["tool"]: job["dia"] for job in ctx["jobs"]}
-    ream_tip = top - (dowel["depth_nominal"] + p["dowel_ream_past_mm"])
-    drill_tip = g["under"] + p["dowel_drill_tip_height_mm"]
-    # The OCC solids' facets stand off a round wall by up to the report's
-    # 0.075 mm noise line; the boxes round a hole take that much more.
-    facets = 0.075
-    r31 = dia["drill-31"] / 2 + facets
-    r128 = dia["reamer-1280"] / 2 + facets
-    expected = [
-        {
-            "name": "datum B reamer lead",
-            "kind": "left",
-            "within": [[bx - r128, bx + r128], [ream_tip, ream_tip + REAMER_LEAD_MM + facets], [bz - r128, bz + r128]],
-            "reason": "the .1280 chucking reamer's 45° lead at its tip, dowel_ream_past_mm past the drawing's depth: the full diameter still reaches the depth band (plan holes note)",
-            "max_mm": REAMER_LEAD_MM,
-        },
-        {
-            "name": "datum B #31 past the reamer",
-            "kind": "gouge",
-            "within": [[bx - r31, bx + r31], [drill_tip - facets, top - dowel["depth_nominal"]], [bz - r31, bz + r31]],
-            "reason": "KM06 drills the #31 drill_past_mm past the reamer's tip by design (plan holes note), deeper than the model's drill point",
-            "max_mm": ream_tip - drill_tip,
-        },
-    ]
     return {
         "parts": {
             "": {
@@ -1276,7 +1251,6 @@ def as_machined(ctx: dict[str, Any], inputs: Any) -> dict[str, Any]:
                     "box": [[0.0, lengths["nominal"]], [y0, y0 + width], [z1 - thickness, z1]],
                     "length": {"axis": "x", "keep": "min", "mm": lengths},
                 },
-                "expected": expected,
             }
         },
         "skip": {},

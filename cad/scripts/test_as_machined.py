@@ -6,6 +6,7 @@ gating summary. The FreeCAD end of it (seeded faults on a cut part) is
 from __future__ import annotations
 
 import math
+import tomllib
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -14,6 +15,8 @@ import pytest
 import _as_machined as am
 import _cam_programs
 import _gcode
+import _process_plans
+import export_features
 
 IDENTITY = {"origin": [0.0, 0.0, 0.0], "axes": [[1, 0, 0], [0, 1, 0], [0, 0, 1]]}
 # Setup Z along model -Z, X along model X: a part turned over about X.
@@ -354,6 +357,35 @@ def test_every_recipe_states_its_coverage_one_way():
         assert not (declares and hasattr(recipe, "AS_MACHINED_NOT_COVERED")), stem
         if declares:
             assert recipe.AS_MACHINED_MODE in am.MODES, stem
+
+
+def _declaring_stems() -> list[str]:
+    return [stem for stem in _cam_programs.CAM_STEMS if hasattr(_cam_programs.load_recipe(stem), "as_machined")]
+
+
+@pytest.mark.parametrize("stem", _declaring_stems())
+def test_every_declaration_resolves_against_its_recipes_current_context(stem):
+    """A recipe's as_machined() reads its own context(): a context change
+    that leaves it reading a key no longer there (a reamer that became a
+    drill) fails here, not first in the report after a merge. The context
+    is the recipe's own on the drawings' requirement manifests (no FreeCAD,
+    no SolidWorks), as its process test builds it."""
+    recipe = _cam_programs.load_recipe(stem)
+    plan = tomllib.loads(_process_plans.plan_path(stem).read_text(encoding="utf-8"))
+    shop = _process_plans.load_shop()
+    family = _process_plans.family_parts(stem)
+    if family:
+        features = {pid: export_features.requirement_manifest(part) for pid, part in family.items()}
+        views = {pid: _process_plans.part_view(plan, pid) for pid in family}
+        steps = {pid: f"{part}.step" for pid, part in family.items()}
+        ctx = recipe.context(features, views, shop, steps)
+        inputs = SimpleNamespace(features=features, plan=views, shop=shop, steps=steps)
+    else:
+        features = export_features.requirement_manifest(stem)
+        ctx = recipe.context(features, plan, shop, f"{stem}.step")
+        inputs = SimpleNamespace(features=features, plan=plan, shop=shop, steps={"": f"{stem}.step"})
+    decl = am.declaration(recipe, ctx, inputs)
+    assert decl.parts and all(part.blanks and part.setups for part in decl.parts), stem
 
 
 def test_cam_nc_never_fails_a_report_mode_task_on_its_report(monkeypatch, tmp_path):

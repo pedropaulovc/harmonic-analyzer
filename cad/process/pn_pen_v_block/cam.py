@@ -1672,10 +1672,8 @@ def as_machined(ctx: dict[str, Any], inputs: Any) -> dict[str, Any]:
     marks no nominal). The paper end touches Z0 in VB01, so it stays put
     and a longer blank reaches further down, which VB02 faces off. Every
     program runs in its jobs' one frame; VB08 is the hand tap (no frame).
-    Two cutters the jobs do not describe: the chamfer mill, a 90° cone that
-    runs to a point (context() refuses one that does not), and the reamer,
-    taken flat-ended at its diameter: its 45° bevel lead runs past the
-    relief slot's roof into the slot, where there is no metal."""
+    One cutter the jobs do not describe: the chamfer mill, a 90° cone that
+    runs to a point (context() refuses one that does not)."""
     p = inputs.plan["parameters"]
     lengths = {
         "nominal": (p["blank_x_in"] + p["blank_x_max_in"]) / 2 * IN,
@@ -1697,12 +1695,6 @@ def as_machined(ctx: dict[str, Any], inputs: Any) -> dict[str, Any]:
             }
         },
         "skip": {},
-        "tools": {
-            ctx["numbers"]["chamfer"]: [[0.0, 0.0], [cone, cone]],
-            ctx["numbers"]["reamer"]: [[dia["reamer"] / 2, 0.0]],
-        },
-        "notes": [
-            "VB08 is the 4-40 tap by hand under the tap guide: the report cuts no thread",
-            "the reamer is taken flat-ended (its bevel lead ends in the relief slot)",
-        ],
+        "tools": {ctx["numbers"]["chamfer"]: [[0.0, 0.0], [cone, cone]]},
+        "notes": ["VB08 is the 4-40 tap by hand under the tap guide: the report cuts no thread"],
     }
