@@ -432,19 +432,20 @@ def test_the_drum_is_bonded_centred_wet_and_accepted_once_cured() -> None:
     (drum_step,) = (step for step in steps.STEPS if step[0] == steps.DRUM_BONDED_KEY)
     assert drum_step == (
         steps.DRUM_BONDED_KEY,
-        "drum-centred",
         "drum-seated",
         "drum-wet-stripped",
+        "drum-wet-stuck",
         "drum-wet-cleaned",
         "drum-wet-rebonded",
+        "drum-centred",
         "drum-bond-cured",
-        "drum-seat-rechecked",
-        "drum-pair-scrapped",
-        "drum-pair-renewed",
         steps.DRUM_HELD_KEY,
         "drum-stripped",
         "drum-cleaned",
         "drum-rebonded",
+        "drum-seat-rechecked",
+        "drum-pair-scrapped",
+        "drum-pair-renewed",
         "drum-trial-resumed",
     )
     bonded = notes.STEP_TEXT[steps.DRUM_BONDED_KEY]
@@ -458,14 +459,22 @@ def test_the_drum_is_bonded_centred_wet_and_accepted_once_cured() -> None:
     assert "24 H" in notes.STEP_TEXT["drum-bond-cured"]
     assert notes.STEP_TEXT[steps.DRUM_HELD_KEY].endswith("DOES NOT TURN OR SLIDE BY HAND.")
     bond = f"STEP {steps.step_number(steps.DRUM_BONDED_KEY)}"
-    # D38 (#3630): the seat is checked wet, within the LOCTITE 638 TDS's
-    # no-strength time, so a wrong seat still pulls off, cleans and rebonds.
+    # D38 (#3630): the seat is checked wet, at once, so a wrong seat still
+    # pulls off, cleans and rebonds; one that has grabbed goes on to cure.
     seated = f"STEP {steps.step_number('drum-seated')}"
     assert notes.STEP_TEXT["drum-wet-stripped"] == (
         f"IF {seated} FAILS, PULL {notes._DRUM} OFF {notes._WHEEL} AT ONCE."
     )
+    assert notes.STEP_TEXT["drum-wet-stuck"] == (
+        f"IF STEP {steps.step_number('drum-wet-stripped')} CANNOT PULL IT OFF, GO ON "
+        f"TO STEP {steps.step_number('drum-bond-cured')}."
+    )
     assert notes.STEP_TEXT["drum-wet-cleaned"].startswith(f"IF {seated} FAILED, CLEAN ")
     assert notes.STEP_TEXT["drum-wet-rebonded"] == f"IF {seated} FAILED, RETURN TO {bond}."
+    # Once cured, the hand check comes before the seat recheck: a drum that
+    # turns still pulls off (Codjiflo review of #3644).
+    order = drum_step
+    assert order.index(steps.DRUM_HELD_KEY) < order.index("drum-seat-rechecked")
     # Once cured, a wrong seat is not released (about 250 C, never next to
     # the wheel's enamel): wheel and drum are scrapped and both renewed.
     rechecked = f"STEP {steps.step_number('drum-seat-rechecked')}"
@@ -551,12 +560,11 @@ def test_the_drum_bond_is_seen_seated_and_not_proud() -> None:
     assert low < stack.DRUM_RECESS < high
     bonded = notes.STEP_TEXT[steps.DRUM_BONDED_KEY]
     assert bonded.endswith("UNTIL IT IS HARD AGAINST THE BOSS.")
-    # The S4 acceptance is its own check (rule 22), made wet within the
-    # LOCTITE 638 TDS's no-strength time (D38, #3630).
+    # The S4 acceptance is its own check (rule 22), made wet at once, before
+    # it grabs (D38, #3630; Codjiflo review of #3644).
     assert notes.STEP_TEXT["drum-seated"] == (
-        f"WITHIN 5 MIN OF STEP {steps.step_number(steps.DRUM_BONDED_KEY)}, BEFORE IT "
-        f"GRABS, CHECK {notes._DRUM} IS HARD AGAINST THE BOSS: NO LIGHT UNDER THE "
-        "DRUM, NOT PROUD OF THE SPIGOT END (STRAIGHTEDGE)."
+        f"AT ONCE, BEFORE IT GRABS, CHECK {notes._DRUM} IS HARD AGAINST THE BOSS: NO "
+        "LIGHT UNDER THE DRUM, NOT PROUD OF THE SPIGOT END (STRAIGHTEDGE)."
     )
     assert notes.ENDSHAKE_DETAIL_TITLE not in bonded
 
