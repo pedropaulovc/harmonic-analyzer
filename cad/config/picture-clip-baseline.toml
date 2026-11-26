@@ -1,0 +1,156 @@
+# Setup-picture findings known on main, admitted by the render gate until fixed.
+#
+# prechips_traveler.py measures every plan picture on the hobby sheet it has just
+# rendered (cad/scripts/picture_clip.py, Arial metrics: the font the PDF prints in)
+# and refuses the render on a finding this file does not list, or on a listed one
+# that no longer occurs. The list only shrinks: fix a picture, render it, and
+# delete the entries the render reports fixed. Never add an entry to pass a
+# render; a new finding is fixed in the picture.
+#
+# Each entry: kind | the picture's alt text, first 60 characters | the text clipped
+# or crossed ("a / b" for two overlapping texts). Recorded from main aef5def251,
+# every enrolled plan rendered on prechips 0.11.52, 2026-11-26: 51 findings, all
+# leaders drawn across text, on 23 plans.
+
+[plans.ch_fulcrum_keeper]
+findings = [
+  "LEADER | The part lying on stacked parallels, I down, the seat to the | foot hole (opened)",
+]
+
+[plans.dt_arbor_pedestal]
+findings = [
+  "LEADER | The 1 x 1-1/4 in flat bar with 2 blanks 2.25–2.30 in long ma | each 2.25–2.30 in long",
+]
+
+[plans.dt_cone_gear_tl_arbor_key]
+findings = [
+  "LEADER | Op 20, from the front: the 1/16 square bar upright in the be | flat across the end, square to the flats",
+  "LEADER | Op 40, from the front: the sawn piece filed end down in the  | soft jaw",
+]
+
+[plans.dt_cone_gear_tl_phasing_comb]
+findings = [
+  "LEADER | Plan of the spoil plate in the vise, fixed jaw at the top, 3 | Z0 plate top",
+  "LEADER | Plan of the spoil plate in the vise, fixed jaw at the top, 3 | edges, against the jaws (hidden)",
+  "LEADER | Plan of the spoil plate in the vise, fixed jaw at the top, 3 | in front, the plate's tape alone",
+  "LEADER | Plan of the spoil plate in the vise, fixed jaw at the top, 3 | plate tape: 2 strips along X, X0 to 5 in",
+  "LEADER | Plan of the spoil plate in the vise, fixed jaw at the top, 3 | tape, CA, tape: stack .009–.013;",
+]
+
+[plans.dt_cone_tip_block]
+findings = [
+  "LEADER | Across the jaws from the right end, 5 px/mm: the strip lying | 1 in + 1/2 in parallels",
+  "LEADER | From the front, 2.6 px/mm: the block on edge on the stacks,  | on the vise bed",
+]
+
+[plans.dt_crank_hub]
+findings = [
+  "LEADER | The hub turned round, its barrel in the jaws over a shim wra | shoulder at Z−S (S = T − .005)",
+]
+
+[plans.dt_crankshaft]
+findings = [
+  "LEADER | As Setup 2's picture: the No. 1 centre drill from the tailst | inside the pinion seat's (Ø.3125)",
+  "LEADER | From the front, 3 px/mm: the shaft on its journals on a 1 in | 1 in parallel on edge under the journals, its left end",
+  "LEADER | From the front, 3 px/mm: the shaft on its journals on a 1 in | jaws' left face 3.55 from F, on the outboard journal;",
+  "LEADER | From the front, 3 px/mm: the shaft on its journals on a 1 in | slug spacer: journal end 1.20 right of F, spigot",
+  "LEADER | Plan from above, 4 px/mm: the slug's journal in the 3-jaw ov | brass shim, the centre-drilled end in",
+]
+
+[plans.dt_pinion_bracket]
+findings = [
+  "LEADER | The blank lying on stacked parallels in the vise; two straps | bridge",
+]
+
+[plans.dt_pinion_pivot_block]
+findings = [
+  "LEADER | Across the jaws from the front, 4 px/mm, K behind: the block | Z0",
+]
+
+[plans.mg_magnifying_bracket]
+findings = [
+  "LEADER | From above: the blank across the jaws on the same stacks, H  | 1 in + 1/2 in",
+  "LEADER | From above: the blank across the jaws on the same stacks, H  | moving jaw",
+  "LEADER | From above: the blank lying across the jaws on two 1 in + 1/ | 1 in + 1/2 in",
+  "LEADER | From above: the blank lying across the jaws on two 1 in + 1/ | moving jaw",
+  "LEADER | From above: the blank lying across the jaws on two 1 in + 1/ | the neck's wall, .020 full",
+  "LEADER | Looking at the moving jaw: the #7 drill, to scale, through t | 1 in parallels",
+  "LEADER | Looking at the moving jaw: the 1/4-20 tap, to scale across,  | 1 in parallels",
+]
+
+[plans.mg_output_fixture]
+findings = [
+  "LEADER | To scale across: the 4-40 bottoming tap in the hole, its mar | bottoming tap's point .46 in, the chuck turned",
+]
+
+[plans.pd_platen_clip]
+findings = [
+  "LEADER | Plan of the spoil plate in the vise, to scale: the plate's b | blank A",
+]
+
+[plans.pd_support_bar]
+findings = [
+  "LEADER | Section at the pivot hole, the bar and the tap to scale: the | T",
+]
+
+[plans.pd_transgear_arm]
+findings = [
+  "LEADER | To scale, a section through the spindle axis at the arm's mi | the spindle bore",
+  "LEADER | To scale, the same section at the pin bore C: the #32 drill  | full diameter .039 past A",
+  "LEADER | To scale, the same section: the .1240 reamer in the latch-pi | the spindle bore",
+]
+
+[plans.pd_transgear_arm_plate]
+findings = [
+  "LEADER | To scale, a section across the jaws and a view from above: t | block's fixed-jaw edge",
+  "LEADER | To scale, the same section at K: the 27/64 drill opening K t | .020 under face A: it leaves .016 for the reamer",
+]
+
+[plans.pd_transgear_front_bushing]
+findings = [
+  "LEADER | To scale: the #31 drill from the tailstock, its full diamete | Z0 to the part-off face at Z-.247",
+]
+
+[plans.pd_transgear_knob_bush]
+findings = [
+  "LEADER | To scale: the 5/8 in bar in the 3-jaw, about 1 in out; the A | with the 220 strip on the file, Op 40 faces it off",
+]
+
+[plans.pd_transgear_pin]
+findings = [
+  "LEADER | To scale: the 1/2 in brass piece in the 3-jaw on .50, a nick | reamed .1260 right through",
+  "LEADER | To scale: the 1/4 in bar in the 3-jaw, the tip end 2.61 out; | the Ø.20 head, the groove, the tip cut and the part-off",
+]
+
+[plans.pd_transgear_pivot_spacer]
+findings = [
+  "LEADER | To scale: the bar stub in the 3-jaw turned into a stub mandr | pilot .15 long in the spacer's hole, root relief Ø.17",
+]
+
+[plans.pd_transgear_rear_bushing]
+findings = [
+  "LEADER | To scale: the #31 drill from the tailstock, its full diamete | Z0 to the part-off face at Z-.209",
+]
+
+[plans.pn_pen_hanger]
+findings = [
+  "LEADER | Plan view: the strap front up on a 1-2-3 block in the vise,  | support 1-2-3 block (dashed, under all)",
+  "LEADER | To scale, as the setup picture: the 1/8 in end mill at its p | 1/8 in end mill at its plunge on the outline, over the spoil plate",
+  "LEADER | To scale, as the setup picture: the 1/8 in end mill at its p | spoil plate under the blank (dashed)",
+  "LEADER | To scale. Plan view: the strap blank across the jaws on the  | #15 drill in the screw hole (after the centre drill's spot)",
+  "LEADER | To scale. Plan view: the strap blank across the jaws on the  | spoil plate under the blank (dashed)",
+  "LEADER | To scale. Plan view: the two plate blanks end to end across  | B",
+  "LEADER | To scale. Side view from the moving jaw: the bonded strap on | its top .03 above Z0",
+]
+
+[plans.pn_pen_rod]
+findings = [
+  "LEADER | The #0-80 plug tap in the T-handle wrench in the drilled hol | pencil mark .15 from the point: stop at the top face",
+  "LEADER | The square turned round in the 4-jaw, the pivot end .60 in o | .60 out of the jaw fronts",
+  "LEADER | To scale: the 1/16 P1 blade's chuck-side face on the shoulde | shoulder at Z-.410",
+]
+
+[plans.pn_pen_v_block]
+findings = [
+  "LEADER | To scale, along the jaws: the blank lying on stacked paralle | of the stacks",
+]
