@@ -12,7 +12,7 @@
 # #4-40 thumb hole drilled #43 and hand-tapped under the tap guide. The two
 # #2-56 plate holes are pair-piloted #49 from MHA-MS-03 by that part's
 # traveler (its Setups 3-5, the block finished but for them); this traveler
-# then taps them bottoming under the tap guide (Setup 12).
+# then taps them bottoming under the tap guide (Setup 13).
 #
 # Route: saw (Setup 1); lying on the 1 in and 1/2 in parallels stacked under
 # each jaw (1.5 in): skim the sawn back face (MS01), back face down, face the
@@ -23,8 +23,10 @@
 # the bar's ends, so the roof is never squeezed by the jaws and stays tied at
 # both ends while it is cut; upright on 1 in parallels, gripped on the mating
 # and back faces, face the locating end and chamfer its roof corner (MS06),
-# then the far end to the length and its roof corner (MS07), the end facing
-# opening the rebate through; lying, locating edge up, spot and drill the
+# then the far end to the length (MS07), the end facing opening the rebate
+# through; lying again, locating edge down, chamfer the far end's roof corner
+# (MS07b: upright, the finished far end stands too little over the jaws for
+# the chamfer mill's point, #3607); lying, locating edge up, spot and drill the
 # thumb hole into the rebate (MS08), tap it by hand under the spring tap guide
 # (MS09); bench deburr; MHA-MS-03's pair pilot; tap both plate holes (MS10,
 # MS11); deburr, inspect; brass black (gated: the solution is to buy).
@@ -176,13 +178,22 @@ test_far_y_mm = 29.25
 # recomputes it).
 relief_floor_height_mm = 2.413
 # Roof chamfers: the 90° chamfer mill's axis chamfer_offset_mm outside the
-# top face, its point chamfer_tip_depth_mm below the end (the leg plus the
-# offset), so its cone cuts the .04 leg on both faces; its point taken as
-# sharp. Point heights above the parallels: MS06 and MS07.
+# end face's neighbour (the top face for MS06, the far end for MS07b), its
+# point chamfer_tip_depth_mm below the other face (the leg plus the offset),
+# so its cone cuts the .04 leg on both faces; its point taken as sharp. Point
+# heights: MS06 above the parallels (upright); MS07b above the stacks (lying,
+# top face up), where the far corner's pass has the jaw tops lying_grip_mm
+# below it (issue #3607: upright, the finished far end left the point .525
+# over the jaws, under the 1.0 mm jaw-clearance floor of D32: delegated ruling
+# 2026-11-25 (Main), no precedent; the owner reviews it on #2144,
+# cad/docs/drawing-simplicity-policy.md "Named exceptions":
+# https://github.com/pedropaulovc/harmonic-analyzer/issues/2144#issuecomment-7171575340,
+# corrected at
+# https://github.com/pedropaulovc/harmonic-analyzer/issues/2144#issuecomment-7171657471).
 chamfer_offset_mm = 0.25
 chamfer_tip_depth_mm = 1.266
 locating_chamfer_tip_mm = 25.277
-far_chamfer_tip_mm = 20.07
+far_chamfer_tip_mm = 12.958
 # Thumb hole: spot Ø.080 with the #2 centre drill, under the #43 (no chamfer
 # at the mouth), then the #43 through the floor in pecks of .080 with full
 # retract, its full diameter thumb_drill_past_mm past the rebate floor; its
@@ -218,7 +229,7 @@ lying_grip_mm = 6.8453
 upright_grip_mm = 19.5453
 # The part centred on the jaws: its ends (jaw width − its length along the
 # jaws)/2 in from the jaw sides: the bar's width (Setups 2-5), the height
-# (Setups 6-8, 12), the length (Setup 9).
+# (Setups 6-8, 13), the length (Setups 9, 10).
 vise_bar_inset_mm = -63.4619
 vise_height_inset_mm = -72.2249
 vise_length_inset_mm = -68.6689
@@ -240,7 +251,7 @@ centre_drill_oal_mm = 47.625
 # the tap in its wrench together reach at most tap_stack_max_mm below the
 # collet face, the spindle-to-table maximum (shop machines.pm-30mv, 431.8)
 # less 25.0 to bring the point down onto the wrench, the vise bed, the
-# stacks, the tallest tapping setup (Setup 9, the .56 height) and the collet
+# stacks, the tallest tapping setup (Setup 10, the .56 height) and the collet
 # gauge, rounded down to .01 in (cam.py recomputes it); it is also the
 # guide-and-tap stack's declared reach in the setups' capacity check. The
 # guide is 3 1/8 in (79.375) overall, its sellers' size and the most it can
@@ -655,14 +666,14 @@ milling_cuts = [
 
 [[setups]]
 machine_kind = "other"
-title = "Far end to the length and its roof chamfer"
+title = "Far end to the length"
 machine = "PM-30MV CNC (FluidNC, CNCjs with the electronic tool setter) / vise, swivel off"
 indexing = "none"
 machine_ref = "pm-30mv"
 holding = "As Setup 7, the slice turned end for end: the locating end down on both parallels, gripped on the mating face and the back face (the MATING face to the fixed jaw), the TOP face to the LEFT, centred."
 datum = "Program MS07_far_end. G54: X0 the TOP face (left), Y0 the fixed jaw's face (the mating face), Z0 the parallels' top (the locating end)."
-diagram = { file = "diagrams/far-end.svg", alt = "The block upright on two 1 in parallels, the locating end down; the 1/2 in end mill faces the far end down to the length, and the chamfer mill chamfers the roof's other corner." }
-envelope = { x_span_mm = ["{{cad.envelope_y_mm}}", "{{process.face_cutter_dia_mm}}", "{{process.face_cutter_dia_mm}}", 5.08], y_span_mm = ["{{cad.envelope_z_mm}}", "{{process.face_cutter_dia_mm}}"], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{process.far_top_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{process.far_chamfer_tip_mm}}"], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_min_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.chamfer_projection_min_mm}}"] }
+diagram = { file = "diagrams/far-end.svg", alt = "The block upright on two 1 in parallels, the locating end down; the 1/2 in end mill faces the far end down to the length." }
+envelope = { x_span_mm = ["{{cad.envelope_y_mm}}", "{{process.face_cutter_dia_mm}}", "{{process.face_cutter_dia_mm}}", 5.08], y_span_mm = ["{{cad.envelope_z_mm}}", "{{process.face_cutter_dia_mm}}"], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{process.far_top_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{cad.envelope_x_mm}}"], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_min_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_min_mm}}"] }
 vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{cad.envelope_z_mm}}", along_jaws_mm = "{{cad.envelope_y_mm}}", part_height_mm = "{{process.far_top_mm}}", parallel_height_mm = "{{process.parallel_height_mm}}", overhang_mm = ["{{process.vise_height_inset_mm}}", "rest"], jaw_offset = "centred", fixed_jaw_face = "machined", moving_jaw_face = "machined", moving_jaw_contact = "flat" }
 beam = { axis = "z", hold = "cantilever", extent_mm = [0, "{{process.far_top_mm}}"], clamp_mm = [0, "{{process.upright_grip_mm}}"], section_mm = { x = "{{cad.envelope_y_mm}}", y = "{{cad.envelope_z_mm}}" }, vise_left = "other" }
 
@@ -671,7 +682,7 @@ instruction = "Before the slice goes back in, repeat Setup 7's Z0: M6 T1, its ti
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Prove MS07_far_end in air, Z0 raised 1.000 in, through the M6. Then Z0 back."
+instruction = "Prove MS07_far_end in air, Z0 raised 1.000 in. Then Z0 back."
 feed = "hand"
 
 [[setups.operations]]
@@ -679,16 +690,48 @@ speed_kind = "spindle"
 tool = "em-half"
 drilling = "none"
 sizing = "other"
-instruction = "Run MS07_far_end (M6 T1; set 2800): face the far end down to Z {{cad.envelope_x_mm:in.4dot}} in equal levels no deeper than {{process.face_step_max_mm:in.3dot}} from {{process.far_top_mm:in.3dot}}; the rebate breaks out through this end. The file stops at its M6 T4 with the spindle stopped and the end mill lifted clear: check the length there, still clamped, and press Cycle Start for the chamfer mill only with hands clear."
+instruction = "Run MS07_far_end (M6 T1; set 2800): face the far end down to Z {{cad.envelope_x_mm:in.4dot}} in equal levels no deeper than {{process.face_step_max_mm:in.3dot}} from {{process.far_top_mm:in.3dot}}; the rebate breaks out through this end. The file ends with the spindle stopped and the end mill lifted clear: check the length there, still clamped."
 settings = "stop-em-half-c360"
-inspection = "Length {{cad.far_end_length_min_in:.3dot}}–{{cad.far_end_length_max_in:.3dot}} at the M6 T4 stop (spindle stopped): the calipers' depth rod from the faced end to the fixed-jaw parallel's top beside the block, at both sides. Mic it after unclamping."
+inspection = "Length {{cad.far_end_length_min_in:.3dot}}–{{cad.far_end_length_max_in:.3dot}} at the file's end (spindle stopped), still clamped: the calipers' depth rod from the faced end to the fixed-jaw parallel's top beside the block, at both sides. Mic it after unclamping."
 gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.far_end_length_band_mm}}" }]
 milling_cuts = [
   { name = "far end", kind = "end", phase = "finish", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", axial_doc_mm = "{{process.face_step_max_mm}}", radial_woc_mm = "{{process.face_stepover_max_mm}}", stations_mm = "{{process.far_top_mm}}" },
 ]
 
 [[setups.operations]]
-instruction = "Length over {{cad.far_end_length_max_in:.3dot}}: stop the file there (the controller keeps G54: no homing, no new touch-off); send $#, note the G54 line's Z; G10 L2 P1 Z(that Z − (the reading − {{cad.far_end_length_in:.3dot}}) × 25.4); run MS07_far_end again from its start and re-check. Under {{cad.far_end_length_min_in:.3dot}}: the block is scrap."
+instruction = "Length over {{cad.far_end_length_max_in:.3dot}}, still clamped (the controller keeps G54: no homing, no new touch-off): send $#, note the G54 line's Z; G10 L2 P1 Z(that Z − (the reading − {{cad.far_end_length_in:.3dot}}) × 25.4); run MS07_far_end again from its start and re-check. Under {{cad.far_end_length_min_in:.3dot}}: the block is scrap."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Unclamp; mic the length."
+inspection = "Length {{cad.far_end_length_min_in:.3dot}}–{{cad.far_end_length_max_in:.3dot}}, locating end to far end, miked at the locating edge and at the top face. Outside: stop and tell the owner with the reading."
+gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.far_end_length_band_mm}}" }]
+
+[[setups]]
+machine_kind = "other"
+title = "Far end's roof chamfer"
+machine = "PM-30MV CNC (FluidNC, CNCjs with the electronic tool setter) / vise, swivel off"
+indexing = "none"
+machine_ref = "pm-30mv"
+# Not upright: there the chamfer mill's point stood 0.525 mm over the jaws (issue #3607).
+holding = "The 1 in and 1/2 in parallels stacked against each jaw again (1.5 in), as Setup 5: the block lying on its LOCATING EDGE, the TOP face up, gripped on the mating face (to the FIXED jaw) and the back face; the far end to the RIGHT; centred on the jaws. Tap it down onto both stacks while closing the vise. Not upright: there the finished far end stands too little over the jaws for the chamfer mill's point."
+datum = "Program MS07b_far_chamfer. G54: X0 the far end (RIGHT), the block to −X; Y0 the fixed jaw's face (the mating face); Z0 the stacks' top (the locating edge)."
+diagram = { file = "diagrams/chamfer-far.svg", alt = "The block lying locating edge down on stacked parallels, top face up, mating face to the fixed jaw, the far end to the right; the chamfer mill's point below the top face, its axis just outside the far end, runs across the jaws and chamfers the roof's far corner." }
+envelope = { x_span_mm = ["{{cad.envelope_x_mm}}", "{{process.face_cutter_dia_mm}}"], y_span_mm = ["{{cad.envelope_z_mm}}", "{{process.face_cutter_dia_mm}}"], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{cad.envelope_y_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{process.far_chamfer_tip_mm}}"], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_min_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.chamfer_projection_min_mm}}"] }
+vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{cad.envelope_z_mm}}", along_jaws_mm = "{{cad.envelope_x_mm}}", part_height_mm = "{{cad.envelope_y_mm}}", parallel_height_mm = "{{process.riser_height_mm}}", overhang_mm = ["{{process.vise_length_inset_mm}}", "rest"], jaw_offset = "centred", fixed_jaw_face = "machined", moving_jaw_face = "machined", moving_jaw_contact = "flat" }
+beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{cad.envelope_x_mm}}"], clamp_mm = [0, "{{cad.envelope_x_mm}}"], section_mm = { y = "{{cad.envelope_z_mm}}", z = "{{cad.envelope_y_mm}}" }, vise_left = "start" }
+
+[[setups.operations]]
+instruction = "Before the block goes in, G54 Z0: the stacks' top, touched with the 1/2 in end mill on the fixed-jaw stack, the jaws open, as Setup 5: console M6 T1; jog it over the fixed-jaw stack, its edge clear of the jaw; spindle stopped, its tip just dragging a .002 feeler leaf on the stack: G10 L20 P1 Z0.051. Raise Z. MS07b_far_chamfer's M6 T4 then measures the chamfer mill against it."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "The block clamped as Holding says: G54 X0 the far end (right), Y0 the fixed jaw's face: edge finder (900 rpm)."
+instruction_detailed = "The block clamped as Holding says. Edge finder (900 rpm): on the fixed jaw's face beside the block, G10 L20 P1 Y-2.540; on the far end (RIGHT) from the right, G10 L20 P1 X2.540 (plus: the finder's centre is right of the end)."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Prove MS07b_far_chamfer in air, Z0 raised 1.000 in. Then Z0 back."
 feed = "hand"
 
 [[setups.operations]]
@@ -696,18 +739,13 @@ speed_kind = "spindle"
 tool = "chamfer"
 drilling = "none"
 sizing = "other"
-instruction = "Same file, M6 T4 (chamfer mill; set 2800): one pass along the roof's other corner, the far end and the top face: chamfer {{cad.roof_chamfer_2_size_in:.2dot}} × 45°."
+instruction = "Run MS07b_far_chamfer (M6 T4, chamfer mill; set 2800): one pass across the jaws along the roof's far corner, the far end and the top face, its point {{process.chamfer_tip_depth_mm:in.3dot}} below the top face and its axis {{process.chamfer_offset_mm:in.3dot}} outside the far end: chamfer {{cad.roof_chamfer_2_size_in:.2dot}} × 45°."
 settings = "stop-chamfer-c360"
 inspection = "Chamfer leg {{cad.roof_chamfer_2_size_min_in:.3dot}}–{{cad.roof_chamfer_2_size_max_in:.3dot}}, read as in Setup 7 after unclamping. Over or under: stop and tell the owner; do not re-cut."
 gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.roof_chamfer_2_size_band_mm}}" }]
 milling_cuts = [
   { name = "far chamfer", kind = "side", phase = "finish", cutter_dia_mm = 6.35, axial_doc_mm = "{{process.chamfer_tip_depth_mm}}", radial_woc_mm = "{{process.chamfer_tip_depth_mm}}", stations_mm = "{{cad.envelope_x_mm}}" },
 ]
-
-[[setups.operations]]
-instruction = "Unclamp; mic the length."
-inspection = "Length {{cad.far_end_length_min_in:.3dot}}–{{cad.far_end_length_max_in:.3dot}}, locating end to far end, miked at the locating edge and at the top face. Outside: stop and tell the owner with the reading."
-gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.far_end_length_band_mm}}" }]
 
 [[setups]]
 machine_kind = "other"
@@ -836,7 +874,7 @@ instruction = "Only if it rocks: stone the mating face again and try it on the p
 feed = "hand"
 
 [[setups.operations]]
-instruction = "To MHA-MS-03's traveler, Setups 3-5, then back here (Setup 12): this block, finished but for its two plate holes, goes with the plate."
+instruction = "To MHA-MS-03's traveler, Setups 3-5, then back here (Setup 13): this block, finished but for its two plate holes, goes with the plate."
 feed = "hand"
 
 [[setups]]
@@ -872,7 +910,7 @@ instruction_detailed = "Edge finder (900 rpm): on the fixed jaw's face beside th
 feed = "hand"
 
 [[setups.operations]]
-instruction = "The 2-56 taps go in the T-handle tap wrench with the centre hole in its top, one at a time. Setup 9's stop check covers this setup: the block stands lower here."
+instruction = "The 2-56 taps go in the T-handle tap wrench with the centre hole in its top, one at a time. Setup 10's stop check covers this setup: the block stands lower here."
 feed = "hand"
 
 [[setups.operations]]
@@ -946,12 +984,12 @@ instruction = "Deburr the plate holes' mouths flush with the mating face (scrape
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Final check, the sizes accepted at their setups: length (Setup 8), height (Setup 5), the rebate and back wall (Setup 6), the chamfers (Setups 7, 8), the thumb hole (Setup 9), the plate threads (Setup 12)."
+instruction = "Final check, the sizes accepted at their setups: length (Setup 8), height (Setup 5), the rebate and back wall (Setup 6), the chamfers (Setups 7, 9), the thumb hole (Setup 10), the plate threads (Setup 13)."
 inspection = "The plate screws its two 2-56 screws down flat, the locating ends and edges flush; a 4-40 thumbscrew runs into the rebate; if the MHA-MS-01 stick is at hand, the block slides along it without shake (NOTE 1). Any failure: stop and tell the owner."
 gauge_checks = "other"
 
 [[setups.operations]]
-instruction = "Tag the block AWAITING BRASS BLACK, with its plate, unless Setup 14 follows now."
+instruction = "Tag the block AWAITING BRASS BLACK, with its plate, unless Setup 15 follows now."
 feed = "hand"
 
 [[setups]]

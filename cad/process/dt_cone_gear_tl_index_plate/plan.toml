@@ -4,20 +4,20 @@
 title = "Cone Gear Dividing Head Index Plate"
 part = "MHA-DT-03-TL-01 Cone Gear Dividing Head Index Plate"
 revision = "placeholder"
-material = "6061-T651 aluminum, owned 1/4 in plate"
+material = "6061-T6511 aluminum, owned 1/4 x 5 in extruded bar"
 stock = "To be written"
 shop = "../shop"
 stock_refs = ["6061-flat-1-4x5"]
 
 [[tools]]
-id = "drill-26"
-name = "#26 drill"
-ref = "drill-26"  # Drills #26
+id = "drill-31"
+name = "#31 drill"
+ref = "drill-31"  # owner ruling 2026-11-23, tool audit Q15: 132X .120 #31 DRILL THRU, just over the .117 index pin (owner fact 2026-11-24)
 
 [[tools]]
-id = "riser-drill-9"
-name = "#9 drill"
-ref = "riser-drill-9"  # Drills #9
+id = "drill-15-64"
+name = "15/64 drill"
+ref = "drill-15-64"  # owner fact 2026-11-24 (stock plate): "3x screw holes thru 15/64"
 
 [[tools]]
 id = "pin-gauges"
@@ -25,24 +25,22 @@ name = "Pin gauges .011-.500"
 ref = "pin-gauges"  # A1-pin-set-061-250, A1-pin-set-061-500-combined
 
 [[tools]]
-id = "reamer-1570"
-name = ".1570 reamer"
-ref = "reamer-1570"  # drawing cross-check 2026-11-19: 132X .1570 +.0005/.0000 REAM THRU
-
-[[tools]]
-id = "riser-countersink"
-name = "3/8 82° countersink"
-ref = "riser-countersink"  # drawing cross-check 2026-11-19: 3X .196 DRILL THRU, .35 X 82°
+id = "endmill-carbide-3fl-1-4"
+name = "1/4 end mill"
+ref = "endmill-carbide-3fl-1-4"  # 3X counterbore Ø.35 x .15 deep, interpolated (owner ruling 2026-11-25, option B)
 
 [[tools]]
 id = "boring-bars-meda-6045000"
 name = "Lathe boring bars"
-ref = "boring-bars-meda-6045000"  # drawing cross-check 2026-11-19: .829 +.003/.000 BORE THRU
+ref = "boring-bars-meda-6045000"  # .827 BORE THRU to the BS-0 head's plate hub, the hub is the gauge (owner facts 2026-11-24: "hole 0.8270", "hub plate sits on 0.8245")
 
 [[setups]]
 machine_kind = "other"
 machine = "To be written"
 title = "Traveler to come"
+
+[[setups.operations]]
+instruction = "Before anything is cut, check the bar two ways. Mike it: .240 to .260 thick (the sheet's .25 ±.01; Online Metals gives ±.008 for this extruded bar). Lay it on the surface plate, each face down in turn: it must sit without rocking, because the sector arms sweep one face and the other seats on the head. If either check fails, stop and tell the owner. Owner ruling 2026-11-25: the plate is used at its supplied thickness, faces as supplied, so there is no stock to skim it flat."
 
 [[setups.operations]]
 instruction = "Process not written yet."

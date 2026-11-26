@@ -30,11 +30,12 @@ def process(tmp_path, monkeypatch):
     return tmp_path / "out", author
 
 
-def _uv_stub(monkeypatch, *, probe=None, traveler=None, printed=True):
+def _uv_stub(monkeypatch, *, probe=None, traveler=None, standing=None, printed=True):
     """Route stubbed ``uv tool run`` calls: the ``@latest`` version probe, then
-    each pinned ``prechips traveler`` run (writes its ``--out`` unless refused).
-    ``traveler(profile)`` returns an exit code or ``(code, stderr)``. A browser
-    call writes a PDF naming the sheet it printed, unless ``printed`` is False."""
+    each pinned ``prechips traveler`` run (writes its ``--out`` unless refused)
+    or ``prechips standing`` run. ``traveler(profile)`` and ``standing(cmd)``
+    return an exit code or ``(code, stderr)``. A browser call writes a PDF
+    naming the sheet it printed, unless ``printed`` is False."""
     calls = []
 
     def run(cmd, **kwargs):
@@ -46,11 +47,15 @@ def _uv_stub(monkeypatch, *, probe=None, traveler=None, printed=True):
             return subprocess.CompletedProcess(cmd, 0, "", "")
         if f"{wrapper.PACKAGE}@latest" in cmd:
             return probe(cmd) if probe else subprocess.CompletedProcess(cmd, 0, f"{_VERSION}\n", "")
-        profile = cmd[cmd.index("--profile") + 1]
-        outcome = traveler(profile) if traveler else 0
+        if "--profile" in cmd:
+            written = cmd[cmd.index("--profile") + 1]
+            outcome = traveler(written) if traveler else 0
+        else:
+            written = "standing"
+            outcome = standing(cmd) if standing else 0
         code, stderr = outcome if isinstance(outcome, tuple) else (outcome, "")
         if code == 0:
-            Path(cmd[cmd.index("--out") + 1]).write_text(profile, encoding="utf-8")
+            Path(cmd[cmd.index("--out") + 1]).write_text(written, encoding="utf-8")
         return subprocess.CompletedProcess(cmd, code, None, stderr)
 
     monkeypatch.setattr(wrapper.subprocess, "run", run)
@@ -240,6 +245,101 @@ def test_missing_uv_fails_clearly(process, monkeypatch):
     assert wrapper.main(["smoke_part", "--out", str(out)]) == 1
     with pytest.raises(RuntimeError, match="uv was not found"):
         wrapper._uv()
+
+
+@pytest.fixture
+def shop(tmp_path, monkeypatch):
+    directory = tmp_path / "process" / "shop"
+    directory.mkdir(parents=True)
+    (directory / "common.toml").write_text("[standing]\n", encoding="utf-8")
+    monkeypatch.setattr(plans, "SHOP_DIR", directory)
+    return directory
+
+
+def test_standing_renders_the_shop_page_and_prints_it_beside(process, shop, monkeypatch):
+    out, _author = process
+    calls = _uv_stub(monkeypatch)
+    assert wrapper.main(["--standing", "--out", str(out)]) == 0
+    probe, render, printing = calls
+    assert probe[:5] == [_UV, "tool", "run", "--from", "prechips@latest"]
+    html, pdf = wrapper.standing_paths(out)
+    directory = out / "travelers" / "shop-standing-instructions"
+    assert (html, pdf) == (
+        directory / "shop-standing-instructions.html", directory / "shop-standing-instructions.pdf",
+    )
+    assert render == [
+        _UV, "tool", "run", "--from", f"prechips=={_VERSION}", "prechips", "standing",
+        str(shop), "--out", str(html),
+    ]
+    assert html.read_text(encoding="utf-8") == "standing"
+    assert printing[-1] == html.resolve().as_uri()
+    assert pdf.read_bytes() == b"%PDF-1.4 " + html.resolve().as_uri().encode()
+
+
+def _previous_standing(out: Path) -> tuple[Path, Path]:
+    paths = wrapper.standing_paths(out)
+    paths[0].parent.mkdir(parents=True)
+    for path in paths:
+        path.write_text("previous success", encoding="utf-8")
+    return paths
+
+
+def test_standing_on_a_prechips_without_the_command_names_the_release_it_needs(
+    process, shop, monkeypatch,
+):
+    out, _author = process
+    paths = _previous_standing(out)
+    errors = []
+    monkeypatch.setattr(wrapper._telemetry, "error", lambda message, **_: errors.append(message))
+    # argparse's refusal of an unknown subcommand, as an older prechips prints it.
+    stderr = (
+        "usage: prechips [-h] {traveler} ...\n"
+        "prechips: error: argument command: invalid choice: 'standing' (choose from traveler)\n"
+    )
+    calls = _uv_stub(monkeypatch, standing=lambda _cmd: (2, stderr))
+    assert wrapper.main(["--standing", "--out", str(out)]) == 1
+    assert len(calls) == 2  # the probe, then the refused render; no print
+    assert not any(path.exists() for path in paths)
+    assert errors == [
+        f"standing: prechips {_VERSION} has no `standing` command; the shop standing page "
+        f"needs the first prechips release that adds `prechips standing` (newer than {_VERSION})"
+    ]
+
+
+@pytest.mark.parametrize(("outcome", "code"), [
+    ((2, "prechips: shop: [notes.burrs] has no text\n"), 2),
+    ((2, "error: Failed to fetch: `https://pypi.org/simple/prechips/`\n"), 1),
+])
+def test_standing_refusal_or_uv_failure_removes_the_page(process, shop, monkeypatch, outcome, code):
+    out, _author = process
+    paths = _previous_standing(out)
+    _uv_stub(monkeypatch, standing=lambda _cmd: outcome)
+    assert wrapper.main(["--standing", "--out", str(out)]) == code
+    assert not any(path.exists() for path in paths)
+
+
+def test_standing_failed_print_removes_the_page(process, shop, monkeypatch):
+    out, _author = process
+    _uv_stub(monkeypatch, printed=False)
+    assert wrapper.main(["--standing", "--out", str(out)]) == 1
+    assert not any(path.exists() for path in wrapper.standing_paths(out))
+
+
+def test_standing_without_shop_files_fails_without_running_uv(process, tmp_path, monkeypatch):
+    out, _author = process
+    monkeypatch.setattr(plans, "SHOP_DIR", tmp_path / "empty-shop")
+    monkeypatch.setattr(
+        wrapper.subprocess, "run",
+        lambda *args, **kwargs: pytest.fail("uv ran without a shop"),
+    )
+    assert wrapper.main(["--standing", "--out", str(out)]) == 2
+
+
+@pytest.mark.parametrize("argv", [[], ["smoke_part", "--standing"]])
+def test_a_stem_or_standing_but_not_both(argv):
+    with pytest.raises(SystemExit) as raised:
+        wrapper.main(argv)
+    assert raised.value.code == 2
 
 
 def test_enrolment_is_every_plan_that_is_not_a_placeholder(tmp_path):

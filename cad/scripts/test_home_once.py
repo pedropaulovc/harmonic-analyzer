@@ -9,9 +9,12 @@ non-volatile memory, a reset with the axes stopped keeps position, and
 position is lost at a power cycle, a hard limit, an E-stop or a reset in
 motion.
 
-So every plan with a PM-30MV setup carries the session rule once, in its
-note (two wordings are on main: the fleet's, and the slitting-saw plans' "once
-a session, not at every setup"), and no operation homes out of habit or
+So every plan with a PM-30MV setup carries the session rule once: in its note
+(two wordings are on main: the fleet's, and the slitting-saw plans' "once a
+session, not at every setup"), or, for a plan that has opted in to the shop's
+standing instructions (``standing = true``), on that page's mill rows
+(``cad/process/shop/standing.toml``), which the sheet then does not repeat.
+No operation homes out of habit or
 re-touches a zero because the file was stopped. Homing stays where position
 is really lost: a step may say "home ($H)" only in a sentence that names such
 an event, says "if not yet homed this session", or depends on the homed
@@ -40,7 +43,7 @@ _LOST = re.compile(r"power cycle|restart|E-stop|alarm|limit switch|stall|crash",
 # A step that depends on the homed position itself.
 _NEEDS_HOME = re.compile(
     r"Only after homing \(\$H\)|if not yet homed this session|if it has not been homed this session"
-    r"|a new session: home|do not home|no homing|after homing again \(the note says when\)",
+    r"|a new session: home|do not home|no homing|after homing again",
     re.IGNORECASE,
 )
 # "the homed Z", "the homed top": a place, not an action.
@@ -64,6 +67,13 @@ def _plans() -> list[tuple[str, dict]]:
     return plans
 
 
+def _standing_mill() -> str:
+    """The standing page's PM-30MV rows, as one text."""
+    path = _process_plans.plan_path(PLANS[0][0]).parent.parent / "shop" / "standing.toml"
+    rows = tomllib.loads(path.read_text(encoding="utf-8"))["notes"]["standing-mill"]["rows"]
+    return " ".join(f"{label}: {text}" for label, text in rows)
+
+
 def _strings(node, path=""):
     if isinstance(node, str):
         yield path, node
@@ -85,6 +95,12 @@ def test_some_plan_runs_on_the_mill() -> None:
 @pytest.mark.parametrize(("stem", "plan"), PLANS, ids=[stem for stem, _plan in PLANS])
 def test_the_note_carries_the_session_rule_once(stem: str, plan: dict) -> None:
     note = plan.get("note", "")
+    if plan.get("standing") is True:
+        page = _standing_mill()
+        assert len(re.findall(r"Home the mill \(`?\$H`?\) once", page)) == 1, "the standing page: session rule once"
+        assert len(re.findall(r"Reset with the axes stopped: position and G54 are kept", page)) == 1
+        assert not SESSION_RULE.search(note) and not RESET_RULE.search(note), f"{stem}: repeats the standing page"
+        return
     assert len(SESSION_RULE.findall(note)) == 1, f"{stem}: the note must give the session rule once"
     assert len(RESET_RULE.findall(note)) == 1, f"{stem}: the note must give the Reset rule once"
 

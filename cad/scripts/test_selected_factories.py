@@ -552,7 +552,11 @@ def _case_enrolled_traveler_keeps_normal_loader_conversion(dodo, monkeypatch, tm
     monkeypatch.setattr(_process_plans, "SHOP_DIR", shop)
 
     normal = {task.name: task for task in generate_tasks("prechips", dodo.task_prechips(), dodo.task_prechips.__doc__)}
-    selected = {task.name: task for task in dodo.canonical_tasks(["prechips", f"prechips:{stem}"])}
+    # The shop standing page is a prechips task of its own beside each traveler.
+    selected = {
+        task.name: task
+        for task in dodo.canonical_tasks(["prechips", "prechips:standing", f"prechips:{stem}"])
+    }
     assert set(selected) == set(normal)
     for name in selected:
         assert _record(selected[name]) == _record(normal[name])

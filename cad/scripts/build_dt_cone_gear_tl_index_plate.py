@@ -2,18 +2,19 @@ r"""Build the cone gears' dividing-head index plate (MHA-DT-03-TL-01; shop tooli
 
 A BS-0 dividing-head plate with the 57-, 51- and 24-hole circles that index
 the 114T, 102T and 96T cone gears (``dt_cone_gear_tl_index_plate_spec``).
-Every size is a best guess pending measurement (#2157).
+Its sizes come from the owner's measurements of the stock plate and the head
+(#2157; his words are in the spec).
 
 Layout (the spec's model frame): the plate is a Front-plane annulus (OD and
 bore circles about the origin) extruded +Z by the thickness, so the back face
 seats on Z0 and the front face is Z = thickness. Each index circle is one
 Front-plane sketch, a construction bolt circle carrying the printed diameter
 and one seed hole on +Y, cut through and circular-patterned about the named
-plate axis. The mounting hole is a cut seed at 150 degrees, its 82 degree
-countersink a revolved cut on a plane through the seed's row (the Top plane
-offset by its Y), as build_ch_rocker_arm_tl_oblique_riser's; the hole and its
-countersink are patterned three times. Their helpers are copied here as
-private functions, as that riser copied the pivot plate's.
+plate axis. The mounting hole is a cut seed at 150 degrees, its counterbore
+a revolved cut on a plane through the seed's row (the Top plane offset by
+its Y), sketched as build_ch_rocker_arm_tl_oblique_riser's countersink is;
+the hole and its counterbore are patterned three times. Their helpers are
+copied here as private functions, as that riser copied the pivot plate's.
 
 Run only through the supervised farm launcher:
 ``part:dt_cone_gear_tl_index_plate``.
@@ -30,7 +31,7 @@ import _telemetry
 from _appearance import apply_material
 from _bore_axis import name_bore_axis
 from _check import check
-from _com import _early_bound, _read_member
+from _com import _early_bound
 from _dimensions import drive_dimension, name_dimensions, set_global
 from _document_units import apply_package_model_units
 from _drawing_dimension_insert import add_diametric_linear_dimension
@@ -40,7 +41,6 @@ from _drawing_marks import (
     mark_dimensions_for_drawing,
 )
 from _drawing_precision import apply_drawing_precision
-from _drawing_tolerances import set_dimension_bilateral_tolerance
 from _feature_tree import name_last_feature
 from _part_checks import report_mass_properties, volume_check
 from _part_properties import part_drawing_unit
@@ -58,16 +58,13 @@ from _sketch import (
 from _sketch_circle import define_circle
 from _visibility import blank_reference_geometry
 from dt_cone_gear_tl_index_plate_spec import (
-    BORE_DEVIATIONS,
     BORE_DIA,
-    CSK_DIA,
-    CSK_FLANK_ANGLE,
+    CBORE_DEPTH,
+    CBORE_DIA,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
     GLOBALS,
-    INDEX_HOLE_DEVIATIONS,
     INDEX_HOLE_DIA,
-    INDEX_HOLE_PLACES,
     ISOMETRIC_VIEW_NOTE,
     MOUNT_COUNT,
     MOUNT_HOLE_DIA,
@@ -76,11 +73,9 @@ from dt_cone_gear_tl_index_plate_spec import (
     MOUNT_X_FACTOR,
     MOUNT_Y_FACTOR,
     PLATE_DIA,
-    PRINTED_HOLE,
     RING_COUNTS,
     RING_PCDS,
     THICKNESS,
-    UNIT,
 )
 
 PART_NAME = "dt-cone-gear-tl-index-plate"
@@ -99,21 +94,14 @@ THROUGH_CUT_DEPTH = 2.0 * THICKNESS
 MOUNT_ROW_PLANE = "MountRowPlane"
 
 
-def _cone_cut_volume(mouth_r: float, flank_deg: float, bore_r: float) -> float:
-    """A cone from a mouth on the face to its apex on the axis, less the part
-    of it a coaxial bore (deeper than the apex) has already removed."""
-    rise = math.tan(math.radians(flank_deg))
-    cone = math.pi * mouth_r**2 * (mouth_r * rise) / 3.0
-    inside_bore = 2.0 * math.pi * rise * (mouth_r * bore_r**2 / 2.0 - bore_r**3 / 3.0)
-    return cone - inside_bore
-
-
 V_PLATE = math.pi / 4.0 * (PLATE_DIA**2 - BORE_DIA**2) * THICKNESS
 V_INDEX_HOLE = math.pi * (INDEX_HOLE_DIA / 2.0) ** 2 * THICKNESS
 V_MOUNT_HOLE = math.pi * (MOUNT_HOLE_DIA / 2.0) ** 2 * THICKNESS
-V_CSK = _cone_cut_volume(CSK_DIA / 2.0, CSK_FLANK_ANGLE, MOUNT_HOLE_DIA / 2.0)
+V_CBORE = (
+    math.pi * ((CBORE_DIA / 2.0) ** 2 - (MOUNT_HOLE_DIA / 2.0) ** 2) * CBORE_DEPTH
+)
 V_FINISHED = (
-    V_PLATE - sum(RING_COUNTS) * V_INDEX_HOLE - MOUNT_COUNT * (V_MOUNT_HOLE + V_CSK)
+    V_PLATE - sum(RING_COUNTS) * V_INDEX_HOLE - MOUNT_COUNT * (V_MOUNT_HOLE + V_CBORE)
 )
 
 
@@ -190,87 +178,32 @@ def _sketch_mapper(
     return to_sketch
 
 
-def _add_flank_reference(
-    adapter: Any,
-    face: str,
-    flank: str,
-    text_model_mm: tuple[float, float, float],
-    text_sketch_mm: tuple[float, float],
-    label: str,
-    *,
-    expected_degrees: float,
-) -> None:
-    """Add a DRIVEN face-to-flank angle, its text steered into the wedge.
-
-    ``AddSpecificDimension`` reads its text point in MODEL space and picks the
-    angle region holding it; on this Top-parallel row plane the point carries
-    the sketch v in the Y slot and the model Z in the Z slot, so it lands in
-    the wedge whether SolidWorks reads it in sketch or model space
-    (build_ch_rocker_arm_tl_oblique_riser's, farm run jig-r2). Sketch u is
-    model X here; the check below holds that.
-    """
-    from solidworks_mcp.adapters import sw_type_info as _sw_type_info
-    from solidworks_mcp.adapters.solidworks.sketch import _select_sketch_entities
-
-    if abs(text_sketch_mm[0] - text_model_mm[0]) > 1e-6:
-        raise RuntimeError(f"{label}: sketch u is not model X on this plane")
-    model = adapter.currentModel
-    model.ClearSelection2(True)
-    _select_sketch_entities(adapter, [face, flank], 0)
-    extension = _sw_type_info.early_bound_or_flag(
-        model.Extension, "IModelDocExtension", "AddSpecificDimension"
-    )
-    display, status = extension.AddSpecificDimension(
-        text_model_mm[0] / 1000.0,
-        text_sketch_mm[1] / 1000.0,
-        text_model_mm[2] / 1000.0,
-        3,  # swDimensionType_e.swAngularDimension
-        0,
-    )
-    model.ClearSelection2(True)
-    if display is None:
-        raise RuntimeError(f"{label}: AddSpecificDimension(angular) failed ({status})")
-    display = _early_bound(display, "IDisplayDimension")
-    dimension = _early_bound(display.GetDimension2(0), "IDimension")
-    dimension.DrivenState = 1  # swDimensionDrivenState_e.swDimensionDriven
-    if int(_read_member(dimension, "DrivenState")) != 1:
-        raise RuntimeError(f"{label}: angular dimension did not become driven")
-    actual = math.degrees(abs(float(_read_member(dimension, "SystemValue"))))
-    if abs(actual - expected_degrees) > 1e-6:
-        raise RuntimeError(
-            f"{label}: angular dimension readback {actual:.6f} deg "
-            f"!= {expected_degrees:.6f} deg"
-        )
-    _telemetry.success(f"angular reference dim {label}: {expected_degrees:.3f} deg")
-
-
-@_telemetry.traced("part.index_plate_countersink")
-def _countersink(
+@_telemetry.traced("part.index_plate_counterbore")
+def _counterbore(
     adapter: Any, *, plane: str, x: float, y: float, x_drive: str
 ) -> list[tuple[str, str]]:
-    """Revolve-cut the 82 degree countersink on ``plane`` (model Y = ``y``):
-    mouth on the front face at model X = ``x``, apex on the hole axis below.
+    """Revolve-cut the flat-bottomed counterbore on ``plane`` (model Y =
+    ``y``): mouth on the front face at model X = ``x``, floor below it.
 
-    The riser's profile and dimensioning: axis-top P0 -> mouth P1 -> apex
-    P2 -> P0, a centerline up past the face as the revolve axis, the cone
-    depth driven from the mouth diameter and a driven face-to-flank reference
-    proving the flank.
+    Profile: axis-top P0 -> mouth P1 -> floor corner P2 -> floor on the axis
+    P3 -> P0, a centerline up past the face as the revolve axis, the mouth
+    diameter and the depth each driven from its global.
     """
     from solidworks_mcp.adapters.base import RevolveParameters
 
-    label = "countersink"
+    label = "counterbore"
     dims = SketchDims()
     check(f"create_sketch {label}", adapter.create_sketch(plane))
     to_sketch = _sketch_mapper(adapter, u_axis=0, v_axis=2, label=label)
     origin = to_sketch((0.0, y, 0.0))
     if origin != (0.0, 0.0):
         raise RuntimeError(f"{label}: sketch origin maps to {origin}")
-    mouth_r = CSK_DIA / 2.0
-    drop = mouth_r * math.tan(math.radians(CSK_FLANK_ANGLE))
+    mouth_r = CBORE_DIA / 2.0
     profile = [
         to_sketch((x, y, THICKNESS)),
         to_sketch((x + mouth_r, y, THICKNESS)),
-        to_sketch((x, y, THICKNESS - drop)),
+        to_sketch((x + mouth_r, y, THICKNESS - CBORE_DEPTH)),
+        to_sketch((x, y, THICKNESS - CBORE_DEPTH)),
     ]
     set_sketch_direct_db(adapter, True)
     axis = check(
@@ -281,7 +214,7 @@ def _countersink(
     )
     lines = add_line_chain(adapter, profile)
     set_sketch_direct_db(adapter, False)
-    face, flank, axis_side = lines
+    face, wall, floor, axis_side = lines
     for i in range(len(lines)):
         check(
             f"{label} junction {i}",
@@ -291,6 +224,8 @@ def _countersink(
         )
     for first, second, relation in (
         (face, None, "horizontal"),
+        (wall, None, "vertical"),
+        (floor, None, "horizontal"),
         (axis_side, None, "vertical"),
         (axis, None, "vertical"),
         (f"{axis}.start", f"{face}.start", "coincident"),
@@ -307,7 +242,7 @@ def _countersink(
         abs(profile[0][0]),
         f"{label} station",
     )
-    dims.record("CskX", x_drive)
+    dims.record("CboreX", x_drive)
     dimension_between(
         adapter,
         "origin",
@@ -316,56 +251,38 @@ def _countersink(
         abs(profile[0][1]),
         f"{label} on the front face",
     )
-    dims.record("CskFace", '"PlateThick"')
+    dims.record("CboreFace", '"PlateThick"')
     add_diametric_linear_dimension(
         adapter,
         axis,
-        f"{flank}.start",
+        f"{wall}.start",
         to_sketch((x + mouth_r, y, THICKNESS + 3.0)),
         f"{label} mouth diameter",
     )
-    dims.record("CskMouthDia", '"CskDia"')
+    dims.record("CboreMouthDia", '"CboreDia"')
     dimension_between(
         adapter,
-        f"{flank}.start",
-        f"{flank}.end",
+        f"{wall}.start",
+        f"{wall}.end",
         "vertical_distance",
-        drop,
-        f"{label} cone depth",
+        CBORE_DEPTH,
+        f"{label} depth",
     )
-    dims.record("CskConeDepth", f'"CskDia" / 2 / tan({90.0 - CSK_FLANK_ANGLE:g})')
-    # Text on the wedge's bisector at the mouth vertex, inside the profile.
-    bisector = math.radians(180.0 + CSK_FLANK_ANGLE / 2.0)
-    reach = 0.5 * mouth_r
-    text_model = (
-        x + mouth_r + reach * math.cos(bisector),
-        y,
-        THICKNESS + reach * math.sin(bisector),
-    )
-    _add_flank_reference(
-        adapter,
-        face,
-        flank,
-        text_model,
-        to_sketch(text_model),
-        f"{label} face-to-flank angle",
-        expected_degrees=CSK_FLANK_ANGLE,
-    )
-    dims.record("CskFlankAngle")
+    dims.record("CboreSeatDepth", '"CboreDepth"')
     check(
         f"{label} axis length",
         adapter.add_sketch_dimension(axis, None, "linear", AXIS_OVERRUN),
     )
-    dims.record("CskAxisLength")
+    dims.record("CboreAxisLength")
     ensure_fully_defined(adapter, f"{label} profile")
     check(f"exit_sketch {label}", adapter.exit_sketch())
-    name_last_feature(adapter, "CountersinkProfile")
-    jobs = dims.apply(adapter, "CountersinkProfile")
+    name_last_feature(adapter, "CounterboreProfile")
+    jobs = dims.apply(adapter, "CounterboreProfile")
     check(
         f"revolve-cut {label}",
         adapter.create_revolve(RevolveParameters(angle=360.0, is_cut=True)),
     )
-    name_last_feature(adapter, "Countersink")
+    name_last_feature(adapter, "Counterbore")
     return jobs
 
 
@@ -516,7 +433,7 @@ def build(adapter: Any) -> dict[str, str]:
             adapter, f"{count}-hole circle", expected, 0.01 * count * V_INDEX_HOLE
         )
 
-    # --- Mounting holes: seed at 150 degrees with its countersink, patterned ---
+    # --- Mounting holes: seed at 150 degrees with its counterbore, patterned ---
     drive_jobs += _seed_hole_sketch(
         adapter,
         sketch="MountHoleProfile",
@@ -552,7 +469,7 @@ def build(adapter: Any) -> dict[str, str]:
         )
     )
     blank_reference_geometry(adapter, (("MountRowPlane", "PLANE"),))
-    drive_jobs += _countersink(
+    drive_jobs += _counterbore(
         adapter,
         plane=MOUNT_ROW_PLANE,
         x=MOUNT_SEED[0],
@@ -560,20 +477,20 @@ def build(adapter: Any) -> dict[str, str]:
         x_drive=f'"MountPcd" * {MOUNT_X_FACTOR!r}',
     )
     volume = volume_check(
-        adapter, "countersink seed", volume - V_CSK, 0.03 * V_CSK + 0.05
+        adapter, "counterbore seed", volume - V_CBORE, 0.03 * V_CBORE + 0.05
     )
     _pattern(
         adapter,
         axis=axis,
-        features=["MountHole", "Countersink"],
+        features=["MountHole", "Counterbore"],
         count=MOUNT_COUNT,
         name="MountHoles",
     )
     volume = volume_check(
         adapter,
         "mounting holes",
-        volume - (MOUNT_COUNT - 1) * (V_MOUNT_HOLE + V_CSK),
-        0.03 * MOUNT_COUNT * (V_MOUNT_HOLE + V_CSK),
+        volume - (MOUNT_COUNT - 1) * (V_MOUNT_HOLE + V_CBORE),
+        0.03 * MOUNT_COUNT * (V_MOUNT_HOLE + V_CBORE),
     )
     _require_one_solid_body(adapter, label="index plate")
 
@@ -586,24 +503,9 @@ def build(adapter: Any) -> dict[str, str]:
     )
     _require_one_solid_body(adapter, label="driven index plate")
 
-    # The bore pilots on the head's hub: never under the stock plate's bore.
-    set_dimension_bilateral_tolerance(
-        adapter,
-        "PlateProfile",
-        "BoreDia",
-        *BORE_DEVIATIONS,
-        places=3,
-        display_unit=UNIT,
-    )
-    # The reamed index holes: a sliding fit on the head's index pin.
-    set_dimension_bilateral_tolerance(
-        adapter,
-        "Ring57Profile",
-        PRINTED_HOLE,
-        *INDEX_HOLE_DEVIATIONS,
-        places=INDEX_HOLE_PLACES,
-        display_unit=UNIT,
-    )
+    # No model dimension carries a band: the bore is bored to the head's hub,
+    # which is the gauge, and the drilled index holes take the title block's
+    # DRILLED HOLES band (owner ruling 2026-11-23, tool audit Q15).
     apply_material(adapter, MATERIAL)
     report_mass_properties(adapter)
     apply_drawing_precision(adapter, DRAWING_PRECISION)

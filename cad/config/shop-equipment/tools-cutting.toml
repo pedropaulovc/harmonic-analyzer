@@ -186,7 +186,7 @@ kind = "files"
 status = "on_hand"
 source = "owner 2026-11-19"
 
-# --- 82° countersink (riser plan, then the index-plate and arm-plate plans) --
+# --- 82° countersink (riser plan, then the arm-plate plan) -------------------
 
 # Same key as its prechips record in cad/process/shop/, which holds the
 # identity (one fact in one file); this record holds ownership, use and the
@@ -204,7 +204,7 @@ source = "https://www.travers.com/product/ma-ford-61037502-single-flute-counters
 purchase = "Travers 07-055-036, M.A. Ford 61037502 3/8 in 82 deg HSS single-flute countersink, 1/4 in shank, 2 in overall, $14.60, in stock (read live 2026-11-22). Import alternatives: Travers 07-031-024, $8.09; LittleMachineShop 4536, $6.95."
 kind = "countersink"
 status = "to_order"
-note = "Not owned: to buy. The 3/8 in 82° countersink: MHA-DT-03-TL-01 index plate (.35 x 82°) and MHA-PD-19 arm plate (Ø.312 x 82°) plans."
+note = "Not owned: to buy. The 3/8 in 82° countersink: MHA-PD-19 arm plate (Ø.312 x 82°) plan. (MHA-DT-03-TL-01 index plate left it: its screw seats are counterbores, owner fact 2026-11-24.)"
 
 # --- McMaster-Carr PO 0803PCAMPOS (owned) ------------------------------------
 

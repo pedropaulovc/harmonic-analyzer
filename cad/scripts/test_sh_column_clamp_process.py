@@ -188,9 +188,32 @@ def test_the_shared_programs_are_posted_once_and_cut_every_blank_alike(context) 
 def test_no_touch_off_is_taken_with_the_work_stop_between_the_jaws() -> None:
     # CodeRabbit, 2026-11-24: the rod left locked from the setup before can
     # lie under the end mill when it comes down beside the blank for Z0. No
-    # posted program's keep-out covers a hand move, so every mill setup opens
-    # with the rod drawn back, and the stop is set only after its touch-offs.
-    drawn_back = "rod drawn back clear of the vise"
+    # posted program's keep-out covers a hand move. Owner 2026-11-25: "Nothing
+    # on the sheet; the standing page and the pictures carry it": printed
+    # once on the standing page the sheet points to, drawn in the pictures
+    # (whose alt text may say it), and not repeated in the setups' text; the
+    # stop is set only after a setup's touch-offs.
+    assert PLAN["standing"] is True
+    assert "standing-mill" in SHOP["standing"]["notes"]
+    rows = dict(SHOP["notes"]["standing-mill"]["rows"])
+    rule = "Slide the rod back out of the vise before any touch-off beside the work"
+    assert rule in rows["Work stop"]
+
+    def printed(node: object) -> list[str]:
+        if isinstance(node, str):
+            return [node]
+        if isinstance(node, list):
+            return [text for item in node for text in printed(item)]
+        if isinstance(node, dict):
+            return [
+                text
+                for key, value in node.items()
+                if key != "diagram"
+                for text in printed(value)
+            ]
+        return []
+
+    assert not [text for text in printed(PLAN) if "drawn back" in text]
     mill = [setup for setup in PLAN["setups"] if setup.get("programs")]
     assert len(mill) == 9
     first_blank = "Before the first blank goes in"
@@ -199,17 +222,6 @@ def test_no_touch_off_is_taken_with_the_work_stop_between_the_jaws() -> None:
         assert first_blank in setup_3["operations"][0][key], key
     for setup in mill:
         operations = setup["operations"]
-        touches = [
-            index
-            for index, operation in enumerate(operations)
-            if "G54" in operation["instruction"]
-            or "touch-off" in operation["instruction"]
-        ]
-        first = operations[touches[0]]
-        # Both texts: the hobby sheet prints the detailed one where an op has
-        # it, the pro sheet the short one.
-        for key in ("instruction", "instruction_detailed"):
-            assert drawn_back in first.get(key, drawn_back), (setup["title"], key)
         stops = [
             index
             for index, operation in enumerate(operations)
@@ -217,8 +229,7 @@ def test_no_touch_off_is_taken_with_the_work_stop_between_the_jaws() -> None:
         ]
         if setup["title"].startswith("Seat check, then the pair bore"):
             assert not stops
-            for key in ("instruction", "instruction_detailed"):
-                assert "No work stop" in first.get(key, "No work stop")
+            assert "No work stop here." in setup["datum"]
             continue
         (stop,) = stops
         # Every zero of the setup is taken before the stop goes in.

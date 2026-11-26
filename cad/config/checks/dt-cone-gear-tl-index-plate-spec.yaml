@@ -1,0 +1,108 @@
+# The cone gear index plate's guards (tolerance-policy.md, "Checks in spec
+# modules and tests"; cad/scripts/check_register.py). Entered 2026-11-25 with
+# the plate's rework to the owner's measurements of the BS-0 head and its
+# stock plate (#2157, PR #3497). Where a number is the author's round figure
+# with no ruling or published source behind it, the source says so.
+checks:
+  - id: C-01
+    check: "INDEX_ERROR_TOOTH_FRACTION_MAX"
+    kind: mesh
+    reason: "cone gear teeth are cut unevenly spaced"
+    source: "the module computes the worst case (0.40 % of a 96-tooth pitch); the 0.5 % cap is the author's round figure, no ruling or standard: a guess"
+    basis: worst_case
+  - id: C-02
+    check: "the BS-0 index pin does not enter a least-size hole"
+    kind: gap
+    reason: "the index pin will not enter a hole"
+    source: "owner fact 2026-11-24: \"0.117 in dia dividing head pin\"; #31 drill .1200 at DRILLED HOLES +.004/0 (owner ruling 2026-11-23, tool audit Q15)"
+    basis: worst_case
+  - id: C-03
+    check: "the index pin's engagement in the plate is not held"
+    kind: joint
+    reason: "the pin rides out of its hole; the division slips"
+    source: "owner facts 2026-11-24: \"pin goes 0.1555 into blind holes\", \"plate thickness 0.2770\"; made plate .25 ±.01; the .1 in floor (about .85 pin diameter) is the author's round figure: a guess"
+    basis: worst_case
+  - id: C-04
+    check: "a hole circle stands outside the index arm's reach"
+    kind: gap
+    reason: "the index pin cannot be set over the circle"
+    source: "owner facts 2026-11-24 (stock plate): \"rim to outermost hole edge 0.1030\", \"innermost hole edge to hto bore 0.5545\""
+    basis: measured
+  - id: C-05
+    check: "index plate bore does not pass the head's plate hub"
+    kind: gap
+    reason: "the plate will not go on the head's hub"
+    source: "owner facts 2026-11-24: \"hole 0.8270\", \"hub plate sits on 0.8245\""
+    basis: measured
+  - id: C-06
+    check: "bolt circle disagrees with the owner's two readings"
+    kind: gap
+    reason: "the plate screws miss the head's tapped holes"
+    source: "owner fact 2026-11-24: \"screw hole outside to outside 1.4445; screw hole edge to bore edge 0.0415\", \"Yes, both at the counterbore edges.\"; the .005 in agreement is the title block's three-place band"
+    basis: measured
+  - id: C-07
+    check: "the plate under the screw head is not the stock plate's"
+    kind: thread
+    reason: "the head's own screws engage the head less deep"
+    source: "owner facts 2026-11-24: \"plate thickness 0.2770\", \"depth 0.1830\", \"i will use the same screws with all plates\"; made seat .10 against the stock .094: agreement within the title block's two-place band"
+    basis: measured
+  - id: C-08
+    check: "a plate screw's head can stand proud of the plate face"
+    kind: gap
+    reason: "the sector arms foul a screw head"
+    source: "owner facts 2026-11-24: \"screw head 0.1380 high\", \"below plate\"; counterbore depth .15 at the .XX grade rule 3 gives a counterbore callout (shallowest .14)"
+    basis: worst_case
+  - id: C-09
+    check: "counterbore does not clear the plate screw's Ø.3235 head"
+    kind: gap
+    reason: "a screw head will not enter its counterbore"
+    source: "owner fact 2026-11-24: \"head dia 0.3235\"; the .015 in diametral margin is the author's round figure: a guess (the stock plate's own is .022); counterbore .35 at the .XX grade leaves .0165"
+    basis: worst_case
+  - id: C-10
+    check: "counterbore floor under rule 17's .080 target"
+    kind: wall
+    reason: "the seat under a screw head tears out"
+    source: "drawing-guidelines.md rule 17 (_inch_wall_limits.WALL_TARGET_MM); met with no margin at thickness .24 and depth .16 (owner ruling 2026-11-25, option B)"
+    basis: worst_case
+  - id: C-11
+    check: "counterbore wall is not the shortfall RV-04 accepts"
+    kind: wall
+    reason: "a counterbore breaks into the bore"
+    source: "owner ruling 2026-11-24 (RV-04): \"Accept the .04 wall as an exception, same as the maker's plate.\"; stock wall measured .0415; the .03 in lower limit is the printed WALL .03 MIN"
+    basis: worst_case
+  - id: C-12
+    check: "is not the stated shortfall"
+    kind: wall
+    reason: "neighbouring index holes break into each other"
+    source: "drawing-guidelines.md rule 17 floor (_inch_wall_limits.WALL_FLOOR_MM) and owner ruling 2026-11-02 (RV-01, webs down to .02 in); the 51-hole circle meets the .060 floor by under .001 in, so it is at the floor, not over it"
+    basis: worst_case
+  - id: C-13
+    check: "index plate web is thinner than owner ruling RV-01 accepts"
+    kind: wall
+    reason: "neighbouring index holes break into each other"
+    source: "owner ruling 2026-11-02 (RV-01): webs down to .02 in on and between the 57- and 51-hole circles"
+    basis: worst_case
+  - id: C-14
+    check: "counterbore wall is thinner than the stock plate's"
+    kind: wall
+    reason: "a counterbore breaks into the bore"
+    source: "owner fact 2026-11-24 (stock plate): \"screw hole edge to bore edge 0.0415\"; the made plate's nominal wall is the same .0415"
+    basis: measured
+  - id: C-15
+    check: "mounting hole is not the stock plate's 15/64 drill"
+    kind: gap
+    reason: "a plate screw binds in its hole"
+    source: "owner facts 2026-11-24: \"3x screw holes thru 15/64\", \"0.1920 dia\" (the screw)"
+    basis: measured
+  - id: C-16
+    check: "counterbore is not the stock plate's Ø.3455"
+    kind: gap
+    reason: "a screw head will not enter its counterbore"
+    source: "owner fact 2026-11-24 (stock plate): \"countersunk 0.3455 dia\", corrected \"not countersunk counterbored;\""
+    basis: measured
+  - id: C-17
+    check: "the bar as supplied can leave the printed thickness band"
+    kind: gap
+    reason: "a thin bar lets the counterbore floor fall short"
+    source: "Online Metals aluminium tolerance table (https://www.onlinemetals.com/en/aluminum-tolerances), rectangle bar, extruded, .250 to .499 thick: ±.008; part 1148 (stock 6061-flat-1-4x5); the plan mikes the bar first"
+    basis: worst_case

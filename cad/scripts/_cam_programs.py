@@ -26,6 +26,7 @@ from pathlib import Path
 from types import ModuleType
 
 import _process_plans
+import _shop_equipment
 from export_features import OUT as CAD_OUT, bundle_paths
 
 PROCESS_ROOT = _process_plans.PROCESS_ROOT
@@ -47,6 +48,9 @@ if _untraveled := sorted(set(CAM_STEMS) - set(_process_plans.TRAVELER_STEMS)):
 SCRIPTS_DIR = Path(__file__).resolve().parent
 # Executed by freecadcmd, never imported on the host: an input of every cam task.
 RUNTIME_PATH = SCRIPTS_DIR / "_freecad_cam_runtime.py"
+# The shop inventory's CNC records, where cam_nc.verify's jaw-clearance floor
+# lives: an input of every cam task (the inventory's other files are not).
+CNC_EQUIPMENT_PATH = _shop_equipment.DIRECTORY / "cnc.toml"
 # The runtime reads its job spec's path from this variable (its own SPEC_ENV).
 SPEC_ENV = "HARMONIC_CAM_SPEC"
 CYCLE_TIMES_NAME = "cycle_times.json"
@@ -69,7 +73,10 @@ def cam_inputs(stem: str, out: Path = CAD_OUT) -> dict[str, Path]:
     records its SHA-256 under: the scoped feature bundle (``features``,
     ``step``; a family's, one pair per part, ``features/<part stem>`` and
     ``step/<part stem>``), the ``plan``, each shop file
-    (``shop/<name>.toml``), the ``recipe`` and the FreeCAD ``runtime``."""
+    (``shop/<name>.toml``), the shop inventory's ``shop-equipment/cnc.toml``
+    (``cam_nc.verify``'s jaw-clearance floor lives there; no other inventory
+    file is an input, so an unrelated record edit leaves every posted set
+    fresh), the ``recipe`` and the FreeCAD ``runtime``."""
     family = _process_plans.family_parts(stem, PROCESS_ROOT)
     bundles: dict[str, Path] = {}
     for part in family.values():
@@ -80,6 +87,7 @@ def cam_inputs(stem: str, out: Path = CAD_OUT) -> dict[str, Path]:
         **bundles,
         "plan": _process_plans.plan_path(stem),
         **{f"shop/{path.name}": path for path in _process_plans.shop_files()},
+        "shop-equipment/cnc.toml": CNC_EQUIPMENT_PATH,
         "recipe": recipe_path(stem),
         "runtime": RUNTIME_PATH,
     }
