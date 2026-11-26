@@ -24,11 +24,20 @@ part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
 material = "C36000 free-machining brass round bar, 1/4 in"
 stock = "Lot: {{process.quantity:d}} bushing. Ø{{process.stock_dia_in:.3dot}} bar, on hand: saw a {{process.bar_length_in:g}} in piece off it for the lathe, never the whole bar (it would run out past the spindle's rear end); the bushing takes {{cad.pitch_in:.2dot}} in of it."
-note = "Inches unless mm. Lathe PM-1127VF-LB (70–380 and 380–2000 rpm); brass cut dry. To order (not on hand): the .0625 chucking reamer."
 shop = "../shop"
 stock_refs = ["c360-round-1-4"]
 material_key = "lathe-c360"
 turning_material = "brass"
+
+# The shop's standing page carries what every traveler shares (units, lathe
+# speeds, coolant); This job says what only this bushing needs.
+standing = true
+
+[[notes]]
+title = "This job"
+rows = [
+  ["To order", "To order (not on hand): the .0625 chucking reamer."],
+]
 
 [cad]
 file = "../../out/features/dt_cone_tip_bushing/features.toml"
