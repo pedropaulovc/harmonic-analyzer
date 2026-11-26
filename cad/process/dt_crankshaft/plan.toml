@@ -86,11 +86,20 @@ part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
 material = "1018 cold-finished steel, 1 in round (drawing: {{cad.material_spec}})"
 stock = "Qty {{process.quantity:g}}. {{process.bar_dia_in:fraction}} in round bar on hand: one blank {{process.blank_length_in:.2f}} in long and one {{process.slug_blank_in:.2f}} in proof-slug blank."
-note = "Inches unless mm; G-code and console entries in mm (the file and the controller run G21). Lathe PM-1127VF-LB (70–380 and 380–2000 rpm); cutting oil on the steel. Lathe cross-slide DRO in inch diameter mode for Setups 2–6 (Setup 7 switches it to mm radius). Every station is from the far end F. Inside corners R.010 max: finish each shoulder's corner with the sharp-nose tool. Each lathe tool sets its own DRO Z0 on the setup's datum face before it cuts a station. Mill speeds on the PM-30MV low belt (100–2800 rpm). Home the mill ($H) once, after switching it on: every M6's trip to the tool setter counts from home. Home again only after a power cycle or a controller restart, an E-stop, an alarm, a limit switch hit, a stall or a crash: homing brings the stored G54 back. Then check every zero of the setup again, each the way its step set it: each must read what its step set, within .001 in. One does not, cannot be reached with the part in, or the part may have moved: take the setup again from its first step, the part out. They all do: run the interrupted file again from its start. Feed Hold, then Reset with the axes stopped keeps position and G54: no homing, no new zero; run the interrupted file again from its start: its first M6 measures the tool, and cuts already made are cut in air. Prove the file in air first. Not made here (drawing notes, at assembly): the Ø.125 pin hole match-reamed through MHA-DT-10 and the pinion seat, and the cross hole's 1:48 taper ream with MHA-DT-31; nothing is drilled for either on this traveler."
 shop = "../shop"
 stock_refs = ["1018-round-1"]
 material_key = "lathe-1018-cold-finished"
 milling_material = "steel_1018"
+
+standing = true
+
+[[notes]]
+title = "This job"
+rows = [
+  ["DRO", "Lathe cross-slide DRO in inch diameter mode for Setups 2–6 (Setup 7 switches it to mm radius)."],
+  ["Inside corners", "Inside corners R.010 max: finish each shoulder's corner with the sharp-nose tool."],
+  ["Not made here", "Not made here (drawing notes, at assembly): the Ø.125 pin hole match-reamed through MHA-DT-10 and the pinion seat, and the cross hole's 1:48 taper ream with MHA-DT-31; nothing is drilled for either on this traveler."],
+]
 
 [cad]
 file = "../../out/features/dt_crankshaft/features.toml"
@@ -1117,7 +1126,7 @@ machine = "PM-30MV CNC (FluidNC, CNCjs with the electronic tool setter) / vise, 
 indexing = "none"
 machine_ref = "pm-30mv"
 holding = "The PM 6 in vise. One 1 in, 4 in long parallel of the 1/8 in thick set standing on edge, centred between the jaws, its left end flush with the jaws' left face; the shaft on its top edge along the jaws, F to the RIGHT, the jaws' left face 3.55 in from F (on the outboard journal; calipers' depth rod), brass shim over both journals at the jaws. The jaw spacer is the proof slug: the pair's other 1 in parallel on edge against the moving jaw, beside the first, its right end {{process.spacer_parallel_end_in:.2dot}} right of F; the slug on its corner, its journal toward F, the journal's end {{process.slug_gap_in:.2dot}} right of F (rule), the same brass shim over its journal at the jaws, its spigot hanging past the parallel's end and the jaws. That {{process.slug_gap_in:.2dot}} gap is the edge finder's room at F. Under the hole nothing but air."
-datum = "Program PK01_cross_hole (cam:dt_crankshaft). G54: X0 F, +X toward the jaws' right end; Y0 the stub's axis; Z0 the stub's top. The file starts with an M6 for the centre drill; tool lengths from the tool setter at each M6; at each M6 stop the file has stopped the spindle and lifted the tool above the jaws."
+datum = "Program PK01_cross_hole (cam:dt_crankshaft). G54: X0 F, +X toward the jaws' right end; Y0 the stub's axis; Z0 the stub's top. The file starts with an M6 for the centre drill."
 diagram = { file = "diagrams/cross-hole.svg", alt = "The shaft along the vise jaws on a parallel on edge, F to the right; the spigot, the stub and the dome out past the jaws' left face; the #9 hole through the stub 4.53 from F; the slug as the spacer on a second parallel against the moving jaw, its journal's end 1.20 right of F, its spigot past that parallel's end." }
 envelope = "other"
 vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{cad.outboard_journal_dia_ref}}", along_jaws_mm = "{{process.part_length_mm}}", part_height_mm = "{{cad.outboard_journal_dia_ref}}", parallel_height_mm = "{{process.riser_height_mm}}", overhang_mm = ["{{process.left_overhang_mm}}", "rest"], jaw_offset = "balanced", balance = "spacer", fixed_jaw_face = "machined", moving_jaw_face = "machined", moving_jaw_contact = "flat" }
@@ -1159,12 +1168,7 @@ feed = "hand"
 
 [[setups.operations]]
 instruction = "G54 Z0: the top of the stub, touched with the centre drill over its axis."
-instruction_detailed = "Console M6 T1 (#2 centre drill; the tool setter measures it). MDI G0 X-120.000 Y0.000: over the stub. Spindle stopped, its point just dragging a .002 feeler leaf on the stub's top: G10 L20 P1 Z0.051."
-feed = "hand"
-
-[[setups.operations]]
-instruction = "Prove PK01_cross_hole in air, Z0 raised 1.000 in. Then Z0 back. The #9 stands at least {{process.cross_projection_min_mm:in.2f}} in out of the chuck."
-instruction_detailed = "Send $# and note the G54 line's Z. G10 L2 P1 Z(that Z + 25.400). Run PK01_cross_hole through every M6, watching each move clear the jaws. G10 L2 P1 Z(the noted Z) puts Z0 back, and the centre drill goes back in for the real run."
+instruction_detailed = "Console M6 T1 (#2 centre drill). MDI G0 X-120.000 Y0.000: over the stub. Spindle stopped, its point just dragging a .002 feeler leaf on the stub's top: G10 L20 P1 Z0.051."
 feed = "hand"
 
 [[setups.operations]]
@@ -1172,7 +1176,7 @@ speed_kind = "spindle"
 tool = "spot"
 drilling = "none"
 sizing = "other"
-instruction = "Run PK01_cross_hole (M6 T1, centre drill; set 1800): spot the cross hole Ø{{process.cross_spot_dia_mm:in.3dot}} on the stub's top at X{{process.cross_x_mm:.3f}} mm."
+instruction = "The #9 stands at least {{process.cross_projection_min_mm:in.2f}} in out of the chuck. Run PK01_cross_hole (M6 T1, centre drill; set 1800): spot the cross hole Ø{{process.cross_spot_dia_mm:in.3dot}} on the stub's top at X{{process.cross_x_mm:.3f}} mm."
 rpm = 1800
 feed = "{{process.spot_feed_per_min_mm:in.1f}} in/min"
 milling_cuts = [

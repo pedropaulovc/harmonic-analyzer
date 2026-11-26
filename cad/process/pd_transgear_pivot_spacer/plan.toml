@@ -35,11 +35,14 @@ part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
 material = "C36000 free-machining brass round bar, 1/2 in"
 stock = "Lot: {{process.quantity:d}} spacer. Ø{{process.stock_dia_in:.3dot}} bar, on hand (the bar, shared with MHA-PD-24, MHA-PD-25 and MHA-MG-11): hacksaw a {{process.bar_length_in:g}} in working piece and a 1 in piece for the pusher of Op 130 off it before Setup 1. The spacer takes {{cad.pitch_in:.2dot}} in of the working piece, and the stub mandrel of Setup 2 is turned on the end left in the chuck: the piece stays in the jaws from Setup 1 to the end of Setup 2."
-note = "Inches unless mm. Lathe PM-1127VF-LB (70–380 and 380–2000 rpm); brass cut dry. Have the {{cad.bore_mate}} screw this spacer is bonded on at the lathe: its shoulder is the hole's gauge."
 shop = "../shop"
 stock_refs = ["c360-round-1-2"]
 material_key = "lathe-c360"
 turning_material = "brass"
+
+# The shop's standing page carries what every traveler shares (units, speeds,
+# coolant). The note's screw sentence prints at Op 60, where the screw is used.
+standing = true
 
 [cad]
 file = "../../out/features/pd_transgear_pivot_spacer/features.toml"

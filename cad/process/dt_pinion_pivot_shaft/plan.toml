@@ -39,10 +39,17 @@ part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
 material = "AISI 1018 cold-finished steel, precision-ground round, 1/4 in"
 stock = "Ø{{process.stock_dia_in:.4dot}} ground bar (to order, not on hand); one blank {{process.blank_length_in:.2dot}} in long and one {{process.trial_offcut_in:.2dot}} in trial offcut (allow two saw kerfs)."
-note = "Inches, unless marked mm (the settings' feeds). Lathe PM-1127VF-LB (70–380 and 380–2000 rpm); cutting oil. The O.D. is left as supplied: grip it over a brass shim wrap and never cut it."
 shop = "../shop"
 stock_refs = ["1018-ground-round-1-4"]
 material_key = "lathe-1018-cold-finished"
+
+standing = true
+
+[[notes]]
+title = "This job"
+rows = [
+  ["O.D.", "The O.D. is left as supplied: grip it over a brass shim wrap and never cut it."],
+]
 
 [cad]
 file = "../../out/features/dt_pinion_pivot_shaft/features.toml"

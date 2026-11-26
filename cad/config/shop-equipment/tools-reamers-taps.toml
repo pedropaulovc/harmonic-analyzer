@@ -349,11 +349,6 @@ kind = "reamer"
 status = "to_order"
 note = "quotes-2026-11-17-rev3.xlsx B-reamer-.2510 (optional tier there): recommended Zoro G3924812. To buy: owner ruling 2026-11-20 (#3073) buys a fixed reamer for each running/press fit rather than setting the adjustable set; REAM_SLIDE is a running fit. The workbook took it as owned (cad/scripts/_fit_ream_slide.py: the owned over reamers), but the owner's inventory of 2026-11-17 owns only tools.reamers-adjustable-lms-5948 and tools.reamer-0376."
 
-[tools.reamer-3135]
-kind = "reamer"
-status = "to_order"
-note = "quotes-2026-11-17-rev3.xlsx B-reamer-.3135 (optional tier there): recommended Zoro G3918887. To buy: owner ruling 2026-11-20 (#3073) buys a fixed reamer for each running/press fit rather than setting the adjustable set; REAM_SLIDE is a running fit. The workbook took it as owned (cad/scripts/_fit_ream_slide.py: the owned over reamers), but the owner's inventory of 2026-11-17 owns only tools.reamers-adjustable-lms-5948 and tools.reamer-0376."
-
 [tools.reamer-4990]
 kind = "reamer"
 status = "to_order"

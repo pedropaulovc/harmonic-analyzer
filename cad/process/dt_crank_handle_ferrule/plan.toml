@@ -16,10 +16,13 @@ part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
 material = "C36000 free-machining brass rod, 9/16 in"
 stock = "Lot: {{process.quantity:d}} ferrule. Ø{{process.stock_dia_in:.4dot}} rod, a piece {{process.bar_length_in:g}}–3 in long (to order, not on hand; longer rod is sawn to that first, never chucked whole); the ferrule takes {{cad.pitch_in:.2dot}} in of it, and a 3 in piece makes a second if the first is scrapped."
-note = "Inches unless mm. Lathe PM-1127VF-LB (70–380 and 380–2000 rpm); brass cut dry."
 shop = "../shop"
 stock_refs = ["c360-round-9-16"]
 material_key = "lathe-c360"
+
+# The shop's standing page carries what every traveler shares (units, lathe
+# speeds, coolant); nothing else in the old note was only this ferrule's.
+standing = true
 
 [cad]
 file = "../../out/features/dt_crank_handle_ferrule/features.toml"

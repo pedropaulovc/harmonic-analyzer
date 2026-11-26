@@ -49,11 +49,18 @@ part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
 material = "1018 cold-finished steel, 5/8 in round (drawing: {{cad.material_spec}})"
 stock = "{{process.bar_dia_in:fraction}} in round bar: saw one piece {{process.bar_length_min_in:.2f}}–3.00 in long off it, which makes both cams ({{process.quantity:d}} off); never chuck the whole bar (it would run out past the spindle's rear end)."
-note = "Inches unless mm; G-code and console entries in mm (the files and the controller run G21). Finished Ø{{cad.cam_od_dia_min_in:.3dot}}–{{cad.cam_od_dia_max_in:.3dot}} × {{cad.cam_od_length_min_in:.3dot}}–{{cad.cam_od_length_max_in:.3dot}} long; the bore Ø{{cad.bore_dia_min_in:.4dot}}–{{cad.bore_dia_max_in:.4dot}} {{cad.bore_eccentricity_min_in:.3dot}}–{{cad.bore_eccentricity_max_in:.3dot}} off the O.D. axis (thin wall {{cad.bore_thin_wall_min_mm:in.4dot}} min); the #2-56 set-screw hole opposite the thin side, {{cad.set_screw_tap_station_min_in:.3dot}}–{{cad.set_screw_tap_station_max_in:.3dot}} from the front face. Mill speeds on the PM-30MV low belt (100–2800 rpm). Home the mill ($H) once, after switching it on: every M6's trip to the tool setter and the tap files' G53 retract count from home. Home again only after a power cycle or a controller restart, an E-stop, an alarm, a limit switch hit, a stall or a crash: homing brings the stored G54 back. Then check every zero of the setup again, each the way its step set it: each must read what its step set, within .001 in. One does not, cannot be reached with the part in, or the part may have moved: take the setup again from its first step, the part out. They all do: run the interrupted file again from its start. Feed Hold, then Reset with the axes stopped keeps position and G54: no homing, no new zero; run the interrupted file again from its start: its first M6 measures the tool, and cuts already made are cut in air. Every file is proved in air on the first cam. Edges: R{{cad.edge_break_in:.3dot}} or chamfer {{cad.chamfer_max_in:.3dot}} max."
 shop = "../shop"
 stock_refs = ["1018-round-5-8"]
 material_key = "rocker-1018-cold-finished"
 milling_material = "steel_1018"
+
+standing = true
+
+[[notes]]
+title = "This job"
+rows = [
+  ["Finished", "Finished Ø{{cad.cam_od_dia_min_in:.3dot}}–{{cad.cam_od_dia_max_in:.3dot}} × {{cad.cam_od_length_min_in:.3dot}}–{{cad.cam_od_length_max_in:.3dot}} long; the bore Ø{{cad.bore_dia_min_in:.4dot}}–{{cad.bore_dia_max_in:.4dot}} {{cad.bore_eccentricity_min_in:.3dot}}–{{cad.bore_eccentricity_max_in:.3dot}} off the O.D. axis (thin wall {{cad.bore_thin_wall_min_mm:in.4dot}} min); the #2-56 set-screw hole opposite the thin side, {{cad.set_screw_tap_station_min_in:.3dot}}–{{cad.set_screw_tap_station_max_in:.3dot}} from the front face."],
+]
 
 [cad]
 file = "../../out/features/dt_pinion_cam/features.toml"
@@ -299,7 +306,7 @@ machine = "PM-30MV CNC (FluidNC, CNCjs with the electronic tool setter) / vise, 
 indexing = "none"
 machine_ref = "pm-30mv"
 holding = "The PM 6 in vise (jaws {{process.vise_jaw_height_mm:in.2f}} tall above its seat; check with the calipers before loading). A 1 in parallel with a 1/2 in parallel on it, both 1/8 in thick, against each jaw (1.5 in stacks). The cam upright on both stacks, face F DOWN, gripped on its O.D., centred on the jaws: its lower {{process.bore_grip_mm:in.3dot}} is in the jaws, its rear face stands above the jaw tops. Tap it down onto both stacks while closing the vise. Under the bore the {{process.bore_parallel_gap_mm:in.3dot}} gap between the stacks: the bore is offset ALONG the jaws, so the drill and reamer run out into that gap. Before Cycle Start look under the cam from the side: both stacks against the jaws, the gap clear."
-datum = "Program CM01_bore (cam:dt_pinion_cam). G54: X0 Y0 the O.D. axis, Z0 the rear face; +Y toward the fixed jaw; the bore at X+{{cad.bore_eccentricity_mm:.3f}} mm ({{cad.bore_eccentricity_in:.3dot}} in). Tool lengths from the tool setter at each M6."
+datum = "Program CM01_bore (cam:dt_pinion_cam). G54: X0 Y0 the O.D. axis, Z0 the rear face; +Y toward the fixed jaw; the bore at X+{{cad.bore_eccentricity_mm:.3f}} mm ({{cad.bore_eccentricity_in:.3dot}} in)."
 diagram = { file = "diagrams/bore.svg", alt = "The cam upright on two parallel stacks in the vise; the centre drill, C drill and .2510 reamer go through it {{cad.bore_eccentricity_in:.3dot}} off its axis along the jaws." }
 envelope = "other"
 vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{cad.cam_od_dia_mm}}", along_jaws_mm = "{{cad.cam_od_dia_mm}}", part_height_mm = "{{cad.envelope_z_mm}}", parallel_height_mm = "{{process.riser_height_mm}}", overhang_mm = [-72.0369, "rest"], jaw_offset = "centred", fixed_jaw_face = "machined", moving_jaw_face = "machined", moving_jaw_contact = "rod" }
@@ -316,12 +323,7 @@ feed = "hand"
 
 [[setups.operations]]
 instruction = "G54 Z0: the rear face, the centre drill's point on a .002 feeler leaf at X-4.000 Y0, clear of the parting pip."
-instruction_detailed = "Console M6 T1 (#2 centre drill; the tool setter measures it). MDI G0 X-4.000 Y0 (on the flat rear face, clear of the parting pip at the axis). Spindle stopped, its point just dragging a .002 leaf there: G10 L20 P1 Z0.051."
-feed = "hand"
-
-[[setups.operations]]
-instruction = "First cam only: prove CM01_bore in air, Z0 raised 1.000 in. Then Z0 back."
-instruction_detailed = "Send $# and note the G54 line's Z. G10 L2 P1 Z(that Z + 25.400). Run CM01_bore through every M6, watching each move clear the jaws. G10 L2 P1 Z(the noted Z) puts Z0 back."
+instruction_detailed = "Console M6 T1 (#2 centre drill). MDI G0 X-4.000 Y0 (on the flat rear face, clear of the parting pip at the axis). Spindle stopped, its point just dragging a .002 leaf there: G10 L20 P1 Z0.051."
 feed = "hand"
 
 [[setups.operations]]
@@ -378,8 +380,8 @@ title = "Drill and tap the set-screw hole"
 machine = "PM-30MV CNC (FluidNC, CNCjs with the electronic tool setter) / vise, swivel off"
 indexing = "none"
 machine_ref = "pm-30mv"
-holding = "The PM 6 in vise (jaws {{process.vise_jaw_height_mm:in.2f}} tall above its seat). A 1 in parallel, 1/8 in thick, against each jaw. The cam lying along the jaws, face F to the LEFT, its rear face {{process.cross_jaw_end_mm:in.2f}} in from the jaws' RIGHT ends, its O.D. on the parallels' inner top edges, the bore BELOW the O.D.'s centre (thick wall up). A 1/4 in drill from the 115-piece index, shank first, in the bore from the right, standing out past the jaw ends. The other cam (or, for the second, the finished first) lies the same way at the jaws' LEFT ends as the balance, so the jaws close square. Snug the vise (ops 180–200 orient it)."
-datum = "Programs CM02_set_screw and CM03_set_screw_tap. G54: X0 face F, +X toward the rear face; Y0 the O.D. axis; Z0 the O.D.'s top line. Tool lengths from the tool setter at each M6; every move between holes runs above the jaw tops, which stand {{process.cross_jaw_top_mm:in.3dot}} above Z0."
+holding = "The PM 6 in vise (jaws {{process.vise_jaw_height_mm:in.2f}} tall above its seat). A 1 in parallel, 1/8 in thick, against each jaw. The cam lying along the jaws, face F to the LEFT, its rear face {{process.cross_jaw_end_mm:in.2f}} in from the jaws' RIGHT ends, its O.D. on the parallels' inner top edges, the bore BELOW the O.D.'s centre (thick wall up). A 1/4 in drill from the 115-piece index, shank first, in the bore from the right, standing out past the jaw ends. The other cam (or, for the second, the finished first) lies the same way at the jaws' LEFT ends as the balance, so the jaws close square. Snug the vise (ops 170–190 orient it)."
+datum = "Programs CM02_set_screw and CM03_set_screw_tap. G54: X0 face F, +X toward the rear face; Y0 the O.D. axis; Z0 the O.D.'s top line. Every move between holes runs above the jaw tops, which stand {{process.cross_jaw_top_mm:in.3dot}} above Z0."
 diagram = { file = "diagrams/cross.svg", alt = "The cam lying in the vise on the parallels' edges, thick side up, a drill shank in the bore; the #50 drills down from the top {{cad.set_screw_tap_station_in:.2dot}} from face F into the bore." }
 envelope = "other"
 vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{cad.cam_od_dia_mm}}", along_jaws_mm = "{{cad.envelope_z_mm}}", part_height_mm = "{{cad.cam_od_dia_mm}}", parallel_height_mm = "{{process.parallel_height_mm}}", overhang_mm = [-143.3238, "rest"], jaw_offset = "balanced", balance = "twin_part", fixed_jaw_face = "machined", moving_jaw_face = "machined", moving_jaw_contact = "rod" }
@@ -395,7 +397,7 @@ instruction = "Orient: the shank resting on the bore's bottom (do not lift it), 
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Average more than {{process.orient_band_mm:.3f}} mm from 0: loosen, turn the cam a touch by the shank (0.035 mm of shank movement is 1° of turn), snug, and repeat op 180."
+instruction = "Average more than {{process.orient_band_mm:.3f}} mm from 0: loosen, turn the cam a touch by the shank (0.035 mm of shank movement is 1° of turn), snug, and repeat op 170."
 feed = "hand"
 
 [[setups.operations]]
@@ -407,11 +409,6 @@ feed = "hand"
 [[setups.operations]]
 instruction = "G54 X0: face F, the edge finder from the left on the face beside the bore at Y0. Z0: the O.D.'s top line, the centre drill on a .002 leaf at the hole's station."
 instruction_detailed = "Edge finder on face F from the left, at Y0, below the O.D.'s top line: G10 L20 P1 X-2.540. Console M6 T1 (#2 centre drill). MDI G0 X{{cad.set_screw_tap_station_mm:.3f}} Y0. Spindle stopped, its point just dragging a .002 leaf on the O.D.'s top: G10 L20 P1 Z0.051."
-feed = "hand"
-
-[[setups.operations]]
-instruction = "First cam only: prove CM02_set_screw in air, Z0 raised 1.000 in. Then Z0 back."
-instruction_detailed = "Send $# and note the G54 line's Z. G10 L2 P1 Z(that Z + 25.400). Run CM02_set_screw through every M6, watching each move clear the jaw tops. G10 L2 P1 Z(the noted Z) puts Z0 back."
 feed = "hand"
 
 [[setups.operations]]
@@ -449,7 +446,7 @@ speed_kind = "other"
 tool = "tap-guide"
 drilling = "none"
 sizing = "other"
-instruction = "Run CM03_set_screw_tap: M6 T5, the tap guide in the 1/2 in collet, pointed end out (the tool setter measures it), spindle off; the file ends Idle at the machine top over the hole."
+instruction = "Run CM03_set_screw_tap: M6 T5, the tap guide in the 1/2 in collet, pointed end out, spindle off; the file ends Idle at the machine top over the hole."
 diagram = { file = "diagrams/tap.svg", alt = "The cam lying in the vise; the #2-56 tap in the T-handle wrench in the hole, the tap guide in the spindle, its spring point in the wrench's centre hole; the tap's point to reach the bore's axis." }
 
 [[setups.operations]]
@@ -466,7 +463,7 @@ instruction = "Tap #2-56 by hand under the tap guide, spindle off, Tapmatic Gold
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Jog Z up clear, back the tap out, blow out the hole and the bore. Swap the two cams' positions: load the second cam at the jaws' RIGHT ends per Setup 3 Holding (face F LEFT, rear face .25 from the jaw ends, bore below centre, the 1/4 shank back in the bore), the drilled cam at the LEFT ends as the balance; then repeat from op 170 in order: its own Y0 from its O.D., orient it, then its X0 and Z0."
+instruction = "Jog Z up clear, back the tap out, blow out the hole and the bore. Swap the two cams' positions: load the second cam at the jaws' RIGHT ends per Setup 3 Holding (face F LEFT, rear face .25 from the jaw ends, bore below centre, the 1/4 shank back in the bore), the drilled cam at the LEFT ends as the balance; then repeat from op 160 in order: its own Y0 from its O.D., orient it, then its X0 and Z0."
 feed = "hand"
 
 [[setups]]

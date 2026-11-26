@@ -68,12 +68,24 @@ part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
 material = "C36000 free-machining brass, 7/8 in round (drawing: {{cad.material_name}})"
 stock = "Lot: {{process.quantity:d}} collar. Ø{{process.bar_dia_in:.3dot}} bar, on hand; Setup 1 takes about {{process.bar_use_in:.2dot}} in of it: saw a 3 in piece off it for the lathe, never the whole bar (it would run out past the spindle's rear end)."
-note = "Inches unless mm; G-code and console entries in mm (the files and the controller run G21). Lathe PM-1127VF-LB (70–380 and 380–2000 rpm); mill PM-30MV low belt (100–2800 rpm). Brass cut dry. The body and the pilot leave this traveler long (supply {{cad.rear_face_supply_length_min_mm:in.3dot}} and {{cad.pilot_face_supply_length_min_mm:in.3dot}} MIN): MHA-PD-00 faces both to fit. Home the mill ($H) once, after switching it on: every M6's trip to the tool setter counts from home. Home again only after a power cycle or a controller restart, an E-stop, an alarm, a limit switch hit, a stall or a crash: homing brings the stored G54 back. Then check every zero of the setup again, each the way its step set it: each must read what its step set, within .001 in. One does not, cannot be reached with the part in, or the part may have moved: do what that setup's Datum says for it; where the Datum says nothing, take the setup again from its first step, the part out. They all do: run the interrupted file again from its start. Feed Hold, then Reset with the axes stopped keeps position and G54: no homing, no new zero; run the interrupted file again from its start: its first M6 measures the tool, and cuts already made are cut in air. Prove CM01 in air before it cuts. The reamed holes' gauges are their own pins (2 MHA-PD-VN-54 dowels, 1 MHA-PD-VN-70 pin): have them at the mill. To order (not on hand): the .0930 and .0615 reamers and the .001-step pin gauge set."
 shop = "../shop"
 stock_refs = ["c360-round-7-8"]
 material_key = "lathe-c360"
 milling_material = "brass"
 turning_material = "brass"
+
+# The shop's standing page carries what every traveler shares (units, speeds,
+# coolant, homing, Feed Hold, tool changes, proving a file); This job says
+# what only this collar needs.
+standing = true
+
+[[notes]]
+title = "This job"
+rows = [
+  ["Left long", "The body and the pilot leave this traveler long (supply {{cad.rear_face_supply_length_min_mm:in.3dot}} and {{cad.pilot_face_supply_length_min_mm:in.3dot}} MIN): MHA-PD-00 faces both to fit."],
+  ["Gauges", "The reamed holes' gauges are their own pins (2 MHA-PD-VN-54 dowels, 1 MHA-PD-VN-70 pin): have them at the mill."],
+  ["To order", "To order (not on hand): the .0930 and .0615 reamers and the .001-step pin gauge set."],
+]
 
 [cad]
 file = "../../out/features/pd_transgear_drive_collar/features.toml"
@@ -359,7 +371,7 @@ machine = "PM-30MV CNC (FluidNC, CNCjs with the electronic tool setter) / vise, 
 indexing = "none"
 machine_ref = "pm-30mv"
 holding = "The PM 6 in vise (jaws {{process.vise_jaw_height_mm:in.2f}} tall above its seat). Against each jaw a stack of the 1 in and the 1/2 in parallels, 1/8 thick ({{process.parallel_stack_mm:in.3f}} tall). The collar seat face down on both stacks' tops, rear face up, the pilot hanging in the gap between them (about {{process.parallel_gap_mm:in.3dot}}); gripped on the outside, centred along the jaws. Tap it down onto both stacks while closing the vise: the rear face then stands {{process.rear_over_jaws_mm:in.3dot}} above the jaw tops."
-datum = "Program CM01_holes (cam:pd_transgear_drive_collar). G54: X0 Y0 the drilled bore's axis, swept with the DTI; Z0 the rear face. The holes lie on the X axis: dowels at X ±{{cad.dowel_a_offset_in:.4f}}, the flat pin's at X −{{cad.flat_pin_hole_centre_in:.3f}}. Tool lengths from the tool setter at each M6. After homing again (the note says when), the collar not disturbed: check X0, Y0 and Z0 as Ops 120–130 set them, each within 0.025 mm; all good: run the file again from its start. One off, or the collar disturbed once cutting has begun: stop and tell the owner. The collar disturbed before any cut: seat it again and repeat Ops 120–140. At each M6 the program has stopped the spindle (M5) and shows the tool and speed: wait for the spindle to stop, change the tool, set the speed, then Cycle Start."
+datum = "Program CM01_holes (cam:pd_transgear_drive_collar). G54: X0 Y0 the drilled bore's axis, swept with the DTI; Z0 the rear face. The holes lie on the X axis: dowels at X ±{{cad.dowel_a_offset_in:.4f}}, the flat pin's at X −{{cad.flat_pin_hole_centre_in:.3f}}. After homing again (the standing page says when): one off, or the collar disturbed once cutting has begun: stop and tell the owner. The collar disturbed before any cut: seat it again and repeat Ops 120–130."
 diagram = { file = "diagrams/mill.svg", alt = "The collar seat face down on two stacked parallels in the vise, rear face up, the pilot hanging between the stacks; the dowel holes reamed through at X ±.2756 and the flat pin's hole reamed blind at X −.118, all on the X axis through the bore." }
 envelope = "other"
 vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{cad.outer_dia_mm}}", along_jaws_mm = "{{cad.outer_dia_mm}}", part_height_mm = 7.62, parallel_height_mm = "{{process.parallel_stack_mm}}", overhang_mm = [-70.5869, -70.5869], jaw_offset = "centred", fixed_jaw_face = "machined", moving_jaw_face = "machined", moving_jaw_contact = "rod" }
@@ -372,12 +384,7 @@ feed = "hand"
 
 [[setups.operations]]
 instruction = "G54 Z0: the rear face, the centre drill's point on a .002 feeler leaf."
-instruction_detailed = "Console M6 T1 (#2 centre drill; the tool setter measures it), at least {{process.tool_out_min_in:.2dot}} out of the chuck. MDI G0 X5 Y0 (on the rear face, clear of the bore and the holes). Spindle stopped, its point just dragging a .002 leaf on the rear face: G10 L20 P1 Z0.051."
-feed = "hand"
-
-[[setups.operations]]
-instruction = "Prove CM01_holes in air, Z0 raised 1.000 in. Then Z0 back."
-instruction_detailed = "Send $# and note the G54 line's Z. G10 L2 P1 Z(that Z + 25.400). Run CM01_holes to its end in air, through every tool change (T1 to T5), watching each move. G10 L2 P1 Z(the noted Z) puts Z0 back."
+instruction_detailed = "Console M6 T1 (#2 centre drill), at least {{process.tool_out_min_in:.2dot}} out of the chuck. MDI G0 X5 Y0 (on the rear face, clear of the bore and the holes). Spindle stopped, its point just dragging a .002 leaf on the rear face: G10 L20 P1 Z0.051."
 feed = "hand"
 
 [[setups.operations]]
@@ -409,7 +416,7 @@ speed_kind = "spindle"
 tool = "reamer-0930"
 drilling = "none"
 sizing = "other"
-instruction = "Same file, M6 T3 (the .0930 reamer, to buy): ream both dowel holes through, its end {{process.ream_past_mm:in.3dot}} past the seat face, fed in and fed out, no peck; set 1400. At the M6 T4 stop (spindle stopped by the file's M5, the reamer raised clear: confirm both before reaching in), still clamped, offer a MHA-PD-VN-54 dowel to each hole's mouth by hand."
+instruction = "Same file, M6 T3 (the .0930 reamer): ream both dowel holes through, its end {{process.ream_past_mm:in.3dot}} past the seat face, fed in and fed out, no peck; set 1400. At the M6 T4 stop, still clamped, offer a MHA-PD-VN-54 dowel to each hole's mouth by hand."
 settings = "pd-collar-ream-0930-c360"
 inspection = "Dowel holes: the MHA-PD-VN-54 dowel is the gauge. It does not enter either hole by hand past its lead."
 gauge_checks = "other"
@@ -418,7 +425,7 @@ milling_cuts = [
 ]
 
 [[setups.operations]]
-instruction = "A dowel entering a hole by hand in Op 170 (the hole is oversize; no cut remedies it): stop the file at its M6 T4 stop. The collar is scrap; make another from Setup 1."
+instruction = "A dowel entering a hole by hand in Op 160 (the hole is oversize; no cut remedies it): stop the file at its M6 T4 stop. The collar is scrap; make another from Setup 1."
 feed = "hand"
 
 [[setups.operations]]
@@ -439,7 +446,7 @@ speed_kind = "spindle"
 tool = "reamer-0615"
 drilling = "none"
 sizing = "other"
-instruction = "Same file, M6 T5 (the .0615 reamer, to buy): ream the flat pin's hole blind, the reamer's end {{process.flat_ream_station_in:.3dot}} from the seat face (Z{{process.flat_ream_tip_mm:.3f}} mm in the file), fed in and fed out; set 1400. The file ends with the spindle stopped and the reamer raised clear. Still clamped, offer the MHA-PD-VN-70 pin to the hole's mouth by hand."
+instruction = "Same file, M6 T5 (the .0615 reamer): ream the flat pin's hole blind, the reamer's end {{process.flat_ream_station_in:.3dot}} from the seat face (Z{{process.flat_ream_tip_mm:.3f}} mm in the file), fed in and fed out; set 1400. The file ends with the spindle stopped and the reamer raised clear. Still clamped, offer the MHA-PD-VN-70 pin to the hole's mouth by hand."
 settings = "pd-collar-ream-0615-c360"
 inspection = "Flat pin's hole: the MHA-PD-VN-70 pin is the gauge. It does not enter by hand past its lead."
 gauge_checks = "other"
@@ -448,7 +455,7 @@ milling_cuts = [
 ]
 
 [[setups.operations]]
-instruction = "The pin entering by hand in Op 200 (the hole is oversize; no cut remedies it): the collar is scrap; make another from Setup 1."
+instruction = "The pin entering by hand in Op 190 (the hole is oversize; no cut remedies it): the collar is scrap; make another from Setup 1."
 feed = "hand"
 
 [[setups]]
@@ -478,13 +485,13 @@ instruction = "Clear the flat pin hole's breakthrough slivers inside the bore: g
 feed = "hand"
 
 [[setups.operations]]
-instruction = "The set's .191 pin passes the full length of the bore, past the flat pin's hole; the .195 pin enters from neither end. Keep the largest pin that enters as the bore's pin for Op 250 and write its marked size here as Pb."
+instruction = "The set's .191 pin passes the full length of the bore, past the flat pin's hole; the .195 pin enters from neither end. Keep the largest pin that enters as the bore's pin for Op 240 and write its marked size here as Pb."
 inspection = "Bore Ø{{cad.bore_dia_min_in:.3dot}}–{{cad.bore_dia_max_in:.3dot}} through (the title block's DRILLED HOLES row)."
 gauge_checks = [{ gauge = "pin-gauges", band_mm = "{{cad.bore_dia_band_mm}}" }]
 feed = "hand"
 
 [[setups.operations]]
-instruction = "The bore's pin through the bore and the set's .093 pin through the dowel hole beside the flat pin's hole, each standing about .3 out of the rear face. Mike over the two pins as M. That hole's centre from the bore's axis is D = M − (Pb + .093)/2: write D here. D feeds Op 260; it is not an acceptance."
+instruction = "The bore's pin through the bore and the set's .093 pin through the dowel hole beside the flat pin's hole, each standing about .3 out of the rear face. Mike over the two pins as M. That hole's centre from the bore's axis is D = M − (Pb + .093)/2: write D here. D feeds Op 250; it is not an acceptance."
 feed = "hand"
 
 [[setups.operations]]
@@ -500,7 +507,7 @@ gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.flat_pin_floor_station_ba
 feed = "hand"
 
 [[setups.operations]]
-instruction = "The .191 pin refused in the bore in Op 240: repeat Op 230 once and gauge again. Still refused, or the .195 pin entering; the flat pin's centre outside {{cad.flat_pin_hole_centre_min_in:.3dot}}–{{cad.flat_pin_hole_centre_max_in:.3dot}} (Op 260); or its floor outside {{cad.flat_pin_floor_station_min_in:.2dot}}–{{cad.flat_pin_floor_station_max_in:.2dot}} (Op 270): scrapped, not reworked; make another from Setup 1."
+instruction = "The .191 pin refused in the bore in Op 230: repeat Op 220 once and gauge again. Still refused, or the .195 pin entering; the flat pin's centre outside {{cad.flat_pin_hole_centre_min_in:.3dot}}–{{cad.flat_pin_hole_centre_max_in:.3dot}} (Op 250); or its floor outside {{cad.flat_pin_floor_station_min_in:.2dot}}–{{cad.flat_pin_floor_station_max_in:.2dot}} (Op 260): scrapped, not reworked; make another from Setup 1."
 feed = "hand"
 
 [[setups.operations]]

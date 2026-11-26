@@ -140,9 +140,12 @@ def test_the_bore_is_hand_reamed_with_the_owned_adjustable_set() -> None:
     assert reams[1]["gauge_checks"] == [
         {"gauge": "zz-pins-3135-3140", "band_mm": "{{cad.bore_dia_band_mm}}"}
     ]
-    # The first op of the setup holds the bore until both pins are in hand.
+    # The first op of the setup holds the bore until both pins are in hand;
+    # the GO pin's lead time (to order) is This job's, read before Setup 1.
     first = ops[0]["instruction"]
-    assert ".3135 plus GO pin (to buy)" in first and ".314 minus NO-GO" in first
+    assert ".3135 plus GO pin" in first and ".314 minus NO-GO" in first
+    (this_job,) = [n for n in PLAN["notes"] if n["title"] == "This job"]
+    assert any(".3135 GO pin" in text for _, text in this_job["rows"] if text.startswith("To order"))
     assert "the bore cannot be accepted" in first
     # Codjiflo #3592 r2: a NO-GO entering at the first .3135 pass has no
     # earlier setting to fall back to; the remedy backs off by a stated step.

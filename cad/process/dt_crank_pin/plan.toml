@@ -31,7 +31,6 @@ part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
 material = "{{cad.material_spec}}"
 stock = "Qty {{process.quantity:g}}. A bought {{cad.taper_stock}} ({{cad.taper_standard}}; to order, not on hand: pack of 25)."
-note = "Inches unless mm; G-code and console entries in mm (the file and the controller run G21). Home the mill ($H) once, after switching it on: every M6's trip to the tool setter counts from home. Home again only after a power cycle or a controller restart, an E-stop, an alarm, a limit switch hit, a stall or a crash: homing brings the stored G54 back. Then check every zero of the setup again, each the way its step set it: each must read what its step set, within .001 in. One does not, cannot be reached with the part in, or the part may have moved: take the setup again from its first step, the part out. They all do: run the interrupted file again from its start. Feed Hold, then Reset with the axes stopped keeps position and G54: no homing, no new zero; run the interrupted file again from its start: its first M6 measures the tool, and cuts already made are cut in air. Prove the file in air first. Leave the pin as supplied except the hole and its deburr (Op 100); never grip it bare in steel jaws (paper in the mill vise's jaws, soft jaws at the bench)."
 shop = "../shop"
 # A bought taper pin, cross-drilled only (owner ruling 2026-11-20, #2368).
 # prechips needs a stock row for the traveler's receiving step, so the pack
@@ -40,6 +39,17 @@ shop = "../shop"
 stock_refs = ["taper-pin-no3-1-3-4"]
 material_key = "mill-12l14"
 milling_material = "steel_1018"
+
+# The shop's standing page carries what every traveler shares (units,
+# homing, Feed Hold, tool changes, proving a file); the Holdings print the
+# paper and the soft jaws. This job keeps what only this pin needs.
+standing = true
+
+[[notes]]
+title = "This job"
+rows = [
+  ["As supplied", "Leave the pin as supplied except the hole and its deburr (Op 90)."],
+]
 
 [cad]
 file = "../../out/features/dt_crank_pin/features.toml"
@@ -166,7 +176,7 @@ machine = "PM-30MV CNC (FluidNC, CNCjs with the electronic tool setter) / vise, 
 indexing = "none"
 machine_ref = "pm-30mv"
 holding = "The PM 6 in vise, a strip of paper folded over each jaw. One 1 in, 4 in long parallel of the 1/8 in thick set standing on edge, centred between the jaws, its left end flush with the jaws' left face (a rule across both). The pin on its top edge along the jaws, the big end to the LEFT, set {{process.big_end_overhang_mm:in.2dot}} in out past the jaws' left face with the calipers' depth rod, .24–.26 (never under .24, never over .26: past it the spacer outgrows the gripped section); the spacer S (Setup 1) standing on the parallel's right end, its 1.375 length along the jaws, so the moving jaw closes square on the pin. Tap the pin down onto the parallel while closing the vise; it must not turn by hand. Under the hole nothing but air."
-datum = "Program DP01_ring_hole (cam:dt_crank_pin). G54: X0 the big end's rim plane, +X along the pin; Y0 the pin's axis at the hole, +Y toward the fixed jaw; Z0 the pin's top at the hole. The file starts with an M6 for the centre drill; tool lengths from the tool setter at each M6; at the M6 stop the file has stopped the spindle and lifted the tool above the jaws."
+datum = "Program DP01_ring_hole (cam:dt_crank_pin). G54: X0 the big end's rim plane, +X along the pin; Y0 the pin's axis at the hole, +Y toward the fixed jaw; Z0 the pin's top at the hole. The file starts with an M6 for the centre drill."
 diagram = { file = "diagrams/hole.svg", alt = "The pin on a 4 in parallel along the vise jaws, its big end out past the jaws' left face; the centre drill spots the top and the #45 drill drills through into air, .15 in from the big end; a gauge-block spacer on the parallel's right end keeps the moving jaw square." }
 envelope = { x_span_mm = ["{{cad.envelope_x_mm}}", 3.175], y_span_mm = ["{{cad.envelope_y_mm}}", 3.175], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{cad.envelope_z_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{process.hole_tip_height_mm}}"], longest_tool_mm = ["{{process.drill_chuck_gauge_mm}}", "{{process.drill_45_oal_mm}}"], shortest_tool_mm = ["{{process.drill_chuck_gauge_mm}}", "{{process.centre_drill_oal_mm}}"] }
 vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{cad.envelope_y_mm}}", along_jaws_mm = "{{cad.envelope_x_mm}}", part_height_mm = "{{cad.envelope_z_mm}}", parallel_height_mm = "{{process.riser_height_mm}}", overhang_mm = ["{{process.big_end_overhang_mm}}", "rest"], jaw_offset = "balanced", balance = "spacer", fixed_jaw_face = "as_bought", moving_jaw_face = "as_bought", moving_jaw_contact = "flat" }
@@ -184,12 +194,7 @@ feed = "hand"
 
 [[setups.operations]]
 instruction = "G54 Z0: the pin's top at the hole, touched with the centre drill over the axis."
-instruction_detailed = "Console M6 T1 (#1 centre drill in the drill chuck, at least {{process.spot_projection_min_mm:in.2dot}} in out of it; the tool setter measures it). MDI G0 X{{cad.ring_hole_x_mm:.3f}} Y0.000: over the hole's station. Spindle stopped, its tip just dragging a .002 feeler leaf on the pin's top: G10 L20 P1 Z0.051."
-feed = "hand"
-
-[[setups.operations]]
-instruction = "Prove DP01_ring_hole in air, Z0 raised 1.000 in. Then Z0 back."
-instruction_detailed = "Send $# and note the G54 line's Z. G10 L2 P1 Z(that Z + 25.400) raises Z0 1.000 in. Run DP01_ring_hole, watching every move clear the jaws; at its first M6 prompt T1 is already in, so continue; at the second put the #45 in (at least {{process.drill_45_projection_min_mm:in.2dot}} in out of the chuck). G10 L2 P1 Z(the noted Z) puts Z0 back, and the centre drill goes back in for the real run."
+instruction_detailed = "Console M6 T1 (#1 centre drill in the drill chuck, at least {{process.spot_projection_min_mm:in.2dot}} in out of it). MDI G0 X{{cad.ring_hole_x_mm:.3f}} Y0.000: over the hole's station. Spindle stopped, its tip just dragging a .002 feeler leaf on the pin's top: G10 L20 P1 Z0.051."
 feed = "hand"
 
 [[setups.operations]]
@@ -245,7 +250,7 @@ inspection = "Hole Ø{{cad.ring_hole_dia_min_in:.3dot}}–{{cad.ring_hole_dia_ma
 gauge_checks = [{ gauge = "pin-gauges", band_mm = "{{cad.ring_hole_dia_band_mm}}" }]
 
 [[setups.operations]]
-instruction = "The {{cad.ring_hole_dia_min_in:.3dot}} pin gauge does not enter: look for a burr at the mouths, deburr as Op 100 and gauge again. Still does not enter, or the {{cad.ring_hole_dia_max_in:.3dot}} pin gauge enters: scrap the pin and take another from the pack (Setup 1)."
+instruction = "The {{cad.ring_hole_dia_min_in:.3dot}} pin gauge does not enter: look for a burr at the mouths, deburr as Op 90 and gauge again. Still does not enter, or the {{cad.ring_hole_dia_max_in:.3dot}} pin gauge enters: scrap the pin and take another from the pack (Setup 1)."
 
 [[setups.operations]]
 instruction = "Find the largest pin gauge D that enters the hole (.001 steps). With D through it, read with the calipers from the big end's rim to D's far side, the jaw tips overlapping the rim's edge .005 at most. The station is the reading less D/2; write both on this sheet."

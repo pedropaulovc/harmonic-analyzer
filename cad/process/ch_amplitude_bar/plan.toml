@@ -131,11 +131,24 @@ part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
 material = "1018 cold-finished steel, 1/4 in square (drawing: {{cad.material_spec}})"
 stock = "{{process.blank_width_in:fraction}} in square bar, 72 in lengths; {{process.quantity:d}} × {{process.blank_length_in:.2f}}–{{process.blank_length_max_in:.2f}} in blanks, two per length. The riser (made once, kept): two {{process.riser_width_min_mm:in.2dot}}–{{process.riser_width_max_mm:in.2dot}} in slices sawn across the 1 × 3 in 6061-T6511 bar."
-note = "Inches unless mm; G-code and console entries in mm (the files and the controller run G21). The bar's section is the stock's, {{cad.front_face_section_min_in:.3dot}}–{{cad.front_face_section_max_in:.3dot}} square, never cut. Finished {{cad.top_end_length_min_in:.2f}}–{{cad.top_end_length_max_in:.2f}} long, foot end to top end. Faces: the drawing names none; this traveler names them L, F, R and B and marks them on each blank in Setup 1 (Op 20). L carries the foot notch's ledge (Detail A, .073), R the top notch's ledge (Detail B, .063), and B is the face the pin hole is located from (View C, .125). Keep the marks readable. Speeds on the PM-30MV low belt (100–2800 rpm): no belt change. Home the mill ($H) once a session, not at every setup; each mill setup touches off its own G54. A Reset after a Feed Hold keeps G54: no homing, no new zero. After any other controller reset (it restarted by itself in a pass once, and lost home: logbook 2026-11-06), an alarm, a stall or an E-stop: home and touch off again before Cycle Start. Every file is proved in air on the first load. The bars hang about 25 in past the vise: before every X move, check nothing stands in their sweep beside the table."
 shop = "../shop"
 stock_refs = ["1018-square-1-4", "6061-flat-1x3"]
 material_key = "rocker-1018-cold-finished"
 milling_material = "steel_1018"
+
+# The shop's standing page carries what every traveler shares (units, speeds,
+# homing, Feed Hold, tool changes, proving a file, burrs); This job says what
+# only these bars need.
+standing = true
+
+[[notes]]
+title = "This job"
+rows = [
+  ["Section", "The bar's section is the stock's, {{cad.front_face_section_min_in:.3dot}}–{{cad.front_face_section_max_in:.3dot}} square, never cut."],
+  ["Finished", "{{cad.top_end_length_min_in:.2f}}–{{cad.top_end_length_max_in:.2f}} long, foot end to top end."],
+  ["Faces", "The drawing names none; this traveler names them L, F, R and B and marks them on each blank in Setup 1 (Op 20). L carries the foot notch's ledge (Detail A, .073), R the top notch's ledge (Detail B, .063), and B is the face the pin hole is located from (View C, .125). Keep the marks readable."],
+  ["Overhang", "The bars hang about 25 in past the vise: before every X move, check nothing stands in their sweep beside the table."],
+]
 
 [cad]
 file = "../../out/features/ch_amplitude_bar/features.toml"
@@ -626,8 +639,8 @@ vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{process.riser_length_max_m
 beam = { axis = "y", hold = "cantilever", extent_mm = [0, "{{process.riser_length_max_mm}}"], clamp_mm = [0, "{{process.riser_length_max_mm}}"], section_mm = { x = "{{process.riser_width_min_mm}}", z = "{{process.riser_height_min_mm}}" }, vise_left = "other" }
 
 [[setups.operations]]
-instruction = "The vise empty. Home ($H) if not yet homed this session. G54 for CA00_riser_face: Y0 the fixed jaw's face, X0 the vise's left jaw side, edge finder (900 rpm)."
-instruction_detailed = "The vise open and empty. Home ($H) if not yet homed this session. Edge finder (900 rpm), its tip .10 below the jaw top. Y: on the fixed jaw's face from the open side (−Y), G10 L20 P1 Y-2.540. X: on the fixed jaw's left side from the left, G10 L20 P1 X-2.540. Edge finder out."
+instruction = "The vise empty. G54 for CA00_riser_face: Y0 the fixed jaw's face, X0 the vise's left jaw side, edge finder (900 rpm)."
+instruction_detailed = "The vise open and empty. Edge finder (900 rpm), its tip .10 below the jaw top. Y: on the fixed jaw's face from the open side (−Y), G10 L20 P1 Y-2.540. X: on the fixed jaw's left side from the left, G10 L20 P1 X-2.540. Edge finder out."
 feed = "hand"
 
 [[setups.operations]]
@@ -637,11 +650,7 @@ inspection = "Each block tight: pushed along the jaws by hand, neither moves. Lo
 gauge_checks = "other"
 
 [[setups.operations]]
-instruction = "Console M6 T1 (1/2 in end mill, 2.00 in out of the collet; the tool setter measures it). Spindle stopped, its tip on a .002 leaf on the higher riser top (the higher reading written in Setup 1): G10 L20 P1 Z0.051."
-feed = "hand"
-
-[[setups.operations]]
-instruction = "The first time: prove CA00_riser_face in air, Z0 raised 1.000 in (send $#, G10 L2 P1 Z(the G54 line's Z + 25.400)); every move passes over the jaws. Then Z0 back (G10 L2 P1 Z(the noted Z))."
+instruction = "Console M6 T1 (1/2 in end mill, 2.00 in out of the collet). Spindle stopped, its tip on a .002 leaf on the higher riser top (the higher reading written in Setup 1): G10 L20 P1 Z0.051."
 feed = "hand"
 
 [[setups.operations]]
@@ -701,18 +710,13 @@ inspection = "Every d within ±{{process.seat_offset_max_mm:in.4dot}}: that bar'
 gauge_checks = "other"
 
 [[setups.operations]]
-instruction = "Home ($H) if not yet homed this session. G54 Y0 the fixed jaw's face; X0 the faced foot end, {{process.foot_skim_mm:in.3dot}} inside the shortest foot end: edge finder (900 rpm)."
-instruction_detailed = "Home ($H) if not yet homed this session. Edge finder (900 rpm). Y: its tip .10 below the jaw top, on the fixed jaw's face from the bars' side (−Y), G10 L20 P1 Y-2.540 (the finder's centre is its radius short of Y0). X: its tip .10 below the bars' top, on the foot end nearest the jaws, from the left: G10 L20 P1 X-3.048 (the finder's radius 2.540 plus the {{process.foot_skim_mm:in.3dot}} skim to its left)."
+instruction = "G54 Y0 the fixed jaw's face; X0 the faced foot end, {{process.foot_skim_mm:in.3dot}} inside the shortest foot end: edge finder (900 rpm)."
+instruction_detailed = "Edge finder (900 rpm). Y: its tip .10 below the jaw top, on the fixed jaw's face from the bars' side (−Y), G10 L20 P1 Y-2.540 (the finder's centre is its radius short of Y0). X: its tip .10 below the bars' top, on the foot end nearest the jaws, from the left: G10 L20 P1 X-3.048 (the finder's radius 2.540 plus the {{process.foot_skim_mm:in.3dot}} skim to its left)."
 feed = "hand"
 
 [[setups.operations]]
 instruction = "G54 Z0: the bars' down face, from the top face of the bar against the fixed jaw and its miked section. The end mill 2.00 in out of the collet, so the collet clears the jaw tops at the cut."
-instruction_detailed = "Console M6 T1 (1/2 in end mill, at least 2.00 in out of the collet, so the collet nose is above the jaw tops at the cut; the tool setter measures it). Spindle stopped, its tip just dragging a .002 feeler leaf on the top of the bar against the fixed jaw, inside the jaws: G10 L20 P1 Z(that bar's L-to-R reading × 25.4 + 0.051); for .2490, Z6.376."
-feed = "hand"
-
-[[setups.operations]]
-instruction = "First load only: prove CA01_foot_end in air, Z0 raised 1.000 in; every move clears the jaws. Then Z0 back."
-instruction_detailed = "First load only: send $# and note the G54 line's Z. G10 L2 P1 Z(that Z + 25.400) raises Z0 1.000 in. Run CA01_foot_end, watching each move clear the jaws. G10 L2 P1 Z(the noted Z) puts Z0 back."
+instruction_detailed = "Console M6 T1 (1/2 in end mill, at least 2.00 in out of the collet, so the collet nose is above the jaw tops at the cut). Spindle stopped, its tip just dragging a .002 feeler leaf on the top of the bar against the fixed jaw, inside the jaws: G10 L20 P1 Z(that bar's L-to-R reading × 25.4 + 0.051); for .2490, Z6.376."
 feed = "hand"
 
 [[setups.operations]]
@@ -720,7 +724,7 @@ speed_kind = "spindle"
 tool = "em-half"
 drilling = "none"
 sizing = "other"
-instruction = "Run CA01_foot_end (M6 T1, 1/2 in end mill; set 2650): face the four foot ends at X0 with the cutter's side, the full bar height in one pass along +Y, {{process.foot_skim_mm:in.3dot}} off the shortest. It ends with T1 parked for the saw: up, left of the ends, over the P1 bar."
+instruction = "Run CA01_foot_end (M6 T1, 1/2 in end mill; set 2650): face the four foot ends at X0 with the cutter's side, the full bar height in one pass along −Y (conventional: the ends on the cutter's left), {{process.foot_skim_mm:in.3dot}} off the shortest. It ends with T1 parked for the saw: up, left of the ends, over the P1 bar."
 settings = "endmill-carbide-3fl-1-2-1018-cf"
 inspection = "Every foot end cut clean across. A sawn patch left: do the next op."
 gauge_checks = "other"
@@ -788,10 +792,6 @@ feed = "hand"
 
 [[setups.operations]]
 instruction = "G54 Z0 again, from the saw's lower face: spindle stopped, turn the saw by hand until the tooth marked LOW is over the end of the P1 bar, the rim 3 mm in over it. Jog Z only, down in CNCjs ({{process.saw_touch_step_mm:.2f}} mm steps near the leaf), until a .002 leaf just drags under the saw on that bar's top; G10 L20 P1 Z(that bar's L-to-R reading × 25.4 + 0.051). CA02 loads no tool."
-feed = "hand"
-
-[[setups.operations]]
-instruction = "First load only: prove CA02_foot_notch in air, Z0 raised {{process.saw_proof_raise_mm:in.3f}} in (send $#, then G10 L2 P1 Z(the G54 line's Z + {{process.saw_proof_raise_mm:.3f}})); it rises straight to its clear height before any X or Y move, and the saw, the arbor's body, the cap and the screw clear the jaws and the four bars' ends; Cycle Start again at its M0 stop. Then Z0 back."
 feed = "hand"
 
 [[setups.operations]]
@@ -910,17 +910,13 @@ inspection = "Every step {{process.foot_flush_max_mm:in.3dot}} or less: the four
 gauge_checks = [{ gauge = "calipers", band_mm = [0, "{{process.foot_flush_max_mm}}"] }]
 
 [[setups.operations]]
-instruction = "Home ($H) if not yet homed this session. G54 Y0 the fixed jaw's face; X0 the top end at the length: edge finder (900 rpm) on the top end that stands farthest right, less that bar's x (Setup 4). It is the bar of the four with the largest x: if not, stop and recheck the x written on them."
-instruction_detailed = "Home ($H) if not yet homed this session. Edge finder (900 rpm). Y: its tip .10 below the jaw top (well above the bars), on the fixed jaw's face from the bars' side (−Y), G10 L20 P1 Y-2.540. X: its tip .10 below the bars' top, on the top end farthest right (the bar with the largest x of the four; if not, stop and recheck the x written on them), from the right: G10 L20 P1 X(2.540 + that bar's x × 25.4); for x = .060, X4.064."
+instruction = "G54 Y0 the fixed jaw's face; X0 the top end at the length: edge finder (900 rpm) on the top end that stands farthest right, less that bar's x (Setup 4). It is the bar of the four with the largest x: if not, stop and recheck the x written on them."
+instruction_detailed = "Edge finder (900 rpm). Y: its tip .10 below the jaw top (well above the bars), on the fixed jaw's face from the bars' side (−Y), G10 L20 P1 Y-2.540. X: its tip .10 below the bars' top, on the top end farthest right (the bar with the largest x of the four; if not, stop and recheck the x written on them), from the right: G10 L20 P1 X(2.540 + that bar's x × 25.4); for x = .060, X4.064."
 feed = "hand"
 
 [[setups.operations]]
 instruction = "G54 Z0: the bars' down face, from the top face of the bar against the fixed jaw and its miked section, with T1 as in Setup 3 (2.00 in out of the collet)."
-instruction_detailed = "Console M6 T1 (at least 2.00 in out of the collet, so the collet nose is above the jaw tops at the cut; the tool setter measures it). Spindle stopped, its tip just dragging a .002 feeler leaf on the top of the bar against the fixed jaw, inside the jaws: G10 L20 P1 Z(that bar's L-to-R reading × 25.4 + 0.051)."
-feed = "hand"
-
-[[setups.operations]]
-instruction = "First load only: prove CA03_top_end in air, Z0 raised 1.000 in; every move clears the jaws. Then Z0 back."
+instruction_detailed = "Console M6 T1 (at least 2.00 in out of the collet, so the collet nose is above the jaw tops at the cut). Spindle stopped, its tip just dragging a .002 feeler leaf on the top of the bar against the fixed jaw, inside the jaws: G10 L20 P1 Z(that bar's L-to-R reading × 25.4 + 0.051)."
 feed = "hand"
 
 [[setups.operations]]
@@ -928,7 +924,7 @@ speed_kind = "spindle"
 tool = "em-half"
 drilling = "none"
 sizing = "other"
-instruction = "Run CA03_top_end (M6 T1; set 2650): face the four top ends to X0 with the cutter's side in passes along −Y no deeper than {{process.end_step_max_mm:in.3dot}}, starting {{process.top_excess_max_mm:in.3dot}} out (the longest blank: a shorter bar cuts air first). It ends with T1 parked for the saw: up, right of the ends, over the P1 bar."
+instruction = "Run CA03_top_end (M6 T1; set 2650): face the four top ends to X0 with the cutter's side in passes along +Y (conventional: the ends on the cutter's left) no deeper than {{process.end_step_max_mm:in.3dot}}, starting {{process.top_excess_max_mm:in.3dot}} out (the longest blank: a shorter bar cuts air first). It ends with T1 parked for the saw: up, right of the ends, over the P1 bar."
 settings = "endmill-carbide-3fl-1-2-1018-cf"
 milling_cuts = [
   { name = "top end", kind = "side", phase = "finish", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", axial_doc_mm = 6.45, radial_woc_mm = "{{process.end_step_max_mm}}", stations_mm = 0 },
@@ -971,10 +967,6 @@ feed = "hand"
 
 [[setups.operations]]
 instruction = "G54 Z0 again, from the saw's lower face: spindle stopped, turn the saw by hand until the tooth marked LOW is over the end of the P1 bar, the rim 3 mm in over it. Jog Z only, down in CNCjs ({{process.saw_touch_step_mm:.2f}} mm steps near the leaf), until a .002 leaf just drags under the saw on that bar's top; G10 L20 P1 Z(that bar's L-to-R reading × 25.4 + 0.051)."
-feed = "hand"
-
-[[setups.operations]]
-instruction = "First load only: prove CA04_top_notch in air, Z0 raised {{process.saw_proof_raise_mm:in.3f}} in (send $#, then G10 L2 P1 Z(the G54 line's Z + {{process.saw_proof_raise_mm:.3f}})); it rises straight to its clear height before any X or Y move, and the saw, the arbor's body, the cap and the screw clear the jaws and the four bars' ends; Cycle Start again at its M0 stop. Then Z0 back."
 feed = "hand"
 
 [[setups.operations]]
@@ -1025,11 +1017,7 @@ instruction = "Jog Z only, up (X and Y untouched), until the clamped saw clears 
 feed = "hand"
 
 [[setups.operations]]
-instruction = "G54 Z0 again with T3: console M6 T3 (the tool setter measures it; T4 and T5 are measured against it at their M6), spindle stopped, its tip on a .002 leaf on the P1 bar's top inside the jaws, G10 L20 P1 Z(that bar's top-end L-to-R reading × 25.4 + 0.051)."
-feed = "hand"
-
-[[setups.operations]]
-instruction = "First load only: prove CA05_pin_hole in air, Z0 raised 1.000 in, through each M6. Then Z0 back."
+instruction = "G54 Z0 again with T3: console M6 T3, spindle stopped, its tip on a .002 leaf on the P1 bar's top inside the jaws, G10 L20 P1 Z(that bar's top-end L-to-R reading × 25.4 + 0.051)."
 feed = "hand"
 
 [[setups.operations]]
@@ -1049,7 +1037,7 @@ speed_kind = "spindle"
 tool = "drill-49"
 drilling = "twist_drill"
 sizing = "other"
-instruction = "Same file, M6 T4: the file has stopped the spindle (M5) and holds at the tool change, the tool raised clear. Change to the #49 {{process.drill_projection_mm:in.2f}} out of the chuck, set 2800, Cycle Start: the M6 measures it on the tool setter against T3's Z0 (do not touch off again). It drills both cheeks of each bar, pecks of {{process.peck_mm:in.3dot}}, full retract, full diameter {{process.drill_past_mm:in.3dot}} past R. Cutting oil."
+instruction = "Same file, M6 T4: change to the #49 {{process.drill_projection_mm:in.2f}} out of the chuck, set 2800, Cycle Start. It drills both cheeks of each bar, pecks of {{process.peck_mm:in.3dot}}, full retract, full diameter {{process.drill_past_mm:in.3dot}} past R. Cutting oil."
 rpm = 2800
 feed = "{{process.drill_feed_per_min_mm:in.1f}} in/min"
 hole_depth_mm = "{{cad.envelope_thickness_mm}}"
@@ -1063,7 +1051,7 @@ speed_kind = "spindle"
 tool = "reamer-0775"
 drilling = "none"
 sizing = { kind = "band", band_mm = "{{cad.top_pin_hole_dia_band_mm}}" }
-instruction = "Same file, M6 T5: stopped and held as at M6 T4; change to the .0775 reamer (to buy) {{process.ream_projection_mm:in.2f}} out of the chuck, set 2000, Cycle Start: the M6 measures it on the tool setter against T3's Z0 (do not touch off again). It reams each hole through, in and out at feed, its full diameter {{process.ream_past_mm:in.3dot}} past the R face. Cutting oil."
+instruction = "Same file, M6 T5: change to the .0775 reamer (to buy) {{process.ream_projection_mm:in.2f}} out of the chuck, set 2000, Cycle Start. It reams each hole through, in and out at feed, its full diameter {{process.ream_past_mm:in.3dot}} past the R face. Cutting oil."
 rpm = 2000
 feed = "{{process.ream_feed_per_min_mm:in.1f}} in/min, in and out"
 milling_cuts = [
