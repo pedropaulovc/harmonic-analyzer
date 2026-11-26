@@ -107,7 +107,7 @@ LOCAL_BAND_SOURCES: dict[tuple[str, str], tuple[str, str]] = {
     ),
     # The cone tip gear's loop over its own module-level bands.
     ("build_dt_cone_tip_gear", "band"): (
-        "(BLANK_DIA_BAND, FACE_WIDTH_BAND, TOOTH_THICKNESS_BAND)",
+        "(BLANK_DIA_BAND, FACE_WIDTH_BAND, TOOTH_THICKNESS_BAND, SPIGOT_DIA_BAND)",
         "each",
     ),
     # _apply_neck_and_flat_limits passes its one native LIMIT band.
@@ -334,14 +334,6 @@ INDEXED_FIT_BANDS: dict[tuple[str, str], str] = {
     ("dt_cone_gear_spec", "LAND_SEAT_BORE_BAND"): (
         "the reamed land-seat bores' spread above the reamer's size, indexed "
         "for the seat and bond clearances; the sheet prints no band"
-    ),
-    ("dt_cone_tip_gear_spec", "SPIGOT_DIA_BAND"): (
-        "the spigot's analysis band (it prints REF, turned last to its holes), "
-        "indexed for the bond clearance and the tip cluster's offsets"
-    ),
-    ("dt_cone_tip_gear_spec", "PIVOT_DIA_BAND"): (
-        "the pivot's analysis band (it prints REF, turned last to its holes), "
-        "indexed for the bond and running clearances"
     ),
     # Machinist review r1 (farm run 20261124T110807008Z): the 1/16 key's
     # widths print REF, the key is the gauge (rule 4, form 3).

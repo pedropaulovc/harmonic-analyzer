@@ -367,11 +367,12 @@ def sheet_notes(teeth: int) -> str:
     """The sheet's numbered notes, flagged from the bore and teeth callouts.
 
     Note 1 is the bore's fit (rule 4).  Every bore is reamed and prints its
-    reamer's size with no band: its mate is turned to it last (the keyed
-    and T024 bores: MHA-DT-04's land, one diameter for all the gears it
-    carries; T012/T018: MHA-DT-37's spigot), so the note names the mate and
-    says it is made to this bore, and the acceptance prints on the mate's
-    sheet (rule 4, form 2).  A fixed reamer cannot be made to a land: the
+    reamer's size with no band, and the note names the mate.  The keyed and
+    T024 bores' mate, MHA-DT-04's land (one diameter for all the gears it
+    carries), is turned to it last, so the note says it is made to this
+    bore and the acceptance prints on the mate's sheet (rule 4, form 2);
+    T012/T018's mate, MHA-DT-37's spigot, prints its own band (D51 as
+    amended).  A fixed reamer cannot be made to a land: the
     land is the side made last.  The keyway's acceptance is the bought key
     MHA-DT-VN-71 sliding in (the 1/16 broach cuts its width).
     Note 2 names the mesh and the fit route of the tip, thickness and root

@@ -362,9 +362,9 @@ def build(adapter: Any) -> dict[str, str]:
 
     # Bands on the model dimensions (millimetres; UNIT prints them in decimal
     # inch at the nominal's places), then the part-owned places.  The two
-    # stems print their bands, read with the micrometer (D50, delegated
-    # ruling 2026-11-26 (Main), precedent: the band main printed until
-    # f4ba380152; owner form timed out; owner review #2144): the pivot
+    # stems print their .0010 bands, narrower than the turned-diameter row,
+    # finished to the micrometer (exception RV-03; D50 as amended, delegated
+    # ruling 2026-11-26 (Main), no precedent; owner review #2144): the pivot
     # bonded in MHA-DT-38 and running in MHA-DT-39, the spigot bonded in
     # MHA-DT-04 and T012/T018 (necessity N-03, N-04).
     for feature, name, band in (

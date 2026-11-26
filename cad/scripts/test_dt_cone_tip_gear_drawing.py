@@ -51,9 +51,9 @@ def test_the_part_is_the_family_t006_on_its_own_identity() -> None:
 def test_stems_are_the_clusters_and_clear_the_tooth_cutter() -> None:
     assert spec.STEM_DIA_MM == cluster.STEM_DIA_MM == pytest.approx(0.0625 * 25.4)
     assert spec.SPIGOT_DIA_BAND == cluster.SPIGOT_DIA_BAND
-    # Both stems print the one band, the turned-diameter row's .0010 held
-    # .0003 under the .0625 reamed holes (#2530: never line to line; D50,
-    # D51 as amended): the pivot's bond and running clearances close the tip
+    # Both stems print the one .0010 band (narrower than the turned row:
+    # exception RV-03) held .0003 under the .0625 reamed holes (#2530: never
+    # line to line; D50, D51 as amended): the pivot's bond and running clearances close the tip
     # air when looser (N-03), the spigot's bond tilts T012 (N-04).
     assert spec.PIVOT_DIA_BAND == cluster.PIVOT_DIA_BAND == spec.SPIGOT_DIA_BAND
     assert [d / 25.4 for d in spec.SPIGOT_DIA_BAND] == pytest.approx([-0.0003, -0.0013])
@@ -172,13 +172,21 @@ def test_callouts_and_notes_name_every_mate_once() -> None:
     assert f"{spec.inch_text(minimum, 4)} TO {spec.inch_text(maximum, 4)}" in gear_data
 
 
-def test_yaml_carries_the_t006_tooth_band_and_face_width_rulings_only() -> None:
+def test_yaml_carries_the_tooth_band_face_width_and_stem_band_rulings_only() -> None:
     row = _config.parts(spec.PART_NAME)
     rows = row["machinist_exceptions"]
-    assert [entry["id"] for entry in rows] == ["RV-01", "RV-02"]
+    assert [entry["id"] for entry in rows] == ["RV-01", "RV-02", "RV-03"]
     assert "2026-11-09" in str(rows[0]) and "pull/1992" in str(rows[0])
     # Owner ruling 2026-11-20 (#2631): the shared .2934 face width.
     assert "#2631" in rows[1]["reason"] and ".2934" in rows[1]["where"]
+    # D50 as amended: the two stems' .0010 bands, narrower than the turned
+    # row, with both ends' necessity and why form 2 cannot be accepted.
+    stems = rows[2]
+    assert stems["kind"] == "accept"
+    for name in ("SpigotDia", "PivotDia"):
+        assert name in stems["where"]
+    for cited in ("D50 as amended", "no precedent", "owner review #2144", "N-03", "N-04", "D47"):
+        assert cited in stems["reason"]
 
 
 def test_custom_six_detail_reproduces_complete_finite_core_grinding_curves() -> None:

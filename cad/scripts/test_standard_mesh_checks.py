@@ -43,12 +43,6 @@ import dt_mesh_checks
 EXEMPT_CONE_TEETH = frozenset({6})
 CONE_TEETH = tuple(t for t in cone.CONE_TEETH if t not in EXEMPT_CONE_TEETH)
 T006_RELIEF_CLEARANCE_MIN_MM = 0.010
-# T012 read on its own part, with MHA-DT-37 tilted in a true socket, holds
-# the cone set's floor: no step reads T012 or T018 about the journal (their
-# after-cure reading is a record, owner ruling 2026-11-24 C5), so the parts
-# alone carry it.  This is what sets the spigot's .0018 bond maximum
-# (necessity dt-cone-tip-gear N-04; checks/test-standard-mesh-checks.yaml).
-SPIGOT_OWN_PART_CONTACT_RATIO_MIN = cone_set_stack.NOMINAL_CONTACT_RATIO_MIN
 
 
 def _require_no_bind(check) -> None:
@@ -177,16 +171,18 @@ def test_the_cone_set_check_reads_both_ways() -> None:
         + cone_running_axis.seat_offset_mm(land_2, pivot)
     )
     assert _nominal_contact_ratio(land_2, uncentred) < 1.0
-    # T012 left to its part's .0015, its bond float and MHA-DT-37's tilt in a
-    # socket taken true to the journal holds (1.0068 on the .0018 spigot
-    # bond; .0019 gives 0.99996); a socket .0005 in TIR off the journal,
-    # which no sheet limits, takes it under (Codjiflo review of #3374).
+    # A record, not a check (its .0001 size margin is under the shop's
+    # reading, tolerance-policy.md): T012 left to its part's .0015, its bond
+    # float and MHA-DT-37's tilt in a socket taken true to the journal sits
+    # at 1.0068 on the .0018 spigot bond (0.9384 one thou looser, necessity
+    # dt-cone-tip-gear N-04); a socket .0005 in TIR off the journal, which no
+    # sheet limits, takes it under (Codjiflo review of #3374).  T012 and T018
+    # are accepted by check 5C's running test (owner ruling 2026-11-24 C5).
     spigot_true = (
         cone_set_stack.SPIGOT_TOOTH_SPACE_RUNOUT_TIR_MM / 2.0
         + cone_set_stack.bond_float_mm(12)
         + cone_running_axis.seat_offset_mm(12, pivot)
     )
-    assert _nominal_contact_ratio(12, spigot_true) >= SPIGOT_OWN_PART_CONTACT_RATIO_MIN
     assert _nominal_contact_ratio(12, spigot_true) == pytest.approx(1.0068, abs=5e-4)
     socket_off = cone_running_axis.spigot_share(12) * (0.0005 * 25.4 / 2.0)
     assert _nominal_contact_ratio(12, spigot_true + socket_off) < 1.0

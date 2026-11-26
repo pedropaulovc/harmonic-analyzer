@@ -436,7 +436,7 @@ SURFACE_FINISHES = (
 # owner decision 2026-11-09, PR #1992); the keyseat and its clock are the
 # section's and the title block's angle (error_budget.yaml books it as
 # cone_flat_clock).  Note BOND_NOTE gives land 2's acceptance and bond
-# clearance (rule 23) and names the spigot made to the socket.  Note
+# clearance (rule 23) and names the spigot bonded in the socket.  Note
 # STACK_NOTE names, once, the stack the three-place lengths set (rule 4): the
 # step stands SEAT_STEP_SETBACK behind T024's south face (the proof below),
 # the tip station keeps the end inside T024's bore so T018 butts T024 (the

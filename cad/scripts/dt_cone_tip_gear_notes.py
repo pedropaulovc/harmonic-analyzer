@@ -56,14 +56,13 @@ SPIGOT_NOTE_NUMBER = 4
 PIVOT_NOTE_FLAG = f"SEE NOTE {PIVOT_NOTE_NUMBER}"
 TEETH_NOTE_FLAG = f"SEE NOTE {TEETH_NOTE_NUMBER}"
 SPIGOT_NOTE_FLAG = f"SEE NOTE {SPIGOT_NOTE_NUMBER}"
-# Both stems print their own bands (rule 4, form 4), read with the
-# micrometer, so the clearances in their reamed holes are REF: the pivot D50
-# (delegated ruling 2026-11-26 (Main), precedent: the band main printed until
-# f4ba380152; owner form timed out; owner review #2144) and the spigot D51 as
-# amended (delegated ruling 2026-11-26 (Main), precedent: the same band main
-# printed until f4ba380152; the widening withdrawn; owner review #2144);
-# necessity N-03 and N-04.  Neither is made to fit any more (fit audit
-# 2026-11-23 MHA-DT-37.stems, superseded).
+# Both stems print their own .0010 bands (rule 4, form 4, narrower than the
+# turned-diameter row: exception RV-03), finished to the micrometer, so the
+# clearances in their reamed holes are REF: D50 as amended and D51 as
+# amended (delegated rulings 2026-11-26 (Main), no precedent; owner review
+# #2144: owner form timed out; the spigot's widening withdrawn); necessity
+# N-03 and N-04.  Neither is made to fit any more (fit audit 2026-11-23
+# MHA-DT-37.stems, superseded; D47 withdrawn).
 
 
 def _clearance_text(clearance_mm: tuple[float, float]) -> str:
