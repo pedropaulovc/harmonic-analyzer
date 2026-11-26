@@ -145,6 +145,7 @@ def test_the_recipes_programs_pass_every_check_they_declare(ctx, tmp_path) -> No
         ("em_feed_per_min_mm", 600.0, "em_feed_per_min_mm"),
         ("drill_past_mm", 0.3, "drill_past_mm"),
         ("ream_past_mm", 0.3, "ream_past_mm"),
+        ("k_drill_past_mm", 1.8, "k_drill_past_mm"),
         ("blank_width_max_mm", 38.5, "front edge outside its band"),
         ("spot_dia_mm", 6.0, "spot"),
     ],

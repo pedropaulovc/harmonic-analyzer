@@ -888,6 +888,17 @@ def context(
     ream_tip = -p["ream_past_mm"]
     if ream_tip > -0.5:
         raise ValueError("the reamer's tip does not pass the down face")
+    # Its full diameter reaches the R face: past by its chamfer + the margin.
+    import cam_nc
+
+    if p["ream_past_mm"] <= cam_nc.ream_full_diameter_past_min_mm(plan, "reamer-0775"):
+        raise ValueError(
+            "the reamer's full diameter does not reach the R face (cnc.ream-full-diameter)"
+        )
+    # The reamer's flat end runs out in the air past the jaws.
+    cam_nc.ream_end_face_clear(
+        "reamer-0775", ream_tip, -p["drill_past_mm"], 0.0, -math.inf
+    )
     projection(
         "the centre drill",
         section - spot_depth,

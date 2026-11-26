@@ -1,7 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 330" width="760" height="330" font-family="sans-serif" font-size="13">
   <!-- Section through the hold-down (X-16.636 Y-0.476) from the front, 8 px/mm. The blank's #31 hole and its counterbore (Ø5.334, 3.505 up from the underside, which now lies on the plate). The #43 (2.2606 = 18 px, 118 deg) at its last peck (PL05 L83), its point at Z-11.430 (holddown_seat_depth_mm) in the plate, 1.27 above the plate's underside. -->
   <rect class="paper" x="0" y="0" width="760" height="330"/>
-  <text class="title" x="20" y="22">Op 300 (PL05, T10): the #43 down the hold-down hole into the plate (section at the hold-down, 8 px/mm)</text>
+  <text class="title" x="20" y="22">Op 270 (PL05, T10): the #43 down the hold-down hole into the plate (section at the hold-down, 8 px/mm)</text>
   <rect class="fixture-plate" x="216" y="180" width="328" height="101.6"/>
   <rect class="part-kept" x="216" y="129.2" width="328" height="50.8"/>
   <rect class="holes" x="398.5" y="129.2" width="51" height="62.8"/>

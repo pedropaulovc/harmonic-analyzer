@@ -278,6 +278,9 @@ def test_the_eighth_cutter_leaves_the_shank_corners_inside_their_limits() -> Non
         ({"fork_thickness_mm": 6.2}, "fork_thickness_mm"),
         ({"crown_x_mm": 186.0}, "crown_x_mm"),
         ({"slot_floor_x_mm": 171.0}, "slot_floor_x_mm"),
+        # The reamer's tip 0.42 past the far face: its .0070 in chamfer plus
+        # the 0.25 margin is 0.428 (cnc.ream-full-diameter).
+        ({"ream_past_mm": 0.42}, "full diameter does not reach the far face"),
         ({"saw_arbor_cap_dia_mm": 44.45}, "saw_depth_past_arbor_max_mm"),
         (
             {"saw_arbor_body_dia_mm": 44.45, "saw_depth_past_arbor_max_mm": 11.7},

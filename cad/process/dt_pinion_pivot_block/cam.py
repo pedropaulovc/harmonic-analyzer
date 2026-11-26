@@ -522,6 +522,14 @@ def context(
         raise ValueError(
             f"reamer tip Z {ream_tip:.3f}: not past the back face by {past} or below the C drill's tip {bore_tip:.3f}"
         )
+    import cam_nc
+
+    if -ream_tip <= cam_nc.ream_full_diameter_past_min_mm(plan, "reamer"):
+        raise ValueError(
+            f"reamer tip Z {ream_tip:.3f}: its full diameter does not reach the back face (cnc.ream-full-diameter)"
+        )
+    # The reamer's flat end runs out into the gap between the parallels.
+    cam_nc.ream_end_face_clear("reamer", ream_tip, -past, 0.0, -math.inf)
     # The sheet's re-ream MDI runs at the program's R plane and parks at its
     # clearance.
     _agree(plan, "ream_r_plane_mm", depth + SAFE_MM)
