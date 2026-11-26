@@ -371,7 +371,7 @@ milling_cuts = [
 ]
 
 [[setups.operations]]
-instruction = "Thickness over {{cad.broad_face_b_thickness_max_in:.3dot}} at either end: stop the file at its M6 T2 stop (spindle off, tool up). Keep G54 as it is: no new touch-offs (face B is already cut). Send $#, note the G54 line's Z; G10 L2 P1 Z(that Z − (the larger end reading − {{cad.broad_face_b_thickness_mm:in.3dot}}) × 25.4); run PB02_flat again from its start. Under {{cad.broad_face_b_thickness_min_in:.3dot}}: the blank is scrap."
+instruction = "Thickness over {{cad.broad_face_b_thickness_max_in:.3dot}} at either end: stop the file at its M6 T2 stop. Keep G54 as it is: no new touch-offs (face B is already cut). Send $#, note the G54 line's Z; G10 L2 P1 Z(that Z − (the larger end reading − {{cad.broad_face_b_thickness_mm:in.3dot}}) × 25.4); run PB02_flat again from its start. Under {{cad.broad_face_b_thickness_min_in:.3dot}}: the blank is scrap."
 feed = "hand"
 
 [[setups.operations]]

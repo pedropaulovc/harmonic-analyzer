@@ -76,7 +76,7 @@ title = "This job"
 rows = [
   ["Finished", "Finished {{cad.east_end_width_min_in:.3dot}}–{{cad.east_end_width_max_in:.3dot}} wide (west end W to east end E), {{cad.top_face_height_min_in:.3dot}}–{{cad.top_face_height_max_in:.3dot}} high (bottom face B to the top), {{cad.front_face_depth_min_in:.3dot}}–{{cad.front_face_depth_max_in:.3dot}} deep (back face K, left as bought, to the front face)."],
   ["Marks", "K the back face, E the east bar edge (later the east end), B the bottom face; keep them readable until Setup 7."],
-  ["To buy", "The .2510 reamer (Setup 6 waits for it); the Presto Black Steel PC9, gloves and safety glasses (Setup 8 waits for them)."],
+  ["To buy", "The .2510 reamer (Setup 6 waits for it); the Presto Black Steel PC9, chemical-resistant gloves and safety glasses (Setup 8 waits for them)."],
 ]
 
 [cad]
@@ -584,7 +584,7 @@ speed_kind = "spindle"
 tool = "reamer"
 drilling = "none"
 sizing = "other"
-instruction = "Same file, M6 T6 (spindle off, retracted): ream the pivot bore through, .2510 reamer in the drill chuck; set 650. Cutting oil. The file feeds the reamer in and feeds it back out, spindle running: no rapid leaves the bore. Leave the block clamped for the check."
+instruction = "Same file, M6 T6: ream the pivot bore through, .2510 reamer in the drill chuck; set 650. Cutting oil. The file feeds the reamer in and feeds it back out, spindle running: no rapid leaves the bore. Leave the block clamped for the check."
 inspection = "Still clamped, chips blown out and the bore oiled: the MHA-DT-19 shaft enters the pivot bore its whole length and turns by hand. Try block 1 before reaming block 2."
 rpm = 650
 feed = "{{process.ream_feed_per_min_mm:in.1f}} in/min, in and out"
@@ -673,7 +673,7 @@ vise_hold = "other"
 beam = "other"
 
 [[setups.operations]]
-instruction = "The drawing's finish: {{cad.finish}}, done in the shop by cold blackening with Birchwood Presto Black Steel PC9 (owner ruling 2026-11-21: accepted as the drawing's black oxide), by its maker's instructions as below. To buy before this setup (none on record): the PC9, chemical-resistant gloves and safety glasses."
+instruction = "The drawing's finish: {{cad.finish}}, done in the shop by cold blackening with Birchwood Presto Black Steel PC9 (owner ruling 2026-11-21: accepted as the drawing's black oxide), by its maker's instructions as below."
 feed = "hand"
 
 [[setups.operations]]
