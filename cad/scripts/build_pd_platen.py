@@ -37,8 +37,13 @@ import sys
 from _appearance import apply_material, apply_color, PANEL_BLACK
 from _bore_axis import name_bore_axis
 from _check import check
-from _com import _early_bound, _read_member
-from _dimensions import drive_dimension, name_dimensions, set_global
+from _com import _bind, _com_invoke, _early_bound, _read_member
+from _dimensions import (
+    _feature_display_dimensions,
+    drive_dimension,
+    name_dimensions,
+    set_global,
+)
 from _drawing_marks import (
     apply_drawing_properties,
     clear_dimensions_for_drawing,
@@ -47,6 +52,7 @@ from _drawing_marks import (
 from _document_units import apply_package_model_units
 from _drawing_precision import apply_drawing_precision
 from _feature_tree import _feature_by_name, name_last_feature
+from _fit_deviations import deviations
 from _part_checks import bbox_extent_check, report_mass_properties, volume_check
 from _part_properties import part_drawing_unit
 from _part_save import save_part_and_images
@@ -66,6 +72,7 @@ from _holes import HoleSpec, SharedCoordinate, blind_cut_dia_mm, wizard_holes
 from _visibility import blank_reference_geometry
 from pd_platen_spec import (
     CBORE_DEPTH,
+    CBORE_DEPTH_BAND,
     CBORE_DIA,
     CBORE_FLOOR,
     CBORE_FLOOR_REFERENCE_Y,
@@ -182,6 +189,50 @@ def _require_on_section_plane(adapter, sketch: str) -> None:
         raise RuntimeError(
             f"{sketch} is not on {CBORE_SECTION_PLANE}: parents {parents}"
         )
+
+
+_TOL_BILATERAL = 2  # swTolType_e.swTolBILAT
+
+
+def _band_counterbore_depth(adapter) -> None:
+    """Put the counterbore depth's own band (owner ruling 2026-11-25, #3619:
+    .115 ±.005; pd_platen_spec.CBORE_DEPTH_BAND) on the GuideHoles Hole
+    Wizard feature's counterbore depth IN THE PART, so the sheet's native
+    callout displays it (build_ch_fulcrum_keeper._band_foot_counterbore); the
+    drawing sets only its places. The Ø keeps no band: a wizard pocket at
+    .XX. The depth is the one dimension on the feature equal to CBORE_DEPTH,
+    and its band is read back."""
+    feature = _feature_by_name(adapter, "GuideHoles")
+    seen = []
+    matches = []
+    for display in _feature_display_dimensions(feature):
+        raw = _com_invoke(display, "IDisplayDimension", "GetDimension2", 0)
+        value = float(_com_invoke(raw, "IDimension", "SystemValue")) * 1000.0
+        seen.append((str(_com_invoke(raw, "IDimension", "FullName")), value))
+        if abs(value - CBORE_DEPTH) < 1e-4:
+            matches.append(raw)
+    if len(matches) != 1:
+        raise RuntimeError(
+            f"GuideHoles: {len(matches)} dimensions read the counterbore depth "
+            f"{CBORE_DEPTH} mm, not 1; dimensions {seen!r}"
+        )
+    lower, upper = deviations(CBORE_DEPTH_BAND)
+    dimension = _bind(matches[0], "IDimension")
+    tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
+    tolerance.Type = _TOL_BILATERAL
+    if not tolerance.SetValues(lower / 1000.0, upper / 1000.0):
+        raise RuntimeError(
+            f"GuideHoles counterbore depth: SetValues rejected {lower}/{upper} mm"
+        )
+    if (
+        int(tolerance.Type) != _TOL_BILATERAL
+        or abs(float(tolerance.GetMinValue()) * 1000.0 - lower) > 1e-6
+        or abs(float(tolerance.GetMaxValue()) * 1000.0 - upper) > 1e-6
+    ):
+        raise RuntimeError("GuideHoles counterbore depth: band did not persist")
+    _telemetry.info(
+        f"GuideHoles counterbore depth {dimension.FullName}: band {lower}/{upper} mm"
+    )
 
 
 def build(adapter) -> dict[str, str]:
@@ -375,6 +426,7 @@ def build(adapter) -> dict[str, str]:
         drive_dimension(adapter, dim_name, expr)
     force_rebuild(adapter)
     volume_check(adapter, "driven platen (equations neutral)", v_final, 0.02 * v_sockets)
+    _band_counterbore_depth(adapter)
 
     apply_material(adapter, MATERIAL)
     apply_color(adapter, PANEL_BLACK)  # ch30 plates: see _appearance palette

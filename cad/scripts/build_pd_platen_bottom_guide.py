@@ -23,10 +23,16 @@ from __future__ import annotations
 import math
 import sys
 
+import _telemetry
 from _appearance import PANEL_BLACK, apply_color, apply_material
 from _check import check
-from _com import _early_bound
-from _dimensions import drive_dimension, name_dimensions, set_global
+from _com import _bind, _com_invoke, _early_bound
+from _dimensions import (
+    _feature_display_dimensions,
+    drive_dimension,
+    name_dimensions,
+    set_global,
+)
 from _document_units import apply_package_model_units
 from _drawing_marks import (
     apply_drawing_properties,
@@ -35,7 +41,7 @@ from _drawing_marks import (
 )
 from _drawing_precision import _named_dimension, apply_drawing_precision
 from _drawing_tolerances import _set_tolerance_precision
-from _feature_tree import name_last_feature
+from _feature_tree import _feature_by_name, name_last_feature
 from _fit_deviations import deviations
 from _hole_spec import blind_cut_dia_mm
 from _holes import SharedCoordinate, wizard_holes
@@ -63,7 +69,9 @@ from pd_platen_bottom_guide_spec import (
     PLATEN_TAP_X,
     PLATEN_TAP_Y,
     SCREW_CBORE_DEPTH,
+    SCREW_CBORE_DEPTH_BAND,
     SCREW_CBORE_DIA,
+    SCREW_CBORE_DIA_BAND,
     SCREW_HOLE_DIA,
     SCREW_HOLE_SPEC,
     SCREW_HOLE_X,
@@ -75,6 +83,7 @@ PART_NAME = "pd-platen-bottom-guide"
 MATERIAL = "Plain Carbon Steel"
 
 _TOL_LIMIT = 3  # swTolType_e.swTolLIMIT
+_TOL_BILATERAL = 2  # swTolType_e.swTolBILAT
 
 
 def _depth_limits(adapter) -> None:
@@ -100,6 +109,56 @@ def _depth_limits(adapter) -> None:
         label=label,
         places=GUIDE_DEPTH_PLACES,
     )
+
+
+def _band_rack_screw_counterbores(adapter) -> None:
+    """Put the counterbore's printed bands (owner ruling 2026-11-25, #3620:
+    Ø.110 +.004/-.000 and depth .469 ±.005; SCREW_CBORE_DIA_BAND,
+    SCREW_CBORE_DEPTH_BAND) on the RackScrewHoles Hole Wizard feature's
+    counterbore diameter and depth IN THE PART, so the sheet's native callout
+    displays them (build_ch_fulcrum_keeper._band_foot_counterbore); the
+    drawing sets only their places. Each dimension is the one on the feature
+    equal to SCREW_CBORE_DIA or SCREW_CBORE_DEPTH, and its band is read
+    back."""
+    feature = _feature_by_name(adapter, "RackScrewHoles")
+    seen = []
+    dimensions = []
+    for display in _feature_display_dimensions(feature):
+        raw = _com_invoke(display, "IDisplayDimension", "GetDimension2", 0)
+        value = float(_com_invoke(raw, "IDimension", "SystemValue")) * 1000.0
+        seen.append((str(_com_invoke(raw, "IDimension", "FullName")), value))
+        dimensions.append((value, raw))
+    for label, nominal, band in (
+        ("diameter", SCREW_CBORE_DIA, SCREW_CBORE_DIA_BAND),
+        ("depth", SCREW_CBORE_DEPTH, SCREW_CBORE_DEPTH_BAND),
+    ):
+        matches = [raw for value, raw in dimensions if abs(value - nominal) < 1e-4]
+        if len(matches) != 1:
+            raise RuntimeError(
+                f"RackScrewHoles: {len(matches)} dimensions read the counterbore "
+                f"{label} {nominal} mm, not 1; dimensions {seen!r}"
+            )
+        lower, upper = deviations(band)
+        dimension = _bind(matches[0], "IDimension")
+        tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
+        tolerance.Type = _TOL_BILATERAL
+        if not tolerance.SetValues(lower / 1000.0, upper / 1000.0):
+            raise RuntimeError(
+                f"RackScrewHoles counterbore {label}: SetValues rejected "
+                f"{lower}/{upper} mm"
+            )
+        if (
+            int(tolerance.Type) != _TOL_BILATERAL
+            or abs(float(tolerance.GetMinValue()) * 1000.0 - lower) > 1e-6
+            or abs(float(tolerance.GetMaxValue()) * 1000.0 - upper) > 1e-6
+        ):
+            raise RuntimeError(
+                f"RackScrewHoles counterbore {label}: band did not persist"
+            )
+        _telemetry.info(
+            f"RackScrewHoles counterbore {label} {dimension.FullName}: "
+            f"band {lower}/{upper} mm"
+        )
 
 
 def lock_placement_dims() -> list:
@@ -232,6 +291,7 @@ def build(adapter) -> dict[str, str]:
         adapter, "driven bottom guide (equations neutral)", v_final, 0.02 * v_lock
     )
 
+    _band_rack_screw_counterbores(adapter)
     _depth_limits(adapter)
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     clear_dimensions_for_drawing(adapter)

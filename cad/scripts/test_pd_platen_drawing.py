@@ -21,7 +21,9 @@ from _printed_tolerance import (
     printed_deviations,
 )
 from machinist_exceptions import load_exceptions
+from sh_vn_brass_fillister_screw_spec import HEAD_DIA as FILLISTER_HEAD_DIA
 from sh_vn_brass_fillister_screw_spec import HEAD_H as FILLISTER_HEAD_H
+from sh_vn_brass_fillister_screw_spec import SHANK_DIA as FILLISTER_SHANK_DIA
 
 CONFIG_ROOT = Path(__file__).resolve().parents[1] / "config"
 # ASME B landscape field and title block (sheet metres).
@@ -119,16 +121,18 @@ def test_socket_engagement_shortfall_is_stated_floored_and_accepted():
 
 def test_counterbore_floor_holds_the_user_accepted_worst_case():
     # User ruling 2026-10-14 (pd-platen RV-02): the thin floor is accepted at
-    # its 0.67 worst case and printed as a reference; nothing may thin it.
+    # its 0.67 worst case and printed as a reference; nothing may thin it. The
+    # deepest counterbore is the depth's own printed band (owner ruling
+    # 2026-11-25, #3619), not the three places' row.
     depth_places = spec.DRAWING_PRECISION_BY_NAME["Depth"]
-    cbore_places = spec.GUIDE_CALLOUT_PRECISION["hw-cbdepth"]
     worst = (
         _limits(spec.PLATE_THICKNESS, depth_places)[0]
-        - _limits(spec.CBORE_DEPTH, cbore_places)[1]
+        - (spec.CBORE_DEPTH + spec.CBORE_DEPTH_BAND[0])
     )
     assert worst == pytest.approx(spec.CBORE_FLOOR_MIN)
     assert worst == pytest.approx(0.027 * 25.4)
     assert worst >= 0.67
+    assert "\n.027 MIN WORST CASE" in spec.CBORE_FLOOR_CALLOUT
     assert spec.CBORE_FLOOR == pytest.approx(spec.PLATE_THICKNESS - spec.CBORE_DEPTH)
     # The reference line crosses the floor's annulus, clear of the through hole
     # and inside the counterbore, so it measures metal.
@@ -208,12 +212,27 @@ def test_printed_stations_place_every_hole():
 
 
 def test_shallowest_printed_counterbore_still_sinks_the_head():
-    places = spec.GUIDE_CALLOUT_PRECISION["hw-cbdepth"]
-    shallowest = _limits(spec.CBORE_DEPTH, places)[0]
+    # Owner ruling 2026-11-25 (#3619): "b: depth .115 ±.005, HOLDS HEAD BELOW
+    # FACE". The depth prints that band; at the wizard pocket's ±.01 (rule 3)
+    # the .107 head would stand .002 proud.
+    inch = 25.4
+    assert spec.CBORE_DEPTH == pytest.approx(0.115 * inch)
+    assert spec.CBORE_DEPTH_BAND == pytest.approx((0.005 * inch, -0.005 * inch))
+    shallowest = spec.CBORE_DEPTH + spec.CBORE_DEPTH_BAND[1]
     assert shallowest - FILLISTER_HEAD_H == pytest.approx(spec.HEAD_RECESS_MIN)
-    assert spec.HEAD_RECESS_MIN > 0.0
-    # The counterbore Ø prints .XX: the head still clears its smallest Ø.
-    assert _limits(spec.CBORE_DIA, spec.GUIDE_CALLOUT_PRECISION["hw-cbdia"])[0] > 4.6482
+    assert spec.HEAD_RECESS_MIN == pytest.approx(0.003 * inch)
+    assert draw.GUIDE_CBORE_SUFFIX.splitlines()[-1] == draw.GUIDE_CBORE_FUNCTION
+    assert draw.GUIDE_CBORE_FUNCTION == "HOLDS HEAD BELOW FACE"
+    # The Ø prints no band of its own: the wizard pocket's ±.01. The head
+    # clears its smallest Ø with the shank anywhere in the largest drilled hole.
+    assert spec.CBORE_DIA_BAND == pytest.approx((0.01 * inch, -0.01 * inch))
+    narrowest = _limits(spec.CBORE_DIA, spec.GUIDE_CALLOUT_PRECISION["hw-cbdia"])[0]
+    assert narrowest == pytest.approx(0.25 * inch)
+    float_max = (spec.GUIDE_HOLE_DIA + 0.004 * inch - FILLISTER_SHANK_DIA) / 2.0
+    assert spec.HEAD_RADIAL_CLEARANCE_MIN == pytest.approx(
+        (narrowest - FILLISTER_HEAD_DIA) / 2.0 - float_max
+    )
+    assert spec.HEAD_RADIAL_CLEARANCE_MIN == pytest.approx(0.0155 * inch, abs=0.0001 * inch)
 
 
 def _overlap(a, b) -> bool:
@@ -413,13 +432,15 @@ def test_hole_table_mates_match_the_registered_patterns_and_callouts():
 
 def test_counterbore_side_follows_its_symbol_row_not_words():
     # Round 4 (rule 26): the counterbore is its symbol, never the word C'BORE;
-    # its side and screw follow its depth on the symbol row.
+    # its side and screw follow its depth on the symbol row, its function on
+    # the line under it.
     assert "C'BORE" not in draw.GUIDE_CALLOUT_PROCESS + draw.GUIDE_CBORE_SUFFIX
     assert "DRILL" not in draw.GUIDE_CALLOUT_PROCESS
     row = "<HOLE-CBORE> <MOD-DIAM><hw-cbdia> <HOLE-DEPTH> <hw-cbdepth>"
     definitions = {5: "<MOD-DIAM><hw-diam> <hw-thru>", 6: "", 7: "", 8: row}
     part, updated = draw.counterbore_side_definition(definitions)
     assert (part, updated) == (8, f"{row} {draw.GUIDE_CBORE_SUFFIX}")
+    assert updated.splitlines()[0].endswith(f"FAR SIDE FOR {draw.GUIDE_SCREW_NUMBER}")
     with pytest.raises(RuntimeError, match="single counterbore depth"):
         draw.counterbore_side_definition({**definitions, 8: f"{row} {draw.GUIDE_CBORE_SUFFIX}"})
     with pytest.raises(RuntimeError, match="does not close"):
@@ -516,13 +537,14 @@ def test_callout_picks_lie_on_their_hole_rims():
 
 def test_guide_leader_clears_the_socket_tags_and_the_callouts_clear_each_other():
     # The leader leaves the guide text's left end, at its bottom row (round 3
-    # read it 11.2 mm under the callout point), for the pick: it must pass
-    # right of the upper left socket's tag box (round 3: it ran through A2).
+    # read it 11.2 mm under the callout point with three rows; the function
+    # row adds ~3.7 mm), for the pick: it must pass right of the upper left
+    # socket's tag box (round 3: it ran through A2).
     # A two-character tag prints ~5.8 x 3.5 mm.
     tag_w, tag_h, air = 0.006, 0.0035, 0.0015
     top = (
         draw.GUIDE_CALLOUT_XY[0] - draw.GUIDE_CALLOUT_HALF_WIDTH,
-        draw.GUIDE_CALLOUT_XY[1] - 0.0112,
+        draw.GUIDE_CALLOUT_XY[1] - 0.0149,
     )
     pick = draw.GUIDE_EDGE_XY
     for station in spec.SOCKET_XY:
