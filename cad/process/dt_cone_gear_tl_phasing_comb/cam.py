@@ -725,11 +725,49 @@ def as_machined(ctx: dict[str, Any], inputs: Any) -> dict[str, Any]:
     (``top.stock_thickness``) and its nominal (``stock_thickness_nominal``,
     the .020 sheet as bought). The underside lies on the tape, so it stays
     put and a thicker sheet stands higher; the tape stack's own band moves
-    the whole sheet and is not a blank size."""
-    top = inputs.features["features"]["top"]
+    the whole sheet and is not a blank size. Expected: the staircase's
+    inside corners left at the cutter's radius (drawn sharp); on the
+    thickest sheet the as-rolled top over the nominal runs into the same
+    region, so it is declared for that length alone."""
+    f = inputs.features["features"]
+    top = f["top"]
     lo, hi = top["stock_thickness"]
     thickness = {"nominal": top["stock_thickness_nominal"], "min": lo, "max": hi}
     x, y, (z0, _z1) = ctx["jobs"][0]["stock"]
+    r = ctx["jobs"][0]["dia"] / 2
+    # A sharp drawn corner cut at the cutter's r leaves r(1 - 1/√2) to the
+    # nearer wall; with the sheet's excess on top, the corner's top edge
+    # stands that and the excess apart. Plus the post's 0.001 mm rounding
+    # of the path (the report measures 0.0003 over the bare figure).
+    corner = r * (1 - 1 / math.sqrt(2)) + 0.001
+    excess = hi - thickness["nominal"]
+    underside = _plane(f, "underside", "z")
+    xs = [_plane(f, "south_end", "x"), _plane(f, "north_end", "x")]
+    ys = [_plane(f, "far_edge", "y"), _plane(f, "back", "y")]
+    reason = (
+        "the staircase's inside corners are drawn sharp and cut at the 1/32 in"
+        " end mill's radius, under the title block's inside-corner max"
+        " (plan inside_corner_max_mm)"
+    )
+    expected = [
+        {
+            "name": "inside corners at the cutter's radius",
+            "kind": "left",
+            "within": [xs, ys, [underside, underside + thickness["nominal"]]],
+            "reason": reason,
+            "max_mm": corner,
+            "variants": ["nominal", "min"],
+        },
+        {
+            "name": "inside corners on the thickest as-rolled sheet",
+            "kind": "left",
+            "within": [xs, ys, [underside, underside + hi]],
+            "reason": reason + "; the .020 sheet as bought may stand to its"
+            " stock band's top, over the drawing's nominal (plan Setup 1 mikes it)",
+            "max_mm": math.hypot(corner, excess),
+            "variants": ["max"],
+        },
+    ]
     return {
         "parts": {
             "": {
@@ -737,7 +775,8 @@ def as_machined(ctx: dict[str, Any], inputs: Any) -> dict[str, Any]:
                     "frame": "plate",
                     "box": [list(x), list(y), [z0, z0 + thickness["nominal"]]],
                     "length": {"axis": "z", "keep": "min", "mm": thickness},
-                }
+                },
+                "expected": expected,
             }
         },
         "skip": {},

@@ -464,8 +464,11 @@ def as_machined(ctx: dict[str, Any], inputs: Any) -> dict[str, Any]:
     stock: X0 the head end, the axis on Y0, the O.D. top Z0). The bar is
     taken as bought: a bar over .2500 has its head skimmed in Setup 2. The
     spigot (Setup 5) and the #0-80 thread (Setup 6) are cut after the mill
-    on the lathe and at the bench: the report leaves them on the blank."""
+    on the lathe and at the bench: the report leaves them on the blank.
+    Expected: that one region, the bar left round the spigot and on the
+    head; no deeper than the bar's radius less the spigot's least."""
     radius = inputs.plan["parameters"]["stock_dia_in"] * IN / 2
+    step = inputs.features["features"]["step"]
     (x0, x1), _y, _z = ctx["stock"]
     circle = [
         [radius * math.cos(2 * math.pi * k / AS_MACHINED_SIDES),
@@ -477,6 +480,20 @@ def as_machined(ctx: dict[str, Any], inputs: Any) -> dict[str, Any]:
             "": {
                 "blank": {"frame": "eye", "prism": {"axis": "x", "polygon": circle, "span": [x0, x1]}},
                 "route": [["PS01_eye", "eye"]],
+                # One connected region: the spigot's skin and the head's
+                # run together round the shoulder, so the causes share it.
+                "expected": [
+                    {
+                        "name": "lathe and bench work after the mill",
+                        "kind": "left",
+                        "frame": "eye",
+                        "within": [[x0, x1], [-radius, radius], [-2 * radius, 0.0]],
+                        "reason": "Setup 5 step-turns the Ø.058 spigot on the lathe and Setup 6 die-cuts the"
+                        " #0-80 thread at the bench, both after PS01; the head is the Ø.25 bar as bought,"
+                        " inside the drawing's .23-.25 head band (plan header, Op 20)",
+                        "max_mm": radius - step["dia"][0] / 2,
+                    }
+                ],
             }
         },
         "skip": {},

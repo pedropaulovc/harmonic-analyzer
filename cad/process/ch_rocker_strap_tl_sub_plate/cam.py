@@ -1207,8 +1207,12 @@ def as_machined(ctx: dict[str, Any], inputs: Any) -> dict[str, Any]:
     parallels, so it stays put and a thicker bar stands higher. The sawn
     length is taken at its nominal: the ends stay as sawn. The slot frees
     the bar's remainder behind the plate (an offcut). The SP03 files are the
-    hand taps under the tap guide (no frame)."""
+    hand taps under the tap guide (no frame). Expected: every inside corner
+    of the fence notches and clamp pockets drawn at the sheet's R.070 MAX
+    and cut at the 1/8 in end mill's R.0625, a corner gouge no deeper than
+    the two radii's gap along the corner's bisector to the nearer wall."""
     p = inputs.plan["parameters"]
+    f = inputs.features["features"]
     thickness = {
         "nominal": p["blank_thickness_in"] * IN,
         "min": p["blank_thickness_min_in"] * IN,
@@ -1218,6 +1222,34 @@ def as_machined(ctx: dict[str, Any], inputs: Any) -> dict[str, Any]:
         job["stock"] for job in ctx["jobs"] if job["ops"][0][0] == "front_edge"
     )
     route = [[name, "model" if name in ("SP01_split_edges", "SP02_top") else None] for name, _ops in PROGRAMS]
+    cutter = next(job["dia"] for job in ctx["jobs"] if job["tool"] == "em-eighth") / 2
+    reason = (
+        "inside corners drawn R.070 MAX, cut at the 1/8 in end mill's R.0625"
+        " (owner ruling 2026-11-17; plan Setup 2: corners R.0625, the cutter's)"
+    )
+
+    def corners(name: str, within: list[list[float]], feature: dict[str, Any]) -> dict[str, Any]:
+        # A drawn fillet R and the cutter's r leave (R - r)(√2 - 1) at most.
+        return {
+            "name": name,
+            "kind": "gouge",
+            "within": within,
+            "reason": reason,
+            "max_mm": (feature["corner_radius_max"] - cutter) * (math.sqrt(2) - 1),
+        }
+
+    top, faced = f["plate_top"]["plane"]["value"], f["faced_top"]["plane"]["value"]
+    fence = f["fence_face"]["plane"]["value"]
+    expected = []
+    for key in ("fence_notch_left", "fence_notch_right"):
+        n = f[key]
+        xs = [min(n["x"][0], n["end_x"][0]), max(n["x"][1], n["end_x"][1])]
+        expected.append(corners(f"{key} corners", [xs, [fence, fence + n["depth"][1]], [n["floor_z"], faced]], n))
+    for key in sorted((k for k in f if re.fullmatch(r"clamp_pocket_\d+", k)), key=lambda k: int(k.rsplit("_", 1)[1])):
+        q = f[key]
+        half = q["length"][1] / 2
+        within = [[q["centre_x"] - half, q["centre_x"] + half], list(q["y_walls"]), [q["floor_z"], top]]
+        expected.append(corners(f"{key} corners", within, q))
     return {
         "parts": {
             "": {
@@ -1227,6 +1259,7 @@ def as_machined(ctx: dict[str, Any], inputs: Any) -> dict[str, Any]:
                     "length": {"axis": "z", "keep": "min", "mm": thickness},
                 },
                 "route": route,
+                "expected": expected,
             }
         },
         "frames": {"model": ctx["model"]},
