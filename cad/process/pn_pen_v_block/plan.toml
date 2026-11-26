@@ -615,7 +615,7 @@ speed_kind = "spindle"
 tool = "em-half"
 drilling = "none"
 sizing = "other"
-instruction = "Run VB06_top_bore (M6 T1; set 2800): face the top down to Z {{cad.top_face_height_mm:in.3dot}}. At the M6 T4 stop the file has stopped the spindle (M5) and holds at the tool change, the end mill raised clear: confirm the spindle has stopped, then, still clamped, check the height before changing tools."
+instruction = "Run VB06_top_bore (M6 T1; set 2800): face the top down to Z {{cad.top_face_height_mm:in.3dot}}. At the M6 T4 stop, confirm the spindle has stopped, then, still clamped, check the height before changing tools."
 settings = "pn-em-half-c360"
 inspection = "Height {{cad.top_face_height_min_in:.3dot}}–{{cad.top_face_height_max_in:.3dot}} at the M6 T4 stop: the calipers' depth rod from the top to the fixed-jaw stack's top beside the block, at both ends."
 gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.top_face_height_band_mm}}" }]
@@ -708,7 +708,7 @@ feed = "hand"
 
 [[setups.operations]]
 instruction = "G54 Z0: the stacks' top, touched with the 1/2 in end mill on the fixed-jaw stack left of the block, as Setups 4–7 (the centre drill's body would meet the jaw there)."
-instruction_detailed = "Console M6 T1. MDI G0 X-12.700 Y-6.850: the cutter left of P, its edge .02 off the fixed jaw, over that jaw's stack. Spindle stopped, its tip just dragging a .002 feeler leaf on the stack: G10 L20 P1 Z0.051. VB07's M6 T4 then measures the centre drill against it."
+instruction_detailed = "Console M6 T1. MDI G0 X-12.700 Y-6.850: the cutter left of P, its edge .02 off the fixed jaw, over that jaw's stack. Spindle stopped, its tip just dragging a .002 feeler leaf on the stack: G10 L20 P1 Z0.051."
 feed = "hand"
 
 [[setups.operations]]
@@ -752,7 +752,7 @@ speed_kind = "other"
 tool = "tap-guide"
 drilling = "none"
 sizing = "other"
-instruction = "Run VB08_set_screw_tap: M6 T7, the tap guide in the 1/2 in collet, pointed end out, spindle off; the file ends Idle at the machine top over the hole. The tap file moves only at the machine top and over the hole, spindle off."
+instruction = "Run VB08_set_screw_tap: M6 T7, the tap guide in the 1/2 in collet, pointed end out, spindle off; the file ends Idle at the machine top over the hole."
 diagram = { file = "diagrams/tap.svg", alt = "The block lying front face up; a 4-40 tap in the T-handle wrench in the set-screw hole, the tap guide in the spindle, its spring point in the wrench's centre hole; the tap's point to go {{process.tap_reach_min_mm:in.3dot}}–{{process.tap_reach_max_mm:in.3dot}} below the front face, into the bore. The block and the tap's diameter to scale; the wrench and the guide schematic." }
 
 [[setups.operations]]
@@ -820,7 +820,7 @@ instruction = "Deburr, scraper from the deburring set and a smooth file, to R{{c
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Wash off the oil and chips and dry the block (bright brass: no coating)."
+instruction = "Wash off the oil and chips and dry the block (FINISH: {{cad.finish}}; no coating)."
 feed = "hand"
 
 [[setups.operations]]

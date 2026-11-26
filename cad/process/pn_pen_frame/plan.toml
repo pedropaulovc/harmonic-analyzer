@@ -585,7 +585,7 @@ speed_kind = "spindle"
 tool = "drill-43"
 drilling = "twist_drill"
 sizing = { kind = "tap_drill", tap = "tap-4-40" }
-instruction = "Same file, M6 T4 (spindle stopped and the tool lifted: put a drop of Tapmatic Gold on the #43's point now): #43 drill down through the bottom rail into the window, its full diameter {{process.tap_drill_past_mm:in.3dot}} past the rail, pecks of {{process.peck_mm:in.3dot}} with full retract; set 2800. Look through the window: the drill has broken through."
+instruction = "Same file, M6 T4 (put a drop of Tapmatic Gold on the #43's point now): #43 drill down through the bottom rail into the window, its full diameter {{process.tap_drill_past_mm:in.3dot}} past the rail, pecks of {{process.peck_mm:in.3dot}} with full retract; set 2800. Look through the window: the drill has broken through."
 settings = "pn-drill-43-c360"
 hole_depth_mm = "{{process.drill_full_depth_mm}}"
 peck = { step_mm = 2.032, retract = "full" }
@@ -615,7 +615,7 @@ speed_kind = "other"
 tool = "tap-guide"
 drilling = "none"
 sizing = "other"
-instruction = "Run PF08_tap: M6 T5, the tap guide in the 1/2 in collet, pointed end out, spindle off; the file ends Idle at the machine top over the hole. The tap file moves only at the machine top and over the hole, spindle off."
+instruction = "Run PF08_tap: M6 T5, the tap guide in the 1/2 in collet, pointed end out, spindle off; the file ends Idle at the machine top over the hole."
 diagram = { file = "diagrams/tap.svg", alt = "The frame upright in the vise, B up, BK at the fixed jaw; the 4-40 tap in the T-handle wrench in the hole, the tap guide in the spindle, its spring point in the wrench's centre hole; the tap's point to go {{process.tap_reach_min_mm:in.3dot}}–{{process.tap_reach_max_mm:in.3dot}} below B, into the window. The frame and the tap's diameter to scale; the wrench and the guide schematic." }
 
 [[setups.operations]]

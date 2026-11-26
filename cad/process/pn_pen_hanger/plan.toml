@@ -408,7 +408,7 @@ speed_kind = "spindle"
 tool = "drill-15"
 drilling = "twist_drill"
 sizing = "other"
-instruction = "Same file, M6 T2 (#15 drill, at least 1.00 in out of the chuck; set 1700): drill the screw hole through in pecks of .180 with full retracts, its full diameter {{process.drill_past_mm:in.3dot}} into the spoil plate. At the M6 T2 stop (spindle stopped), put a drop of cutting oil on the spot before Cycle Start."
+instruction = "Same file, M6 T2 (#15 drill, at least 1.00 in out of the chuck; set 1700): drill the screw hole through in pecks of .180 with full retracts, its full diameter {{process.drill_past_mm:in.3dot}} into the spoil plate. At the M6 T2 stop, put a drop of cutting oil on the spot before Cycle Start."
 rpm = 1700
 feed = "{{process.drill_feed_per_min_mm:in.1f}} in/min"
 hole_depth_mm = "{{process.blank_thickness_max_mm}}"
@@ -594,7 +594,7 @@ speed_kind = "spindle"
 tool = "em-3-16"
 drilling = "none"
 sizing = "other"
-instruction = "Run PH03_slots (M6 T4, 3/16 in end mill at least .70 in out of the collet; set 2800): both slots in line, {{process.slot_levels:d}} levels of {{process.slot_level_mm:in.4dot}} to {{cad.slots_depth_in:.3dot}} deep; on each level one pass along X through both plates and back, .00675 either side of the centre line ({{process.slot_width_mm:in.4dot}} wide). Before Cycle Start (spindle stopped), brush cutting oil on both plates' far ends; hands clear while it runs."
+instruction = "Run PH03_slots (M6 T4, 3/16 in end mill at least .70 in out of the collet; set 2800): both slots in line, {{process.slot_levels:d}} levels of {{process.slot_level_mm:in.4dot}} to {{cad.slots_depth_in:.3dot}} deep; on each level one pass along X through both plates and back, .00675 either side of the centre line ({{process.slot_width_mm:in.4dot}} wide). Before Cycle Start, brush cutting oil on both plates' far ends; hands clear while it runs."
 settings = "pn-em-3-16-1018-cf"
 milling_cuts = [
   { name = "slots", kind = "slot", phase = "finish", cutter_dia_mm = "{{process.slot_cutter_dia_mm}}", axial_doc_mm = "{{process.slot_level_mm}}", radial_woc_mm = "{{process.slot_cutter_dia_mm}}", stations_mm = "{{cad.guide_plates_reach_mm}}" },
