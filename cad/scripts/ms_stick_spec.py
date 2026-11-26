@@ -33,8 +33,8 @@ This is
 dimensioning only: the 2026-10-10 scale position is unchanged. The 7.95
 length stays .XX; nothing prints .X. The
 unprinted 0.24 stroke width at the face is the modelled near-sharp V and
-stays (owner ruling). The listed .005-tip bit at the .016 MIN numeral depth
-cuts strokes about 0.35 wide: stroke width is unprinted, the extra 0.05 a side
+stays (owner ruling). The ESAO 0.1 mm-tip bit at the .016 MIN numeral depth
+cuts strokes about 0.32 wide: stroke width is unprinted, the extra 0.04 a side
 stays inside the .02 numeral gap's +/-.01 band, and note 3 leaves the font to
 the shop.
 """
@@ -82,7 +82,7 @@ SCALE_END_MARGIN = 3.43
 SCALE_START_X = BODY_LENGTH - SCALE_SPAN - SCALE_END_MARGIN
 # The face width .016 MIN (.024 MAX below) at the face of a 30-degree V
 # .020 MIN deep: the drafted walls leave TICK_TIP_FLAT_MM at the root, as a
-# .005-tip bit plunged .021-.033 cuts it.
+# 0.1 mm-tip bit plunged .023-.037 cuts it.
 TICK_WIDTH = 0.4064  # .016 MIN
 TICK_LENGTH = 3.048  # .12
 MINOR_TICK_LENGTH = 1.778  # .07

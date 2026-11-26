@@ -74,8 +74,8 @@
 # .016 MIN. The printed limits hold (the depth MINs, the .016-.024 groove
 # width, the .07-.09 numeral height, the .02 gaps at .XX; drawing note 3:
 # any single-stroke sans font), and test_ms_stick_drawing holds the bit's
-# wider stroke inside the gap band. The tip is the box label's 0.1 mm: check
-# it under a loupe before Setup 4 (a wider tip widens every groove by as much).
+# wider stroke inside the gap band. The tip is the box label's 0.1 mm: Setup 4
+# has it inspected under magnification before T2 goes in (three on hand).
 #
 # Zeroing: X/Y by the .200 in edge finder at 900 rpm; Z by the tool's tip on
 # a .002 feeler leaf. Every program loads its own first tool (M6, the tool
@@ -255,7 +255,9 @@ numeral_gap_min_mm = 0.254
 # spindle nose to tip.
 r8_collet_gauge_mm = 6.3         # HA: holders.r8-collets-lms-4860.gauge_len_mm.
 half_mill_projection_mm = 38.1
-engraver_projection_mm = 25.4
+# The ESAO bit is 32.45 long (owner 2026-11-26): .60 out of the collet leaves
+# about .68 of its 1/8 shank gripped.
+engraver_projection_mm = 15.24
 
 [[tools]]
 id = "em-half"
@@ -539,6 +541,10 @@ feed = "hand"
 
 [[setups.operations]]
 instruction = "G54 X0 on the milled DATUM END: edge finder (900 rpm), its tip .06 below the stick's top, on the stick's right end from the right: G10 L20 P1 X{{process.edge_finder_radius_mm:.3f}}. Edge finder out. From here to the end of MS04: no reset, no homing."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Before T2 goes in: look at the engraving bit's tip under magnification (a phone camera's macro is enough). The 0.1 mm flat must be whole and unchipped: every groove is cut as much wider as the tip is. Chipped, broken or blunt: take another of the three on hand."
 feed = "hand"
 
 [[setups.operations]]
