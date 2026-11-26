@@ -812,15 +812,10 @@ PRESSED = StackDetail(
     (0.342, 0.200),
     frozenset({"mg-wheel-bar", "mg-wheel-axle", "mg-wheel-axle-spacer"}),
     BORE_ROW_HEIGHT,
-    # The BOM items it shows (machinist review r1); the rest are left out.
-    # One clause a line: on one line the spacer clause ran over the border.
-    # The axle is bonded, not pressed (fit audit question 18; machinist
-    # review r1, run 20261124T092122388Z).
-    f"ITEM {notes.ITEM_NUMBERS['mg-wheel-axle']} BONDED IN "
-    f"ITEM {notes.ITEM_NUMBERS['mg-wheel-bar']},\n"
-    f"ITEM {notes.ITEM_NUMBERS['mg-wheel-axle-spacer']} ON "
-    f"ITEM {notes.ITEM_NUMBERS['mg-wheel-axle']},\n"
-    "OTHER PARTS NOT SHOWN",
+    # Its label is the title and scale only, as DETAIL B's: the letter,
+    # boundary and break-out say what the view shows, and the bond lives in
+    # steps 9-9F and NOTE 1 (rule 9; machinist review, run
+    # 20261126T020952932Z: the parts prose under the title gated as clarity).
     letter_corner=(-1, 1),
     break_out=True,
 )
