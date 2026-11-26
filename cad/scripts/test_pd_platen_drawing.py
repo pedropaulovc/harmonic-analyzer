@@ -658,3 +658,11 @@ def test_the_depth_band_is_on_the_callout_not_on_the_hole_table_feature() -> Non
     assert draw._TOL_SYMMETRIC == 4  # swTolType_e.swTolSYMMETRIC
     assert spec.CBORE_DEPTH_BAND == pytest.approx((0.005 * 25.4, -0.005 * 25.4))
     assert spec.GUIDE_CALLOUT_PRECISION["hw-cbdepth"] == 3
+    # The readback refuses an overridden or typed depth, and runs again
+    # after the SLDDRW save through finalize_drawing's checkpoint.
+    check = inspect.getsource(draw._assert_counterbore_depth_band)
+    assert "dimension.GetOverride()" in check
+    assert {"±", ".115", ".005"} <= set(draw._TYPED_DEPTH_TEXT)
+    built = inspect.getsource(draw.build)
+    assert 'if phase == "after_drawing_save":' in built
+    assert "checkpoint=_saved" in built

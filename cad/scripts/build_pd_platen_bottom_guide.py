@@ -84,6 +84,7 @@ MATERIAL = "Plain Carbon Steel"
 
 _TOL_LIMIT = 3  # swTolType_e.swTolLIMIT
 _TOL_BILATERAL = 2  # swTolType_e.swTolBILAT
+_TOL_SYMMETRIC = 4  # swTolType_e.swTolSYMMETRIC
 
 
 def _depth_limits(adapter) -> None:
@@ -119,7 +120,9 @@ def _band_rack_screw_counterbores(adapter) -> None:
     displays them (build_ch_fulcrum_keeper._band_foot_counterbore); the
     drawing sets only their places. Each dimension is the one on the feature
     equal to SCREW_CBORE_DIA or SCREW_CBORE_DEPTH, and its band is read
-    back."""
+    back. A mirrored band is symmetric so it prints ±.005 as ruled; the
+    one-sided Ø stays bilateral (build_sm_summing_lever's rule). This part's
+    sheet has no hole table, so the feature's band reaches only the callout."""
     feature = _feature_by_name(adapter, "RackScrewHoles")
     seen = []
     dimensions = []
@@ -138,16 +141,17 @@ def _band_rack_screw_counterbores(adapter) -> None:
                 f"RackScrewHoles: {len(matches)} dimensions read the counterbore "
                 f"{label} {nominal} mm, not 1; dimensions {seen!r}"
             )
+        kind = _TOL_SYMMETRIC if math.isclose(lower, -upper) else _TOL_BILATERAL
         dimension = _bind(matches[0], "IDimension")
         tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
-        tolerance.Type = _TOL_BILATERAL
+        tolerance.Type = kind
         if not tolerance.SetValues(lower / 1000.0, upper / 1000.0):
             raise RuntimeError(
                 f"RackScrewHoles counterbore {label}: SetValues rejected "
                 f"{lower}/{upper} mm"
             )
         if (
-            int(tolerance.Type) != _TOL_BILATERAL
+            int(tolerance.Type) != kind
             or abs(float(tolerance.GetMinValue()) * 1000.0 - lower) > 1e-6
             or abs(float(tolerance.GetMaxValue()) * 1000.0 - upper) > 1e-6
         ):
@@ -156,7 +160,7 @@ def _band_rack_screw_counterbores(adapter) -> None:
             )
         _telemetry.info(
             f"RackScrewHoles counterbore {label} {dimension.FullName}: "
-            f"band {lower}/{upper} mm"
+            f"swTolType_e {kind}, band {lower}/{upper} mm"
         )
 
 

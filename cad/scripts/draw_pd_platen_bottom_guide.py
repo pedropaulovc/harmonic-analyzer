@@ -420,6 +420,7 @@ def _set_callout_below(display: Any, text: str, *, label: str) -> None:
 
 
 _TOL_BILATERAL = 2  # swTolType_e.swTolBILAT
+_TOL_SYMMETRIC = 4  # swTolType_e.swTolSYMMETRIC
 
 
 @_telemetry.traced("drawing.bottom_guide.counterbore_bands")
@@ -434,9 +435,11 @@ def _print_counterbore_bands(display: Any) -> None:
     displayed band back so a band that did not reach the callout fails here."""
     from win32com.client.dynamic import Dispatch as dynamic_dispatch  # noqa: PLC0415
 
+    # The depth's mirrored band is symmetric on the part, so it prints ±.005
+    # as ruled; the one-sided Ø is bilateral, +.004/.000.
     wanted = {
-        "hw-cbdia": (SCREW_CBORE_DIA, SCREW_CBORE_DIA_BAND),
-        "hw-cbdepth": (SCREW_CBORE_DEPTH, SCREW_CBORE_DEPTH_BAND),
+        "hw-cbdia": (SCREW_CBORE_DIA, SCREW_CBORE_DIA_BAND, _TOL_BILATERAL),
+        "hw-cbdepth": (SCREW_CBORE_DEPTH, SCREW_CBORE_DEPTH_BAND, _TOL_SYMMETRIC),
     }
     found: dict[str, list[tuple[Any, Any]]] = {name: [] for name in wanted}
     for raw in display.GetHoleCalloutVariables() or ():
@@ -444,7 +447,7 @@ def _print_counterbore_bands(display: Any) -> None:
         name = str(variable.VariableName)
         if name in found:
             found[name].append((raw, variable))
-    for name, (nominal, band) in wanted.items():
+    for name, (nominal, band, kind) in wanted.items():
         if len(found[name]) != 1:
             raise RuntimeError(
                 f"rack-screw callout carries {len(found[name])} {name} variables, not 1"
@@ -460,14 +463,14 @@ def _print_counterbore_bands(display: Any) -> None:
         length.TolerancePrecision = places
         upper, lower = band
         if (
-            int(variable.ToleranceType) != _TOL_BILATERAL
+            int(variable.ToleranceType) != kind
             or abs(float(variable.ToleranceMin) * 1000.0 - lower) > 1e-5
             or abs(float(variable.ToleranceMax) * 1000.0 - upper) > 1e-5
             or int(length.TolerancePrecision) != places
         ):
             raise RuntimeError(
                 f"rack-screw callout {name} does not display the part's band: wanted "
-                f"swTolBILAT, deviations {(lower, upper)} mm at {places} places; read "
+                f"swTolType_e {kind}, deviations {(lower, upper)} mm at {places} places; read "
                 f"{int(variable.ToleranceType)}, {float(variable.ToleranceMin)!r}, "
                 f"{float(variable.ToleranceMax)!r}, {int(length.TolerancePrecision)}"
             )

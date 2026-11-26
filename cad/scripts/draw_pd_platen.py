@@ -716,45 +716,83 @@ def _print_counterbore_depth_band(display: Any) -> None:
     its text, _name_hole_table_mates), so a stack there moves the table's
     foot toward the title block. The Ø (``<hw-cbdia>``) keeps no band: a
     wizard pocket at .XX."""
-    from win32com.client.dynamic import Dispatch as dynamic_dispatch  # noqa: PLC0415
-
-    name = "hw-cbdepth"
-    found = []
-    for raw in display.GetHoleCalloutVariables() or ():
-        variable = dynamic_dispatch(raw._oleobj_)
-        if str(variable.VariableName) == name:
-            found.append((raw, variable))
-    if len(found) != 1:
-        raise RuntimeError(f"guide callout carries {len(found)} {name} variables, not 1")
-    raw, variable = found[0]
-    length = _early_bound(raw, "ICalloutLengthVariable")
-    actual = float(length.Length) * 1000.0
-    if abs(actual - CBORE_DEPTH) > 1e-5:
-        raise RuntimeError(f"guide callout {name} reads {actual:g}, expected {CBORE_DEPTH:g} mm")
-    places = GUIDE_CALLOUT_PRECISION[name]
+    variable, length = _guide_depth_variable(display)
     upper, lower = CBORE_DEPTH_BAND
     variable.ToleranceType = _TOL_SYMMETRIC
     variable.ToleranceMin = lower / 1000.0
     variable.ToleranceMax = upper / 1000.0
-    length.TolerancePrecision = places
+    length.TolerancePrecision = GUIDE_CALLOUT_PRECISION["hw-cbdepth"]
+    _assert_counterbore_depth_band(display, when="as set")
+
+
+def _guide_depth_variable(display: Any) -> tuple[Any, Any]:
+    """The guide callout's one ``hw-cbdepth`` variable: (dynamic
+    ICalloutVariable, ICalloutLengthVariable)."""
+    from win32com.client.dynamic import Dispatch as dynamic_dispatch  # noqa: PLC0415
+
+    found = []
+    for raw in display.GetHoleCalloutVariables() or ():
+        variable = dynamic_dispatch(raw._oleobj_)
+        if str(variable.VariableName) == "hw-cbdepth":
+            found.append((variable, _early_bound(raw, "ICalloutLengthVariable")))
+    if len(found) != 1:
+        raise RuntimeError(f"guide callout carries {len(found)} hw-cbdepth variables, not 1")
+    return found[0]
+
+
+# Text that would be a typed nominal or band in the callout's format parts
+# instead of the native variable (rule 3: "A tighter band goes on the
+# dimension itself, never in a note").
+_TYPED_DEPTH_TEXT = ("±", ".115", ".005", "+.", "-.")
+
+
+def _assert_counterbore_depth_band(display: Any, *, when: str) -> None:
+    """The guide callout's depth is native: the display dimension shows its
+    own value (IDisplayDimension.GetOverride false), no format part types the
+    nominal or a band (_TYPED_DEPTH_TEXT) and one part carries the depth
+    token, the ``hw-cbdepth`` variable reads the model's Hole Wizard depth
+    (CBORE_DEPTH) at GUIDE_CALLOUT_PRECISION, and its own tolerance is
+    swTolSYMMETRIC ±CBORE_DEPTH_BAND at the same places. Run as set and again
+    from finalize_drawing's checkpoint after the SLDDRW save
+    (draw_dt_cone_gear's ``checkpoint=`` pattern), so a band lost to the
+    settling rebuild or the save fails the leaf."""
+    variable, length = _guide_depth_variable(display)
+    dimension = _early_bound(display, "IDisplayDimension")
+    places = GUIDE_CALLOUT_PRECISION["hw-cbdepth"]
+    upper, lower = CBORE_DEPTH_BAND
+    definitions = {
+        part: str(dimension.GetText(part) or "") for part in _DEFINITION_TO_WRITABLE
+    }
+    read = {
+        "override": bool(dimension.GetOverride()),
+        "depth_tokens": sum(text.count("<HOLE-DEPTH>") for text in definitions.values()),
+        "typed": sorted(
+            {typed for text in definitions.values() for typed in _TYPED_DEPTH_TEXT if typed in text}
+        ),
+        "depth_mm": float(length.Length) * 1000.0,
+        "precision": int(length.Precision),
+        "type": int(variable.ToleranceType),
+        "lower_mm": float(variable.ToleranceMin) * 1000.0,
+        "upper_mm": float(variable.ToleranceMax) * 1000.0,
+        "tolerance_precision": int(length.TolerancePrecision),
+    }
     if (
-        int(variable.ToleranceType) != _TOL_SYMMETRIC
-        or abs(float(variable.ToleranceMin) * 1000.0 - lower) > 1e-5
-        or abs(float(variable.ToleranceMax) * 1000.0 - upper) > 1e-5
-        or int(length.TolerancePrecision) != places
-        or int(length.Precision) != places
+        read["override"]
+        or read["depth_tokens"] != 1
+        or read["typed"]
+        or abs(read["depth_mm"] - CBORE_DEPTH) > 1e-5
+        or read["precision"] != places
+        or read["type"] != _TOL_SYMMETRIC
+        or abs(read["lower_mm"] - lower) > 1e-5
+        or abs(read["upper_mm"] - upper) > 1e-5
+        or read["tolerance_precision"] != places
     ):
         raise RuntimeError(
-            f"guide callout {name} band did not persist: wanted swTolSYMMETRIC, "
-            f"deviations {(lower, upper)} mm, {places} places; read "
-            f"{int(variable.ToleranceType)}, {float(variable.ToleranceMin)!r}, "
-            f"{float(variable.ToleranceMax)!r}, {int(length.TolerancePrecision)}, "
-            f"{int(length.Precision)}"
+            f"guide callout depth is not the native {CBORE_DEPTH:g} mm "
+            f"swTolSYMMETRIC {(lower, upper)} mm at {places} places ({when}): "
+            f"read {read!r}, definitions {definitions!r}"
         )
-    _telemetry.info(
-        f"guide callout {name} {CBORE_DEPTH:g} mm at {int(length.Precision)} places, "
-        f"band {CBORE_DEPTH_BAND} mm at {int(length.TolerancePrecision)} places"
-    )
+    _telemetry.info(f"guide callout hw-cbdepth native band ({when}): {read!r}")
 
 
 # VIEW B (rules 9, 26): the 1:1 right side is not projected at the sheet's
@@ -1594,6 +1632,12 @@ def build(adapter: Any) -> dict[str, str]:
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
     _telemetry.info("platen sheet: views, dimensions, callouts and hole table placed")
 
+    def _saved(phase: str) -> None:
+        # After the SLDDRW save, the drawing still open: the band the sheet
+        # stores is the native one, unchanged by the settling rebuild.
+        if phase == "after_drawing_save":
+            _assert_counterbore_depth_band(guide_callout, when="after the SLDDRW save")
+
     return finalize_drawing(
         adapter,
         OUTPUTS,
@@ -1602,6 +1646,7 @@ def build(adapter: Any) -> dict[str, str]:
         layout=SPEC.layout,
         redundant_note_substrings=(REDUNDANT_NOTE,),
         expected_redundant_notes=1,
+        checkpoint=_saved,
     )
 
 
