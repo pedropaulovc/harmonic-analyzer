@@ -35,11 +35,22 @@ part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
 material = "1018 cold-finished flat, 1/8 × 1-1/2 in (OnlineMetals 4807)"
 stock = "{{process.blank_thickness_in:fraction}} × {{process.blank_width_in:fraction}} in flat; {{process.quantity:d}} × {{process.blank_length_in:g}} in blanks."
-note = "Inches unless mm; G-code and console entries in mm (the files and the controller run G21). Finished {{cad.thickness_min_in:.3dot}}–{{cad.thickness_max_in:.3dot}} thick, ({{cad.overall_length_in:.2f}}) long. One blank at a time through Setups 2–5, on the fixture MHA-CH-13-TL-00 (made beforehand to its drawings); the sub-plate stays in the vise. All spindle work is on the PM-30MV low belt (100–2800 rpm): no belt change. Home the mill ($H) once, after switching it on: every M6's trip to the tool setter counts from home. Home again only after a power cycle or a controller restart, an E-stop, an alarm, a limit switch hit, a stall or a crash: homing brings the stored G54 back. Then check every zero of the setup again, each the way its step set it: each must read what its step set, within .001 in. One does not, cannot be reached with the part in, or the part may have moved: do what that setup's Datum says for it; where the Datum says nothing, take the setup again from its first step, the part out. They all do: run the interrupted file again from its start. Feed Hold, then Reset with the axes stopped keeps position and G54: no homing, no new zero; run the interrupted file again from its start: its first M6 measures the tool, and cuts already made are cut in air."
 shop = "../shop"
 stock_refs = ["1018-flat-1-8x1-1-2"]
 material_key = "rocker-1018-cold-finished"
 milling_material = "steel_1018"
+
+# The shop's standing page carries what every traveler shares (units, speeds,
+# homing, Feed Hold, tool changes, proving a file, burrs); This job says what
+# only this strap needs.
+standing = true
+
+[[notes]]
+title = "This job"
+rows = [
+  ["Finished", "{{cad.thickness_min_in:.3dot}}–{{cad.thickness_max_in:.3dot}} thick, ({{cad.overall_length_in:.2f}}) long."],
+  ["Fixture", "One blank at a time through Setups 2–5, on the fixture MHA-CH-13-TL-00 (made beforehand to its drawings)."],
+]
 
 [cad]
 file = "../../out/features/ch_rocker_strap/features.toml"
@@ -365,7 +376,7 @@ machine = "PM-30MV CNC (FluidNC, CNCjs with the electronic tool setter) / vise, 
 indexing = "none"
 machine_ref = "pm-30mv"
 holding = "Sub-plate MHA-CH-13-TL-01 in the vise on 1 in parallels, centred, the fence indicated <.001 along X and the plate top indicated within .001 over the 12 in under the blank; it stays there for every blank. Blank flat on the plate, one long edge against the fence, its left end against the end stop, pushed by the Mitee-Bite Pitbull 26000 (4-40) edge clamps TL-VN-50 at X {{cad.clamp_stations_in}} from the end stop, each tightened to {{process.clamp_torque_in_lb:g}} in-lb. Clamp noses, fence and end-stop tops at most {{process.fence_height_mm:in.3dot}} above the plate, below the cut."
-datum = "Program RS01_rough_faces (cam:ch_rocker_strap). One G54 while the plate stays put: Z0 = the plate top, Y0 = the fence face (blank at −Y), X0 = the end stop's face, set in Op 30. After the plate moves, or after homing again (the note says when), in this setup or any later one on the plate: no blank on the plate, set all three again as Op 30 does; a blank on it, stop and tell the owner (the blank covers the faces Op 30 touches). Each M6 measures its tool on the tool setter against T1's length when Z0 was set; every file (RS01–RS04) starts with an M6, so none runs on the length the last file left, even re-run or restarted."
+datum = "Program RS01_rough_faces (cam:ch_rocker_strap). One G54 while the plate stays put: Z0 = the plate top, Y0 = the fence face (blank at −Y), X0 = the end stop's face, set in Op 30. After the plate moves, or after homing again (the standing page says when), in this setup or any later one on the plate: no blank on the plate, set all three again as Op 30 does; a blank on it, stop and tell the owner (the blank covers the faces Op 30 touches). Every file (RS01–RS04) starts with an M6, so none runs on the length the last file left, even re-run or restarted."
 diagram = { file = "diagrams/rough.svg", alt = "Plan of the sub-plate: fence along the back, blank against it and against the end stop at its left end, edge clamps at the front at X {{cad.clamp_stations_in}}; the 1/2 in end mill faces the full blank, one face, then the other after the flip." }
 envelope = { x_span_mm = ["{{cad.blank_length_mm}}", "{{process.face_cutter_dia_mm}}"], y_span_mm = ["{{cad.blank_width_mm}}", "{{process.face_cutter_dia_mm}}"], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{process.plate_top_height_mm}}", "{{cad.blank_thickness_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{process.plate_top_height_mm}}", "{{cad.thickness_mm}}"], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_mm}}"] }
 # The vise grips the sub-plate, not the blank: every size here is the plate's.
@@ -389,7 +400,7 @@ steps = [
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Console M6 T1 (the 1/2 in end mill, {{process.half_mill_projection_mm:in.2f}} in out of the collet, measured on the tool setter). T1, spindle off, just dragging on a .200 gauge block on the plate top: G10 L20 P1 Z5.080. The .200 edge finder at 900 rpm on the fence face: G10 L20 P1 Y-2.540; on the end stop's face: G10 L20 P1 X2.540 (its 2.540 mm radius)."
+instruction = "Console M6 T1 (the 1/2 in end mill, {{process.half_mill_projection_mm:in.2f}} in out of the collet). T1, spindle off, just dragging on a .200 gauge block on the plate top: G10 L20 P1 Z5.080. The .200 edge finder at 900 rpm on the fence face: G10 L20 P1 Y-2.540; on the end stop's face: G10 L20 P1 X2.540 (its 2.540 mm radius)."
 feed = "hand"
 
 # Owner ruling 2026-11-23: "Pick one washer from the pack of 100 by
@@ -408,7 +419,7 @@ feed = "hand"
 # drawing's high limit on the fence and end stop.
 [[setups.operations]]
 steps = [
-  { kind = "action", text = "First blank only, before it goes in: prove RS01–RS04 in air. Edge finder out; console M6 T1 (measured on the tool setter); on the .200 block: G10 L20 P1 Z-20.320 (Z0 25.4 mm, 1.000 in, high). Run each file single block through its first plunges. Then M6 T1 and G10 L20 P1 Z5.080 on the block again." },
+  { kind = "action", text = "First blank only, before it goes in: prove RS01–RS04 in air. Edge finder out; console M6 T1; on the .200 block: G10 L20 P1 Z-20.320 (Z0 25.4 mm, 1.000 in, high). Run each file single block through its first plunges. Then M6 T1 and G10 L20 P1 Z5.080 on the block again." },
 ]
 feed = "hand"
 
@@ -455,7 +466,7 @@ speed_kind = "spindle"
 tool = "em-half"
 drilling = "none"
 sizing = "other"
-instruction = "Run RS02_finish_face_1 (M6 T1 at its start, the 1/2 in end mill: set it on the tool setter again; 2450, display near 2485): the face at Z {{cad.finish_face_1_z_in:.4dot}}."
+instruction = "Run RS02_finish_face_1 (M6 T1 at its start, the 1/2 in end mill; 2450, display near 2485): the face at Z {{cad.finish_face_1_z_in:.4dot}}."
 settings = "em-half-carbide-1018-3439-face"
 milling_cuts = [
   { name = "face finish", kind = "end", phase = "finish", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", axial_doc_mm = "{{process.face_finish_doc_mm}}", radial_woc_mm = "{{process.face_stepover_mm}}", traverse_mm = [0, "{{cad.blank_length_mm}}"] },
@@ -484,7 +495,7 @@ speed_kind = "spindle"
 tool = "em-half"
 drilling = "none"
 sizing = "other"
-instruction = "Run RS03_finish_face_2_hub (M6 T1 at its start, the 1/2 in end mill; 2450, display near 2485): the face at Z {{cad.thickness_in:.4dot}}. It stops at its M6 T3 (spindle off, cutter retracted), before the centre drill goes in: unclamp the blank and lift it off for the check, since the micrometer cannot reach under it on the plate."
+instruction = "Run RS03_finish_face_2_hub (M6 T1 at its start, the 1/2 in end mill; 2450, display near 2485): the face at Z {{cad.thickness_in:.4dot}}. It stops at its M6 T3, before the centre drill goes in: unclamp the blank and lift it off for the check, since the micrometer cannot reach under it on the plate."
 inspection = "Every blank's thickness acceptance: {{cad.thickness_min_in:.3dot}}–{{cad.thickness_max_in:.3dot}}, micrometer at both ends and mid-length."
 gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.thickness_band_mm}}" }]
 settings = "em-half-carbide-1018-3439-face"
@@ -501,7 +512,7 @@ steps = [
 feed = "hand"
 
 [[setups.operations]]
-instruction = "In band: reseat the blank as it was (face 2 up, the same long edge on the fence, the same end on the end stop) and clamp at {{process.clamp_torque_in_lb:g}} in-lb. Then the same stop's tool change: T3, the #2 centre drill, in; set 1800; Cycle Start (the M6 measures it on the tool setter)."
+instruction = "In band: reseat the blank as it was (face 2 up, the same long edge on the fence, the same end on the end stop) and clamp at {{process.clamp_torque_in_lb:g}} in-lb. Then the same stop's tool change: T3, the #2 centre drill, in; set 1800; Cycle Start."
 feed = "hand"
 
 # Hub hole, over the plate's counterbore: the blank spans it as a short beam
@@ -528,7 +539,7 @@ speed_kind = "spindle"
 tool = "hub-drill"
 drilling = "twist_drill"
 sizing = "other"
-instruction = "Same file, M6 T4 (spindle off, cutter retracted): 25/64 drill through into the counterbore, no peck; set 600. Cutting oil."
+instruction = "Same file, M6 T4: 25/64 drill through into the counterbore, no peck; set 600. Cutting oil."
 rpm = 600
 feed = "{{process.hub_drill_feed_per_min_mm:in.1f}} in/min"
 beam = { axis = "x", hold = "between", extent_mm = [0, "{{cad.blank_length_mm}}"], supports_mm = "{{cad.hub_relief_x_mm}}", section_mm = { y = "{{cad.blank_width_mm}}", z = "{{cad.thickness_mm}}" } }
@@ -543,7 +554,7 @@ speed_kind = "spindle"
 tool = "hub-reamer"
 drilling = "none"
 sizing = { kind = "band", band_mm = "{{cad.hub_dia_band_mm}}" }
-instruction = "Same file, M6 T5 (spindle off, retracted): ream through, .4000 reamer in the drill chuck; set 400. Cutting oil. The file feeds the reamer in and feeds it back out, spindle running: no rapid leaves the bore. Leave the blank clamped for the check."
+instruction = "Same file, M6 T5: ream through, .4000 reamer in the drill chuck; set 400. Cutting oil. The file feeds the reamer in and feeds it back out, spindle running: no rapid leaves the bore. Leave the blank clamped for the check."
 inspection = "Still clamped: the .400 minus pin of the pin-gauge set enters the hub hole by hand. Every hole; the first blank's before reaming any other."
 rpm = 400
 feed = "{{process.hub_ream_feed_per_min_mm:in.1f}} in/min, in and out"
@@ -648,7 +659,7 @@ feed = "hand"
 # a stopped cutter). Work Z read there = .200 block + stack + blank, so
 # stack = Z − 5.080 − the blank's reading at that place (mm, the console's).
 [[setups.operations]]
-instruction = "Console M6 T2 (the 1/8 in end mill, measured on the tool setter). Spindle off: T2 just dragging on the .200 gauge block laid on the blank's top, near each end and beside the hub; read work Z at each. Stack = Z − 5.080 − the blank's reading there."
+instruction = "Console M6 T2 (the 1/8 in end mill). Spindle off: T2 just dragging on the .200 gauge block laid on the blank's top, near each end and beside the hub; read work Z at each. Stack = Z − 5.080 − the blank's reading there."
 feed = "hand"
 
 [[setups.operations]]
@@ -685,7 +696,7 @@ speed_kind = "spindle"
 tool = "em-eighth"
 drilling = "none"
 sizing = "other"
-instruction = "Run RS04_outline (M6 T2, spindle off: 1/8 in end mill, {{process.eighth_mill_projection_min_mm:in.2dot}}–{{process.eighth_mill_projection_max_mm:in.2dot}} out of the collet; set 2800). One run, no stop: the next four ops are its stages. Each depth level starts with a straight plunge. First blank: watch the first level pass outside the washer."
+instruction = "Run RS04_outline (M6 T2: 1/8 in end mill, {{process.eighth_mill_projection_min_mm:in.2dot}}–{{process.eighth_mill_projection_max_mm:in.2dot}} out of the collet; set 2800). One run, no stop: the next four ops are its stages. Each depth level starts with a straight plunge. First blank: watch the first level pass outside the washer."
 rpm = 2800
 feed = "{{process.outline_plunge_feed_per_min_mm:in.1f}} in/min plunge"
 milling_cuts = [
