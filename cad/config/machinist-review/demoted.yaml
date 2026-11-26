@@ -6,51 +6,13 @@
 # to SHIP deletes its line; the batch that deletes the last line deletes this
 # file (an empty list fails the graph load).
 demoted:
-  dt_alignment_pinion: fit-batch-dt
-  dt_arbor_pedestal: fit-batch-dt
-  dt_cone_gear: fit-batch-dt
-  dt_cone_gear_shaft: fit-batch-dt
-  dt_cone_gear_tl_arbor_assembly: fit-batch-dt
-  dt_cone_gear_tl_arbor_key: fit-batch-dt
-  dt_cone_gear_tl_phasing_comb: fit-batch-dt
-  dt_cone_pivot_post: fit-batch-dt
-  dt_cone_swing_platform: fit-batch-dt
-  dt_cone_tip_block: fit-batch-dt
-  dt_cone_tip_bushing: fit-batch-dt
-  dt_cone_tip_end_screw: fit-batch-dt
-  dt_cone_tip_gear: fit-batch-dt
-  dt_cone_tip_gear_tl_cutter_assembly: fit-batch-dt
-  dt_cone_tip_gear_tl_cutter_bar: fit-batch-dt
-  dt_cone_tip_gear_tl_form_cutter: fit-batch-dt
-  dt_crank_arm: fit-batch-dt
-  dt_crank_drive_gear: fit-batch-dt
-  dt_crank_handle: fit-batch-dt
-  dt_crank_handle_butt_cup: fit-batch-dt
-  dt_crank_handle_pivot_screw: fit-batch-dt
-  dt_crank_hub: fit-batch-dt
-  dt_crank_pinion: fit-batch-dt
-  dt_crankshaft: fit-batch-dt
-  dt_cylinder_gear: fit-batch-dt
-  dt_cylinder_gear_tl_cam_fixture: fit-batch-dt
-  dt_drive_train_assembly: fit-batch-dt
-  dt_pinion_arbor: fit-batch-dt
-  dt_pinion_arbor_collar: fit-batch-dt
-  dt_pinion_bracket: fit-batch-dt
-  dt_pinion_cam: fit-batch-dt
-  dt_pinion_cam_pin: fit-batch-dt
-  dt_pinion_lever: fit-batch-dt
-  dt_pinion_lever_pin: fit-batch-dt
-  dt_pinion_lift_rod: fit-batch-dt
-  dt_pinion_pivot_block: fit-batch-dt
-  dt_pinion_pivot_shaft: fit-batch-dt
-  # Farm run 20261126T031815939Z on c8404aea15 read FIX: the drum bond's
-  # seating check runs after the 24 h cure, so its pull-off remedy cannot be
-  # done (issue #3630; its fix is rulings.md D38). Delegated ruling
-  # 2026-11-26 (Main), precedent: the owner's ruling 2026-11-24, main during
-  # fit conversion, "better to be able to cut releases with known issues than
-  # to hold unreleased code": a sheet that reads FIX at its batch's last run
-  # stays here with an issue until that issue's fix reads SHIP; no owner
-  # number changed; #2144 (rulings.md D39).
+  # Farm run 20261126T080856204Z on 02cf6d4332 read FIX on DETAIL A's
+  # label (issue #3658); the drum bond (#3630, rulings.md D38) no longer
+  # gates. Delegated ruling 2026-11-26 (Main), precedent: the owner's ruling
+  # 2026-11-24, main during fit conversion, "better to be able to cut
+  # releases with known issues than to hold unreleased code": a sheet that
+  # reads FIX at its batch's last run stays here with an issue until that
+  # issue's fix reads SHIP; no owner number changed; #2144 (rulings.md D39).
   mg_magnifier_assembly: fit-batch-ch
   pd_platen_bottom_guide: fit-batch-pd
   pd_platen_guide: fit-batch-pd

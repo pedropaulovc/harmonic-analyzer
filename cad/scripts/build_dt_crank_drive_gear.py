@@ -53,7 +53,6 @@ from _document_units import apply_package_model_units
 from _feature_tree import _feature_by_name, name_last_feature
 from _part_checks import report_mass_properties
 from _part_properties import part_drawing_unit
-from _paths import IN
 from _rebuild import force_rebuild
 from _session import run_build
 from _sketch import SketchDims, blank_sketch, ensure_fully_defined, set_sketch_direct_db
@@ -62,7 +61,6 @@ from _drawing_precision import _named_dimension, apply_drawing_precision
 from _drawing_marks import apply_drawing_properties, clear_dimensions_for_drawing, mark_dimensions_for_drawing
 from _drawing_tolerances import (
     _set_tolerance_precision,
-    set_dimension_bilateral_tolerance,
     set_dimension_symmetric_tolerance,
 )
 from _fit_deviations import deviations
@@ -73,6 +71,7 @@ from _part_pmi import author_part_pmi
 from gear_face_band import GEAR_FACE_WIDTH_BAND
 from dt_crank_drive_gear_notes import GEAR_DATA
 from dt_crank_drive_gear_spec import (
+    BORE_DIA,
     BORE_DIA_BAND,
     BORE_SOUTH_CHAMFER,
     DRAWING_DIMENSIONS,
@@ -81,7 +80,6 @@ from dt_crank_drive_gear_spec import (
     KEYWAY_T,
     KEYWAY_T_BAND,
     KEYWAY_WIDTH,
-    KEYWAY_WIDTH_BAND,
     NATIVE_FLANK_BOUND_MM,
     OUTSIDE_DIA,
     OUTSIDE_DIA_TOLERANCE_MM,
@@ -211,8 +209,11 @@ MATERIAL = "Plain Carbon Steel"  # p.20: dark gear, distinct from the brass trai
 # The assembly's coaxial and gear mates select the bore axis by this name.
 BORE_AXIS = "BoreAxis"
 
-# The 64T seats on MHA-DT-04's keyed land 1.
-BORE_DIAMETER = 0.375 * IN
+# The 64T seats on MHA-DT-04's keyed land 1. Its bore is modelled at the
+# owned .3760 over reamer's size, the lower end of the spec's analysis band
+# about the land's .375 nominal, and prints that size with no band (fit audit
+# 2026-11-23, MHA-DT-07.bore; drawing-guidelines rule 4).
+BORE_DIAMETER = BORE_DIA + min(BORE_DIA_BAND)
 
 
 
@@ -385,13 +386,10 @@ def build(adapter) -> dict[str, str]:
         adapter, "GearBlank", "FaceWidth", face_upper,
         places=DRAWING_PRECISION["GearBlank"]["FaceWidth"], display_unit=UNIT,
     )
-    set_dimension_bilateral_tolerance(
-        adapter, "BoreProfile", "BoreDia", *deviations(BORE_DIA_BAND), display_unit=UNIT
-    )
-    set_dimension_bilateral_tolerance(
-        adapter, "BoreProfile", "KeywayWidth", *deviations(KEYWAY_WIDTH_BAND),
-        display_unit=UNIT,
-    )
+    # BoreDia carries no band: the reamer's size, its mate the gauge (fit
+    # audit 2026-11-23, MHA-DT-07.bore).  KeywayWidth carries none either:
+    # the 1/16 A broach cuts it and key MHA-DT-VN-71 slides in it (note 1);
+    # the sheet prints it as a reference (draw_dt_crank_drive_gear).
     _set_keyway_t_limits(adapter)
     volume_check(
         adapter, "driven crank-drive gear (equations neutral)",

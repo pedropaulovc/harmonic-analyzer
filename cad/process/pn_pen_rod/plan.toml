@@ -24,11 +24,22 @@ part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
 material = "{{cad.material_spec}}"
 stock = "Qty {{process.quantity:g}}. 5 x 5 mm C36000 brass key stock, DIN 6880 ({{cad.flat_x_pos_stock}}, to order), the 12 in bar; one blank {{process.blank_length_in:.2dot}} in long."
-note = "Inches unless mm. Lathe PM-1127VF-LB (70–380 and 380–2000 rpm); brass cut dry, the taps with a drop of cutting oil. The square is the bar as bought: grip it on its flats over a brass shim wrap and never cut it."
 shop = "../shop"
 stock_refs = ["c360-square-5mm-key"]
 material_key = "lathe-c360"
 turning_material = "brass"
+
+# The shop's standing page carries what every traveler shares (units, speeds,
+# coolant, burrs); This job says what only this rod needs. The taps' drop of
+# cutting oil stays at the plug tap's step ("the same way" carries it to the
+# bottoming tap).
+standing = true
+
+[[notes]]
+title = "This job"
+rows = [
+  ["Square", "The square is the bar as bought: never cut it."],
+]
 
 [cad]
 file = "../../out/features/pn_pen_rod/features.toml"

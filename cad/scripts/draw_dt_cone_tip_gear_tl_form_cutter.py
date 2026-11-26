@@ -219,11 +219,15 @@ def build(adapter: Any) -> dict[str, str]:
     assert_imported_precision(adapter, annotations, part.DRAWING_PRECISION_BY_NAME)
     set_dimension_callouts(adapter, annotations, part.DIMENSION_CALLOUTS)
     # MHA-DT-37 sheet 2's table governs the form; its envelope prints here as
-    # references only.
+    # references only, and so does the drill rod's stock diameter (rule 4).
     for annotation in annotations:
         name = dimension_name(adapter, annotation)
         if name in part.REFERENCE_DIMENSIONS:
             set_reference_dimension(adapter, annotation, label=f"form envelope {name}")
+        elif name in part.STOCK_DIMENSIONS:
+            set_reference_dimension(
+                adapter, annotation, label=f"{name} stock reference", diameter=True
+            )
     for view in (front, top, right):
         set_hidden_lines_removed(adapter, view)
 

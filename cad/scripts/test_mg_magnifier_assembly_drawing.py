@@ -223,6 +223,7 @@ def test_the_axle_is_set_to_the_trial_stack_and_accepted_at_the_nuts() -> None:
         "stack-parts-measured",
         "stack-part-replaced",
         "axle-replaced",
+        "new-wheel-drum-scrapped",
         "new-wheel-drum-bonded",
         "trial-refitted",
     )
@@ -279,6 +280,7 @@ def test_the_axle_is_set_to_the_trial_stack_and_accepted_at_the_nuts() -> None:
         "trial-axle-withdrawn",
         "stack-parts-measured",
         "axle-replaced",
+        "new-wheel-drum-scrapped",
         "new-wheel-drum-bonded",
         "trial-refitted",
     ):
@@ -296,14 +298,22 @@ def test_the_axle_is_set_to_the_trial_stack_and_accepted_at_the_nuts() -> None:
     )
     assert notes.STEP_TEXT["axle-replaced"].endswith(f"REPLACE {notes._AXLE}.")
     assert "MIDDLE OF" in sunk and "CALIPER DEPTH ROD" in sunk
-    # A new wheel has no drum: it goes back through the drum bond, whose last
+    # A replaced wheel is scrapped with its cured drum (D38, #3618), and the
+    # new wheel goes back through the drum bond with a new drum, whose last
     # sub-step rejoins the trial at the spacer, past the already made press
     # sleeve (independent read of #3601); any other new part restarts there.
+    assert order.index("new-wheel-drum-scrapped") + 1 == order.index(
+        "new-wheel-drum-bonded"
+    )
     assert order.index("new-wheel-drum-bonded") + 1 == order.index("trial-refitted")
     replaced_at = f"REPLACED AT STEP {steps.step_number('stack-part-replaced')}"
+    assert notes.STEP_TEXT["new-wheel-drum-scrapped"] == (
+        f"{pushed_out} AND {notes._WHEEL} WAS {replaced_at}, SCRAP THE OLD "
+        f"{notes._DRUM} WITH THE OLD {notes._WHEEL}."
+    )
     assert notes.STEP_TEXT["new-wheel-drum-bonded"] == (
         f"{pushed_out} AND {notes._WHEEL} WAS {replaced_at}, RETURN TO "
-        f"STEP {steps.step_number(steps.DRUM_BONDED_KEY)}."
+        f"STEP {steps.step_number(steps.DRUM_BONDED_KEY)} WITH A NEW {notes._DRUM}."
     )
     assert notes.STEP_TEXT["trial-refitted"] == (
         f"{pushed_out} AND {notes._WHEEL} WAS NOT {replaced_at}, RETURN TO "
@@ -422,13 +432,20 @@ def test_the_drum_is_bonded_centred_wet_and_accepted_once_cured() -> None:
     (drum_step,) = (step for step in steps.STEPS if step[0] == steps.DRUM_BONDED_KEY)
     assert drum_step == (
         steps.DRUM_BONDED_KEY,
+        "drum-seated",
+        "drum-wet-stripped",
+        "drum-wet-stuck",
+        "drum-wet-cleaned",
+        "drum-wet-rebonded",
         "drum-centred",
         "drum-bond-cured",
-        "drum-seated",
         steps.DRUM_HELD_KEY,
         "drum-stripped",
         "drum-cleaned",
         "drum-rebonded",
+        "drum-seat-rechecked",
+        "drum-pair-scrapped",
+        "drum-pair-renewed",
         "drum-trial-resumed",
     )
     bonded = notes.STEP_TEXT[steps.DRUM_BONDED_KEY]
@@ -441,16 +458,48 @@ def test_the_drum_is_bonded_centred_wet_and_accepted_once_cured() -> None:
     assert "SWINGS LEAST" in centred and ".00" not in centred
     assert "24 H" in notes.STEP_TEXT["drum-bond-cured"]
     assert notes.STEP_TEXT[steps.DRUM_HELD_KEY].endswith("DOES NOT TURN OR SLIDE BY HAND.")
-    # Pull off, clean, return: one action per step (rule 22), after either
-    # check fails.
-    assert notes.STEP_TEXT["drum-stripped"].startswith(
-        f"IF STEP {steps.step_number('drum-seated')} OR "
-        f"STEP {steps.step_number(steps.DRUM_HELD_KEY)} FAILS, PULL "
+    bond = f"STEP {steps.step_number(steps.DRUM_BONDED_KEY)}"
+    # D38 (#3630): the seat is checked wet, at once, so a wrong seat still
+    # pulls off, cleans and rebonds; one that has grabbed goes on to cure.
+    seated = f"STEP {steps.step_number('drum-seated')}"
+    assert notes.STEP_TEXT["drum-wet-stripped"] == (
+        f"IF {seated} FAILS, PULL {notes._DRUM} OFF {notes._WHEEL} AT ONCE."
+    )
+    assert notes.STEP_TEXT["drum-wet-stuck"] == (
+        f"IF STEP {steps.step_number('drum-wet-stripped')} CANNOT PULL IT OFF, GO ON "
+        f"TO STEP {steps.step_number('drum-bond-cured')}."
+    )
+    assert notes.STEP_TEXT["drum-wet-cleaned"].startswith(f"IF {seated} FAILED, CLEAN ")
+    assert notes.STEP_TEXT["drum-wet-rebonded"] == f"IF {seated} FAILED, RETURN TO {bond}."
+    # Once cured, the hand check comes before the seat recheck: a drum that
+    # turns still pulls off (Codjiflo review of #3644).
+    order = drum_step
+    assert order.index(steps.DRUM_HELD_KEY) < order.index("drum-seat-rechecked")
+    # Once cured, a wrong seat is not released (about 250 C, never next to
+    # the wheel's enamel): wheel and drum are scrapped and both renewed.
+    rechecked = f"STEP {steps.step_number('drum-seat-rechecked')}"
+    assert seated in notes.STEP_TEXT["drum-seat-rechecked"]
+    assert notes.STEP_TEXT["drum-pair-scrapped"] == (
+        f"IF {rechecked} FAILS, SCRAP {notes._WHEEL} AND {notes._DRUM} TOGETHER."
+    )
+    assert notes.STEP_TEXT["drum-pair-renewed"] == (
+        f"IF {rechecked} FAILED, RETURN TO {bond} WITH A NEW {notes._WHEEL} AND A "
+        f"NEW {notes._DRUM}."
+    )
+    # A drum that turns once cured is not held, so it pulls off: pull off,
+    # clean, return, one action per step (rule 22).
+    held = f"STEP {steps.step_number(steps.DRUM_HELD_KEY)}"
+    assert notes.STEP_TEXT["drum-stripped"] == (
+        f"IF {held} FAILS, PULL {notes._DRUM} OFF {notes._WHEEL}."
     )
     assert "BARE METAL" in notes.STEP_TEXT["drum-cleaned"]
-    assert notes.STEP_TEXT["drum-rebonded"].endswith(
-        f"RETURN TO STEP {steps.step_number(steps.DRUM_BONDED_KEY)}."
-    )
+    assert notes.STEP_TEXT["drum-rebonded"] == f"IF {held} FAILED, RETURN TO {bond}."
+    # No step pulls a drum off once cured unless the hand check found it
+    # loose.
+    cured = drum_step.index("drum-bond-cured")
+    for key in drum_step[cured + 1 :]:
+        if "PULL" in notes.STEP_TEXT[key]:
+            assert key == "drum-stripped", key
 
 
 def test_the_plain_end_window_holds_at_the_model_setting() -> None:
@@ -511,10 +560,11 @@ def test_the_drum_bond_is_seen_seated_and_not_proud() -> None:
     assert low < stack.DRUM_RECESS < high
     bonded = notes.STEP_TEXT[steps.DRUM_BONDED_KEY]
     assert bonded.endswith("UNTIL IT IS HARD AGAINST THE BOSS.")
-    # The S4 acceptance is its own check (rule 22).
+    # The S4 acceptance is its own check (rule 22), made wet at once, before
+    # it grabs (D38, #3630; Codjiflo review of #3644).
     assert notes.STEP_TEXT["drum-seated"] == (
-        f"CHECK {notes._DRUM} IS HARD AGAINST THE BOSS: NO LIGHT UNDER THE DRUM, NOT "
-        "PROUD OF THE SPIGOT END (STRAIGHTEDGE)."
+        f"AT ONCE, BEFORE IT GRABS, CHECK {notes._DRUM} IS HARD AGAINST THE BOSS: NO "
+        "LIGHT UNDER THE DRUM, NOT PROUD OF THE SPIGOT END (STRAIGHTEDGE)."
     )
     assert notes.ENDSHAKE_DETAIL_TITLE not in bonded
 

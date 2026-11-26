@@ -142,30 +142,34 @@ def test_the_steps_do_one_thing_each_and_check_every_joint_and_setting() -> None
         f"OFF ITEM {a}'S Ø.376 SEAT, LEAVING THE KEYSEAT FILLED",
         "CURE 24 H",
         f"CHECK: ITEM {k} DOES NOT MOVE BY HAND",
-        f"GRIP ITEM {a}'S Ø.62 END IN THE HEAD'S 3-JAW CHUCK AGAINST ITS STEP",
+        f"GRIP ITEM {a}'S Ø.62 END IN THE DIVIDING HEAD'S 3-JAW CHUCK AGAINST ITS STEP",
         f"UNTIL ITEM {k} POINTS AWAY FROM THE CUTTER, ROUGHLY LEVEL",
-        f"ZERO A TEST INDICATOR, HELD IN THE SPINDLE, ON ITEM {k}'S UPPER SIDE FACE",
+        f"ZERO A TEST INDICATOR, HELD IN THE MILL SPINDLE, ON ITEM {k}'S UPPER SIDE FACE",
         "NOTE THE Z DRO READING",
-        "TURN THE HEAD 180°.",
+        "TURN THE DIVIDING HEAD 180°.",
         f"CARRY THE INDICATOR OVER ITEM {a}",
         f"CHECK: THE INDICATOR READS ZERO WITHIN "
         f"{arbor.inch_text(spec.KEY_SIDE_READING, 3)}",
         f"IF STEP {spec.CHECK_STEP} FAILS",
-        f"IF ITEM {k} POINTS AWAY FROM THE CUTTER, TURN THE HEAD 180°",
-        "LOCK THE HEAD'S SPINDLE",
+        f"IF ITEM {k} POINTS AWAY FROM THE CUTTER, TURN THE DIVIDING HEAD 180°",
+        "LOCK THE DIVIDING HEAD'S SPINDLE",
         "SLIDE THE BLANK ONTO",
         "COLLAR (SETUP TABLE)",
         f"TIGHTEN ITEM {n}",
         "RUN THE TAILSTOCK CENTRE INTO ITEM",
         "CHECK: THE BLANK DOES NOT TURN OR SLIDE BY HAND",
-        "UNLOCK THE HEAD'S SPINDLE",
+        "UNLOCK THE DIVIDING HEAD'S SPINDLE",
         "FIRST INDEX (SETUP TABLE)",
     ]
     positions = [
         next(i for i, step in enumerate(flat) if words in step) for words in order
     ]
     assert positions == sorted(positions)
-    assert flat[-1].endswith("TURN THE HEAD BY THE BLANK'S FIRST INDEX (SETUP TABLE).")
+    assert flat[-1].endswith("TURN THE DIVIDING HEAD BY THE BLANK'S FIRST INDEX (SETUP TABLE).")
+    # Machinist round 1 (farm 20261125T180203935Z): the work holder is named
+    # in standard terms, never a bare "THE HEAD" or "THE SPINDLE".
+    assert not re.search(r"(?<!DIVIDING )HEAD\b", spec.ASSEMBLY_STEPS.replace("\n", " "))
+    assert " THE SPINDLE" not in " ".join(spec.ASSEMBLY_STEPS.split())
     assert len(steps) == spec.INDEX_STEP
     # The step numbers the steps cite are the zeroing, the DRO and the check.
     assert "ZERO A TEST INDICATOR" in flat[spec.ZERO_STEP - 1]
@@ -228,7 +232,7 @@ def _run_clock_steps(start_error_deg: float) -> float:
         step = steps[index]
         index += 1
         rough = re.fullmatch(
-            rf"TURN THE HEAD UNTIL ITEM {k} POINTS (.+), ROUGHLY LEVEL\.", step
+            rf"TURN THE DIVIDING HEAD UNTIL ITEM {k} POINTS (.+), ROUGHLY LEVEL\.", step
         )
         if rough:
             key_deg = spec.POINTING_DEG[rough[1]] + start_error_deg
@@ -237,7 +241,7 @@ def _run_clock_steps(start_error_deg: float) -> float:
             zero = _upper_face_height(key_deg, station)
         elif step == "NOTE THE Z DRO READING.":
             noted = station
-        elif step == "TURN THE HEAD 180°.":
+        elif step == "TURN THE DIVIDING HEAD 180°.":
             assert not locked
             key_deg += 180.0
         elif step.startswith(f"CARRY THE INDICATOR OVER ITEM {a}"):
@@ -249,20 +253,20 @@ def _run_clock_steps(start_error_deg: float) -> float:
         elif step.startswith(f"IF STEP {spec.CHECK_STEP} FAILS") and not passed:
             key_deg = _turn_until(zero + reading / 2.0, key_deg, station)
             index = spec.ZERO_STEP - 1
-        elif step == f"IF ITEM {k} POINTS AWAY FROM THE CUTTER, TURN THE HEAD 180°.":
+        elif step == f"IF ITEM {k} POINTS AWAY FROM THE CUTTER, TURN THE DIVIDING HEAD 180°.":
             assert not locked
             away = spec.POINTING_DEG["AWAY FROM THE CUTTER"]
             if math.cos(math.radians(key_deg - away)) > 0:
                 key_deg += 180.0
-        elif step == "LOCK THE HEAD'S SPINDLE.":
+        elif step == "LOCK THE DIVIDING HEAD'S SPINDLE.":
             locked = True
-        elif step == "UNLOCK THE HEAD'S SPINDLE.":
+        elif step == "UNLOCK THE DIVIDING HEAD'S SPINDLE.":
             locked = False
-        elif step.startswith("TURN THE HEAD BY THE BLANK'S FIRST INDEX"):
+        elif step.startswith("TURN THE DIVIDING HEAD BY THE BLANK'S FIRST INDEX"):
             assert not locked
             return key_deg
         else:
-            assert step.startswith("IF STEP") or not step.startswith("TURN THE HEAD")
+            assert step.startswith("IF STEP") or not step.startswith("TURN THE DIVIDING HEAD")
     raise AssertionError("the clocking steps never reach the index")
 
 
@@ -330,7 +334,7 @@ def test_the_setup_table_names_every_blank_its_collar_and_index() -> None:
             arbor.COLLAR_DIAS[arbor.COLLAR_BY_GEAR[blank.tag]]
         ), blank.tag
     assert spec.SETUP_TABLE_TITLE.splitlines()[1] == (
-        "(THE FIRST INDEX CENTRES A TOOTH ON ITEM 5 AT THE BLANK'S MID-FACE)"
+        "(EACH MHA-DT-03 FIRST INDEX CENTRES A TOOTH ON ITEM 5 AT MID-FACE)"
     )
     # Each cell on one line: columns cut at the widest glyph run printed
     # (farm 20261113T234307484Z: "CCW FROM CHAMFERED BORE" spanned 73.6 mm
@@ -376,12 +380,14 @@ def _off_pitches(angle: float, target: float, pitch: float) -> float:
     return abs(turns - round(turns)) * pitch
 
 
-def _printed_index_deg(teeth: int) -> tuple[float, str]:
-    """A blank's printed first index (degrees) and its direction cell."""
+def _printed_index_deg(teeth: int) -> tuple[float, str, bool]:
+    """A blank's printed first index (degrees), its direction cell and
+    whether the angle prints as REF."""
     (row,) = (row for row in spec.SETUP_TABLE_ROWS if row[1] == str(teeth))
     angle, direction = row[3], row[4]
-    assert re.fullmatch(r"\d+\.\d\d°", angle), angle
-    return float(angle.removesuffix("°")), direction
+    match = re.fullmatch(r"(\d+\.\d\d)°( REF)?", angle)
+    assert match, angle
+    return float(match[1]), direction, match[2] is not None
 
 
 def test_the_table_indexes_each_cone_blank_so_a_tooth_centres_on_the_key() -> None:
@@ -396,8 +402,8 @@ def test_the_table_indexes_each_cone_blank_so_a_tooth_centres_on_the_key() -> No
         low, high = _cone_gap_span_rad(teeth)
         assert 0.0 < low < high < pitch, teeth  # the keyway lies in a tooth
         bisector = (low + high) / 2.0
-        printed, words = _printed_index_deg(teeth)
-        assert words == "EITHER WAY", teeth
+        printed, words, ref = _printed_index_deg(teeth)
+        assert words == "EITHER WAY" and not ref, teeth
         assert printed == pytest.approx(
             spec.CONE_FIRST_INDEX_PITCHES * 360.0 / teeth, abs=0.005
         )
@@ -417,16 +423,17 @@ def _midface_gap_rad(space: StraightGash) -> float:
     return math.atan2(y, x)
 
 
-def test_the_table_indexes_the_64t_so_its_mid_face_tooth_centres_on_the_key() -> None:
+def test_the_table_prints_no_64t_index_and_the_model_keeps_its_phase() -> None:
     """The 64T's space is straight and inclined: its cutter plane crosses the
     axis at TOOTH_SPACE_CROSSING from the chamfered (z = 0) face, and the
-    model centres a tooth on the keyway at mid-face. The key on the cutter's
-    radius sets the space's crossing radial on the key; the table's index
-    then turns the blank so the cut space is the model's, inside the arbor's
-    setting allowance, where half a pitch is not. The index plus the space's
-    drift from the crossing to mid-face is half a pitch: the tooth sits on
-    the key at mid-face, the station the table's title names, not at the
-    crossing."""
+    model centres a tooth on the keyway at mid-face. The model's index
+    (CRANK_FIRST_INDEX_DEG), turned in the model's sense, cuts the model's
+    space inside the arbor's setting allowance, where half a pitch is not;
+    the index plus the space's drift from the crossing to mid-face is half a
+    pitch. Nothing reads the 64T's clock on the key (the 16T is match-drilled
+    wherever it meshes, MHA-DT-00 4S: fit audit part 2, B13), so the row
+    prints NONE / NOT CLOCKED and the title claims only the cone blanks
+    (restoration round 1, 2026-11-25)."""
     pitch = 2.0 * math.pi / crank.TEETH
     allowance = math.radians(arbor.KEY_SETTING_ALLOWANCE_DEG)
     model = _midface_gap_rad(crank.TOOTH_SPACE)
@@ -437,12 +444,14 @@ def test_the_table_indexes_the_64t_so_its_mid_face_tooth_centres_on_the_key() ->
     drift = model - crank.TOOTH_SPACE.azimuth_rad
     assert math.degrees(drift) == pytest.approx(spec.CRANK_MIDFACE_DRIFT_DEG, abs=1e-9)
     assert drift > allowance  # the crossing is no station for the tooth
-    printed, words = _printed_index_deg(crank.TEETH)
-    assert printed == spec.CRANK_FIRST_INDEX_DEG
+    (row,) = (row for row in spec.SETUP_TABLE_ROWS if row[1] == str(crank.TEETH))
+    assert (row[3], row[4]) == ("NONE", "NOT CLOCKED") == spec.CRANK_NOT_CLOCKED
+    printed = spec.CRANK_FIRST_INDEX_DEG
     assert printed + spec.CRANK_MIDFACE_DRIFT_DEG == pytest.approx(
         180.0 / crank.TEETH, abs=0.005
     )
     assert "MID-FACE" in spec.SETUP_TABLE_TITLE
+    assert spec.CONE_NUMBER in spec.SETUP_TABLE_TITLE
     # The phantoms' labels say which way the chamfered face goes: toward
     # item 2, the collar that covers its mouth.
     assert spec.CHAMFERED_FACE_TOWARD in spec.SHOWN_BLANK_LABEL
@@ -452,13 +461,11 @@ def test_the_table_indexes_the_64t_so_its_mid_face_tooth_centres_on_the_key() ->
     sense = {
         "CCW FROM CHAMFERED FACE": 1.0,
         "CW FROM CHAMFERED FACE": -1.0,
-    }[words]
-    assert words == spec.CRANK_FIRST_INDEX_SENSE
+    }[spec.CRANK_FIRST_INDEX_SENSE]
     cut = replace(crank.TOOTH_SPACE, azimuth_rad=sense * math.radians(printed))
     assert _off_pitches(_midface_gap_rad(cut), model, pitch) < allowance
     half = replace(crank.TOOTH_SPACE, azimuth_rad=pitch / 2.0)
     assert _off_pitches(_midface_gap_rad(half), model, pitch) > allowance
-    (row,) = (row for row in spec.SETUP_TABLE_ROWS if row[1] == str(crank.TEETH))
     assert row[0] == arbor.KEYED_GEARS[-1].number
 
 

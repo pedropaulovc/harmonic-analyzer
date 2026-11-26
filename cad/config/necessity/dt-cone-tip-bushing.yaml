@@ -1,0 +1,11 @@
+# Why the REAM on MHA-DT-38 stays (drawing-guidelines rule 4; owner ruling
+# 2026-11-24: "In the part's registry file, not on the sheet."). Read by the
+# machinist review only. The bore prints the .0625 reamer's size with no
+# band; the MHA-DT-37 pivot is turned to it (form 2). Fit batch DT,
+# 2026-11-24.
+necessity:
+  - id: N-01
+    feature: "Ø.0625 REAM THRU bore, BONDED FIT, LOCTITE 638"
+    kind: gap
+    reason: "a drilled bore needs a bigger OD, closing G19 air"
+    source: "fit audit 2026-11-23 F10 (EVAL s07): a 1/16 drilled bore at OD .228 leaves the wall .0783 under the .080 target; at OD .232 the wall is .08025 and the bushing's arithmetic air to gear 19 fell from 0.1336 to 0.0485 mm"

@@ -2,14 +2,15 @@ r"""Build MHA-DT-39, the cone tip end screw: McMaster 91794A559 plus one hole.
 
 The shared catalog recipe (``diag_build_91794A559``) builds the supplied
 1/4-28 x 3/4 slotted fillister screw in its stock frame; this builder then
-adds the one shop operation, the pivot hole drilled and reamed concentric in
+adds the one shop operation, the #52 pivot hole drilled concentric in
 the threaded end (``dt_cone_tip_end_screw_spec``; the MHA-DT-VN-61 post
 mount screw's pattern of a part-owned modification after the stock recipe).
 
 The hole is a plain cut-extrude from the threaded end face (``TipFace``): an
-on-axis circle carries its diameter (the reamed band, on the model
-dimension) and the cut's blind depth its full-diameter depth (.XX), so the
-drawing's native hole callout prints size, band and depth from the model.
+on-axis circle carries its diameter (the drill's nominal, no band: a drilled
+hole prints its drill) and the cut's blind depth its full-diameter depth
+(.XX), so the drawing's native hole callout prints size and depth from the
+model.
 An analytic volume check proves the cut.
 
 Frame: the stock frame, untransformed.  Axis local Y (``ScrewAxis``), head
@@ -37,10 +38,8 @@ from _drawing_marks import (
     mark_dimensions_for_drawing,
 )
 from _drawing_precision import apply_drawing_precision
-from _drawing_tolerances import set_dimension_bilateral_tolerance
 from _fastener_catalog import fastener
 from _feature_tree import name_last_feature
-from _fit_deviations import deviations
 from _rebuild import force_rebuild
 from _session import run_build
 from _simplified_part import save_simplified_part
@@ -52,7 +51,6 @@ from diagnostics.diag_build_91794A559 import build_91794A559
 from dt_cone_tip_end_screw_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
-    END_HOLE_BAND,
     END_HOLE_DEPTH,
     END_HOLE_DIA,
     HOLE_CUT,
@@ -61,7 +59,6 @@ from dt_cone_tip_end_screw_spec import (
     SHANK_LEN,
     SKU,
     TIP_FACE,
-    UNIT,
 )
 from solidworks_mcp.adapters.com_variant import double_array
 
@@ -107,7 +104,7 @@ def _sketch_normal_along_model_y(adapter) -> float:
 
 
 def _cut_end_hole(adapter) -> None:
-    """Cut-extrude the reamed hole from the threaded end face toward the head:
+    """Cut-extrude the drilled hole from the threaded end face toward the head:
     an on-axis EndHoleDia circle on TipFace, cut EndHoleDepth blind."""
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
@@ -163,14 +160,7 @@ def _tip_face(adapter) -> None:
 
 
 def _manufacturing_controls(adapter) -> None:
-    """The reamed band on the model dimension, places and drawing marks."""
-    set_dimension_bilateral_tolerance(
-        adapter,
-        HOLE_FEATURE,
-        "EndHoleDia",
-        *deviations(END_HOLE_BAND),
-        display_unit=UNIT,
-    )
+    """Places and drawing marks (the drilled hole carries no model band)."""
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
@@ -182,7 +172,7 @@ def _manufacturing_controls(adapter) -> None:
 
 
 @wraps(build_91794A559)
-def _drill_and_ream(adapter, truth=None, **parameters):
+def _drill_pivot_hole(adapter, truth=None, **parameters):
     # The shared recipe builds the supplied screw; the hole is this part's.
     receipt = build_91794A559(adapter, truth, **parameters)
     for name, value in (("EndHoleDia", END_HOLE_DIA), ("EndHoleDepth", END_HOLE_DEPTH)):
@@ -210,7 +200,7 @@ def build(adapter) -> dict[str, str]:
         adapter,
         part_name=PART_NAME,
         components=(
-            StockComponent(sku=SKU, author=_drill_and_ream, transform=RigidTransform()),
+            StockComponent(sku=SKU, author=_drill_pivot_hole, transform=RigidTransform()),
         ),
         material=MATERIAL,
         save_threaded_part=save_simplified_part,

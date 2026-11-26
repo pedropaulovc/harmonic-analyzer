@@ -75,7 +75,9 @@ def test_the_outside_diameter_is_a_native_reference_sketch_dimension() -> None:
 
 def test_the_face_width_is_a_named_driven_blank_dimension() -> None:
     assert spec.FACE_WIDTH == part.FACE_WIDTH
-    assert spec.BORE_DIA == pytest.approx(part.BORE_DIAMETER)
+    # The bore is modelled at the reamer's size, the spec's land nominal plus
+    # the analysis band's low end (see the reamer-size test below).
+    assert spec.BORE_DIA + min(spec.BORE_DIA_BAND) == pytest.approx(part.BORE_DIAMETER)
 
 
 def test_precision_is_authored_on_the_part_and_only_read_by_the_sheet() -> None:
@@ -99,6 +101,15 @@ def test_bore_band_fits_the_keyed_land_at_every_limit() -> None:
         "KeywayWidth": cone_land_key.KEYWAY_PLACES,
         "KeywayT": cone_land_key.KEYWAY_PLACES,
     }
+
+
+def test_bore_is_modelled_at_the_reamer_size_with_no_band() -> None:
+    # Fit audit 2026-11-23, MHA-DT-07.bore: the owned .3760 over reamer cuts
+    # the bore; the sheet prints its size, no band, and the land is the gauge.
+    assert part.BORE_DIAMETER == pytest.approx(0.3760 * 25.4)
+    assert part.BORE_DIAMETER == pytest.approx(spec.BORE_DIA + min(spec.BORE_DIA_BAND))
+    source = Path(part.__file__).read_text(encoding="utf-8")
+    assert '"BoreProfile", "BoreDia", *deviations' not in source
 
 
 def test_keyway_takes_the_key_and_leaves_the_web_target() -> None:
@@ -270,7 +281,7 @@ def test_gear_data_block_is_the_tooth_system_and_nothing_else() -> None:
         "TOOTH LINE:  STRAIGHT, 12.0 DEG RIGHT HAND FROM AXIS",
         "FORM CUTTER CENTRAL PLANE CROSSES GEAR AXIS AT:  .07 FROM CHAMFERED BORE FACE",
         f"BASE TANGENT SPAN OVER {spec.BASE_TANGENT_SPAN_TEETH} TEETH, NORMAL, ACCEPT ON THIS PART",
-        "TRANSVERSE BACKLASH WITH MHA-DT-10, ACCEPT AT ASSEMBLY",
+        "TRANSVERSE BACKLASH WITH MHA-DT-10 (REF)",
         "TOOTH FORM",
         "TOOTH EDGES",
         "TOOTH RUNOUT TO BORE",
@@ -292,25 +303,44 @@ def test_gear_data_block_is_the_tooth_system_and_nothing_else() -> None:
         "LONG ADDENDUM",
     ):
         assert banned not in data, banned
-    # Exact stock span is checked on the part; backlash belongs to the actual
-    # assembly, never a circular-caliper shortcut.
+    # Exact stock span is checked on the part; the mesh is accepted at
+    # assembly by turning free (owner ruling 2026-11-24, fit audit question
+    # 16), its backlash a REF range, never a circular-caliper shortcut.
     accepting = [
         line
         for line in data.splitlines()
         if any(owner in line for owner in ("ACCEPT ON THIS PART", "ACCEPT AT ASSEMBLY"))
     ]
-    assert len(accepting) == 2
+    assert len(accepting) == 1
     assert "ACCEPT AT SETUP" not in data
     for line in accepting:
         assert "REF" not in line
     # ... and no OTHER row claims an acceptance band. A tooth count, the
     # cutter's pitch and the pressure angle are definitional; a row that
-    # carries limits without saying who checks them is the defect.
+    # carries limits without saying who checks them is the defect; a REF
+    # range is a fact, not a band.
     for line in data.splitlines()[1:]:
         if line in accepting:
             continue
-        _, _, value = line.partition(":")
+        label, _, value = line.partition(":")
+        if label.endswith("(REF)"):
+            continue
         assert " +" not in value and " TO " not in value, line
+
+
+def test_backlash_ref_is_the_crank_mesh_stack_range() -> None:
+    # Fit audit question 16: the REF row is the stack's own range at print
+    # worst, copied into the notes to keep the stack out of the part's
+    # rebuild closure.
+    import crank_mesh_stack
+
+    check = crank_mesh_stack.standard_check()
+    assert notes.MESH_BACKLASH_REF_MM == pytest.approx(
+        (check.backlash_min_mm, check.backlash_max_mm), abs=1e-6
+    )
+    data = dict(line.partition(":")[::2] for line in notes.GEAR_DATA.splitlines()[1:])
+    assert data[notes.BACKLASH_LABEL].strip() == ".0035 TO .0376"
+    assert ".002 TO .007" not in notes.GEAR_DATA
 
 
 @pytest.mark.parametrize("part_spec", (spec, pinion_spec))
@@ -492,11 +522,11 @@ def test_notes_do_not_substitute_for_native_fit_dimensions() -> None:
 
 
 def test_bore_and_keyway_dimensions_link_one_matched_fit_note() -> None:
-    # The round band (.0008 wide) is narrower than the turned-diameter row, so
-    # the fit route is a matched fit to the measured keyed land of MHA-DT-04
-    # with an acceptance (rule 4). One feature, several tight dimensions: the
-    # mates print once, in note 1, and every bore and keyway dimension links
-    # it. The round bore takes rule 12's REAM now no flat is left to cut away.
+    # The bore is reamed (no band) and the keyway's bands are cone_land_key's;
+    # MHA-DT-04's keyed land is turned last to the reamed bore, so the
+    # acceptance prints once, on MHA-DT-04 (rule 4 form 2; fit audit
+    # 2026-11-23: "BORE MADE TO THE MEASURED LAND" had it backwards). One
+    # feature, several dimensions: the mates print once, in note 1.
     link = f"SEE NOTE {drawing.BORE_FIT_NOTE_NUMBER}"
     assert drawing.DIMENSION_CALLOUTS["BoreDia"] == f"REAM THRU\n{link}"
     # The keyway's width and T print the bare flag, as the keyed cone gears'
@@ -513,26 +543,30 @@ def test_bore_and_keyway_dimensions_link_one_matched_fit_note() -> None:
         assert notes.SHAFT_MATE_NUMBER not in callout, name
         assert notes.KEY_MATE_NUMBER not in callout, name
         assert "CLEARANCE" not in callout, name
-    note = " ".join(line.strip() for line in drawing.BORE_FIT_NOTE.splitlines())
-    assert note.startswith(f"{drawing.BORE_FIT_NOTE_NUMBER}. ")
-    # The land is named by what it is (its key), not by an undefined label.
-    assert f"THE KEYED LAND OF CONE GEAR SHAFT {notes.SHAFT_MATE_NUMBER}" in note
-    assert "LAND 1" not in note
-    assert notes.KEY_MATE_NUMBER in note
-    # The clearances print as REF in the keyed cone gears' form, off the
-    # same limits (draw_dt_cone_gear.sheet_notes on the same land).
-    import draw_dt_cone_gear as cone_drawing
+    # Machinist review r1 (farm run 20261124T110807008Z): the keyway width's
+    # band had no register reason of a rule-4 kind, so the width prints as a
+    # reference, key MHA-DT-VN-71's trial in note 1 its requirement, and the
+    # register keeps no entry for it.
+    assert drawing.REFERENCE_DIMENSIONS == ("KeywayWidth",)
+    assert f"KEY {notes.KEY_MATE_NUMBER} SLIDES IN THE KEYWAY." in drawing.BORE_FIT_NOTE
+    import yaml
 
-    (round_lo, round_hi), (key_lo, key_hi) = cone_drawing.bore_clearances_mm(30)
-    reference = (
-        f"(CLEARANCE {spec.inch_text(round_lo, 4)}-{spec.inch_text(round_hi, 4)} "
-        f"ON \u00d8, {spec.inch_text(key_lo, 4)}-{spec.inch_text(key_hi, 4)} KEYWAY TO KEY)"
+    register = Path(__file__).resolve().parents[1] / "config" / "necessity"
+    entries = yaml.safe_load(
+        (register / "dt-crank-drive-gear.yaml").read_text(encoding="utf-8")
+    )["necessity"]
+    assert not [e for e in entries if "keyway width" in e["feature"]]
+    note = " ".join(line.strip() for line in drawing.BORE_FIT_NOTE.splitlines())
+    # MHA-DT-03's keyed-sheet words (draw_dt_cone_gear on the cone batch):
+    # the mate and its land by diameter, then the key; no clearance and no
+    # acceptance, which MHA-DT-04's note 1 prints.
+    assert note == (
+        f"{drawing.BORE_FIT_NOTE_NUMBER}. SLIDING FIT: CONE GEAR SHAFT "
+        f"{notes.SHAFT_MATE_NUMBER} \u00d8.3750 LAND IS TURNED TO THIS BORE; "
+        f"KEY {notes.KEY_MATE_NUMBER} SLIDES IN THE KEYWAY."
     )
-    assert reference in " ".join(
-        line.strip() for line in cone_drawing.sheet_notes(30).splitlines()
-    )
-    assert reference in note
-    assert note.endswith("SLIDES ON, NO ROCK.")
+    for phrase in ("CLEARANCE", "SLIDES ON", "NO ROCK", "LAND 1", "BORE MADE TO"):
+        assert phrase not in note, phrase
     # Every line ends left of the keyway width's text above the block.
     assert max(len(line) for line in drawing.SHEET_NOTES.splitlines()) <= 51
     assert "FLAT" not in drawing.SHEET_NOTES
@@ -628,7 +662,7 @@ def test_dimension_text_lands_clear_of_the_views_and_the_title_block() -> None:
         drawing.FRONT_KEEP["KeywayT"], drawing.KEYWAY_T_CALLOUT, "0.4025 \N{PLUS-MINUS SIGN}0.0030"
     )
     width_keep = drawing.FRONT_KEEP["KeywayWidth"]
-    centred = _text_box(width_keep, drawing.KEYWAY_WIDTH_CALLOUT, "0.0625 +0.0020")
+    centred = _text_box(width_keep, drawing.KEYWAY_WIDTH_CALLOUT, "(0.0625)")
     shift = width_keep[0] - centred[0]
     keyway_width = (centred[0] + shift, centred[1], centred[2] + shift, centred[3])
     chamfer_keep = drawing.SECTION_KEEP["BoreSouthChamferSize"]
@@ -665,7 +699,7 @@ def test_dimension_text_lands_clear_of_the_views_and_the_title_block() -> None:
     note_lines = drawing.SHEET_NOTES.splitlines()
     notes_right = notes_left + _NOTE_CHAR_DEFAULT * max(len(line) for line in note_lines)
     notes_bottom = notes_top - _NOTE_PITCH_DEFAULT * len(note_lines)
-    bore = _text_box(drawing.FRONT_KEEP["BoreDia"], drawing.BORE_CALLOUT, "9.525 +0.046")
+    bore = _text_box(drawing.FRONT_KEEP["BoreDia"], drawing.BORE_CALLOUT, "9.550")
     assert notes_top < bore[1] - 0.003
     assert notes_top < drawing.FRONT_CENTER[1] - half_od - 0.005
     assert notes_left > 0.0127 and notes_bottom > 0.0127 + 0.003

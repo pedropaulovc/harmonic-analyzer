@@ -14,3 +14,9 @@ dt-cone-gear-tl-keyed-arbor:
   tolerance_class: machined_block
   drawing_unit: in
   process: "turn between centres from 5/8 in round: centre both ends, turn the seat, pilot and thread relief and the standoff to the shoulder in one setup; single-point or die the 1/4-28 thread; mill the keyseat with a 1/16 end mill; break edges, not the shoulder root"
+  machinist_exceptions:
+    - id: "RV-01"
+      kind: "accept"
+      where: "sheet 1, note 1, SEAT: CLEARANCE .0000-.0013 IN EACH BORE"
+      finding: "a four-place matched clearance where the clean inch form .000-.002 would serve (rules 3 and 4)"
+      reason: "delegated ruling 2026-11-25 (Main), no precedent; owner review #2144 (D34): main's .0000-.0013 kept, because a stack may not tighten a fit without the owner; the upper limit is the converted 0.033 mm the gears' runout budget was built on; the clean inch form (.000-.002, with its runout/contact-ratio consequences) is owner question #3587."

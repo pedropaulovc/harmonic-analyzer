@@ -191,6 +191,8 @@ def context(
         raise ValueError(f"process.stock_dia_in is not the O.D. Ø{dia:.4f}")
 
     em = _shop_tool(plan, shop, "em-eighth")["diameter_mm"]
+    # The vise picture draws the end mill from the plan's restatement.
+    _agree(plan, "flat_mill_dia_mm", em)
     cutter = em / 2
     rpm, feed = _setting(plan, shop, FLATS[0])
     normals = set()

@@ -1777,8 +1777,8 @@ def _band_counterbore_diameter(display: Any) -> None:
     (owner ruling 2026-11-20, #2422; CLAMP_CBORE_DIA_LIMITS). The band lives
     on the part's Hole Wizard feature (build_pd_support_bar
     ._band_round_counterbores) and the callout's ``<hw-cbdia>`` displays it;
-    this sets only its tolerance places, the nominal's four, as
-    draw_dt_cone_swing_platform._print_pivot_band_exactly does, and reads the
+    this sets only its tolerance places, the nominal's four (the hole-callout
+    precision exception of drawing-simplicity-policy.md), and reads the
     displayed band back so a band that did not reach the callout fails here."""
     from win32com.client.dynamic import Dispatch as dynamic_dispatch
 

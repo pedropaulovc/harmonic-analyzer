@@ -20,9 +20,18 @@ part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
 material = "Low-carbon steel, AISI 1018 (one of the drawing's grades), bought as 1/16 × 5/8 cold-drawn strip; the drawing's sheet thickness is the strip's, as supplied"
 stock = "Qty {{process.quantity:g}} and one spare. {{process.blank_thickness_in:fraction}} × {{process.blank_width_in:fraction}} in 1018 strip (McMaster-Carr 7702N136, to order, not on hand); five pieces {{process.blank_length_in:.2dot}} long."
-note = "Inches. Saw, then bench vise with soft jaws and files; no machine work on the outline. The two Ø.125 holes are drilled at assembly, not here."
 shop = "../shop"
 stock_refs = ["1018-strip-1-16x5-8"]
+
+# The shop's standing page carries what every traveler shares (units); This
+# job says what only this guide lock needs.
+standing = true
+
+[[notes]]
+title = "This job"
+rows = [
+  ["Not made here", "The two Ø.125 holes are drilled at assembly, not here."],
+]
 
 [cad]
 file = "../../out/features/pd_guide_lock/features.toml"

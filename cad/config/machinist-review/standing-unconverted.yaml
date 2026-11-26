@@ -9,18 +9,8 @@
 # branch (machinist_review_traveler.STANDING_NOT_APPLIED) and the test
 # (owner 2026-11-25).
 unconverted:
-  - ch_amplitude_bar
   - ch_channel_lever
-  - ch_connecting_rod
   - ch_fulcrum_keeper
-  - ch_fulcrum_shaft
-  - ch_pivot_bracket
-  - ch_pivot_shaft
-  - ch_rocker_arm
-  - ch_rocker_hub
-  - ch_rocker_strap
-  - ch_rocker_strap_tl_hub_plug
-  - ch_rocker_strap_tl_sub_plate
   - dt_arbor_pedestal
   - dt_cone_gear_tl_arbor_collar
   - dt_cone_gear_tl_arbor_key
@@ -50,29 +40,4 @@ unconverted:
   - dt_pinion_lift_rod
   - dt_pinion_pivot_block
   - dt_pinion_pivot_shaft
-  - ms_stick
-  - ms_stop_block
-  - ms_stop_plate
-  - pd_guide_lock
-  - pd_platen
-  - pd_platen_bottom_guide
-  - pd_platen_clip
-  - pd_platen_guide
-  - pd_support_bar
-  - pd_transgear_arm
-  - pd_transgear_arm_plate
   - pd_transgear_disc_hub
-  - pd_transgear_drive_collar
-  - pd_transgear_front_bushing
-  - pd_transgear_knob_bush
-  - pd_transgear_knob_cup
-  - pd_transgear_knob_thrust_ring
-  - pd_transgear_pin
-  - pd_transgear_pivot_spacer
-  - pd_transgear_rear_bushing
-  - pd_transgear_thumbnut
-  - pn_pen_adjust_screw
-  - pn_pen_frame
-  - pn_pen_hanger
-  - pn_pen_rod
-  - pn_pen_v_block

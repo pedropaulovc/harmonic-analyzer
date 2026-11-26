@@ -68,11 +68,21 @@ part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
 material = "AISI 1018 cold-finished steel round bar, 5/8 in"
 stock = "Lot: {{process.quantity:d}} bush. Ø{{process.stock_dia_in:.3dot}} bar, on hand (saw a {{process.bar_length_in:g}} in working piece off the bar); the bush takes {{cad.pitch_in:.2dot}} in of it."
-note = "Inches unless mm. Lathe PM-1127VF-LB (70–380 and 380–2000 rpm); steel cut with cutting oil. MHA-PD-19, the plate this bush is pressed into, is made first and is at the lathe: Setup 1 fits a pilot to its hole and writes its reading, and Op 90 turns the press diameter from that reading. Left for MHA-PD-00 step 11 (not made here): the Ø{{cad.bore_dia_min_in:.4dot}} ream after pressing (the MHA-PD-08 journal is turned to that bore), which follows the B hole this traveler drills in the chucking that turns the press diameter and the shoulder (Ops 160–180 check the hole's squareness to the shoulder before part-off). To order (not on hand): the minus pin gauges for the B hole (Op 160)."
 shop = "../shop"
 stock_refs = ["1018-round-5-8"]
 material_key = "lathe-1018-cold-finished"
 turning_material = "steel_1018"
+
+# The shop's standing page carries what every traveler shares (units, speeds,
+# coolant); This job says what only this bush needs.
+standing = true
+
+[[notes]]
+title = "This job"
+rows = [
+  ["Made first", "MHA-PD-19, the plate this bush is pressed into, is made first and is at the lathe."],
+  ["To order", "To order (not on hand): the minus pin gauges for the B hole (Op 160)."],
+]
 
 [cad]
 file = "../../out/features/pd_transgear_knob_bush/features.toml"

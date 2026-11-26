@@ -65,7 +65,6 @@ from _fit_deviations import deviations
 from _gear import build_stock_form_gear
 from _part_pmi import author_part_pmi
 from dt_alignment_pinion_spec import (
-    ARBOR_BORE_BAND,
     BORE_DIA,
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
@@ -176,23 +175,17 @@ def build(adapter) -> dict[str, str]:
         adapter, "driven alignment pinion (equations neutral)", expected, 0.02 * v_bore
     )
     # The printed tip band rides the side-view witness, not the Front-plane
-    # blank circle that only drives the solid.  Both bands print at their
-    # nominal's places (+.000/-.004), authored here so the .SLDPRT is the one
-    # source the drawing imports (Codex P1 on #1647).
+    # blank circle that only drives the solid.  It prints at its nominal's
+    # places (+.000/-.004), authored here so the .SLDPRT is the one source
+    # the drawing imports (Codex P1 on #1647).  The bore prints the 5/16
+    # drill's size bare (owner ruling 2026-11-24, fit audit question 13: no
+    # band on a drilled hole; MHA-DT-22's bond lands are turned to it).
     set_dimension_bilateral_tolerance(
         adapter,
         "OutsideDiaReference",
         "OutsideDia",
         *deviations(OUTSIDE_DIA_BAND),
         places=DRAWING_PRECISION[OUTSIDE_DIA_REFERENCE]["OutsideDia"],
-        display_unit=UNIT,
-    )
-    set_dimension_bilateral_tolerance(
-        adapter,
-        "ArborBoreProfile",
-        "ArborBoreDia",
-        *deviations(ARBOR_BORE_BAND),
-        places=DRAWING_PRECISION["ArborBoreProfile"]["ArborBoreDia"],
         display_unit=UNIT,
     )
     apply_drawing_precision(adapter, DRAWING_PRECISION)

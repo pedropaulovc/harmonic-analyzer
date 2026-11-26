@@ -27,11 +27,21 @@ part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
 material = "C36000 free-machining brass round bar, 1/2 in"
 stock = "Lot: {{process.quantity:d}} bushing. Ø{{process.stock_dia_in:.3dot}} bar, on hand: saw a {{process.bar_length_in:g}} in piece off it for the lathe, never the whole bar (it would run out past the spindle's rear end); the bushing takes {{cad.pitch_in:.2dot}} in of it."
-note = "Inches unless mm. Lathe PM-1127VF-LB (70–380 and 380–2000 rpm); brass cut dry. To order (not on hand): the .1260 chucking reamer. The bore's fit is accepted on the MHA-PD-23 pin, which is turned last to this bushing: keep the bushing with MHA-PD-18, MHA-PD-10 and MHA-PD-25."
 shop = "../shop"
 stock_refs = ["c360-round-1-2"]
 material_key = "lathe-c360"
 turning_material = "brass"
+
+# The shop's standing page carries what every traveler shares (units, speeds,
+# coolant); This job says what only this bushing needs.
+standing = true
+
+[[notes]]
+title = "This job"
+rows = [
+  ["To order", "To order (not on hand): the .1260 chucking reamer."],
+  ["Fit", "The bore's fit is accepted on the MHA-PD-23 pin, which is turned last to this bushing: keep the bushing with MHA-PD-18, MHA-PD-10 and MHA-PD-25."],
+]
 
 [cad]
 file = "../../out/features/pd_transgear_rear_bushing/features.toml"

@@ -1277,7 +1277,8 @@ keyed arbor MHA-DT-03-TL-03 (kit MHA-DT-03-TL-05: arbor, key MHA-DT-03-TL-06, th
 collars MHA-DT-03-TL-04 and a 1/4-28 nut). The arbor's key carries the blank's clock: the kit
 sheet's fitting steps point the key at the cutter before the blank goes on, then turn the head by
 the blank's first index from the kit's setup table, which centres a tooth on the keyway as the gear
-sheets draw it. Use the largest collar under the blank's root
+sheets draw it. The 64T's index prints as REF (any index serves): its 16T is match-drilled to the
+crankshaft wherever it meshes, so nothing reads its clock on the key. Use the largest collar under the blank's root
 (Ø.50 for T030 to T048, Ø1.00 for T054 to T084, Ø1.75 for T090 to T120 and the 64T) and feed
 toward the collar. Every blank is cut with the arbor's Ø.62 end gripped in the head's chuck against
 its step, from the key's clock through the blank's mount, which leaves the blank more than .75 in

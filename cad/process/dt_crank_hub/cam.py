@@ -14,7 +14,7 @@ drill's catalogue geometry (it sets the spot depth), the twist drill's 118°
 point, the approach, safe and clearance heights and the vise jaws' depth
 (keep-out shapes only).
 
-Route (plan text in ``plan.toml``): the hub is turned and its bore reamed on
+Route (plan text in ``plan.toml``): the hub is turned and its bore drilled on
 the lathe (no NC). It then lies in the vise, its axis along the jaws,
 gripped on the barrel with the barrel on two 1 in parallels' inner top
 edges: CM01 spots the barrel's top line and drills #14 down through the
