@@ -46,11 +46,21 @@ part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
 material = "C36000 free-machining brass round bar, 7/8 in (drawing: {{cad.material_name}})"
 stock = "Lot: {{process.quantity:d}} cup. Ø{{process.bar_dia_in:.3dot}} bar, on hand; the cup takes about {{process.bar_use_in:.2dot}} in of it."
-note = "Inches unless mm. Lathe PM-1127VF-LB (70–380 and 380–2000 rpm); brass cut dry. Make MHA-PD-08 first: Op 70 accepts the pilot on its finished journal. That journal is turned last to the MHA-PD-28 bush's bore, which MHA-PD-00 step 11 reams in the MHA-PD-19 plate, so this cup is made after that ream. Left for MHA-PD-00 step 22, not made here: facing the front face to the fitted pilot depth and the pilot's bond on MHA-PD-08. To order (not on hand): the .113, .117 and .250–.254 pins (pin-gauge sets)."
 shop = "../shop"
 stock_refs = ["c360-round-7-8"]
 material_key = "lathe-c360"
 turning_material = "brass"
+
+# The shop's standing page carries what every traveler shares (units, speeds,
+# coolant); This job says what only this cup needs.
+standing = true
+
+[[notes]]
+title = "This job"
+rows = [
+  ["Make first", "Make MHA-PD-08 first: Op 70 accepts the pilot on its finished journal. That journal is turned last to the MHA-PD-28 bush's bore, which MHA-PD-00 step 11 reams in the MHA-PD-19 plate, so this cup is made after that ream."],
+  ["To order", "To order (not on hand): the .113, .117 and .250–.254 pins (pin-gauge sets)."],
+]
 
 [cad]
 file = "../../out/features/pd_transgear_knob_cup/features.toml"
