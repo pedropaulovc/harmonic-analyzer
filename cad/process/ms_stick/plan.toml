@@ -648,7 +648,7 @@ vise_hold = "other"
 beam = "other"
 
 [[setups.operations]]
-instruction = "Finish (the drawing: {{cad.finish}}). Enamel: the owner's Rust-Oleum Stops Rust Flat Black 376855 (check the shelf; buy if none). To buy: 600-grit wet-or-dry paper and a metal polish (Simichrome). Wipe the stick with isopropyl alcohol (the marker comes off with it) and let it dry."
+instruction = "Finish (the drawing: {{cad.finish}}). Enamel: the owner's Rust-Oleum Stops Rust Flat Black 376855. Wipe the stick with isopropyl alcohol (the marker comes off with it) and let it dry."
 feed = "hand"
 
 [[setups.operations]]
