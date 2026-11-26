@@ -494,11 +494,7 @@ sheet:
   job-specific note only if it passes the test above. No block (paragraph,
   list item or table cell) over 60 printed words; items titled, one idea each;
   no head sentence that only says again what a setup's Holding, Datum or op
-  prints. The exception is a lead-time fact, one that matters before the setup
-  that prints it is reached: something to buy or start ahead ("To buy before
-  Setup 6: ..." when only Setup 6's op lists it) stays in the head (Main
-  2026-11-26), because the setup's text comes too late. A sheet without the
-  pointer line is a finding.
+  prints. A sheet without the pointer line is a finding.
 - **Every printed page names its part** (owner 2026-11-25: "all traveler
   pages must have header and footer with most info from drawing title bar").
   A loose page on the bench must identify itself: each page's running header
