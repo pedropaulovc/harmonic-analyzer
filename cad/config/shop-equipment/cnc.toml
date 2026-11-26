@@ -53,3 +53,21 @@ cite = [
   "FluidNC v3.7.8 source: Probe.cpp tripped() ORs the probe and toolsetter pins; MotionControl.cpp mc_probe_cycle alarms ProbeFailInitial on a tripped start; GCode.cpp G10 L20 = MPos - G92 - TLO - value, saved to NVS (Settings.cpp Coordinates::set).",
   "Owner (Pedro) 2026-11-21, answered in person (cnc rulings record), asked whether machine Z = 0 is the top of travel after homing: \"yes\".",
 ]
+
+# The least air between a cutter and a vise jaw or clamp it passes over: the
+# programmed point (the tool's lowest: an end mill's end, a drill's or chamfer
+# mill's point) at least this far above the declared jaw/clamp keep-out box's
+# top, on every move whose cutter reaches over the box. _gcode.check_keep_out
+# enforces it through cam_nc.verify; a recipe may raise it for a keep_out
+# check, never lower it. It covers a tool-setter or touch-off error, a part
+# not fully down on its parallels and a chip under it. Census of the posted
+# NC on main (issue #3607): 22 of 46 recipes pass a cutter over a jaw, least
+# 0.521 mm; at 1.0 three were under it. The floor is D32, a delegated ruling
+# 2026-11-25 (Main) with no precedent: the owner reviews it first on #2144
+# (cad/docs/drawing-simplicity-policy.md, "Named exceptions"), posted there at
+# issuecomment-7171575340 and corrected at issuecomment-7171657471.
+[cnc.jaw-clearance]
+jaw_clearance_min_mm = 1.0
+cite = [
+  "D32, delegated ruling 2026-11-25 (Main), no precedent: a 1.0 mm (.040 in) floor between any cutter and a declared jaw/clamp box, an HA fact in cad/config/shop-equipment; issue #3607. The owner reviews it on #2144 (cad/docs/drawing-simplicity-policy.md, \"Named exceptions\"): https://github.com/pedropaulovc/harmonic-analyzer/issues/2144#issuecomment-7171575340, corrected at https://github.com/pedropaulovc/harmonic-analyzer/issues/2144#issuecomment-7171657471.",
+]
