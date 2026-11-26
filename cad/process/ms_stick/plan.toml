@@ -107,6 +107,7 @@ title = "This job"
 rows = [
   ["Finished", "{{cad.zero_end_length_min_in:.2f}}–{{cad.zero_end_length_max_in:.2f}} long, {{cad.ruled_edge_width_min_in:.3dot}}–{{cad.ruled_edge_width_max_in:.3dot}} wide, {{cad.back_face_thickness_min_in:.3dot}}–{{cad.back_face_thickness_max_in:.3dot}} thick as the brass bar comes (never machined)."],
   ["Names", "RULED FACE (engraved; up on the mill), BACK (taped down), RULED EDGE (the ticks run off it; toward you on the mill), PLAIN EDGE (toward the fixed jaw), DATUM END (the end nearest the 10, on the right on the mill: every graduation station counts from it), ZERO END."],
+  ["To buy", "Before Setup 6: 600-grit wet-or-dry paper and Simichrome polish, and the Flat Black 376855 enamel if none is on the shelf."],
 ]
 
 [cad]
