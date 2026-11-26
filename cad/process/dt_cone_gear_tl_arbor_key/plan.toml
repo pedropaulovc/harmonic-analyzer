@@ -19,9 +19,18 @@ part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
 material = "Carbon steel key stock, 1/16 in square, undersized"
 stock = "Qty {{process.quantity:g}}. 1/16 in square undersized carbon-steel key stock, the 12 in bar (to order, not on hand; the MHA-DT-VN-71 bar's offcut serves); the key takes {{process.blank_length_in:.2dot}} in of it."
-note = "Inches unless mm. All bench work: no machine runs. Hand tools on the key stock, dry."
 shop = "../shop"
 stock_refs = ["key-stock-1-16-undersized"]
+
+# The shop's standing page carries the units; the setups print the bench
+# route. This job keeps the dry filing (the key is bonded).
+standing = true
+
+[[notes]]
+title = "This job"
+rows = [
+  ["Dry", "Hand tools on the key stock, dry."],
+]
 
 [cad]
 file = "../../out/features/dt_cone_gear_tl_arbor_key/features.toml"
