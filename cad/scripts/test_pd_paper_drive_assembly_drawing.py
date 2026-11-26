@@ -2999,7 +2999,7 @@ def test_every_failure_branch_has_a_pass_exit() -> None:
     texts = drawing._step_text(operating_domain=_unit_operating_domain())
     s = drawing.sub_step
     mesh = texts["fitup-mesh-remedied"]
-    pose_checks = f"{s('fitup-pose-set', 7)}-{s('fitup-pose-set', 9)}"
+    pose_checks = f"{s('fitup-pose-set', 6)}-{s('fitup-pose-set', 8)}"
     after = steps.step_number("collar-rear-faced-to-fit")
     assert mesh[0] == f"IF EVERY {pose_checks} CHECK PASSES, GO TO STEP {after}."
     assert mesh[4] == f"IF EVERY {pose_checks} CHECK NOW PASSES, GO TO STEP {after}."
@@ -3414,12 +3414,15 @@ def test_the_loaded_rack_check_is_one_dial_run_over_the_engaged_window() -> None
     assert drawing.FITUP_CHAIN_KEY == "loaded-rack-geometry-checked"
 
 
-def test_the_reducer_is_clocked_once_with_an_ordinary_limit() -> None:
+def test_the_reducer_pose_sets_no_tooth_centring() -> None:
+    """Fit audit part 2, B5: the .002 tooth centring (delegated ruling
+    2026-11-07, never confirmed by the owner) is deleted with its row: no
+    gate reads the disc's phase, and the checks after it read every phase."""
     body = _step_body("fitup-pose-set")
     assert "HELD BACK ON ITS SEAT" in " ".join(body.split())
-    clock = steps.inch_floor_mm(drawing.quality.reducer_setup_clock_deviation_mm(), 3)
-    assert f"WITHIN {disc.inch_text(clock, 3)} AT THE PITCH CIRCLE" in body
-    assert "TEST INDICATOR" in body
+    assert "CENTRED" not in body and "GAUGE PIN" not in body
+    assert "tooth-centred" not in drawing.SETTING_ROW_KEYS
+    assert not hasattr(drawing, "REDUCER_CLOCK_TEXT")
     # The reducer is accepted on an indicator, not on feelers in the mesh.
     assert (
         f"THE DISC SHAKES {drawing.REDUCER_BACKLASH_DIAL_TEXT} AS "
@@ -3591,7 +3594,7 @@ def test_the_reducer_mesh_is_tried_before_the_plate_is_doweled() -> None:
     assert f"THE DISC SHAKES {drawing.REDUCER_BACKLASH_DIAL_TEXT} AS " in " ".join(
         _step_body("fitup-pose-set").split()
     )
-    assert len(drawing._step_text(operating_domain=_unit_operating_domain())["fitup-pose-set"]) == 10
+    assert len(drawing._step_text(operating_domain=_unit_operating_domain())["fitup-pose-set"]) == 9
     rebuild = pose.index("FOR A FAULT ALL ROUND (ARM SETTING)")
     assert pose.index(f"NEW {_number('pd-transgear-arm')} ARM") > rebuild
     for part, name in (("pd-transgear-arm-plate", "PLATE"), ("pd-latch-hook", "HOOK")):

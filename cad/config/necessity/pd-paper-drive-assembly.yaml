@@ -13,11 +13,6 @@ necessity:
     kind: mesh
     reason: "crest drift takes the feed mesh's contact ratio under one"
     source: "pd_paper_drive_assembly_steps.LEVEL_RACK_CREST_DRIFT, FEED_WORST_CASE_MESH: every loose term stacked, contact ratio 1.028 over the 1.0 floor with the ends level (0.932 with the ±.002 band's .004 of drift)"
-  - id: N-03
-    feature: "step 27G and setting table row 18, disc tooth CENTRED WITHIN .002 in a knob pinion gap"
-    kind: mesh
-    reason: "off centre, the reducer mesh's shake reading is false"
-    source: "_gear_quality.reducer_setup_clock_deviation_mm; exception PD-00-knob-setting-true"
   - id: N-04
     feature: "sheet 7 DETAIL K, S to N 1.7242 +.002/-.001"
     kind: mesh
@@ -29,7 +24,7 @@ necessity:
     reason: "sets the reducer mesh's backlash"
     source: "draw_pd_paper_drive_assembly.REDUCER_SHAKE_MAX_MM; owner ruling 2026-11-24, fit audit part 2 C2 (the .0005 floor retired)"
   - id: N-06
-    feature: "setting table row 23 (22M, 33B), knob end float .006 TO .010"
+    feature: "setting table row 22 (22M, 33B), knob end float .006 TO .010"
     kind: gap
     reason: "keeps the knob shaft's end float open"
     source: "pd_transgear_knob_shaft_spec.END_FLOAT, END_FLOAT_SET_TOL"

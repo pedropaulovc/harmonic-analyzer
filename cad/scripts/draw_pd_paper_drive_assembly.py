@@ -154,7 +154,6 @@ import pd_transgear_disc_screw_spec as disc_screw
 import pd_vn_transgear_knob_cup_screw_spec as cup_screw
 import pd_vn_transgear_pivot_screw_spec as pivot_screw
 import pd_vn_transgear_pivot_spring_spec as spring
-import _gear_quality as quality
 import pd_rack_pinion_spec as disc
 import pd_transgear_feed_pinion_spec as feed_pinion
 import pd_vn_transgear_arm_plate_locating_pin_spec as plate_locating_pin
@@ -2192,9 +2191,6 @@ def _mark_window(location_mm: float) -> str:
 # --- rule 22: the values the setting table and the steps share ---------------
 LOCK_GAP_WINDOW = steps.inch_window(platen_guide.LOCK_GAP_FIT, 3, " TO ")
 KNOB_END_FLOAT_WINDOW = steps.inch_window(KNOB_END_FLOAT_RANGE, 3, " TO ")
-REDUCER_CLOCK_TEXT = steps.inch_text(
-    steps.inch_floor_mm(quality.reducer_setup_clock_deviation_mm(), 3), 3
-)
 # The tooth-space runout grade is the .002 inch step (F3).
 DISC_TIR_TEXT = steps.inch_text(
     steps.inch_floor_mm(disc.TOOTH_SPACE_RUNOUT_TIR_MM, 3), 3
@@ -2234,7 +2230,6 @@ SETTING_ROW_KEYS = (
     "cup-set",
     "engaged-feed",
     "crest-level",
-    "tooth-centred",
     "offset-set",
     "offset-accept",
     "stud-cut",
@@ -2300,7 +2295,6 @@ def _step_text(
     # ACCEPTED_CHAIN_OFFSET_IN_SERVICE assumes.
     float_sheet = SHEET_NAMES.index(CLUSTER_FLOAT_SHEET) + 1
     pose = steps.step_number("fitup-pose-set")
-    clock = REDUCER_CLOCK_TEXT
     tir = DISC_TIR_TEXT
 
     def s(key: str, index: int) -> str:
@@ -3381,10 +3375,9 @@ def _step_text(
             f"SLIDE THE COLLAR BACK AGAINST THE {teeth}.",
             f"FIT THE {knob}, HELD BACK ON ITS SEAT.",
             f"FIT THE {n['pd-transgear-thumbnut']} THUMBNUT FINGER-TIGHT.",
-            "TURN THE DISC UNTIL, ON THE LINE THROUGH THE KNOB AND DISC AXES, "
-            f"A DISC TOOTH STANDS CENTRED IN A {teeth} GAP WITHIN {clock} "
-            "AT THE PITCH CIRCLE, READ WITH A TEST INDICATOR ON A GAUGE PIN IN "
-            f"THE GAP {row_cite('tooth-centred')}.",
+            # Fit audit part 2, B5: no tooth-centring setting. Nothing reads
+            # the disc's phase: the two checks below cover every phase in one
+            # turn, and 12N's eight places 45 deg apart (18.75 teeth) read four.
             "CHECK: TURNED BY THE COLLAR, THE KNOB RUNS WITH NO TIGHT SPOT.",
             "CHECK: THE KNOB HAS SHAKE AT EVERY TOOTH.",
             # The final confirmation reads the doweled reducer as the trial
@@ -3417,13 +3410,13 @@ def _step_text(
         # its condition, so a builder whose checks pass, or whose fault is
         # another branch's, never reads on into a plain command.
         "fitup-mesh-remedied": (
-            f"IF EVERY {s('fitup-pose-set', 7)}-{s('fitup-pose-set', 9)} CHECK "
+            f"IF EVERY {s('fitup-pose-set', 6)}-{s('fitup-pose-set', 8)} CHECK "
             f"PASSES, GO TO STEP {steps.step_number('collar-rear-faced-to-fit')}.",
             "CHECK: ROCKED BY HAND, THE PLATE HAS NO SHAKE ON ITS DOWELS.",
             "CHECK: THE PLATE'S SCREWS ARE TIGHT.",
             f"IF SOUND, CLEAN THE {teeth} AND DISC AND "
-            f"REPEAT {s('fitup-pose-set', 2)}-{s('fitup-pose-set', 9)}.",
-            f"IF EVERY {s('fitup-pose-set', 7)}-{s('fitup-pose-set', 9)} CHECK NOW "
+            f"REPEAT {s('fitup-pose-set', 2)}-{s('fitup-pose-set', 8)}.",
+            f"IF EVERY {s('fitup-pose-set', 6)}-{s('fitup-pose-set', 8)} CHECK NOW "
             f"PASSES, GO TO STEP {steps.step_number('collar-rear-faced-to-fit')}.",
             "TURN THE DISC ONE TURN BY THE COLLAR, NOTING WHERE IT FAULTS.",
             knob_stack_off,
@@ -3771,7 +3764,7 @@ def setting_table_rows(
         ),
         "reducer-shake": (
             f"{s('arm-plate-located', 12)}, {s('arm-plate-fitted', 20)}, "
-            f"{s('fitup-pose-set', 9)}",
+            f"{s('fitup-pose-set', 8)}",
             "DISC SHAKE AT THE TIP OF THE TOOTH IN MESH",
             f"THE NEEDLE MOVES, {steps.inch_max_text(REDUCER_SHAKE_MAX_MM, 3)}",
             f"DIAL INDICATOR, {REDUCER_DIAL_STATIONS} PLACES",
@@ -3834,12 +3827,6 @@ def setting_table_rows(
             "RACK CRESTS, ONE END AGAINST THE OTHER",
             f"WITHIN {steps.inch_text(steps.LEVEL_RACK_CREST_DRIFT, 3)}",
             "TEST INDICATOR, HEIGHT GAUGE",
-        ),
-        "tooth-centred": (
-            s("fitup-pose-set", 6),
-            f"DISC TOOTH IN A {KNOB_PINION} GAP, AT THE PITCH CIRCLE",
-            f"CENTRED WITHIN {REDUCER_CLOCK_TEXT}",
-            "TEST INDICATOR, GAUGE PIN",
         ),
         "offset-set": (
             s("collar-rear-faced-to-fit", 3),
