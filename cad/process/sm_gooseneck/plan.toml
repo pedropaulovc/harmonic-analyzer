@@ -65,15 +65,9 @@ shop = "../shop"
 stock_refs = ["4130n-tube-1-2x0065", "6061-flat-1-2x6-54in"]
 
 # The shop's standing page carries what every traveler shares (units, speeds,
-# homing, Feed Hold, tool changes, proving a file, burrs); This job says what
-# only this gooseneck needs.
+# homing, Feed Hold, tool changes, proving a file, burrs). The note's finish
+# (polished bare, oiled) is Setup 7's own ops, so there is no This job block.
 standing = true
-
-[[notes]]
-title = "This job"
-rows = [
-  ["Finish", "{{cad.finish}}."],
-]
 
 [cad]
 file = "../../out/features/sm_gooseneck/features.toml"
@@ -347,7 +341,7 @@ speed_kind = "spindle"
 tool = "em-half"
 drilling = "none"
 sizing = "other"
-instruction = "Prove in air: every move clears the three straps; the end mill comes down in front of the plate and behind it, never over the plate but at the stud holes. Run GF01_form_a (M6 T1, 1/2 in end mill; set 1250). It pecks the two stud holes through first, {{process.hole_peck_mm:in.3dot}} a peck."
+instruction = "Run GF01_form_a (M6 T1, 1/2 in end mill; set 1250). It pecks the two stud holes through first, {{process.hole_peck_mm:in.3dot}} a peck."
 rpm = 1250
 feed = "{{process.stud_plunge_feed_per_min_mm:in.1f}} in/min plunge"
 milling_cuts = [
@@ -421,7 +415,7 @@ speed_kind = "spindle"
 tool = "em-half"
 drilling = "none"
 sizing = "other"
-instruction = "Prove in air: every move clears the three straps; the end mill comes down in front of the plate and behind it, never over the plate but at the stud holes. Run GF02_form_b (M6 T1, 1/2 in end mill; set 1250). It pecks the two stud holes through first, {{process.hole_peck_mm:in.3dot}} a peck."
+instruction = "Run GF02_form_b (M6 T1, 1/2 in end mill; set 1250). It pecks the two stud holes through first, {{process.hole_peck_mm:in.3dot}} a peck."
 rpm = 1250
 feed = "{{process.stud_plunge_feed_per_min_mm:in.1f}} in/min plunge"
 milling_cuts = [
