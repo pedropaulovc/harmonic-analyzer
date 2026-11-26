@@ -2,15 +2,14 @@
   <!-- Plan from above, 8 px/mm, the pivot end (+X right, +Y up away from E; X0 Y0 the pivot). The 1/4 in end mill (6.35 = 50.8 px) on PL09's one level at Z0 (re-zeroed to the relief's floor): in from beside the pivot-end edge along E's side (L28-L29, X12.242 Y-2.558 to X-0.070 Y-2.158, -X), round the pivot (G2, L30) and out along the far side (L31, +X): the relief 10.67 wide, R5.334 about the pivot, open to the pivot-end edge. Drawn halfway along L29. -->
   <rect class="paper" x="0" y="0" width="760" height="360"/>
   <text class="title" x="20" y="22">Op 440 (PL09, T1): the 1/4 in end mill on the relief's floor, round the pivot (plan 8 px/mm)</text>
-  <rect class="fixture-plate" x="90" y="36" width="640" height="304"/>
-  <path class="part-kept" d="M425.99 309.8A79.25 79.25 0 0 0 505.2 233.12L507.1 174.71A62.99 62.99 0 0 0 453.7 110.41L-1301.7 -159.3L-1305.77 -136.77A31.5 31.5 0 0 1 -1342.35 -111.36A31.5 31.5 0 0 1 -1367.76 -147.95L-1363.98 -168.87L-1375.7 -170.67A40.64 40.64 0 0 0 -1422.49 -131.82L-1429.98 98.58L-1367.72 309.8Z"/>
+  <rect class="fixture-plate" x="114" y="36" width="616" height="304"/>
+  <path class="part-kept" d="M114 309.8L425.99 309.8L428.76 309.75L431.53 309.6L434.29 309.36L437.04 309.02L439.78 308.59L442.5 308.06L445.2 307.43L447.87 306.72L450.52 305.91L453.14 305L455.72 304.01L458.27 302.92L460.78 301.75L463.25 300.49L465.67 299.15L468.05 297.72L470.37 296.21L472.64 294.62L474.85 292.95L477 291.2L479.09 289.38L481.11 287.49L483.07 285.53L484.96 283.5L486.77 281.4L488.51 279.25L490.18 277.03L491.76 274.76L493.27 272.44L494.69 270.06L496.03 267.63L497.28 265.16L498.45 262.65L499.53 260.1L500.51 257.51L501.41 254.89L502.22 252.24L502.93 249.56L503.55 246.86L504.07 244.14L504.5 241.4L504.83 238.65L505.06 235.89L505.2 233.12L507.1 174.71L507.13 172.49L507.08 170.26L506.96 168.03L506.76 165.81L506.47 163.6L506.12 161.4L505.68 159.22L505.16 157.05L504.57 154.9L503.91 152.77L503.16 150.67L502.35 148.59L501.46 146.55L500.5 144.54L499.47 142.56L498.37 140.62L497.2 138.72L495.97 136.87L494.67 135.06L493.31 133.29L491.88 131.58L490.4 129.91L488.86 128.3L487.26 126.75L485.61 125.25L483.91 123.82L482.15 122.44L480.35 121.13L478.51 119.88L476.62 118.69L474.69 117.58L472.72 116.53L470.72 115.56L468.68 114.65L466.61 113.82L464.51 113.06L462.39 112.38L460.25 111.77L458.08 111.24L455.9 110.78L453.7 110.41L114 58.21Z"/>
   <rect class="part-removed" x="450" y="137.33" width="59.2" height="85.34"/>
   <circle class="part-removed" cx="450" cy="180" r="42.67"/>
   <circle class="holes" cx="450" cy="180" r="25.5"/>
   <circle class="holes" cx="316.91" cy="183.81" r="12.19"/>
   <circle class="clamp" cx="316.91" cy="183.81" r="18.56"/>
   <circle class="cutter" cx="498.69" cy="198.86" r="25.4"/>
-  <rect class="paper" x="0" y="30" width="114" height="330"/>
   <path class="hidden" d="M110 40L118 71L110 102L118 133L110 164L118 195L110 226L118 257L110 288L118 319L110 350"/>
   <line class="arrow" x1="528.69" y1="232.86" x2="468.69" y2="234.86"/>
   <text class="label" x="30" y="330">relief {{cad.top_relief_width_nominal_in:.2dot}} wide, R{{cad.top_relief_end_radius_nominal_in:.2dot}} about the pivot, open to the pivot-end edge:</text>

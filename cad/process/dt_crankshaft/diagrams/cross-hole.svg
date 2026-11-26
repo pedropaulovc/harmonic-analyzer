@@ -17,7 +17,7 @@
   <rect class="fixture-support" x="374.75" y="206.96" width="304.8" height="70.2"/>
   <rect class="part-rest" x="561.44" y="167.62" width="121.92" height="33.34"/>
   <rect class="part-rest" x="683.36" y="158.04" width="20.73" height="52.5"/>
-  <rect class="part-rest" x="704.09" y="170" width="66.9" height="28.58"/>
+  <path class="part-rest" d="M704.09 170L748 170L745 177.14L748 184.29L745 191.43L748 198.57L704.09 198.57Z"/>
   <path class="cutter" d="M132.28 40L132.28 201.57L124.81 206.06L117.35 201.57L117.35 40L124.81 37Z"/>
   <line class="arrow" x1="102.81" y1="50" x2="102.81" y2="80"/>
   <line class="datum" x1="470" y1="134" x2="470" y2="278"/>
