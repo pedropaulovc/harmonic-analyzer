@@ -204,8 +204,8 @@ drill_b_tip_mm = -8.7932
 drill_7_tip_mm = -8.5108
 # The .2510 reamer, Setup 4 (the bar flat on the spoil plate, its thrust
 # into the plate): 600 rpm, .004 in/rev (2.4 in/min) in and out at feed,
-# its tip ream_past_mm into the plate (ream_tip_mm below Z0; its full
-# diameter through by more than its chamfer + 0.25: cnc.toml
+# its tip ream_past_mm into the plate (ream_tip_mm below Z0; more than its
+# chamfer + 0.25, so its full diameter passes through by more than 0.25: cnc.toml
 # cnc.ream-full-diameter, D45); the
 # B drill re-enters its hole first, its full diameter drill_past_mm deeper
 # (pivot_redrill_tip_mm), and leaves the reamer ream_allowance_mm on the

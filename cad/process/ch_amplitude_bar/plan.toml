@@ -401,8 +401,9 @@ top_notch_light_mm = 1.397
 # Pin hole: spot Ø.065 with the #1 carbide centre drill (under the #49, so no
 # chamfer at the mouth), the #49 through in pecks of .050 with full retracts,
 # its full diameter .5 mm past the down face, then the .0775 reamer through,
-# its tip 1.0 mm past it (its full diameter past by more than its chamfer +
-# 0.25: cnc.toml cnc.ream-full-diameter, D45), in and out at feed.
+# its tip 1.0 mm past it (more than its chamfer + 0.25, so its full diameter
+# passes by more than 0.25: cnc.toml cnc.ream-full-diameter, D45), in and out
+# at feed.
 spot_dia_mm = 1.651
 peck_mm = 1.27
 drill_past_mm = 0.5
