@@ -35,10 +35,17 @@ part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
 material = "AISI O1 drill rod, precision ground, 5/32 in"
 stock = "Qty {{process.quantity:g}}. Ø{{process.stock_dia_in:.4dot}} ground drill rod (to order, not on hand); one blank {{process.blank_length_in:.2dot}} in long per pin and one {{process.trial_offcut_in:.2dot}} in trial offcut (allow a saw kerf each)."
-note = "Inches unless mm. Lathe PM-1127VF-LB (70–380 and 380–2000 rpm); cutting oil. The O.D. is left as supplied: the ground rod's own surface is the drawing's Ra 63 cam contact, so grip it over a brass shim wrap and never cut, file or stone it."
 shop = "../shop"
 stock_refs = ["o1-drill-rod-5-32"]
 material_key = "lathe-o1-drill-rod"
+
+standing = true
+
+[[notes]]
+title = "This job"
+rows = [
+  ["O.D.", "The O.D. is left as supplied: the ground rod's own surface is the drawing's Ra 63 cam contact, so grip it over a brass shim wrap and never cut, file or stone it."],
+]
 
 [cad]
 file = "../../out/features/dt_pinion_cam_pin/features.toml"
