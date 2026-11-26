@@ -156,7 +156,9 @@ face_stepover_max_mm = 6.4
 # 1.18-1.44 mm under the faced hub. It is faced alone on the set's 1 in and
 # 1/2 in pairs stacked (facing_stack_mm), its top above the jaws, so the cutter
 # runs off every edge; then it goes onto the 15/16 pair and is clamped alone
-# for the gauge. Its width: one long edge milled to 3.940-3.960, under the
+# for the gauge. Its width: one long edge milled to 3.940-3.960, the plate
+# stood on edge on the set's 5/32 in shim pair (edge_shim_height_mm; the
+# jaws then grip 40 % of its 4 in, over the shop's third), under the
 # narrowest load of four blanks (3.984, from Setup 1's .9960-1.0020 gate) so
 # the jaws grip the blanks and never the plate, and over the widest load
 # less a parallel (4.008 - .125), so its far edge stays .057 or more on the
@@ -166,6 +168,7 @@ face_stepover_max_mm = 6.4
 parallel_height_mm = 23.8125
 parallel_thickness_mm = 3.175
 facing_stack_mm = 38.1
+edge_shim_height_mm = 3.96875
 spoil_plate_bought_mm = 15.875
 spoil_plate_thickness_mm = 14.8082
 spoil_plate_thickness_min_mm = 14.6812
@@ -364,17 +367,17 @@ beam = { axis = "x", hold = "between", extent_mm = [0, "{{process.blank_length_m
 
 [[setups.operations]]
 instruction = "Every lot, before the first load: console M6 T1. Mill one long edge of the new spoil plate, stood on edge in the vise, so the plate is 3.940–3.960 wide."
-instruction_detailed = "Every lot, before the first load. Console M6 T1 (1/2 in end mill, {{process.half_mill_projection_mm:in.2f}} in out of the collet; the tool setter measures it). Calipers across the new spoil plate's width at its LEFT end: W. Stand the plate on one long edge on the set's 1/2 in pair, one parallel against each jaw, its two faces in the jaws, LEFT end to the left; tap it down onto both parallels while closing the vise. Set 2650. Spindle stopped, touch the T1 tip on the top edge at the LEFT end over a .002 feeler leaf; then jog Z down .002 plus (W − 3.950) and take the top edge along X by hand jog in two overlapping passes across its 5/8 thickness, the cutter running off both ends: the plate is then 3.950 wide."
+instruction_detailed = "Every lot, before the first load. Console M6 T1 (1/2 in end mill, {{process.half_mill_projection_mm:in.2f}} in out of the collet; the tool setter measures it). Calipers across the new spoil plate's width at its LEFT end: W. Stand the plate on one long edge on the parallel set's 5/32 in shim pair, one against each jaw, its two faces in the jaws, LEFT end to the left; tap it down onto both while closing the vise (the jaws grip the lower 1.61 of its 4 in). Set 2650. Spindle stopped, touch the T1 tip on the top edge at the LEFT end over a .002 feeler leaf; then jog Z down .002 plus (W − 3.950) and take the top edge along X by hand jog in two overlapping passes across its 5/8 thickness, the cutter running off both ends: the plate is then 3.950 wide."
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Every lot, still clamped: the spoil plate's width."
-inspection = "3.940–3.960 (the calipers, at both ends and the middle): under the narrowest load (3.984), so the jaws grip the blanks and never the plate, and at least .057 onto the 1/8 in moving parallel on the widest (4.008). Over 3.960: jog down the excess and take the edge again. Under 3.940: saw a new plate and start again from the op before."
+instruction = "Every lot: open the vise and lift the plate out; its width."
+inspection = "3.940–3.960 (the calipers across the plate, at both ends and the middle): under the narrowest load (3.984), so the jaws grip the blanks and never the plate, and at least .057 onto the 1/8 in moving parallel on the widest (4.008). Over 3.960: stand it back on the shim pair as in the op before, touch the top edge at the LEFT end again, jog down .002 plus (the LEFT-end reading − 3.950), take the edge again and recheck. Under 3.940: saw a new plate and start again from the op before."
 gauge_checks = [{ gauge = "calipers", band_mm = ["{{process.spoil_plate_width_min_mm}}", "{{process.spoil_plate_width_max_mm}}"] }]
 
 [[setups.operations]]
 instruction = "Every lot: face the spoil plate's top alone to .583 on the 1 in and 1/2 in pairs stacked, its top above the jaws."
-instruction_detailed = "Every lot. Open the vise and lift the plate out; take the 1/2 in pair out. Stack the set's 1 in pair on its 1/2 in pair, one stack against each jaw (1.5 in). Lay the plate flat on them, its milled edge toward the moving jaw, LEFT end to the left; tap it down onto both stacks while closing the vise on the plate alone: the jaws grip the lower .27 of its edges and its top stands about .36 above them. Mic it at both ends (the anvil under the plate's end, past the parallels' ends): T, the thicker reading. Spindle stopped, touch the T1 tip on the plate's top over a .002 feeler leaf; then jog Z down .002 plus (T − .583) and face the whole top at 2650 by hand jog in overlapping passes along X at most .4 apart, the cutter running off both ends and over both jaws' tops, so it leaves no lip at the edges. More than .050 to take off: two levels."
+instruction_detailed = "Every lot. Take the shim pair out. Stack the set's 1 in pair on its 1/2 in pair, one stack against each jaw (1.5 in), the stacks centred along the jaws. Lay the plate flat on them, centred along them (its ends about 1 in past the 4 in stacks), its milled edge toward the moving jaw, LEFT end to the left; tap it down onto both stacks while closing the vise on the plate alone: the jaws grip the lower .27 of its edges and its top stands about .36 above them. Mic it at both ends (the anvil under the plate's end, past the stacks' ends): T, the thicker reading. Spindle stopped, touch the T1 tip on the plate's top over a .002 feeler leaf at the end that read T; then jog Z down .002 plus (T − .583) and face the whole top at 2650 by hand jog in overlapping passes along X at most .4 apart, the cutter running off both ends and over both jaws' tops, so it leaves no lip at the edges. More than .050 to take off: two levels."
 feed = "hand"
 
 [[setups.operations]]

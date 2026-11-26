@@ -971,8 +971,6 @@ description = "6061-T6511 aluminium, flat bar, 1/2 x 6 in, 18 in length"
 # The freed 18 in bar (stock-bought, same key, on hand), named by two
 # families' stock_refs: the DT platform's Setups 3-4 spoil plate (whole) and
 # the MHA-PD-02 platen's fixture bar (moved here from dt.toml and pd.toml).
-[stock.6061-flat-5-8x4]
-description = "6061 aluminium, flat bar, 5/8 x 4 in"
 [stock.c360-flat-3-4x1-1-4]
 description = "C36000 free-machining brass (360-H02, extruded), flat bar, 3/4 x 1-1/4 in"
 [stock.c360-round-1-4]

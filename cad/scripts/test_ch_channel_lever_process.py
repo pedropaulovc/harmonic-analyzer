@@ -191,6 +191,9 @@ def test_a_root_band_the_1_8_end_mill_cannot_leave_is_refused() -> None:
         ({"facing_stack_mm": 39.6875}, "on its stack less than the shop's minimum"),
         ({"facing_stack_mm": 30.0}, "stand clear over the jaws"),
         ({"spoil_plate_bought_mm": 14.9}, "nothing to face"),
+        # The width op on edge: the 1/2 in pair leaves the jaws under a
+        # third of the plate's width.
+        ({"edge_shim_height_mm": 12.7}, "less than the shop's fraction"),
         # The milled width: under the narrowest load, onto the moving parallel
         # on the widest.
         (

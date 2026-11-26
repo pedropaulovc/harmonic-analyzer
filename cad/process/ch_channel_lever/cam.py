@@ -563,6 +563,19 @@ def context(
         raise ValueError(
             "the spoil plate misses the moving parallel on the widest load"
         )
+    # The width op stands the bought plate on edge on the set's shim pair:
+    # the jaws grip at least the shop's fraction of its width, and its top
+    # edge stands the jaw-clearance floor over them.
+    edge_grip = p["vise_jaw_height_mm"] - p["edge_shim_height_mm"]
+    if (
+        edge_grip
+        < shop["limits"]["vise_grip_fraction_min"] * p["spoil_plate_width_max_mm"]
+    ):
+        raise ValueError(
+            "the jaws grip the spoil plate on edge less than the shop's fraction"
+        )
+    if p["spoil_plate_width_min_mm"] - edge_grip < floor:
+        raise ValueError("the spoil plate's edge does not stand clear over the jaws")
     jaw_w = p["vise_jaw_width_mm"]
     jaw_x0 = (p["blank_length_in"] * IN - jaw_w) / 2
     _agree(plan, "jaw_start_mm", jaw_x0)
