@@ -44,7 +44,7 @@ standing = true
 [[notes]]
 title = "This job"
 rows = [
-  ["O.D.", "The ground rod's own surface is the drawing's Ra 63 cam contact, so never cut, file or stone it."],
+  ["O.D.", "The O.D. is left as supplied: the ground rod's own surface is the drawing's Ra 63 cam contact, so grip it over a brass shim wrap and never cut, file or stone it."],
 ]
 
 [cad]

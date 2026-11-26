@@ -50,6 +50,12 @@ milling_material = "steel_1018"
 
 standing = true
 
+[[notes]]
+title = "This job"
+rows = [
+  ["O.D.", "The O.D. is left as supplied: grip it over a brass shim wrap (lathe) and never cut it."],
+]
+
 [cad]
 file = "../../out/features/dt_pinion_lift_rod/features.toml"
 adapter = "turned_shaft"

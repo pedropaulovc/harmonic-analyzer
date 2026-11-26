@@ -45,6 +45,12 @@ material_key = "lathe-1018-cold-finished"
 
 standing = true
 
+[[notes]]
+title = "This job"
+rows = [
+  ["O.D.", "The O.D. is left as supplied: grip it over a brass shim wrap and never cut it."],
+]
+
 [cad]
 file = "../../out/features/dt_pinion_pivot_shaft/features.toml"
 adapter = "turned_shaft"
