@@ -20,8 +20,13 @@ import pytest
 
 import _process_plans
 
-# "Op 270", "Ops 320–330", "Ops 110-160"; the range's ends both resolve.
-OP_REFERENCE = re.compile(r"\bOps? (\d+)(?:\s*[–-]\s*(\d+))?")
+# "Op 270", "op 40", "Ops 320–330", "Ops 40, 90, 100 and 110", "Ops 90–210 and
+# 260–300", "Ops 20 to 60": every number after the word resolves (a range by
+# both its ends).
+OP_REFERENCE = re.compile(
+    r"\bops?\s+\d+(?:(?:\s*[–—-]\s*|\s*,\s*|\s+(?:and|to|through)\s+)\d+)*",
+    re.IGNORECASE,
+)
 
 
 def op_numbers(plan: dict) -> dict[int, dict]:
@@ -45,7 +50,7 @@ def printed_references(plan: dict) -> Iterator[tuple[str, int, str]]:
 
     for where, text in walk(plan, "plan"):
         for match in OP_REFERENCE.finditer(text):
-            for number in filter(None, match.groups()):
+            for number in re.findall(r"\d+", match.group(0)):
                 yield where, int(number), match.group(0)
 
 
@@ -73,10 +78,26 @@ def test_a_reference_past_the_last_operation_is_caught() -> None:
                     {"instruction": "As Op 10 says."},
                 ]
             },
-            {"operations": [{"instruction": "Redo Ops 10–30, then Op 25."}]},
+            {
+                "operations": [
+                    {
+                        "instruction": "Redo Ops 10–30, then op 25; see Ops 20, 30 and 40."
+                    }
+                ]
+            },
         ]
     }
-    assert sorted(n for _, n, _ in printed_references(plan)) == [10, 10, 25, 30]
+    assert sorted(n for _, n, _ in printed_references(plan)) == [
+        10,
+        10,
+        20,
+        25,
+        30,
+        30,
+        40,
+    ]
+    where = "plan.setups[1].operations[0].instruction"
     assert broken_references(plan) == [
-        "plan.setups[1].operations[0].instruction: Op 25 names Op 25, not one of the plan's Op 10–30",
+        f"{where}: op 25 names Op 25, not one of the plan's Op 10–30",
+        f"{where}: Ops 20, 30 and 40 names Op 40, not one of the plan's Op 10–30",
     ]

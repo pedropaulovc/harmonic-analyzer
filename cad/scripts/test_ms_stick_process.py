@@ -52,15 +52,25 @@ def ctx() -> dict:
 
 
 def _post(ctx: dict, out: Path) -> None:
-    """Each program as the runtime posts it: the grbl preamble, then per
+    """Each program as the runtime posts it: the header (its name, the plan's
+    comment, one ``(T<n> D=<dia> <name>)`` line per tool, so a tool name that
+    would close the comment early fails here), the grbl preamble, then per
     section an M6 block (M5, the operator's %msg, M6, M3) and its lines, the
     feeds in mm/min."""
     sections = {op[0]: job for job in ctx["jobs"] for op in job["ops"]}
     lines_of = {op[0]: op[2] for job in ctx["jobs"] for op in job["ops"]}
     for name, keys in RECIPE.PROGRAMS:
+        listed = {}
+        for key in keys:
+            job = sections[key]
+            number = ctx["numbers"][job["tool"]]
+            listed.setdefault(
+                number, f"(T{number} D={job['dia']:.3f} {ctx['names'][job['tool']]})"
+            )
         text = [
             f"({name})",
             f"({ctx['comment']})",
+            *listed.values(),
             "(Begin preamble)",
             "G17 G90",
             "G21",
@@ -498,7 +508,7 @@ OP_REFERENCES = {
 }
 
 
-def _printed_where(where: str, numbers: dict[int, int]) -> str:
+def _printed_where(where: str, numbers: dict[tuple[int, int], int]) -> str:
     """``plan.setups[i].operations[j]...`` -> "Op <n>";
     ``plan.setups[i].<field>...`` -> "Setup <i+1> <field>"."""
     m = re.match(r"plan\.setups\[(\d+)\]\.(?:operations\[(\d+)\]|(\w+))", where)
