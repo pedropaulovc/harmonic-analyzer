@@ -1,16 +1,25 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 480" width="760" height="480" font-family="sans-serif" font-size="13">
-  <!-- Hand picture, to scale at 5 px/mm. Top: plan from above, +X right, +Y up toward the fixed jaw: the blank O face up, the T edge on the fixed jaw (Y0), its hub end LEFT, X0 its left end, overhanging the jaws' left ends 40.64 mm (process.overhang_mm); the two 1 in parallels, 1/8 thick, against the jaws dashed under it, their left ends at the jaws' left ends. The spacer at the jaws' right ends and the jaws' far ends are off the picture. Bottom: a section along the line marked in plan, seen from the front (looking +Y, +X right): the fixed jaw and its parallel behind, the jaw tops 11.608 mm over the O face (process.jaw_top_mm); the moving jaw and its parallel in front of the cut, not drawn. The jaw and parallel run on to break lines. The section at Y-12.7, through the seat. The 3/8 end mill (shop em, Ø9.525 mm) at X 21.399 Y-12.700, the +X point of its G2 helix (radius 4.8895, process.seat_path_radius_mm) about the seat's axis at X 16.51 (process.hub_waste_mm + R.50), on its level turn at Z-8.1915 (process.through_bottom_mm), 0.254 under the underside, travelling −Y (clockwise from above). Dashed: the seat Ø.76 and the R.50 round to come. In section it ends in its 12 % arc and runs up to a break line. -->
-  <rect class="paper" x="0" y="0" width="760" height="480"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1080 480" width="1080" height="480" font-family="sans-serif" font-size="13">
+  <!-- Hand picture, to scale at 5 px/mm. Top: plan from above, +X right, +Y up toward the fixed jaw: the blank O face up, the T edge on the fixed jaw (Y0), its hub end LEFT, X0 its left end, overhanging the jaws' left ends 40.64 mm (process.overhang_mm); the two 1 in parallels, 1/8 thick, against the jaws dashed under it, their left ends at the jaws' left ends. Bottom: a section along the line marked in plan, seen from the front (looking +Y, +X right): the fixed jaw and its parallel behind, the jaw tops 11.608 mm over the O face (process.jaw_top_mm); the moving jaw and its parallel in front of the cut, not drawn. The jaw and parallel run on to break lines. The plan runs on to the jaws' right ends (158.67 mm long, process.vise_jaw_width_mm): the parallels drawn their 4 in (101.6 mm, the LMS 6745 set; parallel_length_mm in the crank pin and arbor plans; not on record in this plan) from the jaws' left ends; the spacer (Setup 1, about 1.5 off the same 5/16 x 1 bar: drawn 1.5 x 1, the length not on record closer than 'about') between the jaws, its right end at the jaws' right ends, as the Holding puts it. Drawn true, the spacer stands about 19 mm past the parallels' right ends, so it can't sit 'on the parallels' as the Holding says: issue #3686. The section stops at a break line short of it. The section at Y-12.7, through the seat. The 3/8 end mill (shop em, Ø9.525 mm) at X 21.399 Y-12.700, the +X point of its G2 helix (radius 4.8895, process.seat_path_radius_mm) about the seat's axis at X 16.51 (process.hub_waste_mm + R.50), on its level turn at Z-8.1915 (process.through_bottom_mm), 0.254 under the underside, travelling −Y (clockwise from above). Dashed: the seat Ø.76 and the R.50 round to come. In section it ends in its 12 % arc and runs up to a break line. -->
+  <rect class="paper" x="0" y="0" width="1080" height="480"/>
   <text class="title" x="20" y="22">Setup 2, CA01 T1: the 3/8 end mill's G2 helix at the seat's bottom, Z-8.192, through into air (to scale, 5 px/mm)</text>
-  <rect class="clamp" x="263.2" y="70" width="481.8" height="30"/>
-  <rect class="clamp" x="263.2" y="227" width="481.8" height="30"/>
+  <rect class="clamp" x="263.2" y="70" width="793.37" height="30"/>
+  <rect class="clamp" x="263.2" y="227" width="793.37" height="30"/>
   <text class="label-on-clamp" x="269.2" y="90">fixed jaw (the T edge on it)</text>
   <text class="label-on-clamp" x="269.2" y="247">moving jaw</text>
   <path class="part-kept" d="M60 100L60 103.17L60 106.35L60 109.53L60 112.7L60 115.88L60 119.05L60 122.22L60 125.4L60 128.57L60 131.75L60 134.93L60 138.1L60 141.27L60 144.45L60 147.62L60 150.8L60 153.97L60 157.15L60 160.32L60 163.5L60 166.68L60 169.85L60 173.02L60 176.2L60 179.38L60 182.55L60 185.72L60 188.9L60 192.07L60 195.25L60 198.43L60 201.6L60 204.77L60 207.95L60 211.12L60 214.3L60 217.47L60 220.65L60 223.82L60 227L599.75 227L599.75 223.82L599.75 220.65L599.75 217.47L599.75 214.3L599.75 211.12L599.75 207.95L599.75 204.77L599.75 201.6L599.75 198.43L599.75 195.25L599.75 192.07L599.75 188.9L599.75 185.72L599.75 182.55L599.75 179.38L599.75 176.2L599.75 173.02L599.75 169.85L599.75 166.68L599.75 163.5L599.75 160.32L599.75 157.15L599.75 153.97L599.75 150.8L599.75 147.62L599.75 144.45L599.75 141.27L599.75 138.1L599.75 134.93L599.75 131.75L599.75 128.57L599.75 125.4L599.75 122.22L599.75 119.05L599.75 115.88L599.75 112.7L599.75 109.53L599.75 106.35L599.75 103.17L599.75 100Z"/>
-  <line class="hidden" x1="263.2" y1="115.88" x2="745" y2="115.88"/>
-  <line class="hidden" x1="263.2" y1="211.12" x2="745" y2="211.12"/>
+  <line class="hidden" x1="263.2" y1="115.88" x2="771.2" y2="115.88"/>
+  <line class="hidden" x1="263.2" y1="211.12" x2="771.2" y2="211.12"/>
   <line class="centre-line" x1="20" y1="163.5" x2="745" y2="163.5"/>
   <text class="label" x="4" y="159.5">section</text>
+  <rect class="fixture-support" x="866.07" y="100" width="190.5" height="127"/>
+  <text class="label-halo" x="874.07" y="125">spacer about 1.5 (Setup 1),</text>
+  <text class="label-halo" x="874.07" y="141">off the same 5/16 x 1 bar,</text>
+  <text class="label-halo" x="874.07" y="157">at the jaws' right ends</text>
+  <text class="label" x="779.2" y="160">parallels'</text>
+  <text class="label" x="779.2" y="176">right ends</text>
+  <text class="label" x="779.2" y="192">(4 in long)</text>
+  <line class="leader" x1="777.2" y1="156" x2="771.2" y2="115.88"/>
+  <circle class="leader-dot" cx="771.2" cy="115.88" r="2"/>
   <circle class="datum" cx="60" cy="100" r="3.5"/>
   <text class="datum-label" x="66" y="92">X0 Y0</text>
   <circle class="hidden" cx="142.55" cy="163.5" r="48.26"/>

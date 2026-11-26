@@ -17,4 +17,8 @@
   <text class="label" x="600" y="126">Ø{{cad.outer_dia_in:.3dot}}; 5/16 bore through</text>
   <line class="leader" x1="598" y1="106" x2="480" y2="52"/>
   <circle class="leader-dot" cx="480" cy="52" r="2"/>
+  <text class="label" x="600" y="200">held: the bench vise's</text>
+  <text class="label" x="600" y="216">soft jaws on the O.D.</text>
+  <text class="label" x="600" y="232">(not drawn: they</text>
+  <text class="label" x="600" y="248">would hide the part)</text>
 </svg>

@@ -30,4 +30,5 @@
   <line class="leader" x1="640" y1="66" x2="736.41" y2="149.45"/>
   <circle class="leader-dot" cx="736.41" cy="149.45" r="2"/>
   <text class="label" x="40" y="270">stations from the head's rear face; the journals marked under the shaft</text>
+  <text class="label" x="40" y="290">held: the bench vise's soft jaws on the head (not drawn: they would hide it)</text>
 </svg>

@@ -16,4 +16,6 @@
   <text class="label" x="260" y="76">pin gauge D through the hole: the largest that enters</text>
   <line class="leader" x1="258" y1="72" x2="218.22" y2="80"/>
   <circle class="leader-dot" cx="218.22" cy="80" r="2"/>
+  <text class="label" x="430" y="230">in the hand, or the bench vise's soft jaws on the</text>
+  <text class="label" x="430" y="246">small end if needed (not drawn: they would hide it)</text>
 </svg>
