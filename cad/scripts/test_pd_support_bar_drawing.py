@@ -65,6 +65,35 @@ def test_printed_bands_match_the_bar_and_drilled_slot_limits() -> None:
     assert part.CLAMP_SLOT_WIDTH_LIMITS == (0.0, drilled_oversize_mm(unit="in"))
 
 
+def test_slot_width_band_is_accepted_as_the_cutters_spread() -> None:
+    """D52 (delegated ruling 2026-11-26): the slots keep .196 +.004/.000 on an
+    accept exception, not a necessity entry (no failure at the looser size is
+    shown). Its reason rests on the plan's programmed .199 cut by the 1/8 in
+    end mill (-.002/0) inside the band, and the pins the plan names."""
+    import tomllib
+
+    import _process_plans
+    from _printed_tolerance import drilled_oversize_mm
+
+    entries = {
+        entry["id"]: entry
+        for entry in _config.parts("pd-support-bar")["machinist_exceptions"]
+    }
+    entry = entries["RV-04"]
+    assert entry["kind"] == "accept"
+    assert "2X .196 +.004/.000 THRU, CLEARANCE FOR MHA-SH-VN-53" in entry["where"]
+    assert entry["reason"].startswith(
+        "Delegated ruling 2026-11-26 (Main), no precedent; owner review #2144 (D52)."
+    )
+    plan = tomllib.loads(_process_plans.plan_path("pd_support_bar").read_text(encoding="utf-8"))
+    programmed = plan["parameters"]["slot_width_mm"]
+    low, high = 0.196 * 25.4, 0.196 * 25.4 + drilled_oversize_mm(unit="in")
+    assert part.CLAMP_SLOT_WIDTH_LIMITS == (0.0, drilled_oversize_mm(unit="in"))
+    assert programmed == pytest.approx(0.199 * 25.4, abs=1e-3)
+    assert low <= programmed - 0.002 * 25.4 and programmed <= high
+    assert ".196 pin slides" in str(plan) and ".200 does not enter" in str(plan)
+
+
 def test_hook_tap_stations_are_reference_and_the_pivot_row_is_unbanded() -> None:
     """Round 3 machinist review (over-specification): SPOT THRU MHA-PD-14 AT
     ASSEMBLY sets the hook taps' stations, so they print REF with no band.

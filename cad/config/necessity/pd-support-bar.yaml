@@ -1,0 +1,9 @@
+# MHA-PD-07 support bar: why each band tighter than the title block stays
+# (drawing-guidelines.md rule 4; owner ruling 2026-11-24: the reason lives
+# here, not on the sheet). Read by the machinist review only.
+necessity:
+  - id: N-01
+    feature: "sheet 1, VIEW D, the 2X round clamp counterbores' Ø.3125 +.0100/.0000 (2X Ø.196 DRILL THRU ALL ⌴Ø.3125 +.0100/.0000 ↧.19, CLEARANCE FOR MHA-SH-VN-53 INTO MHA-SH-02 TAPS, SEE NOTE 1): a wizard pocket's Ø is otherwise .XX, ±.01 (rule 3), and its four places keep the .3125 low limit (rule 3: a dimension with its own band keeps the places of its authored limits)"
+    kind: gap
+    reason: "at .303 the MHA-SH-VN-53 head meets the pocket wall"
+    source: "build_pd_support_bar guard (build_pd_support_bar.py:409-413, clamp_round_head_clearance; checks/build-pd-support-bar.yaml C-01): head Ø.270 MAX (sh_vn_clamp_screw_spec.HEAD_DIA, McMaster 90280A201) on its .164 shank floated .018 across the widest .200 hole leaves +.0032 to the wall at .3125 and -.0015 at the .XX row's .303 (.313 printed); owner ruling 2026-11-20 (Pedro), #2422, on the question \"Change the two round Ø.335 counterbores to a 5/16 plunge (Ø.3125 +.010/0) and print the pivot coordinates at the title-block ±.005 instead of ±.002?\": \"Follow recommendations unless noted otherwise\""
