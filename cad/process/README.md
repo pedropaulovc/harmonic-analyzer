@@ -278,6 +278,8 @@ plans in batches"; the column clamp is the worked example):
    - homing once, homing again, and the zero re-check;
    - Feed Hold / Reset, including "(the controller keeps G54...)";
    - "(the tool setter measures it)" and "tool lengths from the tool setter";
+   - "press Cycle Start only with hands clear" at an M6 stop (row Tool
+     changes; delegated ruling 2026-11-26, owner review #2144);
    - the prove-in-air ops: delete the op (the method is the standing row
      "A file's first part", and its "watch every move ... clear the work,
      the jaws, the parallels, any clamp and the stop" covers a list of what

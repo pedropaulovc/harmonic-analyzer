@@ -4,6 +4,7 @@ a browser: every ``uv tool run`` and browser call is stubbed at ``subprocess.run
 from __future__ import annotations
 
 import subprocess
+import tomllib
 from pathlib import Path
 
 import pytest
@@ -375,3 +376,11 @@ def test_shop_files_are_the_directory_tomls_prechips_reads(tmp_path):
         "common.toml",
         "pd.toml",
     ]
+
+
+def test_standing_tool_changes_row_says_hands_clear():
+    """The shop page carries the M6-stop safety sentence once, so a converted
+    sheet need not (delegated ruling 2026-11-26, owner review #2144)."""
+    page = tomllib.loads((plans.PROCESS_ROOT / "shop" / "standing.toml").read_text(encoding="utf-8"))
+    rows = dict(page["notes"]["standing-mill"]["rows"])
+    assert rows["Tool changes"].endswith("Press Cycle Start only with hands clear.")
