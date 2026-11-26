@@ -152,7 +152,10 @@ def picture_texts(plan_dir: Path, diagram: dict) -> list[tuple[str, str]]:
     """("title" | "text" | "alt", the text) for a picture's SVG text and alt."""
     root = ET.parse(plan_dir / diagram["file"]).getroot()
     texts = [
-        ("title" if "title" in (t.get("class") or "").split() else "text", "".join(t.itertext()))
+        (
+            "title" if "title" in (t.get("class") or "").split() else "text",
+            "".join(t.itertext()),
+        )
         for t in root.iter(f"{_SVG}text")
     ]
     return [*texts, ("alt", diagram.get("alt", ""))]
@@ -167,7 +170,7 @@ def _opening(text: str) -> list[tuple[str, str]]:
         if not match:
             break
         out.append(("Setup" if match.re is SETUP_REFERENCE else "Op", match.group(0)))
-        rest = rest[match.end():].lstrip(" ,")
+        rest = rest[match.end() :].lstrip(" ,")
     return out
 
 
@@ -190,24 +193,47 @@ def picture_problems(plan_dir: Path, plan: dict) -> list[str]:
                 ]
             if where in ("title", "alt"):
                 for kind, reference in _opening(text):
-                    if kind == "Setup" and setup not in _named(reference, 1):
-                        found.append(f"{name} {where} opens with {reference!r}, not its own Setup {setup}")
-                    if kind == "Op":
-                        named = _named(reference, 10)
-                        if own_op is not None and own_op not in named:
-                            found.append(f"{name} {where} opens with {reference!r}, not its own Op {own_op}")
-                        if own_op is None and not all(n in setup_ops for n in named):
-                            found.append(
-                                f"{name} {where} opens with {reference!r}, outside its setup's "
-                                f"Ops {setup_ops[0]}–{setup_ops[-1]}"
-                            )
+                    named = _named(reference, 1 if kind == "Setup" else 10)
+                    if not named:
+                        found.append(
+                            f"{name} {where} opens with {reference!r}, a range that runs backwards"
+                        )
+                    elif kind == "Setup" and setup not in named:
+                        found.append(
+                            f"{name} {where} opens with {reference!r}, not its own Setup {setup}"
+                        )
+                    elif kind == "Op" and own_op is not None and named[0] != own_op:
+                        # A picture shown on the first op of a range ("Ops 270-310"
+                        # on Op 270): an op inserted above shifts the whole range.
+                        found.append(
+                            f"{name} {where} opens with {reference!r}, not its own Op {own_op}"
+                        )
+                    elif kind == "Op" and not all(n in setup_ops for n in named):
+                        span = (
+                            f"Ops {setup_ops[0]}–{setup_ops[-1]}"
+                            if setup_ops
+                            else "no ops"
+                        )
+                        found.append(
+                            f"{name} {where} opens with {reference!r}, outside its setup's {span}"
+                        )
             for kind, number in PICTURE_REFERENCE.findall(text):
                 op = kind.lower() == "op"
-                target, have = (pictured_ops, "an operation") if op else (pictured_setups, "a setup")
+                target, have = (
+                    (pictured_ops, "an operation")
+                    if op
+                    else (pictured_setups, "a setup")
+                )
                 if int(number) not in target:
-                    found.append(f"{name} {where}: '{kind} {number}'s picture' names {have} without one")
-                if int(number) == (own_op if op else (setup if own_op is None else None)):
-                    found.append(f"{name} {where}: '{kind} {number}'s picture' names this picture")
+                    found.append(
+                        f"{name} {where}: '{kind} {number}'s picture' names {have} without one"
+                    )
+                if int(number) == (
+                    own_op if op else (setup if own_op is None else None)
+                ):
+                    found.append(
+                        f"{name} {where}: '{kind} {number}'s picture' names this picture"
+                    )
             if where == "title" and own_op is not None:
                 loaded = set(TOOL.findall(ops[own_op].get("instruction", "")))
                 found += [
@@ -230,17 +256,27 @@ def test_a_picture_naming_another_operation_is_caught(tmp_path: Path) -> None:
     # dt_cone_swing_platform before this test: a conversion dropped an op above
     # the #31's, and its picture still said Op 80 for the Op 70 it shows.
     svg = '<svg xmlns="http://www.w3.org/2000/svg"><text class="title">{}</text></svg>'
-    (tmp_path / "drill.svg").write_text(svg.format("Op 80 (PL01, T4): the #31"), encoding="utf-8")
-    (tmp_path / "cbore.svg").write_text(svg.format("Op 80 (PL01, T2): the counterbore"), encoding="utf-8")
+    (tmp_path / "drill.svg").write_text(
+        svg.format("Op 80 (PL01, T4): the #31"), encoding="utf-8"
+    )
+    (tmp_path / "cbore.svg").write_text(
+        svg.format("Op 80 (PL01, T2): the counterbore"), encoding="utf-8"
+    )
     plan = {
         "setups": [
             {"operations": [{"instruction": f"Step {n}."} for n in range(6)]},
             {
                 "operations": [
-                    {"instruction": "Same file, M6 T4: the #31.", "diagram": {"file": "drill.svg", "alt": "The #31."}},
+                    {
+                        "instruction": "Same file, M6 T4: the #31.",
+                        "diagram": {"file": "drill.svg", "alt": "The #31."},
+                    },
                     {
                         "instruction": "Same file, M6 T2: counterbore.",
-                        "diagram": {"file": "cbore.svg", "alt": "As Op 80's picture: the 1/8 in end mill."},
+                        "diagram": {
+                            "file": "cbore.svg",
+                            "alt": "As Op 80's picture: the 1/8 in end mill.",
+                        },
                     },
                 ]
             },
@@ -250,5 +286,46 @@ def test_a_picture_naming_another_operation_is_caught(tmp_path: Path) -> None:
         "drill.svg (Setup 2, Op 70) title opens with 'Op 80', not its own Op 70",
         "cbore.svg (Setup 2, Op 80) alt: 'Op 80's picture' names this picture",
     ]
-    (tmp_path / "drill.svg").write_text(svg.format("Op 70 (PL01, T2): the #31"), encoding="utf-8")
-    assert picture_problems(tmp_path, plan)[0] == "drill.svg (Setup 2, Op 70) title names T2; its Op 70 loads T4"
+    (tmp_path / "drill.svg").write_text(
+        svg.format("Op 70 (PL01, T2): the #31"), encoding="utf-8"
+    )
+    assert (
+        picture_problems(tmp_path, plan)[0]
+        == "drill.svg (Setup 2, Op 70) title names T2; its Op 70 loads T4"
+    )
+
+
+def test_a_range_title_must_start_at_its_own_operation(tmp_path: Path) -> None:
+    # foot-tap.svg on Op 270 says "Ops 270-310"; an op inserted above moves the
+    # picture to Op 280, inside the old range but no longer its first op.
+    svg = '<svg xmlns="http://www.w3.org/2000/svg"><text class="title">{}</text></svg>'
+    (tmp_path / "tap.svg").write_text(
+        svg.format("Ops 270-310 (DT05): tap the foot hole"), encoding="utf-8"
+    )
+    (tmp_path / "setup.svg").write_text(
+        svg.format("Ops 320-300: backwards"), encoding="utf-8"
+    )
+    (tmp_path / "empty.svg").write_text(
+        svg.format("Op 10: nothing here"), encoding="utf-8"
+    )
+    plan = {
+        "setups": [
+            {"operations": [{"instruction": f"Step {n}."} for n in range(27)]},
+            {
+                "diagram": {"file": "setup.svg", "alt": "Setup 2."},
+                "operations": [
+                    {
+                        "instruction": "Run DT05.",
+                        "diagram": {"file": "tap.svg", "alt": "The tap."},
+                    },
+                    *({"instruction": f"Tap {n}."} for n in range(4)),
+                ],
+            },
+            {"diagram": {"file": "empty.svg", "alt": "Setup 3."}},
+        ]
+    }
+    assert picture_problems(tmp_path, plan) == [
+        "setup.svg (Setup 2) title opens with 'Ops 320-300', a range that runs backwards",
+        "tap.svg (Setup 2, Op 280) title opens with 'Ops 270-310', not its own Op 280",
+        "empty.svg (Setup 3) title opens with 'Op 10', outside its setup's no ops",
+    ]
