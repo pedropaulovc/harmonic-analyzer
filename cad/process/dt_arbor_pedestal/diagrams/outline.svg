@@ -1,11 +1,12 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 400" font-family="sans-serif" font-size="13">
-  <!-- Setup 7: far face up, the foot gripped by the seat (fixed jaw) and the foot top (moving jaw); PA07 faces F and profiles the flanks and the crown. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 400" width="760" height="400" font-family="sans-serif" font-size="13">
+  <!-- Plan from above, fixed jaw at the top: +Y up, +X (toward W) right. Y0 the seat at the fixed jaw's face, X0 the bore. The 3/4 + 1/2 in stack (1/8 in thick) under the foot's near end N against the fixed jaw only: hidden; its length not on record (drawn along the jaw). The 1/2 in end mill (58.4 px) on PA07's first far-face level Z 28.702, pass Y -29.205 (wholly over the strap), running +X (NC line 41). It stands over the moving jaw below the strap, 15.5 mm above the jaw tops (foot_grip_mm 13.195); the outline's last level, Z 17.53, is 4.3 mm above them. -->
   <rect class="paper" x="0" y="0" width="760" height="400"/>
-  <text class="title" x="20" y="20">Setup 7 (PA07_outline): F to the depth, then the flanks and the crown round the bore</text>
-  <rect class="clamp" x="43" y="30" width="414" height="40"/>
+  <text class="title" x="20" y="22">Setup 7 (PA07_outline), plan 4.6 px/mm: F faced first, level 1; then the flanks and the crown</text>
+  <path class="clamp" d="M43 30L385 30L382 38L385 46L382 54L385 62L385 70L43 70Z"/>
   <text class="label-on-clamp" x="66" y="56">fixed jaw</text>
-  <rect class="clamp" x="43" y="93.37" width="414" height="122.36"/>
+  <path class="clamp" d="M43 93.37L385 93.37L382 100.57L385 107.77L382 114.96L385 122.16L382 129.36L385 136.56L382 143.75L385 150.95L382 158.15L385 165.35L382 172.54L385 179.74L382 186.94L385 194.14L382 201.33L385 208.53L385 215.73L43 215.73Z"/>
   <text class="label-on-clamp" x="66" y="111.37">moving jaw</text>
+  <rect class="hidden" x="43" y="70" width="342" height="14.6"/>
   <rect class="part-removed" x="195.09" y="93.37" width="109.83" height="231.34"/>
   <path class="part-kept" d="M304.91 70 L304.91 93.37 L300.22 275.76 A50.24 50.24 0 0 1 199.78 275.76 L195.09 93.37 L195.09 70 Z"/>
   <path class="active-face" d="M304.91 93.37 L300.22 275.76 A50.24 50.24 0 0 1 199.78 275.76 L195.09 93.37"/>
@@ -17,16 +18,26 @@
   <text class="datum-label" x="186.2" y="278.47" text-anchor="end">X0: the bore</text>
   <circle class="datum" cx="112" cy="70" r="3.5"/>
   <text class="datum-label" x="106" y="86" text-anchor="end">Y0: the seat</text>
-  <line class="leader" x1="302.9" y1="185" x2="420" y2="185"/>
-  <circle class="leader-dot" cx="302.9" cy="185" r="2"/>
-  <text class="label" x="424" y="189">flank, climb, {{process.outline_depth_mm:in.3dot}} deep through the strap</text>
-  <line class="leader" x1="284.5" y1="311.5" x2="420" y2="311.5"/>
+  <circle class="cutter" cx="250" cy="204.34" r="29.21"/>
+  <line class="arrow" x1="285" y1="204.34" x2="345" y2="204.34"/>
+  <line class="leader" x1="400" y1="160" x2="270" y2="184.34"/>
+  <circle class="leader-dot" cx="270" cy="184.34" r="2"/>
+  <text class="label" x="404" y="150">1/2 in end mill, far face level 1</text>
+  <text class="label" x="404" y="166">(Z 28.702 mm), pass Y -29.205: +X;</text>
+  <text class="label" x="404" y="182">F faced first, two levels of {{process.far_face_level_mm:in.3dot}}</text>
+  <line class="leader" x1="400" y1="250" x2="302.9" y2="245"/>
+  <circle class="leader-dot" cx="302.9" cy="245" r="2"/>
+  <text class="label" x="404" y="254">flank, climb, {{process.outline_depth_mm:in.3dot}} deep through the strap</text>
+  <line class="leader" x1="400" y1="311.5" x2="284.5" y2="311.5"/>
   <circle class="leader-dot" cx="284.5" cy="311.5" r="2"/>
-  <text class="label" x="424" y="315.5">crown R{{cad.crown_radius_in:.2dot}} about the bore</text>
-  <line class="leader" x1="250" y1="81.5" x2="420" y2="85.5"/>
+  <text class="label" x="404" y="315.5">crown R{{cad.crown_radius_in:.2dot}} about the bore</text>
+  <line class="leader" x1="400" y1="85.5" x2="250" y2="81.5"/>
   <circle class="leader-dot" cx="250" cy="81.5" r="2"/>
-  <text class="label" x="424" y="89.5">foot, {{cad.foot_top_height_in:.2dot}} between the jaws, on the stack</text>
-  <text class="label" x="420" y="235.6">F faced first, two levels of {{process.far_face_level_mm:in.3dot}}</text>
-  <text class="label" x="420" y="340">Looking down on F.</text>
-  <text class="label" x="420" y="358">Z0 the stack's top (N, the foot's near end).</text>
+  <text class="label" x="404" y="89.5">foot, {{cad.foot_top_height_in:.2dot}} between the jaws, on the stack</text>
+  <text class="label" x="404" y="112">3/4 + 1/2 in stack under N, at the fixed</text>
+  <text class="label" x="404" y="128">jaw (hidden); jaws' length schematic</text>
+  <text class="label" x="312" y="140">W</text>
+  <text class="label" x="180" y="140" text-anchor="end">E</text>
+  <text class="label" x="404" y="350">Looking down on F.</text>
+  <text class="label" x="404" y="366">Z0 the stack's top (N, the foot's near end).</text>
 </svg>

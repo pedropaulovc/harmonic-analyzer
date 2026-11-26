@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 400" width="760" height="400" font-family="sans-serif" font-size="13">
+  <!-- As Setup 5's picture (from the front, +X right, +Y into the page). The V drill, cutter_dia_mm 9.5758 = 52.7 px, 118 deg point, at X -44.45 (NC: PA04 T4) at the bottom of its one plunge: full diameter bore_drill_past_mm 1.0 below the stacks' top, point Z -3.877 (bore_tip_height_mm), between the stacks (the front stack an outline). Drawn short to a break. -->
+  <rect class="paper" x="0" y="0" width="760" height="400"/>
+  <text class="title" x="20" y="22">Op 310, V drill (PA04 T4), 5.5 px/mm: the bore down through the strap</text>
+  <rect class="fixture-support" x="64.98" y="300" width="351.52" height="6"/>
+  <rect class="hidden" x="30" y="244.89" width="410" height="95"/>
+  <line class="hidden" x1="64.98" y1="306" x2="64.98" y2="340"/>
+  <line class="hidden" x1="416.5" y1="306" x2="416.5" y2="340"/>
+  <text class="label" x="446" y="248.89">jaw tops</text>
+  <text class="label" x="446" y="270">moving jaw in front (outline);</text>
+  <text class="label" x="446" y="286">the 7/8 + 1/2 in stacks, 1/8 in thick,</text>
+  <text class="label" x="446" y="302">under F at each jaw (top shown)</text>
+  <circle class="datum" cx="400" cy="300" r="3.5"/>
+  <text class="datum-label" x="446" y="330">X0 the seat; Z0 the stacks' top (F)</text>
+  <text class="label" x="20" y="388">Looking at the moving jaw (from the front): +X right, +Y into the page; W at the fixed jaw behind.</text>
+  <path class="part-kept" d="M400 300L81.48 300L81.48 235.74L372.06 235.74L372.06 137.95L400 137.95Z"/>
+  <rect class="holes" x="359" y="174.27" width="41" height="25.15"/>
+  <path class="cutter" d="M181.85 80L181.85 305.5L155.52 321.32L129.19 305.5L129.19 80L136.71 77L144.23 80L151.76 77L159.28 80L166.81 77L174.33 80Z"/>
+  <line class="arrow" x1="112" y1="90" x2="112" y2="130"/>
+  <text class="label" x="200" y="90">V drill (.377), one plunge, its full diameter {{process.bore_drill_past_mm:in.3dot}}</text>
+  <text class="label" x="200" y="106">below the stacks' top, between them; cutting oil</text>
+  <line class="leader" x1="196" y1="96" x2="182" y2="120"/>
+  <circle class="leader-dot" cx="182" cy="120" r="2"/>
+  <line class="leader" x1="250" y1="360" x2="157" y2="321.32"/>
+  <circle class="leader-dot" cx="157" cy="321.32" r="2"/>
+  <text class="label" x="254" y="364">bore X −{{cad.arbor_bore_height_mm:in.3dot}}: point Z {{process.bore_tip_height_mm:.3f}} mm</text>
+</svg>

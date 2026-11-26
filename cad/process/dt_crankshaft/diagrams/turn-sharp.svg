@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 330" width="760" height="330" font-family="sans-serif" font-size="13">
+  <!-- As Setup 3's picture, the diameters turned. The sharp-nose tool (R.004 nose, tip under .016 wide; its body not on record: schematic) plunged in the inboard neck, between the seat step Z-.890 and the journal's start Z-1.030, at Ø.375 (neck_aim_in), .010 per side per plunge. -->
+  <rect class="paper" x="0" y="0" width="760" height="330"/>
+  <text class="title" x="20" y="22">Op 140: sharp-nose tool plunges the inboard neck to Ø{{process.neck_aim_in:.3dot}} (4 px/mm)</text>
+  <line class="centre-line" x1="20" y1="165" x2="740" y2="165"/>
+  <rect class="fixture-vise" x="33.23" y="64.2" width="60" height="201.6"/>
+  <rect class="clamp" x="93.23" y="80.2" width="40" height="34"/>
+  <rect class="clamp" x="93.23" y="215.8" width="40" height="34"/>
+  <text class="label" x="33.23" y="58.2">3-jaw (schematic)</text>
+  <rect class="part-rest" x="29.23" y="114.2" width="104" height="101.6"/>
+  <rect class="part-kept" x="133.23" y="114.2" width="13.21" height="101.6"/>
+  <rect class="part-kept" x="599.58" y="149.12" width="90.42" height="31.75"/>
+  <rect class="part-kept" x="585.35" y="145.95" width="14.22" height="38.1"/>
+  <rect class="part-kept" x="525.41" y="142.78" width="59.94" height="44.45"/>
+  <rect class="part-kept" x="374.02" y="144.17" width="151.38" height="41.66"/>
+  <rect class="part-kept" x="324.24" y="142.78" width="49.78" height="44.45"/>
+  <rect class="part-kept" x="318.34" y="145.95" width="5.9" height="38.1"/>
+  <rect class="part-kept" x="290.7" y="130" width="27.64" height="70"/>
+  <rect class="part-kept" x="146.44" y="145.95" width="144.26" height="38.1"/>
+  <path class="fixture-support" d="M690 165L714.25 151L750 151L747 158L750 165L747 172L750 179L714.25 179Z"/>
+  <path class="cutter" d="M591.6 184.05L593.2 184.05L613.6 224.05L613.6 294.05L606.1 291.05L598.6 294.05L591.1 291.05L583.6 294.05L583.6 224.05Z"/>
+  <line class="arrow" x1="631.6" y1="253" x2="631.6" y2="223"/>
+  <text class="label" x="330" y="290">sharp-nose tool, plunging .010 per side to Ø{{process.neck_aim_in:.3dot}},</text>
+  <text class="label" x="330" y="306">from Z-{{cad.seat_step_station_in:.2dot}} to Z-{{cad.inboard_journal_station_in:.2dot}}, never past the journal's station</text>
+  <line class="leader" x1="460" y1="278" x2="585.6" y2="213"/>
+  <circle class="leader-dot" cx="585.6" cy="213" r="2"/>
+  <text class="datum-label" x="740" y="100" text-anchor="end">Z0 F; MT3 dead centre</text>
+</svg>

@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 400" width="760" height="400" font-family="sans-serif" font-size="13">
+  <!-- As Setup 4's picture (across the jaws from the right end, 3 px/mm). The #15 drill, cutter_dia_mm 4.572 = 13.7 px, 118 deg point, at X 8.890 Y -11.938 (NC line 64) at the bottom of its one plunge: point Z -7.454 (hold_tip_depth_mm), full diameter hold_drill_past_mm 1.0 past the foot top (.20 below the seat) into the waste the step removes in Setup 5. Drawn short to a break. -->
+  <rect class="paper" x="0" y="0" width="760" height="400"/>
+  <text class="title" x="20" y="22">Op 230, #15 drill (PA03 T3), 3 px/mm: down from the seat, past the foot top into waste</text>
+  <rect class="fixture-vise" x="64.18" y="380" width="211.63" height="14"/>
+  <rect class="clamp" x="84.18" y="245.16" width="50" height="134.84"/>
+  <rect class="clamp" x="205.81" y="245.16" width="50" height="134.84"/>
+  <rect class="fixture-support" x="134.18" y="313.32" width="9.52" height="66.68"/>
+  <rect class="fixture-support" x="196.28" y="313.32" width="9.52" height="66.68"/>
+  <text class="label-on-clamp" x="109.18" y="370" text-anchor="middle">moving</text>
+  <text class="label-on-clamp" x="230.81" y="370" text-anchor="middle">fixed</text>
+  <line class="leader" x1="258" y1="362" x2="201" y2="350"/>
+  <circle class="leader-dot" cx="201" cy="350" r="2"/>
+  <text class="label" x="262" y="366">7/8 in parallels at each jaw</text>
+  <rect class="part-kept" x="134.19" y="139.59" width="71.63" height="173.74"/>
+  <line class="hidden" x1="134.19" y1="154.83" x2="205.81" y2="154.83"/>
+  <path class="cutter" d="M176.85 60L176.85 157.83L170 161.95L163.14 157.83L163.14 60L170 57Z"/>
+  <line class="arrow" x1="150" y1="70" x2="150" y2="100"/>
+  <line class="leader" x1="290" y1="155.59" x2="177" y2="120"/>
+  <circle class="leader-dot" cx="177" cy="120" r="2"/>
+  <text class="label" x="294" y="159.59">#15 drill, one plunge, the hole spotted first</text>
+  <line class="leader" x1="290" y1="179.59" x2="201.81" y2="154.83"/>
+  <circle class="leader-dot" cx="201.81" cy="154.83" r="2"/>
+  <text class="label" x="294" y="183.59">foot top {{cad.foot_top_height_in:.2dot}} below the seat:</text>
+  <text class="label" x="294" y="199.59">the drill's full diameter runs {{process.hold_drill_past_mm:in.3dot}} past it, into waste</text>
+  <line class="leader" x1="290" y1="220" x2="170" y2="161.95"/>
+  <circle class="leader-dot" cx="170" cy="161.95" r="2"/>
+  <text class="label" x="294" y="224">point {{process.hold_tip_depth_mm:in.3dot}} below the seat</text>
+  <text class="label" x="78.19" y="249.16" text-anchor="end">jaw tops</text>
+  <text class="label" x="470" y="232">The seat from above:</text>
+  <rect class="part-kept" x="520" y="250" width="88.39" height="71.63"/>
+  <line class="datum" x1="520" y1="244" x2="520" y2="327.63"/>
+  <text class="datum-label" x="514" y="325.63" text-anchor="end">X0: N</text>
+  <line class="datum" x1="514" y1="250" x2="614.39" y2="250"/>
+  <text class="datum-label" x="618.39" y="254">Y0: W</text>
+  <text class="label" x="470" y="345.63">hole X {{cad.hold_down_hole_z_from_min_mm:.3f}}, Y −{{cad.hold_down_hole_lateral_mm:.3f}} mm</text>
+  <text class="label" x="370" y="385">Looking along the jaws from the right end: F faces you.</text>
+  <circle class="cutter" cx="546.67" cy="285.81" r="6.86"/>
+</svg>

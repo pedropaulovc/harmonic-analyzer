@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 300" width="760" height="300" font-family="sans-serif" font-size="13">
+  <!-- As Setup 5's picture, the journal, spigot and stub turned, the dead centre in. The sharp-nose tool (schematic body) on the stub, fed toward the spigot face (-Z), stopping at -(1.872 + the tip's width). -->
+  <rect class="paper" x="0" y="0" width="760" height="300"/>
+  <text class="title" x="20" y="22">Op 440: sharp-nose tool turns off the .32 step beside the spigot face (4 px/mm)</text>
+  <line class="centre-line" x1="20" y1="150" x2="740" y2="150"/>
+  <rect class="fixture-vise" x="125.36" y="49.2" width="60" height="201.6"/>
+  <rect class="clamp" x="185.36" y="65.2" width="40" height="34"/>
+  <rect class="clamp" x="185.36" y="200.8" width="40" height="34"/>
+  <text class="label" x="125.36" y="43.2">3-jaw (schematic)</text>
+  <rect class="part-rest" x="20" y="99.2" width="205.36" height="101.6"/>
+  <rect class="part-kept" x="225.36" y="99.2" width="15.24" height="101.6"/>
+  <rect class="part-kept" x="357.44" y="127.78" width="162.56" height="44.45"/>
+  <rect class="part-kept" x="329.8" y="115" width="27.64" height="70"/>
+  <rect class="part-kept" x="240.6" y="130.95" width="89.2" height="38.1"/>
+  <path class="fixture-support" d="M520 150L544.25 136L580 136L577 143L580 150L577 157L580 164L544.25 164Z"/>
+  <rect class="part-kept" x="297.29" y="129.68" width="32.51" height="40.64"/>
+  <path class="cutter" d="M316 169.05L317.6 169.05L338 209.05L338 279.05L330.5 276.05L323 279.05L315.5 276.05L308 279.05L308 209.05Z"/>
+  <line class="arrow" x1="346" y1="216" x2="396" y2="216"/>
+  <text class="label" x="400" y="250">sharp-nose tool, .010 per side per pass, fed toward</text>
+  <text class="label" x="400" y="266">the spigot face, stopped at −({{process.slug_seat_z_in:.3dot}} + the tip's width);</text>
+  <text class="label" x="400" y="282">the last pass at the stub's reading</text>
+  <line class="leader" x1="396" y1="246" x2="320" y2="190"/>
+  <circle class="leader-dot" cx="320" cy="190" r="2"/>
+</svg>

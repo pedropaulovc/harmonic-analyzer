@@ -1,21 +1,31 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 300" font-family="sans-serif" font-size="13">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 300" width="760" height="300" font-family="sans-serif" font-size="13">
+  <!-- Plan from above, 6 px/mm. The (Ø.3750) stub (57.2 px) in the 3-jaw over a brass shim wrap (its thickness not on record: drawn schematic), the parted end dome_stickout_mm 7.62 out. The AR tool (schematic) on a facing skim, feeding in toward the centre (up), in light skims toward the length. -->
   <rect class="paper" x="0" y="0" width="760" height="300"/>
-  <text class="title" x="20" y="20">Setup 4: on the stub over a brass shim, the parted end .30 out (not to scale)</text>
-  <rect class="fixture-vise" x="260" y="70" width="160" height="180"/>
-  <rect class="part-rest" x="40" y="138" width="150" height="44"/>
-  <rect class="part-rest" x="190" y="112" width="40" height="96"/>
-  <rect class="part-rest" x="230" y="140" width="190" height="40"/>
-  <rect class="part-kept" x="420" y="140" width="60" height="40"/>
-  <rect class="part-removed" x="480" y="140" width="50" height="40"/>
-  <path class="part-kept" d="M480,140 Q520,160 480,180 Z"/>
-  <line class="centre-line" x1="30" y1="160" x2="720" y2="160"/>
-  <rect class="cutter" x="600" y="152" width="100" height="16"/>
-  <text class="label" x="40" y="100">spigot and shaft back in the chuck</text>
-  <line class="leader" x1="150" y1="104" x2="200" y2="114"/>
-  <text class="label" x="420" y="240">SR.26 dome, .080 high, stepped then filed</text>
-  <line class="leader" x1="497" y1="228" x2="496" y2="168"/>
-  <text class="datum-label" x="530" y="110">Z0 the faced apex</text>
-  <line class="leader" x1="545" y1="114" x2="501" y2="158"/>
-  <text class="label" x="240" y="275">brass shim on the (Ø.3750) stub</text>
-  <line class="leader" x1="340" y1="263" x2="340" y2="181"/>
+  <text class="title" x="20" y="22">Setup 4: face the parted end to length (AR tool), the stub on a brass shim (6 px/mm)</text>
+  <line class="centre-line" x1="20" y1="150" x2="740" y2="150"/>
+  <rect class="fixture-vise" x="304.28" y="68.42" width="60" height="163.15"/>
+  <rect class="clamp" x="364.28" y="84.42" width="40" height="34"/>
+  <rect class="clamp" x="364.28" y="181.57" width="40" height="34"/>
+  <text class="label" x="304.28" y="62.42">3-jaw (schematic)</text>
+  <rect class="part-rest" x="364.28" y="118.44" width="40" height="2"/>
+  <rect class="part-rest" x="364.28" y="179.56" width="40" height="2"/>
+  <rect class="part-rest" x="20" y="121.42" width="384.28" height="57.15"/>
+  <rect class="hidden" x="277.8" y="97.5" width="41.45" height="105"/>
+  <text class="label" x="30" y="71.42">spigot and shaft back through the chuck</text>
+  <rect class="part-kept" x="404.28" y="121.42" width="43.32" height="57.15"/>
+  <rect class="part-removed" x="447.6" y="121.42" width="2.4" height="57.15"/>
+  <path class="cutter" d="M450 162L460 188L460 252L453 249L446 252L439 249L432 252L432 182Z"/>
+  <line class="arrow" x1="480" y1="168" x2="480" y2="132"/>
+  <text class="label" x="500" y="80">parted end faced square, to the centre,</text>
+  <text class="label" x="500" y="96">in light skims to the length:</text>
+  <text class="label" x="500" y="112">aim {{process.overall_in:.3dot}} (height gauge from F)</text>
+  <line class="leader" x1="496" y1="86" x2="448.8" y2="126"/>
+  <circle class="leader-dot" cx="448.8" cy="126" r="2"/>
+  <text class="label" x="500" y="240">AR tool (schematic); then the SR.26 dome</text>
+  <text class="label" x="500" y="256">stepped from the table (same tool) and filed</text>
+  <line class="leader" x1="496" y1="236" x2="460" y2="210"/>
+  <circle class="leader-dot" cx="460" cy="210" r="2"/>
+  <text class="label" x="80" y="270">brass shim on the (Ø{{cad.hub_shaft_dia_ref_in:.4dot}}) stub, at the jaws</text>
+  <line class="leader" x1="200" y1="258" x2="384.28" y2="181.2"/>
+  <circle class="leader-dot" cx="384.28" cy="181.2" r="2"/>
 </svg>

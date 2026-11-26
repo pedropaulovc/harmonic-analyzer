@@ -1,28 +1,29 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 400" font-family="sans-serif" font-size="13">
-  <!-- Setup 6: upright on the seat on the 7/8 in parallels, N to the right; PA05 faces the top end, spots and drills #43 into the bore. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 400" width="760" height="400" font-family="sans-serif" font-size="13">
+  <!-- 3 px/mm. From the front: +X right, +Y into the page; X0 N on the right, the part to -X. The 1/2 in end mill (38.1 px, 85.4 px out of the collet, 12 % end arc) on PA05's first level Z 56.642 (1.27 under upright_top_max_mm 57.912), pass Y -11.932 (wholly over the strap), running +X, right (NC line 29), its axis on the strap's left (F) face. -->
   <rect class="paper" x="0" y="0" width="760" height="400"/>
-  <text class="title" x="20" y="20">Setup 6 (PA05_top_apex): the top end, then the #43 apex hole into the bore</text>
+  <text class="title" x="20" y="22">Setup 6 (PA05_top_apex), 3 px/mm: face the top end; the #43 hole is the next picture's</text>
   <rect class="fixture-support" x="193.61" y="330" width="124.39" height="6"/>
-  <polygon class="part-kept" points="300,330 211.61,330 211.61,163.88 246.66,163.88 246.66,314.76 300,314.76"/>
-  <rect class="part-removed" x="211.61" y="156.26" width="35.05" height="7.62"/>
-  <line class="active-face" x1="211.61" y1="163.88" x2="246.66" y2="163.88"/>
-  <rect class="holes" x="211.61" y="182.32" width="35.05" height="28.65"/>
-  <rect class="holes" x="228.03" y="163.88" width="6.78" height="22.39"/>
-  <line class="centre-line" x1="231.42" y1="142.26" x2="231.42" y2="198"/>
-  <line class="hidden" x1="193.61" y1="261.84" x2="318" y2="261.84"/>
-  <text class="label" x="324" y="265.84">jaw tops</text>
+  <rect class="hidden" x="150" y="261.84" width="220" height="100"/>
+  <text class="label" x="380" y="265.84">jaw tops</text>
+  <text class="label" x="380" y="284">moving jaw in front (outline); the 7/8 in</text>
+  <text class="label" x="380" y="300">parallels under the seat at each jaw (top shown)</text>
   <circle class="datum" cx="300" cy="314.76" r="3.5"/>
   <text class="datum-label" x="308" y="308.76">X0: N</text>
   <circle class="datum" cx="306" cy="330" r="3.5"/>
-  <text class="datum-label" x="314" y="334">Z0 the parallels' top (the seat)</text>
-  <line class="leader" x1="244.5" y1="163.88" x2="380" y2="151.88"/>
+  <text class="datum-label" x="380" y="334">Z0 the parallels' top (the seat)</text>
+  <text class="label" x="20" y="390">Looking at the moving jaw (from the front): +X right, +Y into the page; W at the fixed jaw behind.</text>
+  <path class="part-kept" d="M300 330L211.61 330L211.61 163.88L246.66 163.88L246.66 314.76L300 314.76Z"/>
+  <rect class="part-removed" x="211.61" y="156.26" width="35.05" height="7.62"/>
+  <line class="active-face" x1="211.61" y1="163.88" x2="246.66" y2="163.88"/>
+  <rect class="holes" x="211.61" y="182.32" width="35.05" height="28.65"/>
+  <line class="centre-line" x1="231.42" y1="165" x2="231.42" y2="198"/>
+  <path class="cutter" d="M230.66 155.5L230.66 74.72L192.56 74.72L192.56 155.5A19.05 4.57 0 0 0 230.66 155.5Z"/>
+  <line class="arrow" x1="240" y1="120" x2="300" y2="120"/>
+  <text class="label" x="306" y="124">+X, level 1 (Z 56.642 mm), pass Y -11.932</text>
+  <line class="leader" x1="380" y1="151.88" x2="244.5" y2="163.88"/>
   <circle class="leader-dot" cx="244.5" cy="163.88" r="2"/>
-  <text class="label" x="384" y="155.88">top Z {{cad.envelope_y_mm:in.4dot}}</text>
-  <line class="leader" x1="232.5" y1="177" x2="380" y2="185"/>
-  <circle class="leader-dot" cx="232.5" cy="177" r="2"/>
-  <text class="label" x="384" y="189">#43 apex hole X −{{cad.apex_tap_z_from_min_mm:in.3dot}}, into the bore</text>
-  <line class="leader" x1="244.5" y1="196.65" x2="380" y2="222.65"/>
+  <text class="label" x="384" y="155.88">top Z {{cad.envelope_y_mm:in.4dot}} (levels of {{process.face_step_max_mm:in.3dot}} max)</text>
+  <line class="leader" x1="380" y1="222.65" x2="244.5" y2="196.65"/>
   <circle class="leader-dot" cx="244.5" cy="196.65" r="2"/>
-  <text class="label" x="384" y="226.65">the bore (reamed in Setup 5)</text>
-  <text class="label" x="20" y="390">Looking at the moving jaw; W at the fixed jaw behind.</text>
+  <text class="label" x="384" y="226.65">the bore (drilled in Setup 5)</text>
 </svg>

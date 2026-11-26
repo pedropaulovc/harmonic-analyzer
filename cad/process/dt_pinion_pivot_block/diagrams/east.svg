@@ -1,35 +1,45 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 440" font-family="sans-serif" font-size="13">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 440" width="760" height="440" font-family="sans-serif" font-size="13">
+  <!-- 4 px/mm. Across the jaws seen from the right end, the block's front face (+X): +Y (toward the fixed jaw, B) right, +X out of the page, K behind. The 1/2 in end mill (50.8 px; drawn short to a break, its 28.45 out of the collet does not fit; 12 % end arc) on PB03's first level Z 1.270, pass Y -9.038 (wholly over the block), entering at K, +X (NC line 33). -->
   <rect class="paper" x="0" y="0" width="760" height="440"/>
   <text class="title" x="20" y="22">Setup 4 (PB03), 4 px/mm: upright on 1/2 in parallels, jaws on B and the top; skim E to the east end</text>
-  <text class="title" x="40" y="50">Across the jaws, looking at the front face (K behind)</text>
+  <text class="title" x="40" y="50">Across the jaws, from the right end, the front face (+X toward you; K behind)</text>
   <rect class="fixture-vise" x="110" y="410" width="240" height="16"/>
   <rect class="clamp" x="130" y="230.2" width="50" height="179.8"/>
   <rect class="clamp" x="280.6" y="230.2" width="50" height="179.8"/>
   <rect class="fixture-support" x="180" y="359.2" width="12.7" height="50.8"/>
   <rect class="fixture-support" x="267.9" y="359.2" width="12.7" height="50.8"/>
+  <text class="label-on-clamp" x="305.6" y="400" text-anchor="middle">fixed</text>
+  <text class="label-on-clamp" x="155" y="400" text-anchor="middle">moving</text>
   <rect class="part-kept" x="180" y="140.8" width="100.6" height="218.4"/>
   <rect class="part-removed" x="180" y="130.6" width="100.6" height="10.2"/>
   <rect class="part-waste" x="180" y="300.3" width="100.6" height="58.9"/>
   <rect class="hidden" x="180" y="153.2" width="100.6" height="19.9"/>
   <rect class="hidden" x="180" y="220.2" width="100.6" height="19.9"/>
-  <rect class="cutter" x="205" y="88" width="50.8" height="38"/>
-  <line class="datum" x1="160" y1="140.8" x2="180" y2="140.8"/>
+  <line class="datum" x1="160" y1="140.8" x2="178" y2="140.8"/>
   <text class="datum-label" x="156" y="145" text-anchor="end">Z0</text>
-  <line class="datum" x1="280.6" y1="120" x2="280.6" y2="150"/>
-  <text class="datum-label" x="285" y="126">Y0 (B)</text>
-  <text class="label-on-clamp" x="305.6" y="400" text-anchor="middle">fixed</text>
-  <text class="label-on-clamp" x="155" y="400" text-anchor="middle">moving</text>
-  <text class="label-halo" x="230.3" y="200" text-anchor="middle">block</text>
+  <line class="datum" x1="280.6" y1="150" x2="280.6" y2="170"/>
+  <text class="datum-label" x="285" y="168">Y0 (B)</text>
+  <text class="label-halo" x="230.3" y="270" text-anchor="middle">block</text>
   <text class="label-halo" x="230.3" y="334" text-anchor="middle">west waste</text>
-  <text class="label-halo" x="250" y="168" text-anchor="middle">hold-downs</text>
-  <line class="leader" x1="360" y1="135" x2="282" y2="135"/>
-  <text class="label" x="364" y="131">E skim .100 (removed): its high point less .100</text>
-  <text class="label" x="364" y="147">is Z0, the east end; the hold-downs were drilled</text>
-  <text class="label" x="364" y="163">counting from E, so this skim sets their stations</text>
+  <text class="label-halo" x="250" y="190" text-anchor="middle">hold-downs</text>
+  <path class="cutter" d="M269.85 129.62L269.85 66L262.59 63L255.33 66L248.08 63L240.82 66L233.56 63L226.31 66L219.05 66L219.05 129.62A25.4 6.1 0 0 0 269.85 129.62Z"/>
+  <text class="label" x="20" y="84">1/2 in end mill, level 1</text>
+  <text class="label" x="20" y="100">(Z 1.270 mm), pass Y -9.038:</text>
+  <text class="label" x="20" y="116">+X, out of the page; drawn</text>
+  <text class="label" x="20" y="132">short (break)</text>
+  <line class="leader" x1="150" y1="140" x2="218" y2="110"/>
+  <circle class="leader-dot" cx="218" cy="110" r="2"/>
+  <text class="label" x="364" y="120">E skim {{process.east_skim_mm:in.3dot}} (removed): its high point less</text>
+  <text class="label" x="364" y="136">{{process.east_skim_mm:in.3dot}} is Z0, the east end; the hold-downs were</text>
+  <text class="label" x="364" y="152">drilled counting from E, so this skim sets their stations</text>
+  <line class="leader" x1="360" y1="128" x2="282" y2="135"/>
+  <circle class="leader-dot" cx="282" cy="135" r="2"/>
   <text class="label" x="364" y="200">Top face against the moving jaw, B against the fixed</text>
   <text class="label" x="364" y="216">jaw (Y0); back face K at the left (X0, edge finder).</text>
   <line class="leader" x1="360" y1="380" x2="282" y2="380"/>
-  <text class="label" x="364" y="384">1/2 in parallels: the lower 1.27 in the jaws</text>
+  <circle class="leader-dot" cx="282" cy="380" r="2"/>
+  <text class="label" x="364" y="384">1/2 in parallels: the lower {{process.upright_grip_mm:in.2dot}} in the jaws</text>
   <line class="leader" x1="360" y1="330" x2="282" y2="330"/>
+  <circle class="leader-dot" cx="282" cy="330" r="2"/>
   <text class="label" x="364" y="334">west waste, faced off in Setup 5</text>
 </svg>

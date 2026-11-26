@@ -1,17 +1,28 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 370" font-family="sans-serif" font-size="13">
-  <rect class="paper" x="0" y="0" width="760" height="370"/>
-  <text class="title" x="20" y="20">PL02 / PL03: the tap guide over the post hole; tap by hand</text>
-  <rect class="clamp" x="300" y="210" width="60" height="90"/>
-  <rect class="fixture-support" x="300" y="275" width="60" height="25"/>
-  <rect class="part-kept" x="120" y="250" width="240" height="25"/>
-  <rect class="part-threads" x="160" y="250" width="10" height="25"/>
-  <rect class="cutter" x="162" y="150" width="6" height="105"/>
-  <rect class="part-rest" x="90" y="140" width="150" height="12"/>
-  <polygon class="cutter" points="158,90 172,90 165,135"/>
-  <line class="leader" x1="380" y1="100" x2="168" y2="132"/>
-  <text class="label" x="384" y="104">tap guide's spring point in the wrench's centre hole</text>
-  <line class="leader" x1="120" y1="320" x2="165" y2="276"/>
-  <text class="label" x="40" y="334">hole runs through into air, left of the jaws</text>
-  <text class="label" x="250" y="135">T-handle wrench</text>
-  <text class="label" x="20" y="358">Spindle off; a half turn back each turn; full threads through the top face.</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 400" width="760" height="400" font-family="sans-serif" font-size="13">
+  <!-- From the front (+X right, +Z up), 3 px/mm, the left overhang. The 1/4-20 plug tap (major .250 = 19 px; its length and lead not on record: round cue) in the farther post hole (X29.328 Y-35.649), the T-handle wrench (schematic) and the Fisher tap guide (1/2 in shank, 3/16 point, tools.tap-guide-fisher) in the 1/2 in collet, its spring point in the wrench's centre hole: all turning or travelling with the tap, in the cutter colour. The hole through into air; the jaws' left ends at X44.23. -->
+  <rect class="paper" x="0" y="0" width="760" height="400"/>
+  <text class="title" x="20" y="22">Ops 140-150 (PL02): tap 1/4-20 by hand under the tap guide, the farther post hole (from the front, 3 px/mm)</text>
+  <rect class="part-kept" x="123" y="300" width="360" height="19.05"/>
+  <rect class="fixture-support" x="252.7" y="319.05" width="240" height="38.1"/>
+  <rect class="hidden" x="252.7" y="260.03" width="240" height="97.12"/>
+  <rect class="part-threads" x="198.46" y="300" width="19.05" height="19.05"/>
+  <path class="cutter" d="M217.51 319.76L217.51 190L198.46 190L198.46 319.76A9.52 2.29 0 0 0 217.51 319.76Z"/>
+  <rect class="cutter" x="147.98" y="180" width="120" height="10"/>
+  <rect class="cutter" x="197.98" y="176" width="20" height="26"/>
+  <path class="cutter" d="M200.84 153.14L215.13 153.14L215.13 168.86L207.98 176L200.84 168.86Z"/>
+  <path class="cutter" d="M227.03 153.14L227.03 30L219.41 27L211.79 30L204.17 27L196.55 30L188.93 30L188.93 153.14Z"/>
+  <text class="datum-label" x="300" y="294">Z0 the underside (U, up)</text>
+  <text class="label" x="400" y="80">Fisher tap guide in the 1/2 in collet, spindle off:</text>
+  <text class="label" x="400" y="96">its spring point in the wrench's centre hole</text>
+  <line class="leader" x1="396" y1="76" x2="219.98" y2="70"/>
+  <circle class="leader-dot" cx="219.98" cy="70" r="2"/>
+  <text class="label" x="400" y="170">T-handle wrench (schematic)</text>
+  <line class="leader" x1="396" y1="166" x2="267.98" y2="184"/>
+  <circle class="leader-dot" cx="267.98" cy="184" r="2"/>
+  <text class="label" x="400" y="376">1/4-20 tap through, a half turn back each turn; full threads</text>
+  <text class="label" x="400" y="392">past the top face; the hole runs through into air</text>
+  <line class="leader" x1="396" y1="356" x2="211.98" y2="319.05"/>
+  <circle class="leader-dot" cx="211.98" cy="319.05" r="2"/>
+  <text class="label" x="20" y="230">moving jaw (in front, outline)</text>
+  <text class="label" x="20" y="246">and parallel, right</text>
 </svg>

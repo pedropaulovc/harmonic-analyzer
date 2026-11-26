@@ -1,12 +1,19 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 240" font-family="sans-serif" font-size="13">
-  <rect class="paper" x="0" y="0" width="760" height="240"/>
-  <text class="title" x="20" y="20">Setup 1: the 1 in bar on the saw (not to scale)</text>
-  <rect class="fixture-vise" x="520" y="80" width="200" height="30"/>
-  <rect class="part-rest" x="470" y="110" width="270" height="50"/>
-  <rect class="part-kept" x="40" y="110" width="250" height="50"/>
-  <rect class="part-kept" x="300" y="110" width="160" height="50"/>
-  <rect class="cutter" x="460" y="40" width="10" height="140"/>
-  <text class="label" x="60" y="190">6.50 in blank (bar end)</text>
-  <text class="label" x="300" y="190">4.00 in slug blank</text>
-  <text class="label" x="530" y="70">saw vise on the bar</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 250" width="760" height="250" font-family="sans-serif" font-size="13">
+  <!-- Plan, 1 in = 50 px: the 1 in bar (bar_dia_in), the 6.50 blank (blank_length_in) off its end, the 4.00 slug blank (slug_blank_in) marked next. The 14 in saw's blade thickness is not on record: drawn schematic, on the waste side of the 6.50 line; the saw's vise clamps the bar's long end, the blank free beyond the blade. -->
+  <rect class="paper" x="0" y="0" width="760" height="250"/>
+  <text class="title" x="20" y="22">Setup 1: saw the {{process.blank_length_in:.2f}} in blank off the bar end (1 in = 50 px)</text>
+  <rect class="part-kept" x="30" y="110" width="325" height="50"/>
+  <text class="label" x="60" y="140">{{process.blank_length_in:.2f}} in blank (bar end)</text>
+  <rect class="part-rest" x="361" y="110" width="380" height="50"/>
+  <line class="hidden" x1="561" y1="100" x2="561" y2="170"/>
+  <text class="label" x="380" y="140">{{process.slug_blank_in:.2f}} in slug blank next</text>
+  <rect class="fixture-vise" x="600" y="80" width="140" height="30"/>
+  <rect class="fixture-vise" x="600" y="160" width="140" height="30"/>
+  <text class="label" x="540" y="72">saw vise on the bar's long end</text>
+  <path class="cutter" d="M355 40L361 40L361 200L358 197L355 200Z"/>
+  <text class="label" x="370" y="54">14 in saw blade (schematic), on the</text>
+  <text class="label" x="370" y="70">waste side of the {{process.blank_length_in:.2f}} line</text>
+  <line class="leader" x1="366" y1="50" x2="360" y2="70"/>
+  <circle class="leader-dot" cx="360" cy="70" r="2"/>
+  <text class="label" x="30" y="232">Pick each piece up only after the blade has stopped; file the burrs off.</text>
 </svg>
