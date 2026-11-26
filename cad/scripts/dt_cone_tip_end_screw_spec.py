@@ -164,16 +164,18 @@ def inch_text(value_mm: float, places: int) -> str:
 # machinist review: the depth belongs in the callout; the depth the
 # model's at its drawing places).  Then rule 7's two lines of words: the
 # flag to note END_HOLE_NOTE, which names the mate by drawing number and
-# says it runs in the hole as drilled, and the wall shortfall as a plain
-# fact in rule 20's own form (RV-01; the hole's one wall is to the thread
-# root).  The hole is rule 4 form 1: MHA-DT-37 prints its pivot's own band,
-# set by its bonded fit in the reamed MHA-DT-38 bushing
-# (cone_tip_cluster.PIVOT_DIA_BAND), so the pivot is not turned to this
-# hole; the #52 hole clears it at every limit (PIVOT_CLEARANCE, .0013-.0063;
-# cone_tip_cluster asserts the running clearance positive).  The fit is a
-# flag note because on one row it is wider than the 72 mm between the frame
-# and the head's outline (machinist review r1, farm run
-# 20261124T110807008Z: three rows of words broke rule 7).
+# says it is turned to run in the hole as drilled, and the wall shortfall as
+# a plain fact in rule 20's own form (RV-01; the hole's one wall is to the
+# thread root).  The hole is drilled #52 with no band (owner ruling
+# 2026-11-24, fit audit question 11) and rule 4 form 2 holds for the pivot:
+# MHA-DT-37 prints it as a reference turned last to this hole and the
+# reamed MHA-DT-38 bushing at once, with both clearances (running
+# PIVOT_CLEARANCE, .0013-.0063). D47, delegated ruling 2026-11-26 (Main),
+# precedent: the owner's question-11 ruling 2026-11-24 and the made-to-fit
+# form of the owner-approved fit policy; owner review #2144: the two sheets
+# say the same thing.  The fit is a flag note because on one row it is
+# wider than the 72 mm between the frame and the head's outline (machinist
+# review r1, farm run 20261124T110807008Z: three rows of words broke rule 7).
 END_HOLE_NOTE = 3
 END_HOLE_DEPTH_TEXT = inch_text(END_HOLE_DEPTH, END_HOLE_DEPTH_PLACES)
 END_HOLE_CALLOUT = "\n".join(
@@ -190,7 +192,7 @@ STOCK_NOTE = "\n".join(
         f"1. MAKE FROM McMASTER-CARR {SKU}, {THREAD} X 3/4 SLOTTED FILLISTER",
         "   HEAD SCREW; ADD THE DRILLED HOLE ONLY.",
         "2. UNDIMENSIONED PURCHASED GEOMETRY IS REFERENCE.",
-        f"{END_HOLE_NOTE}. {PIVOT_NUMBER} PIVOT RUNS IN THE HOLE AS DRILLED.",
+        f"{END_HOLE_NOTE}. {PIVOT_NUMBER} PIVOT IS TURNED TO RUN IN THIS HOLE AS DRILLED.",
     )
 )
 

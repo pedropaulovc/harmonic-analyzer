@@ -16,3 +16,8 @@ necessity:
     kind: gap
     reason: "sets the cone set's last seat station on the shaft"
     source: "owner ruling 2026-11-20 (#2631), exception RV-02: the shared .2934 face; dt_cone_gear_stack books each face's band in the 20-gear stack (fit audit 2026-11-23 MHA-DT-03.face_width, keep)"
+  - id: N-03
+    feature: "note 1, pivot clearances .0003-.0018 bonded in MHA-DT-38, .0013-.0063 running in MHA-DT-39"
+    kind: gap
+    reason: "bond fails past .0018; tip air closes past .0063"
+    source: "D47, delegated ruling 2026-11-26 (Main), precedent: the owner's question-11 ruling 2026-11-24 (end hole #52 as drilled) and the made-to-fit form of the owner-approved fit policy; owner review #2144. Both holes are made first and each is measured; the one pivot diameter is sized from both readings at once, never trial-fitted to one hole. For every reamed bore .0625-.0630 and drilled hole .0635-.0675 a diameter meeting both clearances exists, the window at least .0010 (check C-01 of checks/test-dt-cone-tip-gear-drawing.yaml, test_dt_cone_tip_gear_drawing.PIVOT_FIT_WINDOW_MIN_MM). .0018: the bond's largest gap (owner ruling 2026-11-20, #2469); .0063: the running clearance dt_cone_tip_air's C-01 bushing air and the Step 23C look air are summed on (cone_tip_cluster.PIVOT_RUNNING_CLEARANCE_MM)"

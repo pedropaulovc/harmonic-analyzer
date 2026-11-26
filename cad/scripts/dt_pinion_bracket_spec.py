@@ -137,19 +137,19 @@ PIN_SEAT_FLOOR_CORNER_R_MAX = 0.2032  # .008
 # seat's +.003/0 (dt_pinion_cam_pin_spec.BOND_CLEARANCE_MIN/MAX, inside
 # LOCTITE 638's gap there); the seat band is the requirement, so the range
 # prints as REF.  Machinist review r2 (farm run 20261124T125542720Z, blocker):
-# the callout named the bond but not its clearance.
+# the callout named the bond but not its clearance.  Rule 7's two lines of
+# words (Codjiflo on #3675): the bond with its compound's grade (rule 23)
+# and mate, then its clearance with the floor-corner allowance.
 _BOND_CLEARANCE_TEXT = "-".join(
     f"{value / 25.4:.4f}".lstrip("0")
     for value in (_cam_pin.BOND_CLEARANCE_MIN, _cam_pin.BOND_CLEARANCE_MAX)
 )
+_FLOOR_CORNER_TEXT = f"R{PIN_SEAT_FLOOR_CORNER_R_MAX / 25.4:.3f}".replace("R0.", "R.")
 PIN_SEAT_CALLOUT = "\n".join(
     (
         f"<HOLE-DEPTH> ({PIN_SEAT / 25.4:.2f}) FLAT BOTTOM".replace("(0.", "(."),
-        "BONDED FIT ON MHA-DT-25",
-        f"(CLEARANCE {_BOND_CLEARANCE_TEXT})",
-        f"FLOOR CORNERS R{PIN_SEAT_FLOOR_CORNER_R_MAX / 25.4:.3f} MAX".replace(
-            "R0.", "R."
-        ),
+        "BONDED FIT, LOCTITE 638, ON MHA-DT-25",
+        f"CLEARANCE {_BOND_CLEARANCE_TEXT}; FLOOR CORNERS {_FLOOR_CORNER_TEXT} MAX",
     )
 )
 

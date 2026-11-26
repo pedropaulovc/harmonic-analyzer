@@ -134,7 +134,7 @@ def test_callouts_and_notes_name_every_mate_once() -> None:
         f"{cluster.RETAINING_COMPOUND}, IN MHA-DT-38"
     )
     assert "MHA-DT-39 CONE TIP END SCREW" in pivot_note
-    assert "TURNED LAST TO SLIDE IN BOTH" in pivot_note
+    assert "ONE DIAMETER, TURNED LAST TO BOTH" in pivot_note
     for clearance in (cluster.BUSHING_BOND_CLEARANCE_MM, cluster.PIVOT_RUNNING_CLEARANCE_MM):
         assert f"{spec.inch_text(clearance[0], 4)}-{spec.inch_text(clearance[1], 4)}" in pivot_note
     assert "MEASURED" not in pivot_note
@@ -165,6 +165,42 @@ def test_callouts_and_notes_name_every_mate_once() -> None:
     assert "SPIGOT" not in gear_data and "PIVOT" not in gear_data
     minimum, maximum = family.over_pins_limits_mm(6)
     assert f"{spec.inch_text(minimum, 4)} TO {spec.inch_text(maximum, 4)}" in gear_data
+
+
+# D47 (delegated ruling 2026-11-26 (Main), precedent: the owner's question-11
+# ruling 2026-11-24 and the made-to-fit form of the owner-approved fit policy;
+# owner review #2144): the pivot is sized to both holes at once. For every
+# reamed MHA-DT-38 bore B and every drilled #52 hole H the analysis bands
+# allow, the diameters meeting note 1's two clearances overlap by at least
+# one reading of the 0-1 in micrometer (.0001 in), so the fit always exists.
+PIVOT_FIT_WINDOW_MIN_MM = 0.0001 * 25.4
+
+
+def test_one_pivot_diameter_always_meets_both_clearances() -> None:
+    bond_lo, bond_hi = cluster.BUSHING_BOND_CLEARANCE_MM
+    run_lo, run_hi = cluster.PIVOT_RUNNING_CLEARANCE_MM
+    bores = cluster.limits(*cluster.BUSHING_BORE)
+    holes = cluster.limits(*cluster.END_HOLE)
+    steps = 20
+    windows = []
+    for i in range(steps + 1):
+        bore = bores[0] + (bores[1] - bores[0]) * i / steps
+        for j in range(steps + 1):
+            hole = holes[0] + (holes[1] - holes[0]) * j / steps
+            smallest = max(bore - bond_hi, hole - run_hi)
+            largest = min(bore - bond_lo, hole - run_lo)
+            windows.append(largest - smallest)
+    # The window is piecewise linear in (B, H), so its least is at a corner;
+    # the grid includes all four.  It is .0010 in, the turned-diameter row.
+    assert min(windows) >= PIVOT_FIT_WINDOW_MIN_MM
+    assert min(windows) == pytest.approx(0.0010 * 25.4, abs=1e-6)
+    # The fixed analysis band always lies in the window, so the air checks'
+    # running clearance (dt_cone_tip_air) is what note 1 accepts.
+    pivot = cluster.limits(*cluster.PIVOT)
+    for bore in bores:
+        for hole in holes:
+            assert max(bore - bond_hi, hole - run_hi) <= pivot[0] + 1e-9
+            assert pivot[1] <= min(bore - bond_lo, hole - run_lo) + 1e-9
 
 
 def test_yaml_carries_the_t006_tooth_band_and_face_width_rulings_only() -> None:

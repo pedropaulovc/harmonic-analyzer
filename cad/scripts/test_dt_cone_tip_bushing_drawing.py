@@ -66,9 +66,8 @@ def test_bore_callout_names_process_fit_compound_and_mate() -> None:
     # this bore and MHA-DT-37 prints the acceptance (fit audit 2026-11-23).
     assert spec.BORE_CALLOUT.splitlines() == [
         "REAM THRU",
-        "BONDED FIT, LOCTITE 638:",
-        "MHA-DT-37 PIVOT IS",
-        "TURNED TO THIS BORE",
+        "BONDED FIT, LOCTITE 638",
+        "MHA-DT-37 TURNED TO BORE",
     ]
 
 

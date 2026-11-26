@@ -114,13 +114,13 @@ def _floor_text(value_mm: float, places: int) -> str:
 # Rule 4, form 2: REAM with no band, the fit name with its compound (rule
 # 26, as MHA-DT-37's spigot prints it) and its mate by drawing number, which
 # is turned last to this bore; MHA-DT-37 prints the acceptance (fit audit
-# 2026-11-23, F10 and MHA-DT-37.stems).  THRU: the section shows it.
+# 2026-11-23, F10 and MHA-DT-37.stems; D47).  THRU: the section shows it.
+# Two lines of words under the process line (rule 7; Codjiflo on #3675).
 BORE_CALLOUT = "\n".join(
     (
         "REAM THRU",
-        f"BONDED FIT, {tip.RETAINING_COMPOUND}:",
-        f"{PIVOT_NUMBER} PIVOT IS",
-        "TURNED TO THIS BORE",
+        f"BONDED FIT, {tip.RETAINING_COMPOUND}",
+        f"{PIVOT_NUMBER} TURNED TO BORE",
     )
 )
 OUTER_DIA_CALLOUT = f"HOLDS WALL {_floor_text(WALL_WORST, 3)} MIN"
