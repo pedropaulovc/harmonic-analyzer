@@ -30,11 +30,19 @@ part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
 material = "C36000 free-machining brass, 1/8 x 2-1/2 in flat"
 stock = "1/8 × 2-1/2 in flat, on hand; one disc from a {{process.blank_side_in:g}} in square sawn off it."
-note = "Inches unless mm. Lathe PM-1127VF-LB (70–380 and 380–2000 rpm); brass cut dry. Not on record, to find or buy before the job: the mandrel's 3/8-16 x 1-1/2 in fully threaded hex bolt, its nut and two 3/8 x 1-1/2 in OD fender washers. The .377 and .381 pin gauges are on the owner's order (owner 2026-11-21: \"ill buy pin gauges\")."
 shop = "../shop"
 stock_refs = ["c360-flat-1-8x2-1-2"]
 material_key = "lathe-c360"
 turning_material = "brass"
+
+standing = true
+
+[[notes]]
+title = "This job"
+rows = [
+  ["To find or buy", "Not on record, to find or buy before the job: the mandrel's 3/8-16 x 1-1/2 in fully threaded hex bolt, its nut and two 3/8 x 1-1/2 in OD fender washers."],
+  ["Pin gauges", "The .377 and .381 pin gauges are on the owner's order (owner 2026-11-21: \"ill buy pin gauges\")."],
+]
 
 [cad]
 file = "../../out/features/dt_cylinder_end_disc/features.toml"
