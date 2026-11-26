@@ -9,7 +9,7 @@ drawings, not the generated build-input DXFs.
 The 2026-10-23 owner ruling V-engraves the numerals: single-stroke sans
 numerals cut as true 30-degree included V grooves (the model drafts every
 stroke wall 15 degrees). Issue #2433: the graduations are the same 30-degree
-V, so one engraving bit (shop-equipment tools.ms-stick-engraver) cuts
+V, so one engraving bit (shop-equipment tools.engravers-esao-30-0-1) cuts
 every tick and numeral stroke; no tool in the shop cuts the former
 square-bottom .016-.024 groove.
 

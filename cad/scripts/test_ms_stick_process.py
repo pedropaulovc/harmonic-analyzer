@@ -121,14 +121,14 @@ def test_every_tick_is_cut_at_the_drawings_station(ctx) -> None:
 def test_the_plan_repeats_the_shop_inventory() -> None:
     p = PLAN["parameters"]
     grads = FEATURES["features"]["graduations"]
-    bit = EQUIPMENT["tools"]["ms-stick-engraver"]
-    assert p["engraver_tip_mm"] == pytest.approx(bit["tip_width_in"] * 25.4)
+    bit = EQUIPMENT["tools"]["engravers-esao-30-0-1"]
+    assert p["engraver_tip_mm"] == pytest.approx(bit["tip_width_mm"])
     assert bit["included_angle_deg"] == grads["v_angle_deg"]
     # The Tools table's line for the bit is the inventory's bit.
-    described = SHOP["tools"]["ms-stick-engraver"]["description"]
-    assert bit["sku"] in described
+    described = SHOP["tools"]["engravers-esao-30-0-1"]["description"]
+    assert bit["make"] in described
     assert f"{bit['included_angle_deg']:g}°" in described
-    assert f"{bit['tip_width_in']:.3f}"[1:] in described
+    assert f"{bit['tip_width_mm']:g} mm" in described
     # One strip of the hold's tape covers the bar's top (no seam): the plan
     # tapes each face with a single strip trimmed to width.
     hold = EQUIPMENT["consumables"]["hold-painters-tape-ca"]
@@ -285,11 +285,11 @@ def _seed(ctx: dict, key: str, old: str, new: str) -> dict:
         # The 0 tick .002 off its station.
         ("graduations", "G0 X-145.430 Y-9.513", "G0 X-145.380 Y-9.513", "cleared"),
         # The 0 tick left under its depth.
-        ("graduations", "G1 Z-0.711 F{feed}", "G1 Z-0.650 F{feed}", "cleared"),
+        ("graduations", "G1 Z-0.762 F{feed}", "G1 Z-0.700 F{feed}", "cleared"),
         # A tenth cut as long as a numbered tick.
         ("graduations", "G1 Y-7.239 F{feed}", "G1 Y-5.969 F{feed}", "keep_out"),
         # Three levels taken at once.
-        ("graduations", "G1 Z-0.110 F{feed}", "G1 Z-0.330 F{feed}", "passes"),
+        ("graduations", "G1 Z-0.119 F{feed}", "G1 Z-0.356 F{feed}", "passes"),
         # A rapid down into the brass instead of to the R plane.
         ("graduations", "G0 Z0.500", "G0 Z-0.200", "rapid"),
         # A stroke of the 0 off its line.

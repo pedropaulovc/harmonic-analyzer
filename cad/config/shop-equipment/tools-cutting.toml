@@ -99,27 +99,6 @@ thickness_in = 0.014
 bore_in = 1.0
 teeth = 72
 
-# Engraving bit for every MHA-MS-01 (ms-stick) graduation and numeral (#2433):
-# a 30-degree included V cuts the printed .016 MIN / .024 MAX tick at its face
-# plunged .021-.033 deep (.020 MIN deep, .080 MIN stock under at the .120
-# thinnest bar), and the .016 MIN-deep numerals. Its cutting setting is
-# cad/process/shop/ settings.ms-stick-engrave-brass. Graduation stations
-# are dialled on the X DRO (dro.pm-30mv, .0002 in): its readings are the
-# record of the sheet's +/-.002 stations, finer than any loupe check. Note 3
-# leaves the numeral font to the shop: a single-stroke font of straight
-# horizontal and vertical strokes cuts each stroke with one handwheel.
-[tools.ms-stick-engraver]
-name = "2L Profiler P-125x2.0-30-.005-S, 30 deg included V, .005 in tip, solid carbide, soft-materials (brass) grade"
-kind = "engraving_bit"
-make = "2L Inc."
-sku = "P-125x2.0-30-.005-S"
-source = "https://www.2linc.com/product/profiler-engraving-tools/"
-purchase = "2L P-125x2.0-30-.005-S, $18.40 each (2L listing read live 2026-11-11); buy two, a broken tip stops the job"
-status = "to_order"
-note = "Not owned: to buy. MHA-MS-01 graduations (101 ticks) and numerals 0-10."
-included_angle_deg = 30.0
-tip_width_in = 0.005
-
 # The near-wall Ø.206 #10 close clearance on the same paths: a jobber #5 from
 # the owned 115-piece index stands too proud in the chuck with the base on
 # edge; the screw-machine length does not.
@@ -597,9 +576,8 @@ note = "On hand (owner, 2026-11-24). Held in the 1/2 in R8 collet."
 # kyocera-engravers.jpg). Each record holds what its label or package prints
 # and the pieces visible in the photo; nothing else is asserted. Box labels
 # reading "drills" are recorded as labelled even where the tools look like
-# end mills in the photo. No record is checked against a plan: none of these
-# is the 30 deg, .005 in tip brass engraver tools.ms-stick-engraver buys, nor
-# an 82 deg countersink.
+# end mills in the photo. Only the ESAO bits are checked against a plan: they
+# cut the MHA-MS-01 stick (their record).
 [tools.endmills-3mm-2fl]
 name = "3 mm 2-flute end mills (box label \"3mm 2fl endmils\")"
 kind = "endmill"
@@ -726,6 +704,17 @@ dia_in = 0.0625
 cite = ["Owner (Pedro) 2026-11-26 photo research/shop-evidence/2026-11-26/small-cutters.jpg: box label \"KYOCERA 1800.0625.200\", \"1/16\\\" ENDMILL-SE\", \"SIZE: 1/16\\\"\", \"DIA: 0.0625\", \"SERIES: 1800\", \"QTY 50\"", "Owner (Pedro) 2026-11-26: \"add any relevant to inventory on hand\""]
 note = "The box is printed QTY 50; how many it still holds is not visible in the photo."
 
+# Engraving bit for every MHA-MS-01 (ms-stick) graduation and numeral (#2433;
+# owner 2026-11-26, "switch if possible", in place of the 2L .005 in tip bit
+# that was to be bought): the 30-degree included V and its 0.1 mm tip cut the
+# printed .016 MIN / .024 MAX tick at its face plunged .023-.037 deep (.020
+# MIN deep, .080 MIN stock under at the .120 thinnest bar), and the .016
+# MIN-deep numerals. Its cutting setting is cad/process/shop/
+# settings.ms-stick-engrave-brass. Graduation stations are dialled on the X
+# DRO (dro.pm-30mv, .0002 in): its readings are the record of the sheet's
+# +/-.002 stations, finer than any loupe check. Note 3 leaves the numeral font
+# to the shop: a single-stroke font of straight horizontal and vertical
+# strokes cuts each stroke with one handwheel.
 [tools.engravers-esao-30-0-1]
 name = "ESAO titanium-coated flat-bottom V engraving bits, 3.175 mm shank, 30 deg, 0.1 mm tip"
 kind = "engraving_bit"
@@ -735,7 +724,7 @@ shank_mm = 3.175
 included_angle_deg = 30.0
 tip_width_mm = 0.1
 cite = ["Owner (Pedro) 2026-11-26 photo research/shop-evidence/2026-11-26/small-cutters.jpg: box label \"镀钛平底尖刀\" (titanium-plated flat-bottom pointed cutter), \"3.175*30*0.1\", a partly torn \"...10x Titanium ... Tip(J3.3001Tix10)\" sticker", "Owner (Pedro) 2026-11-26: \"add any relevant to inventory on hand\""]
-note = "Piece count not visible (the sticker reads 10x as sold). Two loose gold V bits lie apart in the photo, unlabelled and not counted here. Not the 2L .005 in tip brass-grade engraver tools.ms-stick-engraver buys."
+note = "Piece count not visible (the sticker reads 10x as sold). Two loose gold V bits lie apart in the photo, unlabelled and not counted here. Cuts the MHA-MS-01 graduations (101 ticks) and numerals 0-10; the tip is the label's 0.1 mm, not measured: mike or loupe it before the stick."
 
 [tools.engraver-kyocera-egr1250-90]
 name = "Kyocera EGR1250-GW00590 1/8 in 2-flute engraver, 90 deg"
