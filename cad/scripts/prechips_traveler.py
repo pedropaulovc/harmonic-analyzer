@@ -160,24 +160,41 @@ def print_lock_path() -> Path:
     return Path(base) / "harmonic-analyzer" / "traveler-print.lock"
 
 
+def _free_slot(path: Path) -> FileLock | None:
+    """Acquire the first free print slot, or None while every slot is held."""
+    for index in range(PRINT_SLOTS):
+        lock = FileLock(f"{path}.{index}")
+        try:
+            lock.acquire(timeout=0)
+        except Timeout:
+            continue
+        return lock
+    return None
+
+
 @contextmanager
 def print_slot(poll_s: float = 0.25) -> Iterator[None]:
-    """Hold one of the host's ``PRINT_SLOTS`` while a headless browser prints."""
+    """Hold one of the host's ``PRINT_SLOTS`` while a headless browser prints.
+
+    The wait is its own span, so a ``prechips.pdf`` span still measures the
+    print; a long wait logs the lock path every 30 s."""
     path = print_lock_path()
     path.parent.mkdir(parents=True, exist_ok=True)
-    while True:
-        for index in range(PRINT_SLOTS):
-            lock = FileLock(f"{path}.{index}")
-            try:
-                lock.acquire(timeout=0)
-            except Timeout:
-                continue
-            try:
-                yield
-            finally:
-                lock.release()
-            return
-        time.sleep(poll_s)
+    next_log = time.monotonic()
+    with _telemetry.span(
+        "prechips.print.wait",
+        lock_path=str(path),
+        print_slots=PRINT_SLOTS,
+    ):
+        while (lock := _free_slot(path)) is None:
+            if time.monotonic() >= next_log:
+                _telemetry.info(f"waiting for a traveler print slot at {path}")
+                next_log = time.monotonic() + 30
+            time.sleep(poll_s)
+    try:
+        yield
+    finally:
+        lock.release()
 
 
 def print_pdf(browser_path: str, html: Path, pdf: Path) -> None:

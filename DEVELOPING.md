@@ -1127,22 +1127,25 @@ gallery, travelers and publish in the owning worktree without local COM
 redispatch; the cut fails if any traveler PDF or NC program is missing.
 
 If the run was launched without `package:manifest check:features_bound`, its
-restored `out/` lacks the other parts' `features.toml` and the cut stops at
-`release.features_stage`. Bind them seat-free in the owning worktree before the
-cut. One `doit -s` invocation takes every task named on its command line (doit
-clears each selected task's `task_dep`), so list them all at once rather than
-one invocation per stem:
+restored `out/` lacks the other parts' `features.toml` (or, over a `cad/out`
+that cut an earlier release, keeps that release's stale ones) and the cut stops
+at `release.features_stage`. Bind every bundle seat-free in the owning worktree
+before the cut. One `doit -s` invocation takes every task named on its command
+line (doit clears each selected task's `task_dep`), so list them all at once
+rather than one invocation per stem. Never run `doit -s` with no task named: it
+would run the default `build` locally, SolidWorks included.
 
 ```powershell
-$stems = (Get-ChildItem cad/out/features -Directory |
-  Where-Object { -not (Test-Path (Join-Path $_.FullName 'features.toml')) }).Name
+$stems = @(Get-ChildItem cad/out/features -Directory | ForEach-Object Name)
+if ($stems.Count -eq 0) { throw 'no feature bundles under cad/out/features' }
 uv run --frozen python -m doit -s @($stems | ForEach-Object { "package:manifest:$_" })
+if ($LASTEXITCODE -ne 0) { throw 'package:manifest failed' }
 uv run --frozen python -m doit -s check:features_bound
 ```
 
 Binding the 52 missing manifests of the 6d349882fd outputs with the tasks'
-`export_features.py` took 226 s (about 4.3 s each); the doit invocation adds one
-graph load of about a minute.
+`export_features.py` took 226 s (about 4.3 s each), so all 133 take about ten
+minutes; the doit invocation adds one graph load of about a minute.
 
 Every release also prepares and attaches
 `harmonic-analyzer-vNN-drawing-diff.zip`, separately from the main CAD bundle,

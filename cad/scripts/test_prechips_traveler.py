@@ -222,14 +222,24 @@ def test_the_browser_prints_inside_a_host_print_slot(process, monkeypatch, tmp_p
     FileLock(f"{wrapper.print_lock_path()}.0").acquire(timeout=0).lock.release()
 
 
-def test_a_print_waits_while_every_host_slot_is_held(process):
+def test_a_print_waits_while_every_host_slot_is_held(process, monkeypatch):
     # Concurrent prints on a loaded submitter ran past the limit (#3460).
     path = wrapper.print_lock_path()
     path.parent.mkdir(parents=True, exist_ok=True)
     others = [FileLock(f"{path}.{index}") for index in range(wrapper.PRINT_SLOTS)]
     for lock in others:
         lock.acquire(timeout=0)
+    refused = threading.Event()
     entered = threading.Event()
+    free_slot = wrapper._free_slot
+
+    def observed(lock_path):
+        lock = free_slot(lock_path)
+        if lock is None:
+            refused.set()
+        return lock
+
+    monkeypatch.setattr(wrapper, "_free_slot", observed)
 
     def printer():
         with wrapper.print_slot(poll_s=0.01):
@@ -238,13 +248,15 @@ def test_a_print_waits_while_every_host_slot_is_held(process):
     thread = threading.Thread(target=printer, daemon=True)
     thread.start()
     try:
-        assert not entered.wait(0.3)
+        # Generous hang guards, not timing windows: the refusal is observed.
+        assert refused.wait(60)
+        assert not entered.is_set()
         others[-1].release()
-        assert entered.wait(5)
+        assert entered.wait(60)
     finally:
         for lock in others:
             lock.release(force=True)
-        thread.join(5)
+        thread.join(60)
 
 
 def test_a_picture_finding_not_in_the_baseline_refuses_before_printing(
