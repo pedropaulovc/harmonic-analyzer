@@ -257,6 +257,11 @@ drill_f_oal_mm = 104.775
 # 79.375, 187.325, rounded down to .01 in.
 tap_stack_max_mm = 266.7
 tap_wrench_reach_max_mm = 187.19
+# The tap guide (shop tools.tap-guide-fisher): its 1/2 in shank and 3/16 in
+# point, the sellers' sizes, restated for the tap pictures
+# (test_shop_equipment.py holds them to the record).
+tap_guide_dia_mm = 12.7
+tap_guide_point_dia_mm = 4.7625
 
 [[tools]]
 id = "em-half"

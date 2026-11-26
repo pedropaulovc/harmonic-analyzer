@@ -428,16 +428,28 @@ def context(
     spot_z = t - _spot_depth(p["spot_dia_mm"])
     # The drills' full diameter and the reamer's bevel reach into the spoil
     # block through the tape stack at its thickest.
-    for key in ("drill_past_mm", "ream_past_mm"):
+    for key in ("drill_past_mm", "ream_past_mm", "k_drill_past_mm"):
         if not p[key] > p["tape_stack_max_mm"]:
             raise ValueError(
                 f"process.{key} does not clear the tape stack at its thickest"
             )
+    # The reamer's flat end stays inside the 27/64's full diameter: below it
+    # the drill's cone narrows under the reamer's end in the solid block.
+    if not p["k_drill_past_mm"] >= p["ream_past_mm"] + p["drill_past_mm"]:
+        raise ValueError(
+            "process.k_drill_past_mm: the 27/64's full diameter does not pass the reamer's tip"
+        )
     drill_1_tip = -(p["drill_past_mm"] + _point(d1))
-    drill_2764_tip = -(p["drill_past_mm"] + _point(d2764))
+    drill_2764_tip = -(p["k_drill_past_mm"] + _point(d2764))
     _agree(plan, "drill_1_tip_mm", drill_1_tip)
     _agree(plan, "drill_2764_tip_mm", drill_2764_tip)
     _agree(plan, "ream_tip_mm", -p["ream_past_mm"])
+    import cam_nc
+
+    if p["ream_past_mm"] <= cam_nc.ream_full_diameter_past_min_mm(plan, "reamer"):
+        raise ValueError(
+            "the reamer's full diameter does not reach face A (cnc.ream-full-diameter)"
+        )
     for name in ("screw drill", "press drill"):
         if _op_with_cut(plan, name)[0]["peck"] != "none":
             raise ValueError(f"'{name}' is one plunge (L/D under 1): peck = \"none\"")

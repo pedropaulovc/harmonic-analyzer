@@ -204,7 +204,9 @@ drill_b_tip_mm = -8.7932
 drill_7_tip_mm = -8.5108
 # The .2510 reamer, Setup 4 (the bar flat on the spoil plate, its thrust
 # into the plate): 600 rpm, .004 in/rev (2.4 in/min) in and out at feed,
-# its full diameter ream_past_mm into the plate (ream_tip_mm below Z0); the
+# its tip ream_past_mm into the plate (ream_tip_mm below Z0; more than its
+# chamfer + 0.25, so its full diameter passes through by more than 0.25: cnc.toml
+# cnc.ream-full-diameter, D45); the
 # B drill re-enters its hole first, its full diameter drill_past_mm deeper
 # (pivot_redrill_tip_mm), and leaves the reamer ream_allowance_mm on the
 # diameter (the channel lever's reamer speeds).  The bore prints no band:
@@ -671,8 +673,8 @@ speed_kind = "spindle"
 tool = "reamer"
 drilling = "none"
 sizing = { kind = "band", band_mm = "{{cad.pivot_bore_dia_band_mm}}" }
-instruction = "Same file, M6 T6 (.2510 reamer, at least {{process.drill_projection_min_mm:in.2f}} out of the chuck; set 600, cutting oil): ream the pivot through, in and out at feed (no rapid leaves the bore), its full diameter {{process.ream_past_mm:in.3dot}} into the plate."
-diagram = { file = "diagrams/outline-ream.svg", alt = "Section at the pivot, 8 px/mm: the .2510 reamer through the pivot, its full diameter 1.5 mm into the plate." }
+instruction = "Same file, M6 T6 (.2510 reamer, at least {{process.drill_projection_min_mm:in.2f}} out of the chuck; set 600, cutting oil): ream the pivot through, in and out at feed (no rapid leaves the bore), its tip {{process.ream_past_mm:in.3dot}} into the plate (its full diameter through)."
+diagram = { file = "diagrams/outline-ream.svg", alt = "Section at the pivot, 8 px/mm: the .2510 reamer through the pivot, its tip 1.5 mm into the plate (its full diameter through)." }
 rpm = 600
 feed = "{{process.ream_feed_per_min_mm:in.1f}} in/min, in and out"
 milling_cuts = [

@@ -562,6 +562,12 @@ def context(
         raise ValueError(
             f".4990 reamer tip Z {bore_ream_tip:.3f}: not past K by {past} or below the drill's tip {bore_tip:.3f}"
         )
+    import cam_nc
+
+    if -bore_ream_tip <= cam_nc.ream_full_diameter_past_min_mm(plan, "reamer-4990"):
+        raise ValueError(
+            f".4990 reamer tip Z {bore_ream_tip:.3f}: its full diameter does not reach K (cnc.ream-full-diameter)"
+        )
     _agree(plan, "bore_ream_r_plane_mm", depth + SAFE_MM)
     _agree(plan, "bore_ream_clear_mm", depth + CLEAR_MM)
     # The sheet's re-ream MDI feeds at the reamer's setting.

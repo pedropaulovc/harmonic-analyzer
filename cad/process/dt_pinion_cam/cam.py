@@ -326,6 +326,12 @@ def context(
     bore_spot = _spot_depth(p["bore_spot_dia_mm"])
     bore_tip = -(length + p["drill_past_mm"] + _point(dc))
     ream_tip = -(length + p["ream_past_mm"])
+    import cam_nc
+
+    if p["ream_past_mm"] <= cam_nc.ream_full_diameter_past_min_mm(plan, "reamer"):
+        raise ValueError(
+            "the reamer's full diameter does not reach face F (cnc.ream-full-diameter)"
+        )
     _agree(plan, "bore_drill_tip_mm", bore_tip)
     _agree(plan, "bore_ream_tip_mm", ream_tip)
     bore_xy = [_r(ecc), 0.0]
