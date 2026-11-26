@@ -66,10 +66,16 @@ part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
 material = "C36000 free-machining brass rod, 1/4 in (drawing: brass)"
 stock = "Qty {{process.quantity:g}}. Ø{{process.stock_dia_in:.3dot}} C360 rod, 360-H02 extruded, the 48 in bar on hand (Online Metals part 1257); one blank {{process.blank_length_in:.2dot}} in long and a {{process.trial_offcut_in:.2dot}} in trial offcut for the ball turner. Before sawing, mike the bar at three places along the blank: every reading .248–.250 (the lever's O.D. is the bar as bought; with the MHA-MG-02 bore accepted at .257–.261 on its own traveler, that is the drawing's .007–.013 sliding clearance); then slide the MHA-MG-02 clamp (made first) along it: it slides without catching. Either fails: do not cut that bar, order another."
-note = "Inches unless mm. Lathe PM-1127VF-LB (70–380 and 380–2000 rpm); brass cut dry. The O.D. is left as bought: the drawn rod's own surface is the drawing's Ra 125 MHA-MG-02 screw seat, so grip it over a brass shim wrap and never cut, file or stone it."
 shop = "../shop"
 stock_refs = ["c360-round-1-4"]
 material_key = "lathe-c360"
+
+# The shop's standing page carries what every traveler shares (units, lathe
+# speeds, coolant). The old note's O.D. rule prints where it applies: the
+# stock line ("the lever's O.D. is the bar as bought"), the shim-wrap
+# Holdings, and the ops that leave the rod untouched and check the Ra 125
+# MHA-MG-02 screw seat.
+standing = true
 
 [cad]
 file = "../../out/features/mg_magnifying_lever/features.toml"
