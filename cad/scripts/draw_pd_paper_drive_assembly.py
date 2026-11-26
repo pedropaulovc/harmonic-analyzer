@@ -123,7 +123,6 @@ from _hole_spec import NUMBER_DRILL_MM, TAP_DRILL_MM, blind_cut_dia_mm
 from _printed_tolerance import printed_deviations
 from _recording_geometry import RECORDING_PAPER_HEIGHT_MM, RECORDING_PAPER_WIDTH_MM
 import paper_drive_mesh_check as mesh_check
-import paper_drive_arm_registration as registration
 import pd_latch_hook_geometry as hook_geometry
 import paper_drive_rack_setup as rack_setup
 import pd_paper_drive_assembly_steps as steps
@@ -154,7 +153,6 @@ import pd_transgear_disc_screw_spec as disc_screw
 import pd_vn_transgear_knob_cup_screw_spec as cup_screw
 import pd_vn_transgear_pivot_screw_spec as pivot_screw
 import pd_vn_transgear_pivot_spring_spec as spring
-import _gear_quality as quality
 import pd_rack_pinion_spec as disc
 import pd_transgear_feed_pinion_spec as feed_pinion
 import pd_vn_transgear_arm_plate_locating_pin_spec as plate_locating_pin
@@ -598,16 +596,18 @@ KNOB_SETTING_INSTANCES = frozenset(
 # indicator's unknown accuracy over its range (codjiflo P2 on 8e8d5d5): a
 # sweep under .0005 puts each centre within .00025. The shop's 1 um lever
 # indicator (shop.toml gauges.dti, owner 2026-11-17) reads it with room to
-# spare. It names what it holds (machinist review round 5 read a finer sweep
-# as finer than the .002 S-K band needs, rule 4): K's worst case must stay
-# inside its Ø.008 setting circle
+# spare. Why that sweep (exception PD-00-knob-setting-true): K's worst case
+# must stay inside its Ø.008 setting circle
 # (paper_drive_arm_registration.REDUCER_AXIS_SETUP_RADIUS_MM; owner ruling
 # 2026-11-08 (Pedro), #2144 item 5.3). The pivot lever amplifies the across
 # error, so a .0005 sweep puts K up to .0022 off, inside the .004 radius
 # (test_the_jig_bored_k_lands_in_the_set_band_with_margin_at_both_ends).
 # The radial part of that worst case (.0008) keeps N inside the S to N set
-# band, which governs along S-N; the .004 circle bounds the rest. TRUE names
-# both, so it no longer reads as wider than DETAIL K's S to N limits (#2417).
+# band, which governs along S-N; the .004 circle bounds the rest. Both are
+# consequences of the sweep, not readings: no step measures N against the
+# circle, so the sheet prints the sweep alone, as a setting-table row step
+# 12C cites (rule 22; the machinist review of 0ecf59d001 read the printed
+# "SO N LANDS ... WITHIN .004" as a second acceptance with no row).
 # The trial mesh may move the table only so far that N, indicated TRUE with
 # that radial error, stays within those limits (owner ruling 2026-11-24, audit
 # part 2 question C1; pd_paper_drive_knob_setting_spec derives the moves).
@@ -617,16 +617,7 @@ KNOB_SETTING_INSTANCES = frozenset(
 # meant both the view and the bore).
 KNOB_BORE_LETTER = "N"
 KNOB_SETTING_SWEEP_IN = knob_setting.TRUE_SWEEP_IN
-_KNOB_SETTING_SWEEP_TEXT = f"{KNOB_SETTING_SWEEP_IN:g}".lstrip("0")
-KNOB_SETTING_CIRCLE_TEXT = (
-    f"WITHIN {steps.inch_text(registration.REDUCER_AXIS_SETUP_RADIUS_MM, 3)} OF ITS "
-    f"{KNOB_SETTING_VIEW_NAME} SETTING"
-)
-KNOB_SETTING_TRUE = (
-    f"TRUE: SWEEP UNDER {_KNOB_SETTING_SWEEP_TEXT} ON THE TEST INDICATOR, SO "
-    f"{KNOB_BORE_LETTER} LANDS INSIDE "
-    f"THE S TO {KNOB_BORE_LETTER} BAND, {KNOB_SETTING_CIRCLE_TEXT}"
-)
+KNOB_SETTING_SWEEP_TEXT = f"UNDER {f'{KNOB_SETTING_SWEEP_IN:g}'.lstrip('0')}"
 # The trial moves of the table, in DRO counts on DETAIL K's two axes
 # (pd_paper_drive_knob_setting_spec): one toward S for a shake over the
 # ceiling; away from S only where the limit leaves the mill a settable move
@@ -1884,7 +1875,7 @@ KNOB_END_FLOAT_RANGE = (
 # stack's sub-step that coats the journal, which the BOM sheet's consumables
 # lines cite, and the cure before the knob is first turned, loaded or oiled
 # (Henkel's LOCTITE 641 TDS states its strength at 24 h, 22 °C).
-KNOB_CUP_BOND_SUB_STEP = 6
+KNOB_CUP_BOND_SUB_STEP = 9
 KNOB_CUP_BOND_CURE_H = 24
 # Rule 23's bond bullet for the MHA-PD-20 spacer on the MHA-PD-VN-57
 # shoulder (owner ruling 2026-11-24, fit audit question 6; LOCTITE 638,
@@ -2192,9 +2183,6 @@ def _mark_window(location_mm: float) -> str:
 # --- rule 22: the values the setting table and the steps share ---------------
 LOCK_GAP_WINDOW = steps.inch_window(platen_guide.LOCK_GAP_FIT, 3, " TO ")
 KNOB_END_FLOAT_WINDOW = steps.inch_window(KNOB_END_FLOAT_RANGE, 3, " TO ")
-REDUCER_CLOCK_TEXT = steps.inch_text(
-    steps.inch_floor_mm(quality.reducer_setup_clock_deviation_mm(), 3), 3
-)
 # The tooth-space runout grade is the .002 inch step (F3).
 DISC_TIR_TEXT = steps.inch_text(
     steps.inch_floor_mm(disc.TOOTH_SPACE_RUNOUT_TIR_MM, 3), 3
@@ -2206,6 +2194,16 @@ DISC_TIR_TEXT = steps.inch_text(
 # control's, so the two sheets read the same spaces.
 DISC_TIR_SAMPLE_SPACES = disc.TOOTH_SPACE_SAMPLE_SPACES
 DISC_TIR_SAMPLE_STRIDES = disc.TOOTH_SPACE_SAMPLE_STRIDES
+# Step 16 dresses the disc screw tips flush and the setting table accepts
+# them by a straightedge lying flat on the disc rear face (drawing-guidelines
+# rule 4: the trial on the mate, not a feeler reading; fit audit part 2, B3):
+# that is the cut window's shallow end, .000, so the sheet prints FLUSH.
+# The window's deep end (.008) is not printed and not widened: it is the
+# dressing allowance the disc tap's worst engagement charges, which holds
+# 1.5D by .001 (pd_transgear_disc_screw_spec.ENGAGEMENT_WORST).
+if disc_screw.TIP_BELOW_REAR_FACE[0] != 0.0:
+    raise AssertionError("the disc screw window's shallow end is not flush")
+DISC_SCREW_TIP_TEXT = "FLUSH"
 # The setting table's rows, in step order; each step cites its row by number.
 SETTING_ROW_KEYS = (
     "bar-top",
@@ -2216,6 +2214,7 @@ SETTING_ROW_KEYS = (
     "disc-tir",
     "bush-seated",
     "bush-reamed",
+    "true-sweep",
     "reducer-shake",
     "trial-move",
     "plate-screw-tips",
@@ -2225,7 +2224,6 @@ SETTING_ROW_KEYS = (
     "cup-set",
     "engaged-feed",
     "crest-level",
-    "tooth-centred",
     "offset-set",
     "offset-accept",
     "stud-cut",
@@ -2291,7 +2289,6 @@ def _step_text(
     # ACCEPTED_CHAIN_OFFSET_IN_SERVICE assumes.
     float_sheet = SHEET_NAMES.index(CLUSTER_FLOAT_SHEET) + 1
     pose = steps.step_number("fitup-pose-set")
-    clock = REDUCER_CLOCK_TEXT
     tir = DISC_TIR_TEXT
 
     def s(key: str, index: int) -> str:
@@ -2335,7 +2332,7 @@ def _step_text(
     )
     knob_cup_off_cited = (
         f"TAKE THE {n['pd-transgear-knob-cup']} CUP OFF AS "
-        f"{s('knob-stack-fitted', 14)}-{s('knob-stack-fitted', 15)}."
+        f"{s('knob-stack-fitted', 17)}-{s('knob-stack-fitted', 18)}."
     )
     knob_shaft_out = f"DRAW THE {n['pd-transgear-knob-shaft']} SHAFT OUT FORWARD."
     # The bonded spacer holds the arm captive on the shoulder, so the arm
@@ -2367,7 +2364,7 @@ def _step_text(
     # #3106: a feed sleeve found outside after the cluster is hung is renewed
     # as 12X renews it, from the stripped cluster: the collar slid on at
     # 22 comes off first, the hub's oil hole is drilled on into the new
-    # sleeve (step 17) and the collar goes back on (22U; the bonded cup
+    # sleeve (step 17) and the collar goes back on (22X; the bonded cup
     # stays, #2425). Written once at 24 and pointed to from 26 (the
     # step-line budget), one action per sub-step (machinist review of
     # 592b20079f).
@@ -2378,7 +2375,7 @@ def _step_text(
         f"FOR IT, DO THE SLIDE-OFF AND THE REPEATS IN {s('arm-plate-located', 21)} "
         "ON A NEW ONE.",
         f"FOR IT, REPEAT STEPS {steps.step_number('oil-hole-drilled')}-"
-        f"{steps.step_number('disc-cluster-shimmed')} AND {s('knob-stack-fitted', 18)}, "
+        f"{steps.step_number('disc-cluster-shimmed')} AND {s('knob-stack-fitted', 21)}, "
         f"THEN FROM {s('hanger-meshed', 0)}.",
     )
 
@@ -2449,10 +2446,18 @@ def _step_text(
             f"CLAMP THE {n['pd-platen-guide']} TOP GUIDE TO THE {n['pd-platen']} "
             "PLATEN'S BACK, ENDS FLUSH WITH THE PLATEN ENDS, ON THE UPPER ROW OF "
             f"\u00d8{steps.inch_text(platen.GUIDE_HOLE_DIA, 3)} PLATEN HOLES.",
+            # The first set also holds the two ends level, read on the test
+            # indicator the height gauge carries (the gauge's own scale reads
+            # only the .100 band); before, that was only 26P's rework
+            # (steps.LEVEL_RACK_CREST_DRIFT). Delegated ruling 2026-11-26
+            # (Main), no precedent; owner review #2144 (D48, fit audit part 2,
+            # B4).
             f"CLAMP THE {n['pd-platen-bottom-guide']} BOTTOM GUIDE, RACK ON, TO THE "
             "PLATEN BACK, ENDS FLUSH, THE RACK'S CRESTS "
-            f"{steps.RACK_CREST_TEXT} BELOW THE PLATEN'S BOTTOM EDGE AT BOTH ENDS "
-            f"BY HEIGHT GAUGE {detail_cite('guides-screwed')}.",
+            f"{steps.RACK_CREST_TEXT} BELOW THE PLATEN'S BOTTOM EDGE "
+            "BY HEIGHT GAUGE, BOTH ENDS ALIKE WITHIN "
+            f"{steps.inch_text(steps.LEVEL_RACK_CREST_DRIFT, 3)} ON ITS TEST "
+            f"INDICATOR {detail_cite('guides-screwed')} {row_cite('crest-level')}.",
             "SPOT THE BOTTOM GUIDE THROUGH THE LOWER ROW OF PLATEN HOLES WITH A "
             f"{GUIDE_SPOT_PUNCH.numerator}/{GUIDE_SPOT_PUNCH.denominator} TRANSFER "
             "PUNCH.",
@@ -2634,10 +2639,12 @@ def _step_text(
             f"THE {n['pd-transgear-knob-shaft']} SHAFT'S REAR END.",
             # #2432: a test indicator's contact cannot sweep the small pivot
             # bore squarely, so it sweeps a snug gauge pin standing in it.
+            # TRUE's sweep is the setting table's row (rule 22); 12F, 12H and
+            # 12Q read TRUE per this step.
             "WITH A TEST INDICATOR IN THE SPINDLE, INDICATE A SNUG GAUGE PIN IN "
             f"THE ARM'S PIVOT BORE AND THE {n['pd-transgear-pin']} PIN'S "
             "SHANK IN ITS PIN BORE S, AT THE HEIGHT THE DISC WILL RUN, TRUE ON ONE DRO "
-            f"AXIS ({KNOB_SETTING_TRUE}).",
+            f"AXIS {row_cite('true-sweep')}.",
             # 12D and 12E can print on the sheet after DETAIL K's key: they
             # point to the key's sheet (review of run
             # 20261117T152142787Z-3d98e09383ba4ebea17fbf039b2b0697).
@@ -2846,9 +2853,12 @@ def _step_text(
             "CUT EACH TIP FLUSH TO "
             f"{steps.inch_text(joints.PLATE_SCREW_CUT_PROUD_MAX, 3)} PROUD OF THE "
             f"ARM {row_cite('plate-screw-tips')}.",
-            "BREAK THE CUT EDGE "
-            f"{steps.inch_max_text(plate_screw.CUT_END_BREAK_MAX, 3)} TO KEEP THE TAP'S "
-            "LAST THREAD.",
+            # The title block's edge break governs (drawing-guidelines rule 2;
+            # fit audit part 2, B2): the arm tap's own exit break already
+            # costs more thread than any title-block break of the cut end, so
+            # the worst engagement is the same 1.91D either way, over rule
+            # 18's 1.5D (transgear_hanger_joints).
+            "BREAK THE CUT EDGE.",
             "REFIT THE SAME SCREWS IN THE SAME HOLES, TIGHT.",
             # A check and its remedy are separate steps (rule 22; r10).
             "CHECK: ROCKED BY HAND, THE PLATE HAS NO SHAKE AND NO DAYLIGHT.",
@@ -3056,10 +3066,10 @@ def _step_text(
             f"{s('disc-taps-transferred', 12)}-{s('disc-taps-transferred', 15)}.",
             "MATCH-MARK DISC AND HUB.",
         ),
+        # The tips are dressed flush and accepted by a straightedge lying flat
+        # (DISC_SCREW_TIP_TEXT; drawing-guidelines rule 4; fit audit part 2, B3).
         "disc-screws-cut": (
-            f"CUT THE {n[explode.DISC_SCREW]} TIPS "
-            f"{steps.inch_window(disc_screw.TIP_BELOW_REAR_FACE, 3, ' TO ')} BELOW "
-            "THE DISC REAR FACE "
+            f"DRESS EACH {n[explode.DISC_SCREW]} TIP FLUSH WITH THE DISC REAR FACE "
             f"{row_cite('disc-screw-tips')}.",
         ),
         "oil-hole-drilled": (
@@ -3202,6 +3212,24 @@ def _step_text(
             f"{row_cite('cup-set')}.",
             "IF THE PILOT ENDS SHALLOWER THAN THAT, MAKE A NEW "
             f"{n['pd-transgear-knob-cup']} CUP AND REPEAT {s('knob-stack-fitted', 3)}.",
+            # A dry trial before the bond, as the pivot spacer's (step 15),
+            # catches a mis-faced cup before the LOCTITE goes on rather than
+            # after the cure and a hot pull-off. Delegated ruling 2026-11-26
+            # (Main), no precedent; owner review #2144 (D48, fit audit part 2,
+            # B6). The window stays .006 TO .010 (owner-accepted .008 ±.002,
+            # #2425, 2026-11-20). Faced too little the gap reads under and the
+            # cup is faced again; faced too far, over, and the cup is renewed,
+            # so the loop ends; each pass ends with the cup and screw off.
+            f"CHECK, DRY: THE CUP'S PILOT ON THE JOURNAL END, THE "
+            f"{n['pd-vn-transgear-knob-cup-screw']} SCREW SEATED, SHAFT REARWARD AS "
+            f"{s('knob-stack-fitted', 1)}: THE GAP BETWEEN THE CUP'S FRONT AND THE "
+            f"BUSH'S REAR FACE READS {knob_window} ON FEELERS "
+            f"{row_cite('knob-end-float')}.",
+            "REMOVE THE SCREW AND THE CUP.",
+            f"IF {s('knob-stack-fitted', 5)} FAILED, REPEAT {s('knob-stack-fitted', 3)}-"
+            f"{s('knob-stack-fitted', 6)} UNTIL {s('knob-stack-fitted', 5)} PASSES, ON A "
+            f"NEW {n['pd-transgear-knob-cup']} CUP WHENEVER THE GAP READS OVER "
+            f"{steps.inch_text(KNOB_END_FLOAT_RANGE[1], 3)}.",
             "DEGREASE THE CUP'S PILOT, THE JOURNAL'S STAND-OUT AND REAR TAP, AND THE "
             f"{n['pd-vn-transgear-knob-cup-screw']} SCREW.",
             "COAT THE JOURNAL'S REAR END WITH LOCTITE 641, NOT THE CUP'S BLIND "
@@ -3216,8 +3244,8 @@ def _step_text(
             f"THE CUP'S FRONT AND THE BUSH'S REAR FACE READS {knob_window} ON FEELERS "
             f"{row_cite('knob-end-float')}.",
             "CHECK: SHAFT HELD, THE CUP DOES NOT TURN OR SLIDE ON THE JOURNAL BY HAND.",
-            f"IF BOTH CHECKS PASS, SKIP {s('knob-stack-fitted', 14)}-"
-            f"{s('knob-stack-fitted', 17)}.",
+            f"IF BOTH CHECKS PASS, SKIP {s('knob-stack-fitted', 17)}-"
+            f"{s('knob-stack-fitted', 20)}.",
             knob_cup_off[0],
             knob_cup_off[1],
             "CLEAN THE COMPOUND OFF THE JOURNAL END AND OUT OF ITS TAP.",
@@ -3320,12 +3348,10 @@ def _step_text(
             "THE MIDDLE OF THE FEED.",
             # Codjiflo P2s on 6abe1aa7f and aa3c6786c: any rework of the rack
             # or guides moves the rack against the match-drilled latch, so the
-            # mesh is set again by feel on a new hook. A feel set always lands
-            # at the run's tight-spot bind, so with every part inside its sheet
-            # the remedy takes out the one term the fitter controls, the crest
-            # drift, by setting the bottom guide again with the rack level
-            # (its screws float in the platen's holes); that the loop then
-            # ends is steps.FEED_LEVEL_RACK_WORST_CASE_MESH's gate. The platen
+            # mesh is set again by feel on a new hook. The bottom guide is set
+            # again per the first set, crests level (its screws float in the
+            # platen's holes); with every part inside its sheet the loop ends
+            # by steps.FEED_WORST_CASE_MESH's gate. The platen
             # comes off for the rework as in lock-seats-faced (codjiflo P3 on
             # 6c847adb0).
             # Machinist review r8 (59eb13ee2): a pass exit first, so a builder
@@ -3346,16 +3372,10 @@ def _step_text(
             f"{steps.step_number('guides-screwed')} OR {s('hanger-meshed', 10)}.",
             f"IF NONE WAS FOUND, SLACKEN THE {n['pd-platen-bottom-guide']} BOTTOM "
             "GUIDE'S SCREWS.",
-            # The crests' .001 is read on the indicator the gauge carries: a
-            # height gauge's own scale is the located-step row (machinist
-            # review of 1fcdca8ca6).
-            # The step keeps its two printed lines (the columns are full): the
-            # sub-step before it slackens the screws, and the row names the
-            # gauge that carries the indicator.
-            "SET THE GUIDE AGAIN PER "
-            f"{s('guides-screwed', 1)}, THE CRESTS AT THE TWO ENDS WITHIN "
-            f"{steps.inch_text(steps.LEVEL_RACK_CREST_DRIFT, 3)} OF EACH OTHER BY "
-            f"TEST INDICATOR {row_cite('crest-level')}.",
+            # The first set's levelling is repeated with it (delegated ruling
+            # 2026-11-26 (Main), no precedent; owner review #2144; D48, fit
+            # audit part 2, B4).
+            f"SET THE GUIDE AGAIN PER {s('guides-screwed', 1)} {row_cite('crest-level')}.",
             "WITH THE GUIDE SET AGAIN, TIGHTEN ITS SCREWS.",
             f"REFIT PER {s('platen-hung', 9)}-{s('guide-locks-set', 3)}.",
             f"FIT A NEW UNDRILLED {n['pd-latch-hook']} HOOK PER "
@@ -3373,10 +3393,11 @@ def _step_text(
             f"SLIDE THE COLLAR BACK AGAINST THE {teeth}.",
             f"FIT THE {knob}, HELD BACK ON ITS SEAT.",
             f"FIT THE {n['pd-transgear-thumbnut']} THUMBNUT FINGER-TIGHT.",
-            "TURN THE DISC UNTIL, ON THE LINE THROUGH THE KNOB AND DISC AXES, "
-            f"A DISC TOOTH STANDS CENTRED IN A {teeth} GAP WITHIN {clock} "
-            "AT THE PITCH CIRCLE, READ WITH A TEST INDICATOR ON A GAUGE PIN IN "
-            f"THE GAP {row_cite('tooth-centred')}.",
+            # No tooth-centring setting (delegated ruling 2026-11-26 (Main),
+            # no precedent; owner review #2144; D48, fit audit part 2, B5).
+            # Nothing reads the disc's phase: the two checks below cover every
+            # phase in one turn, and 12N's eight places 45 deg apart (18.75
+            # teeth) read four.
             "CHECK: TURNED BY THE COLLAR, THE KNOB RUNS WITH NO TIGHT SPOT.",
             "CHECK: THE KNOB HAS SHAKE AT EVERY TOOTH.",
             # The final confirmation reads the doweled reducer as the trial
@@ -3409,13 +3430,13 @@ def _step_text(
         # its condition, so a builder whose checks pass, or whose fault is
         # another branch's, never reads on into a plain command.
         "fitup-mesh-remedied": (
-            f"IF EVERY {s('fitup-pose-set', 7)}-{s('fitup-pose-set', 9)} CHECK "
+            f"IF EVERY {s('fitup-pose-set', 6)}-{s('fitup-pose-set', 8)} CHECK "
             f"PASSES, GO TO STEP {steps.step_number('collar-rear-faced-to-fit')}.",
             "CHECK: ROCKED BY HAND, THE PLATE HAS NO SHAKE ON ITS DOWELS.",
             "CHECK: THE PLATE'S SCREWS ARE TIGHT.",
             f"IF SOUND, CLEAN THE {teeth} AND DISC AND "
-            f"REPEAT {s('fitup-pose-set', 2)}-{s('fitup-pose-set', 9)}.",
-            f"IF EVERY {s('fitup-pose-set', 7)}-{s('fitup-pose-set', 9)} CHECK NOW "
+            f"REPEAT {s('fitup-pose-set', 2)}-{s('fitup-pose-set', 8)}.",
+            f"IF EVERY {s('fitup-pose-set', 6)}-{s('fitup-pose-set', 8)} CHECK NOW "
             f"PASSES, GO TO STEP {steps.step_number('collar-rear-faced-to-fit')}.",
             "TURN THE DISC ONE TURN BY THE COLLAR, NOTING WHERE IT FAULTS.",
             knob_stack_off,
@@ -3761,9 +3782,20 @@ def setting_table_rows(
             "TURNS FREE, NO SHAKE",
             f"{n['pd-transgear-knob-shaft']} JOURNAL",
         ),
+        # The located step's TRUE (12C), which 12F, 12H and 12Q read per
+        # 12C: the step column cites 12C alone, as those steps do, because
+        # the table stands 2 mm inside its width limit and a four-step cell
+        # would push it 12 mm past (format_step_notes).
+        "true-sweep": (
+            s("arm-plate-located", 2),
+            f"PIVOT-BORE GAUGE PIN, {n['pd-transgear-pin']} SHANK S, KNOB BORE "
+            f"{KNOB_BORE_LETTER}: SWEEP",
+            KNOB_SETTING_SWEEP_TEXT,
+            "TEST INDICATOR",
+        ),
         "reducer-shake": (
             f"{s('arm-plate-located', 12)}, {s('arm-plate-fitted', 20)}, "
-            f"{s('fitup-pose-set', 9)}",
+            f"{s('fitup-pose-set', 8)}",
             "DISC SHAKE AT THE TIP OF THE TOOTH IN MESH",
             f"THE NEEDLE MOVES, {steps.inch_max_text(REDUCER_SHAKE_MAX_MM, 3)}",
             f"DIAL INDICATOR, {REDUCER_DIAL_STATIONS} PLACES",
@@ -3797,9 +3829,9 @@ def setting_table_rows(
         ),
         "disc-screw-tips": (
             str(steps.step_number("disc-screws-cut")),
-            f"{n[explode.DISC_SCREW]} TIPS BELOW THE DISC REAR FACE",
-            steps.inch_window(disc_screw.TIP_BELOW_REAR_FACE, 3, " TO "),
-            "STRAIGHTEDGE AND FEELERS",
+            f"{n[explode.DISC_SCREW]} TIPS AT THE DISC REAR FACE",
+            DISC_SCREW_TIP_TEXT,
+            "STRAIGHTEDGE LIES FLAT",
         ),
         "collar-pilot": (
             s("pilot-faced-to-fit", 0),
@@ -3819,17 +3851,13 @@ def setting_table_rows(
             engaged_feed_window(operating_domain),
             "STEEL RULE",
         ),
+        # Checked at the first set and again in 26P's rework (fit audit part
+        # 2, B4); the row stays where it was so the rows after it keep theirs.
         "crest-level": (
-            s("loaded-rack-geometry-checked", 13),
+            f"{s('guides-screwed', 1)}, {s('loaded-rack-geometry-checked', 13)}",
             "RACK CRESTS, ONE END AGAINST THE OTHER",
             f"WITHIN {steps.inch_text(steps.LEVEL_RACK_CREST_DRIFT, 3)}",
             "TEST INDICATOR, HEIGHT GAUGE",
-        ),
-        "tooth-centred": (
-            s("fitup-pose-set", 6),
-            f"DISC TOOTH IN A {KNOB_PINION} GAP, AT THE PITCH CIRCLE",
-            f"CENTRED WITHIN {REDUCER_CLOCK_TEXT}",
-            "TEST INDICATOR, GAUGE PIN",
         ),
         "offset-set": (
             s("collar-rear-faced-to-fit", 3),
@@ -3856,7 +3884,8 @@ def setting_table_rows(
             "FEELER",
         ),
         "knob-end-float": (
-            f"{s('knob-stack-fitted', 11)}, {s('fitup-accepted', 1)}",
+            f"{s('knob-stack-fitted', 5)}, {s('knob-stack-fitted', 14)}, "
+            f"{s('fitup-accepted', 1)}",
             f"KNOB END FLOAT, CUP TO {n['pd-transgear-knob-bush']} REAR FACE",
             KNOB_END_FLOAT_WINDOW,
             "FEELERS",

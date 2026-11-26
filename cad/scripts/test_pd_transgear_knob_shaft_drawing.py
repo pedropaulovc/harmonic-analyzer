@@ -15,6 +15,7 @@ import pytest
 import _config
 import build_pd_transgear_knob_shaft as part
 import draw_pd_transgear_knob_shaft as drawing
+import pd_paper_drive_assembly_steps as steps
 import pd_transgear_knob_bush_geometry as bush
 import pd_transgear_knob_shaft_spec as spec
 import pd_transgear_knob_thrust_ring_spec as ring
@@ -931,6 +932,13 @@ def test_gear_data_span_fit_is_accepted_by_the_trial_with_the_mate() -> None:
     # 2026-11-24, audit part 2 question C2).
     rows = " ".join(" ".join(drawing.GEAR_DATA_NOTE.splitlines()[-2:]).split())
     assert rows == "SPAN MATCHED FIT: RUNS ON MATE WITH NO TIGHT SPOT"
+    # Fit audit part 2, B7: the row above it names the cutting aim and the
+    # trial that accepts the pair, MHA-PD-00's located step.
+    span = " ".join(" ".join(drawing.GEAR_DATA_NOTE.splitlines()[-5:-2]).split())
+    assert span == (
+        "SPAN: CUT TO THE LIMITS SHOWN; PROVED AT MHA-PD-00 STEP 12 BY THE TRIAL MESH"
+    )
+    assert drawing.TRIAL_MESH_STEP == steps.step_ref("arm-plate-located")
     assert "FEELER" not in drawing.GEAR_DATA_NOTE
     assert "BACKLASH" not in drawing.GEAR_DATA_NOTE
 

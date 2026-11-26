@@ -38,14 +38,50 @@ PRINTED_FIELDS = ("material_specification", "finish", "installation_notes")
 PRINTED_CONSTANT = re.compile(
     r"^[A-Z0-9_]*(?:NOTES?|STEPS?|CALLOUTS?|HEADING|CAPTION|CHECKS|PLACEHOLDER)$"
 )
+# A lower-case kebab or snake key (a step key such as "axle-accepted", a
+# registry stem) names text; the sheet prints the text, never the key.
+_KEY = re.compile(r"[a-z0-9]+(?:[-_][a-z0-9]+)+")
 
 
-def _strings(node: ast.AST) -> list[str]:
-    return [
-        child.value
-        for child in ast.walk(node)
-        if isinstance(child, ast.Constant) and isinstance(child.value, str)
-    ]
+def _strings(
+    node: ast.AST,
+    assigned: dict[str, ast.AST] | None = None,
+    seen: frozenset[str] = frozenset(),
+) -> list[str]:
+    """Every literal string in ``node``, and in the module-level constants it
+    names: a sheet's note joined from a rows table prints the table's text
+    (MHA-PD-06's GEAR_DATA_NOTE from _GEAR_DATA_ROWS, codjiflo P2 on
+    390ddbc582)."""
+    found: list[str] = []
+    for child in ast.walk(node):
+        if isinstance(child, ast.Constant) and isinstance(child.value, str):
+            if not _KEY.fullmatch(child.value):
+                found.append(child.value)
+        elif (
+            assigned
+            and isinstance(child, ast.Name)
+            and child.id in assigned
+            and child.id not in seen
+        ):
+            found.extend(_strings(assigned[child.id], assigned, seen | {child.id}))
+    return found
+
+
+def _assignments(tree: ast.Module) -> list[tuple[str, ast.AST]]:
+    """Module-level ``NAME = value`` pairs, in source order."""
+    pairs: list[tuple[str, ast.AST]] = []
+    for node in tree.body:
+        targets = (
+            node.targets
+            if isinstance(node, ast.Assign)
+            else [node.target]
+            if isinstance(node, ast.AnnAssign) and node.value is not None
+            else []
+        )
+        pairs.extend(
+            (target.id, node.value) for target in targets if isinstance(target, ast.Name)
+        )
+    return pairs
 
 
 def _docstrings(tree: ast.Module) -> set[int]:
@@ -88,17 +124,11 @@ def _printed_constants_in(scripts: Path) -> dict[str, str]:
                 and isinstance(child.value, str)
                 and id(child) not in skip
             )
-        for node in tree.body:
-            targets = (
-                node.targets
-                if isinstance(node, ast.Assign)
-                else [node.target]
-                if isinstance(node, ast.AnnAssign) and node.value is not None
-                else []
-            )
-            for target in targets:
-                if isinstance(target, ast.Name) and PRINTED_CONSTANT.match(target.id):
-                    found[f"{path.stem}.{target.id}"] = " ".join(_strings(node.value))
+        pairs = _assignments(tree)
+        assigned = dict(pairs)
+        for name, value in pairs:
+            if PRINTED_CONSTANT.match(name):
+                found[f"{path.stem}.{name}"] = " ".join(_strings(value, assigned))
     return found
 
 
@@ -145,6 +175,17 @@ def test_the_scan_reaches_known_printed_text() -> None:
     assert "draw_sm_knife_mount.PIN_HOLE_CALLOUT" in constants
     assert "draw_dt_drive_train_assembly.CHECKS" in constants
     assert "sm-knife-mount.material_specification" in printed_registry_fields()
+
+
+def test_the_scan_reads_the_rows_a_printed_note_is_joined_from(tmp_path) -> None:
+    (tmp_path / "draw_fake.py").write_text(
+        '_ROWS = (("SPAN", "ACCEPTED AT STEP 12"),)\n'
+        'GEAR_DATA_NOTE = "\\n".join(f"{k}: {v}" for k, v in _ROWS)\n',
+        encoding="utf-8",
+    )
+    assert _internal_hits(dict(_printed_constants_in(tmp_path))) == {
+        "draw_fake.GEAR_DATA_NOTE": ["ACCEPTED"]
+    }
 
 
 def test_no_printed_text_cites_an_internal_rule_or_ruling() -> None:

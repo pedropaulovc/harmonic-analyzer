@@ -95,12 +95,18 @@ CUT_LENGTH = PLATE.THICKNESS_OVER_ARM + ARM.THICKNESS
 # The modelled screw is the installed one: placement, interference and the
 # joint stack read LENGTH as its length.
 LENGTH = CUT_LENGTH
-# The cut end's 45 deg deburr, its radial leg; a single MAX limit, as MHA-DT-VN-61's
-# CUT_END_BREAK_MAX_MM.  The model carries the maximum.  Tighter than the
-# title block's .010 edge break on purpose: at .010 the break would take the
-# arm tap's last thread and the joint's worst engagement falls to 1.47D, under
-# the 1.5D ``transgear_hanger_joints`` requires.  The MHA-PD-00 cut step,
-# which does the cut, prints this limit and the tip's proud limit.
+# The cut end's 45 deg deburr, its radial leg, as the model cuts it.  The
+# MHA-PD-00 cut step prints no limit of its own (drawing-guidelines rule 2;
+# fit audit part 2, B2), so the title block's .010 edge break governs the
+# shop's break; the model's
+# .004 is one break inside it.  The joint stack charges the same either way:
+# the break overlaps the arm tap's own exit break at the front face, whose
+# thread loss (ARM.PLATE_TAP_EXIT_LOSS_MAX_MM, .0102) is the larger, so the
+# worst engagement in ``transgear_hanger_joints`` is 1.91D at .004 and at
+# .010 alike (test_pd_paper_drive_assembly_drawing pins the title block's
+# break under that exit loss).  The value stays .004 so the screw, its
+# siblings in the fastener catalogue and the assemblies holding them do not
+# re-key for a change no stack sees.
 CUT_END_BREAK_MAX = 0.1016  # .004
 # The cut tip may stand this far proud of the arm's front face (the joint
 # stack's ``transgear_hanger_joints.PLATE_SCREW_CUT_PROUD_MAX``).

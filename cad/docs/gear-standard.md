@@ -249,24 +249,26 @@ base circle before the flanks wedge, at 0.069 mm of tooth-centred backlash, so
 the stack starts from that later bind, where every corner keeps the 0.25 mm
 root clearance. The run's tight spot sets the arm, so every other station runs
 looser by the rack's index error and the feed's lateral terms (along the rack),
-the pinion's toothspace runout and the rack's crest drift along the run, up to
-twice the rack's ±.002 crest set at assembly (radial). These are independent, and
-the loose side takes their root sum square: 0.188 mm of backlash at the
+the pinion's toothspace runout and the rack's crest drift along the run, at
+most one .001 division (radial): the bottom rail is set with the rack's crests
+.100 ±.002 below the platen and both ends alike within .001 on the height
+gauge's test indicator (MHA-PD-00 step 3B; delegated ruling 2026-11-26 (Main),
+no precedent; owner review #2144 (D48, fit audit part 2, B4): before, the
+first set allowed twice the ±.002 band, .004). These are independent, and
+the loose side takes their root sum square: 0.168 mm of backlash at the
 loosest feel set. Against coming loose and for a feed at constant speed, every
-printed corner must keep a contact ratio of at least 1.0 there; it is 1.133
+printed corner must keep a contact ratio of at least 1.0 there; it is 1.167
 (`pd_paper_drive_assembly_steps.FEED_LOOSEST_MESH`). If every term stacks
-(0.299 mm, reported only as `FEED_WORST_CASE_MESH`), the contact ratio is 0.942,
-a slight hitch in the feed at that station, which the steady-advance check
-catches. The 1.0 floor and the root sum square are delegated rulings (Main,
+(0.249 mm, `FEED_WORST_CASE_MESH`), the contact ratio is 1.028, also gated
+(0.932 with the .004 of drift the first set allowed before). The 1.0 floor and
+the root sum square are delegated rulings (Main,
 2026-11-11, under the owner's #2416 direction; owner review #2144):
 continuous conjugate action is what "paper advances at constant speed" asks,
 and the 1.1 of the removed .003 leaf fallback is not kept; the root sum square
 is used because the setting is by feel and the acceptance is functional, an
-exception to the worst-case mesh stacks limited to this mesh. A hitch with every
-part inside its sheet is cured by loosening the guide screws and re-setting the
-bottom rail with the rack's crests reading the same at both ends, which leaves at most one .001 division of drift; with
-that the arithmetic worst case keeps contact ratio 1.0 (1.037,
-`FEED_LEVEL_RACK_WORST_CASE_MESH`), and the mesh is set again by feel on a new
+exception to the worst-case mesh stacks limited to this mesh. A hitch found by
+the steady-advance check is cured by loosening the guide screws and re-setting
+the bottom rail per step 3B, and the mesh is set again by feel on a new
 hook. Easing
 past the bind is not booked: the remedy stops where the teeth just turn free,
 and the no-skip check only guards against the mesh coming loose. The builder's

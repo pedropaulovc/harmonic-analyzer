@@ -144,7 +144,11 @@ if TIP_CHAMFER > FIRST_THREAD_LOSS:
 # thinnest flange and disc stands STOCK_TIP_PROUD_MAX (.048) proud of the
 # disc's rear face.  So each tip is cut at assembly to sit this far under
 # the rear face, (min, max), and the cut end broken.  A stock tip already
-# inside the window stays uncut.
+# inside the window stays uncut.  MHA-PD-00 step 16 prints the min only:
+# each tip dressed flush, a straightedge lying flat on the rear face
+# (drawing-guidelines rule 4: the trial on the mate; fit audit part 2, B3).
+# The max is not printed and not widened: it is the
+# dressing allowance the engagement below charges (1.5D by .001).
 TIP_BELOW_REAR_FACE = (0.0, 0.2032)  # .000-.008
 TIP_BELOW_REAR_FACE_TEXT = (
     f"{inch_text(TIP_BELOW_REAR_FACE[0], 3)}-{inch_text(TIP_BELOW_REAR_FACE[1], 3)}"

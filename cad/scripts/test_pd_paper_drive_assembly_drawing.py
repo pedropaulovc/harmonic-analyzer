@@ -26,6 +26,7 @@ import draw_pd_paper_drive_assembly as drawing
 import dt_drive_train_steps
 import fr_harmonic_base_spec as base
 import fr_nameplate_spec as nameplate
+import machinist_necessity
 import paper_drive_geom as paper_geometry
 import paper_drive_rack_setup as rack_setup
 import pd_paper_drive_assembly_steps as steps
@@ -549,14 +550,14 @@ def test_a_feed_sleeve_found_outside_after_hanging_has_a_renewal_route() -> None
         f"{drawing.sub_step('arm-plate-located', 21)} ON A NEW ONE.",
         f"FOR IT, REPEAT STEPS {steps.step_number('oil-hole-drilled')}-"
         f"{steps.step_number('disc-cluster-shimmed')} AND "
-        f"{drawing.sub_step('knob-stack-fitted', 18)}, THEN FROM "
+        f"{drawing.sub_step('knob-stack-fitted', 21)}, THEN FROM "
         f"{drawing.sub_step('hanger-meshed', 0)}.",
     )
     # The sub-step it names is the one that slides the sleeve off and on.
     assert texts["arm-plate-located"][21].startswith(
         f"REPLACE A {sleeve} FOUND OUTSIDE: SLIDE THE HUB AND DISC OFF IT AS ONE"
     )
-    assert texts["knob-stack-fitted"][18].startswith(
+    assert texts["knob-stack-fitted"][21].startswith(
         f"SLIDE THE {_number('pd-transgear-drive-collar')} COLLAR ON"
     )
     assert (
@@ -650,8 +651,23 @@ def test_the_critical_matched_dowels_locate_and_the_plate_screws_only_clamp() ->
     assert "FRONT UP" in located
     assert steps.step_number("pin-pressed") < steps.step_number("arm-plate-located")
     assert steps.step_number("arm-plate-fitted") < steps.step_number("hanger-pivoted")
-    # "True" is a stated null-reading acceptance, the budget's centring bound.
-    assert drawing.KNOB_SETTING_TRUE in located
+    # "True" is a stated null-reading acceptance, the budget's centring bound:
+    # a setting-table row 12C cites (rule 22), not step prose, and no second
+    # limit (the .004 circle and the S to N band are its consequences).
+    true_row = drawing.row_cite("true-sweep")
+    assert f"TRUE ON ONE DRO AXIS {true_row}." in located
+    assert "S TO N BAND" not in located and "WITHIN .004" not in located
+    rows = drawing.setting_table_rows(operating_domain=_unit_operating_domain())
+    assert rows[drawing.SETTING_ROW["true-sweep"] - 1][1:] == (
+        drawing.sub_step("arm-plate-located", 2),
+        f"PIVOT-BORE GAUGE PIN, {_number('pd-transgear-pin')} SHANK S, KNOB BORE N: SWEEP",
+        "UNDER .0005",
+        "TEST INDICATOR",
+    )
+    # In step order: after 11Q's reamed bore, before 12N's shake.
+    keys = drawing.SETTING_ROW_KEYS
+    assert keys.index("bush-reamed") + 1 == keys.index("true-sweep")
+    assert keys.index("true-sweep") + 1 == keys.index("reducer-shake")
 
 
 def test_view_k_carries_the_set_coordinates_as_assembly_model_dimensions() -> None:
@@ -991,7 +1007,7 @@ def test_the_plate_recheck_names_its_bore_and_acceptance() -> None:
     (integration review, run 20261109T062834910Z)."""
     sheet = drawing.SHEET_NAMES.index(drawing.KNOB_SETTING_SHEET) + 1
     defined = drawing.sub_step("arm-plate-located", 2)
-    assert drawing.KNOB_SETTING_TRUE in _step_body("arm-plate-located")
+    assert drawing.row_cite("true-sweep") in _step_body("arm-plate-located")
     assert (
         f"CHECK: RE-INDICATED, {_number('pd-transgear-knob-bush')} KNOB BORE "
         f"{drawing.KNOB_BORE_LETTER} IS STILL TRUE PER {defined} (SHEET {sheet})."
@@ -1952,37 +1968,52 @@ def test_the_rear_cup_is_faced_bonded_and_screwed_and_the_nut_seats_on_the_faced
         in texts[3]
     )
     assert texts[4].startswith("IF THE PILOT ENDS SHALLOWER THAN THAT, MAKE A NEW")
+    # Fit audit part 2, B6: a dry trial of the end float before the bond, the
+    # window unchanged (owner-accepted .008 ±.002, #2425).
+    assert texts[5] == (
+        "CHECK, DRY: THE CUP'S PILOT ON THE JOURNAL END, THE "
+        f"{_number('pd-vn-transgear-knob-cup-screw')} SCREW SEATED, SHAFT REARWARD AS "
+        f"{s('knob-stack-fitted', 1)}: THE GAP BETWEEN THE CUP'S FRONT AND THE BUSH'S "
+        f"REAR FACE READS {drawing.KNOB_END_FLOAT_WINDOW} ON FEELERS "
+        f"{drawing.row_cite('knob-end-float')}."
+    )
+    assert texts[6] == "REMOVE THE SCREW AND THE CUP."
+    assert texts[7] == (
+        f"IF {s('knob-stack-fitted', 5)} FAILED, REPEAT {s('knob-stack-fitted', 3)}-"
+        f"{s('knob-stack-fitted', 6)} UNTIL {s('knob-stack-fitted', 5)} PASSES, ON A NEW "
+        f"{_number('pd-transgear-knob-cup')} CUP WHENEVER THE GAP READS OVER .010."
+    )
     # Rule 23's bond bullet: grade by number, degrease, the compound on the
     # journal (the pin), not the blind pilot, kept off the running land, set
     # at once, the cure before load, and a bench acceptance.
-    assert texts[5].startswith("DEGREASE ")
+    assert texts[8].startswith("DEGREASE ")
     bond = texts[drawing.KNOB_CUP_BOND_SUB_STEP]
     assert "LOCTITE 641" in bond and "NOT THE CUP'S BLIND PILOT" in bond
     assert "OFF THE JOURNAL IN THE BUSH" in bond
-    assert texts[7].startswith("AT ONCE, ")
-    assert texts[8].startswith(f"SEAT THE {_number('pd-vn-transgear-knob-cup-screw')} SCREW")
-    assert f"CURE {drawing.KNOB_CUP_BOND_CURE_H} H BEFORE" in texts[10]
-    assert texts[11].startswith(f"CHECK: SHAFT REARWARD AS {s('knob-stack-fitted', 1)}")
+    assert texts[10].startswith("AT ONCE, ")
+    assert texts[11].startswith(f"SEAT THE {_number('pd-vn-transgear-knob-cup-screw')} SCREW")
+    assert f"CURE {drawing.KNOB_CUP_BOND_CURE_H} H BEFORE" in texts[13]
+    assert texts[14].startswith(f"CHECK: SHAFT REARWARD AS {s('knob-stack-fitted', 1)}")
     assert (
         f"THE CUP'S FRONT AND THE BUSH'S REAR FACE READS {drawing.KNOB_END_FLOAT_WINDOW} "
         "ON FEELERS"
-    ) in texts[11]
+    ) in texts[14]
     assert drawing.KNOB_END_FLOAT_WINDOW == ".006 TO .010"
-    assert texts[12] == "CHECK: SHAFT HELD, THE CUP DOES NOT TURN OR SLIDE ON THE JOURNAL BY HAND."
-    assert texts[13] == (
-        f"IF BOTH CHECKS PASS, SKIP {s('knob-stack-fitted', 14)}-{s('knob-stack-fitted', 17)}."
+    assert texts[15] == "CHECK: SHAFT HELD, THE CUP DOES NOT TURN OR SLIDE ON THE JOURNAL BY HAND."
+    assert texts[16] == (
+        f"IF BOTH CHECKS PASS, SKIP {s('knob-stack-fitted', 17)}-{s('knob-stack-fitted', 20)}."
     )
     # The cured bond lets go only hot (rule 23); the heat is kept off the
     # bush's oil (codjiflo review, #2425).  The screw comes out in its own
     # sub-step, and the later strips cite the pair (machinist review r10).
-    assert texts[14] == f"UNSCREW THE {_number('pd-vn-transgear-knob-cup-screw')} SCREW."
-    assert texts[15] == (
+    assert texts[17] == f"UNSCREW THE {_number('pd-vn-transgear-knob-cup-screw')} SCREW."
+    assert texts[18] == (
         f"PULL THE {_number('pd-transgear-knob-cup')} CUP OFF THE JOURNAL HOT, ABOUT "
         f"250\u00b0C, THE HEAT KEPT OFF THE {_number('pd-transgear-knob-bush')} BUSH'S OIL."
     )
     cited = (
         f"TAKE THE {_number('pd-transgear-knob-cup')} CUP OFF AS "
-        f"{s('knob-stack-fitted', 14)}-{s('knob-stack-fitted', 15)}."
+        f"{s('knob-stack-fitted', 17)}-{s('knob-stack-fitted', 18)}."
     )
     every = drawing._step_text(operating_domain=_unit_operating_domain())
     # Steps 28 and 33, and the rear-faced collar's renewal (29).
@@ -2329,6 +2360,51 @@ def test_the_plate_screws_are_cut_to_the_limit_the_lock_sweep_clears() -> None:
     assert joints.PLATE_SCREW_TIP_PROUD_MAX == joints.PLATE_SCREW_CUT_PROUD_MAX
     # Positive control: the fit step itself does not mention the cut.
     assert "CUT" not in _step_body("arm-plate-fitted")
+
+
+def test_the_cut_plate_screw_edge_takes_the_title_block_break() -> None:
+    """Fit audit part 2, B2: the cut edge's break prints no limit of its
+    own; the title block's .010 governs. The arm tap's exit break already
+    costs the larger thread loss for any break up to it, so the worst
+    engagement the stack charges for the model's .004 (1.91D) holds."""
+    texts = drawing._step_text(operating_domain=_unit_operating_domain())
+    assert texts["arm-plate-screws-cut"][2] == "BREAK THE CUT EDGE."
+    import pd_vn_transgear_arm_plate_screw_spec as plate_screw
+    import transgear_hanger_joints as hanger_joints
+    from _printed_tolerance import edge_break_chamfer_mm
+
+    title_block_break = edge_break_chamfer_mm(unit="in")
+    assert plate_screw.CUT_END_BREAK_MAX <= title_block_break
+    assert steps_arm.PLATE_TAP_EXIT_LOSS_MAX_MM >= title_block_break
+    assert hanger_joints.PLATE_SCREW_ENGAGEMENT_WORST_D == pytest.approx(1.909, abs=0.001)
+
+
+def test_the_disc_screw_tips_are_dressed_flush_and_accepted_by_a_straightedge() -> None:
+    """Fit audit part 2, B3: step 16 and its row print FLUSH, accepted by a
+    straightedge lying flat; the window's shallow end. Its .008 deep end is
+    not printed and not widened: the disc tap's worst engagement charges it
+    and holds 1.5D by .001."""
+    import pd_transgear_disc_screw_spec as disc_screw
+
+    screw = drawing._N[explode.DISC_SCREW]
+    texts = drawing._step_text(operating_domain=_unit_operating_domain())
+    (step,) = texts["disc-screws-cut"]
+    assert step == (
+        f"DRESS EACH {screw} TIP FLUSH WITH THE DISC REAR FACE "
+        f"{drawing.row_cite('disc-screw-tips')}."
+    )
+    rows = drawing.setting_table_rows(operating_domain=_unit_operating_domain())
+    row = rows[drawing.SETTING_ROW["disc-screw-tips"] - 1]
+    assert row[1:] == (
+        str(steps.step_number("disc-screws-cut")),
+        f"{screw} TIPS AT THE DISC REAR FACE",
+        "FLUSH",
+        "STRAIGHTEDGE LIES FLAT",
+    )
+    assert ".008" not in step and ".008" not in " ".join(row)
+    assert disc_screw.TIP_BELOW_REAR_FACE == pytest.approx((0.0, 0.008 * 25.4))
+    assert disc_screw.ENGAGEMENT_WORST == pytest.approx(0.091 * 25.4, abs=1e-9)
+    assert disc_screw.ENGAGEMENT_WORST_D >= 1.5
 
 
 def _spare_world_point(monkeypatch, local):
@@ -2825,17 +2901,35 @@ def test_no_step_solders_and_the_rack_rework_resets_its_guide() -> None:
         assert "SOLDER" not in text and "BACKER" not in text
     rework = _step_body("loaded-rack-geometry-checked")
     assert f"SLACKEN THE {_number('pd-platen-bottom-guide')} BOTTOM GUIDE" in rework
-    # Machinist review r8: the re-set names its reference and band (3B's
-    # crest drop) and the level the mesh gate assumes.
-    assert f"SET THE GUIDE AGAIN PER {drawing.sub_step('guides-screwed', 1)}" in rework
-    level = f"WITHIN {steps.inch_text(steps.LEVEL_RACK_CREST_DRIFT, 3)} OF EACH OTHER"
-    assert level in rework
+    # Machinist review r8: the re-set names its reference (3B's crest drop
+    # and level). Fit audit part 2, B4: the level the mesh gate assumes is
+    # held at the first set, so the rework repeats 3B.
+    crest_level = drawing.row_cite("crest-level")
+    assert (
+        f"SET THE GUIDE AGAIN PER {drawing.sub_step('guides-screwed', 1)} {crest_level}."
+        in rework
+    )
+    first_set = drawing._step_text(operating_domain=_unit_operating_domain())[
+        "guides-screwed"
+    ][1]
+    level = f"BOTH ENDS ALIKE WITHIN {steps.inch_text(steps.LEVEL_RACK_CREST_DRIFT, 3)}"
     # The .001 is read on an indicator, named in the step and in its row:
-    # a height gauge's own scale reads the located-step row only.
-    assert f"{level} BY TEST INDICATOR" in rework
+    # a height gauge's own scale reads the .100 band only.
+    assert f"BY HEIGHT GAUGE, {level} ON ITS TEST INDICATOR" in first_set
+    assert first_set.endswith(f" {crest_level}.")
     rows = drawing.setting_table_rows(operating_domain=_unit_operating_domain())
     (crest_row,) = (row for row in rows if row[2] == "RACK CRESTS, ONE END AGAINST THE OTHER")
+    assert crest_row[1] == (
+        f"{drawing.sub_step('guides-screwed', 1)}, "
+        f"{drawing.sub_step('loaded-rack-geometry-checked', 13)}"
+    )
     assert crest_row[-1] == "TEST INDICATOR, HEIGHT GAUGE"
+    # Every term stacked, the level first set keeps the feed mesh's floor.
+    assert steps.FEED_WORST_CASE_MESH.contact_ratio_min == pytest.approx(1.0275, abs=1e-4)
+    assert steps.FEED_LOOSEST_MESH.contact_ratio_min == pytest.approx(1.1672, abs=1e-4)
+    assert steps.FEED_LOOSE_TERMS_MM["rack crest drift along the run"] == pytest.approx(
+        2.0 * steps.LEVEL_RACK_CREST_DRIFT * math.tan(math.radians(20.0))
+    )
 
 
 def test_every_screwed_setting_has_a_holding_check() -> None:
@@ -2937,7 +3031,7 @@ def test_every_failure_branch_has_a_pass_exit() -> None:
     texts = drawing._step_text(operating_domain=_unit_operating_domain())
     s = drawing.sub_step
     mesh = texts["fitup-mesh-remedied"]
-    pose_checks = f"{s('fitup-pose-set', 7)}-{s('fitup-pose-set', 9)}"
+    pose_checks = f"{s('fitup-pose-set', 6)}-{s('fitup-pose-set', 8)}"
     after = steps.step_number("collar-rear-faced-to-fit")
     assert mesh[0] == f"IF EVERY {pose_checks} CHECK PASSES, GO TO STEP {after}."
     assert mesh[4] == f"IF EVERY {pose_checks} CHECK NOW PASSES, GO TO STEP {after}."
@@ -3352,12 +3446,15 @@ def test_the_loaded_rack_check_is_one_dial_run_over_the_engaged_window() -> None
     assert drawing.FITUP_CHAIN_KEY == "loaded-rack-geometry-checked"
 
 
-def test_the_reducer_is_clocked_once_with_an_ordinary_limit() -> None:
+def test_the_reducer_pose_sets_no_tooth_centring() -> None:
+    """Fit audit part 2, B5: the .002 tooth centring (delegated ruling
+    2026-11-07, never confirmed by the owner) is deleted with its row: no
+    gate reads the disc's phase, and the checks after it read every phase."""
     body = _step_body("fitup-pose-set")
     assert "HELD BACK ON ITS SEAT" in " ".join(body.split())
-    clock = steps.inch_floor_mm(drawing.quality.reducer_setup_clock_deviation_mm(), 3)
-    assert f"WITHIN {disc.inch_text(clock, 3)} AT THE PITCH CIRCLE" in body
-    assert "TEST INDICATOR" in body
+    assert "CENTRED" not in body and "GAUGE PIN" not in body
+    assert "tooth-centred" not in drawing.SETTING_ROW_KEYS
+    assert not hasattr(drawing, "REDUCER_CLOCK_TEXT")
     # The reducer is accepted on an indicator, not on feelers in the mesh.
     assert (
         f"THE DISC SHAKES {drawing.REDUCER_BACKLASH_DIAL_TEXT} AS "
@@ -3529,7 +3626,7 @@ def test_the_reducer_mesh_is_tried_before_the_plate_is_doweled() -> None:
     assert f"THE DISC SHAKES {drawing.REDUCER_BACKLASH_DIAL_TEXT} AS " in " ".join(
         _step_body("fitup-pose-set").split()
     )
-    assert len(drawing._step_text(operating_domain=_unit_operating_domain())["fitup-pose-set"]) == 10
+    assert len(drawing._step_text(operating_domain=_unit_operating_domain())["fitup-pose-set"]) == 9
     rebuild = pose.index("FOR A FAULT ALL ROUND (ARM SETTING)")
     assert pose.index(f"NEW {_number('pd-transgear-arm')} ARM") > rebuild
     for part, name in (("pd-transgear-arm-plate", "PLATE"), ("pd-latch-hook", "HOOK")):
@@ -5438,3 +5535,33 @@ def test_detail_h_text_stands_clear_of_its_extension_lines() -> None:
     line = drawing.SETTING_DETAILS_BY_LETTER["H"].lines[0]
     assert line.end[2] > line.start[2]
     assert line.text[2] - line.end[2] >= 1.0 + 1.0
+
+
+def test_the_necessity_register_cites_only_steps_and_rows_the_sheet_prints() -> None:
+    """The register's features name sub-steps and setting-table rows by
+    label. A step deleted or inserted shifts the letters after it, and a row
+    inserted shifts the numbers after it, so a register that names a label
+    the sheet no longer prints (N-05's 27K after 27G was deleted, codjiflo P2
+    on 390ddbc582), or one row whose step column lacks a sub-step the feature
+    names beside it, fails here."""
+    texts = drawing._step_text(operating_domain=_unit_operating_domain())
+    # A step of one sub-step prints its number alone (16.), so no letter.
+    printed = {
+        f"{steps.step_number(key)}{drawing.SUB_STEP_LETTERS[index]}"
+        for key, subs in texts.items()
+        if len(subs) > 1
+        for index in range(len(subs))
+    }
+    rows = drawing.setting_table_rows(operating_domain=_unit_operating_domain())
+    label = re.compile(r"(?<![\w.-])(\d{1,2}[A-HJ-NP-Z])(?![\w-])")
+    entries = machinist_necessity.load_necessity(_config.CONFIG_DIR, "pd-paper-drive-assembly")
+    assert entries
+    for entry in entries:
+        cited = label.findall(entry.feature)
+        assert set(cited) <= printed, (entry.id, sorted(set(cited) - printed))
+        for first, last in re.findall(r"\brows? (\d+)(?:-(\d+))?", entry.feature):
+            assert 1 <= int(first) <= int(last or first) <= len(rows), (entry.id, first, last)
+        (row,) = re.findall(r"\brow (\d+)\b", entry.feature) or (None,)
+        if row is not None:
+            step_cell = set(label.findall(rows[int(row) - 1][1]))
+            assert set(cited) <= step_cell, (entry.id, row, sorted(set(cited) - step_cell))
