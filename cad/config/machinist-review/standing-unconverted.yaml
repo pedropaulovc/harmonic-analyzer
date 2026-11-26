@@ -10,7 +10,6 @@
 # (owner 2026-11-25).
 unconverted:
   - ch_channel_lever
-  - ch_fulcrum_keeper
   - dt_arbor_pedestal
   - dt_cone_gear_tl_arbor_collar
   - dt_cone_gear_tl_arbor_key
@@ -40,4 +39,3 @@ unconverted:
   - dt_pinion_lift_rod
   - dt_pinion_pivot_block
   - dt_pinion_pivot_shaft
-  - pd_transgear_disc_hub
