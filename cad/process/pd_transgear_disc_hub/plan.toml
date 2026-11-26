@@ -44,9 +44,10 @@
 # Not on hand (to order): the .0615 chucking reamer
 # (cad/config/shop-equipment/tools-reamers-taps.toml reamer-0615), the
 # sharp-nose lathe tool for the spigot's R.004 MAX root
-# (tools-special-cutters.toml lathe-tool-sharp-nose) and the 1/16 long-reach
-# end mill, Harvey Tool 34662, bought for MHA-MS-02 too
-# (endmill-carbide-3fl-1-16-reach-1-2).
+# (tools-special-cutters.toml lathe-tool-sharp-nose) and the plain 1/16
+# end mill with 1/2 in of flutes, MSC 35497056, bought for MHA-MS-02 too
+# (endmill-carbide-3fl-1-16-loc-1-2; delegated ruling 2026-11-24 (Main),
+# #3568, the owner's choice of the plain cutters recorded there).
 # The bore's GO, the Class ZZ .3135 plus pin (gauges.toml zz-pins-3135-3140,
 # MSC 88931357), is on the buy list for MHA-DT-14 too.
 #
@@ -82,10 +83,14 @@
 # where a ream's sizing or gauge needs one.
 #
 # Tool audit 2026-11-23 (row endmill-carbide-3-64): the flat is plunged with
-# the 34662 (.0620, centre cutting, "optimized for plunging") instead of a
-# 3/64. Its .062 pocket lies inside the .0615-.0620 ream that follows on the
-# same axis (any ring left is under .0005 radial, taken by the reamer), and
-# its outer edge meets the O.D. lower, so the flat goes one peck deeper.
+# a 1/16 end mill (centre cutting) instead of a 3/64: since #3568 the plain
+# MSC 35497056, .0625 (the first-named long-reach one was .0620). Its .0625
+# pocket on the ream's axis is .0005 over the .0615-.0620 band's top
+# (.00025 a side), over the pocket's own depth only: 0.20 mm at its outer
+# edge to 1.64 mm at its inner on the largest O.D. (1.57 on the nominal),
+# the mouth of a 10.6 mm hole; the reamer and the dowel's press fit hold
+# the ream below it. Its outer edge meets the O.D. lower, so the flat goes
+# one peck deeper.
 #
 # NC (cad/process/pd_transgear_disc_hub/cam.py): CM01_flange_holes,
 # CM02_pin_hole, CM03_pin_ream. Program names, the [parameters] and the
@@ -97,7 +102,7 @@ part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
 material = "C36000 free-machining brass, 360-H02 half-hard, 1-1/8 in round (drawing: {{cad.material_name}})"
 stock = "Lot: {{process.quantity:d}} hub. Ø{{process.bar_dia_in:.3dot}} bar, on hand (one 3 in piece); Setup 1 takes about {{process.bar_use_in:.2dot}} in of it. Chuck it with at least 1.5 in in the jaws."
-note = "Inches unless mm; G-code and console entries in mm (the files and the controller run G21). Lathe PM-1127VF-LB (70–380 and 380–2000 rpm); mill PM-30MV low belt (100–2800 rpm). Brass cut dry. Home the mill ($H) and touch off G54 at the start of each mill setup; prove each file in air before it cuts. To order (not on hand): the .0615 reamer, the pin-gauge set and .3135 GO pin, the sharp-nose lathe tool and the 1/16 carbide end mill (Harvey Tool 34662). The MHA-PD-VN-69 dowel tries the chord ream."
+note = "Inches unless mm; G-code and console entries in mm (the files and the controller run G21). Lathe PM-1127VF-LB (70–380 and 380–2000 rpm); mill PM-30MV low belt (100–2800 rpm). Brass cut dry. Home the mill ($H) and touch off G54 at the start of each mill setup; prove each file in air before it cuts. To order (not on hand): the .0615 reamer, the pin-gauge set and .3135 GO pin, the sharp-nose lathe tool and the 1/16 carbide end mill (MSC 35497056). The MHA-PD-VN-69 dowel tries the chord ream."
 shop = "../shop"
 stock_refs = ["c360-round-1-1-8"]
 material_key = "lathe-c360"
@@ -218,9 +223,9 @@ pin_jaw_top_mm = 12.6873
 pin_flange_top_mm = 13.335
 # The 1/16 end mill plunges a flat 0.2 mm under the O.D. at its outer edge
 # (the chord meets the O.D. 40° off square: a drill would walk), in pecks;
-# its reach (34662: .500 behind the flutes) takes it past the O.D. under its
-# shank (cam.py checks both).
-pin_flat_bottom_mm = 4.2631
+# its reach (.500 of flutes up to its 1/8 shank, no neck) takes it past the
+# O.D. under its shank (cam.py checks both).
+pin_flat_bottom_mm = 4.2557
 pin_flat_peck_mm = 0.4
 endmill_reach_min_in = 0.1
 # The #56 knockout through, its full diameter 0.3 mm past the O.D. at the
@@ -293,8 +298,8 @@ ref = "drill-51"
 
 [[tools]]
 id = "endmill"
-name = "1/16 carbide end mill, long reach, centre cutting: Harvey Tool 34662"
-ref = "endmill-carbide-3fl-1-16-reach-1-2"
+name = "1/16 carbide end mill, 1/2 in of flutes, centre cutting: MSC 35497056"
+ref = "endmill-carbide-3fl-1-16-loc-1-2"
 status = "to_order"
 
 [[tools]]
@@ -647,10 +652,10 @@ speed_kind = "spindle"
 tool = "endmill"
 drilling = "none"
 sizing = "other"
-instruction = "Run CM02_pin_hole (M6 T3, 1/16 end mill, its reach at least {{process.endmill_reach_min_in:.2dot}}: the 34662 has .500; set 2800): plunge a flat at the hole in {{process.pin_flat_peck_mm:.1f}} mm pecks to Z{{process.pin_flat_bottom_mm:.3f}}, so the #56 starts square on the sloping O.D."
+instruction = "Run CM02_pin_hole (M6 T3, 1/16 end mill, its reach at least {{process.endmill_reach_min_in:.2dot}}: MSC 35497056's flutes run .500; set 2800): plunge a flat at the hole in {{process.pin_flat_peck_mm:.1f}} mm pecks to Z{{process.pin_flat_bottom_mm:.3f}}, so the #56 starts square on the sloping O.D."
 settings = "pd-hub-plunge-1-16-c360"
 milling_cuts = [
-  { name = "pin flat", kind = "plunge", phase = "rough", cutter_dia_mm = 1.5748, flutes = 3, rpm = 2800, feed_mm_min = "{{process.plunge_feed_per_min_mm}}", stations_mm = ["{{cad.pin_ream_chord_mm}}"] },
+  { name = "pin flat", kind = "plunge", phase = "rough", cutter_dia_mm = 1.5875, flutes = 3, rpm = 2800, feed_mm_min = "{{process.plunge_feed_per_min_mm}}", stations_mm = ["{{cad.pin_ream_chord_mm}}"] },
 ]
 
 [[setups.operations]]
@@ -660,7 +665,7 @@ drilling = "twist_drill"
 sizing = "other"
 instruction = "Same file, M6 T4 (#56, at least {{process.pin_tool_out_min_in:.2dot}} out of the chuck): the knockout through the body, its point to Z{{process.knockout_tip_mm:.3f}} (the full diameter out of the underside, the point above the parallel), {{process.peck_56_mm:.1f}} mm pecks with full retract; set 2800."
 settings = "pd-hub-drill-56-c360"
-hole_depth_mm = 10.6075
+hole_depth_mm = 10.6
 peck = { step_mm = 1.0, retract = "full" }
 milling_cuts = [
   { name = "pin knockout", kind = "drill", phase = "rough", cutter_dia_mm = 1.1811, flutes = 2, rpm = 2800, feed_mm_min = "{{process.drill_feed_per_min_mm}}", stations_mm = ["{{cad.pin_ream_chord_mm}}"] },
@@ -673,7 +678,7 @@ drilling = "twist_drill"
 sizing = "other"
 instruction = "Same file, M6 T5 (#53, at least {{process.pin_tool_out_min_in:.2dot}} out of the chuck): open the hole to the stop, the full diameter to Z{{process.ream_tip_mm:.3f}} (the point to Z{{process.pilot_tip_mm:.3f}}), {{process.peck_53_mm:.1f}} mm pecks with full retract; set 2800. It breaks into the bore, as drawn. The file ends with the spindle stopped."
 settings = "pd-collar-drill-53-c360"
-hole_depth_mm = 8.7811
+hole_depth_mm = 8.7737
 peck = { step_mm = 1.2, retract = "full" }
 milling_cuts = [
   { name = "pin pilot", kind = "drill", phase = "rough", cutter_dia_mm = 1.5113, flutes = 2, rpm = 2800, feed_mm_min = "{{process.drill_feed_per_min_mm}}", stations_mm = ["{{cad.pin_ream_chord_mm}}"] },

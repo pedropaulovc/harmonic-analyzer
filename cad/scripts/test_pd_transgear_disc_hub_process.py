@@ -220,6 +220,13 @@ def test_a_plan_number_off_the_model_or_shop_is_refused(key, value, detail) -> N
         _context(plan)
 
 
+def test_an_end_mill_whose_flutes_are_shorter_than_its_reach_is_refused() -> None:
+    shop = copy.deepcopy(SHOP)
+    shop["tools"]["endmill-carbide-3fl-1-16-loc-1-2"]["flute_length_mm"] = 2.3622
+    with pytest.raises(ValueError, match="flutes are shorter"):
+        _context(PLAN, shop)
+
+
 def _with_cut(plan: dict, name: str, key: str, value: float) -> dict:
     plan = copy.deepcopy(plan)
     for setup in plan["setups"]:

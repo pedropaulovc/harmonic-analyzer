@@ -266,18 +266,21 @@ description = "#1-72 UNF plug hand tap (OSG 1010700)"
 tap_drill_mm = 1.5875  # 1/16 (.0625 in, tools.drill-1-16), ~58% thread: MHA-CH-07's Ø.060 +.004/0 crown hole excludes the usual #53 (.0595).
 
 # --- MHA-CH-07 fulcrum keeper's counterbore (cad/process/ch_fulcrum_keeper) ---
-# The long-reach 1/8 in end mill (cad/config/shop-equipment/, same key,
-# to_order): diameter, length of cut and reach from its seller's page
-# (dixie-tool.com, read 2026-11-22); helix not stated there. Its setting is
-# the strap's 1/8 in carbide one on 1018 (common.toml
+# The plain 1/8 in end mill, 3/4 in length of cut, 2-1/4 in overall
+# (cad/config/shop-equipment/, same key, to_order): MSC 09653429, Accupro
+# ASQSC3-CC-40H, read live 2026-11-24 (#3568): .1250 cutter, 3 flutes,
+# 40° helix, 1/8 in shank, no neck. It replaces the necked long-reach
+# cutter the plan first named (delegated ruling 2026-11-24 (Main), #3568;
+# the owner's choice of the plain cutters is recorded there). Its setting
+# is the strap's 1/8 in carbide one on 1018 (common.toml
 # settings.endmill-carbide-3fl-1-8-1018-cf-tru-edge: Tru-Edge .001 in/tooth,
-# 2800 rpm).
-[tools.endmill-carbide-3fl-1-8-lr-755708]
-description = "1/8 in 3-flute uncoated carbide long-reach end mill, 1 in LOC, 1-1/4 in reach, 2-1/2 in OAL (Harvey 755708)"
+# 2800 rpm): the same diameter and flute count, so nothing rescales.
+[tools.endmill-carbide-3fl-1-8-loc-3-4]
+description = "1/8 in 3-flute uncoated carbide square end mill, 3/4 in LOC, 2-1/4 in OAL, 1/8 in shank (MSC 09653429, Accupro ASQSC3-CC-40H)"
 diameter_mm = 3.175
-flute_length_mm = 25.4
-[settings.endmill-carbide-3fl-1-8-lr-1018-cf]
-tool = "endmill-carbide-3fl-1-8-lr-755708"
+flute_length_mm = 19.05
+[settings.endmill-carbide-3fl-1-8-loc-3-4-1018-cf]
+tool = "endmill-carbide-3fl-1-8-loc-3-4"
 material = "rocker-1018-cold-finished"
 rpm = 2800
 chip_load_mm_per_tooth = 0.0254  # .001 in; 2800 × 3 × .001 = 8.4 in/min

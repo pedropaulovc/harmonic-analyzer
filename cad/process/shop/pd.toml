@@ -287,18 +287,21 @@ tool = "drill-56"
 material = "lathe-c360"
 rpm = 2800
 feed = "2.8 in/min"
-# MHA-PD-17's flat with Harvey Tool 34662, the 1/16 in (.0620) 3-flute
-# long-reach stub end mill bought for MHA-MS-02 (tool audit 2026-11-23: it
-# replaces the 3/64 in end mill). Maker: Harvey Tool Speeds &
-# Feeds, Miniature End Mills - Square - Long Reach, Stub Flute, 9x Reach
-# Multiple (the 9x table, the next longer than 34662's 8x, the lower of the
-# two; W.C. Chapman's copy, read 2026-11-21, as ms.toml's
+# MHA-PD-17's flat with the plain 1/16 in (.0625) 3-flute end mill, 1/2 in
+# of flutes, bought for MHA-MS-02 (tool audit 2026-11-23: a 1/16 replaces
+# the 3/64 in end mill; the cutter: MSC 35497056, delegated ruling
+# 2026-11-24 (Main), #3568). Re-derived for it (#3568): its .500 of flutes
+# on .0625 stand out 8x its diameter, so the table is unchanged: Harvey
+# Tool Speeds & Feeds, Miniature End Mills - Square - Long Reach, Stub
+# Flute, 9x Reach Multiple (the 9x table, the next longer than 8x, the
+# lower of the two; W.C. Chapman's copy, read 2026-11-21, as ms.toml's
 # stop-em-sixteenth-c360), row Brass (C2xxxx-C4xxxx): 500 SFM, .062 in
 # Slotting .00035 in/tooth. Here plunged at the spindle's 2800 rpm and
 # .0005 in/rev (half a drill's feed, an end mill plunged off square):
-# .0005 / 3 = .00017 in/tooth, under half the maker's figure; 1.4 in/min.
+# .0005 / 3 = .00017 in/tooth, under half the table's figure; 2800 × .0005
+# = 1.4 in/min, as before.
 [settings.pd-hub-plunge-1-16-c360]
-tool = "endmill-carbide-3fl-1-16-reach-1-2"
+tool = "endmill-carbide-3fl-1-16-loc-1-2"
 material = "lathe-c360"
 rpm = 2800
 feed = "1.4 in/min"

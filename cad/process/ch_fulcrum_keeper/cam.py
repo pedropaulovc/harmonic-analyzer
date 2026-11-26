@@ -35,7 +35,7 @@ into the waste the step removes; the jaws grip only that waste. Lying, I
 down: FK05 faces the foot tip to the length and mills the step to the lug,
 opening the bore and the foot hole. Upright on the seat: FK06 spots and
 drills 1/16 through the crown into the bore and mills the foot hole's
-counterbore from the foot top with the long-reach 1/8 in end mill (a helix
+counterbore from the foot top with the 2-1/4 in long 1/8 in end mill (a helix
 down, then a full circle at the floor); FK07 is the hand-tap stop.
 
 Work frames (G54), each set in its setup:
@@ -117,9 +117,9 @@ DRILL_POINT_DEG = 118.0
 # The #1-72 UNF thread's basic major diameter, .0730 in (ASME B1.1): the
 # export names the thread, not its sizes.
 UNF_1_72_MAJOR_MM = 0.073 * IN
-# The long-reach 1/8 in end mill's shop setting on 1018 (shop/ch.toml): its
+# The 2-1/4 in long 1/8 in end mill's shop setting on 1018 (shop/ch.toml): its
 # chip load holds at the cutter's edge on the counterbore's helix.
-CBORE_SETTING = "endmill-carbide-3fl-1-8-lr-1018-cf"
+CBORE_SETTING = "endmill-carbide-3fl-1-8-loc-3-4-1018-cf"
 # The tap file's first motion: G53 G0 to machine Z0, the homed top (as the
 # magnifying clamp's recipe: FluidNC sets an axis's machine position to its
 # homing mpos_mm, default 0, and Z homes up); the owner (Pedro) confirmed
@@ -738,15 +738,20 @@ def context(
     ):
         if not math.isclose(_cut(plan, "cbore", key), value, abs_tol=1e-3):
             raise ValueError(f"'cbore' {key} is not the helix's {value:.4f}")
-    # The long-reach end mill: the lug's top (the crown's apex) stands
-    # height - foot top above the foot top; the collet nose stays
-    # cbore_collet_clear_mm above it with the cutter on the floor.
-    reach = p["long_reach_mm"]
+    # The 2-1/4 in end mill has no neck and its 1/8 in shank is the
+    # cutter's size, so nothing wider than the cutter stands within its
+    # stick-out. The lug's top (the crown's apex) stands height - foot top
+    # above the foot top; the collet nose stays cbore_collet_clear_mm above
+    # it with the cutter on the floor: at least cbore_projection_min_mm out.
+    # At most its length less holder_grip_min_mm out, the collet's grip.
     need = height - cbore_floor + p["cbore_collet_clear_mm"]
     _agree(plan, "cbore_projection_min_mm", need)
-    if need > reach:
+    out_max = p["cbore_mill_oal_mm"] - p["holder_grip_min_mm"]
+    _agree(plan, "cbore_projection_max_mm", out_max)
+    if need > out_max:
         raise ValueError(
-            f"the counterbore needs {need:.2f} out, the end mill reaches {reach}"
+            f"the counterbore needs {need:.2f} out, the end mill gives {out_max:.2f} "
+            "with holder_grip_min_mm in the collet"
         )
 
     # Vise: upright on the 1 in pair, lying on the stacked risers.

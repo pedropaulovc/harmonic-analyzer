@@ -31,16 +31,18 @@ flutes = 3
 [tools.endmill-carbide-3-32]
 kind = "end_mill"
 status = "to_order"
-note = "Not owned: to buy. drawing cross-check 2026-11-19: MHA-PD-27 flat floor for the Ø.110 counterbore; MHA-CH-03 .106 ±.002 fork slot."
+note = "Not owned: to buy. drawing cross-check 2026-11-19: MHA-PD-27 flat floor for the Ø.110 counterbore (MHA-CH-03's .106 fork slot is sawn since #3505 and needs no 3/32 cutter; #3568)."
 
-[tools.endmill-carbide-3fl-1-16-reach-1-2]
+[tools.endmill-carbide-3fl-1-16-loc-1-2]
 kind = "end_mill"
-make = "Harvey Tool"
-sku = "34662"
-source = "https://www.harveytool.com/products/tool-details-34662"
-purchase = "Harvey Tool 34662, $60.30 each (listing read live 2026-11-21)"
+make = "Accupro"
+sku = "35497056"
+source = "https://www.mscdirect.com/product/details/35497056"
+purchase = "One MSC 35497056 (Accupro, Mfr 14981778), $34.97 (read live 2026-11-24, #3568)"
 status = "to_order"
-note = "Not owned: to buy. Miniature End Mill, Square, Long Reach, Stub Flute: .0620 × .093 length of cut × .500 reach (8x), 3 flutes, 1/8 shank, uncoated, optimized for plunging. MHA-MS-02 rebate corner relief .05 ±.01 deep × .06 ±.01 high beside the roof, .38 below the mating face inside the .134 rebate, plunge-milled: no owned cutter is .07 or under and reaches it."
+flutes = 3
+oal_in = 2.5
+note = "Not owned: to buy; in the MSC cart (delegated ruling 2026-11-24 (Main), #3568; the owner's choice of the plain cutters is recorded there). Square end mill, 1/16 in (.0625) × 1/2 in length of cut × 2-1/2 in overall, 3 flutes, solid carbide, uncoated, 30° helix, centre cutting, 1/8 shank, no neck (\"Extended Reach: No\"). MHA-MS-02 rebate corner relief .05 ±.01 deep × .06 ±.01 high beside the roof, .385 below the mating face inside the .134 rebate, plunge-milled: no owned cutter is .07 or under and reaches it; its .500 of flutes reach past the .385, so its 1/8 shank never enters. MHA-PD-17's pin-hole flat is plunged with it too."
 
 [tools.knurl-straight-25tpi]
 make = "Form Roll"
