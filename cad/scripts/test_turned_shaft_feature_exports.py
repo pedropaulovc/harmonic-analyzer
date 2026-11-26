@@ -253,11 +253,10 @@ def test_printed_bands_are_the_sheets() -> None:
     rod = manifest("dt_pinion_lift_rod")["features"]
     assert _inch(rod["far_end"]["body_length"]) == [8.14, 8.16]
     assert _inch(rod["far_end"]["radius"]) == [0.18, 0.2]
-    assert _inch(rod["flat_back"]["station"]) == [0.58, 0.6]
-    # #3042: the three feeler terms book their leaf tolerance, so the front
-    # flat is one .01 step longer, toward the rim.
-    assert _inch(rod["flat_front"]["station"]) == [6.95, 6.97]
-    assert _inch(rod["flat_front"]["length"]) == [0.22, 0.24]
+    assert _inch(rod["flat_back"]["station"]) == [0.51, 0.53]
+    # Owner ruling C7 (2026-11-24): both flats .30, toward the rim.
+    assert _inch(rod["flat_front"]["station"]) == [6.92, 6.94]
+    assert _inch(rod["flat_front"]["length"]) == [0.29, 0.31]
     assert rod["flat_back"]["station_from"] == "far_root"
     assert _inch(rod["cross_hole"]["dia"]) == [0.064, 0.068]
     assert _inch(rod["cross_hole"]["station"]) == [0.15, 0.17]

@@ -15,14 +15,9 @@ name = "#51 drill"
 ref = "drill-51"  # Drills #51
 
 [[tools]]
-id = "reamer-2510"
-name = ".2510 reamer"
-ref = "reamer-2510"  # B-reamer-.2510
-
-[[tools]]
-id = "pin-gauges"
-name = "Pin gauges .011-.500"
-ref = "pin-gauges"  # A1-pin-set-061-500-combined, A1-pin-set-251-500
+id = "drill-f"
+name = "F drill"
+ref = "jig-drill-f"  # fit audit F23, drawing-guidelines rule 4, form 1 (drilled; pinned at assembly): the hub bore is F DRILL (.257), no band; the MHA-DT-17 rod entering by hand is its acceptance
 
 [[tools]]
 id = "centre-punch-starrett-18a"
@@ -30,14 +25,9 @@ name = "Automatic centre punch"
 ref = "centre-punch-starrett-18a"  # F-centre-punch-starrett-18A
 
 [[tools]]
-id = "drill-c"
-name = "C drill"
-ref = "drill-c"  # drawing cross-check 2026-11-19: pre-drill for the .2500/.2510 ream
-
-[[tools]]
 id = "endmill-hss-2fl-1-4"
 name = "1/4 HSS end mill"
-ref = "endmill-hss-2fl-1-4"  # drawing cross-check 2026-11-19: flatten the blind (.32) floor before reaming
+ref = "endmill-hss-2fl-1-4"  # drawing cross-check 2026-11-19: flatten the blind (.32) floor after the F drill
 
 [[setups]]
 machine_kind = "other"

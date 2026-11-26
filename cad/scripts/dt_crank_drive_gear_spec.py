@@ -361,6 +361,10 @@ if BORE_DIAMETRAL_CLEARANCE != GEAR_SEAT_CLEARANCE:
 # One broached 1/16 keyway on local +X, the clock the retired D-flat held,
 # for the MHA-DT-VN-71 key in MHA-DT-04's land-1 keyseat. Width and T (top to
 # the bore's far side, ANSI B17.1) come from cone_land_key; the 64T forks none.
+# The width's band is ANALYSIS only (the web below reads its widest): the
+# sheet prints the width as a reference and the key's trial governs it
+# (draw_dt_crank_drive_gear; machinist review r1, farm run
+# 20261124T110807008Z).
 KEYWAY_WIDTH = cone_land_key.KEYWAY_WIDTH_MM
 KEYWAY_WIDTH_BAND = cone_land_key.KEYWAY_WIDTH_BAND
 KEYWAY_T = cone_land_key.KEYWAY_T_MM
@@ -453,8 +457,8 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # marks, so ``draw_dt_crank_drive_gear`` imports each dimension verbatim and only
 # reads ``GetPrimaryPrecision2()`` back off the sheet.
 #
-# Inch places: the round bore carries its fit band at four (+.0018/+.0010)
-# and the keyway its width and T bands at four. The outside diameter prints three with
+# Inch places: the round bore prints its reamed size at four, the keyway its
+# width (a reference) and T band at four. The outside diameter prints three with
 # +/-.004. The face width is the four-place +/-.001 member of the solid gear
 # stack; its south face seats on the collar and the tolerance only shifts the
 # north face. The south chamfer leg prints two places under the title block's

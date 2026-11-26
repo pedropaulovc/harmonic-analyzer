@@ -18,6 +18,7 @@ from _drawing_registry import DRAWINGS_BY_NAME
 from _fit_deviations import deviations
 from _hole_spec import TAP_DRILL_MM, THREAD_MAJOR_MM
 from _machinist_review_mode import MachinistReviewMode
+from _printed_tolerance import drilled_oversize_mm, drilled_undersize_mm
 
 SHEET_INNER = (0.0127, 0.0127, 0.4191, 0.2667)
 TITLE_BLOCK = (0.216, 0.0, 0.4318, 0.066)
@@ -31,16 +32,22 @@ def test_the_bar_is_registered_tooling_of_the_tip_gear() -> None:
     assert spec.script.name == Path(drawing.__file__).name
 
 
-def test_the_cross_hole_is_a_slip_fit_on_the_bit_as_supplied() -> None:
+def test_the_cross_hole_is_a_drilled_clearance_for_the_bit() -> None:
+    """Rule 4 form 1 (machinist review r1, farm run 20261124T110807008Z): the
+    set screw bears the bit against one side, so the hole is the #30 drill at
+    DRILLED HOLES, no REAM, and the bit always enters."""
     hole = tuple(
         sorted(part.CROSS_HOLE_DIA + d for d in deviations(part.CROSS_HOLE_BAND))
     )
     assert hole == pytest.approx(part.CROSS_HOLE_LIMITS)
+    assert part.CROSS_HOLE_BAND == pytest.approx(
+        (drilled_oversize_mm(unit="in"), -drilled_undersize_mm(unit="in"))
+    )
+    assert part.DIMENSION_CALLOUTS["CrossHoleDia"].splitlines()[0] == "#30 DRILL THRU"
+    assert "REAM" not in part.DIMENSION_CALLOUTS["CrossHoleDia"]
     least = hole[0] - bit.BIT_DIA_LIMITS[1]
     most = hole[1] - bit.BIT_DIA_LIMITS[0]
-    # Never an interference; at worst a few tenths loose, which the set screw
-    # takes up.
-    assert 0.0 <= least < most <= 0.0762
+    assert 0.0 < least < most
 
 
 def test_the_tap_runs_into_the_cross_hole_leaving_no_web() -> None:

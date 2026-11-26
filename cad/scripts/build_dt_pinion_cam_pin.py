@@ -52,7 +52,6 @@ from _sketch import (
 from _drawing_dimension_insert import add_diametric_linear_dimension
 from _drawing_precision import apply_drawing_precision
 from _drawing_marks import apply_drawing_properties, clear_dimensions_for_drawing, mark_dimensions_for_drawing
-from _drawing_tolerances import set_dimension_symmetric_tolerance
 from _part_pmi import author_part_pmi
 from _saved_part_guard import require_saved_drawing_properties
 from dt_pinion_cam_pin_spec import (
@@ -61,10 +60,8 @@ from dt_pinion_cam_pin_spec import (
     DRAWING_PRECISION,
     ISOMETRIC_VIEW_NOTE,
     PIN_DIA,
-    PIN_DIA_BAND,
     PIN_LEN,
     SURFACE_FINISHES,
-    UNIT,
 )
 
 PART_NAME = "dt-pinion-cam-pin"
@@ -223,12 +220,10 @@ def build(adapter) -> dict[str, str]:
     volume_check(adapter, "driven pin (equations neutral)", volume, 0.005 * V_PIN)
 
     # Manufacturing drawing support: mark exactly the print's dimensions and
-    # stamp the make-critical title-block properties.  Only the bonded
-    # diameter carries a band, the drill rod's own +/-.0005; the length and
+    # stamp the make-critical title-block properties.  No dimension carries a
+    # band: the shank is the drill rod as supplied, printed REF with its stock
+    # (machinist review r1, farm run 20261124T110807008Z), and the length and
     # crown radius take the title block's .XX (dt_pinion_cam_pin_spec).
-    set_dimension_symmetric_tolerance(
-        adapter, "PinProfile", "PinDia", PIN_DIA_BAND[0], display_unit=UNIT
-    )
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)

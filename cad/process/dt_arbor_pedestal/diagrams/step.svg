@@ -25,7 +25,7 @@
   <text class="label" x="478" y="194.84">hold-down hole (opened)</text>
   <line class="leader" x1="155.52" y1="278" x2="40" y2="350"/>
   <circle class="leader-dot" cx="155.52" cy="278" r="2"/>
-  <text class="label" x="44" y="354">bore X −{{cad.arbor_bore_height_mm:in.3dot}}: spot, 23/64, ream .3760, through between the stacks</text>
+  <text class="label" x="44" y="354">bore X −{{cad.arbor_bore_height_mm:in.3dot}}: spot, then the V drill, through between the stacks</text>
   <text class="label" x="20" y="50">Levels of {{process.step_level_mm:in.3dot}}; passes across the width, from the left end to the foot.</text>
   <text class="label" x="20" y="390">Looking at the moving jaw; W at the fixed jaw behind.</text>
 </svg>

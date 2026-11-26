@@ -1,0 +1,9 @@
+# MHA-DT-00 sheet 16 module checks (tolerance-policy.md, "Checks in spec
+# modules and tests"; cad/scripts/check_register.py).
+checks:
+  - id: C-01
+    check: "run past the screw's"
+    kind: thread
+    reason: "the printed turn count cannot be reached before seating"
+    source: "owner ruling 2026-11-24, audit part 2 S1 (turns from first bite); Codjiflo r3-5 on #3550: the count is the engagement floor (DT-04's 1D for MHA-DT-VN-52, rule 18's 1.5D for MHA-SH-VN-52) plus the screw's TIP_CHAMFER and FULL_THREAD_START in pitches, and must fit the screw's thread length (dt_vn_cone_pivot_screw_spec.THREAD_TAIL_LEN, dt_swing_stop_screw_spec.LENGTH_MIN_MM)"
+    basis: worst_case

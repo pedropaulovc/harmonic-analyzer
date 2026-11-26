@@ -4,7 +4,7 @@ by the part build (``build_dt_pinion_bracket.py``) and its manufacturing drawing
 
 PURE DATA, no SolidWorks/COM imports: the marked-dimension -> kept-dimension
 NAME map, the decimal places the MODEL authors for each of those dimensions,
-the three fitted-bore bands and the roughness controls.  Keeping this in ONE
+the bores' analysis bands, the fitted seat's band and the roughness controls.  Keeping this in ONE
 module means a rename or a nominal change is a single edit that reaches both
 scripts, so the part-side ``mark_dimensions_for_drawing`` set and the
 drawing-side ``keep`` maps cannot silently drift apart.
@@ -19,7 +19,6 @@ marks and the drawing keeps EXACTLY ``DRAWING_DIMENSIONS``.
 
 from __future__ import annotations
 
-from _fit_ream_slide import REAM_SLIDE
 from _gtol_cylinder import CylinderFace
 from _inch_wall_limits import WALL_TARGET_MM
 from _printed_tolerance import printed_deviations
@@ -34,6 +33,7 @@ from dt_pinion_bracket_geometry import (
     PIN_DROP as PIN_DROP,
     PIN_SEAT as PIN_SEAT,
     PIVOT_BORE as PIVOT_BORE,
+    PIVOT_BORE_BAND as PIVOT_BORE_BAND,
     R_END as R_END,
     THICKNESS as THICKNESS,
     THICKNESS_LIMITS as THICKNESS_LIMITS,
@@ -41,22 +41,29 @@ from dt_pinion_bracket_geometry import (
     UNIT as UNIT,
     WIDTH as WIDTH,
 )
+import dt_pinion_cam_pin_spec as _cam_pin
 import dt_vn_pinion_strap_pin_spec as _strap_pin
 
-# --- Tolerance bands.  Only the three fitted bores and the cross hole carry
-# one: the two running bores trace to ``_fit_ream_slide``, the bonded seat to
-# the owner's .157 +.003/0 (tool audit Q8, 2026-11-23), the cross hole to the
-# spring pin's own window; every other feature is
+# --- Tolerance bands.  Only the follower seat and the cross hole print one:
+# the bonded seat the owner's .157 +.003/0 (tool audit Q8, 2026-11-23), the
+# cross hole the spring pin's own window; every other feature is
 # governed by its decimal places against the title block's general grades.
 # The strap's former per-part numbers (a +/-0.10 bore centre distance, +/-0.05
 # on the seat axis and through-thickness station, +/-0.05 on the bar thickness
 # and a +0.10/0 seat depth) traced to no fit class and to no error-budget row:
 # they were habit, not specification, and are gone. ---
 # Option E-a: the strap is pinned to the torque shaft, which turns with it in
-# the MHA-DT-18 block bores.  The slide fit stays so the strap goes onto the
-# shaft for fit-up and the cross hole can be match-drilled through both.
-PIVOT_BORE_BAND = REAM_SLIDE
-ARBOR_BORE_BAND = REAM_SLIDE  # pinion arbor turns in it
+# the MHA-DT-18 block bores.  The pivot bore is reamed .2510, no band: the
+# MHA-DT-19 shaft enters and turns by hand (fit audit F16, recommended form),
+# so the strap goes onto the shaft for fit-up and the cross hole can be
+# match-drilled through both.  The arbor bores are drilled 5/16 and the
+# MHA-DT-22 journals are turned to them (owner ruling 2026-11-24, fit audit
+# question 12).  Neither band is printed: each is the ANALYSIS band, what the
+# tool is modelled to cut (the reamer's +.0005; the DRILLED HOLES row's
+# +.004/0), which every stack reads (PIVOT_BORE_BAND lives in the geometry
+# module, beside the bore, for the strap pin's stacks).  (upper, lower)
+# deviations.
+ARBOR_BORE_BAND = (0.1016, 0.0)  # ANALYSIS, 5/16 drill: .3125-.3165
 # The MHA-DT-25 5/32 drill-rod stud slips into this seat and is bonded with
 # LOCTITE 638 (U27; dt_pinion_cam_pin_spec proves the bond gap).  Owner
 # ruling 2026-11-23, tool audit Q8 (option A): "Re-band to +.003/0, finish
@@ -123,13 +130,23 @@ if min(PIN_SEAT_WEB_WORST, PIN_SEAT_NEAR_WEB_WORST) < WALL_TARGET_MM:
 PIN_SEAT_FLOOR_CORNER_R_MAX = 0.2032  # .008
 # The seat's size callout: its REF depth and flat floor (rule 26: never
 # deferred to a view; Section B-B's .16 controls the floor), the bonded mate
-# (rule 4), then the floor-corner allowance.  No cutter is named (tool audit
-# Q8 drops the REAM; MHA-PD-16's pilot precedent: "FLAT BOTTOM END MILL"
-# named a tool, not a requirement).
+# (rule 4), the bond's diametral clearance (rule 23), then the floor-corner
+# allowance.  No cutter is named (tool audit Q8 drops the REAM; MHA-PD-16's
+# pilot precedent: "FLAT BOTTOM END MILL" named a tool, not a requirement).
+# The clearance is the MHA-DT-25 5/32 drill rod's catalogue band in this
+# seat's +.003/0 (dt_pinion_cam_pin_spec.BOND_CLEARANCE_MIN/MAX, inside
+# LOCTITE 638's gap there); the seat band is the requirement, so the range
+# prints as REF.  Machinist review r2 (farm run 20261124T125542720Z, blocker):
+# the callout named the bond but not its clearance.
+_BOND_CLEARANCE_TEXT = "-".join(
+    f"{value / 25.4:.4f}".lstrip("0")
+    for value in (_cam_pin.BOND_CLEARANCE_MIN, _cam_pin.BOND_CLEARANCE_MAX)
+)
 PIN_SEAT_CALLOUT = "\n".join(
     (
         f"<HOLE-DEPTH> ({PIN_SEAT / 25.4:.2f}) FLAT BOTTOM".replace("(0.", "(."),
         "BONDED FIT ON MHA-DT-25",
+        f"(CLEARANCE {_BOND_CLEARANCE_TEXT})",
         f"FLOOR CORNERS R{PIN_SEAT_FLOOR_CORNER_R_MAX / 25.4:.3f} MAX".replace(
             "R0.", "R."
         ),
@@ -163,8 +180,9 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # ), so the MODEL owns them: build_dt_pinion_bracket applies this map to the
 # .SLDPRT and draw_dt_pinion_bracket only reads it back.
 #
-# #290 inch sheet.  Four places on the two reamed bores and the cross hole,
-# whose +.0015/+.0010 and +.0025/.0000 bands need them; three on the follower
+# #290 inch sheet.  Four places on the two bores (the reamer's .2510 and the
+# 5/16 drill's .3125, each named in its callout) and on the cross hole, whose
+# +.0025/.0000 band needs them; three on the follower
 # seat's +.003/.000 (tool audit Q8).  Three
 # (.XXX, +/-.005) where a stack or web reads the row, each naming its function
 # at the dimension: PinSeatCy (the follower stud's height above the pivot sets

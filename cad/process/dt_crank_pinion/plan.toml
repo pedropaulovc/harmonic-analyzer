@@ -9,10 +9,18 @@ stock = "To be written"
 shop = "../shop"
 stock_refs = ["1018-round-3-and-7-8"]
 
+# The Ø.3135 bore (D19, delegated ruling 2026-11-24 (Main), precedent: owner
+# ruling 2026-11-20, #3073; owner review #2144): reamed with the
+# owned adjustable set, the piece whose range covers .3135 set over its
+# blades by micrometer to .3135 and proved in scrap until the trial hole
+# measures .3135 (telescoping gauge and micrometer). Nothing is bought for
+# it: MHA-DT-11's seat is turned
+# last to this bore AS MEASURED (crankshaft traveler), so the adjustable's
+# scatter never reaches the fit. Record the measured bore on the part's tag.
 [[tools]]
-id = "reamer-3135"
-name = ".3135 reamer"
-ref = "reamer-3135"  # B-reamer-.3135
+id = "reamers-adjustable-lms-5948"
+name = "Adjustable reamer set, .250-.375 in (LMS 5948)"
+ref = "reamers-adjustable-lms-5948"
 
 [[tools]]
 id = "gear-cutter-arbor-1"
@@ -28,11 +36,6 @@ ref = "gear-cutters-24dp-20pa"  # F-gear-cutter-10-289-247
 id = "feeler-gauges"
 name = "Feeler gauges (Pittsburgh 32-pc)"
 ref = "feeler-gauges"  # F-feeler-66MA; repointed from the Starrett 66MA (owner 2026-11-19)
-
-[[tools]]
-id = "pin-gauges"
-name = "Pin gauges .011-.500"
-ref = "pin-gauges"  # A1-pin-set-061-500-combined, A1-pin-set-251-500
 
 [[tools]]
 id = "drill-n"

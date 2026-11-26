@@ -28,7 +28,11 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_dimension_import import curate_view_dimensions
-from _drawing_dimensions import assert_imported_precision, set_dimension_callouts
+from _drawing_dimensions import (
+    assert_imported_precision,
+    set_dimension_callouts,
+    set_reference_dimensions,
+)
 from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
@@ -153,6 +157,9 @@ requirement(
     },
     precision={"length": _P["PinLen"]},
 )
+# The 1/16 drill rod as supplied, size REF (no printed band); ``dia`` is the
+# supplier's catalogue band, the traveler's check that the rod is the stock
+# (the turned_bush adapter reads an as-supplied outer as a band).
 requirement(
     "outer",
     kind="diameter",
@@ -239,6 +246,8 @@ def build(adapter: Any) -> dict[str, str]:
     )
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
+    # The drill rod's as-bought diameter prints REF: "(Ø.0625)".
+    set_reference_dimensions(adapter, annotations, ("PinDia",))
     _prove_one_end_mark(right)
     add_view_centerline(
         adapter,

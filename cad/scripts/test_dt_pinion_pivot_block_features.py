@@ -75,7 +75,8 @@ def test_the_block_is_a_feature_export_part_with_one_owner_per_face() -> None:
     selectors = export_features.feature_selectors(STEM)
     west, east = geom.BLOCK_WEST, geom.BLOCK_EAST
     bottom, top, depth = geom.BLOCK_BOTTOM_Y, geom.BLOCK_TOP_Y, geom.BLOCK_DEPTH
-    r = geom.BORE_DIA / 2
+    r = geom.PIVOT_BORE_DIA / 2
+    rl = geom.LIFT_BORE_DIA / 2
     lx, ly = -geom.LIFT_BORE_SPACING, geom.LIFT_BORE_RISE
     s = geom.SCREW_HOLE_DIA / 2
     zc = depth / 2
@@ -87,10 +88,12 @@ def test_the_block_is_a_feature_export_part_with_one_owner_per_face() -> None:
         "back_face": _plane((0.0, 0.0, -1.0), 0.0),
         "front_face": _plane((0.0, 0.0, 1.0), depth),
         "pivot_bore": _cylinder(
-            geom.BORE_DIA, (0.0, 0.0, 1.0), (-r, -r, 0.0, r, r, depth)
+            geom.PIVOT_BORE_DIA, (0.0, 0.0, 1.0), (-r, -r, 0.0, r, r, depth)
         ),
         "lift_bore": _cylinder(
-            geom.BORE_DIA, (0.0, 0.0, 1.0), (lx - r, ly - r, 0.0, lx + r, ly + r, depth)
+            geom.LIFT_BORE_DIA,
+            (0.0, 0.0, 1.0),
+            (lx - rl, ly - rl, 0.0, lx + rl, ly + rl, depth),
         ),
     }
     for name, sign in (("west_hold_down", -1.0), ("east_hold_down", 1.0)):
@@ -124,13 +127,19 @@ def test_block_feature_bands_are_the_printed_ones() -> None:
     assert front["depth_from"] == "back_face"
     assert features["back_face"]["plane"]["value"] == 0.0
 
-    for name in ("pivot_bore", "lift_bore"):
-        bore = features[name]
-        # Ø.2500 +.0015/+.0010 REAM THRU, Ra 63.
-        assert bore["dia"] == pytest.approx([_in(0.2510), _in(0.2515)])
-        assert bore["process"] == "ream" and bore["thru"] is True
+    # The pivot bore at the .2510 reamer's size, its ANALYSIS band (owner
+    # ruling 2026-11-24, fit audit question 12); the lift bore F drilled at
+    # the DRILLED HOLES row (fit audit F26).  Both Ra 63.
+    pivot, lift = features["pivot_bore"], features["lift_bore"]
+    assert pivot["dia"] == pytest.approx([_in(0.2510), _in(0.2515)])
+    assert pivot["process"] == "ream" and pivot["mate"] == "MHA-DT-19"
+    assert pivot["callout"] == "REAM THRU\nMHA-DT-19 ENTERS,\nTURNS BY HAND"
+    assert lift["dia"] == pytest.approx([_in(0.257), _in(0.261)])
+    assert lift["process"] == "drill" and lift["drill"] == "F"
+    assert lift["callout"].startswith("F DRILL THRU\nMHA-DT-17 TURNS FREELY")
+    for bore in (pivot, lift):
+        assert bore["thru"] is True
         assert bore["axis"] == [0.0, 0.0, -1.0]
-        assert bore["callout"].startswith("REAM THRU\nRUNNING FIT ON ")
         assert bore["finish_ra"] == MACHINED_UM
     pivot = features["pivot_bore"]
     assert pivot["at"] == [0.0, 0.0, geom.BLOCK_DEPTH]

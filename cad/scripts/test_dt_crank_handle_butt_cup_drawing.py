@@ -48,7 +48,9 @@ def test_part_and_drawing_share_the_marked_dimension_contract() -> None:
     assert set(drawing.SECTION_KEEP) | set(drawing.DETAIL_KEEP) == marked
     assert not set(drawing.SECTION_KEEP) & set(drawing.DETAIL_KEEP)
     assert set(seat.CUP_DRAWING_PRECISION_BY_NAME) == marked
-    assert spec.REFERENCE_DIMENSIONS == {"PocketDia"}
+    # The pocket prints its own limits (owner ruling 2026-11-24, fit audit
+    # question 15): no reference dimension is left.
+    assert spec.REFERENCE_DIMENSIONS == frozenset()
     # No model band beside the separate native radial MAX and LIMIT
     # setters: the chamfer, the body and the pocket depth hold the title
     # block's .XXX band.
@@ -77,7 +79,13 @@ def test_pocket_names_its_mate_once_on_one_flag_note() -> None:
     pocket = notes.POCKET_NOTE_TEXT
     assert pocket.startswith("1. ") and len(pocket.splitlines()) <= 2
     assert _config.parts("dt-crank-handle-pivot-screw")["number"] in pocket
-    assert "CLEARANCE" in pocket
+    # Fit audit question 15: no matching, so no clearance to read; the note
+    # names the mate and carries no dimension, and no tool (rule 7; machinist
+    # review r1, farm run 20261124T110807008Z: the end mill is the traveler's).
+    assert "CLEARANCE" not in pocket and "BORE TO" not in pocket
+    assert "CLEARS" in pocket
+    for method in ("END MILL", "PLUNGE"):
+        assert method not in pocket
     # The body's bond is a matched fit on flag note 2: the .XXX grade alone
     # cannot give the glue line, so the route prints (round 2 review).
     assert drawing.DIMENSION_CALLOUTS["BodyDia"] not in flags
@@ -138,10 +146,18 @@ def test_face_walls_charge_every_exposed_break() -> None:
 
 
 def test_ruling_b_keeps_the_head_pocket_and_axial_geometry() -> None:
-    # The pocket is bored to suit the head with its diametral clearance.
+    # The pocket is end-milled to its own limits; the head at its own band
+    # clears it (owner ruling 2026-11-24, fit audit question 15).
     low, high = spec.POCKET_CLEARANCE
-    assert spec.POCKET_DIA == pytest.approx(screw.HEAD_DIA + low / 2.0 + high / 2.0)
-    assert spec.POCKET_DIA_MAX >= screw.HEAD_DIA + screw.HEAD_DIA_TOL + high
+    pocket_min, pocket_max = spec.POCKET_DIA_LIMITS
+    assert (pocket_min, pocket_max) == pytest.approx((0.248 * 25.4, 0.257 * 25.4))
+    assert pocket_min < spec.POCKET_DIA < pocket_max
+    assert low == pytest.approx(pocket_min - (screw.HEAD_DIA + screw.HEAD_DIA_TOL))
+    assert high == pytest.approx(pocket_max - (screw.HEAD_DIA - screw.HEAD_DIA_TOL))
+    assert low > 0.0
+    assert spec.POCKET_DIA_MAX == pocket_max
+    assert spec.POCKET_FLOOR_CORNER_R_MAX == pytest.approx(0.003 * 25.4)
+    assert spec.POCKET_FLOOR_CORNER_R_MAX <= low / 2.0
     assert spec.FLOOR_THICKNESS == pytest.approx(spec.OVERALL_LENGTH - spec.POCKET_DEPTH)
     assert spec.FLOOR_HOLE_DIA > screw.SHOULDER_DIA_MAX
 

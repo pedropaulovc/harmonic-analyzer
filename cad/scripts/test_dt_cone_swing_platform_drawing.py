@@ -27,7 +27,7 @@ import pytest
 from _drawing_contract import model_toleranced_dimensions
 from _gtol_planar import PlanarFace
 from _hole_spec import CLEARANCE_MM, THREAD_MAJOR_MM, blind_cut_dia_mm
-from _inch_wall_limits import WALL_TARGET_MM
+from _inch_wall_limits import WALL_FLOOR_MM, WALL_TARGET_MM
 from _printed_tolerance import drilled_oversize_mm, printed_band_mm
 from _surface_finish import MACHINED_UM, SEAT_UM
 
@@ -50,9 +50,10 @@ def test_every_marked_model_dimension_has_one_view_and_native_precision() -> Non
     assert set(drawing_spec.DRAWING_PRECISION_BY_NAME.values()) == {2, 3, 4}
 
 
-def test_pivot_is_the_reamed_h7_bore_on_the_stock_shoulder() -> None:
-    """Main ruling 2026-10-10: the plate is reamed Ø6.350 H7 on the 6.3246-6.350
-    shoulder, band from config, carried natively on the Hole Wizard feature."""
+def test_pivot_is_reamed_by_the_2510_reamer_on_the_stock_shoulder() -> None:
+    """Owner ruling 2026-11-24, fit audit question 10: the plate is reamed with
+    the .2510 over reamer and prints no band; the 1/4 Hole Wizard hole is cut
+    at the reamer's size and the shoulder enters it at its largest."""
     import _config
 
     import dt_cone_swing_platform_pivot_spec as pivot_spec
@@ -60,8 +61,11 @@ def test_pivot_is_the_reamed_h7_bore_on_the_stock_shoulder() -> None:
     assert pivot_spec.PIVOT_HOLE_SPEC.kind == "drilled_fractional"
     assert pivot_spec.PIVOT_HOLE_SPEC.size == "1/4"
     assert pivot_spec.PIVOT_HOLE_SPEC.end == "through_all"
-    assert pivot_spec.PIVOT_HOLE_DIA == blind_cut_dia_mm(pivot_spec.PIVOT_HOLE_SPEC)
-    assert pivot_spec.PIVOT_HOLE_DIA == pytest.approx(6.350)
+    assert pivot_spec.PIVOT_HOLE_DIA == pytest.approx(0.2510 * 25.4)
+    assert pivot_spec.PIVOT_HOLE_SPEC.overrides_mm == {
+        "HoleDiameter": pivot_spec.PIVOT_HOLE_DIA
+    }
+    # The ANALYSIS band: what the reamer is modelled to cut, never printed.
     assert pivot_spec.PIVOT_HOLE_BAND == tuple(
         _config.fit("cone_drum_oblique_mesh", "pivot_bore_band_mm")
     ) == (0.0127, 0.0)
@@ -602,10 +606,10 @@ def test_post_screw_engagement_note_states_the_computed_exception() -> None:
 
     U37 accepts short engagement for the 1/4-20 post screws. The printed worst
     case is the thinnest stock plate (U41 band), less the title block's .010
-    tap-entry break and, at the underside, the .005 cut-to-fit allowance plus
+    tap-entry break and, at the underside, the .015 cut-to-fit allowance plus
     the screw's .010 cut-end break (it outreaches the tap's .010 exit break),
-    floored, never under the drawing-guidelines.md rule 18 (thread engagement)
-    audit's E7 floor of 0.87D.
+    floored, never under the owner's 0.84D floor (owner ruling 2026-11-24, fit
+    audit part 2 S2).
     """
     # To the micron, as the spec rounds it, so a float sum a hair under an
     # exact hundredth does not floor one place low.
@@ -620,7 +624,7 @@ def test_post_screw_engagement_note_states_the_computed_exception() -> None:
     assert spec.POST_MOUNT_ENGAGEMENT_WORST == pytest.approx(worst)
     diameters = worst / (0.25 * 25.4)
     printed = math.floor(diameters * 100.0) / 100.0
-    assert printed <= diameters and printed >= 0.87
+    assert printed <= diameters and printed >= 0.84
     assert spec.POST_MOUNT_ENGAGEMENT_PRINTED == printed
     assert spec.POST_MOUNT_ENGAGEMENT_NOTE == (
         f"1/4-20 THREAD ENGAGEMENT {printed:.2f}D MIN."
@@ -1103,9 +1107,10 @@ def test_holddown_hole_is_the_ruled_counterbore_for_the_tip_block_screw() -> Non
     assert block.FOOT_TAP_OFFSET_X == spec.HOLDDOWN_LOCAL_X
 
 
-def test_holddown_x_is_a_banded_dimension_hanging_right_of_detail_b() -> None:
+def test_holddown_x_is_a_title_block_dimension_hanging_right_of_detail_b() -> None:
     """User ruling 2026-09-29: the hole's lateral station prints as HoldDownX
-    at .XX with +/-0.10, in detail B.  Its 2 mm span cannot hold the text,
+    at .XX, in detail B, at the title block's band since machinist review r1
+    (farm run 20261124T125542720Z: no stack needs a tighter one).  Its 2 mm span cannot hold the text,
     and inside the circle the text either ran out through the outline (run
     20260930T030604208Z) or under the plate's east edge (run
     20260930T041147948Z), so it hangs sheet-right OUTSIDE the circle (user
@@ -1116,10 +1121,11 @@ def test_holddown_x_is_a_banded_dimension_hanging_right_of_detail_b() -> None:
         "HoldDownZ": 3,
     }
     assert spec.HOLDDOWN_STATION_TOL_MM == 0.127  # the +/-.005 drilled-hole row
-    # HoldDownX's .XX carries the band; HoldDownZ and the post-tap stations
-    # print .XXX, whose title-block grade is the band (rule 2, C1 keyed r9).
+    assert spec.HOLDDOWN_LATERAL_TOL_MM == printed_band_mm(2, unit=spec.UNIT)
+    # Neither station carries a band of its own: HoldDownX takes the .XX row,
+    # HoldDownZ and the post-tap stations the .XXX row (rule 2, C1 keyed r9).
     banded = model_toleranced_dimensions(part)
-    assert banded[("HoldDownHole", "HoldDownX")] == "HOLDDOWN_STATION_TOL_MM"
+    assert ("HoldDownHole", "HoldDownX") not in banded
     assert ("HoldDownHole", "HoldDownZ") not in banded
     assert not any(feature == "PostMountHoles" for feature, _ in banded)
     assert (
@@ -1149,21 +1155,44 @@ def test_holddown_x_is_a_banded_dimension_hanging_right_of_detail_b() -> None:
 
 
 def test_holddown_print_worst_stack_keeps_its_margins() -> None:
-    """At the counterbore callout's .XXX and the drilled oversize: head recess
-    under the slide face, head clearance, bearing beside the hole, the
-    counterbore-floor ledge and every web to a neighbour (the wall target)."""
-    xxx = printed_band_mm(3, unit=spec.UNIT)
+    """At the wizard counterbore's .XX grade (rule 3: its three-place Ø and
+    depth are clearance sizes at +/-.01) and the drilled oversize: head
+    recess under the slide face, head clearance, bearing beside the hole,
+    the counterbore-floor ledge and every web to a neighbour (the wall
+    target).  Owner ruling 2026-11-25: "C: counterbore Ø.210, web .080, no
+    shortfall (recommended)"."""
+    xx = printed_band_mm(2, unit=spec.UNIT)
+    assert spec.HOLDDOWN_CBORE_BAND_MM == xx
+    assert spec.HOLDDOWN_CBORE_DIA == pytest.approx(0.210 * 25.4)
+    assert spec.HOLDDOWN_CBORE_DEPTH == pytest.approx(0.138 * 25.4)
     head_d, head_h = 0.183 * 25.4, 0.112 * 25.4
-    assert spec.HOLDDOWN_CBORE_DEPTH - xxx - head_h >= 0.1
-    assert spec.HOLDDOWN_CBORE_DIA - xxx - head_d >= 0.25
+    assert spec.HOLDDOWN_SCREW_HEAD_DIA == head_d and spec.HOLDDOWN_SCREW_HEAD_H == head_h
+    assert spec.HOLDDOWN_CBORE_DEPTH - xx - head_h >= 0.1
+    # The Ø.183 head enters the smallest pocket, Ø.200: .0085 a side against
+    # the .0049 (0.25 mm on the diameter) the spec's guard asks.
+    smallest = spec.HOLDDOWN_CBORE_DIA - xx
+    assert smallest == pytest.approx(0.200 * 25.4)
+    assert (smallest - head_d) / 2.0 == pytest.approx(0.0085 * 25.4)
+    assert (smallest - head_d) / 2.0 >= 0.25 / 2.0
+    assert 0.25 / 2.0 / 25.4 == pytest.approx(0.0049, abs=5e-5)
+    assert spec.HOLDDOWN_CBORE_HEAD_CLEARANCE == pytest.approx(smallest - head_d)
     drilled = drilled_oversize_mm(unit=spec.UNIT)
     assert (head_d - (spec.HOLDDOWN_CLEARANCE_DIA + drilled)) / 2.0 >= 0.5
     ledge_min = (
-        spec.PLATE_THICKNESS - spec.PLATE_STOCK_BAND - (spec.HOLDDOWN_CBORE_DEPTH + xxx)
+        spec.PLATE_THICKNESS - spec.PLATE_STOCK_BAND - (spec.HOLDDOWN_CBORE_DEPTH + xx)
     )
     assert spec.HOLDDOWN_LEDGE_RANGE[0] == pytest.approx(ledge_min)
     assert ledge_min >= WALL_TARGET_MM
     assert min(checks.HOLDDOWN_WEBS.values()) >= WALL_TARGET_MM
+    # What the hole locates, MHA-DT-21 on its MHA-DT-VN-60 screw, is the
+    # screw's float in the Ø.120 clearance and the head's bearing on the
+    # floor: neither reads the pocket's Ø, so the Ø.219 to Ø.210 change
+    # moves neither (MHA-DT-21's dowel band covers the same float).
+    wider = _exec_mutated(spec, {"HOLDDOWN_CBORE_DIA = 5.334": "HOLDDOWN_CBORE_DIA = 5.5626"})
+    assert wider.TIP_HOLDDOWN_SCREW_FLOAT_MM == spec.TIP_HOLDDOWN_SCREW_FLOAT_MM
+    assert wider.HOLDDOWN_HEAD_BEARING == spec.HOLDDOWN_HEAD_BEARING
+    assert wider.HOLDDOWN_LEDGE_RANGE == spec.HOLDDOWN_LEDGE_RANGE
+    assert wider.HOLDDOWN_HEAD_RECESS == spec.HOLDDOWN_HEAD_RECESS
 
 
 def _exec_mutated(module, replacements: dict[str, str]):
@@ -1183,7 +1212,7 @@ def _exec_mutated(module, replacements: dict[str, str]):
     ("replacements", "message"),
     [
         ({"HOLDDOWN_CBORE_DEPTH = 3.5052": "HOLDDOWN_CBORE_DEPTH = 3.00"}, "stand proud"),
-        ({"HOLDDOWN_CBORE_DIA = 5.5626": "HOLDDOWN_CBORE_DIA = 4.90"}, "does not clear"),
+        ({"HOLDDOWN_CBORE_DIA = 5.334": "HOLDDOWN_CBORE_DIA = 4.90"}, "does not clear"),
         ({"HOLDDOWN_SCREW_HEAD_DIA = 0.183": "HOLDDOWN_SCREW_HEAD_DIA = 0.160"}, "bears on"),
         ({"HOLDDOWN_CBORE_DEPTH = 3.5052": "HOLDDOWN_CBORE_DEPTH = 4.20"}, "ledge"),
     ],
@@ -1219,32 +1248,33 @@ def test_holddown_web_guard_refuses_a_station_that_crowds_a_neighbour(
 
 # --- the tip-block locating dowel (rule-23 retention, owner ruling 2026-11-07
 # (MHA-DT-00 rubric sample, PR #2248)) ----------------------------------------
-def test_tip_dowel_slip_ream_clears_the_pin_on_the_hold_down_line() -> None:
-    """The slip ream is .0630 REAM_H7, clear of the pin at both extremes and
-    opening the foot's .0620 press ream; it stands on the hold-down line at
-    MHA-DT-21's own centre distance from its foot tap, and its station band
-    plus the screw's float fits MHA-DT-21's print."""
+def test_tip_dowel_slip_hole_clears_the_pin_on_the_hold_down_line() -> None:
+    """The slip hole is drilled #52 (owner ruling 2026-11-24, fit audit
+    question 11), its DRILLED HOLES row clear of the pin at both extremes; it
+    stands on the hold-down line at MHA-DT-21's own centre distance from its
+    foot tap, and its station band plus the screw's float fits MHA-DT-21's
+    print."""
     import dt_vn_locating_pin_spec as pin
-    from _fit_ream_h7 import REAM_H7
 
-    assert spec.TIP_DOWEL_HOLE_DIA == pytest.approx(0.0630 * 25.4)
-    assert spec.TIP_DOWEL_HOLE_BAND == REAM_H7
+    assert spec.TIP_DOWEL_HOLE_DIA == pytest.approx(0.0635 * 25.4)
+    assert spec.TIP_DOWEL_HOLE_DRILL == "#52"
+    assert spec.TIP_DOWEL_HOLE_BAND == pytest.approx((0.004 * 25.4, 0.0))
     hole_min, hole_max = spec.TIP_DOWEL_HOLE_LIMITS
-    assert (hole_min, hole_max) == pytest.approx((0.0630 * 25.4, 0.0635 * 25.4))
+    assert (hole_min, hole_max) == pytest.approx((0.0635 * 25.4, 0.0675 * 25.4))
     pin_min, pin_max = (pin.DIA + band * 25.4 for band in pin.DIA_BAND_IN)
     assert hole_min - pin_max > 0.0
     assert spec.TIP_DOWEL_SLIP_CLEARANCE_MM == pytest.approx(
         (hole_min - pin_max, hole_max - pin_min)
     )
-    assert hole_min > block.DOWEL_HOLE_LIMITS[1]
-    assert block.DOWEL_HOLE_DIA == pin.PRESS_HOLE_DIA
+    assert block.DOWEL_HOLE_DIA == pytest.approx(0.0625 * 25.4)
     assert spec.TIP_DOWEL_FROM_HOLDDOWN == block.DOWEL_FROM_TAP
     assert spec.TIP_DOWEL_LOCAL_X == pytest.approx(spec.HOLDDOWN_LOCAL_X + block.DOWEL_FROM_TAP)
     assert spec.TIP_DOWEL_LOCAL_Z == spec.HOLDDOWN_LOCAL_Z
     # Chained from the hold-down hole on its own +/-.004 band, which the webs
-    # need; the hold-down hole itself takes the shop's +/-.005 drilled row.
+    # need; the hold-down hole itself takes the title block's grades.
     assert spec.TIP_DOWEL_STATION_TOL_MM == pytest.approx(0.004 * 25.4)
     assert spec.TIP_DOWEL_STATION_TOL_MM < spec.HOLDDOWN_STATION_TOL_MM
+    assert spec.TIP_DOWEL_STATION_TOL_MM < spec.HOLDDOWN_LATERAL_TOL_MM
     major = THREAD_MAJOR_MM[block.HOLDDOWN_THREAD]
     drilled = drilled_oversize_mm(unit=spec.UNIT)
     float_mm = (spec.HOLDDOWN_CLEARANCE_DIA + drilled - major) / 2.0
@@ -1258,15 +1288,26 @@ def test_tip_dowel_slip_ream_clears_the_pin_on_the_hold_down_line() -> None:
     assert spec.TIP_DOWEL_END_ABOVE_UNDERSIDE_RANGE_MM[0] >= 0.0
 
 
-def test_tip_dowel_webs_meet_the_wall_target_at_print_worst() -> None:
-    """Recomputed for the tightest web: the counterbore under the plate, at
-    the dowel's station band and both holes' upper limits."""
-    cbore_r = (spec.HOLDDOWN_CBORE_DIA + printed_band_mm(3, unit=spec.UNIT)) / 2.0
-    ream_r = (spec.TIP_DOWEL_HOLE_DIA + max(spec.TIP_DOWEL_HOLE_BAND)) / 2.0
-    web = spec.TIP_DOWEL_FROM_HOLDDOWN - spec.TIP_DOWEL_STATION_TOL_MM - cbore_r - ream_r
+def test_tip_dowel_webs_meet_the_target_at_print_worst() -> None:
+    """Recomputed for the tightest web: the counterbore under the plate at
+    its wizard .XX largest (Ø.220), the dowel's station band and the #52
+    hole's upper limit.  Owner ruling 2026-11-25: "C: counterbore Ø.210, web
+    .080, no shortfall (recommended)": .0803 meets rule 17's .080 target, so
+    no registry wall exception and no wall print (was .078, RV-04)."""
+    cbore_r = (spec.HOLDDOWN_CBORE_DIA + printed_band_mm(2, unit=spec.UNIT)) / 2.0
+    assert cbore_r * 2.0 == pytest.approx(0.220 * 25.4)
+    hole_r = (spec.TIP_DOWEL_HOLE_DIA + max(spec.TIP_DOWEL_HOLE_BAND)) / 2.0
+    web = spec.TIP_DOWEL_FROM_HOLDDOWN - spec.TIP_DOWEL_STATION_TOL_MM - cbore_r - hole_r
     assert checks.TIP_DOWEL_WEBS["hold-down counterbore (underside)"] == pytest.approx(web)
     assert web >= WALL_TARGET_MM
-    assert min(checks.TIP_DOWEL_WEBS.values()) >= WALL_TARGET_MM
+    assert web / 25.4 == pytest.approx(0.0803, abs=6e-5)
+    assert min(checks.TIP_DOWEL_WEBS.values()) == pytest.approx(web)
+    assert not hasattr(checks, "TIP_DOWEL_WALL_TEXT")
+    assert not hasattr(checks, "TIP_DOWEL_WEB_PRINTED_IN")
+    from machinist_exceptions import load_exceptions
+
+    declared = load_exceptions(_config.CONFIG_DIR, "dt_cone_swing_platform", "part")
+    assert not any("WALL" in entry.where for entry in declared)
 
 
 def test_tip_dowel_web_guard_refuses_a_dowel_that_crowds_the_counterbore(
@@ -1274,24 +1315,23 @@ def test_tip_dowel_web_guard_refuses_a_dowel_that_crowds_the_counterbore(
 ) -> None:
     _exec_mutated(checks, {})  # positive control: the shipped station passes
     mutated = _exec_mutated(spec, {})
-    mutated.TIP_DOWEL_FROM_HOLDDOWN = 5.0  # 0.79 mm toward the hold-down hole
+    mutated.TIP_DOWEL_FROM_HOLDDOWN = 4.7  # 1.09 mm toward the hold-down hole
     monkeypatch.setitem(sys.modules, spec.__name__, mutated)
     with pytest.raises(AssertionError, match="tip-block locating dowel leaves a web"):
         _exec_mutated(checks, {})
 
 
-def test_tip_dowel_ream_callout_flags_its_fit_note() -> None:
-    """Machinist review of round 6, #7: the slip ream states its fit and the
-    part it takes, by drawing number, and when it is match-reamed.  Under the
-    banded size the callout keeps two rows, the process and the flag to
-    note 3; the note carries the fit, MHA-DT-VN-69, and the match-ream at
-    the assembly step after MHA-DT-21's ream (the step's own "PER THEIR
-    CALLOUTS" points here)."""
+def test_tip_dowel_hole_callout_flags_its_fit_note() -> None:
+    """Machinist review of round 6, #7: the slip hole states its fit and the
+    part it takes, by drawing number, and when it is drilled.  Under the
+    untoleranced size the callout gives the drill and the flag to note 3 (no
+    wall row since the Ø.210 counterbore, owner ruling 2026-11-25); the note
+    carries the fit, MHA-DT-VN-69, and the drilling at the assembly step."""
     import dt_drive_train_steps
 
     callout = drawing.TIP_DOWEL_CALLOUT
     assert callout.split("\n") == [
-        "MATCH-REAM THRU",
+        "#52 DRILL THRU",
         f"SEE NOTE {drawing.TIP_DOWEL_NOTE_NUMBER}",
     ]
     note = drawing.TIP_DOWEL_NOTE
@@ -1301,10 +1341,10 @@ def test_tip_dowel_ream_callout_flags_its_fit_note() -> None:
     assert rows[1].startswith("   ")
     assert max(map(len, rows)) <= drawing.TIP_DOWEL_NOTE_WIDTH
     flat = " ".join(row.strip() for row in rows)
-    step = dt_drive_train_steps.step_ref("post-and-tip-block")
+    step = dt_drive_train_steps.step_ref("end-play-set")
     for phrase in (
         "SLIDING FIT ON MHA-DT-VN-69",
-        f"MATCH-REAM THRU AT {step}.",
+        f"DRILLED THRU INTO MHA-DT-21 AT THIS STATION, {step}.",
     ):
         assert phrase in flat, phrase
     assert drawing_spec.DRAWING_DIMENSIONS["TipDowelProfile"] == {
@@ -1325,9 +1365,9 @@ def test_tip_dowel_ream_callout_flags_its_fit_note() -> None:
     assert "_add_sized_note(\n        adapter,\n        TIP_DOWEL_NOTE," in source
     # Each row fits the block the layout reserves, at the r6 render's
     # measured callout text (2.87 mm a glyph; 5.45 mm a row, the size row
-    # with its stacked band 8.4 mm, the underline 1.7 mm under the last row).
+    # one row with no band, the underline 1.7 mm under the last row).
     assert max(map(len, callout.split("\n"))) * 0.00287 <= drawing.TIP_DOWEL_CALLOUT_SIZE[0]
-    rows_height = 0.0017 + 0.0084 + (len(callout.split("\n")) - 1) * 0.00545 + 0.0036
+    rows_height = 0.0017 + 0.00545 + (len(callout.split("\n")) - 1) * 0.00545 + 0.0036
     assert rows_height <= drawing.TIP_DOWEL_CALLOUT_SIZE[1] + 1e-9
 
 
@@ -1373,10 +1413,10 @@ def test_tip_dowel_note_stands_in_the_band_over_the_title_block() -> None:
     assert drawing.TIP_DOWEL_NOTE_CHAR_HEIGHT == 0.0025
 
 
-def test_build_cuts_the_tip_dowel_ream_on_a_named_axis() -> None:
+def test_build_cuts_the_tip_dowel_hole_on_a_named_axis() -> None:
     banded = model_toleranced_dimensions(part)
     assert banded[("TipDowelProfile", "TipDowelX")] == "TIP_DOWEL_STATION_TOL_MM"
-    assert banded[("TipDowelProfile", "TipDowelDia")] == "*deviations(TIP_DOWEL_HOLE_BAND)"
+    assert ("TipDowelProfile", "TipDowelDia") not in banded
     # Round 6, #6: the pivot-axis station is a reference, no band.
     assert ("TipDowelProfile", "TipDowelPivotX") not in banded
     # The equations put the REF station where the spec does.
@@ -1392,22 +1432,26 @@ def test_tip_dowel_stays_chained_for_the_stack() -> None:
     face web both fall under the wall target; the chained station holds
     both, so it controls and the pivot-axis station is a reference.  One
     locating scheme per hole (rule 10; integration proof 20261109T105251629Z
-    read a controlling .188 beside it as a second one).  The spacing matches
-    MHA-DT-21's tap-to-dowel spacing, which note 3 names (rule 4); the .228
-    itself carries only its value and band (rule 7)."""
+    read a controlling .188 beside it as a second one).  Both parts are
+    drilled at this station at MHA-DT-00 step 3, which note 3 says, naming
+    MHA-DT-21 (rule 4; run 8 review, RV-05); the .228 itself carries only
+    its value and band (rule 7)."""
     assert spec.TIP_DOWEL_FROM_HOLDDOWN == block.DOWEL_FROM_TAP
     flat = " ".join(row.strip() for row in drawing.TIP_DOWEL_NOTE.split("\n"))
-    assert f"SPACED TO MATCH {drawing.TIP_BLOCK_NUMBER}." in flat
+    assert f"DRILLED THRU INTO {drawing.TIP_BLOCK_NUMBER} AT THIS STATION" in flat
+    assert "SPACED TO MATCH" not in flat
     assert drawing.TIP_BLOCK_NUMBER == "MHA-DT-21"
     web = checks.TIP_DOWEL_WEBS["hold-down counterbore (underside)"]
     assert web >= WALL_TARGET_MM
-    assert web - spec.HOLDDOWN_STATION_TOL_MM < WALL_TARGET_MM
     from_pivot_band = (
-        spec.TIP_DOWEL_STATION_TOL_MM + spec.HOLDDOWN_STATION_TOL_MM + spec.TIP_HOLDDOWN_SCREW_FLOAT_MM
+        spec.TIP_DOWEL_STATION_TOL_MM + spec.HOLDDOWN_LATERAL_TOL_MM + spec.TIP_HOLDDOWN_SCREW_FLOAT_MM
     )
     plus_x = block.WORST_DOWEL_WEBS_MM["+X face"]
-    assert plus_x >= WALL_TARGET_MM - 1e-6
-    assert plus_x - (from_pivot_band - block.DOWEL_X_TOL_MM) < WALL_TARGET_MM
+    assert plus_x >= WALL_FLOOR_MM
+    # From the pivot the plate's web falls under the .080 target and
+    # MHA-DT-21's under the .078 the owner accepted (fit audit question 11).
+    assert web - spec.HOLDDOWN_LATERAL_TOL_MM < WALL_TARGET_MM
+    assert plus_x - (from_pivot_band - block.DOWEL_X_TOL_MM) < block.DOWEL_WEB_PRINTED_IN * 25.4
 
 
 def _tip_dowel_pivot_x_text_box() -> tuple[float, float, float, float]:
@@ -1603,7 +1647,7 @@ def test_holddown_callout_drills_in_its_thru_row_and_names_face_and_mate() -> No
         {5: "<MOD-DIAM><hw-diam> THRU ALL", 6: "", 7: "", 8: ""}
     )
     assert pivot[5] == "<MOD-DIAM><hw-diam> REAM THRU ALL"
-    assert pivot[8] == "RUNNING FIT ON MHA-DT-VN-52 SHOULDER"
+    assert pivot[8] == "MHA-DT-VN-52 SHOULDER ENTERS, SWINGS FREE"
     # Round 1 seat: the Hole Wizard writes the depth as its <hw-thru> token.
     native = drawing.pivot_callout_definitions(
         {5: "<MOD-DIAM> <hw-diam> <hw-thru>", 6: "", 7: "", 8: ""}
@@ -1694,9 +1738,11 @@ def test_post_mount_tap_drill_prints_three_inch_places() -> None:
 
 
 def test_tight_bands_name_their_mates_on_their_callouts() -> None:
-    """Rule 4: the reamed bore and both +-0.1 hole groups name the part that
-    makes the tolerance necessary, each at its own callout (r1 blocker)."""
-    assert drawing.PIVOT_BORE_CALLOUT_BELOW == ("RUNNING FIT ON MHA-DT-VN-52 SHOULDER",)
+    """Rule 4: the reamed bore names its gauge (the bought shoulder) and its
+    acceptance; both +-0.1 hole groups name their mates at their callouts."""
+    assert drawing.PIVOT_BORE_CALLOUT_BELOW == (
+        "MHA-DT-VN-52 SHOULDER ENTERS, SWINGS FREE",
+    )
     assert "MHA-DT-05" in drawing.POST_MOUNT_CALLOUT_BELOW[0]
     assert "MHA-DT-21" in drawing.HOLDDOWN_CALLOUT_BELOW[1]
     pivot = drawing.callout_below_definitions(
@@ -1707,7 +1753,7 @@ def test_tight_bands_name_their_mates_on_their_callouts() -> None:
         5: "REAM <MOD-DIAM><hw-diam>",
         6: "",
         7: "",
-        8: "RUNNING FIT ON MHA-DT-VN-52 SHOULDER",
+        8: "MHA-DT-VN-52 SHOULDER ENTERS, SWINGS FREE",
     }
     # SolidWorks drops multi-line text above a dimension; every added row is
     # below, and the tallest callout's rows stay in their free fields.
@@ -1982,7 +2028,6 @@ def test_profile_radius_saved_envelopes_clear_a_a_and_c_c():
 
 def test_pivot_callout_precision_write_is_the_declared_exception():
     from _paths import CAD_ROOT
-    from _drawing_tolerances import _tolerance_places
     from machinist_exceptions import load_exceptions
 
     declared = {
@@ -1997,12 +2042,14 @@ def test_pivot_callout_precision_write_is_the_declared_exception():
         "Owner ruling 2026-11-08 (Pedro), #2144 item 1.2"
     )
     assert "#2144" in entry.reason
-    places = _tolerance_places(*part.PIVOT_HOLE_BAND, display_unit=drawing.UNIT)
+    # The reamer's size prints at three places (.251) and no band.
+    assert drawing.PIVOT_CALLOUT_PLACES == 3
+    assert f"{part.PIVOT_HOLE_DIA / 25.4:.3f}" == "0.251"
     assert (
-        f"hw-diam callout variable's tolerance places, written as {places} "
-        in entry.where
+        "hw-diam callout variable's places, written as "
+        f"{drawing.PIVOT_CALLOUT_PLACES} " in entry.where
     )
-    emitter = drawing._print_pivot_band_exactly
+    emitter = drawing._print_pivot_reamer_size
     assert emitter.__name__ in entry.where
     assert (
         "RV-01" in emitter.__doc__ and "dt-cone-swing-platform.yaml" in emitter.__doc__
@@ -2161,9 +2208,11 @@ def test_platform_feature_bands_are_the_printed_ones() -> None:
     assert top["thickness_as_supplied"] == pytest.approx(_in(0.25))
     assert top["callout"] == "1/4 PLATE AS SUPPLIED"
     bore = features["pivot_bore"]
-    assert bore["dia"] == pytest.approx([_in(0.2500), _in(0.2505)])
+    # The .2510 reamer's ANALYSIS band; the bore prints no band.
+    assert bore["dia"] == pytest.approx([_in(0.2510), _in(0.2515)])
     assert bore["process"] == "ream"
-    assert bore["fit"] == "RUNNING FIT ON MHA-DT-VN-52 SHOULDER"
+    assert bore["mate"] == "MHA-DT-VN-52"
+    assert bore["acceptance"] == "MHA-DT-VN-52 SHOULDER ENTERS, SWINGS FREE"
     assert features["north_edge"]["station"] == pytest.approx([_in(0.27), _in(0.29)])
     assert features["north_edge"]["station_from"] == "pivot_bore"
     assert features["south_edge"]["length"] == pytest.approx([_in(9.53), _in(9.55)])
@@ -2203,17 +2252,21 @@ def test_platform_feature_bands_are_the_printed_ones() -> None:
     hold = features["holddown"]
     assert hold["dia"] == pytest.approx([_in(0.120), _in(0.124)], abs=1e-3)
     assert hold["process"] == "drill"
-    assert hold["cbore_dia"] == pytest.approx([_in(0.214), _in(0.224)], abs=1e-3)
-    assert hold["cbore_depth"] == pytest.approx([_in(0.133), _in(0.143)], abs=1e-3)
+    # The wizard pocket at the .XX grade (rule 3; owner ruling 2026-11-25,
+    # Ø.210).
+    assert hold["cbore_dia"] == pytest.approx([_in(0.200), _in(0.220)], abs=1e-3)
+    assert hold["cbore_depth"] == pytest.approx([_in(0.128), _in(0.148)], abs=1e-3)
     assert hold["cbore_depth_from"] == "underside"
-    assert hold["x_from_pivot"] == pytest.approx([_in(0.035), _in(0.045)], abs=1e-3)
+    # .04 at the title block's .XX (machinist review r1, 20261124T125542720Z).
+    assert hold["x_from_pivot"] == pytest.approx([_in(0.03), _in(0.05)], abs=1e-3)
     station = -spec.HOLDDOWN_LOCAL_Z
     assert hold["z_from_pivot"] == pytest.approx([station - _in(0.005), station + _in(0.005)])
     dowel = features["tip_dowel"]
-    assert dowel["dia"] == pytest.approx([_in(0.0630), _in(0.0635)])
+    assert dowel["dia"] == pytest.approx([_in(0.0635), _in(0.0675)])
+    assert dowel["drill"] == "#52" and dowel["mate"] == "MHA-DT-VN-69"
     assert dowel["x_from_holddown"] == pytest.approx([_in(0.224), _in(0.232)], abs=1e-3)
     assert dowel["x_from_holddown_from"] == "holddown"
-    assert dowel["made_at"] == "assembly" and dowel["process"] == "ream"
+    assert dowel["made_at"] == "assembly" and dowel["process"] == "drill"
     notch = features["lock_notch"]
     assert notch["width"] == pytest.approx([_in(0.30), _in(0.32)])
     assert notch["seat_x"] == pytest.approx([_in(1.29), _in(1.31)])

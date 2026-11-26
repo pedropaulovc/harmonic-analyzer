@@ -1,0 +1,7 @@
+checks:
+  - id: C-01
+    check: "DRUM_FRONT_END_ON_JOURNAL_MIN"
+    kind: gap
+    reason: "the drum's front end leaves the front journal"
+    source: "owner ruling 2026-11-25 (pinion arbor): 'A: drum slides over both journals; if no journal size fits both bores, open the drum's front end to the journal +.001'; the seat from the printed .XX stations, front journal 1.82-2.61 and MHA-DT-01 drum 2.40-8.46 from the head rear face: (2.61 - .01) - (2.40 + .01) = .19 minimum (DRUM_FRONT_SEAT_FLOOR)"
+    basis: worst_case

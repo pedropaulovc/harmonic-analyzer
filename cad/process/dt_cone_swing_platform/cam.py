@@ -1365,7 +1365,7 @@ def context(
             "drill",
             "part",
             "pivot_ream",
-            "ream .2500 through",
+            "ream .2510 through",
             _reamed(pivot4, ream_tip, clear4, r_plane4),
         ),
         section(

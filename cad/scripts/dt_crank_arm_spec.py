@@ -25,6 +25,8 @@ without SolidWorks in ~1 s.
 
 from __future__ import annotations
 
+import math
+
 import _config
 import _mcmaster_3603t354 as jack_chain
 import dt_crank_hub_geometry
@@ -275,27 +277,63 @@ DRAWING_REFERENCE_PRECISION: dict[str, int] = {
 # tolerance.  The fiducial and the pivot tap's mouth limit are flagged at
 # their features (dt_crank_arm_notes).
 STOCK_NOTE = "1. WIDTH AND THICKNESS: CF FLAT BAR AS SUPPLIED."
-# The hub-seat press fit's acceptance, flagged from the seat callout (SEE NOTE
-# 2): the callout's two word rows name the fit and its mate, and its width is
-# bounded by the border and the seam leader.
-_PRESS_LOW_IN, _PRESS_HIGH_IN = (
-    f"{value / 25.4:.4f}".lstrip("0")
-    for value in dt_crank_hub_geometry.SEAT_PRESS_INTERFERENCE
-)
+# The hub seat's bonded slip fit, flagged from the seat callout (SEE NOTE 2):
+# the callout's two word rows name the fit and its mate, and its width is
+# bounded by the border and the seam leader.  Owner ruling 2026-11-24, fit
+# audit question 21: the bore is made first and MHA-DT-31's seat is turned
+# to it, the joint bonded with LOCTITE 638 (no press); the acceptance (the
+# arm slides on by hand) prints once, on the hub, the member made last.
 SEAT_PRESS_NOTE = (
-    f"2. HUB SEAT: {_PRESS_LOW_IN}-{_PRESS_HIGH_IN} DIAMETRAL INTERFERENCE"
-    " ON MHA-DT-31."
+    "2. HUB SEAT: MHA-DT-31 IS TURNED TO THIS BORE;"
+    " BONDED WITH LOCTITE 638."
 )
-# The MHA-DT-VN-59 pin hole across the bore/hub joint, flagged from its ream
+# The MHA-DT-VN-59 pin hole across the bore/hub joint, flagged from its drill
 # callout (SEE NOTE 3): the callout keeps size, process and depth; the
-# assembly-made ream, its pin and fit, and the owner's permanent pair
-# (rulings 2026-11-01, as the hub's sheet prints it) are two rows too many
-# for the callout (rule 7).  Plain words, not the private "seam" (rule 26,
-# fan-out round 3).  The rows stay short of the title block (x 0.216 at the
-# render's 2.67 mm per character).
+# assembly-made hole, its pin, bond and clearance, and the owner's permanent
+# pair (rulings 2026-11-01, as the hub's sheet prints it) are too many rows
+# for the callout (rule 7).  Drilled 5/32 and the pin bonded (fit audit
+# 2026-11-23, MHA-DT-06_DT-31.seam_pin; the .1562 reamer is retired).  Plain
+# words, not the private "seam" (rule 26, fan-out round 3).  The rows stay
+# short of the title block (x 0.216 at the render's 2.67 mm per character).
+#
+# The bond's diametral clearance prints in the note (machinist review r1,
+# farm run 20261124T110807008Z: rule 23, a bonded seat prints its clearance
+# on the part sheet).  The 98381A487 pin is 5/32 +.0001/+.0003 as supplied;
+# the hole is the 5/32 drill at DRILLED HOLES +.004/0.  The range runs from
+# the largest pin in a hole on its drill's size (.0003 tight: a light tap
+# home, the compound still wetting the pin, as MHA-DT-VN-69's drilled bond
+# takes it) to the smallest pin in the largest hole, which stays inside
+# LOCTITE 638's largest gap.
+_SEAM_PIN_DIA_BAND_IN = (0.0001, 0.0003)  # 98381A487 catalogue
+_seam_pin_limits = tuple(AXIAL_PIN_DIA + band * 25.4 for band in _SEAM_PIN_DIA_BAND_IN)
+SEAM_BOND_CLEARANCE_MM = (
+    AXIAL_PIN_DIA - max(_seam_pin_limits),
+    dt_crank_hub_geometry.SEAM_HOLE_DIA_MAX - min(_seam_pin_limits),
+)  # (-.0003, .0039) in
+# LOCTITE 638's largest gap, as dt_crank_hub_geometry restates it (already in
+# this module's closure; cone_tip_cluster would widen the crank's recipes).
+if SEAM_BOND_CLEARANCE_MM[1] > dt_crank_hub_geometry._LOCTITE_638_MAX_GAP_MM:
+    raise AssertionError("MHA-DT-VN-59's bond gap passes LOCTITE 638's largest")
+if SEAM_BOND_CLEARANCE_MM[1] - SEAM_BOND_CLEARANCE_MM[0] < 0.0254 - 1e-9:
+    raise AssertionError("MHA-DT-VN-59's bond range is under .001 wide (rule 4)")
+# Printed outward: the tight end floored to .0001, the loose end ceiled to
+# .001.  The tight end is a real interference (the largest pin, .15655, in a
+# hole on the drill's .15625), so the fit prints as interference to
+# clearance, never a negative clearance (drawing-guidelines rule 4, form 1
+# and rule 23; pin 98381A487 in the 5/32 drill +.004/0).  The arm's note 3
+# and the hub's seam callout print this one text.
+_SEAM_BOND_MIN_IN = math.floor(round(SEAM_BOND_CLEARANCE_MM[0] / 25.4 * 1e4, 6)) / 1e4
+_SEAM_BOND_MAX_IN = math.ceil(round(SEAM_BOND_CLEARANCE_MM[1] / 25.4 * 1e3, 6)) / 1e3
+if not _SEAM_BOND_MIN_IN < 0.0 < _SEAM_BOND_MAX_IN:
+    raise AssertionError("MHA-DT-VN-59's fit no longer runs interference to clearance")
+_SEAM_BOND_LOW_TEXT = f"{-_SEAM_BOND_MIN_IN:.4f}".removeprefix("0")
+_SEAM_BOND_HIGH_TEXT = f"{_SEAM_BOND_MAX_IN:.3f}".removeprefix("0")
+SEAM_BOND_CLEARANCE_TEXT = (
+    f"{_SEAM_BOND_LOW_TEXT} INTERFERENCE TO {_SEAM_BOND_HIGH_TEXT} CLEARANCE"
+)
 SEAM_NOTE = (
-    "3. REAM ACROSS THE BORE/HUB JOINT WITH CRANK HUB MHA-DT-31 AT ASSEMBLY;\n"
-    "   PIN MHA-DT-VN-59, LIGHT DRIVE FIT; PERMANENT PAIR."
+    "3. DRILL ACROSS BORE/HUB JOINT WITH MHA-DT-31 AT ASSEMBLY; PERMANENT PAIR.\n"
+    f"   PIN MHA-DT-VN-59, LOCTITE 638 BOND: {SEAM_BOND_CLEARANCE_TEXT}."
 )
 DRAWING_NOTES = "\n".join((STOCK_NOTE, SEAT_PRESS_NOTE, SEAM_NOTE))
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:1"
