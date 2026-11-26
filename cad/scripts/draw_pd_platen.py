@@ -26,7 +26,6 @@ from __future__ import annotations
 
 import argparse
 import math
-import re
 import sys
 from typing import Any
 
@@ -695,20 +694,28 @@ def _name_counterbore_side(display: Any) -> None:
         raise RuntimeError(f"guide counterbore side did not persist: {applied!r}")
 
 
-_TOL_BILATERAL = 2  # swTolType_e.swTolBILAT
+# swTolType_e.swTolSYMMETRIC: the mirrored band prints .115 ±.005, as the
+# owner's ruling reads it (draw_sm_knife_mount.tap_callout_tolerance).
+_TOL_SYMMETRIC = 4
 
 
 @_telemetry.traced("drawing.platen.counterbore_depth_band")
 def _print_counterbore_depth_band(display: Any) -> None:
     """Print the counterbore depth's own band (owner ruling 2026-11-25,
-    #3619: .115 ±.005) on the native guide callout. The band lives on the
-    part's GuideHoles Hole Wizard feature
-    (build_pd_platen._band_counterbore_depth) and ``<hw-cbdepth>`` displays
-    it; this sets only its tolerance places, the nominal's
-    (GUIDE_CALLOUT_PRECISION), as draw_ch_fulcrum_keeper._print_counterbore_band
-    does, and reads the displayed band back so a band that did not reach the
-    callout fails here. The Ø (``<hw-cbdia>``) keeps no band: a wizard pocket
-    at .XX."""
+    #3619: .115 ±.005) on the native guide callout, and read it back.
+
+    A hole callout variable carries its OWN tolerance (SW 2016+:
+    ``ICalloutVariable.ToleranceType``, ``ToleranceMin``/``ToleranceMax``),
+    so the band is set on the callout, as draw_sm_knife_mount._band_tap_callout
+    does. It is not put on the part's GuideHoles feature: the platen's hole
+    table reads that feature, and its hidden SIZE cells then carried the
+    band's stacked tolerance (farm runs 20261126T030547930Z and
+    20261126T043433679Z, drawing:pd_platen: generated `.12 <STACK divider=DIM
+    ...>` and, after the rebuild, `.12<STACK divider=no>+ .01<OVER>- .01
+    </STACK>`). Those cells set the rows' height (a row prints no shorter than
+    its text, _name_hole_table_mates), so a stack there moves the table's
+    foot toward the title block. The Ø (``<hw-cbdia>``) keeps no band: a
+    wizard pocket at .XX."""
     from win32com.client.dynamic import Dispatch as dynamic_dispatch  # noqa: PLC0415
 
     name = "hw-cbdepth"
@@ -725,21 +732,29 @@ def _print_counterbore_depth_band(display: Any) -> None:
     if abs(actual - CBORE_DEPTH) > 1e-5:
         raise RuntimeError(f"guide callout {name} reads {actual:g}, expected {CBORE_DEPTH:g} mm")
     places = GUIDE_CALLOUT_PRECISION[name]
-    length.TolerancePrecision = places
     upper, lower = CBORE_DEPTH_BAND
+    variable.ToleranceType = _TOL_SYMMETRIC
+    variable.ToleranceMin = lower / 1000.0
+    variable.ToleranceMax = upper / 1000.0
+    length.TolerancePrecision = places
     if (
-        int(variable.ToleranceType) != _TOL_BILATERAL
+        int(variable.ToleranceType) != _TOL_SYMMETRIC
         or abs(float(variable.ToleranceMin) * 1000.0 - lower) > 1e-5
         or abs(float(variable.ToleranceMax) * 1000.0 - upper) > 1e-5
         or int(length.TolerancePrecision) != places
+        or int(length.Precision) != places
     ):
         raise RuntimeError(
-            f"guide callout {name} does not display the part's band: wanted "
-            f"swTolBILAT, deviations {(lower, upper)} mm at {places} places; read "
+            f"guide callout {name} band did not persist: wanted swTolSYMMETRIC, "
+            f"deviations {(lower, upper)} mm, {places} places; read "
             f"{int(variable.ToleranceType)}, {float(variable.ToleranceMin)!r}, "
-            f"{float(variable.ToleranceMax)!r}, {int(length.TolerancePrecision)}"
+            f"{float(variable.ToleranceMax)!r}, {int(length.TolerancePrecision)}, "
+            f"{int(length.Precision)}"
         )
-    _telemetry.info(f"guide callout {name} {CBORE_DEPTH:g} mm, band {CBORE_DEPTH_BAND} mm")
+    _telemetry.info(
+        f"guide callout {name} {CBORE_DEPTH:g} mm at {int(length.Precision)} places, "
+        f"band {CBORE_DEPTH_BAND} mm at {int(length.TolerancePrecision)} places"
+    )
 
 
 # VIEW B (rules 9, 26): the 1:1 right side is not projected at the sheet's
@@ -905,35 +920,6 @@ def _table_cells(table: Any, columns: int) -> tuple[tuple[str, ...], ...]:
     )
 
 
-# The SIZE column is the guide holes' Hole Wizard text. Once the part banded
-# the counterbore depth (.115 ±.005, owner ruling 2026-11-25, #3619), the
-# cells read after the MATE column's rebuild carried the depth's tolerance
-# stack, `<HOLE-DEPTH> .12<STACK divider=no>+ .01<OVER>- .01</STACK>`, and the
-# whole-cell compare refused the sheet (farm run 20261126T030547930Z, leaf
-# drawing:pd_platen at 627833b504). SIZE is hidden, so that stack never
-# prints; it is compared without it, and _check_hole_table logs both readings.
-_SIZE_TOLERANCE_STACK = re.compile(r"<STACK\b[^>]*>.*?</STACK>", re.DOTALL)
-
-
-def _changed_generated_cells(
-    generated: tuple[tuple[str, ...], ...], cells: tuple[tuple[str, ...], ...]
-) -> tuple[tuple[int, tuple[str, ...], tuple[str, ...]], ...]:
-    """Rows whose generated TAG, X LOC, Y LOC or SIZE cells changed: (row,
-    generated, now). The hidden SIZE cell is compared without its tolerance
-    stack (_SIZE_TOLERANCE_STACK); every other character counts."""
-
-    def kept(row: tuple[str, ...]) -> tuple[str, ...]:
-        return (*row[:3], *(_SIZE_TOLERANCE_STACK.sub("", cell) for cell in row[3:4]))
-
-    if len(cells) != len(generated):
-        return ((len(cells), (), ()),)
-    return tuple(
-        (index, before, now[:4])
-        for index, (before, now) in enumerate(zip(generated, cells, strict=True))
-        if kept(before) != kept(now[:4])
-    )
-
-
 def _hole_table_rows(table: Any) -> dict[str, tuple[int, tuple[float, float]]]:
     """Bind every generated row to its one model station by its own LOC cells.
 
@@ -1055,15 +1041,8 @@ def _check_hole_table(
     if columns != _HOLE_TABLE_MATE_INDEX + 1:
         raise RuntimeError(f"platen hole table has {columns} columns, expected 5")
     cells = _table_cells(table, columns)
-    changed = _changed_generated_cells(generated, cells)
-    if changed:
-        raise RuntimeError(f"MATE column changed generated hole-table cells: {changed!r}")
-    sizes = {
-        index: (before[3], now[3])
-        for index, (before, now) in enumerate(zip(generated, cells, strict=True))
-        if before[3] != now[3]
-    }
-    _telemetry.info(f"platen hole-table hidden SIZE cells, generated -> now: {sizes!r}")
+    if tuple(row[:4] for row in cells) != generated:
+        raise RuntimeError(f"MATE column changed generated hole-table cells: {cells!r}")
     mates = {row: HOLE_TABLE_MATES[station] for row, station in rows.values()}
     actual = tuple(row[_HOLE_TABLE_MATE_INDEX] for row in cells)
     if actual[0].upper() != HOLE_TABLE_MATE_COLUMN or any(

@@ -9,8 +9,9 @@ places as ``.XXX`` (±.005) while their sheets allowed ±.01 (#3619, #3620; the
 index plate's #3497 first).
 
 For each pocket dimension the printed band is its own band when the part puts
-one on the Hole Wizard feature (owner rulings 2026-11-25), else the wizard's
-``.XX`` (``_wizard_pocket_band``). The feature export (what the sheet's callout
+one on the Hole Wizard feature, or the drawing on the callout's own variable
+(owner rulings 2026-11-25), else the wizard's ``.XX`` (``_wizard_pocket_band``).
+The feature export (what the sheet's callout
 declares, and what the traveler inspects against) must carry exactly that band.
 Each guard's worst case is then recomputed here from the exported limits, and
 the test fails when a spec's value is more favourable than the printed band
@@ -26,6 +27,7 @@ import pytest
 
 import build_pd_platen
 import build_pd_platen_bottom_guide
+import draw_pd_platen
 import export_features
 import pd_feed_rack_spec as rack
 import pd_platen_bottom_guide_spec as guide
@@ -51,16 +53,19 @@ def _names_in(module) -> set[str]:
 
 
 # Per spec, each wizard pocket dimension's band constant, the feature-export
-# field the sheet declares for it, and whether the part puts that band on its
-# Hole Wizard feature (own band) or leaves it to the wizard's .XX.
+# field the sheet declares for it, and the module that writes that band (the
+# builder on the Hole Wizard feature, or the draw script on the callout's own
+# variable), or None when it is left to the wizard's .XX. The platen's depth
+# is banded on the callout: its hole table reads the feature
+# (draw_pd_platen._print_counterbore_depth_band).
 POCKETS = {
     "pd_platen": (
         platen,
         build_pd_platen,
         "guide_b1",
         {
-            "cbore_dia": ("CBORE_DIA", "CBORE_DIA_BAND", False),
-            "cbore_depth": ("CBORE_DEPTH", "CBORE_DEPTH_BAND", True),
+            "cbore_dia": ("CBORE_DIA", "CBORE_DIA_BAND", None),
+            "cbore_depth": ("CBORE_DEPTH", "CBORE_DEPTH_BAND", draw_pd_platen),
         },
     ),
     "pd_platen_bottom_guide": (
@@ -68,8 +73,12 @@ POCKETS = {
         build_pd_platen_bottom_guide,
         "rack_screw_hole_1",
         {
-            "cbore_dia": ("SCREW_CBORE_DIA", "SCREW_CBORE_DIA_BAND", True),
-            "cbore_depth": ("SCREW_CBORE_DEPTH", "SCREW_CBORE_DEPTH_BAND", True),
+            "cbore_dia": (
+                "SCREW_CBORE_DIA", "SCREW_CBORE_DIA_BAND", build_pd_platen_bottom_guide
+            ),
+            "cbore_depth": (
+                "SCREW_CBORE_DEPTH", "SCREW_CBORE_DEPTH_BAND", build_pd_platen_bottom_guide
+            ),
         },
     ),
 }
@@ -84,19 +93,20 @@ def test_each_pocket_band_is_the_one_its_callout_prints(stem: str) -> None:
     spec, builder, feature, pockets = POCKETS[stem]
     exported = _features(stem)[feature]
     builder_names = _names_in(builder)
-    for field, (nominal_name, band_name, own) in pockets.items():
+    for field, (nominal_name, band_name, writer) in pockets.items():
         nominal = getattr(spec, nominal_name)
         upper, lower = getattr(spec, band_name)
-        if own:
-            # The part puts the band on its Hole Wizard feature, so the native
-            # callout displays it.
-            assert band_name in builder_names, (stem, band_name)
+        if writer is not None:
+            # The band is the part's (Hole Wizard feature) or the callout
+            # variable's own, so the native callout displays it.
+            assert band_name in _names_in(writer), (stem, band_name)
         else:
             # No band of its own: the wizard pocket's .XX, which no builder
             # writes.
             assert (upper, lower) == pytest.approx(
                 (WIZARD_POCKET_BAND_MM, -WIZARD_POCKET_BAND_MM)
             ), (stem, band_name)
+        if writer is not builder:
             assert band_name not in builder_names, (stem, band_name)
         assert exported[field] == pytest.approx(
             [nominal + lower, nominal + upper], abs=1e-6

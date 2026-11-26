@@ -109,9 +109,9 @@ CBORE_DEPTH = FILLISTER_HEAD_H + HEAD_RECESS  # .115
 # pocket (.105) leaves the .107 head .002 proud of the paper face, so the
 # paper does not lie flat, and the deepest (.125) in the thinnest plate leaves
 # a .022 floor, under RV-02's accepted .027 (HEAD_RECESS_MIN, CBORE_FLOOR_MIN
-# below compute both). The part puts this band on the GuideHoles Hole Wizard
-# feature (build_pd_platen._band_counterbore_depth) so the native callout
-# displays it.
+# below compute both). The drawing puts this band on the native callout's own
+# depth variable (draw_pd_platen._print_counterbore_depth_band), not on the
+# part's GuideHoles feature, which the sheet's hole table also reads.
 CBORE_DIA_BAND = (WIZARD_POCKET_BAND_MM, -WIZARD_POCKET_BAND_MM)
 CBORE_DEPTH_BAND = (0.127, -0.127)  # .115 +.005/-.005
 
