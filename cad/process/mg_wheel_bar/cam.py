@@ -969,7 +969,7 @@ def context(
                     "z": _r(end_z),
                     "window": [xs, [beside[0], beside[1]]],
                     "min_length": top_w,
-                    "side": "conventional",
+                    "cut": "conventional",
                 },
             ],
             ["keep_out", {"radius": r, "boxes": keep[frame]}],

@@ -1223,7 +1223,7 @@ def context(
                 "z": _r(ear),
                 "window": [[_r(wall_x), _r(wall_x)], [wall_y[1], wall_y[0]]],
                 "min_length": width,
-                "side": "climb",
+                "cut": "climb",
             },
         ],
     ]

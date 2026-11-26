@@ -471,6 +471,56 @@ def test_outline_passes_hold_their_offset_direction_levels_and_coverage(tmp_path
     assert any("uncut at Z-2.000" in d for d in stray)
 
 
+def test_a_declared_outline_cut_is_judged_from_the_path_and_the_part_side(tmp_path):
+    good = "G0 X5 Y-1 Z5\n" + _loop(-1.0) + _loop(-2.0) + "G0 Z5\n"
+    # Anticlockwise round the part (on the elements' left) under M3: conventional
+    # at every point, the G3 corner arcs included.
+    assert _outline(tmp_path, "M3 S2800\n" + good, cut="conventional", part="left") == []
+    climb = _outline(tmp_path, "M3 S2800\n" + good, cut="climb", part="left")
+    assert len(climb) == 1 and "cutting conventional (the part on the cutter's left under M3), declared climb" in climb[0]
+    # M4 turns the same path into climb.
+    assert _outline(tmp_path, "M4 S2800\n" + good, cut="climb", part="left") == []
+    # The part declared on the side the cutter runs: every centre is in it.
+    inside = _outline(tmp_path, "M3 S2800\n" + good, cut="conventional", part="right")
+    assert any("cutter centres on the part's side (right)" in d for d in inside)
+    stopped = _outline(tmp_path, good, cut="conventional", part="left")
+    assert len(stopped) == 1 and "spindle stopped" in stopped[0]
+    for kwargs in ({"cut": "conventional"}, {"part": "left"}, {"cut": "conventional", "part": "up"}):
+        with pytest.raises(ValueError, match="cut and part go together"):
+            _outline(tmp_path, good, **kwargs)
+
+
+# An L-shaped part, anticlockwise, its inside corner a concave R2 fillet about
+# (6, 6) running clockwise (the path turns right there).
+_L_OUTLINE = [
+    {"name": "bottom", "start": (0.0, 0.0), "end": (10.0, 0.0), "tol": 0.05},
+    {"name": "right", "start": (10.0, 0.0), "end": (10.0, 4.0), "tol": 0.05},
+    {"name": "step", "start": (10.0, 4.0), "end": (6.0, 4.0), "tol": 0.05},
+    {"name": "fillet", "start": (6.0, 4.0), "end": (4.0, 6.0), "centre": (6.0, 6.0), "tol": 0.05},
+    {"name": "riser", "start": (4.0, 6.0), "end": (4.0, 10.0), "tol": 0.05},
+    {"name": "top", "start": (4.0, 10.0), "end": (0.0, 10.0), "tol": 0.05},
+    {"name": "left", "start": (0.0, 10.0), "end": (0.0, 0.0), "tol": 0.05},
+]
+# Offset 1 outside: G3 round the convex corners, G2 round the concave fillet.
+_L_LAP = (
+    "G1 X5 Y-1 Z-1 F100\nG1 X10 Y-1\nG3 X11 Y0 I0 J1\nG1 X11 Y4\nG3 X10 Y5 I-1 J0\n"
+    "G1 X6 Y5\nG2 X5 Y6 I0 J1\nG1 X5 Y10\nG3 X4 Y11 I-1 J0\nG1 X0 Y11\nG3 X-1 Y10 I0 J-1\n"
+    "G1 X-1 Y0\nG3 X0 Y-1 I1 J0\nG1 X5 Y-1\n"
+)
+
+
+def test_a_concave_corner_arc_of_an_anticlockwise_outline_is_still_conventional(tmp_path):
+    # G2 or G3 alone cannot tell climb from conventional: the fillet's G2 keeps
+    # the part on the cutter's left like the G3 corners (#3690, PL08's 20 G2).
+    passes = [{"offset": 1.0, "levels": [-1.0]}]
+    program = _program(tmp_path, "M3 S2800\nG0 X5 Y-1 Z5\n" + _L_LAP + "G0 Z5\n")
+    assert [m.motion for m in program.cutting].count(_gcode.Motion.ARC_CW) == 1
+    found = _gcode.check_outline(program, _L_OUTLINE, passes, 0.0, cut="conventional", part="left")
+    assert found == []
+    found = _gcode.check_outline(program, _L_OUTLINE, passes, 0.0, cut="climb", part="left")
+    assert [f.check for f in found] == ["cut"]
+
+
 def test_outline_passes_run_in_order_after_the_clearing(tmp_path):
     passes = [{"offset": 1.0, "levels": [-1.0]}, {"offset": 1.0, "levels": [-2.0]}]
     # Waste 4 from the bottom edge, cleared +X (the bottom's way) at Z-2.
@@ -969,12 +1019,12 @@ def test_freecad_older_than_1_1_is_refused(tmp_path, monkeypatch):
 def test_engagement_sees_what_a_finish_pass_really_meets(tmp_path):
     stock = ((0.0, 20.0), (0.0, 10.0), (0.0, 5.0))
     # A wall at Y5 (the part beyond it): one rough pass leaves 0.5 on it, the
-    # finish pass along -X has the wall on its right (climb).
-    rough = "G0 X-5 Y1.5 Z5\nG1 Z2 F100\nG1 X25\nG0 Z8\n"
+    # finish pass along -X has the wall on its right (climb under M3).
+    rough = "M3 S2000\nG0 X-5 Y1.5 Z5\nG1 Z2 F100\nG1 X25\nG0 Z8\n"
     finish = "G0 X25 Y2 Z8\nG0 Z5\nG1 Z2 F100\nG1 X-5\nG0 Z8\n"
     kwargs = {
         "stock": stock, "radius": 3.0, "max_radial": 0.5, "z": 2.0,
-        "window": ((-10.0, 30.0), (2.0, 2.0)), "min_length": 25.0, "side": "climb",
+        "window": ((-10.0, 30.0), (2.0, 2.0)), "min_length": 25.0, "cut": "climb",
     }
     good = _program(tmp_path, rough + finish)
     assert _gcode.check_engagement(good, **kwargs) == []
@@ -986,10 +1036,36 @@ def test_engagement_sees_what_a_finish_pass_really_meets(tmp_path):
     # The finish run +X: the wall on its left, conventional.
     backward = _program(tmp_path, rough + finish.replace("X25", "XA").replace("X-5", "X25").replace("XA", "X-5"))
     assert [f.detail for f in _gcode.check_engagement(backward, **kwargs)] == [
-        "X-5.000 Y2.000 -> X25.000 Y2.000 Z2.000 cuts conventional, expected climb"
+        "X-5.000 Y2.000 -> X25.000 Y2.000 Z2.000 cuts conventional under M3, declared climb"
     ]
     # Nothing selected is a finding, not a pass.
     assert _gcode.check_engagement(good, **{**kwargs, "z": 1.0})[0].check == "engagement"
+
+
+def test_a_declared_engagement_cut_reads_the_spindle_and_refuses_slots(tmp_path):
+    stock = ((0.0, 20.0), (0.0, 10.0), (0.0, 5.0))
+    rough = "G0 X-5 Y1.5 Z5\nG1 Z2 F100\nG1 X25\nG0 Z8\n"
+    finish = "G0 X25 Y2 Z8\nG0 Z5\nG1 Z2 F100\nG1 X-5\nG0 Z8\n"
+    kwargs = {"stock": stock, "radius": 3.0, "max_radial": 10.0, "z": 2.0,
+              "window": ((-10.0, 30.0), (2.0, 2.0)), "min_length": 25.0}
+    # The same -X finish under M4: the wall on its right is conventional.
+    reversed_spindle = _program(tmp_path, "M4 S2000\n" + rough + finish)
+    assert _gcode.check_engagement(reversed_spindle, **kwargs, cut="conventional") == []
+    assert [f.detail for f in _gcode.check_engagement(reversed_spindle, **kwargs, cut="climb")] == [
+        "X25.000 Y2.000 -> X-5.000 Y2.000 Z2.000 cuts conventional under M4, declared climb"
+    ]
+    stopped = _program(tmp_path, rough + finish)
+    assert [f.detail for f in _gcode.check_engagement(stopped, **kwargs, cut="climb")] == [
+        "X25.000 Y2.000 -> X-5.000 Y2.000 Z2.000: spindle stopped (no M3/M4 in force), declared climb"
+    ]
+    # A slot through solid stock meets it on both sides: no declared way holds.
+    slot = _program(tmp_path, "M3 S2000\nG0 X-5 Y5 Z5\nG1 Z2 F100\nG1 X25\nG0 Z8\n")
+    slot_kwargs = {**kwargs, "window": ((-10.0, 30.0), (5.0, 5.0))}
+    assert [f.detail for f in _gcode.check_engagement(slot, **slot_kwargs, cut="conventional")] == [
+        "X-5.000 Y5.000 -> X25.000 Y5.000 Z2.000 meets stock on both sides, declared conventional"
+    ]
+    with pytest.raises(ValueError, match="cut 'up'"):
+        _gcode.check_engagement(slot, **slot_kwargs, cut="up")
 
 
 def test_engagement_follows_an_arc_and_a_slot(tmp_path):

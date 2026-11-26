@@ -1219,7 +1219,7 @@ def context(
                     "max_radial": edge_step,
                     "z": _r(edge_z),
                     "min_length": height,
-                    "side": "conventional",
+                    "cut": "conventional",
                     "cell": ENGAGEMENT_CELL_MM,
                 },
             ],

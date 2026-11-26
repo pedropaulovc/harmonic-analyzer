@@ -1008,6 +1008,58 @@ def _where(p: Point) -> str:
     return f"X{p[0]:.3f} Y{p[1]:.3f} Z{p[2]:.3f}"
 
 
+def _element_side(element: dict, p: Point) -> str:
+    """Which side of an outline element's running way (start to end) ``p``
+    lies on, seen from above: ``"left"`` or ``"right"``. On an arc the left
+    of an anticlockwise run is inside its circle."""
+    s, e = element["start"], element["end"]
+    c = element.get("centre")
+    if c is None:
+        return "left" if _cross(s, e, p) > 0 else "right"
+    inside = math.dist(c, p[:2]) < math.dist(c, s)
+    return "left" if inside == (_cross(c, s, e) > 0) else "right"
+
+
+def _judge_cut(
+    point: Point,
+    step: tuple[float, float],
+    tangent: tuple[float, float] | None,
+    element: dict,
+    part: str,
+    cut: str,
+    spindle: int,
+    wrong: dict[str, list[str]],
+) -> None:
+    """One outline pass point against the declared ``cut``, the part lying on
+    ``part`` of its nearest ``element``'s way (:func:`check_outline`); each
+    fault is added to ``wrong`` under its description."""
+    where = _where(point)
+    if spindle == 0:
+        wrong.setdefault(f"pass points with the spindle stopped (no M3/M4 in force), declared {cut}", []).append(where)
+        return
+    if tangent is not None:
+        if _element_side(element, point) == part:
+            wrong.setdefault(f"cutter centres on the part's side ({part}) of their element", []).append(
+                f"{where} ({element['name']})"
+            )
+            return
+        along = step[0] * tangent[0] + step[1] * tangent[1] >= 0
+        part_left = (part == "left") == along
+    else:
+        # A corner: the part is on the side the corner point lies from the centre.
+        s, e = element["start"], element["end"]
+        corner = s if math.dist(s, point[:2]) <= math.dist(e, point[:2]) else e
+        turn = step[0] * (corner[1] - point[1]) - step[1] * (corner[0] - point[0])
+        if abs(turn) < 1e-12:
+            return
+        part_left = turn > 0
+    ran = CUT_DIRECTIONS[0] if (1 if part_left else -1) * spindle > 0 else CUT_DIRECTIONS[1]
+    if ran != cut:
+        side = "left" if part_left else "right"
+        what = f"pass points cutting {ran} (the part on the cutter's {side} under M{3 if spindle > 0 else 4}), declared {cut}"
+        wrong.setdefault(what, []).append(where)
+
+
 def check_outline(
     program: Program,
     elements: Sequence[dict],
@@ -1016,6 +1068,8 @@ def check_outline(
     clearing: Sequence[dict] = (),
     tabs: Sequence[dict] = (),
     leads: Sequence[dict] = (),
+    cut: str | None = None,
+    part: str | None = None,
 ) -> list[Finding]:
     """Profile passes round a closed part outline. ``elements`` are its lines
     and minor arcs (``start``, ``end``, optional ``centre``) in the order and
@@ -1053,7 +1107,27 @@ def check_outline(
     off the levels. Only there, and only at levels under its top, is the
     outline excused coverage. Each tab must stand: its top less its floor is
     the recipe's thickness, a level reaches its floor, its box holds outline
-    and every pass cut below its top hops it."""
+    and every pass cut below its top hops it.
+
+    With ``cut`` ("conventional" or "climb", the recipe's declaration) and
+    ``part`` ("left" or "right": the side of the elements' running way the
+    part lies on, which the recipe states), every pass point is judged
+    from the posted path: the cutter centre must lie on the other side of
+    its nearest element (a centre on the part's side is in the part), and
+    with the part's side of the travel (the element's side for a point
+    running the element's way, the reverse for one running against it; at
+    a corner, the side the corner lies on from the centre) and the
+    spindle's turn in force (M3 clockwise seen from above: the part on
+    the cutter's left is conventional, on its right climb; M4 the
+    reverse), it must cut the declared way. A pass point with the spindle
+    stopped fails. Clearing and lead points are not judged: their stock is
+    not the outline's. G2 or G3 alone cannot say it: on an anticlockwise
+    outside outline the convex corners are G3 and the concave ones G2,
+    all conventional."""
+    if cut not in (None, *CUT_DIRECTIONS):
+        raise ValueError(f"cut {cut!r} is not one of {CUT_DIRECTIONS}")
+    if (cut is None) != (part is None) or part not in (None, "left", "right"):
+        raise ValueError(f"cut and part go together (part 'left' or 'right'), got cut {cut!r}, part {part!r}")
     name = program.name
     findings: list[Finding] = []
     levels = {round(z, 3) for p in passes for z in p["levels"]}
@@ -1117,14 +1191,16 @@ def check_outline(
             if point is not None:
                 bites[t["name"]].append(_where(point))
     farthest = max(p["offset"] for p in passes)
+    # What a declared cut finds, by kind, each with its points.
+    wrong: dict[str, list[str]] = {}
     cell = farthest + max(e["tol"] for e in elements) + _SAMPLE_MM
     for m in moves:
         previous = m.start
         for point in _xy_points(m):
             nearest = [(*_element_distance(e, point), e) for e in elements]
             distance, tangent, element = min(nearest, key=lambda item: item[0])
+            step = (point[0] - previous[0], point[1] - previous[1])
             if tangent is not None:
-                step = (point[0] - previous[0], point[1] - previous[1])
                 if step[0] * tangent[0] + step[1] * tangent[1] < 0:
                     backward.append(_where(point))
             previous = point
@@ -1165,6 +1241,8 @@ def check_outline(
                     where = f"{_where(point)} is {distance:.3f}"
                     stray.append(f"{where} from {element['name']}")
                     continue
+                if cut is not None:
+                    _judge_cut(point, step, tangent, element, part, cut, m.spindle, wrong)
             # A point two passes could own goes to the earliest not yet done.
             chosen = min((s for s in stages if s >= stage), default=min(stages))
             if chosen < stage:
@@ -1177,6 +1255,8 @@ def check_outline(
     what = "cutter-centre points off every pass offset or its levels"
     _report(findings, name, what, stray)
     _report(findings, name, "points running against the outline's way", backward)
+    for what, items in wrong.items():
+        _report(findings, name, what, items, check="cut")
     _report(findings, name, "points of a pass cut after a later pass", late)
     samples = [(e, s) for e in elements for s in _element_samples(e, 1.0)]
     for k, p in enumerate(passes):
@@ -1498,7 +1578,7 @@ def check_engagement(
     z: float | None = None,
     window: Sequence[Sequence[float]] | None = None,
     min_length: float = 0.0,
-    side: str | None = None,
+    cut: str | None = None,
     cell: float = ENGAGEMENT_CELL_MM,
 ) -> list[Finding]:
     """The passes a plan declares a radial width for meet no more stock than
@@ -1506,9 +1586,15 @@ def check_engagement(
     feed move selected (both ends at ``z`` when given, both ends' XY inside
     ``window`` ((x0, x1), (y0, y1)) when given, at least ``min_length`` long)
     meets at most ``max_radial`` across its travel, to within one ``cell``;
-    with ``side`` (``"climb"``/``"conventional"``) every one that meets stock
-    meets it on that side. Stations alone cannot show this: what a pass meets
-    depends on what every earlier move left, at the part's edges too."""
+    with ``cut`` (``"conventional"``/``"climb"``, declared as on
+    :func:`check_side_passes`) every one that meets stock meets it the
+    declared way: on the cutter's left for conventional under M3, on its
+    right for climb (M4 the reverse); one that meets stock on both sides
+    (a slot, a plunge) or with the spindle stopped fails. Stations alone
+    cannot show this: what a pass meets depends on what every earlier move
+    left, at the part's edges too."""
+    if cut not in (None, *CUT_DIRECTIONS):
+        raise ValueError(f"cut {cut!r} is not one of {CUT_DIRECTIONS}")
     (wx0, wx1), (wy0, wy1) = window if window is not None else ((-math.inf, math.inf),) * 2
 
     def selected(m: Move) -> bool:
@@ -1527,6 +1613,18 @@ def check_engagement(
         where = f"X{m.start[0]:.3f} Y{m.start[1]:.3f} -> X{m.end[0]:.3f} Y{m.end[1]:.3f} Z{m.end[2]:.3f}"
         if e.radial > max_radial + cell:
             findings.append(Finding(program.name, "engagement", f"{where} meets {e.radial:.3f} radial > {max_radial:.3f}"))
-        if side is not None and e.side and e.side != side:
-            findings.append(Finding(program.name, "engagement", f"{where} cuts {e.side}, expected {side}"))
+        if cut is None or not e.side:
+            continue
+        if m.spindle == 0:
+            findings.append(Finding(program.name, "engagement", f"{where}: spindle stopped (no M3/M4 in force), declared {cut}"))
+        elif e.side == "both":
+            findings.append(Finding(program.name, "engagement", f"{where} meets stock on both sides, declared {cut}"))
+        else:
+            # engagements() reads the side for a clockwise (M3) cutter; M4 swaps it.
+            ran = e.side if m.spindle > 0 else CUT_DIRECTIONS[1 - CUT_DIRECTIONS.index(e.side)]
+            if ran != cut:
+                findings.append(Finding(
+                    program.name, "engagement",
+                    f"{where} cuts {ran} under M{3 if m.spindle > 0 else 4}, declared {cut}",
+                ))
     return findings

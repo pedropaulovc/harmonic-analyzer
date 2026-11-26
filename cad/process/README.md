@@ -667,8 +667,17 @@ A recipe has five parts (and the as-machined declaration, below):
   with the spindle's turn in force at each pass (M3 clockwise seen from above:
   the stock on the cutter's left is conventional, on its right climb; M4 the
   reverse), fails a pass that cuts the other way. Without `cut` the passes'
-  milling direction is not judged, and arcs, pockets and slots (stock on both
-  sides) are not covered by it.
+  milling direction is not judged. G2 or G3 alone cannot say which way an
+  arc cuts (round an anticlockwise outside outline the convex corners are
+  G3 and the concave ones G2, all conventional), so a profile declares
+  `check_outline(..., cut=..., part="left")` (or `"right"`: the side of
+  the elements' running way the part lies on): every pass point's cutter
+  centre must lie off the part's side of its nearest element, and the part's
+  side of the travel with the spindle's turn gives the way it cuts (#3690).
+  A pass judged by the stock it meets, a bore's circles or a wall's finish,
+  declares `check_engagement(..., cut=...)` with its stock box: every
+  selected move that meets stock meets it on the declared side under the
+  turn in force; one that meets it on both sides (a slot) fails.
 
 CAM can produce toolpaths that look valid yet are wrong; the expectations
 caught a spot depth measured from the counterbore floor, a feed height below

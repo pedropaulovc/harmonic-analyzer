@@ -316,7 +316,7 @@ def _step_with(ctx: dict, change) -> dict:
             lambda line: {"G0 X14.224 Y8.890": "G0 X14.224 Y-22.860"}.get(
                 line, "G1 Y8.890 F{feed}" if line.startswith("G1 Y-22.860") else line
             ),
-            "cuts conventional, expected climb",
+            "cuts conventional under M3, declared climb",
         ),
     ],
 )

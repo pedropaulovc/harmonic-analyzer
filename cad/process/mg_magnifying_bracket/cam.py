@@ -1317,7 +1317,7 @@ def context(
                     "z": _r(bottom),
                     "window": [[lo, hi], [_r(foot_y), _r(foot_y)]],
                     "min_length": (hi - lo) / 2,
-                    "side": "climb",
+                    "cut": "climb",
                 },
             ],
         ]

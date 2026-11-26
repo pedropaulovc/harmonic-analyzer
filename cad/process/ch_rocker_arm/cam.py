@@ -567,7 +567,7 @@ def context(
                     ],
                     "radius": radius,
                     "max_radial": woc,
-                    "side": "conventional",
+                    "cut": "conventional",
                 },
             ],
             ["keep_out", {"radius": radius, "boxes": boxes}],

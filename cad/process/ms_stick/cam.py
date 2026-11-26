@@ -1123,7 +1123,7 @@ def context(
                 "radius": r,
                 "max_radial": radial,
                 "min_length": 2 * r,
-                "side": "conventional",
+                "cut": "conventional",
             },
         ],
         [name, "cleared", {"points": edge_points, "radius": r, "z": _r(-depth)}],
