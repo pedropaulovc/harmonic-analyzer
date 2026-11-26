@@ -276,7 +276,7 @@ indexing = "none"
 machine_ref = "pm-30mv"
 holding = "Vise off. Either broad face down on four 1-2-3 blocks lying flat (1 in up, 3 in along X, 1 in in from the bar's ends): two centred under the front 3 in of the bar (the plate), two flush with the bar's back edge. Four step clamps (LMS 1268 kit) along X from studs beyond the bar's ends, one over the middle of each block (2-1/2 in in from the end). The front blocks stay 1/2 in clear of the front edge and the slot line, the back blocks .45 in clear of the slot line; no step clamp over an edge the cutter runs along."
 datum = "Program SP01_split_edges (cam:ch_rocker_strap_tl_sub_plate), in the plate's frame: X0 {{cad.stop_width_mm:in.3dot}} in in from the bar's left sawn end; Y0 2.540 in behind the bar's as-received front edge (the plate's fence face, cut in Setup 3); Z0 {{cad.plate_top_height_mm:in.3dot}} above the underside. +Y toward the back of the table. After homing again (the standing page says when), check Y on the front edge before the file has cut it, or after its finish pass, where the finder reads Y-66.040. One off, the front edge part cut, or the bar moved once cutting has begun: stop and tell the owner. The bar moved before any cut: clamp it again and repeat the first operation."
-diagram = { file = "diagrams/split.svg", alt = "Plan of the bar on the table: four 1-2-3 blocks and four step clamps along X; the plate is the front 3 in strip; the 1/2 in end mill mills the front edge, cuts the slot through behind the strip and finishes the strip's back edge." }
+diagram = { file = "diagrams/split.svg", alt = "Plan of the bar on the table: four 1-2-3 blocks and four step clamps along X; the plate is the front 3 in strip; the 1/2 in end mill, to scale, on the front edge's first pass, fed +X; then the slot through behind the strip and the strip's back edge." }
 envelope = { x_span_mm = ["{{cad.length_mm}}", "{{process.half_cutter_dia_mm}}", 5.08], y_span_mm = [152.4, "{{process.half_cutter_dia_mm}}"], work_top_mm = ["{{process.block_height_mm}}", "{{process.bar_top_max_mm}}"], deepest_cut_mm = ["{{process.block_height_mm}}", -1.016], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_mm}}"] }
 vise_hold = "other"
 # The plate strip between its two straps (the blocks only push up), at its
@@ -336,7 +336,7 @@ indexing = "none"
 machine_ref = "pm-30mv"
 holding = "Vise indicated <.001 along X. The 1 in and 1/2 in parallels of the owned set stacked under each jaw (1.5 in), against the jaws, clear of the holes (the nearest is .85 in in from an edge). The plate on them, underside down, FRONT edge at the moving jaw, gripped on its two milled long edges (.27 in the jaws), centred on the jaws (LEFT end at the left); its top (Z0) stands .146 above the jaw tops. Nothing to the right of or in front of the plate stands above the jaws: the end mill runs out past the right end and the front edge."
 datum = "Program SP02_top, the plate's frame (the G54 of the MHA-CH-13 programs): X0 the end-stop face it cuts, {{cad.stop_width_mm:in.3dot}} in in from the LEFT end; Y0 the fence face it cuts, {{cad.fence_width_in:.3dot}} in in front of the back edge (fixed jaw), +Y toward the fixed jaw; Z0 the plate top it cuts, {{cad.plate_top_height_mm:in.3dot}} above the underside. After homing again (the standing page says when), check G54 before Cycle Start: the edge finder on the LEFT end reads X {{process.sp02_x_set_mm:.3f}}; once the fence face is cut, the finder on it from the front reads Y -2.540; once the tops are faced: console M6 T1, then T1's tip on a .002 leaf on the fence top reads Z {{process.sp02_z_check_mm:.3f}}. One off by more than 0.025 mm, or the plate moved or lifted in the vise: stop and tell the owner. Before the fence face is cut: unclamp and run the first operation again."
-diagram = { file = "diagrams/top.svg", alt = "Plan of the plate in the vise: fence along the back edge at the fixed jaw, end stop at the left end, the plate top milled down round them; the fence notched at both ends, four clamp pockets with 4-40 holes along the front, the hub counterbore with its #10-32 hole; section showing the stacked parallels and the plate top above the jaws." }
+diagram = { file = "diagrams/top.svg", alt = "Plan of the plate in the vise, the fence along the back edge at the fixed jaw, the end stop at the left end, hatched what this setup removes; the 1/2 in end mill, to scale, on the fence top's pass that stays off the fixed jaw, fed +X. Section across the jaws: the stacked parallels, the plate top above the jaws, the end mill's tip at the fence height." }
 envelope = { x_span_mm = ["{{cad.length_mm}}", "{{process.half_cutter_dia_mm}}", 5.08], y_span_mm = ["{{cad.width_mm}}", "{{process.half_cutter_dia_mm}}", 5.08], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{process.bar_top_max_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{process.drill_tip_below_mm}}"], longest_tool_mm = ["{{process.drill_chuck_gauge_mm}}", "{{process.drill_projection_max_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.eighth_mill_projection_min_mm}}"] }
 vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{cad.width_mm}}", along_jaws_mm = "{{cad.length_mm}}", part_height_mm = "{{process.bar_top_max_mm}}", parallel_height_mm = "{{process.parallel_height_mm}}", overhang_mm = ["{{process.plate_overhang_mm}}", "rest"], jaw_offset = "centred", fixed_jaw_face = "machined", moving_jaw_face = "machined", moving_jaw_contact = "flat" }
 beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{cad.length_mm}}"], clamp_mm = ["{{process.plate_overhang_mm}}", "{{process.jaw_right_x_mm}}"], section_mm = { y = "{{cad.width_mm}}", z = "{{cad.plate_top_height_mm}}" }, vise_left = "start" }
@@ -410,6 +410,7 @@ tool = "em-eighth"
 drilling = "none"
 sizing = "other"
 instruction = "Same file, M6 T2 (1/8 in carbide end mill, {{process.eighth_mill_projection_min_mm:in.2dot}}–{{process.eighth_mill_projection_max_mm:in.2dot}} out; set 2800): both fence notches {{cad.notch_depth_in:.2dot}} back from Y0 down to Z0, inner ends at X {{cad.notch_left_end_x_in:.2f}} and X {{cad.notch_right_end_x_in:.2f}}, and the stop face over the left notch, levels ≤ {{process.eighth_step_mm:in.3dot}}; corners R.0625, the cutter's (R{{cad.corner_radius_max_in:.2dot}} max). Notches not gauged: the program's path."
+diagram = { file = "diagrams/top-notch.svg", alt = "The left end from above and from the front: the 1/8 in end mill, to scale, at its first level in the left fence notch, against the stop face, fed +X." }
 settings = "endmill-carbide-3fl-1-8-6061"
 milling_cuts = [
   { name = "left notch", kind = "slot", phase = "finish", cutter_dia_mm = "{{process.eighth_cutter_dia_mm}}", flutes = 3, axial_doc_mm = "{{process.eighth_step_mm}}", radial_woc_mm = "{{process.eighth_cutter_dia_mm}}", traverse_mm = "{{cad.notch_left_beam_x_mm}}" },
@@ -463,6 +464,7 @@ tool = "drill-43"
 drilling = "twist_drill"
 sizing = { kind = "tap_drill", tap = "tap-4-40" }
 instruction = "Same file, M6 T4 (#43 drill; set 2800): the {{cad.pocket_count:d}} clamp holes through the plate, full-retract pecks every {{process.peck_43_mm:in.3dot}}. Cutting oil."
+diagram = { file = "diagrams/top-drill-43.svg", alt = "Section across the jaws at clamp hole 2, inside the jaws: the #43 drill, to scale, through the pocket floor, its full diameter past the underside, between the parallels. The NC drills hole 1 first, at X 25.400 in the overhang past the left jaw, then holes 2, 3 and 4." }
 rpm = 2800
 feed = "{{process.drill_43_feed_per_min_mm:in.1f}} in/min"
 hole_depth_mm = "{{process.clamp_hole_depth_mm}}"
@@ -477,6 +479,7 @@ tool = "drill-21"
 drilling = "twist_drill"
 sizing = { kind = "tap_drill", tap = "tap-10-32" }
 instruction = "Same file, M6 T5 (#21 drill; set 2800): the hub hole through from the counterbore floor, in the 1/8 in end mill's spot, no peck. Cutting oil."
+diagram = { file = "diagrams/top-drill-21.svg", alt = "Section across the jaws at the hub hole: the #21 drill, to scale, through from the counterbore floor, its full diameter past the underside, between the parallels." }
 rpm = 2800
 feed = "{{process.drill_21_feed_per_min_mm:in.1f}} in/min"
 hole_depth_mm = "{{process.hub_hole_depth_mm}}"
@@ -507,6 +510,7 @@ feed = "hand"
 
 [[setups.operations]]
 instruction = "4-40 tap in the T-handle wrench in the hole, tap fluid; jog Z down until the guide's point is in the wrench's centre hole and pushed fully home."
+diagram = { file = "diagrams/top-tap-clamp.svg", alt = "Section across the jaws at clamp hole 2, inside the jaws: the 4-40 tap, to scale across, in the T-handle wrench in the hole, the tap guide's 1/2 in shank in the collet, its spring point in the wrench's centre hole, all in the tool colour. SP03_tap_clamp_1 taps hole 1 first, at X 25.400 in the overhang past the left jaw." }
 feed = "hand"
 
 [[setups.operations]]
@@ -523,6 +527,7 @@ tool = "tap-10-32"
 drilling = "none"
 sizing = "other"
 instruction = "Load and run SP03_tap_hub: the same, the #10-32 tap in the hub hole from the counterbore floor, under the tap guide, its point pushed fully home in the wrench. Jog Z up clear of the wrench at the end."
+diagram = { file = "diagrams/top-tap-hub.svg", alt = "Section across the jaws at the hub hole: the #10-32 tap, to scale across, in the T-handle wrench from the counterbore floor, under the tap guide, its spring point in the wrench's centre hole, all in the tool colour." }
 feed = "hand"
 
 [[setups.operations]]

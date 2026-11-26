@@ -1,33 +1,37 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 330" font-family="sans-serif" font-size="13">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 330" width="760" height="330" font-family="sans-serif" font-size="13">
+  <!-- Plan from above, 4 px/mm (+Z right, toward the tailstock; Z0 F). The 1 in blank in the 3-jaw on 1.00 of its other end, F turn_stickout_mm 139.192 out, F's centre on the MT3 dead centre (schematic). The finished shaft drawn inside the stock (hatched: to come off). The AR tool (schematic) on its first roughing pass, .040 per side (rough_doc_in): Ø.920, from F toward the chuck (-Z), 10 mm along. -->
   <rect class="paper" x="0" y="0" width="760" height="330"/>
-  <text class="title" x="20" y="20">Setup 3: between the 3-jaw and the dead centre in F; Z0 F, stations −Z (not to scale)</text>
-  <rect class="fixture-vise" x="20" y="90" width="90" height="140"/>
-  <rect class="part-rest" x="60" y="130" width="60" height="60"/>
-  <rect class="part-removed" x="120" y="130" width="560" height="60"/>
-  <rect class="part-kept" x="150" y="149" width="110" height="22"/>
-  <rect class="part-kept" x="260" y="140" width="25" height="40"/>
-  <rect class="part-kept" x="285" y="151" width="8" height="18"/>
-  <rect class="part-kept" x="293" y="146" width="50" height="28"/>
-  <rect class="part-kept" x="343" y="148" width="150" height="24"/>
-  <rect class="part-kept" x="493" y="146" width="60" height="28"/>
-  <rect class="part-kept" x="553" y="151" width="14" height="18"/>
-  <rect class="part-kept" x="567" y="153" width="113" height="14"/>
-  <line class="active-face" x1="140" y1="120" x2="140" y2="200"/>
-  <polygon class="clamp" points="680,160 720,140 720,180"/>
-  <line class="centre-line" x1="20" y1="160" x2="740" y2="160"/>
-  <text class="label" x="120" y="230">part-off: blade face at Z-5.200</text>
-  <line class="leader" x1="140" y1="218" x2="140" y2="198"/>
-  <text class="label" x="150" y="110">stub (Ø.3750)</text>
-  <line class="leader" x1="200" y1="114" x2="200" y2="149"/>
-  <text class="label" x="240" y="80">spigot Ø.687, faces at 3.930 and 3.658</text>
-  <line class="leader" x1="272" y1="84" x2="272" y2="140"/>
-  <text class="label" x="300" y="270">journals (Ø.4375) at 3.11–3.60 and 1.03–1.62</text>
-  <line class="leader" x1="318" y1="258" x2="318" y2="174"/>
-  <line class="leader" x1="523" y1="258" x2="523" y2="174"/>
-  <text class="label" x="360" y="215">relief Ø.41</text>
-  <line class="leader" x1="400" y1="203" x2="400" y2="172"/>
-  <text class="label" x="560" y="110">seat (Ø.3125), F to .89</text>
-  <line class="leader" x1="620" y1="114" x2="620" y2="153"/>
-  <text class="datum-label" x="565" y="215">Z0 F; MT3 dead centre</text>
-  <line class="leader" x1="690" y1="205" x2="681" y2="168"/>
+  <text class="title" x="20" y="22">Setup 3: rough from F, the first {{process.rough_doc_in:.3dot}} pass (AR tool), between the 3-jaw and the dead centre (4 px/mm)</text>
+  <line class="centre-line" x1="20" y1="165" x2="740" y2="165"/>
+  <rect class="fixture-vise" x="33.23" y="64.2" width="60" height="201.6"/>
+  <rect class="clamp" x="93.23" y="80.2" width="40" height="34"/>
+  <rect class="clamp" x="93.23" y="215.8" width="40" height="34"/>
+  <text class="label" x="33.23" y="58.2">3-jaw (schematic)</text>
+  <rect class="part-rest" x="29.23" y="114.2" width="104" height="101.6"/>
+  <rect class="part-removed" x="146.43" y="114.2" width="503.57" height="101.6"/>
+  <rect class="part-removed" x="650" y="118.26" width="40" height="93.47"/>
+  <rect class="part-kept" x="133.23" y="114.2" width="13.21" height="101.6"/>
+  <rect class="part-kept" x="599.58" y="149.12" width="90.42" height="31.75"/>
+  <rect class="part-kept" x="585.35" y="145.95" width="14.22" height="38.1"/>
+  <rect class="part-kept" x="525.41" y="142.78" width="59.94" height="44.45"/>
+  <rect class="part-kept" x="374.02" y="144.17" width="151.38" height="41.66"/>
+  <rect class="part-kept" x="324.24" y="142.78" width="49.78" height="44.45"/>
+  <rect class="part-kept" x="318.34" y="145.95" width="5.9" height="38.1"/>
+  <rect class="part-kept" x="290.7" y="130" width="27.64" height="70"/>
+  <rect class="part-kept" x="146.44" y="145.95" width="144.26" height="38.1"/>
+  <path class="fixture-support" d="M690 165L714.25 151L750 151L747 158L750 165L747 172L750 179L714.25 179Z"/>
+  <path class="cutter" d="M650 211.74L680 223.74L680 321.74L672 318.74L664 321.74L656 321.74L656 235.74Z"/>
+  <line class="arrow" x1="640" y1="265.8" x2="580" y2="265.8"/>
+  <text class="label" x="330" y="300">AR tool, first pass Ø.920 ({{process.rough_doc_in:.3dot}} per side), from F toward the chuck;</text>
+  <text class="label" x="330" y="316">rough to Ø{{process.rough_dia_in:.3dot}} to Z-{{process.stub_end_z_in:.2f}}, then the journals and the stub</text>
+  <line class="leader" x1="450" y1="288" x2="648" y2="215"/>
+  <circle class="leader-dot" cx="648" cy="215" r="2"/>
+  <text class="datum-label" x="740" y="100" text-anchor="end">Z0 F; MT3 dead centre</text>
+  <text class="label" x="250" y="36">stations from F (−Z): seat (Ø{{cad.pinion_seat_dia_ref_in:.4dot}}) to {{cad.seat_step_station_in:.2dot}}; journals (Ø.4375) {{cad.inboard_journal_station_in:.2dot}}–{{cad.inboard_journal_end_station_in:.2dot}}</text>
+  <text class="label" x="250" y="52">and {{cad.outboard_journal_station_in:.2dot}}–{{cad.outboard_journal_end_station_in:.2dot}}; relief Ø{{process.relief_aim_in:.2dot}}; spigot Ø{{cad.spigot_dia_in:.3dot}}, faces {{cad.collar_rear_station_in:.3dot}} and {{cad.collar_seat_station_in:.3dot}}; stub (Ø{{cad.hub_shaft_dia_ref_in:.4dot}})</text>
+  <line class="hidden" x1="161.68" y1="106.2" x2="161.68" y2="223.8"/>
+  <line class="leader" x1="110" y1="284" x2="161.68" y2="223.8"/>
+  <circle class="leader-dot" cx="161.68" cy="223.8" r="2"/>
+  <text class="label" x="20" y="296">part-off line: blade face</text>
+  <text class="label" x="20" y="312">at Z-{{process.part_z_in:.3dot}} (Op 290)</text>
 </svg>

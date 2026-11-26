@@ -574,7 +574,7 @@ indexing = "none"
 machine_ref = "pm-30mv"
 holding = "Two 1 in parallels on the vise bed, one against each jaw; the support plate on them, its LEFT edge to the left. A pair of blanks side by side across the jaws on the plate, each on its D face (F up), numbers to the left. Hold a 1-2-3 block's 2 in face across the two left ends and the plate's left edge and push them flush; then set the jaws' left side {{process.jaw_start_mm:in.2dot}} right of the ends (the calipers' depth rod) and close the vise on the blanks (the plate, narrower than the load, is not gripped), tapping them down onto the plate."
 datum = "Program CR01_rough_2 (T1, T2). G54: X0 the blanks' left ends, Y0 the fixed jaw's face, Z0 the support plate's top (face D). +X toward the blanks' right ends, +Y toward the fixed jaw."
-diagram = { file = "diagrams/face_f.svg", alt = "Two blanks across the vise jaws on the support plate on two parallels, F up; the end mill skims each fork and pockets the ring's zone and a band along the shank round the fork, the 1/8 in end mill rings the ring." }
+diagram = { file = "diagrams/face_f.svg", alt = "From above: the two blanks F up across the jaws, the support plate hidden under them; the 1/2 in end mill, to scale, on its first pass, skimming fork 1 along −X; the ring zones and shank bands it then roughs, hatched. Section across the jaws at the fork: the blanks on the plate, the plate on a 1 in parallel at each jaw, the end mill on the fork's face. The 1-2-3 block that flushed the ends is taken away." }
 envelope = { x_span_mm = ["{{process.blank_length_max_mm}}", "{{process.face_cutter_dia_mm}}", "{{process.face_cutter_dia_mm}}", 5.08], y_span_mm = [101.6, 1.0], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.support_height_mm}}", "{{process.blank_thickness_max_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.support_height_mm}}", "{{process.floor_rough_2_mm}}"], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_mm}}", 50.8], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.eighth_mill_projection_min_mm}}"] }
 vise_hold = { vise = "vise-pm-6", across_jaws_mm = 101.6, along_jaws_mm = "{{process.blank_length_min_mm}}", part_height_mm = "{{process.blank_thickness_max_mm}}", parallel_height_mm = "{{process.support_height_mm}}", overhang_mm = ["{{process.jaw_start_mm}}", "rest"], jaw_offset = "centred", fixed_jaw_face = "as_bought", moving_jaw_face = "as_bought", moving_jaw_contact = "flat" }
 beam = { axis = "y", hold = "between", extent_mm = [0, "{{process.blank_pitch_mm}}"], supports_mm = [0, "{{process.blank_pitch_mm}}"], section_mm = { x = "{{process.blank_pitch_mm}}", z = "{{process.floor_rough_2_mm}}" } }
@@ -623,6 +623,7 @@ tool = "em-eighth"
 drilling = "none"
 sizing = "other"
 instruction = "Same file, M6 T2 (1/8 in end mill, at least .75 in out; set 2800): the band round each ring, its circle in levels to the same rough floor."
+diagram = { file = "diagrams/face_f-band.svg", alt = "From above: the 1/8 in end mill, to scale, at the start of its circle round ring 1's band. Section across the jaws through it: the end mill at the band's rough floor, between the jaws." }
 settings = "endmill-carbide-3fl-1-8-1018-cf-tru-edge"
 milling_cuts = [
   { name = "band rough 2", kind = "slot", phase = "rough", cutter_dia_mm = "{{process.eighth_cutter_dia_mm}}", axial_doc_mm = 0.3175, radial_woc_mm = "{{process.eighth_cutter_dia_mm}}", traverse_mm = [0, "{{process.blank_pitch_mm}}"] },
@@ -645,7 +646,7 @@ indexing = "none"
 machine_ref = "pm-30mv"
 holding = "As Setup 2 with each blank turned over about its length (D up, F on the plate), its number still at the left end, back in its own place across the jaws; left ends flushed with the 1-2-3 block against the plate's left edge. Tap the blanks down while closing the vise."
 datum = "Programs CR02_rough_1 and CR03_finish_1 (T1, T2). G54: X0 and Y0 unchanged; Z0 face D, the top of the blank against the fixed jaw (its pair agrees within .0005)."
-diagram = { file = "diagrams/face_d.svg", alt = "The pair turned over, D up, on the support plate; the end mill roughs the ring's zone and the shank's band round the ring and the fork; the blanks are released and reseated, then D is finished to the ring's and the shank's faces." }
+diagram = { file = "diagrams/face_d.svg", alt = "From above: the pair D up; the 1/2 in end mill, to scale, on its first row along blank 1's ring zone and shank band, fed along +X. Section across the jaws: the blanks on the plate and parallels, the end mill just under face D." }
 envelope = { x_span_mm = ["{{process.blank_length_max_mm}}", "{{process.face_cutter_dia_mm}}", "{{process.face_cutter_dia_mm}}", 5.08], y_span_mm = [101.6, 1.0], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.support_height_mm}}", "{{process.blank_thickness_max_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.support_height_mm}}", "{{process.blank_thickness_min_mm}}", "{{process.floor_rough_1_mm}}", -0.508], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_mm}}", 50.8], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.eighth_mill_projection_min_mm}}"] }
 vise_hold = { vise = "vise-pm-6", across_jaws_mm = 101.6, along_jaws_mm = "{{process.blank_length_min_mm}}", part_height_mm = "{{process.blank_thickness_max_mm}}", parallel_height_mm = "{{process.support_height_mm}}", overhang_mm = ["{{process.jaw_start_mm}}", "rest"], jaw_offset = "centred", fixed_jaw_face = "as_bought", moving_jaw_face = "as_bought", moving_jaw_contact = "flat" }
 beam = { axis = "y", hold = "between", extent_mm = [0, "{{process.blank_pitch_mm}}"], supports_mm = [0, "{{process.blank_pitch_mm}}"], section_mm = { x = "{{process.blank_pitch_mm}}", z = "{{process.web_d_finish_mm}}" } }
@@ -679,6 +680,7 @@ tool = "em-eighth"
 drilling = "none"
 sizing = "other"
 instruction = "Same file, M6 T2 (set 2800): the band round each ring to the same rough floor."
+diagram = { file = "diagrams/face_d-band.svg", alt = "From above: the 1/8 in end mill, to scale, at the start of its circle round ring 1's band, D up. Section across the jaws through it: the end mill at the band's rough floor under face D." }
 settings = "endmill-carbide-3fl-1-8-1018-cf-tru-edge"
 milling_cuts = [
   { name = "band rough 1", kind = "slot", phase = "rough", cutter_dia_mm = "{{process.eighth_cutter_dia_mm}}", axial_doc_mm = 0.381, radial_woc_mm = "{{process.eighth_cutter_dia_mm}}", traverse_mm = [0, "{{process.blank_pitch_mm}}"] },
@@ -737,7 +739,7 @@ indexing = "none"
 machine_ref = "pm-30mv"
 holding = "As Setup 2: each blank turned back over (F up, D on the plate), number at the left end, in its own place; left ends flushed with the 1-2-3 block against the plate's left edge; the jaws' left side {{process.jaw_start_mm:in.2dot}} right of the ends. Tap the blanks down while closing the vise."
 datum = "Programs CR04a_end_trim (T1), CR04_finish_2 and CR05_bore (T1, T2). G54: X0 and Y0 unchanged; Z0 the support plate's top (face D): touch it again with T1 before this setup's first load goes in, as in Setup 2."
-diagram = { file = "diagrams/face_f_finish.svg", alt = "The pair F up again: the end mill finishes F round the ring and the fork, trims the right ends to the crowns and cuts through round each fork's end; it bores each ring." }
+diagram = { file = "diagrams/face_f_finish.svg", alt = "From above: the pair F up; the 1/2 in end mill, to scale, on its last end-trim pass, its side on fork 1's crown, fed along +Y. Section through the cutter past the fork ends: its tip just under the plate's top level, in the air." }
 envelope = { x_span_mm = ["{{process.blank_length_max_mm}}", "{{process.face_cutter_dia_mm}}", "{{process.face_cutter_dia_mm}}", 5.08], y_span_mm = [101.6, "{{process.face_cutter_dia_mm}}", 5.08], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.support_height_mm}}", "{{process.blank_thickness_max_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.support_height_mm}}", -0.25], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_mm}}", 50.8], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.eighth_mill_projection_min_mm}}"] }
 vise_hold = { vise = "vise-pm-6", across_jaws_mm = 101.6, along_jaws_mm = "{{process.blank_length_min_mm}}", part_height_mm = "{{process.blank_thickness_max_mm}}", parallel_height_mm = "{{process.support_height_mm}}", overhang_mm = ["{{process.jaw_start_mm}}", "rest"], jaw_offset = "centred", fixed_jaw_face = "as_bought", moving_jaw_face = "as_bought", moving_jaw_contact = "flat" }
 beam = { axis = "y", hold = "between", extent_mm = [0, "{{process.blank_pitch_mm}}"], supports_mm = [0, "{{process.blank_pitch_mm}}"], section_mm = { x = "{{process.blank_pitch_mm}}", z = "{{cad.shank_far_face_thickness_mm}}" } }
@@ -787,6 +789,7 @@ tool = "em-eighth"
 drilling = "none"
 sizing = "other"
 instruction = "Same file, M6 T2 (set 2800): the band round each ring to the finished floor."
+diagram = { file = "diagrams/face_f_finish-band.svg", alt = "From above: the 1/8 in end mill, to scale, at the start of its circle round ring 1's band, F up. Section across the jaws through it: the end mill at the band's finished floor." }
 settings = "endmill-carbide-3fl-1-8-1018-cf-tru-edge"
 milling_cuts = [
   { name = "band 2", kind = "slot", phase = "finish", cutter_dia_mm = "{{process.eighth_cutter_dia_mm}}", axial_doc_mm = 0.254, radial_woc_mm = "{{process.eighth_cutter_dia_mm}}", traverse_mm = [0, "{{process.blank_pitch_mm}}"] },
@@ -836,7 +839,7 @@ indexing = "none"
 machine_ref = "pm-30mv"
 holding = "Unchanged from Setup 4: the same load, F up, still clamped."
 datum = "Programs CR06_slot (the saw) and CR07_pin (T3, T4, T5). G54 X0 and Y0 unchanged; Z0 touched again from the saw, then from T3. After homing again (the standing page says when) with the saw mounted: X and Y stay as the stored G54 brings them back, unchecked (the edge finder does not fit with the arbor in); touch Z0 again on the saw."
-diagram = { file = "diagrams/fork.svg", alt = "The pair F up, the forks past the jaws' right end: the slitting saw, horizontal, slots both forks in one sweep along the jaws; the pin holes are drilled and reamed down through the forks." }
+diagram = { file = "diagrams/fork.svg", alt = "From above: the slitting saw, to scale, horizontal over fork 1 on its light pass, fed along +Y. Section along fork 1: the saw's rim in the crown, its lower face just over the plate's top level, the arbor's cap and body beyond the crown, the fork in the air past the jaws and the plate." }
 # The saw arbor is the shortest tool: its saw's lower face is at least the
 # saw's own thickness below the nose (the shoulder's height below the nose
 # is not on record: at most .90, the record's 1.4 less the cap).
@@ -975,6 +978,7 @@ tool = "drill-49"
 drilling = "twist_drill"
 sizing = "other"
 instruction = "Same file, M6 T4: #49 drill through both tines of each fork, pecks of .050 with full retract, its full diameter {{process.drill_past_mm:in.3dot}} past face D into the air past the plate's end; set 2800. Cutting oil."
+diagram = { file = "diagrams/fork-drill.svg", alt = "Section along fork 1: the #49 drill, to scale, through both tines either side of the slot, its point just under face D, in the air. From above: the drill in fork 1's pin hole." }
 rpm = 2800
 feed = "{{process.drill_feed_per_min_mm:in.1f}} in/min"
 hole_depth_mm = "{{process.fork_thickness_mm}}"
@@ -989,6 +993,7 @@ tool = "reamer-0775"
 drilling = "none"
 sizing = { kind = "band", band_mm = "{{cad.pin_hole_dia_band_mm}}" }
 instruction = "Same file, M6 T5: ream each hole through with the .0775 reamer, in and out at feed, its tip {{process.ream_past_mm:in.3dot}} past face D (its full diameter through); set 2000. Cutting oil."
+diagram = { file = "diagrams/fork-ream.svg", alt = "Section along fork 1: the .0775 reamer, to scale, through both tines either side of the slot, its tip just under face D, in the air. From above: the reamer in fork 1's pin hole." }
 rpm = 2000
 feed = "{{process.ream_feed_per_min_mm:in.1f}} in/min, in and out"
 milling_cuts = [
@@ -1013,7 +1018,7 @@ indexing = "none"
 machine_ref = "pm-30mv"
 holding = "Unchanged from Setups 4 and 5: the same load, F up, still clamped."
 datum = "Program CR08_outline (T2). G54 X0 and Y0 unchanged; Z0 as set with T3 in Setup 5 (the plate's top): do not touch off again."
-diagram = { file = "diagrams/outline.svg", alt = "The pair F up on the support plate; the 1/8 in end mill cuts each rod's outline through the waste on seven tabs, two on the ring and five along the shank, lifting past the fork's end; its radius leaves the four corners where the shank meets the ring and the fork's step." }
+diagram = { file = "diagrams/outline.svg", alt = "From above: the pair F up; the 1/8 in end mill, to scale, on rod 1's shank edge between two tabs, fed along +X; the outline round each rod through the waste, seven tabs left. Section across the jaws through it: the shank in its band, the end mill just past its near face." }
 envelope = { x_span_mm = ["{{process.blank_length_max_mm}}", "{{process.eighth_cutter_dia_mm}}", 5.08], y_span_mm = [101.6, 1.0], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.support_height_mm}}", "{{process.blank_thickness_max_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.support_height_mm}}", 1.016], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", 50.8], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.eighth_mill_projection_min_mm}}"] }
 vise_hold = { vise = "vise-pm-6", grips = "plate", across_jaws_mm = 101.6, along_jaws_mm = "{{process.blank_length_min_mm}}", part_height_mm = "{{process.blank_thickness_max_mm}}", parallel_height_mm = "{{process.support_height_mm}}", overhang_mm = ["{{process.jaw_start_mm}}", "rest"], jaw_offset = "centred", fixed_jaw_face = "as_bought", moving_jaw_face = "as_bought", moving_jaw_contact = "flat" }
 beam = { axis = "x", hold = "plate", extent_mm = ["{{process.rod_start_mm}}", "{{process.outline_end_mm}}"], seat = "the blanks' frames, gripped along their edges by the jaws; the rods hang on their tabs in them, over the support plate", seat_mm = [0, "{{process.blank_length_min_mm}}"], clamps_mm = ["{{process.tab_station_1_mm}}", "{{process.tab_station_2_mm}}", "{{process.tab_station_3_mm}}", "{{process.tab_station_4_mm}}", "{{process.tab_station_5_mm}}", "{{process.tab_station_6_mm}}", "{{process.tab_station_7_mm}}"], section_mm = { y = "{{cad.shank_right_flank_width_mm}}", z = "{{cad.shank_far_face_thickness_mm}}" }, tabs = { stations_mm = ["{{process.tab_station_1_mm}}", "{{process.tab_station_2_mm}}", "{{process.tab_station_3_mm}}", "{{process.tab_station_4_mm}}", "{{process.tab_station_5_mm}}", "{{process.tab_station_6_mm}}", "{{process.tab_station_7_mm}}"], section_mm = { x = "{{process.tab_width_mm}}", z = "{{process.tab_thickness_mm}}" }, length_mm = "{{process.eighth_cutter_dia_mm}}" } }

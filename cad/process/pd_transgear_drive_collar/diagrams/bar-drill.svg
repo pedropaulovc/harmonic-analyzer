@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 400" width="760" height="400" font-family="sans-serif" font-size="13">
+  <!-- To scale, 250 px/in along and across the axis, from above (the cross-slide at the bottom): the Ø.875 bar (bar_dia_in), the jaw fronts .78 behind Z0 (stickout_mm 20.32 less the .02 faced off), the outside Ø.687 (cad.outer_dia_mm) back to Z-.55 (outer_run_in), the pilot Ø.390 (cad.pilot_dia_mm) .140 long (pilot_supply_in) to the seat face, the #11 bore to the quill reading .58 (drill_run_in), the part-off face at Z-.44 (part_off_in) with the 1/16 blade's kerf behind it. The 3-jaw's body and jaws are schematic (their sizes are not on record). The #11 drill to scale (shop drill-11, Ø.1910 = 47.75 px), its 118 deg point, its full diameter at the quill reading .58 (zeroed with the lips on the spot's rim). Drawn short to a break line (its length out of the chuck is not on record). The No. 3 centre drill's spot is not drawn. -->
+  <rect class="paper" x="0" y="0" width="760" height="400"/>
+  <text class="title" x="20" y="22">Setup 1, Op 60: the #11 drill from the tailstock, past the parting line (to scale, 250 px/in)</text>
+  <rect class="fixture-vise" x="209" y="58.62" width="56" height="302.75"/>
+  <path class="part-rest" d="M30 100.62L362.5 100.62L362.5 319.38L30 319.38L27 312.32L30 305.26L27 298.21L30 291.15L27 284.09L30 277.04L27 269.98L30 262.92L27 255.87L30 248.81L27 241.75L30 234.7L27 227.64L30 220.58L27 213.53L30 206.47L27 199.42L30 192.36L27 185.3L30 178.25L27 171.19L30 164.13L27 157.08L30 150.02L27 142.96L30 135.91L27 128.85L30 121.79L27 114.74L30 107.68Z"/>
+  <rect class="part-rest" x="362.5" y="124.12" width="27.5" height="171.75"/>
+  <rect class="part-kept" x="390" y="124.12" width="75" height="171.75"/>
+  <rect class="part-kept" x="465" y="161.25" width="35" height="97.5"/>
+  <rect class="clamp" x="265" y="70.62" width="40" height="30"/>
+  <rect class="clamp" x="265" y="319.38" width="40" height="30"/>
+  <line class="centre-line" x1="20" y1="210" x2="740" y2="210"/>
+  <path class="cutter" d="M740 186.12L355 186.12L340.65 210L355 233.88L740 233.88L737 225.92L740 217.96L737 210L740 202.04L737 194.08Z"/>
+  <line class="arrow" x1="720" y1="170" x2="660" y2="170"/>
+  <line class="datum" x1="500" y1="40" x2="500" y2="76"/>
+  <text class="datum-label" x="506" y="50">Z0 the pilot's front face</text>
+  <text class="label" x="470" y="340">#11 drill to the quill reading {{process.drill_run_in:.2dot}}, backing out</text>
+  <text class="label" x="470" y="356">every {{process.peck_11_in:.2dot}}: the finished bore, past the parting line</text>
+  <line class="leader" x1="520" y1="328" x2="560" y2="226"/>
+  <circle class="leader-dot" cx="560" cy="226" r="2"/>
+</svg>

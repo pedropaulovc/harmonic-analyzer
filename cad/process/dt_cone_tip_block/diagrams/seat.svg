@@ -1,34 +1,30 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 420" font-family="sans-serif" font-size="13">
-  <rect class="paper" x="0" y="0" width="760" height="420"/>
-  <text class="title" x="16" y="22">Setup 5 (DT04): SEAT to the height; the foot hole</text>
-  <rect class="fixture-vise" x="128.8" y="330.0" width="142.3" height="22.0"/>
-  <rect class="clamp" x="153.2" y="195.2" width="30.0" height="134.8"/>
-  <rect class="clamp" x="216.8" y="195.2" width="30.0" height="134.8"/>
-  <text class="label" x="168.2" y="368.0" text-anchor="middle">moving jaw</text>
-  <text class="label" x="231.8" y="368.0" text-anchor="middle">fixed jaw</text>
-  <rect class="fixture-support" x="183.2" y="291.9" width="9.5" height="38.1"/>
-  <rect class="fixture-support" x="207.2" y="291.9" width="9.5" height="38.1"/>
-  <rect class="part-kept" x="183.2" y="134.2" width="33.5" height="157.7"/>
-  <rect class="part-removed" x="183.2" y="126.9" width="33.5" height="7.2"/>
-  <line class="active-face" x1="183.2" y1="134.2" x2="216.8" y2="134.2"/>
-  <rect class="holes" x="196.6" y="134.2" width="6.8" height="33.5"/>
-  <line class="centre-line" x1="200.0" y1="124.2" x2="200.0" y2="179.7"/>
-  <rect class="cutter" x="196.6" y="49.7" width="6.8" height="118.0"/>
-  <polygon class="cutter" points="196.6,167.7 203.4,167.7 200.0,169.7"/>
-  <text class="label" x="440.0" y="70.0">#43 drill (after the end mill, centre drill)</text>
-  <line class="leader" x1="436.0" y1="66.0" x2="200.0" y2="74.2"/>
-  <circle class="leader-dot" cx="200.0" cy="74.2" r="2.5"/>
-  <text class="label" x="440.0" y="110.0">SEAT faced to 2.070; Ra 125</text>
-  <line class="leader" x1="436.0" y1="106.0" x2="182.0" y2="134.2"/>
-  <circle class="leader-dot" cx="182.0" cy="134.2" r="2.5"/>
-  <text class="label" x="440.0" y="150.0">foot hole .440 deep, centred N-S</text>
-  <line class="leader" x1="436.0" y1="146.0" x2="200.0" y2="154.3"/>
-  <circle class="leader-dot" cx="200.0" cy="154.3" r="2.5"/>
-  <text class="label" x="440.0" y="190.0">N (fixed jaw)</text>
-  <line class="leader" x1="436.0" y1="186.0" x2="214.8" y2="224.2"/>
-  <circle class="leader-dot" cx="214.8" cy="224.2" r="2.5"/>
-  <text class="label" x="440.0" y="230.0">TOP down on the 1/2 in parallels</text>
-  <line class="leader" x1="436.0" y1="226.0" x2="200.0" y2="291.9"/>
-  <circle class="leader-dot" cx="200.0" cy="291.9" r="2.5"/>
-  <text class="label" x="16.0" y="406.0">Section across the jaws, E to the left (the hole is .30 from E). Z0 the parallels' top.</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 440" width="760" height="440" font-family="sans-serif" font-size="13">
+  <!-- Across the jaws from the right end (+X toward you): +Y (toward the fixed jaw) right, +Z up, 4 px/mm. The strip upright on the 1/2 in parallels, TOP down, N on the fixed jaw; jaw tops 32.245 above the parallels. Z0 the parallels' top. The 1/2 in end mill (50.8 px) on DT04's first level Z54.388 (from seat_raw_max_mm 54.991 to length_target_mm 52.578), on the pass least past the strip, Y-5.850 (L27), running X29.210 to X-8.890: -X, into the page. The foot hole comes next (its own pictures). -->
+  <rect class="paper" x="0" y="0" width="760" height="440"/>
+  <text class="title" x="20" y="22">Setup 5 (DT04, T1): face SEAT to the height, the strip upright TOP down (4 px/mm)</text>
+  <rect class="fixture-vise" x="305.3" y="406" width="184.7" height="14"/>
+  <rect class="clamp" x="325.3" y="226.22" width="50" height="179.78"/>
+  <rect class="clamp" x="420" y="226.22" width="50" height="179.78"/>
+  <rect class="fixture-support" x="375.3" y="355.2" width="12.7" height="50.8"/>
+  <rect class="fixture-support" x="407.3" y="355.2" width="12.7" height="50.8"/>
+  <text class="label-on-clamp" x="350.3" y="396" text-anchor="middle">moving</text>
+  <text class="label-on-clamp" x="445" y="396" text-anchor="middle">fixed</text>
+  <rect class="part-kept" x="375.3" y="144.89" width="44.7" height="210.31"/>
+  <rect class="part-removed" x="375.3" y="135.74" width="44.7" height="9.14"/>
+  <path class="cutter" d="M422 131.55L422 40L414.74 37L407.49 40L400.23 37L392.97 40L385.71 37L378.46 40L371.2 40L371.2 131.55A25.4 6.1 0 0 0 422 131.55Z"/>
+  <circle class="leader" cx="346.6" cy="97.65" r="7"/>
+  <line class="leader" x1="341.6" y1="92.65" x2="351.6" y2="102.65"/>
+  <line class="leader" x1="341.6" y1="102.65" x2="351.6" y2="92.65"/>
+  <line class="datum" x1="472" y1="355.2" x2="492" y2="355.2"/>
+  <text class="datum-label" x="496" y="359.2">Z0 the parallels' top (TOP)</text>
+  <text class="label" x="470" y="60">1/2 in end mill, first level Z54.388; levels</text>
+  <text class="label" x="470" y="76">to Z{{process.length_target_mm:in.4dot}}: SEAT; the pass at Y-5.850, −X</text>
+  <line class="leader" x1="466" y1="76" x2="422.6" y2="107.65"/>
+  <circle class="leader-dot" cx="422.6" cy="107.65" r="2"/>
+  <text class="label" x="520" y="250">N (fixed jaw)</text>
+  <line class="leader" x1="516" y1="246" x2="418" y2="235.2"/>
+  <circle class="leader-dot" cx="418" cy="235.2" r="2"/>
+  <text class="label" x="470" y="290">TOP down on the 1/2 in parallels</text>
+  <line class="leader" x1="466" y1="286" x2="416" y2="379.2"/>
+  <circle class="leader-dot" cx="416" cy="379.2" r="2"/>
 </svg>

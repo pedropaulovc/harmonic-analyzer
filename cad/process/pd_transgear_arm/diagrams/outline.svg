@@ -1,11 +1,47 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="480" height="265" viewBox="0 0 480 265" font-family="sans-serif" font-size="12">
-<rect width="480" height="265" fill="#fff"/>
-<rect x="40" y="40" width="381" height="190" fill="#dde" stroke="#000"/>
-<text x="44" y="56" text-anchor="start">sub-plate</text>
-<path d="M407.2,117.7 L86.3,104.0 A31.2,31.2 0 1 0 86.3,166.5 L407.2,152.8 Z" fill="none" stroke="#000" stroke-width="1.5"/>
-<circle cx="85.0" cy="135.25" r="9.925" fill="#888"/>
-<circle cx="257.0375" cy="135.25" r="5.8" fill="#888"/>
-<text x="85.0" y="195.25" text-anchor="middle">#10-32 screw</text>
-<text x="257.0375" y="195.25" text-anchor="middle">#4-40 screw</text>
-<text x="40" y="250" text-anchor="start">1/4 end mill, outline anticlockwise; X, Y off the arm; Z0 plate top</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 430" width="760" height="430" font-family="sans-serif" font-size="13">
+  <!-- Hand picture, to scale. Left: a section across the jaws, from the RIGHT end, 4.5 px/mm (the fixed jaw on the right, Y0 its face): the two 1 in parallels (1/8 thick, parallel_thickness_mm) against the jaws, the 1/2 x 3 in 6061 sub-plate (plate_thickness_mm, plate_width_mm) on them, its top Z0, the jaw tops 6.845 mm over it (plate_jaw_top_mm). The jaws' thickness and the parallels' length are not on record; jaws and parallels drawn short to a break line toward the bed. Right: from above, 1.6 px/mm, the plate's left end X0, the pivot at X18.0, Y-38.1 (pivot_on_plate_x_mm). The arm screwed down face A on the plate: the blank 1.00 x .375 seen in section at X100, the outline's two flanks 9.01 mm each side of its centre line there; hatched: the outline's removal through all levels, .010 into the plate (outline_through_mm). The 1/4 in end mill to scale (endmill-carbide-3fl-1-4, Ø6.35 mm = 28.6 px) on the posted AR05 first rough level, Z8.570, its centre at Y-25.659 (.135 outside the flank, outline_rough_offset_mm 3.429), passing -X along the flank toward the pivot (anticlockwise); 22.5 mm from the fixed jaw's face. Square end drawn as its end face's near half, 12 % deep; short to a break line (at least .75 in out of the collet). The screws (the #10-32 head Ø.312 x .190 on the spot face's floor, the #4-40 head Ø.183 x .112 on the rear face) are off this section: from above, in the hardware colour. -->
+  <rect class="paper" x="0" y="0" width="760" height="430"/>
+  <text class="title" x="20" y="22">Setup 3, AR05 T11: the 1/4 in end mill on the outline's first rough level (to scale)</text>
+  <path class="clamp" d="M37.1 199.2L87.1 199.2L87.1 415L79.96 412L72.81 415L65.67 412L58.53 415L51.39 412L44.24 415L37.1 415Z"/>
+  <path class="clamp" d="M430 199.2L480 199.2L480 415L472.86 412L465.71 415L458.57 412L451.43 415L444.29 412L437.14 415L430 415Z"/>
+  <path class="fixture-support" d="M87.1 287.15L101.39 287.15L101.39 415L94.24 412L87.1 415Z"/>
+  <path class="fixture-support" d="M415.71 287.15L430 287.15L430 415L422.86 412L415.71 415Z"/>
+  <rect class="fixture-plate" x="87.1" y="230" width="342.9" height="57.15"/>
+  <text class="label-on-clamp" x="62.1" y="403" text-anchor="middle">moving</text>
+  <text class="label-on-clamp" x="455" y="403" text-anchor="middle">fixed</text>
+  <line class="datum" x1="344.5" y1="230" x2="416.5" y2="230"/>
+  <text class="datum-label" x="416.5" y="224" text-anchor="end">Z0 plate top</text>
+  <text class="label" x="258.55" y="347.15" text-anchor="middle">1 in parallels, 1/8 thick</text>
+  <line class="leader" x1="178.55" y1="343.15" x2="101.39" y2="327.15"/>
+  <circle class="leader-dot" cx="101.39" cy="327.15" r="2"/>
+  <line class="leader" x1="338.55" y1="343.15" x2="415.71" y2="327.15"/>
+  <circle class="leader-dot" cx="415.71" cy="327.15" r="2"/>
+  <text class="label-halo" x="198.55" y="262.57" text-anchor="middle">6061 sub-plate</text>
+  <text class="title" x="20" y="44">section at X100, from the RIGHT end (4.5 px/mm)</text>
+  <rect class="part-kept" x="201.4" y="187.14" width="114.3" height="42.86"/>
+  <rect class="part-removed" x="299.1" y="187.14" width="16.6" height="44.01"/>
+  <rect class="part-removed" x="201.4" y="187.14" width="16.6" height="44.01"/>
+  <path class="cutter" d="M328.82 188.01L328.82 56L321.68 53L314.53 56L307.39 53L300.25 56L300.25 188.01A14.29 3.43 0 0 0 328.82 188.01Z"/>
+  <line class="arrow" x1="344.53" y1="76" x2="344.53" y2="116"/>
+  <text class="label" x="20" y="76">1/4 in end mill, first of {{process.outline_levels:d}} levels,</text>
+  <text class="label" x="20" y="92">Z8.570; anticlockwise round the</text>
+  <text class="label" x="20" y="108">outline, here passing −X</text>
+  <line class="leader" x1="230" y1="100" x2="299.53" y2="120"/>
+  <circle class="leader-dot" cx="299.53" cy="120" r="2"/>
+  <text class="label" x="191.4" y="157.14" text-anchor="end">the arm, face A down</text>
+  <line class="leader" x1="193.4" y1="153.14" x2="231.4" y2="208.57"/>
+  <circle class="leader-dot" cx="231.4" cy="208.57" r="2"/>
+  <rect class="clamp" x="494.98" y="92" width="253.88" height="18"/>
+  <rect class="clamp" x="494.98" y="231.92" width="253.88" height="18"/>
+  <rect class="fixture-plate" x="500" y="110" width="243.84" height="121.92"/>
+  <rect class="part-kept" x="506.56" y="150.64" width="232.66" height="40.64"/>
+  <path class="hidden" d="M529.65 150.98L735.04 159.75L735.04 182.17L529.65 190.94A20 20 0 1 1 529.65 150.98Z"/>
+  <circle class="part-rest" cx="528.8" cy="170.96" r="6.34"/>
+  <circle class="part-rest" cx="638.9" cy="170.96" r="3.72"/>
+  <circle class="cutter" cx="660" cy="151.05" r="5.08"/>
+  <line class="arrow" x1="654" y1="139.05" x2="620" y2="139.05"/>
+  <text class="title" x="500" y="44">from above (1.6 px/mm)</text>
+  <text class="label" x="500" y="290">fixed jaw at the top; the screw</text>
+  <text class="label" x="500" y="306">heads (hardware); dashed: the</text>
+  <text class="label" x="500" y="322">outline; X Y picked up on the arm</text>
 </svg>

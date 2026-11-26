@@ -1,35 +1,47 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 360" font-family="sans-serif" font-size="13">
-  <rect class="paper" x="0" y="0" width="960" height="360"/>
-  <text class="title" x="20" y="22">Setup 8: side view along the jaws; F to the right, the stub in the overhang, the slug as the spacer (not to scale)</text>
-  <rect class="fixture-vise" x="230" y="260" width="560" height="30"/>
-  <rect class="clamp" x="230" y="110" width="560" height="90"/>
-  <rect class="fixture-support" x="230" y="190" width="420" height="70"/>
-  <rect class="fixture-support" x="500" y="194" width="300" height="66"/>
-  <path class="part-kept" d="M40,170 Q25,160 40,150 Z"/>
-  <rect class="part-kept" x="40" y="148" width="120" height="30"/>
-  <rect class="part-kept" x="160" y="138" width="30" height="52"/>
-  <rect class="part-kept" x="190" y="150" width="420" height="40"/>
-  <rect class="part-kept" x="700" y="152" width="110" height="40"/>
-  <rect class="part-kept" x="810" y="138" width="20" height="52"/>
-  <rect class="part-kept" x="830" y="152" width="70" height="38"/>
-  <rect class="holes" x="96" y="148" width="10" height="30"/>
-  <rect class="cutter" x="96" y="60" width="10" height="82"/>
-  <line class="datum" x1="40" y1="148" x2="150" y2="148"/>
-  <text class="datum-label" x="130" y="100">Z0 the stub's top</text>
-  <line class="leader" x1="150" y1="104" x2="140" y2="148"/>
-  <line class="datum" x1="610" y1="120" x2="610" y2="215"/>
-  <text class="datum-label" x="600" y="70">X0 F</text>
-  <line class="leader" x1="615" y1="74" x2="611" y2="122"/>
-  <text class="label" x="280" y="80">jaws (behind) on the journals, brass shim</text>
-  <line class="dims" x1="610" y1="140" x2="700" y2="140"/>
-  <text class="label" x="615" y="132">1.20 gap</text>
-  <text class="label" x="560" y="320">slug spacer: journal end 1.20 from F, spigot past the</text>
-  <text class="label" x="560" y="336">second parallel (behind, against the moving jaw, to 2.75)</text>
-  <line class="leader" x1="760" y1="306" x2="760" y2="196"/>
-  <text class="label" x="20" y="320">jaws' left face 3.55 from F, on the outboard journal</text>
-  <line class="leader" x1="230" y1="308" x2="230" y2="292"/>
-  <rect class="part-rest" x="124" y="160" width="36" height="6"/>
-  <text class="label" x="20" y="222">.0930 GO pin in each drive-pin</text>
-  <text class="label" x="20" y="238">hole in turn, levelled first</text>
-  <line class="leader" x1="120" y1="210" x2="136" y2="167"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 400" width="760" height="400" font-family="sans-serif" font-size="13">
+  <!-- From the front (+X right toward the jaws' right end, +Z up, +Y into the page), 3 px/mm. X0 F, Z0 the stub's top. The shaft on its journals on the 1 in parallel's top edge (parallel 1/8 x 1 x 4, its left end at the jaws' left face, jaw_left_from_f_mm 90.17); the jaws (behind, outline) X -90.17 .. 68.50 (vise_jaw_width_mm), tops jaw_top_over_stub_mm 9.227 above the stub's top. The slug as the spacer on the second parallel against the moving jaw (its right end spacer_parallel_end_in 2.75 right of F), its journal's end 1.20 right of F. The centre drill spots first (not drawn). The #9 (4.9784 = 14.9 px, 118 deg) at X -115.062 (cross_x_mm), its point at Z -12.021 (cross_drill_tip_mm): its full diameter 1.0 past the stub's underside, 24.9 mm left of the parallel's end, into the air. Drawn short to a break. -->
+  <rect class="paper" x="0" y="0" width="760" height="400"/>
+  <text class="title" x="20" y="22">Setup 8 (PK01_cross_hole): the #9 through the stub, from the front (3 px/mm)</text>
+  <rect class="hidden" x="199.49" y="142.32" width="476.01" height="147.68"/>
+  <text class="label" x="290" y="136.32">jaws (behind, outline), brass shim on the journals</text>
+  <rect class="fixture-support" x="199.49" y="200.96" width="304.8" height="76.2"/>
+  <rect class="part-kept" x="402.18" y="172.38" width="67.82" height="23.81"/>
+  <rect class="part-kept" x="391.51" y="170" width="10.67" height="28.58"/>
+  <rect class="part-kept" x="346.56" y="167.62" width="44.96" height="33.34"/>
+  <rect class="part-kept" x="233.02" y="168.67" width="113.54" height="31.24"/>
+  <rect class="part-kept" x="195.68" y="167.62" width="37.34" height="33.34"/>
+  <rect class="part-kept" x="191.25" y="170" width="4.43" height="28.58"/>
+  <rect class="part-kept" x="170.53" y="158.04" width="20.73" height="52.5"/>
+  <rect class="part-kept" x="84.43" y="170" width="86.1" height="28.58"/>
+  <path class="part-kept" d="M84.43 170 A19.79 19.79 0 0 0 84.43 198.57 Z"/>
+  <rect class="fixture-support" x="374.75" y="206.96" width="304.8" height="70.2"/>
+  <rect class="part-rest" x="561.44" y="167.62" width="121.92" height="33.34"/>
+  <rect class="part-rest" x="683.36" y="158.04" width="20.73" height="52.5"/>
+  <path class="part-rest" d="M704.09 170L748 170L745 177.14L748 184.29L745 191.43L748 198.57L704.09 198.57Z"/>
+  <path class="cutter" d="M132.28 40L132.28 201.57L124.81 206.06L117.35 201.57L117.35 40L124.81 37Z"/>
+  <line class="arrow" x1="102.81" y1="50" x2="102.81" y2="80"/>
+  <line class="datum" x1="470" y1="134" x2="470" y2="278"/>
+  <text class="datum-label" x="474" y="292">X0 F</text>
+  <line class="datum" x1="134" y1="170" x2="158" y2="170"/>
+  <text class="datum-label" x="150" y="130">Z0 the stub's top</text>
+  <line class="leader" x1="170" y1="134" x2="146" y2="170"/>
+  <circle class="leader-dot" cx="146" cy="170" r="2"/>
+  <text class="label" x="150" y="52">#9 through the stub, one feed, its full diameter</text>
+  <text class="label" x="150" y="68">{{process.drill_past_mm:in.3dot}} past the underside, into the air</text>
+  <line class="leader" x1="146" y1="56" x2="130.81" y2="70"/>
+  <circle class="leader-dot" cx="130.81" cy="70" r="2"/>
+  <line class="leader" x1="140" y1="236" x2="124.81" y2="206.06"/>
+  <circle class="leader-dot" cx="124.81" cy="206.06" r="2"/>
+  <text class="label" x="30" y="250">point Z{{process.cross_drill_tip_mm:.3f}} mm, the hole</text>
+  <text class="label" x="30" y="266">{{cad.cross_hole_station_in:.3dot}} from F</text>
+  <text class="label" x="30" y="330">jaws' left face {{process.jaw_left_from_f_mm:in.2f}} from F, on the outboard journal;</text>
+  <text class="label" x="30" y="346">1 in parallel on edge under the journals, its left end</text>
+  <text class="label" x="30" y="362">at the jaws' left face</text>
+  <line class="leader" x1="230" y1="352" x2="230" y2="230.96"/>
+  <circle class="leader-dot" cx="230" cy="230.96" r="2"/>
+  <text class="label" x="470" y="330">slug spacer: journal end {{process.slug_gap_in:.2f}} right of F, spigot</text>
+  <text class="label" x="470" y="346">past the second 1 in parallel (against the moving</text>
+  <text class="label" x="470" y="362">jaw, behind, its right end {{process.spacer_parallel_end_in:.2f}} right of F)</text>
+  <line class="leader" x1="520" y1="326" x2="621.44" y2="200.96"/>
+  <circle class="leader-dot" cx="621.44" cy="200.96" r="2"/>
 </svg>

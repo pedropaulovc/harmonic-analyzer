@@ -286,7 +286,7 @@ indexing = "none"
 machine_ref = "pm-1127vf-lb"
 holding = "The {{process.bar_length_in:g}} in blank, sawn off the bar with the metal-cutting saw, in the 3-jaw {{cad.stickout_in:.2dot}} in out of the jaw fronts (the pin, its kerf, the jaws' clearance and the {{process.centre_stub_in:.2dot}} in stub), the rest inside the chuck: nothing projects past the spindle's rear end. A restart pulls what is left out to {{cad.stickout_in:.2dot}} again; with under {{process.chuck_grip_in:.2dot}} + {{cad.stickout_in:.2dot}} in left a new blank is sawn. The tailstock dead centre, greased, in the stub's centre hole from Op 60 until the stub is cut off in Op 180."
 datum = "Z0 (carriage DRO) the tip plane, {{process.centre_stub_in:.3dot}} in back from the bar end faced in Op 40; the sharp-nose tool is set on that faced end (Op 100); the grooving tool and the blade are set on the seat or the cut tip end as their ops say."
-diagram = { file = "diagrams/bar.svg", alt = "The 1/4 in bar in the 3-jaw, the tip end out: the one-diameter shank and the head turned, the ring groove cut, the pin parted off at the head." }
+diagram = { file = "diagrams/bar.svg", alt = "To scale: the 1/4 in bar in the 3-jaw, the tip end {{cad.stickout_in:.2dot}} out; the AR tool facing the bar end to the stub's end, Z+{{process.centre_stub_in:.2dot}}, the dead centre backed off; hatched, the rest of the setup's removal: the journal, the head, the groove, the tip cut and the part-off; the stub dotted, waste." }
 lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{cad.stock_dia_mm}}", stock_diameter_mm = "{{cad.stock_dia_mm}}", stickout_mm = "{{cad.stickout_mm}}", minimum_diameter_mm = "{{cad.groove_dia_min_mm}}", support = "tailstock" }
 turning_support = { kind = "tailstock", chuck_z_mm = "{{cad.jaw_z_mm}}", centre_z_mm = "{{process.centre_stub_mm}}" }
 
@@ -321,6 +321,7 @@ tool = "centre-drill"
 drilling = "none"
 sizing = "other"
 instruction = "Centre-drill the faced end with the size 1 centre drill from the tailstock chuck, to about Ø.08 at the countersink: the hole stays inside the stub."
+diagram = { file = "diagrams/bar-centre.svg", alt = "To scale across: the No. 1 centre drill from the tailstock in the stub's end, its countersink about Ø.08, inside the stub." }
 settings = "lathe-centre-1018"
 cut_diameter_mm = 1.191
 
@@ -367,6 +368,7 @@ tool = "sharp"
 drilling = "none"
 sizing = "other"
 instruction = "Sharp-nose tool: touch it on the stub's faced end and set DRO Z to +{{process.centre_stub_in:.3dot}}. Face the seat square at Z{{cad.outer_far_out_far_z_mm:in.3dot}} from the journal's rough size out to the head, in skims of .002 or less, its corner R{{cad.fillet_seat_radius_max_in:.3dot}} max (the tool's nose)."
+diagram = { file = "diagrams/bar-seat.svg", alt = "To scale: the sharp-nose tool on the seat at Z{{cad.outer_far_out_far_z_mm:in.3dot}}, fed out from the roughed journal to the head; the dead centre in the stub." }
 settings = "lathe-sharp-nose-1018"
 cut_diameter_mm = "{{cad.step_head_dia_mm}}"
 inspection = "The seat faced clean out to the head's rim, by eye: no step, the corner sharp to the tool's nose."
@@ -408,6 +410,7 @@ tool = "groove"
 drilling = "none"
 sizing = "other"
 instruction = "Grooving tool, its width miked: with its tip clear of the journal, spindle stopped, bring its chuck-side edge onto the seat face until it just traps a cigarette paper (.001); set DRO Z there to its width + .001. The DRO then reads its tailstock-side edge: move that edge to Z+{{cad.groove_station_in:.3dot}}, the load wall. Zero the cross-slide on the journal and plunge (the miked Ø − .096)/2 on the radius."
+diagram = { file = "diagrams/bar-groove.svg", alt = "To scale: the .020 grooving tool, its tailstock-side edge on the load wall {{cad.groove_station_in:.3dot}} from the seat, plunged to Ø.096; the dead centre in the stub." }
 settings = "lathe-groove-1018"
 cut_diameter_mm = "{{cad.outer_dia_mm}}"
 
@@ -434,6 +437,7 @@ tool = "blade"
 drilling = "none"
 sizing = "other"
 instruction = "Lower the blade to about Ø.16, clear of the journal; bring the blade's chuck-side face onto the seat face and set DRO Z there to 0: the DRO then reads the blade's chuck-side face. Cut in with that face at Z+{{process.tip_cut_in:.3dot}} to about Ø.04, the centre still in; withdraw the tailstock and finish the cut. The stub drops off; Setup 4 faces the tip to its station. Spindle stopped, stone the burr off the cut end and the groove's two edges."
+diagram = { file = "diagrams/bar-tip.svg", alt = "To scale: the 1/16 P1 blade, its chuck-side face {{process.tip_cut_in:.3dot}} from the seat, cut in to about Ø.04 with the centre still in; the stub beyond it waste." }
 settings = "lathe-part-1018"
 cut_diameter_mm = "{{cad.outer_dia_mm}}"
 
@@ -464,6 +468,7 @@ tool = "blade"
 drilling = "none"
 sizing = "other"
 instruction = "Set a tray on the ways under the cut, clear of the chuck and saddle. Touch the blade's chuck-side face on the cut tip end and set DRO Z to the blade's width (miked, {{process.blade_width_in:.4dot}} nominal): the DRO then reads the blade's tailstock-side face. Part off with that face at Z-{{cad.part_off_in:.3dot}}: the head about .005 long, faced in Op 290. Pick the pin out of the tray with the spindle stopped."
+diagram = { file = "diagrams/bar-part.svg", alt = "To scale: the 1/16 P1 blade, its tailstock-side face {{cad.part_off_in:.3dot}} from the cut tip end, parting the pin off at the head." }
 settings = "lathe-part-1018"
 cut_diameter_mm = "{{cad.step_head_dia_mm}}"
 
@@ -475,7 +480,7 @@ indexing = "none"
 machine_ref = "pm-1127vf-lb"
 holding = "A {{process.bush_length_in:.2dot}} in piece sawn off the Ø{{process.bush_dia_in:.2dot}} brass bar with the metal-cutting saw, in the 3-jaw on {{process.bush_grip_in:.2dot}} in, the rest out of the jaw fronts. The pin's Ø.125 shank is under the 3-jaw's least grip (Ø.175): this bush holds it in Setups 3 and 4."
 datum = "None read: the hole is drilled and reamed from the tailstock, on the spindle's axis, right through the piece."
-diagram = { file = "diagrams/bush.svg", alt = "The 1/2 in brass piece in the 3-jaw, a nick on its rim against jaw 1: faced, drilled and reamed .1260 through, then slit along one side into the hole." }
+diagram = { file = "diagrams/bush.svg", alt = "To scale: the 1/2 in brass piece in the 3-jaw on {{process.bush_grip_in:.2dot}}, a nick on its rim at jaw 1; the AR tool facing its end; hatched, the hole drilled #31 and reamed .1260 right through." }
 lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{process.bush_dia_mm}}", stock_diameter_mm = "{{process.bush_dia_mm}}", stickout_mm = "{{process.bush_stickout_mm}}", minimum_diameter_mm = "{{process.bush_dia_mm}}", support = "none" }
 
 [[setups.operations]]
@@ -507,6 +512,7 @@ tool = "drill-31"
 drilling = "twist_drill"
 sizing = "other"
 instruction = "Drill #31 right through the piece from the tailstock, pecking: about .12 a peck, the drill drawn clear of the hole each time to shed its chips."
+diagram = { file = "diagrams/bush-drill.svg", alt = "To scale: the #31 drill from the tailstock right through the brass piece, into the chuck's bore." }
 rpm = 2000
 feed = "tailstock quill by hand, light and steady, dry"
 cut_diameter_mm = 3.048
@@ -520,6 +526,7 @@ tool = "reamer"
 drilling = "none"
 sizing = "other"
 instruction = "Ream .1260 right through from the tailstock, spindle running, in one slow feed; withdraw with the spindle still running."
+diagram = { file = "diagrams/bush-ream.svg", alt = "To scale: the .1260 reamer from the tailstock right through the #31 hole; its lead chamfer drawn schematic (no size on record)." }
 rpm = 600
 feed = "tailstock quill by hand, slow and light, dry; withdraw with the spindle running"
 cut_diameter_mm = 3.2004
@@ -543,7 +550,7 @@ indexing = "none"
 machine_ref = "pm-1127vf-lb"
 holding = "The pin's shank in the split bush, the head out {{cad.outer_stickout_datum_mm:in.2dot}} in from the bush's front face; the bush in the 3-jaw on {{process.bush_grip_in:.2dot}} in, its nick at jaw 1, the jaws closed until the pin cannot be turned by hand. The rest of the pin runs on through the bush into the chuck. The jaws never touch the pin."
 datum = "DRO Z0 the head's faced end (Op 290, the AR tool); the dome's steps (Op 310) are read from it."
-diagram = { file = "diagrams/head.svg", alt = "The pin turned round, its shank held in the split bush in the jaws, the head out: the head faced and its R.18 dome stepped from the table and filed." }
+diagram = { file = "diagrams/head.svg", alt = "To scale: the pin's shank in the split bush, the bush in the 3-jaw with its nick at jaw 1, the head {{cad.outer_stickout_datum_mm:in.2dot}} out; the AR tool facing the head; hatched, the R.18 dome's corners, stepped and filed after." }
 # The jaws hold the bush (grip and stock its Ø.50); the pin's shank is the
 # least diameter the stick-out is screened on.
 lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{process.bush_dia_mm}}", stock_diameter_mm = "{{process.bush_dia_mm}}", stickout_mm = "{{cad.outer_stickout_datum_mm}}", minimum_diameter_mm = "{{cad.outer_dia_mm}}", support = "none" }
@@ -607,7 +614,7 @@ indexing = "none"
 machine_ref = "pm-1127vf-lb"
 holding = "Take the bush out and the pin out of it; thread the pin tip first through the bush from behind (the head will not pass through it), the tip out {{cad.outer_stickout_far_mm:in.2dot}} in from the bush's front face, the groove clear of the bush. The bush back in the 3-jaw on {{process.bush_grip_in:.2dot}} in, its nick at jaw 1, the jaws closed until the pin cannot be turned by hand; the head hangs behind the bush inside the chuck. The jaws never touch the pin."
 datum = "DRO Z0 the tip's faced end (Op 350, the AR tool); the dome's steps (Op 370) are read from it."
-diagram = { file = "diagrams/tip.svg", alt = "The pin turned round again, its journal held in the split bush in the jaws, the tip out: the tip faced and its R.07 dome stepped from the table and filed." }
+diagram = { file = "diagrams/tip.svg", alt = "To scale: the pin's journal in the split bush, the tip {{cad.outer_stickout_far_mm:in.2dot}} out, the groove clear of the bush; the AR tool facing the tip; hatched, the R.07 dome's corners, stepped and filed after." }
 lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{process.bush_dia_mm}}", stock_diameter_mm = "{{process.bush_dia_mm}}", stickout_mm = "{{cad.outer_stickout_far_mm}}", minimum_diameter_mm = "{{cad.groove_dia_min_mm}}", support = "none" }
 
 [[setups.operations]]

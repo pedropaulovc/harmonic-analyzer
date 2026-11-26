@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 400" width="760" height="400" font-family="sans-serif" font-size="13">
+  <!-- To scale, 300 px/in, from above (the cross-slide at the bottom): the Ø.500 x .75 brass piece (bush_dia_in, bush_length_in) in the 3-jaw on .50 (bush_grip_in), .25 out of the jaw fronts; the jaws drawn .50 long, schematic (their sizes are not on record), the chuck's body behind them schematic, its bore open behind the piece. Z0 the faced end (no DRO reading is kept). The nick at jaw 1 filed on the rim. The .1260 reamer to scale (shop reamer-1260, Ø3.2004 mm = 37.8 px), its 45 deg lead chamfer (schematic) past the back end. Drawn short to a break line (its length out of the chuck is not on record). -->
+  <rect class="paper" x="0" y="0" width="760" height="400"/>
+  <text class="title" x="20" y="22">Setup 2, Op 270: the .1260 reamer right through in one slow feed (to scale, 300 px/in)</text>
+  <rect class="fixture-vise" x="189" y="70" width="56" height="260"/>
+  <rect class="part-kept" x="245" y="125" width="225" height="150"/>
+  <rect class="holes" x="245" y="182" width="225" height="36"/>
+  <rect class="clamp" x="245" y="91" width="150" height="34"/>
+  <rect class="clamp" x="245" y="275" width="150" height="34"/>
+  <path class="datum" d="M464 126L470.5 126L470.5 132Z"/>
+  <line class="centre-line" x1="20" y1="200" x2="740" y2="200"/>
+  <path class="cutter" d="M740 181.1L239 181.1L236 184.1L236 215.9L239 218.9L740 218.9L737 211.34L740 203.78L737 196.22L740 188.66Z"/>
+  <line class="arrow" x1="720" y1="166" x2="660" y2="166"/>
+  <text class="label" x="470" y="330">the .1260 reamer, spindle running, one slow</text>
+  <text class="label" x="470" y="346">feed through; withdrawn running</text>
+  <line class="leader" x1="520" y1="318" x2="580" y2="219"/>
+  <circle class="leader-dot" cx="580" cy="219" r="2"/>
+</svg>

@@ -42,9 +42,13 @@ material = "C26000 cartridge brass, half hard (H02), .020 sheet"
 material_key = "c260-h02"
 milling_material = "brass"
 stock = "Qty {{process.quantity:g}}. C26000 H02 brass sheet, .020 x 12 x 12 in (to order, not on hand); the comb takes one {{process.blank_length_in:.2dot}} x {{process.blank_width_in:.2dot}} in blank snipped from a corner."
-note = "Inches unless mm; G-code and console entries in mm (the file and the controller run G21). Bench, then the CNC mill (one NC file), then the bench. Dry: no coolant on the tape. Home the mill ($H) once, after switching it on: every M6's trip to the tool setter counts from home. Home again only after a power cycle or a controller restart, an E-stop, an alarm, a limit switch hit, a stall or a crash: homing brings the stored G54 back. Then check every zero of the setup again, each the way its step set it: each must read what its step set, within .001 in. One does not, cannot be reached with the part in, or the part may have moved: do what that setup's Datum says for it; where the Datum says nothing, take the setup again from its first step, the part out. They all do: run the interrupted file again from its start. Feed Hold, then Reset with the axes stopped keeps position and G54: no homing, no new zero; run the interrupted file again from its start: its first M6 measures the tool, and cuts already made are cut in air."
 shop = "../shop"
 stock_refs = ["c260-h02-sheet-020-12x12"]
+
+# The shop's standing page carries what every traveler shares (units,
+# homing, Feed Hold, tool changes, proving a file); the setups print the
+# route and the run op the dry cut.
+standing = true
 
 [cad]
 file = "../../out/features/dt_cone_gear_tl_phasing_comb/features.toml"
@@ -223,7 +227,7 @@ title = "Bench: check the sheet, snip the blank"
 machine = "Bench"
 envelope = "other"
 indexing = "none"
-diagram = { file = "diagrams/blank.svg", alt = "The 12 x 12 sheet with the 4.25 x 1.50 blank marked in one corner: two snip cuts, the blank's edges filed." }
+diagram = { file = "diagrams/blank.svg", alt = "Op 20, plan, 1 in = 25 px: the 12 x 12 sheet with the {{process.blank_length_in:.2dot}} x {{process.blank_width_in:.2dot}} blank marked in one corner, its two outer edges the sheet's own; the aviation snips (schematic) part way along snip cut 1 from the sheet's edge, the flat blade on the blank's side; snip cut 2 along the blank's long edge next." }
 vise_hold = "other"
 beam = "other"
 
@@ -260,8 +264,8 @@ machine = "PM-30MV CNC (FluidNC, CNCjs with the electronic tool setter) / vise, 
 indexing = "none"
 machine_ref = "pm-30mv"
 holding = "Spoil plate on 1 in parallels across the vise jaws, its back edge on the fixed jaw, centred along the jaws: the jaw tops stand {{process.jaw_top_over_plate_mm:in.3dot}} above the plate top, room for the edge finder's touch. The blank bonded to its top under its whole face: blue tape on the plate, CA glue, blue tape on the blank (stack {{process.tape_stack_min_mm:in.3dot}}–{{process.tape_stack_max_mm:in.3dot}}), its left end and back edge {{process.blank_left_x_mm:in.2dot}} in from the plate's left end and back edge."
-datum = "Program CB01_outline. G54: X0 the plate's left end, Y0 the fixed jaw's face (the plate's back edge), Z0 the plate top, bare right of the tape; the file works {{process.tape_stack_mm:in.3dot}} above it for the tape stack, its last level {{process.outline_tip_into_plate_mm:in.3dot}} into the plate on any stack; +Y toward the fixed jaw. The comb's open end stands at X {{process.comb_south_x_mm:in.3dot}}, its back edge (the stepped arm's, toward the fixed jaw) at Y {{process.comb_back_y_mm:in.3dot}}. After homing again (the note says when): check that the blank has not moved or lifted on its bond, then check X, Y and Z, each as its op set it (the plate's left end, the fixed jaw's face, T1 after a console M6 T1 on the bare plate top), each within 0.025 mm. All good: run the file again from its start. One off, the blank moved, or the plate moved in the vise: stop and tell the owner. A Reset after a Feed Hold keeps them."
-diagram = { file = "diagrams/outline.svg", alt = "Plan of the spoil plate in the vise: the plate's blue tape, two strips along X from its left end to 5 in, and on it the blank near the fixed jaw and the plate's left end; dashed, the tape seams along X, the plate's under the U's slot and the blank's in its back margin; the comb's U drawn inside the blank with its open end left and its stepped arm toward the fixed jaw; the 1/32 end mill's path runs round the U once per level, starting and ending at the middle of the spring arm's front edge (toward the moving jaw)." }
+datum = "Program CB01_outline. G54: X0 the plate's left end, Y0 the fixed jaw's face (the plate's back edge), Z0 the plate top, bare right of the tape; the file works {{process.tape_stack_mm:in.3dot}} above it for the tape stack, its last level {{process.outline_tip_into_plate_mm:in.3dot}} into the plate on any stack; +Y toward the fixed jaw. The comb's open end stands at X {{process.comb_south_x_mm:in.3dot}}, its back edge (the stepped arm's, toward the fixed jaw) at Y {{process.comb_back_y_mm:in.3dot}}. After homing again (the standing page says when): check that the blank has not moved or lifted on its bond. One off, the blank moved, or the plate moved in the vise: stop and tell the owner."
+diagram = { file = "diagrams/outline.svg", alt = "Plan of the spoil plate in the vise, fixed jaw at the top, 3 px/mm: the 1 in parallels hidden under the plate's front and back edges; the plate's blue tape, two strips along X from its left end to 5 in, and on it the blank near the fixed jaw and the plate's left end; dashed, the tape seams; the comb's U inside the blank, its open end left and its stepped arm toward the fixed jaw. The 1/32 end mill, to scale, where CB01_outline's first level reaches the middle of the spring arm's front edge, in from in front of the blank (+Y), then anticlockwise round the U. Detail, section from the right end at 20 px/mm: the plate, the tape stack, the blank and the end mill's tip at Z 0.525 mm on level 1." }
 # Top: the thickest sheet on the thickest tape stack; deepest: the cutter's
 # tip, .004 into the spoil plate.
 envelope = { x_span_mm = ["{{process.blank_length_mm}}", "{{process.blank_left_x_mm}}"], y_span_mm = ["{{process.blank_width_mm}}", "{{process.blank_back_y_mm}}"], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{process.plate_thickness_mm}}", "{{process.tape_stack_max_mm}}", "{{cad.top_stock_thickness_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{process.plate_thickness_mm}}", "{{process.outline_tip_z_mm}}"], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.em_thirtysecond_projection_max_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.em_thirtysecond_projection_min_mm}}"] }
@@ -328,14 +332,14 @@ instruction = "Press, within about 10 seconds of the spray (the glue grabs at on
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Console M6 T1 (1/32 in end mill, {{process.em_thirtysecond_projection_min_mm:in.2dot}}–{{process.em_thirtysecond_projection_max_mm:in.2dot}} out of the collet; the tool setter measures it). Spindle stopped, its tip just dragging a .002 feeler leaf on the bare plate top right of the tape: G10 L20 P1 Z0.051 (mm: .002 in)."
+instruction = "Console M6 T1 (1/32 in end mill, {{process.em_thirtysecond_projection_min_mm:in.2dot}}–{{process.em_thirtysecond_projection_max_mm:in.2dot}} out of the collet). Spindle stopped, its tip just dragging a .002 feeler leaf on the bare plate top right of the tape: G10 L20 P1 Z0.051 (mm: .002 in)."
 feed = "hand"
 
 [[setups.operations]]
 steps = [
   { kind = "action", text = "Check, stack: spindle stopped, the tip dragging the same leaf on the blank's top at op 60's three spots; read Z (mm). Stack = reading − 0.051 (the leaf) − that spot's op 60 thickness." },
   { kind = "check", text = "Every stack {{process.tape_stack_min_mm:.2f}}–{{process.tape_stack_max_mm:.2f}} mm ({{process.tape_stack_min_mm:in.3dot}}–{{process.tape_stack_max_mm:in.3dot}}); the two ends within 0.05 mm (.002) of each other." },
-  { kind = "stop", text = "Outside the band or ends differing more: Z up, plate left in the vise (G54 stands); free the blank as ops 200–210 free the comb, peel the plate's tape; ops 70–120, then this op again." },
+  { kind = "stop", text = "Outside the band or ends differing more: Z up, plate left in the vise (G54 stands); free the blank as ops 190–200 free the comb, peel the plate's tape; ops 70–120, then this op again." },
 ]
 feed = "hand"
 
@@ -343,15 +347,7 @@ feed = "hand"
 steps = [
   { kind = "action", text = "Check, push test: jog Z up 1 in clear. With the heel of the hand push the blank hard along and across; try to lift each corner with a thumbnail." },
   { kind = "check", text = "No movement, no creak, no lifted corner." },
-  { kind = "stop", text = "Any movement: the plate left in the vise, free the blank as ops 200–210 free the comb, peel the plate's tape, then ops 70–120 and ops 140–150 again." },
-]
-feed = "hand"
-
-[[setups.operations]]
-steps = [
-  { kind = "action", text = "Prove CB01_outline in air before it cuts: on the same feeler leaf on the bare plate top, G10 L20 P1 Z-25.349 (Z0 1.000 in high). Run the file single block through its descent and the feed in, then let it run its {{process.level_count:g}} rounds at that height." },
-  { kind = "check", text = "The cutter comes down in front of the blank, clear of it, and its path stays inside the blank's margin all round, clear of both jaws." },
-  { kind = "action", text = "Then Z0 back: tip dragging the leaf on the bare plate top, G10 L20 P1 Z0.051." },
+  { kind = "stop", text = "Any movement: the plate left in the vise, free the blank as ops 190–200 free the comb, peel the plate's tape, then ops 70–120 and ops 140–150 again." },
 ]
 feed = "hand"
 
@@ -364,19 +360,20 @@ speed_kind = "spindle"
 tool = "em-thirtysecond"
 drilling = "none"
 sizing = "other"
-instruction = "Run CB01_outline (M6 T1, spindle off: set 2800; about 19 min): in through the margin, round the U anticlockwise at size and out, {{process.level_count:g}} times, each {{process.level_depth_mm:in.4dot}} deeper, the last {{process.outline_tip_into_plate_mm:in.3dot}} into the plate. Dry: a light air blast from a nozzle held well clear of the spindle, hands off the work; no coolant or water (paper tape soaks and lets go)."
+instruction = "Run CB01_outline (M6 T1: set 2800; about 19 min): in through the margin, round the U anticlockwise at size and out, {{process.level_count:g}} times, each {{process.level_depth_mm:in.4dot}} deeper, the last {{process.outline_tip_into_plate_mm:in.3dot}} into the plate. Dry: a light air blast from a nozzle held well clear of the spindle, hands off the work; no coolant or water (paper tape soaks and lets go)."
 settings = "endmill-carbide-3fl-1-32-downcut-c260"
 beam = { axis = "x", hold = "plate", extent_mm = [0, "{{process.blank_length_mm}}"], seat = "spoil plate", seat_mm = ["{{process.plate_from_x_mm}}", "{{process.plate_to_x_mm}}"], bond = { shear_mpa = "{{process.bond_accepted_shear_mpa}}", tensile_mpa = "{{process.bond_accepted_tensile_mpa}}", accepted_by = "the shop owner", pieces = [{ name = "comb", kind = "part", area_mm2 = "{{process.comb_bond_area_mm2}}", width_mm = "{{process.comb_spring_width_mm}}" }, { name = "waste", kind = "waste", area_mm2 = "{{process.waste_bond_area_mm2}}" }] } }
 milling_cuts = [
   { name = "outline", kind = "slot", phase = "finish", cutter_dia_mm = "{{process.outline_cutter_dia_mm}}", axial_doc_mm = "{{process.level_depth_mm}}", radial_woc_mm = "{{process.outline_cutter_dia_mm}}", traverse_mm = ["{{process.outline_from_x_mm}}", "{{process.outline_to_x_mm}}"] },
 ]
 
-# CA softens with heat (the brief's cut caution): the remedy stops the
-# spindle and reruns the file, whose cut levels then pass in air.
+# CA softens with heat (the brief's cut caution): the remedy stops the feed
+# and, by Reset, the spindle (FluidNC refuses a jog in Hold), then waits for
+# the blank to cool; the standing page's Feed Hold row reruns the file.
 [[setups.operations]]
 steps = [
   { kind = "action", text = "CA softens with heat; never touch the work while CB01_outline runs." },
-  { kind = "stop", text = "The cut smokes or smells hot: Feed Hold, then Reset (the spindle stops; G54 stands); jog Z up clear. When the blank is cool to a finger, run CB01_outline again from its start, G54 untouched: the cut levels pass in air." },
+  { kind = "stop", text = "The cut smokes or smells hot: Feed Hold, then Reset (the spindle stops); jog Z up clear and wait until the blank is cool to a finger." },
 ]
 feed = "hand"
 

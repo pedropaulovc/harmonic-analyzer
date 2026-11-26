@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 400" width="760" height="400" font-family="sans-serif" font-size="13">
+  <!-- To scale, 300 px/in along and across the axis, from above (the cross-slide at the bottom): the Ø.500 bar (stock_dia_in), the jaw fronts 0.384 behind Z0 (cad.jaw_z_mm), the outside Ø0.350 (cad.outer_dia_mm) back to Z-0.284 (cad.run_end_z_mm), the part-off face at Z-0.209 (cad.part_off_in) with the 1/16 blade's kerf behind it. The 3-jaw's body and jaws are schematic (their sizes are not on record). The #31 drill to scale (shop drill-31, Ø.1200 = 36 px), its 118 deg point; its full diameter drawn at the quill reading, Z-0.284 (cad.run_in, zeroed with the lips on the spot's rim; the spot's few thou of depth not drawn). Drawn short to a break line (its length out of the chuck is not on record). The No. 1 centre drill's spot before it is not drawn (the drill stands for it). -->
+  <rect class="paper" x="0" y="0" width="760" height="400"/>
+  <text class="title" x="20" y="22">Setup 1: the #31 drill from the tailstock through the bushing, past the parting line (to scale, 300 px/in)</text>
+  <rect class="fixture-vise" x="228.8" y="84" width="56" height="242"/>
+  <path class="part-rest" d="M30 130L354.8 130L354.8 280L30 280L27 272.86L30 265.71L27 258.57L30 251.43L27 244.29L30 237.14L27 230L30 222.86L27 215.71L30 208.57L27 201.43L30 194.29L27 187.14L30 180L27 172.86L30 165.71L27 158.57L30 151.43L27 144.29L30 137.14Z"/>
+  <rect class="part-rest" x="354.8" y="152.5" width="22.5" height="105"/>
+  <rect class="part-kept" x="377.3" y="152.5" width="62.7" height="105"/>
+  <rect class="clamp" x="284.8" y="96" width="40" height="34"/>
+  <rect class="clamp" x="284.8" y="280" width="40" height="34"/>
+  <line class="centre-line" x1="20" y1="205" x2="740" y2="205"/>
+  <path class="cutter" d="M730 187L354.8 187L343.98 205L354.8 223L730 223L727 215.8L730 208.6L727 201.4L730 194.2Z"/>
+  <line class="arrow" x1="700" y1="171" x2="640" y2="171"/>
+  <line class="datum" x1="440" y1="72" x2="440" y2="128"/>
+  <text class="datum-label" x="434" y="84" text-anchor="end">Z0 the thrust face</text>
+  <text class="label" x="470" y="300">#31 drill (Ø.120), one steady feed to the quill</text>
+  <text class="label" x="470" y="316">reading {{cad.run_in:.2dot}}: through and past the parting line</text>
+  <line class="leader" x1="560" y1="288" x2="600" y2="223"/>
+  <circle class="leader-dot" cx="600" cy="223" r="2"/>
+  <text class="label" x="40" y="56">the bushing, faced and turned:</text>
+  <text class="label" x="40" y="72">Z0 to the part-off face at Z-{{cad.part_off_in:.3dot}}</text>
+  <line class="leader" x1="150" y1="64" x2="408.65" y2="166.5"/>
+  <circle class="leader-dot" cx="408.65" cy="166.5" r="2"/>
+  <line class="dims" x1="354.8" y1="330" x2="440" y2="330"/>
+  <line class="dims" x1="354.8" y1="227" x2="354.8" y2="336"/>
+  <line class="dims" x1="440" y1="259.5" x2="440" y2="336"/>
+  <text class="label" x="470" y="352">{{cad.run_in:.3dot}}: the full diameter's depth from Z0</text>
+  <line class="leader" x1="468" y1="348" x2="397.4" y2="330"/>
+  <circle class="leader-dot" cx="397.4" cy="330" r="2"/>
+</svg>

@@ -1,22 +1,26 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 780 230" font-family="sans-serif" font-size="13">
-  <rect class="paper" x="0" y="0" width="780" height="230"/>
-  <text class="title" x="20" y="20">Setup 1, the bar lying flat in the saw's vise (plan, 1/16 scale along the bar)</text>
-  <line class="fixture-table" x1="20" y1="150" x2="760" y2="150"/>
-  <!-- The rest of the 36 in bar to the right of the blank. -->
-  <rect class="part-rest" x="330" y="110" width="420" height="40"/>
-  <!-- The blank, about 10.8 in, and the kerf. -->
-  <rect class="part-kept" x="40" y="110" width="270" height="40"/>
-  <rect class="part-removed" x="310" y="106" width="20" height="48"/>
-  <rect class="clamp" x="350" y="80" width="60" height="30"/>
-  <rect class="clamp" x="350" y="150" width="60" height="30"/>
-  <line class="dims" x1="40" y1="92" x2="310" y2="92"/>
-  <line class="dims" x1="40" y1="86" x2="40" y2="106"/>
-  <line class="dims" x1="310" y1="86" x2="310" y2="106"/>
-  <text class="label-halo" x="70" y="86">blank {{process.blank_length_min_in:.2f}}–{{process.blank_length_max_in:.2f}} in</text>
-  <line class="leader" x1="320" y1="170" x2="320" y2="192"/>
-  <text class="label" x="250" y="208">saw kerf, about {{process.kerf_in:.3dot}}</text>
-  <text class="label" x="430" y="100">rest of the 3/4 in square bar</text>
-  <line class="datum" x1="40" y1="160" x2="40" y2="182"/>
-  <text class="datum-label" x="46" y="182">LEFT end (marked)</text>
-  <text class="label-halo" x="110" y="135">3/4 in square 1018 CF</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 780 260" width="780" height="260" font-family="sans-serif" font-size="13">
+  <!-- Hand picture, from above, to scale at 2.25 px/mm (57.15 px/in) from the bar's 19.05 mm width. The blank drawn at its longest, blank_length_max_in; the kerf is the plan's kerf_in (.125), the blade drawn in it, cut short to break lines (its 14 in diameter runs off the picture). The saw's vise jaws' size is not on record: schematic. The rest of the 36 in bar is drawn short, to a break line. -->
+  <rect class="paper" x="0" y="0" width="780" height="260"/>
+  <text class="title" x="20" y="24">Setup 1: one blank off the 3/4 in square bar, from above (to scale, 2.25 px/mm)</text>
+  <path class="part-rest" d="M667.22 110L760 110L763 114.29L760 118.57L763 122.86L760 127.15L763 131.43L760 135.72L763 140L760 144.29L763 148.58L760 152.86L667.22 152.86Z"/>
+  <rect class="part-kept" x="40" y="110" width="620.08" height="42.86"/>
+  <rect class="part-waste" x="660.08" y="110" width="7.14" height="42.86"/>
+  <rect class="clamp" x="675.22" y="84" width="80.78" height="26"/>
+  <rect class="clamp" x="675.22" y="152.86" width="80.78" height="26"/>
+  <text class="label" x="675.22" y="196.86">saw's vise</text>
+  <path class="cutter" d="M660.08 70L661.86 67L663.65 70L665.44 67L667.22 70L667.22 192.86L665.44 195.86L663.65 192.86L661.86 195.86L660.08 192.86Z"/>
+  <line class="dims" x1="40" y1="174.86" x2="660.08" y2="174.86"/>
+  <line class="dims" x1="40" y1="166.86" x2="40" y2="182.86"/>
+  <line class="dims" x1="660.08" y1="202.86" x2="660.08" y2="166.86"/>
+  <text class="label" x="350.04" y="192.86" text-anchor="middle">blank {{process.blank_length_min_in:.2f}}–{{process.blank_length_max_in:.2f}} in</text>
+  <text class="label" x="654.08" y="216.86" text-anchor="end">saw blade in its {{process.kerf_in:.3dot}} kerf</text>
+  <line class="leader" x1="656.08" y1="210.86" x2="663.65" y2="188.86"/>
+  <circle class="leader-dot" cx="663.65" cy="188.86" r="2"/>
+  <text class="label" x="760" y="58" text-anchor="end">rest of the 3/4 in square bar</text>
+  <line class="leader" x1="730" y1="62" x2="752" y2="114"/>
+  <circle class="leader-dot" cx="752" cy="114" r="2"/>
+  <line class="datum" x1="40" y1="90" x2="40" y2="186.86"/>
+  <text class="datum-label" x="44" y="84">LEFT end (marked)</text>
+  <text class="label-halo" x="100" y="136.43">3/4 in square 1018 CF</text>
+  <text class="label" x="20" y="236">The bar lying flat in the saw's vise. File both ends' burr off: the blank goes on parallels next.</text>
 </svg>

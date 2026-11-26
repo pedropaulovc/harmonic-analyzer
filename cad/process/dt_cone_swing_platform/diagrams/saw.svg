@@ -1,14 +1,14 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 300" font-family="sans-serif" font-size="13">
-  <rect class="paper" x="0" y="0" width="760" height="300"/>
-  <text class="title" x="20" y="20">Setup 1: saw the blank off the 1/4 x 2-1/2 in bar, flat on the saw bed</text>
-  <rect class="part-rest" x="30" y="110" width="700" height="70"/>
-  <rect class="part-kept" x="30" y="110" width="420" height="70"/>
-  <line class="leader" x1="450" y1="80" x2="450" y2="110"/>
-  <text class="label" x="400" y="72">saw cut</text>
-  <text class="label" x="150" y="200">blank 9.70–9.76 (aim 9.73)</text>
-  <text class="label" x="520" y="200">rest of the bar</text>
-  <line class="leader" x1="60" y1="240" x2="60" y2="181"/>
-  <text class="label" x="30" y="256">E: the straighter long edge</text>
-  <text class="label" x="38" y="150">U  E  (marked end)</text>
-  <text class="label" x="20" y="288">Mark U on the better face (the underside) and E on the straighter edge, at one end: the marked end.</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 270" width="760" height="270" font-family="sans-serif" font-size="13">
+  <!-- Plan, 2.6 px/mm: the 2-1/2 in bar (165 px wide), the blank 9.70-9.76 (aim 9.73 = 642.6 px) marked off; the miter saw's blade thickness not on record: drawn schematic on the waste side of the line. U and E are marked after sawing (Op 30). -->
+  <rect class="paper" x="0" y="0" width="760" height="270"/>
+  <text class="title" x="20" y="22">Setup 1: saw the blank off the 1/4 x 2-1/2 in bar, flat on the saw bed (2.6 px/mm)</text>
+  <rect class="part-kept" x="20" y="60" width="642.57" height="165.1"/>
+  <path class="part-rest" d="M666.57 60L748 60L745 67.18L748 74.36L745 81.53L748 88.71L745 95.89L748 103.07L745 110.25L748 117.43L745 124.6L748 131.78L745 138.96L748 146.14L745 153.32L748 160.5L745 167.67L748 174.85L745 182.03L748 189.21L745 196.39L748 203.57L745 210.74L748 217.92L748 225.1L666.57 225.1Z"/>
+  <path class="cutter" d="M662.57 40L666.57 40L666.57 240L664.57 237Z"/>
+  <text class="label" x="40" y="150">blank {{process.blank_length_min_mm:in.2f}}–{{process.blank_length_max_mm:in.2f}} (aim {{process.blank_length_mm:in.2f}})</text>
+  <text class="label" x="40" y="90">U E (marked end)</text>
+  <line class="leader" x1="60" y1="256" x2="50" y2="225.1"/>
+  <circle class="leader-dot" cx="50" cy="225.1" r="2"/>
+  <text class="label" x="70" y="260">E: the straighter long edge; U on the better face (the underside), both at the marked end</text>
+  <text class="label" x="372.57" y="200">Evolution saw blade (schematic), waste side</text>
 </svg>

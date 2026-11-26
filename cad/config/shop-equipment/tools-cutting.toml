@@ -290,12 +290,13 @@ cite = ["McMaster-Carr packing list, PO 0803PCAMPOS (1616317-01, 08/04/2025), li
 name = "Uncoated carbide square 3-flute end mill, 1/2 in, 3 in OAL"
 kind = "endmill"
 sku = "88815A45"
-status = "on_hand"
+status = "to_order"
+purchase = "One McMaster-Carr 88815A45, the same cutter, $96.42 (read live 2026-11-26, delivers next business day); in the McMaster cart, not ordered."
 pieces = 1
 flutes = 3
 oal_in = 3.0
 cite = ["McMaster-Carr packing list, PO 0803PCAMPOS (1616317-01, 08/04/2025), line 13: \"Uncoated Carbide Square 3-Flute End Mill, 1/2\" Mill Diameter, 3\" Overall Length\", 1 each", "Owner (Pedro) 2026-11-17: \"add to inventory ... already owned\""]
-note = "Measured on the owner's PM-30MV, dechatter 0.4.0 reports v5 and v6, 2026-11-22, R8 collet, 27.94 mm (1.100 in) stick-out as the owner measured it (the reports' setup field reads 30.0), side-milling 1018 (cad/process/dechatter/2026-11-22-pm30mv-em-half-carbide-1018-v5.html, -v6.html; cad/process/shop/ settings.em-half-carbide-1018-v5-face and -v6-deep; limits in measured-cuts.toml). Wider faces: session 1018-3.4mm-3fl-issue3439-v1, dechatter 0.5.0, 2026-11-23, setup stick-out 28.448 mm (cad/process/dechatter/2026-11-23-pm30mv-em-half-carbide-1018-issue3439-v1.html; settings.em-half-carbide-1018-3439-face)."
+note = "To buy: the one piece on hand is chipped (owner, 2026-11-26, reported through his retune session; PR #3634 paused); status set by delegated ruling 2026-11-26 (Main), no precedent; owner review #2144 (D46); owner form timed out. The measurements below were taken with that piece before the chip and stay valid for the replacement, the same McMaster-Carr 88815A45. Measured on the owner's PM-30MV, dechatter 0.4.0 reports v5 and v6, 2026-11-22, R8 collet, 27.94 mm (1.100 in) stick-out as the owner measured it (the reports' setup field reads 30.0), side-milling 1018 (cad/process/dechatter/2026-11-22-pm30mv-em-half-carbide-1018-v5.html, -v6.html; cad/process/shop/ settings.em-half-carbide-1018-v5-face and -v6-deep; limits in measured-cuts.toml). Wider faces: session 1018-3.4mm-3fl-issue3439-v1, dechatter 0.5.0, 2026-11-23, setup stick-out 28.448 mm (cad/process/dechatter/2026-11-23-pm30mv-em-half-carbide-1018-issue3439-v1.html; settings.em-half-carbide-1018-3439-face)."
 
 [tools.roughing-endmill-carbide-4fl-3-8]
 name = "Roughing carbide square end mill, TiN coated, 4-flute, 3/8 in, 1/2 in length of cut"

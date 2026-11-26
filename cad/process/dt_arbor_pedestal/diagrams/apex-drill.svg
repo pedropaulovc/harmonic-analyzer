@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 400" width="760" height="400" font-family="sans-serif" font-size="13">
+  <!-- As Setup 6's picture (from the front, +X right). The #43 drill, cutter_dia_mm 2.2606 = 6.8 px, 118 deg point, at X -22.860 Y -11.938 (NC line 82) at the bottom of its last peck: point Z 47.923 (apex_tip_height_mm 47.92), its full diameter apex_drill_past_mm .5 past the bore's wall. Drawn short to a break. -->
+  <rect class="paper" x="0" y="0" width="760" height="400"/>
+  <text class="title" x="20" y="22">Op 420, #43 drill (PA05 T5), 3 px/mm: the apex hole down into the bore</text>
+  <rect class="fixture-support" x="193.61" y="330" width="124.39" height="6"/>
+  <rect class="hidden" x="150" y="261.84" width="220" height="100"/>
+  <text class="label" x="380" y="265.84">jaw tops</text>
+  <text class="label" x="380" y="284">moving jaw in front (outline); the 7/8 in</text>
+  <text class="label" x="380" y="300">parallels under the seat at each jaw (top shown)</text>
+  <circle class="datum" cx="300" cy="314.76" r="3.5"/>
+  <text class="datum-label" x="308" y="308.76">X0: N</text>
+  <circle class="datum" cx="306" cy="330" r="3.5"/>
+  <text class="datum-label" x="380" y="334">Z0 the parallels' top (the seat)</text>
+  <text class="label" x="20" y="390">Looking at the moving jaw (from the front): +X right, +Y into the page; W at the fixed jaw behind.</text>
+  <path class="part-kept" d="M300 330L211.61 330L211.61 163.88L246.66 163.88L246.66 314.76L300 314.76Z"/>
+  <rect class="holes" x="211.61" y="182.32" width="35.05" height="28.65"/>
+  <path class="cutter" d="M234.81 70L234.81 184.19L231.42 186.23L228.03 184.19L228.03 70L231.42 67Z"/>
+  <line class="arrow" x1="210" y1="80" x2="210" y2="110"/>
+  <line class="leader" x1="380" y1="185" x2="234" y2="150"/>
+  <circle class="leader-dot" cx="234" cy="150" r="2"/>
+  <text class="label" x="384" y="189">#43 apex hole X −{{cad.apex_tap_z_from_min_mm:in.3dot}}, into the bore: pecks of</text>
+  <text class="label" x="384" y="205">{{process.apex_peck_mm:in.3dot}}, full retract; its full diameter {{process.apex_drill_past_mm:in.3dot}} past the wall</text>
+  <line class="leader" x1="380" y1="236" x2="236" y2="185.23"/>
+  <circle class="leader-dot" cx="236" cy="185.23" r="2"/>
+  <text class="label" x="384" y="240">point Z {{process.apex_tip_height_mm:.2f}} mm, in the bore</text>
+</svg>

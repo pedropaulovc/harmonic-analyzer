@@ -1,38 +1,19 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 780 330" font-family="sans-serif" font-size="13">
-  <rect class="paper" x="0" y="0" width="780" height="330"/>
-  <text class="title" x="20" y="20">Setup 1, the bar lying flat in the saw's vise (plan, 1 in = 25 px)</text>
-  <!-- The 24 in length: the blank, about 17.87 in, the kerf and the rest. -->
-  <rect class="part-rest" x="509.75" y="100" width="150.25" height="25"/>
-  <rect class="part-kept" x="60" y="100" width="446.75" height="25"/>
-  <rect class="part-removed" x="506.75" y="95" width="3" height="35"/>
-  <rect class="clamp" x="560" y="70" width="60" height="30"/>
-  <rect class="clamp" x="560" y="125" width="60" height="30"/>
-  <line class="dims" x1="60" y1="60" x2="506.75" y2="60"/>
-  <line class="dims" x1="60" y1="54" x2="60" y2="98"/>
-  <line class="dims" x1="506.75" y1="54" x2="506.75" y2="93"/>
-  <text class="label" x="200" y="52">blank {{process.blank_length_in:.2f}}–{{process.blank_length_max_in:.2f}} in</text>
-  <text class="label-halo" x="80" y="117">3/8 x 1 in 1018 cold-finished flat, lying on a 1 in face</text>
-  <line class="leader" x1="508.25" y1="131" x2="494" y2="152"/>
-  <text class="label" x="436" y="166">saw kerf</text>
-  <text class="label" x="632" y="92">rest of the bar</text>
-  <!-- The blank's marks. -->
-  <text class="title" x="20" y="200">The blank's marks, looking at F with T up</text>
-  <rect class="part-kept" x="60" y="230" width="446.75" height="25"/>
-  <text class="label-halo" x="270" y="247">F, the front face</text>
-  <line class="leader" x1="150" y1="230" x2="165" y2="218"/>
-  <text class="label" x="168" y="220">T, the top edge (the one it rocked on)</text>
-  <line class="datum" x1="506.75" y1="222" x2="506.75" y2="263"/>
-  <text class="datum-label" x="512" y="247">END A</text>
-  <text class="label" x="12" y="247">far end</text>
-  <line class="leader" x1="330" y1="255" x2="345" y2="268"/>
-  <text class="label" x="348" y="273">bottom edge</text>
-  <text class="label" x="60" y="296">the back face is the 1 in face behind F</text>
-  <!-- The bow check, the bow drawn large. -->
-  <text class="title" x="575" y="200">Bow check on the mill table</text>
-  <line class="fixture-table" x1="570" y1="262" x2="772" y2="262"/>
-  <path class="part-kept" d="M578 262 Q671 250 764 262 L764 244 Q671 232 578 244 Z"/>
-  <text class="label-halo" x="656" y="251">T up</text>
-  <line class="leader" x1="671" y1="259" x2="671" y2="282"/>
-  <text class="label" x="590" y="296">the .003 leaf must not enter</text>
-  <text class="label" x="590" y="313">here (the bow is drawn large)</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 780 230" width="780" height="230" font-family="sans-serif" font-size="13">
+  <!-- Hand picture, from above, to scale at 1.4 px/mm (35.56 px/in) from the bar's 1 in width and the blank drawn at its longest, blank_length_max_mm 455.168. The saw's kerf is not on record (the plan gives no kerf_in): drawn schematic, 3 px, the blade in it cut short to break lines. The saw's vise jaws' size is not on record: schematic. The rest of the bar is drawn short, to a break line. -->
+  <rect class="paper" x="0" y="0" width="780" height="230"/>
+  <text class="title" x="20" y="24">Setup 1: one blank off the 3/8 x 1 in bar, from above (to scale, 1.4 px/mm)</text>
+  <path class="part-rest" d="M680.24 100L760 100L763 104.44L760 108.89L763 113.34L760 117.78L763 122.22L760 126.67L763 131.12L760 135.56L680.24 135.56Z"/>
+  <rect class="part-kept" x="40" y="100" width="637.24" height="35.56"/>
+  <rect class="part-waste" x="677.24" y="100" width="3" height="35.56"/>
+  <rect class="clamp" x="688.24" y="78" width="60" height="22"/>
+  <rect class="clamp" x="688.24" y="135.56" width="60" height="22"/>
+  <text class="label" x="760" y="175.56" text-anchor="end">saw's vise</text>
+  <path class="cutter" d="M677.24 60L677.99 57L678.74 60L679.49 57L680.24 60L680.24 175.56L679.49 178.56L678.74 175.56L677.99 178.56L677.24 175.56Z"/>
+  <line class="dims" x1="40" y1="157.56" x2="677.24" y2="157.56"/>
+  <line class="dims" x1="40" y1="149.56" x2="40" y2="165.56"/>
+  <line class="dims" x1="677.24" y1="149.56" x2="677.24" y2="165.56"/>
+  <text class="label" x="358.62" y="175.56" text-anchor="middle">blank {{process.blank_length_in:.2f}}–{{process.blank_length_max_in:.2f}} in</text>
+  <text class="label" x="671.24" y="50" text-anchor="end">saw blade in its kerf (kerf schematic)</text>
+  <text class="label-halo" x="60" y="122.78">3/8 x 1 in 1018 cold-finished flat, lying on a 1 in face</text>
+  <text class="label" x="20" y="206">The bar lying flat in the saw's vise. Then the top edge (the bow check) and the marks on F and END A.</text>
 </svg>

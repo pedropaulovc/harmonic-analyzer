@@ -1,52 +1,61 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 450" font-family="sans-serif" font-size="13">
-  <rect class="paper" x="0" y="0" width="760" height="450"/>
-  <text class="title" x="20" y="18">SP02, plan (fixed jaw at the top): everything on the top in one clamping</text>
-  <!-- Vise jaws, the plate centred on them. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 500" font-family="sans-serif" font-size="13">
+  <!-- Setup 3. Plan (top), 2 px/mm, fixed jaw at the top: X0 Y0 (the stop and fence faces) at (65.4, 85.4); the jaws 6.247 in wide (vise_jaw_width_mm), the plate centred on them; hatched, what this setup removes. Section across the jaws (bottom), 3 px/mm, front at the left, at X 200. The first cut drawn: SP02's first tool, the 1/2 in end mill to scale (half_cutter_dia_mm 12.7) facing the fence top at Z 1.880 (fence_height_mm), on the pass that stands least past the fence and not over the fixed jaw: SP02's third pass, centre Y +5.850, fed +X from X -21.590 to 328.930 (its first two, Y +14.983 and +10.417, run out over the fixed jaw, 5.59 mm above its top); drawn at X +200. Its square end drawn as the near half of the end face, 12 % deep; drawn short to a break line (half_mill_projection_mm 48.8 out of the collet; the collet not drawn). Jaws' depth and the vise body are not on record: drawn schematic. Parallels 1/8 in thick (the shaft plans' parallel_thickness_mm; this plan does not restate it), 1 in + 1/2 in stacked (parallel_height_mm 38.1), broken.  -->
+  <rect class="paper" x="0" y="0" width="760" height="500"/>
+  <text class="title" x="20" y="24">SP02: the plate in the vise; the first cut, the fence top (plan 2 px/mm; section 4 px/mm)</text>
   <rect class="clamp" x="211.5" y="30" width="317.4" height="30"/>
   <rect class="clamp" x="211.5" y="212.4" width="317.4" height="30"/>
-  <!-- The plate; this setup removes the plate top round the fence and stop,
-       the notches, pockets, counterbore and holes. -->
   <rect class="part-kept" x="40" y="60" width="660" height="152.4"/>
   <rect class="part-removed" x="65.4" y="85.4" width="634.6" height="127"/>
   <rect class="part-removed" x="65.4" y="76.76" width="46.74" height="8.64"/>
   <rect class="part-removed" x="628.26" y="76.76" width="71.74" height="8.64"/>
   <rect class="holes" x="101.98" y="161.6" width="28.44" height="19.05"/>
-  <rect class="holes" x="267.08" y="161.6" width="28.44" height="19.05"/>
-  <rect class="holes" x="444.88" y="161.6" width="28.44" height="19.05"/>
-  <rect class="holes" x="609.98" y="161.6" width="28.44" height="19.05"/>
   <circle class="part-threads" cx="116.2" cy="169.22" r="2.3"/>
+  <rect class="holes" x="267.08" y="161.6" width="28.44" height="19.05"/>
   <circle class="part-threads" cx="281.3" cy="169.22" r="2.3"/>
+  <rect class="holes" x="444.88" y="161.6" width="28.44" height="19.05"/>
   <circle class="part-threads" cx="459.1" cy="169.22" r="2.3"/>
+  <rect class="holes" x="609.98" y="161.6" width="28.44" height="19.05"/>
   <circle class="part-threads" cx="624.2" cy="169.22" r="2.3"/>
   <circle class="holes" cx="370.2" cy="136.2" r="12.7"/>
   <circle class="part-threads" cx="370.2" cy="136.2" r="5.1"/>
-  <circle class="cutter" cx="719" cy="205" r="12.7"/>
-  <line class="arrow" x1="700" y1="190" x2="90" y2="190"/>
-  <text class="label-halo" x="480" y="205">cutter path: plate top, zigzag along X</text>
+  <circle class="cutter" cx="465.4" cy="73.7" r="12.7"/>
+  <line class="arrow" x1="481.4" y1="73.7" x2="690" y2="73.7"/>
+  <line class="leader" x1="548" y1="46" x2="471.4" y2="62.7"/>
+  <circle class="leader-dot" cx="471.4" cy="62.7" r="2"/>
+  <text class="label" x="550" y="50">1/2 in end mill, on the fence top</text>
   <line class="datum" x1="65.4" y1="72" x2="65.4" y2="100"/>
   <line class="datum" x1="52" y1="85.4" x2="80" y2="85.4"/>
   <text class="datum-label" x="70" y="104">X0 Y0</text>
-  <text class="label-halo" x="150" y="76">fence, .074 above Z0</text>
+  <text class="label-halo" x="100" y="78">fence, to {{cad.fence_height_in:.3dot}} above Z0</text>
   <text class="label-halo" x="42" y="140">stop</text>
   <line class="leader" x1="398" y1="136.2" x2="383" y2="136.2"/>
-  <text class="label-halo" x="400" y="140">counterbore .500 × .185, 10-32 thru</text>
+  <circle class="leader-dot" cx="383" cy="136.2" r="2"/>
+  <text class="label-halo" x="400" y="140">counterbore, 10-32 thru</text>
   <line class="leader" x1="266" y1="148" x2="274" y2="161.6"/>
+  <circle class="leader-dot" cx="274" cy="161.6" r="2"/>
   <text class="label-halo" x="262" y="150" text-anchor="end">4 clamp pockets, 4-40 thru</text>
-  <text class="label-halo" x="66" y="74">notch</text>
-  <text class="label-halo" x="640" y="74">notch</text>
-  <!-- Section across the jaws: the plate on the stacked parallels. -->
-  <text class="title" x="20" y="268">Section across the jaws, 1.5× the plan's scale (front at the left)</text>
-  <rect class="clamp" x="180" y="305.2" width="40" height="134.8"/>
-  <rect class="clamp" x="448.6" y="305.2" width="40" height="134.8"/>
-  <rect class="fixture-support" x="220" y="325.7" width="18" height="114.3"/>
-  <rect class="fixture-support" x="430.6" y="325.7" width="18" height="114.3"/>
-  <polygon class="part-kept" points="220,325.7 220,294 410.5,294 410.5,288.36 448.6,288.36 448.6,325.7"/>
-  <polygon class="part-removed" points="220,287.2 448.6,287.2 448.6,288.36 410.5,288.36 410.5,294 220,294"/>
-  <line class="fixture-table" x1="160" y1="440" x2="510" y2="440"/>
-  <line class="leader" x1="498" y1="276" x2="400" y2="294"/>
-  <text class="label" x="502" y="280">Z0 (plate top) .146 above the jaws</text>
-  <line class="leader" x1="498" y1="380" x2="440" y2="380"/>
-  <text class="label" x="502" y="384">1 in + 1/2 in parallels stacked</text>
-  <text class="label" x="502" y="404">plate gripped on its milled edges,</text>
-  <text class="label" x="502" y="420">.27 in the jaws, underside down</text>
+  <text class="label-halo" x="480" y="200">plate top to Z0</text>
+  <text class="title" x="20" y="268">Section across the jaws at X +200 (4 px/mm, front at the left)</text>
+  <rect class="clamp" x="95.2" y="374.83" width="40" height="97.43"/>
+  <rect class="clamp" x="440" y="374.83" width="40" height="97.43"/>
+  <path class="fixture-support" d="M147.9 402.26L147.9 472.26L144.72 475.26L141.55 472.26L138.38 475.26L135.2 472.26L135.2 402.26Z"/>
+  <path class="fixture-support" d="M440 402.26L440 472.26L436.82 475.26L433.65 472.26L430.48 475.26L427.3 472.26L427.3 402.26Z"/>
+  <path class="part-kept" d="M135.2 402.26L135.2 360L389.2 360L389.2 352.48L440 352.48L440 402.26Z"/>
+  <path class="part-removed" d="M135.2 360L135.2 351.46L440 351.46L440 352.48L389.2 352.48L389.2 360Z"/>
+  <path class="cutter" d="M438 346.38L438 290L433.77 293L429.53 290L425.3 293L421.07 290L416.83 293L412.6 290L408.37 293L404.13 290L399.9 293L395.67 290L391.43 293L387.2 290L387.2 346.38A25.4 6.1 0 0 0 438 346.38Z"/>
+  <text class="label" x="500" y="300">1/2 in end mill, to scale, the fence top's</text>
+  <text class="label" x="500" y="316">third pass (Y +5.850), its tip at</text>
+  <text class="label" x="500" y="332">Z {{cad.fence_height_in:.3dot}}; fed +X (toward you)</text>
+  <line class="leader" x1="498" y1="316" x2="438" y2="316"/>
+  <circle class="leader-dot" cx="438" cy="316" r="2"/>
+  <text class="label" x="500" y="372">Z0 (plate top) .146 above the jaws</text>
+  <line class="leader" x1="498" y1="368" x2="349.2" y2="360"/>
+  <circle class="leader-dot" cx="349.2" cy="360" r="2"/>
+  <text class="label" x="500" y="420">1 in + 1/2 in parallels stacked (broken);</text>
+  <text class="label" x="500" y="436">plate gripped on its milled edges,</text>
+  <text class="label" x="500" y="452">.27 in the jaws, underside down</text>
+  <line class="leader" x1="498" y1="416" x2="433.65" y2="432.26"/>
+  <circle class="leader-dot" cx="433.65" cy="432.26" r="2"/>
+  <text class="label" x="95.2" y="490.26">moving jaw</text>
+  <text class="label" x="20" y="340">hatched: the stock SP02 removes</text>
 </svg>

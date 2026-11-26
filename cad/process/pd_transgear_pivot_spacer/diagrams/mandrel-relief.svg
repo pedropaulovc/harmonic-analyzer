@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 400" width="760" height="400" font-family="sans-serif" font-size="13">
+  <!-- To scale, 400 px/in along and across the axis, from above (the cross-slide at the bottom). The bar stays in the jaws from Setup 1: its jaw fronts .6919 behind Setup 1's Z0 (cad.jaw_z_mm), the bar parted at .2169 (cad.part_off_in) plus the 1/16 kerf and faced .07 more off in Op 90, so the shoulder (DRO Z-.197, cad.length_in) is .4994 and the jaw fronts .6919 behind Setup 1's Z0: Z-.3895 here. The mandrel: the pilot .15 long (pilot_length_in) at the spacer's #11 hole, Ø.191 (cad.bore_dia_mm; fitted a light press), the body Ø.38 x .10 (mandrel_body_dia_in, mandrel_body_length_in), the root relief Ø.17 (relief_dia_in) one blade width long. The 3-jaw's body and jaws are schematic (their sizes are not on record). The P1 blade to scale across (shop cutoff-blade-p1, 1/16 = 25 px), its chuck-side face on the shoulder (backed off .0005, 0.2 px, not drawn), its tip at Ø.17; its length runs on past the break line (not on record). The spacer is not on the mandrel yet (Op 140). -->
+  <rect class="paper" x="0" y="0" width="760" height="400"/>
+  <text class="title" x="20" y="22">Setup 2, Op 110: the P1 blade relieves the pilot's root on the shoulder (to scale, 400 px/in)</text>
+  <rect class="fixture-vise" x="218.2" y="59" width="56" height="292"/>
+  <path class="part-rest" d="M30 105L351.2 105L351.2 305L30 305L27 297.86L30 290.71L27 283.57L30 276.43L27 269.29L30 262.14L27 255L30 247.86L27 240.71L30 233.57L27 226.43L30 219.29L27 212.14L30 205L27 197.86L30 190.71L27 183.57L30 176.43L27 169.29L30 162.14L27 155L30 147.86L27 140.71L30 133.57L27 126.43L30 119.29L27 112.14Z"/>
+  <rect class="part-rest" x="351.2" y="129" width="40" height="152"/>
+  <rect class="part-rest" x="391.2" y="166.8" width="60" height="76.4"/>
+  <rect class="part-removed" x="391.2" y="166.8" width="25" height="4.2"/>
+  <rect class="clamp" x="274.2" y="71" width="40" height="34"/>
+  <rect class="clamp" x="274.2" y="305" width="40" height="34"/>
+  <line class="centre-line" x1="20" y1="205" x2="740" y2="205"/>
+  <path class="cutter" d="M391.2 390L391.2 239L416.2 239L416.2 390L407.87 387L399.53 390Z"/>
+  <line class="arrow" x1="375.2" y1="380" x2="375.2" y2="330"/>
+  <line class="datum" x1="391.2" y1="52" x2="391.2" y2="96"/>
+  <text class="datum-label" x="397.2" y="62">the shoulder: DRO Z-{{cad.length_in:.3dot}} (Op 100)</text>
+  <text class="label" x="446.2" y="320">P1 blade, its chuck-side face on the</text>
+  <text class="label" x="446.2" y="336">shoulder, plunged to Ø{{process.relief_dia_in:.2dot}}, under</text>
+  <text class="label" x="446.2" y="352">the pilot: the AR's nose radius out</text>
+  <text class="label" x="446.2" y="368">of the corner (hatched, above)</text>
+  <line class="leader" x1="444.2" y1="316" x2="416.2" y2="300"/>
+  <circle class="leader-dot" cx="416.2" cy="300" r="2"/>
+  <text class="label" x="20" y="372">3-jaw, not opened since Setup 1</text>
+  <line class="leader" x1="120" y1="360" x2="294.2" y2="329"/>
+  <circle class="leader-dot" cx="294.2" cy="329" r="2"/>
+</svg>

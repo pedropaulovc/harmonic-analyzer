@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 490" width="760" height="490" font-family="sans-serif" font-size="13">
+  <!-- Setup 3. Section across the jaws at X 152.400, 5 px/mm, front at the left, Z0 the plate top at y 330. The #10-32 plug tap to scale across its major Ø.190 (the 10-32 thread), its end square with the round cue (its lead is not on record), its point drawn at the underside (the plan taps through). The T-handle wrench is schematic (not on record); the tap's length is schematic. The Fisher tap guide from the shop record (tools.tap-guide-fisher: shank Ø.500, 3 1/8 in overall, point Ø.1875; this plan does not restate them): its shank in the 1/2 in collet drawn short to a break line, its spring point in the wrench's centre hole. Tap, wrench and guide all in the tool colour; spindle off. Jaws' depth and the vise body are not on record: drawn schematic. Parallels 1/8 in thick (the shaft plans' parallel_thickness_mm; this plan does not restate it), 1 in + 1/2 in stacked (parallel_height_mm 38.1), broken.  -->
+  <rect class="paper" x="0" y="0" width="760" height="490"/>
+  <text class="title" x="20" y="24">Setup 3, SP03_tap_hub: the #10-32 tap under the tap guide, in the hub hole (5 px/mm)</text>
+  <rect class="clamp" x="139" y="348.54" width="40" height="104.29"/>
+  <rect class="clamp" x="560" y="348.54" width="40" height="104.29"/>
+  <path class="fixture-support" d="M194.88 382.83L194.88 452.83L190.91 455.83L186.94 452.83L182.97 455.83L179 452.83L179 382.83Z"/>
+  <path class="fixture-support" d="M560 382.83L560 452.83L556.03 455.83L552.06 452.83L548.09 455.83L544.12 452.83L544.12 382.83Z"/>
+  <path class="part-kept" d="M179 382.83L179 330L337.75 330L337.75 353.5L401.25 353.5L401.25 330L496.5 330L496.5 320.6L560 320.6L560 382.83Z"/>
+  <rect class="part-threads" x="357.44" y="353.5" width="24.13" height="29.34"/>
+  <path class="cutter" d="M381.56 379.93L381.56 283.5L357.44 283.5L357.44 379.93A12.06 2.9 0 0 0 381.56 379.93Z"/>
+  <rect class="cutter" x="299.5" y="274.5" width="140" height="9"/>
+  <rect class="cutter" x="358.5" y="258.5" width="22" height="25"/>
+  <path class="cutter" d="M401.25 205.88L401.25 30L397.28 33L393.31 30L389.34 33L385.38 30L381.41 33L377.44 30L373.47 33L369.5 30L365.53 33L361.56 30L357.59 33L353.62 30L349.66 33L345.69 30L341.72 33L337.75 30L337.75 205.88A31.75 7.62 0 0 0 401.25 205.88Z"/>
+  <path class="cutter" d="M357.59 212.5L381.41 212.5L381.41 243.5L369.5 258.5L357.59 243.5Z"/>
+  <text class="label" x="433.5" y="50">Fisher tap guide, its 1/2 in shank in</text>
+  <text class="label" x="433.5" y="66">the 1/2 in collet, spindle OFF</text>
+  <line class="leader" x1="429.5" y1="56" x2="401.25" y2="56"/>
+  <circle class="leader-dot" cx="401.25" cy="56" r="2"/>
+  <text class="label" x="433.5" y="225.5">its 3/16 spring point in the</text>
+  <text class="label" x="433.5" y="241.5">wrench's centre hole</text>
+  <line class="leader" x1="429.5" y1="233.5" x2="381.41" y2="233.5"/>
+  <circle class="leader-dot" cx="381.41" cy="233.5" r="2"/>
+  <text class="label" x="503.5" y="281.5">T-handle wrench (schematic)</text>
+  <line class="leader" x1="499.5" y1="277.5" x2="439.5" y2="277.5"/>
+  <circle class="leader-dot" cx="439.5" cy="277.5" r="2"/>
+  <text class="label" x="20" y="262.83">#10-32 plug tap, by hand, through,</text>
+  <text class="label" x="20" y="278.83">its point drawn at the underside</text>
+  <line class="leader" x1="60" y1="282.83" x2="357.44" y2="378.83"/>
+  <circle class="leader-dot" cx="357.44" cy="378.83" r="2"/>
+  <text class="label" x="135" y="468.83">moving jaw</text>
+  <text class="label" x="560" y="468.83">fixed jaw</text>
+</svg>
