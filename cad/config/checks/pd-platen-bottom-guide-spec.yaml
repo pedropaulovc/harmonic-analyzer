@@ -14,7 +14,7 @@ checks:
     check: "the rack's floor band is not this rail's .XXX height and counterbore depth bands"
     kind: thread
     reason: "a rack screw bottoms in its tap's lead"
-    source: "the floor under the counterbore carries the rail height's title-block .XXX (±.005) and the depth's own ±.005 (owner ruling 2026-11-25, #3620); pd_feed_rack_spec.SCREW_FLOOR is sized on that .010 so the longest screw on the thinnest floor stops at the least full thread (SCREW_TIP_REACH_MAX); at the wizard's ±.01 it ran .005 into the lead"
+    source: "the floor under the counterbore carries the rail height's title-block .XXX (±.005) and the depth's own ±.005 (owner ruling 2026-11-25, #3620: \"b: Ø.110 +.004/−0 and depth .469 ±.005\"); pd_feed_rack_spec.SCREW_FLOOR is sized on that .010 so the longest screw on the thinnest floor stops at the least full thread with margin 0 (ZERO; pd_feed_rack_spec.SCREW_TIP_MARGIN, checks/pd-feed-rack-spec.yaml C-01; option b's sketch line reads \"tip short of lead +0.0000\"); at the wizard's ±.01 it ran .005 into the lead"
     basis: worst_case
   - id: C-03
     check: "a rack-screw counterbore breaks the rail's front face"

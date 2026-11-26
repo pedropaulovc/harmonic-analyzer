@@ -154,10 +154,11 @@ SCREW_CALLOUT_BELOW = (
 )
 # The counterbore prints its own bands (owner ruling 2026-11-25, #3620: "b:
 # Ø.110 +.004/−0 and depth .469 ±.005"; build_pd_platen_bottom_guide puts them
-# on the Hole Wizard feature, _print_counterbore_bands their places) and,
-# straight under its row, the function those bands hold, option b's words: the
-# floor they leave sets the rack screws' engagement in the rack's taps.
-SCREW_CBORE_FUNCTION = f"SETS ENGAGEMENT OF {SCREW_NUMBER}"
+# on the Hole Wizard feature, _print_counterbore_bands their places). It names
+# no function: a dimension with its own band needs none (rule 3), the floor's
+# reason is already the height's (HEIGHT_CALLOUT: the floor is the height less
+# this depth), and one reason on two dimensions is narration (rule 7). Its two
+# word lines are the transfer and the stated wall (rule 7: at most two).
 # The callout's three places print the bands' deviations too.
 SCREW_CBORE_PLACES = {"hw-cbdia": 3, "hw-cbdepth": 3}
 TAPPED_HOLE_NOTE = "Tapped Hole"
@@ -552,7 +553,7 @@ def build(adapter: Any) -> dict[str, str]:
          PLATEN_CALLOUT_BELOW,
          f"platen-screw taps ({PLATEN_TAP_SPEC.size})"),
         (top, SCREW_HOLE_X[0], SCREW_CBORE_DIA, SCREW_CALLOUT_XY,
-         f"{SCREW_CBORE_FUNCTION}\n{SCREW_CALLOUT_BELOW}",
+         SCREW_CALLOUT_BELOW,
          "rack-screw counterbores"),
     ):
         callout = add_native_hole_callout(

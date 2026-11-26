@@ -183,7 +183,7 @@ def test_the_height_band_names_its_screw_by_number() -> None:
     assert drawing.HEIGHT_CALLOUT.splitlines() == ["SETS ENGAGEMENT", "OF MHA-SH-VN-59"]
 
 
-def test_the_counterbore_prints_the_owners_bands_and_names_their_function() -> None:
+def test_the_counterbore_prints_the_owners_bands_in_two_word_lines() -> None:
     # Owner ruling 2026-11-25 (#3620): "b: Ø.110 +.004/−0 and depth .469
     # ±.005". Without them the wizard pocket's ±.01 (rule 3) fails the head
     # entry, the tap lead, the printed engagement and the printed wall.
@@ -192,13 +192,18 @@ def test_the_counterbore_prints_the_owners_bands_and_names_their_function() -> N
     assert spec.SCREW_CBORE_DEPTH == pytest.approx(_in(0.469))
     assert spec.SCREW_CBORE_DEPTH_BAND == pytest.approx((_in(0.005), -_in(0.005)))
     # The part bands the Hole Wizard feature; the sheet prints both bands at
-    # the callout's three places and the function straight under its row.
+    # the callout's three places.
     assert drawing.SCREW_CBORE_PLACES == {"hw-cbdia": 3, "hw-cbdepth": 3}
-    assert drawing.SCREW_CBORE_FUNCTION == "SETS ENGAGEMENT OF MHA-SH-VN-59"
-    assert len(drawing.SCREW_CBORE_FUNCTION.split()) - 1 <= 6
-    # The worst cases at the printed bands, inch.
+    # Rule 7: at most two word lines on a callout, and one reason once: the
+    # engagement the floor sets is named by the height alone.
+    assert drawing.SCREW_CALLOUT_BELOW.splitlines() == [
+        "TRANSFER FROM MHA-PD-26 AT ASSEMBLY",
+        "WALL .044 MIN TO FRONT FACE",
+    ]
+    assert "ENGAGEMENT" in drawing.HEIGHT_CALLOUT
+    # The worst cases at the printed bands, inch. The tip margin is ZERO.
     assert spec.SCREW_HEAD_ENTRY_MIN / 25.4 == pytest.approx(0.007, abs=1e-4)
-    assert rack.SCREW_TIP_REACH_MAX <= rack.TAP_THREAD_DEPTH_MIN + 1e-9
+    assert rack.SCREW_TIP_MARGIN == 0.0
     assert rack.ENGAGEMENT_WORST >= _in(0.032)
     assert rack.ENGAGEMENT_STATEMENT == "ENGAGEMENT .032 MIN (0.54D)"
     assert spec.SCREW_CBORE_FRONT_WALL_MIN >= _in(0.044)

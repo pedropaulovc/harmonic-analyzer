@@ -336,8 +336,19 @@ SCREW_FIRST_THREAD_LOSS = _screw.PITCH
 SCREW_FLOOR_BAND = 2.0 * TAP_BAND  # rail height .XXX + counterbore depth's own ±.005
 SCREW_FLOOR = _ceil_in(SCREW_LENGTH - TAP_THREAD_DEPTH_MIN + SCREW_FLOOR_BAND)  # .155
 SCREW_TIP_REACH_MAX = SCREW_LENGTH - (SCREW_FLOOR - SCREW_FLOOR_BAND)
-if SCREW_TIP_REACH_MAX > TAP_THREAD_DEPTH_MIN + 1e-9:
-    raise AssertionError("the longest rack screw can reach its tap's lead")
+# The margin is ZERO at the printed bands: the longest .250 screw on the
+# thinnest .145 floor reaches .105, the tap's least full thread exactly. The
+# owner chose this form knowing it: "b: Ø.110 +.004/−0 and depth .469 ±.005"
+# (owner ruling 2026-11-25, #3620), over option b's sketch line "tip short of
+# lead +0.0000" (cbore-band-audit-2026-11-25/bottom-guide-cbore-options.png).
+# The guard has no rounding and no epsilon: the difference is exactly 0.0 mm
+# here, and any negative fails.
+SCREW_TIP_MARGIN = TAP_THREAD_DEPTH_MIN - SCREW_TIP_REACH_MAX
+if not SCREW_TIP_MARGIN >= 0.0:
+    raise AssertionError(
+        "the longest rack screw can reach its tap's lead (margin is zero at the "
+        "printed bands; any negative fails)"
+    )
 # Full-thread engagement: shortest stock on the thickest floor, the screw's
 # first thread and the tap's mouth break lost (rule 18 counts full threads
 # only); nominal: the catalogue length on the nominal floor.

@@ -140,10 +140,14 @@ def test_bottom_guide_guards_hold_at_the_printed_bands() -> None:
     floor_max = height_max - depth_min
     assert rack.SCREW_FLOOR - rack.SCREW_FLOOR_BAND <= floor_min + TOL
     assert rack.SCREW_FLOOR + rack.SCREW_FLOOR_BAND >= floor_max - TOL
-    # The longest screw on the thinnest floor stops short of the tap's lead.
+    # The longest screw on the thinnest floor stops at the tap's least full
+    # thread: the margin is ZERO (pd_feed_rack_spec.SCREW_TIP_MARGIN). TOL,
+    # 1e-9 mm (4e-11 in), only absorbs float noise in the manifest's inch
+    # limits; a negative margin any larger fails.
     tip_reach = rack.SCREW_LENGTH - floor_min
     assert rack.SCREW_TIP_REACH_MAX >= tip_reach - TOL
     assert tip_reach <= rack.TAP_THREAD_DEPTH_MIN + TOL
+    assert rack.SCREW_TIP_MARGIN == 0.0
     # The shortest screw on the thickest floor engages what MHA-PD-26 prints.
     engagement = (
         rack.SCREW_LENGTH_MIN
