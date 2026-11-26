@@ -172,10 +172,12 @@ def test_a_root_band_the_1_8_end_mill_cannot_leave_is_refused() -> None:
         ({"tab_station_7_mm": 178.811}, "tab_station_7_mm"),
         ({"jaw_start_mm": 20.0}, "jaw_start_mm"),
         # The jaw-top band's ends: the grip floor, the faced hub's clearance,
-        # and a plate faced past the band (.015 lifts the jaws to .2845).
+        # and a plate faced past the band (.020 lifts the jaws to .2645).
         ({"jaw_top_min_mm": 5.9}, "shop's minimum"),
         ({"jaw_top_max_mm": 7.2}, "clear of the jaws' top"),
-        ({"spoil_plate_face_mm": 0.381}, "outside the traveler's band"),
+        ({"spoil_plate_face_mm": 0.508}, "outside the traveler's band"),
+        # Five .005 strips a parallel make the .025 shim (#3607, D41).
+        ({"support_shim_strips": 4}, "support_shim_mm"),
         ({"hub_from_end_mm": 8.0}, "end margins"),
         ({"spot_dia_mm": 2.0}, "under the #47"),
         ({"ring_half_angle_deg": 50}, "short of the bar-to-hub roots"),

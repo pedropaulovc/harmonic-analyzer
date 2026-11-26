@@ -491,30 +491,36 @@ def context(
     _agree(plan, "pocket_b_floor_mm", floor_b)
     _agree(plan, "pocket_a_floor_mm", floor_a)
 
-    # Holding: the spoil plate on the parallels; the jaws' top above Z0.
-    # The traveler gauges the jaws' top above the faced plate against a band
-    # (jaw_top_min_mm-jaw_top_max_mm); the guards and the keep-outs run at
-    # that band's ends, so any plate the band accepts is proved. The
-    # as-bought plate, before and after its one facing, must land inside it.
-    support = p["parallel_height_mm"] + p["spoil_plate_thickness_mm"]
+    # Holding: the spoil plate on the shim strips on the parallels; the jaws'
+    # top above Z0. The traveler gauges the jaws' top above the faced plate
+    # against a band (jaw_top_min_mm-jaw_top_max_mm); the guards and the
+    # keep-outs run at that band's ends, so any plate the band accepts is
+    # proved. The as-bought plate, before and after its one facing, must land
+    # inside it.
+    shim = p["support_shim_strips"] * p["support_shim_leaf_in"] * IN
+    _agree(plan, "support_shim_mm", shim)
+    under = p["parallel_height_mm"] + shim
+    support = under + p["spoil_plate_thickness_mm"]
     _agree(plan, "support_height_mm", support)
     jaw_top_min, jaw_top_max = p["jaw_top_min_mm"], p["jaw_top_max_mm"]
     if jaw_top_min < shop["limits"]["vise_grip_min_mm"]:
         raise ValueError("the jaws grip the blanks less than the shop's minimum")
-    if jaw_top_max >= hub_t - 0.5:
+    # CL01 faces B over the moving jaw: the band's high end leaves the shop's
+    # jaw-clearance floor under the faced hub (#3607).
+    if hub_t - jaw_top_max < p["jaw_clear_min_mm"] - 1e-6:
         raise ValueError("the faced blanks do not stand clear of the jaws' top")
     for plate_t_now in (
         p["spoil_plate_thickness_mm"],
         p["spoil_plate_thickness_mm"] - p["spoil_plate_face_mm"],
     ):
-        jaw_top_now = p["vise_jaw_height_mm"] - p["parallel_height_mm"] - plate_t_now
+        jaw_top_now = p["vise_jaw_height_mm"] - under - plate_t_now
         if not jaw_top_min <= jaw_top_now <= jaw_top_max:
             raise ValueError(
                 f"a {plate_t_now:.3f} mm spoil plate puts the jaws' top "
                 f"{jaw_top_now:.3f} mm above it, outside the traveler's band"
             )
     # The thinnest plate the band accepts.
-    plate_t_min = p["vise_jaw_height_mm"] - p["parallel_height_mm"] - jaw_top_max
+    plate_t_min = p["vise_jaw_height_mm"] - under - jaw_top_max
     jaw_w = p["vise_jaw_width_mm"]
     jaw_x0 = (p["blank_length_in"] * IN - jaw_w) / 2
     _agree(plan, "jaw_start_mm", jaw_x0)

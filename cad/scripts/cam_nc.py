@@ -179,7 +179,6 @@ def _program(directory: Path, name: str, cache: dict[str, _gcode.Program]) -> _g
 # listed file no longer falls under the floor: its owner empties its entry once
 # fixed. Nothing else exempts a file from the floor.
 KNOWN_JAW_CLEARANCE_VIOLATIONS: dict[str, str] = {
-    "CL01_face_b.nc": "#3607 (ch_channel_lever: 0.521 mm over the moving jaw); not to be run until fixed",
     "PG15_height.nc": "#3607 (pd_platen_guide: 0.521 mm over the fixed jaw); not to be run until fixed",
 }
 
