@@ -21,7 +21,7 @@
   <line class="leader" x1="398" y1="196" x2="275.18" y2="220"/>
   <circle class="leader-dot" cx="275.18" cy="220" r="2"/>
   <text class="label" x="400" y="250">toolpath: the cutter's centre, 0.94 mm about</text>
-  <text class="label" x="400" y="266">the slot's two end centres</text>
+  <text class="label" x="400" y="266">the slot's two end centres, {{cad.clamp_slot_3_run_in:.3dot}} apart</text>
   <line class="leader" x1="398" y1="246" x2="234.15" y2="190"/>
   <circle class="leader-dot" cx="234.15" cy="190" r="2"/>
   <text class="title" x="20" y="366">From above (1.5 px/mm), the fixed jaw at the top</text>

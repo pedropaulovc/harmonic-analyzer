@@ -7,14 +7,18 @@
   <rect class="part-waste" x="660.65" y="110" width="7.14" height="28.57"/>
   <rect class="clamp" x="675.79" y="84" width="46.01" height="26"/>
   <rect class="clamp" x="675.79" y="138.57" width="46.01" height="26"/>
-  <text class="label" x="698.8" y="182.57" text-anchor="middle">saw's vise</text>
+  <text class="label" x="675.79" y="182.57">saw's vise</text>
   <path class="cutter" d="M660.65 70L662.43 67L664.22 70L666.01 67L667.79 70L667.79 178.57L666.01 181.57L664.22 178.57L662.43 181.57L660.65 178.57Z"/>
   <line class="dims" x1="40" y1="160.57" x2="660.65" y2="160.57"/>
   <line class="dims" x1="40" y1="152.57" x2="40" y2="168.57"/>
   <line class="dims" x1="660.65" y1="188.57" x2="660.65" y2="152.57"/>
   <text class="label" x="350.32" y="178.57" text-anchor="middle">blank {{process.blank_length_min_in:.2f}}–{{process.blank_length_max_in:.2f}} in</text>
   <text class="label" x="654.65" y="202.57" text-anchor="end">saw blade in its {{process.kerf_in:.3dot}} kerf</text>
+  <line class="leader" x1="656.65" y1="196.57" x2="664.22" y2="174.57"/>
+  <circle class="leader-dot" cx="664.22" cy="174.57" r="2"/>
   <text class="label" x="760" y="58" text-anchor="end">rest of the 12 in piece (about 1 in)</text>
+  <line class="leader" x1="695.8" y1="62" x2="717.8" y2="114"/>
+  <circle class="leader-dot" cx="717.8" cy="114" r="2"/>
   <line class="datum" x1="40" y1="90" x2="40" y2="172.57"/>
   <text class="datum-label" x="44" y="84">LEFT end (marked)</text>
   <text class="label-halo" x="100" y="129.29">3/8 x 1/2 in 1018 CF flat, a 1/2 in face down</text>

@@ -378,6 +378,7 @@ gauge_checks = "other"
 [[setups.operations]]
 instruction = "Find the top edge. Stand the blank on each long edge in turn on the clean mill table, along the land between two T-slots. The edge it rocks on (bowed outward) becomes the top face: mark it T with marking fluid. No rock on either edge: mark either one T."
 inspection = "The blank standing on its other edge (T up): the .003 feeler leaf does not enter under its middle. Enters: stop and tell the owner (the skim would not clean T's ends)."
+diagram = { file = "diagrams/bow.svg", alt = "The blank standing on its bottom edge on the mill table, seen on F, T up, the bow drawn large: the {{process.bow_max_mm:in.3dot}} feeler leaf at the middle must not enter under it." }
 gauge_checks = "other"
 feed = "hand"
 

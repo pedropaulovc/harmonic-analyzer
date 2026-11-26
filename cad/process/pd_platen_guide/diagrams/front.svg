@@ -20,7 +20,7 @@
   <text class="datum-label" x="134.95" y="276.68" text-anchor="end">Z0, the</text>
   <text class="datum-label" x="134.95" y="292.68" text-anchor="end">skimmed</text>
   <text class="datum-label" x="134.95" y="308.68" text-anchor="end">face (F)</text>
-  <text class="label-halo" x="271.35" y="317.8" text-anchor="middle">U</text>
+  <text class="label-halo" x="275.35" y="314.6" text-anchor="middle">U</text>
   <text class="title" x="440" y="50">From above (1 px/mm), fixed jaw at the top</text>
   <rect class="clamp" x="518.59" y="70" width="158.67" height="16"/>
   <rect class="clamp" x="518.59" y="94.76" width="158.67" height="16"/>
@@ -28,7 +28,7 @@
   <circle class="cutter" cx="581.52" cy="88.91" r="6.35"/>
   <line class="arrow" x1="601.52" y1="124.76" x2="531.52" y2="124.76"/>
   <line class="datum" x1="461.52" y1="64" x2="461.52" y2="116.76"/>
-  <text class="datum-label" x="461.52" y="60" text-anchor="middle">X0</text>
+  <text class="datum-label" x="457.52" y="90" text-anchor="end">X0</text>
   <text class="label" x="440" y="146.76">Arrowed: this pass runs -X, along the rail;</text>
   <text class="label" x="440" y="162.76">the passes zigzag across it, end to end.</text>
   <text class="label" x="440" y="186.76">1/2 in end mill, PG03's pass Y-2.913,</text>

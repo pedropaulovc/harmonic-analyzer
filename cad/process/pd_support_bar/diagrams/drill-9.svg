@@ -29,9 +29,9 @@
   <text class="label" x="480" y="138">spot first, not drawn</text>
   <line class="leader" x1="478" y1="102" x2="313.96" y2="209.5"/>
   <circle class="leader-dot" cx="313.96" cy="209.5" r="2"/>
-  <text class="label" x="480" y="340">its point at Z{{process.drill_9_tip_mm:in.3dot}},</text>
-  <text class="label" x="480" y="356">in the air between the stacks</text>
-  <line class="leader" x1="478" y1="336" x2="306" y2="325.58"/>
+  <text class="label" x="480" y="370">its point at Z{{process.drill_9_tip_mm:in.3dot}},</text>
+  <text class="label" x="480" y="386">in the air between the stacks</text>
+  <line class="leader" x1="478" y1="366" x2="306" y2="325.58"/>
   <circle class="leader-dot" cx="306" cy="325.58" r="2"/>
   <text class="label" x="480" y="430">three 1.5 in stacks; the .125 pin on</text>
   <text class="label" x="480" y="446">the outer one, the moving jaw on it</text>

@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 780 170" width="780" height="170" font-family="sans-serif" font-size="13">
+  <!-- Hand picture, the blank standing on its bottom edge (T up) on the mill table, seen on F, its length and width to scale at 1.4 px/mm (blank_length_max_mm 455.168, 25.4 mm). The bow is drawn large, 8 px: the limit, bow_max_mm 0.0762 (.003), is a tenth of a pixel here. The feeler leaf drawn at the blank's middle, schematic (its width not on record). -->
+  <rect class="paper" x="0" y="0" width="780" height="170"/>
+  <text class="title" x="20" y="24">Setup 1: the bow check on the mill table, T up (to scale along the blank; the bow drawn large)</text>
+  <rect class="fixture-table" x="10" y="110" width="760" height="14"/>
+  <path class="part-kept" d="M40.0 110.0 Q358.6176 94.0 677.2352 110.0 L677.2352 74.44 Q358.6176 58.44 40.0 74.44Z"/>
+  <text class="label-halo" x="358.62" y="92.22" text-anchor="middle">F</text>
+  <text class="label" x="198.62" y="56.44">T up (the edge it rocked on, bowed outward)</text>
+  <rect class="fixture-support" x="355.62" y="108" width="30" height="2"/>
+  <text class="label" x="418.62" y="144">the {{process.bow_max_mm:in.3dot}} feeler leaf must not enter under the middle;</text>
+  <text class="label" x="418.62" y="160">enters: stop and tell the owner</text>
+  <line class="leader" x1="414.62" y1="140" x2="368.62" y2="109"/>
+  <circle class="leader-dot" cx="368.62" cy="109" r="2"/>
+  <text class="label" x="40" y="144">mill table, the land between two T-slots</text>
+</svg>

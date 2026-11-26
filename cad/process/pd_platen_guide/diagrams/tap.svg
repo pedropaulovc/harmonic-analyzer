@@ -36,4 +36,7 @@
   <text class="label" x="440" y="360">F down on the stack, U against the</text>
   <text class="label" x="440" y="376">FIXED jaw, the top against the moving</text>
   <text class="label" x="440" y="392">jaw, R up, LEFT end to the left.</text>
+  <text class="label" x="440" y="430">the stack</text>
+  <line class="leader" x1="438" y1="426" x2="271.3" y2="430"/>
+  <circle class="leader-dot" cx="271.3" cy="430" r="2"/>
 </svg>

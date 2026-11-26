@@ -28,8 +28,8 @@
   <text class="label" x="480" y="122">mouth Ø{{process.csk_dia_mm:in.3dot}}, under Ø{{cad.pivot_tap_csk_dia_max_in:.3dot}} MAX</text>
   <line class="leader" x1="478" y1="102" x2="314.7" y2="229.5"/>
   <circle class="leader-dot" cx="314.7" cy="229.5" r="2"/>
-  <text class="label" x="480" y="340">the #29 hole (Setup 3)</text>
-  <line class="leader" x1="478" y1="336" x2="306.91" y2="327.6"/>
+  <text class="label" x="480" y="370">the #29 hole (Setup 3)</text>
+  <line class="leader" x1="478" y1="366" x2="306.91" y2="327.6"/>
   <circle class="leader-dot" cx="306.91" cy="327.6" r="2"/>
   <text class="label" x="480" y="400">three 1.5 in stacks; the .125 pin on</text>
   <text class="label" x="480" y="416">the outer one, the moving jaw on it</text>

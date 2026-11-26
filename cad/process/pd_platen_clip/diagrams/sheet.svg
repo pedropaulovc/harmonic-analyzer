@@ -75,17 +75,19 @@
   <rect class="part-kept" x="906.55" y="521.8" width="203.45" height="2"/>
   <text class="label-on-clamp" x="831" y="590" text-anchor="middle">moving</text>
   <text class="label-on-clamp" x="1135" y="590" text-anchor="middle">fixed</text>
-  <text class="label" x="790" y="340">blanks A (at the fixed jaw) and B, .032, on the</text>
-  <text class="label" x="790" y="356">tape stack {{process.tape_stack_min_mm:in.3dot}}–{{process.tape_stack_max_mm:in.3dot}}: one line here</text>
-  <line class="leader" x1="788" y1="352" x2="1050" y2="522.8"/>
-  <circle class="leader-dot" cx="1050" cy="522.8" r="2"/>
-  <text class="label" x="790" y="390">spoil plate 1/2 in, its back edge on the fixed</text>
-  <text class="label" x="790" y="406">jaw; jaw tops {{process.jaw_top_over_plate_mm:in.3dot}} above it</text>
-  <line class="leader" x1="788" y1="402" x2="916" y2="533.8"/>
-  <circle class="leader-dot" cx="916" cy="533.8" r="2"/>
-  <text class="label" x="790" y="440">1 in parallels, one at each jaw</text>
-  <line class="leader" x1="788" y1="436" x2="860" y2="580"/>
+  <text class="label" x="1000" y="410">blanks A and B, .032,</text>
+  <text class="label" x="1000" y="426">on the tape stack</text>
+  <text class="label" x="1000" y="442">{{process.tape_stack_min_mm:in.3dot}}–{{process.tape_stack_max_mm:in.3dot}}: one line</text>
+  <line class="leader" x1="1040" y1="450" x2="1040" y2="521.8"/>
+  <circle class="leader-dot" cx="1040" cy="521.8" r="2"/>
+  <text class="label" x="790" y="410">spoil plate 1/2 in, its</text>
+  <text class="label" x="790" y="426">back edge on the fixed</text>
+  <text class="label" x="790" y="442">jaw; jaw tops {{process.jaw_top_over_plate_mm:in.3dot}} above</text>
+  <line class="leader" x1="880" y1="450" x2="896" y2="533.8"/>
+  <circle class="leader-dot" cx="896" cy="533.8" r="2"/>
+  <text class="label" x="880" y="640">1 in parallels, one at each jaw</text>
+  <line class="leader" x1="878" y1="630" x2="860" y2="580"/>
   <circle class="leader-dot" cx="860" cy="580" r="2"/>
-  <line class="leader" x1="788" y1="436" x2="1106" y2="580"/>
+  <line class="leader" x1="1100" y1="630" x2="1106" y2="580"/>
   <circle class="leader-dot" cx="1106" cy="580" r="2"/>
 </svg>

@@ -28,9 +28,9 @@
   <text class="label" x="480" y="122">{{process.drill_past_mm:in.3dot}} past the back face</text>
   <line class="leader" x1="478" y1="102" x2="308.91" y2="209.5"/>
   <circle class="leader-dot" cx="308.91" cy="209.5" r="2"/>
-  <text class="label" x="480" y="340">its point at Z{{process.drill_29_tip_mm:in.3dot}},</text>
-  <text class="label" x="480" y="356">in the air between the stacks</text>
-  <line class="leader" x1="478" y1="336" x2="304" y2="323.75"/>
+  <text class="label" x="480" y="370">its point at Z{{process.drill_29_tip_mm:in.3dot}},</text>
+  <text class="label" x="480" y="386">in the air between the stacks</text>
+  <line class="leader" x1="478" y1="366" x2="304" y2="323.75"/>
   <circle class="leader-dot" cx="304" cy="323.75" r="2"/>
   <text class="label" x="480" y="430">three 1.5 in stacks; the .125 pin on</text>
   <text class="label" x="480" y="446">the outer one, the moving jaw on it</text>

@@ -29,8 +29,8 @@
   <line class="dims" x1="50" y1="320" x2="50" y2="348"/>
   <line class="dims" x1="197.6" y1="320" x2="197.6" y2="348"/>
   <text class="label" x="123.8" y="360" text-anchor="middle">X0 {{process.x0_from_bar_left_mm:in.3f}}</text>
-  <line class="leader" x1="190" y1="328" x2="220" y2="372"/>
-  <circle class="leader-dot" cx="220" cy="372" r="2"/>
+  <line class="leader" x1="220" y1="368" x2="190" y2="316"/>
+  <circle class="leader-dot" cx="190" cy="316" r="2"/>
   <text class="label" x="224" y="376">scribed line {{process.blank_left_mm:in.2f}} from the left end</text>
   <line class="dims" x1="814" y1="93.8" x2="814" y2="320"/>
   <line class="dims" x1="806" y1="320" x2="822" y2="320"/>
@@ -44,8 +44,8 @@
   <line class="leader" x1="400" y1="44" x2="410" y2="108"/>
   <circle class="leader-dot" cx="410" cy="108" r="2"/>
   <text class="label" x="700" y="40">step clamps on studs (schematic)</text>
-  <line class="leader" x1="740" y1="44" x2="740" y2="150.63"/>
-  <circle class="leader-dot" cx="740" cy="150.63" r="2"/>
+  <line class="leader" x1="740" y1="44" x2="740" y2="160.63"/>
+  <circle class="leader-dot" cx="740" cy="160.63" r="2"/>
   <text class="label" x="890" y="404" text-anchor="end">4 relief pockets, Ø.500 × {{process.relief_depth_mm:in.3dot}} deep (PL02, next)</text>
   <line class="leader" x1="800" y1="392" x2="619.43" y2="300.8"/>
   <circle class="leader-dot" cx="619.43" cy="300.8" r="2"/>

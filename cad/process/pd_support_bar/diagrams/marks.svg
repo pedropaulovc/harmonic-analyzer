@@ -9,6 +9,10 @@
   <text class="label" x="140" y="50">T, the top edge (the one it rocked on)</text>
   <line class="leader" x1="138" y1="46" x2="120" y2="60"/>
   <circle class="leader-dot" cx="120" cy="60" r="2"/>
-  <text class="label" x="40" y="115.56">far end</text>
-  <text class="label" x="240" y="117.56">bottom edge; the back face is the 1 in face behind F</text>
+  <line class="datum" x1="40" y1="46" x2="40" y2="109.56"/>
+  <text class="label" x="36" y="82.78" text-anchor="end">far</text>
+  <text class="label" x="36" y="98.78" text-anchor="end">end</text>
+  <text class="label" x="280" y="129.56">bottom edge; the back face is the 1 in face behind F</text>
+  <line class="leader" x1="276" y1="125.56" x2="240" y2="95.56"/>
+  <circle class="leader-dot" cx="240" cy="95.56" r="2"/>
 </svg>

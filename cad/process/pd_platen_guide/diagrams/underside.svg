@@ -27,7 +27,7 @@
   <circle class="cutter" cx="581.52" cy="92.85" r="6.35"/>
   <line class="arrow" x1="561.52" y1="128.7" x2="631.52" y2="128.7"/>
   <line class="datum" x1="461.52" y1="64" x2="461.52" y2="120.7"/>
-  <text class="datum-label" x="461.52" y="60" text-anchor="middle">X0</text>
+  <text class="datum-label" x="457.52" y="90" text-anchor="end">X0</text>
   <text class="label" x="440" y="150.7">Arrowed: this pass runs +X, along the rail;</text>
   <text class="label" x="440" y="166.7">the passes zigzag across it, end to end.</text>
   <text class="label" x="440" y="190.7">1/2 in end mill, PG01's pass Y-6.850,</text>

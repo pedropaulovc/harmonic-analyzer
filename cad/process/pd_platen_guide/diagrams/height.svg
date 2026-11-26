@@ -21,8 +21,8 @@
   <text class="datum-label" x="129.87" y="338.6" text-anchor="end">top (U)</text>
   <line class="datum" x1="133.87" y1="288.14" x2="165.87" y2="288.14"/>
   <text class="datum-label" x="129.87" y="293.14" text-anchor="end">Z{{process.height_target_mm:in.4dot}}</text>
-  <text class="label-halo" x="265.47" y="317.8" text-anchor="middle">F</text>
-  <text class="label-halo" x="294.4" y="317.8" text-anchor="middle">R</text>
+  <text class="label-halo" x="270.27" y="314.6" text-anchor="middle">F</text>
+  <text class="label-halo" x="289.6" y="314.6" text-anchor="middle">R</text>
   <text class="title" x="440" y="50">From above (1 px/mm), fixed jaw at the top</text>
   <rect class="clamp" x="518.59" y="70" width="158.67" height="16"/>
   <rect class="clamp" x="518.59" y="96.03" width="158.67" height="16"/>
@@ -30,7 +30,7 @@
   <circle class="cutter" cx="581.52" cy="90.18" r="6.35"/>
   <line class="arrow" x1="601.52" y1="126.03" x2="531.52" y2="126.03"/>
   <line class="datum" x1="461.52" y1="64" x2="461.52" y2="118.03"/>
-  <text class="datum-label" x="461.52" y="60" text-anchor="middle">X0</text>
+  <text class="datum-label" x="457.52" y="90" text-anchor="end">X0</text>
   <text class="label" x="440" y="148.03">Arrowed: this pass runs -X, along the rail;</text>
   <text class="label" x="440" y="164.03">the passes zigzag across it, end to end.</text>
   <text class="label" x="440" y="188.03">1/2 in end mill, PG15's pass Y-4.183,</text>

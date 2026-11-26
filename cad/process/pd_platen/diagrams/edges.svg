@@ -17,9 +17,11 @@
   <line class="datum" x1="190" y1="70" x2="190" y2="387.5"/>
   <text class="datum-label" x="194" y="66">X0, the left edge</text>
   <line class="datum" x1="-2.5" y1="110" x2="733" y2="110"/>
-  <text class="datum-label" x="9.5" y="104">Y0, the bottom edge as drawn (at the back)</text>
+  <text class="datum-label" x="308.11" y="104">Y0, the bottom edge as drawn (at the back)</text>
   <text class="label-halo" x="197.5" y="149.37">1/2 in end mill, its side on X0</text>
   <text class="label-halo" x="197.5" y="165.37">(the left edge's last pass)</text>
+  <line class="leader" x1="195.5" y1="161.37" x2="186.25" y2="239.05"/>
+  <circle class="leader-dot" cx="186.25" cy="239.05" r="2"/>
   <text class="label" x="40" y="452">The plate stays on the cutter's left in every pass (conventional with M3); steps of {{process.outline_step_max_mm:in.3dot}},</text>
   <text class="label" x="40" y="468">the last {{process.outline_finish_mm:in.3dot}}, down to {{process.outline_breakthrough_mm:in.3dot}} under Z0. Back of the table at the top.</text>
 </svg>

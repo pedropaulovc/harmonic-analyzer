@@ -35,18 +35,18 @@
   <circle class="hidden" cx="667.7" cy="214.6" r="3.6"/>
   <circle class="cutter" cx="457.72" cy="245.69" r="12.5"/>
   <line class="arrow" x1="473.72" y1="245.69" x2="527.72" y2="245.69"/>
-  <text class="label-halo" x="475.72" y="229.69">1/2 in end mill, PL04's pass Y-63.849, +X</text>
+  <text class="label-halo" x="475.72" y="275.69">1/2 in end mill, PL04's pass Y-63.849, +X</text>
   <line class="datum" x1="190" y1="80" x2="190" y2="397.5"/>
   <text class="datum-label" x="194" y="90">X0, the left edge</text>
   <line class="datum" x1="-2.5" y1="120" x2="733" y2="120"/>
-  <text class="datum-label" x="9.5" y="114">Y0, the bottom edge as drawn (at the back)</text>
-  <line class="leader" x1="205.5" y1="241.04" x2="120" y2="330"/>
-  <circle class="leader-dot" cx="120" cy="330" r="2"/>
+  <text class="datum-label" x="308.11" y="114">Y0, the bottom edge as drawn (at the back)</text>
+  <line class="leader" x1="150" y1="340" x2="205.5" y2="241.04"/>
+  <circle class="leader-dot" cx="205.5" cy="241.04" r="2"/>
   <text class="label" x="20" y="344">sockets A1–A4 over</text>
   <text class="label" x="20" y="360">their relief pockets</text>
   <text class="label" x="20" y="376">(dashed: drilled later)</text>
-  <line class="leader" x1="355.25" y1="218.6" x2="360" y2="360"/>
-  <circle class="leader-dot" cx="360" cy="360" r="2"/>
+  <line class="leader" x1="360" y1="360" x2="355.25" y2="218.6"/>
+  <circle class="leader-dot" cx="355.25" cy="218.6" r="2"/>
   <text class="label" x="364" y="364">guide holes B1–B10, counterbored from P (dashed: later)</text>
   <text class="label" x="20" y="424">Hatched: the blank's margin, all to chips with the edges. Back of the table at the top: the drawing's bottom edge is at the back.</text>
   <text class="title" x="20" y="460">Section across the bar at X136, seen from the left end (1 in = 50 px): back on the left</text>
@@ -58,19 +58,19 @@
   <rect class="part-kept" x="217.25" y="633.4" width="265.5" height="7.6"/>
   <path class="cutter" d="M355.44 630.4L355.44 583.4L351.27 586.4L347.1 583.4L342.94 586.4L338.77 583.4L334.6 586.4L330.44 583.4L330.44 630.4A12.5 3 0 0 0 355.44 630.4Z"/>
   <line class="centre-line" x1="342.94" y1="573.4" x2="342.94" y2="641.4"/>
-  <line class="leader" x1="492.84" y1="637.2" x2="576" y2="556"/>
-  <circle class="leader-dot" cx="576" cy="556" r="2"/>
+  <line class="leader" x1="576" y1="556" x2="492.84" y2="637.2"/>
+  <circle class="leader-dot" cx="492.84" cy="637.2" r="2"/>
   <text class="label" x="580" y="560">P up, faced to {{process.thickness_target_mm:in.3dot}} over Z0; hatched:</text>
   <text class="label" x="580" y="576">what comes off, and the margin</text>
-  <line class="leader" x1="492.84" y1="643" x2="576" y2="600"/>
-  <circle class="leader-dot" cx="576" cy="600" r="2"/>
+  <line class="leader" x1="576" y1="600" x2="492.84" y2="643"/>
+  <circle class="leader-dot" cx="492.84" cy="643" r="2"/>
   <text class="label" x="580" y="604">tape stack: Z0 the plate's underside on it</text>
   <text class="label" x="580" y="620">({{process.tape_stack_min_mm:in.3dot}}–{{process.tape_stack_max_mm:in.3dot}}, drawn thicker)</text>
-  <line class="leader" x1="492.84" y1="662.13" x2="576" y2="644"/>
-  <circle class="leader-dot" cx="576" cy="644" r="2"/>
+  <line class="leader" x1="576" y1="644" x2="492.84" y2="662.13"/>
+  <circle class="leader-dot" cx="492.84" cy="662.13" r="2"/>
   <text class="label" x="580" y="648">fixture bar on its 1-2-3 blocks</text>
-  <line class="leader" x1="330.44" y1="609.4" x2="180" y2="520"/>
-  <circle class="leader-dot" cx="180" cy="520" r="2"/>
+  <line class="leader" x1="180" y1="506" x2="330.44" y2="609.4"/>
+  <circle class="leader-dot" cx="330.44" cy="609.4" r="2"/>
   <text class="label" x="20" y="510">1/2 in end mill at</text>
   <text class="label" x="20" y="526">Z{{process.thickness_target_mm:in.3dot}}, passes along X</text>
   <text class="label" x="20" y="542">(into the page)</text>

@@ -17,16 +17,16 @@
   <text class="label" x="330" y="70">1/2 in end mill, its side on X0: PB05_ends_drill's last pass</text>
   <text class="label" x="330" y="86">on the left end, X-6.350, across the rail +Y (into</text>
   <text class="label" x="330" y="102">the page), its end {{process.end_past_mm:in.3dot}} under F; steps of</text>
-  <text class="label" x="330" y="118">{{process.end_step_max_mm:in.4dot}} into the end. The right end next, the same</text>
-  <text class="label" x="330" y="134">way, to X {{process.length_target_mm:in.3f}}.</text>
+  <text class="label" x="330" y="118">{{process.end_step_max_mm:in.4dot}} into the end. The right end next, its</text>
+  <text class="label" x="330" y="134">passes -Y, to X {{process.length_target_mm:in.3f}}.</text>
   <line class="leader" x1="328" y1="82" x2="240" y2="259.63"/>
   <circle class="leader-dot" cx="240" cy="259.63" r="2"/>
   <text class="label" x="330" y="172">hatched: the sawn end's {{process.left_end_skim_mm:in.3dot}}</text>
   <line class="leader" x1="328" y1="168" x2="236.95" y2="297.53"/>
   <circle class="leader-dot" cx="236.95" cy="297.53" r="2"/>
-  <text class="label" x="470" y="504">both stacks side by side against</text>
-  <text class="label" x="470" y="520">the FIXED jaw; none at the moving jaw</text>
-  <line class="leader" x1="468" y1="500" x2="621.89" y2="440"/>
+  <text class="label" x="470" y="514">both stacks side by side against</text>
+  <text class="label" x="470" y="530">the FIXED jaw; none at the moving jaw</text>
+  <line class="leader" x1="520" y1="500" x2="621.89" y2="440"/>
   <circle class="leader-dot" cx="621.89" cy="440" r="2"/>
   <text class="title" x="20" y="496">From above (1 px/mm), fixed jaw at the top</text>
   <rect class="clamp" x="118.46" y="514" width="158.67" height="16"/>
@@ -37,5 +37,5 @@
   <line class="arrow" x1="41.17" y1="559.92" x2="41.17" y2="515.92"/>
   <line class="datum" x1="61.52" y1="508" x2="61.52" y2="567.85"/>
   <text class="datum-label" x="65.52" y="579.85">X0</text>
-  <text class="label" x="370" y="583.85">Arrowed: each pass +Y, across the rail, one way.</text>
+  <text class="label" x="370" y="583.85">Arrowed: the left end's passes run +Y; the right end's, -Y.</text>
 </svg>

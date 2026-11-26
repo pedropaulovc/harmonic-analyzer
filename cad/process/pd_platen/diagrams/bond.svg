@@ -20,25 +20,31 @@
   <line class="datum" x1="179" y1="54" x2="179" y2="274"/>
   <circle class="cutter" cx="367.51" cy="159.2" r="8.5"/>
   <line class="arrow" x1="379.51" y1="159.2" x2="421.51" y2="159.2"/>
-  <text class="label-halo" x="377.51" y="145.2">1/2 in end mill, PL03's pass Y-63.849, +X</text>
-  <line class="leader" x1="179" y1="56" x2="120" y2="40"/>
-  <circle class="leader-dot" cx="120" cy="40" r="2"/>
+  <text class="label" x="300" y="40">1/2 in end mill, PL03's pass Y-63.849, +X</text>
+  <line class="leader" x1="400" y1="44" x2="367.51" y2="150.7"/>
+  <circle class="leader-dot" cx="367.51" cy="150.7" r="2"/>
   <text class="label" x="20" y="36">scribed line: the blank's left end</text>
-  <line class="leader" x1="501.73" y1="218.06" x2="590" y2="42"/>
-  <circle class="leader-dot" cx="590" cy="42" r="2"/>
-  <text class="label" x="594" y="40">bar's tape: five 1.41 in strips along X, butted</text>
-  <line class="leader" x1="461.57" y1="194.09" x2="590" y2="58"/>
-  <circle class="leader-dot" cx="590" cy="58" r="2"/>
-  <text class="label" x="594" y="56">blank's tape seams (dashed), half a strip off</text>
-  <line class="leader" x1="541.89" y1="266" x2="600" y2="290"/>
-  <circle class="leader-dot" cx="600" cy="290" r="2"/>
+  <line class="leader" x1="120" y1="40" x2="179" y2="56"/>
+  <circle class="leader-dot" cx="179" cy="56" r="2"/>
+  <text class="label" x="708" y="80">bar's tape: five 1.41 in</text>
+  <text class="label" x="708" y="96">strips along X, butted</text>
+  <line class="leader" x1="704" y1="76" x2="557.95" y2="74.24"/>
+  <circle class="leader-dot" cx="557.95" cy="74.24" r="2"/>
+  <text class="label" x="708" y="160">blank's tape seams</text>
+  <text class="label" x="708" y="176">(dashed), half a strip off</text>
+  <line class="leader" x1="704" y1="156" x2="521.81" y2="146.15"/>
+  <circle class="leader-dot" cx="521.81" cy="146.15" r="2"/>
+  <text class="label" x="708" y="236">step clamps on studs</text>
+  <text class="label" x="708" y="252">(schematic)</text>
+  <line class="leader" x1="704" y1="232" x2="692" y2="206.46"/>
+  <circle class="leader-dot" cx="692" cy="206.46" r="2"/>
   <text class="label" x="604" y="294">FRONT edge, flush with the bar's front edge</text>
+  <line class="leader" x1="602" y1="290" x2="541.89" y2="267"/>
+  <circle class="leader-dot" cx="541.89" cy="267" r="2"/>
   <text class="label" x="10" y="312">tape from 1/4 in left of the scribed line</text>
-  <line class="leader" x1="170.5" y1="268" x2="60" y2="300"/>
-  <circle class="leader-dot" cx="60" cy="300" r="2"/>
+  <line class="leader" x1="60" y1="300" x2="171.5" y2="263"/>
+  <circle class="leader-dot" cx="171.5" cy="263" r="2"/>
   <text class="label" x="300" y="312">front of the table (operator)</text>
-  <text class="label" x="678" y="116.54">step</text>
-  <text class="label" x="678" y="132.54">clamps</text>
   <text class="title" x="20" y="344">Section across the bar at X136, seen from the left end (1 in = 44 px): back on the left, operator on the right</text>
   <line class="fixture-table" x1="120" y1="520" x2="640" y2="520"/>
   <rect class="fixture-support" x="316" y="476" width="132" height="44"/>
@@ -50,24 +56,24 @@
   <rect class="part-removed" x="250" y="439.74" width="264" height="1.08"/>
   <path class="cutter" d="M386.78 438.17L386.78 396.81L383.12 399.81L379.45 396.81L375.78 399.81L372.12 396.81L368.45 399.81L364.78 396.81L364.78 438.17A11 2.64 0 0 0 386.78 438.17Z"/>
   <line class="centre-line" x1="375.78" y1="386.81" x2="375.78" y2="448.81"/>
-  <line class="leader" x1="514" y1="443.74" x2="596" y2="396"/>
-  <circle class="leader-dot" cx="596" cy="396" r="2"/>
+  <line class="leader" x1="596" y1="396" x2="514" y2="443.74"/>
+  <circle class="leader-dot" cx="514" cy="443.74" r="2"/>
   <text class="label" x="600" y="400">blank, B up</text>
-  <line class="leader" x1="514" y1="452.5" x2="596" y2="418"/>
-  <circle class="leader-dot" cx="596" cy="418" r="2"/>
+  <line class="leader" x1="596" y1="418" x2="514" y2="452.5"/>
+  <circle class="leader-dot" cx="514" cy="452.5" r="2"/>
   <text class="label" x="600" y="422">blue tape, CA glue, blue tape, {{process.tape_stack_min_mm:in.3dot}}–{{process.tape_stack_max_mm:in.3dot}}</text>
   <text class="label" x="600" y="438">(drawn thicker)</text>
-  <line class="leader" x1="514" y1="465.61" x2="596" y2="458"/>
-  <circle class="leader-dot" cx="596" cy="458" r="2"/>
+  <line class="leader" x1="596" y1="458" x2="514" y2="465.61"/>
+  <circle class="leader-dot" cx="514" cy="465.61" r="2"/>
   <text class="label" x="600" y="462">fixture bar</text>
-  <line class="leader" x1="479" y1="506.14" x2="596" y2="482"/>
-  <circle class="leader-dot" cx="596" cy="482" r="2"/>
+  <line class="leader" x1="596" y1="482" x2="479" y2="506.14"/>
+  <circle class="leader-dot" cx="479" cy="506.14" r="2"/>
   <text class="label" x="600" y="486">screw jack, near each long edge (schematic)</text>
-  <line class="leader" x1="448" y1="509.61" x2="596" y2="506"/>
-  <circle class="leader-dot" cx="596" cy="506" r="2"/>
+  <line class="leader" x1="596" y1="506" x2="448" y2="509.61"/>
+  <circle class="leader-dot" cx="448" cy="509.61" r="2"/>
   <text class="label" x="600" y="510">1-2-3 block, 1 in up</text>
-  <line class="leader" x1="364.78" y1="420.81" x2="200" y2="386"/>
-  <circle class="leader-dot" cx="200" cy="386" r="2"/>
+  <line class="leader" x1="200" y1="380" x2="364.78" y2="420.81"/>
+  <circle class="leader-dot" cx="364.78" cy="420.81" r="2"/>
   <text class="label" x="20" y="376">1/2 in end mill, one cut</text>
   <text class="label" x="20" y="392">{{process.face_cut_mm:in.4dot}} deep, passes along X</text>
   <text class="label" x="20" y="408">(into the page)</text>

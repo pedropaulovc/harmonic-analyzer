@@ -38,9 +38,9 @@
   <text class="label-on-clamp" x="396.92" y="555" text-anchor="middle">fixed jaw</text>
   <text class="label-on-clamp" x="396.92" y="588.29" text-anchor="middle">moving jaw</text>
   <rect class="part-kept" x="54.53" y="560" width="682.75" height="14.29"/>
-  <circle class="cutter" cx="396.92" cy="565.51" r="9.52"/>
-  <line class="arrow" x1="416.92" y1="614.29" x2="346.92" y2="614.29"/>
-  <text class="label" x="422.92" y="618.29">this pass -X; the other, Y1.338, +X</text>
+  <circle class="cutter" cx="472.5" cy="565.51" r="9.52"/>
+  <line class="arrow" x1="492.5" y1="614.29" x2="422.5" y2="614.29"/>
+  <text class="label" x="498.5" y="618.29">this pass -X; the other, Y1.338, +X</text>
   <line class="datum" x1="735" y1="536" x2="735" y2="598.29"/>
   <text class="datum-label" x="731" y="532" text-anchor="end">X0, {{process.end_a_skim_mm:in.3dot}} inside the sawn END A</text>
   <text class="label" x="20" y="640">the sawn END A {{process.top_out_mm:in.2f}} in out past the jaws' right side; the far end about as far</text>
