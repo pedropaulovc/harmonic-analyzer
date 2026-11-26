@@ -661,7 +661,7 @@ speed_kind = "spindle"
 tool = "em-half"
 drilling = "none"
 sizing = "other"
-instruction = "Run PG15_height (M6 T1; 2450, display near 2485): face the top down from the rough {{process.rough_height_mm:in.3dot}} to Z {{process.height_target_mm:in.4dot}} in equal levels no deeper than {{process.height_step_max_mm:in.3dot}}. Unclamp; mic the height."
+instruction = "Do not run this file: its last level passes {{process.height_jaw_clear_mm:.2f}} mm ({{process.height_jaw_clear_mm:in.4dot}} in) over the jaw tops, under the shop's 1.0 mm floor (#3607); stop and tell the owner. Run PG15_height (M6 T1; 2450, display near 2485): face the top down from the rough {{process.rough_height_mm:in.3dot}} to Z {{process.height_target_mm:in.4dot}} in equal levels no deeper than {{process.height_step_max_mm:in.3dot}}. Unclamp; mic the height."
 settings = "em-half-carbide-1018-3439-face"
 inspection = "Height {{cad.top_face_height_min_in:.3dot}}–{{cad.top_face_height_max_in:.3dot}}, U to the top, miked at both ends and the middle."
 gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.top_face_height_band_mm}}" }]

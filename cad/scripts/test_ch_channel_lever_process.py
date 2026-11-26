@@ -171,11 +171,43 @@ def test_a_root_band_the_1_8_end_mill_cannot_leave_is_refused() -> None:
         ({"tab_top_mm": 3.0734}, "tab_top_mm"),
         ({"tab_station_7_mm": 178.811}, "tab_station_7_mm"),
         ({"jaw_start_mm": 20.0}, "jaw_start_mm"),
-        # The jaw-top band's ends: the grip floor, the faced hub's clearance,
-        # and a plate faced past the band (.015 lifts the jaws to .2845).
+        # The jaw-top band's ends: the grip floor, the faced hub's clearance
+        # (the old 7.112 band end left 0.521 mm over the moving jaw, #3607),
+        # and a faced plate's band reaching past them (.567 lifts the jaws to
+        # .265).
         ({"jaw_top_min_mm": 5.9}, "shop's minimum"),
-        ({"jaw_top_max_mm": 7.2}, "clear of the jaws' top"),
-        ({"spoil_plate_face_mm": 0.381}, "outside the traveler's band"),
+        ({"jaw_top_max_mm": 7.112}, "clear of the jaws' top"),
+        (
+            {
+                "spoil_plate_thickness_min_mm": 14.4,
+                "spoil_plate_thickness_max_mm": 15.2164,
+            },
+            "outside the traveler's band",
+        ),
+        # The 15/16 in pair (#3607, D44): the 1 in pair needs the shims back.
+        ({"parallel_height_mm": 25.4}, "support_height_mm"),
+        # Facing on the 1 in + 1/2 in stack: grip, the top over the jaws, and
+        # stock to face.
+        ({"facing_stack_mm": 39.6875}, "on its stack less than the shop's minimum"),
+        ({"facing_stack_mm": 30.0}, "stand clear over the jaws"),
+        ({"spoil_plate_bought_mm": 14.9}, "nothing to face"),
+        # The width op on edge: the 1/2 in pair leaves the jaws under a
+        # third of the plate's width.
+        ({"edge_shim_height_mm": 12.7}, "less than the shop's fraction"),
+        # The milled width: under the narrowest load, onto the moving parallel
+        # on the widest.
+        (
+            {"spoil_plate_width_min_mm": 99.4, "spoil_plate_width_max_mm": 101.26},
+            "grip the spoil plate",
+        ),
+        (
+            {
+                "spoil_plate_width_mm": 98.0,
+                "spoil_plate_width_min_mm": 97.8,
+                "spoil_plate_width_max_mm": 98.2,
+            },
+            "misses the moving parallel",
+        ),
         ({"hub_from_end_mm": 8.0}, "end margins"),
         ({"spot_dia_mm": 2.0}, "under the #47"),
         ({"ring_half_angle_deg": 50}, "short of the bar-to-hub roots"),

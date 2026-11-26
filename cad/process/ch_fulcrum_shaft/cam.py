@@ -195,6 +195,8 @@ def context(
     _agree(plan, "y0_edge_find_mm", radius + EDGE_FINDER_DIA_IN * IN / 2)
 
     em = _shop_tool(plan, shop, "em-eighth")["diameter_mm"]
+    # The vise picture draws the end mill from the plan's restatement.
+    _agree(plan, "flat_mill_dia_mm", em)
     cutter = em / 2
     rpm, feed = _setting(plan, shop, FLATS[0])
     normals = set()
