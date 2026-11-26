@@ -20,11 +20,14 @@ part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
 material = "AISI 1018 cold-drawn round, 5/8 in"
 stock = "Ø{{process.stock_dia_in:.3dot}} bar, on hand; Setup 1 saws one {{process.bar_length_in:g}} in piece off it, which makes the one plug ({{cad.pitch_in:.2dot}} in of it)."
-note = "Inches unless mm. Lathe PM-1127VF-LB (70–380 and 380–2000 rpm); cutting oil on steel."
 shop = "../shop"
 stock_refs = ["1018-round-5-8"]
 material_key = "lathe-1018-cold-finished"
 turning_material = "steel_1018"
+
+# The shop's standing page carries what every traveler shares (units, the
+# lathe's speed ranges, cutting oil); this plug needs nothing more at its head.
+standing = true
 
 [cad]
 file = "../../out/features/sm_gooseneck_end_plug/features.toml"
