@@ -50,9 +50,7 @@ unconverted:
   - dt_pinion_lift_rod
   - dt_pinion_pivot_block
   - dt_pinion_pivot_shaft
-  - ms_stick
   - ms_stop_block
-  - ms_stop_plate
   - pd_guide_lock
   - pd_platen
   - pd_platen_bottom_guide

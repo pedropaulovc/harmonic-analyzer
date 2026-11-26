@@ -48,10 +48,21 @@ part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
 material = "Brass sheet .040 (drawing: {{cad.material_spec}}; alloy not specified; not on record: to buy)"
 stock = "Brass sheet or strip {{cad.outer_face_thickness_min_in:.3dot}}–{{cad.outer_face_thickness_max_in:.3dot}} thick as rolled; {{process.quantity:d}} blank {{process.blank_x_in:.2f}} × {{process.blank_y_in:.2f}} in sawn from it."
-note = "Inches unless mm; G-code and console entries in mm (the files and the controller run G21). Finished {{cad.far_end_length_min_in:.2f}}–{{cad.far_end_length_max_in:.2f}} long (locating end to far end), {{cad.roof_edge_height_min_in:.2f}}–{{cad.roof_edge_height_max_in:.2f}} high (locating edge to roof edge), {{cad.outer_face_thickness_min_in:.3dot}}–{{cad.outer_face_thickness_max_in:.3dot}} thick as the sheet comes. A matched pair with MHA-MS-02: Setups 3 and 4 need that block finished by its own traveler through its Setup 11 (all but its two 2-56 taps, which its Setup 13 cuts after Setup 4 here). Speeds on the PM-30MV low belt (100–2800 rpm): no belt change. Home the mill ($H) once, after switching it on: every M6's trip to the tool setter counts from home. Home again only after a power cycle or a controller restart, an E-stop, an alarm, a limit switch hit, a stall or a crash: homing brings the stored G54 back. Then check every zero of the setup again, each the way its step set it: each must read what its step set, within .001 in. One does not, cannot be reached with the part in, or the part may have moved: take the setup again from its first step, the part out. They all do: run the interrupted file again from its start. Feed Hold, then Reset with the axes stopped keeps position and G54: no homing, no new zero; run the interrupted file again from its start: its first M6 measures the tool, and cuts already made are cut in air. Finish: brass black, the last setup, once the Brass Black is bought; until then the plate stays bare, tagged AWAITING BRASS BLACK."
 shop = "../shop"
 material_key = "ms-stop-plate-brass-sheet"
 milling_material = "brass"
+
+# The shop's standing page carries what every traveler shares (units, speeds,
+# homing, Feed Hold, tool changes, proving a file, burrs); This job says what
+# only this plate needs.
+standing = true
+
+[[notes]]
+title = "This job"
+rows = [
+  ["Finished", "{{cad.far_end_length_min_in:.2f}}–{{cad.far_end_length_max_in:.2f}} long (locating end to far end), {{cad.roof_edge_height_min_in:.2f}}–{{cad.roof_edge_height_max_in:.2f}} high (locating edge to roof edge), {{cad.outer_face_thickness_min_in:.3dot}}–{{cad.outer_face_thickness_max_in:.3dot}} thick as the sheet comes."],
+  ["Pair", "A matched pair with MHA-MS-02: Setups 3 and 4 need that block finished by its own traveler through its Setup 11 (all but its two 2-56 taps, which its Setup 13 cuts after Setup 4 here)."],
+]
 
 [cad]
 file = "../../out/features/ms_stop_plate/features.toml"
@@ -233,7 +244,7 @@ machine = "PM-30MV CNC (FluidNC, CNCjs with the electronic tool setter) / vise, 
 indexing = "none"
 machine_ref = "pm-30mv"
 holding = "A 1 in parallel against each jaw. The finished MHA-MS-02 block (from its traveler's Setup 11, all but its 2-56 taps) lying on them, its mating face up (the window open upward), its LOCATING END against the FIXED jaw. This plate on it, seating face down, its LOCATING END against the fixed jaw too. Close the jaws lightly across the .84 length, hold a 1-2-3 block against both locating edges and tap the plate until both edges touch it, then tighten. Never grip across the .56 height: it would bend the block's .09 window roof."
-datum = "Program MS01_pair_pilot (cam:ms_stop_plate). G54: X0 the locating edges (RIGHT side), the pair to −X; Y0 the fixed jaw's face (the locating ends), +Y toward it; Z0 the plate's top at its nominal {{cad.outer_face_thickness_in:.3dot}} above the block face. Holes at Y −{{cad.clearance_hole_1_station_in:.3f}} and −{{cad.clearance_hole_2_station_in:.3f}}, X −{{cad.clearance_hole_1_height_in:.3f}}. The file starts with an M6 for the centre drill; tool lengths from the tool setter."
+datum = "Program MS01_pair_pilot (cam:ms_stop_plate). G54: X0 the locating edges (RIGHT side), the pair to −X; Y0 the fixed jaw's face (the locating ends), +Y toward it; Z0 the plate's top at its nominal {{cad.outer_face_thickness_in:.3dot}} above the block face. Holes at Y −{{cad.clearance_hole_1_station_in:.3f}} and −{{cad.clearance_hole_2_station_in:.3f}}, X −{{cad.clearance_hole_1_height_in:.3f}}. The file starts with an M6 for the centre drill."
 diagram = { file = "diagrams/pair.svg", alt = "The MHA-MS-02 block mating face up on two 1 in parallels with this plate on it, the two gripped across their length, locating ends on the fixed jaw; the #49 drill, to scale, at the end of its feed in the pilot by the locating ends, {{cad.clearance_hole_1_pair_pilot_depth_in_mate_mm:in.2dot}} into the block; the 1-2-3 block that flushed the locating edges is taken away before drilling (not shown)." }
 envelope = { x_span_mm = ["{{cad.envelope_y_mm}}", 5.08], y_span_mm = ["{{cad.envelope_x_mm}}", 5.08], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{process.stack_height_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{process.stack_height_mm}}", "{{process.pilot_tip_height_mm}}"], longest_tool_mm = ["{{process.drill_chuck_gauge_mm}}", "{{process.drill_49_oal_mm}}"], shortest_tool_mm = ["{{process.drill_chuck_gauge_mm}}", "{{process.centre_drill_oal_mm}}"] }
 vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{cad.envelope_x_mm}}", along_jaws_mm = "{{cad.envelope_y_mm}}", part_height_mm = "{{process.stack_height_mm}}", parallel_height_mm = "{{process.parallel_height_mm}}", overhang_mm = ["{{process.vise_inset_mm}}", "rest"], jaw_offset = "centred", fixed_jaw_face = "machined", moving_jaw_face = "machined", moving_jaw_contact = "flat" }
@@ -250,12 +261,7 @@ feed = "hand"
 
 [[setups.operations]]
 instruction = "G54 Z0: the plate's top less its miked thickness over .040, so Z counts from the block face as if the plate were {{cad.outer_face_thickness_in:.3dot}}."
-instruction_detailed = "Console M6 T1 (#1 carbide centre drill; the tool setter measures it). Spindle stopped, its point just dragging a .002 feeler leaf on the plate near the far end: G10 L20 P1 Z(0.051 + (the plate's miked thickness in mm − 1.016)); for a .041 plate, Z0.076."
-feed = "hand"
-
-[[setups.operations]]
-instruction = "Prove MS01_pair_pilot in air, Z0 raised 1.000 in; every move clears the jaws, through the M6. Then Z0 back."
-instruction_detailed = "Send $# and note the G54 line's Z. G10 L2 P1 Z(that Z + 25.400) raises Z0 1.000 in. Run MS01_pair_pilot, watching each move clear the jaws. G10 L2 P1 Z(the noted Z) puts Z0 back."
+instruction_detailed = "Console M6 T1 (#1 carbide centre drill). Spindle stopped, its point just dragging a .002 feeler leaf on the plate near the far end: G10 L20 P1 Z(0.051 + (the plate's miked thickness in mm − 1.016)); for a .041 plate, Z0.076."
 feed = "hand"
 
 [[setups.operations]]
@@ -294,7 +300,7 @@ inspection = "Each pilot {{cad.clearance_hole_1_pair_pilot_depth_in_mate_mm:in.2
 gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.clearance_hole_1_pair_pilot_depth_in_mate_band_mm}}" }]
 
 [[setups.operations]]
-instruction = "Only if Op 140 found a pilot short: put the plate back on the block and reclamp as this setup (pilots aligned: a #49 shank through both), repeat its X/Y/Z touch-offs, then send $#, note the G54 line's Z and enter G10 L2 P1 Z(that Z − 0.254), Z0 .010 lower. Run the whole MS01_pair_pilot again (the deeper spot stays under the #41 that opens the plate), unclamp and repeat Op 140."
+instruction = "Only if Op 130 found a pilot short: put the plate back on the block and reclamp as this setup (pilots aligned: a #49 shank through both), repeat its X/Y/Z touch-offs, then send $#, note the G54 line's Z and enter G10 L2 P1 Z(that Z − 0.254), Z0 .010 lower. Run the whole MS01_pair_pilot again (the deeper spot stays under the #41 that opens the plate), unclamp and repeat Op 130."
 feed = "hand"
 
 [[setups]]
@@ -317,11 +323,7 @@ feed = "hand"
 
 [[setups.operations]]
 instruction = "Mike the #41 across its margins first: .094–.098 (else use another). G54 Z0: the plate's top, touched with the #41's point on a .002 feeler leaf."
-instruction_detailed = "Mike the #41 across its margins: .094–.098, else use another #41; note the reading for Ops 210–220. Console M6 T3 (#41; the tool setter measures it). Spindle stopped, its point just dragging a .002 feeler leaf on the plate between the holes: G10 L20 P1 Z0.051."
-feed = "hand"
-
-[[setups.operations]]
-instruction = "Prove MS02_open in air, Z0 raised 1.000 in and put back with the console entries of Op 100; the #41 comes down over each pilot's centre."
+instruction_detailed = "Mike the #41 across its margins: .094–.098, else use another #41; note the reading for Ops 190–200. Console M6 T3 (#41). Spindle stopped, its point just dragging a .002 feeler leaf on the plate between the holes: G10 L20 P1 Z0.051."
 feed = "hand"
 
 [[setups.operations]]
@@ -329,7 +331,7 @@ speed_kind = "spindle"
 tool = "drill-41"
 drilling = "twist_drill"
 sizing = { kind = "band", band_mm = "{{cad.clearance_hole_1_dia_band_mm}}" }
-instruction = "Run MS02_open (M6 T3, #41; set 2800): open both holes through the plate, the #41's full diameter {{process.open_past_mm:in.3dot}} past the plate into the block's window."
+instruction = "The plate was turned over: in the air run the #41 comes down over each pilot's centre. Run MS02_open (M6 T3, #41; set 2800): open both holes through the plate, the #41's full diameter {{process.open_past_mm:in.3dot}} past the plate into the block's window."
 rpm = 2800
 feed = "{{process.hole_feed_per_min_mm:in.1f}} in/min"
 hole_depth_mm = "{{cad.outer_face_thickness_mm}}"
