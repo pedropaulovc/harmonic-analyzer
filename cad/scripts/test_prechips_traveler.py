@@ -229,6 +229,23 @@ def test_a_picture_finding_not_in_the_baseline_refuses_before_printing(
     assert wrapper.main(["smoke_part", "--out", str(out)]) == 0
 
 
+def test_a_picture_gate_error_refuses_and_removes_every_output(process, monkeypatch, tmp_path):
+    out, author = process
+    author("smoke_part")
+    # Malformed picture XML: the gate cannot measure it, so the render fails
+    # like a refusal, every output removed, nothing printed.
+    picture = base64.b64encode(b"<svg xmlns='http://www.w3.org/2000/svg'><text>").decode()
+    hobby = f'<img src="data:image/svg+xml;base64,{picture}" alt="From the front">'
+    monkeypatch.setattr(picture_clip, "BASELINE", tmp_path / "missing-baseline.toml")
+    errors = []
+    monkeypatch.setattr(wrapper._telemetry, "error", lambda message, **_: errors.append(message))
+    calls = _uv_stub(monkeypatch, sheets={"hobby": hobby})
+    assert wrapper.main(["smoke_part", "--out", str(out)]) == 2
+    assert not any(path.exists() for path in plans.traveler_outputs("smoke_part", out))
+    assert all(cmd[0] == _UV for cmd in calls)
+    assert any("smoke_part: no element found" in message for message in errors)
+
+
 def test_missing_browser_fails_before_any_sheet(process, monkeypatch, tmp_path):
     out, author = process
     author("smoke_part")
