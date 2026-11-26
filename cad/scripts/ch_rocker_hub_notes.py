@@ -82,7 +82,10 @@ SUPPLY_LENGTH_CALLOUT = SUPPLY_NOTE_LINK
 # it cures and the cure before the joined MHA-CH-06 is finished, with an
 # acceptance; rule 4 form 1. Printed once, here, on the member made last
 # (owner ruling 2026-11-24, fit audit question 2: "hub turned until it
-# slides in (clearance .0005-.0030); bond").
+# slides in (clearance .0005-.0030); bond"). A hub that turns once cured is
+# not held, so it still pushes out and is bonded again; the cure is 24 h at
+# room temperature (delegated ruling 2026-11-26 (Main), precedent: D38
+# (MG-00 drum bond wording); owner review #2144 (D54); #3646).
 DRAWING_NOTES = "\n".join(
     (
         f"{SUPPLY_NOTE_NUMBER}. BORE AND LENGTH ARE FINISHED AFTER JOINING TO"
@@ -90,7 +93,8 @@ DRAWING_NOTES = "\n".join(
         f"{BOND_NOTE_NUMBER}. BONDED INTO {STRAP_NUMBER} WITH LOCTITE 638: LAND AND HOLE"
         " DEGREASED,",
         "   COMPOUND ON THE LAND ONLY; HELD SQUARE TO THE STRAP UNTIL SET; 24 H CURE",
-        f"   BEFORE {ROCKER_NUMBER} IS FINISHED. THE HUB DOES NOT TURN BY HAND.",
+        f"   AT ROOM TEMPERATURE BEFORE {ROCKER_NUMBER} IS FINISHED. THE HUB DOES NOT TURN",
+        "   BY HAND; IF IT TURNS, PUSH IT OUT, CLEAN TO BARE METAL AND BOND AGAIN.",
     )
 )
 if NUMBER in DRAWING_NOTES:
