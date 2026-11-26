@@ -175,7 +175,8 @@ PRESS_DIA_TEXT_SUFFIX = ")"
 # the disc cluster's stack (F, transgear_cluster_fit), and the stack's air
 # between the MHA-PD-22 drive collar and the MHA-PD-06 disc is what closes
 # when it is loose: at the title block's ±.005 the statistical air falls to
-# 0.0599 mm under its 0.1016 floor (pd_cluster_air.require_air).
+# 0.0972 mm under its 0.1016 floor (pd_cluster_air.require_air; the
+# MHA-PD-17 spigot length at the title block, delegated ruling D21).
 # The hub-to-rear-face length places the bush's rear face on the knob shaft,
 # so its ±.002 is a term of the journal's stand-out behind it
 # (pd_transgear_knob_shaft_spec.JOURNAL_STANDOUT_BAND), which the
@@ -184,7 +185,8 @@ PRESS_DIA_TEXT_SUFFIX = ")"
 # negative: .001 is left at ±.002, none at ±.003, and at the title block's
 # ±.005 the float cannot be set).  Neither band has a mate to try, so
 # neither prints a label (rule 4: a band with no mate to try names none);
-# the necessity register says what each protects (N-02, N-03).
+# the station stands on machinist exception RV-05 and the length on the
+# necessity register (N-03).
 # Below-text the part build authors on its source dimensions; the drawing
 # imports and reads it back (text set from the drawing writes through to the
 # built part, fleet issue #1942).
