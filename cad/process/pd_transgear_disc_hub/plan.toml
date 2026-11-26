@@ -180,6 +180,9 @@ drill_run_in = 0.75
 ream_first_set_in = 0.308
 ream_second_set_in = 0.3135
 ream_open_step_in = 0.0001
+# A setting that lets the NO-GO in (the first .3135 pass included) restarts
+# on a new offcut this much under it, then opens in the steps above.
+ream_back_off_in = 0.0003
 # The bore's pins, each miked before use (Op 60): the GO, a Class ZZ plus
 # pin, .3135-.3137; the NO-GO, the set's Class ZZ minus, .3138-.3140.
 go_pin_min_mm = 7.9629
@@ -445,7 +448,7 @@ feed = "hand"
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "The GO refused in Op 90: open the reamer {{process.ream_open_step_in:.4dot}} by the micrometer, ream the trial hole again and try both pins again. The NO-GO entering: chuck a new offcut and repeat Ops 60–90 (the pins need no second miking), the second setting the last one the GO refused at, then open it as above."
+instruction = "The GO refused in Op 90: open the reamer {{process.ream_open_step_in:.4dot}} by the micrometer, ream the trial hole again and try both pins again. The NO-GO entering, at the first {{process.ream_second_set_in:.4dot}} setting or later: chuck a new offcut, repeat Ops 60–90 (the pins need no second miking) with the second setting {{process.ream_back_off_in:.4dot}} under the one that let it in, then open it {{process.ream_open_step_in:.4dot}} at a time as above."
 feed = "hand"
 
 [[setups.operations]]
@@ -494,7 +497,7 @@ gauge_checks = [{ gauge = "dti", band_mm = "{{cad.spigot_diametral_clearance_ban
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "In Op 150, the disc not going on: feed in .0005 (.001 off the diameter), a spring pass, try the disc again. Its shake S under {{cad.spigot_diametral_clearance_min_in:.3dot}}: feed in half of ({{process.spigot_aim_shake_in:.3dot}} less S), a spring pass, try the disc again. The flange over {{cad.flange_front_face_thickness_max_in:.3dot}}: face on by its miked excess over {{cad.flange_front_face_thickness_mm:in.3dot}}, never past Z-{{cad.spigot_length_max_in:.3dot}}. The shake over {{cad.spigot_diametral_clearance_max_in:.3dot}}, the face past Z-{{cad.spigot_length_max_in:.3dot}}, or the flange under {{cad.flange_front_face_thickness_min_in:.3dot}}: scrapped, not reworked; make another from Setup 1."
+instruction = "In Op 150, the disc not going on: feed in .0005 (.001 off the diameter), a spring pass, try again. Its shake S under {{cad.spigot_diametral_clearance_min_in:.3dot}}: feed in half of ({{process.spigot_aim_shake_in:.3dot}} less S), a spring pass, try again. The face short of Z-{{cad.spigot_length_min_in:.3dot}} or the flange over {{cad.flange_front_face_thickness_max_in:.3dot}}: face on until the flange mikes {{cad.flange_front_face_thickness_mm:in.3dot}}, never past Z-{{cad.spigot_length_max_in:.3dot}}. Scrapped, not reworked (make another from Setup 1): the shake over {{cad.spigot_diametral_clearance_max_in:.3dot}}, the face past Z-{{cad.spigot_length_max_in:.3dot}}, the flange under {{cad.flange_front_face_thickness_min_in:.3dot}}, or still over {{cad.flange_front_face_thickness_max_in:.3dot}} with the face at Z-{{cad.spigot_length_max_in:.3dot}}."
 feed = "hand"
 
 [[setups.operations]]
@@ -532,7 +535,7 @@ feed = "hand"
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "The GO refused in Op 190: open the reamer {{process.ream_open_step_in:.4dot}}, ream the trial piece with it at the bench (soft vise jaws, the tap wrench, clockwise only); the NO-GO still refused there, ream the bore again at that setting as Op 190 and try both pins (the NO-GO enters: stop and tell the owner). The NO-GO entering the bore: scrapped, not reworked; make another from Setup 1."
+instruction = "The GO refused in Op 190: open the reamer {{process.ream_open_step_in:.4dot}}, ream the trial piece with it at the bench (soft vise jaws, the tap wrench, clockwise only) and try both pins there. The NO-GO entering the trial piece: stop and tell the owner. The NO-GO still refused there: ream the bore again at that setting as Op 190 and try both pins. The NO-GO entering the bore: scrapped, not reworked; make another from Setup 1."
 feed = "hand"
 
 [[setups.operations]]

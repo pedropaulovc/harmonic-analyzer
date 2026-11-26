@@ -144,6 +144,11 @@ def test_the_bore_is_hand_reamed_with_the_owned_adjustable_set() -> None:
     first = ops[0]["instruction"]
     assert ".3135 plus GO pin (to buy)" in first and ".314 minus NO-GO" in first
     assert "the bore cannot be accepted" in first
+    # Codjiflo #3592 r2: a NO-GO entering at the first .3135 pass has no
+    # earlier setting to fall back to; the remedy backs off by a stated step.
+    trial_remedy = ops[ops.index(reams[0]) + 1]["instruction"]
+    assert "{{process.ream_back_off_in:.4dot}} under the one that let it in" in trial_remedy
+    assert PLAN["parameters"]["ream_back_off_in"] > PLAN["parameters"]["ream_open_step_in"]
 
 
 def test_the_flange_face_is_set_from_the_miked_length_not_the_spigot_nominal() -> None:
@@ -154,6 +159,12 @@ def test_the_flange_face_is_set_from_the_miked_length_not_the_spigot_nominal() -
     assert "spigot_length_mm" not in sharp["instruction"]
     assert "less {{cad.flange_front_face_thickness_mm:in.3dot}}" in sharp["instruction"]
     assert sharp["instruction"].count("Z-F") == 2
+    # Codjiflo #3592 r2: every outcome of the face and flange checks has an
+    # action; a face short of Z-.139 is faced on, never scrapped.
+    remedy = PLAN["setups"][1]["operations"][PLAN["setups"][1]["operations"].index(sharp) + 1]
+    text = remedy["instruction"]
+    assert "The face short of Z-{{cad.spigot_length_min_in:.3dot}} or the flange over" in text
+    assert "never past Z-{{cad.spigot_length_max_in:.3dot}}" in text
 
 
 def test_the_traveler_leaves_the_assembly_work_to_pd_00() -> None:
