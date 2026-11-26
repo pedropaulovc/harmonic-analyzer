@@ -97,7 +97,8 @@ MATERIAL = "Plain Carbon Steel"  # steel like its mate (p.19/20)
 # FACE_WIDTH (the whole tooth length), SHOULDER_LENGTH, TURNED_DIA and
 # BOSS_LENGTH are in dt_crank_pinion_spec. build_dt_drive_train_assembly checks the
 # installed south face, the T120 clearances and the 64T row overlap.
-# The bore at the .3135 reamer's size (to order: reamer-3135), the lower end of the spec's
+# The bore at its .3135 reamed size (D19: the owned adjustable reamer set), the
+# lower end of the spec's
 # analysis band over the crankshaft's Ø.3125 seat; it prints that size with
 # no band (fit audit 2026-11-23, MHA-DT-10.bore).
 BORE_DIAMETER = BORE_DIA + min(BORE_DIA_BAND)

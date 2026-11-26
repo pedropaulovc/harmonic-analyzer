@@ -11,7 +11,7 @@ ease out in small steps and stop at the first free run, and lock
 the cone-lock-knob (MHA-DT-VN-51). Nothing is gauged, so no setting
 reading is booked.
 
-The ease out of the bind (check 4N) is neither printed nor measured, and no
+The ease out of the bind (check 5A) is neither printed nor measured, and no
 number is booked for it: delegated ruling 2026-11-12 (Main), following the
 owner's direction of 2026-11-11 on #2416 (the gears must not bind and must
 not come loose; backlash is not a function); owner review #2144, pending
@@ -70,14 +70,14 @@ count on it.
 T024 and MHA-DT-37's pivot are each tapped true on an indicator while the
 LOCTITE 638 is wet (#3292, #2473) to their sheet 16 limit, the value booked
 as their reading below; T012 and T018 are not set, and their booked .0030 is
-the analysis figure that check 4R's running test alone accepts. After cure
+the analysis figure that check 5C's running test alone accepts. After cure
 the readings are a record only (owner ruling 2026-11-24, audit part 2 C5:
 "B. Keep the wet tap-true steps; the after-cure readings become a record
 only; strip and re-bond only if a gear hesitates in the 80-turn running
 check."): what the compound does as it cures is not booked, and MHA-DT-00
-check 4R's running turns are its acceptance. A bonded gear that hesitates
-there is stripped and re-bonded (2G); a keyed one, not bonded, is checked
-to its sheet, remade if it fails, and the cone redone (3H-3L; delegated
+check 5C's running turns are its acceptance. A bonded gear that hesitates
+there is stripped and re-bonded (2H); a keyed one, not bonded, is checked
+to its sheet, remade if it fails, and the cone redone (3P-3S; delegated
 ruling 2026-11-24 (Main), no precedent; owner review #2144).
 
 The journal's axis is not the running axis (#2473, cone_running_axis):
@@ -125,7 +125,7 @@ from standard_mesh_checks import PlaneGear, backlash, interference_margin, plane
 
 SET_ABOVE_STANDARD_MM = float(_config.fit("cone_drum_oblique_mesh", "edge_slack_mm"))
 # The D1 pivot seat in MHA-FR-01 is transfer-punched through MHA-DT-20's
-# reamed pivot bore with the plate at check 4's feel-set pose, then spotted,
+# reamed pivot bore with the plate at check 5's feel-set pose, then spotted,
 # drilled and tapped with the base still on the mill (MHA-DT-00 step 23,
 # owner ruling 2026-11-08). The seat is never located from the MHA-DT-02
 # pedestal seats, so it carries no band from them (#2366): it lands off the
@@ -188,7 +188,7 @@ PIVOT_RUNOUT_TIR_MM = 0.0020 * 25.4
 # end on the V-block, .0030 TIR MAX (as the 24-tooth already has)". Since C5
 # (2026-11-24) that reading is a record, and no step sets or checks T012 or
 # T018 to .0030 (1S taps only T024, 2B only the pivot): the .0030 is the
-# booked analysis figure, accepted only by check 4R's running test.
+# booked analysis figure, accepted only by check 5C's running test.
 SPIGOT_ASSEMBLED_RUNOUT_TIR_MM = 0.0030 * 25.4
 # Read about MHA-DT-04's journal: gear -> its TIR limit.
 ASSEMBLED_RUNOUT_TIR_MM = {
@@ -321,10 +321,10 @@ def first_bind_offsets_mm(teeth: int) -> tuple[float, ...]:
 
 
 # The highest first bind of any pair: check 4 lays the arbor line on a bind
-# near each end and swings the set in to the first bind.  Every pair taken to
-# lie between the pairs that hold the line sits no higher than this at its
-# tightest phase; a gear past a hold is accepted by the owner's #2584 ruling
-# (option A, exception DT-08; see the module docstring).
+# near each end and check 5 swings the set in to the first bind.  Every pair
+# taken to lie between the pairs that hold the line sits no higher than this
+# at its tightest phase; a gear past a hold is accepted by the owner's #2584
+# ruling (option A, exception DT-08; see the module docstring).
 SET_OFFSET_MAX_MM = max(max(first_bind_offsets_mm(t)) for t in cone.CONE_TEETH)
 
 

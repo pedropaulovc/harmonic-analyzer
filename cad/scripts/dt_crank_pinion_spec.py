@@ -190,7 +190,8 @@ STOCK_PROFILE_CORNERS = tuple(
 SEAT_DIA = 7.9375  # .3125
 
 # The bore over the crankshaft's seat is the part's one critical fit. It is
-# cut by the .3135 reamer (to order: inventory reamer-3135) and prints that size with no band; the
+# reamed .3135 with the owned adjustable reamer set (D19;
+# reamers-adjustable-lms-5948, no tool bought) and prints that size with no band; the
 # crankshaft's seat is made last, turned to this bore less the named fit
 # class's clearance (fit audit 2026-11-23, MHA-DT-10.bore; drawing-guidelines
 # rule 4). BORE_DIA_BAND is the ANALYSIS band, never printed: what the
