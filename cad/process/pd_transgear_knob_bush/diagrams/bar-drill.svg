@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 400" width="760" height="400" font-family="sans-serif" font-size="13">
+  <!-- To scale, 300 px/in along and across the axis, from above (the cross-slide at the bottom): the Ø.625 bar (stock_dia_in), the jaw fronts 1.298 behind Z0 (cad.jaw_z_mm), the hub Ø.520 (cad.outer_dia_mm) back to Z-1.238 (cad.run_end_z_mm), the press diameter Ø.4389 (cad.step_dia_mm) to the shoulder at Z-.334 (cad.step_far_out_far_z_mm), the part-off face at Z-1.163 (cad.part_off_in) with the 1/16 blade's kerf behind it. The 3-jaw's body and jaws are schematic (their sizes are not on record). The B drill to scale (shop drill-b, Ø.2380 = 71.4 px), its 118 deg point; its full diameter drawn at the quill reading Z-1.238 (cad.run_in, zeroed with the lips on the spot's rim). Drawn short to a break line (its length out of the chuck is not on record). The No. 3 centre drill's spot is not drawn. -->
+  <rect class="paper" x="0" y="0" width="760" height="400"/>
+  <text class="title" x="20" y="22">Setup 2, Op 150: the B drill from the tailstock through the bush, past the parting line (to scale, 300 px/in)</text>
+  <rect class="fixture-vise" x="114.6" y="65.25" width="56" height="279.5"/>
+  <path class="part-rest" d="M30 111.25L228.6 111.25L228.6 298.75L30 298.75L27 291.54L30 284.33L27 277.12L30 269.9L27 262.69L30 255.48L27 248.27L30 241.06L27 233.85L30 226.63L27 219.42L30 212.21L27 205L30 197.79L27 190.58L30 183.37L27 176.15L30 168.94L27 161.73L30 154.52L27 147.31L30 140.1L27 132.88L30 125.67L27 118.46Z"/>
+  <rect class="part-rest" x="228.6" y="127" width="22.5" height="156"/>
+  <rect class="part-kept" x="251.1" y="127" width="248.7" height="156"/>
+  <rect class="part-kept" x="499.8" y="139.16" width="100.2" height="131.67"/>
+  <rect class="clamp" x="170.6" y="77.25" width="40" height="34"/>
+  <rect class="clamp" x="170.6" y="298.75" width="40" height="34"/>
+  <line class="centre-line" x1="20" y1="205" x2="740" y2="205"/>
+  <path class="cutter" d="M735 169.3L228.6 169.3L207.15 205L228.6 240.7L735 240.7L732 233.56L735 226.42L732 219.28L735 212.14L732 205L735 197.86L732 190.72L735 183.58L732 176.44Z"/>
+  <line class="arrow" x1="720" y1="153" x2="660" y2="153"/>
+  <line class="datum" x1="600" y1="52" x2="600" y2="96"/>
+  <text class="datum-label" x="594" y="62" text-anchor="end">Z0 the rear face</text>
+  <text class="label" x="340" y="372">B drill (Ø.238) to the quill reading {{cad.run_in:.2dot}}, backing out every .24:</text>
+  <text class="label" x="340" y="388">through the bush and past the parting line</text>
+  <line class="leader" x1="420" y1="360" x2="470" y2="235"/>
+  <circle class="leader-dot" cx="470" cy="235" r="2"/>
+</svg>

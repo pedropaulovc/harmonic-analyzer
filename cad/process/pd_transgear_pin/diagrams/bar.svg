@@ -1,34 +1,47 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<!-- The 1/4 in bar in the 3-jaw, the tip end out on the tailstock centre: head and journal turned, the ring groove cut, the stub cut off and the pin parted off. Drawn once by prechips.shaft_diagrams and kept as a picture: the template labels the journal with its analysis band, and the drawing prints (Ø.125) REF, made to fit its mates (fit audit 2026-11-23). Not to scale after a model change; its sizes are bound. -->
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 429.55" width="720" height="429.55" font-family="Arial, Helvetica, sans-serif" font-size="14"><defs>
-  <marker id="prechips-arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
-    <path d="M0 0L10 5L0 10z" fill="#111" />
-  </marker>
-  <pattern id="prechips-cut" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
-    <rect width="6" height="6" fill="#fbe1dd" />
-    <line x1="0" y1="0" x2="0" y2="6" stroke="#b33" stroke-width="1.6" />
-  </pattern>
-  <pattern id="prechips-sec" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(-45)">
-    <rect width="6" height="6" fill="#d7e1ec" />
-    <line x1="0" y1="0" x2="0" y2="6" stroke="#333" stroke-width="0.9" />
-  </pattern>
-  <pattern id="prechips-thread" width="4" height="4" patternUnits="userSpaceOnUse">
-    <rect width="4" height="4" fill="#fff" />
-    <path d="M0 0L4 4M4 0L0 4" stroke="#333" stroke-width="0.8" />
-  </pattern>
-  <pattern id="prechips-vise" width="6" height="6" patternUnits="userSpaceOnUse">
-    <rect width="6" height="6" fill="#dcdee1" />
-    <line x1="0" y1="3" x2="6" y2="3" stroke="#9a9fa6" stroke-width="1" />
-  </pattern>
-  <pattern id="prechips-plate" width="8" height="8" patternUnits="userSpaceOnUse">
-    <rect width="8" height="8" fill="#e6e8ea" />
-    <line x1="4" y1="0" x2="4" y2="8" stroke="#9a9fa6" stroke-width="1" />
-  </pattern>
-  <pattern id="prechips-bond" width="10" height="6" patternUnits="userSpaceOnUse">
-    <rect width="10" height="6" fill="#f4f1e4" />
-    <path d="M1 1.5H5M6 4.5H10" stroke="#555" stroke-width="1" />
-  </pattern>
-  <pattern id="prechips-support" width="4" height="4" patternUnits="userSpaceOnUse">
-    <circle cx="2" cy="2" r="1.1" fill="#2f6b3a" />
-  </pattern>
-</defs><rect class="paper" width="720" height="429.55" fill="#fff" /><g class="fixture-table" fill="#f1f2f3" stroke="#7a7f86" stroke-width="1" /><g class="fixture-vise" fill="url(#prechips-vise)" stroke="#555" stroke-width="1.2"><rect x="70" y="222.49" width="40" height="95.01" /><path d="M523.2 270L533.2 264H567.20V276.00H533.20Z" /></g><g class="fixture-plate" fill="url(#prechips-plate)" stroke="#555" stroke-width="1.2" /><g class="bond" fill="url(#prechips-bond)" stroke="none" /><g class="part-rest" fill="#c9cbce" stroke="#888" stroke-width="1.2"><path d="M70 252.49H179.14V287.51H70.00L65 283.13L75 274.38L65 265.62L75 256.87L70 252.49Z" /></g><g class="part-waste" fill="#eeeff0" stroke="#666" stroke-width="1.2" stroke-dasharray="2 2" /><g class="part-arriving" fill="none" stroke="#444" stroke-width="1.3" stroke-dasharray="8 4"><rect x="70" y="252.49" width="460" height="35.01" /></g><g class="part-kept" fill="#d7e1ec" stroke="#111" stroke-width="1.6"><path d="M191.04 270L191.04 256L195.29 256L207.9 256L207.9 261.25L474.4 261.25L474.4 263.35L477.2 263.35L477.2 261.25L493.8 261.25L499.19 261.25L499.19 270L499.19 270L499.19 278.75L493.8 278.75L477.2 278.75L477.2 276.65L474.4 276.65L474.4 278.75L207.9 278.75L207.9 284L195.29 284L191.04 284L191.04 270Z" /><rect x="189.64" y="256" width="1.4" height="28.01" /></g><g class="section" fill="url(#prechips-sec)" stroke="#111" stroke-width="1.5" /><g class="part-removed" fill="url(#prechips-cut)" stroke="none"><rect x="179.14" y="252.49" width="10.5" height="35.01" /><rect x="195.29" y="252.49" width="12.6" height="3.5" /><rect x="195.29" y="284" width="12.6" height="3.5" /><rect x="207.9" y="252.49" width="285.91" height="8.76" /><rect x="207.9" y="278.75" width="285.91" height="8.76" /><rect x="474.4" y="261.25" width="2.8" height="2.09" /><rect x="474.4" y="276.65" width="2.8" height="2.09" /><rect x="527.2" y="252.49" width="2.8" height="35.01" /><rect x="499.19" y="252.49" width="28.01" height="35.01" /></g><g class="part-threads" fill="url(#prechips-thread)" stroke="#555" stroke-width="0.6" /><g class="holes" fill="#fff" stroke="#111" stroke-width="1.2" /><g class="hidden" fill="none" stroke="#555" stroke-width="1.1" stroke-dasharray="4 3" /><g class="fixture-support" fill="url(#prechips-support)" stroke="#2f6b3a" stroke-width="1.3" stroke-dasharray="1.5 2" /><g class="clamp" fill="#6b7178" stroke="#111" stroke-width="1.2"><rect x="110" y="230.49" width="55.14" height="22" /><rect x="110" y="287.51" width="55.14" height="22" /></g><g class="cutter" fill="#e0a800" stroke="#111" stroke-width="1.6"><path d="M534.00 293.51l18 5v28h-18z" /><rect x="179.14" y="291.51" width="10.5" height="40" /></g><g class="centre-line" fill="none" stroke="#555" stroke-width="0.9" stroke-dasharray="16 3 3 3"><line x1="60" y1="270" x2="650" y2="270" /></g><g class="active-face" fill="none" stroke="#e07000" stroke-width="3" stroke-linecap="round" /><g class="datum" fill="#b22" stroke="#b22" stroke-width="2.4"><line x1="499.19" y1="242.49" x2="499.19" y2="297.51" /></g><g class="arrow" stroke="#111" stroke-width="1.5" marker-end="url(#prechips-arr)" /><g class="axis" fill="none" stroke="#111" stroke-width="1" marker-end="url(#prechips-arr)" /><g class="dims" fill="none" stroke="#111" stroke-width="1"><line x1="165.14" y1="289.51" x2="165.14" y2="335.51" /><line x1="530" y1="289.51" x2="530" y2="335.51" /><line x1="165.14" y1="331.51" x2="530" y2="331.51" marker-start="url(#prechips-arr)" marker-end="url(#prechips-arr)" /></g><g class="leader" fill="none" stroke="#333" stroke-width="0.9"><polyline points="114 196.06 114 218.49 114 230.49" /><circle cx="114" cy="230.49" r="1.8" class="leader-dot" fill="#333" stroke="none" /><polyline points="268.1 196.06 201.59 218.49 201.59 256" /><circle cx="201.59" cy="256" r="1.8" class="leader-dot" fill="#333" stroke="none" /><polyline points="418.14 196.06 350.85 218.49 350.85 261.25" /><circle cx="350.85" cy="261.25" r="1.8" class="leader-dot" fill="#333" stroke="none" /><polyline points="184.39 383.55 184.39 351.51 184.39 331.51" /><circle cx="184.39" cy="331.51" r="1.8" class="leader-dot" fill="#333" stroke="none" /><polyline points="391.74 383.55 475.8 351.51 475.8 276.65" /><circle cx="475.8" cy="276.65" r="1.8" class="leader-dot" fill="#333" stroke="none" /><polyline points="537.72 383.55 528.2 351.51 528.2 287.51" /><circle cx="528.2" cy="287.51" r="1.8" class="leader-dot" fill="#333" stroke="none" /><polyline points="659.34 383.55 563.2 351.51 563.2 276" /><circle cx="563.2" cy="276" r="1.8" class="leader-dot" fill="#333" stroke="none" /></g><g class="leader-dot" fill="#333" stroke="none" /><g class="label" fill="#111"><text x="495.19" y="311.51" text-anchor="end" class="datum-label" fill="#b22" font-weight="bold">Z0</text><text x="347.57" y="326.51" text-anchor="middle">2.605 out</text><text x="114" y="175.06" text-anchor="middle">3-jaw chuck,</text><text x="114" y="191.06" text-anchor="middle">jaws on bar Ø.2500</text><text x="268.1" y="191.06" text-anchor="middle">turn Ø.1900–.2100</text><text x="418.14" y="191.06" text-anchor="middle">turn (Ø.125)</text><text x="184.39" y="399.55" text-anchor="middle">parting blade:</text><text x="184.39" y="415.55" text-anchor="middle">part off</text><text x="391.74" y="399.55" text-anchor="middle">groove Ø.095–.097</text><text x="391.74" y="415.55" text-anchor="middle">.020–.022 wide</text><text x="537.72" y="399.55" text-anchor="middle">face the bar end</text><text x="537.72" y="415.55" text-anchor="middle">for the stub</text><text x="659.34" y="399.55" text-anchor="middle">dead centre</text></g><g class="label-on-clamp" fill="#fff" /><g class="label-halo" fill="#111" stroke="#fff" stroke-width="4" paint-order="stroke" /><g class="datum-label" fill="#b22" font-weight="bold" /><g class="title" fill="#555" font-style="italic"><text x="20" y="24">Bar in the chuck, seen from the operator's side</text></g></svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 400" width="760" height="400" font-family="sans-serif" font-size="13">
+  <!-- To scale, 220 px/in along and across the axis, from above (the cross-slide at the bottom): the Ø.250 bar (cad.stock_dia_mm), the jaw fronts 2.385 behind Z0, the tip plane (cad.jaw_z_mm); the sawn end .22 out (cad.face_allowance_mm), faced to the .20 stub's end (centre_stub_in); the journal Ø.125 (cad.outer_dia_mm) from Z+.10 (turn_start_z_mm) to the seat at Z-2.08 (cad.outer_far_out_far_z_mm), the head Ø.20 (cad.step_head_dia_mm) back to Z-2.29 (head_turn_end_z_mm), the groove Ø.096 x .021 .157 from the tip plane (cad.groove_far_out_*). The 3-jaw's body and jaws are schematic (their sizes are not on record); the MT3 dead centre is schematic (its sizes are not on record), the bar's rest runs on into the chuck. The AR tool schematic (not on record), its point on the faced end. The dead centre drawn backed off: it comes up in Op 60, after the centre drill. Hatched: this setup's removal; dotted: the stub, cut off in Op 180 (waste). -->
+  <rect class="paper" x="0" y="0" width="760" height="400"/>
+  <text class="title" x="20" y="22">Setup 1, Op 40: the AR tool faces the bar end square, .02 off (to scale, 220 px/in)</text>
+  <rect class="fixture-vise" x="34" y="130.5" width="56" height="139"/>
+  <path class="part-rest" d="M20 172.5L155.78 172.5L155.78 227.5L20 227.5L17 219.64L20 211.79L17 203.93L20 196.07L17 188.21L20 180.36Z"/>
+  <rect class="part-kept" x="169.53" y="178" width="27.57" height="44"/>
+  <rect class="part-kept" x="197.1" y="186.25" width="458.7" height="27.5"/>
+  <rect class="part-waste" x="669.55" y="186.25" width="7.15" height="27.5"/>
+  <rect class="part-waste" x="676.7" y="172.5" width="22" height="55"/>
+  <rect class="part-removed" x="698.7" y="172.5" width="4.4" height="55"/>
+  <rect class="part-removed" x="197.1" y="172.5" width="479.6" height="13.75"/>
+  <rect class="part-removed" x="197.1" y="213.75" width="479.6" height="13.75"/>
+  <rect class="part-removed" x="150.9" y="172.5" width="46.2" height="5.5"/>
+  <rect class="part-removed" x="150.9" y="222" width="46.2" height="5.5"/>
+  <rect class="part-removed" x="155.78" y="178" width="13.75" height="44"/>
+  <rect class="part-removed" x="655.8" y="186.25" width="13.75" height="27.5"/>
+  <rect class="part-removed" x="615.54" y="186.25" width="4.62" height="3.19"/>
+  <rect class="part-removed" x="615.54" y="210.56" width="4.62" height="3.19"/>
+  <rect class="clamp" x="90" y="142.5" width="40" height="30"/>
+  <rect class="clamp" x="90" y="227.5" width="40" height="30"/>
+  <line class="centre-line" x1="20" y1="200" x2="740" y2="200"/>
+  <path class="clamp" d="M729.1 200L786.26 167L760 167L760 233L786.26 233Z"/>
+  <path class="cutter" d="M698.7 213.2L728.7 225.2L728.7 323.2L720.7 320.2L712.7 323.2L704.7 323.2L704.7 237.2Z"/>
+  <line class="arrow" x1="738.7" y1="273.2" x2="738.7" y2="227.2"/>
+  <line class="datum" x1="654.7" y1="50" x2="654.7" y2="92"/>
+  <text class="datum-label" x="648.7" y="60" text-anchor="end">Z0 the tip plane</text>
+  <text class="label" x="500" y="372" text-anchor="end">AR facing the sawn end .02 off:</text>
+  <text class="label" x="500" y="388" text-anchor="end">the stub's end, Z+{{process.centre_stub_in:.2dot}}</text>
+  <line class="leader" x1="502" y1="368" x2="708.7" y2="330"/>
+  <circle class="leader-dot" cx="708.7" cy="330" r="2"/>
+  <text class="label" x="560" y="110">dead centre, backed off:</text>
+  <text class="label" x="560" y="126">in the stub from Op 60</text>
+  <text class="label" x="560" y="142">until Op 180 cuts it off</text>
+  <line class="leader" x1="712" y1="136" x2="724" y2="173"/>
+  <circle class="leader-dot" cx="724" cy="173" r="2"/>
+  <text class="label" x="20" y="384">3-jaw on the Ø{{cad.stock_dia_mm:in.3dot}} bar, {{cad.stickout_in:.2dot}} out</text>
+  <line class="leader" x1="110" y1="372" x2="110" y2="247.5"/>
+  <circle class="leader-dot" cx="110" cy="247.5" r="2"/>
+  <text class="label" x="160" y="60">hatched: the rest of this setup's removal: the Ø{{cad.outer_dia_in:.3dot}} journal,</text>
+  <text class="label" x="160" y="76">the Ø{{cad.step_head_dia_in:.2dot}} head, the groove, the tip cut and the part-off</text>
+  <line class="leader" x1="300" y1="74" x2="390.7" y2="178.5"/>
+  <circle class="leader-dot" cx="390.7" cy="178.5" r="2"/>
+  <text class="label" x="150" y="300">the pin, head at the chuck end</text>
+  <line class="leader" x1="260" y1="288" x2="302.7" y2="209.75"/>
+  <circle class="leader-dot" cx="302.7" cy="209.75" r="2"/>
+</svg>

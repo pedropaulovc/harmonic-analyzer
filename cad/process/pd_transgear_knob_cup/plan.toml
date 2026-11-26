@@ -166,7 +166,7 @@ indexing = "none"
 machine_ref = "pm-1127vf-lb"
 holding = "3-jaw on the Ø{{process.bar_dia_in:.3dot}} bar, {{process.stickout_mm:in.2dot}} in out of the jaw fronts (rule)."
 datum = "Z0 (carriage DRO): the bar end faced in Op 10, the cup's front face as supplied (MHA-PD-00 step 22 faces it again at fit-up). Hole depths run from it by the tailstock quill scale."
-diagram = { file = "diagrams/bar.svg", alt = "The 7/8 in bar in the 3-jaw, front end out: the end faced, the outside turned to .44 past the parting line, the #33 hole through the web, the B drill short of the pilot floor, the flat-bottomed pilot plunged by the 1/4 end mill; the cup parted off .38 from Z0." }
+diagram = { file = "diagrams/bar.svg", alt = "To scale: the 7/8 in bar in the 3-jaw, front end out; the AR tool facing the end to Z0, the front face; hatched, the rest of the setup's removal: the outside to Ø{{cad.outside_dia_in:.2dot}}, the pilot, the #33 hole and the parting kerf, {{process.part_off_in:.3dot}} from Z0." }
 lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = 22.225, stock_diameter_mm = 22.225, stickout_mm = "{{process.stickout_mm}}", minimum_diameter_mm = "{{cad.outside_dia_least_mm}}", support = "none" }
 
 [[setups.operations]]
@@ -213,6 +213,7 @@ tool = "drill-33"
 drilling = "twist_drill"
 sizing = { kind = "band", band_mm = "{{cad.web_hole_dia_band_mm}}" }
 instruction = "The web hole first: feed the #33 drill in until its lips just touch the spot's rim and zero the tailstock quill scale there. Drill in one steady feed until the scale reads {{process.web_drill_depth_in:.2dot}}: through the web (between Z-{{cad.pilot_depth_in:.3dot}} and Z-{{cad.pocket_y_mm:in.3dot}}) and on into what the pocket removes in Setup 2 (drawing: {{cad.web_hole_drill}} DRILL THRU, Ø{{cad.web_hole_dia_min_in:.3dot}}–{{cad.web_hole_dia_max_in:.3dot}})."
+diagram = { file = "diagrams/bar-drill.svg", alt = "To scale: the #33 drill from the tailstock, its full diameter at the quill reading {{process.web_drill_depth_in:.2dot}}, through the web." }
 settings = "lathe-drill-33-c360"
 cut_diameter_mm = "{{cad.web_hole_dia_mm}}"
 hole_depth_mm = 7.62
@@ -225,6 +226,7 @@ tool = "drill-b"
 drilling = "twist_drill"
 sizing = "other"
 instruction = "Feed the B drill in until its lips touch the #33 hole's edge and zero the quill scale there. Drill until it reads {{process.pilot_drill_depth_in:.2dot}}: its full diameter is then about .04 deep and its point ends in the #33 hole above the pilot floor. It leaves the end mill about .006 a side and the floor to cut flat."
+diagram = { file = "diagrams/bar-bdrill.svg", alt = "To scale: the B drill from the tailstock, its full diameter about .04 past Z0, its point in the #33 hole." }
 settings = "lathe-drill-b-c360"
 cut_diameter_mm = 6.0452
 hole_depth_mm = 2.032
@@ -237,6 +239,7 @@ tool = "endmill-1-4"
 drilling = "none"
 sizing = "other"
 instruction = "The pilot: the end mill in the tailstock drill chuck, short. Feed it until its end just touches the faced end and zero the quill scale there. Plunge slowly to {{cad.pilot_depth_in:.3dot}}, backing out to clear chips every .03: its square corner leaves the floor's R{{cad.pilot_corner_radius_max_mm:in.3dot}} MAX and its end the flat floor."
+diagram = { file = "diagrams/bar-pilot.svg", alt = "To scale: the 1/4 end mill from the tailstock plunged to the pilot's flat floor, {{cad.pilot_depth_in:.3dot}} from Z0." }
 settings = "lathe-plunge-1-4-c360"
 cut_diameter_mm = "{{process.pilot_cutter_dia_mm}}"
 inspection = "The pilot is accepted on its mate (drawing note 2: clearance {{cad.pilot_diametral_clearance_min_in:.4dot}}–{{cad.pilot_diametral_clearance_max_in:.3dot}} on the {{cad.pilot_mate}} journal). Mike the finished {{cad.pilot_mate}} journal's end: J. The journal's end enters to the floor. Try the pins from {{process.pilot_go_pin_in:.3dot}} up: P is the largest that enters. P less J is {{cad.pilot_diametral_clearance_min_in:.4dot}}–{{process.pilot_pin_over_journal_max_in:.3dot}} (the pilot is under P plus .001); write J and P down. Depth {{cad.pilot_depth_min_in:.3dot}}–{{cad.pilot_depth_max_in:.3dot}} from the faced end, calipers' depth rod beside the #33 hole (a supply size); write it down."
@@ -254,6 +257,7 @@ tool = "cutoff"
 drilling = "none"
 sizing = "other"
 instruction = "Bring the blade's chuck-side face onto the faced end and set DRO Z there to the blade's width, miked across its cutting edge ({{process.blade_width_in:.4dot}} nominal): the DRO then reads the blade's tailstock-side face. Part off with that face at Z-{{process.part_off_in:.3dot}}: {{process.regrip_allowance_in:.2dot}} over length, for Setup 2. Hands clear: let the cup fall; pick it up from the bed or the chip tray only after the spindle has stopped."
+diagram = { file = "diagrams/bar-part.svg", alt = "To scale: the 1/16 P1 blade, its tailstock-side face at Z-{{process.part_off_in:.3dot}}, near the centre." }
 settings = "lathe-part-c360"
 cut_diameter_mm = "{{cad.outside_dia_mm}}"
 
@@ -265,7 +269,7 @@ indexing = "none"
 machine_ref = "pm-1127vf-lb"
 holding = "3-jaw over a shim wrap of brass shim, {{process.regrip_grip_in:.2dot}} in of the outside in the jaws from the front face (a pencil line that far from it at the jaw fronts), the wrap cut no wider than that, closed lightly (the pilot's wall is about .095); the parted end about .20 in out. Nothing seats the cup axially."
 datum = "Z0 (carriage DRO): the rear face, {{cad.rear_face_length_in:.2dot}} from the front face, preset from the length miked in Op 100 through a {{process.touch_leaf_in:.3dot}} feeler leaf. The pocket's depth runs from it by the tailstock quill scale."
-diagram = { file = "diagrams/regrip.svg", alt = "The cup turned round, its front end in the jaws over a shim wrap: the parted end faced to length, the 3/16 end mill plunged from the tailstock for the head pocket over the #33 hole." }
+diagram = { file = "diagrams/regrip.svg", alt = "To scale: the cup turned round, the front end's {{process.regrip_grip_in:.2dot}} in the jaws over a shim wrap, nothing behind it; the AR tool facing the parted end to Z0, the rear face; hatched, the head pocket to come." }
 lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{cad.outside_dia_mm}}", stock_diameter_mm = "{{cad.outside_dia_mm}}", stickout_mm = 5.08, minimum_diameter_mm = "{{cad.outside_dia_mm}}", support = "none" }
 
 [[setups.operations]]
@@ -292,6 +296,7 @@ tool = "endmill-3-16"
 drilling = "none"
 sizing = { kind = "band", band_mm = "{{cad.pocket_dia_band_mm}}" }
 instruction = "Chuck it again as Op 100. The head pocket: the 3/16 end mill in the tailstock drill chuck, short. Feed it until its end just touches the rear face and zero the quill scale there. Plunge slowly to {{cad.pocket_depth_in:.3dot}}, backing out to clear chips every .03, centred on the #33 hole: its square corner leaves the floor's R{{cad.pocket_corner_radius_max_mm:in.3dot}} MAX."
+diagram = { file = "diagrams/regrip-pocket.svg", alt = "To scale: the 3/16 end mill from the tailstock plunged {{cad.pocket_depth_in:.3dot}} into the rear face over the #33 hole: the head pocket." }
 settings = "lathe-plunge-3-16-c360"
 cut_diameter_mm = 4.7625
 inspection = "Pocket Ø{{cad.pocket_dia_min_in:.2dot}}–{{cad.pocket_dia_max_in:.2dot}}, calipers; depth {{cad.pocket_depth_min_in:.3dot}}–{{cad.pocket_depth_max_in:.3dot}} from the rear face, calipers' depth rod beside the #33 hole. The length, the pilot depth and the pocket depth inside their bands hold the drawing's {{cad.pocket_callout}}."

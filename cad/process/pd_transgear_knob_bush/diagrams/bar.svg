@@ -1,41 +1,34 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 400" font-family="sans-serif" font-size="13">
-  <!-- Setup 2, drawn by hand: the turned-bush template's label row does not fit across the picture once the press diameter is labelled as a fit to its measured mate, and leaving the hub's label out also left its turned band undrawn (traveler review r3). Bush at about 240 px per inch; the bar's stub in the chuck is shortened. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 400" width="760" height="400" font-family="sans-serif" font-size="13">
+  <!-- To scale, 300 px/in along and across the axis, from above (the cross-slide at the bottom): the Ø.625 bar (stock_dia_in), the jaw fronts 1.298 behind Z0 (cad.jaw_z_mm), the hub Ø.520 (cad.outer_dia_mm) back to Z-1.238 (cad.run_end_z_mm), the press diameter Ø.4389 (cad.step_dia_mm) to the shoulder at Z-.334 (cad.step_far_out_far_z_mm), the part-off face at Z-1.163 (cad.part_off_in) with the 1/16 blade's kerf behind it. The 3-jaw's body and jaws are schematic (their sizes are not on record). The AR tool is schematic (its holder's size is not on record), its point on Z0 part way in, facing toward the axis. Hatched: this setup's whole removal (the face, the hub and press diameters, the B hole, the kerf). -->
   <rect class="paper" x="0" y="0" width="760" height="400"/>
-  <text class="title" x="20" y="20">Setup 2: the bar in the 3-jaw, rear end out, seen from the operator's side (not to scale)</text>
-  <rect class="fixture-vise" x="30" y="80" width="130" height="240"/>
-  <rect class="part-rest" x="160" y="125" width="90" height="150"/>
-  <rect class="part-removed" x="250" y="125" width="14" height="150"/>
-  <rect class="part-removed" x="264" y="125" width="194" height="12.5"/>
-  <rect class="part-removed" x="264" y="262.5" width="194" height="12.5"/>
-  <rect class="part-removed" x="458" y="125" width="80" height="22.5"/>
-  <rect class="part-removed" x="458" y="252.5" width="80" height="22.5"/>
-  <rect class="part-removed" x="538" y="125" width="6" height="150"/>
-  <rect class="part-kept" x="264" y="137.5" width="194" height="125"/>
-  <rect class="part-kept" x="458" y="147.5" width="80" height="105"/>
-  <line class="hidden" x1="250" y1="171.5" x2="538" y2="171.5"/>
-  <line class="hidden" x1="250" y1="228.5" x2="538" y2="228.5"/>
-  <line class="centre-line" x1="140" y1="200" x2="730" y2="200"/>
-  <line class="datum" x1="538" y1="115" x2="538" y2="285"/>
-  <rect class="cutter" x="250" y="280" width="14" height="56"/>
-  <path class="cutter" d="M500 256l22 6v50h-22z"/>
-  <path class="cutter" d="M552 200l16 -9h74v18h-74z"/>
-  <text class="label" x="72" y="70">3-jaw</text>
-  <text class="label" x="168" y="112">Ø{{process.stock_dia_in:.3dot}} bar</text>
-  <text class="label" x="232" y="56">turn the hub Ø{{cad.outer_dia_min_in:.3dot}}–{{cad.outer_dia_max_in:.3dot}}</text>
-  <line class="leader" x1="330" y1="62" x2="352" y2="135"/>
-  <text class="label" x="430" y="80">turn the press diameter to PILOT</text>
-  <text class="label" x="430" y="96">plus {{process.press_over_pilot_min_in:.4dot}}–{{cad.step_interference_max_in:.4dot}}</text>
-  <line class="leader" x1="470" y1="102" x2="492" y2="146"/>
-  <text class="datum-label" x="548" y="130">Z0, the rear face</text>
-  <text class="label" x="574" y="176">tailstock: centre drill,</text>
-  <text class="label" x="574" y="232">then drill B through</text>
-  <text class="label" x="376" y="318">shoulder (datum A)</text>
-  <line class="leader" x1="440" y1="304" x2="457" y2="264"/>
-  <text class="label" x="150" y="350">parting blade:</text>
-  <text class="label" x="150" y="366">part off {{process.regrip_allowance_in:.2dot}} long</text>
-  <line class="leader" x1="240" y1="344" x2="255" y2="337"/>
-  <text class="label" x="530" y="300">AR: face the end, turn</text>
-  <text class="label" x="530" y="316">the diameters and the shoulder</text>
-  <text class="label" x="300" y="384">B hole, drilled through past the parting line</text>
-  <line class="leader" x1="320" y1="372" x2="300" y2="230"/>
+  <text class="title" x="20" y="22">Setup 2, Op 50: the AR tool faces the rear face to Z0 (to scale, 300 px/in)</text>
+  <rect class="fixture-vise" x="114.6" y="65.25" width="56" height="279.5"/>
+  <path class="part-rest" d="M30 111.25L232.35 111.25L232.35 298.75L30 298.75L27 291.54L30 284.33L27 277.12L30 269.9L27 262.69L30 255.48L27 248.27L30 241.06L27 233.85L30 226.63L27 219.42L30 212.21L27 205L30 197.79L27 190.58L30 183.37L27 176.15L30 168.94L27 161.73L30 154.52L27 147.31L30 140.1L27 132.88L30 125.67L27 118.46Z"/>
+  <rect class="part-kept" x="251.1" y="127" width="248.7" height="156"/>
+  <rect class="part-kept" x="499.8" y="139.16" width="100.2" height="131.67"/>
+  <rect class="part-removed" x="600" y="111.25" width="4.5" height="187.5"/>
+  <rect class="part-removed" x="228.6" y="111.25" width="271.2" height="15.75"/>
+  <rect class="part-removed" x="228.6" y="283" width="271.2" height="15.75"/>
+  <rect class="part-removed" x="499.8" y="111.25" width="100.2" height="27.91"/>
+  <rect class="part-removed" x="499.8" y="270.84" width="100.2" height="27.91"/>
+  <rect class="part-removed" x="232.35" y="127" width="18.75" height="156"/>
+  <rect class="part-removed" x="228.6" y="169.3" width="371.4" height="71.4"/>
+  <rect class="clamp" x="170.6" y="77.25" width="40" height="34"/>
+  <rect class="clamp" x="170.6" y="298.75" width="40" height="34"/>
+  <line class="centre-line" x1="20" y1="205" x2="740" y2="205"/>
+  <path class="cutter" d="M600 265L630 277L630 385L622 382L614 385L606 385L606 289Z"/>
+  <line class="arrow" x1="644" y1="315" x2="644" y2="271"/>
+  <line class="datum" x1="600" y1="52" x2="600" y2="96"/>
+  <text class="datum-label" x="594" y="62" text-anchor="end">Z0 the rear face</text>
+  <text class="label" x="586" y="384" text-anchor="end">AR facing, {{process.face_allowance_in:.3dot}} off</text>
+  <line class="leader" x1="588" y1="380" x2="608" y2="345"/>
+  <circle class="leader-dot" cx="608" cy="345" r="2"/>
+  <text class="label" x="20" y="384">3-jaw on the Ø{{process.stock_dia_in:.3dot}} bar, {{cad.stickout_in:.2dot}} out of the jaw fronts</text>
+  <line class="leader" x1="140" y1="372" x2="190.6" y2="322.75"/>
+  <circle class="leader-dot" cx="190.6" cy="322.75" r="2"/>
+  <text class="label" x="300" y="44">hatched: the rest of this setup's removal</text>
+  <line class="leader" x1="330" y1="50" x2="360" y2="115.25"/>
+  <circle class="leader-dot" cx="360" cy="115.25" r="2"/>
+  <line class="dims" x1="499.8" y1="287" x2="499.8" y2="346"/>
+  <text class="label" x="495.8" y="360" text-anchor="end">shoulder (datum A) Z{{cad.step_far_out_far_z_mm:in.3dot}}</text>
 </svg>

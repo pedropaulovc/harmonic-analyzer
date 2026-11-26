@@ -1,43 +1,40 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 400" font-family="sans-serif" font-size="13">
-  <!-- Setup 2. Left: section across the jaws through the axis, seen along +X, 100 px to the inch: the vise bed at y 360, the 1-1/2 in stacked parallels against the jaws, the collar seat face down on them, the pilot hanging between them, the rear face (Z0) .03 above the jaw tops. Right: top view, 250 px to the inch, X0 Y0 the bore's axis at (560, 200). Styles: prechips.palette. -->
-  <rect class="paper" x="0" y="0" width="760" height="400"/>
-  <text class="title" x="20" y="22">Setup 2: the collar on stacked parallels in the vise, rear face up; CM01 reams the dowel holes and the flat pin's hole</text>
-  <text class="label" x="20" y="44">left: across the jaws, through the axis</text>
-  <rect class="clamp" x="105" y="183" width="60" height="177"/>
-  <rect class="clamp" x="235" y="183" width="60" height="177"/>
-  <rect class="fixture-support" x="165" y="210" width="13" height="150"/>
-  <rect class="fixture-support" x="222" y="210" width="13" height="150"/>
-  <line class="hidden" x1="165" y1="310" x2="178" y2="310"/>
-  <line class="hidden" x1="222" y1="310" x2="235" y2="310"/>
-  <polygon class="part-kept" points="165,180 235,180 235,210 220,210 220,224 180,224 180,210 165,210"/>
-  <rect class="holes" x="190" y="180" width="20" height="44"/>
-  <line class="centre-line" x1="200" y1="60" x2="200" y2="380"/>
-  <line class="datum" x1="140" y1="180" x2="260" y2="180"/>
-  <rect class="cutter" x="196" y="100" width="8" height="78"/>
-  <line class="leader" x1="260" y1="180" x2="300" y2="150"/>
-  <text class="datum-label" x="304" y="146">Z0: the rear face</text>
-  <line class="leader" x1="228" y1="300" x2="300" y2="300"/>
-  <text class="label" x="304" y="296">1 in + 1/2 in parallels,</text>
-  <text class="label" x="304" y="312">1/8 thick, against each jaw</text>
-  <line class="leader" x1="215" y1="222" x2="300" y2="250"/>
-  <text class="label" x="304" y="254">pilot hanging in the gap</text>
-  <text class="label" x="60" y="380">moving jaw</text>
-  <text class="label" x="240" y="380">fixed jaw</text>
-  <text class="label" x="420" y="44">right: from above (+X right, +Y up)</text>
-  <line class="clamp" x1="440" y1="114" x2="680" y2="114"/>
-  <line class="clamp" x1="440" y1="286" x2="680" y2="286"/>
-  <circle class="part-kept" cx="560" cy="200" r="86"/>
-  <circle class="hidden" cx="560" cy="200" r="49"/>
-  <circle class="holes" cx="560" cy="200" r="24"/>
-  <circle class="holes" cx="629" cy="200" r="12"/>
-  <circle class="holes" cx="491" cy="200" r="12"/>
-  <circle class="holes" cx="531" cy="200" r="8"/>
-  <line class="centre-line" x1="450" y1="200" x2="670" y2="200"/>
-  <line class="centre-line" x1="560" y1="90" x2="560" y2="310"/>
-  <line class="leader" x1="629" y1="188" x2="660" y2="80"/>
-  <text class="label" x="560" y="72">dowels .0930 through at X ±{{cad.dowel_a_offset_in:.4f}}</text>
-  <line class="leader" x1="531" y1="208" x2="500" y2="330"/>
-  <text class="label" x="420" y="346">flat pin .0615 blind at X −{{cad.flat_pin_hole_centre_in:.3f}}</text>
-  <line class="leader" x1="560" y1="224" x2="610" y2="330"/>
-  <text class="label" x="612" y="362">X0 Y0: the bore's axis</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 430" width="760" height="430" font-family="sans-serif" font-size="13">
+  <!-- Hand picture, to scale. Left: a section along the X axis through the bore's axis (the plane Y0, every hole lies in it), seen from the moving jaw's side, 14 px/mm: the collar Ø17.5 (cad.outer_dia_mm), its body .300 (body_supply_in) on the stacks' tops, the pilot Ø9.906 x .140 (cad.pilot_dia_mm, pilot_supply_in) hanging in the gap; behind the cut the fixed jaw, its top .7747 mm below the rear face (rear_over_jaws_mm), and its 1 in + 1/2 in stack (parallel_stack_mm 38.1), both drawn short to break lines; the moving jaw and its stack are in front of the cut and not drawn. The jaws' thickness and the parallels' length are not on record. Right: from above, 5 px/mm, the fixed jaw at the top, X0 Y0 the bore's axis. The #43 drill to scale (shop jig-drill-43, Ø2.2606 mm = 31.6 px), its 118 deg point; its full diameter 1.0 mm past the seat face (drill_past_mm, Z-8.62), its point at Z-9.30 (dowel_drill_tip_mm, the posted Z-9.299 of CM01), into the air of the gap; drawn short to a break line (its length out of the chuck is not on record). The #2 centre drill's spots before it are not drawn. -->
+  <rect class="paper" x="0" y="0" width="760" height="430"/>
+  <text class="title" x="20" y="22">Setup 2, CM01 T2: the #43 drill through dowel hole A at X+.2756 (section along X, 14 px/mm)</text>
+  <path class="clamp" d="M60 160.85L480 160.85L480 420L473 417L466 420L459 417L452 420L445 417L438 420L431 417L424 420L417 417L410 420L403 417L396 420L389 417L382 420L375 417L368 420L361 417L354 420L347 417L340 420L333 417L326 420L319 417L312 420L305 417L298 420L291 417L284 420L277 417L270 420L263 417L256 420L249 417L242 420L235 417L228 420L221 417L214 420L207 417L200 420L193 417L186 420L179 417L172 420L165 417L158 420L151 417L144 420L137 417L130 420L123 417L116 420L109 417L102 420L95 417L88 420L81 417L74 420L67 417L60 420Z"/>
+  <path class="fixture-support" d="M70 256.68L470 256.68L470 420L462.98 417L455.96 420L448.95 417L441.93 420L434.91 417L427.89 420L420.88 417L413.86 420L406.84 417L399.82 420L392.81 417L385.79 420L378.77 417L371.75 420L364.74 417L357.72 420L350.7 417L343.68 420L336.67 417L329.65 420L322.63 417L315.61 420L308.6 417L301.58 420L294.56 417L287.54 420L280.53 417L273.51 420L266.49 417L259.47 420L252.46 417L245.44 420L238.42 417L231.4 420L224.39 417L217.37 420L210.35 417L203.33 420L196.32 417L189.3 420L182.28 417L175.26 420L168.25 417L161.23 420L154.21 417L147.19 420L140.18 417L133.16 420L126.14 417L119.12 420L112.11 417L105.09 420L98.07 417L91.05 420L84.04 417L77.02 420L70 420Z"/>
+  <path class="part-kept" d="M177.5 150L422.5 150L422.5 256.68L369.34 256.68L369.34 306.46L230.66 306.46L230.66 256.68L177.5 256.68Z"/>
+  <rect class="holes" x="266.04" y="150" width="67.92" height="156.46"/>
+  <line class="centre-line" x1="300" y1="40" x2="300" y2="330"/>
+  <line class="datum" x1="127.5" y1="150" x2="171.5" y2="150"/>
+  <text class="datum-label" x="123.5" y="155" text-anchor="end">Z0 the rear face</text>
+  <text class="label" x="500" y="300">behind the cut: the fixed jaw</text>
+  <text class="label" x="500" y="316">(its top {{process.rear_over_jaws_mm:in.3dot}} under Z0) and its</text>
+  <text class="label" x="500" y="332">1 in + 1/2 in stack of 1/8 parallels</text>
+  <line class="leader" x1="498" y1="296" x2="460" y2="330"/>
+  <circle class="leader-dot" cx="460" cy="330" r="2"/>
+  <text class="label" x="500" y="360">the moving jaw and its stack, in</text>
+  <text class="label" x="500" y="376">front of this cut, not drawn</text>
+  <text class="label-halo" x="70" y="352">pilot hanging in the gap</text>
+  <text class="label-halo" x="70" y="368">between the stacks</text>
+  <line class="leader" x1="140" y1="340" x2="240.66" y2="300.46"/>
+  <circle class="leader-dot" cx="240.66" cy="300.46" r="2"/>
+  <path class="cutter" d="M413.82 40L413.82 270.68L398 280.19L382.18 270.68L382.18 40L390.09 37L398 40L405.91 37Z"/>
+  <line class="arrow" x1="438" y1="60" x2="438" y2="100"/>
+  <text class="label" x="20" y="50">#43 drill through dowel hole A,</text>
+  <text class="label" x="20" y="66">pecks of {{process.peck_43_mm:in.3dot}}: its full diameter</text>
+  <text class="label" x="20" y="82">{{process.drill_past_mm:in.3dot}} past the seat face, into the gap</text>
+  <line class="leader" x1="250" y1="82" x2="382" y2="110"/>
+  <circle class="leader-dot" cx="382" cy="110" r="2"/>
+  <text class="label-halo" x="202" y="140" text-anchor="middle">then hole B at X-{{cad.dowel_a_offset_in:.4dot}}</text>
+  <rect class="clamp" x="560" y="80.25" width="160" height="26"/>
+  <rect class="clamp" x="560" y="193.75" width="160" height="26"/>
+  <circle class="part-kept" cx="640" cy="150" r="43.75"/>
+  <circle class="holes" cx="640" cy="150" r="12.13"/>
+  <circle class="cutter" cx="675" cy="150" r="5.65"/>
+  <line class="centre-line" x1="560" y1="150" x2="720" y2="150"/>
+  <text class="title" x="560" y="64">from above (5 px/mm)</text>
+  <text class="label" x="560" y="244">fixed jaw at the top;</text>
+  <text class="label" x="560" y="260">X0 Y0 the bore's axis</text>
 </svg>

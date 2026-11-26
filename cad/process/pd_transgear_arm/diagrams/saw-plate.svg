@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 280" width="760" height="280" font-family="sans-serif" font-size="13">
+  <!-- Hand picture, to scale, 1.4 px/mm: the 1/2 x 6 in 6061 flat seen on its wide face, a 3.0 in piece (plate_width_mm) marked off its end, one 3.0 in edge marked LEFT. The flat's length is not on record: drawn short to a break line. -->
+  <rect class="paper" x="0" y="0" width="760" height="280"/>
+  <text class="title" x="20" y="22">Setup 1: saw the 3.0 in sub-plate off the 1/2 x 6 flat (to scale, 1.4 px/mm)</text>
+  <path class="part-rest" d="M40 60L300 60L300 273.36L297 67.11L300 74.22L297 81.34L300 88.45L297 95.56L300 102.67L297 109.78L300 116.9L297 124.01L300 131.12L297 138.23L300 145.34L297 152.46L300 159.57L297 166.68L300 173.79L297 180.9L300 188.02L297 195.13L300 202.24L297 209.35L300 216.46L297 223.58L300 230.69L297 237.8L300 244.91L297 252.02L300 259.14L297 266.25L40 273.36Z"/>
+  <rect class="part-kept" x="40" y="60" width="106.68" height="213.36"/>
+  <text class="label" x="44" y="166.68">LEFT</text>
+  <line class="cutter" x1="147.68" y1="48" x2="147.68" y2="285.36"/>
+  <text class="label" x="330" y="100">the sub-plate, 3.0 x 6.0:</text>
+  <text class="label" x="330" y="116">saw at the mark, file the burrs;</text>
+  <text class="label" x="330" y="132">mark one 3.0 in edge LEFT</text>
+  <line class="leader" x1="328" y1="96" x2="100" y2="90"/>
+  <circle class="leader-dot" cx="100" cy="90" r="2"/>
+</svg>

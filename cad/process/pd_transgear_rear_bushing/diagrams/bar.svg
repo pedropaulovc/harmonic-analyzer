@@ -1,34 +1,35 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<!-- The 1/2 in brass bar in the 3-jaw: face, turn the outside, centre, drill #31, ream .1260, part off at length. Drawn once by prechips.bush_diagrams and kept as a picture: the template labels the reamed bore with a size band, and the drawing prints none (fit audit 2026-11-23). Not to scale after a model change; its sizes are bound. -->
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 467.0" width="720" height="467.0" font-family="Arial, Helvetica, sans-serif" font-size="14"><defs>
-  <marker id="prechips-arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
-    <path d="M0 0L10 5L0 10z" fill="#111" />
-  </marker>
-  <pattern id="prechips-cut" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
-    <rect width="6" height="6" fill="#fbe1dd" />
-    <line x1="0" y1="0" x2="0" y2="6" stroke="#b33" stroke-width="1.6" />
-  </pattern>
-  <pattern id="prechips-sec" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(-45)">
-    <rect width="6" height="6" fill="#d7e1ec" />
-    <line x1="0" y1="0" x2="0" y2="6" stroke="#333" stroke-width="0.9" />
-  </pattern>
-  <pattern id="prechips-thread" width="4" height="4" patternUnits="userSpaceOnUse">
-    <rect width="4" height="4" fill="#fff" />
-    <path d="M0 0L4 4M4 0L0 4" stroke="#333" stroke-width="0.8" />
-  </pattern>
-  <pattern id="prechips-vise" width="6" height="6" patternUnits="userSpaceOnUse">
-    <rect width="6" height="6" fill="#dcdee1" />
-    <line x1="0" y1="3" x2="6" y2="3" stroke="#9a9fa6" stroke-width="1" />
-  </pattern>
-  <pattern id="prechips-plate" width="8" height="8" patternUnits="userSpaceOnUse">
-    <rect width="8" height="8" fill="#e6e8ea" />
-    <line x1="4" y1="0" x2="4" y2="8" stroke="#9a9fa6" stroke-width="1" />
-  </pattern>
-  <pattern id="prechips-bond" width="10" height="6" patternUnits="userSpaceOnUse">
-    <rect width="10" height="6" fill="#f4f1e4" />
-    <path d="M1 1.5H5M6 4.5H10" stroke="#555" stroke-width="1" />
-  </pattern>
-  <pattern id="prechips-support" width="4" height="4" patternUnits="userSpaceOnUse">
-    <circle cx="2" cy="2" r="1.1" fill="#2f6b3a" />
-  </pattern>
-</defs><rect class="paper" width="720" height="467.0" fill="#fff" /><g class="fixture-table" fill="#f1f2f3" stroke="#7a7f86" stroke-width="1" /><g class="fixture-vise" fill="url(#prechips-vise)" stroke="#555" stroke-width="1.2"><rect x="30" y="165" width="40" height="210" /><rect x="370.81" y="256" width="34" height="28" /></g><g class="fixture-plate" fill="url(#prechips-plate)" stroke="#555" stroke-width="1.2" /><g class="bond" fill="url(#prechips-bond)" stroke="none" /><g class="part-rest" fill="#c9cbce" stroke="#888" stroke-width="1.2"><path d="M10.00 195.00H218.11V345.00H10.00L5 326.25L15 288.75L5 251.25L15 213.75L10 195Z" /></g><g class="part-waste" fill="#eeeff0" stroke="#666" stroke-width="1.2" stroke-dasharray="2 2" /><g class="part-arriving" fill="none" stroke="#444" stroke-width="1.3" stroke-dasharray="8 4"><rect x="10" y="195" width="300.81" height="150" /></g><g class="part-kept" fill="#d7e1ec" stroke="#111" stroke-width="1.6"><path d="M240.61 217.50L304.81 217.50L304.81 322.50L240.61 322.50Z" /></g><g class="section" fill="url(#prechips-sec)" stroke="#111" stroke-width="1.5" /><g class="part-removed" fill="url(#prechips-cut)" stroke="none"><rect x="240.61" y="195" width="64.2" height="22.5" /><rect x="240.61" y="322.5" width="64.2" height="22.5" /><rect x="218.11" y="195" width="22.5" height="150" /><rect x="304.81" y="195" width="6" height="150" /></g><g class="part-threads" fill="url(#prechips-thread)" stroke="#555" stroke-width="0.6" /><g class="holes" fill="#fff" stroke="#111" stroke-width="1.2" /><g class="hidden" fill="none" stroke="#555" stroke-width="1.1" stroke-dasharray="4 3"><rect x="240.61" y="251.1" width="64.2" height="37.8" /><rect x="218.11" y="251.1" width="22.5" height="37.8" /></g><g class="fixture-support" fill="url(#prechips-support)" stroke="#2f6b3a" stroke-width="1.3" stroke-dasharray="1.5 2" /><g class="clamp" fill="#6b7178" stroke="#111" stroke-width="1.2"><rect x="70" y="173" width="118.11" height="22" /><rect x="70" y="345" width="118.11" height="22" /></g><g class="cutter" fill="#e0a800" stroke="#111" stroke-width="1.6"><path d="M304.81 351.00l18 5v44h-18z" /><rect x="218.11" y="349" width="22.5" height="46" /><path d="M324.81 270.00L332.81 265.00H370.81V275.00H332.81Z" /></g><g class="centre-line" fill="none" stroke="#555" stroke-width="0.9" stroke-dasharray="16 3 3 3"><line x1="20" y1="270" x2="420.81" y2="270" /></g><g class="active-face" fill="none" stroke="#e07000" stroke-width="3" stroke-linecap="round" /><g class="datum" fill="#b22" stroke="#b22" stroke-width="2.4"><line x1="304.81" y1="207.5" x2="304.81" y2="332.5" /></g><g class="arrow" stroke="#111" stroke-width="1.5" marker-end="url(#prechips-arr)" /><g class="axis" fill="none" stroke="#111" stroke-width="1" marker-end="url(#prechips-arr)" /><g class="dims" fill="none" stroke="#111" stroke-width="1" /><g class="leader" fill="none" stroke="#333" stroke-width="0.9"><polyline points="89.08 131.55 74 165 74 173" /><circle cx="74" cy="173" r="1.8" class="leader-dot" fill="#333" stroke="none" /><polyline points="272.71 131.55 272.71 165 272.71 217.5" /><circle cx="272.71" cy="217.5" r="1.8" class="leader-dot" fill="#333" stroke="none" /><polyline points="451.17 131.55 350.81 165 350.81 265" /><circle cx="350.81" cy="265" r="1.8" class="leader-dot" fill="#333" stroke="none" /><polyline points="229.36 421 229.36 405 229.36 395" /><circle cx="229.36" cy="395" r="1.8" class="leader-dot" fill="#333" stroke="none" /><polyline points="346.92 421 305.81 405 305.81 345" /><circle cx="305.81" cy="345" r="1.8" class="leader-dot" fill="#333" stroke="none" /></g><g class="leader-dot" fill="#333" stroke="none" /><g class="label" fill="#111"><text x="300.81" y="346.5" text-anchor="end" class="datum-label" fill="#b22" font-weight="bold">Z0</text><text x="89.08" y="110.55" text-anchor="middle">3-jaw chuck,</text><text x="89.08" y="126.55" text-anchor="middle">jaws on bar Ø{{process.stock_dia_in:.3dot}}</text><text x="272.71" y="126.55" text-anchor="middle">turn Ø{{cad.outer_dia_min_in:.3dot}}–{{cad.outer_dia_max_in:.3dot}}</text><text x="451.17" y="78.55" text-anchor="middle">tailstock, in turn:</text><text x="451.17" y="94.55" text-anchor="middle">centre drill</text><text x="451.17" y="110.55" text-anchor="middle">drill under the reamer</text><text x="451.17" y="126.55" text-anchor="middle">ream Ø.126, the .1260 reamer</text><text x="229.36" y="437" text-anchor="middle">parting blade:</text><text x="229.36" y="453" text-anchor="middle">part off</text><text x="346.92" y="437" text-anchor="middle">face the end</text><text x="346.92" y="453" text-anchor="middle">to Z0</text></g><g class="label-on-clamp" fill="#fff" /><g class="label-halo" fill="#111" stroke="#fff" stroke-width="4" paint-order="stroke" /><g class="datum-label" fill="#b22" font-weight="bold" /><g class="title" fill="#555" font-style="italic"><text x="20" y="24">Bar in the chuck, seen from the operator's side</text></g></svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 400" width="760" height="400" font-family="sans-serif" font-size="13">
+  <!-- To scale, 300 px/in along and across the axis, from above (the cross-slide at the bottom): the Ø.500 bar (stock_dia_in), the jaw fronts 0.389 behind Z0 (cad.jaw_z_mm), the outside Ø0.350 (cad.outer_dia_mm) back to Z-0.289 (cad.run_end_z_mm), the part-off face at Z-0.214 (cad.part_off_in) with the 1/16 blade's kerf behind it. The 3-jaw's body and jaws are schematic (their sizes are not on record). The AR tool is schematic (its holder's size is not on record), its point on Z0 part way in, facing toward the axis. Hatched: this setup's whole removal (the face, the outside skin, the bore, the kerf). -->
+  <rect class="paper" x="0" y="0" width="760" height="400"/>
+  <text class="title" x="20" y="22">Setup 1, Op 10: the AR tool faces the bar end to Z0, the thrust face (to scale, 300 px/in)</text>
+  <rect class="fixture-vise" x="227.3" y="84" width="56" height="242"/>
+  <path class="part-rest" d="M30 130L357.05 130L357.05 280L30 280L27 272.86L30 265.71L27 258.57L30 251.43L27 244.29L30 237.14L27 230L30 222.86L27 215.71L30 208.57L27 201.43L30 194.29L27 187.14L30 180L27 172.86L30 165.71L27 158.57L30 151.43L27 144.29L30 137.14Z"/>
+  <rect class="part-kept" x="375.8" y="152.5" width="64.2" height="105"/>
+  <rect class="part-removed" x="440" y="130" width="6" height="150"/>
+  <rect class="part-removed" x="353.3" y="130" width="86.7" height="22.5"/>
+  <rect class="part-removed" x="353.3" y="257.5" width="86.7" height="22.5"/>
+  <rect class="part-removed" x="357.05" y="152.5" width="18.75" height="105"/>
+  <rect class="part-removed" x="353.3" y="186.1" width="86.7" height="37.8"/>
+  <rect class="clamp" x="283.3" y="96" width="40" height="34"/>
+  <rect class="clamp" x="283.3" y="280" width="40" height="34"/>
+  <line class="centre-line" x1="20" y1="205" x2="740" y2="205"/>
+  <path class="cutter" d="M440 253L470 265L470 373L462 370L454 373L446 373L446 277Z"/>
+  <line class="arrow" x1="484" y1="303" x2="484" y2="259"/>
+  <line class="datum" x1="440" y1="72" x2="440" y2="128"/>
+  <text class="datum-label" x="434" y="84" text-anchor="end">Z0 the thrust face</text>
+  <text class="label" x="522" y="330">AR tool facing toward the axis,</text>
+  <text class="label" x="522" y="346">{{process.face_allowance_in:.2dot}} off the sawn end</text>
+  <line class="leader" x1="520" y1="326" x2="454" y2="293"/>
+  <circle class="leader-dot" cx="454" cy="293" r="2"/>
+  <text class="label" x="20" y="384">3-jaw on the Ø{{process.stock_dia_in:.3dot}} bar, {{cad.stickout_in:.2dot}} out of the jaw fronts (before facing)</text>
+  <line class="leader" x1="200" y1="372" x2="303.3" y2="310"/>
+  <circle class="leader-dot" cx="303.3" cy="310" r="2"/>
+  <text class="label" x="470" y="56">hatched: the rest of this setup's removal: the</text>
+  <text class="label" x="470" y="72">outside to Ø{{cad.outer_dia_mm:in.3dot}}, the bore, the parting kerf</text>
+  <line class="leader" x1="468" y1="72" x2="443" y2="145"/>
+  <circle class="leader-dot" cx="443" cy="145" r="2"/>
+  <text class="label" x="40" y="56">the bushing: Z0 to the part-off</text>
+  <text class="label" x="40" y="72">face at Z-{{cad.part_off_in:.3dot}}</text>
+  <line class="leader" x1="150" y1="64" x2="407.9" y2="166.5"/>
+  <circle class="leader-dot" cx="407.9" cy="166.5" r="2"/>
+</svg>

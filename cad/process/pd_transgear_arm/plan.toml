@@ -259,7 +259,7 @@ machine_kind = "other"
 title = "Saw the blank and the sub-plate"
 machine = "Saw / bench"
 indexing = "none"
-diagram = { file = "diagrams/saw.svg", alt = "The 12 in length of 3/8 x 1 ground flat with one 5.70–5.75 in blank marked off its end; beside it the 1/2 x 6 in aluminium flat with a 3.0 in piece marked off its end." }
+diagram = { file = "diagrams/saw.svg", alt = "To scale: the 12 in length of 3/8 x 1 ground flat with one {{process.blank_length_min_mm:in.2f}}–{{process.blank_length_max_mm:in.2f}} blank marked off its end, the saw at the mark." }
 envelope = "other"
 vise_hold = "other"
 beam = "other"
@@ -285,6 +285,7 @@ tool = "cutoff-saw"
 drilling = "none"
 sizing = "other"
 instruction = "Saw a 3.0 in piece off the end of the 1/2 x 6 in 6061 flat: the sub-plate, 6 in along X and 3.0 in across the jaws. File its burrs; mark one 3.0 in edge LEFT."
+diagram = { file = "diagrams/saw-plate.svg", alt = "To scale: the 1/2 x 6 in 6061 flat with a 3.0 in piece marked off its end, one 3.0 in edge marked LEFT." }
 feed = "hand"
 
 # --- Setup 2 ------------------------------------------------------------------
@@ -296,7 +297,7 @@ indexing = "none"
 machine_ref = "pm-30mv"
 holding = "Two 1 in parallels, each 1/8 thick, on the bed of the 6 in PM vise (shop vise-pm-6), one against each jaw: the 1.00 blank's holes at Y −.500 stand .30 clear of each parallel. The blank on them face A down (the rear face up), along X, centred in the jaws' width; the jaws grip its two 1 in ground edges. Tap it down on the parallels with a soft hammer until neither parallel slides."
 datum = "Program AR01_holes (T1–T7). G54: X0 the blank's left end, Y0 the fixed jaw's face, Z0 the parallels' top (face A). +X toward the blank's right end, +Y toward the fixed jaw: the blank lies at −Y, its centre line at Y −.500. The pivot at X {{process.pivot_from_end_mm:in.3dot}}."
-diagram = { file = "diagrams/holes.svg", alt = "The blank across the vise jaws on two parallels, rear face up; the pivot bore {{process.pivot_from_end_mm:in.3dot}} from the left end on the centre line with its Ø.50 counterbore, the pin bore {{cad.pin_bore_x_mm:in.3dot}} further right; the arm's outline (made in Setup 3) dashed." }
+diagram = { file = "diagrams/holes.svg", alt = "To scale, a section across the jaws at the pivot and a view from above: the blank face A down on two 1 in parallels against the jaws, rear face up; the #14 drill through the pivot bore B, {{process.pivot_from_end_mm:in.3dot}} from the left end on the centre line, its full diameter {{process.drill_past_mm:in.3dot}} past face A. From above: the arm's outline (made in Setup 3) dashed." }
 envelope = { x_span_mm = ["{{process.blank_length_max_mm}}"], y_span_mm = ["{{process.blank_width_mm}}"], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{cad.rear_face_thickness_stock_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{process.drill_9_tip_mm}}"], longest_tool_mm = ["{{process.drill_chuck_gauge_mm}}", "{{process.reamer_oal_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.quarter_mill_projection_min_mm}}"] }
 vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{process.blank_width_mm}}", along_jaws_mm = "{{process.blank_length_min_mm}}", part_height_mm = "{{cad.rear_face_thickness_stock_mm}}", parallel_height_mm = "{{process.parallel_height_mm}}", overhang_mm = ["{{process.holes_overhang_mm}}", "rest"], jaw_offset = "centred", fixed_jaw_face = "as_bought", moving_jaw_face = "as_bought", moving_jaw_contact = "flat" }
 beam = { axis = "x", hold = "solid", extent_mm = [0, "{{process.blank_length_min_mm}}"], seat = "the two parallels under the blank's edges, its whole length", seat_mm = [0, "{{process.blank_length_min_mm}}"] }
@@ -348,6 +349,7 @@ tool = "drill-32"
 drilling = "twist_drill"
 sizing = "other"
 instruction = "Same file, M6 T3: #32 through the pin bore, pecks of {{process.drill_peck_mm:in.3dot}} with full retract; set 2400. Cutting oil."
+diagram = { file = "diagrams/holes-pin-drill.svg", alt = "To scale, the same section at the pin bore C: the #32 drill through, its full diameter {{process.drill_past_mm:in.3dot}} past face A." }
 rpm = 2400
 feed = "3.6 in/min"
 hole_depth_mm = "{{cad.rear_face_thickness_stock_mm}}"
@@ -362,6 +364,7 @@ tool = "em-half"
 drilling = "none"
 sizing = "other"
 instruction = "Same file, M6 T4 (1/2 in end mill, at least .75 in out of the collet; set 2650): plunge once over the pivot, at 1.4 in/min, to {{cad.spot_face_floor_in:.4dot}} above face A, and out at feed: the Ø.50 counterbore."
+diagram = { file = "diagrams/holes-spot.svg", alt = "To scale, the section at the pivot: the 1/2 in end mill plunged to {{cad.spot_face_floor_in:.4dot}} above face A, the Ø.50 spot face, over the #14 hole." }
 rpm = 2650
 feed = "1.4 in/min"
 milling_cuts = [
@@ -374,6 +377,7 @@ tool = "drill-9"
 drilling = "twist_drill"
 sizing = { kind = "band", band_mm = "{{cad.pivot_bore_dia_band_mm}}" }
 instruction = "Same file, M6 T5: the #9 drill through the pivot from the spot face's floor, following the #14 hole, its full diameter {{process.drill_past_mm:in.3dot}} past face A, in and out at feed; set 1600. Cutting oil. The #9 drill is the bore (drawing: #9 DRILL THRU)."
+diagram = { file = "diagrams/holes-bore.svg", alt = "To scale, the section at the pivot: the #9 drill through from the spot face's floor, its full diameter {{process.drill_past_mm:in.3dot}} past face A." }
 rpm = 1600
 feed = "3.2 in/min"
 hole_depth_mm = "{{cad.rear_face_thickness_stock_mm}}"
@@ -388,6 +392,7 @@ tool = "reamer-1260"
 drilling = "none"
 sizing = { kind = "band", band_mm = "{{cad.pin_bore_dia_band_mm}}" }
 instruction = "Same file, M6 T6: the .1260 reamer through the pin bore, in and out at feed; set 1200. Cutting oil."
+diagram = { file = "diagrams/holes-ream.svg", alt = "To scale, the section at the pin bore C: the .1260 reamer through, its end {{process.ream_past_mm:in.3dot}} past face A." }
 rpm = 1200
 feed = "3.6 in/min"
 milling_cuts = [
@@ -400,6 +405,7 @@ tool = "chamfer"
 drilling = "none"
 sizing = "other"
 instruction = "Same file, M6 T7 (the 90° chamfer mill; set 2800): plunge its point down the pin bore to {{process.chamfer_tip_mm:in.4dot}} above face A and out at feed: a .008 × 45° break on the pin bore's rear mouth (the face opposite A), over the drawing's .006 MIN and inside the title block's .010 break."
+diagram = { file = "diagrams/holes-chamfer.svg", alt = "To scale, the section at the pin bore C: the 90° chamfer mill's point {{process.chamfer_tip_mm:in.4dot}} above face A, breaking C's rear mouth." }
 rpm = 2800
 feed = "1.4 in/min"
 milling_cuts = [
@@ -433,7 +439,7 @@ indexing = "none"
 machine_ref = "pm-30mv"
 holding = "The same two 1 in parallels; the sub-plate on them, 6 in along X, LEFT edge to the left, gripped across its 3 in. AR02–AR04 drill and tap it with the arm off; then the arm lies face A down on it, held by two socket head cap screws, no washers: a #10-32 x 5/8 (head Ø.312 x .190) through the pivot bore, its head on the spot face's floor, and a #4-40 x 5/8 (head Ø.183 x .112) through the pin bore, its head on the rear face; both into the plate. The plate stays clamped from AR02 to the end of AR05."
 datum = "AR02_plate (T1, T8, T9), AR03_tap_pivot and AR04_tap_pin (T10, spindle off): G54 X0 the plate's left end, Y0 the fixed jaw's face, Z0 the plate's top (face A, once the arm is on); the pivot at X {{process.pivot_on_plate_x_mm:in.3dot}}, Y −1.500 (the plate's centre line). AR05_outline (T11): X and Y picked up again on the arm itself (its left end and ground edge), so the pivot bore, not the tapped hole, is at X {{process.pivot_on_plate_x_mm:in.3dot}}, Y −1.500; Z0 unchanged."
-diagram = { file = "diagrams/outline.svg", alt = "The sub-plate across the jaws on two parallels; the arm screwed down on it face A down through the pivot bore and the pin bore; the 1/4 in end mill's path round the outline: the pivot round, the two flanks, the square end." }
+diagram = { file = "diagrams/outline.svg", alt = "To scale, a section across the jaws at X100 and a view from above: the sub-plate across the jaws on two parallels; the arm screwed down on it face A down through the pivot bore and the pin bore; the 1/4 in end mill on the first of {{process.outline_levels:d}} rough levels beside the flank nearer the fixed jaw, passing -X, anticlockwise round the outline." }
 envelope = { x_span_mm = ["{{process.plate_length_mm}}"], y_span_mm = ["{{process.plate_width_mm}}"], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{process.plate_thickness_mm}}", "{{cad.rear_face_thickness_stock_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{process.plate_thickness_mm}}", "{{process.plate_drill_21_tip_mm}}"], longest_tool_mm = ["{{process.drill_chuck_gauge_mm}}", "{{process.reamer_oal_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.quarter_mill_projection_min_mm}}"] }
 vise_hold = { vise = "vise-pm-6", grips = "plate", across_jaws_mm = "{{process.plate_width_mm}}", along_jaws_mm = "{{process.plate_length_mm}}", part_height_mm = "{{process.plate_thickness_mm}}", parallel_height_mm = "{{process.parallel_height_mm}}", overhang_mm = ["{{process.plate_overhang_mm}}", "rest"], jaw_offset = "centred", fixed_jaw_face = "as_bought", moving_jaw_face = "as_bought", moving_jaw_contact = "flat" }
 beam = { axis = "x", hold = "plate", extent_mm = ["{{process.arm_start_on_plate_mm}}", "{{process.arm_end_on_plate_mm}}"], seat = "the sub-plate, gripped by the jaws; the arm screwed down on it at the pivot and the pin bore", seat_mm = [0, "{{process.plate_length_mm}}"], clamps_mm = ["{{process.pivot_on_plate_x_mm}}", "{{process.pin_on_plate_x_mm}}"], section_mm = { y = "{{cad.end_face_width_mm}}", z = "{{cad.rear_face_thickness_stock_mm}}" } }
@@ -461,6 +467,7 @@ tool = "drill-21"
 drilling = "twist_drill"
 sizing = "other"
 instruction = "Same file, M6 T8: #21 through the plate at the pivot (the #10-32 tap drill), pecks of {{process.drill_peck_mm:in.3dot}}; set 2800. WD-40 on the drill."
+diagram = { file = "diagrams/plate-drill-pivot.svg", alt = "To scale, a section across the jaws at the pivot station, the arm off: the #21 drill through the sub-plate into the gap between the parallels." }
 rpm = 2800
 feed = "8.4 in/min"
 hole_depth_mm = "{{process.plate_thickness_mm}}"
@@ -475,6 +482,7 @@ tool = "drill-43"
 drilling = "twist_drill"
 sizing = { kind = "tap_drill", tap = "tap-4-40" }
 instruction = "Same file, M6 T9: #43 through the plate at the pin station, pecks of .080 with full retract; set 2800. WD-40 on the drill."
+diagram = { file = "diagrams/plate-drill-pin.svg", alt = "To scale, a section across the jaws at the pin station, the arm off: the #43 drill through the sub-plate." }
 rpm = 2800
 feed = "5.6 in/min"
 hole_depth_mm = "{{process.plate_thickness_mm}}"
@@ -497,7 +505,7 @@ tool = "tap-guide"
 drilling = "none"
 sizing = "other"
 instruction = "Run AR03_tap_pivot: M6 T10, the tap guide in the 1/2 in collet, pointed end out (the tool setter measures it), spindle off; the file ends Idle at the machine top over the pivot hole. Tap #10-32 through the plate by hand, the guide's point kept home in the wrench by jogging Z down as the tap feeds; tapping fluid, back off each half turn. Jog Z up clear."
-diagram = { file = "diagrams/tap.svg", alt = "The bare sub-plate in the vise, the arm off; the tap in its T-handle wrench in the pivot hole, the spring tap guide in the spindle above it, spindle off." }
+diagram = { file = "diagrams/tap.svg", alt = "To scale, a section across the jaws at the pivot station, the arm off: the #10-32 tap in its T-handle wrench through the sub-plate, the tap guide in the spindle above it, its point in the wrench's centre hole, spindle off." }
 feed = "hand"
 
 [[setups.operations]]
@@ -506,6 +514,7 @@ tool = "tap-guide"
 drilling = "none"
 sizing = "other"
 instruction = "Swap the wrench to the #4-40 plug tap. Run AR04_tap_pin: the guide stays in (M6 T10 again), spindle off; the file ends Idle at the machine top over the pin hole. Tap #4-40 through the plate the same way. Jog Z up clear; blow the plate clean and stone its top flat of any raised thread. Both screws must run in by hand."
+diagram = { file = "diagrams/tap-pin.svg", alt = "To scale, the section at the pin station: the #4-40 tap in the wrench through the sub-plate, under the same tap guide, spindle off." }
 feed = "hand"
 
 [[setups.operations]]
@@ -558,7 +567,7 @@ indexing = "none"
 machine_ref = "pm-1127vf-lb"
 holding = "The 6 in 4-jaw. The arm goes into the chuck pivot end first, through the chuck and into the 1-1/2 in spindle bore (the arm's largest section, 1.00 x .375, is 1.06 across its diagonal); the square end stands .25 out of the jaws. Two opposite jaws on the faces, two on the flanks. Dial it in with the DTI on the square end's sides close to the jaws: the two faces to equal readings, then the two flanks to equal readings, within .001 (the hole's centre is the section's centre: .188 from face A, half the .375). Then face-check the square end: within .001 across it."
 datum = "The square end: the tailstock quill scale zeroed with each tool's lips on the spot's rim."
-diagram = { file = "diagrams/latch.svg", alt = "The arm in the 4-jaw, its pivot end through the chuck into the spindle bore, the square end out; the latch-pin hole on the section's centre, drilled and reamed from the tailstock {{cad.latch_pin_hole_height_in:.3dot}} from face A." }
+diagram = { file = "diagrams/latch.svg", alt = "To scale, a section through the spindle axis at the arm's mid-thickness: the arm in the 4-jaw, its pivot end through the chuck into the spindle bore, the square end .25 out of the jaws; the #32 drill from the tailstock to the quill reading {{process.latch_drill_depth_mm:in.3dot}}." }
 lathe_hold = "other"
 
 [[setups.operations]]
@@ -595,6 +604,7 @@ tool = "reamer-1240"
 drilling = "none"
 sizing = { kind = "band", band_mm = "{{cad.latch_pin_hole_dia_band_mm}}" }
 instruction = "The .1240 reamer; set 600. Its lead chamfer on the hole's mouth, zero the quill scale; feed slowly until it reads {{process.latch_ream_depth_mm:in.3dot}} plus its .020 chamfer, and withdraw with the spindle running. Cutting oil."
+diagram = { file = "diagrams/latch-ream.svg", alt = "To scale, the same section: the .1240 reamer in the latch-pin hole to {{process.latch_ream_depth_mm:in.3dot}} plus its .020 chamfer." }
 rpm = 600
 cut_diameter_mm = 3.1496
 

@@ -1,17 +1,38 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="460" height="220" viewBox="0 0 460 220" font-family="sans-serif" font-size="12">
-<rect width="460" height="220" fill="#fff"/>
-<rect x="40" y="60" width="365" height="64" fill="#cde" stroke="#000"/>
-<rect x="20" y="30" width="400" height="28" fill="#aaa" stroke="#000"/>
-<text x="30" y="48" text-anchor="start">fixed jaw (Y0)</text>
-<rect x="20" y="126" width="400" height="28" fill="#aaa" stroke="#000"/>
-<text x="330" y="144.5" text-anchor="start">moving jaw</text>
-<path d="M397.0,74.2 L76.1,60.5 A31.2,31.2 0 1 0 76.1,123.0 L397.0,109.3 Z" fill="none" stroke="#000" stroke-width="1.5" stroke-dasharray="6 4"/>
-<circle cx="74.75" cy="91.75" r="15.875" fill="#f9c" stroke="#000"/>
-<circle cx="74.8" cy="91.8" r="6.2" fill="#fff" stroke="#000" stroke-width="1.2"/>
-<circle cx="246.8" cy="91.8" r="4.0" fill="#fff" stroke="#000" stroke-width="1.2"/>
-<line x1="74.75" y1="107.75" x2="74.75" y2="173.5" stroke="#000"/>
-<text x="74.75" y="187.5" text-anchor="middle">pivot B, Ø.500 spot face</text>
-<line x1="246.7875" y1="95.75" x2="246.7875" y2="173.5" stroke="#000"/>
-<text x="246.7875" y="187.5" text-anchor="middle">pin bore C, .008 x 45° rear</text>
-<text x="40" y="209.5" text-anchor="start">X0 blank left end; Z0 parallels' top (face A down)</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 430" width="760" height="430" font-family="sans-serif" font-size="13">
+  <!-- Hand picture, to scale. Left: a section across the jaws, from the RIGHT end, 7 px/mm (the fixed jaw on the right, Y0 its face): the two 1 in parallels, 1/8 thick (parallel_height_mm, parallel_thickness_mm), against the jaws; the blank 1.00 x .375 (blank_width_mm, rear_face_thickness_stock) face A down on them, its centre line at Y-.500; the jaw tops 19.545 mm over face A (holes_jaw_top_mm). The jaws' thickness and the parallels' length are not on record; the jaws and parallels drawn short to a break line toward the bed. Right: from above, 2.2 px/mm, X0 the blank's left end, the arm's outline (cut in Setup 3) dashed. The #14 drill to scale (shop drill-14, Ø4.6228 mm = 32.4 px), 118 deg point, its full diameter 1.0 mm past face A (drill_past_mm), its point at Z-2.389 (drill_14_tip_mm, the posted AR01 T2 depth), in the gap between the parallels; drawn short to a break line (its length out of the chuck is not on record). The #1 centre drill's spots before it are not drawn. -->
+  <rect class="paper" x="0" y="0" width="760" height="430"/>
+  <text class="title" x="20" y="22">Setup 2, AR01 T2: the #14 drill through the pivot bore B (to scale, 7 px/mm)</text>
+  <path class="clamp" d="M102.2 153.18L152.2 153.18L152.2 415L145.06 412L137.91 415L130.77 412L123.63 415L116.49 412L109.34 415L102.2 415Z"/>
+  <path class="clamp" d="M330 153.18L380 153.18L380 415L372.86 412L365.71 415L358.57 412L351.43 415L344.29 412L337.14 415L330 415Z"/>
+  <path class="fixture-support" d="M152.2 290L174.43 290L174.43 415L167.02 412L159.61 415L152.2 415Z"/>
+  <path class="fixture-support" d="M307.77 290L330 290L330 415L322.59 412L315.18 415L307.77 415Z"/>
+  <rect class="part-kept" x="152.2" y="223.32" width="177.8" height="66.67"/>
+  <text class="label-on-clamp" x="127.2" y="403" text-anchor="middle">moving</text>
+  <text class="label-on-clamp" x="355" y="403" text-anchor="middle">fixed</text>
+  <line class="datum" x1="20" y1="290" x2="98.2" y2="290"/>
+  <text class="datum-label" x="20" y="284">Z0 face A</text>
+  <text class="label" x="241.1" y="339" text-anchor="middle">1 in parallels,</text>
+  <text class="label" x="241.1" y="355" text-anchor="middle">1/8 thick</text>
+  <line class="leader" x1="211.1" y1="349" x2="174.43" y2="365"/>
+  <circle class="leader-dot" cx="174.43" cy="365" r="2"/>
+  <line class="leader" x1="271.1" y1="349" x2="307.77" y2="365"/>
+  <circle class="leader-dot" cx="307.77" cy="365" r="2"/>
+  <text class="title" x="20" y="44">section at the pivot (X13.9), from the RIGHT end (7 px/mm)</text>
+  <path class="cutter" d="M257.28 56L257.28 297L241.1 306.72L224.92 297L224.92 56L233.01 53L241.1 56L249.19 53Z"/>
+  <line class="arrow" x1="207.1" y1="76" x2="207.1" y2="116"/>
+  <text class="label" x="20" y="76">#14 drill, one feed, no pecks:</text>
+  <text class="label" x="20" y="92">its full diameter</text>
+  <text class="label" x="20" y="108">{{process.drill_past_mm:in.3dot}} past face A</text>
+  <line class="leader" x1="140" y1="106" x2="225.1" y2="140"/>
+  <circle class="leader-dot" cx="225.1" cy="140" r="2"/>
+  <rect class="clamp" x="394.72" y="88" width="349.08" height="22"/>
+  <rect class="clamp" x="394.72" y="165.88" width="349.08" height="22"/>
+  <rect class="part-kept" x="410" y="110" width="319.91" height="55.88"/>
+  <path class="hidden" d="M441.75 110.47L724.16 122.53L724.16 153.35L441.75 165.41A27.5 27.5 0 1 1 441.75 110.47Z"/>
+  <circle class="cutter" cx="440.58" cy="137.94" r="5.09"/>
+  <text class="title" x="410" y="44">from above (2.2 px/mm)</text>
+  <text class="label" x="410" y="232">fixed jaw at the top; X0 the blank's left end,</text>
+  <text class="label" x="410" y="248">Y0 the fixed jaw's face; dashed: the outline</text>
+  <text class="label" x="410" y="264">(Setup 3)</text>
+  <text class="label-on-clamp" x="696" y="103" text-anchor="middle">fixed jaw</text>
 </svg>

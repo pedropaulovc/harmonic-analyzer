@@ -415,7 +415,7 @@ indexing = "none"
 machine_ref = "pm-30mv"
 holding = "Two 1 in parallels on the bed of the 6 in PM vise (shop vise-pm-6), one against each jaw. The spoil block on them, its 3 in width across the jaws (its as-bought 1 in edges in the jaws), centred along the jaws; tap it down and tighten: its top stands {{process.spoil_over_jaws_mm:in.3dot}} over the jaw tops. The blank bonded on its top face A down (rear face up): ScotchBlue 2090 blue painter's tape on the block and on face A, GH1200 thick CA glue between, the stack {{process.tape_stack_mm:in.3dot}} thick; its C edge flush with the block's edge at the FIXED jaw, its R end to the RIGHT, {{process.spoil_end_margin_mm:in.2dot}} in from the block's right end. Nothing else holds it. Cut dry or with a light air blast: no flood or mist coolant and no water (the paper tape soaks and lets go); oil only where an op says, a drop on the tool, never poured on the work. CA softens with heat: if the blank is too warm to hold a finger on, stop and let it cool."
 datum = "Programs AP01_holes (T1–T5), AP02_sink (T6), AP03_outline (T1). G54: X0 Y0 the press hole K's axis, the plate's length along −X (the end round at +X, the top edge at −X), +Y toward the fixed jaw (the C edge at Y {{cad.outline_edge_right_x_in:.3dot}}); Z0 face A (the blank's underside, {{process.tape_stack_mm:in.3dot}} above the block's top on the tape stack), set from T1 on the blank's top less its miked thickness, so the stack moves no depth on the plate. At each M6 the file stops the spindle with the tool lifted above the stock; change the tool, set the speed, oil if the op says, then Cycle Start; the tool setter measures the tool. After homing again (the note says when): AP03_outline has begun (it cuts away the edges X0 Y0 was set from): stop and tell the owner. Before that: check that the blank has not moved on its bond, then check G54. The edge finder fitted by hand, as when X0 Y0 was set: the C edge from +Y, 1/2 in in from the R end, reads Y {{process.y_set_mm:.3f}}; the R end from +X at mid-width reads X {{process.x_set_mm:.3f}}. Console M6 T1, then its end on a .002 leaf on the blank's top: Z (the written thickness in mm + {{process.z_leaf_mm:.3f}}) before AP01_holes has faced it, Z {{process.thickness_target_mm:.3f}} + {{process.z_leaf_mm:.3f}} once it has. Each within 0.025 mm: run the interrupted program from its start (every cut done is then cut in air). One off, or the blank moved: stop and tell the owner."
-diagram = { file = "diagrams/bond.svg", alt = "Plan and section: the spoil block across the vise jaws on two parallels, its top over the jaw tops; the blank on blue tape, CA glue, blue tape on it (two strips on each face), its C edge flush with the block's fixed-jaw edge, R end to the right; the plate's outline inside it with K, the two screw holes, the end round at +X; X0 Y0 at K." }
+diagram = { file = "diagrams/bond.svg", alt = "To scale, a section across the jaws and a view from above: the spoil block across the vise jaws on two parallels, its top over the jaw tops; the blank on the tape stack, its C edge flush with the block's fixed-jaw edge, R end to the right; the 3/8 in end mill on a facing pass at the first level, Z{{process.face_rough_z_mm:in.3dot}}, passing -X. From above: X0 Y0 at K, the plate's outline and holes dashed (cut later)." }
 envelope = { x_span_mm = ["{{process.blank_length_max_mm}}", 9.525, 9.525, 5.08], y_span_mm = ["{{process.spoil_width_mm}}", 9.525], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{process.spoil_height_mm}}", "{{process.tape_stack_max_mm}}", "{{process.blank_thickness_max_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{process.spoil_height_mm}}", "{{process.tape_stack_min_mm}}", "{{process.drill_2764_tip_mm}}"], longest_tool_mm = ["{{process.drill_chuck_gauge_mm}}", "{{process.reamer_oal_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.em_projection_min_mm}}"] }
 vise_hold = { vise = "vise-pm-6", grips = "plate", across_jaws_mm = "{{process.spoil_width_mm}}", along_jaws_mm = "{{process.spoil_length_mm}}", part_height_mm = "{{process.spoil_height_mm}}", parallel_height_mm = "{{process.parallel_height_mm}}", overhang_mm = [-34.887, "rest"], jaw_offset = "centred", fixed_jaw_face = "as_bought", moving_jaw_face = "as_bought", moving_jaw_contact = "flat" }
 beam = { axis = "x", hold = "plate", extent_mm = [-48.514, 14.986], seat = "6061 spoil block", seat_mm = [-61.214, 27.686], bond = { shear_mpa = "{{process.bond_accepted_shear_mpa}}", tensile_mpa = "{{process.bond_accepted_tensile_mpa}}", accepted_by = "the shop owner", pieces = [{ name = "plate", kind = "part", area_mm2 = "{{process.bond_area_mm2}}", width_mm = "{{cad.blank_width_mm}}" }] } }
@@ -527,6 +527,7 @@ tool = "drill-1"
 drilling = "twist_drill"
 sizing = { kind = "band", band_mm = "{{cad.screw_hole_1_dia_band_mm}}" }
 instruction = "Same file, M6 T3 (#1 drill in the drill chuck; set 1100): K and both screw holes through, one plunge each, the full diameter {{process.drill_past_mm:in.3dot}} under face A, into the spoil block."
+diagram = { file = "diagrams/bond-drill.svg", alt = "To scale, a section across the jaws at K: the #1 drill through the blank, its full diameter {{process.drill_past_mm:in.3dot}} under face A, into the tape and the spoil block." }
 rpm = 1100
 feed = "{{process.drill_1_feed_per_min_mm:in.1f}} in/min"
 hole_depth_mm = "{{process.thickness_target_mm}}"
@@ -541,6 +542,7 @@ tool = "drill-27-64"
 drilling = "twist_drill"
 sizing = "other"
 instruction = "Same file, M6 T4 (27/64 drill in the drill chuck; set 600): open K through in one plunge, the full diameter {{process.drill_past_mm:in.3dot}} under face A. It leaves .016 on the diameter for the reamer."
+diagram = { file = "diagrams/bond-drill-k.svg", alt = "To scale, the same section at K: the 27/64 drill opening K through, its full diameter {{process.drill_past_mm:in.3dot}} under face A." }
 rpm = 600
 feed = "{{process.drill_2764_feed_per_min_mm:in.1f}} in/min"
 hole_depth_mm = "{{process.thickness_target_mm}}"
@@ -555,6 +557,7 @@ tool = "reamer"
 drilling = "none"
 sizing = { kind = "band", band_mm = "{{cad.press_hole_dia_band_mm}}" }
 instruction = "Same file, M6 T5 (the set's .4385 reamer in the drill chuck; set 400, cutting oil on the reamer only, a drop, wiped so none runs to the tape): ream K through, fed in and fed out, spindle running, {{process.ream_past_mm:in.3dot}} under face A. The file ends there. K is not gauged: MHA-PD-28's traveler turns the bush to this hole."
+diagram = { file = "diagrams/bond-ream.svg", alt = "To scale, the same section at K: the .4385 reamer through K, its end {{process.ream_past_mm:in.3dot}} under face A." }
 rpm = 400
 feed = "{{process.ream_feed_per_min_mm:in.1f}} in/min, in and out"
 milling_cuts = [
@@ -567,6 +570,7 @@ tool = "sink"
 drilling = "none"
 sizing = "other"
 instruction = "Run AP02_sink (M6 T6, 3/8 in 82° countersink in the drill chuck; set 420): its point {{process.sink_tip_mm:in.3dot}} above face A on each screw hole's axis: countersinks Ø{{process.sink_dia_mm:in.3dot}} on the rear face."
+diagram = { file = "diagrams/bond-sink.svg", alt = "To scale, a section across the jaws at the screw holes: the 82° countersink, its point {{process.sink_tip_mm:in.3dot}} above face A, on screw hole 1; rim Ø{{process.sink_dia_mm:in.3dot}} on the rear face." }
 rpm = 420
 feed = "{{process.sink_feed_per_min_mm:in.2f}} in/min"
 milling_cuts = [

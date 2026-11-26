@@ -109,7 +109,7 @@ indexing = "none"
 machine_ref = "pm-1127vf-lb"
 holding = "3-jaw on the Ø{{process.stock_dia_in:.3dot}} bar, {{process.chuck_grip_in:.2dot}} in in the jaws; {{cad.stickout_in:.2dot}} in out of the jaw fronts."
 datum = "Z0 (carriage DRO) the bar end faced in Op 10: the ring face."
-diagram = { file = "diagrams/bar.svg", alt = "The 1/2 in bar in the 3-jaw: the end faced, the outside turned back past the parting line, the faced end's edge chamfered, the bore spotted, drilled and reamed through past the parting line; the bushing parted off .02 long." }
+diagram = { file = "diagrams/bar.svg", alt = "To scale: the 1/2 in bar in the 3-jaw, {{cad.stickout_in:.2dot}} out; the AR tool facing the end to Z0, the ring face; hatched, the rest of the setup's removal: the outside, the bore and the parting kerf." }
 lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{cad.stock_dia_mm}}", stock_diameter_mm = "{{cad.stock_dia_mm}}", stickout_mm = "{{cad.stickout_mm}}", minimum_diameter_mm = "{{cad.outer_turn_min_mm}}", support = "none" }
 turning_support = { kind = "chuck_only", chuck_z_mm = "{{cad.jaw_z_mm}}" }
 
@@ -179,6 +179,7 @@ tool = "drill-31"
 drilling = "twist_drill"
 sizing = "other"
 instruction = "Feed the #31 drill in until its lips just touch the spot's rim and zero the tailstock quill scale there. Drill in one steady feed until the scale reads {{cad.run_in:.2dot}} (the hole is under three diameters deep, so it needs no peck): the hole runs through the bushing and past the parting line. It leaves the reamer .003 a side."
+diagram = { file = "diagrams/bar-drill.svg", alt = "To scale: the #31 drill from the tailstock, its full diameter at the quill reading {{cad.run_in:.2dot}}, through the bushing and past the parting line." }
 settings = "lathe-drill-31-c360"
 cut_diameter_mm = 3.048
 hole_depth_mm = "{{cad.run_mm}}"
@@ -191,6 +192,7 @@ tool = "reamer"
 drilling = "none"
 sizing = { kind = "band", band_mm = "{{cad.bore_dia_band_mm}}" }
 instruction = "Ream .1260 from the tailstock, spindle running: feed the reamer in until its lead chamfer meets the hole's mouth and zero the quill scale there; feed slowly until it reads {{cad.run_in:.2dot}} (past the parting line), and withdraw with the spindle still running. The bore runs on the MHA-PD-23 pin: Ra 63."
+diagram = { file = "diagrams/bar-ream.svg", alt = "To scale: the .1260 reamer from the tailstock in the #31 hole, to the quill reading {{cad.run_in:.2dot}}." }
 settings = "lathe-ream-1260-c360"
 cut_diameter_mm = "{{cad.bore_dia_mm}}"
 
@@ -201,6 +203,7 @@ tool = "cutoff"
 drilling = "none"
 sizing = "other"
 instruction = "Bring the blade's chuck-side face onto the faced end and set DRO Z there to the blade's width, miked across its cutting edge ({{process.blade_width_in:.4dot}} nominal): the DRO then reads the blade's tailstock-side face. Part off with that face at Z-{{cad.part_off_in:.3dot}}: {{process.regrip_allowance_in:.2dot}} over length, for Setup 2. Hands clear: let the bushing fall; pick it up from the bed or the chip tray only after the spindle has stopped."
+diagram = { file = "diagrams/bar-part.svg", alt = "To scale: the 1/16 P1 blade, its tailstock-side face at Z-{{cad.part_off_in:.3dot}}, its tip at the reamed bore." }
 settings = "lathe-part-c360"
 cut_diameter_mm = "{{cad.outer_dia_mm}}"
 

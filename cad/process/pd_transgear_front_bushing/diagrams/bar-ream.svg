@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 400" width="760" height="400" font-family="sans-serif" font-size="13">
+  <!-- To scale, 300 px/in along and across the axis, from above (the cross-slide at the bottom): the Ø.500 bar (stock_dia_in), the jaw fronts 0.417 behind Z0 (cad.jaw_z_mm), the outside Ø0.470 (cad.outer_dia_mm) back to Z-0.317 (cad.run_end_z_mm), the part-off face at Z-0.242 (cad.part_off_in) with the 1/16 blade's kerf behind it. The 3-jaw's body and jaws are schematic (their sizes are not on record). The .1260 reamer to scale (shop reamer-1260, Ø3.2004 mm = 37.8 px), its 45 deg lead chamfer (schematic, about .01) at Z-0.317, in the #31 hole (white). Drawn short to a break line (its length out of the chuck is not on record). -->
+  <rect class="paper" x="0" y="0" width="760" height="400"/>
+  <text class="title" x="20" y="22">Setup 1: the .1260 reamer from the tailstock, to the same quill reading (to scale, 300 px/in)</text>
+  <rect class="fixture-vise" x="218.9" y="84" width="56" height="242"/>
+  <path class="part-rest" d="M30 130L344.9 130L344.9 280L30 280L27 272.86L30 265.71L27 258.57L30 251.43L27 244.29L30 237.14L27 230L30 222.86L27 215.71L30 208.57L27 201.43L30 194.29L27 187.14L30 180L27 172.86L30 165.71L27 158.57L30 151.43L27 144.29L30 137.14Z"/>
+  <rect class="part-rest" x="344.9" y="134.5" width="22.5" height="141"/>
+  <rect class="part-kept" x="367.4" y="134.5" width="72.6" height="141"/>
+  <path class="paper" d="M437 134.5L440.5 134.5L440.5 137.5Z"/>
+  <path class="paper" d="M437 275.5L440.5 275.5L440.5 272.5Z"/>
+  <rect class="holes" x="344.9" y="187" width="95.1" height="36"/>
+  <path class="holes" d="M344.9 187L334.08 205L344.9 223Z"/>
+  <rect class="clamp" x="274.9" y="96" width="40" height="34"/>
+  <rect class="clamp" x="274.9" y="280" width="40" height="34"/>
+  <line class="centre-line" x1="20" y1="205" x2="740" y2="205"/>
+  <path class="cutter" d="M730 186.1L347.9 186.1L344.9 189.1L344.9 220.9L347.9 223.9L730 223.9L727 216.34L730 208.78L727 201.22L730 193.66Z"/>
+  <line class="arrow" x1="700" y1="171" x2="640" y2="171"/>
+  <line class="datum" x1="440" y1="72" x2="440" y2="128"/>
+  <text class="datum-label" x="434" y="84" text-anchor="end">Z0 the ring face</text>
+  <text class="label" x="470" y="300">the .1260 reamer, spindle running, fed slowly</text>
+  <text class="label" x="470" y="316">to the quill reading {{cad.run_in:.2dot}}; withdrawn running</text>
+  <line class="leader" x1="560" y1="288" x2="600" y2="224"/>
+  <circle class="leader-dot" cx="600" cy="224" r="2"/>
+  <text class="label" x="470" y="56">the #31 hole's point, past the parting line</text>
+  <line class="leader" x1="520" y1="64" x2="340.9" y2="205"/>
+  <circle class="leader-dot" cx="340.9" cy="205" r="2"/>
+</svg>

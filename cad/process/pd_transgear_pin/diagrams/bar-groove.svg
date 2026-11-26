@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 400" width="760" height="400" font-family="sans-serif" font-size="13">
+  <!-- To scale, 220 px/in along and across the axis, from above (the cross-slide at the bottom): the Ø.250 bar (cad.stock_dia_mm), the jaw fronts 2.385 behind Z0, the tip plane (cad.jaw_z_mm); the sawn end .22 out (cad.face_allowance_mm), faced to the .20 stub's end (centre_stub_in); the journal Ø.125 (cad.outer_dia_mm) from Z+.10 (turn_start_z_mm) to the seat at Z-2.08 (cad.outer_far_out_far_z_mm), the head Ø.20 (cad.step_head_dia_mm) back to Z-2.29 (head_turn_end_z_mm), the groove Ø.096 x .021 .157 from the tip plane (cad.groove_far_out_*). The 3-jaw's body and jaws are schematic (their sizes are not on record); the MT3 dead centre is schematic (its sizes are not on record), the bar's rest runs on into the chuck. The journal finished. The grooving bit to scale across (tools.grooving-tool-020: .020 wide or less, drawn .020 = 4.4 px), its tailstock-side edge at Z-.157 (the load wall), plunged to Ø.096; its holder schematic (not on record), to a break line. Op 160 widens the groove toward the chuck if the bit is under .020. The dead centre in. -->
+  <rect class="paper" x="0" y="0" width="760" height="400"/>
+  <text class="title" x="20" y="22">Setup 1, Op 150: the grooving tool plunges the ring groove, its tailstock-side edge on the load wall (to scale, 220 px/in)</text>
+  <rect class="fixture-vise" x="34" y="130.5" width="56" height="139"/>
+  <path class="part-rest" d="M20 172.5L150.9 172.5L150.9 227.5L20 227.5L17 219.64L20 211.79L17 203.93L20 196.07L17 188.21L20 180.36Z"/>
+  <rect class="part-kept" x="150.9" y="178" width="46.2" height="44"/>
+  <rect class="part-kept" x="197.1" y="186.25" width="479.6" height="27.5"/>
+  <rect class="part-kept" x="676.7" y="172.5" width="22" height="55"/>
+  <rect class="clamp" x="90" y="142.5" width="40" height="30"/>
+  <rect class="clamp" x="90" y="227.5" width="40" height="30"/>
+  <line class="centre-line" x1="20" y1="200" x2="740" y2="200"/>
+  <path class="clamp" d="M689.9 200L747.06 167L760 167L760 233L747.06 233Z"/>
+  <rect class="part-removed" x="615.76" y="186.25" width="4.4" height="3.19"/>
+  <rect class="part-removed" x="615.76" y="210.56" width="4.4" height="3.19"/>
+  <path class="cutter" d="M615.76 210.56L620.16 210.56L620.16 240.56L642.16 270.56L642.16 390L635.09 387L628.03 390L620.96 387L613.89 390L606.83 387L599.76 390L599.76 270.56L615.76 240.56Z"/>
+  <line class="arrow" x1="581.76" y1="380" x2="581.76" y2="330"/>
+  <line class="datum" x1="654.7" y1="50" x2="654.7" y2="92"/>
+  <text class="datum-label" x="648.7" y="60" text-anchor="end">Z0 the tip plane</text>
+  <text class="label" x="565.76" y="300" text-anchor="end">grooving tool .020: its tailstock-side edge on the</text>
+  <text class="label" x="565.76" y="316" text-anchor="end">load wall {{cad.groove_station_in:.3dot}} from the seat, plunged to Ø.096</text>
+  <line class="leader" x1="567.76" y1="296" x2="605.76" y2="274.56"/>
+  <circle class="leader-dot" cx="605.76" cy="274.56" r="2"/>
+  <text class="label" x="480" y="120">dead centre in the stub's centre hole</text>
+  <line class="leader" x1="560" y1="126" x2="700" y2="167"/>
+  <circle class="leader-dot" cx="700" cy="167" r="2"/>
+</svg>

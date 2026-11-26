@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 400" width="760" height="400" font-family="sans-serif" font-size="13">
+  <!-- To scale, 300 px/in along and across the axis, from above (the cross-slide at the bottom): the Ø.500 bar (stock_dia_in), the jaw fronts 0.417 behind Z0 (cad.jaw_z_mm), the outside Ø0.470 (cad.outer_dia_mm) back to Z-0.317 (cad.run_end_z_mm), the part-off face at Z-0.242 (cad.part_off_in) with the 1/16 blade's kerf behind it. The 3-jaw's body and jaws are schematic (their sizes are not on record). The P1 blade to scale across (shop cutoff-blade-p1, 1/16 = 18.75 px wide), its tailstock-side face at Z-0.242, drawn at the moment its tip reaches the reamed bore; its length runs on past the break line (not on record). Hatched: the kerf it cuts. -->
+  <rect class="paper" x="0" y="0" width="760" height="400"/>
+  <text class="title" x="20" y="22">Setup 1: the P1 blade parts the bushing off at the part-off face (to scale, 300 px/in)</text>
+  <rect class="fixture-vise" x="218.9" y="84" width="56" height="242"/>
+  <path class="part-rest" d="M30 130L344.9 130L344.9 280L30 280L27 272.86L30 265.71L27 258.57L30 251.43L27 244.29L30 237.14L27 230L30 222.86L27 215.71L30 208.57L27 201.43L30 194.29L27 187.14L30 180L27 172.86L30 165.71L27 158.57L30 151.43L27 144.29L30 137.14Z"/>
+  <rect class="part-rest" x="344.9" y="134.5" width="22.5" height="141"/>
+  <rect class="part-kept" x="367.4" y="134.5" width="72.6" height="141"/>
+  <path class="paper" d="M437 134.5L440.5 134.5L440.5 137.5Z"/>
+  <path class="paper" d="M437 275.5L440.5 275.5L440.5 272.5Z"/>
+  <rect class="holes" x="344.9" y="186.1" width="95.1" height="37.8"/>
+  <rect class="part-removed" x="348.65" y="134.5" width="18.75" height="141"/>
+  <rect class="holes" x="344.9" y="186.1" width="95.1" height="37.8"/>
+  <rect class="clamp" x="274.9" y="96" width="40" height="34"/>
+  <rect class="clamp" x="274.9" y="280" width="40" height="34"/>
+  <line class="centre-line" x1="20" y1="205" x2="740" y2="205"/>
+  <path class="cutter" d="M348.65 380L348.65 223.9L367.4 223.9L367.4 380L358.02 377Z"/>
+  <line class="arrow" x1="389.4" y1="360" x2="389.4" y2="312"/>
+  <line class="datum" x1="440" y1="72" x2="440" y2="128"/>
+  <text class="datum-label" x="434" y="84" text-anchor="end">Z0 the ring face</text>
+  <text class="label" x="470" y="330">P1 blade, its tailstock-side face</text>
+  <text class="label" x="470" y="346">at Z-{{cad.part_off_in:.3dot}}; hands clear, let it fall</text>
+  <line class="leader" x1="468" y1="326" x2="367.4" y2="330"/>
+  <circle class="leader-dot" cx="367.4" cy="330" r="2"/>
+  <text class="label" x="470" y="56">the reamed bore through, past the kerf</text>
+  <line class="leader" x1="520" y1="60" x2="403.7" y2="195"/>
+  <circle class="leader-dot" cx="403.7" cy="195" r="2"/>
+</svg>
