@@ -112,3 +112,9 @@ machinist_exceptions:
     where: "step 9, 9C and 9N, and setting table row 6: the MHA-PD-06 disc centred on its O.D., then its tooth-space runout read with the Ø.040 pin in 12 spaces about evenly round it"
     finding: "tooth-space runout sampled at 12 of the 150 spaces, not read in every space (MHA-PD-06 RV-02)"
     reason: "Owner ruling 2026-11-20 (Pedro), #2665, in his words: \"Follow recommendations unless noted otherwise\"; the recommendation he accepted: \"12 spaces plus the OD check; once-a-turn runout is caught by any evenly spaced sample.\" The O.D. is cut on the same arbor as the teeth"
+  # The reason's airs are derived by cad/scripts/test_pd_collar_air_necessity.py.
+  - id: "PD-00-bush-seat-feeler"
+    kind: "accept"
+    where: "step 11M and setting table row 7: MHA-PD-28 shoulder on MHA-PD-19, .002 FEELER DOES NOT ENTER"
+    finding: "seat feeler finer than the collar-to-disc air needs on its own: a .004 leaf alone would still leave the air over its floor (rule 4, necessity test)"
+    reason: "delegated ruling 2026-11-25 (Main), no precedent, D21; owner review https://github.com/pedropaulovc/harmonic-analyzer/issues/2144. The MHA-PD-22 collar to MHA-PD-06 disc air is one budget shared by this seat, the MHA-PD-28 hub face station and the two Ø.126 running bores (pd_cluster_air.COLLAR_AIR, statistical, floor 0.1016 mm). With the MHA-PD-17 spigot length at the title block it is 0.1366. This seat opened to a .004 leaf alone leaves 0.1159, and with the hub face station also opened .002 leaves 0.1032, 0.0016 over the floor; opened with either bore .002 looser the air closes (0.0468 with MHA-PD-10's, 0.0745 with MHA-PD-25's). The budget was spent on the spigot length, so the .002 leaf stays; it is an owned leaf used as a single limit (assembly row of the shop table)"

@@ -32,7 +32,6 @@ import math
 import _config
 from _package_units import drawing_unit
 from _printed_tolerance import printed_band_mm
-from pd_cluster_stack_band import FIT_LENGTH_BAND_IN
 
 # The hub sheet prints the bolt circle; the disc reads the same unit.
 UNIT = drawing_unit(
@@ -78,18 +77,21 @@ if len(SCREW_ANGLES_DEG) != SCREW_COUNT:
 # under the disc bore's own analysis band (.501-.503): .496 (the least bore
 # less the greatest clearance) to .500 (the greatest bore less the least),
 # never a printed limit; pd_rack_pinion_spec proves the pair.
-# Its length runs from the flange's
-# rear face to its end on the sleeve's step: a term of the disc cluster's
-# stack (transgear_cluster_fit) that sets the collar-to-disc air, so it
-# prints +/-.001 (the shims set the end float: owner ruling 2026-11-01,
-# #2124).
+# Its length runs from the flange's rear face to its end on the sleeve's
+# step: a term of the disc cluster's stack (transgear_cluster_fit.SP, and
+# the disc front's station, pd_transgear_feed_pinion_spec.
+# DISC_FRONT_STATION_BAND) that spends the collar-to-disc air.  It prints
+# plain at three places, so its band is the title block's .XXX row: there
+# the statistical collar air (pd_cluster_air.COLLAR_AIR) still clears its
+# floor (delegated ruling D21, 2026-11-25; it printed +/-.001, the shims
+# setting the end float, owner ruling 2026-11-01, #2124).
 SPIGOT_DIA = 12.6492  # .498 REF
 SPIGOT_CLEARANCE = (0.0762, 0.127)  # printed (least, greatest) diametral: .003-.005
 SPIGOT_DIA_BAND = (0.0508, -0.0508)  # analysis (upper, lower) deviations: +.002/-.002
 SPIGOT_DIA_PLACES = 3
 SPIGOT_LENGTH = 3.6576  # .144
 SPIGOT_LENGTH_PLACES = 3
-SPIGOT_LENGTH_BAND = FIT_LENGTH_BAND_IN
+SPIGOT_LENGTH_BAND = printed_band_mm(SPIGOT_LENGTH_PLACES, unit=UNIT)
 
 
 def screw_centres() -> tuple[tuple[float, float], ...]:

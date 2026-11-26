@@ -1,15 +1,21 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 420" font-family="sans-serif" font-size="13">
+  <!-- Plan at 127 px/in (5 px/mm) from the bar's 1-1/4 width (158.8 px). The blade drawn as wide as the plan's kerf_in (.125 in = 15.9 px); its length across the bar and the saw vise's jaws are schematic (no size on record). -->
   <rect class="paper" x="0" y="0" width="760" height="420"/>
   <text class="title" x="16" y="22">Setup 1: saw one slice off the end of the 3/4 × 1-1/4 brass bar</text>
   <rect class="fixture-table" x="10.0" y="50.0" width="740.0" height="270.0"/>
   <rect class="part-kept" x="40.0" y="110.0" width="75.0" height="158.8"/>
-  <rect class="part-rest" x="123.0" y="110.0" width="600.0" height="158.8"/>
-  <rect class="cutter" x="115.0" y="80.0" width="8.0" height="218.8"/>
+  <rect class="part-rest" x="130.9" y="110.0" width="592.1" height="158.8"/>
+  <!-- The saw's vise: its jaws grip the bar across its 1-1/4 width, on the rest of the bar beside the blade. -->
+  <rect class="clamp" x="160.0" y="84.0" width="150.0" height="26.0"/>
+  <rect class="clamp" x="160.0" y="268.8" width="150.0" height="26.0"/>
+  <text class="label-on-clamp" x="168.0" y="101.0">saw's vise</text>
+  <text class="label-on-clamp" x="168.0" y="286.0">saw's vise</text>
+  <rect class="cutter" x="115.0" y="70.0" width="15.9" height="238.8"/>
   <line class="dims" x1="40.0" y1="290.0" x2="115.0" y2="290.0"/>
   <line class="dims" x1="40.0" y1="282.0" x2="40.0" y2="298.0"/>
   <line class="dims" x1="115.0" y1="282.0" x2="115.0" y2="298.0"/>
   <text class="label" x="40.0" y="312.0">{{process.blank_z_min_mm:in.2dot}}–{{process.blank_z_max_mm:in.2dot}} slice</text>
-  <text class="label" x="130.0" y="76.0">saw blade</text>
+  <text class="label" x="134.0" y="66.0">saw blade, {{process.kerf_in:.3dot}} kerf</text>
   <text class="label" x="300.0" y="190.0">rest of the bar (MHA-PN-05 draws on it)</text>
   <text class="label" x="46.0" y="128.0">end L</text>
   <line class="dims" x1="30.0" y1="110.0" x2="30.0" y2="268.8"/>

@@ -4118,6 +4118,44 @@ def test_prechips_task_shape_and_complete_dependency_closure(synthetic_prechips_
     ]
 
 
+def test_prechips_standing_task_renders_the_shop_page_from_every_shop_file(
+    synthetic_prechips_task,
+):
+    import prechips_traveler
+
+    dodo, _, _, stem, source, _, shop = synthetic_prechips_task
+    second = shop.parent / "notes.toml"
+    second.write_text("[notes.burrs]\n")
+    *travelers, task = dodo.task_prechips()
+    assert [t["name"] for t in travelers] == [stem]
+    assert task["name"] == "standing"
+    assert dodo._canonical_subtask_names("prechips") == [stem, "standing"]
+    deps = set(task["file_dep"])
+    assert {str(shop.resolve()), str(second.resolve())} <= deps
+    assert str((dodo.SCRIPTS_DIR / "prechips_traveler.py").resolve()) in deps
+    # The page is the shop's, not any plan's.
+    assert str(source.resolve()) not in deps
+    assert "task_dep" not in task
+    stamp = str(dodo.REPORTS / "prechips-standing.ok")
+    html, pdf = prechips_traveler.standing_paths(dodo.CAD_OUT)
+    assert task["targets"] == [stamp, str(html), str(pdf)]
+    assert task["targets"] == dodo._canonical_targets("prechips:standing")
+    assert [Path(target).name for target in task["targets"][1:]] == [
+        "shop-standing-instructions.html", "shop-standing-instructions.pdf",
+    ]
+    assert task["uptodate"] == [False]
+    clear, (action, args) = task["actions"]
+    assert clear == (Path.unlink, [Path(stamp)], {"missing_ok": True})
+    assert action is dodo._run_stamped
+    assert args[1:] == ["prechips:standing", stamp, "prechips:standing"]
+    assert args[0] == [
+        dodo.sys.executable, str(dodo.SCRIPTS_DIR / "prechips_traveler.py"),
+        "--standing", "--out", str(dodo.CAD_OUT),
+    ]
+    assert dodo._canonical_subtask_definition("prechips", "standing")["targets"] == task["targets"]
+    assert dodo._stage_name("prechips:standing") == "prechips-traveler"
+
+
 def test_build_and_release_render_every_traveler_build_bare_none(synthetic_prechips_task):
     """``build`` renders each enrolled traveler beside the drawing PDFs and
     ``release`` ships its hobby PDF (owner rulings 2026-11-14), so both reach
@@ -4145,6 +4183,7 @@ def test_build_and_release_render_every_traveler_build_bare_none(synthetic_prech
     assert not any(name.startswith("prechips") for name in closure("build_bare"))
     for root in ("build", "release"):
         assert f"prechips:{stem}" in closure(root), root
+        assert "prechips:standing" in closure(root), root
     assert dodo._stage_name(f"prechips:{stem}") == "prechips-traveler"
     assert not any(name.startswith("traveler_") for name in dodo._CHECK_NAMES)
     assert not any(task["name"].startswith("traveler_") for task in dodo.task_check())

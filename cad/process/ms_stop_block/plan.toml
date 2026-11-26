@@ -321,7 +321,7 @@ machine_kind = "other"
 title = "Saw the slice"
 machine = "Saw / bench"
 indexing = "none"
-diagram = { file = "diagrams/saw.svg", alt = "The 3/4 × 1-1/4 in brass bar lying on its wide face in the saw; one slice {{process.blank_z_min_mm:in.2dot}}–{{process.blank_z_max_mm:in.2dot}} in thick marked off its end." }
+diagram = { file = "diagrams/saw.svg", alt = "The 3/4 × 1-1/4 in brass bar lying on its wide face in the saw, gripped across its width in the saw's vise; the blade, as wide as its {{process.kerf_in:.3dot}} kerf, cuts one slice {{process.blank_z_min_mm:in.2dot}}–{{process.blank_z_max_mm:in.2dot}} in thick off its end." }
 envelope = "other"
 vise_hold = "other"
 beam = "other"
@@ -509,7 +509,7 @@ indexing = "none"
 machine_ref = "pm-30mv"
 holding = "The same stacks. The slice lying MATING face up, gripped across its as-bought 1-1/4 in width: end L against the FIXED jaw, the other end on the moving jaw; the top face to the LEFT, the locating edge to the right; centred on the jaws. Tap it down onto both stacks while closing the vise. The jaws grip only the waste beyond both final ends: never grip across the .56 height once the rebate is cut (the roof would bend)."
 datum = "Programs MS05_rebate and MS05_relief. G54: X0 the TOP face (left), Y0 the fixed jaw's face (end L), Z0 the mating face; +Y toward the fixed jaw. The rebate runs along Y beside the roof, its ceiling {{process.roof_aim_mm:in.3dot}} in from X0 and its height {{process.rebate_height_aim_mm:in.4dot}}; it stops {{process.rebate_tab_mm:in.3dot}} short of each bar end, in the waste the end facing removes."
-diagram = { file = "diagrams/rebate.svg", alt = "The slice lying mating face up, gripped across its 1-1/4 in width on its as-bought ends; the 1/8 in end mill slots the rebate along the slice beside the roof, stopping short of both ends, and the 1/16 in long-reach end mill cuts the relief at its bottom beside the roof." }
+diagram = { file = "diagrams/rebate.svg", alt = "The slice lying mating face up, gripped across its 1-1/4 in width on its as-bought ends; the 1/8 in end mill, to scale, at the bottom of the rebate it slots along the slice beside the roof, stopping short of both ends." }
 envelope = { x_span_mm = ["{{cad.envelope_y_mm}}", "{{process.slot_cutter_dia_mm}}"], y_span_mm = ["{{process.bar_width_mm}}", "{{process.slot_cutter_dia_mm}}"], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{process.thickness_max_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{process.relief_floor_height_mm}}"], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.small_mill_projection_min_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.small_mill_projection_min_mm}}"] }
 vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{process.bar_width_mm}}", along_jaws_mm = "{{cad.envelope_y_mm}}", part_height_mm = "{{cad.envelope_z_mm}}", parallel_height_mm = "{{process.riser_height_mm}}", overhang_mm = ["{{process.vise_height_inset_mm}}", "rest"], jaw_offset = "centred", fixed_jaw_face = "as_bought", moving_jaw_face = "as_bought", moving_jaw_contact = "flat" }
 beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{cad.envelope_y_mm}}"], clamp_mm = [0, "{{cad.envelope_y_mm}}"], section_mm = { y = "{{process.bar_width_mm}}", z = "{{cad.envelope_z_mm}}" }, vise_left = "start" }
@@ -608,6 +608,7 @@ settings = "stop-em-sixteenth-c360"
 milling_cuts = [
   { name = "relief", kind = "plunge", phase = "finish", cutter_dia_mm = "{{process.relief_cutter_dia_mm}}", stations_mm = "{{process.rebate_centre_x_mm}}" },
 ]
+diagram = { file = "diagrams/relief.svg", alt = "The same clamping: the 1/16 in long-reach end mill, to scale, plunged to the relief's bottom beside the roof, past the rebate's back; its 1/8 shank starts .50 above its tip, clear of the mating face; it steps along the rebate end to end." }
 
 [[setups.operations]]
 instruction = "Look along the rebate: the relief runs end to end beside the roof, its walls lightly ridged. Its depth ({{cad.relief_back_relief_depth_min_in:.3dot}}–{{cad.relief_back_relief_depth_max_in:.3dot}}) is the file's Z and its height the cutter's, held by its pin-gauged test cut above: neither is gauged here."
@@ -621,7 +622,7 @@ indexing = "none"
 machine_ref = "pm-30mv"
 holding = "A 1 in parallel against each jaw. The slice upright on them, end L UP, gripped on the mating face and the back face (the BACK face to the fixed jaw), the TOP face to the LEFT, centred on the jaws. Tap it down onto both parallels while closing the vise. The lower {{process.upright_grip_mm:in.3dot}} of it is in the jaws."
 datum = "Program MS06_locating_end. G54: X0 the TOP face (left), Y0 the fixed jaw's face (the back face), Z0 the parallels' top (the bar's other end)."
-diagram = { file = "diagrams/locating-end.svg", alt = "The slice upright on two 1 in parallels, end L up, gripped on its mating and back faces; the 1/2 in end mill faces the end down to the locating end in levels, opening the rebate, and the chamfer mill chamfers the roof's corner." }
+diagram = { file = "diagrams/locating-end.svg", alt = "The slice upright on two 1 in parallels, end L up, gripped on its mating and back faces; the 1/2 in end mill, to scale, faces the end down to the locating end in levels, opening the rebate." }
 envelope = { x_span_mm = ["{{cad.envelope_y_mm}}", "{{process.face_cutter_dia_mm}}", "{{process.face_cutter_dia_mm}}", 5.08], y_span_mm = ["{{cad.envelope_z_mm}}", "{{process.face_cutter_dia_mm}}"], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{process.bar_width_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{process.locating_chamfer_tip_mm}}"], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_min_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.chamfer_projection_min_mm}}"] }
 vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{cad.envelope_z_mm}}", along_jaws_mm = "{{cad.envelope_y_mm}}", part_height_mm = "{{process.bar_width_mm}}", parallel_height_mm = "{{process.parallel_height_mm}}", overhang_mm = ["{{process.vise_height_inset_mm}}", "rest"], jaw_offset = "centred", fixed_jaw_face = "machined", moving_jaw_face = "machined", moving_jaw_contact = "flat" }
 beam = { axis = "z", hold = "cantilever", extent_mm = [0, "{{process.bar_width_mm}}"], clamp_mm = [0, "{{process.upright_grip_mm}}"], section_mm = { x = "{{cad.envelope_y_mm}}", y = "{{cad.envelope_z_mm}}" }, vise_left = "other" }
@@ -663,6 +664,7 @@ gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.roof_chamfer_1_size_band_
 milling_cuts = [
   { name = "locating chamfer", kind = "side", phase = "finish", cutter_dia_mm = 6.35, axial_doc_mm = "{{process.chamfer_tip_depth_mm}}", radial_woc_mm = "{{process.chamfer_tip_depth_mm}}", stations_mm = "{{process.far_top_mm}}" },
 ]
+diagram = { file = "diagrams/chamfer-locating.svg", alt = "From the front: the 90° chamfer mill, to scale, its point {{process.chamfer_offset_mm:in.3dot}} outside the top face and {{process.chamfer_tip_depth_mm:in.3dot}} below the locating end, cutting the roof's corner in one pass across the jaws, above the moving jaw." }
 
 [[setups]]
 machine_kind = "other"
@@ -672,7 +674,7 @@ indexing = "none"
 machine_ref = "pm-30mv"
 holding = "As Setup 7, the slice turned end for end: the locating end down on both parallels, gripped on the mating face and the back face (the MATING face to the fixed jaw), the TOP face to the LEFT, centred."
 datum = "Program MS07_far_end. G54: X0 the TOP face (left), Y0 the fixed jaw's face (the mating face), Z0 the parallels' top (the locating end)."
-diagram = { file = "diagrams/far-end.svg", alt = "The block upright on two 1 in parallels, the locating end down; the 1/2 in end mill faces the far end down to the length." }
+diagram = { file = "diagrams/far-end.svg", alt = "The block upright on two 1 in parallels, the locating end down; the 1/2 in end mill, to scale, faces the far end down to the length in levels." }
 envelope = { x_span_mm = ["{{cad.envelope_y_mm}}", "{{process.face_cutter_dia_mm}}", "{{process.face_cutter_dia_mm}}", 5.08], y_span_mm = ["{{cad.envelope_z_mm}}", "{{process.face_cutter_dia_mm}}"], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{process.far_top_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{cad.envelope_x_mm}}"], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_min_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_min_mm}}"] }
 vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{cad.envelope_z_mm}}", along_jaws_mm = "{{cad.envelope_y_mm}}", part_height_mm = "{{process.far_top_mm}}", parallel_height_mm = "{{process.parallel_height_mm}}", overhang_mm = ["{{process.vise_height_inset_mm}}", "rest"], jaw_offset = "centred", fixed_jaw_face = "machined", moving_jaw_face = "machined", moving_jaw_contact = "flat" }
 beam = { axis = "z", hold = "cantilever", extent_mm = [0, "{{process.far_top_mm}}"], clamp_mm = [0, "{{process.upright_grip_mm}}"], section_mm = { x = "{{cad.envelope_y_mm}}", y = "{{cad.envelope_z_mm}}" }, vise_left = "other" }
@@ -755,7 +757,7 @@ indexing = "none"
 machine_ref = "pm-30mv"
 holding = "The 1 in and 1/2 in parallels stacked against each jaw again (1.5 in). The block lying on its TOP face, the LOCATING EDGE up, gripped on the mating face (to the FIXED jaw) and the back face; the locating end to the RIGHT; centred on the jaws. Tap it down onto both stacks while closing the vise."
 datum = "Programs MS08_thumb and MS09_thumb_tap. G54: X0 the locating end (RIGHT), the block to −X; Y0 the fixed jaw's face (the mating face); Z0 the stacks' top (the top face). The thumb hole at X −{{cad.thumb_tap_location_from_end_in:.3f}}, Y −{{cad.thumb_tap_location_from_mating_face_in:.3f}} in."
-diagram = { file = "diagrams/thumb.svg", alt = "The block lying locating edge up on stacked parallels, mating face to the fixed jaw; the centre drill spots and the #43 drill drills the thumb hole down through the floor into the rebate, short of the roof; then the 4-40 tap is turned by hand under the tap guide." }
+diagram = { file = "diagrams/thumb.svg", alt = "The block lying locating edge up on stacked parallels, mating face to the fixed jaw; the #43 drill, to scale, at the end of its feed through the floor, its point in the rebate, short of the roof." }
 envelope = { x_span_mm = ["{{cad.envelope_x_mm}}", "{{process.face_cutter_dia_mm}}"], y_span_mm = ["{{cad.envelope_z_mm}}", "{{process.face_cutter_dia_mm}}"], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{cad.envelope_y_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{process.thumb_tip_height_mm}}"], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.tap_stack_max_mm}}"], shortest_tool_mm = ["{{process.drill_chuck_gauge_mm}}", "{{process.centre_drill_oal_mm}}"] }
 vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{cad.envelope_z_mm}}", along_jaws_mm = "{{cad.envelope_x_mm}}", part_height_mm = "{{cad.envelope_y_mm}}", parallel_height_mm = "{{process.riser_height_mm}}", overhang_mm = ["{{process.vise_length_inset_mm}}", "rest"], jaw_offset = "centred", fixed_jaw_face = "machined", moving_jaw_face = "machined", moving_jaw_contact = "flat" }
 beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{cad.envelope_x_mm}}"], clamp_mm = [0, "{{cad.envelope_x_mm}}"], section_mm = { y = "{{cad.envelope_z_mm}}", z = "{{cad.envelope_y_mm}}" }, vise_left = "start" }

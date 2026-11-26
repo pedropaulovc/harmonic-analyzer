@@ -1,0 +1,76 @@
+# The shop's standing instructions (owner 2026-11-25: "a generic instructions
+# page with any disclaimers that apply to all travelers this way all reviewers
+# are on the same page on what is common sense"). One page, rendered on its own
+# by `prechips standing cad/process/shop` (cad/scripts/prechips_traveler.py),
+# shipped once per release as travelers/shop-standing-instructions.pdf, and
+# given to every traveler review as common sense in this shop: a traveler does
+# not repeat or re-word anything here; it prints a caution only at the step
+# where it applies and only when it is critical, uncommon or confusing for that
+# part. A plan opts in with `standing = true`; its head then prints `pointer`.
+# Shop strings print as written (no {{...}} binding).
+#
+# Sources, the wording kept where it was standing text:
+# - Units, speeds, homing, the zero re-check, Feed Hold, prove in air and burrs
+#   before a seat: the mill plans' top-level notes as PR #3521 (head
+#   1acbad6dfe) words them, generic over its per-plan variants (HomeOnce,
+#   2026-11-25: the Datum-deferring clause is a superset; "any file's G53
+#   retract", not only the tap files').
+# - A file's first part: the column clamp's prove op (Setup 2, CC01, its
+#   G10 L2 raise of Z0 by 1.000 in and back) moved here (owner 2026-11-25:
+#   "Move the method to the standing page; delete the per-setup operations").
+# - The page as a whole: owner 2026-11-25, "Approve as written".
+# - Speeds: machines.pm-30mv and machines.pm-1127vf-lb rpm_ranges (common.toml).
+# - Work stop: tools.work-stop-hhip-3900-2125 (common.toml); the clamp
+#   family's touch-off rule (CodeRabbit on #3510, 2026-11-24: a rod left locked
+#   from the setup before can lie under the end mill at the next Z0 touch).
+# - Coolant: the lathe plans' notes (oil on steel, stainless and aluminium;
+#   brass dry).
+# The running header every traveler page and this page carry (owner
+# 2026-11-25: "all traveler pages must have header and footer with most info
+# from drawing title bar"): the project title as the drawings' title block
+# prints it (the project drawing template; e.g. the v50 release's
+# pdf/ch-fulcrum-keeper.pdf title block: "Albert Michelson's Harmonic
+# Analyzer / A Project For Hobby Machinists").
+[sheet]
+project = "Albert Michelson's Harmonic Analyzer · A Project For Hobby Machinists"
+
+[standing]
+title = "Shop standing instructions"
+intro = "These hold for every traveler in this shop. A traveler does not repeat them; where one of its steps differs, the step says so."
+pointer = "Shop standing instructions apply (shop-standing-instructions.pdf: units, homing, Feed Hold, tool changes, proving a file, burrs, the work stop, picture colours). Read them before the first setup; this sheet does not repeat them."
+legend = true
+notes = ["standing-every", "standing-mill", "standing-lathe"]
+
+[notes.standing-every]
+title = "Every traveler"
+rows = [
+  ["This sheet", "A generated plan for making the part, checked by software and by review. It is not approval to machine: the drawing and the owner decide. Where the sheet and the drawing differ, stop and tell the owner."],
+  ["Stop and tell the owner", "Stop the machine, leave the part as it is (in the vise or chuck where it can stay), and ask before going on. Do not work round it or substitute a tool, part or size."],
+  ["Units", "Inches unless marked mm. G-code and console entries are mm: the files and the controller run G21."],
+  ["Burrs", "File the burr off a milled or turned edge before that face goes down on parallels or against a jaw: a burr under the seat lifts the part and the next cut comes out thin."],
+  ["Picture colours", "The key below; each sheet also prints the key for its own pictures."],
+]
+
+[notes.standing-mill]
+title = "PM-30MV CNC mill (FluidNC, CNCjs)"
+rows = [
+  ["Speeds", "Low belt, 100–2800 rpm: no belt change. Set the rpm by hand when the step or the M6 stop names it."],
+  ["Switching on", "Home the mill (`$H`) once. Every M6's trip to the tool setter and any file's G53 retract count from home."],
+  ["Home again only after", "A power cycle or a controller restart, an E-stop, an alarm, a limit switch hit, a stall or a crash. Homing brings the stored G54 back."],
+  # Correction after the owner's approval (Main, 2026-11-25; HomeOnce, from
+  # Codjiflo on #3521): a zero swept with an indicator in a bore cannot be
+  # re-checked with the edge finder. Was "X and Y with the edge finder and Z
+  # as its step touched it"; now each zero is checked the way its step set it.
+  ["After homing again", "Check every zero of the setup again, each the way its step set it: each must read what its step set, within .001 in. One does not, cannot be reached with the part in, or the part may have moved: do what that setup's Datum says for it; where the Datum says nothing, take the setup again from its first step, the part out. They all do: run the interrupted file again from its start."],
+  ["Feed Hold", "Then Reset with the axes stopped: position and G54 are kept; no homing, no new zero. Run the interrupted file again from its start: its first M6 measures the tool, and cuts already made are cut in air."],
+  ["Tool changes", "At an M6 the file stops the spindle and lifts the tool above the part; the tool setter measures the new tool. A console `M6 T<n>` does the same by hand."],
+  ["A file's first part", "Prove each file in air on the first part it cuts: send `$#` and note the G54 line's Z; `G10 L2 P1 Z(that Z + 25.400)` raises Z0 1.000 in. Run the file and watch every move, through every M6, clear the work, the jaws, the parallels, any clamp and the stop. `G10 L2 P1 Z(the noted Z)` puts Z0 back."],
+  ["Work stop", "HHIP universal stop bolted to the table beside the vise; its 3/8 in rod reaches between the jaws. Take a setup's touch-offs first, then set the rod against the first part and lock it; each later part goes in against it. Slide the rod back out of the vise before any touch-off beside the work (the edge finder, or the end mill coming down on a parallel): it is still where the last setup locked it."],
+]
+
+[notes.standing-lathe]
+title = "PM-1127VF-LB lathe"
+rows = [
+  ["Speeds", "Two ranges, 70–380 and 380–2000 rpm."],
+  ["Coolant", "Cutting oil on steel, stainless and aluminium; brass is cut dry."],
+]

@@ -25,6 +25,7 @@ Task groups (the prefix says whether SolidWorks is required):
   check:<name>       math/config/graph/nameplate/recipe gates (NO SolidWorks)
   check:machinist_review:<stem> cached blind reviews + judge (NO SolidWorks)
   prechips:<stem>    pro + hobby HTML travelers + hobby PDF, latest PyPI prechips (in build + release, not build_bare; NO SolidWorks)
+  prechips:standing  shop standing instructions HTML + PDF, common to every traveler (with the travelers; NO SolidWorks)
   cam:<stem>         NC programs posted by headless FreeCAD CAM (freecadcmd) with cycle times (in build + release, not build_bare; NO SolidWorks; FreeCAD 1.1+ on the submitter)
   export             neutral STEP/STL/glTF/scene export (COM)
   release            cut a tagged GitHub release (COM + gh; opt-in)
@@ -4585,16 +4586,49 @@ def _prechips_task(stem: str) -> dict[str, Any]:
     }
 
 
+def _prechips_standing_task() -> dict[str, Any]:
+    import _process_plans
+    import prechips_traveler
+
+    label = f"prechips:{prechips_traveler.STANDING_STEM}"
+    targets = _canonical_targets(label)
+    cmd = [
+        sys.executable, str(SCRIPTS_DIR / "prechips_traveler.py"),
+        "--standing", "--out", str(CAD_OUT),
+    ]
+    return {
+        "name": prechips_traveler.STANDING_STEM,
+        "file_dep": sorted({
+            *(str(path.resolve()) for path in _process_plans.shop_files()),
+            *_executed_closure(cmd),
+        }),
+        "targets": targets,
+        # Latest PyPI prechips, like every traveler: always run.
+        "uptodate": [False],
+        "actions": [
+            (Path.unlink, [Path(targets[0])], {"missing_ok": True}),
+            (_run_stamped, [cmd, label, targets[0], label]),
+        ],
+        "clean": True,
+        "verbosity": 2,
+    }
+
+
 def task_prechips():
     """prechips travelers for enrolled parts (pro and hobby HTML, plus the hobby
     sheet printed to ``<slug>-traveler.pdf``), rendered by the latest PyPI release.
     A family plan's task (one plan for several parts) also prints each part's
-    placeholder, ``<part slug>-traveler.pdf``. ``build`` and ``release`` run
-    every one (release ships the PDFs); ``build_bare`` runs none."""
+    placeholder, ``<part slug>-traveler.pdf``. With any traveler enrolled,
+    ``prechips:standing`` renders the shop's standing instructions page, common
+    to every traveler, to ``shop-standing-instructions.html`` and ``.pdf``.
+    ``build`` and ``release`` run every one (release ships the PDFs);
+    ``build_bare`` runs none."""
     import _process_plans
 
     for stem in _process_plans.TRAVELER_STEMS:
         yield _prechips_task(stem)
+    if _process_plans.TRAVELER_STEMS:
+        yield _prechips_standing_task()
 
 
 def _cam_task(stem: str) -> dict[str, Any]:
@@ -4906,7 +4940,6 @@ def task_release():
     ``nc/<stem>/`` (owner ruling 2026-11-17).
     """
     import _cam_programs
-    import _process_plans
 
     return {
         "task_dep": [
@@ -4918,7 +4951,7 @@ def task_release():
             *(f"check:machinist_review:{s}" for s, _mode in _reviewed_drawings()),
             *(f"verify:{s}" for s in _VERIFY_NAMES),
             *(f"check:{c}" for c in _CHECK_NAMES),
-            *(f"prechips:{s}" for s in _process_plans.TRAVELER_STEMS),
+            *(f"prechips:{s}" for s in _canonical_subtask_names("prechips")),
             *(f"cam:{s}" for s in _cam_programs.CAM_STEMS),
         ],
         "uptodate": [False],
@@ -4948,7 +4981,6 @@ def task_build():
     submitter.
     """
     import _cam_programs
-    import _process_plans
 
     return {
         "actions": None,
@@ -4959,7 +4991,7 @@ def task_build():
             + [f"drawing:{s}" for s in _drawing_order()]
             + [f"check:machinist_review:{s}" for s, _mode in _reviewed_drawings()]
             + [f"verify:{s}" for s in _VERIFY_NAMES]
-            + [f"prechips:{s}" for s in _process_plans.TRAVELER_STEMS]
+            + [f"prechips:{s}" for s in _canonical_subtask_names("prechips")]
             + [f"cam:{s}" for s in _cam_programs.CAM_STEMS]
         ),
     }
@@ -5007,8 +5039,10 @@ def _canonical_subtask_names(family: str) -> list[str]:
         ]
     if family == "prechips":
         import _process_plans
+        import prechips_traveler
 
-        return list(_process_plans.TRAVELER_STEMS)
+        stems = list(_process_plans.TRAVELER_STEMS)
+        return [*stems, prechips_traveler.STANDING_STEM] if stems else []
     if family == "cam":
         import _cam_programs
 
@@ -5062,10 +5096,16 @@ def _canonical_targets(name: str) -> list[str]:
         return [str(REPORTS / f"check-{subname}.ok")]
     if family == "prechips":
         import _process_plans
+        import prechips_traveler
 
+        outputs = (
+            prechips_traveler.standing_paths(CAD_OUT)
+            if subname == prechips_traveler.STANDING_STEM
+            else _process_plans.traveler_outputs(subname, CAD_OUT)
+        )
         return [
             str(REPORTS / f"prechips-{subname}.ok"),
-            *(str(path) for path in _process_plans.traveler_outputs(subname, CAD_OUT)),
+            *(str(path) for path in outputs),
         ]
     if family == "cam":
         import _cam_programs
@@ -5120,6 +5160,10 @@ def _canonical_subtask_definition(family: str, subname: str) -> dict[str, Any]:
             return _machinist_review_fitup_task(stem, fitup)
         return _check_task(subname)
     if family == "prechips":
+        import prechips_traveler
+
+        if subname == prechips_traveler.STANDING_STEM:
+            return _prechips_standing_task()
         return _prechips_task(subname)
     if family == "cam":
         return _cam_task(subname)
@@ -5322,9 +5366,7 @@ def canonical_target_owners(paths: Iterable[str] | None = None) -> dict[str, str
         )
         or any(path.is_symlink() for path in REPORTS.glob("prechips-*.ok"))
     ):
-        import _process_plans
-
-        for stem in _process_plans.TRAVELER_STEMS:
+        for stem in _canonical_subtask_names("prechips"):
             include(f"prechips:{stem}")
 
     nc_root = CAD_OUT / "nc"

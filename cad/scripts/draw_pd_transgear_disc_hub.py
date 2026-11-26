@@ -5,9 +5,8 @@ axis lies horizontal, as it sits in the lathe (drawing-guidelines.md rule 11 (tu
 face on the left, the flange and the spigot on the right.  It carries the
 turned profile: the three diameters beside their steps, the spigot's and
 flange's lengths from the flange's rear face, the overall (spigot end to hub
-front), both lengths printed to the disc cluster stack's band, and the
-flange's rear face and the
-spigot's end square to the bore, datum A.  Looking down on +Y it sees the
+front) printed to the disc cluster stack's band, and the flange's rear face
+and the spigot's end square to the bore, datum A.  Looking down on +Y it sees the
 radial oil hole end-on, so it also carries the hole's size and its
 match-drill callout, and the station of the key pin's chord hole, which
 the oil hole shares (a hidden reference line on the hub's O.D.).  The face
@@ -103,6 +102,7 @@ from pd_transgear_disc_hub_spec import (
     KEY_PIN_DRILL_CALLOUT_BELOW,
     KEY_PIN_SUFFIX,
     KEY_PIN_STOP,
+    KEY_PIN_STOP_SUFFIX,
     KEY_PIN_Z,
     OIL_HOLE_CALLOUT_BELOW,
     SCREW_HOLE_CALLOUT_ABOVE,
@@ -198,13 +198,22 @@ NOTES_XY = (0.020, 0.262)
 #   review: with no circle they ended in air; near-side, its shelf ran
 #   into the screw holes' callout), the screw-hole size (3X,
 #   drilled through the flange) above-right, each with its callout under
-#   it.  The bore's size and fit hang well below-right, one arrow on the
-#   bore (near-side): through the centre its line crossed the bolt circle's
-#   and ran almost on the vertical centreline (machinist review r6).
+#   it.  The bore's size and fit hang below-left, one arrow on the bore
+#   (near-side): through the centre its line crossed the bolt circle's and
+#   ran almost on the vertical centreline (machinist review r6).
 #   SolidWorks lands that arrow on the bore's radius toward the shelf's near
-#   end, the block's lower-left corner, which stands below the oil hole's
-#   block and left of it: the leader leaves the bore down-right, clear of
-#   both centrelines.
+#   end, so the leader runs on the ray from the bore's centre to that end.
+#   Hung below-right, the block's lower-left corner put that ray at about
+#   287 degrees, beside the bolt circle diameter's line, which runs through
+#   the centre from its text above-left and leaves at about 298 degrees: the
+#   two lines ran almost on top of each other through the view (machinist
+#   review 2026-11-24, two runs of three; rule 14).  Below-left, the near
+#   end is the block's lower-right corner, the shoulder, on a ray chosen
+#   first (_BORE_LEADER_DEG): the leader leaves the bore down-left, well off
+#   the diameter's line, between the 210-degree hole and the vertical
+#   centreline and clear of both centrelines, the holes' centre marks and
+#   datum A's leader.  The block extends left from the shoulder, under the
+#   flange, left of the oil hole's block and well clear of the title block.
 # - Edge view: the hub's diameter inline left of the hub front face; the
 #   spigot's and then the flange's inline right of the spigot's end, the
 #   flange's outermost so the spigot's extension lines end inside it, the
@@ -212,9 +221,10 @@ NOTES_XY = (0.020, 0.262)
 #   little low between its extension lines to leave the spigot end's frame
 #   room above it.  One row above: the key-pin hole's station from the hub
 #   front face, its text between its extension lines left of the flange, and
-#   the spigot's length from the flange's rear face, its text right of the
-#   spigot, its whole callout block right of the spigot end's extension line
-#   (the overall's rises through that row) and so clear of the flange's
+#   the spigot's length from the flange's rear face, at the title block's
+#   row, its text right of the spigot, its whole callout block (the stack
+#   note's link) right of the spigot end's extension line (the overall's
+#   rises through that row) and so clear of the flange's
 #   dimension line.  The overall, printed to the disc cluster stack's band, on the
 #   next row up, outermost, its text and stack callout right of the spigot end's
 #   extension line.  Its ends are the spigot's and the hub's +X corners, so
@@ -237,19 +247,24 @@ NOTES_XY = (0.020, 0.262)
 #   dimension's line.
 # Estimated (width, height) of the bore's block: the size row, REAM THRU,
 # the fit note's link and the wall row (5.3 mm a row, 2.73 mm a character
-# on the r1 render of 2026-11-23; the wall row is the widest).  The block's
-# lower-left corner, where SolidWorks starts the leader, stays where that
-# render's wider block had it (x .1235), so the leader keeps its proven run
-# down-right from the bore, left of the oil hole's block; the block's top
-# stands under that block and its right end left of the title block.
+# on the r1 render of 2026-11-23; the wall row is the widest).
 BORE_TEXT_BLOCK = (0.0355, 0.027)
-_BORE_SHOULDER_DROP = 0.108
-_BORE_SHOULDER = (0.1235, AXIS_Y - _BORE_SHOULDER_DROP)
+# The bore leader's ray from the face view's centre (degrees counter-
+# clockwise from sheet +X) and the shoulder's distance along it: 51 degrees
+# off the bolt circle diameter's line, 23 off the vertical centreline and
+# 37 off the 210-degree hole; at that reach the block's upper-right corner
+# stands 6 mm off the flange.
+_BORE_LEADER_DEG = 247.0
+_BORE_LEADER_REACH = 0.070
+_BORE_SHOULDER = (
+    END_CENTER[0] + _BORE_LEADER_REACH * math.cos(math.radians(_BORE_LEADER_DEG)),
+    AXIS_Y + _BORE_LEADER_REACH * math.sin(math.radians(_BORE_LEADER_DEG)),
+)
 END_KEEP = {
     "BoltCircleDia": (END_CENTER[0] - 0.030, AXIS_Y + _FLANGE_R + 0.016),
     "ScrewHoleDia": (END_CENTER[0] + 0.036, AXIS_Y + _FLANGE_R + 0.016),
     "BoreDia": (
-        _BORE_SHOULDER[0] + BORE_TEXT_BLOCK[0] / 2.0,
+        _BORE_SHOULDER[0] - BORE_TEXT_BLOCK[0] / 2.0,
         _BORE_SHOULDER[1] + BORE_TEXT_BLOCK[1] / 2.0,
     ),
 }
@@ -397,30 +412,48 @@ SECTION_CENTERLINE_OVERRUN_MM = 1.0
 _SECTION_REACH_MM = _HUB_R_MM + SECTION_CENTERLINE_OVERRUN_MM
 # The chord hole's dimensions, imported from its station-plane profile,
 # print left of the section, in the air between the flange thickness's
-# block and the ring: the ream's size, depth and fit beside the ream,
-# four rows under the Ø1.05's lower extension line (y .125), the
+# block and the ring: the ream's size, REF depth and note link beside the
+# ream, three rows under the Ø1.05's lower extension line (y .125), the
 # knockout's beside the knockout, their dimension lines running straight
 # across the hole; the chord offset above the ring, its text right of the
 # hub axis's extension line and clear of the chord hole's (r5 review: a
-# line ran into the .17).  The ream's stop prints as the depth in its
-# callout, not as a dimension on the view.
+# line ran into the .17).  The ream's stop, its floor from the hub axis,
+# controls the callout's REF depth (rule 26) and prints between the two
+# blocks as run 20261124T013305458Z printed it, the same model dimension:
+# SolidWorks set its arrows outside the 12 mm between its extension lines
+# (the hub axis's level and the floor's), centred its text on the arrows'
+# column between them and drew no line there, so the ream's dimension line,
+# 2.6 mm over the text, passes between the extension lines and crosses
+# nothing.  Its note link rides the value's row (a row under it would sit on
+# the floor's extension line), so the text runs 15 characters, centred 6 mm
+# left of that run's column to stay 5 mm off the ring; the ream's block keeps
+# that run's point, three rows as then (one row more had the stop's upper
+# arrow run through the callout text, run 20261124T050324452Z), now
+# narrower, its right end 4 mm left of the arrows.  The knockout's block
+# drops 2 mm so the stop's lower arrow ends 2.7 mm over its second row.
+SECTION_STOP_ARROW_X = 0.329
 SECTION_KEEP = {
     "KeyPinChord": (
         SECTION_CENTER[0] + 0.019,
         _section_xy(_SECTION_REACH_MM, 0.0)[1] + 0.004,
     ),
-    "KeyPinDia": (0.313, SECTION_CENTER[1] + 0.004),
+    "KeyPinStop": (
+        SECTION_STOP_ARROW_X,
+        _section_xy(-KEY_PIN_STOP / 2.0, 0.0)[1],
+    ),
+    "KeyPinDia": (0.3125, SECTION_CENTER[1] + 0.0065),
     "KeyPinDrillDia": (
         0.315,
-        _section_xy(-(KEY_PIN_STOP + _SECTION_REACH_MM) / 2.0, 0.0)[1],
+        _section_xy(-(KEY_PIN_STOP + _SECTION_REACH_MM) / 2.0, 0.0)[1] - 0.002,
     ),
 }
 SECTION_CALLOUTS_BELOW = {
     "KeyPinDia": KEY_PIN_CALLOUT_BELOW,
     "KeyPinDrillDia": KEY_PIN_DRILL_CALLOUT_BELOW,
 }
-# REAM stands beside the ream's size, on the value's own row.
-SECTION_SUFFIXES = {"KeyPinDia": KEY_PIN_SUFFIX}
+# REAM stands beside the ream's size, and the stop's note link beside the
+# stop, each on the value's own row.
+SECTION_SUFFIXES = {"KeyPinDia": KEY_PIN_SUFFIX, "KeyPinStop": KEY_PIN_STOP_SUFFIX}
 # Centrelines across the cut, each ending 1 mm past the O.D. where it crosses
 # it: the bore's two, the horizontal one the oil hole's axis, and the chord
 # hole's axis.  The section arrives centre-marked, the mark's arms running
@@ -451,9 +484,9 @@ SECTION_CAPTION_XY = (
 # face at z = 0, the spigot toward +Z, the flange and the hub body toward -Z;
 # screw 0° on +X; the key pin's chord parallel to X on -Y, its ream entering
 # from +X; the oil hole on +Y).  The bore is reamed through, datum A; the
-# flange's rear face and the spigot's end are square to it; the overall and
-# the spigot's length print the disc cluster stack's band (note 1); the
-# flange, the hub, the flange thickness and the bolt circle the title
+# flange's rear face and the spigot's end are square to it; the overall
+# prints the disc cluster stack's band (note 1); the flange, the hub, the
+# spigot's length, the flange thickness and the bolt circle the title
 # block's rows; the screw holes and the #56 knockout its DRILLED HOLES row;
 # the chord ream its press-fit band, its chord offset and stop from the hub
 # axis and its station .XX from the hub front face (SECTION A-A).  The oil
@@ -468,11 +501,8 @@ _GEOM = "pd_transgear_disc_hub_geometry"
 _UNIT = _geom.UNIT
 _PLUS_MINUS = {
     "HubLength": (_spec.HUB_LENGTH_BAND, -_spec.HUB_LENGTH_BAND),
-    "SpigotLength": (_geom.SPIGOT_LENGTH_BAND, -_geom.SPIGOT_LENGTH_BAND),
     "KeyPinChord": (_spec.KEY_PIN_CHORD_BAND, -_spec.KEY_PIN_CHORD_BAND),
 }
-# The chord ream enters the hub body's O.D. where its axis meets it (+X).
-KEY_PIN_ENTRY_X = math.sqrt((HUB_DIA / 2.0) ** 2 - KEY_PIN_CHORD_OFFSET**2)
 KEY_PIN_STOP_LIMITS = limits(
     KEY_PIN_STOP, _spec.KEY_PIN_LOCATION_PLACES, unit=_UNIT
 )
@@ -599,7 +629,7 @@ requirement(
 )
 # The spigot: made to the MHA-PD-06 disc's reamed bore (its size REF, the
 # clearance in that bore the requirement, note 4), its root sharp, its
-# length from the flange's rear face (note 1).
+# length from the flange's rear face at the title block's row.
 requirement(
     "spigot",
     kind="outside_cylinder",
@@ -617,21 +647,13 @@ requirement(
             ((_GEOM, "SPIGOT_CLEARANCE"), "SPIGOT_NOTE_TEXT"),
         ),
         "length": (
-            limits(
-                SPIGOT_LENGTH,
-                _P["SpigotLength"],
-                _PLUS_MINUS["SpigotLength"],
-                unit=_UNIT,
-            ),
-            (
-                (_GEOM, "SPIGOT_LENGTH"),
-                (_GEOM, "SPIGOT_LENGTH_BAND"),
-                (_SELF, "SIDE_KEEP"),
-            ),
+            limits(SPIGOT_LENGTH, _P["SpigotLength"], unit=_UNIT),
+            ((_GEOM, "SPIGOT_LENGTH"), (_GEOM, "UNIT"), (_SELF, "SIDE_KEEP")),
         ),
         "length_nominal": (SPIGOT_LENGTH, ((_GEOM, "SPIGOT_LENGTH"),)),
         "length_end": ("flange_rear_face", ((_SELF, "SIDE_KEEP"),)),
         "length_callout": (SPIGOT_LENGTH_CALLOUT, ("SPIGOT_LENGTH_CALLOUT",)),
+        "length_note": (STACK_TEXT, ("STACK_TEXT", (_SELF, "DRAWING_NOTES"))),
         "root_radius_max": (
             _spec.CORNER_RADIUS_MAX,
             ("CORNER_RADIUS_MAX", "SPIGOT_ROOT_CALLOUT", (_SELF, "SPIGOT_ROOT_XY")),
@@ -751,8 +773,8 @@ for _index, (_x, _y) in enumerate(_geom.screw_centres(), 1):
 # short of the -X O.D., a press fit for the MHA-PD-VN-69 pin, its chord
 # offset and stop from the hub axis, its station from the hub front face.
 # Its blind depth runs from the entry (the nominal O.D. meeting the chord) to
-# the printed stop's band: the depth a blind hole needs, derived from the
-# stop, not a size the sheet prints.
+# the printed stop's band: the callout prints its nominal as REF, and the
+# stop on the section controls it.
 requirement(
     "pin_ream",
     kind="hole",
@@ -760,13 +782,8 @@ requirement(
     requirements=("dia", "chord", "stop", "station", "depth"),
     fields={
         "at": (
-            [KEY_PIN_ENTRY_X, -KEY_PIN_CHORD_OFFSET, KEY_PIN_Z],
-            (
-                "HUB_DIA",
-                "KEY_PIN_CHORD_OFFSET",
-                "KEY_PIN_Z",
-                (_SELF, "KEY_PIN_ENTRY_X"),
-            ),
+            [_spec.KEY_PIN_ENTRY_X, -KEY_PIN_CHORD_OFFSET, KEY_PIN_Z],
+            ("HUB_DIA", "KEY_PIN_CHORD_OFFSET", "KEY_PIN_Z", "KEY_PIN_ENTRY_X"),
         ),
         "axis": ([-1.0, 0.0, 0.0], ("__frame__",)),
         "dia": (
@@ -782,8 +799,12 @@ requirement(
         "nominal_dia": (_spec.KEY_PIN_HOLE_DIA, ("KEY_PIN_HOLE_DIA",)),
         "process": ("ream", ("KEY_PIN_SUFFIX",)),
         "depth": (
-            [KEY_PIN_ENTRY_X + stop for stop in KEY_PIN_STOP_LIMITS],
-            ((_SELF, "KEY_PIN_ENTRY_X"), (_SELF, "KEY_PIN_STOP_LIMITS")),
+            [_spec.KEY_PIN_ENTRY_X + stop for stop in KEY_PIN_STOP_LIMITS],
+            ("KEY_PIN_ENTRY_X", (_SELF, "KEY_PIN_STOP_LIMITS")),
+        ),
+        "depth_nominal": (
+            _spec.KEY_PIN_DEPTH_REF,
+            ("KEY_PIN_DEPTH_REF", "KEY_PIN_CALLOUT_BELOW"),
         ),
         "chord": (
             limits(
@@ -799,17 +820,18 @@ requirement(
         "chord_axis": ("y", ("__frame__",)),
         "stop": (
             KEY_PIN_STOP_LIMITS,
-            ("KEY_PIN_STOP", (_GEOM, "UNIT"), "KEY_PIN_DEPTH_TEXT"),
+            ("KEY_PIN_STOP", (_GEOM, "UNIT"), (_SELF, "SECTION_KEEP")),
         ),
         "stop_nominal": (KEY_PIN_STOP, ("KEY_PIN_STOP",)),
         "stop_x": (-KEY_PIN_STOP, ("KEY_PIN_STOP_X",)),
+        "stop_callout": (KEY_PIN_STOP_SUFFIX.strip(), ("KEY_PIN_STOP_SUFFIX",)),
         "station": (
             limits(_spec.KEY_PIN_STATION, _P["KeyPinStation"], unit=_UNIT),
             ("KEY_PIN_STATION", (_GEOM, "UNIT"), (_SELF, "SIDE_KEEP")),
         ),
         "station_nominal": (_spec.KEY_PIN_STATION, ("KEY_PIN_STATION",)),
         "station_from": ("front_face", ((_SELF, "SIDE_KEEP"),)),
-        "mate": ("MHA-PD-VN-69", ("KEY_PIN_NUMBER", "KEY_PIN_CALLOUT_BELOW")),
+        "mate": ("MHA-PD-VN-69", ("KEY_PIN_NUMBER", "KEY_PIN_NOTE_TEXT")),
         "fit": ("press", ("KEY_PIN_NOTE_TEXT",)),
         "diametral_interference": (
             list(_spec.KEY_PIN_INTERFERENCE),
@@ -837,13 +859,8 @@ requirement(
     requirements=("dia",),
     fields={
         "at": (
-            [KEY_PIN_ENTRY_X, -KEY_PIN_CHORD_OFFSET, KEY_PIN_Z],
-            (
-                "HUB_DIA",
-                "KEY_PIN_CHORD_OFFSET",
-                "KEY_PIN_Z",
-                (_SELF, "KEY_PIN_ENTRY_X"),
-            ),
+            [_spec.KEY_PIN_ENTRY_X, -KEY_PIN_CHORD_OFFSET, KEY_PIN_Z],
+            ("HUB_DIA", "KEY_PIN_CHORD_OFFSET", "KEY_PIN_Z", "KEY_PIN_ENTRY_X"),
         ),
         "axis": ([-1.0, 0.0, 0.0], ("__frame__",)),
         "dia": (
@@ -1609,7 +1626,7 @@ def build(adapter: Any) -> dict[str, str]:
             raise RuntimeError(
                 f"failed to add ASME center marks to the hub {label} view"
             )
-    # The bore's diameter lands one arrow from below-right (machinist review).
+    # The bore's diameter lands one arrow from below-left (machinist review).
     _set_near_side_bore(adapter, end_annotations)
     # The bolt circle draws as its centreline, the diameter's arrows on it.
     _add_bolt_circle_centerline(adapter, end)
@@ -1650,7 +1667,7 @@ def build(adapter: Any) -> dict[str, str]:
         view=side,
         label="spigot root radius",
     )
-    # The stack note the overall's and the spigot length's callouts link.
+    # The stack note the overall's callout links, and the three fit notes.
     if add_note(adapter, NOTES_TEXT, *NOTES_XY) is None:
         raise RuntimeError("failed to add the disc hub's stack note")
     # SECTION A-A, cut last so every face- and edge-view step above runs on

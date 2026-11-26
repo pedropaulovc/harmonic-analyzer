@@ -1,6 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 420" font-family="sans-serif" font-size="13">
+  <!-- To scale at 4 px/mm (the .485 depth = 48.8 px). The 1/2 in end mill Ø12.7 (milling_cuts "locating end") = 50.8 px, on MS06's second pass, Y −5.850 (over the block), its end on the last level, Z 26.543 (far_top_mm); at least 1.00 in out of the collet (half_mill_projection_min_mm): drawn short, broken off. The chamfer mill that follows in the same file has its own picture (chamfer-locating.svg). -->
   <rect class="paper" x="0" y="0" width="760" height="420"/>
-  <text class="title" x="16" y="22">Setup 7 (MS06): face the locating end; chamfer its roof corner</text>
+  <text class="title" x="16" y="22">Setup 7 (MS06): face the locating end</text>
   <rect class="fixture-vise" x="101.6" y="330.0" width="156.8" height="22.0"/>
   <rect class="clamp" x="125.6" y="150.2" width="30.0" height="179.8"/>
   <rect class="clamp" x="204.4" y="150.2" width="30.0" height="179.8"/>
@@ -11,8 +12,8 @@
   <rect class="part-kept" x="155.6" y="122.2" width="48.8" height="106.2"/>
   <rect class="part-removed" x="155.6" y="101.4" width="48.8" height="20.8"/>
   <line class="active-face" x1="155.6" y1="122.2" x2="204.4" y2="122.2"/>
-  <rect class="cutter" x="145.9" y="59.4" width="50.8" height="40.0"/>
-  <text class="label" x="300.0" y="60.0">1/2 in end mill, then the chamfer mill</text>
+  <path class="cutter" d="M155.6 44 L155.6 116.1 A25.4 6.1 0 0 0 206.4 116.1 L206.4 44 L200.1 40 L187.3 48 L174.7 40 L161.9 48 L155.6 44 Z"/>
+  <text class="label" x="300.0" y="60.0">1/2 in end mill; passes along the jaws</text>
   <line class="leader" x1="296.0" y1="56.0" x2="163.6" y2="77.4"/>
   <circle class="leader-dot" cx="163.6" cy="77.4" r="2.5"/>
   <text class="label" x="300.0" y="95.0">LOCATING END (end L), faced in levels</text>

@@ -7,6 +7,7 @@ This directory holds the inputs to the `prechips:<stem>` travelers and the
 cad/process/
   shop/common.toml          prechips shop directory: records several families share
   shop/<prefix>.toml        records only one subsystem family's plans name
+  shop/standing.toml        the shop standing instructions page and the page header's project
   <stem>/plan.toml          one prechips plan per part (enrolled or placeholder),
                             or one family plan for several parts (see Family plans)
   placeholder-profile.toml  no-check prechips profile for the placeholder plans
@@ -248,6 +249,61 @@ height). The opening is the owner-reported fit with the stock hard jaws
 3/8 and 1/2 in 3-flute uncoated carbide end mills (`tools.endmill-carbide-3fl-*`)
 carry cutting settings on 1018 within the PM-30MV's 2800 rpm ceiling
 (`settings.endmill-carbide-3fl-*-1018-cf`), each number cited beside it.
+
+`standing.toml` is the shop's **standing instructions** page (owner
+2026-11-25): what is common sense on every traveler (units, speeds, homing
+and the zero re-check, Feed Hold, tool changes, proving a file, burrs, the
+work stop, picture colours, "stop and tell the owner", and that a traveler is
+not approval to machine). `prechips:standing` renders it once and the release
+ships it as `travelers/shop-standing-instructions.pdf`; every traveler review
+receives its text (rule T18 in `cad/docs/traveler-guidelines.md`). A plan
+with `standing = true` prints only its one pointer line at the head and does
+not repeat or re-word anything on it; a step prints a caution only where it is
+critical, uncommon or confusing for that part. Its `[sheet] project` is the
+running page header every traveler page carries. Plans convert batch by batch
+(owner 2026-11-25: reviews stay on hold until then).
+
+Converting a plan to the standing page (owner 2026-11-25: "convert the other
+plans in batches"; the column clamp is the worked example):
+
+1. Set root `standing = true` and delete the top-level `note`. What only this
+   job needs (parts and marks, which setups serve which part, program
+   prefixes, where finished sizes are tabled) goes into a `[[notes]]` block
+   titled `This job`, one `[label, text]` row per idea, 60 printed words at
+   most each; nothing a setup's Holding, Datum or op already prints.
+2. Delete every sentence anywhere in the plan (head, Holding, Datum, op
+   text, detail, steps, inspection) that says again what a standing row says:
+   - units and G21;
+   - speeds and belt;
+   - homing once, homing again, and the zero re-check;
+   - Feed Hold / Reset, including "(the controller keeps G54...)";
+   - "(the tool setter measures it)" and "tool lengths from the tool setter";
+   - the prove-in-air ops: delete the op (the method is the standing row
+     "A file's first part", and its "watch every move ... clear the work,
+     the jaws, the parallels, any clamp and the stop" covers a list of what
+     a move clears, screw heads included); keep only a proof that departs
+     from the row (a partial file, another raise);
+   - burrs off before a face seats;
+   - the work stop's rod drawn back before a touch-off.
+3. Keep, at its own step, every departure from a standing row that is true
+   only for this part: "do not home from here to the end of MS04", "this file
+   has no M6: console M6 T2 before running it again", "pick G54 up again after
+   a vise move", a rod moved mid-setup, a part-specific Feed Hold caution.
+   Rewrite old wording that contradicts the standing page ("home at the start
+   of every mill setup") to the standing rule, or delete it.
+4. Remove the stem from `cad/config/machinist-review/standing-unconverted.yaml`.
+5. Proof, on the PR:
+   - a text diff, each removed sentence named with the standing row or step
+     that now carries it;
+   - the NC byte-identical: the recipe context and every posted program,
+     before and after (the clamp's recipe reads no op text; if a program
+     changes, something besides wording moved, so stop);
+   - both profiles rendered, exit 0, with the hobby page count before and
+     after;
+   - the plan's own tests.
+   Deleting ops renumbers the route, so check that nothing (plan text,
+   tests, `machinist_exceptions`, `demoted.yaml`) cites an op number.
+   Traveler reviews stay held until the owner lifts the hold.
 
 Every inventory stock key a plan's `stock_refs` names also has a
 `[stock.<key>]` record here, `description` only, because prechips checks each
