@@ -4040,6 +4040,11 @@ def _check_recipe_spec(pytest_cmd: list[str]) -> dict[str, Any]:
             str(
                 (REPO_ROOT / "cad" / "config" / "current-identity-map.json").resolve()
             ),
+            # test_picture_clip and the prechips_traveler tests read the
+            # picture-clip ratchet baseline.
+            str(
+                (REPO_ROOT / "cad" / "config" / "picture-clip-baseline.toml").resolve()
+            ),
             # test_check_register reads every check and necessity register.
             *(
                 str(path.resolve())
@@ -4571,6 +4576,11 @@ def _prechips_task(stem: str) -> dict[str, Any]:
             ),
             *(str(path.resolve()) for path in _process_plans.shop_files()),
             *(str(manifest.resolve()) for manifest in manifests),
+            # The render refuses a picture finding this ratchet does not list
+            # (picture_clip.check).
+            str(
+                (REPO_ROOT / "cad" / "config" / "picture-clip-baseline.toml").resolve()
+            ),
             *_executed_closure(cmd),
         }),
         "task_dep": [f"package:manifest:{part}" for part in parts],
