@@ -128,7 +128,7 @@ def test_the_relief_plunges_keep_it_inside_its_height_band(context) -> None:
     step = max(steps)
     p = PLAN["parameters"]
     band = FEATURES["features"]["relief_floor"]["relief_height"]
-    nominal = SHOP["tools"]["endmill-carbide-3fl-1-16-reach-1-2"]["diameter_mm"]
+    nominal = SHOP["tools"]["endmill-carbide-3fl-1-16-loc-1-2"]["diameter_mm"]
     for cutter in (p["relief_cutter_min_mm"], nominal, p["relief_cutter_max_mm"]):
         assert step <= cutter / 2 + 1e-3
         clear = math.sqrt(cutter**2 - step**2)
@@ -175,6 +175,15 @@ def test_a_plan_number_off_the_model_or_shop_is_refused(key, value, detail) -> N
     plan["parameters"][key] = value
     with pytest.raises(ValueError, match=detail):
         _context(plan)
+
+
+def test_a_relief_cutter_whose_flutes_stop_above_the_relief_is_refused() -> None:
+    """A stub-flute 1/16 (.093 of flutes) would bring its 1/8 shank into the
+    rebate beside the roof: refused."""
+    shop = copy.deepcopy(SHOP)
+    shop["tools"]["endmill-carbide-3fl-1-16-loc-1-2"]["flute_length_mm"] = 2.3622
+    with pytest.raises(ValueError, match="flutes stop short"):
+        RECIPE.context(FEATURES, PLAN, shop, "stop.step")
 
 
 def _lines(ctx: dict, key: str) -> list[str]:
