@@ -220,6 +220,60 @@ def test_a_climb_roughing_pass_is_caught(tmp_path):
     assert [f.detail for f in _gcode.check_side_passes(program, **kwargs)] == ["Y -6.350 Z -7.000: pass does not run +X"]
 
 
+# A left end milled with the cutter's side (pd_platen_guide PG05, #3669): the
+# passes step from raw X-7.62 toward final X-6.35, so the rail lies +X of them.
+_END_KWARGS = {"axis": "X", "final": -6.35, "raw": -7.62, "max_step": 1.27, "span": 20.0, "below_z": 10.0}
+_END_DOWN = "G0 X-6.35 Y8.89 Z15\nG1 Z-0.5 F500\nG1 Y-17.65\nG0 Z15\n"
+_END_UP = "G0 X-6.35 Y-17.65 Z15\nG1 Z-0.5 F500\nG1 Y8.89\nG0 Z15\n"
+
+
+def test_a_declared_conventional_side_pass_is_judged_from_its_path_stock_side_and_spindle(tmp_path):
+    # Under M3 (clockwise seen from above) a -Y pass has the rail on the
+    # cutter's left: conventional. The same pass reversed has it on the right:
+    # climb, which the posted PG05 and PB05 cut while their recipes said
+    # conventional (#3669).
+    down = _program(tmp_path, "M3 S2650\n" + _END_DOWN)
+    assert _gcode.check_side_passes(down, direction=-1.0, cut="conventional", **_END_KWARGS) == []
+    up = _program(tmp_path, "M3 S2650\n" + _END_UP)
+    assert [f.detail for f in _gcode.check_side_passes(up, direction=1.0, cut="conventional", **_END_KWARGS)] == [
+        "X -6.350 Z -0.500: pass runs +Y with the stock on the cutter's right under M3: climb, declared conventional"
+    ]
+    assert _gcode.check_side_passes(up, direction=1.0, cut="climb", **_END_KWARGS) == []
+
+
+def test_the_counter_clockwise_spindle_reverses_the_cut_direction(tmp_path):
+    down = _program(tmp_path, "M4 S2650\n" + _END_DOWN)
+    assert [f.detail for f in _gcode.check_side_passes(down, direction=-1.0, cut="conventional", **_END_KWARGS)] == [
+        "X -6.350 Z -0.500: pass runs -Y with the stock on the cutter's left under M4: climb, declared conventional"
+    ]
+    up = _program(tmp_path, "M4 S2650\n" + _END_UP)
+    assert _gcode.check_side_passes(up, direction=1.0, cut="conventional", **_END_KWARGS) == []
+    # The turn in force at each pass counts: M5 then M3 before the pass is M3.
+    restarted = _program(tmp_path, "M4 S2650\nM5\nM3 S2650\n" + _END_DOWN)
+    assert _gcode.check_side_passes(restarted, direction=-1.0, cut="conventional", **_END_KWARGS) == []
+
+
+def test_an_edge_pass_along_x_is_judged_the_same_way(tmp_path):
+    # The stock +Y of passes stepping from Y-9 to Y-6.35: a +X pass has it on
+    # the cutter's left (conventional under M3), a -X pass on its right.
+    kwargs = {"axis": "Y", "final": -6.35, "raw": -9.0, "max_step": 3.0, "span": 200.0, "below_z": 0.0}
+    plus = _program(tmp_path, "M3 S2000\nG0 X0 Y-6.35 Z5\nG1 Z-7 F100\nG1 X400\nG0 Z5\n")
+    assert _gcode.check_side_passes(plus, direction=1.0, cut="conventional", **kwargs) == []
+    minus = _program(tmp_path, "M3 S2000\nG0 X400 Y-6.35 Z5\nG1 Z-7 F100\nG1 X0\nG0 Z5\n")
+    assert [f.check for f in _gcode.check_side_passes(minus, direction=-1.0, cut="conventional", **kwargs)] == ["cut"]
+
+
+def test_an_undeclared_side_cut_is_not_judged_and_a_stopped_spindle_fails_a_declared_one(tmp_path):
+    up = _program(tmp_path, "M3 S2650\n" + _END_UP)
+    assert _gcode.check_side_passes(up, direction=1.0, **_END_KWARGS) == []
+    stopped = _program(tmp_path, _END_DOWN)
+    assert [f.detail for f in _gcode.check_side_passes(stopped, direction=-1.0, cut="conventional", **_END_KWARGS)] == [
+        "X -6.350 Z -0.500: spindle stopped (no M3/M4 in force), declared conventional"
+    ]
+    with pytest.raises(ValueError, match="cut 'up'"):
+        _gcode.check_side_passes(up, direction=1.0, cut="up", **_END_KWARGS)
+
+
 def test_side_pass_deeper_than_the_measured_stepdown_is_caught(tmp_path):
     # The edge settings hold only within 7.62 mm deep (dechatter v11): one
     # 14.732 mm level fails, two even 7.366 mm levels pass, and each station is
