@@ -54,11 +54,22 @@ part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
 material = "1018 cold-finished steel, 3/8 x 1-1/4 in flat: a plain carbon steel (drawing: {{cad.material_spec}})"
 stock = "3/8 x 1-1/4 in flat bar; {{process.quantity:d}} × {{process.blank_length_in:.2f}}–{{process.blank_length_max_in:.2f}} in blank."
-note = "Inches unless mm; G-code and console entries in mm (the files and the controller run G21). Finished {{cad.right_end_length_min_in:.2f}}–{{cad.right_end_length_max_in:.2f}} long (left end to right end), {{cad.bottom_face_height_min_in:.3dot}}–{{cad.bottom_face_height_max_in:.3dot}} high (top face to bottom face), {{cad.back_face_depth_min_in:.3dot}}–{{cad.back_face_depth_max_in:.3dot}} deep (the bar's 3/8 thickness as supplied). Speeds on the PM-30MV low belt (100–2800 rpm): no belt change. Home the mill ($H) once, after switching it on: every M6's trip to the tool setter counts from home. Home again only after a power cycle or a controller restart, an E-stop, an alarm, a limit switch hit, a stall or a crash: homing brings the stored G54 back. Then check every zero of the setup again, each the way its step set it: each must read what its step set, within .001 in. One does not, cannot be reached with the part in, or the part may have moved: take the setup again from its first step, the part out. They all do: run the interrupted file again from its start. Feed Hold, then Reset with the axes stopped keeps position and G54: no homing, no new zero; run the interrupted file again from its start: its first M6 measures the tool, and cuts already made are cut in air. Every file is proved in air before it cuts. To buy before Setup 3: the pin gauge set (its .125 pin seats Setups 3 and 4)."
 shop = "../shop"
 stock_refs = ["1018-flat-3-8x1-1-4"]
 material_key = "rocker-1018-cold-finished"
 milling_material = "steel_1018"
+
+# The shop's standing page carries what every traveler shares (units, speeds,
+# homing, Feed Hold, tool changes, proving a file, burrs); This job says what
+# only this bar needs.
+standing = true
+
+[[notes]]
+title = "This job"
+rows = [
+  ["Finished", "{{cad.right_end_length_min_in:.2f}}–{{cad.right_end_length_max_in:.2f}} long (left end to right end), {{cad.bottom_face_height_min_in:.3dot}}–{{cad.bottom_face_height_max_in:.3dot}} high (top face to bottom face), {{cad.back_face_depth_min_in:.3dot}}–{{cad.back_face_depth_max_in:.3dot}} deep (the bar's 3/8 thickness as supplied)."],
+  ["To buy", "Before Setup 3: the pin gauge set (its .125 pin seats Setups 3 and 4)."],
+]
 
 [cad]
 file = "../../out/features/mg_wheel_bar/features.toml"
@@ -276,7 +287,7 @@ machine = "PM-30MV CNC (FluidNC, CNCjs with the electronic tool setter) / vise, 
 indexing = "none"
 machine_ref = "pm-30mv"
 holding = "A 1/2 in and a 9/16 in parallel of the set stacked against each jaw ({{process.top_riser_height_mm:in.4dot}} in). The blank on edge on them, edge B down, edge A up, F against the FIXED jaw, gripped across its two 1-1/4 in faces, LEFT end to the left, centred on the jaws (both ends about 1.6 in out past them). Tap it down onto both stacks along its length while closing the vise. The lower {{process.top_grip_mm:in.3dot}} of its width is in the jaws."
-datum = "Program WB02_top. G54: X0 {{process.left_end_skim_mm:in.3dot}} right of the LEFT end (where Setup 3 mills that end), Y0 the fixed jaw's face (F), +Y toward it; Z0 the stacks' top (edge B), set from the miked width. The file starts with an M6 for the end mill; tool lengths from the tool setter."
+datum = "Program WB02_top. G54: X0 {{process.left_end_skim_mm:in.3dot}} right of the LEFT end (where Setup 3 mills that end), Y0 the fixed jaw's face (F), +Y toward it; Z0 the stacks' top (edge B), set from the miked width. The file starts with an M6 for the end mill."
 diagram = { file = "diagrams/top.svg", alt = "The blank on edge on a 1/2 + 9/16 in stack of parallels against each jaw, edge B down, F at the fixed jaw; the 1/2 in end mill, to scale, on its first level and on the pass least past the bar's edges, faces edge A down in levels to the top face, .840 above edge B." }
 envelope = { x_span_mm = ["{{process.blank_length_max_mm}}", "{{process.face_cutter_dia_mm}}", 5.08], y_span_mm = ["{{process.blank_thickness_mm}}", "{{process.face_cutter_dia_mm}}"], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.top_riser_height_mm}}", "{{process.bar_width_max_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.top_riser_height_mm}}", "{{process.top_width_mm}}"], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_mm}}"] }
 vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{process.blank_thickness_mm}}", along_jaws_mm = "{{process.blank_length_max_mm}}", part_height_mm = "{{process.bar_width_max_mm}}", parallel_height_mm = "{{process.top_riser_height_mm}}", overhang_mm = ["{{process.vise_overhang_mm}}", "rest"], jaw_offset = "centred", fixed_jaw_face = "as_bought", moving_jaw_face = "as_bought", moving_jaw_contact = "flat" }
@@ -289,12 +300,7 @@ feed = "hand"
 
 [[setups.operations]]
 instruction = "G54 Z0: the stacks' top (edge B), from that reading and the end mill touched on edge A at the blank's middle."
-instruction_detailed = "Console M6 T1 (1/2 in end mill, {{process.half_mill_projection_mm:in.2f}} in out of the collet; the tool setter measures it); MDI G0 X116.840 Y-4.763 (the blank's middle, over edge A). Spindle stopped, its tip just dragging a .002 feeler leaf on edge A: G10 L20 P1 Z(the reading in mm + 0.051)."
-feed = "hand"
-
-[[setups.operations]]
-instruction = "Prove WB02_top in air: Z0 raised 1.000 in; every move clears the jaws. Then Z0 back."
-instruction_detailed = "Send $# and note the G54 line's Z. G10 L2 P1 Z(that Z + 25.400) raises Z0 1.000 in. Run WB02_top, watching each move clear the jaws. G10 L2 P1 Z(the noted Z) puts Z0 back."
+instruction_detailed = "Console M6 T1 (1/2 in end mill, {{process.half_mill_projection_mm:in.2f}} in out of the collet); MDI G0 X116.840 Y-4.763 (the blank's middle, over edge A). Spindle stopped, its tip just dragging a .002 feeler leaf on edge A: G10 L20 P1 Z(the reading in mm + 0.051)."
 feed = "hand"
 
 [[setups.operations]]
@@ -356,11 +362,7 @@ feed = "hand"
 
 [[setups.operations]]
 instruction = "G54 Z0: the stacks' top (F), from that reading and the end mill touched on the back face over the jaws."
-instruction_detailed = "Console M6 T1 (the tool setter measures it); MDI G0 X{{process.z_touch_left_x_mm:.3f}} Y-10.668 (over the middle of the jaws). Spindle stopped, its tip just dragging a .002 feeler leaf on the back face: G10 L20 P1 Z(the reading in mm + 0.051)."
-feed = "hand"
-
-[[setups.operations]]
-instruction = "Prove WB03_left in air, Z0 raised 1.000 in; every move clears the jaws, the stacks and the pin, through every M6. Then Z0 back."
+instruction_detailed = "Console M6 T1; MDI G0 X{{process.z_touch_left_x_mm:.3f}} Y-10.668 (over the middle of the jaws). Spindle stopped, its tip just dragging a .002 feeler leaf on the back face: G10 L20 P1 Z(the reading in mm + 0.051)."
 feed = "hand"
 
 # Not measured (#3427): the end's side cut is deeper than the 1/2 in end
@@ -455,15 +457,11 @@ feed = "hand"
 
 [[setups.operations]]
 instruction = "G54 Z0: the stacks' top (F), from that reading and the end mill touched on the back face over the jaws."
-instruction_detailed = "Console M6 T1 (the tool setter measures it); MDI G0 X{{process.z_touch_right_x_mm:.3f}} Y-10.668 (over the middle of the jaws). Spindle stopped, its tip just dragging a .002 feeler leaf on the back face: G10 L20 P1 Z(the reading in mm + 0.051)."
+instruction_detailed = "Console M6 T1; MDI G0 X{{process.z_touch_right_x_mm:.3f}} Y-10.668 (over the middle of the jaws). Spindle stopped, its tip just dragging a .002 feeler leaf on the back face: G10 L20 P1 Z(the reading in mm + 0.051)."
 feed = "hand"
 
 [[setups.operations]]
 instruction = "Pickup check before cutting, Z from the back face's reading: MDI G0 Z(the reading in mm + 5.000), then G0 X{{cad.axle_bore_station_mm:.3f}} Y-{{cad.axle_bore_height_mm:.3f}}, then G0 Z(the reading in mm + 1.000): the end mill's tip stands centred over the drilled axle bore (look across it from the front and from the side). Off by a visible amount: stop and set X0 again."
-feed = "hand"
-
-[[setups.operations]]
-instruction = "Prove WB04_right in air, Z0 raised 1.000 in; every move clears the jaws, the stacks and the pin, through every M6. Then Z0 back."
 feed = "hand"
 
 # Not measured (#3427): as WB03's left end. Owner, Pedro, 2026-11-22: "log
@@ -546,11 +544,7 @@ feed = "hand"
 
 [[setups.operations]]
 instruction = "G54 Z0: the stacks' top (T), from that reading and the end mill touched on edge B at the bar's middle."
-instruction_detailed = "Console M6 T1 (the tool setter measures it); MDI G0 X116.840 Y-4.763. Spindle stopped, its tip just dragging a .002 feeler leaf on edge B: G10 L20 P1 Z(the reading in mm + 0.051)."
-feed = "hand"
-
-[[setups.operations]]
-instruction = "Prove WB05_height in air, Z0 raised 1.000 in. Then Z0 back."
+instruction_detailed = "Console M6 T1; MDI G0 X116.840 Y-4.763. Spindle stopped, its tip just dragging a .002 feeler leaf on edge B: G10 L20 P1 Z(the reading in mm + 0.051)."
 feed = "hand"
 
 [[setups.operations]]
