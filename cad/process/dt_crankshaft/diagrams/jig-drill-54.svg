@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 360" width="760" height="360" font-family="sans-serif" font-size="13">
+  <!-- As Op 630's picture. The #54 drill (1.397 = 11.2 px) knockout_stickout_in 1.63 out, from the reamed floor on through the spigot (6.909 thick) into the 1/8 gap, its point at Z-.32 (knockout_tip_in): 1.22 mm into the 3.175 mm gap, short of the jig face. -->
+  <rect class="paper" x="0" y="0" width="760" height="360"/>
+  <text class="title" x="20" y="22">Op 650: the #54 taper-length drill on through the spigot into the gap (8 px/mm)</text>
+  <line class="centre-line" x1="20" y1="150" x2="740" y2="150"/>
+  <rect class="part-kept" x="221.6" y="111.9" width="178.4" height="76.2"/>
+  <rect class="part-kept" x="400" y="80" width="55.27" height="140"/>
+  <rect class="part-kept" x="455.27" y="105.55" width="345.4" height="88.9"/>
+  <rect class="fixture-plate" x="480.67" y="48.4" width="320" height="203.2"/>
+  <rect class="part-kept" x="480.67" y="105.55" width="320" height="88.9"/>
+  <text class="label" x="490.67" y="40.4">jig (bore .4385), journal in it</text>
+  <text class="label" x="457.27" y="269.6">1/8 spacer gap</text>
+  <rect class="holes" x="400" y="200.41" width="61.67" height="11.18"/>
+  <path class="cutter" d="M133.81 200.41L461.67 200.41L465.02 206L461.67 211.59L133.81 211.59Z"/>
+  <rect class="fixture-vise" x="73.81" y="166" width="60" height="80"/>
+  <text class="label" x="73.81" y="262">drill chuck (schematic)</text>
+  <line class="arrow" x1="680.67" y1="281.6" x2="620.67" y2="281.6"/>
+  <text class="label" x="520.67" y="301.6">carriage feeds the jig onto the cutter</text>
+  <text class="label" x="30" y="40">#54 drill {{process.knockout_stickout_in:.2f}} out: through the spigot into the gap,</text>
+  <text class="label" x="30" y="56">its tip to Z-{{process.knockout_tip_in:.2dot}}, pecking .02</text>
+  <line class="dims" x1="205.6" y1="150" x2="205.6" y2="206"/>
+  <text class="label" x="199.6" y="182" text-anchor="end">{{process.pin_x_mm:.3f}} mm</text>
+  <text class="datum-label" x="396" y="72" text-anchor="end">Z0 + H: the spigot face</text>
+  <text class="datum-label" x="199.6" y="142" text-anchor="end">X0 the stub's axis</text>
+</svg>

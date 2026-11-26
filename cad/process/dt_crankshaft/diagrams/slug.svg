@@ -1,23 +1,24 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 280" font-family="sans-serif" font-size="13">
-  <rect class="paper" x="0" y="0" width="760" height="280"/>
-  <text class="title" x="20" y="20">Setup 5: the proof slug between the 3-jaw and the dead centre (not to scale)</text>
-  <rect class="fixture-vise" x="60" y="70" width="120" height="180"/>
-  <rect class="part-rest" x="100" y="110" width="110" height="100"/>
-  <rect class="part-removed" x="210" y="110" width="440" height="100"/>
-  <rect class="part-kept" x="240" y="142" width="120" height="36"/>
-  <rect class="part-kept" x="360" y="122" width="45" height="76"/>
-  <rect class="part-kept" x="405" y="137" width="245" height="46"/>
-  <line class="active-face" x1="232" y1="100" x2="232" y2="220"/>
-  <polygon class="clamp" points="650,160 690,140 690,180"/>
-  <line class="centre-line" x1="40" y1="160" x2="720" y2="160"/>
-  <text class="label" x="450" y="250">journal (Ø.4375), Z0 to Z-1.600</text>
-  <line class="leader" x1="520" y1="238" x2="520" y2="183"/>
-  <text class="label" x="300" y="90">spigot Ø.687; its stub-side face at Z-1.872</text>
-  <line class="leader" x1="360" y1="94" x2="360" y2="122"/>
-  <text class="label" x="240" y="250">stub (Ø.3750)</text>
-  <line class="leader" x1="290" y1="238" x2="290" y2="178"/>
-  <text class="datum-label" x="540" y="60">Z0 the faced end; dead centre</text>
-  <line class="leader" x1="640" y1="64" x2="650" y2="150"/>
-  <text class="label" x="60" y="270">part-off at Z-2.622</text>
-  <line class="leader" x1="150" y1="258" x2="230" y2="218"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 300" width="760" height="300" font-family="sans-serif" font-size="13">
+  <!-- Plan from above, 4 px/mm: the 4.00 slug blank (1 in, 101.6 px) slug_stickout_mm 73.66 out. The AR tool (schematic) facing the end square, feeding in toward the centre. The dead centre goes in after the centre-drilling op. -->
+  <rect class="paper" x="0" y="0" width="760" height="300"/>
+  <text class="title" x="20" y="22">Setup 5: face the slug blank's end (AR tool), {{process.slug_stickout_mm:in.2f}} in out of the 3-jaw (4 px/mm)</text>
+  <line class="centre-line" x1="20" y1="150" x2="740" y2="150"/>
+  <rect class="fixture-vise" x="125.36" y="49.2" width="60" height="201.6"/>
+  <rect class="clamp" x="185.36" y="65.2" width="40" height="34"/>
+  <rect class="clamp" x="185.36" y="200.8" width="40" height="34"/>
+  <text class="label" x="125.36" y="43.2">3-jaw (schematic)</text>
+  <rect class="part-rest" x="20" y="99.2" width="205.36" height="101.6"/>
+  <rect class="part-kept" x="225.36" y="99.2" width="292.24" height="101.6"/>
+  <rect class="part-removed" x="517.6" y="99.2" width="2.4" height="101.6"/>
+  <path class="cutter" d="M520 174L530 200L530 264L523 261L516 264L509 261L502 264L502 194Z"/>
+  <line class="arrow" x1="550" y1="170" x2="550" y2="142"/>
+  <text class="label" x="560" y="80">the end faced square: Z0;</text>
+  <text class="label" x="560" y="96">then the journal, the Ø{{cad.spigot_dia_in:.3dot}}</text>
+  <text class="label" x="560" y="112">spigot and the stub turned</text>
+  <line class="leader" x1="556" y1="86" x2="518.8" y2="110"/>
+  <circle class="leader-dot" cx="518.8" cy="110" r="2"/>
+  <text class="label" x="560" y="230">AR tool (schematic), feeding</text>
+  <text class="label" x="560" y="246">in toward the centre</text>
+  <line class="leader" x1="556" y1="236" x2="528" y2="190"/>
+  <circle class="leader-dot" cx="528" cy="190" r="2"/>
 </svg>

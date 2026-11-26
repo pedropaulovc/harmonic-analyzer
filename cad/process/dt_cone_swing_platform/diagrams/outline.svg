@@ -1,29 +1,31 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 400" font-family="sans-serif" font-size="13">
-  <rect class="paper" x="0" y="0" width="760" height="400"/>
-  <text class="title" x="20" y="20">Setup 4 (plan view): top up on the spoil plate, E to the front; G54 on the pivot</text>
-  <rect class="fixture-plate" x="20" y="100" width="720" height="230"/>
-  <rect class="part-removed" x="50" y="135" width="636" height="165"/>
-  <path class="part-kept" d="M 72.9 300 L 680.5 300 L 682.5 238 L 55.5 141.8 L 52.6 273.5 Z"/>
-  <path class="part-removed" d="M 78 146 A 5 5 0 0 0 88 146 Z"/>
-  <path class="part-removed" d="M 663.6 244 L 686 244 L 686 272 L 663.6 272 A 14 14 0 0 1 663.6 244 Z"/>
-  <circle class="holes" cx="663.6" cy="257.8" r="8"/>
-  <circle class="holes" cx="620.3" cy="259" r="5"/>
-  <circle class="holes" cx="628.7" cy="183" r="6"/>
-  <circle class="holes" cx="123.7" cy="207.3" r="6"/>
-  <circle class="holes" cx="107.6" cy="272.7" r="6"/>
-  <line class="leader" x1="700" y1="360" x2="664" y2="262"/>
-  <text class="label" x="600" y="374">pivot: X0 Y0</text>
-  <line class="leader" x1="560" y1="360" x2="620" y2="262"/>
-  <text class="label" x="420" y="374">#4-40 hold-down screw</text>
-  <line class="leader" x1="560" y1="80" x2="627" y2="180"/>
-  <text class="label" x="450" y="76">#10-24 wedge screw (waste wedge)</text>
-  <line class="leader" x1="200" y1="360" x2="110" y2="276"/>
-  <text class="label" x="150" y="374">1/4-20 screws from below</text>
-  <line class="leader" x1="690" y1="228" x2="678" y2="250"/>
-  <text class="label" x="660" y="224">relief</text>
-  <line class="leader" x1="40" y1="80" x2="82" y2="153"/>
-  <text class="label" x="22" y="76">notch</text>
-  <line class="leader" x1="330" y1="330" x2="330" y2="300"/>
-  <text class="label" x="250" y="346">edge E, as supplied: cut only at the pivot-end round</text>
-  <text class="label" x="20" y="394">Hatched: removed by PL08 (outline through) and PL09 (relief); the chamfered corner cleared first.</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 560" width="760" height="560" font-family="sans-serif" font-size="13">
+  <!-- Top: plan from above, 2.5 px/mm (+X right toward the pivot end, +Y up away from E; X0 Y0 the pivot's axis), the blank top up on the spoil plate (part of the plate drawn), E to the front; the outline (cam.py's elements on the feature bundle) and the waste it leaves (hatched: milled later in this setup by PL08 and PL09); the post screws from below at the two post taps. Bottom: section at Y0 from the front (+X right, +Z up), 8 px/mm: Z0 the plate's top, the blank 6.35 over it; the B drill (6.0452 = 48.4 px) at X0 (PL05 L25), its point at Z-3.816 (pivot_redrill_tip_mm) in the plate, so the reamer runs out into a hole. The plate's 1-2-3 blocks lie outside this section (plate X 381 on, here X38.7 on). -->
+  <rect class="paper" x="0" y="0" width="760" height="560"/>
+  <text class="title" x="20" y="22">Setup 4 (PL05, T5): the B drill down the pivot into the plate (plan 2.5 px/mm; section 8 px/mm)</text>
+  <rect class="fixture-plate" x="15" y="80" width="650" height="205"/>
+  <rect class="part-removed" x="30.01" y="101.81" width="611.6" height="158.75"/>
+  <path class="part-kept" d="M612.5 260.56A24.77 24.77 0 0 0 637.25 236.6L637.84 218.35A19.68 19.68 0 0 0 621.16 198.25L72.59 113.97L71.32 121.01A9.84 9.84 0 0 1 59.89 128.95A9.84 9.84 0 0 1 51.95 117.52L53.13 110.98L49.47 110.42A12.7 12.7 0 0 0 34.85 122.56L32.51 194.56L51.96 260.56Z"/>
+  <circle class="holes" cx="100.83" cy="171.44" r="6.38"/>
+  <circle class="holes" cx="85.28" cy="234.32" r="6.38"/>
+  <circle class="holes" cx="620" cy="220" r="7.56"/>
+  <circle class="holes" cx="578.41" cy="221.19" r="3.81"/>
+  <circle class="holes" cx="586.47" cy="148.06" r="6.38"/>
+  <circle class="cutter" cx="620" cy="220" r="7.56"/>
+  <text class="datum-label" x="628" y="242">X0 Y0 the pivot</text>
+  <text class="label" x="20" y="46">the outline drawn; hatched: the waste PL08 and PL09 mill off later in this setup;</text>
+  <text class="label" x="20" y="62">1/4-20 SHCS up through the L holes into the post taps; E to the front</text>
+  <text class="label" x="320" y="278.5">edge E (front), trammed along X; cut only at the pivot-end round</text>
+  <rect class="fixture-plate" x="212" y="440" width="328" height="101.6"/>
+  <rect class="part-kept" x="212" y="389.2" width="328" height="50.8"/>
+  <rect class="holes" x="395.82" y="389.2" width="48.36" height="50.8"/>
+  <rect class="holes" x="274.72" y="389.2" width="24.38" height="50.8"/>
+  <rect class="holes" x="395.82" y="440" width="48.36" height="24"/>
+  <path class="cutter" d="M444.18 296L444.18 456L420 470.53L395.82 456L395.82 296L403.88 293L411.94 296L420 293L428.06 296L436.12 293Z"/>
+  <text class="datum-label" x="216" y="456">Z0 the plate's top</text>
+  <text class="label" x="560" y="320">B drill down its own hole and</text>
+  <text class="label" x="560" y="336">into the plate, its point</text>
+  <text class="label" x="560" y="352">at Z{{process.pivot_redrill_tip_mm:.3f}} mm</text>
+  <line class="leader" x1="556" y1="316" x2="446" y2="344"/>
+  <circle class="leader-dot" cx="446" cy="344" r="2"/>
+  <text class="label" x="212" y="381.2">the blank, top up (U down)</text>
 </svg>

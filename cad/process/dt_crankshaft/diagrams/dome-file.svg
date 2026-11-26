@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 300" width="760" height="300" font-family="sans-serif" font-size="13">
+  <!-- As Setup 4's picture. The SR.26 dome (2.03 high, cad dome height_nominal) stepped by the AR tool; the smooth file (jig-files: its size not on record) drawn schematic across it, stroking from the apex out to the rim. No centre hole in the dome. -->
+  <rect class="paper" x="0" y="0" width="760" height="300"/>
+  <text class="title" x="20" y="22">Op 350: file the dome's steps off, spindle at the low range (6 px/mm)</text>
+  <line class="centre-line" x1="20" y1="150" x2="740" y2="150"/>
+  <rect class="fixture-vise" x="304.28" y="68.42" width="60" height="163.15"/>
+  <rect class="clamp" x="364.28" y="84.42" width="40" height="34"/>
+  <rect class="clamp" x="364.28" y="181.57" width="40" height="34"/>
+  <text class="label" x="304.28" y="62.42">3-jaw (schematic)</text>
+  <rect class="part-rest" x="364.28" y="118.44" width="40" height="2"/>
+  <rect class="part-rest" x="364.28" y="179.56" width="40" height="2"/>
+  <rect class="part-rest" x="20" y="121.42" width="384.28" height="57.15"/>
+  <rect class="hidden" x="277.8" y="97.5" width="41.45" height="105"/>
+  <text class="label" x="30" y="71.42">spigot and shaft back through the chuck</text>
+  <rect class="part-kept" x="404.28" y="121.42" width="33.53" height="57.15"/>
+  <path class="part-kept" d="M437.81 121.42 A39.58 39.58 0 0 1 437.81 178.57 Z"/>
+  <path class="cutter" d="M433.54 146.12L529.96 31.21L522.3 24.79L425.88 139.69Z"/>
+  <line class="arrow" x1="470" y1="144" x2="510" y2="90"/>
+  <text class="label" x="540" y="70">smooth file (schematic), stroked</text>
+  <text class="label" x="540" y="86">from the apex out to the rim, until</text>
+  <text class="label" x="540" y="102">the step corners are just gone;</text>
+  <text class="label" x="540" y="118">the Ø.05 face blended in</text>
+  <line class="leader" x1="536" y1="76" x2="486.4" y2="90.8"/>
+  <circle class="leader-dot" cx="486.4" cy="90.8" r="2"/>
+  <text class="label" x="500" y="250">SR.26 dome, {{process.dome_height_in:.3dot}} high: no centre hole</text>
+  <line class="leader" x1="496" y1="246" x2="444" y2="168"/>
+  <circle class="leader-dot" cx="444" cy="168" r="2"/>
+</svg>

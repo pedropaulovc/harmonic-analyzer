@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 440" width="760" height="440" font-family="sans-serif" font-size="13">
+  <!-- 4 px/mm, as Setup 3's picture (across the jaws from the right end, the front face, +X out of the page). The #9 drill, cutter_dia_mm 4.9784 = 19.9 px, 118 deg point, in the west hold-down (Y -24.892, its first hole, NC line 124 on), at the bottom of its last peck: point Z -2.496 (hold_tip_height_mm), its full diameter drill_past_mm 1.0 past B, between the 1 in parallels (the nearer one 7.3 mm away). Drawn short to a break (its stick-out is not on record). The east hold-down (Y -8.128) next, the same way. -->
+  <rect class="paper" x="0" y="0" width="760" height="440"/>
+  <text class="title" x="20" y="22">Op 180, #9 drill (PB02 T3), 4 px/mm: through the west hold-down, past B between the parallels</text>
+  <text class="title" x="40" y="50">Across the jaws, from the right end, the front face (+X toward you)</text>
+  <text class="title" x="520" y="50">Plan</text>
+  <rect class="fixture-vise" x="70" y="400" width="370" height="16"/>
+  <rect class="clamp" x="90" y="220.2" width="50" height="179.8"/>
+  <rect class="clamp" x="368.6" y="220.2" width="50" height="179.8"/>
+  <rect class="fixture-support" x="140" y="298.4" width="12.7" height="101.6"/>
+  <rect class="fixture-support" x="355.9" y="298.4" width="12.7" height="101.6"/>
+  <line class="datum" x1="368.6" y1="176" x2="368.6" y2="200"/>
+  <text class="datum-label" x="372" y="176">Y0 (E)</text>
+  <line class="datum" x1="420" y1="298.4" x2="440" y2="298.4"/>
+  <text class="datum-label" x="444" y="302">Z0 = B</text>
+  <text class="label-on-clamp" x="393" y="390" text-anchor="middle">fixed</text>
+  <text class="label-on-clamp" x="115" y="390" text-anchor="middle">moving</text>
+  <line class="leader" x1="196" y1="370" x2="152" y2="370"/>
+  <text class="label-halo" x="198" y="374">1 in parallels</text>
+  <rect class="part-kept" x="140" y="197.8" width="228.6" height="100.6"/>
+  <rect class="part-waste" x="140" y="197.8" width="58.9" height="100.6"/>
+  <rect class="part-waste" x="358.4" y="197.8" width="10.2" height="100.6"/>
+  <line class="centre-line" x1="336.1" y1="200" x2="336.1" y2="315"/>
+  <path class="cutter" d="M278.96 120L278.96 302.4L269 308.38L259.04 302.4L259.04 120L269 117Z"/>
+  <line class="arrow" x1="250" y1="130" x2="250" y2="170"/>
+  <text class="label" x="20" y="90">#9 drill, pecks of {{process.peck_mm:in.3dot}}, full retract;</text>
+  <text class="label" x="20" y="106">its full diameter {{process.drill_past_mm:in.3dot}} past B,</text>
+  <text class="label" x="20" y="122">into the gap between the parallels</text>
+  <line class="leader" x1="200" y1="130" x2="262" y2="160"/>
+  <circle class="leader-dot" cx="262" cy="160" r="2"/>
+  <line class="leader" x1="300" y1="336" x2="270" y2="308.38"/>
+  <circle class="leader-dot" cx="270" cy="308.38" r="2"/>
+  <text class="label" x="304" y="340">point Z {{process.hold_tip_height_mm:.3f}} mm</text>
+  <text class="label" x="440" y="236">east hold-down</text>
+  <text class="label" x="440" y="252">next (centre line)</text>
+  <rect class="clamp" x="510" y="115" width="150" height="25"/>
+  <rect class="clamp" x="510" y="368.6" width="150" height="25"/>
+  <rect class="part-kept" x="560" y="140" width="50.8" height="228.6"/>
+  <rect class="part-waste" x="560" y="140" width="50.8" height="10.2"/>
+  <rect class="part-waste" x="560" y="309.7" width="50.8" height="58.9"/>
+  <line class="datum" x1="546" y1="140" x2="574" y2="140"/>
+  <line class="datum" x1="560" y1="128" x2="560" y2="154"/>
+  <text class="datum-label" x="554" y="160" text-anchor="end">X0 Y0</text>
+  <text class="label-halo" x="556" y="300" text-anchor="end">K</text>
+  <text class="label-halo" x="616" y="210">front</text>
+  <text class="label-halo" x="616" y="344">west waste</text>
+  <text class="label-on-clamp" x="585" y="132" text-anchor="middle">fixed jaw (E)</text>
+  <text class="label-on-clamp" x="585" y="386" text-anchor="middle">moving jaw</text>
+  <circle class="cutter" cx="582.4" cy="239.6" r="9.96"/>
+  <circle class="hidden" cx="582.4" cy="172.5" r="9.96"/>
+  <text class="label" x="616" y="177">east hold-down (next)</text>
+  <text class="label" x="616" y="244">#9, west hold-down</text>
+</svg>

@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 360" width="760" height="360" font-family="sans-serif" font-size="13">
+  <!-- Plan from above, 8 px/mm, the pivot end (+X right, +Y up away from E; X0 Y0 the pivot). The 1/4 in end mill (6.35 = 50.8 px) on PL09's one level at Z0 (re-zeroed to the relief's floor): in from beside the pivot-end edge along E's side (L28-L29, X12.242 Y-2.558 to X-0.070 Y-2.158, -X), round the pivot (G2, L30) and out along the far side (L31, +X): the relief 10.67 wide, R5.334 about the pivot, open to the pivot-end edge. Drawn halfway along L29. -->
+  <rect class="paper" x="0" y="0" width="760" height="360"/>
+  <text class="title" x="20" y="22">Op 440 (PL09, T1): the 1/4 in end mill on the relief's floor, round the pivot (plan 8 px/mm)</text>
+  <rect class="fixture-plate" x="90" y="36" width="640" height="304"/>
+  <path class="part-kept" d="M425.99 309.8A79.25 79.25 0 0 0 505.2 233.12L507.1 174.71A62.99 62.99 0 0 0 453.7 110.41L-1301.7 -159.3L-1305.77 -136.77A31.5 31.5 0 0 1 -1342.35 -111.36A31.5 31.5 0 0 1 -1367.76 -147.95L-1363.98 -168.87L-1375.7 -170.67A40.64 40.64 0 0 0 -1422.49 -131.82L-1429.98 98.58L-1367.72 309.8Z"/>
+  <rect class="part-removed" x="450" y="137.33" width="59.2" height="85.34"/>
+  <circle class="part-removed" cx="450" cy="180" r="42.67"/>
+  <circle class="holes" cx="450" cy="180" r="25.5"/>
+  <circle class="holes" cx="316.91" cy="183.81" r="12.19"/>
+  <circle class="clamp" cx="316.91" cy="183.81" r="18.56"/>
+  <circle class="cutter" cx="498.69" cy="198.86" r="25.4"/>
+  <rect class="paper" x="0" y="30" width="114" height="330"/>
+  <path class="hidden" d="M110 40L118 71L110 102L118 133L110 164L118 195L110 226L118 257L110 288L118 319L110 350"/>
+  <line class="arrow" x1="528.69" y1="232.86" x2="468.69" y2="234.86"/>
+  <text class="label" x="30" y="330">relief {{cad.top_relief_width_nominal_in:.2dot}} wide, R{{cad.top_relief_end_radius_nominal_in:.2dot}} about the pivot, open to the pivot-end edge:</text>
+  <text class="label" x="30" y="346">in along E's side (−X), round the pivot (G2), out along the far side (+X), one level at Z0</text>
+  <line class="leader" x1="300" y1="316" x2="498.69" y2="224.86"/>
+  <circle class="leader-dot" cx="498.69" cy="224.86" r="2"/>
+  <text class="label" x="30" y="50">#4-40 hold-down screw head</text>
+  <line class="leader" x1="120" y1="54" x2="296.91" y2="163.81"/>
+  <circle class="leader-dot" cx="296.91" cy="163.81" r="2"/>
+  <text class="datum-label" x="440" y="130" text-anchor="end">X0 Y0 the pivot</text>
+</svg>

@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 360" width="760" height="360" font-family="sans-serif" font-size="13">
+  <!-- As Op 630's picture. The .0930 reamer (2.3622 = 18.9 px; its lead not on record: square end with the 12 % cue) ream_stickout_in 1.48 out, its tip at Z-.1655 (ream_tip_in), fed in and back out running. -->
+  <rect class="paper" x="0" y="0" width="760" height="360"/>
+  <text class="title" x="20" y="22">Op 640: the .0930 reamer in each hole, tip to Z-{{process.ream_tip_in:.4dot}} (8 px/mm)</text>
+  <line class="centre-line" x1="20" y1="150" x2="740" y2="150"/>
+  <rect class="part-kept" x="221.6" y="111.9" width="178.4" height="76.2"/>
+  <rect class="part-kept" x="400" y="80" width="55.27" height="140"/>
+  <rect class="part-kept" x="455.27" y="105.55" width="345.4" height="88.9"/>
+  <rect class="fixture-plate" x="480.67" y="48.4" width="320" height="203.2"/>
+  <rect class="part-kept" x="480.67" y="105.55" width="320" height="88.9"/>
+  <text class="label" x="490.67" y="40.4">jig (bore .4385), journal in it</text>
+  <text class="label" x="457.27" y="269.6">1/8 spacer gap</text>
+  <path class="cutter" d="M132.89 196.55L431.36 196.55A2.27 9.45 0 0 1 431.36 215.45L132.89 215.45Z"/>
+  <rect class="fixture-vise" x="72.89" y="166" width="60" height="80"/>
+  <text class="label" x="72.89" y="262">drill chuck (schematic)</text>
+  <line class="arrow" x1="680.67" y1="281.6" x2="620.67" y2="281.6"/>
+  <text class="label" x="520.67" y="301.6">carriage feeds the jig onto the cutter</text>
+  <text class="label" x="30" y="40">the .0930 reamer {{process.ream_stickout_in:.2f}} out: its tip to Z-{{process.ream_tip_in:.4dot}},</text>
+  <text class="label" x="30" y="56">fed in and back out with the spindle running</text>
+  <line class="dims" x1="205.6" y1="150" x2="205.6" y2="206"/>
+  <text class="label" x="199.6" y="182" text-anchor="end">{{process.pin_x_mm:.3f}} mm</text>
+  <text class="datum-label" x="396" y="72" text-anchor="end">Z0 + H: the spigot face</text>
+  <text class="datum-label" x="199.6" y="142" text-anchor="end">X0 the stub's axis</text>
+</svg>

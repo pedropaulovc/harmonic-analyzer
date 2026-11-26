@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 330" width="760" height="330" font-family="sans-serif" font-size="13">
+  <!-- Section through the hold-down (X-16.636 Y-0.476) from the front, 8 px/mm. The blank's #31 hole and its counterbore (Ø5.334, 3.505 up from the underside, which now lies on the plate). The #43 (2.2606 = 18 px, 118 deg) at its last peck (PL05 L83), its point at Z-11.430 (holddown_seat_depth_mm) in the plate, 1.27 above the plate's underside. -->
+  <rect class="paper" x="0" y="0" width="760" height="330"/>
+  <text class="title" x="20" y="22">Op 300 (PL05, T10): the #43 down the hold-down hole into the plate (section at the hold-down, 8 px/mm)</text>
+  <rect class="fixture-plate" x="216" y="180" width="328" height="101.6"/>
+  <rect class="part-kept" x="216" y="129.2" width="328" height="50.8"/>
+  <rect class="holes" x="398.5" y="129.2" width="51" height="62.8"/>
+  <rect class="holes" x="278.72" y="129.2" width="24.38" height="50.8"/>
+  <rect class="holes" x="269.58" y="151.96" width="42.67" height="28.04"/>
+  <rect class="holes" x="281.87" y="180" width="18.08" height="91.44"/>
+  <path class="cutter" d="M299.96 52L299.96 266.01L290.91 271.44L281.87 266.01L281.87 52L290.91 49Z"/>
+  <text class="datum-label" x="220" y="196">Z0 the plate's top</text>
+  <text class="label" x="216" y="299.6">the blank, top up (U down), on the spoil plate</text>
+  <text class="label" x="556" y="60">#43 down through the</text>
+  <text class="label" x="556" y="76">hold-down hole, {{process.holddown_seat_depth_mm:in.3dot}} into</text>
+  <text class="label" x="556" y="92">the plate, pecks of {{process.peck_43_mm:in.3dot}}</text>
+  <line class="leader" x1="552" y1="88" x2="301.96" y2="84"/>
+  <circle class="leader-dot" cx="301.96" cy="84" r="2"/>
+</svg>

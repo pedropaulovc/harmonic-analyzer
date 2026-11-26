@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 330" width="760" height="330" font-family="sans-serif" font-size="13">
+  <!-- Section at Y0 from the front, 8 px/mm, as Setup 4's picture. The .2510 reamer (6.3754 = 51 px; its lead not on record: drawn as a small 45 deg chamfer, schematic) at X0 (PL05 L42), its end at Z-1.500 (ream_tip_mm): its full diameter ream_past_mm 1.5 into the B-drilled hole in the plate; in and out at feed. -->
+  <rect class="paper" x="0" y="0" width="760" height="330"/>
+  <text class="title" x="20" y="22">Op 290 (PL05, T6): ream the pivot .2510 through, into the plate (section at Y0, 8 px/mm)</text>
+  <rect class="fixture-plate" x="216" y="180" width="328" height="101.6"/>
+  <rect class="part-kept" x="216" y="129.2" width="328" height="50.8"/>
+  <rect class="holes" x="399.82" y="129.2" width="48.36" height="66.8"/>
+  <rect class="holes" x="278.72" y="129.2" width="24.38" height="50.8"/>
+  <path class="cutter" d="M449.5 52L449.5 186.9L444.4 192L403.6 192L398.5 186.9L398.5 52L405.78 49L413.07 52L420.36 49L427.64 52L434.93 49L442.22 52Z"/>
+  <text class="datum-label" x="220" y="196">Z0 the plate's top</text>
+  <text class="label" x="216" y="299.6">the blank, top up (U down), on the spoil plate</text>
+  <text class="label" x="556" y="60">the .2510 reamer, in and</text>
+  <text class="label" x="556" y="76">out at feed: its full</text>
+  <text class="label" x="556" y="92">diameter {{process.ream_past_mm:in.3dot}} into the plate</text>
+  <line class="leader" x1="552" y1="88" x2="451.5" y2="84"/>
+  <circle class="leader-dot" cx="451.5" cy="84" r="2"/>
+</svg>

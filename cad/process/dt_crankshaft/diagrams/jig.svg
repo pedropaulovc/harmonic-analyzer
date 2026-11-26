@@ -1,32 +1,25 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 360" font-family="sans-serif" font-size="13">
-  <rect class="paper" x="0" y="0" width="760" height="360"/>
-  <text class="title" x="20" y="20">Setup 7: plan view from above; the jig on the tool post, the cutters in the headstock (not to scale)</text>
-  <rect class="fixture-vise" x="20" y="60" width="80" height="240"/>
-  <rect class="fixture-vise" x="100" y="160" width="70" height="40"/>
-  <rect class="cutter" x="170" y="176" width="110" height="8"/>
-  <line class="centre-line" x1="20" y1="180" x2="740" y2="180"/>
-  <line class="centre-line" x1="200" y1="214" x2="740" y2="214"/>
-  <rect class="clamp" x="400" y="150" width="230" height="128"/>
-  <rect class="clamp" x="630" y="178" width="110" height="72"/>
-  <path class="part-kept" d="M300,214 Q280,206 300,198 Z"/>
-  <rect class="part-kept" x="300" y="198" width="70" height="32"/>
-  <rect class="part-kept" x="370" y="183" width="22" height="62"/>
-  <rect class="part-kept" x="406" y="194" width="300" height="40"/>
-  <rect class="holes" x="370" y="176" width="10" height="10"/>
-  <rect class="part-rest" x="490" y="132" width="16" height="22"/>
-  <text class="label" x="110" y="150">drill chuck on its 1/2 arbor in the 3-jaw</text>
-  <text class="label" x="20" y="344">cutters 1.35–1.63 in out, X±7.000 mm off the stub</text>
-  <line class="leader" x1="175" y1="332" x2="175" y2="186"/>
-  <text class="label" x="250" y="300">stub and dome stand 1.21 proud</text>
-  <line class="leader" x1="340" y1="288" x2="340" y2="232"/>
-  <text class="label" x="400" y="320">jig bore .4385 reamed in place</text>
-  <line class="leader" x1="470" y1="308" x2="500" y2="222"/>
-  <text class="label" x="520" y="300">Ø.750 shank in the No. 4 holder</text>
-  <line class="leader" x1="690" y1="288" x2="690" y2="250"/>
-  <text class="label" x="430" y="120">10-32 set screw, brass pad on the relief</text>
-  <line class="leader" x1="498" y1="124" x2="498" y2="134"/>
-  <text class="label" x="260" y="60">1/8 spacer gap behind the spigot</text>
-  <line class="leader" x1="396" y1="64" x2="398" y2="183"/>
-  <text class="datum-label" x="190" y="262">X0 the stub's axis</text>
-  <line class="leader" x1="240" y1="250" x2="245" y2="216"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 330" width="760" height="330" font-family="sans-serif" font-size="13">
+  <!-- Plan from above, 3 px/mm. The drive-pin jig (fixtures record: 1 in 1018, 4.75 long, Ø.750 shank 2.00 long) on the tool post in the AXA No. 4 holder (schematic), its head toward the headstock, its axis on the spindle's. The No. 1 centre drill spots the bore first (not drawn). The 27/64 drill (10.716 = 32 px) in the 3-jaw, the jig fed onto it with the carriage to jig_ream_depth_in 2.95 plus .10 (full diameter drawn at 3.05 from the jig face); the drill's length out of the chuck is not on record (drawn schematic). -->
+  <rect class="paper" x="0" y="0" width="760" height="330"/>
+  <text class="title" x="20" y="22">Setup 7: the jig bored on the lathe, the 27/64 drill in the 3-jaw (3 px/mm)</text>
+  <line class="centre-line" x1="20" y1="150" x2="740" y2="150"/>
+  <rect class="fixture-vise" x="30" y="60" width="50" height="180"/>
+  <rect class="clamp" x="80" y="104" width="30" height="30"/>
+  <rect class="clamp" x="80" y="166" width="30" height="30"/>
+  <rect class="part-kept" x="250" y="111.9" width="209.55" height="76.2"/>
+  <rect class="part-kept" x="459.55" y="121.42" width="152.4" height="57.15"/>
+  <rect class="holes" x="467.17" y="135.71" width="144.78" height="28.58"/>
+  <rect class="clamp" x="489.55" y="110" width="90" height="80"/>
+  <text class="label-on-clamp" x="534.55" y="154" text-anchor="middle">AXA No. 4</text>
+  <rect class="part-rest" x="339.25" y="101.9" width="12" height="10"/>
+  <rect class="holes" x="250" y="133.93" width="232.41" height="32.15"/>
+  <path class="cutter" d="M110 133.93L482.41 133.93L492.07 150L482.41 166.07L110 166.07Z"/>
+  <line class="arrow" x1="499.55" y1="220" x2="439.55" y2="220"/>
+  <text class="label" x="399.55" y="240">carriage feeds the jig onto the tool</text>
+  <text class="label" x="250" y="44">27/64 drill in the 3-jaw: the jig fed onto it, pecking every .25,</text>
+  <text class="label" x="250" y="60">to {{process.jig_ream_depth_in:.2f}} plus .10 deep; cutting oil</text>
+  <line class="leader" x1="246" y1="52" x2="180" y2="133.93"/>
+  <circle class="leader-dot" cx="180" cy="133.93" r="2"/>
+  <text class="label" x="20" y="300">jig: 1 in 1018, 4.75 long, Ø.750 shank 2.00 long in the AXA No. 4 holder, head toward the</text>
+  <text class="label" x="20" y="316">headstock; 3/8 clearance 1.90 deep from the shank end; 10-32 set screw 1.25 from the front face</text>
 </svg>

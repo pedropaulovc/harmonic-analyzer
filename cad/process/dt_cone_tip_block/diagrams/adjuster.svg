@@ -1,35 +1,32 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 420" font-family="sans-serif" font-size="13">
-  <rect class="paper" x="0" y="0" width="760" height="420"/>
-  <text class="title" x="16" y="22">Setup 8 (DT08): the adjuster, N up, at H from SEAT</text>
-  <rect class="fixture-vise" x="120.1" y="330.0" width="159.9" height="22.0"/>
-  <rect class="clamp" x="144.5" y="195.2" width="30.0" height="134.8"/>
-  <rect class="clamp" x="225.5" y="195.2" width="30.0" height="134.8"/>
-  <text class="label" x="159.5" y="368.0" text-anchor="middle">moving jaw</text>
-  <text class="label" x="240.5" y="368.0" text-anchor="middle">fixed jaw</text>
-  <rect class="fixture-support" x="174.5" y="215.7" width="9.5" height="114.3"/>
-  <rect class="fixture-support" x="216.0" y="215.7" width="9.5" height="114.3"/>
-  <line class="dims" x1="174.5" y1="291.9" x2="184.0" y2="291.9"/>
-  <line class="dims" x1="216.0" y1="291.9" x2="225.5" y2="291.9"/>
-  <rect class="part-kept" x="174.5" y="182.2" width="51.1" height="33.5"/>
-  <rect class="holes" x="191.9" y="182.2" width="16.2" height="33.5"/>
-  <polygon class="holes" points="190.2,182.2 209.8,182.2 208.1,183.8 191.9,183.8"/>
-  <line class="centre-line" x1="200.0" y1="172.2" x2="200.0" y2="227.7"/>
-  <rect class="cutter" x="190.5" y="52.2" width="19.0" height="94.3"/>
-  <polygon class="cutter" points="190.5,146.5 209.5,146.5 200.0,152.2"/>
-  <text class="label" x="440.0" y="70.0">centre drill, #3 through, chamfer mill</text>
-  <line class="leader" x1="436.0" y1="66.0" x2="200.0" y2="102.2"/>
-  <circle class="leader-dot" cx="200.0" cy="102.2" r="2.5"/>
-  <text class="label" x="440.0" y="110.0">N up: countersink .252-.262 here</text>
-  <line class="leader" x1="436.0" y1="106.0" x2="209.0" y2="182.2"/>
-  <circle class="leader-dot" cx="209.0" cy="182.2" r="2.5"/>
-  <text class="label" x="440.0" y="150.0">#3 exits S between the stacks</text>
-  <line class="leader" x1="436.0" y1="146.0" x2="200.0" y2="215.7"/>
-  <circle class="leader-dot" cx="200.0" cy="215.7" r="2.5"/>
-  <text class="label" x="440.0" y="190.0">W (moving jaw)</text>
-  <line class="leader" x1="436.0" y1="186.0" x2="176.5" y2="204.2"/>
-  <circle class="leader-dot" cx="176.5" cy="204.2" r="2.5"/>
-  <text class="label" x="440.0" y="230.0">E (fixed jaw)</text>
-  <line class="leader" x1="436.0" y1="226.0" x2="223.5" y2="204.2"/>
-  <circle class="leader-dot" cx="223.5" cy="204.2" r="2.5"/>
-  <text class="label" x="16.0" y="406.0">Section across the jaws, SEAT to the left; X0 on SEAT shifted by D = (H - 1.500) x 25.4 mm. Then the 1/4-28 tap (DT09).</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 440" width="760" height="440" font-family="sans-serif" font-size="13">
+  <!-- Across the jaws from the right end (+X toward you): +Y (toward the fixed jaw) right, +Z up (the right end is TOP), 5 px/mm. The block lying N up, S down on the 1 in + 1/2 in stacks, E on the fixed jaw (E-W 17.018 across); Z0 .4400 below N (the stacks' top for a .4400 block). The centre drill spots first (not drawn). The #3 (5.4102 = 27 px) at Y-8.636 (X38.100 = H from SEAT), at its last peck (L56): its point at Z-2.625 (adjuster_tip_height_mm), full diameter 1.0 past S, in the gap between the stacks (2.75 and 2.50 mm clear of each). -->
+  <rect class="paper" x="0" y="0" width="760" height="440"/>
+  <text class="title" x="20" y="22">Setup 8 (DT08, T5): the #3 drills the adjuster through, N up (5 px/mm)</text>
+  <rect class="fixture-vise" x="284.91" y="406" width="225.09" height="14"/>
+  <rect class="clamp" x="304.91" y="181.27" width="50" height="224.73"/>
+  <rect class="clamp" x="440" y="181.27" width="50" height="224.73"/>
+  <rect class="fixture-support" x="354.91" y="279" width="15.88" height="127"/>
+  <rect class="fixture-support" x="424.12" y="279" width="15.88" height="127"/>
+  <rect class="fixture-support" x="354.91" y="215.5" width="15.88" height="63.5"/>
+  <rect class="fixture-support" x="424.12" y="215.5" width="15.88" height="63.5"/>
+  <text class="label-on-clamp" x="329.91" y="396" text-anchor="middle">moving</text>
+  <text class="label-on-clamp" x="465" y="396" text-anchor="middle">fixed</text>
+  <rect class="part-kept" x="354.91" y="159.62" width="85.09" height="55.88"/>
+  <rect class="holes" x="383.29" y="159.62" width="27.05" height="60.88"/>
+  <path class="cutter" d="M410.35 60L410.35 220.5L396.82 228.63L383.29 220.5L383.29 60L392.31 57L401.33 60Z"/>
+  <line class="datum" x1="492" y1="215.5" x2="512" y2="215.5"/>
+  <text class="datum-label" x="516" y="219.5">Z0 {{process.depth_target_mm:in.4dot}} below N</text>
+  <text class="label" x="470" y="60">#3 through, pecks of {{process.peck_mm:in.3dot}}: full diameter</text>
+  <text class="label" x="470" y="76">{{process.drill_past_mm:in.3dot}} past S, between the stacks</text>
+  <line class="leader" x1="466" y1="76" x2="412.82" y2="90.5"/>
+  <circle class="leader-dot" cx="412.82" cy="90.5" r="2"/>
+  <text class="label" x="560" y="250">E (fixed jaw)</text>
+  <line class="leader" x1="556" y1="246" x2="438" y2="185.5"/>
+  <circle class="leader-dot" cx="438" cy="185.5" r="2"/>
+  <text class="label" x="20" y="250">W (moving jaw)</text>
+  <line class="leader" x1="126" y1="246" x2="356.91" y2="185.5"/>
+  <circle class="leader-dot" cx="356.91" cy="185.5" r="2"/>
+  <text class="label" x="20" y="140">N up</text>
+  <line class="leader" x1="56" y1="144" x2="365" y2="159.62"/>
+  <circle class="leader-dot" cx="365" cy="159.62" r="2"/>
 </svg>

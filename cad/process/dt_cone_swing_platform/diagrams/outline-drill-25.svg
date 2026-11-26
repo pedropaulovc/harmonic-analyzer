@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 330" width="760" height="330" font-family="sans-serif" font-size="13">
+  <!-- Section at Y28.775 (the wedge screw's hole, X-13.411) from the front, 8 px/mm: the blank's #7 hole, the plate under it (no block: plate X328.9, the blocks from X381). The #25 (3.7973 = 30 px, 118 deg) at its last peck (PL05 L115), its point at Z-14.341 (drill_25_tip_mm), 1.64 below the plate, into the space over the table. -->
+  <rect class="paper" x="0" y="0" width="760" height="330"/>
+  <text class="title" x="20" y="22">Op 310 (PL05, T9): the #25 down the wedge screw's hole, through the plate (section at Y28.775, 8 px/mm)</text>
+  <rect class="fixture-plate" x="216" y="180" width="328" height="101.6"/>
+  <rect class="part-kept" x="216" y="129.2" width="328" height="50.8"/>
+  <rect class="holes" x="296.29" y="129.2" width="40.84" height="50.8"/>
+  <rect class="holes" x="301.52" y="180" width="30.38" height="114.73"/>
+  <path class="cutter" d="M331.9 52L331.9 285.6L316.71 294.73L301.52 285.6L301.52 52L309.12 49L316.71 52L324.31 49Z"/>
+  <text class="datum-label" x="220" y="196">Z0 the plate's top</text>
+  <text class="label" x="216" y="299.6">the blank, top up (U down), on the spoil plate</text>
+  <text class="label" x="556" y="60">#25 down through the</text>
+  <text class="label" x="556" y="76">wedge screw's hole and the</text>
+  <text class="label" x="556" y="92">plate, pecks of {{process.peck_25_mm:in.3dot}};</text>
+  <text class="label" x="556" y="108">point Z{{process.drill_25_tip_mm:.3f}} mm</text>
+  <line class="leader" x1="552" y1="104" x2="333.9" y2="84"/>
+  <circle class="leader-dot" cx="333.9" cy="84" r="2"/>
+</svg>

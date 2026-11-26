@@ -1,54 +1,57 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 440" font-family="sans-serif" font-size="13">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 440" width="760" height="440" font-family="sans-serif" font-size="13">
+  <!-- 4 px/mm. Across the jaws seen from the right end, the block's front face (+X): +Y (toward the fixed jaw, E) right, +X out of the page. The 1/2 in end mill (50.8 px, 113.8 px out of the collet, 12 % end arc) on PB02's first level, Z 27.178 (1.016 under the longest blank's top, edge_top_max_mm 28.194), on the pass at Y -22.538 (wholly over the blank, clear of both jaws), entering at K (X0), +X (NC line 33). The hold-down holes are drilled in Op 180 (its own picture); centre lines only here. -->
   <rect class="paper" x="0" y="0" width="760" height="440"/>
-  <text class="title" x="20" y="22">Setup 3 (PB02), 4 px/mm: on edge, B down, jaws on the bar edges; top to height, #9 hold-downs</text>
-  <text class="title" x="40" y="50">Across the jaws, looking at the front face</text>
+  <text class="title" x="20" y="22">Setup 3 (PB02), 4 px/mm: on edge, B down, jaws on the bar edges; face the top to the height</text>
+  <text class="title" x="40" y="50">Across the jaws, from the right end, the front face (+X toward you)</text>
   <text class="title" x="520" y="50">Plan</text>
-  <!-- Across the jaws: E against the fixed jaw (right), the end waste in the jaws. -->
   <rect class="fixture-vise" x="70" y="400" width="370" height="16"/>
   <rect class="clamp" x="90" y="220.2" width="50" height="179.8"/>
   <rect class="clamp" x="368.6" y="220.2" width="50" height="179.8"/>
   <rect class="fixture-support" x="140" y="298.4" width="12.7" height="101.6"/>
   <rect class="fixture-support" x="355.9" y="298.4" width="12.7" height="101.6"/>
+  <line class="datum" x1="368.6" y1="176" x2="368.6" y2="200"/>
+  <text class="datum-label" x="372" y="176">Y0 (E)</text>
+  <line class="datum" x1="420" y1="298.4" x2="440" y2="298.4"/>
+  <text class="datum-label" x="444" y="302">Z0 = B</text>
+  <text class="label-on-clamp" x="393" y="390" text-anchor="middle">fixed</text>
+  <text class="label-on-clamp" x="115" y="390" text-anchor="middle">moving</text>
+  <line class="leader" x1="196" y1="370" x2="152" y2="370"/>
+  <text class="label-halo" x="198" y="374">1 in parallels</text>
   <rect class="part-kept" x="140" y="197.8" width="228.6" height="100.6"/>
   <rect class="part-removed" x="140" y="185.6" width="228.6" height="12.2"/>
   <rect class="part-waste" x="140" y="197.8" width="58.9" height="100.6"/>
   <rect class="part-waste" x="358.4" y="197.8" width="10.2" height="100.6"/>
-  <rect class="holes" x="259.0" y="197.8" width="19.9" height="100.6"/>
-  <rect class="holes" x="326.1" y="197.8" width="19.9" height="100.6"/>
-  <polygon class="hidden" points="326.1,298.4 326.1,302.4 336.1,308.4 346.0,302.4 346.0,298.4"/>
-  <rect class="cutter" x="326.1" y="130" width="19.9" height="45"/>
-  <polygon class="cutter" points="326.1,175 336.1,181 346.0,175"/>
-  <line class="centre-line" x1="269.0" y1="186" x2="269.0" y2="315"/>
-  <line class="centre-line" x1="336.1" y1="186" x2="336.1" y2="315"/>
-  <line class="datum" x1="368.6" y1="170" x2="368.6" y2="200"/>
-  <text class="datum-label" x="372" y="176">Y0 (E)</text>
-  <line class="datum" x1="420" y1="298.4" x2="440" y2="298.4"/>
-  <text class="datum-label" x="444" y="302">Z0 = B</text>
-  <text class="label-halo" x="150" y="176">height: face the top down</text>
+  <line class="centre-line" x1="269.0" y1="200" x2="269.0" y2="315"/>
+  <line class="centre-line" x1="336.1" y1="200" x2="336.1" y2="315"/>
   <text class="label-halo" x="170" y="252" text-anchor="middle">west</text>
   <text class="label-halo" x="170" y="268" text-anchor="middle">waste</text>
-  <text class="label-halo" x="300" y="250" text-anchor="middle">#9 thru</text>
-  <text class="label-on-clamp" x="393" y="390" text-anchor="middle">fixed</text>
-  <line class="leader" x1="424" y1="330" x2="347" y2="306"/>
-  <text class="label-halo" x="426" y="334">#9 exits between</text>
-  <text class="label-halo" x="426" y="350">the 1 in parallels</text>
-  <text class="label-on-clamp" x="115" y="390" text-anchor="middle">moving</text>
-  <!-- Plan, seen from above: +X right, +Y up; K at the left (X0), E at the fixed jaw (top, Y0). -->
+  <path class="cutter" d="M303.85 183.59L303.85 75.89L253.05 75.89L253.05 183.59A25.4 6.1 0 0 0 303.85 183.59Z"/>
+  <text class="label" x="20" y="74">1/2 in end mill, level 1 of 3</text>
+  <text class="label" x="20" y="90">(Z 27.178 mm), pass Y -22.538:</text>
+  <text class="label" x="20" y="106">+X, out of the page; levels</text>
+  <text class="label" x="20" y="122">down to the height</text>
+  <line class="leader" x1="200" y1="130" x2="252.45" y2="150"/>
+  <circle class="leader-dot" cx="252.45" cy="150" r="2"/>
+  <text class="label" x="440" y="236">hold-downs: Op 180</text>
+  <text class="label" x="440" y="252">(centre lines)</text>
   <rect class="clamp" x="510" y="115" width="150" height="25"/>
   <rect class="clamp" x="510" y="368.6" width="150" height="25"/>
   <rect class="part-kept" x="560" y="140" width="50.8" height="228.6"/>
   <rect class="part-waste" x="560" y="140" width="50.8" height="10.2"/>
   <rect class="part-waste" x="560" y="309.7" width="50.8" height="58.9"/>
-  <circle class="holes" cx="582.4" cy="172.5" r="9.96"/>
-  <circle class="holes" cx="582.4" cy="239.6" r="9.96"/>
   <line class="datum" x1="546" y1="140" x2="574" y2="140"/>
   <line class="datum" x1="560" y1="128" x2="560" y2="154"/>
   <text class="datum-label" x="554" y="160" text-anchor="end">X0 Y0</text>
-  <text class="label-halo" x="556" y="210" text-anchor="end">K</text>
+  <text class="label-halo" x="556" y="300" text-anchor="end">K</text>
   <text class="label-halo" x="616" y="210">front</text>
-  <text class="label-halo" x="616" y="177">east hold-down</text>
-  <text class="label-halo" x="616" y="244">west hold-down</text>
   <text class="label-halo" x="616" y="344">west waste</text>
   <text class="label-on-clamp" x="585" y="132" text-anchor="middle">fixed jaw (E)</text>
   <text class="label-on-clamp" x="585" y="386" text-anchor="middle">moving jaw</text>
+  <circle class="hidden" cx="582.4" cy="172.5" r="9.96"/>
+  <circle class="hidden" cx="582.4" cy="239.6" r="9.96"/>
+  <circle class="cutter" cx="560" cy="230.15" r="25.4"/>
+  <line class="arrow" x1="590" y1="290" x2="640" y2="290"/>
+  <text class="label" x="616" y="284">+X</text>
+  <text class="label" x="616" y="177">east hold-down</text>
+  <text class="label" x="616" y="244">west hold-down</text>
 </svg>

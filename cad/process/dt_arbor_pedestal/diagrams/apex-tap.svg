@@ -1,25 +1,39 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 400" font-family="sans-serif" font-size="13">
-  <!-- Setup 6: the 4-40 tap in the T-handle wrench under the spring tap guide, spindle off. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 400" width="760" height="400" font-family="sans-serif" font-size="13">
+  <!-- As Setup 6's picture (from the front). The 4-40 plug tap to scale across (major Ø.112 = 8.5 px), its point tap_reach_min_mm 9.525 below the top (the full thread through into the bore), ending in the round cue (its lead not on record). Its length and the T-handle wrench are schematic (not on record). The Fisher tap guide (tap-guide-fisher): 1/2 in shank (38.1 px) in the collet, drawn short to a break (3 1/8 in overall), its 3/16 in spring point in the wrench's centre hole. All in the cutter colour: the tool and what moves with it. -->
   <rect class="paper" x="0" y="0" width="760" height="400"/>
-  <text class="title" x="20" y="20">Setup 6 (PA06_apex_tap): tap 4-40 by hand under the tap guide</text>
-  <rect class="fixture-support" x="223.61" y="345" width="124.39" height="6"/>
-  <polygon class="part-kept" points="330,345 241.61,345 241.61,178.88 276.66,178.88 276.66,329.76 330,329.76"/>
-  <rect class="holes" x="241.61" y="197.32" width="35.05" height="28.65"/>
-  <text class="label" x="259.2" y="215.65" text-anchor="middle">bore</text>
-  <rect class="part-threads" x="257.16" y="178.88" width="8.54" height="18.97"/>
-  <line class="centre-line" x1="261.42" y1="138.88" x2="261.42" y2="231"/>
-  <line class="hidden" x1="223.61" y1="276.84" x2="348" y2="276.84"/>
-  <text class="label" x="354" y="280.84">jaw tops</text>
-  <circle class="datum" cx="330" cy="329.76" r="3.5"/>
-  <text class="datum-label" x="338" y="323.76">X0: N</text>
-  <rect class="part-rest" x="221.42" y="138.88" width="80" height="10"/>
-  <text class="label" x="307.42" y="148.88">T-handle wrench</text>
-  <rect class="part-rest" x="258.42" y="148.88" width="6" height="30"/>
-  <polygon class="cutter" points="249.42,34 273.42,34 261.42,132.88"/>
-  <text class="label" x="281.42" y="64">tap guide in the spindle, spindle OFF</text>
-  <line class="dims" x1="280.66" y1="178.88" x2="324.66" y2="178.88"/>
-  <line class="dims" x1="267.42" y1="214.88" x2="324.66" y2="214.88"/>
-  <line class="arrow" x1="316.66" y1="192.88" x2="316.66" y2="214.88"/>
-  <text class="label" x="330.66" y="200.88">tap point {{process.tap_reach_min_mm:in.3dot}}–{{process.tap_reach_max_mm:in.3dot}} below the top: into the bore</text>
-  <text class="label" x="20" y="392">Looking at the moving jaw; W at the fixed jaw behind.</text>
+  <text class="title" x="20" y="22">Op 450 (PA06_apex_tap), 3 px/mm: tap 4-40 by hand under the tap guide</text>
+  <rect class="fixture-support" x="193.61" y="330" width="124.39" height="6"/>
+  <rect class="hidden" x="150" y="261.84" width="220" height="100"/>
+  <text class="label" x="380" y="265.84">jaw tops</text>
+  <text class="label" x="380" y="284">moving jaw in front (outline); the 7/8 in</text>
+  <text class="label" x="380" y="300">parallels under the seat at each jaw (top shown)</text>
+  <circle class="datum" cx="300" cy="314.76" r="3.5"/>
+  <text class="datum-label" x="308" y="308.76">X0: N</text>
+  <circle class="datum" cx="306" cy="330" r="3.5"/>
+  <text class="datum-label" x="380" y="334">Z0 the parallels' top (the seat)</text>
+  <text class="label" x="20" y="390">Looking at the moving jaw (from the front): +X right, +Y into the page; W at the fixed jaw behind.</text>
+  <path class="part-kept" d="M300 330L211.61 330L211.61 163.88L246.66 163.88L246.66 314.76L300 314.76Z"/>
+  <rect class="holes" x="211.61" y="182.32" width="35.05" height="28.65"/>
+  <rect class="part-threads" x="227.16" y="163.88" width="8.54" height="18.44"/>
+  <line class="centre-line" x1="231.42" y1="30" x2="231.42" y2="215"/>
+  <path class="cutter" d="M235.69 191.43L235.69 120L227.15 120L227.15 191.43A4.27 1.02 0 0 0 235.69 191.43Z"/>
+  <rect class="cutter" x="171.42" y="110" width="120" height="10"/>
+  <rect class="cutter" x="221.42" y="106" width="20" height="26"/>
+  <path class="cutter" d="M224.28 83.14L238.56 83.14L238.56 98.86L231.42 106L224.28 98.86Z"/>
+  <path class="cutter" d="M250.47 83.14L250.47 34L242.85 31L235.23 34L227.61 31L219.99 34L212.37 34L212.37 83.14Z"/>
+  <line class="leader" x1="380" y1="110" x2="291" y2="115"/>
+  <circle class="leader-dot" cx="291" cy="115" r="2"/>
+  <text class="label" x="384" y="114">T-handle wrench (schematic)</text>
+  <line class="leader" x1="380" y1="84" x2="236" y2="96"/>
+  <circle class="leader-dot" cx="236" cy="96" r="2"/>
+  <text class="label" x="384" y="80">the guide's 3/16 spring point in the</text>
+  <text class="label" x="384" y="96">wrench's centre hole (it travels .50)</text>
+  <line class="leader" x1="380" y1="52" x2="251" y2="52"/>
+  <circle class="leader-dot" cx="251" cy="52" r="2"/>
+  <text class="label" x="384" y="48">Fisher tap guide, 1/2 in shank in the collet, spindle OFF</text>
+  <line class="leader" x1="380" y1="196" x2="236" y2="190"/>
+  <circle class="leader-dot" cx="236" cy="190" r="2"/>
+  <text class="label" x="384" y="200">tap point {{process.tap_reach_min_mm:in.3dot}}–{{process.tap_reach_max_mm:in.3dot}} below the top:</text>
+  <text class="label" x="384" y="216">the full thread into the bore</text>
+  <text class="label" x="384" y="236">the bore (drilled in Setup 5)</text>
 </svg>

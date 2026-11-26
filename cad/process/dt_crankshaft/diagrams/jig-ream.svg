@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 330" width="760" height="330" font-family="sans-serif" font-size="13">
+  <!-- As Setup 7's picture. The .4385 reamer (11.138 = 33.4 px; square end with the 12 % cue, its lead not on record) in the 3-jaw, the jig fed onto it to jig_ream_depth_in 2.95, backed off with the spindle running. -->
+  <rect class="paper" x="0" y="0" width="760" height="330"/>
+  <text class="title" x="20" y="22">Op 570: ream the jig bore .4385, {{process.jig_ream_depth_in:.2f}} deep (3 px/mm)</text>
+  <line class="centre-line" x1="20" y1="150" x2="740" y2="150"/>
+  <rect class="fixture-vise" x="30" y="60" width="50" height="180"/>
+  <rect class="clamp" x="80" y="104" width="30" height="30"/>
+  <rect class="clamp" x="80" y="166" width="30" height="30"/>
+  <rect class="part-kept" x="250" y="111.9" width="209.55" height="76.2"/>
+  <rect class="part-kept" x="459.55" y="121.42" width="152.4" height="57.15"/>
+  <rect class="holes" x="467.17" y="135.71" width="144.78" height="28.58"/>
+  <rect class="clamp" x="489.55" y="110" width="90" height="80"/>
+  <text class="label-on-clamp" x="534.55" y="154" text-anchor="middle">AXA No. 4</text>
+  <rect class="part-rest" x="339.25" y="101.9" width="12" height="10"/>
+  <rect class="holes" x="250" y="133.93" width="232.41" height="32.15"/>
+  <rect class="holes" x="250" y="133.29" width="224.79" height="33.41"/>
+  <path class="cutter" d="M110 133.29L470.78 133.29A4.01 16.71 0 0 1 470.78 166.71L110 166.71Z"/>
+  <line class="arrow" x1="499.55" y1="220" x2="439.55" y2="220"/>
+  <text class="label" x="399.55" y="240">carriage feeds the jig onto the tool</text>
+  <text class="label" x="250" y="44">the .4385 reamer, jig fed on steadily to {{process.jig_ream_depth_in:.2f}} deep,</text>
+  <text class="label" x="250" y="60">backed off running; plenty of cutting oil</text>
+  <line class="leader" x1="246" y1="52" x2="180" y2="133.29"/>
+  <circle class="leader-dot" cx="180" cy="133.29" r="2"/>
+  <text class="label" x="20" y="300">jig: 1 in 1018, 4.75 long, Ø.750 shank 2.00 long in the AXA No. 4 holder, head toward the</text>
+  <text class="label" x="20" y="316">headstock; 3/8 clearance 1.90 deep from the shank end; 10-32 set screw 1.25 from the front face</text>
+</svg>
