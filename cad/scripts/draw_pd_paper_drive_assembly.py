@@ -2798,7 +2798,10 @@ def _step_text(
             # within the step's 24 letters (review of 70917f0316).
             "IF A DOWEL SLIDES IN BY HAND, BOND IT PER THE BOND NOTE AT "
             f"{detail_cite('arm-plate-fitted')[1:-1]}.",
-            "CHECK: A BONDED DOWEL, PUSHED, STILL READS AS "
+            # Delegated ruling 2026-11-26 (Main), precedent: D38 (MG-00 drum
+            # bond wording); owner review #2144 (D54; #3646): the check names
+            # the cure it waits for, since 13K refits the plate straight after.
+            "CHECK, CURED 24 H: A BONDED DOWEL, PUSHED, STILL READS AS "
             f"{s('arm-plate-fitted', 5)}.",
             f"IF IT MOVES OR READS OUTSIDE, RENEW AS {s('arm-plate-fitted', 22)}.",
             "FIT THE PLATE BACK ON ITS DOWELS AND MATCH-MARK ARM AND PLATE.",
