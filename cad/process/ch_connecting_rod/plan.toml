@@ -834,7 +834,7 @@ machine = "PM-30MV CNC (FluidNC, CNCjs with the electronic tool setter) / vise, 
 indexing = "none"
 machine_ref = "pm-30mv"
 holding = "Unchanged from Setup 4: the same load, F up, still clamped."
-datum = "Programs CR06_slot (the saw) and CR07_pin (T3, T4, T5). G54 X0 and Y0 unchanged; Z0 touched again from the saw, then from T3. With the saw mounted, $H brings the stored G54 back, the edge finder not fitting with the arbor in."
+datum = "Programs CR06_slot (the saw) and CR07_pin (T3, T4, T5). G54 X0 and Y0 unchanged; Z0 touched again from the saw, then from T3. After homing again (the standing page says when) with the saw mounted: X and Y stay as the stored G54 brings them back, unchecked (the edge finder does not fit with the arbor in); touch Z0 again on the saw."
 diagram = { file = "diagrams/fork.svg", alt = "The pair F up, the forks past the jaws' right end: the slitting saw, horizontal, slots both forks in one sweep along the jaws; the pin holes are drilled and reamed down through the forks." }
 # The saw arbor is the shortest tool: its saw's lower face is at least the
 # saw's own thickness below the nose (the shoulder's height below the nose
