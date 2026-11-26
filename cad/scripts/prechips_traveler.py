@@ -49,6 +49,13 @@ or ``×`` diagnostic, never prechips' ``prechips:`` prefix), so an
 infrastructure failure is never read as a plan or shop-data refusal. A missing
 browser (checked before any sheet) or a failed print also exits 1 and removes
 every output.
+
+Before printing, ``picture_clip.check`` measures the setup pictures on the
+hobby sheet just rendered, in the font it prints in (text past a picture's
+edge, text over text, a leader across text). A finding that
+``cad/config/picture-clip-baseline.toml`` does not list, or a listed one that
+no longer occurs, refuses the plan's pictures: exit 2, every output removed,
+each named.
 """
 
 from __future__ import annotations
@@ -66,6 +73,7 @@ from pypdf.errors import PdfReadError
 
 import _telemetry
 import _process_plans
+import picture_clip
 
 PACKAGE = "prechips"
 _VERSION_PROBE = f"import importlib.metadata as m; print(m.version({PACKAGE!r}))"
@@ -356,6 +364,19 @@ def main(argv: list[str] | None = None) -> int:
                 exc, code = _render_failure(version, f"traveler {what}", code, stderr)
                 return _fail(root, args.stem, exc, code, outputs)
         sheets = dict(zip(_process_plans.TRAVELER_PROFILES.values(), paths, strict=True))
+        try:
+            with _telemetry.span("picture_clip", stem=args.stem):
+                refused = picture_clip.check(
+                    args.stem, sheets[_process_plans.PDF_PROFILE]
+                )
+        except Exception as exc:  # noqa: BLE001 - any gate error refuses the render, outputs removed
+            return _fail(root, args.stem, exc, 2, outputs)
+        if refused:
+            exc = RuntimeError(
+                f"setup pictures on {sheets[_process_plans.PDF_PROFILE].name} "
+                "(cad/scripts/picture_clip.py):\n  " + "\n  ".join(refused)
+            )
+            return _fail(root, args.stem, exc, 2, outputs)
         prints = [(sheets[_process_plans.PDF_PROFILE], pdf), *placeholders.values()]
         for html, printed in prints:
             try:

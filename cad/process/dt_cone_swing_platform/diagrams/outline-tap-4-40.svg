@@ -1,7 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 420" width="760" height="420" font-family="sans-serif" font-size="13">
   <!-- Section through the hold-down from the front, 4 px/mm. The #4-40 plug tap (major .112 = 11.4 px; length and lead schematic) through the blank's #31 hole (3.048, clear of the tap's .112) into the plate, tap_4_40_depth_mm 10.16 deep (16 turns); the Fisher tap guide and the T-handle wrench in the cutter colour. -->
   <rect class="paper" x="0" y="0" width="760" height="420"/>
-  <text class="title" x="20" y="22">Op 350 (PL06): tap #4-40 into the plate down the hold-down hole (section, 4 px/mm)</text>
+  <text class="title" x="20" y="22">Op 320 (PL06): tap #4-40 into the plate down the hold-down hole (section, 4 px/mm)</text>
   <rect class="fixture-plate" x="220" y="330" width="320" height="50.8"/>
   <rect class="part-kept" x="220" y="304.6" width="320" height="25.4"/>
   <rect class="holes" x="373.9" y="304.6" width="12.19" height="25.4"/>

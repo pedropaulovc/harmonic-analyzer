@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 380" width="760" height="380" font-family="sans-serif" font-size="13">
+  <!-- Hand picture, from above, to scale at 80 px/in: the 2-1/2 in square (process.blank_side_in), both diagonals scribed and centre-punched where they cross, each corner marked .8 in back along both edges (Op 10); the finished Ø2.17 disc (cad.outer_dia_in) dashed inside. The blade at 45° on the near-left corner's marks; the other three corners (dotted) are sawn the same way in turn. The saw's vise jaw and the fence are schematic; the blade's kerf is not on record: drawn as a heavy line. -->
+  <rect class="paper" x="0" y="0" width="760" height="380"/>
+  <text class="title" x="20" y="22">Setup 1, Op 20: the head at 45°, an edge on the fence: a corner sawn off (to scale, 80 px/in)</text>
+  <rect class="fixture-table" x="20" y="40" width="720" height="330"/>
+  <rect class="fixture-support" x="20" y="290" width="720" height="8"/>
+  <rect class="clamp" x="180" y="56" width="120" height="34"/>
+  <text class="label-on-clamp" x="188" y="78">saw vise</text>
+  <path class="part-kept" d="M204 90L276 90L340 154L340 226L276 290L204 290L140 226L140 154Z"/>
+  <path class="part-waste" d="M140 90L204 90L140 154Z"/>
+  <path class="part-waste" d="M340 90L276 90L340 154Z"/>
+  <path class="part-waste" d="M340 290L276 290L340 226Z"/>
+  <path class="part-removed" d="M140 290L204 290L140 226Z"/>
+  <line class="hidden" x1="140" y1="90" x2="340" y2="290"/>
+  <line class="hidden" x1="340" y1="90" x2="140" y2="290"/>
+  <circle class="hidden" cx="240" cy="190" r="86.8"/>
+  <circle class="holes" cx="240" cy="190" r="2.5"/>
+  <path class="cutter" d="M100 186L244 330L246.5 327.5L102.5 183.5Z"/>
+  <line class="arrow" x1="90" y1="300" x2="120" y2="330"/>
+  <text class="label" x="470" y="90">centre punch where the diagonals cross</text>
+  <line class="leader" x1="468" y1="86" x2="243" y2="187"/>
+  <circle class="leader-dot" cx="243" cy="187" r="2"/>
+  <text class="label" x="458" y="150">each corner sawn off at 45°, the blade on the</text>
+  <text class="label" x="458" y="166">marks .8 in back along each edge</text>
+  <line class="leader" x1="456" y1="146" x2="176" y2="262"/>
+  <circle class="leader-dot" cx="176" cy="262" r="2"/>
+  <text class="label" x="470" y="220">dashed: the finished Ø2.17 disc, inside</text>
+  <line class="leader" x1="468" y1="216" x2="300.76" y2="250.76"/>
+  <circle class="leader-dot" cx="300.76" cy="250.76" r="2"/>
+  <text class="label" x="470" y="270">an edge on the fence;</text>
+  <text class="label" x="470" y="286">the square in the saw's vise</text>
+  <text class="label" x="470" y="330">1/8 in thick; deburr the sawn edges</text>
+</svg>

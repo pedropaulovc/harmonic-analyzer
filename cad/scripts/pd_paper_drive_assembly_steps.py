@@ -230,9 +230,12 @@ RACK_CREST_TOL = bottom_guide.CREST_SET_BAND  # .002
 # interference point). The run's tight spot sets it, so every other station
 # runs looser by the rack's relative index error and the feed's lateral terms
 # (along the rack), the pinion's toothspace runout over a turn and the rack's
-# crest drift along the run (radial: the crest set's band lets one end of
-# the engaged feed sit 2 x RACK_CREST_TOL higher than the other; codjiflo P2
-# on 6fa30c1d3). The loosest feel set books those from the later of the two
+# crest drift along the run (radial: the crest set's band alone would let one
+# end of the engaged feed sit 2 x RACK_CREST_TOL higher than the other,
+# codjiflo P2 on 6fa30c1d3, so the first set also holds the two ends alike
+# within LEVEL_RACK_CREST_DRIFT: delegated ruling 2026-11-26 (Main), no
+# precedent; owner review #2144; D48, fit audit part 2, B4). The loosest feel set
+# books those from the later of the two
 # binds. Easing past the bind is not booked: the remedy eases the arm only
 # until the teeth just turn free at the tight spot, which keeps the set at that
 # spot's bind (draw_pd_paper_drive_assembly, "hanger-meshed"); the no-skip
@@ -262,6 +265,14 @@ FEED_FIRST_BIND_BACKLASH_MM = _feed_first_bind_backlash_mm()
 # backlash and its crests clear of the interference point.
 mesh_check.feed_rack_mesh((FEED_FIRST_BIND_BACKLASH_MM,) * 2).require()
 _PRESSURE_ANGLE_TAN = math.tan(math.radians(feed_pinion.PRESSURE_ANGLE_DEG))
+# The rack's crests at the two ends of the run read alike within one .001
+# division of the height gauge's test indicator when the bottom guide is set
+# (draw_pd_paper_drive_assembly, "guides-screwed"), and again whenever it is
+# set again. Before the delegated ruling of 2026-11-26 (Main, no precedent;
+# owner review #2144; D48, fit audit part 2, B4) this held only in the
+# steady-advance rework; the first set allowed 2 x RACK_CREST_TOL (.004) of
+# drift.
+LEVEL_RACK_CREST_DRIFT = 0.0254  # one .001 height-gauge division
 # Each opening as tooth-centred backlash along the rack (a radial opening r
 # gives 2 r tan(PA)).
 FEED_LOOSE_TERMS_MM = {
@@ -271,7 +282,7 @@ FEED_LOOSE_TERMS_MM = {
         2.0 * feed_pinion.TOOTH_SPACE_RUNOUT_TIR_MM * _PRESSURE_ANGLE_TAN
     ),
     "rack crest drift along the run": (
-        2.0 * (2.0 * RACK_CREST_TOL) * _PRESSURE_ANGLE_TAN
+        2.0 * LEVEL_RACK_CREST_DRIFT * _PRESSURE_ANGLE_TAN
     ),
 }
 # The terms are independent (the stock rack's index, the mounting and cock of
@@ -283,7 +294,10 @@ FEED_LOOSE_TERMS_MM = {
 FEED_LOOSEST_BACKLASH_MM = FEED_FIRST_BIND_BACKLASH_MM + math.hypot(
     *FEED_LOOSE_TERMS_MM.values()
 )
-# Reported, not gated: every term at its limit together.
+# Every term at its limit together: gated too, since the first set holds the
+# crests level (delegated ruling 2026-11-26 (Main), no precedent; owner review
+# #2144; D48, fit audit part 2, B4); before, with .004 of drift, it read 0.932
+# and was only reported.
 FEED_WORST_CASE_BACKLASH_MM = FEED_FIRST_BIND_BACKLASH_MM + math.fsum(
     FEED_LOOSE_TERMS_MM.values()
 )
@@ -308,31 +322,17 @@ if not FEED_LOOSEST_MESH.contact_ratio_min >= FEED_CONTACT_RATIO_FLOOR:
     raise AssertionError(
         f"the loosest feel set leaves the feed mesh: {FEED_LOOSEST_MESH.summary}"
     )
-# If every term stacks, the contact ratio falls just under 1.0: a slight hitch
-# in the feed at that station, which the steady-advance check
-# ("loaded-rack-geometry-checked") catches. With every part inside its sheet
-# its remedy re-sets the bottom guide, the guide screws slackened, with the
-# rack's crests reading the same at both ends on the height gauge, the one
-# term the fitter controls, before setting
-# the mesh again by feel on a new hook. "The same" leaves at most one .001
-# division of drift, and with that the arithmetic worst case keeps the floor,
-# so the loop ends.
+# With every term stacked the floor still holds (1.028), so a build with every
+# part inside its sheet passes the steady-advance check
+# ("loaded-rack-geometry-checked"). Its rework re-sets the bottom guide, the
+# guide screws slackened, per the first set, crests level, before setting the
+# mesh again by feel on a new hook; this gate is why that loop ends.
 FEED_WORST_CASE_MESH = mesh_check.feed_rack_mesh(
     (FEED_FIRST_BIND_BACKLASH_MM, FEED_WORST_CASE_BACKLASH_MM)
 )
-LEVEL_RACK_CREST_DRIFT = 0.0254  # one .001 height-gauge division
-FEED_LEVEL_RACK_WORST_CASE_MESH = mesh_check.feed_rack_mesh(
-    (
-        FEED_FIRST_BIND_BACKLASH_MM,
-        FEED_WORST_CASE_BACKLASH_MM
-        - FEED_LOOSE_TERMS_MM["rack crest drift along the run"]
-        + 2.0 * LEVEL_RACK_CREST_DRIFT * _PRESSURE_ANGLE_TAN,
-    )
-)
-if not FEED_LEVEL_RACK_WORST_CASE_MESH.contact_ratio_min >= FEED_CONTACT_RATIO_FLOOR:
+if not FEED_WORST_CASE_MESH.contact_ratio_min >= FEED_CONTACT_RATIO_FLOOR:
     raise AssertionError(
-        "a level-soldered rack still leaves the feed mesh: "
-        f"{FEED_LEVEL_RACK_WORST_CASE_MESH.summary}"
+        f"every loose term stacked leaves the feed mesh: {FEED_WORST_CASE_MESH.summary}"
     )
 
 # The collar is set to pd_transgear_drive_collar_spec.FIT_UP_OFFSET_SET_TEXT and

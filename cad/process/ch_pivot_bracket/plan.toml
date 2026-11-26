@@ -257,6 +257,11 @@ drill_f_oal_mm = 104.775
 # 79.375, 187.325, rounded down to .01 in.
 tap_stack_max_mm = 266.7
 tap_wrench_reach_max_mm = 187.19
+# The tap guide (shop tools.tap-guide-fisher): its 1/2 in shank and 3/16 in
+# point, the sellers' sizes, restated for the tap pictures
+# (test_shop_equipment.py holds them to the record).
+tap_guide_dia_mm = 12.7
+tap_guide_point_dia_mm = 4.7625
 
 [[tools]]
 id = "em-half"
@@ -405,7 +410,7 @@ indexing = "none"
 machine_ref = "pm-30mv"
 holding = "A 1 in parallel against each jaw. The blank upright on them, a sawn end up (it becomes the seat), gripped on W (against the FIXED jaw) and E, I to the LEFT, centred on the jaws. Tap it down onto both parallels with a soft mallet while closing the vise; both parallels pinned. The lower {{process.upright_grip_mm:in.2dot}} of it is in the jaws."
 datum = "Program PB03_seat. G54: X0 the inboard face I (the blank's left side), +X toward its opposite; Y0 the fixed jaw's face (W), +Y toward it; Z0 the faced seat. The hold-down hole at X {{cad.hold_down_station_mm:.3f}}, Y −{{cad.hold_down_lateral_mm:.3f}} mm."
-diagram = { file = "diagrams/seat.svg", alt = "From the right end: the blank upright on two 1 in parallels, a sawn end up, W at the fixed jaw; the 1/2 in end mill, to scale, facing the seat on its pass least past the sides. From above: the seat with the hold-down hole the #15 drills in its own picture." }
+diagram = { file = "diagrams/seat.svg", alt = "From the right end: the blank upright on two 1 in parallels, a sawn end up, W at the fixed jaw; the 1/2 in end mill, to scale, on PB03's first pass, its edge over W and the fixed jaw, fed +X toward you. From above (4 px/mm): the same pass, Y +0.765 mm, .280 past W; the #15 hole has its own picture." }
 envelope = { x_span_mm = ["{{process.blank_section_mm}}", "{{process.face_cutter_dia_mm}}", "{{process.face_cutter_dia_mm}}", 5.08], y_span_mm = ["{{cad.east_side_width_mm}}", "{{process.face_cutter_dia_mm}}"], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{process.blank_length_max_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{process.hold_tip_height_mm}}"], longest_tool_mm = ["{{process.drill_chuck_gauge_mm}}", "{{process.drill_15_oal_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_mm}}"] }
 vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{cad.east_side_width_mm}}", along_jaws_mm = "{{process.blank_section_mm}}", part_height_mm = "{{process.blank_length_max_mm}}", parallel_height_mm = "{{process.parallel_height_mm}}", overhang_mm = ["{{process.vise_upright_inset_mm}}", "rest"], jaw_offset = "centred", fixed_jaw_face = "machined", moving_jaw_face = "machined", moving_jaw_contact = "flat" }
 beam = { axis = "z", hold = "cantilever", extent_mm = [0, "{{process.blank_length_max_mm}}"], clamp_mm = [0, "{{process.upright_grip_mm}}"], section_mm = { x = "{{process.blank_section_mm}}", y = "{{cad.east_side_width_mm}}" }, vise_left = "other" }

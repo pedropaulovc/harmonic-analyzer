@@ -1,49 +1,42 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 470" font-family="sans-serif" font-size="13">
-  <rect class="paper" x="0" y="0" width="760" height="470"/>
-  <text class="title" x="20" y="20">PB02, plan (fixed jaw at the top): face B, four bores, both outlines to their bridges</text>
-  <rect class="clamp" x="20" y="42" width="720" height="28"/>
-  <rect class="clamp" x="20" y="228.8" width="720" height="28"/>
-  <text class="label-on-clamp" x="600" y="60">fixed jaw</text>
-  <text class="label-on-clamp" x="600" y="246.8">moving jaw</text>
-  <rect class="part-removed" x="70" y="70" width="590.5" height="158.8"/>
-  <path class="part-kept" d="M155,111.9 L295,111.9 A37.5,37.5 0 0 1 295,186.9 L155,186.9 A37.5,37.5 0 0 1 155,111.9 Z"/>
-  <circle class="holes" cx="155" cy="149.4" r="15.9"/>
-  <circle class="holes" cx="295" cy="149.4" r="19.9"/>
-  <rect class="part-kept" x="330.5" y="141.9" width="25.9" height="15"/>
-  <line class="arrow" x1="175" y1="194.8" x2="275" y2="194.8"/>
-  <text class="label-halo" x="225" y="152.4" text-anchor="middle">strap 1</text>
-  <line class="leader" x1="342.5" y1="149.4" x2="352.5" y2="101.4"/>
-  <path class="part-kept" d="M420,111.9 L560,111.9 A37.5,37.5 0 0 1 560,186.9 L420,186.9 A37.5,37.5 0 0 1 420,111.9 Z"/>
-  <circle class="holes" cx="420" cy="149.4" r="15.9"/>
-  <circle class="holes" cx="560" cy="149.4" r="19.9"/>
-  <rect class="part-kept" x="595.5" y="141.9" width="25.9" height="15"/>
-  <line class="arrow" x1="440" y1="194.8" x2="540" y2="194.8"/>
-  <text class="label-halo" x="490" y="152.4" text-anchor="middle">strap 2</text>
-  <line class="leader" x1="607.5" y1="149.4" x2="617.5" y2="101.4"/>
-  <text class="label-halo" x="335" y="99.4">bridge</text>
-  <text class="label-halo" x="600" y="99.4">bridge</text>
-  <circle class="cutter" cx="155" cy="194.8" r="7.9"/>
-  <text class="label-halo" x="295" y="212.8" text-anchor="middle">1/8 in end mill, anticlockwise round each strap</text>
-  <line class="datum" x1="70" y1="64" x2="70" y2="92"/>
-  <line class="datum" x1="56" y1="70" x2="84" y2="70"/>
-  <text class="datum-label" x="8" y="86">X0 Y0</text>
-  <text class="label" x="668.5" y="153.4">face B up</text>
-  <text class="title" x="20" y="270">Section across the jaws through a pivot bore (fixed jaw at the right)</text>
-  <rect class="clamp" x="242.4" y="305.1" width="40" height="134.9"/>
-  <rect class="clamp" x="377.6" y="305.1" width="40" height="134.9"/>
-  <rect class="fixture-support" x="282.4" y="325.7" width="9.5" height="114.3"/>
-  <rect class="fixture-support" x="368.1" y="325.7" width="9.5" height="114.3"/>
-  <rect class="part-kept" x="282.4" y="298.3" width="95.2" height="27.4"/>
-  <rect class="part-removed" x="282.4" y="297.1" width="95.2" height="1.1"/>
-  <rect class="holes" x="320.4" y="298.3" width="19.1" height="27.4"/>
-  <rect class="holes" x="298" y="298.3" width="9.5" height="27.4"/>
-  <rect class="holes" x="352.5" y="298.3" width="9.5" height="27.4"/>
-  <line class="fixture-table" x1="202.4" y1="440" x2="457.6" y2="440"/>
-  <line class="leader" x1="431.6" y1="292.3" x2="379.6" y2="298.3"/>
-  <text class="label" x="437.6" y="296.3">face B faced to the thickness, above the jaws</text>
-  <line class="leader" x1="431.6" y1="382.9" x2="379.6" y2="382.9"/>
-  <text class="label" x="437.6" y="386.9">1 in + 1/2 in parallels stacked, 1/8 in thick</text>
-  <text class="label" x="437.6" y="404.9">bores and slots run out into the gap between them</text>
-  <text class="datum-label" x="152.4" y="329.7">Z0 face A</text>
-  <line class="datum" x1="222.4" y1="325.7" x2="238.4" y2="325.7"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 540" width="760" height="540" font-family="sans-serif" font-size="13">
+  <!-- Hand picture, to scale at 5 px/mm. Top: plan from above, +X right, +Y up toward the fixed jaw (at the top): the blank 4.60 long (drawn at the band's middle), 1.25 across the jaws, face B up; X0 its left end (marked L), Y0 the fixed jaw's face. The 1 in + 1/2 in parallel stacks, 1/8 thick, against each jaw, dashed under it (process.riser_height_mm, process.parallel_thickness_mm); the jaws run on past the picture. Bottom, 8 px/mm: a section across the jaws (at X 60 for the face pass, across strap 1's flanks at X 31 for the outline), seen from the right end looking −X, so +Y (the fixed jaw) is to the right and +X comes toward you; Z0 face A on the stacks, the jaw tops 6.845 mm over it (process.vise_jaw_height_mm less the 1.5 in stacks); the stacks run down to a break line. The 1/2 end mill (shop endmill 1/2, Ø12.7 mm) on PB02's fourth pass, Y-15.150, at its posted Z 9.144 (cad.broad_face_b_thickness_mm), travelling −X (PB02 passes at Y 0.975, -4.400, -9.775, -15.150, -20.525, -25.900, each from X-8.890 to X127.000 or back; the first runs +X). This pass stands past the blank only at its ends; the first pass also runs over the fixed jaw, its end 2.30 mm over the jaw top. Dashed in plan: the six pass lanes. In the section the end mill ends in its 12 % arc and runs up to a break line. -->
+  <rect class="paper" x="0" y="0" width="760" height="540"/>
+  <text class="title" x="20" y="22">Setup 2, PB02 T1: the 1/2 end mill faces B to Z 9.144, its fourth pass at Y-15.150 travelling −X (5 and 8 px/mm)</text>
+  <rect class="clamp" x="20" y="50" width="720" height="30"/>
+  <rect class="clamp" x="20" y="238.75" width="720" height="30"/>
+  <text class="label-on-clamp" x="28" y="70">fixed jaw</text>
+  <text class="label-on-clamp" x="28" y="258.75">moving jaw</text>
+  <rect class="part-kept" x="70" y="80" width="584.2" height="158.75"/>
+  <circle class="datum" cx="70" cy="80" r="3.5"/>
+  <text class="datum-label" x="76" y="94">X0 Y0</text>
+  <line class="hidden" x1="25.55" y1="75.12" x2="705" y2="75.12"/>
+  <line class="hidden" x1="25.55" y1="102" x2="705" y2="102"/>
+  <line class="hidden" x1="25.55" y1="128.88" x2="705" y2="128.88"/>
+  <line class="hidden" x1="25.55" y1="155.75" x2="705" y2="155.75"/>
+  <line class="hidden" x1="25.55" y1="182.62" x2="705" y2="182.62"/>
+  <line class="hidden" x1="25.55" y1="209.5" x2="705" y2="209.5"/>
+  <circle class="cutter" cx="370" cy="155.75" r="31.75"/>
+  <line class="arrow" x1="330" y1="155.75" x2="280" y2="155.75"/>
+  <text class="label" x="410" y="148.75">1/2 end mill, pass 4: −X</text>
+  <path class="clamp" d="M507 355.24L567 355.24L567 522L559.5 519L552 522L544.5 519L537 522L529.5 519L522 522L514.5 519L507 522Z"/>
+  <path class="fixture-support" d="M481.6 410L507 410L507 522L498.53 519L490.07 522L481.6 522Z"/>
+  <path class="clamp" d="M253 355.24L193 355.24L193 522L200.5 519L208 522L215.5 519L223 522L230.5 519L238 522L245.5 519L253 522Z"/>
+  <path class="fixture-support" d="M253 410L278.4 410L278.4 522L269.93 519L261.47 522L253 522Z"/>
+  <line class="hidden" x1="193" y1="511.6" x2="567" y2="511.6"/>
+  <rect class="part-kept" x="253" y="333.8" width="254" height="76.2"/>
+  <text class="label-on-clamp" x="513" y="395.24">fixed</text>
+  <text class="label-on-clamp" x="197" y="395.24">moving</text>
+  <text class="datum-label" x="183" y="414" text-anchor="end">Z0 face A</text>
+  <text class="label" x="577" y="458">1 in + 1/2 in parallels</text>
+  <text class="label" x="577" y="474">stacked, 1/8 thick,</text>
+  <text class="label" x="577" y="490">against each jaw</text>
+  <line class="leader" x1="575" y1="454" x2="494.3" y2="458"/>
+  <circle class="leader-dot" cx="494.3" cy="458" r="2"/>
+  <rect class="part-removed" x="253" y="333.8" width="254" height="3.05"/>
+  <path class="cutter" d="M436.6 324.66L436.6 285L429.34 282L422.09 285L414.83 282L407.57 285L400.31 282L393.06 285L385.8 282L378.54 285L371.29 282L364.03 285L356.77 282L349.51 285L342.26 282L335 285L335 324.66A50.8 12.19 0 0 0 436.6 324.66Z"/>
+  <text class="label" x="577" y="325.24">face B to Z</text>
+  <text class="label" x="577" y="341.24">{{cad.broad_face_b_thickness_mm:in.4dot}},</text>
+  <text class="label" x="577" y="357.24">{{process.face_b_skim_mm:in.3dot}} off</text>
+  <line class="leader" x1="575" y1="321.24" x2="497" y2="334.8"/>
+  <circle class="leader-dot" cx="497" cy="334.8" r="2"/>
 </svg>

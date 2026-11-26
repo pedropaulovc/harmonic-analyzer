@@ -1,7 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 420" width="760" height="420" font-family="sans-serif" font-size="13">
   <!-- Section at Y28.775 from the front, 4 px/mm. The #10-24 plug tap (major .190 = 19.3 px; length and lead schematic) through the blank's #7 hole (5.105, clear of the tap's 4.826) and through the plate until its full threads show under it; the tap guide and wrench in the cutter colour. -->
   <rect class="paper" x="0" y="0" width="760" height="420"/>
-  <text class="title" x="20" y="22">Op 360 (PL07): tap #10-24 through the plate down the wedge screw's hole (section, 4 px/mm)</text>
+  <text class="title" x="20" y="22">Op 330 (PL07): tap #10-24 through the plate down the wedge screw's hole (section, 4 px/mm)</text>
   <rect class="fixture-plate" x="220" y="330" width="320" height="50.8"/>
   <rect class="part-kept" x="220" y="304.6" width="320" height="25.4"/>
   <rect class="holes" x="369.79" y="304.6" width="20.42" height="25.4"/>

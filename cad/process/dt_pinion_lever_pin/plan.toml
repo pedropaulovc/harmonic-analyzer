@@ -74,7 +74,7 @@ machine = "Bench vise with soft jaws"
 holding = "The 1/16 rod, then the sawn piece, upright in the bench vise's soft jaws. Each op says how far it stands out: to file, no more than 1/16 in above the jaw tops (the thin rod bends under the file)."
 envelope = "other"
 indexing = "none"
-diagram = { file = "diagrams/vise.svg", alt = "Three panels in the bench vise's soft jaws: Op 20 the rod end filed square 1/16 out; Op 30 the .65 piece standing above the jaws, sawn off at the mark; Op 40 the piece filed end down, its sawn end filed to the .63 cut length." }
+diagram = { file = "diagrams/vise.svg", alt = "Op 20, to scale: the rod's end 1/16 above the bench vise's soft jaws, the smooth file flat across it, filing it square." }
 vise_hold = "other"
 beam = "other"
 
@@ -98,6 +98,7 @@ tool = "saw"
 drilling = "none"
 sizing = "other"
 instruction = "Mark the rod {{process.saw_length_in:.2dot}} in from the filed end with the calipers' jaw tips. Clamp the rod with the mark 1/16 in above the jaw tops, the .65 piece standing above it. Saw just below the mark, on the jaw (waste) side, so the kerf comes out of the rod and the piece stays at least that long; light strokes, the piece held between finger and thumb so it does not fly."
+diagram = { file = "diagrams/vise-saw.svg", alt = "Op 30, to scale: the mark 1/16 above the jaw tops, the {{process.saw_length_in:.2dot}} piece standing above it; the junior hacksaw just below the mark, on the jaw side." }
 feed = "hand"
 
 [[setups.operations]]
@@ -106,6 +107,7 @@ tool = "file"
 drilling = "none"
 sizing = "other"
 instruction = "Clamp the piece filed end down, its sawn end 1/16 in above the jaw tops. File the sawn end square toward the {{cad.length_nominal_in:.2dot}} length; between passes take it out and caliper it across both ends. Stop inside {{cad.length_min_in:.2dot}}–{{cad.length_max_in:.2dot}}; Op 60 is the acceptance."
+diagram = { file = "diagrams/vise-file.svg", alt = "Op 40, to scale: the piece filed end down, its sawn end 1/16 above the jaw tops, filed square toward the {{cad.length_nominal_in:.2dot}} length." }
 feed = "hand"
 
 [[setups]]

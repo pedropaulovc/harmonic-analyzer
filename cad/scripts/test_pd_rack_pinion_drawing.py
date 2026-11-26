@@ -14,6 +14,7 @@ import pytest
 import _config
 import build_pd_rack_pinion as part
 import draw_pd_rack_pinion as drawing
+import pd_paper_drive_assembly_steps as steps
 import pd_rack_pinion_callouts as callouts
 import pd_rack_pinion_spec as spec
 import pd_transgear_feed_pinion_spec as feed_spec
@@ -279,7 +280,10 @@ def test_the_bore_chamfer_is_modelled_and_sized_by_a_leadered_note_in_detail_b()
     radius = drawing.DETAIL_CROP_RADIUS
     cx, cy = drawing.DETAIL_CENTER
     assert cx - radius > 0.0127
-    assert cy + radius < drawing.GEAR_DATA_XY[1] - 9 * 0.0035
+    gear_data_bottom = (
+        drawing.GEAR_DATA_XY[1] - len(callouts.GEAR_DATA_NOTE.splitlines()) * 0.0035
+    )
+    assert cy + radius < gear_data_bottom
     assert drawing.DETAIL_LABEL_XY[1] - 0.010 > drawing.TAP_CALLOUT_XY[1]
     # The note, set off its nominal tip (section +Y up, -Z right, so the
     # detail lays z = 0 right of the focus), clears the circle on the right,
@@ -296,7 +300,7 @@ def test_the_bore_chamfer_is_modelled_and_sized_by_a_leadered_note_in_detail_b()
     assert box.ymin > drawing.DETAIL_LABEL_XY[1] + 0.002
     bore_shoulder = drawing.FRONT_KEEP["BoreDia"][0] - drawing.BORE_TEXT_BLOCK[0] / 2.0
     assert box.xmax < bore_shoulder - 0.010
-    assert box.ymax < drawing.GEAR_DATA_XY[1] - 9 * 0.0035
+    assert box.ymax < gear_data_bottom
     # The section's caption hangs under the thickness's text, clear of the
     # title block's top edge.
     assert 0.066 < drawing.SECTION_CAPTION_XY[1] - 0.006
@@ -364,7 +368,8 @@ def test_sheet_gear_data_names_the_mesh_once_with_its_acceptance() -> None:
         f"MATES WITH:  KNOB SHAFT MHA-PD-08, {spec.MESH_PINION_TEETH}T",
     ):
         assert row in rows
-    assert len(rows) == 9
+    # The heading, nine rows and the B7 span row's continuation line.
+    assert len(rows) == 11
     assert spec.CUTTER_NUMBER == 1
     assert spec.CUTTER_REFERENCE_TEETH == 135 != spec.TEETH == 150
     assert spec.CUTTER_TOOTH_RANGE == (135, None)
@@ -376,6 +381,17 @@ def test_sheet_gear_data_names_the_mesh_once_with_its_acceptance() -> None:
     for limit in spec.SPAN_LIMITS:
         assert f"{limit / 25.4:.4f}".lstrip("0") not in data
     assert "SPAN MATCHED FIT:  RUNS ON MATE WITH NO TIGHT SPOT" in rows
+    # Fit audit part 2, B7: the limits are the cutting aim; the pair is
+    # accepted at MHA-PD-00's trial mesh, the located step.
+    trial = steps.step_ref("arm-plate-located")
+    assert trial == "MHA-PD-00 STEP 12"
+    assert (
+        f"SPAN: CUT TO THE LIMITS SHOWN; PROVED AT {trial} BY THE TRIAL MESH"
+        in " ".join(data.split())
+    )
+    assert max(map(len, data.splitlines())) == len(
+        "SPAN MATCHED FIT:  RUNS ON MATE WITH NO TIGHT SPOT"
+    )
     assert "FEELER" not in data and "BACKLASH" not in data
     # Rule 4: the teeth's one mate is named once on the sheet; span and tip
     # link the block.

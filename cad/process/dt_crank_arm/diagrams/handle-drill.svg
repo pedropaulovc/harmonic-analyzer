@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 480" width="760" height="480" font-family="sans-serif" font-size="13">
+  <!-- Hand picture, to scale at 5 px/mm. Top: plan from above, +X right, +Y up toward the fixed jaw: the arm turned end for end, O face up, the bottom edge on the fixed jaw (Y0), the T edge on the moving jaw, the handle end LEFT; X0 the hub end's tip, the arm at −X; the jaws' left ends 77.47 mm from the tip (process.handle_jaw_end_mm), the seat and the anchor hole in the jaws; the two 1 in parallels dashed under it, their left ends at the jaws' left ends. The spacer at the jaws' right ends is off the picture. Bottom: a section through the pivot (Y-12.7) seen from the front (looking +Y, +X right): the fixed jaw and its parallel behind, the jaw tops 11.608 mm over the O face (process.jaw_top_mm); the moving jaw and its parallel in front, not drawn. The jaw and the parallel run on to break lines. The handle end rounded. The #43 drill (shop drill-43, Ø2.261 mm) at X -87.63 Y-12.700, its point at Z-9.117, CA03's posted depth, 1.18 mm (process.pivot_tip_below_underside_mm) under the underside, into air left of the jaws and parallels. It runs up to a break line. The T2 centre drill's spot is not drawn. -->
+  <rect class="paper" x="0" y="0" width="760" height="480"/>
+  <text class="title" x="20" y="22">Setup 3, CA03 T4: the #43 through the pivot hole, its point at Z-9.117 (to scale, 5 px/mm)</text>
+  <rect class="clamp" x="292.65" y="70" width="452.35" height="30"/>
+  <rect class="clamp" x="292.65" y="227" width="452.35" height="30"/>
+  <text class="label-on-clamp" x="298.65" y="90">fixed jaw (the bottom edge on it)</text>
+  <text class="label-on-clamp" x="298.65" y="247">moving jaw</text>
+  <path class="part-kept" d="M241.85 100L222.02 103.17L214.17 106.35L208.4 109.53L203.75 112.7L199.85 115.88L196.5 119.05L193.59 122.22L191.05 125.4L188.82 128.57L186.86 131.75L185.14 134.93L183.65 138.1L182.37 141.27L181.27 144.45L180.37 147.62L179.63 150.8L179.07 153.97L178.67 157.15L178.43 160.32L178.35 163.5L178.43 166.68L178.67 169.85L179.07 173.02L179.63 176.2L180.37 179.38L181.27 182.55L182.37 185.72L183.65 188.9L185.14 192.07L186.86 195.25L188.82 198.43L191.05 201.6L193.59 204.77L196.5 207.95L199.85 211.12L203.75 214.3L208.4 217.47L214.17 220.65L222.02 223.82L241.85 227L616.5 227L636.33 223.82L644.18 220.65L649.95 217.47L654.6 214.3L658.5 211.12L661.85 207.95L664.76 204.77L667.3 201.6L669.53 198.43L671.49 195.25L673.21 192.07L674.7 188.9L675.98 185.72L677.08 182.55L677.98 179.38L678.72 176.2L679.28 173.02L679.68 169.85L679.92 166.68L680 163.5L679.92 160.32L679.68 157.15L679.28 153.97L678.72 150.8L677.98 147.62L677.08 144.45L675.98 141.27L674.7 138.1L673.21 134.93L671.49 131.75L669.53 128.57L667.3 125.4L664.76 122.22L661.85 119.05L658.5 115.88L654.6 112.7L649.95 109.53L644.18 106.35L636.33 103.17L616.5 100Z"/>
+  <circle class="holes" cx="616.5" cy="163.5" r="48.26"/>
+  <circle class="holes" cx="516.17" cy="213.03" r="4.45"/>
+  <circle class="holes" cx="241.85" cy="163.5" r="5.65"/>
+  <line class="hidden" x1="292.65" y1="115.88" x2="745" y2="115.88"/>
+  <line class="hidden" x1="292.65" y1="211.12" x2="745" y2="211.12"/>
+  <line class="centre-line" x1="20" y1="163.5" x2="745" y2="163.5"/>
+  <text class="label" x="4" y="159.5">section</text>
+  <circle class="datum" cx="680" cy="100" r="3.5"/>
+  <text class="datum-label" x="688" y="112">X0 Y0</text>
+  <circle class="cutter" cx="241.85" cy="163.5" r="5.65"/>
+  <path class="clamp" d="M292.65 321.96L745 321.96L742 329.23L745 336.51L742 343.78L745 351.05L742 358.32L745 365.6L742 372.87L745 380.14L742 387.42L745 394.69L742 401.96L745 409.23L742 416.51L745 423.78L742 431.05L745 438.32L742 445.6L745 452.87L742 460.14L745 467.41L737.93 471.69L730.86 474.69L723.8 471.69L716.73 474.69L709.66 471.69L702.59 474.69L695.52 471.69L688.46 474.69L681.39 471.69L674.32 474.69L667.25 471.69L660.18 474.69L653.12 471.69L646.05 474.69L638.98 471.69L631.91 474.69L624.84 471.69L617.78 474.69L610.71 471.69L603.64 474.69L596.57 471.69L589.5 474.69L582.44 471.69L575.37 474.69L568.3 471.69L561.23 474.69L554.16 471.69L547.1 474.69L540.03 471.69L532.96 474.69L525.89 471.69L518.83 474.69L511.76 471.69L504.69 474.69L497.62 471.69L490.55 474.69L483.49 471.69L476.42 474.69L469.35 471.69L462.28 474.69L455.21 471.69L448.15 474.69L441.08 471.69L434.01 474.69L426.94 471.69L419.87 474.69L412.81 471.69L405.74 474.69L398.67 471.69L391.6 474.69L384.53 471.69L377.47 474.69L370.4 471.69L363.33 474.69L356.26 471.69L349.19 474.69L342.13 471.69L335.06 474.69L327.99 471.69L320.92 474.69L313.85 471.69L306.79 474.69L299.72 471.69L292.65 474.69Z"/>
+  <path class="fixture-support" d="M292.65 419.69L745 419.69L742 427.54L745 435.4L742 443.26L745 451.12L742 458.97L745 466.83L737.93 471.69L730.86 474.69L723.8 471.69L716.73 474.69L709.66 471.69L702.59 474.69L695.52 471.69L688.46 474.69L681.39 471.69L674.32 474.69L667.25 471.69L660.18 474.69L653.12 471.69L646.05 474.69L638.98 471.69L631.91 474.69L624.84 471.69L617.78 474.69L610.71 471.69L603.64 474.69L596.57 471.69L589.5 474.69L582.44 471.69L575.37 474.69L568.3 471.69L561.23 474.69L554.16 471.69L547.1 474.69L540.03 471.69L532.96 474.69L525.89 471.69L518.83 474.69L511.76 471.69L504.69 474.69L497.62 471.69L490.55 474.69L483.49 471.69L476.42 474.69L469.35 471.69L462.28 474.69L455.21 471.69L448.15 474.69L441.08 471.69L434.01 474.69L426.94 471.69L419.87 474.69L412.81 471.69L405.74 474.69L398.67 471.69L391.6 474.69L384.53 471.69L377.47 474.69L370.4 471.69L363.33 474.69L356.26 471.69L349.19 474.69L342.13 471.69L335.06 474.69L327.99 471.69L320.92 474.69L313.85 471.69L306.79 474.69L299.72 471.69L292.65 474.69Z"/>
+  <rect class="part-kept" x="178.35" y="380" width="501.65" height="39.69"/>
+  <rect class="holes" x="236.2" y="380" width="11.3" height="39.69"/>
+  <text class="label-on-clamp" x="600" y="339.96">fixed jaw (behind)</text>
+  <text class="label-halo" x="600" y="443.69">1 in parallel against</text>
+  <text class="label-halo" x="600" y="459.69">the fixed jaw (behind)</text>
+  <line class="datum" x1="16" y1="380" x2="178.35" y2="380"/>
+  <line class="leader" x1="40" y1="431.69" x2="40" y2="382"/>
+  <circle class="leader-dot" cx="40" cy="382" r="2"/>
+  <text class="datum-label" x="20" y="443.69">Z0 the O face (top)</text>
+  <path class="cutter" d="M247.5 270L247.5 422.19L241.85 425.58L236.2 422.19L236.2 270L241.85 267Z"/>
+  <line class="arrow" x1="271.85" y1="276" x2="271.85" y2="306"/>
+  <text class="label" x="285.85" y="286">#43 through, pecks of {{process.peck_43_mm:in.3dot}}, full retract;</text>
+  <text class="label" x="285.85" y="302">the pivot {{cad.pivot_tap_station_min_in:.2dot}}–{{cad.pivot_tap_station_max_in:.2dot}} from the seat's axis</text>
+  <line class="leader" x1="283.85" y1="282" x2="245.85" y2="374"/>
+  <circle class="leader-dot" cx="245.85" cy="374" r="2"/>
+</svg>

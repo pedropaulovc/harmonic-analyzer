@@ -114,9 +114,13 @@ end_top_max_mm = 28.448
 # +.0015/0 (owner chose against the agent's recommendation to keep .4720); no
 # 12 mm reamer"): the #25 pilot's and the owned 31/64 drill's full diameters
 # 1.0 mm past K into the gap between the stacks; the .4990 reamer's tip 2.0
-# mm past K, above the 31/64 drill's. Pecks of about one diameter with full
-# retracts (#30 L/D 3.2, #25 L/D 3.2 blind and 4.2 through); the 31/64 drill,
-# L/D 1.1 after the pilot, in one feed.
+# mm past K, above the 31/64 drill's, past its end chamfer plus the shop's
+# margin (cad/config/shop-equipment cnc.toml cnc.ream-full-diameter, D45).
+# Its chamfer is an ESTIMATE (.0400 in, 1.016 mm) and 2.0 is under three
+# times it, so the ream op has it measured at first use: over .069 (2.0 less
+# the 0.25 margin) the full diameter would stop short of K. Pecks of about
+# one diameter with full retracts (#30 L/D 3.2, #25 L/D 3.2 blind and 4.2
+# through); the 31/64 drill, L/D 1.1 after the pilot, in one feed.
 spot_dia_mm = 2.54
 dowel_peck_mm = 3.048
 tap_peck_mm = 3.556
@@ -813,7 +817,7 @@ speed_kind = "spindle"
 tool = "reamer-4990"
 drilling = "none"
 sizing = { kind = "band", band_mm = "{{cad.knife_bore_dia_band_mm}}" }
-instruction = "Same file, M6 T6: ream the bore through, the .4990 reamer in the 7/16 collet {{process.reamer_projection_mm:in.2f}} in out; set 190. Cutting oil, plenty. The file feeds the reamer in and feeds it back out, spindle running: no rapid leaves the bore. Leave the block clamped for the check."
+instruction = "Same file, M6 T6: ream the bore through, the .4990 reamer in the 7/16 collet {{process.reamer_projection_mm:in.2f}} in out; set 190. The first time this reamer is used, measure its end chamfer's length along the reamer first: over .069, stop and tell the owner (its full diameter would stop short of K). Cutting oil, plenty. The file feeds the reamer in and feeds it back out, spindle running: no rapid leaves the bore. Leave the block clamped for the check."
 settings = "reamer-4990-4140-ht"
 inspection = "Still clamped: the bore Ø{{cad.knife_bore_dia_min_in:.4dot}}–{{cad.knife_bore_dia_max_in:.4dot}} through: the GO pin (.4985 plus) enters its whole length, the NO-GO pin (.500 minus) does not enter. As reamed (the drawing's finish mark on the bore): no tears or chatter marks."
 gauge_checks = [{ gauge = "zz-pins-4985-5000", band_mm = "{{cad.knife_bore_dia_band_mm}}" }]

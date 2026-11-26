@@ -1,15 +1,22 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 300" font-family="sans-serif" font-size="13">
-  <rect class="paper" x="0" y="0" width="760" height="300"/>
-  <text class="title" x="20" y="20">Setup 3: turned round, the back end out (not to scale)</text>
-  <rect class="fixture-vise" x="40" y="70" width="140" height="200"/>
-  <rect class="part-rest" x="180" y="125" width="360" height="90"/>
-  <rect class="part-removed" x="540" y="125" width="14" height="90"/>
-  <line class="centre-line" x1="160" y1="170" x2="700" y2="170"/>
-  <line class="active-face" x1="540" y1="125" x2="540" y2="215"/>
-  <rect class="cutter" x="570" y="164" width="90" height="12"/>
-  <text class="label" x="400" y="100">faced end: length from the faced head end</text>
-  <line class="leader" x1="530" y1="104" x2="540" y2="126"/>
-  <text class="label" x="560" y="250">No. 1 centre drill</text>
-  <line class="leader" x1="600" y1="238" x2="600" y2="177"/>
-  <text class="label" x="200" y="110">head end back in the spindle</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 360" width="760" height="360" font-family="sans-serif" font-size="13">
+  <!-- Hand picture, from above (the cross-slide at the bottom), a section through the axis, to scale at 200 px/in: the 5/8 bar (process.bar_dia_in) 1.00 out of the jaw fronts (process.end_stickout_mm), the rest of the blank back through the chuck into the spindle bore, to a break line. The 3-jaw's body and jaws are schematic (their sizes are not on record). The blank turned round, the back end out. The AR tool schematic (not on record), in light skims toward the length (overall 9.9949, process.overall_in, read from the faced head end with the height gauge between skims); Z0 on the last skim. Hatched: a skim. -->
+  <rect class="paper" x="0" y="0" width="760" height="360"/>
+  <text class="title" x="20" y="22">Setup 3, Op 30: turned round, the AR tool faces the back end toward the length (to scale, 200 px/in)</text>
+  <rect class="fixture-vise" x="298" y="71.5" width="56" height="217"/>
+  <path class="part-kept" d="M40 117.5L600 117.5L600 242.5L40 242.5L37 235.15L40 227.79L37 220.44L40 213.09L37 205.74L40 198.38L37 191.03L40 183.68L37 176.32L40 168.97L37 161.62L40 154.26L37 146.91L40 139.56L37 132.21L40 124.85Z"/>
+  <rect class="part-removed" x="600" y="117.5" width="4" height="125"/>
+  <rect class="clamp" x="354" y="83.5" width="46" height="34"/>
+  <rect class="clamp" x="354" y="242.5" width="46" height="34"/>
+  <line class="centre-line" x1="20" y1="180" x2="740" y2="180"/>
+  <path class="cutter" d="M600 188L630 200L630 288L622 285L614 288L606 288L606 212Z"/>
+  <line class="arrow" x1="648" y1="258" x2="648" y2="208"/>
+  <line class="datum" x1="600" y1="50" x2="600" y2="84"/>
+  <text class="datum-label" x="606" y="62">Z0</text>
+  <text class="label" x="560" y="330" text-anchor="end">back end: skims to the length, DRO Z0 on the last</text>
+  <text class="label" x="560" y="346" text-anchor="end">AR tool, to the centre, no pip</text>
+  <line class="leader" x1="562" y1="326" x2="618" y2="268"/>
+  <circle class="leader-dot" cx="618" cy="268" r="2"/>
+  <text class="label" x="40" y="60">3-jaw on the 5/8 bar, {{process.end_stickout_mm:in.2f}} in out</text>
+  <line class="leader" x1="140" y1="66" x2="380" y2="97.5"/>
+  <circle class="leader-dot" cx="380" cy="97.5" r="2"/>
 </svg>

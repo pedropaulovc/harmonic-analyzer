@@ -1,29 +1,34 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 400" font-family="sans-serif" font-size="13">
-  <!-- Setup 2, section through the axis, 200 px to the inch: the hub turned round, its barrel .40 in the 3-jaw over brass shim, the front end out at the right. Styles: prechips.palette. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 400" width="760" height="400" font-family="sans-serif" font-size="13">
+  <!-- Hand picture, from above (the cross-slide at the bottom), a section through the axis, to scale at 200 px/in: the hub turned round, its barrel Ø.88 .40 in the jaws from the rear face (process.regrip_grip_in), the relief end inward, the parted end out; Z0 the front face, faced to .987 from the rear face (process.length_target_in). The 3-jaw's body and jaws are schematic (their sizes are not on record). The brass shim wrap's thickness is not on record: drawn 2 px; nothing seats the hub axially. The AR tool schematic (not on record). Hatched: the about .023 faced off (L0 less .987); dashed: this setup's later cuts, the seat (turned to the arm, back to the shoulder at Z-S, drawn S = .3075) and the 3/8 bore through. -->
   <rect class="paper" x="0" y="0" width="760" height="400"/>
-  <text class="title" x="20" y="22">Setup 2: the hub turned round on its barrel; faced to length, the seat turned to the arm, the bore drilled</text>
-  <rect class="fixture-vise" x="30" y="60" width="80" height="280"/>
-  <rect class="clamp" x="150" y="80" width="80" height="29"/>
-  <rect class="clamp" x="150" y="291" width="80" height="29"/>
-  <rect class="clamp" x="150" y="109" width="80" height="3"/>
-  <rect class="clamp" x="150" y="288" width="80" height="3"/>
-  <polygon class="part-kept" points="150,135 182,135 182,112 285,112 285,124 347,124 347,276 285,276 285,288 182,288 182,265 150,265"/>
-  <rect class="part-removed" x="285" y="112" width="66" height="12"/>
-  <rect class="part-removed" x="285" y="276" width="66" height="12"/>
-  <rect class="part-removed" x="347" y="124" width="4" height="152"/>
-  <rect class="part-removed" x="150" y="162" width="197" height="76"/>
-  <line class="centre-line" x1="120" y1="200" x2="720" y2="200"/>
-  <line class="active-face" x1="347" y1="124" x2="347" y2="276"/>
-  <rect class="cutter" x="380" y="163" width="200" height="74"/>
-  <line class="leader" x1="347" y1="140" x2="420" y2="96"/>
-  <text class="label" x="424" y="80">Z0: the front face, faced to</text>
-  <text class="label" x="424" y="96">{{process.length_target_in:.3dot}} from the rear face</text>
-  <line class="leader" x1="316" y1="124" x2="300" y2="56"/>
-  <text class="label" x="200" y="40">seat turned until the arm slides on, back to the</text>
-  <text class="label" x="200" y="54">shoulder at Z−S (S = T − .005)</text>
-  <text class="label" x="590" y="190">3/8 drill</text>
-  <line class="leader" x1="250" y1="238" x2="330" y2="340"/>
-  <text class="label" x="334" y="344">bore drilled 3/8 through</text>
-  <line class="leader" x1="190" y1="291" x2="150" y2="364"/>
-  <text class="label" x="40" y="378">brass shim; .40 of the hub in the jaws, from the rear face</text>
+  <text class="title" x="20" y="22">Setup 2, Op 80: the AR tool faces the parted end to Z0, .987 from the rear face (to scale, 200 px/in)</text>
+  <rect class="fixture-vise" x="262.6" y="64" width="56" height="272"/>
+  <rect class="part-kept" x="322.6" y="135" width="32" height="130"/>
+  <rect class="part-kept" x="354.6" y="112" width="165.4" height="176"/>
+  <rect class="clamp" x="318.6" y="76" width="84" height="34"/>
+  <rect class="clamp" x="318.6" y="290" width="84" height="34"/>
+  <rect class="fixture-support" x="352.6" y="110" width="50" height="180"/>
+  <rect class="part-kept" x="352.6" y="112" width="50" height="176"/>
+  <line class="centre-line" x1="20" y1="200" x2="740" y2="200"/>
+  <rect class="part-removed" x="520" y="112" width="4.6" height="176"/>
+  <rect class="hidden" x="458.5" y="112" width="61.5" height="12"/>
+  <rect class="hidden" x="458.5" y="276" width="61.5" height="12"/>
+  <rect class="hidden" x="322.6" y="162.5" width="197.4" height="75"/>
+  <path class="cutter" d="M520 216L550 228L550 316L542 313L534 316L526 316L526 240Z"/>
+  <line class="arrow" x1="568" y1="286" x2="568" y2="236"/>
+  <line class="datum" x1="520" y1="60" x2="520" y2="92"/>
+  <text class="datum-label" x="526" y="70">Z0: the front face,</text>
+  <text class="datum-label" x="526" y="86">{{process.length_target_in:.3dot}} from the rear face</text>
+  <text class="label" x="480" y="370" text-anchor="end">AR: DRO Z set to L0 less {{process.length_target_in:.3dot}} on the parted rim;</text>
+  <text class="label" x="480" y="386" text-anchor="end">face in light skims to Z0</text>
+  <line class="leader" x1="482" y1="366" x2="538" y2="296"/>
+  <circle class="leader-dot" cx="538" cy="296" r="2"/>
+  <text class="label" x="30" y="40">brass shim; {{process.regrip_grip_in:.2dot}} of the hub in</text>
+  <text class="label" x="30" y="56">the jaws, from the rear face</text>
+  <line class="leader" x1="150" y1="60" x2="382.6" y2="109"/>
+  <circle class="leader-dot" cx="382.6" cy="109" r="2"/>
+  <text class="label" x="30" y="332">dashed: the seat, to the arm, back to Z−S</text>
+  <text class="label" x="30" y="348">(S = T − .005), and the 3/8 bore</text>
+  <line class="leader" x1="200" y1="322" x2="490" y2="276"/>
+  <circle class="leader-dot" cx="490" cy="276" r="2"/>
 </svg>

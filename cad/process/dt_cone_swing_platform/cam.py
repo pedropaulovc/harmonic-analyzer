@@ -829,9 +829,18 @@ def context(
     # The ream is Setup 4's, the bar flat on the spoil plate (its thrust
     # bends nothing there): the B drill first re-enters its hole and runs
     # drill_past_mm past the reamer's reach into the plate, then the reamer
-    # takes the bore with its full diameter ream_past_mm into the plate.
+    # takes the bore with its tip ream_past_mm into the plate.
     ream_tip = -p["ream_past_mm"]
+    import cam_nc
+
+    if p["ream_past_mm"] <= cam_nc.ream_full_diameter_past_min_mm(plan, "reamer"):
+        raise ValueError(
+            "the reamer's full diameter does not reach the bar's underside (cnc.ream-full-diameter)"
+        )
     redrill_tip = -(p["ream_past_mm"] + p["drill_past_mm"] + _point(db))
+    # The plate under the bar is solid from Z0 down: the reamer's flat end
+    # stays inside the B redrill's full diameter.
+    cam_nc.ream_end_face_clear("reamer", ream_tip, redrill_tip + _point(db), 0.0, 0.0)
     _agree(plan, "drill_31_tip_mm", tips["#31"])
     _agree(plan, "drill_b_tip_mm", tips["B"])
     _agree(plan, "drill_7_tip_mm", tips["#7"])

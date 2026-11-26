@@ -534,6 +534,14 @@ def context(
     _agree(plan, "drill_9_tip_mm", tip_9)
     _agree(plan, "drill_32_tip_mm", tip_32)
     ream_tip = -p["ream_past_mm"]
+    import cam_nc
+
+    if p["ream_past_mm"] <= cam_nc.ream_full_diameter_past_min_mm(plan, "reamer-1260"):
+        raise ValueError(
+            "the reamer's full diameter does not reach face A (cnc.ream-full-diameter)"
+        )
+    # The reamer's flat end runs out between the parallels.
+    cam_nc.ream_end_face_clear("reamer-1260", ream_tip, -past, 0.0, -math.inf)
     # The parallels stand under the blank's edges: every drill and reamer
     # passes between them.
     gap = width / 2 - p["parallel_thickness_mm"]

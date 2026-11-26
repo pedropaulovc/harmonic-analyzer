@@ -169,7 +169,7 @@ if any(
     for point in _CHAMFER_ENDS_MM
 ):
     raise AssertionError("detail B's fence must take in both ends of the bore chamfer")
-# Left of the face view, under GEAR DATA (its last row near y 0.234) and
+# Left of the face view, under GEAR DATA (its last row near y 0.224) and
 # left of the bore's text (x >= 0.140): the circle spans x 0.036..0.064,
 # y 0.164..0.192; the label hangs from its top centre under the circle.
 DETAIL_CENTER = (0.050, 0.178)

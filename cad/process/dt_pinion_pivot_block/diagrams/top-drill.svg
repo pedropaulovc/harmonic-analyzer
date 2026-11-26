@@ -1,7 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 440" width="760" height="440" font-family="sans-serif" font-size="13">
   <!-- 4 px/mm, as Setup 3's picture (across the jaws from the right end, the front face, +X out of the page). The #9 drill, cutter_dia_mm 4.9784 = 19.9 px, 118 deg point, in the west hold-down (Y -24.892, its first hole, NC line 124 on), at the bottom of its last peck: point Z -2.496 (hold_tip_height_mm), its full diameter drill_past_mm 1.0 past B, between the 1 in parallels (the nearer one 7.3 mm away). Drawn short to a break (its stick-out is not on record). The east hold-down (Y -8.128) next, the same way. -->
   <rect class="paper" x="0" y="0" width="760" height="440"/>
-  <text class="title" x="20" y="22">Op 180, #9 drill (PB02 T3), 4 px/mm: through the west hold-down, past B between the parallels</text>
+  <text class="title" x="20" y="22">Op 160, #9 drill (PB02 T3), 4 px/mm: through the west hold-down, past B between the parallels</text>
   <text class="title" x="40" y="50">Across the jaws, from the right end, the front face (+X toward you)</text>
   <text class="title" x="520" y="50">Plan</text>
   <rect class="fixture-vise" x="70" y="400" width="370" height="16"/>

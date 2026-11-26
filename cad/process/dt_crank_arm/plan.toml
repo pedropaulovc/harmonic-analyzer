@@ -248,7 +248,7 @@ machine_kind = "other"
 title = "Saw the blank and the spacer"
 machine = "Saw / bench"
 indexing = "none"
-diagram = { file = "diagrams/saw.svg", alt = "The 12 in length of the 5/16 x 1 in flat marked off into a 4.25 in blank and a 1.5 in spacer, kerfs between." }
+diagram = { file = "diagrams/saw.svg", alt = "Op 10, to scale: the 5/16 x 1 flat marked off into the blank (aim 4.25) and the spacer about 1.5, each sawn on its waste side." }
 envelope = "other"
 vise_hold = "other"
 beam = "other"
@@ -279,7 +279,7 @@ indexing = "none"
 machine_ref = "pm-30mv"
 holding = "Two 1 in parallels on the bed of the 6 in PM vise (shop vise-pm-6), one against each jaw, their left ends level with the jaws' left end faces (0–.03 right of them, steel rule): they reach {{process.parallel_length_mm:in.2f}} along the jaws, past the blank's right end. The blank on them, O face up, the T edge against the fixed jaw, its hub end (marked) to the LEFT, overhanging the jaws' left ends by {{process.overhang_min_mm:in.2f}}–{{process.overhang_max_mm:in.2f}} (steel rule from the jaws' left end face to the blank's end). The spacer lying on the vise bed, NOT on the parallels, at the jaws' RIGHT ends, its right end level with the jaws' right end faces, same way up, so the jaws close square on it and on the blank. Tap the blank down on both parallels with a soft hammer and tighten: the parallels must not slide. The jaws stand {{process.jaw_top_mm:in.3dot}} above the O face."
 datum = "Programs CA01_hub_end (T1, T2, T3) and CA02_anchor_tap (T6). G54: X0 the blank's left end, +X toward the jaws; Y0 the fixed jaw's face (the T edge), the blank at −Y; Z0 the O face. Tool lengths from the tool setter at each M6; every move between cuts runs above the jaw tops."
-diagram = { file = "diagrams/hub-end.svg", alt = "The blank on two parallels in the vise, the hub end overhanging the jaws' left ends, the spacer at their right ends; hatched: the seat bored through and the end rounded R.50 about it, the anchor hole drilled .79 along from the seat's axis and .11 down from the T edge, the mark spot up and left of the seat." }
+diagram = { file = "diagrams/hub-end.svg", alt = "CA01 T1, to scale: plan from above, the T edge on the fixed jaw at the top, the hub end overhanging the jaws' left ends {{process.overhang_min_mm:in.2f}}–{{process.overhang_max_mm:in.2f}}; the 3/8 end mill on the seat's G2 helix; the parallels dashed under it from the jaws' left ends, {{process.parallel_length_mm:in.2f}} long, and the spacer on the vise bed at the jaws' right ends. Below, a section through the seat from the front: its end at Z{{process.through_bottom_mm:.3f}}, through into air left of the jaws and parallels. Dashed: the seat and the R.50 round." }
 envelope = { x_span_mm = ["{{process.blank_length_max_mm}}", 9.525, 9.525, 5.08], y_span_mm = ["{{cad.blank_width_mm}}", 9.525, 9.525], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{process.blank_thickness_max_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", -1.0342], longest_tool_mm = ["{{process.drill_chuck_gauge_mm}}", "{{process.drill_43_oal_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.em_projection_min_mm}}"] }
 vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{cad.blank_width_mm}}", along_jaws_mm = "{{process.blank_length_mm}}", part_height_mm = "{{process.blank_thickness_max_mm}}", parallel_height_mm = "{{process.parallel_height_mm}}", overhang_mm = ["{{process.overhang_mm}}", "rest"], jaw_offset = "balanced", balance = "spacer", fixed_jaw_face = "as_bought", moving_jaw_face = "as_bought", moving_jaw_contact = "flat" }
 beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{process.blank_length_mm}}"], clamp_mm = ["{{process.overhang_mm}}", "{{process.blank_length_mm}}"], section_mm = { y = "{{cad.blank_width_mm}}", z = "{{process.blank_thickness_min_mm}}" }, vise_left = "start" }
@@ -335,6 +335,7 @@ tool = "drill-50"
 drilling = "twist_drill"
 sizing = { kind = "band", band_mm = "{{cad.anchor_tap_dia_band_mm}}" }
 instruction = "Same file, M6 T3 (#50, at least {{process.drill_projection_min_mm:in.2f}} out of the chuck; set 2800, Tapmatic Gold): the anchor hole through, pecks of {{process.peck_50_mm:in.3dot}} with full retract, its full diameter {{process.drill_past_mm:in.3dot}} past the underside, into air."
+diagram = { file = "diagrams/hub-end-drill.svg", alt = "CA01 T3, to scale: the seat and round cut; the #50 through the anchor hole {{cad.anchor_tap_station_in:.2dot}} from the seat's axis and {{cad.anchor_tap_edge_offset_in:.3dot}} below the T edge, its point at Z{{process.anchor_drill_tip_mm:.3f}}, into air." }
 rpm = 2800
 feed = "{{process.drill_feed_per_min_mm:in.1f}} in/min"
 hole_depth_mm = "{{process.blank_thickness_max_mm}}"
@@ -362,7 +363,6 @@ tool = "tap-guide"
 drilling = "none"
 sizing = "other"
 instruction = "Run CA02_anchor_tap: M6 T6, the tap guide in the 1/2 in collet, pointed end out (the tool setter measures it), spindle off; the file ends Idle at the machine top over the anchor hole."
-diagram = { file = "diagrams/tap.svg", alt = "The bar in the vise, the tap in the T-handle wrench in the hole, the tap guide in the spindle, its spring point in the wrench's centre hole; the hole runs through into air." }
 
 [[setups.operations]]
 speed_kind = "other"
@@ -370,6 +370,7 @@ tool = "tap-2-56"
 drilling = "none"
 sizing = "other"
 instruction = "Tap #2-56 through by hand under the tap guide, spindle off, Tapmatic Gold: tap's point in the hole, jog Z down until the guide's point is pushed fully home in the wrench, then turn the wrench, a half turn back each turn; the spring follows the tap. Stop when the tap's full threads show below the underside. A #2 tap breaks easily: stop at any rise in effort and back out."
+diagram = { file = "diagrams/tap.svg", alt = "To scale across, a section through the anchor hole: the #2-56 tap in the T-handle wrench through the hole into air, the tap guide in the 1/2 collet, its spring point in the wrench's centre hole, spindle off." }
 feed = "hand"
 
 [[setups.operations]]
@@ -388,7 +389,7 @@ indexing = "none"
 machine_ref = "pm-30mv"
 holding = "As Setup 2, the arm turned end for end about the vertical: O face still up, the T edge now against the MOVING jaw (the bottom edge on the fixed jaw), the handle end to the LEFT. The jaws' left end faces {{process.handle_jaw_end_min_mm:in.2f}}–{{process.handle_jaw_end_max_mm:in.2f}} from the hub end's tip (steel rule along the bar from the tip to the jaws' left end face): the seat and the anchor hole in the jaws, the handle end overhanging. The parallels' left ends level with the jaws' left end faces again (0–.03 right of them); the spacer on the vise bed at the jaws' RIGHT ends again, not on the parallels. Tap the arm down on both parallels and tighten."
 datum = "Programs CA03_handle_end (T1, T2, T4, T5) and CA04_pivot_tap (T6). G54: X0 the hub end's tip (machined in Setup 2), the arm at −X; Y0 the fixed jaw's face (the bottom edge), the arm at −Y; Z0 the O face. Tool lengths from the tool setter at each M6; every move between cuts runs above the jaw tops."
-diagram = { file = "diagrams/handle-end.svg", alt = "The arm turned end for end on the parallels, the handle end overhanging the jaws' left ends, the hub end and its seat in the jaws; hatched: the handle end rounded R.50 about the pivot, the pivot hole drilled 2.95 from the seat's axis and countersunk." }
+diagram = { file = "diagrams/handle-end.svg", alt = "CA03 T1, to scale: plan, the arm turned end for end, the bottom edge on the fixed jaw, the handle end overhanging the jaws' left ends, the seat and anchor hole in the jaws; the 3/8 end mill on the G3 round about the pivot, the waste end it cuts away hatched; the parallels dashed under it from the jaws' left ends, and the spacer on the vise bed at the jaws' right ends. Below, a section through the pivot: its last level at Z{{process.through_bottom_mm:.3f}}." }
 envelope = { x_span_mm = ["{{process.blank_length_max_mm}}", 9.525, 9.525, 5.08], y_span_mm = ["{{cad.blank_width_mm}}", 9.525, 9.525], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{process.blank_thickness_max_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{process.pivot_tip_below_underside_mm}}"], longest_tool_mm = ["{{process.drill_chuck_gauge_mm}}", "{{process.drill_43_oal_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.sink_projection_min_mm}}"] }
 vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{cad.blank_width_mm}}", along_jaws_mm = "{{process.handle_along_mm}}", part_height_mm = "{{process.blank_thickness_max_mm}}", parallel_height_mm = "{{process.parallel_height_mm}}", overhang_mm = ["{{process.handle_overhang_mm}}", "rest"], jaw_offset = "balanced", balance = "spacer", fixed_jaw_face = "as_bought", moving_jaw_face = "as_bought", moving_jaw_contact = "flat" }
 beam = { axis = "x", hold = "cantilever", extent_mm = [-104.14, 0], clamp_mm = [-77.47, 0], section_mm = { y = "{{cad.blank_width_mm}}", z = "{{process.blank_thickness_min_mm}}" }, vise_left = "start" }
@@ -439,6 +440,7 @@ tool = "drill-43"
 drilling = "twist_drill"
 sizing = { kind = "band", band_mm = "{{cad.pivot_tap_dia_band_mm}}" }
 instruction = "Same file, M6 T4 (#43, at least {{process.drill_projection_min_mm:in.2f}} out of the chuck; set 2800, Tapmatic Gold): the pivot hole through, pecks of {{process.peck_43_mm:in.3dot}} with full retract, into air."
+diagram = { file = "diagrams/handle-drill.svg", alt = "CA03 T4, to scale: the handle end rounded; the #43 through the pivot hole {{cad.pivot_tap_station_in:.2dot}} from the seat's axis, its point at Z{{process.pivot_drill_tip_mm:.3f}}, into air." }
 rpm = 2800
 feed = "{{process.drill_feed_per_min_mm:in.1f}} in/min"
 hole_depth_mm = "{{process.blank_thickness_max_mm}}"
@@ -453,6 +455,7 @@ tool = "sink"
 drilling = "none"
 sizing = "other"
 instruction = "Same file, M6 T5 (1/4 in 90° chamfer mill, at least {{process.sink_projection_min_mm:in.2f}} out of its collet; set 2800): plunge its point {{process.sink_tip_mm:in.3dot}} below Z0 on the pivot's axis: countersink Ø{{process.sink_dia_mm:in.3dot}} on the O face (the outboard, near side)."
+diagram = { file = "diagrams/handle-sink.svg", alt = "CA03 T5, to scale: the 1/4 90° chamfer mill on the pivot's axis, its point at Z{{process.sink_tip_mm:.3f}}: the countersink Ø{{process.sink_dia_mm:in.3dot}} on the O face." }
 rpm = 2800
 feed = "{{process.sink_feed_per_min_mm:in.1f}} in/min"
 milling_cuts = [
@@ -476,6 +479,7 @@ tool = "tap-4-40"
 drilling = "none"
 sizing = "other"
 instruction = "Tap #4-40 through by hand under the tap guide, spindle off, Tapmatic Gold, as Setup 2: a half turn back each turn, until the tap's full threads show below the underside."
+diagram = { file = "diagrams/handle-tap.svg", alt = "To scale across, a section through the pivot: the #4-40 tap in the T-handle wrench through the hole into air, the tap guide in the 1/2 collet, spindle off." }
 feed = "hand"
 
 [[setups.operations]]
@@ -487,7 +491,7 @@ machine_kind = "other"
 title = "Punch the mark, deburr, inspect, oil"
 machine = "Bench, surface plate"
 indexing = "none"
-diagram = { file = "diagrams/bench.svg", alt = "The finished arm on the bench, O face up: the seat at the hub end with the punched mark up and left of it, the anchor hole near the T edge, the countersunk pivot hole at the handle end." }
+diagram = { file = "diagrams/bench.svg", alt = "To scale: the finished arm from above, O face up, the T edge at the top, the hub end left: the seat, the punched match mark up and left of it, the #2-56 anchor near the T edge, the countersunk #4-40 pivot at the handle end." }
 envelope = "other"
 vise_hold = "other"
 beam = "other"

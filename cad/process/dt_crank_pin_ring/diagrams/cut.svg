@@ -1,20 +1,20 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 330" font-family="sans-serif" font-size="14">
-  <rect class="paper" x="0" y="0" width="760" height="330"/>
-  <text class="title" x="20" y="24">Front of the bench vise: filing a wire end square, flush with the soft jaws (not to scale)</text>
-  <rect class="fixture-vise" x="150" y="150" width="400" height="130"/>
-  <rect class="clamp" x="250" y="110" width="120" height="120"/>
-  <rect class="clamp" x="390" y="110" width="120" height="120"/>
-  <text class="label-on-clamp" x="262" y="175">soft jaw</text>
-  <text class="label-on-clamp" x="402" y="175">soft jaw</text>
-  <rect class="part-kept" x="372" y="110" width="16" height="150"/>
-  <rect class="part-removed" x="372" y="88" width="16" height="22"/>
-  <rect class="cutter" x="200" y="78" width="360" height="10"/>
-  <line class="datum" x1="230" y1="110" x2="530" y2="110"/>
-  <text class="datum-label" x="572" y="106">jaws' top: the end</text>
-  <text class="datum-label" x="572" y="124">is filed flush with it</text>
-  <text class="label" x="200" y="70">smooth file, flat on the jaws, stroking across</text>
-  <line class="leader" x1="380" y1="250" x2="590" y2="250"/>
-  <circle class="leader-dot" cx="380" cy="250" r="3"/>
-  <text class="label" x="596" y="254">Ø.040 brass wire</text>
-  <text class="label" x="20" y="312">First end: flat and square. Second end: filed down to the developed length, checked with the calipers.</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 470" width="760" height="470" font-family="sans-serif" font-size="13">
+  <!-- Hand picture, the bench vise from the front, to scale at 200 px/in: the Ø.040 brass wire (cad.ring_dia_in, 8 px). The bench vise's soft jaws are schematic (their size is not on record), seen from the front. The smooth file is schematic (its width and thickness are not on record). The 6 in length clamped 1.50 out (process.blank_length_in); the piece above the jaws is kept, the rest of the length below runs on to a break line. -->
+  <rect class="paper" x="0" y="0" width="760" height="470"/>
+  <text class="title" x="20" y="22">Setup 1, Op 10: the wire 1.50 out of the soft jaws, filed through flush with their top (to scale, 200 px/in)</text>
+  <rect class="clamp" x="256" y="390" width="120" height="65"/>
+  <rect class="clamp" x="384" y="390" width="120" height="65"/>
+  <text class="label-on-clamp" x="266" y="412">soft jaw</text>
+  <text class="label-on-clamp" x="394" y="412">soft jaw</text>
+  <path class="part-rest" d="M376 462L376 390L384 390L384 462L380 459Z"/>
+  <rect class="part-kept" x="376" y="90" width="8" height="300"/>
+  <rect class="cutter" x="384" y="381" width="296" height="9"/>
+  <line class="arrow" x1="540" y1="366" x2="440" y2="366"/>
+  <line class="datum" x1="180" y1="390" x2="373" y2="390"/>
+  <text class="datum-label" x="368" y="384" text-anchor="end">jaws' top: filed through flush with it</text>
+  <text class="label" x="400" y="110">the {{process.blank_length_in:.2dot}} piece standing above the jaws</text>
+  <line class="leader" x1="398" y1="106" x2="384" y2="120"/>
+  <circle class="leader-dot" cx="384" cy="120" r="2"/>
+  <text class="label" x="500" y="334">smooth file flat on the jaws,</text>
+  <text class="label" x="500" y="350">stroking across</text>
 </svg>

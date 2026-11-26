@@ -3,6 +3,7 @@ a browser: every ``uv tool run`` and browser call is stubbed at ``subprocess.run
 
 from __future__ import annotations
 
+import base64
 import io
 import subprocess
 import tomllib
@@ -13,6 +14,7 @@ from pypdf import PdfReader, PdfWriter
 
 import prechips_traveler as wrapper
 import _process_plans as plans
+import picture_clip
 
 _UV = "uv-under-test"
 _VERSION = "9.9.9"
@@ -33,12 +35,13 @@ def process(tmp_path, monkeypatch):
     return tmp_path / "out", author
 
 
-def _uv_stub(monkeypatch, *, probe=None, traveler=None, standing=None, printed=True):
+def _uv_stub(monkeypatch, *, probe=None, traveler=None, standing=None, printed=True, sheets=None):
     """Route stubbed ``uv tool run`` calls: the ``@latest`` version probe, then
-    each pinned ``prechips traveler`` run (writes its ``--out`` unless refused)
-    or ``prechips standing`` run. ``traveler(profile)`` and ``standing(cmd)``
-    return an exit code or ``(code, stderr)``. A browser call writes a PDF
-    naming the sheet it printed, unless ``printed`` is False."""
+    each pinned ``prechips traveler`` run (writes its ``--out`` unless refused:
+    ``sheets[profile]`` if given, else the profile's name) or ``prechips
+    standing`` run. ``traveler(profile)`` and ``standing(cmd)`` return an exit
+    code or ``(code, stderr)``. A browser call writes a PDF naming the sheet it
+    printed, unless ``printed`` is False."""
     calls = []
 
     def run(cmd, **kwargs):
@@ -58,7 +61,9 @@ def _uv_stub(monkeypatch, *, probe=None, traveler=None, standing=None, printed=T
             outcome = standing(cmd) if standing else 0
         code, stderr = outcome if isinstance(outcome, tuple) else (outcome, "")
         if code == 0:
-            Path(cmd[cmd.index("--out") + 1]).write_text(written, encoding="utf-8")
+            Path(cmd[cmd.index("--out") + 1]).write_text(
+                (sheets or {}).get(written, written), encoding="utf-8"
+            )
         return subprocess.CompletedProcess(cmd, code, None, stderr)
 
     monkeypatch.setattr(wrapper.subprocess, "run", run)
@@ -191,6 +196,54 @@ def test_failed_print_removes_every_traveler(process, monkeypatch):
     _uv_stub(monkeypatch, printed=False)
     assert wrapper.main(["smoke_part", "--out", str(out)]) == 1
     assert not any(path.exists() for path in plans.traveler_outputs("smoke_part", out))
+
+
+def test_a_picture_finding_not_in_the_baseline_refuses_before_printing(
+    process, monkeypatch, tmp_path
+):
+    out, author = process
+    author("smoke_part")
+    # A leader drawn through its own label (dt_cone_tip_block's, cut down).
+    svg = (
+        '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300" font-size="13">'
+        '<text x="20" y="196">on the vise bed</text>'
+        '<line class="leader" x1="60" y1="196" x2="117.92" y2="224"/></svg>'
+    )
+    picture = base64.b64encode(svg.encode()).decode()
+    hobby = f'<img src="data:image/svg+xml;base64,{picture}" alt="From the front">'
+    baseline = tmp_path / "picture-clip-baseline.toml"
+    baseline.write_text("[plans]\n", encoding="utf-8")
+    monkeypatch.setattr(picture_clip, "BASELINE", baseline)
+    errors = []
+    monkeypatch.setattr(wrapper._telemetry, "error", lambda message, **_: errors.append(message))
+    calls = _uv_stub(monkeypatch, sheets={"hobby": hobby})
+    assert wrapper.main(["smoke_part", "--out", str(out)]) == 2
+    assert not any(path.exists() for path in plans.traveler_outputs("smoke_part", out))
+    assert all(cmd[0] == _UV for cmd in calls)  # nothing printed
+    assert "new: LEADER | From the front | on the vise bed" in errors[0]
+    # Listed in the baseline, the same sheet renders and prints.
+    baseline.write_text(
+        '[plans.smoke_part]\nfindings = ["LEADER | From the front | on the vise bed"]\n',
+        encoding="utf-8",
+    )
+    assert wrapper.main(["smoke_part", "--out", str(out)]) == 0
+
+
+def test_a_picture_gate_error_refuses_and_removes_every_output(process, monkeypatch, tmp_path):
+    out, author = process
+    author("smoke_part")
+    # Malformed picture XML: the gate cannot measure it, so the render fails
+    # like a refusal, every output removed, nothing printed.
+    picture = base64.b64encode(b"<svg xmlns='http://www.w3.org/2000/svg'><text>").decode()
+    hobby = f'<img src="data:image/svg+xml;base64,{picture}" alt="From the front">'
+    monkeypatch.setattr(picture_clip, "BASELINE", tmp_path / "missing-baseline.toml")
+    errors = []
+    monkeypatch.setattr(wrapper._telemetry, "error", lambda message, **_: errors.append(message))
+    calls = _uv_stub(monkeypatch, sheets={"hobby": hobby})
+    assert wrapper.main(["smoke_part", "--out", str(out)]) == 2
+    assert not any(path.exists() for path in plans.traveler_outputs("smoke_part", out))
+    assert all(cmd[0] == _UV for cmd in calls)
+    assert any("smoke_part: no element found" in message for message in errors)
 
 
 def test_missing_browser_fails_before_any_sheet(process, monkeypatch, tmp_path):

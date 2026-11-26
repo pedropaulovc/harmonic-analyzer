@@ -1,7 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 440" width="760" height="440" font-family="sans-serif" font-size="13">
   <!-- Across the jaws from the right end (+X toward you): +Y (toward the fixed jaw) right, +Z up, 5 px/mm. The #30 (3.2639 = 16.3 px) at Y-5.588 (X46.990), its point at Z7.657 (clearance_tip_height_mm): full diameter clearance_depth_mm 8.38 below W, to the slot's place; the #43 hole through below it. -->
   <rect class="paper" x="0" y="0" width="760" height="440"/>
-  <text class="title" x="20" y="22">Op 470 (DT06, T4): the #30 opens the W half {{process.clearance_depth_mm:in.3dot}} deep (5 px/mm)</text>
+  <text class="title" x="20" y="22">Op 420 (DT06, T4): the #30 opens the W half {{process.clearance_depth_mm:in.3dot}} deep (5 px/mm)</text>
   <rect class="fixture-vise" x="294.12" y="406" width="195.88" height="14"/>
   <rect class="clamp" x="314.12" y="181.27" width="50" height="224.73"/>
   <rect class="clamp" x="420" y="181.27" width="50" height="224.73"/>
