@@ -6,6 +6,15 @@
 # to SHIP deletes its line; the batch that deletes the last line deletes this
 # file (an empty list fails the graph load).
 demoted:
+  # The v52 qualification build (farm run 20261126T191045812Z on 6d349882fd)
+  # read FIX on the MATCHED SET note (issue #3709): no necessity entry for
+  # the one-lot ±1.25% selection, and its procedure printed on the sheet.
+  # The sheet is unchanged since before the necessity register; this was its
+  # first review under it. Delegated ruling 2026-11-26 (Main), precedent: D39
+  # (owner's 2026-11-24 "better to be able to cut releases with known issues
+  # than to hold unreleased code"); owner review #2144. The line goes when
+  # #3709's fix reads SHIP.
+  ch_vn_channel_spring_installed: issue-3709
   # Farm run 20261126T080856204Z on 02cf6d4332 read FIX on DETAIL A's
   # label (issue #3658); the drum bond (#3630, rulings.md D38) no longer
   # gates. Delegated ruling 2026-11-26 (Main), precedent: the owner's ruling
