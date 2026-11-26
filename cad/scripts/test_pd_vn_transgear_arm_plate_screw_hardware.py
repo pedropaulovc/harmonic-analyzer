@@ -63,9 +63,9 @@ def test_the_cut_is_flush_with_the_arm_front_face() -> None:
     the arm's front face after the plate's over-arm section and the arm."""
     assert screw.CUT_LENGTH == pytest.approx(plate.THICKNESS_OVER_ARM + arm.THICKNESS)
     assert screw.LENGTH == screw.CUT_LENGTH
-    # The title block's .010 edge break (fit audit part 2, B2): MHA-PD-00
-    # prints no limit of its own for the cut edge.
-    assert screw.CUT_END_BREAK_MAX == pytest.approx(0.010 * 25.4)
+    # The model's .004 break, one inside the title block's .010 that governs
+    # the shop's break (fit audit part 2, B2).
+    assert screw.CUT_END_BREAK_MAX == pytest.approx(0.1016)  # .004
     assert joints.PLATE_SCREW_STOCK_LEAD_MARGIN_MM > 0.0
 
 

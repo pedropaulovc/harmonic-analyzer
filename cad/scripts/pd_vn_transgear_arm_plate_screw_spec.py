@@ -26,7 +26,6 @@ import _config
 import pd_transgear_arm_geometry as ARM
 import pd_transgear_arm_plate_geometry as PLATE
 from _package_units import drawing_unit
-from _printed_tolerance import edge_break_chamfer_mm
 
 IN = 25.4
 # #290: the purchased reference sheet prints decimal inch.
@@ -96,14 +95,18 @@ CUT_LENGTH = PLATE.THICKNESS_OVER_ARM + ARM.THICKNESS
 # The modelled screw is the installed one: placement, interference and the
 # joint stack read LENGTH as its length.
 LENGTH = CUT_LENGTH
-# The cut end's 45 deg deburr, its radial leg: the title block's edge break
-# (.010 chamfer max), so the MHA-PD-00 cut step prints no limit of its own
-# (fit audit part 2, B2).  The model carries that maximum.  It costs the
-# joint nothing: it overlaps the arm tap's own exit break at the front face,
-# whose thread loss (ARM.PLATE_TAP_EXIT_LOSS_MAX_MM, .0102) is already the
-# larger, so the worst engagement in ``transgear_hanger_joints`` is 1.91D at
-# .004 and at .010 alike.
-CUT_END_BREAK_MAX = edge_break_chamfer_mm(unit=UNIT)
+# The cut end's 45 deg deburr, its radial leg, as the model cuts it.  The
+# MHA-PD-00 cut step prints no limit of its own (fit audit part 2, B2), so
+# the title block's .010 edge break governs the shop's break; the model's
+# .004 is one break inside it.  The joint stack charges the same either way:
+# the break overlaps the arm tap's own exit break at the front face, whose
+# thread loss (ARM.PLATE_TAP_EXIT_LOSS_MAX_MM, .0102) is the larger, so the
+# worst engagement in ``transgear_hanger_joints`` is 1.91D at .004 and at
+# .010 alike (test_pd_paper_drive_assembly_drawing pins the title block's
+# break under that exit loss).  The value stays .004 so the screw, its
+# siblings in the fastener catalogue and the assemblies holding them do not
+# re-key for a change no stack sees.
+CUT_END_BREAK_MAX = 0.1016  # .004
 # The cut tip may stand this far proud of the arm's front face (the joint
 # stack's ``transgear_hanger_joints.PLATE_SCREW_CUT_PROUD_MAX``).
 CUT_PROUD_MAX = 0.2032  # .008

@@ -2348,17 +2348,18 @@ def test_the_plate_screws_are_cut_to_the_limit_the_lock_sweep_clears() -> None:
 
 def test_the_cut_plate_screw_edge_takes_the_title_block_break() -> None:
     """Fit audit part 2, B2: the cut edge's break prints no limit of its
-    own; the title block's .010 governs and the model and the engagement
-    stack carry it. The arm tap's exit break already costs the larger
-    thread loss, so the worst engagement is unchanged (1.91D)."""
+    own; the title block's .010 governs. The arm tap's exit break already
+    costs the larger thread loss for any break up to it, so the worst
+    engagement the stack charges for the model's .004 (1.91D) holds."""
     texts = drawing._step_text(operating_domain=_unit_operating_domain())
     assert texts["arm-plate-screws-cut"][2] == "BREAK THE CUT EDGE."
     import pd_vn_transgear_arm_plate_screw_spec as plate_screw
     import transgear_hanger_joints as hanger_joints
     from _printed_tolerance import edge_break_chamfer_mm
 
-    assert plate_screw.CUT_END_BREAK_MAX == pytest.approx(edge_break_chamfer_mm(unit="in"))
-    assert steps_arm.PLATE_TAP_EXIT_LOSS_MAX_MM >= plate_screw.CUT_END_BREAK_MAX
+    title_block_break = edge_break_chamfer_mm(unit="in")
+    assert plate_screw.CUT_END_BREAK_MAX <= title_block_break
+    assert steps_arm.PLATE_TAP_EXIT_LOSS_MAX_MM >= title_block_break
     assert hanger_joints.PLATE_SCREW_ENGAGEMENT_WORST_D == pytest.approx(1.909, abs=0.001)
 
 
