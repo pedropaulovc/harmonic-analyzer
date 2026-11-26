@@ -1,0 +1,24 @@
+# MHA-PD-02's counterbore guards (tolerance-policy.md, "Checks in spec modules
+# and tests"; cad/scripts/check_register.py). Entered 2026-11-25 when the
+# guide-screw counterbore's depth took its own printed band and every guard on
+# the pocket moved to the band its callout prints (#3619; rule 3: a Hole Wizard
+# pocket with no band of its own is ±.01, _wizard_pocket_band).
+checks:
+  - id: C-01
+    check: "HEAD_RECESS_MIN"
+    kind: gap
+    reason: "a guide-screw head stands proud; the paper lifts"
+    source: "owner ruling 2026-11-25 (#3619): \"b: depth .115 ±.005, HOLDS HEAD BELOW FACE\"; stock MHA-SH-VN-51 head .107 high (sh_vn_brass_fillister_screw_spec.HEAD_H); the shallowest .110 leaves .003; the .001 in floor is what the shop reads (tolerance-policy.md, 'A margin is stated in the unit and to the place the shop reads it')"
+    basis: worst_case
+  - id: C-02
+    check: "HEAD_RADIAL_CLEARANCE_MIN"
+    kind: gap
+    reason: "a guide-screw head fouls its counterbore wall"
+    source: "drawing-guidelines.md rule 3 (a wizard counterbore Ø with no band of its own is .XX, ±.01: Ø.26 is .25 at least); head Ø.183 (sh_vn_brass_fillister_screw_spec.HEAD_DIA) on a .112 shank in the #4 loose Ø.144 at DRILLED HOLES +.004/0 (float .018); leaves .0155 a side; the .001 in floor is what the shop reads"
+    basis: worst_case
+  - id: C-03
+    check: "CBORE_FLOOR_ACCEPTED_MIN"
+    kind: wall
+    reason: "the floor under a guide-screw head tears out"
+    source: "owner-ruled shortfall pd-platen RV-02 (2026-10-14, restated in inch 2026-10-31): .027 MIN under each head; met with no margin by the thinnest .147 plate under the deepest pocket at the depth's own ±.005 (owner ruling 2026-11-25, #3619); at the wizard's ±.01 it was .022"
+    basis: worst_case

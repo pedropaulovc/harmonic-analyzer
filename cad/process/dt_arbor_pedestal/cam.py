@@ -5,11 +5,11 @@ part's exported ``features.toml`` and the plan/shop TOML, then runs
 :func:`build` inside headless FreeCAD (``freecadcmd``) with that context and
 checks the posted G-code against :func:`expectations`. The pedestal's sizes
 come from the feature export (the width, the far face to near end depth, the
-strap, the foot top, the flanks and the crown, the reamed bore, the hold-down
+strap, the foot top, the flanks and the crown, the drilled bore, the hold-down
 hole and the apex tap); the blank, the skims, face levels, the step's
 stations and levels, the outline's passes, spots, pecks and the holds from
 ``plan.toml`` ``[parameters]`` and ``milling_cuts``; cutter diameters, speeds
-and feeds from the shop (``shop/``) and the plan's authored drill and reamer
+and feeds from the shop (``shop/``) and the plan's authored drill
 settings. Every path is written here (``rt.custom``): straight lines and
 arcs a recipe can state exactly. Typed here, because neither record carries
 them: the #2 centre drill's catalogue geometry (it sets the spot depth), the
@@ -25,7 +25,7 @@ PA02 faces the near end to the depth plus the stock left on the far face.
 Upright, a sawn end up: PA03 faces the foot seat, spots and drills the #15
 hold-down hole into the waste above the foot. Lying again, the near end up,
 the far face's stock on the stacks: PA04 mills the step down to the strap
-(which opens the hold-down hole), then spots, drills and reams the arbor
+(which opens the hold-down hole), then spots and drills (V) the arbor
 bore through the strap. Upright on the seat: PA05 faces the top end to the
 height, spots and drills #43 from the apex into the bore; PA06 brings the
 tap guide over it for tapping by hand. Far face up, the foot gripped
@@ -77,7 +77,7 @@ PROGRAMS: tuple[tuple[str, tuple[Any, ...]], ...] = (
     ("PA03_seat", (("seat",), ("hold_spot",), ("hold_drill",))),
     (
         "PA04_step_bore",
-        (("step",), ("bore_spot",), ("bore_drill",), ("bore_ream",)),
+        (("step",), ("bore_spot",), ("bore_drill",)),
     ),
     ("PA05_top_apex", (("top",), ("apex_spot",), ("apex_drill",))),
     ("PA06_apex_tap", ("tap_apex",)),
@@ -93,8 +93,7 @@ CAM_TOOLS = (
     "em-half",
     "spot",
     "drill-15",
-    "drill-23-64",
-    "reamer",
+    "drill-v",
     "drill-43",
     "tap-guide",
 )
@@ -140,8 +139,8 @@ PARALLEL_LENGTH_MM = 4 * IN
 OUTLINE_TOL_MM = 0.01
 # A plan number the recipe recomputes must agree to this (its rounding).
 PLAN_TOL_MM = 0.01
-# A drill or reamer may sit this far outside its hole's band (the band's inch
-# limits and the tool's inch size each rounded to mm).
+# A drill may sit this far outside its hole's band (the band's inch limits
+# and the tool's inch size each rounded to mm).
 BAND_TOL_MM = 0.001
 
 
@@ -298,20 +297,6 @@ def _pecked(
         lines.append(f"G1 Z{z:.3f} F{{feed}}")
         previous = z
     return lines + [f"G0 Z{r_plane:.3f}", f"G0 Z{clear:.3f}"]
-
-
-def _reamed(xy: tuple[float, float], top: float, tip: float, clear: float) -> list[str]:
-    """Ream from ``top`` to ``tip`` and feed back out to the R plane, spindle
-    running: no rapid leaves the bore."""
-    clear, r_plane = _r(clear), _r(top + SAFE_MM)
-    return [
-        f"G0 Z{clear:.3f}",
-        f"G0 X{xy[0]:.3f} Y{xy[1]:.3f}",
-        f"G0 Z{r_plane:.3f}",
-        f"G1 Z{_r(tip):.3f} F{{feed}}",
-        f"G1 Z{r_plane:.3f} F{{feed}}",
-        f"G0 Z{clear:.3f}",
-    ]
 
 
 def _stations(y: tuple[float, float], radius: float, max_step: float) -> list[float]:
@@ -638,8 +623,7 @@ def context(
     # Holes: each spot under its drill (no chamfer at the mouth); drills from
     # the authored settings.
     d15 = _shop_tool(plan, shop, "drill-15")["diameter_mm"]
-    d2364 = _shop_tool(plan, shop, "drill-23-64")["diameter_mm"]
-    dream = _shop_tool(plan, shop, "reamer")["diameter_mm"]
+    dv = _shop_tool(plan, shop, "drill-v")["diameter_mm"]
     d43 = _shop_tool(plan, shop, "drill-43")["diameter_mm"]
     hold, apex = g["hold"], g["apex"]
 
@@ -652,16 +636,14 @@ def context(
         raise ValueError(
             f"#15 Ø{d15} is outside the hold-down hole's band {hold['dia']}"
         )
-    if not within(dream, g["bore_dia"]):
-        raise ValueError(f"reamer Ø{dream} is outside the bore's band {g['bore_dia']}")
+    if not within(dv, g["bore_dia"]):
+        raise ValueError(f"V drill Ø{dv} is outside the bore's band {g['bore_dia']}")
     if not within(d43, apex["dia"]):
         raise ValueError(f"#43 Ø{d43} is not the apex tap's drill {apex['dia']}")
-    if not d2364 < dream:
-        raise ValueError("the bore's drill is not under the reamer")
     spot_rpm, spot_feed = _setting(plan, shop, "hold spot")
     for name, key, drill in (
         ("hold spot", "hold_spot_dia_mm", d15),
-        ("bore spot", "bore_spot_dia_mm", d2364),
+        ("bore spot", "bore_spot_dia_mm", dv),
         ("apex spot", "apex_spot_dia_mm", d43),
     ):
         if not math.isclose(_cut(plan, name, "cutter_dia_mm"), p[key], abs_tol=1e-6):
@@ -674,7 +656,6 @@ def context(
             raise ValueError(f"'{name}' runs at another speed than 'hold spot'")
     hold_rpm, hold_feed = _setting(plan, shop, "hold drill")
     bore_rpm, bore_feed = _setting(plan, shop, "bore drill")
-    ream_rpm, ream_feed = _setting(plan, shop, "bore ream")
     apex_rpm, apex_feed = _setting(plan, shop, "apex drill")
 
     # Hold-down (PA03): one plunge from the seat, full diameter past the
@@ -682,15 +663,13 @@ def context(
     hold_tip = -(foot_top + p["hold_drill_past_mm"] + _point(d15))
     _agree(plan, "hold_tip_depth_mm", -hold_tip)
     # Bore (PA04): from the step's floor through the strap and the far face's
-    # stock, the drill's full diameter and the reamer's past the stacks' top
-    # (into the gap between them).
-    bore_tip = -(p["bore_drill_past_mm"] + _point(d2364))
-    ream_tip = -(p["bore_ream_past_mm"] + p["reamer_lead_mm"])
+    # stock, the V drill's full diameter past the stacks' top (into the gap
+    # between them; fit audit F01: no reamer).
+    bore_tip = -(p["bore_drill_past_mm"] + _point(dv))
     _agree(plan, "bore_tip_height_mm", bore_tip)
-    _agree(plan, "ream_tip_height_mm", ream_tip)
     # Apex (PA05): #43 pecked from the apex, its full diameter past the
     # bore's wall at the hole's edge.
-    bore_r = dream / 2
+    bore_r = dv / 2
     edge_wall = g["crown_y"] + math.sqrt(bore_r**2 - (d43 / 2) ** 2)
     apex_tip = edge_wall - p["apex_drill_past_mm"] - _point(d43)
     _agree(plan, "apex_tip_height_mm", apex_tip)
@@ -756,9 +735,8 @@ def context(
     # The PA07 beam's strap section: the crown's Ø less the bore's largest.
     _agree(plan, "strap_net_width_mm", 2 * g["radius"] - g["bore_dia"][1])
     # PA04's air prove-out: Z0 raised by the least .1 in multiple that puts
-    # the drill's and the reamer's points CLEAR_MM above the uncut near end.
-    lowest = min(bore_tip, ream_tip)
-    raise_mm = math.ceil((height + CLEAR_MM - lowest) / 2.54 - 1e-9) * 2.54
+    # the drill's point CLEAR_MM above the uncut near end.
+    raise_mm = math.ceil((height + CLEAR_MM - bore_tip) / 2.54 - 1e-9) * 2.54
     _agree(plan, "step_prove_raise_mm", raise_mm)
     # The near end (PA02) and the step's floor (PA04) each take half the
     # strap's band: the floor is cut from F, the far face later from N.
@@ -831,7 +809,7 @@ def context(
     bore_xy = xy("step", [0.0, g["crown_y"], g["far"]])
     apex_xy = xy("top", apex["at"])
     # The bore clears the step's stacks.
-    if not (-width + t < bore_xy[1] - d2364 / 2 and bore_xy[1] + d2364 / 2 < -t):
+    if not (-width + t < bore_xy[1] - dv / 2 and bore_xy[1] + dv / 2 < -t):
         raise ValueError(f"the bore at Y {bore_xy[1]} reaches a stack ({t} thick)")
 
     em_tool = {
@@ -1086,28 +1064,15 @@ def context(
             ],
         },
         {
-            **drill_tool("drill-23-64", d2364, bore_rpm, bore_feed),
+            **drill_tool("drill-v", dv, bore_rpm, bore_feed),
             "frame": "step",
             "label": "bore drill",
             "stock": stocks["step"],
             "ops": [
                 [
                     "bore_drill",
-                    "drill the bore 23/64",
+                    "drill the bore V",
                     _pecked(bore_xy, floor, bore_tip, None, step_clear),
-                ]
-            ],
-        },
-        {
-            **drill_tool("reamer", dream, ream_rpm, ream_feed),
-            "frame": "step",
-            "label": "bore ream",
-            "stock": stocks["step"],
-            "ops": [
-                [
-                    "bore_ream",
-                    "ream the bore .3760",
-                    _reamed(bore_xy, floor, ream_tip, step_clear),
                 ]
             ],
         },
@@ -1304,8 +1269,8 @@ def context(
         ),
         "PA04_step_bore": (
             height,
-            [tn["em-half"], tn["spot"], tn["drill-23-64"], tn["reamer"]],
-            [[step_rpm], [spot_rpm], [bore_rpm], [ream_rpm]],
+            [tn["em-half"], tn["spot"], tn["drill-v"]],
+            [[step_rpm], [spot_rpm], [bore_rpm]],
             bore_tip,
             [
                 [
@@ -1334,14 +1299,7 @@ def context(
                     spot_r,
                     bore_keep,
                 ),
-                hole_checks([bore_xy], floor, bore_tip, d2364 / 2, bore_keep),
-                [
-                    ["holes", {"centres": [bore_xy], "z_bottom": _r(ream_tip)}],
-                    ["feed_out", {"z_top": floor}],
-                    ["air_feed", {"z_top": floor}],
-                    ["vertical_below_top", {"z_top": floor}],
-                    ["keep_out", {"radius": dream / 2, "boxes": bore_keep}],
-                ],
+                hole_checks([bore_xy], floor, bore_tip, dv / 2, bore_keep),
             ],
         ),
         "PA05_top_apex": (

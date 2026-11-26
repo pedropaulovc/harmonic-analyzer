@@ -17,20 +17,15 @@
 #   into the bore, CM03 brings the tap guide over it for hand tapping #2-56
 #   (FluidNC cannot rigid-tap; as mg_magnifying_clamp). No drill press is
 #   recorded in the shop.
-# - Setup 4, bench: deburr, inspect (eccentricity over the GO pin on the
-#   height gauge, with the pin's written reading), oil, bag the set screw.
+# - Setup 4, bench: deburr, inspect (eccentricity over the 1/4 drill's
+#   shank on the height gauge, with the shank's miked reading), oil, bag the
+#   set screw.
 # To order before Setup 2 runs: the .2510 reamer (tools.reamer-2510, owner
-# ruling #3073 buys fixed reamers for running fits); the bore's two Class ZZ
-# pins, .2510 plus (GO) and .2515 minus (NO-GO), shop dt.toml
-# zz-pins-2510-2515. Owner ruling 2026-11-23 (tool audit Q1, re-answered on
-# the corrected facts), verbatim: "ZZ singles per the record: 29 pins (17
-# plus GO, 12 minus NO-GO), about $130. Accept that good holes near a limit
-# may be refused; the traveler mikes each pin so the real window is known
-# per pin." Setup 1 ends by miking both pins and the reamer (a trial hole in
-# the bar's remainder if the reamer reads under the GO pin); the bore is
-# accepted between the two pins' written readings, and Setup 4 reads the
-# eccentricity over the GO pin with its reading G in place of the old
-# Class X plug's .2510. No V-blocks or setting mandrel are used.
+# ruling #3073 buys fixed reamers for running fits). The bore prints no band
+# and the MHA-DT-17 rod sliding in by hand accepts it (drawing-guidelines
+# rule 4, form 3; fit audit F19: ".2510 REAM THRU; MHA-DT-17 ROD SLIDES IN BY
+# HAND"); the Class ZZ pins zz-pins-2510-2515 are not used. No V-blocks or
+# setting mandrel are used.
 #
 # Tapping: FluidNC cannot rigid-tap (owner, Pedro, 2026-11-17). The tap is
 # guided by the Fisher spring tap guide in the 1/2 in R8 collet (owner, Pedro,
@@ -54,7 +49,7 @@ part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
 material = "1018 cold-finished steel, 5/8 in round (drawing: {{cad.material_spec}})"
 stock = "{{process.bar_dia_in:fraction}} in round bar: saw one piece {{process.bar_length_min_in:.2f}}–3.00 in long off it, which makes both cams ({{process.quantity:d}} off); never chuck the whole bar (it would run out past the spindle's rear end)."
-note = "Inches unless mm; G-code and console entries in mm (the files and the controller run G21). Finished Ø{{cad.cam_od_dia_min_in:.3dot}}–{{cad.cam_od_dia_max_in:.3dot}} × {{cad.cam_od_length_min_in:.3dot}}–{{cad.cam_od_length_max_in:.3dot}} long; the bore Ø{{cad.bore_dia_min_in:.4dot}}–{{cad.bore_dia_max_in:.4dot}} {{cad.bore_eccentricity_min_in:.3dot}}–{{cad.bore_eccentricity_max_in:.3dot}} off the O.D. axis (thin wall {{cad.bore_thin_wall_min_mm:in.4dot}} min); the #2-56 set-screw hole opposite the thin side, {{cad.set_screw_tap_station_min_in:.3dot}}–{{cad.set_screw_tap_station_max_in:.3dot}} from the front face. Mill speeds on the PM-30MV low belt (100–2800 rpm). Home the mill ($H) and touch off G54 at the start of every mill setup; after any controller reset, stall or E-stop, home and touch off again before Cycle Start. Every file is proved in air on the first cam. Edges: R{{cad.edge_break_in:.3dot}} or chamfer {{cad.chamfer_max_in:.3dot}} max."
+note = "Inches unless mm; G-code and console entries in mm (the files and the controller run G21). Finished Ø{{cad.cam_od_dia_min_in:.3dot}}–{{cad.cam_od_dia_max_in:.3dot}} × {{cad.cam_od_length_min_in:.3dot}}–{{cad.cam_od_length_max_in:.3dot}} long; the bore Ø{{cad.bore_dia_min_in:.4dot}}–{{cad.bore_dia_max_in:.4dot}} {{cad.bore_eccentricity_min_in:.3dot}}–{{cad.bore_eccentricity_max_in:.3dot}} off the O.D. axis (thin wall {{cad.bore_thin_wall_min_mm:in.4dot}} min); the #2-56 set-screw hole opposite the thin side, {{cad.set_screw_tap_station_min_in:.3dot}}–{{cad.set_screw_tap_station_max_in:.3dot}} from the front face. Mill speeds on the PM-30MV low belt (100–2800 rpm). Home the mill ($H) once, after switching it on: every M6's trip to the tool setter and the tap files' G53 retract count from home. Home again only after a power cycle or a controller restart, an E-stop, an alarm, a limit switch hit, a stall or a crash: homing brings the stored G54 back. Then check every zero of the setup again, each the way its step set it: each must read what its step set, within .001 in. One does not, cannot be reached with the part in, or the part may have moved: take the setup again from its first step, the part out. They all do: run the interrupted file again from its start. Feed Hold, then Reset with the axes stopped keeps position and G54: no homing, no new zero; run the interrupted file again from its start: its first M6 measures the tool, and cuts already made are cut in air. Every file is proved in air on the first cam. Edges: R{{cad.edge_break_in:.3dot}} or chamfer {{cad.chamfer_max_in:.3dot}} max."
 shop = "../shop"
 stock_refs = ["1018-round-5-8"]
 material_key = "rocker-1018-cold-finished"
@@ -167,14 +162,6 @@ drill_50_feed_per_min_mm = 71.12
 # to .01 in.
 tap_stack_max_mm = 288.29
 tap_wrench_reach_max_mm = 208.78
-# The Class ZZ pins (shop dt.toml zz-pins-2510-2515; owner ruling 2026-11-23,
-# tool audit Q1): GO a plus pin at the bore band's low limit, true size .2510
-# to .2512; NO-GO a minus pin at the high limit, .2513 to .2515 (one pin's ZZ
-# tolerance, .0002, is the record's resolution_mm 0.00508). The largest GO
-# pin and the smallest NO-GO pin a sheet may use: with both pins there, a
-# bore is sure to pass only between them, the middle .0001 of the .0005 band.
-go_pin_max_in = 0.2512
-nogo_pin_min_in = 0.2513
 
 [[tools]]
 id = "turn"
@@ -213,11 +200,6 @@ ref = "tap-2-56-plug"
 id = "feeler"
 name = "Feeler gauges"
 ref = "feeler-gauges"
-[[tools]]
-id = "pins"
-name = "Class ZZ pins: .2510 plus (GO) and .2515 minus (NO-GO)"
-ref = "zz-pins-2510-2515"
-status = "to_order"
 [[tools]]
 id = "files"
 name = "Files"
@@ -310,24 +292,6 @@ feed = "hand"
 inspection = "Length {{cad.cam_od_length_min_in:.3dot}}–{{cad.cam_od_length_max_in:.3dot}}, calipers."
 gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.cam_od_length_band_mm}}" }]
 
-[[setups.operations]]
-cut_kind = "other"
-instruction = "The bar's remainder still chucked, spindle stopped: on the 0–1 in micrometer (reads .0001; trust a reading to ±.00005), mike the {{cad.bore_dia_min_in:.4dot}} GO pin, the {{cad.bore_dia_max_in:.4dot}} NO-GO pin, and the .2510 reamer across two opposite margins at its front end. Write the three readings here (the GO pin's as G), and each pin's on its tag."
-inspection = "GO pin reads {{cad.bore_dia_min_in:.4dot}}–{{process.go_pin_max_in:.4dot}}, NO-GO pin {{process.nogo_pin_min_in:.4dot}}–{{cad.bore_dia_max_in:.4dot}}: a pin outside its range is not used. The reamer reads under the NO-GO pin's reading, else it is not used: stop and tell the owner."
-gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.bore_dia_band_mm}}" }]
-feed = "hand"
-
-[[setups.operations]]
-cut_kind = "other"
-instruction = "This sheet accepts a bore the GO pin enters and the NO-GO pin does not: GO reading ≤ bore < NO-GO reading. With both pins at their size limits only {{process.go_pin_max_in:.4dot}}–{{process.nogo_pin_min_in:.4dot}} is sure to pass; a good bore within .0002 of either band limit may be refused (owner ruling 2026-11-23)."
-feed = "hand"
-
-[[setups.operations]]
-cut_kind = "other"
-instruction = "Only if the reamer read under the GO pin, the bar's remainder still chucked: face it; from the tailstock drill chuck, spot it with the #2 centre drill, drill C .50 deep at 1000 rpm and ream .2510 .40 deep at 400 rpm, Tapmatic Gold, the reamer withdrawn running; gauge it as op 170 does. The GO pin enters: go on. Refused: stop and tell the owner (the pins refuse this reamer's holes)."
-feed = "hand"
-
-
 [[setups]]
 machine_kind = "other"
 title = "Ream the eccentric bore"
@@ -342,12 +306,12 @@ vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{cad.cam_od_dia_mm}}", alon
 beam = { axis = "z", hold = "cantilever", extent_mm = [0, "{{cad.envelope_z_mm}}"], clamp_mm = [0, "{{process.bore_grip_mm}}"], section_mm = { diameter = "{{cad.cam_od_dia_mm}}" }, vise_left = "other" }
 
 [[setups.operations]]
-instruction = "Start only with the .2510 reamer and the two Class ZZ pins in hand (to order), the pins and the reamer miked in op 80. Mike each cam's O.D. and write it on a tag with the cam."
+instruction = "Start only with the .2510 reamer (to order) and an MHA-DT-17 rod (or a length of its 1/4 ground stock) in hand. Mike each cam's O.D. and write it on a tag with the cam."
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Home the mill ($H). G54 Y0: the O.D. axis, half the miked O.D. from the fixed jaw. X0: the O.D. axis, midway between its left and right sides at Y0."
-instruction_detailed = "Home the mill ($H). Edge finder (900 rpm) on the fixed jaw's face beside the cam: G10 L20 P1 Y(half your O.D. reading in mm − 2.540); for .575, Y4.763. MDI G0 Y0. Edge finder down beside the O.D. between the jaws, on the LEFT side from the left: G10 L20 P1 X0. On the RIGHT side from the right: G10 L20 P1 X(half the DRO X reading)."
+instruction = "G54 Y0: the O.D. axis, half the miked O.D. from the fixed jaw. X0: the O.D. axis, midway between its left and right sides at Y0."
+instruction_detailed = "Edge finder (900 rpm) on the fixed jaw's face beside the cam: G10 L20 P1 Y(half your O.D. reading in mm − 2.540); for .575, Y4.763. MDI G0 Y0. Edge finder down beside the O.D. between the jaws, on the LEFT side from the left: G10 L20 P1 X0. On the RIGHT side from the right: G10 L20 P1 X(half the DRO X reading)."
 feed = "hand"
 
 [[setups.operations]]
@@ -390,22 +354,22 @@ milling_cuts = [
 speed_kind = "spindle"
 tool = "reamer"
 drilling = "none"
-sizing = { kind = "band", band_mm = "{{cad.bore_dia_band_mm}}" }
+sizing = "other"
 instruction = "Same file, M6 T3: .2510 reamer through, {{process.ream_past_mm:in.3dot}} past face F, fed in and fed back out with the spindle running; set 400. Plenty of Tapmatic Gold."
 rpm = 400
 feed = "{{process.ream_feed_per_min_mm:in.1f}} in/min"
 milling_cuts = [
   { name = "bore ream", kind = "drill", phase = "finish", cutter_dia_mm = 6.3754, flutes = 6, rpm = 400, feed_mm_min = "{{process.ream_feed_per_min_mm}}", stations_mm = "{{cad.bore_eccentricity_mm}}" },
 ]
-inspection = "GO enters, NO-GO does not, before unclamping: bore Ø{{cad.bore_dia_min_in:.4dot}}–{{cad.bore_dia_max_in:.4dot}}."
-gauge_checks = [{ gauge = "zz-pins-2510-2515", band_mm = "{{cad.bore_dia_band_mm}}" }]
+inspection = "Before unclamping, chips blown out and the bore oiled: an MHA-DT-17 rod (or a length of its 1/4 ground stock) slides into the bore by hand and through it (fit audit F19: .2510 REAM THRU, the rod is the gauge)."
+gauge_checks = "other"
 
 [[setups.operations]]
-instruction = "The GO pin refused: T3 still in, spindle at 400, plenty of Tapmatic Gold, the same reamer once more: MDI G0 X{{cad.bore_eccentricity_mm:.3f}} Y0 Z1, M3 S400, G1 Z{{process.bore_ream_tip_mm:.3f}} F{{process.ream_feed_per_min_mm:.1f}}, G1 Z1, G0 Z5, M5; blow out and gauge again. Still refused (a reamer cannot be made to cut larger), or the NO-GO pin entering (no cut remedies it): reject the cam."
+instruction = "The rod refused: T3 still in, spindle at 400, plenty of Tapmatic Gold, the same reamer once more: MDI G0 X{{cad.bore_eccentricity_mm:.3f}} Y0 Z1, M3 S400, G1 Z{{process.bore_ream_tip_mm:.3f}} F{{process.ream_feed_per_min_mm:.1f}}, G1 Z1, G0 Z5, M5; blow out and try the rod again. Still refused (a reamer cannot be made to cut larger): reject the cam."
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Blow out the chips. Second cam: unclamp, load it the same way and repeat Setup 2 from op 120 with its own Y0 (its tagged O.D.) and its own X0 (both sides of its O.D.): the first cam's zero does not locate the second."
+instruction = "Blow out the chips. Second cam: unclamp, load it the same way and repeat Setup 2 from op 90 with its own Y0 (its tagged O.D.) and its own X0 (both sides of its O.D.): the first cam's zero does not locate the second."
 feed = "hand"
 
 [[setups]]
@@ -414,7 +378,7 @@ title = "Drill and tap the set-screw hole"
 machine = "PM-30MV CNC (FluidNC, CNCjs with the electronic tool setter) / vise, swivel off"
 indexing = "none"
 machine_ref = "pm-30mv"
-holding = "The PM 6 in vise (jaws {{process.vise_jaw_height_mm:in.2f}} tall above its seat). A 1 in parallel, 1/8 in thick, against each jaw. The cam lying along the jaws, face F to the LEFT, its rear face {{process.cross_jaw_end_mm:in.2f}} in from the jaws' RIGHT ends, its O.D. on the parallels' inner top edges, the bore BELOW the O.D.'s centre (thick wall up). A 1/4 in drill from the 115-piece index, shank first, in the bore from the right, standing out past the jaw ends. The other cam (or, for the second, the finished first) lies the same way at the jaws' LEFT ends as the balance, so the jaws close square. Snug the vise (ops 210–230 orient it)."
+holding = "The PM 6 in vise (jaws {{process.vise_jaw_height_mm:in.2f}} tall above its seat). A 1 in parallel, 1/8 in thick, against each jaw. The cam lying along the jaws, face F to the LEFT, its rear face {{process.cross_jaw_end_mm:in.2f}} in from the jaws' RIGHT ends, its O.D. on the parallels' inner top edges, the bore BELOW the O.D.'s centre (thick wall up). A 1/4 in drill from the 115-piece index, shank first, in the bore from the right, standing out past the jaw ends. The other cam (or, for the second, the finished first) lies the same way at the jaws' LEFT ends as the balance, so the jaws close square. Snug the vise (ops 180–200 orient it)."
 datum = "Programs CM02_set_screw and CM03_set_screw_tap. G54: X0 face F, +X toward the rear face; Y0 the O.D. axis; Z0 the O.D.'s top line. Tool lengths from the tool setter at each M6; every move between holes runs above the jaw tops, which stand {{process.cross_jaw_top_mm:in.3dot}} above Z0."
 diagram = { file = "diagrams/cross.svg", alt = "The cam lying in the vise on the parallels' edges, thick side up, a drill shank in the bore; the #50 drills down from the top {{cad.set_screw_tap_station_in:.2dot}} from face F into the bore." }
 envelope = "other"
@@ -422,8 +386,8 @@ vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{cad.cam_od_dia_mm}}", alon
 beam = { axis = "x", hold = "solid", extent_mm = [0, "{{cad.envelope_z_mm}}"], seat = "gripped full length across the O.D. in the vise jaws, on the parallels' edges", seat_mm = [0, "{{cad.envelope_z_mm}}"] }
 
 [[setups.operations]]
-instruction = "Home the mill ($H). G54 Y0: the O.D. axis, half the miked O.D. from the fixed jaw, as Setup 2."
-instruction_detailed = "Home the mill ($H). Edge finder (900 rpm) on the fixed jaw's face: G10 L20 P1 Y(half your O.D. reading in mm − 2.540)."
+instruction = "G54 Y0: the O.D. axis, half the miked O.D. from the fixed jaw, as Setup 2."
+instruction_detailed = "Edge finder (900 rpm) on the fixed jaw's face: G10 L20 P1 Y(half your O.D. reading in mm − 2.540)."
 feed = "hand"
 
 [[setups.operations]]
@@ -431,7 +395,7 @@ instruction = "Orient: the shank resting on the bore's bottom (do not lift it), 
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Average more than {{process.orient_band_mm:.3f}} mm from 0: loosen, turn the cam a touch by the shank (0.035 mm of shank movement is 1° of turn), snug, and repeat op 210."
+instruction = "Average more than {{process.orient_band_mm:.3f}} mm from 0: loosen, turn the cam a touch by the shank (0.035 mm of shank movement is 1° of turn), snug, and repeat op 180."
 feed = "hand"
 
 [[setups.operations]]
@@ -502,7 +466,7 @@ instruction = "Tap #2-56 by hand under the tap guide, spindle off, Tapmatic Gold
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Jog Z up clear, back the tap out, blow out the hole and the bore. Swap the two cams' positions: load the second cam at the jaws' RIGHT ends per Setup 3 Holding (face F LEFT, rear face .25 from the jaw ends, bore below centre, the 1/4 shank back in the bore), the drilled cam at the LEFT ends as the balance; then repeat from op 200 in order: its own Y0 from its O.D., orient it, then its X0 and Z0."
+instruction = "Jog Z up clear, back the tap out, blow out the hole and the bore. Swap the two cams' positions: load the second cam at the jaws' RIGHT ends per Setup 3 Holding (face F LEFT, rear face .25 from the jaw ends, bore below centre, the 1/4 shank back in the bore), the drilled cam at the LEFT ends as the balance; then repeat from op 170 in order: its own Y0 from its O.D., orient it, then its X0 and Z0."
 feed = "hand"
 
 [[setups]]
@@ -510,7 +474,7 @@ machine_kind = "other"
 title = "Deburr, inspect, oil"
 machine = "Bench, surface plate"
 indexing = "none"
-diagram = { file = "diagrams/inspect.svg", alt = "The cam lying on the surface plate, thick side down, the .2510 GO pin in the bore; the height gauge reads over the pin to give the eccentricity." }
+diagram = { file = "diagrams/inspect.svg", alt = "The cam lying on the surface plate, thick side down, the 1/4 drill's shank in the bore; the height gauge reads over the shank to give the eccentricity." }
 envelope = "other"
 vise_hold = "other"
 beam = "other"
@@ -524,13 +488,13 @@ instruction = "Deburr both bore mouths, the hole's mouth on the O.D. and the rea
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Length and O.D. were accepted on the lathe. Eccentricity: lay the cam on the surface plate on its O.D. with the GO pin in the bore (under .0005 shake); hold it on the plate by hand, roll it slowly and read the highest point H over the pin with the height gauge. Eccentricity = H − O.D./2 − G/2 (G the GO pin's reading, op 80)."
+instruction = "Length and O.D. were accepted on the lathe. Eccentricity: mike the 1/4 drill's shank (Setup 3's) as R and lay the cam on the surface plate on its O.D. with the shank in the bore; hold it on the plate by hand, roll it slowly and read the highest point H over the shank with the height gauge. Eccentricity = H − O.D./2 − R/2 (the shank's shake in the bore reads up to .0012 low)."
 feed = "hand"
 inspection = "Eccentricity {{cad.bore_eccentricity_min_in:.3dot}}–{{cad.bore_eccentricity_max_in:.3dot}}."
 gauge_checks = [{ gauge = "height-gauge", band_mm = "{{cad.bore_eccentricity_band_mm}}" }]
 
 [[setups.operations]]
-instruction = "Thin wall from that eccentricity: O.D./2 − eccentricity − N/2 (N the NO-GO pin's reading, op 80: the bore is under it)."
+instruction = "Thin wall from that eccentricity: O.D./2 − eccentricity − {{cad.bore_dia_max_in:.4dot}}/2 (the reamed bore's largest, fit audit F19: no pins)."
 feed = "hand"
 inspection = "Thin wall at least {{cad.bore_thin_wall_min_mm:in.4dot}}."
 gauge_checks = "other"
@@ -542,5 +506,5 @@ inspection = "Station {{cad.set_screw_tap_station_min_in:.3dot}}–{{cad.set_scr
 gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.set_screw_tap_station_band_mm}}" }]
 
 [[setups.operations]]
-instruction = "Wipe on ISO VG 32 oil, into the tapped hole. Bag each cam with one ASME B18.3 #2-56 × 3/16 flat-point socket set screw, loose (drawing note 2)."
+instruction = "Wipe on ISO VG 32 oil, into the tapped hole. Bag each cam with one ASME B18.3 #2-56 × 3/16 flat-point socket set screw, loose (drawing note 1)."
 feed = "hand"

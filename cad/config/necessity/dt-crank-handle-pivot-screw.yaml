@@ -1,0 +1,14 @@
+# Why each band tighter than the title block stays on MHA-DT-32
+# (drawing-guidelines rule 4; owner ruling 2026-11-24: the reason lives here,
+# not on the sheet).  The shoulder's limits .1535-.1585 are owner ruling
+# 2026-11-24, fit audit question 14; the shoulder is turned to them, nothing
+# read off the handle (delegated ruling 2026-11-25 (Main), no precedent;
+# owner review #2144 (D35: MHA-DT-32's shoulder keeps owner Q14's
+# .1535-.1585 as a necessity band; Q14's trial retired with D26)).  The sheet
+# prints the band as swTolBILAT, +.0025/-.0025.
+necessity:
+  - id: N-01
+    feature: "sheet 1, front view, Ø.1560 +.0025/-.0025 shoulder (RUNNING FIT IN MHA-DT-08 BORE)"
+    kind: gap
+    reason: "title block .156 ±.005 binds high, thins seat low"
+    source: "two checks, each failing at the title block's .156 ±.005 and passing at the band. Upper: 'shoulder can bind in the oak bore' (HANDLE_BORE_MIN - SHOULDER_DIA_MAX > 0) leaves 0 at .161 (the #20 bore's .161 minimum), .0025 at .1585. Lower: 'the shoulder's seat on the arm face is under 0.2 radial' (SEAT_RADIAL_MIN >= 0.2 mm on the MHA-DT-06 arm face) leaves 0.183 mm at .151, 0.215 mm at .1535. Form 2 (made to fit the bore) was retired with D26/D35, so the band governs: delegated ruling 2026-11-25 (Main), no precedent; owner review #2144 (D35: MHA-DT-32's shoulder keeps owner Q14's .1535-.1585 as a necessity band; Q14's trial retired with D26); limits per owner ruling 2026-11-24 (fit audit question 14: limits .1535-.1585)"

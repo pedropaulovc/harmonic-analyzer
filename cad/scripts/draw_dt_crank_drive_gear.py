@@ -48,7 +48,11 @@ from _drawing_common import (
     rebuild_drawing,
     stamp_drawing_summary,
 )
-from _drawing_dimensions import assert_imported_precision, set_dimension_callouts
+from _drawing_dimensions import (
+    assert_imported_precision,
+    set_dimension_callouts,
+    set_reference_dimension,
+)
 from _drawing_hidden_sketches import curate_view_dimensions
 from _drawing_leaders import (
     assert_leaders_clear,
@@ -66,11 +70,9 @@ from _part_properties import part_drawing_unit
 from _paths import CAD_ROOT
 from _session import run_build
 import _telemetry
-import cone_land_key
 from dt_crank_drive_gear_notes import GEAR_DATA, KEY_MATE_NUMBER, SHAFT_MATE_NUMBER
 from dt_crank_drive_gear_spec import (
     BORE_DIA,
-    BORE_DIAMETRAL_CLEARANCE,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     FACE_WIDTH,
@@ -197,38 +199,45 @@ SECTION_KEEP = {
 # text-unmatched), while the native below lane prints on every sheet.
 FACE_WIDTH_CALLOUT = "SETS CONE GEAR STACK\nON MHA-DT-04"
 
-# Native bands on the bore and keyway dimensions set the fitted clearances:
-# the fleet gear-seat fit (gear_seat_fit) on MHA-DT-04's land 1, .0008 wide
-# on the round, and cone_land_key's width and T for the MHA-DT-VN-71 key.
-# The round's fit route is a matched fit to the finished land with its
-# acceptance (drawing-guidelines.md rule 4), named once in numbered note 1
-# that the bore and keyway dimensions link (rule 4: one feature with several
-# tight dimensions names its mate once). The round bore's callout carries
-# REAM, rule 12's process for a fit bore (no flat left for a reamer to cut
-# away, so dt-crank-drive-gear.yaml RV-01 is retired); the keyway's bands
-# are its requirement and print no process. The mate's name lives here, not beside its number in
+# The round bore comes off the owned .3760 over reamer and prints its size
+# with no band (fit audit 2026-11-23, MHA-DT-07.bore; drawing-guidelines rule
+# 4: a reamed hole's mate is the gauge). The keyway's width comes off the
+# stock 1/16 A broach and prints as a reference, the key the gauge: KEY
+# MHA-DT-VN-71 SLIDES IN THE KEYWAY is its requirement (rule 4 form 3; machinist
+# review r1, farm run 20261124T110807008Z: the .0625 +.002/.000 band's
+# register reason, the 64T clocking on the key, is not a kind rule 4 names,
+# and its side play only shifts the crank index, error_budget.phase_profiles,
+# so no check fails without it; drawing-guidelines rule 4's necessity test).
+# Its keyway T keeps cone_land_key's band (register N-03). The fit is named
+# once, in numbered note 1 that the bore and keyway dimensions link (rule 4:
+# one feature with several dimensions names its mate once): MHA-DT-04's
+# land is the member made last and is turned to the reamed bore, not the
+# bore to the land (the note had it backwards: a fixed reamer cannot be
+# made to a measured land). The round bore's callout carries REAM, rule 12's
+# process for a fit bore (no flat left for a reamer to cut away, so
+# dt-crank-drive-gear.yaml RV-01 is retired). Why the ream and the T band
+# stay is in cad/config/necessity/dt-crank-drive-gear.yaml, not on the sheet.
+# The mate's name lives here, not beside its number in
 # crank_drive_gear_notes, which is in the part's rebuild closure;
-# test_crank_drive_gear_drawing checks it against the registry.
+# test_dt_crank_drive_gear_drawing checks it against the registry.
 SHAFT_MATE_NAME = "CONE GEAR SHAFT"
 KEY_MATE_NAME = "KEY"
 BORE_FIT_NOTE_NUMBER = 1
-# The land is named by what it is, its key, not by a project label the sheet
-# never defines (machinist review, run 20261110T001845485Z: "LAND 1"; rule
-# 26). MHA-DT-04 keys one land only. The clearances print as REF in the form
-# draw_dt_cone_gear.sheet_notes prints for the keyed cone gears on the same
-# land, read from the same limits (the round fit, cone_land_key's keyway side
-# clearance). Each line stays no longer than 51 characters, left of the
-# keyway width's text above it.
-_ROUND_FIT = "-".join(inch_text(value, 4) for value in BORE_DIAMETRAL_CLEARANCE)
-_KEYWAY_FIT = "-".join(
-    inch_text(value, 4) for value in cone_land_key.KEYWAY_SIDE_CLEARANCE_MM
-)
+# The land is named by its diameter, as MHA-DT-03's keyed sheets name theirs
+# (draw_dt_cone_gear._land_text; "LAND 1" was a label no sheet defined,
+# machinist review run 20261110T001845485Z, rule 26). Form 2 of rule 4: the
+# land is turned last to this bore, so the acceptance and the clearances
+# print once, on MHA-DT-04's note 1 ("TURNED LAST TO MHA-DT-03 30T-120T AND
+# MHA-DT-07 BORES, EACH SLIDES ON, NO SHAKE"); this note names the mates
+# only, in MHA-DT-03's words. BORE_DIAMETRAL_CLEARANCE and cone_land_key's
+# keyway side clearance stay as the analysis bands (the necessity register
+# and the stacks), printed nowhere. Each line stays no longer than 51
+# characters, left of the keyway width's text above it.
 BORE_FIT_NOTE = "\n".join(
     (
-        f"{BORE_FIT_NOTE_NUMBER}. SLIDING FIT ON THE KEYED LAND OF {SHAFT_MATE_NAME}",
-        f"   {SHAFT_MATE_NUMBER} AND {KEY_MATE_NAME} {KEY_MATE_NUMBER}: BORE MADE TO THE",
-        f"   MEASURED LAND (CLEARANCE {_ROUND_FIT} ON \u00d8,",
-        f"   {_KEYWAY_FIT} KEYWAY TO KEY); SLIDES ON, NO ROCK.",
+        f"{BORE_FIT_NOTE_NUMBER}. SLIDING FIT: {SHAFT_MATE_NAME} {SHAFT_MATE_NUMBER}",
+        f"   \u00d8{inch_text(BORE_DIA, 4)} LAND IS TURNED TO THIS BORE;",
+        f"   {KEY_MATE_NAME} {KEY_MATE_NUMBER} SLIDES IN THE KEYWAY.",
     )
 )
 # The sheet's numbered notes, in one block (rule 7: at most four short
@@ -237,10 +246,12 @@ BORE_FIT_NOTE = "\n".join(
 SHEET_NOTES = BORE_FIT_NOTE
 NOTES_XY = (0.016, 0.060)
 BORE_CALLOUT = f"REAM THRU\nSEE NOTE {BORE_FIT_NOTE_NUMBER}"
-# The keyway's width and T print their value, band and flag only, as the
-# keyed cone gears' do (draw_dt_cone_gear: the machinist review of the
-# C1-keyed sheets dropped KEYWAY TO FAR SIDE; rule 25, sheets agree). T
-# reads from its witnesses: the keyway top and the far side of the bore.
+# The keyway's width and T print their value and flag only, as the keyed
+# cone gears' do (draw_dt_cone_gear: the machinist review of the C1-keyed
+# sheets dropped KEYWAY TO FAR SIDE; rule 25, sheets agree); the width's
+# value is a reference (REFERENCE_DIMENSIONS). T reads from its witnesses:
+# the keyway top and the far side of the bore.
+REFERENCE_DIMENSIONS = ("KeywayWidth",)
 KEYWAY_WIDTH_CALLOUT = f"SEE NOTE {BORE_FIT_NOTE_NUMBER}"
 KEYWAY_T_CALLOUT = f"SEE NOTE {BORE_FIT_NOTE_NUMBER}"
 DIMENSION_CALLOUTS = {
@@ -534,6 +545,10 @@ def build(adapter: Any) -> dict[str, str]:
         adapter, section_annotations,
         {name: DIMENSION_CALLOUTS[name] for name in SECTION_KEEP},
     )
+    for name in REFERENCE_DIMENSIONS:
+        set_reference_dimension(
+            adapter, _named(adapter, front_annotations, name), label=f"64T {name}"
+        )
     assert_imported_precision(
         adapter, front_annotations + section_annotations, DRAWING_PRECISION_BY_NAME
     )

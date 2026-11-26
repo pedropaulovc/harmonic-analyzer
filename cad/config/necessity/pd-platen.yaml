@@ -1,0 +1,9 @@
+# MHA-PD-02 platen: why each band tighter than the title block stays
+# (drawing-guidelines.md rule 4; owner ruling 2026-11-24: the reason lives
+# here, not on the sheet). Read by the machinist review only.
+necessity:
+  - id: N-01
+    feature: "sheet 1, the ten guide-screw counterbores' depth ↧.115 ±.005 (10X Ø.144 THRU ALL ⌴Ø.26 ↧.115 ±.005 FAR SIDE FOR MHA-SH-VN-51, HOLDS HEAD BELOW FACE): a wizard pocket's depth is otherwise .XX, ±.01 (rule 3)"
+    kind: gap
+    reason: "at ±.01 a guide-screw head stands proud of the paper"
+    source: "pd_platen_spec.HEAD_RECESS_MIN (and CBORE_FLOOR_MIN: the deepest pocket at ±.01 leaves .022 under RV-02's .027); owner ruling 2026-11-25 (#3619): \"b: depth .115 ±.005, HOLDS HEAD BELOW FACE\""

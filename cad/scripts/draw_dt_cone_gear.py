@@ -63,6 +63,7 @@ from _drawing_dimension_import import _INSERT_DIMS_MARKED, delete_unnamed_import
 from _drawing_dimensions import (
     assert_imported_precision,
     set_dimension_callouts,
+    set_reference_dimension,
 )
 from _drawing_edges import visible_view_entities
 import _drawing_hidden_sketches as hidden_sketches
@@ -246,15 +247,17 @@ GEAR_DATA_HEIGHT = 0.056
 NUMBERED_NOTES_POS = (0.015, 0.263)
 
 
-# Each tight band names its mate and fit (drawing-guidelines rule 4; ENFORCE
-# round 1 of #971 found them only in Gear Data, or nowhere). A mate serving
-# several dimensions is named once, in one numbered note those dimensions
-# flag (rule 4; screen of f21dfcdd2ba7): note 1 holds the bore's fit (bonded
-# on MHA-DT-37's spigot, T012/T018; bonded on MHA-DT-04's land 2, T024;
-# sliding on MHA-DT-04 and the MHA-DT-VN-71 key, T030..T120), note 2 the
-# teeth's mesh with MHA-DT-12 (``sheet_notes``).  The bonded notes name the
-# fit, its mate and its diametral clearance (rule 23: the part sheet prints a
-# bond with its clearance); the compound is MHA-DT-00's bonding step's.
+# Each fit names its mate (drawing-guidelines rule 4; ENFORCE round 1 of
+# #971 found them only in Gear Data, or nowhere). A mate serving several
+# dimensions is named once, in one numbered note those dimensions flag (rule
+# 4; screen of f21dfcdd2ba7): note 1 holds the bore's fit (bonded on
+# MHA-DT-37's spigot, T012/T018; bonded on MHA-DT-04's land 2, T024; sliding
+# on MHA-DT-04's land 1 and the MHA-DT-VN-71 key, T030..T120), note 2 the
+# teeth's mesh with MHA-DT-12 (``sheet_notes``).  Every bore is reamed and
+# prints its reamer's size with no band; its mate is turned to it last, so
+# the acceptance (and a bond's clearance, rule 23) prints once, on the mate's
+# sheet (rule 4, form 2; fit audit 2026-11-23).  The compound is MHA-DT-00's
+# bonding step's.
 SHAFT_MATE = "MHA-DT-04"
 # A matched pair names its mate by name and number (rule 4; round-1 review
 # of the fan-out: note 1 named MHA-DT-04 by number only, and no land).
@@ -277,10 +280,14 @@ DIMENSION_CALLOUTS = {
     # under the value.
     "BoreCutDia": f"REAM THRU\n{BORE_NOTE_FLAG}",
     # The keyed bore (T030..T120) is round, so it takes the fit bore's REAM
-    # (rule 7); its keyway's width band is the requirement, with no process
-    # word.  T reads from its witnesses (keyway top, far side of the bore):
-    # a size carries its value, band and flag (machinist review of the
-    # C1-keyed sheets dropped KEYWAY TO FAR SIDE).
+    # (rule 7).  The keyway's width prints (.0625) REF: the standard 1/16 A
+    # broach cuts it and the bought key MHA-DT-VN-71 is the gauge (note 1;
+    # drawing-guidelines rule 4, form 3: error_budget closes at a .010 key
+    # play, scatter MAE .2243 against .2195 at the broach's .004, machinist
+    # review r1, farm run 20261124T110807008Z).  T reads from its witnesses
+    # (keyway top, far side of the bore): a size carries its value, band and
+    # flag (machinist review of the C1-keyed sheets dropped KEYWAY TO FAR
+    # SIDE).
     "KeyedBoreDia": f"REAM THRU\n{BORE_NOTE_FLAG}",
     "KeywayWidth": BORE_NOTE_FLAG,
     "KeywayT": BORE_NOTE_FLAG,
@@ -317,51 +324,55 @@ if any("\n" in text for text in CALLOUTS_ABOVE.values()):
     raise AssertionError("an above-callout with a line break does not print")
 
 
-def _inch_limits(lower_mm: float, upper_mm: float) -> str:
-    return f"{inch_text(lower_mm, 4)}-{inch_text(upper_mm, 4)}"
-
-
 def bore_clearances_mm(teeth: int) -> tuple[tuple[float, float], tuple[float, float]]:
     """((min, max) round, (min, max) keyway-to-key) clearance of a keyed
-    sheet's bore on MHA-DT-04's land 1, from the parts' printed limits.
-
-    Bore and land share their nominals (gear_seat_fit), so the round
-    clearance is the bore's deviation less the land's; the keyway's is its
-    width's against the key's (cone_land_key).
-    """
+    gear's bore on MHA-DT-04's land 1 at the parts' ANALYSIS bands (the
+    reamer's modelled cut on the land's), for the stacks: the sheet prints
+    neither.  The keyway's is its width's against the key's
+    (cone_land_key)."""
     if not keyed(teeth):
         raise ValueError(f"T{teeth:03d} is bonded: its clearance is bond_clearance_mm")
     land_upper, land_lower = SECTION_DIA_BANDS[KEYED_LAND]
     bore_upper, bore_lower = bore_dia_band(teeth)
-    round_fit = (bore_lower - land_upper, bore_upper - land_lower)
+    bore = bore_dia_mm(teeth)
+    land = dt_cone_gear_spec.BORE_DIA
+    round_fit = (
+        bore + bore_lower - (land + land_upper),
+        bore + bore_upper - (land + land_lower),
+    )
     return round_fit, cone_land_key.KEYWAY_SIDE_CLEARANCE_MM
 
 
+def _land_text(teeth: int) -> str:
+    """The land a land-seated gear rides, by its diameter: "LAND 2" was a
+    label no sheet defined (rule 26; machinist review, farm run
+    20261112T035245975Z)."""
+    nominal = dt_cone_gear_spec.BORE_DIA if keyed(teeth) else dt_cone_gear_spec.LAND_2_DIA
+    return f"\u00d8{inch_text(nominal, BORE_BAND_PLACES)} LAND"
+
+
 def bonded_fit_note(teeth: int) -> str:
-    """Note 1 of a round-bored sheet: the bonded slip fit, its mate and its
-    diametral clearance at the parts' printed limits (rule 23; machinist
-    review, farm run 20261112T075603458Z: the bond gap was printed nowhere)."""
+    """Note 1 of a round-bored sheet: the bonded slip fit and its mate,
+    which is turned to this bore; the mate's sheet prints the acceptance
+    and the bond's clearance (rule 4, form 2; rule 23)."""
     if teeth in SPIGOT_TEETH:
         mate = f"{TIP_GEAR_NAME} {TIP_GEAR_MATE} SPIGOT"
     else:
-        # The land by its diameter, as the keyed sheets name theirs: "LAND 2"
-        # was a label no sheet defined (rule 26; machinist review, farm run
-        # 20261112T035245975Z).
-        land = f"\u00d8{inch_text(bore_dia_mm(teeth), BORE_BAND_PLACES)} LAND"
-        mate = f"{SHAFT_NAME} {SHAFT_MATE}, {land}"
-    clearance = _inch_limits(*dt_cone_gear_spec.bond_clearance_mm(teeth))
-    return f"{BORE_NOTE_NUMBER}. BONDED SLIP FIT ON {mate} (CLEARANCE {clearance} ON \u00d8)."
+        mate = f"{SHAFT_NAME} {SHAFT_MATE} {_land_text(teeth)}"
+    return f"{BORE_NOTE_NUMBER}. BONDED SLIP FIT: {mate} IS TURNED TO THIS BORE."
 
 
 def sheet_notes(teeth: int) -> str:
     """The sheet's numbered notes, flagged from the bore and teeth callouts.
 
-    Note 1 is the bore's fit (rule 4).  A keyed bore's bands are narrower
-    than the shop's turned and milled rows, so it is made to the measured
-    land, with the clearance the parts' limits give as REF, and names the
-    key its keyway slides on.  A round bore is bonded (owner decision
-    2026-11-09, C1 keyed, PR #1992): the note names the fit, its mate and
-    its diametral clearance (rule 23).
+    Note 1 is the bore's fit (rule 4).  Every bore is reamed and prints its
+    reamer's size with no band: its mate is turned to it last (the keyed
+    and T024 bores: MHA-DT-04's land, one diameter for all the gears it
+    carries; T012/T018: MHA-DT-37's spigot), so the note names the mate and
+    says it is made to this bore, and the acceptance prints on the mate's
+    sheet (rule 4, form 2).  A fixed reamer cannot be made to a land: the
+    land is the side made last.  The keyway's acceptance is the bought key
+    MHA-DT-VN-71 sliding in (the 1/16 broach cuts its width).
     Note 2 names the mesh and the fit route of the tip, thickness and root
     bands: over pins, then the feel set at assembly (MHA-DT-00 check 4;
     GEAR DATA carries the backlash as REF, #2586); it
@@ -369,14 +380,10 @@ def sheet_notes(teeth: int) -> str:
     block.
     """
     if keyed(teeth):
-        (round_min, round_max), (key_min, key_max) = bore_clearances_mm(teeth)
-        land = f"\u00d8{inch_text(bore_dia_mm(teeth), BORE_BAND_PLACES)} LAND"
         fit: tuple[str, ...] = (
-            f"{BORE_NOTE_NUMBER}. SLIDING FIT ON {SHAFT_NAME} {SHAFT_MATE}, {land}, "
-            f"AND KEY {KEY_MATE}:",
-            "   BORE MADE TO THE MEASURED LAND "
-            f"(CLEARANCE {_inch_limits(round_min, round_max)} ON \u00d8, "
-            f"{_inch_limits(key_min, key_max)} KEYWAY TO KEY).",
+            f"{BORE_NOTE_NUMBER}. SLIDING FIT: {SHAFT_NAME} {SHAFT_MATE} {_land_text(teeth)} "
+            "IS TURNED TO THIS BORE;",
+            f"   KEYWAY: 1/16 BROACH; KEY {KEY_MATE} SLIDES IN, NO ROCK.",
         )
     else:
         fit = (bonded_fit_note(teeth),)
@@ -918,15 +925,26 @@ def _rewrite_callouts(adapter: Any, sheets: list[SheetCallouts]) -> None:
     on T030..T120 and the web's on every sheet, so the keyed sheets reset the
     callouts T012..T024 had written (farm proof 6fda5a4: the reamed bore's Ø
     printed bare, the T012 web without its words).
+
+    The keyway width's REF parentheses are a shared model dimension's prefix
+    and suffix too, so they are written again here (Codjiflo 3549-r5: the
+    later sheets' imports could clear them) and read back after the settling
+    rebuild (``_assert_settled_callouts``).
     """
-    for _sheet, printed, below, above in sheets:
+    for sheet, printed, below, above in sheets:
         set_dimension_callouts(adapter, printed, below)
         set_dimension_callouts(adapter, printed, above, location="above")
+        for annotation in printed:
+            if dimension_name(adapter, annotation) == "KeywayWidth":
+                set_reference_dimension(
+                    adapter, annotation, label=f"{sheet} keyway width reference"
+                )
 
 
 def _assert_settled_callouts(adapter: Any, sheets: list[SheetCallouts]) -> None:
     """After finalize's settling rebuild, every sheet's printed dimensions
-    still carry their callouts (``_rewrite_callouts``)."""
+    still carry their callouts (``_rewrite_callouts``), and a keyed sheet's
+    keyway width still prints as REF, in parentheses."""
     ddoc = _early_bound(adapter.currentModel, "IDrawingDoc")
     faults = []
     for sheet, printed, below, above in sheets:
@@ -937,10 +955,24 @@ def _assert_settled_callouts(adapter: Any, sheets: list[SheetCallouts]) -> None:
             for part, texts in ((_CALLOUT_BELOW, below), (_CALLOUT_ABOVE, above))
             for name, text in texts.items()
         }
+        keyway_widths = 0
         for annotation in printed:
             annotation = _early_bound(annotation, "IAnnotation")
             name = dimension_name(adapter, annotation)
             display = None
+            if name == "KeywayWidth":
+                keyway_widths += 1
+                display = _early_bound(
+                    annotation.GetSpecificAnnotation(), "IDisplayDimension"
+                )
+                parens = (
+                    str(display.GetText(1) or ""),
+                    str(display.GetText(2) or ""),
+                )
+                if parens != ("(", ")"):
+                    faults.append(
+                        f"{sheet} KeywayWidth: {parens!r}, expected REF ('(', ')')"
+                    )
             for part in (_CALLOUT_BELOW, _CALLOUT_ABOVE):
                 text = expected.pop((name, part), None)
                 if text is None:
@@ -953,6 +985,8 @@ def _assert_settled_callouts(adapter: Any, sheets: list[SheetCallouts]) -> None:
                 if read != text:
                     faults.append(f"{sheet} {name}: {read!r}, expected {text!r}")
         faults.extend(f"{sheet} {name}: not on the sheet" for name, _part in expected)
+        if keyway_widths != (1 if keyed(int(sheet[1:])) else 0):
+            faults.append(f"{sheet}: {keyway_widths} KeywayWidth dimensions printed")
     if faults:
         raise RuntimeError(
             "dimension callouts after the settling rebuild:\n" + "\n".join(faults)
@@ -1314,6 +1348,21 @@ def build(adapter: Any) -> dict[str, str]:
                 dimensions_by_feature=DRAWING_DIMENSIONS,
             )
             _crop_bore_view(adapter, bore_view, configuration, teeth, set(bore_keep))
+            # The keyway width is REF; note 1's broach and key trial govern
+            # (machinist review r1, farm run 20261124T110807008Z).
+            width = [
+                item
+                for item in bore_annotations
+                if dimension_name(adapter, item) == "KeywayWidth"
+            ]
+            if len(width) != (1 if keyed(teeth) else 0):
+                raise RuntimeError(
+                    f"{configuration}: expected one KeywayWidth, found {len(width)}"
+                )
+            for item in width:
+                set_reference_dimension(
+                    adapter, item, label=f"{configuration} keyway width reference"
+                )
         # The part saves its authoring sketches hidden; the front view shows
         # the tooth and floor ones again for their dimensions, the side view
         # the tip-diameter witness (the iso view shows the part as saved).

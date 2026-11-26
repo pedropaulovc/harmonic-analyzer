@@ -8,14 +8,12 @@ from __future__ import annotations
 from math import sqrt
 
 import _config
-from _fit_ream_slide import REAM_SLIDE
 from _inch_wall_limits import WALL_TARGET_MM
 from _package_units import drawing_unit
 from _hole_spec import HoleSpec, THREAD_MAJOR_MM, blind_cut_dia_mm
 from _printed_tolerance import printed_band_mm
-from _gtol_cylinder import CylinderFace
 from _gtol_planar import PlanarFace
-from _surface_finish import MACHINED_UM, SEAT_UM, SurfaceFinishControl
+from _surface_finish import SEAT_UM, SurfaceFinishControl
 from sh_vn_arbor_set_screw_spec import THREAD as SET_SCREW_THREAD
 from _cone_axis_constants import CONE_AXIS_HEIGHT_MM, PLATFORM_THICKNESS_MM
 
@@ -48,10 +46,18 @@ LEDGE_DEPTH = FOOT_DEPTH - STRAP_T  # exposed hold-down ledge, .70
 # the crown carries the MHA-DT-VN-64 apex set screw (#743, below), and only
 # about R11 leaves it 1.5D of full thread at the printed worst case.
 TOP_RADIUS = 10.922  # .43
-# Finished running bore for the 3/8 in cylinder-arbor journal: REAM_SLIDE,
-# .3760-.3765 in, cut by the owned .3760 over reamer.
-BORE_DIA = 9.525
-BORE_DIA_BAND = REAM_SLIDE
+# The bore for the 3/8 in cylinder arbor, which nothing turns in: the apex
+# set screw (MHA-SH-VN-54) clamps it on the bore's bottom.  Drilled with the
+# V drill (.377), the arbor entering by hand (fit audit F01, recommended form
+# "V DRILL (.377) THRU; ARBOR MHA-DT-13 ENTERS BY HAND, CLAMPED BY
+# MHA-DT-VN-64"; MHA-DT-VN-64 is MHA-SH-VN-54's prior number, per
+# current-identity-map.json).  The model nominal is the drill's size, so the sheet
+# prints it.  BORE_DIA_BAND is NOT a printed limit: it is the ANALYSIS band,
+# what the drill is modelled to cut (the DRILLED HOLES row's +.004/0,
+# .377-.381), which the set screw's thread and point stacks and the arbor's
+# float read.
+BORE_DIA = 9.5758  # .377, V drill
+BORE_DIA_BAND = (0.1016, 0.0)  # ANALYSIS (upper, lower) deviations
 BORE_HEIGHT = PLATFORM_THICKNESS_MM + CONE_AXIS_HEIGHT_MM
 _ROOT_HALF_WIDTH = FOOT_WIDTH / 2.0
 _CENTER_RISE = BORE_HEIGHT - FOOT_HEIGHT
@@ -148,12 +154,11 @@ if SET_SCREW_WEB_MM < WALL_TARGET_MM:
     raise AssertionError(f"apex tap web {SET_SCREW_WEB_MM:.3f} mm < .080 in target")
 
 SURFACE_FINISHES = (
-    SurfaceFinishControl(
-        "arbor_bore",
-        MACHINED_UM,
-        CylinderFace(BORE_DIA, contains_y_mm=BORE_HEIGHT),
-        display_unit=UNIT,
-    ),
+    # The V-drilled bore carries no symbol: it is a clamp seat (fit audit F01),
+    # MHA-DT-13 enters by hand and the apex set screw clamps it, so nothing
+    # runs or slides in it (drawing-guidelines.md rule 6).  Machinist review r1
+    # (farm run 20261124T110807008Z, 3 of 3 runs): its Ra 125 was
+    # over-specification beside the foot's one locating-seat Ra 125.
     # The foot seat mates the pedestal to harmonic-base: on a part that may be
     # left as-cast elsewhere, the one face that MUST be cut says so.
     SurfaceFinishControl(
@@ -201,11 +206,11 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # +-.1 would cost the apex set screw its thread (crown), the tap its webs
 # (strap depth, station), and move the hold-down and foot past what the base
 # seat and drive-train checks read; their nominals sit on the .01 grid.  The
-# reamed bore prints four places, for its own REAM_SLIDE band.
+# drilled bore prints three places, the V drill's .377 (fit audit F01).
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "FootProfile": {"Width": 2, "Depth": 2},
     "Foot": {"FootHt": 2},
-    "BoreProfile": {"BoreDia": 4, "BoreHeight": 2},
+    "BoreProfile": {"BoreDia": 3, "BoreHeight": 2},
     # The apex set screw's full thread is sized at this band's least radius
     # (set_screw_wall_terms).
     "DomeProfile": {"DomeRadius": 2},

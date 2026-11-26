@@ -10,3 +10,9 @@ dt-crank-handle-pivot-screw:
   fit_class: shaft_in_bushing
   process: "turned slotted shoulder screw; die-cut #4-40 thread"
   drawing_unit: in
+  machinist_exceptions:
+    - id: "RV-01"
+      kind: "accept"
+      where: "sheet 1, front view, Ø.1560 +.0025/-.0025 shoulder, RUNNING FIT IN MHA-DT-08 BORE"
+      finding: "a printed band (rule 4 form 4) on a running fit whose mate, MHA-DT-08, is made in this shop and could be tried on the shoulder (form 2)"
+      reason: "delegated ruling 2026-11-25 (Main), no precedent; owner review #2144 (D35): the owner's question-14 limits .1535-.1585 are kept as the governing band; both ends are necessary (N-01: bind 0 at .161; seat 0.183 < 0.2 at .151); form 2 retired with D26. Accepts this shoulder band only."

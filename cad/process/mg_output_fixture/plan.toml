@@ -50,11 +50,21 @@ part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
 material = "C36000 free-cutting brass, 7/16 in hex bar (drawing: {{cad.material_spec}})"
 stock = "{{process.blank_af_in:fraction}} in hex bar, the {{process.blank_x_in:g}} in piece on hand (at least {{process.bar_length_min_in:.2f}} in): one fixture off its end."
-note = "Inches unless mm; G-code and console entries in mm (the file and the controller run G21). Lathe PM-1127VF-LB, dry (C36000). Home the mill ($H) and touch off G54 at the start of the mill setup; after any controller reset, stall or E-stop, home and touch off again before Cycle Start. Prove the file in air first. Finish: as machined."
 shop = "../shop"
 stock_refs = ["c360-hex-7-16"]
 material_key = "lathe-c360"
 milling_material = "brass"
+
+# The shop's standing page carries what every traveler shares (units, speeds,
+# coolant, homing, Feed Hold, tool changes, proving a file, burrs); This job
+# says what only this fixture needs.
+standing = true
+
+[[notes]]
+title = "This job"
+rows = [
+  ["Finish", "As machined."],
+]
 
 [cad]
 file = "../../out/features/mg_output_fixture/features.toml"
@@ -321,7 +331,7 @@ machine = "PM-30MV CNC (FluidNC, CNCjs with the electronic tool setter) / vise, 
 indexing = "none"
 machine_ref = "pm-30mv"
 holding = "Two 1 in parallels, 1/8 in thick, one against each jaw, their LEFT ends {{process.cross_parallel_start_mm:in.2f}} in right of where the spigot face will be. The bar lies along the jaws, a corner straight UP and one DOWN, the spigot end to the LEFT, {{process.jaw_side_from_face_mm:in.2f}} in out past the jaws' left side (the calipers' depth rod from the jaw side to the spigot face): its lower diagonal flats rest on the parallels' inner top edges, gripped on the two vertical flats. Tap it down onto both edges while closing the vise. Under the bore nothing but air: the parallels start right of it."
-datum = "Program MO01_cross_bore (cam:mg_output_fixture). G54: X0 the spigot face, +X along the bar to the right; Y0 the spigot's axis, +Y toward the fixed jaw; Z0 the top corner. Tool lengths from the tool setter at each M6; at every M6 stop the file has stopped the spindle and lifted the tool above the jaws."
+datum = "Program MO01_cross_bore (cam:mg_output_fixture). G54: X0 the spigot face, +X along the bar to the right; Y0 the spigot's axis, +Y toward the fixed jaw; Z0 the top corner."
 diagram = { file = "diagrams/cross.svg", alt = "The bar lying along the jaws, corner up, the spigot end .50 out past the jaws' left side, its lower diagonal flats on the parallels' inner edges from .75 in; the F drill, to scale, through both corners .49 from the spigot face, its point in the air left of the parallels (the centre drill's spot under it not drawn)." }
 envelope = { x_span_mm = ["{{cad.envelope_x_mm}}", 4.7625], y_span_mm = ["{{cad.hex_af_mm}}", 4.7625], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{process.cross_top_height_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{process.cross_tip_height_mm}}"], longest_tool_mm = ["{{process.drill_chuck_gauge_mm}}", "{{process.drill_f_oal_mm}}"], shortest_tool_mm = ["{{process.drill_chuck_gauge_mm}}", "{{process.centre_drill_oal_mm}}"] }
 vise_hold = "other"
@@ -332,18 +342,13 @@ instruction = "Bore gauges, before the setup: mike the F drill's shank, .2570–
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Home the mill first ($H). G54 Y0 the spigot's axis, between two touches on its sides; X0 the spigot face."
-instruction_detailed = "Home the mill first ($H). Edge finder (900 rpm), its tip level with the spigot's middle. On the spigot's front side (toward the moving jaw), from the front: G10 L20 P1 Y0. On its back side, from the back: G10 L20 P1 Y(half the DRO Y reading). On the spigot face from the left, at Y0: G10 L20 P1 X-2.540 (minus: the edge finder's centre is left of the face)."
+instruction = "G54 Y0 the spigot's axis, between two touches on its sides; X0 the spigot face."
+instruction_detailed = "Edge finder (900 rpm), its tip level with the spigot's middle. On the spigot's front side (toward the moving jaw), from the front: G10 L20 P1 Y0. On its back side, from the back: G10 L20 P1 Y(half the DRO Y reading). On the spigot face from the left, at Y0: G10 L20 P1 X-2.540 (minus: the edge finder's centre is left of the face)."
 feed = "hand"
 
 [[setups.operations]]
 instruction = "G54 Z0: the top corner, touched with the centre drill at the bore's station."
-instruction_detailed = "Console M6 T1 (#2 centre drill; the tool setter measures it). MDI G0 X{{cad.rod_bore_face_station_mm:.3f}} Y0. Spindle stopped, its point just dragging a .002 feeler leaf on the top corner: G10 L20 P1 Z0.051."
-feed = "hand"
-
-[[setups.operations]]
-instruction = "Prove MO01_cross_bore in air, Z0 raised 1.000 in; every move clears the jaws. Then Z0 back."
-instruction_detailed = "Send $# and note the G54 line's Z. G10 L2 P1 Z(that Z + 25.400) raises Z0 1.000 in. Run the whole of MO01_cross_bore in air, through both its tool changes (T1, then T2) and the F drill's pass to the program's end, watching each move clear the jaw tops ({{process.cross_jaw_top_mm:in.3dot}} above the corner). G10 L2 P1 Z(the noted Z) puts Z0 back. Op 170 runs the file again from its start, its first M6 T1 putting the centre drill back in."
+instruction_detailed = "Console M6 T1 (#2 centre drill). MDI G0 X{{cad.rod_bore_face_station_mm:.3f}} Y0. Spindle stopped, its point just dragging a .002 feeler leaf on the top corner: G10 L20 P1 Z0.051."
 feed = "hand"
 
 [[setups.operations]]
@@ -383,7 +388,7 @@ machine = "PM-1127VF-LB lathe / 6 in 3-jaw"
 indexing = "none"
 machine_ref = "pm-1127vf-lb"
 holding = "The bar back in the 3-jaw, a jaw on every other flat, the spigot end {{process.stickout_in:.2f}} in out of the jaw fronts."
-datum = "DRO Z set with the blade on the spigot face in Op 200."
+datum = "DRO Z set with the blade on the spigot face in Op 190."
 diagram = { file = "diagrams/part.svg", alt = "To scale: the bar in the 3-jaw, the fixture's spigot end out, the F bore through it; the P1 blade, its tailstock-side face at Z−.720, parting the fixture off .72 long." }
 lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = 11.1125, stock_diameter_mm = 12.8316, stickout_mm = 24.13, minimum_diameter_mm = 8.2968, support = "none" }
 

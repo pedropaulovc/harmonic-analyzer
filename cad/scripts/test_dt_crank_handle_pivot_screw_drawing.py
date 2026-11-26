@@ -86,7 +86,7 @@ def test_model_owns_places_and_bands() -> None:
     assert seat.SCREW_DRAWING_PRECISION_BY_NAME == {
         "HeadDia": 3,
         "HeadLength": 3,
-        "ShoulderDia": 3,
+        "ShoulderDia": 4,
         "ShoulderLength": 2,
         "ThreadLength": 2,
         "ReliefDia": 3,
@@ -108,9 +108,10 @@ def test_model_owns_places_and_bands() -> None:
     assert model_toleranced_dimensions(part) == {
         ("ScrewProfile", "ShoulderDia"): "*deviations(SHOULDER_DIA_BAND)",
     }
-    # The F12 running fit (#290): .156 0/-.0020 in a .161 +.0005/0 ream.
+    # The F12 running fit (#290): the shoulder at the owner's .1535-.1585
+    # (owner ruling 2026-11-24, fit audit question 14), no matched fit.
     assert spec.SHOULDER_DIA == pytest.approx(0.156 * 25.4)
-    assert spec.SHOULDER_DIA_BAND == pytest.approx((0.0, -0.002 * 25.4))
+    assert spec.SHOULDER_DIA_BAND == pytest.approx((0.0025 * 25.4, -0.0025 * 25.4))
     assert spec.SHOULDER_LENGTH == pytest.approx(
         spec.HANDLE_STACK_NOMINAL + spec.END_PLAY_NOMINAL
     )
@@ -153,21 +154,33 @@ def test_u33_running_fit_end_play_and_engagement() -> None:
     # Handle numbers come from its own spec, the arm thickness from the shared
     # crank interface geometry.
     assert handle.PIVOT_BORE_DIA + handle.PIVOT_BORE_BAND[1] == pytest.approx(0.161 * 25.4)
-    assert handle.PIVOT_BORE_DIA + handle.PIVOT_BORE_BAND[0] == pytest.approx(0.1615 * 25.4)
+    # Delegated ruling 2026-11-25 (Main), precedent: owner ruling 2026-11-24
+    # merging the fit policy; RETIRES the owner's fit-audit Q14 answer's trial
+    # step; owner review #2144 (D26): the #20's DRILLED HOLES .165, no cap.
+    assert handle.PIVOT_BORE_DIA + handle.PIVOT_BORE_BAND[0] == pytest.approx(0.165 * 25.4)
 
     # The fitted shoulder: the cup face on the handle's basic length less the
     # pocket is the bonded handle, plus the modelled end play.
     assert spec.HANDLE_STACK_NOMINAL == pytest.approx(handle.HANDLE_LENGTH - cup.POCKET_DEPTH)
     low, high = spec.END_PLAY_RANGE
     assert low < spec.END_PLAY_NOMINAL < high
-    # The ream over the shoulder, on diameter.
-    assert spec.DIAMETRAL_CLEARANCE_MIN == pytest.approx(
+    # The owner's limits .1535-.1585, turned to on their own (delegated ruling
+    # 2026-11-25 (Main), no precedent; owner review #2144 (D35: MHA-DT-32's
+    # shoulder keeps owner Q14's .1535-.1585 as a necessity band; Q14's trial
+    # retired with D26)): the largest shoulder still clears the smallest #20
+    # bore, .1610 - .1585 = .0025, and the title block's .161 would not.
+    assert (spec.SHOULDER_DIA_MIN, spec.SHOULDER_DIA_MAX) == pytest.approx(
+        (0.1535 * 25.4, 0.1585 * 25.4)
+    )
+    assert spec.SHOULDER_CLEARANCE_MIN == pytest.approx(
         spec.HANDLE_BORE_MIN - spec.SHOULDER_DIA_MAX
     )
-    assert spec.DIAMETRAL_CLEARANCE_MAX == pytest.approx(
-        spec.HANDLE_BORE_MAX - spec.SHOULDER_DIA_MIN
-    )
-    assert spec.DIAMETRAL_CLEARANCE_MIN > 0.0
+    assert spec.SHOULDER_CLEARANCE_MIN == pytest.approx(0.0025 * 25.4)
+    assert spec.SHOULDER_CLEARANCE_MIN > 0.0
+    title_block_max = spec.SHOULDER_DIA + printed_band_mm(3, unit=spec.UNIT)
+    assert spec.HANDLE_BORE_MIN - title_block_max <= 1e-9
+    for name in ("SHOULDER_FIT_CLEARANCE", "DIAMETRAL_CLEARANCE_MIN", "DIAMETRAL_CLEARANCE_MAX"):
+        assert not hasattr(spec, name)
     # The shortest threaded section always spans the stock arm.
     assert spec.THREAD_LENGTH_MIN >= spec.ARM_STOCK_THICKNESS
     # The head retains the handle.
@@ -217,6 +230,17 @@ def test_thread_relief_sits_below_the_minor_with_a_45_degree_lead() -> None:
         abs=1e-4,
     )
     assert spec.SEAT_RADIAL_MIN >= 0.2
+    # Necessity N-01's lower end (Codjiflo 3550-r7-12): at the title block's
+    # .156 - .005 = .151 the same seat falls under 0.2, so the band's lower
+    # limit is needed too.  0.215 at .1535, 0.183 at .151.
+    title_min = spec.SHOULDER_DIA - printed_band_mm(3, unit=spec.UNIT)
+    assert title_min == pytest.approx(0.151 * 25.4)
+    seat_at_title = (
+        (title_min - 2.0 * spec.SEAT_EDGE_BREAK_MAX) - spec.SEAT_CONTACT_INNER_DIA
+    ) / 2.0 - spec.THREAD_FIT_OFFSET_MAX
+    assert seat_at_title < 0.2
+    assert seat_at_title == pytest.approx(0.183, abs=5e-4)
+    assert spec.SEAT_RADIAL_MIN == pytest.approx(0.215, abs=5e-4)
     title_break = edge_break_chamfer_mm(unit=spec.UNIT)
     assert (spec.SHOULDER_DIA_MIN - 2.0 * title_break) - (2.845 + 2.0 * title_break) < 0.1
     assert spec.SEAT_FLAT_ANNULUS_AREA == pytest.approx(
@@ -519,10 +543,11 @@ def test_fitted_shoulder_length_is_one_flagged_numbered_note() -> None:
     x, _ = drawing.NOTES_XY
     assert x + max(map(len, lines)) * 0.0027 < 0.4191
     # Standard fit name and forms on the other callouts (rules 3, 4, 7).
-    assert notes.SHOULDER_FIT_CALLOUT == (
-        "RUNNING FIT, TURN TO\nMHA-DT-08 BORE LESS\n.0050-.0075"
-    )
+    # Rule 4 (Codjiflo 3550-r7-12): the shoulder's band names its mate and
+    # its fit, no number and no trial.
+    assert notes.SHOULDER_FIT_CALLOUT == "RUNNING FIT IN\nMHA-DT-08 BORE"
     assert max(map(len, notes.SHOULDER_FIT_CALLOUT.splitlines())) <= 21
+    assert not re.search(r"\d\.|\.\d|TRIAL|TURN", notes.SHOULDER_FIT_CALLOUT)
     assert notes.HEAD_LENGTH_CALLOUT == "CLEARS\nMHA-DT-35 FACE"
     assert notes.HEAD_DIA_CALLOUT == "CLEARS POCKET\nOF MHA-DT-35"
     assert max(map(len, notes.HEAD_DIA_CALLOUT.splitlines())) <= 15
@@ -724,13 +749,18 @@ def test_head_seat_breaks_clear_each_mating_corner_and_keep_a_bearing_flat() -> 
     assert under_head == pytest.approx(seat.UNDER_HEAD_AIR_MIN, abs=1e-6)
     assert head_edge == pytest.approx(seat.HEAD_EDGE_AIR_MIN, abs=1e-6)
     assert min(under_head, head_edge) > 0.0
-    # Each break is modelled inside its limits and no larger than the title
-    # block's edge break, so the specs' existing annulus budgets still hold.
+    # Each break prints its single limit .005 MIN and is modelled at it; the
+    # title block's edge break caps it (machinist review r1, farm run
+    # 20261124T110807008Z: the stacked .010/.005 was a tight band), so the
+    # specs' existing annulus budgets still hold.  The two are one mating
+    # pair and print alike.
+    assert seat.HEAD_CHAMFER_TOL_TYPE == cup_seat.MIN_TOL_TYPE == 5  # swTolMIN
     for nominal, (low, high) in (
         (seat.HEAD_CHAMFER, seat.HEAD_CHAMFER_LIMITS),
         (cup_seat.FLOOR_HOLE_CHAMFER, cup_seat.FLOOR_HOLE_CHAMFER_LIMITS),
     ):
-        assert low < nominal < high <= edge_break_chamfer_mm(unit=spec.UNIT)
+        assert low == nominal == pytest.approx(0.005 * 25.4)
+        assert high == edge_break_chamfer_mm(unit=spec.UNIT)
     # The flat annulus left on the narrow side, from the printed limits:
     # smallest head less its largest break, over the largest drilled hole
     # plus its largest break, the head pushed over by its running play.  The
@@ -749,7 +779,7 @@ def test_head_seat_breaks_clear_each_mating_corner_and_keep_a_bearing_flat() -> 
 
 
 def test_head_seat_prints_native_limits_with_words_only_callouts() -> None:
-    # The limits are the model dimensions' own (swTolMAX, swTolLIMIT); the
+    # The limits are the model dimensions' own (swTolMAX, swTolMIN); the
     # callouts name what each feature clears and carry no number.
     for callout in (notes.UNDER_HEAD_RADIUS_CALLOUT, notes.HEAD_CHAMFER_CALLOUT):
         assert "MHA-DT-35" in callout

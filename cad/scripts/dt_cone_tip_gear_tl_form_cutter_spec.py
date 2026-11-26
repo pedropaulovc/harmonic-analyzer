@@ -438,11 +438,16 @@ if set(DRAWING_PRECISION) != set(DRAWING_DIMENSIONS) or any(
 ):
     raise AssertionError("every printed dimension needs its places, and only those")
 
-# Rule 4: the band names its mate; rule 7: words, no method.  The material
-# block names the drill rod, so the Ø says only that it stays as supplied.
-# The flat's length and depth print bare: the depth dimension is the flat.
+# Rule 4 (form 4's last sentence): the drill rod's diameter is bought to size
+# and never cut, so it prints the stock as a reference, not the supplier's
+# limits (STOCK_DIMENSIONS); BIT_DIA_TOL stays the analysis band the bar's
+# slip and the flat's offset book.  Rule 7: words, no method.  The bar's
+# cross hole is a #30 drill (FOR MHA-DT-37-TL-01) with no slip acceptance:
+# the set screw takes the play out.  The flat's length and depth print
+# bare: the depth dimension is the flat.
+STOCK_DIMENSIONS = frozenset({"BitDia"})
 DIMENSION_CALLOUTS: dict[str, str] = {
-    "BitDia": f"AS SUPPLIED\nSLIDING FIT IN {BAR_NUMBER}",
+    "BitDia": f"STOCK, AS SUPPLIED\nSLIDES IN {BAR_NUMBER}",
     "FrontClearance": "FRONT CLEARANCE",
     "SideClearance": "SIDE CLEARANCE,\nBOTH FLANKS",
 }

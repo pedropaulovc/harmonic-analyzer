@@ -1,31 +1,35 @@
 """Fit-up settings for the pinion rig that the prints state and no build reads.
 
-Every fit-up setting is a leaf, or a pair of leaves, of the one inch feeler
-gauge the shop owns (FEELER_GAGE), and each is sized in pinion_rig_layout, where the
+Every fit-up setting is any one leaf of a printed range of the one inch
+feeler gauge the shop owns (FEELER_GAGE), or for D a pair of leaves or a 1/16
+drill shank (owner ruling 2026-11-24, fit audit part 2 C7: "Yes: ranges,
+longer flats, no leaf miking."), each sized in pinion_rig_layout, where the
 worst fitted stacks that need it live.  This module is the print-facing import
-point: it re-exports the settings, checks each is a leaf or a leaf pair of the
-gage, and words the step each print carries.  Only tests and drawing steps
-import it.
+point: it re-exports the ranges and the model's leaves, checks each model
+leaf is a leaf or a leaf pair of the gage, and words the step each print
+carries.  Only tests and drawing steps import it.
 
-- The front block is set FRONT_BLOCK_FEELER off the front strap (+/- BAND;
-  the base's RIG SET note, before its seats are transferred), which sets the
-  pinned cluster's end play.
-- MHA-DT-19 is match-drilled on a DRUM_END_SHIM leaf at the drum's front end
-  (SHAFT_DRILL_STEP), which sets the drum's end play.
+- The front block is set off the front strap on any leaf of SMALL_LEAF_RANGE
+  (the base's RIG SET note, before its seats are transferred), which sets
+  the pinned cluster's end play.
+- MHA-DT-19 is match-drilled on a SMALL_LEAF_RANGE leaf at the drum's front
+  end (SHAFT_DRILL_STEP), which sets the drum's end play.
 - The rig's axial datum (user ruling P1-2): with the cylinder-gear bank
-  preloaded south onto its disc, the drum's back end is set RIG_SET_LEAF_D
-  off the ACTUAL north MHA-DT-12 back face before the block seats are
-  transferred. The setting follows the accepted bank length; it does not
-  assume gear 19 is fixed to a north hard datum.
-- The MHA-DT-23 cams (user ruling P1-1): the front cam's front face
-  FRONT_COLLAR_LEAF off the front block, the back cam's back face
-  BACK_COLLAR_LEAF_F off the back block, then staked (COLLAR_SET_STEP).  Nothing is cut
-  there, so it is a drive-train assembly step, never an MHA-DT-23 note (policy
-  drawing-guidelines.md rule 7 (notes: few, flagged, never a method), as MHA-DT-18 keeps its feeler off its own print).
-- The MHA-DT-24 foot pad's aft edge, flush with the strip's, is set
-  SPRING_PAD_LEAF off the back block before its seat is transferred (the
-  same RIG SET note).  The foot lies east of the block's east end, so the
-  leaf stands on edge against the block's inner face and overhangs that
+  preloaded south onto its disc, the drum's back end is set D
+  (RIG_SET_D_RANGE, two leaves or the 1/16 shank) off the ACTUAL north
+  MHA-DT-12 back face before the block seats are transferred. The setting
+  follows the accepted bank length; it does not assume gear 19 is fixed to a
+  north hard datum.
+- The MHA-DT-23 cams (user ruling P1-1): the front cam's front face on a
+  SMALL_LEAF_RANGE leaf off the front block, the back cam's back face on a
+  LARGE_LEAF_RANGE leaf off the back block, then staked (COLLAR_SET_STEP).
+  Nothing is cut there, so it is a drive-train assembly step, never an
+  MHA-DT-23 note (policy drawing-guidelines.md rule 7 (notes: few, flagged,
+  never a method), as MHA-DT-18 keeps its feeler off its own print).
+- The MHA-DT-24 foot pad's aft edge, flush with the strip's, is set on a
+  LARGE_LEAF_RANGE leaf off the back block before its seat is transferred
+  (the same RIG SET note).  The foot lies east of the block's east end, so
+  the leaf stands on edge against the block's inner face and overhangs that
   end to meet the pad.
 - ASSEMBLY_SEQUENCE orders the rig's assembly steps.  The MHA-DT-33 collar's
   install, the bonds and the MHA-DT-30 drive-through are each part spec's
@@ -44,15 +48,14 @@ import dt_pinion_lever_pin_spec
 from pinion_rig_layout import (
     BACK_COLLAR_LEAF_F,
     DRUM_END_SHIM,
-    DRUM_END_SHIM_SET_ERROR,
-    FEELER_SET_BAND,
-    FEELER_SET_ERROR,
     FLUSH_SET_ERROR,
     FRONT_BLOCK_FEELER,
-    FRONT_BLOCK_FEELER_BAND,
-    RIG_SET_ERROR,
+    LARGE_LEAF_RANGE,
+    RIG_SET_D_RANGE,
+    RIG_SET_D_SHANK,
     RIG_SET_LEAF_D,
     RIG_SET_LEAVES,
+    SMALL_LEAF_RANGE,
     SPRING_PAD_LEAF,
 )
 from dt_vn_pinion_strap_pin_spec import HOLE_DIA, PIN_SUB_FLUSH_MAX
@@ -67,11 +70,11 @@ FEELER_GAGE_LEAVES_MM = tuple(
     round(leaf * dt_feeler_leaves.MM_PER_IN, 5) for leaf in dt_feeler_leaves.LEAVES_IN
 )
 
-# The front collar sits flush with the front strap's outer face, so its leaf
-# is the front block's own feeler (ruling (c)).
+# The front collar sits flush with the front strap's outer face in the model,
+# so its leaf is the front block's own (ruling (c)); both take SMALL_LEAF_RANGE.
 FRONT_COLLAR_LEAF = FRONT_BLOCK_FEELER
 
-# Every single-leaf setting, by the step that uses it.
+# The model's leaf for every single-leaf setting, by the step that uses it.
 SINGLE_LEAF_SETTINGS = {
     "front block feeler": FRONT_BLOCK_FEELER,
     "MHA-DT-19 drum end shim": DRUM_END_SHIM,
@@ -87,20 +90,8 @@ if len(RIG_SET_LEAVES) > 2 or not set(RIG_SET_LEAVES) <= set(FEELER_GAGE_LEAVES_
     raise AssertionError(f"rig-set D {RIG_SET_LEAVES} is not one or two gage leaves")
 if abs(sum(RIG_SET_LEAVES) - RIG_SET_LEAF_D) > 1e-9:
     raise AssertionError("the rig-set leaves do not make up D")
-# Every setting is made to the same band, and books its own stack's error
-# over it: a leaf tolerance for each one-leaf setting, two for D's pair.
-if not (
-    FEELER_SET_ERROR == FRONT_BLOCK_FEELER_BAND == DRUM_END_SHIM_SET_ERROR
-    and abs(FEELER_SET_ERROR - FEELER_SET_BAND - dt_feeler_leaves.LEAF_TOLERANCE)
-    < 1e-12
-    and abs(
-        RIG_SET_ERROR
-        - FEELER_SET_BAND
-        - len(RIG_SET_LEAVES) * dt_feeler_leaves.LEAF_TOLERANCE
-    )
-    < 1e-12
-):
-    raise AssertionError("a fit-up setting carries its own band")
+if RIG_SET_D_SHANK != 25.4 / 16.0:
+    raise AssertionError("19A's drill shank is not the 1/16 the step names")
 
 
 # The bank is seated on its front hard datum before the rig follows actual g19.
@@ -108,20 +99,16 @@ RIG_SET_BANK_PRECONDITION = "BANK HELD TO THE FRONT ON MHA-DT-26"
 
 
 # MHA-DT-00 prints decimal inch (#290) and an inch sheet prints inch values
-# only (drawing-guidelines rule 26): each setting prints its inch value to the
-# gage's thousandth, and MHA-DT-00's feeler-stack table (draw_dt_drive_train_
-# assembly.FEELER_STACK_ROWS) lists the inch leaves that make it up.
-def _leaf_setting(setting: float) -> str:
-    return inch_text(setting, FEELER_PLACES)
+# only (drawing-guidelines rule 26): each range prints its ends to the gage's
+# thousandth.  P2 (owner, 2026-11-24): a leaf is a single limit; the fitter
+# picks any leaf of the range, so the set is no longer miked leaf by leaf.
+def _leaf_range(leaf_range: tuple[float, float]) -> str:
+    return " TO ".join(inch_text(end, FEELER_PLACES) for end in leaf_range)
 
 
-# The stacks book each leaf within dt_feeler_leaves.LEAF_TOLERANCE of its
-# etched size, an assumption the set's maker does not state: the fitter mics
-# each leaf the sheet's table lists once, which makes it a check (Main, #3042).
-FEELER_LEAF_CHECK = (
-    "MIC EACH LEAF FIRST: WITHIN "
-    f"±{inch_text(dt_feeler_leaves.LEAF_TOLERANCE, 4)} OF ITS ETCHED SIZE, OR REJECT IT."
-)
+ONE_LEAF_SMALL = f"ANY ONE LEAF {_leaf_range(SMALL_LEAF_RANGE)}"
+ONE_LEAF_LARGE = f"ANY ONE LEAF {_leaf_range(LARGE_LEAF_RANGE)}"
+RIG_SET_D_SETTING = f"TWO LEAVES {_leaf_range(RIG_SET_D_RANGE)} OR A 1/16 DRILL SHANK"
 
 
 # The step each print carries, uppercase to match the sheets.  Each line is
@@ -137,11 +124,11 @@ RIG_SET_NAME = "RIG SET"
 RIG_SET_STEP = "\n".join(
     (
         f"{RIG_SET_NAME}, BEFORE SPOTTING THE TRANSFER SEATS: SET THE FRONT MHA-DT-18 "
-        f"{_leaf_setting(FRONT_BLOCK_FEELER)} OFF THE FRONT MHA-DT-14 ON A FEELER.",
+        f"OFF THE FRONT MHA-DT-14 ON {ONE_LEAF_SMALL}.",
         f"WITH THE {RIG_SET_BANK_PRECONDITION}, SET THE MHA-DT-01 BACK END "
-        f"{_leaf_setting(RIG_SET_LEAF_D)} OFF THE BACK FACE OF GEAR 19 (THE BACK "
-        "MHA-DT-12) AS FITTED, ON A FEELER STACK.",
-        f"SET THE MHA-DT-24 PAD {_leaf_setting(SPRING_PAD_LEAF)} OFF MHA-DT-18 ON A FEELER.",
+        "OFF THE BACK FACE OF GEAR 19 (THE BACK MHA-DT-12) AS FITTED, ON "
+        f"{RIG_SET_D_SETTING}.",
+        f"SET THE MHA-DT-24 PAD OFF MHA-DT-18 ON {ONE_LEAF_LARGE}.",
     )
 )
 TRANSFER_AFTER_RIG_SET = f"AFTER {RIG_SET_NAME};"
@@ -162,10 +149,8 @@ COLLAR_SET_STEP = "\n".join(
         "SET MHA-DT-17'S REAR END FLUSH WITH MHA-DT-18'S REAR FACE "
         f"±{inch_max_text(FLUSH_SET_ERROR, 3)}.",
         "TURN MHA-DT-17 UNTIL ITS TWO FLATS FACE THE CAM SET SCREWS.",
-        f"SET THE FRONT MHA-DT-23 {_leaf_setting(FRONT_COLLAR_LEAF)} "
-        "OFF THE FRONT MHA-DT-18 ON A FEELER.",
-        f"SET THE BACK MHA-DT-23 {_leaf_setting(BACK_COLLAR_LEAF_F)} "
-        "OFF THE BACK MHA-DT-18 ON A FEELER.",
+        f"SET THE FRONT MHA-DT-23 OFF THE FRONT MHA-DT-18 ON {ONE_LEAF_SMALL}.",
+        f"SET THE BACK MHA-DT-23 OFF THE BACK MHA-DT-18 ON {ONE_LEAF_LARGE}.",
         "TIGHTEN EACH SET SCREW ON ITS MHA-DT-17 FLAT.",
         "STAKE EACH TAP MOUTH AT 2 POINTS.",
         # Rule 23 (rubric sample round 5): the bench acceptance.
@@ -216,8 +201,7 @@ SHAFT_DRILL_STEP = "\n".join(
         f"{SHAFT_DRILL_NAME}: PUSH THE BACK MHA-DT-14 HARD ON THE BACK MHA-DT-18 INNER "
         "FACE.",
         "PUSH MHA-DT-01 BACK, HARD ON THE BACK MHA-DT-14.",
-        "SET THE FRONT MHA-DT-14 OFF THE MHA-DT-01 FRONT END ON A "
-        f"{_leaf_setting(DRUM_END_SHIM)} FEELER.",
+        f"SET THE FRONT MHA-DT-14 OFF THE MHA-DT-01 FRONT END ON {ONE_LEAF_SMALL}.",
         "SET THE MHA-DT-19 REAR END FLUSH WITH THE MHA-DT-18 REAR FACE "
         f"±{inch_max_text(FLUSH_SET_ERROR, 3)}, SO IT BEARS IN BOTH MHA-DT-18 AND CLEARS "
         "MHA-DT-16.",
@@ -252,18 +236,17 @@ __all__ = [
     "BACK_COLLAR_LEAF_F",
     "COLLAR_SET_STEP",
     "DRUM_END_SHIM",
-    "DRUM_END_SHIM_SET_ERROR",
     "FEELER_GAGE",
     "FEELER_GAGE_LEAVES_MM",
     "FEELER_GAGE_NAME",
-    "FEELER_LEAF_CHECK",
-    "FEELER_SET_BAND",
-    "FEELER_SET_ERROR",
     "FRONT_BLOCK_FEELER",
-    "FRONT_BLOCK_FEELER_BAND",
     "FRONT_COLLAR_LEAF",
+    "LARGE_LEAF_RANGE",
+    "ONE_LEAF_LARGE",
+    "ONE_LEAF_SMALL",
     "RIG_SET_BANK_PRECONDITION",
-    "RIG_SET_ERROR",
+    "RIG_SET_D_RANGE",
+    "RIG_SET_D_SETTING",
     "RIG_SET_LEAF_D",
     "RIG_SET_LEAVES",
     "RIG_SET_NAME",
@@ -271,6 +254,7 @@ __all__ = [
     "SHAFT_DRILL_NAME",
     "SHAFT_DRILL_STEP",
     "SINGLE_LEAF_SETTINGS",
+    "SMALL_LEAF_RANGE",
     "SPRING_PAD_LEAF",
     "STRAP_PIN_NUMBER",
     "TRANSFER_AFTER_RIG_SET",

@@ -1,0 +1,9 @@
+# MHA-DT-00 sheet module checks (tolerance-policy.md, "Checks in spec modules
+# and tests"; cad/scripts/check_register.py). Fit batch DT, 2026-11-24.
+checks:
+  - id: C-01
+    check: "MHA-DT-10's least air to T120 is too small to check by a look"
+    kind: gap
+    reason: "a look cannot tell a tight pair from contact"
+    source: "fit audit 2026-11-23 part 2 row B9 (no owner ruling touched); 1 mm is a judgement of what the eye resolves, not a measurement; pinion.T120_TURNED_BAND_RADIAL_WORST is 1.67 mm"
+    basis: worst_case

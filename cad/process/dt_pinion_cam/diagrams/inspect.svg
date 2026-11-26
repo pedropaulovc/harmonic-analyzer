@@ -1,12 +1,12 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 400" font-family="sans-serif" font-size="13">
   <rect class="paper" x="0" y="0" width="760" height="400"/>
-  <text class="title" x="20" y="20">Setup 4: eccentricity over the GO pin on the surface plate</text>
+  <text class="title" x="20" y="20">Setup 4: eccentricity over the 1/4 shank on the surface plate</text>
   <rect class="fixture-table" x="40" y="320" width="680" height="30"/>
   <circle class="part-kept" cx="300" cy="210" r="110"/>
   <circle class="holes" cx="300" cy="180" r="48"/>
   <circle class="part-rest" cx="300" cy="180" r="46"/>
   <rect class="cutter" x="300" y="120" width="260" height="14"/>
   <line class="dims" x1="580" y1="134" x2="580" y2="320"/>
-  <text class="label" x="590" y="230">H over the .2510 GO pin</text>
-  <text class="label" x="20" y="385">Ecc = H − O.D./2 − G/2: .077–.081; thin wall = O.D./2 − ecc − N/2 (G, N: pin readings).</text>
+  <text class="label" x="590" y="230">H over the 1/4 shank</text>
+  <text class="label" x="20" y="385">Ecc = H − O.D./2 − R/2: {{cad.bore_eccentricity_min_in:.3dot}}–{{cad.bore_eccentricity_max_in:.3dot}}; thin wall = O.D./2 − ecc − {{cad.bore_dia_max_in:.4dot}}/2 (R: shank reading).</text>
 </svg>

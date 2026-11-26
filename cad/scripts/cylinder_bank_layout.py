@@ -18,7 +18,7 @@ brass end disc (MHA-DT-26) closes gear 0's cam slot at the south end.
 * The arbor fills both strap bores and domes proud of each strap. Its two
   crown-apex set screws (MHA-DT-VN-64) bear midway through the straps:
   tighten the datum-side south screw before the north one.
-* The BACK (north) strap is set one BANK_SPRING_SET feeler stack off gear 19's
+* The BACK (north) strap is set one BANK_SPRING_SET feeler leaf off gear 19's
   north planar face. The MHA-DT-VN-68 wave spring squeezed directly between
   them preloads the whole stack south onto the datum. There is no north disc
   (user ruling 2026-10-20).
@@ -87,12 +87,12 @@ def station_z(j: int) -> float:
 
 
 # --- preload (#948 ruling R) ----------------------------------------------------
-# The north strap is set off gear 19's north face on a feeler stack, a pair of
-# inch leaves of the shop's one set (dt_feeler_leaves, #3042). The spring in
+# The north strap is set off gear 19's north face on one inch leaf of the
+# shop's one set (dt_feeler_leaves, #3042; fit audit part 2, B11). The spring in
 # that gap holds the stack south, with no end play. Re-setting the north strap
 # changes only spring height and preload, never the datum.
 MARGIN_SPARE = 0.25  # novice spare over every floor (pinion_rig_layout rule)
-BANK_SPRING_SET = _spring.INSTALLED_HEIGHT  # .037
+BANK_SPRING_SET = _spring.INSTALLED_HEIGHT  # .035
 BANK_SPRING_LEAVES = _leaves.leaf_stack(BANK_SPRING_SET)
 # The printed set band: the north strap re-set on its hold-downs.
 BANK_SPRING_SET_BAND = 0.10

@@ -21,7 +21,7 @@
 # to the .65 length and mill the L step to the .32 lug, which opens the bore
 # and the foot hole (FK05); Setup 7 upright on the seat: spot and drill 1/16
 # through the crown into the bore, mill the foot hole's Ø.150 counterbore
-# from the foot top with the long-reach 1/8 in end mill (FK06), tap #1-72 by
+# from the foot top with the 2-1/4 in long 1/8 in end mill (FK06), tap #1-72 by
 # hand under the spring tap guide in the spindle (FK07); bench deburr (the
 # F drill by hand through the bore) and inspect. Finish: black oxide, in the
 # shop. Owner (Pedro), answered in person 2026-11-21: "Black oxide: cold
@@ -36,10 +36,12 @@
 # .075 from it), and the lug stands
 # 0.96 in above the foot top: a 1/2 in end mill cannot reach it and a
 # standard 1/8 in end mill's 1-1/2 in overall length leaves too little out
-# of the collet to keep the collet nose over the crown. The Harvey 755708
-# long-reach 1/8 in end mill (1-1/4 in reach, 2-1/2 in overall; shop
-# tools.endmill-carbide-3fl-1-8-lr-755708, to_order) mills it by
-# interpolation; cam.py checks the reach.
+# of the collet to keep the collet nose over the crown. The plain 1/8 in
+# end mill with 3/4 in of flutes, 2-1/4 in overall (MSC 09653429, shop
+# tools.endmill-carbide-3fl-1-8-loc-3-4, to_order; the owner chose the
+# plain cutters, #3568; the pick: delegated ruling 2026-11-24 (Main), no
+# precedent; owner review #2144) mills it by interpolation; cam.py checks
+# its stick-out.
 #
 # Tapping: FluidNC cannot rigid-tap (owner, Pedro, 2026-11-17). The tap is
 # guided by the Fisher spring tap guide in the 1/2 in R8 collet (owner, Pedro,
@@ -65,14 +67,14 @@
 # them: west = F, hold = the foot hole, arch = the crown, apex = the crown
 # hole). Tool numbers are the places in the tools list among the mill's
 # tools: T1 1/2 in end mill, T2 centre drill, T3 #41, T4 D, T5 F drill,
-# T6 1/16 drill, T7 long-reach 1/8 in end mill, T8 the tap guide (the tap is turned
+# T6 1/16 drill, T7 2-1/4 in long 1/8 in end mill, T8 the tap guide (the tap is turned
 # by hand).
 title = "Fulcrum keeper"
 part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
 material = "1018 cold-finished steel, 3/4 in square (the drawing's MATERIAL: {{cad.material_name}}; the part's spec: {{cad.material_spec}})"
 stock = "{{process.blank_section_in:fraction}} in square bar; {{process.quantity:d}} blanks, each sawn about {{process.blank_length_nominal_in:.2f}} in long (at least {{process.blank_length_min_in:.2f}}, at most {{process.blank_length_max_in:.2f}}: Setup 1)."
-note = "Inches unless mm; G-code and console entries in mm (the files and the controller run G21). Finished {{cad.far_side_width_min_in:.3dot}}–{{cad.far_side_width_max_in:.3dot}} wide (F to N), {{cad.foot_tip_length_min_in:.3dot}}–{{cad.foot_tip_length_max_in:.3dot}} long (I to the foot tip); the lug {{cad.lug_outer_face_thickness_min_in:.3dot}}–{{cad.lug_outer_face_thickness_max_in:.3dot}} thick (I to its outer face O), the foot {{cad.foot_top_height_min_in:.3dot}}–{{cad.foot_top_height_max_in:.3dot}} high (the seat to the foot top). Speeds on the PM-30MV low belt (100–2800 rpm): no belt change. Home the mill ($H) once, after switching it on: every M6's trip to the tool setter and the tap files' G53 retract count from home. Home again only after a power cycle or a controller restart, an E-stop, an alarm, a limit switch hit, a stall or a crash: homing brings the stored G54 back. Then, before Cycle Start, touch one of the setup's zeros again with the edge finder: it must read what its step set, within .001 in. It does not, or the part may have moved: take the setup again from its first step, the part out. Feed Hold, then Reset with the axes stopped keeps position and G54: no homing, no new zero; console M6 for the tool in the spindle, then Cycle Start. Each blank gets its own zeros (no vise stop): in every mill setup, repeat the edge-finder and Z touch-off ops for each blank clamped, before its run. Every cutting file is proved in air on the first blank; the tap file moves only at the machine top and over the hole, spindle off. To order: the long-reach 1/8 in end mill (Setup 7's counterbore waits for it), and the black-oxide solution with gloves and glasses (the last setup waits for them)."
+note = "Inches unless mm; G-code and console entries in mm (the files and the controller run G21). Finished {{cad.far_side_width_min_in:.3dot}}–{{cad.far_side_width_max_in:.3dot}} wide (F to N), {{cad.foot_tip_length_min_in:.3dot}}–{{cad.foot_tip_length_max_in:.3dot}} long (I to the foot tip); the lug {{cad.lug_outer_face_thickness_min_in:.3dot}}–{{cad.lug_outer_face_thickness_max_in:.3dot}} thick (I to its outer face O), the foot {{cad.foot_top_height_min_in:.3dot}}–{{cad.foot_top_height_max_in:.3dot}} high (the seat to the foot top). Speeds on the PM-30MV low belt (100–2800 rpm): no belt change. Home the mill ($H) once, after switching it on: every M6's trip to the tool setter and the tap files' G53 retract count from home. Home again only after a power cycle or a controller restart, an E-stop, an alarm, a limit switch hit, a stall or a crash: homing brings the stored G54 back. Then check every zero of the setup again, each the way its step set it: each must read what its step set, within .001 in. One does not, cannot be reached with the part in, or the part may have moved: take the setup again from its first step, the part out. They all do: run the interrupted file again from its start. Feed Hold, then Reset with the axes stopped keeps position and G54: no homing, no new zero; run the interrupted file again from its start: its first M6 measures the tool, and cuts already made are cut in air. Each blank gets its own zeros (no vise stop): in every mill setup, repeat the edge-finder and Z touch-off ops for each blank clamped, before its run. Every cutting file is proved in air on the first blank; the tap file moves only at the machine top and over the hole, spindle off. To order: the 2-1/4 in long 1/8 in end mill (Setup 7's counterbore waits for it), and the black-oxide solution with gloves and glasses (the last setup waits for them)."
 shop = "../shop"
 stock_refs = ["1018-square-3-4"]
 material_key = "rocker-1018-cold-finished"
@@ -204,7 +206,7 @@ apex_tip_height_mm = 27.389
 plug_tap_lead_mm = 1.764
 tap_reach_min_mm = 5.619
 tap_reach_max_mm = 9.249
-# Counterbore (FK06): the long-reach 1/8 in end mill's centre on a circle
+# Counterbore (FK06): the 2-1/4 in long 1/8 in end mill's centre on a circle
 # cbore_path_radius_mm round the foot hole's axis (Ø.150, the middle of the
 # drawing's .145-.155 band, less the cutter), 17 helical turns of .0049 down
 # to cbore_depth_mm (.083, the band's middle), then one flat turn on the
@@ -214,8 +216,8 @@ tap_reach_max_mm = 9.249
 # the foot tip's .072 wall and clears the MHA-CH-VN-52's Ø.140 head. Its
 # collet nose stays cbore_collet_clear_mm over the crown's apex with the
 # cutter on the floor: at least cbore_projection_min_mm out of the collet,
-# inside its 1-1/4 in reach (cam.py). Feed: the setting's chip load
-# (endmill-carbide-3fl-1-8-lr-1018-cf, 2800 rpm × 3 × .001 = 8.4 in/min)
+# with its stick-out checked against its length (cam.py). Feed: the setting's chip load
+# (endmill-carbide-3fl-1-8-loc-3-4-1018-cf, 2800 rpm × 3 × .001 = 8.4 in/min)
 # holds at the cutter's edge, which on the helix runs (path radius + cutter
 # radius)/path radius = 6.00× faster than its centre: the centre's F is
 # 8.4 × .3175/1.905 = 1.40 in/min (cam.py; sh_column_clamp_back's rule).
@@ -226,12 +228,21 @@ cbore_collet_clear_mm = 2.54
 cbore_projection_min_mm = 28.959
 cbore_feed_per_min_mm = 35.56
 # The edge's feed, the setting's 8.4 in/min: the cut's feed (its chip load
-# .001 in/tooth is what deflects the long-reach cutter).
+# .001 in/tooth is what deflects the long cutter).
 cbore_edge_feed_per_min_mm = 213.36
-# The end mill's 1-1/4 in reach (cad/config/shop-equipment/
-# tools.endmill-carbide-3fl-1-8-lr-755708, its seller's page): its neck,
-# under the cutter's Ø, runs that far from the tip.
-long_reach_mm = 31.75
+# The end mill (MSC 09653429, read live 2026-11-24, #3568): 2-1/4 in
+# overall, 3/4 in of flutes, 3 flutes, 40° helix, centre cutting, its 1/8 in
+# shank the cutter's size and no neck: nothing wider than the cutter stands
+# within its stick-out. Out of the 1/8 in collet at least
+# cbore_projection_min_mm (1.140) and at most cbore_projection_max_mm, its
+# length less holder_grip_min_mm in the collet (ch_amplitude_bar's grip
+# rule, its plan's holder_grip_min_mm; no shop-wide grip rule is on
+# record): at the least stick-out 1.110 in stays in the collet. The 1/8 in
+# stick-out floor of the coming retune (#3634, 13.97 mm) is under the
+# 28.959 set here. Its 40° helix (the setting names none) changes none of
+# the setting's numbers. cam.py checks both ends.
+cbore_projection_max_mm = 44.45
+holder_grip_min_mm = 12.7
 # Speeds and feeds of the holes, authored in the operations: LittleMachineShop
 # "Cutting Speeds", Drilling & Reaming, Plain carbon steels 1006-1026 (read
 # 2026-11-20): drilling 60-100 ft/min; AutoDrill "Suggested
@@ -283,14 +294,14 @@ drill_chuck_gauge_mm = 95.0      # Archive holders.drill-chuck-r8.gauge_len_mm.
 half_mill_projection_mm = 28.45
 # Overall lengths: jobber #41 2-1/8 in, D 4 in, F 4-1/8 in, 1/16 1-7/8 in
 # (ASME B94.11M); the #2 combined drill and countersink 1-7/8 in; the
-# long-reach 1/8 in end mill 2-1/2 in. Bounded by their whole length below
+# 1/8 in end mill 2-1/4 in. Bounded by their whole length below
 # the chuck or collet.
 drill_41_oal_mm = 53.975
 drill_d_oal_mm = 101.6
 drill_1_16_oal_mm = 47.625
 centre_drill_oal_mm = 47.625
 drill_f_oal_mm = 104.775
-long_reach_oal_mm = 63.5
+cbore_mill_oal_mm = 57.15
 # Tapping under the spring tap guide (tools.tap-guide-fisher): the guide and
 # the tap in its wrench together reach at most tap_stack_max_mm below the
 # collet face, the spindle-to-table maximum (shop machines.pm-30mv, 431.8)
@@ -332,8 +343,8 @@ name = "1/16 drill"
 ref = "drill-1-16"
 [[tools]]
 id = "em-eighth"
-name = "Long-reach 1/8 in carbide end mill, TO ORDER"
-ref = "endmill-carbide-3fl-1-8-lr-755708"
+name = "1/8 in carbide end mill, 3/4 in of flutes, 2-1/4 in long, TO ORDER"
+ref = "endmill-carbide-3fl-1-8-loc-3-4"
 [[tools]]
 id = "tap-guide"
 name = "Fisher spring tap guide"
@@ -721,7 +732,7 @@ indexing = "none"
 machine_ref = "pm-30mv"
 holding = "The 1 in parallels back against the jaws. The part upright, the SEAT down on both parallels, the crown up, gripped on F (against the FIXED jaw) and N, I to the RIGHT, centred on the jaws. Tap it down onto both parallels while closing the vise. The jaws grip the lower {{process.upright_grip_mm:in.2dot}}; the crown stands above them, the foot top {{cad.foot_top_height_in:.3dot}} above the parallels, between the jaws."
 datum = "Programs FK06_crown_cbore, FK07_crown_tap and FK08_cbore_recut. G54: X0 the inner face I (the RIGHT side), the part to −X; Y0 the fixed jaw's face (F), +Y toward it; Z0 the parallels' top (the seat). The crown hole at X −{{cad.crown_tap_station_mm:.3f}}, the apex at Z {{cad.crown_overall_height_ref:.3f}}; the foot hole at X −{{process.foot_hole_station_from_i_mm:.3f}}; both at Y −{{process.width_middle_mm:.3f}} mm (the width's middle). Tool lengths from the tool setter at each M6; every file starts with an M6 for its first tool; at every M6 stop the file has stopped the spindle and lifted the tool above the part."
-diagram = { file = "diagrams/apex.svg", alt = "The keeper upright on two parallels, seat down, the crown up, I to the right; the centre drill spots the crown and the 1/16 drill drills down into the bore; the long-reach 1/8 in end mill mills the counterbore from the foot top, beside the lug." }
+diagram = { file = "diagrams/apex.svg", alt = "The keeper upright on two parallels, seat down, the crown up, I to the right; the centre drill spots the crown and the 1/16 drill drills down into the bore; the 2-1/4 in long 1/8 in end mill mills the counterbore from the foot top, beside the lug." }
 envelope = { x_span_mm = ["{{cad.foot_tip_length_mm}}", "{{process.centre_drill_oal_mm}}"], y_span_mm = ["{{cad.far_side_width_mm}}", "{{process.centre_drill_oal_mm}}"], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{cad.crown_overall_height_ref}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", 5.766], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.tap_stack_max_mm}}"], shortest_tool_mm = ["{{process.drill_chuck_gauge_mm}}", "{{process.drill_1_16_oal_mm}}"] }
 vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{cad.far_side_width_mm}}", along_jaws_mm = "{{cad.foot_tip_length_mm}}", part_height_mm = "{{cad.crown_overall_height_ref}}", parallel_height_mm = "{{process.parallel_height_mm}}", overhang_mm = ["{{process.vise_seat_inset_mm}}", "rest"], jaw_offset = "centred", fixed_jaw_face = "machined", moving_jaw_face = "machined", moving_jaw_contact = "flat" }
 beam = { axis = "z", hold = "cantilever", extent_mm = [0, "{{cad.crown_overall_height_ref}}"], clamp_mm = [0, "{{process.upright_grip_mm}}"], section_mm = { x = "{{cad.lug_outer_face_thickness_mm}}", y = "{{cad.far_side_width_mm}}" }, vise_left = "other" }
@@ -737,12 +748,12 @@ instruction_detailed = "The part clamped as Holding says. Edge finder (900 rpm):
 feed = "hand"
 
 [[setups.operations]]
-instruction = "The long-reach 1/8 in end mill in its 1/8 in collet, at least {{process.cbore_projection_min_mm:in.3dot}} out (its neck's 1-1/4 in reach covers it): with the cutter on the counterbore's floor the collet nose then stays {{process.cbore_collet_clear_mm:in.3dot}} over the crown."
+instruction = "The 2-1/4 in long 1/8 in end mill in its 1/8 in collet, just over {{process.cbore_projection_min_mm:in.3dot}} out, never over {{process.cbore_projection_max_mm:in.3dot}} (at least {{process.holder_grip_min_mm:in.2dot}} stays in the collet): with the cutter on the counterbore's floor the collet nose then stays {{process.cbore_collet_clear_mm:in.3dot}} over the crown."
 feed = "hand"
 
 [[setups.operations]]
 instruction = "First part only: prove FK06_crown_cbore and FK08_cbore_recut in air, Z0 raised 1.000 in, through every M6. Then Z0 back."
-instruction_detailed = "First part only: send $# and note the G54 line's Z. G10 L2 P1 Z(that Z + 25.400) raises Z0 1.000 in. Run FK06_crown_cbore through every M6, watching each move. Then run FK08_cbore_recut (the counterbore remedy's file, run only if the counterbore is small or shallow) the same way: the collet nose clears the crown and the long-reach cutter clears the jaws. G10 L2 P1 Z(the noted Z) puts Z0 back."
+instruction_detailed = "First part only: send $# and note the G54 line's Z. G10 L2 P1 Z(that Z + 25.400) raises Z0 1.000 in. Run FK06_crown_cbore through every M6, watching each move. Then run FK08_cbore_recut (the counterbore remedy's file, run only if the counterbore is small or shallow) the same way: the collet nose clears the crown and the 1/8 in cutter clears the jaws. G10 L2 P1 Z(the noted Z) puts Z0 back."
 feed = "hand"
 
 [[setups.operations]]
@@ -776,7 +787,7 @@ speed_kind = "spindle"
 tool = "em-eighth"
 drilling = "none"
 sizing = "other"
-instruction = "Same file, M6 T7 (the long-reach 1/8 in end mill; set 2800): mill the foot hole's counterbore from the foot top, beside the lug: down a helix of {{process.cbore_pitch_mm:in.3dot}} a turn, climb, to {{process.cbore_depth_mm:in.3dot}} deep, once round flat on the floor, then up over the hole, at {{process.cbore_feed_per_min_mm:in.2f}} in/min (the cutter's centre; its edge runs at the 1/8 in's 8.4). The part stays in the vise for the tap."
+instruction = "Same file, M6 T7 (the 2-1/4 in long 1/8 in end mill; set 2800): mill the foot hole's counterbore from the foot top, beside the lug: down a helix of {{process.cbore_pitch_mm:in.3dot}} a turn, climb, to {{process.cbore_depth_mm:in.3dot}} deep, once round flat on the floor, then up over the hole, at {{process.cbore_feed_per_min_mm:in.2f}} in/min (the cutter's centre; its edge runs at the 1/8 in's 8.4). The part stays in the vise for the tap."
 rpm = 2800
 feed = "{{process.cbore_feed_per_min_mm:in.2f}} in/min"
 milling_cuts = [
@@ -790,7 +801,7 @@ gauge_checks = [
 
 [[setups.operations]]
 steps = [
-  { kind = "action", text = "Smaller in Ø than its band: the 1/8 end mill is worn. Fit a new long-reach 1/8 in end mill, at least {{process.cbore_projection_min_mm:in.3dot}} out, and run FK08_cbore_recut (the counterbore alone; its M6 T7 measures the new cutter). Check again." },
+  { kind = "action", text = "Smaller in Ø than its band: the 1/8 end mill is worn. Fit a new 2-1/4 in long 1/8 in end mill, just over {{process.cbore_projection_min_mm:in.3dot}} out, never over {{process.cbore_projection_max_mm:in.3dot}}, and run FK08_cbore_recut (the counterbore alone; its M6 T7 measures the new cutter). Check again." },
 ]
 feed = "hand"
 

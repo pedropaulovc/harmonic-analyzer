@@ -446,3 +446,59 @@ def build(ctx: dict[str, Any], rt: Any) -> dict[str, Any]:
     ops.update(ctx["manual"])
     rt.generate(doc)
     return {"ops": ops}
+
+
+# The as-machined report (``cad/scripts/_as_machined.py``) only reports: it
+# never fails the task. "gate" would fail it on a difference over the noise
+# line or a rapid that cuts.
+AS_MACHINED_MODE = "report"
+# The round bar's section as a polygon of this many sides (its chords stand
+# 0.0001 mm inside the Ø.25 circle, far under the report's noise line).
+AS_MACHINED_SIDES = 360
+
+
+def as_machined(ctx: dict[str, Any], inputs: Any) -> dict[str, Any]:
+    """What the as-machined report needs: PS01's blank, the Ø.25 bar as
+    bought (the plan's stock_dia_in) already faced at both ends on the lathe
+    to the screw's nominal length (Setups 2-3), in PS01's frame (its job
+    stock: X0 the head end, the axis on Y0, the O.D. top Z0). The bar is
+    taken as bought: a bar over .2500 has its head skimmed in Setup 2. The
+    spigot (Setup 5) and the #0-80 thread (Setup 6) are cut after the mill
+    on the lathe and at the bench: the report leaves them on the blank.
+    Expected: that one region, the bar left round the spigot and on the
+    head; no deeper than the bar's radius less the spigot's least."""
+    radius = inputs.plan["parameters"]["stock_dia_in"] * IN / 2
+    step = inputs.features["features"]["step"]
+    (x0, x1), _y, _z = ctx["stock"]
+    circle = [
+        [radius * math.cos(2 * math.pi * k / AS_MACHINED_SIDES),
+         -radius + radius * math.sin(2 * math.pi * k / AS_MACHINED_SIDES)]
+        for k in range(AS_MACHINED_SIDES)
+    ]
+    return {
+        "parts": {
+            "": {
+                "blank": {"frame": "eye", "prism": {"axis": "x", "polygon": circle, "span": [x0, x1]}},
+                "route": [["PS01_eye", "eye"]],
+                # One connected region: the spigot's skin and the head's
+                # run together round the shoulder, so the causes share it.
+                "expected": [
+                    {
+                        "name": "lathe and bench work after the mill",
+                        "kind": "left",
+                        "frame": "eye",
+                        "within": [[x0, x1], [-radius, radius], [-2 * radius, 0.0]],
+                        "reason": "Setup 5 step-turns the Ø.058 spigot on the lathe and Setup 6 die-cuts the"
+                        " #0-80 thread at the bench, both after PS01; the head is the Ø.25 bar as bought,"
+                        " inside the drawing's .23-.25 head band (plan header, Op 20)",
+                        "max_mm": radius - step["dia"][0] / 2,
+                    }
+                ],
+            }
+        },
+        "skip": {},
+        "notes": [
+            "the spigot (lathe, Setup 5) and the #0-80 thread (bench die, Setup 6) come after the mill:"
+            " the blank keeps the bar's Ø.25 there",
+        ],
+    }

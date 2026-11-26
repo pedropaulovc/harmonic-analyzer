@@ -1084,3 +1084,16 @@ def build(ctx: dict[str, Any], rt: Any) -> dict[str, Any]:
     ops.update(ctx["manual"])
     rt.generate(doc)
     return {"ops": ops}
+
+
+# The as-machined report (``cad/scripts/_as_machined.py``) cannot take this
+# part: it is built up from three blanks (the strap's, PH01; the two plates'
+# end to end in PH02's one frame) bonded at gauge-block places before PH03,
+# and the report holds one blank per part.
+AS_MACHINED_NOT_COVERED = (
+    "a built-up part: the STEP is the strap with two bonded guide plates, cut"
+    " from three blanks (the strap's in PH01, the two plates' end to end in"
+    " PH02, whose one frame maps only the lower plate onto the model) and"
+    " bonded at gauge-block places before PH03 slots them; the report holds"
+    " one blank per part"
+)

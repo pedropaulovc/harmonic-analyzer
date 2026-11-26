@@ -93,7 +93,9 @@ from _title_block_units import LENGTH_UNITS
 from pd_platen_callouts import SOCKET_ENGAGEMENT_LINE
 from pd_platen_spec import (
     CBORE_DEPTH,
+    CBORE_DEPTH_BAND,
     CBORE_DIA,
+    CBORE_DIA_BAND,
     CBORE_FLOOR,
     CBORE_FLOOR_CALLOUT,
     CBORE_SECTION_HOLE_Y,
@@ -330,17 +332,23 @@ GUIDE_EDGE_XY = (
 # leader rises from the text's left end almost straight down to the rim
 # (round 3: centred at x 0.128, its left end at x 0.078 sent the leader up-left
 # through the upper left socket's A2 tag).  Half-widths from the v48 render's
-# ink: the guide's C'BORE row runs ~96 mm, the socket's TAP row ~69 mm; the
-# socket text moves right with it, ~6 mm clear of the guide's right end.
-GUIDE_CALLOUT_HALF_WIDTH = 0.050
-GUIDE_CALLOUT_XY = (0.137, 0.248)
-# Three rows: the size, the pattern's mate, and the counterbore by its symbol
-# with its side and the screw whose heads it sinks after its depth (round 4,
-# rule 26: "DRILL, C'BORE FAR SIDE FOR ..." wrote the counterbore in words over
-# its own symbol row).  The side and screw join the definition part that ends
-# on the counterbore's depth (_name_counterbore_side).
+# ink: the guide's C'BORE row ran ~96 mm, the socket's TAP row ~69 mm.  The
+# depth's own band (" ±.005", ~16 mm at ~2.7 mm a character) widens the C'BORE
+# row to ~112 mm, so the guide text grows right from the same left end and the
+# socket text moves right with it, its left end over its pick (x 0.2056) and
+# ~5 mm clear of the guide's right end.
+GUIDE_CALLOUT_HALF_WIDTH = 0.057
+GUIDE_CALLOUT_XY = (0.144, 0.248)
+# Four rows: the size, the pattern's mate, the counterbore by its symbol with
+# its side and the screw whose heads it sinks after its depth (round 4, rule
+# 26: "DRILL, C'BORE FAR SIDE FOR ..." wrote the counterbore in words over its
+# own symbol row), and under it the function the depth's own band holds, rule
+# 3's exception form: owner ruling 2026-11-25 (#3619), "b: depth .115 ±.005,
+# HOLDS HEAD BELOW FACE". The side, screw and function join the definition
+# part that ends on the counterbore's depth (_name_counterbore_side).
 GUIDE_CALLOUT_PROCESS = f"PATTERN MATCHES {GUIDE_NUMBER}\n"
-GUIDE_CBORE_SUFFIX = f"FAR SIDE FOR {GUIDE_SCREW_NUMBER}"
+GUIDE_CBORE_FUNCTION = "HOLDS HEAD BELOW FACE"
+GUIDE_CBORE_SUFFIX = f"FAR SIDE FOR {GUIDE_SCREW_NUMBER}\n{GUIDE_CBORE_FUNCTION}"
 # A hole callout's format parts (prefix, suffix, callout above, callout below)
 # read back at their definitions 5-8 and are written at 1-4.
 _DEFINITION_TO_WRITABLE = {5: 1, 6: 2, 7: 3, 8: 4}
@@ -352,10 +360,10 @@ SOCKET_EDGE_XY = (
 )
 # Its engagement row (#2411) is the widest, ~78 mm in the farm layout audit
 # (run 20261112T194605766Z: its left end at x 187.0 put the leader
-# through the guide callout's right end at 188.1), so the text stands 7 mm
-# further right, ~6 mm clear of the guide's right end.
+# through the guide callout's right end at 188.1), so the text stands right
+# of the guide's, its left end over its pick.
 SOCKET_CALLOUT_HALF_WIDTH = 0.040
-SOCKET_CALLOUT_XY = (0.233, 0.252)
+SOCKET_CALLOUT_XY = (0.246, 0.252)
 # The engagement line states the clip screws' worst-case full thread in the
 # plate, under 1.5D (rule 20, pd_platen_callouts; pd-platen RV-03, #2411).
 SOCKET_CALLOUT_PROCESS = (  # pd-platen RV-01, RV-03
@@ -529,13 +537,13 @@ for _index, (_x, _y) in enumerate(_GUIDE_TABLE, 1):
             "nominal_dia": (GUIDE_HOLE_DIA, ("GUIDE_HOLE_DIA",)),
             "thru": (True, ((_SELF, "GUIDE_CALLOUT_PROCESS"),)),
             "cbore_dia": (
-                limits(CBORE_DIA, GUIDE_CALLOUT_PRECISION["hw-cbdia"], unit=UNIT),
-                ("CBORE_DIA", "UNIT", "GUIDE_CALLOUT_PRECISION"),
+                limits(CBORE_DIA, GUIDE_CALLOUT_PRECISION["hw-cbdia"], CBORE_DIA_BAND, unit=UNIT),
+                ("CBORE_DIA", "CBORE_DIA_BAND", "UNIT", "GUIDE_CALLOUT_PRECISION"),
             ),
             "cbore_dia_nominal": (CBORE_DIA, ("CBORE_DIA",)),
             "cbore_depth": (
-                limits(CBORE_DEPTH, GUIDE_CALLOUT_PRECISION["hw-cbdepth"], unit=UNIT),
-                ("CBORE_DEPTH", "UNIT", "GUIDE_CALLOUT_PRECISION"),
+                limits(CBORE_DEPTH, GUIDE_CALLOUT_PRECISION["hw-cbdepth"], CBORE_DEPTH_BAND, unit=UNIT),
+                ("CBORE_DEPTH", "CBORE_DEPTH_BAND", "UNIT", (_SELF, "_print_counterbore_depth_band")),
             ),
             "cbore_depth_nominal": (CBORE_DEPTH, ("CBORE_DEPTH",)),
             "cbore_depth_from": ("paper_face", ((_SELF, "GUIDE_CBORE_SUFFIX"),)),
@@ -684,6 +692,107 @@ def _name_counterbore_side(display: Any) -> None:
     applied = str(display.GetText(part) or "")
     if applied.replace("\r", "") != updated.replace("\r", ""):
         raise RuntimeError(f"guide counterbore side did not persist: {applied!r}")
+
+
+# swTolType_e.swTolSYMMETRIC: the mirrored band prints .115 ±.005, as the
+# owner's ruling reads it (draw_sm_knife_mount.tap_callout_tolerance).
+_TOL_SYMMETRIC = 4
+
+
+@_telemetry.traced("drawing.platen.counterbore_depth_band")
+def _print_counterbore_depth_band(display: Any) -> None:
+    """Print the counterbore depth's own band (owner ruling 2026-11-25,
+    #3619: .115 ±.005) on the native guide callout, and read it back.
+
+    A hole callout variable carries its OWN tolerance (SW 2016+:
+    ``ICalloutVariable.ToleranceType``, ``ToleranceMin``/``ToleranceMax``),
+    so the band is set on the callout, as draw_sm_knife_mount._band_tap_callout
+    does. It is not put on the part's GuideHoles feature: the platen's hole
+    table reads that feature, and its hidden SIZE cells then carried the
+    band's stacked tolerance (farm runs 20261126T030547930Z and
+    20261126T043433679Z, drawing:pd_platen: generated `.12 <STACK divider=DIM
+    ...>` and, after the rebuild, `.12<STACK divider=no>+ .01<OVER>- .01
+    </STACK>`). Those cells set the rows' height (a row prints no shorter than
+    its text, _name_hole_table_mates), so a stack there moves the table's
+    foot toward the title block. The Ø (``<hw-cbdia>``) keeps no band: a
+    wizard pocket at .XX."""
+    variable, length = _guide_depth_variable(display)
+    upper, lower = CBORE_DEPTH_BAND
+    variable.ToleranceType = _TOL_SYMMETRIC
+    variable.ToleranceMin = lower / 1000.0
+    variable.ToleranceMax = upper / 1000.0
+    length.TolerancePrecision = GUIDE_CALLOUT_PRECISION["hw-cbdepth"]
+    _assert_counterbore_depth_band(display, when="as set")
+
+
+def _guide_depth_variable(display: Any) -> tuple[Any, Any]:
+    """The guide callout's one ``hw-cbdepth`` variable: (dynamic
+    ICalloutVariable, ICalloutLengthVariable)."""
+    from win32com.client.dynamic import Dispatch as dynamic_dispatch  # noqa: PLC0415
+
+    found = []
+    for raw in display.GetHoleCalloutVariables() or ():
+        variable = dynamic_dispatch(raw._oleobj_)
+        if str(variable.VariableName) == "hw-cbdepth":
+            found.append((variable, _early_bound(raw, "ICalloutLengthVariable")))
+    if len(found) != 1:
+        raise RuntimeError(f"guide callout carries {len(found)} hw-cbdepth variables, not 1")
+    return found[0]
+
+
+# Text that would be a typed nominal or band in the callout's format parts
+# instead of the native variable (rule 3: "A tighter band goes on the
+# dimension itself, never in a note").
+_TYPED_DEPTH_TEXT = ("±", ".115", ".005", "+.", "-.")
+
+
+def _assert_counterbore_depth_band(display: Any, *, when: str) -> None:
+    """The guide callout's depth is native: the display dimension shows its
+    own value (IDisplayDimension.GetOverride false), no format part types the
+    nominal or a band (_TYPED_DEPTH_TEXT) and one part carries the depth
+    token, the ``hw-cbdepth`` variable reads the model's Hole Wizard depth
+    (CBORE_DEPTH) at GUIDE_CALLOUT_PRECISION, and its own tolerance is
+    swTolSYMMETRIC ±CBORE_DEPTH_BAND at the same places. Run as set and again
+    from finalize_drawing's checkpoint after the SLDDRW save
+    (draw_dt_cone_gear's ``checkpoint=`` pattern), so a band lost to the
+    settling rebuild or the save fails the leaf."""
+    variable, length = _guide_depth_variable(display)
+    dimension = _early_bound(display, "IDisplayDimension")
+    places = GUIDE_CALLOUT_PRECISION["hw-cbdepth"]
+    upper, lower = CBORE_DEPTH_BAND
+    definitions = {
+        part: str(dimension.GetText(part) or "") for part in _DEFINITION_TO_WRITABLE
+    }
+    read = {
+        "override": bool(dimension.GetOverride()),
+        "depth_tokens": sum(text.count("<HOLE-DEPTH>") for text in definitions.values()),
+        "typed": sorted(
+            {typed for text in definitions.values() for typed in _TYPED_DEPTH_TEXT if typed in text}
+        ),
+        "depth_mm": float(length.Length) * 1000.0,
+        "precision": int(length.Precision),
+        "type": int(variable.ToleranceType),
+        "lower_mm": float(variable.ToleranceMin) * 1000.0,
+        "upper_mm": float(variable.ToleranceMax) * 1000.0,
+        "tolerance_precision": int(length.TolerancePrecision),
+    }
+    if (
+        read["override"]
+        or read["depth_tokens"] != 1
+        or read["typed"]
+        or abs(read["depth_mm"] - CBORE_DEPTH) > 1e-5
+        or read["precision"] != places
+        or read["type"] != _TOL_SYMMETRIC
+        or abs(read["lower_mm"] - lower) > 1e-5
+        or abs(read["upper_mm"] - upper) > 1e-5
+        or read["tolerance_precision"] != places
+    ):
+        raise RuntimeError(
+            f"guide callout depth is not the native {CBORE_DEPTH:g} mm "
+            f"swTolSYMMETRIC {(lower, upper)} mm at {places} places ({when}): "
+            f"read {read!r}, definitions {definitions!r}"
+        )
+    _telemetry.info(f"guide callout hw-cbdepth native band ({when}): {read!r}")
 
 
 # VIEW B (rules 9, 26): the 1:1 right side is not projected at the sheet's
@@ -1472,6 +1581,7 @@ def build(adapter: Any) -> dict[str, str]:
         guide_callout, GUIDE_CALLOUT_PRECISION, label="guide-screw counterbored holes"
     )
     _name_counterbore_side(guide_callout)
+    _print_counterbore_depth_band(guide_callout)
     socket = (_SOCKET_RIGHT_X, _SOCKET_HIGH_Y)  # *Front: model +X right, +Y up
     socket_callout = add_native_hole_callout(
         adapter,
@@ -1522,6 +1632,12 @@ def build(adapter: Any) -> dict[str, str]:
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
     _telemetry.info("platen sheet: views, dimensions, callouts and hole table placed")
 
+    def _saved(phase: str) -> None:
+        # After the SLDDRW save, the drawing still open: the band the sheet
+        # stores is the native one, unchanged by the settling rebuild.
+        if phase == "after_drawing_save":
+            _assert_counterbore_depth_band(guide_callout, when="after the SLDDRW save")
+
     return finalize_drawing(
         adapter,
         OUTPUTS,
@@ -1530,6 +1646,7 @@ def build(adapter: Any) -> dict[str, str]:
         layout=SPEC.layout,
         redundant_note_substrings=(REDUNDANT_NOTE,),
         expected_redundant_notes=1,
+        checkpoint=_saved,
     )
 
 

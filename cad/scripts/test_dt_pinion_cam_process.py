@@ -104,9 +104,11 @@ def test_context_accepts_the_plan_and_numbers_the_tools(ctx) -> None:
 def test_the_plan_is_an_enrolled_traveler_and_cam_stem() -> None:
     assert PLAN["revision"] != "placeholder"
     assert STEM in _process_plans.enrolled_stems()
-    assert {"reamer", "pins"} <= {
-        t["id"] for t in PLAN["tools"] if t.get("status") == "to_order"
-    }
+    tools = {t["id"]: t for t in PLAN["tools"]}
+    assert tools["reamer"].get("status") == "to_order"
+    # Fit audit F19: the MHA-DT-17 rod gauges the bore; no Class ZZ pins.
+    assert "pins" not in tools
+    assert not {t["ref"] for t in PLAN["tools"]} & {"zz-pins-2510-2515"}
 
 
 def test_the_recipes_programs_pass_every_check_it_declares(ctx, tmp_path) -> None:

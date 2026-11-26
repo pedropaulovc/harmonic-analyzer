@@ -80,10 +80,11 @@ HEAD_EDGE_LOW = (
 #   the head, HeadDia, and the cast body, MainBodyDia, each at its printed .XX
 HEAD_GROWTH = printed_band_mm(post.DRAWING_PRECISION_BY_NAME["HeadDia"], unit=POST_UNIT) / 2.0
 BODY_GROWTH = printed_band_mm(post.DRAWING_PRECISION_BY_NAME["MainBodyDia"], unit=POST_UNIT) / 2.0
-#   the cone boss's end faces, ConeBossLen at .XX, symmetric about the post
-#   axis: the north end SHORT brings the seated collar and 64T toward the
-#   post; the boss itself, ConeBossDia at .X
-CONE_BOSS_END_GROWTH = printed_band_mm(post.DRAWING_PRECISION_BY_NAME["ConeBossLen"], unit=POST_UNIT) / 2.0
+#   the cone boss's north end face, its station ConeBossNorthZ at the title
+#   block's .XXX (owner ruling 2026-11-24, audit part 2 C9): the north end
+#   SHORT brings the seated collar and 64T toward the post; the boss itself,
+#   ConeBossDia at .X
+CONE_BOSS_END_GROWTH = post.CONE_BOSS_NORTH_STATION_TOLERANCE_MM
 CONE_BOSS_GROWTH = printed_band_mm(post.DRAWING_PRECISION_BY_NAME["ConeBossDia"], unit=POST_UNIT) / 2.0
 #   the 64T's station: the ONE input for how far it may stand toward the
 #   post.  MHA-DT-00 step 1 sets it against MHA-DT-04's thrust collar (#916),

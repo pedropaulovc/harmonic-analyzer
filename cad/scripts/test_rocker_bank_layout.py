@@ -47,11 +47,34 @@ def test_the_hub_is_shorter_than_the_station_pitch() -> None:
 def test_shared_rules_are_the_cylinder_bank_rules() -> None:
     """The rocker layout shares ONE datum with cylinder_bank_layout (the cam
     plane, its arm plane, from the cam_plane leaf) but restates the running
-    floor, the novice spare and the DRO locate band, because the pivot parts
-    must not re-key on the cylinder bank; this pins them in lockstep."""
+    floor and the novice spare, because the pivot parts must not re-key on
+    the cylinder bank; this pins them in lockstep."""
     assert bank.RUNNING_FLOOR == drum_bank.RUNNING_FLOOR
     assert bank.MARGIN_SPARE == drum_bank.MARGIN_SPARE
-    assert bank.NORTH_EAR_LOCATE_BAND == drum_bank.FRONT_STRAP_LOCATE_BAND
+
+
+def test_each_dro_locate_band_is_its_own_row() -> None:
+    """The two DRO edge-finds off the one DRO zero are separate MHA-DT-00
+    setting rows with their own bands and reasons. Row 5, the back MHA-CH-08
+    ear: rule 4 opens it to the title block's .010 window, since no check it
+    feeds falls under D28's 0.03 mm margin there. Row 2, the front MHA-DT-02
+    strap: kept at 0.10 mm by necessity N-01 (delegated ruling 2026-11-25
+    (Main), no precedent; owner review #2144 (D28)), the channel axial
+    budget's 0.028 mm headroom."""
+    import machinist_necessity
+
+    # The nominal is off the .001 grid, so .0052 prints the full .010
+    # (Codjiflo 3550-r5).
+    assert bank.NORTH_EAR_LOCATE_BAND == pytest.approx(0.132)
+    assert min(bank.END_CLEARANCE_MIN) - bank.RUNNING_FLOOR >= 0.03
+    assert drum_bank.FRONT_STRAP_LOCATE_BAND == pytest.approx(0.10)
+    register = machinist_necessity.load_necessity(
+        _config.CONFIG_DIR, "dt_drive_train_assembly"
+    )
+    (row_2,) = (entry for entry in register if entry.id == "N-01")
+    assert "setting table row 2" in row_2.feature
+    assert "D28" in (row_2.source or "")
+    assert not any("row 5" in entry.feature for entry in register)
 
 
 def test_hub_mid_planes_are_the_channel_arm_planes() -> None:
@@ -302,9 +325,9 @@ def test_the_set_screws_bite_flats_clear_of_the_hubs() -> None:
         bracket.SET_SCREW_STATION_BAND + bracket.EAR_T_BAND,
     )
     assert bank.FLAT_RUN_MAX == pytest.approx(hub_free)
-    # The ear thickness at the title block's +/-.005 (fit audit census) and
-    # the span at +/-.005 (D20; (4.5863, 4.2180) at the span's +/-.004).
-    assert bank.FLAT_RUN_MAX == pytest.approx((4.5609, 4.2180), abs=5e-4)
+    # The ear thickness at the title block's +/-.005 (fit audit census), the
+    # span at +/-.005 (D20) and the north ear's .010 DRO window (row 5).
+    assert bank.FLAT_RUN_MAX == pytest.approx((4.5289, 4.1860), abs=5e-4)
     for offset, error, run_max, band in zip(
         bank.FLAT_OFFSET_MAX, station_error, hub_free, tap_band, strict=True
     ):

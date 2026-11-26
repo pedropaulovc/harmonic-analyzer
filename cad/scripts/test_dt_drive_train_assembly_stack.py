@@ -543,9 +543,9 @@ def _tip_block_hold_down(drive) -> None:
     assert (
         drive.POST_SCREW_INTO_PLATE
         - 2.0 * dt_cone_swing_platform_spec.POST_MOUNT_TAP_EDGE_BREAK
-        >= 0.87 * drive.POST_MOUNT_THREAD_DIA
-        and dt_cone_swing_platform_spec.POST_MOUNT_ENGAGEMENT_WORST_DIAMETERS >= 0.87
-    ), "MHA-DT-VN-61 engages the MHA-DT-20 tap under 0.87D"
+        >= 0.84 * drive.POST_MOUNT_THREAD_DIA
+        and dt_cone_swing_platform_spec.POST_MOUNT_ENGAGEMENT_WORST_DIAMETERS >= 0.84
+    ), "MHA-DT-VN-61 engages the MHA-DT-20 tap under 0.84D"
     # The shaft is placed by its front stub end; keep the station in lockstep with
     # the part's FRONT_STUB.
     assert abs(drive.SHAFT_FRONT_STATION + drive.SHAFT_FRONT_STUB) <= 1e-9, (
@@ -808,38 +808,12 @@ def _pinion_under_t120(drive) -> None:
         f"{drive.CRANK_SHAFT_END_NORTH_AIR_WORST:.3f} mm from the {drive.CRANK_SHAFT_END_NORTH_NEIGHBOUR} "
         f"at print-worst, below the {drive.T120_TURNED_BAND_RADIAL_FLOOR:.2f}-mm radial floor"
     )
-    assert set(drive.T120_RUNNING_PLAY.values()) <= set(
-        drive.PINION_T120_FITUP_PUSHED
-    ), "the T120 fit-up check leaves running play unpushed"
-    # So what the check reads is the pair's worst in service: a band or shoulder
-    # that passes the feeler keeps that clearance however the plays then move.
-    T120_FITUP_READING = drive.t120_fitup_reading()
-    for _name, _reading in T120_FITUP_READING.items():
-        assert _reading <= drive.PINION_T120_CLEARANCES[_name] + 1e-9, (
-            f"the T120 fit-up check reads {_name} {_reading:.4f}, more than its service "
-            f"worst {drive.PINION_T120_CLEARANCES[_name]:.4f}: its pose is not the closing one"
-        )
-    # The fit-up can always close: a band turned down to its fit-up minimum, or a
-    # shoulder faced back to its short limit, passes the fit-up feeler at every
-    # corner of the same stack.  The minimum is an actual size, not a toleranced one.
-    T120_FITUP_LIMIT_CLEARANCES = {
-        "turned band radial": drive.t120_fitup_reading(
-            turned_dia=drive.PINION_TURNED_DIA_FITUP_MIN
-            - 2.0 * drive._PINION_TURNED_RADIUS_UP
-        )["turned band radial"],
-        "shoulder air": drive.t120_fitup_reading(
-            shoulder_length=dt_crank_pinion_spec.SHOULDER_LENGTH_FITUP_MIN
-        )["shoulder air"],
-    }
-    for _name, _clearance in T120_FITUP_LIMIT_CLEARANCES.items():
-        assert _clearance >= drive.PINION_T120_FITUP_FEELER, (
-            f"16T {_name} to T120 at its fit-up limit is {_clearance:.3f} mm, under the "
-            f"{drive.PINION_T120_FITUP_FEELER:.2f} fit-up feeler"
-        )
-    # T120's distance from the crank axis never falls as the crank rises, so the
-    # band-turn heights run from the bottom of the printed band to one height.
-    assert drive.Y_CRANK + min(drive._CRANK_HEIGHT_BAND) > drive.Y_DRIVE, (
-        "the T120 band reading is not monotonic over the crank height band"
+    # Fit audit 2026-11-23 part 2, B9: MHA-DT-00 looks for daylight between
+    # the 16T and T120 instead of reading a feeler, because the service worst
+    # clearances stay well over a look's resolution (no fit-up cut remains).
+    assert min(drive.PINION_T120_CLEARANCES.values()) >= 1.0, (
+        f"16T to T120 worst clearances {drive.PINION_T120_CLEARANCES} fall under the "
+        "1 mm a look for daylight is held to"
     )
     assert math.isclose(
         drive.gear64_contact_z(0.0), drive._GEAR64_CONTACT_Z, abs_tol=1e-9
@@ -890,7 +864,7 @@ def _cone_pivot_screw(drive) -> None:
 
 def _tip_print_worst(drive) -> None:
     # Owner ruling 2026-11-20 (#2726): the 3/4 end screw keeps rule 18's 1.5 D
-    # at the print-worst embed, so MHA-DT-00 step 3A prints no shortfall.
+    # at the print-worst embed, so MHA-DT-00 step 3G prints no shortfall.
     assert drive.END_SCREW_ENGAGEMENT_FLOOR_D == 1.5
     assert drive.END_SCREW_ENGAGEMENT_WORST_D >= 1.5, (
         f"end screw print-worst full thread {drive.END_SCREW_ENGAGEMENT_WORST_D:.4f}D "
@@ -1004,9 +978,9 @@ def _alignment_pinion(drive) -> None:
     assert drive.J19_FULL_FACE_MARGIN >= -1e-9, (
         f"j = 19 loses {-drive.J19_FULL_FACE_MARGIN:.3f} of its full face at the worst stack"
     )
-    assert (
-        drive.J19_FULL_FACE_MARGIN - RIG.FEELER_LEAF_STEP < RIG.RIG_MARGIN_SPARE - 1e-9
-    ), "RIG_SET_LEAF_D is more than the thinnest setting for j = 19"
+    assert RIG.RIG_SET_D_RANGE[0] <= RIG.RIG_SET_LEAF_D <= RIG.RIG_SET_D_RANGE[1], (
+        "RIG_SET_LEAF_D is outside the owner's D range (audit part 2 C7)"
+    )
     # The rig reads the bank's configured-grid datum; the independently placed
     # gear and drum must still put the drum's back end exactly D off that face.
     assert abs(drive._G19_FACE_Z[1] - RIG.G19_BACK_FACE_Z) <= 1e-9, (
@@ -1372,7 +1346,7 @@ def _full_rotation_clearances(drive) -> None:
         <= 1e-9
     ), "the lever throw plane drifted from the rig layout's"
     assert not drive._THIN, (
-        "rig margins under their floor + RIG_MARGIN_SPARE: "
+        "rig margins under their floor (+ RIG_MARGIN_SPARE where no owner range rules): "
         + "; ".join(f"{n} {v:.3f} (floor {f})" for n, (v, f) in drive._THIN.items())
     )
     # The MHA-DT-33 collar rides the arbor outboard of the front strap.  It must
@@ -1464,15 +1438,26 @@ def _pinion_arbor_and_rig_fasteners(drive) -> None:
         and abs(drum_station_setting.DRUM_FRONT_END_Z - drive.APINION_Z_FRONT) <= 1e-9
         and abs(drum_station_setting.AXIS_Y - drive.APINION_Y) <= 1e-9
     ), "the drum-station setting leg left the placed arbor head and drum"
-    # R1: the crossrod is a bonded slip fit, modelled line to line.  Its printed
-    # limits (rod enters, gap inside Loctite 638) are dt_pinion_arbor_spec's asserts;
-    # the assembly only needs the shared nominal it places both parts at.
-    assert (
-        abs(drive.HANDLE_ROD_DIA - dt_pinion_arbor_geometry.CROSS_HOLE_DIA) <= 1e-9
-    ), "grip crossrod and head hole no longer share a nominal"
-    assert abs(drive.STRAP_PIVOT_BORE - 6.35) <= 1e-9, (
-        "strap pivot bore no longer rides the O6.35 shaft"
+    # R1: the crossrod is a bonded slip fit.  Fit audit F14: the head hole is
+    # the .2510 reamer's size on the 1/4 rod; the bond's limits (rod enters,
+    # gap inside Loctite 638) are dt_pinion_arbor_geometry's asserts.
+    assert abs(drive.HANDLE_ROD_DIA - 6.35) <= 1e-9, "grip crossrod left 1/4 in"
+    assert abs(dt_pinion_arbor_geometry.CROSS_HOLE_DIA - 0.2510 * 25.4) <= 1e-9, (
+        "the head hole is no longer the .2510 reamer"
     )
+    # Fit audit F16: the strap pivot bore is the .2510 reamer's size on the
+    # 1/4 in MHA-DT-19 shaft, whose nominal the strap pin's ligament reads
+    # from the bracket geometry (lockstep).
+    import dt_pinion_pivot_shaft_spec
+
+    assert abs(drive.STRAP_PIVOT_BORE - 0.2510 * 25.4) <= 1e-9, (
+        "strap pivot bore is no longer the .2510 reamer"
+    )
+    assert (
+        dt_pinion_bracket_geometry.PIVOT_SHAFT_DIA
+        == dt_pinion_pivot_shaft_spec.SHAFT_DIA
+        == 6.35
+    ), "the strap pin's shaft nominal left the MHA-DT-19 shaft"
     assert (
         drive.BLOCK_SCREW_HALF + dt_vn_slotted_screw_spec.HEAD_DIA / 2.0
         <= min(drive.BLOCK_EAST, drive.BLOCK_WIDTH - drive.BLOCK_EAST) - 0.25

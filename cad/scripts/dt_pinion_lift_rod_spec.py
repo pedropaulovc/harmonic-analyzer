@@ -33,6 +33,12 @@ ROD_LEN = LIFT_ROD_LEN
 # from it on the 1/4 in diameter (1.19, the old 1.2).
 CAP_R = 4.826  # .19
 CAP_SAG = CAP_R - math.sqrt(CAP_R**2 - ROD_DIA**2 / 4.0)
+# The as-supplied band of the 1/4 ground rod the O.D. is bought as
+# (stock-to-order.toml 1018-ground-round-1-4: stated tolerance inside
+# +.0000/-.0008), never cut and printed REF (ROD_DIA_CALLOUT).  An analysis
+# band only: the cams' .2510 reamed bores book their slip against it (fit
+# audit F19, dt_pinion_cam_spec.SLIP_CLEARANCE_MAX), and so do the MHA-DT-16
+# hub bore's clearance (draw_dt_pinion_lever) and the flats here.
 ROD_DIA_BAND = SHAFT_H
 
 LEVER_NUMBER = "MHA-DT-16"
@@ -92,35 +98,52 @@ _BLOCK_XX = printed_band_mm(_rig.BLOCK_DEPTH_PLACES, unit=_rig.BLOCK_UNIT)
 _STRAP_XX = printed_band_mm(_rig.STRAP_T_PLACES, unit=_rig.STRAP_UNIT)
 _CAM_LEN_XX = printed_band_mm(CAM_LENGTH_PLACES, unit=CAM_UNIT)
 _CAM_STATION_XX = printed_band_mm(CAM_SET_SCREW_Z_PLACES, unit=CAM_UNIT)
+
+
+def _range_deviation(gap: tuple[float, float], nominal: float) -> float:
+    """A setting's larger deviation from the model's leaf over the owner's
+    range (fit audit part 2 C7, pinion_rig_layout)."""
+    return max(gap[1] - nominal, nominal - gap[0])
+
+
+_FRONT_CAM_DEVIATION = _range_deviation(_rig.FRONT_CAM_GAP, _rig.FRONT_BLOCK_FEELER)
+_BACK_CAM_DEVIATION = _range_deviation(_rig.BACK_COLLAR_GAP, _rig.BACK_COLLAR_LEAF_F)
 SCREW_STATION_TERMS: dict[str, dict[str, float]] = {
     "front": {
         "back MHA-DT-18 depth": _BLOCK_XX,
         "2X MHA-DT-14 thickness": 2.0 * _STRAP_XX,
         "MHA-DT-01 drum length": _rig.DRUM_LEN_BAND,
-        "drum end shim set error": _rig.DRUM_END_SHIM_SET_ERROR,
-        "front block feeler band": _rig.FRONT_BLOCK_FEELER_BAND,
-        "front cam leaf set error": _rig.FEELER_SET_ERROR,
+        "drum end gap, its range": _range_deviation(
+            _rig.DRUM_END_GAP, _rig.DRUM_END_SHIM
+        ),
+        "front block gap, its range": _range_deviation(
+            _rig.FRONT_BLOCK_GAP, _rig.FRONT_BLOCK_FEELER
+        ),
+        "front cam leaf, its range": _FRONT_CAM_DEVIATION,
         "MHA-DT-23 tap station": _CAM_STATION_XX,
         "rod rim flush set": _rig.FLUSH_SET_ERROR,
     },
     "back": {
         "back MHA-DT-18 depth": _BLOCK_XX,
-        "back cam leaf F set error": _rig.FEELER_SET_ERROR,
+        "back cam leaf F, its range": _BACK_CAM_DEVIATION,
         "MHA-DT-23 length": _CAM_LEN_XX,
         "MHA-DT-23 tap station": _CAM_STATION_XX,
         "rod rim flush set": _rig.FLUSH_SET_ERROR,
     },
 }
 SCREW_HALF_RANGE = {key: sum(terms.values()) for key, terms in SCREW_STATION_TERMS.items()}
-# Each flat covers its whole range plus the screw's major, up to the .XX grid.
-# Its rim-side edge, the printed station, is the .XX grid point closest to
-# centring the flat on the nominal tap station, among those that keep the
-# screw's point on the flat at both bands' worst case (R8 review #2).  Round
-# to nearest gave the back flat .58, and its far end then let the point run
-# off by .0014.  Centres follow from the edge and the length.
+# Owner ruling C7 (fit audit part 2, 2026-11-24: "Yes: ranges, longer flats,
+# no leaf miking."): both flats are .30 long.  The least length that covers
+# a flat's whole range plus the screw's major, up to the .XX grid, stays as
+# the guard: .30 must hold it.  Each flat's rim-side edge, the printed
+# station, is the .XX grid point closest to centring the flat on the nominal
+# tap station, among those that keep the screw's point on the flat at both
+# bands' worst case (R8 review #2: rounding to nearest once let the back
+# point run off).  Centres follow from the edge and the length.
 _LENGTH_GRID = _IN / 10**FLAT_LENGTH_PLACES
 _STATION_GRID = _IN / 10**FLAT_STATION_PLACES
-FLAT_LEN = {
+FLAT_LEN_RULED = 0.30 * _IN
+FLAT_LEN_NEEDED = {
     key: round(
         math.ceil((2.0 * half + CAM_SET_SCREW_MAJOR_MAX) / _LENGTH_GRID - 1e-9)
         * _LENGTH_GRID,
@@ -128,6 +151,11 @@ FLAT_LEN = {
     )
     for key, half in SCREW_HALF_RANGE.items()
 }
+if max(FLAT_LEN_NEEDED.values()) > FLAT_LEN_RULED + 1e-9:
+    raise AssertionError(
+        f"a set-screw range outgrows the ruled .30 flat: {FLAT_LEN_NEEDED}"
+    )
+FLAT_LEN = dict.fromkeys(SCREW_HALF_RANGE, FLAT_LEN_RULED)
 # Worst case of the printed bands (inch title block) and the rig's set
 # errors together: the screw's point lies wholly on its flat.
 _LENGTH_BAND = printed_band_mm(FLAT_LENGTH_PLACES, unit=UNIT)
@@ -152,12 +180,12 @@ def _flat_edge_from_rim(key: str) -> float:
 
 FLAT_EDGE_FROM_RIM = {key: _flat_edge_from_rim(key) for key in FLAT_LEN}
 FLAT_FROM_RIM = {key: FLAT_EDGE_FROM_RIM[key] + FLAT_LEN[key] / 2.0 for key in FLAT_LEN}
-FRONT_FLAT_LEN = FLAT_LEN["front"]  # 5.588 (.22)
-BACK_FLAT_LEN = FLAT_LEN["back"]  # 4.318 (.17)
-FRONT_FLAT_EDGE_FROM_RIM = FLAT_EDGE_FROM_RIM["front"]  # 177.038 (6.97), printed
-BACK_FLAT_EDGE_FROM_RIM = FLAT_EDGE_FROM_RIM["back"]  # 14.986 (.59), printed
+FRONT_FLAT_LEN = FLAT_LEN["front"]  # 7.62 (.30)
+BACK_FLAT_LEN = FLAT_LEN["back"]  # 7.62 (.30)
+FRONT_FLAT_EDGE_FROM_RIM = FLAT_EDGE_FROM_RIM["front"]  # 176.022 (6.93), printed
+BACK_FLAT_EDGE_FROM_RIM = FLAT_EDGE_FROM_RIM["back"]  # 13.208 (.52), printed
 FRONT_FLAT_FROM_RIM = FLAT_FROM_RIM["front"]  # 179.832 (7.080), centre
-BACK_FLAT_FROM_RIM = FLAT_FROM_RIM["back"]  # 17.145 (.675), centre
+BACK_FLAT_FROM_RIM = FLAT_FROM_RIM["back"]  # 17.018 (.670), centre
 
 SCREW_POINT_ON_FLAT_MARGIN_MM = min(
     min(
@@ -199,12 +227,12 @@ _BLOCK_FACE_SHIFT = {
 }
 _HUB_FACE_SHIFT = {  # (front face, back face)
     "front": (
-        _BLOCK_FACE_SHIFT["front"] + _rig.FEELER_SET_ERROR,
-        _BLOCK_FACE_SHIFT["front"] + _rig.FEELER_SET_ERROR + _CAM_LEN_XX,
+        _BLOCK_FACE_SHIFT["front"] + _FRONT_CAM_DEVIATION,
+        _BLOCK_FACE_SHIFT["front"] + _FRONT_CAM_DEVIATION + _CAM_LEN_XX,
     ),
     "back": (
-        _BLOCK_FACE_SHIFT["back"] + _rig.FEELER_SET_ERROR + _CAM_LEN_XX,
-        _BLOCK_FACE_SHIFT["back"] + _rig.FEELER_SET_ERROR,
+        _BLOCK_FACE_SHIFT["back"] + _BACK_CAM_DEVIATION + _CAM_LEN_XX,
+        _BLOCK_FACE_SHIFT["back"] + _BACK_CAM_DEVIATION,
     ),
 }
 FLAT_HUB_COVER_MM = {
@@ -292,7 +320,8 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 DRAWING_REFERENCE_DIMENSIONS = frozenset({"RodOverall"})
 
 # Decimal places ARE the tolerance statement (drawing-simplicity-policy.md `How the repository implements the guidelines`); the part authors
-# them and the drawing reads them back.  Four on the banded bearing diameter;
+# them and the drawing reads them back.  Four on the stock diameter, printed
+# REF as the rod's own .2500;
 # three on the drilled pin hole, which takes the title block's DRILLED HOLES
 # row (.064, +.004/0); two on the length the rig's stacks read, the crown, the
 # reference overall and the pin station, which the lever's mid-engagement
@@ -322,15 +351,20 @@ if len(DRAWING_PRECISION_BY_NAME) != len(_PRECISION_NAMES):
 if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
     raise AssertionError("every marked dimension must state its decimal places")
 
-# drawing-guidelines.md rule 4 (tighten only for function, and name the mate):
-# the h band rides the diameter because the rod turns in the two MHA-DT-18
-# blocks' reamed lift bores (+.0015/+.0010 slide band); ground 1/4 in shafting
-# already holds it, so the stock is good enough as supplied (machinist review
-# r1: the band and Ra named no mate).
+# drawing-guidelines.md rule 4 (form 4's last sentence): the O.D. is 1/4
+# ground rod bought to size and never cut, so it prints the stock as a
+# reference, "(Ø.2500)", not limits of size (STOCK_DIMENSIONS; Codjiflo #3550
+# r1).  ROD_DIA_BAND stays the analysis band the cams' slip books.  The mate
+# that asks anything of it is the two MHA-DT-23 cams, whose .2510 reamed
+# bores it slides into by hand (fit audit F19; their sheet prints that
+# acceptance).  The MHA-DT-18 lift bores (fit audit F26) and the MHA-DT-16
+# hub's bore (fit audit F23) are F drills, .257, with no band, so they ask
+# nothing of it.  Two lines: below the value, where a callout prints.
+STOCK_DIMENSIONS = frozenset({"RodDia"})
 ROD_DIA_CALLOUT = "\n".join(
     (
-        f"RUNNING FIT IN {PIVOT_BLOCK_NUMBER} LIFT BORES,",
-        "1/4 IN GROUND STOCK OK",
+        "1/4 GROUND ROD, AS SUPPLIED",
+        f"SLIDES IN 2X {CAM_NUMBER}",
     )
 )
 

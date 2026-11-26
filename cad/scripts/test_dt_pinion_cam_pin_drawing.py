@@ -115,13 +115,15 @@ def test_the_bond_step_counts_one_pin_per_strap() -> None:
     assert step.startswith(f"BOND {pins}X MHA-DT-25, ONE INTO EACH MHA-DT-14 ")
 
 
-def test_no_gdt_the_shank_carries_the_finish_and_only_the_fit_is_banded() -> None:
+def test_no_gdt_the_shank_carries_the_finish_and_nothing_is_banded() -> None:
     """drawing-simplicity-policy.md `GD&T allowlist (rule 5)`: a pin is not on
     the GD&T allowlist.  drawing-guidelines.md rule 6 (roughness symbols only
     where a surface runs, slides or locates): the cam rides the Ø4 shank, a
     cam-follower contact (Codex P2 on #1687); the crown touches nothing.
     Machinist review r1 of #1009: the length and crown radius bands named no
-    mate; they take the title block's .XX."""
+    mate; they take the title block's .XX.  Machinist review r1 (farm run
+    20261124T110807008Z): the shank is bought to size, so it prints the stock
+    and no band (rule 4)."""
     from _gtol_cylinder import CylinderFace
 
     assert not hasattr(dt_pinion_cam_pin_spec, "GEOMETRIC_TOLERANCES_MM")
@@ -129,9 +131,7 @@ def test_no_gdt_the_shank_carries_the_finish_and_only_the_fit_is_banded() -> Non
     assert control.key == "shank"
     assert control.roughness_um == 1.6
     assert control.face == CylinderFace(diameter_mm=dt_pinion_cam_pin_spec.PIN_DIA)
-    assert model_toleranced_dimensions(pin) == {
-        ("PinProfile", "PinDia"): "PIN_DIA_BAND[0]",
-    }
+    assert model_toleranced_dimensions(pin) == {}
     assert "FINAL SIZE" not in drawing.DIMENSION_CALLOUTS["PinDia"]
     # Rule 7: the length and the crown radius carry their values only.
     assert set(drawing.DIMENSION_CALLOUTS) == {"PinDia"}
@@ -216,24 +216,26 @@ def test_part_stamps_make_critical_drawing_properties() -> None:
     assert int(spec["quantity"]) == 2
 
 
-def test_pin_diameter_callout_names_the_stock_not_the_material() -> None:
-    """Codex P2 on #814: the PinDia callout said drill rod while the title
-    block said AISI 1018 rod.  Machinist review of 7f7fc1717: naming the stock
-    on the callout repeated the Material cell.  Screen f21dfcdd C1 (rule 4):
-    the as-received shank is called out as stock, so it says the size is the
-    stock's without naming the material, and the bonded fit still assumes
-    the drill rod the registry row names."""
+def test_pin_diameter_prints_the_stock_not_limits_of_size() -> None:
+    """Rule 4: a diameter bought to size and never cut prints the stock, not
+    limits of size (machinist review r1, farm run 20261124T110807008Z: the
+    ±.0005 banded the bought 5/32 drill rod).  Fit audit F22 carries no owner
+    ruling, so the stock form stands (drawing-guidelines rule 4, form 4's
+    bought-to-size clause).  The size prints REF; the bonded fit keeps its words."""
     import _config
 
     row = _config.parts("dt-pinion-cam-pin")
     callout = drawing.DIMENSION_CALLOUTS["PinDia"]
-    assert callout is drawing.PIN_DIA_CALLOUT
-    assert callout.startswith("STOCK, AS SUPPLIED;")
-    assert len(callout.splitlines()) <= 2
-    assert "DRILL ROD" not in callout.upper()
-    assert row["material_specification"].upper() not in callout.upper()
-    assert "drill rod" in row["material_specification"].lower()
+    assert callout is dt_pinion_cam_pin_spec.PIN_DIA_CALLOUT
+    assert callout == (
+        "5/32 DRILL ROD, AS SUPPLIED; BONDED FIT IN\n"
+        "MHA-DT-14 FOLLOWER SEAT, LOCTITE 638"
+    )
+    assert "5/32 in" in row["material"]
     assert "drill rod" in row["process"]
+    assert "set_reference_dimensions(adapter, annotations, (\"PinDia\",))" in (
+        Path(drawing.__file__).read_text(encoding="utf-8")
+    )
 
 
 def test_finish_states_the_condition_not_the_method() -> None:

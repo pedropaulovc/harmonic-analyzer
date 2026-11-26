@@ -7,7 +7,8 @@ carries only its centre mark and the cutting plane; the longitudinal section
 A-A is the ring's length view (drawing-guidelines.md rule 9 (show internal
 shape in solid lines)) and takes every dimension, so the bore reads on cut
 edges rather than hidden lines (the MHA-DT-34 machinist review).  Every size
-but the bore is routine (.X): the oak tenon is turned to suit this bore.
+but the bore is routine (.X); the bore is the N drill's at DRILLED HOLES, and
+the oak tenon is turned to suit it.
 Note 1, flagged from the OD, carries the OD's skim with MHA-DT-08 and the
 walls it leaves; the bore's matched fit is its own callout (rule 7: a callout
 is short, a longer requirement is a numbered flag note).
@@ -54,7 +55,7 @@ from _gtol_cylinder import CylinderFace
 from _gtol_planar import PlanarFace
 from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
-from _printed_limits import limits
+from _printed_limits import drilled_limits, limits
 from _supplier_dimensions import supplier_reference_dimension
 from _section_axis import create_section_axis_centerline, position_section_caption
 from _session import run_build
@@ -142,9 +143,10 @@ CUT_END = (END_CENTER[0], END_CENTER[1] + OUTER_R + 0.006)
 # (build_dt_crank_handle_ferrule: one revolve about model +X; the arm-bearing
 # face at x = 0, the datum end the length runs from; the seat face at x =
 # LENGTH). The O.D. is the 9/16 rod as supplied (a REF, skimmed at
-# MHA-DT-08, note 1); the bore takes the title block's .XXX row (BORE names
-# the process, not DRILLED HOLES) and names its bonded tenon; the length the
-# .XX row. Each ``span`` is a diameter's model-X extent. The declarations
+# MHA-DT-08, note 1); the hole is the N drill's at DRILLED HOLES (codjiflo
+# 3548-1, rule 3), and names its bonded
+# tenon; the length the .XX row. Each ``span`` is a diameter's model-X
+# extent. The declarations
 # print nothing.
 _P = DRAWING_PRECISION_BY_NAME
 _NOTES = "dt_crank_handle_ferrule_notes"
@@ -209,12 +211,12 @@ requirement(
         "at": ([0.0, 0.0, 0.0], ("BORE_DIA",)),
         "span": ([0.0, LENGTH], ("LENGTH",)),
         "dia": (
-            limits(BORE_DIA, _P["BoreDia"], unit=UNIT),
-            ("BORE_DIA", "BORE_DIA_TOL", "UNIT", (_SELF, "SECTION_KEEP")),
+            drilled_limits(BORE_DIA, _P["BoreDia"], unit=UNIT),
+            ("BORE_DIA", "BORE_DIA_MIN", "BORE_DIA_MAX", "UNIT", (_SELF, "SECTION_KEEP")),
         ),
         "nominal_dia": (BORE_DIA, ("BORE_DIA",)),
         "thru": (True, ((_NOTES, "BORE_FIT_CALLOUT"),)),
-        "process": ("bore", ((_NOTES, "BORE_FIT_CALLOUT"),)),
+        "process": ("drill", ((_NOTES, "BORE_FIT_CALLOUT"),)),
         "diametral_clearance_ref": (
             list(TENON_GLUE_LINE),
             ("TENON_GLUE_LINE", (_NOTES, "BORE_FIT_CALLOUT")),

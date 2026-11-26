@@ -55,8 +55,6 @@ from _paths import CAD_ROOT
 from _session import run_build
 from _surface_finish import surface_finish_by_key
 import _telemetry
-from dt_pinion_pivot_block_spec import BORE_DIA as BLOCK_BORE_DIA
-from dt_pinion_pivot_block_spec import BORE_DIA_BAND as BLOCK_BORE_BAND
 from dt_pinion_pivot_shaft_spec import (
     CAP_RADIUS,
     CAP_SAG,
@@ -117,38 +115,29 @@ ISO_CENTER = (0.150, 0.110)
 ISO_SCALE = (1, 2)
 ISO_NOTE_XY = (0.115, 0.082)
 
-# The O.D.'s band is narrower than the shop table's turned-diameter row, so
-# its callout names the fit route: a running fit turned to the measured
-# pivot-block bores, with the diametral clearance the printed limits give as
-# REF (drawing-guidelines.md rule 4 (tighten only for function, and name the
-# mate)).
-_MM_PER_IN = 25.4
-if BLOCK_BORE_DIA != SHAFT_DIA:
-    raise AssertionError("the shaft and the pivot-block bores share one nominal")
-SHAFT_CLEARANCE_IN = (
-    (BLOCK_BORE_BAND[1] - SHAFT_DIA_BAND[0]) / _MM_PER_IN,
-    (BLOCK_BORE_BAND[0] - SHAFT_DIA_BAND[1]) / _MM_PER_IN,
-)
-# A matched pair names its mate by name and number (rule 4).
+# The O.D. is the bought ground bar's band (fit audit F22: kept as bought).
+# Its callout names the mate it runs in (drawing-guidelines.md rule 4 (tighten
+# only for function, and name the mate)).  The MHA-DT-18 bores are reamed
+# .2510 with this shaft as their gauge (owner ruling 2026-11-24, fit audit
+# question 12, option B), so the acceptance prints once, on that sheet, and
+# this one prints no matched fit or clearance.
 _BLOCK = _config.parts("dt-pinion-pivot-block")
-SHAFT_FIT_CALLOUT = "\n".join(
-    (
-        f"RUNNING FIT, MATCHED TO {_BLOCK['number']}",
-        f"{str(_BLOCK['title']).upper().removeprefix('PINION ')} BORES (CLEARANCE "
-        + "-".join(f"{value:.4f}".removeprefix("0") for value in SHAFT_CLEARANCE_IN)
-        + ")",
-    )
+SHAFT_FIT_CALLOUT = (
+    f"RUNS IN {_BLOCK['number']} "
+    f"{str(_BLOCK['title']).upper().removeprefix('PINION ')} BORES"
 )
-# The spring pin's +.0025/0 band is the pin's hole: the callout names the pin
-# and its fit, and the match-drill with its strap, in two lines of words
-# (rule 7).  The drilling set-up is MHA-DT-00's step, which names the hole,
-# so the part sheet carries no pointer to it.
+# The spring pin's +.0025/0 band is the pin's hole (ASME B18.8.2's
+# recommended hole): the callout names the pin as its own gauge (fit audit
+# F15; drawing-guidelines rule 4, form 2: "MUST DRIVE" on a
+# match-drilled hole) and the match-drill with its strap, in two lines of
+# words (rule 7).  The drilling set-up is MHA-DT-00's step, which names the
+# hole, so the part sheet carries no pointer to it.
 STRAP_NUMBER = _config.parts("dt-pinion-bracket")["number"]
 STRAP_PIN_NUMBER = _config.parts("dt-vn-pinion-strap-pin")["number"]
 PIN_HOLE_CALLOUT = "\n".join(
     (
         f"MATCH-DRILL THRU AT ASSEMBLY IN {STRAP_NUMBER}, 2 PL",
-        f"PRESS FIT ON {STRAP_PIN_NUMBER} SPRING PIN",
+        f"{STRAP_PIN_NUMBER} MUST DRIVE",
     )
 )
 DIMENSION_CALLOUTS = {

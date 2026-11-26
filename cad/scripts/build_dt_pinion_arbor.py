@@ -35,18 +35,16 @@ from _sketch import (
 )
 from _sketch_circle import define_circle
 from _drawing_dimension_insert import add_diametric_linear_dimension
-from _drawing_precision import apply_drawing_precision
+from _drawing_precision import _named_dimension, apply_drawing_precision
 from _drawing_marks import apply_drawing_properties, clear_dimensions_for_drawing, mark_dimensions_for_drawing
-from _drawing_tolerances import set_dimension_bilateral_tolerance
 from _drawing_prefix import set_dimension_prefix
-from _fit_deviations import deviations
 from _gtol_cylinder import CylinderFace
 from _gtol_face_read import face_geometry
 from _gtol_face_resolve import resolve_faces
 from _part_pmi import author_part_pmi
 from solidworks_mcp.adapters.pywin32_adapter import null_callout
 from _saved_part_guard import require_saved_drawing_properties
-from dt_pinion_arbor_pin_spec import PIN_HOLE_DIA, PIN_HOLE_DIA_BAND
+from dt_pinion_arbor_pin_spec import PIN_HOLE_DIA
 from dt_pinion_arbor_spec import (
     BACK_RIM_FROM_HEAD_REAR,
     BACK_CAP_R,
@@ -60,7 +58,6 @@ from dt_pinion_arbor_spec import (
     BOND_RELIEF_LEN,
     BOND_RELIEF_Z,
     CROSS_HOLE_DIA,
-    CROSS_HOLE_DIA_BAND,
     CROSS_HOLE_STATION,
     DRAWING_NOTES,
     DRUM_STATION,
@@ -76,7 +73,6 @@ from dt_pinion_arbor_spec import (
     HEAD_LEN,
     HEAD_REAR_Z,
     ISOMETRIC_VIEW_NOTE,
-    JOURNAL_DIA_BAND,
     JOURNAL_LEN,
     NECK_DIA,
     NECK_END_Z,
@@ -85,18 +81,20 @@ from dt_pinion_arbor_spec import (
     PIN_STATION_FROM_HEAD_REAR,
     PIN_Z,
     SHAFT_DIA,
-    SHAFT_DIA_BAND,
     SHAFT_LEN,
     SURFACE_FINISHES,
-    UNIT,
 )
 # The sheet's marked set: the spec's plus the two plain spans' diameters
 # (dt_pinion_arbor_notes), so dt_pinion_arbor_spec's other readers keep theirs.
 from dt_pinion_arbor_notes import (
     BACK_STUB_DIA_PREFIX,
+    BACK_STUB_DIA_SUFFIX,
+    BOND_LAND_DIA_PREFIX,
+    BOND_LAND_DIA_SUFFIX,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
     JOURNAL_DIA_PREFIX,
+    JOURNAL_DIA_SUFFIX,
     REFERENCE_SKETCHES,
     SPAN_REFERENCES,
 )
@@ -739,6 +737,19 @@ def _add_bond_relief(adapter) -> list[tuple[str, str]]:
     return drive_jobs
 
 
+def _set_dimension_suffix(
+    adapter, feature_name: str, dimension_name: str, suffix: str
+) -> None:
+    """Set and verify a model display dimension's native suffix text (the
+    journals' REF bracket; ``_drawing_prefix`` sets only the prefix)."""
+    display, _ = _named_dimension(adapter, feature_name, dimension_name)
+    display = _early_bound(display, "IDisplayDimension")
+    display.SetText(2, suffix)  # swDimensionTextParts_e.swDimensionTextSuffix
+    if str(display.GetText(2) or "") != suffix:
+        raise RuntimeError(
+            f"{dimension_name}@{feature_name}: suffix did not persist as {suffix!r}"
+        )
+
 
 def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import ExtrusionParameters, RevolveParameters
@@ -1147,50 +1158,45 @@ def build(adapter) -> dict[str, str]:
     # The bands are millimetres; UNIT prints them in inches.  The drum
     # station's .XX band is the title block's, so it rides no dimension.
     # Spelled out per span: _drawing_contract reads each call's literal names.
-    set_dimension_bilateral_tolerance(
-        adapter, "BondZoneReference", "BondZoneDia", *deviations(SHAFT_DIA_BAND), display_unit=UNIT
-    )
-    set_dimension_bilateral_tolerance(
-        adapter,
-        "BackBondReference",
-        "BackBondDia",
-        *deviations(SHAFT_DIA_BAND),
-        display_unit=UNIT,
-    )
-    set_dimension_bilateral_tolerance(
-        adapter, "BackStubReference", "BackStubDia", *deviations(SHAFT_DIA_BAND), display_unit=UNIT
-    )
-    set_dimension_bilateral_tolerance(
-        adapter,
-        "CrossHoleProfile",
-        "CrossHoleDia",
-        *deviations(CROSS_HOLE_DIA_BAND),
-        display_unit=UNIT,
-    )
-    set_dimension_bilateral_tolerance(
-        adapter,
-        "PinHoleProfile",
-        "PinHoleDia",
-        *deviations(PIN_HOLE_DIA_BAND),
-        display_unit=UNIT,
-    )
-    set_dimension_bilateral_tolerance(
-        adapter,
-        "BackJournalReference",
-        "BackJournalDia",
-        *deviations(JOURNAL_DIA_BAND),
-        display_unit=UNIT,
-    )
-    # One size for both journal lands (dt_pinion_arbor_notes).
+    # The two MHA-DT-01 bond lands carry no band: they are made to fit the
+    # drilled drum bore (owner ruling 2026-11-24, fit audit question 13;
+    # drawing-guidelines rule 4, form 2), REF sizes below.  Nor do the
+    # two spans outside the journals: they are made to fit the MHA-DT-33
+    # collar's drilled bore (machinist review r1, farm run 20261124T110807008Z;
+    # drawing-guidelines rule 4, form 2), REF size below.  The crossrod
+    # hole prints the .2510 reamer's size and no band (fit audit F14), and
+    # the collar pin hole the 1/16 drill under the title block's DRILLED
+    # HOLES, its acceptance the MHA-DT-VN-63 drive trial (machinist round 1,
+    # farm 20261125T180203935Z).
+    # One size for both journal lands, a REFERENCE: they are made to fit the
+    # MHA-DT-14 bores, so the size carries no band (dt_pinion_arbor_notes).
     set_dimension_prefix(
         adapter, "BackJournalReference", "BackJournalDia", JOURNAL_DIA_PREFIX
     )
-    # Each MHA-DT-01 bond land carries its own size (dt_pinion_arbor_notes).
-    set_dimension_prefix(adapter, "BondZoneReference", "BondZoneDia", "<MOD-DIAM>")
-    set_dimension_prefix(adapter, "BackBondReference", "BackBondDia", "<MOD-DIAM>")
+    _set_dimension_suffix(
+        adapter, "BackJournalReference", "BackJournalDia", JOURNAL_DIA_SUFFIX
+    )
+    # Each MHA-DT-01 bond land carries its own size (dt_pinion_arbor_notes),
+    # a REFERENCE: the lands are turned to the drilled drum bore (note 3).
+    set_dimension_prefix(
+        adapter, "BondZoneReference", "BondZoneDia", BOND_LAND_DIA_PREFIX
+    )
+    _set_dimension_suffix(
+        adapter, "BondZoneReference", "BondZoneDia", BOND_LAND_DIA_SUFFIX
+    )
+    set_dimension_prefix(
+        adapter, "BackBondReference", "BackBondDia", BOND_LAND_DIA_PREFIX
+    )
+    _set_dimension_suffix(
+        adapter, "BackBondReference", "BackBondDia", BOND_LAND_DIA_SUFFIX
+    )
     set_dimension_prefix(adapter, "BondReliefProfile", "BondReliefDia", "<MOD-DIAM>")
-    # One size for both spans outside the journals (dt_pinion_arbor_notes).
+    # One size for both spans outside the journals (dt_pinion_arbor_notes),
+    # a REFERENCE: they are turned to the MHA-DT-33 collar's bore (note 2).
     set_dimension_prefix(adapter, "BackStubReference", "BackStubDia", BACK_STUB_DIA_PREFIX)
+    _set_dimension_suffix(
+        adapter, "BackStubReference", "BackStubDia", BACK_STUB_DIA_SUFFIX
+    )
     set_dimension_prefix(adapter, "FrontCapProfile", "HeadCapR", "SR")
     set_dimension_prefix(adapter, "BackCapProfile", "BackCapR", "SR")
     clear_dimensions_for_drawing(adapter)

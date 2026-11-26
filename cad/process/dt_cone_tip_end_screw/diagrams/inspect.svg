@@ -1,7 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 360" font-family="sans-serif" font-size="13">
   <!-- The finished screw, section through its axis, about 300 px to the inch: the bought 1/4-28 x 3/4 fillister screw and the one added hole. Styles: prechips.palette. -->
   <rect class="paper" x="0" y="0" width="760" height="360"/>
-  <text class="title" x="20" y="22">The finished screw: the bought 91794A559 and its reamed end hole</text>
+  <text class="title" x="20" y="22">The finished screw: the bought 91794A559 and its drilled end hole</text>
   <rect class="part-kept" x="120" y="118" width="71" height="124"/>
   <rect class="part-threads" x="191" y="142" width="225" height="76"/>
   <rect class="part-removed" x="380" y="170" width="36" height="20"/>
@@ -10,7 +10,7 @@
   <line class="datum" x1="416" y1="130" x2="416" y2="230"/>
   <text class="datum-label" x="422" y="126">end face (as bought)</text>
   <line class="leader" x1="398" y1="190" x2="460" y2="262"/>
-  <text class="label" x="464" y="268">Ø{{cad.end_hole_dia_min_in:.4dot}}–{{cad.end_hole_dia_max_in:.4dot}} × {{cad.end_hole_depth_min_in:.2dot}}–{{cad.end_hole_depth_max_in:.2dot}} deep</text>
+  <text class="label" x="464" y="268">#52 × {{cad.end_hole_depth_min_in:.2dot}}–{{cad.end_hole_depth_max_in:.2dot}} deep</text>
   <text class="label" x="464" y="286">mouth broken, {{cad.chamfer_max_in:.3dot}} chamfer max</text>
   <line class="leader" x1="300" y1="218" x2="300" y2="300"/>
   <text class="label" x="200" y="318">1/4-28 UNF-2A thread, head and slot: as bought</text>

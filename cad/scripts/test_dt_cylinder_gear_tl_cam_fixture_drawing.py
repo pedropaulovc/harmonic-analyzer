@@ -217,7 +217,8 @@ def test_every_marked_dimension_has_a_place_and_callouts_name_their_mates() -> N
         assert f"PRESS FIT ON {spec.kit_short_form(number)}" in words[0]
         assert number.endswith(spec.kit_short_form(number))
         assert not any(word.startswith(("SETS", "LOCATES")) for word in words)
-    assert "DOES NOT TURN BY HAND" in spec.CALLOUTS_BELOW["StubHoleDia"]
+    for name in ("StubHoleDia", "PinHoleDia"):
+        assert spec.CALLOUTS_BELOW[name].endswith("\nDOES NOT TURN BY HAND"), name
     assert spec.PIN_HOLE_DEPTH_TEXT in spec.CALLOUTS_BELOW["PinHoleDia"]
     # A .0375 pin pressed blind has no knockout: the pair is permanent.
     assert "PERMANENT PAIR" in spec.CALLOUTS_BELOW["PinHoleDia"]

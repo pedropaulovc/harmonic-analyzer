@@ -15,7 +15,7 @@ import dt_crank_handle_ferrule_spec as spec
 import draw_dt_crank_handle_ferrule as drawing
 from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dimensions
 from _inch_wall_limits import WALL_FLOOR_MM, WALL_TARGET_MM
-from _printed_tolerance import printed_band_mm
+from _printed_tolerance import drilled_oversize_mm, printed_band_mm
 from _drawing_registry import DRAWINGS_BY_NAME
 from _paths import CAD_ROOT
 from machinist_exceptions import load_exceptions
@@ -39,24 +39,28 @@ def test_part_and_drawing_share_the_marked_dimension_contract() -> None:
     assert set(spec.DRAWING_PRECISION_BY_NAME) == marked
 
 
-def test_bore_is_banded_the_od_is_stock() -> None:
+def test_bore_is_the_n_drill_the_od_is_stock() -> None:
     # User ruling 2026-09-29 (MHA-DT-34 review): the tenon is turned to suit this
-    # bore and the end play is fitted on the MHA-DT-32 shoulder.  The bore
-    # holds the title block's .XXX band (#290; Codex P1/P2 on #1139: at .X the
-    # fitted tenon could outgrow the MHA-DT-08 seat shoulder or thin the oak
-    # over the pivot bore).  User ruling 2026-10-01 (local review of
-    # 47cb8a46b): the OD is the 9/16-in rod as supplied, a reference, skimmed
-    # to the grip contour with the oak after cure.
+    # bore and the end play is fitted on the MHA-DT-32 shoulder.  The bore is
+    # the N drill's at DRILLED HOLES (codjiflo 3548-1, rule 3), inside the .XXX
+    # row it was first held to (#290; Codex P1/P2 on #1139: at .X the fitted
+    # tenon could outgrow the MHA-DT-08 seat shoulder or thin the oak over the
+    # pivot bore).  User ruling 2026-10-01 (local review of 47cb8a46b): the OD
+    # is the 9/16-in rod as supplied, a reference, skimmed to the grip contour
+    # with the oak after cure.
     assert spec.DRAWING_PRECISION_BY_NAME["BoreDia"] == 3
-    assert spec.BORE_DIA_TOL == pytest.approx(printed_band_mm(3, unit=spec.UNIT))
+    assert (spec.BORE_DIA_MIN, spec.BORE_DIA_MAX) == pytest.approx(
+        (spec.BORE_DIA, spec.BORE_DIA + drilled_oversize_mm(unit=spec.UNIT))
+    )
+    third = printed_band_mm(3, unit=spec.UNIT)
+    assert spec.BORE_DIA_MIN >= 0.303 * 25.4 - third
+    assert spec.BORE_DIA_MAX <= 0.303 * 25.4 + third
     assert spec.OUTER_DIA == spec.STOCK_DIA == pytest.approx(9 / 16 * 25.4)
     assert spec.STOCK_FRACTION_DENOMINATOR == 16
     assert not hasattr(spec, "OUTER_DIA_TOL")
     assert spec.REFERENCE_DIMENSIONS == {"OuterDia"}
     assert model_toleranced_dimensions(part) == {}
-    assert spec.WALL_WORST == pytest.approx(
-        (spec.STOCK_DIA_MIN - (spec.BORE_DIA + spec.BORE_DIA_TOL)) / 2.0
-    )
+    assert spec.WALL_WORST == pytest.approx((spec.STOCK_DIA_MIN - spec.BORE_DIA_MAX) / 2.0)
     assert spec.WALL_WORST >= WALL_FLOOR_MM
 
 
@@ -89,7 +93,7 @@ def test_fitted_tenon_keeps_its_seat_and_wall() -> None:
     assert handle.FERRULE_SKIMMED_WALL_MIN == pytest.approx(
         (spec.INSTALLED_OUTER_DIA - xx) / 2.0
         - ecc
-        - ((spec.BORE_DIA + spec.BORE_DIA_TOL) / 2.0 + ecc)
+        - (spec.BORE_DIA_MAX / 2.0 + ecc)
     )
     assert spec.STOCK_DIA_MIN / 2.0 >= (spec.INSTALLED_OUTER_DIA + xx) / 2.0 + 2.0 * ecc
     assert handle.FERRULE_SEAT_RADIAL_MIN >= handle.FERRULE_SEAT_RADIAL_FLOOR
@@ -112,6 +116,12 @@ def test_callouts_name_the_mating_tenon_and_flag_the_skim_note() -> None:
     # words; the OD's skim and the walls it leaves are numbered note 1,
     # flagged from the OD.  Bonding the ring on is the assembly's business.
     assert notes.HANDLE_NUMBER in notes.BORE_FIT_CALLOUT
+    # Codjiflo 3548-1 (rule 3): a bare decimal with DRILL read as a size under
+    # DRILLED HOLES that no drill in the index cuts; the hole is the N drill's,
+    # its own .302, and the callout names it.
+    assert notes.BORE_FIT_CALLOUT.splitlines()[0] == f"{notes.BORE_DRILL} DRILL THRU"
+    assert notes.BORE_DRILL == "N"
+    assert spec.BORE_DIA == pytest.approx(0.302 * 25.4)
     for callout in (notes.BORE_FIT_CALLOUT, notes.OUTER_DIA_CALLOUT):
         assert len(callout.splitlines()) <= 3
         assert "EPOXY" not in callout and "LATHE" not in callout
@@ -169,8 +179,8 @@ def test_skimmed_walls_at_both_faces_are_stated_and_declared() -> None:
     assert handle.FERRULE_MOUTH_WALL_MIN >= handle.TENON_WALL_FLOOR_MM
     assert handle.FERRULE_MOUTH_WALL_MIN < WALL_TARGET_MM
     assert handle.FERRULE_ARM_FACE_WALL_MIN >= handle.FERRULE_ARM_FACE_WALL_ACCEPTED_MM
-    assert notes.SEAT_FACE_WALL_MIN <= handle.FERRULE_MOUTH_WALL_MIN
-    assert notes.ARM_FACE_WALL_MIN <= handle.FERRULE_ARM_FACE_WALL_MIN
+    assert notes.SEAT_FACE_WALL_MIN <= handle.FERRULE_MOUTH_WALL_MIN + 1e-9
+    assert notes.ARM_FACE_WALL_MIN <= handle.FERRULE_ARM_FACE_WALL_MIN + 1e-9
     declared = {
         entry.id: entry
         for entry in load_exceptions(

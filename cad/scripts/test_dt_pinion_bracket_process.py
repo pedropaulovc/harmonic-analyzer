@@ -83,11 +83,10 @@ def test_context_accepts_the_plan_and_numbers_the_tools(context) -> None:
         "em-half": 1,
         "spot": 2,
         "drill-c": 3,
-        "drill-n": 4,
+        "drill-5-16": 4,
         "reamer-2510": 5,
-        "reamer-3135": 6,
-        "em-eighth": 7,
-        "drill-26": 8,
+        "em-eighth": 6,
+        "drill-26": 7,
     }
     assert RECIPE.LOAD_FIRST_TOOL == tuple(name for name, _ops in RECIPE.PROGRAMS)
     # Both straps' bores on the blank's centre line, the arbor bores the

@@ -89,39 +89,77 @@ def test_the_lathe_stations_match_the_model():
 
 
 def test_the_journal_aim_gives_the_drawings_clearance_on_the_strap():
+    # Owner ruling 2026-11-24, fit audit question 12: the journals are turned
+    # to the measured strap bores, each aim its own strap's bore less the
+    # clearance aim, never over journal_aim_in (the drum and collar pass it).
     p = _plan()["parameters"]
-    journal = _features()["features"]["front_journal"]
-    low, high = (v / IN for v in journal["dia"])
+    f = _features()["features"]
+    # The journals print no band (REF Ø, made to fit): the aim's cap stays
+    # inside the spans' band, which the drum and collar pass.
+    low, high = (v / IN for v in f["shaft"]["dia"])
     assert low <= p["journal_aim_in"] <= high
-    clearance = [v / IN for v in journal["diametral_clearance"]]
-    assert p["strap_bore_min_in"] - high == pytest.approx(clearance[0], abs=1e-4)
-    assert p["strap_bore_max_in"] - low == pytest.approx(clearance[1], abs=1e-4)
+    clearance = [v / IN for v in f["front_journal"]["diametral_clearance"]]
+    assert clearance[0] < p["journal_clearance_aim_in"] < clearance[1]
+    # The largest strap bore for which Setup 7's whole acceptance window, A
+    # down to .0004 under it, stays inside the loosest clearance at the
+    # capped aim (Codjiflo 3547-7: at .3147 the window's foot ran .0034).
+    window = 0.0004
+    assert p["strap_bore_max_fit_in"] == pytest.approx(
+        p["journal_aim_in"] + clearance[1] - window, abs=1e-4
+    )
+    plan_text = _process_plans.plan_path(STEM).read_text(encoding="utf-8")
+    assert "to .0004 under it, so .001–.003 under its strap's SF or SB" in plan_text
+
+
+def test_the_drum_slides_over_both_journals_or_its_front_end_is_opened():
+    # Owner ruling 2026-11-25 (pinion arbor): "A: drum slides over both
+    # journals; if no journal size fits both bores, open the drum's front end
+    # to the journal +.001".
+    import dt_alignment_pinion_spec as drum
+    import dt_pinion_arbor_geometry as geometry
+    import dt_pinion_arbor_spec as spec
+    from _inch_wall_limits import WALL_TARGET_MM
+
+    p = _plan()["parameters"]
+    f = _features()["features"]
+    clearance = [v / IN for v in f["front_journal"]["diametral_clearance"]]
+    window = 0.0004
+    slide = p["journal_drum_clearance_in"]
+    # The journal's slide under the drum bore is the spans' under 5/16.
+    assert slide == pytest.approx(-spec.SHAFT_DIA_BAND[0] / IN, abs=1e-6)
+    # A journal fits both while its strap is at most this over the drum bore.
+    assert p["strap_over_drum_max_in"] == pytest.approx(
+        clearance[1] - window - slide, abs=1e-6
+    )
+    # The ream runs past the deepest seat and no deeper than the front land
+    # can take: the reamed bore at the capped journal + .001.
+    assert p["drum_front_ream_depth_in"] > spec.DRUM_FRONT_END_ON_JOURNAL_MAX / IN
+    reamed = (p["journal_aim_in"] + p["drum_front_ream_over_in"]) * IN
+    assert p["drum_front_ream_over_in"] == pytest.approx(0.001)
+    wall = drum.STOCK_FORM.root_radius_min_mm - reamed / 2.0
+    assert wall >= WALL_TARGET_MM
+    land_min = geometry.SHAFT_DIA + geometry.BOND_LAND_DIA_BAND[1]
+    assert reamed - land_min <= geometry.BOND_FIT_CLEARANCE[1]
+    # The inspection's .3165 cap is the drilled top the bond already reads.
+    assert geometry.DRUM_BORE_MAX / IN == pytest.approx(0.3165)
+    # An O drill (.316, cutting to .320) would overrun LOCTITE 638's gap.
+    assert (0.316 + 0.004) * IN - land_min > geometry.RETAINING_COMPOUND_MAX_GAP_MM
+    plan_text = _process_plans.plan_path(STEM).read_text(encoding="utf-8")
+    assert plan_text.count("open the drum's front end") >= 3
 
 
 def test_the_bench_gauges_read_inside_the_drawings_bands():
-    p = _plan()["parameters"]
+    plan = _plan()
+    p = plan["parameters"]
     f = _features()["features"]
-    for hole, go, nogo, side_min, side_max, sign in (
-        (
-            "cross_hole",
-            "cross_go_pin_in",
-            "cross_nogo_pin_in",
-            "cross_near_side_min_in",
-            "cross_near_side_max_in",
-            -1,
-        ),
-        (
-            "pin_hole",
-            "pin_go_pin_in",
-            "pin_nogo_pin_in",
-            "pin_far_side_min_in",
-            "pin_far_side_max_in",
-            1,
-        ),
-    ):
-        low, high = (v / IN for v in f[hole]["dia"])
-        assert p[go] == pytest.approx(low, abs=1e-4) and p[nogo] <= high + 1e-9
-        station = [v / IN for v in f[hole]["station"]]
-        half = sign * p[go] / 2
-        assert p[side_min] == pytest.approx(station[0] + half, abs=1e-4)
-        assert p[side_max] == pytest.approx(station[1] + half, abs=1e-4)
+    # Fit audit F15: the MHA-DT-VN-63 pin is the pin hole's gauge (it must
+    # drive, not enter by hand); no gauge pin is bought for it.
+    refs = {t["ref"] for t in plan["tools"]}
+    assert not refs & {"gauge-pin-0625", "pin-gauges"}
+    # The station reads over the 1/16 drill's shank.
+    low, _high = (v / IN for v in f["pin_hole"]["dia"])
+    assert p["pin_shank_in"] == pytest.approx(low, abs=1e-4)
+    station = [v / IN for v in f["pin_hole"]["station"]]
+    half = p["pin_shank_in"] / 2
+    assert p["pin_far_side_min_in"] == pytest.approx(station[0] + half, abs=1e-4)
+    assert p["pin_far_side_max_in"] == pytest.approx(station[1] + half, abs=1e-4)

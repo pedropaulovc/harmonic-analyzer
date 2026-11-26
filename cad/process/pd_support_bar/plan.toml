@@ -71,7 +71,7 @@ part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
 material = "1018 cold-finished steel, 3/8 x 1 in flat: this traveler's stock, a plain carbon steel as the drawing's MATERIAL asks (the part's record: {{cad.material_spec}})"
 stock = "3/8 x 1 in flat bar; {{process.quantity:d}} × {{process.blank_length_in:.2f}}–{{process.blank_length_max_in:.2f}} in blank."
-note = "Inches unless mm; G-code and console entries in mm (the files and the controller run G21). Finished {{cad.far_end_length_min_in:.1f}}–{{cad.far_end_length_max_in:.1f}} long (END A to the far end), {{cad.bottom_face_height_min_in:.3dot}}–{{cad.bottom_face_height_max_in:.3dot}} high (top face to bottom face), {{cad.back_face_depth_min_in:.3dot}}–{{cad.back_face_depth_max_in:.3dot}} thick (the bar's 3/8 as supplied). Two slide faces, {{cad.front_face_finish_ra_uin:d}} µin Ra: the top face T, milled here, and the front face F, the bar's cold-finished skin, never cut: keep F off chips and grit. Speeds on the PM-30MV low belt (100–2800 rpm): no belt change. Home the mill ($H) and touch off G54 at the start of every mill setup: a FluidNC reset loses home. After any controller reset, stall or E-stop, home and touch off again before Cycle Start. Every file is proved in air before it cuts. Not made here: the 2X #4-40 UNC tapped holes (the drawing: spotted through MHA-PD-14 at assembly). To buy: the 3/8 x 1 in bar before Setup 1; the pin-gauge sets before Setup 3."
+note = "Inches unless mm; G-code and console entries in mm (the files and the controller run G21). Finished {{cad.far_end_length_min_in:.1f}}–{{cad.far_end_length_max_in:.1f}} long (END A to the far end), {{cad.bottom_face_height_min_in:.3dot}}–{{cad.bottom_face_height_max_in:.3dot}} high (top face to bottom face), {{cad.back_face_depth_min_in:.3dot}}–{{cad.back_face_depth_max_in:.3dot}} thick (the bar's 3/8 as supplied). Two slide faces, {{cad.front_face_finish_ra_uin:d}} µin Ra: the top face T, milled here, and the front face F, the bar's cold-finished skin, never cut: keep F off chips and grit. Speeds on the PM-30MV low belt (100–2800 rpm): no belt change. Home the mill ($H) once, after switching it on: every M6's trip to the tool setter and the tap files' G53 retract count from home. Home again only after a power cycle or a controller restart, an E-stop, an alarm, a limit switch hit, a stall or a crash: homing brings the stored G54 back. Then check every zero of the setup again, each the way its step set it: each must read what its step set, within .001 in. One does not, cannot be reached with the part in, or the part may have moved: take the setup again from its first step, the part out. They all do: run the interrupted file again from its start. Feed Hold, then Reset with the axes stopped keeps position and G54: no homing, no new zero; run the interrupted file again from its start: its first M6 measures the tool, and cuts already made are cut in air. Every file is proved in air before it cuts. Not made here: the 2X #4-40 UNC tapped holes (the drawing: spotted through MHA-PD-14 at assembly). To buy: the 3/8 x 1 in bar before Setup 1; the pin-gauge sets before Setup 3."
 shop = "../shop"
 stock_refs = ["1018-flat-3-8x1"]
 material_key = "rocker-1018-cold-finished"
@@ -401,8 +401,8 @@ vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{process.blank_thickness_mm
 beam = { axis = "x", hold = "cantilever", extent_mm = ["{{process.sawn_end_a_mm}}", "{{process.bar_length_max_mm}}"], clamp_mm = ["{{process.pickup_out_mm}}", "{{process.b_clamp_end_mm}}"], section_mm = { y = "{{cad.back_face_depth_mm}}", z = "{{process.height_target_mm}}" }, vise_left = "end" }
 
 [[setups.operations]]
-instruction = "Home the mill ($H). Before the blank goes in: G54 Y0 on the bare fixed jaw's face, edge finder (900 rpm). The blank will cover that face."
-instruction_detailed = "Home the mill ($H). Before the blank goes in: edge finder (900 rpm), its tip below the jaw tops, on the bare fixed jaw's face from the front: G10 L20 P1 Y-2.540. The blank will cover that face."
+instruction = "Before the blank goes in: G54 Y0 on the bare fixed jaw's face, edge finder (900 rpm). The blank will cover that face."
+instruction_detailed = "Before the blank goes in: edge finder (900 rpm), its tip below the jaw tops, on the bare fixed jaw's face from the front: G10 L20 P1 Y-2.540. The blank will cover that face."
 feed = "hand"
 
 [[setups.operations]]
@@ -461,8 +461,8 @@ vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{process.height_target_mm}}
 beam = { axis = "x", hold = "cantilever", extent_mm = ["{{process.sawn_end_a_mm}}", "{{process.bar_length_max_mm}}"], clamp_mm = ["{{process.a_clamp_start_mm}}", "{{process.a_clamp_end_mm}}"], section_mm = { y = "{{process.height_target_mm}}", z = "{{cad.back_face_depth_mm}}" }, vise_left = "end" }
 
 [[setups.operations]]
-instruction = "Home the mill ($H). Before the bar goes in: G54 Y0 on the bare fixed jaw's face, edge finder (900 rpm). The bar will cover that face."
-instruction_detailed = "Home the mill ($H). Before the bar goes in: edge finder (900 rpm), its tip below the jaw tops, on the bare fixed jaw's face from the front: G10 L20 P1 Y-2.540. The bar will cover that face."
+instruction = "Before the bar goes in: G54 Y0 on the bare fixed jaw's face, edge finder (900 rpm). The bar will cover that face."
+instruction_detailed = "Before the bar goes in: edge finder (900 rpm), its tip below the jaw tops, on the bare fixed jaw's face from the front: G10 L20 P1 Y-2.540. The bar will cover that face."
 feed = "hand"
 
 [[setups.operations]]
@@ -587,8 +587,8 @@ vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{process.height_target_mm}}
 beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{process.bar_length_max_mm}}"], clamp_mm = ["{{process.pickup_out_mm}}", "{{process.b_clamp_end_mm}}"], section_mm = { y = "{{process.height_target_mm}}", z = "{{cad.back_face_depth_mm}}" }, vise_left = "end" }
 
 [[setups.operations]]
-instruction = "Home the mill ($H). Before the bar goes in: G54 Y0 on the bare fixed jaw's face, edge finder (900 rpm). The bar will cover that face."
-instruction_detailed = "Home the mill ($H). Before the bar goes in: edge finder (900 rpm), its tip below the jaw tops, on the bare fixed jaw's face from the front: G10 L20 P1 Y-2.540. The bar will cover that face."
+instruction = "Before the bar goes in: G54 Y0 on the bare fixed jaw's face, edge finder (900 rpm). The bar will cover that face."
+instruction_detailed = "Before the bar goes in: edge finder (900 rpm), its tip below the jaw tops, on the bare fixed jaw's face from the front: G10 L20 P1 Y-2.540. The bar will cover that face."
 feed = "hand"
 
 [[setups.operations]]
@@ -662,8 +662,8 @@ vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{process.height_target_mm}}
 beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{process.bar_length_max_mm}}"], clamp_mm = ["{{process.pickup_out_mm}}", "{{process.b_clamp_end_mm}}"], section_mm = { y = "{{process.height_target_mm}}", z = "{{cad.back_face_depth_mm}}" }, vise_left = "start" }
 
 [[setups.operations]]
-instruction = "Home the mill ($H). Before the bar goes in: G54 Y0 on the bare fixed jaw's face, edge finder (900 rpm). The bar will cover that face."
-instruction_detailed = "Home the mill ($H). Before the bar goes in: edge finder (900 rpm), its tip below the jaw tops, on the bare fixed jaw's face from the front: G10 L20 P1 Y-2.540. The bar will cover that face."
+instruction = "Before the bar goes in: G54 Y0 on the bare fixed jaw's face, edge finder (900 rpm). The bar will cover that face."
+instruction_detailed = "Before the bar goes in: edge finder (900 rpm), its tip below the jaw tops, on the bare fixed jaw's face from the front: G10 L20 P1 Y-2.540. The bar will cover that face."
 feed = "hand"
 
 [[setups.operations]]

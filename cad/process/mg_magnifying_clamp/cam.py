@@ -801,3 +801,51 @@ def build(ctx: dict[str, Any], rt: Any) -> dict[str, Any]:
     ops.update(ctx["manual"])
     rt.generate(doc)
     return {"ops": ops}
+
+
+# The as-machined report (``cad/scripts/_as_machined.py``) only reports: it
+# never fails the task. "gate" would fail it on a difference over the noise
+# line or a rapid that cuts.
+AS_MACHINED_MODE = "report"
+
+
+def as_machined(ctx: dict[str, Any], inputs: Any) -> dict[str, Any]:
+    """The sawn blank of 1/2 in hex bar in MC01's frame: a hex prism along Z
+    on the hex axis, the plan's blank_af_in across the flats on Y, its
+    corners on X; the sawn bottom end at +bottom_skim_mm stays put (Z0 is
+    set from its high point less the skim), the length down Z at the plan's
+    blank_length_min_in-blank_length_max_in band and its middle (the plan
+    marks no nominal length). Every program runs in its jobs' frame, in
+    order; the tap files (MC02, MC05) cut nothing."""
+    p = inputs.plan["parameters"]
+    lengths = {
+        "nominal": (p["blank_length_min_in"] + p["blank_length_max_in"]) / 2 * IN,
+        "min": p["blank_length_min_in"] * IN,
+        "max": p["blank_length_max_in"] * IN,
+    }
+    hy = p["blank_af_in"] * IN / 2
+    hx = 2 * hy / math.sqrt(3)
+    skim = p["bottom_skim_mm"]
+    return {
+        "parts": {
+            "": {
+                "blank": {
+                    "frame": "bottom",
+                    "prism": {
+                        "axis": "z",
+                        "polygon": [
+                            [hx, 0.0],
+                            [hx / 2, hy],
+                            [-hx / 2, hy],
+                            [-hx, 0.0],
+                            [-hx / 2, -hy],
+                            [hx / 2, -hy],
+                        ],
+                        "span": [skim - lengths["nominal"], skim],
+                    },
+                    "length": {"axis": "z", "keep": "max", "mm": lengths},
+                }
+            }
+        },
+        "skip": {},
+    }

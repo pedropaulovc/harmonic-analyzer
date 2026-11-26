@@ -60,7 +60,12 @@ BLOCK_DEPTH = 11.176  # .44; U28: 12 -> 10.25; ruling (c) then put the back stra
 BLOCK_DEPTH_PLACES = 2
 BLOCK_DEPTH_BAND = printed_band_mm(BLOCK_DEPTH_PLACES, unit=UNIT)  # .01 in
 BORE_UP = 12.0 + AXIS_RAISE_MM
-BORE_DIA = 6.35  # 1/4 in: rides the Ø6.35 torque shaft / lift rod (derived)
+# The pivot bore takes the .2510 reamer, the MHA-DT-19 shaft its gauge
+# (owner ruling 2026-11-24, fit audit question 12, option B); the lift bore
+# is drilled F (.257), the MHA-DT-17 rod turning freely in it (fit audit F26,
+# recommended form).
+PIVOT_BORE_DIA = 6.3754  # .2510 reamer
+LIFT_BORE_DIA = 6.5278  # F drill, .257
 LIFT_BORE_SPACING = 18.5  # pivot -> lift bore, horizontal (photo ~16-17): the
 # eccentric collar (Ø14.6, ecc 2.0) orbits the lift axis and must clear the
 # strap's R7.5 pivot end cap over the whole engage throw -- 1.83 of air

@@ -35,29 +35,17 @@ CASES = (
         dt_alignment_pinion_spec,
         build_dt_alignment_pinion,
         draw_dt_alignment_pinion,
-        (
-            SurfaceFinishControl(
-                "drum_bore",
-                MACHINED_UM,
-                CylinderFace(dt_alignment_pinion_spec.BORE_DIA),
-                display_unit="in",
-            ),
-        ),
+        # Fit audit Q13: the drum bore is drilled 5/16 and its bond land is
+        # made to fit, so nothing runs on it and it prints no finish (rule 6).
+        (),
     ),
     (
         dt_arbor_pedestal_spec,
         build_dt_arbor_pedestal,
         draw_dt_arbor_pedestal,
+        # Fit audit F01: the V-drilled bore is a clamp seat, so it prints no
+        # finish (rule 6); the foot's locating seat keeps its Ra 125.
         (
-            SurfaceFinishControl(
-                "arbor_bore",
-                MACHINED_UM,
-                CylinderFace(
-                    dt_arbor_pedestal_spec.BORE_DIA,
-                    contains_y_mm=dt_arbor_pedestal_spec.BORE_HEIGHT,
-                ),
-                display_unit="in",
-            ),
             SurfaceFinishControl(
                 "foot_seat",
                 SEAT_UM,

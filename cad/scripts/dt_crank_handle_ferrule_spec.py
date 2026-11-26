@@ -8,12 +8,14 @@ the crank arm MHA-DT-06.
 
 The oak tenon is turned to suit this bore, and the handle's end play is set by
 facing the MHA-DT-32 shoulder at assembly (user ruling 2026-09-29, after the
-MHA-DT-34 machinist review), so no length here is a stack term.  The bore
-prints at .XXX (Codex P1/P2 on #1139, user ruling 2026-09-30): a looser bore
-let the fitted tenon outgrow the MHA-DT-08 shoulder it seats on, and a small
-one thinned the oak round the pivot bore under the rule-17 floor.  Both bore
-mouths take only the title block's edge break (owner ruling 2026-10-24,
-#1900).
+MHA-DT-34 machinist review), so no length here is a stack term.  The bore is
+the N drill's (codjiflo 3548-1, drawing-guidelines rule 3: a named drill keeps
+its own decimal and takes the DRILLED HOLES row, +.004/0): a looser bore let
+the fitted tenon outgrow the MHA-DT-08 shoulder it seats on, and a small one
+thinned the oak round the pivot bore under the rule-17 floor (Codex P1/P2 on
+#1139), and the N drill's .302-.306 sits inside the .298-.308 those walls were
+first judged at.  Both bore mouths take only the title block's edge break
+(owner ruling 2026-10-24, #1900).
 
 Issue #290: the sheet prints decimal inch (``drawing_unit: in``); lengths
 stay physical millimetres, each the exact decimal of its printed inch value.
@@ -30,7 +32,11 @@ from __future__ import annotations
 import _config
 from _inch_wall_limits import WALL_FLOOR_MM
 from _package_units import drawing_unit
-from _printed_tolerance import edge_break_chamfer_mm, printed_band_mm
+from _printed_tolerance import (
+    drilled_oversize_mm,
+    drilled_undersize_mm,
+    edge_break_chamfer_mm,
+)
 
 UNIT = drawing_unit(
     "parts/dt-crank-handle-ferrule", _config.parts("dt-crank-handle-ferrule")
@@ -53,8 +59,11 @@ INSTALLED_OUTER_DIA = 12.446  # .49
 INSTALLED_CONFIG = "INSTALLED"
 # The fitted tenon keeps the rule-17 floor of oak over the reamed pivot bore
 # with the bore's eccentricity between them (local review of 1f3067ef2).
-BORE_DIA = 7.6962  # .303
-BORE_DIA_TOL = printed_band_mm(3, unit=UNIT)
+# The N drill (.3020 in, the shop's 115-piece index): the bore's limits are
+# its DRILLED HOLES row, never under the drill.
+BORE_DIA = 7.6708  # .302
+BORE_DIA_MIN = BORE_DIA - drilled_undersize_mm(unit=UNIT)
+BORE_DIA_MAX = BORE_DIA + drilled_oversize_mm(unit=UNIT)
 LENGTH = 7.112  # .28
 # Joint dimensions shared with MHA-DT-08, whose spec imports this one.
 # The shortest tenon must retain this much uninterrupted bonded length.
@@ -70,7 +79,7 @@ SEAT_MOUTH_BREAK_MAX = edge_break_chamfer_mm(unit=UNIT)
 
 # Brass wall, on radius, as made: the smallest stock over the largest bore.
 # The skimmed wall, with the ring off-centre, is MHA-DT-08's check.
-WALL_WORST = (STOCK_DIA_MIN - (BORE_DIA + BORE_DIA_TOL)) / 2.0
+WALL_WORST = (STOCK_DIA_MIN - BORE_DIA_MAX) / 2.0
 if WALL_WORST < WALL_FLOOR_MM:
     raise AssertionError("MHA-DT-34 ferrule wall is under .060 at the worst case")
 

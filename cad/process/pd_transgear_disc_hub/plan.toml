@@ -44,9 +44,11 @@
 # Not on hand (to order): the .0615 chucking reamer
 # (cad/config/shop-equipment/tools-reamers-taps.toml reamer-0615), the
 # sharp-nose lathe tool for the spigot's R.004 MAX root
-# (tools-special-cutters.toml lathe-tool-sharp-nose) and the 1/16 long-reach
-# end mill, Harvey Tool 34662, bought for MHA-MS-02 too
-# (endmill-carbide-3fl-1-16-reach-1-2).
+# (tools-special-cutters.toml lathe-tool-sharp-nose) and the plain 1/16
+# end mill with 1/2 in of flutes, MSC 35497056, bought for MHA-MS-02 too
+# (endmill-carbide-3fl-1-16-loc-1-2; the owner chose the plain cutters,
+# #3568; the pick: delegated ruling 2026-11-24 (Main), no precedent; owner
+# review #2144).
 # The bore's GO, the Class ZZ .3135 plus pin (gauges.toml zz-pins-3135-3140,
 # MSC 88931357), is on the buy list for MHA-DT-14 too.
 #
@@ -76,16 +78,26 @@
 # and no band. The chord ream takes no Class ZZ pin (zz-pins-0615-0620 is
 # not used); the bore is the one exception, by the 2026-11-26 ruling above.
 # The chord ream is accepted by its mate (traveler-guidelines T0): the
-# MHA-PD-VN-69 dowel does not enter by hand. The set's .061 pin (it enters
+# MHA-PD-VN-69 dowel does not enter the ream by hand; it may start into the
+# flat's .0625 pocket above the ream's mouth (D40). The set's .061 pin (it enters
 # the ream) stands in it for the stop and the station; cad.bore_dia_band_mm
 # and cad.pin_ream_dia_band_mm are the spec's analysis bands, bound only
 # where a ream's sizing or gauge needs one.
 #
 # Tool audit 2026-11-23 (row endmill-carbide-3-64): the flat is plunged with
-# the 34662 (.0620, centre cutting, "optimized for plunging") instead of a
-# 3/64. Its .062 pocket lies inside the .0615-.0620 ream that follows on the
-# same axis (any ring left is under .0005 radial, taken by the reamer), and
-# its outer edge meets the O.D. lower, so the flat goes one peck deeper.
+# a 1/16 end mill (centre cutting) instead of a 3/64: since #3568 the plain
+# MSC 35497056, .0625 (the first-named long-reach one was .0620). Its .0625
+# pocket on the ream's axis is .0005 over the .0615-.0620 band's top
+# (.00025 a side), over the pocket's own depth only: 0.20 mm at its outer
+# edge to 1.64 mm at its inner on the largest O.D. (1.57 on the nominal),
+# above the ream's mouth at Z pin_flat_bottom_mm (4.2557). The installed
+# dowel bottoms on the stop: its outer end sits at Z 3.874 nominal (ream_tip
+# -4.064 + 7.9375) and at most 4.2545 (stop_shallow -3.937 + the longest
+# pin, 8.1915, pd_vn_transgear_hub_key_pin_spec LENGTH_LIMITS_MM), under the
+# flat's floor, so the pocket never touches the pin; the ream and the press
+# fit are unchanged. Accepted: delegated ruling 2026-11-26 (Main), no
+# precedent; owner review #2144 (rulings.md D40). Its outer edge meets the
+# O.D. lower, so the flat goes one peck deeper.
 #
 # NC (cad/process/pd_transgear_disc_hub/cam.py): CM01_flange_holes,
 # CM02_pin_hole, CM03_pin_ream. Program names, the [parameters] and the
@@ -97,7 +109,7 @@ part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
 material = "C36000 free-machining brass, 360-H02 half-hard, 1-1/8 in round (drawing: {{cad.material_name}})"
 stock = "Lot: {{process.quantity:d}} hub. Ø{{process.bar_dia_in:.3dot}} bar, on hand (one 3 in piece); Setup 1 takes about {{process.bar_use_in:.2dot}} in of it. Chuck it with at least 1.5 in in the jaws."
-note = "Inches unless mm; G-code and console entries in mm (the files and the controller run G21). Lathe PM-1127VF-LB (70–380 and 380–2000 rpm); mill PM-30MV low belt (100–2800 rpm). Brass cut dry. Home the mill ($H) and touch off G54 at the start of each mill setup; prove each file in air before it cuts. To order (not on hand): the .0615 reamer, the pin-gauge set and .3135 GO pin, the sharp-nose lathe tool and the 1/16 carbide end mill (Harvey Tool 34662). The MHA-PD-VN-69 dowel tries the chord ream."
+note = "Inches unless mm; G-code and console entries in mm (the files and the controller run G21). Lathe PM-1127VF-LB (70–380 and 380–2000 rpm); mill PM-30MV low belt (100–2800 rpm). Brass cut dry. Home the mill ($H) once, after switching it on: every M6's trip to the tool setter counts from home. Home again only after a power cycle or a controller restart, an E-stop, an alarm, a limit switch hit, a stall or a crash: homing brings the stored G54 back. Then check every zero of the setup again, each the way its step set it: each must read what its step set, within .001 in. One does not, cannot be reached with the part in, or the part may have moved: do what that setup's Datum says for it; where the Datum says nothing, take the setup again from its first step, the part out. They all do: run the interrupted file again from its start. Feed Hold, then Reset with the axes stopped keeps position and G54: no homing, no new zero; run the interrupted file again from its start: its first M6 measures the tool, and cuts already made are cut in air. Prove each file in air before it cuts. To order (not on hand): the .0615 reamer, the pin-gauge set and .3135 GO pin, the sharp-nose lathe tool and the 1/16 carbide end mill (MSC 35497056). The MHA-PD-VN-69 dowel tries the chord ream."
 shop = "../shop"
 stock_refs = ["c360-round-1-1-8"]
 material_key = "lathe-c360"
@@ -218,9 +230,9 @@ pin_jaw_top_mm = 12.6873
 pin_flange_top_mm = 13.335
 # The 1/16 end mill plunges a flat 0.2 mm under the O.D. at its outer edge
 # (the chord meets the O.D. 40° off square: a drill would walk), in pecks;
-# its reach (34662: .500 behind the flutes) takes it past the O.D. under its
-# shank (cam.py checks both).
-pin_flat_bottom_mm = 4.2631
+# its reach (.500 of flutes up to its 1/8 shank, no neck) takes it past the
+# O.D. under its shank (cam.py checks both).
+pin_flat_bottom_mm = 4.2557
 pin_flat_peck_mm = 0.4
 endmill_reach_min_in = 0.1
 # The #56 knockout through, its full diameter 0.3 mm past the O.D. at the
@@ -293,8 +305,8 @@ ref = "drill-51"
 
 [[tools]]
 id = "endmill"
-name = "1/16 carbide end mill, long reach, centre cutting: Harvey Tool 34662"
-ref = "endmill-carbide-3fl-1-16-reach-1-2"
+name = "1/16 carbide end mill, 1/2 in of flutes, centre cutting: MSC 35497056"
+ref = "endmill-carbide-3fl-1-16-loc-1-2"
 status = "to_order"
 
 [[tools]]
@@ -557,15 +569,15 @@ machine = "PM-30MV CNC (FluidNC, CNCjs with the electronic tool setter) / vise, 
 indexing = "none"
 machine_ref = "pm-30mv"
 holding = "The PM 6 in vise (jaws {{process.vise_jaw_height_mm:in.2f}} tall above its seat). Against each jaw a stack of the 1 in and the 1/2 in parallels, 1/8 thick ({{process.parallel_stack_mm:in.3f}} tall). The hub upright, the flange's front face down on both stacks' tops, the body hanging in the {{process.flange_parallel_gap_mm:in.3dot}} gap between them, the spigot up; gripped on the flange's rim, centred along the jaws. Tap it down onto both stacks while closing the vise: the jaw tops then stand {{process.flange_jaw_top_mm:in.3dot}} above the flange's rear face."
-datum = "Program CM01_flange_holes (cam:pd_transgear_disc_hub). G54: X0 Y0 the bore's axis, swept with the DTI; Z0 the flange's rear face. The holes on the Ø{{cad.flange_hole_1_bolt_circle_dia_in:.2dot}} circle at 0°, 120° and 240° from +X. Tool lengths from the tool setter at each M6. After any reset, alarm, stall or E-stop, or if the hub is disturbed in the vise: home ($H) and repeat Ops 230–240 before Cycle Start. At each M6 the program has stopped the spindle (M5) and shows the tool and speed: wait for the spindle to stop, change the tool, set the speed, then Cycle Start."
+datum = "Program CM01_flange_holes (cam:pd_transgear_disc_hub). G54: X0 Y0 the bore's axis, swept with the DTI; Z0 the flange's rear face. The holes on the Ø{{cad.flange_hole_1_bolt_circle_dia_in:.2dot}} circle at 0°, 120° and 240° from +X. Tool lengths from the tool setter at each M6. After homing again (the note says when), the hub not disturbed: check X0, Y0 and Z0 as Ops 230–240 set them, each within 0.025 mm; all good: run the file again from its start. One off, or the hub disturbed once cutting has begun: stop and tell the owner. The hub disturbed before any cut: seat it again and repeat Ops 230–240. At each M6 the program has stopped the spindle (M5) and shows the tool and speed: wait for the spindle to stop, change the tool, set the speed, then Cycle Start."
 diagram = { file = "diagrams/flange.svg", alt = "The hub upright, the flange's front face on two stacked parallels in the vise, the body hanging between them, gripped on the flange's rim; the three #51 holes drilled through the flange on the Ø.75 circle into the gap." }
 envelope = "other"
 vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{cad.flange_dia_mm}}", along_jaws_mm = "{{cad.flange_dia_mm}}", part_height_mm = "{{cad.flange_length_mm}}", parallel_height_mm = "{{process.parallel_stack_mm}}", overhang_mm = [-66.0019, -66.0019], jaw_offset = "centred", fixed_jaw_face = "machined", moving_jaw_face = "machined", moving_jaw_contact = "rod" }
 beam = { axis = "x", hold = "solid", extent_mm = [0, "{{cad.flange_dia_mm}}"], seat = "gripped across the flange's rim in the vise jaws, its front face on the stacked parallels", seat_mm = [0, "{{cad.flange_dia_mm}}"] }
 
 [[setups.operations]]
-instruction = "Home the mill ($H). G54 X0 Y0: the bore's axis, swept with the DTI in the bore."
-instruction_detailed = "Home the mill ($H). Spindle stopped, the DTI in the collet, its ball in the bore about .10 below the spigot's end, preloaded to mid-range. Turn the spindle by hand and read at +X, −X, +Y and −Y; jog X and Y by half of each pair's difference and repeat until all four read within .025 mm (.001). Then G10 L20 P1 X0 Y0. Raise the DTI clear and remove it."
+instruction = "G54 X0 Y0: the bore's axis, swept with the DTI in the bore."
+instruction_detailed = "Spindle stopped, the DTI in the collet, its ball in the bore about .10 below the spigot's end, preloaded to mid-range. Turn the spindle by hand and read at +X, −X, +Y and −Y; jog X and Y by half of each pair's difference and repeat until all four read within .025 mm (.001). Then G10 L20 P1 X0 Y0. Raise the DTI clear and remove it."
 feed = "hand"
 
 [[setups.operations]]
@@ -616,15 +628,15 @@ machine = "PM-30MV CNC (FluidNC, CNCjs with the electronic tool setter) / vise, 
 indexing = "none"
 machine_ref = "pm-30mv"
 holding = "The PM 6 in vise (jaws {{process.vise_jaw_height_mm:in.2f}} tall above its seat). Before clamping, mike the hub body .15 from the hub front face (where the hole goes) and write it on this sheet as D. A 1 in parallel, 1/8 thick, against the fixed jaw only. The hub lying across the jaws, gripped end to end: the hub front face flat on the fixed jaw, the spigot's end on the moving jaw, the body's underside on the parallel, centred along the jaws. Wipe both jaws and both ends clean first; close the vise firmly by hand, no hammer, tapping the body down onto the parallel as it closes. The flange's top then stands {{process.pin_flange_top_mm:in.3dot}} above the hub's axis, the jaw tops {{process.pin_jaw_top_mm:in.3dot}}."
-datum = "Programs CM02_pin_hole and CM03_pin_ream (cam:pd_transgear_disc_hub). G54: X0 the hub's axis, +X to the right; Y0 the fixed jaw's face (the hub front face), the hub toward −Y; Z0 the hub's axis. The hole at X{{cad.pin_ream_chord_mm:.3f}} Y−{{cad.pin_ream_station_mm:.3f}} mm (.174 right of the axis, .15 from the hub front face), vertical. Tool lengths from the tool setter at each M6. After any reset, alarm, stall or E-stop, or if the hub is disturbed in the vise: home ($H) and repeat Ops 290–310 before Cycle Start. At each M6 the program has stopped the spindle (M5) and shows the tool and speed: wait for the spindle to stop, change the tool, set the speed, then Cycle Start."
+datum = "Programs CM02_pin_hole and CM03_pin_ream (cam:pd_transgear_disc_hub). G54: X0 the hub's axis, +X to the right; Y0 the fixed jaw's face (the hub front face), the hub toward −Y; Z0 the hub's axis. The hole at X{{cad.pin_ream_chord_mm:.3f}} Y−{{cad.pin_ream_station_mm:.3f}} mm (.174 right of the axis, .15 from the hub front face), vertical. Tool lengths from the tool setter at each M6. After homing again (the note says when), the hub not disturbed: check X0, Y0 and Z0 as Ops 290–310 set them, each within 0.025 mm; all good: run the interrupted file again from its start. One off, or the hub disturbed once cutting has begun: stop and tell the owner. The hub disturbed before any cut: seat it again and repeat Ops 290–310. At each M6 the program has stopped the spindle (M5) and shows the tool and speed: wait for the spindle to stop, change the tool, set the speed, then Cycle Start."
 diagram = { file = "diagrams/chord.svg", alt = "The hub lying in the vise, gripped end to end between the jaws, its body on a parallel against the fixed jaw; the chord hole drilled down through the body .174 off its axis, .15 from the hub front face, the ream stopping .160 below the axis." }
 envelope = "other"
 vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{cad.envelope_z_mm}}", along_jaws_mm = "{{cad.flange_dia_mm}}", part_height_mm = "{{cad.flange_dia_mm}}", parallel_height_mm = "{{process.pin_parallel_height_mm}}", overhang_mm = [-66.0019, -66.0019], jaw_offset = "centred", fixed_jaw_face = "machined", moving_jaw_face = "machined", moving_jaw_contact = "rod" }
 beam = { axis = "x", hold = "solid", extent_mm = [0, "{{cad.flange_dia_mm}}"], seat = "gripped end to end between the vise jaws, the body on the parallel", seat_mm = [0, "{{cad.flange_dia_mm}}"] }
 
 [[setups.operations]]
-instruction = "Home the mill ($H). G54 Y0: the fixed jaw's face, the edge finder from the hub's side."
-instruction_detailed = "Home the mill ($H). Edge finder (900 rpm) on the fixed jaw's face about 1 in left of the flange, its tip's centre about .20 below the jaw top, brought to it from −Y: G10 L20 P1 Y-2.540."
+instruction = "G54 Y0: the fixed jaw's face, the edge finder from the hub's side."
+instruction_detailed = "Edge finder (900 rpm) on the fixed jaw's face about 1 in left of the flange, its tip's centre about .20 below the jaw top, brought to it from −Y: G10 L20 P1 Y-2.540."
 feed = "hand"
 
 [[setups.operations]]
@@ -647,10 +659,10 @@ speed_kind = "spindle"
 tool = "endmill"
 drilling = "none"
 sizing = "other"
-instruction = "Run CM02_pin_hole (M6 T3, 1/16 end mill, its reach at least {{process.endmill_reach_min_in:.2dot}}: the 34662 has .500; set 2800): plunge a flat at the hole in {{process.pin_flat_peck_mm:.1f}} mm pecks to Z{{process.pin_flat_bottom_mm:.3f}}, so the #56 starts square on the sloping O.D."
+instruction = "Run CM02_pin_hole (M6 T3, 1/16 end mill, its reach at least {{process.endmill_reach_min_in:.2dot}}: MSC 35497056's flutes run .500; set 2800): plunge a flat at the hole in {{process.pin_flat_peck_mm:.1f}} mm pecks to Z{{process.pin_flat_bottom_mm:.3f}}, so the #56 starts square on the sloping O.D."
 settings = "pd-hub-plunge-1-16-c360"
 milling_cuts = [
-  { name = "pin flat", kind = "plunge", phase = "rough", cutter_dia_mm = 1.5748, flutes = 3, rpm = 2800, feed_mm_min = "{{process.plunge_feed_per_min_mm}}", stations_mm = ["{{cad.pin_ream_chord_mm}}"] },
+  { name = "pin flat", kind = "plunge", phase = "rough", cutter_dia_mm = 1.5875, flutes = 3, rpm = 2800, feed_mm_min = "{{process.plunge_feed_per_min_mm}}", stations_mm = ["{{cad.pin_ream_chord_mm}}"] },
 ]
 
 [[setups.operations]]
@@ -660,7 +672,7 @@ drilling = "twist_drill"
 sizing = "other"
 instruction = "Same file, M6 T4 (#56, at least {{process.pin_tool_out_min_in:.2dot}} out of the chuck): the knockout through the body, its point to Z{{process.knockout_tip_mm:.3f}} (the full diameter out of the underside, the point above the parallel), {{process.peck_56_mm:.1f}} mm pecks with full retract; set 2800."
 settings = "pd-hub-drill-56-c360"
-hole_depth_mm = 10.6075
+hole_depth_mm = 10.6
 peck = { step_mm = 1.0, retract = "full" }
 milling_cuts = [
   { name = "pin knockout", kind = "drill", phase = "rough", cutter_dia_mm = 1.1811, flutes = 2, rpm = 2800, feed_mm_min = "{{process.drill_feed_per_min_mm}}", stations_mm = ["{{cad.pin_ream_chord_mm}}"] },
@@ -673,7 +685,7 @@ drilling = "twist_drill"
 sizing = "other"
 instruction = "Same file, M6 T5 (#53, at least {{process.pin_tool_out_min_in:.2dot}} out of the chuck): open the hole to the stop, the full diameter to Z{{process.ream_tip_mm:.3f}} (the point to Z{{process.pilot_tip_mm:.3f}}), {{process.peck_53_mm:.1f}} mm pecks with full retract; set 2800. It breaks into the bore, as drawn. The file ends with the spindle stopped."
 settings = "pd-collar-drill-53-c360"
-hole_depth_mm = 8.7811
+hole_depth_mm = 8.7737
 peck = { step_mm = 1.2, retract = "full" }
 milling_cuts = [
   { name = "pin pilot", kind = "drill", phase = "rough", cutter_dia_mm = 1.5113, flutes = 2, rpm = 2800, feed_mm_min = "{{process.drill_feed_per_min_mm}}", stations_mm = ["{{cad.pin_ream_chord_mm}}"] },
@@ -686,7 +698,7 @@ drilling = "none"
 sizing = { kind = "band", band_mm = "{{cad.pin_ream_dia_band_mm}}" }
 instruction = "Run CM03_pin_ream (M6 T6, the .0615 reamer, to buy, at least {{process.pin_tool_out_min_in:.2dot}} out of the chuck; set 1400): ream to the stop, the reamer's end to Z{{process.ream_tip_mm:.3f}}, fed in and fed out. The file ends with the spindle stopped and the reamer raised clear."
 settings = "pd-collar-ream-0615-c360"
-inspection = "The ream is accepted by its mate: the MHA-PD-VN-69 dowel, offered to the mouth by hand, does not enter. The .061 pin enters to the stop; refused: Op 400 first."
+inspection = "The ream is accepted by its mate: the MHA-PD-VN-69 dowel, offered to the mouth by hand, does not enter the ream past the flat's floor (it may start into the flat). The .061 pin enters to the stop; refused: Op 400 first."
 gauge_checks = "other"
 milling_cuts = [
   { name = "pin ream", kind = "drill", phase = "finish", cutter_dia_mm = 1.5621, flutes = 4, rpm = 1400, feed_mm_min = "{{process.ream_feed_per_min_mm}}", stations_mm = ["{{cad.pin_ream_chord_mm}}"] },
@@ -710,7 +722,7 @@ gauge_checks = [{ gauge = "mill-x-dro", band_mm = "{{cad.pin_ream_chord_band_mm}
 feed = "hand"
 
 [[setups.operations]]
-instruction = "The .061 pin not entering to the stop in Op 360: lift it out, blow out the chips, oil the reamer, run CM03_pin_ream once more, G54 unchanged; try it again. It now enters: Ops 370–390. Still refused: scrapped. The dowel entering by hand (the ream is too large for the press; no cut remedies it), or the centre outside its band in Op 390: scrapped. Either way make another from Setup 1."
+instruction = "The .061 pin not entering to the stop in Op 360: lift it out, blow out the chips, oil the reamer, run CM03_pin_ream once more, G54 unchanged; try it again. It now enters: Ops 370–390. Still refused: scrapped. The dowel entering the ream past the flat's floor by hand (the ream is too large for the press; no cut remedies it), or the centre outside its band in Op 390: scrapped. Either way make another from Setup 1."
 feed = "hand"
 
 [[setups]]
@@ -741,7 +753,7 @@ feed = "hand"
 
 [[setups.operations]]
 instruction = "The chord ream after deburring: try the .061 pin in it, then offer the MHA-PD-VN-69 dowel to its mouth by hand (it is pressed at MHA-PD-00, step 8A)."
-inspection = "The .061 pin enters to the stop; the MHA-PD-VN-69 dowel does not enter by hand."
+inspection = "The .061 pin enters to the stop; the MHA-PD-VN-69 dowel does not enter the ream past the flat's floor by hand."
 gauge_checks = "other"
 feed = "hand"
 
@@ -752,7 +764,7 @@ gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.pin_ream_station_band_mm}
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Station outside its band in Op 440, or the dowel entering by hand in Op 430: scrapped (the hole is reamed and cannot move or close); make another from Setup 1."
+instruction = "Station outside its band in Op 440, or the dowel entering the ream past the flat's floor by hand in Op 430: scrapped (the hole is reamed and cannot move or close); make another from Setup 1."
 feed = "hand"
 
 [[setups.operations]]
