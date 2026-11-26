@@ -829,7 +829,7 @@ def context(
     # The ream is Setup 4's, the bar flat on the spoil plate (its thrust
     # bends nothing there): the B drill first re-enters its hole and runs
     # drill_past_mm past the reamer's reach into the plate, then the reamer
-    # takes the bore with its full diameter ream_past_mm into the plate.
+    # takes the bore with its tip ream_past_mm into the plate.
     ream_tip = -p["ream_past_mm"]
     import cam_nc
 
