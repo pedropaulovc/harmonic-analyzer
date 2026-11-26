@@ -1110,8 +1110,12 @@ executors, cache contracts or release checks.
 
 `farm_build.py run` refuses the `release` target: it would run in a disposable
 snapshot, and cleanup would discard the publisher's post-release tracked image
-and `release.yaml` updates. Run `build export package:release`
-(`build` supplies drawing and check gates). Once successful, copy the run's
+and `release.yaml` updates. Run
+`build export package:release package:manifest check:features_bound`
+(`build` supplies drawing and check gates but binds only the enrolled parts'
+`features.toml`; the release stages every feature bundle, so `package:manifest`
+binds the rest and `check:features_bound` checks them, both on the submitter
+and with no extra farm leaf, #3469). Once successful, copy the run's
 complete `out/` (`status` → `outputs`) over the owning worktree's `cad/out`.
 Then run `uv run --frozen python -m doit -s gallery`,
 `uv run --frozen python -m doit -s prechips` (every enrolled traveler, rendered
