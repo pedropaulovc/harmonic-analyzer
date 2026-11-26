@@ -4,7 +4,7 @@ The sheet's views print only replacement sizes: ID, OD and free height. The stri
 thickness is not one: SKU 9714K392 defines it, and its 0.127 mm strip
 printed as a doubled hairline through the FRONT envelope (machinist review of
 4e46b502). The part keeps its strip and catalogue load-point gauge sketches,
-which this sheet neither shows nor dimensions; the .035 feeler set gap governs
+which this sheet neither shows nor dimensions; the 0.95 mm set gap governs
 the installed preload. As a tier-2 specification-control sheet (#2886, owner
 rulings 2026-11-17 on #3044) the ID and OD print as receiving limits on their
 native dimensions (``vn_disc_spring_acceptance``: the catalogue's OD band and
