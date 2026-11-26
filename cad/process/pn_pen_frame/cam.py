@@ -1187,3 +1187,40 @@ def build(ctx: dict[str, Any], rt: Any) -> dict[str, Any]:
     ops.update(ctx["manual"])
     rt.generate(doc)
     return {"ops": ops}
+
+
+# The as-machined report (``cad/scripts/_as_machined.py``) only reports: it
+# never fails the task. "gate" would fail it on a difference over the noise
+# line or a rapid that cuts.
+AS_MACHINED_MODE = "report"
+
+
+def as_machined(ctx: dict[str, Any], inputs: Any) -> dict[str, Any]:
+    """What the as-machined report needs: the blank sawn off the 3/8 x 1-1/4
+    in bar, as PF01 holds it upright (its stock box: the bar's section, the
+    raw top end the end skim above Z0), the sawn length below the raw top at
+    the plan's 1.65-1.75 in band and its middle (the plan's "sawn 1.70
+    ±.05"). The top end touches Z0 in PF01, so the raw top stays put and a
+    longer blank reaches further down, which PF02 faces off. Every program
+    runs in its jobs' one frame; PF08 is the hand tap (no frame)."""
+    p = inputs.plan["parameters"]
+    lengths = {
+        "nominal": (p["blank_length_min_in"] + p["blank_length_max_in"]) / 2 * IN,
+        "min": p["blank_length_min_in"] * IN,
+        "max": p["blank_length_max_in"] * IN,
+    }
+    stock = next(job["stock"] for job in ctx["jobs"] if job["ops"][0][0] == "top_end")
+    top = stock[2][1]
+    return {
+        "parts": {
+            "": {
+                "blank": {
+                    "frame": "top",
+                    "box": [list(stock[0]), list(stock[1]), [top - lengths["nominal"], top]],
+                    "length": {"axis": "z", "keep": "max", "mm": lengths},
+                }
+            }
+        },
+        "skip": {},
+        "notes": ["PF08 is the 4-40 tap by hand under the tap guide: the report cuts no thread"],
+    }
