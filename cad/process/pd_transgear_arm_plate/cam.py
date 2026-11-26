@@ -452,7 +452,7 @@ def context(
         )
     # Under face A the tape and the spoil block are solid.
     cam_nc.ream_end_face_clear(
-        plan, "reamer", dream, -p["ream_past_mm"], d2764, -p["k_drill_past_mm"], 0.0
+        "reamer", -p["ream_past_mm"], -p["k_drill_past_mm"], 0.0, 0.0
     )
     for name in ("screw drill", "press drill"):
         if _op_with_cut(plan, name)[0]["peck"] != "none":

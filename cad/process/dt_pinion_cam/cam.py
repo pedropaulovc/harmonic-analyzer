@@ -334,7 +334,7 @@ def context(
         )
     # The reamer's flat end runs out into the gap between the stacks.
     cam_nc.ream_end_face_clear(
-        plan, "reamer", dr, ream_tip, dc, -(length + p["drill_past_mm"]), -math.inf
+        "reamer", ream_tip, -(length + p["drill_past_mm"]), -length, -math.inf
     )
     _agree(plan, "bore_drill_tip_mm", bore_tip)
     _agree(plan, "bore_ream_tip_mm", ream_tip)

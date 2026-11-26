@@ -914,13 +914,7 @@ def context(
         )
     # The reamer's flat end runs out in the air past the plate's end.
     cam_nc.ream_end_face_clear(
-        plan,
-        "reamer-0775",
-        tools["reamer-0775"],
-        ream_tip,
-        tools["drill-49"],
-        -p["drill_past_mm"],
-        -math.inf,
+        "reamer-0775", ream_tip, -p["drill_past_mm"], 0.0, -math.inf
     )
     spot_rpm, spot_feed = _setting(plan, shop, "pin spot")
     drill_rpm, drill_feed = _setting(plan, shop, "pin drill")

@@ -644,12 +644,10 @@ def context(
     # Both ends run out into the relief, wider than either; its floor is the
     # first solid below them.
     cam_nc.ream_end_face_clear(
-        plan,
         "hub-reamer",
-        reamer_dia,
         ream_tip,
-        drill_dia,
         drill_tip + drill_dia / 2 / math.tan(math.radians(59)),
+        0.0,
         relief_floor,
     )
     if min(drill_tip, ream_tip) < lowest_tip:

@@ -897,7 +897,7 @@ def context(
         )
     # The reamer's flat end runs out in the air past the jaws.
     cam_nc.ream_end_face_clear(
-        plan, "reamer-0775", dream, ream_tip, d49, -p["drill_past_mm"], -math.inf
+        "reamer-0775", ream_tip, -p["drill_past_mm"], 0.0, -math.inf
     )
     projection(
         "the centre drill",

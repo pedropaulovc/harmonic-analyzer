@@ -611,7 +611,7 @@ def context(
     # rerun above is a hand MDI, outside this file).
     import cam_nc
 
-    cam_nc.ream_end_face_clear(plan, "reamer-0615", r615, stop, d53, stop, math.inf)
+    cam_nc.ream_end_face_clear("reamer-0615", stop, stop, -math.inf, -math.inf)
     _agree(plan, "stop_shallow_mm", -g["stop"][0])
     _agree(plan, "stop_deep_mm", -g["stop"][1])
     pilot_top = _height(r_max, chord - d53 / 2)

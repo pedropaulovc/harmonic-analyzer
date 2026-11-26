@@ -737,29 +737,30 @@ def test_a_reamer_must_pass_by_its_recorded_chamfer_plus_the_margin():
         cam_nc.ream_full_diameter_past_min_mm(plan, "adj")
 
 
-def test_a_reamers_flat_end_must_not_meet_its_pre_drills_cone_in_solid():
-    plan = {
-        "tools": [
-            {"id": "k", "ref": "reamer-4385"},
-            {"id": "new", "ref": "reamer-9999"},
-        ]
-    }
-    # main's AP01 before #3696: the .4385 (end Ø9.350 behind its 0.894 chamfer)
-    # to Z-1.0, the 27/64 full to Z-0.5, its cone Ø9.350 at Z-0.910; the
-    # spoil block solid from Z0 down.
+def test_a_reamers_flat_end_must_not_pass_its_pre_drills_full_diameter_in_solid():
+    clear = cam_nc.ream_end_face_clear
+    # main's AP01 before #3696: the reamer to Z-1.0, the 27/64 full to Z-0.5,
+    # the spoil block solid straight under face A (Z0).
     with pytest.raises(
-        ValueError,
-        match=r"k: its flat end \(Ø9.350\) meets the pre-drill's cone at Z-0.910",
+        ValueError, match=r"k: its flat end goes past .* \(Z-0.500\) to Z-1.000"
     ):
-        cam_nc.ream_end_face_clear(plan, "k", 11.1379, -1.0, 10.715625, -0.5, 0.0)
-    # The same in air past the part, or with the 27/64 full to Z-2.0: clear.
-    cam_nc.ream_end_face_clear(plan, "k", 11.1379, -1.0, 10.715625, -0.5, -math.inf)
-    cam_nc.ream_end_face_clear(plan, "k", 11.1379, -1.5, 10.715625, -2.0, 0.0)
-    # No chamfer on record: the end is the full diameter, so in a blind hole
-    # the reamer may not pass the drill's full diameter at all.
-    cam_nc.ream_end_face_clear(plan, "new", 2.0, -1.0, 1.9, -1.0, math.inf)
-    with pytest.raises(ValueError, match="new: its flat end"):
-        cam_nc.ream_end_face_clear(plan, "new", 2.0, -1.05, 1.9, -1.0, math.inf)
+        clear("k", -1.0, -0.5, 0.0, 0.0)
+    # With the 27/64 full to Z-2.0 (#3696): clear.
+    clear("k", -1.5, -2.0, 0.0, 0.0)
+    # Air under the part: the end may run past the drill's full diameter, but
+    # only when that is past the far face.
+    clear("k", -1.0, -0.5, 0.0, -math.inf)
+    with pytest.raises(ValueError, match="k: its flat end"):
+        clear("k", 0.5, 1.0, 0.0, -math.inf)
+    # A gap, then a fixture: solid again below Z-3.0.
+    clear("k", -2.9, -0.5, 0.0, -3.0)
+    with pytest.raises(ValueError, match="k: its flat end"):
+        clear("k", -3.1, -0.5, 0.0, -3.0)
+    # Blind: the part is solid all the way down; the end may reach the drill's
+    # full diameter and no further.
+    clear("k", -1.0, -1.0, -math.inf, -math.inf)
+    with pytest.raises(ValueError, match="k: its flat end"):
+        clear("k", -1.05, -1.0, -math.inf, -math.inf)
 
 
 _JAW = {"name": "fixed jaw", "x": (0.0, 20.0), "y": (0.0, 25.4), "z_top": 6.0}

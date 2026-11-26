@@ -569,9 +569,7 @@ def context(
             f".4990 reamer tip Z {bore_ream_tip:.3f}: its full diameter does not reach K (cnc.ream-full-diameter)"
         )
     # The reamer's flat end runs out into the gap between the stacks.
-    cam_nc.ream_end_face_clear(
-        plan, "reamer-4990", r4990, bore_ream_tip, d3164, -past, -math.inf
-    )
+    cam_nc.ream_end_face_clear("reamer-4990", bore_ream_tip, -past, 0.0, -math.inf)
     _agree(plan, "bore_ream_r_plane_mm", depth + SAFE_MM)
     _agree(plan, "bore_ream_clear_mm", depth + CLEAR_MM)
     # The sheet's re-ream MDI feeds at the reamer's setting.

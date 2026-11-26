@@ -352,13 +352,7 @@ def context(
         )
     # The cross hole is in the overhang: the reamer's flat end runs out in air.
     cam_nc.ream_end_face_clear(
-        plan,
-        "reamer",
-        tools["reamer"],
-        ream_tip,
-        tools["drill-c"],
-        -(bar + p["drill_past_mm"]),
-        -math.inf,
+        "reamer", ream_tip, -(bar + p["drill_past_mm"]), -bar, -math.inf
     )
     pin_tip = -(bar + p["pin_drill_past_mm"] + _point(tools["drill-1-16"]))
     _agree(plan, "cross_drill_tip_mm", drill_tip)

@@ -43,7 +43,6 @@ import argparse
 import glob
 import hashlib
 import json
-import math
 import os
 import re
 import shutil
@@ -227,37 +226,32 @@ def ream_full_diameter_past_min_mm(plan: dict[str, Any], reamer: str) -> float:
 
 
 def ream_end_face_clear(
-    plan: dict[str, Any],
     reamer: str,
-    reamer_dia_mm: float,
     tip_mm: float,
-    drill_dia_mm: float,
     drill_full_mm: float,
+    far_face_mm: float,
     solid_below_mm: float,
 ) -> None:
     """Refuse a ream whose flat end face would push into solid material.
 
     A reamer cuts only on its 45° end chamfer; the face inside it is flat and
     does not cut. Below its pre-drill's full diameter (``drill_full_mm``, Z)
-    the drill's 118° cone narrows, and where it is narrower than that face
-    the face meets uncut material. ``tip_mm`` is the reamer's tip (Z) and
-    ``solid_below_mm`` the Z below which solid material lies round the hole
-    (spoil, a fixture, the part itself in a blind hole: ``math.inf``; air
-    past the tip: ``-math.inf``). The face is the plan tool ``reamer``'s
-    ``reamer_dia_mm`` less twice its chamfer recorded in ``cnc.toml``
-    cnc.ream-full-diameter, or its full diameter where none is recorded (the
-    worst case)."""
-    ref = next(tool["ref"] for tool in plan["tools"] if tool["id"] == reamer)
-    cnc = _shop_equipment.merge([_cam_programs.CNC_EQUIPMENT_PATH])
-    chamfer = float(cnc["cnc"]["ream-full-diameter"]["chamfer_length_mm"].get(ref, 0.0))
-    face = reamer_dia_mm - 2 * chamfer
-    meets = drill_full_mm - max(0.0, drill_dia_mm - face) / (
-        2 * math.tan(math.radians(59))
-    )
-    if tip_mm < min(meets, solid_below_mm):
+    the drill's 118° cone narrows below the reamer's diameter. No reamer we
+    buy publishes its chamfer, and a shorter one widens the face, so the face
+    is taken as the full diameter: it meets the cone at ``drill_full_mm``.
+    ``tip_mm`` is the reamer's tip (Z). Material is solid above the part's
+    far face ``far_face_mm`` (``-math.inf`` for a blind hole) and below
+    ``solid_below_mm`` (spoil or a fixture; ``-math.inf`` for air under the
+    part, the far face for spoil straight under it); between them is air.
+    The face's travel from ``drill_full_mm`` down to ``tip_mm`` must stay in
+    that air."""
+    if tip_mm < drill_full_mm and (
+        drill_full_mm > far_face_mm or tip_mm < solid_below_mm
+    ):
         raise ValueError(
-            f"{reamer}: its flat end (Ø{face:.3f}) meets the pre-drill's cone at Z{meets:.3f}, "
-            f"above its tip Z{tip_mm:.3f}, in solid material (below Z{solid_below_mm:.3f})"
+            f"{reamer}: its flat end goes past the pre-drill's full diameter (Z{drill_full_mm:.3f}) "
+            f"to Z{tip_mm:.3f} in solid material (the part above Z{far_face_mm:.3f}, "
+            f"solid below Z{solid_below_mm:.3f})"
         )
 
 
