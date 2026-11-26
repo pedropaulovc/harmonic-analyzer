@@ -798,9 +798,15 @@ def test_the_floor_is_read_from_cnc_toml_alone(tmp_path, monkeypatch):
     (directory / "other.toml").write_text(
         "[cnc.jaw-clearance]\njaw_clearance_min_mm = 0.1\n[stock\n", encoding="utf-8"
     )
-    monkeypatch.setattr(_shop_equipment, "DIRECTORY", directory)
+    # A whole-directory load() would now read this directory (its default
+    # argument binds the real one at import, so patch the function).
+    real_load = _shop_equipment.load
+    monkeypatch.setattr(_shop_equipment, "load", lambda directory=directory: real_load(directory))
+    with pytest.raises(ValueError):
+        _shop_equipment.load()
     monkeypatch.setattr(_cam_programs, "CNC_EQUIPMENT_PATH", cnc)
     assert cam_nc.jaw_clearance_min_mm() == 1.5
+    # verify reads the floor before any check, so it too must not touch other.toml.
     assert cam_nc.verify([], tmp_path) == []
 
 
