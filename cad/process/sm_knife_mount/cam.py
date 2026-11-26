@@ -324,25 +324,25 @@ def _face(
 ) -> list[str]:
     """Zigzag faces at ``levels``: at each, one X pass per Y in ``ys``
     between the cutter-centre ends ``x``, alternating direction, starting at
-    the low X end; every plunge, level change and stepover beside the part."""
+    the low X end; every plunge and stepover beside the part. Between levels
+    the cutter rises clear of the stock and goes back to the low X end at
+    rapid: a fed return at the level would only pass over the face just cut
+    (#3631)."""
     clear = _r(top + CLEAR_MM)
     x0, x1 = _r(x[0]), _r(x[1])
-    lines = [
+    start = [
         f"G0 Z{clear:.3f}",
         f"G0 X{x0:.3f} Y{ys[0]:.3f}",
         f"G0 Z{_r(top + SAFE_MM):.3f}",
     ]
+    lines = []
     for z in levels:
+        lines += start
         lines.append(f"G1 Z{_r(z):.3f} F{{feed}}")
         for k, y in enumerate(ys):
             if k:
                 lines.append(f"G1 Y{y:.3f} F{{feed}}")
             lines.append(f"G1 X{x1 if k % 2 == 0 else x0:.3f} F{{feed}}")
-        if len(ys) % 2:
-            # Back to the low X side, beside the part, for the next level.
-            lines.append(f"G1 X{x0:.3f} F{{feed}}")
-        if z != levels[-1]:
-            lines.append(f"G1 Y{ys[0]:.3f} F{{feed}}")
     return lines + [f"G0 Z{clear:.3f}"]
 
 
