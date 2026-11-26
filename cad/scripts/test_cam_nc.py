@@ -824,7 +824,7 @@ def test_verify_applies_the_shop_floor_and_reads_the_known_list(tmp_path):
 
 
 def test_the_known_jaw_clearance_list_names_its_issue():
-    assert cam_nc.KNOWN_JAW_CLEARANCE_VIOLATIONS.keys() == {"CL01_face_b.nc", "PG15_height.nc"}
+    assert cam_nc.KNOWN_JAW_CLEARANCE_VIOLATIONS.keys() == {"PG15_height.nc"}
     assert all("#3607" in why for why in cam_nc.KNOWN_JAW_CLEARANCE_VIOLATIONS.values())
 
 

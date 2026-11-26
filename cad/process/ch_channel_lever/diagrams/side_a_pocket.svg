@@ -5,7 +5,7 @@
 <text class="label" x="20" y="20">Side A up: pocket and rings (top view)</text>
 <rect class="clamp" x="89" y="34" width="413" height="26"/>
 <text class="label" x="510" y="51">fixed jaw</text>
-<rect class="fixture-plate" x="40" y="62" width="396" height="260" fill-opacity="0.4"/>
+<rect class="fixture-plate" x="40" y="60" width="396" height="260.9" fill-opacity="0.4"/>
 <rect class="part-kept" x="40" y="60.0" width="511.8" height="66.0"/>
 <rect class="part-removed" x="102.7" y="76.5" width="449.1" height="33.0"/>
 <path class="part-removed" d="M114.4 114.1 A48.5 48.5 0 0 0 114.4 71.9 L84.7 86.3 A15.5 15.5 0 0 1 84.7 99.8 Z"/>
@@ -65,9 +65,9 @@
 <rect class="clamp" x="89" y="324" width="413" height="26"/>
 <text class="label" x="510" y="341">moving jaw</text>
 <line class="datum" x1="40" y1="30" x2="40" y2="354"/>
-<rect x="40" y="62" width="396" height="260" fill="none" stroke="#333" stroke-width="1.5" stroke-dasharray="6 4"/>
+<rect x="40" y="60" width="396" height="260.9" fill="none" stroke="#333" stroke-width="1.5" stroke-dasharray="6 4"/>
 <text class="label" x="10" y="372">X0 left ends</text>
-<text class="label" x="110" y="372">spoil plate (dashed, 6 x 3.9 in); A up, turned over as one stack</text>
+<text class="label" x="110" y="372">spoil plate (dashed, 6 x 3.95 in); A up, turned over as one stack</text>
 <text class="label" x="10" y="390">The blanks stay whole rectangles: the lever outline is cut in Setup 4.</text>
 <text class="label" x="10" y="417">Detail, one blank at its left end (2.5 x)</text>
 <rect class="part-kept" x="40" y="425" width="364.0" height="165.1" stroke="none"/>
