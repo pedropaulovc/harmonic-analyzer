@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 300" width="760" height="300" font-family="sans-serif" font-size="13">
+  <!-- As Setup 2's picture, 4 px/mm. The No. 1 carbide centre drill (pilot 3/64 = 4.8 px, body Ø.125 = 12.7 px; its pilot length schematic) in F's centre, the countersink about Ø.08 across (inside the pinion seat's Ø.3125). The tailstock chuck is not drawn (break). -->
+  <rect class="paper" x="0" y="0" width="760" height="300"/>
+  <text class="title" x="20" y="22">Op 30: centre-drill F, No. 1 centre drill from the tailstock chuck (4 px/mm)</text>
+  <line class="centre-line" x1="20" y1="160" x2="740" y2="160"/>
+  <rect class="fixture-vise" x="318.4" y="59.2" width="60" height="201.6"/>
+  <rect class="clamp" x="378.4" y="75.2" width="40" height="34"/>
+  <rect class="clamp" x="378.4" y="210.8" width="40" height="34"/>
+  <text class="label" x="318.4" y="53.2">3-jaw (schematic)</text>
+  <rect class="part-rest" x="40" y="109.2" width="378.4" height="101.6"/>
+  <rect class="part-kept" x="418.4" y="109.2" width="101.6" height="101.6"/>
+  <path class="cutter" d="M700 153.65L523.96 153.65L517.09 157.62L511.09 157.62L509.65 160L511.09 162.38L517.09 162.38L523.96 166.35L700 166.35L697 160Z"/>
+  <line class="arrow" x1="690" y1="190" x2="640" y2="190"/>
+  <text class="label" x="500" y="90">No. 1 centre drill from the tailstock</text>
+  <text class="label" x="500" y="106">chuck: countersink about Ø.08 across,</text>
+  <text class="label" x="500" y="122">inside the pinion seat's (Ø{{cad.pinion_seat_dia_ref_in:.4dot}})</text>
+  <line class="leader" x1="600" y1="120" x2="590" y2="155"/>
+  <circle class="leader-dot" cx="590" cy="155" r="2"/>
+  <text class="label" x="50" y="101.2">rest of the blank</text>
+</svg>

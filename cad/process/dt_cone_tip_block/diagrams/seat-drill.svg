@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 440" width="760" height="440" font-family="sans-serif" font-size="13">
+  <!-- Across the jaws from the right end (+X toward you): +Y (toward the fixed jaw) right, +Z up, 4 px/mm, as Setup 5's picture. The #43 (2.2606 = 9 px, 118 deg) at Y-5.588 (X7.620, DT04 L75 on), at its last peck: its point at Z40.723 (foot_tip_height_mm), full diameter foot_tap_drill_depth .440 below SEAT. The centre drill spotted it (not drawn). -->
+  <rect class="paper" x="0" y="0" width="760" height="440"/>
+  <text class="title" x="20" y="22">Op 270 (DT04, T3): the #43 drills the foot hole {{cad.foot_tap_drill_depth_in:.3dot}} below SEAT (4 px/mm)</text>
+  <rect class="fixture-vise" x="305.3" y="406" width="184.7" height="14"/>
+  <rect class="clamp" x="325.3" y="226.22" width="50" height="179.78"/>
+  <rect class="clamp" x="420" y="226.22" width="50" height="179.78"/>
+  <rect class="fixture-support" x="375.3" y="355.2" width="12.7" height="50.8"/>
+  <rect class="fixture-support" x="407.3" y="355.2" width="12.7" height="50.8"/>
+  <text class="label-on-clamp" x="350.3" y="396" text-anchor="middle">moving</text>
+  <text class="label-on-clamp" x="445" y="396" text-anchor="middle">fixed</text>
+  <rect class="part-kept" x="375.3" y="144.89" width="44.7" height="210.31"/>
+  <rect class="holes" x="393.13" y="144.89" width="9.04" height="44.7"/>
+  <line class="arrow" x1="379.13" y1="66" x2="379.13" y2="96"/>
+  <path class="cutter" d="M402.17 60L402.17 189.59L397.65 192.31L393.13 189.59L393.13 60L397.65 57Z"/>
+  <text class="label" x="470" y="60">#43, pecks of {{process.peck_43_mm:in.3dot}}: the foot hole</text>
+  <text class="label" x="470" y="76">{{cad.foot_tap_drill_depth_in:.3dot}} deep (full diameter) below SEAT,</text>
+  <text class="label" x="470" y="92">centred N–S</text>
+  <line class="leader" x1="466" y1="92" x2="403.65" y2="131.2"/>
+  <circle class="leader-dot" cx="403.65" cy="131.2" r="2"/>
+  <text class="label" x="520" y="250">N (fixed jaw)</text>
+  <line class="leader" x1="516" y1="246" x2="418" y2="235.2"/>
+  <circle class="leader-dot" cx="418" cy="235.2" r="2"/>
+  <line class="datum" x1="472" y1="144.89" x2="492" y2="144.89"/>
+  <text class="datum-label" x="496" y="148.89">SEAT</text>
+</svg>

@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 360" width="760" height="360" font-family="sans-serif" font-size="13">
+  <!-- Plan from above, 8 px/mm. The slug in the jig (its journal in the .4385 bore, the 1/8 spacer gap behind the spigot), the stub out toward the headstock. The #43 drill (2.2606 = 18.1 px) in the drill chuck, drill_43_stickout_in 1.51 out (the chuck schematic), 7.000 mm (pin_x_mm) off the stub's axis, its point at Z-.202 (drill_43_tip_in) from the spigot face, full diameter at .175. The spot drill spots first (not drawn). The second hole the same at the other side; the shaft's holes later the same way. -->
+  <rect class="paper" x="0" y="0" width="760" height="360"/>
+  <text class="title" x="20" y="22">Op 630: the #43 drill, {{process.pin_x_mm:.3f}} mm off the stub's axis, into the slug's spigot face (8 px/mm)</text>
+  <line class="centre-line" x1="20" y1="150" x2="740" y2="150"/>
+  <rect class="part-kept" x="221.6" y="111.9" width="178.4" height="76.2"/>
+  <rect class="part-kept" x="400" y="80" width="55.27" height="140"/>
+  <path class="part-kept" d="M455.27 105.55L745 105.55L742 112.96L745 120.37L742 127.78L745 135.19L742 142.59L745 150L742 157.41L745 164.82L742 172.23L745 179.64L742 187.04L745 194.45L455.27 194.45Z"/>
+  <path class="fixture-plate" d="M480.67 48.4L745 48.4L742 55.41L745 62.41L742 69.42L745 76.43L742 83.43L745 90.44L742 97.45L745 104.46L742 111.46L745 118.47L742 125.48L745 132.48L742 139.49L745 146.5L742 153.5L745 160.51L742 167.52L745 174.52L742 181.53L745 188.54L742 195.54L745 202.55L742 209.56L745 216.57L742 223.57L745 230.58L742 237.59L745 244.59L745 251.6L480.67 251.6Z"/>
+  <path class="part-kept" d="M480.67 105.55L745 105.55L742 112.96L745 120.37L742 127.78L745 135.19L742 142.59L745 150L742 157.41L745 164.82L742 172.23L745 179.64L742 187.04L745 194.45L480.67 194.45Z"/>
+  <text class="label" x="490.67" y="40.4">jig (bore .4385), journal in it</text>
+  <text class="label" x="457.27" y="269.6">1/8 spacer gap</text>
+  <rect class="holes" x="400" y="196.96" width="35.61" height="18.08"/>
+  <path class="cutter" d="M134.21 196.96L435.61 196.96L441.05 206L435.61 215.04L134.21 215.04Z"/>
+  <rect class="cutter" x="74.21" y="166" width="60" height="80"/>
+  <text class="label" x="74.21" y="262">drill chuck (schematic)</text>
+  <line class="arrow" x1="680.67" y1="281.6" x2="620.67" y2="281.6"/>
+  <text class="label" x="520.67" y="301.6">carriage feeds the jig onto the cutter</text>
+  <text class="label" x="30" y="40">#43 drill {{process.drill_43_stickout_in:.2f}} out of the drill chuck, the cross slide at</text>
+  <text class="label" x="30" y="56">X±{{process.pin_x_mm:.3f}} mm: its tip to Z-{{process.drill_43_tip_in:.3dot}} in one steady feed</text>
+  <line class="dims" x1="205.6" y1="150" x2="205.6" y2="206"/>
+  <text class="label" x="199.6" y="182" text-anchor="end">{{process.pin_x_mm:.3f}} mm</text>
+  <text class="datum-label" x="396" y="72" text-anchor="end">Z0 + H: the spigot face</text>
+  <text class="datum-label" x="199.6" y="142" text-anchor="end">X0 the stub's axis</text>
+  <text class="label" x="30" y="300">the shaft later the same way: its stub and dome stand {{cad.collar_seat_y_from_min_in:.2f}}</text>
+  <text class="label" x="30" y="316">proud of the spigot face; the chuck's nose stays .10 clear of the apex</text>
+</svg>

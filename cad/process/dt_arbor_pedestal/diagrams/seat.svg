@@ -1,31 +1,30 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 400" font-family="sans-serif" font-size="13">
-  <!-- Setup 4: upright on the 7/8 in parallels, gripped on W and E; PA03 faces the seat, spots and drills the #15 hold-down from it. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 400" width="760" height="400" font-family="sans-serif" font-size="13">
+  <!-- 3 px/mm. Across the jaws seen from the RIGHT end: +Y (the fixed jaw, W) right, +X out of the page (F faces you; X0, N, away). Plan of the seat from above, fixed jaw at the top. The 7/8 in parallels (parallel_height_mm 22.225) 1/8 in thick against each jaw. The 1/2 in end mill (38.1 px, 12 % end arc) on PA03's one level Z0, pass Y -11.932 (wholly over the blank), running +X (NC line 29), toward you; drawn short to a break. -->
   <rect class="paper" x="0" y="0" width="760" height="400"/>
-  <text class="title" x="20" y="20">Setup 4 (PA03_seat): the seat, then the #15 hold-down hole down from it</text>
-  <rect class="fixture-vise" x="64.19" y="380" width="211.63" height="14"/>
-  <rect class="clamp" x="84.19" y="245.16" width="50" height="134.84"/>
+  <text class="title" x="20" y="22">Setup 4 (PA03_seat), 3 px/mm: face the seat; the #15 hole is the next picture's</text>
+  <rect class="fixture-vise" x="64.18" y="380" width="211.63" height="14"/>
+  <rect class="clamp" x="84.18" y="245.16" width="50" height="134.84"/>
   <rect class="clamp" x="205.81" y="245.16" width="50" height="134.84"/>
-  <text class="label-on-clamp" x="109.19" y="261.16" text-anchor="middle">moving</text>
-  <text class="label-on-clamp" x="230.81" y="261.16" text-anchor="middle">fixed</text>
-  <rect class="fixture-support" x="134.19" y="313.32" width="9.52" height="66.68"/>
-  <rect class="fixture-support" x="196.29" y="313.32" width="9.52" height="66.68"/>
+  <rect class="fixture-support" x="134.18" y="313.32" width="9.52" height="66.68"/>
+  <rect class="fixture-support" x="196.28" y="313.32" width="9.52" height="66.68"/>
+  <text class="label-on-clamp" x="109.18" y="370" text-anchor="middle">moving</text>
+  <text class="label-on-clamp" x="230.81" y="370" text-anchor="middle">fixed</text>
+  <line class="leader" x1="258" y1="362" x2="201" y2="350"/>
+  <circle class="leader-dot" cx="201" cy="350" r="2"/>
+  <text class="label" x="262" y="366">7/8 in parallels at each jaw</text>
   <rect class="part-arriving" x="134.19" y="138.06" width="71.63" height="175.26"/>
   <rect class="part-kept" x="134.19" y="139.59" width="71.63" height="173.74"/>
   <rect class="part-removed" x="134.19" y="138.06" width="71.63" height="2.52"/>
   <line class="active-face" x1="134.19" y1="139.59" x2="205.81" y2="139.59"/>
-  <rect class="holes" x="163.14" y="139.59" width="13.72" height="22.36"/>
-  <line class="centre-line" x1="170" y1="127.59" x2="170" y2="175.95"/>
-  <line class="hidden" x1="134.19" y1="154.83" x2="205.81" y2="154.83"/>
-  <line class="leader" x1="201.81" y1="139.59" x2="290" y2="131.59"/>
+  <line class="centre-line" x1="170" y1="140" x2="170" y2="175.95"/>
+  <path class="cutter" d="M189.06 135.02L189.06 54.24L150.96 54.24L150.96 135.02A19.05 4.57 0 0 0 189.06 135.02Z"/>
+  <line class="leader" x1="290" y1="131.59" x2="201.81" y2="139.59"/>
   <circle class="leader-dot" cx="201.81" cy="139.59" r="2"/>
   <text class="label" x="294" y="135.59">the seat: {{process.seat_skim_mm:in.3dot}} off the sawn end; Z0</text>
-  <line class="leader" x1="172" y1="151.59" x2="290" y2="155.59"/>
-  <circle class="leader-dot" cx="172" cy="151.59" r="2"/>
-  <text class="label" x="294" y="159.59">#15 hole, spotted first</text>
-  <line class="leader" x1="201.81" y1="154.83" x2="290" y2="179.59"/>
-  <circle class="leader-dot" cx="201.81" cy="154.83" r="2"/>
-  <text class="label" x="294" y="183.59">foot top {{cad.foot_top_height_in:.2dot}} below the seat:</text>
-  <text class="label" x="294" y="201.59">the drill runs {{process.hold_drill_past_mm:in.3dot}} past it, into waste</text>
+  <text class="label" x="294" y="70">1/2 in end mill, Z0, pass Y -11.932:</text>
+  <text class="label" x="294" y="86">+X, toward you</text>
+  <line class="leader" x1="290" y1="76" x2="190" y2="80"/>
+  <circle class="leader-dot" cx="190" cy="80" r="2"/>
   <text class="label" x="78.19" y="249.16" text-anchor="end">jaw tops</text>
   <text class="label" x="470" y="232">The seat from above:</text>
   <rect class="part-kept" x="520" y="250" width="88.39" height="71.63"/>
@@ -33,7 +32,10 @@
   <text class="datum-label" x="514" y="325.63" text-anchor="end">X0: N</text>
   <line class="datum" x1="514" y1="250" x2="614.39" y2="250"/>
   <text class="datum-label" x="618.39" y="254">Y0: W</text>
-  <circle class="holes" cx="546.67" cy="285.81" r="6.86"/>
   <text class="label" x="470" y="345.63">hole X {{cad.hold_down_hole_z_from_min_mm:.3f}}, Y −{{cad.hold_down_hole_lateral_mm:.3f}} mm</text>
-  <text class="label" x="370" y="380">Looking along the jaws from the right end: F faces you.</text>
+  <text class="label" x="370" y="385">Looking along the jaws from the right end: F faces you.</text>
+  <circle class="hidden" cx="546.67" cy="285.81" r="6.86"/>
+  <circle class="cutter" cx="520" cy="285.8" r="19.05"/>
+  <line class="arrow" x1="560" y1="300" x2="600" y2="300"/>
+  <text class="label" x="604" y="304">+X</text>
 </svg>

@@ -1,23 +1,38 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 400" font-family="sans-serif" font-size="13">
-  <rect class="paper" x="0" y="0" width="760" height="400"/>
-  <text class="title" x="20" y="20">Setup 3 (plan view): spoil plate on five 1-2-3 blocks, step-clamped at its corners</text>
-  <rect class="part-kept" x="40" y="70" width="686" height="229"/>
-  <rect class="fixture-support" x="40" y="70" width="114" height="76" stroke-dasharray="4 3"/>
-  <rect class="fixture-support" x="40" y="223" width="114" height="76" stroke-dasharray="4 3"/>
-  <rect class="fixture-support" x="612" y="70" width="114" height="76" stroke-dasharray="4 3"/>
-  <rect class="fixture-support" x="612" y="223" width="114" height="76" stroke-dasharray="4 3"/>
-  <rect class="fixture-support" x="326" y="146" width="114" height="76" stroke-dasharray="4 3"/>
-  <rect class="clamp" x="78" y="50" width="38" height="96"/>
-  <rect class="clamp" x="78" y="223" width="38" height="96"/>
-  <rect class="clamp" x="650" y="50" width="38" height="96"/>
-  <rect class="clamp" x="650" y="223" width="38" height="96"/>
-  <circle class="holes" cx="233" cy="179" r="6"/>
-  <circle class="holes" cx="242" cy="141" r="6"/>
-  <line class="leader" x1="300" y1="110" x2="246" y2="138"/>
-  <text class="label" x="304" y="108">two L holes for the post screws</text>
-  <line class="leader" x1="380" y1="326" x2="383" y2="222"/>
-  <text class="label" x="240" y="340">block under the middle (dashed: under the plate)</text>
-  <text class="label" x="160" y="44">step clamps over the corner blocks</text>
-  <text class="label" x="20" y="368">X0 the plate's left end, Y0 its front edge (bottom), Z0 its top.</text>
-  <text class="label" x="20" y="388">The holes drill through into the 1 in space over the table, clear of every block.</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 492" width="760" height="492" font-family="sans-serif" font-size="13">
+  <!-- Top: plan from above, 1.5 px/mm (+X right, +Y up; X0 the plate's left end, Y0 its front edge): the 1/2 x 6 x 18 spoil plate on five 1-2-3 blocks lying flat (1 in up; 2 x 3 in footprints: under each corner flush with the ends, one under the middle, X190.5-266.7, as the plan's beam supports 76.2 and 190.5), four step clamps (schematic) over the corner blocks. Bottom: from the front (+X right, +Z up), same scale: the L drill (7.366 = 11 px) at X128.391 Y54.948 (PL04 L46), its point at Z-15.413 (drill_l_tip_mm), 2.7 mm below the plate, in the 1 in space over the table, clear of every block. The centre drill spots first (not drawn). -->
+  <rect class="paper" x="0" y="0" width="760" height="492"/>
+  <text class="title" x="20" y="22">Setup 3 (PL04, T8): the L drill through the plate (plan and front, 1.5 px/mm)</text>
+  <rect class="part-kept" x="40" y="71.4" width="685.8" height="228.6"/>
+  <rect class="hidden" x="40" y="223.8" width="114.3" height="76.2"/>
+  <rect class="hidden" x="40" y="71.4" width="114.3" height="76.2"/>
+  <rect class="hidden" x="611.5" y="223.8" width="114.3" height="76.2"/>
+  <rect class="hidden" x="611.5" y="71.4" width="114.3" height="76.2"/>
+  <rect class="hidden" x="325.75" y="147.6" width="114.3" height="76.2"/>
+  <rect class="clamp" x="77.5" y="219" width="37.5" height="96"/>
+  <rect class="clamp" x="77.5" y="51.6" width="37.5" height="96"/>
+  <rect class="clamp" x="688.3" y="219" width="37.5" height="96"/>
+  <rect class="clamp" x="688.3" y="51.6" width="37.5" height="96"/>
+  <circle class="cutter" cx="232.59" cy="217.58" r="5.52"/>
+  <circle class="hidden" cx="241.91" cy="179.85" r="5.52"/>
+  <text class="label" x="260" y="60">step clamps (schematic) over the corner blocks</text>
+  <text class="label" x="240" y="108">L drill in the first hole; the second (dashed) next</text>
+  <line class="leader" x1="236" y1="104" x2="236.59" y2="212.58"/>
+  <circle class="leader-dot" cx="236.59" cy="212.58" r="2"/>
+  <text class="label" x="350" y="250">1-2-3 blocks under the plate (dashed)</text>
+  <line class="leader" x1="346" y1="246" x2="385" y2="210"/>
+  <circle class="leader-dot" cx="385" cy="210" r="2"/>
+  <text class="datum-label" x="44" y="296">X0 Y0</text>
+  <rect class="part-kept" x="40" y="400" width="685.8" height="19.05"/>
+  <rect class="fixture-support" x="40" y="419.05" width="114.3" height="38.1"/>
+  <rect class="fixture-support" x="325.75" y="419.05" width="114.3" height="38.1"/>
+  <rect class="fixture-support" x="611.5" y="419.05" width="114.3" height="38.1"/>
+  <rect class="fixture-vise" x="30" y="457.15" width="705.8" height="8"/>
+  <rect class="holes" x="227.06" y="400" width="11.05" height="19.05"/>
+  <path class="cutter" d="M238.11 361L238.11 419.8L232.59 423.12L227.06 419.8L227.06 361L232.59 358Z"/>
+  <line class="arrow" x1="213.06" y1="367" x2="213.06" y2="397"/>
+  <text class="label" x="260" y="365">L drill: point at Z{{process.drill_l_tip_mm:.3f}} mm,</text>
+  <text class="label" x="260" y="381">past the plate's underside into air</text>
+  <line class="leader" x1="256" y1="361" x2="240.59" y2="409"/>
+  <circle class="leader-dot" cx="240.59" cy="409" r="2"/>
+  <text class="label" x="721.8" y="479.15" text-anchor="end">table</text>
 </svg>

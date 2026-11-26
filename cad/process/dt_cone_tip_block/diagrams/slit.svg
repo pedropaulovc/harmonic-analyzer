@@ -1,42 +1,45 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 420" font-family="sans-serif" font-size="13">
-  <rect class="paper" x="0" y="0" width="760" height="420"/>
-  <text class="title" x="16" y="22">Setup 10 (DT11): saw the slit, TOP .75 past the right jaw side</text>
-  <rect class="fixture-vise" x="44.6" y="330.0" width="317.3" height="22.0"/>
-  <rect class="clamp" x="44.6" y="240.1" width="317.3" height="89.9"/>
-  <rect class="fixture-support" x="158.7" y="253.8" width="203.2" height="76.2"/>
-  <rect class="part-kept" x="294.8" y="219.8" width="105.2" height="34.0"/>
-  <rect class="part-removed" x="369.7" y="234.9" width="30.3" height="3.3"/>
-  <rect class="cutter" x="369.7" y="234.9" width="139.7" height="3.3"/>
-  <rect class="cutter" x="407.8" y="60.0" width="63.5" height="174.9"/>
-  <rect class="cutter" x="407.8" y="238.2" width="63.5" height="25.4"/>
-  <rect class="cutter" x="423.8" y="263.6" width="31.6" height="12.7"/>
-  <line class="centre-line" x1="439.6" y1="56.0" x2="439.6" y2="284.0"/>
-  <circle class="hidden" cx="371.0" cy="236.5" r="5.4"/>
-  <rect class="fixture-support" x="44.6" y="215.7" width="40.6" height="24.4"/>
-  <line class="hidden" x1="85.2" y1="240.1" x2="85.2" y2="330.0"/>
-  <text class="label" x="560.0" y="70.0">R8 stepped arbor, body Ø1.25</text>
-  <line class="leader" x1="556.0" y1="66.0" x2="471.3" y2="100.0"/>
-  <circle class="leader-dot" cx="471.3" cy="100.0" r="2.5"/>
-  <text class="label" x="560.0" y="110.0">2-3/4 x .064 saw</text>
-  <line class="leader" x1="556.0" y1="106.0" x2="495.0" y2="236.5"/>
-  <circle class="leader-dot" cx="495.0" cy="236.5" r="2.5"/>
-  <text class="label" x="232.0" y="92.0">TOP, .75 past jaw side</text>
-  <line class="leader" x1="372.0" y1="96.0" x2="400.0" y2="219.8"/>
-  <circle class="leader-dot" cx="400.0" cy="219.8" r="2.5"/>
-  <text class="label" x="560.0" y="262.0">cap Ø1.25 x .50, its screw</text>
-  <line class="leader" x1="556.0" y1="258.0" x2="471.3" y2="252.0"/>
-  <circle class="leader-dot" cx="471.3" cy="252.0" r="2.5"/>
-  <text class="label" x="560.0" y="302.0">E down on the stacks</text>
-  <line class="leader" x1="556.0" y1="298.0" x2="340.0" y2="253.8"/>
-  <circle class="leader-dot" cx="340.0" cy="253.8" r="2.5"/>
-  <text class="label" x="100.0" y="200.0">moving jaw (N behind)</text>
-  <line class="leader" x1="150.0" y1="206.0" x2="130.0" y2="285.0"/>
-  <circle class="leader-dot" cx="130.0" cy="285.0" r="2.5"/>
-  <text class="label" x="150.0" y="120.0">slit .596 REF, into the adjuster</text>
-  <line class="leader" x1="250.0" y1="126.0" x2="384.9" y2="236.5"/>
-  <circle class="leader-dot" cx="384.9" cy="236.5" r="2.5"/>
-  <text class="label" x="30.0" y="170.0">spacer strip on end</text>
-  <line class="leader" x1="64.9" y1="176.0" x2="64.9" y2="225.7"/>
-  <circle class="leader-dot" cx="64.9" cy="225.7" r="2.5"/>
-  <text class="label" x="16.0" y="406.0">Along the jaws, 2 px per mm, the saw at full depth. Passes along +Y, away from the viewer (toward the fixed jaw).</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 400" width="760" height="400" font-family="sans-serif" font-size="13">
+  <!-- From the front (+X right, +Z up, +Y into the page), 2.6 px/mm. X0 TOP (right, the block to -X), Z0 the stacks' top (E). The jaws (the moving jaw in front, outline) 158.67 wide, their right side slit_overhang_mm 19.05 left of TOP; the 1 in + 1/2 in stacks (38.1) ending at the jaws' right side; the block on edge, E down, W up (17.018). The spacer strip on end on the bed at the jaws' left end (57.15 tall, .80 along the jaws). The 2-3/4 x .064 saw (Ø69.85 x 1.6256, saw_dia_mm, saw_thickness_mm) on the stepped arbor, its lower face at Z7.823 (saw_cut_z_mm), centre X32.764 on DT11's first pass (L19-L20: rim 2.161 into TOP), fed +Y (into the page) across the block's depth; the arbor's body Ø31.75 above the saw (to a break at the spindle), its cap Ø31.75 x 12.7 and the screw below it, all past TOP. -->
+  <rect class="paper" x="0" y="0" width="760" height="400"/>
+  <text class="title" x="20" y="22">Setup 10 (DT11): the slitting saw's first pass, {{process.slit_first_pass_mm:in.3dot}} into TOP, from the front (2.6 px/mm)</text>
+  <rect class="fixture-vise" x="87.92" y="349.06" width="432.55" height="10"/>
+  <rect class="fixture-support" x="198.47" y="250" width="312" height="99.06"/>
+  <rect class="part-kept" x="423.3" y="205.75" width="136.7" height="44.25"/>
+  <rect class="hidden" x="97.92" y="232.2" width="412.55" height="116.86"/>
+  <rect class="part-rest" x="97.92" y="200.47" width="52.83" height="148.59"/>
+  <rect class="cutter" x="554.38" y="225.43" width="181.61" height="4.23"/>
+  <path class="cutter" d="M603.91 225.43L603.91 146L611.42 143L618.92 146L626.43 143L633.93 146L641.43 143L648.94 146L656.44 143L663.95 146L671.45 143L678.96 146L686.46 146L686.46 225.43Z"/>
+  <rect class="cutter" x="603.91" y="229.66" width="82.55" height="33.02"/>
+  <rect class="cutter" x="624.62" y="262.68" width="41.14" height="1.56"/>
+  <circle class="leader" cx="705.19" cy="172" r="7"/>
+  <line class="leader" x1="700.19" y1="167" x2="710.19" y2="177"/>
+  <line class="leader" x1="700.19" y1="177" x2="710.19" y2="167"/>
+  <text class="datum-label" x="564" y="199.75">X0 TOP</text>
+  <line class="datum" x1="560" y1="198" x2="560" y2="265.6"/>
+  <text class="datum-label" x="417.3" y="195.75" text-anchor="end">Z0 the stacks' top (E)</text>
+  <line class="leader" x1="415.3" y1="199.75" x2="423.3" y2="250"/>
+  <circle class="leader-dot" cx="423.3" cy="250" r="2"/>
+  <text class="label" x="20" y="60">slitting saw 2-3/4 × {{process.saw_thickness_mm:in.3dot}}, horizontal on the stepped arbor, its lower face at Z{{process.saw_cut_z_mm:.3f}} mm;</text>
+  <text class="label" x="20" y="76">first pass {{process.slit_first_pass_mm:in.3dot}} into TOP, fed +Y (into the page) across the block's depth; then</text>
+  <text class="label" x="20" y="92">three passes {{process.slit_step_mm:in.3dot}} deeper each, to {{process.slit_depth_mm:in.3dot}} REF, into the adjuster</text>
+  <line class="leader" x1="300" y1="108" x2="557.4" y2="227.64"/>
+  <circle class="leader-dot" cx="557.4" cy="227.64" r="2"/>
+  <text class="label" x="560" y="126">arbor body Ø{{process.saw_arbor_body_dia_mm:in.2f}}</text>
+  <line class="leader" x1="640" y1="132" x2="646" y2="165"/>
+  <circle class="leader-dot" cx="646" cy="165" r="2"/>
+  <text class="label" x="620" y="320">cap Ø{{process.saw_arbor_cap_dia_mm:in.2f}} × .50</text>
+  <text class="label" x="620" y="336">and its screw</text>
+  <line class="leader" x1="616" y1="316" x2="671.19" y2="250"/>
+  <circle class="leader-dot" cx="671.19" cy="250" r="2"/>
+  <text class="label" x="500" y="372">TOP {{process.slit_overhang_mm:in.2dot}} in past the jaws' right</text>
+  <text class="label" x="500" y="388">side; E down on the stacks</text>
+  <line class="leader" x1="496" y1="368" x2="534" y2="244.8"/>
+  <circle class="leader-dot" cx="534" cy="244.8" r="2"/>
+  <text class="label" x="20" y="180">spacer strip on end</text>
+  <text class="label" x="20" y="196">on the vise bed</text>
+  <line class="leader" x1="60" y1="196" x2="117.92" y2="224"/>
+  <circle class="leader-dot" cx="117.92" cy="224" r="2"/>
+  <text class="label" x="120" y="372">moving jaw (in front, outline); N behind</text>
+  <line class="leader" x1="200" y1="360" x2="404" y2="328"/>
+  <circle class="leader-dot" cx="404" cy="328" r="2"/>
 </svg>

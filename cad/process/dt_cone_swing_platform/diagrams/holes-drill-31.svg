@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 330" width="760" height="330" font-family="sans-serif" font-size="13">
+  <!-- From the front (+X right, +Z up), 6 px/mm, the right overhang past the jaws' right ends (X 202.91). The #31 (3.048 = 18.3 px, 118 deg) at X220.362 (PL01 L110), its point at Z-7.893 (drill_31_tip_mm): its full diameter .5 mm past the top face, into air. The centre drill spotted it (not drawn). -->
+  <rect class="paper" x="0" y="0" width="760" height="330"/>
+  <text class="title" x="20" y="22">Op 80 (PL01, T4): the #31 through the hold-down, into air (from the front, 6 px/mm)</text>
+  <rect class="part-kept" x="40" y="200" width="333.83" height="38.1"/>
+  <rect class="fixture-support" x="40" y="238.1" width="77.45" height="76.2"/>
+  <rect class="hidden" x="40" y="120.07" width="77.45" height="194.23"/>
+  <text class="label" x="44" y="96.07">moving jaw (in front,</text>
+  <text class="label" x="44" y="112.07">outline); parallel below</text>
+  <rect class="holes" x="213.03" y="200" width="18.29" height="38.1"/>
+  <path class="cutter" d="M231.32 92L231.32 241.86L222.17 247.36L213.03 241.86L213.03 92L222.17 89Z"/>
+  <line class="arrow" x1="199.03" y1="98" x2="199.03" y2="128"/>
+  <text class="datum-label" x="40" y="194">Z0 the underside (U, up)</text>
+  <text class="label" x="380" y="52">#31, one feed: full diameter {{process.drill_past_mm:in.3dot}} past</text>
+  <text class="label" x="380" y="68">the top face, its point at Z{{process.drill_31_tip_mm:.3f}} mm</text>
+  <line class="leader" x1="376" y1="48" x2="233.32" y2="116"/>
+  <circle class="leader-dot" cx="233.32" cy="116" r="2"/>
+</svg>

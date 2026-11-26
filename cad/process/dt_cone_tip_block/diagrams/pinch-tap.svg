@@ -1,36 +1,40 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 420" font-family="sans-serif" font-size="13">
-  <rect class="paper" x="0" y="0" width="760" height="420"/>
-  <text class="title" x="16" y="22">Setup 7 (DT07): tap the pinch hole from E</text>
-  <rect class="fixture-vise" x="128.8" y="330.0" width="142.3" height="22.0"/>
-  <rect class="clamp" x="153.2" y="195.2" width="30.0" height="134.8"/>
-  <rect class="clamp" x="216.8" y="195.2" width="30.0" height="134.8"/>
-  <text class="label" x="168.2" y="368.0" text-anchor="middle">moving jaw</text>
-  <text class="label" x="231.8" y="368.0" text-anchor="middle">fixed jaw</text>
-  <rect class="fixture-support" x="183.2" y="215.7" width="9.5" height="114.3"/>
-  <rect class="fixture-support" x="207.2" y="215.7" width="9.5" height="114.3"/>
-  <line class="dims" x1="183.2" y1="291.9" x2="192.8" y2="291.9"/>
-  <line class="dims" x1="207.2" y1="291.9" x2="216.8" y2="291.9"/>
-  <rect class="part-kept" x="183.2" y="164.6" width="33.5" height="51.1"/>
-  <rect class="part-threads" x="195.7" y="164.6" width="8.5" height="34.3"/>
-  <rect class="holes" x="195.1" y="190.2" width="9.8" height="25.5"/>
-  <rect class="cutter" x="195.7" y="136.6" width="8.5" height="30.0"/>
-  <rect class="clamp" x="170.0" y="126.6" width="60.0" height="8.0"/>
-  <rect class="cutter" x="196.0" y="81.6" width="8.0" height="45.0"/>
-  <line class="arrow" x1="200.0" y1="66.6" x2="200.0" y2="78.6"/>
-  <text class="label" x="440.0" y="70.0">tap guide's spring point in the wrench</text>
-  <line class="leader" x1="436.0" y1="66.0" x2="200.0" y2="104.6"/>
-  <circle class="leader-dot" cx="200.0" cy="104.6" r="2.5"/>
-  <text class="label" x="440.0" y="110.0">4-40 plug tap, stop .450 below E</text>
-  <line class="leader" x1="436.0" y1="106.0" x2="200.0" y2="198.9"/>
-  <circle class="leader-dot" cx="200.0" cy="198.9" r="2.5"/>
-  <text class="label" x="440.0" y="150.0">E up</text>
-  <line class="leader" x1="436.0" y1="146.0" x2="186.0" y2="164.6"/>
-  <circle class="leader-dot" cx="186.0" cy="164.6" r="2.5"/>
-  <text class="label" x="440.0" y="190.0">W's #30 (down)</text>
-  <line class="leader" x1="436.0" y1="186.0" x2="204.0" y2="206.7"/>
-  <circle class="leader-dot" cx="204.0" cy="206.7" r="2.5"/>
-  <text class="label" x="440.0" y="230.0">N (fixed jaw)</text>
-  <line class="leader" x1="436.0" y1="226.0" x2="214.8" y2="194.6"/>
-  <circle class="leader-dot" cx="214.8" cy="194.6" r="2.5"/>
-  <text class="label" x="16.0" y="406.0">Turned end over end: W down, SEAT now to the right, N still at the fixed jaw. Spindle off.</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 440" width="760" height="440" font-family="sans-serif" font-size="13">
+  <!-- Across the jaws from the right end (+X toward you; the right end is SEAT): +Y right, +Z up, 5 px/mm. The block turned end over end on the same 1 in + 1/2 in stacks: W down, E up, N on the fixed jaw. The 4-40 plug tap (11.4 px; length and lead schematic) in the pinch hole from E, its point pinch_tap_reach_mm 11.43 below E, inside W's #30 (8.38 deep from W); the T-handle wrench and the Fisher tap guide in the cutter colour; spindle off. -->
+  <rect class="paper" x="0" y="0" width="760" height="440"/>
+  <text class="title" x="20" y="22">Setup 7 (DT07): tap the pinch hole 4-40 from E, W down (5 px/mm)</text>
+  <rect class="fixture-vise" x="294.12" y="406" width="195.88" height="14"/>
+  <rect class="clamp" x="314.12" y="181.27" width="50" height="224.73"/>
+  <rect class="clamp" x="420" y="181.27" width="50" height="224.73"/>
+  <rect class="fixture-support" x="364.12" y="279" width="15.88" height="127"/>
+  <rect class="fixture-support" x="404.12" y="279" width="15.88" height="127"/>
+  <rect class="fixture-support" x="364.12" y="215.5" width="15.88" height="63.5"/>
+  <rect class="fixture-support" x="404.12" y="215.5" width="15.88" height="63.5"/>
+  <text class="label-on-clamp" x="339.12" y="396" text-anchor="middle">moving</text>
+  <text class="label-on-clamp" x="445" y="396" text-anchor="middle">fixed</text>
+  <rect class="part-kept" x="364.12" y="130.41" width="55.88" height="85.09"/>
+  <rect class="holes" x="386.41" y="130.41" width="11.3" height="85.09"/>
+  <rect class="holes" x="383.9" y="173.6" width="16.32" height="41.9"/>
+  <rect class="part-threads" x="384.95" y="130.41" width="14.23" height="43.19"/>
+  <path class="cutter" d="M399.17 185.85L399.17 100.41L384.95 100.41L384.95 185.85A7.11 1.71 0 0 0 399.17 185.85Z"/>
+  <rect class="cutter" x="332.06" y="90.41" width="120" height="10"/>
+  <rect class="cutter" x="382.06" y="86.41" width="20" height="26"/>
+  <path class="cutter" d="M380.15 48.31L403.97 48.31L403.97 74.5L392.06 86.41L380.15 74.5Z"/>
+  <path class="cutter" d="M423.81 48.31L423.81 32L416.75 29L409.7 32L402.64 29L395.59 32L388.53 29L381.48 32L374.42 29L367.37 32L360.31 32L360.31 48.31Z"/>
+  <text class="label" x="530" y="50">Fisher tap guide in the 1/2 in</text>
+  <text class="label" x="530" y="66">collet, spindle off: its spring</text>
+  <text class="label" x="530" y="82">point in the wrench's centre hole</text>
+  <line class="leader" x1="526" y1="56" x2="398.06" y2="66"/>
+  <circle class="leader-dot" cx="398.06" cy="66" r="2"/>
+  <text class="label" x="530" y="130">T-handle wrench (schematic)</text>
+  <line class="leader" x1="526" y1="126" x2="452.06" y2="94.41"/>
+  <circle class="leader-dot" cx="452.06" cy="94.41" r="2"/>
+  <text class="label" x="530" y="190">4-40 plug tap, point {{process.pinch_tap_reach_mm:in.3dot}}</text>
+  <text class="label" x="530" y="206">below E, inside W's #30</text>
+  <line class="leader" x1="526" y1="186" x2="398.06" y2="165.5"/>
+  <circle class="leader-dot" cx="398.06" cy="165.5" r="2"/>
+  <text class="label-halo" x="304.12" y="140.5" text-anchor="end">E up</text>
+  <text class="label-halo" x="304.12" y="200.5" text-anchor="end">W down</text>
+  <text class="label" x="540" y="300">N (fixed jaw)</text>
+  <line class="leader" x1="536" y1="296" x2="418" y2="165.5"/>
+  <circle class="leader-dot" cx="418" cy="165.5" r="2"/>
 </svg>

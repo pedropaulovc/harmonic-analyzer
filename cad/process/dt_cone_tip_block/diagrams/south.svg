@@ -1,31 +1,30 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 420" font-family="sans-serif" font-size="13">
-  <rect class="paper" x="0" y="0" width="760" height="420"/>
-  <text class="title" x="16" y="22">Setup 9 (DT10): countersink the adjuster at S</text>
-  <rect class="fixture-vise" x="120.1" y="330.0" width="159.9" height="22.0"/>
-  <rect class="clamp" x="144.5" y="195.2" width="30.0" height="134.8"/>
-  <rect class="clamp" x="225.5" y="195.2" width="30.0" height="134.8"/>
-  <text class="label" x="159.5" y="368.0" text-anchor="middle">moving jaw</text>
-  <text class="label" x="240.5" y="368.0" text-anchor="middle">fixed jaw</text>
-  <rect class="fixture-support" x="174.5" y="215.7" width="9.5" height="114.3"/>
-  <rect class="fixture-support" x="216.0" y="215.7" width="9.5" height="114.3"/>
-  <line class="dims" x1="174.5" y1="291.9" x2="184.0" y2="291.9"/>
-  <line class="dims" x1="216.0" y1="291.9" x2="225.5" y2="291.9"/>
-  <rect class="part-kept" x="174.5" y="182.2" width="51.1" height="33.5"/>
-  <rect class="part-threads" x="190.5" y="182.2" width="19.0" height="33.5"/>
-  <polygon class="holes" points="190.2,182.2 209.8,182.2 208.1,183.8 191.9,183.8"/>
-  <polygon class="cutter" points="190.5,176.2 209.5,176.2 200.0,185.8"/>
-  <rect class="cutter" x="190.5" y="86.2" width="19.0" height="90.0"/>
-  <text class="label" x="440.0" y="70.0">1/4 in 90° chamfer mill, once round</text>
-  <line class="leader" x1="436.0" y1="66.0" x2="200.0" y2="132.2"/>
-  <circle class="leader-dot" cx="200.0" cy="132.2" r="2.5"/>
-  <text class="label" x="440.0" y="110.0">S up: countersink .252-.262</text>
-  <line class="leader" x1="436.0" y1="106.0" x2="209.0" y2="182.2"/>
-  <circle class="leader-dot" cx="209.0" cy="182.2" r="2.5"/>
-  <text class="label" x="440.0" y="150.0">N down on the stacks</text>
-  <line class="leader" x1="436.0" y1="146.0" x2="200.0" y2="215.7"/>
-  <circle class="leader-dot" cx="200.0" cy="215.7" r="2.5"/>
-  <text class="label" x="440.0" y="190.0">E (fixed jaw)</text>
-  <line class="leader" x1="436.0" y1="186.0" x2="223.5" y2="204.2"/>
-  <circle class="leader-dot" cx="223.5" cy="204.2" r="2.5"/>
-  <text class="label" x="16.0" y="406.0">Turned end over end: S up, SEAT to the right; X0 on SEAT shifted by D = (H - 1.500) x 25.4 mm.</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 440" width="760" height="440" font-family="sans-serif" font-size="13">
+  <!-- Across the jaws from the right end (+X toward you; the right end is SEAT): +Y right, +Z up, 5 px/mm. The block turned end over end on the same stacks: S up, N down, E on the fixed jaw; Z0 .4400 below S. The 1/4 in 90 deg chamfer mill (31.8 px) at Y-8.636 (X-38.100, DT10 L28), its point at Z8.576, then once round r .6639: countersink Ø.257 x 90 deg at S. N's countersink (Setup 8) below. -->
+  <rect class="paper" x="0" y="0" width="760" height="440"/>
+  <text class="title" x="20" y="22">Setup 9 (DT10, T6): the chamfer mill circles the adjuster's countersink at S (5 px/mm)</text>
+  <rect class="fixture-vise" x="284.91" y="406" width="225.09" height="14"/>
+  <rect class="clamp" x="304.91" y="181.27" width="50" height="224.73"/>
+  <rect class="clamp" x="440" y="181.27" width="50" height="224.73"/>
+  <rect class="fixture-support" x="354.91" y="279" width="15.88" height="127"/>
+  <rect class="fixture-support" x="424.12" y="279" width="15.88" height="127"/>
+  <rect class="fixture-support" x="354.91" y="215.5" width="15.88" height="63.5"/>
+  <rect class="fixture-support" x="424.12" y="215.5" width="15.88" height="63.5"/>
+  <text class="label-on-clamp" x="329.91" y="396" text-anchor="middle">moving</text>
+  <text class="label-on-clamp" x="465" y="396" text-anchor="middle">fixed</text>
+  <rect class="part-kept" x="354.91" y="159.62" width="85.09" height="55.88"/>
+  <rect class="holes" x="383.29" y="159.62" width="27.05" height="55.88"/>
+  <path class="holes" d="M380.5 215.5L413.14 215.5L410.35 212.71L383.29 212.71Z"/>
+  <path class="holes" d="M380.5 159.62L413.14 159.62L410.35 162.41L383.29 162.41Z"/>
+  <path class="cutter" d="M412.69 60L412.69 156.75L396.82 172.62L380.94 156.75L380.94 60L388.88 57L396.82 60L404.76 57Z"/>
+  <line class="arrow" x1="366.94" y1="66" x2="366.94" y2="96"/>
+  <line class="datum" x1="492" y1="215.5" x2="512" y2="215.5"/>
+  <text class="datum-label" x="516" y="219.5">Z0 {{process.depth_target_mm:in.4dot}} below S</text>
+  <text class="label" x="470" y="60">1/4 in 90° chamfer mill, its point fed to Z{{process.csk_tip_height_mm:.3f}} mm</text>
+  <text class="label" x="470" y="76">({{process.csk_tip_depth_mm:in.3dot}} down), then once round r {{process.csk_orbit_mm:in.4dot}} (climb):</text>
+  <text class="label" x="470" y="92">countersink Ø{{cad.adjuster_csk_dia_in:.3dot}} × 90° at S</text>
+  <line class="leader" x1="466" y1="92" x2="414.82" y2="115.5"/>
+  <circle class="leader-dot" cx="414.82" cy="115.5" r="2"/>
+  <text class="label" x="560" y="250">E (fixed jaw)</text>
+  <line class="leader" x1="556" y1="246" x2="438" y2="185.5"/>
+  <circle class="leader-dot" cx="438" cy="185.5" r="2"/>
 </svg>

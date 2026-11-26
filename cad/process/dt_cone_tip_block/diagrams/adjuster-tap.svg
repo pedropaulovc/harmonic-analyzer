@@ -1,33 +1,37 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 420" font-family="sans-serif" font-size="13">
-  <rect class="paper" x="0" y="0" width="760" height="420"/>
-  <text class="title" x="16" y="22">Setup 8 (DT09): tap the adjuster 1/4-28</text>
-  <rect class="fixture-vise" x="120.1" y="330.0" width="159.9" height="22.0"/>
-  <rect class="clamp" x="144.5" y="195.2" width="30.0" height="134.8"/>
-  <rect class="clamp" x="225.5" y="195.2" width="30.0" height="134.8"/>
-  <text class="label" x="159.5" y="368.0" text-anchor="middle">moving jaw</text>
-  <text class="label" x="240.5" y="368.0" text-anchor="middle">fixed jaw</text>
-  <rect class="fixture-support" x="174.5" y="215.7" width="9.5" height="114.3"/>
-  <rect class="fixture-support" x="216.0" y="215.7" width="9.5" height="114.3"/>
-  <line class="dims" x1="174.5" y1="291.9" x2="184.0" y2="291.9"/>
-  <line class="dims" x1="216.0" y1="291.9" x2="225.5" y2="291.9"/>
-  <rect class="part-kept" x="174.5" y="182.2" width="51.1" height="33.5"/>
-  <rect class="part-threads" x="190.5" y="182.2" width="19.0" height="33.5"/>
-  <rect class="cutter" x="190.5" y="154.2" width="19.0" height="30.0"/>
-  <rect class="cutter" x="190.5" y="215.7" width="19.0" height="16.0"/>
-  <rect class="clamp" x="170.0" y="144.2" width="60.0" height="8.0"/>
-  <rect class="cutter" x="196.0" y="99.2" width="8.0" height="45.0"/>
-  <line class="arrow" x1="200.0" y1="84.2" x2="200.0" y2="96.2"/>
-  <text class="label" x="440.0" y="70.0">tap guide's spring point in the wrench</text>
-  <line class="leader" x1="436.0" y1="66.0" x2="200.0" y2="122.2"/>
-  <circle class="leader-dot" cx="200.0" cy="122.2" r="2.5"/>
-  <text class="label" x="440.0" y="110.0">N up</text>
-  <line class="leader" x1="436.0" y1="106.0" x2="182.0" y2="182.2"/>
-  <circle class="leader-dot" cx="182.0" cy="182.2" r="2.5"/>
-  <text class="label" x="440.0" y="150.0">E (fixed jaw)</text>
-  <line class="leader" x1="436.0" y1="146.0" x2="223.5" y2="204.2"/>
-  <circle class="leader-dot" cx="223.5" cy="204.2" r="2.5"/>
-  <text class="label" x="440.0" y="190.0">1/4-28 plug tap, stop .650 below N</text>
-  <line class="leader" x1="436.0" y1="186.0" x2="200.0" y2="231.7"/>
-  <circle class="leader-dot" cx="200.0" cy="231.7" r="2.5"/>
-  <text class="label" x="16.0" y="406.0">Spindle off; the full thread runs out through S between the stacks.</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 440" width="760" height="440" font-family="sans-serif" font-size="13">
+  <!-- Across the jaws from the right end (+X toward you): +Y (toward the fixed jaw) right, +Z up, 5 px/mm, as Setup 8's picture. The 1/4-28 plug tap (major .250 = 31.8 px; length and lead schematic) in the adjuster from N, its point adjuster_tap_reach_mm 16.51 below N, through S between the stacks; the T-handle wrench and the Fisher tap guide in the cutter colour; spindle off. -->
+  <rect class="paper" x="0" y="0" width="760" height="440"/>
+  <text class="title" x="20" y="22">Ops 670-690 (DT09): tap the adjuster 1/4-28 by hand under the tap guide (5 px/mm)</text>
+  <rect class="fixture-vise" x="284.91" y="406" width="225.09" height="14"/>
+  <rect class="clamp" x="304.91" y="181.27" width="50" height="224.73"/>
+  <rect class="clamp" x="440" y="181.27" width="50" height="224.73"/>
+  <rect class="fixture-support" x="354.91" y="279" width="15.88" height="127"/>
+  <rect class="fixture-support" x="424.12" y="279" width="15.88" height="127"/>
+  <rect class="fixture-support" x="354.91" y="215.5" width="15.88" height="63.5"/>
+  <rect class="fixture-support" x="424.12" y="215.5" width="15.88" height="63.5"/>
+  <text class="label-on-clamp" x="329.91" y="396" text-anchor="middle">moving</text>
+  <text class="label-on-clamp" x="465" y="396" text-anchor="middle">fixed</text>
+  <rect class="part-kept" x="354.91" y="159.62" width="85.09" height="55.88"/>
+  <rect class="part-threads" x="380.94" y="159.62" width="31.75" height="55.88"/>
+  <path class="cutter" d="M412.69 238.36L412.69 89.62L380.94 89.62L380.94 238.36A15.88 3.81 0 0 0 412.69 238.36Z"/>
+  <rect class="cutter" x="336.82" y="79.62" width="120" height="10"/>
+  <rect class="cutter" x="386.82" y="75.62" width="20" height="26"/>
+  <path class="cutter" d="M384.91 37.52L408.73 37.52L408.73 63.71L396.82 75.62L384.91 63.71Z"/>
+  <path class="cutter" d="M428.57 37.52L428.57 30L421.51 27L414.46 30L407.4 27L400.35 30L393.29 27L386.24 30L379.18 27L372.13 30L365.07 30L365.07 37.52Z"/>
+  <text class="label" x="530" y="50">Fisher tap guide in the 1/2 in</text>
+  <text class="label" x="530" y="66">collet, spindle off: its spring</text>
+  <text class="label" x="530" y="82">point in the wrench's centre hole</text>
+  <line class="leader" x1="526" y1="56" x2="410.82" y2="60"/>
+  <circle class="leader-dot" cx="410.82" cy="60" r="2"/>
+  <text class="label" x="530" y="130">T-handle wrench (schematic)</text>
+  <line class="leader" x1="526" y1="126" x2="456.82" y2="83.62"/>
+  <circle class="leader-dot" cx="456.82" cy="83.62" r="2"/>
+  <text class="label" x="530" y="190">1/4-28 plug tap, its point</text>
+  <text class="label" x="530" y="206">{{process.adjuster_tap_reach_mm:in.3dot}} below N: the full thread</text>
+  <text class="label" x="530" y="222">through S, between the stacks</text>
+  <line class="leader" x1="526" y1="222" x2="414.82" y2="225.5"/>
+  <circle class="leader-dot" cx="414.82" cy="225.5" r="2"/>
+  <text class="label" x="560" y="300">E (fixed jaw)</text>
+  <line class="leader" x1="556" y1="296" x2="438" y2="185.5"/>
+  <circle class="leader-dot" cx="438" cy="185.5" r="2"/>
 </svg>

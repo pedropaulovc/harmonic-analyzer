@@ -523,7 +523,7 @@ machine_kind = "other"
 title = "Saw the strip"
 machine = "Saw / bench"
 indexing = "none"
-diagram = { file = "diagrams/saw.svg", alt = "The 1/2 × 2-1/4 in flat bar lying on a wide face in the saw; one strip about .80 in wide marked off its end, the cut across the bar's 2-1/4 width." }
+diagram = { file = "diagrams/saw.svg", alt = "From above, 3 px/mm: the 1/2 × 2-1/4 in flat bar lying on a wide face in the saw; one strip {{process.blank_x_in:.2dot}} in wide marked off its end, the blade (schematic) on the waste side, the cut across the bar's 2-1/4 width." }
 envelope = "other"
 vise_hold = "other"
 beam = "other"
@@ -560,7 +560,7 @@ indexing = "none"
 machine_ref = "pm-30mv"
 holding = "The 1 in and 1/2 in parallels of the set stacked against each jaw (1.5 in). The strip lying flat on them, N down, its 2-1/4 length across the jaws: gripped on the bar's two cold-finished edges, SEAT against the FIXED jaw; E to the LEFT, centred along the jaws. Tap it down onto both stacks while closing the vise; the lower {{process.lying_grip_mm:in.3dot}} of it is in the jaws."
 datum = "Program DT01_depth. G54: X0 face E (left), Y0 the fixed jaw's face (SEAT), Z0 the stacks' top (N), set from the miked thickness; +Y toward the fixed jaw. The file starts with an M6 for the end mill."
-diagram = { file = "diagrams/depth.svg", alt = "The strip lying N down on stacked parallels, gripped on the bar's edges across the jaws; the 1/2 in end mill faces the face up down to the depth in levels: it becomes S." }
+diagram = { file = "diagrams/depth.svg", alt = "Across the jaws from the right end, 5 px/mm: the strip lying N down on the 1 in + 1/2 in stacks, gripped on the bar's edges, SEAT at the fixed jaw; the 1/2 in end mill on its first level, on the pass over the strip's middle, running into the page: the face up becomes S." }
 envelope = { x_span_mm = ["{{process.strip_max_mm}}", "{{process.face_cutter_dia_mm}}", 5.08], y_span_mm = ["{{process.bar_width_max_mm}}", "{{process.face_cutter_dia_mm}}"], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{process.bar_thickness_max_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{process.depth_target_mm}}"], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_mm}}"] }
 vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{process.bar_width_max_mm}}", along_jaws_mm = "{{process.strip_max_mm}}", part_height_mm = "{{process.bar_thickness_max_mm}}", parallel_height_mm = "{{process.riser_height_mm}}", overhang_mm = ["{{process.vise_strip_inset_mm}}", "rest"], jaw_offset = "centred", fixed_jaw_face = "as_bought", moving_jaw_face = "as_bought", moving_jaw_contact = "flat" }
 beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{process.strip_max_mm}}"], clamp_mm = [0, "{{process.strip_max_mm}}"], section_mm = { y = "{{process.bar_width_max_mm}}", z = "{{process.bar_thickness_max_mm}}" }, vise_left = "start" }
@@ -614,7 +614,7 @@ indexing = "none"
 machine_ref = "pm-30mv"
 holding = "The 5/8 in and 1/2 in parallels of the set stacked against each jaw (1-1/8 in). The strip on edge on them, the unmarked sawn face down and E up, gripped on N and S: N (as bought) against the FIXED jaw; the unmarked bar edge (TOP to be) to the LEFT, SEAT to the right, centred along the jaws. Tap it down onto both stacks while closing the vise."
 datum = "Program DT02_east. G54: X0 the unmarked bar edge (left), Y0 the fixed jaw's face (N), Z0 E skimmed (its high point less {{process.east_skim_mm:in.3dot}})."
-diagram = { file = "diagrams/east.svg", alt = "The strip on edge on stacked parallels, gripped on N and S, N at the fixed jaw; the 1/2 in end mill skims the sawn face up, E." }
+diagram = { file = "diagrams/east.svg", alt = "Across the jaws from the right end, 6 px/mm: the strip on edge on the 5/8 + 1/2 in stacks, gripped on N and S, N at the fixed jaw; the 1/2 in end mill skims the sawn face up, E, at Z0, running into the page." }
 envelope = { x_span_mm = ["{{process.bar_width_max_mm}}", "{{process.face_cutter_dia_mm}}", 5.08], y_span_mm = ["{{process.depth_target_mm}}", "{{process.face_cutter_dia_mm}}"], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.east_riser_height_mm}}", "{{process.strip_max_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.east_riser_height_mm}}", "{{process.west_raw_max_mm}}"], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_mm}}"] }
 vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{process.depth_target_mm}}", along_jaws_mm = "{{process.bar_width_max_mm}}", part_height_mm = "{{process.strip_max_mm}}", parallel_height_mm = "{{process.east_riser_height_mm}}", overhang_mm = ["{{process.vise_bar_inset_mm}}", "rest"], jaw_offset = "centred", fixed_jaw_face = "as_bought", moving_jaw_face = "machined", moving_jaw_contact = "flat" }
 beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{process.bar_width_max_mm}}"], clamp_mm = [0, "{{process.bar_width_max_mm}}"], section_mm = { y = "{{process.depth_target_mm}}", z = "{{process.strip_max_mm}}" }, vise_left = "start" }
@@ -650,7 +650,7 @@ indexing = "none"
 machine_ref = "pm-30mv"
 holding = "The 1/2 in parallels of the set, one against each jaw. The strip upright on them, SEAT down, the unmarked bar edge up (it becomes TOP), gripped on N and S: N against the FIXED jaw; the unmarked sawn face W to the LEFT, E to the right, centred along the jaws. Tap it down onto both parallels while closing the vise. The lower {{process.upright_grip_mm:in.3dot}} of it is in the jaws."
 datum = "Program DT03_top. G54: X0 face W (left), Y0 the fixed jaw's face (N), Z0 TOP skimmed (its high point less {{process.top_skim_mm:in.3dot}})."
-diagram = { file = "diagrams/top.svg", alt = "The strip upright on two 1/2 in parallels, SEAT down, gripped on N and S; the 1/2 in end mill skims the end up, TOP, in levels." }
+diagram = { file = "diagrams/top.svg", alt = "Across the jaws from the right end, 4 px/mm: the strip upright on two 1/2 in parallels, SEAT down, gripped on N and S; the 1/2 in end mill on its first level over the end up, TOP, running into the page." }
 envelope = { x_span_mm = ["{{process.west_raw_max_mm}}", "{{process.face_cutter_dia_mm}}", 5.08], y_span_mm = ["{{process.depth_target_mm}}", "{{process.face_cutter_dia_mm}}"], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{process.bar_width_max_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{process.seat_raw_min_mm}}"], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_mm}}"] }
 vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{process.depth_target_mm}}", along_jaws_mm = "{{process.west_raw_max_mm}}", part_height_mm = "{{process.bar_width_max_mm}}", parallel_height_mm = "{{process.parallel_height_mm}}", overhang_mm = ["{{process.vise_upright_inset_mm}}", "rest"], jaw_offset = "centred", fixed_jaw_face = "as_bought", moving_jaw_face = "machined", moving_jaw_contact = "flat" }
 beam = { axis = "z", hold = "cantilever", extent_mm = [0, "{{process.bar_width_max_mm}}"], clamp_mm = [0, "{{process.upright_grip_mm}}"], section_mm = { x = "{{process.west_raw_max_mm}}", y = "{{process.depth_target_mm}}" }, vise_left = "other" }
@@ -686,7 +686,7 @@ indexing = "none"
 machine_ref = "pm-30mv"
 holding = "The same 1/2 in parallels. The strip upright on them, TOP down, SEAT up, gripped on N and S: N against the FIXED jaw; E to the LEFT, centred. Tap it down onto both parallels while closing the vise. The lower {{process.upright_grip_mm:in.3dot}} of it is in the jaws."
 datum = "Programs DT04_seat and DT05_foot_tap. G54: X0 face E (left), Y0 the fixed jaw's face (N), Z0 the parallels' top (TOP), set from the miked height. The foot hole at X {{cad.foot_tap_station_in:.3f}}, Y −{{cad.foot_tap_depth_station_in:.3f}} in."
-diagram = { file = "diagrams/seat.svg", alt = "The strip upright on two 1/2 in parallels, TOP down, gripped on N and S; the 1/2 in end mill faces SEAT down to the height in levels; the centre drill spots and the #43 drills the foot hole down from SEAT." }
+diagram = { file = "diagrams/seat.svg", alt = "Across the jaws from the right end, 4 px/mm: the strip upright on two 1/2 in parallels, TOP down, gripped on N and S; the 1/2 in end mill on its first level facing SEAT down to the height, running into the page." }
 envelope = { x_span_mm = ["{{process.west_raw_max_mm}}", "{{process.face_cutter_dia_mm}}", 5.08], y_span_mm = ["{{process.depth_target_mm}}", "{{process.face_cutter_dia_mm}}"], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{process.seat_raw_max_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{process.foot_tip_height_mm}}"], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.tap_stack_max_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_mm}}"] }
 vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{process.depth_target_mm}}", along_jaws_mm = "{{process.west_raw_max_mm}}", part_height_mm = "{{process.seat_raw_max_mm}}", parallel_height_mm = "{{process.parallel_height_mm}}", overhang_mm = ["{{process.vise_upright_inset_mm}}", "rest"], jaw_offset = "centred", fixed_jaw_face = "as_bought", moving_jaw_face = "machined", moving_jaw_contact = "flat" }
 beam = { axis = "z", hold = "cantilever", extent_mm = [0, "{{process.seat_raw_max_mm}}"], clamp_mm = [0, "{{process.upright_grip_mm}}"], section_mm = { x = "{{process.west_raw_max_mm}}", y = "{{process.depth_target_mm}}" }, vise_left = "other" }
@@ -730,7 +730,7 @@ speed_kind = "spindle"
 tool = "spot"
 drilling = "none"
 sizing = "other"
-instruction = "Cycle Start, hands clear: same file, M6 T2 (#2 centre drill; set 1800): spot the foot hole Ø{{process.spot_dia_mm:in.3dot}}, under the #43."
+instruction = "Cycle Start: same file, M6 T2 (#2 centre drill; set 1800): spot the foot hole Ø{{process.spot_dia_mm:in.3dot}}, under the #43."
 rpm = 1800
 feed = "{{process.spot_feed_per_min_mm:in.1f}} in/min"
 milling_cuts = [
@@ -743,6 +743,7 @@ tool = "drill-43"
 drilling = "twist_drill"
 sizing = { kind = "tap_drill", tap = "tap-4-40" }
 instruction = "Same file, M6 T3 (#43 drill; set 2800): drill the foot hole {{cad.foot_tap_drill_depth_in:.3dot}} deep (full diameter) below SEAT, pecks of {{process.peck_43_mm:in.3dot}} with full retract. Cutting oil."
+diagram = { file = "diagrams/seat-drill.svg", alt = "As Setup 5's picture: the #43 in the foot hole, {{cad.foot_tap_drill_depth_in:.3dot}} deep (full diameter) below SEAT, centred N–S." }
 rpm = 2800
 feed = "{{process.drill_43_feed_per_min_mm:in.1f}} in/min"
 hole_depth_mm = "{{process.depth_target_mm}}"
@@ -772,7 +773,7 @@ tool = "tap-guide"
 drilling = "none"
 sizing = "other"
 instruction = "Run DT05_foot_tap: M6 T7, the tap guide in the 1/2 in collet, pointed end out, spindle off; the file ends Idle at the machine top over the foot hole."
-diagram = { file = "diagrams/foot-tap.svg", alt = "The block upright, SEAT up; the 4-40 tap in the T-handle wrench in the foot hole, the tap guide in the spindle, its spring point in the wrench's centre hole; the plug tap's point to stop {{process.foot_plug_reach_mm:in.3dot}} below SEAT, the bottoming tap's {{process.foot_bottoming_reach_mm:in.3dot}}." }
+diagram = { file = "diagrams/foot-tap.svg", alt = "Across the jaws from the right end, 4 px/mm: the block upright, SEAT up; the 4-40 tap in the foot hole, the T-handle wrench on it and the tap guide in the spindle, its spring point in the wrench's centre hole, all in the cutter colour; the plug tap's point to stop {{process.foot_plug_reach_mm:in.3dot}} below SEAT, the bottoming tap's {{process.foot_bottoming_reach_mm:in.3dot}}." }
 
 [[setups.operations]]
 instruction = "Plug tap's depth reference: the DRO's work Z, in inches, with the plug tap's point standing on SEAT beside the hole and the guide's point pushed fully home in the wrench."
@@ -826,7 +827,7 @@ indexing = "none"
 machine_ref = "pm-30mv"
 holding = "The 1 in and 1/2 in parallels stacked against each jaw (1.5 in), each stack hard against its jaw. The block on edge on them, E down, W up, gripped on N and S: N against the FIXED jaw; SEAT to the LEFT, centred along the jaws. Tap it down onto both stacks while closing the vise. The parallels are {{process.parallel_thickness_mm:in.3dot}} thick: the pinch hole exits E in the gap between the two stacks, {{process.pinch_stack_clear_min_mm:in.3dot}} or more clear of each."
 datum = "Program DT06_west. G54: X0 SEAT (left), Y0 the fixed jaw's face (N), Z0 the stacks' top (E), set from the miked width. The pinch hole at X {{cad.pinch_tap_height_in:.3f}}, Y −{{cad.pinch_tap_depth_center_in:.3f}} in."
-diagram = { file = "diagrams/west.svg", alt = "The block on edge on stacked parallels, E down, gripped on N and S; the 1/2 in end mill faces W down to the width; the #43 drills the pinch hole through both halves and the #30 opens the W half to the slot." }
+diagram = { file = "diagrams/west.svg", alt = "Across the jaws from the right end, 5 px/mm: the block on edge on the 1 in + 1/2 in stacks, E down, gripped on N and S; the 1/2 in end mill on its first level facing W down to the width, running into the page." }
 envelope = { x_span_mm = ["{{process.length_target_mm}}", "{{process.face_cutter_dia_mm}}", 5.08], y_span_mm = ["{{process.depth_target_mm}}", "{{process.face_cutter_dia_mm}}"], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{process.west_raw_max_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{process.pinch_tip_height_mm}}"], longest_tool_mm = ["{{process.drill_chuck_gauge_mm}}", "{{process.drill_30_oal_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_mm}}"] }
 vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{process.depth_target_mm}}", along_jaws_mm = "{{process.length_target_mm}}", part_height_mm = "{{process.west_raw_max_mm}}", parallel_height_mm = "{{process.riser_height_mm}}", overhang_mm = ["{{process.vise_length_inset_mm}}", "rest"], jaw_offset = "centred", fixed_jaw_face = "as_bought", moving_jaw_face = "machined", moving_jaw_contact = "flat" }
 beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{process.length_target_mm}}"], clamp_mm = [0, "{{process.length_target_mm}}"], section_mm = { y = "{{process.depth_target_mm}}", z = "{{process.width_target_mm}}" }, vise_left = "start" }
@@ -868,7 +869,7 @@ speed_kind = "spindle"
 tool = "spot"
 drilling = "none"
 sizing = "other"
-instruction = "Cycle Start, hands clear: same file, M6 T2 (centre drill; set 1800): spot the pinch hole Ø{{process.spot_dia_mm:in.3dot}}."
+instruction = "Cycle Start: same file, M6 T2 (centre drill; set 1800): spot the pinch hole Ø{{process.spot_dia_mm:in.3dot}}."
 rpm = 1800
 feed = "{{process.spot_feed_per_min_mm:in.1f}} in/min"
 milling_cuts = [
@@ -881,6 +882,7 @@ tool = "drill-43"
 drilling = "twist_drill"
 sizing = { kind = "tap_drill", tap = "tap-4-40" }
 instruction = "Same file, M6 T3 (#43 drill; set 2800): drill the pinch hole through both halves, pecks of {{process.peck_43_mm:in.3dot}} with full retract, its full diameter {{process.drill_past_mm:in.3dot}} past E, between the stacks. Cutting oil."
+diagram = { file = "diagrams/west-drill-43.svg", alt = "As Setup 6's picture: the #43 through both halves, its full diameter 1.0 mm past E, in the gap between the stacks." }
 rpm = 2800
 feed = "{{process.drill_43_feed_per_min_mm:in.1f}} in/min"
 hole_depth_mm = "{{process.width_target_mm}}"
@@ -898,6 +900,7 @@ drilling = "twist_drill"
 # a twist drill cuts at or over its size.
 sizing = "other"
 instruction = "Same file, M6 T4 (#30 drill; set 1800): open the pinch hole in the W half {{process.clearance_depth_mm:in.3dot}} deep (full diameter) from W, to the slot, pecks of {{process.peck_mm:in.3dot}} with full retract. Cutting oil."
+diagram = { file = "diagrams/west-drill-30.svg", alt = "As Setup 6's picture: the #30 in the W half, {{process.clearance_depth_mm:in.3dot}} deep (full diameter) from W, to the slot's place." }
 rpm = 1800
 feed = "{{process.drill_30_feed_per_min_mm:in.1f}} in/min"
 hole_depth_mm = "{{process.clearance_depth_mm}}"
@@ -930,7 +933,7 @@ indexing = "none"
 machine_ref = "pm-30mv"
 holding = "The same stacks. The block turned end over end: W down, E up, N still against the FIXED jaw; SEAT now to the RIGHT, centred. Tap it down onto both stacks while closing the vise."
 datum = "Program DT07_pinch_tap. G54: X0 SEAT (right, the block to −X), Y0 the fixed jaw's face (N). No Z0: the tap file moves Z only to the machine top (G53); the depth is the DRO Z you note by hand. The pinch hole at X −{{cad.pinch_tap_height_in:.3f}}, Y −{{cad.pinch_tap_depth_center_in:.3f}} in: where Setup 6 drilled it from SEAT."
-diagram = { file = "diagrams/pinch-tap.svg", alt = "The block on edge, W down, E up; the 4-40 tap in the T-handle wrench in the pinch hole from E, the tap guide in the spindle; the tap's point to stop {{process.pinch_tap_reach_mm:in.3dot}} below E, inside W's #30." }
+diagram = { file = "diagrams/pinch-tap.svg", alt = "Across the jaws from the right end, 5 px/mm: the block on edge, W down, E up; the 4-40 tap in the pinch hole from E, the T-handle wrench and the tap guide in the cutter colour; the tap's point to stop {{process.pinch_tap_reach_mm:in.3dot}} below E, inside W's #30." }
 envelope = { x_span_mm = ["{{process.length_target_mm}}", "{{process.face_cutter_dia_mm}}"], y_span_mm = ["{{process.depth_target_mm}}", "{{process.face_cutter_dia_mm}}"], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{process.width_target_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{process.width_target_mm}}"], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.tap_stack_max_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.tap_stack_max_mm}}"] }
 vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{process.depth_target_mm}}", along_jaws_mm = "{{process.length_target_mm}}", part_height_mm = "{{process.width_target_mm}}", parallel_height_mm = "{{process.riser_height_mm}}", overhang_mm = ["{{process.vise_length_inset_mm}}", "rest"], jaw_offset = "centred", fixed_jaw_face = "as_bought", moving_jaw_face = "machined", moving_jaw_contact = "flat" }
 beam = "other"
@@ -982,7 +985,7 @@ indexing = "none"
 machine_ref = "pm-30mv"
 holding = "The same stacks, each hard against its jaw. The block lying N up, S down on them, gripped on E and W: E against the FIXED jaw; SEAT to the LEFT, centred. Tap it down onto both stacks while closing the vise. The adjuster, drilled and tapped through, exits S in the gap between the two {{process.parallel_thickness_mm:in.3dot}} thick stacks, {{process.adjuster_stack_clear_min_mm:in.3dot}} or more clear of each."
 datum = "Programs DT08_adjuster and DT09_adjuster_tap. G54: X0 SEAT (left) shifted by H − 1.500 (below), Y0 the fixed jaw's face (E), Z0 .4400 below N (touched off on N: the countersink is cut from N whatever the block's depth). The adjuster at X 1.500 (that is, H from SEAT), Y −{{cad.adjuster_lateral_in:.3f}} in."
-diagram = { file = "diagrams/adjuster.svg", alt = "The block lying N up on stacked parallels, gripped on E and W; the centre drill spots, the #3 drills the adjuster through and the chamfer mill circles its countersink at N; then the 1/4-28 tap is turned by hand under the tap guide." }
+diagram = { file = "diagrams/adjuster.svg", alt = "Across the jaws from the right end, 5 px/mm: the block lying N up on the 1 in + 1/2 in stacks, gripped on E and W, E at the fixed jaw; the #3 through the adjuster, its full diameter 1.0 mm past S, between the stacks." }
 envelope = { x_span_mm = ["{{process.length_target_mm}}", "{{process.face_cutter_dia_mm}}"], y_span_mm = ["{{process.width_target_mm}}", "{{process.face_cutter_dia_mm}}"], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{process.depth_target_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{process.adjuster_tip_height_mm}}"], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.tap_stack_max_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.chamfer_projection_min_mm}}"] }
 vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{process.width_target_mm}}", along_jaws_mm = "{{process.length_target_mm}}", part_height_mm = "{{process.depth_target_mm}}", parallel_height_mm = "{{process.riser_height_mm}}", overhang_mm = ["{{process.vise_length_inset_mm}}", "rest"], jaw_offset = "centred", fixed_jaw_face = "machined", moving_jaw_face = "machined", moving_jaw_contact = "flat" }
 beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{process.length_target_mm}}"], clamp_mm = [0, "{{process.length_target_mm}}"], section_mm = { y = "{{process.width_target_mm}}", z = "{{process.depth_target_mm}}" }, vise_left = "start" }
@@ -1044,6 +1047,7 @@ tool = "chamfer"
 drilling = "none"
 sizing = "other"
 instruction = "Same file, M6 T6 (1/4 in 90° chamfer mill, at least .50 out of its collet; set 1400): its point fed {{process.csk_tip_depth_mm:in.3dot}} down the hole's axis, then once round a circle of radius {{process.csk_orbit_mm:in.4dot}} (climb): countersink Ø{{cad.adjuster_csk_dia_in:.3dot}} × 90° at N."
+diagram = { file = "diagrams/adjuster-csk.svg", alt = "As Setup 8's picture: the 1/4 in 90° chamfer mill in the adjuster's mouth at N, its point {{process.csk_tip_depth_mm:in.3dot}} down, on its one circle: the countersink Ø{{cad.adjuster_csk_dia_in:.3dot}} × 90°." }
 rpm = 1400
 feed = "{{process.chamfer_feed_per_min_mm:in.1f}} in/min"
 inspection = "Countersink Ø{{cad.adjuster_csk_dia_min_in:.3dot}}–{{cad.adjuster_csk_dia_max_in:.3dot}} at N: the calipers' inside jaws across its rim, two places 90° apart. Under: send $#, G10 L2 P1 Z(the G54 Z − 0.050) and run DT08_adjuster again whole (the spot and the drill cut only air); over: stop and tell the owner."
@@ -1069,7 +1073,7 @@ tool = "tap-guide"
 drilling = "none"
 sizing = "other"
 instruction = "Run DT09_adjuster_tap: M6 T7, the tap guide in the 1/2 in collet, spindle off; the file ends Idle at the machine top over the adjuster."
-diagram = { file = "diagrams/adjuster-tap.svg", alt = "The block lying N up; the 1/4-28 tap in the T-handle wrench in the adjuster, the tap guide in the spindle, its spring point in the wrench's centre hole; the tap's point to stop {{process.adjuster_tap_reach_mm:in.3dot}} below N, through S between the stacks." }
+diagram = { file = "diagrams/adjuster-tap.svg", alt = "Across the jaws from the right end, 5 px/mm: the block lying N up; the 1/4-28 tap in the adjuster, the T-handle wrench and the tap guide in the cutter colour, its spring point in the wrench's centre hole; the tap's point to stop {{process.adjuster_tap_reach_mm:in.3dot}} below N, through S between the stacks." }
 
 [[setups.operations]]
 instruction = "Tap depth reference: the DRO's work Z, in inches, with the 1/4-28 tap's point standing on N beside the hole and the guide's point pushed fully home in the wrench."
@@ -1106,7 +1110,7 @@ indexing = "none"
 machine_ref = "pm-30mv"
 holding = "The same stacks. The block turned end over end: lying S up, N down on them, gripped on E and W: E still against the FIXED jaw; SEAT now to the RIGHT, centred. Tap it down onto both stacks while closing the vise."
 datum = "Program DT10_south_csk. G54: X0 SEAT (right, the block to −X) shifted by H − 1.500, Y0 the fixed jaw's face (E), Z0 .4400 below S (touched off on S: the countersink is cut from S whatever the block's depth). The adjuster at X −1.500 (that is, H from SEAT), Y −{{cad.adjuster_lateral_in:.3f}} in."
-diagram = { file = "diagrams/south.svg", alt = "The block lying S up on stacked parallels, gripped on E and W, SEAT to the right; the chamfer mill circles the adjuster's countersink at S." }
+diagram = { file = "diagrams/south.svg", alt = "Across the jaws from the right end (SEAT), 5 px/mm: the block lying S up on the stacks, gripped on E and W; the chamfer mill in the adjuster's mouth at S, its point {{process.csk_tip_depth_mm:in.3dot}} down, on its one circle; N's countersink below." }
 envelope = { x_span_mm = ["{{process.length_target_mm}}", "{{process.face_cutter_dia_mm}}"], y_span_mm = ["{{process.width_target_mm}}", "{{process.face_cutter_dia_mm}}"], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{process.depth_target_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{process.csk_tip_height_mm}}"], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.chamfer_projection_min_mm}}"] }
 vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{process.width_target_mm}}", along_jaws_mm = "{{process.length_target_mm}}", part_height_mm = "{{process.depth_target_mm}}", parallel_height_mm = "{{process.riser_height_mm}}", overhang_mm = ["{{process.vise_length_inset_mm}}", "rest"], jaw_offset = "centred", fixed_jaw_face = "machined", moving_jaw_face = "machined", moving_jaw_contact = "flat" }
 beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{process.length_target_mm}}"], clamp_mm = [0, "{{process.length_target_mm}}"], section_mm = { y = "{{process.width_target_mm}}", z = "{{process.depth_target_mm}}" }, vise_left = "start" }
@@ -1147,7 +1151,7 @@ indexing = "none"
 machine_ref = "pm-30mv"
 holding = "The 1 in and 1/2 in parallels stacked against each jaw, their right ends at or left of the right jaw side. The block on edge on them, E down, W up, gripped on N and S: N against the FIXED jaw; TOP to the RIGHT, standing {{process.slit_overhang_mm:in.2dot}} in past the right jaw side. The spacer strip (Setup 2) standing on end on the vise bed at the jaws' left end (its 2-1/4 length upright, a .44 × .80 end down), the stacks ending to its right: the bare jaws grip it on its two wide faces (the bar's faces: Setup 2 left it no thicker than the block and at most {{process.spacer_under_max_mm:in.3dot}} thinner), its .80 width along the jaws. If Setup 2 wrote a larger difference on it, feeler leaves between it and the moving jaw bring it to within {{process.spacer_under_max_mm:in.3dot}} under the block, never over. Tap the block down onto both stacks while closing the vise. The saw works right of TOP: the arbor's body above the saw and its cap and screw below pass beside the TOP end, right of the jaws."
 datum = "Program DT11_slit. G54: X0 TOP (right, the block to −X), Y0 the fixed jaw's face (N), Z0 the stacks' top (E), set from the miked width with the saw's lower face touched off on W. The file's Z is the saw's lower face; it loads no tool."
-diagram = { file = "diagrams/slit.svg", alt = "The block on edge on stacked parallels, E down, gripped on N and S, TOP .75 in past the right jaw side; the slitting saw, horizontal on the stepped arbor, saws the slit in from TOP across the block's depth, the arbor's body above the saw and its cap and screw below it, both past the end." }
+diagram = { file = "diagrams/slit.svg", alt = "From the front, 2.6 px/mm: the block on edge on the stacks, E down, TOP {{process.slit_overhang_mm:in.2dot}} in past the jaws' right side, the spacer strip on end at the jaws' left end; the slitting saw, horizontal on the stepped arbor, on its first pass {{process.slit_first_pass_mm:in.3dot}} into TOP, fed into the page across the block's depth; the arbor's body above the saw and its cap and screw below it, past TOP." }
 envelope = { x_span_mm = ["{{process.saw_dia_mm}}", "{{process.slit_depth_mm}}", 5.08], y_span_mm = ["{{process.saw_dia_mm}}", "{{process.depth_target_mm}}", 5.08], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{process.width_target_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{process.saw_cut_z_mm}}"], longest_tool_mm = "{{process.saw_arbor_length_mm}}", shortest_tool_mm = "{{process.saw_arbor_length_mm}}" }
 vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{process.depth_target_mm}}", along_jaws_mm = "{{process.length_target_mm}}", part_height_mm = "{{process.width_target_mm}}", parallel_height_mm = "{{process.riser_height_mm}}", overhang_mm = ["{{process.vise_slit_inset_mm}}", "rest"], jaw_offset = "balanced", balance = "spacer", fixed_jaw_face = "as_bought", moving_jaw_face = "machined", moving_jaw_contact = "flat" }
 beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{process.length_target_mm}}"], clamp_mm = [0, 33.528], section_mm = { y = "{{process.depth_target_mm}}", z = "{{process.width_target_mm}}" }, vise_left = "start" }
