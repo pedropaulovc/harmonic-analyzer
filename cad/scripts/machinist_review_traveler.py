@@ -39,7 +39,7 @@ STANDING_HEADING = (
 # 2026-11-25): an unconverted plan's review neither reads the standing page nor
 # applies rule T18's standing-page items. When
 # cad/config/machinist-review/standing-unconverted.yaml empties, delete it,
-# STANDING_NOT_APPLIED and its branch in machinist_review._review_prompt.
+# STANDING_NOT_APPLIED and its branch in standing_block.
 STANDING_TOML = PROCESS_ROOT / "shop" / "standing.toml"
 STANDING_NOT_APPLIED = (
     "SHOP STANDING INSTRUCTIONS: NOT APPLIED (this plan is not yet converted to "
@@ -180,8 +180,8 @@ def standing_missing(path: Path) -> str:
     return (
         f"shop standing instructions page missing: {path}; a traveler review "
         "reads it as common sense the traveler must not repeat. Render it with "
-        "cad/scripts/prechips_traveler.py (the shop standing render, "
-        "`prechips standing cad/process/shop`), or pass --standing-html."
+        "cad/scripts/prechips_traveler.py --standing "
+        "(`prechips standing cad/process/shop`)."
     )
 
 
@@ -243,6 +243,31 @@ def pdf_text(paths: Sequence[Path]) -> str:
 
 
 def document_roles(
+    sources: Sequence[Path], companion_count: int, sheet_count: int
+) -> str:
+    """The traveler review's own prompt block, for the reviewers and the judge
+    alike: which sheets are the traveler and which the companion part drawing,
+    then the shop standing page (``standing_block``). Everything a traveler
+    review adds lives here, so ``machinist_review.py`` (a key input of every
+    drawing review) stays as it is."""
+    return _companion_roles(sources, companion_count, sheet_count) + standing_block(
+        sources[: len(sources) - companion_count]
+    )
+
+
+def standing_block(traveler_sources: Sequence[Path], standing: Path | None = None) -> str:
+    """A converted plan's traveler (its printed text carries the standing
+    pointer) gets the standing page's text, refused when the page is missing;
+    an unconverted one gets STANDING_NOT_APPLIED."""
+    if not standing_converted(pdf_text(traveler_sources)):
+        return f"\n{STANDING_NOT_APPLIED}\n"
+    standing = STANDING_HTML if standing is None else standing
+    if not standing.is_file():
+        raise FileNotFoundError(standing_missing(standing))
+    return standing_section(standing.read_text(encoding="utf-8"))
+
+
+def _companion_roles(
     sources: Sequence[Path], companion_count: int, sheet_count: int
 ) -> str:
     """Which sheets are the traveler and which the companion part drawing:

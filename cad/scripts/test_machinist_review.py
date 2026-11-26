@@ -2820,18 +2820,24 @@ def _standing_page(path: Path, rule: str = "Feed Hold before reaching in.") -> P
     return path
 
 
-def _traveler_page(path: Path, *, converted: bool) -> Path:
-    """A traveler HTML whose head prints the pointer (wrapped as the source
-    may wrap it) when ``converted``."""
+def _traveler_pdf(path: Path, *, converted: bool) -> Path:
+    """A traveler PDF whose head prints the pointer, wrapped over two lines as
+    a sheet wraps it, when ``converted``."""
     head = (
-        "<p>Shop standing instructions\n   apply. Read them before\nthe first setup.</p>"
-        if converted else "<p>Units are inches.</p>"
+        [(40, 700, "Shop standing instructions apply. Read them"), (40, 688, "before the first setup.")]
+        if converted else [(40, 700, "Units are inches.")]
     )
-    path.write_text(
-        f"<html><body><h1>Probe part</h1>{head}<div>Setup 1</div></body></html>",
-        encoding="utf-8",
-    )
-    return path
+    return _text_pdf(path, [*head, (40, 660, "Setup 1")])
+
+
+@pytest.fixture
+def standing_page(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    """The shop standing page where a traveler review reads it."""
+    import machinist_review_traveler
+
+    page = _standing_page(tmp_path / "standing.html")
+    monkeypatch.setattr(machinist_review_traveler, "STANDING_HTML", page)
+    return page
 
 
 def test_shop_standing_pointer_is_read_from_the_shop() -> None:
@@ -2845,17 +2851,17 @@ def test_shop_standing_pointer_is_read_from_the_shop() -> None:
     ligatured = pointer.replace("fi", "\ufb01").replace("ff", "\ufb00")
     assert ligatured != pointer
     assert machinist_review_traveler.standing_converted(f"Head\n{ligatured}\nSetup 1")
+    assert machinist_review_traveler.STANDING_HTML == (
+        mr.CAD_ROOT / "out" / "travelers" / "shop-standing-instructions"
+        / "shop-standing-instructions.html"
+    )
 
 
 def test_converted_traveler_prompts_carry_the_standing_page(
-    tmp_path: Path, standing_pointer: str,
+    tmp_path: Path, standing_pointer: str, standing_page: Path,
 ) -> None:
-    standing = _standing_page(tmp_path / "standing.html")
-    source = _png_source(tmp_path / "sheet.png")
     traveler = mr.ReviewPackage(
-        "probe_part", "traveler", (source,),
-        traveler_html=_traveler_page(tmp_path / "t.html", converted=True),
-        standing_html=standing,
+        "probe_part", "traveler", (_traveler_pdf(tmp_path / "t.pdf", converted=True),),
     )
     for prefix in (mr.load_prompt("traveler"), mr.load_prompt("traveler", judge=True)):
         prompt = mr._review_prompt(traveler, 1, prompt_text=prefix)
@@ -2870,134 +2876,66 @@ def test_converted_traveler_prompts_carry_the_standing_page(
 
 
 def test_unconverted_traveler_prompts_skip_the_standing_page(
-    tmp_path: Path, standing_pointer: str,
+    tmp_path: Path, standing_pointer: str, standing_page: Path,
 ) -> None:
-    source = _png_source(tmp_path / "sheet.png")
     traveler = mr.ReviewPackage(
-        "probe_part", "traveler", (source,),
-        traveler_html=_traveler_page(tmp_path / "t.html", converted=False),
-        standing_html=_standing_page(tmp_path / "standing.html"),
+        "probe_part", "traveler", (_traveler_pdf(tmp_path / "t.pdf", converted=False),),
     )
     for prefix in (mr.load_prompt("traveler"), mr.load_prompt("traveler", judge=True)):
         prompt = mr._review_prompt(traveler, 1, prompt_text=prefix)
         assert _STANDING_NOT_APPLIED in prompt
         assert _STANDING_HEADING not in prompt
         assert "Feed Hold before reaching in." not in prompt
-    assert _STANDING_NOT_APPLIED not in mr._review_prompt(
+    source = _png_source(tmp_path / "sheet.png")
+    assert "SHOP STANDING" not in mr._review_prompt(
         mr.ReviewPackage("probe_part", "part", (source,)), 1
     )
 
 
-def test_conversion_reads_the_traveler_pdf_without_html(
-    tmp_path: Path, standing_pointer: str,
+def test_conversion_reads_the_traveler_pdf_not_the_companion(
+    tmp_path: Path, standing_pointer: str, standing_page: Path,
 ) -> None:
-    """Without --traveler-html the traveler's own PDF text decides; the
-    companion drawing's text never does."""
-    converted = _text_pdf(tmp_path / "converted.pdf", [
-        (40, 700, "Shop standing instructions apply. Read them"),
-        (40, 688, "before the first setup."),
-    ])
-    plain = _text_pdf(tmp_path / "plain.pdf", [(40, 700, "Setup 1")])
-    assert mr._standing_applies(mr.ReviewPackage("p", "traveler", (converted,)))
-    assert not mr._standing_applies(mr.ReviewPackage("p", "traveler", (plain,)))
-    assert not mr._standing_applies(
-        mr.ReviewPackage("p", "traveler", (plain, converted), companion_count=1)
-    )
+    """The traveler's own PDF text decides; the companion drawing's never does."""
+    import machinist_review_traveler
+
+    converted = _traveler_pdf(tmp_path / "converted.pdf", converted=True)
+    plain = _traveler_pdf(tmp_path / "plain.pdf", converted=False)
+    assert _STANDING_HEADING in machinist_review_traveler.document_roles((converted,), 0, 1)
+    assert machinist_review_traveler.document_roles((plain,), 0, 1) == _STANDING_NOT_APPLIED
+    roles = machinist_review_traveler.document_roles((plain, converted), 1, 2)
+    assert roles.startswith("\nDOCUMENT ROLES\n")
+    assert roles.endswith(_STANDING_NOT_APPLIED)
 
 
 def test_standing_page_without_text_is_refused(
-    tmp_path: Path, standing_pointer: str,
+    tmp_path: Path, standing_pointer: str, standing_page: Path,
 ) -> None:
-    standing = tmp_path / "standing.html"
-    standing.write_text("<html><body><svg>x</svg></body></html>", encoding="utf-8")
+    standing_page.write_text("<html><body><svg>x</svg></body></html>", encoding="utf-8")
     package = mr.ReviewPackage(
-        "probe_part", "traveler", (_png_source(tmp_path / "sheet.png"),),
-        traveler_html=_traveler_page(tmp_path / "t.html", converted=True),
-        standing_html=standing,
+        "probe_part", "traveler", (_traveler_pdf(tmp_path / "t.pdf", converted=True),),
     )
     with pytest.raises(ValueError, match="standing instructions page has no text"):
         mr._review_prompt(package, 1)
 
 
-def test_standing_html_defaults_for_traveler_and_is_traveler_only(tmp_path: Path) -> None:
-    import machinist_review_traveler
-
-    pdf = tmp_path / "t.pdf"
-    args = mr._parse_args(["--pdf", str(pdf), "--name", "probe", "--kind", "traveler"])
-    assert args.standing_html == machinist_review_traveler.STANDING_HTML
-    assert machinist_review_traveler.STANDING_HTML == (
-        mr.CAD_ROOT / "out" / "travelers" / "shop-standing-instructions"
-        / "shop-standing-instructions.html"
-    )
-    explicit = tmp_path / "standing.html"
-    args = mr._parse_args([
-        "--pdf", str(pdf), "--name", "probe", "--kind", "traveler",
-        "--standing-html", str(explicit),
-    ])
-    assert args.standing_html == explicit
-    assert mr._parse_args(["--pdf", str(pdf), "--name", "probe"]).standing_html is None
-    for argv in (
-        ["--pdf", str(pdf), "--name", "probe", "--standing-html", str(explicit)],
-        ["--pdf", str(pdf), "--name", "probe", "--kind", "traveler",
-         "--standing-html", str(tmp_path / "standing.pdf")],
-    ):
-        with pytest.raises(SystemExit):
-            mr._parse_args(argv)
-
-
-def test_missing_standing_page_fails_a_converted_traveler_review_fast(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str],
-    standing_pointer: str,
-) -> None:
-    def forbidden(*_args: Any, **_kwargs: Any) -> None:
-        pytest.fail("a converted traveler review ran without its standing page")
-
-    monkeypatch.setattr(mr, "aggregate_package", forbidden)
-    monkeypatch.setattr(mr, "_run_reviewer", forbidden)
-    pdf = _text_pdf(tmp_path / "t.pdf", [(40, 700, "Setup 1")])
-    html = _traveler_page(tmp_path / "t.html", converted=True)
-    missing = tmp_path / "absent" / "shop-standing-instructions.html"
-    code = mr.main([
-        "--pdf", str(pdf), "--traveler-html", str(html), "--name", "probe",
-        "--kind", "traveler", "--standing-html", str(missing),
-        "--report-dir", str(tmp_path / "reports"),
-    ])
-    assert code == 2
-    err = capsys.readouterr().err
-    assert str(missing.resolve()) in err
-    assert "cad/scripts/prechips_traveler.py" in err
-    # The programmatic path refuses a converted package with no or a missing page.
-    source = _png_source(tmp_path / "sheet.png")
-    for standing in (None, missing):
-        with pytest.raises(FileNotFoundError, match="standing instructions page missing"):
-            mr._review_session(
-                mr.ReviewPackage(
-                    "probe", "traveler", (source,), traveler_html=html,
-                    standing_html=standing,
-                ),
-                reviewer="codex", report_dir=tmp_path / "reports", codex="codex-test",
-            )
-
-
-def test_missing_standing_page_does_not_stop_an_unconverted_review(
+def test_missing_standing_page_refuses_only_a_converted_traveler(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, standing_pointer: str,
 ) -> None:
-    received: list[mr.ReviewPackage] = []
+    import machinist_review_traveler
 
-    def aggregate(package: mr.ReviewPackage, **_kwargs: Any) -> dict[str, Any]:
-        received.append(package)
-        raise RuntimeError("stop after the package is built")
-
-    monkeypatch.setattr(mr, "aggregate_package", aggregate)
-    monkeypatch.setattr(mr, "write_index", lambda report_dir: report_dir / "index.md")
-    pdf = _text_pdf(tmp_path / "t.pdf", [(40, 700, "Setup 1")])
-    mr.main([
-        "--pdf", str(pdf), "--name", "probe", "--kind", "traveler",
-        "--standing-html", str(tmp_path / "absent.html"),
-        "--report-dir", str(tmp_path / "reports"),
-    ])
-    (package,) = received
-    assert package.standing_html is None
+    missing = tmp_path / "absent" / "shop-standing-instructions.html"
+    monkeypatch.setattr(machinist_review_traveler, "STANDING_HTML", missing)
+    converted = mr.ReviewPackage(
+        "probe", "traveler", (_traveler_pdf(tmp_path / "c.pdf", converted=True),),
+    )
+    with pytest.raises(FileNotFoundError, match="standing instructions page missing") as info:
+        mr._review_prompt(converted, 1)
+    assert str(missing) in str(info.value)
+    assert "cad/scripts/prechips_traveler.py --standing" in str(info.value)
+    plain = mr.ReviewPackage(
+        "probe", "traveler", (_traveler_pdf(tmp_path / "p.pdf", converted=False),),
+    )
+    assert _STANDING_NOT_APPLIED in mr._review_prompt(plain, 1)
 
 
 def _stubbed_reviews(monkeypatch: pytest.MonkeyPatch) -> list[tuple[bool, str]]:
@@ -3018,18 +2956,17 @@ def _stubbed_reviews(monkeypatch: pytest.MonkeyPatch) -> list[tuple[bool, str]]:
 
 def test_standing_page_reaches_reviewer_and_judge_and_keys_the_review(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, standing_pointer: str,
+    standing_page: Path,
 ) -> None:
+    """The page's text is in every reviewer and judge prompt, so the recorded
+    prompt sha256 changes with it."""
     prompts = _stubbed_reviews(monkeypatch)
-    source = _png_source(tmp_path / "sheet.png")
-    html = _traveler_page(tmp_path / "t.html", converted=True)
-    standing = _standing_page(tmp_path / "standing.html")
+    source = _traveler_pdf(tmp_path / "t.pdf", converted=True)
 
     def review(directory: str, rule: str) -> dict[str, Any]:
         prompts.clear()
         aggregate = mr.aggregate_package(
-            mr.ReviewPackage(
-                "probe", "traveler", (source,), traveler_html=html, standing_html=standing,
-            ),
+            mr.ReviewPackage("probe", "traveler", (source,)),
             reviewer="codex", judge_reviewer="codex", runs=1, retries=0,
             report_dir=tmp_path / directory, codex="codex-test",
         )
@@ -3041,31 +2978,22 @@ def test_standing_page_reaches_reviewer_and_judge_and_keys_the_review(
         return aggregate
 
     first = review("a", "Feed Hold before reaching in.")
-    sha = mr._sha256(standing)
-    assert first["standing_applied"] is True
-    assert first["standing_html"] == {"path": str(standing), "sha256": sha}
     run = json.loads(Path(first["runs"][0]["report"]).read_text(encoding="utf-8"))
-    assert run["extra"]["standing_applied"] is True
-    assert run["extra"]["standing_html"]["sha256"] == sha
-
-    _standing_page(standing, "Stop and tell the owner.")
+    _standing_page(standing_page, "Stop and tell the owner.")
     second = review("b", "Stop and tell the owner.")
-    assert second["standing_html"]["sha256"] == mr._sha256(standing) != sha
     rerun = json.loads(Path(second["runs"][0]["report"]).read_text(encoding="utf-8"))
     assert rerun["prompt_sha256"] != run["prompt_sha256"]
     assert second["judge"]["prompt_sha256"] != first["judge"]["prompt_sha256"]
 
 
-def test_unconverted_review_sends_and_records_no_standing_page(
+def test_unconverted_review_sends_no_standing_page(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, standing_pointer: str,
+    standing_page: Path,
 ) -> None:
     prompts = _stubbed_reviews(monkeypatch)
     aggregate = mr.aggregate_package(
         mr.ReviewPackage(
-            "probe", "traveler", (_png_source(tmp_path / "sheet.png"),),
-            traveler_html=_traveler_page(tmp_path / "t.html", converted=False),
-            # Given but not read: an unconverted plan's review ignores it.
-            standing_html=_standing_page(tmp_path / "standing.html"),
+            "probe", "traveler", (_traveler_pdf(tmp_path / "t.pdf", converted=False),),
         ),
         reviewer="codex", judge_reviewer="codex", runs=1, retries=0,
         report_dir=tmp_path / "reports", codex="codex-test",
@@ -3076,11 +3004,6 @@ def test_unconverted_review_sends_and_records_no_standing_page(
         assert _STANDING_NOT_APPLIED in prompt
         assert _STANDING_HEADING not in prompt
         assert "Feed Hold before reaching in." not in prompt
-    assert aggregate["standing_applied"] is False
-    assert "standing_html" not in aggregate
-    run = json.loads(Path(aggregate["runs"][0]["report"]).read_text(encoding="utf-8"))
-    assert run["extra"]["standing_applied"] is False
-    assert "standing_html" not in run["extra"]
 
 
 def test_standing_unconverted_list_matches_the_plans() -> None:
