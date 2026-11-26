@@ -19,9 +19,9 @@
   <text class="label" x="260" y="40">3-jaw on the bolt's threads, up to the nut</text>
   <line class="leader" x1="300" y1="46" x2="255" y2="160.95"/>
   <circle class="leader-dot" cx="255" cy="160.95" r="2"/>
-  <text class="label" x="440" y="110">nut toward the chuck, tight; a fender washer each</text>
-  <text class="label" x="440" y="126">side of the disc; the bolt head outboard</text>
-  <line class="leader" x1="438" y1="106" x2="352.77" y2="187.43"/>
+  <text class="label" x="426" y="110">nut toward the chuck, tight; a fender washer each</text>
+  <text class="label" x="426" y="126">side of the disc; the bolt head outboard</text>
+  <line class="leader" x1="424" y1="106" x2="352.77" y2="187.43"/>
   <circle class="leader-dot" cx="352.77" cy="187.43" r="2"/>
   <text class="label" x="440" y="330">AR tool: the outside across its thickness,</text>
   <text class="label" x="440" y="346">light cuts at the sawn flats' interruptions,</text>

@@ -67,11 +67,18 @@ part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
 material = "1018 cold-finished steel, 5/8 in round (drawing: {{cad.material_spec}})"
 stock = "Qty {{process.quantity:g}}. {{process.bar_dia_in:fraction}} in round bar on hand: one blank {{process.blank_length_in:.2f}} in long."
-note = "Inches unless mm; G-code and console entries in mm (the file and the controller run G21). Lathe PM-1127VF-LB (70–380 and 380–2000 rpm); cutting oil on the steel. Stations are read from the faced head end through Setup 6, and from the head's rear face from Setup 7 on. Inside corners R.010 max: finish each shoulder's corner with the sharp-nose tool. Mill speeds on the PM-30MV low belt (100–2800 rpm). Home the mill ($H) once, after switching it on: every M6's trip to the tool setter counts from home. Home again only after a power cycle or a controller restart, an E-stop, an alarm, a limit switch hit, a stall or a crash: homing brings the stored G54 back. Then check every zero of the setup again, each the way its step set it: each must read what its step set, within .001 in. One does not, cannot be reached with the part in, or the part may have moved: take the setup again from its first step, the part out. They all do: run the interrupted file again from its start. Feed Hold, then Reset with the axes stopped keeps position and G54: no homing, no new zero; run the interrupted file again from its start: its first M6 measures the tool, and cuts already made are cut in air. Prove the file in air first."
 shop = "../shop"
 stock_refs = ["1018-round-5-8"]
 material_key = "lathe-1018-cold-finished"
 milling_material = "steel_1018"
+
+standing = true
+
+[[notes]]
+title = "This job"
+rows = [
+  ["Inside corners", "Inside corners R.010 max: finish each shoulder's corner with the sharp-nose tool."],
+]
 
 [cad]
 file = "../../out/features/dt_pinion_arbor/features.toml"
@@ -424,7 +431,7 @@ machine = "PM-30MV CNC (FluidNC, CNCjs with the electronic tool setter) / vise, 
 indexing = "none"
 machine_ref = "pm-30mv"
 holding = "The PM 6 in vise. One 1 in, 4 in long parallel of the 1/8 in thick set standing on edge, centred between the jaws, its left end flush with the jaws' left face (a rule across both). The blank (still 5/8 bar its whole length) on its top edge along the jaws, the marked head end to the LEFT, {{process.cross_jaw_left_mm:in.2f}} in out past the jaws' left face (calipers' depth rod), never under .70 nor over .80; the blank runs on past the jaws' right end. Tap it down onto the parallel while closing the vise. Under the hole nothing but air."
-datum = "Program PA01_cross_hole (cam:dt_pinion_arbor). G54: X0 the faced head end (Setup 2), +X toward the back end; Y0 the bar's axis; Z0 the top of the 5/8 bar. The file starts with an M6 for the centre drill; tool lengths from the tool setter at each M6; at each M6 stop the file has stopped the spindle and lifted the tool above the jaws."
+datum = "Program PA01_cross_hole (cam:dt_pinion_arbor). G54: X0 the faced head end (Setup 2), +X toward the back end; Y0 the bar's axis; Z0 the top of the 5/8 bar. The file starts with an M6 for the centre drill."
 diagram = { file = "diagrams/cross-hole.svg", alt = "PA01 T2, to scale: a section along the bar from the front, the bar on a 1 in parallel on edge, the head end {{process.cross_jaw_left_mm:in.2f}} in past the jaws' left face; the C drill at X{{process.cross_x_mm:.3f}} mm, its point at Z{{process.cross_drill_tip_mm:.3f}}, into air left of the jaws and the parallel. Beside it, the bar end-on from the head end, the fixed jaw on the left." }
 envelope = "other"
 vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{process.bar_dia_mm}}", along_jaws_mm = "{{process.part_length_mm}}", part_height_mm = "{{process.bar_dia_mm}}", parallel_height_mm = "{{process.riser_height_mm}}", overhang_mm = ["{{process.cross_jaw_left_mm}}", "rest"], jaw_offset = "centred", fixed_jaw_face = "as_bought", moving_jaw_face = "as_bought", moving_jaw_contact = "flat" }
@@ -442,12 +449,7 @@ feed = "hand"
 
 [[setups.operations]]
 instruction = "G54 Z0: the top of the bar, touched with the centre drill over the axis."
-instruction_detailed = "Console M6 T1 (#2 centre drill; the tool setter measures it). MDI G0 X9.000 Y0.000: over the bar. Spindle stopped, its point just dragging a .002 feeler leaf on the bar's top: G10 L20 P1 Z0.051."
-feed = "hand"
-
-[[setups.operations]]
-instruction = "Prove PA01_cross_hole in air, Z0 raised 1.000 in. Then Z0 back. The C drill and the reamer stand at least {{process.cross_projection_min_mm:in.2f}} in out of the chuck."
-instruction_detailed = "Send $# and note the G54 line's Z. G10 L2 P1 Z(that Z + 25.400). Run PA01_cross_hole through every M6, watching each move clear the jaws. G10 L2 P1 Z(the noted Z) puts Z0 back, and the centre drill goes back in for the real run."
+instruction_detailed = "Console M6 T1 (#2 centre drill). MDI G0 X9.000 Y0.000: over the bar. Spindle stopped, its point just dragging a .002 feeler leaf on the bar's top: G10 L20 P1 Z0.051."
 feed = "hand"
 
 [[setups.operations]]
@@ -455,7 +457,7 @@ speed_kind = "spindle"
 tool = "spot"
 drilling = "none"
 sizing = "other"
-instruction = "Run PA01_cross_hole (M6 T1, centre drill; set 1800): spot the cross hole Ø{{process.cross_spot_dia_mm:in.3dot}} on the bar's top at X{{process.cross_x_mm:.3f}} mm."
+instruction = "The C drill and the reamer stand at least {{process.cross_projection_min_mm:in.2f}} in out of the chuck. Run PA01_cross_hole (M6 T1, centre drill; set 1800): spot the cross hole Ø{{process.cross_spot_dia_mm:in.3dot}} on the bar's top at X{{process.cross_x_mm:.3f}} mm."
 rpm = 1800
 feed = "{{process.spot_feed_per_min_mm:in.1f}} in/min"
 milling_cuts = [
@@ -531,11 +533,7 @@ feed = "hand"
 
 [[setups.operations]]
 instruction = "G54 Z0: the top of the bar, touched with the centre drill over the axis at X40.000."
-instruction_detailed = "Console M6 T1 (#2 centre drill; the tool setter measures it). MDI G0 X40.000 Y0.000: over the bar. Spindle stopped, its point just dragging a .002 feeler leaf on the bar's top: G10 L20 P1 Z0.051."
-feed = "hand"
-
-[[setups.operations]]
-instruction = "Prove PA02_pin_hole in air, Z0 raised 1.000 in, as in Setup 4. Then Z0 back."
+instruction_detailed = "Console M6 T1 (#2 centre drill). MDI G0 X40.000 Y0.000: over the bar. Spindle stopped, its point just dragging a .002 feeler leaf on the bar's top: G10 L20 P1 Z0.051."
 feed = "hand"
 
 [[setups.operations]]

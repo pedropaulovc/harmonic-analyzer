@@ -17,7 +17,7 @@
   <text class="datum-label" x="341" y="124">Z0 the rear face</text>
   <text class="label" x="20" y="70">face F down on the stacks;</text>
   <text class="label" x="20" y="86">the bore runs out into the gap</text>
-  <line class="leader" x1="150" y1="86" x2="197" y2="208"/>
+  <line class="leader" x1="150" y1="92" x2="197" y2="208"/>
   <circle class="leader-dot" cx="197" cy="208" r="2"/>
   <rect class="clamp" x="540" y="214.9" width="205" height="34"/>
   <rect class="clamp" x="540" y="351.1" width="205" height="34"/>
@@ -32,7 +32,7 @@
   <text class="datum-label" x="540" y="202.9">from above: +X →, +Y ↑</text>
   <text class="label" x="560" y="411.1">bore at X+{{cad.bore_eccentricity_mm:.3f}} mm</text>
   <text class="label" x="560" y="427.1">({{cad.bore_eccentricity_in:.3dot}} in) along the jaws</text>
-  <line class="leader" x1="600" y1="401.1" x2="654" y2="320.31"/>
+  <line class="leader" x1="640" y1="399.1" x2="654" y2="320.31"/>
   <circle class="leader-dot" cx="654" cy="320.31" r="2"/>
   <path class="cutter" d="M310.73 30L310.73 220L280 238.47L249.27 220L249.27 30L256.95 27L264.63 30L272.32 27L280 30L287.68 27L295.37 30L303.05 27Z"/>
   <text class="label" x="340" y="50">C drill through in one feed,</text>

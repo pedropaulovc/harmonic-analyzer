@@ -26,9 +26,18 @@ part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
 material = "18-8 stainless steel, McMaster-Carr 91794A559 (1/4-28 x 3/4 in slotted fillister head screw), as supplied"
 stock = "Lot: {{process.quantity:d}} screw, bought: McMaster-Carr 91794A559, used as supplied but for the added hole."
-note = "Inches unless mm. Lathe PM-1127VF-LB (70–380 and 380–2000 rpm); cutting oil on the stainless. The screw's thread, head and slot are left as bought."
 shop = "../shop"
 material_key = "lathe-18-8"
+
+# The shop's standing page carries what every traveler shares (units, lathe
+# speeds, coolant); This job says what only this screw needs.
+standing = true
+
+[[notes]]
+title = "This job"
+rows = [
+  ["As bought", "The screw's thread, head and slot are left as bought."],
+]
 
 [cad]
 file = "../../out/features/dt_cone_tip_end_screw/features.toml"

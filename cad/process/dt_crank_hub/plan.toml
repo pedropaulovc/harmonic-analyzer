@@ -44,11 +44,21 @@ part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
 material = "1018 cold-finished steel, 1 in round (drawing: {{cad.material_spec}})"
 stock = "Lot: {{process.quantity:d}} hub. Ø{{process.bar_dia_in:.3dot}} bar, on hand; Setup 1 takes about {{process.bar_use_in:.2dot}} in of it: saw a 3 in piece off it for the lathe (1.25 out of the jaws, .50 in them), never the whole bar (it would run out past the spindle's rear end)."
-note = "Inches unless mm; G-code and console entries in mm (the files and the controller run G21). Lathe PM-1127VF-LB (70–380 and 380–2000 rpm); mill PM-30MV low belt (100–2800 rpm). Cutting oil on the steel. Crank arm MHA-DT-06 is finished before Setup 1: Op 20 mikes its thickness and Setup 2 tries its bore on the seat; the seat is turned to both. Home the mill ($H) once, after switching it on: every M6's trip to the tool setter counts from home. Home again only after a power cycle or a controller restart, an E-stop, an alarm, a limit switch hit, a stall or a crash: homing brings the stored G54 back. Then check every zero of the setup again, each the way its step set it: each must read what its step set, within .001 in. One does not, cannot be reached with the part in, or the part may have moved: do what that setup's Datum says for it; where the Datum says nothing, take the setup again from its first step, the part out. They all do: run the interrupted file again from its start. Feed Hold, then Reset with the axes stopped keeps position and G54: no homing, no new zero; run the interrupted file again from its start: its first M6 measures the tool, and cuts already made are cut in air. Prove CM01 in air before it cuts."
 shop = "../shop"
 stock_refs = ["1018-round-1"]
 material_key = "lathe-1018-cold-finished"
 milling_material = "steel_1018"
+
+# The shop's standing page carries what every traveler shares (units,
+# speeds, coolant, homing, Feed Hold, tool changes, proving a file); This job
+# keeps the arm made first. Ops 20 and 90 print what is read off the arm.
+standing = true
+
+[[notes]]
+title = "This job"
+rows = [
+  ["Made first", "Crank arm MHA-DT-06 is finished before Setup 1"],
+]
 
 [cad]
 file = "../../out/features/dt_crank_hub/features.toml"
@@ -314,7 +324,7 @@ machine = "PM-30MV CNC (FluidNC, CNCjs with the electronic tool setter) / vise, 
 indexing = "none"
 machine_ref = "pm-30mv"
 holding = "The PM 6 in vise (jaws {{process.vise_jaw_height_mm:in.2f}} tall above its seat). A 1 in parallel, 1/8 in thick, against each jaw. The hub lying along the jaws, centred on them, front face to the LEFT, its barrel on the parallels' inner top edges and gripped by the jaws; the seat and relief hang clear of both. Between the parallels a {{process.cross_parallel_gap_mm:in.3dot}} gap: the #14 runs out into it. Tap the barrel down onto both edges while closing the vise."
-datum = "Program CM01_pin_hole (cam:dt_crank_hub). G54: X0 the front face, +X toward the rear face; Y0 the barrel's axis, +Y toward the fixed (rear) jaw; Z0 the barrel's top line. Tool lengths from the tool setter at each M6; the jaw tops stand {{process.cross_jaw_top_mm:in.3dot}} above Z0. After homing again (the note says when), the hub not disturbed: check X0, Y0 and Z0 as Ops 140–160 set them, each within 0.025 mm (once the hole is spotted, Op 160's leaf on the top line beside the hole, not over it); all good: run the file again from its start. One off, or the hub disturbed once cutting has begun: stop and tell the owner. The hub disturbed before any cut: seat it again and repeat Ops 140–160. At each M6 the program has stopped the spindle (M5) and shows the tool and speed: wait for the spindle to stop, change the tool, set the speed, then Cycle Start."
+datum = "Program CM01_pin_hole (cam:dt_crank_hub). G54: X0 the front face, +X toward the rear face; Y0 the barrel's axis, +Y toward the fixed (rear) jaw; Z0 the barrel's top line; the jaw tops stand {{process.cross_jaw_top_mm:in.3dot}} above Z0. After homing again (the standing page says when), the hub not disturbed: check X0, Y0 and Z0 as Ops 140–160 set them (once the hole is spotted, Op 160's leaf on the top line beside the hole, not over it). One off, or the hub disturbed once cutting has begun: stop and tell the owner. The hub disturbed before any cut: seat it again and repeat Ops 140–160."
 diagram = { file = "diagrams/cross.svg", alt = "CM01 T2, to scale: a section at the hole seen from the rear face, the fixed jaw at the right: the barrel on the inner top edges of two 1 in parallels against the jaws; the #14 down through the barrel and the bore, its point at Z-24.741 in the gap between the parallels. Beside it, from the front, the front face at the left: the hole {{cad.pin_hole_station_min_in:.2dot}}–{{cad.pin_hole_station_max_in:.2dot}} from it." }
 envelope = "other"
 vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{cad.barrel_dia_mm}}", along_jaws_mm = "{{cad.envelope_y_mm}}", part_height_mm = "{{cad.barrel_dia_mm}}", parallel_height_mm = "{{process.parallel_height_mm}}", overhang_mm = [-66.7639, -66.7639], jaw_offset = "centred", fixed_jaw_face = "machined", moving_jaw_face = "machined", moving_jaw_contact = "rod" }
@@ -332,12 +342,7 @@ feed = "hand"
 
 [[setups.operations]]
 instruction = "G54 Z0: the barrel's top line, the centre drill's point on a .002 feeler leaf at the hole's station."
-instruction_detailed = "Console M6 T1 (#2 centre drill; the tool setter measures it). MDI G0 X{{cad.pin_hole_station_mm:.3f}} Y0. Spindle stopped, its point just dragging a .002 leaf on the barrel's top: G10 L20 P1 Z0.051."
-feed = "hand"
-
-[[setups.operations]]
-instruction = "Prove CM01_pin_hole in air, Z0 raised 1.000 in. Then Z0 back."
-instruction_detailed = "Send $# and note the G54 line's Z. G10 L2 P1 Z(that Z + 25.400). Run CM01_pin_hole to its end in air, through both tool changes (T1, then T2), watching each move clear the jaw tops. G10 L2 P1 Z(the noted Z) puts Z0 back."
+instruction_detailed = "Console M6 T1 (#2 centre drill). MDI G0 X{{cad.pin_hole_station_mm:.3f}} Y0. Spindle stopped, its point just dragging a .002 leaf on the barrel's top: G10 L20 P1 Z0.051."
 feed = "hand"
 
 [[setups.operations]]
@@ -405,7 +410,7 @@ gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.rear_face_length_band_
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Length outside its band in Op 220: scrapped, not reworked; make another from Setup 1."
+instruction = "Length outside its band in Op 210: scrapped, not reworked; make another from Setup 1."
 feed = "hand"
 
 [[setups.operations]]

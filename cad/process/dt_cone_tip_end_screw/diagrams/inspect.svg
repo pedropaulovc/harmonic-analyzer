@@ -8,8 +8,8 @@
   <line class="centre-line" x1="100" y1="180" x2="640" y2="180"/>
   <line class="datum" x1="560" y1="120" x2="560" y2="240"/>
   <text class="datum-label" x="566" y="116">end face (as bought)</text>
-  <text class="label" x="560" y="290">#52 × {{cad.end_hole_depth_min_in:.2dot}}–{{cad.end_hole_depth_max_in:.2dot}} deep</text>
-  <text class="label" x="560" y="306">mouth broken, {{cad.chamfer_max_in:.3dot}} chamfer max</text>
+  <text class="label" x="540" y="290">#52 × {{cad.end_hole_depth_min_in:.2dot}}–{{cad.end_hole_depth_max_in:.2dot}} deep</text>
+  <text class="label" x="540" y="306">mouth broken, {{cad.chamfer_max_in:.3dot}} chamfer max</text>
   <line class="leader" x1="600" y1="280" x2="534.62" y2="189.53"/>
   <circle class="leader-dot" cx="534.62" cy="189.53" r="2"/>
   <text class="label" x="200" y="330">1/4-28 UNF-2A thread, head and slot: as bought</text>

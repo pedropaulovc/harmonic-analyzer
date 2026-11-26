@@ -35,11 +35,18 @@ part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
 material = "1018 cold-finished steel, 5/8 in round (drawing: {{cad.material_name}})"
 stock = "Qty {{process.quantity:g}}. {{process.bar_dia_in:fraction}} in round bar on hand: one blank {{process.blank_length_in:.2f}} in long, and a 1 in offcut for the mill setup's spacer."
-note = "Inches unless mm; G-code and console entries in mm (the file and the controller run G21). Lathe PM-1127VF-LB (70–380 and 380–2000 rpm); cutting oil on the steel. Finished Ø{{cad.outer_dia_min_in:.2dot}}–{{cad.outer_dia_max_in:.2dot}} × {{cad.far_end_length_min_in:.2dot}}–{{cad.far_end_length_max_in:.2dot}} long, the Ø{{process.bore_print_min_in:.3dot}}–{{process.bore_print_max_in:.3dot}} drilled bore through, the 1/16 pin hole through both walls {{cad.pin_hole_station_min_in:.2dot}}–{{cad.pin_hole_station_max_in:.2dot}} from the faced (datum) end. Mill speeds on the PM-30MV low belt (100–2800 rpm). Home the mill ($H) once, after switching it on: every M6's trip to the tool setter counts from home. Home again only after a power cycle or a controller restart, an E-stop, an alarm, a limit switch hit, a stall or a crash: homing brings the stored G54 back. Then check every zero of the setup again, each the way its step set it: each must read what its step set, within .001 in. One does not, cannot be reached with the part in, or the part may have moved: take the setup again from its first step, the part out. They all do: run the interrupted file again from its start. Feed Hold, then Reset with the axes stopped keeps position and G54: no homing, no new zero; run the interrupted file again from its start: its first M6 measures the tool, and cuts already made are cut in air. Prove the file in air first."
 shop = "../shop"
 stock_refs = ["1018-round-5-8"]
 material_key = "lathe-1018-cold-finished"
 milling_material = "steel_1018"
+
+standing = true
+
+[[notes]]
+title = "This job"
+rows = [
+  ["Finished", "Finished Ø{{cad.outer_dia_min_in:.2dot}}–{{cad.outer_dia_max_in:.2dot}} × {{cad.far_end_length_min_in:.2dot}}–{{cad.far_end_length_max_in:.2dot}} long, the Ø{{process.bore_print_min_in:.3dot}}–{{process.bore_print_max_in:.3dot}} drilled bore through, the 1/16 pin hole through both walls {{cad.pin_hole_station_min_in:.2dot}}–{{cad.pin_hole_station_max_in:.2dot}} from the faced (datum) end."],
+]
 
 [cad]
 file = "../../out/features/dt_pinion_arbor_collar/features.toml"
@@ -293,7 +300,7 @@ machine = "PM-30MV CNC (FluidNC, CNCjs with the electronic tool setter) / vise, 
 indexing = "none"
 machine_ref = "pm-30mv"
 holding = "The PM 6 in vise. One 1 in, 4 in long parallel of the 1/8 in thick set standing on edge, centred between the jaws, its left end flush with the jaws' left face (a rule across both). The blank on its top edge along the jaws, the turned end to the LEFT, set {{process.end_overhang_mm:in.2f}} in out past the jaws' left face with the calipers' depth rod, never under .45; the jaws close on the blank's 5/8 end. The 1 in offcut (Op 10) on the parallel's right end, so the moving jaw closes square. Tap both down onto the parallel while closing the vise. Under the pin hole nothing but air."
-datum = "Program PC01_pin_hole (cam:dt_pinion_arbor_collar). G54: X0 face F (faced in Op 20), +X along the blank; Y0 the turned O.D.'s axis, +Y toward the fixed jaw; Z0 the top of the turned O.D. The file starts with an M6 for the centre drill; tool lengths from the tool setter at each M6; at the M6 stop the file has stopped the spindle and lifted the tool above the jaws."
+datum = "Program PC01_pin_hole (cam:dt_pinion_arbor_collar). G54: X0 face F (faced in Op 20), +X along the blank; Y0 the turned O.D.'s axis, +Y toward the fixed jaw; Z0 the top of the turned O.D. The file starts with an M6 for the centre drill."
 diagram = { file = "diagrams/pin-hole.svg", alt = "PC01 T2, to scale, from the front: the blank on the 1 in x 4 in parallel on edge, face F {{process.end_overhang_mm:in.2f}} past the jaws' left face, the 1 in offcut on the parallel's right end; the 1/16 drill {{cad.pin_hole_station_in:.2dot}} from face F through both walls and the bore into the air under it." }
 envelope = { x_span_mm = ["{{process.blank_length_mm}}", 3.175], y_span_mm = ["{{process.bar_dia_mm}}", 3.175], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{process.bar_dia_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{process.pin_tip_height_mm}}"], longest_tool_mm = ["{{process.drill_chuck_gauge_mm}}", "{{process.drill_1_16_oal_mm}}"], shortest_tool_mm = ["{{process.drill_chuck_gauge_mm}}", "{{process.centre_drill_oal_mm}}"] }
 vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{process.bar_dia_mm}}", along_jaws_mm = "{{process.blank_length_mm}}", part_height_mm = "{{process.bar_dia_mm}}", parallel_height_mm = "{{process.riser_height_mm}}", overhang_mm = ["{{process.end_overhang_mm}}", "rest"], jaw_offset = "balanced", balance = "spacer", fixed_jaw_face = "as_bought", moving_jaw_face = "as_bought", moving_jaw_contact = "flat" }
@@ -311,12 +318,7 @@ feed = "hand"
 
 [[setups.operations]]
 instruction = "G54 Z0: the top of the turned O.D., touched with the centre drill over the axis."
-instruction_detailed = "Console M6 T1 (#1 centre drill in the drill chuck, at least {{process.spot_projection_min_mm:in.2f}} in out of it; the tool setter measures it). MDI G0 X3.000 Y0.000: over the overhang. Spindle stopped, its tip just dragging a .002 feeler leaf on the O.D. top: G10 L20 P1 Z0.051."
-feed = "hand"
-
-[[setups.operations]]
-instruction = "Prove PC01_pin_hole in air, Z0 raised 1.000 in. Then Z0 back."
-instruction_detailed = "Send $# and note the G54 line's Z. G10 L2 P1 Z(that Z + 25.400) raises Z0 1.000 in. Run PC01_pin_hole, watching every move clear the jaws; at its first M6 prompt T1 is already in, so continue; at the second put the 1/16 drill in (at least {{process.drill_projection_min_mm:in.2f}} in out of the chuck). G10 L2 P1 Z(the noted Z) puts Z0 back, and the centre drill goes back in for the real run."
+instruction_detailed = "Console M6 T1 (#1 centre drill in the drill chuck, at least {{process.spot_projection_min_mm:in.2f}} in out of it). MDI G0 X3.000 Y0.000: over the overhang. Spindle stopped, its tip just dragging a .002 feeler leaf on the O.D. top: G10 L20 P1 Z0.051."
 feed = "hand"
 
 [[setups.operations]]
@@ -352,7 +354,7 @@ machine = "PM-1127VF-LB lathe / 6 in 3-jaw"
 indexing = "none"
 machine_ref = "pm-1127vf-lb"
 holding = "3-jaw on the blank's 5/8 end, the turned end out, {{process.part_off_stickout_mm:in.2f}} in out of the jaw fronts (the turned shoulder .15 in out of them)."
-datum = "DRO Z set on face F (Op 20's datum end) through the blade, as Op 150 says: the collar is parted .66 from it."
+datum = "DRO Z set on face F (Op 20's datum end) through the blade, as Op 140 says: the collar is parted .66 from it."
 diagram = { file = "diagrams/part-off.svg", alt = "Op 150, to scale: the blank back in the 3-jaw, the turned end out; the P1 blade parts the collar off {{cad.far_end_length_in:.2dot}} from face F." }
 lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{process.bar_dia_mm}}", stock_diameter_mm = "{{process.bar_dia_mm}}", stickout_mm = "{{process.part_off_stickout_mm}}", minimum_diameter_mm = "{{cad.outer_dia_mm}}", support = "none" }
 
@@ -392,7 +394,7 @@ gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.far_end_length_band_mm}}"
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Out of any limit in Op 170: scrap the collar and make another from Setup 1. Over-long only: face the parted end on the lathe (3-jaw over a brass shim wrap, face F in) into the band, break the re-faced end's outer edge and bore mouth again as in Op 160, then read Op 170 again."
+instruction = "Out of any limit in Op 160: scrap the collar and make another from Setup 1. Over-long only: face the parted end on the lathe (3-jaw over a brass shim wrap, face F in) into the band, break the re-faced end's outer edge and bore mouth again as in Op 150, then read Op 160 again."
 feed = "hand"
 
 [[setups.operations]]

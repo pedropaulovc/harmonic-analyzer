@@ -7,10 +7,10 @@
   <circle class="holes" cx="344" cy="200" r="31.75"/>
   <circle class="hidden" cx="176" cy="156.26" r="2"/>
   <rect class="hidden" x="160.05" y="140" width="31.9" height="32.51"/>
-  <text class="label" x="40" y="70">pivot bore Ø{{cad.pivot_bore_dia_min_in:.4dot}}–{{cad.pivot_bore_dia_max_in:.4dot}}, reamed</text>
-  <line class="leader" x1="120" y1="76" x2="110" y2="180"/>
+  <text class="label" x="40" y="70">pivot bore, reamed .2510: the MHA-DT-19 shaft its gauge</text>
+  <line class="leader" x1="120" y1="80" x2="110" y2="180"/>
   <circle class="leader-dot" cx="110" cy="180" r="2"/>
-  <text class="label" x="260" y="300">arbor bore Ø{{cad.arbor_bore_dia_min_in:.4dot}}–{{cad.arbor_bore_dia_max_in:.4dot}}, 5/16 drill</text>
+  <text class="label" x="260" y="300">arbor bore, drilled 5/16</text>
   <line class="leader" x1="300" y1="288" x2="354" y2="226"/>
   <circle class="leader-dot" cx="354" cy="226" r="2"/>
   <text class="label" x="40" y="330">seat {{cad.follower_seat_height_in:.3dot}} from the pivot bore's axis</text>
@@ -27,5 +27,5 @@
   <text class="label" x="530" y="276">the pivot bore's axis (dashed)</text>
   <line class="leader" x1="528" y1="272" x2="470" y2="228"/>
   <circle class="leader-dot" cx="470" cy="228" r="2"/>
-  <text class="label" x="470" y="340">no cross hole: it is match-drilled at assembly</text>
+  <text class="label" x="460" y="340">no cross hole: it is match-drilled at assembly</text>
 </svg>

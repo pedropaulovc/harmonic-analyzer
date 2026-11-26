@@ -24,8 +24,8 @@
   <path class="fixture-support" d="M253 410L278.4 410L278.4 522L269.93 519L261.47 522L253 522Z"/>
   <line class="hidden" x1="193" y1="511.6" x2="567" y2="511.6"/>
   <rect class="part-kept" x="253" y="333.8" width="254" height="76.2"/>
-  <text class="label-on-clamp" x="513" y="373.24">fixed</text>
-  <text class="label-on-clamp" x="197" y="373.24">moving</text>
+  <text class="label-on-clamp" x="513" y="395.24">fixed</text>
+  <text class="label-on-clamp" x="197" y="395.24">moving</text>
   <text class="datum-label" x="183" y="414" text-anchor="end">Z0 face A</text>
   <text class="label" x="577" y="458">1 in + 1/2 in parallels</text>
   <text class="label" x="577" y="474">stacked, 1/8 thick,</text>

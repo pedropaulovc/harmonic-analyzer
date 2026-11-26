@@ -18,9 +18,9 @@
   <text class="label" x="40" y="120">1/4 drill's shank in the bore</text>
   <line class="leader" x1="200" y1="124" x2="261.9" y2="248.4"/>
   <circle class="leader-dot" cx="261.9" cy="248.4" r="2"/>
-  <text class="label" x="40" y="330">thick side down; roll it slowly,</text>
-  <text class="label" x="40" y="346">read the highest point</text>
-  <line class="leader" x1="200" y1="326" x2="238.68" y2="333.72"/>
+  <text class="label" x="20" y="280">thick side down; roll it slowly,</text>
+  <text class="label" x="20" y="296">read the highest point</text>
+  <line class="leader" x1="150" y1="302" x2="238.68" y2="333.72"/>
   <circle class="leader-dot" cx="238.68" cy="333.72" r="2"/>
-  <text class="label" x="600" y="50">height gauge (schematic)</text>
+  <text class="label" x="580" y="50">height gauge (schematic)</text>
 </svg>

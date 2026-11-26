@@ -15,7 +15,7 @@
   <path class="cutter" d="M520 239L550 251L550 339L542 336L534 339L526 339L526 263Z"/>
   <line class="arrow" x1="500" y1="309" x2="450" y2="309"/>
   <line class="datum" x1="620" y1="50" x2="620" y2="84"/>
-  <text class="datum-label" x="626" y="62">Z0 the crown's apex</text>
+  <text class="datum-label" x="614" y="44" text-anchor="end">Z0 the crown's apex</text>
   <text class="label" x="565" y="330">AR tool: the head Ø{{cad.head_dia_min_in:.3dot}}–{{cad.head_dia_max_in:.3dot}},</text>
   <text class="label" x="565" y="346">to Z-{{process.neck_end_z_in:.3dot}}</text>
   <line class="leader" x1="563" y1="326" x2="542" y2="299"/>

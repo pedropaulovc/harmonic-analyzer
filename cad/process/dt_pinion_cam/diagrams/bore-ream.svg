@@ -17,7 +17,7 @@
   <text class="datum-label" x="341" y="124">Z0 the rear face</text>
   <text class="label" x="20" y="70">face F down on the stacks;</text>
   <text class="label" x="20" y="86">the bore runs out into the gap</text>
-  <line class="leader" x1="150" y1="86" x2="197" y2="208"/>
+  <line class="leader" x1="150" y1="92" x2="197" y2="208"/>
   <circle class="leader-dot" cx="197" cy="208" r="2"/>
   <rect class="clamp" x="540" y="214.9" width="205" height="34"/>
   <rect class="clamp" x="540" y="351.1" width="205" height="34"/>
@@ -32,7 +32,7 @@
   <text class="datum-label" x="540" y="202.9">from above: +X →, +Y ↑</text>
   <text class="label" x="560" y="411.1">bore at X+{{cad.bore_eccentricity_mm:.3f}} mm</text>
   <text class="label" x="560" y="427.1">({{cad.bore_eccentricity_in:.3dot}} in) along the jaws</text>
-  <line class="leader" x1="600" y1="401.1" x2="654" y2="320.31"/>
+  <line class="leader" x1="640" y1="399.1" x2="654" y2="320.31"/>
   <circle class="leader-dot" cx="654" cy="320.31" r="2"/>
   <path class="cutter" d="M311.88 30L311.88 215L301.88 225L258.12 225L248.12 215L248.12 30L255.21 27L262.29 30L269.37 27L276.46 30L283.54 27L290.63 30L297.71 27L304.79 30Z"/>
   <text class="label" x="340" y="50">.2510 reamer through, {{process.ream_past_mm:in.3dot}} past F,</text>

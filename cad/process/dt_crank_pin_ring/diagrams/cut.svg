@@ -15,5 +15,6 @@
   <text class="label" x="400" y="110">the {{process.blank_length_in:.2dot}} piece standing above the jaws</text>
   <line class="leader" x1="398" y1="106" x2="384" y2="120"/>
   <circle class="leader-dot" cx="384" cy="120" r="2"/>
-  <text class="label" x="500" y="350">smooth file flat on the jaws, stroking across</text>
+  <text class="label" x="500" y="334">smooth file flat on the jaws,</text>
+  <text class="label" x="500" y="350">stroking across</text>
 </svg>

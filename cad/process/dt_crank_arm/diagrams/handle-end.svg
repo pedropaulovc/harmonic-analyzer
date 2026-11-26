@@ -14,13 +14,13 @@
   <line class="centre-line" x1="20" y1="163.5" x2="745" y2="163.5"/>
   <text class="label" x="4" y="159.5">section</text>
   <rect class="fixture-support" x="865.52" y="100" width="190.5" height="127"/>
-  <text class="label-halo" x="873.52" y="125">spacer about 1.5 (Setup 1),</text>
-  <text class="label-halo" x="873.52" y="141">off the same 5/16 x 1 bar,</text>
-  <text class="label-halo" x="873.52" y="157">on the vise bed at</text>
-  <text class="label-halo" x="873.52" y="173">the jaws' right ends</text>
+  <text class="label-halo" x="873.52" y="120">spacer about 1.5 (Setup 1)</text>
+  <text class="label-halo" x="873.52" y="136">on the vise bed, not on</text>
+  <text class="label-halo" x="873.52" y="152">the parallels, its right end</text>
+  <text class="label-halo" x="873.52" y="168">level with the jaws' right ends</text>
   <text class="label" x="778.65" y="160">parallels'</text>
   <text class="label" x="778.65" y="176">right ends</text>
-  <text class="label" x="778.65" y="192">(4 in long)</text>
+  <text class="label" x="778.65" y="192">({{process.parallel_length_mm:in.2f}} long)</text>
   <line class="leader" x1="776.65" y1="156" x2="770.65" y2="115.88"/>
   <circle class="leader-dot" cx="770.65" cy="115.88" r="2"/>
   <circle class="datum" cx="650" cy="100" r="3.5"/>

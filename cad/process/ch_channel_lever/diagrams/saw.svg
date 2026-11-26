@@ -21,10 +21,10 @@
 <text class="label" x="504" y="47">8</text>
 <rect class="part-kept" x="548" y="34" width="62" height="18"/>
 <text class="label" x="570" y="47">9</text>
-<text class="label" x="20" y="90">1/2 x 6 in 6061 flat: the spoil plate, 3.9 in off its end</text>
-<rect class="part-rest" x="20" y="100" width="420" height="60"/>
-<rect class="part-kept" x="20" y="100" width="40" height="60"/>
-<path class="arrow" d="M90 172 H40 V162"/>
-<text class="label" x="94" y="176">spoil plate 3.9 x 6 (the kept piece)</text>
+<text class="label" x="20" y="90">5/8 x 4 in 6061 flat: the spoil plate, 6 in off its end</text>
+<rect class="part-rest" x="20" y="110" width="420" height="40"/>
+<rect class="part-kept" x="20" y="110" width="60" height="40"/>
+<path class="arrow" d="M110 172 H50 V152"/>
+<text class="label" x="114" y="176">spoil plate 6 x 4 (the kept piece)</text>
 <text class="label" x="200" y="134">rest of the 6061 flat</text>
 </svg>

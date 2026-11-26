@@ -11,7 +11,7 @@
   <line class="hidden" x1="90" y1="145.24" x2="700" y2="145.24"/>
   <text class="label" x="40" y="86.85">fixed jaw (behind),</text>
   <text class="label" x="40" y="102.85">its top dashed</text>
-  <line class="leader" x1="60" y1="102.85" x2="50" y2="151.24"/>
+  <line class="leader" x1="60" y1="108.85" x2="50" y2="151.24"/>
   <circle class="leader-dot" cx="50" cy="151.24" r="2"/>
   <text class="datum-label" x="34" y="218">Z0 face A</text>
   <text class="datum-label" x="34" y="234">(the stacks' top)</text>
@@ -19,7 +19,7 @@
   <text class="label" x="34" y="278">stack (dashed),</text>
   <text class="label" x="34" y="294">against the fixed</text>
   <text class="label" x="34" y="310">jaw (behind)</text>
-  <line class="leader" x1="128" y1="272" x2="170.96" y2="264"/>
+  <line class="leader" x1="114" y1="258" x2="170.96" y2="264"/>
   <circle class="leader-dot" cx="170.96" cy="264" r="2"/>
   <text class="datum-label" x="94" y="118.85">X0</text>
   <path class="cutter" d="M251.5 30L251.5 212.32L243.5 220.32L208.5 220.32L200.5 212.32L200.5 30L207.78 27L215.07 30L222.36 27L229.64 30L236.93 27L244.22 30Z"/>

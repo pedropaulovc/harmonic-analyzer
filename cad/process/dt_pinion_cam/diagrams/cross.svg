@@ -47,7 +47,8 @@
   <text class="label" x="10" y="66">of {{process.peck_50_mm:in.3dot}}, full retract</text>
   <line class="leader" x1="150" y1="66" x2="223.78" y2="74"/>
   <circle class="leader-dot" cx="223.78" cy="74" r="2"/>
-  <text class="label" x="564.92" y="46">#50 at X {{cad.set_screw_tap_station_mm:.3f}} mm from face F</text>
+  <text class="label" x="564.92" y="46">#50 at X {{cad.set_screw_tap_station_mm:.3f}} mm</text>
+  <text class="label" x="564.92" y="62">from face F</text>
   <line class="leader" x1="562.92" y1="50" x2="534.92" y2="70"/>
   <circle class="leader-dot" cx="534.92" cy="70" r="2"/>
 </svg>

@@ -19,10 +19,14 @@ part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
 material = "1018 cold-finished steel round (drawing: low-carbon steel, e.g. 12L14 CF)"
 stock = "One each: Ø{{process.stock_dia_in:.2dot}} × {{process.bar_length_in:g}} in piece (to order, not on hand), Ø{{process.stock_dia_c100_in:.2dot}} and Ø{{process.stock_dia_c050_in:.2dot}} bar (on hand): saw a 3 in piece off each for the lathe, never the whole bar (it would run out past the spindle's rear end); each collar takes {{cad.pitch_in:.2dot}} in of bar."
-note = "Inches unless mm. Lathe PM-1127VF-LB (70–380 and 380–2000 rpm); cutting oil on the steel. Three collars, one from each bar: C175 Ø1.75, C100 Ø1.00, C050 Ø.50; mark each with its size after parting."
 shop = "../shop"
 stock_refs = ["1018-round-1-3-4", "1018-round-1", "1018-round-1-2"]
 material_key = "lathe-1018-cold-finished"
+
+# The shop's standing page carries what every traveler shares (units, lathe
+# speeds, coolant); the setups' titles and part-off ops print which bar makes
+# which collar and its mark, so nothing else in the old note was only theirs.
+standing = true
 
 [cad]
 file = "../../out/features/dt_cone_gear_tl_arbor_collar/features.toml"

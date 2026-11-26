@@ -930,11 +930,13 @@ def context(
 
     # Passes along Y: from beside the moving jaw's side of the load to past
     # the fixed jaw's, or back; the saw starts and ends clear of every bar.
-    # The saw's passes are conventional: with it turning clockwise seen from
+    # Every pass is conventional: with the cutter turning clockwise seen from
     # above (M3), along -Y left of the foot ends and along +Y right of the
-    # top ends (the other way it climbs, and a slitting saw climbing grabs
-    # and turns on its friction-driven arbor). Each notch's first, light pass
-    # is a section of its own, before the witness-line stop.
+    # top ends, the bars on the cutter's left. Every measured cut on record
+    # is conventional and climb is untested on this mill (#3590, #3680); a
+    # slitting saw climbing also grabs and turns on its friction-driven
+    # arbor. Each notch's first, light pass is a section of its own, before
+    # the witness-line stop.
     em_y = (-load - r - APPROACH_MM, r + APPROACH_MM)
     saw_y = (-load - radius - APPROACH_MM, radius + APPROACH_MM)
     foot_ledge, top_ledge = foot["ledge_nominal"], top["ledge_nominal"]
@@ -943,10 +945,10 @@ def context(
     foot_saw_x = [foot_depth - radius]
     top_saw_x = [radius - d for d in top_steps]
     side = {
-        "foot_end": ([-r], [end_z], em_y),
+        "foot_end": ([-r], [end_z], em_y[::-1]),
         "foot_light": ([lights["foot"] - radius], foot_zs[:1], saw_y[::-1]),
         "foot_notch": (foot_saw_x, foot_zs, saw_y[::-1]),
-        "top_end": (top_xs, [end_z], em_y[::-1]),
+        "top_end": (top_xs, [end_z], em_y),
         "top_light": ([radius - lights["top"]], top_zs[:1], saw_y),
         "top_notch": (top_saw_x, top_zs, saw_y),
     }
@@ -1226,7 +1228,7 @@ def context(
     tn = numbers
     expect: list[list[Any]] = list(riser_expect)
     for name, key, final, raw, max_step, direction, rpm, tool, loads in (
-        ("CA01_foot_end", "foot_end", -r, -r - skim, skim, 1, em_rpm, "em-half", True),
+        ("CA01_foot_end", "foot_end", -r, -r - skim, skim, -1, em_rpm, "em-half", True),
         (
             "CA02_foot_notch",
             "foot_notch",
@@ -1244,7 +1246,7 @@ def context(
             r,
             r + top_excess,
             step,
-            -1,
+            1,
             em_rpm,
             "em-half",
             True,
@@ -1295,6 +1297,7 @@ def context(
                     "raw": _r(raw),
                     "max_step": max_step,
                     "direction": direction,
+                    "cut": "conventional",
                     "span": load,
                     "below_z": section,
                 },

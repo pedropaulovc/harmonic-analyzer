@@ -14,8 +14,8 @@
   <text class="label" x="524.5" y="174">apart radially</text>
   <line class="leader" x1="522.5" y1="124" x2="416.5" y2="170"/>
   <circle class="leader-dot" cx="416.5" cy="170" r="2"/>
-  <text class="label" x="524.5" y="310">butt joint: ends square, NOT soldered</text>
-  <line class="leader" x1="522.5" y1="306" x2="370.5" y2="202"/>
+  <text class="label" x="510.5" y="310">butt joint: ends square, NOT soldered</text>
+  <line class="leader" x1="508.5" y1="306" x2="370.5" y2="202"/>
   <circle class="leader-dot" cx="370.5" cy="202" r="2"/>
   <text class="label" x="40" y="360">Round the ring with the fingers if it has gone oval; Op 80 calipers its ID across the joint and at 90° to it.</text>
 </svg>

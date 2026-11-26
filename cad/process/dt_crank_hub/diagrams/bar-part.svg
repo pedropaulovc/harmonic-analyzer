@@ -23,6 +23,6 @@
   <line class="leader" x1="572" y1="64" x2="544" y2="135"/>
   <circle class="leader-dot" cx="544" cy="135" r="2"/>
   <text class="label" x="40" y="44">barrel Ø{{cad.barrel_dia_min_in:.3dot}}–{{cad.barrel_dia_max_in:.3dot}}, back past the parting line</text>
-  <line class="leader" x1="298" y1="46" x2="440" y2="112"/>
+  <line class="leader" x1="200" y1="50" x2="440" y2="112"/>
   <circle class="leader-dot" cx="440" cy="112" r="2"/>
 </svg>

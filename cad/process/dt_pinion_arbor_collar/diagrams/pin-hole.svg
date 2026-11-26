@@ -26,11 +26,12 @@
   <text class="label-on-clamp" x="534.5" y="131.78">1 in offcut, on the parallel</text>
   <text class="label" x="470" y="86">fixed jaw (behind); the moving jaw,</text>
   <text class="label" x="470" y="102">in front, not drawn</text>
-  <line class="dims" x1="90" y1="240" x2="153.5" y2="240"/>
-  <line class="dims" x1="90" y1="232" x2="90" y2="248"/>
-  <line class="dims" x1="153.5" y1="232" x2="153.5" y2="248"/>
-  <text class="label" x="20" y="300">face F {{process.end_overhang_mm:in.2f}}</text>
-  <text class="label" x="20" y="316">past the jaws' left face</text>
-  <line class="leader" x1="60" y1="288" x2="121.75" y2="242"/>
-  <circle class="leader-dot" cx="121.75" cy="242" r="2"/>
+  <line class="dims" x1="90" y1="276" x2="153.5" y2="276"/>
+  <line class="dims" x1="90" y1="268" x2="90" y2="284"/>
+  <line class="dims" x1="153.5" y1="268" x2="153.5" y2="284"/>
+  <text class="label" x="20" y="312">face F {{process.end_overhang_mm:in.2f}}</text>
+  <text class="label" x="20" y="328">past the jaws'</text>
+  <text class="label" x="20" y="344">left face</text>
+  <line class="leader" x1="60" y1="300" x2="121.75" y2="278"/>
+  <circle class="leader-dot" cx="121.75" cy="278" r="2"/>
 </svg>

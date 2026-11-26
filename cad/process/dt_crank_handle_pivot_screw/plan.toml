@@ -40,11 +40,15 @@ part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
 material = "{{cad.material_spec}}"
 stock = "Qty {{process.quantity:g}}. Ø{{process.stock_dia_in:.3dot}} 1018 cold-finished rod, the bar on hand; one blank B = P + {{process.blank_over_p_in:.2dot}} long (Setup 1), {{process.blank_min_in:.2dot}}–{{process.blank_max_in:.2dot}} over the accepted stack."
-note = "Inches unless mm. Lathe PM-1127VF-LB (70–380 and 380–2000 rpm); steel cut with cutting oil. The shoulder's length is fitted to the bonded handle (Setup 1): write the measured stack and the stations derived from it on this sheet before Setup 3."
 shop = "../shop"
 stock_refs = ["1018-round-1-4"]
 material_key = "lathe-1018-cold-finished"
 turning_material = "steel_1018"
+
+# The shop's standing page carries what every traveler shares (units, lathe
+# speeds, coolant); Setup 1's ops print the measured stack and the stations
+# written on this sheet, so nothing else in the old note was only this screw's.
+standing = true
 
 [cad]
 file = "../../out/features/dt_crank_handle_pivot_screw/features.toml"

@@ -28,14 +28,15 @@
   <text class="label" x="442.23" y="202.23">+Y →</text>
   <text class="label" x="10" y="40">#14 through the barrel</text>
   <text class="label" x="10" y="56">and the bore, into the gap</text>
-  <line class="leader" x1="140" y1="56" x2="283.82" y2="70"/>
+  <line class="leader" x1="140" y1="62" x2="283.82" y2="70"/>
   <circle class="leader-dot" cx="283.82" cy="70" r="2"/>
   <path class="part-kept" d="M510 156.1L541.24 156.1L541.24 150L594.02 150L594.02 161.68L610.28 161.68L610.28 227.72L594.02 227.72L594.02 239.41L541.24 239.41L541.24 233.31L510 233.31Z"/>
   <rect class="holes" x="554.6" y="150" width="18.49" height="89.41"/>
   <path class="cutter" d="M573.09 60L573.09 243.41L563.85 248.96L554.6 243.41L554.6 60L563.85 57Z"/>
   <line class="datum" x1="510" y1="120" x2="510" y2="269.41"/>
   <text class="datum-label" x="506" y="285.41" text-anchor="middle">X0: the front face</text>
-  <text class="label" x="560" y="300">#14 at {{cad.pin_hole_station_min_in:.2dot}}–{{cad.pin_hole_station_max_in:.2dot}} from the front face</text>
+  <text class="label" x="560" y="300">#14 at {{cad.pin_hole_station_min_in:.2dot}}–{{cad.pin_hole_station_max_in:.2dot}}</text>
+  <text class="label" x="560" y="316">from the front face</text>
   <line class="leader" x1="600" y1="288" x2="565.85" y2="245.41"/>
   <circle class="leader-dot" cx="565.85" cy="245.41" r="2"/>
   <text class="label" x="470" y="40">from the front (+X →)</text>

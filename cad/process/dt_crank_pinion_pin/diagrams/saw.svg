@@ -11,7 +11,7 @@
   <text class="label" x="326" y="83.5">saw vise on the long end (jaws schematic)</text>
   <rect class="cutter" x="237" y="95" width="3" height="90"/>
   <line class="datum" x1="120" y1="112" x2="120" y2="168"/>
-  <text class="datum-label" x="114" y="106" text-anchor="end">faced end (Op 10)</text>
+  <text class="datum-label" x="124" y="88">faced end (Op 10)</text>
   <text class="label" x="120" y="206">scribe line {{process.saw_length_in:.2dot}} from the faced end; the blade on its far side;</text>
   <text class="label" x="120" y="222">the piece drops clear onto the saw base: pick it up only once the blade stops</text>
   <text class="label" x="120" y="246">Ø1/8 drill rod; file the burr off the sawn end</text>

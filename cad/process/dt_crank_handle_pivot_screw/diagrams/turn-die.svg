@@ -19,7 +19,8 @@
   <rect class="hidden" x="680" y="179.13" width="10" height="21.73"/>
   <line class="arrow" x1="620" y1="98.75" x2="580" y2="98.75"/>
   <line class="datum" x1="690" y1="250" x2="690" y2="286"/>
-  <text class="datum-label" x="696" y="300">Z0 the tip</text>
+  <text class="datum-label" x="696" y="300">Z0</text>
+  <text class="datum-label" x="696" y="316">the tip</text>
   <text class="label" x="20" y="330">#4-40 die, lettered face toward the tip, its back square on the quill's face;</text>
   <text class="label" x="20" y="346">by hand: a half turn forward, a quarter back, the quill following, to the seat</text>
   <line class="leader" x1="330" y1="318" x2="640" y2="261.25"/>

@@ -19,7 +19,8 @@
   <text class="label" x="380" y="60">O.D. Ø{{cad.cam_od_dia_min_in:.3dot}}–{{cad.cam_od_dia_max_in:.3dot}}</text>
   <line class="leader" x1="420" y1="66" x2="560" y2="122.5"/>
   <circle class="leader-dot" cx="560" cy="122.5" r="2"/>
-  <text class="label" x="100" y="60">the second cam comes from here (Ops 50–70)</text>
+  <text class="label" x="100" y="44">the second cam comes from</text>
+  <text class="label" x="100" y="60">here (Ops 50–70)</text>
   <line class="leader" x1="200" y1="66" x2="450" y2="122.5"/>
   <circle class="leader-dot" cx="450" cy="122.5" r="2"/>
 </svg>

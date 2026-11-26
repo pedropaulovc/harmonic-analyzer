@@ -23,8 +23,8 @@
   <rect class="part-kept" x="608.56" y="150" width="91.44" height="150"/>
   <text class="label-on-clamp" x="704" y="249.55">fixed</text>
   <text class="label-on-clamp" x="558.56" y="249.55">mov.</text>
-  <text class="datum-label" x="700" y="480" text-anchor="end">Y0 face A, at the fixed jaw</text>
-  <text class="label" x="700" y="498" text-anchor="end">+Y →</text>
+  <text class="datum-label" x="750" y="480" text-anchor="end">Y0 face A, at the fixed jaw</text>
+  <text class="label" x="750" y="498" text-anchor="end">+Y →</text>
   <rect class="holes" x="251.33" y="150" width="37.34" height="28.92"/>
   <path class="cutter" d="M288.67 30L288.67 178.92L270 190.14L251.33 178.92L251.33 30L258.8 27L266.27 30L273.73 27L281.2 30Z"/>
   <rect class="holes" x="635.61" y="150" width="37.34" height="28.92"/>

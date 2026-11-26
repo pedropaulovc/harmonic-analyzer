@@ -11,9 +11,9 @@
   <path class="cutter" d="M368 60L392 60L392 131.1A12 2.9 0 0 1 368 131.1Z"/>
   <rect class="cutter" x="300" y="52" width="160" height="8"/>
   <line class="arrow" x1="410" y1="40" x2="410" y2="80"/>
-  <text class="label" x="480" y="60">adjustable reamer in a tap wrench, by hand,</text>
-  <text class="label" x="480" y="76">to about {{process.drum_front_ream_depth_in:.1f}} deep</text>
-  <line class="leader" x1="478" y1="64" x2="392" y2="100"/>
+  <text class="label" x="466" y="60">adjustable reamer in a tap wrench, by hand,</text>
+  <text class="label" x="466" y="76">to about {{process.drum_front_ream_depth_in:.1f}} deep</text>
+  <line class="leader" x1="464" y1="64" x2="392" y2="100"/>
   <circle class="leader-dot" cx="392" cy="100" r="2"/>
   <text class="label" x="20" y="100">MHA-DT-01 drum, front end up,</text>
   <text class="label" x="20" y="116">in soft jaws</text>

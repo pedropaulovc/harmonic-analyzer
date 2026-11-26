@@ -187,7 +187,6 @@ def _program(directory: Path, name: str, cache: dict[str, _gcode.Program]) -> _g
 # listed file no longer falls under the floor: its owner empties its entry once
 # fixed. Nothing else exempts a file from the floor.
 KNOWN_JAW_CLEARANCE_VIOLATIONS: dict[str, str] = {
-    "CL01_face_b.nc": "#3607 (ch_channel_lever: 0.521 mm over the moving jaw); not to be run until fixed",
     "PG15_height.nc": "#3607 (pd_platen_guide: 0.521 mm over the fixed jaw); not to be run until fixed",
 }
 
@@ -199,6 +198,14 @@ def jaw_clearance_min_mm() -> float:
     declares, so no other inventory file can reach the check."""
     cnc = _shop_equipment.merge([_cam_programs.CNC_EQUIPMENT_PATH])
     return float(cnc["cnc"]["jaw-clearance"]["jaw_clearance_min_mm"])
+
+
+# The sentence that opens the op running a listed file (the plan op whose
+# instruction says "Run <program>"), so the operator reads the stop where the
+# file is run: "Do not run this file: <why> (<issue>); stop and tell the
+# owner." test_cam_nc ties these stops to KNOWN_JAW_CLEARANCE_VIOLATIONS both
+# ways, so a stop leaves its plan with the file's entry.
+DO_NOT_RUN_STOP = "Do not run this file:"
 
 
 def verify(expectations, directory: Path, known: dict[str, str] | None = None) -> list[_gcode.Finding]:

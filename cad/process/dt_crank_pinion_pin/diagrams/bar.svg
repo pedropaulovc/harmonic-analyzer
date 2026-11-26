@@ -20,7 +20,7 @@
   <circle class="leader-dot" cx="618" cy="264" r="2"/>
   <text class="label" x="200" y="60">3-jaw over a brass shim wrap on the Ø{{process.stock_dia_in:.3dot}} rod,</text>
   <text class="label" x="200" y="76">{{cad.outer_stickout_datum_mm:in.2dot}} out of the jaw fronts</text>
-  <line class="leader" x1="300" y1="74" x2="548" y2="135.5"/>
+  <line class="leader" x1="300" y1="82" x2="548" y2="135.5"/>
   <circle class="leader-dot" cx="548" cy="135.5" r="2"/>
   <text class="label" x="40" y="300">the rest of the 3 in piece back through</text>
   <text class="label" x="40" y="316">the jaws into the spindle bore</text>
