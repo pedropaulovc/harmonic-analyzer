@@ -26,8 +26,9 @@ the two tooth discs of its cam slot and whose fork carries the arm's strap.
   (END_CLEARANCE_MIN).
 * The NORTH bracket is DRO-located at fit-up (NORTH_EAR_LOCATE_BAND) and the
   SOUTH bracket is set from it to the ears' inner-face span (EAR_INNER_SPAN,
-  +/-EAR_SPAN_BAND). The ears stand within .008 of where the retired
-  preloaded stack put them, and the shaft keeps its printed length.
+  +/-EAR_SPAN_BAND, the title block's .XXX). The ears stand within .008 of
+  where the retired preloaded stack put them, and the shaft keeps its
+  printed length.
 * The shaft is a plain rod whose cylinder spans both ears' outer faces, each
   end domed proud of its ear. One #4-40 set screw down through each ear's
   arch apex bites a flat milled on the shaft at that ear's mid-plane, so the
@@ -94,17 +95,24 @@ END_FLOAT = (
     NORTH_EAR_INNER_Z - HUB19_NORTH_FACE_Z,
 )
 # Fit-up: the north ear's inner face is DRO-located off the located drum bank;
-# the south bracket is then set to the ears' inner-face span, +/-.004 in.
+# the south bracket is then set to the ears' inner-face span at the title
+# block's .XXX, +/-.005 in: delegated ruling 2026-11-25 (Main), precedent:
+# the fit-necessity rule of the owner-approved fit policy
+# (drawing-simplicity-policy.md; owner ruling 2026-11-24): a band stays
+# tighter than the title block only when a named check fails at the looser
+# size; changes the owner's 2026-10-18 X1+B1 number (+/-.004), #2144
+# (rulings.md D20).
 # The DRO locate is booked at the title block's .010 window (MHA-DT-00
 # setting row 5 prints 2.631-2.641: rule 4 opens it to the title block, since
-# no check it feeds falls under D28's 0.03 mm margin; END_CLEARANCE_MIN north
-# 0.249 against the 0.10 floor). The nominal is off the .001 grid, so the
-# band is .0052 to print the title block's full .010 window (Codjiflo
-# 3550-r5). It is this row's own band, not cylinder_bank_layout's
-# FRONT_STRAP_LOCATE_BAND (row 2, kept at 0.10 by necessity N-01).
+# no check it feeds falls under D28's 0.03 mm margin; END_CLEARANCE_MIN is
+# (0.528, 0.249) mm, south and north, against the 0.10 floor). The nominal is
+# off the .001 grid, so the band is .0052 to print the title block's full .010
+# window (Codjiflo 3550-r5). It is this row's own band, not
+# cylinder_bank_layout's FRONT_STRAP_LOCATE_BAND (row 2, kept at 0.10 by
+# necessity N-01).
 NORTH_EAR_LOCATE_BAND = 0.132  # DRO edge-find on the ear's inner face, +/-.0052
 EAR_INNER_SPAN = NORTH_EAR_INNER_Z - SOUTH_EAR_INNER_Z
-EAR_SPAN_BAND = 0.1016  # +/-.004
+EAR_SPAN_BAND = 0.127  # +/-.005, the title block's .XXX
 # Each ear's inner face off its nominal station, (south, north).
 EAR_LOCATE_BAND = (NORTH_EAR_LOCATE_BAND + EAR_SPAN_BAND, NORTH_EAR_LOCATE_BAND)
 # How far an END arm's hub mid-plane may stand off its nominal station while

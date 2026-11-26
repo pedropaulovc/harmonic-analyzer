@@ -127,6 +127,21 @@ def test_station_rows_stack_shortest_nearest_under_the_bar() -> None:
     assert side_y < bar_bottom < bar_top < row_y
 
 
+def test_axle_bore_shelf_clears_the_clamp_callout() -> None:
+    """Machinist review (run 20261124T175053911Z): the axle bore's shelf,
+    under its four-line block (text centred on its keep point, rows 5.5 mm
+    apart), ran through the 2X of the clamp callout's first line, whose top
+    stood 8.8 mm over its callout point (measured on that run's PDF). The
+    shelf now stands at least 3 mm over that line, and the block's top
+    under the frame (y 266.7 mm)."""
+    row = 0.00554
+    axle_y = drawing.FRONT_KEEP["AxleBoreDia"][1]
+    shelf_y = axle_y - 2.0 * row
+    clamp_top = drawing.CLAMP_CALLOUT_XY[1] + 0.0088
+    assert shelf_y - clamp_top >= 0.003
+    assert axle_y + 2.0 * row + 0.005 < 0.2667
+
+
 def test_the_sheet_carries_no_general_notes() -> None:
     # Every hole callout says THRU; the holes' purposes were only polish.
     assert not hasattr(mg_wheel_bar_spec, "DRAWING_NOTES")
@@ -265,7 +280,7 @@ def test_every_wall_is_stated_at_the_full_worst_case() -> None:
     runoff = (0.374 + 0.005) * IN * math.tan(math.radians(0.3))
     losses = runoff + 2 * 0.010 * IN
     bores = {
-        "axle bore": ((0.1865 + 0.0005) * IN / 2.0, row),
+        "axle bore": ((0.1875 + 0.004) * IN / 2.0, row),
         "hanger hole": ((geom.PEN_HANGER_HOLE_DIA + 0.004 * IN) / 2.0, row),
         "clamp holes": ((geom.CLAMP_HOLE_DIA + 0.004 * IN) / 2.0, clamp_row),
     }
@@ -291,7 +306,7 @@ def test_every_wall_is_stated_at_the_full_worst_case() -> None:
     }
     assert set(mg_wheel_bar_spec.MINOR_WALLS) == minors
     assert mg_wheel_bar_spec.WALL_CALLOUT_MIN_IN == {
-        "axle bore": 0.076,
+        "axle bore": 0.074,
         "hanger hole": 0.076,
         "clamp holes": 0.070,
     }
@@ -328,7 +343,7 @@ def test_every_wall_is_an_owner_declared_minor_stated_on_the_sheet() -> None:
         assert entry.reason.startswith("owner ruling 2026-10-26 (#1532)")
 
 
-def test_axle_bore_is_a_marked_reamed_cut() -> None:
+def test_axle_bore_is_a_marked_drilled_cut() -> None:
     assert mg_wheel_bar_spec.DRAWING_DIMENSIONS["AxleBoreProfile"] == {
         "AxleBoreDia",
         "AxleBoreStation",
@@ -344,9 +359,9 @@ def test_axle_bore_is_a_marked_reamed_cut() -> None:
         "ClampStation1": 3,
         "ClampStation2": 3,
     }
-    assert model_toleranced_dimensions(part) == {
-        ("AxleBoreProfile", "AxleBoreDia"): "*deviations(AXLE_BORE_BAND)",
-    }
+    # Owner ruling 2026-11-24, fit audit question 18: the 3/16 drilled bore
+    # takes the DRILLED HOLES row, no band of its own.
+    assert model_toleranced_dimensions(part) == {}
 
 
 def test_part_stamps_make_critical_properties() -> None:
@@ -448,8 +463,8 @@ def test_bar_feature_bands_are_the_printed_ones() -> None:
         [0.369 * IN, 0.379 * IN], abs=1e-3
     )
     bore = features["axle_bore"]
-    assert bore["process"] == "ream" and bore["thru"] is True
-    assert bore["dia"] == pytest.approx([0.1865 * IN, 0.1870 * IN], abs=1e-3)
+    assert bore["process"] == "drill" and bore["thru"] is True
+    assert bore["dia"] == pytest.approx([0.1875 * IN, 0.1915 * IN], abs=1e-3)
     stations = {
         "hanger_hole": (0.20, 0.01),
         "axle_bore": (2.40, 0.01),

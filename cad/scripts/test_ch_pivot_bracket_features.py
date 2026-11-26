@@ -119,7 +119,7 @@ def test_bracket_feature_bands_are_the_printed_ones() -> None:
     assert features["foot_top"]["height"] == pytest.approx([_in(0.23), _in(0.25)])
     assert features["east_side"]["width"] == pytest.approx([_in(0.63), _in(0.65)])
     ear = features["outboard_face"]
-    assert ear["thickness"] == pytest.approx([_in(0.316), _in(0.324)])
+    assert ear["thickness"] == pytest.approx([_in(0.315), _in(0.325)])
     assert ear["callout"] == drawing.DIMENSION_CALLOUTS["EarThick"]
     assert features["foot_end"]["length"] == pytest.approx([_in(0.69), _in(0.71)])
     arch = features["arch"]
@@ -130,8 +130,8 @@ def test_bracket_feature_bands_are_the_printed_ones() -> None:
     assert round(arch["apex_above_bore_ref"] / 25.4, 2) == 0.39
     assert arch["center"][1] + arch["radius_nominal"] == pytest.approx(spec.EAR_TOP_Y)
     bore = features["bore"]
-    assert bore["dia"] == pytest.approx([_in(0.256), _in(0.260)])
-    assert bore["process"] == "ream" and bore["thru"] is True
+    assert bore["dia"] == pytest.approx([6.528, 6.6296])  # F, +.004/0
+    assert bore["process"] == "drill" and bore["drill"] == "F" and bore["thru"] is True
     assert bore["callout"] == drawing.DIMENSION_CALLOUTS["ShaftBoreDia"]
     assert bore["height"] == pytest.approx([_in(0.98), _in(1.00)])
     assert bore["lateral"] == pytest.approx([_in(0.31), _in(0.33)])

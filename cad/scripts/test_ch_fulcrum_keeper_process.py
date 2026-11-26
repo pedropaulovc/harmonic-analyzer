@@ -94,7 +94,7 @@ def test_context_accepts_the_plan_and_numbers_the_tools(ctx) -> None:
         "spot": 2,
         "drill-41": 3,
         "drill-d": 4,
-        "reamer": 5,
+        "drill-f": 5,
         "drill-1-16": 6,
         "em-eighth": 7,
         "tap-guide": 8,
@@ -138,7 +138,6 @@ def test_the_recipes_programs_pass_every_check_they_declare(ctx, tmp_path) -> No
         ("blank_length_min_in", 1.27, "blank_length_min_mm"),
         ("hold_tip_height_mm", 24.0, "hold_tip_height_mm"),
         ("bore_drill_past_mm", 1.0, "bore_tip_height_mm"),
-        ("reamer_lead_mm", 1.5, "ream_tip_height_mm"),
         ("apex_drill_past_mm", 0.0, "apex_tip_height_mm"),
         ("arch_rough_woc_mm", 4.5, "arch_rough_woc_mm"),
         ("arch_past_mm", 0.5, "arch_depth_mm"),
@@ -160,7 +159,7 @@ def test_the_recipes_programs_pass_every_check_they_declare(ctx, tmp_path) -> No
         ("cbore_projection_min_mm", 25.0, "cbore_projection_min_mm"),
         ("long_reach_mm", 25.4, "the end mill reaches"),
         ("foot_hole_station_from_i_mm", 12.5, "foot_hole_station_from_i_mm"),
-        # The setting's centre feed on the helix: 5.6x the chip load at the edge.
+        # The setting's centre feed on the helix: 6.0x the chip load at the edge.
         ("cbore_feed_per_min_mm", 213.36, "cbore_feed_per_min_mm"),
         ("cbore_edge_feed_per_min_mm", 37.899, "cbore_edge_feed_per_min_mm"),
     ],
@@ -219,17 +218,18 @@ def _seed(ctx: dict, key: str, pick, change) -> dict:
             lambda line: "G1 Y8.890 F{feed}",
             "passes",
         ),
-        # The reamer rapided out of the bore.
+        # The F drill stopped short of the lug's outer face (fit audit
+        # question 1: the bore is F-drilled, no reamer).
         (
-            "bore_ream",
-            lambda line: line == "G1 Z20.050 F{feed}",
-            lambda line: "G0 Z20.050",
-            "feed_out",
+            "bore_open",
+            lambda line: line.startswith("G1 Z"),
+            lambda line: "G1 Z15.000 F{feed}",
+            "holes",
         ),
         # The 1/16 stopped short of the bore.
         (
             "crown_drill",
-            lambda line: line.startswith("G1 Z27.376"),
+            lambda line: line.startswith("G1 Z27.389"),
             lambda line: "G1 Z29.000 F{feed}",
             "holes",
         ),
@@ -243,8 +243,8 @@ def _seed(ctx: dict, key: str, pick, change) -> dict:
         # The counterbore's circle .010 too large: off its band's middle.
         (
             "cbore",
-            lambda line: line.startswith("G0 X-11.595"),
-            lambda line: "G0 X-11.341 Y-6.985",
+            lambda line: line.startswith("G0 X-11.620"),
+            lambda line: "G0 X-11.366 Y-6.985",
             "bounds",
         ),
         # The counterbore's last turn .010 deep: under its floor.
@@ -264,7 +264,7 @@ def _seed(ctx: dict, key: str, pick, change) -> dict:
         # The counterbore's cutter dropped onto the lug's side of the foot.
         (
             "cbore",
-            lambda line: line.startswith("G0 X-11.595"),
+            lambda line: line.startswith("G0 X-11.620"),
             lambda line: "G0 X-9.000 Y-6.985",
             "keep_out",
         ),

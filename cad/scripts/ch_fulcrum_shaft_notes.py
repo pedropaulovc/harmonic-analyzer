@@ -10,16 +10,16 @@ re-key them on every sheet edit. Imported ONLY by ``build_ch_fulcrum_shaft``,
 
 from __future__ import annotations
 
-# The shaft is the first-made part of the keeper fit (drawing-guidelines.md
-# rule 4: the band lives here, the bore's .XXX is the mate's): one fit, named
-# by its standard name and its mate. Its SHAFT_H band is narrower than the
-# shop's turned-diameter row, so the callout names the route at the feature:
-# bought ground stock (fan-out F1, delegated ruling 2026-11-07). One fit
-# statement per feature (rule 7: a second mate's sentence is narration, and a
-# callout carries two lines of words). No line ends in punctuation: the
-# widest row ends on the dimension's vertical leader, and a trailing ';'
-# touched it (machinist review r2).
-SHAFT_DIA_CALLOUT = "SLIDING FIT IN MHA-CH-07 BORES\n1/4 GROUND STOCK OK"
+# The shaft is the bought 1/4 ground rod, its O.D. never cut: the sheet
+# prints the stock as a fraction reference with this line under it, not
+# limits of size (drawing-guidelines.md rule 4, "A diameter that is bought to
+# size and never cut prints the stock"; owner ruling 2026-11-20, #2346: buy
+# ground rod). The keeper bores name this shaft as their mate (F DRILL THRU,
+# SLIDING CLEARANCE ON MHA-CH-04; owner ruling 2026-11-24, fit audit
+# question 1), so the shaft carries no fit statement of its own. No line
+# ends in punctuation: the widest row ends on the dimension's vertical
+# leader, and a trailing ';' touched it (machinist review r2).
+SHAFT_DIA_CALLOUT = "GROUND ROD, AS SUPPLIED"
 # AcrossFlat's .XXX is the set screw's seat height: it sets both the >= 1.5D
 # engagement and the proud limit (a .XX band breaks both).
 ACROSS_FLAT_CALLOUT = "SETS MHA-CH-VN-55\nENGAGEMENT"

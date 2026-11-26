@@ -17,6 +17,7 @@ import _config
 import ch_amplitude_bar_spec as bar
 import sh_vn_pivot_pin_bar_spec as pin
 import ch_channel_lever_spec as lever
+import sh_vn_pivot_pin_spec as pin_family
 import rocker_bank_layout as bank
 from _hole_spec import NUMBER_DRILL_MM
 
@@ -64,8 +65,9 @@ def test_the_pin_is_flush_with_the_bar_and_runs_in_the_lever() -> None:
 
 def test_worst_case_joint_budget() -> None:
     b = pin.BUDGET
-    # Press in the reamed cheeks: real at both band extremes, inside FN2 by
-    # limits alone (the loosest pin still presses at FN2's minimum).
+    # The press on the reamer's modelled cut (.0775-.0779, the ANALYSIS band:
+    # owner ruling 2026-11-24, fit audit question 3 prints no band), inside
+    # FN2 (the loosest pin still presses at FN2's minimum).
     assert b["interference_min"] == pytest.approx(0.005715, abs=1e-6)
     assert b["interference_max"] == pytest.approx(0.020955, abs=1e-6)
     assert 0.0 < b["interference_min"] < b["interference_max"]
@@ -74,18 +76,25 @@ def test_worst_case_joint_budget() -> None:
     # Running fit in the lever's #47 hole.
     assert b["running_clearance_min"] == pytest.approx(0.004545, abs=1e-6)
     assert b["running_clearance_max"] == pytest.approx(0.111225, abs=1e-6)
-    # Flush ends leave the #1038 top-notch gap untouched: at the .300 pitch
-    # 7.62 - 6.35 - (3.3274 - 2.9464) - 0.1016 - 0.1016.
-    assert b["neighbour_clearance_min"] == pytest.approx(0.6858, abs=1e-6)
+    # Flush ends leave the #1038 top-notch gap untouched: at the .300 pitch,
+    # on the .118 +.002/-.004 plate (D23),
+    # 7.62 - 6.35 - (3.3274 - 2.8956) - 0.1016 - 0.1016.
+    assert b["neighbour_clearance_min"] == pytest.approx(0.6350, abs=1e-6)
     assert b["neighbour_clearance_min"] >= pin.RUNNING_FLOOR
     # The .55 roof under the .37 lever (#3113; full depth at the pin) turned
     # the full relative swing.
     assert b["notch_roof_clearance_min"] == pytest.approx(1.7405, abs=1e-4)
     assert b["notch_roof_clearance_min"] >= pin.RUNNING_FLOOR
-    # The far face, the offset at its long limit on the narrowest stock: .079,
-    # under the .080 target and over the .060 floor (MHA-CH-01 RV-06).
-    assert b["hole_face_wall_min"] == pytest.approx(2.00787, abs=1e-6)
+    # The far face, the offset at its long limit on the narrowest stock, at
+    # the largest hole a bonded pin is accepted in (the set's .079 pin does
+    # not enter): .0785, printed .078 MIN, under the .080 target and over the
+    # .060 floor (MHA-CH-01 RV-06).
+    assert b["hole_face_wall_min"] == pytest.approx(0.0785 * 25.4, abs=1e-6)
     assert pin.RULE12_WALL_FLOOR <= b["hole_face_wall_min"] < pin.RULE12_WALL_TARGET
+    # A pin that entered by hand, bonded: .000875 at most, inside LOCTITE
+    # 641's 0.15 mm gap fill.
+    assert b["bond_gap_max"] == pytest.approx(0.000875 * 25.4, abs=1e-6)
+    assert b["bond_gap_max"] <= pin_family.LOCTITE_641_GAP_MAX
     # The supplied 5/16 pin under the assumed +/-.010 length grade: the
     # shortest over the widest bar leaves .02625 to dress at each end.
     assert b["length_excess_min"] == pytest.approx(1.3335, abs=1e-6)
@@ -115,7 +124,7 @@ def test_neighbour_stack_closes_the_inter_bar_gap_exactly() -> None:
     neighbour clearance: nothing left out (#1038 option 2)."""
     b = pin.BUDGET
     notch_max = bar.TOP_NOTCH_WIDTH + bar.TOP_NOTCH_WIDTH_BAND[0]
-    lever_min = lever.LEVER_THICKNESS - lever.LEVER_THICKNESS_TOLERANCE
+    lever_min = lever.LEVER_THICKNESS + lever.LEVER_THICKNESS_BAND[1]
     assert bank.PITCH - (
         bar.BAR_WIDTH
         + (notch_max - lever_min)
@@ -123,8 +132,8 @@ def test_neighbour_stack_closes_the_inter_bar_gap_exactly() -> None:
         + 2.0 * lever.PLATE_OFFSET_TOLERANCE
         + 2.0 * pin.PIN_END_PROUD_MAX
     ) == pytest.approx(b["neighbour_clearance_min"])
-    # 7.62 - 6.35 - (3.3274 - 2.9464) - 0.1016 - 0.1016 = 0.6858.
-    assert (notch_max, lever_min) == pytest.approx((3.3274, 2.9464))
+    # 7.62 - 6.35 - (3.3274 - 2.8956) - 0.1016 - 0.1016 = 0.6350.
+    assert (notch_max, lever_min) == pytest.approx((3.3274, 2.8956))
 
 
 def _lever_bar_swing_deg() -> float:
@@ -171,6 +180,12 @@ def _lever_bar_swing_deg() -> float:
 def test_restated_lever_bar_swing_brackets_the_solved_loop() -> None:
     worst = _lever_bar_swing_deg()
     assert worst <= pin.LEVER_BAR_SWING_DEG <= worst + 0.05
+
+
+def test_the_bar_notes_bonded_hole_literal_is_the_pin_specs() -> None:
+    import ch_amplitude_bar_notes as notes
+
+    assert notes.BOND_HOLE_MAX == pytest.approx(pin_family.BOND_HOLE_MAX, abs=1e-9)
 
 
 def test_the_assembly_press_allowance_is_this_joint() -> None:

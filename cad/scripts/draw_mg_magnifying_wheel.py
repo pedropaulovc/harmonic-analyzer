@@ -199,9 +199,10 @@ _SECTION_PLACEMENT_TOL = 1e-5
 # The Ø reads the whole callout on one line, size, process, then the depth
 # as REF (drawing-guidelines.md rule 26: "a depth is never deferred to a
 # view"; the REF is complete because B-B's .32 locates the shoulder, as
-# draw_fr_harmonic_base's spotface), and the face view's TIE 1 callout
-# points at B-B (machinist review of run 20261122T203050502Z, 3/3: the hole
-# was defined in two places, its depth only as a view dimension).
+# draw_fr_harmonic_base's spotface). The face view's TIE 1 callout names
+# the #50 and points at B-B for its Ø and depth, typing neither (Codjiflo
+# r1 of #3529: the simplicity policy forbids hard-coded text standing for
+# a native dimension, and B-B prints both associatively).
 # The cutting line runs along TIE 1's row from just outside the spigot
 # (whose chord on that row would stand a sliver over the drum face, under
 # the Ø's line) out past the boss into the 300-360 spoke window's air, drawn
@@ -447,14 +448,24 @@ WIRE_NUMBER = str(_config.parts("sh-vn-music-wire")["number"])
 # centreline) through to the rim bore, clocked by its 43° from the
 # horizontal.  Each takes at most two lines of words under its process
 # (rule 7).  TIE 1's #60 names its drill (rule 12; dt_crank_pin's "#45 DRILL
-# THRU"); its #50 counter-drill, from the far (drum) side, prints whole on
-# B-B, which the callout names so the hole is not read as a plain #60.
-TIE1_CALLOUT = "#60 DRILL THRU\nWIRE TIE HOLE\nSEE SECTION B-B"
+# THRU"); its #50 counter-drill from the far (drum) side is defined once,
+# by section B-B's own native callout (size, process, depth REF) and depth
+# dimension.  The front callout names no part of it: a line naming the
+# drill and sending the reader to B-B for its size and depth deferred them
+# to another view (rules 9 and 26; machinist review r1 and r2, farm run
+# 20261125T172832344Z); B-B's cutting line through the hole links the two.
+TIE1_CALLOUT = "#60 DRILL THRU\nWIRE TIE HOLE"
 TIE2_CALLOUT = "DRILL THRU\nRADIAL WIRE TIE HOLE\nFROM GROOVE BOTTOM"
 # Each side of a centred tie block past the DRILL THRU line's half-width
-# (capitals about 2.6 mm a character), mm.
+# (capitals about 2.6 mm a character; each text token prints one glyph), mm.
 _TIE_BLOCK_WIDEN = (
-    (max(len(line) for line in TIE1_CALLOUT.splitlines()) - len("DRILL THRU"))
+    (
+        max(
+            len(line.replace("<MOD-DIAM>", "Ø").replace("<HOLE-DEPTH>", "v"))
+            for line in TIE1_CALLOUT.splitlines()
+        )
+        - len("DRILL THRU")
+    )
     * 2.6
     / 2.0
 )
@@ -512,11 +523,11 @@ FRONT_KEEP = {
     # shoulder's near end (the shoulder runs 7.3 mm under the point).  Each
     # reads size, then process, then its plain name (rule 26), centred on
     # the point.  TIE 1's block stands below the wheel, its top 3.2 mm under
-    # the OD, its shoulder's near end 20 mm right of the bore's centre (the
-    # name line widens the block _TIE_BLOCK_WIDEN each side past the DRILL
-    # THRU width the 15.3 mm shoulder offset was set for), so the leader runs
-    # down-right from the hole, away from the X's extension line, and the
-    # block stays left of the section's overall row.
+    # the OD, its shoulder's near end 20 mm right of the bore's centre (its
+    # widest line, "#60 DRILL THRU", widens the block _TIE_BLOCK_WIDEN each
+    # side past the DRILL THRU width the 15.3 mm shoulder offset was set
+    # for), so the leader runs down-right from the hole, away from the X's
+    # extension line, and the block stays left of the section's overall row.
     "Tie1HoleDia": _face(
         20.0 + _CALLOUT_SHOULDER_LEFT + _TIE_BLOCK_WIDEN,
         -RIM_OUTER_DIA / 2.0

@@ -1,0 +1,9 @@
+# What fails past each numeric check test_channel_axial_budget asserts
+# (check_register.py, tolerance-policy.md "Checks in spec modules and tests").
+checks:
+  - id: C-01
+    check: "CHEEK_CLOSURE_LIMIT"
+    kind: gap
+    reason: "bar notch cheek rubs lever plate as lever rocks"
+    source: "the module computes it: least top notch .124 (MHA-CH-01 TopNotchWidth +.007/0) less the thickest lever plate .120 (MHA-CH-02 .118 +.002/-.004) = .004 (0.1016 mm); worst closure 0.0330 mm at station 12 (arm follow 1.0131, lever offset .0252 in from ch_keeper_fitup, plate offset ±.002, notch ledges ±.002 and half the +.007 width), margin 0.0686 mm"
+    basis: worst_case

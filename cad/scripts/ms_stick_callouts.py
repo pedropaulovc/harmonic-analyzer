@@ -31,10 +31,17 @@ RULED_FACE_ISOMETRIC_OCTANT = (1, -1, -1)
 # fit, and the graduation stations share one function: each names its mate
 # once, in the note its dimensions and the station table link (rule 4). The
 # table on sheet 2 links the sheet 1 note by sheet.
+# Rule 4 (fitted pairs): a fit name alone is incomplete, so note 1 gives the
+# acceptance by feel against the MHA-MS-02 rebate. The rebate keeps its own
+# .330 x .134 +.010/0 (owner ruling 2026-11-21, ms_stop_spec
+# WINDOW_SIZE_TOLERANCE_MM), so this note does not make it to the stick: one
+# controlling value per feature (rule 7). No shake limit: the thumbscrew
+# seats the stick on the roof, taking out the designed clearance.
 REBATE_NOTE_NUMBER = 1
 STATION_NOTE_NUMBER = 2
 DRAWING_NOTES = (
-    f"{REBATE_NOTE_NUMBER}. SLIDING FIT IN {_config.parts('ms-stop-block')['number']} STOP BLOCK REBATE\n"
+    f"{REBATE_NOTE_NUMBER}. SLIDING FIT IN {_config.parts('ms-stop-block')['number']} STOP BLOCK REBATE: "
+    "STICK SLIDES FULL LENGTH\n"
     f"{STATION_NOTE_NUMBER}. SETS {_config.parts('ch-amplitude-bar')['number']} AMPLITUDE BAR STATIONS\n"
     # The model's stroke shapes are representative; the shop's own
     # single-stroke sans font engraves the same V at the dimensioned height
@@ -42,6 +49,10 @@ DRAWING_NOTES = (
     "3. NUMERALS: ANY SINGLE-STROKE SANS FONT"
 )
 REBATE_LINK = f"SEE NOTE {REBATE_NOTE_NUMBER}"
+# Rule 4 (stock that is good enough stays stock): the thickness is the 1/8
+# flat's as supplied (owner ruling 2026-11-20, #2441, option B), printed as a
+# reference over the stock it is, as MHA-PN-02's "1/8 CF FLAT".
+THICKNESS_STOCK = "1/8 FLAT AS SUPPLIED"
 STATION_LINK = f"SEE NOTE {STATION_NOTE_NUMBER}"
 STATION_LINK_FROM_SHEET_2 = f"{STATION_LINK}, SHEET 1"
 
@@ -59,7 +70,7 @@ SECTION_PARENT_VIEW_NOTE = "FRONT VIEW ROTATED 180°"
 # carries its value and band; a callout at most two lines of words).
 CALLOUTS: dict[str, str] = {
     "BodyWidth": REBATE_LINK,
-    "BodyThickness": REBATE_LINK,
+    "BodyThickness": f"{THICKNESS_STOCK}\n{REBATE_LINK}",
     # The station table locates the 10 tick with every other graduation;
     # sheet 1 shows its distance from the datum face as a reference.
     "Tick0Width": f"ALL GRADUATIONS\n{part.GRADUATION_WIDTH_CALLOUT}",
@@ -78,11 +89,13 @@ CALLOUTS: dict[str, str] = {
     "NumeralDepth": (f"NUMERALS: {part.ENGRAVING_V_INCLUDED_ANGLE_DEG:g}° INCLUDED V\n"
                      f"{part.NUMERAL_FLOOR_CALLOUT}"),
 }
-# dimension name -> its prefix: detail A's pitches open their reference
-# parentheses; detail F's gaps carry a count (rule 10: one nX callout), since
-# they hold for every numeral beside its tick: the tick-edge gap for 0-9 on
-# the +X side (the 10 has its own detail), the tick-end gap for all eleven.
+# dimension name -> its prefix: detail A's pitches and the stock thickness
+# open their reference parentheses; detail F's gaps carry a count (rule 10:
+# one nX callout), since they hold for every numeral beside its tick: the
+# tick-edge gap for 0-9 on the +X side (the 10 has its own detail), the
+# tick-end gap for all eleven.
 PREFIXES: dict[str, str] = {
+    "BodyThickness": "(",
     "Tick10FromEnd": "(",
     "FullTickPitch": "(",
     "MinorTickPitch": "(",
@@ -91,8 +104,10 @@ PREFIXES: dict[str, str] = {
 }
 # Detail A's pitches and the 10 tick's land show as references (rule 10: the
 # station table, not a chain from the 10 tick, locates every graduation from
-# the end face).
-SUFFIXES: dict[str, str] = {"Tick10FromEnd": ")", "FullTickPitch": ")", "MinorTickPitch": ")"}
+# the end face); the thickness is the stock's (THICKNESS_STOCK).
+SUFFIXES: dict[str, str] = {
+    "BodyThickness": ")", "Tick10FromEnd": ")", "FullTickPitch": ")", "MinorTickPitch": ")",
+}
 # Each native text lane and the text the part authors in it.
 LANES: tuple[tuple[int, dict[str, str]], ...] = (
     (CALLOUT_BELOW, CALLOUTS), (PREFIX, PREFIXES), (SUFFIX, SUFFIXES),

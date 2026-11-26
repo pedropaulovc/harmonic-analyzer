@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Setup 3: the blank taped on the fixture bar's faced top, from above, the middle 7 in broken out (MS02_outline). +X right, +Y up (the fixed jaw is at the rear, the top of the picture). 10 px/mm: left part X-215..-185, right part X-17..+13. Hand-drawn; styles: prechips.palette. -->
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 820 440" width="820" height="440" font-family="Arial, Helvetica, sans-serif" font-size="13">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 820 460" width="820" height="460" font-family="Arial, Helvetica, sans-serif" font-size="13">
   <text class="title" x="12" y="20">Setup 3: blank bonded on the bar, outline MS02 (from above; the middle 7 in left out)</text>
   <!-- Jaws: under the middle only (6.25 in), their tops .22 below the bar's top. -->
   <rect class="clamp" x="350" y="96" width="120" height="54"/>
@@ -54,4 +54,6 @@
   <text class="label" x="24" y="392">hatched: milled away, {{process.outline_trim_mm:in.2dot}} a side and the left end's surplus</text>
   <text class="label" x="24" y="410">every pass is entered in air, off the bar: behind its rear face or in front of its front face</text>
   <text class="label" x="24" y="428">T1 is drawn at pass 3's entry; with M3 the stick on the pass's left is conventional milling</text>
+  <!-- The 1-2-3 block the setup names is the bonding fence, taken away before MS02: not in this picture. -->
+  <text class="label" x="24" y="446">the 1-2-3 block that fenced the blank's rear edge while it was bonded is taken away before MS02 (not shown)</text>
 </svg>

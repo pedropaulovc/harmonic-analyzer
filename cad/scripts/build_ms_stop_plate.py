@@ -28,7 +28,6 @@ from _drawing_marks import (
     mark_dimensions_for_drawing,
 )
 from _drawing_precision import apply_drawing_precision
-from _drawing_tolerances import set_dimension_symmetric_tolerance
 from _holes import wizard_holes
 from ms_stop_geom import (
     author_hole_precision, hide_location_references, location_reference,
@@ -93,10 +92,6 @@ def build(adapter) -> dict[str, str]:
     force_rebuild(adapter)
     volume_check(adapter, "finished brass stop cover", spec.PLATE_FINISHED_VOLUME,
                        0.005 * spec.PLATE_FINISHED_VOLUME)
-    set_dimension_symmetric_tolerance(
-        adapter, "Plate", "PlateThickness", spec.PLATE_THICKNESS_TOLERANCE_MM,
-        display_unit=spec.UNIT,
-    )
     clear_dimensions_for_drawing(adapter)
     for feature, names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature, names)

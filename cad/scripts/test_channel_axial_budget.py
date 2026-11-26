@@ -18,7 +18,9 @@ import pytest
 
 import cam_plane
 import ch_amplitude_bar_spec as bar
+import ch_channel_lever_spec as lever
 import ch_connecting_rod_spec as rod
+import ch_keeper_fitup as fitup
 import ch_rocker_arm_spec as arm
 import cylinder_bank_layout as bank
 import dt_cylinder_gear_spec as gear
@@ -153,16 +155,59 @@ def test_every_rocker_follows_its_rod_inside_the_hub_gaps_and_the_ears(j: int) -
     if j == bank.COUNT - 1:
         assert north <= rocker.END_ARM_FOLLOW_MAX
         assert north == pytest.approx(0.8353, abs=1e-4)
-    # The bar leans from its lever down to the rocker it rides: over the top
-    # notch's depth that lean takes a negligible part of the notch's least
-    # float on the lever.
-    lean = max(-south, north) / bar.TOP_PIN_Y * bar.TOP_NOTCH_HEIGHT
-    assert lean < rocker.RUNNING_FLOOR / 4.0
+    # The bar leans from its lever down to the rocker it rides; over the top
+    # notch's depth the lean closes a cheek on the lever plate.
+    assert _cheek_closure(j) < CHEEK_CLOSURE_LIMIT
+
+
+# The bar slides on its pin across the lever plate, so its top notch closes
+# on the plate only when the lean over the notch's depth spends the notch's
+# least float: the least notch (.124, +.007/0) less the thickest plate (.118
+# +.002/-.004), .004. Past it a cheek rubs the plate as the lever rocks on the
+# pin (check register test-channel-axial-budget).
+CHEEK_CLOSURE_LIMIT = bar.TOP_NOTCH_WIDTH + bar.TOP_NOTCH_WIDTH_BAND[1] - (
+    lever.LEVER_THICKNESS + lever.LEVER_THICKNESS_BAND[0]
+)  # 0.1016
+
+
+def _cheek_closure(j: int) -> float:
+    """The lean's closure over the top notch at station j, every band at its
+    worst and no credit for either notch's float: the arm's follow; the
+    lever's offset from its station, floating between the keeper lugs
+    (ch_keeper_fitup), and its plate's offset on its hub; the bar's top and
+    foot notch centres off each other (each ledge's band and half each
+    width band, the ledges measured from one face)."""
+    south, north = _follow_band(j)
+    lever_low, lever_high = fitup.LEVER_STATION_OFFSET_MM
+    notches = (
+        2.0 * bar.NOTCH_OFFSET_TOLERANCE_MM
+        + max(bar.TOP_NOTCH_WIDTH_BAND[0], bar.BOTTOM_NOTCH_WIDTH_BAND[0]) / 2.0
+    )
+    offset = (
+        max(north - lever_low, lever_high - south)
+        + lever.PLATE_OFFSET_TOLERANCE
+        + notches
+    )
+    return offset / bar.TOP_PIN_Y * bar.TOP_NOTCH_HEIGHT
+
+
+def test_the_bar_lean_books_the_lever_bank_and_closes_no_cheek() -> None:
+    """Fit audit 2026-11-23 (second pass) found the lean booked from the
+    rocker's follow alone, against RUNNING_FLOOR / 4; with the levers' float
+    between the keeper lugs it is booked here against the notch itself."""
+    assert CHEEK_CLOSURE_LIMIT == pytest.approx(0.1016)
+    closures = [_cheek_closure(j) for j in range(bank.COUNT)]
+    worst = max(range(bank.COUNT), key=closures.__getitem__)
+    assert worst == 12
+    assert closures[worst] == pytest.approx(0.0330, abs=1e-4)
+    assert closures[worst] < CHEEK_CLOSURE_LIMIT
 
 
 def test_the_end_hubs_never_reach_their_ears() -> None:
     south, north = rocker.END_CLEARANCE_MIN
-    assert (south, north) == pytest.approx((0.5538, 0.2490), abs=1e-4)
+    # The south ear at the span's ±.005 (D20) on the north ear's .010 DRO
+    # window (MHA-DT-00 row 5, Codjiflo 3550-r5).
+    assert (south, north) == pytest.approx((0.5284, 0.2490), abs=1e-4)
     assert min(south, north) >= rocker.RUNNING_FLOOR
     assert rocker.END_FLOAT == pytest.approx((1.6764, 1.27))
     # The same from this test's own stack, the ear at its locate band.

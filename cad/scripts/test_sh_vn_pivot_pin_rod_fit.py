@@ -94,8 +94,9 @@ def test_the_pin_is_pressed_in_the_fork_and_runs_in_the_arm() -> None:
 
 def test_worst_case_joint_budget() -> None:
     b = pin.BUDGET
-    # The press, at the catalogue's 0/+0.00508 against the ream's limits
-    # Ø1.9685-1.97866 (.0775-.0779 in).
+    # The press, at the catalogue's 0/+0.00508 against the reamer's modelled
+    # cut Ø1.9685-1.97866 (.0775-.0779 in; the ANALYSIS band, owner ruling
+    # 2026-11-24, fit audit question 3 prints no band).
     assert b["interference_min"] == pytest.approx(0.005715, abs=1e-6)
     assert b["interference_max"] == pytest.approx(0.020955, abs=1e-6)
     assert 0.0 < b["interference_min"] <= b["interference_max"]
@@ -116,7 +117,11 @@ def test_worst_case_joint_budget() -> None:
     assert b["tine_min"] == pytest.approx(1.651, abs=1e-6)
     assert b["tine_bearing_land_min"] == b["tine_min"]
     assert b["tine_bearing_land_min"] >= pin.RULE12_WALL_FLOOR
+    # At the largest hole a bonded pin is accepted in (.079), the hole off
+    # by half its Ø.014 position zone: .1435.
+    assert b["crown_wall_min"] == pytest.approx(0.1435 * 25.4, abs=1e-6)
     assert b["crown_wall_min"] >= pin.RULE12_WALL_TARGET
+    assert b["bond_gap_max"] == pytest.approx(0.000875 * 25.4, abs=1e-6)
     assert b["crotch_clearance_min"] >= pin.CROTCH_CLEARANCE_MIN
     assert b["bridge_min"] == pytest.approx(2.794, abs=1e-6)
     assert b["bridge_min"] >= pin.BRIDGE_TARGET

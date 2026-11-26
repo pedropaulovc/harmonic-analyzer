@@ -50,11 +50,6 @@ drawing_unit: in
 #   machinist_exceptions.load_exceptions for ch_channel_assembly, ignored by
 #   the build.
 machinist_exceptions:
-  - id: "RV-01"
-    kind: "accept"
-    where: "sheet 5 VIEW F, the lug inner faces 1.3702 ±.0010 and 7.4102 ±.0010 off the MHA-FR-02 line of the upper socket centres (KeeperFrontFaceZ, KeeperRearFaceZ), set by DRO at the keeper-faces-set step"
-    finding: "lug inner faces DRO-set to ±.001 where a fit-up of the keepers to the MHA-CH-04 flats could absorb the stack (rules 4, 19)"
-    reason: "owner ruling X-A (50072e913, 2026-10-18) loosened the lug centre's lateral band to ±.004 and left the inner faces at KEEPER_FITUP_LOCATION_BAND_MM ±.001 because the shaft flats need them. As stated in step 10, the lug centre's ±.004 band keeps each transferred foot hole over the MHA-FR-02 rail web with a full wall round its tap; the title-block band would put the drill wall below .059. Both bands are named on the sheet with their mates. At the .300 pitch the south foot stands over the K5 relief machined on the MHA-FR-02 front socket boss, .029 clear of its step at the printed worst case (build_fr_top_frame KEEPER_FOOT_PRINTED_BOSS_MARGINS, #1038), so the boss no longer sets this band. The ±.001 pair is what ch_fulcrum_shaft_spec's .048 flat-station window and the frame's foot-to-boss stack are computed against. Replacing them with a fit-up to the flats changes those shared stacks (MHA-CH-04, MHA-FR-02), and that is left to the owner (PR #1665, decisions) (owner-accepted)"
   - id: "U-MHA-SH-VN-54-in-CH-08-no-lock"
     kind: "accept"
     where: "rocker bank fit-up, step set-screws-driven: one MHA-SH-VN-54 cup-point set screw tightened down each MHA-CH-08 ear's apex tap onto its MHA-CH-05 flat; no stake, nut or threadlocker"
@@ -65,3 +60,13 @@ machinist_exceptions:
     where: "lever bank fit-up, step fulcrum-set-screws-driven: one MHA-CH-VN-55 cup-point set screw tightened down each MHA-CH-07 keeper's crown tap onto its MHA-CH-04 flat; no stake, nut or threadlocker"
     finding: "MHA-CH-VN-55 set screws on the reversing fulcrum shaft carry no mechanical lock (rule 23, lock threaded joints exposed to operating loads)"
     reason: "Owner ruling 2026-11-20 (Pedro), #2397 (threaded-joint-retention.md ruling U-MHA-CH-VN-55-no-lock), the same ruling as U-MHA-SH-VN-54-in-CH-08-no-lock: the fulcrum shaft comes out to change one channel part, so its set screws hold on the shaft's flats unstaked. Covers these two set screws only"
+  - id: "CH-00-pin-bond"
+    kind: "accept"
+    where: "steps rod-pin-bonded and bar-pin-bonded and the PIN BOND note on the detail sheet: an MHA-SH-VN-58 pin that slid into its MHA-CH-03 fork or MHA-CH-01 bar ream by hand bonded with LOCTITE 641 on its trailing end only, then checked cured"
+    finding: "a press that slips salvaged with retaining compound instead of renewing the part (rule 23: a slip fit is a new part)"
+    reason: "Owner ruling 2026-11-24, fit audit question 3, APPROVED as recommended (option A): the .0775 holes are reamed with no band and accepted by the pin itself, and a pin that enters by hand is bonded with LOCTITE 641 instead of the bar or rod being scrapped. The largest hole bonded is the one the .079 pin of the .061-.500 set does not enter (the bar and rod travelers; delegated ruling 2026-11-24 (Main), no precedent; changes the number in the owner's 2026-11-24 fit-audit question 3 answer (.0785 → .079: the owned pin set has no .0785 pin; .079 is the nearest pin; HOLE WALL .078 MIN unchanged), #2144 (rulings.md D13); sh_vn_pivot_pin_spec.BOND_HOLE_MAX, the hole MHA-CH-01's HOLE WALL .078 MIN is stated at): a .0009 gap at most, inside 641's .15 mm gap fill (sh_vn_pivot_pin_spec.BOND_GAP). 641 is the removable grade, so the pin still comes out (with heat) for channel service; the trailing-end coat keeps the compound off the running arm or lever (the audit's second pass)"
+  - id: "CH-00-rail-web-tap-wall"
+    kind: "minor"
+    where: "view F, under the lug centre .114 +/-.004: RAIL WEB 2-56 TAP WALL .076 MIN, the wall of each MHA-CH-07 keeper's foot tap transferred into the MHA-FR-02 west rail web"
+    finding: "tap drill wall to the rail web .0767 at the worst case, below the .080 in target (rule 17)"
+    reason: "Owner ruling 2026-11-01: thin walls above the .060 floor but under the .080 target, with no geometry escape, are accepted as package-specific minor exceptions. The same wall as MHA-FR-02 RV-14: delegated ruling 2026-11-24 (Main), precedent: owner ruling 2026-11-01 (thin walls accepted as minor); no owner number changed, #2144 (rulings.md D15, #3534): the stack charges the lug centre this sheet prints, .114 +/-.004, and the narrowest as-cast web at its 2 deg minimum added draft, less the largest printed tap-drill radius and .3 deg of drill wander over the full printed depth, leaves .0767 (1.948 mm), above the .060 floor (build_fr_top_frame KEEPER_TAP_DRILL_WALL_MARGIN). The line states .076, the .0767 floored to the .001 reading unit (fr_top_frame_spec KEEPER_TAP_WALL_ACCEPTED_MM), and build_fr_top_frame raises below it. Accepts this wall only"

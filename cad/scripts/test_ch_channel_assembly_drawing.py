@@ -206,9 +206,11 @@ def test_the_printed_step_heads_are_the_registry_in_order() -> None:
     assert len(set(steps.SEQUENCE)) == len(steps.SEQUENCE)
     assert tuple(drawing.FITUP_TEXT) == steps.SEQUENCE
     # The lever bank's steps all follow the rocker bank's; the strap check
-    # (#2343) opens them, the rocker bank's columns being full.
-    assert steps.LEVER_SEQUENCE[0] == "straps-shake-in-forks"
-    assert steps.LEVER_SEQUENCE[len(steps.STRAP_SHAKE_REMEDY) + 1] == "keepers-on-frame"
+    # (#2343) closes the rocker bank, and the keepers open the lever bank.
+    assert steps.ROCKER_SEQUENCE[-1 - len(steps.STRAP_SHAKE_REMEDY)] == (
+        "straps-shake-in-forks"
+    )
+    assert steps.LEVER_SEQUENCE[0] == "keepers-on-frame"
     assert steps.SEQUENCE[-1] == "spring-bottom-loops-left"
 
 
@@ -232,7 +234,9 @@ def test_every_step_is_one_action_of_at_most_six_lines() -> None:
         body = _step_body(key)
         assert re.search(rf"RETURN TO STEP {steps.step_number(target)}\b", body), key
         # The return is the whole step: nothing but its block prefix before it.
-        assert re.fullmatch(r"((LEFT|RIGHT) HUB: )?RETURN TO STEP .*", body), key
+        assert re.fullmatch(
+            r"((LEFT|RIGHT) HUB: |BONDED PIN: |PIN PUSHED OUT: )?RETURN TO STEP .*", body
+        ), key
     for key in steps.SEQUENCE:
         assert ("RETURN TO STEP" in _step_body(key)) == (key in returns), key
     # Each remedy block is consecutive, in order, right after its check.
@@ -256,9 +260,48 @@ def test_every_step_is_one_action_of_at_most_six_lines() -> None:
         )
         for key in block[1:]:
             assert _step_body(key).startswith(f"{side} HUB: "), key
+    # Each bonded-pin block opens with its condition; every later step
+    # carries "BONDED PIN:" (#3601 independent read: on the normal path
+    # nothing was bonded, so an unprefixed check read as main flow), and the
+    # steps after a failed bond's push-out carry "PIN PUSHED OUT:" (#3601
+    # Codjiflo r2: a bonded pin that passed never replaces its part).
+    for block in (steps.ROD_PIN_REMEDY, steps.BAR_PIN_REMEDY):
+        assert _step_body(block[0]).startswith("IF AN ITEM ")
+        pushed = next(i for i, key in enumerate(block) if key.endswith("-pin-pushed-out"))
+        for key in block[1 : pushed + 1]:
+            assert _step_body(key).startswith("BONDED PIN: "), key
+        assert block[pushed + 1 :], block
+        for key in block[pushed + 1 :]:
+            assert _step_body(key).startswith("PIN PUSHED OUT: "), key
     for prefix in ("rod", "bar"):
-        assert _step_body(f"{prefix}-pin-pressed-out").startswith("IF AN ITEM ")
-        assert _step_body(f"{prefix}-replaced").startswith("REPLACE THAT ITEM ")
+        assert _step_body(f"{prefix}-pin-bond-held").startswith(
+            "BONDED PIN: CURED, CHECK ITEM "
+        )
+        assert " AND " not in _step_body(f"{prefix}-pin-bond-held")
+        assert " AND " not in _step_body(f"{prefix}-pin-bond-swings")
+        # A failed bond is not bonded again: the pin comes out and its part is
+        # replaced (main's remedy), the new part back to its starting step.
+        assert _step_body(f"{prefix}-pin-pushed-out").endswith(
+            "PUSH THAT PIN OUT, HEATING THE "
+            + ("TINES." if prefix == "rod" else "CHEEKS.")
+        )
+        # The replace and return steps carry the push-out's own condition, so a
+        # bonded pin that passed its cured checks never reaches them.
+        assert _step_body(f"{prefix}-replaced").startswith("PIN PUSHED OUT: REPLACE THAT ITEM ")
+    # #3563: the right-hub remedy says which way the right ear moves: out,
+    # to the span's upper limit as view D prints it (nominal plus band), one
+    # action a step: the new setting, then the return on its own.
+    span_band = drawing.asm.DIMENSION_TOLERANCES[drawing.asm.EAR_SPAN_DIMENSION]
+    upper = (bank.EAR_INNER_SPAN + span_band[1]) / 25.4
+    assert drawing.notes.EAR_SPAN_UPPER_TEXT == f"{upper:.3f}" == "6.099"
+    assert _step_body("right-hub-span-to-upper-limit") == (
+        f"RIGHT HUB: AT STEP {steps.step_number('south-bracket-span-set')}, SET "
+        "THE EAR SPAN TO ITS UPPER LIMIT, 6.099."
+    )
+    assert _step_body("right-hub-return") == (
+        f"RIGHT HUB: RETURN TO STEP {steps.step_number('bare-shaft-through-ears')}."
+    )
+    assert ";" not in drawing.FITUP_STEPS
 
 
 def test_the_steps_name_parts_by_bom_item() -> None:
@@ -293,6 +336,7 @@ def test_no_compass_or_private_words_print() -> None:
             *(text for text, _, _ in drawing.DETAIL_POINTERS),
             *(text for text, _, _ in drawing.PLAN_POINTERS),
             *drawing.DIMENSION_CALLOUTS.values(),
+            *drawing.DIMENSION_BELOW_CALLOUTS.values(),
         )
     )
     for word in ("NORTH", "SOUTH", "STRAP", "APEX", "CROWN", "CLOSED UP", "HUB 0", "SPLIT OF"):
@@ -343,8 +387,11 @@ def test_the_right_bracket_is_set_to_the_ear_span_and_the_end_hubs_checked() -> 
     )
     nominal = asm.PIVOT_CHAIN_Z[1] - asm.PIVOT_CHAIN_Z[0]
     assert nominal == pytest.approx(bank.EAR_INNER_SPAN)
+    # The steps never restate the nominal (view D prints it); the right-hub
+    # remedy prints only the band's upper limit (#3563), a different number.
     for text in (f"{nominal / 25.4:.3f}", f"{nominal / 25.4:.2f}"):
-        assert text not in drawing.FITUP_STEPS
+        assert not re.search(rf"(?<![\d.]){re.escape(text)}(?![\d])", drawing.FITUP_STEPS)
+    assert drawing.notes.EAR_SPAN_UPPER_TEXT in _step_body("right-hub-span-to-upper-limit")
     assert asm.DIMENSION_TOLERANCES[asm.EAR_SPAN_DIMENSION] == (
         -bank.EAR_SPAN_BAND,
         bank.EAR_SPAN_BAND,
@@ -558,7 +605,10 @@ def test_the_package_sheets_and_settings_contract() -> None:
         asm.KEEPER_PLAN_FEATURE
     }
     assert set(drawing.notes.DIMENSION_CALLOUTS) == set(kept)
-    assert drawing.notes.REFERENCE_DIMENSIONS == {asm.LUG_SPAN_DIMENSION}
+    assert drawing.notes.REFERENCE_DIMENSIONS == {
+        asm.LUG_SPAN_DIMENSION,
+        asm.KEEPER_REAR_Z_DIMENSION,
+    }
     assert set(asm.DIMENSION_TOLERANCES) == set(kept) - drawing.notes.REFERENCE_DIMENSIONS
     # Every kept dimension text lands on view D, E or F, inside the border,
     # left of the right column.
@@ -1024,16 +1074,21 @@ def test_the_fulcrum_keepers_are_set_by_dro_checked_and_screwed() -> None:
     assert not hasattr(steps, "KEEPERS_PAIR_REAMED_KEY")
     for retired in ("keepers-clamped", "keeper-tops-finished", "keeper-taps-made"):
         assert retired not in steps.SEQUENCE
-    assert steps.LEVER_SEQUENCE[len(steps.STRAP_SHAKE_REMEDY) + 1] == "keepers-on-frame"
+    assert steps.LEVER_SEQUENCE[0] == "keepers-on-frame"
     order = [
         "keepers-on-frame",
         "fulcrum-shaft-through-keepers",
         steps.KEEPERS_SET_KEY,
+        "keeper-faces-set",
+        "rear-keeper-to-stack",
         "keepers-clamped-on-frame",
+        "rear-keeper-leaf-removed",
         "keeper-feet-transferred",
         steps.KEEPERS_SCREWED_KEY,
         "keepers-held",
         "keeper-bores-checked",
+        "fulcrum-shaft-withdrawn",
+        "bars-straight",
         steps.BARS_PINNED_KEY,
         steps.LEVER_BANK_THREADED_KEY,
         "lever-bank-slides",
@@ -1060,15 +1115,38 @@ def test_the_fulcrum_keepers_are_set_by_dro_checked_and_screwed() -> None:
     import ch_fulcrum_shaft_spec as shaft
 
     assert shaft.ALIGNED_MIN_CLEARANCE_MM >= keeper.BORE_RUNNING_MIN_CLEARANCE_MM
-    # #1660 r2 (rule 19): the lever bank has no stack fit-up because it
-    # needs none: twenty hubs at the top of their band leave end play at the
-    # shortest lug span, which the slide check gauges.
-    from ch_channel_lever_spec import HUB_LENGTH as LEVER_HUB, HUB_LENGTH_BAND
-
-    span_min = (
-        keeper.KEEPER_INNER_FACE_SPAN_MM - 2 * keeper.KEEPER_FITUP_LOCATION_BAND_MM
+    # C10 (owner ruling 2026-11-24, fit audit part 2, C10): the bare levers
+    # go on with the shaft, the front lug is set by DRO at the title block's
+    # band and the rear keeper is pushed up to the hubs over the leaf; the
+    # levers come off again before the bars are pinned at the bench.
+    lever = drawing.item(drawing.explode.LEVER)
+    assert f"{drawing.COUNT} BARE {lever}" in _step_body("fulcrum-shaft-through-keepers")
+    assert "RIGHT LUG INNER FACE" in _step_body("keeper-faces-set")
+    pushed = _step_body("rear-keeper-to-stack")
+    assert drawing.notes.setting_row("rear-keeper-to-stack") in pushed
+    assert ".020" not in pushed
+    # The leaf comes out once the clamp holds the keeper, before the drill
+    # (#3601 independent read: no step removed it).
+    assert steps.step_number("rear-keeper-leaf-removed") == (
+        steps.step_number("keepers-clamped-on-frame") + 1
     )
-    assert span_min - drawing.COUNT * (LEVER_HUB + HUB_LENGTH_BAND[0]) > 0.2
+    assert _step_body("rear-keeper-leaf-removed") == "REMOVE THE FEELER LEAF."
+    # The levers come off with the shaft, in its step (#3571 P3), before the
+    # bench work on them.
+    assert _step_body("fulcrum-shaft-withdrawn").endswith(
+        f"CATCHING EACH {lever} LEVER AS IT COMES OFF."
+    )
+    # The bank's end play is the leaf less or plus the push's settle; a
+    # cocked hub (.012 longer, c10_close_solid.py) never closes it solid,
+    # and the slide check's leaf enters at the least play.
+    import ch_keeper_fitup as fitup
+
+    assert fitup.REAR_KEEPER_LEAF_MM == pytest.approx(0.020 * 25.4)
+    assert [p / 25.4 for p in fitup.END_PLAY_MM] == pytest.approx([0.019, 0.021])
+    assert drawing.notes.END_PLAY_LEAF_MM <= fitup.END_PLAY_MM[0]
+    deviations = {k: [d / 25.4 for d in v] for k, v in fitup.FACE_DEVIATIONS_MM.items()}
+    assert deviations["front"] == pytest.approx([-0.0052, 0.0048], abs=1e-4)
+    assert deviations["rear"] == pytest.approx([-0.0262, 0.0058], abs=1e-4)
     assert keeper.SET_SCREW_ENGAGEMENT_D >= keeper.SET_SCREW_MIN_ENGAGEMENT_D
     # Main's ruling: X off the receiving web, Z off the upper socket line; the
     # owner's (X1+B1, b9ae review): the settings are view F's own banded
@@ -1078,14 +1156,17 @@ def test_the_fulcrum_keepers_are_set_by_dro_checked_and_screwed() -> None:
     )
     assert drawing.KEEPER_PLAN.title in _step_body(steps.KEEPERS_SET_KEY)
     asm = drawing.asm
-    # Owner ruling X-A: the lug centre carries its own looser band, the
-    # inner faces the location band.
-    for name, band in (
-        (asm.KEEPER_X_DIMENSION, keeper.KEEPER_FITUP_X_BAND_MM),
-        (asm.KEEPER_FRONT_Z_DIMENSION, keeper.KEEPER_FITUP_LOCATION_BAND_MM),
-        (asm.KEEPER_REAR_Z_DIMENSION, keeper.KEEPER_FITUP_LOCATION_BAND_MM),
-    ):
-        assert asm.DIMENSION_TOLERANCES[name] == (-band, band)
+    # Owner ruling X-A: the lug centre carries its own looser band; C10: the
+    # front inner face the title block's, the rear a reference.
+    assert asm.DIMENSION_TOLERANCES[asm.KEEPER_X_DIMENSION] == (
+        -keeper.KEEPER_FITUP_X_BAND_MM,
+        keeper.KEEPER_FITUP_X_BAND_MM,
+    )
+    assert asm.DIMENSION_TOLERANCES[asm.KEEPER_FRONT_Z_DIMENSION] == pytest.approx(
+        (-0.127, 0.127)
+    )
+    assert asm.KEEPER_REAR_Z_DIMENSION not in asm.DIMENSION_TOLERANCES
+    assert asm.KEEPER_REAR_Z_DIMENSION in drawing.notes.REFERENCE_DIMENSIONS
     assert asm.KEEPER_LUG_X - asm.KEEPER_SOCKET_XZ[0] == pytest.approx(
         keeper.KEEPER_FITUP_X_FROM_WEB_MM
     )
@@ -1094,19 +1175,15 @@ def test_the_fulcrum_keepers_are_set_by_dro_checked_and_screwed() -> None:
     )
     # The bands' functions (Main's ruling, 2026-10-16): the lug centre's band
     # is charged in the transferred foot tap's wall to the rail web (#1660
-    # r6), and the inner faces' band is the shaft flats' (ch_fulcrum_shaft_spec).
-    # At the .300 pitch the south foot stands over the K5 relief machined on
-    # the front socket boss (#1038, fr_top_frame_spec KEEPER_BOSS_RELIEF_*),
-    # so it clears the relief step at the printed worst case even at the
-    # title block's band: the boss no longer sets the location band.
+    # r6), and the inner faces' fit-up is the shaft flats'
+    # (ch_fulcrum_shaft_spec). At the .300 pitch the south foot stands over
+    # the K5 relief machined on the front socket boss (#1038, fr_top_frame_spec
+    # KEEPER_BOSS_RELIEF_*), so it clears the relief step with the front face
+    # at the title block's band.
     import build_fr_top_frame as top
 
     south_margin, north_margin = top.KEEPER_FOOT_PRINTED_BOSS_MARGINS
-    band = keeper.KEEPER_FITUP_LOCATION_BAND_MM
-    title_block_band = top.PRINTED_LINEAR_BAND_MM[keeper.KEEPER_FITUP_PLACES]
-    assert south_margin == pytest.approx(0.737, abs=5e-4)
-    assert south_margin + band - title_block_band > 0.0
-    assert north_margin > 10 * band
+    assert (south_margin, north_margin) == pytest.approx((0.635, 1.3716), abs=5e-4)
     assert top.KEEPER_TAP_DRILL_WALL_MARGIN >= top.WALL_FLOOR_MM
 
 
@@ -1134,42 +1211,106 @@ def test_each_rod_fork_is_pinned_to_its_arm_at_the_bench_first() -> None:
     assert "FLUSH" in _step_body("rod-pins-dressed")
     for word in ("PEEN", "COUNTERSINK", "DRIVE OUT"):
         assert word not in drawing.FITUP_STEPS
-    # Positive control: only the pin steps name the rod pin; only the two
-    # pinning steps and their remedies press.
+    # Positive control: only the pin steps name the rod pin (the bond's swing
+    # check, like rod-arms-swing, names the arm on "ITS PIN"; the replace and
+    # return steps name the rod); only the two pinning steps press.
     pin_steps = {
         steps.RODS_PINNED_KEY,
         "rod-pins-dressed",
         "rod-pins-held",
-        "rod-pin-pressed-out",
-    }
-    pressing = {
-        steps.RODS_PINNED_KEY,
-        steps.BARS_PINNED_KEY,
-        "rod-pin-pressed-out",
-        "bar-pin-pressed-out",
-    }
+        *steps.ROD_PIN_REMEDY,
+    } - {"rod-pin-bond-swings", "rod-replaced", "rod-pin-return"}
+    pressing = {steps.RODS_PINNED_KEY, steps.BARS_PINNED_KEY}
     pin = drawing.item(drawing.explode.ROD_PIN)
     for key in steps.SEQUENCE:
         body = _step_body(key)
         assert (re.search(rf"\b{pin}\b", body) is not None) == (key in pin_steps), key
         assert ("PRESS" in body) == (key in pressing), key
-    # A bought pin cannot be remade: each remedy presses the pin out, replaces
-    # the part whose reamed hole let it slide, and sends the fitter back to
-    # its press, one action a step (rule 22); a replacement bar first passes
-    # the straightness check (#2341).
-    for prefix, host_pin, host, pinned in (
-        ("rod", drawing.explode.ROD_PIN, drawing.explode.ROD, steps.RODS_PINNED_KEY),
-        ("bar", drawing.explode.BAR_PIN, drawing.explode.BAR, "bars-straight"),
+    # Owner ruling 2026-11-24, fit audit question 3: a pin that slid in by
+    # hand is bonded with LOCTITE 641 per the pin bond note; the bond is
+    # checked cured, one check a step (rule 22), each step after the bond
+    # under "BONDED PIN:". A bond that fails its check is not bonded again:
+    # the pin comes out hot and its rod or bar is replaced, as main replaced
+    # it, the new part going back to the step that starts it (#3601
+    # independent read: the old return looped on the bond).
+    detail_sheet = drawing.SHEET_NAMES.index(drawing.DETAIL_SHEET) + 1
+    for prefix, host_pin, mover, host, start, weight, faces in (
+        (
+            "rod",
+            drawing.explode.ROD_PIN,
+            "ch-rocker-arm",
+            drawing.item(drawing.explode.ROD),
+            steps.RODS_PINNED_KEY,
+            "BY",
+            "TINES",
+        ),
+        (
+            "bar",
+            drawing.explode.BAR_PIN,
+            drawing.explode.BAR,
+            f"{drawing.item(drawing.explode.BAR)} BAR",
+            "bars-straight",
+            "UNDER",
+            "CHEEKS",
+        ),
     ):
-        out = _step_body(f"{prefix}-pin-pressed-out")
-        assert out.startswith(f"IF AN {drawing.item(host_pin)} SLID IN BY HAND,")
-        assert out.endswith("IS OVER SIZE: PRESS THAT PIN OUT.")
-        assert _step_body(f"{prefix}-replaced") == f"REPLACE THAT {drawing.item(host)}."
+        assert _step_body(f"{prefix}-pin-bonded") == (
+            f"IF AN {drawing.item(host_pin)} SLID IN BY HAND, BOND IT PER THE "
+            f"PIN BOND NOTE (SHEET {detail_sheet})."
+        )
+        # One check a step (#3563), as the main flow's held and swing checks.
+        assert _step_body(f"{prefix}-pin-bond-held") == (
+            f"BONDED PIN: CURED, CHECK {drawing.item(host_pin)} DOES NOT SLIDE BY HAND."
+        )
+        assert _step_body(f"{prefix}-pin-bond-swings") == (
+            f"BONDED PIN: CHECK {drawing.item(mover)} SWINGS FREE ON ITS PIN "
+            f"{weight} ITS OWN WEIGHT."
+        )
+        assert _step_body(f"{prefix}-pin-pushed-out") == (
+            f"BONDED PIN: IF {drawing.item(host_pin)} SLIDES OR "
+            f"{drawing.item(mover)} BINDS, PUSH THAT PIN OUT, HEATING THE {faces}."
+        )
+        assert _step_body(f"{prefix}-replaced") == f"PIN PUSHED OUT: REPLACE THAT {host}."
         assert _step_body(f"{prefix}-pin-return") == (
-            f"RETURN TO STEP {steps.step_number(pinned)} WITH THE NEW "
-            f"{drawing.item(host)}."
+            f"PIN PUSHED OUT: RETURN TO STEP {steps.step_number(start)} WITH THE NEW {host}."
         )
         assert "REMAKE" not in drawing.FITUP_STEPS
+
+
+def test_the_pin_bond_note_keeps_the_compound_off_the_running_joint() -> None:
+    """Owner ruling 2026-11-24, fit audit question 3, and rule 23: the note
+    names the grade, degreases, coats the trailing end only (no further in
+    than half the tine or cheek, so nothing coated passes the arm or lever),
+    holds the pin square by its far hole, cures before the check, and says
+    how a bonded pin comes out. It prints above detail A's labels."""
+    note = drawing.PIN_BOND_NOTE
+    flat = " ".join(line.strip() for line in note.splitlines())
+    for words in (
+        "LOCTITE 641",
+        "DEGREASE",
+        "COAT ONE END",
+        "HALF THE TINE OR CHEEK",
+        "COATED END LAST",
+        f"THE COMPOUND STAYS OFF THE {drawing.item('ch-rocker-arm')} OR "
+        f"{drawing.item('ch-channel-lever')}",
+        "CURE 24 H",
+        "HOLDING THE PIN SQUARE",
+        "HEATING THE TINES OR CHEEKS IF IT WAS BONDED",
+    ):
+        assert words in flat, words
+    assert flat.startswith(
+        f"PIN BOND (STEPS {steps.step_number('rod-pin-bonded')} AND "
+        f"{steps.step_number('bar-pin-bonded')}):"
+    )
+    lines = note.splitlines()
+    assert max(map(len, lines)) <= drawing.STEPS_LINE_WIDTH
+    x, top = drawing.PIN_BOND_NOTE_XY
+    assert x == drawing.STEPS_RIGHT_X
+    hub_label_top = drawing.SOUTH_END.centre[1] + 0.033
+    assert top - len(lines) * NOTE_LINE_PITCH > hub_label_top
+    assert x + drawing.STEPS_LINE_WIDTH * NOTE_CHAR_WIDTH < (
+        drawing._TEMPLATE.width_m - drawing.BORDER
+    )
 
 
 def test_the_finished_shaft_is_set_by_its_tip_before_the_screws() -> None:
@@ -1249,11 +1390,13 @@ def test_the_set_screws_go_in_after_the_shaft_is_set() -> None:
 def test_the_set_screw_engagement_needs_no_declaration() -> None:
     """The owner's 2026-10-15 shortfall ruling (#1371) covered the R8 arch's
     1.08D; the lifted arch holds 1.5D, so the engagement is no shortfall and
-    the channel contract declares no exception for it. RV-01 covers the
-    keeper inner-face bands of owner ruling X-A."""
+    the channel contract declares no exception for it. RV-01 (the keeper
+    inner faces at ±.001) retired with C10; the lug centre's ±.004 band
+    (owner ruling X-A) is in the necessity register."""
     import ch_pivot_bracket_spec as bracket_spec
     from _paths import CAD_ROOT
     from machinist_exceptions import load_exceptions
+    from machinist_necessity import load_necessity
 
     name = "ch_channel_assembly"
     assert DRAWINGS_BY_NAME[name].source_kind == "assembly"
@@ -1261,11 +1404,12 @@ def test_the_set_screw_engagement_needs_no_declaration() -> None:
         entry.id: entry
         for entry in load_exceptions(CAD_ROOT / "config", name, "assembly")
     }
-    keeper_bands = entries["RV-01"]
+    assert "RV-01" not in entries
     assert not [id_ for id_ in entries if "1667" in id_]
-    assert (keeper_bands.id, keeper_bands.kind) == ("RV-01", "accept")
-    assert "KeeperFrontFaceZ, KeeperRearFaceZ" in keeper_bands.where
-    assert "ENGAGEMENT" not in keeper_bands.where.upper()
+    assert not [e for e in entries.values() if "ENGAGEMENT" in e.where.upper()]
+    register = load_necessity(CAD_ROOT / "config", name)
+    assert [entry.id for entry in register] == ["N-01"]
+    assert "KeeperLugX" in register[0].feature
     assert bracket_spec.SET_SCREW_ENGAGEMENT_PRINTED >= 1.5
     assert assembly_contract("ch-channel").number == "MHA-CH-00"
 
@@ -1362,10 +1506,8 @@ def _setting_table_row(key: str) -> tuple[str, ...]:
 def test_the_feeler_acceptances_are_setting_table_rows_their_steps_cite() -> None:
     """R5 machinist review (rule 22): the feeler acceptances printed only in
     their steps. Each is a setting table row on sheet 6, cited by its step,
-    which carries no number; the end-play leaf is the worst case floored to
-    .01 in."""
-    import ch_fulcrum_keeper_spec as keeper
-    from ch_channel_lever_spec import HUB_LENGTH as LEVER_HUB, HUB_LENGTH_BAND
+    which carries no number; the end-play leaf is the rear keeper's leaf
+    less the push's settle, floored to .01 in (C10)."""
 
     assert drawing.notes.SETTING_TABLE_HEADER == (
         "ROW",
@@ -1375,20 +1517,30 @@ def test_the_feeler_acceptances_are_setting_table_rows_their_steps_cite() -> Non
         "SET TO / ACCEPT",
         "CHECK WITH",
     )
-    keys = ("end-hubs-clear", "bars-straight", "bars-gapped", "lever-bank-slides")
-    assert [row[0] for row in drawing.SETTING_TABLE_ROWS] == ["1", "2", "3", "4"]
+    # C10's rear-keeper row comes last so rows 1-4 keep their numbers.
+    keys = (
+        "end-hubs-clear",
+        "bars-straight",
+        "bars-gapped",
+        "lever-bank-slides",
+        "rear-keeper-to-stack",
+    )
+    assert [row[0] for row in drawing.SETTING_TABLE_ROWS] == ["1", "2", "3", "4", "5"]
     assert [row[1] for row in drawing.SETTING_TABLE_ROWS] == [
         str(steps.step_number(key)) for key in keys
     ]
     for key in keys:
         assert drawing.notes.setting_row(key) in _step_body(key)
         assert "SHEET 6" in drawing.notes.setting_row(key)
-    span_min = (
-        keeper.KEEPER_INNER_FACE_SPAN_MM - 2 * keeper.KEEPER_FITUP_LOCATION_BAND_MM
+    assert _setting_table_row("rear-keeper-to-stack")[2:] == (
+        "LEFT LUG TO LAST HUB",
+        "-",
+        ".020",
+        "FEELER LEAF",
     )
-    play_min_in = (span_min - drawing.COUNT * (LEVER_HUB + HUB_LENGTH_BAND[0])) / 25.4
+    play_min_in = 0.020 - 0.001
     leaf_in = math.floor(play_min_in * 100.0) / 100.0
-    assert 0.0 < leaf_in <= play_min_in
+    assert leaf_in == pytest.approx(0.01)
     assert _setting_table_row("lever-bank-slides")[2:] == (
         "LEVER END PLAY",
         "-",
@@ -1400,16 +1552,79 @@ def test_the_feeler_acceptances_are_setting_table_rows_their_steps_cite() -> Non
     assert drawing.SETTING_TABLE_SHEET == drawing.SHEET_NAMES[5]
 
 
+# The LUG CENTRE block on farm run 20261125T172832344Z's sheet 5 (two rows,
+# text point y 0.140): its top 4.5 mm over the text point, its dimension
+# line 5.3 mm under it, 5.5 mm between row baselines. SolidWorks centres a
+# block on its text point, so each added row moves both ends half a row.
+DIMENSION_TWO_ROW_TOP = 0.0045
+DIMENSION_TWO_ROW_SHELF = 0.0053
+DIMENSION_ROW_PITCH = 0.0055
+
+
+def _plan_keep_x_block() -> tuple[int, float, float]:
+    """View F's lug-centre block: its rows, its top and its dimension line
+    (sheet m), from its text point and the rows its callouts print."""
+    name = drawing.asm.KEEPER_X_DIMENSION
+    rows = 2 + len(drawing.DIMENSION_BELOW_CALLOUTS.get(name, "").splitlines())
+    y = drawing.PLAN_KEEP[name][1]
+    half_rows = (rows - 2) * DIMENSION_ROW_PITCH / 2.0
+    return rows, y + DIMENSION_TWO_ROW_TOP + half_rows, y - DIMENSION_TWO_ROW_SHELF - half_rows
+
+
 def test_view_e_caption_stands_with_its_own_view() -> None:
     """Machinist review r1/r2 (2026-11-19): view E's caption sat nearer view
     F's LUG CENTRE callout than its own view. It now sits just under view E's
     lowest ink (the keeper foot screws' tips, y 0.172 on the farm sheet), with
-    far more air above view F's topmost callout than under view E."""
+    more air above view F's lug-centre block than under view E, and that
+    block's top row (LUG CENTRE) starts east of the caption's end."""
     view = drawing.LEVER_BANK
     x, top = view.label_xy
     foot = top - len(view.label_text.splitlines()) * NOTE_LINE_PITCH
     view_ink_bottom = 0.172
-    view_f_top_text = drawing.PLAN_KEEP[drawing.asm.KEEPER_X_DIMENSION][1]
+    _, block_top, _ = _plan_keep_x_block()
     assert x == pytest.approx(view.centre[0] - 0.016)
     assert 0.002 <= view_ink_bottom - top <= 0.006
-    assert foot - view_f_top_text > 3.0 * (view_ink_bottom - top)
+    assert foot - block_top > 2.0 * (view_ink_bottom - top)
+    name = drawing.asm.KEEPER_X_DIMENSION
+    caption_right = x + max(map(len, view.label_text.splitlines())) * NOTE_CHAR_WIDTH
+    top_row_left = (
+        drawing.PLAN_KEEP[name][0]
+        - len(drawing.DIMENSION_CALLOUTS[name]) * NOTE_CHAR_WIDTH / 2.0
+    )
+    assert top_row_left > caption_right + 0.010
+
+
+def test_the_lug_centre_states_the_rail_web_wall_once() -> None:
+    """Machinist review of farm run 20261125T172832344Z, r1 and r2 (rule 20):
+    the lug centre's band holds the keeper's transferred 2-56 tap's wall in
+    the MHA-FR-02 rail web at .076, under rule 17's .080 target (necessity
+    N-01), and neither view F nor the transfer steps stated it. It prints
+    once, as a plain fact, under the lug centre's value: the number and
+    wording MHA-FR-02 sheet 7 prints, read off the same accepted wall."""
+    from fr_top_frame_callouts import ADDED_DRAFT_WALL_CALLOUT
+
+    name = drawing.asm.KEEPER_X_DIMENSION
+    wall = drawing.notes.KEEPER_TAP_WALL_TEXT
+    assert drawing.DIMENSION_BELOW_CALLOUTS == {name: wall}
+    assert wall == "RAIL WEB " + ADDED_DRAFT_WALL_CALLOUT.removeprefix("HOLDS ")
+    assert "\n" not in wall
+    for _column, block in drawing.FITUP_NOTES:
+        assert "TAP WALL" not in block
+    # The wall row is the block's widest. It starts east of the dimension's
+    # extension lines (the lug and the web centre) and ends short of the
+    # steps column; the third row leaves the dimension line where the
+    # two-row block printed it (y 0.1347, over the boss top at 0.1345).
+    x, _ = drawing.PLAN_KEEP[name]
+    half_width = len(wall) * NOTE_CHAR_WIDTH / 2.0
+    assert len(wall) > len(drawing.DIMENSION_CALLOUTS[name])
+    extension_east = max(
+        drawing._PLAN_LUG[0],
+        drawing.KEEPER_PLAN.plan_xy(
+            drawing.asm.KEEPER_SOCKET_XZ[0], drawing.asm.KEEPER_SOCKET_XZ[1]
+        )[0],
+    )
+    assert x - half_width > extension_east + 0.005
+    assert x + half_width < drawing.STEPS_RIGHT_X - 0.015
+    rows, _, shelf = _plan_keep_x_block()
+    assert rows == 3
+    assert shelf == pytest.approx(0.1347, abs=0.0005)

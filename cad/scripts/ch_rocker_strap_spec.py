@@ -2,10 +2,10 @@ r"""Rocker strap (MHA-CH-13): the flat strap of the built-up rocker arm.
 
 PURE DATA, no SolidWorks/COM imports. MHA-CH-06 may be built up
 (``ch_rocker_arm_notes.BUILT_UP_PERMISSION_NOTE``): the turned hub MHA-CH-12
-is pressed into this strap's Ø.400 reamed hole (``ch_rocker_hub_fit``). The
+is bonded into this strap's Ø.400 reamed hole (``ch_rocker_hub_fit``). The
 strap's outline, faces and thickness are FINISHED here and never cut again;
 only the #47 rod-pin hole is added after joining (it is located from the
-joined part's reamed bore, so it is not on this detail).
+joined part's F-drilled bore, so it is not on this detail).
 
 Frame: the MHA-CH-06 frame, so every value below is the finished part's own
 (``ch_rocker_arm_spec``): origin on the mirror axis at the book bottom edge

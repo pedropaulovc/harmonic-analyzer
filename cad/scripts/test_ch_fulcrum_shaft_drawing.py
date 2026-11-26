@@ -11,11 +11,13 @@ import ch_fulcrum_shaft_spec
 import draw_ch_fulcrum_shaft as drawing
 
 
-def test_surface_finish_is_part_owned_and_consumed_by_key() -> None:
-    (control,) = ch_fulcrum_shaft_spec.SURFACE_FINISHES
-    assert control.key == "bearing"
-    assert control.roughness_um == 1.6
-    assert control.face.diameter_mm == ch_fulcrum_shaft_spec.SHAFT_DIA
+def test_the_bought_rod_carries_no_roughness_symbol() -> None:
+    # The O.D. is the ground rod as supplied, never cut (drawing-guidelines.md
+    # rule 4 prints the stock; rule 6).
+    assert ch_fulcrum_shaft_spec.SURFACE_FINISHES == ()
+    source = open(drawing.__file__, encoding="utf-8").read()
+    assert "add_surface_finish" not in source
+    assert "supplier_reference_dimension(" in source
 
 
 def test_every_marked_model_dimension_is_shown() -> None:
@@ -34,9 +36,9 @@ def test_shaft_carries_no_frames_or_datums() -> None:
 def test_plain_shaft_domed_proud_of_each_keeper() -> None:
     spec = ch_fulcrum_shaft_spec
     keeper = ch_fulcrum_keeper_spec
-    # #2338: the keeper bore is a .2560 reamer's size over the .2500 shaft
-    # (owner ruling 2026-11-23, tool audit Q7; was .2550).
-    assert round((keeper.BORE_DIA - spec.SHAFT_DIA) / 25.4, 4) == 0.0060
+    # #2338: the keeper bore is the F drill's .257 over the .2500 shaft
+    # (owner ruling 2026-11-24, fit audit question 1; was the .2560 reamer).
+    assert round((keeper.BORE_DIA - spec.SHAFT_DIA) / 25.4, 4) == 0.0070
     assert math.isclose(
         spec.CYLINDER_HALF, keeper.KEEPER_Z_OFF + keeper.LUG_HALF_T + 1.016
     )
@@ -84,7 +86,7 @@ def test_flat_pair_is_baselined_from_one_end() -> None:
     assert spec.DRAWING_PRECISION["FlatProfile"]["FlatFromEnd"] == 2
     assert spec.DRAWING_PRECISION["FlatProfile"]["FlatBaseline"] == 2
     assert spec.DRAWING_PRECISION["FlatProfile"]["FlatLength"] == 2
-    assert round(spec.FLAT_STATION_WINDOW_MM, 3) == 1.219
+    assert round(spec.FLAT_STATION_WINDOW_MM, 3) == 0.474  # C10 (ch_keeper_fitup)
 
 
 def _station_window(spec) -> float:
@@ -106,7 +108,7 @@ def test_the_flat_length_cannot_drop_a_place(monkeypatch) -> None:
     with monkeypatch.context() as patch:
         for key in ("front_flat", "rear_flat"):
             patch.setitem(spec._STATION_BANDS, key, spec._BAND_BY_PLACES[1])
-        assert round(_station_window(spec), 3) == -2.337
+        assert round(_station_window(spec), 3) == -3.082
 
 
 def test_both_flats_print_one_length_and_one_across_flat() -> None:
@@ -158,15 +160,6 @@ def test_side_view_texts_stand_clear_of_extension_lines() -> None:
     dome_x, _ = keep["DomeRadius"]
     assert dome_x + len("2X (SR.125)") * char / 2.0 + 0.005 <= dia_x - dia_widest * char
     assert dia_y + 0.007 + 0.003 <= drawing._SHAFT_BOTTOM_Y
-    # The Ra symbol (~9 mm tall up from its anchor) stands on the upper
-    # silhouette right of the Ø line, left of the across-flat callout, between
-    # the shaft and the second row's dimension line (~3 mm under its text).
-    finish_x, finish_y = drawing.FINISH_SYMBOL
-    assert finish_x > dia_x + 0.005
-    assert finish_x + 0.035 < across_x
-    assert finish_y > drawing._SHAFT_TOP_Y + 0.004
-    assert finish_y + 0.009 < keep["FlatBaseline"][1] - 0.003
-    assert math.isclose(drawing.FINISH_EDGE[1], drawing._SHAFT_TOP_Y)
     # Machinist review r2: a row's last glyph meets the dimension's vertical
     # leader, and a trailing ';' touched it.
     for callout in (notes.SHAFT_DIA_CALLOUT, notes.ACROSS_FLAT_CALLOUT):
@@ -184,15 +177,13 @@ def test_side_view_texts_stand_clear_of_extension_lines() -> None:
 
 
 def test_three_place_sizes_name_their_mates() -> None:
-    # Rule 4: the shaft is the first-made part of the keeper fit, so its band
-    # stays here and the callout names the bores by the standard fit and,
-    # the SHAFT_H band being narrower than the turned-diameter row, its route
-    # (fan-out F1: bought ground stock); the across-flat size sets the set
-    # screw's engagement. Rule 7: one fit statement, two lines of words.
-    assert notes.SHAFT_DIA_CALLOUT.splitlines() == [
-        "SLIDING FIT IN MHA-CH-07 BORES",
-        "1/4 GROUND STOCK OK",
-    ]
+    # Rule 4: the shaft is the bought 1/4 ground rod, never cut on its O.D.,
+    # so it prints the stock (a 1/4 REF fraction over this line), not
+    # limits; the keeper bores name it as their mate (fit audit question 1).
+    # The across-flat size sets the set screw's engagement.
+    assert notes.SHAFT_DIA_CALLOUT == "GROUND ROD, AS SUPPLIED"
+    assert ch_fulcrum_shaft_spec.SHAFT_DIA_FRACTION_DENOMINATOR == 4
+    assert ch_fulcrum_shaft_spec.SHAFT_DIA == 0.25 * 25.4
     assert "MHA-CH-VN-55" in notes.ACROSS_FLAT_CALLOUT
     # The sheet's drawing text lives off the spec the assembly imports.
     for name in ("SHAFT_DIA_CALLOUT", "ACROSS_FLAT_CALLOUT", "DRAWING_NOTES", "ISO_VIEW_NOTE"):
@@ -213,16 +204,16 @@ def test_every_orthographic_view_is_at_sheet_scale() -> None:
     assert drawing.ISO_SCALE == (1, 1)
 
 
-def test_keeper_bores_reamed_apart_still_pass_the_shaft() -> None:
-    # #2338: each keeper is reamed alone, so the two bores stand up to both
+def test_keeper_bores_drilled_apart_still_pass_the_shaft() -> None:
+    # #2338: each keeper is drilled alone, so the two bores stand up to both
     # .XX LugRise bands (.020) plus the rail seats' 0.04 zone apart in height
     # (a roll across the width only moves a lug sideways, which the fit-up
     # takes with the shaft through both); each seat may also pitch its zone
     # over its .65 length. The shaft runs through both lug centres 6.360
     # apart and each lug, at its thickest printed .33, spends its thickness x
-    # (pitch + slope); each bore, reamed in its own setup, may run off 0.3 deg
-    # from its seat (the drill it follows). The .2560 bore keeps the slip
-    # minimum after all of that.
+    # (pitch + slope); each bore, drilled in its own setup, may run off 0.3 deg
+    # from its seat. The F-drilled .257 bore (owner ruling 2026-11-24, fit
+    # audit question 1) keeps the slip minimum after all of that.
     keeper = ch_fulcrum_keeper_spec
     spec = ch_fulcrum_shaft_spec
     flatness = keeper.KEEPER_SEAT_FLATNESS_BUDGET_MM
@@ -237,9 +228,9 @@ def test_keeper_bores_reamed_apart_still_pass_the_shaft() -> None:
     assert math.isclose(keeper.BORE_ALIGNMENT_ALLOWANCE_MM, allowance)
     assert round(allowance, 4) == 0.0926
     least = keeper.BORE_DIA + keeper.BORE_DIA_BAND[1] - spec.SHAFT_DIA - spec.SHAFT_DIA_BAND[0]
-    assert round(least / 25.4, 4) == 0.0060
+    assert round(least / 25.4, 4) == 0.0070
     assert math.isclose(spec.ALIGNED_MIN_CLEARANCE_MM, least - allowance)
-    assert round(spec.ALIGNED_MIN_CLEARANCE_MM, 4) == 0.0598
+    assert round(spec.ALIGNED_MIN_CLEARANCE_MM, 4) == 0.0854
     assert spec.ALIGNED_MIN_CLEARANCE_MM >= keeper.BORE_RUNNING_MIN_CLEARANCE_MM == 0.010
     # Neither the owned .2510 reamer nor a .2540 one would do it: each one's
     # least clearance is under the slip minimum plus the allowance.
@@ -267,7 +258,7 @@ def test_analytic_volumes() -> None:
 
 def test_precision_matches_the_marked_dimensions() -> None:
     spec = ch_fulcrum_shaft_spec
-    assert spec.DRAWING_PRECISION["ShaftProfile"]["ShaftDia"] == 4
+    assert spec.DRAWING_PRECISION["ShaftProfile"]["ShaftDia"] == 3
     assert spec.DRAWING_PRECISION["FlatProfile"]["AcrossFlat"] == 3
     assert len(notes.DRAWING_NOTES.splitlines()) <= 4
 

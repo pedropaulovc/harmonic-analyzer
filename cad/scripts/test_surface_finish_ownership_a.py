@@ -11,13 +11,11 @@ import build_dt_arbor_pedestal
 import build_dt_cone_gear_shaft
 import build_dt_cone_swing_platform
 import build_ch_connecting_rod
-import build_ch_channel_lever
 import build_dt_crankshaft
 import build_dt_cylinder_gear_shaft
 import dt_cone_gear_shaft_spec
 import dt_cone_swing_platform_spec
 import ch_connecting_rod_spec
-import ch_channel_lever_spec
 import dt_crankshaft_spec
 import dt_cylinder_gear_shaft_spec
 import draw_dt_alignment_pinion
@@ -25,7 +23,6 @@ import draw_dt_arbor_pedestal
 import draw_dt_cone_gear_shaft
 import draw_dt_cone_swing_platform
 import draw_ch_connecting_rod
-import draw_ch_channel_lever
 import draw_dt_crankshaft
 import draw_dt_cylinder_gear_shaft
 from _gtol_cylinder import CylinderFace
@@ -103,19 +100,10 @@ CASES = (
             ),
         ),
     ),
-    (
-        ch_channel_lever_spec,
-        build_ch_channel_lever,
-        draw_ch_channel_lever,
-        (
-            SurfaceFinishControl(
-                "fulcrum_bore",
-                MACHINED_UM,
-                CylinderFace(ch_channel_lever_spec.PIVOT_HOLE_DIA),
-                display_unit="in",
-            ),
-        ),
-    ),
+    # channel_lever: no finish controls -- its F-drilled fulcrum bore only
+    # rocks against one side under the spring (drawing-guidelines.md rule 6;
+    # owner ruling 2026-11-24, fit audit question 1); its empty tuple is
+    # pinned by test_ch_channel_lever_drawing.
     # crank_arm: no finish controls -- the arm is pinned to its shaft, nothing
     # runs on the bore (drawing-guidelines.md rule 6 (roughness symbols only where a surface runs, slides or locates)); its empty tuple is
     # pinned by test_crank_arm_drawing.

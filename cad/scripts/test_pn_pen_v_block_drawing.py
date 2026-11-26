@@ -48,9 +48,6 @@ def test_drawing_keeps_exactly_the_marked_dimensions() -> None:
     assert set(spec.DIMENSION_CALLOUTS_ABOVE) <= marked
     for feature, name in spec.DIMENSION_PREFIXES:
         assert name in spec.DRAWING_DIMENSIONS[feature]
-    for feature, name in spec.DRAWING_BANDS:
-        assert name in spec.DRAWING_DIMENSIONS[feature]
-        assert name in spec.DIMENSION_CALLOUTS
 
 
 def test_every_feature_is_located_from_the_front_face() -> None:
@@ -122,6 +119,33 @@ def test_relief_corners_print_r065_and_clear_the_grip_at_r070() -> None:
         spec._GRIP_GAP_AT_BOTTOM - 0.070 * 25.4
     )
     assert spec.RELIEF_CORNER_GRIP_MARGIN_MIN >= 0.25
+
+
+def test_relief_corner_callout_stands_off_the_part_beside_the_bottom_view() -> None:
+    # Fan-out 2b-final (rule 14): inside the slot the three rows sat in the
+    # bottom view's silhouette with the sheet right of it empty.  They stand
+    # there now, right of the depth's line, over the title block, under the
+    # paper-end view's rows; the leader rises from the near corner's centre
+    # through the neck, clear of the V's mouth edge and under the ".08"'s
+    # lower arrow (~6.2 mm from its extension line, measured on the 2b sheet).
+    keep_x, keep_y = drawing.BOTTOM_KEEP["ReliefCornerR"]
+    half_w, half_h = drawing._CORNER_TEXT_HALF_W, 0.0075
+    left = keep_x - half_w
+    depth_line = drawing.BOTTOM_KEEP["Depth"][0]
+    assert left == pytest.approx(drawing._CORNER_TEXT_LEFT)
+    assert left > depth_line + 0.005 > drawing._fx(0.0)
+    assert keep_y - half_h > 0.0651 + 0.03  # the title block's top
+    assert keep_y + half_h < drawing.RIGHT_KEEP["VMouthZ1"][1] - 0.0033 - 0.008
+    assert keep_x + half_w < drawing.ISO_CENTER[0] - 0.0350 * 1.5 / 2.0 - 0.03
+    centre_x, centre_y = drawing._CORNER_CENTRE
+    shelf_y = keep_y - drawing._CORNER_SHELF_DROP
+    slope = (shelf_y - centre_y) / (left - centre_x)
+    assert 0.0 < slope < math.tan(math.radians(5.0))
+    step_wall_y = centre_y + slope * (drawing._fx(spec.RELIEF_X0) - centre_x)
+    assert step_wall_y > drawing._bz(spec.V_MOUTH_Z0) + 0.001
+    neck_arrow_x = drawing.BOTTOM_KEEP["NeckZ0"][0]
+    at_neck_arrow = centre_y + slope * (neck_arrow_x - centre_x)
+    assert at_neck_arrow < drawing._bz(0.0) - 0.0062 - 0.0015
 
 
 def test_pivot_bore_drops_wholly_into_the_slot_at_its_printed_limits() -> None:
@@ -401,10 +425,10 @@ def test_bottom_view_prints_the_neck_step_where_it_is_an_outline_change() -> Non
     assert x2 - half_depth_text > x1 + 0.0035
     assert y2 + 0.0019 < y1 - 0.0019 - 0.015
     assert neck_back < y2 < drawing._bz(drawing._CZ)
-    # The reamed diameter's five-row callout (~35 x 32 mm about its keep)
-    # stands below them: right of the depth's line and its extension line's
-    # end (~1.3 mm past it), left of the title block (x 0.2158), over the
-    # border, under "22.2".
+    # The drilled diameter's callout (measured as the reamed one's five rows,
+    # ~35 x 32 mm about its keep; it prints three now) stands below them:
+    # right of the depth's line and its extension line's end (~1.3 mm past
+    # it), left of the title block (x 0.2158), over the border, under "22.2".
     pivot_x, pivot_y = keep["PivotDia"]
     left, bottom = pivot_x - 0.017, pivot_y - 0.016
     assert left > x2 + 0.0013 + 0.001
@@ -412,8 +436,8 @@ def test_bottom_view_prints_the_neck_step_where_it_is_an_outline_change() -> Non
     assert pivot_x + 0.018 < 0.2158 - 0.003
     assert bottom > 0.0127 + 0.01
     assert pivot_y + 0.016 < y2 - 0.0019 - 0.004
-    # REAM THRU and two lines of words (rule 7).
-    assert spec.DIMENSION_CALLOUTS["PivotDia"].count("\n") == 2
+    # #30 DRILL THRU and one line naming the mate (rule 7).
+    assert spec.DIMENSION_CALLOUTS["PivotDia"].count("\n") == 1
     # Its leader, from the bore's near rim to the block's lower left, passes
     # the paper end's extension line between the neck's back corner and the
     # depth's extension line, and under the depth line's end: it crosses no
@@ -482,21 +506,22 @@ def test_section_looks_the_same_way_as_the_paper_end_view() -> None:
 def test_holes_are_native_wizard_features_with_native_callouts() -> None:
     assert spec.SET_SCREW_TAP_SPEC.kind == "tapped"
     assert spec.SET_SCREW_TAP_SPEC.end == "through_next"
-    assert spec.DRAWING_BANDS == {
-        ("PivotBoreProfile", "PivotDia"): spec.PIVOT_BORE_BAND
-    }
+    # The pivot bore is drilled (owner ruling 2026-11-24, fit audit question
+    # 20): no size carries a native band.
+    assert not hasattr(spec, "DRAWING_BANDS")
 
 
-def test_pivot_callout_names_its_mate_and_says_ream() -> None:
+def test_pivot_callout_names_its_drill_and_its_mate() -> None:
     import _config
 
     rod_number = _config.parts("pn-pen-rod")["number"]
     callout = spec.DIMENSION_CALLOUTS["PivotDia"]
-    assert callout.startswith("REAM THRU")
+    # Rule 4: a drilled hole prints the named drill; the mate by number.
+    assert callout.startswith(f"{spec.PIVOT_BORE_DRILL} DRILL THRU")
+    assert spec.PIVOT_BORE_DRILL == "#30"
     assert rod_number in callout
     assert not re.search(r"\d\.\d", callout)
-    # The standard fit name (rule 26), the words in at most two lines (rule 7).
-    assert "SLIDING FIT" in callout
+    assert "REAM" not in callout and "FIT" not in callout
     assert len(callout.splitlines()[1:]) <= 2
 
 
@@ -839,11 +864,13 @@ def test_analytic_volumes_match_the_carriage_mass_model() -> None:
     )
     assert 0.0 < part.V_PIVOT_CHAMFER < 0.0005 * part.V_TOTAL
     bore_length = spec.BLOCK_HEIGHT - spec.RELIEF_HEIGHT
-    assert part.V_PIVOT_BORE == pytest.approx(math.pi * 1.6002**2 * bore_length)
+    assert part.V_PIVOT_BORE == pytest.approx(
+        math.pi * (spec.PIVOT_BORE_DIA / 2.0) ** 2 * bore_length
+    )
     tap_r = TAP_DRILL_MM[spec.SET_SCREW_TAP_SPEC.size] / 2.0
-    # The exact tap reaches past the bore wall's 9.32 from the front face on
-    # its axis, never past the bore axis.
-    assert spec.SET_SCREW_TAP_LENGTH == pytest.approx(9.3218)
+    # The exact tap reaches past the #30 bore wall's 9.29 from the front face
+    # on its axis, never past the bore axis.
+    assert spec.SET_SCREW_TAP_LENGTH == pytest.approx(9.29005)
     assert (
         math.pi * tap_r**2 * spec.SET_SCREW_TAP_LENGTH
         < part.V_SET_SCREW_TAP
@@ -888,7 +915,7 @@ def test_neck_edge_breaks_print_and_clear_the_stirrup_and_the_body() -> None:
     assert carriage.window_corner_ride_max(carriage.STIRRUP_REAR_FACE_LIMITS[1]) == 0.0
     # The chamfer mill stops short of the step at its printed nearest (.34),
     # so its cone on the top face stays inside the body's side faces; its
-    # run-out keeps the target to the bore's chamfer (5.50) and to the rod
+    # run-out keeps the target to the bore's chamfer (5.42) and to the rod
     # shoulder's circle (3.97), and stops 0.23 short of the set-screw thread.
     step_min = spec.RELIEF_X0 + _printed_devs(spec.RELIEF_X0, "ReliefX0")[0]
     assert spec.NECK_BREAK_FULL_X < step_min
@@ -896,7 +923,7 @@ def test_neck_edge_breaks_print_and_clear_the_stirrup_and_the_body() -> None:
         spec.NECK_EDGE_BREAK**2 - (spec.RELIEF_X0 - spec.NECK_BREAK_FULL_X) ** 2
     )
     assert reach < spec.BODY_SIDE_STEP
-    assert spec.NECK_BREAK_BORE_CHAMFER_WALL_MIN == pytest.approx(5.500, abs=1e-3)
+    assert spec.NECK_BREAK_BORE_CHAMFER_WALL_MIN == pytest.approx(5.424, abs=1e-3)
     assert spec.NECK_BREAK_ROD_SHOULDER_GAP_MIN == pytest.approx(3.975, abs=1e-3)
     assert spec.NECK_BREAK_TAP_GAP_MIN == pytest.approx(0.2285, abs=1e-4)
     # The top flat the stirrup's rail rests on keeps .51 at the printed worst.
@@ -1178,8 +1205,8 @@ def test_block_feature_bands_are_the_printed_ones() -> None:
     assert relief["far_wall"] == pytest.approx([_in(0.73), _in(0.75)])
     assert relief["height"] == pytest.approx([_in(0.25), _in(0.27)])
     bore = features["pivot_bore"]
-    assert bore["process"] == "ream" and bore["thru"] is True
-    assert bore["dia"] == pytest.approx([_in(0.1260), _in(0.1265)], abs=1e-4)
+    assert bore["process"] == "drill" and bore["thru"] is True
+    assert bore["dia"] == pytest.approx([_in(0.1285), _in(0.1325)], abs=1e-4)
     assert bore["station"] == pytest.approx([_in(0.48), _in(0.50)])
     assert bore["depth_station"] == pytest.approx([_in(0.42), _in(0.44)])
     assert bore["top_chamfer"] == pytest.approx([_in(0.012), _in(0.016)])

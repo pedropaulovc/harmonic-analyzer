@@ -2786,6 +2786,252 @@ def test_companion_pdf_requires_a_traveler_package(tmp_path: Path) -> None:
         ])
 
 
+_STANDING_HEADING = (
+    "\nSHOP STANDING INSTRUCTIONS (common sense in this shop: the traveler must "
+    "not repeat or re-word any of it)\n"
+)
+_STANDING_NOT_APPLIED = (
+    "\nSHOP STANDING INSTRUCTIONS: NOT APPLIED (this plan is not yet converted to "
+    "the shop standing page; owner 2026-11-25: plans convert batch by batch). "
+    "Do not report rule T18 items about the standing page: repeated or "
+    "re-worded standing rules, the pointer line, or cautions in the head. Rule "
+    "T18's running page header/footer item and every other rule still apply.\n"
+)
+_POINTER = "Shop standing instructions apply. Read them before the first setup."
+
+
+@pytest.fixture
+def standing_pointer(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> str:
+    import machinist_review_traveler
+
+    shop = tmp_path / "shop-standing.toml"
+    shop.write_text(f'[standing]\npointer = "{_POINTER}"\n', encoding="utf-8")
+    monkeypatch.setattr(machinist_review_traveler, "STANDING_TOML", shop)
+    return _POINTER
+
+
+def _standing_page(path: Path, rule: str = "Feed Hold before reaching in.") -> Path:
+    path.write_text(
+        "<!doctype html><html><head><style>h1{color:#000}</style></head><body>"
+        f"<h1>Shop standing instructions</h1><ul><li>{rule}</li>"
+        "<li>Units: inch, G20.</li></ul></body></html>",
+        encoding="utf-8",
+    )
+    return path
+
+
+def _traveler_pdf(path: Path, *, converted: bool) -> Path:
+    """A traveler PDF whose head prints the pointer, wrapped over two lines as
+    a sheet wraps it, when ``converted``."""
+    head = (
+        [(40, 700, "Shop standing instructions apply. Read them"), (40, 688, "before the first setup.")]
+        if converted else [(40, 700, "Units are inches.")]
+    )
+    return _text_pdf(path, [*head, (40, 660, "Setup 1")])
+
+
+@pytest.fixture
+def standing_page(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    """The shop standing page where a traveler review reads it."""
+    import machinist_review_traveler
+
+    page = _standing_page(tmp_path / "standing.html")
+    monkeypatch.setattr(machinist_review_traveler, "STANDING_HTML", page)
+    return page
+
+
+def test_shop_standing_pointer_is_read_from_the_shop() -> None:
+    import machinist_review_traveler
+
+    pointer = machinist_review_traveler.standing_pointer()
+    assert pointer.startswith("Shop standing instructions apply")
+    assert machinist_review_traveler.standing_converted(f"Head\n{pointer}\nSetup 1")
+    assert not machinist_review_traveler.standing_converted("Head\nSetup 1")
+    # A PDF text layer may print "fi" as the ligature U+FB01 (Codjiflo, #3593).
+    ligatured = pointer.replace("fi", "\ufb01").replace("ff", "\ufb00")
+    assert ligatured != pointer
+    assert machinist_review_traveler.standing_converted(f"Head\n{ligatured}\nSetup 1")
+    assert machinist_review_traveler.STANDING_HTML == (
+        mr.CAD_ROOT / "out" / "travelers" / "shop-standing-instructions"
+        / "shop-standing-instructions.html"
+    )
+
+
+def test_converted_traveler_prompts_carry_the_standing_page(
+    tmp_path: Path, standing_pointer: str, standing_page: Path,
+) -> None:
+    traveler = mr.ReviewPackage(
+        "probe_part", "traveler", (_traveler_pdf(tmp_path / "t.pdf", converted=True),),
+    )
+    for prefix in (mr.load_prompt("traveler"), mr.load_prompt("traveler", judge=True)):
+        prompt = mr._review_prompt(traveler, 1, prompt_text=prefix)
+        section = prompt.split(_STANDING_HEADING, 1)[1]
+        assert section.splitlines()[1:4] == [
+            "Shop standing instructions",
+            "Feed Hold before reaching in.",
+            "Units: inch, G20.",
+        ]
+        assert "h1{color:#000}" not in prompt
+        assert "NOT APPLIED" not in prompt
+
+
+def test_unconverted_traveler_prompts_skip_the_standing_page(
+    tmp_path: Path, standing_pointer: str, standing_page: Path,
+) -> None:
+    traveler = mr.ReviewPackage(
+        "probe_part", "traveler", (_traveler_pdf(tmp_path / "t.pdf", converted=False),),
+    )
+    for prefix in (mr.load_prompt("traveler"), mr.load_prompt("traveler", judge=True)):
+        prompt = mr._review_prompt(traveler, 1, prompt_text=prefix)
+        assert _STANDING_NOT_APPLIED in prompt
+        assert _STANDING_HEADING not in prompt
+        assert "Feed Hold before reaching in." not in prompt
+    source = _png_source(tmp_path / "sheet.png")
+    assert "SHOP STANDING" not in mr._review_prompt(
+        mr.ReviewPackage("probe_part", "part", (source,)), 1
+    )
+
+
+def test_conversion_reads_the_traveler_pdf_not_the_companion(
+    tmp_path: Path, standing_pointer: str, standing_page: Path,
+) -> None:
+    """The traveler's own PDF text decides; the companion drawing's never does."""
+    import machinist_review_traveler
+
+    converted = _traveler_pdf(tmp_path / "converted.pdf", converted=True)
+    plain = _traveler_pdf(tmp_path / "plain.pdf", converted=False)
+    assert _STANDING_HEADING in machinist_review_traveler.document_roles((converted,), 0, 1)
+    assert machinist_review_traveler.document_roles((plain,), 0, 1) == _STANDING_NOT_APPLIED
+    roles = machinist_review_traveler.document_roles((plain, converted), 1, 2)
+    assert roles.startswith("\nDOCUMENT ROLES\n")
+    assert roles.endswith(_STANDING_NOT_APPLIED)
+
+
+def test_standing_page_without_text_is_refused(
+    tmp_path: Path, standing_pointer: str, standing_page: Path,
+) -> None:
+    standing_page.write_text("<html><body><svg>x</svg></body></html>", encoding="utf-8")
+    package = mr.ReviewPackage(
+        "probe_part", "traveler", (_traveler_pdf(tmp_path / "t.pdf", converted=True),),
+    )
+    with pytest.raises(ValueError, match="standing instructions page has no text"):
+        mr._review_prompt(package, 1)
+
+
+def test_missing_standing_page_refuses_only_a_converted_traveler(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, standing_pointer: str,
+) -> None:
+    import machinist_review_traveler
+
+    missing = tmp_path / "absent" / "shop-standing-instructions.html"
+    monkeypatch.setattr(machinist_review_traveler, "STANDING_HTML", missing)
+    converted = mr.ReviewPackage(
+        "probe", "traveler", (_traveler_pdf(tmp_path / "c.pdf", converted=True),),
+    )
+    with pytest.raises(FileNotFoundError, match="standing instructions page missing") as info:
+        mr._review_prompt(converted, 1)
+    assert str(missing) in str(info.value)
+    assert "cad/scripts/prechips_traveler.py --standing" in str(info.value)
+    plain = mr.ReviewPackage(
+        "probe", "traveler", (_traveler_pdf(tmp_path / "p.pdf", converted=False),),
+    )
+    assert _STANDING_NOT_APPLIED in mr._review_prompt(plain, 1)
+
+
+def _stubbed_reviews(monkeypatch: pytest.MonkeyPatch) -> list[tuple[bool, str]]:
+    prompts: list[tuple[bool, str]] = []
+
+    def reply(command: list[str], **kwargs: Any):
+        findings = _judge_inputs(kwargs["input"])
+        prompts.append((findings is not None, kwargs["input"]))
+        value = (
+            {"clusters": [_judge_cluster([item["id"] for item in findings])]}
+            if findings is not None else _finding_verdict()
+        )
+        return _session_reply(command, kwargs, value)
+
+    monkeypatch.setattr(mr, "_run_reviewer", reply)
+    return prompts
+
+
+def test_standing_page_reaches_reviewer_and_judge_and_keys_the_review(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, standing_pointer: str,
+    standing_page: Path,
+) -> None:
+    """The page's text is in every reviewer and judge prompt, so the recorded
+    prompt sha256 changes with it."""
+    prompts = _stubbed_reviews(monkeypatch)
+    source = _traveler_pdf(tmp_path / "t.pdf", converted=True)
+
+    def review(directory: str, rule: str) -> dict[str, Any]:
+        prompts.clear()
+        aggregate = mr.aggregate_package(
+            mr.ReviewPackage("probe", "traveler", (source,)),
+            reviewer="codex", judge_reviewer="codex", runs=1, retries=0,
+            report_dir=tmp_path / directory, codex="codex-test",
+        )
+        assert aggregate["error"] is None
+        assert [judge for judge, _ in prompts] == [False, True]
+        for _, prompt in prompts:
+            assert _STANDING_HEADING + "Text of the shop's" in prompt
+            assert f"\n{rule}\nUnits: inch, G20.\n" in prompt
+        return aggregate
+
+    first = review("a", "Feed Hold before reaching in.")
+    run = json.loads(Path(first["runs"][0]["report"]).read_text(encoding="utf-8"))
+    _standing_page(standing_page, "Stop and tell the owner.")
+    second = review("b", "Stop and tell the owner.")
+    rerun = json.loads(Path(second["runs"][0]["report"]).read_text(encoding="utf-8"))
+    assert rerun["prompt_sha256"] != run["prompt_sha256"]
+    assert second["judge"]["prompt_sha256"] != first["judge"]["prompt_sha256"]
+
+
+def test_unconverted_review_sends_no_standing_page(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, standing_pointer: str,
+    standing_page: Path,
+) -> None:
+    prompts = _stubbed_reviews(monkeypatch)
+    aggregate = mr.aggregate_package(
+        mr.ReviewPackage(
+            "probe", "traveler", (_traveler_pdf(tmp_path / "t.pdf", converted=False),),
+        ),
+        reviewer="codex", judge_reviewer="codex", runs=1, retries=0,
+        report_dir=tmp_path / "reports", codex="codex-test",
+    )
+    assert aggregate["error"] is None
+    assert [judge for judge, _ in prompts] == [False, True]
+    for _, prompt in prompts:
+        assert _STANDING_NOT_APPLIED in prompt
+        assert _STANDING_HEADING not in prompt
+        assert "Feed Hold before reaching in." not in prompt
+
+
+def test_standing_unconverted_list_matches_the_plans() -> None:
+    """The ratchet: every enrolled plan not yet converted to the standing page
+    (owner 2026-11-25). Placeholder plans render no traveler and are not listed."""
+    import tomllib
+
+    import _process_plans
+    import yaml
+
+    path = mr.CAD_ROOT / "config" / "machinist-review" / "standing-unconverted.yaml"
+    listed = yaml.safe_load(path.read_text(encoding="utf-8"))["unconverted"]
+    actual = [
+        stem for stem in _process_plans.enrolled_stems()
+        if tomllib.loads(
+            _process_plans.plan_path(stem).read_text(encoding="utf-8")
+        ).get("standing") is not True
+    ]
+    assert listed == sorted(listed), f"{path}: keep the list sorted"
+    assert listed == actual, (
+        f"{path} differs from the unconverted plans: "
+        f"converted but still listed {sorted(set(listed) - set(actual))}; "
+        f"unconverted but not listed {sorted(set(actual) - set(listed))}. "
+        "Convert the plan (`standing = true`), then remove it from the list; "
+        "a new plan starts converted."
+    )
+
+
 # --- owner-declared machinist exceptions -------------------------------------
 
 

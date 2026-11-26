@@ -439,6 +439,7 @@ def test_release_ships_a_family_traveler_once_and_a_placeholder_per_part(
 
     import _process_plans
     import export_features
+    import prechips_traveler
 
     # Owner ruling 2026-11-24: a release ships "a placeholder pdf per part
     # that points to shared one".
@@ -457,6 +458,10 @@ def test_release_ships_a_family_traveler_once_and_a_placeholder_per_part(
     )
     out = tmp_path / "cad" / "out"
     monkeypatch.setattr(_process_plans, "PROCESS_ROOT", process)
+    shop = process / "shop" / "common.toml"
+    shop.parent.mkdir()
+    shop.write_text("[standing]\n", encoding="utf-8")
+    monkeypatch.setattr(_process_plans, "SHOP_DIR", shop.parent)
     monkeypatch.setattr(cut_release, "TRAVELER_STEMS", (stem,))
     monkeypatch.setattr(cut_release, "CAD_ROOT", out.parent)
     manifests = [export_features.bundle_paths(part, out)[0] for part in parts]
@@ -471,17 +476,46 @@ def test_release_ships_a_family_traveler_once_and_a_placeholder_per_part(
     pdfs[0].parent.mkdir(parents=True)
     for pdf in pdfs:
         pdf.write_bytes(b"%PDF-1.4 " + pdf.name.encode())
+    # The shop's standing page ships once beside them, under its own name.
+    standing = prechips_traveler.standing_paths(out)[1]
+    standing.parent.mkdir(parents=True)
+    standing.write_bytes(b"%PDF-1.4 standing")
+    shipped = [*names, "shop-standing-instructions.pdf"]
 
     stage = tmp_path / "stage"
-    assert cut_release.stage_travelers(stage) == [f"travelers/{name}" for name in names]
-    assert sorted(p.name for p in (stage / "travelers").iterdir()) == sorted(names)
+    assert cut_release.stage_travelers(stage) == [f"travelers/{name}" for name in shipped]
+    assert sorted(p.name for p in (stage / "travelers").iterdir()) == sorted(shipped)
     assert (stage / "travelers" / names[1]).read_bytes() == b"%PDF-1.4 " + names[1].encode()
+    assert (stage / "travelers" / shipped[-1]).read_bytes() == b"%PDF-1.4 standing"
 
-    # The notes count the two parts, not the three PDFs or the one nc/ directory.
-    staged = [f"travelers/{name}" for name in names]
+    # The notes count the two parts, not the four PDFs or the one nc/ directory.
+    staged = [f"travelers/{name}" for name in shipped]
     assert cut_release._traveler_part_count(staged) == 2
+    facts = {
+        "native_documents": 3, "sw_revision": "35", "parts": 3, "assemblies": 1,
+        "steps": 3, "stls": 3, "config_meshes": 3, "pngs": 3,
+        "comparisons": {"pairs": 0, "mean_score": None}, "size_mb": 1.0,
+        "travelers": staged,
+    }
+    notes = cut_release.release_notes("v42", facts)
+    assert notes.count("shop-standing-instructions.pdf") == 1
+    assert "(2 parts), rendered by prechips" in notes
+
     assert cut_release._nc_part_count([f"nc/{stem}/A.nc", f"nc/{stem}/B.nc"]) == 2
     assert cut_release._nc_part_count(["nc/ch_rocker_arm/A.nc"]) == 1
+
+    # A missing standing page, or one older than any shop file, fails the cut.
+    standing.unlink()
+    with pytest.raises(
+        RuntimeError,
+        match=r"required traveler is missing.*shop-standing-instructions.*prechips:standing",
+    ):
+        cut_release.stage_travelers(tmp_path / "no-standing")
+    standing.write_bytes(b"%PDF-1.4 standing")
+    newer = standing.stat().st_mtime + 60
+    os.utime(shop, (newer, newer))
+    with pytest.raises(RuntimeError, match=r"traveler is stale.*common\.toml.*prechips:standing"):
+        cut_release.stage_travelers(tmp_path / "stale-standing")
 
     # A missing placeholder, and any sheet older than either part's manifest,
     # fails the cut.
@@ -493,6 +527,10 @@ def test_release_ships_a_family_traveler_once_and_a_placeholder_per_part(
     os.utime(manifests[1], (newer, newer))
     with pytest.raises(RuntimeError, match="traveler is stale.*ch_rocker_hub"):
         cut_release.stage_travelers(tmp_path / "stale")
+
+    # No traveler enrolled: no standing page is needed or shipped.
+    monkeypatch.setattr(cut_release, "TRAVELER_STEMS", ())
+    assert cut_release.stage_travelers(tmp_path / "none") == []
 
 
 def test_release_stages_every_cam_output_under_nc_and_refuses_missing_or_stale_ones(

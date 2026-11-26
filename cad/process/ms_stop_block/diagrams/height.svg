@@ -1,4 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 420" font-family="sans-serif" font-size="13">
+  <!-- To scale at 4 px/mm (the .485 depth = 48.8 px). The 1/2 in end mill Ø12.7 (milling_cuts "top face") = 50.8 px, on MS04_height's second pass, Y −5.850 (over the slice), its end on the last level; at least 1.00 in out of the collet (half_mill_projection_min_mm): drawn short, broken off. -->
   <rect class="paper" x="0" y="0" width="760" height="420"/>
   <text class="title" x="16" y="22">Setup 5 (MS04): face the top face down to the height</text>
   <rect class="fixture-vise" x="121.6" y="330.0" width="156.8" height="22.0"/>
@@ -11,9 +12,9 @@
   <rect class="part-kept" x="175.6" y="120.7" width="48.8" height="56.9"/>
   <rect class="part-removed" x="175.6" y="103.4" width="48.8" height="17.3"/>
   <line class="active-face" x1="175.6" y1="120.7" x2="224.4" y2="120.7"/>
-  <rect class="cutter" x="168.3" y="57.4" width="50.8" height="44.0"/>
-  <line class="arrow" x1="225.1" y1="77.4" x2="260.4" y2="77.4"/>
-  <text class="label" x="440.0" y="70.0">1/2 in end mill; passes along the jaws</text>
+  <path class="cutter" d="M175.6 44 L175.6 114.6 A25.4 6.1 0 0 0 226.4 114.6 L226.4 44 L220.1 40 L207.3 48 L194.7 40 L181.9 48 L175.6 44 Z"/>
+  <line class="arrow" x1="232" y1="70" x2="272" y2="70"/>
+  <text class="label" x="440.0" y="70.0">1/2 in end mill; passes along the jaws, stepping over →</text>
   <line class="leader" x1="436.0" y1="66.0" x2="185.6" y2="73.4"/>
   <circle class="leader-dot" cx="185.6" cy="73.4" r="2.5"/>
   <text class="label" x="440.0" y="110.0">TOP face, faced in levels</text>

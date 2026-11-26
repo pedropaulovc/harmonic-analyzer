@@ -1,0 +1,16 @@
+# MHA-MG-05 magnifying wheel: why each REAM and each band tighter than the
+# title block stays (drawing-guidelines.md rule 4; owner ruling 2026-11-24:
+# the reason lives here, not on the sheet). Read by the machinist review only.
+# Fit audit 2026-11-23 (MHA-MG-05.running_bore, second pass, SkepticDT claim
+# 5): a drilled hole gives the size but not the surface. The wheel turns on
+# this bore and its radius error at the front end reaches the pen about x3.6
+# (.0005 out of round is 0.046 mm of the 0.075 mm allowance), so it stays
+# reamed with the set's .1885, no band, the drill-rod axle MHA-MG-07 as its
+# gauge (note 1). The hub's overall rides the title block since the fit
+# conversion (MHA-MG-05.hub_length).
+necessity:
+  - id: N-01
+    feature: "axle bore (.1885) REAM THRU, note 1: running fit on axle MHA-MG-07"
+    kind: trace
+    reason: "bore play and roundness reach the pen trace magnified"
+    source: "mg_wheel_group.HUB_RUNNING; fit audit 2026-11-23 MHA-MG-05.running_bore"

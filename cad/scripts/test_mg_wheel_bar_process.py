@@ -85,10 +85,9 @@ def test_context_numbers_the_tools_and_drills_every_hole_from_the_milled_left_en
     assert ctx["numbers"] == {
         "em-half": 1,
         "spot": 2,
-        "drill-17": 3,
+        "drill-3-16": 3,
         "drill-15": 4,
         "drill-9": 5,
-        "reamer-1865": 6,
     }
     assert RECIPE.LOAD_FIRST_TOOL == tuple(name for name, _ops in RECIPE.PROGRAMS)
     f = FEATURES["features"]
@@ -110,7 +109,6 @@ def test_context_numbers_the_tools_and_drills_every_hole_from_the_milled_left_en
     # X from the milled left end, Y down from T at the fixed jaw.
     assert centres("WB03_left@2") == model("axle_bore")
     assert centres("WB03_left@3") == model("hanger_hole")
-    assert centres("WB03_left@4") == model("axle_bore")
     assert centres("WB04_right@2") == model("clamp_hole_1", "clamp_hole_2")
 
 
@@ -129,9 +127,8 @@ def test_the_recipes_programs_pass_every_check_they_declare(ctx, tmp_path) -> No
         ("blank_length_min_mm", 230.0, "blank_length_min_mm"),
         ("right_end_station_mm", 235.0, "right_end_station_mm"),
         ("end_axial_doc_mm", 9.0, "end_axial_doc_mm"),
-        ("drill_17_tip_mm", -1.0, "drill_17_tip_mm"),
-        ("ream_tip_mm", -1.0, "ream_tip_mm"),
-        ("spot_dia_mm", 4.5, "under every drill"),
+        ("drill_3_16_tip_mm", -1.0, "drill_3_16_tip_mm"),
+        ("spot_dia_mm", 4.6, "under every drill"),
         ("lying_grip_mm", 7.5, "lying_grip_mm"),
         ("left_clamp_end_mm", 170.0, "left_clamp_end_mm"),
         ("pickup_reach_min_mm", 70.0, "pickup_reach_min_mm"),
@@ -174,9 +171,7 @@ def _seed(ctx: dict, key: str, changes: dict[str, str]) -> dict:
             "engagement",
         ),
         # The axle bore drilled short of its exit.
-        ("axle_drill", {"G1 Z-2.320 F{feed}": "G1 Z0.500 F{feed}"}, "holes"),
-        # The reamer rapided out of the bore.
-        ("axle_ream", {"G1 Z10.627 F{feed}": "G0 Z10.627"}, "feed_out"),
+        ("axle_drill", {"G1 Z-2.431 F{feed}": "G1 Z0.500 F{feed}"}, "holes"),
         # A clamp hole drilled over the stacks at the moving jaw.
         ("clamp_drill", {"G0 X187.499 Y-5.000": "G0 X187.499 Y-18.000"}, "keep_out"),
     ],

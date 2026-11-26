@@ -55,12 +55,12 @@ note = "owner-confirmed 2026-11-08: 81-piece inch set, shop grade; largest block
 # #2334, S2): a 2 in class ZZ pin cannot pass both knife mounts, whose outer faces
 # stand 7.67 in apart at worst. To make: not owned, no receipt metrology.
 [gauges.gauge-bar-0472x8]
-name = "Gauge bar, (Ø.49) x 8.0 in, matched to the bores it gauges"
+name = "Gauge bar, (Ø.49) x 8.0 in, made to the bores it gauges"
 kind = "gauge_bar"
 status = "to_make"
 supply = "shop_made"
-purchase = "Make from one 1/2 in annealed ground drill rod cut to 8.0 in (203 mm), ends centre-drilled and chamfered: measure both finished MHA-SM-02 bores, then turn it between centres and lap it over its whole length until it mikes .0026-.0041 in under each bore (a Ø.4944-.4974 bar under the Ø.4985 +.0015/0 bores of owner ruling 2026-11-23, tool audit Q13; the former Ø.4720 bores took Ø.4679-.4709). No stock size meets every bore pair as bought: the 1/2 in rod is over every such bar and is turned down to it."
-note = "Tool, not a BOM part: MHA-SM-00 step 5B passes it through both MHA-SM-02 bores to set the front mount's yaw before its hanger bolt is tightened (the rear mount is set by the rock gauge at step 6G); check 5 withdraws it. Its matched fit, .0026-.0041 diametral clearance in each bore, is made here (purchase); step 5B states only the fitter's hand check, that it slides by hand without force (PR #2717). Owner ruling 2026-11-20 (Pedro), #2499: \"Follow recommendations unless noted otherwise\": the fit widened from .0002-.0017 so a straight bar passes two conforming bores pitched within their ∥.002|A and at opposite heights in their ⌖Ø.008 (.00255, build_sm_summing_assembly KNIFE_BAR_FIT_NEED, rounded up to .0026), band width kept. The .0041 maximum is the clearance the knife rock budget and the hanger-bolt stack charge (sm_knife_mount_spec KNIFE_GAUGE_BAR_CLEARANCE_IN, KNIFE_GAUGE_BAR_LENGTH)."
+purchase = "Make from one 1/2 in annealed ground drill rod cut to 8.0 in (203 mm), ends centre-drilled and chamfered, turned between centres and lapped over its whole length: TURN THE BAR UNTIL IT SLIDES THROUGH BOTH MOUNTS; DIA .496 MIN (owner ruling 2026-11-24, fit audit S6). Under the Ø.4985 +.0015/0 bores of owner ruling 2026-11-23, tool audit Q13, the bar is Ø.4960 up to just under the bores. No stock size meets every bore pair as bought: the 1/2 in rod is over every such bar and is turned down to it."
+note = "Tool, not a BOM part: MHA-SM-00 step 5B passes it through both MHA-SM-02 bores to set the front mount's yaw before its hanger bolt is tightened (the rear mount is set by the rock gauge at step 6G); check 5 withdraws it. Its trial and floor are made here (purchase); step 5B states only the fitter's hand check, that it slides by hand without force (PR #2717; owner, #3203, 2026-11-24: \"Accepted when the bar is made; the assembly sheet says nothing more\"). Owner ruling 2026-11-24, fit audit S6 replaces the matched .0026-.0041 fit of owner ruling 2026-11-20 (Pedro), #2499: the .496 floor caps the bar's play at .0040 in the largest bore, the clearance the knife rock budget and the hanger-bolt stack charge (sm_knife_mount_spec KNIFE_GAUGE_BAR_DIA_MIN_IN, KNIFE_GAUGE_BAR_LENGTH_IN); a straight bar through the smallest conforming pair (pitched within ∥.002|A, at opposite heights in ⌖Ø.008) may need .00255 under the .4985 bore, .00005 under the floor, below the shop's .001 reading unit, which the fit-necessity policy (#3518, owner rulings 2026-11-24) reads as evidence neither way, so the trial governs."
 pieces = 1
 
 # --- assembly tools, gauges and consumables (#2392) ------------------------
@@ -235,39 +235,21 @@ status = "on_hand"
 pieces = 1
 cite = ["McMaster-Carr packing list, PO 0803PCAMPOS (1616317-01, 08/04/2025), line 51: \"Precision Lathe Alignment Bar\", 1 each", "Owner (Pedro) 2026-11-17: \"add to inventory ... already owned\""]
 
-# --- MHA-CH-13 rocker strap on the CNC (cad/process/ch_rocker_strap) ---------
+# --- .1260 reams (cad/process/pd_transgear_*) --------------------------------
 
-# Hub-hole acceptance for MHA-CH-13, Ø.4000-.4005 (codjiflo PR #3049): a
-# fixed-limit pair, .4000 GO and .4005 NO-GO. Vermont Gage's standard Class X
-# pin/plug gages: .004-1.000 in by .0001 in, tolerance .000040 in up to
-# .8250 in, GO plus and NO-GO minus, so a GO that enters proves the hole at or
-# over .4000 and a NO-GO that does not proves it at or under .4005. The pair
-# gives up .00008 in (16 %) of the .0005 in band; Vermont's 10 % rule would
-# take class XX (.000020 in, a quoted custom gage). Range and tolerance:
-# cad/process/shop/ gauges.plug-gauges-4000-4005.
-[gauges.plug-gauges-4000-4005]
-name = "Plug gauge pair, .4000 GO and .4005 NO-GO, Class X"
-kind = "plug_gauge_pair"
-make = "Vermont Gage"
-status = "to_order"
-purchase = "Two Vermont Gage standard Class X steel pin/plug gages, .4000 in GO (plus tolerance) and .4005 in NO-GO (minus tolerance), each +/- .000040 in; no part number, price or stock read."
-note = "Not owned: to buy. MHA-CH-13 Setup 4 (RS03, after the ream): the first hole gauged before the lot, then every hole; GO enters, NO-GO does not."
-cite = ["Vermont Gage, Standard Class X pin/plug gages (read 2026-11-17): range .004-1.000 in, increments .0001 in, tolerance +/- .000040 in up to .8250 in, Go: plus tolerance, NoGo: minus tolerance: https://www.vermontgage.com/gaging-products/standard-pin-gages-and-sets/class-x-standard-pin-plug-gages", "Vermont Gage, Gage Tolerance Selection (read 2026-11-17): the 10% rule, GO at the hole's minimum with the tolerance plus, NO-GO at its maximum with the tolerance minus; ASME B89.1.5 chart, .010-.825 in: XX .000020, X .000040 in: https://vermontgage.com/support/detail/gage-tolerance-selection"]
-
-# --- MHA-PN-05 pen V block (cad/process/pn_pen_v_block) ----------------------
-
-# Pivot-bore acceptance for MHA-PN-05, Ø.1260-.1265 REAM THRU: the same
-# fixed-limit pattern as gauges.plug-gauges-4000-4005 (Vermont Gage standard
-# Class X, .000040 in, GO plus and NO-GO minus). The pin-gauge sets to buy
-# (gauges.pin-gauges) step by .001 in and hold no .1265. Range and
-# tolerance: cad/process/shop/ gauges.plug-gauges-1260-1265.
+# Acceptance for the Ø.1260-.1265 reamed bores of the transgear arm and
+# bushings: a fixed-limit pair (Vermont Gage standard Class X, .000040 in, GO
+# plus and NO-GO minus). The pin-gauge sets to buy (gauges.pin-gauges) step by
+# .001 in and hold no .1265. MHA-PN-05's pivot bore no longer uses it: drilled
+# #30 (owner ruling 2026-11-24, fit audit question 20). Range and tolerance:
+# cad/process/shop/ gauges.plug-gauges-1260-1265.
 [gauges.plug-gauges-1260-1265]
 name = "Plug gauge pair, .1260 GO and .1265 NO-GO, Class X"
 kind = "plug_gauge_pair"
 make = "Vermont Gage"
 status = "to_order"
 purchase = "Two Vermont Gage standard Class X steel pin/plug gages, .1260 in GO (plus tolerance) and .1265 in NO-GO (minus tolerance), each +/- .000040 in; no part number, price or stock read."
-note = "Not owned: to buy. MHA-PN-05 Ø.1260-.1265 REAM THRU pivot bore (after the ream, and again after the bench clean-up): GO enters, NO-GO does not."
+note = "Not owned: to buy. MHA-PD transgear arm and bushings Ø.1260-.1265 reamed bores (after the ream): GO enters, NO-GO does not."
 cite = ["Vermont Gage, Standard Class X pin/plug gages (read 2026-11-17): range .004-1.000 in, increments .0001 in, tolerance +/- .000040 in up to .8250 in, Go: plus tolerance, NoGo: minus tolerance: https://www.vermontgage.com/gaging-products/standard-pin-gages-and-sets/class-x-standard-pin-plug-gages"]
 
 [gauges.gauge-pin-0625]
@@ -295,7 +277,6 @@ note = "Not owned: to buy. drawing cross-check 2026-11-19: MHA-PD-10 .002 TIR TO
 # above) when the part's plan names it; until then the plan and the BOM still
 # show the Class X pair. Buy the ZZ pins, not the pair, for these bands.
 
-
 [gauges.zz-pins-0930-0935]
 name = "Class ZZ pins for the .0930-.0935 band"
 kind = "plug_gauge_pair"
@@ -304,25 +285,6 @@ status = "to_order"
 source = "https://www.mscdirect.com/product/details/88909304"
 purchase = "MSC 88909304 (.0930 plus, $4.48); MSC 89009351 (.0935 minus, $4.48): Vermont Gage Class ZZ steel plug gages, 2 in long, in stock."
 note = "MHA-DT-11. GO: ZZ .0930 plus single. NO-GO: ZZ .0935 minus single. Each pin is miked before first use and its size written on its tag."
-
-[gauges.zz-pins-1273-1287]
-name = "Class ZZ pins for the .1273-.1287 band"
-kind = "plug_gauge_pair"
-make = "Vermont Gage"
-status = "to_order"
-source = "https://www.mscdirect.com/product/details/89012751"
-purchase = "MSC 89012751 (.1275 minus, $4.48); MSC 88912852 (.1285 plus, $4.48): Vermont Gage Class ZZ steel plug gages, 2 in long, in stock."
-note = "MHA-SM-02. GO: ZZ .1275 minus single. NO-GO: ZZ .1285 plus single. Each pin is miked before first use and its size written on its tag."
-
-[gauges.zz-pins-1865-1870]
-name = "Class ZZ pins for the .1865-.1870 band"
-kind = "gauge_pin"
-make = "Vermont Gage"
-status = "to_order"
-source = "https://www.mscdirect.com/product/details/88918651"
-purchase = "MSC 88918651 (.1865 plus, $4.48): Vermont Gage Class ZZ steel plug gages, 2 in long, in stock."
-note = "MHA-MG-08. GO: ZZ .1865 plus single. NO-GO: the .187 minus pin of the sets (gauges.pin-gauges). Each pin is miked before first use and its size written on its tag."
-
 
 [gauges.zz-pins-3135-3140]
 name = "Class ZZ pins for the .3135-.3140 band"
@@ -333,52 +295,11 @@ source = "https://www.mscdirect.com/product/details/88931357"
 purchase = "MSC 88931357 (.3135 plus, $4.48): Vermont Gage Class ZZ steel plug gages, 2 in long, in stock."
 note = "MHA-DT-14; also MHA-PD-17 GO gauge (owner ruling 2026-11-26). GO: ZZ .3135 plus single. NO-GO: the .314 minus pin of the sets (gauges.pin-gauges). Each pin is miked before first use and its size written on its tag."
 
-
-[gauges.zz-pins-4990-4995]
-name = "Class ZZ pins for the .4990-.4995 band"
-kind = "plug_gauge_pair"
-make = "Vermont Gage"
-status = "to_order"
-source = "https://www.mscdirect.com/product/details/88949904"
-purchase = "MSC 88949904 (.4990 plus, $4.48); MSC 89049951 (.4995 minus, $4.48): Vermont Gage Class ZZ steel plug gages, 2 in long, in stock."
-note = "MHA-MG-10. GO: ZZ .4990 plus single. NO-GO: ZZ .4995 minus single. Each pin is miked before first use and its size written on its tag."
-
-# --- MHA-CH-12 hub land reading steps (owner ruling 2026-11-23, tool audit Q2) ---
-# Owner chose four reading pins, .4000, .4002, .4004 and .4005: the two steps
-# below with the .4000/.4005 pair (gauges.plug-gauges-4000-4005). It replaces
-# gauges.plug-gauges-4001-4004 once the MHA-CH-12 plan names it.
-[gauges.plug-gauges-4002-4004]
-name = "Plug gauges .4002 and .4004, Class X"
-kind = "plug_gauge_pair"
-make = "Vermont Gage"
-status = "to_order"
-source = "https://www.mscdirect.com/product/details/85872265"
-purchase = "MSC 85872265 (.4002 plus, $20.64); MSC 82164948 (.4004 plus, $20.64): Vermont Gage Class X plus pin gages, 2 in long (read live 2026-11-23)."
-note = "Not owned: to buy. MHA-CH-12: the largest of the four pins .4000, .4002, .4004, .4005 that enters each MHA-CH-13 hub hole is that hole's reading."
-
 # --- Bands the 2026-11-23 rulings re-cut (tool audit Q7, Q8, Q11, Q13, Q14) ---
 # Same policy as the zz-pins records above: a plus single is the GO; where the
 # top limit is a whole thousandth the NO-GO is the sets' minus pin. Each record
 # applies once its part's spec and plan carry the re-cut band; until then the
 # plan still gauges the old band with the record it names.
-[gauges.zz-pins-2560-2570]
-name = "Class ZZ pins for the .2560-.2570 band"
-kind = "gauge_pin"
-make = "Vermont Gage"
-status = "to_order"
-source = "https://www.mscdirect.com/product/details/88925607"
-purchase = "MSC 88925607 (.2560 plus, $4.48): Vermont Gage Class ZZ steel plug gage, 2 in long (read live 2026-11-23)."
-note = "MHA-CH-07 keeper bore (Q7). GO: ZZ .2560 plus single. NO-GO: the .257 minus pin of the sets (gauges.pin-gauges). Each pin is miked before first use and its size written on its tag."
-
-[gauges.zz-pins-2560-2600]
-name = "Class ZZ pins for the .2560-.2600 band"
-kind = "gauge_pin"
-make = "Vermont Gage"
-status = "to_order"
-source = "https://www.mscdirect.com/product/details/88925607"
-purchase = "MSC 88925607 (.2560 plus, $4.48): the same pin as gauges.zz-pins-2560-2570; one is bought for both bands."
-note = "MHA-CH-08. GO: ZZ .2560 plus single. NO-GO: the .260 minus pin of the sets (gauges.pin-gauges). Each pin is miked before first use and its size written on its tag."
-
 [gauges.zz-pins-4985-5000]
 name = "Class ZZ pins for the .4985-.5000 band"
 kind = "gauge_pin"

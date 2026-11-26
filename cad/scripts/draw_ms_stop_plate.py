@@ -33,7 +33,7 @@ from _drawing_common import (
     read_required_properties,
     stamp_drawing_summary,
 )
-from _drawing_dimensions import set_dimension_callouts
+from _drawing_dimensions import set_dimension_callouts, set_reference_dimension
 from _drawing_hole_callout import add_native_hole_callout, set_hole_callout_precision
 from _drawing_leader_notes import add_attached_note
 from _drawing_notes import add_property_linked_note
@@ -78,12 +78,17 @@ FRONT_KEEP = {
 }
 # Text left of the thin edge view, so neither witness line strikes it.
 RIGHT_KEEP = {"PlateThickness": (0.327, 0.225)}
-# Rule 4: the thickness and the hole callout link note 1
-# (ms_stop_plate_notes.MATCHED_PAIR_NOTE), which names the matched pair, its
-# screws and the thickness that sets their reach once; the three hole
-# locations carry only their value (title block .XXX).
+# Rule 4: the hole callout links note 1 (ms_stop_plate_notes.MATCHED_PAIR_NOTE),
+# which names the matched pair and its screws once and gives the trial on
+# MHA-MS-02. Rule 4 form 2: the holes are pair-drilled with the block, so the
+# three hole locations print as references, the note's screw trial the
+# requirement. Rule 4 (stock that is good enough stays stock): the thickness
+# is the .040 sheet as supplied (fit audit 2026-11-23,
+# MHA-MS-03.plate_thickness), a reference over its stock.
 NOTE_LINK = f"SEE NOTE {NOTE_NUMBER}"
-DIMENSION_CALLOUTS = {"PlateThickness": NOTE_LINK}
+THICKNESS_STOCK = "SHEET AS SUPPLIED"
+DIMENSION_CALLOUTS = {"PlateThickness": THICKNESS_STOCK}
+REFERENCE_DIMENSIONS = frozenset({*part.PLATE_LOCATION_DIMENSIONS, "PlateThickness"})
 # Upper-left corner of the note: the open top-left field, as on MHA-MS-02.
 MATCHED_PAIR_NOTE_XY = (0.020, 0.262)
 # The size rows are wider than the room between the .56 witnesses, so the
@@ -104,12 +109,14 @@ LOCATING_EDGE_X_MM = 7.0
 # LOCATING END, Y = 0 the LOCATING EDGE, Z = 0 the face that seats on the
 # MHA-MS-02 mating face, the sheet's .040 thickness toward -Z). A band is the
 # title block's row for the places the sheet prints
-# (PLATE_DRAWING_PRECISION_BY_NAME) on the printed nominal, the thickness its
-# own +/-.004, the clearance holes the DRILLED HOLES row
-# (HOLE_CALLOUT_PRECISION). The plate is the match-drill master: its holes
-# are opened from the #49 pilot the pair drill puts through it and into the
-# block (MHA-MS-02's 2X Ø.073 to .300 from its mating face), carried here as
-# the pair's pilot. The declarations print nothing.
+# (PLATE_DRAWING_PRECISION_BY_NAME) on the printed nominal; the clearance
+# holes take the DRILLED HOLES row (HOLE_CALLOUT_PRECISION). The references
+# (REFERENCE_DIMENSIONS) carry their analysis band: the receiving range of
+# the sheet (PLATE_THICKNESS_TOLERANCE_MM) and the pair drill's DRO places
+# (PLATE_HOLE_POSITION_TOLERANCE_MM), which every web proof in ms_stop_spec
+# uses. The holes are opened from the #49 pilot the pair drill puts through
+# the plate and into the block (MHA-MS-02's 2X Ø.073 to .30 from its mating
+# face), carried here as the pair's pilot. The declarations print nothing.
 _P = part.PLATE_DRAWING_PRECISION_BY_NAME
 _SPEC = "ms_stop_spec"
 _SELF = "draw_ms_stop_plate"
@@ -131,6 +138,17 @@ def _printed(
     return (
         limits(value, _P[name], unit=part.UNIT),
         (*sources, (_SPEC, "UNIT"), _PRECISION),
+    )
+
+
+def _reference(
+    value: float, band_mm: float, band_source: str, *sources: Any
+) -> tuple[list[float], tuple[Any, ...]]:
+    """A reference dimension's analysis band (it prints none): ``band_source``,
+    a ms_stop_spec half-width, about the model nominal."""
+    return (
+        [value - band_mm, value + band_mm],
+        (*sources, (_SPEC, band_source), (_SELF, "REFERENCE_DIMENSIONS")),
     )
 
 
@@ -213,8 +231,9 @@ for _name, _normal, _axis, _value, _key, _dim, _source, _from in (
         },
         precision={_key: _P[_dim]},
     )
-# The seating face (Z = 0) and the outer face: the sheet's .040 +/-.004
-# (RIGHT_KEEP PlateThickness, SEE NOTE 1), the stock's as bought.
+# The seating face (Z = 0) and the outer face: the sheet's (.040) as a
+# reference over SHEET AS SUPPLIED (RIGHT_KEEP PlateThickness, THICKNESS_STOCK),
+# its band the receiving range (PLATE_THICKNESS_TOLERANCE_MM).
 requirement(
     "seating_face",
     kind="face",
@@ -229,22 +248,18 @@ requirement(
     requirements=("thickness",),
     fields={
         "plane": (_plane("z", part.PLATE_Z_MIN), ((_SPEC, "PLATE_Z_MIN"),)),
-        "thickness": (
-            limits(
-                part.PLATE_THICKNESS,
-                _P["PlateThickness"],
-                (part.PLATE_THICKNESS_TOLERANCE_MM, -part.PLATE_THICKNESS_TOLERANCE_MM),
-                unit=part.UNIT,
-            ),
-            (
-                (_SPEC, "PLATE_THICKNESS"),
-                (_SPEC, "PLATE_THICKNESS_TOLERANCE_MM"),
-                (_SELF, "RIGHT_KEEP"),
-            ),
+        "thickness": _reference(
+            part.PLATE_THICKNESS,
+            part.PLATE_THICKNESS_TOLERANCE_MM,
+            "PLATE_THICKNESS_TOLERANCE_MM",
+            (_SPEC, "PLATE_THICKNESS"),
+            (_SELF, "RIGHT_KEEP"),
         ),
         "thickness_nominal": (part.PLATE_THICKNESS, ((_SPEC, "PLATE_THICKNESS"),)),
         "thickness_from": ("seating_face", ((_SELF, "RIGHT_KEEP"),)),
-        "callout": (NOTE_LINK, ((_SELF, "DIMENSION_CALLOUTS"),)),
+        "as_supplied": (True, ((_SELF, "THICKNESS_STOCK"),)),
+        "dimension_type": ("reference", ((_SELF, "REFERENCE_DIMENSIONS"),)),
+        "callout": (THICKNESS_STOCK, ((_SELF, "DIMENSION_CALLOUTS"),)),
     },
     precision={"thickness": _P["PlateThickness"]},
 )
@@ -290,8 +305,10 @@ requirement(
     precision={"size": _P["RoofChamferSize"], "angle_deg": _P["RoofChamferAngle"]},
 )
 # The two clearance holes, THRU from the outer face: one native callout (2X
-# Ø.094 THRU ALL, SEE NOTE 1), stations .150 and .690 from the locating end
-# and .160 from the locating edge; each opened from the pair's #49 pilot.
+# Ø.094 THRU ALL, SEE NOTE 1), stations (.150) and (.690) from the locating
+# end and (.160) from the locating edge as references (rule 4 form 2: made
+# with MHA-MS-02 in the pair drill, note 1's screw trial the requirement);
+# each opened from the pair's #49 pilot.
 _CLEARANCE = (
     drilled_limits(
         part.PLATE_CLEARANCE_DIA, part.HOLE_CALLOUT_PRECISION, unit=part.UNIT
@@ -323,23 +340,29 @@ for _index, (_x, _dim) in enumerate(
                 ((_SPEC, "PLATE_CLEARANCE_SPEC"),),
             ),
             "thru": (True, ((_SPEC, "PLATE_CLEARANCE_SPEC"), (_SELF, "build"))),
-            "station": _printed(
-                _dim, _x, (_SPEC, "PLATE_HOLE_XS"), (_SELF, "FRONT_KEEP")
+            "station": _reference(
+                _x,
+                part.PLATE_HOLE_POSITION_TOLERANCE_MM,
+                "PLATE_HOLE_POSITION_TOLERANCE_MM",
+                (_SPEC, "PLATE_HOLE_XS"),
+                (_SELF, "FRONT_KEEP"),
             ),
             "station_nominal": (_x, ((_SPEC, "PLATE_HOLE_XS"),)),
             "station_from": ("locating_end", ((_SELF, "FRONT_KEEP"),)),
-            "height": _printed(
-                "PlateFromHeadFace",
+            "height": _reference(
                 part.PLATE_HOLE_Y,
+                part.PLATE_HOLE_POSITION_TOLERANCE_MM,
+                "PLATE_HOLE_POSITION_TOLERANCE_MM",
                 (_SPEC, "PLATE_HOLE_Y"),
                 (_SELF, "FRONT_KEEP"),
             ),
             "height_nominal": (part.PLATE_HOLE_Y, ((_SPEC, "PLATE_HOLE_Y"),)),
             "height_from": ("locating_edge", ((_SELF, "FRONT_KEEP"),)),
+            "dimension_type": ("reference", ((_SELF, "REFERENCE_DIMENSIONS"),)),
             "callout": (NOTE_LINK, ((_SELF, "NOTE_LINK"),)),
-            # The pair drill (MHA-MS-02's callout: 2X Ø.073 ↓.300 MATCH-DRILL
+            # The pair drill (MHA-MS-02's callout: 2X Ø.073 ↓.30 MATCH-DRILL
             # FROM MHA-MS-03 STOP PLATE): the #49 pilot through this plate
-            # and into the block to .300 below the block's mating face.
+            # and into the block to .30 below the block's mating face.
             "pair_pilot_dia": (
                 part.PLATE_TAP_DRILL_DIA,
                 ((_SPEC, "PLATE_TAP_DRILL_DIA"),),
@@ -347,10 +370,10 @@ for _index, (_x, _dim) in enumerate(
             "pair_pilot_depth_in_mate": (
                 limits(
                     part.PLATE_TAP_DRILL_DEPTH,
-                    part.HOLE_CALLOUT_PRECISION,
+                    part.TAP_DEPTH_PRECISION,
                     unit=part.UNIT,
                 ),
-                ((_SPEC, "PLATE_TAP_DRILL_DEPTH"), (_SPEC, "HOLE_LINEAR_TOLERANCE_MM")),
+                ((_SPEC, "PLATE_TAP_DRILL_DEPTH"), (_SPEC, "TAP_DEPTH_TOLERANCE_MM")),
             ),
             "pair_pilot_depth_in_mate_nominal": (
                 part.PLATE_TAP_DRILL_DEPTH,
@@ -365,7 +388,7 @@ for _index, (_x, _dim) in enumerate(
             "dia": part.HOLE_CALLOUT_PRECISION,
             "station": _P[_dim],
             "height": _P["PlateFromHeadFace"],
-            "pair_pilot_depth_in_mate": part.HOLE_CALLOUT_PRECISION,
+            "pair_pilot_depth_in_mate": part.TAP_DEPTH_PRECISION,
         },
     )
 
@@ -412,6 +435,22 @@ def _style_plate_chamfer(adapter: Any, annotations: list[Any]) -> None:
         raise RuntimeError(f"missing native plate chamfer dimensions: {sorted(remaining)}")
 
 
+def _mark_reference_dimensions(adapter: Any, annotations: list[Any]) -> None:
+    """Parenthesize the three hole locations and the stock thickness
+    (REFERENCE_DIMENSIONS), one native dimension each."""
+    references = [
+        (name, annotation)
+        for annotation in annotations
+        if (name := dimension_name(adapter, annotation)) in REFERENCE_DIMENSIONS
+    ]
+    if sorted(name for name, _ in references) != sorted(REFERENCE_DIMENSIONS):
+        raise RuntimeError(
+            f"expected one native reference dimension each: {sorted(REFERENCE_DIMENSIONS)}"
+        )
+    for name, annotation in references:
+        set_reference_dimension(adapter, annotation, label=f"{name} reference")
+
+
 def _label_locating_edges(adapter: Any, front: Any) -> None:
     """Leader the match-drill X=0 end and Y=0 edge on the cover-face view."""
     face_z = part.PLATE_Z_MIN / 1000.0
@@ -449,8 +488,9 @@ def build(adapter: Any) -> dict[str, str]:
         annotations += curate_view_dimensions(adapter, view, keep=keep, view_label=label,
                                                dimensions_by_feature=part.PLATE_DRAWING_DIMENSIONS)
     set_hidden_lines_removed(adapter, iso)
-    set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
     _style_plate_chamfer(adapter, annotations)
+    set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
+    _mark_reference_dimensions(adapter, annotations)
     # The rim's lower outboard point, off the .160 witness through the centre,
     # so the leader from the callout below crosses no station line.
     rim = part.PLATE_CLEARANCE_DIA / 2.0 / math.sqrt(2.0)
@@ -472,9 +512,6 @@ def build(adapter: Any) -> dict[str, str]:
     assert_manufacturing_dimensions(
         adapter, annotations, part.PLATE_DRAWING_VALUES_BY_NAME,
         part.PLATE_DRAWING_PRECISION_BY_NAME,
-        bands={
-            "PlateThickness": (-part.PLATE_THICKNESS_TOLERANCE_MM, part.PLATE_THICKNESS_TOLERANCE_MM),
-        },
         angular=frozenset({"RoofChamferAngle"}),
     )
     for view in (front, right):

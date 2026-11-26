@@ -95,26 +95,6 @@ resolution_mm = 0.0254
 range_mm = [7.9375, 53.975]
 resolution_mm = 0.00254
 
-# The MHA-CH-13 hub-hole go/no-go pair (cad/config/shop-equipment/
-# gauges.plug-gauges-4000-4005, to buy): GO .4000 and NO-GO .4005 in =
-# 10.16 and 10.1727 mm. A fixed-limit pair reads no scale; its resolution is
-# each member's Class X tolerance, .000040 in = 0.001016 mm.
-[gauges.plug-gauges-4000-4005]
-range_mm = [10.16, 10.1727]
-resolution_mm = 0.001016
-
-# The MHA-CH-13 hub hole read with two Class X steps, .4002 and .4004, between
-# the hub pair above (owner ruling 2026-11-23, tool audit Q2, verbatim: "B.
-# Four reading pins (.4000, .4002, .4004, .4005)."). It replaces the four
-# .4001-.4004 steps the hub hole was first read with. Range:
-# the two pins, .4002-.4004 in = 10.16508-10.17016 mm; resolution: the
-# reading's step, .0002 in = 0.00508 mm (the last step, .4004 to the pair's
-# .4005, is .0001). Not owned: to buy. Its inventory record
-# (cad/config/shop-equipment/, same key) is ShopSourcing's to add.
-[gauges.plug-gauges-4002-4004]
-range_mm = [10.16508, 10.17016]
-resolution_mm = 0.00508
-
 # Class ZZ go/no-go pins for the reamed bands (owner ruling 2026-11-23, tool
 # audit Q1, verbatim: "ZZ singles per the record: 29 pins (17 plus GO, 12
 # minus NO-GO), about $130. Accept that good holes near a limit may be
@@ -312,7 +292,7 @@ tap_drill_mm = 2.2606
 range_mm = [0.0, 222.25]
 resolution_mm = 0.005
 
-# The .1260 reams' go/no-go pair (pn pivot bore, pd transgear bushings) (cad/config/shop-equipment/
+# The .1260 reams' go/no-go pair (pd transgear arm and bushings) (cad/config/shop-equipment/
 # gauges.plug-gauges-1260-1265, to buy): GO .1260 and NO-GO .1265 in =
 # 3.2004 and 3.2131 mm. A fixed-limit pair reads no scale; its resolution is
 # each member's Class X tolerance, .000040 in = 0.001016 mm.
@@ -708,6 +688,9 @@ diameter_mm = 6.0452
 [tools.drill-c]  # Drills C
 description = "C (.2420 in) drill, 115-piece index"
 diameter_mm = 6.1468
+[tools.drill-e]  # Drills E; MHA-FR-02 2X E DRILL THRU (owner ruling 2026-11-24, fit audit OQ19)
+description = "E (.2500 in) drill, 115-piece index"
+diameter_mm = 6.35
 [tools.drill-n]  # Drills N
 description = "N (.3020 in) drill, 115-piece index"
 diameter_mm = 7.6708
@@ -879,6 +862,12 @@ description = "Starbond CA accelerator spray"
 # tools.aviation-snips-straight, same key.
 [tools.aviation-snips-straight]
 description = "Aviation snips, straight cut"
+
+# The 220 sanding roll: MHA-SM-01's polish and MHA-CH-06's scuff before
+# blackening, moved here from sm.toml. Ownership: cad/config/shop-equipment/
+# consumables.toml, same key (on hand).
+[tools.sanding-roll-220]
+description = "Sanding roll, 2 in wide, 220 grit (McMaster 4687A223)"
 
 # The sheet parts' outline cutter, moved here from pd.toml: the MHA-PD-03
 # platen clip and the MHA-DT-03-TL-02 phasing comb (tool audit 2026-11-23:

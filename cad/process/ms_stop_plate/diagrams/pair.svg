@@ -1,41 +1,43 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Setup 3: looking along the jaws (+X into the page): the MHA-MS-02 block mating face up on two 1 in parallels, this plate on it, both gripped across their .84 length, locating ends on the fixed jaw; the #49 pilot drilled through the plate into the block. Hand-drawn at 200 px/in; styles: prechips.palette. -->
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 380" width="600" height="380" font-family="Arial, Helvetica, sans-serif" font-size="13">
+<!-- Setup 3: looking along the jaws (−X into the page, the fixed jaw on the right): the MHA-MS-02 block mating face up on two 1 in parallels, this plate on it, both gripped across their .84 length, locating ends on the fixed jaw; the #49 drill at the end of its feed in the pilot near the locating ends (MS01_pair_pilot drills it first). To scale at 300 px/in (11.811 px/mm) from the .84 length (252 px); jaws and parallels broken off below. #49 Ø1.8542 (the plan's milling_cuts "pair pilot") = 21.9 px, its 118° point to Z −9.193 (pilot_tip_height_mm); the drill's length out of the chuck is not on record: broken off. Hand-drawn; styles: prechips.palette. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 440" width="600" height="440" font-family="Arial, Helvetica, sans-serif" font-size="13">
   <text class="title" x="12" y="20">Setup 3: pair pilot, MS01_pair_pilot (looking along the jaws)</text>
-  <!-- Vise bed. -->
-  <rect class="fixture-vise" x="60" y="320" width="480" height="30"/>
-  <!-- Jaws: moving at the left, fixed at the right, tops 6.3 mm (.25) above the plate, gripping block and plate. -->
-  <rect class="clamp" x="60" y="74" width="110" height="246"/>
-  <rect class="clamp" x="428" y="74" width="112" height="246"/>
-  <text class="label-on-clamp" x="74" y="300">moving jaw</text>
-  <text class="label-on-clamp" x="446" y="300">fixed jaw</text>
-  <!-- Parallels (1 in, 1/8 thick) against each jaw. -->
-  <rect class="fixture-support" x="175" y="220" width="25" height="100"/>
-  <rect class="fixture-support" x="403" y="220" width="25" height="100"/>
-  <!-- Block: .84 across the jaws (168 px), .48 deep (96 px). -->
-  <rect class="part-rest" x="175" y="132" width="253" height="88"/>
-  <text class="label-halo" x="306" y="186">MHA-MS-02</text>
-  <!-- Plate on it, .040 (8 px). -->
-  <rect class="part-kept" x="175" y="124" width="253" height="8"/>
+  <!-- Jaws: moving at the left, fixed at the right; tops 6.34 mm (.25) above the plate's top. -->
+  <path class="clamp" d="M70 85.2 L184 85.2 L184 360 L169.8 356 L141.2 364 L112.8 356 L84.2 364 L70 360 Z"/>
+  <path class="clamp" d="M440 85.2 L550 85.2 L550 360 L536.2 356 L508.8 364 L481.2 356 L453.8 364 L440 360 Z"/>
+  <text class="label-on-clamp" x="84" y="340">moving jaw</text>
+  <text class="label-on-clamp" x="458" y="340">fixed jaw</text>
+  <!-- 1 in parallels, 1/8 thick (37.5 px), one against each jaw. -->
+  <path class="fixture-support" d="M188 316 L225.5 316 L225.5 360 L220.8 357 L211.4 363 L202.1 357 L192.7 363 L188 360 Z"/>
+  <path class="fixture-support" d="M402.5 316 L440 316 L440 360 L435.3 357 L425.9 363 L416.6 357 L407.2 363 L402.5 360 Z"/>
+  <path class="leader" d="M207 340 L250 384 M421 340 L330 384"/>
+  <text class="label" x="232" y="398">1 in parallels</text>
+  <!-- Block: .84 across the jaws (252 px), .48 deep (144 px). -->
+  <rect class="part-rest" x="188" y="172" width="252" height="144"/>
+  <text class="label-halo" x="270" y="300">MHA-MS-02</text>
+  <!-- Plate on it, .040 (12 px). -->
+  <rect class="part-kept" x="188" y="160" width="252" height="12"/>
   <!-- Feeler leaves between the moving jaw and the shorter part, as needed. -->
-  <rect class="fixture-support" x="170" y="124" width="5" height="96"/>
-  <path class="leader" d="M188 96 L173 140"/>
-  <text class="label" x="180" y="90">feeler leaves</text>
-  <!-- Pilots: .150 and .690 from the locating end (fixed jaw), into the block .300. -->
-  <rect class="part-removed" x="395" y="124" width="14" height="74"/>
-  <rect class="part-removed" x="287" y="124" width="14" height="74"/>
-  <path class="part-removed" d="M395 198 L402 206 L409 198 Z"/>
-  <path class="part-removed" d="M287 198 L294 206 L301 198 Z"/>
-  <!-- The #49 over the near-end hole. -->
-  <rect class="cutter" x="395" y="40" width="14" height="80"/>
-  <line class="arrow" x1="380" y1="60" x2="380" y2="112"/>
-  <text class="label" x="300" y="56">#49, set 2800</text>
+  <rect class="fixture-support" x="184" y="160" width="4" height="156"/>
+  <path class="leader" d="M150 64 L184 200"/>
+  <text class="label" x="74" y="58">feeler leaves, as needed</text>
+  <!-- Pilots: .150 and .690 from the locating ends (fixed jaw face), .30 below the block face, the #49's point beyond. -->
+  <path class="part-removed" d="M384.1 160 L406 160 L406 262 L395 268.6 L384.1 262 Z"/>
+  <path class="part-removed" d="M222.1 160 L244 160 L244 262 L233 268.6 L222.1 262 Z"/>
+  <!-- The #49 at the end of its feed in the near pilot. -->
+  <path class="cutter" d="M384.1 40 L384.1 262 L395 268.6 L406 262 L406 40 L403.2 36 L397.7 44 L392.3 36 L386.8 44 L384.1 40 Z"/>
+  <line class="arrow" x1="370" y1="60" x2="370" y2="120"/>
+  <text class="label" x="226" y="70">#49 drill, set 2800,</text>
+  <text class="label" x="226" y="86">pecks {{process.pilot_peck_mm:in.3dot}}</text>
   <!-- Datums. -->
-  <line class="datum" x1="428" y1="40" x2="428" y2="136"/>
-  <text class="datum-label" x="434" y="66">Y0 locating ends</text>
-  <line class="datum" x1="235" y1="116" x2="235" y2="124"/>
-  <text class="datum-label" x="210" y="112">Z0 plate top</text>
-  <path class="dims" d="M281 132 L281 198"/>
-  <text class="label" x="200" y="152">pilots .300</text><text class="label" x="200" y="168">below the</text><text class="label" x="200" y="184">block face</text>
-  <text class="label" x="200" y="370">locating edges flushed against a 1-2-3 block (X0, the near side)</text>
+  <line class="datum" x1="440" y1="36" x2="440" y2="85"/>
+  <text class="datum-label" x="446" y="52">Y0 locating ends</text>
+  <line class="datum" x1="196" y1="146" x2="196" y2="160"/>
+  <text class="datum-label" x="190" y="140">Z0 plate top</text>
+  <path class="dims" d="M300 172 L300 262 M294 262 L306 262"/>
+  <text class="label-halo" x="306" y="214" font-size="12">pilots {{cad.clearance_hole_1_pair_pilot_depth_in_mate_mm:in.2dot}}</text>
+  <text class="label-halo" x="306" y="229" font-size="12">below the</text>
+  <text class="label-halo" x="306" y="244" font-size="12">block face</text>
+  <text class="label" x="12" y="418">locating edges flushed against a 1-2-3 block before tightening,</text>
+  <text class="label" x="12" y="434">then the 1-2-3 block taken away (X0, the near side; not shown)</text>
 </svg>

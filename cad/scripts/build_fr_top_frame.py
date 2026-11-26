@@ -38,7 +38,7 @@ rescaled onto the model column grid, and ch19 close-ups (webbing, hub, screw):
   faced underside 999.6932 is the knife-mount seat plane), with 18.034 (.71)
   plan gussets at all four rail
   junctions and, at z 3.088 - 93.41 (front; #1038, the summing plate's .25
-  front extension) and 3.088 + 87.06 (rear), a plain #10 through-hole (C drill) per
+  front extension) and 3.088 + 87.06 (rear), a plain #10 through-hole (E drill) per
   knife mount. The cut-to-length #10-24 hex bolt bears on a 96659A104
   washer on the faced top; each unchanged 98381A473 dowel presses into a
   blind underside ream, its full diameter .50 MIN over a 118 deg drill point
@@ -131,7 +131,7 @@ polygon) -> crossbar T pockets -> flange corner crops -> corner bosses
 (up/down pair from the faced top) -> hub V-gusset plate and its ramp cuts
 -> hub boss -> set-screw boss and spot face -> counterbores -> column
 bores -> gooseneck
-bore -> wizard holes (#10 C-drill hanger clearance holes) -> dowel reams ->
+bore -> wizard holes (#10 E-drill hanger clearance holes) -> dowel reams ->
 dowel knockouts (wizard) -> wizard
 holes (side-screw taps, set-screw tap, keeper taps) -> internal T-root
 fillets (R.12) -> external top-rim breaks (1/16 in) -> .02 bore top lead-ins ->
@@ -280,9 +280,7 @@ from fr_top_frame_spec import (
     HANGER_PIN_HOLE_POINT_H,
     HANGER_PIN_HOLE_POINT_H_MAX,
     HANGER_PIN_HOLE_DIA,
-    HANGER_PIN_HOLE_DIA_BAND,
     HANGER_PIN_HOLE_DIA_MAX,
-    HANGER_PIN_HOLE_DIA_PLACES,
     HANGER_PIN_X,
     HANGER_PIN_X_TOL,
     HANGER_X,
@@ -291,6 +289,7 @@ from fr_top_frame_spec import (
     STUD_Z_REAR,
     KEEPER_TAP_CALLOUT_PRECISION,
     KEEPER_TAP_DRILL_WANDER_DEG,
+    KEEPER_TAP_WALL_ACCEPTED_MM,
     DRILL_DRIFT_PER_MM,
     PRINTED_DRILLED_HOLE_PLUS_MM,
     PRINTED_LINEAR_BAND_MM,
@@ -348,7 +347,6 @@ from ch_fulcrum_keeper_spec import (
     KEEPER_FITUP_X_FROM_WEB_MM,
     KEEPER_SCREW_TRANSVERSE_BAND_MM,
     SCREW_FROM_SIDE,
-    KEEPER_FITUP_LOCATION_BAND_MM,
     KEEPER_FITUP_X_BAND_MM,
     KEEPER_FITUP_PLACES,
     KEEPER_INNER_FACE_FROM_FRONT_SOCKET_MM,
@@ -360,6 +358,7 @@ from ch_fulcrum_keeper_spec import (
     KEEPER_WIDTH,
     KEEPER_Z_OFF,
 )
+from ch_keeper_fitup import FACE_DEVIATIONS_MM as KEEPER_FACE_DEVIATIONS_MM
 
 import _telemetry
 
@@ -1065,8 +1064,8 @@ _HANGER_BORE_LINE_OFFSET = (
     + _KNIFE_DOWEL_HOLE_PERP / 2.0
     + KNIFE_MOUNT.KNIFE_BORE_POSITION_TOL / 2.0
 )  # 0.4140, each station
-# The bar's own diametral clearance in each bore, the gauge bar's .0041
-# maximum (owner ruling 2026-11-20 (Pedro), #2499), turns each block on it a
+# The bar's own diametral clearance in each bore, at most .0040 at the gauge
+# bar's DIA .496 MIN (owner ruling 2026-11-24, fit audit S6), turns each block on it a
 # further atan(clearance / shortest bore) (build_sm_summing_assembly
 # KNIFE_BAR_PLAY_YAW_DEG, owner review of #2334); the tap turns with it.
 _HANGER_BAR_PLAY_YAW = math.atan(
@@ -1076,7 +1075,7 @@ _HANGER_BAR_PLAY_YAW = math.atan(
 HANGER_BAR_YAW_SHIFT = HANGER_PIN_X * math.tan(
     math.atan(2.0 * _HANGER_BORE_LINE_OFFSET / (STUD_Z_REAR - STUD_Z_FRONT))
     + _HANGER_BAR_PLAY_YAW
-)  # 0.0928
+)  # 0.0955
 HANGER_SEAT_BOLT_MISMATCH = math.hypot(
     _HANGER_BLOCK_SHIFT, _HANGER_BLOCK_SHIFT + HANGER_BAR_YAW_SHIFT
 )
@@ -1118,7 +1117,17 @@ HANGER_WASHER_OUTER_END_WALL = min(
         for station in (STUD_Z_FRONT, STUD_Z_REAR)
     ),
 )
-# Pure full-annulus contact geometry, not a preload/material strength claim.
+# The washer's bearing width: its narrowest land on the faced top, from the
+# #10 hole's far edge out to its own rim, with its centre off the hole's by
+# HANGER_WASHER_OFFSET_MAX.  At zero the rim reaches the hole's edge on that
+# side, so the washer no longer bears on the frame all round the hole and
+# the bolt's clamp loses its seat there.  Pure contact geometry, not a
+# preload/material strength claim.  Owner ruling 2026-11-24 (fit audit
+# part 2, C12): "A. The ring is not needed: the rule becomes the washer's
+# bearing width (1.47 mm, 1.64 today) and question 19 stands."  So this is
+# the washer's criterion; the
+# former unbroken ring inside the knockouts is not one (the knockout mouths
+# under the washer are pin holes in its land, not a lost seat).
 HANGER_WASHER_BEARING_MIN = (
     HANGER_WASHER_CONCENTRIC_ANNULUS_MIN - HANGER_WASHER_OFFSET_MAX
 )
@@ -1129,7 +1138,7 @@ for _label, _value, _minimum in (
         0.0,
     ),
     ("washer to outer rail ends", HANGER_WASHER_OUTER_END_WALL, WALL_TARGET_MM),
-    ("washer continuous bearing annulus", HANGER_WASHER_BEARING_MIN, 0.0),
+    ("washer bearing width round the hole", HANGER_WASHER_BEARING_MIN, 0.0),
 ):
     if _value < _minimum:
         raise AssertionError(f"knife-hanger {_label}: {_value:.3f} below {_minimum:g}")
@@ -1168,19 +1177,8 @@ KNOCKOUT_SCREW_WALL = (
 # top-rim break at its printed worst leg (the washer stack's bar reach).
 KNOCKOUT_TOP_BREAK_LAND = KNOCKOUT_BAR_WALL - EDGE_BREAK_PRINTED_MAX
 # The knockout exits under the MHA-SM-VN-54 washer (its reach from the bolt
-# axis covers the 7.62 station), so the washer bears on a continuous ring
-# INSIDE the knockouts: round the washer's own centre, from the farther of
-# its bore and the #10 hole's far edge out to the nearer of its rim and the
-# nearest knockout's near edge.  The washer centre wanders from both the
-# hole and the nominal axis by HANGER_WASHER_OFFSET_MAX; the knockouts stand
-# at their station limits from that axis.
-HANGER_WASHER_KNOCKOUT_RING_MIN = min(
-    HANGER_WASHER.OD_MIN / 2.0,
-    _KNOCKOUT_NEAR_AXIS_MIN - _KNOCKOUT_MAX_R - HANGER_WASHER_OFFSET_MAX,
-) - max(
-    HANGER_WASHER.ID_MAX / 2.0,
-    _CLEARANCE_MAX_R + HANGER_WASHER_OFFSET_MAX,
-)
+# axis covers the 7.62 station); the washer's seat is its bearing width
+# above (C12).
 for _label, _value in (
     ("knockout wall to the crossbar side face", KNOCKOUT_BAR_WALL),
     ("knockout wall to the screw clearance hole", KNOCKOUT_SCREW_WALL),
@@ -1191,7 +1189,6 @@ for _label, _value in (
         )
 for _label, _value in (
     ("knockout land inside the crossbar top-rim break", KNOCKOUT_TOP_BREAK_LAND),
-    ("washer bearing ring inside the knockouts", HANGER_WASHER_KNOCKOUT_RING_MIN),
 ):
     if _value <= 0.0:
         raise AssertionError(
@@ -1577,17 +1574,19 @@ KEEPER_PRINTED_MIN_RELIEF_FROM_SOCKET = _printed_limit(
 KEEPER_PRINTED_MIN_SOCKET_PITCH = (
     REAR_COLUMN_Z - FRONT_COLUMN_Z
 ) - SOCKET_PATTERN_REFINEMENT_ZONE
+# The lug inner faces as fit-up leaves them (ch_keeper_fitup, C10: the front
+# by DRO, the rear pushed up to the lever stack over a leaf).
 KEEPER_FOOT_PRINTED_BOSS_MARGINS = (
-    _keeper_printed(KEEPER_INNER_FACE_FROM_FRONT_SOCKET_MM[0], KEEPER_FITUP_PLACES)
-    - KEEPER_FITUP_LOCATION_BAND_MM
+    KEEPER_INNER_FACE_FROM_FRONT_SOCKET_MM[0]
+    + KEEPER_FACE_DEVIATIONS_MM["front"][0]
     - KEEPER_PRINTED_MAX_OUTBOARD_REACH
     - KEEPER_PRINTED_MAX_RELIEF_FROM_SOCKET,
     KEEPER_PRINTED_MIN_SOCKET_PITCH
-    - _keeper_printed(KEEPER_INNER_FACE_FROM_FRONT_SOCKET_MM[1], KEEPER_FITUP_PLACES)
-    - KEEPER_FITUP_LOCATION_BAND_MM
+    - KEEPER_INNER_FACE_FROM_FRONT_SOCKET_MM[1]
+    - KEEPER_FACE_DEVIATIONS_MM["rear"][1]
     - KEEPER_PRINTED_MAX_OUTBOARD_REACH
     - KEEPER_PRINTED_MAX_RELIEF_FROM_SOCKET,
-)  # 0.737, 1.499
+)  # 0.635, 1.372
 # The taps stand on the faced span too, their thread's major clear of the
 # step.
 KEEPER_TAP_BOSS_MARGINS = (
@@ -1605,7 +1604,7 @@ if min(KEEPER_TAP_BOSS_MARGINS) <= 0.0:
 # own edge break is not credited), so the whole foot bears on the flat.
 KEEPER_FOOT_RELIEF_ROOT_MARGIN = (
     min(KEEPER_FOOT_PRINTED_BOSS_MARGINS) - KEEPER_BOSS_RELIEF_ROOT_R_MAX
-)  # 0.229
+)  # 0.127 (C10 front face at the title block's band)
 if KEEPER_FOOT_RELIEF_ROOT_MARGIN <= 0.0:
     raise AssertionError("a keeper foot reaches the relief step's root radius")
 # What the step must leave standing (K5).  The chord lies inside the
@@ -1791,10 +1790,20 @@ KEEPER_TAP_DRILL_WALL_MARGIN_NO_WANDER = (
 KEEPER_TAP_DRILL_WALL_MARGIN = (
     KEEPER_TAP_DRILL_WALL_MARGIN_NO_WANDER - KEEPER_TAP_AXIS_WANDER_MM
 )
-# Owner rulings D3/D4 (#2333): the drill wall holds the .080 target at the 2°
-# minimum added draft (.0807 MIN); the owner's floor is .060.
-if min(KEEPER_TAP_THREAD_WALL_MARGIN, KEEPER_TAP_DRILL_WALL_MARGIN) < WALL_TARGET_MM:
-    raise AssertionError("keeper receiver leaves less than .080 with drill wander")
+# Owner rulings D3/D4 (#2333) leave the drill wall its least at the 2°
+# minimum added draft; with the lug centre charged at MHA-CH-00's printed
+# .114 ±.004 it is .0767, under the .080 target. Delegated ruling 2026-11-24
+# (Main), precedent: owner ruling 2026-11-01 (thin walls accepted as minor);
+# no owner number changed, #2144 (rulings.md D15): the tap wall .0767 is
+# accepted against the .080 target (floor .060) as an exception entry
+# (RV-14), held at KEEPER_TAP_WALL_ACCEPTED_MM (.076); the floor still binds.
+_KEEPER_TAP_WALL = min(KEEPER_TAP_THREAD_WALL_MARGIN, KEEPER_TAP_DRILL_WALL_MARGIN)
+if _KEEPER_TAP_WALL < WALL_FLOOR_MM:
+    raise AssertionError("keeper receiver leaves less than .060 with drill wander")
+if _KEEPER_TAP_WALL < KEEPER_TAP_WALL_ACCEPTED_MM:
+    raise AssertionError(
+        "keeper receiver leaves less than D15's accepted .076 with drill wander"
+    )
 KEEPER_MAX_STOCK_ENTRY = FOOT_SCREW_LENGTH_MM - (
     _keeper_printed(FOOT_H, KEEPER_DRAWING_PRECISION["FootProfile"]["FootRise"], -1.0)
     - _keeper_printed(CBORE_DEPTH_MM, FOOT_COUNTERBORE_DEPTH_PLACES, 1.0)
@@ -4451,7 +4460,7 @@ def build(adapter) -> dict[str, str]:
     v_gn = math.pi * (GOOSENECK_BORE_DIA / 2.0) ** 2 * (RING_HEIGHT + HUB_BOSS_DROP)
     volume = volume_check(adapter, "gooseneck bore", volume - v_gn, 60.0)
 
-    # 12. Native #10 plain clearance holes pinned to the C drill, both stations in one
+    # 12. Native #10 plain clearance holes pinned to the E drill, both stations in one
     #     underside-entry wizard feature (the shop drills them from the
     #     underside, so drift grows toward the faced top; HANGER_HOLE_SPEC).
     #     The washers bear on the faced top plane round each hole.
@@ -4942,17 +4951,11 @@ def build(adapter) -> dict[str, str]:
         places=DRAWING_PRECISION["CapRecesses"]["CapRecessDepth"],
         display_unit=UNIT,
     )
-    # Explicit press band on both dowel reams (the dowel spec's
-    # REAM_H7 +.0005/0), printed at the nominal's four places.
-    for pin_dia_name in ("HangerPinHoleDia", "HangerPinHole1Dia"):
-        set_dimension_bilateral_tolerance(
-            adapter,
-            "HangerPinProfile",
-            pin_dia_name,
-            *deviations(HANGER_PIN_HOLE_DIA_BAND),
-            places=HANGER_PIN_HOLE_DIA_PLACES,
-            display_unit=UNIT,
-        )
+    # The dowel reams print the .1240 reamer's size and no band
+    # (drawing-guidelines rule 4, form 3): the bought MHA-SM-VN-53 dowel is
+    # the gauge.  HANGER_PIN_HOLE_DIA_BAND (REAM_H7, what the reamer cuts)
+    # stays the analysis band for the press and the walls, never a printed
+    # limit.
     # The reams' full-diameter depth prints as its single MIN limit (owner
     # decision 2026-11-19, #3124 item 3): the model value is the minimum.
     set_single_limit(

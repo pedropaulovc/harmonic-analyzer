@@ -6,49 +6,15 @@
 # to SHIP deletes its line; the batch that deletes the last line deletes this
 # file (an empty list fails the graph load).
 demoted:
-  ch_amplitude_bar: fit-batch-ch
-  ch_channel_assembly: fit-batch-ch
-  ch_channel_lever: fit-batch-ch
-  ch_connecting_rod: fit-batch-ch
-  ch_fulcrum_keeper: fit-batch-ch
-  ch_fulcrum_shaft: fit-batch-ch
-  ch_pivot_bracket: fit-batch-ch
-  ch_pivot_shaft: fit-batch-ch
-  ch_rocker_arm: fit-batch-ch
-  ch_rocker_strap: fit-batch-ch
-  fr_frame_assembly: fit-batch-fr
-  fr_top_frame: fit-batch-fr
-  mg_magnifier_assembly: fit-batch-mg
-  mg_magnifying_bracket: fit-batch-mg
-  mg_magnifying_vertical_rod: fit-batch-mg
-  mg_magnifying_wheel: fit-batch-mg
-  mg_wheel_axle: fit-batch-mg
-  mg_wheel_bar: fit-batch-mg
-  mg_wheel_drum: fit-batch-mg
-  ms_measuring_stick_assembly: fit-batch-ms
-  ms_stick: fit-batch-ms
-  ms_stop_plate: fit-batch-ms
-  pd_paper_drive_assembly: fit-batch-pd
+  # Farm run 20261126T031815939Z on c8404aea15 read FIX: the drum bond's
+  # seating check runs after the 24 h cure, so its pull-off remedy cannot be
+  # done (issue #3630; its fix is rulings.md D38). Delegated ruling
+  # 2026-11-26 (Main), precedent: the owner's ruling 2026-11-24, main during
+  # fit conversion, "better to be able to cut releases with known issues than
+  # to hold unreleased code": a sheet that reads FIX at its batch's last run
+  # stays here with an issue until that issue's fix reads SHIP; no owner
+  # number changed; #2144 (rulings.md D39).
+  mg_magnifier_assembly: fit-batch-ch
   pd_platen_bottom_guide: fit-batch-pd
   pd_platen_guide: fit-batch-pd
-  # Final farm run on 237cdfc514 read FIX (gear data MATCHED while the span
-  # limits print live; issue #3525). Owner ruling 2026-11-24, main during fit
-  # conversion: "better to be able to cut releases with known issues than to
-  # hold unreleased code".
-  pd_rack_pinion: fit-batch-pd
   pd_support_bar: fit-batch-pd
-  pd_transgear_disc_hub: fit-batch-pd
-  pd_transgear_feed_pinion: fit-batch-pd
-  pd_transgear_front_bushing: fit-batch-pd
-  pd_transgear_knob_bush: fit-batch-pd
-  pd_transgear_knob_thrust_ring: fit-batch-pd
-  pn_pen_assembly: fit-batch-pn
-  pn_pen_hanger: fit-batch-pn
-  pn_pen_rod: fit-batch-pn
-  pn_pen_v_block: fit-batch-pn
-  sh_column_clamp_back: fit-batch-sh
-  sh_column_clamp_front: fit-batch-sh
-  sm_gooseneck: fit-batch-sm
-  sm_knife_mount: fit-batch-sm
-  sm_summing_assembly: fit-batch-sm
-  sm_summing_lever: fit-batch-sm

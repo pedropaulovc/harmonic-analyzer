@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 260" font-family="sans-serif" font-size="12">
+  <!-- Setup 5: the finished arm, every surface blackened. Plan, 1 in = 55 px. -->
+  <rect class="paper" x="0" y="0" width="760" height="260"/>
+  <text class="title" x="20" y="20">Setup 5: blacken every surface with the Presto Black Steel PC9</text>
+  <path class="part-kept" d="M63.9 83.0 A1731.5 1731.5 0 0 0 696.1 83.0 L696.1 118.2 A1766.2 1766.2 0 0 1 63.9 118.2 Z"/>
+  <path class="active-face" fill="none" d="M63.9 83.0 A1731.5 1731.5 0 0 0 696.1 83.0 L696.1 118.2 A1766.2 1766.2 0 0 1 63.9 118.2 Z"/>
+  <circle class="part-kept" cx="380" cy="130" r="11"/>
+  <circle class="active-face" fill="none" cx="380" cy="130" r="11"/>
+  <circle class="holes" cx="380" cy="130" r="7.1"/>
+  <circle class="holes" cx="668.1" cy="111.7" r="2.2"/>
+  <line class="leader" x1="380" y1="130" x2="330" y2="190"/>
+  <circle class="leader-dot" cx="380" cy="130" r="2"/>
+  <text class="label" x="200" y="204">the F bore: brushed too</text>
+  <line class="leader" x1="668.1" y1="111.7" x2="640" y2="170"/>
+  <circle class="leader-dot" cx="668.1" cy="111.7" r="1.5"/>
+  <text class="label" x="560" y="184">the #47: brushed too</text>
+  <text class="label" x="20" y="245">Every face, edge and hole: washed, strap faces scuffed, brushed, rinsed, dried, oiled.</text>
+</svg>

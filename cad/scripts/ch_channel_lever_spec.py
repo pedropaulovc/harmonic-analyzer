@@ -13,7 +13,6 @@ from __future__ import annotations
 import math
 
 import _config
-from _gtol_cylinder import CylinderFace
 from _hole_spec import HoleSpec, blind_cut_dia_mm
 from _inch_wall_limits import WALL_FLOOR_MM, WALL_TARGET_MM
 from _package_units import drawing_unit
@@ -23,7 +22,7 @@ from _printed_tolerance import (
     edge_break_radius_mm,
     printed_band_mm,
 )
-from _surface_finish import MACHINED_UM, SurfaceFinishControl
+from _surface_finish import SurfaceFinishControl
 
 # #290: the sheet prints decimal inch (the row's ``drawing_unit``). Lengths
 # stay millimetres, each fabricated one the exact decimal of its printed inch
@@ -52,8 +51,15 @@ BAR_TALL = 9.398  # .37
 # .118: ch_amplitude_bar_spec restates it for the top notch (it follows when
 # the bar converts).
 LEVER_THICKNESS = 2.9972  # .118
-# .256 +.0010/.0000 (#290 fit table F3): the owned 6.5 mm reamer cuts .2561.
-PIVOT_HOLE_DIA = 6.5024  # .256, fulcrum bore riding the .250 fulcrum shaft
+# The fulcrum bore is drilled F, .257 at the title block's DRILLED HOLES row
+# (owner ruling 2026-11-24, fit audit question 1, approved as recommended:
+# the 44 bores on the two 1/4 in shafts drilled F; was the .2560
+# +.0010/.0000 ream of #290 fit table F3). The spring and the bar hold
+# the bore's lower wall on the shaft through the whole crank turn, so the
+# clearance is a constant offset, not shake. It stays a plain circle cut:
+# the sketch dimension prints the drill's size under the drill's callout.
+PIVOT_HOLE_SPEC = HoleSpec("drilled_letter", "F")
+PIVOT_HOLE_DIA = blind_cut_dia_mm(PIVOT_HOLE_SPEC)  # 6.528, .257
 BAR_PIN_X = 127.0  # fulcrum -> bar-pin c2c, 5"
 BAR_PIN_HOLE_SPEC = HoleSpec("drilled_number", "#47")
 SPRING_EYE_HOLE_SPEC = HoleSpec("drilled_number", "#21")
@@ -96,22 +102,33 @@ if not TIP_RADIUS < BAR_TALL / 2.0:
 # Integral fulcrum hub (2026-09-02 photo re-derive, ch17 p.40 page002_img03):
 # the levers stack hub-to-hub on the fulcrum shaft at the station pitch; the
 # 19 `lever-bushing` spacers are retired. OD near the old bushing's O12.
-HUB_DIA = 11.938  # .47
+# .48 since the F-drilled bore (the same ruling: the hub O.D. goes .47 to
+# .48): at .47 the wall round the drill's largest hole falls under the .080
+# target (WALL_MIN below).
+HUB_DIA = 12.192  # .48
 HUB_LENGTH = 7.62  # == channels.station_pitch_mm (build + lockstep test); .3000
 if not BAR_TALL < HUB_DIA:
     raise AssertionError("the arm must stay under the hub")
 
 # --- Bands (upper, lower), native on the model dimensions. ---
-# The fulcrum bore is reamed: it runs on the h-band .250 fulcrum shaft
-# (MHA-CH-04), the same .256 +.0010/.0000 pivot the rocker arm runs on its
-# shaft.
-PIVOT_HOLE_BAND = (0.0254, 0.0)
+# The fulcrum bore's ANALYSIS band: what the F drill cuts, the title block's
+# DRILLED HOLES row (the sheet prints the drill and no band of its own). The
+# walls and the clearance on the h-band .250 fulcrum shaft (MHA-CH-04) read
+# it; the rocker arm's pivot is the same F-drilled bore on its shaft.
+PIVOT_HOLE_BAND = (drilled_oversize_mm(unit=UNIT), 0.0)
 # The plate is straddled by the amplitude bar's top notch, whose minimum is
 # this band's maximum plus the running floor (ch_amplitude_bar_spec, which
-# restates it). The band is +/-.002 so the bar's float, with both ledges and
-# both plate offsets, leaves the bar-to-bar running gap (owner ruling
-# 2026-10-15, #1038 option 2).
-LEVER_THICKNESS_TOLERANCE = 0.0508  # +/-.002
+# restates it; owner ruling 2026-10-15, #1038 option 2). The plate prints
+# .118 +.002/-.004 (delegated ruling 2026-11-25 (Main), no precedent; no
+# owner number changed, #2144 (rulings.md D23)), each side earned by a named
+# check (necessity
+# ch-channel-lever N-02): past +.002 the plate leaves less than the 0.10 mm
+# running floor in the narrowest notch (.0508 mm at +.004), and at +.005 the
+# bar's lean closes a cheek on it (CHEEK_CLOSURE_LIMIT .0254 mm against the
+# .0330 mm worst lean); past -.004 the bar float leaves BAR_GAP mid_span_bowed
+# .0006 in over the .0039 floor, under the .001 the shop reads (D14's
+# criterion; .0011 at -.004).
+LEVER_THICKNESS_BAND = (0.0508, -0.1016)  # +.002/-.004; (upper, lower) deviations
 # Both transfer arms are drilled holes located from the fulcrum bore the
 # lever turns about, so they print plain at the title block's .XXX row
 # (+/-.005, drawing-guidelines rule 3), the shop's drilled-hole location row.
@@ -138,7 +155,7 @@ PLATE_OFFSET_TOLERANCE = 0.0508  # +/-.002
 
 # drawing-guidelines.md rule 17 (walls and webs): every wall the holes leave,
 # at the worst case of the printed bands (the bar height and the hub both
-# print .XX; drilled holes +.004/0; the reamed bore at its top), less the
+# print .XX; drilled holes, the fulcrum bore among them, +.004/0), less the
 # title block's edge break at each of its two edges (the hole mouth and the
 # outside edge), against the .080 target.
 _LINEAR_2PL = printed_band_mm(2, unit=UNIT)
@@ -169,9 +186,8 @@ _TIP_WALL_IN = (
 )
 TIP_WALL_TEXT = f"HOLDS WALL {_TIP_WALL_IN:.3f}".replace(" 0.", " .") + " MIN"
 
-# drawing-guidelines.md rule 6: the fulcrum bore is the one running surface.
-SURFACE_FINISHES = (
-    SurfaceFinishControl(
-        "fulcrum_bore", MACHINED_UM, CylinderFace(PIVOT_HOLE_DIA), display_unit=UNIT
-    ),
-)
+# drawing-guidelines.md rule 6: no surface carries a roughness symbol. The
+# fulcrum bore only rocks a few degrees against one side of its clearance
+# under the spring, so it takes none (owner ruling 2026-11-24, fit audit
+# question 1: the 63 microinch symbol comes off the 40 pivots).
+SURFACE_FINISHES: tuple[SurfaceFinishControl, ...] = ()
