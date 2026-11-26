@@ -28,6 +28,7 @@
    ``as_machined.json`` (and ``as_machined.png`` over the noise line) beside
    them. The report is no task output; a recipe in report mode
    (``AS_MACHINED_MODE``) never fails on it, one in gate mode does.
+   ``HARMONIC_AS_MACHINED=skip`` skips a report-mode recipe's report.
 
 Exit 0 only when every program posted and every check passed (and, for a
 gate-mode recipe, its as-machined report found nothing). Any failure
@@ -384,6 +385,10 @@ def main(argv: list[str] | None = None) -> int:
         for line in time_table(times).splitlines():
             _telemetry.info(line)
         _telemetry.info(f"{stem}: posted {len(programs)} programs, {len(checks)} checks passed (FreeCAD {result['freecad_version']})")
+        if (os.environ.get(_as_machined.SKIP_ENV) == "skip"
+                and getattr(recipe, "AS_MACHINED_MODE", None) != _as_machined.MODE_GATE):
+            _telemetry.info(f"{stem}: as-machined report skipped ({_as_machined.SKIP_ENV}=skip)")
+            return 0
         failed = as_machined(stem, recipe, ctx, inputs_seen, directory, lambda: freecadcmd)
         if failed and getattr(recipe, "AS_MACHINED_MODE", None) == _as_machined.MODE_GATE:
             return _fail(root, stem, RuntimeError("as-machined report:\n  " + "\n  ".join(failed)), directory)
@@ -410,7 +415,10 @@ def as_machined(stem: str, recipe: Any, ctx: dict[str, Any], inputs: SimpleNames
     found = _as_machined.failures(out)
     for line in found:
         _telemetry.warn(f"{stem}: as-machined {line}")
-    _telemetry.info(f"{stem}: as-machined report ({out['mode']}) in {out['seconds']:.1f} s, {len(found)} over the noise line")
+    explained = sum(1 for part in (out.get("parts") or {}).values() for v in part["variants"].values()
+                    for r in v["over_noise"] if r["expected"])
+    _telemetry.info(f"{stem}: as-machined report ({out['mode']}) in {out['seconds']:.1f} s: "
+                    f"{explained} expected differences, {len(found)} unexplained or gone")
     return found
 
 

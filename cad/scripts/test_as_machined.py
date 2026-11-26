@@ -249,21 +249,76 @@ def test_skipped_programs_and_declared_tools():
 
 
 def _out(**variant):
-    base = {"over_noise": [], "rapid_cuts": [], "air_passes": [], "max_left_mm": 0.0, "max_gouge_mm": 0.0,
-            "cog_offset_mm": 0.0, "volume_mm3": {"difference": -0.1}}
+    base = {"over_noise": [], "unexplained": [], "expected": [], "rapid_cuts": [], "air_passes": [], "max_left_mm": 0.0,
+            "max_gouge_mm": 0.0, "cog_offset_mm": 0.0, "volume_mm3": {"difference": -0.1}}
     return {"stem": "s", "covered": True, "mode": "report", "seconds": 1.0,
             "parts": {"": {"variants": {"nominal": {**base, **variant}}}}}
 
 
-def test_failures_name_regions_over_the_noise_line_and_cutting_rapids():
+def test_failures_name_unexplained_regions_gone_expectations_and_cutting_rapids():
     assert am.failures(_out()) == []
-    out = _out(over_noise=[{"kind": "left", "thickness_mm": 0.5, "at_mm": [1, 2, 3]}],
+    out = _out(unexplained=[{"kind": "left", "thickness_mm": 0.5, "extent_mm": [[0, 1], [0, 1], [0, 1]]},
+                            {"kind": "gouge", "thickness_mm": None, "extent_mm": [[0, 1], [0, 1], [0, 1]]}],
+               expected=[{"name": "tap", "kind": "left", "stale": True}, {"name": "aim", "kind": "gouge", "stale": False}],
                rapid_cuts=[{"program": "P1", "move": 4, "removed_mm3": 2.0}])
-    assert am.failures(out) == ["s nominal: left 0.500 mm at [1, 2, 3]", "s nominal: rapid P1 move 4 removed 2.000 mm3"]
+    assert am.failures(out) == [
+        "s nominal: unexplained left 0.500 mm in [[0, 1], [0, 1], [0, 1]]",
+        "s nominal: unexplained gouge unmeasured in [[0, 1], [0, 1], [0, 1]]",
+        "s nominal: expected 'tap' (left) is gone",
+        "s nominal: rapid P1 move 4 removed 2.000 mm3",
+    ]
     assert am.failures({"stem": "s", "covered": True, "error": "boom"}) == ["s: the report failed: boom"]
+    attrs = am.headline(out)
+    assert attrs["as_machined.unexplained"] == 2 and attrs["as_machined.stale_expected"] == 1
     attrs = am.headline(_out(max_left_mm=0.2, air_passes=[{}, {}]))
     assert attrs["as_machined.max_left_mm"] == 0.2 and attrs["as_machined.air_passes"] == 2
     assert am.headline({"covered": False, "reason": "r", "seconds": 0.0})["as_machined.reason"] == "r"
+
+
+def _region(kind, depth, box):
+    return {"kind": kind, "thickness_mm": depth, "at_mm": None, "volume_mm3": 1.0, "extent_mm": box}
+
+
+def test_expected_differences_explain_regions_in_their_box_and_report_aims_and_gone_ones():
+    expects = am.expected([
+        {"name": "taps", "kind": "left", "within": [[0, 10], [0, 10], [-5, 0]], "reason": "hand taps", "max_mm": 0.8},
+        {"name": "length aim", "kind": "gouge", "within": [[99, 101], [0, 10], [-5, 0]], "reason": "band middle",
+         "aim": {"band_mm": [98.0, 99.5], "cad_mm": 100.0, "aim_mm": 99.0}},
+        {"name": "thin sheet", "kind": "gouge", "within": [[0, 100], [0, 10], [-1, 0]], "reason": "as rolled",
+         "variants": ["min"]},
+    ], {}, ["nominal", "min", "max"])
+    over = [_region("left", 0.5, [[1, 2], [1, 2], [-3, 0]]),  # a tap
+            _region("left", 0.9, [[1, 2], [1, 2], [-3, 0]]),  # deeper than taps allow
+            _region("gouge", 1.02, [[99.5, 100], [0, 10], [-5, 0]]),  # the aim, 1.0 deep
+            _region("gouge", 0.5, [[0, 50], [0, 10], [-1, 0]])]  # the sheet: min only
+    unexplained, rows = am.explain("nominal", over, {"left": [{"volume_mm3": 0.1, "extent_mm": [[3, 4], [3, 4], [-1, 0]]}],
+                                                     "gouge": []}, expects)
+    assert [r["expected"] for r in over] == ["taps", None, "length aim", None]
+    assert [(r["thickness_mm"], r["kind"]) for r in unexplained] == [(0.9, "left"), (0.5, "gouge")]
+    assert [(r["name"], r["regions"], r["stale"]) for r in rows] == [("taps", 2, False), ("length aim", 1, False)]
+    assert rows[1]["aim"]["in_band"] and not rows[1]["aim"]["cad_in_band"]
+    unexplained, rows = am.explain("min", [], {"left": [], "gouge": []}, expects)
+    assert unexplained == [] and [r["name"] for r in rows if r["stale"]] == ["taps", "length aim", "thin sheet"]
+
+
+@pytest.mark.parametrize("bad, why", [
+    ({"kind": "left", "within": [[0, 1], [0, 1], [0, 1]], "reason": "r"}, "name"),
+    ({"name": "a", "kind": "both", "within": [[0, 1], [0, 1], [0, 1]], "reason": "r"}, "kind"),
+    ({"name": "a", "kind": "left", "within": [[0, 1], [0, 1], [0, 1]], "reason": " "}, "reason"),
+    ({"name": "a", "kind": "left", "within": [[1, 0], [0, 1], [0, 1]], "reason": "r"}, "increasing"),
+    ({"name": "a", "kind": "left", "within": [[0, 1], [0, 1], [0, 1]], "reason": "r", "variants": ["long"]}, "variants"),
+    ({"name": "a", "kind": "left", "within": [[0, 1], [0, 1], [0, 1]], "reason": "r", "frame": "side"}, "frame"),
+])
+def test_an_expected_difference_states_what_it_is_and_why(bad, why):
+    with pytest.raises(am.NotCovered, match=why):
+        am.expected([bad], {}, ["nominal"])
+
+
+def test_an_expected_box_in_a_setup_frame_is_its_model_bound_box():
+    side = am.frame({"origin": [10, 0, 0], "axes": [[0, 1, 0], [0, 0, 1], [1, 0, 0]]}, "side")
+    (e,) = am.expected([{"name": "a", "kind": "left", "within": [[0, 1], [0, 2], [0, 3]], "reason": "r",
+                         "frame": "side"}], {"side": side}, ["nominal"])
+    assert e.within == ((10.0, 13.0), (0.0, 1.0), (0.0, 2.0))
 
 
 def test_every_recipe_states_its_coverage_one_way():

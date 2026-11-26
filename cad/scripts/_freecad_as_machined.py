@@ -355,7 +355,7 @@ def thickness(region, whole, other, faces):
 def regions(whole, other):
     solids = sorted(whole.cut(other).Solids, key=lambda s: -s.Volume)
     big = [s for s in solids if s.Volume >= REGION_MIN_MM3]
-    faces = _Faces(other)
+    faces = _Faces(other) if big else None
     measured = []
     for s in big[:REGION_CAP]:
         t, at = thickness(s, whole, other, faces)
@@ -363,6 +363,7 @@ def regions(whole, other):
     return measured, {
         "unmeasured_regions": len(big) - len(measured),
         "unmeasured_mm3": sum(s.Volume for s in big[REGION_CAP:]),
+        "unmeasured": [{"volume_mm3": s.Volume, "extent_mm": _bbox(s)} for s in big[REGION_CAP:]],
         "slivers_mm3": sum(s.Volume for s in solids if s.Volume < REGION_MIN_MM3),
     }, big
 

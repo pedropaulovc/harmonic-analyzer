@@ -18,7 +18,6 @@ from __future__ import annotations
 
 import os
 import subprocess
-from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -80,7 +79,7 @@ def step(freecadcmd, tmp_path_factory):
     return path
 
 
-def _report(freecadcmd, step, tmp_path, face=_FACE, hole=_HOLE):
+def _report(freecadcmd, step, tmp_path, face=_FACE, hole=_HOLE, expected=()):
     (tmp_path / "P1_face.nc").write_text(face, encoding="utf-8")
     (tmp_path / "P2_hole.nc").write_text(hole, encoding="utf-8")
     recipe = SimpleNamespace(
@@ -89,7 +88,7 @@ def _report(freecadcmd, step, tmp_path, face=_FACE, hole=_HOLE):
         as_machined=lambda ctx, inputs: {"parts": {"": {"blank": {
             "frame": "top", "box": [[0, 40], [0, 20], [0, 12]],
             "length": {"axis": "z", "keep": "min", "mm": {"nominal": 12.0, "min": 10.8, "max": 12.5}},
-        }}}},
+        }, "expected": list(expected)}}},
     )
     ctx = {
         "frames": {"top": IDENTITY},
@@ -168,6 +167,22 @@ def test_an_undrilled_hole_under_a_strip_left_shows_its_depth(freecadcmd, step, 
     out, variants = _report(freecadcmd, step, tmp_path, face=face, hole=_HOLE.replace("G1 Z-3 F50\n", ""))
     (region,) = variants["nominal"]["over_noise"]
     assert region["kind"] == "left" and region["thickness_mm"] > 2.5
+
+
+def test_an_expected_difference_explains_its_region_and_one_gone_is_named(freecadcmd, step, tmp_path):
+    """The hole left for the bench drill, declared: 0 unexplained. A
+    declared face strip the programs no longer leave: named as gone."""
+    expected = [
+        {"name": "bench-drilled hole", "kind": "left", "within": [[26.9, 33.1], [6.9, 13.1], [-0.1, 10.1]],
+         "reason": "drilled at the bench after the mill"},
+        {"name": "top strip", "kind": "left", "within": [[0, 40], [0, 20], [10, 10.2]], "reason": "faced by hand"},
+    ]
+    out, variants = _report(freecadcmd, step, tmp_path, hole=_HOLE.replace("G1 Z-3 F50\n", ""), expected=expected)
+    nominal = variants["nominal"]
+    assert [r["expected"] for r in nominal["over_noise"]] == ["bench-drilled hole"] and nominal["unexplained"] == []
+    assert [(row["name"], row["regions"], row["stale"]) for row in nominal["expected"]] == [
+        ("bench-drilled hole", 1, False), ("top strip", 0, True)]
+    assert am.failures(out) == [f"mini {name}: expected 'top strip' (left) is gone" for name in ("nominal", "min", "max")]
 
 
 def test_programs_past_the_move_cap_are_cut_in_one_boolean(freecadcmd, step, tmp_path, monkeypatch):

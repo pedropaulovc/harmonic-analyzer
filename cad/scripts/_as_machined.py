@@ -20,11 +20,20 @@ region is thicker than :data:`NOISE_MM`, ``as_machined.png`` with it drawn.
 A recipe that declares nothing, or one this model cannot hold, is reported
 ``covered: false`` with its reason, never skipped in silence.
 
+A recipe declares the differences it expects (``expected``, per part: hand
+taps, a later lathe operation, an edge break filed at the bench, a cutter's
+form, a size aimed inside its band), each a named box with its reason.
+Every over-noise region is matched against them: the report counts the
+unexplained ones (a clean recipe: 0) and names each expected difference
+that no longer differs.
+
 The report is not an output of the ``cam:<stem>`` task (no release ships
 it, no target names it). Each recipe states its mode in
 ``AS_MACHINED_MODE``: :data:`MODE_REPORT` never fails the task;
-:data:`MODE_GATE` fails it on a region over the noise line or a rapid
-that cuts. Turning a recipe to gating is that one line.
+:data:`MODE_GATE` fails it on an unexplained region, an expected difference
+that is gone or a rapid that cuts. Turning a recipe to gating is that one
+line. ``HARMONIC_AS_MACHINED=skip`` skips a report-mode recipe's report
+(an inner loop); builds and releases leave it unset.
 """
 
 from __future__ import annotations
@@ -58,6 +67,11 @@ REPORT_NAME = "as_machined.json"
 PICTURE_NAME = "as_machined.png"
 LOG_NAME = "as_machined.log"
 OUTPUT_NAMES = (REPORT_NAME, PICTURE_NAME, LOG_NAME)
+# "skip": no report for a report-mode recipe (a gating one always runs).
+SKIP_ENV = "HARMONIC_AS_MACHINED"
+# A region lies within an expected difference's box to this much (OCC's
+# bound boxes carry the shapes' tolerances).
+EXTENT_TOL_MM = 0.01
 TIMEOUT_S = 1800
 # freecadcmd processes at once: each part and blank length is one.
 PARALLEL = 4
@@ -112,6 +126,23 @@ class Setup:
     entry_tool: int | None  # the tool loaded before the program's first M6
 
 
+@dataclass(frozen=True)
+class Expected:
+    """A difference the recipe expects (hand work, a later lathe operation,
+    an edge break, a cutter's form, a size aimed inside its band): every
+    over-noise region of ``kind`` within the model-space box ``within`` (and
+    no deeper than ``max_mm``) is explained by it. With an aim, the region
+    is the aimed size against the CAD's: it must be ``|aim - cad|`` deep,
+    within the noise line, and the aim is reported against its band."""
+    name: str
+    kind: str
+    within: tuple[tuple[float, float], ...]
+    reason: str
+    max_mm: float | None
+    variants: tuple[str, ...] | None  # None: every blank length
+    aim: dict[str, Any] | None  # band_mm [lo, hi], cad_mm, aim_mm
+
+
 @dataclass
 class PartRoute:
     id: str
@@ -120,6 +151,7 @@ class PartRoute:
     lengths: dict[str, float] | None
     setups: list[Setup]
     density: float | None
+    expected: list[Expected] = field(default_factory=list)
 
 
 @dataclass
@@ -266,6 +298,46 @@ def blank_corners(blank: list[dict[str, Any]]) -> list[tuple[float, ...]]:
     return [tuple(c) for prism in blank for p in prism["base"] for c in (p, [a + d for a, d in zip(p, prism["dir"])])]
 
 
+def expected(specs: list[dict[str, Any]], frames: dict[str, Frame], variants: list[str]) -> list[Expected]:
+    """A part's ``expected`` differences, checked: each a ``name``, a
+    ``kind`` (left or gouge), a ``reason``, the box ``within`` it lies (three
+    spans in model coordinates, or in setup ``frame``: its corners' model
+    bound box), and optionally ``max_mm``, ``variants`` (blank lengths it
+    applies to) and ``aim`` (``band_mm`` [lo, hi], ``cad_mm``, ``aim_mm``)."""
+    out, names = [], set()
+    for spec in specs:
+        name = spec.get("name")
+        if not name or name in names:
+            raise NotCovered(f"expected difference name {name!r} is missing or repeated")
+        names.add(name)
+        if spec.get("kind") not in ("left", "gouge"):
+            raise NotCovered(f"expected {name!r} kind {spec.get('kind')!r} is not left or gouge")
+        if not str(spec.get("reason", "")).strip():
+            raise NotCovered(f"expected {name!r} gives no reason")
+        box = [tuple(float(v) for v in pair) for pair in spec["within"]]
+        if len(box) != 3 or any(len(pair) != 2 or pair[0] >= pair[1] for pair in box):
+            raise NotCovered(f"expected {name!r} within {spec['within']} is not three increasing spans")
+        if "frame" in spec:
+            if spec["frame"] not in frames:
+                raise NotCovered(f"expected {name!r} frame {spec['frame']!r} is no frame of the recipe")
+            corners = [frames[spec["frame"]].to_model((x, y, z)) for x in box[0] for y in box[1] for z in box[2]]
+            box = [(min(c[i] for c in corners), max(c[i] for c in corners)) for i in range(3)]
+        applies = spec.get("variants")
+        if applies is not None and (not applies or set(applies) - set(variants)):
+            raise NotCovered(f"expected {name!r} variants {applies} are not blank lengths {variants}")
+        aim = spec.get("aim")
+        if aim is not None:
+            aim = {"band_mm": [float(v) for v in aim["band_mm"]], "cad_mm": float(aim["cad_mm"]),
+                   "aim_mm": float(aim["aim_mm"])}
+            if len(aim["band_mm"]) != 2 or aim["band_mm"][0] >= aim["band_mm"][1]:
+                raise NotCovered(f"expected {name!r} aim band {aim['band_mm']} is not [lo, hi]")
+        max_mm = spec.get("max_mm")
+        out.append(Expected(name, spec["kind"], tuple(box), str(spec["reason"]),  # type: ignore[arg-type]
+                            None if max_mm is None else float(max_mm),
+                            None if applies is None else tuple(applies), aim))
+    return out
+
+
 def declaration(recipe: Any, ctx: dict[str, Any], inputs: SimpleNamespace) -> Declaration:
     """The recipe's declaration, resolved and checked; :class:`NotCovered`
     with the reason when it declares none or this model cannot hold it."""
@@ -324,7 +396,8 @@ def declaration(recipe: Any, ctx: dict[str, Any], inputs: SimpleNamespace) -> De
             routed.add(name)
         part_blanks, lengths = blanks(spec["blank"], frames)
         material = _find(inputs.plan.get(part_id, inputs.plan) if part_id else inputs.plan, "milling_material")
-        parts.append(PartRoute(part_id, str(inputs.steps[part_id]), part_blanks, lengths, setups, DENSITY_G_CM3.get(material)))
+        parts.append(PartRoute(part_id, str(inputs.steps[part_id]), part_blanks, lengths, setups, DENSITY_G_CM3.get(material),
+                               expected(spec.get("expected", []), frames, list(part_blanks))))
     if missing := sorted(set(programs) - routed - set(skipped)):
         raise NotCovered(f"programs neither routed nor skipped: {missing}")
     return Declaration(mode, parts, profiles, skipped, uncut, list(decl.get("notes", [])))
@@ -544,6 +617,60 @@ def _norm(v):
     return math.sqrt(sum(x * x for x in v))
 
 
+def _inside(extent, box) -> bool:
+    return all(lo - EXTENT_TOL_MM <= a and b <= hi + EXTENT_TOL_MM for (a, b), (lo, hi) in zip(extent, box))
+
+
+def explain(variant: str, over: list[dict[str, Any]], unmeasured: dict[str, list[dict[str, Any]]],
+            expects: list[Expected]) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """Mark every over-noise region with the expected difference that
+    explains it (``expected``: its name, or None), and match the regions too
+    many to measure (their depth unknown) by their extent alone. Returns the
+    unexplained regions, and per expected difference of this blank length
+    the regions it explained (``stale`` when none: the difference it
+    declares is gone) and, for an aim, the aim against its band."""
+    applicable = [e for e in expects if e.variants is None or variant in e.variants]
+    count = {e.name: 0 for e in applicable}
+    deepest = {e.name: 0.0 for e in applicable}
+
+    def match(kind: str, region: dict[str, Any], depth: float | None) -> Expected | None:
+        for e in applicable:
+            if e.kind != kind or not _inside(region["extent_mm"], e.within):
+                continue
+            if depth is not None and e.max_mm is not None and depth > e.max_mm:
+                continue
+            if depth is not None and e.aim is not None and abs(depth - abs(e.aim["aim_mm"] - e.aim["cad_mm"])) > NOISE_MM:
+                continue
+            return e
+        return None
+
+    unexplained = []
+    for region in over:
+        e = match(region["kind"], region, region["thickness_mm"])
+        region["expected"] = e.name if e else None
+        if e is None:
+            unexplained.append(region)
+        else:
+            count[e.name] += 1
+            deepest[e.name] = max(deepest[e.name], region["thickness_mm"])
+    for kind, regions in unmeasured.items():
+        for region in regions:
+            e = match(kind, region, None)
+            if e is None:
+                unexplained.append({"kind": kind, "thickness_mm": None, "at_mm": None, "expected": None, **region})
+            else:
+                count[e.name] += 1
+    rows = []
+    for e in applicable:
+        row: dict[str, Any] = {"name": e.name, "kind": e.kind, "reason": e.reason, "regions": count[e.name],
+                               "deepest_mm": deepest[e.name], "stale": count[e.name] == 0}
+        if e.aim is not None:
+            lo, hi = e.aim["band_mm"]
+            row["aim"] = {**e.aim, "in_band": lo <= e.aim["aim_mm"] <= hi, "cad_in_band": lo <= e.aim["cad_mm"] <= hi}
+        rows.append(row)
+    return unexplained, rows
+
+
 def summarize(decl: Declaration, result: dict[str, Any], kept: dict) -> dict[str, Any]:
     parts = {}
     for part, found in zip(decl.parts, result["parts"]):
@@ -563,6 +690,8 @@ def summarize(decl: Declaration, result: dict[str, Any], kept: dict) -> dict[str
                                  "air_passes": len(a), "air_pass_minutes": sum(p["minutes"] or 0.0 for p in a),
                                  "seconds": prog["seconds"]})
             over = [{"kind": kind, **r} for kind in ("left", "gouge") for r in variant[kind] if r["thickness_mm"] > NOISE_MM]
+            unmeasured = {kind: variant[f"{kind}_rest"].pop("unmeasured") for kind in ("left", "gouge")}
+            unexplained, expected_rows = explain(variant["name"], over, unmeasured, part.expected)
             density = part.density
             variants[variant["name"]] = {
                 "blank_length_mm": (part.lengths or {}).get(variant["name"]),
@@ -578,6 +707,8 @@ def summarize(decl: Declaration, result: dict[str, Any], kept: dict) -> dict[str
                 "max_left_mm": max((r["thickness_mm"] for r in variant["left"]), default=0.0),
                 "max_gouge_mm": max((r["thickness_mm"] for r in variant["gouge"]), default=0.0),
                 "over_noise": over,
+                "unexplained": unexplained,
+                "expected": expected_rows,
                 "left": variant["left"], "left_rest": variant["left_rest"],
                 "gouge": variant["gouge"], "gouge_rest": variant["gouge_rest"],
                 "programs": programs,
@@ -619,7 +750,7 @@ def picture(parts: dict[str, Any], path: Path) -> bool:
             ax.autoscale_view()
             ax.set_aspect("equal")
             ax.set_title(f"{pid or 'part'} {name}: {title}  left {v['max_left_mm']:.3f} mm (red), "
-                         f"gouge {v['max_gouge_mm']:.3f} mm (blue)", fontsize=8)
+                         f"gouge {v['max_gouge_mm']:.3f} mm (blue), {len(v['unexplained'])} unexplained", fontsize=8)
     fig.tight_layout()
     fig.savefig(path, dpi=200)
     plt.close(fig)
@@ -678,6 +809,8 @@ def headline(out: dict[str, Any]) -> dict[str, Any]:
         "as_machined.cog_offset_mm": max(v["cog_offset_mm"] for v in variants),
         "as_machined.volume_difference_mm3": max((v["volume_mm3"]["difference"] for v in variants), key=abs),
         "as_machined.over_noise": sum(len(v["over_noise"]) for v in variants),
+        "as_machined.unexplained": sum(len(v["unexplained"]) for v in variants),
+        "as_machined.stale_expected": sum(row["stale"] for v in variants for row in v["expected"]),
         "as_machined.air_passes": sum(len(v["air_passes"]) for v in variants),
         "as_machined.rapid_cuts": sum(len(v["rapid_cuts"]) for v in variants),
     })
@@ -685,11 +818,17 @@ def headline(out: dict[str, Any]) -> dict[str, Any]:
 
 
 def failures(out: dict[str, Any]) -> list[str]:
-    """What a gating recipe fails on: every region over the noise line and
-    every rapid that cut, by part and blank length."""
+    """What a gating recipe fails on, by part and blank length: every region
+    over the noise line its recipe does not expect (and every region too
+    many to measure outside what it expects), every expected difference
+    that is gone, and every rapid that cut."""
     found = [f"{out['stem']}: the report failed: {out['error']}"] if "error" in out else []
     for pid, part in (out.get("parts") or {}).items():
         for name, v in part["variants"].items():
-            found += [f"{pid or out['stem']} {name}: {r['kind']} {r['thickness_mm']:.3f} mm at {r['at_mm']}" for r in v["over_noise"]]
-            found += [f"{pid or out['stem']} {name}: rapid {r['program']} move {r['move']} removed {r['removed_mm3']:.3f} mm3" for r in v["rapid_cuts"]]
+            where = f"{pid or out['stem']} {name}"
+            for r in v["unexplained"]:
+                depth = "unmeasured" if r["thickness_mm"] is None else f"{r['thickness_mm']:.3f} mm"
+                found.append(f"{where}: unexplained {r['kind']} {depth} in {r['extent_mm']}")
+            found += [f"{where}: expected {row['name']!r} ({row['kind']}) is gone" for row in v["expected"] if row["stale"]]
+            found += [f"{where}: rapid {r['program']} move {r['move']} removed {r['removed_mm3']:.3f} mm3" for r in v["rapid_cuts"]]
     return found
