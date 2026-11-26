@@ -5,7 +5,7 @@
   <path class="part-kept" d="M160 116.62L693.4 122.18L693.4 177.82L160 183.38Z"/>
   <path class="part-kept" d="M160.00 116.62A65.48 65.48 0 0 0 160.00 183.38Z"/>
   <rect class="holes" x="193.22" y="117.1" width="24.99" height="65.8"/>
-  <rect class="part-rest" x="193.22" y="60" width="24.99" height="180"/>
+  <path class="part-rest" d="M193.22 60L201.55 57L209.89 60L218.22 60L218.22 240L209.89 237L201.55 240L193.22 240Z"/>
   <line class="centre-line" x1="100" y1="150" x2="720" y2="150"/>
   <line class="datum" x1="160" y1="50" x2="160" y2="250"/>
   <text class="datum-label" x="154" y="46" text-anchor="end">big end's rim</text>

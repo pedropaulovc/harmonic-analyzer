@@ -12,6 +12,7 @@
   <rect class="clamp" x="354" y="242.5" width="46" height="34"/>
   <line class="centre-line" x1="20" y1="180" x2="740" y2="180"/>
   <path class="cutter" d="M491.56 221L498.56 237L498.56 331L490.56 328L482.56 331L482.56 237Z"/>
+  <line class="arrow" x1="410.56" y1="313" x2="466.56" y2="313"/>
   <line class="datum" x1="620" y1="50" x2="620" y2="84"/>
   <text class="datum-label" x="614" y="62" text-anchor="end">Z0 the apex (the tool's left side)</text>
   <text class="label" x="470.56" y="330" text-anchor="end">sharp-nose tool: the neck Ø{{cad.neck_dia_min_in:.3dot}}–{{cad.neck_dia_max_in:.3dot}};</text>

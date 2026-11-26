@@ -8,7 +8,7 @@
   <text class="label-on-clamp" x="470" y="172">soft jaw</text>
   <rect class="part-kept" x="300" y="110" width="160" height="180"/>
   <rect class="holes" x="368" y="110" width="24" height="180"/>
-  <rect class="cutter" x="368" y="60" width="24" height="74"/>
+  <path class="cutter" d="M368 60L392 60L392 131.1A12 2.9 0 0 1 368 131.1Z"/>
   <rect class="cutter" x="300" y="52" width="160" height="8"/>
   <line class="arrow" x1="410" y1="40" x2="410" y2="80"/>
   <text class="label" x="480" y="60">adjustable reamer in a tap wrench, by hand,</text>

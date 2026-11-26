@@ -5,7 +5,7 @@
   <rect class="part-kept" x="296" y="52" width="264" height="236"/>
   <rect class="holes" x="296" y="107.5" width="264" height="125"/>
   <rect class="holes" x="415.5" y="52" width="25" height="236"/>
-  <path class="part-rest" d="M415.5 40L440.5 40L440.5 300L415.5 300Z"/>
+  <path class="part-rest" d="M415.5 40L423.83 37L432.17 40L440.5 40L440.5 300L432.17 297L423.83 300L415.5 300Z"/>
   <line class="centre-line" x1="200" y1="170" x2="640" y2="170"/>
   <line class="datum" x1="560" y1="40" x2="560" y2="300"/>
   <text class="datum-label" x="566" y="50">face F</text>

@@ -6,9 +6,9 @@
   <text class="label" x="50" y="375">surface plate</text>
   <circle class="part-kept" cx="300" cy="272.4" r="87.6"/>
   <circle class="holes" cx="300" cy="248.4" r="38.25"/>
-  <circle class="cutter" cx="300" cy="248.4" r="38.1"/>
+  <circle class="part-rest" cx="300" cy="248.4" r="38.1"/>
   <rect class="clamp" x="560" y="60" width="30" height="300"/>
-  <rect class="clamp" x="430" y="202.3" width="130" height="8"/>
+  <rect class="clamp" x="300" y="202.3" width="260" height="8"/>
   <line class="dims" x1="620" y1="360" x2="620" y2="210.3"/>
   <line class="dims" x1="612" y1="210.3" x2="628" y2="210.3"/>
   <line class="dims" x1="612" y1="360" x2="628" y2="360"/>

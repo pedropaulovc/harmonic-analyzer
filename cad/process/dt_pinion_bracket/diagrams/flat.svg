@@ -18,10 +18,10 @@
   <circle class="cutter" cx="370" cy="155.75" r="31.75"/>
   <line class="arrow" x1="330" y1="155.75" x2="280" y2="155.75"/>
   <text class="label" x="410" y="148.75">1/2 end mill, pass 4: −X</text>
-  <path class="clamp" d="M507 355.24L567 355.24L567 522L507 522Z"/>
-  <rect class="fixture-support" x="481.6" y="410" width="25.4" height="112"/>
-  <path class="clamp" d="M253 355.24L193 355.24L193 522L253 522Z"/>
-  <rect class="fixture-support" x="253" y="410" width="25.4" height="112"/>
+  <path class="clamp" d="M507 355.24L567 355.24L567 522L559.5 519L552 522L544.5 519L537 522L529.5 519L522 522L514.5 519L507 522Z"/>
+  <path class="fixture-support" d="M481.6 410L507 410L507 522L498.53 519L490.07 522L481.6 522Z"/>
+  <path class="clamp" d="M253 355.24L193 355.24L193 522L200.5 519L208 522L215.5 519L223 522L230.5 519L238 522L245.5 519L253 522Z"/>
+  <path class="fixture-support" d="M253 410L278.4 410L278.4 522L269.93 519L261.47 522L253 522Z"/>
   <line class="hidden" x1="193" y1="511.6" x2="567" y2="511.6"/>
   <rect class="part-kept" x="253" y="333.8" width="254" height="76.2"/>
   <text class="label-on-clamp" x="513" y="373.24">fixed</text>

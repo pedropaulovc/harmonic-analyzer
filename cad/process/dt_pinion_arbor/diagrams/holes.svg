@@ -29,8 +29,8 @@
   <rect class="holes" x="635.24" y="140" width="9.52" height="95.25"/>
   <path class="cutter" d="M644.76 30L644.76 238.25L640 241.11L635.24 238.25L635.24 30L640 27Z"/>
   <line class="arrow" x1="415.61" y1="40" x2="415.61" y2="80"/>
-  <text class="label" x="429.61" y="52">1/16 drill, {{process.pin_peck_mm:in.3dot}} pecks, full retract,</text>
-  <text class="label" x="429.61" y="68">through into air</text>
+  <text class="label" x="375.61" y="52" text-anchor="end">1/16 drill, {{process.pin_peck_mm:in.3dot}} pecks, full retract,</text>
+  <text class="label" x="375.61" y="68" text-anchor="end">through into air</text>
   <text class="label" x="20" y="392">head end {{process.jaw_left_x_mm:in.2f}} in past the jaws' left face</text>
   <line class="leader" x1="60" y1="380" x2="410.9" y2="239.25"/>
   <circle class="leader-dot" cx="410.9" cy="239.25" r="2"/>

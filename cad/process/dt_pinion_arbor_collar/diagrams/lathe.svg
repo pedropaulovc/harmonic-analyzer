@@ -23,7 +23,7 @@
   <text class="label" x="30" y="60">and the 5/16 bore, 0.80 on the quill</text>
   <line class="leader" x1="200" y1="64" x2="500" y2="129.25"/>
   <circle class="leader-dot" cx="500" cy="129.25" r="2"/>
-  <text class="label" x="40" y="350">3-jaw on the blank, {{process.stickout_mm:in.2f}} out (rule)</text>
-  <line class="leader" x1="140" y1="338" x2="384" y2="272.5"/>
+  <text class="label" x="40" y="330">3-jaw on the blank, {{process.stickout_mm:in.2f}} out (rule)</text>
+  <line class="leader" x1="140" y1="318" x2="384" y2="272.5"/>
   <circle class="leader-dot" cx="384" cy="272.5" r="2"/>
 </svg>

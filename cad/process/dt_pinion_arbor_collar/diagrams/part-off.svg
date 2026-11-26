@@ -17,10 +17,11 @@
   <line class="arrow" x1="488" y1="360" x2="488" y2="320"/>
   <line class="datum" x1="600" y1="60" x2="600" y2="110"/>
   <text class="datum-label" x="594" y="72" text-anchor="end">face F (Z0)</text>
-  <text class="label" x="508" y="340">P1 blade: its tailstock-side face at Z-{{cad.far_end_length_in:.3dot}};</text>
-  <text class="label" x="508" y="356">it breaks into the bore: no pip</text>
-  <text class="label" x="380" y="80">pin hole, {{cad.pin_hole_station_in:.2dot}} from face F</text>
-  <line class="leader" x1="440" y1="86" x2="534" y2="131"/>
+  <text class="label" x="508" y="330">P1 blade: its tailstock-side</text>
+  <text class="label" x="508" y="346">face at Z-{{cad.far_end_length_in:.3dot}}; it breaks</text>
+  <text class="label" x="508" y="362">into the bore: no pip</text>
+  <text class="label" x="250" y="46">pin hole, {{cad.pin_hole_station_in:.2dot}} from face F</text>
+  <line class="leader" x1="330" y1="52" x2="534" y2="131"/>
   <circle class="leader-dot" cx="534" cy="131" r="2"/>
   <text class="label" x="40" y="350">3-jaw on the 5/8 end, {{process.part_off_stickout_mm:in.2f}} out</text>
   <text class="label" x="40" y="366">(the turned shoulder .15 out)</text>

@@ -26,8 +26,13 @@
   <text class="label-halo" x="560" y="276" text-anchor="middle">wrung, on the parallel's right end</text>
   <line class="leader" x1="560" y1="248" x2="604.75" y2="137.42"/>
   <circle class="leader-dot" cx="604.75" cy="137.42" r="2"/>
-  <text class="label" x="470" y="96">fixed jaw (behind), paper folded over it;</text>
-  <text class="label" x="470" y="112">the moving jaw, in front, not drawn</text>
+  <text class="label-on-clamp" x="470" y="96">fixed jaw (behind), paper folded over it;</text>
+  <text class="label-on-clamp" x="470" y="112">the moving jaw, in front, not drawn</text>
+  <line class="dims" x1="150" y1="320" x2="181.75" y2="320"/>
+  <line class="dims" x1="150" y1="312" x2="150" y2="328"/>
+  <line class="dims" x1="181.75" y1="312" x2="181.75" y2="328"/>
   <text class="label" x="20" y="360">{{process.big_end_overhang_mm:in.2dot}} past the</text>
   <text class="label" x="20" y="376">jaws' left face</text>
+  <line class="leader" x1="60" y1="348" x2="165.88" y2="322"/>
+  <circle class="leader-dot" cx="165.88" cy="322" r="2"/>
 </svg>
