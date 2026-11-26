@@ -46,28 +46,28 @@ def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
     } == set(drawing.DETAIL_KEEP)
 
 
-def test_bore_band_is_a_slip_fit_on_the_lift_rod() -> None:
+def test_bore_is_the_f_drill_and_slips_on_the_lift_rod() -> None:
     # U36: the pin carries the torque, so the bore only slides on the h-band
-    # rod.  Codex P2 (#844): the repo's REAM_SLIDE band, never line-to-line.
-    from _fit_ream_slide import REAM_SLIDE
+    # rod.  Fit audit F23 (drawing-guidelines rule 4, form 1): F DRILL (.257), no band;
+    # BORE_BAND is its ANALYSIS band, the title block's DRILLED HOLES row.
     from _fit_shaft_h import SHAFT_H
     from dt_pinion_lift_rod_spec import ROD_DIA
 
-    assert dt_pinion_lever_spec.BORE_BAND == REAM_SLIDE
+    assert dt_pinion_lever_spec.BORE_BAND == (0.1016, 0.0)
     low, high = (
         dt_pinion_lever_spec.BORE + dt_pinion_lever_spec.BORE_BAND[1],
         dt_pinion_lever_spec.BORE + dt_pinion_lever_spec.BORE_BAND[0],
     )
-    assert (round(low, 6), round(high, 6)) == (6.3754, 6.3881)
+    assert (round(low, 6), round(high, 6)) == (6.5278, 6.6294)
     min_clearance = low - (ROD_DIA + SHAFT_H[0])
     assert min_clearance > 0.0
-    assert round(min_clearance, 6) == 0.0254
-    # ENFORCE r1 (#1011): the bore is the one band; the end wall's own
-    # +/-0.25 rescued a wall and named no mate, so it went.
-    assert model_toleranced_dimensions(lever) == {
-        ("BarrelProfile", "HubBore"): "*deviations(BORE_BAND)",
-    }
-    assert dt_pinion_lever_spec.DRAWING_PRECISION_BY_NAME["HubBore"] == 4
+    assert round(min_clearance, 6) == 0.1778
+    assert drawing.BORE_CLEARANCE_IN == (0.007, 0.0118)
+    assert drawing.HUB_BORE_CALLOUT.startswith("F DRILL <HOLE-DEPTH>")
+    # ENFORCE r1 (#1011): the end wall's own +/-0.25 rescued a wall and named
+    # no mate, so it went; F23 took the bore's band off too.
+    assert model_toleranced_dimensions(lever) == {}
+    assert dt_pinion_lever_spec.DRAWING_PRECISION_BY_NAME["HubBore"] == 3
     assert not hasattr(dt_pinion_lever_spec, "END_WALL_TOLERANCE_MM")
 
 
@@ -133,7 +133,13 @@ def test_hub_bore_names_its_fit_route_and_depth() -> None:
     callout = drawing.DIMENSION_CALLOUTS["HubBore"]
     assert "<HOLE-DEPTH>" in callout.split("\n")[0]
     assert _config.parts("dt-pinion-lift-rod")["number"] in callout
-    assert "CLEARANCE" in callout
+    # Fit audit F23 (drawing-guidelines rule 4, form 1): the F drill, the rod as
+    # the gauge, no clearance row (rule 4 v2).
+    assert callout.splitlines() == [
+        "F DRILL <HOLE-DEPTH> (.32) FLAT BOTTOM;",
+        "MHA-DT-17 ROD ENTERS BY HAND",
+    ]
+    assert "CLEARANCE" not in callout
     # Location and length dimensions carry no words (rule 7).
     assert set(drawing.DIMENSION_CALLOUTS) == {"HubBore", "PinHoleDia"}
 
@@ -325,10 +331,11 @@ def test_lever_feature_bands_are_the_printed_ones() -> None:
     assert rod["root_corner_r_max"] == pytest.approx(_in(0.040))
     assert rod["root_corner_exception"] == "RV-01"
     bore = features["bore"]
-    assert bore["dia"] == pytest.approx([_in(0.2510), _in(0.2515)])
+    assert bore["dia"] == pytest.approx([_in(0.257), _in(0.261)])
     assert bore["depth"] == pytest.approx([_in(0.31), _in(0.33)])
     assert bore["depth_from"] == "mouth_face_b"
-    assert bore["flat_bottom"] is True and bore["process"] == "bore_or_ream"
+    assert bore["flat_bottom"] is True and bore["process"] == "drill"
+    assert bore["drill"] == "F"
     assert bore["mate"] == dt_pinion_lever_spec.LIFT_ROD_NUMBER
     assert bore["callout"] == drawing.HUB_BORE_CALLOUT
     pin = features["pin_hole"]

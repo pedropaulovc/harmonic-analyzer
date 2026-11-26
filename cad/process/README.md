@@ -658,12 +658,22 @@ A recipe has five parts (and the as-machined declaration, below):
   its box below that top, and a level reaches its floor elsewhere) and that
   every level still covers the outline outside the boxes, so an undeclared
   gap, a moved or short box, a plunge inside a tab or a thinner tab fails.
+  A straight side cut declares its milling direction to
+  `check_side_passes(..., cut="conventional")` (or `"climb"`): the check takes
+  the stock to lie on the side its passes step toward (`raw` to `final`) and,
+  with the spindle's turn in force at each pass (M3 clockwise seen from above:
+  the stock on the cutter's left is conventional, on its right climb; M4 the
+  reverse), fails a pass that cuts the other way. Without `cut` the passes'
+  milling direction is not judged, and arcs, pockets and slots (stock on both
+  sides) are not covered by it.
 
 CAM can produce toolpaths that look valid yet are wrong; the expectations
 caught a spot depth measured from the counterbore floor, a feed height below
 the stock top, a slot cut from the outside and an oversized radial step in the
-first recipe. A failed check removes every output. Fix the recipe, not the
-expectation.
+first recipe, and the declared cut direction caught the rail ends of
+`pd_platen_guide` PG05 and `pd_platen_bottom_guide` PB05 cutting climb where
+their plans said conventional (#3669). A failed check removes every output.
+Fix the recipe, not the expectation.
 
 **As-machined report.** After the checks pass and the programs are in place,
 `cam:<stem>` cuts every posted move from the blank with OCC booleans in

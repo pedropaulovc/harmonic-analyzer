@@ -68,16 +68,13 @@ from _drawing_marks import (
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
 )
-from _drawing_tolerances import set_dimension_bilateral_tolerance
 from _drawing_prefix import set_dimension_prefix
-from _fit_deviations import deviations
 from _part_pmi import author_part_pmi
 from _saved_part_guard import require_saved_drawing_properties
 from _document_units import apply_package_model_units
 from _part_properties import part_drawing_unit
 from dt_pinion_lever_spec import (
     BORE,
-    BORE_BAND,
     CAP_SAG,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
@@ -91,7 +88,6 @@ from dt_pinion_lever_spec import (
     ROD_LEN,
     ROD_Y0,
     SURFACE_FINISHES,
-    UNIT,
     WALL_T,
 )
 
@@ -552,12 +548,9 @@ def build(adapter) -> dict[str, str]:
         0.01 * V_ROD,
     )
 
-    # Manufacturing drawing support: the slip bore carries the only band
-    # (named in the spec); everything else rides the title block at the
-    # part-authored decimal places.
-    set_dimension_bilateral_tolerance(
-        adapter, "BarrelProfile", "HubBore", *deviations(BORE_BAND), display_unit=UNIT
-    )
+    # Manufacturing drawing support: nothing carries a band (the bore is F
+    # DRILL, .257, fit audit F23: drawing-guidelines rule 4, form 1); everything rides the
+    # title block at the part-authored decimal places.
     set_dimension_prefix(adapter, "CapProfile", "CapR", "SR")
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():

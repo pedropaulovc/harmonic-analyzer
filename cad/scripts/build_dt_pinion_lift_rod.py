@@ -57,9 +57,7 @@ from _sketch_circle import define_circle
 from _drawing_dimension_insert import add_diametric_linear_dimension
 from _drawing_precision import apply_drawing_precision
 from _drawing_marks import apply_drawing_properties, clear_dimensions_for_drawing, mark_dimensions_for_drawing
-from _drawing_tolerances import set_dimension_bilateral_tolerance
 from _drawing_prefix import set_dimension_prefix
-from _fit_deviations import deviations
 from _part_pmi import author_part_pmi
 from _document_units import apply_package_model_units
 from _part_properties import part_drawing_unit
@@ -81,11 +79,9 @@ from dt_pinion_lift_rod_spec import (
     FRONT_FLAT_LEN,
     ISOMETRIC_VIEW_NOTE,
     ROD_DIA,
-    ROD_DIA_BAND,
     ROD_LEN,
     ROD_PHASE_DEG,
     SURFACE_FINISHES,
-    UNIT,
 )
 
 PART_NAME = "dt-pinion-lift-rod"
@@ -662,9 +658,9 @@ def build(adapter) -> dict[str, str]:
     apply_material(adapter, MATERIAL)
     apply_color(adapter, POLISHED_STEEL)
     report_mass_properties(adapter)
-    set_dimension_bilateral_tolerance(
-        adapter, "RodProfile", "RodDia", *deviations(ROD_DIA_BAND), display_unit=UNIT
-    )
+    # The O.D. is 1/4 ground rod as supplied, never cut: it prints the stock,
+    # not limits of size (drawing-guidelines rule 4).  ROD_DIA_BAND stays the
+    # stock's band for the stacks.
     set_dimension_prefix(adapter, "RodProfile", "CapR", "SR")
     # One AcrossFlat sets both flats (they share one line in FlatProfile).
     set_dimension_prefix(adapter, "FlatProfile", "AcrossFlat", "2X ")

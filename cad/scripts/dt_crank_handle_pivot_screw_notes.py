@@ -57,12 +57,11 @@ THREAD_NOTE = f"{THREAD_CALLOUT}\nCENTRE OK"
 # words (fan-out r2: "LEAD, INSIDE" is a private phrase, rule 26).  Rows of
 # 18 characters at most, as the spec's callouts.
 RELIEF_LEAD_CALLOUT = f"{CHAMFER_CALLOUT}\nSTAYS INSIDE\nMHA-DT-06 THREAD"
-# The shoulder's running mate by the standard fit name (rule 4), rows of 21
-# characters at most so they clear the Ra 63 leader.  MHA-DT-08's bore is
-# drilled #20 and read with pins; the shoulder is turned to it in the owner's
-# words (owner ruling 2026-11-23, tool audit Q14: "turn the MHA-DT-32
-# shoulder last to the bore less .0050-.0075"), inside its printed band.
-SHOULDER_FIT_CALLOUT = "RUNNING FIT, TURN TO\nMHA-DT-08 BORE LESS\n.0050-.0075"
+# Rule 4 (Codjiflo 3550-r7-12): the shoulder's band names its mate and its
+# fit, no number and no trial: it runs in MHA-DT-08's #20 bore, the band's
+# two checks are in the necessity register (N-01).  Rows of 21 characters
+# at most so they clear the Ra 63 leader.
+SHOULDER_FIT_CALLOUT = "RUNNING FIT IN\nMHA-DT-08 BORE"
 # The head seat on MHA-DT-35 (#1757), in detail B: each corner names the
 # MHA-DT-35 feature it clears (rule 3's CLEARS form, rule 4).  The radius
 # lands in the cup's floor-hole break; the head's break clears the cup's

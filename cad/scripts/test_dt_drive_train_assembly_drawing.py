@@ -268,10 +268,10 @@ def test_sheet_numbers_are_pinned_where_the_sheets_cite_them() -> None:
     assert drawing.SETTING_SHEET == drawing.BANK_SETTINGS_SHEET + 1
     assert names[drawing.FULL_DETAIL_SHEET - 1] == "FULL-DETAIL SIDE VIEW"
     assert f"FULL DETAIL: SHEET {drawing.FULL_DETAIL_SHEET}." in drawing.ASSEMBLED_HEADING
-    assert names[drawing.SEQUENCE_SHEET - 1] == "ASSEMBLY SEQUENCE"
+    assert names[drawing.SEQUENCE_SHEET - 1] == "ASSEMBLY SEQUENCE + SAVED POSE"
     assert names[drawing.CRANK_SHEET - 1] == "ASSEMBLY SEQUENCE CONT. - CONE SET + CRANK"
     assert names[drawing.BANK_SHEET - 1] == "ASSEMBLY SEQUENCE CONT. - CRANK + CYLINDER BANK"
-    assert names[drawing.CHECKS_SHEET - 1] == "CHECKS + SETUP"
+    assert names[drawing.CHECKS_SHEET - 1] == "FUNCTIONAL CHECKS"
     assert names[drawing.FIT_SHEET - 1] == "ASSEMBLY SEQUENCE CONT. - CYLINDER BANK + PINION RIG"
     assert names[drawing.BANK_SETTINGS_SHEET - 1] == "CYLINDER BANK + MHA-DT-01 STATION SETTINGS"
     assert names[drawing.SETTING_SHEET - 1] == "SETTING TABLES + CONE STATIONS"
@@ -281,10 +281,16 @@ def test_sheet_numbers_are_pinned_where_the_sheets_cite_them() -> None:
     assert "BALLOONS ON SHEETS 3-6" in drawing.BOM_REFERENCE_NOTES
     assert f"STATIONS: SHEET {drawing.SETTING_SHEET}" in drawing.BOM_REFERENCE_NOTES
     fields = {field.label: field for field in drawing.package_note_fields(_drawing_facts())}
-    sequence_right = fields[f"sheet {drawing.SEQUENCE_SHEET} right note field"].blocks[-1][1]
-    assert sequence_right.endswith(
+    # DT-00 machinist round 1: the saved pose prints under the cone set
+    # sequence's continuation on sheet 7, where sheet 1 points.
+    sequence_blocks = fields[f"sheet {drawing.SEQUENCE_SHEET} right note field"].blocks
+    assert sequence_blocks[-1] == ("saved pose", drawing.SETUP_NOTES)
+    assert drawing.SAVED_POSE_SHEET == drawing.SEQUENCE_SHEET
+    assert sequence_blocks[0][1].endswith(
         f"CONT. STEP {drawing.CRANK_SHEET_FROM}: SHEET {drawing.CRANK_SHEET}."
     )
+    checks_blocks = fields[f"sheet {drawing.CHECKS_SHEET} right note field"].blocks
+    assert [label for label, _text in checks_blocks] == ["functional checks continuation"]
     crank_right = fields[f"sheet {drawing.CRANK_SHEET} right note field"].blocks[-1][1]
     assert crank_right.endswith(
         f"CONT. STEP {drawing.CRANK_CONTINUED_FROM}: SHEET {drawing.BANK_SHEET}."
@@ -532,7 +538,7 @@ def test_changed_gear_bom_counts_come_from_their_specs() -> None:
         assert f"{teeth}T" in drawing.BOM_DESCRIPTIONS[stem]
 
 
-def test_t120_fitup_envelope_matches_the_actual_model() -> None:
+def test_t120_clearance_facts_match_the_actual_model() -> None:
     import build_dt_drive_train_assembly as assembly
     import dt_crank_pinion_spec as pinion
 
@@ -583,30 +589,33 @@ def test_step_one_sets_the_64t_against_the_shaft_collar() -> None:
 
 
 def test_crank_mesh_is_accepted_by_hand_with_a_pinion_recut_remedy() -> None:
-    """Delegated ruling 2026-11-17 on #2481 (option B): 4N's full turn by
+    """Delegated ruling 2026-11-17 (Main) on #2481 (option B), precedent: the
+    owner's fit-by-feel directions (#2365, #2416); owner review #2144: 4J's full turn by
     hand, before the 16T is pinned, is the crank mesh's acceptance; a pair
     that binds in its teeth has the 16T recut at the same depth, the cutter
-    moved sideways, and the step is redone from the slide-on.  Each 4N
-    remedy names the bind it answers, and only a recut sends the fitter back
-    (Codjiflo r1 on #3090)."""
+    moved sideways, and the step is redone from the slide-on.  4J's remedy
+    is the teeth's: the band and shoulder were looked at in 4G (fit audit
+    part 2, B9), and only a recut sends the fitter back (Codjiflo r1 on
+    #3090)."""
     number = drawing.steps.step_number("crank-mesh-checked")
     step = drawing.CONE_CRANK_STEPS.split(f"\n{number}. ", 1)[1]
     step = " ".join(step.split(f"\n{number + 1}. ")[0].split())
-    (turn,) = re.findall(rf"{number}N\. [^.]*\.", step)
+    (look,) = re.findall(rf"{number}G\. [^.]*\.", step)
+    assert "DAYLIGHT" in look and "T120" in look
+    (turn,) = re.findall(rf"{number}J\. [^.]*\.", step)
     assert "ONE FULL REVOLUTION BY HAND" in turn and "MUST NEVER BIND" in turn
-    (rub,) = re.findall(rf"{number}P\. [^.]*\.", step)
-    assert rub.startswith(f"{number}P. IF THE BAND OR SHOULDER RUBS T120,")
-    (recut,) = re.findall(rf"{number}Q\. .*?SAME DEPTH\.", step)
+    assert "RUBS T120" not in step
+    (recut,) = re.findall(rf"{number}K\. .*?SAME DEPTH\.", step)
     assert recut == (
-        f"{number}Q. IF THE TEETH BIND, RECUT MHA-DT-10: EVERY TOOTH GAP .004 WIDER, "
+        f"{number}K. IF THE TEETH BIND, RECUT MHA-DT-10: EVERY TOOTH GAP .004 WIDER, "
         "CUTTER MOVED SIDEWAYS, SAME DEPTH."
     )
-    redo = f"{number}R. AFTER A RECUT, REPEAT FROM {number}D."
+    redo = f"{number}L. AFTER A RECUT, REPEAT FROM {number}D."
     assert redo in step
     assert f"{number}D. SLIDE MHA-DT-10 ON WITHOUT ITS PIN" in step
     order = [
+        step.index(look),
         step.index(turn),
-        step.index(rub),
         step.index(recut),
         step.index(redo),
         step.index("MATCH-DRILL"),
@@ -629,7 +638,7 @@ RECUT_TIP_LAND_MODULE_FRACTION_MIN = 0.25
 
 
 def test_pinion_recut_clears_the_print_worst_corner_and_keeps_a_tip_land() -> None:
-    """The recut 4Q prints is sized against the owner pack's figures (#2481
+    """The recut 4K prints is sized against the owner pack's figures (#2481
     option B) and checked against the 16T's own finite-form tooth."""
     import dt_crank_pinion_spec as pinion
 
@@ -650,6 +659,12 @@ def test_pinion_recut_clears_the_print_worst_corner_and_keeps_a_tip_land() -> No
         profile.require_tip_land(floor + widening)
 
 
+def _cone_checks() -> str:
+    """Checks 4 (the pedestals' seating) and 5 (the cone swing set), folded:
+    DT-00 machinist round 1 split the old check 4 in two (rule 22)."""
+    return " ".join(drawing.CHECKS.split("\n4. ")[1].split("\n6. ")[0].split())
+
+
 def test_cone_swing_check_stops_disengaged_at_the_swing_stop() -> None:
     """MHA-SH-VN-52 bounds the DISENGAGE swing; the engaged mesh is set by
     feel at assembly (owner direction 2026-11-11, #2365; cone_set_stack):
@@ -657,24 +672,24 @@ def test_cone_swing_check_stops_disengaged_at_the_swing_stop() -> None:
     tapped either way to a bind at its end and tightened, then the swing
     brought in to the first bind, eased out to an observable stop (#2585),
     and locked with MHA-DT-VN-51 -- never the stop, and nothing gauged."""
-    check = " ".join(drawing.CHECKS.split("4. CONE SWING")[1].split("\n5.")[0].split())
+    check = _cone_checks()
     (hold,) = re.findall(r"4D\. [^.]*\.", check)
     (taps,) = re.findall(r"4E\. [^.]*\.", check)
-    (ease,) = re.findall(r"4N\. [^.]*\.", check)
+    (ease,) = re.findall(r"5A\. [^.]*\.", check)
     assert "BIND" in hold and "HOLD" in hold
     assert " IN " in taps and " OUT " in taps
     assert "AT ITS END" in taps
     assert "SMALL STEPS" in ease and "RUN FREE" in ease
     order = [
         check.index("OUT TO THE MHA-SH-VN-52 STOP"),
-        check.index("EASE MHA-DT-VN-62 UNTIL EACH MHA-DT-02 MOVES"),
+        check.index("EASE EACH MHA-DT-02'S HOLD-DOWN UNTIL IT MOVES"),
         check.index(hold),
         check.index(taps),
-        check.index("TIGHTEN MHA-DT-VN-62"),
-        check.index("SWING THE CONE SET OUT"),
+        check.index("SNUG EACH HOLD-DOWN THERE"),
+        check.index("WITH THE CONE SET SWUNG OUT"),
         check.index("SWING IN UNTIL A GEAR JUST BINDS"),
         check.index(ease),
-        check.index("TIGHTEN MHA-DT-VN-51"),
+        check.index("TIGHTEN MHA-DT-VN-51 THERE: THE CONE SET DOES NOT SWING BY HAND."),
     ]
     assert order == sorted(order), check
     assert "RETURN IT TO THE MHA-SH-VN-52" not in check
@@ -684,35 +699,139 @@ def test_cone_swing_check_stops_disengaged_at_the_swing_stop() -> None:
 def test_the_run_check_accepts_end_gear_shake_but_no_bind_or_skip() -> None:
     """Owner ruling 2026-11-14 on #2584 (option A): a gear past the binds
     that hold the cone line may run loose; the sheet states it as a plain
-    fact naming those gears by the 4E binds.  Check 4R, the run after the
-    lock, still refuses a bind, and its remedy (4S) still follows it."""
-    check = " ".join(drawing.CHECKS.split("4. CONE SWING")[1].split("\n5.")[0].split())
-    (run,) = re.findall(r"(?<![-\w])4R\. [^.]*\.", check)
+    fact naming those gears by the 4E binds.  Check 5C, the run after the
+    lock, still refuses a bind, and its remedy (5D) still follows it."""
+    check = _cone_checks()
+    (run,) = re.findall(r"(?<![-\w])5C\. [^.]*\.", check)
     assert f"{drawing.CHECK_RUN_CRANK_TURNS} TURNS" in run
     assert "NEVER BIND" in run
     assert "4E" in run and "SHAKE" in run
     assert "ACCEPT" not in run
-    assert check.index(run) < check.index("4S. IF ONE BINDS")
+    assert check.index(run) < check.index("5D. IF ONE BINDS")
 
 
-def test_an_out_pedestal_has_a_remedy_that_fits_its_sheet() -> None:
-    """Check 4J sends the fitter to the recheck table's last column, and every
-    row has a remedy naming that end's gears (X) or its indicator (Y); the
-    widened table still fits inside the sheet 15 frame."""
-    check = " ".join(drawing.CHECKS.split("4. CONE SWING")[1].split("\n5.")[0].split())
-    (line_4j,) = re.findall(r"4J\. [^.]*\.", check)
-    assert f"SHEET {drawing.SETTING_SHEET}" in line_4j
-    assert drawing.PEDESTAL_RECHECK_HEADER[-1] in line_4j
-    remedies = {row[0]: row[-1] for row in drawing.PEDESTAL_RECHECK_ROWS}
-    assert all(remedies.values())
-    gears = drawing.CYLINDER_GEAR_COUNT if hasattr(drawing, "CYLINDER_GEAR_COUNT") else 20
-    assert "GEAR 0 " in remedies["FRONT MHA-DT-02, X"]
-    assert f"GEAR {gears - 1} " in remedies["BACK MHA-DT-02, X"]
-    assert "INDICATOR" in remedies["FRONT MHA-DT-02, Y"]
-    widths = general_table.table_column_widths(
-        drawing.PEDESTAL_RECHECK_HEADER, drawing.PEDESTAL_RECHECK_ROWS
+def test_the_pedestals_are_set_by_feel_then_spotted_with_one_tripwire() -> None:
+    """Owner ruling 2026-11-24, fit audit part 2 C6 ("Yes: set by feel, spot
+    the holes after, tripwire .015."): the pedestals stand clamped at their
+    DRO X/Y until check 4E has tapped them to their binds; their MHA-FR-01
+    seats are spotted through the foot holes after that; the DRO recheck
+    table is gone and one .015 X tripwire sends the fitter to the cone pivot
+    seat, which it clears with the pivot seat's whole error and the DRO set
+    band."""
+    import cone_set_stack
+    import dt_drive_train_steps as steps
+
+    check = _cone_checks()
+    (snug,) = re.findall(r"4F\. [^.]*\.", check)
+    (tripwire,) = re.findall(r"4G\. [^.]*\. ", check + " ")
+    (remedy,) = re.findall(r"4H\. .*? GOING ON\.", check)
+    (spot,) = re.findall(r"4J\. [^.]*\.", check)
+    (lift,) = re.findall(r"4K\. [^.]*\.", check)
+    (drill,) = re.findall(r"4L\. [^.]*\.", check)
+    (blow,) = re.findall(r"4M\. [^.]*\.", check)
+    (back,) = re.findall(r"4N\. [^.]*\.", check)
+    (tighten,) = re.findall(r"4P\. [^.]*\.", check)
+    (holds,) = re.findall(r"4Q\. [^.]*\.", check)
+    (accept,) = re.findall(r"4R\. .*? BY HAND\.", check)
+    # The indicators stand on MHA-FR-01 (4B) and 4G records them at the set.
+    assert "4B. ZERO INDICATORS ON MHA-FR-01: EACH MHA-DT-02 IN X, THE FRONT IN Y." in check
+    # DT-00 machinist round 1 (farm run 7, rule 22): the tripwire is a sheet
+    # 16 row, .015 MAX on the dial indicator, which 4G cites.
+    row = drawing.acceptance_ref("pedestal-x-tripwire")
+    assert tripwire.strip() == f"4G. RECORD EACH INDICATOR: EACH X MUST PASS ({row})."
+    (cells,) = [r for r in drawing.ACCEPTANCE_TABLE_ROWS if row.endswith(f" ROW {r[0]}")]
+    assert cells[1:] == (
+        "CHECK 4G", "EACH MHA-DT-02 X FROM ITS 4B ZERO", ".015 MAX", "DIAL INDICATOR"
     )
-    assert drawing.SETTING_TABLE_LEFT + sum(widths) <= drawing.NOTE_FIELD_RIGHT[2]
+    pivot = steps.step_number("other-base-mounting")
+    assert f"STEP {pivot}F-{pivot}J PIVOT SEAT" in remedy
+    # Codjiflo round 4 on #3550 (r4-8): no drill or tap reaches the seat
+    # past the MHA-DT-02 upright, so the seat is spotted through the foot
+    # hole with the clamps on, and the bank comes off for the drilling and
+    # tapping and the chips.  Round 6 (r6-10): the undrilled-seat steps run
+    # once, so a redo goes from 4H to the tightening (4P).  DT-00 machinist
+    # round 1 (rule 22): the drill and the blow-out, the tightening and its
+    # two checks, are a step each.
+    assert spot.startswith("4J. UNDRILLED SEATS (4J-4N):"), spot
+    assert "TRANSFER-PUNCH" in spot and "FOOT HOLE" in spot
+    assert "WITH THE CONE SET SWUNG OUT," in lift and "LIFT THE PEDESTAL BANK OFF" in lift
+    assert drill == "4L. DRILL AND TAP THE SEATS PER MHA-FR-01."
+    assert blow == "4M. BLOW THE DECK AND THE FOOT UNDERSIDES CLEAN."
+    # r6-10: the Ø.180 foot holes let each pedestal float, so the refit goes
+    # on MHA-DT-VN-62 snug and each pedestal is tapped back to its 4G
+    # readings (its X set and the front's Y zero) before the tightening.
+    assert back == "4N. WITH THE BANK ON MHA-DT-VN-62 SNUG, TAP EACH TO ITS 4G READINGS."
+    assert tighten == "4P. TIGHTEN MHA-DT-VN-62."
+    # Codjiflo r7-14: the tightening keeps the 4G readings 4N tapped back to.
+    assert holds == "4Q. CHECK THAT THE INDICATORS STILL HOLD THE 4G READINGS."
+    # Codjiflo round 4 on #3550 (r4-9, rule 23): the screwed pedestals get
+    # their hand check once MHA-DT-VN-62 holds them.
+    assert accept == "4R. CHECK THAT NEITHER MHA-DT-02 TURNS OR MOVES BY HAND.", accept
+    # One hold-down word for the clamps (first time) and MHA-DT-VN-62 (redo).
+    assert "4C. EASE EACH MHA-DT-02'S HOLD-DOWN" in check
+    assert "Y ZERO" in snug and "HOLD-DOWN" in snug and "CLAMP" not in snug
+    texts = (snug, tripwire, remedy, spot, lift, drill, blow, back, tighten, holds, accept)
+    order = [check.index(text) for text in texts]
+    assert order == sorted(order)
+    follow = (
+        cone_set_stack.PIVOT_TRANSFER_PUNCH_PLAY_MM
+        + cone_set_stack.PUNCH_MARK_PICKUP_MM
+        + cone_set_stack.PIVOT_THREAD_CENTRING_MM
+        + cone_set_stack.PIVOT_BORE_FLOAT_MM
+    )
+    # Row 3's own window (D42) books against the tripwire, .0007 in to spare.
+    assert follow + drawing.BANK_X_LOCATE_BAND < 0.015 * 25.4
+    assert (0.015 * 25.4 - follow - drawing.BANK_X_LOCATE_BAND) / 25.4 == pytest.approx(
+        0.0007, abs=5e-5
+    )
+    assert drawing.BANK_X_LIMITS == "6.618-6.626"
+    # The bank steps clamp; no seat is cut and nothing is recorded there.
+    assert "8T. CLAMP THE FRONT MHA-DT-02 TO MHA-FR-01 THERE." in drawing.BANK_STEPS
+    assert "9F. CLAMP IT TO MHA-FR-01." in drawing.BANK_STEPS
+    for gone in ("TRANSFER PUNCH", "MHA-DT-VN-62", "RECHECK TABLE", "DRILL AND TAP THE SEAT"):
+        assert gone not in drawing.BANK_STEPS, gone
+    assert not hasattr(drawing, "PEDESTAL_RECHECK_ROWS")
+    assert "FILL IN" not in check
+
+
+def test_the_back_ear_row_prints_the_title_block_s_full_window() -> None:
+    """Row 5's nominal is off the .001 grid, so its band is .0052 and the
+    inward-rounded limits still span the title block's full .010 (Codjiflo
+    3550-r5)."""
+    (row,) = (
+        r for r in drawing.SETTING_TABLE_ROWS if r[2].startswith("BACK MHA-CH-08 EAR INNER FACE")
+    )
+    low, high = (float(text) for text in row[4].split("-"))
+    assert high - low >= 0.010 - 1e-9, row
+
+
+def test_the_front_pedestal_row_names_its_route_and_an_owned_instrument() -> None:
+    """DT-00 machinist round 1, delegated ruling 2026-11-25 (Main), no
+    precedent; owner review #2144 (D36; accept DT-15): row 2 keeps its .007
+    window and names how 8R sets it: the mill's Y DRO from its 8P zero on
+    the MHA-FR-01 Y datum, the face found by the edge finder.  The DRO is
+    owned and reads finer than .0005."""
+    import tomllib
+
+    (row,) = (r for r in drawing.SETTING_TABLE_ROWS if r[0] == "2")
+    assert row[4] == "W + 8.612 TO W + 8.619"
+    assert row[-1] == f"DRO Y FROM {drawing.DRO_ZERO_STEP} ZERO, EDGE FINDER"
+    steps = " ".join(drawing.BANK_STEPS.split())
+    assert (
+        "8R. SET THE FRONT MHA-DT-02 INNER FACE TO ITS Y (SETTING TABLE ROW 2) BY EDGE"
+        f" FINDER ON THE DRO Y ZEROED AT {drawing.DRO_ZERO_STEP}."
+    ) in steps
+    assert f"{drawing.DRO_ZERO_STEP}. ZERO DRO X AND Y THERE." in steps
+    cad = Path(drawing.__file__).resolve().parents[1]
+    equipment = cad / "config" / "shop-equipment"
+    dro = tomllib.loads((equipment / "dro.toml").read_text(encoding="utf-8"))["dro"]
+    assert dro["pm-30mv"]["status"] == "on_hand"
+    hand = tomllib.loads((equipment / "tools-hand.toml").read_text(encoding="utf-8"))
+    assert hand["tools"]["edge-finder"]["status"] == "on_hand"
+    gauges = tomllib.loads((cad / "process" / "shop" / "common.toml").read_text(encoding="utf-8"))
+    assert gauges["gauges"]["mill-y-dro"]["resolution_mm"] <= 0.0005 * 25.4
+    # The window's far end stays on the Y scale with W at MHA-DT-26's .110.
+    assert (8.619 + 0.110) * 25.4 <= gauges["gauges"]["mill-y-dro"]["range_mm"][1]
 
 
 def test_the_cone_set_is_accepted_through_a_turn_of_every_drum_gear() -> None:
@@ -725,7 +844,7 @@ def test_the_cone_set_is_accepted_through_a_turn_of_every_drum_gear() -> None:
 
     crank_per_cone_turn = gear64.TEETH / pinion.TEETH
     slowest_drum_turn = drum.TEETH / min(cone.CONE_TEETH)
-    check = " ".join(drawing.CHECKS.split("4. CONE SWING")[1].split("\n5.")[0].split())
+    check = _cone_checks()
     turns = re.search(r"TURN THE CRANK (\d+) TURNS\b[^.]*\bBIND", check)
     assert turns is not None, check
     assert int(turns.group(1)) == crank_per_cone_turn * slowest_drum_turn
@@ -744,7 +863,7 @@ def test_zeroing_re_sets_the_swing_and_cranks_back_to_the_zero() -> None:
     cone_turns = Fraction(drawing.CHECK_RUN_CRANK_TURNS * pinion.TEETH, gear64.TEETH)
     for teeth in cone.CONE_TEETH:
         assert (cone_turns * Fraction(teeth, drum.TEETH)).denominator == 1, teeth
-    zeroing = " ".join(drawing.CHECKS.split("\n5. ")[1].split("\n6. ")[0].split())
+    zeroing = " ".join(drawing.CHECKS.split("\n6. ")[1].split("\n7. ")[0].split())
     reset = zeroing.index("RE-SET THE CONE SET SWING")
     assert zeroing.index("UNTIL EVERY NOTCH IS BACK") > reset > zeroing.index("NOTCHES")
 
@@ -753,32 +872,31 @@ def test_cone_swing_check_requires_installed_stop_inspection_and_seating() -> No
     """The supplied thread class does not prove the assembled stop's engagement."""
     import dt_swing_stop_screw_spec as stop_screw
 
-    check = " ".join(drawing.CHECKS.split("4. CONE SWING")[1].split("\n5.")[0].split())
-    # Attempt 1 review (rule 22): the minimum prints as check 4Y's sheet 16 row.
-    printed = re.fullmatch(r"(\.\d{3}) MIN", _accept_cell("stop-screw-engagement"))
-    assert printed is not None
-    # The inch minimum is the 1.5D rule rounded up, never over the guarantee.
-    minimum = float(printed.group(1)) * 25.4
-    assert 1.5 * stop_screw.SHANK_DIA - 1e-9 <= minimum
-    assert minimum <= stop_screw.MIN_USEFUL_ENGAGEMENT_MM + 1e-9
-    assert "CHECK THAT ITS HEAD IS FULLY SEATED" in check
-    assert "CHECK THAT MHA-DT-20 AND THE MHA-DT-VN-52 SHOULDER STAY SEATED" in check
-    _assert_engagement_cites_its_records(
-        check,
-        "SWING STOP FULL-FORM",
-        "THE STOP SEAT'S",
-        "MHA-SH-VN-52'S THREAD LENGTH",
-        "stop-screw-engagement",
+    check = _cone_checks()
+    # Owner ruling S1 (audit part 2): turns from first bite.  Codjiflo r3-5 on
+    # #3550: the count less the tip chamfer and the head-end runout holds the
+    # 1.5D full-form floor, one turn fewer does not, and the screw's thread
+    # can give the count before the head seats.
+    turns = _assert_engagement_cites_its_count(
+        check, "MHA-SH-VN-52", "stop-screw-engagement"
     )
+    lead = stop_screw.TIP_CHAMFER + stop_screw.FULL_THREAD_START_MAX_MM
+    pitch = stop_screw.THREAD_PITCH
+    assert turns * pitch - lead >= stop_screw.MIN_USEFUL_ENGAGEMENT_MM
+    assert (turns - 1) * pitch - lead < stop_screw.MIN_USEFUL_ENGAGEMENT_MM
+    assert turns * pitch <= stop_screw.LENGTH_MIN_MM + 1e-9
+    assert turns == 10
+    assert "TURNS (SHEET 16 ROW 19). 5L. CHECK THAT ITS HEAD IS FULLY SEATED." in check
+    assert "CHECK THAT MHA-DT-20 AND THE MHA-DT-VN-52 SHOULDER STAY SEATED" in check
 
 
 def test_a_loosened_post_screw_re_sets_the_post_before_the_checks() -> None:
     # Owner ruling 2026-11-20 (#1177 friction-only, #3085 option B).
-    check = " ".join(drawing.CHECKS.split("4. CONE SWING")[1].split("\n5.")[0].split())
-    assert "4U. MHA-DT-02 AND MHA-DT-VN-61 STAY AS SET FROM HERE ON." in check
+    check = _cone_checks()
+    assert "5F. MHA-DT-02 AND MHA-DT-VN-61 STAY AS SET FROM HERE ON." in check
     post = drawing.steps.step_number("post-and-tip-block")
     end_play = drawing.steps.step_number("end-play-set")
-    redo = re.search(r"4V\. IF ONE LOOSENS, REDO CHECKS 4-7 \(A SCREW: STEP (\d+[A-Z]) FIRST\)\.", check)
+    redo = re.search(r"5G\. IF ONE LOOSENS, REDO CHECKS 4-8 \(A SCREW: STEP (\d+[A-Z]) FIRST\)\.", check)
     assert redo is not None, check
     bodies: dict[str, str] = {}
     key: str | None = None
@@ -796,77 +914,74 @@ def test_a_loosened_post_screw_re_sets_the_post_before_the_checks() -> None:
     def redone(first: str, last: str) -> str:
         return " ".join(bodies[key] for key in keys[keys.index(first) : keys.index(last) + 1])
 
-    # 4V names the remedy step 3G, which follows the end-play steps.
-    assert redo.group(1) == f"{end_play}G"
+    # 5G names the remedy step 3N, which follows the end-play steps.
+    assert redo.group(1) == f"{end_play}N"
     step = re.fullmatch(
-        rf"{end_play}G\. IF A MHA-DT-VN-61 IS EVER LOOSENED, REDO (\d+[A-Z]), (\d+[A-Z])-(\d+[A-Z]), "
+        rf"{end_play}N\. IF A MHA-DT-VN-61 IS EVER LOOSENED, REDO (\d+[A-Z]), (\d+[A-Z])-(\d+[A-Z]), "
         r"THEN (\d+[A-Z])-(\d+[A-Z])\.",
         bodies[redo.group(1)],
     )
     assert step is not None, bodies[redo.group(1)]
-    assert step.group(1) == f"{post}M"
+    assert step.group(1) == f"{post}N"
     assert "LOOSE ENOUGH TO TURN MHA-DT-05" in bodies[step.group(1)]
     assert step.group(2).startswith(str(post)) and step.group(3).startswith(str(post))
     re_set = redone(step.group(2), step.group(3))
     assert "TURN MHA-DT-05 ON ITS SCREWS" in re_set
     assert "TIGHTEN BOTH MHA-DT-VN-61" in re_set
     # The post can shift along the shaft on the screws' float: the end play
-    # is indicated again, with its remedy and the pinch lock's check.
-    assert step.group(4) == f"{end_play}C" and step.group(5) == f"{end_play}F"
+    # is measured again, with its remedy and the pinch lock's check.
+    assert step.group(4) == f"{end_play}J" and step.group(5) == f"{end_play}M"
     end_play_redo = redone(step.group(4), step.group(5))
-    assert "INDICATE THE MHA-DT-04 END PLAY" in end_play_redo
+    assert "MEASURE THE MHA-DT-04 END PLAY AT THE SHAFT END" in end_play_redo
     assert "DOES NOT TURN IN MHA-DT-21" in end_play_redo
 
 
-def _assert_engagement_cites_its_records(
-    check: str, joint: str, seat: str, screw: str, row: str
-) -> None:
-    """PR 2 machinist review round 6: a seated screw's engagement cannot be
-    read, so the check takes the lesser of the seat's full-thread depth and
-    the screw's thread length, both recorded in step 23 before it goes in;
-    its sheet 16 row names the same two records."""
+def _assert_engagement_cites_its_count(check: str, screw: str, row: str) -> int:
+    """A seated screw's engagement cannot be read: step 23 records its turns
+    from first bite as it goes in, the check verifies that record, and its
+    sheet 16 row prints the minimum and names the same record (owner ruling
+    S1, audit part 2).  Returns the printed minimum."""
     import dt_drive_train_steps as steps
 
     cited = re.search(
-        rf"{joint} THREAD ENGAGEMENT, THE LESSER READING OF STEPS (\d+\w)-(\d+\w) "
-        rf"\({re.escape(drawing.acceptance_ref(row))}\)\.",
+        rf"VERIFY {screw}'S STEP (\d+\w) TURNS \({re.escape(drawing.acceptance_ref(row))}\)(?:\.| AND THAT)",
         check,
     )
-    assert cited is not None
+    assert cited is not None, check
+    (ref,) = cited.groups()
     number = steps.step_number("other-base-mounting")
-    assert all(ref.startswith(str(number)) for ref in cited.groups())
+    assert ref.startswith(str(number))
     number_text = str(drawing.ACCEPTANCE_ROW_NUMBERS[row])
     (printed,) = (cells for cells in drawing.ACCEPTANCE_TABLE_ROWS if cells[0] == number_text)
-    assert printed[-1] == "LESSER OF {}, {}".format(*cited.groups())
+    assert printed[-1] == f"COUNTED AT {ref}"
     body = _rig_step_body("other-base-mounting")
-    seat_line, screw_line = (
-        re.search(rf"\b{ref}\. (.*?)(?= {number}[A-HJ-NP-Z]\. |$)", body).group(1)
-        for ref in cited.groups()
-    )
-    assert seat_line == f"RECORD {seat} FULL-THREAD DEPTH WITH A DEPTH GAUGE."
-    assert screw_line == f"RECORD {screw} WITH CALIPERS."
+    record = re.search(rf"\b{ref}\. (.*?)(?= {number}[A-HJ-NP-Z]\. |$)", body).group(1)
+    assert record == f"RECORD {screw}'S TURNS FROM FIRST BITE TO SEATED."
+    # Nothing is read off a depth gauge or calipers for the engagement now.
+    assert "FULL-THREAD DEPTH" not in body and "THREAD LENGTH WITH CALIPERS" not in body
+    minimum = re.fullmatch(r"(\d+) MIN", _accept_cell(row))
+    assert minimum is not None
+    return int(minimum.group(1))
 
 
 def test_cone_swing_check_requires_pivot_thread_engagement() -> None:
     """The seated shoulder does not establish actual full-form thread engagement."""
+    from _mcmaster_91829a560 import PITCH
     import dt_vn_cone_pivot_screw_spec as pivot_screw
 
-    check = " ".join(drawing.CHECKS.split("4. CONE SWING")[1].split("\n5.")[0].split())
-    # Attempt 1 review (rule 22): the minimum prints as check 4W's sheet 16 row.
-    printed = re.fullmatch(r"(\.\d{3}) MIN", _accept_cell("pivot-screw-engagement"))
-    assert printed is not None
-    # The inch minimum is the 1D floor rounded up, never over the guarantee.
-    minimum = float(printed.group(1)) * 25.4
-    assert pivot_screw.THREAD_SOLID_DIA - 1e-9 <= minimum
-    assert minimum <= pivot_screw.MIN_USEFUL_ENGAGEMENT_MM + 1e-9
-    assert "MHA-DT-VN-52 SHOULDER STAY SEATED" in check
-    _assert_engagement_cites_its_records(
-        check,
-        "MHA-DT-VN-52 FULL-FORM",
-        "THE TAPPED HOLE'S",
-        "MHA-DT-VN-52'S THREAD LENGTH",
-        "pivot-screw-engagement",
+    check = _cone_checks()
+    turns = _assert_engagement_cites_its_count(
+        check, "MHA-DT-VN-52", "pivot-screw-engagement"
     )
+    # The count less the tip chamfer and the runout under the shoulder holds
+    # DT-04's 1D floor (Codjiflo r3-5 on #3550), one turn fewer does not, and
+    # the screw's thread (9 turns) can give it before the shoulder seats.
+    lead = pivot_screw.TIP_CHAMFER + pivot_screw.FULL_THREAD_START
+    assert turns * PITCH - lead >= pivot_screw.MIN_USEFUL_ENGAGEMENT_MM
+    assert (turns - 1) * PITCH - lead < pivot_screw.MIN_USEFUL_ENGAGEMENT_MM
+    assert turns * PITCH <= pivot_screw.THREAD_TAIL_LEN + 1e-9
+    assert turns == 8
+    assert "MHA-DT-VN-52 SHOULDER STAY SEATED" in check
     # Owner ruling DT-04's location follows the minimum to its sheet 16 row
     # (Codjiflo on #3023), as DT-07's is pinned to its fact.
     from machinist_exceptions import load_exceptions
@@ -877,7 +992,7 @@ def test_cone_swing_check_requires_pivot_thread_engagement() -> None:
         if entry.id == "DT-04"
     )
     row = drawing.acceptance_ref("pivot-screw-engagement")
-    assert f"({row}: {pivot_screw.MIN_USEFUL_ENGAGEMENT_TEXT})" in dt04.where
+    assert f"({row}: {turns} MIN)" in dt04.where
 
 
 def _flat(text: str) -> str:
@@ -912,24 +1027,25 @@ def test_rig_is_located_by_its_parked_tip_gap() -> None:
     import dt_drive_train_steps as steps
     import pinion_rig_tip_gap as tip_gap
 
-    feeler = f"{tip_gap.TIP_GAP_SETTING_TEXT} FEELER"
+    rod = f"A {tip_gap.TIP_GAP_ROD_TEXT} IS SNUG"
     cite = f"({drawing.acceptance_ref('tip-gap')})"
     located = _rig_step_body("rig-located")
-    for phrase in ("UNDRILLED SEATS", tip_gap.TIP_GAP_FEELER_TEXT, cite):
+    for phrase in ("UNDRILLED SEATS", rod, cite):
         assert phrase in located, phrase
     check = _flat(drawing.CHECKS)
-    assert feeler in check
+    assert f"{rod} TIP TO TIP" in check
     assert (
         f"AT GEAR 19 ({drawing.acceptance_ref('tip-gap')}, SET AT SHEET "
         f"{drawing.CONTINUATION_SHEET}, STEP {steps.step_number('rig-located')}E)"
     ) in check
-    # The inch acceptance rounds inward, inside the spec's window, and prints
-    # as the steps' sheet 16 row (R5 machinist review, rule 22).
-    printed = re.fullmatch(r"(\.\d{3})-(\.\d{3})", _accept_cell("tip-gap"))
-    assert printed is not None
-    low, high = (float(value) * 25.4 for value in printed.groups())
-    assert tip_gap.TIP_GAP_ACCEPT[0] - 1e-9 <= low < high <= tip_gap.TIP_GAP_ACCEPT[1] + 1e-9
-    assert f"SEE SHEET {drawing.CHECKS_SHEET}" in drawing.ASSEMBLED_HEADING
+    # Owner ruling C8 (audit part 2): one rod, no window, and the lever is
+    # turned until the teeth seat; the row names the rod (R5, rule 22).
+    assert _accept_cell("tip-gap") == "SNUG TIP TO TIP"
+    number = str(drawing.ACCEPTANCE_ROW_NUMBERS["tip-gap"])
+    (row,) = (row for row in drawing.ACCEPTANCE_TABLE_ROWS if row[0] == number)
+    assert row[-1] == tip_gap.TIP_GAP_ROD_TEXT
+    assert "6C. TURN MHA-DT-16 UNTIL THE TEETH SEAT, NO FORCE." in check
+    assert f"SEE SHEET {drawing.SAVED_POSE_SHEET}" in drawing.ASSEMBLED_HEADING
     fields = {field.label: field for field in drawing.package_note_fields(_drawing_facts())}
     assert "pinion rig sequence" in dict(fields[f"sheet {drawing.FIT_SHEET} left note field"].blocks)
     # The seats are spotted after RIG SET, and drilled per the base's own
@@ -987,7 +1103,12 @@ def test_lever_pin_step_states_existing_drill_size_and_slip_fit() -> None:
 
     assert pin.PIN_DIA == 25.4 / 16.0
     step = _rig_step_body(pin.LEVER_PIN_SET_STEP_KEY)
-    assert step.startswith(f"{pin.LEVER_PIN_SET_NAME}, GRIP PARKED: MATCH-DRILL #51 THRU")
+    # Fit audit F23 (rule 4 form 1, F drilled hub): the lead holds the lever
+    # square to the rod while the pin hole is match-drilled.
+    assert step.startswith(
+        f"{pin.LEVER_PIN_SET_NAME}, GRIP PARKED, {pin.LEVER_NUMBER} HELD SQUARE TO "
+        f"{pin.LIFT_ROD_NUMBER} WITH A SQUARE: MATCH-DRILL #51 THRU"
+    )
     assert f"{pin.LEVER_NUMBER}'S HUB AT ITS PRINTED STATION AND {pin.LIFT_ROD_NUMBER} TOGETHER" in step
     assert f"INSERT {pin.PIN_NUMBER}, A SLIDING FIT." in step
     assert "TRIM BOTH ENDS." in step
@@ -1009,77 +1130,73 @@ def test_lever_pin_step_states_existing_drill_size_and_slip_fit() -> None:
     assert "REAM" not in step
 
 
-def test_the_tip_gap_feeler_is_the_rest_gap_in_gage_leaves() -> None:
-    """Main's TbPB ruling (Q1 b): the rig's east-west feeler is the bench
-    rest gap (pins on the cams), to the gage's thousandth, made up only of
-    the owned inch feeler gauge's leaves, each once; nothing on it is typed."""
-    import dt_feeler_leaves
-    import pinion_rig_fitup as fitup
-    import pinion_rig_layout as rig
+def test_the_tip_gap_rod_keeps_the_parked_pinion_clear_and_the_cam_in_reach() -> None:
+    """Owner ruling C8 (audit part 2, "Yes, a 3/32 rod."): the rig's east-west
+    locate is a 3/32 rod at the bench rest gap (pins on the cams); the rod
+    leaves the parked pinion clear of every cylinder gear and the cam still
+    swings it past the standard centre, where 5C seats the teeth."""
+    import dt_cylinder_gear_spec as cylinder_gear
     import pinion_rig_tip_gap as tip_gap
 
     # The model parks the pins a design air above the cams; the spring takes
     # it up on the bench, so the rest gap is wider than the model's.
     assert tip_gap.REST_TIP_GAP > tip_gap.MODEL_TIP_GAP
-    assert abs(tip_gap.TIP_GAP_FEELER - tip_gap.REST_TIP_GAP) <= rig.FEELER_LEAF_STEP / 2.0
-    assert set(tip_gap.TIP_GAP_LEAVES) <= set(fitup.FEELER_GAGE_LEAVES_MM)
-    assert len(set(tip_gap.TIP_GAP_LEAVES)) == len(tip_gap.TIP_GAP_LEAVES)
-    assert math.isclose(sum(tip_gap.TIP_GAP_LEAVES), tip_gap.TIP_GAP_FEELER, abs_tol=1e-9)
-    # The stack's own error and the rounding stay inside check 7's acceptance.
-    assert tip_gap.TIP_GAP_STACK_ERROR == pytest.approx(
-        len(tip_gap.TIP_GAP_LEAVES) * dt_feeler_leaves.LEAF_TOLERANCE
+    assert tip_gap.TIP_GAP_ROD == pytest.approx(3.0 / 32.0 * 25.4)
+    spread = (cylinder_gear.OUTSIDE_DIA_BAND[0] - cylinder_gear.OUTSIDE_DIA_BAND[1]) / 2.0
+    assert tip_gap.PARKED_TIP_CLEARANCE_MIN == pytest.approx(
+        tip_gap.TIP_GAP_ROD - tip_gap.TIP_GAP_ROD_TOLERANCE - spread
     )
-    assert (
-        abs(tip_gap.TIP_GAP_FEELER - tip_gap.REST_TIP_GAP) + tip_gap.TIP_GAP_STACK_ERROR
-        <= tip_gap.TIP_GAP_ACCEPT_BAND
-    )
-    assert tip_gap.TIP_GAP_ACCEPT == pytest.approx(
-        (
-            tip_gap.TIP_GAP_FEELER - tip_gap.TIP_GAP_ACCEPT_BAND,
-            tip_gap.TIP_GAP_FEELER + tip_gap.TIP_GAP_ACCEPT_BAND,
-        )
-    )
-    # The inch sheet prints the setting to the thousandth; the feeler stack
-    # table (sheet 15) lists the leaves by their etched inch size.
-    printed = re.search(r"^(\.\d{3}) FEELER$", tip_gap.TIP_GAP_FEELER_TEXT)
-    assert printed is not None
-    assert float(printed.group(1)) * 25.4 == pytest.approx(tip_gap.TIP_GAP_FEELER, abs=1e-9)
-    (row,) = (row for row in drawing.FEELER_STACK_ROWS if row[0] == printed.group(1))
-    leaves = [float(leaf) for leaf in row[1].split(" + ")]
-    assert math.isclose(sum(leaves), float(printed.group(1)), abs_tol=1e-9)
-    assert set(leaves) <= set(dt_feeler_leaves.LEAVES_IN)
-    assert "CHECK 7" in row[2]
+    assert tip_gap.PARKED_TIP_CLEARANCE_MIN > 2.0
+    assert tip_gap.CAM_REACH_AT_STANDARD_CENTRE_MIN > 1.0
+    # No leaf makes up the locate any more.
+    assert not any("CHECK 7" in row[2] for row in drawing.FEELER_STACK_ROWS)
 
 
 def test_every_set_feeler_the_steps_and_checks_print_has_a_leaf_row() -> None:
     """Rubric sample round 16 (#0, 3/3 runs): each feeler a step or check
     sets is a sheet 15 row citing it; check cites carry CHECK.  The table
-    stays left of the cone station table.  #3042: every row is whole inch
-    leaves of the owned set, each once, summing to the printed setting."""
+    stays left of the cone station table.  #3042: every exact row is whole
+    inch leaves of the owned set, each once, summing to the printed setting.
+    Owner ruling C7 (2026-11-24, "Yes: ranges, longer flats, no leaf
+    miking."): the rig's rows are ranges, and no leaf is miked."""
     import dt_feeler_leaves
-    from cone_stack_end_play import STACK_FEELER
 
     assert drawing.FEELER_STACK_HEADER[1] == "LEAVES (IN)"
-    for setting, leaves, _cited in drawing.FEELER_STACK_ROWS:
+    ranged = {}
+    for setting, leaves, cited in drawing.FEELER_STACK_ROWS:
+        if " TO " in setting:
+            ranged[setting] = (leaves, cited)
+            continue
         sizes = [float(leaf) for leaf in leaves.split(" + ")]
         assert set(sizes) <= set(dt_feeler_leaves.LEAVES_IN), setting
         assert len(set(sizes)) == len(sizes) <= dt_feeler_leaves.MAX_STACK_LEAVES, setting
         assert sizes == sorted(sizes, reverse=True), setting
         assert math.isclose(sum(sizes), float(setting), abs_tol=1e-9), setting
+    assert ranged == {
+        ".010 TO .020": ("ANY ONE", "16B, 19, 21C"),
+        # D4 (delegated ruling 2026-11-24 (Main), no precedent; owner review
+        # #2144): T024 off T030.
+        ".015 TO .020": ("ANY ONE", "1R"),
+        ".020 TO .040": ("ANY ONE", "19B, 21D"),
+        ".049 TO .065": ("TWO, OR 1/16 DRILL", "19A"),
+    }
+    for setting in ranged:
+        for end in setting.split(" TO "):
+            assert float(end) in dt_feeler_leaves.LEAVES_IN or float(end) > max(
+                dt_feeler_leaves.LEAVES_IN
+            ), setting
     assert "MM" not in " ".join(
         (drawing.FEELER_STACK_TITLE, *drawing.FEELER_STACK_HEADER, drawing.FEELER_TABLE_NOTE)
     )
-    # The booked leaf tolerance is checked at the bench, not assumed.
-    tolerance = drawing.inch_text(dt_feeler_leaves.LEAF_TOLERANCE, 4)
     note = " ".join(drawing.FEELER_TABLE_NOTE.split())
-    assert re.search(rf"MIC EACH LEAF\b.*WITHIN ±{re.escape(tolerance)} OF ITS ETCHED SIZE", note)
+    assert "MIC" not in note and "ETCHED SIZE" not in note
     rows = {row[0]: row[2] for row in drawing.FEELER_STACK_ROWS}
 
     def printed(setting: float) -> str:
         return drawing.inch_text(setting, drawing.FEELER_PLACES)
 
-    assert "4H, 4J" in rows[printed(drawing.pinion.T120_FITUP_FEELER_MM)]
-    assert "1R" in rows[printed(STACK_FEELER)]
+    # Fit audit part 2, B9: the T120 check is a look, so no leaf row cites 4G.
+    assert not any("4G" in cited for cited in rows.values())
     assert "4F" in rows[printed(drawing.pinion.SEAT_FEELER_MM)]
     # The cone swing is set by feel (#2365): no row cites check 4.
     assert not any("CHECK 4" in cited for cited in rows.values())
@@ -1131,7 +1248,9 @@ def test_sheet_15_tables_stack_clear_of_the_station_field_on_any_seat(
     station table field; on the 1010x598 px one it cleared by 0.53 mm.  A
     table hangs off its title's requested top, so a title box read a pixel
     or two off moves no table, and the stack ends 2 mm clear of the station
-    table field and the interface notes."""
+    table field and the interface notes.  Owner ruling C6 (2026-11-24) took
+    the recheck table out: the setting table now ends over the station table
+    field and the narrow feeler stack table stands left of it."""
     monkeypatch.setattr(general_table, "_early_bound", lambda value, _interface: value)
     monkeypatch.setattr(drawing, "_activate_sheet", lambda *_args: None)
     monkeypatch.setattr(drawing, "_heading", lambda *_args: None)
@@ -1158,17 +1277,20 @@ def test_sheet_15_tables_stack_clear_of_the_station_field_on_any_seat(
 
     assert drawing._place_setting_sheet(adapter, facts=None) == []
 
-    setting, recheck, feeler = tables
+    setting, feeler = tables
     assert setting.anchor[1] == pytest.approx(
         drawing.SETTING_TABLE_TOP - general_table.TABLE_TITLE_DROP
     )
     bottoms = [table.anchor[1] - table.RowCount * table.ROW_HEIGHT for table in tables]
-    for above, below in zip(bottoms, (recheck, feeler)):
-        assert above - below.anchor[1] == pytest.approx(
-            drawing.SETTING_TABLE_GAP + general_table.TABLE_TITLE_DROP
-        )
-    assert bottoms[1] - drawing.STATION_TABLE_FIELD[1] >= 0.002
-    assert bottoms[2] - drawing.INTERFACE_FIELD[1] >= 0.002
+    assert bottoms[0] - feeler.anchor[1] == pytest.approx(
+        drawing.SETTING_TABLE_GAP + general_table.TABLE_TITLE_DROP
+    )
+    assert bottoms[0] - drawing.STATION_TABLE_FIELD[1] >= 0.002
+    assert bottoms[1] - drawing.INTERFACE_FIELD[1] >= 0.002
+    widths = general_table.table_column_widths(
+        drawing.FEELER_STACK_HEADER, drawing.FEELER_STACK_ROWS
+    )
+    assert drawing.SETTING_TABLE_LEFT + sum(widths) <= drawing.STATION_TABLE_FIELD[0]
 
 
 def test_every_sheet_16_row_is_cited_by_its_step_and_fits_its_sheet(
@@ -1190,8 +1312,8 @@ def test_every_sheet_16_row_is_cited_by_its_step_and_fits_its_sheet(
     )
     for key, number in drawing.ACCEPTANCE_ROW_NUMBERS.items():
         cite = f"({drawing.acceptance_ref(key)}"
-        # T024's row is the setup 1S centres in and 1X accepts in (#3292),
-        # the pivot's the one 2B centres in and 2F accepts in (#2473).
+        # T024's row is the setup 1S centres in and 1X records in (#3292),
+        # the pivot's the one 2B centres in and 2F records in (#2473, C5).
         twice = ("tip-gap", "t024-runout", "pivot-runout")
         assert printed.count(cite) == (2 if key in twice else 1), key
         (row,) = (row for row in drawing.ACCEPTANCE_TABLE_ROWS if row[0] == str(number))
@@ -1600,14 +1722,15 @@ def test_cone_station_rows_run_front_to_back() -> None:
         "2C. CLIP MHA-DT-03-TL-02, BLADES WAXED AGAIN, OVER THE TIP, BOTH ARMS"
         " ON T036, T030'S BLADE BESIDE THE KEY."
     )
-    for head in ("1W", "2E"):
+    for head in ("1X", "2G"):
         step = steps[steps.index(f"{head}. ") :]
         assert step.split(".", 2)[1].endswith("BOTH ARMS ON T036"), step[:120]
     # #2473 (owner ruling 2026-11-22, option G): the pivot is tapped true
     # before the comb goes on, read after cure with the comb off and before
-    # the post is assembled (2J on), and a failed reading has its remedy.
+    # the post is assembled (2K on), and a failed reading has its remedy.
     pivot_row = drawing.acceptance_ref("pivot-runout")
-    order = [steps.index(f"{head}. ") for head in ("2A", "2B", "2C", "2D", "2E", "2F", "2G", "2H", "2J")]
+    heads = ("2A", "2B", "2C", "2D", "2E", "2F", "2G", "2H", "2J", "2K")
+    order = [steps.index(f"{head}. ") for head in heads]
     assert order == sorted(order)
     assert steps[order[1] : order[2]].strip() == (
         "2B. HOLDING MHA-DT-37 HOME, TAP ITS PIVOT TRUE ON AN INDICATOR BEFORE"
@@ -1618,27 +1741,61 @@ def test_cone_station_rows_run_front_to_back() -> None:
         " T024 UNTIL THEN."
     )
     gear_row = drawing.acceptance_ref("spigot-gear-runout")
-    assert steps[order[5] : order[6]].strip() == (
-        f"2F. CHECK THE RUNOUT ABOUT MHA-DT-04 OF THE MHA-DT-37 PIVOT ({pivot_row})"
-        f" AND OF T012'S AND T018'S TEETH ({gear_row})."
+    # Owner ruling 2026-11-24, audit part 2 C5: the after-cure readings are a
+    # record, taken before the comb check so the strip and re-bond follows
+    # that check (rule 22), and a bonded gear that hesitates in check 5C's
+    # run; a keyed one is not bonded and goes to 3P (Codjiflo round 1 on
+    # #3550, delegated ruling 2026-11-24 (Main), no precedent; owner review
+    # #2144).  DT-00 machinist round 1 (rule 22): one reading a step, each
+    # saying plainly it is a record with nothing accepted on it (C5).
+    assert steps[order[4] : order[5]].strip() == (
+        "2E. ONCE CURED, RECORD ONLY, NO ACCEPTANCE: MHA-DT-37 PIVOT RUNOUT ABOUT"
+        f" MHA-DT-04 ({pivot_row})."
     )
-    assert steps[order[6] : order[7]].startswith("2G. IF ANY CHECK FAILS, AT 250 DEG C TAKE MHA-DT-37,")
-    assert steps[order[7] : order[8]].strip().endswith("FOR A REDO FROM 1L.")
-    assert steps[order[8] :].startswith("2J. ALIGN THE MHA-DT-05 COUNTERBORES")
+    assert steps[order[5] : order[6]].strip() == (
+        f"2F. RECORD ONLY, NO ACCEPTANCE: T012 AND T018 TOOTH RUNOUT, SAME SETUP ({gear_row})."
+    )
+    assert steps[order[7] : order[8]].startswith(
+        "2H. IF IT FAILS, OR A BONDED GEAR HESITATES IN CHECK 5C, AT 250 DEG C TAKE MHA-DT-37,"
+    )
+    assert steps[steps.index("1W. ") :].startswith(
+        "1W. RECORD ONLY, NO ACCEPTANCE: T024 TOOTH RUNOUT ("
+    )
+    assert steps[steps.index("1Y. ") :].startswith("1Y. IF IT FAILS, TAKE T024 OFF")
+    check = " ".join(drawing.CHECKS.split())
+    assert "MUST NEVER BIND OR HESITATE" in check
+    import dt_drive_train_steps as steps_registry
+
+    end_play = steps_registry.step_number("end-play-set")
+    assert (
+        "5D. IF ONE BINDS, LOOSEN MHA-DT-VN-51 THERE (A BONDED GEAR HESITATES: STEP 2H,"
+        f" A KEYED ONE: STEP {end_play}P)."
+    ) in check
+    keyed = " ".join(drawing.CONE_CRANK_STEPS.split())
+    assert (
+        f"{end_play}P. IF A KEYED GEAR HESITATES IN CHECK 5C, TAKE IT OFF MHA-DT-04 AFTER 2H-2J."
+        f" {end_play}Q. CHECK A GEAR TAKEN OFF: BORE AND TEETH TO ITS MHA-DT-03 SHEET,"
+        f" NO SHAKE ON MHA-DT-04. {end_play}R. IF IT FAILS, REMAKE IT TO THAT SHEET."
+        f" {end_play}S. AFTER {end_play}P, REDO FROM 1B."
+    ) in keyed
+    assert steps[order[8] : order[9]].strip().endswith("FOR A REDO FROM 1L.")
+    assert steps[order[9] :].startswith("2K. ALIGN THE MHA-DT-05 COUNTERBORES")
+    # Codjiflo r9 on #3550 (rule 25): the limit row names 2B, the wet set,
+    # only; 2E reads as the row and accepts nothing.
     (row,) = (r for r in drawing.ACCEPTANCE_TABLE_ROWS if r[2].startswith("MHA-DT-37 PIVOT"))
     assert row[1:] == (
-        "2B, 2F",
+        "2B",
         "MHA-DT-37 PIVOT, MHA-DT-04 ON END ON A V-BLOCK",
         ".0020 TIR MAX",
         "TEST INDICATOR",
     )
     # Owner ruling 2026-11-22 (#2473): T012 and T018 are read after cure in
-    # the same setup, as T024 is.
+    # the same setup, as T024 is; a record since C5 (2026-11-24).
     (row,) = (r for r in drawing.ACCEPTANCE_TABLE_ROWS if r[2].startswith("T012 AND T018"))
     assert row[1:] == (
         "2F",
         "T012 AND T018, \u00d8.040 GAUGE PIN, SETUP AS T024",
-        ".0030 TIR MAX EACH SPACE",
+        "RECORD ONLY, NO ACCEPTANCE",
         "TEST INDICATOR",
     )
     assert "MHA-DT-03-TL-02 BLADES WITH" in steps

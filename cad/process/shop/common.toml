@@ -649,6 +649,9 @@ diameter_mm = 1.5113
 [tools.drill-1-16]  # Drills 1/16
 description = "1/16 (.0625 in) drill, 115-piece index"
 diameter_mm = 1.5875
+[tools.drill-52]  # 115-piece index; MHA-DT-39 pivot hole, MHA-DT-20 tip-dowel hole (fit audit question 11)
+description = "#52 (.0635 in) drill, 115-piece index"
+diameter_mm = 1.6129
 [tools.drill-51]  # Drills #51
 description = "#51 (.0670 in) drill, 115-piece index"
 diameter_mm = 1.7018

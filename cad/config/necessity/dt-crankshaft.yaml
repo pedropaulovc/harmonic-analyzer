@@ -1,0 +1,44 @@
+# Why each ream and each band tighter than the title block stays on MHA-DT-11
+# (drawing-guidelines rule 4; owner ruling 2026-11-24: the reason lives here,
+# not on the sheet).  The fit audit's rows for MHA-DT-11 (2026-11-23,
+# each one kept stands on its entry below): the drive-pin holes reamed with no
+# band, the offsets, spigot and overall kept as drawn; the three turned fits
+# became REF under note 3 and are not tight bands.  The (Ø.125) hole for pin
+# MHA-DT-29 (former N-06) is match-reamed through MHA-DT-10's pin hole at
+# assembly for the pin that joins them: drawing-guidelines rule 4, form 2
+# ("needs no register entry").
+necessity:
+  - id: N-01
+    feature: "sheet 1, END view, 2X Ø.0930 REAM .1555 drive-pin holes"
+    kind: bought_seat
+    reason: "pins MHA-DT-VN-67 press in, not by hand"
+    source: "fit audit 2026-11-23, MHA-DT-11.drive_pin_holes; dt_crankshaft_spec DRIVE_PIN_PRESS_INTERFERENCE"
+  # The wheel trial (owner ruling 2026-11-24, fit audit question 8) accepts
+  # the pins' spacing only. The wheel's offset on the shaft comes from the
+  # pins alone: its bore has .018 radial air round the shank. At the
+  # ±.002 reamed-hole row the offset leaves the ANSI #25 plate .0008 mm
+  # from the spigot, under the floor. The band stays by D12, delegated ruling
+  # 2026-11-24 (Main), no precedent; owner review #2144 (N-02 names the
+  # failing check; batch-dt/crank/Q8-dt11-centre-shift.png): "Q8 chain
+  # clearance: MHA-DT-11 and the three MHA-PD-09 wheels keep ±.0009 (today's
+  # band), wheel holes located from the teeth; collar by trial."
+  - id: N-02
+    feature: "sheet 1, END view, 2X drive-pin offset .2756 ±.0009"
+    kind: gap
+    reason: "shifted pins float the wheel; #25 plates hit the spigot"
+    source: "build_dt_drive_train_assembly.CHAIN_RADIAL_AIR_WORST_MIN"
+  - id: N-03
+    feature: "sheet 1, FRONT view, Ø.689 +.000/-.004 seat spigot, note 2"
+    kind: gap
+    reason: "the chain wrapping MHA-PD-09 passes over it"
+    source: "fit audit 2026-11-23, MHA-DT-11.spigot (kept); dt_crankshaft_spec SPIGOT_DIA_BAND"
+  - id: N-04
+    feature: "sheet 1, FRONT view, far end to dome root 5.06 +.000/-.016"
+    kind: gap
+    reason: "long closes MHA-DT-31's air to MHA-PD-09"
+    source: "fit audit 2026-11-23, MHA-DT-11.overall_length (kept); dt_crankshaft_spec SHAFT_LENGTH_BAND"
+  - id: N-05
+    feature: "sheet 1, note 1, taper-ream 1:48 with MHA-DT-31 for MHA-DT-09"
+    kind: joint
+    reason: "the taper pin alone drives the crank"
+    source: "fit audit 2026-11-23, MHA-DT-31_DT-11.taper_pin: kept as drawn (README, Kept as drawn)"

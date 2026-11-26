@@ -48,14 +48,22 @@ def _floor_3pl(value_mm: float) -> float:
 SEAT_FACE_WALL_MIN = _floor_3pl(FERRULE_MOUTH_WALL_MIN)
 ARM_FACE_WALL_MIN = _floor_3pl(FERRULE_ARM_FACE_WALL_MIN)
 
-# The bore keeps its .XXX row; the oak tenon is turned to the measured bore
-# for an epoxy line, so the callout names the fit, the mate and its route,
-# with the clearance as the acceptance (rule 4; fan-out policy 1).  BORE
-# names the process, so the .XXX row, not DRILLED HOLES, sets its limits
-# (#290 review of eb22a22f1).
+# The hole is the N drill's at DRILLED HOLES (+.004/0): the native Ø.302 is
+# the drill's own decimal and the callout names it (rule 3; codjiflo 3548-1:
+# a bare "DRILL THRU" under Ø.303 read as .303-.307, which no drill in the
+# shop's index cuts, while the export claimed the .XXX row).  The oak tenon is
+# turned to the measured hole for an epoxy line, so the callout names the fit,
+# the mate and its route, with the clearance as the acceptance (rule 4; fan-out
+# policy 1).  The N drill's .302-.306 sits inside the .298-.308 the tenon walls
+# were first judged at, so every wall gains (Q-ferrule-n-drill had read Ø.302
+# at the .XXX row, .297 at its smallest): delegated ruling 2026-11-25 (Main),
+# no precedent; replaces D5 of 2026-11-24; owner review #2144.  No "BORE":
+# owner ruling 2026-11-24, fit audit question 15 ("BORE" had promised a
+# boring bar no traveler uses).
+BORE_DRILL = "N"
 BORE_FIT_CALLOUT = "\n".join(
     (
-        "BORE THRU",
+        f"{BORE_DRILL} DRILL THRU",
         f"BONDED FIT ON {HANDLE_NUMBER} TENON TURNED",
         f"TO MEASURED BORE (CLEARANCE {inch_text(TENON_GLUE_LINE[0], 3)}-"
         f"{inch_text(TENON_GLUE_LINE[1], 3)})",

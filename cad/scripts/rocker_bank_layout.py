@@ -100,10 +100,17 @@ END_FLOAT = (
 # the fit-necessity rule of the owner-approved fit policy
 # (drawing-simplicity-policy.md; owner ruling 2026-11-24): a band stays
 # tighter than the title block only when a named check fails at the looser
-# size, and at +/-.005 END_CLEARANCE_MIN is still (0.560, 0.281) mm over the
-# 0.10 running floor; changes the owner's 2026-10-18 X1+B1 number (+/-.004),
-# #2144 (rulings.md D20).
-NORTH_EAR_LOCATE_BAND = 0.10  # DRO edge-find on the ear's inner face
+# size; changes the owner's 2026-10-18 X1+B1 number (+/-.004), #2144
+# (rulings.md D20).
+# The DRO locate is booked at the title block's .010 window (MHA-DT-00
+# setting row 5 prints 2.631-2.641: rule 4 opens it to the title block, since
+# no check it feeds falls under D28's 0.03 mm margin; END_CLEARANCE_MIN is
+# (0.528, 0.249) mm, south and north, against the 0.10 floor). The nominal is
+# off the .001 grid, so the band is .0052 to print the title block's full .010
+# window (Codjiflo 3550-r5). It is this row's own band, not
+# cylinder_bank_layout's FRONT_STRAP_LOCATE_BAND (row 2, kept at 0.10 by
+# necessity N-01).
+NORTH_EAR_LOCATE_BAND = 0.132  # DRO edge-find on the ear's inner face, +/-.0052
 EAR_INNER_SPAN = NORTH_EAR_INNER_Z - SOUTH_EAR_INNER_Z
 EAR_SPAN_BAND = 0.127  # +/-.005, the title block's .XXX
 # Each ear's inner face off its nominal station, (south, north).

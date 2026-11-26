@@ -217,7 +217,11 @@ def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
     kept = set(drawing.END_KEEP) | set(drawing.PROFILE_KEEP)
     assert kept == marked
     assert set(drawing.DIMENSION_CALLOUTS) <= kept
-    assert drawing.DIMENSION_CALLOUTS["PinHoleDia"].startswith("1/16 DRILL THRU\n")
+    assert drawing.DIMENSION_CALLOUTS["PinHoleDia"].splitlines() == [
+        "1/16 DRILL THRU;",
+        "MHA-DT-VN-63 MUST DRIVE,",
+        "NOT ENTER BY HAND",
+    ]
     assert "MHA-DT-22" in drawing.DIMENSION_CALLOUTS["BoreDia"]
 
 

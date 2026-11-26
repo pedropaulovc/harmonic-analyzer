@@ -41,11 +41,20 @@ part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
 material = "AISI 1018 cold-finished round, 1/2 in"
 stock = "Ø{{process.stock_dia_in:.2dot}} bar, on hand; Setup 1 saws a {{process.bar_length_in:g}} in piece off it: {{process.quantity:d}} hubs at {{cad.pitch_in:.2dot}} in each ({{cad.parts_per_bar:d}} fit the piece)."
-note = "Inches unless mm. Lathe PM-1127VF-LB (70–380 and 380–2000 rpm); cutting oil on the steel. Setup 2 runs ten times, two hubs per pull. Bore and length are finished after joining to MHA-CH-13 (drawing note 1, MHA-CH-06)."
 shop = "../shop"
 stock_refs = ["1018-round-1-2"]
 material_key = "lathe-1018-cold-finished"
 turning_material = "steel_1018"
+
+# The shop's standing page carries what every traveler shares (units, lathe
+# speeds, coolant); This job says what only these hubs need.
+standing = true
+
+[[notes]]
+title = "This job"
+rows = [
+  ["After joining", "Bore and length are finished after joining to MHA-CH-13 (drawing note 1, MHA-CH-06)."],
+]
 
 [cad]
 file = "../../out/features/ch_rocker_hub/features.toml"

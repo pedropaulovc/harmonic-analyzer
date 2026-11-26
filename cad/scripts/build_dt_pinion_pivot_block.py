@@ -45,8 +45,6 @@ from _drawing_marks import (
 )
 from _document_units import apply_package_model_units
 from _drawing_precision import apply_drawing_precision
-from _drawing_tolerances import set_dimension_bilateral_tolerance
-from _fit_deviations import deviations
 from _part_properties import part_drawing_unit
 from _hole_spec import blind_cut_dia_mm
 from _holes import wizard_holes
@@ -58,8 +56,8 @@ from dt_pinion_pivot_block_spec import (
     BLOCK_HEIGHT,
     BLOCK_WEST,
     BLOCK_WIDTH,
-    BORE_DIA,
-    BORE_DIA_BAND,
+    LIFT_BORE_DIA,
+    PIVOT_BORE_DIA,
     BORE_UP,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
@@ -69,7 +67,6 @@ from dt_pinion_pivot_block_spec import (
     SCREW_HOLE_SPEC,
     SCREW_HALF_SPACING,
     SURFACE_FINISHES,
-    UNIT,
 )
 
 PART_NAME = "dt-pinion-pivot-block"
@@ -101,7 +98,8 @@ def build(adapter) -> dict[str, str]:
     set_global(adapter, "BlockHeight", f"{BLOCK_HEIGHT}mm")
     set_global(adapter, "BlockDepth", f"{BLOCK_DEPTH}mm")
     set_global(adapter, "BoreUp", f"{BORE_UP}mm")
-    set_global(adapter, "Bore", f"{BORE_DIA}mm")
+    set_global(adapter, "PivotBore", f"{PIVOT_BORE_DIA}mm")
+    set_global(adapter, "LiftBore", f"{LIFT_BORE_DIA}mm")
     set_global(adapter, "BlockEast", f"{BLOCK_EAST}mm")
     set_global(adapter, "LiftBoreSpacing", f"{LIFT_BORE_SPACING}mm")
     set_global(adapter, "LiftBoreRise", f"{LIFT_BORE_RISE}mm")
@@ -129,21 +127,21 @@ def build(adapter) -> dict[str, str]:
         adapter,
         0.0,
         0.0,
-        BORE_DIA / 2.0,
+        PIVOT_BORE_DIA / 2.0,
         "pivot bore",
         dims=block,
         names=(None, None, "PivotBoreDia"),
-        drives=(None, None, '"Bore"'),
+        drives=(None, None, '"PivotBore"'),
     )
     define_circle(
         adapter,
         -LIFT_BORE_SPACING,
         LIFT_BORE_RISE,
-        BORE_DIA / 2.0,
+        LIFT_BORE_DIA / 2.0,
         "lift bore",
         dims=block,
         names=("LiftBoreX", "LiftBoreCz", "LiftBoreDia"),
-        drives=('"LiftBoreSpacing"', '"LiftBoreRise"', '"Bore"'),
+        drives=('"LiftBoreSpacing"', '"LiftBoreRise"', '"LiftBore"'),
     )
     # Rectangle anchored at vertex 0 (-BLOCK_WEST, -BORE_UP): the width (X
     # span) and height (Y span) segment dims, then the two anchor dims (absolute
@@ -173,7 +171,11 @@ def build(adapter) -> dict[str, str]:
     name_last_feature(adapter, "Block")
     depth_dim = name_dimensions(adapter, "Block", ["Depth"])
     drive_jobs += [(depth_dim[0], '"BlockDepth"')]
-    area = BLOCK_WIDTH * BLOCK_HEIGHT - 2.0 * math.pi * (BORE_DIA / 2.0) ** 2
+    area = (
+        BLOCK_WIDTH * BLOCK_HEIGHT
+        - math.pi * (PIVOT_BORE_DIA / 2.0) ** 2
+        - math.pi * (LIFT_BORE_DIA / 2.0) ** 2
+    )
     expected = area * BLOCK_DEPTH
     volume_check(adapter, "block", expected, 0.005 * expected)
 
@@ -228,21 +230,9 @@ def build(adapter) -> dict[str, str]:
 
     # Manufacturing drawing support: mark exactly the print's dimensions (the
     # drawing recipe imports the marked set and must find every one of these),
-    # and stamp the make-critical title-block properties.
-    set_dimension_bilateral_tolerance(
-        adapter,
-        "BlockProfile",
-        "PivotBoreDia",
-        *deviations(BORE_DIA_BAND),
-        display_unit=UNIT,
-    )
-    set_dimension_bilateral_tolerance(
-        adapter,
-        "BlockProfile",
-        "LiftBoreDia",
-        *deviations(BORE_DIA_BAND),
-        display_unit=UNIT,
-    )
+    # and stamp the make-critical title-block properties.  Neither bore carries
+    # a band: the pivot bore prints the .2510 reamer's size, the lift bore the
+    # F drill's (fit audit question 12 and F26).
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():

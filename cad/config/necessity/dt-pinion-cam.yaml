@@ -1,0 +1,17 @@
+# MHA-DT-23 pinion eccentric cam: why each REAM and each band tighter than
+# the title block stays (drawing-guidelines.md rule 4; owner ruling
+# 2026-11-24: the reason lives here, not on the sheet). Read by the machinist
+# review only.
+# The eccentric bore is reamed with the owned .2510 reamer and prints no
+# band; the MHA-DT-17 rod sliding in by hand is its acceptance
+# (drawing-guidelines rule 4, form 3; fit audit F19). An F drill (.257-.261) on the .2492-.2500
+# rod leaves up to .0118 (0.30 mm) of diametral clearance, past the 0.10 mm
+# slip limit dt_pinion_cam_spec checks (SLIP_CLEARANCE_MAX, check register
+# C-01); it would also take the thin side .0048 further under the .080
+# target (.0705 against .07525).
+necessity:
+  - id: N-01
+    feature: "Ø.2510 REAM THRU eccentric bore (MHA-DT-17 ROD SLIDES IN BY HAND)"
+    kind: gap
+    reason: "F drill's 0.30 play fails the 0.10 slip limit"
+    source: "fit audit F19; dt_pinion_cam_spec.SLIP_CLEARANCE_MAX"

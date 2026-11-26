@@ -47,14 +47,14 @@ from _feature_requirements import part_metadata, requirement
 from _gtol_cylinder import CylinderFace
 from _gtol_planar import PlanarFace
 from _printed_limits import drilled_limits, limits
+from dt_crank_arm_spec import SEAM_BOND_CLEARANCE_MM
 from dt_crank_hub_geometry import (
     HUB_BARREL_LENGTH,
-    HUB_BORE_BAND,
     HUB_LENGTH_BAND,
     HUB_SEAT_DIA,
     RELIEF_DIA,
     RELIEF_LENGTH,
-    SEAT_PRESS_INTERFERENCE,
+    SEAT_SLIP_CLEARANCE,
     SHAFT_CLEARANCE_MAX,
     SHAFT_CLEARANCE_MIN,
     UNIT,
@@ -268,8 +268,8 @@ DIMENSION_CALLOUTS = {
 # measured MHA-DT-06 bore for the stated interference, its length the arm's
 # measured thickness +.000/-.002 (note 2); the barrel, relief and their
 # lengths take the title block's .XX row; the overall its +.004/-.010; the
-# bore its reamed band; the #14 pilot the DRILLED HOLES row, stationed .XX
-# from the front face and taper-reamed at assembly (note 1); the seam is
+# bore the 3/8 drill's DRILLED HOLES row (D27); the #14 pilot the same row,
+# stationed .XX from the front face and taper-reamed at assembly (note 1); the seam is
 # match-reamed at assembly, never by the part's traveler. The declarations
 # print nothing.
 DRAWING_NOTES = SHEET_NOTES
@@ -354,7 +354,7 @@ requirement(
     "seat",
     kind="outside_cylinder",
     faces=(CylinderFace(HUB_SEAT_DIA),),
-    requirements=("dia_ref", "diametral_interference"),
+    requirements=("dia_ref", "diametral_clearance"),
     fields={
         "at": ([0.0, 0.0, 0.0], ("__frame__",)),
         "axis": ([0.0, 1.0, 0.0], ("__frame__",)),
@@ -362,9 +362,11 @@ requirement(
             HUB_SEAT_DIA,
             ((_GEOM, "HUB_SEAT_DIA"), "REFERENCE_DIMENSIONS", (_SELF, "SIDE_KEEP")),
         ),
-        "diametral_interference": (
-            list(SEAT_PRESS_INTERFERENCE),
-            ((_GEOM, "SEAT_PRESS_INTERFERENCE"), (_NOTES, "SEAT_CALLOUT")),
+        # The bonded slip fit's design clearance (fit audit question 21): the
+        # traveler turns the seat until the arm slides on by hand.
+        "diametral_clearance": (
+            list(SEAT_SLIP_CLEARANCE),
+            ((_GEOM, "SEAT_SLIP_CLEARANCE"), (_NOTES, "SEAT_CALLOUT")),
         ),
         "mate": ("MHA-DT-06 CRANK ARM BORE", ((_NOTES, "SEAT_CALLOUT"),)),
         "length_nominal": (HUB_SEAT_LENGTH, ((_GEOM, "HUB_SEAT_LENGTH"),)),
@@ -419,13 +421,18 @@ requirement(
     fields={
         "at": ([0.0, 0.0, 0.0], ("__frame__",)),
         "axis": ([0.0, 1.0, 0.0], ("__frame__",)),
+        # The sheet prints the 3/8 drill's Ø.375 under DRILLED HOLES (rule 3;
+        # D27, delegated ruling 2026-11-25 (Main), precedent: the fit-necessity
+        # rule of the owner-approved fit policy (owner ruling 2026-11-24);
+        # owner review #2144); MHA-DT-11's shank is turned to
+        # the measured bore.
         "dia": (
-            limits(HUB_BORE_DIA, _P["BoreDia"], HUB_BORE_BAND, unit=UNIT),
-            ((_GEOM, "HUB_BORE_DIA"), (_GEOM, "HUB_BORE_BAND"), (_SELF, "END_KEEP")),
+            drilled_limits(HUB_BORE_DIA, _P["BoreDia"], unit=UNIT),
+            ((_GEOM, "HUB_BORE_DIA"), (_GEOM, "UNIT"), (_SELF, "END_KEEP")),
         ),
         "nominal_dia": (HUB_BORE_DIA, ((_GEOM, "HUB_BORE_DIA"),)),
         "thru": (True, ((_NOTES, "BORE_CALLOUT"),)),
-        "process": ("ream", ((_NOTES, "BORE_CALLOUT"),)),
+        "process": ("drill", ((_NOTES, "BORE_CALLOUT"),)),
         "mate": ("MHA-DT-11", ((_NOTES, "BORE_CALLOUT"),)),
         "diametral_clearance": (
             [SHAFT_CLEARANCE_MIN, SHAFT_CLEARANCE_MAX],
@@ -490,6 +497,14 @@ requirement(
         ),
         "depth_nominal": (SEAM_DEPTH, ((_GEOM, "SEAM_DEPTH"),)),
         "made_at": ("assembly", ((_NOTES, "SEAM_CALLOUT"),)),
+        "diametral_clearance": (
+            list(SEAM_BOND_CLEARANCE_MM),
+            (
+                ("dt_crank_arm_spec", "SEAM_BOND_CLEARANCE_MM"),
+                ("dt_crank_arm_spec", "SEAM_BOND_CLEARANCE_TEXT"),
+                (_NOTES, "SEAM_CALLOUT"),
+            ),
+        ),
         "callout": (
             SEAM_CALLOUT.replace("<MOD-DIAM>", "\u00d8").replace(
                 "<HOLE-DEPTH>", "\u21a7"

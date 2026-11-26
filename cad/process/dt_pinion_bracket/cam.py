@@ -4,7 +4,7 @@
 part's exported ``features.toml`` and the plan/shop TOML, then runs
 :func:`build` inside headless FreeCAD (``freecadcmd``) with that context and
 checks the posted G-code against :func:`expectations`. The strap's sizes come
-from the feature export (its thickness, flanks, round ends, both reamed bores,
+from the feature export (its thickness, flanks, round ends, both bores,
 the follower seat); the blank, the parts' places in it,
 the levels, spots, drill and reamer depths and the holding from ``plan.toml``
 ``[parameters]`` and ``milling_cuts``; cutter diameters and end-mill speeds
@@ -23,7 +23,8 @@ face) down.
 
 - PB02 (the blank lying on stacked parallels, gripped on the bar's edges):
   face B to the thickness, spot all four bores, drill the pivot bores C and
-  the arbor bores N, ream them .2510 and .3135 (fed in and out), then cut
+  ream them .2510 (fed in and out), drill the arbor bores 5/16 to size
+  (owner ruling 2026-11-24, fit audit question 12), then cut
   each outline with the 1/8 in end mill through into the gap between the
   parallels, anticlockwise from one side of a bridge at the arbor end's apex
   round to its other side: the bridge alone holds each strap in the blank
@@ -74,7 +75,6 @@ PROGRAMS: tuple[tuple[str, tuple[Any, ...]], ...] = (
             ("pivot_drill",),
             ("arbor_drill",),
             ("pivot_ream",),
-            ("arbor_ream",),
             ("outline",),
         ),
     ),
@@ -96,9 +96,8 @@ CAM_TOOLS = (
     "em-half",
     "spot",
     "drill-c",
-    "drill-n",
+    "drill-5-16",
     "reamer-2510",
-    "reamer-3135",
     "em-eighth",
     "drill-26",
 )
@@ -595,7 +594,7 @@ def context(
             raise ValueError(f"'{cut}' cutter_dia_mm is not its spot Ø")
     drills = {
         "pivot": ("drill-c", "pivot drill", "pivot_drill_tip_mm"),
-        "arbor": ("drill-n", "arbor drill", "arbor_drill_tip_mm"),
+        "arbor": ("drill-5-16", "arbor drill", "arbor_drill_tip_mm"),
     }
     drill = {}
     for key, (tool, cut, tip_key) in drills.items():
@@ -608,19 +607,19 @@ def context(
         _agree(plan, tip_key, tip)
         rpm, feed = _setting(plan, shop, cut)
         drill[key] = {"tool": tool, "dia": dia, "tip": tip, "rpm": rpm, "feed": feed}
-    reams = {
-        "pivot": ("reamer-2510", "pivot ream", g["pivot_band"]),
-        "arbor": ("reamer-3135", "arbor ream", g["arbor_band"]),
-    }
-    ream = {}
-    for key, (tool, cut, band) in reams.items():
-        dia = tool_dia(tool)
-        if not band[0] <= dia <= band[1]:
-            raise ValueError(f"{tool} Ø{dia} is outside the {key} bore's band {band}")
-        if not 0 < dia - drill[key]["dia"] <= p["ream_stock_max_mm"]:
-            raise ValueError(f"the {key} drill leaves the {tool} no stock or too much")
-        rpm, feed = _setting(plan, shop, cut)
-        ream[key] = {"tool": tool, "dia": dia, "rpm": rpm, "feed": feed}
+    # The arbor bores are drilled to size: the 5/16 drill is the bore.
+    arbor_band = g["arbor_band"]
+    if not arbor_band[0] <= drill["arbor"]["dia"] <= arbor_band[1]:
+        raise ValueError(f"the 5/16 drill is outside the arbor bore's band {arbor_band}")
+    # The pivot bores: the .2510 reamer after the C drill.
+    reamer_dia = tool_dia("reamer-2510")
+    pivot_band = g["pivot_band"]
+    if not pivot_band[0] <= reamer_dia <= pivot_band[1]:
+        raise ValueError(f"reamer-2510 Ø{reamer_dia} is outside the pivot bore's band")
+    if not 0 < reamer_dia - drill["pivot"]["dia"] <= p["ream_stock_max_mm"]:
+        raise ValueError("the pivot drill leaves the reamer-2510 no stock or too much")
+    ream_rpm, ream_feed = _setting(plan, shop, "pivot ream")
+    ream = {"tool": "reamer-2510", "dia": reamer_dia, "rpm": ream_rpm, "feed": ream_feed}
     ream_tip = -p["ream_past_mm"]
 
     # The outline: the 1/8 in end mill in equal levels into the gap, round
@@ -823,27 +822,25 @@ def context(
                 ],
             }
         )
-    for key, xys in (("pivot", pivots), ("arbor", arbors)):
-        m = ream[key]
-        jobs.append(
-            {
-                **reamer_tool(m["tool"], m["dia"], m["rpm"], m["feed"]),
-                "frame": "flat",
-                "label": f"{key} ream",
-                "stock": stocks["flat_faced"],
-                "ops": [
+    jobs.append(
+        {
+            **reamer_tool(ream["tool"], ream["dia"], ream["rpm"], ream["feed"]),
+            "frame": "flat",
+            "label": "pivot ream",
+            "stock": stocks["flat_faced"],
+            "ops": [
+                [
+                    "pivot_ream",
+                    "ream both pivot bores",
                     [
-                        f"{key}_ream",
-                        f"ream both {key} bores",
-                        [
-                            line
-                            for xy in xys
-                            for line in _reamed(xy, T, ream_tip, flat_clear)
-                        ],
-                    ]
-                ],
-            }
-        )
+                        line
+                        for xy in pivots
+                        for line in _reamed(xy, T, ream_tip, flat_clear)
+                    ],
+                ]
+            ],
+        }
+    )
     jobs.append(
         {
             **e8_tool,
@@ -1055,12 +1052,8 @@ def context(
             ),
         ),
         (
-            [ream["pivot"]["rpm"]],
-            hole_checks(pivots, ream_tip, T, ream["pivot"]["dia"] / 2, flat_keep, True),
-        ),
-        (
-            [ream["arbor"]["rpm"]],
-            hole_checks(arbors, ream_tip, T, ream["arbor"]["dia"] / 2, flat_keep, True),
+            [ream["rpm"]],
+            hole_checks(pivots, ream_tip, T, ream["dia"] / 2, flat_keep, True),
         ),
         (
             [out_rpm],
@@ -1086,9 +1079,8 @@ def context(
         tn["em-half"],
         tn["spot"],
         tn["drill-c"],
-        tn["drill-n"],
+        tn["drill-5-16"],
         tn["reamer-2510"],
-        tn["reamer-3135"],
         tn["em-eighth"],
     ]
     deepest = min(

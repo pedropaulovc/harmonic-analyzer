@@ -2,7 +2,7 @@ r"""Manufacturing drawing of the DT6-FORM1 fly-cutter bar (MHA-DT-37-TL-02).
 
 Issue #2358: one sheet at 2:1, laid as the bar sits in the lathe (rule 11):
 the front view with its axis horizontal, the faced, tapped cutting end on the
-right, carrying the bar's Ø and length; the top view above it with the reamed
+right, carrying the bar's Ø and length; the top view above it with the drilled
 cross hole end-on and its station from that end; the end view of the cutting
 end projected right of the front view with the #4-40 tap's native callout,
 both rows running INTO CROSS HOLE (no depth: the tap breaks into it); and the

@@ -19,7 +19,6 @@ import math
 
 import _config
 from _fit_deviations import deviations
-from _fit_ream_h7 import REAM_H7
 from _gtol_planar import PlanarFace
 from _hole_spec import CLEARANCE_MM, THREAD_MAJOR_MM, HoleSpec, blind_cut_dia_mm
 from _inch_wall_limits import WALL_TARGET_MM
@@ -113,9 +112,11 @@ def crank_gear_platform_budget() -> dict[str, float]:
     def upper(nominal: float, places: int, unit: str) -> float:
         return nominal + printed_deviations(nominal, places, unit=unit)[1]
 
-    boss_half_max = upper(
-        post.CONE_BOSS_LENGTH, post.DRAWING_PRECISION_BY_NAME["ConeBossLen"], post.UNIT
-    ) / 2.0
+    # The collar face's station prints at the title block (owner ruling
+    # 2026-11-24, audit part 2 C9): its own upper limit.
+    boss_half_max = (
+        post.CONE_BOSS_NORTH_STATION + post.CONE_BOSS_NORTH_STATION_DEVIATIONS_MM[1]
+    )
     overhang = (
         upper(
             cone_shaft.COLLAR_THICKNESS,
@@ -205,10 +206,12 @@ POST_MOUNT_ENGAGEMENT_WORST_DIAMETERS = (
 POST_MOUNT_ENGAGEMENT_PRINTED = (
     math.floor(POST_MOUNT_ENGAGEMENT_WORST_DIAMETERS * 100.0) / 100.0
 )
-# The drawing-guidelines.md rule 18 (thread engagement) audit's E7 floor (0.87D, at the old .XX plate band): the stock
-# band must not print below it without a new ruling.
-if POST_MOUNT_ENGAGEMENT_PRINTED < 0.87:
-    raise AssertionError("MHA-DT-VN-61 engagement fell below the audited 0.87D floor")
+# The owner's floor: 0.84D (owner ruling 2026-11-24, fit audit part 2 S2,
+# "all approved (ticked)": cut flush to .015 short; was the rule-18 audit's
+# E7 0.87D, ruled 2026-11-01).  The stock band must not print below it
+# without a new ruling.
+if POST_MOUNT_ENGAGEMENT_PRINTED < 0.84:
+    raise AssertionError("MHA-DT-VN-61 engagement fell below the owner's 0.84D floor")
 # The sheet states the shortfall as a plain fact, worded like MHA-DT-32's.
 # The taps' callout names the post they mount, so the line names no screw
 # (machinist review r1). Owner-accepted 2026-11-01: MHA-DT-VN-61's RV-01.
@@ -241,27 +244,31 @@ HOLDDOWN_LOCAL_Z = -dt_cone_tip_block_spec.TIP_BLOCK_PIVOT_OFFSET
 # to -x of its adjuster axis (dt_cone_tip_block_spec.FOOT_TAP_OFFSET_X), so the
 # block body still stands centred on the cone line.  The offset exists only
 # so the hole's lateral station is a real dimension (HoldDownX): on the line
-# it was a zero-valued placement, which a sketch can hold only as a relation,
-# and so it printed at the general .XX band the tip block's containment and
-# lateral stacks cannot absorb (user ruling 2026-09-29: HoldDownX +/-0.10
-# from the pivot bore, now +/-.004).  -x (east) rather than +x because it
+# it was a zero-valued placement, which a sketch can hold only as a relation
+# (user ruling 2026-09-29).  -x (east) rather than +x because it
 # leaves the larger webs on both parts: the hole's web to the narrow west edge
 # grows on that side, and the block's foot tap moves off its +X side, where
 # the width's band sits.
 HOLDDOWN_LOCAL_X = -1.016  # -.04
-# The band on both printed stations from the pivot bore (HoldDownX,
-# HoldDownZ): the block's lateral and axial stacks need it rather than the
-# general .XX grade.  HoldDownZ prints .XXX, whose title-block grade is this
-# band; HoldDownX prints .XX and carries it explicitly (a .XXX restating
-# the title block is over-specification, rule 2: C1 keyed r9 machinist
-# review).  The shop's +/-.005 drilled-hole row (delegated ruling
-# 2026-11-07 (Main), no precedent; owner review #2144: was +/-.004 with a
-# spot from MHA-DT-21; a sheet cannot print an imported banded station as
-# REF, so the band went to the row).  build_dt_drive_train_assembly proves
-# the pivot-head air, the tip lateral take-up, the end screw's embed window
-# (C1 keyed, 2026-11-09) and the hold-down webs at +/-.005, with the post
-# taps also at +/-.005.
+# HoldDownZ, the hole's station along the cone axis, prints .XXX at the
+# shop's +/-.005 drilled-hole row (delegated ruling 2026-11-07 (Main), no
+# precedent; owner review #2144: was +/-.004 with a spot from MHA-DT-21; a
+# sheet cannot print an imported banded station as REF, so the band went to
+# the row).
 HOLDDOWN_STATION_TOL_MM = 0.127  # +/-.005
+# HoldDownX, the lateral station, prints .XX at the title block's band.  It
+# carried +/-.005 until machinist review r1 (farm run 20261124T125542720Z,
+# over-specification, gating) found no register entry for it, and none is
+# owed: re-derived 2026-11-24 with both stations at +/-.010, every check that
+# reads them still holds (the tip block's containment on the plate 0.764 mm
+# against 0.50, the hold-down and tip-dowel webs over .080, the end screw's
+# embed window, the tip lateral take-up, the pivot-head air), and the cone
+# tip's air to gear 19 still closes with HoldDownX at +/-.01: the bushing
+# tier's full-arithmetic least air 0.024 mm (0.053 at +/-.005), and step
+# 23's .010 leaf passes every in-print build (look air 0.278 mm; D18 as
+# amended 2026-11-25, delegated ruling (Main), no precedent; owner review
+# #2144).
+HOLDDOWN_LATERAL_TOL_MM = printed_band_mm(2, unit=UNIT)  # +/-.01
 # The same stacks run through the post-mount taps, whose placement dimensions
 # (PostMountWestX/WestZ/EastX/EastZ) print .XXX, so the title-block grade is
 # this band: the shop's +/-.005 drilled-hole row. Owner ruling 2026-11-08 (Pedro), #2144 item 9.1
@@ -284,9 +291,15 @@ HOLDDOWN_SCREW_HEAD_DIA = 0.183 * 25.4
 HOLDDOWN_SCREW_HEAD_H = 0.112 * 25.4
 # #4 CLOSE clearance, drilled: the title block's DRILLED HOLES row.
 HOLDDOWN_CLEARANCE_DIA = CLEARANCE_MM[("#4", "close")]
-# The counterbore's sizes print three places on its Hole Wizard callout.
-HOLDDOWN_CBORE_DIA = 5.5626  # .219
+# The counterbore's sizes print three places on its Hole Wizard callout,
+# toleranced by the .XX grade (drawing-guidelines.md rule 3: a wizard
+# pocket's Ø and depth are clearance sizes at +/-.01).  Owner ruling
+# 2026-11-25 (#3547, swing-platform web options): "C: counterbore Ø.210,
+# web .080, no shortfall (recommended)" (was Ø.219, its web to the tip dowel
+# .0777 at +/-.01).
+HOLDDOWN_CBORE_DIA = 5.334  # .210
 HOLDDOWN_CBORE_DEPTH = 3.5052  # .138, from the underside
+HOLDDOWN_CBORE_BAND_MM = printed_band_mm(2, unit=UNIT)  # +/-.01, Ø and depth
 HOLDDOWN_HOLE_SPEC = HoleSpec(
     "counterbore_socket",
     "#4",
@@ -296,17 +309,22 @@ HOLDDOWN_HOLE_SPEC = HoleSpec(
         "CounterBoreDepth": HOLDDOWN_CBORE_DEPTH,
     },
 )
-# Print-worst checks (drawing-guidelines.md rule 17 (walls and webs)): .XXX counterbore sizes, drilled-hole oversize,
-# the stock plate's mill band.
-HOLDDOWN_HEAD_RECESS = HOLDDOWN_CBORE_DEPTH - _XXX - HOLDDOWN_SCREW_HEAD_H
-HOLDDOWN_CBORE_HEAD_CLEARANCE = HOLDDOWN_CBORE_DIA - _XXX - HOLDDOWN_SCREW_HEAD_DIA
+# Print-worst checks (drawing-guidelines.md rule 17 (walls and webs)): the
+# wizard pocket's .XX band, drilled-hole oversize, the stock plate's mill
+# band.
+HOLDDOWN_HEAD_RECESS = HOLDDOWN_CBORE_DEPTH - HOLDDOWN_CBORE_BAND_MM - HOLDDOWN_SCREW_HEAD_H
+# The Ø.183 head in the smallest pocket (Ø.200): .017 in, .0085 a side,
+# against the 0.25 mm (.0049 a side) the guard below asks.
+HOLDDOWN_CBORE_HEAD_CLEARANCE = (
+    HOLDDOWN_CBORE_DIA - HOLDDOWN_CBORE_BAND_MM - HOLDDOWN_SCREW_HEAD_DIA
+)
 HOLDDOWN_HEAD_BEARING = (
     HOLDDOWN_SCREW_HEAD_DIA - (HOLDDOWN_CLEARANCE_DIA + _DRILL_OVERSIZE)
 ) / 2.0
 # Ledge from the counterbore floor to the top face, both bands.
 HOLDDOWN_LEDGE_RANGE = (
-    PLATE_THICKNESS - PLATE_STOCK_BAND - (HOLDDOWN_CBORE_DEPTH + _XXX),
-    PLATE_THICKNESS + PLATE_STOCK_BAND - (HOLDDOWN_CBORE_DEPTH - _XXX),
+    PLATE_THICKNESS - PLATE_STOCK_BAND - (HOLDDOWN_CBORE_DEPTH + HOLDDOWN_CBORE_BAND_MM),
+    PLATE_THICKNESS + PLATE_STOCK_BAND - (HOLDDOWN_CBORE_DEPTH - HOLDDOWN_CBORE_BAND_MM),
 )
 if HOLDDOWN_HEAD_RECESS < 0.1:
     raise AssertionError("hold-down screw head can stand proud of the slide face")
@@ -324,12 +342,13 @@ if HOLDDOWN_LEDGE_RANGE[0] < WALL_TARGET_MM:
 # Rule-23 retention, owner ruling 2026-11-07 (MHA-DT-00 rubric sample, PR
 # #2248).  The one hold-down screw lets the adjuster's thrust turn
 # the block on the plate, so a 1/16 x 3/8 dowel (MHA-DT-VN-69) locates it:
-# pressed into a blind ream in the block's foot, it slips through this plate.
-# At MHA-DT-00 step post-and-tip-block, with the block squared and snug, the
-# fitter drills and reams up through this plate into the foot to the pin's
-# press size (dt_cone_tip_block_spec.DOWEL_HOLE_*), opens this hole to the
-# slip size below from underneath with the block still on, then presses the
-# pin up through it to the foot's hole floor.
+# bonded into a blind drilled hole in the block's foot, it slips through
+# this plate.  Owner ruling 2026-11-24, fit audit question 11: at MHA-DT-00
+# step end-play-set, with the block squared and snug, the fitter
+# drills 1/16 up through this plate into the foot
+# (dt_cone_tip_block_spec.DOWEL_HOLE_*), opens this hole to #52 from
+# underneath with the block still on, then bonds the pin up through it to
+# the foot's hole floor.
 #
 # On the hold-down line (the block's mid-depth), TIP_DOWEL_FROM_HOLDDOWN
 # toward +x (machine west) of the hold-down hole: the block's own c-c from its
@@ -337,31 +356,39 @@ if HOLDDOWN_LEDGE_RANGE[0] < WALL_TARGET_MM:
 # HOLDDOWN_LOCAL_X/Z.  The station prints from the hold-down hole with its
 # own +/-.004 band, tighter than the hole's +/-.005 drilled row
 # (HOLDDOWN_STATION_TOL_MM), which the webs to the counterbore here and to
-# the block's +X face need (neither the general .XXX band nor the drilled
-# row closes them at the .080 wall target).
+# the block's +X face need: with the drilled pair (fit audit question 11)
+# they stand at .0803 here (the Ø.210 counterbore at +/-.01, owner ruling
+# 2026-11-25: "C: counterbore Ø.210, web .080, no shortfall
+# (recommended)") and .078 in the foot, the value the owner accepted under
+# the .080 target (necessity register N-02).
 #
 # Why the controlling station stays chained to the hold-down hole, with the
 # pivot-bore axis station printed only as a REF (machinist review of round
 # 6, #6; delegated ruling 2026-11-07, option A): the two webs that close on
 # the dowel-to-hold-down distance have almost no margin.  At print-worst
-# with the chained +/-.004, the plate's web to the Ø.219 hold-down
-# counterbore clears the .080 wall target by +.0003 in, and MHA-DT-21's web
-# from the foot ream to its +X face by +.0008 in (the foot's hole lands
-# within this band plus the screw's .006 float, .010, from its tap).
+# with the chained +/-.004 and the drilled holes (2026-11-25), the plate's
+# web to the Ø.210 hold-down counterbore at +/-.01 is .0803 in and
+# MHA-DT-21's web from the foot hole to its +X face .0788 in (the foot's
+# hole lands within this band plus the screw's .006 float, .010, from its
+# tap).
 # Located from the pivot at +/-.004 instead, with HoldDownX also +/-.004 from
 # the pivot, the dowel-to-hold-down distance takes both bands (+/-.008): the
-# counterbore web falls to -.0037 in, and the foot's landing band grows to
-# .014, its +X face web to about -.0032 in.  No DOWEL_FROM_TAP closes both
+# counterbore web falls .0037 in under the .080 target, and the foot's
+# landing band grows to .014, its +X face web to about .0032 in under the
+# accepted .078.  No DOWEL_FROM_TAP closes both
 # (the window is short by about .007 in), so the pivot-axis station prints
 # as a reference, TIP_DOWEL_LOCAL_X, and the chained station controls.
 TIP_DOWEL_FROM_HOLDDOWN = dt_cone_tip_block_spec.DOWEL_FROM_TAP  # .228
 TIP_DOWEL_LOCAL_X = HOLDDOWN_LOCAL_X + TIP_DOWEL_FROM_HOLDDOWN  # .188 REF
 TIP_DOWEL_LOCAL_Z = HOLDDOWN_LOCAL_Z
 TIP_DOWEL_STATION_TOL_MM = 0.1016  # +/-.004
-# Slip fit over the pin, reamed: .0630 REAM_H7 (.0630/.0635) over the pin's
-# .0626/.0628 (dt_vn_locating_pin_spec.DIA_BAND_IN).
-TIP_DOWEL_HOLE_DIA = 0.0630 * 25.4  # 1.6002
-TIP_DOWEL_HOLE_BAND = REAM_H7  # +.0005/-.0000
+# Slip fit over the pin, drilled #52 (.0635, the DRILLED HOLES row's +.004/0
+# its ANALYSIS band) over the pin's .0626/.0628
+# (dt_vn_locating_pin_spec.DIA_BAND_IN).  Owner ruling 2026-11-24, fit audit
+# question 11.
+TIP_DOWEL_HOLE_DIA = 0.0635 * 25.4  # 1.6129, #52
+TIP_DOWEL_HOLE_DRILL = "#52"
+TIP_DOWEL_HOLE_BAND = (_DRILL_OVERSIZE, 0.0)  # +.004/-.000, title block
 _tip_dowel_lower, _tip_dowel_upper = deviations(TIP_DOWEL_HOLE_BAND)
 TIP_DOWEL_HOLE_LIMITS = (
     TIP_DOWEL_HOLE_DIA + _tip_dowel_lower,
@@ -373,11 +400,12 @@ _pin_dia_limits = tuple(
 TIP_DOWEL_SLIP_CLEARANCE_MM = (
     TIP_DOWEL_HOLE_LIMITS[0] - max(_pin_dia_limits),
     TIP_DOWEL_HOLE_LIMITS[1] - min(_pin_dia_limits),
-)  # (.0002, .0009) in
+)  # (.0007, .0049) in
+# The pin slips in the plate (restated 2026-11-24, fit audit question 11:
+# was "the plate's slip ream opens the foot's press ream", which the drilled
+# pair fails by its print bands though the pin still slips).
 if TIP_DOWEL_SLIP_CLEARANCE_MM[0] <= 0.0:
-    raise AssertionError("the plate's dowel ream grips MHA-DT-VN-69 at its extremes")
-if TIP_DOWEL_HOLE_LIMITS[0] <= dt_cone_tip_block_spec.DOWEL_HOLE_LIMITS[1]:
-    raise AssertionError("the plate's slip ream does not open the foot's press ream")
+    raise AssertionError("the plate's #52 hole grips MHA-DT-VN-69 at its extremes")
 # The pin's lower end above this plate's underside (its range never proud of
 # the sliding underside): the block's press depth owns them, and its copy of
 # this plate's mill band must agree.
