@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 470" width="760" height="470" font-family="sans-serif" font-size="13">
+  <!-- Setup 3, the F drill. Section through the hub's axis from the front, 1 in = 200 px, Z0 the strap's top at y 330, as main's second-end.svg: the strap .098 thick, the hub Ø.40 through it, both ends faced (.090 over the strap each side), on the gap blocks (2 in up, broken, .500 apart). The F drill to scale (cutter_dia_mm 6.5278 = 51.4 px; plan tool drill-f), 118 deg point, at X0 Y0, its point at Z -7.236 (bore_tip_z_mm, RA02's plunge): its full diameter 0.5 mm past end G (bore_drill_past_mm), into the gap between the blocks. Drawn short to a break line (its chuck is not drawn: no size on record). -->
+  <rect class="paper" x="0" y="0" width="760" height="470"/>
+  <text class="title" x="20" y="24">Setup 3, RA02 T2, the F drill: section through the hub from the front (1 in = 200 px)</text>
+  <rect class="fixture-support" x="150" y="349.6" width="180" height="70"/>
+  <rect class="fixture-support" x="430" y="349.6" width="180" height="70"/>
+  <text class="label" x="160" y="440">gap blocks, 2 in up (broken), .500 apart</text>
+  <rect class="part-kept" x="120" y="330" width="220" height="19.6"/>
+  <rect class="part-kept" x="420" y="330" width="220" height="19.6"/>
+  <rect class="part-kept" x="340" y="312" width="80" height="55.6"/>
+  <rect class="holes" x="354.3" y="312" width="51.4" height="55.6"/>
+  <path class="cutter" d="M405.7 236L405.7 371.53L380 386.98L354.3 371.53L354.3 236L358.58 233L362.87 236L367.15 233L371.43 236L375.72 233L380 236L384.28 233L388.57 236L392.85 233L397.13 236L401.42 233Z"/>
+  <line class="centre-line" x1="380" y1="226" x2="380" y2="400.98"/>
+  <line class="arrow" x1="330" y1="250" x2="330" y2="280"/>
+  <text class="label" x="440" y="256">F drill, one plunge down the hub's pilot bore,</text>
+  <text class="label" x="440" y="272">its full diameter {{process.bore_drill_past_mm:in.3dot}} past end G into the gap</text>
+  <line class="leader" x1="436" y1="252" x2="406" y2="262"/>
+  <circle class="leader-dot" cx="406" cy="262" r="2"/>
+  <text class="label" x="475" y="316">{{cad.hub_end_height_in:.3dot}} over the strap (Z0 its top)</text>
+  <line class="leader" x1="420" y1="312" x2="470" y2="312"/>
+  <text class="label" x="620" y="372">end G, faced in Setup 2</text>
+  <line class="leader" x1="420" y1="367.6" x2="616" y2="367.6"/>
+  <text class="label" x="20" y="322">strap MHA-CH-13</text>
+  <text class="label" x="20" y="60">From above: the F drill at X0 Y0 (1 in = 55 px)</text>
+  <rect class="part-kept" x="40" y="112.68" width="160" height="34.65"/>
+  <text class="label" x="210" y="134">the strap, the hub in it</text>
+  <circle class="part-kept" cx="120" cy="130" r="11"/>
+  <circle class="cutter" cx="120" cy="130" r="7.07"/>
+</svg>

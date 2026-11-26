@@ -1,11 +1,47 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="480" height="265" viewBox="0 0 480 265" font-family="sans-serif" font-size="12">
-<rect width="480" height="265" fill="#fff"/>
-<rect x="40" y="40" width="381" height="190" fill="#dde" stroke="#000"/>
-<text x="44" y="56" text-anchor="start">sub-plate, arm off</text>
-<circle cx="85.0" cy="135.25" r="5.0" fill="#fff" stroke="#000"/>
-<circle cx="257.0375" cy="135.25" r="2.8249999999999997" fill="#fff" stroke="#000"/>
-<rect x="45.0" y="131.25" width="80" height="8" fill="#888"/>
-<circle cx="85.0" cy="135.25" r="5" fill="#444"/>
-<text x="85.0" y="161.25" text-anchor="start">tap in T-wrench; guide point in its centre hole</text>
-<text x="40" y="250" text-anchor="start">Spindle off: the tap guide in the spindle over each hole; #10-32 at B, #4-40 at C</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 430" width="760" height="430" font-family="sans-serif" font-size="13">
+  <!-- Hand picture, to scale. Left: a section across the jaws, from the RIGHT end, 4.5 px/mm (the fixed jaw on the right, Y0 its face): the two 1 in parallels (1/8 thick, parallel_thickness_mm) against the jaws, the 1/2 x 3 in 6061 sub-plate (plate_thickness_mm, plate_width_mm) on them, its top Z0, the jaw tops 6.845 mm over it (plate_jaw_top_mm). The jaws' thickness and the parallels' length are not on record; jaws and parallels drawn short to a break line toward the bed. Right: from above, 1.6 px/mm, the plate's left end X0, the pivot at X18.0, Y-38.1 (pivot_on_plate_x_mm). The arm off. The #10-32 tap's diameter to scale (its major diameter Ø4.826 mm = 21.7 px), its arc-ended point 12 % of its diameter deep at the plate's underside (through). The tap's length and the T-handle wrench are not on record: schematic. The tap guide (shop tap-guide-fisher): its point Ø3/16 to scale in the wrench's centre hole, its Ø.5 shank to scale, drawn short to a break line (3 1/8 in long). Wrench and guide in the tool's colour: they travel with the tap. Spindle off. -->
+  <rect class="paper" x="0" y="0" width="760" height="430"/>
+  <text class="title" x="20" y="22">Setup 3, AR03: the #10-32 tap by hand under the tap guide, at the pivot (to scale)</text>
+  <path class="clamp" d="M37.1 199.2L87.1 199.2L87.1 415L79.96 412L72.81 415L65.67 412L58.53 415L51.39 412L44.24 415L37.1 415Z"/>
+  <path class="clamp" d="M430 199.2L480 199.2L480 415L472.86 412L465.71 415L458.57 412L451.43 415L444.29 412L437.14 415L430 415Z"/>
+  <path class="fixture-support" d="M87.1 287.15L101.39 287.15L101.39 415L94.24 412L87.1 415Z"/>
+  <path class="fixture-support" d="M415.71 287.15L430 287.15L430 415L422.86 412L415.71 415Z"/>
+  <rect class="fixture-plate" x="87.1" y="230" width="342.9" height="57.15"/>
+  <rect class="holes" x="249.46" y="230" width="18.17" height="57.15"/>
+  <text class="label-on-clamp" x="62.1" y="403" text-anchor="middle">moving</text>
+  <text class="label-on-clamp" x="455" y="403" text-anchor="middle">fixed</text>
+  <line class="datum" x1="344.5" y1="230" x2="416.5" y2="230"/>
+  <text class="datum-label" x="416.5" y="224" text-anchor="end">Z0 plate top</text>
+  <text class="label" x="258.55" y="347.15" text-anchor="middle">1 in parallels, 1/8 thick</text>
+  <line class="leader" x1="178.55" y1="343.15" x2="101.39" y2="327.15"/>
+  <circle class="leader-dot" cx="101.39" cy="327.15" r="2"/>
+  <line class="leader" x1="338.55" y1="343.15" x2="415.71" y2="327.15"/>
+  <circle class="leader-dot" cx="415.71" cy="327.15" r="2"/>
+  <text class="label-halo" x="198.55" y="262.57" text-anchor="middle">6061 sub-plate</text>
+  <text class="title" x="20" y="44">section at the pivot (X18.0), from the RIGHT end (4.5 px/mm)</text>
+  <path class="cutter" d="M269.41 284.54L269.41 150L247.69 150L247.69 284.54A10.86 2.61 0 0 0 269.41 284.54Z"/>
+  <rect class="cutter" x="168.55" y="138" width="180" height="12"/>
+  <rect class="cutter" x="246.55" y="134" width="24" height="20"/>
+  <path class="cutter" d="M247.83 134L269.27 134L287.12 98.28L229.97 98.28Z"/>
+  <path class="cutter" d="M287.12 98.28L287.12 56L279.98 53L272.84 56L265.69 53L258.55 56L251.41 53L244.26 56L237.12 53L229.97 56L229.97 98.28Z"/>
+  <text class="label" x="20" y="64">tap guide in the 1/2 in collet,</text>
+  <text class="label" x="20" y="80">spindle off; its point in the</text>
+  <text class="label" x="20" y="96">wrench's centre hole</text>
+  <line class="leader" x1="200" y1="80" x2="229.97" y2="80"/>
+  <circle class="leader-dot" cx="229.97" cy="80" r="2"/>
+  <text class="label" x="358.55" y="120">T-handle tap wrench</text>
+  <line class="leader" x1="356.55" y1="116" x2="338.55" y2="142"/>
+  <circle class="leader-dot" cx="338.55" cy="142" r="2"/>
+  <text class="label-halo" x="288.55" y="190">#10-32 plug tap (Ø.190),</text>
+  <text class="label-halo" x="288.55" y="206">through the plate</text>
+  <line class="leader" x1="286.55" y1="186" x2="269.41" y2="210"/>
+  <circle class="leader-dot" cx="269.41" cy="210" r="2"/>
+  <rect class="clamp" x="494.98" y="92" width="253.88" height="18"/>
+  <rect class="clamp" x="494.98" y="231.92" width="253.88" height="18"/>
+  <rect class="fixture-plate" x="500" y="110" width="243.84" height="121.92"/>
+  <circle class="holes" cx="638.9" cy="170.96" r="1.81"/>
+  <circle class="cutter" cx="528.8" cy="170.96" r="3.86"/>
+  <text class="title" x="500" y="44">from above (1.6 px/mm)</text>
+  <text class="label" x="500" y="290">fixed jaw at the top; the arm off;</text>
+  <text class="label" x="500" y="306">jog Z down as the tap feeds</text>
 </svg>

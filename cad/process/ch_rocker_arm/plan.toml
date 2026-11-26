@@ -337,7 +337,7 @@ indexing = "none"
 machine_ref = "pm-30mv"
 holding = "Vise off. Two 1-2-3 blocks on the table, each on its 1 × 3 face (2 in up), 3 in along X, their inner ends .500 apart; a third, the tip block, the same way, its inner end {{process.tip_block_x_mm:in.3f}} right of the gap's middle, moved back from the gap blocks' line until the strap's right tip lies across its middle. The arm across them, strap face 1 up, the hub's lower end in the gap. A step clamp (LMS 1268) on the strap over each gap block, toes {{process.clamp_x_mm:in.2f}} either side of the hub."
 datum = "Program RA01_first_end. G54 per arm: X0 Y0 the hub's axis (edge finder on both sides of the hub's top end, each way); Z0 the strap's top face (T1 on a .200 gauge block on the strap over a block)."
-diagram = { file = "diagrams/first-end.svg", alt = "Elevation from the front: the strap on two 1-2-3 blocks 2 in up, .500 apart, the hub's lower end in the gap, a step clamp on the strap over each block; the 1/2 in end mill faces the hub's top end {{cad.hub_end_height_in:.3dot}} above the strap. Plan: the two passes at Y +{{process.face_pass_y_mm:in.3dot}} and −{{process.face_pass_y_mm:in.3dot}}." }
+diagram = { file = "diagrams/first-end.svg", alt = "Section from the front: the strap on two 1-2-3 blocks 2 in up, .500 apart, the hub's lower end in the gap; the 1/2 in end mill, to scale, on its first pass, its tip {{cad.hub_end_height_in:.3dot}} above the strap, facing the hub's top end. Plan: the step clamps over the blocks, the tip block, the end mill over the hub on the Y +{{process.face_pass_y_mm:in.3dot}} pass, fed along −X." }
 envelope = { x_span_mm = ["{{process.strap_tip_x_mm}}", "{{process.strap_tip_x_mm}}"], y_span_mm = ["{{process.strap_depth_mm}}", "{{process.face_cutter_dia_mm}}"], work_top_mm = ["{{process.block_height_mm}}", "{{cad.strap_thickness_mm}}", "{{cad.hub_end_supply_max_mm}}"], deepest_cut_mm = ["{{process.block_height_mm}}", "{{cad.strap_thickness_mm}}", "{{cad.hub_end_height_mm}}"], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_mm}}"] }
 vise_hold = "other"
 # Signed spans are written out (a template cannot negate): extent ±strap_tip_x_mm, supports ±block_inner_x_mm; test_ch_rocker_arm_process checks them.
@@ -403,7 +403,7 @@ indexing = "none"
 machine_ref = "pm-30mv"
 holding = "As Setup 2, the arm turned over: strap face 2 up, the faced end G down in the gap, the strap's top edge (the concave one) to the back; one tip on the tip block (before the #47 the strap's two ends are alike)."
 datum = "Program RA02_second_end_holes. G54 per arm: X0 Y0 the hub's axis, +X toward the tip block, the top edge trammed along X; Z0 the strap's top face (T1 on the .200 gauge block)."
-diagram = { file = "diagrams/second-end.svg", alt = "Elevation from the front: the arm turned over on the blocks, its right tip on the tip block; the end mill faces the hub's top end, the F drill runs through the hub into the gap, the #47 through the strap between the right block and the tip block. Plan: the top edge read at X −3.94 and +3.94; the #47 at X {{cad.rod_hole_from_bore_x_in:.4dot}}, Y {{cad.rod_hole_from_bore_y_in:.4dot}}." }
+diagram = { file = "diagrams/second-end.svg", alt = "Section from the front: the arm turned over on the blocks, end G down in the gap; the 1/2 in end mill, to scale, on its first pass, facing the hub's top end {{cad.hub_end_height_in:.3dot}} above the strap. Plan: the arm, its right tip on the tip block, the end mill over the hub fed along −X; the tram's stations on the top edge at X −3.94 and +3.94." }
 envelope = { x_span_mm = ["{{process.strap_tip_x_mm}}", "{{process.strap_tip_x_mm}}"], y_span_mm = ["{{process.strap_depth_mm}}", "{{process.face_cutter_dia_mm}}"], work_top_mm = ["{{process.block_height_mm}}", "{{cad.strap_thickness_mm}}", "{{cad.hub_end_supply_max_mm}}"], deepest_cut_mm = ["{{process.block_height_mm}}", "{{cad.strap_thickness_mm}}", "{{process.bore_tip_z_mm}}"], longest_tool_mm = ["{{process.drill_chuck_gauge_mm}}", "{{process.drill_oal_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_mm}}"] }
 vise_hold = "other"
 beam = { axis = "x", hold = "between", extent_mm = [-145.978, 145.978], supports_mm = [-6.35, 6.35], section_mm = { y = "{{process.strap_depth_mm}}", z = "{{cad.strap_thickness_mm}}" } }
@@ -441,6 +441,7 @@ tool = "drill-f"
 drilling = "twist_drill"
 sizing = "other"
 instruction = "Same file, M6 T2: the F drill down the hub's Ø{{process.hub_pilot_bore_in:.3dot}} pilot bore at X0 Y0 (the hub's outside, edge-found), one plunge, its full diameter {{process.bore_drill_past_mm:in.3dot}} past end G into the gap; set 969. Cutting oil. X0 Y0 holds the bore's position to the hub's Ø.40; the first arm proves it at the file's end."
+diagram = { file = "diagrams/second-end-drill-f.svg", alt = "Section through the hub from the front: the F drill, to scale, down the hub's pilot bore, its full diameter past end G, into the gap between the blocks." }
 rpm = 969
 feed = "{{process.bore_feed_per_min_mm:in.1f}} in/min"
 hole_depth_mm = "{{cad.bore_depth_mm}}"
@@ -470,6 +471,7 @@ tool = "drill-47"
 drilling = "twist_drill"
 sizing = "other"
 instruction = "Same file, M6 T4: the #47 drill through the strap, one plunge, its full diameter {{process.rod_drill_past_mm:in.3dot}} past the underside; set 2800. Cutting oil."
+diagram = { file = "diagrams/second-end-drill-47.svg", alt = "Section along the strap at the rod-pin hole: the #47 drill, to scale, through the strap, its point in the air just short of the tip block." }
 rpm = 2800
 feed = "{{process.rod_feed_per_min_mm:in.1f}} in/min"
 hole_depth_mm = "{{cad.strap_thickness_mm}}"

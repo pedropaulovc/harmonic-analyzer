@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 840 490" width="840" height="490" font-family="sans-serif" font-size="13">
+  <!-- Setup 2, T2. Hand picture, both views at 2.4 px/mm (61 px/in). From the plan's [parameters]: blanks 2 x 1/4 in (blank_width_in, blank_thickness_max_mm), two side by side across the jaws, 50.8 mm apart (blank_pitch_mm); the jaws X 12.0 to 170.674 (jaw_start_mm, jaw_end_mm), their tops 6.845 mm over the plate (jaw_top_mm); the support plate 99.06 x 152.4 x 12.7 mm (support_plate_*_mm) from X0, centred across the load (its place across is not stated), on two 1 in parallels (parallel_height_mm), 1/8 in thick (the parallel set's thickness as the shaft plans' parallel_thickness_mm restates it). Not on record, drawn schematic: the jaws' depth (6 mm drawn), the vise body, the parallels' length (drawn jaw to jaw). The part outline in the view from above is main's picture, rescaled. CR01's T2: the 1/8 in end mill to scale (eighth_cutter_dia_mm 3.175 = 7.6 px), on ring 1's band, a circle of radius 22.034 about (23.500, -25.400) clockwise (G3 from X 45.534), at its last level Z 5.080 (floor_rough_2_mm, over the plate); drawn at X 45.534, the circle's right point and its start, on the section through the cutter. Its square end 12 % deep; drawn short to a break line (at least .75 in out of the collet, eighth_mill_projection_min_mm; the collet is not drawn). Ring 2 the same at Y -76.200. -->
+  <rect class="paper" x="0" y="0" width="840" height="490"/>
+  <text class="title" x="20" y="24">Setup 2, CR01 T2 on ring 1's band: from above (2.4 px/mm)</text>
+  <rect class="part-rest" x="40" y="80" width="454.1" height="121.9"/>
+  <path class="part-removed" d="M 40 84.3 L 167.53 84.3 L 167.53 117.32 L 445.1 117.32 L 445.1 98.62 L 476.47 98.62 L 476.47 183.37 L 445.1 183.37 L 445.1 164.58 L 167.53 164.58 L 167.53 197.68 L 40 197.68 Z"/>
+  <rect class="part-rest" x="40" y="201.9" width="454.1" height="121.9"/>
+  <path class="part-removed" d="M 40 206.21 L 167.53 206.21 L 167.53 239.23 L 445.1 239.23 L 445.1 220.52 L 476.47 220.52 L 476.47 305.27 L 445.1 305.27 L 445.1 286.48 L 167.53 286.48 L 167.53 319.59 L 40 319.59 Z"/>
+  <rect class="clamp" x="68.8" y="65.6" width="380.82" height="14.4"/>
+  <rect class="clamp" x="68.8" y="323.84" width="380.82" height="14.4"/>
+  <text class="label-on-clamp" x="232" y="76.6" text-anchor="middle">fixed jaw</text>
+  <text class="label-on-clamp" x="232" y="334.84" text-anchor="middle">moving jaw</text>
+  <path class="hidden" d="M40 83.05H405.76V320.79H40Z"/>
+  <line class="datum" x1="40" y1="51.2" x2="40" y2="347.84"/>
+  <text class="datum-label" x="38" y="360.84" text-anchor="middle">X0</text>
+  <text class="label" x="26" y="144.96" text-anchor="middle">1</text>
+  <text class="label" x="26" y="266.88" text-anchor="middle">2</text>
+  <path class="hidden" d="M149.28 140.96A52.88 52.88 0 1 0 43.52 140.96A52.88 52.88 0 1 0 149.28 140.96"/>
+  <circle class="cutter" cx="149.28" cy="140.96" r="3.81"/>
+  <line class="arrow" x1="159.28" y1="138.96" x2="159.28" y2="110.96"/>
+  <text class="label" x="20" y="378">The 1/8 in end mill (T2) round ring 1's band to its floor, Z 5.080 mm,</text>
+  <text class="label" x="20" y="394">anticlockwise seen from above (G3), in levels; ring 2 the same.</text>
+  <text class="label" x="20" y="410">Drawn at the band's right point (X 45.534), where it starts.</text>
+  <rect class="fixture-vise" x="531.76" y="391.44" width="272.64" height="16"/>
+  <rect class="clamp" x="790" y="283.57" width="14.4" height="107.87"/>
+  <rect class="clamp" x="531.76" y="283.57" width="14.4" height="107.87"/>
+  <rect class="fixture-support" x="782.38" y="330.48" width="7.62" height="60.96"/>
+  <rect class="fixture-support" x="546.16" y="330.48" width="7.62" height="60.96"/>
+  <rect class="fixture-plate" x="549.21" y="300" width="237.74" height="30.48"/>
+  <rect class="part-kept" x="668.08" y="284.76" width="121.92" height="15.24"/>
+  <rect class="part-kept" x="546.16" y="284.76" width="121.92" height="15.24"/>
+  <text class="label" x="804.4" y="423.44" text-anchor="end">fixed jaw</text>
+  <text class="label" x="531.76" y="423.44">moving jaw</text>
+  <text class="title" x="531.76" y="52">Section at X 45.5, from the right end</text>
+  <text class="label" x="531.76" y="70">through the cutter; the ring's centre</text>
+  <text class="label" x="531.76" y="86">is at X 23.5, behind</text>
+  <text class="label" x="668.08" y="443.44" text-anchor="middle">support plate on two 1 in parallels</text>
+  <line class="leader" x1="668.08" y1="431.44" x2="668.08" y2="330.48"/>
+  <circle class="leader-dot" cx="668.08" cy="330.48" r="2"/>
+  <line class="leader" x1="628.08" y1="431.44" x2="549.97" y2="360.96"/>
+  <circle class="leader-dot" cx="549.97" cy="360.96" r="2"/>
+  <path class="cutter" d="M732.85 286.89L732.85 235.01L730.94 238.01L729.04 235.01L727.13 238.01L725.23 235.01L725.23 286.89A3.81 0.91 0 0 0 732.85 286.89Z"/>
+  <line class="datum" x1="501.76" y1="300" x2="527.76" y2="300"/>
+  <text class="datum-label" x="525.76" y="316" text-anchor="end">Z0</text>
+  <text class="label" x="737.04" y="244.61">T2, 1/8 in</text>
+</svg>

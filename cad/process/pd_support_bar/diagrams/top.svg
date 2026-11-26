@@ -1,56 +1,48 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 780 540" font-family="sans-serif" font-size="13">
-  <rect class="paper" x="0" y="0" width="780" height="540"/>
-  <text class="title" x="20" y="20">Setup 2, section across the jaws, seen from the right, from END A (1 in = 80 px)</text>
-  <line class="fixture-table" x1="60" y1="300" x2="400" y2="300"/>
-  <rect class="clamp" x="190" y="158.4" width="50" height="141.6"/>
-  <rect class="clamp" x="270" y="158.4" width="50" height="141.6"/>
-  <text class="label-on-clamp" x="194" y="290">moving</text>
-  <text class="label-on-clamp" x="278" y="290">fixed</text>
-  <!-- One 1 in parallel against each jaw, 1/8 in thick. -->
-  <rect class="fixture-support" x="240" y="220" width="10" height="80"/>
-  <rect class="fixture-support" x="260" y="220" width="10" height="80"/>
-  <!-- The blank on edge, 3/8 across, T up; the skim drawn thick. -->
-  <rect class="part-kept" x="240" y="140.56" width="30" height="79.44"/>
-  <rect class="part-removed" x="240" y="137.5" width="30" height="3.06"/>
-  <!-- The 1/2 in end mill on its first pass, .197 in onto the edge. -->
-  <rect class="cutter" x="254.2" y="60" width="40" height="80.56"/>
-  <text class="label-halo" x="247" y="160">T</text>
-  <line class="datum" x1="60" y1="220" x2="532" y2="220"/>
-  <text class="datum-label" x="20" y="214">Z0: the parallels' top</text>
-  <line class="datum" x1="270" y1="150" x2="270" y2="330"/>
-  <text class="datum-label" x="276" y="328">Y0: the fixed jaw's face (the back face against it)</text>
-  <line class="leader" x1="246" y1="138.5" x2="170" y2="112"/>
-  <text class="label" x="165" y="106" text-anchor="end">skim .003–.009</text>
-  <text class="label" x="165" y="122" text-anchor="end">(drawn thick)</text>
-  <line class="leader" x1="294.2" y1="90" x2="340" y2="80"/>
-  <text class="label" x="344" y="84">1/2 in end mill, pass 1 of 2; the passes run along the bar</text>
-  <line class="dims" x1="335" y1="140.56" x2="335" y2="158.4"/>
-  <line class="dims" x1="301" y1="140.56" x2="525" y2="140.56"/>
-  <line class="dims" x1="322" y1="158.4" x2="340" y2="158.4"/>
-  <text class="label" x="344" y="160">jaw tops {{process.top_jaw_clear_mm:in.3dot}} below T</text>
-  <line class="dims" x1="520" y1="140.56" x2="520" y2="220"/>
-  <text class="label" x="528" y="186">T at Z {{process.height_target_mm:in.4dot}}</text>
-  <text class="label" x="344" y="250">F toward the moving jaw; the lower {{process.top_grip_mm:in.3dot}} in the jaws</text>
-  <!-- Plan, fixed jaw at the top, 1 in = 40 px. -->
-  <text class="title" x="20" y="372">Plan (fixed jaw at the top, 1 in = 40 px)</text>
-  <rect class="clamp" x="265.1" y="410" width="249.9" height="30"/>
-  <rect class="clamp" x="265.1" y="455" width="249.9" height="30"/>
-  <text class="label-on-clamp" x="360" y="430">fixed jaw</text>
-  <text class="label-on-clamp" x="360" y="475">moving jaw</text>
-  <rect class="part-kept" x="32" y="440" width="715.4" height="15"/>
-  <circle class="cutter" cx="16.6" cy="437.9" r="10"/>
-  <line class="arrow" x1="34" y1="424" x2="130" y2="424"/>
-  <text class="label" x="34" y="414">pass 1 +X, pass 2 back</text>
-  <line class="datum" x1="745" y1="424" x2="745" y2="470"/>
-  <text class="datum-label" x="776" y="418" text-anchor="end">X0, {{process.end_a_skim_mm:in.3dot}} inside the sawn END A</text>
-  <text class="label" x="738" y="474" text-anchor="end">END A</text>
-  <text class="label" x="40" y="474">far end</text>
-  <line class="dims" x1="515" y1="505" x2="747.4" y2="505"/>
-  <line class="dims" x1="515" y1="487" x2="515" y2="510"/>
-  <line class="dims" x1="747.4" y1="457" x2="747.4" y2="510"/>
-  <text class="label" x="530" y="500">sawn END A {{process.top_out_mm:in.2f}} in out</text>
-  <line class="dims" x1="32" y1="505" x2="265.1" y2="505"/>
-  <line class="dims" x1="32" y1="457" x2="32" y2="510"/>
-  <line class="dims" x1="265.1" y1="487" x2="265.1" y2="510"/>
-  <text class="label" x="60" y="500">the far end about as far out</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 780 680" width="780" height="680" font-family="sans-serif" font-size="13">
+  <!-- Hand picture, the section to scale at 4 px/mm (101.6 px/in), the plan at 1.5 px/mm, from the bar's sizes: 9.525 mm across the jaws (blank_thickness_mm), 25.2222 mm above the parallels after the skim (height_target_mm), from 25.4508 (bar_width_max_mm): the .229 mm skim is under 1 px here, so it is named, not hatched. 1/2 in end mill Ø12.7 mm (face_cutter_dia_mm, shop endmill-carbide-3fl-1-2), drawn 28.45 mm out (half_mill_projection_mm) to a break line, the collet not drawn; its square end drawn as the near half of its end face, an arc 12 % of its diameter deep whose lowest point is the true end. Drawn on SB02_top's pass Y-3.675 (-X) at its last level, Z25.222: of the two passes the one least past the bar's edges (2.675 mm over the fixed jaw, 0.500 over the moving one; its end 5.677 mm over the jaw tops, top_jaw_clear_mm). One 1 in parallel against each jaw (top_riser_height_mm 25.4). Section seen from END A (the right), the fixed jaw on the right. The vise jaws' thickness is not on record: schematic. Jaw height 44.9453 mm (vise_jaw_height_mm), jaw width 158.6738 mm (vise_jaw_width_mm); the parallels 1/8 in thick (parallel_thickness_mm), 4 in long (fixtures.parallels-lms-6745). -->
+  <rect class="paper" x="0" y="0" width="780" height="680"/>
+  <text class="title" x="20" y="24">SB02: on edge, T skimmed to the height, across the jaws and from above (4 px/mm; plan 1.5 px/mm)</text>
+  <rect class="fixture-vise" x="231.9" y="470" width="218.1" height="14"/>
+  <rect class="clamp" x="231.9" y="290.22" width="90" height="179.78"/>
+  <rect class="clamp" x="360" y="290.22" width="90" height="179.78"/>
+  <rect class="fixture-support" x="347.3" y="368.4" width="12.7" height="101.6"/>
+  <rect class="fixture-support" x="321.9" y="368.4" width="12.7" height="101.6"/>
+  <rect class="part-kept" x="321.9" y="267.51" width="38.1" height="100.89"/>
+  <text class="label-on-clamp" x="276.9" y="458" text-anchor="middle">moving jaw</text>
+  <text class="label-on-clamp" x="405" y="458" text-anchor="middle">fixed jaw</text>
+  <text class="label-halo" x="340.95" y="283.51" text-anchor="middle">T</text>
+  <path class="cutter" d="M370.7 261.42L370.7 153.71L366.47 156.71L362.23 153.71L358 156.71L353.77 153.71L349.53 156.71L345.3 153.71L341.07 156.71L336.83 153.71L332.6 156.71L328.37 153.71L324.13 156.71L319.9 153.71L319.9 261.42A25.4 6.1 0 0 0 370.7 261.42Z"/>
+  <line class="centre-line" x1="345.3" y1="139.71" x2="345.3" y2="279.51"/>
+  <line class="datum" x1="360" y1="288.22" x2="360" y2="334.22"/>
+  <text class="datum-label" x="456" y="304.22">Y0 the fixed jaw's</text>
+  <text class="datum-label" x="456" y="320.22">face (the back face)</text>
+  <line class="datum" x1="195.9" y1="368.4" x2="227.9" y2="368.4"/>
+  <text class="datum-label" x="191.9" y="373.4" text-anchor="end">Z0 the parallels'</text>
+  <text class="datum-label" x="191.9" y="389.4" text-anchor="end">top (bottom edge)</text>
+  <line class="datum" x1="195.9" y1="267.51" x2="227.9" y2="267.51"/>
+  <text class="datum-label" x="191.9" y="272.51" text-anchor="end">Z{{process.height_target_mm:in.4dot}}</text>
+  <text class="label" x="480" y="60">1/2 in end mill, SB02's pass Y-3.675,</text>
+  <text class="label" x="480" y="76">going -X, its last level: T to</text>
+  <text class="label" x="480" y="92">Z{{process.height_target_mm:in.4dot}}, in levels of {{process.face_step_max_mm:in.4dot}};</text>
+  <text class="label" x="480" y="108">its end {{process.top_jaw_clear_mm:in.3dot}} over the jaw tops</text>
+  <line class="leader" x1="478" y1="72" x2="370.7" y2="217.51"/>
+  <circle class="leader-dot" cx="370.7" cy="217.51" r="2"/>
+  <text class="label" x="480" y="150">back face at the fixed jaw, F at the</text>
+  <text class="label" x="480" y="166">moving jaw; the lower {{process.top_grip_mm:in.3dot}} in the jaws</text>
+  <text class="label" x="480" y="400">one 1 in parallel against each jaw</text>
+  <line class="leader" x1="478" y1="396" x2="353.65" y2="408.4"/>
+  <circle class="leader-dot" cx="353.65" cy="408.4" r="2"/>
+  <text class="title" x="20" y="520">From above (1.5 px/mm), the fixed jaw at the top</text>
+  <rect class="clamp" x="277.91" y="542" width="238.01" height="18"/>
+  <rect class="clamp" x="277.91" y="574.29" width="238.01" height="18"/>
+  <text class="label-on-clamp" x="396.92" y="555" text-anchor="middle">fixed jaw</text>
+  <text class="label-on-clamp" x="396.92" y="588.29" text-anchor="middle">moving jaw</text>
+  <rect class="part-kept" x="54.53" y="560" width="682.75" height="14.29"/>
+  <circle class="cutter" cx="472.5" cy="565.51" r="9.52"/>
+  <line class="arrow" x1="492.5" y1="614.29" x2="422.5" y2="614.29"/>
+  <text class="label" x="498.5" y="618.29">this pass -X; the other, Y1.338, +X</text>
+  <line class="datum" x1="735" y1="536" x2="735" y2="598.29"/>
+  <text class="datum-label" x="731" y="532" text-anchor="end">X0, {{process.end_a_skim_mm:in.3dot}} inside the sawn END A</text>
+  <text class="label" x="20" y="640">the sawn END A {{process.top_out_mm:in.2f}} in out past the jaws' right side; the far end about as far</text>
+  <text class="label" x="20" y="656">out past their left side. Rest of the setup: the fixed jaw's face edge-found first (Y0).</text>
 </svg>

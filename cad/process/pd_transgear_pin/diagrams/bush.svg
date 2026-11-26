@@ -1,22 +1,28 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<!-- The split bush that holds the pin turned round (#3500): 1/2 in brass in the 3-jaw, drilled and reamed .1260 through, slit along one side. Hand-drawn, not to scale. -->
-<svg xmlns="http://www.w3.org/2000/svg" width="540" height="290" viewBox="0 0 540 290" font-family="sans-serif" font-size="12">
-<rect width="540" height="290" fill="#fff"/>
-<rect x="20" y="30" width="40" height="230" fill="#ccc" stroke="#000"/>
-<rect x="60" y="30" width="150" height="40" fill="#ccc" stroke="#000"/>
-<rect x="60" y="220" width="150" height="40" fill="#ccc" stroke="#000"/>
-<rect x="60" y="70" width="225" height="150" fill="#ec9" stroke="#000"/>
-<rect x="60" y="126" width="225" height="38" fill="#fff" stroke="#000"/>
-<line x1="60" y1="100" x2="285" y2="100" stroke="#000" stroke-width="2"/>
-<path d="M285 70 l-8 0 l4 8 z" fill="#000"/>
-<line x1="10" y1="145" x2="530" y2="145" stroke="#000" stroke-dasharray="12 3 2 3" stroke-width="0.6"/>
-<text x="300" y="66" text-anchor="start">nick on the rim at jaw 1</text>
-<line x1="298" y1="62" x2="283" y2="72" stroke="#000" stroke-width="0.6"/>
-<text x="300" y="104" text-anchor="start">slit, sawn after reaming:</text>
-<text x="300" y="119" text-anchor="start">one wall, end to end</text>
-<line x1="298" y1="100" x2="285" y2="100" stroke="#000" stroke-width="0.6"/>
-<text x="300" y="149" text-anchor="start">#31 drill, then .1260 reamer,</text>
-<text x="300" y="164" text-anchor="start">right through</text>
-<text x="135" y="22" text-anchor="middle">3-jaw on .50 of the piece</text>
-<text x="172" y="282" text-anchor="middle">1/2 brass, .75 long</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 400" width="760" height="400" font-family="sans-serif" font-size="13">
+  <!-- To scale, 300 px/in, from above (the cross-slide at the bottom): the Ø.500 x .75 brass piece (bush_dia_in, bush_length_in) in the 3-jaw on .50 (bush_grip_in), .25 out of the jaw fronts; the jaws drawn .50 long, schematic (their sizes are not on record), the chuck's body behind them schematic, its bore open behind the piece. Z0 the faced end (no DRO reading is kept). The nick at jaw 1 filed on the rim. The AR tool schematic (not on record), its point on the face. Hatched: the hole this setup drills and reams through. -->
+  <rect class="paper" x="0" y="0" width="760" height="400"/>
+  <text class="title" x="20" y="22">Setup 2, Op 240: the AR tool faces the brass piece's end in a light skim (to scale, 300 px/in)</text>
+  <rect class="fixture-vise" x="189" y="70" width="56" height="260"/>
+  <rect class="part-kept" x="245" y="125" width="225" height="150"/>
+  <rect class="part-removed" x="245" y="181.1" width="225" height="37.8"/>
+  <rect class="clamp" x="245" y="91" width="150" height="34"/>
+  <rect class="clamp" x="245" y="275" width="150" height="34"/>
+  <path class="datum" d="M464 126L470.5 126L470.5 132Z"/>
+  <line class="centre-line" x1="20" y1="200" x2="740" y2="200"/>
+  <path class="cutter" d="M470 248L500 260L500 358L492 355L484 358L476 358L476 272Z"/>
+  <line class="arrow" x1="514" y1="304" x2="514" y2="258"/>
+  <text class="label" x="534" y="384">AR, a light skim</text>
+  <line class="leader" x1="532" y1="380" x2="488" y2="340"/>
+  <circle class="leader-dot" cx="488" cy="340" r="2"/>
+  <text class="label" x="520" y="60">the nick filed on the rim in line with</text>
+  <text class="label" x="520" y="76">jaw 1: the bush goes back in with it there</text>
+  <line class="leader" x1="518" y1="56" x2="467" y2="129"/>
+  <circle class="leader-dot" cx="467" cy="129" r="2"/>
+  <text class="label" x="20" y="384">3-jaw on {{process.bush_grip_in:.2dot}} of the Ø{{process.bush_dia_in:.2dot}} x {{process.bush_length_in:.2dot}} brass piece</text>
+  <line class="leader" x1="120" y1="372" x2="320" y2="305"/>
+  <circle class="leader-dot" cx="320" cy="305" r="2"/>
+  <text class="label" x="20" y="60">hatched: the hole drilled #31 and</text>
+  <text class="label" x="20" y="76">reamed .1260 right through</text>
+  <line class="leader" x1="120" y1="74" x2="290" y2="192"/>
+  <circle class="leader-dot" cx="290" cy="192" r="2"/>
 </svg>

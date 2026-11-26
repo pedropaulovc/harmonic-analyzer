@@ -1,21 +1,25 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 400" font-family="sans-serif" font-size="13">
-  <!-- Setup 7: upright on the seat; PB06 spots the apex and drills #43 into the bore. -->
+  <!-- Setup 7. Hand picture at 6 px/mm, looking at the moving jaw (its outline only: the jaw tops, 19.545 mm over the parallels, upright_grip_mm); W at the fixed jaw, behind. The bracket upright on the 1 in parallels (parallel_height_mm 25.4), the seat down, I on the right at X0: the foot 17.78 from I (.7000), 6.10 up from the seat (.240), the ear 8.128 thick (.3200), the apex 35.05 over the seat (1.380), the bore Ø.257 at 25.2 (Setup 5). The #43 drill to scale (cutter_dia_mm 2.2606; plan tool drill-43), 118 deg point, at X -4.064, Y -8.128, its point at Z 27.083 (apex_tip_height_mm, PB06's last peck): its full diameter 0.5 mm past the bore's wall (apex_drill_past_mm). Drawn short to a break line (its chuck is not drawn). The centre drill's spot before it is not drawn. -->
   <rect class="paper" x="0" y="0" width="760" height="400"/>
-  <text class="title" x="20" y="20">Setup 7 (PB06_apex): spot and drill #43 through the apex</text>
-  <rect class="fixture-support" x="175.54" y="380" width="184.46" height="6"/>
-  <polygon class="part-kept" points="330,380 205.54,380 205.54,337.33 273.1,337.33 273.1,134.64 330,134.64"/>
-  <rect class="holes" x="273.1" y="180.85" width="56.9" height="45.5"/>
-  <text class="label" x="301.55" y="207.6" text-anchor="middle">bore</text>
-  <rect class="holes" x="293.64" y="134.64" width="15.82" height="51.11"/>
-  <line class="centre-line" x1="301.55" y1="104.64" x2="301.55" y2="240"/>
-  <line class="hidden" x1="175.54" y1="243.18" x2="390" y2="243.18"/>
-  <text class="label" x="396" y="247.18">jaw tops</text>
-  <circle class="datum" cx="330" cy="134.64" r="3.5"/>
-  <text class="datum-label" x="336" y="128.64">X0: I</text>
-  <circle class="datum" cx="332" cy="380" r="3.5"/>
-  <text class="datum-label" x="338" y="374">Z0 the parallels' top (the seat)</text>
-  <rect class="cutter" x="293.64" y="74.64" width="15.82" height="55"/>
-  <text class="label" x="396" y="138.64">spot Ø{{process.apex_spot_dia_mm:in.3dot}} on the crown, #43 down into the bore</text>
-  <text class="label" x="396" y="158.64">apex at Z {{cad.arch_overall_height_in:.3dot}}, the hole {{cad.apex_tap_station_in:.3dot}} from I</text>
-  <text class="label" x="20" y="40">Looking at the moving jaw; W at the fixed jaw behind.</text>
+  <text class="title" x="20" y="24">Setup 7, PB06 T6, the #43 drill, from the front (6 px/mm)</text>
+  <path class="fixture-support" d="M320 380L320 392L315.93 395L311.85 392L307.78 395L303.7 392L299.63 395L295.55 392L291.48 395L287.4 392L283.33 395L279.26 392L275.18 395L271.11 392L267.03 395L262.96 392L258.88 395L254.81 392L250.73 395L246.66 392L242.59 395L238.51 392L234.44 395L230.36 392L226.29 395L222.21 392L218.14 395L214.06 392L209.99 395L205.92 392L201.84 395L197.77 392L193.69 395L189.62 392L185.54 395L181.47 392L177.39 395L173.32 392L173.32 380Z"/>
+  <path class="part-kept" d="M300 380L193.32 380L193.32 343.42L251.23 343.42L251.23 169.69L300 169.69Z"/>
+  <rect class="holes" x="251.23" y="209.22" width="48.77" height="39.17"/>
+  <text class="label" x="245.23" y="233.8" text-anchor="end">bore</text>
+  <line class="hidden" x1="173.32" y1="262.73" x2="360" y2="262.73"/>
+  <text class="label" x="364" y="266.73">jaw tops (the moving jaw, in front)</text>
+  <circle class="datum" cx="300" cy="169.69" r="3.5"/>
+  <text class="datum-label" x="308" y="173.69">X0: I</text>
+  <circle class="datum" cx="300" cy="380" r="3.5"/>
+  <text class="datum-label" x="308" y="376">Z0 the parallels' top (the seat)</text>
+  <text class="label" x="364" y="320">1 in parallels</text>
+  <line class="leader" x1="360" y1="316" x2="288" y2="386"/>
+  <circle class="leader-dot" cx="288" cy="386" r="2"/>
+  <line class="centre-line" x1="275.62" y1="20" x2="275.62" y2="228.8"/>
+  <rect class="holes" x="268.83" y="169.69" width="13.56" height="39.53"/>
+  <path class="cutter" d="M282.4 40L282.4 213.43L275.62 217.5L268.83 213.43L268.83 40L272.23 37L275.62 40L279.01 37Z"/>
+  <line class="arrow" x1="249.62" y1="50" x2="249.62" y2="80"/>
+  <text class="label" x="364" y="60">#43 drill down into the bore, pecks of {{process.apex_peck_mm:in.3dot}},</text>
+  <text class="label" x="364" y="76">its full diameter {{process.apex_drill_past_mm:in.3dot}} past the bore's wall</text>
+  <text class="label" x="364" y="92">apex at Z {{cad.arch_overall_height_in:.3dot}}, the hole {{cad.apex_tap_station_in:.3dot}} from I</text>
 </svg>

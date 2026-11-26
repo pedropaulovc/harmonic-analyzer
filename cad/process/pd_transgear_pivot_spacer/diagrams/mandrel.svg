@@ -1,43 +1,37 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 420" font-family="sans-serif" font-size="13">
-  <!-- Setup 2, section through the axis, 400 px to the inch: the bar stub left in the 3-jaw from Setup 1, turned into a stub mandrel; the spacer on its pilot, front face to the shoulder, the rear face faced to Z0. Styles: prechips.palette. -->
-  <rect class="paper" x="0" y="0" width="760" height="420"/>
-  <text class="title" x="20" y="22">Setup 2: the spacer on the stub mandrel turned on the bar end, front face to the shoulder; rear face faced to Z0</text>
-  <rect class="fixture-vise" x="20" y="70" width="60" height="260"/>
-  <rect class="clamp" x="80" y="78" width="50" height="22"/>
-  <rect class="clamp" x="80" y="300" width="50" height="22"/>
-  <rect class="part-rest" x="80" y="100" width="140" height="200"/>
-  <rect class="part-removed" x="220" y="100" width="40" height="24"/>
-  <rect class="part-removed" x="220" y="276" width="40" height="24"/>
-  <rect class="part-rest" x="220" y="124" width="40" height="152"/>
-  <rect class="part-rest" x="260" y="166" width="25" height="68"/>
-  <rect class="part-removed" x="260" y="163" width="25" height="3"/>
-  <rect class="part-removed" x="260" y="234" width="25" height="3"/>
-  <rect class="part-rest" x="285" y="163" width="35" height="74"/>
-  <rect class="part-kept" x="260" y="112" width="79" height="51"/>
-  <rect class="part-kept" x="260" y="237" width="79" height="51"/>
-  <rect class="part-removed" x="339" y="112" width="4" height="51"/>
-  <rect class="part-removed" x="339" y="237" width="4" height="51"/>
-  <line class="centre-line" x1="10" y1="200" x2="420" y2="200"/>
-  <line class="active-face" x1="339" y1="112" x2="339" y2="163"/>
-  <line class="active-face" x1="339" y1="237" x2="339" y2="288"/>
-  <polygon class="cutter" points="343,300 343,290 351,282 380,282 380,300"/>
-  <rect class="cutter" x="350" y="300" width="30" height="50"/>
-  <line class="leader" x1="339" y1="130" x2="420" y2="70"/>
-  <text class="datum-label" x="424" y="66">Z0: the rear (bearing) face, faced to length</text>
-  <line class="leader" x1="260" y1="118" x2="300" y2="50"/>
-  <text class="label" x="304" y="46">shoulder, faced in Op 100: DRO Z-{{cad.length_in:.3dot}}</text>
-  <line class="leader" x1="240" y1="128" x2="160" y2="50"/>
-  <text class="label" x="20" y="46">body Ø{{process.mandrel_body_dia_in:.2dot}}, {{process.mandrel_body_length_in:.2dot}} long</text>
-  <line class="leader" x1="305" y1="215" x2="430" y2="232"/>
-  <text class="label" x="434" y="236">pilot fitted to the spacer,</text>
-  <text class="label" x="434" y="252">{{process.pilot_length_in:.2dot}} long: a light press</text>
-  <line class="leader" x1="272" y1="236" x2="430" y2="270"/>
-  <text class="label" x="434" y="274">root relief Ø{{process.relief_dia_in:.2dot}} (P1 blade)</text>
-  <line class="leader" x1="300" y1="270" x2="430" y2="300"/>
-  <text class="label" x="434" y="304">spacer, front face on the shoulder;</text>
-  <text class="label" x="434" y="320">its rim overhangs the body all round</text>
-  <text class="label" x="390" y="346">AR</text>
-  <text class="label" x="20" y="352">3-jaw, not opened since Setup 1</text>
-  <text class="label" x="20" y="384">Op 140: the spacer pushed on once, its front face (faced in Setup 1) to the shoulder.</text>
-  <text class="label" x="20" y="402">Op 160: pushed off by the blade's face on the overhanging rim, a strip of paper between.</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 400" width="760" height="400" font-family="sans-serif" font-size="13">
+  <!-- To scale, 400 px/in along and across the axis, from above (the cross-slide at the bottom). The bar stays in the jaws from Setup 1: its jaw fronts .6919 behind Setup 1's Z0 (cad.jaw_z_mm), the bar parted at .2169 (cad.part_off_in) plus the 1/16 kerf and faced .07 more off in Op 90, so the shoulder (DRO Z-.197, cad.length_in) is .4994 and the jaw fronts .6919 behind Setup 1's Z0: Z-.3895 here. The mandrel: the pilot .15 long (pilot_length_in) at the spacer's #11 hole, Ø.191 (cad.bore_dia_mm; fitted a light press), the body Ø.38 x .10 (mandrel_body_dia_in, mandrel_body_length_in), the root relief Ø.17 (relief_dia_in) one blade width long. The 3-jaw's body and jaws are schematic (their sizes are not on record). The spacer Ø.44 (cad.outer_dia_mm) pushed on to the shoulder, parted .2169 long: .02 (regrip allowance) faced off to Z0 (hatched). The AR tool schematic (not on record), its point on Z0 between the hole and the rim, fed from the outside in. -->
+  <rect class="paper" x="0" y="0" width="760" height="400"/>
+  <text class="title" x="20" y="22">Setup 2, Op 150: the spacer on the stub mandrel; the AR tool faces its rear face to Z0 (to scale, 400 px/in)</text>
+  <rect class="fixture-vise" x="218.2" y="59" width="56" height="292"/>
+  <path class="part-rest" d="M30 105L351.2 105L351.2 305L30 305L27 297.86L30 290.71L27 283.57L30 276.43L27 269.29L30 262.14L27 255L30 247.86L27 240.71L30 233.57L27 226.43L30 219.29L27 212.14L30 205L27 197.86L30 190.71L27 183.57L30 176.43L27 169.29L30 162.14L27 155L30 147.86L27 140.71L30 133.57L27 126.43L30 119.29L27 112.14Z"/>
+  <rect class="part-rest" x="351.2" y="129" width="40" height="152"/>
+  <rect class="part-rest" x="391.2" y="166.8" width="60" height="76.4"/>
+  <rect class="paper" x="391.2" y="165.8" width="25" height="5.2"/>
+  <rect class="paper" x="391.2" y="239" width="25" height="5.2"/>
+  <rect class="part-kept" x="391.2" y="117" width="78.8" height="49.8"/>
+  <rect class="part-kept" x="391.2" y="243.2" width="78.8" height="49.8"/>
+  <rect class="part-removed" x="470" y="117" width="7.96" height="49.8"/>
+  <rect class="part-removed" x="470" y="243.2" width="7.96" height="49.8"/>
+  <rect class="clamp" x="274.2" y="71" width="40" height="34"/>
+  <rect class="clamp" x="274.2" y="305" width="40" height="34"/>
+  <line class="centre-line" x1="20" y1="205" x2="740" y2="205"/>
+  <path class="cutter" d="M470 265L500 277L500 375L492 372L484 375L476 375L476 289Z"/>
+  <line class="arrow" x1="516" y1="321" x2="516" y2="275"/>
+  <line class="datum" x1="470" y1="52" x2="470" y2="96"/>
+  <text class="datum-label" x="476" y="62">Z0 the rear face, {{cad.length_in:.3dot}} out from the shoulder</text>
+  <text class="label" x="520" y="380">AR facing, the last skim .001, outside in</text>
+  <line class="leader" x1="518" y1="376" x2="486" y2="355"/>
+  <circle class="leader-dot" cx="486" cy="355" r="2"/>
+  <text class="label" x="20" y="44">stub mandrel on the bar's end (Ops 90–110): body Ø{{process.mandrel_body_dia_in:.2dot}},</text>
+  <text class="label" x="20" y="60">pilot {{process.pilot_length_in:.2dot}} long in the spacer's hole, root relief Ø{{process.relief_dia_in:.2dot}}</text>
+  <line class="leader" x1="120" y1="60" x2="371.2" y2="135"/>
+  <circle class="leader-dot" cx="371.2" cy="135" r="2"/>
+  <text class="label" x="20" y="372">3-jaw, not opened since Setup 1</text>
+  <line class="leader" x1="120" y1="360" x2="294.2" y2="329"/>
+  <circle class="leader-dot" cx="294.2" cy="329" r="2"/>
+  <text class="label" x="560" y="150">the spacer, its front face</text>
+  <text class="label" x="560" y="166">on the shoulder; its rim</text>
+  <text class="label" x="560" y="182">overhangs the body all round</text>
+  <line class="leader" x1="558" y1="146" x2="430.6" y2="127"/>
+  <circle class="leader-dot" cx="430.6" cy="127" r="2"/>
 </svg>

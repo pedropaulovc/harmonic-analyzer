@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 400" width="760" height="400" font-family="sans-serif" font-size="13">
+  <!-- To scale, 250 px/in along and across the axis, from above (the cross-slide at the bottom): the Ø.875 bar (bar_dia_in), the jaw fronts .78 behind Z0 (stickout_mm 20.32 less the .02 faced off), the outside Ø.687 (cad.outer_dia_mm) back to Z-.55 (outer_run_in), the pilot Ø.390 (cad.pilot_dia_mm) .140 long (pilot_supply_in) to the seat face, the #11 bore to the quill reading .58 (drill_run_in), the part-off face at Z-.44 (part_off_in) with the 1/16 blade's kerf behind it. The 3-jaw's body and jaws are schematic (their sizes are not on record). The P1 blade to scale across (shop cutoff-blade-p1, 1/16 = 15.6 px), its tailstock-side face at Z-.44, drawn at the moment its tip reaches the bore; its length runs on past the break line (not on record). Hatched: the kerf. -->
+  <rect class="paper" x="0" y="0" width="760" height="400"/>
+  <text class="title" x="20" y="22">Setup 1, Op 90: the P1 blade parts the collar off, the body .300 behind the seat face (to scale, 250 px/in)</text>
+  <rect class="fixture-vise" x="209" y="58.62" width="56" height="302.75"/>
+  <path class="part-rest" d="M30 100.62L362.5 100.62L362.5 319.38L30 319.38L27 312.32L30 305.26L27 298.21L30 291.15L27 284.09L30 277.04L27 269.98L30 262.92L27 255.87L30 248.81L27 241.75L30 234.7L27 227.64L30 220.58L27 213.53L30 206.47L27 199.42L30 192.36L27 185.3L30 178.25L27 171.19L30 164.13L27 157.08L30 150.02L27 142.96L30 135.91L27 128.85L30 121.79L27 114.74L30 107.68Z"/>
+  <rect class="part-rest" x="362.5" y="124.12" width="27.5" height="171.75"/>
+  <rect class="part-kept" x="390" y="124.12" width="75" height="171.75"/>
+  <rect class="part-kept" x="465" y="161.25" width="35" height="97.5"/>
+  <rect class="part-removed" x="374.38" y="124.12" width="15.62" height="171.75"/>
+  <rect class="holes" x="355" y="186.12" width="145" height="47.75"/>
+  <rect class="clamp" x="265" y="70.62" width="40" height="30"/>
+  <rect class="clamp" x="265" y="319.38" width="40" height="30"/>
+  <line class="centre-line" x1="20" y1="210" x2="740" y2="210"/>
+  <path class="cutter" d="M374.38 395L374.38 233.88L390 233.88L390 395L382.19 392Z"/>
+  <line class="arrow" x1="358.38" y1="385" x2="358.38" y2="340"/>
+  <line class="datum" x1="500" y1="40" x2="500" y2="76"/>
+  <text class="datum-label" x="506" y="50">Z0 the pilot's front face</text>
+  <text class="label" x="430" y="350">P1 blade, its tailstock-side face at Z-{{process.part_off_in:.3dot}}:</text>
+  <text class="label" x="430" y="366">the body {{process.body_supply_in:.3dot}} long; hands clear, let it fall</text>
+  <line class="leader" x1="428" y1="346" x2="390" y2="340"/>
+  <circle class="leader-dot" cx="390" cy="340" r="2"/>
+</svg>

@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 780 500" width="780" height="500" font-family="sans-serif" font-size="13">
+  <!-- Hand picture, the bar, the tap's diameter and the tap guide's body to scale at 4 px/mm, a section at the pivot hole as in the setup picture (the back face up, Z0). #8-32 plug tap Ø.164 (4.166 mm, the thread's major diameter, shop jig-tap-8-32-plug), its point at tap_point_depth_mm 15.24 below the back face (5.715 mm below F, in the air between the stacks), its end drawn as the near half of its end face (an arc 12 % of its diameter deep). Tap guide (tools.tap-guide-fisher): body Ø.5 (shank_dia_in) drawn to a break line, its point Ø.1875 (point_dia_in). The tap's length, the T-handle wrench and how far the point stands out are not on record: schematic. The wrench and the guide in the tool's colour: they turn or travel with the tap. Three stacks 1.5 in high (riser_height_mm 38.1): 1 in + 1/2 in at the fixed jaw, 1 in + 1/2 in under the bottom edge and the two 3/4 in outside it under the .125 pin (Ø3.175 mm), the moving jaw on the pin. The vise jaws' thickness is not on record: schematic. Jaw height 44.9453 mm (vise_jaw_height_mm), jaw width 158.6738 mm (vise_jaw_width_mm); the parallels 1/8 in thick (parallel_thickness_mm), 4 in long (fixtures.parallels-lms-6745). -->
+  <rect class="paper" x="0" y="0" width="780" height="500"/>
+  <text class="title" x="20" y="24">SB06: the 8-32 tap by hand under the tap guide (bar to scale, 4 px/mm)</text>
+  <rect class="fixture-vise" x="156.41" y="470" width="293.59" height="14"/>
+  <rect class="clamp" x="156.41" y="290.22" width="90" height="179.78"/>
+  <rect class="clamp" x="360" y="290.22" width="90" height="179.78"/>
+  <rect class="fixture-support" x="347.3" y="317.6" width="12.7" height="152.4"/>
+  <rect class="fixture-support" x="259.11" y="317.6" width="12.7" height="152.4"/>
+  <rect class="fixture-support" x="246.41" y="317.6" width="12.7" height="152.4"/>
+  <circle class="fixture-support" cx="252.76" cy="311.25" r="6.35"/>
+  <rect class="part-kept" x="259.11" y="279.5" width="100.89" height="38.1"/>
+  <text class="label-on-clamp" x="201.41" y="458" text-anchor="middle">moving jaw</text>
+  <text class="label-on-clamp" x="405" y="458" text-anchor="middle">fixed jaw</text>
+  <text class="label-halo" x="350" y="295.5" text-anchor="middle">T</text>
+  <line class="datum" x1="360" y1="288.22" x2="360" y2="334.22"/>
+  <text class="datum-label" x="456" y="304.22">Y0 the fixed</text>
+  <text class="datum-label" x="456" y="320.22">jaw's face (T)</text>
+  <line class="datum" x1="120.41" y1="279.5" x2="152.41" y2="279.5"/>
+  <text class="datum-label" x="116.41" y="284.5" text-anchor="end">Z0 the back</text>
+  <text class="datum-label" x="116.41" y="300.5" text-anchor="end">face</text>
+  <rect class="part-threads" x="293.67" y="279.5" width="16.66" height="38.1"/>
+  <path class="cutter" d="M310.33 338.46L310.33 209.5L293.67 209.5L293.67 338.46A8.33 2 0 0 0 310.33 338.46Z"/>
+  <rect class="cutter" x="222" y="197.5" width="160" height="12"/>
+  <rect class="cutter" x="292" y="187.5" width="20" height="22"/>
+  <path class="cutter" d="M302 187.5L292.48 170.99L292.48 141.4L311.52 141.4L311.52 170.99Z"/>
+  <path class="cutter" d="M327.4 141.4L327.4 50L323.17 53L318.93 50L314.7 53L310.47 50L306.23 53L302 50L297.77 53L293.53 50L289.3 53L285.07 50L280.83 53L276.6 50L276.6 141.4A25.4 6.1 0 0 0 327.4 141.4Z"/>
+  <line class="centre-line" x1="302" y1="40" x2="302" y2="352.46"/>
+  <text class="label" x="480" y="60">tap guide in the 1/2 in collet,</text>
+  <text class="label" x="480" y="76">spindle off; its spring point in</text>
+  <text class="label" x="480" y="92">the wrench's centre hole</text>
+  <line class="leader" x1="478" y1="64" x2="327.4" y2="100"/>
+  <circle class="leader-dot" cx="327.4" cy="100" r="2"/>
+  <text class="label" x="480" y="179.5">T-handle tap wrench</text>
+  <line class="leader" x1="478" y1="175.5" x2="372" y2="203.5"/>
+  <circle class="leader-dot" cx="372" cy="203.5" r="2"/>
+  <text class="label" x="480" y="236">{{cad.pivot_tap_thread}} plug tap; stop when its</text>
+  <text class="label" x="480" y="252">mark reaches the back face: its</text>
+  <text class="label" x="480" y="268">point {{process.tap_point_depth_mm:in.2dot}} below it, through F,</text>
+  <text class="label" x="480" y="284">between the stacks</text>
+  <line class="leader" x1="478" y1="248" x2="310.33" y2="310.46"/>
+  <circle class="leader-dot" cx="310.33" cy="310.46" r="2"/>
+  <text class="label" x="480" y="400">three 1.5 in stacks; the .125 pin on</text>
+  <text class="label" x="480" y="416">the outer one, the moving jaw on it</text>
+  <line class="leader" x1="478" y1="396" x2="252.76" y2="430"/>
+  <circle class="leader-dot" cx="252.76" cy="430" r="2"/>
+  <line class="leader" x1="478" y1="396" x2="256.76" y2="311.25"/>
+  <circle class="leader-dot" cx="256.76" cy="311.25" r="2"/>
+</svg>

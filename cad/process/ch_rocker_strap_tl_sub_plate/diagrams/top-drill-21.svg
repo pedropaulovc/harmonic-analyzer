@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 400" width="760" height="400" font-family="sans-serif" font-size="13">
+  <!-- Setup 3. Section across the jaws at X 152.400, 5 px/mm, front at the left, Z0 the plate top at y 250: the plate 3.00 wide between the jaws, its underside 10.566 below Z0, the fence 1.880 up at the back. The #21 drill to scale (cutter_dia_mm 4.0386; plan tool drill-21), 118 deg point, at X 152.400, Y -25.400, from the counterbore floor (Z -4.699), its point at Z -12.280 (drill_tip_below_mm -1.713 under the underside): its full diameter 0.5 mm past the underside, between the parallels. Drawn short to a break line (its chuck is not drawn: no size on record). Jaws' depth and the vise body are not on record: drawn schematic. Parallels 1/8 in thick (the shaft plans' parallel_thickness_mm; this plan does not restate it), 1 in + 1/2 in stacked (parallel_height_mm 38.1), broken.  -->
+  <rect class="paper" x="0" y="0" width="760" height="400"/>
+  <text class="title" x="20" y="24">Setup 3, SP02 T5, the #21 drill: section across the jaws at the hub hole (5 px/mm)</text>
+  <rect class="clamp" x="139" y="268.54" width="40" height="114.29"/>
+  <rect class="clamp" x="560" y="268.54" width="40" height="114.29"/>
+  <path class="fixture-support" d="M194.88 302.83L194.88 382.83L190.91 385.83L186.94 382.83L182.97 385.83L179 382.83L179 302.83Z"/>
+  <path class="fixture-support" d="M560 302.83L560 382.83L556.03 385.83L552.06 382.83L548.09 385.83L544.12 382.83L544.12 302.83Z"/>
+  <path class="part-kept" d="M179 302.83L179 250L337.75 250L337.75 273.5L401.25 273.5L401.25 250L496.5 250L496.5 240.6L560 240.6L560 302.83Z"/>
+  <rect class="holes" x="359.4" y="273.5" width="20.19" height="29.34"/>
+  <path class="cutter" d="M379.6 110L379.6 305.33L369.5 311.4L359.4 305.33L359.4 110L362.77 107L366.13 110L369.5 107L372.87 110L376.23 107Z"/>
+  <line class="centre-line" x1="369.5" y1="100" x2="369.5" y2="325.4"/>
+  <line class="arrow" x1="339.5" y1="120" x2="339.5" y2="155"/>
+  <text class="label" x="399.5" y="60">#21 drill through from the counterbore floor,</text>
+  <text class="label" x="399.5" y="76">one plunge, its full diameter {{process.drill_breakthrough_mm:in.3dot}} past</text>
+  <text class="label" x="399.5" y="92">the underside</text>
+  <line class="leader" x1="397.5" y1="96" x2="379.6" y2="130"/>
+  <circle class="leader-dot" cx="379.6" cy="130" r="2"/>
+  <text class="label" x="610" y="254">Z0, the plate top</text>
+  <line class="leader" x1="606" y1="250" x2="471.5" y2="250"/>
+  <circle class="leader-dot" cx="471.5" cy="250" r="2"/>
+  <text class="label" x="610" y="226.6">fence</text>
+  <text class="label" x="608" y="330">1 in + 1/2 in</text>
+  <text class="label" x="608" y="346">parallels (broken),</text>
+  <text class="label" x="608" y="362">clear of the holes</text>
+  <line class="leader" x1="606" y1="326" x2="552.06" y2="332.83"/>
+  <circle class="leader-dot" cx="552.06" cy="332.83" r="2"/>
+  <text class="label" x="135" y="394.83">moving jaw</text>
+  <text class="label" x="560" y="394.83">fixed jaw</text>
+</svg>

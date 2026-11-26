@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 400" width="760" height="400" font-family="sans-serif" font-size="13">
+  <!-- To scale, 220 px/in along and across the axis, from above (the cross-slide at the bottom): the Ø.250 bar (cad.stock_dia_mm), the jaw fronts 2.385 behind Z0, the tip plane (cad.jaw_z_mm); the sawn end .22 out (cad.face_allowance_mm), faced to the .20 stub's end (centre_stub_in); the journal Ø.125 (cad.outer_dia_mm) from Z+.10 (turn_start_z_mm) to the seat at Z-2.08 (cad.outer_far_out_far_z_mm), the head Ø.20 (cad.step_head_dia_mm) back to Z-2.29 (head_turn_end_z_mm), the groove Ø.096 x .021 .157 from the tip plane (cad.groove_far_out_*). The 3-jaw's body and jaws are schematic (their sizes are not on record); the MT3 dead centre is schematic (its sizes are not on record), the bar's rest runs on into the chuck. The stub cut off, the tailstock back. The P1 blade to scale across (1/16 = 13.75 px), its tailstock-side face 2.2103 (cad.part_off_in) from the cut tip end, drawn near the centre; its length runs on past the break line (not on record). Hatched: the kerf. -->
+  <rect class="paper" x="0" y="0" width="760" height="400"/>
+  <text class="title" x="20" y="22">Setup 1, Op 230: the P1 blade parts the pin off at the head (to scale, 220 px/in)</text>
+  <rect class="fixture-vise" x="34" y="130.5" width="56" height="139"/>
+  <path class="part-rest" d="M20 172.5L150.9 172.5L150.9 227.5L20 227.5L17 219.64L20 211.79L17 203.93L20 196.07L17 188.21L20 180.36Z"/>
+  <rect class="part-kept" x="150.9" y="178" width="46.2" height="44"/>
+  <rect class="part-kept" x="197.1" y="186.25" width="458.7" height="27.5"/>
+  <rect class="paper" x="615.54" y="186.25" width="4.62" height="3.19"/>
+  <rect class="paper" x="615.54" y="210.56" width="4.62" height="3.19"/>
+  <rect class="clamp" x="90" y="142.5" width="40" height="30"/>
+  <rect class="clamp" x="90" y="227.5" width="40" height="30"/>
+  <line class="centre-line" x1="20" y1="200" x2="740" y2="200"/>
+  <rect class="part-rest" x="150.9" y="178" width="4.88" height="44"/>
+  <rect class="part-removed" x="155.78" y="178" width="13.75" height="44"/>
+  <path class="cutter" d="M155.78 390L155.78 202.64L169.53 202.64L169.53 390L162.66 387Z"/>
+  <line class="arrow" x1="139.78" y1="380" x2="139.78" y2="330"/>
+  <line class="datum" x1="655.8" y1="50" x2="655.8" y2="92"/>
+  <text class="datum-label" x="649.8" y="60" text-anchor="end">the cut tip end</text>
+  <text class="label" x="199.53" y="330">P1 blade, its tailstock-side face {{cad.part_off_in:.3dot}} from the</text>
+  <text class="label" x="199.53" y="346">cut tip end: the head about .005 long; a tray under it</text>
+  <line class="leader" x1="197.53" y1="326" x2="169.53" y2="320"/>
+  <circle class="leader-dot" cx="169.53" cy="320" r="2"/>
+</svg>

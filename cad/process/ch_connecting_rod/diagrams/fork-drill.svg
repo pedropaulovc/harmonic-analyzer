@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 780 430" width="780" height="430" font-family="sans-serif" font-size="13">
+  <!-- Setup 5, the #49 drill. Hand picture. The section along fork 1's centre line (Y -25.400) at 8 px/mm: the fork 6.096 thick (fork_thickness_mm) on Z0, the plate's top (face D), its crown X 186.819 (crown_x_mm); the slot cut by CR06 from its floor X 172.087 (slot_floor_x_mm) to the crown, between Z 1.702 (saw_low_mm) and 4.394 (saw_high_mm 2.769 + the saw's 1.626); the pin hole at X 181.866 (pin_x_mm). The jaws end at X 170.674 and the plate at 152.4: the fork is in the air. The #49 drill to scale (cutter_dia_mm 1.8542 = 14.8 px; shop tools.drill-49), 118 deg point, its full diameter 0.5 mm past D (drill_past_mm), its point at Z -1.057 (drill_tip_mm, CR07's last peck); drawn short to a break line (its chuck not drawn: no size on record). The centre drill's spot before it is not drawn. -->
+  <rect class="paper" x="0" y="0" width="780" height="430"/>
+  <text class="title" x="20" y="24">Setup 5, CR07 T4, the #49 drill: section along fork 1 (8 px/mm); from above (4 px/mm)</text>
+  <rect class="clamp" x="20" y="160.24" width="185.39" height="150.76"/>
+  <text class="label-on-clamp" x="28" y="178.24">fixed jaw (behind), ends X 170.7</text>
+  <path class="part-kept" d="M334.55 166.23L334.55 215L20 215L17 210.94L20 206.87L17 202.81L20 198.74L17 194.68L20 190.62L17 186.55L20 182.49L17 178.42L20 174.36L17 170.3L20 166.23Z"/>
+  <rect class="holes" x="216.7" y="179.85" width="117.86" height="21.54"/>
+  <rect class="holes" x="287.51" y="166.23" width="14.83" height="13.62"/>
+  <rect class="holes" x="287.51" y="201.38" width="14.83" height="13.62"/>
+  <line class="centre-line" x1="294.93" y1="63" x2="294.93" y2="247"/>
+  <path class="cutter" d="M302.34 79L302.34 219L294.93 223.46L287.51 219L287.51 79L291.22 76L294.93 79L298.64 76Z"/>
+  <line class="arrow" x1="268.93" y1="87" x2="268.93" y2="127"/>
+  <line class="datum" x1="20" y1="215" x2="200" y2="215"/>
+  <text class="label-on-clamp" x="28" y="233">Z0: D, the plate's top level</text>
+  <line class="leader" x1="248" y1="287" x2="248" y2="191"/>
+  <circle class="leader-dot" cx="248" cy="191" r="2"/>
+  <text class="label" x="211.39" y="301">the slot (CR06), between the tines</text>
+  <text class="label" x="308.93" y="87">#49 drill, through both tines,</text>
+  <text class="label" x="308.93" y="103">pecks of .050, full retract;</text>
+  <text class="label" x="308.93" y="119">its full diameter {{process.drill_past_mm:in.3dot}} past D</text>
+  <text class="label" x="308.93" y="135">into the air</text>
+  <text class="label" x="470" y="260">From above: fork 1</text>
+  <path class="part-kept" d="M597.48 310.2L597.48 349.8L470 349.8L467 345.84L470 341.88L467 337.92L470 333.96L467 330L470 326.04L467 322.08L470 318.12L467 314.16L470 310.2Z"/>
+  <circle class="part-kept" cx="597.48" cy="330" r="19.8"/>
+  <rect class="part-kept" x="591.48" y="311.4" width="6" height="37.2"/>
+  <circle class="cutter" cx="597.46" cy="330" r="3.71"/>
+  <text class="label" x="470" y="380">fork 2 the same, at Y −76.2</text>
+</svg>
