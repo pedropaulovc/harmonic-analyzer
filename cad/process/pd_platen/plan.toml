@@ -310,10 +310,13 @@ r8_collet_gauge_mm = 6.3         # HA: holders.r8-collets-lms-4860.gauge_len_mm.
 # stand no longer than the tap stack the envelopes allow for.
 drill_chuck_gauge_mm = 95.0      # Archive holders.drill-chuck-r8.gauge_len_mm.
 drill_projection_max_mm = 112.8  # Archive 13/32 jobber, bounds the drills.
-# 1/2 in end mill at least 1 in out of its collet; 1/4 in end mill at least
-# 7/8 in out.
-half_mill_projection_min_mm = 25.4
-quarter_mill_projection_min_mm = 22.225
+# End mills' least stick-out: flute length + 10 % (owner ruling 2026-11-25
+# on #3386, HA #3624: "min stickout based on flute length then add 10pct on
+# top of it"; flutes from shop tools): the 1/2 in, 25.4 flutes, 27.94; the
+# 1/4 in, 28.575 flutes, 31.43. cam.py checks each still reaches its setup's
+# deepest cut and that the 1/2 in alone does not reach the bar from the table.
+half_mill_projection_min_mm = 27.94
+quarter_mill_projection_min_mm = 31.43
 # Tapping under the spring tap guide (tools.tap-guide-fisher, 3 1/8 in
 # overall): the guide and the tap in its wrench reach tap_stack_max_mm below
 # the collet face when the tap, point to the wrench's centre hole, is at
@@ -440,7 +443,7 @@ feed = "hand"
 
 [[setups.operations]]
 instruction = "G54 Z0: the bar top's high point less the {{process.bar_skim_mm:in.3dot}} skim."
-instruction_detailed = "Console M6 T1 (1/2 in end mill, at least 1.00 in out of the collet; the tool setter measures it). Spindle stopped, its tip just dragging a .002 feeler leaf on the bar top at mid-length and 5 in either side of it; at the highest of the three: G10 L20 P1 Z{{process.bar_z_set_mm:.3f}} (the skim plus the .002 leaf)."
+instruction_detailed = "Console M6 T1 (1/2 in end mill, at least {{process.half_mill_projection_min_mm:in.2f}} in out of the collet; the tool setter measures it). Spindle stopped, its tip just dragging a .002 feeler leaf on the bar top at mid-length and 5 in either side of it; at the highest of the three: G10 L20 P1 Z{{process.bar_z_set_mm:.3f}} (the skim plus the .002 leaf)."
 feed = "hand"
 
 [[setups.operations]]
@@ -551,7 +554,7 @@ feed = "hand"
 
 [[setups.operations]]
 instruction = "G54 Z0: the top's high point less the {{process.face_cut_mm:in.4dot}} cut."
-instruction_detailed = "Console M6 T1 (1/2 in end mill, at least 1.00 in out; the tool setter measures it). Spindle stopped, its tip just dragging a .002 feeler leaf on the blank at its middle and 1 in in from each end; at the highest of the three: G10 L20 P1 Z{{process.face_z_set_mm:.3f}} (the cut plus the .002 leaf)."
+instruction_detailed = "Console M6 T1 (1/2 in end mill, at least {{process.half_mill_projection_min_mm:in.2f}} in out; the tool setter measures it). Spindle stopped, its tip just dragging a .002 feeler leaf on the blank at its middle and 1 in in from each end; at the highest of the three: G10 L20 P1 Z{{process.face_z_set_mm:.3f}} (the cut plus the .002 leaf)."
 feed = "hand"
 
 [[setups.operations]]
@@ -793,7 +796,7 @@ speed_kind = "spindle"
 tool = "em-quarter"
 drilling = "none"
 sizing = "other"
-instruction = "Same file, M6 T5 (1/4 in end mill, 7/8 to 1 in out of the collet; set 2800): counterbore the ten guide holes from P. First the plunge down each drilled hole to the floor, {{cad.guide_b1_cbore_depth_in:.3dot}} below P."
+instruction = "Same file, M6 T5 (1/4 in end mill, at least {{process.quarter_mill_projection_min_mm:in.2f}} in out of the collet; set 2800): counterbore the ten guide holes from P. First the plunge down each drilled hole to the floor, {{cad.guide_b1_cbore_depth_in:.3dot}} below P."
 rpm = 2800
 feed = "{{process.plunge_feed_per_min_mm:in.1f}} in/min plunge"
 milling_cuts = [

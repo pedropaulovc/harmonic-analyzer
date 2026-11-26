@@ -121,8 +121,10 @@ upright_grip_mm = 19.5453
 # lengths from spindle nose to tip.
 r8_collet_gauge_mm = 6.3         # HA: holders.r8-collets-lms-4860.gauge_len_mm.
 drill_chuck_gauge_mm = 95.0      # Archive holders.drill-chuck-r8.gauge_len_mm.
-# 1/2 in end mill, 3 in overall: set at least 1 in out of the collet.
-half_mill_projection_min_mm = 25.4
+# 1/2 in end mill, 3 in overall, 1 in of flute: at least its flute length
+# + 10 % out of the collet, 27.94 mm (owner ruling 2026-11-25 on #3386, HA
+# #3624: "min stickout based on flute length then add 10pct on top of it").
+half_mill_projection_min_mm = 27.94
 # ASME B94.11M jobber lengths, overall: F 4-1/8 in; the #2 combined drill
 # and countersink 1-7/8 in. Bounded by their whole length below the chuck.
 drill_f_oal_mm = 104.775
@@ -234,7 +236,7 @@ feed = "hand"
 
 [[setups.operations]]
 instruction = "G54 Z0: the faced bottom end, the sawn top's high point less the {{process.bottom_skim_mm:in.3dot}} skim."
-instruction_detailed = "Console M6 T1 (1/2 in end mill, at least 1.00 in out of the collet; the tool setter measures it). Spindle stopped, its tip just dragging a .002 feeler leaf on the highest point of the sawn top: G10 L20 P1 Z0.559 (the {{process.bottom_skim_mm:in.3dot}} skim plus the .002 leaf)."
+instruction_detailed = "Console M6 T1 (1/2 in end mill, at least {{process.half_mill_projection_min_mm:in.2f}} in out of the collet; the tool setter measures it). Spindle stopped, its tip just dragging a .002 feeler leaf on the highest point of the sawn top: G10 L20 P1 Z0.559 (the {{process.bottom_skim_mm:in.3dot}} skim plus the .002 leaf)."
 feed = "hand"
 
 [[setups.operations]]
@@ -397,7 +399,7 @@ beam = { axis = "z", hold = "cantilever", extent_mm = [0, "{{process.upright_top
 
 [[setups.operations]]
 instruction = "Before the clamp goes in, G54 Z0: the parallels' top (the faced bottom end), touched with the 1/2 in end mill on the fixed-jaw parallel, the jaws open."
-instruction_detailed = "Before the clamp goes in, the parallels in place and the jaws open: console M6 T1 (1/2 in end mill, at least 1.00 in out of the collet; the tool setter measures it). Jog it over the fixed-jaw parallel, its edge clear of the jaw. Spindle stopped, its tip just dragging a .002 feeler leaf on the parallel: G10 L20 P1 Z0.051. Raise Z. Not with the clamp in: no tool reaches the parallel beside it before its holder meets the clamp."
+instruction_detailed = "Before the clamp goes in, the parallels in place and the jaws open: console M6 T1 (1/2 in end mill, at least {{process.half_mill_projection_min_mm:in.2f}} in out of the collet; the tool setter measures it). Jog it over the fixed-jaw parallel, its edge clear of the jaw. Spindle stopped, its tip just dragging a .002 feeler leaf on the parallel: G10 L20 P1 Z0.051. Raise Z. Not with the clamp in: no tool reaches the parallel beside it before its holder meets the clamp."
 feed = "hand"
 
 [[setups.operations]]

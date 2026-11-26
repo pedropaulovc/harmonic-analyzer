@@ -237,10 +237,13 @@ vise_length_inset_mm = -68.6689
 # the spindle nose to the tip.
 r8_collet_gauge_mm = 6.3         # HA: holders.r8-collets-lms-4860.gauge_len_mm.
 drill_chuck_gauge_mm = 95.0      # Archive holders.drill-chuck-r8.gauge_len_mm.
-# Each end mill set out of its collet at least this far: the 1/2 in 1.00 in;
-# the 1/8 in and the 1/16 in long-reach .60 in (their cuts reach .38 below
-# the mating face; the 1/16's shank starts .50 up); the chamfer mill .50 in.
-half_mill_projection_min_mm = 25.4
+# Each end mill set out of its collet at least this far: the 1/2 in its
+# flute length (1 in) + 10 %, 27.94 mm (owner ruling 2026-11-25 on #3386,
+# HA #3624: "min stickout based on flute length then add 10pct on top of
+# it"); the 1/8 in and the 1/16 in long-reach .60 in (their cuts reach .38
+# below the mating face; the 1/16's shank starts .50 up); the chamfer mill
+# .50 in. Each is over its flute length + 10 %.
+half_mill_projection_min_mm = 27.94
 small_mill_projection_min_mm = 15.24
 chamfer_projection_min_mm = 12.7
 # ASME B94.11M jobber lengths, overall: #43 2-1/4 in; the #2 combined drill
@@ -360,7 +363,7 @@ feed = "hand"
 
 [[setups.operations]]
 instruction = "G54 Z0: the faced back face, the sawn top's high point less the {{process.back_skim_mm:in.3dot}} skim."
-instruction_detailed = "Console M6 T1 (1/2 in end mill, at least 1.00 in out of the collet; the tool setter measures it). Spindle stopped, its tip just dragging a .002 feeler leaf on the highest point of the sawn top: G10 L20 P1 Z0.559 (the {{process.back_skim_mm:in.3dot}} skim plus the .002 leaf)."
+instruction_detailed = "Console M6 T1 (1/2 in end mill, at least {{process.half_mill_projection_min_mm:in.2f}} in out of the collet; the tool setter measures it). Spindle stopped, its tip just dragging a .002 feeler leaf on the highest point of the sawn top: G10 L20 P1 Z0.559 (the {{process.back_skim_mm:in.3dot}} skim plus the .002 leaf)."
 feed = "hand"
 
 [[setups.operations]]

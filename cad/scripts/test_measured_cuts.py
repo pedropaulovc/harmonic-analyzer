@@ -533,6 +533,34 @@ def test_a_side_or_end_cut_off_every_record_is_refused() -> None:
     assert _unmeasured(plan) == []
 
 
+def test_only_a_stickout_known_to_be_outside_the_band_exempts_a_cut() -> None:
+    # An unresolvable stick-out proves nothing, so the cut stays checked; a
+    # stick-out within problems()'s tolerance of the band's end is inside it.
+    plan = _plan(28.45, 10.54, 0.76)
+    plan["setups"][0]["operations"][1]["settings"] = CHART
+    plan["parameters"] = {"half_mill_projection_min_mm": "{{cad.unknown_mm}}"}
+    assert len(_unmeasured(plan)) == 1
+    plan["parameters"] = {"half_mill_projection_min_mm": 31.75 + 1e-12}
+    assert len(_unmeasured(plan)) == 1
+    plan["parameters"] = {
+        "half_mill_projection_min_mm": 50.8,
+        "half_mill_projection_mm": "{{cad.unknown_mm}}",
+    }
+    assert len(_unmeasured(plan)) == 1
+
+
+def test_a_cutter_with_no_records_yet_is_not_checked() -> None:
+    plan = _plan(28.45, 10.54, 0.76)
+    plan["setups"][0]["operations"][1]["settings"] = CHART
+    cutters = {**CUTTERS, "endmill-carbide-3fl-1-4": CUTTERS[HALF]}
+    plan["tools"].append({"id": "T9", "ref": "endmill-carbide-3fl-1-4"})
+    plan["setups"][0]["operations"].append(
+        {"tool": "T9", "milling_cuts": [{"kind": "side", "name": "x"}]}
+    )
+    found = _measured_cuts.unmeasured(plan, MEASURED, cutters, SHOP["settings"])
+    assert len(found) == 1
+
+
 def _plans() -> list[tuple[str, dict]]:
     paths = sorted(_process_plans.PROCESS_ROOT.glob("*/plan.toml"))
     assert paths

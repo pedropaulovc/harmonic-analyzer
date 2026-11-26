@@ -177,7 +177,7 @@ def unmeasured(
         tool = settings[key]["tool"] if key in settings else tool_refs.get(
             operation.get("tool")
         )
-        if tool not in measured_cutters or material not in materials[tool]:
+        if tool not in measured_cutters or material not in materials.get(tool, ()):
             continue
         cutter = measured_cutters[tool]
         shortest, longest = _band(cutter)
@@ -185,8 +185,13 @@ def unmeasured(
             _number(parameters, value)
             for value in _pinned(parameters, cutter, names).values()
         ]
-        if stickouts and not any(
-            s is not None and shortest <= s <= longest for s in stickouts
+        # Exempt only a setup whose every stick-out resolves to a number
+        # outside the band, by the same tolerance problems() allows; an
+        # unresolvable one proves nothing and stays checked.
+        if stickouts and all(
+            s is not None
+            and not shortest - _TOLERANCE_MM <= s <= longest + _TOLERANCE_MM
+            for s in stickouts
         ):
             continue
         for cut in operation.get("milling_cuts", []):
