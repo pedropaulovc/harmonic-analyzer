@@ -43,15 +43,6 @@ demoted:
   dt_pinion_lift_rod: fit-batch-dt
   dt_pinion_pivot_block: fit-batch-dt
   dt_pinion_pivot_shaft: fit-batch-dt
-  # Farm run 20261126T031815939Z on c8404aea15 read FIX: the drum bond's
-  # seating check runs after the 24 h cure, so its pull-off remedy cannot be
-  # done (issue #3630; its fix is rulings.md D38). Delegated ruling
-  # 2026-11-26 (Main), precedent: the owner's ruling 2026-11-24, main during
-  # fit conversion, "better to be able to cut releases with known issues than
-  # to hold unreleased code": a sheet that reads FIX at its batch's last run
-  # stays here with an issue until that issue's fix reads SHIP; no owner
-  # number changed; #2144 (rulings.md D39).
-  mg_magnifier_assembly: fit-batch-ch
   pd_platen_bottom_guide: fit-batch-pd
   pd_platen_guide: fit-batch-pd
   pd_support_bar: fit-batch-pd
