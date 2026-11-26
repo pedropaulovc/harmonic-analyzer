@@ -201,6 +201,14 @@ def jaw_clearance_min_mm() -> float:
     return float(cnc["cnc"]["jaw-clearance"]["jaw_clearance_min_mm"])
 
 
+# The sentence that opens the op running a listed file (the plan op whose
+# instruction says "Run <program>"), so the operator reads the stop where the
+# file is run: "Do not run this file: <why> (<issue>); stop and tell the
+# owner." test_cam_nc ties these stops to KNOWN_JAW_CLEARANCE_VIOLATIONS both
+# ways, so a stop leaves its plan with the file's entry.
+DO_NOT_RUN_STOP = "Do not run this file:"
+
+
 def verify(expectations, directory: Path, known: dict[str, str] | None = None) -> list[_gcode.Finding]:
     """Run every expectation against its posted program or tool section.
 

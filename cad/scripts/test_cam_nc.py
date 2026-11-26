@@ -12,10 +12,13 @@ edge passes with full-length returns, one-way facing.
 from __future__ import annotations
 
 import math
+import re
+import tomllib
 from pathlib import Path
 
 import pytest
 
+import _cam_programs
 import _gcode
 import cam_nc
 
@@ -835,6 +838,40 @@ def test_cnc_toml_alone_of_the_inventory_is_a_cam_input():
     assert [k for k in inputs if k.startswith("shop-equipment/")] == ["shop-equipment/cnc.toml"]
     assert inputs["shop-equipment/cnc.toml"] == _shop_equipment.DIRECTORY / "cnc.toml"
     assert "jaw-clearance" in _shop_equipment.merge([inputs["shop-equipment/cnc.toml"]])["cnc"]
+
+
+# CL01_face_b leaves KNOWN_JAW_CLEARANCE_VIOLATIONS with #3647, which makes it
+# clear the jaws; until then it is listed without a stop. The exemption counts
+# only while the file is listed, so the test passes on main, here, and after
+# either PR merges first, with no edit.
+_STOP_PENDING = {"CL01_face_b.nc": "#3647"}
+
+
+def test_a_listed_jaw_clearance_violation_is_stopped_in_the_op_that_runs_it():
+    """Every file on KNOWN_JAW_CLEARANCE_VIOLATIONS opens each op that runs it
+    (its instruction says "Run <program>") with cam_nc.DO_NOT_RUN_STOP, citing
+    the shop floor; no op carries that stop for a file off the list."""
+    floor = f"{cam_nc.jaw_clearance_min_mm():.1f} mm floor"
+    listed = cam_nc.KNOWN_JAW_CLEARANCE_VIOLATIONS
+    stopped: dict[str, int] = {}
+    wrong = []
+    for stem in _cam_programs.CAM_STEMS:
+        plan = tomllib.loads(_cam_programs.cam_inputs(stem)["plan"].read_text(encoding="utf-8"))
+        names = _cam_programs.program_names(stem)
+        for setup in plan["setups"]:
+            for op in setup["operations"]:
+                texts = [op[key] for key in ("instruction", "instruction_detailed") if key in op]
+                runs = [f"{n}.nc" for n in names if re.search(rf"\bRun {re.escape(n)}\b", op.get("instruction", ""))]
+                stops = [t.startswith(cam_nc.DO_NOT_RUN_STOP) for t in texts]
+                for file in runs:
+                    if file in listed and file not in _STOP_PENDING:
+                        if not all(stops) or not all(floor in t for t in texts):
+                            wrong.append(f"{stem}: an op running listed {file} does not open with the stop citing the {floor}")
+                        stopped[file] = stopped.get(file, 0) + 1
+                if any(stops) and (not runs or any(file not in listed for file in runs)):
+                    wrong.append(f"{stem}: an op running {runs or 'no program'} carries the stop, off the list")
+    assert wrong == []
+    assert sorted(stopped) == sorted(listed.keys() - _STOP_PENDING.keys())
 
 
 def test_the_floor_is_read_from_cnc_toml_alone(tmp_path, monkeypatch):
