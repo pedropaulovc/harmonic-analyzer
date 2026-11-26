@@ -1126,6 +1126,24 @@ which therefore needs FreeCAD 1.1+. This keeps the
 gallery, travelers and publish in the owning worktree without local COM
 redispatch; the cut fails if any traveler PDF or NC program is missing.
 
+If the run was launched without `package:manifest check:features_bound`, its
+restored `out/` lacks the other parts' `features.toml` and the cut stops at
+`release.features_stage`. Bind them seat-free in the owning worktree before the
+cut. One `doit -s` invocation takes every task named on its command line (doit
+clears each selected task's `task_dep`), so list them all at once rather than
+one invocation per stem:
+
+```powershell
+$stems = (Get-ChildItem cad/out/features -Directory |
+  Where-Object { -not (Test-Path (Join-Path $_.FullName 'features.toml')) }).Name
+uv run --frozen python -m doit -s @($stems | ForEach-Object { "package:manifest:$_" })
+uv run --frozen python -m doit -s check:features_bound
+```
+
+Binding the 52 missing manifests of the 6d349882fd outputs with the tasks'
+`export_features.py` took 226 s (about 4.3 s each); the doit invocation adds one
+graph load of about a minute.
+
 Every release also prepares and attaches
 `harmonic-analyzer-vNN-drawing-diff.zip`, separately from the main CAD bundle,
 the existing 3D changed-parts PNGs and the logs asset. Extract it and open
