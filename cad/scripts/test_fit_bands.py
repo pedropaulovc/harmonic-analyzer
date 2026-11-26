@@ -420,7 +420,7 @@ INDEXED_FIT_BANDS: dict[tuple[str, str], str] = {
         "knob shaft's rear tooth-end bearing (RING_TRANSVERSE_FLOAT_MAX)"
     ),
     ("pd_transgear_pivot_spacer_spec", "BORE_DIA_BAND"): (
-        "title-block drilled-hole deviations (the #12 DRILL THRU callout's row, "
+        "title-block drilled-hole deviations (the #11 DRILL THRU callout's row, "
         "no native band); indexed for the bond gap on MHA-PD-VN-57's shoulder "
         "(BOND_GAP) and the ring's worst wall"
     ),

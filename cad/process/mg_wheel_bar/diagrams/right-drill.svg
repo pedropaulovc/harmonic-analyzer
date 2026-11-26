@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 780 430" font-family="sans-serif" font-size="13">
+  <rect class="paper" x="0" y="0" width="780" height="430"/>
+  <text class="title" x="20" y="20">Setup 4, #9 drill: section at a clamp hole, from the RIGHT end (1 in = 100 px)</text>
+  <line class="fixture-table" x1="60" y1="400" x2="380" y2="400"/>
+  <!-- Section at the hole, from the RIGHT end: the moving jaw on the LEFT;
+       both 1 + 1/2 in stacks at it, the .125 pin at B, the bar .840 across
+       (T at the fixed jaw), .375 thick, F down. -->
+  <rect class="clamp" x="131" y="223" width="60" height="177"/>
+  <rect class="clamp" x="287.5" y="223" width="60" height="177"/>
+  <text class="label-on-clamp" x="137" y="390">moving</text>
+  <text class="label-on-clamp" x="297" y="390">fixed</text>
+  <rect class="fixture-support" x="191" y="250" width="12.5" height="150"/>
+  <rect class="fixture-support" x="203.5" y="250" width="12.5" height="150"/>
+  <circle class="fixture-support" cx="197.25" cy="243.75" r="6.25"/>
+  <rect class="part-kept" x="203.5" y="212.5" width="84" height="37.5"/>
+  <!-- The #9 drill to scale (cutter_dia_mm 4.9784 = 19.6 px), 118 deg point, its full diameter drill_past_mm 1.0 past F, its point at drill_9_tip_mm -2.496. Drawn short to a break line: drill_9_oal_mm 88.9 is its whole length, its length out of the chuck is not on record. -->
+  <path class="cutter" d="M277.6 110.0L277.6 253.9L267.8 259.8L258.0 253.9L258.0 110.0L262.9 107.0L267.8 110.0L272.7 107.0Z"/>
+  <line class="arrow" x1="237.8" y1="112" x2="237.8" y2="140"/>
+  <line class="centre-line" x1="267.8" y1="196" x2="267.8" y2="285"/>
+  <line class="datum" x1="80" y1="250" x2="125" y2="250"/>
+  <text class="datum-label" x="30" y="246">Z0 (F)</text>
+  <line class="datum" x1="287.5" y1="190" x2="287.5" y2="216"/>
+  <text class="datum-label" x="352" y="214">Y0 (T)</text>
+  <line class="dims" x1="267.8" y1="192" x2="287.5" y2="192"/>
+  <line class="leader" x1="280" y1="192" x2="352" y2="176"/>
+  <text class="label" x="356" y="180">clamp holes {{cad.clamp_hole_1_height_in:.3dot}} from T</text>
+  <line class="leader" x1="267.8" y1="261.1" x2="267.8" y2="410"/>
+  <text class="label" x="261.8" y="422" text-anchor="end">the point exits here, in the air</text>
+  <line class="leader" x1="197" y1="238" x2="160" y2="200"/>
+  <text class="label" x="60" y="196">.125 pin at B</text>
+  <line class="leader" x1="209" y1="330" x2="120" y2="330"/>
+  <text class="label" x="20" y="326">both 1 + 1/2 in</text>
+  <text class="label" x="20" y="342">stacks, under B</text>
+  <text class="label" x="356" y="90">#9 drill through each clamp hole, no peck:</text>
+  <text class="label" x="356" y="106">its full diameter {{process.drill_past_mm:in.3dot}} past F, beside the stacks;</text>
+  <text class="label" x="356" y="122">drawn in clamp hole 1; hole 2 the same</text>
+  <text class="title" x="430" y="270">Plan, fixed jaw at the top (1 in = 25 px)</text>
+  <!-- Plan, fixed jaw at the top, 1 in = 25 px: X0 the milled left end. -->
+  <rect class="clamp" x="525.3" y="280" width="156.2" height="30"/>
+  <rect class="clamp" x="525.3" y="331" width="156.2" height="30"/>
+  <rect class="part-kept" x="460" y="310" width="230" height="21"/>
+  <circle class="holes" cx="465" cy="314.9" r="2.25"/>
+  <circle class="holes" cx="520" cy="314.9" r="2.33"/>
+  <circle class="holes" cx="679" cy="314.9" r="2.45"/>
+  <circle class="cutter" cx="644.6" cy="314.9" r="2.45"/>
+  <line class="datum" x1="460" y1="290" x2="460" y2="306"/>
+  <text class="datum-label" x="432" y="300">X0</text>
+  <line class="leader" x1="644.6" y1="318" x2="584.6" y2="385"/>
+  <text class="label" x="580.6" y="390" text-anchor="end">the #9 in clamp hole 1</text>
+</svg>

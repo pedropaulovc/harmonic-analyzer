@@ -1,21 +1,32 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 320" width="760" height="320">
-  <rect class="paper" x="0" y="0" width="760" height="320"/>
-  <text class="title" x="20" y="24">Pivot end out of the 4-jaw: face to length, turn the pivot, groove (not to scale)</text>
-  <rect class="fixture-vise" x="180" y="60" width="110" height="70"/>
-  <rect class="fixture-vise" x="180" y="170" width="110" height="70"/>
-  <rect class="clamp" x="200" y="120" width="90" height="10"/>
-  <rect class="clamp" x="200" y="170" width="90" height="10"/>
-  <rect class="part-kept" x="40" y="130" width="300" height="40"/>
-  <rect class="part-kept" x="340" y="138" width="240" height="24"/>
-  <rect class="paper" x="420" y="138" width="90" height="5"/>
-  <rect class="paper" x="420" y="157" width="90" height="5"/>
-  <line class="centre-line" x1="30" y1="150" x2="740" y2="150"/>
-  <rect class="cutter" x="420" y="60" width="30" height="78"/>
-  <line class="datum" x1="580" y1="90" x2="580" y2="210"/>
-  <text class="datum-label" x="590" y="96">Z0 pivot end</text>
-  <line class="dims" x1="340" y1="170" x2="300" y2="252"/>
-  <text class="label" x="40" y="266">shoulder at Z−.410: the blade squares it (R.008 MAX)</text>
-  <line class="dims" x1="465" y1="162" x2="480" y2="282"/>
-  <text class="label" x="400" y="298">groove .165–.315 from the shoulder</text>
-  <text class="label" x="460" y="56">cutoff blade, three plunges</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 420" width="760" height="420">
+  <!-- Hand picture, the blank to scale at 20 px/mm from the 5 mm square (square_mm). The faced end .60 in (pivot_stickout_in) out of the jaw fronts; the Ø.125 x .41 pivot (pivot_aim_dia_mm, pivot_len_in) and the groove .165-.315 from the shoulder, floor Ø.106 (groove_plunge_1_in, groove_aim_dia_in, the drawing) hatched: cut later in this setup. The sawn excess over the length L read in Op 120 varies blank to blank: drawn .05 in, schematic. The 4-jaw, its shims and the AR tool (its TCMT insert size is not on record) are schematic. -->
+  <rect class="paper" x="0" y="0" width="760" height="420"/>
+  <text class="title" x="20" y="24">Pivot end out of the 4-jaw, to scale (20 px/mm) bar the chuck and the AR tool: facing to Z0</text>
+  <rect class="fixture-vise" x="70" y="65" width="110" height="250"/>
+  <rect class="clamp" x="180" y="66" width="120" height="70"/>
+  <rect class="part-rest" x="180" y="136" width="120" height="4"/>
+  <rect class="clamp" x="180" y="244" width="120" height="70"/>
+  <rect class="part-rest" x="180" y="240" width="120" height="4"/>
+  <text class="label" x="70" y="390">4-jaw (schematic) on the flats over brass shims;</text>
+  <text class="label" x="70" y="406">indicate each pair of flats within {{process.indicate_tir_in:.3dot}} TIR</text>
+  <path class="part-kept" d="M604.8 140L604.8 240L20 240L17 235.83L20 231.67L17 227.5L20 223.33L17 219.17L20 215L17 210.83L20 206.67L17 202.5L20 198.33L17 194.17L20 190L17 185.83L20 181.67L17 177.5L20 173.33L17 169.17L20 165L17 160.83L20 156.67L17 152.5L20 148.33L17 144.17L20 140Z"/>
+  <rect class="part-removed" x="604.8" y="140" width="25.4" height="100"/>
+  <rect class="part-removed" x="396.52" y="140" width="208.28" height="18.33"/>
+  <rect class="part-removed" x="396.52" y="221.67" width="208.28" height="18.33"/>
+  <rect class="part-removed" x="480.34" y="158.33" width="76.2" height="4.75"/>
+  <rect class="part-removed" x="480.34" y="216.92" width="76.2" height="4.75"/>
+  <line class="centre-line" x1="10" y1="190" x2="740" y2="190"/>
+  <path class="cutter" d="M604.8 216.0L638.8 238.0L638.8 346.0L574.8 346.0L574.8 256.0Z"/>
+  <line class="arrow" x1="664.8" y1="300" x2="664.8" y2="220"/>
+  <line class="datum" x1="604.8" y1="70" x2="604.8" y2="136"/>
+  <text class="datum-label" x="610.8" y="80">Z0 pivot end</text>
+  <line class="dims" x1="300" y1="108" x2="300" y2="136"/>
+  <line class="dims" x1="300" y1="116" x2="604.8" y2="116"/>
+  <text class="label" x="310" y="110">{{process.pivot_stickout_in:.2dot}} out of the jaw fronts</text>
+  <text class="label" x="564.8" y="340" text-anchor="end">AR tool (schematic): faces the end</text>
+  <text class="label" x="564.8" y="356" text-anchor="end">to Z0, then turns the pivot</text>
+  <text class="label" x="20" y="44">hatched: cut in this setup: the pivot Ø{{cad.pivot_dia_in:.3dot}} x {{cad.pivot_length_in:.2dot}},</text>
+  <text class="label" x="20" y="60">the groove {{cad.groove_station_in:.3dot}}-{{cad.groove_end_station_in:.3dot}} from the shoulder (floor Ø{{cad.groove_dia_in:.3dot}})</text>
+  <line class="leader" x1="340" y1="64" x2="438.43" y2="150"/>
+  <circle class="leader-dot" cx="438.43" cy="150" r="2"/>
 </svg>

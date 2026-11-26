@@ -12,7 +12,16 @@
   <line class="centre-line" x1="170" y1="147.5" x2="260" y2="147.5"/>
   <line class="centre-line" x1="190.3" y1="110" x2="190.3" y2="185"/>
   <path class="hidden" d="M185.3 88.25 H190.3 A59.25 59.25 0 0 1 249.55 147.5 A59.25 59.25 0 0 1 190.3 206.75 H185.3"/>
+  <!-- The 1 in parallels (1/8 thick, 4 in long) against each jaw, under the
+       part, their right ends at the jaws' right side: outlines only, the
+       part over them. -->
+  <rect class="fixture-support" x="20" y="120" width="123.5" height="15.9" fill="none"/>
+  <rect class="fixture-support" x="20" y="159.1" width="123.5" height="15.9" fill="none"/>
+  <!-- The 1/2 in end mill to scale (face_cutter_dia_mm 12.7 = 63.5 px at
+       5 px/mm) at the start of the finish profile, X 93.057 Y 6.350, its
+       lead along the L side toward +X, then round the nose (G2). -->
   <circle class="cutter" cx="185.3" cy="88.25" r="31.75"/>
+  <line class="arrow" x1="222" y1="48" x2="252" y2="48"/>
   <line class="datum" x1="143.5" y1="60" x2="143.5" y2="235"/>
   <text class="label" x="100" y="250">jaws' right side, {{process.nose_jaw_side_mm:in.3dot}} from the seat</text>
   <line class="leader" x1="215" y1="135" x2="300" y2="110"/>
@@ -27,5 +36,7 @@
   <text class="label" x="300" y="204">the sawn stub, cut away by the profile</text>
   <text class="datum-label" x="20" y="290">Y0 the fixed jaw (L); X0 the seat, off to the left; Z0 the parallels' top (O).</text>
   <text class="label" x="20" y="320">The parallels' right ends at the jaws' right side: nothing under the nose.</text>
-  <text class="label" x="20" y="336">The foot stands inside the jaws at the left; the offcut at the jaws' left end.</text>
+  <text class="label" x="20" y="336">The foot stands inside the jaws at the left; the offcut at the jaws' left end (not in this view).</text>
+  <line class="leader" x1="60" y1="128" x2="40" y2="262"/>
+  <text class="label" x="20" y="276">1 in parallels under the part (outlines)</text>
 </svg>

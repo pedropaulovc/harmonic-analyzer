@@ -36,8 +36,8 @@
 # the cutter's diameter. Setup 4 ends by finding the face again: X0 has not
 # moved (the one registration check). Groove width and depth are the bit's
 # form at the programmed depth from Z0, which is touched on the ruled face
-# with the bit itself: 30 degrees, .005 tip (shop-equipment
-# tools.ms-stick-engraver), width at the face = tip + 2 x depth x tan 15.
+# with the bit itself: 30 degrees, 0.1 mm tip (shop-equipment
+# tools.engravers-esao-30-0-1), width at the face = tip + 2 x depth x tan 15.
 #
 # Tape stack and Z (owner rulings 2026-11-23): every Z0 of MS02 to MS04 is
 # touched on the bonded blank's RULED FACE by the tool that cuts, so the
@@ -57,8 +57,7 @@
 # consumables.hold-painters-tape-ca) and prints a Bond: line per setup. The
 # operator proves each bond by the stack check and a hand push test.
 #
-# FLAGGED, to buy: the engraving bit (2L P-125x2.0-30-.005-S, two),
-# 600-grit wet-or-dry paper and a metal polish (the last two
+# FLAGGED, to buy: 600-grit wet-or-dry paper and a metal polish (the last two
 # the author's choice, shop-equipment consumables.wetordry-paper-600 and
 # metal-polish-simichrome). The black enamel is the owner's Rust-Oleum Flat
 # Black 376855 (ownership not stated: check the shelf). The tape, the CA
@@ -69,13 +68,14 @@
 # between every numeral and its tick above numeral_gap_min_mm.
 # FLAGGED: the model's numeral strokes are 0.24 wide at the face (owner
 # 2026-10-23, ms_stick_spec NUMERAL_STROKE_WIDTH_MM, a near-sharp V). The
-# listed bit's .005 tip cannot cut a stroke narrower than .0136 (0.345) at
-# the .016 MIN depth; this plan cuts them numeral_width_mm (.016) wide at
+# ESAO bit's 0.1 mm tip cannot cut a stroke narrower than .0125 (0.318) at
+# the .016 MIN depth; this plan cuts them numeral_width_mm (.015) wide at
 # numeral_depth_mm, and the ticks tick_width_mm (.020) against the modelled
 # .016 MIN. The printed limits hold (the depth MINs, the .016-.024 groove
 # width, the .07-.09 numeral height, the .02 gaps at .XX; drawing note 3:
 # any single-stroke sans font), and test_ms_stick_drawing holds the bit's
-# wider stroke inside the gap band. The owner may want a finer-tipped bit.
+# wider stroke inside the gap band. The tip is the box label's 0.1 mm: Setup 4
+# has it inspected under magnification before T2 goes in (three on hand).
 #
 # Zeroing: X/Y by the .200 in edge finder at 900 rpm; Z by the tool's tip on
 # a .002 feeler leaf. Every program loads its own first tool (M6, the tool
@@ -91,7 +91,7 @@ part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
 material = "C36000 free-machining brass, 1/8 × 3/8 in flat bar (drawing: {{cad.material_spec}})"
 stock = "{{process.blank_thickness_in:fraction}} × {{process.blank_width_in:fraction}} in C360 flat bar, 24 in length; {{process.quantity:d}} blank {{process.blank_length_in:.2f}}–{{process.blank_length_max_in:.2f}} in. Fixture: the 1/2 × 1 × 12 in 6061-T6511 bar, used whole (only its top is skimmed)."
-note = "Inches unless mm; G-code and console entries in mm (the files and the controller run G21). Finished {{cad.zero_end_length_min_in:.2f}}–{{cad.zero_end_length_max_in:.2f}} long, {{cad.ruled_edge_width_min_in:.3dot}}–{{cad.ruled_edge_width_max_in:.3dot}} wide, {{cad.back_face_thickness_min_in:.3dot}}–{{cad.back_face_thickness_max_in:.3dot}} thick as the brass bar comes (never machined). To buy before Setup 3: the engraving bit (two: a broken tip stops the job); before Setup 6: 600-grit wet-or-dry paper and Simichrome polish, and the Flat Black 376855 enamel if none is on the shelf. Names: RULED FACE (engraved; up on the mill), BACK (taped down), RULED EDGE (the ticks run off it; toward you on the mill), PLAIN EDGE (toward the fixed jaw), DATUM END (the end nearest the 10, on the right on the mill: every graduation station counts from it), ZERO END. Speeds on the PM-30MV low belt (100–2800 rpm): no belt change. Home the mill ($H) before Setup 2. From Setup 4's X0 to the end of MS04 the controller must not be reset: after a reset, stall or E-stop there, stop and tell the owner (a half-engraved stick is picked up only from its datum end, by Setup 4's first ops, never by re-homing alone). Do not open the vise between Setup 2 and Setup 5."
+note = "Inches unless mm; G-code and console entries in mm (the files and the controller run G21). Finished {{cad.zero_end_length_min_in:.2f}}–{{cad.zero_end_length_max_in:.2f}} long, {{cad.ruled_edge_width_min_in:.3dot}}–{{cad.ruled_edge_width_max_in:.3dot}} wide, {{cad.back_face_thickness_min_in:.3dot}}–{{cad.back_face_thickness_max_in:.3dot}} thick as the brass bar comes (never machined). To buy before Setup 6: 600-grit wet-or-dry paper and Simichrome polish, and the Flat Black 376855 enamel if none is on the shelf. Names: RULED FACE (engraved; up on the mill), BACK (taped down), RULED EDGE (the ticks run off it; toward you on the mill), PLAIN EDGE (toward the fixed jaw), DATUM END (the end nearest the 10, on the right on the mill: every graduation station counts from it), ZERO END. Speeds on the PM-30MV low belt (100–2800 rpm): no belt change. Home the mill ($H) before Setup 2. From Setup 4's X0 to the end of MS04 the controller must not be reset: after a reset, stall or E-stop there, stop and tell the owner (a half-engraved stick is picked up only from its datum end, by Setup 4's first ops, never by re-homing alone). Do not open the vise between Setup 2 and Setup 5."
 shop = "../shop"
 stock_refs = ["c360-flat-1-8x3-8", "6061-flat-1-2x1-12in"]
 material_key = "ms-stick-brass"
@@ -210,27 +210,27 @@ outline_levels = 3
 outline_step_mm = 1.128
 outline_end_stations = 6
 fixture_skim_max_mm = 0.2
-# Engraving, the 30 degree V bit with a .005 flat tip (shop-equipment
-# tools.ms-stick-engraver.included_angle_deg and tip_width_in x 25.4).
-# Graduations tick_depth_mm (.028) deep: .020 wide at the face, the middle of
+# Engraving, the 30 degree V bit with a 0.1 mm flat tip (shop-equipment
+# tools.engravers-esao-30-0-1.included_angle_deg and tip_width_mm).
+# Graduations tick_depth_mm (.030) deep: .020 wide at the face, the middle of
 # the drawing's .016-.024, with .0075 of depth either way before a limit.
-# Numerals numeral_depth_mm (.021) deep: .016 wide strokes; the drawing's
-# .016 MIN depth is .005 under it and its .09 tallest numeral .006 over.
+# Numerals numeral_depth_mm (.021) deep: .015 wide strokes; the drawing's
+# .016 MIN depth is .005 under it and its .09 tallest numeral .007 over.
 # Levels of engrave_step_max_mm (.005) at most, then the last
 # engrave_finish_mm (.002) at half feed, and every plunge into the brass at
 # half feed (shop settings.ms-stick-engrave-brass and its source note).
-# R3 leaves these levels as they are: the .005 is the bit maker's pass depth
-# (2L's note), not the bond's, so the bond never set them.
+# R3 leaves these levels as they are: the .005 is the engraving table's pass
+# depth (2L's note), not the bond's, so the bond never set them.
 # cam.py holds each depth engrave_depth_margin_mm inside its limits.
-engraver_tip_mm = 0.127
-tick_depth_mm = 0.7112
-tick_width_mm = 0.5081
+engraver_tip_mm = 0.1
+tick_depth_mm = 0.762
+tick_width_mm = 0.5084
 tick_rough_levels = 6
-tick_rough_step_mm = 0.11007
-# Where the rough levels end: tick_rough_levels x tick_rough_step_mm (.026).
-tick_rough_depth_mm = 0.6604
+tick_rough_step_mm = 0.11853
+# Where the rough levels end: tick_rough_levels x tick_rough_step_mm (.028).
+tick_rough_depth_mm = 0.7112
 numeral_depth_mm = 0.5334
-numeral_width_mm = 0.4129
+numeral_width_mm = 0.3858
 numeral_rough_levels = 4
 numeral_rough_step_mm = 0.12065
 engrave_step_max_mm = 0.127
@@ -255,7 +255,9 @@ numeral_gap_min_mm = 0.254
 # spindle nose to tip.
 r8_collet_gauge_mm = 6.3         # HA: holders.r8-collets-lms-4860.gauge_len_mm.
 half_mill_projection_mm = 38.1
-engraver_projection_mm = 25.4
+# The ESAO bit is 32.45 long (owner 2026-11-26): .60 out of the collet leaves
+# about .68 of its 1/8 shank gripped.
+engraver_projection_mm = 15.24
 
 [[tools]]
 id = "em-half"
@@ -263,8 +265,8 @@ name = "T1 1/2 in carbide end mill"
 ref = "endmill-carbide-3fl-1-2"
 [[tools]]
 id = "engraver"
-name = "T2 30° V engraving bit, .005 tip, TO BUY"
-ref = "ms-stick-engraver"
+name = "T2 30° V engraving bit, 0.1 mm tip (ESAO, on hand)"
+ref = "engravers-esao-30-0-1"
 [[tools]]
 id = "tape"
 name = "ScotchBlue 2090 blue painter's tape, 1.41 in wide: on the bar's top and the blank's BACK"
@@ -534,7 +536,7 @@ vise_hold = { vise = "vise-pm-6", grips = "plate", across_jaws_mm = "{{process.f
 beam = { axis = "x", hold = "plate", extent_mm = [0, "{{cad.zero_end_length_mm}}"], seat = "faced fixture bar top", seat_mm = ["{{process.fixture_seat_start_mm}}", "{{process.fixture_seat_end_mm}}"], bond = { shear_mpa = "{{process.bond_accepted_shear_mpa}}", tensile_mpa = "{{process.bond_accepted_tensile_mpa}}", accepted_by = "the shop owner", pieces = [{ name = "stick", kind = "part", area_mm2 = "{{process.bond_area_mm2}}", width_mm = "{{cad.ruled_edge_width_mm}}" }] } }
 
 [[setups.operations]]
-instruction = "Prove both files in air first, Z0 raised 1.000 in (Setup 2's console entries), T2 in at the files' M6: MS04_numerals whole, then MS03_graduations through its first eleven ticks (the 0 tick about {{cad.graduations_zero_station_in:.2f}} from the right end, each tick starting just off the front edge), then feed hold and reset. Home ($H) and put Z0 back."
+instruction = "First look at the engraving bit's tip under magnification (a phone camera's macro is enough): the 0.1 mm flat must be whole and unchipped, since every groove is cut as much wider as the tip is; chipped, broken or blunt, take another of the three on hand. Then prove both files in air, Z0 raised 1.000 in (Setup 2's console entries), T2 in at the files' M6 ({{process.engraver_projection_mm:in.2f}} in out of the 1/8 collet): MS04_numerals whole, then MS03_graduations through its first eleven ticks (the 0 tick about {{cad.graduations_zero_station_in:.2f}} from the right end, each tick starting just off the front edge), then feed hold and reset. Home ($H) and put Z0 back."
 feed = "hand"
 
 [[setups.operations]]
@@ -596,7 +598,7 @@ inspection = [
   "Thickness: not miked here. It was gated at Op 10 and no face is cut; it is miked after the polish, Op 380.",
   "Length {{cad.zero_end_length_min_in:.2f}}–{{cad.zero_end_length_max_in:.2f}}, height gauge, the stick stood on its DATUM END on the surface plate against a 1-2-3 block. Outside: stop and tell the owner.",
   "By eye, with the drawing: {{cad.graduations_count_mm:.0f}} ticks; every tenth a long one with its numeral, 0 to 10, the 10 nearest the DATUM END; the one longest tick halfway between the 0 and the 1; every groove clean to its end. A tick or stroke missing or torn: stop and tell the owner.",
-  "Not gauged, held by the program from the zeros of Setup 4: the stations (±.002 from the datum end; X0 found on that face, Op 260, and found unmoved, Op 300); groove width {{cad.graduations_width_min_in:.3dot}}–{{cad.graduations_width_max_in:.3dot}} and depths {{cad.graduations_depth_min_in:.3dot}} and {{cad.numerals_depth_min_in:.3dot}} MIN (the bit's 30° and .005 tip at the programmed depths, Z0 touched with the bit on the face, Op 270); tick lengths {{cad.graduations_minor_length_in:.2dot}}, {{cad.graduations_full_length_in:.2dot}} and {{cad.graduations_half_length_in:.2dot}} and the numeral height {{cad.numerals_height_in:.2dot}}.",
+  "Not gauged, held by the program from the zeros of Setup 4: the stations (±.002 from the datum end; X0 found on that face, Op 260, and found unmoved, Op 300); groove width {{cad.graduations_width_min_in:.3dot}}–{{cad.graduations_width_max_in:.3dot}} and depths {{cad.graduations_depth_min_in:.3dot}} and {{cad.numerals_depth_min_in:.3dot}} MIN (the bit's 30° and 0.1 mm tip at the programmed depths, Z0 touched with the bit on the face, Op 270); tick lengths {{cad.graduations_minor_length_in:.2dot}}, {{cad.graduations_full_length_in:.2dot}} and {{cad.graduations_half_length_in:.2dot}} and the numeral height {{cad.numerals_height_in:.2dot}}.",
 ]
 gauge_checks = [
   { gauge = "micrometers", band_mm = "{{cad.ruled_edge_width_band_mm}}" },

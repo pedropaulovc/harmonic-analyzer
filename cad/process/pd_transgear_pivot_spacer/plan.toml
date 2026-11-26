@@ -1,16 +1,16 @@
 # Transgear pivot spacer MHA-PD-20, one off, turned on the manual
 # PM-1127VF-LB (owner ruling 2026-11-21: turned parts get lathe travelers, no
-# NC). The bore is a #12 drilled hole, a LOCTITE 638 bonded slip fit on the
+# NC). The bore is a #11 drilled hole, a LOCTITE 638 bonded slip fit on the
 # MHA-PD-VN-57 shoulder (owner ruling 2026-11-24, fit audit question 6):
 # no reamer, no plug gauges; the hole is accepted by trying the screw's
 # shoulder in it. The sheet carries no frame between the faces: its length
-# band (±.001; delegated ruling 2026-11-24 (FitBatchPD), no precedent, owner
-# review #2144) holds at every place round the rim, which bounds their taper
+# band (±.001; necessity register N-01: at ±.002 the faces' taper takes the
+# platen air under its floor) holds at every place round the rim, which bounds their taper
 # (pd_transgear_pivot_spacer_spec REAR_FACE_PARALLELISM). The 1/2 in C36000
 # bar on hand (cad/config/shop-equipment/stock-bought.toml c360-round-1-2;
 # the 7/16 bar is only to order).
 # Setup 1, the bar: face the end (the spacer's front face), turn the outside
-# to its .43-.45 band back past the parting line, spot, drill #12 through and
+# to its .43-.45 band back past the parting line, spot, drill #11 through and
 # past the parting line in the same chucking (the hole runs true to the
 # outside, the printed .016 runout), try the screw's shoulder in the hole,
 # part off .02 long.
@@ -50,10 +50,10 @@ part = "pd-transgear-pivot-spacer"
 quantity = 1
 stock_dia_in = 0.5
 # The drawing's bonded-fit clearance on the MHA-PD-VN-57 shoulder
-# (pd_transgear_pivot_spacer_callouts.BOND_CALLOUT: CLEARANCE .0015-.0065;
-# test_turned_bush_process ties the two).
-bond_clearance_min_in = 0.0015
-bond_clearance_max_in = 0.0065
+# (pd_transgear_pivot_spacer_callouts.BOND_CALLOUT: CLEARANCE .0035-.0085,
+# the #11 of D17, owner question Q7b; test_turned_bush_process ties the two).
+bond_clearance_min_in = 0.0035
+bond_clearance_max_in = 0.0085
 # A working piece sawn off the 12 in bar on hand (stock-bought.toml
 # c360-round-1-2 length_in, shared with MHA-PD-24, MHA-PD-25 and MHA-MG-11):
 # short enough to stand behind the jaws (the fleet's 10 in limit), and with
@@ -112,9 +112,9 @@ name = "No. 1 centre drill"
 ref = "centre-drills-carbide-60"
 
 [[tools]]
-id = "drill-12"
-name = "#12 drill"
-ref = "drill-12"
+id = "drill-11"
+name = "#11 drill"
+ref = "drill-11"
 
 [[tools]]
 id = "cutoff"
@@ -128,7 +128,7 @@ ref = "feeler-gauges"
 
 [[tools]]
 id = "pin-gauges"
-name = "Pin gauges, .001 steps: .189 to .194"
+name = "Pin gauges, .001 steps: .191 to .196"
 ref = "pin-gauges"
 
 [[tools]]
@@ -143,13 +143,13 @@ ref = "deburring-set"
 
 [[setups]]
 machine_kind = "lathe"
-title = "Bar: face, turn the outside, drill #12 through, part off long"
+title = "Bar: face, turn the outside, drill #11 through, part off long"
 machine = "PM-1127VF-LB lathe"
 indexing = "none"
 machine_ref = "pm-1127vf-lb"
 holding = "3-jaw on the Ø{{process.stock_dia_in:.3dot}} bar, {{process.chuck_grip_in:.2dot}} in in the jaws; {{cad.stickout_in:.2dot}} in out of the jaw fronts. Leave the bar in the jaws after Op 80: Setup 2 turns its mandrel on it."
 datum = "Z0 (carriage DRO) the bar end faced in Op 10."
-diagram = { file = "diagrams/bar.svg", alt = "The 1/2 in bar in the 3-jaw: the end faced, the outside turned, the hole spotted and drilled #12 through past the parting line; the spacer parted off .02 long." }
+diagram = { file = "diagrams/bar.svg", alt = "The 1/2 in bar in the 3-jaw: the end faced, the outside turned, the hole spotted and drilled #11 through past the parting line; the spacer parted off .02 long." }
 lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{cad.stock_dia_mm}}", stock_diameter_mm = "{{cad.stock_dia_mm}}", stickout_mm = "{{cad.stickout_mm}}", minimum_diameter_mm = "{{cad.outer_turn_min_mm}}", support = "none" }
 turning_support = { kind = "chuck_only", chuck_z_mm = "{{cad.jaw_z_mm}}" }
 
@@ -190,18 +190,18 @@ speed_kind = "spindle"
 tool = "centre"
 drilling = "none"
 sizing = "other"
-instruction = "Spot the centre from the tailstock with the No. 1 centre drill, about Ø.10 across the countersink: under the #12 drill, so the drill removes it."
+instruction = "Spot the centre from the tailstock with the No. 1 centre drill, about Ø.10 across the countersink: under the #11 drill, so the drill removes it."
 settings = "lathe-centre-c360"
 cut_diameter_mm = 1.191
 
 [[setups.operations]]
 cut_kind = "other"
 speed_kind = "spindle"
-tool = "drill-12"
+tool = "drill-11"
 drilling = "twist_drill"
 sizing = { kind = "band", band_mm = "{{cad.bore_dia_band_mm}}" }
-instruction = "Feed the #12 drill in until its lips just touch the spot's rim and zero the tailstock quill scale there. Drill in one steady feed until the scale reads {{cad.run_in:.2dot}}: the drill's full diameter then runs through the spacer and past the parting line. The #12 drill is the bore (drawing: #12 DRILL THRU). The outside, turned in Op 20, and this hole are made in one chucking: that holds the drawing's .016 runout of the outside to the bore (not gauged)."
-settings = "lathe-drill-12-c360"
+instruction = "Feed the #11 drill in until its lips just touch the spot's rim and zero the tailstock quill scale there. Drill in one steady feed until the scale reads {{cad.run_in:.2dot}}: the drill's full diameter then runs through the spacer and past the parting line. The #11 drill is the bore (drawing: #11 DRILL THRU). The outside, turned in Op 20, and this hole are made in one chucking: that holds the drawing's .016 runout of the outside to the bore (not gauged)."
+settings = "spacer-lathe-drill-11-c360"
 cut_diameter_mm = "{{cad.bore_dia_mm}}"
 hole_depth_mm = "{{cad.run_mm}}"
 peck = "none"
@@ -215,7 +215,7 @@ feed = "hand"
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "A shoulder that will not enter in Op 60: break the burr at the hole's mouth, clear the chips and try again. Clearance outside {{process.bond_clearance_min_in:.4dot}}–{{process.bond_clearance_max_in:.4dot}}: part the turned length off as scrap, pull the bar out to {{cad.stickout_in:.2dot}} in again and start again at Op 10 with a #12 drill that mikes .189 across its lands."
+instruction = "A shoulder that will not enter in Op 60: break the burr at the hole's mouth, clear the chips and try again. Clearance outside {{process.bond_clearance_min_in:.4dot}}–{{process.bond_clearance_max_in:.4dot}}: part the turned length off as scrap, pull the bar out to {{cad.stickout_in:.2dot}} in again and start again at Op 10 with a #11 drill that mikes .191 across its lands."
 feed = "hand"
 
 [[setups.operations]]
@@ -320,7 +320,7 @@ title = "Bench: deburr and check the spacer"
 machine = "Bench"
 envelope = "other"
 indexing = "none"
-diagram = { file = "diagrams/inspect.svg", alt = "The finished spacer: its {{cad.length_min_in:.3dot}}–{{cad.length_max_in:.3dot}} length between parallel faces, the turned outside and the #12 drilled hole through." }
+diagram = { file = "diagrams/inspect.svg", alt = "The finished spacer: its {{cad.length_min_in:.3dot}}–{{cad.length_max_in:.3dot}} length between parallel faces, the turned outside and the #11 drilled hole through." }
 vise_hold = "other"
 beam = "other"
 

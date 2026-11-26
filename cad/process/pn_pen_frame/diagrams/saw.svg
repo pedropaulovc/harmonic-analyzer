@@ -1,13 +1,22 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 440" font-family="sans-serif" font-size="13">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 440" width="760" height="440" font-family="sans-serif" font-size="13">
+  <!-- Hand picture, to scale at 127 px/in (5 px/mm) from the bar's 1-1/4 in width. The kerf is the plan's kerf_in (.125); the blade drawn in it, cut short to break lines (its 14 in diameter runs off the picture). The saw's vise jaws' size is not on record: schematic. -->
   <rect class="paper" x="0" y="0" width="760" height="440"/>
-  <text class="title" x="16" y="20">Setup 1: saw one blank off the bar</text>
-  <rect class="part-rest" x="40.0" y="120.0" width="508.0" height="158.8"/>
-  <rect class="part-arriving" x="40.0" y="120.0" width="222.2" height="158.8"/>
-  <rect class="part-waste" x="262.2" y="120.0" width="15.9" height="158.8"/>
-  <line class="dims" x1="40.0" y1="300.0" x2="262.2" y2="300.0"/>
-  <text class="label" x="151.1" y="318.0" text-anchor="middle">{{process.blank_length_min_in:.2f}}–{{process.blank_length_max_in:.2f}} blank</text>
-  <text class="label" x="302.2" y="110.0">saw kerf</text>
-  <text class="label" x="544.0" y="110.0" text-anchor="end">rest of the 4 in bar</text>
-  <text class="label" x="50.0" y="100.0">C36000 flat bar, 3/8 × 1-1/4 (seen from above)</text>
-  <text class="label" x="40.0" y="350.0">Mark one wide face BK, the back face: Setups 2–5 grip BK and the other wide face, BK to the fixed jaw.</text>
+  <text class="title" x="20" y="24">Setup 1: saw one blank off the bar, from above, to scale (127 px/in)</text>
+  <rect class="part-rest" x="40" y="120" width="508" height="158.75"/>
+  <rect class="part-arriving" x="40" y="120" width="222.2" height="158.75"/>
+  <rect class="part-waste" x="262.2" y="120" width="15.9" height="158.75"/>
+  <rect class="clamp" x="330" y="94" width="200" height="26"/>
+  <rect class="clamp" x="330" y="278.75" width="200" height="26"/>
+  <text class="label-on-clamp" x="430" y="112" text-anchor="middle">saw's vise jaw</text>
+  <text class="label-on-clamp" x="430" y="296.75" text-anchor="middle">saw's vise jaw</text>
+  <path class="cutter" d="M262.2 106L266.18 103L270.15 106L274.12 103L278.1 106L278.1 292L274.12 295L270.15 292L266.18 295L262.2 292Z"/>
+  <line class="dims" x1="40" y1="300" x2="262.2" y2="300"/>
+  <line class="dims" x1="40" y1="292" x2="40" y2="308"/>
+  <line class="dims" x1="262.2" y1="292" x2="262.2" y2="308"/>
+  <text class="label" x="151.1" y="318" text-anchor="middle">{{process.blank_length_min_in:.2f}}–{{process.blank_length_max_in:.2f}} blank</text>
+  <text class="label" x="286" y="336">saw blade in its {{process.kerf_in:.3dot}} kerf</text>
+  <text class="label" x="560" y="190">rest of the 4 in bar,</text>
+  <text class="label" x="560" y="206">clamped in the saw's vise</text>
+  <text class="label" x="50" y="100">C36000 flat bar, 3/8 × 1-1/4 (seen from above)</text>
+  <text class="label" x="40" y="370">Mark one wide face BK, the back face: Setups 2–5 grip BK and the other wide face, BK to the fixed jaw.</text>
 </svg>

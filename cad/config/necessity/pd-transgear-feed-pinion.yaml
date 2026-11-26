@@ -2,8 +2,9 @@
 # (owner ruling 2026-11-24: "In the part's registry file, not on the sheet.
 # The sheet stays clean; the reviewer fails a tight feature that has no
 # registry reason."). Read by the machinist review only. The gear's outside
-# diameter and its tooth data keep the gear data block's rules. Fit audit
-# 2026-11-23, pending owner confirmation.
+# diameter and its tooth data keep the gear data block's rules. The bore and
+# the boss are rule 4, form 2 (their mates are made to them); the bore's
+# modelled cut is the owner's ruling of 2026-11-24 on fit audit question 5.
 necessity:
   - id: N-01
     feature: "sheet 1, section B-B, Ø.126 REAM THRU bore, MHA-PD-23 IS TURNED TO THIS BORE"

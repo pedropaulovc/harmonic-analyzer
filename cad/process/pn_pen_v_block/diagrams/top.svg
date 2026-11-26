@@ -1,34 +1,35 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 460" font-family="sans-serif" font-size="13">
-  <rect class="paper" x="0" y="0" width="760" height="460"/>
-  <text class="title" x="20" y="22">VB06: section along the block through the bore (8 px/mm), B down, P left</text>
-  <!-- The fixed jaw behind, its top 16.4 mm above the stacks; the stacks under the block's edges. -->
-  <rect class="hidden" x="40" y="80.4" width="360" height="359.6" fill="none"/>
-  <rect class="fixture-support" x="60" y="211.4" width="320" height="228.6"/>
-  <line class="fixture-table" x1="30" y1="440" x2="420" y2="440"/>
-  <!-- The block at the bore's plane: the V's flat under the neck, the relief slot under the body. -->
-  <polygon class="part-kept" points="120,67.4 329.3,67.4 329.3,158.6 191.1,158.6 191.1,171.5 120,171.5"/>
-  <rect class="part-removed" x="120" y="63.1" width="209.3" height="4.3"/>
-  <!-- Pivot bore down into the slot; the #30's point below the roof. -->
-  <rect class="holes" x="206.8" y="67.4" width="25.6" height="91.2"/>
-  <polygon class="holes" points="207.8,158.6 231.4,158.6 219.6,173.6"/>
-  <polygon class="active-face" points="203.9,67.4 235.3,67.4 232.4,70.3 206.8,70.3"/>
-  <!-- The #30 drill above the bore. -->
-  <rect class="cutter" x="206.8" y="32" width="25.6" height="28"/>
-  <line class="arrow" x1="219.6" y1="30" x2="219.6" y2="100"/>
-  <line class="datum" x1="120" y1="40" x2="120" y2="66"/>
-  <text class="datum-label" x="126" y="50">X0 = P</text>
-  <line class="datum" x1="329.3" y1="211.4" x2="430" y2="211.4"/>
-  <text class="datum-label" x="434" y="215">Z0 stacks' top (B)</text>
-  <line class="leader" x1="430" y1="66" x2="330" y2="64"/>
-  <text class="label" x="434" y="70">top faced to the height</text>
-  <line class="leader" x1="430" y1="100" x2="233" y2="100"/>
-  <text class="label" x="434" y="104">pivot bore Ø{{cad.pivot_bore_dia_min_in:.4dot}}–{{cad.pivot_bore_dia_max_in:.4dot}}, X {{cad.pivot_bore_station_in:.3dot}}:</text>
-  <text class="label" x="434" y="120">spot, #30 drill to size, pecks of</text>
-  <text class="label" x="434" y="136">{{process.peck_30_mm:in.3dot}} full retract, chamfer mill</text>
-  <line class="leader" x1="430" y1="172" x2="232" y2="168"/>
-  <text class="label" x="434" y="176">#30 point in the slot's air</text>
-  <text class="label" x="434" y="230">relief slot (cut in VB05)</text>
-  <line class="leader" x1="430" y1="226" x2="300" y2="185"/>
-  <text class="label-halo" x="130" y="190">V flat (VB05)</text>
-  <text class="label" x="434" y="300">fixed jaw (behind): FRONT face</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 470" width="760" height="470" font-family="sans-serif" font-size="13">
+  <!-- Hand picture, to scale at 6 px/mm from the block's length (1.030, 26.162 mm), a section along the block at Y-10.922 (the bore's, the slot's and the V's centre), B down on the stacks, the fixed jaw (FRONT) behind. 1/2 in end mill Ø12.7 mm (face_cutter_dia_mm, shop endmill-carbide-3fl-1-2), its square end drawn as the near half of its end face (arc 12 % of its diameter deep, its lowest point the true end), drawn 1 in out (half_mill_projection_min_mm, a least stick-out) to a break line; the collet not drawn. Shown at the height .709 (18.0 mm), on the pass at Y-10.408 at X13 (the first pass, Y0.764, hangs over the fixed jaw); hatched: the .021 off the top from 18.542. Relief slot .260 (6.604 mm) high, the V's flat .196 (4.984) up (dashed: the V is open below the neck at this section). Stacks 1/2 + 5/8 in (stack_height_mm). The vise jaws' thickness and the parallels' length are not on record: schematic. Jaw height 44.9453 mm (vise_jaw_height_mm). -->
+  <rect class="paper" x="0" y="0" width="760" height="470"/>
+  <text class="title" x="20" y="24">VB06: B down, the top faced to the height, section through the bore, to scale (6 px/mm)</text>
+  <rect class="fixture-vise" x="120" y="450" width="348.97" height="14"/>
+  <rect class="clamp" x="120" y="180.33" width="348.97" height="269.67"/>
+  <path class="paper" d="M144 278.55L408.97 278.55L411.97 282.63L408.97 286.71L411.97 290.8L408.97 294.88L411.97 298.96L408.97 303.04L411.97 307.12L408.97 311.21L411.97 315.29L408.97 319.37L411.97 323.45L408.97 327.54L411.97 331.62L408.97 335.7L411.97 339.78L408.97 343.86L411.97 347.95L408.97 352.03L411.97 356.11L408.97 360.19L411.97 364.27L408.97 368.36L411.97 372.44L408.97 376.52L411.97 380.6L408.97 384.69L411.97 388.77L408.97 392.85L411.97 396.93L408.97 401.01L411.97 405.1L408.97 409.18L411.97 413.26L408.97 417.34L411.97 421.43L408.97 425.51L411.97 429.59L408.97 433.67L411.97 437.75L408.97 441.84L411.97 445.92L408.97 450L144 450Z"/>
+  <path class="fixture-support" d="M144 278.55L408.97 278.55L411.97 282.63L408.97 286.71L411.97 290.8L408.97 294.88L411.97 298.96L408.97 303.04L411.97 307.12L408.97 311.21L411.97 315.29L408.97 319.37L411.97 323.45L408.97 327.54L411.97 331.62L408.97 335.7L411.97 339.78L408.97 343.86L411.97 347.95L408.97 352.03L411.97 356.11L408.97 360.19L411.97 364.27L408.97 368.36L411.97 372.44L408.97 376.52L411.97 380.6L408.97 384.69L411.97 388.77L408.97 392.85L411.97 396.93L408.97 401.01L411.97 405.1L408.97 409.18L411.97 413.26L408.97 417.34L411.97 421.43L408.97 425.51L411.97 429.59L408.97 433.67L411.97 437.75L408.97 441.84L411.97 445.92L408.97 450L144 450Z"/>
+  <path class="part-kept" d="M180 248.65L233.34 248.65L233.34 238.93L336.97 238.93L336.97 167.3L180 167.3Z"/>
+  <text class="label-on-clamp" x="460.97" y="200.33" text-anchor="end">fixed jaw (behind);</text>
+  <text class="label-on-clamp" x="460.97" y="216.33" text-anchor="end">the moving jaw</text>
+  <text class="label-on-clamp" x="460.97" y="232.33" text-anchor="end">not shown</text>
+  <rect class="hidden" x="180" y="238.93" width="156.97" height="39.62"/>
+  <rect class="part-removed" x="180" y="167.3" width="156.97" height="3.25"/>
+  <path class="cutter" d="M296.1 161.41L296.1 94.35L292.29 97.35L288.48 94.35L284.67 97.35L280.86 94.35L277.05 97.35L273.24 94.35L269.43 97.35L265.62 94.35L261.81 97.35L258 94.35L254.19 97.35L250.38 94.35L246.57 97.35L242.76 94.35L238.95 97.35L235.14 94.35L231.33 97.35L227.52 94.35L223.71 97.35L219.9 94.35L219.9 161.41A38.1 9.14 0 0 0 296.1 161.41Z"/>
+  <line class="datum" x1="60" y1="170.55" x2="176" y2="170.55"/>
+  <text class="datum-label" x="56" y="175.55" text-anchor="end">Z{{cad.top_face_height_mm:in.3dot}}</text>
+  <line class="arrow" x1="306.1" y1="120.55" x2="376.1" y2="120.55"/>
+  <line class="datum" x1="20" y1="278.55" x2="140" y2="278.55"/>
+  <text class="datum-label" x="20" y="238.55">Z0 the</text>
+  <text class="datum-label" x="20" y="254.55">stacks'</text>
+  <text class="datum-label" x="20" y="270.55">top (B)</text>
+  <line class="datum" x1="180" y1="137.3" x2="180" y2="163.3"/>
+  <text class="datum-label" x="174" y="153.3" text-anchor="end">X0 = P</text>
+  <text class="label" x="490" y="56">1/2 in end mill faces the top to</text>
+  <text class="label" x="490" y="72">the height {{cad.top_face_height_min_in:.3dot}}-{{cad.top_face_height_max_in:.3dot}} ({{cad.top_face_height_mm:in.3dot}})</text>
+  <line class="leader" x1="488" y1="60" x2="272" y2="127.3"/>
+  <circle class="leader-dot" cx="272" cy="127.3" r="2"/>
+  <text class="label" x="490" y="330">relief slot (from Setup 6), the</text>
+  <text class="label" x="490" y="346">bore breaks into it; dashed:</text>
+  <text class="label" x="490" y="362">the block's B and the slot's walls,</text>
+  <text class="label" x="490" y="378">behind the section</text>
+  <line class="leader" x1="488" y1="326" x2="300" y2="258.75"/>
+  <circle class="leader-dot" cx="300" cy="258.75" r="2"/>
 </svg>

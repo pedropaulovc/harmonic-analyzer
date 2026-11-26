@@ -46,9 +46,9 @@
 #   on #3485 removed the bond salvage).
 # - The dowel centres are the program's targets: their acceptance is the
 #   three MHA-PD-09 wheels dropping on at MHA-PD-00 (20E), never a reading
-#   over pins here. The flat pin's centre keeps its printed ±.002: it is
-#   read over set pins (Setup 3) and accepted inside that band less the
-#   reading's .0012 bias each side.
+#   over pins here. The flat pin's centre keeps its printed ±.002 and is
+#   read over set pins (Setup 3), accepted as read: the spec charges the
+#   reading's bias in its worst cases (D6).
 # - The feature export still binds limits for the reamed sizes and the dowel
 #   centres (the adapter requires them): they are the spec's ANALYSIS bands
 #   and no step here accepts by them.
@@ -168,18 +168,13 @@ tool_out_min_in = 0.6
 # constant half of .093 + .061.
 over_flat_half_sum_in = 0.077
 # The pins stand loose in their holes and up to .0002 under their marked
-# sizes, so a reading can sit up to over_pins_bias_in off the true centre,
-# and re-seating the pins does not remove it (the anvils push both pins
-# toward each other). So the reading is accepted only inside the sheet's
-# .116-.120 less that bias each side (Codjiflo round 2 on #3485): a reading
-# there proves the true centre inside the print, which N-03 and RV-03 rest
-# on. test_pd_transgear_drive_collar_process derives the window from the
-# spec's FLAT_PIN_CENTRE and FLAT_PIN_CENTRE_TOL.
-over_pins_bias_in = 0.0012
-flat_centre_accept_min_in = 0.1172
-flat_centre_accept_max_in = 0.1188
-flat_centre_accept_min_mm = 2.97688
-flat_centre_accept_max_mm = 3.01752
+# sizes, so a reading can sit up to .0012 off the true centre. The
+# acceptance is the sheet's .116-.120 as printed: the spec charges that
+# .0012 in every worst case that reads the centre
+# (pd_transgear_drive_collar_spec.FLAT_PIN_CENTRE_READ_BIAS; delegated
+# ruling 2026-11-24 (Main), D6), so a narrower window would only
+# scrap parts that meet the print. A reading near a limit is taken again
+# with the pins re-seated.
 # Speeds and feeds: the shop settings (cad/process/shop/pd.toml, the
 # MHA-PD-22 block, sourced there): spot, #43 and #53 2800 rpm × .001 in/rev
 # = 2.8 in/min; the reamers 1400 × .001 = 1.4 in/min. cam.py refuses a feed
@@ -494,8 +489,8 @@ feed = "hand"
 
 [[setups.operations]]
 instruction = "The bore's pin out. The .093 pin in the same dowel hole, the set's .061 pin in the flat pin's hole, both standing out of the rear face. Mike over the two pins as R. The flat pin's centre from the bore's axis is D + {{process.over_flat_half_sum_in:.3dot}} − R."
-inspection = "Flat pin's centre {{process.flat_centre_accept_min_in:.4dot}}–{{process.flat_centre_accept_max_in:.4dot}} from the bore's axis: the sheet's {{cad.flat_pin_hole_centre_min_in:.3dot}}–{{cad.flat_pin_hole_centre_max_in:.3dot}} less the {{process.over_pins_bias_in:.4dot}} the loose pins can read off, each side. Outside it: re-seat both pins and mike once more."
-gauge_checks = [{ gauge = "micrometers", band_mm = ["{{process.flat_centre_accept_min_mm}}", "{{process.flat_centre_accept_max_mm}}"] }]
+inspection = "Flat pin's centre {{cad.flat_pin_hole_centre_min_in:.3dot}}–{{cad.flat_pin_hole_centre_max_in:.3dot}} from the bore's axis. Within .001 of a limit: re-seat both pins and mike again."
+gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.flat_pin_hole_centre_band_mm}}" }]
 feed = "hand"
 
 [[setups.operations]]
@@ -505,7 +500,7 @@ gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.flat_pin_floor_station_ba
 feed = "hand"
 
 [[setups.operations]]
-instruction = "The .191 pin refused in the bore in Op 240: repeat Op 230 once and gauge again. Still refused, or the .195 pin entering; the flat pin's centre still outside {{process.flat_centre_accept_min_in:.4dot}}–{{process.flat_centre_accept_max_in:.4dot}} after the re-seat (Op 260); or its floor outside {{cad.flat_pin_floor_station_min_in:.2dot}}–{{cad.flat_pin_floor_station_max_in:.2dot}} (Op 270): scrapped, not reworked; make another from Setup 1."
+instruction = "The .191 pin refused in the bore in Op 240: repeat Op 230 once and gauge again. Still refused, or the .195 pin entering; the flat pin's centre outside {{cad.flat_pin_hole_centre_min_in:.3dot}}–{{cad.flat_pin_hole_centre_max_in:.3dot}} (Op 260); or its floor outside {{cad.flat_pin_floor_station_min_in:.2dot}}–{{cad.flat_pin_floor_station_max_in:.2dot}} (Op 270): scrapped, not reworked; make another from Setup 1."
 feed = "hand"
 
 [[setups.operations]]
@@ -523,5 +518,5 @@ instruction = "Finish (drawing: bright machined, oiled): wipe the collar clean a
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Left to MHA-PD-00, not done here: the two MHA-PD-VN-54 dowels pressed (step 20A); the three MHA-PD-09 wheels tried on the dowels (20E); the pilot faced to fit (21A, note 5); the rear face faced to fit (29D, note 6) and the rear bore mouth broken .008 X 45° (29E)."
+instruction = "Left to MHA-PD-00, not done here: the two MHA-PD-VN-54 dowels pressed (step 20A); the three MHA-PD-09 wheels tried on the dowels (20E); the pilot faced to fit (21A, note 6); the rear face faced to fit (29D, note 7) and the rear bore mouth broken .008 X 45° (29E)."
 feed = "hand"

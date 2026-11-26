@@ -1,24 +1,33 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 355" font-family="sans-serif" font-size="13">
-  <rect class="paper" x="0" y="0" width="760" height="355"/>
-  <text class="title" x="20" y="20">Setup 6 (side view): PH03, both slots in line through the bonded plates</text>
-  <rect class="fixture-support" x="176.9" y="201.8" width="251.5" height="83.8"/>
-  <rect class="part-kept" x="168.5" y="191.3" width="534.8" height="10.5"/>
-  <rect class="part-kept" x="168.5" y="110.0" width="10.5" height="81.3"/>
-  <rect class="part-kept" x="299.7" y="110.0" width="10.5" height="81.3"/>
-  <rect class="part-removed" x="168.5" y="110.0" width="10.5" height="35.2"/>
-  <rect class="part-removed" x="299.7" y="110.0" width="10.5" height="35.2"/>
-  <rect class="fixture-support" x="168.5" y="107.5" width="251.5" height="83.8" fill="none" stroke-dasharray="4 3"/>
-  <line class="leader" x1="33.2" y1="137.3" x2="554.6" y2="137.3" stroke-dasharray="6 3"/>
-  <text class="label" x="564.5" y="141.3">jaws' top</text>
-  <line class="leader" x1="155.6" y1="145.2" x2="322.9" y2="145.2"/>
-  <line class="leader" x1="234.5" y1="145.2" x2="194.5" y2="48.0"/>
-  <text class="label" x="20.0" y="44.0">T4 path at the floor, through both plates</text>
-  <line class="leader" x1="399.5" y1="107.5" x2="531.5" y2="74.0"/>
-  <text class="label" x="471.5" y="70.0">packing block (dashed, in front of the plates):</text>
-  <text class="label" x="471.5" y="86.0">its top .03 above Z0</text>
-  <text class="label" x="449.0" y="242.0">support block</text>
-  <text class="label" x="498.5" y="217.8">strap</text>
-  <text class="label" x="20.0" y="307.9">Side view from the moving jaw: X0 the foot end (left), Z0 the plates' far ends;</text>
-  <text class="label" x="20.0" y="323.9">slots ({{cad.slots_width_nominal_in:.3dot}}) x {{cad.slots_depth_in:.3dot}} hatched. Plan as Setup 5 (same clamping); Y0 the fixed jaw.</text>
-  <text class="label" x="20" y="343">T4 3/16 in end mill at least .70 out; oil brushed on before Cycle Start.</text>
-</svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 380" width="760" height="380" font-family="sans-serif" font-size="13">
+  <!-- Hand picture, to scale at 3.307 px/mm (the 1/8 in strap 10.5 px). 3/16 in end mill Ø4.7625 mm (slot_cutter_dia_mm, shop endmill-carbide-3fl-3-16) at the slots' floor, .420 below Z0 (slot_depth_mm), in the upper plate on its pass along X; its square end drawn as the near half of its end face, arc 12 % of its diameter deep; drawn .70 in out (slot_projection_min_mm 17.78, its least stick-out) to a break line. The screw jack about 4.3 in from the foot (the plan's holding); its size is not on record: schematic. -->
+  <rect class="paper" x="0" y="0" width="760" height="380"/>
+  <text class="title" x="20" y="24">Setup 6 (side view, to scale 3.3 px/mm): PH03, the 3/16 in end mill through both plates in line</text>
+  <rect class="fixture-support" x="176.9" y="201.8" width="251.5" height="83.8"/>
+  <rect class="part-kept" x="168.5" y="191.3" width="534.8" height="10.5"/>
+  <rect class="part-kept" x="168.5" y="110.0" width="10.5" height="81.3"/>
+  <rect class="part-kept" x="299.7" y="110.0" width="10.5" height="81.3"/>
+  <rect class="part-removed" x="168.5" y="110.0" width="10.5" height="35.2"/>
+  <rect class="part-removed" x="299.7" y="110.0" width="10.5" height="35.2"/>
+  <rect class="fixture-support" x="168.5" y="107.5" width="251.5" height="83.8" fill="none" stroke-dasharray="4 3"/>
+  <line class="leader" x1="33.2" y1="137.3" x2="554.6" y2="137.3" stroke-dasharray="6 3"/>
+  <text class="label" x="564.5" y="141.3">jaws' top</text>
+  <line class="leader" x1="155.6" y1="145.2" x2="322.9" y2="145.2"/>
+  <line class="leader" x1="399.5" y1="107.5" x2="531.5" y2="74.0"/>
+  <text class="label" x="471.5" y="70.0">packing block (dashed, in front of the plates):</text>
+  <text class="label" x="471.5" y="86.0">its top {{process.packing_top_mm:in.2dot}} above Z0</text>
+  <path class="cutter" d="M312.82 143.39L312.82 86.48L308.89 89.48L304.95 86.48L301.01 89.48L297.08 86.48L297.08 143.39A7.87 1.89 0 0 0 312.82 143.39Z"/>
+  <line class="arrow" x1="320.95" y1="95.28" x2="374.95" y2="95.28"/>
+  <text class="label" x="20" y="44">3/16 in end mill at the slots' floor, on its pass</text>
+  <text class="label" x="20" y="60">along X through both plates</text>
+  <line class="leader" x1="344" y1="40" x2="312.82" y2="115.28"/>
+  <circle class="leader-dot" cx="312.82" cy="115.28" r="2"/>
+  <rect class="fixture-support" x="519.69" y="201.8" width="20" height="83.8"/>
+  <rect class="fixture-vise" x="150" y="285.6" width="590" height="10"/>
+  <text class="label" x="600" y="218">strap</text>
+  <text class="label-halo" x="240" y="250">support block</text>
+  <text class="label" x="545.69" y="262">screw jack under the strap</text>
+  <text class="label" x="545.69" y="278">(about 4.3 in from the foot)</text>
+  <text class="label" x="20" y="318">Side view from the moving jaw: X0 the foot end (left), Z0 the plates' far ends; slots ({{cad.slots_width_nominal_in:.3dot}}) x {{cad.slots_depth_mm:in.3dot}}</text>
+  <text class="label" x="20" y="334">hatched. Plan as Setup 5 (same clamping); Y0 the fixed jaw; the 1/2 in parallel beside the strap is</text>
+  <text class="label" x="20" y="350">behind it in this view. T4 at least {{process.slot_projection_min_mm:in.2dot}} out; oil brushed on before Cycle Start.</text>
+</svg>

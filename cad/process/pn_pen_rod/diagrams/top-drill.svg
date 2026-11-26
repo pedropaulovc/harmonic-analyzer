@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 400" width="760" height="400">
+  <!-- Hand picture, to scale at 20 px/mm from the 5 mm square (square_mm). 3/64 drill Ø1.190625 mm (shop tools.drill-3-64; the drawing's DRILL .0469), 118° point, full diameter .27 deep (the drawing's .26-.28, aimed at its middle); drawn short to a break line, its tailstock chuck not drawn (no size on record). The 4-jaw and its shims are schematic. The centre drill's spot is not drawn (the drill stands for it). -->
+  <rect class="paper" x="0" y="0" width="760" height="400"/>
+  <text class="title" x="20" y="24">Top end, to scale (20 px/mm) bar the chuck: the 3/64 drill at its depth from the tailstock</text>
+  <rect class="fixture-vise" x="70" y="65" width="110" height="250"/>
+  <rect class="clamp" x="180" y="66" width="120" height="70"/>
+  <rect class="part-rest" x="180" y="136" width="120" height="4"/>
+  <rect class="clamp" x="180" y="244" width="120" height="70"/>
+  <rect class="part-rest" x="180" y="240" width="120" height="4"/>
+  <text class="label" x="70" y="370">4-jaw (schematic) on the flats over brass shims;</text>
+  <text class="label" x="70" y="386">indicate each pair of flats within {{process.indicate_tir_in:.3dot}} TIR</text>
+  <path class="part-kept" d="M528.6 140L528.6 240L20 240L17 235.83L20 231.67L17 227.5L20 223.33L17 219.17L20 215L17 210.83L20 206.67L17 202.5L20 198.33L17 194.17L20 190L17 185.83L20 181.67L17 177.5L20 173.33L17 169.17L20 165L17 160.83L20 156.67L17 152.5L20 148.33L17 144.17L20 140Z"/>
+  <rect class="part-removed" x="391.44" y="178.09" width="137.16" height="23.81"/>
+  <path class="part-removed" d="M391.4 178.1L384.3 190L391.4 201.9Z"/>
+  <line class="centre-line" x1="10" y1="190" x2="740" y2="190"/>
+  <path class="cutter" d="M700 178.09L391.44 178.09L384.29 190L391.44 201.91L700 201.91L697 197.94L700 193.97L697 190L700 186.03L697 182.06Z"/>
+  <line class="arrow" x1="640" y1="150" x2="590" y2="150"/>
+  <line class="datum" x1="528.6" y1="80" x2="528.6" y2="136"/>
+  <text class="datum-label" x="522.6" y="100" text-anchor="end">Z0 top face</text>
+  <line class="dims" x1="391.44" y1="204" x2="391.44" y2="276"/>
+  <line class="dims" x1="528.6" y1="244" x2="528.6" y2="276"/>
+  <line class="dims" x1="391.44" y1="270" x2="528.6" y2="270"/>
+  <text class="label" x="351.44" y="294">full diameter {{cad.stud_tap_drill_depth_min_in:.2dot}}-{{cad.stud_tap_drill_depth_max_in:.2dot}} deep: the quill scale reads {{process.drill_scale_in:.3dot}}</text>
+  <text class="label" x="545" y="52">3/64 drill (Ø.0469) in the</text>
+  <text class="label" x="545" y="68">tailstock chuck, short out</text>
+  <text class="label" x="545" y="84">of it; back out every {{process.peck_mm:in.3dot}}</text>
+  <line class="leader" x1="600" y1="90" x2="660" y2="178.09"/>
+  <circle class="leader-dot" cx="660" cy="178.09" r="2"/>
+</svg>

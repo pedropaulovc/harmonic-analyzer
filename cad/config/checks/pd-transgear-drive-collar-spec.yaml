@@ -1,0 +1,16 @@
+# MHA-PD-22's checks (tolerance-policy.md, "Checks in spec modules and
+# tests"; cad/scripts/check_register.py). Entered on Codjiflo r1 on #3569
+# for D6's reading bias and the shoulder wall.
+checks:
+  - id: C-01
+    check: "FLAT_PIN_CENTRE_READ_BIAS"
+    kind: gap
+    reason: "a true centre outside the band closes the stud gap"
+    source: "delegated ruling 2026-11-24 (Main), D6, following the owner's 2026-11-01 thin-wall ruling; owner review on #2144 (https://github.com/pedropaulovc/harmonic-analyzer/issues/2144#issuecomment-7139937225): the bias is charged in the spec and the traveler accepts the printed .116-.120 as read. The .0012: the two set pins the traveler mikes over stand loose in their holes and up to .0002 under their marked sizes, and re-seating them does not remove it (the anvils push both toward each other). Every worst case that reads the flat pin's centre (crest, stud air .0019, edge margin .0060, the web .0746 and the shoulder wall) takes .118 ±.0032"
+    basis: worst_case
+  - id: C-02
+    check: "FLAT_PIN_SHOULDER_WALL_ACCEPTED"
+    kind: wall
+    reason: "pressing the pin breaks the hole out at the shoulder"
+    source: "rule 17's .060 floor and .080 target (owner-ruled thresholds); the declared value of registry exception RV-06, .075 MIN: delegated ruling 2026-11-25 (Main), precedent: the owner's 2026-11-01 ruling accepting this collar's pin-hole-to-rim wall under the target (owner review on #2144, https://github.com/pedropaulovc/harmonic-analyzer/issues/2144#issuecomment-7139937225). It supersedes D6's .0796, taken at the reamed floor's edge: the #53 pilot drill runs full diameter .005 past the floor (not stopped short) and its point lies beyond, so the worst case is .0752, printed .075 MIN (rule 20); no geometry escape without moving the pin. The guard keeps the printed MIN at or over what RV-06 declares and the wall over the floor"
+    basis: worst_case

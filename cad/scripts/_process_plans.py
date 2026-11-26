@@ -82,14 +82,16 @@ def family_parts(stem: str, root: Path | None = None) -> dict[str, str]:
     path = root / stem / "plan.toml"
     if not path.is_file():
         return {}
-    return dict(_bound_parts(path, path.stat().st_mtime_ns, stem))
+    return dict(_bound_parts(path.read_text(encoding="utf-8"), stem))
 
 
 @functools.cache
-def _bound_parts(path: Path, _mtime_ns: int, stem: str) -> tuple[tuple[str, str], ...]:
-    """``family_parts`` of the plan at ``path``, parsed once per version of
-    the file: task loading asks for every enrolled plan's parts many times."""
-    plan = tomllib.loads(path.read_text(encoding="utf-8"))
+def _bound_parts(text: str, stem: str) -> tuple[tuple[str, str], ...]:
+    """``family_parts`` of a plan's ``text``, parsed once per text: task
+    loading asks for every enrolled plan's parts many times. Keyed on the
+    text, not the file's mtime: a rewrite inside one clock tick keeps the
+    mtime."""
+    plan = tomllib.loads(text)
     parts: dict[str, str] = {}
     for part in plan.get("parts", ()):
         manifest = Path(part["file"])

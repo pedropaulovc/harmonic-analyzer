@@ -455,14 +455,14 @@ def test_listed_engraving_bit_cuts_every_graduation_and_numeral() -> None:
     import _process_plans
     import _shop_equipment
 
-    bit = _shop_equipment.load()["tools"]["ms-stick-engraver"]
+    bit = _shop_equipment.load()["tools"]["engravers-esao-30-0-1"]
     shop = _process_plans.load_shop()
     # One bit cuts both: its V is the model's.
     assert bit["included_angle_deg"] == spec.ENGRAVING_V_INCLUDED_ANGLE_DEG
     assert f"{spec.ENGRAVING_V_INCLUDED_ANGLE_DEG:g}°" in callouts.CALLOUTS["TickDepth"]
     assert f"{spec.ENGRAVING_V_INCLUDED_ANGLE_DEG:g}°" in callouts.CALLOUTS["NumeralDepth"]
     slope = math.tan(math.radians(bit["included_angle_deg"] / 2.0))
-    tip = bit["tip_width_in"] * 25.4
+    tip = bit["tip_width_mm"]
     # Plunge depths that cut the printed face-width limits, against the depth
     # MIN and the deepest cut that leaves the stated stock at the thinnest bar.
     depth_for_width_min = (spec.TICK_WIDTH - tip) / (2.0 * slope)
@@ -478,7 +478,7 @@ def test_listed_engraving_bit_cuts_every_graduation_and_numeral() -> None:
     stroke = tip + 2.0 * spec.NUMERAL_DEPTH * slope
     assert 0.0 < (stroke - spec.NUMERAL_STROKE_WIDTH_MM) / 2.0 < 0.254
     setting = shop["settings"]["ms-stick-engrave-brass"]
-    assert setting["tool"] == "ms-stick-engraver" and "ms-stick-engraver" in shop["tools"]
+    assert setting["tool"] == "engravers-esao-30-0-1" and "engravers-esao-30-0-1" in shop["tools"]
     low, high = shop["machines"]["pm-30mv"]["rpm_ranges"][0]
     assert low <= setting["rpm"] <= high
 

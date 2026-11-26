@@ -348,8 +348,9 @@ PIN_HOLE_DEPTH = LENGTH  # through the body
 # ANALYSIS band the walls charge.  The hole is reamed blind from the rear
 # face into the supplied body to a full-diameter floor FLAT_PIN_FLOOR behind
 # the front (seat) face; the floor prints at two places (.XX, ±.01): over its
-# band the drill point stays in the body, the pilot-shoulder wall holds the
-# .080 target and the pin keeps its engagement on the core (asserted below),
+# band the drill point stays in the body, the hole's wall to the pilot
+# shoulder stays over the .060 floor (note 5) and the pin keeps its
+# engagement on the core (asserted below),
 # so the floor needs no tighter row and no function words.  The pin is
 # pressed to that floor and its
 # crest, the surface nearest the axis, stands inside the bore over the core's
@@ -361,11 +362,12 @@ FLAT_PIN_HOLE_PLACES = 4
 # The shop row for a reamed hole's location, no fit route: the shaft's flat is
 # milled last to this collar's own crest (MHA-PD-08 note 2), wherever in the
 # band the centre lands.  The band stays ±.002 (machinist review r1 asked for
-# the title block's ±.005): at ±.005 the lowest crest leaves the #8-32 stud
-# .0001 of air (.0031 here), the pin drives on the flat's edge (margin
-# -.0010, .0098 here) and the floor's wall to the pilot shoulder falls to
-# .0787, under the .080 target (.0801 here); no nominal passes all three.
-# The callout prints the first as its one reason (FLAT_PIN_HOLE_CALLOUT).
+# the title block's ±.005): at ±.005, before the reading bias below, the
+# lowest crest leaves the #8-32 stud .0001 of air, the pin drives on the
+# flat's edge (margin -.0010) and the hole's wall to the pilot shoulder
+# falls to .0743; at ±.002 with the bias charged (D6) they are .0019, .0060
+# and .0752.  The callout prints the first as its one reason
+# (FLAT_PIN_HOLE_CALLOUT).
 FLAT_PIN_CENTRE = 2.9972  # .118 from the bore axis, along local -Y
 FLAT_PIN_CENTRE_TOL = 0.0508  # ±.002
 FLAT_PIN_CENTRE_PLACES = 3
@@ -376,8 +378,21 @@ FLAT_PIN_FLOOR_LIMITS = (FLAT_PIN_FLOOR + _FLOOR_LO, FLAT_PIN_FLOOR + _FLOOR_HI)
 # The pin as modelled: the catalogue length, faced flush with the model's
 # nominal fitted rear face when it would stand past it.
 FLAT_PIN_LENGTH = min(FLAT_PIN_STOCK_LENGTH, LENGTH - FLAT_PIN_FLOOR)
+# The traveler reads the centre by miking over two set pins that stand loose
+# in their holes and up to .0002 under their marked sizes, so a reading can
+# sit up to FLAT_PIN_CENTRE_READ_BIAS off the true centre, and re-seating the
+# pins does not remove it.  The traveler accepts the printed .116-.120 as
+# read; every worst case here charges the true centre that band widened by
+# the bias each side (delegated ruling 2026-11-24 (Main), D6, following the
+# owner's 2026-11-01 thin-wall ruling; owner review on #2144,
+# https://github.com/pedropaulovc/harmonic-analyzer/issues/2144#issuecomment-7139937225).
+# The shoulder wall this leaves, FLAT_PIN_SHOULDER_WALL_WORST, is declared
+# at FLAT_PIN_SHOULDER_WALL_ACCEPTED under the .080 target (RV-06).  Check
+# register: cad/config/checks/pd-transgear-drive-collar-spec.yaml.
+FLAT_PIN_CENTRE_READ_BIAS = 0.03048  # .0012
 _FLAT_PIN_CENTRE_LIMITS = (
-    FLAT_PIN_CENTRE - FLAT_PIN_CENTRE_TOL, FLAT_PIN_CENTRE + FLAT_PIN_CENTRE_TOL
+    FLAT_PIN_CENTRE - FLAT_PIN_CENTRE_TOL - FLAT_PIN_CENTRE_READ_BIAS,
+    FLAT_PIN_CENTRE + FLAT_PIN_CENTRE_TOL + FLAT_PIN_CENTRE_READ_BIAS,
 )
 _FLAT_PIN_R_LIMITS = (min(FLAT_PIN_DIA_LIMITS) / 2.0, max(FLAT_PIN_DIA_LIMITS) / 2.0)
 _FLAT_PIN_HOLE_R_MAX = (FLAT_PIN_HOLE_DIA + max(FLAT_PIN_HOLE_BAND)) / 2.0
@@ -386,7 +401,7 @@ _FLAT_PIN_HOLE_OUTER_R_MAX = max(_FLAT_PIN_CENTRE_LIMITS) + _FLAT_PIN_HOLE_R_MAX
 FLAT_PIN_CREST_LIMITS = (
     min(_FLAT_PIN_CENTRE_LIMITS) - max(_FLAT_PIN_R_LIMITS),
     max(_FLAT_PIN_CENTRE_LIMITS) - min(_FLAT_PIN_R_LIMITS),
-)  # .0847 .. .0888
+)  # .0835 .. .0900, the reading bias charged
 # Radial air from the crest to the core's flat, the core centred in the bore:
 # what the flat's trial fit leaves (the collar with its pin pressed slides on
 # by hand), not a stack of two printed bands.  MHA-PD-08's flat analysis band
@@ -415,10 +430,22 @@ FLAT_PIN_RETAINED_MARGIN = min(_FLAT_PIN_CENTRE_LIMITS) - _BORE_R_MAX
 # blank: the rear-face fit faces the pin with the body.
 FLAT_PIN_REAR_MAX = max(FLAT_PIN_FLOOR_LIMITS) + max(FLAT_PIN_LENGTH_LIMITS)
 FLAT_PIN_BLANK_INSET_MIN = BODY_BLANK_LENGTH_MIN - FLAT_PIN_REAR_MAX
-# The reamed hole's 118-degree drill point lies ahead of the full-diameter
-# floor; it stays in the body, behind the front face.
+# The reamer's pilot, a #53 drill, runs its full diameter FLAT_PIN_PILOT_LEAD
+# past the reamer's end so the reamer's bevel never meets the drill's point
+# (the traveler's Op 190), and the reamer's end may sit at the full-diameter
+# floor itself (its bevel taken at none).  So the hole's deepest full
+# diameter stands FLAT_PIN_DRILL_STATION_MIN from the front face, at the
+# shallowest floor less that lead, and the drill's 118-degree point lies
+# ahead of it; it stays in the body, behind the front face.  The drill's cut
+# is charged at the reamed hole's largest radius: a drill that cut more than
+# the reamer would leave the hole open to the pin, which note 3's press
+# (the pin is the gauge) refuses.  Traveler review 2026-11-25 on #3569: the
+# floor alone, with the point drawn from it, missed the lead.
+FLAT_PIN_PILOT_DRILL = "#53"
+FLAT_PIN_PILOT_LEAD = 0.127  # .005
+FLAT_PIN_DRILL_STATION_MIN = min(FLAT_PIN_FLOOR_LIMITS) - FLAT_PIN_PILOT_LEAD
 FLAT_PIN_DRILL_POINT = _FLAT_PIN_HOLE_R_MAX / math.tan(math.radians(59.0))
-FLAT_PIN_DRILL_TIP_MIN = min(FLAT_PIN_FLOOR_LIMITS) - FLAT_PIN_DRILL_POINT
+FLAT_PIN_DRILL_TIP_MIN = FLAT_PIN_DRILL_STATION_MIN - FLAT_PIN_DRILL_POINT
 # Within FRONT_CORNER_RADIUS_MAX of F the shaft's root corner reaches
 # _ROOT_CORNER_REACH_MAX.  There the rear break has cut the pin's crest back
 # to at least its cone's radius at that depth (its smallest leg at its
@@ -483,6 +510,9 @@ if min(FLAT_PIN_CREST_CLEARANCE) < 0.0 or (
     )
 # Lost motion, stated not gated: the knob is chain-driven and the paper feeds
 # one way while the crank turns.  Delegated accept RV-04 in the registry row.
+# The flat's loose side carries no limit (D10, owner question Q4: MHA-PD-08
+# RV-07): a flat cut deeper than the fit only adds play, and the 17.2° cap
+# below is reached at about .0051 of air.
 # With the flat fitted to the crest the play follows the fitted air alone:
 # cos(theta) = 1 - air / centre, widest at the nearest centre.
 FLAT_PIN_PLAY_DEG = (
@@ -596,13 +626,47 @@ FLAT_PIN_WEB_WORST = floor_inch(
 )
 # Flat-pin hole to the body O.D.
 FLAT_PIN_OD_WALL_WORST = _OD_R_MIN - _FLAT_PIN_HOLE_OUTER_R_MAX
-# The hole lies inside the pilot's footprint; its floor's outer edge meets
-# the pilot shoulder (pilot O.D. on the front face) across the shallowest
-# floor.  The hole breaking into the bore is the intended crest, not a wall.
+# The hole lies inside the pilot's footprint, so the metal between its
+# deepest end and the pilot shoulder (pilot O.D. on the front face) is a
+# wall across the corner, not a depth.  In the plane through both axes, at
+# the smallest pilot and the farthest centre, it runs from the shoulder's
+# corner to the nearest point of the hole's end: the drill's full-diameter
+# corner at FLAT_PIN_DRILL_STATION_MIN or its 118-degree point beyond.  The
+# hole breaking into the bore is the intended crest, not a wall.
 _PILOT_R_MIN = (PILOT_DIA + min(PILOT_DIA_BAND)) / 2.0
-FLAT_PIN_SHOULDER_WALL_WORST = math.hypot(
-    _PILOT_R_MIN - _FLAT_PIN_HOLE_OUTER_R_MAX, min(FLAT_PIN_FLOOR_LIMITS)
-)
+
+
+def _distance_to_segment(
+    point: tuple[float, float], start: tuple[float, float], end: tuple[float, float]
+) -> float:
+    """The least distance from ``point`` to the segment ``start``-``end``."""
+    along = (end[0] - start[0], end[1] - start[1])
+    t = (
+        (point[0] - start[0]) * along[0] + (point[1] - start[1]) * along[1]
+    ) / (along[0] ** 2 + along[1] ** 2)
+    t = min(1.0, max(0.0, t))
+    return math.dist(point, (start[0] + t * along[0], start[1] + t * along[1]))
+
+
+# (radius from the hole's axis, depth behind the front face)
+_SHOULDER_CORNER = (_PILOT_R_MIN - max(_FLAT_PIN_CENTRE_LIMITS), 0.0)
+FLAT_PIN_SHOULDER_WALL_WORST = _distance_to_segment(
+    _SHOULDER_CORNER,
+    (_FLAT_PIN_HOLE_R_MAX, FLAT_PIN_DRILL_STATION_MIN),
+    (0.0, FLAT_PIN_DRILL_TIP_MIN),
+)  # .0752
+# Under the .080 target, over the .060 floor: printed as note SHOULDER_NOTE
+# (rule 20) and declared as registry exception RV-06, accepted at .075 MIN by
+# delegated ruling 2026-11-25 (Main), precedent: the owner's 2026-11-01
+# ruling accepting this collar's pin-hole-to-rim wall under the target (owner
+# review on #2144,
+# https://github.com/pedropaulovc/harmonic-analyzer/issues/2144#issuecomment-7139937225).
+# It supersedes D6's .0796, which was taken at the reamed floor's edge: the
+# #53 pilot runs full diameter .005 past the floor (the drill is not stopped
+# short), and no geometry escape exists without moving the pin.  The printed
+# MIN never falls under what RV-06 declares.
+FLAT_PIN_SHOULDER_WALL_ACCEPTED = 1.905  # .075
+FLAT_PIN_SHOULDER_WALL_PRINTED = floor_inch(FLAT_PIN_SHOULDER_WALL_WORST)
 # The holes run through the body beside the pilot, never into it.
 PIN_HOLE_INNER_R_MIN = PIN_CIRCLE_RADIUS - PIN_CENTRE_SHIFT_MAX - _PIN_HOLE_R_MAX
 PILOT_R_MAX = (PILOT_DIA + max(PILOT_DIA_BAND)) / 2.0
@@ -688,8 +752,9 @@ for _ok, _what in (
     (FLAT_PIN_WEB_WORST >= WALL_FLOOR, "flat-pin hole to drive-pin hole under the floor"),
     (FLAT_PIN_OD_WALL_WORST >= WALL_TARGET_MM, "flat-pin hole to the O.D. under the target"),
     (
-        FLAT_PIN_SHOULDER_WALL_WORST >= WALL_TARGET_MM,
-        "flat-pin hole floor to the pilot shoulder under the target",
+        FLAT_PIN_SHOULDER_WALL_PRINTED >= FLAT_PIN_SHOULDER_WALL_ACCEPTED - 1e-9
+        and FLAT_PIN_SHOULDER_WALL_WORST >= WALL_FLOOR,
+        "the flat-pin hole's wall to the pilot shoulder under RV-06's declared value",
     ),
     (FRONT_BEARING_AREA_MIN > 0.0, "the collar rear face has no actual gear support"),
     (ROOT_CORNER_BORE_AIR_MIN > 0.0, "the rear bore mouth does not clear the root corner"),
@@ -741,7 +806,7 @@ for _ok, _what in (
 # link: machinist review r2 of the fit batch read it as unlinked).  Why each
 # ream and tight band stays is the registry's, not the sheet's (owner ruling
 # 2026-11-24): cad/config/necessity/pd-transgear-drive-collar.yaml.
-RIM_NOTE, WEB_NOTE, REAM_NOTE, TRIAL_NOTE = 1, 2, 3, 4
+RIM_NOTE, WEB_NOTE, REAM_NOTE, TRIAL_NOTE, SHOULDER_NOTE = 1, 2, 3, 4, 5
 BORE_CALLOUT = f"{BORE_DRILL} DRILL THRU\n{SHAFT_NUMBER} D-CORE\nIS TURNED TO FIT"
 # The dowels' reams: the linked gauge note, then the dowel and its fit.
 PIN_HOLE_CALLOUT = (
@@ -955,15 +1020,19 @@ FIT_UP_NOTE = "\n".join(
 
 # The external drive-pin rim shortfall, note 1: minor exception RV-01 in
 # cad/config/parts/pd-transgear-drive-collar.yaml (shared #25 sprocket-seat
-# geometry, #2141; the owner's ruling at .019, restated at the shop row's
-# value by a delegated ruling 2026-11-24).  The flat-pin hole to drive-pin
-# hole web, note 2: delegated minor exception RV-03 there (#2409).  Note 3: the
+# geometry, #2141; the owner's ruling at .019; the .018 the shop row now
+# gives accepted with no band, D7).  The flat-pin hole to drive-pin hole
+# web, note 2: minor exception RV-03 there (delegated ruling 2026-11-11
+# (Main), #2409), advisory under rule 20.  Note 3: the
 # three reamed holes print no band, their bought dowels are their gauges.
 # Note 4, which both REF offsets link (rule 4: a location made to its mate):
 # the drive-pin holes are located to the wheels' holes, the trial of the
-# three wheels their acceptance (MHA-PD-00 tries them on).  The drawing
-# appends the two fitted lengths as the next two notes with their assembly
-# steps (draw_pd_transgear_drive_collar.FIT_NOTES).
+# three wheels their acceptance (MHA-PD-00 tries them on).  Note 5: the
+# wall from the flat-pin hole's end (its pilot drill's point) across to the
+# pilot shoulder, under the target: exception RV-06 (Main, 2026-11-25), advisory under
+# rule 20; worded as a WALL so it is not read as the floor's depth.  The
+# drawing appends the two fitted lengths as the next two notes with their
+# assembly steps (draw_pd_transgear_drive_collar.FIT_NOTES).
 DRAWING_NOTES = (
     f"{RIM_NOTE}. DRIVE-PIN HOLE TO COLLAR RIM "
     f"{inch_text(DRIVE_PIN_COLLAR_RIM_WORST, 3)} MIN.\n"
@@ -974,7 +1043,9 @@ DRAWING_NOTES = (
     # sheet and its procedures agree; no bonded salvage, whose clearance no
     # print could bound).
     f"{REAM_NOTE}. PRESS FIT: THE PIN IS THE GAUGE; NONE ENTERS ITS HOLE BY HAND.\n"
-    f"{TRIAL_NOTE}. LOCATE BY TRIAL: ALL 3 {SPROCKET_NUMBER} WHEELS DROP ON FREELY."
+    f"{TRIAL_NOTE}. LOCATE BY TRIAL: ALL 3 {SPROCKET_NUMBER} WHEELS DROP ON FREELY.\n"
+    f"{SHOULDER_NOTE}. WALL FROM PIN {FLAT_PIN_NUMBER} HOLE TO PILOT SHOULDER "
+    f"{inch_text(FLAT_PIN_SHOULDER_WALL_PRINTED, 3)} MIN."
 )
 if max(map(len, DRAWING_NOTES.splitlines())) > FIT_UP_NOTE_WIDTH:
     raise AssertionError("a MHA-PD-22 sheet note runs past the notes block")

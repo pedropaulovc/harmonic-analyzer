@@ -212,8 +212,8 @@ def _mate_name(part: dict) -> str:
     return f"{title} {part['number']}"
 
 
-# The journal is made to fit (rule 4; fit audit 2026-11-23, pending owner
-# confirmation): turned last to the MHA-PD-28 bush's reamed bore and tried
+# The journal is made to fit (drawing-guidelines rule 4, form 2): turned
+# last to the MHA-PD-28 bush's reamed bore and tried
 # in it, so it prints REF and no limits.  JOURNAL_DIA_BAND stays the
 # ANALYSIS band (the modelled result of that fitting) and this the
 # clearance the stacks consume; neither prints.

@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 400" font-family="sans-serif" font-size="13">
+  <rect class="paper" x="0" y="0" width="760" height="400"/>
+  <text class="title" x="20" y="20">Setup 3, Op 190: the 1/16 cutoff blade's last plunge at Z0, to the Ø{{process.neck_dia_in:.2dot}} neck (to scale, 300 px/in)</text>
+  <!-- To scale, 300 px/in: the P1 blade .0625 wide (tools.cutoff-blade-p1
+       width_in: 18.75 px), its chuck-side face on end B's plane, down to the
+       Ø.06 neck after the plunges at Z+.100 and Z+.050. Its 1/2 in height runs
+       on past the break line. -->
+  <!-- The 3-jaw, schematic (its jaws' and body's sizes are not on record):
+       its jaw fronts to scale from the part. -->
+  <rect class="fixture-vise" x="30.0" y="70" width="60" height="260"/>
+  <rect class="clamp" x="90.0" y="126.5" width="40" height="36"/>
+  <rect class="clamp" x="90.0" y="237.5" width="40" height="36"/>
+  <path class="part-kept" d="M40.0 162.5L190.0 162.5L193.0 166.7L190.0 170.8L193.0 175.0L190.0 179.2L193.0 183.3L190.0 187.5L193.0 191.7L190.0 195.8L193.0 200.0L190.0 204.2L193.0 208.3L190.0 212.5L193.0 216.7L190.0 220.8L193.0 225.0L190.0 229.2L193.0 233.3L190.0 237.5L40.0 237.5Z"/>
+  <path class="part-kept" d="M560.0 162.5L205.0 162.5L208.0 166.7L205.0 170.8L208.0 175.0L205.0 179.2L208.0 183.3L205.0 187.5L208.0 191.7L205.0 195.8L208.0 200.0L205.0 204.2L208.0 208.3L205.0 212.5L208.0 216.7L205.0 220.8L208.0 225.0L205.0 229.2L208.0 233.3L205.0 237.5L560.0 237.5Z"/>
+  <rect class="part-kept" x="560.0" y="173.0" width="60.0" height="54.0"/>
+  <rect class="part-threads" x="254.0" y="162.5" width="216.0" height="75.0"/>
+  <rect class="part-removed" x="470.0" y="162.5" width="48.8" height="28.5"/>
+  <rect class="part-removed" x="470.0" y="209.0" width="48.8" height="28.5"/>
+  <path class="holes" d="M620.0 186.5L596.6 200L620.0 213.5Z"/>
+  <path class="clamp" d="M596.6 200L648.6 170L738.6 170L738.6 230L648.6 230Z"/>
+  <line class="leader" x1="694.6" y1="170" x2="694.6" y2="134"/>
+  <text class="label" x="600" y="112">dead centre, oiled,</text>
+  <text class="label" x="600" y="128">in the stub's centre hole</text>
+  <path class="cutter" d="M470.0 209.0L488.8 209.0L488.8 380.0L484.1 383.0L479.4 380.0L474.7 383.0L470.0 380.0Z"/>
+  <line class="arrow" x1="502.8" y1="330" x2="502.8" y2="270"/>
+  <line class="centre-line" x1="20" y1="200" x2="740" y2="200"/>
+  <line class="datum" x1="470" y1="96" x2="470" y2="140"/>
+  <text class="datum-label" x="400" y="90">Z0 end B's plane</text>
+  <line class="leader" x1="110" y1="273.5" x2="120" y2="352"/>
+  <text class="label" x="20" y="366">3-jaw over a shim wrap on end A, .60 in the jaws</text>
+  <text class="label" x="150" y="140">the {{process.blank_length_in:.2f}} in rod (break)</text>
+  <line class="leader" x1="510.0" y1="166.5" x2="520.0" y2="156"/>
+  <text class="label" x="410.0" y="152">groove about .16 wide, Ø{{process.neck_dia_in:.2dot}} neck</text>
+  <text class="label" x="518.8" y="300">P1 blade 1/16, chuck-side</text>
+  <text class="label" x="518.8" y="316">face on Z0, plunged last</text>
+</svg>

@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 780 430" font-family="sans-serif" font-size="13">
+  <rect class="paper" x="0" y="0" width="780" height="430"/>
+  <text class="title" x="20" y="20">Setup 3, #15 drill: section at the hanger hole, from the RIGHT end (1 in = 100 px)</text>
+  <line class="fixture-table" x1="60" y1="400" x2="380" y2="400"/>
+  <!-- Section at the hanger hole (X .197), from the RIGHT end. The jaws
+       start at X .440 (end_overhang_mm 12.7 less left_end_skim_mm 1.524:
+       11.176 mm) and the stacks (X 39.7-141.3 mm) and the pin lie wholly
+       between the jaws' sides, so all of them are on your side of this cut:
+       the jaws are drawn as hidden outlines, the stacks and the pin left
+       out. The bar .840 across (T at the fixed jaw's face), .375 thick, F
+       down, held by the jaws .244 (6.18 mm) toward you: nothing under it
+       here. -->
+  <path class="hidden" d="M131 223 H191 V400 H131 Z"/>
+  <path class="hidden" d="M287.5 223 H347.5 V400 H287.5 Z"/>
+  <text class="label" x="137" y="390">moving</text>
+  <text class="label" x="297" y="390">fixed</text>
+  <rect class="part-kept" x="203.5" y="212.5" width="84" height="37.5"/>
+  <!-- The #15 drill to scale (cutter_dia_mm 4.572 = 18.0 px), 118 deg point, its full diameter drill_past_mm 1.0 past F, its point at drill_15_tip_mm -2.374. Drawn short to a break line (its length out of the chuck is not on record). -->
+  <path class="cutter" d="M276.8 110.0L276.8 253.9L267.8 259.3L258.8 253.9L258.8 110.0L263.3 107.0L267.8 110.0L272.3 107.0Z"/>
+  <line class="arrow" x1="237.8" y1="112" x2="237.8" y2="140"/>
+  <line class="centre-line" x1="267.8" y1="196" x2="267.8" y2="285"/>
+  <line class="datum" x1="80" y1="250" x2="125" y2="250"/>
+  <text class="datum-label" x="30" y="246">Z0 (F)</text>
+  <line class="datum" x1="287.5" y1="190" x2="287.5" y2="216"/>
+  <text class="datum-label" x="352" y="214">Y0 (T)</text>
+  <line class="dims" x1="267.8" y1="192" x2="287.5" y2="192"/>
+  <line class="leader" x1="280" y1="192" x2="352" y2="176"/>
+  <text class="label" x="356" y="180">hanger hole {{cad.axle_bore_height_in:.3dot}} from T</text>
+  <line class="leader" x1="267.8" y1="261.1" x2="267.8" y2="410"/>
+  <text class="label" x="261.8" y="422" text-anchor="end">the point exits here, in the air</text>
+  <line class="leader" x1="150" y1="223" x2="120" y2="210"/>
+  <text class="label" x="20" y="140">the jaws (outline): their</text>
+  <text class="label" x="20" y="156">left side .244 toward you;</text>
+  <text class="label" x="20" y="172">the stacks and the pin</text>
+  <text class="label" x="20" y="188">further in, not in</text>
+  <text class="label" x="20" y="204">this section</text>
+  <text class="label" x="356" y="74">#15 drill through the hanger hole, no peck:</text>
+  <text class="label" x="356" y="90">its full diameter {{process.drill_past_mm:in.3dot}} past F, into the air;</text>
+  <text class="label" x="356" y="106">the hole .244 out past the jaws' left side</text>
+  <text class="title" x="430" y="270">Plan, fixed jaw at the top (1 in = 25 px)</text>
+  <!-- Plan, fixed jaw at the top, 1 in = 25 px: X0 the milled left end. -->
+  <rect class="clamp" x="471" y="280" width="156.2" height="30"/>
+  <rect class="clamp" x="471" y="331" width="156.2" height="30"/>
+  <rect class="part-kept" x="460" y="310" width="232.3" height="21"/>
+  <circle class="holes" cx="520" cy="314.9" r="2.33"/>
+  <circle class="cutter" cx="465" cy="314.9" r="2.25"/>
+  <line class="datum" x1="460" y1="290" x2="460" y2="306"/>
+  <text class="datum-label" x="432" y="300">X0</text>
+  <line class="leader" x1="465" y1="318" x2="505" y2="385"/>
+  <text class="label" x="509" y="390">the #15 in the hanger hole</text>
+</svg>

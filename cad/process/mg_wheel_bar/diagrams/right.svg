@@ -1,39 +1,69 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 780 430" font-family="sans-serif" font-size="13">
   <rect class="paper" x="0" y="0" width="780" height="430"/>
-  <text class="title" x="20" y="20">Setup 4, the bar slid along the jaws: plan, fixed jaw at the top (1 in = 70 px)</text>
-  <!-- Bar 9.35 x .84, jaws 6.247 long; the sawn right end .50 out past the jaws. -->
-  <rect class="clamp" x="248.3" y="90" width="437.3" height="50"/>
-  <rect class="clamp" x="248.3" y="198.8" width="437.3" height="50"/>
-  <text class="label-on-clamp" x="440" y="120">fixed jaw</text>
-  <text class="label-on-clamp" x="440" y="230">moving jaw</text>
-  <rect class="part-kept" x="65.2" y="140" width="655.4" height="58.8"/>
-  <rect class="part-removed" x="716.4" y="140" width="4.2" height="58.8"/>
-  <circle class="holes" cx="582.6" cy="153.8" r="7.0"/>
-  <circle class="holes" cx="679.0" cy="153.8" r="7.0"/>
-  <circle class="holes" cx="233.2" cy="153.8" r="6.5"/>
-  <circle class="holes" cx="68.7" cy="153.8" r="6.3"/>
-  <circle class="cutter" cx="738.6" cy="169.4" r="17.8"/>
-  <line class="arrow" x1="765" y1="205" x2="765" y2="135"/>
-  <text class="label" x="330" y="275">right end: passes +Y (the arrow at the right)</text>
-  <!-- The edge finder on the milled left end, in the air. -->
-  <circle class="cutter" cx="58.2" cy="185" r="7.0"/>
-  <line class="datum" x1="65.2" y1="60" x2="65.2" y2="135"/>
-  <text class="datum-label" x="20" y="55">X0: the edge finder on the milled LEFT end (the pickup)</text>
-  <line class="dims" x1="65.2" y1="300" x2="248.3" y2="300"/>
-  <line class="dims" x1="65.2" y1="205" x2="65.2" y2="305"/>
-  <line class="dims" x1="248.3" y1="250" x2="248.3" y2="305"/>
-  <text class="label" x="80" y="318">left end {{process.pickup_reach_min_mm:in.2f}}+ out past the jaws</text>
-  <line class="dims" x1="65.2" y1="340" x2="716.4" y2="340"/>
-  <line class="dims" x1="716.4" y1="205" x2="716.4" y2="345"/>
-  <text class="label" x="330" y="358">length {{process.length_target_mm:in.3f}} to the right end</text>
-  <line class="dims" x1="685.6" y1="380" x2="720.6" y2="380"/>
-  <line class="dims" x1="685.6" y1="250" x2="685.6" y2="385"/>
-  <line class="dims" x1="720.6" y1="200" x2="720.6" y2="385"/>
-  <text class="label" x="560" y="398">sawn end .50 out</text>
-  <line class="leader" x1="582.6" y1="146.8" x2="600" y2="70"/>
-  <line class="leader" x1="679.0" y1="146.8" x2="600" y2="70"/>
-  <text class="label" x="480" y="64">clamp holes #9 at {{cad.clamp_hole_1_station_in:.3f}} and {{cad.clamp_hole_2_station_in:.3f}}</text>
-  <line class="leader" x1="233.2" y1="147" x2="233.2" y2="86"/>
-  <text class="label" x="140" y="80">axle bore (Setup 3): the pickup check</text>
-  <text class="label" x="20" y="420">Section as Setup 3: F down on both stacks at the moving jaw, T at the fixed jaw, the .125 pin at B.</text>
+  <text class="title" x="20" y="20">Setup 4, from the RIGHT end: the end mill in front of it (1 in = 100 px)</text>
+  <line class="fixture-table" x1="60" y1="400" x2="380" y2="400"/>
+  <!-- The hold as Setup 3, the bar slid along the jaws; seen from the right
+       end the moving jaw is on the LEFT. -->
+  <rect class="clamp" x="131" y="223" width="60" height="177"/>
+  <rect class="clamp" x="287.5" y="223" width="60" height="177"/>
+  <text class="label-on-clamp" x="137" y="390">moving</text>
+  <text class="label-on-clamp" x="297" y="390">fixed</text>
+  <rect class="fixture-support" x="191" y="250" width="12.5" height="150"/>
+  <rect class="fixture-support" x="203.5" y="250" width="12.5" height="150"/>
+  <circle class="fixture-support" cx="197.25" cy="243.75" r="6.25"/>
+  <rect class="part-kept" x="203.5" y="212.5" width="84" height="37.5"/>
+  <!-- The 1/2 in end mill to scale (face_cutter_dia_mm 12.7 = 50 px),
+       half_mill_projection_mm 28.45 (112 px) out of the collet, in front of
+       the bar's right end on its last side pass (its side on the length),
+       mid-way across the bar (Y -10.668), its tip end_past_mm .020 under F,
+       passing +Y (toward the fixed jaw). Square end drawn as the near half
+       of the end face, 12 % deep. The collet is not drawn (its size is not
+       on record). -->
+  <path class="cutter" d="M270.5 246.0L270.5 140.0L220.5 140.0L220.5 246.0A25.0 6.0 0 0 0 270.5 246.0Z"/>
+  <line class="arrow" x1="228" y1="125" x2="264" y2="125"/>
+  <text class="label" x="272" y="129">+Y, conventional</text>
+  <line class="leader" x1="235" y1="160" x2="140" y2="96"/>
+  <text class="label" x="20" y="74">1/2 in end mill's side on the right end,</text>
+  <text class="label" x="20" y="90">{{process.half_mill_projection_mm:in.2f}} out of the collet, the full depth at once</text>
+  <line class="datum" x1="80" y1="250" x2="125" y2="250"/>
+  <text class="datum-label" x="30" y="246">Z0 (F)</text>
+  <line class="datum" x1="287.5" y1="190" x2="287.5" y2="216"/>
+  <text class="datum-label" x="292" y="206">Y0 (T)</text>
+  <line class="leader" x1="197" y1="238" x2="160" y2="200"/>
+  <text class="label" x="60" y="196">.125 pin at B</text>
+  <line class="leader" x1="209" y1="330" x2="120" y2="330"/>
+  <text class="label" x="20" y="326">both 1 + 1/2 in</text>
+  <text class="label" x="20" y="342">stacks, under B</text>
+  <!-- Plan, fixed jaw at the top, 1 in = 35 px: X0 the milled left end at
+       x 420; jaws 2.51 to 8.76 from it (the sawn end .50 past them); the right end at 9.200, its sawn end
+       .060 beyond; holes Ø.196 at .197 from T. -->
+  <text class="title" x="400" y="60">Plan (fixed jaw at the top, 1 in = 35 px)</text>
+  <rect class="clamp" x="508.0" y="110" width="218.6" height="30"/>
+  <rect class="clamp" x="508.0" y="169.4" width="218.6" height="30"/>
+  <rect class="part-kept" x="420" y="140" width="322" height="29.4"/>
+  <rect class="part-removed" x="742" y="140" width="2.1" height="29.4"/>
+  <circle class="holes" cx="427" cy="146.9" r="3.15"/>
+  <circle class="holes" cx="504.1" cy="146.9" r="3.3"/>
+  <circle class="holes" cx="678.4" cy="146.9" r="3.45"/>
+  <circle class="holes" cx="726.6" cy="146.9" r="3.45"/>
+  <!-- The same end mill, the same place: Ø.5 = 17.5 px. -->
+  <circle class="cutter" cx="750.75" cy="154.7" r="8.75"/>
+  <line class="arrow" x1="770" y1="200" x2="770" y2="118"/>
+  <line class="datum" x1="420" y1="90" x2="420" y2="135"/>
+  <text class="datum-label" x="400" y="85">X0: the milled LEFT end (the pickup)</text>
+  <line class="leader" x1="504.1" y1="152" x2="504.1" y2="226"/>
+  <text class="label" x="400" y="240">axle bore: the pickup check</text>
+  <line class="leader" x1="678.4" y1="152" x2="690" y2="244"/>
+  <line class="leader" x1="726.6" y1="152" x2="690" y2="244"/>
+  <text class="label" x="640" y="258">clamp holes #9</text>
+  <text class="label" x="640" y="274">at {{cad.clamp_hole_1_station_in:.3f}}, {{cad.clamp_hole_2_station_in:.3f}}</text>
+  <line class="dims" x1="420" y1="296" x2="508.0" y2="296"/>
+  <line class="dims" x1="420" y1="174" x2="420" y2="340"/>
+  <line class="dims" x1="508.0" y1="204" x2="508.0" y2="302"/>
+  <text class="label" x="400" y="290">left end {{process.pickup_reach_min_mm:in.2f}}+ out past the jaws</text>
+  <line class="dims" x1="420" y1="334" x2="742" y2="334"/>
+  <line class="dims" x1="742" y1="174" x2="742" y2="340"/>
+  <text class="label" x="560" y="328">length {{process.length_target_mm:in.3f}}</text>
+  <text class="label" x="400" y="370">right end: passes +Y (the arrow at the right); sawn</text>
+  <text class="label" x="400" y="386">end {{process.end_overhang_mm:in.2dot}} out past the jaws. Each drill: its own op's picture.</text>
 </svg>
