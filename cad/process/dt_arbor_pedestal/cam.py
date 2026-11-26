@@ -993,7 +993,7 @@ def context(
     )
     # Along +Y, from beside the moving jaw (E) to beside the fixed jaw (W):
     # both plunges stand over a jaw, above its top (the step's floor is).
-    step_y = (-width - r - APPROACH_MM, r + APPROACH_MM)
+    step_y = (r + APPROACH_MM, -width - r - APPROACH_MM)
     jobs.append(
         {
             **em_tool,
@@ -1281,7 +1281,8 @@ def context(
                             "final": _r(final_x),
                             "raw": _r(raw_x),
                             "max_step": station,
-                            "direction": 1.0,
+                            "direction": -1.0,
+                            "cut": "conventional",
                             "span": width,
                             "below_z": height,
                             "max_stepdown": step_level,
