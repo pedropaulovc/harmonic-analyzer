@@ -43,6 +43,7 @@ import argparse
 import glob
 import hashlib
 import json
+import math
 import os
 import re
 import shutil
@@ -223,6 +224,41 @@ def ream_full_diameter_past_min_mm(plan: dict[str, Any], reamer: str) -> float:
     if ref not in rule["chamfer_length_mm"]:
         raise ValueError(f"{ref}: no end chamfer recorded in cnc.ream-full-diameter")
     return float(rule["chamfer_length_mm"][ref]) + float(rule["past_margin_mm"])
+
+
+def ream_end_face_clear(
+    plan: dict[str, Any],
+    reamer: str,
+    reamer_dia_mm: float,
+    tip_mm: float,
+    drill_dia_mm: float,
+    drill_full_mm: float,
+    solid_below_mm: float,
+) -> None:
+    """Refuse a ream whose flat end face would push into solid material.
+
+    A reamer cuts only on its 45° end chamfer; the face inside it is flat and
+    does not cut. Below its pre-drill's full diameter (``drill_full_mm``, Z)
+    the drill's 118° cone narrows, and where it is narrower than that face
+    the face meets uncut material. ``tip_mm`` is the reamer's tip (Z) and
+    ``solid_below_mm`` the Z below which solid material lies round the hole
+    (spoil, a fixture, the part itself in a blind hole: ``math.inf``; air
+    past the tip: ``-math.inf``). The face is the plan tool ``reamer``'s
+    ``reamer_dia_mm`` less twice its chamfer recorded in ``cnc.toml``
+    cnc.ream-full-diameter, or its full diameter where none is recorded (the
+    worst case)."""
+    ref = next(tool["ref"] for tool in plan["tools"] if tool["id"] == reamer)
+    cnc = _shop_equipment.merge([_cam_programs.CNC_EQUIPMENT_PATH])
+    chamfer = float(cnc["cnc"]["ream-full-diameter"]["chamfer_length_mm"].get(ref, 0.0))
+    face = reamer_dia_mm - 2 * chamfer
+    meets = drill_full_mm - max(0.0, drill_dia_mm - face) / (
+        2 * math.tan(math.radians(59))
+    )
+    if tip_mm < min(meets, solid_below_mm):
+        raise ValueError(
+            f"{reamer}: its flat end (Ø{face:.3f}) meets the pre-drill's cone at Z{meets:.3f}, "
+            f"above its tip Z{tip_mm:.3f}, in solid material (below Z{solid_below_mm:.3f})"
+        )
 
 
 def verify(expectations, directory: Path, known: dict[str, str] | None = None) -> list[_gcode.Finding]:
