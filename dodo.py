@@ -1400,6 +1400,8 @@ VERIFY_PY = (SCRIPTS_DIR / "verify.py").resolve()
 # does not ride a .SLDASM digest) -> a direct file_dep of verify: tasks.
 POSTBUILD_PY = (SCRIPTS_DIR / "_assembly_postbuild.py").resolve()
 EXPORT_PY = (SCRIPTS_DIR / "export_models.py").resolve()
+# Appends a bound features.toml's geometry inputs (package:manifest's action).
+FEATURE_PROVENANCE_PY = (SCRIPTS_DIR / "_features_provenance.py").resolve()
 RELEASE_PY = (SCRIPTS_DIR / "cut_release.py").resolve()
 # COM half of a release: SolidWorks Pack-and-Go of the top assembly and of every
 # drawing, merged into cad/out/release/native/ (the `package:release` leaf). Split
@@ -1903,10 +1905,12 @@ def _feature_export_file_deps(stem: str) -> list[str]:
 
 def _feature_manifest_file_deps(stem: str) -> list[str]:
     """One ``features.toml``: the declaration closure, the release revision,
-    and the labelled STEPs and inventories it binds."""
+    the labelled STEPs and inventories it binds, and the provenance stamp's
+    code (its geometry inputs are the STEP's own key's)."""
     return sorted({
         *_feature_requirement_deps(stem),
         str(RELEASE_VERSION_FILE),
+        str(FEATURE_PROVENANCE_PY),
         *(str(path) for path in _feature_export_outputs(stem)),
     })
 
@@ -4829,7 +4833,10 @@ def _package_features_task() -> dict[str, Any]:
 
 def _write_feature_manifest(stem: str) -> None:
     """``package:manifest:<stem>``'s action (``_run`` cannot be the action
-    itself: doit refuses a callable declaring ``task`` with a default)."""
+    itself: doit refuses a callable declaring ``task`` with a default), then
+    the geometry inputs the bundle's STEP was keyed on (#3668)."""
+    import _features_provenance
+
     label = f"package:manifest:{stem}"
     _run(
         [sys.executable, str(SCRIPTS_DIR / "export_features.py"), stem, "--out", str(CAD_OUT)],
@@ -4837,6 +4844,7 @@ def _write_feature_manifest(stem: str) -> None:
         f"manifest-{stem.replace('_', '-')}",
         task=label,
     )
+    _features_provenance.stamp(stem, CAD_OUT)
 
 
 def _package_manifest_task(stem: str) -> dict[str, Any]:

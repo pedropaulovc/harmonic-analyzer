@@ -4295,6 +4295,10 @@ def isolated_feature_keys(isolated_assembly_helper_keys, monkeypatch):
         dodo, "RELEASE_VERSION_FILE",
         root / dodo.RELEASE_VERSION_FILE.relative_to(REPO_ROOT),
     )
+    provenance = root / dodo.FEATURE_PROVENANCE_PY.relative_to(REPO_ROOT)
+    provenance.parent.mkdir(parents=True, exist_ok=True)
+    provenance.write_bytes(dodo.FEATURE_PROVENANCE_PY.read_bytes())
+    monkeypatch.setattr(dodo, "FEATURE_PROVENANCE_PY", provenance)
     # The labelled STEPs and inventories a manifest binds (CAD_OUT is already
     # isolated under root): produced bytes.
     for stem in export_features.SUPPORTED_PARTS:

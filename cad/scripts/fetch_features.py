@@ -31,8 +31,19 @@ is diffed between the release's tagged commit and the working tree:
   changed ``requirement(...)`` declarations need no farm.
 
 A STALE bundle is reported with its findings and the command exits 2 without
-writing it unless ``--accept-stale`` is given; declarations that do not bind
-(a selector matching no face) exit 1.
+writing it; there is no override. Declarations that do not bind (a selector
+matching no face) exit 1. A rebound ``features.toml`` records this checkout's
+geometry inputs (``_features_provenance``), which ``cam_nc.py`` and
+``prechips_traveler.py`` check before they read the bundle.
+
+``uv run --frozen python cad/scripts/fetch_features.py --check <stem> [...]``
+(or ``--check --all``) fetches nothing: it reports whether the bundles already
+under ``--out`` (copied in, or left by an older checkout) were built from this
+checkout's geometry, and exits 2 if any was not. ``--rebind`` in its place
+also rebinds each current bundle's ``features.toml`` from this checkout's
+declarations, keeping its geometry inputs: the seat-free step after a
+``requirement(...)`` edit (``export_features.py <stem>`` alone writes no
+geometry inputs, so the bundle it binds is refused).
 
 With the bundle in place, the part's traveler and NC programs run seat-free
 without doit (whose ``prechips:<stem>``/``cam:<stem>`` tasks would first try to
@@ -50,7 +61,6 @@ import json
 import os
 import shutil
 import subprocess
-import sys
 import tempfile
 import tomllib
 import urllib.request
@@ -58,6 +68,7 @@ from pathlib import Path
 from typing import Any
 
 import _config
+import _features_provenance
 import _telemetry
 import export_features
 from _export_feature_faces import FeatureFaceError, inventory_path
@@ -150,37 +161,11 @@ def check_binding(stem: str, out: Path) -> None:
         raise FetchError(f"{stem}: bundle records {recorded}, its files are {expected}")
 
 
-def recipe_files(stem: str) -> dict[str, str]:
-    """Repo-relative tracked inputs of the part's keys, each labelled with what
-    it can change: ``geometry`` (``part:<stem>`` and the labelled-STEP export
-    code) or ``manifest`` (only ``package:manifest:<stem>``: notes, citations,
-    declarations). Other parts' registry rows in the generic exporter's config
-    closure cannot change this part's STEP and are left out."""
-    sys.path.insert(0, str(REPO))
-    import dodo  # noqa: PLC0415 - the graph's own key inputs, loaded only here
-
-    out = (REPO / "cad" / "out").resolve()
-    part = dodo._part_file_deps(dodo.SCRIPTS_DIR / f"build_{stem}.py", stem)
-    exporter = [
-        dep for dep in dodo._feature_export_file_deps(stem) if dep.endswith(".py")
-    ]
-    labelled: dict[str, str] = {}
-    for label, deps in (
-        ("manifest", dodo._feature_manifest_file_deps(stem)),
-        ("geometry", [*part, *exporter]),
-    ):
-        for dep in deps:
-            path = Path(dep).resolve()
-            if path == Path(dodo.RELEASE_VERSION_FILE).resolve() or out in path.parents:
-                continue
-            if path.is_relative_to(REPO.resolve()):
-                labelled[path.relative_to(REPO.resolve()).as_posix()] = label
-    return dict(sorted(labelled.items()))
-
-
 def rebind(stem: str, out: Path) -> None:
     """Rewrite ``stem``'s fetched ``features.toml`` from this checkout's
-    declarations over the fetched STEPs and face inventories."""
+    declarations over the fetched STEPs and face inventories, recording this
+    checkout's geometry inputs (the caller has found them unchanged since the
+    release's commit)."""
     _manifest, step = export_features.bundle_paths(stem, out)
     missing = [
         path.name
@@ -190,6 +175,7 @@ def rebind(stem: str, out: Path) -> None:
     if missing:
         raise FetchError(f"{stem}: the release carries no face inventory for {missing}")
     export_features.write_manifest(stem, step, revision=_config.release_revision())
+    _features_provenance.stamp(stem, out)
 
 
 def changed_since(commit: str, files: list[str]) -> list[str]:
@@ -224,10 +210,16 @@ def main(argv: list[str] | None = None) -> int:
         default=export_features.OUT,
         help="output root (default: cad/out)",
     )
-    parser.add_argument(
-        "--accept-stale",
+    local = parser.add_mutually_exclusive_group()
+    local.add_argument(
+        "--check",
         action="store_true",
-        help="write bundles this checkout's recipe has moved past",
+        help="fetch nothing: report whether the bundles under --out are this checkout's",
+    )
+    local.add_argument(
+        "--rebind",
+        action="store_true",
+        help="fetch nothing: rebind current bundles under --out to this checkout's declarations",
     )
     args = parser.parse_args(argv)
     stems = (
@@ -242,6 +234,12 @@ def main(argv: list[str] | None = None) -> int:
         )
     _telemetry.set_service("fetch-features")
     _telemetry.configure()
+    if args.check or args.rebind:
+        try:
+            return check(stems, Path(args.out), rebind_current=args.rebind)
+        except FeatureFaceError as exc:
+            _telemetry.error(f"fetch-features: declarations do not bind: {exc}")
+            return 1
 
     try:
         tag, url = release_asset(args.release)
@@ -260,10 +258,9 @@ def main(argv: list[str] | None = None) -> int:
             except ValueError as exc:
                 raise FetchError(f"release {tag}: {exc}") from exc
             stale: dict[str, list[str]] = {}
-            rebound: list[str] = []
             for stem in stems:
                 check_binding(stem, staging)
-                recipe = recipe_files(stem)
+                recipe = _features_provenance.recipe_files(stem)
                 changed = changed_since(commit, list(recipe))
                 findings = [
                     f"geometry input changed since {tag}: {name}"
@@ -289,7 +286,6 @@ def main(argv: list[str] | None = None) -> int:
                 else:
                     if not findings:
                         rebind(stem, staging)
-                        rebound.append(stem)
                     try:
                         validate_bundle(stem, staging)
                     except FeaturesBoundError as exc:
@@ -305,10 +301,8 @@ def main(argv: list[str] | None = None) -> int:
                     stem=stem,
                     release=tag,
                 )
-            if stale and not args.accept_stale:
-                _telemetry.error(
-                    "fetch-features: nothing written; rerun with --accept-stale to use these bundles anyway"
-                )
+            if stale:
+                _telemetry.error("fetch-features: nothing written")
                 return 2
             for stem in stems:
                 source = staging / "features" / stem
@@ -316,14 +310,9 @@ def main(argv: list[str] | None = None) -> int:
                 shutil.rmtree(target, ignore_errors=True)
                 target.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copytree(source, target)
-                state = "STALE" if stem in stale else "current"
-                how = (
-                    ", features.toml rebound from this checkout"
-                    if stem in rebound
-                    else ""
-                )
                 _telemetry.info(
-                    f"fetch-features: {stem}: {target} ({state} for this checkout{how})",
+                    f"fetch-features: {stem}: {target} (current for this checkout, "
+                    "features.toml rebound from this checkout)",
                     stem=stem,
                     release=tag,
                 )
@@ -334,6 +323,43 @@ def main(argv: list[str] | None = None) -> int:
         _telemetry.error(f"fetch-features: {exc}")
         return 1
     return 0
+
+
+def check(stems: list[str], out: Path, *, rebind_current: bool = False) -> int:
+    """``--check``: each bundle under ``out`` against this checkout, 2 if any
+    is missing, does not bind its STEP or was built from other geometry.
+    ``--rebind`` also rebinds each current one's ``features.toml`` from this
+    checkout's declarations (after a ``requirement(...)`` edit), keeping its
+    geometry inputs; a stale one is left as it is."""
+    stale = 0
+    for stem in stems:
+        try:
+            check_binding(stem, out)
+            findings = _features_provenance.features_current(stem, out)
+        except FetchError as exc:
+            findings = [str(exc)]
+        if findings:
+            stale += 1
+            _telemetry.warn(
+                f"fetch-features: STALE {stem} ({out / 'features' / stem})\n"
+                + "\n".join(f"  {finding}" for finding in findings),
+                stem=stem,
+            )
+            continue
+        how = ""
+        if rebind_current:
+            try:
+                rebind(stem, out)
+                validate_bundle(stem, out)
+            except (FetchError, FeaturesBoundError) as exc:
+                stale += 1
+                _telemetry.warn(f"fetch-features: {stem}: {exc}", stem=stem)
+                continue
+            how = ", features.toml rebound from this checkout"
+        _telemetry.info(
+            f"fetch-features: {stem}: current for this checkout{how}", stem=stem
+        )
+    return 2 if stale else 0
 
 
 if __name__ == "__main__":

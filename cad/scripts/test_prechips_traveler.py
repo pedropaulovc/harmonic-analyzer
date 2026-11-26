@@ -30,6 +30,8 @@ def process(tmp_path, monkeypatch):
     printer.write_bytes(b"")
     monkeypatch.setenv(wrapper.BROWSER_ENV, str(printer))
     monkeypatch.setenv(wrapper.PRINT_LOCK_ENV, str(tmp_path / "locks" / "print.lock"))
+    # The smoke plans name parts with no feature bundle: every bundle current.
+    monkeypatch.setattr(wrapper._features_provenance, "features_current", lambda _stem, _out: [])
 
     def author(stem: str) -> None:
         plans.plan_path(stem).parent.mkdir(parents=True)
@@ -199,6 +201,23 @@ def test_failed_print_removes_every_traveler(process, monkeypatch):
     _uv_stub(monkeypatch, printed=False)
     assert wrapper.main(["smoke_part", "--out", str(out)]) == 1
     assert not any(path.exists() for path in plans.traveler_outputs("smoke_part", out))
+
+
+def test_a_bundle_not_built_from_this_checkout_refuses_before_any_render(process, monkeypatch):
+    out, author = process
+    author("smoke_part")
+    paths = plans.traveler_outputs("smoke_part", out)
+    paths[0].parent.mkdir(parents=True)
+    for path in paths:
+        path.write_text("previous success", encoding="utf-8")
+    monkeypatch.setattr(
+        wrapper._features_provenance, "features_current",
+        lambda stem, _out: [f"geometry input changed since the bundle was built: cad/scripts/build_{stem}.py"],
+    )
+    calls = _uv_stub(monkeypatch)
+    assert wrapper.main(["smoke_part", "--out", str(out)]) == 2
+    assert calls == []
+    assert not any(path.exists() for path in paths)
 
 
 def test_the_browser_prints_inside_a_host_print_slot(process, monkeypatch, tmp_path):

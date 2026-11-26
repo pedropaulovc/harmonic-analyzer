@@ -39,6 +39,11 @@ shop-standing-instructions.html`` and prints that page to
 page is one sheet by the owner's design: a print on more sheets exits 1 and
 removes both files, so a row that grows the page fails loudly.
 
+Before anything renders, every part the plan names must have a feature bundle
+built from this checkout's geometry (``_features_provenance``, #3668): a
+bundle copied in from another worktree, left by an older checkout or missing
+exits 2, every output removed, naming each changed input.
+
 Only exit 0 from every run and every printed PDF is success. Every previous
 traveler is removed first, and a refusal from either run removes every output
 and returns that run's exit code (2 for a prechips refusal), so a refusal never
@@ -75,6 +80,7 @@ from filelock import FileLock, Timeout
 from pypdf import PdfReader
 from pypdf.errors import PdfReadError
 
+import _features_provenance
 import _telemetry
 import _process_plans
 import picture_clip
@@ -397,6 +403,10 @@ def main(argv: list[str] | None = None) -> int:
         if not plan.is_file():
             exc = FileNotFoundError(f"{args.stem}: no process plan at {plan}")
             return _fail(root, PACKAGE, exc, 2, outputs)
+        try:
+            _features_provenance.require_current(_process_plans.part_stems(args.stem), args.out)
+        except _features_provenance.StaleBundle as exc:
+            return _fail(root, args.stem, exc, 2, outputs)
         try:
             uv = _uv()
             printer = browser()

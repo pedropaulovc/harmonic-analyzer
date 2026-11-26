@@ -10,6 +10,7 @@ from pathlib import Path
 import pytest
 
 import _config
+import _features_provenance
 import export_features
 import fetch_features
 from _export_feature_faces import inventory_path
@@ -105,7 +106,7 @@ def _release(
     monkeypatch.setattr(fetch_features, "tag_commit", lambda _tag: "a" * 40)
     monkeypatch.setattr(fetch_features, "_git", lambda *_args: "b" * 40)
     monkeypatch.setattr(
-        fetch_features,
+        _features_provenance,
         "recipe_files",
         lambda selected: {
             f"cad/scripts/build_{selected}.py": "geometry",
@@ -113,9 +114,19 @@ def _release(
         },
     )
     monkeypatch.setattr(
+        _features_provenance,
+        "geometry_inputs",
+        lambda selected: {f"cad/scripts/build_{selected}.py": "d1"},
+    )
+    monkeypatch.setattr(
         fetch_features, "changed_since", lambda _commit, _files: list(changed)
     )
     return ranges
+
+
+def _stamp(stem: str) -> str:
+    """The provenance table the doubles above make the rebind append."""
+    return f'\n[geometry_inputs]\n"cad/scripts/build_{stem}.py" = "d1"\n'
 
 
 def test_a_current_bundle_is_fetched_by_range_without_the_rest_of_the_zip(
@@ -126,7 +137,9 @@ def test_a_current_bundle_is_fetched_by_range_without_the_rest_of_the_zip(
     assert fetch_features.main([UNDECLARED, "--out", str(out)]) == 0
     manifest, step = export_features.bundle_paths(UNDECLARED, out)
     published = export_features.bundle_paths(UNDECLARED, tmp_path / "published")
-    assert manifest.read_bytes() == published[0].read_bytes()
+    assert (
+        manifest.read_bytes() == published[0].read_bytes() + _stamp(UNDECLARED).encode()
+    )
     assert step.read_bytes() == published[1].read_bytes()
     assert (
         inventory_path(step).read_bytes() == inventory_path(published[1]).read_bytes()
@@ -177,7 +190,7 @@ def test_a_release_without_inventories_is_always_stale(
     assert not (out / "features").exists()
 
 
-def test_a_geometry_change_is_reported_stale_and_not_written_unless_accepted(
+def test_a_geometry_change_is_reported_stale_and_not_written(
     tmp_path: Path, monkeypatch, capsys
 ) -> None:
     _release(monkeypatch, tmp_path, changed=(f"cad/scripts/build_{UNDECLARED}.py",))
@@ -187,8 +200,43 @@ def test_a_geometry_change_is_reported_stale_and_not_written_unless_accepted(
     assert f"STALE {UNDECLARED}" in err
     assert f"geometry input changed since v99: cad/scripts/build_{UNDECLARED}.py" in err
     assert not (out / "features").exists()
-    assert fetch_features.main([UNDECLARED, "--out", str(out), "--accept-stale"]) == 0
-    assert export_features.bundle_paths(UNDECLARED, out)[0].is_file()
+    # No override: the old flag is gone.
+    with pytest.raises(SystemExit):
+        fetch_features.main([UNDECLARED, "--out", str(out), "--accept-stale"])
+
+
+def test_check_reports_a_copied_bundle_against_this_checkout(
+    tmp_path: Path, monkeypatch, capsys
+) -> None:
+    _release(monkeypatch, tmp_path)
+    out = tmp_path / "out"
+    assert fetch_features.main([UNDECLARED, "--out", str(out)]) == 0
+    assert fetch_features.main(["--check", UNDECLARED, "--out", str(out)]) == 0
+    # A current bundle rebinds in place and keeps its geometry inputs.
+    manifest = export_features.bundle_paths(UNDECLARED, out)[0]
+    stamped = manifest.read_bytes()
+    assert fetch_features.main(["--rebind", UNDECLARED, "--out", str(out)]) == 0
+    assert manifest.read_bytes() == stamped
+    # The checkout's geometry moves on: the bundle is stale, the input named.
+    monkeypatch.setattr(
+        _features_provenance,
+        "geometry_inputs",
+        lambda selected: {f"cad/scripts/build_{selected}.py": "d2"},
+    )
+    assert fetch_features.main(["--check", UNDECLARED, "--out", str(out)]) == 2
+    assert (
+        f"geometry input changed since the bundle was built: cad/scripts/build_{UNDECLARED}.py"
+        in capsys.readouterr().err
+    )
+    # A stale one is neither rebound nor restamped.
+    assert fetch_features.main(["--rebind", UNDECLARED, "--out", str(out)]) == 2
+    assert manifest.read_bytes() == stamped
+    # A bundle bound without the stamp (by hand, or before #3668) is refused.
+    published = tmp_path / "published"
+    assert fetch_features.main(["--check", UNDECLARED, "--out", str(published)]) == 2
+    assert "records no geometry_inputs" in capsys.readouterr().err
+    assert fetch_features.main(["--check", DECLARED, "--out", str(out)]) == 2
+    assert "unreadable bundle" in capsys.readouterr().err
 
 
 def test_a_bundle_that_does_not_bind_its_step_is_refused(
@@ -196,7 +244,7 @@ def test_a_bundle_that_does_not_bind_its_step_is_refused(
 ) -> None:
     _release(monkeypatch, tmp_path, tamper=True)
     out = tmp_path / "out"
-    assert fetch_features.main([UNDECLARED, "--out", str(out), "--accept-stale"]) == 1
+    assert fetch_features.main([UNDECLARED, "--out", str(out)]) == 1
     assert "bundle records" in capsys.readouterr().err
     assert not (out / "features").exists()
 
@@ -214,7 +262,7 @@ def test_an_unsafe_or_nested_bundle_member_is_refused(
 ) -> None:
     _release(monkeypatch, tmp_path, extra=(member,))
     out = tmp_path / "out"
-    assert fetch_features.main([UNDECLARED, "--out", str(out), "--accept-stale"]) == 1
+    assert fetch_features.main([UNDECLARED, "--out", str(out)]) == 1
     err = capsys.readouterr().err
     assert repr(member) in err or member in err
     assert not (out / "features").exists()

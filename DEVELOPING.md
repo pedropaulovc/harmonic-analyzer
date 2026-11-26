@@ -374,14 +374,19 @@ each labelled STEP, its `.faces.json` inventory. The script range-reads only
 those members of the release ZIP and refuses a bundle that does not bind its
 STEP. It rebinds `features.toml` to this checkout's requirement declarations
 over the fetched STEP, so a new or changed `requirement(...)` needs no farm,
-and reports the bundle STALE (exit 2, nothing written, unless `--accept-stale`)
+and reports the bundle STALE (exit 2, nothing written; there is no override)
 when the part's geometry inputs (`part:<stem>` or the labelled-STEP exporter)
 differ between the release's tag and the working tree. A release that predates
 face inventories can be neither rebound nor validated, so it is always STALE
-(use a newer release or `--accept-stale`). A
-stale part needs a farm build of `package:features:<stem>`. After editing
-declarations on top of a local bundle,
-`uv run --frozen python cad/scripts/export_features.py <stem>` rebinds it. Only exit 0
+(use a newer release). A
+stale part needs a farm build of `package:features:<stem>`. A bound
+`features.toml` records its geometry inputs' digests (`[geometry_inputs]`),
+and the traveler wrapper and `cam_nc.py` refuse (exit 2, naming each changed
+input) a bundle without them or built from other geometry, such as one copied
+from another worktree; `fetch_features.py --check <stem>` reports the same
+without fetching. After editing declarations on top of a local bundle,
+`uv run --frozen python cad/scripts/fetch_features.py --rebind <stem>` rebinds
+it (`export_features.py <stem>` alone writes no geometry inputs). Only exit 0
 from both profiles and a printed PDF is success. Exit 2 from either profile is
 a prechips refusal (bad input or a failed enforced check) and leaves no
 traveler file; exit 1 means uv itself failed (no `uv`, no PyPI, or a `uv tool

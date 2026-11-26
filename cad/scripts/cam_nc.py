@@ -55,6 +55,7 @@ from typing import Any
 
 import _as_machined
 import _cam_programs
+import _features_provenance
 import _gcode
 import _process_plans
 import _shop_equipment
@@ -341,11 +342,13 @@ def _remove_outputs(directory: Path) -> None:
 
 
 def _fail(root, stem: str, exc: Exception, directory: Path) -> int:
+    """Remove every output, mark the pipeline span failed and return 2 for a
+    feature bundle not built from this checkout, else 1."""
     _remove_outputs(directory)
     root.record_exception(exc)
     root.set_status(_telemetry.Status(_telemetry.StatusCode.ERROR, str(exc)))
     _telemetry.error(f"{stem}: {exc}")
-    return 1
+    return 2 if isinstance(exc, _features_provenance.StaleBundle) else 1
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -378,6 +381,7 @@ def main(argv: list[str] | None = None) -> int:
             if missing:
                 parts = " ".join(_process_plans.part_stems(stem))
                 raise FileNotFoundError(f"missing inputs {missing}; run package:manifest:<part> (or fetch_features.py {parts}) first")
+            _features_provenance.require_current(_cam_programs.cam_parts(stem), args.out)
             plan = _load_toml(plan_path)
             family = _process_plans.family_parts(stem)
             bundles = {
