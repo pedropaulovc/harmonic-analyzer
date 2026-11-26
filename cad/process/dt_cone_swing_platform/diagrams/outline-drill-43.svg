@@ -9,6 +9,7 @@
   <rect class="holes" x="269.58" y="151.96" width="42.67" height="28.04"/>
   <rect class="holes" x="281.87" y="180" width="18.08" height="91.44"/>
   <path class="cutter" d="M299.96 52L299.96 266.01L290.91 271.44L281.87 266.01L281.87 52L290.91 49Z"/>
+  <line class="arrow" x1="267.87" y1="58" x2="267.87" y2="88"/>
   <text class="datum-label" x="220" y="196">Z0 the plate's top</text>
   <text class="label" x="216" y="299.6">the blank, top up (U down), on the spoil plate</text>
   <text class="label" x="556" y="60">#43 down through the</text>

@@ -21,6 +21,7 @@
   <rect class="holes" x="274.72" y="389.2" width="24.38" height="50.8"/>
   <rect class="holes" x="395.82" y="440" width="48.36" height="24"/>
   <path class="cutter" d="M444.18 296L444.18 456L420 470.53L395.82 456L395.82 296L403.88 293L411.94 296L420 293L428.06 296L436.12 293Z"/>
+  <line class="arrow" x1="381.82" y1="302" x2="381.82" y2="332"/>
   <text class="datum-label" x="216" y="456">Z0 the plate's top</text>
   <text class="label" x="560" y="320">B drill down its own hole and</text>
   <text class="label" x="560" y="336">into the plate, its point</text>

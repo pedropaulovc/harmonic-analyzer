@@ -9,6 +9,7 @@
   <text class="label" x="44" y="112.07">outline); parallel below</text>
   <rect class="holes" x="213.03" y="200" width="18.29" height="38.1"/>
   <path class="cutter" d="M231.32 92L231.32 241.86L222.17 247.36L213.03 241.86L213.03 92L222.17 89Z"/>
+  <line class="arrow" x1="199.03" y1="98" x2="199.03" y2="128"/>
   <text class="datum-label" x="40" y="194">Z0 the underside (U, up)</text>
   <text class="label" x="380" y="52">#31, one feed: full diameter {{process.drill_past_mm:in.3dot}} past</text>
   <text class="label" x="380" y="68">the top face, its point at Z{{process.drill_31_tip_mm:.3f}} mm</text>

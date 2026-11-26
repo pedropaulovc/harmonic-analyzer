@@ -10,6 +10,7 @@
   <rect class="holes" x="213.03" y="200" width="18.29" height="38.1"/>
   <rect class="holes" x="206.17" y="200" width="32" height="21.03"/>
   <path class="cutter" d="M238.17 218.75L238.17 92L228.65 89L219.12 92L219.12 218.75A9.52 2.29 0 0 0 238.17 218.75Z"/>
+  <line class="arrow" x1="205.12" y1="98" x2="205.12" y2="128"/>
   <text class="datum-label" x="40" y="194">Z0 the underside (U, up)</text>
   <text class="label" x="380" y="52">1/8 in end mill, G2 helix of {{process.cbore_path_radius_mm:in.4dot}} radius,</text>
   <text class="label" x="380" y="68">{{process.cbore_helix_pitch_mm:.1f}} mm a turn, to {{cad.holddown_cbore_depth_nominal_in:.3dot}} deep: Ø{{cad.holddown_cbore_dia_nominal_in:.3dot}}</text>

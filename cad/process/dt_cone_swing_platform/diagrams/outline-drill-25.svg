@@ -5,8 +5,9 @@
   <rect class="fixture-plate" x="216" y="180" width="328" height="101.6"/>
   <rect class="part-kept" x="216" y="129.2" width="328" height="50.8"/>
   <rect class="holes" x="296.29" y="129.2" width="40.84" height="50.8"/>
-  <rect class="holes" x="301.52" y="180" width="30.38" height="114.73"/>
+  <rect class="holes" x="301.52" y="180" width="30.38" height="101.6"/>
   <path class="cutter" d="M331.9 52L331.9 285.6L316.71 294.73L301.52 285.6L301.52 52L309.12 49L316.71 52L324.31 49Z"/>
+  <line class="arrow" x1="287.52" y1="58" x2="287.52" y2="88"/>
   <text class="datum-label" x="220" y="196">Z0 the plate's top</text>
   <text class="label" x="216" y="299.6">the blank, top up (U down), on the spoil plate</text>
   <text class="label" x="556" y="60">#25 down through the</text>

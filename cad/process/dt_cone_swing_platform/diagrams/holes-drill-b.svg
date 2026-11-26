@@ -9,6 +9,7 @@
   <text class="label" x="44" y="112.07">outline); parallel below</text>
   <rect class="holes" x="303.85" y="200" width="36.27" height="38.1"/>
   <path class="cutter" d="M340.12 92L340.12 241.86L321.98 252.76L303.85 241.86L303.85 92L311.1 89L318.35 92L325.61 89L332.86 92Z"/>
+  <line class="arrow" x1="289.85" y1="98" x2="289.85" y2="128"/>
   <text class="datum-label" x="40" y="194">Z0 the underside (U, up)</text>
   <text class="label" x="380" y="52">B drill through the pivot in one feed, its point</text>
   <text class="label" x="380" y="68">at Z{{process.drill_b_tip_mm:.3f}} mm, into air; reamed in Setup 4</text>

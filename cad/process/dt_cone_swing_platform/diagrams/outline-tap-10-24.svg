@@ -6,7 +6,7 @@
   <rect class="part-kept" x="220" y="304.6" width="320" height="25.4"/>
   <rect class="holes" x="369.79" y="304.6" width="20.42" height="25.4"/>
   <rect class="holes" x="372.41" y="330" width="15.19" height="50.8"/>
-  <rect class="part-threads" x="370.35" y="330" width="19.3" height="58.8"/>
+  <rect class="part-threads" x="370.35" y="330" width="19.3" height="50.8"/>
   <path class="cutter" d="M389.65 386.48L389.65 194.6L370.35 194.6L370.35 386.48A9.65 2.32 0 0 0 389.65 386.48Z"/>
   <rect class="cutter" x="320" y="184.6" width="120" height="10"/>
   <rect class="cutter" x="370" y="180.6" width="20" height="26"/>

@@ -29,6 +29,7 @@
   <rect class="fixture-vise" x="30" y="457.15" width="705.8" height="8"/>
   <rect class="holes" x="227.06" y="400" width="11.05" height="19.05"/>
   <path class="cutter" d="M238.11 361L238.11 419.8L232.59 423.12L227.06 419.8L227.06 361L232.59 358Z"/>
+  <line class="arrow" x1="213.06" y1="367" x2="213.06" y2="397"/>
   <text class="label" x="260" y="365">L drill: point at Z{{process.drill_l_tip_mm:.3f}} mm,</text>
   <text class="label" x="260" y="381">past the plate's underside into air</text>
   <line class="leader" x1="256" y1="361" x2="240.59" y2="409"/>

@@ -10,9 +10,9 @@
   <path class="part-kept" d="M480.67 105.55L745 105.55L742 112.96L745 120.37L742 127.78L745 135.19L742 142.59L745 150L742 157.41L745 164.82L742 172.23L745 179.64L742 187.04L745 194.45L480.67 194.45Z"/>
   <text class="label" x="490.67" y="40.4">jig (bore .4385), journal in it</text>
   <text class="label" x="457.27" y="269.6">1/8 spacer gap</text>
-  <rect class="holes" x="400" y="200.41" width="61.67" height="11.18"/>
+  <rect class="holes" x="400" y="200.41" width="55.27" height="11.18"/>
   <path class="cutter" d="M133.81 200.41L461.67 200.41L465.02 206L461.67 211.59L133.81 211.59Z"/>
-  <rect class="fixture-vise" x="73.81" y="166" width="60" height="80"/>
+  <rect class="cutter" x="73.81" y="166" width="60" height="80"/>
   <text class="label" x="73.81" y="262">drill chuck (schematic)</text>
   <line class="arrow" x1="680.67" y1="281.6" x2="620.67" y2="281.6"/>
   <text class="label" x="520.67" y="301.6">carriage feeds the jig onto the cutter</text>

@@ -15,19 +15,19 @@
   <rect class="holes" x="386.41" y="130.41" width="11.3" height="85.09"/>
   <rect class="holes" x="383.9" y="173.6" width="16.32" height="41.9"/>
   <rect class="part-threads" x="384.95" y="130.41" width="14.23" height="43.19"/>
-  <path class="cutter" d="M399.17 185.85L399.17 84.41L384.95 84.41L384.95 185.85A7.11 1.71 0 0 0 399.17 185.85Z"/>
-  <rect class="cutter" x="332.06" y="74.41" width="120" height="10"/>
-  <rect class="cutter" x="382.06" y="70.41" width="20" height="26"/>
-  <path class="cutter" d="M380.15 32.31L403.97 32.31L403.97 58.5L392.06 70.41L380.15 58.5Z"/>
-  <path class="cutter" d="M423.81 32.31L423.81 36L416.75 33L409.7 36L402.64 33L395.59 36L388.53 33L381.48 36L374.42 33L367.37 36L360.31 36L360.31 32.31Z"/>
+  <path class="cutter" d="M399.17 185.85L399.17 100.41L384.95 100.41L384.95 185.85A7.11 1.71 0 0 0 399.17 185.85Z"/>
+  <rect class="cutter" x="332.06" y="90.41" width="120" height="10"/>
+  <rect class="cutter" x="382.06" y="86.41" width="20" height="26"/>
+  <path class="cutter" d="M380.15 48.31L403.97 48.31L403.97 74.5L392.06 86.41L380.15 74.5Z"/>
+  <path class="cutter" d="M423.81 48.31L423.81 32L416.75 29L409.7 32L402.64 29L395.59 32L388.53 29L381.48 32L374.42 29L367.37 32L360.31 32L360.31 48.31Z"/>
   <text class="label" x="530" y="50">Fisher tap guide in the 1/2 in</text>
   <text class="label" x="530" y="66">collet, spindle off: its spring</text>
   <text class="label" x="530" y="82">point in the wrench's centre hole</text>
-  <line class="leader" x1="526" y1="56" x2="406.06" y2="60"/>
-  <circle class="leader-dot" cx="406.06" cy="60" r="2"/>
+  <line class="leader" x1="526" y1="56" x2="398.06" y2="66"/>
+  <circle class="leader-dot" cx="398.06" cy="66" r="2"/>
   <text class="label" x="530" y="130">T-handle wrench (schematic)</text>
-  <line class="leader" x1="526" y1="126" x2="452.06" y2="78.41"/>
-  <circle class="leader-dot" cx="452.06" cy="78.41" r="2"/>
+  <line class="leader" x1="526" y1="126" x2="452.06" y2="94.41"/>
+  <circle class="leader-dot" cx="452.06" cy="94.41" r="2"/>
   <text class="label" x="530" y="190">4-40 plug tap, point {{process.pinch_tap_reach_mm:in.3dot}}</text>
   <text class="label" x="530" y="206">below E, inside W's #30</text>
   <line class="leader" x1="526" y1="186" x2="398.06" y2="165.5"/>

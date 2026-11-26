@@ -11,7 +11,7 @@
   <text class="label" x="490.67" y="40.4">jig (bore .4385), journal in it</text>
   <text class="label" x="457.27" y="269.6">1/8 spacer gap</text>
   <path class="cutter" d="M132.89 196.55L431.36 196.55A2.27 9.45 0 0 1 431.36 215.45L132.89 215.45Z"/>
-  <rect class="fixture-vise" x="72.89" y="166" width="60" height="80"/>
+  <rect class="cutter" x="72.89" y="166" width="60" height="80"/>
   <text class="label" x="72.89" y="262">drill chuck (schematic)</text>
   <line class="arrow" x1="680.67" y1="281.6" x2="620.67" y2="281.6"/>
   <text class="label" x="520.67" y="301.6">carriage feeds the jig onto the cutter</text>

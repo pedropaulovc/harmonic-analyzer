@@ -24,10 +24,9 @@
   <text class="label" x="20" y="92">three passes {{process.slit_step_mm:in.3dot}} deeper each, to {{process.slit_depth_mm:in.3dot}} REF, into the adjuster</text>
   <line class="leader" x1="300" y1="108" x2="557.4" y2="227.64"/>
   <circle class="leader-dot" cx="557.4" cy="227.64" r="2"/>
-  <text class="label" x="620" y="140">arbor body</text>
-  <text class="label" x="620" y="156">Ø{{process.saw_arbor_body_dia_mm:in.2f}}</text>
-  <line class="leader" x1="616" y1="150" x2="682.46" y2="185"/>
-  <circle class="leader-dot" cx="682.46" cy="185" r="2"/>
+  <text class="label" x="560" y="126">arbor body Ø{{process.saw_arbor_body_dia_mm:in.2f}}</text>
+  <line class="leader" x1="640" y1="132" x2="646" y2="165"/>
+  <circle class="leader-dot" cx="646" cy="165" r="2"/>
   <text class="label" x="620" y="320">cap Ø{{process.saw_arbor_cap_dia_mm:in.2f}} × .50</text>
   <text class="label" x="620" y="336">and its screw</text>
   <line class="leader" x1="616" y1="316" x2="671.19" y2="250"/>

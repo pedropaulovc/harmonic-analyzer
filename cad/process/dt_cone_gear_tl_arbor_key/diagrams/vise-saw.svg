@@ -12,7 +12,7 @@
   <line class="arrow" x1="400" y1="185" x2="490" y2="185"/>
   <text class="label" x="498" y="189">light strokes along the blade</text>
   <line class="dims" x1="363" y1="89" x2="405" y2="89"/>
-  <line class="dims" x1="385" y1="89" x2="385" y2="203"/>
+  <line class="dims" x1="385" y1="89" x2="385" y2="225"/>
   <text class="label" x="395" y="147">{{process.blank_length_in:.2dot}} piece from the filed end,</text>
   <text class="label" x="395" y="163">held between finger and thumb</text>
   <text class="datum-label" x="293" y="94" text-anchor="end">filed end</text>

@@ -11,6 +11,7 @@
   <text class="label-on-clamp" x="445" y="396" text-anchor="middle">fixed</text>
   <rect class="part-kept" x="375.3" y="144.89" width="44.7" height="210.31"/>
   <rect class="holes" x="393.13" y="144.89" width="9.04" height="44.7"/>
+  <line class="arrow" x1="379.13" y1="66" x2="379.13" y2="96"/>
   <path class="cutter" d="M402.17 60L402.17 189.59L397.65 192.31L393.13 189.59L393.13 60L397.65 57Z"/>
   <text class="label" x="470" y="60">#43, pecks of {{process.peck_43_mm:in.3dot}}: the foot hole</text>
   <text class="label" x="470" y="76">{{cad.foot_tap_drill_depth_in:.3dot}} deep (full diameter) below SEAT,</text>

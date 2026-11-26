@@ -12,7 +12,7 @@
   <text class="label" x="457.27" y="269.6">1/8 spacer gap</text>
   <rect class="holes" x="400" y="196.96" width="35.61" height="18.08"/>
   <path class="cutter" d="M134.21 196.96L435.61 196.96L441.05 206L435.61 215.04L134.21 215.04Z"/>
-  <rect class="fixture-vise" x="74.21" y="166" width="60" height="80"/>
+  <rect class="cutter" x="74.21" y="166" width="60" height="80"/>
   <text class="label" x="74.21" y="262">drill chuck (schematic)</text>
   <line class="arrow" x1="680.67" y1="281.6" x2="620.67" y2="281.6"/>
   <text class="label" x="520.67" y="301.6">carriage feeds the jig onto the cutter</text>

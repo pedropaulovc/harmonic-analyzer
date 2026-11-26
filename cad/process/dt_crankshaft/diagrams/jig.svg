@@ -3,9 +3,9 @@
   <rect class="paper" x="0" y="0" width="760" height="330"/>
   <text class="title" x="20" y="22">Setup 7: the jig bored on the lathe, the 27/64 drill in the 3-jaw (3 px/mm)</text>
   <line class="centre-line" x1="20" y1="150" x2="740" y2="150"/>
-  <rect class="fixture-vise" x="30" y="60" width="50" height="180"/>
-  <rect class="clamp" x="80" y="104" width="30" height="30"/>
-  <rect class="clamp" x="80" y="166" width="30" height="30"/>
+  <rect class="cutter" x="30" y="60" width="50" height="180"/>
+  <rect class="cutter" x="80" y="104" width="30" height="30"/>
+  <rect class="cutter" x="80" y="166" width="30" height="30"/>
   <rect class="part-kept" x="250" y="111.9" width="209.55" height="76.2"/>
   <rect class="part-kept" x="459.55" y="121.42" width="152.4" height="57.15"/>
   <rect class="holes" x="467.17" y="135.71" width="144.78" height="28.58"/>
