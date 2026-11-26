@@ -1,49 +1,58 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<!-- Setup 2 (a new riser only): the two riser blocks side by side along the jaws, centred, each standing across the jaws on the 1 in pair of parallels (one against each jaw), its 3 in as-bought length gripped; their tops about .2 above the jaw tops. CA00 faces both tops at one Z in passes along X past both jaw sides. Top view and an end view. Styles: prechips.palette. -->
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 400" width="640" height="400" font-family="sans-serif" font-size="12">
-<rect class="paper" width="640" height="400"/>
-<text class="label" x="470" y="20">Top view</text>
-<rect class="clamp" x="170" y="36" width="250" height="28"/>
-<text class="label" x="190" y="30">fixed jaw, 6.247 long</text>
-<rect class="clamp" x="170" y="184" width="250" height="28"/>
-<text class="label" x="250" y="226">moving jaw</text>
-<rect class="fixture-support" x="170" y="64" width="250" height="5"/>
-<rect class="fixture-support" x="170" y="179" width="250" height="5"/>
-<rect class="part-kept" x="257" y="64" width="38" height="120"/>
-<rect class="part-kept" x="295" y="64" width="38" height="120"/>
-<text class="label" x="440" y="100">two blocks, each</text>
-<text class="label" x="440" y="114">{{process.riser_width_min_mm:in.2dot}}–{{process.riser_width_max_mm:in.2dot}} along the jaws,</text>
-<text class="label" x="440" y="128">3 in across them (TOP up)</text>
-<path class="leader" d="M436 110 L335 110"/>
-<text class="label" x="440" y="160">1 in parallels under</text>
-<text class="label" x="440" y="174">both ends of each block</text>
-<path class="leader" d="M436 170 L422 181"/>
-<circle class="cutter" cx="150" cy="64" r="10"/>
-<text class="label" x="40" y="96">end mill: passes</text>
-<text class="label" x="40" y="110">along X past both</text>
-<text class="label" x="40" y="124">jaw sides, stepping −Y</text>
-<path class="arrow" d="M150 80 H210"/>
-<line class="datum" x1="170" y1="22" x2="170" y2="236"/>
-<text class="label" x="150" y="248">X0</text>
-<line class="datum" x1="140" y1="64" x2="180" y2="64"/>
-<text class="label" x="116" y="60">Y0</text>
-<path class="axis" d="M520 250 H570"/><text class="label" x="574" y="254">+X</text>
-<path class="axis" d="M520 250 V200"/><text class="label" x="512" y="196">+Y</text>
-<text class="label" x="20" y="272">End view, from the left: one block across the jaws</text>
-<rect class="clamp" x="40" y="314" width="30" height="71"/>
-<text class="label" x="22" y="397">fixed jaw</text>
-<rect class="clamp" x="190" y="314" width="30" height="71"/>
-<text class="label" x="176" y="397">moving jaw</text>
-<rect class="fixture-support" x="70" y="345" width="6" height="40"/>
-<rect class="fixture-support" x="184" y="345" width="6" height="40"/>
-<rect class="part-kept" x="70" y="308" width="120" height="37"/>
-<rect class="part-removed" x="70" y="304" width="120" height="4"/>
-<line class="active-face" x1="70" y1="308" x2="190" y2="308"/>
-<text class="label" x="240" y="300">CA00 faces {{process.riser_face_mm:in.3dot}} off both tops at one Z</text>
-<text class="label" x="240" y="314">(Z0 the higher top); the cutter passes over the jaws</text>
-<path class="leader" d="M236 304 L192 306"/>
-<text class="label" x="240" y="340">the jaws grip the lower .77 in, on the bar's</text>
-<text class="label" x="240" y="354">as-bought edges, never a sawn face</text>
-<text class="label" x="240" y="378">1 in parallels, one against each jaw</text>
-<path class="leader" d="M236 374 L192 372"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 780 430" width="780" height="430" font-family="sans-serif" font-size="13">
+  <!-- Setup 2, a new riser only. Sizes from the plan's [parameters]: bars 1/4 in square (blank_width_in), riser 1 in tall (riser_parallel_height_mm) and .92-.96 wide (riser_width_min/max_mm, drawn .94), two 3 in blocks end to end centred on the 6.247 in jaws (vise_jaw_width_mm), jaws 1.770 in tall (vise_jaw_height_mm), the ends .75 in past the jaw side (end_protrusion_mm). The jaws' depth across the vise and the vise body are not on record: drawn schematic. The two blocks .94 along the jaws (drawn), 3 in across them (the 1 x 3 in bar's width), side by side, centred along the jaws; 1 in tall on the 1 in pair of parallels (parallels-lms-6745, 1/8 in thick: the set's thickness as the shaft plans restate it, parallel_thickness_mm; its length is not on record and is drawn schematic). Their tops 2.000 in over the bed, .230 over the jaw tops. The 1/2 in end mill to scale (face_cutter_dia_mm 12.7 = 20 px above, 40 px in the end view), on CA00's pass at Y -38.100 (cutter centre), the middle of the 13 passes and one wholly over the blocks, travelling +X (CA00 alternates: Y0 +X, -6.35 -X, ... -38.1 +X). Its tip .005 under the higher top (riser_face_mm 0.127). Its square end drawn as the near half of the end face, 12 % deep; drawn short to a break line (2.00 in out of the collet, half_mill_projection_min_mm; the collet is not drawn, its size is not on record). -->
+  <rect class="paper" x="0" y="0" width="780" height="430"/>
+  <text class="title" x="20" y="24">Setup 2, CA00 on its Y −1.500 pass: from above (1 in = 40 px); end view from the left (1 in = 80 px)</text>
+  <rect class="clamp" x="70" y="100" width="249.88" height="20"/>
+  <rect class="clamp" x="70" y="240" width="249.88" height="20"/>
+  <text class="label-on-clamp" x="76" y="115">fixed jaw, 6.247 long</text>
+  <text class="label-on-clamp" x="76" y="255">moving jaw</text>
+  <rect class="fixture-support" x="74.8" y="120" width="240" height="5"/>
+  <rect class="fixture-support" x="74.8" y="235" width="240" height="5"/>
+  <rect class="part-kept" x="157.34" y="120" width="37.6" height="120"/>
+  <rect class="part-kept" x="194.94" y="120" width="37.6" height="120"/>
+  <rect class="part-removed" x="157.34" y="170" width="24" height="20"/>
+  <circle class="cutter" cx="181.34" cy="180" r="10"/>
+  <line class="arrow" x1="197.34" y1="180" x2="241.34" y2="180"/>
+  <line class="datum" x1="70" y1="88" x2="70" y2="252"/>
+  <text class="datum-label" x="66" y="84" text-anchor="middle">X0</text>
+  <line class="datum" x1="34" y1="120" x2="68" y2="120"/>
+  <text class="datum-label" x="34" y="114">Y0</text>
+  <line class="leader" x1="141.34" y1="246" x2="181.34" y2="189"/>
+  <circle class="leader-dot" cx="181.34" cy="189" r="2"/>
+  <text class="label" x="74" y="292">the 1/2 in end mill on the Y −1.500 pass, +X;</text>
+  <text class="label" x="74" y="308">13 passes .250 apart, Y0 to −3.000, past both jaw sides</text>
+  <line class="leader" x1="238.54" y1="160" x2="278.54" y2="160"/>
+  <circle class="leader-dot" cx="278.54" cy="160" r="2"/>
+  <text class="label" x="282.54" y="150">two blocks, TOP up, each</text>
+  <text class="label" x="282.54" y="166">{{process.riser_width_min_mm:in.2dot}}–{{process.riser_width_max_mm:in.2dot}} along the jaws</text>
+  <line class="axis" x1="22" y1="276" x2="56" y2="276"/>
+  <text class="label" x="60" y="280">+X</text>
+  <line class="axis" x1="22" y1="276" x2="22" y2="242"/>
+  <text class="label" x="14" y="236">+Y</text>
+  <rect class="fixture-vise" x="438" y="340" width="304" height="18"/>
+  <rect class="clamp" x="438" y="198.44" width="32" height="141.56"/>
+  <rect class="clamp" x="710" y="198.44" width="32" height="141.56"/>
+  <rect class="fixture-support" x="470" y="260" width="10" height="80"/>
+  <rect class="fixture-support" x="700" y="260" width="10" height="80"/>
+  <rect class="part-kept" x="470" y="180" width="240" height="80"/>
+  <rect class="part-removed" x="470" y="180" width="240" height="1.9"/>
+  <line class="active-face" x1="470" y1="180" x2="710" y2="180"/>
+  <path class="cutter" d="M610 175.6L610 88L606 91L602 88L598 91L594 88L590 91L586 88L582 91L578 88L574 91L570 88L570 175.6A20 4.8 0 0 0 610 175.6Z"/>
+  <text class="label" x="438" y="374">fixed jaw</text>
+  <text class="label" x="742" y="374" text-anchor="end">moving jaw</text>
+  <line class="leader" x1="494" y1="80" x2="510" y2="179"/>
+  <circle class="leader-dot" cx="510" cy="179" r="2"/>
+  <text class="label" x="400" y="56">CA00 faces {{process.riser_face_mm:in.3dot}} off both tops</text>
+  <text class="label" x="400" y="72">at one Z (Z0 the higher top)</text>
+  <text class="label" x="618" y="104">1/2 in end mill,</text>
+  <text class="label" x="618" y="120">{{process.half_mill_projection_min_mm:in.2dot}} out (drawn short);</text>
+  <text class="label" x="618" y="136">the tops .23 over the jaws</text>
+  <text class="label" x="590" y="304" text-anchor="middle">1 in parallels, one at each jaw</text>
+  <line class="leader" x1="498" y1="290" x2="465" y2="280"/>
+  <circle class="leader-dot" cx="465" cy="280" r="2"/>
+  <line class="leader" x1="682" y1="290" x2="705" y2="280"/>
+  <circle class="leader-dot" cx="705" cy="280" r="2"/>
+  <text class="label-halo" x="590" y="225" text-anchor="middle">TOP up, 3 in across the jaws</text>
+  <text class="label" x="438" y="394">the jaws grip the lower .77 in, on the as-bought</text>
+  <text class="label" x="438" y="410">edges, never a sawn face</text>
 </svg>

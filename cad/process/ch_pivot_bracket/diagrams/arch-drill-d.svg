@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 400" width="760" height="400" font-family="sans-serif" font-size="13">
+  <!-- Setup 5. Hand picture at 4.5 px/mm. The part lying I up on the 1 in + 1/2 in stacks (riser_height_mm 38.1), gripped on W (fixed jaw) and E, the seat at X0 on the right, the jaw tops 6.845 mm over the stacks (lying_grip_mm): the jaws grip only waste. Part 19.05 I to O (blank_section_mm), .640 W to E, drawn 1.475 long less the seat skim. Jaws' depth and the vise body are not on record: drawn schematic. Parallels 1/8 in thick (parallel_thickness_mm). The D drill (.246) to scale (cutter_dia_mm 6.2484; plan tool drill-d), 118 deg point, at the bore X -25.200, Y -8.128, its point at Z 7.045 (PB04's plunge): its full diameter 2.0 mm past the outboard face's plane (bore_drill_past_mm), into the waste Setup 6 removes. Drawn short to a break line (its chuck is not drawn: no size on record). The centre drill's spot before it is not drawn. -->
+  <rect class="paper" x="0" y="0" width="760" height="400"/>
+  <text class="title" x="20" y="24">Setup 5, PB04 T4, the D drill (.246): from above; section at the bore (4.5 px/mm)</text>
+  <rect class="clamp" x="203.67" y="34" width="226.33" height="45"/>
+  <rect class="clamp" x="203.67" y="152.15" width="226.33" height="45"/>
+  <text class="label-on-clamp" x="316.84" y="49" text-anchor="middle">fixed jaw</text>
+  <text class="label-on-clamp" x="316.84" y="167.15" text-anchor="middle">moving jaw</text>
+  <path class="part-kept" d="M400 79H278.84A36.58 36.58 0 0 0 278.84 152.15H400Z"/>
+  <line class="centre-line" x1="223.67" y1="115.58" x2="410" y2="115.58"/>
+  <circle class="datum" cx="400" cy="79" r="3.5"/>
+  <text class="datum-label" x="434" y="83">X0 the seat; Y0 W</text>
+  <circle class="cutter" cx="286.6" cy="115.58" r="14.06"/>
+  <text class="label" x="500" y="118">the D drill (.246) in the bore,</text>
+  <text class="label" x="500" y="134">X −25.200 from the seat</text>
+  <rect class="fixture-support" x="203.67" y="353" width="226.33" height="3"/>
+  <path class="hidden" d="M203.67 322.2H430"/>
+  <line class="hidden" x1="203.67" y1="303.85" x2="430" y2="303.85"/>
+  <rect class="part-kept" x="242.27" y="267.27" width="157.73" height="85.73"/>
+  <rect class="holes" x="272.54" y="267.27" width="28.12" height="45.58"/>
+  <path class="cutter" d="M300.66 226.77L300.66 312.85L286.6 321.3L272.54 312.85L272.54 226.77L276.06 223.77L279.57 226.77L283.09 223.77L286.6 226.77L290.11 223.77L293.63 226.77L297.14 223.77Z"/>
+  <line class="centre-line" x1="286.6" y1="222.28" x2="286.6" y2="362"/>
+  <line class="arrow" x1="256.6" y1="226.77" x2="256.6" y2="258.27"/>
+  <circle class="datum" cx="400" cy="353" r="3.5"/>
+  <text class="label" x="20" y="216">Section along the bore's centre line (Y −8.128):</text>
+  <text class="datum-label" x="410" y="357">Z0 the stacks' top</text>
+  <text class="label" x="434" y="307.85">outboard face's plane (Setup 6)</text>
+  <text class="label" x="434" y="336.2">jaw tops: the jaws grip waste only</text>
+  <text class="label" x="434" y="271.27">I up; the drill through the ear, its full</text>
+  <text class="label" x="434" y="287.27">diameter {{process.bore_drill_past_mm:in.3dot}} past the outboard plane</text>
+</svg>

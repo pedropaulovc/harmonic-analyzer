@@ -1,17 +1,21 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 300" font-family="sans-serif" font-size="14">
-  <rect class="paper" x="0" y="0" width="760" height="300"/>
-  <text class="title" x="20" y="24">Plan of the saw bed: cut one 13.0 in length off the 1/2 × 6 in bar</text>
-  <rect class="fixture-table" x="10" y="50" width="740" height="200"/>
-  <rect class="part-kept" x="30" y="90" width="330" height="120"/>
-  <rect class="part-rest" x="366" y="90" width="374" height="120"/>
-  <rect class="cutter" x="360" y="70" width="6" height="160"/>
-  <line class="dims" x1="30" y1="222" x2="360" y2="222"/>
-  <line class="dims" x1="30" y1="214" x2="30" y2="230"/>
-  <line class="dims" x1="360" y1="214" x2="360" y2="230"/>
-  <text class="label" x="150" y="242">13.0 ±.1 in</text>
-  <text class="label" x="120" y="155">this length: the plate</text>
-  <text class="label" x="490" y="155">rest of bar</text>
-  <text class="label" x="372" y="66">saw blade</text>
-  <line class="dims" x1="20" y1="90" x2="20" y2="210"/>
-  <text class="label" x="14" y="280">6 in bar, 1/2 in thick, flat on the bed; deburr both sawn ends; mic the thickness .495–.505</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 310" font-family="sans-serif" font-size="14">
+  <!-- Setup 1. Plan of the saw bed, 1 px/mm: the 1/2 x 6 in bar (blank_width_in 6.0)
+       and the 13.0 in length (blank_length_in) to scale. The saw is not on
+       record: its bed and blade are drawn schematic (the blade's thickness
+       exaggerated). -->
+  <rect class="paper" x="0" y="0" width="760" height="310"/>
+  <text class="title" x="20" y="24">Plan of the saw bed (1 px/mm; the saw schematic): cut one {{process.blank_length_in:.1f}} in length off the {{process.blank_thickness_in:fraction}} × {{process.blank_width_in:g}} in bar</text>
+  <rect class="fixture-table" x="10" y="40" width="740" height="222"/>
+  <rect class="part-kept" x="30" y="70" width="330.2" height="152.4"/>
+  <rect class="part-rest" x="366.2" y="70" width="373.8" height="152.4"/>
+  <rect class="cutter" x="360.2" y="50" width="6" height="192.4"/>
+  <line class="dims" x1="30" y1="236" x2="360.2" y2="236"/>
+  <line class="dims" x1="30" y1="228" x2="30" y2="244"/>
+  <line class="dims" x1="360.2" y1="228" x2="360.2" y2="244"/>
+  <text class="label" x="150" y="256">{{process.blank_length_in:.1f}} ±.1 in</text>
+  <text class="label" x="120" y="150">this length: the plate</text>
+  <text class="label" x="490" y="150">rest of bar</text>
+  <text class="label" x="372" y="62">saw blade</text>
+  <line class="dims" x1="20" y1="70" x2="20" y2="222.4"/>
+  <text class="label" x="14" y="290">{{process.blank_width_in:g}} in bar, {{process.blank_thickness_in:fraction}} in thick, flat on the bed; deburr both sawn ends; mic the thickness {{process.blank_thickness_min_in:.3dot}}–{{process.blank_thickness_max_in:.3dot}}</text>
 </svg>

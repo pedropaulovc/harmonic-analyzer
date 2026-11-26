@@ -1,31 +1,51 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<!-- Setup 4: F up again; finish F, trim the ends, cut round the fork ends, bore the rings. Styles: prechips.palette. -->
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 470" width="640" height="470" font-family="sans-serif" font-size="12">
-<rect class="paper" width="640" height="470"/>
-<text class="title" x="20" y="22">Face F up: finish, trim, fork ends, bore (top view)</text>
-<rect class="clamp" x="85" y="46" width="460" height="24"/>
-<text class="label" x="270" y="62">fixed jaw</text>
-<rect class="fixture-plate" x="50" y="76" width="442" height="283" fill-opacity="0.35"/>
-<rect class="part-rest" x="50" y="70.0" width="548.7" height="147.3"/>
-<path class="part-removed" d="M50.0 75.2 L204.1 75.2 L204.1 115.1 L539.5 115.1 L539.5 172.2 L204.1 172.2 L204.1 212.2 L50.0 212.2 Z"/>
-<path class="part-removed" fill-rule="evenodd" d="M527.7 92.5 L577.4 92.5 A51.2 51.2 0 0 1 591.8 94.6 L591.8 192.8 A51.2 51.2 0 0 1 577.4 194.9 L527.7 194.9 Z M527.7 129.3 L577.4 129.3 A14.4 14.4 0 0 1 577.4 158.0 L527.7 158.0 Z"/>
-<rect class="part-removed" x="591.8" y="70.0" width="6.9" height="147.3"/>
-<path class="part-kept" d="M539.5 129.3 L577.4 129.3 A14.4 14.4 0 0 1 577.4 158.0 L539.5 158.0 Z"/>
-<circle class="holes" cx="118.1" cy="143.7" r="44.7"/>
-<text class="label" x="38" y="84.0">1</text>
-<rect class="part-rest" x="50" y="217.3" width="548.7" height="147.3"/>
-<path class="part-removed" d="M50.0 222.5 L204.1 222.5 L204.1 262.4 L539.5 262.4 L539.5 319.5 L204.1 319.5 L204.1 359.5 L50.0 359.5 Z"/>
-<path class="part-removed" fill-rule="evenodd" d="M527.7 239.8 L577.4 239.8 A51.2 51.2 0 0 1 591.8 241.9 L591.8 340.1 A51.2 51.2 0 0 1 577.4 342.2 L527.7 342.2 Z M527.7 276.6 L577.4 276.6 A14.4 14.4 0 0 1 577.4 305.3 L527.7 305.3 Z"/>
-<rect class="part-removed" x="591.8" y="217.3" width="6.9" height="147.3"/>
-<path class="part-kept" d="M539.5 276.6 L577.4 276.6 A14.4 14.4 0 0 1 577.4 305.3 L539.5 305.3 Z"/>
-<circle class="holes" cx="118.1" cy="291.0" r="44.7"/>
-<text class="label" x="38" y="231.3">2</text>
-<rect class="clamp" x="85" y="365" width="460" height="24"/>
-<text class="label" x="270" y="381">moving jaw</text>
-<line class="datum" x1="50" y1="36" x2="50" y2="399"/>
-<text class="datum-label" x="10" y="415">X0 left ends</text>
-<text class="label" x="170" y="415">F up; support plate (6061) on two 1 in parallels</text>
-<line class="cutter" x1="591.8" y1="50" x2="591.8" y2="395"/>
-<text class="label" x="480" y="40">trim to the crown</text>
-<text class="label" x="170" y="433">finish F; trim the ends; cut through round each fork end; bore each ring</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 840 430" width="840" height="430" font-family="sans-serif" font-size="13">
+  <!-- Setup 4. Hand picture, both views at 2.4 px/mm (61 px/in). From the plan's [parameters]: blanks 2 x 1/4 in (blank_width_in, blank_thickness_max_mm), two side by side across the jaws, 50.8 mm apart (blank_pitch_mm); the jaws X 12.0 to 170.674 (jaw_start_mm, jaw_end_mm), their tops 6.845 mm over the plate (jaw_top_mm); the support plate 99.06 x 152.4 x 12.7 mm (support_plate_*_mm) from X0, centred across the load (its place across is not stated), on two 1 in parallels (parallel_height_mm), 1/8 in thick (the parallel set's thickness as the shaft plans' parallel_thickness_mm restates it). Not on record, drawn schematic: the jaws' depth (6 mm drawn), the vise body, the parallels' length (drawn jaw to jaw). The part outline in the view from above is main's picture, rescaled. Z0 the plate's top (face D). CR04a's first cut on the part: T1, the 1/2 in end mill to scale (face_cutter_dia_mm 12.7 = 30.5 px), on its last pass, centre X 193.169 (its side on the crown, crown_x_mm 186.819), Z -0.250 (end_trim_run_past_mm), fed +Y from Y -110.490 to +8.890; drawn at Y -25.400, fork 1. The pass before it, 1.587 mm out (end_trim_step_mm, X 194.755), is not drawn. Its square end 12 % deep; drawn short to a break line (1.12 in out of the collet; the collet is not drawn). -->
+  <rect class="paper" x="0" y="0" width="840" height="430"/>
+  <text class="title" x="20" y="24">Setup 4, CR04a trims the right ends: from above (2.4 px/mm)</text>
+  <rect class="part-rest" x="40" y="80" width="454.1" height="121.9"/>
+  <path class="part-removed" d="M 40 84.3 L 167.53 84.3 L 167.53 117.32 L 445.1 117.32 L 445.1 164.58 L 167.53 164.58 L 167.53 197.68 L 40 197.68 Z"/>
+  <path class="part-removed" fill-rule="evenodd" d="M 435.34 98.62 L 476.47 98.62 A 42.37 42.37 0 0 1 488.39 100.36 L 488.39 181.63 A 42.37 42.37 0 0 1 476.47 183.37 L 435.34 183.37 Z M 435.34 129.08 L 476.47 129.08 A 11.92 11.92 0 0 1 476.47 152.83 L 435.34 152.83 Z"/>
+  <rect class="part-removed" x="488.39" y="80" width="5.71" height="121.9"/>
+  <path class="part-kept" d="M 445.1 129.08 L 476.47 129.08 A 11.92 11.92 0 0 1 476.47 152.83 L 445.1 152.83 Z"/>
+  <circle class="holes" cx="96.36" cy="140.99" r="36.99"/>
+  <rect class="part-rest" x="40" y="201.9" width="454.1" height="121.9"/>
+  <path class="part-removed" d="M 40 206.21 L 167.53 206.21 L 167.53 239.23 L 445.1 239.23 L 445.1 286.48 L 167.53 286.48 L 167.53 319.59 L 40 319.59 Z"/>
+  <path class="part-removed" fill-rule="evenodd" d="M 435.34 220.52 L 476.47 220.52 A 42.37 42.37 0 0 1 488.39 222.26 L 488.39 303.53 A 42.37 42.37 0 0 1 476.47 305.27 L 435.34 305.27 Z M 435.34 250.98 L 476.47 250.98 A 11.92 11.92 0 0 1 476.47 274.73 L 435.34 274.73 Z"/>
+  <rect class="part-removed" x="488.39" y="201.9" width="5.71" height="121.9"/>
+  <path class="part-kept" d="M 445.1 250.98 L 476.47 250.98 A 11.92 11.92 0 0 1 476.47 274.73 L 445.1 274.73 Z"/>
+  <circle class="holes" cx="96.36" cy="262.9" r="36.99"/>
+  <rect class="clamp" x="68.8" y="65.6" width="380.82" height="14.4"/>
+  <rect class="clamp" x="68.8" y="323.84" width="380.82" height="14.4"/>
+  <text class="label-on-clamp" x="232" y="76.6" text-anchor="middle">fixed jaw</text>
+  <text class="label-on-clamp" x="232" y="334.84" text-anchor="middle">moving jaw</text>
+  <path class="hidden" d="M40 83.05H405.76V320.79H40Z"/>
+  <line class="datum" x1="40" y1="51.2" x2="40" y2="347.84"/>
+  <text class="datum-label" x="38" y="360.84" text-anchor="middle">X0</text>
+  <text class="label" x="26" y="144.96" text-anchor="middle">1</text>
+  <text class="label" x="26" y="266.88" text-anchor="middle">2</text>
+  <circle class="cutter" cx="503.61" cy="140.96" r="15.24"/>
+  <line class="arrow" x1="525.61" y1="154.96" x2="525.61" y2="118.96"/>
+  <text class="label" x="529.61" y="154.96">+Y</text>
+  <text class="label" x="20" y="378">The 1/2 in end mill trims both right ends to the crowns in two passes</text>
+  <text class="label" x="20" y="394">along +Y, through to {{process.end_trim_run_past_mm:in.3dot}} below Z0, in the air past the plate and</text>
+  <text class="label" x="20" y="410">the jaws (the last pass drawn); then finishes F, cuts round the fork ends</text>
+  <text class="label" x="20" y="426">and bores each ring. The 1/8 in band has its own picture.</text>
+  <rect class="fixture-vise" x="531.76" y="391.44" width="272.64" height="16"/>
+  <rect class="clamp" x="790" y="283.57" width="14.4" height="107.87"/>
+  <rect class="clamp" x="531.76" y="283.57" width="14.4" height="107.87"/>
+  <rect class="fixture-support" x="782.38" y="330.48" width="7.62" height="60.96"/>
+  <rect class="fixture-support" x="546.16" y="330.48" width="7.62" height="60.96"/>
+  <rect class="fixture-plate" x="549.21" y="300" width="237.74" height="30.48"/>
+  <rect class="part-kept" x="668.08" y="284.76" width="121.92" height="15.24"/>
+  <rect class="part-kept" x="546.16" y="284.76" width="121.92" height="15.24"/>
+  <text class="label" x="804.4" y="423.44" text-anchor="end">fixed jaw</text>
+  <text class="label" x="531.76" y="423.44">moving jaw</text>
+  <text class="title" x="531.76" y="52">Section at X 193.2, from the right end</text>
+  <text class="label" x="531.76" y="70">through the cutter, past the fork ends;</text>
+  <text class="label" x="531.76" y="86">the forks, jaws and plate stand behind</text>
+  <line class="leader" x1="670" y1="379.44" x2="670" y2="315.24"/>
+  <circle class="leader-dot" cx="670" cy="315.24" r="2"/>
+  <path class="cutter" d="M744.28 296.94L744.28 239.15L740.47 242.15L736.66 239.15L732.85 242.15L729.04 239.15L725.23 242.15L721.42 239.15L717.61 242.15L713.8 239.15L713.8 296.94A15.24 3.66 0 0 0 744.28 296.94Z"/>
+  <line class="datum" x1="501.76" y1="300" x2="527.76" y2="300"/>
+  <text class="datum-label" x="499.76" y="304" text-anchor="end">Z0</text>
 </svg>

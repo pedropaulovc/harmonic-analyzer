@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 780 430" width="780" height="430" font-family="sans-serif" font-size="13">
+  <!-- Setup 5, the reamer. Sizes from the plan's [parameters]: bars 1/4 in square (blank_width_in), riser 1 in tall (riser_parallel_height_mm) and .92-.96 wide (riser_width_min/max_mm, drawn .94), two 3 in blocks end to end centred on the 6.247 in jaws (vise_jaw_width_mm), jaws 1.770 in tall (vise_jaw_height_mm), the ends .75 in past the jaw side (end_protrusion_mm). The jaws' depth across the vise and the vise body are not on record: drawn schematic. Section along the P1 bar's centre (Y -3.175, CA05's first hole), from the moving jaw's side: the fixed jaw behind, the moving jaw and the P2-P4 bars in front cut away. The hole at X -6.350 (.25 from the top end), the top notch already sawn (CA04: .55 deep, 3.200 mm wide, its ledge 1.600 mm over R). The riser starts .87 in from the top end, under the jaws: out of this view. The .0775 reamer to scale (cutter_dia_mm 1.9685 = 23.2 px; plan tool reamer-0775), its end drawn as the near half of the end face, 12 % deep, its true end at CA05's Z -1.000 (ream_past_mm 1.0 past R); drawn short to a break line, 1.00 in out of the chuck (ream_projection_mm; the chuck is not drawn). -->
+  <rect class="paper" x="0" y="0" width="780" height="430"/>
+  <text class="title" x="20" y="24">Setup 5, CA05 .0775 reamer: section along the P1 bar at its hole (1 in = 300 px); from above (1 in = 100 px)</text>
+  <path class="clamp" d="M155 99.15L155 405L151.03 408L147.06 405L143.09 408L139.12 405L135.15 408L131.18 405L127.21 408L123.24 405L119.26 408L115.29 405L111.32 408L107.35 405L103.38 408L99.41 405L95.44 408L91.47 405L87.5 408L83.53 405L79.56 408L75.59 405L71.62 408L67.65 405L63.68 408L59.71 405L55.74 408L51.76 405L47.79 408L43.82 405L39.85 408L35.88 405L31.91 408L27.94 405L23.97 408L20 405L20 99.15Z"/>
+  <text class="label-on-clamp" x="30" y="117.15">fixed jaw (behind)</text>
+  <path class="part-kept" d="M380 255L380 330L20 330L17 325.83L20 321.67L17 317.5L20 313.33L17 309.17L20 305L17 300.83L20 296.67L17 292.5L20 288.33L17 284.17L20 280L17 275.83L20 271.67L17 267.5L20 263.33L17 259.17L20 255Z"/>
+  <rect class="part-removed" x="215" y="273.3" width="165" height="37.8"/>
+  <rect class="holes" x="293.38" y="255" width="23.25" height="18.9"/>
+  <rect class="holes" x="293.38" y="255" width="23.25" height="18.3"/>
+  <line class="centre-line" x1="305" y1="45" x2="305" y2="390"/>
+  <path class="cutter" d="M316.62 339.02L316.62 90L312.75 93L308.88 90L305 93L301.12 90L297.25 93L293.38 90L293.38 339.02A11.62 2.79 0 0 0 316.62 339.02Z"/>
+  <line class="arrow" x1="271" y1="105" x2="271" y2="159"/>
+  <line class="datum" x1="380" y1="210" x2="380" y2="390"/>
+  <text class="datum-label" x="386" y="394">X0 (the top end)</text>
+  <line class="datum" x1="395" y1="330" x2="470" y2="330"/>
+  <text class="datum-label" x="476" y="335">Z0 (R)</text>
+  <text class="label" x="329" y="69">.0775 reamer, {{process.ream_projection_mm:in.2f}} out of the chuck (drawn short):</text>
+  <text class="label" x="329" y="85">through both cheeks, in and out at feed,</text>
+  <text class="label" x="329" y="101">its full diameter {{process.ream_past_mm:in.3dot}} past R, into the air</text>
+  <line class="leader" x1="245" y1="366" x2="245" y2="292.2"/>
+  <circle class="leader-dot" cx="245" cy="292.2" r="2"/>
+  <text class="label" x="245" y="382" text-anchor="middle">the top notch (CA04), between the two cheeks</text>
+  <text class="label" x="560" y="110">From above, fixed jaw at the top:</text>
+  <path class="clamp" d="M625 150L625 190L560 190L557 186L560 182L557 178L560 174L557 170L560 166L557 162L560 158L557 154L560 150Z"/>
+  <path class="clamp" d="M625 289.6L625 329.6L560 329.6L557 325.6L560 321.6L557 317.6L560 313.6L557 309.6L560 305.6L557 301.6L560 297.6L557 293.6L560 289.6Z"/>
+  <path class="part-kept" d="M700 190L700 214.9L560 214.9L557 210.75L560 206.6L557 202.45L560 198.3L557 194.15L560 190Z"/>
+  <path class="part-kept" d="M700 214.9L700 239.8L560 239.8L557 235.65L560 231.5L557 227.35L560 223.2L557 219.05L560 214.9Z"/>
+  <circle class="holes" cx="675" cy="227.35" r="3.88"/>
+  <path class="part-kept" d="M700 239.8L700 264.7L560 264.7L557 260.55L560 256.4L557 252.25L560 248.1L557 243.95L560 239.8Z"/>
+  <circle class="holes" cx="675" cy="252.25" r="3.88"/>
+  <path class="part-kept" d="M700 264.7L700 289.6L560 289.6L557 285.45L560 281.3L557 277.15L560 273L557 268.85L560 264.7Z"/>
+  <circle class="holes" cx="675" cy="277.15" r="3.88"/>
+  <circle class="cutter" cx="675" cy="202.45" r="3.88"/>
+  <text class="label" x="706" y="207.45">P1</text>
+  <text class="label" x="560" y="351.6">the same at P2–P4, {{process.bar_pitch_mm:in.4dot}}</text>
+  <text class="label" x="560" y="367.6">apart; each hole .25 from the top end</text>
+</svg>

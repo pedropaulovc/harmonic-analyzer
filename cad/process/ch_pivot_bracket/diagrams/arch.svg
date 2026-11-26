@@ -1,39 +1,38 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 400" font-family="sans-serif" font-size="13">
-  <!-- Setup 5: lying, I up, seat to the right (X0); PB04 profiles the arch and drills the bore (D, then F), above the jaw tops. -->
+  <!-- Setup 5. Hand picture at 4.5 px/mm. The part lying I up on the 1 in + 1/2 in stacks (riser_height_mm 38.1), gripped on W (fixed jaw) and E, the seat at X0 on the right, the jaw tops 6.845 mm over the stacks (lying_grip_mm): the jaws grip only waste. Part 19.05 I to O (blank_section_mm), .640 W to E, drawn 1.475 long less the seat skim. Jaws' depth and the vise body are not on record: drawn schematic. Parallels 1/8 in thick (parallel_thickness_mm). PB04's first cut: the arch's first rough level, Z 14.486 (arch_rough_level_mm 4.564 down from I), climb (G2) round the centre X -26.924, Y -8.128 at R14.986 (the arch R.320 + arch_finish_stock_mm 0.508 + the cutter's radius); drawn at its left point, X -41.910, fed +Y. The second level (Z 9.922) and the finish pass are not drawn. The 1/2 in end mill to scale (face_cutter_dia_mm 12.7), its square end drawn as the near half of the end face, 12 % deep; drawn short to a break line, 1.12 in out of the collet (half_mill_projection_mm 28.45; the collet is not drawn, its size is not on record). -->
   <rect class="paper" x="0" y="0" width="760" height="400"/>
-  <text class="title" x="20" y="20">Setup 5 (PB04_arch_bore): the arch and the bore, I up</text>
-  <text class="label" x="20" y="45">From above (the fixed jaw at the top, the seat at the right):</text>
-  <rect class="clamp" x="183.24" y="58" width="266.76" height="22"/>
-  <text class="label-on-clamp" x="347.64" y="73" text-anchor="middle">fixed jaw</text>
-  <rect class="clamp" x="183.24" y="169.41" width="266.76" height="22"/>
-  <text class="label-on-clamp" x="347.64" y="184.41" text-anchor="middle">moving jaw</text>
-  <rect class="part-removed" x="213.24" y="80" width="58.67" height="89.41"/>
-  <path class="part-kept" d="M420 80 H271.92 A44.7 44.7 0 0 0 271.92 169.41 H420 Z"/>
-  <circle class="holes" cx="281.4" cy="124.7" r="17.88"/>
-  <line class="centre-line" x1="215.21" y1="124.7" x2="430" y2="124.7"/>
-  <circle class="datum" cx="420" cy="80" r="3.5"/>
-  <text class="datum-label" x="426" y="74"></text>
-  <line class="leader" x1="420" y1="80" x2="490" y2="80"/>
-  <circle class="leader-dot" cx="420" cy="80" r="2"/>
-  <text class="datum-label" x="490" y="84">X0 the seat; Y0 W</text>
-  <line class="leader" x1="281.4" y1="124.7" x2="490" y2="130.7"/>
-  <circle class="leader-dot" cx="281.4" cy="124.7" r="2"/>
-  <text class="label" x="490" y="134.7">bore: spot, D drill, F drill</text>
-  <line class="leader" x1="240.63" y1="156" x2="490" y2="187.41"/>
-  <circle class="leader-dot" cx="240.63" cy="156" r="2"/>
-  <text class="label" x="490" y="191.41">arch R{{cad.arch_radius_in:.2dot}}: climb (G2), E side to W side</text>
-  <text class="label" x="20" y="240">From the front (the moving jaw toward you):</text>
-  <rect class="fixture-support" x="183.24" y="376" width="266.76" height="4"/>
-  <rect class="part-kept" x="213.24" y="271.23" width="206.76" height="104.78"/>
-  <rect class="part-removed" x="213.24" y="271.23" width="58.67" height="50.2"/>
-  <rect class="holes" x="264.21" y="271.23" width="34.38" height="55.7"/>
-  <line class="hidden" x1="183.24" y1="338.35" x2="440" y2="338.35"/>
-  <line class="hidden" x1="183.24" y1="315.93" x2="440" y2="315.93"/>
-  <text class="label" x="490" y="275.23">I (up); arch and bore cut {{process.arch_past_mm:in.3dot}} past</text>
-  <text class="label" x="490" y="291.23">the outboard face's plane (Setup 6's step)</text>
-  <text class="label" x="490" y="320.93">outboard face's plane</text>
-  <text class="label" x="490" y="350.35">jaw tops: the jaws grip waste only</text>
-  <text class="datum-label" x="490" y="380">Z0 the stacks' top</text>
-  <circle class="datum" cx="420" cy="376" r="3.5"/>
-  <text class="datum-label" x="426" y="370"></text>
+  <text class="title" x="20" y="24">Setup 5, PB04 T1 on the arch: from above and from the front (4.5 px/mm)</text>
+  <rect class="clamp" x="203.67" y="34" width="226.33" height="45"/>
+  <rect class="clamp" x="203.67" y="152.15" width="226.33" height="45"/>
+  <text class="label-on-clamp" x="316.84" y="49" text-anchor="middle">fixed jaw</text>
+  <text class="label-on-clamp" x="316.84" y="167.15" text-anchor="middle">moving jaw</text>
+  <rect class="part-removed" x="233.67" y="79" width="45.17" height="73.15"/>
+  <path class="part-kept" d="M400 79H278.84A36.58 36.58 0 0 0 278.84 152.15H400Z"/>
+  <line class="centre-line" x1="223.67" y1="115.58" x2="410" y2="115.58"/>
+  <circle class="datum" cx="400" cy="79" r="3.5"/>
+  <text class="datum-label" x="434" y="83">X0 the seat; Y0 W</text>
+  <path class="hidden" d="M278.84 183.01A67.44 67.44 0 0 1 278.84 48.14"/>
+  <circle class="cutter" cx="211.41" cy="115.58" r="28.57"/>
+  <line class="arrow" x1="171.41" y1="125.58" x2="171.41" y2="93.58"/>
+  <text class="label" x="165.41" y="119.58" text-anchor="end">+Y</text>
+  <text class="label" x="500" y="118">arch R{{cad.arch_radius_in:.2dot}}: climb (G2), E side to</text>
+  <text class="label" x="500" y="134">W side; the bore's drills have</text>
+  <text class="label" x="500" y="150">their own pictures</text>
+  <rect class="fixture-support" x="203.67" y="353" width="226.33" height="3"/>
+  <path class="hidden" d="M203.67 322.2H430"/>
+  <line class="hidden" x1="203.67" y1="303.85" x2="430" y2="303.85"/>
+  <rect class="part-kept" x="233.67" y="267.27" width="166.33" height="85.73"/>
+  <rect class="part-removed" x="233.67" y="267.27" width="45.17" height="20.54"/>
+  <path class="cutter" d="M239.98 280.95L239.98 224.81L235.9 227.81L231.82 224.81L227.73 227.81L223.65 224.81L219.57 227.81L215.49 224.81L211.41 227.81L207.32 224.81L203.24 227.81L199.16 224.81L195.08 227.81L190.99 224.81L186.91 227.81L182.83 224.81L182.83 280.95A28.57 6.86 0 0 0 239.98 280.95Z"/>
+  <circle class="datum" cx="400" cy="353" r="3.5"/>
+  <text class="label" x="20" y="216">From the front (the moving jaw toward you):</text>
+  <text class="datum-label" x="410" y="357">Z0 the stacks' top</text>
+  <text class="label" x="434" y="307.85">outboard face's plane (Setup 6)</text>
+  <text class="label" x="434" y="336.2">jaw tops: the jaws grip waste only</text>
+  <text class="label" x="434" y="271.27">I up; the arch cut {{process.arch_past_mm:in.3dot}} past</text>
+  <text class="label" x="434" y="287.27">the outboard plane</text>
+  <text class="label" x="20" y="250">1/2 in end mill on the first level,</text>
+  <text class="label" x="20" y="266">at the arch's left point</text>
+  <line class="leader" x1="200" y1="262" x2="182.83" y2="267.81"/>
+  <circle class="leader-dot" cx="182.83" cy="267.81" r="2"/>
 </svg>

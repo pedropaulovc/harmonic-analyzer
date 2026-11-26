@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 780 430" width="780" height="430" font-family="sans-serif" font-size="13">
+  <!-- Setup 3, the saw. Sizes from the plan's [parameters]: bars 1/4 in square (blank_width_in), riser 1 in tall (riser_parallel_height_mm) and .92-.96 wide (riser_width_min/max_mm, drawn .94), two 3 in blocks end to end centred on the 6.247 in jaws (vise_jaw_width_mm), jaws 1.770 in tall (vise_jaw_height_mm), the ends .75 in past the jaw side (end_protrusion_mm). The jaws' depth across the vise and the vise body are not on record: drawn schematic. The slitting saw to scale (saw_dia_mm 69.85, saw_thickness_mm 1.6256; shop tools.slitting-saw-2-75-064), horizontal, on the R8 stepped arbor: body above and cap below the saw both Ø1.25 (saw_arbor_body_dia_mm, saw_arbor_cap_dia_mm), the cap .50 thick (saw_arbor_cap_thickness_mm), all in the tool colour; the arbor's body drawn short to a break line. The screw head under the cap is not drawn (its stand past the cap is to be measured). CA02's first full-depth pass: saw centre X -32.798 (its rim foot_notch_depth_mm 2.127 past X0), lower face Z 1.854 (the ledge), fed -Y from +37.465 to -62.763; drawn at Y -12.649, the load's middle. The light pass before it (X -33.861) and the second level (Z 2.946, foot_notch_rise_mm) are not drawn; the notch is shown whole. -->
+  <rect class="paper" x="0" y="0" width="780" height="430"/>
+  <text class="title" x="20" y="24">Setup 3, CA02: from the front, the moving jaw as an outline (1 in = 100 px); from above (1 in = 50 px)</text>
+  <path class="fixture-vise" d="M370 380L520 380L523 384.5L520 389L523 393.5L520 398L370 398Z"/>
+  <path class="clamp" d="M370 203.05L520 203.05L523 207.07L520 211.09L523 215.11L520 219.14L523 223.16L520 227.18L523 231.2L520 235.22L523 239.24L520 243.27L523 247.29L520 251.31L523 255.33L520 259.35L523 263.37L520 267.4L523 271.42L520 275.44L523 279.46L520 283.48L523 287.5L520 291.52L523 295.55L520 299.57L523 303.59L520 307.61L523 311.63L520 315.65L523 319.68L520 323.7L523 327.72L520 331.74L523 335.76L520 339.78L523 343.81L520 347.83L523 351.85L520 355.87L523 359.89L520 363.91L523 367.94L520 371.96L523 375.98L520 380L370 380Z"/>
+  <path class="fixture-support" d="M382.35 280L520 280L523 284.17L520 288.33L523 292.5L520 296.67L523 300.83L520 305L523 309.17L520 313.33L523 317.5L520 321.67L523 325.83L520 330L523 334.17L520 338.33L523 342.5L520 346.67L523 350.83L520 355L523 359.17L520 363.33L523 367.5L520 371.67L523 375.83L520 380L382.35 380Z"/>
+  <path class="part-kept" d="M295 255L520 255L523 259.17L520 263.33L523 267.5L520 271.67L523 275.83L520 280L295 280Z"/>
+  <rect class="part-removed" x="295" y="255" width="2" height="25"/>
+  <rect class="part-removed" x="295" y="262" width="8.38" height="10.7"/>
+  <path class="hidden" d="M370 203.05L520 203.05L520 380L370 380Z"/>
+  <rect class="cutter" x="103.37" y="272.7" width="125" height="50"/>
+  <rect class="cutter" x="28.37" y="266.3" width="275" height="6.4"/>
+  <path class="cutter" d="M103.37 266.3L228.37 266.3L228.37 185L224.47 188L220.56 185L216.66 188L212.75 185L208.84 188L204.94 185L201.03 188L197.12 185L193.22 188L189.31 185L185.41 188L181.5 185L177.59 188L173.69 185L169.78 188L165.87 185L161.97 188L158.06 185L154.16 188L150.25 185L146.34 188L142.44 185L138.53 188L134.62 185L130.72 188L126.81 185L122.91 188L119 185L115.09 188L111.19 185L107.28 188L103.37 185Z"/>
+  <line class="centre-line" x1="165.87" y1="177" x2="165.87" y2="334.7"/>
+  <line class="datum" x1="295" y1="218" x2="295" y2="320"/>
+  <text class="datum-label" x="301" y="328">X0</text>
+  <text class="label-halo" x="165.87" y="225" text-anchor="middle">arbor body</text>
+  <text class="label-halo" x="165.87" y="302.7" text-anchor="middle">cap</text>
+  <text class="label" x="20" y="60">slitting saw, Ø{{process.saw_dia_mm:in.2f}} × {{process.saw_thickness_mm:in.3dot}}, on the stepped arbor, horizontal:</text>
+  <text class="label" x="20" y="76">its lower face at the ledge, {{cad.foot_notch_ledge_in:.3dot}} above L; its rim {{process.foot_notch_depth_mm:in.3dot}}</text>
+  <text class="label" x="20" y="92">into the foot ends; this pass, then one {{process.foot_notch_rise_mm:in.3dot}} higher: notch {{process.foot_notch_width_mm:in.3dot}} wide</text>
+  <text class="label" x="376" y="175">fixed jaw behind; the moving</text>
+  <text class="label" x="376" y="191">jaw, in front, as an outline</text>
+  <path class="clamp" d="M737.5 230L770 230L773 234.17L770 238.33L773 242.5L770 246.67L773 250.83L770 255L737.5 255Z"/>
+  <path class="clamp" d="M737.5 304.8L770 304.8L773 308.97L770 313.13L773 317.3L770 321.47L773 325.63L770 329.8L737.5 329.8Z"/>
+  <path class="part-kept" d="M700 255L770 255L773 258.11L770 261.23L773 264.34L770 267.45L700 267.45Z"/>
+  <path class="part-kept" d="M700 267.45L770 267.45L773 270.56L770 273.67L773 276.79L770 279.9L700 279.9Z"/>
+  <path class="part-kept" d="M700 279.9L770 279.9L773 283.01L770 286.12L773 289.24L770 292.35L700 292.35Z"/>
+  <path class="part-kept" d="M700 292.35L770 292.35L773 295.46L770 298.58L773 301.69L770 304.8L700 304.8Z"/>
+  <path class="hidden" d="M743.68 255L770 255L770 302L743.68 302"/>
+  <circle class="cutter" cx="635.44" cy="279.9" r="68.75"/>
+  <circle class="cutter" cx="635.44" cy="279.9" r="31.25"/>
+  <line class="arrow" x1="635.44" y1="269.9" x2="635.44" y2="305.9"/>
+  <text class="label" x="641.44" y="305.9">−Y</text>
+  <line class="datum" x1="700" y1="195" x2="700" y2="335"/>
+  <text class="datum-label" x="700" y="349" text-anchor="middle">X0</text>
+  <text class="label" x="540" y="130">From above, fixed jaw at the top:</text>
+  <text class="label" x="540" y="365">the saw, the arbor's body over it, fed</text>
+  <text class="label" x="540" y="381">across the four ends, turning clockwise</text>
+  <text class="label" x="540" y="397">seen from above (conventional)</text>
+</svg>

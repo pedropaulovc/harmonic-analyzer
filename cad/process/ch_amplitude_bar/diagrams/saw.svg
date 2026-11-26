@@ -1,21 +1,28 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<!-- Setup 1: two blanks from each 72 in length; the bow check on the surface plate. Styles: prechips.palette. -->
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 250" width="640" height="250" font-family="sans-serif" font-size="12">
-<rect class="paper" width="640" height="250"/>
-<text class="label" x="20" y="24">72 in length of 1/4 in square, two blanks</text>
-<rect class="part-kept" x="20" y="40" width="270" height="14"/>
-<rect class="part-kept" x="296" y="40" width="270" height="14"/>
-<rect class="part-waste" x="572" y="40" width="48" height="14"/>
-<line class="cutter" x1="293" y1="32" x2="293" y2="62"/>
-<line class="cutter" x1="569" y1="32" x2="569" y2="62"/>
-<text class="label" x="80" y="80">{{process.blank_length_in:.2f}}–{{process.blank_length_max_in:.2f}}</text>
-<text class="label" x="356" y="80">{{process.blank_length_in:.2f}}–{{process.blank_length_max_in:.2f}}</text>
-<text class="label" x="560" y="80">rest</text>
-<text class="label" x="20" y="130">Bow check: the blank on its L face, then its F face</text>
-<rect class="fixture-table" x="20" y="190" width="600" height="22"/>
-<text class="label" x="26" y="230">surface plate</text>
-<path class="part-kept" d="M40 186 Q330 176 620 186 L620 176 Q330 166 40 176 Z"/>
-<rect class="leader" fill="none" x="300" y="181" width="60" height="4"/>
-<path class="leader" d="M330 182 L360 150"/>
-<text class="label" x="364" y="148">.005 leaf: must not enter</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 250" width="640" height="250" font-family="sans-serif" font-size="13">
+  <!-- Setup 1: two blanks from each 72 in length, the bar flat in the saw's vise (the vise and blade schematic: their sizes are not on record); the bow check on the surface plate. Lengths not to scale. -->
+  <rect class="paper" x="0" y="0" width="640" height="250"/>
+  <text class="label" x="20" y="24">72 in length of 1/4 in square, two blanks; the bar flat in the saw's vise</text>
+  <rect class="part-kept" x="20" y="40" width="270" height="14"/>
+  <rect class="part-kept" x="296" y="40" width="270" height="14"/>
+  <rect class="part-rest" x="572" y="40" width="48" height="14"/>
+  <rect class="part-removed" x="290" y="36" width="6" height="22"/>
+  <rect class="part-removed" x="566" y="36" width="6" height="22"/>
+  <rect class="clamp" x="300" y="26" width="40" height="14"/>
+  <rect class="clamp" x="300" y="54" width="40" height="14"/>
+  <line class="leader" x1="342" y1="64" x2="380" y2="100"/>
+  <circle class="leader-dot" cx="380" cy="100" r="2"/>
+  <text class="label" x="384" y="104">saw vise (schematic), the next cut at its left</text>
+  <text class="label" x="80" y="80">{{process.blank_length_in:.2f}}–{{process.blank_length_max_in:.2f}}</text>
+  <text class="label" x="120" y="104">kerfs</text>
+  <line class="leader" x1="150" y1="94" x2="292" y2="58"/>
+  <circle class="leader-dot" cx="292" cy="58" r="2"/>
+  <text class="label" x="576" y="80">rest</text>
+  <text class="label" x="20" y="140">Bow check: the blank on its L face, then its F face</text>
+  <rect class="fixture-table" x="20" y="190" width="600" height="22"/>
+  <text class="label" x="26" y="230">surface plate</text>
+  <path class="part-kept" d="M40 186 Q330 176 620 186 L620 176 Q330 166 40 176 Z"/>
+  <path class="leader" d="M300 181H360V185H300Z"/>
+  <line class="leader" x1="360" y1="150" x2="330" y2="182"/>
+  <circle class="leader-dot" cx="330" cy="182" r="2"/>
+  <text class="label" x="364" y="148">.005 leaf: must not enter</text>
 </svg>

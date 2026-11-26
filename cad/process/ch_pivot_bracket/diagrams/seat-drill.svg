@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 400" width="760" height="400" font-family="sans-serif" font-size="13">
+  <!-- Setup 4. Hand picture at 4.2 px/mm, from the right end, looking -X (I at the far end, X0). The blank upright on the 1 in parallels against each jaw (parallel_height_mm, parallel_thickness_mm), gripped on W (fixed jaw) and E, the jaw tops 19.545 over the parallels (upright_grip_mm); drawn 1.475 long less the seat skim (blank_length_min/max_mm, seat_skim_mm 0.508); W to E .640 (Setup 3). Jaws' depth and the vise body are not on record: drawn schematic. Parallels 1/8 in thick (parallel_thickness_mm). The #15 drill to scale (cutter_dia_mm 4.572; plan tool drill-15), 118 deg point, at the hold-down hole X 12.700, Y -8.128, its point at Z -8.470 (PB03's plunge): its full diameter 1.0 mm past the foot top (hold_drill_past_mm), into the waste Setup 6's step removes. Drawn short to a break line (its chuck is not drawn: no size on record). The centre drill's spot before it is not drawn. -->
+  <rect class="paper" x="0" y="0" width="760" height="400"/>
+  <text class="title" x="20" y="24">Setup 4, PB03 T3, the #15 drill: section at the hole, X 12.700 (4.2 px/mm)</text>
+  <rect class="fixture-vise" x="119.72" y="361.92" width="152.28" height="16"/>
+  <rect class="clamp" x="230" y="173.15" width="42" height="188.77"/>
+  <rect class="clamp" x="119.72" y="173.15" width="42" height="188.77"/>
+  <text class="label-on-clamp" x="251" y="189.15" text-anchor="middle">fixed</text>
+  <text class="label-on-clamp" x="140.72" y="189.15" text-anchor="middle">moving</text>
+  <rect class="fixture-support" x="161.72" y="255.24" width="13.33" height="106.68"/>
+  <rect class="fixture-support" x="216.66" y="255.24" width="13.33" height="106.68"/>
+  <rect class="part-kept" x="161.72" y="100" width="68.28" height="155.24"/>
+  <line class="active-face" x1="161.72" y1="100" x2="230" y2="100"/>
+  <line class="hidden" x1="161.72" y1="125.6" x2="230" y2="125.6"/>
+  <rect class="holes" x="186.26" y="100" width="19.2" height="29.81"/>
+  <path class="cutter" d="M205.46 45.4L205.46 129.81L195.86 135.57L186.26 129.81L186.26 45.4L191.06 42.4L195.86 45.4L200.66 42.4Z"/>
+  <line class="centre-line" x1="195.86" y1="24.4" x2="195.86" y2="152.37"/>
+  <line class="arrow" x1="171.86" y1="49.6" x2="171.86" y2="83.2"/>
+  <text class="label" x="330" y="60">#15 drill, one plunge from the seat: its full diameter</text>
+  <text class="label" x="330" y="76">{{process.hold_drill_past_mm:in.3dot}} past the foot top ({{cad.foot_top_height_in:.2dot}} below the seat),</text>
+  <text class="label" x="330" y="92">into the waste Setup 6's step takes away</text>
+  <line class="leader" x1="205.86" y1="58" x2="326" y2="66"/>
+  <circle class="leader-dot" cx="326" cy="66" r="2"/>
+  <line class="leader" x1="221.6" y1="125.6" x2="326" y2="140"/>
+  <circle class="leader-dot" cx="326" cy="140" r="2"/>
+  <text class="label" x="330" y="144">foot top, {{cad.foot_top_height_in:.2dot}} below the seat (hidden)</text>
+  <line class="leader" x1="223.33" y1="204.84" x2="326" y2="300"/>
+  <circle class="leader-dot" cx="326" cy="300" r="2"/>
+  <text class="label" x="330" y="304">1 in parallels, one against each jaw</text>
+  <text class="label" x="330" y="324">W at the fixed jaw (right); I at the far end (X0)</text>
+  <text class="label" x="330" y="344">jaw tops {{process.upright_grip_mm:in.2dot}} over the parallels</text>
+</svg>

@@ -1,10 +1,19 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 240" font-family="sans-serif" font-size="13">
+  <!-- Setup 1, from the front, 1 in = 50 px: the Ø.50 bar (stock_dia_in, 25 px)
+       and the 10 in piece (bar_length_in, 500 px) to scale. The saw is not on
+       record: its vise and blade are drawn schematic (the blade's thickness
+       exaggerated); the rest of the bar runs on past the view. -->
   <rect class="paper" x="0" y="0" width="760" height="240"/>
-  <text class="title" x="20" y="20">Setup 1: the 1/2 in bar on the saw (not to scale)</text>
-  <rect class="fixture-vise" x="500" y="80" width="200" height="30"/>
-  <rect class="part-rest" x="430" y="110" width="300" height="40"/>
-  <rect class="part-kept" x="40" y="110" width="370" height="40"/>
-  <rect class="cutter" x="412" y="40" width="10" height="130"/>
-  <text class="label" x="60" y="180">{{process.bar_length_in:g}} in piece (bar end): the {{cad.parts_per_bar:d}} hubs</text>
-  <text class="label" x="510" y="70">saw vise on the bar</text>
+  <text class="title" x="20" y="20">Setup 1: the Ø{{process.stock_dia_in:.2dot}} bar on the saw (1 in = 50 px; the saw schematic)</text>
+  <rect class="fixture-vise" x="580" y="85" width="140" height="25"/>
+  <rect class="fixture-vise" x="580" y="135" width="140" height="25"/>
+  <rect class="part-rest" x="536" y="110" width="224" height="25"/>
+  <rect class="part-kept" x="30" y="110" width="500" height="25"/>
+  <rect class="cutter" x="530" y="50" width="6" height="140"/>
+  <line class="dims" x1="30" y1="150" x2="30" y2="176"/>
+  <line class="dims" x1="530" y1="150" x2="530" y2="176"/>
+  <line class="dims" x1="30" y1="170" x2="530" y2="170"/>
+  <text class="label" x="60" y="196">{{process.bar_length_in:g}} in piece (bar end): the {{cad.parts_per_bar:d}} hubs</text>
+  <text class="label" x="586" y="76">saw vise on the bar</text>
+  <text class="label" x="544" y="60">blade</text>
 </svg>

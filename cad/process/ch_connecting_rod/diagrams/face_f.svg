@@ -1,22 +1,47 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<!-- Setup 2: two blanks F up across the jaws on the support plate; skim the fork, rough F. Styles: prechips.palette. -->
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 470" width="640" height="470" font-family="sans-serif" font-size="12">
-<rect class="paper" width="640" height="470"/>
-<text class="title" x="20" y="22">Face F up: skim the fork's face, rough F (top view)</text>
-<rect class="clamp" x="85" y="46" width="460" height="24"/>
-<text class="label" x="270" y="62">fixed jaw</text>
-<rect class="fixture-plate" x="50" y="76" width="442" height="283" fill-opacity="0.35"/>
-<rect class="part-rest" x="50" y="70.0" width="548.7" height="147.3"/>
-<path class="part-removed" d="M50.0 75.2 L204.1 75.2 L204.1 115.1 L539.5 115.1 L539.5 92.5 L577.4 92.5 L577.4 194.9 L539.5 194.9 L539.5 172.2 L204.1 172.2 L204.1 212.2 L50.0 212.2 Z"/>
-<text class="label" x="38" y="84.0">1</text>
-<rect class="part-rest" x="50" y="217.3" width="548.7" height="147.3"/>
-<path class="part-removed" d="M50.0 222.5 L204.1 222.5 L204.1 262.4 L539.5 262.4 L539.5 239.8 L577.4 239.8 L577.4 342.2 L539.5 342.2 L539.5 319.5 L204.1 319.5 L204.1 359.5 L50.0 359.5 Z"/>
-<text class="label" x="38" y="231.3">2</text>
-<rect class="clamp" x="85" y="365" width="460" height="24"/>
-<text class="label" x="270" y="381">moving jaw</text>
-<line class="datum" x1="50" y1="36" x2="50" y2="399"/>
-<text class="datum-label" x="10" y="415">X0 left ends</text>
-<text class="label" x="170" y="415">F up; support plate (6061) on two 1 in parallels</text>
-<path class="arrow" d="M622 144 H539"/>
-<text class="label" x="170" y="433">skim the forks; rough the ring zones and shank bands; 1/8 in band round each ring</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 840 430" width="840" height="430" font-family="sans-serif" font-size="13">
+  <!-- Setup 2. Hand picture, both views at 2.4 px/mm (61 px/in). From the plan's [parameters]: blanks 2 x 1/4 in (blank_width_in, blank_thickness_max_mm), two side by side across the jaws, 50.8 mm apart (blank_pitch_mm); the jaws X 12.0 to 170.674 (jaw_start_mm, jaw_end_mm), their tops 6.845 mm over the plate (jaw_top_mm); the support plate 99.06 x 152.4 x 12.7 mm (support_plate_*_mm) from X0, centred across the load (its place across is not stated), on two 1 in parallels (parallel_height_mm), 1/8 in thick (the parallel set's thickness as the shaft plans' parallel_thickness_mm restates it). Not on record, drawn schematic: the jaws' depth (6 mm drawn), the vise body, the parallels' length (drawn jaw to jaw). The part outline in the view from above is main's picture, rescaled. CR01's first cut on the part: T1, the 1/2 in end mill to scale (face_cutter_dia_mm 12.7 = 30.5 px), the fork skim of blank 1 at Y -25.400, Z 6.096 (fork_thickness_mm), fed -X from X 198.882 to 168.785; drawn at X 183, over the fork. The same pass skims fork 2 at Y -76.200. Its square end drawn as the near half of the end face, 12 % deep; drawn short to a break line, 1.12 in out of the collet (half_mill_projection_mm 28.45; the collet is not drawn, its size is not on record). Blanks drawn raw at the section (the skim takes .010; the rows and the band come after). The 1-2-3 block that set the ends flush with the plate is taken away before the vise closes: a callout. -->
+  <rect class="paper" x="0" y="0" width="840" height="430"/>
+  <text class="title" x="20" y="24">Setup 2, CR01 skims fork 1: from above (2.4 px/mm)</text>
+  <rect class="part-rest" x="40" y="80" width="454.1" height="121.9"/>
+  <path class="part-removed" d="M 40 84.3 L 167.53 84.3 L 167.53 117.32 L 445.1 117.32 L 445.1 98.62 L 476.47 98.62 L 476.47 183.37 L 445.1 183.37 L 445.1 164.58 L 167.53 164.58 L 167.53 197.68 L 40 197.68 Z"/>
+  <rect class="part-rest" x="40" y="201.9" width="454.1" height="121.9"/>
+  <path class="part-removed" d="M 40 206.21 L 167.53 206.21 L 167.53 239.23 L 445.1 239.23 L 445.1 220.52 L 476.47 220.52 L 476.47 305.27 L 445.1 305.27 L 445.1 286.48 L 167.53 286.48 L 167.53 319.59 L 40 319.59 Z"/>
+  <rect class="clamp" x="68.8" y="65.6" width="380.82" height="14.4"/>
+  <rect class="clamp" x="68.8" y="323.84" width="380.82" height="14.4"/>
+  <text class="label-on-clamp" x="232" y="76.6" text-anchor="middle">fixed jaw</text>
+  <text class="label-on-clamp" x="232" y="334.84" text-anchor="middle">moving jaw</text>
+  <path class="hidden" d="M40 83.05H405.76V320.79H40Z"/>
+  <line class="datum" x1="40" y1="51.2" x2="40" y2="347.84"/>
+  <text class="datum-label" x="38" y="360.84" text-anchor="middle">X0</text>
+  <text class="label" x="26" y="144.96" text-anchor="middle">1</text>
+  <text class="label" x="26" y="266.88" text-anchor="middle">2</text>
+  <rect class="part-removed" x="429.76" y="125.72" width="64.32" height="30.48"/>
+  <circle class="cutter" cx="479.2" cy="140.96" r="15.24"/>
+  <line class="arrow" x1="475.2" y1="118.96" x2="439.2" y2="118.96"/>
+  <text class="label" x="471.2" y="112.96" text-anchor="end">−X</text>
+  <text class="label" x="20" y="378">The 1/2 in end mill skims fork 1 to {{process.fork_thickness_mm:in.4dot}} over Z0, one pass along −X</text>
+  <text class="label" x="20" y="394">(fork 2 the same), then rows the ring zones and shank bands (hatched);</text>
+  <text class="label" x="20" y="410">the 1/8 in band round each ring has its own picture. X0 the left ends, flushed</text>
+  <text class="label" x="20" y="426">with the plate's left edge by a 1-2-3 block, taken away before the vise closes.</text>
+  <rect class="fixture-vise" x="531.76" y="391.44" width="272.64" height="16"/>
+  <rect class="clamp" x="790" y="283.57" width="14.4" height="107.87"/>
+  <rect class="clamp" x="531.76" y="283.57" width="14.4" height="107.87"/>
+  <rect class="fixture-support" x="782.38" y="330.48" width="7.62" height="60.96"/>
+  <rect class="fixture-support" x="546.16" y="330.48" width="7.62" height="60.96"/>
+  <rect class="fixture-plate" x="549.21" y="300" width="237.74" height="30.48"/>
+  <rect class="part-kept" x="668.08" y="284.76" width="121.92" height="15.24"/>
+  <rect class="part-kept" x="546.16" y="284.76" width="121.92" height="15.24"/>
+  <rect class="part-removed" x="713.8" y="284.76" width="30.48" height="0.61"/>
+  <rect class="part-removed" x="591.88" y="284.76" width="30.48" height="0.61"/>
+  <text class="label" x="804.4" y="423.44" text-anchor="end">fixed jaw</text>
+  <text class="label" x="531.76" y="423.44">moving jaw</text>
+  <text class="title" x="531.76" y="52">Section at X 183.0, from the right end</text>
+  <text class="label" x="531.76" y="70">past the jaws' and the plate's right ends:</text>
+  <text class="label" x="531.76" y="86">both stand behind, the forks overhang</text>
+  <line class="leader" x1="670" y1="379.44" x2="670" y2="315.24"/>
+  <circle class="leader-dot" cx="670" cy="315.24" r="2"/>
+  <path class="cutter" d="M744.28 281.71L744.28 223.92L740.47 226.92L736.66 223.92L732.85 226.92L729.04 223.92L725.23 226.92L721.42 223.92L717.61 226.92L713.8 223.92L713.8 281.71A15.24 3.66 0 0 0 744.28 281.71Z"/>
+  <line class="datum" x1="501.76" y1="300" x2="527.76" y2="300"/>
+  <text class="datum-label" x="499.76" y="304" text-anchor="end">Z0</text>
+  <text class="label" x="761.2" y="213.6" text-anchor="end">T1, 1/2 in</text>
 </svg>
