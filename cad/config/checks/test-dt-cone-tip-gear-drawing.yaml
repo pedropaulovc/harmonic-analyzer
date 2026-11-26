@@ -5,5 +5,5 @@ checks:
     check: "PIVOT_FIT_WINDOW_MIN_MM"
     kind: gap
     reason: "no pivot diameter meets both note 1 clearances"
-    source: "D47, delegated ruling 2026-11-26 (Main), precedent: the owner's question-11 ruling 2026-11-24 and the made-to-fit form of the owner-approved fit policy; owner review #2144. The floor is one reading of the 0-1 in micrometer (.0001 in); the test computes the window over the MHA-DT-38 bore .0625-.0630 (REAM_H7) and the #52 hole .0635-.0675 (cone_tip_cluster.END_HOLE) against note 1's .0003-.0018 bonded and .0013-.0063 running: least .0010 at the corners (B .0630, H .0635 and B .0625, H .0675), margin .0009"
+    source: "D47, delegated ruling 2026-11-26 (Main), precedent: the owner's question-11 ruling 2026-11-24 and the made-to-fit form of the owner-approved fit policy; owner review #2144. The floor is rule 4's narrowest clearance range, .001 in (drawing-guidelines.md rule 4). The test computes the window over the MHA-DT-38 bore .0625-.0630 (REAM_H7) and the #52 hole .0635-.0675 (cone_tip_cluster.END_HOLE) against note 1's .0003-.0018 bonded and .0013-.0063 running: least .0010 at two corners (B .0630 with H .0635, B .0625 with H .0675). It meets the floor exactly: arithmetic on printed limits, an identity, not a measured margin"
     basis: worst_case

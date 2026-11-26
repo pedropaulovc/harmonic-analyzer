@@ -87,9 +87,10 @@ def sheet_notes() -> str:
     the analysis bands give (fit audit 2026-11-23, form 2). D47, delegated
     ruling 2026-11-26 (Main), precedent: the owner's question-11 ruling
     2026-11-24 and the made-to-fit form of the owner-approved fit policy;
-    owner review #2144: both holes are made first and the pivot is sized to
-    both at once, never trial-fitted to one; a diameter meeting both always
-    exists (test_dt_cone_tip_gear_drawing.PIVOT_FIT_WINDOW_MIN_MM).
+    owner review #2144, amended 2026-11-26: the DT-39 hole is pin-read as h
+    (the largest pin entering) and the pivot, slid in MHA-DT-38 for the bond,
+    mikes h-.0053 to h-.0013 (necessity N-03); a diameter meeting both
+    clearances always exists (test_dt_cone_tip_gear_drawing.PIVOT_FIT_WINDOW_MIN_MM).
     Note 2 names the mesh and the fit route of the tip, thickness and root
     bands, with the teeth's do-not-cut. Note 3: the stems are turned between
     centres, and a centre hole in either end harms nothing (rule 11).

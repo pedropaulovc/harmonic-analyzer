@@ -169,11 +169,13 @@ def test_callouts_and_notes_name_every_mate_once() -> None:
 
 # D47 (delegated ruling 2026-11-26 (Main), precedent: the owner's question-11
 # ruling 2026-11-24 and the made-to-fit form of the owner-approved fit policy;
-# owner review #2144): the pivot is sized to both holes at once. For every
-# reamed MHA-DT-38 bore B and every drilled #52 hole H the analysis bands
-# allow, the diameters meeting note 1's two clearances overlap by at least
-# one reading of the 0-1 in micrometer (.0001 in), so the fit always exists.
-PIVOT_FIT_WINDOW_MIN_MM = 0.0001 * 25.4
+# owner review #2144): one pivot diameter meets both of note 1's clearances.
+# For every reamed MHA-DT-38 bore B and every drilled #52 hole H the analysis
+# bands allow, the diameters meeting both overlap by at least rule 4's
+# narrowest clearance range, .001 in (drawing-guidelines.md, rule 4). The
+# window is arithmetic on printed limits: it meets the floor exactly, at two
+# corners, an identity rather than a measured margin.
+PIVOT_FIT_WINDOW_MIN_MM = 0.001 * 25.4
 
 
 def test_one_pivot_diameter_always_meets_both_clearances() -> None:
@@ -191,9 +193,17 @@ def test_one_pivot_diameter_always_meets_both_clearances() -> None:
             largest = min(bore - bond_lo, hole - run_lo)
             windows.append(largest - smallest)
     # The window is piecewise linear in (B, H), so its least is at a corner;
-    # the grid includes all four.  It is .0010 in, the turned-diameter row.
-    assert min(windows) >= PIVOT_FIT_WINDOW_MIN_MM
-    assert min(windows) == pytest.approx(0.0010 * 25.4, abs=1e-6)
+    # the grid includes all four (B .0630 with H .0635, B .0625 with H .0675).
+    assert min(windows) >= PIVOT_FIT_WINDOW_MIN_MM - 1e-9
+    assert min(windows) == pytest.approx(PIVOT_FIT_WINDOW_MIN_MM, abs=1e-9)
+    # D47's order (necessity N-03): the DT-39 hole is pin-read as h, the
+    # largest pin of the .001-step set that enters (h <= H < h + .001); the
+    # pivot slides in MHA-DT-38 (the bond's try-in) and mikes h - .0053 to
+    # h - .0013.  Any such diameter runs in H inside note 1's running range.
+    for hole in holes:
+        for pin in (hole - 0.0009 * 25.4, hole):
+            assert hole - (pin - 0.0013 * 25.4) >= run_lo - 1e-9
+            assert hole - (pin - 0.0053 * 25.4) <= run_hi + 1e-9
     # The fixed analysis band always lies in the window, so the air checks'
     # running clearance (dt_cone_tip_air) is what note 1 accepts.
     pivot = cluster.limits(*cluster.PIVOT)
