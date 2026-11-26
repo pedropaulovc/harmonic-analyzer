@@ -47,12 +47,17 @@ part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
 material = "C36000 free-machining brass rod, 1/4 in (drawing: brass)"
 stock = "Qty {{process.quantity:g}}. Ø{{process.stock_dia_in:.3dot}} C360 rod, the 48 in bar on hand; one blank {{process.blank_length_in:.2dot}} in long."
-note = "Inches unless mm; G-code and console entries in mm (the file and the controller run G21). Lathe PM-1127VF-LB (70–380 and 380–2000 rpm); brass cut dry. The head is the bar as bought (Op 20). Home the mill ($H) once, after switching it on: every M6's trip to the tool setter counts from home. Home again only after a power cycle or a controller restart, an E-stop, an alarm, a limit switch hit, a stall or a crash: homing brings the stored G54 back. Then check every zero of the setup again, each the way its step set it: each must read what its step set, within .001 in. One does not, cannot be reached with the part in, or the part may have moved: take the setup again from its first step, the part out. They all do: run the interrupted file again from its start. Feed Hold, then Reset with the axes stopped keeps position and G54: no homing, no new zero; run the interrupted file again from its start: its first M6 measures the tool, and cuts already made are cut in air. Prove the file in air first."
 shop = "../shop"
 stock_refs = ["c360-round-1-4"]
 material_key = "lathe-c360"
 milling_material = "brass"
 turning_material = "brass"
+
+# The shop's standing page carries what every traveler shares (units, speeds,
+# coolant, homing, Feed Hold, tool changes, proving a file, burrs). No This
+# job rows: the note's one job fact ("The head is the bar as bought") is
+# Op 20's own words.
+standing = true
 
 [cad]
 file = "../../out/features/pn_pen_adjust_screw/features.toml"
@@ -84,7 +89,7 @@ shoulder_aim_in = 0.32
 # Setup 6: the die's chamfered face first stops at .60, aimed short because
 # no die record gives the start chamfer (authored): a 1.5-thread chamfer at
 # 80 TPI (.019) leaves about .58 of full thread, a 3-thread one (.0375)
-# about .56, and Op 260 runs the die on a quarter turn at a time into the
+# about .56, and Op 250 runs the die on a quarter turn at a time into the
 # drawing's .57-.59; never within .04 of the shoulder's fillet at .70.
 die_stop_in = 0.6
 die_stop_max_in = 0.66
@@ -265,7 +270,7 @@ cut_diameter_mm = "{{cad.stock_dia_mm}}"
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Between skims, stop the spindle, take the blank out and mike it across both faces; chuck it again, the thread end {{process.end_stickout_in:.2dot}} in out. Write the final reading on the traveler: Op 170 sets the shoulder from it."
+instruction = "Between skims, stop the spindle, take the blank out and mike it across both faces; chuck it again, the thread end {{process.end_stickout_in:.2dot}} in out. Write the final reading on the traveler: Op 160 sets the shoulder from it."
 inspection = "Length {{cad.length_min_in:.2dot}}–{{cad.length_max_in:.2dot}}."
 gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.length_band_mm}}" }]
 
@@ -280,7 +285,7 @@ machine = "PM-30MV CNC (FluidNC, CNCjs with the electronic tool setter) / vise, 
 indexing = "none"
 machine_ref = "pm-30mv"
 holding = "The PM 6 in vise. One 1 in, 4 in long parallel of the 1/8 in thick set standing on edge, centred between the jaws, 1/16 in clear of each, its left end flush with the jaws' left face (a rule across both). The blank on its top edge along the jaws, the head end to the LEFT, set {{process.head_overhang_mm:in.2dot}} in out past the jaws' left face with the calipers' depth rod, never under .24; the 1 in offcut (Op 10) on the parallel's right end, so the moving jaw closes square. Tap both down onto the parallel while closing the vise. Under the eye nothing but air."
-datum = "Program PS01_eye (cam:pn_pen_adjust_screw). G54: X0 the head end (faced in Op 40), +X along the blank; Y0 the blank's axis, +Y toward the fixed jaw; Z0 the top of the O.D. The file starts with an M6 for the centre drill; tool lengths from the tool setter at each M6; at the M6 stop the file has stopped the spindle and lifted the tool above the jaws."
+datum = "Program PS01_eye (cam:pn_pen_adjust_screw). G54: X0 the head end (faced in Op 40), +X along the blank; Y0 the blank's axis, +Y toward the fixed jaw; Z0 the top of the O.D. The file starts with an M6 for the centre drill."
 diagram = { file = "diagrams/eye.svg", alt = "To scale: the blank on a 1 x 4 in parallel on edge between the jaws, its head end .25 in out past the jaws' left face; the #54 drill through the eye .16 in from the head end, its point in the air under it; a 1 in offcut on the parallel's right end balances the jaws." }
 envelope = { x_span_mm = ["{{cad.length_mm}}", 3.175], y_span_mm = ["{{cad.stock_dia_mm}}", 3.175], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{cad.stock_dia_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{process.eye_tip_height_mm}}"], longest_tool_mm = ["{{process.drill_chuck_gauge_mm}}", "{{process.drill_54_oal_mm}}"], shortest_tool_mm = ["{{process.drill_chuck_gauge_mm}}", "{{process.centre_drill_oal_mm}}"] }
 vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{cad.stock_dia_mm}}", along_jaws_mm = "{{cad.length_mm}}", part_height_mm = "{{cad.stock_dia_mm}}", parallel_height_mm = "{{process.riser_height_mm}}", overhang_mm = ["{{process.head_overhang_mm}}", "rest"], jaw_offset = "balanced", balance = "spacer", fixed_jaw_face = "as_bought", moving_jaw_face = "as_bought", moving_jaw_contact = "flat" }
@@ -293,12 +298,7 @@ feed = "hand"
 
 [[setups.operations]]
 instruction = "G54 Z0: the top of the O.D., touched with the centre drill over the axis."
-instruction_detailed = "Console M6 T1 (#1 centre drill in the drill chuck, at least {{process.spot_projection_min_mm:in.2dot}} in out of it; the tool setter measures it). MDI G0 X3.000 Y0.000: over the head end's overhang. Spindle stopped, its tip just dragging a .002 feeler leaf on the O.D. top: G10 L20 P1 Z0.051."
-feed = "hand"
-
-[[setups.operations]]
-instruction = "Prove PS01_eye in air, Z0 raised 1.000 in. Then Z0 back."
-instruction_detailed = "Send $# and note the G54 line's Z. G10 L2 P1 Z(that Z + 25.400) raises Z0 1.000 in. Run PS01_eye, watching every move clear the jaws; at its first M6 prompt T1 is already in, so continue; at the second put the #54 in (at least {{process.drill_54_projection_min_mm:in.2dot}} in out of the chuck). G10 L2 P1 Z(the noted Z) puts Z0 back, and the centre drill goes back in for the real run."
+instruction_detailed = "Console M6 T1 (#1 centre drill in the drill chuck, at least {{process.spot_projection_min_mm:in.2dot}} in out of it). MDI G0 X3.000 Y0.000: over the head end's overhang. Spindle stopped, its tip just dragging a .002 feeler leaf on the O.D. top: G10 L20 P1 Z0.051."
 feed = "hand"
 
 [[setups.operations]]
@@ -371,7 +371,7 @@ speed_kind = "spindle"
 tool = "ar"
 drilling = "none"
 sizing = "other"
-instruction = "The last step ends at the shoulder's Z (Op 170), never past it: the tool's R.016 nose leaves the R{{cad.fillet_shoulder_radius_min_in:.2dot}}–{{cad.fillet_shoulder_radius_max_in:.2dot}} fillet. There, carriage still, feed the cross slide out to face the shoulder square, stopping as the point clears the head's O.D. (the jaw fronts are .025–.045 behind the point), then back off along +Z."
+instruction = "The last step ends at the shoulder's Z (Op 160), never past it: the tool's R.016 nose leaves the R{{cad.fillet_shoulder_radius_min_in:.2dot}}–{{cad.fillet_shoulder_radius_max_in:.2dot}} fillet. There, carriage still, feed the cross slide out to face the shoulder square, stopping as the point clears the head's O.D. (the jaw fronts are .025–.045 behind the point), then back off along +Z."
 settings = "lathe-ar-c360"
 cut_diameter_mm = "{{cad.stock_dia_mm}}"
 load_diameter_mm = "{{process.head_load_dia_mm}}"
@@ -410,7 +410,7 @@ speed_kind = "other"
 tool = "die"
 drilling = "none"
 sizing = "other"
-instruction = "Cut down, half a turn on and a quarter back, dry, until the calipers' depth rod from the spigot's end to the die's top face reads {{process.die_stop_in:.2dot}} − T: the chamfered face is then {{process.die_stop_in:.2dot}} from the end, aimed short of {{cad.thread_length_in:.2dot}} of full thread (the die's chamfer is not on record; Op 260 runs it on). Never past {{process.die_stop_max_in:.2dot}} (the shoulder is about .70 from the end). Back the die off."
+instruction = "Cut down, half a turn on and a quarter back, dry, until the calipers' depth rod from the spigot's end to the die's top face reads {{process.die_stop_in:.2dot}} − T: the chamfered face is then {{process.die_stop_in:.2dot}} from the end, aimed short of {{cad.thread_length_in:.2dot}} of full thread (the die's chamfer is not on record; Op 250 runs it on). Never past {{process.die_stop_max_in:.2dot}} (the shoulder is about .70 from the end). Back the die off."
 feed = "hand"
 
 [[setups.operations]]
@@ -422,7 +422,7 @@ gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.thread_length_band_mm}}" 
 instruction = "Run the MHA-PN-VN-53 #0-80 nut (the screw's mate) on by hand to the full thread's end: it runs on without forcing and without shake."
 
 [[setups.operations]]
-instruction = "Full thread short: run the die on a quarter turn at a time, never past {{process.die_stop_max_in:.2dot}}, and read Op 240 again. Tight on the nut: close the die's adjusting screw an eighth of a turn, run the die down again to the same stop and try again. Shake, a torn thread or a full thread over {{cad.thread_length_max_in:.2dot}}: scrap the screw and make another from Setup 1."
+instruction = "Full thread short: run the die on a quarter turn at a time, never past {{process.die_stop_max_in:.2dot}}, and read Op 230 again. Tight on the nut: close the die's adjusting screw an eighth of a turn, run the die down again to the same stop and try again. Shake, a torn thread or a full thread over {{cad.thread_length_max_in:.2dot}}: scrap the screw and make another from Setup 1."
 
 [[setups.operations]]
 speed_kind = "other"
