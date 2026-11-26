@@ -1,7 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 470" width="760" height="470" font-family="sans-serif" font-size="13">
-  <!-- Hand picture, to scale at 6 px/mm from the block's length (1.030, 26.162 mm), a section along the block at Y-10.922 (the bore's, the slot's and the V's centre), B down on the stacks, the fixed jaw (FRONT) behind. #32 drill Ø2.9464 mm (the plan's milling_cuts cutter_dia_mm, shop drill-32), 118° point, its full diameter 12.396 mm below the top (bore_drill_depth_mm: 1 mm, drill_past_mm, past the slot's roof), its point 4.719 above the stacks (bore_tip_height_mm); drawn short to a break line, the chuck not drawn (no size on record). The #2 centre drill's spot before it is not drawn. Relief slot .260 (6.604 mm) high, the V's flat .196 (4.984) up (dashed: the V is open below the neck at this section). Stacks 1/2 + 5/8 in (stack_height_mm). The vise jaws' thickness and the parallels' length are not on record: schematic. Jaw height 44.9453 mm (vise_jaw_height_mm). -->
+  <!-- Hand picture, to scale at 6 px/mm from the block's length (1.030, 26.162 mm), a section along the block at Y-10.922 (the bore's, the slot's and the V's centre), B down on the stacks, the fixed jaw (FRONT) behind. #30 drill Ø3.2639 mm (the plan's milling_cuts cutter_dia_mm, shop drill-30), the bore's finish size (no ream), 118° point, its full diameter 12.396 mm below the top (bore_drill_depth_mm: 1 mm, drill_past_mm, past the slot's roof), its point 4.623 above the stacks (bore_tip_height_mm); drawn short to a break line, the chuck not drawn (no size on record). The #2 centre drill's spot before it is not drawn. Relief slot .260 (6.604 mm) high, the V's flat .196 (4.984) up (dashed: the V is open below the neck at this section). Stacks 1/2 + 5/8 in (stack_height_mm). The vise jaws' thickness and the parallels' length are not on record: schematic. Jaw height 44.9453 mm (vise_jaw_height_mm). -->
   <rect class="paper" x="0" y="0" width="760" height="470"/>
-  <text class="title" x="20" y="24">VB06, M6 T5: the #32 drill through the top into the relief slot, to scale (6 px/mm)</text>
+  <text class="title" x="20" y="24">VB06, M6 T5: the #30 drill through the top into the relief slot, to scale (6 px/mm)</text>
   <rect class="fixture-vise" x="120" y="450" width="348.97" height="14"/>
   <rect class="clamp" x="120" y="180.33" width="348.97" height="269.67"/>
   <path class="paper" d="M144 278.55L408.97 278.55L411.97 282.63L408.97 286.71L411.97 290.8L408.97 294.88L411.97 298.96L408.97 303.04L411.97 307.12L408.97 311.21L411.97 315.29L408.97 319.37L411.97 323.45L408.97 327.54L411.97 331.62L408.97 335.7L411.97 339.78L408.97 343.86L411.97 347.95L408.97 352.03L411.97 356.11L408.97 360.19L411.97 364.27L408.97 368.36L411.97 372.44L408.97 376.52L411.97 380.6L408.97 384.69L411.97 388.77L408.97 392.85L411.97 396.93L408.97 401.01L411.97 405.1L408.97 409.18L411.97 413.26L408.97 417.34L411.97 421.43L408.97 425.51L411.97 429.59L408.97 433.67L411.97 437.75L408.97 441.84L411.97 445.92L408.97 450L144 450Z"/>
@@ -11,8 +11,8 @@
   <text class="label-on-clamp" x="460.97" y="216.33" text-anchor="end">the moving jaw</text>
   <text class="label-on-clamp" x="460.97" y="232.33" text-anchor="end">not shown</text>
   <rect class="hidden" x="180" y="238.93" width="156.97" height="39.62"/>
-  <rect class="part-removed" x="245.84" y="170.55" width="17.68" height="68.38"/>
-  <path class="cutter" d="M263.52 100.55L263.52 244.92L254.68 250.24L245.84 244.92L245.84 100.55L250.26 97.55L254.68 100.55L259.1 97.55Z"/>
+  <rect class="part-removed" x="244.89" y="170.55" width="19.58" height="68.38"/>
+  <path class="cutter" d="M264.47 100.55L264.47 244.93L254.68 250.81L244.89 244.93L244.89 100.55L249.79 97.55L254.68 100.55L259.58 97.55Z"/>
   <line class="centre-line" x1="254.68" y1="90.55" x2="254.68" y2="288.55"/>
   <line class="datum" x1="20" y1="278.55" x2="140" y2="278.55"/>
   <text class="datum-label" x="20" y="238.55">Z0 the</text>
@@ -20,11 +20,12 @@
   <text class="datum-label" x="20" y="270.55">top (B)</text>
   <line class="datum" x1="180" y1="140.55" x2="180" y2="166.55"/>
   <text class="datum-label" x="174" y="156.55" text-anchor="end">X0 = P</text>
-  <text class="label" x="490" y="56">#32 drill through the top into</text>
-  <text class="label" x="490" y="72">the slot, {{process.drill_past_mm:.0f}} mm past its roof</text>
-  <text class="label" x="490" y="88">(after the centre drill's spot)</text>
-  <line class="leader" x1="488" y1="60" x2="263.52" y2="130.55"/>
-  <circle class="leader-dot" cx="263.52" cy="130.55" r="2"/>
+  <text class="label" x="490" y="56">#30 drill (the bore's size, no ream)</text>
+  <text class="label" x="490" y="72">through the top into the slot,</text>
+  <text class="label" x="490" y="88">{{process.drill_past_mm:.0f}} mm past its roof, pecks of {{process.peck_30_mm:in.3dot}}</text>
+  <text class="label" x="490" y="104">(after the centre drill's spot)</text>
+  <line class="leader" x1="488" y1="60" x2="264.47" y2="130.55"/>
+  <circle class="leader-dot" cx="264.47" cy="130.55" r="2"/>
   <text class="label" x="490" y="330">relief slot (from Setup 6), the</text>
   <text class="label" x="490" y="346">bore breaks into it; dashed:</text>
   <text class="label" x="490" y="362">the block's B and the slot's walls,</text>

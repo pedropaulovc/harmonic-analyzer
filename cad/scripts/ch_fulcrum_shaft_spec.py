@@ -2,7 +2,7 @@ r"""Pure-data dimensional contract shared by the fulcrum shaft, its drawing and
 the channel assembly that places it.
 
 The plain Ø.250 steel shaft the top levers rock on. It runs full length at
-one diameter (no journals, shoulders or steps) through the reamed bores of the
+one diameter (no journals, shoulders or steps) through the F-drilled bores of the
 two end keepers (MHA-CH-07, ``ch_fulcrum_keeper_spec``); each end stands
 END_PROUD past its keeper lug's outer face and finishes in a hemispherical
 dome (the bright dome of the ch. 17 p. 40 photo). One set-screw flat per end,
@@ -20,17 +20,15 @@ from math import sqrt
 
 import _config
 from _fit_shaft_h import SHAFT_H
-from _gtol_cylinder import CylinderFace
 from _package_units import drawing_unit
 from _printed_tolerance import printed_band_mm
-from _surface_finish import MACHINED_UM, SurfaceFinishControl
+from _surface_finish import SurfaceFinishControl
 from ch_fulcrum_keeper_spec import (
     BORE_ALIGNMENT_ALLOWANCE_MM,
     BORE_DIA,
     BORE_DIA_BAND,
     BORE_RUNNING_MIN_CLEARANCE_MM,
     CROWN_R,
-    KEEPER_FITUP_LOCATION_BAND_MM,
     KEEPER_Z_OFF,
     LUG_HALF_T,
     SET_SCREW_MIN_ENGAGEMENT_D,
@@ -38,6 +36,7 @@ from ch_fulcrum_keeper_spec import (
     crown_least_height,
 )
 from ch_fulcrum_keeper_spec import DRAWING_PRECISION as KEEPER_PRECISION
+from ch_keeper_fitup import FACE_DEVIATIONS_MM as KEEPER_FACE_DEVIATIONS_MM
 from ch_vn_fulcrum_set_screw_spec import CUP_DIA as SET_SCREW_CUP_DIA
 from ch_vn_fulcrum_set_screw_spec import LENGTH as SET_SCREW_LENGTH
 from ch_vn_fulcrum_set_screw_spec import MAJOR_DIA as SET_SCREW_MAJOR_DIA
@@ -49,7 +48,13 @@ MM_PER_IN = 25.4
 UNIT = drawing_unit("parts/ch-fulcrum-shaft", _config.parts("ch-fulcrum-shaft"))
 
 SHAFT_DIA = 0.25 * MM_PER_IN
+# The bought 1/4 ground rod's catalogue band (stock 1018-ground-round-1-4:
+# its stated tolerance lies inside +.0000/-.0008). The sheet prints the
+# stock, 1/4 REF GROUND ROD, AS SUPPLIED, not limits (drawing-guidelines.md
+# rule 4: a diameter bought to size and never cut); this band stays the
+# analysis band every clearance below is taken at.
 SHAFT_DIA_BAND = SHAFT_H
+SHAFT_DIA_FRACTION_DENOMINATOR = 4
 SHAFT_R = SHAFT_DIA / 2.0
 
 # --- Length: cylindrical to END_PROUD past each keeper lug's outer face, then
@@ -140,11 +145,9 @@ SET_SCREW_PROUD_WORST = _SEAT_HIGH + SET_SCREW_LENGTH - crown_least_height(0.0)
 if SET_SCREW_PROUD_NOMINAL >= 0.0 or SET_SCREW_PROUD_WORST > 0.4:
     raise AssertionError("set screw stands proud of the keeper crown past the ruling")
 
-SURFACE_FINISHES = (
-    SurfaceFinishControl(
-        "bearing", MACHINED_UM, CylinderFace(SHAFT_DIA), display_unit=UNIT
-    ),
-)
+# No roughness symbol: the O.D. is the ground rod as supplied, never cut
+# (drawing-guidelines.md rule 4: the stock is printed; rule 6).
+SURFACE_FINISHES: tuple[SurfaceFinishControl, ...] = ()
 
 # One revolved half-profile carries the diameter and the tip-to-tip length;
 # the flats' cut sketch carries their length, both stations off the -Z dome
@@ -162,14 +165,16 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     },
 }
 # Decimal places are the tolerance statement (drawing-simplicity-policy.md `How the repository implements the guidelines`); the model owns
-# them, in inches. ShaftDia carries its SHAFT_H band natively at four places;
+# them, in inches. ShaftDia is the bought rod's fraction reference (1/4,
+# AS SUPPLIED; the supplier's band governs, rule 4), set at three places as
+# the fleet's other as-bought fractions are (dt_crank_pinion_pin_spec);
 # AcrossFlat at .XXX holds FLAT_CHORD_MIN above the set screw's major and its
 # >= 1.5D engagement and proud ruling. FlatFromEnd, FlatBaseline, FlatLength
 # and OverallLength at .XX hold FLAT_STATION_WINDOW_MM open (inch .X is far
 # too loose for it). DomeRadius is a reference (.125): the full hemisphere
 # follows from the diameter.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
-    "ShaftProfile": {"ShaftDia": 4, "OverallLength": 2},
+    "ShaftProfile": {"ShaftDia": 3, "OverallLength": 2},
     "FlatProfile": {
         "FlatLength": 2,
         "FlatFromEnd": 2,
@@ -195,7 +200,7 @@ DIMENSION_PREFIXES = {
 
 # --- Flat stations, at the worst case of every printed band and of the
 # MHA-CH-00 fit-up (drawing-guidelines.md rule 19 (absorb stacks at fit-up, not with tighter bands)). The keepers go on the frame with their
-# lug inner faces DRO-set (KEEPER_FITUP_LOCATION_BAND_MM each); each tap
+# lug inner faces set at fit-up (ch_keeper_fitup: the front by DRO, the rear to the lever stack, each face's larger deviation); each tap
 # stands SetScrewLocation off its lug's inner face, as the keeper prints it,
 # and the lug is LugThickness thick. The shaft is free to slide until both
 # screws bite, so it needs ONE
@@ -210,8 +215,8 @@ def _band(precision: dict[str, dict[str, int]], feature: str, name: str) -> floa
 
 
 _STATION_BANDS = {
-    "front_face": KEEPER_FITUP_LOCATION_BAND_MM,
-    "rear_face": KEEPER_FITUP_LOCATION_BAND_MM,
+    "front_face": max(map(abs, KEEPER_FACE_DEVIATIONS_MM["front"])),
+    "rear_face": max(map(abs, KEEPER_FACE_DEVIATIONS_MM["rear"])),
     "front_lug": _band(KEEPER_PRECISION, "LugBody", "LugThickness"),
     "rear_lug": _band(KEEPER_PRECISION, "LugBody", "LugThickness"),
     "front_tap": _band(KEEPER_PRECISION, "SetScrewReference", "SetScrewLocation"),
@@ -293,7 +298,7 @@ if FLAT_STATION_WINDOW_MM <= 0.0:
         f"({FLAT_STATION_WINDOW_MM:.3f})"
     )
 
-# --- The keepers' bores, each reamed alone on its own keeper
+# --- The keepers' bores, each F-drilled alone on its own keeper
 # (ch_fulcrum_keeper_spec): the straight shaft through both spends
 # BORE_ALIGNMENT_ALLOWANCE_MM of each bore's clearance on the two bore
 # heights' bands, each bore's tilt and the rail seats under the feet, and
@@ -304,7 +309,7 @@ ALIGNED_MIN_CLEARANCE_MM = (
     - SHAFT_DIA
     - SHAFT_DIA_BAND[0]
     - BORE_ALIGNMENT_ALLOWANCE_MM
-)  # 0.0598 (0.0344 at the former .2550 bore; owner ruling 2026-11-23, tool audit Q7)
+)  # 0.0854 (0.0598 at the former .2560 ream; owner ruling 2026-11-24, fit audit question 1)
 if ALIGNED_MIN_CLEARANCE_MM < BORE_RUNNING_MIN_CLEARANCE_MM:
     raise AssertionError(
         f"the keeper bores keep {ALIGNED_MIN_CLEARANCE_MM:.4f} on the shaft "

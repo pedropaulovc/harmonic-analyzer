@@ -1,0 +1,19 @@
+# MHA-MG-01 magnifying bracket: why each band tighter than the title block
+# stays (drawing-guidelines.md rule 4; owner ruling 2026-11-24: the reason
+# lives here, not on the sheet). Read by the machinist review only.
+# The three head controls owner exception RV-03 keeps (the nose R and the
+# 1/4-20 tap's two stations, each +/-.002) hold the material around the tap:
+# RV-03 records the tap mouth's wall at .078 MIN with them; the title
+# block's +/-.005 on the R and the stations would thin it further. Fit audit
+# 2026-11-23 MHA-MG-01.head_wall_controls: keep as is.
+necessity:
+  - id: N-01
+    feature: "sheet 1, thread-axis end view, NOSE R.217 ±.002"
+    kind: gap
+    reason: "a looser size thins the tap's wall in the head"
+    source: "mg_lever_thread_joint.NOSE_R_TOL; machinist_exceptions RV-03"
+  - id: N-02
+    feature: "sheet 1, thread-axis end view, 1/4-20 tap .217 ±.002 from the nose tip and from the side"
+    kind: gap
+    reason: "a looser station thins the tap's wall in the head"
+    source: "mg_lever_thread_joint.HOLE_LOCATION_TOL; machinist_exceptions RV-03"

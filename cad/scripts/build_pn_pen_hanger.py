@@ -60,13 +60,10 @@ from _drawing_marks import (
 )
 from _drawing_precision import apply_drawing_precision
 from _drawing_prefix import set_dimension_prefix
-from _drawing_tolerances import set_dimension_bilateral_tolerance
-from _fit_deviations import deviations
 from _holes import wizard_holes
 from _single_limit_tolerance import set_single_limit
 from pn_pen_hanger_spec import (
     DIMENSION_PREFIXES,
-    DRAWING_BANDS,
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
     DRAWING_PRECISION,
@@ -93,7 +90,6 @@ from pn_pen_hanger_spec import (
     STRAP_T,
     STRAP_TOP_X,
     STRAP_Z,
-    UNIT,
     UPPER_PLATE_OVERHANG,
 )
 
@@ -364,14 +360,6 @@ def build(adapter) -> dict[str, str]:
     # for black edges to read.
     apply_color(adapter, BAR_STEEL)
     report_mass_properties(adapter)
-    for (feature_name, dimension_name), band in DRAWING_BANDS.items():
-        set_dimension_bilateral_tolerance(
-            adapter,
-            feature_name,
-            dimension_name,
-            *deviations(band),
-            display_unit=UNIT,
-        )
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     # "2X R.08 MAX": the modelled radius is the printed limit (rule 16).
     set_single_limit(

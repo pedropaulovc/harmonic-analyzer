@@ -46,25 +46,27 @@ def test_every_marked_dimension_lands_on_the_side_view_or_its_detail() -> None:
     }
 
 
-def test_only_the_running_fit_carries_a_size_band() -> None:
+def test_the_bought_rod_carries_no_size_band() -> None:
+    # Rule 4: a diameter bought to size and never cut prints the stock. The
+    # catalogue band stays the spec's analysis band.
     assert spec.SHAFT_DIA_BAND is _fit_shaft_h.SHAFT_H
-    assert model_toleranced_dimensions(part) == {
-        ("ShaftProfile", "ShaftDia"): "*deviations(SHAFT_DIA_BAND)",
-    }
+    assert spec.SHAFT_DIA_FRACTION_DENOMINATOR == 4
+    assert model_toleranced_dimensions(part) == {}
 
 
 def test_shaft_band_runs_in_the_bracket_bores() -> None:
     lower, upper = _fit_deviations.deviations(spec.SHAFT_DIA_BAND)
     clearance_min = ch_pivot_bracket_spec.BORE_DIA - (spec.SHAFT_DIA + upper)
     clearance_max = ch_pivot_bracket_spec.BORE_DIA - (spec.SHAFT_DIA + lower)
-    assert round(clearance_min, 2) == 0.15
+    # .0070 in: the F-drilled bracket bore (fit audit question 1; .0060 at .256).
+    assert round(clearance_min, 3) == 0.178
     assert clearance_max > clearance_min
 
 
 def test_the_part_owns_display_precision_and_the_sheet_only_asserts_it() -> None:
     assert part.DRAWING_PRECISION is spec.DRAWING_PRECISION
     assert spec.DRAWING_PRECISION_BY_NAME == {
-        "ShaftDia": 4,
+        "ShaftDia": 3,
         "DomeHeight": 2,
         "Radius": 2,
         "OverallLength": 2,
@@ -134,11 +136,12 @@ def test_part_stamps_make_critical_properties() -> None:
     assert int(config["quantity"]) == 1
 
 
-def test_surface_finishes_name_the_running_face() -> None:
-    by_key = {control.key: control for control in spec.SURFACE_FINISHES}
-    assert set(by_key) == {"pivot_bearing"}
-    face = by_key["pivot_bearing"].face
-    assert by_key["pivot_bearing"].roughness_um == 1.6
+def test_the_bought_rod_carries_no_roughness_symbol() -> None:
+    # The O.D. is the ground rod as supplied, never cut (rule 4; rule 6).
+    assert spec.SURFACE_FINISHES == ()
+    source = open(drawing.__file__, encoding="utf-8").read()
+    assert "add_surface_finish" not in source
+    face = spec.BEARING_FACE
     assert face.diameter_mm == spec.SHAFT_DIA
     # Part frame: the north end at z 0, the body toward -z. The probe station
     # is on the O.D., off both flats at their longest.
@@ -224,15 +227,16 @@ def test_the_flats_print_once_as_two_places() -> None:
     assert drawing.FLATS_CALLOUT == "2X"
 
 
-def test_the_running_fit_names_its_mate_clear_of_its_witnesses() -> None:
-    """Baseline machinist review: the Ø6.350 0/-0.02 band named no mate
-    (rule 4), and inside its witness pair the lower extension line ran
-    through its text (rule 14). The callout names the hubs it runs in and,
-    the band being narrower than the turned-diameter row, its route (fan-out
-    F1: bought ground stock), and the text stands under the bar's lower
-    flank, right of the south tip."""
-    arm = _config.parts("ch-rocker-arm")["number"]
-    assert drawing.SHAFT_FIT_CALLOUT == f"RUNNING FIT IN {arm}\n1/4 GROUND STOCK OK"
+def test_the_stock_diameter_stands_clear_of_its_witnesses() -> None:
+    """Baseline machinist review: inside its witness pair the lower extension
+    line ran through its text (rule 14). The O.D. is the bought rod, printed
+    as its stock (rule 4; the rocker and bracket bores name this shaft as
+    their mate), and the text stands under the bar's lower flank, right of
+    the south tip."""
+    assert drawing.SHAFT_DIA_CALLOUT == "GROUND ROD, AS SUPPLIED"
+    assert "supplier_reference_dimension(" in open(
+        drawing.__file__, encoding="utf-8"
+    ).read()
     x, y = drawing.PROFILE_KEEP["ShaftDia"]
     lower_flank = drawing.PROFILE_CENTER[1] - spec.SHAFT_DIA * drawing._MM / 2.0
     assert y < lower_flank - 0.005
@@ -240,12 +244,6 @@ def test_the_running_fit_names_its_mate_clear_of_its_witnesses() -> None:
     # of it (the v48 render: block from the line to the right).
     south_tip = drawing.SOUTH_END_X + spec.DOME_HEIGHT * drawing._MM
     assert x > south_tip + 0.020
-
-
-def test_finishes_print_at_note_height() -> None:
-    """r743-2R: at the template's default height the Ra symbols printed
-    ~18 mm tall."""
-    assert drawing.FINISH_CHAR_HEIGHT == 0.0025
 
 
 # Measured on the r743-3 render: "BOTH ENDS" runs 24.5 mm, centred on its
@@ -288,7 +286,7 @@ def test_the_dome_radius_prints_as_a_spherical_reference() -> None:
 # diameter callout: its widest line is the mate's.
 INNER_BORDER_RIGHT = 0.419
 PROFILE_DIA_CALLOUT_WIDTH = max(
-    len(line) for line in drawing.SHAFT_FIT_CALLOUT.splitlines()
+    len(line) for line in drawing.SHAFT_DIA_CALLOUT.splitlines()
 ) * drawing.CALLOUT_CHAR_WIDTH
 
 

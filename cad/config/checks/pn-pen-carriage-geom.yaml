@@ -1,0 +1,9 @@
+# What fails past each numeric check pn_pen_carriage_geom asserts
+# (check_register.py, tolerance-policy.md "Checks in spec modules and tests").
+checks:
+  - id: C-01
+    check: "groove_landing_spare"
+    kind: gap
+    reason: "cup jams on a groove wall; pivot not clamped"
+    source: "the module computes it: the screw's axis (MHA-PN-05 Height less SetScrewY, both .XX) against the groove walls (MHA-PN-04, .XXX from the shoulder), the vendor's 45 deg x one-pitch cup-end chamfer where it crosses the #30 bore's wall: .0077 in a side with the diameters nominal; .0032 in (0.082 mm) at the deepest printed floor in the largest drilled bore (test_pn_pen_carriage_geom); #2439 option B; owner ruling 2026-11-24, fit audit question 20 (the bore drilled #30, the pivot unchanged)"
+    basis: worst_case

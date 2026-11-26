@@ -1,0 +1,9 @@
+# What fails past each numeric check ch_pivot_bracket_drawing_spec asserts
+# (check_register.py, tolerance-policy.md "Checks in spec modules and tests").
+checks:
+  - id: C-01
+    check: "CORNER_R_MAX"
+    kind: gap
+    reason: "a larger corner radius lifts the screw head"
+    source: "the module computes it: ch_pivot_bracket_sides.HEAD_TO_EAR_FACE_MIN rounded down to two inch places, R.02 MAX"
+    basis: worst_case

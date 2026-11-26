@@ -382,8 +382,9 @@ beam = { axis = "x", hold = "plate", extent_mm = [0, "{{cad.blank_length_mm}}"],
 # underside are not parallel; the fence and end-stop heights do not change.
 [[setups.operations]]
 steps = [
-  { kind = "check", text = "Once per vise setup, no blank in: the lever indicator along the plate top over X 0–12 reads within .001." },
-  { kind = "stop", text = "Over: reseat the plate on the parallels and indicate again. Still over: a feeler-gauge leaf between the parallels and the plate's low end, then indicate again." },
+  { kind = "check", text = "Once per vise setup, no blank in: the lever indicator along the plate top over X 0–12 reads within .001; then along the fence face over X 0–12, within .001." },
+  { kind = "stop", text = "Plate top over: reseat the plate on the parallels and indicate again. Still over: a feeler-gauge leaf between the parallels and the plate's low end, then indicate again." },
+  { kind = "stop", text = "Fence over: open the vise a little, tap the plate's high-reading end away from the indicator with a soft mallet, close the vise and indicate the fence, then the plate top, again." },
 ]
 feed = "hand"
 
@@ -543,10 +544,10 @@ tool = "hub-reamer"
 drilling = "none"
 sizing = { kind = "band", band_mm = "{{cad.hub_dia_band_mm}}" }
 instruction = "Same file, M6 T5 (spindle off, retracted): ream through, .4000 reamer in the drill chuck; set 400. Cutting oil. The file feeds the reamer in and feeds it back out, spindle running: no rapid leaves the bore. Leave the blank clamped for the check."
-inspection = "Still clamped: hub hole Ø{{cad.hub_dia_min_in:.4dot}}–{{cad.hub_dia_max_in:.4dot}}, the .4000 GO plug gauge enters, the .4005 NO-GO does not. Every hole; the first blank's before reaming any other."
+inspection = "Still clamped: the .400 minus pin of the pin-gauge set enters the hub hole by hand. Every hole; the first blank's before reaming any other."
 rpm = 400
 feed = "{{process.hub_ream_feed_per_min_mm:in.1f}} in/min, in and out"
-gauge_checks = [{ gauge = "plug-gauges-4000-4005", band_mm = "{{cad.hub_dia_band_mm}}" }]
+gauge_checks = "other"
 beam = { axis = "x", hold = "between", extent_mm = [0, "{{cad.blank_length_mm}}"], supports_mm = "{{cad.hub_relief_x_mm}}", section_mm = { y = "{{cad.blank_width_mm}}", z = "{{cad.thickness_mm}}" } }
 # No reamer kind: its thrust is analysed as a two-lip twist drill's at the
 # reamer Ø and the same feed (flutes = 2 is that model's, not the reamer's),
@@ -559,8 +560,8 @@ milling_cuts = [
 # an op's Check after its work, so they are the next op.
 [[setups.operations]]
 steps = [
-  { kind = "stop", text = "NO-GO enters or GO will not: stop, the reamer is out of band." },
-  { kind = "action", text = "In band: unclamp the blank and lift it out." },
+  { kind = "stop", text = "The pin will not enter: stop, the reamer is worn or undersize; tell the owner." },
+  { kind = "action", text = "The pin enters: unclamp the blank and lift it out." },
 ]
 feed = "hand"
 
@@ -753,7 +754,7 @@ vise_hold = "other"
 beam = "other"
 inspection = [
   "Thickness {{cad.thickness_min_in:.3dot}}–{{cad.thickness_max_in:.3dot}}, micrometer, every strap: again after the stoning, freeing and straightening, any of which can move it (RS03's reading gated the machining).",
-  "Every strap, from the hub centre: calipers over the .4000 GO plug gauge in the hub hole, the reading less .200. Top edge {{cad.top_height_min_in:.3dot}}–{{cad.top_height_max_in:.3dot}} above and bottom edge {{cad.bottom_height_min_in:.3dot}}–{{cad.bottom_height_max_in:.3dot}} below, on the hub centreline: the check that the strap stayed on its tape and plug.",
+  "Every strap, from the hub centre: calipers over the .400 minus pin of the pin-gauge set in the hub hole, the reading less .200. Top edge {{cad.top_height_min_in:.3dot}}–{{cad.top_height_max_in:.3dot}} above and bottom edge {{cad.bottom_height_min_in:.3dot}}–{{cad.bottom_height_max_in:.3dot}} below, on the hub centreline: the check that the strap stayed on its tape and plug.",
   "First article only, the same way, at both ends: the top corner, where the short tip land meets the angled end face, and the bottom corner, where the end face meets the bottom edge. The drawing's {{cad.corner_station_min_in:.2f}}–{{cad.corner_station_max_in:.2f}} and {{cad.foot_station_min_in:.2f}}–{{cad.foot_station_max_in:.2f}} run along the strap, but the top corner stands {{cad.corner_rise_in:.3dot}} and the bottom corner {{cad.foot_rise_in:.3dot}} above the hub centre, so the calipers read the slant: top corners {{cad.corner_slant_min_in:.3f}}–{{cad.corner_slant_max_in:.3f}}, bottom corners {{cad.foot_slant_min_in:.3f}}–{{cad.foot_slant_max_in:.3f}}.",
   "First article only: tip lands {{cad.tip_length_min_in:.2dot}}–{{cad.tip_length_max_in:.2dot}} long, from the top edge to the top corner, calipers along the land.",
   "Not gauged, the program's interpolated path: arc radii R{{cad.top_radius_min_in:.1f}}–{{cad.top_radius_max_in:.1f}} top and R{{cad.bottom_radius_min_in:.1f}}–{{cad.bottom_radius_max_in:.1f}} bottom, tip-land angle {{cad.tip_angle_min_deg:.1f}}–{{cad.tip_angle_max_deg:.1f}}°.",

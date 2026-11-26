@@ -10,8 +10,8 @@
 # Route: saw; Setup 2 on edge, edge B down, face edge A down .41 to the top
 # face (WB02_top); Setup 3 lying, front face down, the top face at the fixed
 # jaw, the LEFT end .50 out past the jaws: mill the left end with the
-# cutter's side, spot, drill #15 (hanger) and #17 (axle), ream the axle bore
-# .1865 (WB03_left); Setup 4, the same hold slid along the jaws so the RIGHT
+# cutter's side, spot, drill #15 (hanger) and 3/16 (axle) (WB03_left);
+# Setup 4, the same hold slid along the jaws so the RIGHT
 # end stands .50 out past them: mill the right end to the length, spot and
 # drill both clamp holes #9 (WB04_right); Setup 5 on edge, the top face
 # down, face edge B down to the .43 height (WB05_height); bench deburr,
@@ -38,29 +38,23 @@
 # .002 feeler leaf; a to-size face's Z0 is the stacks' top, set from the
 # miked width or depth, as the bottom guide's plan does.
 #
-# Not on hand, to buy before Setup 3 (flagged): the .1865 chucking reamer
-# (shop-equipment tools.reamer-1865, to_order) and the axle bore's Class ZZ
-# pins, a .1865 plus single (GO) and the .187 minus pin of the .061-.500 box
-# (NO-GO), shop gauges.zz-pins-1865-1870; the pin-gauge sets
-# (gauges.pin-gauges, to_order) for the drilled holes. Owner ruling
-# 2026-11-23 (tool audit Q1, re-answered), verbatim: "ZZ singles per the
-# record: 29 pins (17 plus GO, 12 minus NO-GO), about $130. Accept that good
-# holes near a limit may be refused; the traveler mikes each pin so the real
-# window is known per pin." It replaces the Class X .1865/.1870 pair. Setup 3
-# mikes both pins and the reamer before clamping, and the station check over
-# the GO pin uses its miked reading.
+# Not on hand, to buy before Setup 3 (flagged): the pin-gauge sets
+# (gauges.pin-gauges, to_order) for the drilled holes. The axle bore is
+# drilled 3/16 from the owned drill index (shop-equipment tools.drill-3-16;
+# owner ruling 2026-11-24, fit audit question 18: the axle is bonded in it
+# with LOCTITE 638 at assembly), so no reamer and no Class ZZ pins.
 #
 # NC (cam:mg_wheel_bar, cad/process/mg_wheel_bar/cam.py): WB02_top,
 # WB03_left, WB04_right, WB05_height. Program names, the [parameters] and the
 # milling_cuts names are a contract with that recipe. Tool numbers are the
 # places in the tools list among the mill's tools: T1 1/2 in end mill, T2 #2
-# centre drill, T3 #17, T4 #15, T5 #9, T6 .1865 reamer.
+# centre drill, T3 3/16, T4 #15, T5 #9.
 title = "Wheel bar"
 part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
 material = "1018 cold-finished steel, 3/8 x 1-1/4 in flat: a plain carbon steel (drawing: {{cad.material_spec}})"
 stock = "3/8 x 1-1/4 in flat bar; {{process.quantity:d}} × {{process.blank_length_in:.2f}}–{{process.blank_length_max_in:.2f}} in blank."
-note = "Inches unless mm; G-code and console entries in mm (the files and the controller run G21). Finished {{cad.right_end_length_min_in:.2f}}–{{cad.right_end_length_max_in:.2f}} long (left end to right end), {{cad.bottom_face_height_min_in:.3dot}}–{{cad.bottom_face_height_max_in:.3dot}} high (top face to bottom face), {{cad.back_face_depth_min_in:.3dot}}–{{cad.back_face_depth_max_in:.3dot}} deep (the bar's 3/8 thickness as supplied). Speeds on the PM-30MV low belt (100–2800 rpm): no belt change. Home the mill ($H) once, after switching it on: every M6's trip to the tool setter counts from home. Home again only after a power cycle or a controller restart, an E-stop, an alarm, a limit switch hit, a stall or a crash: homing brings the stored G54 back. Then check every zero of the setup again, each the way its step set it: each must read what its step set, within .001 in. One does not, cannot be reached with the part in, or the part may have moved: take the setup again from its first step, the part out. They all do: run the interrupted file again from its start. Feed Hold, then Reset with the axes stopped keeps position and G54: no homing, no new zero; run the interrupted file again from its start: its first M6 measures the tool, and cuts already made are cut in air. Every file is proved in air before it cuts. To buy before Setup 3: the .1865 reamer, the .1865/.1870 plug gauge pair and the pin gauge set (its .125 pin seats Setups 3 and 4)."
+note = "Inches unless mm; G-code and console entries in mm (the files and the controller run G21). Finished {{cad.right_end_length_min_in:.2f}}–{{cad.right_end_length_max_in:.2f}} long (left end to right end), {{cad.bottom_face_height_min_in:.3dot}}–{{cad.bottom_face_height_max_in:.3dot}} high (top face to bottom face), {{cad.back_face_depth_min_in:.3dot}}–{{cad.back_face_depth_max_in:.3dot}} deep (the bar's 3/8 thickness as supplied). Speeds on the PM-30MV low belt (100–2800 rpm): no belt change. Home the mill ($H) once, after switching it on: every M6's trip to the tool setter counts from home. Home again only after a power cycle or a controller restart, an E-stop, an alarm, a limit switch hit, a stall or a crash: homing brings the stored G54 back. Then check every zero of the setup again, each the way its step set it: each must read what its step set, within .001 in. One does not, cannot be reached with the part in, or the part may have moved: take the setup again from its first step, the part out. They all do: run the interrupted file again from its start. Feed Hold, then Reset with the axes stopped keeps position and G54: no homing, no new zero; run the interrupted file again from its start: its first M6 measures the tool, and cuts already made are cut in air. Every file is proved in air before it cuts. To buy before Setup 3: the pin gauge set (its .125 pin seats Setups 3 and 4)."
 shop = "../shop"
 stock_refs = ["1018-flat-3-8x1-1-4"]
 material_key = "rocker-1018-cold-finished"
@@ -89,8 +83,6 @@ blank_thickness_in = 0.375
 # depth band's top): the programs' stock tops on it.
 blank_thickness_mm = 9.525
 depth_max_mm = 9.6266
-# WB03's deepest point: the reamer's tip under F.
-ream_tip_mm = -2.54
 # The incoming bar gate on its width (author's choice, ±.005 about 1-1/4):
 # WB02 faces from the widest.
 bar_width_min_mm = 31.623
@@ -133,34 +125,29 @@ face_step_max_mm = 1.27
 end_step_max_mm = 0.762
 end_past_mm = 0.508
 end_axial_doc_mm = 10.1346
-# Holes: spot Ø.140 with the #2 centre drill, under the #17 (no chamfer at
+# Holes: spot Ø.140 with the #2 centre drill, under the #15 (no chamfer at
 # the mouths), then each drill through, no peck (L/D 2.2 at most), its full
 # diameter 1.0 mm past the front face into the air beside the stacks; its
-# 118° point below that (cam.py checks the tips). The .1865 reamer fed
-# through to .100 below the front face, in and out, spindle running.
+# 118° point below that (cam.py checks the tips). The 3/16's tip is WB03's
+# deepest point.
 spot_dia_mm = 3.556
 drill_past_mm = 1.0
-drill_17_tip_mm = -2.32
+drill_3_16_tip_mm = -2.431
 drill_15_tip_mm = -2.374
 drill_9_tip_mm = -2.496
-ream_past_mm = 2.54
-# A reamer takes at most this much on the diameter after its drill (.016 in).
-ream_stock_max_mm = 0.4064
 # Speeds and feeds of the holes, authored in the operations: LittleMachineShop
 # "Cutting Speeds", Drilling & Reaming, Plain carbon steels 1006-1026 (read
 # 2026-11-20): drilling 60-100 ft/min, the low end taken; AutoDrill
 # "Suggested drilling feed rates" (read 2026-11-20), row Stl, Carbon: 1/8 in
-# .003 in/rev, a size between two columns taking the lower one's feed. #17
-# (.173): 1300 rpm × .003 = 3.9 in/min; #15 (.180): 1250 × .003 = 3.75; #9
-# (.196): 1150 × .003 = 3.45. The #2 centre drill as the bottom guide's spot:
-# 1800 rpm × .001 = 1.8 in/min. Reaming (author's rule of thumb, as the
-# pinion bracket's): half the drilling speed, 30 ft/min, .004 in/rev: .1865
-# at 600 rpm = 2.4 in/min.
+# .003 in/rev, a size between two columns taking the lower one's feed. 3/16
+# (.1875): 1292 rpm (a spindle stop, 12 × 107.7: shop-equipment
+# machines.pm-30mv; 63 ft/min) × .003 = 3.88 in/min; #15 (.180): 1250 ×
+# .003 = 3.75; #9 (.196): 1150 × .003 = 3.45. The #2 centre drill as the
+# bottom guide's spot: 1800 rpm × .001 = 1.8 in/min.
 spot_feed_per_min_mm = 45.72
-drill_17_feed_per_min_mm = 99.06
+drill_3_16_feed_per_min_mm = 98.45
 drill_15_feed_per_min_mm = 95.25
 drill_9_feed_per_min_mm = 87.63
-ream_feed_per_min_mm = 60.96
 # Holding (shop workholding.vise-pm-6 and fixtures.parallels-lms-6745, 1/8
 # in thick, 1/2-1 in by 1/16): Setup 2, a 1/2 + 9/16 in stack against each
 # jaw (the jaw tops .133 under the top face's cut); Setups 3 and 4, two 1 +
@@ -210,24 +197,11 @@ drill_chuck_gauge_mm = 95.0      # Archive holders.drill-chuck-r8.gauge_len_mm.
 # measured-cuts.toml: 27.94 to 28.45 mm). cam.py checks the
 # collet's nose clears the bar at the deepest end-mill cut.
 half_mill_projection_mm = 28.45
-# ANSI B94.2 straight-shank chucking reamer, .1865: 4-1/2 in overall,
-# bounded by its whole length below the chuck; the #2 centre drill 1-7/8 in;
-# the #9 jobber drill 3-1/2 in.
-reamer_oal_mm = 114.3
+# The 3/16 jobber drill 3-1/2 in overall (ANSI), bounded by its whole length
+# below the chuck; the #2 centre drill 1-7/8 in; the #9 jobber drill 3-1/2 in.
+drill_3_16_oal_mm = 88.9
 centre_drill_oal_mm = 47.625
 drill_9_oal_mm = 88.9
-# The axle bore's Class ZZ pins (owner ruling 2026-11-23, tool audit Q1; shop
-# gauges.zz-pins-1865-1870): each pin is made within .0002 in = 0.00508 mm
-# of its size, on one side. GO, the .1865 plus single, is .1865-.1867 in
-# (4.7371 to 4.7371 + 0.00508 mm); NO-GO, the .187 minus pin of the box, is
-# .1868-.1870 in (4.7498 - 0.00508 to 4.7498 mm). go_pin_min_mm and
-# nogo_pin_max_mm are the band's own ends (cad axle bore dia), repeated in
-# mm for the micrometer checks (test_zz_pin_windows binds all four). A pin
-# miking outside its range is not used.
-go_pin_min_mm = 4.7371
-go_pin_max_mm = 4.7422
-nogo_pin_min_mm = 4.7447
-nogo_pin_max_mm = 4.7498
 
 [[tools]]
 id = "em-half"
@@ -238,9 +212,9 @@ id = "spot"
 name = "#2 centre drill"
 ref = "jig-spot"
 [[tools]]
-id = "drill-17"
-name = "#17 drill"
-ref = "drill-17"
+id = "drill-3-16"
+name = "3/16 drill"
+ref = "drill-3-16"
 [[tools]]
 id = "drill-15"
 name = "#15 drill"
@@ -249,11 +223,6 @@ ref = "block-drill-15"
 id = "drill-9"
 name = "#9 drill"
 ref = "riser-drill-9"
-[[tools]]
-id = "reamer-1865"
-name = ".1865 chucking reamer, to buy"
-ref = "reamer-1865"
-status = "to_order"
 [[tools]]
 id = "saw"
 name = "Evolution miter saw"
@@ -266,11 +235,6 @@ ref = "jig-files"
 id = "deburring-set"
 name = "Deburring scraper set"
 ref = "deburring-set"
-[[tools]]
-id = "zz-pins"
-name = "Class ZZ pins: .1865 plus (GO) and .187 minus (NO-GO)"
-ref = "zz-pins-1865-1870"
-status = "to_order"
 [[tools]]
 id = "pin-gauges"
 name = "Pin gauges .011-.500"
@@ -376,19 +340,9 @@ machine_ref = "pm-30mv"
 holding = "Two stacks of the 1 in and the 1/2 in parallels (1.5 in) side by side against the MOVING jaw (1/4 in wide in all), centred along the jaws, none at the fixed jaw: the holes, .197 from T, exit clear of them. The blank lying on them along the jaws, F down, T against the FIXED jaw, edge B (as bought) at the moving jaw, the sawn LEFT end {{process.end_overhang_mm:in.2f}} out past the jaws' left side (the rule), the rest out past their right side. The .125 pin of the pin-gauge set laid along edge B between it and the moving jaw, on the stacks' top, so the jaw seats T flat against the fixed jaw. The stacks (4 in long) and the pin lie wholly between the jaws' sides: the end mill passes .020 below their top just outside the jaws. Tap it down onto the stacks along its length while closing the vise. The lower {{process.lying_grip_mm:in.3dot}} of its thickness is in the jaws."
 datum = "Program WB03_left. G54: X0 {{process.left_end_skim_mm:in.3dot}} right of the sawn LEFT end (where WB03 mills that end), Y0 the fixed jaw's face (T), +Y toward it; Z0 the stacks' top (F), set from the miked thickness. The hanger hole at X {{cad.hanger_hole_station_in:.3f}} and the axle bore at X {{cad.axle_bore_station_mm:in.4f}} in (X{{cad.axle_bore_station_mm:.3f}} mm), Y −{{cad.axle_bore_height_in:.3f}} in. At every M6 stop the file has stopped the spindle and lifted the tool above the bar."
 diagram = { file = "diagrams/left.svg", alt = "From the left end: the blank lying front face down on two stacks at the moving jaw, the .125 pin at edge B, the top face at the fixed jaw; the 1/2 in end mill, to scale, in front of the left end, its side milling it full depth, its tip .020 under F, passing toward the moving jaw. From above: the same end mill at the left end, just out past the jaws, and the hanger hole and the axle bore each drill makes in its own picture." }
-envelope = { x_span_mm = ["{{process.blank_length_max_mm}}", "{{process.face_cutter_dia_mm}}", 5.08], y_span_mm = ["{{process.top_width_mm}}", "{{process.face_cutter_dia_mm}}", 5.08], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{process.depth_max_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{process.ream_tip_mm}}"], longest_tool_mm = ["{{process.drill_chuck_gauge_mm}}", "{{process.reamer_oal_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_mm}}"] }
+envelope = { x_span_mm = ["{{process.blank_length_max_mm}}", "{{process.face_cutter_dia_mm}}", 5.08], y_span_mm = ["{{process.top_width_mm}}", "{{process.face_cutter_dia_mm}}", 5.08], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{process.depth_max_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{process.drill_3_16_tip_mm}}"], longest_tool_mm = ["{{process.drill_chuck_gauge_mm}}", "{{process.drill_3_16_oal_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_mm}}"] }
 vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{process.top_width_mm}}", along_jaws_mm = "{{process.blank_length_max_mm}}", part_height_mm = "{{cad.back_face_depth_mm}}", parallel_height_mm = "{{process.riser_height_mm}}", overhang_mm = ["{{process.end_overhang_mm}}", "rest"], jaw_offset = "centred", fixed_jaw_face = "machined", moving_jaw_face = "as_bought", moving_jaw_contact = "rod" }
 beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{process.blank_length_max_mm}}"], clamp_mm = ["{{process.end_overhang_mm}}", "{{process.left_clamp_end_mm}}"], section_mm = { y = "{{process.top_width_mm}}", z = "{{cad.back_face_depth_mm}}" }, vise_left = "start" }
-
-[[setups.operations]]
-instruction = "Before clamping, on the bench: with the .0001 micrometer (it reads to about ±.00005), mike the GO pin, the NO-GO pin, and the reamer across two opposite margins at its front end. Write the three readings here, and each pin's reading on its tag."
-inspection = "GO pin {{cad.axle_bore_dia_min_in:.4dot}}–{{process.go_pin_max_mm:in.4dot}}; NO-GO pin {{process.nogo_pin_min_mm:in.4dot}}–{{cad.axle_bore_dia_max_in:.4dot}}. A pin outside its range is not used: get another before running WB03_left."
-gauge_checks = [{ gauge = "micrometers", band_mm = ["{{process.go_pin_min_mm}}", "{{process.go_pin_max_mm}}"] }, { gauge = "micrometers", band_mm = ["{{process.nogo_pin_min_mm}}", "{{process.nogo_pin_max_mm}}"] }]
-feed = "hand"
-
-[[setups.operations]]
-instruction = "Only if the reamer read under the GO pin's reading (otherwise skip): before clamping the blank, clamp a 1018 offcut in the vise and make a trial hole by hand at the console: the #17 drill through at 1300 rpm, then the .1865 reamer through at 600 rpm, cutting oil. Gauge it with both pins: GO refused, stop and tell the owner (this reamer's holes would be refused)."
-feed = "hand"
 
 [[setups.operations]]
 instruction = "Before clamping: mic F to the back face at the blank's middle and write it down (mm = in × 25.4). G54 Y0 on the bare fixed jaw's face (it becomes T's) with the edge finder."
@@ -433,7 +387,7 @@ speed_kind = "spindle"
 tool = "spot"
 drilling = "none"
 sizing = "other"
-instruction = "Same file, M6 T2 (#2 centre drill, in the drill chuck): spot the hanger hole and the axle bore Ø{{process.spot_dia_mm:in.3dot}}, under the #17; set 1800."
+instruction = "Same file, M6 T2 (#2 centre drill, in the drill chuck): spot the hanger hole and the axle bore Ø{{process.spot_dia_mm:in.3dot}}, under the #15; set 1800."
 rpm = 1800
 feed = "{{process.spot_feed_per_min_mm:in.1f}} in/min"
 milling_cuts = [
@@ -442,17 +396,17 @@ milling_cuts = [
 
 [[setups.operations]]
 speed_kind = "spindle"
-tool = "drill-17"
+tool = "drill-3-16"
 drilling = "twist_drill"
-sizing = "other"
-instruction = "Same file, M6 T3: #17 drill through the axle bore, its full diameter {{process.drill_past_mm:in.3dot}} past F, beside the stacks, no peck; set 1300. Cutting oil. It leaves the reamer .0135 on the diameter."
-diagram = { file = "diagrams/left-drill-17.svg", alt = "Section at the axle bore from the right end: the #17 drill, to scale, through the bar, its full diameter .039 past F into the air beside the stacks at the moving jaw. From above: the drill in the axle bore." }
-rpm = 1300
-feed = "{{process.drill_17_feed_per_min_mm:in.1f}} in/min"
+sizing = { kind = "band", band_mm = "{{cad.axle_bore_dia_band_mm}}" }
+instruction = "Same file, M6 T3: 3/16 drill through the axle bore, its full diameter {{process.drill_past_mm:in.3dot}} past F, beside the stacks, no peck; set 1292 (a spindle stop). Cutting oil."
+diagram = { file = "diagrams/left-drill-3-16.svg", alt = "Section at the axle bore from the right end: the 3/16 drill, to scale, through the bar, its full diameter .039 past F into the air beside the stacks at the moving jaw. From above: the drill in the axle bore." }
+rpm = 1292
+feed = "{{process.drill_3_16_feed_per_min_mm:in.1f}} in/min"
 hole_depth_mm = "{{cad.back_face_depth_mm}}"
 peck = "none"
 milling_cuts = [
-  { name = "axle drill", kind = "drill", phase = "rough", cutter_dia_mm = 4.3942, flutes = 2, rpm = 1300, feed_mm_min = "{{process.drill_17_feed_per_min_mm}}", stations_mm = "{{cad.axle_bore_station_mm}}" },
+  { name = "axle drill", kind = "drill", phase = "finish", cutter_dia_mm = 4.7625, flutes = 2, rpm = 1292, feed_mm_min = "{{process.drill_3_16_feed_per_min_mm}}", stations_mm = "{{cad.axle_bore_station_mm}}" },
 ]
 
 [[setups.operations]]
@@ -471,37 +425,8 @@ milling_cuts = [
 ]
 
 [[setups.operations]]
-speed_kind = "spindle"
-tool = "reamer-1865"
-drilling = "none"
-sizing = { kind = "band", band_mm = "{{cad.axle_bore_dia_band_mm}}" }
-instruction = "Same file, M6 T6: ream the axle bore through, .1865 reamer in the drill chuck, its tip to {{process.ream_past_mm:in.3dot}} below F; set 600. Cutting oil. The file feeds the reamer in and back out, spindle running: no rapid leaves the bore."
-diagram = { file = "diagrams/left-ream.svg", alt = "Section at the axle bore from the right end: the .1865 reamer, to scale, through the drilled bore, its tip .100 below F, beside the stacks. From above: the reamer in the axle bore." }
-rpm = 600
-feed = "{{process.ream_feed_per_min_mm:in.1f}} in/min, in and out"
-milling_cuts = [
-  { name = "axle ream", kind = "drill", phase = "finish", cutter_dia_mm = 4.7371, flutes = 6, rpm = 600, feed_mm_min = "{{process.ream_feed_per_min_mm}}", stations_mm = "{{cad.axle_bore_station_mm}}" },
-]
-
-[[setups.operations]]
-instruction = "File done, still clamped, the bore's edges still sharp: try the GO pin, then the NO-GO pin, in the axle bore. The sheet accepts a bore from the GO pin's reading up to, not including, the NO-GO pin's reading (the first op of this setup). Both pass: skip the next two ops. GO refused: the next op. NO-GO enters: the op after it."
-inspection = "Axle bore Ø{{cad.axle_bore_dia_min_in:.4dot}}–{{cad.axle_bore_dia_max_in:.4dot}} (a press fit on MHA-MG-07's axle): GO enters, NO-GO does not. With both pins at their limits only {{process.go_pin_max_mm:in.4dot}}–{{process.nogo_pin_min_mm:in.4dot}} is sure to pass: a good bore within .0002 of either end may be refused."
-gauge_checks = [{ gauge = "zz-pins-1865-1870", band_mm = "{{cad.axle_bore_dia_band_mm}}" }]
-
-[[setups.operations]]
-instruction = "Only if the GO pin was refused (otherwise skip): still clamped, blow the chips out, oil the bore and ream it once more with T6 by MDI, then gauge it again as the op before. Still refused: the bar is rejected; stop and tell the owner (the pins cannot show the bore at or over {{cad.axle_bore_dia_min_in:.4dot}}; a reamer cuts no larger)."
-instruction_detailed = "Only if the GO pin was refused (otherwise skip): blow the chips out, brush oil into the bore. Console M6 T6 (the tool setter measures it), S600 M3. G0 X{{cad.axle_bore_station_mm:.3f}} Y-{{cad.axle_bore_height_mm:.3f}}, G0 Z(the back-face reading in mm + 5.000); G1 Z{{process.ream_tip_mm:.3f}} F{{process.ream_feed_per_min_mm:.1f}}; G1 Z(the reading in mm + 5.000) at the same feed; M5. Gauge again with both pins."
-feed = "hand"
-inspection = "GO enters, NO-GO does not: go on (skip the next op). GO still refused: the bar is rejected; stop and tell the owner (the pins cannot show the bore at or over {{cad.axle_bore_dia_min_in:.4dot}}; a reamer cuts no larger)."
-gauge_checks = [{ gauge = "zz-pins-1865-1870", band_mm = "{{cad.axle_bore_dia_band_mm}}" }]
-
-[[setups.operations]]
-instruction = "NO-GO enters: no cut remedies it. The bar is rejected; stop and tell the owner (nothing on the sheet shows the bore at or under {{cad.axle_bore_dia_max_in:.4dot}})."
-feed = "hand"
-
-[[setups.operations]]
 instruction = "Still clamped: the axle bore's station from the left end."
-instruction_detailed = "The GO pin in the axle bore; the calipers from the left end over the pin, less half the GO pin's miked reading (about .0933)."
+instruction_detailed = "Take the T3 3/16 drill out of the chuck and put its shank in the axle bore; the calipers from the left end over the shank, less half its miked Ø (about .0937)."
 inspection = "Axle bore {{cad.axle_bore_station_min_in:.3dot}}–{{cad.axle_bore_station_max_in:.3dot}} from the left end. Outside: stop and tell the owner."
 gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.axle_bore_station_band_mm}}" }]
 
@@ -534,7 +459,7 @@ instruction_detailed = "Console M6 T1 (the tool setter measures it); MDI G0 X{{p
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Pickup check before cutting, Z from the back face's reading: MDI G0 Z(the reading in mm + 5.000), then G0 X{{cad.axle_bore_station_mm:.3f}} Y-{{cad.axle_bore_height_mm:.3f}}, then G0 Z(the reading in mm + 1.000): the end mill's tip stands centred over the reamed axle bore (look across it from the front and from the side). Off by a visible amount: stop and set X0 again."
+instruction = "Pickup check before cutting, Z from the back face's reading: MDI G0 Z(the reading in mm + 5.000), then G0 X{{cad.axle_bore_station_mm:.3f}} Y-{{cad.axle_bore_height_mm:.3f}}, then G0 Z(the reading in mm + 1.000): the end mill's tip stands centred over the drilled axle bore (look across it from the front and from the side). Off by a visible amount: stop and set X0 again."
 feed = "hand"
 
 [[setups.operations]]
@@ -596,7 +521,7 @@ speed_kind = "other"
 tool = "deburring-set"
 drilling = "none"
 sizing = "other"
-instruction = "Unclamp. Scrape the burr off both clamp holes' and the two Setup 3 holes' mouths on F and the back face, flush (no countersink), before Setup 5 grips across those faces; keep the scraper out of the reamed axle bore's wall."
+instruction = "Unclamp. Scrape the burr off both clamp holes' and the two Setup 3 holes' mouths on F and the back face, flush (no countersink), before Setup 5 grips across those faces."
 feed = "hand"
 inspection = "F and the back face flat at every hole: no burr stands proud (a fingernail drawn across each mouth). Proud: scrape it again."
 gauge_checks = "other"
@@ -650,7 +575,7 @@ machine_kind = "other"
 title = "Deburr and inspect"
 machine = "Bench"
 indexing = "none"
-diagram = { file = "diagrams/inspect.svg", alt = "The finished bar, back face toward the viewer, T up, the LEFT end on the left: the hanger hole, the reamed axle bore and the two clamp holes on one row .197 below the top face, at their stations from the left end; the edges broken." }
+diagram = { file = "diagrams/inspect.svg", alt = "The finished bar, back face toward the viewer, T up, the LEFT end on the left: the hanger hole, the drilled axle bore and the two clamp holes on one row .197 below the top face, at their stations from the left end; the edges broken." }
 envelope = "other"
 vise_hold = "other"
 beam = "other"
@@ -666,12 +591,12 @@ inspection = "No burr stands proud of any face or end."
 gauge_checks = "other"
 
 [[setups.operations]]
-instruction = "Hole sizes: the pin gauges in the hanger hole and in each clamp hole; the GO and NO-GO Class ZZ pins in the axle bore."
-inspection = "Hanger hole Ø{{cad.hanger_hole_dia_min_in:.3dot}}–{{cad.hanger_hole_dia_max_in:.3dot}}: the .180 pin enters (GO), the .184 does not (NO-GO). Clamp holes Ø{{cad.clamp_hole_1_dia_min_in:.3dot}}–{{cad.clamp_hole_1_dia_max_in:.3dot}}: the .196 pin enters, the .200 does not. Axle bore: the GO pin still enters, the NO-GO still does not. Outside: stop and tell the owner."
+instruction = "Hole sizes: the pin gauges in the hanger hole and in each clamp hole; the 3/16 drill's shank and the pin gauges in the axle bore."
+inspection = "Hanger hole Ø{{cad.hanger_hole_dia_min_in:.3dot}}–{{cad.hanger_hole_dia_max_in:.3dot}}: the .180 pin enters (GO), the .184 does not (NO-GO). Clamp holes Ø{{cad.clamp_hole_1_dia_min_in:.3dot}}–{{cad.clamp_hole_1_dia_max_in:.3dot}}: the .196 pin enters, the .200 does not. Axle bore Ø{{cad.axle_bore_dia_min_in:.4dot}}–{{cad.axle_bore_dia_max_in:.4dot}}: the 3/16 drill's shank enters, the .192 pin does not. Outside: stop and tell the owner."
 gauge_checks = [
   { gauge = "pin-gauges", band_mm = "{{cad.hanger_hole_dia_band_mm}}" },
   { gauge = "pin-gauges", band_mm = "{{cad.clamp_hole_1_dia_band_mm}}" },
-  { gauge = "zz-pins-1865-1870", band_mm = "{{cad.axle_bore_dia_band_mm}}" },
+  { gauge = "pin-gauges", band_mm = "{{cad.axle_bore_dia_band_mm}}" },
 ]
 
 [[setups.operations]]

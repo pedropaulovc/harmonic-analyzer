@@ -53,7 +53,8 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     },
     "Strap": {"StrapThickness"},
 }
-# The hole at four places with its press band; the thickness at three with
+# The hole at three places, the .400 reamer's size, no band (drawing-guidelines
+# rule 3: a fourth place would read as a .0001 requirement); the thickness at three with
 # its band; both edges at three with their bilateral bands, the .325 and .305
 # the finished MHA-CH-06 prints (at two places each rounds .005 off and
 # shifts its limits that far off the rocker's profile zone); the radii at
@@ -63,7 +64,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # one, under the title block's angular +/-1 deg.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "StrapProfile": {
-        "HoleDia": 4,
+        "HoleDia": 3,
         "TopAbovePivot": 3,
         "BottomBelowPivot": 3,
         "TopRadius": 1,
@@ -92,15 +93,18 @@ if {name for names in DRAWING_DIMENSIONS.values() for name in names} != set(
 TIP_LAND_PREFIX = "2X "
 TIP_LAND_ANGLE_PREFIX = "2X "
 
-# drawing-guidelines.md rule 4: the press band names its mate and the fit;
-# the interference follows from both parts' limits. The hole's two edges stay
+# drawing-guidelines.md rule 4: the hole is reamed with the .4000 reamer and
+# prints that size with no band; the hub MHA-CH-12 is turned to slide into it
+# and bonded (owner ruling 2026-11-24, fit audit question 2), so the
+# clearance is the hub sheet's acceptance, printed there once, and this sheet
+# names the hub and says it is made to this hole. The hole's two edges stay
 # sharp, overriding the title block's edge break for this hole only (a break
-# would leave a ring groove round the pressed hub's root, where MHA-CH-06
+# would leave a ring groove round the bonded hub's root, where MHA-CH-06
 # prints the hub-to-strap root as a MAX radius): a short requirement written
 # at its leader (rule 7). Below rows (an ABOVE-compartment line break never
 # prints).
 HOLE_EDGE_CALLOUT = "BOTH EDGES SHARP, NO BURR"
-HOLE_CALLOUT = f"REAM THRU\nPRESS FIT ON {HUB_NUMBER}\n{HOLE_EDGE_CALLOUT}"
+HOLE_CALLOUT = f"REAM THRU\n{HUB_NUMBER} IS TURNED TO THIS HOLE\n{HOLE_EDGE_CALLOUT}"
 # A location dimension carries its value and band only (rule 7), and each
 # arc prints its own radius (rule 26: no "concentric" or "centre above"
 # sentence), so only the sizes carry words.

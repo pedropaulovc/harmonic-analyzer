@@ -143,7 +143,7 @@ _PIN_HOLE_DIA = PIN_HOLE_DIA
 
 SHEET_SCALE = (1.0, 1.0)  # 1:1
 # The BASIC centre distance (6.235): three inch places hold the printed value
-# within .0005 of the closure, well inside the pin's Ø.008 position zone.
+# within .0005 of the closure, well inside the pin's Ø.014 position zone.
 CENTRE_DISTANCE_PLACES = 3
 
 # Front-view model bbox: X symmetric about 0, Y from the ring bottom up to the
@@ -646,7 +646,7 @@ requirement(
         "depth": _P["SlotDepth"],
     },
 )
-# The strap bore (datum A): 1.213 +.003/.000, Ra, running on the cam
+# The strap bore (datum A): 1.213 +.005/.000, Ra, running on the cam
 # (FRONT_KEEP "StrapBoreDia").
 requirement(
     "strap_bore",
@@ -669,9 +669,12 @@ requirement(
     },
     precision={"dia": _P["StrapBoreDia"], "finish_ra": 1},
 )
-# The reamed press hole through both tines on the rod axis: its limits and
-# REAM THRU / SEE NOTE 1, at the BASIC centre distance from A and .16 BASIC
-# from B, inside a diameter-.008 position zone to A and B.
+# The reamed press hole through both tines on the rod axis: the .0775
+# reamer's size, no band, and REAM THRU / SEE NOTE 1 (owner ruling
+# 2026-11-24, fit audit question 3), at the BASIC centre distance from A and
+# .16 BASIC from B, inside a diameter-.014 position zone to A and B. "dia" is
+# the spec's ANALYSIS band (what the reamer is modelled to cut), not a
+# printed limit.
 requirement(
     "pin_hole",
     kind="hole",
@@ -1032,7 +1035,7 @@ def build(adapter: Any) -> dict[str, str]:
         label="rod centre distance",
     )
     # A sheet-made dimension takes the document's two places (6.24, .005 in
-    # off the closure, outside the pin's Ø.008 position zone); it prints at
+    # off the closure, most of the pin's Ø.014 zone's radius); it prints at
     # CENTRE_DISTANCE_PLACES, read back.
     set_dimension_display_precision(
         adapter,

@@ -24,8 +24,9 @@ assembly) -- its west front upper socket (bore, boss and the boss's keeper
 relief step), the line of the upper socket centres through it, and the west
 rail's inner web face leaving the boss with the web centre line beside it --
 and the lug centre line, dimensioned to the lug centre (X, within
-KEEPER_FITUP_X_BAND_MM) and the two lug inner faces (Z, each within
-KEEPER_FITUP_LOCATION_BAND_MM).
+KEEPER_FITUP_X_BAND_MM), the front lug inner face (Z, the title block's
+band) and the rear lug inner face as a reference: the rear keeper is set to
+the lever stack over a leaf (C10, ch_keeper_fitup).
 """
 
 from __future__ import annotations
@@ -33,7 +34,10 @@ from __future__ import annotations
 import math
 
 import ch_amplitude_bar_spec as _bar
+import ch_keeper_fitup as _fitup
+import ch_channel_lever_spec as _lever
 import ch_rocker_arm_spec as _arm
+import rocker_bank_layout as _rocker_bank
 from sh_vn_pivot_pin_bar_spec import BUDGET as _PIN_BUDGET
 from sh_vn_pivot_pin_bar_spec import RUNNING_FLOOR as _BAR_RUNNING_FLOOR
 
@@ -42,7 +46,6 @@ from _assembly_contract import assembly_contract
 from ch_fulcrum_keeper_spec import (
     FOOT_TIP_X,
     FULCRUM_KEEPER_CENTRE_Z,
-    KEEPER_FITUP_LOCATION_BAND_MM,
     KEEPER_FITUP_X_BAND_MM,
     KEEPER_FITUP_X_FROM_WEB_MM,
     KEEPER_INNER_FACE_FROM_FRONT_SOCKET_MM,
@@ -192,12 +195,13 @@ DRAWING_DIMENSIONS = {
 }
 # Inch places per setting. The ears' inner-face span is 6.094 (nineteen .300
 # pitches and the two ear stand-offs, .189 and .205), on the plain inch grid
-# at its +/-.004 band's three places. The lug inner faces (1.3702, 7.4102),
-# set off the kinematic fulcrum line, are closures the inch grid does not
-# snap, so they print to the four places that state their exact nominal
-# within their band; three for the lug
-# centre (.114, band .004). The reference lug span is on the .XX grid (6.04).
+# at the title block's .XXX (+/-.005). The front lug inner face (1.3702), set
+# off the kinematic fulcrum line by DRO at the title block's band, prints
+# 1.370; the rear (7.4102) is set to the lever stack, so it prints as a
+# reference at the same places; three for the lug centre (.114, band .004).
+# The reference lug span is on the .XX grid (6.04).
 # The tip set prints .XXX (.060 ±.010), read with a caliper's depth rod.
+KEEPER_FACE_PLACES = 3
 DRAWING_PRECISION = {
     PIVOT_FEATURE: {
         EAR_SPAN_DIMENSION: 3,
@@ -206,8 +210,8 @@ DRAWING_PRECISION = {
     FULCRUM_FEATURE: {LUG_SPAN_DIMENSION: 2},
     KEEPER_PLAN_FEATURE: {
         KEEPER_X_DIMENSION: 3,
-        KEEPER_FRONT_Z_DIMENSION: 4,
-        KEEPER_REAR_Z_DIMENSION: 4,
+        KEEPER_FRONT_Z_DIMENSION: KEEPER_FACE_PLACES,
+        KEEPER_REAR_Z_DIMENSION: KEEPER_FACE_PLACES,
     },
 }
 DIMENSION_FEATURE = {
@@ -220,19 +224,31 @@ TOLERANCE_PRECISION = {
     for name, places in places_by_name.items()
 }
 # (lower, upper) deviations.
-# The keeper plan's three each carry their fit-up band on their own
-# dimension (owner ruling X1+B1, 2026-10-18): each inner face off the socket
-# line the location band, the lug centre off the web centre its own looser
-# band (owner ruling X-A, 2026-10-18).
+# The lug centre carries its fit-up band on its own dimension (owner ruling
+# X-A, 2026-10-18), in necessity register ch-channel-assembly N-01. The ear
+# span prints the title block's +/-.005 as its setting band: delegated
+# ruling 2026-11-25 (Main), precedent: the fit-necessity rule of the
+# owner-approved fit policy (drawing-simplicity-policy.md; owner ruling
+# 2026-11-24): a band stays tighter than the title block only when a named
+# check fails at the looser size, and none fails at +/-.005; changes the
+# owner's 2026-10-18 X1+B1 number (+/-.004), #2144 (rulings.md D20); its end
+# hubs still clear at it (rocker_bank_layout.END_CLEARANCE_MIN, #3563). The
+# front lug inner face the title block's band and the rear inner face is a
+# reference (C10, ch_keeper_fitup: the rear keeper is set to the bare lever
+# stack over a leaf).
 DIMENSION_TOLERANCES = {
     EAR_SPAN_DIMENSION: (-EAR_SPAN_BAND, EAR_SPAN_BAND),
     TIP_PROUD_DIMENSION: (-SHAFT_TIP_SET_BAND, SHAFT_TIP_SET_BAND),
     KEEPER_X_DIMENSION: (-KEEPER_FITUP_X_BAND_MM, KEEPER_FITUP_X_BAND_MM),
-    **{
-        name: (-KEEPER_FITUP_LOCATION_BAND_MM, KEEPER_FITUP_LOCATION_BAND_MM)
-        for name in (KEEPER_FRONT_Z_DIMENSION, KEEPER_REAR_Z_DIMENSION)
-    },
+    KEEPER_FRONT_Z_DIMENSION: (-_fitup.FRONT_FACE_BAND_MM, _fitup.FRONT_FACE_BAND_MM),
 }
+if UNIT != _fitup.UNIT or KEEPER_FACE_PLACES != _fitup.FRONT_FACE_PLACES:
+    raise AssertionError("the keeper fit-up prints in another unit or place")
+if _fitup.LEVER_COUNT != _rocker_bank.COUNT or _fitup.LEVER_HUB_LENGTH_MM != (
+    _lever.HUB_LENGTH + _lever.HUB_LENGTH_BAND[1],
+    _lever.HUB_LENGTH + _lever.HUB_LENGTH_BAND[0],
+):
+    raise AssertionError("ch_keeper_fitup's lever stack is not the bank's")
 
 # The bar-to-bar running gap down the bank (#1038, #2341): a channel-assembly
 # stack (rocker hubs, strap, bar bow), kept here so the pin part's recipe

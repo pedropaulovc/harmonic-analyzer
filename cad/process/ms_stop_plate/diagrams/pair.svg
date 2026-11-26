@@ -21,7 +21,7 @@
   <rect class="fixture-support" x="184" y="160" width="4" height="156"/>
   <path class="leader" d="M150 64 L184 200"/>
   <text class="label" x="74" y="58">feeler leaves, as needed</text>
-  <!-- Pilots: .150 and .690 from the locating ends (fixed jaw face), .300 below the block face, the #49's point beyond. -->
+  <!-- Pilots: .150 and .690 from the locating ends (fixed jaw face), .30 below the block face, the #49's point beyond. -->
   <path class="part-removed" d="M384.1 160 L406 160 L406 262 L395 268.6 L384.1 262 Z"/>
   <path class="part-removed" d="M222.1 160 L244 160 L244 262 L233 268.6 L222.1 262 Z"/>
   <!-- The #49 at the end of its feed in the near pilot. -->
@@ -35,7 +35,7 @@
   <line class="datum" x1="196" y1="146" x2="196" y2="160"/>
   <text class="datum-label" x="190" y="140">Z0 plate top</text>
   <path class="dims" d="M300 172 L300 262 M294 262 L306 262"/>
-  <text class="label-halo" x="306" y="214" font-size="12">pilots {{cad.clearance_hole_1_pair_pilot_depth_in_mate_mm:in.3dot}}</text>
+  <text class="label-halo" x="306" y="214" font-size="12">pilots {{cad.clearance_hole_1_pair_pilot_depth_in_mate_mm:in.2dot}}</text>
   <text class="label-halo" x="306" y="229" font-size="12">below the</text>
   <text class="label-halo" x="306" y="244" font-size="12">block face</text>
   <text class="label" x="12" y="418">locating edges flushed against a 1-2-3 block before tightening,</text>

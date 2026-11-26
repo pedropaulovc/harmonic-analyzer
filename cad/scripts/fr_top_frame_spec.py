@@ -308,16 +308,19 @@ _XX = printed_band_mm(2, unit=UNIT)
 _XXX = printed_band_mm(3, unit=UNIT)
 # The title block's DRILLED HOLES row: a drilled hole cuts up to this oversize.
 DRILL_OVERSIZE = drilled_oversize_mm(unit=UNIT)
-# Owner ruling 2026-11-06: the #10 hanger holes are a letter C drill, .242
-# in = 6.1468 mm, the next drill over the ASME B18.2.8 Table 2 #10 loose
-# .238: the larger hole's float takes the ream/tap stack and the gauge
-# bar's yaw with margin (``build_sm_summing_assembly.HANGER_SCREW_FLOAT_SPARE``
-# and ``KNIFE_REAR_YAW_RANGE_DEG``).  The drawing prints the letter
-# (HANGER_HOLE_DRILL) as "C DRILL".
-HANGER_HOLE_DRILL = "C"
-HANGER_CLEARANCE_DIA = 0.242 * IN  # 6.1468
+# Owner ruling 2026-11-06 made the #10 hanger holes a letter C drill (.242),
+# the next drill over the ASME B18.2.8 Table 2 #10 loose .238.  Owner ruling
+# 2026-11-24, fit audit OQ19 (APPROVED as recommended, option A): with
+# MHA-SM-02's slip hole drilled #30, they are a letter E drill, .250 in =
+# 6.35 mm, whose larger float takes the drilled slip, the tap stack and the
+# gauge bar's yaw (``build_sm_summing_assembly.HANGER_SCREW_FLOAT_SPARE``
+# and ``KNIFE_REAR_YAW_RANGE_DEG``); the washer's bearing width
+# (``build_fr_top_frame``) stays positive under the larger hole.  The
+# drawing prints the letter (HANGER_HOLE_DRILL) as "E DRILL".
+HANGER_HOLE_DRILL = "E"
+HANGER_CLEARANCE_DIA = 0.250 * IN  # 6.35
 if HANGER_CLEARANCE_DIA <= CLEARANCE_MM[("#10", "loose")]:
-    raise AssertionError("the C drill hanger hole must clear past the #10 loose row")
+    raise AssertionError("the E drill hanger hole must clear past the #10 loose row")
 HANGER_CLEARANCE_DIA_PLACES = 3
 # The title block's DRILLED HOLES row is the acceptance (+.004/0): it never
 # undersizes the drill, so the callout restates no band (machinist review:
@@ -338,7 +341,7 @@ HANGER_GRIP = RING_HEIGHT
 HANGER_GRIP_PLACES = 3
 HANGER_GRIP_TOL = printed_band_mm(HANGER_GRIP_PLACES, unit=UNIT)  # 0.127, title block .XXX
 # A plain native Hole Wizard #10 clearance row, drilled through from the
-# faced underside, its cut pinned to the C drill: _holes.wizard_holes writes
+# faced underside, its cut pinned to the E drill: _holes.wizard_holes writes
 # HoleDiameter and ThruHoleDiameter from the override (and skips its pinned
 # loose-fit edit), and the build reads the exact cut diameter back.
 HANGER_HOLE_SPEC = HoleSpec(
@@ -355,8 +358,9 @@ if HANGER_WASHER_CONCENTRIC_ANNULUS_MIN <= 0.0:
     raise AssertionError("knife-hanger washer lacks a bearing annulus round its hole")
 # The dowel press reams: at each hanger station one blind ream, drilled and
 # reamed to a drill point, its full diameter KNIFE_DOWEL.PRESS_DEPTH MIN up
-# from the faced underside, to the dowel spec's press band, .1240 +.0005/0
-# printed .XXXX (press .0006-.0013 on the catalogue pin), two in all.  Owner
+# from the faced underside, on the .1240 reamer with no printed band (rule
+# 4, form 3; the dowel spec's analysis band +.0005/0 gives press .0006-.0013
+# on the catalogue pin), two in all.  Owner
 # ruling 2026-11-08 (Pedro), #2144 item 11.3: the -X ream at each station,
 # its position frame, its BASIC span and its knockout are deleted; the +X
 # ream stays.
@@ -495,7 +499,7 @@ HANGER_PRESS_HOLE_PERPENDICULARITY_TOL = float(
 # location band (the ream's .XXX station, +/-.005 each way).
 if not HANGER_PRESS_HOLE_PERPENDICULARITY_TOL < 2.0 * HANGER_PIN_X_TOL:
     raise AssertionError("the reams' perpendicularity must refine their location")
-# The drilled #10 hole's float about the bolt shank is 0.6604 radial.
+# The drilled #10 hole's float about the bolt shank is 0.762 radial (E drill).
 # The assembly proves the tap/dowel mismatch plus underside-entry drill
 # drift stays inside that float.
 HANGER_SCREW_FLOAT = (HANGER_CLEARANCE_DIA - HANGER_SCREW.SHANK_DIA) / 2.0
@@ -565,24 +569,35 @@ HANGER_KNOCKOUT_PUNCH_REACH_MIN = HANGER_GRIP + HANGER_GRIP_TOL  # 36.6268, no r
 # Callouts on the model's own ream size and depth (drawing-guidelines.md
 # rule 4: a REAM names its mate and fit; rule 12: count, process and
 # purpose; the size and its band print natively).  The underside locator
-# carries the ream size, its count, mate and fit on one row under it; F-F
-# the full-diameter depth both share, a native single MIN limit.  Where the
+# carries the ream size, then its count, mate and fit on one row under it
+# and the acceptance on a second: rule 4, form 3 makes the bought dowel the
+# gauge, so the row states what the builder checks with it, in the fleet's
+# press-fit wording (ch_amplitude_bar_notes.DRAWING_NOTES: the pin does not
+# enter by hand; machinist review, farm run 20261125T172832344Z: "gives no
+# acceptance").  No interference band prints: the .1240 ream on the dowel's
+# own band leaves a range under the .001 the shop reads.  F-F carries the
+# full-diameter depth both share, a native single MIN limit.  Where the
 # press stops (each dowel to its proud) is MHA-SM-00's step 1 and its
 # setting dimension, not this part's (rule 7: an assembly instruction on a
 # part sheet; farm run 20261106T234223948Z).  The knockouts' native callout
 # reads its drill above the native size and its purpose below
-# (dt_crankshaft_notes.KNOCKOUT_CALLOUT_*).
-HANGER_PIN_HOLE_CALLOUT = "2X REAM, PRESS FIT MHA-SM-VN-53 DOWEL"
+# (dt_crankshaft_notes.KNOCKOUT_CALLOUT_*).  The drawing splits this text
+# at its one ", " to put the ream's REF depth after the process.
+HANGER_PIN_HOLE_CALLOUT = (
+    "2X REAM, PRESS FIT MHA-SM-VN-53 DOWEL:\nTHE DOWEL DOES NOT ENTER BY HAND."
+)
 # The depth's row carries its count only: the drill point below it is the
 # standard form of a drilled-and-reamed blind hole, and nothing seats there.
 HANGER_PIN_DEPTH_CALLOUT = "2X"
 # The knockout's process row names the drill only (machinist review, farm
 # run 20261027T175429300Z: "REAM SETUP" was a method, not a requirement;
-# owner ruling 2026-10-27); the row under the native size names its start,
-# the ream's drill point.  The drawn common axis is its only location to
-# the ream.
+# owner ruling 2026-10-27); the row under the native size names its
+# purpose only.  Its start is geometry, not words: section F-F draws the
+# knockout on the ream's axis from the ream's drill point (machinist
+# review, farm run 20261125T172832344Z: "FROM REAM POINT" was a private
+# phrase, rule 26).
 HANGER_KNOCKOUT_CALLOUT_ABOVE = drill_process(HANGER_KNOCKOUT_SPEC)
-HANGER_KNOCKOUT_CALLOUT_BELOW = "FROM REAM POINT;\nMHA-SM-VN-53 KNOCKOUT"
+HANGER_KNOCKOUT_CALLOUT_BELOW = "MHA-SM-VN-53 KNOCKOUT"
 
 # Full thread in the hub at the printed worst case (dt_arbor_pedestal_spec's
 # terms): the thread is full only where its major circle lies wholly in metal,
@@ -812,8 +827,8 @@ DRAFT_ANGLE_DIMENSIONS: dict[str, tuple[str, tuple[float, float]]] = {
 # diameter the title block's .XXX (owner ruling 2026-11-06), the
 # gooseneck bore prints its 33/64 drill's exact decimal, the
 # finished grip prints .XXX (the rail height, that same thickness, prints its
-# reference at the grip's places), and the dowel press ream holds its own
-# +.0005/0 band at four places.
+# reference at the grip's places), and the dowel press ream prints its
+# reamer's size at four places.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "OuterProfile": {
         "Width": 3,
@@ -972,6 +987,15 @@ KEEPER_TAP_DRILL_WANDER_DEG = 0.3
 # knockouts, drilled up from the reams' points, charge it at the depth each
 # wall is judged (``build_fr_top_frame``).
 DRILL_DRIFT_PER_MM = tan(radians(KEEPER_TAP_DRILL_WANDER_DEG))  # 0.00524
+# The keeper's 2-56 receiver wall in the rail web (build_fr_top_frame's
+# KEEPER_TAP_DRILL_WALL_MARGIN) with the lug centre charged at MHA-CH-00's
+# printed .114 ±.004 is .0767 at the 2° minimum added draft, under the .080
+# target and over the .060 floor: accepted at .076, the .0767 floored to
+# the .001 reading unit (delegated ruling 2026-11-24 (Main), precedent:
+# owner ruling 2026-11-01 (thin walls accepted as minor); no owner number
+# changed, #2144 (rulings.md D15); RV-14). The added draft's
+# callout states this held wall.
+KEEPER_TAP_WALL_ACCEPTED_MM = 0.076 * IN
 # The knockout's offset from its ream.  The print locates each knockout on
 # its ream only by the drawn common axis (owner ruling 2026-10-27: no method
 # note, no frame), so its real worst case is the title block's implied zero

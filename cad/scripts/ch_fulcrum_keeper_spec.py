@@ -12,8 +12,8 @@ terms, and the marked-dimension -> kept-dimension NAME map (see
 The keeper is the black shaft-end bracket of the top-lever fulcrum bank
 (book ch. 17 p. 40 bottom-left closeup and ch. 17 p. 2 img08; ch. 30 top view
 + p008): a stubby straight L. Its upright round-topped lug sits right against
-the outermost lever hub and carries the plain Ø6.35 fulcrum shaft in a reamed
-bore; the shaft's domed end stands proud of the lug's outer face (the bright
+the outermost lever hub and carries the plain Ø6.35 fulcrum shaft in an
+F-drilled bore; the shaft's domed end stands proud of the lug's outer face (the bright
 dome of the photo). One #1-72 cup-point set screw (MHA-CH-VN-55), tapped down
 through the crown top on the lug mid-plane, bears on the shaft's set-screw
 flat and fixes the shaft axially and in rotation. The short straight foot
@@ -38,6 +38,7 @@ from _hole_spec import THREAD_MAJOR_MM, HoleSpec, blind_cut_dia_mm
 from _inch_wall_limits import WALL_TARGET_MM
 from _package_units import drawing_unit
 from _printed_tolerance import (
+    drilled_oversize_mm,
     edge_break_radius_mm,
     printed_band_mm,
 )
@@ -66,12 +67,12 @@ FULCRUM_KEEPER_CENTRE_Z = (
 )  # -0.504
 # Lug mid-plane off the centre, on the .005 in grid so the shaft's flat
 # stations (2 x this apart) print .XX: 3.180 in, inner face at 76.708. The
-# least grid value whose inner faces, each at the -.001 edge of its fit-up
-# band, leave twenty levers at the top of their +.001 hub band a .010 feeler
-# leaf of end play (draw_ch_channel_assembly) and each lug >= 0.25 of float
-# (build_ch_channel_assembly): KEEPER_Z_OFF >= 10P + LUG_HALF_T + 10 x .001
-# + .001 + .005, i.e. 80.645 at P 7.62 gives .0080 in of play, under a leaf;
-# 80.772 (3.180) gives .0180, a .010 leaf, 0.508 nominal float per lug.
+# value was chosen (#1038 re-pitch) as the least grid value leaving twenty
+# levers a .010 feeler leaf of end play with each inner face DRO-set to
+# ±.001: 80.645 gave .0080 in of play, 80.772 (3.180) .0180. Since C10
+# (owner ruling 2026-11-24, fit audit part 2) the rear lug is pushed up to
+# the stack over a .020 leaf, so this nominal sets only the front face and
+# the reference place of the rear one (ch_keeper_fitup).
 KEEPER_Z_OFF = 80.772  # 3.180 in (#1038 re-pitch; was 2.955 at the 7.0565 pitch)
 
 # --- Nominal geometry (mm; inch in the comments). Shaft axis 25.2 above the
@@ -97,39 +98,28 @@ OVERALL_LENGTH_PLACES = 2
 FOOT_TIP_X = LUG_HALF_T + FOOT_L  # 12.446 (.49): outboard end of the foot
 OVERALL_LENGTH = 2.0 * LUG_HALF_T + FOOT_L  # 16.51 (.65): inner lug face to foot tip
 CROWN_TOP_Y = SHAFT_AXIS_H + CROWN_R  # 32.185: the set-screw tap's entry
-# Plain reamed bore for the plain .250 (1/4 in ground, SHAFT_H) fulcrum
+# Plain F-drilled bore for the plain .250 (1/4 in ground, SHAFT_H) fulcrum
 # shaft: the shaft slides through both lugs at assembly and the set screw
-# then pulls it onto the bore wall, so the fit only has to let it slide in
+# then pulls it onto the bore wall, so the bore only has to let it slide in
 # and locate it, not run on it (the dt_pinion_cam slip bore's case). Each
-# keeper is finished alone, as a detail, to its own print (#2338: the
-# at-assembly pair ream needed a made-to-order 12 in reamer and an undrawn
-# setup). Two bores reamed apart sit out of line by their bore-height bands
-# and each bore's own tilt to its seat, so the bore is a stock chucking
-# reamer's size, BORE_DIA_BAND +.0010/.0000: its least clearance on the
-# shaft covers the slip minimum plus BORE_ALIGNMENT_ALLOWANCE_MM below.
-# Owner ruling 2026-11-23, tool audit Q7: "Re-band to dia .2560 +.0010/0,
-# cut with the .2560 reamer" (was .2550 +.0010/0 on a .2550 reamer bought
-# for these two bores alone): the .2560 reamer the MHA-CH-02 levers' and
-# MHA-CH-06 rocker arms' bores take (shop-equipment tools.reamer-2560) cuts it, and the shaft may sit
-# .0005 further from the set screw's far wall.
+# keeper is finished alone, as a detail, to its own print (#2338: no
+# at-assembly pair ream). Two bores drilled apart sit out of line by their
+# bore-height bands and each bore's own tilt to its seat: the bore's least
+# clearance on the shaft covers the slip minimum plus
+# BORE_ALIGNMENT_ALLOWANCE_MM below.
+# Owner ruling 2026-11-24, fit audit question 1: drilled F (.257), the title
+# block's DRILLED HOLES row (+.004/0), with the 42 other bores on the two
+# 1/4 in shafts; this reverses tool audit Q7 (2026-11-23: re-banded .2560
+# +.0010/0 and cut with the .2560 reamer). BORE_DIA_BAND is that row, the
+# analysis band, printed by the row and not on BoreDia.
 # The crown is a full round tangent to both side faces, centred on the bore
 # (ch_fulcrum_keeper_notes.CROWN_CALLOUT). The bore keeps within
 # BORE_CENTRE_BAND_MM of the width's centre plane, so the crown thread's
 # worst case below spends that offset under the round.
-BORE_DIA = 0.2560 * 25.4  # 6.5024
+BORE_HOLE_SPEC = HoleSpec("drilled_letter", "F")
+BORE_DIA = blind_cut_dia_mm(BORE_HOLE_SPEC)  # 6.528, .257
 BORE_RUNNING_MIN_CLEARANCE_MM = 0.010
-BORE_DIA_BAND = (0.0254, 0.0)  # (upper, lower): .2560 +.0010/.0000 in
-# The reamer that cuts it: a .2560 chucking reamer (tools.reamer-2560),
-# ANSI B94.2 diameter tolerance +.0001/+.0005 in over 1/4 in (Machinery's
-# Handbook, chucking reamers); the hole it cuts lies inside the bore band.
-BORE_REAMER_DIA_RANGE_MM = (BORE_DIA + 0.0001 * 25.4, BORE_DIA + 0.0005 * 25.4)
-if not (
-    BORE_DIA + BORE_DIA_BAND[1]
-    <= BORE_REAMER_DIA_RANGE_MM[0]
-    < BORE_REAMER_DIA_RANGE_MM[1]
-    <= BORE_DIA + BORE_DIA_BAND[0]
-):
-    raise AssertionError("the keeper bore reamer does not cut inside the bore band")
+BORE_DIA_BAND = (drilled_oversize_mm(unit=UNIT), 0.0)  # (upper, lower): +.004/0 in
 KEEPER_INNER_FACE_SPAN_MM = 2.0 * (KEEPER_Z_OFF - LUG_HALF_T)  # 153.416
 # The rail under the two feet: both foot seats lie on MHA-FR-02's one faced
 # top plane (its note B, faced in one setup; no flatness frame is printed,
@@ -146,15 +136,19 @@ KEEPER_INNER_FACE_SPAN_MM = 2.0 * (KEEPER_Z_OFF - LUG_HALF_T)  # 153.416
 KEEPER_SEAT_FLATNESS_BUDGET_MM = 0.04
 KEEPER_SEAT_LENGTH_MM = LUG_HALF_T + FOOT_TIP_X  # 16.5: seat along the shaft
 # --- Fit-up on the top frame (MHA-CH-00): the pair goes on with the shaft
-# through both bores and is set by DRO, the lug centres on the fulcrum line
-# within KEEPER_FITUP_X_BAND_MM and the lug INNER faces off the front column
-# socket each within KEEPER_FITUP_LOCATION_BAND_MM; the frame's keeper taps
-# are then transferred from the foot holes, so no frame-tap or foot-hole
-# station reaches the keeper's place. The step prints these distances to
-# KEEPER_FITUP_PLACES; build_fr_top_frame reads the same names for the
-# foot-to-boss stack. ---
-KEEPER_FITUP_LOCATION_BAND_MM = 0.0254  # ±.001 in on the inch assembly sheet
-KEEPER_FITUP_PLACES = 2
+# through both bores, the lug centres set by DRO on the fulcrum line within
+# KEEPER_FITUP_X_BAND_MM; the front lug's inner face is set by DRO at the
+# title block's band and the rear one pushed up to the lever stack over a
+# feeler leaf (owner ruling 2026-11-24, fit audit part 2, C10;
+# ch_keeper_fitup). The frame's keeper taps are then transferred from the
+# foot holes, so no frame-tap or foot-hole station reaches the keeper's
+# place. MHA-CH-00 prints the lug-centre X distance (KeeperLugX, .114
+# ±.004) at KEEPER_FITUP_PLACES (ch_channel_assembly_spec.DRAWING_PRECISION),
+# and build_fr_top_frame charges that printed value in its foot-to-boss
+# stacks (delegated ruling 2026-11-24 (Main), precedent: owner ruling
+# 2026-11-01 (thin walls accepted as minor); no owner number changed, #2144
+# (rulings.md D15)). ---
+KEEPER_FITUP_PLACES = 3
 # Each lug centre stands this far west (+x) of the centre of the top-frame
 # rail web under it, its column's socket axis (Main's ruling: a local X
 # datum on the receiving web): the kinematic fulcrum line off the frame's
@@ -164,9 +158,8 @@ KEEPER_FITUP_X_FROM_WEB_MM = 2.8976  # fulcrum 199.9 - column 197.0024
 # The lug centre's own band (owner ruling X-A, 2026-10-18, on the 5d5245a48
 # machinist review): no mate needs the lateral X held tight -- the pair is
 # set with the shaft through both bores, the fulcrum's gain
-# sensitivity is ~0.04 %/mm and common to every channel -- so it carries a
-# looser band than the inner faces (KEEPER_FITUP_LOCATION_BAND_MM, which the
-# shaft flats need). build_fr_top_frame reads it for its X-side stacks.
+# sensitivity is ~0.04 %/mm and common to every channel -- so it carries
+# ±.004. build_fr_top_frame reads it for its X-side stacks.
 KEEPER_FITUP_X_BAND_MM = 0.1016  # ±.004 in
 KEEPER_INNER_FACE_FROM_FRONT_SOCKET_MM = tuple(
     FULCRUM_KEEPER_CENTRE_Z + side * (KEEPER_Z_OFF - LUG_HALF_T) - FRAME_FRONT_COLUMN_Z
@@ -197,11 +190,21 @@ HOLE_DIA_MM = blind_cut_dia_mm(SCREW_CLEARANCE_SPEC)
 CBORE_DIA_MM = 3.81  # .150
 CBORE_DEPTH_MM = 2.1082
 # The counterbore prints its own limits on the native callout (owner ruling
-# 2026-11-22, #3367): Ø.150-.154 x .078-.088 deep, so the sheet, the feature
-# record, the RV-04 tip wall below and the traveler read one band. The
-# part's Hole Wizard dimensions carry them (build_ch_fulcrum_keeper
+# 2026-11-22, #3367), so the sheet, the feature record, the RV-04 tip wall
+# below and the traveler read one band: the title block's ±.005, Ø.145-.155
+# x .078-.088 deep. Delegated ruling 2026-11-25 (Main), precedent: the
+# fit-necessity rule of the owner-approved fit policy
+# (drawing-simplicity-policy.md; owner ruling 2026-11-24): a band stays
+# tighter than the title block only when a named check fails at the looser
+# size, and at Ø.150 ±.005 the four checks hold at Ø.145 and Ø.155; changes
+# the owner's 2026-11-22 #3367 number (the Ø.150 +.004/.000 band printed
+# under that ruling, which decided where the limits print, not their width),
+# #2144 (rulings.md D25): at Ø.155 the tip wall is
+# .0925 (target .080) and its worst case still floors to .072, the lug
+# clearance 1.08 mm; at Ø.145 the Ø.140 head still clears. The part's Hole
+# Wizard dimensions carry the band (build_ch_fulcrum_keeper
 # ._band_foot_counterbore). (upper, lower), millimetres.
-CBORE_DIA_BAND = (0.1016, 0.0)  # Ø.150 +.004/.000
+CBORE_DIA_BAND = (0.127, -0.127)  # Ø.150 ±.005, the title block's .XXX
 CBORE_DEPTH_BAND = (0.127, -0.127)  # .083 +.005/-.005
 SCREW_HOLE_SPEC = HoleSpec(
     "counterbore_fillister",
@@ -334,9 +337,9 @@ if SET_SCREW_WEB_MM < WALL_TARGET_MM:
 # off a side face at .XXX (FootScrewReference / FootScrewSideReference: the
 # side station is the frame tap's transverse place, transferred at fit-up);
 # the lug thickness and the overall length print .XX off the inner lug face,
-# the width .XX, and the counterbore prints its own Ø.150-.154 x .078-.088
+# the width .XX, and the counterbore prints its own Ø.145-.155 x .078-.088
 # (CBORE_DIA_BAND, CBORE_DEPTH_BAND). Located off the tip, the tip wall
-# takes only the station's band: .093 here, .0725 at the full worst case
+# takes only the station's band: .0925 here, .0720 at the full worst case
 # (less two .010 title-block edge breaks, the counterbore rim and the tip's
 # top edge, and 0.3 deg run-off over its .088 deepest), between
 # the .060 floor and the .080 target. Off the inner lug face (.47) the .65's
@@ -353,14 +356,14 @@ if FOOT_TIP_WALL_MM < WALL_TARGET_MM:
         f"keeper counterbore tip wall {FOOT_TIP_WALL_MM:.3f} < {WALL_TARGET_MM}"
     )
 # The full worst case the sheet states as a plain fact (rule 20; review
-# exception RV-04): the wall at the counterbore's printed Ø.154 less two
+# exception RV-04): the wall at the counterbore's printed Ø.155 less two
 # title-block edge breaks and the 0.3 deg drill run-off over its printed
 # .088 deepest, floored to .001 so the MIN never overstates it.
 FOOT_TIP_WALL_WORST_MM = (
     FOOT_TIP_WALL_MM
     - 2.0 * edge_break_radius_mm(unit=UNIT)
     - (CBORE_DEPTH_MM + CBORE_DEPTH_BAND[0]) * tan(radians(0.3))
-)  # 1.842 (.0725)
+)  # 1.830 (.0720)
 FOOT_TIP_WALL_TEXT = (
     f"{floor(FOOT_TIP_WALL_WORST_MM / 25.4 * 1000 + 1e-9) / 1000:.3f}".removeprefix("0")
 )  # .072
@@ -369,7 +372,7 @@ FOOT_CBORE_LUG_CLEARANCE_MM = (
     - (2.0 * LUG_HALF_T + _LUG_T_BAND)
     - (SCREW_FROM_TIP + _BAND_BY_PLACES[2])
     - _CBORE_MAX_RADIUS
-)  # 1.09
+)  # 1.08
 if FOOT_CBORE_LUG_CLEARANCE_MM <= 0.0:
     raise AssertionError("the keeper counterbore runs into the lug's outer face")
 # The foot-to-lug inside corner (drawing-guidelines.md rule 16; machinist
@@ -377,7 +380,7 @@ if FOOT_CBORE_LUG_CLEARANCE_MM <= 0.0:
 # block's INSIDE CORNERS R.040 MAX governs it, so the sheet prints no local
 # limit (ENFORCE review 2026-10-24: a local "R1.0 MAX" restated that row,
 # rule 2). The part models the round at that ceiling. The counterbore's
-# nearest worst-case edge stands FOOT_CBORE_LUG_CLEARANCE_MM (1.09) off the
+# nearest worst-case edge stands FOOT_CBORE_LUG_CLEARANCE_MM (1.08) off the
 # lug's outer face, outside a round at that ceiling, and it never reaches the
 # lug face (the assert above).
 CORNER_R = 1.016  # .040
@@ -471,7 +474,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # and the bore's side walls at the same (BORE_SIDE_WALL_MM). The shaft-axis
 # height (it sets the fulcrum height; both keepers' bands at .XX stay inside
 # the bore's alignment allowance) prints its exact 25.2 rounded to .99; the
-# reamed bore carries its own BORE_DIA_BAND at four places; the foot screw's
+# F-drilled bore takes the DRILLED HOLES row at three places; the foot screw's
 # station off the tip
 # (FOOT_TIP_WALL_MM), the tap station off the inner face and the lug
 # thickness hold the crown tap's web at both title-block .XX bands
@@ -489,7 +492,7 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "FootProfile": {"FootRise": 2},
     "Foot": {"Depth": KEEPER_WIDTH_PLACES},
     "LugCrownProfile": {"CrownRadius": 3},
-    "ShaftBoreProfile": {"BoreDia": 4},
+    "ShaftBoreProfile": {"BoreDia": 3},
     "SetScrewReference": {"SetScrewLocation": 2},
     "FootScrewReference": {"ScrewFromTip": 2},
     "FootScrewSideReference": {"ScrewFromSide": 3},
@@ -515,13 +518,13 @@ if DRAWING_PRECISION["FootProfile"]["FootRise"] != 2:
     raise AssertionError("the foot screw's engagement is sized at the .XX foot height")
 if DRAWING_PRECISION["Foot"]["Depth"] != KEEPER_WIDTH_PLACES:
     raise AssertionError("the crown thread is sized at half the width's .XX least")
-# Walls from the reamed bore to each side face (drawing-guidelines.md rule 17
+# Walls from the F-drilled bore to each side face (drawing-guidelines.md rule 17
 # (walls and webs)): the bore stands within BORE_CENTRE_BAND_MM of the width's
 # centre plane, so each wall is half the least width less that band.
 _WIDTH_BAND = _BAND_BY_PLACES[DRAWING_PRECISION["Foot"]["Depth"]]
 BORE_SIDE_WALL_MM = (
     (KEEPER_WIDTH - _WIDTH_BAND) / 2.0 - BORE_CENTRE_BAND_MM - _BORE_MAX_RADIUS
-)  # 3.289
+)  # 3.238
 if BORE_SIDE_WALL_MM < WALL_TARGET_MM:
     raise AssertionError(f"keeper bore side wall {BORE_SIDE_WALL_MM:.3f} < {WALL_TARGET_MM}")
 # The foot hole's (and so the transferred frame tap's) transverse place off
@@ -529,7 +532,7 @@ if BORE_SIDE_WALL_MM < WALL_TARGET_MM:
 KEEPER_SCREW_TRANSVERSE_BAND_MM = _BAND_BY_PLACES[
     DRAWING_PRECISION["FootScrewSideReference"]["ScrewFromSide"]
 ]
-# The two bores, each reamed alone, line up on the straight shaft through
+# The two bores, each drilled alone, line up on the straight shaft through
 # both: each keeper's bore height may stand anywhere in its printed LugRise
 # band and the two seats KEEPER_SEAT_FLATNESS_BUDGET_MM apart, so the bore
 # axes stand up to BORE_HEIGHT_MISMATCH_MM apart in height over the
@@ -537,9 +540,9 @@ KEEPER_SCREW_TRANSVERSE_BAND_MM = _BAND_BY_PLACES[
 # length. The shaft takes the straight line through both lug centres, so
 # each lug, at the thick end of its printed LugThickness band, spends its
 # thickness x (its seat's pitch + that line's slope) of diametral
-# clearance. Each bore, reamed in its own setup, may also tilt to its seat:
-# BORE_TILT_MM, the repo's 0.3 deg drill run-off (the reamer follows its
-# drilled hole; the frame's keeper taps charge the same) over the
+# clearance. Each bore, drilled in its own setup, may also tilt to its seat:
+# BORE_TILT_MM, the repo's 0.3 deg drill run-off (the F drill follows its
+# D pilot; the frame's keeper taps charge the same) over the
 # thickest lug, since the print sets no bore-to-seat orientation. Together
 # they make
 # BORE_ALIGNMENT_ALLOWANCE_MM; ch_fulcrum_shaft_spec checks the bore band's

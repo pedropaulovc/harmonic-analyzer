@@ -39,9 +39,9 @@ name = "#5 stub drill"
 ref = "frame-clearance-stub-drill"  # G-drill-5-stub, Drills #5
 
 [[tools]]
-id = "drill-c"
-name = "C drill"
-ref = "drill-c"  # Drills C
+id = "drill-e"
+name = "E drill"
+ref = "drill-e"  # Drills E; owner ruling 2026-11-24, fit audit OQ19 (the hanger holes)
 
 # Tool audit 2026-11-23 (row drill-13mm): no 13 mm drill. The gooseneck
 # socket is the 33/64 drill (owner 2026-11-19, #3124 item 2); a pilot, if

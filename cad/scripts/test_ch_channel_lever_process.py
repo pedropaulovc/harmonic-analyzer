@@ -92,7 +92,7 @@ def test_context_numbers_the_tools_and_places_the_cuts(ctx) -> None:
         "drill-47": 4,
         "drill-21": 5,
         "drill-d": 6,
-        "reamer-2560": 7,
+        "drill-f": 7,
     }
     holes = {
         program: (kwargs["centres"], kwargs["z_bottom"])
@@ -109,8 +109,9 @@ def test_context_numbers_the_tools_and_places_the_cuts(ctx) -> None:
     ]
     assert [c[0] for c in holes["CL04_holes@1"][0]] == [138.811] * 4
     assert [c[0] for c in holes["CL04_holes@2"][0]] == [186.861] * 4
-    # The reamer 1.0 mm into the spoil plate, the D drill's full diameter .5 mm.
-    assert holes["CL03_bore@2"][1] == -1.0
+    # The D and F drills' full diameters .5 mm into the spoil plate (fit
+    # audit question 1, owner ruling 2026-11-24: F drilled, no reamer).
+    assert holes["CL03_bore@2"][1] == -2.461
     assert holes["CL03_bore@1"][1] == -2.377
     # Seven tabs per lever, each .050 thick on the plate's near face.
     outline = next(
@@ -237,12 +238,12 @@ def _seed(ctx: dict, key: str, pick, change) -> dict:
             lambda line: "G1 Z0.500 F{feed}",
             "holes",
         ),
-        # The reamer rapided out of the bore.
+        # The F drill stopped short of the plate.
         (
-            "bore_ream",
-            lambda line: line == "G1 Z8.633 F{feed}",
-            lambda line: "G0 Z8.633",
-            "feed_out",
+            "bore_open",
+            lambda line: line == "G1 Z-2.461 F{feed}",
+            lambda line: "G1 Z0.500 F{feed}",
+            "holes",
         ),
         # The first hub level cut at 5.000: a full-depth bite round the hub.
         (

@@ -2,13 +2,21 @@
 # title block stays (drawing-guidelines.md rule 4; owner ruling 2026-11-24:
 # the reason lives here, not on the sheet). Read by the machinist review only.
 # The spigot is made to fit (rule 4, form 2: REF, its clearance in the
-# MHA-PD-06 bore the requirement): no band.
+# MHA-PD-06 bore the requirement): no band. Its length .144 prints at the
+# title block's .XXX row (delegated ruling D21, 2026-11-25), no tighter, so
+# it takes no entry; its third place is functional (rule 3): at the .XX row
+# pd_cluster_air.COLLAR_AIR statistical is 0.0311 mm, under its 0.1016 floor
+# (0.1366 at .XXX), and the sheet links it to note 1, the stack it sets.
+# The ream's floor .160 from the axis (SECTION A-A) is also at the title
+# block: at .XX the pressed pin's end and the floor's corner break the O.D.
+# (pd_transgear_disc_hub_spec.KEY_PIN_END_RECESS_WORST); the .160 links
+# note 3, the fit note of the pin that seats on that floor.
 necessity:
   - id: N-01
     feature: "sheet 1, end view, Ø.3135 REAM THRU bore (note 2: MHA-PD-10 is turned to it)"
     kind: gap
     reason: "hub rock on MHA-PD-10 closes the MHA-PD-22 gap"
-    source: "pd_transgear_disc_hub_spec.BOSS_CLEARANCE_LIMITS, COLLAR_NUMBER; .002 looser, pd_cluster_air.COLLAR_AIR statistical is 0.0420 mm, under its 0.1016 floor (0.1880 as modelled, fit audit question 5)"
+    source: "pd_transgear_disc_hub_spec.BOSS_CLEARANCE_LIMITS, COLLAR_NUMBER; .002 looser, pd_cluster_air.COLLAR_AIR statistical is -0.0093 mm, under its 0.1016 floor (0.1366 as modelled, the spigot length at the title block)"
   - id: N-02
     feature: "sheet 1, SECTION A-A, Ø.0615 REAM for the key pin MHA-PD-VN-69 (note 3)"
     kind: joint
@@ -23,9 +31,4 @@ necessity:
     feature: "sheet 1, side view, overall .539 ±.001 (note 1, disc cluster stack)"
     kind: gap
     reason: "keeps the hub's front face behind MHA-PD-10's nose"
-    source: "transgear_cluster_fit.RECESS_RANGE (LHUB): at ±.003 the hub stands .002 proud of the sleeve's nose; owner ruling 2026-11-01, #2124. The collar air no longer needs it after fit audit question 5 (0.1688 mm at ±.003 against 0.1016)"
-  - id: N-05
-    feature: "sheet 1, side view, spigot length .144 ±.001 (note 1, disc cluster stack)"
-    kind: gap
-    reason: "sets the MHA-PD-22 to MHA-PD-06 running clearance"
-    source: "no longer required after fit audit question 5; loosening tracked in issue (pending). At ±.003 pd_cluster_air.COLLAR_AIR statistical is 0.1688 mm against its 0.1016 floor (0.1880 at ±.001), PLATEN_AIR 0.2060 against 0.03; no other gate or printed value moves"
+    source: "transgear_cluster_fit.RECESS_RANGE (LHUB): at ±.003 the hub stands .002 proud of the sleeve's nose; owner ruling 2026-11-01, #2124. The collar air does not need it (0.1225 mm at ±.003 against 0.1016, the spigot length at the title block)"

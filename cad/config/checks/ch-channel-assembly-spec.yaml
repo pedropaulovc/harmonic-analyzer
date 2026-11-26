@@ -1,0 +1,9 @@
+# What fails past each numeric check ch_channel_assembly_spec asserts
+# (check_register.py, tolerance-policy.md "Checks in spec modules and tests").
+checks:
+  - id: C-01
+    check: "BAR_GAP"
+    kind: gap
+    reason: "neighbouring amplitude bars rub; the running gap closes"
+    source: "the module computes it (bar_gap_budget): top, foot, bowed mid-span and the feeler leaf, each against sh_vn_pivot_pin_bar_spec.RUNNING_FLOOR 0.10 mm, oiled steel faces; BAR_BOW_MAX .005 per bar (#2341 triage)"
+    basis: worst_case

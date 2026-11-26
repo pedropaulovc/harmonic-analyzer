@@ -1,0 +1,12 @@
+# Why the band under the title block stays on MHA-PD-15 (owner ruling
+# 2026-11-24: "In the part's registry file, not on the sheet. The sheet
+# stays clean; the reviewer fails a tight feature that has no registry
+# reason."). Read by the machinist review only. The bore is a named drill
+# at DRILLED HOLES (rule 4, form 1): the ring is loose on the MHA-PD-08
+# journal and only spaces its pinion from the MHA-PD-28 bush.
+necessity:
+  - id: N-01
+    feature: "sheet 1, side view, length .267 ±.001 (SPACES MHA-PD-08 FROM MHA-PD-28)"
+    kind: gap
+    reason: "with MHA-PD-08 and MHA-PD-28, sets the MHA-PD-16 pilot's float"
+    source: "pd_transgear_knob_thrust_ring_spec.LENGTH_TOL (FIT_LENGTH_BAND_IN), a term of pd_transgear_knob_shaft_spec.JOURNAL_STANDOUT_BAND; at ±.003 pd_transgear_knob_cup_spec raises: MHA-PD-16's supplied pilot is shallower than the float needs"

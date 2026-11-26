@@ -37,7 +37,7 @@ BAR_SIDE = 10.922  # .43 tall (Y)
 # The front face in the machine frame: the column-axis plane less the clamp
 # interface's BAR_FRONT_DEPTH (-138.9), the plane the platen's back face
 # shares (build_mg_magnifier_assembly asserts it against the clamp chain). The
-# wheel axle's press gauge and the axial stack on it read from here
+# wheel axle's step station and the axial stack on it read from here
 # (mg_wheel_group).
 BAR_FRONT_Z = FRAME_FRONT_COLUMN_Z - BAR_FRONT_DEPTH
 BAR_LENGTH = 234.0  # clamped end 29 past the west column + free end (photo, med)
@@ -60,18 +60,22 @@ WHEEL_BAR_X0 = COLUMN_X - COLUMN_LOCAL_X  # 109.0024
 WHEEL_BAR_Y = 575.7  # ch30 p002 re-anchor (was 565.0)
 HANGER_SCREW_MACHINE_X = WHEEL_BAR_X0 + SCREW_HOLE_X
 
-# Wheel-axle bore: reamed .1865 through at the wheel station (the owned .1865
-# reamer, +.0005/0); the 3/16 mg-wheel-axle presses in to a gauge from the
-# front face (mg_wheel_axle_spec), its back end near the back face.
+# Wheel-axle bore: drilled 3/16 through at the wheel station (owner ruling
+# 2026-11-24, fit audit question 18; the owned drill index's 3/16,
+# shop-equipment tools.drill-3-16), the DRILLED HOLES row's +.004/0 its
+# analysis band (the sheet prints the drill, no band). The 3/16
+# mg-wheel-axle is bonded in it with LOCTITE 638 (mg_wheel_group.BAR_BOND_GAP),
+# its back end near the back face (mg_wheel_axle_spec).
 WHEEL_X = 53.0  # magnifying-wheel centre, machine x
 AXLE_BORE_X = WHEEL_X - WHEEL_BAR_X0  # -56
-AXLE_BORE_DIA = 4.7371  # .1865
-AXLE_BORE_BAND = (0.0127, 0.0)  # (upper, lower) deviations: +.0005/0, reamed
+AXLE_BORE_DRILL = "3/16"
+AXLE_BORE_DIA = 4.7625  # .1875
+AXLE_BORE_BAND = (drilled_oversize_mm(unit=UNIT), 0.0)  # (upper, lower): +.004/0
 AXLE_BORE_PLACES = 4
 # Printed depth: .374 (the 9.5 mm stock) at the title block's .XXX, no band
 # of its own, loosened from a converted-mm +/-.004.
 # Owner ruling 2026-11-08 (Pedro), #2144 item 11.2. Its three places carry a function: with the axle's
-# press gauge and shank it places the axle's back end in the bore
+# model step station and shank it places the axle's back end in the bore
 # (mg_wheel_axle_spec.BACK_END_SUNK_MIN / BACK_END_SUNK_MAX), and the sheet
 # names that stack on it.
 BAR_DEPTH_PLACES = 3

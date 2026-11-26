@@ -1,0 +1,16 @@
+# MHA-PN-02 pen hanger: why each band tighter than the title block stays
+# (drawing-guidelines.md rule 4; owner ruling 2026-11-24: the reason lives
+# here, not on the sheet). Read by the machinist review only.
+# The slots are made to the pen rod MHA-PN-04 (rule 4 form 2: the width
+# prints (.201) REF and the fit is the requirement). Note 2's free fall sets
+# only the lower limit of the play; the upper one stays because the hanger
+# spec's guard on the rod's lean fails past it: the play over the 1.69 in
+# between the plates' outer faces (pn_pen_hanger_spec.GUIDE_PITCH plus
+# GUIDE_PLATE_T) leans the rod .007 -> 0.237 deg, and .0074 reaches the
+# guard's 0.25 deg.
+necessity:
+  - id: N-01
+    feature: "sheet 1, section A-A, slot (.201) 2X CLEARANCE .007 MAX ON MHA-PN-04 (SEE NOTE 2)"
+    kind: trace
+    reason: "slot play leans the pen rod past 0.25 deg"
+    source: "pn_pen_hanger_spec guard 'guide slots let the pen rod lean over 0.25 deg' (GUIDE_TILT_MAX)"

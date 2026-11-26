@@ -1,0 +1,9 @@
+# What fails past each numeric check ch_connecting_rod_spec asserts
+# (check_register.py, tolerance-policy.md "Checks in spec modules and tests").
+checks:
+  - id: C-01
+    check: "a shank face can stand proud of its ring face"
+    kind: gap
+    reason: "a proud shank face rubs its neighbour in the stack"
+    source: "the module computes SHANK_INSIDE_RING_MIN: each ring face's worst place less the shank face's at the title block's .XX row, above zero"
+    basis: worst_case

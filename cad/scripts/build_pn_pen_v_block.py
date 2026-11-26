@@ -5,7 +5,7 @@ The bright brass block that hangs on the pen rod and carries the marker, a
 "simplified E" in plan: a neck at the paper end that the stirrup straddles,
 with a 90 degree V-groove under it that seats the marker's grip; then a body
 wider by BODY_SIDE_STEP each side, with a flat-roofed relief slot that passes
-the marker's body; the rod's reamed pivot bore from the top face down into the
+the marker's body; the rod's #30 drilled pivot bore from the top face down into the
 relief; and a #4-40 set-screw tap from the body's front face into that bore.
 
 Part frame (the assembly places the part by its origin and Front/Top/Right
@@ -33,9 +33,9 @@ Features, in tree order:
 * ``ReliefProfile`` (Top plane) -> ``Relief``: the slot from ``RELIEF_X0`` to
   the free end, its two step corners the end mill's ``RELIEF_CORNER_R`` arcs
   (unprinted, under the same title-block row), cut +Y to the roof.
-* ``PivotBoreProfile`` (Top plane) -> ``PivotBore``: the reamed bore, a
+* ``PivotBoreProfile`` (Top plane) -> ``PivotBore``: the drilled bore, a
   sketched through cut; it removes brass only between the top face and the
-  relief roof.  Its diameter carries the H7 band.
+  relief roof.  Its diameter takes the title block's DRILLED HOLES row.
 * ``PivotBoreChamfer``: 45 deg on the bore's top edge (it clears the rod's
   shoulder-root fillet); ``PivotReference`` prints its size, a single MIN limit.
 * ``SetScrewHole``: Hole Wizard #4-40 tap from the body's front face, up to
@@ -75,7 +75,6 @@ from _drawing_marks import (
 )
 from _drawing_precision import _named_dimension, apply_drawing_precision
 from _drawing_prefix import set_dimension_prefix
-from _drawing_tolerances import set_dimension_bilateral_tolerance
 from _feature_tree import _feature_by_name, name_last_feature
 from _fit_deviations import deviations
 from _holes import TAP_DRILL_MM, cross_hole_volume_mm3, wizard_holes
@@ -106,7 +105,6 @@ from pn_pen_v_block_spec import (
     BODY_Z1,
     DEPTH_MID_Z,
     DIMENSION_PREFIXES,
-    DRAWING_BANDS,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
     ISOMETRIC_VIEW_NOTE,
@@ -134,7 +132,6 @@ from pn_pen_v_block_spec import (
     TAP_WALL_MIN_TOL_TYPE,
     TAP_WALL_START_X,
     SET_SCREW_Y,
-    UNIT,
     V_FLANK_ANGLE_DEG,
     V_APEX_FILLET_AREA,
     V_APEX_FILLET_R,
@@ -1314,7 +1311,7 @@ def build(adapter) -> dict[str, str]:
         adapter, "relief slot", volume - V_RELIEF, 0.01 * V_RELIEF
     )
 
-    # 4. The rod's reamed pivot bore: a Top-plane circle cut mid-plane through
+    # 4. The rod's drilled pivot bore: a Top-plane circle cut mid-plane through
     # everything; below the roof it crosses only the relief's void.
     pivot = SketchDims()
     check("create_sketch pivot bore", adapter.create_sketch("Top"))
@@ -1405,12 +1402,10 @@ def build(adapter) -> dict[str, str]:
     apply_material(adapter, MATERIAL)
     report_mass_properties(adapter)
 
-    # Manufacturing drawing support: the pivot band, the authored places, and
-    # exactly the print's dimensions marked (the drawing must find every one).
-    for (feature_name, dimension_name), band in DRAWING_BANDS.items():
-        set_dimension_bilateral_tolerance(
-            adapter, feature_name, dimension_name, *deviations(band), display_unit=UNIT
-        )
+    # Manufacturing drawing support: the authored places, and exactly the
+    # print's dimensions marked (the drawing must find every one). No size
+    # carries a band of its own: the #30 pivot bore takes the DRILLED HOLES
+    # row (owner ruling 2026-11-24, fit audit question 20).
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     _single_limits(adapter)
     _author_reference_dimensions(adapter)

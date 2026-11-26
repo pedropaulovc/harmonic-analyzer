@@ -33,7 +33,7 @@ checks them with the ligament functions below.
 
 from __future__ import annotations
 
-from math import sqrt
+from math import floor, sqrt
 
 import _config
 from _hole_spec import THREAD_MAJOR_MM, HoleSpec, blind_cut_dia_mm
@@ -54,7 +54,12 @@ FOOT_Z0 = -EAR_T / 2.0  # foot starts at the ear's inboard face
 # 228.6 support apex (kinematic, so exact; it prints .99).
 BORE_H = 25.2
 BORE_H_PLACES = 2
-BORE_DIA = 6.5024  # .256: O.250 shaft, .006 diametral clearance (fit F5)
+# The cross-bore on the O.250 pivot shaft MHA-CH-05: drilled F (.257) at the
+# title block's DRILLED HOLES row (owner ruling 2026-11-24, fit audit
+# question 1: the 44 bores on the two 1/4 in shafts are F-drilled; it printed
+# REAM over the drilled row before).
+BORE_HOLE_SPEC = HoleSpec("drilled_letter", "F")
+BORE_DIA = blind_cut_dia_mm(BORE_HOLE_SPEC)  # .257
 EAR_ARCH_R = EAR_W / 2.0  # .32: the ear's top is a half-round, tangent to its sides
 # Every height runs from the seat (drawing-guidelines.md rule 10, #1371 r1
 # review): the bore axis and the arch apex, each at the title block's .XX.
@@ -86,16 +91,16 @@ HOLE_DIA = blind_cut_dia_mm(HOLD_DOWN_HOLE_SPEC)
 # seat's end wall at those bands (user ruling 2026-10-14, #954 machinist
 # review: fix the wall with geometry, not a band; #1371 review: the station's
 # own band went the same way; ``ch_pivot_bracket_sides`` checks the support,
-# and so the foot, for it). The ear thickness keeps its +/-.004 for the tap's
-# walls and the pivot shaft's flat under the tap (the shaft is set off the
+# and so the foot, for it). The ear thickness rides the title block's .XXX
+# (+/-.005; fit audit census, MHA-CH-08 ear thickness: the +/-.004 it
+# printed held nothing the row does not -- the tap's walls and the pivot
+# shaft's flat under the tap still clear at the row; the shaft is set off the
 # outboard face, the tap stands off the inboard one). Across the foot its sides stay at .XX (the band
 # rocker_bracket_seat_layout carries this foot at) and the hole's centring on
 # x = 0 at .XX; a drilled hole grows by the title block's +.004/0.
-# build_ch_pivot_bracket carries the +/-.004 band on the model's own
-# dimension.
 _LINEAR_2PL = printed_band_mm(2, unit=UNIT)
 FOOT_LEN_BAND = _LINEAR_2PL
-EAR_T_BAND = 0.1016  # +/-.004
+EAR_T_BAND = printed_band_mm(3, unit=UNIT)  # .XXX row, +/-.005
 STATION_BAND = _LINEAR_2PL
 EDGE_BAND = _LINEAR_2PL  # the foot's sides
 HOLE_X_BAND = _LINEAR_2PL  # the hole's centring across the foot
@@ -184,12 +189,18 @@ SET_SCREW_WALLS_MIN = {
     - EAR_T_BAND
     - SET_SCREW_OFF_MID_MAX
     - SET_SCREW_MAJOR_DIA / 2.0,
-}  # 2.34, 2.24
+}  # 2.32, 2.20 (.0915, .0865; .092, .088 at the old +/-.004)
 if min(SET_SCREW_WALLS_MIN.values()) < LIGAMENT_TARGET:
     raise AssertionError(
         f"the apex tap leaves {SET_SCREW_WALLS_MIN} to the ear faces at worst"
         f" case, under the {LIGAMENT_TARGET} wall"
     )
+# Rule 3: the ear thickness keeps its third place for the outboard face's
+# wall (the one that also loses the thickness band; at the .XX row it falls
+# to 2.007 mm, under the target), so it states that wall once, floored to the
+# .001 reading unit so the MIN never overstates it.
+_EAR_WALL_IN = floor(SET_SCREW_WALLS_MIN["outboard face"] / 25.4 * 1000 + 1e-9) / 1000
+EAR_WALL_TEXT = f"HOLDS WALL {_EAR_WALL_IN:.3f} MIN".replace(" 0.", " .")  # .086
 
 
 def _sag(radius: float) -> float:
@@ -212,8 +223,8 @@ SET_SCREW_WALL_TERMS = {
     "bore sag across the thread": -_sag(BORE_RADIUS_MAX),
     "one-pitch entry chamfer": -SET_SCREW_PITCH,
 }
-SET_SCREW_FULL_THREAD_MIN = sum(SET_SCREW_WALL_TERMS.values())  # 5.01
-SET_SCREW_ENGAGEMENT_D = SET_SCREW_FULL_THREAD_MIN / SET_SCREW_MAJOR_DIA  # 1.76D
+SET_SCREW_FULL_THREAD_MIN = sum(SET_SCREW_WALL_TERMS.values())  # 5.00
+SET_SCREW_ENGAGEMENT_D = SET_SCREW_FULL_THREAD_MIN / SET_SCREW_MAJOR_DIA  # 1.757D
 SET_SCREW_ENGAGEMENT_PRINTED = int(SET_SCREW_ENGAGEMENT_D * 100.0) / 100.0
 SET_SCREW_MIN_ENGAGEMENT_D = 1.5  # drawing-guidelines.md rule 18 (thread engagement)
 if SET_SCREW_ENGAGEMENT_D < SET_SCREW_MIN_ENGAGEMENT_D:

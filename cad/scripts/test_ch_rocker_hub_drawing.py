@@ -26,30 +26,38 @@ def test_required_drawing_paths() -> None:
     assert "draw_ch_rocker_hub.py" in PRECISION_MIGRATED_DRAWINGS
 
 
-def test_the_matched_press_holds_interference_over_every_reamed_hole() -> None:
-    # .400 strap hole +.0005/.0000; each land turned to its own measured hole
-    # for .0004-.0013 (owner ruling 2026-11-21, matched fit only), so across
-    # the reamed band the lands run .4004-.4018.
+def test_the_bonded_land_slides_into_every_reamed_hole() -> None:
+    # Owner ruling 2026-11-24, fit audit question 2: .400 strap hole reamed
+    # with no band (the reamer's modelled +.0005/.0000), each land turned to
+    # slide into it with .0005-.0030 diametral clearance and bonded with
+    # LOCTITE 638, so across the reamed band the lands run .3970-.4000.
     assert rocker.HUB_DIA == pytest.approx(0.400 * 25.4)
     assert fit.STRAP_HOLE_BAND == (0.0127, 0.0)
-    assert fit.PRESS_INTERFERENCE == pytest.approx((0.01016, 0.03302))
-    assert fit.LAND_RANGE == pytest.approx((0.01016, 0.04572))
-    # Each land's own window is the whole .0009 interference, against the
-    # .0004 the old .4009-.4013 band left (every hole at once).
-    each = fit.PRESS_INTERFERENCE[1] - fit.PRESS_INTERFERENCE[0]
-    every_hole = each - (fit.STRAP_HOLE_BAND[0] - fit.STRAP_HOLE_BAND[1])
-    assert each / 25.4 == pytest.approx(0.0009)
-    assert every_hole / 25.4 == pytest.approx(0.0004)
+    assert fit.BOND_CLEARANCE == pytest.approx((0.0127, 0.0762))
+    assert fit.LAND_RANGE == pytest.approx((-0.0762, 0.0))
+    # One micrometer window takes every hole the reamer cuts: .3975-.3995.
+    assert fit.LAND_WINDOW == pytest.approx((-0.0635, -0.0127))
+    for hole in fit.STRAP_HOLE_BAND:
+        for land in fit.LAND_WINDOW:
+            gap = hole - land
+            assert fit.BOND_CLEARANCE[0] - 1e-9 <= gap <= fit.BOND_CLEARANCE[1] + 1e-9
+    # The widest gap stays inside the compound's gap fill (TDS: 0.25 mm).
+    assert fit.BOND_CLEARANCE[1] <= fit.LOCTITE_638_GAP_MAX
 
 
 @pytest.mark.parametrize(
-    "interference",
+    "clearance",
     [(0.0, 0.0127), (-0.0127, 0.0127), (0.0254, 0.0127)],
-    ids=["line-to-line", "loose", "inverted"],
+    ids=["line-to-line", "tight", "inverted"],
 )
-def test_a_press_that_can_go_line_to_line_is_refused(interference) -> None:
-    with pytest.raises(AssertionError, match="line-to-line or loose"):
-        fit.land_range(interference, fit.STRAP_HOLE_BAND)
+def test_a_bond_that_can_go_line_to_line_is_refused(clearance) -> None:
+    with pytest.raises(AssertionError, match="line-to-line or tight"):
+        fit.land_range(clearance, fit.STRAP_HOLE_BAND)
+
+
+def test_a_bond_gap_past_the_compound_is_refused() -> None:
+    with pytest.raises(AssertionError, match="gap fill"):
+        fit.land_range((0.0127, 0.3), fit.STRAP_HOLE_BAND)
 
 
 def test_supply_sizes_derive_from_the_finished_rocker() -> None:
@@ -87,9 +95,12 @@ def test_the_sheet_never_repeats_a_finished_size() -> None:
         (rocker.HUB_LENGTH, 4),
     ):
         assert f"{value / 25.4:.{places}f}".removeprefix("0") not in printed
-    assert notes.DRAWING_NOTES == (
-        "1. BORE AND LENGTH ARE FINISHED AFTER JOINING TO MHA-CH-13; SEE MHA-CH-06."
-    )
+    assert notes.DRAWING_NOTES.splitlines() == [
+        "1. BORE AND LENGTH ARE FINISHED AFTER JOINING TO MHA-CH-13; SEE MHA-CH-06.",
+        "2. BONDED INTO MHA-CH-13 WITH LOCTITE 638: LAND AND HOLE DEGREASED,",
+        "   COMPOUND ON THE LAND ONLY; HELD SQUARE TO THE STRAP UNTIL SET; 24 H CURE",
+        "   BEFORE MHA-CH-06 IS FINISHED. THE HUB DOES NOT TURN BY HAND.",
+    ]
 
 
 def test_every_marked_dimension_has_one_view_and_model_places() -> None:
@@ -100,8 +111,8 @@ def test_every_marked_dimension_has_one_view_and_model_places() -> None:
 
 
 def test_every_band_is_native_and_named() -> None:
-    # The land carries no band of its own (owner ruling 2026-11-21, matched
-    # fit only): a reference, bracketed on the part.
+    # The land carries no band of its own (owner ruling 2026-11-24, fit audit
+    # question 2, made to fit): a reference, bracketed on the part.
     assert model_toleranced_dimensions(part) == {}
     assert notes.REFERENCE_DIMENSIONS == {"HubProfile": frozenset({"LandDia"})}
     assert notes.DRAWING_PRECISION_BY_NAME["LandDia"] == 3
@@ -111,19 +122,20 @@ def test_every_band_is_native_and_named() -> None:
     assert notes.SUPPLY_BORE_CALLOUT.splitlines() == [
         "DRILL THRU",
         "SUPPLY SIZE, SEE NOTE 1",
-        "WALL .075 MIN",
+        "WALL .073 MIN",
     ]
     assert notes.SUPPLY_LENGTH_CALLOUT == "SEE NOTE 1"
     assert drawing.DIMENSION_CALLOUTS["SupplyLength"] == notes.SUPPLY_LENGTH_CALLOUT
     assert notes.DRAWING_NOTES.startswith("1. ")
-    # Rule 4, matched pairs: the reference Ø names its measured mate and the
-    # interference that governs.
+    # Rule 4, made to fit: the reference Ø names its mate, the clearance that
+    # governs and the compound, once, on the member made last.
     assert notes.LAND_CALLOUT.splitlines() == [
-        "TURN TO MEASURED STRAP HOLE",
-        ".0004-.0013 DIAMETRAL INTERFERENCE ON MHA-CH-13",
+        "TURN TO SLIDE INTO MHA-CH-13 HOLE",
+        ".0005-.0030 CLEARANCE, SEE NOTE 2",
     ]
-    # The stated wall is the spec's worst case, rounded down (rule 20).
-    assert 0.075 <= spec.SUPPLY_WALL_MIN / 25.4 < 0.076
+    # The stated wall is the spec's worst case, rounded down (rule 20): the
+    # smallest land .3970 over the largest D drill .250.
+    assert 0.073 <= spec.SUPPLY_WALL_MIN / 25.4 < 0.074
 
 
 def test_registry_row() -> None:
@@ -153,42 +165,17 @@ def test_land_callout_stands_above_the_hub_clear_of_the_isometric() -> None:
     assert drawing.ISO_CENTER[0] - iso_half > x + 0.005
 
 
-def test_the_traveler_land_window_reads_the_drawing_interference() -> None:
+def test_the_traveler_land_window_reads_the_drawing_clearance() -> None:
     import tomllib
 
     from _paths import CAD_ROOT
 
-    plan = tomllib.loads(
-        (CAD_ROOT / "process/ch_rocker_hub/plan.toml").read_text("utf-8")
-    )
-    # Owner ruling 2026-11-23 (tool audit Q2): "B. Four reading pins (.4000,
-    # .4002, .4004, .4005)." A hole's reading R is the largest pin that
-    # enters; the hole lies under the next pin up.
-    pins = (0.4000, 0.4002, 0.4004, 0.4005)
-    least, greatest = (i / 25.4 for i in fit.PRESS_INTERFERENCE)
-    p = plan["parameters"]
-    assert p["land_over_reading_min_in"] == pytest.approx(least + 0.0002)
-    assert p["top_reading_in"] == pytest.approx(pins[-2])
-    assert p["land_over_top_reading_min_in"] == pytest.approx(
-        least + pins[-1] - pins[-2]
-    )
-
-    def land_low(largest: float) -> float:  # the plan's Op 40 rule
-        if largest == pytest.approx(p["top_reading_in"]):
-            return largest + p["land_over_top_reading_min_in"]
-        return largest + p["land_over_reading_min_in"]
-
-    windows = []
-    readings = pins[:-1]
-    for smallest in readings:
-        for largest in (r for r in readings if r >= smallest):
-            low, high = land_low(largest), smallest + greatest
-            # Every hole the lot's readings admit takes the drawing's
-            # interference from both ends of the window.
-            for r in (smallest, largest):
-                top = pins[pins.index(r) + 1]
-                assert low - top >= least - 1e-9
-                assert high - r <= greatest + 1e-9
-            windows.append(high - low)
-    assert min(windows) == pytest.approx(p["land_window_min_in"])
-    assert min(windows) > 0.0
+    plan_text = (CAD_ROOT / "process/ch_rocker_hub/plan.toml").read_text("utf-8")
+    p = tomllib.loads(plan_text)["parameters"]
+    # The lot is turned to one micrometer window that takes the drawing's
+    # clearance in every hole the .4000 reamer cuts (.3975-.3995), then each
+    # land is tried in a strap hole: no hole is read with plug gauges.
+    nominal = rocker.HUB_DIA / 25.4
+    assert p["land_min_in"] == pytest.approx(nominal + fit.LAND_WINDOW[0] / 25.4)
+    assert p["land_max_in"] == pytest.approx(nominal + fit.LAND_WINDOW[1] / 25.4)
+    assert "plug-gauges-" not in plan_text

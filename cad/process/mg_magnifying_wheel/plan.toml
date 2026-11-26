@@ -22,11 +22,9 @@ ref = "drill-16"  # Drills #16
 id = "reamer-1885"
 name = ".1885 reamer"
 ref = "reamer-1885"  # B-reamer-.1885
-
-[[tools]]
-id = "pin-gauges"
-name = "Pin gauges .011-.500"
-ref = "pin-gauges"  # A1-pin-set-061-250, A1-pin-set-061-500-combined
+# The reamed bore prints no band: MHA-MG-07, the drill-rod axle, is its
+# gauge (fit audit MHA-MG-05.running_bore, second pass), so the pin-gauge set
+# is not listed for it.
 
 [[tools]]
 id = "protractor"

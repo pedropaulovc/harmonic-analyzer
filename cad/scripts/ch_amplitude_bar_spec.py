@@ -18,7 +18,7 @@ from _package_units import drawing_unit
 
 from top_frame_plane import FULCRUM_KEEPER_SEAT_Y
 # The top notch's plate.
-from ch_channel_lever_spec import LEVER_THICKNESS, LEVER_THICKNESS_TOLERANCE
+from ch_channel_lever_spec import LEVER_THICKNESS, LEVER_THICKNESS_BAND
 
 
 MM_PER_IN = 25.4
@@ -65,7 +65,8 @@ BAR_STOCK_UNDERSIZE = 0.002 * MM_PER_IN  # 0.051
 # so a notch is never narrower than its plate. The 0.25 novice spare
 # (rocker_bank_layout.MARGIN_SPARE) is deliberately left out.
 # The top notch (owner ruling 2026-10-15, #1038 option 2): the lever plate
-# prints .118 +/-.002, so the notch is .124 +.007/.000. The foot notch is
+# prints .118 +.002/-.004 and the notch takes its +.002 maximum, so the notch is .124 +.007/.000 (necessity register
+# ch-amplitude-bar: +.010 leaves the bar-gap budget under a thousandth). The foot notch is
 # .104 +.006/.000 on the .098 +/-.001 strap (#3114): the rocker arms float
 # on their shaft, each following its own rod, so two neighbouring arms can
 # close to their hubs' least length (ch_rocker_arm_spec.HUB_LENGTH_MIN), and
@@ -78,7 +79,7 @@ BOTTOM_NOTCH_WIDTH = _straddle_minimum(
 )  # 2.6416 (.104)
 BOTTOM_NOTCH_HEIGHT = 0.09375 * MM_PER_IN  # 2.381 (.094), the foot's contact height
 BOTTOM_NOTCH_WIDTH_BAND = (0.1524, 0.0)  # +.006/.000 (upper, lower) deviations, native
-TOP_NOTCH_WIDTH = _straddle_minimum(LEVER_THICKNESS, LEVER_THICKNESS_TOLERANCE)  # .124
+TOP_NOTCH_WIDTH = _straddle_minimum(LEVER_THICKNESS, LEVER_THICKNESS_BAND[0])  # .124
 TOP_NOTCH_WIDTH_BAND = (0.1778, 0.0)  # +.007/.000 (upper, lower) deviations, native
 # The top notch's depth only clears the lever: its roof must stay below the
 # lever's lower edge with the lever turned on the pin relative to the bar
@@ -89,15 +90,17 @@ TOP_NOTCH_HEIGHT = 13.97  # .55
 TOP_PIN_DROP = 0.25 * MM_PER_IN  # 6.35 (.25) hole centre below the bar top
 # The MHA-SH-VN-58 bar pivot pin presses into this hole through both top-notch
 # cheeks and runs in the lever's #47 hole (user ruling 2026-10, press fit;
-# sh_vn_pivot_pin_bar_spec holds the fit budget). Reamed .0775-.0779 in under
-# the 5/64 dowel, the limits the pin budget holds, printed as the two limits
-# (swTolLIMIT), so no deviation step reads as a converted millimetre value
-# (owner decision 2026-11-19, #3124 item 5, and its limit-form follow-up the
-# same day). The model sits mid-band, as every LIMIT dimension does.
-TOP_PIN_HOLE_LIMITS = (1.9685, 1.97866)  # .0775-.0779 in, reamed; native
-TOP_PIN_HOLE_DIA = 1.97358  # .0777 in
-if abs(TOP_PIN_HOLE_DIA - sum(TOP_PIN_HOLE_LIMITS) / 2.0) > 1e-9:
-    raise AssertionError("the top pin hole's model must sit mid-band")
+# sh_vn_pivot_pin_bar_spec holds the fit budget). Owner ruling 2026-11-24,
+# fit audit question 3: reamed with
+# the .0775 reamer and printed with no band, the pin itself the gauge (it
+# presses in, it does not enter by hand); a pin that enters by hand is bonded
+# at MHA-CH-00. The model sits at the reamer's size, which the sheet prints.
+# TOP_PIN_HOLE_LIMITS is the ANALYSIS band, what the reamer is modelled to
+# cut (sh_vn_pivot_pin_spec.HOLE_REAMED_LIMITS), not a printed limit.
+TOP_PIN_HOLE_LIMITS = (1.9685, 1.97866)  # .0775-.0779 in, the reamer's cut
+TOP_PIN_HOLE_DIA = 1.9685  # .0775 in, the reamer
+if TOP_PIN_HOLE_DIA != TOP_PIN_HOLE_LIMITS[0]:
+    raise AssertionError("the top pin hole's model must be its reamer's size")
 
 # --- Derived. ---
 TOP_PIN_Y = BAR_LENGTH - TOP_PIN_DROP  # 801.9432

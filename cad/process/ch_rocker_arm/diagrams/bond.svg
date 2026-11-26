@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 330" font-family="sans-serif" font-size="13">
+  <rect class="paper" x="0" y="0" width="760" height="330"/>
+  <text class="title" x="20" y="22">Setup 1 (section through the hub, 2.5:1): bond the hub into its own strap (LOCTITE 638); 24 h cure</text>
+  <!-- Surface plate: its top is the datum the hub stands on. -->
+  <rect class="fixture-table" x="20" y="240" width="720" height="40"/>
+  <text class="label" x="30" y="265">Surface plate</text>
+  <!-- Paper square under the hub (keeps the 638 off the plate). -->
+  <rect class="part-rest" x="315" y="236" width="130" height="4"/>
+  <line class="leader" x1="380" y1="238" x2="380" y2="286"/>
+  <text class="label" x="300" y="300">paper square under the hub</text>
+  <!-- Gauge blocks, one under each strap arm, ~1 in either side of the hub. -->
+  <rect class="fixture-support" x="86" y="209.75" width="88" height="30.25"/>
+  <rect class="fixture-support" x="586" y="209.5" width="88" height="30.5"/>
+  <line class="leader" x1="130" y1="232" x2="130" y2="286"/>
+  <line class="leader" x1="630" y1="232" x2="630" y2="286"/>
+  <text class="label" x="70" y="300">gauge block H</text>
+  <text class="label" x="560" y="300">gauge block within .001 of it</text>
+  <!-- Strap MHA-CH-13, .098 thick, on the blocks, at the hub's middle. -->
+  <rect class="part-kept" x="30" y="185.25" width="300" height="24.5"/>
+  <rect class="part-kept" x="430" y="185.25" width="300" height="24.5"/>
+  <text class="label" x="200" y="178">strap MHA-CH-13</text>
+  <!-- Hub MHA-CH-12, Ø.400 land, standing on its faced end on the paper. -->
+  <rect class="part-kept" x="330" y="151" width="100" height="85"/>
+  <line class="hidden" x1="349.25" y1="151" x2="349.25" y2="236"/>
+  <line class="hidden" x1="410.75" y1="151" x2="410.75" y2="236"/>
+  <text class="label" x="440" y="140">hub MHA-CH-12 (Ø{{process.hub_pilot_bore_in:.3dot}} pilot bore, hidden)</text>
+  <!-- LOCTITE 638 film: the middle of the land, inside the strap's hole. -->
+  <rect class="bond" x="326" y="187" width="4" height="21"/>
+  <rect class="bond" x="430" y="187" width="4" height="21"/>
+  <text class="label" x="470" y="160">638 on the land's middle only;</text>
+  <text class="label" x="470" y="176">none on the ends or in the bore</text>
+  <line class="leader" x1="438" y1="137" x2="424" y2="156"/>
+  <circle class="leader-dot" cx="424" cy="156" r="2"/>
+  <line class="leader" x1="466" y1="170" x2="432" y2="197"/>
+  <circle class="leader-dot" cx="432" cy="197" r="2"/>
+  <text class="label" x="20" y="322">H = (hub length − {{cad.strap_thickness_in:.3dot}})/2; the hub stands square on its lathe-faced end, the blocks hold the strap parallel to the plate.</text>
+</svg>

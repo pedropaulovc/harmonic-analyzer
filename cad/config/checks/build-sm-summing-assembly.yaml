@@ -1,0 +1,10 @@
+# What fails past each numeric check build_sm_summing_assembly asserts on the
+# knife gauge bar (check_register.py, tolerance-policy.md "Checks in spec
+# modules and tests").
+checks:
+  - id: C-01
+    check: "KNIFE_BAR_CORNER_SHORTFALL_IN"
+    kind: gap
+    reason: "the floor refuses a bar the smallest bores pass"
+    source: "the module computes it: DIA .496 MIN less the largest straight bar the smallest conforming bore pair passes (.4985 - .00255 = .49595), +.00005; it must stay under the shop's .001 reading unit (tolerance-policy.md) so the slide trial, not the floor, governs (owner ruling 2026-11-24, fit audit S6)"
+    basis: worst_case

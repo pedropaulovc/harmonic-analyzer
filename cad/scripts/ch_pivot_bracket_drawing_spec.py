@@ -27,10 +27,10 @@ SURFACE_FINISHES = (
     ),
 )
 
-# The cross-bore holds the drilled-hole row's +.004/0 explicitly (upper,
-# lower; fit F5): the apex set screw's full thread is counted at this largest
-# bore (ch_pivot_bracket_spec.BORE_RADIUS_MAX), so the print must not leave
-# the bore to the .XXX row's +/-.005.
+# The cross-bore's analysis band: the title block's DRILLED HOLES row
+# (+.004/0) its F DRILL callout invokes (owner ruling 2026-11-24, fit audit
+# question 1); the apex set screw's full thread is counted at this largest
+# bore (ch_pivot_bracket_spec.BORE_RADIUS_MAX).
 BORE_DIA_BAND = (DRILL_GROWTH, 0.0)
 
 # The foot-to-ear inside corner (drawing-guidelines.md rule 16): the largest
