@@ -1556,19 +1556,22 @@ def test_the_pivot_screw_is_unlocked_and_the_spacer_bonded_as_made() -> None:
         "FIT THE ARM, ITS BORE AND FRONT FACE COATED WITH PASTE WAX, ON IT FROM THE REAR."
     )
     # The dry trial proves the bought screw's shoulder end and the spacer's
-    # bore square enough before anything is bonded; its failure takes the
-    # step's one renewal, then the inspection (Codjiflo r1 on #3487).
+    # bore square enough before anything is bonded. The spacer comes off by
+    # hand either way; a failure takes the step's one renewal, then the
+    # inspection (Codjiflo r1 on #3487), with no press: nothing is bonded
+    # yet (#3558).
     assert texts[2].startswith("CHECK, DRY: ")
     assert texts[2].endswith(
         "THE SPACER SHOWS NO DAYLIGHT ON THE PLATE AND THE ARM SWINGS FREELY."
     )
     assert "FLAT PLATE COVERED WITH POLYETHYLENE FILM, WHOSE HOLE CLEARS" in texts[2]
     assert "WAXED" not in body
-    assert texts[3] == (
-        f"IF EITHER FAILS, DO {drawing.sub_step('hanger-pivoted', 20)}-"
+    assert texts[3] == "LIFT THE SPACER OFF THE SHOULDER."
+    assert texts[4] == (
+        f"IF {drawing.sub_step('hanger-pivoted', 2)} FAILED, DO "
+        f"{drawing.sub_step('hanger-pivoted', 20)}-"
         f"{drawing.sub_step('hanger-pivoted', 23)}."
     )
-    assert texts[4] == "LIFT THE SPACER OFF THE SHOULDER."
     # One action per sub-step (machinist review 20261124T013305458Z, rule
     # 22): degrease, coat, push on, wipe, clamp; the screw is seated only
     # when the bond has cured.
@@ -2870,15 +2873,16 @@ def test_every_screwed_setting_has_a_holding_check() -> None:
     # bar outside (with the arm if it is outside too), an arm outside or all
     # inside, one action a step (rule 22). The renewal frees the captive arm
     # on the arbor press (D10, owner question Q7a, option B), a bonded spacer
-    # only: the dry trial's failure reaches it with the spacer slipped on
-    # (Codjiflo r1 on #3569).
+    # only: the dry trial's failure reaches it with the spacer already lifted
+    # off by hand (Codjiflo r1 on #3569; #3558).
     bar = _number("pd-support-bar")
-    assert pivot[3] == "IF EITHER FAILS, DO 15W-15Z."
+    assert pivot[3] == "LIFT THE SPACER OFF THE SHOULDER."
+    assert pivot[4] == "IF 15C FAILED, DO 15W-15Z."
     assert pivot[20:23] == (
-        "IF NOT YET RENEWED, PRESS A BONDED SPACER OFF THE SCREW ON THE ARBOR "
-        "PRESS, ARM REAR FACE DOWN, AND REPEAT FROM 14G WITH A NEW "
+        "IF NOT YET RENEWED, REPEAT FROM 14G WITH A NEW "
         f"{_number('pd-vn-transgear-pivot-screw')} SCREW AND "
-        f"{_number('pd-transgear-pivot-spacer')} SPACER.",
+        f"{_number('pd-transgear-pivot-spacer')} SPACER, FIRST PRESSING ANY BONDED "
+        "SPACER OFF ON THE ARBOR PRESS, ARM REAR FACE DOWN.",
         f"IF ALREADY RENEWED, INSPECT THE {bar} BAR'S TAP AND BACK FACE AND THE "
         f"{_number('pd-transgear-arm')} ARM'S BORE TO THEIR SHEETS.",
         f"FOR A BAR FOUND OUTSIDE, MAKE A NEW {bar} BAR AND REBUILD FROM STEP "

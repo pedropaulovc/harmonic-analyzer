@@ -603,3 +603,87 @@ def build(ctx: dict[str, Any], rt: Any) -> dict[str, Any]:
     ops.update(ctx["manual"])
     rt.generate(doc)
     return {"ops": ops}
+
+
+# The as-machined report (``cad/scripts/_as_machined.py``) only reports: it
+# never fails the task. "gate" would fail it on a difference over the noise
+# line or a rapid that cuts.
+AS_MACHINED_MODE = "report"
+
+
+def as_machined(ctx: dict[str, Any], inputs: Any) -> dict[str, Any]:
+    """What the as-machined report needs: the plate as it comes to the mill,
+    sawn and filed to its outline at the bench (Setups 1-2; the filed roof
+    chamfers are not in a box), MS01's stock in the ``pair`` frame, its
+    thickness the sheet's as rolled: the outer face's band, nominal the
+    drawing's (the model's). The seating face lies on the block, so the
+    outer face (MS01's top) moves with the thickness. Both programs cut in
+    their own frames; the #49's run into the block below is not this part."""
+    g = _geometry(inputs.features)
+    f = inputs.features["features"]
+    band = f["outer_face"]["thickness"]
+    (x0, x1), (y0, y1), _z = next(job["stock"] for job in ctx["jobs"] if job["frame"] == "pair")
+    # The filed 45° roof chamfers: a corner of leg L leaves L/√2 against the
+    # flat; the sheet's whole thickness band in Z.
+    leg = f["roof_chamfers"]["size"][1]
+    corner_depth = leg / math.sqrt(2)
+    z_span = [-band[1], 0.0]
+    length, height = g["length"], g["height"]
+    filed = (
+        "Setup 2 files the two 45° roof chamfers by hand (third operation); no program cuts them"
+    )
+    expected = [
+        {
+            "name": "roof chamfer, locating end",
+            "kind": "left",
+            "within": [[0.0, leg], [height - leg, height], z_span],
+            "reason": filed,
+            "max_mm": corner_depth,
+            # On the thickest sheet the chamfers join its extra thickness.
+            "variants": ["nominal", "min"],
+        },
+        {
+            "name": "roof chamfer, far end",
+            "kind": "left",
+            "within": [[length - leg, length], [height - leg, height], z_span],
+            "reason": filed,
+            "max_mm": corner_depth,
+            "variants": ["nominal", "min"],
+        },
+        {
+            "name": "thin sheet as rolled",
+            "kind": "gouge",
+            "within": [[0.0, length], [0.0, height], z_span],
+            "reason": "the sheet is used as rolled, never machined to thickness (Setup 1 mikes it in the outer face's band)",
+            # The band's thinnest against the model, plus the engine's 0.01 mm
+            # extent tolerance (OCC's measuring tolerance).
+            "max_mm": g["thickness"] - band[0] + 0.01,
+            "variants": ["min"],
+        },
+        {
+            "name": "thick sheet as rolled",
+            "kind": "left",
+            "within": [[0.0, length], [0.0, height], z_span],
+            "reason": "the sheet is used as rolled, never machined to thickness (Setup 1 mikes it in the outer face's band); its extra thickness joins the filed roof chamfers into one region, so the chamfers' depth bounds it",
+            "max_mm": corner_depth,
+            "variants": ["max"],
+        },
+    ]
+    return {
+        "parts": {
+            "": {
+                "blank": {
+                    "frame": "pair",
+                    "box": [[x0, x1], [y0, y1], [-g["thickness"], 0.0]],
+                    "length": {
+                        "axis": "z",
+                        "keep": "min",
+                        "mm": {"nominal": g["thickness"], "min": band[0], "max": band[1]},
+                    },
+                },
+                "expected": expected,
+            }
+        },
+        "skip": {},
+        "notes": ["the outline and both roof chamfers are sawn and filed at the bench (Setups 1-2)"],
+    }

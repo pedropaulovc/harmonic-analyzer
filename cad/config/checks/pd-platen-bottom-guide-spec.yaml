@@ -1,0 +1,30 @@
+# MHA-PD-27's rack-screw counterbore guards (tolerance-policy.md, "Checks in
+# spec modules and tests"; cad/scripts/check_register.py). Entered 2026-11-25
+# when the counterbore's Ø and depth took their own printed bands and every
+# guard on the pocket moved to the band its callout prints (#3620; rule 3: a
+# Hole Wizard pocket with no band of its own is ±.01, _wizard_pocket_band).
+checks:
+  - id: C-01
+    check: "SCREW_HEAD_ENTRY_MIN"
+    kind: gap
+    reason: "a rack-screw head hangs on its counterbore wall"
+    source: "owner ruling 2026-11-25 (#3620): \"b: Ø.110 +.004/−0 and depth .469 ±.005\"; stock 91794A055 head Ø.096 (_mcmaster_91794a055.HEAD_DIA) and .060 shank in the #51 .067 (float .0035, which bounds the .001-per-axis transfer the head follows); leaves .007; the .001 in floor is what the shop reads (tolerance-policy.md)"
+    basis: worst_case
+  - id: C-02
+    check: "the rack's floor band is not this rail's .XXX height and counterbore depth bands"
+    kind: thread
+    reason: "a rack screw bottoms in its tap's lead"
+    source: "the floor under the counterbore carries the rail height's title-block .XXX (±.005) and the depth's own ±.005 (owner ruling 2026-11-25, #3620: \"b: Ø.110 +.004/−0 and depth .469 ±.005\"); pd_feed_rack_spec.SCREW_FLOOR is sized on that .010 so the longest screw on the thinnest floor stops at the least full thread with margin 0 (ZERO; pd_feed_rack_spec.SCREW_TIP_MARGIN, checks/pd-feed-rack-spec.yaml C-01; option b's sketch line reads \"tip short of lead +0.0000\"); at the wizard's ±.01 it ran .005 into the lead"
+    basis: worst_case
+  - id: C-03
+    check: "a rack-screw counterbore breaks the rail's front face"
+    kind: wall
+    reason: "the counterbore breaks out of the rail's front face"
+    source: "pd-platen-bottom-guide RV-01 (delegated ruling 2026-11-14 (Main), owner review #2144): WALL .044 MIN printed; the counterbore at its printed largest Ø.114 (owner ruling 2026-11-25, #3620) leaves .0447"
+    basis: worst_case
+  - id: C-04
+    check: "a rack-screw hole crowds a bottom-guide tap"
+    kind: wall
+    reason: "a rack-screw hole breaks into a through tap"
+    source: "drawing-guidelines.md rule 17 floor (_inch_wall_limits.WALL_FLOOR_MM); the counterbore at its printed largest Ø.114 (owner ruling 2026-11-25, #3620); leaves .590"
+    basis: worst_case

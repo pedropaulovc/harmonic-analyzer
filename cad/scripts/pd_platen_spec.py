@@ -19,14 +19,19 @@ from __future__ import annotations
 import math
 
 import _config
+from _fit_deviations import deviations
 from _hole_spec import CLEARANCE_MM, THREAD_MAJOR_MM, HoleSpec
 from _package_units import drawing_unit
 from _printed_tolerance import (
+    drilled_oversize_mm,
     edge_break_chamfer_mm,
     edge_break_radius_mm,
     printed_deviations,
 )
+from _wizard_pocket_band import WIZARD_POCKET_BAND_MM
+from sh_vn_brass_fillister_screw_spec import HEAD_DIA as FILLISTER_HEAD_DIA
 from sh_vn_brass_fillister_screw_spec import HEAD_H as FILLISTER_HEAD_H
+from sh_vn_brass_fillister_screw_spec import SHANK_DIA as FILLISTER_SHANK_DIA
 
 UNIT = drawing_unit("parts/pd-platen", _config.parts("pd-platen"))
 
@@ -93,10 +98,22 @@ GUIDE_HOLE_XY = tuple((x, y) for y in GUIDE_HOLE_Y for x in GUIDE_HOLE_X)
 
 # Front-face counterbores recess the stock .183 x .107 fillister heads
 # exactly .008 below the front face so the recording paper lies flat.
-# The Ø.26 counterbore remains ample for the stock head.
 HEAD_RECESS = 0.2032  # .008
 CBORE_DIA = 6.604  # .26
 CBORE_DEPTH = FILLISTER_HEAD_H + HEAD_RECESS  # .115
+# The counterbore's printed bands, (upper, lower) in mm. Its Ø prints no band
+# of its own, so it is a Hole Wizard pocket at the .XX grade, ±.01 (rule 3,
+# _wizard_pocket_band). Its depth prints its own band and the function it
+# holds, rule 3's exception form: owner ruling 2026-11-25 (#3619), "b: depth
+# .115 ±.005, HOLDS HEAD BELOW FACE". At the wizard's ±.01 the shallowest
+# pocket (.105) leaves the .107 head .002 proud of the paper face, so the
+# paper does not lie flat, and the deepest (.125) in the thinnest plate leaves
+# a .022 floor, under RV-02's accepted .027 (HEAD_RECESS_MIN, CBORE_FLOOR_MIN
+# below compute both). The drawing puts this band on the native callout's own
+# depth variable (draw_pd_platen._print_counterbore_depth_band), not on the
+# part's GuideHoles feature, which the sheet's hole table also reads.
+CBORE_DIA_BAND = (WIZARD_POCKET_BAND_MM, -WIZARD_POCKET_BAND_MM)
+CBORE_DEPTH_BAND = (0.127, -0.127)  # .115 +.005/-.005
 
 # Counterbore floor: the plate left under each guide-screw head.  USER-ACCEPTED
 # rule-17 exception (2026-10-14, pd-platen RV-02): .037 nominal and
@@ -169,12 +186,21 @@ if DRAWING_PRECISION.keys() != DRAWING_DIMENSIONS.keys() or any(
     raise AssertionError("every marked platen dimension needs authored places")
 
 # The counterbored guide-hole callout's native variables: the loose through
-# hole DRILLED at a three-place inch size, the head-recess depth at .XXX (the
-# head sits sub-flush below the paper face), the counterbore Ø at .XX (the
-# head clears it by more than the .XX band).
+# hole DRILLED at a three-place inch size, the counterbore Ø at .XX and its
+# depth at .XXX with its own band (CBORE_DEPTH_BAND), whose deviations print
+# at the same three places.
 GUIDE_CALLOUT_PRECISION = {"hw-thruholedia": 3, "hw-cbdia": 2, "hw-cbdepth": 3}
 _CBORE_DEPTH_LOWER, _CBORE_DEPTH_UPPER = printed_deviations(
-    CBORE_DEPTH, GUIDE_CALLOUT_PRECISION["hw-cbdepth"], unit=UNIT
+    CBORE_DEPTH,
+    GUIDE_CALLOUT_PRECISION["hw-cbdepth"],
+    deviations(CBORE_DEPTH_BAND),
+    unit=UNIT,
+)
+_CBORE_DIA_LOWER, _CBORE_DIA_UPPER = printed_deviations(
+    CBORE_DIA,
+    GUIDE_CALLOUT_PRECISION["hw-cbdia"],
+    deviations(CBORE_DIA_BAND),
+    unit=UNIT,
 )
 _THICKNESS_LOWER, _THICKNESS_UPPER = printed_deviations(
     PLATE_THICKNESS, DRAWING_PRECISION_BY_NAME["Depth"], unit=UNIT
@@ -183,11 +209,28 @@ _THICKNESS_LOWER, _THICKNESS_UPPER = printed_deviations(
 # (build_pd_platen_clip) and the paper-drive assembly's sweep read them.
 PLATE_THICKNESS_MIN = PLATE_THICKNESS + _THICKNESS_LOWER
 PLATE_THICKNESS_MAX = PLATE_THICKNESS + _THICKNESS_UPPER
-# The shallowest printed counterbore still sinks the stock fillister head.
+# The least a margin can be and still be read: the shop's .001 in on a size
+# (tolerance-policy.md, "Checks in spec modules and tests").
+_SHOP_READS = 0.0254
+# The shallowest printed counterbore still sinks the stock fillister head
+# below the paper face (.003).
 HEAD_RECESS_MIN = CBORE_DEPTH + _CBORE_DEPTH_LOWER - FILLISTER_HEAD_H
-if HEAD_RECESS_MIN <= 0.0:
+if HEAD_RECESS_MIN < _SHOP_READS - 1e-9:
     raise AssertionError(
         f"guide-screw heads stand proud at the shallowest counterbore: {HEAD_RECESS_MIN}"
+    )
+# The head enters the narrowest printed counterbore (the wizard's ±.01) with
+# the shank anywhere in its loose hole at the hole's DRILLED HOLES largest:
+# the screws are fixed in the guides' taps and the plate floats over them.
+GUIDE_SCREW_FLOAT_MAX = (
+    GUIDE_HOLE_DIA + drilled_oversize_mm(unit=UNIT) - FILLISTER_SHANK_DIA
+) / 2.0
+HEAD_RADIAL_CLEARANCE_MIN = (
+    CBORE_DIA + _CBORE_DIA_LOWER - FILLISTER_HEAD_DIA
+) / 2.0 - GUIDE_SCREW_FLOAT_MAX
+if HEAD_RADIAL_CLEARANCE_MIN < _SHOP_READS - 1e-9:
+    raise AssertionError(
+        f"a guide-screw head can foul the narrowest counterbore: {HEAD_RADIAL_CLEARANCE_MIN}"
     )
 # The thinnest printed plate under the deepest printed counterbore.
 CBORE_FLOOR_MIN = (
@@ -198,8 +241,9 @@ if CBORE_FLOOR_MIN < CBORE_FLOOR_ACCEPTED_MIN:
         f"counterbore floor {CBORE_FLOOR_MIN:.3f} is thinner than the user-accepted "
         f"{CBORE_FLOOR_ACCEPTED_MIN}"
     )
-# The floor's reference dimension states that worst case as plain fact at the
-# callout (Main's ruling, option A), floored to .XXX so it never overstates it.
+# The floor's reference dimension states that worst case, at the depth's own
+# printed band, as plain fact at the callout (Main's ruling, option A), floored
+# to .XXX so it never overstates it.
 _FLOOR_MIN_IN = math.floor(CBORE_FLOOR_MIN / 25.4 * 1000.0 + 1e-9) / 1000.0
 CBORE_FLOOR_CALLOUT = (
     f"C'BORE FLOOR\n{f'{_FLOOR_MIN_IN:.3f}'.lstrip('0')} MIN WORST CASE"

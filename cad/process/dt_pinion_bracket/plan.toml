@@ -55,7 +55,7 @@ part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
 material = "1018 cold-finished steel, 3/8 x 1-1/4 in flat (drawing: {{cad.material_spec}})"
 stock = "3/8 x 1-1/4 in flat bar; one blank {{process.blank_length_min_in:.2f}}–{{process.blank_length_max_in:.2f}} in long makes both straps."
-note = "Inches unless mm; G-code and console entries in mm (the files and the controller run G21). Finished {{cad.broad_face_b_thickness_min_in:.3dot}}–{{cad.broad_face_b_thickness_max_in:.3dot}} thick (face A to face B); face A is the bar's cold-finished face, left as bought. Speeds on the PM-30MV low belt (100–2800 rpm): no belt change. Home the mill ($H) and touch off G54 at the start of every mill setup: a FluidNC reset loses home. After any controller reset, stall or E-stop, home and touch off again before Cycle Start (Op 110 alone keeps G54: its face is already cut). Every file is proved in air before its first cut. Not on hand, to buy before the job: the .2510 and .3135 reamers and the six Class ZZ pins (.2510, .3135 and .157 plus; .2515, .314 and .160 minus)."
+note = "Inches unless mm; G-code and console entries in mm (the files and the controller run G21). Finished {{cad.broad_face_b_thickness_min_in:.3dot}}–{{cad.broad_face_b_thickness_max_in:.3dot}} thick (face A to face B); face A is the bar's cold-finished face, left as bought. Speeds on the PM-30MV low belt (100–2800 rpm): no belt change. Home the mill ($H) once, after switching it on: every M6's trip to the tool setter counts from home. Home again only after a power cycle or a controller restart, an E-stop, an alarm, a limit switch hit, a stall or a crash: homing brings the stored G54 back. Then check every zero of the setup again, each the way its step set it: each must read what its step set, within .001 in. One does not, cannot be reached with the part in, or the part may have moved: take the setup again from its first step, the part out. They all do: run the interrupted file again from its start. Feed Hold, then Reset with the axes stopped keeps position and G54: no homing, no new zero; run the interrupted file again from its start: its first M6 measures the tool, and cuts already made are cut in air. Every file is proved in air before its first cut. Not on hand, to buy before the job: the .2510 and .3135 reamers and the six Class ZZ pins (.2510, .3135 and .157 plus; .2515, .314 and .160 minus)."
 shop = "../shop"
 stock_refs = ["1018-flat-3-8x1-1-4"]
 material_key = "rocker-1018-cold-finished"
@@ -369,8 +369,8 @@ instruction = "Only if a reamer read under its GO pin, before the blank goes in:
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Home the mill first ($H). G54 X0 the blank's left end, Y0 the fixed jaw's face: edge finder (900 rpm)."
-instruction_detailed = "Home the mill first ($H). Edge finder (900 rpm), its tip {{process.finder_tip_depth_mm:in.3dot}} below the blank's top (below the jaw tops): on the fixed jaw's face beside the blank, G10 L20 P1 Y-2.540; on the blank's LEFT end from the left, G10 L20 P1 X-2.540."
+instruction = "G54 X0 the blank's left end, Y0 the fixed jaw's face: edge finder (900 rpm)."
+instruction_detailed = "Edge finder (900 rpm), its tip {{process.finder_tip_depth_mm:in.3dot}} below the blank's top (below the jaw tops): on the fixed jaw's face beside the blank, G10 L20 P1 Y-2.540; on the blank's LEFT end from the left, G10 L20 P1 X-2.540."
 feed = "hand"
 
 [[setups.operations]]
@@ -397,7 +397,7 @@ milling_cuts = [
 ]
 
 [[setups.operations]]
-instruction = "Thickness over {{cad.broad_face_b_thickness_max_in:.3dot}} at either end: stop the file at its M6 T2 stop (spindle off, tool up). If the controller reset or alarmed, home ($H). Keep G54 as it is: no new touch-offs (face B is already cut). Send $#, note the G54 line's Z; G10 L2 P1 Z(that Z − (the larger end reading − {{cad.broad_face_b_thickness_mm:in.3dot}}) × 25.4); run PB02_flat again from its start. Under {{cad.broad_face_b_thickness_min_in:.3dot}}: the blank is scrap."
+instruction = "Thickness over {{cad.broad_face_b_thickness_max_in:.3dot}} at either end: stop the file at its M6 T2 stop (spindle off, tool up). Keep G54 as it is: no new touch-offs (face B is already cut). Send $#, note the G54 line's Z; G10 L2 P1 Z(that Z − (the larger end reading − {{cad.broad_face_b_thickness_mm:in.3dot}}) × 25.4); run PB02_flat again from its start. Under {{cad.broad_face_b_thickness_min_in:.3dot}}: the blank is scrap."
 feed = "hand"
 
 [[setups.operations]]
@@ -549,8 +549,8 @@ vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{cad.broad_face_b_thickness
 beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{cad.envelope_y_mm}}"], clamp_mm = [0, "{{cad.envelope_y_mm}}"], section_mm = { y = "{{cad.broad_face_b_thickness_mm}}", z = "{{process.strap_width_mm}}" }, vise_left = "start" }
 
 [[setups.operations]]
-instruction = "Home the mill first ($H). G54 Y0 the fixed jaw's face; X0 the pivot bore's axis, the pivot end's radius written on face B in Setup 3 right of the pivot end's apex: edge finder (900 rpm)."
-instruction_detailed = "Home the mill first ($H). Edge finder (900 rpm): on the fixed jaw's face beside the strap, its tip below the jaw tops, G10 L20 P1 Y-2.540. On the pivot end's apex from the left, the finder's tip centred on the end's half height and on the strap's thickness: G10 L20 P1 X−(R + .100) × 25.4, R the pivot end's radius written on face B, in inches (the finder's .100 radius added; X{{process.pivot_apex_x_mm:.3f}} at R{{cad.pivot_end_radius_in:.3dot}})."
+instruction = "G54 Y0 the fixed jaw's face; X0 the pivot bore's axis, the pivot end's radius written on face B in Setup 3 right of the pivot end's apex: edge finder (900 rpm)."
+instruction_detailed = "Edge finder (900 rpm): on the fixed jaw's face beside the strap, its tip below the jaw tops, G10 L20 P1 Y-2.540. On the pivot end's apex from the left, the finder's tip centred on the end's half height and on the strap's thickness: G10 L20 P1 X−(R + .100) × 25.4, R the pivot end's radius written on face B, in inches (the finder's .100 radius added; X{{process.pivot_apex_x_mm:.3f}} at R{{cad.pivot_end_radius_in:.3dot}})."
 feed = "hand"
 
 [[setups.operations]]

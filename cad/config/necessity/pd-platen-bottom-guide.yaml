@@ -1,0 +1,17 @@
+# MHA-PD-27 platen bottom guide: why each band tighter than the title block
+# stays (drawing-guidelines.md rule 4; owner ruling 2026-11-24: the reason
+# lives here, not on the sheet). Read by the machinist review only. N-01 is
+# kept for the rail depth's band (.40/.39 here; .387 +.000/-.007 under the
+# held platen-rails change, #3540 C4, which creates this file with that N-01
+# entry), so the two files join without renumbering whichever lands second.
+necessity:
+  - id: N-02
+    feature: "sheet 1, the four rack-screw counterbores' Ø.110 +.004/-.000 (4X Ø.067 THRU ALL ⌴Ø.110 +.004/.000 ↧.469 ±.005): a wizard pocket's Ø is otherwise .XX, ±.01 (rule 3)"
+    kind: gap
+    reason: "at Ø.100 a rack-screw head hangs on the counterbore"
+    source: "pd_platen_bottom_guide_spec.SCREW_HEAD_ENTRY_MIN (and SCREW_CBORE_FRONT_WALL_MIN: at Ø.120 the wall falls to .0417 under the printed .044 MIN); owner ruling 2026-11-25 (#3620): \"b: Ø.110 +.004/−0 and depth .469 ±.005\""
+  - id: N-03
+    feature: "sheet 1, the four rack-screw counterbores' depth ↧.469 ±.005 (4X Ø.067 THRU ALL ⌴Ø.110 +.004/.000 ↧.469 ±.005): a wizard pocket's depth is otherwise .XX, ±.01 (rule 3); the floor it leaves sets the engagement the height's SETS ENGAGEMENT OF MHA-SH-VN-59 names"
+    kind: gap
+    reason: "at ±.01 the longest rack screw reaches its tap's lead"
+    source: "pd_feed_rack_spec.SCREW_TIP_MARGIN, margin 0 (ZERO) at ±.005, via pd_platen_bottom_guide_spec's floor-band guard (and pd_feed_rack_spec.ENGAGEMENT_WORST: .0275 at ±.01 under MHA-PD-26's printed .032 MIN); owner ruling 2026-11-25 (#3620): \"b: Ø.110 +.004/−0 and depth .469 ±.005\""

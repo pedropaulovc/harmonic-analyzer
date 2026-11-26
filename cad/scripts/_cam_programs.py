@@ -51,6 +51,10 @@ RUNTIME_PATH = SCRIPTS_DIR / "_freecad_cam_runtime.py"
 # The shop inventory's CNC records, where cam_nc.verify's jaw-clearance floor
 # lives: an input of every cam task (the inventory's other files are not).
 CNC_EQUIPMENT_PATH = _shop_equipment.DIRECTORY / "cnc.toml"
+# Also executed by freecadcmd, after the post: the as-machined report
+# (``_as_machined``). An input of every cam task, not of the NC it posts, so
+# no manifest records it.
+AS_MACHINED_RUNTIME_PATH = SCRIPTS_DIR / "_freecad_as_machined.py"
 # The runtime reads its job spec's path from this variable (its own SPEC_ENV).
 SPEC_ENV = "HARMONIC_CAM_SPEC"
 CYCLE_TIMES_NAME = "cycle_times.json"
