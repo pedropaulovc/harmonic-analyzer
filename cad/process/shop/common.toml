@@ -706,9 +706,6 @@ diameter_mm = 3.1496
 [tools.reamer-1260]  # B-reamer-.1260
 description = ".1260 in HSS chucking reamer"
 diameter_mm = 3.2004
-[tools.reamer-3135]  # B-reamer-.3135
-description = ".3135 in HSS chucking reamer"
-diameter_mm = 7.9629
 [tools.tap-0-80-bottoming]  # F-tap-bottoming-0-80; Tap coverage #0-80 UNF
 description = "Bottoming hand tap #0-80 UNF, HSS"
 [tools.tap-0-80-plug]  # Tap coverage #0-80 UNF
