@@ -23,7 +23,8 @@ def test_registry_row_is_the_modified_mcmaster_screw() -> None:
     assert row["supplier_skus"] == [stock.SKU] == ["91794A559"]
     assert row["quantity"] == 1
     assert row["drawing_unit"] == spec.UNIT == "in"
-    assert "drill and ream" in row["process"]
+    assert "drill the #52 pivot hole" in row["process"]
+    assert "ream" not in row["process"]
 
 
 def test_mates_are_named_by_their_registered_numbers() -> None:
@@ -61,29 +62,33 @@ def test_head_and_thread_are_the_sourced_catalogue_sizes() -> None:
 
 
 def test_hole_is_the_tip_cluster_contract() -> None:
-    assert spec.END_HOLE_DIA == pytest.approx(0.0630 * IN)
-    assert spec.END_HOLE_BAND == tip.REAM_H7
+    # Owner ruling 2026-11-24, fit audit question 11: drilled #52, its
+    # DRILLED HOLES row the analysis band.
+    assert spec.END_HOLE_DRILL == tip.END_HOLE_DRILL == "#52"
+    assert spec.END_HOLE_DIA == pytest.approx(0.0635 * IN)
+    assert spec.END_HOLE_BAND == pytest.approx((0.004 * IN, 0.0))
     assert spec.END_HOLE_DEPTH == pytest.approx(0.12 * IN)
     # The pivot turns on the spigot's band (#2469, #2530).
-    assert spec.PIVOT_CLEARANCE[0] / IN == pytest.approx(0.0008)
-    assert spec.PIVOT_CLEARANCE[1] / IN == pytest.approx(0.0023)
+    assert spec.PIVOT_CLEARANCE[0] / IN == pytest.approx(0.0013)
+    assert spec.PIVOT_CLEARANCE[1] / IN == pytest.approx(0.0063)
 
 
 def test_hole_wall_to_the_thread_root_is_the_declared_minor() -> None:
     minor_min = (0.2225 - 0.649519 / 28.0) * IN
-    hole_max = (0.0630 + 0.0005) * IN
+    hole_max = (0.0635 + 0.004) * IN
     # The shop table's runout row: .001 TIR, .0005 radial.
     assert spec.END_HOLE_POSITION_MM == pytest.approx(0.0005 * IN)
     assert spec.END_HOLE_WALL_WORST == pytest.approx(
         (minor_min - hole_max) / 2.0 - spec.END_HOLE_POSITION_MM
     )
     assert WALL_FLOOR_MM <= spec.END_HOLE_WALL_WORST < WALL_TARGET_MM
-    assert spec.END_HOLE_WALL_PRINTED_IN == 0.067
+    assert spec.END_HOLE_WALL_PRINTED_IN == 0.065
     (row,) = _config.parts(spec.PART_NAME)["machinist_exceptions"]
     assert row["id"] == "RV-01" and row["kind"] == "minor"
     # The exception quotes the wall row the callout prints.
-    assert spec.END_HOLE_CALLOUT.splitlines()[-1] == "WALL .067 MIN"
-    assert row["where"].endswith(": WALL .067 MIN")
+    assert spec.END_HOLE_CALLOUT.splitlines()[-1] == "WALL .065 MIN"
+    assert row["where"].endswith(": WALL .065 MIN")
+    assert "owner ruling 2026-11-24, fit audit question 11" in row["reason"].lower()
     assert row["reason"].startswith("Owner ruling 2026-11-09 via PR #1992")
     assert "pull/1992" in row["reason"]
 
@@ -95,21 +100,31 @@ def test_pivot_never_bottoms_and_always_runs_in_the_hole() -> None:
 
 
 def test_hole_callout_is_process_depth_then_two_lines_of_words() -> None:
-    # Rules 12 and 26 (PR 2 r7 machinist review): under the imported reamed
-    # diameter, the process and the model's depth at its places; rule 7: two
-    # lines of words.
+    # Rules 12 and 26 (PR 2 r7 machinist review): under the imported
+    # untoleranced diameter, the drill and the model's depth at its places;
+    # rule 7: at most two lines of words. The pivot's fit is flag note 3: on
+    # one row it is wider than the room beside the end view (machinist
+    # review r1, farm run 20261124T110807008Z).
     assert spec.END_HOLE_DEPTH_TEXT == ".12"
     assert spec.END_HOLE_CALLOUT.splitlines() == [
-        "REAM <HOLE-DEPTH> .12",
-        "RUNNING FIT ON MHA-DT-37",
-        "WALL .067 MIN",
+        "#52 DRILL <HOLE-DEPTH> .12",
+        "SEE NOTE 3",
+        "WALL .065 MIN",
     ]
+    # Rule 4 form 1 (Codjiflo 3547-1): MHA-DT-37's pivot band is set by its
+    # bond in the reamed MHA-DT-38 bushing, so the note names the mate and
+    # its running fit in the hole as drilled, not a pivot turned to it.
+    assert spec.STOCK_NOTE.splitlines()[-1] == (
+        "3. MHA-DT-37 PIVOT RUNS IN THE HOLE AS DRILLED."
+    )
+    assert "TURNED TO" not in spec.STOCK_NOTE
+    assert spec.PIVOT_CLEARANCE[0] > 0.0
     assert "91794A559" in spec.STOCK_NOTE
     # Rule 2: the material lives in the title block only.
     assert "STAINLESS" not in spec.STOCK_NOTE
 
 
-def test_builder_cuts_one_reamed_hole() -> None:
+def test_builder_cuts_one_drilled_hole() -> None:
     import math
 
     import build_dt_cone_tip_end_screw as build
@@ -152,5 +167,5 @@ def test_hole_callout_stands_clear_of_the_end_view_and_inside_the_frame() -> Non
     assert (
         x + drawing.CALLOUT_HALF_WIDTH < drawing.END_CENTER[0] - drawing.HEAD_R - 0.005
     )
-    rows = spec.END_HOLE_CALLOUT.splitlines()
+    rows = spec.END_HOLE_CALLOUT.replace("<HOLE-DEPTH>", "\u21a7").splitlines()
     assert max(len(row) for row in rows) * 0.00248 <= 2 * drawing.CALLOUT_HALF_WIDTH

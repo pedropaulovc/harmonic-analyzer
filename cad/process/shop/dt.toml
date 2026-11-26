@@ -53,14 +53,11 @@ diameter_mm = 7.493
 [tools.drill-v]  # Drills V
 description = "V (.3770 in) drill, 115-piece index"
 diameter_mm = 9.5758
+[tools.drill-3-8]  # 115-piece index (1/16-1/2 by 64ths); MHA-DT-31's 3/8 DRILL THRU bore (D27)
+description = "3/8 (.3750 in) drill, 115-piece index"
+diameter_mm = 9.525
 [tools.taper-pin-reamer]  # B-reamer-taper-pin
 description = "Taper-pin reamer 1:48 (No. 3) for MHA-DT-09"
-[tools.reamer-0620]  # B-reamer-.0620
-description = ".0620 in HSS chucking reamer"
-diameter_mm = 1.5748
-[tools.reamer-0630]  # B-reamer-.0630
-description = ".0630 in HSS chucking reamer"
-diameter_mm = 1.6002
 [tools.reamer-2510]  # B-reamer-.2510
 description = ".2510 in HSS chucking reamer"
 diameter_mm = 6.3754
@@ -124,9 +121,6 @@ diameter_mm = 0.9271
 [tools.reamer-0625]  # MHA-DT-03 .0625 +.0005/.0000 REAM THRU (T012, T018); MHA-DT-04 .0625 +.0005/.0000 REAM .20; MHA-DT-38 .0625 +.0005/.0000 REAM THRU (#2469)
 description = ".0625 in HSS chucking reamer"
 diameter_mm = 1.5875
-[tools.reamer-1562]  # MHA-DT-31 (Ø.156) REAM .17 at assembly with MHA-DT-06; MHA-DT-06 (Ø.156) REAM .17 for dowel MHA-DT-VN-59
-description = "5/32 (.1562 in) HSS chucking reamer"
-diameter_mm = 3.96875
 [tools.chamfer-mill-3-16-90]  # MHA-DT-35 #20 hole's floor-side chamfer inside the pocket (inventory: to order)
 description = "3/16 in 90° pointed 2-flute carbide chamfer cutter (Harvey Tool 902345-C3)"
 diameter_mm = 4.7625
@@ -164,44 +158,38 @@ sfm = 160
 feed = "tailstock quill by hand, slow and light, dry; withdraw with the spindle running"
 
 # --- MHA-DT-39 cone tip end screw (cad/process/dt_cone_tip_end_screw) --------
-# The bought 18-8 screw's pivot hole. LittleMachineShop "Cutting Speeds" (read
-# live 2026-11-22, lathe.toml header), Drilling & Reaming, Stainless steels
-# (Austenitic) 201-348 (18-8 is 302/304): drilling 50-55, reaming 30-35
-# ft/min; each takes the low end. The centre drill and the #53 drill ask over
-# 3000 rpm and clamp to the lathe's 2000; the .0630 reamer 1819 rpm. 18-8
-# work-hardens under a rubbing edge: a steady positive feed and cutting oil.
+# The bought 18-8 screw's pivot hole, drilled #52 (owner ruling 2026-11-24,
+# fit audit question 11). LittleMachineShop "Cutting Speeds" (read live
+# 2026-11-22, lathe.toml header), Drilling & Reaming, Stainless steels
+# (Austenitic) 201-348 (18-8 is 302/304): drilling 50-55 ft/min; it takes
+# the low end. The centre drill and the #52 drill ask over 3000 rpm and
+# clamp to the lathe's 2000. 18-8 work-hardens under a rubbing edge: a
+# steady positive feed and cutting oil.
 [settings.lathe-centre-18-8]
 tool = "centre-drills-carbide-60"
 material = "lathe-18-8"
 sfm = 50
 feed = "tailstock quill by hand, a steady positive feed, cutting oil; never dwell"
-[settings.lathe-drill-53-18-8]
-tool = "drill-53"
+[settings.lathe-drill-52-18-8]
+tool = "drill-52"
 material = "lathe-18-8"
 sfm = 50
 feed = "tailstock quill by hand, a steady positive feed, cutting oil; back fully out to clear chips, never dwell"
-[settings.lathe-ream-0630-18-8]
-tool = "reamer-0630"
-material = "lathe-18-8"
-sfm = 30
-feed = "tailstock quill by hand, steady, cutting oil; withdraw with the spindle running"
 
 # --- MHA-DT-31 crank hub (cad/process/dt_crank_hub/plan.toml) ----------------
 # Facing, turning, the L drill and parting take shop/lathe.toml's 1018 rows.
 # LittleMachineShop "Cutting Speeds" (read live 2026-11-22, lathe.toml
 # header), Drilling & Reaming, Plain carbon steels 1006-1026: drilling 60-100,
-# reaming 40-65 ft/min; each takes the low end (the 23/64 drill 637 rpm, the
-# .3760 reamer 406 rpm).
-[settings.lathe-drill-23-64-1018]
-tool = "jig-drill-23-64"
+# reaming 40-65 ft/min; each takes the low end (the 3/8 drill 611 rpm).  The
+# bore is the 3/8 drill's at DRILLED HOLES (D27, delegated ruling 2026-11-25
+# (Main), precedent: the fit-necessity rule of the owner-approved fit policy
+# (owner ruling 2026-11-24); owner review #2144),
+# so the hub takes no 23/64 pilot and no reamer.
+[settings.lathe-drill-3-8-1018]
+tool = "drill-3-8"
 material = "lathe-1018-cold-finished"
 sfm = 60
 feed = "tailstock quill by hand, steady, cutting oil"
-[settings.lathe-ream-3760-1018]
-tool = "reamer-0376"
-material = "lathe-1018-cold-finished"
-sfm = 40
-feed = "tailstock quill by hand, slow and steady, cutting oil; withdraw with the spindle running"
 
 # --- Stock the process plans name (stock_refs) ---------------------------------
 # One record per cad/config/shop-equipment/stock-*.toml key a plan names, so
@@ -295,15 +283,6 @@ rpm = 560
 feed_mm_rev = 0.0254
 
 # --- MHA-DT-20 cone swing platform (cad/process/dt_cone_swing_platform/plan.toml) ---
-# The pivot bore, Ø.2500 +.0005/.0000 REAM THRU (a running fit on the
-# MHA-DT-VN-52 shoulder): a fixed .2500 chucking reamer, not the adjustable
-# set (owner ruling 2026-11-20, #3073: a fixed reamer for each running/press
-# fit). Not owned: to buy (cad/config/shop-equipment/ tools-reamers-taps,
-# same key). diameter_mm is its nominal size.
-[tools.reamer-2500]
-description = ".2500 in HSS chucking reamer"
-diameter_mm = 6.35
-
 # The platform's assembly shims (owner ruling 2026-11-22, issue #3363):
 # description only; the record is fixtures.shim-washers-1-4-id-arbor-19.
 [tools.shim-washers-1-4-id-arbor-19]
@@ -342,45 +321,6 @@ description = "Plug gauge pair, .0930 GO (plus) and .0935 NO-GO (minus), Vermont
 # resolution is one pin's Class ZZ tolerance, .0002 in = 0.00508 mm. Of the
 # Class X pairs only .0930-.0935 (MHA-DT-11) keeps its records: the
 # crankshaft's test reads its range (test_dt_crankshaft_process.py).
-# .3760-.3765: MHA-DT-02 arbor bore, MHA-DT-31 hub bore (MHA-DT-11 re-gauges
-# the hub's).
-[gauges.zz-pins-3760-3765]
-range_mm = [9.5504, 9.5631]
-resolution_mm = 0.00508
-[tools.zz-pins-3760-3765]
-description = "Class ZZ pins for .3760-.3765: GO .3760 plus (single), NO-GO .3765 minus (single)"
-# .2510-.2515: MHA-DT-18 pivot and lift bores, MHA-DT-23 bore, MHA-DT-14.
-[gauges.zz-pins-2510-2515]
-range_mm = [6.3754, 6.3881]
-resolution_mm = 0.00508
-[tools.zz-pins-2510-2515]
-description = "Class ZZ pins for .2510-.2515: GO .2510 plus (single), NO-GO .2515 minus (single)"
-# .2500-.2505: MHA-DT-20 pivot bore.
-[gauges.zz-pins-2500-2505]
-range_mm = [6.35, 6.3627]
-resolution_mm = 0.00508
-[tools.zz-pins-2500-2505]
-description = "Class ZZ pins for .2500-.2505: GO .2500 plus (single), NO-GO .2505 minus (single)"
-# .0625-.0630: MHA-DT-38 bushing bore.
-[gauges.zz-pins-0625-0630]
-range_mm = [1.5875, 1.6002]
-resolution_mm = 0.00508
-[tools.zz-pins-0625-0630]
-description = "Class ZZ pins for .0625-.0630: GO .0625 plus (single), NO-GO .063 minus (the .061-.500 box)"
-# .0630-.0635: MHA-DT-39 end screw hole.
-[gauges.zz-pins-0630-0635]
-range_mm = [1.6002, 1.6129]
-resolution_mm = 0.00508
-[tools.zz-pins-0630-0635]
-description = "Class ZZ pins for .0630-.0635: GO .0630 plus (single), NO-GO .0635 minus (single)"
-# .4385-.4390: MHA-DT-05's two journal bores and the MHA-DT-11 drive-pin
-# jig's bore (owner ruling 2026-11-23, tool audit Q11); MHA-DT-11 re-gauges
-# the post's crank bore.
-[gauges.zz-pins-4385-4390]
-range_mm = [11.1379, 11.1506]
-resolution_mm = 0.00508
-[tools.zz-pins-4385-4390]
-description = "Class ZZ pins for .4385-.4390: GO .4385 plus (single), NO-GO .439 minus (the .061-.500 box)"
 # .157-.160: MHA-DT-14 follower seat, end-milled (owner ruling 2026-11-23,
 # tool audit Q8: "check with .157/.160 pins").
 [gauges.zz-pins-1570-1600]
@@ -388,14 +328,3 @@ range_mm = [3.9878, 4.064]
 resolution_mm = 0.00508
 [tools.zz-pins-1570-1600]
 description = "Class ZZ pins for .157-.160: GO .157 plus (single), NO-GO .160 minus (the .061-.500 box)"
-# .1610-.1635: MHA-DT-08's #20-drilled oak bore and its trial hole (owner
-# ruling 2026-11-23, tool audit Q14: "DRILL #20, read with pins"). A #20 never
-# cuts under .1610; .1635 is the largest bore the MHA-DT-32 shoulder print
-# (.1540-.1560) fits at .0050-.0075 and the handle's walls are sized at
-# (dt_crank_handle_spec.PIVOT_BORE_FIT_MAX). The bore is read with the box's
-# .161, .162 and .163 minus pins; the .1635 minus single is the NO-GO.
-[gauges.zz-pins-1610-1635]
-range_mm = [4.0894, 4.1529]
-resolution_mm = 0.00508
-[tools.zz-pins-1610-1635]
-description = "Class ZZ pins for .1610-.1635: reading pins .161, .162, .163 minus (the .061-.500 box), NO-GO .1635 minus (single)"

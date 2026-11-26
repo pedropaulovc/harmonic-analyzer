@@ -1,0 +1,13 @@
+checks:
+  - id: C-01
+    check: "SLIP_CLEARANCE_MAX"
+    kind: gap
+    reason: "set-screw shift outgrows the feeler-set rig location"
+    source: "U27 (Main, 2026-09-23): 0.02-0.10 diametral clearance on the MHA-DT-17 rod's h band; the .2510 reamer's analysis band gives .0010-.0023 (fit audit F19)"
+    basis: worst_case
+  - id: C-02
+    check: "cam thin-side wall falls below the .060 in floor (RV-01)"
+    kind: wall
+    reason: "the thin side under the eccentric bore tears out"
+    source: "owner minor RV-01 restated for fit audit S3 (owner ruling 2026-11-24, \"S1, S2, S3, S4, S5, S6 all approved (ticked)\"): between rule 17's .060 floor and .080 target"
+    basis: worst_case

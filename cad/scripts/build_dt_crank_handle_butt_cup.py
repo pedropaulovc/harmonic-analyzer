@@ -51,6 +51,7 @@ from _drawing_precision import _named_dimension, apply_drawing_precision
 from _drawing_marks import apply_drawing_properties, clear_dimensions_for_drawing, mark_dimensions_for_drawing
 from _fit_deviations import deviations
 from _limit_tolerance import set_limits
+from _single_limit_tolerance import set_single_limit
 from dt_crank_handle_butt_cup_notes import ISOMETRIC_VIEW_NOTE
 from dt_crank_handle_butt_cup_spec import (
     BODY_CHAMFER,
@@ -59,6 +60,7 @@ from dt_crank_handle_butt_cup_spec import (
     OVERALL_LENGTH,
     POCKET_DEPTH,
     POCKET_DIA,
+    POCKET_DIA_LIMITS,
     POCKET_FLOOR_CORNER_R_BAND,
     POCKET_FLOOR_CORNER_R_MAX,
     POCKET_FLOOR_CORNER_R_TOL_TYPE,
@@ -69,6 +71,7 @@ from dt_crank_handle_butt_cup_seat_spec import (
     CUP_DRAWING_PRECISION as DRAWING_PRECISION,
     FLOOR_HOLE_CHAMFER,
     FLOOR_HOLE_CHAMFER_LIMITS,
+    MIN_TOL_TYPE,
 )
 
 PART_NAME = "dt-crank-handle-butt-cup"
@@ -329,12 +332,24 @@ def build(adapter) -> dict[str, str]:
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     _pocket_floor_max_limit(adapter)
-    set_limits(
+    # The mouth break prints its single limit .005 MIN; the title block's
+    # edge break bounds it above (dt_crank_handle_butt_cup_seat_spec).
+    set_single_limit(
         adapter,
         "CupProfile",
         "FloorHoleChamfer",
-        limits=FLOOR_HOLE_CHAMFER_LIMITS,
-        places=DRAWING_PRECISION["CupProfile"]["FloorHoleChamfer"],
+        limit=FLOOR_HOLE_CHAMFER,
+        band=(FLOOR_HOLE_CHAMFER_LIMITS[1] - FLOOR_HOLE_CHAMFER, 0.0),
+        tol_type=MIN_TOL_TYPE,
+    )
+    # The pocket's own limits .248-.257, the end mill's .250 modelled
+    # (owner ruling 2026-11-24, fit audit question 15).
+    set_limits(
+        adapter,
+        "CupProfile",
+        "PocketDia",
+        limits=POCKET_DIA_LIMITS,
+        places=DRAWING_PRECISION["CupProfile"]["PocketDia"],
         display_unit=UNIT,
     )
     apply_drawing_properties(

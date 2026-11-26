@@ -70,9 +70,16 @@ def test_cross_hole_webs_clear_two_millimetres_at_the_worst_case() -> None:
 def test_marked_set_bands_and_places_come_from_the_spec() -> None:
     assert pin.DRAWING_DIMENSIONS is spec.DRAWING_DIMENSIONS
     assert set(drawing.FRONT_KEEP) == set().union(*spec.DRAWING_DIMENSIONS.values())
-    assert model_toleranced_dimensions(pin) == {
-        ("PinProfile", "PinDia"): "PIN_DIA_BAND[0]"
-    }
+    # Machinist review r1 (farm run 20261124T110807008Z): the bought rod
+    # prints the stock, size REF, and no band (rule 4).
+    assert model_toleranced_dimensions(pin) == {}
+    assert spec.PIN_DIA_CALLOUT == (
+        "1/16 DRILL ROD, AS SUPPLIED;\nSLIDING FIT IN MHA-DT-16 AND MHA-DT-17"
+    )
+    assert drawing.DIMENSION_CALLOUTS["PinDia"] is spec.PIN_DIA_CALLOUT
+    assert "set_reference_dimensions(adapter, annotations, (\"PinDia\",))" in (
+        Path(drawing.__file__).read_text(encoding="utf-8")
+    )
     assert spec.DRAWING_PRECISION_BY_NAME == {"PinDia": 4, "PinLen": 2}
 
 

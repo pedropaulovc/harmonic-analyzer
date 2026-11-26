@@ -1,9 +1,9 @@
 r"""Create the curated machinist drawing for crank arm MHA-DT-06.
 
-Separate through hub MHA-DT-31 is a light press in the arm's seat bore, turned
-to suit it.  Its outboard face
+Separate through hub MHA-DT-31 is a bonded slip fit in the arm's seat bore,
+turned to it (fit audit question 21).  Its outboard face
 shows the simple punched alignment witness and the axial seam for MHA-DT-VN-59,
-match-drilled with the hub; the seam's callout gives its nominal size and
+drilled with the hub at assembly; the seam's callout gives its nominal size and
 depth.  The handle pivot is tapped for the MHA-DT-32 shoulder screw.
 The MHA-DT-09 taper-pin cross-hole belongs to the hub and shaft drawings.
 
@@ -103,6 +103,7 @@ from dt_crank_arm_spec import (
     HALF_WIDTH,
     HANDLE_PIVOT_HOLE_SPEC,
     HUB_SEAT_DIA,
+    SEAM_BOND_CLEARANCE_MM,
     SEAT_PRESS_NOTE,
     STOCK_FRACTION_DENOMINATOR,
     STOCK_FRACTION_DIMENSIONS,
@@ -381,7 +382,7 @@ def _hub_seat_leader_clear(adapter: Any, annotations: list[Any]) -> None:
 
     The bore is made first and keeps the title block's .XX band: its limits
     are the U29 cheek's real limits (crank_hub_geometry).  MHA-DT-31 is turned
-    to suit it for a light press, and the note under the value states that
+    to it for a bonded slip fit, and the note under the value states that
     fit; the band bounds the bore, the note the fit (drawing-guidelines.md rule 4 (tighten only for function, and name the mate): "any
     retained dimensional limits still apply").
     """
@@ -559,7 +560,7 @@ requirement(
     },
     precision={"dia": _P["HubSeatDia"], "axis_from_edge": _P["AxisFromEdge"]},
 )
-# The MHA-DT-VN-59 seam: reamed with the hub at assembly (note 3), so this
+# The MHA-DT-VN-59 seam: drilled 5/32 with the hub at assembly (note 3), so this
 # part's traveler does not make it; the callout's (.156) is a reference, its
 # .17 depth from the outboard face at .XX.
 requirement(
@@ -578,6 +579,10 @@ requirement(
         "depth_nominal": (SEAM_DEPTH, ((_HUB, "SEAM_DEPTH"),)),
         "depth_from": ("outboard_face", ((_NOTES, "SEAM_CALLOUT"),)),
         "made_at": ("assembly", ("SEAM_NOTE",)),
+        "diametral_clearance": (
+            list(SEAM_BOND_CLEARANCE_MM),
+            ("SEAM_BOND_CLEARANCE_MM", "SEAM_BOND_CLEARANCE_TEXT", "SEAM_NOTE"),
+        ),
         "callout": (SEAM_CALLOUT, ((_NOTES, "SEAM_CALLOUT"),)),
     },
     precision={"depth": 2},
@@ -860,7 +865,7 @@ def build(adapter: Any) -> dict[str, str]:
     if int(seam_display.ArrowSide) != _DIM_ARROWS_INSIDE:
         raise RuntimeError("seam station reference did not keep its arrows inside")
 
-    # MHA-DT-VN-59's axial seam is reamed with the hub at assembly; its callout
+    # MHA-DT-VN-59's axial seam is drilled with the hub at assembly; its callout
     # names the mate, the fit and the pin's nominal size and depth.
     add_attached_note(
         adapter,

@@ -14,14 +14,16 @@ block, owner decision C1 keyed 2026-11-09, PR #1992) is proved here too.
 from __future__ import annotations
 
 import math
+import re
 
 import pytest
 
 
-def test_post_fillisters_engage_the_plate_tap_at_least_087d() -> None:
+def test_post_fillisters_engage_the_plate_tap_at_least_084d() -> None:
     """I22: each MHA-DT-VN-61 seats on the post's counterbore floor and runs into
     the MHA-DT-20 tap by its cut length past the post's grip -- never proud of
-    the plate underside, and 0.87D of thread after the tap's edge break."""
+    the plate underside, and 0.84D of thread after the tap's edge break (owner
+    ruling 2026-11-24, fit audit part 2 S2)."""
     import build_dt_drive_train_assembly as bdt
     import dt_cone_swing_platform_spec as platform
     import dt_vn_post_mount_screw_spec as screw
@@ -32,8 +34,8 @@ def test_post_fillisters_engage_the_plate_tap_at_least_087d() -> None:
     )
     assert bdt.POST_SCREW_INTO_PLATE <= platform.PLATE_THICKNESS
     thread = bdt.POST_SCREW_INTO_PLATE - 2.0 * platform.POST_MOUNT_TAP_EDGE_BREAK
-    assert thread >= 0.87 * platform.POST_MOUNT_THREAD_DIA
-    assert platform.POST_MOUNT_ENGAGEMENT_WORST_DIAMETERS >= 0.87
+    assert thread >= 0.84 * platform.POST_MOUNT_THREAD_DIA
+    assert platform.POST_MOUNT_ENGAGEMENT_WORST_DIAMETERS >= 0.84
 
 
 
@@ -495,8 +497,10 @@ def test_the_certified_swing_ends_before_the_crank_boss_meets_column_0() -> None
 def test_cone_tip_keeps_air_to_g19_over_the_whole_swing() -> None:
     """C1 keyed (owner decision 2026-11-09, PR #1992): the bushing, the end
     screw's proud end and MHA-DT-21's south face (where it stands over G19)
-    each keep positive air to G19's tooth and cam tiers over the P1 sweep at
-    the printed limits, worst-case arithmetic over every source."""
+    each keep positive air to G19's tooth and cam tiers over the P1 sweep.
+    Every tier, the bushing's too, is worst-case arithmetic over every source
+    (delegated ruling 2026-11-24 (Main), no precedent; owner review #2144,
+    D18)."""
     import dt_cone_tip_air as air
 
     rows = air.full_sweep_proof(intervals=100)
@@ -509,6 +513,60 @@ def test_cone_tip_keeps_air_to_g19_over_the_whole_swing() -> None:
         assert row["closure_mm"].keys() - {"continuous p1 interval arc"} <= (
             air.IN_SERVICE_CLEARANCES | air.INDEPENDENT_TOLERANCES
         )
+        if row["tier"] == air.LOOK_TIER:
+            assert air.AFTER_LOOK_SOURCES < row["closure_mm"].keys()
+
+
+def test_step_23s_leaf_passes_every_in_print_build() -> None:
+    """Delegated ruling 2026-11-25 (Main), no precedent; replaces D18's .020;
+    owner review #2144 (Codjiflo 3549-r4-13).  Both directions of step 23C's
+    .010 leaf, at the working pose: (i) the worst in-print build, every
+    source present at the look at its worst, passes the leaf at its thickest
+    (LEAF_TOLERANCE charged); (ii) a build that just passes the nominal leaf
+    keeps positive air after the pivot's transfer, the only sources that act
+    after the look.  The 3/64 drill shank and the .020 leaf would reject
+    some in-print builds."""
+    import dt_cone_tip_air as air
+    import dt_feeler_leaves
+
+    assert air.LOOK_LEAF_MM == pytest.approx(0.010 * 25.4)
+    assert 0.010 in dt_feeler_leaves.LEAVES_IN
+    assert air.AFTER_LOOK_SOURCES == {
+        "pivot thread centring",
+        "base pivot seat transferred through the platform bore",
+        "platform pivot bore on the shoulder",
+    }
+    look = air.look_in_print_air_mm()
+    after = air.after_look_mm()
+    assert set(look) == set(after) == {fixed.name for fixed in air.DRUM_TIERS}
+    # (i)
+    assert min(look.values()) >= air.LOOK_LEAF_MM + dt_feeler_leaves.LEAF_TOLERANCE
+    assert min(look.values()) < 0.020 * 25.4 < 3.0 / 64.0 * 25.4
+    # (ii)
+    assert all(air.LOOK_LEAF_MM - transfer > 0.0 for transfer in after.values())
+
+
+def test_step_23c_prints_the_leaf_the_proof_sizes() -> None:
+    """Step 23C's sheet 16 row prints LOOK_LEAF_MM's size (lockstep: the
+    drawing does not import the proof), the feeler table lists 23C with it,
+    and its remedy names the parts the look sees."""
+    import draw_dt_drive_train_assembly as drawing
+    import dt_cone_tip_air as air
+    import dt_drive_train_acceptance_assembly_sheet as acceptance
+
+    assert acceptance.TIP_LOOK_LEAF_MM == pytest.approx(air.LOOK_LEAF_MM)
+    steps = " ".join(drawing.rig_steps(pivot_blocks=2, cams=2, slotted=4).split())
+    leaf = f".{round(air.LOOK_LEAF_MM / 25.4 * 1000):03d}"
+    row = drawing.acceptance_ref("tip-look-leaf")
+    assert f"A FEELER LEAF PASSES BETWEEN MHA-DT-38 AND GEAR 19 ({row})." in steps
+    (cells,) = [r for r in drawing.ACCEPTANCE_TABLE_ROWS if row.endswith(f" ROW {r[0]}")]
+    assert cells[1].endswith("C") and cells[3:] == (f"{leaf} LEAF PASSES", "FEELERS")
+    (stack,) = [r for r in drawing.FEELER_STACK_ROWS if r[0] == leaf]
+    assert cells[1] in stack[2].split(", ")
+    (remedy,) = re.findall(r"IF IT DOES NOT, MEASURE [^.]*\.", steps)
+    for part in ("MHA-DT-04", "MHA-DT-05", "MHA-DT-12", "MHA-DT-20", "MHA-DT-21",
+                 "MHA-DT-38", "MHA-DT-39"):
+        assert part in remedy
 
 
 def test_tip_air_refuses_an_unclassified_source() -> None:
@@ -518,16 +576,45 @@ def test_tip_air_refuses_an_unclassified_source() -> None:
         air.AirStack("bushing", "tooth_face", 0.0, 1.0, {"a stray source": 0.1}, 0.0)
 
 
-def test_shaft_thrust_collar_width_needs_its_band_for_the_bushing_air(monkeypatch) -> None:
-    """CollarWidth's printed band sets where the shaft, and so the bushing on
-    T006's pivot, stands along the cone axis; at the inch .X the bushing can
-    reach G19."""
+def test_the_leaf_sees_what_comes_before_it(monkeypatch) -> None:
+    """CollarWidth's band sets where the bushing stands before step 23's
+    look, so the leaf sees it and the bushing's air books it; the pivot
+    thread's centring acts after the look, so the leaf does not see it,
+    though the bushing's air still books it."""
     import dt_cone_tip_air as air
-    import dt_cone_tip_block_spec as block
 
+    look = air.look_in_print_air_mm()
+    bushing = air.require_air()[air.LOOK_TIER]
     terms = dict(air.AXIAL_TERMS_MM)
-    terms["shaft thrust collar width"] = block.printed_band_mm(1)
+    terms["shaft thrust collar width"] += 0.01
     monkeypatch.setattr(air, "AXIAL_TERMS_MM", terms)
+    assert air.look_in_print_air_mm()["tooth_face"] < look["tooth_face"]
+    assert air.require_air()[air.LOOK_TIER] < bushing
+    monkeypatch.undo()
+    swing = dict(air.SWING_TERMS_MM)
+    swing["pivot thread centring"] += 0.01
+    monkeypatch.setattr(air, "SWING_TERMS_MM", swing)
+    assert air.look_in_print_air_mm() == pytest.approx(look)
+    assert air.require_air()[air.LOOK_TIER] < bushing
+
+
+def test_the_bushing_air_and_the_look_fail_first(monkeypatch) -> None:
+    """Fail-first controls: a look an in-print build can fail is refused; an
+    after-look source past the bushing's arithmetic margin sends the whole
+    sweep to the statistical method, and past that margin too it closes."""
+    import dt_cone_tip_air as air
+
+    monkeypatch.setattr(air, "LOOK_LEAF_MM", 3.0 / 64.0 * 25.4)
+    with pytest.raises(ValueError, match="rejects an in-print build"):
+        air.full_sweep_proof(intervals=40)
+    monkeypatch.undo()
+    swing = dict(air.SWING_TERMS_MM)
+    swing["pivot thread centring"] += 0.1
+    monkeypatch.setattr(air, "SWING_TERMS_MM", swing)
+    assert {row["method"] for row in air.full_sweep_proof(intervals=40)} == {
+        "statistical"
+    }
+    swing["pivot thread centring"] += 1.1
     with pytest.raises(ValueError, match="cone tip bushing can reach G19"):
         air.full_sweep_proof(intervals=40)
 

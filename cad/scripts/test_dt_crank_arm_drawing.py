@@ -32,11 +32,29 @@ def test_arm_is_a_matched_receiver_for_the_separate_hub() -> None:
     assert spec.ARM_THICKNESS == geometry.ARM_THICKNESS == pytest.approx(7.9375)
     assert spec.HUB_SEAT_DIA == geometry.HUB_SEAT_DIA == pytest.approx(0.76 * 25.4)
     assert spec.HALF_WIDTH == pytest.approx(12.7)
-    # The arm bore is made first; the hub is turned to suit it for the F10
-    # light press, .0004-.0012 in diametral.
-    assert geometry.SEAT_PRESS_INTERFERENCE == pytest.approx((0.01016, 0.03048))
+    # The arm bore is made first; the hub is turned to it for a slip fit
+    # bonded with LOCTITE 638 (owner ruling 2026-11-24, fit audit question
+    # 21), .0005-.003 in diametral; the arm's note names the bond.
+    assert geometry.SEAT_SLIP_CLEARANCE == pytest.approx((0.0127, 0.0762))
+    assert "LOCTITE 638" in spec.SEAT_PRESS_NOTE and "INTERFERENCE" not in spec.SEAT_PRESS_NOTE
+    assert notes.HUB_SEAT_CALLOUT.startswith("BONDED ON CRANK HUB")
+    assert "5/32 DRILL" in notes.SEAM_CALLOUT and "REAM" not in notes.SEAM_CALLOUT
     assert not hasattr(spec, "SHAFT_BORE_DIA")
     assert not hasattr(spec, "PIN_HOLE_SPEC")
+
+
+def test_seam_pin_note_prints_its_bond_clearance_inside_638s_gap() -> None:
+    # Machinist review r1 (farm run 20261124T110807008Z): the drilled bonded
+    # seat prints its diametral clearance (rule 23), at least .001 wide
+    # (rule 4) and inside LOCTITE 638's largest gap.
+    low, high = (value / 25.4 for value in spec.SEAM_BOND_CLEARANCE_MM)
+    assert (low, high) == pytest.approx((-0.0003, 0.0039))
+    assert high - low >= 0.001
+    assert spec.SEAM_BOND_CLEARANCE_MM[1] <= 0.25
+    assert spec.SEAM_BOND_CLEARANCE_TEXT == ".0003 INTERFERENCE TO .004 CLEARANCE"
+    assert "-" not in spec.SEAM_BOND_CLEARANCE_TEXT  # never a negative clearance
+    assert spec.SEAM_BOND_CLEARANCE_TEXT in spec.SEAM_NOTE
+    assert "MHA-DT-VN-59" in spec.SEAM_NOTE and "LOCTITE 638" in spec.SEAM_NOTE
 
 
 def test_axial_seam_key_is_six_oclock_and_the_cut_pin_seats_flush() -> None:

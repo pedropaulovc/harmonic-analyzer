@@ -25,7 +25,7 @@ Research: ``research/3-detailed-design/drive-train-cone-tip-options.md``
   north face (owner ruling 2026-11-20, #2469: a bonded slip fit on the shared
   .0625 reamer, not a press); its north face bears on the end of the end
   screw (McMaster 91794A559, 1/4-28 x 3/4 slotted fillister, owner ruling
-  2026-11-20, #2726, with a reamed hole for the pivot in its threaded end),
+  2026-11-20, #2726, with a drilled hole for the pivot in its threaded end),
   which threads through MHA-DT-21 and is locked by its pinch slit.
   The end screw sets the shaft's end play (cone_stack_end_play.SHAFT_END_PLAY).
 
@@ -108,12 +108,16 @@ BUSHING_BORE_DIA_MM = STEM_BORE_DIA_MM  # .0625 reamer
 BUSHING_BORE_BAND = STEM_BORE_BAND
 BUSHING_PLACES = 3
 
-# The end screw's added operation: drill and ream Ø.0630 x .12 for the pivot.
-# Owner ruling 2026-11-20 (#2726): the 3/4 screw, so the thread keeps 1.5 D
-# over the whole embed stack with the block's stations at .XX.
+# The end screw's added operation: drill #52 x .12 for the pivot (owner
+# ruling 2026-11-24, fit audit question 11; was a .0630 reamer and its ZZ
+# pins).  The DRILLED HOLES row's +.004/0 is its ANALYSIS band: the pivot
+# runs free in it and the tip air to gear 19 takes its float.  Owner ruling
+# 2026-11-20 (#2726): the 3/4 screw, so the thread keeps 1.5 D over the
+# whole embed stack with the block's stations at .XX.
 END_SCREW_SKU = "91794A559"
-END_HOLE_DIA_MM = 1.6002  # .0630 reamer
-END_HOLE_BAND = REAM_H7
+END_HOLE_DRILL = "#52"
+END_HOLE_DIA_MM = 1.6129  # .0635, #52
+END_HOLE_BAND = (0.1016, 0.0)  # +.004/-.000, title block DRILLED HOLES
 END_HOLE_DEPTH_MM = 3.048  # .12, .XX
 
 # MHA-DT-21: BLOCK_DEPTH_MM deep for the end screw's thread; its stations
@@ -157,7 +161,7 @@ _require_bond("spigot", SPIGOT_BOND_CLEARANCE_MM)
 # The bushing's bond on the pivot (#2469).
 BUSHING_BOND_CLEARANCE_MM = diametral_clearance_mm(BUSHING_BORE, PIVOT)
 _require_bond("bushing", BUSHING_BOND_CLEARANCE_MM)
-# The pivot runs in the end screw's reamed hole.
+# The pivot runs in the end screw's drilled hole.
 PIVOT_RUNNING_CLEARANCE_MM = diametral_clearance_mm(END_HOLE, PIVOT)
 if PIVOT_RUNNING_CLEARANCE_MM[0] <= 0.0:
     raise AssertionError(f"pivot running clearance {PIVOT_RUNNING_CLEARANCE_MM} mm")

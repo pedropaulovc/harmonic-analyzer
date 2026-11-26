@@ -137,12 +137,24 @@ if key.END_Z_MM + key.LENGTH >= BLANK_FACE_Z:
 # counter-clockwise about +z from it. With the key on the cutter's radius,
 # turning the blank -2.27° about +z (counter-clockwise seen from the
 # chamfered face, which looks along +z) carries that space under the cutter.
-# So every row's index puts a tooth on the key at the blank's mid-face, where
-# the 64T's tooth is centred on it; at the cutter's station it is .54° off
-# (machinist review of farm 20261113T234307484Z read 2.27° against half a
-# pitch: the title now names the station). Half a pitch on the 64T would
-# leave its mid-face tooth .54° off the key, over the arbor's setting
-# allowance (KEY_SETTING_ALLOWANCE_DEG).
+# So the model's index puts a tooth on the key at the blank's mid-face, where
+# the 64T's tooth is centred on it; at the cutter's station it is .54° off.
+# Half a pitch on the 64T would leave its mid-face tooth .54° off the key,
+# over the arbor's setting allowance (KEY_SETTING_ALLOWANCE_DEG): the model's
+# phase, not a function.
+#
+# Nothing in the machine reads the 64T's tooth-to-key clock (fit audit part 2,
+# B13; drawing-guidelines rule 4: a setting nothing needs takes no
+# requirement). The 16T it meshes is match-drilled to MHA-DT-11 wherever it
+# meshes (MHA-DT-00 step 4M; dt_crank_pinion_spec's retention pin), so any
+# 64T phase on the key is taken up there, and error_budget's crank index
+# (timebase.crank_index_deg) is the crank arm's stop repeatability, not this
+# clock. So the 64T row prints no index (NONE, NOT CLOCKED: restoration
+# round 1, 2026-11-25; the machinist review read "2.27° REF" beside "ANY
+# INDEX SERVES" as two instructions); the cone rows keep theirs (a keyed
+# cone gear's clock reaches the pen). CRANK_FIRST_INDEX_DEG and
+# CRANK_FIRST_INDEX_SENSE stay as the model's phase (the test checks the cut
+# against them).
 CONE_FIRST_INDEX_PITCHES = 0.5
 CRANK_MIDFACE_DRIFT_DEG = math.degrees(
     math.asin(
@@ -162,6 +174,7 @@ if (
     raise AssertionError("the 64T's model no longer centres a tooth on +X at mid-face")
 CRANK_FIRST_INDEX_DEG = round(math.degrees(crank.TOOTH_SPACE.azimuth_rad), 2)
 CRANK_FIRST_INDEX_SENSE = "CCW FROM CHAMFERED FACE"
+CRANK_NOT_CLOCKED = ("NONE", "NOT CLOCKED")
 
 
 def cone_first_index_deg(teeth: int) -> float:
@@ -277,18 +290,23 @@ _SEAT_TEXT = "Ø" + arbor.inch_text(
 # its first index's angle and direction (rule 22's setting table; machinist
 # review of farm 20261113T204539922Z: prose lines are not a table). The
 # index's acceptance is the title block's angle, set on the dividing head's
-# own dial (the last fitting step). The title names the station every index
-# centres a tooth on the key at: the blank's mid-face (the 64T derivation
-# above), so the 64T row's 2.27° agrees with it.
+# own dial (the last fitting step). The title names the station every
+# printed index centres a tooth on the key at: each cone blank's mid-face.
+# The 64T row reads NONE under FIRST INDEX and NOT CLOCKED under DIRECTION
+# (fit audit part 2, B13; restoration round 1, 2026-11-25): its clock is read
+# by nothing, so it takes no index, and step 23's "TURN THE DIVIDING HEAD BY
+# THE BLANK'S FIRST INDEX" turns it by none. CRANK_FIRST_INDEX_DEG and
+# CRANK_FIRST_INDEX_SENSE stay the model's phase (the test checks the cut
+# against them).
 SETUP_TABLE_TITLE = "\n".join(
     (
         "SETUP TABLE: EACH BLANK'S COLLAR AND FIRST INDEX",
-        f"(THE FIRST INDEX CENTRES A TOOTH ON ITEM {BOM_ITEMS[KEY]} AT THE BLANK'S "
-        "MID-FACE)",
+        f"(EACH {CONE_NUMBER} FIRST INDEX CENTRES A TOOTH ON ITEM {BOM_ITEMS[KEY]} "
+        "AT MID-FACE)",
     )
 )
-# Collar cells read "ITEM n" under COLLAR, and the 64T's direction is CCW
-# seen from its chamfered face, so every cell prints on one line.
+# Collar cells read "ITEM n" under COLLAR, and the 64T's cells read NONE and
+# NOT CLOCKED, so every cell prints on one line.
 SETUP_TABLE_HEADER = ("BLANK", "TEETH", "COLLAR", "FIRST INDEX", "DIRECTION")
 
 
@@ -296,7 +314,7 @@ def _first_index(tag: str) -> tuple[str, str]:
     """A blank's first index as the table prints it: angle and direction."""
     if tag.startswith("T"):
         return f"{cone_first_index_deg(blank_teeth(tag)):.2f}°", "EITHER WAY"
-    return f"{CRANK_FIRST_INDEX_DEG:.2f}°", CRANK_FIRST_INDEX_SENSE
+    return CRANK_NOT_CLOCKED
 
 
 SETUP_TABLE_ROWS: tuple[tuple[str, ...], ...] = tuple(
@@ -321,11 +339,14 @@ _AWAY = "AWAY FROM THE CUTTER"
 if _AWAY not in POINTING_DEG:
     raise AssertionError("the steps' pointing words are not a declared direction")
 # The key's clock (above): set on its own two side faces before the blank
-# goes on, touched in turn by one test indicator at one height, the head
-# turned half a turn between them (the cutter's centre plane is nothing a
+# goes on, touched in turn by one test indicator at one height, the dividing
+# head turned half a turn between them (the cutter's centre plane is nothing a
 # builder can touch; machinist review of farm 20261113T204539922Z); then a
 # half turn, only if it points away, brings it to the cutter. Rule 26's
-# private phrases (BY EYE among them) appear in no step.
+# private phrases (BY EYE among them) appear in no step. The work holder is
+# the shop's BS-0 dividing head (shop-equipment machines.toml), named so in
+# every step, and the indicator rides the MILL SPINDLE (machinist round 1,
+# farm 20261125T180203935Z: "THE HEAD" and "THE SPINDLE" read either way).
 _FITTING: tuple[str, ...] = (
     f"DEGREASE ITEM {_K} AND ITEM {_A}'S KEYSEAT.",
     f"COAT ITEM {_K} WITH {arbor.KEY_BOND}.",
@@ -335,34 +356,35 @@ _FITTING: tuple[str, ...] = (
     "KEYSEAT FILLED.",
     "LET THE BOND CURE 24 H.",
     f"CHECK: ITEM {_K} DOES NOT MOVE BY HAND.",
-    f"GRIP ITEM {_A}'S Ø.62 END IN THE HEAD'S 3-JAW CHUCK AGAINST ITS STEP, "
-    f"ONLY ITEM {_K} ON IT.",
-    f"TURN THE HEAD UNTIL ITEM {_K} POINTS {_AWAY}, ROUGHLY LEVEL.",
-    f"ZERO A TEST INDICATOR, HELD IN THE SPINDLE, ON ITEM {_K}'S UPPER SIDE FACE.",
+    f"GRIP ITEM {_A}'S Ø.62 END IN THE DIVIDING HEAD'S 3-JAW CHUCK AGAINST ITS "
+    f"STEP, ONLY ITEM {_K} ON IT.",
+    f"TURN THE DIVIDING HEAD UNTIL ITEM {_K} POINTS {_AWAY}, ROUGHLY LEVEL.",
+    f"ZERO A TEST INDICATOR, HELD IN THE MILL SPINDLE, ON ITEM {_K}'S UPPER SIDE "
+    "FACE.",
 )
 ZERO_STEP = len(_FITTING)
 DRO_STEP = ZERO_STEP + 1
 _SETTING: tuple[str, ...] = (
     "NOTE THE Z DRO READING.",
-    "TURN THE HEAD 180°.",
+    "TURN THE DIVIDING HEAD 180°.",
     f"CARRY THE INDICATOR OVER ITEM {_A} TO ITEM {_K}'S UPPER SIDE FACE BY Y AND "
     f"Z ONLY, BACK AT THE STEP {DRO_STEP} Z DRO READING.",
     f"CHECK: THE INDICATOR READS ZERO WITHIN {_READING}.",
 )
 CHECK_STEP = ZERO_STEP + len(_SETTING)
 _SETTING += (
-    f"IF STEP {CHECK_STEP} FAILS, TURN THE HEAD UNTIL THE INDICATOR READS HALF "
-    f"ITS STEP {CHECK_STEP} READING AND REPEAT FROM STEP {ZERO_STEP}.",
-    f"IF ITEM {_K} POINTS {_AWAY}, TURN THE HEAD 180°.",
-    "LOCK THE HEAD'S SPINDLE.",
+    f"IF STEP {CHECK_STEP} FAILS, TURN THE DIVIDING HEAD UNTIL THE INDICATOR READS "
+    f"HALF ITS STEP {CHECK_STEP} READING AND REPEAT FROM STEP {ZERO_STEP}.",
+    f"IF ITEM {_K} POINTS {_AWAY}, TURN THE DIVIDING HEAD 180°.",
+    "LOCK THE DIVIDING HEAD'S SPINDLE.",
     f"SLIDE THE BLANK ONTO ITEM {_A} OVER ITEM {_K}, AGAINST ITEM {_A}'S SHOULDER.",
     f"SLIDE THE BLANK'S COLLAR (SETUP TABLE) ONTO ITEM {_A} AGAINST THE BLANK.",
     f"TIGHTEN ITEM {_N} AGAINST THE COLLAR.",
     f"FOR AN {CONE_NUMBER} BLANK, RUN THE TAILSTOCK CENTRE INTO ITEM {_A}'S "
     "THREADED-END CENTRE HOLE.",
     "CHECK: THE BLANK DOES NOT TURN OR SLIDE BY HAND.",
-    "UNLOCK THE HEAD'S SPINDLE.",
-    "TURN THE HEAD BY THE BLANK'S FIRST INDEX (SETUP TABLE).",
+    "UNLOCK THE DIVIDING HEAD'S SPINDLE.",
+    "TURN THE DIVIDING HEAD BY THE BLANK'S FIRST INDEX (SETUP TABLE).",
 )
 _STEPS: tuple[str, ...] = (*_FITTING, *_SETTING)
 INDEX_STEP = len(_STEPS)

@@ -1,0 +1,19 @@
+checks:
+  - id: C-01
+    check: "MHA-DT-VN-59's bond gap passes LOCTITE 638's largest"
+    kind: joint
+    reason: "LOCTITE 638 cannot fill the gap; the seam pin walks"
+    source: "LOCTITE 638 TDS, 0.25 mm max diametral gap (dt_crank_hub_geometry _LOCTITE_638_MAX_GAP_MM); pin 98381A487 5/32 +.0001/+.0003 in the 5/32 drill at DRILLED HOLES +.004/0 (fit audit 2026-11-23, MHA-DT-06_DT-31.seam_pin; drawing-guidelines rule 23)"
+    basis: worst_case
+  - id: C-02
+    check: "MHA-DT-VN-59's bond range is under .001 wide (rule 4)"
+    kind: joint
+    reason: "a narrower printed range needs a gauge the shop lacks"
+    source: "drawing-guidelines rule 4, form 2 (a clearance or interference range no narrower than .001 wide) and its over-specification list"
+    basis: worst_case
+  - id: C-03
+    check: "MHA-DT-VN-59's fit no longer runs interference to clearance"
+    kind: joint
+    reason: "note 3 would misstate the pin's tight end"
+    source: "dt_crank_arm_spec SEAM_BOND_CLEARANCE_MM (98381A487 catalogue +.0001/+.0003 over the 5/32 drill's size); drawing-guidelines rule 23 (a bonded seat prints its clearance)"
+    basis: worst_case

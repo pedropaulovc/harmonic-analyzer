@@ -1,7 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 400" font-family="sans-serif" font-size="13">
   <!-- Section through the screw's axis, about 300 px to the inch: the head Ø.414 x .237, the 1/4-28 shank .75 long, .40 of it out of the jaws' front step. Styles: prechips.palette. -->
   <rect class="paper" x="0" y="0" width="760" height="400"/>
-  <text class="title" x="20" y="22">Setup 1: the bought screw in the 4-jaw, on the jaws' front step over brass shim; the end hole reamed from the tailstock</text>
+  <text class="title" x="20" y="22">Setup 1: the bought screw in the 4-jaw, on the jaws' front step over brass shim; the end hole drilled #52 from the tailstock</text>
   <rect class="fixture-vise" x="40" y="60" width="90" height="280"/>
   <polygon class="clamp" points="130,70 240,70 240,100 330,100 330,159 240,159 240,125 130,125"/>
   <polygon class="clamp" points="130,330 240,330 240,300 330,300 330,241 240,241 240,275 130,275"/>
@@ -23,10 +23,10 @@
   <line class="leader" x1="285" y1="241" x2="320" y2="364"/>
   <text class="label" x="300" y="380">brass shim on the thread, front step only</text>
   <line class="leader" x1="432" y1="210" x2="470" y2="262"/>
-  <text class="label" x="474" y="268">Ø{{cad.end_hole_dia_min_in:.4dot}}–{{cad.end_hole_dia_max_in:.4dot}} reamed {{cad.end_hole_depth_min_in:.2dot}}–{{cad.end_hole_depth_max_in:.2dot}} deep</text>
+  <text class="label" x="474" y="268">#52 drilled {{cad.end_hole_depth_min_in:.2dot}}–{{cad.end_hole_depth_max_in:.2dot}} deep</text>
   <line class="leader" x1="450" y1="160" x2="520" y2="140"/>
   <text class="label" x="524" y="138">end face as bought: quill scale zero</text>
-  <text class="label" x="630" y="190">reamer</text>
+  <text class="label" x="630" y="190">#52 drill</text>
   <line class="dims" x1="330" y1="250" x2="450" y2="250"/>
   <line class="dims" x1="330" y1="242" x2="330" y2="258"/>
   <line class="dims" x1="450" y1="240" x2="450" y2="258"/>

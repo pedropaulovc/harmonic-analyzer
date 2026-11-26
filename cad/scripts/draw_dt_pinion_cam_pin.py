@@ -42,6 +42,7 @@ from _drawing_dimensions import (
     set_arc_endpoints_to_max,
     set_dimension_callouts,
     set_reference_dimension,
+    set_reference_dimensions,
 )
 from _drawing_edge_dimensions import add_edge_dimension
 from _drawing_finish import add_surface_finish
@@ -69,9 +70,8 @@ from dt_pinion_cam_pin_spec import (
     DRAWING_REFERENCE_PRECISION,
     PIN_DIA as PIN_DIA,
     PIN_DIA_BAND,
+    PIN_DIA_CALLOUT,
     PIN_LEN,
-    RETAINING_COMPOUND,
-    SEAT_NUMBER,
     SURFACE_FINISHES,
     UNIT,
 )
@@ -131,16 +131,11 @@ RIGHT_KEEP = {
     "CapR": (0.105, 0.110),
 }
 OVERALL_TEXT_XY = (RIGHT_CENTER[0], RIGHT_CENTER[1] + HALF_DIA + 0.067)
-# The shank is the drill rod as received (title block), so its callout says
-# the size is the stock's (rule 4: stock that is good enough stays stock),
-# the supplier's ±.0005 printed as its acceptance, without repeating the
-# Material cell (machinist review of 7f7fc1717); the fit by its standard
-# name, bonded with its LOCTITE grade (dt_pinion_cam_pin_spec: U27, #290).
-# The length and the crown radius carry their values only (rule 7).
-PIN_DIA_CALLOUT = (
-    "STOCK, AS SUPPLIED; BONDED FIT IN\n"
-    f"{SEAT_NUMBER} FOLLOWER SEAT, {RETAINING_COMPOUND}"
-)
+# The shank is the drill rod as received, so its size prints REF beside the
+# stock (rule 4: a diameter bought to size and never cut prints the stock;
+# dt_pinion_cam_pin_spec.PIN_DIA_CALLOUT), and the fit by its standard name,
+# bonded with its LOCTITE grade (U27, #290).  The length and the crown
+# radius carry their values only (rule 7).
 DIMENSION_CALLOUTS = {
     "PinDia": PIN_DIA_CALLOUT,
 }
@@ -214,6 +209,10 @@ requirement(
         "root_station": _P["Depth"],
     },
 )
+# The shank: the 5/32 drill rod as supplied, size REF (no printed band);
+# ``dia`` is the supplier's catalogue band, the traveler's check that the bar
+# is the stock (the turned_shaft adapter reads an as-supplied outer as a
+# band, as MHA-DT-13's and MHA-DT-17's).
 requirement(
     "outer",
     kind="diameter",
@@ -228,7 +227,7 @@ requirement(
             ((_GEOM, "PIN_DIA"), "PIN_DIA_BAND", (_SELF, "RIGHT_KEEP")),
         ),
         "dia_nominal": (PIN_DIA, ((_GEOM, "PIN_DIA"),)),
-        "callout": (PIN_DIA_CALLOUT, ((_SELF, "PIN_DIA_CALLOUT"),)),
+        "callout": (PIN_DIA_CALLOUT, ("PIN_DIA_CALLOUT",)),
     },
     precision={"dia": _P["PinDia"]},
 )
@@ -362,6 +361,8 @@ def build(adapter: Any) -> dict[str, str]:
     )
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
+    # The drill rod's as-bought diameter prints REF: "(Ø.1563)".
+    set_reference_dimensions(adapter, annotations, ("PinDia",))
     if _center_mark_count(front) == 0 and not auto_center_marks(
         adapter, front, holes=True, size=0.0025
     ):

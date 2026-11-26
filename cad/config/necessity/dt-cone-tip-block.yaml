@@ -1,0 +1,18 @@
+# MHA-DT-21 cone tip block: why each band tighter than the title block stays
+# (drawing-guidelines.md rule 4; owner ruling 2026-11-24: the reason lives
+# here, not on the sheet). Read by the machinist review only. The dowel hole
+# is drilled and bonded (owner ruling 2026-11-24, fit audit question 11) and
+# the pinch clearance prints DRILL THIS JAW TO SLOT with no depth band, so
+# neither needs an entry.
+# The axis height, made to the measured MHA-DT-05 journal axis height within
+# +/-.003 (note 2; fit audit 2026-11-23 F09, kept): T006's pivot runs in the
+# end screw's hole, and build_dt_drive_train_assembly books this residual
+# against the shaft's tilt in its journal, the screw's float in its thread
+# and the pivot's running clearance (require_tip_vertical_take_up); the
+# .XXX row's +/-.005 exceeds that take-up
+# (dt_cone_tip_block_spec.AXIS_HEIGHT_MATCH_RESIDUAL_MM).
+necessity:
+  - id: N-01
+    feature: "note 2, axis height made to the MHA-DT-05 journal within ±.003"
+    kind: gap
+    reason: "past .003 the tip pivot's vertical take-up runs out"

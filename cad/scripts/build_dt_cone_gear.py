@@ -81,9 +81,7 @@ from dt_cone_gear_spec import (
     BLANK_DIA_BAND,
     BORE_SKETCH,
     FACE_WIDTH_BAND,
-    BORE_DIA_BAND,
     CONFIGS,
-    ROUND_BORE_TEETH,
     DEFAULT_TEETH,
     DIAMETRAL_PITCH,
     FACE_WIDTH,
@@ -99,7 +97,6 @@ from dt_cone_gear_spec import (
     WEB_REFERENCE_ANGLE_DEG,
     WEB_REFERENCE_SKETCH,
     web_reference_mm,
-    bore_dia_band,
     bore_dia_mm,
     configuration_number,
     floor_limits_mm,
@@ -388,8 +385,8 @@ def _set_keyway_t_limits(adapter: Any, places: int) -> None:
 
 def _set_configuration_bands(adapter: Any) -> None:
     """Store each configuration's bilateral bands (``_BANDED_DIMENSIONS``)
-    in every configuration: the blank and tooth-thickness bands, and the
-    round bore's (the reamer's on T012/T018, the seat class elsewhere).
+    in every configuration: the blank and tooth-thickness bands.  The bores
+    print no band (fit audit 2026-11-23).
 
     The FloorDia form (``_set_gap_floor_limits``): one ``SetValues2`` with
     swSetValue_InSpecificConfigurations per configuration. No readback here:
@@ -397,7 +394,7 @@ def _set_configuration_bands(adapter: Any) -> None:
     the active configuration's band (part:dt_cone_gear at 039e557da). The
     reopened audit reads each back with its configuration active
     (``_assert_configuration_bands``). Called with T120, the marking
-    configuration, active: BoreCutDia's feature is live in every one.
+    configuration, active.
     """
     import pythoncom
     from win32com.client import VARIANT
@@ -416,10 +413,7 @@ def _set_configuration_bands(adapter: Any) -> None:
                     f"{name}@{configuration}: SetValues2 rejected the band {band} mm"
                 )
     _telemetry.success(
-        f"BlankDia, ToothThickness and BoreCutDia bands set in {len(CONFIGS)} "
-        f"configurations (BoreCutDia: "
-        f"{', '.join(f'T{t:03d} {bore_dia_band(t)}' for t in ROUND_BORE_TEETH)} mm, "
-        f"seat class {BORE_DIA_BAND} mm on the rest)"
+        f"BlankDia and ToothThickness bands set in {len(CONFIGS)} configurations"
     )
 
 
@@ -1129,21 +1123,14 @@ def build(adapter) -> dict[str, str]:
         adapter, "Blank", "FaceWidth", *deviations(FACE_WIDTH_BAND),
         places=places["FaceWidth"], display_unit=UNIT,
     )
-    # The keyed configurations' (and T024's) seat band; T012/T018 take the
-    # reamer's in their own configurations (``_set_configuration_bands``).
-    set_dimension_bilateral_tolerance(
-        adapter, BORE_SKETCH, "BoreCutDia", *deviations(BORE_DIA_BAND),
-        places=places["BoreCutDia"], display_unit=UNIT,
-    )
-    set_dimension_bilateral_tolerance(
-        adapter, KEYED_BORE_SKETCH, "KeyedBoreDia", *deviations(BORE_DIA_BAND),
-        places=places["KeyedBoreDia"], display_unit=UNIT,
-    )
-    set_dimension_bilateral_tolerance(
-        adapter, KEYED_BORE_SKETCH, "KeywayWidth",
-        *deviations(cone_land_key.KEYWAY_WIDTH_BAND),
-        places=places["KeywayWidth"], display_unit=UNIT,
-    )
+    # The bores print their reamer's size with no band (drawing-guidelines
+    # rule 4; fit audit 2026-11-23): MHA-DT-04's lands and MHA-DT-37's spigot
+    # are turned to them, and note 1 names that mate.  Their places are
+    # DRAWING_PRECISION's (apply_drawing_precision below).  The keyway width
+    # carries no band either: the 1/16 A broach cuts it and the bought key is
+    # the gauge (rule 4, form 3; machinist review r1, farm run
+    # 20261124T110807008Z); cone_land_key.KEYWAY_WIDTH_BAND stays the
+    # broach's analysis band.
     _set_keyway_t_limits(adapter, places["KeywayT"])
     set_dimension_bilateral_tolerance(
         adapter,

@@ -20,17 +20,17 @@
   <line class="leader" x1="124" y1="74" x2="124" y2="127"/>
   <text class="label" x="150" y="210">2X .0930 drive-pin holes, .2756 each side of the axis; knockouts through</text>
   <line class="leader" x1="187" y1="198" x2="197" y2="163"/>
-  <text class="label" x="300" y="100">journals Ø.4371</text>
+  <text class="label" x="300" y="100">journals (Ø.4375)</text>
   <line class="leader" x1="320" y1="104" x2="260" y2="125"/>
   <line class="leader" x1="370" y1="104" x2="505" y2="125"/>
   <text class="label" x="330" y="190">relief Ø.41</text>
   <line class="leader" x1="380" y1="178" x2="380" y2="153"/>
-  <text class="label" x="560" y="190">seat Ø.3121; F with its centre</text>
+  <text class="label" x="560" y="190">seat (Ø.3125); F with its centre</text>
   <line class="leader" x1="610" y1="178" x2="610" y2="150"/>
   <rect class="holes" x="47" y="132" width="4" height="4"/>
   <text class="label" x="20" y="250">SR.26 dome; the punch mark on it, off the apex</text>
   <line class="leader" x1="40" y1="238" x2="48" y2="137"/>
-  <text class="label" x="70" y="230">Ø.3746 stub</text>
+  <text class="label" x="70" y="230">(Ø.3750) stub</text>
   <line class="leader" x1="100" y1="218" x2="100" y2="153"/>
   <text class="label" x="230" y="60">Ø.687 spigot</text>
   <line class="leader" x1="240" y1="64" x2="206" y2="113"/>

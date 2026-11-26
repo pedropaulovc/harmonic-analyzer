@@ -768,6 +768,7 @@ from dt_cone_swing_platform_checks import manufactured_p1_stop_enclosure  # noqa
 from dt_cone_swing_platform_spec import (  # noqa: E402
     HOLDDOWN_CBORE_DEPTH as PLAT_HOLDDOWN_CBORE_DEPTH,
     HOLDDOWN_CLEARANCE_DIA as PLAT_HOLDDOWN_CLEARANCE_DIA,
+    HOLDDOWN_LATERAL_TOL_MM as PLAT_HOLDDOWN_LATERAL_TOL_MM,
     HOLDDOWN_LOCAL_X as PLAT_HOLDDOWN_LOCAL_X,
     HOLDDOWN_STATION_TOL_MM as PLAT_HOLDDOWN_STATION_TOL_MM,
     POST_MOUNT_SPEC,
@@ -985,6 +986,7 @@ from build_dt_cone_pivot_post import (  # noqa: E402
 )
 from dt_cone_pivot_post_spec import (  # noqa: E402
     ATTACHMENT_THRU_DIA as POST_ATTACHMENT_THRU_DIA,
+    CONE_BOSS_NORTH_STATION_DEVIATIONS_MM as POST_CONE_BOSS_NORTH_DEVIATIONS,
     CRANK_BOSS_DIA as POST_CRANK_BOSS_DIA,
     DRAWING_PRECISION_BY_NAME as POST_DRAWING_PRECISION,
     UNIT as POST_UNIT,
@@ -1076,8 +1078,8 @@ TIP_DOWEL_BOTTOM_Y = Y_BASE_TOP + PLAT_T + TIP_DOWEL_HOLE_DEPTH - TIP_DOWEL_LENG
 _require_tapped_thread("cone-tip hold-down", HOLDDOWN_THREAD, TIP_FOOT_BORE_SPEC)
 # U30 post mount (I22): each MHA-DT-VN-61 seats on the MHA-DT-05 counterbore floor and
 # is cut to fit into the MHA-DT-20 tap: never proud of the plate underside, and
-# at least 0.87D of thread (owner ruling 2026-11-01, MHA-DT-VN-61's RV-01;
-# #1019's 0.90D target is not met) both at the modelled cut length and at the
+# at least 0.84D of thread (owner rulings 2026-11-01 and 2026-11-24 S2,
+# MHA-DT-VN-61's RV-01; #1019's 0.90D target is not met) both at the modelled cut length and at the
 # platform spec's printed worst case.
 _require_tapped_thread("cone-post mount", POST_SCREW_THREAD, POST_MOUNT_SPEC)
 POST_SCREW_SEAT = POST_BLOCK_HEIGHT - POST_CBORE_DEPTH  # above PlateTop
@@ -1204,8 +1206,9 @@ def tip_block_print_worst_containment_mm(half_widths: dict[str, float]) -> float
 # The block is located by its foot tap on MHA-DT-VN-60 in the platform's hold-down
 # hole, not slid to the shaft at fit-up, so every station it used to take up
 # closes by print tolerance.  The screw floats in its drilled close-clearance
-# hole; the hole's two stations from the pivot bore (HoldDownX, HoldDownZ)
-# and the tap's two stations carry explicit +/-0.10 bands.
+# hole; the hole's stations from the pivot bore print at the title block
+# (HoldDownZ .XXX, HoldDownX .XX) and the tap's two stations carry their own
+# bands.
 _DRILLED_HOLE_PLUS_MM = drilled_oversize_mm(unit=PLAT_UNIT)
 HOLDDOWN_SCREW_FLOAT_MM = (
     PLAT_HOLDDOWN_CLEARANCE_DIA + _DRILLED_HOLE_PLUS_MM - HOLDDOWN_SHANK_DIA
@@ -1217,7 +1220,7 @@ TIP_NORTH_FACE_BAND_MM = (
 )
 # The tap's lateral station about its nominal PLAT_HOLDDOWN_LOCAL_X.
 TIP_TAP_LATERAL_BAND_MM = (
-    PLAT_HOLDDOWN_STATION_TOL_MM + HOLDDOWN_SCREW_FLOAT_MM + TIP_FOOT_TAP_X_TOL_MM
+    PLAT_HOLDDOWN_LATERAL_TOL_MM + HOLDDOWN_SCREW_FLOAT_MM + TIP_FOOT_TAP_X_TOL_MM
 )
 # Each side face's worst distance from the plate centreline: the tap stands
 # at PLAT_HOLDDOWN_LOCAL_X, the -X face FootTapX to its -X side, and the +X
@@ -1371,10 +1374,7 @@ from dt_crank_pinion_spec import (  # noqa: E402
     OUTSIDE_DIA_TOLERANCE_MM as PINION_OUTSIDE_DIA_TOLERANCE,
     SHOULDER_LENGTH as PINION_SHOULDER_LENGTH,
     SHOULDER_LENGTH_LIMITS as PINION_SHOULDER_LIMITS,
-    T120_FITUP_FEELER_MM as PINION_T120_FITUP_FEELER,
-    T120_FITUP_PUSHED as PINION_T120_FITUP_PUSHED,
     TURNED_DIA as PINION_TURNED_DIA,
-    TURNED_DIA_FITUP_MIN as PINION_TURNED_DIA_FITUP_MIN,
     TURNED_DIA_TOLERANCE_MM as PINION_TURNED_DIA_TOLERANCE,
 )
 from gear_seat_fit import GEAR_SEAT_CLEARANCE  # noqa: E402
@@ -1408,10 +1408,9 @@ _PINION_TURNED_RADIUS_UP = _PINION_TURNED_DIA_BAND[1] / 2.0
 _BOSS_NORTH_BAND = printed_deviations(
     POST_CRANK_BOSS_NORTH_FACE, POST_DRAWING_PRECISION["CrankBossStartZ"], unit=POST_UNIT
 )
-_CONE_BOSS_NORTH_BAND = tuple(
-    d / 2.0
-    for d in printed_deviations(POST_CONE_BOSS_LENGTH, POST_DRAWING_PRECISION["ConeBossLen"], unit=POST_UNIT)
-)
+# The collar face's station prints at the title block (owner ruling
+# 2026-11-24, audit part 2 C9): its own limits, not half the face-to-face.
+_CONE_BOSS_NORTH_BAND = POST_CONE_BOSS_NORTH_DEVIATIONS
 _COLLAR_WIDTH_BAND = printed_deviations(
     SHAFT_COLLAR_THICKNESS, SHAFT_DRAWING_PRECISION["CollarWidth"], unit=SHAFT_UNIT
 )
@@ -1840,90 +1839,11 @@ CRANK_SHAFT_END_NORTH_AIR_WORST = (
     _END_T120_NEAREST - T120_POSE_RADIAL - CRANK_SHAFT_END_RADIUS_MAX
 )
 # This envelope follows the configured cone family. The nominal floors above
-# and the fit-up/service and engagement guards below remain independent of
-# the worst-clearance facts stated on the manufacturing sheets.
-
-# The fit-up check (dt_crank_pinion_spec.T120_FITUP_ASSEMBLY_CHECK) reads the
-# pair with the 16T on its seat feeler (its end play's north end) and the
-# stack resting at its model pose, MHA-DT-10 and T120 pushed toward each other.
-# Each running play that can still move after the check is taken up by one of
-# those pushes: MHA-DT-10 takes up its own bore and MHA-DT-11's journal, T120 the
-# cone shaft in the post boss.  The rest of T120_POSE_TERMS are fixed once
-# assembled, and the check's full turn sweeps them.  Codex P2 on #1154: a
-# check that pushed only MHA-DT-11 passed a Ø16.043 band that then closed to
-# 0.018 when the cone shaft moved.
-T120_RUNNING_PLAY = {
-    "crank journal float": "MHA-DT-10",
-    "16T bore on the crankshaft": "MHA-DT-10",
-    "cone shaft float in the post boss": "T120",
-}
-
-
-def t120_fitup_reading(
-    *, pushed: tuple[str, ...] = PINION_T120_FITUP_PUSHED, **geometry
-) -> dict[str, float]:
-    """The least the fit-up feeler can read at the check's pose: every fixed
-    offset and pose at its worst, the running play of each part in
-    ``pushed`` taken up toward T120 and the rest left centred."""
-    left = [
-        T120_POSE_TERMS[name]
-        for name, part in T120_RUNNING_PLAY.items()
-        if part not in pushed
-    ]
-    return pinion_t120_clearances(
-        pose_radial=T120_POSE_RADIAL - sum(radial for radial, _ in left),
-        pose_axial=T120_POSE_AXIAL - sum(axial for _, axial in left),
-        end_plays=(max(PINION_END_PLAY),),
-        cone_floats=(0.0,),
-        **geometry,
-    )
-
-
-# ... and a band turned down must still mesh.  Codex P1 on #1154: at Ø15.48
-# and the open centre distance the band's contact path is -0.63, no contact.
-# Each cut is called for by its own reading alone (t120_fitup_cuts): the band
-# is turned down only where the feeler stops between it and the T120 tips,
-# and the check reads the pair's worst, so only a crank no higher than
-# T120_BAND_CHECK_CRANK_HEIGHT above its model height is ever turned down
-# (every other term taken at its closing worst there: a superset).  A
-# shoulder faced back leaves the band reading as it was: the band's window
-# already starts at the shoulder's short limit, the facing's floor.  A lower
-# crank also closes the 16T:64T centres, so the floor need keep contact only
-# up to that height, every other open-corner term open (worst to worst only
-# on the terms the two checks do not share).  Codex P1 on #1154 (review 3):
-# a check that let either failure turn the band down would turn it at crank
-# +0.300, where only the shoulder stops the feeler, and lose contact there.
-
-
-def t120_fitup_cuts(reading: dict[str, float]) -> frozenset[str]:
-    """The clearances whose own fit-up cut the check calls for at
-    ``reading`` (dt_crank_pinion_spec.T120_FITUP_ASSEMBLY_CHECK): the band is
-    turned down only for ``turned band radial``, the shoulder faced back only
-    for ``shoulder air``, each where its own reading stops the feeler."""
-    return frozenset(
-        name for name, value in reading.items() if value < PINION_T120_FITUP_FEELER
-    )
-
-
-def _band_check_crank_height() -> float:
-    """Highest crank height at which the fit-up check can call for the band
-    to be turned down: its own reading, the band at its printed upper limit,
-    stops the feeler (the reading grows as the crank rises)."""
-
-    def turns_band(height: float) -> bool:
-        reading = t120_fitup_reading(crank_heights=(height,))
-        return "turned band radial" in t120_fitup_cuts(reading)
-
-    low, high = _CRANK_HEIGHT_BAND
-    if turns_band(high):
-        return high
-    for _ in range(50):
-        middle = (low + high) / 2.0
-        low, high = (middle, high) if turns_band(middle) else (low, middle)
-    return high
-
-
-T120_BAND_CHECK_CRANK_HEIGHT = _band_check_crank_height()
+# and the service and engagement guards below remain independent of the
+# worst-clearance facts stated on the manufacturing sheets.  MHA-DT-00 checks
+# the 16T against T120 by a look for daylight (fit audit 2026-11-23 part 2,
+# B9): the worst clearances (T120_TURNED_BAND_RADIAL, T120_SHOULDER_AIR) leave
+# no fit-up feeler or cut to model.
 
 
 # Retain this pitch-cylinder frame construction for independent dimensional
@@ -1995,7 +1915,8 @@ PIVOT_BASE_THREAD_FIT = require_through_seat_fit(
 # plate's post-mount taps (explicit +/-0.10 stations).  Its journal runs at the
 # incline to its mount-hole line, so the mount holes' .XX stations move it
 # along the cone axis by sin(I); the shaft collar bears on the boss's north
-# face, half the ConeBossLen band off the post centre.
+# face, its station's title-block band off the post centre (owner ruling
+# 2026-11-24, audit part 2 C9).
 _SIN_INCLINE = math.sin(math.radians(INCLINE_DEG))
 _COS_INCLINE = math.cos(math.radians(INCLINE_DEG))
 POST_SCREW_FLOAT_MM = (
@@ -2006,7 +1927,7 @@ POST_BOSS_FACE_AXIAL_BAND_MM = (
     PLAT_POST_MOUNT_STATION_TOL_MM
     + POST_SCREW_FLOAT_MM
     + _POST_MOUNT_X_BAND * _SIN_INCLINE
-    + tip_printed_band_mm(POST_DRAWING_PRECISION["ConeBossLen"]) / 2.0
+    + max(abs(deviation) for deviation in POST_CONE_BOSS_NORTH_DEVIATIONS)
 )
 # Pivot-screw head vs the block's plain north face: the head stands on its
 # shoulder at PIVOT_STATION and floats in the plate's reamed pivot bore by
@@ -2054,7 +1975,7 @@ PIVOT_HEAD_WORST_GAP = tip_pivot_head_worst_gap_mm(TIP_NORTH_FACE_BAND_MM)
 #
 # The post's screw clearance is one-sided (#2697): MHA-DT-00 holds MHA-DT-05
 # pushed toward MHA-DT-21 along the shaft while it is turned and tightened
-# (steps 2S-2U, user decision 2026-10-12; dt_cone_tip_air books the same), so
+# (steps 2T-2V, user decision 2026-10-12; dt_cone_tip_air books the same), so
 # the clearance can only carry the shaft north of its centred station, by
 # anything from none (the post turned to the end of its clearance) to all of
 # it.  It makes the embed shallower, never deeper.
@@ -2466,12 +2387,12 @@ ARBOR_COLLAR_Z0 = ARBOR_Z0 + ARBOR_PIN_Z - ARBOR_COLLAR_PIN_Z
 ARBOR_COLLAR_Z = (ARBOR_COLLAR_Z0, ARBOR_COLLAR_Z0 + ARBOR_COLLAR_LEN)
 
 # Worst stack at both ends (user ruling P1-2): the rig is set with the drum's
-# back end RIG_SET_LEAF_D off g19's back face, so from the pose it advances
-# by DRUM_BACK_ADVANCE_STACK and must still cover all of g19's face (so j = 19
+# back end D off g19's back face, so from the pose it advances by
+# DRUM_BACK_ADVANCE_STACK and must still cover all of g19's face (so j = 19
 # engages >= 2.0 a fortiori); its front end retreats by DRUM_FRONT_RETREAT_STACK
-# and must stay 1.0 south of g0's front face.  Both spares join RIG_MARGINS
-# (below), and one leaf step thinner would leave j = 19 short of
-# RIG_MARGIN_SPARE (D is the thinnest setting that holds).  D is set with the
+# and must stay 1.0 south of g0's front face.  Both join RIG_MARGINS (below);
+# D and the two plays it covers are the owner's ranges (C7), so j = 19 keeps
+# its floor, not RIG_MARGIN_SPARE.  D is set with the
 # bank held south on its disc (user ruling 2026-10-20), and D follows the
 # actual g19 back face, so the bank adds nothing to j = 19; at the front g0
 # sits south by a long g0 -> g19 pitch stack (RIG.G0_FRONT_SOUTH_STACK), beside the
@@ -2537,8 +2458,8 @@ SPRING_X = PIVOT_X + SPR_PIVOT_LX  # machine anchor
 # in from that inner face.
 STRAP_Z_INNER = RIG.STRAP_Z_INNER
 # Blade inner edge, in from the strap's inner face: SPRING_BLADE_INSET keeps the
-# whole blade on the flank at every strap thickness, RIG_MARGIN_SPARE over its
-# floor (pinion_rig_layout).
+# whole blade on the flank at every strap thickness and pad leaf of its range,
+# RIG_MARGIN_SPARE over its floor (pinion_rig_layout).
 SPRING_BLADE_INSET = RIG.SPRING_BLADE_INSET
 SPRING_Z = RIG.SPRING_Z
 # _SPR_U (up the strap axis) and _SPR_N (its east normal, east = machine -x)
@@ -2570,10 +2491,10 @@ SPRING_FOOT_END_X = SPRING_X - SPR_FOOT_END_L[0]  # the free end, east
 SPRING_FOOT_TAN_X = SPRING_X - SPR_FOOT_TAN_L[0]  # the bend tangent
 
 # The foot's screw pad widens the free end forward of the strip, flush with
-# its aft edge (pinion_rig_layout): booked with that edge at the pad leaf's
-# thinnest setting, no width band reaches it.  The leaf sets z, so z alone
+# its aft edge (pinion_rig_layout): booked with that edge at the pad range's
+# thinnest leaf, no width band reaches it.  The leaf sets z, so z alone
 # is gated (Main, #859 restricted review).
-_SPR_PAD_Z_HI = RIG.SPRING_PAD_AFT_Z + RIG.FEELER_SET_ERROR
+_SPR_PAD_Z_HI = RIG.SPRING_PAD_AFT_Z + (RIG.SPRING_PAD_LEAF - RIG.SPRING_PAD_GAP[0])
 
 # --- cam engage path (ch. 25 + page001_img01; PR8) ---------------------------
 # Blind-seat integrity: nearest approach of the seat cylinder to the pivot
@@ -2735,6 +2656,16 @@ SPRING_TO_LIFT_ROD = (
 # point A: the .300 in channel grid's 153.924 drum, the 236.83 arbor and the
 # 7.71 pivot shaft): weight volume +2676 mm^3, mass +22.1 g (+4.8%), the
 # moments rose 5.33% parked and 5.27% engaged.
+# Corrected 2026-11-24 without a re-measure (fit audit question 12, F16): the
+# strap pivot bore moved to the .2510 reamer's 6.3754, removing a ring
+# coaxial with the swing axis, 2.3213 mm^3 per strap (analytic: pi/4 x
+# (6.3754^2 - 6.35^2) x 9.144): its moment about that axis is zero, so the
+# moments stand; the strap volume and the mass (-0.036 g) follow.  Again
+# (fit audit F14): the arbor's crossrod hole moved to the .2510 reamer's
+# 6.3754, its analytic volume -3.6266 mm^3 (V_TOTAL), -0.0283 g at the arbor
+# head; at most C2C 28 off the swing axis, the moments would fall by at
+# most 0.0078 N mm (0.05%), so they stand; the arbor volume and the mass
+# follow.
 # Install the measured basis AND frozen fingerprint together (DEVELOPING.md).
 SWING_GRAVITY_NMM = (14.980239335725214, 25.47546406056267)
 SWING_GRAVITY_CORNER_NMM = (15.284948898840918, 25.98774126443521)
@@ -2744,14 +2675,14 @@ SWING_GRAVITY_CORNER_NMM = (15.284948898840918, 25.98774126443521)
 # any current part's analytic volume, material or governing dimensions move.
 SWING_GRAVITY_BASIS = {
     "dt-alignment-pinion": (1, 26128.94294339178, 8500.0),
-    "dt-pinion-arbor": (1, 13457.368170365333, 7800.0),
+    "dt-pinion-arbor": (1, 13453.741545886222, 7800.0),
     "dt-pinion-pivot-shaft": (1, 6219.3351191767015, 7800.0),
-    "dt-pinion-bracket": (2, 4644.392411286894, 7800.0),
+    "dt-pinion-bracket": (2, 4642.071111359271, 7800.0),
     "dt-pinion-arbor-collar": (1, 2113.391953300099, 7800.0),
     "dt-pinion-handle": (1, 2059.2591950522306, 7800.0),
     "dt-pinion-cam-pin": (2, 253.14809801839277, 7800.0),
 }
-SWING_GRAVITY_MASS_G = 484.52261157956855
+SWING_GRAVITY_MASS_G = 484.4581116297606
 # Frozen governing dimensions of the accepted native-STL calibration, never
 # live config aliases.
 SWING_GRAVITY_FINGERPRINT = {
@@ -2776,7 +2707,7 @@ SWING_GRAVITY_FINGERPRINT = {
         "WIDTH": 15.0,
         "C2C": 28.0,
         "THICKNESS": 9.144,
-        "PIVOT_BORE": 6.35,
+        "PIVOT_BORE": 6.3754,
         "ARBOR_BORE": 7.9375,
         "PIN_BORE": 3.9878,
         "PIN_SEAT": 4.064,
@@ -3010,11 +2941,13 @@ DRUM_TIP_TO_END_DISC_STACK = {
 # with the strip's aft edge flush (pinion_rig_layout).  Each term moves the
 # strip's front edge south, toward the gear.
 SPRING_TO_J19_STACK = {
-    "rig-set leaf D, thinnest setting": RIG.RIG_SET_ERROR,
+    "rig-set D, thinnest setting": RIG.RIG_SET_LEAF_D - RIG.RIG_SET_D_GAP[0],
     "MHA-DT-14 strap thickness .XX, thinnest": -printed_deviations(
         STRAP_T, STRAP_T_PLACES, unit=STRAP_UNIT
     )[0],
-    "spring pad leaf, thickest setting": RIG.FEELER_SET_ERROR,
+    "spring pad leaf, thickest of its range": (
+        RIG.SPRING_PAD_GAP[1] - RIG.SPRING_PAD_LEAF
+    ),
     "MHA-DT-24 strip width .XX, widest": printed_deviations(
         SPRING_W, SPRING_W_PLACES, unit=SPRING_UNIT
     )[1],
@@ -3025,10 +2958,14 @@ def _worst(nominal: float, *stacks: dict[str, float]) -> float:
     return nominal - sum(sum(stack.values()) for stack in stacks)
 
 
-# The novice-margin rule (Main, restricted review of #858): every rig-scope
-# margin -- the fit-up stacks, the drum's gears and end play, and each
-# clearance the rig's axial stations set against its neighbours -- stands at
-# least RIG_MARGIN_SPARE over its floor.  name -> (worst value, floor).
+# RIG_MARGIN_SPARE (pinion_rig_layout) is a coordinator's planning margin
+# (Main, restricted review of #858): every rig-scope margin -- the fit-up
+# stacks, the drum's gears and end play, and each clearance the rig's axial
+# stations set against its neighbours -- stood at least that much over its
+# floor.  The owner's fit-up ranges (2026-11-24, audit part 2 C7) override it
+# for the rows they size (owner ruling 2026-11-24 (C7): "Yes: ranges, longer
+# flats, no leaf miking."): those keep their
+# floors only.  name -> (worst value, floor).
 RIG_MARGINS = {
     "j = 19 past its full face (bank preloaded south)": (J19_FULL_FACE_MARGIN, 0.0),
     "j = 0 drum overhang slack (rig and bank terms)": (J0_SLACK_WORST, 0.0),
@@ -3049,7 +2986,7 @@ RIG_MARGINS = {
         min(min(stop.values()) for stop in ARBOR_LAND_MARGINS_AT_STOPS.values()),
         ARBOR_MIN_LAND_OVER_STRAP,
     ),
-    "back collar to the back block": (RIG.BACK_COLLAR_GAP_MIN, RIG.BACK_COLLAR_MIN_GAP),
+    "MHA-DT-17 end play between its collars": (RIG.LIFT_ROD_END_PLAY_MIN, 0.0),
     "spring blade on the back strap flank": (
         RIG.SPRING_BLADE_ON_FLANK_WORST,
         RIG.SPRING_BLADE_MIN_ON_FLANK,
@@ -3100,19 +3037,34 @@ RIG_MARGINS = {
         0.25,
     ),
 }
+OWNER_RANGED_RIG_MARGINS = frozenset(
+    {
+        "j = 19 past its full face (bank preloaded south)",
+        "lift rod seat past the front block",
+        "drum end play",
+        "MHA-DT-17 end play between its collars",
+        "spring foot pad to the back block",
+    }
+)
 _THIN = {
     name: (value, floor)
     for name, (value, floor) in RIG_MARGINS.items()
-    if value < floor + RIG.RIG_MARGIN_SPARE - 1e-9
+    if value
+    < floor + (0.0 if name in OWNER_RANGED_RIG_MARGINS else RIG.RIG_MARGIN_SPARE) - 1e-9
 }
 
 
 def rig_margin_lines() -> list[str]:
-    """One line per RIG_MARGINS row: worst value, floor and spare over the
-    floor + RIG_MARGIN_SPARE requirement, for the build log."""
+    """One line per RIG_MARGINS row: worst value, floor and what it holds over
+    the floor (+ RIG_MARGIN_SPARE where no owner range sets it), for the build
+    log."""
     return [
         f"{name}: worst {value:.3f}, floor {floor:g}, "
-        f"spare {value - floor - RIG.RIG_MARGIN_SPARE:+.3f}"
+        + (
+            f"over floor {value - floor:+.3f} (owner range)"
+            if name in OWNER_RANGED_RIG_MARGINS
+            else f"spare {value - floor - RIG.RIG_MARGIN_SPARE:+.3f}"
+        )
         for name, (value, floor) in RIG_MARGINS.items()
     ]
 
@@ -3891,10 +3843,7 @@ def build(adapter) -> dict[str, str]:
         f"{PINION_T120_CONCENTRIC['turned band radial']:.4f} >= "
         f"{T120_TURNED_BAND_RADIAL_FLOOR:.2f} mm on the nominal axes; at the worst fit "
         f"offsets and poses {T120_SHOULDER_AIR:.4f} "
-        f"and {T120_TURNED_BAND_RADIAL:.4f} mm, "
-        f"checked at fit-up on a {PINION_T120_FITUP_FEELER:.2f} feeler; band turned down to "
-        f"{PINION_TURNED_DIA_FITUP_MIN:.2f} only at crank height <= "
-        f"{T120_BAND_CHECK_CRANK_HEIGHT:.4f}"
+        f"and {T120_TURNED_BAND_RADIAL:.4f} mm, checked at fit-up by a look for daylight"
     )
     _telemetry.info(
         f"16T covers {CRANK_ROW_ENGAGEMENT_FRACTION_WORST:.2%} of the 64T tooth row at worst "
@@ -4061,10 +4010,10 @@ def build(adapter) -> dict[str, str]:
         label="cone-tip-block-screw (MHA-DT-VN-60 up through the plate into the block foot)",
     )
     # MHA-DT-VN-69 tip dowel (rule-23 retention, owner ruling 2026-11-07;
-    # MHA-DT-00 rubric sample, PR #2248): match-drilled from under
+    # MHA-DT-00 rubric sample, PR #2248): drilled from under
     # the plate on the hold-down line, PLAT_TIP_DOWEL_LOCAL_X along the plate's
-    # local x, and pressed up to the floor of the block foot's blind .0620
-    # ream; its lower end is a slip fit in the plate's opened ream, so the
+    # local x, and bonded up to the floor of the block foot's blind 1/16
+    # hole; its lower end is a slip fit in the plate's #52 hole, so the
     # block cannot turn about MHA-DT-VN-60.  Stock frame: axis +Y, one end
     # face on y = 0.
     tip_dowel_xz = (

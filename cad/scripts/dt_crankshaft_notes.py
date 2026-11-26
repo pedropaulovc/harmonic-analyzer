@@ -23,7 +23,6 @@ from dt_crankshaft_spec import (
     PINION_SEAT_DIA,
     PINION_SEAT_DIA_BAND,
     SHAFT_DIA,
-    SHAFT_DIA_BAND,
     SURFACE_FINISHES,
 )
 
@@ -90,22 +89,29 @@ def _clearance(
     )
 
 
-# Note 3: the three fit diameters.  Each band (.0008 wide) is narrower than
-# the shop's turned-diameter row, so each callout names its fit route (rule 4,
-# "What the shop holds").  Each callout keeps the fit name above its value
-# and SEE NOTE 3 under it.  Note 3 names each mate, the matched route (turn
-# to the mate's measured bore) and the clearance from both parts' printed
-# limits.  The limits themselves are unchanged.  The route cannot ride the
-# callouts: a 45-character row under each diameter ran ~116 mm wide, through
-# the #9 cross-hole's and the 16T pin hole's leaders, the neighbouring blocks
-# and the border (farm round 1 layout audit).  Every block stays as narrow as
-# its value row.
+# Note 3: the three fit diameters.  The crankshaft is made last of the fit
+# pairs: each diameter is turned to its mate's bore (the reamers' bores, no
+# band, and MHA-DT-31's 3/8 drilled bore, D27: delegated ruling 2026-11-25
+# (Main), precedent: the fit-necessity rule of the owner-approved fit policy
+# (owner ruling 2026-11-24); owner review #2144), so each prints as a REF and
+# the acceptance prints here
+# once (fit audit 2026-11-23, MHA-DT-31.bore__MHA-DT-11.hub_shaft,
+# MHA-DT-11.journals and MHA-DT-10.bore__MHA-DT-11.pinion_seat; drawing-
+# guidelines rule 4 v2).  Each callout keeps the fit name above its value
+# and SEE NOTE 3 under it.  Note 3 names each mate and the clearance the
+# turning leaves, from the bores' and diameters' analysis bands.  The route
+# cannot ride the callouts: a 45-character row under each diameter ran
+# ~116 mm wide, through the #9 cross-hole's and the 16T pin hole's leaders,
+# the neighbouring blocks and the border (farm round 1 layout audit).  Every
+# block stays as narrow as its value row.
 FIT_NOTE_NUMBER = 3
 FIT_CALLOUT = see_note(FIT_NOTE_NUMBER)
 SLIDING_FIT = "SLIDING FIT"
 JOURNAL_FIT = "2X RUNNING FIT"
 FIT_CLEARANCES = {
-    "MHA-DT-31": _clearance(hub.HUB_BORE_DIA, hub.HUB_BORE_BAND, SHAFT_DIA, SHAFT_DIA_BAND),
+    # The drilled hub bore is measured (its smallest reading) and the stub
+    # turned to it, so the clearance is the turning's own (D27).
+    "MHA-DT-31": (hub.SHAFT_CLEARANCE_MIN, hub.SHAFT_CLEARANCE_MAX),
     "MHA-DT-05": _clearance(JOURNAL_BORE_DIA, JOURNAL_BORE_BAND, JOURNAL_DIA, JOURNAL_DIA_BAND),
     "MHA-DT-10": _clearance(
         pinion.BORE_DIA, pinion.BORE_DIA_BAND, PINION_SEAT_DIA, PINION_SEAT_DIA_BAND
@@ -116,8 +122,8 @@ if len({tuple(round(v, 6) for v in pair) for pair in FIT_CLEARANCES.values()}) !
 _FIT_LEAST, _FIT_MOST = next(iter(FIT_CLEARANCES.values()))
 FIT_NOTE = "\n".join(
     (
-        f"{FIT_NOTE_NUMBER}. TURN EACH FIT TO THE MEASURED MATE BORE (CLEARANCE "
-        f"{inch_text(_FIT_LEAST, 4)}-{inch_text(_FIT_MOST, 4)}):",
+        f"{FIT_NOTE_NUMBER}. TURN EACH FIT TO ITS MATE'S BORE LESS "
+        f"{inch_text(_FIT_LEAST, 4)}-{inch_text(_FIT_MOST, 4)}:",
         f"   <MOD-DIAM>{inch_text(SHAFT_DIA, 4)} IN MHA-DT-31, "
         f"2X <MOD-DIAM>{inch_text(JOURNAL_DIA, 4)} IN MHA-DT-05, "
         f"<MOD-DIAM>{inch_text(PINION_SEAT_DIA, 4)} IN MHA-DT-10.",
@@ -164,16 +170,18 @@ NECKS = "2X"
 # #991, and 2026-11-13, #1679: accepted for good, as on the original).
 DRIVE_PIN_RIM_NOTE = f"DRIVE-PIN HOLE TO SPIGOT RIM {inch_text(DRIVE_PIN_SPIGOT_RIM_WORST, 3)} MIN."
 
-# Under the native REAM callout on the seat spigot's two blind holes, two
-# lines of words (rule 7): the purchased dowel each is a press fit for and the
-# sprocket the pins drive -- the mate the holes' tight locations serve, named
-# once here and not on the location dimensions (rule 7: a location carries
-# its value and band only) -- then their rim.  How far the dowel goes in is
-# the MHA-DT-00 step 4 press, not this sheet's (rule 7: an assembly
-# instruction on a part sheet is narration).
+# Under the native REAM callout on the seat spigot's two blind holes (the
+# .0930 reamer's, no band; the pin is the gauge), two lines of words (rule
+# 7): the purchased dowel's acceptance by feel and the sprocket the pins
+# drive -- the mate the holes' tight locations serve, named once here and
+# not on the location dimensions (rule 7: a location carries its value and
+# band only) -- then their rim (fit audit 2026-11-23,
+# MHA-DT-11.drive_pin_holes).  How far the dowel goes in is the MHA-DT-00
+# step 4 press, not this sheet's (rule 7: an assembly instruction on a part
+# sheet is narration).
 DRIVE_PIN_CALLOUT = "\n".join(
     (
-        "PRESS FIT PIN MHA-DT-VN-67 FOR SPROCKET MHA-PD-09",
+        "MHA-DT-VN-67 PRESSES IN, NOT BY HAND; DRIVES MHA-PD-09",
         DRIVE_PIN_RIM_NOTE,
     )
 )

@@ -867,7 +867,13 @@ def context(
     _agree(plan, "saw_dia_min_mm", p["saw_dia_mm"] - dia_tol)
     _agree(plan, "saw_dia_max_mm", p["saw_dia_mm"] + dia_tol)
     bore_r = adj["dia"][0] / 2
-    for h in adj["height"]:
+    # The adjuster's axis prints (1.50) REF and is made to the measured
+    # MHA-DT-05 journal height (note 2, machinist review r1, farm run
+    # 20261124T110807008Z); the floor is still proved over the title
+    # block's .XX band (±.01 in) around that REF, the envelope the matched
+    # height was proved in before it went REF.
+    xx_band = 0.01 * 25.4
+    for h in (adj["height_ref"] - xx_band, adj["height_ref"] + xx_band):
         for top in f["top_face"]["height"]:
             if not (
                 h - bore_r < top - slit_depth - tip_tir - dia_tol / 2
@@ -877,6 +883,10 @@ def context(
                     "the slit's floor is not inside the adjuster bore at "
                     "process.saw_tip_tir_max_mm and process.saw_dia_tol_mm"
                 )
+    # Setup 11's height-gauge check: the match about the drawn (REF) height,
+    # as the gauge reads it from SEAT.
+    _agree(plan, "adjuster_height_check_min_mm", adj["height_ref"] + adj["height_match"][0])
+    _agree(plan, "adjuster_height_check_max_mm", adj["height_ref"] + adj["height_match"][1])
     _agree(plan, "saw_cut_z_mm", lateral - thick / 2)
     saw_z = p["saw_cut_z_mm"]
     if not lying_grip < saw_z:

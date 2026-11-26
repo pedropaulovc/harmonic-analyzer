@@ -13,14 +13,13 @@ first, the matched-fit prose after it (drawing-guidelines.md rule 7 (notes: few,
 
 from __future__ import annotations
 
+from dt_crank_arm_spec import SEAM_BOND_CLEARANCE_TEXT
 from dt_crank_hub_geometry import (
     AXIAL_PIN_DIA,
     MM_PER_IN,
     HUB_SEAT_LENGTH,
     SEAM_DEPTH,
-    SEAT_PRESS_INTERFERENCE,
-    SHAFT_CLEARANCE_MAX,
-    SHAFT_CLEARANCE_MIN,
+    SEAT_SLIP_CLEARANCE,
 )
 
 
@@ -30,87 +29,66 @@ def inch_text(value_mm: float, places: int) -> str:
 
 
 def seat_callout(mate: str, name: str = "CRANK ARM") -> str:
-    """Hub-seat fit on MHA-DT-31, turned second to press into ``mate``'s bore.
+    """Hub-seat fit on MHA-DT-31, turned last to slide into ``mate``'s bore.
 
     Two lines of words under the reference size (drawing-guidelines.md rule 7
     (notes: few, flagged, never a method): at most two).  The arm bore is
-    made first, so the reference nominal, the named mate and the stated
-    interference define the matched fit (rule 4).  ``name`` is the mate's
-    part name, printed with its number (r7 review of farm run
-    20261101T022045634Z).  The fit is the seat's IN the arm: "BORE FOR LIGHT
-    PRESS" on a turned OD read as this part's bore (review of farm run
-    20261101T081735465Z).  The seat end flush with the arm's front is the
-    MHA-DT-00 press step's acceptance, not this sheet's: rule 7 names "END
-    FLUSH WITH CRANK ARM FRONT" as an assembly instruction.
+    made first, so the reference nominal, the named mate and the bond's
+    diametral clearance define the made-to-fit seat (rule 4); the joint is
+    bonded with LOCTITE 638 (owner ruling 2026-11-24, fit audit question 21:
+    a bonded slip fit, not the light press).  The clearance is the fit's
+    acceptance, printed once, here on the member made last (rules 4 and 23;
+    machinist review r1, farm run 20261124T110807008Z: the feel alone gave
+    the bond no gap), with the slide-on feel beside it; SEAT_SLIP_CLEARANCE
+    holds it inside 638's gap.  ``name`` is the mate's part name, printed
+    with its number (r7 review of farm run 20261101T022045634Z).  The seat
+    end flush with the arm's front and the bond's preparation and cure are
+    the MHA-DT-00 bond step's, not this sheet's (rule 7).
     """
-    low, high = SEAT_PRESS_INTERFERENCE
+    low, high = SEAT_SLIP_CLEARANCE
     return "\n".join(
         (
-            f"LIGHT PRESS IN {name} {mate}:",
-            f"{inch_text(low, 4)}-{inch_text(high, 4)} DIAMETRAL INTERFERENCE",
+            f"TURN TO {name} {mate} BORE",
+            f"LESS {inch_text(low, 4)}-{inch_text(high, 3)}: SLIDES ON; BONDED",
         )
     )
 
 
-def seat_bore_callout(mate: str) -> str:
-    """The arm's seat bore, made first: ``mate`` is pressed into it."""
-    return "\n".join(
-        (f"{mate} IS A LIGHT", "PRESS FIT IN THIS BORE;", "FACES FLUSH")
-    )
-
-
-def seam_callout(mate: str, depth: str = "", pin: str = "SEAM PIN MHA-DT-VN-59") -> str:
-    """MHA-DT-VN-59 seam, match-drilled with ``mate``: size first, then the process.
-
-    ``mate`` and ``pin`` name the parts by name and number (rule 4; MHA-DT-06
-    machinist review, 2026-09-29; review of farm run 20261101T081735465Z:
-    SEAM PIN says what the pin is).  The blind pin makes hub and arm a
-    permanent pair, taken apart at the MHA-DT-09 taper pin (owner rulings
-    2026-11-01; r9 review: say it plainly).  The depth is never typed here:
-    the hub's side view prints it as a native dimension, and ``depth`` lets
-    the arm's sheet refer to it (Codjiflo review of 831be7869).
-    """
-    return "\n".join(
-        (
-            f"(<MOD-DIAM>{inch_text(AXIAL_PIN_DIA, 3)}){depth} ON SEAM, MATCH-DRILL/REAM",
-            f"WITH {mate} AT ASSEMBLY;",
-            f"{pin} LIGHT DRIVE FIT;",
-            "PERMANENT PAIR; DISASSEMBLE AT MHA-DT-09",
-        )
-    )
-
-
-# The printed band governs the bore; the callout names the standard fit
-# MHA-DT-11's sheet gives the same joint (its SLIDING_FIT on the hub shank),
-# and the clearance it yields follows as REF (rule 4: DIAMETRAL
-# CLEARANCE beside printed limits repeats them in private words; integration
-# proof 20261109T105251629Z, 3 of 3 runs).  The hub slides on and is
-# taper-pinned at assembly, so no ANSI RC/LC class fits the .0010-.0023 band.
-BORE_CALLOUT = (
-    "REAM THRU\n"
-    "SLIDING FIT ON MHA-DT-11\n"
-    f"(CLEARANCE {inch_text(SHAFT_CLEARANCE_MIN, 4)}-{inch_text(SHAFT_CLEARANCE_MAX, 4)})"
-)
+# The bore is the named 3/8 drill's, Ø.375 at DRILLED HOLES (rule 3: a named
+# drill keeps its own decimal; delegated ruling 2026-11-25 (Main), precedent:
+# the fit-necessity rule of the owner-approved fit policy
+# (drawing-simplicity-policy.md; owner ruling 2026-11-24): a bore with no
+# failing check takes the plain drill; no owner number changed; owner review
+# #2144 (D27)).  MHA-DT-11's shank is made last,
+# turned to the bore's smallest reading, and carries the fit's acceptance on
+# its own sheet (fit audit 2026-11-23, MHA-DT-31.bore: the acceptance prints
+# once, on the member made last).
+BORE_DRILL = "3/8"
+BORE_CALLOUT = f"{BORE_DRILL} DRILL THRU\nMHA-DT-11 IS TURNED\nTO THIS BORE"
 # The arm bore is made first and carries the band; this seat is turned to fit
-# it, so its nominal prints as a reference under the match-fit callout.
+# it, so its nominal prints as a reference under the made-to-fit callout.
 SEAT_CALLOUT = seat_callout("MHA-DT-06")
 # The hub's own seam callout: the size, process and depth line, then two
-# lines of words (rule 7).  The final process is REAM, at assembly with the
-# arm, so the hole is matched to its mate (rule 4); the pin is named by part
-# name and number.  The depth sits in the callout (rule 26: size, process,
-# depth; a depth is never deferred to a view), read from SEAM_DEPTH, the
-# constant the model's seam cut is built to; the side view's native depth
-# then prints as a reference.  The hole's radial station is a native
-# dimension on the end view (rule 26: a location is a dimension, not a
-# sentence; ON SEAM is a private phrase).  The permanent-pair and
-# disassembly line is an assembly instruction on a part sheet (rule 7), so
-# it is gone.  The arm's sheet keeps ``seam_callout``.
+# lines of words (rule 7).  The hole is drilled 5/32 at assembly with the
+# arm, so it is matched to its mate (rule 4), and the pin is bonded in
+# (fit audit 2026-11-23, MHA-DT-06_DT-31.seam_pin: the joint is bonded under
+# question 21, so the seam needs no reamed drive fit and the .1562 reamer is retired); the
+# pin is named by number.  The bond's diametral clearance prints once on
+# each sheet the hole is on (rule 23), the arm's note 3 and this callout
+# reading the one SEAM_BOND_CLEARANCE_TEXT (machinist review r1, farm run
+# 20261124T110807008Z: the 5/32 drill's 0-.004 started line to line).  The
+# depth sits in the callout (rule
+# 26: size, process, depth; a depth is never deferred to a view), read from
+# SEAM_DEPTH, the constant the model's seam cut is built to; the side view's
+# native depth then prints as a reference.  The hole's radial station is a
+# native dimension on the end view (rule 26: a location is a dimension, not a
+# sentence).
 SEAM_DEPTH_TEXT = inch_text(SEAM_DEPTH, 2)
 SEAM_CALLOUT = "\n".join(
     (
-        f"(<MOD-DIAM>{inch_text(AXIAL_PIN_DIA, 3)}) REAM <HOLE-DEPTH> {SEAM_DEPTH_TEXT} AT ASSEMBLY",
-        "WITH CRANK ARM MHA-DT-06 FOR",
-        "DOWEL PIN MHA-DT-VN-59, LIGHT DRIVE FIT",
+        f"(<MOD-DIAM>{inch_text(AXIAL_PIN_DIA, 3)}) 5/32 DRILL <HOLE-DEPTH> {SEAM_DEPTH_TEXT} AT ASSEMBLY",
+        "WITH MHA-DT-06; PIN MHA-DT-VN-59 BONDED:",
+        SEAM_BOND_CLEARANCE_TEXT,
     )
 )
 # The seat length is the arm's thickness as made, not a turned size (owner
@@ -120,11 +98,12 @@ SEAM_CALLOUT = "\n".join(
 # acceptance (rule 4).  A plain reference left the shoulder with no
 # controlling value (round-1 review, 2 of 3 runs), and MATCH alone gave no
 # acceptance (round-2 review, 2 of 3 runs).  The acceptance is one-sided,
-# +.000/-.002 to the arm's measured thickness, so the hub end is never proud
-# of the arm's front face (owner ruling 2026-11-06).  END FLUSH on a part
-# sheet is an assembly instruction (rule 7), so the faces-flush check stays
-# on the MHA-DT-00 press step.
-SEAT_LENGTH_MATCH_BAND = "+.000/-.002"
+# +.000/-.010 to the arm's measured thickness, so the hub end is never proud
+# of the arm's front face (owner ruling 2026-11-06; fit audit 2026-11-23,
+# MHA-DT-31.seat_length: nothing needs the old -.002, the face is not a
+# stack term).  END FLUSH on a part sheet is an assembly instruction (rule
+# 7), so the faces-flush check stays on the MHA-DT-00 bond step.
+SEAT_LENGTH_MATCH_BAND = "+.000/-.010"
 SEAT_LENGTH_NOTE_NUMBER = 2
 SEAT_LENGTH_CALLOUT = f"SEE NOTE {SEAT_LENGTH_NOTE_NUMBER}"
 SEAT_LENGTH_NOTE = (

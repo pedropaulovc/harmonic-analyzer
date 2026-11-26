@@ -68,7 +68,6 @@ from dt_crank_pinion_notes import (
     BORE_FIT_NOTE_NUMBER,
     MESH_NOTE_NUMBER,
     PIN_HOLE_CALLOUT,
-    TURNED_DIA_NOTE_NUMBER,
 )
 from dt_crank_pinion_spec import (
     BORE_PROCESS_CALLOUT,
@@ -315,14 +314,14 @@ ISO_TEXT_CLEARANCE = 0.003
 
 # Each band's mate and reason prints once, in a numbered note the dimension
 # links (dt_crank_pinion_notes.DRAWING_NOTES; drawing-guidelines.md rules 4 and
-# 7): the tip diameter and the two banded lengths serve the 64T mesh and the
-# 120T cone gear's clearance (note 1), the turned band its supply and
-# fitted-at-assembly sizes (note 2), the reamed bore its fit on the
-# crankshaft (note 3) and the pin hole its pin's fit (note 4).
+# 7): the tip diameter, the turned band and the two banded lengths serve the
+# 64T mesh and the 120T cone gear's clearance (note 1), the reamed bore its
+# fit on the crankshaft (note 2) and the pin hole its pin's fit (note 3).
+# The turned band has no fit-up note any more (fit audit part 2, B9).
 DIMENSION_CALLOUTS = {
     "BoreDia": f"{BORE_PROCESS_CALLOUT}\nSEE NOTE {BORE_FIT_NOTE_NUMBER}",
     "OutsideDia": f"SEE NOTE {MESH_NOTE_NUMBER}",
-    "TurnedDia": f"SEE NOTE {TURNED_DIA_NOTE_NUMBER}",
+    "TurnedDia": f"SEE NOTE {MESH_NOTE_NUMBER}",
     "ShoulderLength": f"SEE NOTE {MESH_NOTE_NUMBER}",
     "FaceWidth": f"SEE NOTE {MESH_NOTE_NUMBER}",
     # Reamed to the pin, so the size is a reference; the words carry the

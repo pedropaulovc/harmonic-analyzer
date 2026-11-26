@@ -82,10 +82,8 @@ from _sketch_circle import define_circle
 from _drawing_precision import apply_drawing_precision
 from _drawing_marks import apply_drawing_properties, clear_dimensions_for_drawing, mark_dimensions_for_drawing
 from _drawing_tolerances import (
-    set_dimension_bilateral_tolerance,
     set_dimension_symmetric_tolerance,
 )
-from _fit_deviations import deviations
 from _holes import wizard_holes
 from _part_pmi import author_part_pmi
 from _visibility import blank_reference_geometry
@@ -141,7 +139,6 @@ from dt_cone_swing_platform_spec import (
     HOLDDOWN_HOLE_SPEC,
     HOLDDOWN_LOCAL_X,
     HOLDDOWN_LOCAL_Z,
-    HOLDDOWN_STATION_TOL_MM,
     PIVOT_BEARING_RELIEF_DEPTH,
     PIVOT_BEARING_RELIEF_DIAMETER,
     PIVOT_RELIEF_FIT_REQUIREMENT,
@@ -150,7 +147,6 @@ from dt_cone_swing_platform_spec import (
     POST_MOUNT_TAP_DIA,
     SURFACE_FINISHES,
     TIP_DOWEL_FROM_HOLDDOWN,
-    TIP_DOWEL_HOLE_BAND,
     TIP_DOWEL_HOLE_DIA,
     TIP_DOWEL_LOCAL_X,
     TIP_DOWEL_LOCAL_Z,
@@ -158,7 +154,6 @@ from dt_cone_swing_platform_spec import (
     UNIT,
 )
 from dt_cone_swing_platform_pivot_spec import (
-    PIVOT_HOLE_BAND,
     PIVOT_HOLE_DIA,
     PIVOT_HOLE_SPEC,
 )
@@ -571,18 +566,19 @@ def build(adapter) -> dict[str, str]:
     )
     volume = volume_check(adapter, "plate", v_plate, 0.005 * v_plate)
 
-    # Pivot bore at the origin: native Hole Wizard 1/4 drill-size hole,
-    # reamed H7 on the stock shoulder (dt_cone_swing_platform_spec). The band
-    # lives on the feature, so the sheet's REAM callout displays it.
+    # Pivot bore at the origin: native Hole Wizard 1/4 drill-size hole with
+    # its diameter overridden to the .2510 reamer (owner ruling 2026-11-24,
+    # fit audit question 10).  No band on the feature: the sheet prints the
+    # reamer's size, REAM and the shoulder as the gauge.
     pivot_dia = PIVOT_HOLE_DIA
     wizard_holes(
         adapter,
         PIVOT_HOLE_SPEC,
         [[0.0, 0.0, 0.0]],
         (0.0, -1.0, 0.0),
-        "pivot bore (1/4 reamed H7)",
+        "pivot bore (.2510 reamed)",
         name="PivotHole",
-        dia_tolerance_mm=(-PIVOT_HOLE_BAND[1], PIVOT_HOLE_BAND[0]),
+        expect_dia_mm=PIVOT_HOLE_DIA,
     )
     v_hole = math.pi * (pivot_dia / 2.0) ** 2 * PLATE_T
     volume = volume_check(
@@ -987,33 +983,19 @@ def build(adapter) -> dict[str, str]:
     # Decimal places for imported model dimensions live on the PART.  The
     # Hole Wizard owns the pivot-hole precision and native size callout.
     apply_drawing_precision(adapter, DRAWING_PRECISION)
-    # The tip-block stacks run through the hold-down stations and the post
-    # taps at +/-.005.  HoldDownZ and the post-tap stations print .XXX, whose
-    # title-block grade is that band (DRAWING_PRECISION); HoldDownX prints
-    # .XX, so it alone carries the band explicitly.
-    set_dimension_symmetric_tolerance(
-        adapter,
-        "HoldDownHole",
-        "HoldDownX",
-        HOLDDOWN_STATION_TOL_MM,
-        display_unit=UNIT,
-    )
+    # HoldDownZ and the post-tap stations print .XXX at the title block's
+    # +/-.005 (DRAWING_PRECISION); HoldDownX prints .XX at the title block's
+    # +/-.01 (machinist review r1, farm run 20261124T125542720Z: no stack
+    # needs its former +/-.005; dt_cone_swing_platform_spec.
+    # HOLDDOWN_LATERAL_TOL_MM).
     # The tip-block locating dowel's station carries the hold-down's band
     # (the webs to its counterbore here and to MHA-DT-21's +X face close on
-    # it); the slip ream its REAM_H7, at the nominal's four places.
+    # it); the #52 hole prints its drill, no band.
     set_dimension_symmetric_tolerance(
         adapter,
         "TipDowelProfile",
         "TipDowelX",
         TIP_DOWEL_STATION_TOL_MM,
-        display_unit=UNIT,
-    )
-    set_dimension_bilateral_tolerance(
-        adapter,
-        "TipDowelProfile",
-        "TipDowelDia",
-        *deviations(TIP_DOWEL_HOLE_BAND),
-        places=DRAWING_PRECISION["TipDowelProfile"]["TipDowelDia"],
         display_unit=UNIT,
     )
     volume_check(

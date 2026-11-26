@@ -48,12 +48,14 @@ def _lands_ride_named_bands(bands: tuple[tuple[float, float], ...]) -> bool:
 
 
 def test_section_fits_are_toleranced_on_the_model() -> None:
-    """Each turned land rides its NAMED fit class, applied to the model.
+    """Each turned land rides its NAMED fit class as its ANALYSIS band; the
+    model carries no band on it: the journal and both lands are turned last
+    to their mates and print as references, and the socket prints its
+    reamer's size (fit audit 2026-11-23, rule 4 form 2). Only the keyseat
+    and the root radius carry model bands.
 
-    Spelled as callout text the band is frozen: SolidWorks prints it verbatim
-    and never re-renders it, so the mm->inch flip in issue #290 would leave
-    "+0.00/-0.02" reading as inches on every land. The identity assertion also
-    stops a local retype from silently forking a named class.
+    The identity assertion stops a local retype from silently forking a
+    named class.
     """
     spec = dt_cone_gear_shaft_spec
     assert spec.RUNNING_DIA_BAND is _fit_shaft_h.SHAFT_H
@@ -67,15 +69,12 @@ def test_section_fits_are_toleranced_on_the_model() -> None:
     forked = list(spec.SECTION_DIA_BANDS)
     forked[0] = (0.0, -0.02032)
     assert not _lands_ride_named_bands(tuple(forked))
-    # The socket rides the tip cluster's reamed stem-bore band.
+    # The socket's analysis band is the tip cluster's reamed stem-bore band.
     assert spec.SOCKET_DIA_BAND is cone_tip_cluster.STEM_BORE_BAND
     assert spec.SOCKET_DIA == cone_tip_cluster.STEM_BORE_DIA_MM
-    # Applied in ONE loop over the named land bands, so the AST reports the
-    # f-string sources rather than literal keys.
+    assert spec.MADE_TO_FIT_DIAMETERS == ("Sec0Dia", "Sec1Dia", "Sec2Dia")
     assert model_toleranced_dimensions(part) == {
-        ("f'Sec{section}Profile'", "f'Sec{section}Dia'"): "*deviations(band)",
         ("Sec1KeyseatProfile", "name"): "*deviations(band)",
-        ("SocketProfile", "SocketDia"): "*deviations(SOCKET_DIA_BAND)",
         ("ShoulderFillets", "ShoulderR"): "*deviations(FILLET_R_BAND)",
     }
 
@@ -117,14 +116,23 @@ def test_the_keyseat_section_flags_the_land_note(monkeypatch):
         "_set_dimension_suffixes",
         lambda _a, dimensions, texts: suffixes.append((tuple(dimensions), texts)),
     )
+    references = []
+    monkeypatch.setattr(
+        drawing,
+        "set_reference_dimension",
+        lambda _a, dimension, *, label: references.append(dimension),
+    )
     placed = drawing._add_d_sections(object(), object(), 1)
     assert len(placed) == len(drawing.D_SECTIONS) == 1
     assert placed[0].dimensions == ("Sec1KeyseatS", "Sec1KeyseatWidth")
     flag = f"NOTE {dt_cone_gear_shaft_spec.LAND_NOTE}"
+    # The width prints (.0625) REF and closes its parenthesis before the flag
+    # (machinist review r1, farm run 20261124T110807008Z).
+    assert references == ["Sec1KeyseatWidth"]
     assert suffixes == [
         (
             ("Sec1KeyseatS", "Sec1KeyseatWidth"),
-            {"Sec1KeyseatWidth": f" {flag}"},
+            {"Sec1KeyseatWidth": f") {flag}"},
         )
     ]
     assert callouts == [(("Sec1KeyseatS",), {"Sec1KeyseatS": flag}, "above")]
@@ -148,50 +156,79 @@ def test_the_keyseat_section_flags_the_land_note(monkeypatch):
 
 
 def test_every_tight_band_names_its_mate_and_fit_route():
-    """Rule 4: a band under its shop row names a fit route at the feature.
-    The journal is a matched running fit to the MHA-DT-05 bore with the
-    printed limits' clearance; land 1 and its keyseat link the land note,
-    land 2 and the socket the bond note, each naming its mates by drawing
-    number.  Lengths carry no words but the stack flag."""
+    """Rule 4, form 2: every fit on this shaft is made here, last, and
+    prints its acceptance once, here. The journal is a running fit turned to
+    the MHA-DT-05 bore with its clearance; land 1 and its keyseat link the
+    land note (every gear slides on, no shake), land 2 and the socket the
+    bond note (the bond's clearance, rule 23), each naming its mates by
+    drawing number.  Lengths carry no words but the stack flag."""
     spec = dt_cone_gear_shaft_spec
     journal = drawing.DIMENSION_CALLOUTS["Sec0Dia"]
     assert _config.parts("dt-cone-pivot-post")["number"] in journal
-    assert "CLEARANCE" in journal
+    # Beside the REF journal size the clearance is the requirement (rule 4,
+    # form 2): printed bare, never parenthesized as a reference, and no
+    # narrower than .001.
+    journal_low, journal_high = spec.JOURNAL_DIAMETRAL_CLEARANCE_MM
+    assert journal_high - journal_low >= 0.001 * 25.4 - 1e-9
+    assert journal.split("\n")[-1] == (
+        f"CLEARANCE {spec.inch_text(journal_low, 4)}-{spec.inch_text(journal_high, 4)}"
+    )
+    assert not any("(" in row for row in journal.split("\n"))
     # The journal's text hangs right of its line only off the faced end
     # (round 3: dragged onto the journal its box hung left onto section A's
-    # letter); its widest row, in the proof's 2.17 mm a character, ends at
-    # least 3 mm short of section A-A's box (0.3141).
+    # letter).  Its widest row inks 2.48 mm a character, not the proof's 2.17:
+    # farm run 20261124T125542720Z measured "RUNNING FIT TO MHA-DT-05" at
+    # 0.2579..0.3175, into section A-A's S value (machinist review r2).  That
+    # row ends CLEAR_GAP_M short of S's block (0.0131 left of S's position).
     x, _y = drawing.SIDE_DIAMETERS["Sec0Dia"]
     assert x > drawing.BIG_END_X
     widest = max(map(len, drawing.DIMENSION_CALLOUTS["Sec0Dia"].split("\n")))
-    assert x + widest * 0.00217 <= 0.3141 - 0.003
+    (a_section,) = drawing.D_SECTIONS
+    s_block_left = a_section.centre[0] - drawing.KEYSEAT_S_SHIFT - 0.0131
+    assert x + widest * 0.00248 <= s_block_left - CLEAR_GAP_M
     # Land 2 flags the bond note; the stack's lengths flag the stack note, at
     # every callout it serves (round 4).
     assert set(drawing.DIMENSION_SUFFIXES) == {"Sec2Dia"} | set(drawing.STACK_LENGTHS)
-    assert drawing.DIMENSION_SUFFIXES["Sec2Dia"] == f" SEE NOTE {spec.BOND_NOTE}"
+    # A reference diameter closes its parenthesis before its flag.
+    assert drawing.DIMENSION_SUFFIXES["Sec2Dia"] == f") SEE NOTE {spec.BOND_NOTE}"
     assert {drawing.DIMENSION_SUFFIXES[name] for name in drawing.STACK_LENGTHS} == {
         drawing.STACK_FLAG_SUFFIX
     }
     assert str(spec.STACK_NOTE) in drawing.STACK_FLAG_SUFFIX
-    notes = spec.DRAWING_NOTES.splitlines()
+    # Each numbered note with its indented continuation lines.
+    notes: list[str] = []
+    for line in spec.DRAWING_NOTES.splitlines():
+        if line.startswith(" "):
+            notes[-1] += " " + line.strip()
+        else:
+            notes.append(line)
     assert [note.split(".")[0] for note in notes] == [
         str(spec.LAND_NOTE), str(spec.BOND_NOTE), str(spec.STACK_NOTE)
     ]
     # Land 1's mates and its key (owner decision 2026-11-09, PR #1992) by
-    # number.
+    # number, and its acceptance by feel.
     for mate in ("dt-cone-gear", "dt-crank-drive-gear", "dt-vn-cone-shaft-key"):
         assert _config.parts(mate)["number"] in notes[0]
-    # Land 2 and the socket are bonded fits: their mates by number, and the
-    # fit named with its compound's grade (drawing-guidelines.md rule 26).
+    assert "SLIDES ON, NO SHAKE" in notes[0]
+    # Land 2 and the socket are bonded fits: their mates by number, the fit
+    # named with its compound's grade (drawing-guidelines.md rule 26) and
+    # land 2's clearance inside the compound's gap (rule 23).
     for mate in ("dt-cone-gear", "dt-cone-tip-gear"):
         assert _config.parts(mate)["number"] in notes[1]
     assert f"BONDED FIT, {cone_tip_cluster.RETAINING_COMPOUND}" in notes[1]
+    low, high = spec.T024_BOND_CLEARANCE_MM
+    assert 0.0 <= low < high <= cone_tip_cluster.RETAINING_COMPOUND_MAX_GAP_MM
+    assert f"CLEARANCE {spec.inch_text(low, 4)}-{spec.inch_text(high, 4)}" in notes[1]
+    assert "MHA-DT-37 SPIGOT IS TURNED TO THE SOCKET" in notes[1]
     # The three-place lengths name the stack they set once (rule 4).
     for mate in ("dt-cone-gear", "dt-crank-drive-gear"):
         assert _config.parts(mate)["number"] in notes[2]
-    # Rule 7: notes carry no dimension and no method.
-    assert not re.search(r"\d?\.\d{2,}", spec.DRAWING_NOTES)
-    for word in ("TAILSTOCK", "MILL", "TURN"):
+    # Rule 7: notes carry no method; the only dimension is the bond's
+    # clearance range.
+    assert re.findall(r"\d?\.\d{2,}", spec.DRAWING_NOTES) == [
+        spec.inch_text(low, 4), spec.inch_text(high, 4)
+    ]
+    for word in ("TAILSTOCK", "MILL", "TURN "):
         assert word not in spec.DRAWING_NOTES
     # The socket's callout (rule 12): the process, its .XX depth, its flag.
     assert spec.SOCKET_CALLOUT.split("\n") == [
@@ -200,11 +237,11 @@ def test_every_tight_band_names_its_mate_and_fit_route():
     ]
     assert drawing.SOCKET_CALLOUTS == {"SocketDia": spec.SOCKET_CALLOUT}
     # Every suffix is one line; every below callout carries at most two lines
-    # of words (rule 7), a parenthesized REF clearance row beside them.
+    # of words (rule 7).
     assert not any("\n" in text for text in drawing.DIMENSION_SUFFIXES.values())
     assert not any("\n" in text for text in spec.KEYSEAT_MATE_SUFFIXES.values())
     for text in spec.SEAT_MATE_CALLOUTS.values():
-        assert len([row for row in text.split("\n") if not row.startswith("(")]) <= 2
+        assert len(text.split("\n")) <= 2
 
 
 def test_display_precision_is_owned_by_the_part() -> None:
@@ -674,14 +711,15 @@ def test_the_keyseat_section_cuts_land_one_clear_of_its_neighbours() -> None:
     # The width's line rises at the keyseat's edge.  The S text (PR 1
     # 5a4e41cb5f r3 layout audit: 0.3227..0.3501 about its 0.3371 position,
     # 14.4 mm left and 13.0 mm right) steps away from it, ending CLEAR_GAP_M
-    # plus 1 mm short of that line, its left end clear of the Ø.4825 block
-    # (<= 0.3111, test_every_tight_band_names_its_mate_and_fit_route); with
-    # its arrows inside, its dimension line ends at the floor's extension line,
-    # inside the land's edge.
+    # plus 1 mm short of that line, its left end clear of the journal's
+    # callout (its "MHA-DT-05" row inked to 0.3175, farm run
+    # 20261124T125542720Z); with its arrows inside, its dimension line ends at
+    # the floor's extension line, inside the land's edge.
+    journal_ink_right = 0.3175
     keyseat_x = x + half
     s_x = x - drawing.KEYSEAT_S_SHIFT
     assert s_x + 0.0130 <= keyseat_x - CLEAR_GAP_M - 0.001
-    assert s_x - 0.0144 >= 0.3111 + CLEAR_GAP_M
+    assert s_x - 0.0144 >= journal_ink_right + CLEAR_GAP_M
     # With its NOTE flag above, S's block is centred on its position, the
     # value pushed down by the flag's row: PR 1 r9 (9b8efb7876) and PR 2 r6
     # measured 0.3170..0.3424 x 0.1747..0.1872 about (0.3301, 0.182), its
@@ -691,7 +729,7 @@ def test_the_keyseat_section_cuts_land_one_clear_of_its_neighbours() -> None:
     s_y = y + 0.017 + drawing.KEYSEAT_S_FLAG_LIFT
     block = (s_x - 0.0131, s_y - 0.0073, s_x + 0.0123, s_y + 0.0052)
     assert block[1] - (y + half) >= CLEAR_GAP_M + 0.001
-    assert block[0] >= 0.3144 + CLEAR_GAP_M
+    assert block[0] >= journal_ink_right + CLEAR_GAP_M
     assert block[2] <= keyseat_x - CLEAR_GAP_M
     assert block[3] <= iso_bottom - CLEAR_GAP_M
     floor_x = x + cone_land_key.KEYSEAT_FLOOR_OFFSET_MM / 1000.0 * section.scale[0] / section.scale[1]
@@ -1102,7 +1140,10 @@ def test_shoulder_roots_are_modelled_not_noted() -> None:
     )
     numbered = [line.split(".")[0] for line in notes.splitlines() if not line.startswith(" ")]
     assert numbered == ["1", "2", "3"]
-    assert len(notes.splitlines()) == 3
+    # Notes 1 and 2 each carry their acceptance on one continuation line
+    # (rule 4, form 2): five lines from y = 0.060 end above the frame.
+    assert len(notes.splitlines()) == 5
+    assert drawing.NOTES_XY[1] - 5 * 0.0035 > 0.020
     for forbidden in (
         "R0.",
         "MUST",
@@ -1115,7 +1156,7 @@ def test_shoulder_roots_are_modelled_not_noted() -> None:
         "RETAIN",
         "ADHESIVE",
         "TAILSTOCK",
-        "TURN",
+        "TURN ",
         "64T",
         "CLEAR OF",
     ):

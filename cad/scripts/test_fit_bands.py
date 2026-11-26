@@ -50,8 +50,12 @@ _SETTER = "set_dimension_bilateral_tolerance"
 # the imported module) must say here which module-level expression build()
 # derives it from. "each" checks a tuple of bands; "values" checks a band mapping.
 LOCAL_BAND_SOURCES: dict[tuple[str, str], tuple[str, str]] = {
-    # for section, band in enumerate(SECTION_DIA_BANDS): ... deviations(band)
-    ("build_dt_cone_gear_shaft", "band"): ("SECTION_DIA_BANDS", "each"),
+    # for name, band in ((keyseat S,),): ... deviations(band); the keyseat
+    # width and the turned diameters are REF (fit batch DT, 2026-11-24)
+    ("build_dt_cone_gear_shaft", "band"): (
+        "(cone_land_key.KEYSEAT_S_BAND,)",
+        "each",
+    ),
     # def gear_tip_band_mm(grade): band = ...; deviations(band)
     ("_gear_fit_limits", "band"): (
         "(gear_tip_band_mm('standard'), gear_tip_band_mm('contact_critical'))",
@@ -85,7 +89,6 @@ LOCAL_BAND_SOURCES: dict[tuple[str, str], tuple[str, str]] = {
         " __import__('dt_pinion_cam_spec').THIN_WALL_MIN_BAND,"
         " __import__('pn_pen_rod_spec').TAP_WALL_MIN_BAND,"
         " __import__('dt_crank_handle_pivot_screw_spec').TIP_CHAMFER_BAND,"
-        " __import__('dt_cone_pivot_post_spec').JOURNAL_RIM_BREAK_BAND,"
         " __import__('pd_transgear_arm_spec').PIN_HOLE_DEPTH_BAND,"
         " __import__('fr_top_frame_spec').HANGER_PIN_HOLE_DEPTH_BAND)",
         "each",
@@ -104,7 +107,7 @@ LOCAL_BAND_SOURCES: dict[tuple[str, str], tuple[str, str]] = {
     ),
     # The cone tip gear's loop over its own module-level bands.
     ("build_dt_cone_tip_gear", "band"): (
-        "(BLANK_DIA_BAND, FACE_WIDTH_BAND, TOOTH_THICKNESS_BAND, SPIGOT_DIA_BAND)",
+        "(BLANK_DIA_BAND, FACE_WIDTH_BAND, TOOTH_THICKNESS_BAND)",
         "each",
     ),
     # _apply_neck_and_flat_limits passes its one native LIMIT band.
@@ -305,6 +308,11 @@ INDEXED_FIT_BANDS: dict[tuple[str, str], str] = {
         "equal band indexed into the native symmetric (+/-) tolerance and the "
         "hub key pin's air to the flat"
     ),
+    ("dt_crank_drive_gear_spec", "BORE_DIA_BAND"): (
+        "the .3760 reamer's analysis band, never printed (fit audit 2026-11-23, "
+        "MHA-DT-07.bore): indexed for the modelled reamer size and the keyed "
+        "arbor's and collar-annulus walls"
+    ),
     ("dt_alignment_pinion_spec", "BASE_TANGENT_SPAN_BAND"): (
         "indexed into the span-measurement note text"
     ),
@@ -315,6 +323,35 @@ INDEXED_FIT_BANDS: dict[tuple[str, str], str] = {
     ("dt_cone_gear_shaft_spec", "_T030_NORTH_BAND"): (
         "the cone gear stack's T030 north-face station band (an axial stack "
         "position, not a fit), indexed into T024_NORTH_FACE_DEVIATION_MM"
+    ),
+    # Fit batch DT, 2026-11-24 (rule 4 forms 2/3): the bores print the
+    # reamer's size with no band and the mates are made last to them; these
+    # stay the analysis bands the stacks index.
+    ("dt_cone_gear_spec", "BORE_DIA_BAND"): (
+        "the keyed bores' reamed spread over the Ø.3750 nominal, indexed for "
+        "the seat clearance (GEAR_SEAT_CLEARANCE) and cone_set_stack's float"
+    ),
+    ("dt_cone_gear_spec", "LAND_SEAT_BORE_BAND"): (
+        "the reamed land-seat bores' spread above the reamer's size, indexed "
+        "for the seat and bond clearances; the sheet prints no band"
+    ),
+    ("dt_cone_tip_gear_spec", "SPIGOT_DIA_BAND"): (
+        "the spigot's analysis band (it prints REF, turned last to its holes), "
+        "indexed for the bond clearance and the tip cluster's offsets"
+    ),
+    ("dt_cone_tip_gear_spec", "PIVOT_DIA_BAND"): (
+        "the pivot's analysis band (it prints REF, turned last to its holes), "
+        "indexed for the bond and running clearances"
+    ),
+    # Machinist review r1 (farm run 20261124T110807008Z): the 1/16 key's
+    # widths print REF, the key is the gauge (rule 4, form 3).
+    ("dt_crank_drive_gear_spec", "KEYWAY_WIDTH_BAND"): (
+        "the 1/16 A broach's analysis band (cone_land_key.KEYWAY_WIDTH_BAND; the "
+        "width prints REF), indexed for the keyway walls and side clearance"
+    ),
+    ("dt_cone_gear_tl_keyed_arbor_spec", "KEYSEAT_WIDTH_BAND"): (
+        "the 1/16 end mill's analysis band (cone_land_key.KEYSEAT_WIDTH_BAND; the "
+        "width prints REF, the key bonded), indexed for the keyseat's corner reach"
     ),
     ("pn_pen_hanger_spec", "STRAP_T_STOCK_BAND"): (
         "the 3 mm strap stock's supplied thickness band, indexed for the "
@@ -345,6 +382,32 @@ INDEXED_FIT_BANDS: dict[tuple[str, str], str] = {
     ),
     ("dt_crankshaft_spec", "SEAT_COLLAR_BAND"): (
         "the seat face's station deviations, indexed for the hub-to-sprocket air"
+    ),
+    # Codjiflo 3548-2: the three note-3 fits print REF and export dia_ref with
+    # the clearance; their turning aims stay as analysis bands only.
+    ("dt_crankshaft_spec", "JOURNAL_DIA_BAND"): (
+        "analysis aim of the REF journals turned to MHA-DT-05's measured bores; "
+        "dt_crankshaft_notes.FIT_CLEARANCES derives note 3's .0010-.0023 from it"
+    ),
+    ("dt_crankshaft_spec", "PINION_SEAT_DIA_BAND"): (
+        "analysis aim of the REF pinion seat turned to MHA-DT-10's measured bore; "
+        "dt_crankshaft_notes.FIT_CLEARANCES derives note 3's .0010-.0023 from it"
+    ),
+    # D27 below: delegated ruling 2026-11-25 (Main), precedent: the
+    # fit-necessity rule of the owner-approved fit policy (owner ruling
+    # 2026-11-24); owner review #2144.
+    ("dt_crank_hub_geometry", "SHAFT_DIA_BAND"): (
+        "analysis aim of MHA-DT-11's REF stub turned to MHA-DT-31's measured bore "
+        "(the 3/8 drill's, D27) less SHAFT_CLEARANCE, note 3's clearance"
+    ),
+    ("dt_crank_hub_geometry", "HUB_BORE_BAND"): (
+        "the 3/8 drilled hub bore's ANALYSIS band, the title block's "
+        "drilled-hole row (no native band; D27): indexed for the seam web, "
+        "the relief wall and the hub's float on the stub"
+    ),
+    ("dt_crank_handle_butt_cup_spec", "POCKET_DIA_BAND"): (
+        "the pocket's own .248-.257 as deviations on the modelled .250; the sheet "
+        "and export carry dia_ref and dia_max (POCKET_DIA_LIMITS), fit audit Q15"
     ),
     ("_sprocket_seat_geometry", "PLATE_BAND"): (
         "the wheel plate's thickness deviations, indexed for the hub-to-sprocket "
@@ -389,21 +452,57 @@ INDEXED_FIT_BANDS: dict[tuple[str, str], str] = {
         "wall and pin-end-depth stacks (not printed on the bore)"
     ),
     ("dt_pinion_arbor_geometry", "DRUM_LEN_BAND"): "indexed into the drum-length limits",
+    ("dt_pinion_arbor_geometry", "BOND_LAND_DIA_BAND"): (
+        "the MHA-DT-01 bond lands' ANALYSIS band (no native band; the lands "
+        "are turned to the 5/16 drilled drum bore, fit audit question 13), "
+        "indexed for the bond gap's BOND_GAP_MAX"
+    ),
+    ("dt_pinion_arbor_geometry", "DRUM_BORE_BAND"): (
+        "the 5/16 drilled MHA-DT-01 bore's ANALYSIS band, the title block's "
+        "drilled-hole row, indexed for the bond gap and the relief air"
+    ),
+    ("dt_pinion_arbor_geometry", "CROSS_HOLE_DIA_BAND"): (
+        "the .2510 reamed crossrod hole's ANALYSIS band (no native band; the "
+        "MHA-DT-15 rod is its gauge, fit audit F14), indexed for the bond's "
+        "CROSSROD_MIN/MAX_CLEARANCE and the head webs"
+    ),
+    ("dt_alignment_pinion_spec", "ARBOR_BORE_BAND"): (
+        "the 5/16 drilled drum bore's ANALYSIS band, the title block's "
+        "drilled-hole row (no native band; MHA-DT-22's bond lands are made to "
+        "fit it, fit audit question 13)"
+    ),
+    ("dt_pinion_bracket_spec", "ARBOR_BORE_BAND"): (
+        "the 5/16 drilled strap bore's ANALYSIS band, the title block's "
+        "drilled-hole row (no native band; the MHA-DT-22 journals are made to "
+        "fit it, fit audit question 12)"
+    ),
+    ("dt_pinion_pivot_block_spec", "LIFT_BORE_BAND"): (
+        "the F drilled lift bore's ANALYSIS band, the title block's "
+        "drilled-hole row (no native band; fit audit F26)"
+    ),
+    ("dt_arbor_pedestal_spec", "BORE_DIA_BAND"): (
+        "the V drilled arbor bore's ANALYSIS band, the title block's "
+        "drilled-hole row (no native band; fit audit F01): indexed for the "
+        "set screw's thread, point margin and the arbor's float"
+    ),
     ("dt_pinion_handle_geometry", "ROD_DIA_BAND"): (
         "indexed by pinion_arbor_spec for the cross-rod fit limits"
     ),
     ("dt_pinion_cam_pin_spec", "PIN_DIA_BAND"): (
-        "the 5/32 drill rod's supplied +/-.0005 in: indexed as the symmetric "
-        "tolerance and for the bonded slip fit's BOND_CLEARANCE_MIN/MAX"
+        "the 5/32 drill rod's supplied +/-.0005 in (no native band; the size "
+        "prints REF, AS SUPPLIED): indexed for the bonded slip fit's "
+        "BOND_CLEARANCE_MIN/MAX and the traveler's rod check"
     ),
     ("dt_pinion_lever_pin_spec", "PIN_DIA_BAND"): (
-        "the 1/16 drill rod's supplied +/-.0003 in: indexed as the symmetric "
-        "tolerance (the pin slips into the #51 match-drilled hole)"
+        "the 1/16 drill rod's supplied +/-.0003 in (no native band; the size "
+        "prints REF, AS SUPPLIED): indexed for the pin's clearance in the #51 "
+        "match-drilled hole and the traveler's rod check"
     ),
     ("dt_cone_swing_platform_pivot_spec", "PIVOT_HOLE_BAND"): (
-        "the pivot bore reamed 6.350 H7 on the 91829A560 shoulder: indexed into "
-        "the Hole Wizard diameter tolerance, the cone set stack's and support "
-        "pose's pivot float and the assembly's pivot air"
+        "the .2510 reamed pivot bore's ANALYSIS band (no native band; fit "
+        "audit question 10, necessity N-01): indexed into the float on the "
+        "91829A560 shoulder, the cone set stack's transfer-punch and "
+        "support-pose pivot float and the assembly's pivot air"
     ),
     ("ch_rocker_arm_spec", "PIVOT_HOLE_BAND"): (
         "title-block drilled-hole deviations (the F DRILL THRU row, no native "
@@ -630,8 +729,11 @@ def test_band_uses_are_found() -> None:
     helpers = [u for u in BAND_USES if u.order == "upper_lower"]
     assert len(helpers) >= 50, f"band consumer scan found only {len(helpers)} helper uses"
     ids = {f"{u.module}:{u.expression}" for u in BAND_USES}
-    assert "build_dt_crank_drive_gear:BORE_DIA_BAND" in ids, (
-        "missing band consumer anchor: build_dt_crank_drive_gear:BORE_DIA_BAND"
+    # The 64T's face width is the anchor since its reamed bore and then its
+    # keyway width lost their bands (fit audit 2026-11-23, MHA-DT-07.bore;
+    # machinist review r1, farm run 20261124T110807008Z).
+    assert "build_dt_crank_drive_gear:GEAR_FACE_WIDTH_BAND" in ids, (
+        "missing band consumer anchor: build_dt_crank_drive_gear:GEAR_FACE_WIDTH_BAND"
     )
     assert "build_dt_cone_gear_shaft:band" in ids, (
         "missing band consumer anchor: build_dt_cone_gear_shaft:band"
@@ -738,7 +840,7 @@ def test_classification_lists_are_current() -> None:
 def band_use_source_tree(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     """AST-only sources: every consumer anchor plus a rich unrelated module."""
     anchors = {
-        "build_dt_crank_drive_gear": "BORE_DIA_BAND",
+        "build_dt_crank_drive_gear": "GEAR_FACE_WIDTH_BAND",
         "build_dt_cone_gear_shaft": "band",
     }
     for module, expression in anchors.items():
@@ -768,7 +870,7 @@ def test_band_uses_anchor_rejects_no_match(
 @pytest.mark.parametrize(
     ("module", "expression"),
     [
-        ("build_dt_crank_drive_gear", "BORE_DIA_BAND"),
+        ("build_dt_crank_drive_gear", "GEAR_FACE_WIDTH_BAND"),
         ("build_dt_cone_gear_shaft", "band"),
     ],
 )

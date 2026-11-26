@@ -71,12 +71,12 @@ def test_running_fit_names_its_mate_and_the_sheet_carries_no_gdt() -> None:
     import _config
 
     block = _config.parts("dt-pinion-pivot-block")["number"]
-    # The band is narrower than the turned-diameter row, so the callout names
-    # the matched-fit route with the clearance the printed limits give.
+    # The callout names the mate it runs in; the MHA-DT-18 bores are reamed
+    # with this shaft as their gauge and print the acceptance (owner ruling
+    # 2026-11-24, fit audit question 12), so no clearance prints here.
     shaft_dia = drawing.DIMENSION_CALLOUTS["ShaftDia"]
-    assert len(shaft_dia.split("\n")) <= 2
-    assert block in shaft_dia
-    assert "CLEARANCE" in shaft_dia
+    assert shaft_dia == f"RUNS IN {block} PIVOT BLOCK BORES"
+    assert "CLEARANCE" not in shaft_dia and "MATCHED" not in shaft_dia
     assert not hasattr(dt_pinion_pivot_shaft_spec, "GEOMETRIC_TOLERANCES_MM")
     assert drawing.BEARING_FINISH_EDGE[1] == drawing.SHAFT_UPPER_FLANK_Y
     # The diameter's two fit lines stand right of the front end, over DETAIL
