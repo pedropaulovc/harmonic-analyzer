@@ -240,8 +240,9 @@ cite = ["McMaster-Carr packing list, PO 0803PCAMPOS (1616317-01, 08/04/2025), li
 # ASQSC3-CC-40H, $18.38, in stock; 1/8 in cutter, 3/4 in length of cut,
 # 2-1/4 in overall, 1/8 in shank, 3 flutes, solid micrograin carbide,
 # bright (uncoated), 40° helix, centre cutting, "Extended Reach: No" (no
-# neck). In the MSC cart, not yet owned (delegated ruling 2026-11-24 (Main),
-# #3568; the owner's choice of the plain cutters is recorded there).
+# neck). In the MSC cart, not yet owned (the owner chose the plain cutters,
+# #3568; the pick: delegated ruling 2026-11-24 (Main), no precedent; owner
+# review #2144).
 [tools.endmill-carbide-3fl-1-8-loc-3-4]
 name = "Accupro ASQSC3-CC-40H carbide square 3-flute end mill, 1/8 in, 3/4 in LOC, 2-1/4 in OAL, 1/8 in shank"
 kind = "endmill"

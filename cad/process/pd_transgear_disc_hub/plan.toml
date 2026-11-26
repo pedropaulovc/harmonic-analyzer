@@ -46,8 +46,9 @@
 # sharp-nose lathe tool for the spigot's R.004 MAX root
 # (tools-special-cutters.toml lathe-tool-sharp-nose) and the plain 1/16
 # end mill with 1/2 in of flutes, MSC 35497056, bought for MHA-MS-02 too
-# (endmill-carbide-3fl-1-16-loc-1-2; delegated ruling 2026-11-24 (Main),
-# #3568, the owner's choice of the plain cutters recorded there).
+# (endmill-carbide-3fl-1-16-loc-1-2; the owner chose the plain cutters,
+# #3568; the pick: delegated ruling 2026-11-24 (Main), no precedent; owner
+# review #2144).
 # The bore's GO, the Class ZZ .3135 plus pin (gauges.toml zz-pins-3135-3140,
 # MSC 88931357), is on the buy list for MHA-DT-14 too.
 #
@@ -77,7 +78,8 @@
 # and no band. The chord ream takes no Class ZZ pin (zz-pins-0615-0620 is
 # not used); the bore is the one exception, by the 2026-11-26 ruling above.
 # The chord ream is accepted by its mate (traveler-guidelines T0): the
-# MHA-PD-VN-69 dowel does not enter by hand. The set's .061 pin (it enters
+# MHA-PD-VN-69 dowel does not enter the ream by hand; it may start into the
+# flat's .0625 pocket above the ream's mouth (D40). The set's .061 pin (it enters
 # the ream) stands in it for the stop and the station; cad.bore_dia_band_mm
 # and cad.pin_ream_dia_band_mm are the spec's analysis bands, bound only
 # where a ream's sizing or gauge needs one.
@@ -88,11 +90,14 @@
 # pocket on the ream's axis is .0005 over the .0615-.0620 band's top
 # (.00025 a side), over the pocket's own depth only: 0.20 mm at its outer
 # edge to 1.64 mm at its inner on the largest O.D. (1.57 on the nominal),
-# the mouth of a 10.6 mm hole, so at least 8.96 mm of press length stays in
-# band; the reamer and the dowel's press fit are unchanged. Accepted as a
-# mouth relief: delegated ruling 2026-11-26 (Main), no precedent; owner
-# review #2144 (rulings.md D40). Its outer edge meets the O.D. lower, so the
-# flat goes one peck deeper.
+# above the ream's mouth at Z pin_flat_bottom_mm (4.2557). The installed
+# dowel bottoms on the stop: its outer end sits at Z 3.874 nominal (ream_tip
+# -4.064 + 7.9375) and at most 4.2545 (stop_shallow -3.937 + the longest
+# pin, 8.1915, pd_vn_transgear_hub_key_pin_spec LENGTH_LIMITS_MM), under the
+# flat's floor, so the pocket never touches the pin; the ream and the press
+# fit are unchanged. Accepted: delegated ruling 2026-11-26 (Main), no
+# precedent; owner review #2144 (rulings.md D40). Its outer edge meets the
+# O.D. lower, so the flat goes one peck deeper.
 #
 # NC (cad/process/pd_transgear_disc_hub/cam.py): CM01_flange_holes,
 # CM02_pin_hole, CM03_pin_ream. Program names, the [parameters] and the
@@ -693,7 +698,7 @@ drilling = "none"
 sizing = { kind = "band", band_mm = "{{cad.pin_ream_dia_band_mm}}" }
 instruction = "Run CM03_pin_ream (M6 T6, the .0615 reamer, to buy, at least {{process.pin_tool_out_min_in:.2dot}} out of the chuck; set 1400): ream to the stop, the reamer's end to Z{{process.ream_tip_mm:.3f}}, fed in and fed out. The file ends with the spindle stopped and the reamer raised clear."
 settings = "pd-collar-ream-0615-c360"
-inspection = "The ream is accepted by its mate: the MHA-PD-VN-69 dowel, offered to the mouth by hand, does not enter. The .061 pin enters to the stop; refused: Op 400 first."
+inspection = "The ream is accepted by its mate: the MHA-PD-VN-69 dowel, offered to the mouth by hand, does not enter the ream past the flat's floor (it may start into the flat). The .061 pin enters to the stop; refused: Op 400 first."
 gauge_checks = "other"
 milling_cuts = [
   { name = "pin ream", kind = "drill", phase = "finish", cutter_dia_mm = 1.5621, flutes = 4, rpm = 1400, feed_mm_min = "{{process.ream_feed_per_min_mm}}", stations_mm = ["{{cad.pin_ream_chord_mm}}"] },
@@ -717,7 +722,7 @@ gauge_checks = [{ gauge = "mill-x-dro", band_mm = "{{cad.pin_ream_chord_band_mm}
 feed = "hand"
 
 [[setups.operations]]
-instruction = "The .061 pin not entering to the stop in Op 360: lift it out, blow out the chips, oil the reamer, run CM03_pin_ream once more, G54 unchanged; try it again. It now enters: Ops 370–390. Still refused: scrapped. The dowel entering by hand (the ream is too large for the press; no cut remedies it), or the centre outside its band in Op 390: scrapped. Either way make another from Setup 1."
+instruction = "The .061 pin not entering to the stop in Op 360: lift it out, blow out the chips, oil the reamer, run CM03_pin_ream once more, G54 unchanged; try it again. It now enters: Ops 370–390. Still refused: scrapped. The dowel entering the ream past the flat's floor by hand (the ream is too large for the press; no cut remedies it), or the centre outside its band in Op 390: scrapped. Either way make another from Setup 1."
 feed = "hand"
 
 [[setups]]
@@ -748,7 +753,7 @@ feed = "hand"
 
 [[setups.operations]]
 instruction = "The chord ream after deburring: try the .061 pin in it, then offer the MHA-PD-VN-69 dowel to its mouth by hand (it is pressed at MHA-PD-00, step 8A)."
-inspection = "The .061 pin enters to the stop; the MHA-PD-VN-69 dowel does not enter by hand."
+inspection = "The .061 pin enters to the stop; the MHA-PD-VN-69 dowel does not enter the ream past the flat's floor by hand."
 gauge_checks = "other"
 feed = "hand"
 
@@ -759,7 +764,7 @@ gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.pin_ream_station_band_mm}
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Station outside its band in Op 440, or the dowel entering by hand in Op 430: scrapped (the hole is reamed and cannot move or close); make another from Setup 1."
+instruction = "Station outside its band in Op 440, or the dowel entering the ream past the flat's floor by hand in Op 430: scrapped (the hole is reamed and cannot move or close); make another from Setup 1."
 feed = "hand"
 
 [[setups.operations]]

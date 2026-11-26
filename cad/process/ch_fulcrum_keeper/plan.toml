@@ -38,9 +38,10 @@
 # standard 1/8 in end mill's 1-1/2 in overall length leaves too little out
 # of the collet to keep the collet nose over the crown. The plain 1/8 in
 # end mill with 3/4 in of flutes, 2-1/4 in overall (MSC 09653429, shop
-# tools.endmill-carbide-3fl-1-8-loc-3-4, to_order; delegated ruling
-# 2026-11-24 (Main), #3568, the owner's choice of the plain cutters
-# recorded there) mills it by interpolation; cam.py checks its stick-out.
+# tools.endmill-carbide-3fl-1-8-loc-3-4, to_order; the owner chose the
+# plain cutters, #3568; the pick: delegated ruling 2026-11-24 (Main), no
+# precedent; owner review #2144) mills it by interpolation; cam.py checks
+# its stick-out.
 #
 # Tapping: FluidNC cannot rigid-tap (owner, Pedro, 2026-11-17). The tap is
 # guided by the Fisher spring tap guide in the 1/2 in R8 collet (owner, Pedro,
@@ -747,7 +748,7 @@ instruction_detailed = "The part clamped as Holding says. Edge finder (900 rpm):
 feed = "hand"
 
 [[setups.operations]]
-instruction = "The 2-1/4 in long 1/8 in end mill in its 1/8 in collet, {{process.cbore_projection_min_mm:in.3dot}}–{{process.cbore_projection_max_mm:in.3dot}} out (at least {{process.holder_grip_min_mm:in.2dot}} stays in the collet): with the cutter on the counterbore's floor the collet nose then stays {{process.cbore_collet_clear_mm:in.3dot}} over the crown."
+instruction = "The 2-1/4 in long 1/8 in end mill in its 1/8 in collet, just over {{process.cbore_projection_min_mm:in.3dot}} out, never over {{process.cbore_projection_max_mm:in.3dot}} (at least {{process.holder_grip_min_mm:in.2dot}} stays in the collet): with the cutter on the counterbore's floor the collet nose then stays {{process.cbore_collet_clear_mm:in.3dot}} over the crown."
 feed = "hand"
 
 [[setups.operations]]
@@ -800,7 +801,7 @@ gauge_checks = [
 
 [[setups.operations]]
 steps = [
-  { kind = "action", text = "Smaller in Ø than its band: the 1/8 end mill is worn. Fit a new 2-1/4 in long 1/8 in end mill, {{process.cbore_projection_min_mm:in.3dot}}–{{process.cbore_projection_max_mm:in.3dot}} out, and run FK08_cbore_recut (the counterbore alone; its M6 T7 measures the new cutter). Check again." },
+  { kind = "action", text = "Smaller in Ø than its band: the 1/8 end mill is worn. Fit a new 2-1/4 in long 1/8 in end mill, just over {{process.cbore_projection_min_mm:in.3dot}} out, never over {{process.cbore_projection_max_mm:in.3dot}}, and run FK08_cbore_recut (the counterbore alone; its M6 T7 measures the new cutter). Check again." },
 ]
 feed = "hand"
 

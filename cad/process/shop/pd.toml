@@ -289,8 +289,9 @@ rpm = 2800
 feed = "2.8 in/min"
 # MHA-PD-17's flat with the plain 1/16 in (.0625) 3-flute end mill, 1/2 in
 # of flutes, bought for MHA-MS-02 (tool audit 2026-11-23: a 1/16 replaces
-# the 3/64 in end mill; the cutter: MSC 35497056, delegated ruling
-# 2026-11-24 (Main), #3568). Re-derived for it (#3568): its .500 of flutes
+# the 3/64 in end mill; the cutter: MSC 35497056, the owner chose the plain
+# cutters, #3568; the pick: delegated ruling 2026-11-24 (Main), no
+# precedent; owner review #2144). Re-derived for it (#3568): its .500 of flutes
 # on .0625 stand out 8x its diameter, so the table is unchanged: Harvey
 # Tool Speeds & Feeds, Miniature End Mills - Square - Long Reach, Stub
 # Flute, 9x Reach Multiple (the 9x table, the next longer than 8x, the
