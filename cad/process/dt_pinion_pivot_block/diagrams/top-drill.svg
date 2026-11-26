@@ -28,9 +28,9 @@
   <text class="label" x="20" y="122">into the gap between the parallels</text>
   <line class="leader" x1="200" y1="130" x2="262" y2="160"/>
   <circle class="leader-dot" cx="262" cy="160" r="2"/>
-  <line class="leader" x1="300" y1="336" x2="270" y2="308.38"/>
+  <line class="leader" x1="426" y1="330" x2="270" y2="308.38"/>
   <circle class="leader-dot" cx="270" cy="308.38" r="2"/>
-  <text class="label" x="304" y="340">point Z {{process.hold_tip_height_mm:.3f}} mm</text>
+  <text class="label" x="430" y="334">point Z {{process.hold_tip_height_mm:.3f}} mm</text>
   <text class="label" x="440" y="236">east hold-down</text>
   <text class="label" x="440" y="252">next (centre line)</text>
   <rect class="clamp" x="510" y="115" width="150" height="25"/>
