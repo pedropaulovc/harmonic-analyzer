@@ -1341,10 +1341,10 @@ def test_tip_dowel_hole_callout_flags_its_fit_note() -> None:
     assert rows[1].startswith("   ")
     assert max(map(len, rows)) <= drawing.TIP_DOWEL_NOTE_WIDTH
     flat = " ".join(row.strip() for row in rows)
-    step = dt_drive_train_steps.step_ref("post-and-tip-block")
+    step = dt_drive_train_steps.step_ref("end-play-set")
     for phrase in (
         "SLIDING FIT ON MHA-DT-VN-69",
-        f"DRILLED THRU AT {step}.",
+        f"DRILLED THRU INTO MHA-DT-21 AT THIS STATION, {step}.",
     ):
         assert phrase in flat, phrase
     assert drawing_spec.DRAWING_DIMENSIONS["TipDowelProfile"] == {
@@ -1432,12 +1432,14 @@ def test_tip_dowel_stays_chained_for_the_stack() -> None:
     face web both fall under the wall target; the chained station holds
     both, so it controls and the pivot-axis station is a reference.  One
     locating scheme per hole (rule 10; integration proof 20261109T105251629Z
-    read a controlling .188 beside it as a second one).  The spacing matches
-    MHA-DT-21's tap-to-dowel spacing, which note 3 names (rule 4); the .228
-    itself carries only its value and band (rule 7)."""
+    read a controlling .188 beside it as a second one).  Both parts are
+    drilled at this station at MHA-DT-00 step 3, which note 3 says, naming
+    MHA-DT-21 (rule 4; run 8 review, RV-05); the .228 itself carries only
+    its value and band (rule 7)."""
     assert spec.TIP_DOWEL_FROM_HOLDDOWN == block.DOWEL_FROM_TAP
     flat = " ".join(row.strip() for row in drawing.TIP_DOWEL_NOTE.split("\n"))
-    assert f"SPACED TO MATCH {drawing.TIP_BLOCK_NUMBER}." in flat
+    assert f"DRILLED THRU INTO {drawing.TIP_BLOCK_NUMBER} AT THIS STATION" in flat
+    assert "SPACED TO MATCH" not in flat
     assert drawing.TIP_BLOCK_NUMBER == "MHA-DT-21"
     web = checks.TIP_DOWEL_WEBS["hold-down counterbore (underside)"]
     assert web >= WALL_TARGET_MM

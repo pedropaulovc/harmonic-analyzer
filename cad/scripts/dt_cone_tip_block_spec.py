@@ -673,7 +673,7 @@ for _name, _web in WORST_FOOT_TAP_WEBS_MM.items():
 # stands on the hold-down line beside the screw, bonded (LOCTITE 638) into a
 # blind drilled hole in this foot and slipping through MHA-DT-20.  Owner
 # ruling 2026-11-24, fit audit question 11: at MHA-DT-00 step
-# post-and-tip-block, with the block squared and snug on its screw, the
+# end-play-set, with the block squared and snug on its screw, the
 # fitter drills 1/16 up through MHA-DT-20 into the foot (this hole's
 # callout), opens the MHA-DT-20 hole to #52 from below (its callout; the
 # block stays on), then bonds the pin up through MHA-DT-20 to this hole's

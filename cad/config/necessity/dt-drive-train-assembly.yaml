@@ -35,12 +35,12 @@ necessity:
     reason: "keeps the cone tip bushing off gear 19"
     source: "delegated ruling 2026-11-25 (Main), no precedent; owner review #2144 (D28): dt_cone_tip_air C-01 'can reach G19' (worst case): bushing air 0.024 mm at today's ±0.10 mm (prints ±.003), -0.003 mm at the title block's ±.005"
   - id: N-03
-    feature: "sheet 16, row 20 (steps 1S, 1W): T024 tooth runout .0045 TIR MAX EACH SPACE"
+    feature: "sheet 16, row 20 (step 1S; 1W records only): T024 tooth runout .0045 TIR MAX EACH SPACE"
     kind: mesh
     reason: "T024 runout opens its drum mesh centre"
     source: "delegated ruling 2026-11-25 (Main), no precedent; owner review #2144 (D28); owner ruling 2026-11-21, #3292: cone gate C-01 (NOMINAL_CONTACT_RATIO_MIN 1.0): T024 contact ratio 1.044 at today's .0045 TIR, 1.021 at .005, 0.800 at the title block's .010"
   - id: N-04
-    feature: "sheet 16, row 21 (steps 2B, 2E): MHA-DT-37 pivot runout .0020 TIR MAX"
+    feature: "sheet 16, row 21 (step 2B; 2E records only): MHA-DT-37 pivot runout .0020 TIR MAX"
     kind: mesh
     reason: "pivot runout tilts the cone gears off centre"
     source: "delegated ruling 2026-11-25 (Main), no precedent; owner review #2144 (D28); owner ruling 2026-11-22, #2473 option G: cone gate C-01 (NOMINAL_CONTACT_RATIO_MIN 1.0): least contact ratio T012 1.022 at today's .0020 TIR, 1.001 at .0025, 0.899 at .005"

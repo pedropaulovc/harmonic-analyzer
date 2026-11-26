@@ -196,9 +196,9 @@ T012/T018/T024 are thick-only (+0.075/−0) for the standard blank (owner ruling
   (#3219). The journal's axis is not the running axis (#2473, owner ruling
   2026-11-22, option G; `cone_running_axis`):
   MHA-DT-37's spigot cures off-centre and tilted in MHA-DT-04's socket, so
-  its pivot is tapped true while the bond is wet and read after cure, before
-  the post is assembled, at .0020 in TIR MAX (MHA-DT-00 steps 2B and 2E,
-  sheet 16). Half that reading reaches each gear by its plane's share of
+  its pivot is tapped true to .0020 in TIR MAX while the bond is wet
+  (MHA-DT-00 step 2B, sheet 16) and read after cure as a record only (2E),
+  before the post is assembled. Half that reading reaches each gear by its plane's share of
   the journal-to-pivot span (0.27 at T120 to 0.92 at T012). T012, T018 and
   T024 carry
   the standard (N + 2)/DP blank for it, their tooth thickness +.003/−0 in.

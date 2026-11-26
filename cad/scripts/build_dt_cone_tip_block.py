@@ -459,7 +459,7 @@ def build(adapter) -> dict[str, str]:
     # rubric sample, PR #2248)): a 1/16 drilled hole
     # up into the foot, the MHA-DT-VN-69 pin bonded to its floor up
     # through the platform, on the tap's line DOWEL_FROM_TAP toward +X.
-    # Match-drilled up through MHA-DT-20 at MHA-DT-00 step post-and-tip-block,
+    # Match-drilled up through MHA-DT-20 at MHA-DT-00 step end-play-set,
     # modelled at its nominal station.  The Top plane IS the foot, so the cut
     # runs up (+Y) into the block.
     dowel = SketchDims()

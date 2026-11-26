@@ -1061,11 +1061,12 @@ SETTING_TABLE_ROWS = (
         STACK_WINDOW,
         "INDICATOR ON BLOCKS",
     ),
-    # DT-00 machinist round 1, Main's ruling (b): the .007 window stays and
-    # the row names the route 8R sets it by: the mill's Y DRO (MagXact
-    # MX-100M, cad/config/shop-equipment/dro.toml; gauges.mill-y-dro reads
-    # 0.005 mm, .0002 in) from its zero on the MHA-FR-01 Y datum face at
-    # 8P, the face found with the edge finder (tools.edge-finder).
+    # DT-00 machinist round 1: delegated ruling 2026-11-25 (Main), no
+    # precedent; owner review #2144 (D36; accept DT-15, necessity N-01): the
+    # .007 window stays and the row names the route 8R sets it by: the
+    # mill's Y DRO (MagXact MX-100M, cad/config/shop-equipment/dro.toml) from
+    # its zero on the MHA-FR-01 Y datum face at 8P, the face found with the
+    # edge finder (tools.edge-finder).
     (
         "2",
         f"{_step_ref('cylinder-stack-accepted', 'Q')}-{_step_ref('cylinder-stack-accepted', 'R')}",
@@ -1614,7 +1615,9 @@ CONE_CRANK_STEPS = _note_text(
         # Attempt 1 review (clarity, rule 22): the redo says which way
         # MHA-DT-39 moves; Codjiflo on #3023: it redoes 3H-3J only, not 3G's
         # fixed 1/8 turn (the embed books SHAFT_END_PLAY[1] either way).
-        "3L. IF IT WAS LOOSE, REDO 3H-3J WITH MHA-DT-39 IN MORE, IF TIGHT LESS.",
+        # Codjiflo 37c9fbac (rules 22, 25): 3J reads a dial window, so 3L
+        # says OVER/UNDER, not loose/tight.
+        "3L. IF IT READ OVER, REDO 3H-3J WITH MHA-DT-39 IN MORE, IF UNDER LESS.",
         # Rule 23 (PR 2 machinist review round 10): the pinch lock's bench
         # acceptance, worded as 3E's, once the end play is final.
         "3M. CHECK THAT MHA-DT-39 DOES NOT TURN IN MHA-DT-21 BY HAND.",

@@ -13,8 +13,9 @@
 # title block's .XX).
 # HoldDownX (.04, the hold-down hole across the cone line) has no entry: at
 # the .XX row's +/-.01 the bushing air stays 0.024 mm (0.053 at +/-.005),
-# step 23's .020 leaf still passes every in-print build (0.731 mm look air
-# against 0.508), the hold-down webs stay .326 in or more and the tip block
+# step 23's .010 leaf still passes every in-print build (0.278 mm look air
+# against the .010 leaf, its tolerance charged; D18 as amended 2026-11-25),
+# the hold-down webs stay .326 in or more and the tip block
 # on the plate (0.764 mm against 0.50), so it prints at the title block.
 # The tip dowel's .228 +/-.004 station from the hold-down hole: the webs to
 # the hold-down counterbore here and to MHA-DT-21's +X face close on it

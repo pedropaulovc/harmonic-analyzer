@@ -244,10 +244,12 @@ ACCEPTANCES = (
     # journal's axis and 1T clips the comb in that same setup (Codjiflo
     # review of #3324); the pin names the pin-gauge row of the tool list as
     # MHA-PD-00's tooth-space rows do.  The cells hold the table's widest
-    # SETTING and ACCEPT widths (reference-view keep-out).
+    # SETTING and ACCEPT widths (reference-view keep-out).  Codjiflo r9 on
+    # #3550 (rule 25): the limit is 1S's alone, so the STEP cell names 1S
+    # only; 1W cites the row for how it reads, and says it accepts nothing.
     (
         "t024-runout",
-        f"{_step_ref('cone-gears-stacked', 'S')}, {_step_ref('cone-gears-stacked', 'W')}",
+        _step_ref("cone-gears-stacked", "S"),
         f"T{_LAND_2_TEETH:03d}, "
         f"\u00d8{inch_text(cone_gear.over_pins_pin_dia_mm(_LAND_2_TEETH), 3)} GAUGE PIN, "
         "MHA-DT-04 ON END ON A V-BLOCK",
@@ -258,10 +260,11 @@ ACCEPTANCES = (
     # true to this row while the tip's bonds are wet (2B) and recorded after
     # cure (2E, audit part 2 C5), before the post is assembled, over a full
     # turn in T024's setup; cone_set_stack books the limit as the running
-    # axis's offset from MHA-DT-04's.
+    # axis's offset from MHA-DT-04's.  The STEP cell names 2B only: 2E reads
+    # as the row, and accepts nothing (Codjiflo r9 on #3550, rule 25).
     (
         "pivot-runout",
-        f"{_step_ref('post-and-tip-block', 'B')}, {_step_ref('post-and-tip-block', 'E')}",
+        _step_ref("post-and-tip-block", "B"),
         "MHA-DT-37 PIVOT, MHA-DT-04 ON END ON A V-BLOCK",
         f"{inch_text(inch_floor_mm(PIVOT_RUNOUT_TIR_MM, 4), 4)} TIR MAX",
         "TEST INDICATOR",

@@ -192,8 +192,8 @@ def gear_data() -> str:
         ),
         ("TOOTH FORM", tooth_form()),
         ("MATE", f"{CYLINDER_MATE_NUMBER}, 120T"),
-        # Reference only: MHA-DT-00 check 4 sets the mesh by feel and
-        # measures no backlash (#2586).
+        # Reference only: MHA-DT-00 checks 4-5 set the mesh by feel and
+        # measure no backlash (#2586).
         (
             "BACKLASH WITH MATE (REF), FEEL SET AT ASSEMBLY",
             f"{inch(minimum, 3)} TO {inch(maximum, 3)}",

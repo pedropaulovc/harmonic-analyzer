@@ -472,10 +472,10 @@ _TIP_DOWEL_X_TEXT_X = (
 # Rule-23 retention, owner ruling 2026-11-07 (MHA-DT-00 rubric sample, PR
 # #2248).  The tip-block locating dowel's #52 slip hole (owner ruling
 # 2026-11-24, fit audit question 11), under its untoleranced size in detail
-# B, for MHA-DT-00 step post-and-tip-block: the drill, then the flag to the
-# numbered note that states the fit, the part that goes in the hole and
-# where it is drilled (machinist review of round 6, #7; round 8, #2: the
-# order of operations is MHA-DT-00 step 2's, not this sheet's).  No wall
+# B, for MHA-DT-00 step end-play-set (the dowel block at its head): the drill,
+# then the flag to the numbered note that states the fit, the part that goes
+# in the hole and where it is drilled (machinist review of round 6, #7; round
+# 8, #2: the order of operations is MHA-DT-00 step 3's, not this sheet's).  No wall
 # row: owner ruling 2026-11-25, "C: counterbore Ø.210, web .080, no
 # shortfall (recommended)" (dt_cone_swing_platform_checks.TIP_DOWEL_WEBS).
 TIP_DOWEL_PIN_NUMBER = _config.parts("dt-vn-locating-pin")["number"]
@@ -489,11 +489,13 @@ TIP_DOWEL_CALLOUT = "\n".join(
 # The note the callout flags (the lift rod's made-at-assembly precedent,
 # dt_pinion_lift_rod_spec.PIN_HOLE_CALLOUT): the hole slips over the dowel
 # MHA-DT-21 holds bonded, and is opened to #52 through with the block on,
-# after MHA-DT-21's 1/16 hole has been drilled up through this plate.  Its
-# banded spacing from the hold-down hole matches the block's own
-# tap-to-dowel spacing (dt_cone_tip_block_spec.DOWEL_FROM_TAP), so the note
-# names that mate (rule 4); words on the .228 itself read as a location
-# carrying words (rule 7; proof run 20261109T134133430Z, 3 of 3 runs).  Two
+# after MHA-DT-21's 1/16 hole has been drilled up through this plate.  The
+# banded station from the hold-down hole is where BOTH parts are drilled at
+# MHA-DT-00 step 3 (the block's own spacing, dt_cone_tip_block_spec.
+# DOWEL_FROM_TAP, prints REF), so the note names the block as drilled
+# through here (rule 4) and does not read as a match to an existing hole
+# (run 8 review, 3 of 3 runs; RV-05, D37); words on the .228 itself read as
+# a location carrying words (rule 7; proof run 20261109T134133430Z).  Two
 # rows of at most TIP_DOWEL_NOTE_WIDTH characters under a hanging indent; the
 # step reference never breaks across rows.  Round 7's layout audit measured
 # 62 characters at 107.7 mm (x 221.6..329.3 mm), 7.6 mm into the box of the
@@ -504,8 +506,8 @@ TIP_DOWEL_NOTE_WIDTH = 55
 TIP_BLOCK_NUMBER = _config.parts("dt-cone-tip-block")["number"]
 _NBSP = "\u00a0"
 TIP_DOWEL_NOTE = textwrap.fill(
-    f"SLIDING FIT ON {TIP_DOWEL_PIN_NUMBER}, SPACED TO MATCH {TIP_BLOCK_NUMBER}. "
-    f"DRILLED THRU AT {step_ref('post-and-tip-block').replace(' ', _NBSP)}.",
+    f"SLIDING FIT ON {TIP_DOWEL_PIN_NUMBER}. DRILLED THRU INTO {TIP_BLOCK_NUMBER} "
+    f"AT THIS STATION, {step_ref('end-play-set').replace(' ', _NBSP)}.",
     width=TIP_DOWEL_NOTE_WIDTH,
     initial_indent=f"{TIP_DOWEL_NOTE_NUMBER}. ",
     subsequent_indent="   ",

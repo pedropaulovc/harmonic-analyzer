@@ -802,7 +802,8 @@ def test_the_back_ear_row_prints_the_title_block_s_full_window() -> None:
 
 
 def test_the_front_pedestal_row_names_its_route_and_an_owned_instrument() -> None:
-    """DT-00 machinist round 1, Main's ruling (b): row 2 keeps its .007
+    """DT-00 machinist round 1, delegated ruling 2026-11-25 (Main), no
+    precedent; owner review #2144 (D36; accept DT-15): row 2 keeps its .007
     window and names how 8R sets it: the mill's Y DRO from its 8P zero on
     the MHA-FR-01 Y datum, the face found by the edge finder.  The DRO is
     owned and reads finer than .0005."""
@@ -1775,9 +1776,11 @@ def test_cone_station_rows_run_front_to_back() -> None:
     ) in keyed
     assert steps[order[8] : order[9]].strip().endswith("FOR A REDO FROM 1L.")
     assert steps[order[9] :].startswith("2K. ALIGN THE MHA-DT-05 COUNTERBORES")
+    # Codjiflo r9 on #3550 (rule 25): the limit row names 2B, the wet set,
+    # only; 2E reads as the row and accepts nothing.
     (row,) = (r for r in drawing.ACCEPTANCE_TABLE_ROWS if r[2].startswith("MHA-DT-37 PIVOT"))
     assert row[1:] == (
-        "2B, 2E",
+        "2B",
         "MHA-DT-37 PIVOT, MHA-DT-04 ON END ON A V-BLOCK",
         ".0020 TIR MAX",
         "TEST INDICATOR",

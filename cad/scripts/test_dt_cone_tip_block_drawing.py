@@ -996,7 +996,7 @@ def test_dowel_hole_callout_gives_the_drill_its_wall_and_the_note_flag() -> None
     assert all(line.startswith("   ") for line in note.split("\n")[1:])
     assert max(map(len, note.split("\n"))) <= drawing.DOWEL_NOTE_WIDTH
     flat = " ".join(line.strip() for line in note.split("\n"))
-    step = dt_drive_train_steps.step_ref("post-and-tip-block")
+    step = dt_drive_train_steps.step_ref("end-play-set")
     for phrase in (
         "MHA-DT-VN-69 BONDED, LOCTITE 638, CLEARANCE .004 MAX.",
         f"DRILLED THRU MHA-DT-20 AT {step}",

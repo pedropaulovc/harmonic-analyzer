@@ -162,7 +162,7 @@ DOWEL_HOLE_CALLOUT_PRINTED = DOWEL_HOLE_CALLOUT.replace("<HOLE-DEPTH>", "\u21a7"
 # (rule 23: a bonded joint prints its clearance on the part sheet), and
 # where and through what the hole is match-drilled (the lift rod's
 # made-at-assembly precedent, dt_pinion_lift_rod_spec.PIN_HOLE_CALLOUT;
-# MHA-DT-00 step post-and-tip-block points back at this callout).  Round 7
+# MHA-DT-00 step end-play-set points back at this callout).  Round 7
 # (#0, #1): the note is the requirement only, four rows at most (rule 7),
 # clear of the border.  Wrapped to a hanging indent under its number, at
 # most DOWEL_NOTE_WIDTH characters a row; the step reference never breaks
@@ -172,7 +172,7 @@ _NBSP = "\u00a0"
 DOWEL_NOTE = textwrap.fill(
     f"{DOWEL_PIN_NUMBER} BONDED, {RETAINING_COMPOUND}, "
     f"{DOWEL_BOND_CLEARANCE_TEXT}. DRILLED THRU "
-    f"{PLATFORM_NUMBER} AT {step_ref('post-and-tip-block').replace(' ', _NBSP)}.",
+    f"{PLATFORM_NUMBER} AT {step_ref('end-play-set').replace(' ', _NBSP)}.",
     width=DOWEL_NOTE_WIDTH,
     initial_indent=f"{DOWEL_NOTE_NUMBER}. ",
     subsequent_indent="   ",
