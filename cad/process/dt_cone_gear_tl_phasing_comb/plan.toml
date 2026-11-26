@@ -368,12 +368,12 @@ milling_cuts = [
 ]
 
 # CA softens with heat (the brief's cut caution): the remedy stops the feed
-# and waits for the blank to cool; the standing page's Feed Hold row reruns
-# the file.
+# and, by Reset, the spindle (FluidNC refuses a jog in Hold), then waits for
+# the blank to cool; the standing page's Feed Hold row reruns the file.
 [[setups.operations]]
 steps = [
   { kind = "action", text = "CA softens with heat; never touch the work while CB01_outline runs." },
-  { kind = "stop", text = "The cut smokes or smells hot: Feed Hold; jog Z up clear and wait until the blank is cool to a finger." },
+  { kind = "stop", text = "The cut smokes or smells hot: Feed Hold, then Reset (the spindle stops); jog Z up clear and wait until the blank is cool to a finger." },
 ]
 feed = "hand"
 

@@ -1232,10 +1232,6 @@ instruction = "G54 Z0: spindle stopped, turn the saw by hand until the tooth mar
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Prove DT11_slit in air, Z0 raised {{process.saw_proof_raise_mm:in.3f}} in (send $#, then G10 L2 P1 Z(the G54 line's Z + {{process.saw_proof_raise_mm:.3f}})): it rises straight to its clear height before any X or Y move; the saw, the arbor's body, its cap and the screw clear the block, the jaws and the stacks; it stops once after its first pass, spindle stopped (Cycle Start). Then Z0 back."
-feed = "hand"
-
-[[setups.operations]]
 speed_kind = "spindle"
 tool = "slit-saw"
 drilling = "none"
