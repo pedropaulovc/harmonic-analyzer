@@ -383,7 +383,7 @@ def test_sheet_gear_data_names_the_mesh_once_with_its_acceptance() -> None:
     trial = steps.step_ref("arm-plate-located")
     assert trial == "MHA-PD-00 STEP 12"
     assert (
-        f"SPAN: CUT TO THE SPAN AIM; ACCEPTED AT {trial} BY THE TRIAL MESH"
+        f"SPAN: CUT TO THE LIMITS SHOWN; ACCEPTED AT {trial} BY THE TRIAL MESH"
         in " ".join(data.split())
     )
     assert max(map(len, data.splitlines())) == len(

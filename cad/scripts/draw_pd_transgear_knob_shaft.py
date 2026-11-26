@@ -315,7 +315,7 @@ GEAR_DATA_ROWS = (
     ("MATES WITH", "\n   ".join(_mate_name(_config.parts("pd-rack-pinion")).rsplit(" ", 1))),
     (
         "SPAN",
-        f"CUT TO THE SPAN AIM;\n   ACCEPTED AT {TRIAL_MESH_STEP}\n   BY THE TRIAL MESH",
+        f"CUT TO THE LIMITS SHOWN;\n   ACCEPTED AT {TRIAL_MESH_STEP}\n   BY THE TRIAL MESH",
     ),
     ("SPAN MATCHED FIT", "RUNS ON\n   MATE WITH NO TIGHT SPOT"),
 )
