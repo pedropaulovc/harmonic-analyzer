@@ -14,7 +14,8 @@
 # (the datum face, kept as bought) up: rough D (CR02); release and reseat the
 # blanks; finish D (CR03). Setup 4, F up again: trim the blank's right end to
 # the fork's crown (CR04a); finish F and cut through round the fork's end (CR04);
-# bore the ring (CR05). Setup 5, the same clamping: saw the fork slot (CR06);
+# bore the ring, the rough levels then, after a speed stop, the finish
+# circle (CR05). Setup 5, the same clamping: saw the fork slot (CR06);
 # spot, drill and ream the pin hole (CR07). Setup 6, the same clamping: cut
 # the outline on seven tabs, the 1/8 in end mill leaving the shank's four
 # corners at its R.0625 (CR08). Setup 7, bench: break the rods out, file the
@@ -29,14 +30,17 @@
 # frame (not after it). Both faces are still roughed in turns to .020 over,
 # the blanks released and reseated, then both finished.
 #
-# Speed (owner's priority): NC 49 min per load of two (about 24 min a rod),
+# Speed (owner's priority): NC 50 min per load of two (about 25 min a rod),
 # from 100 in the first draft: only the ring's zone and the shank's band are
 # pocketed (the waste beside the shank was pocketed on both faces), the skim
 # covers the fork alone and the outline takes three levels instead of five.
 # The 5/64 in corner recut and its tool change went with owner ruling
 # 2026-11-23, tool audit Q9 (2 min and one M6 a load). The slot's light
 # pass and its three steps a level, for the owned arbor's friction drive
-# and its reserve, put 5 min a load back (CR06 7.5 min, from 2.1).
+# and its reserve, put 5 min a load back (CR06 7.5 min, from 2.1). The
+# 1/2 in end mill's chart speed down to 2483 (owner ruling 2026-11-25) and
+# the bore's finish circle at 1839 (its measured deep-wall setting) put
+# about 1 min a load back.
 #
 # Workholding: the agent's recommendation (option A, the vise; owner's
 # per-part choice pending, 2026-11-21). The plate supports the two blanks'
@@ -372,7 +376,14 @@ fork_touch_z_mm = 6.147
 # rough .010 a side (.020 on the diameter) under the band's middle, then the finish circle
 # full depth and a spring pass, clockwise (conventional inside), entered and
 # left on half-circle arcs from and back to the bore's centre (no plunge on
-# the wall, no rapid up it). cam.py computes the circles' radii.
+# the wall, no rapid up it). cam.py computes the circles' radii. The rough
+# levels cut full width, on the chart setting (shop
+# settings.endmill-carbide-3fl-1-2-1018-cf, 2483): no record is a
+# full-width cut (#3428). The finish circle, bore_finish_mm wide down the
+# ring's whole 4.572 (.180), is a conventional deep wall inside shop
+# settings.em-half-carbide-1018-3427-wall (#3427), so it runs at that
+# record's 1839 after an M0 stop to set the speed (cam.py checks its depth
+# and width).
 bore_finish_mm = 0.254
 bore_rough_radius_mm = 8.8201
 bore_finish_radius_mm = 9.0741
@@ -600,11 +611,15 @@ instruction = "First load only: prove CR01_rough_2 in air, Z0 raised 1.000 in; e
 instruction_detailed = "First load only: send $# and note the G54 line's Z. G10 L2 P1 Z(that Z + 25.400) raises Z0 1.000 in. Run the file, watching each move clear the jaws. G10 L2 P1 Z(the noted Z) puts Z0 back."
 feed = "hand"
 
-# Not measured: owner (Pedro), 2026-11-22, on full-width passes: "same log
-# new dechatter issues to try full radial depth but shallow axial" (#3428).
-# CR01's cuts stay as they are, on the chart setting; this stop flags them.
+# Full width, not measured: no record is a full-width cut. Owner (Pedro),
+# 2026-11-22: "same log new dechatter issues to try full radial depth but
+# shallow axial" (#3428). CR01's cuts stay on the chart setting (shop
+# settings.endmill-carbide-3fl-1-2-1018-cf, 2483). Owner ruling 2026-11-25:
+# the first part of each program is a supervised run, hand on the feed
+# override, adjusting by ear; dechatter sessions are for cuts that actually
+# chatter on a part.
 [[setups.operations]]
-instruction = "First load only: these CR01_rough_2 cuts at 2650 rpm have not been chatter-tested on this end mill (owner's test list #3428): fork skim .010 deep x {{process.face_cutter_dia_mm:in.3dot}} wide, rows .025 deep x {{process.face_cutter_dia_mm:in.3dot}} wide. Listen through the run; on chatter, feed hold, stop the spindle and tell the owner."
+instruction = "First load only: these CR01_rough_2 cuts are full width, not chatter-tested at 2483 rpm on this end mill (owner's test list #3428): fork skim .010 deep x {{process.face_cutter_dia_mm:in.3dot}} wide, rows .025 deep x {{process.face_cutter_dia_mm:in.3dot}} wide. Run CR01_rough_2 supervised, hand on the feed override, adjusting it by ear: back it off at the first chatter, bring it back up while the cut stays clean. Note the override that cut clean beside the program."
 feed = "hand"
 
 [[setups.operations]]
@@ -612,7 +627,7 @@ speed_kind = "spindle"
 tool = "em-half"
 drilling = "none"
 sizing = "other"
-instruction = "Run CR01_rough_2 (M6 T1; set 2650): the skim of each fork's face to {{process.fork_thickness_mm:in.4dot}} above Z0 (finished here); then each blank's ring zone and the band along its shank, rows along X, to {{process.ring_rough_2_mm:in.4dot}}, and the band to the rough floor {{process.floor_rough_2_mm:in.4dot}} round the ring; the fork's contour at each level."
+instruction = "Run CR01_rough_2 (M6 T1; set 2483): the skim of each fork's face to {{process.fork_thickness_mm:in.4dot}} above Z0 (finished here); then each blank's ring zone and the band along its shank, rows along X, to {{process.ring_rough_2_mm:in.4dot}}, and the band to the rough floor {{process.floor_rough_2_mm:in.4dot}} round the ring; the fork's contour at each level."
 settings = "endmill-carbide-3fl-1-2-1018-cf"
 milling_cuts = [
   { name = "skim 2", kind = "slot", phase = "finish", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", axial_doc_mm = 0.254, radial_woc_mm = "{{process.face_cutter_dia_mm}}", stations_mm = "{{process.blank_mid_mm}}" },
@@ -661,11 +676,11 @@ feed = "hand"
 instruction = "First load only: prove CR02_rough_1 and CR03_finish_1 in air, Z0 raised 1.000 in, through each M6. Then Z0 back."
 feed = "hand"
 
-# Not measured: owner (Pedro), 2026-11-22, on full-width passes: "same log
-# new dechatter issues to try full radial depth but shallow axial" (#3428).
-# CR02's cuts stay as they are, on the chart setting; this stop flags them.
+# Full width, not measured (#3428), as CR01's: CR02's cuts stay on the
+# chart setting (2483); the first load is a supervised run (owner ruling
+# 2026-11-25).
 [[setups.operations]]
-instruction = "First load only: these CR02_rough_1 cuts at 2650 rpm have not been chatter-tested on this end mill (owner's test list #3428): rows .015 deep x {{process.face_cutter_dia_mm:in.3dot}} wide. Listen through the run; on chatter, feed hold, stop the spindle and tell the owner."
+instruction = "First load only: these CR02_rough_1 cuts are full width, not chatter-tested at 2483 rpm on this end mill (owner's test list #3428): rows .015 deep x {{process.face_cutter_dia_mm:in.3dot}} wide. Run CR02_rough_1 supervised, hand on the feed override, adjusting it by ear: back it off at the first chatter, bring it back up while the cut stays clean. Note the override that cut clean beside the program."
 feed = "hand"
 
 [[setups.operations]]
@@ -673,7 +688,7 @@ speed_kind = "spindle"
 tool = "em-half"
 drilling = "none"
 sizing = "other"
-instruction = "Run CR02_rough_1 (M6 T1; set 2650): each blank's ring zone and the band along its shank, rows along X, to {{process.ring_rough_1_mm:in.4dot}} below Z0, and the band to the rough floor {{process.floor_rough_1_mm:in.4dot}} round the ring; the fork's contour at each level."
+instruction = "Run CR02_rough_1 (M6 T1; set 2483): each blank's ring zone and the band along its shank, rows along X, to {{process.ring_rough_1_mm:in.4dot}} below Z0, and the band to the rough floor {{process.floor_rough_1_mm:in.4dot}} round the ring; the fork's contour at each level."
 settings = "endmill-carbide-3fl-1-2-1018-cf"
 milling_cuts = [
   { name = "rough 1", kind = "slot", phase = "rough", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", axial_doc_mm = 0.381, radial_woc_mm = "{{process.face_cutter_dia_mm}}", traverse_mm = [0, "{{process.blank_pitch_mm}}"] },
@@ -694,11 +709,11 @@ milling_cuts = [
 instruction = "Release and reseat: open the vise, lift each blank and set it back down flush (the 1-2-3 block at the left ends), tap it down while closing the vise. Both faces are now roughed: the blank takes its free shape before the finish passes. Z0 stays."
 feed = "hand"
 
-# Not measured: owner (Pedro), 2026-11-22, on full-width passes: "same log
-# new dechatter issues to try full radial depth but shallow axial" (#3428).
-# CR03's cuts stay as they are, on the chart setting; this stop flags them.
+# Full width, not measured (#3428), as CR01's: CR03's cuts stay on the
+# chart setting (2483); the first load is a supervised run (owner ruling
+# 2026-11-25).
 [[setups.operations]]
-instruction = "First load only: these CR03_finish_1 cuts at 2650 rpm have not been chatter-tested on this end mill (owner's test list #3428): face and band passes {{process.floor_stock_mm:in.3dot}} deep x {{process.face_cutter_dia_mm:in.3dot}} wide. Listen through the run; on chatter, feed hold, stop the spindle and tell the owner."
+instruction = "First load only: these CR03_finish_1 cuts are full width, not chatter-tested at 2483 rpm on this end mill (owner's test list #3428): face and band passes {{process.floor_stock_mm:in.3dot}} deep x {{process.face_cutter_dia_mm:in.3dot}} wide. Run CR03_finish_1 supervised, hand on the feed override, adjusting it by ear: back it off at the first chatter, bring it back up while the cut stays clean. Note the override that cut clean beside the program."
 feed = "hand"
 
 [[setups.operations]]
@@ -706,7 +721,7 @@ speed_kind = "spindle"
 tool = "em-half"
 drilling = "none"
 sizing = "other"
-instruction = "Run CR03_finish_1 (M6 T1; set 2650): each ring's face to {{process.ring_near_mm:in.4dot}} below Z0 (the ring's near face), then the shank's band round the ring to {{process.shank_near_mm:in.4dot}} below Z0 (the shank's near face) and the fork's contour."
+instruction = "Run CR03_finish_1 (M6 T1; set 2483): each ring's face to {{process.ring_near_mm:in.4dot}} below Z0 (the ring's near face), then the shank's band round the ring to {{process.shank_near_mm:in.4dot}} below Z0 (the shank's near face) and the fork's contour."
 settings = "endmill-carbide-3fl-1-2-1018-cf"
 milling_cuts = [
   { name = "finish 1", kind = "slot", phase = "finish", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", axial_doc_mm = "{{process.floor_stock_mm}}", radial_woc_mm = "{{process.face_cutter_dia_mm}}", traverse_mm = [0, "{{process.blank_pitch_mm}}"] },
@@ -772,11 +787,11 @@ milling_cuts = [
 instruction = "Later loads only, after CR04a_end_trim: if the first load's ring check lowered Z0, lower it again now by the same amount (G10 L2 P1 Z, as in that check)."
 feed = "hand"
 
-# Not measured: owner (Pedro), 2026-11-22, on full-width passes: "same log
-# new dechatter issues to try full radial depth but shallow axial" (#3428).
-# CR04's cuts stay as they are, on the chart setting; this stop flags them.
+# Full width, not measured (#3428), as CR01's: CR04's cuts stay on the
+# chart setting (2483); the first load is a supervised run (owner ruling
+# 2026-11-25).
 [[setups.operations]]
-instruction = "First load only: these CR04_finish_2 cuts at 2650 rpm have not been chatter-tested on this end mill (owner's test list #3428): face and band passes {{process.floor_stock_mm:in.3dot}} deep x {{process.face_cutter_dia_mm:in.3dot}} wide, end-zone levels .028 deep x {{process.face_cutter_dia_mm:in.3dot}} wide. Listen through the run; on chatter, feed hold, stop the spindle and tell the owner."
+instruction = "First load only: these CR04_finish_2 cuts are full width, not chatter-tested at 2483 rpm on this end mill (owner's test list #3428): face and band passes {{process.floor_stock_mm:in.3dot}} deep x {{process.face_cutter_dia_mm:in.3dot}} wide, end-zone levels .028 deep x {{process.face_cutter_dia_mm:in.3dot}} wide. Run CR04_finish_2 supervised, hand on the feed override, adjusting it by ear: back it off at the first chatter, bring it back up while the cut stays clean. Note the override that cut clean beside the program."
 feed = "hand"
 
 [[setups.operations]]
@@ -784,7 +799,7 @@ speed_kind = "spindle"
 tool = "em-half"
 drilling = "none"
 sizing = "other"
-instruction = "Run CR04_finish_2 (M6 T1; set 2650): each ring's face to {{process.ring_far_mm:in.4dot}} above Z0 (the ring's far face); the shank's band round the ring to {{process.shank_far_mm:in.4dot}} (the shank's far face) and the fork's contour; then through round each fork's end, from the crown along both its sides to the slot's floor, in levels."
+instruction = "Run CR04_finish_2 (M6 T1; set 2483): each ring's face to {{process.ring_far_mm:in.4dot}} above Z0 (the ring's far face); the shank's band round the ring to {{process.shank_far_mm:in.4dot}} (the shank's far face) and the fork's contour; then through round each fork's end, from the crown along both its sides to the slot's floor, in levels."
 settings = "endmill-carbide-3fl-1-2-1018-cf"
 milling_cuts = [
   { name = "finish 2", kind = "slot", phase = "finish", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", axial_doc_mm = "{{process.floor_stock_mm}}", radial_woc_mm = "{{process.face_cutter_dia_mm}}", traverse_mm = [0, "{{process.blank_pitch_mm}}"] },
@@ -810,11 +825,14 @@ gauge_checks = [
   { gauge = "micrometers", band_mm = "{{cad.shank_far_face_thickness_band_mm}}" },
 ]
 
-# Not measured: owner (Pedro), 2026-11-22, on full-width passes: "same log
-# new dechatter issues to try full radial depth but shallow axial" (#3428).
-# CR05's cuts stay as they are, on the chart setting; this stop flags them.
+# The rough levels are full width, not measured (#3428): they stay on the
+# chart setting (2483). The finish circle sits inside shop
+# settings.em-half-carbide-1018-3427-wall (.010 wide x 4.572 deep under its
+# 0.4 x 13.5, conventional, at 1839; #3427). Owner ruling 2026-11-25: the
+# first part of each program is a supervised run, hand on the feed override,
+# adjusting by ear.
 [[setups.operations]]
-instruction = "First load only: these CR05_bore cuts at 2650 rpm have not been chatter-tested on this end mill (owner's test list #3428): rough levels .030 deep, each a centre plunge {{process.face_cutter_dia_mm:in.3dot}} wide and a circle {{process.bore_rough_radius_mm:in.3dot}} wide. Listen through the run; on chatter, feed hold, stop the spindle and tell the owner."
+instruction = "First load only: CR05_bore's rough levels are full width, not chatter-tested at 2483 rpm on this end mill (owner's test list #3428): .030 deep, each a centre plunge {{process.face_cutter_dia_mm:in.3dot}} wide and a circle {{process.bore_rough_radius_mm:in.3dot}} wide; its finish circle, {{process.bore_finish_mm:in.3dot}} wide down the ring, sits inside the measured deep-wall cut at 1839. Run CR05_bore supervised, hand on the feed override, adjusting it by ear: back it off at the first chatter, bring it back up while the cut stays clean. Note the override that cut clean beside the program."
 feed = "hand"
 
 [[setups.operations]]
@@ -822,10 +840,20 @@ speed_kind = "spindle"
 tool = "em-half"
 drilling = "none"
 sizing = "other"
-instruction = "Run CR05_bore (M6 T1; set 2650): each ring's bore Ø{{cad.strap_bore_dia_in:.4dot}}: at each level a plunge on the bore's centre at 1 in/min and a clockwise circle, to {{process.through_mm:in.3dot}} past the ring's near face; then the finish circle, full depth, entered and left on an arc from the bore's centre, and a spring pass."
+instruction = "Run CR05_bore (M6 T1; set 2483): each ring's bore Ø{{cad.strap_bore_dia_in:.4dot}} roughed: at each level a plunge on the bore's centre at 1 in/min and a clockwise circle, to {{process.through_mm:in.3dot}} past the ring's near face. The file then stops (M0), T1 raised clear over the load."
 settings = "endmill-carbide-3fl-1-2-1018-cf"
 milling_cuts = [
   { name = "bore rough", kind = "slot", phase = "rough", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", axial_doc_mm = 0.762, radial_woc_mm = "{{process.face_cutter_dia_mm}}", stations_mm = "{{process.blank_mid_mm}}" },
+]
+
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "em-half"
+drilling = "none"
+sizing = "other"
+instruction = "Same file, at its stop: set 1839, Cycle Start: each bore's finish circle, clockwise (conventional), {{process.bore_finish_mm:in.3dot}} a side, full depth, entered and left on an arc from the bore's centre, and a spring pass."
+settings = "em-half-carbide-1018-3427-wall"
+milling_cuts = [
   { name = "bore", kind = "side", phase = "finish", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", axial_doc_mm = 4.572, radial_woc_mm = "{{process.bore_finish_mm}}", stations_mm = "{{process.blank_mid_mm}}" },
 ]
 
@@ -835,7 +863,7 @@ feed = "hand"
 
 [[setups.operations]]
 instruction = "Every load, still clamped: each bore."
-inspection = "Bore Ø{{cad.strap_bore_dia_min_in:.4dot}}–{{cad.strap_bore_dia_max_in:.4dot}}: the telescoping gauge across it at two places 90° apart, each miked; a bright, even wall with no chatter rings or tears, by eye and fingernail (the Ra {{cad.strap_bore_finish_ra_uin:d}} µin finish is held by the finish circle and the spring pass). Under: run CR05_bore again, whole file, same tool and set (its levels cut air; the finish circle and the spring pass take the rest), once; still under, or over, or rings: stop and tell the owner."
+inspection = "Bore Ø{{cad.strap_bore_dia_min_in:.4dot}}–{{cad.strap_bore_dia_max_in:.4dot}}: the telescoping gauge across it at two places 90° apart, each miked; a bright, even wall with no chatter rings or tears, by eye and fingernail (the Ra {{cad.strap_bore_finish_ra_uin:d}} µin finish is held by the finish circle and the spring pass). Under: run CR05_bore again, whole file, same tool, each section at the speed set before (its levels cut air; the finish circle and the spring pass take the rest), once; still under, or over, or rings: stop and tell the owner."
 gauge_checks = [{ gauge = "telescoping-gauges-starrett-s579gz", band_mm = "{{cad.strap_bore_dia_band_mm}}" }]
 
 [[setups]]

@@ -73,10 +73,11 @@ COMMENT = "MHA-MG-01 magnifying bracket"
 PROGRAMS: tuple[tuple[str, tuple[Any, ...]], ...] = (
     ("MB01_width", ("width",)),
     ("MB02_seat", (("seat",), ("mount_spot",), ("mount_drill",))),
-    ("MB03_notch", ("notch",)),
-    ("MB04_low", ("low_side",)),
+    # One end mill, one section per speed (an M0 stop between them).
+    ("MB03_notch", (("high_side",), ("notch",), ("foot_wall",))),
+    ("MB04_low", (("low_side",), ("notch_through",), ("foot_wall_through",))),
     ("MB05_neck", ("neck",)),
-    ("MB06_nose", (("nose",), ("tap_spot",), ("tap_drill",))),
+    ("MB06_nose", (("nose_rough",), ("nose_finish",), ("tap_spot",), ("tap_drill",))),
     ("MB07_lever_tap", ("lever_tap",)),
 )
 # Every program loads its own first tool (M6, the tool setter): each setup
@@ -331,48 +332,64 @@ def _notch(
     surface: float,
     levels: list[float],
     xs: list[float],
-    air_x: float,
     foot_y: float,
     waste_y: float,
+    radius: float,
 ) -> list[str]:
-    """A notch from the faced ``surface`` down its ``levels``: each level
-    ramps along the first station ``xs[0]`` (beside F) from the waste line
-    ``waste_y`` down to the foot's line ``foot_y`` and back level, then
-    zigzag passes along Y at the other stations (an odd count, so each level
-    ends on the waste line), and back along the waste line to the first
-    station. Last, one full-depth pass along the foot's line in -X, climb
-    with the foot on the cutter's right, between the neck's station and
-    ``air_x`` beside F. Moves between cuts are G0 above the raw top ``top``."""
-    if len(xs) % 2 == 0:
-        raise ValueError("an even number of notch stations ends a level at the foot")
+    """A notch from the faced ``surface`` down its ``levels`` that never
+    steps over in uncut stock (a full-width cut): at each level every
+    station ``xs`` (from beside F in to the neck's wall) ramps along Y from
+    the waste line ``waste_y`` down to the foot's line ``foot_y`` and feeds
+    back level, taking the wedge the ramp left; it then rises to the level
+    above (cut, or the face) and steps over there to the next station. Each
+    pass meets only the strip between its station and the one before (the
+    stations' step) until its last ``radius`` into the closed waste end,
+    where it also takes the scallop the station before left against that
+    end, as a cutter does entering any closed corner: the pass back is posted
+    as those two moves. Moves between cuts are G0 above the raw top
+    ``top``."""
     clear = _r(top + CLEAR_MM)
-    x0 = xs[0]
+    foot, waste = _r(foot_y), _r(waste_y)
     lines = [
         f"G0 Z{clear:.3f}",
-        f"G0 X{x0:.3f} Y{_r(waste_y):.3f}",
+        f"G0 X{xs[0]:.3f} Y{waste:.3f}",
         f"G0 Z{_r(top + SAFE_MM):.3f}",
         f"G1 Z{_r(surface):.3f} F{{feed}}",
     ]
+    above = surface
     for z in levels:
-        lines += [
-            f"G1 Y{_r(foot_y):.3f} Z{_r(z):.3f} F{{feed}}",
-            f"G1 Y{_r(waste_y):.3f} F{{feed}}",
-        ]
-        for k, x in enumerate(xs[1:], 1):
+        for k, x in enumerate(xs):
+            if k:
+                lines += [f"G1 Z{_r(above):.3f} F{{feed}}", f"G1 X{x:.3f} F{{feed}}"]
             lines += [
-                f"G1 X{x:.3f} F{{feed}}",
-                f"G1 Y{_r(foot_y if k % 2 else waste_y):.3f} F{{feed}}",
+                f"G1 Y{foot:.3f} Z{_r(z):.3f} F{{feed}}",
+                f"G1 Y{_r(waste_y + radius):.3f} F{{feed}}",
+                f"G1 Y{waste:.3f} F{{feed}}",
             ]
-        lines.append(f"G1 X{x0:.3f} F{{feed}}")
-    start, end = max(air_x, xs[-1]), min(air_x, xs[-1])
-    return lines + [
-        f"G0 Z{clear:.3f}",
-        f"G0 X{start:.3f} Y{_r(foot_y):.3f}",
-        f"G0 Z{_r(top + SAFE_MM):.3f}",
-        f"G1 Z{_r(levels[-1]):.3f} F{{feed}}",
-        f"G1 X{end:.3f} F{{feed}}",
-        f"G0 Z{clear:.3f}",
-    ]
+        if z != levels[-1]:
+            lines.append(f"G1 X{xs[0]:.3f} F{{feed}}")
+        above = z
+    return lines + [f"G0 Z{clear:.3f}"]
+
+
+def _foot_wall(
+    top: float, bottom: float, ys: list[float], x_from: float, x_to: float
+) -> list[str]:
+    """The foot's wall at full depth: one pass per Y in ``ys`` (the last on
+    the foot's line) from ``x_from`` to ``x_to`` in -X, climb with the foot
+    on the cutter's right, each entered at ``x_from`` (beside F, or in the
+    cut notch). Moves between passes are G0 above the raw top ``top``."""
+    clear = _r(top + CLEAR_MM)
+    lines = [f"G0 Z{clear:.3f}"]
+    for y in ys:
+        lines += [
+            f"G0 X{_r(x_from):.3f} Y{_r(y):.3f}",
+            f"G0 Z{_r(top + SAFE_MM):.3f}",
+            f"G1 Z{_r(bottom):.3f} F{{feed}}",
+            f"G1 X{_r(x_to):.3f} F{{feed}}",
+            f"G0 Z{clear:.3f}",
+        ]
+    return lines
 
 
 def _geometry(features: dict[str, Any]) -> dict[str, Any]:
@@ -517,30 +534,32 @@ def context(
             raise ValueError(
                 f"'{name}' cutter Ø{_cut(plan, name, 'cutter_dia_mm')}, the end mill is Ø{em}"
             )
-    # F and the seat (MB01, MB02) run at their measured setting; MB03-MB06
-    # (the notch's full-width stepovers, the neck at a longer stick-out, the
-    # nose's deep finish) at the chart's, one speed among them.
+    # One measured setting per kind of cut (shop settings, bounded in
+    # cad/config/shop-equipment/measured-cuts.toml): the faces (F, the seat,
+    # H, L) at the face record's; the notch and the nose's rough at the
+    # deep-rough record's; the foot's wall and the nose's finish, deep and
+    # climb, at the climb wall record's. The neck (MB05) stays on the chart
+    # setting: its stick-out is outside every record's.
     face_rpm, face_feed = _setting(plan, shop, "width")
-    if _setting(plan, shop, "seat") != (face_rpm, face_feed):
-        raise ValueError("'seat' runs at another setting than 'width'")
-    chart_rpm, chart_feed = _setting(plan, shop, "high side")
-    for name in (
-        "low side",
-        "neck",
-        "notch",
-        "foot wall",
-        "notch through",
-        "foot wall through",
-        "nose rough",
-        "nose finish",
+    deep_rpm, deep_feed = _setting(plan, shop, "notch")
+    wall_rpm, wall_feed = _setting(plan, shop, "foot wall")
+    chart_rpm, chart_feed = _setting(plan, shop, "neck")
+    for name, first in (
+        ("seat", "width"),
+        ("high side", "width"),
+        ("low side", "width"),
+        ("notch through", "notch"),
+        ("nose rough", "notch"),
+        ("foot wall through", "foot wall"),
+        ("nose finish", "foot wall"),
     ):
-        if _setting(plan, shop, name) != (chart_rpm, chart_feed):
-            raise ValueError(f"'{name}' runs at another setting than 'high side'")
+        if _setting(plan, shop, name) != _setting(plan, shop, first):
+            raise ValueError(f"'{name}' runs at another setting than '{first}'")
     for name, woc in (
         ("width", skim_step),
         ("seat", skim_step),
-        ("high side", step_max),
-        ("low side", step_max),
+        ("high side", skim_step),
+        ("low side", skim_step),
     ):
         if not math.isclose(_cut(plan, name, "radial_woc_mm"), woc, abs_tol=1e-6):
             raise ValueError(f"'{name}' radial_woc_mm is not its stepover parameter")
@@ -566,29 +585,31 @@ def context(
     if through <= 0:
         raise ValueError("MB04's notch reaches the stacks")
     # Y passes (along the part) at X stations from beside F in to the neck's
-    # wall station, each taking the same width.
+    # wall station, each taking the same width, no wider than
+    # notch_step_max_mm.
     raw_x = width + r
     wall_x = neck + p["neck_stock_mm"] + r
-    n = math.ceil((raw_x - wall_x) / step_max - 1e-9)
+    n = math.ceil((raw_x - wall_x) / p["notch_step_max_mm"] - 1e-9)
     notch_step = (raw_x - wall_x) / n
     _agree(plan, "notch_step_mm", notch_step)
     notch_xs = [_r(raw_x - k * notch_step) for k in range(1, n + 1)]
-    if len(notch_xs) % 2 == 0:
-        raise ValueError("an even number of notch stations ends a level at the foot")
     foot_y = -(foot + r)
     notch_end = p["notch_end_mm"]
     waste_y = -(notch_end - r)
-    # The foot wall: stepovers there sweep it between alternate stations;
-    # the cusps between the others come off in one full-depth climb pass.
+    # The foot wall: each station's pass ends on the foot's line, leaving
+    # cusps between the stations; they come off at full depth, climb, in
+    # equal passes no wider than wall_woc_max_mm, the last on the line.
     cusp = r - math.sqrt(r**2 - (notch_step / 2) ** 2)
-    _agree(plan, "foot_wall_woc_mm", cusp)
+    wall_n = math.ceil(cusp / p["wall_woc_max_mm"] - 1e-9)
+    _agree(plan, "foot_wall_woc_mm", cusp / wall_n)
+    foot_ys = [_r(foot_y - cusp * (wall_n - 1 - k) / wall_n) for k in range(wall_n)]
     for name, axial, woc in (
         ("notch", p["notch_level_mm"], notch_step),
         ("notch through", p["notch_level_mm"], notch_step),
         ("foot wall", high_level - split, p["foot_wall_woc_mm"]),
         ("foot wall through", thick - through, p["foot_wall_woc_mm"]),
-        ("high side", t_max - high_level, step_max),
-        ("low side", low_skim, step_max),
+        ("high side", t_max - high_level, skim_step),
+        ("low side", low_skim, skim_step),
         ("width", p["width_level_mm"], skim_step),
         ("seat", seat_skim, skim_step),
     ):
@@ -625,27 +646,35 @@ def context(
         raise ValueError("'neck' axial_doc_mm is not process.neck_level_mm")
     neck_woc = _cut(plan, "neck", "radial_woc_mm")
 
-    # The nose (MB06): rough levels finish_stock off the radius, then the
-    # full-depth finish on it; through the neck and nose_past_mm below O.
+    # The nose (MB06): rough rings outside the finish stock, each at every
+    # level no deeper than nose_rough_level_max_mm, outermost ring first,
+    # the rings in equal steps no wider than nose_rough_step_max_mm; then
+    # the finish stock at full depth in equal passes no wider than
+    # wall_woc_max_mm, the last on the radius. Through the neck and
+    # nose_past_mm below O.
     stock_n = p["nose_finish_stock_mm"]
     nose_depth = neck + p["nose_past_mm"]
     _agree(plan, "nose_depth_mm", nose_depth)
-    rough_levels = _levels(neck, neck - nose_depth, p["nose_rough_level_mm"])
+    rough_levels = _levels(neck, neck - nose_depth, p["nose_rough_level_max_mm"])
     _agree(plan, "nose_rough_level_mm", nose_depth / len(rough_levels))
     # The tap's (and the nose's) centre from the seat; the sawn stub beyond.
     centre_x = seat - g["tap"]["at"][2]
     corner = math.hypot(thick / 2, part_max - centre_x)
     rough_woc = corner - radius - stock_n
     _agree(plan, "nose_rough_woc_mm", rough_woc)
-    if corner > radius + stock_n + 2 * r:
+    rings = math.ceil(rough_woc / p["nose_rough_step_max_mm"] - 1e-9)
+    _agree(plan, "nose_rough_step_mm", rough_woc / rings)
+    if corner > radius + stock_n + rough_woc * (rings - 1) / rings + 2 * r:
         raise ValueError("the rough nose pass leaves the longest part's corners uncut")
+    finishes = math.ceil(stock_n / p["wall_woc_max_mm"] - 1e-9)
+    _agree(plan, "nose_finish_step_mm", stock_n / finishes)
     for name, axial, woc in (
-        ("nose rough", p["nose_rough_level_mm"], p["nose_rough_woc_mm"]),
-        ("nose finish", nose_depth, stock_n),
+        ("nose rough", p["nose_rough_level_mm"], p["nose_rough_step_mm"]),
+        ("nose finish", nose_depth, p["nose_finish_step_mm"]),
     ):
         if not (
-            math.isclose(_cut(plan, name, "axial_doc_mm"), axial, abs_tol=1e-6)
-            and math.isclose(_cut(plan, name, "radial_woc_mm"), woc, abs_tol=1e-6)
+            math.isclose(_cut(plan, name, "axial_doc_mm"), axial, abs_tol=1e-3)
+            and math.isclose(_cut(plan, name, "radial_woc_mm"), woc, abs_tol=1e-3)
         ):
             raise ValueError(f"'{name}' depth or width is not the plan's")
     # The jaws' right side stands nose_jaw_back_mm back from the nose's
@@ -794,7 +823,13 @@ def context(
         return {"tool": key, "rpm": rpm, "feed": feed, "plunge": feed, **extra}
 
     em_tool = tool("em-half", face_rpm, face_feed, dia=em, shape="endmill", flutes=3)
-    chart_tool = {**em_tool, "rpm": chart_rpm, "feed": chart_feed, "plunge": chart_feed}
+
+    def em_at(rpm: float, feed: float) -> dict[str, Any]:
+        return {**em_tool, "rpm": rpm, "feed": feed, "plunge": feed}
+
+    deep_tool = em_at(deep_rpm, deep_feed)
+    wall_tool = em_at(wall_rpm, wall_feed)
+    chart_tool = em_at(chart_rpm, chart_feed)
     spot_tool = tool(
         "spot",
         spot_rpm,
@@ -812,24 +847,25 @@ def context(
 
     edge_ys = _stations((-t_max, 0.0), r, skim_step)
     seat_ys = _stations((-t_max, 0.0), r, skim_step)
-    long_ys = _stations((-long_max, 0.0), r, step_max)
+    long_ys = _stations((-long_max, 0.0), r, skim_step)
     neck_ys = _stations((-thick, 0.0), r, step_max)
 
-    # MB03: H faced across the whole blank, then the notch's upper half;
-    # MB04: L faced, then the notch's lower half through MB03's floor. The
-    # stations mirror in X (O at X0 on the left in MB03, on the right in
-    # MB04); the Y lines are the same (the seat at the fixed jaw).
+    # MB03: H faced across the whole blank, then the notch's upper half,
+    # then the foot's wall; MB04: L faced, then the notch's lower half
+    # through MB03's floor, then the foot's wall. The stations mirror in X
+    # (O at X0 on the left in MB03, on the right in MB04); the Y lines are
+    # the same (the seat at the fixed jaw).
     notch_top = t_max
     high_lines = _face([high_level], notch_top, run((0.0, width)), long_ys)
     air_x = _r(width + r + APPROACH_MM)
-    notch_lines = _notch(
-        notch_top, high_level, notch_levels, notch_xs, air_x, foot_y, waste_y
-    )
+    notch_lines = _notch(notch_top, high_level, notch_levels, notch_xs, foot_y, waste_y, r)
+    foot_lines = _foot_wall(notch_top, split, foot_ys, air_x, notch_xs[-1])
     low_lines = _face([thick], high_level, run((-width, 0.0)), long_ys)
     through_xs = [_r(-x) for x in notch_xs]
     through_lines = _notch(
-        high_level, thick, through_levels, through_xs, -air_x, foot_y, waste_y
+        high_level, thick, through_levels, through_xs, foot_y, waste_y, r
     )
+    foot_through_lines = _foot_wall(high_level, through, foot_ys, through_xs[-1], -air_x)
 
     # MB05: each level entered from beside the part over the fixed jaw, at
     # the nose end, then zigzag X passes to the foot's station and back.
@@ -922,31 +958,42 @@ def context(
     for element in elements:
         element["tol"] = OUTLINE_TOL_MM
     nose_bottom = neck - nose_depth
-    passes = [
-        {"offset": r + stock_n, "levels": [_r(z) for z in rough_levels]},
-        {"offset": r, "levels": [_r(nose_bottom)]},
+    # The rough rings, outermost first, every level each; the finish
+    # passes, outermost first, at full depth.
+    step_n, fin_n = p["nose_rough_step_mm"], p["nose_finish_step_mm"]
+    rough_passes = [
+        {"offset": r + stock_n + k * step_n, "levels": [_r(z) for z in rough_levels]}
+        for k in range(rings - 1, -1, -1)
+    ]
+    finish_passes = [
+        {"offset": r + k * fin_n, "levels": [_r(nose_bottom)]}
+        for k in range(finishes - 1, -1, -1)
     ]
     # Between the nose's passes the cutter clears the jaw tops too.
     nose_clear = _r(max(upright_grip, neck) + CLEAR_MM)
-    first = passes[0]["offset"]
-    nose_lines: list[str] = [
-        f"G0 Z{travel:.3f}",
-        f"G0 X{_r(cx - lead):.3f} Y{_r(cy + radius + first):.3f}",
-    ]
-    for pass_ in passes:
-        o = pass_["offset"]
-        for z in pass_["levels"]:
-            nose_lines += [
-                f"G0 Z{nose_clear:.3f}",
-                f"G0 X{_r(cx - lead):.3f} Y{_r(cy + radius + o):.3f}",
-                f"G0 Z{_r(neck + SAFE_MM):.3f}",
-                f"G1 Z{z:.3f} F{{feed}}",
-                f"G1 X{_r(cx):.3f} F{{feed}}",
-                f"G2 X{_r(cx + radius + o):.3f} Y{_r(cy):.3f} I0.000 J{_r(-(radius + o)):.3f} F{{feed}}",
-                f"G2 X{_r(cx):.3f} Y{_r(cy - radius - o):.3f} I{_r(-(radius + o)):.3f} J0.000 F{{feed}}",
-                f"G1 X{_r(cx - lead):.3f} F{{feed}}",
-            ]
-    nose_lines.append(f"G0 Z{travel:.3f}")
+
+    def nose_lines(passes: list[dict[str, Any]]) -> list[str]:
+        """A section of nose passes, opened and closed at ``travel``."""
+        first = passes[0]["offset"]
+        lines: list[str] = [
+            f"G0 Z{travel:.3f}",
+            f"G0 X{_r(cx - lead):.3f} Y{_r(cy + radius + first):.3f}",
+        ]
+        for pass_ in passes:
+            o = pass_["offset"]
+            for z in pass_["levels"]:
+                lines += [
+                    f"G0 Z{nose_clear:.3f}",
+                    f"G0 X{_r(cx - lead):.3f} Y{_r(cy + radius + o):.3f}",
+                    f"G0 Z{_r(neck + SAFE_MM):.3f}",
+                    f"G1 Z{z:.3f} F{{feed}}",
+                    f"G1 X{_r(cx):.3f} F{{feed}}",
+                    f"G2 X{_r(cx + radius + o):.3f} Y{_r(cy):.3f} I0.000 J{_r(-(radius + o)):.3f} F{{feed}}",
+                    f"G2 X{_r(cx):.3f} Y{_r(cy - radius - o):.3f} I{_r(-(radius + o)):.3f} J0.000 F{{feed}}",
+                    f"G1 X{_r(cx - lead):.3f} F{{feed}}",
+                ]
+        return lines + [f"G0 Z{travel:.3f}"]
+
     # The end mill set half_mill_projection_mm out (MB01-MB04 and, at the
     # shortest, MB06): its collet's nose clears the stock's top and the jaw
     # tops at each program's deepest end-mill cut. MB05's longer set is
@@ -1025,40 +1072,56 @@ def context(
                 ]
             ],
         },
-        {
-            **chart_tool,
-            "frame": "notch",
-            "label": "notch",
-            "stock": stocks["notch"],
-            "ops": [["notch", "face H, mill the notch", high_lines[:-1] + notch_lines]],
-        },
-        {
-            **chart_tool,
-            "frame": "low",
-            "label": "low side",
-            "stock": stocks["low"],
-            "ops": [
-                [
-                    "low_side",
-                    "face L, mill the notch through",
-                    low_lines[:-1] + through_lines,
-                ]
-            ],
-        },
-        {
-            **chart_tool,
-            "frame": "neck",
-            "label": "neck",
-            "stock": stocks["neck"],
-            "ops": [["neck", "face the neck, square the corner", neck_lines]],
-        },
-        {
-            **chart_tool,
-            "frame": "nose",
-            "label": "nose",
-            "stock": stocks["nose"],
-            "ops": [["nose", "profile the nose", nose_lines]],
-        },
+        *(
+            {
+                **section_tool,
+                "frame": frame,
+                "label": key.replace("_", " "),
+                "stock": stocks[frame],
+                "ops": [[key, label, lines]],
+            }
+            for section_tool, frame, key, label, lines in (
+                (em_tool, "notch", "high_side", "face H", high_lines),
+                (deep_tool, "notch", "notch", "mill the notch", notch_lines),
+                (wall_tool, "notch", "foot_wall", "the foot's wall", foot_lines),
+                (em_tool, "low", "low_side", "face L", low_lines),
+                (
+                    deep_tool,
+                    "low",
+                    "notch_through",
+                    "mill the notch through",
+                    through_lines,
+                ),
+                (
+                    wall_tool,
+                    "low",
+                    "foot_wall_through",
+                    "the foot's wall through",
+                    foot_through_lines,
+                ),
+                (
+                    chart_tool,
+                    "neck",
+                    "neck",
+                    "face the neck, square the corner",
+                    neck_lines,
+                ),
+                (
+                    deep_tool,
+                    "nose",
+                    "nose_rough",
+                    "rough the nose",
+                    nose_lines(rough_passes),
+                ),
+                (
+                    wall_tool,
+                    "nose",
+                    "nose_finish",
+                    "finish the nose",
+                    nose_lines(finish_passes),
+                ),
+            )
+        ),
         {
             **spot_tool,
             "frame": "nose",
@@ -1229,9 +1292,16 @@ def context(
             ["keep_out", {"radius": radius, "boxes": keep[frame]}],
         ]
 
-    def single(name, top, z_min, checks, rpm, change_top=None) -> list[list[Any]]:
-        """``change_top``: what an XY rapid after the M6 must clear, when it
-        stands higher than the stock top (the foot, MB05)."""
+    def speeds(*rpms: float) -> list[float]:
+        """The speeds a tool's sections set in order, a repeat of the running
+        one dropped (it carries on, no stop)."""
+        return [s for k, s in enumerate(rpms) if not k or s != rpms[k - 1]]
+
+    def single(name, top, z_min, checks, rpms, change_top=None) -> list[list[Any]]:
+        """One end mill, a section per speed in ``rpms`` (an M0 stop at each
+        change). ``change_top``: what an XY rapid after the M6 must clear,
+        when it stands higher than the stock top (the foot, MB05)."""
+        set_speeds = speeds(*rpms)
         return [
             [
                 name,
@@ -1242,8 +1312,8 @@ def context(
                     "loads_first": True,
                 },
             ],
-            [name, "spindle", {"rpm": [[rpm]]}],
-            [name, "pauses", {"z_top": top, "count": 0}],
+            [name, "spindle", {"rpm": [set_speeds]}],
+            [name, "pauses", {"z_top": top, "count": len(set_speeds) - 1}],
             [name, "depth", {"z_min": _r(z_min)}],
             *[[name, check, kwargs] for check, kwargs in checks],
         ]
@@ -1253,7 +1323,7 @@ def context(
         w_max,
         width,
         face_checks(width_levels, w_max, (-t_max, 0.0), blank_max, "width", skim_step),
-        face_rpm,
+        [face_rpm],
     )
 
     name = "MB02_seat"
@@ -1287,8 +1357,9 @@ def context(
 
     def notch_checks(frame, top, surface, bottom, xs, x_air, sign) -> list[list[Any]]:
         """The face at ``surface``, then the notch: its floor cleared from
-        the neck's wall to F and from the foot to the notch's end; the foot
-        wall's pass meets only the cusps the stepovers left, climb."""
+        the neck's wall to F and from the foot to the notch's end, each
+        station's level pass meeting no more than the stations' step; the
+        foot wall's passes meet only the cusps the stations left, climb."""
         # The neck's wall meets the foot and the waste in the cutter's
         # radius (MB05 squares the foot's corner); every other edge is sharp.
         mid_x, mid_y = (neck_raw + width) / 2, (-foot - notch_end) / 2
@@ -1306,8 +1377,19 @@ def context(
         ]
         lo, hi = sorted((xs[-1], x_air))
         return [
-            *face_checks([surface], top, (-long_max, 0.0), width, frame, step_max),
+            *face_checks([surface], top, (-long_max, 0.0), width, frame, skim_step),
             ["cleared", {"points": points, "radius": r, "z": _r(bottom)}],
+            [
+                "engagement",
+                {
+                    "stock": stocks[frame],
+                    "radius": r,
+                    "max_radial": notch_step,
+                    "z": _r(bottom),
+                    "window": [sorted((xs[0], xs[-1])), [_r(waste_y), _r(foot_y)]],
+                    "min_length": (foot_y - waste_y) / 2,
+                },
+            ],
             [
                 "engagement",
                 {
@@ -1315,7 +1397,7 @@ def context(
                     "radius": r,
                     "max_radial": p["foot_wall_woc_mm"],
                     "z": _r(bottom),
-                    "window": [[lo, hi], [_r(foot_y), _r(foot_y)]],
+                    "window": [[lo, hi], [foot_ys[0], foot_ys[-1]]],
                     "min_length": (hi - lo) / 2,
                     "side": "climb",
                 },
@@ -1327,14 +1409,14 @@ def context(
         t_max,
         split,
         notch_checks("notch", t_max, high_level, split, notch_xs, air_x, 1.0),
-        chart_rpm,
+        [face_rpm, deep_rpm, wall_rpm],
     )
     expect += single(
         "MB04_low",
         high_level,
         through,
         notch_checks("low", high_level, thick, through, through_xs, -air_x, -1.0),
-        chart_rpm,
+        [face_rpm, deep_rpm, wall_rpm],
     )
     corner_points = [[_r(foot + 0.1), _r(y)] for y in (-0.1, -thick / 2, -thick + 0.1)]
     expect += single(
@@ -1361,7 +1443,7 @@ def context(
             ["cleared", {"points": corner_points, "radius": r, "z": _r(neck)}],
             ["keep_out", {"radius": r, "boxes": keep["neck"]}],
         ],
-        chart_rpm,
+        [chart_rpm],
         change_top=width,
     )
 
@@ -1376,15 +1458,22 @@ def context(
                 "loads_first": True,
             },
         ],
-        [name, "spindle", {"rpm": [[chart_rpm], [spot_rpm], [tap_rpm]]}],
-        [name, "pauses", {"z_top": neck, "count": 0}],
+        [name, "spindle", {"rpm": [speeds(deep_rpm, wall_rpm), [spot_rpm], [tap_rpm]]}],
+        [name, "pauses", {"z_top": neck, "count": len(speeds(deep_rpm, wall_rpm)) - 1}],
         [name, "depth", {"z_min": _r(tap_tip)}],
     ]
     for k, checks in enumerate(
         (
             [
                 ["depth", {"z_min": _r(nose_bottom)}],
-                ["outline", {"elements": elements, "passes": passes, "z_top": neck}],
+                [
+                    "outline",
+                    {
+                        "elements": elements,
+                        "passes": rough_passes + finish_passes,
+                        "z_top": neck,
+                    },
+                ],
                 ["rapids_clear", {"z_top": neck}],
                 ["air_feed", {"z_top": neck}],
                 ["keep_out", {"radius": r, "boxes": keep["nose"]}],

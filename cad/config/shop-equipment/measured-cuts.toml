@@ -2,21 +2,28 @@
 # the prechips setting's key in cad/process/shop/ (which carries its speed and
 # chip load, once); these are the facts prechips has no field for: it refuses
 # any other key on a setting record (pedropaulovc/prechips#586). A dechatter
-# result holds for one tool assembly (cutter, holder, stick-out) and only as
-# deep and as wide as the passes that were cut, so a plan operation naming one
-# of these settings must pin the assembly's stick-out in the plan parameter
-# named here and declare each cut (milling_cuts) no deeper and no wider than
-# the limits: cad/scripts/_measured_cuts.py, test_measured_cuts.py.
+# result holds only as deep and as wide as the passes that were cut, so a plan
+# operation naming one of these settings must declare each cut (milling_cuts)
+# no deeper and no wider than the limits: cad/scripts/_measured_cuts.py,
+# test_measured_cuts.py.
 #
-# stickout_mm is the owner's own figure for the assembly that made the cuts.
-# report_setup_stickout_mm is what the report's setup field reads, where the
-# two differ: the reports are the owner's recorded data and are not edited.
-# A plan may pin any stick-out from stickout_min_mm to stickout_max_mm (each
-# stickout_mm where the record does not give it); the reason a record allows
-# a stick-out it was not cut at is beside the record.
-# direction is the reports' setup: every pass was conventional. No plan field
-# states a cut's direction, so it is recorded here and not checked: a zigzag
-# face climbs on every other pass, and that half is not measured.
+# One record set per cutter (owner ruling 2026-11-25, in measured_cutters'
+# cite): a cutter's records hold at every stick-out in its measured_cutters
+# band, from the shortest to the longest stick-out the plans use for it. A
+# plan operation naming one of them pins each of the cutter's
+# stickout_parameters it defines inside that band, and a plan cutting a side
+# or end cut with the cutter, in its records' material, at a stick-out inside
+# the band names a record for the cut (full-width slots and plunges excepted:
+# no record is a slot). stickout_mm is the owner's own figure for the assembly
+# that made a record's cuts; report_setup_stickout_mm is what the report's
+# setup field reads, where the two differ: the reports are the owner's
+# recorded data and are not edited.
+# direction is the session's setup. No plan field states a cut's direction,
+# so it is recorded here and not checked: a plan picks the record whose
+# direction matches its cut, and a zigzag face climbs on every other pass.
+# The first part of each program is a supervised run, hand on the feed
+# override, adjusted by ear (the same ruling); a session is for a cut that
+# chatters on a part.
 #
 # The mill's spindle is set by hand, and the speed a report prints is the one
 # it asked for. The speed the spindle ran is in the session's results file
@@ -25,32 +32,50 @@
 # is the band of heard speeds its limit holds in, with chatter heard on both
 # sides of it; speed_no_load_rpm is what to set before the cutter enters (the
 # spindle slows in a wide cut).
-#
-# The travelers set this cutter 28.45 mm (1.12 in) out. Owner (Pedro)
-# 2026-11-24, asked "the session's setup stick-out reads 28.448 mm against the
-# 27.94 the plans pin; which should the travelers print?": "28.45".
+
+# The 1/2 in carbide end mill in its R8 collet. Owner (Pedro) 2026-11-25, on
+# the stick-out each session was cut at: "I can not believe that 2 mm [of
+# stick-out] makes any significant difference. This whole exercise is going
+# way above and beyond what even professional CNC machinists do. I will never
+# actually make a part if I keep having to trial every single combination of
+# parameters." Ruled with it: the cutter's measured records hold from the
+# shortest to the longest stick-out the plans use for it; a shorter stick-out
+# than a session's is only stiffer.
+# Shortest: its flute length plus 10 % (owner ruling 2026-11-25 on #3386,
+# "min stickout based on flute length then add 10pct on top of it"): 25.4 ×
+# 1.1 = 27.94 mm, which v5 and v6 were cut at. Longest: the column clamp's
+# bore, 31.75 mm (1.25 in) out so the collet clears its 1-2-3 block
+# (sh_column_clamp bore_mill_projection_min_mm). The sessions sit inside:
+# 27.94 (v5, v6), 28.45 (#3439), 28.52 (#3427), 29.13 (#3627). Outside it no
+# record holds, so those cuts stay on the chart setting, run supervised: the
+# amplitude bar's 50.8 mm (2 in, #3384) and the magnifying bracket's neck,
+# 46.99-50.8 mm out to reach past its foot. A plan pins the stick-out in one
+# of stickout_parameters; a setup runs at the ones it names (its envelope's
+# tool lengths, its touch-off text), or at every one the plan pins where it
+# names none.
+[measured_cutters.endmill-carbide-3fl-1-2]
+holder = "R8 collet"
+stickout_min_mm = 27.94
+stickout_max_mm = 31.75
+stickout_parameters = ["half_mill_projection_mm", "half_mill_projection_min_mm", "bore_mill_projection_min_mm", "neck_mill_projection_min_mm"]
+cite = ["Owner (Pedro) 2026-11-25: \"I can not believe that 2 mm [of stick-out] makes any significant difference. This whole exercise is going way above and beyond what even professional CNC machinists do. I will never actually make a part if I keep having to trial every single combination of parameters.\"", "Owner (Pedro) 2026-11-25 on #3386: \"min stickout based on flute length then add 10pct on top of it\""]
 
 # dechatter 0.4.0 report v5, 2026-11-22: 1.27 mm deep only. 2370 rpm was
 # stable at 3.0, 3.2 and 3.4 mm wide; 3.4 mm was the widest cut made. Those
 # passes ran at 2376-2379 rpm as heard; the next session heard 3.4 mm chatter
 # at 2272, one step of the dial below, and cut wider (the record after this
-# one, which new plans use).
-# Stick-out: cut at the owner's 27.94 mm. 28.45 is allowed by his ruling of
-# 2026-11-24. The next session, at 28.448 mm, cut this depth stable 4.6 mm
-# wide at 2377 rpm as heard, this record's speed, and 3.4 mm wide at 2477.
+# one, which new plans use). Cut at the owner's 27.94 mm.
 [measured_cuts.em-half-carbide-1018-v5-face]
 tool = "endmill-carbide-3fl-1-2"
 holder = "R8 collet"
 report = "cad/process/dechatter/2026-11-22-pm30mv-em-half-carbide-1018-v5.html"
 results = "cad/process/dechatter/2026-11-22-pm30mv-em-half-carbide-1018-v5-results.json"
 stickout_mm = 27.94
-stickout_max_mm = 28.45
 report_setup_stickout_mm = 30.0
-stickout_parameter = "half_mill_projection_mm"
 direction = "conventional"
 axial_doc_max_mm = 1.27
 radial_woc_max_mm = 3.4
-cite = ["Owner (Pedro) 2026-11-22: \"stickout is recorded as 30mm but is actually 27.94\"", "Owner (Pedro) 2026-11-24, asked which of the session's 28.448 mm and the plans' 27.94 the travelers should print: \"28.45\""]
+cite = ["Owner (Pedro) 2026-11-22: \"stickout is recorded as 30mm but is actually 27.94\""]
 
 # dechatter 0.5.0, session 1018-3.4mm-3fl-issue3439-v1, 2026-11-23 (#3439):
 # 1.27 mm deep, 0.071 mm/tooth, conventional. One pass each, speeds as heard:
@@ -82,14 +107,9 @@ cite = ["Owner (Pedro) 2026-11-22: \"stickout is recorded as 30mm but is actuall
 # name the stop. The display at this stop has not been filmed (no video of
 # this session): 2485 is the heard 2477-2488 plus the 3-8 rpm the display
 # read over the heard speed on the stops that were filmed.
-# Stick-out: the session's setup reads 28.448 mm (1.120 in), half a millimetre
-# longer than the 27.94 the owner measured for v5 and v6. The owner's figure
-# for it is 28.45 (ruling of 2026-11-24, in cite), which the plans pin and the
-# travelers print as 1.12 in; it is the session's reading to the hundredth.
-# 27.94 stays allowed: the shorter assembly is the stiffer one, both sessions
-# heard chatter at the same two pitches (about 400 and 2050-2130 Hz), and v5
-# cut this record's speed step below (2377) stable to 3.4 mm at 27.94. Wider
-# than 3.4 mm has not been cut at 27.94 itself.
+# Stick-out: the session's setup reads 28.448 mm (1.120 in); the owner's
+# figure for it is 28.45 (ruling of 2026-11-24, in cite), the session's
+# reading to the hundredth.
 # Not measured: climb, the session's other depth (0.4 mm), any chip load but
 # 0.071 mm/tooth.
 [measured_cuts.em-half-carbide-1018-3439-face]
@@ -98,9 +118,7 @@ holder = "R8 collet"
 report = "cad/process/dechatter/2026-11-23-pm30mv-em-half-carbide-1018-issue3439-v1.html"
 results = "cad/process/dechatter/2026-11-23-pm30mv-em-half-carbide-1018-issue3439-v1-results.json"
 stickout_mm = 28.45
-stickout_min_mm = 27.94
 report_setup_stickout_mm = 28.448
-stickout_parameter = "half_mill_projection_mm"
 direction = "conventional"
 axial_doc_max_mm = 1.27
 radial_woc_max_mm = 6.4
@@ -112,21 +130,87 @@ cite = ["Owner (Pedro) 2026-11-22: \"stickout is recorded as 30mm but is actuall
 # dechatter 0.4.0 report v6, 2026-11-22: 6.6 mm deep. 2400 rpm was stable at
 # 2.2 mm wide; 2.4 mm (2330 rpm), 2.6 mm (2400 rpm) and 3.0 mm (2330 rpm,
 # aborted) chattered. Nothing deeper was cut.
-# Stick-out: every pass was cut at the owner's 27.94 mm. 28.45 is allowed by
-# his ruling of 2026-11-24 and is NOT a measurement: nothing was cut 6.6 mm
-# deep at 28.45, and for this record a longer tool is the less stiff case
-# (0.51 mm more overhang: as a cantilever, (28.45/27.94) cubed, about 6 % more
-# tip deflection for the same force),
-# with 0.2 mm of width between the limit and the first chattering pass.
+# Cut at the owner's 27.94 mm.
 [measured_cuts.em-half-carbide-1018-v6-deep]
 tool = "endmill-carbide-3fl-1-2"
 holder = "R8 collet"
 report = "cad/process/dechatter/2026-11-22-pm30mv-em-half-carbide-1018-v6.html"
 stickout_mm = 27.94
-stickout_max_mm = 28.45
 report_setup_stickout_mm = 30.0
-stickout_parameter = "half_mill_projection_mm"
 direction = "conventional"
 axial_doc_max_mm = 6.6
 radial_woc_max_mm = 2.2
-cite = ["Owner (Pedro) 2026-11-22: \"stickout is recorded as 30mm but is actually 27.94\"", "Owner (Pedro) 2026-11-22: \"deeper cuts caused violent chatter\"", "Owner (Pedro) 2026-11-24, asked which of the session's 28.448 mm and the plans' 27.94 the travelers should print: \"28.45\""]
+cite = ["Owner (Pedro) 2026-11-22: \"stickout is recorded as 30mm but is actually 27.94\"", "Owner (Pedro) 2026-11-22: \"deeper cuts caused violent chatter\""]
+
+# Deep walls, conventional (#3427): dechatter 0.8.0, session
+# 1018-12.7mm-3fl-28.45-side-deep-issue3427-v1, 2026-11-24/25, 13.5 mm deep,
+# 0.071 mm/tooth, 28.52 mm out (the setup's reading). The owner's export of
+# rounds 1-3 without the recordings is attached on #3427
+# (https://github.com/user-attachments/files/35437936/1018-12.7mm-3fl-28.45-side-deep-issue3427-v1-rounds1-3-no-audio.zip);
+# report and results here. Speeds as heard; S stable, C chatter, then the
+# detector's prominence (it calls chatter from 27 dB):
+#   round 1, conventional, 13.5 deep
+#     1513: 0.2 S 21.7, 0.4 S 26.7, 0.8 C 31.7
+#     1839: 0.2 S 20.6, 0.4 S 21.7, 0.8 C 29.4
+#     2154: 0.2, 0.4 and 0.8 C
+#     2483: 0.2 S 25.7, 0.4 C 27.3, 0.8 C (the detector read 26.0 at 2416
+#           heard; the owner, from the clips: "both sounded like chatter")
+#     asked 2794, heard 2654: 0.2 S 20.1, 0.4 C, 0.8 C
+#   round 2: 1.4 at 2224 C, 1.9 at 2365 C (stopped after 3 of its 8 passes)
+#   round 3, climb check at 2483: 0.4 S 25.7, 0.6 S 26.0, 0.8 C, 0.9 C
+# The limit is 0.4 mm at 1839 rpm (dial stop 17): 5 dB under the detector's
+# line, and 0.8 chattered at 1839 and at 1513. 1513 also held 0.4, but at
+# 26.7 dB, so the plans use 1839. At the chart's 2483 only 0.2 held
+# conventional. A width stable 13.5 mm deep is taken as stable at any
+# shallower depth at the same speed (the interim reading on #3427). Every
+# pass in lane 1 stopped in the stock (pedropaulovc/dechatter#63, found from
+# this session's recording), so a verdict may carry that end load: a stable
+# pass held in spite of it. Not measured: climb at 1839, the session's other
+# depths (10.6, 6.6, 4.6), any chip load but 0.071 mm/tooth.
+[measured_cuts.em-half-carbide-1018-3427-wall]
+tool = "endmill-carbide-3fl-1-2"
+holder = "R8 collet"
+report = "cad/process/dechatter/2026-11-25-pm30mv-em-half-carbide-1018-issue3427-v1.html"
+results = "cad/process/dechatter/2026-11-25-pm30mv-em-half-carbide-1018-issue3427-v1-results.json"
+stickout_mm = 28.52
+direction = "conventional"
+axial_doc_max_mm = 13.5
+radial_woc_max_mm = 0.4
+cite = ["Owner (Pedro) 2026-11-25, after the clips of round 1's 0.8 mm and 0.4 mm passes at 2483 asked: \"both sounded like chatter\""]
+
+# Deep walls, climb (#3627): dechatter 0.8.0, session
+# 1018-12.7mm-3fl-31.75-clamp-bore-climb-issue3627-v1, 2026-11-25, climb,
+# 17 mm deep, 0.071 mm/tooth, 29.13 mm out (the setup's reading; the 31.75 in
+# the session's name was the plan's, and the session was cut shorter). The
+# owner's export of rounds 1-3 without the recordings:
+# https://github.com/pedropaulovc/harmonic-analyzer/issues/3627#issuecomment-7181848058;
+# the reading: #issuecomment-7181668796. Speeds as heard, as above:
+#   round 1, climb, 17 deep
+#     1400: 0.1 S 21.3, 0.3 S 25.8, 0.5 C 31.4
+#     1723: 0.1 S 22.7, 0.3 C 30.8, 0.5 S 24.3 (inconsistent: not used)
+#     2046: 0.1 S 23.7, 0.3 S 26.8, 0.5 S 26.7
+#     2483: 0.1 S 24.0, 0.3 S 26.6, 0.5 S 26.0
+#     asked 2794, heard 2654-2750: 0.1, 0.3 and 0.5 C
+#   round 2: 2.7 at 1950 (heard 1899) C 34.7, violent
+#   round 3: the spindle stalled in its first pass. Not a measurement: the
+#     setup was saved with two lanes, so every pass stopped in the stock, and
+#     dechatter#63's lane-end overload put the cutter on a sliver up to its
+#     radius wide at 17 deep (the reading above). Round 2's 2.7 mm pass ended
+#     the same way.
+# The limit is 0.3 mm at 2483 rpm (dial stop 23): stable at 2046 and 2483,
+# both close to the line (26.6-26.8 dB), with chatter at 2654 and above.
+# 0.5 held at 2046 and 2483 too, at 26.0-26.7 dB, but chattered at 1400, so
+# the limit keeps one width step under it. #3427's climb check agrees: at
+# 2483 and 13.5 deep, climb held 0.4 and 0.6 and chattered at 0.8. Not
+# measured: conventional at this depth, the full-width 0.6 mm level (the clamp
+# bore's helix, #3428), any chip load but 0.071 mm/tooth.
+[measured_cuts.em-half-carbide-1018-3627-wall-climb]
+tool = "endmill-carbide-3fl-1-2"
+holder = "R8 collet"
+report = "cad/process/dechatter/2026-11-25-pm30mv-em-half-carbide-1018-issue3627-v1.html"
+results = "cad/process/dechatter/2026-11-25-pm30mv-em-half-carbide-1018-issue3627-v1-results.json"
+stickout_mm = 29.13
+direction = "climb"
+axial_doc_max_mm = 17.0
+radial_woc_max_mm = 0.3
+cite = ["HA #3627, the reading of rounds 1-3 (2026-11-25, https://github.com/pedropaulovc/harmonic-analyzer/issues/3627#issuecomment-7181668796): \"The round-3 stall was dechatter#63, not chatter.\""]

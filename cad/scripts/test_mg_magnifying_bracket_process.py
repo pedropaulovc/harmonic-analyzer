@@ -42,7 +42,9 @@ def ctx() -> dict:
 def _post(ctx: dict, out: Path) -> None:
     """Each program as the runtime posts it: the grbl preamble, then per
     section an M6 block (M5, the operator's %msg, M6, M3) and its lines, the
-    feeds in mm/min; a tap stop's lines after its M6, ending with its M30."""
+    feeds in mm/min; a section that keeps the tool at a new speed opens with
+    the speed's %msg, an M0 and its M3, one at the same speed carries on; a
+    tap stop's lines after its M6, ending with its M30."""
     sections = {op[0]: job for job in ctx["jobs"] for op in job["ops"]}
     lines_of = {op[0]: op[2] for job in ctx["jobs"] for op in job["ops"]}
     for name, groups in RECIPE.PROGRAMS:
@@ -55,6 +57,7 @@ def _post(ctx: dict, out: Path) -> None:
             "G54",
         ]
         keys = [group[0] if isinstance(group, tuple) else group for group in groups]
+        running = None
         for key in keys:
             if key in ctx["manual"]:
                 manual = ctx["manual"][key]
@@ -64,20 +67,27 @@ def _post(ctx: dict, out: Path) -> None:
                     f"M6 T{manual['tool']}",
                     *manual["gcode"],
                 ]
+                running = None
                 continue
             job = sections[key]
             number = ctx["numbers"][job["tool"]]
+            if running is None or running[0] != number:
+                text += [
+                    "M5",
+                    f"%msg TOOL CHANGE: T{number} {ctx['names'][job['tool']]}, SET SPINDLE TO {job['rpm']:g} RPM",
+                    f"M6 T{number}",
+                    f"M3 S{job['rpm']:g}",
+                ]
+            elif running[1] != job["rpm"]:
+                text += [
+                    f"%msg PAUSE: SET SPINDLE TO {job['rpm']:g} RPM, THEN CYCLE START",
+                    "M0",
+                    f"M3 S{job['rpm']:g}",
+                ]
+            running = (number, job["rpm"])
             text += [
-                "M5",
-                f"%msg TOOL CHANGE: T{number} {ctx['names'][job['tool']]}, SET SPINDLE TO {job['rpm']:g} RPM",
-                f"M6 T{number}",
-                f"M3 S{job['rpm']:g}",
-                *(
-                    line.format(
-                        feed=f"{job['feed']:.3f}", plunge=f"{job['plunge']:.3f}"
-                    )
-                    for line in lines_of[key]
-                ),
+                line.format(feed=f"{job['feed']:.3f}", plunge=f"{job['plunge']:.3f}")
+                for line in lines_of[key]
             ]
         if not any(key in ctx["manual"] for key in keys):
             text += ["M5", "G17 G90", "M2"]
@@ -138,6 +148,10 @@ def test_the_recipes_programs_pass_every_check_they_declare(ctx, tmp_path) -> No
         ("notch_through_mm", 5.0, "notch_through_mm"),
         ("notch_level_mm", 2.0, "notch_level_mm"),
         ("foot_wall_woc_mm", 0.2, "foot_wall_woc_mm"),
+        ("notch_step_mm", 2.5, "notch_step_mm"),
+        ("nose_rough_level_mm", 6.75, "nose_rough_level_mm"),
+        ("nose_rough_step_mm", 2.739, "nose_rough_step_mm"),
+        ("nose_finish_step_mm", 0.508, "nose_finish_step_mm"),
         ("neck_level_mm", 2.0, "neck_level_mm"),
         ("nose_jaw_back_mm", 10.0, "nose_jaw_back_mm"),
         ("mount_tip_z_mm", -4.0, "mount_tip_z_mm"),
@@ -185,16 +199,16 @@ def _seed(ctx: dict, key: str, pick, change) -> dict:
     [
         # The nose's finish turned conventional (G3): the climb outline is broken.
         (
-            "nose",
+            "nose_finish",
             lambda line: line.startswith("G2 X105.907 Y-5.500"),
             lambda line: "G3" + line[2:],
             "outline",
         ),
-        # The nose's finish radius .010 too large: off its offset.
+        # The nose's last finish radius .005 too large: off every offset.
         (
-            "nose",
+            "nose_finish",
             lambda line: line.startswith("G2 X105.907"),
-            lambda line: line.replace("X105.907", "X106.161"),
+            lambda line: line.replace("X105.907", "X106.034"),
             "outline",
         ),
         # The neck's last level left .010 high: the neck comes out thick.
@@ -211,12 +225,19 @@ def _seed(ctx: dict, key: str, pick, change) -> dict:
             lambda line: "G1 Y8.890 F{feed}",
             "cleared",
         ),
-        # MB03's last notch level left .010 high: its floor not cleared.
+        # MB03's notch level left .010 high: its floor not cleared.
         (
             "notch",
-            lambda line: line == "G1 Z6.262 F{feed}",
-            lambda line: "G1 Z6.516 F{feed}",
+            lambda line: line.startswith("G1 Y") and "Z6.262" in line,
+            lambda line: line.replace("Z6.262", "Z6.516"),
             "cleared",
+        ),
+        # A notch station skipped: the next pass meets two stations' width.
+        (
+            "notch",
+            lambda line: line == "G1 X56.258 F{feed}",
+            lambda line: "G1 X54.087 F{feed}",
+            "engagement",
         ),
         # A mounting hole drilled off its station.
         (
@@ -288,8 +309,8 @@ def _reversed_wall_pass(ctx: dict, key: str, start: str, end: str) -> dict:
 @pytest.mark.parametrize(
     ("key", "start", "end", "program"),
     [
-        ("notch", "63.140", "19.350", "MB03_notch"),
-        ("low_side", "-19.350", "-63.140", "MB04_low"),
+        ("foot_wall", "63.140", "19.350", "MB03_notch"),
+        ("foot_wall_through", "-19.350", "-63.140", "MB04_low"),
     ],
 )
 def test_the_foot_wall_pass_climbs(ctx, tmp_path, key, start, end, program) -> None:

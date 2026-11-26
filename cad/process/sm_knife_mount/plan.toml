@@ -196,8 +196,10 @@ vise_bore_inset_mm = -64.4779
 # spindle nose to tip.
 r8_collet_gauge_mm = 6.3         # HA: holders.r8-collets-lms-4860.gauge_len_mm.
 drill_chuck_gauge_mm = 95.0      # Archive holders.drill-chuck-r8.gauge_len_mm.
-# 1/2 in end mill, 3 in overall: set at least 1 in out of the collet.
-half_mill_projection_min_mm = 25.4
+# 1/2 in end mill, 3 in overall, 1 in of flute: at least its flute length
+# + 10 % out of the collet, 27.94 mm (owner ruling 2026-11-25 on #3386, HA
+# #3624: "min stickout based on flute length then add 10pct on top of it").
+half_mill_projection_min_mm = 27.94
 # Overall lengths, bounded long: #2 combined drill and countersink 1-7/8 in;
 # a jobber 31/64 drill 5-7/8 in (ASME B94.11M). The .4990 reamer (Shars
 # 404-7571: 8 in overall, 2 in flutes; a 1/2 in class chucking reamer's
@@ -357,7 +359,7 @@ feed = "hand"
 
 [[setups.operations]]
 instruction = "G54 Z0: the faced K, the top's high point less the {{process.back_skim_mm:in.3dot}} skim."
-instruction_detailed = "Console M6 T1 (1/2 in end mill, at least 1.00 in out of the collet; the tool setter measures it). Spindle stopped, its tip just dragging a .002 feeler leaf on the highest point of the top: G10 L20 P1 Z0.813 (the {{process.back_skim_mm:in.3dot}} skim plus the .002 leaf)."
+instruction_detailed = "Console M6 T1 (1/2 in end mill, at least {{process.half_mill_projection_min_mm:in.2f}} in out of the collet; the tool setter measures it). Spindle stopped, its tip just dragging a .002 feeler leaf on the highest point of the top: G10 L20 P1 Z0.813 (the {{process.back_skim_mm:in.3dot}} skim plus the .002 leaf)."
 feed = "hand"
 
 [[setups.operations]]

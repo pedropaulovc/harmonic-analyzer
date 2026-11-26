@@ -70,16 +70,23 @@ STEM = "ch_fulcrum_keeper"
 COMMENT = "MHA-CH-07 fulcrum keeper"
 # Programs in order, each listing its operation keys. A program whose keys
 # are grouped in tuples is one section per group (a FreeCAD Job, or a manual
-# section), joined at M6 tool changes.
+# section), joined at M6 tool changes, or on the same tool at an M0 speed
+# stop (a new setting: the PM-30MV's speed is set by hand).
 PROGRAMS: tuple[tuple[str, tuple[Any, ...]], ...] = (
     ("FK01_far", ("far_side",)),
     ("FK02_width", ("near_side",)),
     ("FK03_seat", (("seat",), ("foot_spot",), ("foot_drill",))),
     (
         "FK04_crown_bore",
-        (("crown",), ("bore_spot",), ("bore_drill",), ("bore_ream",)),
+        (
+            ("crown_rough",),
+            ("crown_finish",),
+            ("bore_spot",),
+            ("bore_drill",),
+            ("bore_ream",),
+        ),
     ),
-    ("FK05_step", ("step",)),
+    ("FK05_step", (("step",), ("step_wall",))),
     ("FK06_crown_cbore", (("crown_spot",), ("crown_drill",), ("cbore",))),
     ("FK07_crown_tap", ("crown_tap",)),
     # The counterbore alone, FK06's last section: the remedy for a shallow or
@@ -555,38 +562,44 @@ def context(
     if not em8 < cbore_band[0]:
         raise ValueError(f"the 1/8 end mill Ø{em8} is not under the counterbore")
 
-    # The faces F, N and the seat run the measured face setting; the crown
-    # and FK05 (the foot tip, the step and its full-depth wall pass, one
-    # operation) stay on the chart's: the crown's finish and the wall pass
-    # cut deeper than any measured pass. Each face cut declares its true
-    # stepover, the most any of its passes engages (posted: face_passes).
+    # Every end-mill cut sits inside a measured record (owner ruling
+    # 2026-11-25; cad/config/shop-equipment/measured-cuts.toml): the faces
+    # F, N and the seat and FK05's foot tip and step on the face record
+    # em-half-carbide-1018-3439-face; the crown's rough on the deep record
+    # em-half-carbide-1018-v6-deep, in equal offset contours no wider than
+    # arch_rough_woc_max_mm; the crown's finish and the step's wall pass,
+    # both climb, on em-half-carbide-1018-3627-wall-climb, each in equal
+    # passes no wider than wall_woc_max_mm. One setting per operation: a new
+    # setting is a new section, at an M0 speed stop. Each cut declares its
+    # true width, the most any of its passes engages (posted: face_passes,
+    # outline, side_passes, engagement).
     face_cap = p["face_stepover_max_mm"]
     step_max = p["step_stepover_max_mm"]
+    wall_cap = p["wall_woc_max_mm"]
     face_cuts = {
         "west side": "lying_stepover_mm",
         "width": "lying_stepover_mm",
         "seat": "seat_stepover_mm",
+        "foot end": "step_stepover_max_mm",
+        "step": "step_stepover_max_mm",
     }
-    chart_cuts = ("foot end", "step", "arch rough", "arch finish", "step wall")
+    wall_cuts = ("arch finish", "step wall")
     face_rpm, face_feed = _setting(plan, shop, "west side")
-    em_rpm, em_feed = _setting(plan, shop, "step")
-    for name in (*face_cuts, *chart_cuts):
+    rough_rpm, rough_feed = _setting(plan, shop, "arch rough")
+    wall_rpm, wall_feed = _setting(plan, shop, "arch finish")
+    for name in (*face_cuts, "arch rough", *wall_cuts):
         if not math.isclose(_cut(plan, name, "cutter_dia_mm"), em, abs_tol=1e-6):
             raise ValueError(
                 f"'{name}' cutter Ø{_cut(plan, name, 'cutter_dia_mm')}, the end mill is Ø{em}"
             )
     for names, first, speeds in (
         (face_cuts, "west side", (face_rpm, face_feed)),
-        (chart_cuts, "step", (em_rpm, em_feed)),
+        (wall_cuts, "arch finish", (wall_rpm, wall_feed)),
     ):
         for name in names:
             if _setting(plan, shop, name) != speeds:
                 raise ValueError(f"'{name}' runs at another setting than '{first}'")
-    for name, key in (
-        *face_cuts.items(),
-        ("foot end", "step_stepover_max_mm"),
-        ("step", "step_stepover_max_mm"),
-    ):
+    for name, key in face_cuts.items():
         if not math.isclose(_cut(plan, name, "radial_woc_mm"), p[key], abs_tol=1e-6):
             raise ValueError(f"'{name}' radial_woc_mm is not process.{key}")
     level_max = p["face_step_max_mm"]
@@ -614,21 +627,29 @@ def context(
     step_levels = _levels(length, ear, level_max)
     _agree(plan, "step_level_mm", (length - ear) / len(step_levels))
 
-    # Arch: rough levels finish_stock off the radius, then the full-depth
-    # finish on it; through the ear and arch_past_mm into the waste.
+    # Crown: at each rough level, equal contours from the outside in, the
+    # innermost finish_stock off the radius; then the finish stock in equal
+    # full-depth passes, the last on the radius; through the lug and
+    # arch_past_mm into the waste.
     stock_a = p["arch_finish_stock_mm"]
+    finish_n = math.ceil(stock_a / wall_cap - 1e-9)
+    _agree(plan, "arch_finish_pass_mm", stock_a / finish_n)
+    finish_pass = p["arch_finish_pass_mm"]
     arch_depth = ear + p["arch_past_mm"]
     _agree(plan, "arch_depth_mm", arch_depth)
     rough_levels = _levels(section, section - arch_depth, p["arch_rough_level_mm"])
     _agree(plan, "arch_rough_level_mm", arch_depth / len(rough_levels))
+    # The rough's widest stock is the longest blank's corner.
     corner = math.hypot(width / 2, top_max - g["arch_centre"][1])
-    rough_woc = corner - radius - stock_a
-    _agree(plan, "arch_rough_woc_mm", rough_woc)
-    if corner > radius + stock_a + 2 * r:
+    rough_stock = corner - radius - stock_a
+    contours = math.ceil(rough_stock / p["arch_rough_woc_max_mm"] - 1e-9)
+    _agree(plan, "arch_rough_woc_mm", rough_stock / contours)
+    rough_woc = p["arch_rough_woc_mm"]
+    if corner > radius + stock_a + (contours - 1) * rough_woc + 2 * r:
         raise ValueError("the rough arch pass leaves the longest blank's corners uncut")
     for name, axial, woc in (
-        ("arch rough", p["arch_rough_level_mm"], p["arch_rough_woc_mm"]),
-        ("arch finish", arch_depth, stock_a),
+        ("arch rough", p["arch_rough_level_mm"], rough_woc),
+        ("arch finish", arch_depth, finish_pass),
     ):
         if not (
             math.isclose(_cut(plan, name, "axial_doc_mm"), axial, abs_tol=1e-6)
@@ -875,7 +896,8 @@ def context(
         return {"tool": key, "rpm": rpm, "feed": feed, "plunge": feed, **extra}
 
     em_face = tool("em-half", face_rpm, face_feed, dia=em, shape="endmill", flutes=3)
-    em_tool = tool("em-half", em_rpm, em_feed, dia=em, shape="endmill", flutes=3)
+    em_rough = tool("em-half", rough_rpm, rough_feed, dia=em, shape="endmill", flutes=3)
+    em_wall = tool("em-half", wall_rpm, wall_feed, dia=em, shape="endmill", flutes=3)
     spot_tool = tool(
         "spot",
         spot_rpm,
@@ -892,7 +914,7 @@ def context(
         return (x[0] - r - APPROACH_MM, x[1] + r + APPROACH_MM)
 
     # The faces at the measured cap; FK05's foot tip and step at their own
-    # (unchanged, chart) stepover.
+    # stepover (under the cap: the step needs an even number of stations).
     lying_ys = _stations((-section, 0.0), r, face_cap)
     seat_ys = _stations((-width, 0.0), r, face_cap)
     _agree(plan, "lying_stepover_mm", _stepover((-section, 0.0), face_cap)[1])
@@ -904,8 +926,9 @@ def context(
     # it between pairs of stations. The facing stations, the last moved onto
     # E's line: the first pair's stepover starts beyond W and the last
     # pair's ends on E, so the stepovers sweep the wall to both edges and
-    # leave only scallops between the pairs, which one full-depth wall pass
-    # along -Y (climb) takes off.
+    # leave only scallops between the pairs, which full-depth wall passes
+    # along -Y (climb) take off: equal passes, each no wider than the climb
+    # wall record, the last on the wall.
     wall_x = foot_top + r
     far_x = top_max + r + APPROACH_MM
     step_ys = [*width_ys[:-1], _r(-width)]
@@ -916,7 +939,11 @@ def context(
     gap = max(step_ys[k] - step_ys[k + 1] for k in range(1, len(step_ys) - 1, 2))
     scallop = r - math.sqrt(r**2 - (gap / 2) ** 2)
     _agree(plan, "wall_finish_woc_mm", scallop)
-    for name, axial, woc in (("step wall", length - ear, p["wall_finish_woc_mm"]),):
+    wall_n = math.ceil(p["wall_finish_woc_mm"] / wall_cap - 1e-9)
+    _agree(plan, "wall_pass_woc_mm", p["wall_finish_woc_mm"] / wall_n)
+    wall_pass = p["wall_pass_woc_mm"]
+    wall_xs = [wall_x + k * wall_pass for k in reversed(range(wall_n))]
+    for name, axial, woc in (("step wall", length - ear, wall_pass),):
         if not (
             math.isclose(_cut(plan, name, "axial_doc_mm"), axial, abs_tol=1e-3)
             and math.isclose(_cut(plan, name, "radial_woc_mm"), woc, abs_tol=1e-6)
@@ -924,17 +951,9 @@ def context(
             raise ValueError(f"'{name}' depth or width is not the recipe's")
     wall_y = (_r(r + APPROACH_MM), _r(-width - r - APPROACH_MM))
     step_lines = _step_lines(
-        foot_levels,
-        section,
-        ear,
-        step_levels,
-        width_ys,
-        step_ys,
-        r,
-        far_x,
-        wall_x,
-        wall_y,
+        foot_levels, section, step_levels, width_ys, step_ys, r, far_x, wall_x
     )
+    wall_lines = _wall_lines(section, ear, wall_xs, wall_y)
     cbore_lines = _cbore(
         cbore_xy,
         p["cbore_path_radius_mm"],
@@ -975,25 +994,39 @@ def context(
     ]
     for element in elements:
         element["tol"] = OUTLINE_TOL_MM
-    passes = [
-        {"offset": r + stock_a, "levels": [_r(z) for z in rough_levels]},
-        {"offset": r, "levels": [_r(arch_bottom)]},
+    # In the order cut, each pass one offset at one level: at each rough
+    # level the contours from the outside in, then the finish passes at the
+    # crown's bottom from the outside in.
+    rough_passes = [
+        {"offset": r + stock_a + k * rough_woc, "levels": [_r(z)]}
+        for z in rough_levels
+        for k in reversed(range(contours))
     ]
-    arch_lines: list[str] = []
-    for pass_ in passes:
-        o = pass_["offset"]
-        for z in pass_["levels"]:
-            arch_lines += [
-                f"G0 Z{_r(section + CLEAR_MM):.3f}",
-                f"G0 X{_r(cx + lead):.3f} Y{_r(cy - radius - o):.3f}",
-                f"G0 Z{_r(section + SAFE_MM):.3f}",
-                f"G1 Z{z:.3f} F{{feed}}",
-                f"G1 X{_r(cx):.3f} F{{feed}}",
-                f"G2 X{_r(cx - radius - o):.3f} Y{_r(cy):.3f} I0.000 J{_r(radius + o):.3f} F{{feed}}",
-                f"G2 X{_r(cx):.3f} Y{_r(cy + radius + o):.3f} I{_r(radius + o):.3f} J0.000 F{{feed}}",
-                f"G1 X{_r(cx + lead):.3f} F{{feed}}",
-            ]
-    arch_lines.append(f"G0 Z{_r(section + CLEAR_MM):.3f}")
+    finish_passes = [
+        {"offset": r + k * finish_pass, "levels": [_r(arch_bottom)]}
+        for k in reversed(range(finish_n))
+    ]
+    passes = rough_passes + finish_passes
+
+    def contours_at(group: list[dict[str, Any]]) -> list[str]:
+        lines: list[str] = []
+        for pass_ in group:
+            o = pass_["offset"]
+            for z in pass_["levels"]:
+                lines += [
+                    f"G0 Z{_r(section + CLEAR_MM):.3f}",
+                    f"G0 X{_r(cx + lead):.3f} Y{_r(cy - radius - o):.3f}",
+                    f"G0 Z{_r(section + SAFE_MM):.3f}",
+                    f"G1 Z{z:.3f} F{{feed}}",
+                    f"G1 X{_r(cx):.3f} F{{feed}}",
+                    f"G2 X{_r(cx - radius - o):.3f} Y{_r(cy):.3f} I0.000 J{_r(radius + o):.3f} F{{feed}}",
+                    f"G2 X{_r(cx):.3f} Y{_r(cy + radius + o):.3f} I{_r(radius + o):.3f} J0.000 F{{feed}}",
+                    f"G1 X{_r(cx + lead):.3f} F{{feed}}",
+                ]
+        return lines + [f"G0 Z{_r(section + CLEAR_MM):.3f}"]
+
+    rough_lines = contours_at(rough_passes)
+    finish_lines = contours_at(finish_passes)
 
     seat_top = seat_skim
     jobs = [
@@ -1059,11 +1092,18 @@ def context(
             ],
         },
         {
-            **em_tool,
+            **em_rough,
             "frame": "arch",
-            "label": "crown",
+            "label": "crown rough",
             "stock": stocks["arch"],
-            "ops": [["crown", "profile the crown", arch_lines]],
+            "ops": [["crown_rough", "rough the crown", rough_lines]],
+        },
+        {
+            **em_wall,
+            "frame": "arch",
+            "label": "crown finish",
+            "stock": stocks["arch"],
+            "ops": [["crown_finish", "finish the crown", finish_lines]],
         },
         {
             **spot_tool,
@@ -1110,11 +1150,18 @@ def context(
             ],
         },
         {
-            **em_tool,
+            **em_face,
             "frame": "step",
             "label": "step",
             "stock": stocks["step"],
             "ops": [["step", "face the foot tip, mill the step", step_lines]],
+        },
+        {
+            **em_wall,
+            "frame": "step",
+            "label": "step wall",
+            "stock": stocks["step"],
+            "ops": [["step_wall", "finish the foot top", wall_lines]],
         },
         {
             **spot_tool,
@@ -1327,10 +1374,20 @@ def context(
                 "loads_first": True,
             },
         ],
-        [name, "spindle", {"rpm": [[em_rpm], [spot_rpm], [drill_rpm], [ream_rpm]]}],
-        [name, "pauses", {"z_top": section, "count": 0}],
+        # T1 roughs the crown on v6 and, after the M0 speed stop, finishes
+        # it on the climb wall record.
+        [
+            name,
+            "spindle",
+            {"rpm": [[rough_rpm, wall_rpm], [spot_rpm], [drill_rpm], [ream_rpm]]},
+        ],
+        [name, "pauses", {"z_top": section, "count": 1}],
         [name, "depth", {"z_min": _r(bore_tip)}],
     ]
+    # The outline check proves each contour's offset and level in the order
+    # cut: the rough contours rough_woc apart from the outside in (the
+    # outermost reaching the longest blank's corners, checked above), the
+    # finish passes finish_pass apart, the last on the radius.
     for k, checks in enumerate(
         (
             [
@@ -1365,8 +1422,10 @@ def context(
             "tool_changes",
             {"z_top": section, "tools": [tn["em-half"]], "loads_first": True},
         ],
-        [name, "spindle", {"rpm": [[em_rpm]]}],
-        [name, "pauses", {"z_top": section, "count": 0}],
+        # The foot tip and the step on the face record, then, after the M0
+        # speed stop, the wall passes on the climb wall record.
+        [name, "spindle", {"rpm": [[face_rpm, wall_rpm]]}],
+        [name, "pauses", {"z_top": section, "count": 1}],
         [name, "depth", {"z_min": _r(ear)}],
         *[
             [name, check, kwargs]
@@ -1387,23 +1446,24 @@ def context(
                 "axis": "X",
                 "final": _r(wall_x),
                 "raw": _r(wall_x + p["wall_finish_woc_mm"]),
-                "max_step": p["wall_finish_woc_mm"],
+                "max_step": wall_pass,
                 "direction": -1.0,
                 "span": width,
                 "below_z": length,
             },
         ],
-        # What the wall pass really meets: the scallops only, climb, E's and
-        # W's edges included (stations alone cannot show the edges).
+        # What the wall passes really meet: the scallops only, each no more
+        # than its declared width, climb, E's and W's edges included
+        # (stations alone cannot show the edges).
         [
             name,
             "engagement",
             {
                 "stock": stocks["step"],
                 "radius": r,
-                "max_radial": p["wall_finish_woc_mm"],
+                "max_radial": wall_pass,
                 "z": _r(ear),
-                "window": [[_r(wall_x), _r(wall_x)], [wall_y[1], wall_y[0]]],
+                "window": [[_r(wall_x), _r(wall_xs[0])], [wall_y[1], wall_y[0]]],
                 "min_length": width,
                 "side": "climb",
             },
@@ -1506,34 +1566,41 @@ def context(
 def _step_lines(
     foot_levels: list[float],
     section: float,
-    ear: float,
     levels: list[float],
     ys: list[float],
     step_ys: list[float],
     radius: float,
     far_x: float,
     wall_x: float,
-    wall_y: tuple[float, float],
 ) -> list[str]:
-    """FK05: the foot tip faced to the length at ``foot_levels`` across the
-    whole part (X passes from beside the seat at the facing stations
-    ``ys``), then the step's ``levels``, each in X passes at ``step_ys`` from
-    beside the far end to the wall station and back, then one full-depth wall
-    pass from beside F along -Y (climb: the wall on the cutter's right) to
-    beside N. Every plunge and level change is beside the part; the moves
+    """FK05's face section: the foot tip faced to the length at
+    ``foot_levels`` across the whole part (X passes from beside the seat at
+    the facing stations ``ys``), then the step's ``levels``, each in X
+    passes at ``step_ys`` from beside the far end to the wall station and
+    back. Every plunge and level change is beside the part; the moves
     between them are G0 above the raw stock top ``section``."""
     foot = _face(foot_levels, section, (-radius - APPROACH_MM, far_x), ys)
     step = _face(levels, section, (far_x, wall_x), step_ys)
+    return [*foot, *step[1:]]
+
+
+def _wall_lines(
+    section: float, ear: float, xs: list[float], wall_y: tuple[float, float]
+) -> list[str]:
+    """FK05's wall section: one full-depth pass at each of ``xs`` (the last
+    on the wall), each plunged beside F and run along -Y (climb: the wall on
+    the cutter's right) to beside N, back over the part at G0 for the next."""
     clear = _r(section + CLEAR_MM)
-    return [
-        *foot,
-        *step[1:],
-        f"G0 X{_r(wall_x):.3f} Y{wall_y[0]:.3f}",
-        f"G0 Z{_r(section + SAFE_MM):.3f}",
-        f"G1 Z{_r(ear):.3f} F{{feed}}",
-        f"G1 Y{wall_y[1]:.3f} F{{feed}}",
-        f"G0 Z{clear:.3f}",
-    ]
+    lines: list[str] = []
+    for x in xs:
+        lines += [
+            f"G0 Z{clear:.3f}",
+            f"G0 X{_r(x):.3f} Y{wall_y[0]:.3f}",
+            f"G0 Z{_r(section + SAFE_MM):.3f}",
+            f"G1 Z{_r(ear):.3f} F{{feed}}",
+            f"G1 Y{wall_y[1]:.3f} F{{feed}}",
+        ]
+    return lines + [f"G0 Z{clear:.3f}"]
 
 
 def _cbore(

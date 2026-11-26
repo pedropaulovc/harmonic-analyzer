@@ -235,6 +235,12 @@ end_protrusion_mm = 19.05
 # Ends: the 1/2 in carbide end mill (shop endmill-carbide-3fl-1-2) on its
 # side, full bar height in one level, its tip .1 mm under the bars' down
 # face (past the jaw side, in air), passes no deeper than .020 into the end.
+# At 2 in out (half_mill_projection_min_mm) the cutter is outside the
+# 27.94-31.75 mm stick-out band its measured 1018 records hold in
+# (measured_cutters.endmill-carbide-3fl-1-2 in cad/config/shop-equipment/
+# measured-cuts.toml; #3384), so its cuts stay on the chart setting (shop
+# settings.endmill-carbide-3fl-1-2-1018-cf, 2483) and the first part of
+# each program is a supervised run (owner ruling 2026-11-25).
 face_cutter_dia_mm = 12.7
 end_step_max_mm = 0.508
 foot_skim_mm = 0.508
@@ -454,7 +460,9 @@ drill_chuck_gauge_mm = 95.0      # Archive holders.drill-chuck-r8.gauge_len_mm.
 # Each tool's least projection out of its holder: at its deepest tip (the
 # riser's least height plus its Z) the holder's nose stands at least 1 mm above
 # the jaw tops; none more than the tool's length less a holder_grip_min_mm
-# grip (cam.py checks both). The 1/2 in end mill, 3 in overall, 2 in out.
+# grip (cam.py checks both). The 1/2 in end mill, 3 in overall, 2 in out:
+# longer than its measured records' 27.94-31.75 band (#3384), so none of
+# them applies.
 holder_grip_min_mm = 12.7
 half_mill_oal_mm = 76.2
 half_mill_projection_min_mm = 50.8
@@ -642,12 +650,23 @@ feed = "hand"
 instruction = "The first time: prove CA00_riser_face in air, Z0 raised 1.000 in (send $#, G10 L2 P1 Z(the G54 line's Z + 25.400)); every move passes over the jaws. Then Z0 back (G10 L2 P1 Z(the noted Z))."
 feed = "hand"
 
+# Not inside a measured record: the end mill is 2.00 in out, past the
+# 27.94-31.75 mm band its 1018 records hold in (#3384), and the riser is
+# 6061, a material none was cut in. CA00 stays on the chart setting (shop
+# settings.endmill-carbide-3fl-1-2-1018-cf, 2483). Owner ruling 2026-11-25:
+# the first part of each program is a supervised run, hand on the feed
+# override, adjusting by ear; dechatter sessions are for cuts that actually
+# chatter on a part.
+[[setups.operations]]
+instruction = "The first time: CA00_riser_face's pass, {{process.riser_face_mm:in.3dot}} deep x {{process.riser_face_woc_mm:in.3dot}} wide, is not inside a measured record: the end mill is 2.00 in out, past the 1.10–1.25 in its records were cut at (#3384), and the riser is aluminium. Run CA00_riser_face supervised, hand on the feed override, adjusting it by ear: back it off at the first chatter, bring it back up while the cut stays clean. Note the override that cut clean beside the program."
+feed = "hand"
+
 [[setups.operations]]
 speed_kind = "spindle"
 tool = "em-half"
 drilling = "none"
 sizing = "other"
-instruction = "Run CA00_riser_face (M6 T1; set 2650). It faces both tops {{process.riser_face_mm:in.3dot}} at one Z, in passes along X past both jaw sides, stepping from over the fixed jaw's top to past the moving jaw's face: both blocks edge to edge, wherever they stand along the jaws."
+instruction = "Run CA00_riser_face (M6 T1; set 2483). It faces both tops {{process.riser_face_mm:in.3dot}} at one Z, in passes along X past both jaw sides, stepping from over the fixed jaw's top to past the moving jaw's face: both blocks edge to edge, wherever they stand along the jaws."
 settings = "endmill-carbide-3fl-1-2-1018-cf"
 milling_cuts = [
   { name = "riser face", kind = "end", phase = "finish", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", axial_doc_mm = "{{process.riser_face_mm}}", radial_woc_mm = "{{process.riser_face_woc_mm}}", stations_mm = 0 },
@@ -713,12 +732,20 @@ instruction = "First load only: prove CA01_foot_end in air, Z0 raised 1.000 in; 
 instruction_detailed = "First load only: send $# and note the G54 line's Z. G10 L2 P1 Z(that Z + 25.400) raises Z0 1.000 in. Run CA01_foot_end, watching each move clear the jaws. G10 L2 P1 Z(the noted Z) puts Z0 back."
 feed = "hand"
 
+# Not inside a measured record: the end mill is 2.00 in out, past the
+# 27.94-31.75 mm band its 1018 records hold in (#3384); CA01 stays on the
+# chart setting (2483). The first load is a supervised run (owner ruling
+# 2026-11-25).
+[[setups.operations]]
+instruction = "First load only: CA01_foot_end's side cut, the full bar height x {{process.foot_skim_mm:in.3dot}} wide, is not inside a measured record: the end mill is 2.00 in out, past the 1.10–1.25 in its records were cut at (#3384). Run CA01_foot_end supervised, hand on the feed override, adjusting it by ear: back it off at the first chatter, bring it back up while the cut stays clean. Note the override that cut clean beside the program."
+feed = "hand"
+
 [[setups.operations]]
 speed_kind = "spindle"
 tool = "em-half"
 drilling = "none"
 sizing = "other"
-instruction = "Run CA01_foot_end (M6 T1, 1/2 in end mill; set 2650): face the four foot ends at X0 with the cutter's side, the full bar height in one pass along +Y, {{process.foot_skim_mm:in.3dot}} off the shortest. It ends with T1 parked for the saw: up, left of the ends, over the P1 bar."
+instruction = "Run CA01_foot_end (M6 T1, 1/2 in end mill; set 2483): face the four foot ends at X0 with the cutter's side, the full bar height in one pass along +Y, {{process.foot_skim_mm:in.3dot}} off the shortest. It ends with T1 parked for the saw: up, left of the ends, over the P1 bar."
 settings = "endmill-carbide-3fl-1-2-1018-cf"
 inspection = "Every foot end cut clean across. A sawn patch left: do the next op."
 gauge_checks = "other"
@@ -926,12 +953,19 @@ feed = "hand"
 instruction = "First load only: prove CA03_top_end in air, Z0 raised 1.000 in; every move clears the jaws. Then Z0 back."
 feed = "hand"
 
+# Not inside a measured record (#3384), as CA01's: CA03 stays on the chart
+# setting (2483); the first load is a supervised run (owner ruling
+# 2026-11-25).
+[[setups.operations]]
+instruction = "First load only: CA03_top_end's side passes, the full bar height x {{process.end_step_max_mm:in.3dot}} wide, are not inside a measured record: the end mill is 2.00 in out, past the 1.10–1.25 in its records were cut at (#3384). Run CA03_top_end supervised, hand on the feed override, adjusting it by ear: back it off at the first chatter, bring it back up while the cut stays clean. Note the override that cut clean beside the program."
+feed = "hand"
+
 [[setups.operations]]
 speed_kind = "spindle"
 tool = "em-half"
 drilling = "none"
 sizing = "other"
-instruction = "Run CA03_top_end (M6 T1; set 2650): face the four top ends to X0 with the cutter's side in passes along −Y no deeper than {{process.end_step_max_mm:in.3dot}}, starting {{process.top_excess_max_mm:in.3dot}} out (the longest blank: a shorter bar cuts air first). It ends with T1 parked for the saw: up, right of the ends, over the P1 bar."
+instruction = "Run CA03_top_end (M6 T1; set 2483): face the four top ends to X0 with the cutter's side in passes along −Y no deeper than {{process.end_step_max_mm:in.3dot}}, starting {{process.top_excess_max_mm:in.3dot}} out (the longest blank: a shorter bar cuts air first). It ends with T1 parked for the saw: up, right of the ends, over the P1 bar."
 settings = "endmill-carbide-3fl-1-2-1018-cf"
 milling_cuts = [
   { name = "top end", kind = "side", phase = "finish", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", axial_doc_mm = 6.45, radial_woc_mm = "{{process.end_step_max_mm}}", stations_mm = 0 },

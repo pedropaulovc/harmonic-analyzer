@@ -490,7 +490,8 @@ def context(
             raise ValueError(f"#43 Ø{d43} is outside {tap['name']}'s band {tap['dia']}")
     step_max = p["face_stepover_max_mm"]
     # The four faces run at one setting and the two ends at another: the
-    # ends' depth lies past the faces' measured envelope (plan.toml).
+    # ends' depth lies past the faces' measured envelope, inside the deep
+    # conventional wall record (plan.toml).
     face_rpm, face_feed = _setting(plan, shop, "underside")
     end_rpm, end_feed = _setting(plan, shop, "left end")
     for names, first, speeds in (

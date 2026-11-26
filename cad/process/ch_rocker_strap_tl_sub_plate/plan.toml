@@ -185,8 +185,11 @@ drill_chuck_gauge_mm = 95.0      # Archive holders.drill-chuck-r8.gauge_len_mm.
 drill_projection_max_mm = 112.8  # Archive 13/32 jobber, bounds the drills.
 # The 1/2 in end mill out of the collet as dechatter v11 measured it.
 half_mill_projection_mm = 48.8
-eighth_mill_projection_min_mm = 12.0
-eighth_mill_projection_max_mm = 12.7
+# 1/8 in end mill (1/2 in of flute): at least its flute length + 10 % out,
+# 13.97 mm (owner ruling 2026-11-25 on #3386, HA #3624); the max a .030 in
+# setting window above it, as the strap plan.
+eighth_mill_projection_min_mm = 13.97
+eighth_mill_projection_max_mm = 14.73
 
 [[tools]]
 id = "em-half"

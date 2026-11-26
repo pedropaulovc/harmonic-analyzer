@@ -173,11 +173,11 @@ def _seed(ctx: dict, key: str, pick, change) -> dict:
             lambda line: line.split(" Y")[0] + " Y-7.925",
             "face",
         ),
-        # The left end's first pass dropped: the second takes both steps.
+        # The left end's first pass moved onto the second: it takes two steps.
         (
             "ends",
-            lambda line: line == "G0 X-7.112 Y-24.740",
-            lambda line: "G0 X-6.350 Y-24.740",
+            lambda line: line == "G0 X-7.493 Y-24.740",
+            lambda line: "G0 X-7.112 Y-24.740",
             "passes",
         ),
         # A right-end pass run the other way: climb, not conventional.

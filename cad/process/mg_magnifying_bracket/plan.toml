@@ -98,7 +98,7 @@ blank_y_in = 0.5
 blank_z_in = 4.75
 # Skims (author's choice): the seat .020 off the sawn end; L .035 off the bar
 # face, H to high_level_mm above the stacks (L's skim plus the width), so H
-# takes .027-.037. O is not cut.
+# takes .027-.037. O is not cut. Each is one level, under face_step_max_mm.
 seat_skim_mm = 0.508
 low_skim_mm = 0.889
 high_level_mm = 11.889
@@ -106,42 +106,56 @@ face_step_max_mm = 1.27
 # F (MB01): faced from the widest bar to the foot's length in equal levels.
 width_level_mm = 1.009
 # Facing: the 1/2 in carbide end mill (shop endmill-carbide-3fl-1-2). F
-# (MB01) and the seat (MB02) in equal passes no wider than
-# skim_stepover_max_mm, 6.4 mm (.252 in), and levels no deeper than .050:
-# the measured face envelope, shop settings.em-half-carbide-1018-3439-face
-# (dechatter session of 2026-11-23, #3439: stable at 1.27 mm deep to 6.4 mm
-# wide, 2420-2490 rpm in the cut, conventional; the zigzag's return passes
-# climb, and that half is not measured); three passes of 4.44 mm across the
-# 1/2 in bar (two would need 6.66, over the limit), and each level starts
-# with the cutter over the edge, so no pass takes more than the stepover. H, L and the neck (MB03-MB05) keep passes no
-# wider than .200 in, under half the cutter, on the chart setting
-# (settings.endmill-carbide-3fl-1-2-1018-cf): those programs also cut the
-# notch, whose stepovers run full width, and MB05 runs at a longer stick-out.
+# (MB01), the seat (MB02), H (MB03) and L (MB04) in equal passes no wider
+# than skim_stepover_max_mm, 6.4 mm (.252 in), and levels no deeper than
+# .050: the measured face envelope, shop
+# settings.em-half-carbide-1018-3439-face (#3439: stable at 1.27 mm deep to
+# 6.4 mm wide, 2420-2490 rpm in the cut, conventional; the zigzag's return
+# passes climb, and that half is not measured); three passes of 4.44 mm
+# across the 1/2 in bar (two would need 6.66, over the limit), and each
+# level starts with the cutter over the edge, so no pass takes more than the
+# stepover. The neck (MB05) keeps passes no wider than face_stepover_max_mm
+# (.200 in, under half the cutter) on the chart setting
+# (settings.endmill-carbide-3fl-1-2-1018-cf): MB05 sets the end mill
+# neck_mill_projection_min_mm out, past every record's stick-out.
 face_cutter_dia_mm = 12.7
 face_stepover_max_mm = 5.08
 skim_stepover_max_mm = 6.4
 # The notch: half its depth from H (MB03, L down: down to notch_split_mm
 # above the stacks), the other half from L once L is faced (MB04, H down:
 # down to notch_through_mm, notch_past_mm through MB03's floor), so no thin
-# skin is ever cut; each in equal levels no deeper than notch_level_max_mm
-# (.10 in). Each level: one ramp along the first station (beside F) from the
-# waste line down to the foot's line and back, then zigzag passes along the
-# part at stations notch_step_mm apart stepping in to the neck's wall
-# station (the neck left neck_stock_mm full for MB05), back along the waste
-# line. The notch ends notch_end_mm from the seat (the waste the moving jaw
-# grips lies beyond). The stepovers at the foot's line sweep it between
-# alternate stations; the cusps between the others (at most
-# foot_wall_woc_mm) come off in one full-depth climb pass along the foot's
-# underside in each setup.
+# skin is ever cut. Each half in one level (notch_level_mm, no deeper than
+# notch_level_max_mm) at stations notch_step_mm apart (no wider than
+# notch_step_max_mm): shop settings.em-half-carbide-1018-v6-deep, measured
+# stable at 6.6 mm deep x 2.2 mm wide at 2400 (dechatter v6, 2026-11-22).
+# The face record would take five 1.125 levels of seven 5.89 stations a half
+# (and three foot wall passes): as posted, 16.5 min a program against v6's
+# 10.3. Each station,
+# from beside F in to the neck's wall station (the neck left neck_stock_mm
+# full for MB05): one ramp along the part from the waste line down to the
+# foot's line, a pass back level along it, then up to the level above (the
+# face, or a cut level) and over to the next station there: no stepover runs
+# in uncut stock, so nothing is cut full width. A pass meets only the step
+# except in its last cutter radius into the closed waste end, where it also
+# takes the scallop the station before left there: a corner, as in any
+# closed pocket (in the waste, sawn off with the nose). The notch ends
+# notch_end_mm from the seat (the waste the moving jaw grips lies beyond).
+# Each station's passes end on the foot's line; the cusps between them
+# (foot_wall_woc_mm) come off in full-depth climb passes along the foot's
+# underside in each setup, no wider than wall_woc_max_mm: shop
+# settings.em-half-carbide-1018-3627-wall-climb (#3627: climb, stable at 17
+# mm deep x 0.3 mm wide at 2483).
 notch_past_mm = 0.254
 notch_split_mm = 6.262
 notch_through_mm = 5.373
-notch_level_max_mm = 2.54
-notch_level_mm = 1.876
+notch_level_max_mm = 6.6
+notch_level_mm = 5.627
 neck_stock_mm = 0.5
 notch_end_mm = 110.0
-notch_step_mm = 4.583
-foot_wall_woc_mm = 0.428
+notch_step_max_mm = 2.2
+notch_step_mm = 2.171
+foot_wall_woc_mm = 0.093
+wall_woc_max_mm = 0.3
 # The nose waste (bench saw): sawn nose_cut_in from the seat, ±
 # nose_cut_tol_in, so the part is part_length_min_mm–part_length_max_mm long
 # and its kerf stays short of the notch's end.
@@ -157,16 +171,29 @@ part_length_max_mm = 104.14
 neck_level_max_mm = 3.81
 neck_level_mm = 3.425
 # The nose (MB06): profiled round the R.217 with the end mill's side, climb
-# (G2), through the neck and nose_past_mm below O: two rough levels .020 off
-# the radius, then one finish pass at full depth. The rough pass's widest cut
-# is the longest part's corner. The leads run nose_lead_mm along each side;
-# the jaws' right side stands nose_jaw_back_mm back from the nose's centre,
-# so the cutter keeps nose_jaw_clear_mm off it.
+# (G2), through the neck and nose_past_mm below O. The rough first: rings
+# nose_rough_step_mm apart (no wider than nose_rough_step_max_mm) outside a
+# finish stock of nose_finish_stock_mm, the outermost first, each in levels
+# of nose_rough_level_mm (no deeper than nose_rough_level_max_mm): shop
+# settings.em-half-carbide-1018-v6-deep (6.6 deep x 2.2 wide, 2400). The
+# rough's widest cut, nose_rough_woc_mm in all, is the longest part's
+# corner. The face record would take eleven 1.227 levels of one ring: as
+# posted, MB06 1.95 min against v6's 1.89. Then the finish stock at full
+# depth in equal climb passes nose_finish_step_mm wide (no wider than
+# wall_woc_max_mm): shop
+# settings.em-half-carbide-1018-3627-wall-climb (17 deep x 0.3 wide,
+# 2483). The leads run nose_lead_mm along each side; the jaws' right side
+# stands nose_jaw_back_mm back from the nose's centre, so the cutter keeps
+# nose_jaw_clear_mm off it.
 nose_past_mm = 1.0
 nose_depth_mm = 13.5
-nose_rough_level_mm = 6.75
+nose_rough_level_max_mm = 6.6
+nose_rough_level_mm = 4.5
 nose_finish_stock_mm = 0.508
 nose_rough_woc_mm = 5.478
+nose_rough_step_max_mm = 2.2
+nose_rough_step_mm = 1.826
+nose_finish_step_mm = 0.254
 nose_lead_mm = 1.0
 nose_jaw_clear_mm = 2.0
 nose_jaw_back_mm = 9.35
@@ -243,9 +270,9 @@ r8_collet_gauge_mm = 6.3         # HA: holders.r8-collets-lms-4860.gauge_len_mm.
 drill_chuck_gauge_mm = 95.0      # Archive holders.drill-chuck-r8.gauge_len_mm.
 # 1/2 in end mill, 3 in overall (tools.endmill-carbide-3fl-1-2's
 # description): set 1.12 in (28.45 mm) out of the collet (owner, Pedro,
-# 2026-11-24: "28.45"), the longer end of the stick-out the measured face
-# setting allows (cad/config/shop-equipment/measured-cuts.toml: 27.94 to
-# 28.45 mm).
+# 2026-11-24: "28.45"), inside the 27.94-31.75 mm the cutter's measured
+# records hold in (cad/config/shop-equipment/measured-cuts.toml,
+# measured_cutters.endmill-carbide-3fl-1-2).
 # cam.py checks the collet's nose clears the part and the jaws at each
 # program's deepest end-mill cut. MB05 sets it longer (below).
 half_mill_projection_mm = 28.45
@@ -253,7 +280,8 @@ half_mill_oal_mm = 76.2
 # MB05: at the neck's last level the end mill stands beside the foot, which
 # rises the part's width above O. Set it at least 1.85 in out, so the collet
 # stays above the foot's top: width − neck + 5 mm = 46.75 mm, rounded up to
-# .05 in; 1.15 in of the 3 in cutter is still in the collet.
+# .05 in; 1.15 in of the 3 in cutter is still in the collet. Past the
+# records' band: the neck's cut is not measured and runs on the chart.
 neck_mill_projection_min_mm = 46.99
 # Overall lengths: jobber #37 2-1/4 in, #7 3-5/8 in (ASME B94.11M); the #2
 # combined drill and countersink 1-7/8 in. Bounded by their whole length
@@ -493,13 +521,16 @@ instruction = "Prove MB03_notch in air, Z0 raised 1.000 in; every pass crosses a
 instruction_detailed = "Send $# and note the G54 line's Z. G10 L2 P1 Z(that Z + 25.400) raises Z0 1.000 in. Run MB03_notch, watching each pass cross above the jaws and the rod. G10 L2 P1 Z(the noted Z) puts Z0 back."
 feed = "hand"
 
-# Not chatter-tested (#3428): H's face .200 wide and the notch's .180
-# steps at .074 deep are wider than tested at those depths, and the notch's
-# stepovers at the foot and the waste line run full width; the foot wall pass
-# climbs. Owner, Pedro, 2026-11-22: "same log new dechatter issues to try
-# full radial depth but shallow axial".
+# H's face sits inside shop settings.em-half-carbide-1018-3439-face (.037
+# deep x at most 6.4 mm wide, its 1.27 x 6.4), the notch inside
+# settings.em-half-carbide-1018-v6-deep (5.627 deep x 2.171 wide, its 6.6 x
+# 2.2; no stepover in uncut stock) and the foot wall inside
+# settings.em-half-carbide-1018-3627-wall-climb (5.627 deep x .093 wide,
+# climb, its 17 x 0.3; #3627). Owner (Pedro), 2026-11-25: the first part of
+# each program is a supervised run, hand on the feed override, adjusting by
+# ear; dechatter sessions are for cuts that actually chatter on a part.
 [[setups.operations]]
-instruction = "First part only: these cuts at 2650 rpm have not been chatter-tested on this end mill (owner's test list #3428): H's face .037 deep x {{process.face_stepover_max_mm:in.3dot}} wide, the notch {{process.notch_level_mm:in.3dot}} deep x {{process.notch_step_mm:in.3dot}} wide with full-width ({{process.face_cutter_dia_mm:in.3dot}}) stepovers, the foot wall .222 deep x {{process.foot_wall_woc_mm:in.3dot}} wide, climb. Listen through the run; on chatter, feed hold, stop the spindle and tell the owner."
+instruction = "First part only: run MB03_notch supervised, hand on the feed override, adjusting it by ear: back it off at the first chatter, bring it back up while the cut stays clean. Note the override that cut clean beside the program."
 feed = "hand"
 
 [[setups.operations]]
@@ -507,13 +538,33 @@ speed_kind = "spindle"
 tool = "em-half"
 drilling = "none"
 sizing = "other"
-instruction = "Run MB03_notch (M6 T1; set 2650): face H at Z {{process.high_level_mm:in.4dot}}; then the notch down to Z {{process.notch_split_mm:in.3dot}} in {{process.notch_level_mm:in.3dot}} levels, each ramped in beside F; last, one pass along the foot's underside from beside F (climb) takes off the {{process.foot_wall_woc_mm:in.3dot}} cusps the stepovers left."
+instruction = "Run MB03_notch (M6 T1; set 2450: the display rests near 2485, not 2380): face H at Z {{process.high_level_mm:in.4dot}} in passes no wider than {{process.skim_stepover_max_mm:in.3dot}}; the file then stops (M0) for the notch's speed."
+settings = "em-half-carbide-1018-3439-face"
+milling_cuts = [
+  { name = "high side", kind = "end", phase = "finish", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", axial_doc_mm = 0.938, radial_woc_mm = "{{process.skim_stepover_max_mm}}", traverse_mm = [0, "{{process.blank_length_max_mm}}"] },
+]
+
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "em-half"
+drilling = "none"
+sizing = "other"
+instruction = "Same file, at its stop: set 2400, Cycle Start: the notch down to Z {{process.notch_split_mm:in.3dot}} in one {{process.notch_level_mm:in.3dot}} level, in passes along the part {{process.notch_step_mm:in.3dot}} apart from beside F in to the neck: each ramped down from the waste end to the foot's line and fed back level, then up to H and over to the next. The file then stops (M0) for the foot wall's speed."
+settings = "em-half-carbide-1018-v6-deep"
+milling_cuts = [
+  { name = "notch", kind = "side", phase = "rough", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", axial_doc_mm = "{{process.notch_level_mm}}", radial_woc_mm = "{{process.notch_step_mm}}", traverse_mm = ["{{cad.foot_underside_thickness_mm}}", "{{process.notch_end_mm}}"] },
+]
+
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "em-half"
+drilling = "none"
+sizing = "other"
+instruction = "Same file, at its stop: set 2483, Cycle Start: one full-depth pass along the foot's underside from beside F (climb) takes off the {{process.foot_wall_woc_mm:in.4dot}} cusps the notch's passes left."
 inspection = "Still clamped: H faced all over, no cold-finished patch left."
 gauge_checks = "other"
-settings = "endmill-carbide-3fl-1-2-1018-cf"
+settings = "em-half-carbide-1018-3627-wall-climb"
 milling_cuts = [
-  { name = "high side", kind = "end", phase = "finish", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", axial_doc_mm = 0.938, radial_woc_mm = "{{process.face_stepover_max_mm}}", traverse_mm = [0, "{{process.blank_length_max_mm}}"] },
-  { name = "notch", kind = "side", phase = "rough", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", axial_doc_mm = "{{process.notch_level_mm}}", radial_woc_mm = "{{process.notch_step_mm}}", traverse_mm = ["{{cad.foot_underside_thickness_mm}}", "{{process.notch_end_mm}}"] },
   { name = "foot wall", kind = "side", phase = "finish", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", axial_doc_mm = 5.627, radial_woc_mm = "{{process.foot_wall_woc_mm}}", stations_mm = "{{cad.foot_underside_thickness_mm}}" },
 ]
 
@@ -542,10 +593,14 @@ feed = "hand"
 instruction = "Prove MB04_low in air, Z0 raised 1.000 in. Then Z0 back."
 feed = "hand"
 
-# Not chatter-tested (#3428): as MB03's. Owner, Pedro, 2026-11-22: "same log
-# new dechatter issues to try full radial depth but shallow axial".
+# As MB03's: L's face inside settings.em-half-carbide-1018-3439-face (.035
+# deep x at most 6.4 mm wide), the notch through inside
+# settings.em-half-carbide-1018-v6-deep (5.627 x 2.171) and the foot wall
+# inside settings.em-half-carbide-1018-3627-wall-climb (5.627 x .093,
+# climb). Owner (Pedro), 2026-11-25: the first part of each program is a
+# supervised run, hand on the feed override, adjusting by ear.
 [[setups.operations]]
-instruction = "First part only: these cuts at 2650 rpm have not been chatter-tested on this end mill (owner's test list #3428): L's face {{process.low_skim_mm:in.3dot}} deep x {{process.face_stepover_max_mm:in.3dot}} wide, the notch {{process.notch_level_mm:in.3dot}} deep x {{process.notch_step_mm:in.3dot}} wide with full-width ({{process.face_cutter_dia_mm:in.3dot}}) stepovers, the foot wall .222 deep x {{process.foot_wall_woc_mm:in.3dot}} wide, climb. Listen through the run; on chatter, feed hold, stop the spindle and tell the owner."
+instruction = "First part only: run MB04_low supervised, hand on the feed override, adjusting it by ear: back it off at the first chatter, bring it back up while the cut stays clean. Note the override that cut clean beside the program."
 feed = "hand"
 
 [[setups.operations]]
@@ -553,16 +608,36 @@ speed_kind = "spindle"
 tool = "em-half"
 drilling = "none"
 sizing = "other"
-instruction = "Run MB04_low (M6 T1; set 2650): face L down to Z {{cad.high_side_width_mm:in.4dot}}, {{process.low_skim_mm:in.3dot}} off; then the notch down to Z {{process.notch_through_mm:in.3dot}}, through MB03's, in {{process.notch_level_mm:in.3dot}} levels; last, the foot's underside pass (climb). The notch opens both mounting holes. Unclamp; mic the width; calipers the foot. Mark this face L."
-settings = "endmill-carbide-3fl-1-2-1018-cf"
+instruction = "Run MB04_low (M6 T1; set 2450: the display rests near 2485, not 2380): face L down to Z {{cad.high_side_width_mm:in.4dot}}, {{process.low_skim_mm:in.3dot}} off, in passes no wider than {{process.skim_stepover_max_mm:in.3dot}}; the file then stops (M0) for the notch's speed."
+settings = "em-half-carbide-1018-3439-face"
+milling_cuts = [
+  { name = "low side", kind = "end", phase = "finish", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", axial_doc_mm = "{{process.low_skim_mm}}", radial_woc_mm = "{{process.skim_stepover_max_mm}}", traverse_mm = [0, "{{process.blank_length_max_mm}}"] },
+]
+
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "em-half"
+drilling = "none"
+sizing = "other"
+instruction = "Same file, at its stop: set 2400, Cycle Start: the notch down to Z {{process.notch_through_mm:in.3dot}}, through MB03's, in one {{process.notch_level_mm:in.3dot}} level, in passes along the part {{process.notch_step_mm:in.3dot}} apart from beside F in to the neck, each ramped down from the waste end and fed back level. The notch opens both mounting holes. The file then stops (M0) for the foot wall's speed."
+settings = "em-half-carbide-1018-v6-deep"
+milling_cuts = [
+  { name = "notch through", kind = "side", phase = "rough", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", axial_doc_mm = "{{process.notch_level_mm}}", radial_woc_mm = "{{process.notch_step_mm}}", traverse_mm = ["{{cad.foot_underside_thickness_mm}}", "{{process.notch_end_mm}}"] },
+]
+
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "em-half"
+drilling = "none"
+sizing = "other"
+instruction = "Same file, at its stop: set 2483, Cycle Start: one full-depth pass along the foot's underside from the neck out past F (climb) takes off the {{process.foot_wall_woc_mm:in.4dot}} cusps. Unclamp; mic the width; calipers the foot. Mark this face L."
 inspection = "Width {{cad.high_side_width_min_in:.3dot}}–{{cad.high_side_width_max_in:.3dot}}, L to H, miked on the neck and on the foot. Foot {{cad.foot_underside_thickness_min_in:.3dot}}–{{cad.foot_underside_thickness_max_in:.3dot}} thick (the seat to the underside), calipers beside F; no step where the two halves meet."
 gauge_checks = [
   { gauge = "micrometers", band_mm = "{{cad.high_side_width_band_mm}}" },
   { gauge = "calipers", band_mm = "{{cad.foot_underside_thickness_band_mm}}" },
 ]
+settings = "em-half-carbide-1018-3627-wall-climb"
 milling_cuts = [
-  { name = "low side", kind = "end", phase = "finish", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", axial_doc_mm = "{{process.low_skim_mm}}", radial_woc_mm = "{{process.face_stepover_max_mm}}", traverse_mm = [0, "{{process.blank_length_max_mm}}"] },
-  { name = "notch through", kind = "side", phase = "rough", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", axial_doc_mm = "{{process.notch_level_mm}}", radial_woc_mm = "{{process.notch_step_mm}}", traverse_mm = ["{{cad.foot_underside_thickness_mm}}", "{{process.notch_end_mm}}"] },
   { name = "foot wall through", kind = "side", phase = "finish", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", axial_doc_mm = 5.627, radial_woc_mm = "{{process.foot_wall_woc_mm}}", stations_mm = "{{cad.foot_underside_thickness_mm}}" },
 ]
 
@@ -622,12 +697,16 @@ instruction = "Prove MB05_neck in air, Z0 raised 1.000 in; the cutter enters eac
 instruction_detailed = "Send $# and note the G54 line's Z. G10 L2 P1 Z(that Z + 25.400) raises Z0 1.000 in. Run MB05_neck, watching each level enter over the fixed jaw and stop short of the foot, and every move between them run above the foot's top. G10 L2 P1 Z(the noted Z) puts Z0 back."
 feed = "hand"
 
-# Not chatter-tested (#3428): .151 wide at .135 deep is wider than tested at
-# that depth, and the end mill stands 1.85-2.00 out, longer than the 1.10-1.12
-# it was tested at. Owner, Pedro, 2026-11-22: "same log new dechatter issues to
-# try full radial depth but shallow axial".
+# Not measured: MB05 sets the end mill neck_mill_projection_min_mm-2.00 in
+# out (1.85-2.00) to reach past the foot, outside the 27.94-31.75 mm the
+# cutter's records hold in (cad/config/shop-equipment/measured-cuts.toml,
+# measured_cutters.endmill-carbide-3fl-1-2), so the neck stays on the chart
+# setting (settings.endmill-carbide-3fl-1-2-1018-cf, 2483). Owner (Pedro),
+# 2026-11-25: the first part of each program is a supervised run, hand on
+# the feed override, adjusting by ear; dechatter sessions are for cuts that
+# actually chatter on a part.
 [[setups.operations]]
-instruction = "First part only: this cut at 2650 rpm, the end mill {{process.neck_mill_projection_min_mm:in.2dot}}–2.00 out, has not been chatter-tested on this end mill (owner's test list #3428): the neck {{process.neck_level_mm:in.3dot}} deep x .151 wide. Listen through the run; on chatter, feed hold, stop the spindle and tell the owner."
+instruction = "First part only: the neck's cut ({{process.neck_level_mm:in.3dot}} deep x .151 wide, the end mill {{process.neck_mill_projection_min_mm:in.2dot}}–2.00 out) is not measured: no chatter record holds that far out. Run MB05_neck supervised, hand on the feed override, adjusting it by ear: back it off at the first chatter, bring it back up while the cut stays clean. Note the override that cut clean beside the program."
 feed = "hand"
 
 [[setups.operations]]
@@ -635,7 +714,7 @@ speed_kind = "spindle"
 tool = "em-half"
 drilling = "none"
 sizing = "other"
-instruction = "Run MB05_neck (M6 T1; set 2650): face the neck down to Z {{cad.neck_inner_face_thickness_mm:in.4dot}} in {{process.neck_level_mm:in.3dot}} levels, each in passes from the nose end to the foot's underside; the end mill's square corner takes off MB03's R.25 there. Unclamp; mic the neck."
+instruction = "Run MB05_neck (M6 T1; set 2483): face the neck down to Z {{cad.neck_inner_face_thickness_mm:in.4dot}} in {{process.neck_level_mm:in.3dot}} levels, each in passes from the nose end to the foot's underside; the end mill's square corner takes off MB03's R.25 there. Unclamp; mic the neck."
 settings = "endmill-carbide-3fl-1-2-1018-cf"
 inspection = "Neck {{cad.neck_inner_face_thickness_min_in:.3dot}}–{{cad.neck_inner_face_thickness_max_in:.3dot}} thick (O to the inner face), miked by the nose and by the foot. The inside corner square (no radius over R.040 left)."
 gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.neck_inner_face_thickness_band_mm}}" }]
@@ -661,8 +740,8 @@ vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{cad.high_side_width_mm}}",
 beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{process.part_length_max_mm}}"], clamp_mm = [0, 84.707], section_mm = { y = "{{cad.high_side_width_mm}}", z = "{{cad.neck_inner_face_thickness_mm}}" }, vise_left = "start" }
 
 [[setups.operations]]
-instruction = "Home the mill first ($H). Before loading the part, G54 Z0: the parallels' top (O), touched with the end mill on the fixed-jaw parallel, the jaws open."
-instruction_detailed = "Home the mill first ($H). Before loading the part, the parallels in and the jaws open: console M6 T1 (the tool setter measures it). Jog it over the fixed-jaw parallel, its edge clear of the jaw. Spindle stopped, its tip just dragging a .002 feeler leaf on the parallel: G10 L20 P1 Z0.051. Raise Z."
+instruction = "Home the mill first ($H). Reset the end mill {{process.half_mill_projection_mm:in.2f}} out of the collet (MB05 left it longer). Before loading the part, G54 Z0: the parallels' top (O), touched with the end mill on the fixed-jaw parallel, the jaws open."
+instruction_detailed = "Home the mill first ($H). Reset the 1/2 in end mill {{process.half_mill_projection_mm:in.2f}} in out of the collet (calipers; MB05 left it 1.85–2.00 out). Before loading the part, the parallels in and the jaws open: console M6 T1 (the tool setter measures it). Jog it over the fixed-jaw parallel, its edge clear of the jaw. Spindle stopped, its tip just dragging a .002 feeler leaf on the parallel: G10 L20 P1 Z0.051. Raise Z."
 feed = "hand"
 
 [[setups.operations]]
@@ -675,13 +754,14 @@ instruction = "Prove MB06_nose in air, Z0 raised 1.000 in, through every M6; the
 instruction_detailed = "Send $# and note the G54 line's Z. G10 L2 P1 Z(that Z + 25.400) raises Z0 1.000 in. Run MB06_nose through every M6, watching the cutter stay right of the jaws' side. G10 L2 P1 Z(the noted Z) puts Z0 back."
 feed = "hand"
 
-# Not chatter-tested (#3427, #3428): the finish pass is deeper than tested
-# and the rough pass wider; both climb. Owner, Pedro, 2026-11-22: "log new
-# dechatter issues to try deep axial cuts but with shallow radial depth" and
-# "same log new dechatter issues to try full radial depth but shallow
-# axial".
+# The nose rough sits inside shop settings.em-half-carbide-1018-v6-deep
+# (4.5 deep x 1.826 wide, its 6.6 x 2.2) and the nose finish inside
+# settings.em-half-carbide-1018-3627-wall-climb (13.5 deep x .254 wide,
+# climb, its 17 x 0.3; #3627). Owner (Pedro), 2026-11-25: the first part of
+# each program is a supervised run, hand on the feed override, adjusting by
+# ear; dechatter sessions are for cuts that actually chatter on a part.
 [[setups.operations]]
-instruction = "First part only: these cuts at 2650 rpm have not been chatter-tested on this end mill (owner's test list #3427, #3428): the nose rough {{process.nose_rough_level_mm:in.3dot}} deep x {{process.nose_rough_woc_mm:in.3dot}} wide, the nose finish {{process.nose_depth_mm:in.3dot}} deep x {{process.nose_finish_stock_mm:in.3dot}} wide. Listen through the run; on chatter, feed hold, stop the spindle and tell the owner."
+instruction = "First part only: run MB06_nose supervised, hand on the feed override, adjusting it by ear: back it off at the first chatter, bring it back up while the cut stays clean. Note the override that cut clean beside the program."
 feed = "hand"
 
 [[setups.operations]]
@@ -689,11 +769,21 @@ speed_kind = "spindle"
 tool = "em-half"
 drilling = "none"
 sizing = "other"
-instruction = "Run MB06_nose (M6 T1; set 2650): profile the nose R{{cad.nose_radius_in:.3dot}} round the tap's centre, climb: two levels {{process.nose_finish_stock_mm:in.3dot}} off the radius, then one full-depth finish pass on it, {{process.nose_past_mm:in.3dot}} below O."
-settings = "endmill-carbide-3fl-1-2-1018-cf"
+instruction = "Run MB06_nose (M6 T1; set 2400): rough the nose round the tap's centre, climb, in rings {{process.nose_rough_step_mm:in.3dot}} apart down to {{process.nose_finish_stock_mm:in.3dot}} off the R{{cad.nose_radius_in:.3dot}}, the outermost first, each in levels of {{process.nose_rough_level_mm:in.3dot}} to {{process.nose_past_mm:in.3dot}} below O; the file then stops (M0) for the finish's speed."
+settings = "em-half-carbide-1018-v6-deep"
 milling_cuts = [
-  { name = "nose rough", kind = "side", phase = "rough", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", axial_doc_mm = "{{process.nose_rough_level_mm}}", radial_woc_mm = "{{process.nose_rough_woc_mm}}", traverse_mm = [84.707, "{{process.part_length_max_mm}}"] },
-  { name = "nose finish", kind = "side", phase = "finish", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", axial_doc_mm = "{{process.nose_depth_mm}}", radial_woc_mm = "{{process.nose_finish_stock_mm}}", traverse_mm = [84.707, "{{cad.nose_overall_height_ref}}"] },
+  { name = "nose rough", kind = "side", phase = "rough", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", axial_doc_mm = "{{process.nose_rough_level_mm}}", radial_woc_mm = "{{process.nose_rough_step_mm}}", traverse_mm = [84.707, "{{process.part_length_max_mm}}"] },
+]
+
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "em-half"
+drilling = "none"
+sizing = "other"
+instruction = "Same file, at its stop: set 2483, Cycle Start: finish the nose R{{cad.nose_radius_in:.3dot}}, climb, in full-depth passes {{process.nose_finish_step_mm:in.3dot}} apart, the last on the radius, {{process.nose_past_mm:in.3dot}} below O."
+settings = "em-half-carbide-1018-3627-wall-climb"
+milling_cuts = [
+  { name = "nose finish", kind = "side", phase = "finish", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", axial_doc_mm = "{{process.nose_depth_mm}}", radial_woc_mm = "{{process.nose_finish_step_mm}}", traverse_mm = [84.707, "{{cad.nose_overall_height_ref}}"] },
 ]
 
 [[setups.operations]]

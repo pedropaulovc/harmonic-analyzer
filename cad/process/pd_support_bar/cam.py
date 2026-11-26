@@ -656,8 +656,8 @@ def context(
     step_max = p["face_stepover_max_mm"]
     for name in ("top face", "end a"):
         _same(plan, name, "cutter_dia_mm", em, "the end mill's diameter")
-    # The top skim runs at its measured setting, END A (deeper than it was
-    # measured) at the chart's.
+    # The top skim runs at its measured face setting, END A (deeper than
+    # it) at the deep conventional wall record.
     face_rpm, face_feed = _setting(plan, shop, "top face")
     end_rpm, end_feed = _setting(plan, shop, "end a")
     _agree(plan, "face_cutter_dia_mm", em)

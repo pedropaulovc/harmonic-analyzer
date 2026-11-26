@@ -339,7 +339,7 @@ beam = { axis = "x", hold = "between", extent_mm = [0, "{{process.blank_length_m
 
 [[setups.operations]]
 instruction = "Every lot, before the first load: Home ($H); console M6 T1. Clamp the new spoil plate alone on the parallels and face its top .005, once."
-instruction_detailed = "Home the mill ($H). Console M6 T1 (1/2 in end mill, {{process.half_mill_projection_mm:in.2f}} in out of the collet; the tool setter measures it). Clamp the new spoil plate alone across the jaws on the parallels, its LEFT edge to the left. Set 2650 and face its top .005 by hand jog in overlapping passes, once: a second facing could lift the jaws' top over the band below."
+instruction_detailed = "Home the mill ($H). Console M6 T1 (1/2 in end mill, {{process.half_mill_projection_mm:in.2f}} in out of the collet; the tool setter measures it). Clamp the new spoil plate alone across the jaws on the parallels, its LEFT edge to the left. Set 2483 and face its top .005 by hand jog in overlapping passes, once: a second facing could lift the jaws' top over the band below."
 feed = "hand"
 
 [[setups.operations]]
@@ -402,11 +402,15 @@ instruction = "Only after the Z0 correction: unclamp, mic the same blank again n
 inspection = "Hub thickness {{cad.hub_far_face_length_min_in:.4dot}}–{{cad.hub_far_face_length_max_in:.4dot}}: on to CL02_pocket_b. Still outside: stop and tell the owner."
 gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.hub_far_face_length_band_mm}}" }]
 
-# Not measured: owner (Pedro), 2026-11-22, on full-width passes: "same log
-# new dechatter issues to try full radial depth but shallow axial" (#3428).
-# CL02's cuts stay as they are, on the chart setting; this stop flags them.
+# Full width, not measured: no record is a full-width cut. Owner (Pedro),
+# 2026-11-22: "same log new dechatter issues to try full radial depth but
+# shallow axial" (#3428). CL02's pocket is a full-width slot and stays on the
+# chart setting (shop settings.endmill-carbide-3fl-1-2-1018-cf, 2483). Owner
+# ruling 2026-11-25: the first part of each program is a supervised run,
+# hand on the feed override, adjusting by ear; dechatter sessions are for
+# cuts that actually chatter on a part.
 [[setups.operations]]
-instruction = "First load only: these CL02_pocket_b cuts at 2650 rpm have not been chatter-tested on this end mill (owner's test list #3428): rough levels .028 deep x {{process.face_cutter_dia_mm:in.3dot}} wide, finish level {{process.pocket_finish_mm:in.3dot}} deep x {{process.face_cutter_dia_mm:in.3dot}} wide. Listen through the run; on chatter, feed hold, stop the spindle and tell the owner."
+instruction = "First load only: these CL02_pocket_b cuts are full width, not chatter-tested at 2483 rpm on this end mill (owner's test list #3428): rough levels .028 deep x {{process.face_cutter_dia_mm:in.3dot}} wide, finish level {{process.pocket_finish_mm:in.3dot}} deep x {{process.face_cutter_dia_mm:in.3dot}} wide. Run CL02_pocket_b supervised, hand on the feed override, adjusting it by ear: back it off at the first chatter, bring it back up while the cut stays clean. Note the override that cut clean beside the program."
 feed = "hand"
 
 [[setups.operations]]
@@ -414,7 +418,7 @@ speed_kind = "spindle"
 tool = "em-half"
 drilling = "none"
 sizing = "other"
-instruction = "Run CL02_pocket_b (M6 T1; set 2650): each blank's pocket in three rough levels and a .008 finish level to the web's near face, {{process.pocket_b_floor_mm:in.4dot}} above Z0: the slot along the centre line from past the right end to the hub, then the arc round the hub ±{{process.pocket_arc_deg:.0f}}°."
+instruction = "Run CL02_pocket_b (M6 T1; set 2483): each blank's pocket in three rough levels and a .008 finish level to the web's near face, {{process.pocket_b_floor_mm:in.4dot}} above Z0: the slot along the centre line from past the right end to the hub, then the arc round the hub ±{{process.pocket_arc_deg:.0f}}°."
 settings = "endmill-carbide-3fl-1-2-1018-cf"
 milling_cuts = [
   { name = "pocket b rough", kind = "slot", phase = "rough", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", axial_doc_mm = 0.7027, radial_woc_mm = "{{process.face_cutter_dia_mm}}", traverse_mm = [0, "{{process.blank_length_min_mm}}"] },
@@ -580,11 +584,11 @@ instruction = "First load only: prove CL05_pocket_a in air, Z0 raised 1.000 in, 
 instruction_detailed = "Send $# and note the G54 line's Z now. G10 L2 P1 Z(that Z + 25.400). Run CL05_pocket_a in air through each M6. G10 L2 P1 Z(the Z noted in this op) puts Z0 back."
 feed = "hand"
 
-# Not measured: owner (Pedro), 2026-11-22, on full-width passes: "same log
-# new dechatter issues to try full radial depth but shallow axial" (#3428).
-# CL05's cuts stay as they are, on the chart setting; this stop flags them.
+# Full width, not measured (#3428), as CL02's: CL05's pocket stays on the
+# chart setting (2483); the first load is a supervised run (owner ruling
+# 2026-11-25).
 [[setups.operations]]
-instruction = "First load only: these CL05_pocket_a cuts at 2650 rpm have not been chatter-tested on this end mill (owner's test list #3428): rough levels .028 deep x {{process.face_cutter_dia_mm:in.3dot}} wide, finish level {{process.pocket_finish_mm:in.3dot}} deep x {{process.face_cutter_dia_mm:in.3dot}} wide. Listen through the run; on chatter, feed hold, stop the spindle and tell the owner."
+instruction = "First load only: these CL05_pocket_a cuts are full width, not chatter-tested at 2483 rpm on this end mill (owner's test list #3428): rough levels .028 deep x {{process.face_cutter_dia_mm:in.3dot}} wide, finish level {{process.pocket_finish_mm:in.3dot}} deep x {{process.face_cutter_dia_mm:in.3dot}} wide. Run CL05_pocket_a supervised, hand on the feed override, adjusting it by ear: back it off at the first chatter, bring it back up while the cut stays clean. Note the override that cut clean beside the program."
 feed = "hand"
 
 [[setups.operations]]
@@ -592,7 +596,7 @@ speed_kind = "spindle"
 tool = "em-half"
 drilling = "none"
 sizing = "other"
-instruction = "Run CL05_pocket_a (M6 T1; set 2650): each blank's pocket in three rough levels and a .008 finish level to the web's far face, {{process.pocket_a_floor_mm:in.4dot}} above Z0, as in Setup 2."
+instruction = "Run CL05_pocket_a (M6 T1; set 2483): each blank's pocket in three rough levels and a .008 finish level to the web's far face, {{process.pocket_a_floor_mm:in.4dot}} above Z0, as in Setup 2."
 settings = "endmill-carbide-3fl-1-2-1018-cf"
 milling_cuts = [
   { name = "pocket a rough", kind = "slot", phase = "rough", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", axial_doc_mm = 0.707, radial_woc_mm = "{{process.face_cutter_dia_mm}}", traverse_mm = [0, "{{process.blank_length_min_mm}}"] },

@@ -277,23 +277,31 @@ they need from their process plans. They hold:
 
 - `measured_cuts.<setting>`: the envelope a measured cutting setting (a
   `shop/` `settings.<setting>` record from a dechatter report under
-  `dechatter/`) is valid inside: the tool assembly's stick-out (`stickout_mm`; a
-  record may allow a band with `stickout_min_mm` and `stickout_max_mm`, the
-  reason beside it: the three 1/2 in carbide records allow 27.94 to 28.45 mm,
-  and the plans pin the 28.45 the owner ruled on 2026-11-24) and the
-  plan parameter that pins it, the deepest and the widest cut found stable.
-  prechips refuses any other key on a setting, so the limits are data here;
-  `test_measured_cuts.py` checks each against its report and refuses a plan
-  operation that names the setting with a stick-out the record does not
-  allow, or a
-  `milling_cuts` entry deeper or wider than measured. The spindle is set by
+  `dechatter/`) is valid inside: the deepest and the widest cut found
+  stable, the stick-out the session was cut at (`stickout_mm`) and the cut
+  direction its passes ran (`direction`). prechips refuses any other key on a
+  setting, so the limits are data here. One record set holds per cutter
+  (owner ruling 2026-11-25: "I can not believe that 2 mm [of stick-out]
+  makes any significant difference"): `measured_cutters.<tool>` gives the
+  band of stick-outs its records hold in, from the shortest to the longest
+  the plans use (the 1/2 in carbide: 27.94, its flute length plus 10 %, to
+  31.75, the column clamp's bore), and the plan parameters that pin it.
+  `test_measured_cuts.py` checks each record against its report and refuses
+  a plan operation that names a setting with a stick-out outside its
+  cutter's band, or a `milling_cuts` entry deeper or wider than measured; and
+  it refuses a side or end cut that the cutter makes in its records'
+  material, at a stick-out inside the band, in an operation that names no
+  record (full-width slots and plunges are exempt: no record is a slot; the
+  amplitude bar's 2 in stick-out is outside the band, so its cuts stay on
+  the chart setting). A plan picks the record whose direction matches its
+  cut: `direction` is recorded and NOT checked, since a cut has no direction
+  field. The first part of each program is a supervised run, hand on the
+  feed override, adjusted by ear (the same ruling). The spindle is set by
   hand and a report prints the speed it asked for; the speed the spindle ran
   is in the session's results file beside the report (`results`,
   `spindle_hz` × 60), and a record may carry the band of heard speeds its
   limit holds in (`speed_in_cut_rpm`, `speed_no_load_rpm`), which the test
-  checks against that file. The cut direction the
-  passes ran (`direction`) is recorded and NOT checked: a cut has no direction
-  field, so a climb pass on a measured setting is not refused;
+  checks against that file;
 - the PM-30MV's spindle speed stops (`machines.pm-30mv`:
   `spindle_speed_step_rpm`, `spindle_speed_steps`, the resting speeds
   observed, and how the head's display reads against the heard speed): the

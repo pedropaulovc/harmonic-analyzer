@@ -17,8 +17,9 @@
 # face the top end, spot and drill #43 from the apex into the bore (PA05),
 # tap 4-40 by hand under the spring tap guide (PA06); Setup 7 the far face
 # up, the foot gripped by the seat and the foot top: face the far face to
-# the depth and profile the tapered flanks and the crown round the bore
-# (PA07); bench
+# the depth, then rough and finish the tapered flanks and the crown round
+# the bore, each of the three at its own measured setting's speed, an M0
+# stop at each change (PA07); bench
 # deburr (the reamer by hand through the bore) and inspect; black enamel,
 # the bore and the foot seat masked, the bare machined faces oiled: the
 # owner's Rust-Oleum Flat Black 376855 (owner 2026-11-21, answered in
@@ -111,15 +112,16 @@ depth_top_mm = 29.464
 depth_top_min_mm = 29.337
 depth_top_max_mm = 29.591
 # Facing: the 1/2 in carbide end mill (shop endmill-carbide-3fl-1-2). The
-# faces of PA01-PA03 and PA05 at the measured setting
+# faces of PA01-PA03, PA05 and PA07 at the measured setting
 # em-half-carbide-1018-3439-face (shop common.toml; cad/config/
 # shop-equipment/measured-cuts.toml, #3439: stable to 1.27 mm deep and 6.4 mm
 # wide, conventional, 2420-2490 rpm in the cut): equal passes no wider than
 # .250 in, half the cutter and inside its 6.4 mm, the first engaging one
 # stepover and the last overhanging the far edge; the zigzag climbs on every
-# other pass, which the session did not measure. The far face (PA07) shares its Job and speed with the outline,
-# which no measured setting covers (below): it stays on the chart setting
-# settings.endmill-carbide-3fl-1-2-1018-cf, in passes no wider than .200 in.
+# other pass, which the session did not measure. The far face (PA07), its
+# two light levels, in passes no wider than .200 in, also inside the 6.4 mm;
+# it is PA07's first section, the outline's rough and finish (below) run at
+# their own settings' speeds after M0 stops.
 face_cutter_dia_mm = 12.7
 face_stepover_max_mm = 6.35
 far_face_stepover_max_mm = 5.08
@@ -142,15 +144,30 @@ step_floor_min_mm = 11.557
 step_floor_max_mm = 11.811
 # The outline (PA07): the flanks and the crown, climb (G2, the PM-30MV has
 # ball screws), from the far face through the strap and outline_past_mm into
-# the step's void: three rough levels .020 off the outline, then one finish
-# pass at full depth. The rough pass's widest cut is the top end's corner,
-# off the crown (cam.py checks it). Its finish pass is deeper than any
-# measured cut (10.41 mm against 6.6), so PA07 stays on the chart setting.
+# the step's void, outline_finish_stock_mm left for the finish. Owner ruling
+# 2026-11-25: side cuts capped to what is measured, the rough on whichever
+# record posts faster. The rough at em-half-carbide-1018-v6-deep (6.6 mm
+# deep x 2.2 wide at 2400; its passes were conventional, this one climbs as
+# the recipe has always cut it: the record notes the direction, it does not
+# limit it): its widest stock, the top end's corner off the crown
+# (outline_rough_woc_mm, cam.py computes it), in equal offsets no wider than
+# outline_rough_step_max_mm (three of .062), the outermost first, each at
+# two levels of outline_rough_level_mm: six passes at 20.2 in/min, against
+# nine at 20.6 on the face record (its 1.27 mm levels, one 4.75 mm offset):
+# PA07 posts 4.7 min against 5.5.
+# The finish at em-half-carbide-1018-3627-wall-climb (17 mm deep x 0.3 wide,
+# climb, 2483): the stock in equal full-depth passes no wider than
+# outline_finish_step_max_mm (two of .010), the last on the outline. cam.py
+# computes and checks the steps.
 outline_past_mm = 0.25
 outline_depth_mm = 10.41
-outline_rough_level_mm = 3.47
-outline_finish_stock_mm = 0.508
+outline_rough_level_mm = 5.205
 outline_rough_woc_mm = 4.75
+outline_rough_step_max_mm = 2.2
+outline_rough_step_mm = 1.583
+outline_finish_stock_mm = 0.508
+outline_finish_step_max_mm = 0.3
+outline_finish_step_mm = 0.254
 # The strap's narrowest section, at the bore: the crown's Ø less the bore's
 # largest (the PA07 beam).
 strap_net_width_mm = 12.28
@@ -259,10 +276,10 @@ step_prove_raise_mm = 40.64
 r8_collet_gauge_mm = 6.3         # HA: holders.r8-collets-lms-4860.gauge_len_mm.
 drill_chuck_gauge_mm = 95.0      # Archive holders.drill-chuck-r8.gauge_len_mm.
 # 1/2 in end mill, 3 in overall: set 1.12 in (28.45 mm) out of the collet
-# (owner, Pedro, 2026-11-24: "28.45"), the longer end of the stick-out its
-# measured settings allow (cad/config/shop-equipment/measured-cuts.toml:
-# 27.94 to 28.45 mm). The deep one was measured at 27.94 only: 28.45 is the
-# owner's ruling for it, not a cut, and a longer tool is the less stiff case.
+# (owner, Pedro, 2026-11-24: "28.45"), inside the 27.94-31.75 mm its
+# measured settings hold across (owner ruling 2026-11-25: one record set per
+# cutter over that stick-out; cad/config/shop-equipment/measured-cuts.toml,
+# measured_cuts.endmill-carbide-3fl-1-2).
 half_mill_projection_mm = 28.45
 # Overall lengths: jobber #15 3-1/2 in, 23/64 4-7/8 in (ASME B94.11M); the
 # #2 combined drill and countersink 1-7/8 in. Bounded by their whole length
@@ -628,15 +645,14 @@ instruction = "First blank only: prove PA04_step_bore in air, Z0 raised {{proces
 instruction_detailed = "First blank only: send $# and note the G54 line's Z. G10 L2 P1 Z(that Z + {{process.step_prove_raise_mm:.3f}}) raises Z0 {{process.step_prove_raise_mm:in.3dot}} in: the reamer's and the drill's lowest point then stands above N. Run PA04_step_bore through every M6, watching each move cut only air and each pass cross above the jaws. G10 L2 P1 Z(the noted Z) puts Z0 back."
 feed = "hand"
 
-# The step's depth and width lie inside em-half-carbide-1018-v6-deep, but
-# cad/config/shop-equipment/measured-cuts.toml records its direction as
-# conventional (every measured pass), and the owner's 2026-11-16 ruling
-# (cam.py: ball screws) keeps the step's passes climb: the first part is
-# listened to.
+# Owner ruling 2026-11-25: the first part of each program is run
+# supervised, by ear on the feed override. The step's passes sit in
+# em-half-carbide-1018-v6-deep (2.54 deep x 2.113 wide against 6.6 x 2.2);
+# the record's passes were conventional, the step's climb (owner
+# 2026-11-16, ball screws): the record notes the direction, it does not
+# limit it.
 [[setups.operations]]
-steps = [
-  { kind = "stop", text = "First part only: the step passes at 2400 rpm are inside the depth and width the owner chatter-tested on this end mill, but they cut climb, which was not tested: {{process.step_level_mm:in.3dot}} deep x {{process.step_station_mm:in.3dot}} wide. Listen through the run; on chatter, feed hold, stop the spindle and tell the owner." },
-]
+instruction = "First part only: run PA04_step_bore supervised, hand on the feed override, adjusting it by ear: back it off at the first chatter, bring it back up while the cut stays clean. Note the override that cut clean beside the program."
 feed = "hand"
 
 [[setups.operations]]
@@ -873,18 +889,14 @@ instruction = "First part only: prove PA07_outline in air, Z0 raised 1.000 in; e
 instruction_detailed = "First part only: send $# and note the G54 line's Z. G10 L2 P1 Z(that Z + 25.400) raises Z0 1.000 in. Run PA07_outline, watching each move clear the jaws. G10 L2 P1 Z(the noted Z) puts Z0 back."
 feed = "hand"
 
-# PA07 stays on the chart setting, its cuts as they were: the outline finish
-# (.410 deep) is deeper than any measured cut, and the outline rough (.187
-# wide) and the far face (.200 stepover) are wider. Owner (Pedro),
-# 2026-11-22, on re-cutting them: deep walls, "log new dechatter issues to
-# try deep axial cuts but with shallow radial depth" (#3427); full-width
-# passes, "same log new dechatter issues to try full radial depth but
-# shallow axial" (#3428). Until those sessions run, the first part is
-# listened to.
+# Owner ruling 2026-11-25 (one record set per cutter across 27.94-31.75 mm
+# out; side cuts capped to what is measured; the first part of each program
+# supervised, by ear on the feed override). PA07's cuts each sit in a
+# record: the far face in em-half-carbide-1018-3439-face, the outline's
+# rough in em-half-carbide-1018-v6-deep (climb; the record's passes were
+# conventional), its climb finish in em-half-carbide-1018-3627-wall-climb.
 [[setups.operations]]
-steps = [
-  { kind = "stop", text = "First part only: these cuts at 2650 rpm have not been chatter-tested on this end mill (owner's test list #3427, #3428): the outline finish {{process.outline_depth_mm:in.3dot}} deep x {{process.outline_finish_stock_mm:in.3dot}} wide, the outline rough {{process.outline_rough_level_mm:in.3dot}} deep x {{process.outline_rough_woc_mm:in.3dot}} wide, the far face {{process.far_face_level_mm:in.3dot}} deep x {{process.far_face_stepover_max_mm:in.3dot}} wide. Listen through the run; on chatter, feed hold, stop the spindle and tell the owner." },
-]
+instruction = "First part only: run PA07_outline supervised, hand on the feed override, adjusting it by ear: back it off at the first chatter, bring it back up while the cut stays clean. Note the override that cut clean beside the program."
 feed = "hand"
 
 [[setups.operations]]
@@ -892,17 +904,37 @@ speed_kind = "spindle"
 tool = "em-half"
 drilling = "none"
 sizing = "other"
-instruction = "Run PA07_outline (M6 T1; set 2650): face F down to Z {{cad.near_end_depth_mm:in.4dot}} in two {{process.far_face_level_mm:in.3dot}} levels; then profile the outline, climb, plunging beside a flank's root: three levels {{process.outline_finish_stock_mm:in.3dot}} off it, then one full-depth finish pass on it, {{process.outline_depth_mm:in.3dot}} deep from the far face ({{process.outline_past_mm:in.3dot}} past the strap's outer face, into the step). Unclamp; mic the depth."
-settings = "endmill-carbide-3fl-1-2-1018-cf"
+instruction = "Run PA07_outline (M6 T1; set 2450: the display rests near 2485): face F down to Z {{cad.near_end_depth_mm:in.4dot}} in two {{process.far_face_level_mm:in.3dot}} levels, in passes no wider than {{process.far_face_stepover_max_mm:in.3dot}}."
+settings = "em-half-carbide-1018-3439-face"
+milling_cuts = [
+  { name = "far face", kind = "end", phase = "finish", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", axial_doc_mm = "{{process.far_face_level_mm}}", radial_woc_mm = "{{process.far_face_stepover_max_mm}}", traverse_mm = [0, "{{cad.envelope_y_mm}}"] },
+]
+
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "em-half"
+drilling = "none"
+sizing = "other"
+instruction = "Same file, at its M0 set 2400: rough the outline, climb, plunging beside a flank's root, {{process.outline_finish_stock_mm:in.3dot}} off it: offsets {{process.outline_rough_step_mm:in.3dot}} apart, the outermost first, each in two {{process.outline_rough_level_mm:in.3dot}} levels down to {{process.outline_depth_mm:in.3dot}} below the far face ({{process.outline_past_mm:in.3dot}} past the strap's outer face, into the step)."
+settings = "em-half-carbide-1018-v6-deep"
+milling_cuts = [
+  { name = "outline rough", kind = "side", phase = "rough", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", axial_doc_mm = "{{process.outline_rough_level_mm}}", radial_woc_mm = "{{process.outline_rough_step_mm}}", traverse_mm = ["{{cad.foot_top_height_mm}}", "{{cad.envelope_y_mm}}"] },
+]
+
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "em-half"
+drilling = "none"
+sizing = "other"
+instruction = "Same file, at its M0 set 2483 (dial stop 23): finish the outline, climb, in full-depth passes of {{process.outline_finish_step_mm:in.3dot}}, {{process.outline_depth_mm:in.3dot}} deep, the last on the outline. Unclamp; mic the depth."
+settings = "em-half-carbide-1018-3627-wall-climb"
 inspection = "Depth {{cad.near_end_depth_min_in:.3dot}}–{{cad.near_end_depth_max_in:.3dot}} (the far face to the near end), miked across the foot; strap {{cad.strap_outer_face_depth_min_in:.3dot}}–{{cad.strap_outer_face_depth_max_in:.3dot}} thick, miked beside the bore."
 gauge_checks = [
   { gauge = "micrometers", band_mm = "{{cad.near_end_depth_band_mm}}" },
   { gauge = "micrometers", band_mm = "{{cad.strap_outer_face_depth_band_mm}}" },
 ]
 milling_cuts = [
-  { name = "far face", kind = "end", phase = "finish", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", axial_doc_mm = "{{process.far_face_level_mm}}", radial_woc_mm = "{{process.far_face_stepover_max_mm}}", traverse_mm = [0, "{{cad.envelope_y_mm}}"] },
-  { name = "outline rough", kind = "side", phase = "rough", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", axial_doc_mm = "{{process.outline_rough_level_mm}}", radial_woc_mm = "{{process.outline_rough_woc_mm}}", traverse_mm = ["{{cad.foot_top_height_mm}}", "{{cad.envelope_y_mm}}"] },
-  { name = "outline finish", kind = "side", phase = "finish", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", axial_doc_mm = "{{process.outline_depth_mm}}", radial_woc_mm = "{{process.outline_finish_stock_mm}}", traverse_mm = ["{{cad.foot_top_height_mm}}", "{{cad.envelope_y_mm}}"] },
+  { name = "outline finish", kind = "side", phase = "finish", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", axial_doc_mm = "{{process.outline_depth_mm}}", radial_woc_mm = "{{process.outline_finish_step_mm}}", traverse_mm = ["{{cad.foot_top_height_mm}}", "{{cad.envelope_y_mm}}"] },
 ]
 
 [[setups.operations]]

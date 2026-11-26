@@ -110,29 +110,28 @@ blank_z_in = 0.75
 seat_skim_mm = 0.508
 west_skim_mm = 1.27
 face_step_max_mm = 1.27
-# Facing W, E and the seat (PB01-PB03): the 1/2 in carbide end mill (shop
-# endmill-carbide-3fl-1-2) on the measured face setting
-# em-half-carbide-1018-3439-face, valid to 1.27 mm deep and 6.4 mm wide at
-# 2420-2490 rpm in the cut (dechatter session of 2026-11-23, #3439;
-# cad/config/shop-equipment/measured-cuts.toml): equal passes no wider
-# than face_stepover_max_mm, its width limit. Each face cut declares its
-# true stepover, the most any of its passes engages, the first and the last
-# included (cam.py computes both and the post checks every pass): lying
-# across the 3/4 section 4 passes of lying_stepover_mm (3 would need 6.52,
-# over the limit), upright across the .64 width 3 of seat_stepover_mm (2
-# would need 8.38). Every measured pass was conventional and the faces
-# zigzag, so every other pass climbs, not measured. E comes down to the
-# width in equal levels of width_level_mm, the fewest no deeper than
-# face_step_max_mm.
+# Facing W, E and the seat (PB01-PB03) and PB05's foot end and step: the
+# 1/2 in carbide end mill (shop endmill-carbide-3fl-1-2) on the measured
+# face setting em-half-carbide-1018-3439-face, valid to 1.27 mm deep and 6.4
+# mm wide at 2420-2490 rpm in the cut (dechatter session of 2026-11-23,
+# #3439; cad/config/shop-equipment/measured-cuts.toml): equal passes no
+# wider than face_stepover_max_mm, its width limit. Each face cut declares
+# its true stepover, the most any of its passes engages, the first and the
+# last included (cam.py computes both and the post checks every pass):
+# lying across the 3/4 section 4 passes of lying_stepover_mm (3 would need
+# 6.52, over the limit), upright across the .64 width 3 of seat_stepover_mm
+# (2 would need 8.38). Every measured pass was conventional and the faces
+# zigzag, so every other pass climbs (the record holds the direction it
+# was measured in; it is not checked). E comes down to the width in equal
+# levels of width_level_mm, the fewest no deeper than face_step_max_mm.
 face_cutter_dia_mm = 12.7
 face_stepover_max_mm = 6.4
 lying_stepover_mm = 4.8875
 seat_stepover_mm = 5.5853
 width_level_mm = 0.762
-# PB05 (the foot end, the step and its wall pass: one operation, on the
-# chart setting endmill-carbide-3fl-1-2-1018-cf, whose wall pass is deeper
-# than any measured cut): passes no wider than .200 in, under half the
-# cutter (the 6G chip-load factor 1.0 holds to 50 % engagement).
+# PB05's foot end and step, on the face record too: passes no wider than
+# .200 in, 4 across the width (3 at the record's 6.4 would end each step
+# level at the wall: the step needs an even number of passes).
 step_stepover_max_mm = 5.08
 # The step (PB05): equal levels from the faced foot end down to the outboard
 # face (8 × 1.2065), each a zigzag of X passes across the width (the facing
@@ -140,21 +139,38 @@ step_stepover_max_mm = 5.08
 # top's station (the cutter's edge on the foot top) and back; the stepovers
 # at that end sweep the foot top from beyond W to E, and the scallops they
 # leave between alternate pairs (at most wall_finish_woc_mm, from the 4.189
-# stations) come off in one full-depth pass along the foot top at the end,
-# from W to E (climb). cam.py computes and checks both, and simulates what
-# that pass meets.
+# stations) come off at the end in full-depth passes along the foot top,
+# from W to E (climb), on the climb wall record
+# em-half-carbide-1018-3627-wall-climb (#3627: 17 mm deep, 0.3 mm wide at
+# 2483): equal passes of wall_pass_woc_mm, the fewest no wider than
+# wall_woc_max_mm, its width limit. cam.py computes and checks them, and
+# simulates what each pass meets.
 wall_finish_woc_mm = 0.355
+wall_woc_max_mm = 0.3
+wall_pass_woc_mm = 0.1775
 step_level_mm = 1.2065
 # The arch (PB04): profiled round the R.32 with the end mill's side, climb
 # (G2, the PM-30MV has ball screws), through the ear and arch_past_mm into
-# the waste the step removes: two rough levels .020 off the radius, then
-# one finish pass at full depth. The rough pass's widest cut is the
-# longest blank's corner (cam.py checks it).
+# the waste the step removes. Rough on the deep record
+# em-half-carbide-1018-v6-deep (6.6 mm deep, 2.2 mm wide at 2400): two
+# levels of arch_rough_level_mm, each in equal contours from the outside
+# in, the fewest no wider than arch_rough_woc_max_mm (the longest blank's
+# corner stands 4.776 off the innermost: 3 of arch_rough_woc_mm), the
+# innermost arch_finish_stock_mm off the radius. The face record
+# (3439: 1.27 deep) would need 8 levels of one contour, about 440 mm of
+# cutting at 2450 against v6's 370 at 2400: v6 is the faster. Then the
+# finish at full depth on the climb wall record
+# em-half-carbide-1018-3627-wall-climb (17 mm deep, 0.3 wide): equal
+# passes of arch_finish_pass_mm, the fewest no wider than wall_woc_max_mm,
+# the last on the radius. cam.py checks the passes and simulates what each
+# meets.
 arch_past_mm = 1.0
 arch_depth_mm = 9.128
 arch_rough_level_mm = 4.564
 arch_finish_stock_mm = 0.508
-arch_rough_woc_mm = 4.776
+arch_finish_pass_mm = 0.254
+arch_rough_woc_max_mm = 2.2
+arch_rough_woc_mm = 1.592
 # Each pass plunges beside a side, this far below the arch's tangent point.
 arch_lead_mm = 1.0
 # Spots with the #2 centre drill, each under its drill (no chamfer at the
@@ -236,10 +252,10 @@ upright_top_max_mm = 37.592
 r8_collet_gauge_mm = 6.3         # HA: holders.r8-collets-lms-4860.gauge_len_mm.
 drill_chuck_gauge_mm = 95.0      # Archive holders.drill-chuck-r8.gauge_len_mm.
 # The 1/2 in end mill, 3 in overall, 1.12 in (28.45 mm) out of the R8
-# collet (owner, Pedro, 2026-11-24: "28.45"): the longer end of the
-# stick-out the measured face setting allows (cad/config/shop-equipment/
-# measured-cuts.toml: 27.94 to 28.45 mm).
-# cam.py checks its
+# collet (owner, Pedro, 2026-11-24: "28.45"): inside the stick-out band
+# every record of this cutter holds, 27.94 to 31.75 mm (owner ruling
+# 2026-11-25; cad/config/shop-equipment/measured-cuts.toml,
+# measured_cutters). cam.py checks its
 # collet nose clears the stock at every program's deepest cut.
 half_mill_projection_mm = 28.45
 # Overall lengths: jobber #15 3-1/2 in, D 4 in, #43 2-1/4 in (ASME B94.11M);
@@ -530,15 +546,16 @@ instruction = "First blank only: prove PB04_arch_bore in air, Z0 raised 1.000 in
 instruction_detailed = "First blank only: send $# and note the G54 line's Z. G10 L2 P1 Z(that Z + 25.400) raises Z0 1.000 in. Run PB04_arch_bore through every M6, watching each move clear the jaws. G10 L2 P1 Z(the noted Z) puts Z0 back."
 feed = "hand"
 
-# PB04's arch stays on the chart setting, outside the measured envelope
-# (finish 9.128 deep x 0.508, rough 4.564 deep x 4.776 wide). Owner (Pedro),
-# 2026-11-22, on deep walls: "log new dechatter issues to try deep axial
-# cuts but with shallow radial depth" (#3427). No re-cut: the first blank
-# is listened to.
+# Owner ruling 2026-11-25: the measured 1/2 in carbide records hold across
+# the stick-out band, and the first part of each program is run supervised,
+# adjusting the feed by ear. PB04's arch now sits inside records, one
+# operation per setting: the rough in em-half-carbide-1018-v6-deep (two
+# levels 4.564 deep × three contours 1.592 wide, inside 6.6 × 2.2; it
+# climbs, as it did, which a roughing record allows), the finish in
+# em-half-carbide-1018-3627-wall-climb (two passes 9.128 deep × 0.254,
+# inside 17 × 0.3, climb as that record was measured).
 [[setups.operations]]
-steps = [
-  { kind = "stop", text = "First blank only: these arch cuts at 2650 rpm have not been chatter-tested on this end mill (owner's test list #3427): the finish pass {{process.arch_depth_mm:in.3dot}} deep × {{process.arch_finish_stock_mm:in.3dot}} wide, the rough levels {{process.arch_rough_level_mm:in.3dot}} deep × up to {{process.arch_rough_woc_mm:in.3dot}} wide. Listen through the arch; on chatter, feed hold, stop the spindle and tell the owner." },
-]
+instruction = "First part only: run PB04_arch_bore supervised, hand on the feed override, adjusting it by ear: back it off at the first chatter, bring it back up while the cut stays clean. Note the override that cut clean beside the program."
 feed = "hand"
 
 [[setups.operations]]
@@ -546,11 +563,21 @@ speed_kind = "spindle"
 tool = "em-half"
 drilling = "none"
 sizing = "other"
-instruction = "Run PB04_arch_bore (M6 T1, 1/2 in end mill; set 2650): profile the arch R{{cad.arch_radius_in:.2dot}} round the left end, climb, plunging beside a side: two levels {{process.arch_finish_stock_mm:in.3dot}} off the radius, then one full-depth finish pass on it, {{process.arch_depth_mm:in.3dot}} deep from I ({{process.arch_past_mm:in.3dot}} into the waste under the ear). At the M6 T2 stop look: the arch blends into both sides with no step."
-settings = "endmill-carbide-3fl-1-2-1018-cf"
+instruction = "Run PB04_arch_bore (M6 T1, 1/2 in end mill; set 2400): rough the arch R{{cad.arch_radius_in:.2dot}} round the left end, climb, plunging beside a side: two levels of {{process.arch_rough_level_mm:in.3dot}}, each in three contours {{process.arch_rough_woc_mm:in.3dot}} apart from the outside in, the last {{process.arch_finish_stock_mm:in.3dot}} off the radius, down to {{process.arch_depth_mm:in.3dot}} from I ({{process.arch_past_mm:in.3dot}} into the waste under the ear). The file then stops at its M0, the cutter raised clear."
+settings = "em-half-carbide-1018-v6-deep"
 milling_cuts = [
   { name = "arch rough", kind = "side", phase = "rough", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", axial_doc_mm = "{{process.arch_rough_level_mm}}", radial_woc_mm = "{{process.arch_rough_woc_mm}}", traverse_mm = ["{{cad.arch_y_mm}}", "{{process.blank_length_max_mm}}"] },
-  { name = "arch finish", kind = "side", phase = "finish", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", axial_doc_mm = "{{process.arch_depth_mm}}", radial_woc_mm = "{{process.arch_finish_stock_mm}}", traverse_mm = ["{{cad.arch_y_mm}}", "{{cad.arch_overall_height_mm}}"] },
+]
+
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "em-half"
+drilling = "none"
+sizing = "other"
+instruction = "Same file, at its M0 set 2483: finish the arch on its radius at full depth, {{process.arch_depth_mm:in.3dot}} deep, climb, in two passes of {{process.arch_finish_pass_mm:in.3dot}}. At the M6 T2 stop look: the arch blends into both sides with no step."
+settings = "em-half-carbide-1018-3627-wall-climb"
+milling_cuts = [
+  { name = "arch finish", kind = "side", phase = "finish", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", axial_doc_mm = "{{process.arch_depth_mm}}", radial_woc_mm = "{{process.arch_finish_pass_mm}}", traverse_mm = ["{{cad.arch_y_mm}}", "{{cad.arch_overall_height_mm}}"] },
 ]
 
 [[setups.operations]]
@@ -640,18 +667,14 @@ instruction = "First blank only: prove PB05_step in air, Z0 raised 1.000 in; eve
 instruction_detailed = "First blank only: send $# and note the G54 line's Z. G10 L2 P1 Z(that Z + 25.400) raises Z0 1.000 in. Run PB05_step, watching each pass cross above the jaws. G10 L2 P1 Z(the noted Z) puts Z0 back."
 feed = "hand"
 
-# PB05 stays on the chart setting, outside the measured envelope: the wall
-# pass 9.652 deep x 0.355, the foot-end and step passes 4.189 wide in the
-# same operation at its 2650 rpm (the measured face record holds at
-# 2420-2490). Owner (Pedro), 2026-11-22: deep walls, "log new
-# dechatter issues to try deep axial cuts but with shallow radial depth"
-# (#3427); full-width passes, "same log new dechatter issues to try full
-# radial depth but shallow axial" (#3428). No re-cut: the first blank is
-# listened to.
+# Owner ruling 2026-11-25 (as PB04): PB05 now sits inside records, one
+# operation per setting. The foot end (1.27 deep) and the step levels
+# (1.2065 deep), passes 4.189 wide, in em-half-carbide-1018-3439-face
+# (1.27 × 6.4); the wall passes along the foot top, 9.652 deep, climb, in
+# em-half-carbide-1018-3627-wall-climb (17 × 0.3): the 0.355 scallops in two
+# passes of 0.1775.
 [[setups.operations]]
-steps = [
-  { kind = "stop", text = "First blank only: these PB05_step cuts at 2650 rpm have not been chatter-tested on this end mill (owner's test list #3427, #3428): the wall pass .380 deep × {{process.wall_finish_woc_mm:in.3dot}} wide, the foot-end and step passes {{process.face_step_max_mm:in.3dot}} and {{process.step_level_mm:in.3dot}} deep × .165 wide. Listen through the run; on chatter, feed hold, stop the spindle and tell the owner." },
-]
+instruction = "First part only: run PB05_step supervised, hand on the feed override, adjusting it by ear: back it off at the first chatter, bring it back up while the cut stays clean. Note the override that cut clean beside the program."
 feed = "hand"
 
 [[setups.operations]]
@@ -659,12 +682,22 @@ speed_kind = "spindle"
 tool = "em-half"
 drilling = "none"
 sizing = "other"
-instruction = "Run PB05_step (M6 T1; set 2650): face the foot end down to Z {{cad.foot_end_length_mm:in.4dot}} across the whole part, then the step down to Z {{cad.outboard_face_thickness_mm:in.4dot}} in {{process.step_level_mm:in.3dot}} levels, each in passes along the part from beside the arch end to the foot top and back; then one full-depth pass along the foot top, from W to E (climb), takes off the {{process.wall_finish_woc_mm:in.3dot}} scallops the stepovers left on it. The step cuts the waste under the bore and the hold-down hole away: both open."
-settings = "endmill-carbide-3fl-1-2-1018-cf"
+instruction = "Run PB05_step (M6 T1; set 2450: the display rests near 2485, not 2380): face the foot end down to Z {{cad.foot_end_length_mm:in.4dot}} across the whole part, then the step down to Z {{cad.outboard_face_thickness_mm:in.4dot}} in {{process.step_level_mm:in.3dot}} levels, each in passes along the part from beside the arch end to the foot top and back. The step cuts the waste under the bore and the hold-down hole away: both open. The file then stops at its M0, the cutter raised clear."
+settings = "em-half-carbide-1018-3439-face"
 milling_cuts = [
   { name = "foot end", kind = "end", phase = "finish", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", axial_doc_mm = "{{process.face_step_max_mm}}", radial_woc_mm = "{{process.step_stepover_max_mm}}", traverse_mm = [0, "{{process.blank_length_max_mm}}"] },
   { name = "step", kind = "end", phase = "rough", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", axial_doc_mm = "{{process.step_level_mm}}", radial_woc_mm = "{{process.step_stepover_max_mm}}", traverse_mm = ["{{cad.foot_top_height_mm}}", "{{process.blank_length_max_mm}}"] },
-  { name = "step wall", kind = "side", phase = "finish", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", axial_doc_mm = 9.652, radial_woc_mm = "{{process.wall_finish_woc_mm}}", traverse_mm = [0, "{{cad.east_side_width_mm}}"] },
+]
+
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "em-half"
+drilling = "none"
+sizing = "other"
+instruction = "Same file, at its M0 set 2483: two full-depth passes along the foot top, each from W to E (climb), take off the {{process.wall_finish_woc_mm:in.3dot}} scallops the stepovers left on it, {{process.wall_pass_woc_mm:in.4dot}} each, the last on the foot top."
+settings = "em-half-carbide-1018-3627-wall-climb"
+milling_cuts = [
+  { name = "step wall", kind = "side", phase = "finish", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", axial_doc_mm = 9.652, radial_woc_mm = "{{process.wall_pass_woc_mm}}", traverse_mm = [0, "{{cad.east_side_width_mm}}"] },
 ]
 
 [[setups.operations]]

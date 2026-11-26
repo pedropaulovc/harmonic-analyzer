@@ -41,9 +41,11 @@ def ctx() -> dict:
 
 def _post(ctx: dict, out: Path) -> None:
     """Each program as the runtime posts it: the grbl preamble, then per
-    section (a FreeCAD Job: a group, or a program's flat keys) an M6 block
-    (M5, the operator's %msg, M6, M3) and its operations' lines, the feeds in
-    mm/min; a tap stop's lines after its M6, ending with its M30."""
+    section (a FreeCAD Job: a group, or a program's flat keys) its lines, the
+    feeds in mm/min: a new tool after an M6 block (M5, the operator's %msg,
+    M6, M3); the same tool at a new speed after the operator's %msg, an M0
+    and its M3; the same tool and speed carrying on. A tap stop's lines come
+    after its M6, ending with its M30."""
     jobs = {op[0]: job for job in ctx["jobs"] for op in job["ops"]}
     lines_of = {op[0]: op[2] for job in ctx["jobs"] for op in job["ops"]}
     for name, groups in RECIPE.PROGRAMS:
@@ -57,6 +59,7 @@ def _post(ctx: dict, out: Path) -> None:
         ]
         flat = not any(isinstance(group, tuple) for group in groups)
         sections = [groups] if flat else groups
+        previous = None
         for keys in sections:
             first = keys[0]
             if first in ctx["manual"]:
@@ -67,15 +70,23 @@ def _post(ctx: dict, out: Path) -> None:
                     f"M6 T{manual['tool']}",
                     *manual["gcode"],
                 ]
+                previous = (manual["tool"], None)
                 continue
             job = jobs[first]
             number = ctx["numbers"][job["tool"]]
-            text += [
-                "M5",
-                f"%msg TOOL CHANGE: T{number} {ctx['names'][job['tool']]}, SET SPINDLE TO {job['rpm']:g} RPM",
-                f"M6 T{number}",
-                f"M3 S{job['rpm']:g}",
-            ]
+            if previous is None or number != previous[0]:
+                text += [
+                    "M5",
+                    f"%msg TOOL CHANGE: T{number} {ctx['names'][job['tool']]}, SET SPINDLE TO {job['rpm']:g} RPM",
+                    f"M6 T{number}",
+                    f"M3 S{job['rpm']:g}",
+                ]
+            elif job["rpm"] != previous[1]:
+                text += [
+                    f"%msg PAUSE: SET SPINDLE TO {job['rpm']:g} RPM, THEN CYCLE START",
+                    "M0",
+                    f"M3 S{job['rpm']:g}",
+                ]
             for key in keys:
                 text += [
                     line.format(
@@ -83,6 +94,7 @@ def _post(ctx: dict, out: Path) -> None:
                     )
                     for line in lines_of[key]
                 ]
+            previous = (number, job["rpm"])
         if not any(keys[0] in ctx["manual"] for keys in sections):
             text += ["M5", "G17 G90", "M2"]
         (out / f"{name}.nc").write_text("\n".join(text) + "\n", encoding="utf-8")
@@ -122,6 +134,57 @@ def test_the_recipes_programs_pass_every_check_they_declare(ctx, tmp_path) -> No
     assert set(times) == {name for name, _ops in RECIPE.PROGRAMS}
 
 
+def test_pa07_cuts_each_pass_inside_its_record(ctx) -> None:
+    """The far face at the 3439 face record's speed; the outline's rough at
+    the v6 deep record's, in three equal offsets no wider than its 2.2 mm,
+    the outermost first, each at two levels no deeper than its 6.6 mm; its
+    climb finish at the 3627 climb wall record's, two full-depth passes no
+    wider than its 0.3 mm, the last on the outline; an M0 stop at each new
+    speed."""
+    checks = {
+        check: kwargs
+        for program, check, kwargs in ctx["expect"]
+        if program == "PA07_outline"
+    }
+    r = SHOP["tools"]["endmill-carbide-3fl-1-2"]["diameter_mm"] / 2
+    stock = PLAN["parameters"]["outline_finish_stock_mm"]
+    passes = checks["outline"]["passes"]
+    rough, finish = passes[:3], passes[3:]
+    rough_offsets = [p["offset"] for p in rough]
+    assert rough_offsets[-1] == pytest.approx(r + stock)
+    steps = [a - b for a, b in zip(rough_offsets, rough_offsets[1:])]
+    assert steps == pytest.approx([steps[0]] * 2) and steps[0] <= 2.2
+    # The outer pass takes the same width at the top end's corners.
+    widest = PLAN["parameters"]["outline_rough_woc_mm"]
+    assert steps[0] == pytest.approx(widest / 3, abs=1e-3)
+    for p in rough:
+        levels = [checks["outline"]["z_top"], *p["levels"]]
+        assert len(p["levels"]) == 2
+        assert max(a - b for a, b in zip(levels, levels[1:])) <= 6.6
+    assert [p["offset"] for p in finish] == pytest.approx([r + stock / 2, r])
+    assert stock / 2 <= 0.3
+    assert all(p["levels"] == [checks["depth"]["z_min"]] for p in finish)
+    assert checks["outline"]["z_top"] - checks["depth"]["z_min"] <= 17.0
+    speeds = [
+        SHOP["settings"][key]["rpm"]
+        for key in (
+            "em-half-carbide-1018-3439-face",
+            "em-half-carbide-1018-v6-deep",
+            "em-half-carbide-1018-3627-wall-climb",
+        )
+    ]
+    assert checks["spindle"] == {"rpm": [speeds]}
+    assert checks["pauses"]["count"] == 2
+
+
+def test_an_outline_finish_at_another_speed_is_caught(ctx, tmp_path) -> None:
+    seeded = copy.deepcopy(ctx)
+    job = next(j for j in seeded["jobs"] if j["ops"][0][0] == "outline_finish")
+    job.update(rpm=2650.0)
+    _post(seeded, tmp_path)
+    assert "spindle" in {finding.check for finding in _findings(seeded, tmp_path)}
+
+
 @pytest.mark.parametrize(
     ("key", "value", "detail"),
     [
@@ -131,6 +194,8 @@ def test_the_recipes_programs_pass_every_check_they_declare(ctx, tmp_path) -> No
         ("step_station_mm", 5.08, "step_station_mm"),
         ("step_level_mm", 3.0, "does not divide"),
         ("outline_rough_level_mm", 4.0, "does not divide"),
+        ("outline_rough_step_mm", 2.2, "outline_rough_step_mm"),
+        ("outline_finish_step_mm", 0.3, "outline_finish_step_mm"),
         ("hold_tip_depth_mm", 6.0, "hold_tip_depth_mm"),
         ("bore_tip_height_mm", -2.0, "bore_tip_height_mm"),
         ("apex_tip_height_mm", 47.0, "apex_tip_height_mm"),
@@ -220,14 +285,14 @@ def _seed(ctx: dict, key: str, pick, change) -> dict:
         ),
         # The crown cut conventional (G3).
         (
-            "outline",
+            "outline_rough",
             lambda line: line.startswith("G2 "),
             lambda line: "G3" + line[2:],
             "outline",
         ),
         # The finish pass's flank stepped .010 into the part.
         (
-            "outline",
+            "outline_finish",
             lambda line: line.startswith("G1 X") and " Y" in line,
             lambda line: (
                 f"G1 X{float(line.split()[1][1:]) - 0.254:.3f} " + line.split(" ", 2)[2]

@@ -2,8 +2,8 @@
 
 The records are split across files by topic; ``load`` merges every file's
 top-level sections (machines, gauges, tools, fixtures, holders, consumables,
-stock, dro, cnc, measured_cuts), so a reader sees one table per section
-whichever file holds
+stock, dro, cnc, measured_cuts, measured_cutters), so a reader sees one table
+per section whichever file holds
 a record. A record key in two files is refused, naming both. Every reader of
 the inventory goes through here; none opens a file by path.
 

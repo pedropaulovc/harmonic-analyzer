@@ -141,10 +141,13 @@ face_stepover_max_mm = 5.0125
 face_step_max_mm = 0.0635
 # END A: the same cutter's side, one level from the front face to .020 under
 # the thickest bar's back face (end_axial_doc_mm, cam.py checks it), in
-# equal radial steps no deeper than .030, one-way conventional passes across
-# the bar. 10.03 mm deep is past the measured 6.6 mm (v6-deep), so END A
-# stays on the chart setting (settings.endmill-carbide-3fl-1-2-1018-cf).
-end_step_max_mm = 0.762
+# equal radial steps no deeper than 0.4 mm (the .060 skim in four of .015),
+# one-way conventional passes across the bar. Shop
+# settings.em-half-carbide-1018-3427-wall, 1839 rpm: measured stable
+# conventional at up to 13.5 mm deep and 0.4 mm wide (#3427;
+# cad/config/shop-equipment/measured-cuts.toml), so the 10.03 mm deep cut
+# sits inside it.
+end_step_max_mm = 0.4
 end_past_mm = 0.508
 end_axial_doc_mm = 10.033
 # Holes, Z from the front face: spot Ø.125 with the #2 centre drill, under
@@ -480,12 +483,13 @@ instruction = "Prove SB03_end_a in air, Z0 raised 1.000 in; every move clears th
 instruction_detailed = "Send $# and note the G54 line's Z. G10 L2 P1 Z(that Z + 25.400) raises Z0 1.000 in. Run SB03_end_a through every M6, watching each move clear the jaws. G10 L2 P1 Z(the noted Z) puts Z0 back."
 feed = "hand"
 
-# Not measured (#3427): END A's side cut is deeper than the 1/2 in end
-# mill's measured envelope (6.6 mm, settings.em-half-carbide-1018-v6-deep)
-# and runs at the chart's 2650 rpm. Owner, Pedro, 2026-11-22: "log new
-# dechatter issues to try deep axial cuts but with shallow radial depth".
+# END A sits inside shop settings.em-half-carbide-1018-3427-wall (10.03 deep
+# x at most 0.4 wide, its 13.5 x 0.4, conventional, at 1839; #3427). Owner
+# (Pedro), 2026-11-25: the first part of each program is a supervised run,
+# hand on the feed override, adjusting by ear; dechatter sessions are for
+# cuts that actually chatter on a part.
 [[setups.operations]]
-instruction = "First part only: this cut at 2650 rpm has not been chatter-tested on this end mill (owner's test list #3427): END A's side cut {{process.end_axial_doc_mm:in.3dot}} deep x {{process.end_step_max_mm:in.3dot}} wide. Listen through the run; on chatter, feed hold, stop the spindle and tell the owner."
+instruction = "First part only: run SB03_end_a supervised, hand on the feed override, adjusting it by ear: back it off at the first chatter, bring it back up while the cut stays clean. Note the override that cut clean beside the program."
 feed = "hand"
 
 [[setups.operations]]
@@ -493,8 +497,8 @@ speed_kind = "spindle"
 tool = "em-half"
 drilling = "none"
 sizing = "other"
-instruction = "Run SB03_end_a (M6 T1; set 2650): END A with the cutter's side, from F to {{process.end_past_mm:in.3dot}} under the back face, the full depth at once, in side passes no wider than {{process.end_step_max_mm:in.3dot}} into the end, each across the bar one way (+Y: the bar on the pass's left, conventional with M3), to X0."
-settings = "endmill-carbide-3fl-1-2-1018-cf"
+instruction = "Run SB03_end_a (M6 T1; set 1839): END A with the cutter's side, from F to {{process.end_past_mm:in.3dot}} under the back face, the full depth at once, in equal side passes no wider than {{process.end_step_max_mm:in.4dot}} into the end, each across the bar one way (+Y: the bar on the pass's left, conventional with M3), to X0."
+settings = "em-half-carbide-1018-3427-wall"
 milling_cuts = [
   { name = "end a", kind = "side", phase = "finish", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", axial_doc_mm = "{{process.end_axial_doc_mm}}", radial_woc_mm = "{{process.end_step_max_mm}}", stations_mm = "{{process.sawn_end_a_mm}}" },
 ]

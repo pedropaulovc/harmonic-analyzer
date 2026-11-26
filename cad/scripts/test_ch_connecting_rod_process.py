@@ -43,8 +43,10 @@ def _post(ctx: dict, out: Path) -> None:
     """Each program as the runtime posts it: the grbl preamble, then per
     section its lines, the feeds in mm/min, after an M6 block (M5, the
     operator's %msg, M6) where the tool changes or the program loads its
-    first tool; a manual section (the saw's witness-line stop) is its own
-    lines, and the section after it restarts the spindle on its M3."""
+    first tool, or after a speed stop (the operator's %msg, M0) where the
+    tool stays and its speed changes; a manual section (the saw's
+    witness-line stop) is its own lines, and the section after it restarts
+    the spindle on its M3."""
     sections = {op[0]: job for job in ctx["jobs"] for op in job["ops"]}
     lines_of = {op[0]: op[2] for job in ctx["jobs"] for op in job["ops"]}
     for name, groups in RECIPE.PROGRAMS:
@@ -57,7 +59,7 @@ def _post(ctx: dict, out: Path) -> None:
             "G54",
         ]
         keys = [group[0] if isinstance(group, tuple) else group for group in groups]
-        previous = None
+        previous = previous_rpm = None
         for key in keys:
             if key in ctx["manual"]:
                 manual = ctx["manual"][key]
@@ -74,6 +76,11 @@ def _post(ctx: dict, out: Path) -> None:
                     f"%msg TOOL CHANGE: T{number} {ctx['names'][job['tool']]}, SET SPINDLE TO {job['rpm']:g} RPM",
                     f"M6 T{number}",
                 ]
+            elif number == previous and previous_rpm not in (None, job["rpm"]):
+                text += [
+                    f"%msg PAUSE: SET SPINDLE TO {job['rpm']:g} RPM, THEN CYCLE START",
+                    "M0",
+                ]
             text += [
                 f"M3 S{job['rpm']:g}",
                 *(
@@ -83,7 +90,7 @@ def _post(ctx: dict, out: Path) -> None:
                     for line in lines_of[key]
                 ),
             ]
-            previous = number
+            previous, previous_rpm = number, job["rpm"]
         text += ["M5", "G17 G90", "M2"]
         (out / f"{name}.nc").write_text("\n".join(text) + "\n", encoding="utf-8")
 
@@ -143,6 +150,12 @@ def test_context_numbers_the_tools_and_places_the_cuts(ctx) -> None:
         trim["direction"],
         trim["max_stepdown"],
     ) == (193.169, 196.342, 1.5865, 1, 6.6)
+    # The bore: the rough levels on the chart setting, then a speed stop and
+    # the finish circle on the measured conventional deep-wall setting.
+    speeds = next(
+        kw for p, c, kw in ctx["expect"] if p == "CR05_bore" and c == "spindle"
+    )
+    assert speeds == {"rpm": [[2483.0, 1839.0]]}
 
 
 def test_the_recipes_programs_pass_every_check_they_declare(ctx, tmp_path) -> None:
@@ -155,7 +168,7 @@ def test_the_recipes_programs_pass_every_check_they_declare(ctx, tmp_path) -> No
 def test_the_saw_is_mounted_and_moved_only_where_its_arbor_clears(ctx) -> None:
     p = PLAN["parameters"]
     # CR05 leaves T1 parked over the touch-off station: up, then X, then Y.
-    assert _lines(ctx, "bore")[-3:] == [
+    assert _lines(ctx, "bore_finish")[-3:] == [
         f"G0 Z{p['saw_park_z_mm']:.3f}",
         f"G0 X{p['saw_touch_x_mm']:.3f}",
         "G0 Y-25.400",

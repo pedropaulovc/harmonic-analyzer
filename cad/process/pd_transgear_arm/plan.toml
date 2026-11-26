@@ -174,7 +174,13 @@ reamer_oal_mm = 88.9
 # to .01 in.
 tap_stack_max_mm = 289.052
 tap_wrench_reach_max_mm = 209.55
-quarter_mill_projection_min_mm = 19.05
+# End mills' least stick-out: flute length + 10 % (owner ruling 2026-11-25
+# on #3386, HA #3624: "min stickout based on flute length then add 10pct on
+# top of it"; flutes from shop tools): the 1/4 in, 28.575 flutes, 31.43
+# (its session, #3052, ran 34.93); the 1/2 in, 25.4 flutes, 27.94. The
+# 1/2 in is Setup 2's shortest tool, the 1/4 in Setup 3's.
+quarter_mill_projection_min_mm = 31.43
+half_mill_projection_min_mm = 27.94
 
 [[tools]]
 id = "spot"
@@ -297,7 +303,7 @@ machine_ref = "pm-30mv"
 holding = "Two 1 in parallels, each 1/8 thick, on the bed of the 6 in PM vise (shop vise-pm-6), one against each jaw: the 1.00 blank's holes at Y −.500 stand .30 clear of each parallel. The blank on them face A down (the rear face up), along X, centred in the jaws' width; the jaws grip its two 1 in ground edges. Tap it down on the parallels with a soft hammer until neither parallel slides."
 datum = "Program AR01_holes (T1–T7). G54: X0 the blank's left end, Y0 the fixed jaw's face, Z0 the parallels' top (face A). +X toward the blank's right end, +Y toward the fixed jaw: the blank lies at −Y, its centre line at Y −.500. The pivot at X {{process.pivot_from_end_mm:in.3dot}}."
 diagram = { file = "diagrams/holes.svg", alt = "The blank across the vise jaws on two parallels, rear face up; the pivot bore {{process.pivot_from_end_mm:in.3dot}} from the left end on the centre line with its Ø.50 counterbore, the pin bore {{cad.pin_bore_x_mm:in.3dot}} further right; the arm's outline (made in Setup 3) dashed." }
-envelope = { x_span_mm = ["{{process.blank_length_max_mm}}"], y_span_mm = ["{{process.blank_width_mm}}"], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{cad.rear_face_thickness_stock_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{process.drill_9_tip_mm}}"], longest_tool_mm = ["{{process.drill_chuck_gauge_mm}}", "{{process.reamer_oal_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.quarter_mill_projection_min_mm}}"] }
+envelope = { x_span_mm = ["{{process.blank_length_max_mm}}"], y_span_mm = ["{{process.blank_width_mm}}"], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{cad.rear_face_thickness_stock_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{process.drill_9_tip_mm}}"], longest_tool_mm = ["{{process.drill_chuck_gauge_mm}}", "{{process.reamer_oal_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_min_mm}}"] }
 vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{process.blank_width_mm}}", along_jaws_mm = "{{process.blank_length_min_mm}}", part_height_mm = "{{cad.rear_face_thickness_stock_mm}}", parallel_height_mm = "{{process.parallel_height_mm}}", overhang_mm = ["{{process.holes_overhang_mm}}", "rest"], jaw_offset = "centred", fixed_jaw_face = "as_bought", moving_jaw_face = "as_bought", moving_jaw_contact = "flat" }
 beam = { axis = "x", hold = "solid", extent_mm = [0, "{{process.blank_length_min_mm}}"], seat = "the two parallels under the blank's edges, its whole length", seat_mm = [0, "{{process.blank_length_min_mm}}"] }
 
@@ -356,16 +362,19 @@ milling_cuts = [
   { name = "pin drill", kind = "drill", phase = "rough", cutter_dia_mm = 2.9464, flutes = 2, rpm = 2400, feed_mm_min = 91.44, stations_mm = "{{cad.pin_bore_x_mm}}" },
 ]
 
+# The spot face: the 1/2 in carbide's chart speed in 1018, 2483 rpm (dial
+# stop 23; owner ruling 2026-11-25, shop settings.endmill-carbide-3fl-1-2-
+# 1018-cf). A plunge: no measured record applies (#3428).
 [[setups.operations]]
 speed_kind = "spindle"
 tool = "em-half"
 drilling = "none"
 sizing = "other"
-instruction = "Same file, M6 T4 (1/2 in end mill, at least .75 in out of the collet; set 2650): plunge once over the pivot, at 1.4 in/min, to {{cad.spot_face_floor_in:.4dot}} above face A, and out at feed: the Ø.50 counterbore."
-rpm = 2650
+instruction = "Same file, M6 T4 (1/2 in end mill, at least {{process.half_mill_projection_min_mm:in.2f}} in out of the collet; set 2483): plunge once over the pivot, at 1.4 in/min, to {{cad.spot_face_floor_in:.4dot}} above face A, and out at feed: the Ø.50 counterbore."
+rpm = 2483
 feed = "1.4 in/min"
 milling_cuts = [
-  { name = "spot face", kind = "drill", phase = "finish", cutter_dia_mm = 12.7, flutes = 3, rpm = 2650, feed_mm_min = 35.56, stations_mm = "{{process.pivot_from_end_mm}}" },
+  { name = "spot face", kind = "drill", phase = "finish", cutter_dia_mm = 12.7, flutes = 3, rpm = 2483, feed_mm_min = 35.56, stations_mm = "{{process.pivot_from_end_mm}}" },
 ]
 
 [[setups.operations]]
@@ -524,7 +533,7 @@ feed = "hand"
 
 [[setups.operations]]
 instruction = "Prove AR05_outline in air, Z0 raised 1.000 in; every move clears both screw heads and the jaws. Then Z0 back."
-instruction_detailed = "Console M6 T11 (1/4 in end mill, at least .75 in out of the collet; the tool setter measures it). Send $# and note the G54 line's Z. G10 L2 P1 Z(that Z + 25.400). Run AR05_outline, watching it pass round the screw heads. G10 L2 P1 Z(the noted Z) puts Z0 back."
+instruction_detailed = "Console M6 T11 (1/4 in end mill, at least {{process.quarter_mill_projection_min_mm:in.2f}} in out of the collet; the tool setter measures it). Send $# and note the G54 line's Z. G10 L2 P1 Z(that Z + 25.400). Run AR05_outline, watching it pass round the screw heads. G10 L2 P1 Z(the noted Z) puts Z0 back."
 feed = "hand"
 
 [[setups.operations]]

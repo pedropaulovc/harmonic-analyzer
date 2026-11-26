@@ -127,9 +127,12 @@ round_level_mm = 1.0239
 # flutes: 21.0 in/min (cam.py recomputes both from the setting).
 em_rpm = 2800
 em_feed_per_min_mm = 533.4
-# 3/8 in end mill, 4 in overall: at least 1.00 in out of its collet, so the
-# collet's nose stays over the jaw tops at the through depth.
-em_projection_min_mm = 25.4
+# 3/8 in end mill, 4 in overall, 1-3/4 in of flute: at least its flute length
+# + 10 % out of its collet, 48.9 mm (owner ruling 2026-11-25 on #3386, HA
+# #3624: "min stickout based on flute length then add 10pct on top of it");
+# cam.py checks it only as a least: the collet's nose stays over the jaw
+# tops at the through depth.
+em_projection_min_mm = 48.9
 # Spots with the #1 centre drill: the anchor and the match mark Ø.030 (on
 # the pilot's point: under the #50, and the punched mark's Ø.03); the pivot
 # Ø.080 (on the 60° countersink, under the #43).
@@ -275,7 +278,7 @@ beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{process.blank_lengt
 
 [[setups.operations]]
 instruction = "Home the mill ($H). G54 Y0 on the fixed jaw's face, X0 on the blank's left end (edge finder at 900 rpm). Console M6 T1 (3/8 in end mill, at least {{process.em_projection_min_mm:in.2f}} out of its collet). Z0: T1's end on a .002 leaf on the O face."
-instruction_detailed = "Home the mill ($H). Edge finder (900 rpm) on the fixed jaw's face from −Y: G10 L20 P1 Y−2.540. On the blank's left end from −X: G10 L20 P1 X−2.540. Console M6 T1 (3/8 in end mill, at least 1.00 in out of the collet; the tool setter measures it). MDI G0 X20 Y−12.7, spindle stopped, its end just dragging a .002 leaf on the O face: G10 L20 P1 Z0.051."
+instruction_detailed = "Home the mill ($H). Edge finder (900 rpm) on the fixed jaw's face from −Y: G10 L20 P1 Y−2.540. On the blank's left end from −X: G10 L20 P1 X−2.540. Console M6 T1 (3/8 in end mill, at least {{process.em_projection_min_mm:in.2f}} in out of the collet; the tool setter measures it). MDI G0 X20 Y−12.7, spindle stopped, its end just dragging a .002 leaf on the O face: G10 L20 P1 Z0.051."
 feed = "hand"
 
 [[setups.operations]]

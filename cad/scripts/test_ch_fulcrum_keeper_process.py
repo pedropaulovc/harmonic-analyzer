@@ -42,7 +42,9 @@ def ctx() -> dict:
 def _post(ctx: dict, out: Path) -> None:
     """Each program as the runtime posts it: the grbl preamble, then per
     section an M6 block (M5, the operator's %msg, M6, M3) and its lines, the
-    feeds in mm/min; a tap stop's lines after its M6, ending with its M30."""
+    feeds in mm/min, or on the tool already loaded at a new speed an M0
+    speed stop (its %msg, M0, M3); a tap stop's lines after its M6, ending
+    with its M30."""
     sections = {op[0]: job for job in ctx["jobs"] for op in job["ops"]}
     lines_of = {op[0]: op[2] for job in ctx["jobs"] for op in job["ops"]}
     for name, groups in RECIPE.PROGRAMS:
@@ -55,6 +57,7 @@ def _post(ctx: dict, out: Path) -> None:
             "G54",
         ]
         keys = [group[0] if isinstance(group, tuple) else group for group in groups]
+        previous = None
         for key in keys:
             if key in ctx["manual"]:
                 manual = ctx["manual"][key]
@@ -64,13 +67,23 @@ def _post(ctx: dict, out: Path) -> None:
                     f"M6 T{manual['tool']}",
                     *manual["gcode"],
                 ]
+                previous = None
                 continue
             job = sections[key]
             number = ctx["numbers"][job["tool"]]
+            if previous is not None and previous[0] == number:
+                assert job["rpm"] != previous[1], f"{key}: same tool, same speed"
+                text += [
+                    f"%msg PAUSE: SET SPINDLE TO {job['rpm']:g} RPM, THEN CYCLE START",
+                    "M0",
+                ]
+            else:
+                text += [
+                    "M5",
+                    f"%msg TOOL CHANGE: T{number} {ctx['names'][job['tool']]}, SET SPINDLE TO {job['rpm']:g} RPM",
+                    f"M6 T{number}",
+                ]
             text += [
-                "M5",
-                f"%msg TOOL CHANGE: T{number} {ctx['names'][job['tool']]}, SET SPINDLE TO {job['rpm']:g} RPM",
-                f"M6 T{number}",
                 f"M3 S{job['rpm']:g}",
                 *(
                     line.format(
@@ -79,6 +92,7 @@ def _post(ctx: dict, out: Path) -> None:
                     for line in lines_of[key]
                 ),
             ]
+            previous = (number, job["rpm"])
         if not any(key in ctx["manual"] for key in keys):
             text += ["M5", "G17 G90", "M2"]
         (out / f"{name}.nc").write_text("\n".join(text) + "\n", encoding="utf-8")
@@ -140,7 +154,9 @@ def test_the_recipes_programs_pass_every_check_they_declare(ctx, tmp_path) -> No
         ("bore_drill_past_mm", 1.0, "bore_tip_height_mm"),
         ("reamer_lead_mm", 1.5, "ream_tip_height_mm"),
         ("apex_drill_past_mm", 0.0, "apex_tip_height_mm"),
-        ("arch_rough_woc_mm", 4.5, "arch_rough_woc_mm"),
+        ("arch_rough_woc_mm", 1.8, "arch_rough_woc_mm"),
+        ("arch_finish_pass_mm", 0.508, "arch_finish_pass_mm"),
+        ("wall_pass_woc_mm", 0.2, "wall_pass_woc_mm"),
         ("arch_past_mm", 0.5, "arch_depth_mm"),
         ("step_level_mm", 1.27, "step_level_mm"),
         ("wall_finish_woc_mm", 0.2, "wall_finish_woc_mm"),
@@ -193,16 +209,25 @@ def _seed(ctx: dict, key: str, pick, change) -> dict:
     [
         # The crown's finish turned conventional (G3): the climb outline is broken.
         (
-            "crown",
+            "crown_finish",
             lambda line: line.startswith("G2 X-25.200 Y6.350"),
             lambda line: "G3" + line[2:],
             "outline",
         ),
-        # The crown's finish radius .010 too large: off its offset.
+        # The crown's finish radius .005 too large: off its offset (and short
+        # of the first finish pass's .010).
         (
-            "crown",
+            "crown_finish",
             lambda line: line.startswith("G2 X-38.535"),
-            lambda line: line.replace("X-38.535", "X-38.789"),
+            lambda line: line.replace("X-38.535", "X-38.662"),
+            "outline",
+        ),
+        # The crown's outer rough contour at the first level run in the air:
+        # that pass leaves the outline uncut there.
+        (
+            "crown_rough",
+            lambda line: line == "G1 Z14.486 F{feed}",
+            lambda line: "G1 Z20.050 F{feed}",
             "outline",
         ),
         # The step's floor left .010 high: the lug comes out thick.
@@ -214,7 +239,7 @@ def _seed(ctx: dict, key: str, pick, change) -> dict:
         ),
         # The wall pass dropped: the foot top keeps its scallops.
         (
-            "step",
+            "step_wall",
             lambda line: line.startswith("G1 Y-22.860"),
             lambda line: "G1 Y8.890 F{feed}",
             "passes",
@@ -287,8 +312,9 @@ def test_a_seeded_fault_in_a_program_is_caught(
 
 def _step_with(ctx: dict, change) -> dict:
     seeded = copy.deepcopy(ctx)
-    lines = _lines(seeded, "step")
-    lines[:] = [change(line) for line in lines]
+    for key in ("step", "step_wall"):
+        lines = _lines(seeded, key)
+        lines[:] = [change(line) for line in lines]
     return seeded
 
 
@@ -300,8 +326,12 @@ def _step_with(ctx: dict, change) -> dict:
         (lambda line: line.replace("Y-13.970", "Y-8.120"), "radial > 0.263"),
         # The wall pass run +Y, the wall on the cutter's left: conventional.
         (
-            lambda line: {"G0 X14.224 Y8.890": "G0 X14.224 Y-22.860"}.get(
-                line, "G1 Y8.890 F{feed}" if line.startswith("G1 Y-22.860") else line
+            lambda line: (
+                line.replace("Y8.890", "Y-22.860")
+                if line.startswith("G0 X") and line.endswith(" Y8.890")
+                else "G1 Y8.890 F{feed}"
+                if line.startswith("G1 Y-22.860")
+                else line
             ),
             "cuts conventional, expected climb",
         ),

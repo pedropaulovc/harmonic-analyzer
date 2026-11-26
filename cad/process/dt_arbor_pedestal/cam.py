@@ -30,7 +30,9 @@ bore through the strap. Upright on the seat: PA05 faces the top end to the
 height, spots and drills #43 from the apex into the bore; PA06 brings the
 tap guide over it for tapping by hand. Far face up, the foot gripped
 between the jaws by the seat and the foot top: PA07 faces the far face to
-the depth and profiles the flanks and the crown through the strap.
+the depth and profiles the flanks and the crown through the strap, three
+sections on the end mill, each at the speed of its own shop setting (the
+far face, the outline's rough, its finish), joined at M0 speed stops.
 
 Work frames (G54), each set in its setup:
 - PA01: X0 the blank's left end, Y0 the fixed jaw (the far face's bar
@@ -81,7 +83,7 @@ PROGRAMS: tuple[tuple[str, tuple[Any, ...]], ...] = (
     ),
     ("PA05_top_apex", (("top",), ("apex_spot",), ("apex_drill",))),
     ("PA06_apex_tap", ("tap_apex",)),
-    ("PA07_outline", ("far_face", "outline")),
+    ("PA07_outline", (("far_face",), ("outline_rough",), ("outline_finish",))),
 )
 # Every program loads its own first tool (M6, the tool setter): each setup
 # starts on whatever the mill last held, and the tap file before its retract
@@ -519,15 +521,18 @@ def context(
     step_max = p["face_stepover_max_mm"]
     far_step_max = p["far_face_stepover_max_mm"]
     level_max = p["face_step_max_mm"]
-    # Three settings: the faces (PA01-PA03, PA05), the step (PA04), and the
-    # far face with the outline (PA07, one Job, one speed).
+    # Four settings: the faces (PA01-PA03, PA05 and PA07's far face), the
+    # step (PA04), the outline's rough and its finish (PA07, each its own
+    # section after an M0 speed stop).
     face_rpm, face_feed = _setting(plan, shop, "width")
     step_rpm, step_feed = _setting(plan, shop, "step")
-    outline_rpm, outline_feed = _setting(plan, shop, "far face")
+    rough_rpm, rough_feed = _setting(plan, shop, "outline rough")
+    finish_rpm, finish_feed = _setting(plan, shop, "outline finish")
     groups = (
-        ("width", ("width", "depth", "seat", "top")),
+        ("width", ("width", "depth", "seat", "top", "far face")),
         ("step", ("step",)),
-        ("far face", ("far face", "outline rough", "outline finish")),
+        ("outline rough", ("outline rough",)),
+        ("outline finish", ("outline finish",)),
     )
     for lead, names in groups:
         for name in names:
@@ -596,9 +601,9 @@ def context(
         raise ValueError("'step' radial_woc_mm is not process.step_station_mm")
     step_xs = [raw_x + station * (k + 1) for k in range(n_stations)]
 
-    # The outline: rough levels off the finish offset, then one full-depth
-    # finish pass on the outline; through the strap and outline_past_mm into
-    # the step's void.
+    # The outline: rough passes off the finish stock, then the finish passes
+    # on to the outline, each at full depth; through the strap and
+    # outline_past_mm into the step's void.
     past = p["outline_past_mm"]
     outline_bottom = depth - strap - past
     stock = p["outline_finish_stock_mm"]
@@ -609,31 +614,39 @@ def context(
             f"process.outline_rough_level_mm {rough_level:g} does not divide the outline's {depth - outline_bottom:.3f}"
         )
     _agree(plan, "outline_depth_mm", depth - outline_bottom)
-    for name, doc, woc in (
-        ("outline rough", rough_level, None),
-        ("outline finish", depth - outline_bottom, stock),
+    # The rough's widest stock: the faced top end's corner, off the crown,
+    # less the finish stock. It is cut in equal offsets no wider than
+    # outline_rough_step_max_mm, the outermost first, each at every rough
+    # level; the finish stock in equal full-depth passes no wider than
+    # outline_finish_step_max_mm, the last on the outline.
+    corner = math.dist((half, top), (0.0, g["crown_y"])) - g["radius"]
+    rough_woc = corner - stock
+    _agree(plan, "outline_rough_woc_mm", rough_woc)
+    n_rough = math.ceil(rough_woc / p["outline_rough_step_max_mm"] - 1e-9)
+    rough_step = rough_woc / n_rough
+    _agree(plan, "outline_rough_step_mm", rough_step)
+    n_finish = math.ceil(stock / p["outline_finish_step_max_mm"] - 1e-9)
+    finish_step = stock / n_finish
+    _agree(plan, "outline_finish_step_mm", finish_step)
+    for name, doc, woc, key in (
+        ("outline rough", rough_level, rough_step, "outline_rough_step_mm"),
+        (
+            "outline finish",
+            depth - outline_bottom,
+            finish_step,
+            "outline_finish_step_mm",
+        ),
     ):
         if not math.isclose(_cut(plan, name, "axial_doc_mm"), doc, abs_tol=PLAN_TOL_MM):
             raise ValueError(f"'{name}' axial_doc_mm is not {doc:.3f}")
-        if woc is not None and not math.isclose(
-            _cut(plan, name, "radial_woc_mm"), woc, abs_tol=1e-6
-        ):
-            raise ValueError(
-                f"'{name}' radial_woc_mm is not process.outline_finish_stock_mm"
-            )
-    # The rough pass's widest cut: the faced top end's corner, off the crown.
-    corner = math.dist((half, top), (0.0, g["crown_y"])) - g["radius"]
-    _agree(plan, "outline_rough_woc_mm", corner - stock)
-    if not math.isclose(
-        _cut(plan, "outline rough", "radial_woc_mm"),
-        corner - stock,
-        abs_tol=PLAN_TOL_MM,
-    ):
-        raise ValueError(
-            "'outline rough' radial_woc_mm is not process.outline_rough_woc_mm"
-        )
-    if 2 * r < corner - stock:
-        raise ValueError("the rough pass does not reach the top end's corners")
+        if not math.isclose(_cut(plan, name, "radial_woc_mm"), woc, abs_tol=PLAN_TOL_MM):
+            raise ValueError(f"'{name}' radial_woc_mm is not process.{key}")
+    # The outermost rough pass's edge reaches the corners: the cutter spans
+    # one offset step.
+    if 2 * r < rough_step:
+        raise ValueError("the rough's outer pass does not reach the top end's corners")
+    rough_offs = [r + stock + rough_step * k for k in reversed(range(n_rough))]
+    finish_offs = [r + finish_step * k for k in reversed(range(n_finish))]
 
     # Holes: each spot under its drill (no chamfer at the mouth); drills from
     # the authored settings.
@@ -974,13 +987,17 @@ def context(
             f"G0 Z{clear:.3f}",
         ]
 
-    rough_off, finish_off = r + stock, r
-    outline_lines = [f"G0 Z{_r(height + CLEAR_MM):.3f}"]
-    for z in rough_levels:
-        outline_lines += outline_pass(rough_off, z)
-    outline_lines += outline_pass(finish_off, outline_bottom)
+    # The rough: each offset, the outermost first, at every level; the
+    # finish: each offset at full depth, the last on the outline.
+    rough_lines = [f"G0 Z{_r(height + CLEAR_MM):.3f}"]
+    for off in rough_offs:
+        for z in rough_levels:
+            rough_lines += outline_pass(off, z)
+    finish_lines = [f"G0 Z{_r(height + CLEAR_MM):.3f}"]
+    for off in finish_offs:
+        finish_lines += outline_pass(off, outline_bottom)
     # The offset arcs' ends agree with their centre to the post's places.
-    for off in (rough_off, finish_off):
+    for off in rough_offs + finish_offs:
         (_s, e1), (s3, _e) = (
             offset_line(elements[0], off),
             offset_line(elements[2], off),
@@ -1006,13 +1023,25 @@ def context(
                 ],
             }
         )
-    # PA07 is one Job: the far face, then the outline, same tool and speed.
-    outline_job = jobs[-1]
-    outline_job["label"] = "far face and outline"
-    outline_job.update(rpm=outline_rpm, feed=outline_feed, plunge=outline_feed)
-    outline_job["ops"].append(
-        ["outline", "profile the flanks and the crown", outline_lines]
-    )
+    # PA07's outline after its far face: the rough and the finish, each its
+    # own section at its own setting's speed (the far face runs at the
+    # faces').
+    for key, label, lines, rpm, feed in (
+        ("outline_rough", "rough the flanks and the crown", rough_lines, rough_rpm, rough_feed),
+        ("outline_finish", "finish the flanks and the crown", finish_lines, finish_rpm, finish_feed),
+    ):
+        jobs.append(
+            {
+                **em_tool,
+                "rpm": rpm,
+                "feed": feed,
+                "plunge": feed,
+                "frame": "outline",
+                "label": key.replace("_", " "),
+                "stock": stocks["outline"],
+                "ops": [[key, label, lines]],
+            }
+        )
     # Along +Y, from beside the moving jaw (E) to beside the fixed jaw (W):
     # both plunges stand over a jaw, above its top (the step's floor is).
     step_y = (-width - r - APPROACH_MM, r + APPROACH_MM)
@@ -1387,6 +1416,12 @@ def context(
         ["PA06_apex_tap", "air_feed", {"z_top": top}],
     ]
 
+    # PA07's speeds in order, one tool section: the far face, the rough and
+    # the finish; each change of speed an M0 stop (the speed is set by hand).
+    pa07_speeds = [face_rpm]
+    for rpm in (rough_rpm, finish_rpm):
+        if rpm != pa07_speeds[-1]:
+            pa07_speeds.append(rpm)
     name = "PA07_outline"
     expect += [
         [
@@ -1394,8 +1429,8 @@ def context(
             "tool_changes",
             {"z_top": height, "tools": [tn["em-half"]], "loads_first": True},
         ],
-        [name, "spindle", {"rpm": [[outline_rpm]]}],
-        [name, "pauses", {"z_top": height, "count": 0}],
+        [name, "spindle", {"rpm": [pa07_speeds]}],
+        [name, "pauses", {"z_top": height, "count": len(pa07_speeds) - 1}],
         [name, "depth", {"z_min": _r(outline_bottom)}],
         *[
             [name, check, kwargs]
@@ -1408,8 +1443,14 @@ def context(
             {
                 "elements": elements,
                 "passes": [
-                    {"offset": rough_off, "levels": [_r(z) for z in rough_levels]},
-                    {"offset": finish_off, "levels": [_r(outline_bottom)]},
+                    *[
+                        {"offset": off, "levels": [_r(z) for z in rough_levels]}
+                        for off in rough_offs
+                    ],
+                    *[
+                        {"offset": off, "levels": [_r(outline_bottom)]}
+                        for off in finish_offs
+                    ],
                 ],
                 "z_top": depth,
             },

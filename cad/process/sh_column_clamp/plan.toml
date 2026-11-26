@@ -170,23 +170,32 @@ pair_jaw_span_mm = 109.093
 # the finish on the radius, .020 in down per turn, from the pair's top to
 # 1.0 mm past the underside (into the gap between the parallels); a finish
 # and a spring turn at full depth. CB10 opens the finish .002 in on the
-# diameter (.001 on the radius) when the gauge reads it small.
+# diameter (.001 on the radius) when the gauge reads it small. The finish
+# and opening turns climb a wall the tallest pair's height deep
+# (bore_wall_depth_mm, the export's greatest height; cam.py checks it).
 bore_finish_stock_mm = 0.254
 helix_pitch_mm = 0.508
 bore_past_mm = 1.0
 bore_tip_height_mm = -1.0
 bore_open_mm = 0.0508
 bore_open_radial_mm = 0.0254
-# The end mill's centre runs the helix at the chart setting's feed scaled to
-# its centre: the edge, at the rough radius plus the cutter's, carries the
-# chip load of shop settings.endmill-carbide-3fl-1-2-1018-cf (565.4 ×
-# 6.198/12.548). The bore is not inside a measured envelope (a full-width
-# helix and a 17 mm deep finish wall), so it stays on that chart setting.
-# cam.py checks it.
-bore_feed_per_min_mm = 279.27
-# The 1/2 in end mill set at least 1.25 in out of its collet for the bore,
+bore_wall_depth_mm = 16.256
+# Speeds (owner ruling, Pedro, 2026-11-25): the finish, spring and opening
+# turns, .640 deep x .010 (finish) or .001 (opening) wide, climbing, sit
+# inside shop settings.em-half-carbide-1018-3627-wall-climb; the rough
+# helix cuts the cutter's full width, which no record holds (#3428), and
+# stays on the chart setting, settings.endmill-carbide-3fl-1-2-1018-cf.
+# Both run 2483 rpm at 529.77 mm/min on the edge. The end mill's centre
+# runs the helix at that feed scaled to its centre: the edge, at the rough
+# radius plus the cutter's, carries the settings' chip load (529.77 ×
+# 6.198/12.548); the finish and opening turns run the same feed, their edge
+# a little under it. cam.py checks it.
+bore_feed_per_min_mm = 261.67
+# The 1/2 in end mill set 1.25 in out of its collet for the bore: no less,
 # so the collet's face clears the 1-2-3 block and the fixed jaw with the
-# cutter 1.0 mm below the pair (cam.py checks it).
+# cutter 1.0 mm below the pair (cam.py checks it), and no more, the longest
+# stick-out the cutter's measured records hold (cad/config/shop-equipment/
+# measured-cuts.toml: 27.94 to 31.75 mm).
 bore_mill_projection_min_mm = 31.75
 # Tapping under the spring tap guide (tools.tap-guide-fisher): the guide and
 # the tap in its wrench together reach at most tap_stack_max_mm below the
@@ -974,22 +983,23 @@ feed = "hand"
 
 [[setups.operations]]
 instruction = "G54 Z0: the parallels' top, touched with the end mill on the front's parallel right of the pair."
-instruction_detailed = "Console M6 T1, the 1/2 in end mill at least {{process.bore_mill_projection_min_mm:in.2dot}} out of the collet (the collet's face must clear the block and the fixed jaw at the bore's bottom; the tool setter measures it). MDI G0 X55.400 Y-12.000: the cutter right of the pair, over the front's parallel and clear of the block. Spindle stopped, its tip just dragging a .002 feeler leaf on that parallel: G10 L20 P1 Z0.051."
+instruction_detailed = "Console M6 T1, the 1/2 in end mill set {{process.bore_mill_projection_min_mm:in.2dot}} out of the collet: no less (the collet's face must clear the block and the fixed jaw at the bore's bottom), no more (the end mill's measured speeds hold to that stick-out); the tool setter measures it. MDI G0 X55.400 Y-12.000: the cutter right of the pair, over the front's parallel and clear of the block. Spindle stopped, its tip just dragging a .002 feeler leaf on that parallel: G10 L20 P1 Z0.051."
 feed = "hand"
 
 [[setups.operations]]
 instruction = "First pair only: prove CB09_pair_bore in air, Z0 raised 1.000 in; the helix circles the bore's place and clears the screw heads and the block. Then Z0 back."
 feed = "hand"
 
-# CB09 runs outside the measured envelope of the 1/2 in end mill (shop
-# settings.em-half-carbide-1018-3439-face/-v6-deep): the rough helix cuts the
-# cutter's full width, the finish a 17.0 mm deep wall. Owner ruling (Pedro,
-# 2026-11-22), no re-cut: for full-width passes "same log new dechatter
-# issues to try full radial depth but shallow axial" (#3428); for deep walls
-# "log new dechatter issues to try deep axial cuts but with shallow radial
-# depth" (GitHub issue #3427). It keeps the chart setting; the first pair is watched.
+# First pair supervised (owner ruling, Pedro, 2026-11-25: "I will never
+# actually make a part if I keep having to trial every single combination of
+# parameters"; the first part of each program runs supervised, hand on the
+# feed override). CB09's finish and spring turns sit inside shop
+# settings.em-half-carbide-1018-3627-wall-climb. Its rough helix cuts the
+# cutter's full width, which no record holds: it stays on the chart setting
+# (settings.endmill-carbide-3fl-1-2-1018-cf) until full-width cuts are
+# measured (#3428).
 [[setups.operations]]
-instruction = "First pair only: these CB09 cuts at 2650 rpm have not been chatter-tested on this end mill (the owner's test list: GitHub issues #3427 and #3428): rough helix {{process.helix_pitch_mm:in.3dot}} deep a turn x {{process.face_cutter_dia_mm:in.3dot}} wide, finish turn about .67 deep x {{process.bore_finish_stock_mm:in.3dot}} wide. Listen through the run; on chatter, feed hold, stop the spindle and tell the owner."
+instruction = "First pair only: run CB09_pair_bore supervised, hand on the feed override, adjusting it by ear: back it off at the first chatter, bring it back up while the cut stays clean. Note the override that cut clean beside the program. Its finish turn ({{process.bore_wall_depth_mm:in.3dot}} deep x {{process.bore_finish_stock_mm:in.3dot}} wide, climbing) is inside the end mill's measured climb wall cut; its rough helix, the cutter's full {{process.face_cutter_dia_mm:in.3dot}} width at {{process.helix_pitch_mm:in.3dot}} a turn, is not measured: full-width cuts are still on the owner's test list (GitHub issue #3428)."
 feed = "hand"
 
 [[setups.operations]]
@@ -997,21 +1007,33 @@ speed_kind = "spindle"
 tool = "em-half"
 drilling = "none"
 sizing = "other"
-instruction = "Run CB09_pair_bore (M6 T1; set 2650): the end mill helixes down the bore's place, climbing, {{process.helix_pitch_mm:in.3dot}} a turn, to {{process.bore_past_mm:in.3dot}} below the pair, then a finish turn and a spring turn at full depth. Cutting oil on the pair before Cycle Start; hands clear until the program ends, then blow the chips out of the bore. It puts the bore {{cad.bore_location_in:.3dot}} from the flush N ends, where both halves' holes were drilled from. Then, still clamped, gauge the bore."
-rpm = 2650
+instruction = "Run CB09_pair_bore (M6 T1; set 2483): the end mill helixes down the bore's place, climbing, {{process.helix_pitch_mm:in.3dot}} a turn, to {{process.bore_past_mm:in.3dot}} below the pair. Cutting oil on the pair before Cycle Start; hands clear until the program ends, then blow the chips out of the bore. It puts the bore {{cad.bore_location_in:.3dot}} from the flush N ends, where both halves' holes were drilled from."
+settings = "endmill-carbide-3fl-1-2-1018-cf"
+rpm = 2483
+feed = "{{process.bore_feed_per_min_mm:in.1f}} in/min"
+milling_cuts = [
+  { name = "bore rough", kind = "slot", phase = "rough", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", flutes = 3, axial_doc_mm = "{{process.helix_pitch_mm}}", radial_woc_mm = "{{process.face_cutter_dia_mm}}", rpm = 2483, feed_mm_min = "{{process.bore_feed_per_min_mm}}", stations_mm = "{{cad.bore_location_mm}}" },
+]
+
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "em-half"
+drilling = "none"
+sizing = "other"
+instruction = "Same file, same speed (set 2483): at full depth, out {{process.bore_finish_stock_mm:in.3dot}} to the finish, a finish turn and a spring turn, climbing. Then, still clamped, gauge the bore."
+settings = "em-half-carbide-1018-3627-wall-climb"
+rpm = 2483
 feed = "{{process.bore_feed_per_min_mm:in.1f}} in/min"
 inspection = "Bore Ø (Ø{{cad.bore_dia_in:.3dot}} REF) still clamped: at least {{cad.bore_clearance_min_in:.3dot}} over the larger column reading and at most {{cad.bore_clearance_max_in:.3dot}} over the smaller, each reading on the 3/4–1-1/4 in telescoping gauge at mid-height, across the split line and along it, read on the 0–1 in or 1–2 in micrometer."
 gauge_checks = [{ gauge = "telescoping-gauges-starrett-s579gz", band_mm = "{{cad.bore_dia_band_mm}}" }]
 milling_cuts = [
-  { name = "bore rough", kind = "slot", phase = "rough", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", flutes = 3, axial_doc_mm = "{{process.helix_pitch_mm}}", radial_woc_mm = "{{process.face_cutter_dia_mm}}", rpm = 2650, feed_mm_min = "{{process.bore_feed_per_min_mm}}", stations_mm = "{{cad.bore_location_mm}}" },
-  { name = "bore finish", kind = "side", phase = "finish", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", flutes = 3, axial_doc_mm = "{{cad.height_mm}}", radial_woc_mm = "{{process.bore_finish_stock_mm}}", rpm = 2650, feed_mm_min = "{{process.bore_feed_per_min_mm}}", stations_mm = "{{cad.bore_location_mm}}" },
+  { name = "bore finish", kind = "side", phase = "finish", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", flutes = 3, axial_doc_mm = "{{process.bore_wall_depth_mm}}", radial_woc_mm = "{{process.bore_finish_stock_mm}}", rpm = 2483, feed_mm_min = "{{process.bore_feed_per_min_mm}}", stations_mm = "{{cad.bore_location_mm}}" },
 ]
 
-# CB10 runs outside the measured envelope too: a 17.0 mm deep wall. Owner
-# ruling (Pedro, 2026-11-22), no re-cut: "log new dechatter issues to try
-# deep axial cuts but with shallow radial depth" (GitHub issue #3427).
+# The same supervised first run (owner ruling, Pedro, 2026-11-25). CB10's
+# opening turn sits inside shop settings.em-half-carbide-1018-3627-wall-climb.
 [[setups.operations]]
-instruction = "First pair that needs CB10 only: this CB10 cut at 2650 rpm has not been chatter-tested on this end mill (the owner's test list: GitHub issue #3427): opening turn about .67 deep x {{process.bore_open_radial_mm:in.3dot}} wide. Listen through the run; on chatter, feed hold, stop the spindle and tell the owner."
+instruction = "First pair that needs CB10 only: run CB10_bore_open supervised, hand on the feed override, adjusting it by ear: back it off at the first chatter, bring it back up while the cut stays clean. Note the override that cut clean beside the program. Its opening turn ({{process.bore_wall_depth_mm:in.3dot}} deep x {{process.bore_open_radial_mm:in.3dot}} wide, climbing) is inside the end mill's measured climb wall cut."
 feed = "hand"
 
 [[setups.operations]]
@@ -1019,11 +1041,12 @@ speed_kind = "spindle"
 tool = "em-half"
 drilling = "none"
 sizing = "other"
-instruction = "Bore under the larger column reading plus {{cad.bore_clearance_min_in:.3dot}} either way: run CB10_bore_open (M6 T1; set 2650): down the bore's centre, out, a turn {{process.bore_open_mm:in.3dot}} larger on the diameter and a spring turn; gauge again. Over the smaller column reading plus {{cad.bore_clearance_max_in:.3dot}} either way, or still under after CB10: stop and tell the owner."
-rpm = 2650
+instruction = "Bore under the larger column reading plus {{cad.bore_clearance_min_in:.3dot}} either way: run CB10_bore_open (M6 T1; set 2483): down the bore's centre, out, a turn {{process.bore_open_mm:in.3dot}} larger on the diameter and a spring turn, climbing; gauge again. Over the smaller column reading plus {{cad.bore_clearance_max_in:.3dot}} either way, or still under after CB10: stop and tell the owner."
+settings = "em-half-carbide-1018-3627-wall-climb"
+rpm = 2483
 feed = "{{process.bore_feed_per_min_mm:in.1f}} in/min"
 milling_cuts = [
-  { name = "bore open", kind = "side", phase = "finish", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", flutes = 3, axial_doc_mm = "{{cad.height_mm}}", radial_woc_mm = "{{process.bore_open_radial_mm}}", rpm = 2650, feed_mm_min = "{{process.bore_feed_per_min_mm}}", stations_mm = "{{cad.bore_location_mm}}" },
+  { name = "bore open", kind = "side", phase = "finish", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", flutes = 3, axial_doc_mm = "{{process.bore_wall_depth_mm}}", radial_woc_mm = "{{process.bore_open_radial_mm}}", rpm = 2483, feed_mm_min = "{{process.bore_feed_per_min_mm}}", stations_mm = "{{cad.bore_location_mm}}" },
 ]
 
 [[setups.operations]]

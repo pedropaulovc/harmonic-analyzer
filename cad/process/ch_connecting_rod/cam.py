@@ -26,7 +26,9 @@ roughs side 1; the blanks are released and reseated; CR03 finishes side 1.
 Side 2 up again: CR04a trims the blank's right end to the fork's crown on
 the measured deep setting; CR04 finishes side 2 and clears the waste beside
 the fork's end through; CR05 bores
-the ring by interpolation; CR06 saws the fork slot with the slitting saw
+the ring by interpolation, the rough levels on the chart setting, then,
+after a speed stop, the finish circle on the measured deep-wall setting;
+CR06 saws the fork slot with the slitting saw
 running horizontally; CR07 spots, drills and reams the pin hole; CR08 cuts
 the outline on seven tabs with the 1/8 in end mill, whose radius is the
 shank's four corners' R.065 (.060-.070; owner ruling 2026-11-23, tool audit
@@ -61,14 +63,14 @@ COMMENT = "MHA-CH-03 connecting rod, two per load"
 # Programs in order, each listing its operation keys. A program whose keys
 # are grouped in tuples is one section per group (a FreeCAD Job, or a manual
 # section: the saw's witness-line stop), joined at M6 tool changes and M0
-# stops.
+# stops (a new speed on the same tool: the bore's finish).
 PROGRAMS: tuple[tuple[str, tuple[Any, ...]], ...] = (
     ("CR01_rough_2", (("rough_2",), ("band_rough_2",))),
     ("CR02_rough_1", (("rough_1",), ("band_rough_1",))),
     ("CR03_finish_1", (("finish_1",), ("band_1",))),
     ("CR04a_end_trim", ("end_trim",)),
     ("CR04_finish_2", (("finish_2",), ("band_2",))),
-    ("CR05_bore", ("bore",)),
+    ("CR05_bore", (("bore",), ("bore_finish",))),
     ("CR06_slot", (("slot_light",), ("slot_line",), ("slot",))),
     ("CR07_pin", (("pin_spot",), ("pin_drill",), ("pin_ream",))),
     ("CR08_outline", ("outline",)),
@@ -876,11 +878,20 @@ def context(
         )
     through = p["through_mm"]
     bore_levels = _levels(ring_far, ring_near - through, level_max)
-    bore_rpm, bore_feed = _setting(plan, shop, "bore")
-    if _setting(plan, shop, "bore rough") != (bore_rpm, bore_feed):
-        raise ValueError("'bore rough' runs at another setting than 'bore'")
+    # The rough levels cut full width, on the chart setting the faces run
+    # at; the finish circle and the spring pass, a conventional wall down the
+    # ring, on their own measured setting: a section of their own after a
+    # speed stop.
+    bore_rpm, bore_feed = _setting(plan, shop, "bore rough")
+    if (bore_rpm, bore_feed) != (em_rpm, em_feed):
+        raise ValueError("'bore rough' runs at another setting than 'rough 2'")
+    bore_finish_rpm, bore_finish_feed = _setting(plan, shop, "bore")
     if not math.isclose(_cut(plan, "bore", "radial_woc_mm"), bore_finish, abs_tol=1e-6):
         raise ValueError("'bore' radial_woc_mm is not process.bore_finish_mm")
+    if not math.isclose(
+        _cut(plan, "bore", "axial_doc_mm"), ring_far - bore_levels[-1], abs_tol=PLAN_TOL_MM
+    ):
+        raise ValueError("'bore' axial_doc_mm is not the finish circle's depth")
 
     # Pin hole: spot, the #49 through in pecks, the .0775 reamer through.
     tools = {
@@ -1206,11 +1217,11 @@ def context(
         end_zone.append(f"G0 Z{clear2:.3f}")
     finish2 = finish2 + end_zone
 
-    # The bores: every blank's rough levels, then every blank's finish
-    # circle and its spring pass (the check orders clearing before passes).
-    # Each rough comes down at the cutting feed to the ring's face, through
-    # the air the finish of side 2 left over it, then plunges into metal at
-    # the slow feed.
+    # The bores: every blank's rough levels (one section), then every
+    # blank's finish circle and its spring pass (the next, at its own
+    # speed; the check orders clearing before passes). Each rough comes down
+    # at the cutting feed to the ring's face, through the air the finish of
+    # side 2 left over it, then plunges into metal at the slow feed.
     bore: list[str] = []
     for yc in centres:
         c = (rx, yc)
@@ -1235,11 +1246,12 @@ def context(
     # the finish lap and the spring lap, then off it on the other half of
     # that circle back to the centre before the retract (no rapid up the
     # finished wall).
+    bore_finish: list[str] = []
     for yc in centres:
         c = (rx, yc)
         a, b = (rx + finish_rr, yc), (rx - finish_rr, yc)
         lead = (rx + finish_rr / 2, yc)
-        bore += [
+        bore_finish += [
             f"G0 {_xy(*c)}",
             f"G0 Z{safe2:.3f}",
             f"G1 Z{_r(bore_levels[-1]):.3f} F{{feed}}",
@@ -1254,7 +1266,7 @@ def context(
     # T1 parked for the saw's mounting and touch-off (Setup 5): up to the
     # park height, then along X past the crowns, then along Y over the fork
     # against the fixed jaw.
-    bore += [
+    bore_finish += [
         f"G0 Z{_r(park_z):.3f}",
         f"G0 X{_r(touch[0]):.3f}",
         f"G0 Y{_r(touch[1]):.3f}",
@@ -1588,6 +1600,20 @@ def context(
             "two",
             stock_two,
             bore,
+            3,
+        ),
+        job(
+            "bore_finish",
+            "finish the bores",
+            "em-half",
+            em,
+            "endmill",
+            bore_finish_rpm,
+            bore_finish_feed,
+            plunge,
+            "two",
+            stock_two,
+            bore_finish,
             3,
         ),
         job(
@@ -1961,7 +1987,15 @@ def context(
     ]
 
     name = "CR05_bore"
-    expect += common(name, t_max, [tn["em-half"]], [bore_rpm], bore_levels[-1])
+    # One tool section at two speeds: the rough levels', then, after the
+    # speed stop over the last bore's centre, T1 clear over the load, the
+    # finish circle's.
+    expect += [
+        [name, "tool_changes", {"z_top": t_max, "tools": [tn["em-half"]], "loads_first": True}],
+        [name, "spindle", {"rpm": [[bore_rpm, bore_finish_rpm]]}],
+        [name, "pauses", {"z_top": t_max, "count": 1, "at": [[_r(rx), _r(centres[-1])]]}],
+        [name, "depth", {"z_min": _r(bore_levels[-1])}],
+    ]
     bore_elements = []
     for k, yc in enumerate(centres):
         rb = bore_d / 2

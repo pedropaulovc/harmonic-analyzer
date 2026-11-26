@@ -171,10 +171,18 @@ JAW_DEPTH_MM = IN
 PARALLEL_LENGTH_MM = 4 * IN
 # A plan number the recipe recomputes must agree to this (its rounding).
 PLAN_TOL_MM = 0.01
-# The pair bore's shop setting: the chart record for the 1/2 in carbide end
-# mill in 1018, which its authored rpm and feed follow (the bore's cuts lie
-# outside the measured face envelope; the faces run on the measured one).
+# The pair bore's shop settings (owner ruling, Pedro, 2026-11-25): the rough
+# helix cuts the end mill's full width, which no record holds (#3428), so it
+# stays on the chart setting for the 1/2 in carbide end mill in 1018; the
+# finish, spring and opening turns climb (G3) a wall no deeper and no wider
+# than the measured climb wall record holds. Both run at one rpm, one section.
 BORE_SETTING = "endmill-carbide-3fl-1-2-1018-cf"
+BORE_WALL_SETTING = "em-half-carbide-1018-3627-wall-climb"
+BORE_SETTINGS = {
+    "bore rough": BORE_SETTING,
+    "bore finish": BORE_WALL_SETTING,
+    "bore open": BORE_WALL_SETTING,
+}
 
 
 def _plan_operations(plan: dict[str, Any]):
@@ -1244,20 +1252,51 @@ def _back_context(
         _cut(plan, "bore rough", "axial_doc_mm"), p["helix_pitch_mm"], abs_tol=1e-6
     ):
         raise ValueError("'bore rough' axial_doc_mm is not process.helix_pitch_mm")
-    # The bore's feeds: the chart setting's chip load holds at the cutter's
-    # edge, which runs (r_rough + r)/r_rough faster than its centre on the
-    # helix. The bore lies outside the measured face envelope, so it keeps
-    # the chart setting the faces ran on before they were measured.
-    chart = shop["settings"][BORE_SETTING]
-    bore_rpm = float(chart["rpm"])
-    chart_feed = chart["chip_load_mm_per_tooth"] * chart["flutes"] * bore_rpm
-    bore_feed = chart_feed * r_rough / (r_rough + r)
-    _agree(plan, "bore_feed_per_min_mm", bore_feed)
-    for name in ("bore rough", "bore finish", "bore open"):
-        if _setting(plan, shop, name) != (bore_rpm, p["bore_feed_per_min_mm"]):
-            raise ValueError(
-                f"'{name}' does not run at {bore_rpm:g} rpm and process.bore_feed_per_min_mm"
+    # The bore's feeds: each bore cut's operation names its shop setting
+    # (BORE_SETTINGS), whose chip load holds at the cutter's edge, which runs
+    # (r_rough + r)/r_rough faster than its centre on the helix; the plan
+    # authors that centre feed, and the finish and opening turns, further
+    # out, run it too (their edge a little under the setting's chip load).
+    # Every setting must give one rpm and edge feed: CB09 is one section.
+    speeds = set()
+    for name, key in BORE_SETTINGS.items():
+        op, _cut_record = _op_with_cut(plan, name)
+        if op.get("settings") != key:
+            raise ValueError(f"'{name}' does not name shop settings.{key}")
+        record = shop["settings"][key]
+        speeds.add(
+            (
+                float(record["rpm"]),
+                record["chip_load_mm_per_tooth"] * record["flutes"] * record["rpm"],
             )
+        )
+    if len(speeds) != 1:
+        raise ValueError(f"the bore's settings differ in rpm or feed: {sorted(speeds)}")
+    ((bore_rpm, edge_feed),) = speeds
+    bore_feed = edge_feed * r_rough / (r_rough + r)
+    _agree(plan, "bore_feed_per_min_mm", bore_feed)
+    for name in BORE_SETTINGS:
+        for key, value in (
+            ("rpm", bore_rpm),
+            ("feed_mm_min", p["bore_feed_per_min_mm"]),
+        ):
+            if not math.isclose(_cut(plan, name, key), value, abs_tol=1e-3):
+                raise ValueError(
+                    f"'{name}' {key} is not {value:g} (its setting's rpm; "
+                    "process.bore_feed_per_min_mm)"
+                )
+    # The finish and opening walls the plan bounds against the climb record:
+    # the tallest pair's full height, the finish stock and half the opening.
+    _agree(plan, "bore_wall_depth_mm", height_max)
+    _agree(plan, "bore_open_radial_mm", p["bore_open_mm"] / 2)
+    for name, key, value in (
+        ("bore finish", "axial_doc_mm", p["bore_wall_depth_mm"]),
+        ("bore finish", "radial_woc_mm", p["bore_finish_stock_mm"]),
+        ("bore open", "axial_doc_mm", p["bore_wall_depth_mm"]),
+        ("bore open", "radial_woc_mm", p["bore_open_radial_mm"]),
+    ):
+        if not math.isclose(_cut(plan, name, key), value, abs_tol=1e-6):
+            raise ValueError(f"'{name}' {key} is not the wall the recipe cuts, {value:g}")
     # The pair's holding: a parallel under each outside face's band behind
     # the bore, the back's stopped short of it along the jaws; a 1-2-3 block
     # between the moving jaw and the front's bar face, between the screw

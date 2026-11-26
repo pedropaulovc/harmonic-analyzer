@@ -457,10 +457,11 @@ helix_deg = 30
 # 1/2 in cutters. Ceiling: The Carbide End Mill Store "Carbide End Mill Speeds
 # and Feeds, General Purpose, Uncoated" (6gtools.com, PDF read 2026-11-17),
 # row Steels P, Mild - 1018 (.2-.3 Carbon): 350 SFM. The 1/2 in cutter is
-# held under it: 350 × 3.82 / .5 = 2674 rpm, taken down to 2650 (347 ft/min);
-# the other three run at 2800. Tru-Edge "Solid Carbide Endmills Feeds and
-# Speeds" (PDF read 2026-11-17), row Low Carbon Steel - 1018: 200-400 SFM,
-# would admit 2800 on all four; the lower ceiling is kept for this mill.
+# held under it: 350 × 3.82 / .5 = 2674 rpm; it runs at 2483, the dial's stop
+# 23 (below); the other three run at 2800. Tru-Edge "Solid Carbide Endmills
+# Feeds and Speeds" (PDF read 2026-11-17), row Low Carbon Steel - 1018:
+# 200-400 SFM, would admit 2800 on all four; the lower ceiling is kept for
+# this mill.
 # Chip load: the same 6G table's Mild - 1018 feeds, .0006, .0017, .0025 and
 # .0028 in/tooth for 1/8, 1/4, 3/8 and 1/2 in, × 25.4. These are its low end:
 # the table multiplies them by a chip-load factor of 1.0 at 50 % radial
@@ -498,11 +499,20 @@ rpm = 2800
 chip_load_mm_per_tooth = 0.0635  # .0025 in; 2800 × 3 × .0025 = 21.0 in/min
 flutes = 3
 feed_unit = "in/min"
+# The 1/2 in cutter's chart speed (owner ruling 2026-11-25): 2483 rpm, the
+# dial's stop 23 (machines.pm-30mv, cad/config/shop-equipment/machines.toml),
+# 325 ft/min. The chart's former 2650 sits where every width chattered in
+# both deep sessions (#3427: 13.5 mm deep, 0.4 and 0.8 mm at 2654 heard;
+# #3627: 17 mm deep, climb, 0.1-0.5 mm at 2654-2750 heard), and 2483 was
+# stable or close to the line in all of them (measured-cuts.toml). The cuts
+# that still run on this record are the ones no record covers: full-width
+# slots and the column clamp bore's helix (#3428 measures them) and the
+# amplitude bar, whose 2 in stick-out is outside the cutter's band.
 [settings.endmill-carbide-3fl-1-2-1018-cf]
 tool = "endmill-carbide-3fl-1-2"
 material = "rocker-1018-cold-finished"
-rpm = 2650
-chip_load_mm_per_tooth = 0.07112  # .0028 in; 2650 × 3 × .0028 = 22.3 in/min
+rpm = 2483
+chip_load_mm_per_tooth = 0.07112  # .0028 in; 2483 × 3 × .0028 = 20.9 in/min
 flutes = 3
 feed_unit = "in/min"
 # Measured (#3383): dechatter 0.4.0 reports v5 and v6, 2026-11-22, on the
@@ -512,19 +522,16 @@ feed_unit = "in/min"
 # and -v6.html. Stick-out 27.94 mm (1.100 in), the owner's measurement; both
 # reports' setup field reads 30.0, the value entered before the cut (owner,
 # Pedro, 2026-11-22: "stickout is recorded as 30mm but is actually 27.94").
-# The reports are his recorded data and stay as written. The travelers set
-# 28.45 mm (1.12 in), which the session of 2026-11-23 cut at (owner, Pedro,
-# 2026-11-24: "28.45"); each record's band, and what was and was not cut at
-# 28.45, is in measured-cuts.toml. The work: a
+# The reports are his recorded data and stay as written. Each record holds
+# at every stick-out in the cutter's band, 27.94 to 31.75 mm (owner ruling
+# 2026-11-25, measured_cutters in measured-cuts.toml). The work: a
 # 126 x 13 x 73 mm 1018 plate upright in the vise, about 30 mm above the jaws
-# (the reports' setup text). Valid only for that tool assembly, and only inside
-# each record's depth and width; those limits and the stick-out are data in
+# (the reports' setup text). Valid only inside each record's depth and width;
+# those limits and the stick-out band are data in
 # cad/config/shop-equipment/measured-cuts.toml (prechips refuses any other key
 # on a setting), and test_measured_cuts.py refuses a plan cut outside them.
-# NOT tested, so the chart record above still carries them: any cut deeper
-# than 6.6 mm (the 10.54 mm side finishing); any cut wider than 6.4 mm at
-# 1.27 mm deep (7.6 mm chattered) or wider than 3.0 mm deeper (the 12.7 mm
-# full-width passes); climb milling; slotting; any other holder or material.
+# NOT measured, so the chart record above still carries them: full-width
+# slots and the clamp bore's helix (#3428); any other holder or material.
 # 3.2 mm deep had one pass, which chattered; v6 planned a 1.27 mm re-check and
 # did not run it.
 # Full width at shallow depth (#3428) is still NOT measured. The session of
@@ -534,9 +541,8 @@ feed_unit = "in/min"
 # 2300 and 2420), 2600, 2690 and 2800 rpm as heard, 2.5 mm stable at 2375; its
 # second round (4.6 and 6.2 mm) was planned and not cut. Nothing wider than
 # 2.5 mm, so it adds no setting.
-# Speed: 2800 rpm chattered at both depths (1.8 mm wide at 1.27 deep, 1.3 mm
-# wide at 6.6 deep) and no speed between 2400 and 2800 was cut, so the chart's
-# 2650 is unmeasured, between the stable 2400 and the chattering 2800.
+# Speed in v5 and v6: 2800 rpm chattered at both depths (1.8 mm wide at 1.27
+# deep, 1.3 mm wide at 6.6 deep); no speed between 2400 and 2800 was cut.
 # Deep, up to 6.6 mm deep and 2.2 mm wide. Owner, Pedro, 2026-11-22: "deeper
 # cuts caused violent chatter". v6 at 6.6 mm deep: stable at 1500 rpm 0.6 and
 # 1.3 mm wide (0.3 mm chattered), 1930 and 2370 rpm 0.3-1.3 mm, 2370 at
@@ -595,6 +601,35 @@ feed_unit = "in/min"
 tool = "endmill-carbide-3fl-1-2"
 material = "rocker-1018-cold-finished"
 rpm = 2450
+chip_load_mm_per_tooth = 0.07112
+flutes = 3
+feed_unit = "in/min"
+# Deep walls, conventional, up to 13.5 mm deep and 0.4 mm wide (#3427):
+# session 1018-12.7mm-3fl-28.45-side-deep-issue3427-v1, 2026-11-24/25,
+# dechatter 0.8.0, same cutter and collet, .0028 in (.071 mm)/tooth; the
+# passes, the speeds heard and why the limit is 0.4 mm at 1839 are beside
+# measured_cuts.em-half-carbide-1018-3427-wall (cad/config/shop-equipment/
+# measured-cuts.toml). 1839 is the dial's stop 17 (heard 1838 in the 0.4 mm
+# pass). A wider finish wall is split into equal passes no wider than 0.4.
+# 1839 × 3 × .0028 = 15.4 in/min.
+[settings.em-half-carbide-1018-3427-wall]
+tool = "endmill-carbide-3fl-1-2"
+material = "rocker-1018-cold-finished"
+rpm = 1839
+chip_load_mm_per_tooth = 0.07112
+flutes = 3
+feed_unit = "in/min"
+# Deep walls, climb, up to 17 mm deep and 0.3 mm wide (#3627): session
+# 1018-12.7mm-3fl-31.75-clamp-bore-climb-issue3627-v1, 2026-11-25, dechatter
+# 0.8.0, same cutter and collet, .0028 in (.071 mm)/tooth; the passes and why
+# the limit is 0.3 mm at 2483 are beside
+# measured_cuts.em-half-carbide-1018-3627-wall-climb. 2483 is the dial's stop
+# 23, the chart's speed (heard 2484 in the 0.3 mm pass). 2483 × 3 × .0028 =
+# 20.9 in/min.
+[settings.em-half-carbide-1018-3627-wall-climb]
+tool = "endmill-carbide-3fl-1-2"
+material = "rocker-1018-cold-finished"
+rpm = 2483
 chip_load_mm_per_tooth = 0.07112
 flutes = 3
 feed_unit = "in/min"

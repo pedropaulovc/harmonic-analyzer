@@ -253,11 +253,14 @@ sink_feed_per_min_mm = 21.336
 # Holders and reach: HA holders.r8-collets-lms-4860.gauge_len_mm; archive
 # holders.drill-chuck-r8.gauge_len_mm. The longest tool: the .4385 chucking
 # reamer in the drill chuck, 7 in overall (ASME B94.2 straight-shank chucking
-# reamers, 7/16 in; the .4385 is the set's 7/16 over). The end mill at least 1.00 in out of its collet.
+# reamers, 7/16 in; the .4385 is the set's 7/16 over). The 3/8 in end mill
+# (1-3/4 in of flute) at least its flute length + 10 % out of its collet,
+# 48.9 mm (owner ruling 2026-11-25 on #3386, HA #3624: "min stickout based
+# on flute length then add 10pct on top of it").
 r8_collet_gauge_mm = 6.3
 drill_chuck_gauge_mm = 95.0
 reamer_oal_mm = 177.8
-em_projection_min_mm = 25.4
+em_projection_min_mm = 48.9
 # Inspection, from K (the .438 minus pin of the pin gauges standing in it,
 # .219 radius: a plug to measure from, not K's acceptance): the calipers
 # over the pin and an edge read the edge's distance from K plus the pin's
@@ -449,7 +452,7 @@ instruction = "Wait 5 minutes before touching the blank (the maker's glue cures 
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Console M6 T1 (3/8 in end mill, at least 1.00 in out of its collet). Spindle stopped, its end just dragging a .002 feeler leaf, note the machine Z (MPos, mm) on the blank's top 1/2 in in from the R end and from the front edge, then on the bare block 1 in in front of the blank at the same X. The same at the far end."
+instruction = "Console M6 T1 (3/8 in end mill, at least {{process.em_projection_min_mm:in.2f}} in out of its collet). Spindle stopped, its end just dragging a .002 feeler leaf, note the machine Z (MPos, mm) on the blank's top 1/2 in in from the R end and from the front edge, then on the bare block 1 in in front of the blank at the same X. The same at the far end."
 feed = "hand"
 
 [[setups.operations]]
@@ -487,7 +490,7 @@ feed = "hand"
 
 [[setups.operations]]
 instruction = "G54 Z0: face A, from the thickness written on the blank and T1 touched on its top over the miked spot."
-instruction_detailed = "Console M6 T1 (3/8 in end mill, at least 1.00 in out of its collet; the tool setter measures it); MDI G0 X{{process.z_touch_x_mm:.3f}} Y{{process.z_touch_y_mm:.3f}} (the blank's middle, 1/2 in in from its front edge). Spindle stopped, its end just dragging a .002 feeler leaf on the blank: G10 L20 P1 Z(the written thickness in mm + {{process.z_leaf_mm:.3f}})."
+instruction_detailed = "Console M6 T1 (3/8 in end mill, at least {{process.em_projection_min_mm:in.2f}} in out of its collet; the tool setter measures it); MDI G0 X{{process.z_touch_x_mm:.3f}} Y{{process.z_touch_y_mm:.3f}} (the blank's middle, 1/2 in in from its front edge). Spindle stopped, its end just dragging a .002 feeler leaf on the blank: G10 L20 P1 Z(the written thickness in mm + {{process.z_leaf_mm:.3f}})."
 feed = "hand"
 
 [[setups.operations]]

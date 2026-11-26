@@ -481,8 +481,8 @@ def context(
             raise ValueError(
                 f"'{name}' cutter Ø{_cut(plan, name, 'cutter_dia_mm')}, the end mill is Ø{em}"
             )
-    # The faces run at their measured setting, the ends (deeper than it was
-    # measured) at the chart's: each pair at one speed.
+    # The faces run at their measured face setting, the ends (deeper than
+    # it) at the deep conventional wall record: each pair at one speed.
     face_rpm, face_feed = _setting(plan, shop, "top face")
     if _setting(plan, shop, "height") != (face_rpm, face_feed):
         raise ValueError("'height' runs at another setting than 'top face'")

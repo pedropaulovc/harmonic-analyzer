@@ -283,10 +283,14 @@ reamer_oal_mm = 177.8
 # the plate top while the faces are cut: the jaws' top is 9 mm over it, the
 # fence, end stop and clamp noses at most 2 mm.
 half_mill_projection_mm = 28.45
-# 1/8 in end mill, 1-1/2 in overall, 1/2 in of flute: between this much out
-# of the collet and its flute length (4 diameters).
-eighth_mill_projection_min_mm = 12.0
-eighth_mill_projection_max_mm = 12.7
+# 1/8 in end mill, 1-1/2 in overall, 1/2 in of flute (McMaster 88815A18):
+# at least its flute length + 10 % out of the collet, 13.97 mm (owner
+# ruling 2026-11-25 on #3386, HA #3624: "min stickout based on flute length
+# then add 10pct on top of it"). The max is the setting window above it,
+# .030 in as the old 12.0–12.7; it bounds the setup's longest tool. Longer
+# only lifts the collet's nose further over the washer and screw head.
+eighth_mill_projection_min_mm = 13.97
+eighth_mill_projection_max_mm = 14.73
 
 [[tools]]
 id = "em-half"
