@@ -383,7 +383,7 @@ instruction = "An unfaced patch left: send $#, note the G54 line's Z; work out w
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Unclamp; mark this face K; file its edges' burr off so K seats flat. Next piece: this setup again from its edge-find."
+instruction = "Unclamp; mark this face K. Next piece: this setup again from its edge-find."
 feed = "hand"
 
 [[setups]]
@@ -428,7 +428,7 @@ instruction_detailed = "Over {{cad.back_face_depth_max_in:.3dot}}: send $# and n
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Unclamp; mark this face F, and write the piece's number (1, 2 or T) on it again: facing F took the first one off. File the burr off its edges. The coupon T is done until Setup 8. Next piece: this setup again from its edge-find."
+instruction = "Unclamp; mark this face F, and write the piece's number (1, 2 or T) on it again: facing F took the first one off. The coupon T is done until Setup 8. Next piece: this setup again from its edge-find."
 feed = "hand"
 
 [[setups]]
@@ -472,7 +472,7 @@ instruction = "An unfaced patch left: lower Z0 .010 (as Setup 2), run KM03_botto
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Unclamp; mark this face U; file its edges' burr off so U seats flat."
+instruction = "Unclamp; mark this face U."
 feed = "hand"
 
 [[setups]]
@@ -526,7 +526,7 @@ instruction = "A sawn patch left: lower Z0 .010 (as Setup 2), run KM04_s_end aga
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Unclamp; mark the faced end S again; file the burr off its four edges with the smooth file so S seats flat on the parallels next."
+instruction = "Unclamp; mark the faced end S again."
 feed = "hand"
 
 [[setups]]
@@ -571,7 +571,7 @@ instruction_detailed = "Over {{cad.minus_x_side_width_max_in:.3dot}}: send $# an
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Unclamp; mark the faced end N; file the burr off its four edges."
+instruction = "Unclamp; mark the faced end N."
 feed = "hand"
 
 [[setups]]
@@ -730,7 +730,7 @@ gauge_checks = "other"
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Unclamp. File the milled burr off A's four edges with the smooth file, and the mouths of B and the tap hole with the scraper only: A, S and K are Setup 8's seats and datums. Next blank: this setup again from its edge-find."
+instruction = "Unclamp. The burr off the mouths of B and the tap hole: the scraper only. Next blank: this setup again from its edge-find."
 feed = "hand"
 
 [[setups]]
@@ -813,7 +813,7 @@ speed_kind = "spindle"
 tool = "reamer-4990"
 drilling = "none"
 sizing = { kind = "band", band_mm = "{{cad.knife_bore_dia_band_mm}}" }
-instruction = "Same file, M6 T6 (spindle off, retracted): ream the bore through, the .4990 reamer in the 7/16 collet {{process.reamer_projection_mm:in.2f}} in out; set 190. Cutting oil, plenty. The file feeds the reamer in and feeds it back out, spindle running: no rapid leaves the bore. Leave the block clamped for the check."
+instruction = "Same file, M6 T6: ream the bore through, the .4990 reamer in the 7/16 collet {{process.reamer_projection_mm:in.2f}} in out; set 190. Cutting oil, plenty. The file feeds the reamer in and feeds it back out, spindle running: no rapid leaves the bore. Leave the block clamped for the check."
 settings = "reamer-4990-4140-ht"
 inspection = "Still clamped: the bore Ø{{cad.knife_bore_dia_min_in:.4dot}}–{{cad.knife_bore_dia_max_in:.4dot}} through: the GO pin (.4985 plus) enters its whole length, the NO-GO pin (.500 minus) does not enter. As reamed (the drawing's finish mark on the bore): no tears or chatter marks."
 gauge_checks = [{ gauge = "zz-pins-4985-5000", band_mm = "{{cad.knife_bore_dia_band_mm}}" }]
