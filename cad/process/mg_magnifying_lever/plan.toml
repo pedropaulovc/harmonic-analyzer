@@ -71,14 +71,11 @@ stock_refs = ["c360-round-1-4"]
 material_key = "lathe-c360"
 
 # The shop's standing page carries what every traveler shares (units, lathe
-# speeds, coolant); This job says what only this lever needs.
+# speeds, coolant). The old note's O.D. rule prints where it applies: the
+# stock line ("the lever's O.D. is the bar as bought"), the shim-wrap
+# Holdings, and the ops that leave the rod untouched and check the Ra 125
+# MHA-MG-02 screw seat.
 standing = true
-
-[[notes]]
-title = "This job"
-rows = [
-  ["O.D.", "The O.D. is left as bought: the drawn rod's own surface is the drawing's Ra 125 MHA-MG-02 screw seat, so grip it over a brass shim wrap and never cut, file or stone it."],
-]
 
 [cad]
 file = "../../out/features/mg_magnifying_lever/features.toml"
