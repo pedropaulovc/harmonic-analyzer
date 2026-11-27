@@ -24,6 +24,7 @@ import pd_cluster_air as AIR
 import pd_transgear_disc_hub_geometry as HUB_GEOMETRY
 import transgear_cluster_fit as FIT
 from _printed_tolerance import printed_band_mm
+from machinist_exceptions import load_exceptions
 
 CONFIG = Path(__file__).resolve().parents[1] / "config"
 LOOSER = 0.002 * 25.4  # rule 4's necessity test: the feature .002 in loose
@@ -106,12 +107,10 @@ def _necessity(stem: str, entry_id: str) -> str:
     return entry["source"]
 
 
-def _exception(path: Path, entry_id: str) -> str:
-    data = yaml.safe_load(path.read_text(encoding="utf-8"))
-    (package,) = data.values() if "machinist_exceptions" not in data else (data,)
-    (entry,) = (e for e in package["machinist_exceptions"] if e["id"] == entry_id)
-    assert entry["kind"] == "accept"
-    return entry["reason"]
+def _exception(name: str, kind: str, entry_id: str) -> str:
+    (entry,) = (e for e in load_exceptions(CONFIG, name, kind) if e.id == entry_id)
+    assert entry.kind == "accept"
+    return entry.reason
 
 
 def test_the_registers_quote_the_derived_airs():
@@ -131,11 +130,11 @@ def test_the_accept_entries_quote_the_shared_budget():
     alone each opens, both open with 0.0016 mm over the floor, and neither
     opens with a bore."""
     entries = (
-        (CONFIG / "parts" / "pd-transgear-knob-bush.yaml", "RV-05", HUB_STATION),
-        (CONFIG / "assemblies" / "pd-paper-drive.yaml", "PD-00-bush-seat-feeler", SEAT),
+        ("pd-transgear-knob-bush", "part", "RV-05", HUB_STATION),
+        ("pd-paper-drive-assembly", "assembly", "PD-00-bush-seat-feeler", SEAT),
     )
-    for path, entry_id, feature in entries:
-        reason = _exception(path, entry_id)
+    for name, kind, entry_id, feature in entries:
+        reason = _exception(name, kind, entry_id)
         assert "delegated ruling 2026-11-25 (Main), no precedent" in reason
         assert "issues/2144" in reason
         for opened in (

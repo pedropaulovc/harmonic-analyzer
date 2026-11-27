@@ -15,6 +15,7 @@ from _drawing_contract import model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_types import DrawingLayout
 from _machinist_review_mode import MachinistReviewMode
+from machinist_exceptions import load_exceptions
 
 INCH = 25.4
 
@@ -31,7 +32,7 @@ def test_registry_row_is_sheet_tooling_in_inch_its_stock_a_one_line_change() -> 
     assert "OnlineMetals 1589" in row["material_specification"]
     assert row["material"] == "C26000 BRASS, HALF-HARD"
     assert spec.MATERIAL == "Brass"
-    assert "machinist_exceptions" not in row
+    assert load_exceptions(_config.CONFIG_DIR, spec.PART_NAME, "part") == ()
     assert "mill" not in row["process"]
     assert spec.SHEET_THICK == pytest.approx(0.020 * INCH)
     assert spec.SHEET_THICK_TOLERANCE_MM == pytest.approx(0.002 * INCH)

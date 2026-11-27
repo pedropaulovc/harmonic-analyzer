@@ -27,6 +27,7 @@ from _drawing_contract import (
 from _drawing_registry import DRAWINGS_BY_NAME
 from _layout_geometry import estimate_text_box
 from _printed_tolerance import printed_band_mm
+from machinist_exceptions import load_exceptions
 from paper_drive_stock_inspection import span_contact_points_mm
 from _test_stubbed_build import offline_adapter, stub_seat
 
@@ -164,12 +165,12 @@ def test_finished_tap_web_pays_both_mouths_and_prints_its_least() -> None:
 def test_the_package_declares_the_tap_web_the_sheet_prints() -> None:
     """#2167: Main's delegated minor (option A, the geometry kept) names the
     generated wall line the taps' note prints last (rule 20)."""
-    exceptions = _config.parts("pd-rack-pinion")["machinist_exceptions"]
-    (entry,) = [entry for entry in exceptions if entry["id"] == "RV-03"]
-    assert entry["kind"] == "minor"
-    assert spec.TAP_WALL_TEXT in entry["where"]
-    assert "Owner ruling 2026-11-08 (Pedro), #2144 item 3.1" in entry["reason"]
-    assert "#2144" in entry["reason"]
+    exceptions = load_exceptions(_config.CONFIG_DIR, "pd-rack-pinion", "part")
+    (entry,) = [entry for entry in exceptions if entry.id == "RV-03"]
+    assert entry.kind == "minor"
+    assert spec.TAP_WALL_TEXT in entry.where
+    assert "Owner ruling 2026-11-08 (Pedro), #2144 item 3.1" in entry.reason
+    assert "#2144" in entry.reason
     assert f"{spec.TAP_WALL_TEXT}." in callouts.DRAWING_NOTES
 
 
@@ -177,11 +178,11 @@ def test_the_runout_accept_names_the_sample_the_sheet_prints() -> None:
     """#2665 (owner rulings 2026-11-20 and 2026-11-21): RV-02's where names
     the 12-space sample line the callout prints (review of 696de31975), in
     prose case."""
-    exceptions = _config.parts("pd-rack-pinion")["machinist_exceptions"]
-    (entry,) = [entry for entry in exceptions if entry["id"] == "RV-02"]
-    assert entry["kind"] == "accept"
-    assert spec.TOOTH_SPACE_CALLOUT.splitlines()[1] in entry["where"].upper()
-    assert "Owner ruling 2026-11-21 (Pedro), #2665" in entry["reason"]
+    exceptions = load_exceptions(_config.CONFIG_DIR, "pd-rack-pinion", "part")
+    (entry,) = [entry for entry in exceptions if entry.id == "RV-02"]
+    assert entry.kind == "accept"
+    assert spec.TOOTH_SPACE_CALLOUT.splitlines()[1] in entry.where.upper()
+    assert "Owner ruling 2026-11-21 (Pedro), #2665" in entry.reason
 
 
 def test_the_bore_clears_the_hub_spigot_for_centring_at_every_limit() -> None:

@@ -30,6 +30,7 @@ from _hole_spec import TAP_DRILL_MM, THREAD_MAJOR_MM
 from _layout_audit import TEXT_ROW_LIMIT
 from _machinist_review_mode import MachinistReviewMode
 from _printed_tolerance import printed_band_mm
+from machinist_exceptions import load_exceptions
 
 STEM = "ch_rocker_strap_tl_sub_plate"
 INCH = 25.4
@@ -142,10 +143,10 @@ def test_the_hub_tap_states_its_worst_case_engagement() -> None:
     )
     assert spec.HUB_ENGAGEMENT_STATEMENT == "ENGAGEMENT .19 MIN (1.01D)"
     assert spec.HUB_THREAD_LENGTH_MIN < spec.HUB_THREAD_REQUIRED
-    exception = _config.parts(spec.PART_NAME)["machinist_exceptions"][0]
-    assert exception["id"] == "RV-01" and "(1.01D)" in exception["finding"]
-    assert "Owner ruling 2026-11-23" in exception["reason"]
-    assert "Use a 1/4-20 hub screw." in exception["reason"]
+    exception = load_exceptions(_config.CONFIG_DIR, spec.PART_NAME, "part")[0]
+    assert exception.id == "RV-01" and "(1.01D)" in exception.finding
+    assert "Owner ruling 2026-11-23" in exception.reason
+    assert "Use a 1/4-20 hub screw." in exception.reason
     for word in ("ACCEPT", "RULING", "RULE", "OWNER"):
         assert word not in spec.HUB_ENGAGEMENT_STATEMENT
     # The drill and reamer tips stop the plan's clearance above the floor.

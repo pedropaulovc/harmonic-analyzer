@@ -19,6 +19,7 @@ import dt_cone_tip_gear_notes as notes
 import dt_cone_tip_gear_spec as spec
 from _drawing_registry import DRAWINGS_BY_NAME
 from _layout_geometry import Box, Segment, segment_box_distance
+from machinist_exceptions import load_exceptions
 
 # 2.5 mm note text: 1.79 mm a character, 3.51 mm a line (the family's
 # measured pitch); dimension text: 2.77 mm a character, 5.7 mm a row.
@@ -173,20 +174,19 @@ def test_callouts_and_notes_name_every_mate_once() -> None:
 
 
 def test_yaml_carries_the_tooth_band_face_width_and_stem_band_rulings_only() -> None:
-    row = _config.parts(spec.PART_NAME)
-    rows = row["machinist_exceptions"]
-    assert [entry["id"] for entry in rows] == ["RV-01", "RV-02", "RV-03"]
+    rows = load_exceptions(_config.CONFIG_DIR, spec.PART_NAME, "part")
+    assert [entry.id for entry in rows] == ["RV-01", "RV-02", "RV-03"]
     assert "2026-11-09" in str(rows[0]) and "pull/1992" in str(rows[0])
     # Owner ruling 2026-11-20 (#2631): the shared .2934 face width.
-    assert "#2631" in rows[1]["reason"] and ".2934" in rows[1]["where"]
+    assert "#2631" in rows[1].reason and ".2934" in rows[1].where
     # D50 as amended: the two stems' .0010 bands, narrower than the turned
     # row, with both ends' necessity and why form 2 cannot be accepted.
     stems = rows[2]
-    assert stems["kind"] == "accept"
+    assert stems.kind == "accept"
     for name in ("SpigotDia", "PivotDia"):
-        assert name in stems["where"]
+        assert name in stems.where
     for cited in ("D50 as amended", "no precedent", "owner review #2144", "N-03", "N-04", "D47"):
-        assert cited in stems["reason"]
+        assert cited in stems.reason
 
 
 def test_custom_six_detail_reproduces_complete_finite_core_grinding_curves() -> None:

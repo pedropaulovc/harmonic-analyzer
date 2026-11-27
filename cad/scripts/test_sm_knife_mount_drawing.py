@@ -12,6 +12,7 @@ import build_sm_knife_mount as part
 import draw_sm_knife_mount as drawing
 import sm_knife_mount_spec
 from _drawing_registry import DRAWINGS_BY_NAME
+from machinist_exceptions import load_exceptions
 
 
 def test_knife_seat_bore_finish_is_part_owned_and_consumed_by_key() -> None:
@@ -637,15 +638,15 @@ def test_native_gdt_and_bore_geometry() -> None:
         assert not hasattr(sm_knife_mount_spec, gone), gone
     # The ∥ refinement is an extra GD&T row: the package declares it
     # (drawing-simplicity-policy.md, GD&T allowlist), citing the ruling.
-    declared = _config.parts("sm-knife-mount")["machinist_exceptions"]
+    declared = load_exceptions(_config.CONFIG_DIR, "sm-knife-mount", "part")
     parallel_accepts = [
         entry
         for entry in declared
-        if entry["kind"] == "accept" and "parallelism" in entry["where"]
+        if entry.kind == "accept" and "parallelism" in entry.where
     ]
     assert len(parallel_accepts) == 1
-    assert "#2144 item 11.3" in parallel_accepts[0]["reason"]
-    assert not any("datum-C" in entry["where"] or "slot" in entry["where"] for entry in declared)
+    assert "#2144 item 11.3" in parallel_accepts[0].reason
+    assert not any("datum-C" in entry.where or "slot" in entry.where for entry in declared)
 
 
 @pytest.mark.parametrize(

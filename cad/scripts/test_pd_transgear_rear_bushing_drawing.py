@@ -21,6 +21,7 @@ from _drawing_types import DrawingLayout
 from _inch_wall_limits import WALL_TARGET_MM
 from _printed_tolerance import printed_band_mm
 from _surface_finish import MACHINED_UM
+from machinist_exceptions import load_exceptions
 
 
 def test_required_drawing_paths() -> None:
@@ -83,7 +84,7 @@ def test_the_bore_runs_on_the_pin_and_names_it() -> None:
     assert loose > least_float
     drilled = spec.bore_cock_take_up((0.1285 + 0.004) * 25.4 - pin.DIA_MIN)
     assert drilled / 25.4 == pytest.approx(0.0157, abs=5e-5)
-    assert "machinist_exceptions" not in _config.parts("pd-transgear-rear-bushing")
+    assert load_exceptions(_config.CONFIG_DIR, "pd-transgear-rear-bushing", "part") == ()
     (entry,) = yaml.safe_load(
         (_config.CONFIG_DIR / "necessity" / "pd-transgear-rear-bushing.yaml").read_text(
             encoding="utf-8"

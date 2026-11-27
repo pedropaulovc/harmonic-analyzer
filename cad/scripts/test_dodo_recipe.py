@@ -2186,6 +2186,33 @@ def test_shop_file_readers_stay_outside_every_com_leaf():
     assert {root: hits for root, hits in reached.items() if hits} == {}
 
 
+def test_review_registers_stay_outside_every_native_leaf():
+    """The exception and necessity registers (#3663, rule 4) are read by the
+    machinist review alone. Neither a register file nor a module that reads
+    one may enter any other cached leaf's key (part, assembly, drawing,
+    soundness, kinematics, export, feature or release), or an entry edit would
+    rebuild native leaves again."""
+    dodo = _load_dodo()
+    registers = {
+        (dodo.CONFIG_DIR / family).resolve() for family in ("exceptions", "necessity")
+    }
+    readers = {
+        (dodo.SCRIPTS_DIR / name).resolve()
+        for name in ("machinist_exceptions.py", "machinist_necessity.py")
+    }
+    leaked = {}
+    for label, deps in dodo._cache_rows():
+        if label.startswith("check:machinist_review:"):
+            continue
+        paths = [Path(dep).resolve() for dep in deps]
+        hits = sorted(
+            str(path) for path in paths if path.parent in registers or path in readers
+        )
+        if hits:
+            leaked[label] = hits
+    assert leaked == {}
+
+
 def test_verify_gate_logic_off_build_closure_is_a_file_dep():
     """A verify gate whose LOGIC lives in a module on NO assembly's build
     closure (so it rides no .SLDASM digest) MUST list that module as a direct

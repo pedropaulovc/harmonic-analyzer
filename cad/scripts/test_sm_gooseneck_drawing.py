@@ -14,6 +14,7 @@ from _machinist_review_mode import MachinistReviewMode
 import _shop_equipment
 import build_sm_gooseneck as part
 import draw_sm_gooseneck as drawing
+from machinist_exceptions import load_exceptions
 import sm_gooseneck_geom as geom
 import sm_gooseneck_spec as spec
 
@@ -185,10 +186,10 @@ def test_title_block_material_and_finish_come_from_the_registry_row() -> None:
     assert "polished bare" in finish and "oil or wax" in finish
     # Owner ruling 2026-11-17 (Pedro): the reach's .XX is the plumb station
     # of the counter spring, accepted against the over-specification finding.
-    (exception,) = row["machinist_exceptions"]
-    assert exception["kind"] == "accept"
-    assert "3.72" in exception["where"]
-    assert '"3.72 at .XX stays; it plumbs the vertical spring"' in exception["reason"]
+    (exception,) = load_exceptions(_config.CONFIG_DIR, "sm-gooseneck", "part")
+    assert exception.kind == "accept"
+    assert "3.72" in exception.where
+    assert '"3.72 at .XX stays; it plumbs the vertical spring"' in exception.reason
 
 
 def test_shop_stock_row_covers_the_bent_tube_and_its_tail() -> None:

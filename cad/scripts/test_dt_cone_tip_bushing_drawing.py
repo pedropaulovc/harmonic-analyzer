@@ -12,6 +12,7 @@ import dt_cone_tip_bushing_spec as spec
 from _drawing_registry import DRAWINGS_BY_NAME
 from _inch_wall_limits import WALL_TARGET_MM
 from _machinist_review_mode import MachinistReviewMode
+from machinist_exceptions import load_exceptions
 
 IN = 25.4
 
@@ -23,7 +24,7 @@ def test_registry_row_is_the_turned_brass_bushing() -> None:
     assert row["quantity"] == 1
     assert row["drawing_unit"] == spec.UNIT == "in"
     assert "ream the bore" in row["process"]
-    assert "machinist_exceptions" not in row
+    assert load_exceptions(_config.CONFIG_DIR, spec.PART_NAME, "part") == ()
 
 
 def test_mates_are_named_by_their_registered_numbers() -> None:

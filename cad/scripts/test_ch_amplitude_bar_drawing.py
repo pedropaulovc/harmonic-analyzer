@@ -15,9 +15,10 @@ import export_features
 import build_ch_amplitude_bar as bar
 from _drawing_registry import DRAWINGS_BY_NAME
 from _gtol_face import FaceGeometry
-from _config import parts
+from _config import CONFIG_DIR, parts
 from _inch_wall_limits import WALL_FLOOR_MM, WALL_TARGET_MM
 from _printed_tolerance import printed_deviations
+from machinist_exceptions import MachinistException, load_exceptions
 
 OWNER_THIN_WALL_RULING = (
     "Owner ruling 2026-11-01: thin walls above the .060 floor but under the"
@@ -26,11 +27,11 @@ OWNER_THIN_WALL_RULING = (
 )
 
 
-def _exception(rv: str) -> dict[str, str]:
+def _exception(rv: str) -> MachinistException:
     (row,) = [
         row
-        for row in parts("ch-amplitude-bar")["machinist_exceptions"]
-        if row["id"] == rv
+        for row in load_exceptions(CONFIG_DIR, "ch-amplitude-bar", "part")
+        if row.id == rv
     ]
     return row
 
@@ -91,7 +92,7 @@ def test_top_pin_hole_is_the_reamed_press_hole_for_the_bar_pivot_pin() -> None:
         (0.0775, 0.0779), abs=1e-12
     )
     assert "RV-07" not in {
-        row["id"] for row in parts("ch-amplitude-bar")["machinist_exceptions"]
+        row.id for row in load_exceptions(CONFIG_DIR, "ch-amplitude-bar", "part")
     }
     assert ("TopPinProfile", "TopPinDia") not in model_toleranced_dimensions(bar)
     tree = ast.parse(Path(bar.__file__).read_text(encoding="utf-8"))
@@ -136,10 +137,10 @@ def test_top_pin_hole_is_the_reamed_press_hole_for_the_bar_pivot_pin() -> None:
     assert notes.PIN_HOLE_WALL_MIN <= wall < notes.PIN_HOLE_WALL_MIN + 0.0254
     assert WALL_FLOOR_MM <= wall < WALL_TARGET_MM
     row = _exception("RV-06")
-    assert row["kind"] == "minor"
-    assert row["reason"].startswith(OWNER_THIN_WALL_RULING)
-    assert "HOLE WALL .078 MIN" in row["where"]
-    assert "TopPinX location .125 under HOLE WALL .078 MIN" in _exception("RV-03")["where"]
+    assert row.kind == "minor"
+    assert row.reason.startswith(OWNER_THIN_WALL_RULING)
+    assert "HOLE WALL .078 MIN" in row.where
+    assert "TopPinX location .125 under HOLE WALL .078 MIN" in _exception("RV-03").where
 
 
 def test_pin_hole_is_a_native_sketch_located_from_the_top_edge() -> None:
@@ -265,9 +266,9 @@ def test_cheek_walls_state_their_worst_case_at_each_width() -> None:
     assert notes.CHEEK_WALL_APPROVED_MIN == {"top": 1.17}
     assert notes.TOP_CHEEK_WALL_MIN >= notes.CHEEK_WALL_APPROVED_MIN["top"]
     row = _exception("RV-04")
-    assert "1.17 mm (.046)" in row["reason"] and ".052" in row["reason"]
-    assert "CHEEK WALL .052 MIN" in row["where"] and "foot" not in row["where"]
-    assert "CHEEK WALL .063 MIN" in _exception("RV-05")["where"]
+    assert "1.17 mm (.046)" in row.reason and ".052" in row.reason
+    assert "CHEEK WALL .052 MIN" in row.where and "foot" not in row.where
+    assert "CHEEK WALL .063 MIN" in _exception("RV-05").where
 
 
 def test_ledge_cheeks_hold_the_floor_under_the_target() -> None:
@@ -284,12 +285,12 @@ def test_ledge_cheeks_hold_the_floor_under_the_target() -> None:
     assert foot_ledge_min == pytest.approx(0.071 * 25.4)
     assert foot_ledge_min < WALL_TARGET_MM
     row = _exception("RV-05")
-    assert row["kind"] == "minor"
-    assert row["reason"].startswith(OWNER_THIN_WALL_RULING)
-    assert ".063 \u00b1.002" in row["where"] and ".073 \u00b1.002" in row["where"]
-    assert ".061" in row["finding"] and ".071" in row["finding"]
+    assert row.kind == "minor"
+    assert row.reason.startswith(OWNER_THIN_WALL_RULING)
+    assert ".063 \u00b1.002" in row.where and ".073 \u00b1.002" in row.where
+    assert ".061" in row.finding and ".071" in row.finding
     for ledge in (".073 \u00b1.002", ".063 \u00b1.002"):
-        assert ledge in _exception("RV-02")["where"]
+        assert ledge in _exception("RV-02").where
 
 
 def test_bottom_notch_depth_band_is_native_on_its_dimension() -> None:

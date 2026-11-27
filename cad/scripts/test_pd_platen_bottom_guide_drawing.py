@@ -19,6 +19,7 @@ from _gtol_face import FaceGeometry
 from _hole_spec import THREAD_MAJOR_MM
 from _inch_wall_limits import WALL_FLOOR_MM
 from _mcmaster_91794a055 import HEAD_DIA, SHANK_DIA
+from machinist_exceptions import load_exceptions
 from pd_platen_spec import GUIDE_HOLE_X, GUIDE_HOLE_Y, PLATE_WIDTH
 
 
@@ -124,8 +125,8 @@ def test_counterbore_front_wall_shortfall_is_a_declared_minor() -> None:
         tap_from_front - cbore_radius - spec.EDGE_BREAK
     )
     declared = {
-        entry["id"]: entry["kind"]
-        for entry in _config.parts(builder.PART_NAME)["machinist_exceptions"]
+        entry.id: entry.kind
+        for entry in load_exceptions(_config.CONFIG_DIR, builder.PART_NAME, "part")
     }
     if spec.SCREW_CBORE_FRONT_WALL_MIN < WALL_FLOOR_MM:
         assert declared["RV-01"] == "minor"

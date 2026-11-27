@@ -21,6 +21,7 @@ from _hole_spec import TAP_DRILL_MM
 from _inch_wall_limits import WALL_FLOOR_MM
 from _drawing_types import DrawingLayout
 from _printed_tolerance import printed_deviations
+from machinist_exceptions import load_exceptions
 from pd_platen_spec import GUIDE_HOLE_X, PLATE_WIDTH
 
 
@@ -162,8 +163,8 @@ def test_engagement_shortfall_and_walls_are_declared_minors() -> None:
     assert spec.TAP_FACE_WALL_STATEMENT in drawing.NOTES_TEXT
     assert min(spec.TAP_FACE_WALL_MIN, spec.TAP_TOOTH_WALL_MIN) < WALL_FLOOR_MM
     declared = {
-        entry["id"]: entry["kind"]
-        for entry in _config.parts(builder.PART_NAME)["machinist_exceptions"]
+        entry.id: entry.kind
+        for entry in load_exceptions(_config.CONFIG_DIR, builder.PART_NAME, "part")
     }
     assert declared["RV-02"] == declared["RV-03"] == "minor"
     assert spec.ENGAGEMENT_STATEMENT in drawing.TAP_CALLOUT_BELOW

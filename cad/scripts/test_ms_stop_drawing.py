@@ -24,6 +24,7 @@ from _drawing_registry import DRAWINGS_BY_NAME
 from _hole_spec import DRILL_POINT_H
 from _inch_wall_limits import WALL_FLOOR_MM, WALL_TARGET_MM
 from _printed_tolerance import inside_corner_radius_mm, printed_band_mm
+from machinist_exceptions import load_exceptions
 
 
 def _inch(value_in: float) -> float:
@@ -135,7 +136,7 @@ def test_every_worst_case_wall_meets_the_inch_rule_17_target() -> None:
     assert min(walls) == pytest.approx(WALL_TARGET_MM)  # the roof, exactly .080
     assert all(wall >= WALL_TARGET_MM - 1e-9 for wall in walls)
     for stem in ("ms-stop-block", "ms-stop-plate"):
-        assert "machinist_exceptions" not in _config.parts(stem)
+        assert load_exceptions(_config.CONFIG_DIR, stem, "part") == ()
     assert "RoofThickness" not in block_drawing.DIMENSION_CALLOUTS
     for name in ("ROOF_WALL_CALLOUT", "PLATE_TAP_WEB_LINES", "PLATE_CLEARANCE_WEB_LINE"):
         assert not hasattr(spec, name)

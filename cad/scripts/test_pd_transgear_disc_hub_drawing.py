@@ -19,6 +19,7 @@ from _layout_geometry import Box, estimate_text_box
 import _printed_tolerance
 import build_pd_transgear_disc_hub as part
 import draw_pd_transgear_disc_hub as drawing
+from machinist_exceptions import load_exceptions
 from pd_cluster_stack_band import FIT_LENGTH_BAND_IN, STACK_NAME
 import pd_transgear_disc_hub_geometry as joint
 import pd_transgear_disc_hub_spec as spec
@@ -413,18 +414,18 @@ def test_the_package_declares_the_chord_wall_and_the_key_pin_play() -> None:
     owner's thin-wall band (#2144 item 3.2), and the stated play a delegated
     accept pending the owner's review."""
     exceptions = {
-        row["id"]: row
-        for row in _config.parts(part.PART_NAME)["machinist_exceptions"]
+        row.id: row
+        for row in load_exceptions(_config.CONFIG_DIR, part.PART_NAME, "part")
     }
     wall, play = exceptions["RV-03"], exceptions["RV-04"]
-    assert wall["kind"] == "minor"
-    assert "#2144 item 3.2" in wall["reason"]
-    assert play["kind"] == "accept"
-    assert play["reason"].startswith(
+    assert wall.kind == "minor"
+    assert "#2144 item 3.2" in wall.reason
+    assert play.kind == "accept"
+    assert play.reason.startswith(
         "Delegated ruling 2026-11-11 (Main), no precedent; owner review #2144"
     )
-    assert f"{spec.KEY_PIN_PLAY_DEG:.1f} deg" in play["finding"]
-    assert not any("rule 18" in row["finding"] for row in exceptions.values())
+    assert f"{spec.KEY_PIN_PLAY_DEG:.1f} deg" in play.finding
+    assert not any("rule 18" in row.finding for row in exceptions.values())
 
 
 def test_the_spigot_seats_on_the_step_square_and_clear_of_the_disc() -> None:
@@ -796,12 +797,12 @@ def test_finished_walls_over_the_bore_pay_both_end_breaks() -> None:
 def test_the_package_declares_the_bore_wall_the_callout_prints() -> None:
     """#2168: Main's delegated minor (option A, the geometry kept) names the
     generated wall line the bore callout prints last (rule 20)."""
-    exceptions = _config.parts("pd-transgear-disc-hub")["machinist_exceptions"]
-    (entry,) = [entry for entry in exceptions if entry["id"] == "RV-02"]
-    assert entry["kind"] == "minor"
-    assert spec.BORE_WALL_TEXT in entry["where"]
-    assert entry["reason"].startswith("Owner ruling 2026-11-08 (Pedro)")
-    assert "#2144" in entry["reason"]
+    exceptions = load_exceptions(_config.CONFIG_DIR, "pd-transgear-disc-hub", "part")
+    (entry,) = [entry for entry in exceptions if entry.id == "RV-02"]
+    assert entry.kind == "minor"
+    assert spec.BORE_WALL_TEXT in entry.where
+    assert entry.reason.startswith("Owner ruling 2026-11-08 (Pedro)")
+    assert "#2144" in entry.reason
     assert drawing.DIMENSION_CALLOUTS_BELOW["BoreDia"].split("\n")[-1] == (
         spec.BORE_WALL_TEXT
     )

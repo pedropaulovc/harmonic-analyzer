@@ -372,11 +372,11 @@ def test_keeper_relief_is_a_chord_step_that_leaves_the_cap_recess_its_wall() -> 
     assert part.KEEPER_RELIEF_RECESS_MOUTH_LAND < part.WALL_TARGET_MM
     (exception,) = [
         entry
-        for entry in _config.parts("fr-top-frame")["machinist_exceptions"]
-        if entry["id"] == "RV-13"
+        for entry in load_exceptions(CAD_ROOT / "config", "fr_top_frame", "part")
+        if entry.id == "RV-13"
     ]
-    assert exception["kind"] == "minor"
-    assert "#2626" in exception["reason"] and ".071" in exception["reason"]
+    assert exception.kind == "minor"
+    assert "#2626" in exception.reason and ".071" in exception.reason
     assert wall - (0.03 * spec.IN + spec.PRINTED_LINEAR_BAND_MM[mouth_places]) < (
         part.WALL_TARGET_MM
     )

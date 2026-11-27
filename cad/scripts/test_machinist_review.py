@@ -3036,89 +3036,145 @@ def test_standing_unconverted_list_matches_the_plans() -> None:
 
 
 def _write_exceptions_config(root: Path, name: str, section: Any) -> Path:
-    dashed = name.replace("_", "-")
-    directory = root / "parts"
-    directory.mkdir(parents=True, exist_ok=True)
-    path = directory / f"{dashed}.yaml"
+    """Drawing package ``name``'s register, ``exceptions/<dashed>.yaml``."""
     import yaml
 
-    path.write_text(
-        yaml.safe_dump({dashed: {"number": "MHA-XX-01", "machinist_exceptions": section}}),
-        encoding="utf-8",
-    )
+    path = root / "exceptions" / f"{name.replace('_', '-')}.yaml"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(yaml.safe_dump({"machinist_exceptions": section}), encoding="utf-8")
     return path
 
 
+_EXCEPTION = {
+    "id": "RV-001",
+    "where": "sheet 1, front view, 25.20 overall length",
+    "finding": "tight clearance band with no named mate (rule 4)",
+    "reason": "CLEARS callout names the mate; owner accepts it",
+    "kind": "accept",
+}
+
+
 def test_declared_exceptions_load_and_validate(tmp_path: Path) -> None:
+    import yaml
+
     import machinist_exceptions
 
-    section = [
-        {
-            "id": "RV-001",
-            "where": "sheet 1, front view, 25.20 overall length",
-            "finding": "tight clearance band with no named mate (rule 4)",
-            "reason": "CLEARS callout names the mate; owner accepts it",
-            "kind": "accept",
-        }
-    ]
-    _write_exceptions_config(tmp_path, "dt_crank_hub", section)
+    path = _write_exceptions_config(tmp_path, "dt_crank_hub", [_EXCEPTION])
     entries = machinist_exceptions.load_exceptions(tmp_path, "dt_crank_hub", "part")
     assert [entry.id for entry in entries] == ["RV-001"]
     assert entries[0].kind == "accept"
-    # A package that declares nothing (or has no config file) gets nothing.
+    # A package that declares nothing (or has no register) gets nothing.
     assert machinist_exceptions.load_exceptions(tmp_path, "ms_stick", "part") == ()
     assert machinist_exceptions.load_exceptions(tmp_path, "pn_pen_assembly", "assembly") == ()
     # Malformed declarations fail loud: a typo must never silently widen
     # or narrow what the reviewer ignores.
     for bad in (
-        [dict(section[0], kind="ignore")],
-        [dict(section[0], reason="")],
-        [dict(section[0], extra="x")],
-        [section[0], section[0]],
+        [dict(_EXCEPTION, kind="ignore")],
+        [dict(_EXCEPTION, reason="")],
+        [dict(_EXCEPTION, extra="x")],
+        [_EXCEPTION, _EXCEPTION],
+        [],
     ):
         _write_exceptions_config(tmp_path, "dt_crank_hub", bad)
         with pytest.raises(ValueError):
             machinist_exceptions.load_exceptions(tmp_path, "dt_crank_hub", "part")
+    # The register holds its one key: build data belongs in the contract.
+    path.write_text(
+        yaml.safe_dump({"number": "MHA-DT-31", "machinist_exceptions": [_EXCEPTION]}),
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="exactly the key"):
+        machinist_exceptions.load_exceptions(tmp_path, "dt_crank_hub", "part")
 
 
-def test_assembly_declarations_load_from_the_assemblys_contract(tmp_path: Path) -> None:
+def test_assembly_register_keeps_the_assembly_suffix(tmp_path: Path) -> None:
     """The review names an assembly package by its drawing, ``<stem>_assembly``
-    (BUILDING.md keeps the suffix); its declarations live at top level in the
-    assembly's contract, ``assemblies/<stem>.yaml``, beside the build keys."""
+    (BUILDING.md keeps the suffix); its register keeps it too, as the
+    necessity register does, so a part named like the assembly finds none."""
+    import machinist_exceptions
+
+    load = machinist_exceptions.load_exceptions
+    _write_exceptions_config(tmp_path, "xx_bank_assembly", [dict(_EXCEPTION, kind="minor")])
+    (loaded,) = load(tmp_path, "xx_bank_assembly", "assembly")
+    assert (loaded.id, loaded.kind) == ("RV-001", "minor")
+    assert load(tmp_path, "xx_bank", "part") == ()
+
+
+def test_unmoved_contract_declarations_load_until_moved(tmp_path: Path) -> None:
+    """TEMPORARY (#3663): a package not yet moved declares under its registry
+    row or at the top level of its assembly contract. One package declaring in
+    both places is an error, never a merge."""
     import yaml
 
     import machinist_exceptions
 
-    entry = {
-        "id": "RV-01",
-        "where": "fit-up step 4, the set-screw engagement",
-        "finding": "short thread engagement (rule 18)",
-        "reason": "the arch is all the thread there is (owner-ruled shortfall)",
-        "kind": "minor",
-    }
-    directory = tmp_path / "assemblies"
-    directory.mkdir()
-    (directory / "xx-bank.yaml").write_text(
+    load = machinist_exceptions.load_exceptions
+    (tmp_path / "parts").mkdir()
+    (tmp_path / "parts" / "xx-bank.yaml").write_text(
+        yaml.safe_dump(
+            {"xx-bank": {"number": "MHA-XX-01", "machinist_exceptions": [_EXCEPTION]}}
+        ),
+        encoding="utf-8",
+    )
+    (tmp_path / "assemblies").mkdir()
+    (tmp_path / "assemblies" / "xx-bank.yaml").write_text(
         yaml.safe_dump(
             {
                 "number": "MHA-XX-00",
-                "flip_invert": [],
-                "allowed_free_stems": [],
-                "required_free_stems": [],
                 "free_dof": 0,
-                "machinist_exceptions": [entry],
+                "machinist_exceptions": [dict(_EXCEPTION, id="RV-09")],
             }
         ),
         encoding="utf-8",
     )
-    load = machinist_exceptions.load_exceptions
-    (loaded,) = load(tmp_path, "xx_bank_assembly", "assembly")
-    assert (loaded.id, loaded.kind, loaded.where) == ("RV-01", "minor", entry["where"])
-    # Parts are unchanged: their own key in parts/<name>.yaml, the name never
-    # stripped, so an "-assembly" part name finds no file.
-    _write_exceptions_config(tmp_path, "xx_bank", [dict(entry, id="RV-09")])
-    assert [e.id for e in load(tmp_path, "xx_bank", "part")] == ["RV-09"]
-    assert load(tmp_path, "xx_bank_assembly", "part") == ()
+    assert [e.id for e in load(tmp_path, "xx_bank", "part")] == ["RV-001"]
+    assert [e.id for e in load(tmp_path, "xx_bank_assembly", "assembly")] == ["RV-09"]
+    _write_exceptions_config(tmp_path, "xx_bank_assembly", [_EXCEPTION])
+    with pytest.raises(ValueError, match="both declare"):
+        load(tmp_path, "xx_bank_assembly", "assembly")
+
+
+def test_exceptions_unmoved_list_matches_the_build_contracts() -> None:
+    """The ratchet (#3663): every registry file or assembly contract that still
+    declares machinist_exceptions, with the digest its cache keys read. A
+    commit that changes one re-keys its leaves anyway, so it moves the block."""
+    import yaml
+    from _yaml_digest import yaml_digest
+
+    config = mr.CAD_ROOT / "config"
+    path = config / "machinist-review" / "exceptions-unmoved.yaml"
+    listed = yaml.safe_load(path.read_text(encoding="utf-8"))["unmoved"]
+    actual = {}
+    for family in ("parts", "assemblies"):
+        for holder in sorted((config / family).glob("*.yaml")):
+            raw = holder.read_bytes()
+            doc = yaml.safe_load(raw) or {}
+            row = doc.get(holder.stem) if family == "parts" else doc
+            if isinstance(row, dict) and "machinist_exceptions" in row:
+                actual[f"{family}/{holder.name}"] = yaml_digest(raw)[:12]
+    assert list(listed) == sorted(listed), f"{path}: keep the list sorted"
+    move = "cad/config/exceptions/<dashed-drawing-stem>.yaml (-assembly kept)"
+    new = sorted(set(actual) - set(listed))
+    assert not new, f"{new}: declare machinist_exceptions in {move}"
+    stale = sorted(set(listed) - set(actual))
+    assert not stale, f"{path}: delete {stale}; they declare nothing now"
+    changed = sorted(name for name in actual if actual[name] != listed[name])
+    assert not changed, (
+        f"{changed} changed and re-key their leaves anyway: move each file's "
+        f"whole machinist_exceptions block to {move} and delete its line in {path}"
+    )
+
+
+def test_every_exception_register_names_a_drawing_and_loads() -> None:
+    import machinist_exceptions
+    from _drawing_registry import DRAWINGS_BY_NAME
+
+    config = mr.CAD_ROOT / "config"
+    for path in sorted((config / "exceptions").glob("*.yaml")):
+        name = path.stem.replace("-", "_")
+        assert name in DRAWINGS_BY_NAME, f"{path}: no drawing {name}"
+        kind = DRAWINGS_BY_NAME[name].source_kind
+        assert machinist_exceptions.load_exceptions(config, name, kind), path
 
 
 
@@ -3145,7 +3201,7 @@ def test_traveler_declarations_load_from_process_directory(
         encoding="utf-8",
     )
     monkeypatch.setattr(machinist_review_traveler, "PROCESS_ROOT", tmp_path / "process")
-    # Part exceptions in config/parts/ do not bleed into traveler reviews and vice versa.
+    # Part exceptions in config/exceptions/ do not bleed into traveler reviews and vice versa.
     _write_exceptions_config(config_root, "probe_part", [dict(entry, id="RV-99")])
     (loaded,) = machinist_review_traveler.load_exceptions("probe_part")
     assert (loaded.id, loaded.kind) == ("TR-01", "accept")

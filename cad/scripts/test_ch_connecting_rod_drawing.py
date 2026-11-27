@@ -309,6 +309,7 @@ def test_pin_hole_is_the_reamed_press_hole_for_the_rod_pivot_pin() -> None:
     it prints the .0775 reamer's size with no band, the pin itself the
     gauge."""
     import _config
+    from machinist_exceptions import load_exceptions
 
     spec = ch_connecting_rod_spec
     assert rod.PIN_HOLE_DIA is spec.PIN_HOLE_DIA
@@ -320,7 +321,7 @@ def test_pin_hole_is_the_reamed_press_hole_for_the_rod_pivot_pin() -> None:
     )
     assert spec.PIN_HOLE_DIA == pytest.approx(0.0775 * 25.4)
     assert "RV-04" not in {
-        row["id"] for row in _config.parts("ch-connecting-rod")["machinist_exceptions"]
+        row.id for row in load_exceptions(_config.CONFIG_DIR, "ch-connecting-rod", "part")
     }
     assert not hasattr(spec, "PIN_HOLE_SPEC")
     assert not _set_limits_calls()

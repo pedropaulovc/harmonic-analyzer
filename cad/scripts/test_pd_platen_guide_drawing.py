@@ -22,6 +22,7 @@ from _hole_spec import CLEARANCE_MM, THREAD_MAJOR_MM, blind_cut_dia_mm
 import build_pd_platen_guide as guide
 import cut_release
 import draw_pd_platen_guide as drawing
+from machinist_exceptions import load_exceptions
 import package_native
 from pd_platen_guide_spec import TAPPED_HOLE_SPEC
 from pd_platen_spec import CBORE_DEPTH, PLATE_THICKNESS
@@ -242,15 +243,15 @@ def test_tap_walls_to_the_edges_pay_both_breaks_and_print_under_the_floor() -> N
         f"SEE NOTE {drawing.TAP_WALL_NOTE_NUMBER}"
     )
     assert drawing.TAP_WALL_NOTE.startswith(f"{drawing.TAP_WALL_NOTE_NUMBER}. ")
-    exceptions = _config.parts("pd-platen-guide")["machinist_exceptions"]
-    (entry,) = [entry for entry in exceptions if entry["id"] == "RV-01"]
-    assert entry["kind"] == "minor"
-    assert "WALL .059 MIN" in entry["where"] and ".140 ±.005" in entry["where"]
-    assert entry["reason"].startswith("Owner ruling 2026-11-08 (Pedro)")
+    exceptions = load_exceptions(_config.CONFIG_DIR, "pd-platen-guide", "part")
+    (entry,) = [entry for entry in exceptions if entry.id == "RV-01"]
+    assert entry.kind == "minor"
+    assert "WALL .059 MIN" in entry.where and ".140 ±.005" in entry.where
+    assert entry.reason.startswith("Owner ruling 2026-11-08 (Pedro)")
     assert (
         "Delegated ruling 2026-11-09 (Main), pending owner confirmation; "
         "owner review #2144 item 2.3"
-    ) in entry["reason"]
+    ) in entry.reason
 
 
 def test_the_taps_print_plain_coordinates_without_gdt() -> None:
@@ -274,8 +275,8 @@ def test_the_taps_print_plain_coordinates_without_gdt() -> None:
     assert "±" not in drawing.TAP_WALL_NOTE and "LOC" not in drawing.TAP_WALL_NOTE
     assert not hasattr(drawing, "TAP_ROW_NOTE")
     assert len(drawing.HOLE_TAGS) == len(drawing.HOLE_STATIONS_MM) == 9
-    exceptions = _config.parts("pd-platen-guide")["machinist_exceptions"]
-    assert [entry["id"] for entry in exceptions] == ["RV-01"]
+    exceptions = load_exceptions(_config.CONFIG_DIR, "pd-platen-guide", "part")
+    assert [entry.id for entry in exceptions] == ["RV-01"]
 
 
 def test_drawing_contract_imports_without_pywin32() -> None:
