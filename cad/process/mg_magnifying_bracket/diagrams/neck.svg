@@ -1,7 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 400" font-family="sans-serif" font-size="13">
-  <!-- Setup 7: on edge on the stacks, O down, the foot past the jaws' left side; MB05 faces the neck to its thickness and squares the inside corner under the foot. Looking at the moving jaw (H toward you), 2.5 px/mm. -->
+  <!-- Setup 7: on edge on the stacks, O down, the foot past the jaws' left side; MB05 faces the neck to its thickness and cuts the inside corner under the foot. Looking at the moving jaw (H toward you), 2.5 px/mm. -->
   <rect class="paper" x="0" y="0" width="760" height="400"/>
-  <text class="title" x="20" y="20">Setup 7 (MB05_neck): the neck to thickness; the square inside corner</text>
+  <text class="title" x="20" y="20">Setup 7 (MB05_neck): the neck to thickness; the inside corner</text>
   <rect class="fixture-vise" x="112.9" y="395.3" width="396.7" height="4.7"/>
   <rect class="fixture-support" x="144.7" y="300" width="254" height="95.3"/>
   <line class="hidden" x1="112.9" y1="282.9" x2="509.6" y2="282.9"/>
@@ -39,7 +39,7 @@
   <text class="label" x="420" y="226">the neck's face: Z {{cad.neck_inner_face_thickness_mm:in.4dot}} ({{process.neck_level_mm:in.3dot}} levels)</text>
   <line class="leader" x1="112" y1="262" x2="200" y2="150"/>
   <circle class="leader-dot" cx="112" cy="262" r="2"/>
-  <text class="label" x="200" y="146">MB03's R.25 off: the end mill's square corner</text>
+  <text class="label" x="200" y="146">MB03's R.25 off: the end mill's corner</text>
   <text class="label" x="200" y="162">under the foot (R.040 max), a pass along it each level</text>
   <line class="leader" x1="102" y1="175" x2="60" y2="108"/>
   <circle class="leader-dot" cx="102" cy="175" r="2"/>

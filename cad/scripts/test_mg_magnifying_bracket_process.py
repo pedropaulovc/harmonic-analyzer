@@ -119,6 +119,11 @@ def test_context_accepts_the_plan_and_numbers_the_tools(ctx) -> None:
     assert (
         depths["MB03_notch"] + depths["MB04_low"] < PLAN["parameters"]["high_level_mm"]
     )
+    # Issue #3742: the unloaded inside X-root follows INSIDE CORNERS R.040 MAX
+    # and is modeled at .020 in (2x edge_break_r = 0.508 mm).
+    assert PLAN["parameters"]["inside_root_model_r_mm"] == pytest.approx(
+        2 * FEATURES["general_tolerances"]["edge_break_r"]
+    )
 
 
 def test_the_recipes_programs_pass_every_check_they_declare(ctx, tmp_path) -> None:
@@ -139,6 +144,7 @@ def test_the_recipes_programs_pass_every_check_they_declare(ctx, tmp_path) -> No
         ("notch_level_mm", 2.0, "notch_level_mm"),
         ("foot_wall_woc_mm", 0.2, "foot_wall_woc_mm"),
         ("neck_level_mm", 2.0, "neck_level_mm"),
+        ("inside_root_model_r_mm", 0.254, "inside_root_model_r_mm"),
         ("nose_jaw_back_mm", 10.0, "nose_jaw_back_mm"),
         ("mount_tip_z_mm", -4.0, "mount_tip_z_mm"),
         ("tap_tip_z_mm", -2.0, "tap_tip_z_mm"),

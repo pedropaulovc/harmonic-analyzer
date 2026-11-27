@@ -11,15 +11,21 @@ from __future__ import annotations
 
 import _config
 from _package_units import drawing_unit
-from _printed_tolerance import edge_break_radius_mm, printed_band_mm
+from _printed_tolerance import edge_break_radius_mm, inside_corner_radius_mm, printed_band_mm
 
 UNIT = drawing_unit(
     "parts/mg-magnifying-bracket", _config.parts("mg-magnifying-bracket")
 )
 
 # The matched-width foot has no lateral ledge or axial bridge fillet.
-# The inside X-root and free-foot rounds are the title block's edge break.
+# Outside free-foot rounds stay at the title block's .010 edge break; the
+# unloaded inside X-root (-X neck face to -Z foot underside, opposite the
+# flat +Z MHA-SM-03 seat; #3742) stays governed on the sheet by the title
+# block's INSIDE CORNERS R.040 MAX and is modeled unmarked at .020 in (2x the
+# edge break, half of inside_corner_radius_mm) so .015-.020 in corner-radius
+# 3/8 and 1/2 in carbide end mills cover every steel pass.
 FOOT_CORNER_R = edge_break_radius_mm(unit=UNIT)
+INSIDE_ROOT_R = 2.0 * FOOT_CORNER_R
 DRAWING_DIMENSIONS = {
     "NeckProfile": {"NoseR", "SeatToAxis"},
     "Neck": {"NeckThickness"},

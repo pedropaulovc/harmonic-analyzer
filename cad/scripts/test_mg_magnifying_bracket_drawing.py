@@ -43,6 +43,10 @@ def test_model_precision_and_functional_bands_have_one_authority() -> None:
     assert spec.DRAWING_PRECISION["Neck"]["NeckThickness"] == 2
     assert spec.DRAWING_PRECISION["FlangeProfile"] == {"FlangeWidth": 2, "FlangeDepth": 3}
     assert spec.DRAWING_PRECISION["Flange"]["FlangeHeight"] == 2
+    assert "RootAndFootRounds" not in spec.DRAWING_DIMENSIONS
+    assert "RootAndFootRounds" not in spec.DRAWING_PRECISION
+    assert spec.INSIDE_ROOT_R == pytest.approx(2.0 * spec.FOOT_CORNER_R)
+    assert spec.INSIDE_ROOT_R == pytest.approx(spec.inside_corner_radius_mm(unit=spec.UNIT) / 2.0)
     assert joint.NECK_THICKNESS == 12.5
     # .49 +/-.01 over the 12.5 mm model: .48 is the thinnest accepted neck.
     assert joint.NECK_THICKNESS - joint.NECK_THICKNESS_TOL == pytest.approx(0.48 * 25.4)

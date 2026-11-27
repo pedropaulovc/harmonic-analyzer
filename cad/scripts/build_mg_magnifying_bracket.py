@@ -15,8 +15,8 @@ import sys
 from _appearance import apply_color, apply_material
 from _bore_axis import name_bore_axis
 from _check import check
-from _com import _early_bound
-from _dimensions import drive_dimension, name_dimensions, set_global
+from _com import _bind, _early_bound
+from _dimensions import _dim_value_mm, _display_dimensions, drive_dimension, name_dimensions, set_global
 from _document_units import apply_package_model_units
 from _drawing_marks import apply_drawing_properties, clear_dimensions_for_drawing, mark_dimensions_for_drawing
 from _drawing_precision import _named_dimension, apply_drawing_precision
@@ -39,7 +39,7 @@ from _sketch import SketchDims, add_line_chain, anchor_point_to_origin, anchor_p
 from _sketch_chains import define_rectilinear_chain
 from magnifying_bracket_joint_layout import BRACKET_HOLE_POINTS, CLEARANCE_DIA, CLEARANCE_SPEC, SIDE_PLATE_X as FLANGE_X, SIDE_PLATE_Y as FLANGE_Y, SIDE_PLATE_Z as FLANGE_Z, SIDE_PLATE_THICKNESS
 from mg_lever_thread_joint import HOLE_LOCATION_TOL, MOUTH_CHAMFER, MOUTH_CHAMFER_BAND, MOUTH_CHAMFER_MAX, NECK_HALF_X, NECK_THICKNESS, NOSE_R, NOSE_R_TOL, TAP_DRILL_DIA, TAP_SPEC
-from mg_magnifying_bracket_spec import DIMENSION_CALLOUTS, DRAWING_DIMENSIONS, DRAWING_PRECISION, FOOT_CORNER_R, ISOMETRIC_VIEW_NOTE, UNIT
+from mg_magnifying_bracket_spec import DIMENSION_CALLOUTS, DRAWING_DIMENSIONS, DRAWING_PRECISION, FOOT_CORNER_R, INSIDE_ROOT_R, ISOMETRIC_VIEW_NOTE, UNIT
 from mg_magnifying_bracket_finish_spec import SURFACE_FINISHES
 import _telemetry
 
@@ -146,19 +146,139 @@ def _coordinates(adapter, jobs) -> None:
 
 
 
-def _round_foot_root(adapter) -> None:
-    """Solve the three incident edge-break rounds before any blend changes them."""
+def _apply_fillet_item_radii(
+    fillet_data, expected_count: int, root_probe_m: tuple[float, float, float]
+) -> None:
+    item_count = int(fillet_data.FilletItemsCount)
+    if item_count != expected_count:
+        raise RuntimeError(
+            f"RootAndFootRounds: expected {expected_count} fillet items, found {item_count}"
+        )
+    root_hits = 0
+    for index in range(item_count):
+        item = fillet_data.GetFilletItemAtIndex(index)
+        if item is None:
+            raise RuntimeError(f"RootAndFootRounds: missing fillet item {index}")
+        closest = _early_bound(item, "IEdge").GetClosestPointOn(*root_probe_m)
+        if closest is None or len(closest) < 3:
+            raise RuntimeError(f"RootAndFootRounds: fillet item {index} has no closest point")
+        is_root = math.dist(tuple(float(v) for v in closest[:3]), root_probe_m) < 1e-6
+        target_m = (INSIDE_ROOT_R if is_root else FOOT_CORNER_R) / 1000.0
+        fillet_data.SetRadius(item, target_m)
+        root_hits += int(is_root)
+    if root_hits != 1:
+        raise RuntimeError(
+            f"RootAndFootRounds: expected 1 inside-root item, matched {root_hits} of {item_count}"
+        )
+
+
+def _round_foot_root(adapter, jobs) -> None:
+    """Solve the .020 inside X-root and .010 outside foot rounds together."""
+    from solidworks_mcp.adapters import sw_type_info as _sw_type_info
+
     # Matched Y sides make these a single interacting corner treatment.
     # Do not first create the inside-root cylinder and then try to terminate
     # two new side rounds against its tangent boundary. Select only the raw
     # root and free-foot front edges, never the upright's long sharp edges.
-    points = [
-        [-NECK_HALF_X, 0.0, FLANGE_Z[0]],
-        *[[(FLANGE_X[0] - NECK_HALF_X) / 2.0, y, FLANGE_Z[0]] for y in FLANGE_Y],
-    ]
-    check("joint inside-root and outside-foot rounds",
-          adapter.add_fillet(FOOT_CORNER_R, points, propagate=False))
+    targets = (
+        (-NECK_HALF_X, 0.0, FLANGE_Z[0]),
+        ((FLANGE_X[0] - NECK_HALF_X) / 2.0, FLANGE_Y[0], FLANGE_Z[0]),
+        ((FLANGE_X[0] - NECK_HALF_X) / 2.0, FLANGE_Y[1], FLANGE_Z[0]),
+    )
+    part = _early_bound(adapter.currentModel, "IPartDoc")
+    bodies = tuple(part.GetBodies2(0, True) or ())
+    if len(bodies) != 1:
+        raise RuntimeError(f"RootAndFootRounds: expected 1 solid body, found {len(bodies)}")
+    body_edges = tuple(_early_bound(bodies[0], "IBody2").GetEdges() or ())
+    if not body_edges:
+        raise RuntimeError("RootAndFootRounds: solid body has no edges")
+    selected = []
+    for point_mm in targets:
+        point_m = tuple(coord / 1000.0 for coord in point_mm)
+        best_edge = None
+        best_gap = 0.0005
+        for raw_edge in body_edges:
+            edge = _early_bound(raw_edge, "IEdge")
+            closest = edge.GetClosestPointOn(*point_m)
+            if closest is None or len(closest) < 3:
+                continue
+            gap = math.dist(tuple(float(v) for v in closest[:3]), point_m)
+            if gap < best_gap:
+                best_gap = gap
+                best_edge = raw_edge
+        if best_edge is None:
+            raise RuntimeError(f"RootAndFootRounds: no body edge near {point_mm} mm")
+        selected.append(best_edge)
+    model = _early_bound(adapter.currentModel, "IModelDoc2")
+    fm = _early_bound(model.FeatureManager, "IFeatureManager")
+    model.ClearSelection2(True)
+    sw_fm_fillet = _sw_type_info.constant("swFmFillet")
+    raw_defn = fm.CreateDefinition(sw_fm_fillet)
+    if raw_defn is None:
+        raise RuntimeError("RootAndFootRounds: CreateDefinition(swFmFillet) returned None")
+    defn = _early_bound(raw_defn, "ISimpleFilletFeatureData2")
+    if not defn.Initialize(_sw_type_info.constant("swConstRadiusFillet")):
+        raise RuntimeError("RootAndFootRounds: Initialize(swConstRadiusFillet) failed")
+    defn.ConicTypeForCrossSectionProfile = _sw_type_info.constant("swFeatureFilletCircular")
+    defn.OverflowType = _sw_type_info.constant("swFilletOverFlowType_Default")
+    defn.PropagateToTangentFaces = False
+    defn.DefaultRadius = FOOT_CORNER_R / 1000.0
+    for index, raw_edge in enumerate(selected):
+        if not _early_bound(raw_edge, "IEntity").Select2(index > 0, 1):
+            raise RuntimeError(f"RootAndFootRounds: Select2(Mark=1) failed for edge {index}")
+    defn.IsMultipleRadius = True
+    root_probe_m = (-NECK_HALF_X / 1000.0, 0.0, FLANGE_Z[0] / 1000.0)
+    pre_count = int(defn.FilletItemsCount)
+    if pre_count == len(selected):
+        _apply_fillet_item_radii(defn, len(selected), root_probe_m)
+    _telemetry.info(
+        f"RootAndFootRounds pre-create: swFmFillet={sw_fm_fillet} items={pre_count}"
+    )
+    raw_created = fm.CreateFeature(defn)
+    model.ClearSelection2(True)
+    if raw_created is None:
+        raise RuntimeError("RootAndFootRounds: CreateFeature(ISimpleFilletFeatureData2) returned None")
     name_last_feature(adapter, "RootAndFootRounds")
+    force_rebuild(adapter)
+    raw_feature = part.FeatureByName("RootAndFootRounds")
+    if raw_feature is None:
+        raise RuntimeError("RootAndFootRounds: native part feature not found")
+    feature = _early_bound(raw_feature, "IFeature")
+    dims = list(_display_dimensions(feature, "RootAndFootRounds"))
+    root_dims = [
+        idim for idim in dims
+        if math.isclose(_dim_value_mm(idim), INSIDE_ROOT_R, abs_tol=1e-6)
+    ]
+    if len(root_dims) != 1:
+        committed = _early_bound(feature.GetDefinition(), "ISimpleFilletFeatureData2")
+        if not committed.AccessSelections(model, None):
+            raise RuntimeError("RootAndFootRounds: post-create AccessSelections failed")
+        try:
+            committed.IsMultipleRadius = True
+            _telemetry.info(
+                f"RootAndFootRounds post-create modify: items={int(committed.FilletItemsCount)} dims_before={len(dims)}"
+            )
+            _apply_fillet_item_radii(committed, len(selected), root_probe_m)
+            if not feature.ModifyDefinition(committed, model, None):
+                raise RuntimeError("RootAndFootRounds: post-create ModifyDefinition failed")
+        except BaseException:
+            committed.ReleaseSelectionAccess()
+            raise
+        force_rebuild(adapter)
+        dims = list(_display_dimensions(feature, "RootAndFootRounds"))
+        root_dims = [
+            idim for idim in dims
+            if math.isclose(_dim_value_mm(idim), INSIDE_ROOT_R, abs_tol=1e-6)
+        ]
+    _telemetry.info(
+        f"RootAndFootRounds dimensions_mm={[round(_dim_value_mm(d), 6) for d in dims]}"
+    )
+    if len(root_dims) != 1:
+        raise RuntimeError(
+            f"RootAndFootRounds: expected one {INSIDE_ROOT_R:g} mm dimension, found {len(root_dims)} of {len(dims)}"
+        )
+    _bind(root_dims[0], "IDimension").Name = "InsideRootRadius"
+    jobs.append(("InsideRootRadius@RootAndFootRounds", '"InsideRootR"'))
 
 
 def _assert_matched_width_topology(adapter) -> None:
@@ -167,19 +287,20 @@ def _assert_matched_width_topology(adapter) -> None:
     foot_z = sum(FLANGE_Z) / 2.0
     foot_x = (FLANGE_X[0] - NECK_HALF_X) / 2.0
     requests = {"nose": CylinderFace(2.0 * NOSE_R, contains_z_mm=-NOSE_R / 2.0)}
-    radius = FOOT_CORNER_R
-    root_center = (-NECK_HALF_X - radius, 0.0, FLANGE_Z[0] - radius)
+    root_radius = INSIDE_ROOT_R
+    root_center = (-NECK_HALF_X - root_radius, 0.0, FLANGE_Z[0] - root_radius)
     root_point = (
-        root_center[0] + radius / math.sqrt(2.0), 0.0,
-        root_center[2] + radius / math.sqrt(2.0),
+        root_center[0] + root_radius / math.sqrt(2.0), 0.0,
+        root_center[2] + root_radius / math.sqrt(2.0),
     )
     requests["root_round"] = CylinderFace(
-        2.0 * radius, contains_x_mm=root_point[0],
+        2.0 * root_radius, contains_x_mm=root_point[0],
         contains_y_mm=0.0, contains_z_mm=root_point[2],
     )
+    radius = FOOT_CORNER_R
     cylinders = {
         "nose": (0, (0.0, 0.0, 0.0), NOSE_R),
-        "root_round": (1, root_center, radius),
+        "root_round": (1, root_center, root_radius),
     }
     probes = [("root_round", root_point)]
     for sign in (-1, 1):
@@ -258,7 +379,12 @@ def build(adapter) -> dict[str, str]:
     check("create part", adapter.create_part())
     # #290: the row's inch calculation units, before the first global.
     apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
-    for name, value in (("NoseR", NOSE_R), ("SeatToAxis", FLANGE_Z[1]), ("NeckThickness", NECK_THICKNESS)):
+    for name, value in (
+        ("NoseR", NOSE_R),
+        ("SeatToAxis", FLANGE_Z[1]),
+        ("NeckThickness", NECK_THICKNESS),
+        ("InsideRootR", INSIDE_ROOT_R),
+    ):
         set_global(adapter, name, f"{value}mm")
     jobs = []
     dims = SketchDims()
@@ -303,7 +429,7 @@ def build(adapter) -> dict[str, str]:
 
     # The matched-width foot has no axial side-root bridge. Its inside X
     # root and two outside foot edges are solved together on the raw solid.
-    _round_foot_root(adapter)
+    _round_foot_root(adapter, jobs)
     # Only the two free-end edges remain foot corners. At +X the old picks
     # now lie on full-length upright edges and must never receive a fillet.
     check("rounded free-end foot corners", adapter.add_fillet(FOOT_CORNER_R, [[FLANGE_X[0], y, sum(FLANGE_Z) / 2.0] for y in FLANGE_Y], propagate=False))
