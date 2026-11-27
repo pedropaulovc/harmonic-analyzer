@@ -86,11 +86,11 @@ def test_slit_keeps_the_photographed_gap_at_the_printed_worst_case():
     assert clip.SLIT_WIDTH_MIN == pytest.approx(narrowest)
     assert narrowest >= clip.PHOTO_SLIT_WIDTH - 1e-9
     # The lanes close to the overall width; the spring rail is what the .30
-    # screw rail and the .04 slit leave of it.
+    # screw rail and the .08 slit (#3740) leave of it.
     assert clip.SCREW_RAIL_WIDTH + clip.NOTCH_WIDTH + clip.SPRING_RAIL_WIDTH == (
         pytest.approx(clip.CLIP_WIDTH)
     )
-    assert clip.NOTCH_WIDTH == pytest.approx(0.04 * 25.4)
+    assert clip.NOTCH_WIDTH == pytest.approx(0.08 * 25.4)
     assert clip.SPRING_RAIL_WIDTH == pytest.approx(0.130 * 25.4)
 
 

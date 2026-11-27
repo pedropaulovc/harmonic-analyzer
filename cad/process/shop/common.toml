@@ -869,43 +869,43 @@ description = "Aviation snips, straight cut"
 description = "Sanding roll, 2 in wide, 220 grit (McMaster 4687A223)"
 
 # The sheet parts' outline cutter, moved here from pd.toml: the MHA-PD-03
-# platen clip and the MHA-DT-03-TL-02 phasing comb (tool audit 2026-11-23:
-# the comb takes the clip's 1/32 instead of a 1/16 bought for it alone) both
-# cut with it.
-# The clip's cutter: Harvey Tool 896231, Variable Helix End Mill for
-# Aluminum Alloys - Square - Downcut (harveytool.com/products/tool-details-
-# 896231 and the family page, read 2026-11-22): .0310 (1/32) cutter, .0930
-# length of cut, 3 left-hand spiral right-hand cut flutes (a downcut:
-# "prevents lifting of workpiece"), centre cutting, 1/8 shank, 1-1/2
-# overall, uncoated, the family "excellent performance in copper, brass, and
-# bronze alloys". It fits the .04 slit, which it cuts by running down one
-# side and back up the other. Ownership: cad/config/shop-equipment/
+# platen clip and the MHA-DT-03-TL-02 phasing comb (owner direction
+# 2026-11-26, #3740: switch both from the 1/32 Harvey 896231 to a 1/16 downcut
+# after widening MHA-PD-03's slits from .04 to .08 in) both cut with it.
+# The cutter: Harvey Tool 896262, Variable Helix End Mill for Aluminum Alloys -
+# Square - Downcut (harveytool.com/products/tool-details-896262, read live
+# 2026-11-26, and the family page): .0620 (1/16) cutter, .1860 length of cut,
+# 3 left-hand spiral right-hand cut flutes (a downcut: "prevents lifting of
+# workpiece"), centre cutting, 1/8 shank, 1-1/2 overall, uncoated, the family
+# "excellent performance in copper, brass, and bronze alloys". It fits the
+# .08 slit, which it cuts by running down one side and back up the other, and
+# both sheets' R.040 MAX inside corners. Ownership: cad/config/shop-equipment/
 # tools-special-cutters.toml, same key. diameter_mm and flute_length_mm: its
-# .0310 and .0930 × 25.4.
-[tools.endmill-carbide-3fl-1-32-downcut]
-description = "1/32 in (.0310) 3-flute carbide downcut square end mill, .093 length of cut, 1/8 shank (Harvey Tool 896231)"
-diameter_mm = 0.7874
-flute_length_mm = 2.3622
+# .0620 and .1860 × 25.4.
+[tools.endmill-carbide-3fl-1-16-downcut]
+description = "1/16 in (.0620) 3-flute carbide downcut square end mill, .186 length of cut, 1/8 shank (Harvey Tool 896262)"
+diameter_mm = 1.5748
+flute_length_mm = 4.7244
 # Harvey's own speeds and feeds for the series (SF_896200, "Variable Helix End
 # Mills for Aluminum Alloys - Square - Downcut", harveyperformance.widen.net/
-# content/urxytgzfxb/pdf/SF_896200.pdf, read 2026-11-22), uncoated, Brass
-# (Copper Zinc alloys, C2xxxx): 500 SFM; .031 cutter slotting .00033 in/tooth
-# (1x D radial, .5x D axial), max .00044. Every clip cut is a full-width slot
-# level, so the slotting figure is the ceiling (.00033 × 25.4).
-maker_chip_load_mm_per_tooth = { brass = 0.008382 }
-maker_chip_load_source = "Harvey Tool SF_896200 (8962xx downcut), uncoated, Brass C2xxxx, .031 cutter, slotting .00033 in/tooth"
-# Its setting in half-hard C26000 strip: Harvey's 500 SFM on .031 in is
-# 61,600 rpm, so the spindle's 2800 (machines.pm-30mv; 23 ft/min). Chip load
-# at Harvey's slotting figure, rounded down to the 0.1 in/min the sheet
-# prints: 2800 × 3 × .00033 = 2.77, so 2.7 in/min, .000321 in/tooth
-# (2.7 × 25.4 / 8400 mm); the plan holds each level to Harvey's .5 x D depth.
+# content/urxytgzfxb/pdf/SF_896200.pdf, read 2026-11-26), uncoated, Brass
+# (Copper Zinc alloys, C2xxxx): 500 SFM; .062 cutter slotting .00065 in/tooth
+# (1x D radial, .5x D axial), max .00087. Every sheet cut is a full-width slot
+# level, so the slotting figure is the ceiling (.00065 × 25.4).
+maker_chip_load_mm_per_tooth = { brass = 0.01651 }
+maker_chip_load_source = "Harvey Tool SF_896200 (8962xx downcut), uncoated, Brass C2xxxx, .062 cutter, slotting .00065 in/tooth"
+# Its setting in half-hard C26000 sheet and strip: Harvey's 500 SFM on .0620 in
+# is 30,800 rpm, so the spindle's 2800 (machines.pm-30mv; 45 ft/min). Chip load
+# at Harvey's slotting figure, rounded down to the 0.1 in/min the sheet prints:
+# 2800 × 3 × .00065 = 5.46, so 5.4 in/min, .000643 in/tooth
+# (5.4 × 25.4 / 8400 mm); the plans hold each level to Harvey's .5 x D depth.
 # Delegated ruling 2026-11-22 (Main, owner review #2144): never above the
 # maker's published chip load without a measurement.
-[settings.endmill-carbide-3fl-1-32-downcut-c260]
-tool = "endmill-carbide-3fl-1-32-downcut"
+[settings.endmill-carbide-3fl-1-16-downcut-c260]
+tool = "endmill-carbide-3fl-1-16-downcut"
 material = "c260-h02"
 rpm = 2800
-chip_load_mm_per_tooth = 0.0081643  # .000321 in; 2800 × 3 × .000321 = 2.7 in/min
+chip_load_mm_per_tooth = 0.0163286  # .000643 in; 2800 × 3 × .000643 = 5.4 in/min
 flutes = 3
 feed_unit = "in/min"
 

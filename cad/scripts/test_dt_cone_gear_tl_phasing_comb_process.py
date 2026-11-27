@@ -77,7 +77,7 @@ def _findings(ctx: dict, out: Path) -> list:
 
 
 def test_context_accepts_the_plan_and_rounds_every_inside_corner(context) -> None:
-    assert context["numbers"] == {"em-thirtysecond": 1}
+    assert context["numbers"] == {"em-sixteenth": 1}
     assert RECIPE.LOAD_FIRST_TOOL == ("CB01_outline",)
     outline = next(
         kwargs for _p, check, kwargs in context["expect"] if check == "outline"
@@ -123,14 +123,14 @@ def test_the_recipes_program_passes_every_check_it_declares(context, tmp_path) -
         ("through_margin_min_mm", 0.4, "through_margin_min_mm below"),
         ("tape_stack_min_mm", 0.3, "over the tape stack"),
         ("tape_stack_max_mm", 0.25, "under the tape stack"),
-        ("tape_stack_max_mm", 0.4, "first level on the thickest tape stack"),
+        ("tape_stack_max_mm", 0.65, "first level on the thickest tape stack"),
         ("outline_depth_mm", 0.5, "outline_depth_mm"),
         ("comb_bond_area_mm2", 900.0, "comb_bond_area_mm2"),
         ("jaw_top_over_plate_mm", 6.0, "jaw_top_over_plate_mm"),
-        ("em_thirtysecond_projection_min_mm", 5.0, "collet would not clear"),
+        ("em_sixteenth_projection_min_mm", 5.0, "collet would not clear"),
         ("inside_corner_max_mm", 0.3, "title block's"),
-        ("outline_cutter_dia_mm", 1.5748, "cutter_dia_mm"),
-        ("level_count", 2, "level_count"),
+        ("outline_cutter_dia_mm", 0.7874, "cutter_dia_mm"),
+        ("level_count", 3, "level_count"),
         ("level_depth_mm", 0.4, "level_depth_mm"),
     ],
 )
@@ -158,8 +158,8 @@ def _seed(ctx: dict, pick, change) -> dict:
     [
         # The back edge cut .27 mm inside the comb.
         (
-            lambda line: line.startswith("G1 X113.030 Y-43.574"),
-            lambda line: line.replace("Y-43.574", "Y-43.300"),
+            lambda line: line.startswith("G1 X113.030 Y-43.967"),
+            lambda line: line.replace("Y-43.967", "Y-43.700"),
             "outline",
         ),
         # The last level taken deeper into the spoil plate.
@@ -170,8 +170,8 @@ def _seed(ctx: dict, pick, change) -> dict:
         ),
         # The feed in through the margin rapided at cutting depth.
         (
-            lambda line: line.startswith("G1 Y-43.574"),
-            lambda line: "G0 Y-43.574",
+            lambda line: line.startswith("G1 Y-43.967"),
+            lambda line: "G0 Y-43.967",
             "rapid",
         ),
     ],

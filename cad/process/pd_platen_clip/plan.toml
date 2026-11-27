@@ -2,8 +2,8 @@
 # in sheet brass; opposed open-ended slits with rounded ends leave a
 # center-bridged spring rail, formed in smooth tangent bends").
 #
-# Route chosen for speed: the clip's slits (.04 with full R ends), the R.03
-# and R.10 corners, the full R finger tips and the two Ø.116 holes at .XXX
+# Route chosen for speed: the clip's slits (.08 with full R ends, #3740), the
+# R.03 and R.10 corners, the full R finger tips and the two Ø.116 holes at .XXX
 # stations are what a CNC holds in one pass and a hand-cut strip takes hours
 # to reach; the six bows are pressed in one squeeze per clip between matched
 # dies, the bow former, which the same file cuts from the same strip.
@@ -18,13 +18,13 @@
 # with the plate's left end, blank A's back edge on a strip of the tape on
 # the fixed jaw's face and blank B's on blank A's front edge. G54: X0 the plate's left end, Y0 the
 # fixed jaw's face, Z0 the plate top. PC01_sheet (cam:pd_platen_clip,
-# cad/process/pd_platen_clip/cam.py) runs the 1/32 downcut end mill (T1) in
-# four equal levels, the last .004 into the spoil plate: each Ø.116 hole
-# plunged near its centre and opened by two circles to the drilled band's
+# cad/process/pd_platen_clip/cam.py) runs the 1/16 downcut end mill (T1) in
+# two equal levels, the last .004 into the spoil plate: each Ø.116 hole
+# plunged near its centre and opened by one circle to the drilled band's
 # middle; each clip's flat outline at its developed length (the fingers'
 # tips stand .008 past the rail ends until the bows draw them back); then
 # four die laminations (blank A's last part and blank B's three), each cut
-# round and split along the bow profile by one pass into a male and a female
+# round and split along the bow profile into a male and a female
 # half. Setup 3 at the bench frees the parts, deburrs them and checks the
 # first clip. Setup 4 presses each clip's bows in the vise: the four male
 # halves stacked on one parallel, the four female halves on the other, the
@@ -40,9 +40,9 @@
 # strip's ±.002 lands inside the .05-.07 rise.
 #
 # To order: the strip (stock-to-order.toml c260-h02-strip-032x2, McMaster
-# 8859K86; its rest goes to MHA-PD-14), the 1/32 downcut end mill
-# (tools-special-cutters.toml endmill-carbide-3fl-1-32-downcut, Harvey Tool
-# 896231), the junior hacksaw
+# 8859K86; its rest goes to MHA-PD-14), the 1/16 downcut end mill
+# (tools-special-cutters.toml endmill-carbide-3fl-1-16-downcut, Harvey Tool
+# 896262, #3740), the junior hacksaw
 # (tools-hand.toml junior-hacksaw, bought for the DT pins anyway) and the pin
 # gauges (gauges.pin-gauges). The spoil plate is to make from owned stock.
 # On hand: the blue tape, the CA glue and its accelerator (consumables.toml
@@ -108,7 +108,7 @@ clip_spring_edge_y_mm = -2.54
 # What is left of each blank in front of its last part, and right of the
 # far finger tip's path. The saw cut, on a line squared by hand, may wander
 # this far (the author's 1/16 in, no source).
-blank_a_front_margin_mm = 7.62
+blank_a_front_margin_mm = 5.588
 blank_b_front_margin_mm = 6.096
 blank_right_margin_mm = 3.596
 saw_error_mm = 1.5875
@@ -119,12 +119,12 @@ plate_width_mm = 127.0
 plate_thickness_mm = 12.7
 # The blanks along the plate (the beam checks), in X from the plate's left
 # end: the cut runs from the first finger tip's path to the last's.
-sheet_from_x_mm = 3.454
-sheet_to_x_mm = 88.238
+sheet_from_x_mm = 3.0603
+sheet_to_x_mm = 88.6337
 plate_from_x_mm = 0.0
 plate_to_x_mm = 152.4
 # The cutter's way in from beyond the plate's left end (machine capacity).
-entry_overhang_mm = 1.787
+entry_overhang_mm = 2.5748
 # The hold (owner 2026-11-23, R1: "for tape isnt it possible to use blue
 # painters tape on both sides and ca glue between them"): ScotchBlue 2090
 # blue painter's tape on the plate and on each blank's underside, GH1200
@@ -143,13 +143,13 @@ bond_accepted_tensile_mpa = 0.6
 # The pieces the cut leaves on the tape (the recipe recomputes each): a
 # clip, its finger the narrowest width; a male and a female die half, each
 # at its narrowest; and the rest of each blank.
-clip_bond_area_mm2 = 905.456
+clip_bond_area_mm2 = 914.637
 clip_finger_width_mm = 3.302
 male_bond_area_mm2 = 484.115
-female_bond_area_mm2 = 508.608
-female_least_width_mm = 4.7324
-waste_a_bond_area_mm2 = 1841.517
-waste_b_bond_area_mm2 = 1666.985
+female_bond_area_mm2 = 424.039
+female_least_width_mm = 3.7204
+waste_a_bond_area_mm2 = 1907.725
+waste_b_bond_area_mm2 = 1920.692
 blank_area_mm2 = 4645.152
 # The cutter's tip .004 in into the spoil plate (Z0 its top beside the
 # blanks), as the comb's plan: the tip goes past the tape stack whatever the
@@ -161,30 +161,27 @@ blank_area_mm2 = 4645.152
 # level_depth_max_fraction of the cutter's diameter.
 # Levels (R3: "no need to bring to me ; make coarser as you see fit"): the
 # bond never set this count; the binding limit is the maker's, Harvey Tool's
-# slotting depth for the series (SF_896200, read 2026-11-22: axial .5 x D,
-# .0155 a level), the depth that goes with the slotting chip load the feed
-# is held to (delegated ruling 2026-11-22: never above the maker's
-# published chip load). Precedents for this cutter in brass, both
-# shallower than the maker's limit: the .006-tape version of this plan ran
-# three levels of .0146; dt_cone_gear_tl_phasing_comb's outline runs three
-# of .0123 (.3135 mm). The thicker stack adds .007 to the cut, so four
-# levels of .0127 here, no deeper than the .006-tape version's .0146. The
-# 0.6 MPa bond cap does
-# not bind: the cut asks 0.056 MPa in shear of the smallest piece (a male
-# die half) and no tension (a downcut).
+# slotting depth for the series (SF_896200, read 2026-11-26: axial .5 x D,
+# .0310 a level on the .0620 cutter), the depth that goes with the slotting
+# chip load the feed is held to (delegated ruling 2026-11-22: never above the
+# maker's published chip load). 1.2952 / (.5 x 1.5748) = 1.64, so two levels
+# of .6476 mm (.0255 in), as dt_cone_gear_tl_phasing_comb's outline runs two
+# levels with the same 1/16 downcut (#3740). The 0.6 MPa bond cap does
+# not bind: the cut uses a downcut helix (no tension) well within the shear
+# cap on the smallest piece (a female die half).
 sheet_tip_z_mm = -0.1016
 sheet_tip_into_plate_mm = 0.1016
 through_margin_min_mm = 0.2
 spoil_cut_max_mm = 0.254
 sheet_depth_mm = 1.2952
 level_depth_max_fraction = 0.5
-level_count = 4
-level_depth_mm = 0.3238
-# The 1/32 end mill (shop tools.endmill-carbide-3fl-1-32-downcut
+level_count = 2
+level_depth_mm = 0.6476
+# The 1/16 end mill (shop tools.endmill-carbide-3fl-1-16-downcut
 # diameter_mm; the recipe checks it): its runs down each slit's two sides
-# leave this much of the .040 slit between them.
-sheet_cutter_dia_mm = 0.7874
-slit_cutter_clearance_mm = 0.2286
+# leave this much of the .080 slit between them.
+sheet_cutter_dia_mm = 1.5748
+slit_cutter_clearance_mm = 0.4572
 # The title block's INSIDE CORNERS R.040 MAX (cad/config/title_block.yaml
 # in.inside_corner.radius_in): the cutter's radius must not exceed it.
 inside_corner_max_mm = 1.016
@@ -194,7 +191,7 @@ hole_dia_target_mm = 2.9968
 # Plunges into the strip near each hole's centre at a quarter of the cutting
 # feed (the author's, no source; the gooseneck's ball plunges at half).
 plunge_feed_fraction = 0.25
-plunge_feed_mm_min = 17.145
+plunge_feed_mm_min = 34.29
 # --- The bow former: four laminations of the strip ---
 # Each as long as the rail; its male half's flats this far above its back
 # edge, the whole lamination this high; each half at least
@@ -224,7 +221,7 @@ collet_over_jaw_mm = 12.1031
 # The plate's ends inside the jaws' width, centred: no overhang either side.
 plate_overhang_mm = 0.0
 r8_collet_gauge_mm = 6.3         # HA: holders.r8-collets-lms-4860.gauge_len_mm (as the base-bar plan).
-# The 1/32 end mill on its 1/8 shank, 1-1/2 in overall: 3/4 to 1 in out of
+# The 1/16 end mill on its 1/8 shank, 1-1/2 in overall: 3/4 to 1 in out of
 # the 1/8 collet, so the collet's nose stays above the jaw tops at the cut
 # (the recipe checks the least), at least 1/2 in of shank held.
 em_projection_min_mm = 19.05
@@ -265,11 +262,11 @@ ref = "ca-accelerator-starbond"
 description = "Starbond CA glue accelerator spray: misted on the blank's tape so the glue sets at once"
 
 [[tools]]
-id = "em-thirty-second"
-name = "1/32 in carbide downcut end mill"
-ref = "endmill-carbide-3fl-1-32-downcut"
-# Harvey Tool 896231: 3 left-hand spiral, right-hand cut flutes, "prevents
-# lifting of workpiece" (harveytool.com family page, read 2026-11-22): its
+id = "em-sixteenth"
+name = "1/16 in carbide downcut end mill"
+ref = "endmill-carbide-3fl-1-16-downcut"
+# Harvey Tool 896262: 3 left-hand spiral, right-hand cut flutes, "prevents
+# lifting of workpiece" (harveytool.com family page, read 2026-11-26): its
 # helix pushes the clip's narrow finger onto the tape.
 axial_direction = "down"
 
@@ -343,7 +340,7 @@ indexing = "none"
 machine_ref = "pm-30mv"
 holding = "Spoil plate on 1 in parallels across the vise jaws, its back edge on the fixed jaw, centred along the jaws: the jaw tops stand {{process.jaw_top_over_plate_mm:in.3dot}} above the plate top, room for the edge finder's touch and blank A's edge, and at the least stickout the collet's nose passes {{process.collet_over_jaw_mm:in.2dot}} over them at the cut. Blanks A and B bonded to its top: blue tape under their whole faces, on the plate and on each blank, and a zigzag CA bead between that runs under every part (stack {{process.tape_stack_min_mm:in.3dot}}–{{process.tape_stack_max_mm:in.3dot}}); both left ends flush with the plate's left end, A's back edge against a 1/8 in strip of the tape on the fixed jaw's face (so no glue reaches the jaw) and B's against A's front edge."
 datum = "Program PC01_sheet. G54: X0 the plate's left end, Y0 the fixed jaw's bare face (the plate's back edge; blank A's stands .005 off it on the jaw's tape strip, which the program does not need: it cuts from G54), Z0 the plate top, bare right of the tape; the file works {{process.tape_stack_mm:in.3dot}} above it for the tape stack, starting each cut over the thickest stack ({{process.tape_stack_max_mm:in.3dot}}) and ending {{process.sheet_tip_into_plate_mm:in.3dot}} into the plate; +Y toward the fixed jaw. Each clip's rail near end stands at X {{process.part_left_x_mm:in.3dot}}, the first clip's spring edge at Y {{process.clip_spring_edge_y_mm:in.3dot}}. After homing again (the standing page says when): check that neither blank has moved or lifted on its bond. One off, a blank moved, or the plate moved in the vise: stop and tell the owner."
-diagram = { file = "diagrams/sheet.svg", alt = "Plan of the spoil plate in the vise, to scale: the plate's blue tape, four strips along X from its left end to 4 in, and blank A against the fixed jaw and blank B in front of it on it, both flush with the plate's left end; dashed, the tape seams along X; on A the two clips, rails toward the moving jaw, and the first lamination; on B the other three; each lamination split along its bow profile into a male half and a female half. The 1/32 in end mill at PC01's first plunge, in clip 1's left hole, with a detail of the two clockwise circles that open it. A section across the jaws: the plate on a 1 in parallel at each jaw, its back edge on the fixed jaw, the blanks on their tape stack on top, the jaw tops {{process.jaw_top_over_plate_mm:in.3dot}} above the plate." }
+diagram = { file = "diagrams/sheet.svg", alt = "Plan of the spoil plate in the vise, to scale: the plate's blue tape, four strips along X from its left end to 4 in, and blank A against the fixed jaw and blank B in front of it on it, both flush with the plate's left end; dashed, the tape seams along X; on A the two clips, rails toward the moving jaw, and the first lamination; on B the other three; each lamination split along its bow profile into a male half and a female half. The 1/16 in end mill at PC01's first plunge, in clip 1's left hole, with a detail of the clockwise circle that opens it. A section across the jaws: the plate on a 1 in parallel at each jaw, its back edge on the fixed jaw, the blanks on their tape stack on top, the jaw tops {{process.jaw_top_over_plate_mm:in.3dot}} above the plate." }
 # Top: the thickest strip on the thickest tape stack; deepest: the cutter's
 # tip, .004 into the spoil plate. Across the jaws, the two blanks; along
 # them, blank A and the cutter's way in beyond the plate's left end.
@@ -432,7 +429,7 @@ instruction = "Press, within about 10 seconds of the spray: lower blank B, its b
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Console M6 T1 (1/32 in end mill, {{process.em_projection_min_mm:in.2dot}}–{{process.em_projection_max_mm:in.2dot}} out of the collet). Spindle stopped, its tip just dragging a .002 feeler leaf on the bare plate top right of the tape: G10 L20 P1 Z0.051 (mm: .002 in)."
+instruction = "Console M6 T1 (1/16 in end mill, {{process.em_projection_min_mm:in.2dot}}–{{process.em_projection_max_mm:in.2dot}} out of the collet). Spindle stopped, its tip just dragging a .002 feeler leaf on the bare plate top right of the tape: G10 L20 P1 Z0.051 (mm: .002 in)."
 feed = "hand"
 
 [[setups.operations]]
@@ -455,17 +452,17 @@ feed = "hand"
 instruction = "Only after a Stop at op 180 or 190: jog Z up clear; the plate stays in the vise. Free both blanks with the blade under the plate's tape and peel them as ops 240–250 do, peel all the tape, then repeat ops 80–170."
 feed = "hand"
 
-# Four equal levels, each piece's last with the tip into the spoil plate:
+# Two equal levels, each piece's last with the tip into the spoil plate:
 # the holes plunged near their centres, every outline entered from the air
 # beyond the plate's left end. The last level cuts through both tapes and
 # the glue, so every piece and both wastes stay on their own island of tape.
 [[setups.operations]]
 speed_kind = "spindle"
-tool = "em-thirty-second"
+tool = "em-sixteenth"
 drilling = "none"
 sizing = "other"
-instruction = "Run PC01_sheet (M6 T1: set 2800, then Cycle Start; about 114 min). Each hole is plunged near its centre at a quarter of the feed and opened by two circles; then each clip is cut round; then each lamination round and split along its bow profile. Four levels each, the last {{process.sheet_tip_into_plate_mm:in.3dot}} into the spoil plate."
-settings = "endmill-carbide-3fl-1-32-downcut-c260"
+instruction = "Run PC01_sheet (M6 T1: set 2800, then Cycle Start; about 34 min). Each hole is plunged near its centre at a quarter of the feed and opened by one circle; then each clip is cut round; then each lamination round and split along its bow profile. Two levels each, the last {{process.sheet_tip_into_plate_mm:in.3dot}} into the spoil plate."
+settings = "endmill-carbide-3fl-1-16-downcut-c260"
 beam = { axis = "x", hold = "plate", extent_mm = [0, "{{process.blank_length_mm}}"], seat = "spoil plate", seat_mm = ["{{process.plate_from_x_mm}}", "{{process.plate_to_x_mm}}"], bond = { shear_mpa = "{{process.bond_accepted_shear_mpa}}", tensile_mpa = "{{process.bond_accepted_tensile_mpa}}", accepted_by = "the shop owner", pieces = [{ name = "clip", kind = "part", area_mm2 = "{{process.clip_bond_area_mm2}}", width_mm = "{{process.clip_finger_width_mm}}" }, { name = "male die half", kind = "part", area_mm2 = "{{process.male_bond_area_mm2}}", width_mm = "{{process.lamination_flat_mm}}" }, { name = "female die half", kind = "part", area_mm2 = "{{process.female_bond_area_mm2}}", width_mm = "{{process.female_least_width_mm}}" }, { name = "waste A", kind = "waste", area_mm2 = "{{process.waste_a_bond_area_mm2}}" }, { name = "waste B", kind = "waste", area_mm2 = "{{process.waste_b_bond_area_mm2}}" }] } }
 milling_cuts = [
   { name = "sheet", kind = "slot", phase = "finish", cutter_dia_mm = "{{process.sheet_cutter_dia_mm}}", axial_doc_mm = "{{process.level_depth_mm}}", radial_woc_mm = "{{process.sheet_cutter_dia_mm}}", traverse_mm = ["{{process.sheet_from_x_mm}}", "{{process.sheet_to_x_mm}}"] },

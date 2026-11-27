@@ -125,27 +125,23 @@ PHOTO_SPRING_RAIL_WIDTH = PHOTO_CLIP_WIDTH * 32.0 / 68.0
 # #2 loose hole drilled at its printed Ø.116.
 SCREW_RAIL_WIDTH = 7.62  # .30
 RAIL_WIDTH_PLACES = 2
-# The overall width keeps the clip's inboard edge 2.0 off the recording paper
-# with the platen's clip sockets (pd_platen_spec.SOCKET_X; test_pd_platen_refit
-# asserts the gap): the spring rail is what the screw rail and the slit leave
-# of it (.130, the photograph's 4.23 short of the widened screw rail).
-CLIP_WIDTH = 11.938  # .47
+# The overall width keeps the clip's inboard edge over 1.0 mm off the recording
+# paper with the platen's clip sockets (pd_platen_spec.SOCKET_X;
+# test_pd_platen_refit asserts both the nominal gap and the worst-case sweep
+# clearance inboard_edge_max < paper_inset_min): #3740 widened the slit from
+# .04 to .08 for a 1/16 in downcut end mill and grew CLIP_WIDTH from .47 to .51
+# inward over the paper margin so SCREW_RAIL_WIDTH (.30) and SPRING_RAIL_WIDTH
+# (.130, the photograph's 4.23 short of the widened screw rail) stay unchanged.
+CLIP_WIDTH = 12.954  # .51
 # The slit frees the spring rail to flex out of the sheet on its own while the
 # screw rail stays clamped; the book's clip does that through the photographed
 # 0.53 slit, so the print's narrowest slit keeps at least that open.  It
-# prints .XX (the title block's general band, +/-.01): the nominal is the
-# floor plus the band, rounded up to the .01 grid, .04.
+# prints .XX (the title block's general band, +/-.01): widened from .04 to .08
+# (#3740) so a 1/16 in (.0620) downcut end mill cuts down one side and back up
+# the other with its R.0310 inside the full R.040 end.
 SLIT_PLACES = 2
 SLIT_GAP_FLOOR = PHOTO_SLIT_WIDTH
-NOTCH_WIDTH = (
-    math.ceil(
-        round(
-            (SLIT_GAP_FLOOR + printed_band_mm(SLIT_PLACES, unit=UNIT)) / 25.4 * 100.0, 9
-        )
-    )
-    / 100.0
-    * 25.4
-)
+NOTCH_WIDTH = 2.032  # .08
 SPRING_RAIL_WIDTH = CLIP_WIDTH - SCREW_RAIL_WIDTH - NOTCH_WIDTH
 SPRING_RAIL_Y0 = SCREW_RAIL_WIDTH + NOTCH_WIDTH
 # img03: the slits stop 77 px apart on their centreline; with their full

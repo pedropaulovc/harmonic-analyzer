@@ -12,26 +12,25 @@
 # on the fixed jaw; the blank bonded to its top on blue painter's tape on the
 # plate and on the blank with CA glue between (owner 2026-11-23). G54: X0
 # the plate's left end, Y0 the fixed jaw's face, Z0 the plate top. CB01_outline
-# (cam:dt_cone_gear_tl_phasing_comb) brings the 1/32 downcut end mill in through
-# the blank's margin and round the U at the finished size, three equal levels,
+# (cam:dt_cone_gear_tl_phasing_comb) brings the 1/16 downcut end mill in through
+# the blank's margin and round the U at the finished size, two equal levels,
 # the last with its tip .004 into the spoil plate: the comb comes free of the
 # blank. Setup 3 at the
 # bench frees the comb from the tape, deburrs and inspects it (FINISH: as cut).
 #
-# Cutter: the 1/32 Harvey 896231 downcut bought for MHA-PD-03 (shop
-# common.toml tools.endmill-carbide-3fl-1-32-downcut), not a 1/16 downcut
-# bought for this comb alone (tool audit 2026-11-23, endmill-carbide-3fl-1-16-
-# downcut: "Cut the comb with the 1/32 in Harvey 896231 downcut already
-# bought (x2) for MHA-PD-03, at its recorded maker chip load ... drop the 1/16
-# downcut"). Same downcut series, so the arms are still pushed onto the tape.
+# Cutter: the 1/16 Harvey 896262 downcut shared with MHA-PD-03 (shop
+# common.toml tools.endmill-carbide-3fl-1-16-downcut; owner direction
+# 2026-11-26, #3740: retire the 1/32 Harvey 896231 downcut after widening
+# MHA-PD-03's slits from .04 to .08 in, for 16x higher D^4 bending stiffness).
+# Same downcut series, so the arms are still pushed onto the tape.
 # The blanking cuts stay with the snips: the audit's junior-hacksaw route
 # needs the .020 sheet sandwiched between scrap boards no shop record holds,
 # and its 4.25 in cut is a stopped cut 1.50 in from the edge of the 12 in
 # sheet, which the bench vise cannot sandwich along its length.
 #
 # To order: the .020 sheet (stock-to-order.toml c260-h02-sheet-020-12x12),
-# the 1/32 carbide downcut end mill (tools-special-cutters.toml
-# endmill-carbide-3fl-1-32-downcut, Harvey Tool 896231, on MHA-PD-03's order)
+# the 1/16 carbide downcut end mill (tools-special-cutters.toml
+# endmill-carbide-3fl-1-16-downcut, Harvey Tool 896262, shared with MHA-PD-03)
 # and straight-cut aviation snips (tools-hand.toml aviation-snips-straight).
 # The spoil plate is to make from owned stock. On hand: the blue tape, the CA
 # glue and its accelerator (consumables.toml hold-painters-tape-ca).
@@ -69,10 +68,9 @@ blank_width_in = 1.5
 blank_thickness_in = 0.02
 blank_length_mm = 107.95
 blank_width_mm = 38.1
-# .30 in margin: the cutter plus blank_edge_error_mm, the blank's
+# .30 in margin: the 1/16 cutter plus blank_edge_error_mm, the blank's
 # placement by steel rule and a snipped edge's wander (the author's 1/8 in,
-# no source), stays inside the blank (sized for the 1/16 cutter first; the
-# 1/32 needs less and the blank is kept).
+# no source), stays inside the blank.
 blank_margin_mm = 7.62
 blank_edge_error_mm = 3.175
 # The blank's place on the plate: its left end and its back edge 1/2 in in
@@ -128,28 +126,26 @@ comb_spring_width_mm = 2.286
 # sheet's top on the nominal stack (.011 + .022) to the tip, in level_count
 # equal levels, the fewest with each at most level_depth_max_fraction of
 # the cutter's diameter; on the thickest stack (.013) the first level takes
-# .002 more, .0143, still under .5 x D (.0155): the recipe checks it.
+# .002 more, .0205, still under .5 x D (.0310): the recipe checks it.
 # Levels (R3: "no need to bring to me ; make coarser as you see fit"): the
 # bond does not set them. The binding limit is the cutter maker's: Harvey
-# Tool's slotting depth for the series (SF_896200, read 2026-11-22: axial
+# Tool's slotting depth for the series (SF_896200, read 2026-11-26: axial
 # .5 x D), never exceeded (delegated ruling 2026-11-22: never above the
-# maker's published figure), as MHA-PD-03's plan cuts with the same cutter.
-# .9404 / (.5 × .7874) = 2.39, so 3 levels of .3135 mm (.0123 in), where the
-# .006 tape took 3 of .2701; MHA-PD-03 runs .3238 mm levels by the same
-# rule in the same cutter and brass. The 0.6 MPa bond cap does not bind: the cut
-# asks .026 MPa in shear of the comb (the smallest piece, 1010 mm²) and no
-# tension (a downcut).
+# maker's published figure), as MHA-PD-03's plan cuts with the same 1/16
+# cutter (#3740). .9404 / (.5 × 1.5748) = 1.19, so 2 levels of .4702 mm
+# (.0185 in). The 0.6 MPa bond cap does not bind: the cut uses a downcut
+# helix (no tension) well within the shear cap on the comb (1010 mm²).
 outline_tip_z_mm = -0.1016
 outline_tip_into_plate_mm = 0.1016
 through_margin_min_mm = 0.2
 spoil_cut_max_mm = 0.254
 outline_depth_mm = 0.9404
 level_depth_max_fraction = 0.5
-level_count = 3
-level_depth_mm = 0.31347
-# The 1/32 end mill (shop tools.endmill-carbide-3fl-1-32-downcut
+level_count = 2
+level_depth_mm = 0.4702
+# The 1/16 end mill (shop tools.endmill-carbide-3fl-1-16-downcut
 # diameter_mm; the recipe checks it).
-outline_cutter_dia_mm = 0.7874
+outline_cutter_dia_mm = 1.5748
 # The title block's INSIDE CORNERS R.040 MAX (cad/config/title_block.yaml
 # in.inside_corner.radius_in): the cutter's radius must not exceed it.
 inside_corner_max_mm = 1.016
@@ -164,11 +160,11 @@ jaw_top_over_plate_mm = 6.8453
 # The plate's ends inside the jaws' width, centred: no overhang either side.
 plate_overhang_mm = 0.0
 r8_collet_gauge_mm = 6.3         # HA: holders.r8-collets-lms-4860.gauge_len_mm (as the base-bar plan).
-# The 1/32 end mill on its 1/8 shank, 1-1/2 in overall: 3/4 to 1 in out of
+# The 1/16 end mill on its 1/8 shank, 1-1/2 in overall: 3/4 to 1 in out of
 # the 1/8 collet, so the collet's nose stays above the jaw tops at the cut
 # (the recipe checks the least), at least 1/2 in of shank held.
-em_thirtysecond_projection_min_mm = 19.05
-em_thirtysecond_projection_max_mm = 25.4
+em_sixteenth_projection_min_mm = 19.05
+em_sixteenth_projection_max_mm = 25.4
 
 [[tools]]
 id = "snips"
@@ -205,11 +201,11 @@ ref = "ca-accelerator-starbond"
 description = "Starbond CA glue accelerator spray: misted on the blank's tape so the glue sets at once"
 
 [[tools]]
-id = "em-thirtysecond"
-name = "1/32 in carbide downcut end mill"
-ref = "endmill-carbide-3fl-1-32-downcut"
-# Harvey Tool 896231: 3 left-hand spiral, right-hand cut flutes, "prevents
-# lifting of workpiece" (harveytool.com family page, read 2026-11-22): its
+id = "em-sixteenth"
+name = "1/16 in carbide downcut end mill"
+ref = "endmill-carbide-3fl-1-16-downcut"
+# Harvey Tool 896262: 3 left-hand spiral, right-hand cut flutes, "prevents
+# lifting of workpiece" (harveytool.com family page, read 2026-11-26): its
 # helix pushes the comb's narrow arms onto the tape.
 axial_direction = "down"
 
@@ -265,10 +261,10 @@ indexing = "none"
 machine_ref = "pm-30mv"
 holding = "Spoil plate on 1 in parallels across the vise jaws, its back edge on the fixed jaw, centred along the jaws: the jaw tops stand {{process.jaw_top_over_plate_mm:in.3dot}} above the plate top, room for the edge finder's touch. The blank bonded to its top under its whole face: blue tape on the plate, CA glue, blue tape on the blank (stack {{process.tape_stack_min_mm:in.3dot}}–{{process.tape_stack_max_mm:in.3dot}}), its left end and back edge {{process.blank_left_x_mm:in.2dot}} in from the plate's left end and back edge."
 datum = "Program CB01_outline. G54: X0 the plate's left end, Y0 the fixed jaw's face (the plate's back edge), Z0 the plate top, bare right of the tape; the file works {{process.tape_stack_mm:in.3dot}} above it for the tape stack, its last level {{process.outline_tip_into_plate_mm:in.3dot}} into the plate on any stack; +Y toward the fixed jaw. The comb's open end stands at X {{process.comb_south_x_mm:in.3dot}}, its back edge (the stepped arm's, toward the fixed jaw) at Y {{process.comb_back_y_mm:in.3dot}}. After homing again (the standing page says when): check that the blank has not moved or lifted on its bond. One off, the blank moved, or the plate moved in the vise: stop and tell the owner."
-diagram = { file = "diagrams/outline.svg", alt = "Plan of the spoil plate in the vise, fixed jaw at the top, 3 px/mm: the 1 in parallels hidden under the plate's front and back edges; the plate's blue tape, two strips along X from its left end to 5 in, and on it the blank near the fixed jaw and the plate's left end; dashed, the tape seams; the comb's U inside the blank, its open end left and its stepped arm toward the fixed jaw. The 1/32 end mill, to scale, where CB01_outline's first level reaches the middle of the spring arm's front edge, in from in front of the blank (+Y), then anticlockwise round the U. Detail, section from the right end at 20 px/mm: the plate, the tape stack, the blank and the end mill's tip at Z 0.525 mm on level 1." }
+diagram = { file = "diagrams/outline.svg", alt = "Plan of the spoil plate in the vise, fixed jaw at the top, 3 px/mm: the 1 in parallels hidden under the plate's front and back edges; the plate's blue tape, two strips along X from its left end to 5 in, and on it the blank near the fixed jaw and the plate's left end; dashed, the tape seams; the comb's U inside the blank, its open end left and its stepped arm toward the fixed jaw. The 1/16 end mill, to scale, where CB01_outline's first level reaches the middle of the spring arm's front edge, in from in front of the blank (+Y), then anticlockwise round the U. Detail, section from the right end at 20 px/mm: the plate, the tape stack, the blank and the end mill's tip at Z 0.369 mm on level 1." }
 # Top: the thickest sheet on the thickest tape stack; deepest: the cutter's
 # tip, .004 into the spoil plate.
-envelope = { x_span_mm = ["{{process.blank_length_mm}}", "{{process.blank_left_x_mm}}"], y_span_mm = ["{{process.blank_width_mm}}", "{{process.blank_back_y_mm}}"], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{process.plate_thickness_mm}}", "{{process.tape_stack_max_mm}}", "{{cad.top_stock_thickness_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{process.plate_thickness_mm}}", "{{process.outline_tip_z_mm}}"], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.em_thirtysecond_projection_max_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.em_thirtysecond_projection_min_mm}}"] }
+envelope = { x_span_mm = ["{{process.blank_length_mm}}", "{{process.blank_left_x_mm}}"], y_span_mm = ["{{process.blank_width_mm}}", "{{process.blank_back_y_mm}}"], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{process.plate_thickness_mm}}", "{{process.tape_stack_max_mm}}", "{{cad.top_stock_thickness_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{process.plate_thickness_mm}}", "{{process.outline_tip_z_mm}}"], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.em_sixteenth_projection_max_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.em_sixteenth_projection_min_mm}}"] }
 vise_hold = { vise = "vise-pm-6", grips = "plate", across_jaws_mm = "{{process.plate_width_mm}}", along_jaws_mm = "{{process.plate_length_mm}}", part_height_mm = "{{process.plate_thickness_mm}}", parallel_height_mm = "{{process.parallel_height_mm}}", overhang_mm = ["{{process.plate_overhang_mm}}", "rest"], jaw_offset = "centred", fixed_jaw_face = "machined", moving_jaw_face = "machined", moving_jaw_contact = "flat" }
 beam = { axis = "x", hold = "plate", extent_mm = [0, "{{process.blank_length_mm}}"], seat = "spoil plate", seat_mm = ["{{process.plate_from_x_mm}}", "{{process.plate_to_x_mm}}"], bond = { shear_mpa = "{{process.bond_accepted_shear_mpa}}", tensile_mpa = "{{process.bond_accepted_tensile_mpa}}", accepted_by = "the shop owner", pieces = [{ name = "blank", kind = "part", area_mm2 = "{{process.blank_area_mm2}}", width_mm = "{{process.blank_width_mm}}" }] } }
 
@@ -332,7 +328,7 @@ instruction = "Press, within about 10 seconds of the spray (the glue grabs at on
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Console M6 T1 (1/32 in end mill, {{process.em_thirtysecond_projection_min_mm:in.2dot}}–{{process.em_thirtysecond_projection_max_mm:in.2dot}} out of the collet). Spindle stopped, its tip just dragging a .002 feeler leaf on the bare plate top right of the tape: G10 L20 P1 Z0.051 (mm: .002 in)."
+instruction = "Console M6 T1 (1/16 in end mill, {{process.em_sixteenth_projection_min_mm:in.2dot}}–{{process.em_sixteenth_projection_max_mm:in.2dot}} out of the collet). Spindle stopped, its tip just dragging a .002 feeler leaf on the bare plate top right of the tape: G10 L20 P1 Z0.051 (mm: .002 in)."
 feed = "hand"
 
 [[setups.operations]]
@@ -351,17 +347,17 @@ steps = [
 ]
 feed = "hand"
 
-# Three levels, each one pass at the finished size, entered from the air
+# Two levels, each one pass at the finished size, entered from the air
 # through the blank's margin and left back out the same way. The last level
 # cuts through both tapes and the glue, so the comb and the waste each stay
 # on their own island of tape.
 [[setups.operations]]
 speed_kind = "spindle"
-tool = "em-thirtysecond"
+tool = "em-sixteenth"
 drilling = "none"
 sizing = "other"
-instruction = "Run CB01_outline (M6 T1: set 2800; about 19 min): in through the margin, round the U anticlockwise at size and out, {{process.level_count:g}} times, each {{process.level_depth_mm:in.4dot}} deeper, the last {{process.outline_tip_into_plate_mm:in.3dot}} into the plate. Dry: a light air blast from a nozzle held well clear of the spindle, hands off the work; no coolant or water (paper tape soaks and lets go)."
-settings = "endmill-carbide-3fl-1-32-downcut-c260"
+instruction = "Run CB01_outline (M6 T1: set 2800; about 6 min): in through the margin, round the U anticlockwise at size and out, {{process.level_count:g}} times, each {{process.level_depth_mm:in.4dot}} deeper, the last {{process.outline_tip_into_plate_mm:in.3dot}} into the plate. Dry: a light air blast from a nozzle held well clear of the spindle, hands off the work; no coolant or water (paper tape soaks and lets go)."
+settings = "endmill-carbide-3fl-1-16-downcut-c260"
 beam = { axis = "x", hold = "plate", extent_mm = [0, "{{process.blank_length_mm}}"], seat = "spoil plate", seat_mm = ["{{process.plate_from_x_mm}}", "{{process.plate_to_x_mm}}"], bond = { shear_mpa = "{{process.bond_accepted_shear_mpa}}", tensile_mpa = "{{process.bond_accepted_tensile_mpa}}", accepted_by = "the shop owner", pieces = [{ name = "comb", kind = "part", area_mm2 = "{{process.comb_bond_area_mm2}}", width_mm = "{{process.comb_spring_width_mm}}" }, { name = "waste", kind = "waste", area_mm2 = "{{process.waste_bond_area_mm2}}" }] } }
 milling_cuts = [
   { name = "outline", kind = "slot", phase = "finish", cutter_dia_mm = "{{process.outline_cutter_dia_mm}}", axial_doc_mm = "{{process.level_depth_mm}}", radial_woc_mm = "{{process.outline_cutter_dia_mm}}", traverse_mm = ["{{process.outline_from_x_mm}}", "{{process.outline_to_x_mm}}"] },
