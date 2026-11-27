@@ -123,6 +123,64 @@ def test_the_recipes_programs_pass_every_check_they_declare(ctx, tmp_path) -> No
     assert set(times) == {name for name, _ops in RECIPE.PROGRAMS}
 
 
+def test_build_matches_freecad_cam_runtime_signatures(ctx) -> None:
+    import ast
+    import inspect
+
+    runtime_path = Path(__file__).resolve().parent / "_freecad_cam_runtime.py"
+    tree = ast.parse(runtime_path.read_text(encoding="utf-8"))
+    signatures: dict[str, inspect.Signature] = {}
+    for node in tree.body:
+        if not isinstance(node, ast.FunctionDef):
+            continue
+        args = node.args
+        n_defaults = len(args.defaults)
+        n_pos = len(args.args)
+        params = [
+            inspect.Parameter(
+                arg.arg,
+                inspect.Parameter.POSITIONAL_OR_KEYWORD,
+                default=(
+                    inspect.Parameter.empty
+                    if i < n_pos - n_defaults
+                    else None
+                ),
+            )
+            for i, arg in enumerate(args.args)
+        ] + [
+            inspect.Parameter(
+                arg.arg,
+                inspect.Parameter.KEYWORD_ONLY,
+                default=(
+                    inspect.Parameter.empty if default is None else None
+                ),
+            )
+            for arg, default in zip(args.kwonlyargs, args.kw_defaults, strict=True)
+        ]
+        signatures[node.name] = inspect.Signature(params)
+
+    calls: list[str] = []
+
+    class _FakeRuntime:
+        def __getattr__(self, name: str):
+            sig = signatures[name]
+
+            def _call(*args, **kwargs):
+                sig.bind(*args, **kwargs)
+                calls.append(name)
+                return f"{name}_result"
+
+            return _call
+
+    built = RECIPE.build(ctx, _FakeRuntime())
+    assert "generate" in calls
+    assert set(built["ops"]) == {
+        group[0] if isinstance(group, tuple) else group
+        for _name, groups in RECIPE.PROGRAMS
+        for group in groups
+    }
+
+
 @pytest.mark.parametrize(
     ("key", "value", "detail"),
     [

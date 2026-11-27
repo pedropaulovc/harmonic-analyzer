@@ -162,11 +162,9 @@ arch_lead_mm = 1.0
 hold_spot_dia_mm = 2.159
 bore_spot_dia_mm = 4.572
 apex_spot_dia_mm = 1.27
-# Foot hole (FK03): the #41 from the seat, pecked .080 with full retract
-# (L/D 4), its full diameter hold_drill_past_mm past the foot top into the
-# waste; its point then stands hold_tip_height_mm above the parallels in
-# the shortest blank.
-hold_peck_mm = 2.032
+# Foot hole (FK03): the #41 from the seat, one plunge (L/D 2.4), its full
+# diameter hold_drill_past_mm past the foot top into the waste; its point
+# then stands hold_tip_height_mm above the parallels in the shortest blank.
 hold_drill_past_mm = 1.0
 hold_tip_height_mm = 25.522
 # The holes' setup coordinates: the foot hole's station from I (cad
@@ -475,11 +473,11 @@ speed_kind = "spindle"
 tool = "drill-41"
 drilling = "twist_drill"
 sizing = { kind = "band", band_mm = "{{cad.foot_hole_dia_band_mm}}" }
-instruction = "Same file, M6 T3: #41 drill down from the seat, pecks of {{process.hold_peck_mm:in.3dot}} with full retract, its full diameter {{process.hold_drill_past_mm:in.3dot}} past the foot top ({{cad.foot_top_height_in:.3dot}} below the seat) into the waste the step removes in Setup 6, which opens the hole; set 2600. Cutting oil."
+instruction = "Same file, M6 T3: #41 drill down from the seat, one plunge, its full diameter {{process.hold_drill_past_mm:in.3dot}} past the foot top ({{cad.foot_top_height_in:.3dot}} below the seat) into the waste the step removes in Setup 6, which opens the hole; set 2600. Cutting oil."
 rpm = 2600
 feed = "{{process.hold_drill_feed_per_min_mm:in.1f}} in/min"
 hole_depth_mm = "{{cad.foot_top_height_mm}}"
-peck = { step_mm = 2.032, retract = "full" }
+peck = "none"
 milling_cuts = [
   { name = "hold drill", kind = "drill", phase = "finish", cutter_dia_mm = 2.4384, flutes = 2, rpm = 2600, feed_mm_min = "{{process.hold_drill_feed_per_min_mm}}", stations_mm = "{{process.upright_top_max_mm}}" },
 ]

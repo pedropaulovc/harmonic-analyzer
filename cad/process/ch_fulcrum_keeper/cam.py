@@ -156,7 +156,7 @@ def _setting(
 
 
 def _shop_tool(plan: dict[str, Any], shop: dict[str, Any], tool: str) -> dict[str, Any]:
-    ref = next(t["id"] == tool and t["ref"] for t in plan["tools"] if t["id"] == tool)
+    ref = next(t["ref"] for t in plan["tools"] if t["id"] == tool)
     return shop["tools"][ref]
 
 
@@ -572,13 +572,7 @@ def context(
     _agree(plan, "tap_reach_min_mm", height - major_wall + p["plug_tap_lead_mm"])
     _agree(plan, "tap_reach_max_mm", height - (bore_y - bore_r) - 1.0)
     for op, (key, peck) in (
-        (
-            _op_with_cut(plan, "hold drill")[0],
-            (
-                "{{cad.foot_top_height_mm}}",
-                {"step_mm": p["hold_peck_mm"], "retract": "full"},
-            ),
-        ),
+        (_op_with_cut(plan, "hold drill")[0], ("{{cad.foot_top_height_mm}}", "none")),
         (_op_with_cut(plan, "bore drill")[0], (ear + p["bore_drill_past_mm"], "none")),
         (
             _op_with_cut(plan, "apex drill")[0],
@@ -845,7 +839,7 @@ def context(
                 [
                     "foot_drill",
                     "drill the foot hole #41",
-                    _pecked(hold_xy, 0.0, hold_tip, p["hold_peck_mm"], CLEAR_MM),
+                    _pecked(hold_xy, 0.0, hold_tip, math.inf, CLEAR_MM),
                 ]
             ],
         },
@@ -1282,18 +1276,19 @@ def build(ctx: dict[str, Any], rt: Any) -> dict[str, Any]:
             doc, section["label"], [models[section["frame"]]], section["stock"]
         )
         tc = rt.tool_controller(
-            target,
-            ctx["numbers"][section["tool"]],
+            doc,
             ctx["names"][section["tool"]],
+            ctx["numbers"][section["tool"]],
+            section["shape"],
             section["dia"],
-            rpm=section["rpm"],
-            horiz_feed=section["feed"],
-            vert_feed=section["plunge"],
-            shape=section["shape"],
-            flutes=section.get("flutes", 2),
-            tip_angle=section.get("tip_angle", 118.0),
+            section["rpm"],
+            section["feed"],
+            section["plunge"],
+            flutes=section.get("flutes"),
+            tip_angle=section.get("tip_angle"),
         )
         for key, label, lines in section["ops"]:
-            ops[key] = rt.custom(target, tc, lines, label=label)
+            ops[key] = rt.custom(target, tc, label, lines)
     ops.update(ctx["manual"])
+    rt.generate(doc)
     return {"ops": ops}

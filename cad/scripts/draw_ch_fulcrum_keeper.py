@@ -44,6 +44,7 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_dimensions import (
+    assert_imported_precision,
     offset_dimension_text,
     set_dimension_callouts,
     set_reference_dimension,
@@ -839,7 +840,7 @@ def build(adapter: Any) -> dict[str, str]:
         view_label="front",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
-    curate_view_dimensions(
+    top_annotations = curate_view_dimensions(
         adapter,
         top,
         keep=TOP_KEEP,
@@ -852,6 +853,11 @@ def build(adapter: Any) -> dict[str, str]:
         keep=RIGHT_KEEP,
         view_label="right",
         dimensions_by_feature=DRAWING_DIMENSIONS,
+    )
+    assert_imported_precision(
+        adapter,
+        [*front_annotations, *top_annotations, *right_annotations],
+        _P,
     )
     for name in NEAR_SIDE_DIAMETERS:
         set_near_side_diameter(_one(adapter, right_annotations, name), f"keeper {name}")
