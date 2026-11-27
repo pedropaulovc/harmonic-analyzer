@@ -98,7 +98,9 @@ def test_bonded_slip_fit_replaces_the_press() -> None:
     assert "SLIP FIT" not in drawing.DIMENSION_CALLOUTS["PinDia"]
     import draw_dt_pinion_bracket
 
-    assert "MHA-DT-25" in draw_dt_pinion_bracket.DIMENSION_CALLOUTS["PinSeatDia"]
+    # #3693: the seat callout flags note 1, which names the mate.
+    assert "SEE NOTE 1" in draw_dt_pinion_bracket.DIMENSION_CALLOUTS["PinSeatDia"]
+    assert "MHA-DT-25" in dt_pinion_bracket_spec.DRAWING_NOTES
 
 
 def test_the_bond_step_counts_one_pin_per_strap() -> None:

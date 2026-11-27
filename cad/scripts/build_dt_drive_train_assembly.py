@@ -2342,7 +2342,7 @@ LIFT_ROD_Z0 = RIG.LIFT_ROD_Z0
 # front end LEVER_SEAT_PROUD (15.60) south of the front block -- the lever
 # hub's seat, sized so the hub never stops the rod (pinion_rig_layout)
 BLOCK_X = PIVOT_X  # block local origin ON the pivot bore (datum B, U28)
-BLOCK_FRONT_Z0 = RIG.FRONT_BLOCK_Z0  # one 0.25 feeler off the front strap
+BLOCK_FRONT_Z0 = RIG.FRONT_BLOCK_Z0  # one .010-.020 feeler leaf off the front strap
 BLOCK_BACK_Z0 = RIG.BACK_BLOCK_Z0  # the (c) back stop, the rig's reference
 # U28 thinned the blocks (12 -> 10.25); ruling (c) then put the back strap hard
 # on the back block, and pinion_rig_layout sizes the shaft and rod from the
@@ -2511,7 +2511,7 @@ _S_CAM = (_FPIN_C[0] - LIFT_X) / _SPR_N[0]  # 14.9: where the pin crosses the
 # U28 deleted the set-pin boss; MHA-DT-23 now has a sub-flush #2-56 set screw at
 # its geometry-owned SET_SCREW_Z, so the collar is a bare cylinder throughout
 # free cam spin.  Ruling (c): the FRONT collar is set against the front
-# block's inner face (0.25 feeler) -- flush with the strap's outer face, so
+# block's inner face (one .010-.020 leaf) -- flush with the strap's outer face, so
 # the pin rides mid-collar (T/2) and the collar and lever hub capture the lift
 # rod on the block.  The BACK collar is set the same way, its back face
 # BACK_COLLAR_LEAF_F off the back block (user ruling P1-1), so the pin rides

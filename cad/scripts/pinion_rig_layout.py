@@ -9,7 +9,7 @@ never re-key the base or the drive train.
 User ruling (c), 2026-09-24: the two pivot blocks locate the swing cluster
 (strap / drum / strap) axially, as the ch25 photos show -- no collar, no
 spacer.  At fit-up the cluster is pushed hard against the BACK block and the
-FRONT block is stood off the front strap with a 0.25 feeler before its base
+FRONT block is stood off the front strap on one .010-.020 feeler leaf before its base
 seats are spotted through it (the existing U28 transfer-at-assembly step).
 The same ruling moved the drum's bond station 0.3 aft on the MHA-DT-22 arbor
 (drum front end 61.55 from the head shoulder), so j = 19 reads full face at
