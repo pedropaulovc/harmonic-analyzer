@@ -645,6 +645,15 @@ traveler first.
   README image files. It may merge immediately. Plan or shop changes, code,
   prose, docs, README markup/layout or any other change stays in an ordinary PR
   and MUST satisfy the ordinary PR requirements.
+- Merging that follow-up re-keys almost the whole remote cache:
+  `release.yaml` is an input of every part, assembly and drawing recipe, so the
+  bump re-keys 493 of 639 cache rows (#3734) and main stays cold until a full
+  build. The release procedure therefore ends with a warm-up: right after the
+  follow-up merges, the release agent launches `build` on that main commit, and
+  other farm launches wait until it is green. After the v53 bump this took a
+  182-leaf run (130 min) and a 231-leaf run (82 min); see
+  [`DEVELOPING.md`](DEVELOPING.md#farm-releases). Farm proof that an open PR
+  made before the bump no longer matches main's keys.
 - For a farm release, run only
   `build export package:release package:manifest check:features_bound` through
   `farm_build.py run` (`build` supplies drawing and check gates; it binds only

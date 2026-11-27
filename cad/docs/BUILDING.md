@@ -221,6 +221,10 @@ files. This exact generated-only PR is exempt
 from the ordinary PR requirements and may merge immediately. Any other
 plan/shop edit, code, prose, documentation, README markup or layout change
 remains an ordinary PR under [the merge requirements](../../AGENTS.md#minimum-merge-gate-every-pr).
+Merging it re-keys 493 of 639 remote-cache rows, because `release.yaml` is an
+input of every part, assembly and drawing recipe (#3734). Right after it merges,
+the release agent launches the warm-up `build` on main, and other farm launches
+wait until it is green; see [`DEVELOPING.md`](../../DEVELOPING.md#farm-releases).
 During the rolling-main trial, authors provide focused checks and appropriate
 native/review proof; an individual PR or stack does not need a full build to
 merge. The release manager continuously full-builds main, and daily releases
