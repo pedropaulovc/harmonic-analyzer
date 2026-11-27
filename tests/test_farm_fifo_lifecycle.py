@@ -1455,13 +1455,11 @@ class _SleepClock:
 
     def __init__(self):
         self.now = 0.0
-        self.sleeps = []
 
     def monotonic(self):
         return self.now
 
     async def sleep(self, seconds):
-        self.sleeps.append(seconds)
         self.now += seconds
         await asyncio.sleep(0)
 
