@@ -296,7 +296,7 @@ feed_mm_rev = 0.0254
 description = "Steel arbor shim assortment, 1/4 in ID x 3/8 in OD, .001-.125 in, Precision Brand 25100"
 
 # --- MHA-DT-16 pinion engage lever (cad/process/dt_pinion_lever/plan.toml) -----
-# The owned 1/4 in 2-flute carbide ball end mill (sm.toml
+# The owned 1/4 in 2-flute carbide ball end mill (common.toml
 # tools.ball-endmill-carbide-2fl-1-4, McMaster 8878A17) on 1018 cold-finished
 # at the PM-30MV: the lever's rod and SR crown. The square 1/4 in carbide end
 # mill's setting (common.toml settings.endmill-carbide-3fl-1-4-1018-cf: 2800
@@ -322,13 +322,14 @@ feed_unit = "in/min"
 # MSC 35497056, Accupro (Mfr 14981778), read live 2026-11-24 (#3568): 1/16
 # (.0625) × 1/2 in length of cut × 2-1/2 overall, 3 flutes, solid carbide,
 # uncoated, 30° helix, centre cutting, 1/8 shank, no neck, $34.97. Not
-# owned: to buy (cad/config/shop-equipment/ under the same key). Its chip
-# load: no maker's figure is on record, so Harvey Tool's long-reach table
-# stands in, as for ms.toml's stop-em-sixteenth-c360: Miniature End Mills -
+# owned: to buy (cad/config/shop-equipment/ under the same key); MHA-DT-16
+# is the only part that needs it. Its chip load: no maker's figure is on
+# record, so Harvey Tool's long-reach table stands in: Miniature End Mills -
 # Square - Long Reach, Stub Flute, 9x Reach Multiple (the 9x table, the next
-# longer than its 8x flutes; W.C. Chapman's copy, read 2026-11-27), row
-# Carbon Steels: Free-Machining/Low Carbon (10xx - 1029), .062 in Roughing
-# .00017 in/tooth (× 25.4).
+# longer than its 8x flutes; W.C. Chapman's copy, read 2026-11-27; pd.toml's
+# pd-hub-plunge-1-16-c360 reads the same table, its Brass row), row Carbon
+# Steels: Free-Machining/Low Carbon (10xx - 1029), .062 in Roughing .00017
+# in/tooth (× 25.4).
 [tools.endmill-carbide-3fl-1-16-loc-1-2]
 description = "1/16 in (.0625) 3-flute carbide square end mill, 1/2 in LOC, 2-1/2 in OAL, 1/8 shank (MSC 35497056, Accupro)"
 diameter_mm = 1.5875

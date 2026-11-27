@@ -25,17 +25,19 @@ axis runs through the bar's thickness. A window round the part is cleared
 from each face, so the part ends hanging on two tabs on the rod's axis
 plane: one behind the hub, one past the rod's tip. Mouth face up,
 DT16_top_rough clears the window to a ball's radius past the axis plane
-(full-width slots of the 1/4 in end mill, a contour at .010 stock round the
-part at each level) and finishes the hub's wall and the rod's tip face;
-DT16_top_rod finishes the rod's upper half with the 1/4 in ball end mill in
-passes along it; DT16_top_root cuts the rod's root with the 1/16 in end mill
-in fine levels (INSIDE CORNERS R.040 MAX); DT16_top_holes spots, drills the
-bore with the F drill, flattens its floor with the 1/4 in HSS end mill, and
-drills F through the reference hole. Turned end for end about the jaws' axis
-(mouth face down), DT16_crown_rough clears the rest of the window and the
-shadow under the rod, DT16_crown_dome_rod finishes the SR crown in rings and
-the rod's lower half with the ball, DT16_crown_root the root's lower half.
-The tabs are sawn and filed at the bench.
+(passes of the 1/4 in end mill along the rod, each cut one way, a contour at
+.010 stock round the part at each level) and finishes the hub's wall and the
+rod's tip face; DT16_top_rod finishes the rod's upper half with the 1/4 in
+ball end mill in passes along it; DT16_top_root cuts the rod's root with the
+1/16 in end mill in fine levels (INSIDE CORNERS R.040 MAX) and finishes the
+rod's tip face beside the tip tab, where the 1/4 in end mill cannot reach;
+DT16_top_holes spots, drills the bore with the F drill, flattens its floor
+with the 1/4 in HSS end mill, and drills F through the reference hole.
+Turned end for end about the jaws' axis (mouth face down), DT16_crown_rough
+clears the rest of the window and the shadow under the rod,
+DT16_crown_dome_rod finishes the SR crown in rings and the rod's lower half
+with the ball, DT16_crown_root the root's lower half and the tip face beside
+the tab. The tabs are sawn and filed at the bench.
 
 Work frames (G54), each set in its setup, in model terms (model: hub axis
 +Z through the origin, rod +Y, mouth face at Z+.20):
@@ -54,9 +56,11 @@ into metal at the plunge feed. Every side cut is conventional under M3
 as each setup's spindle sees them, the ball's passes along the rod run
 toward the rod's tip on one side and toward the hub on the other, and the
 root's levels all run the same way, the cutter lifted and brought back
-over the start between them. The window's raster passes are full-width
-slots (one cutter's width apart at most), which meet metal across the
-cutter's whole width and so have no climb or conventional side. The plan's
+over the start between them. The window's raster passes overlap (no more
+than a cutter's width apart): the first is a full-width slot along the
+window's wall, and each next one meets uncut steel on its far side only, so
+they all run the one way that cuts that side conventional, the cutter
+lifted and brought back over the next start between them. The plan's
 paths are stated here in model terms for the top frame (clockwise round the
 part); the top frame is a turn of the model plan, so it runs them reversed,
 and the crown frame mirrors the plan, so it runs them as stated.
@@ -76,7 +80,7 @@ COMMENT = "MHA-DT-16 pinion engage lever"
 PROGRAMS: tuple[tuple[str, tuple[Any, ...]], ...] = (
     ("DT16_top_rough", ("top_rough", "top_wall", "top_tip")),
     ("DT16_top_rod", ("top_rod_semi", "top_rod_finish")),
-    ("DT16_top_root", ("top_root",)),
+    ("DT16_top_root", ("top_root", "top_tip_tab")),
     (
         "DT16_top_holes",
         (("spot",), ("bore_drill", "ref_drill"), ("bore_floor",)),
@@ -86,7 +90,7 @@ PROGRAMS: tuple[tuple[str, tuple[Any, ...]], ...] = (
         "DT16_crown_dome_rod",
         ("crown_dome_semi", "crown_dome_finish", "crown_rod_semi", "crown_rod_finish"),
     ),
-    ("DT16_crown_root", ("crown_root",)),
+    ("DT16_crown_root", ("crown_root", "crown_tip_tab")),
 )
 # Every program loads its own first tool (M6, the tool setter): a restart or
 # a re-run never inherits the previous file's tool length.
@@ -126,10 +130,8 @@ JAW_DEPTH_MM = IN
 PLUNGE_ABOVE_MM = 0.5
 # Plan parameters the recipe recomputes agree to this.
 PLAN_TOL_MM = 0.01
-# A raster span shorter than this is not cut; a link between spans is
-# tested for the part at this spacing.
+# A raster span shorter than this is not cut.
 MIN_CUT_MM = 0.2
-LINK_SAMPLE_MM = 0.1
 # The ball stops this far short of touching the hub's wall.
 BALL_SHORT_MM = 0.02
 
@@ -389,12 +391,19 @@ class Writer:
             self.lines.append(f"G1 Z{switch:.3f} F{{feed}}")
         self.lines.append(f"G1 Z{self.z(e):.3f} F{{plunge}}")
 
-    def line(self, x: float, y: float, e: float | None = None) -> None:
+    def plunge(self, e: float) -> None:
+        """Straight down to ``e`` from where the cutter stands, all of it at
+        the plunge feed (what lies below may be metal)."""
+        self.lines.append(f"G1 Z{self.z(e):.3f} F{{plunge}}")
+
+    def lift(self, e: float) -> None:
+        """Feed straight up to ``e`` inside the column already cut (below the
+        stock's top, where no rapid runs)."""
+        self.lines.append(f"G1 Z{self.z(e):.3f} F{{feed}}")
+
+    def line(self, x: float, y: float) -> None:
         X, Y = self.xy(x, y)
-        if e is None:
-            self.lines.append(f"G1 X{X:.3f} Y{Y:.3f} F{{feed}}")
-        else:
-            self.lines.append(f"G1 X{X:.3f} Y{Y:.3f} Z{self.z(e):.3f} F{{feed}}")
+        self.lines.append(f"G1 X{X:.3f} Y{Y:.3f} F{{feed}}")
 
     def arc(self, start, end, centre, cw_model: bool) -> None:
         """An arc in the plan from ``start`` to ``end`` round ``centre``."""
@@ -524,6 +533,32 @@ def _outline(
     ]
 
 
+def raster_lines(
+    half_w: float, r: float, stepover: float, inner: float
+) -> list[tuple[float, float]]:
+    """The window's raster lines (model x, along the rod) in the order they
+    are cut, each with the side (+1: +x, -1: -x) its uncut steel lies on:
+    from the -x wall in to -``inner``, then from the +x wall in to +``inner``
+    (where the tabs' blocked spans begin, so no ridge stands beside a tab),
+    each group's steps equal and no more than ``stepover``; then, when the
+    two inner lines leave steel between them, one on the axis (a slot in that
+    rib). The first line from each wall is a full-width slot; each next one
+    meets steel only on its inner side, the outer side cut by the line before
+    over the same spans (the part's blocked spans only grow toward the
+    axis)."""
+    lo, hi = -half_w + r, half_w - r
+    if not r <= inner < hi:
+        raise ValueError("the window is too narrow for a raster beside the tabs")
+    n = math.ceil((hi - inner) / stepover - 1e-9)
+    step = (hi - inner) / n
+    # The inner lines exactly on ±inner: the tabs' spans begin there.
+    lines = [(lo + step * k, 1.0) for k in range(n)] + [(-inner, 1.0)]
+    lines += [(hi - step * k, -1.0) for k in range(n)] + [(inner, -1.0)]
+    if inner > r:
+        lines.append((0.0, 1.0))
+    return lines
+
+
 def _rough(
     lever: Lever,
     side: str,
@@ -537,18 +572,16 @@ def _rough(
     raster: bool,
 ) -> int:
     """Clear the window round the part in ``levels``: at each (with
-    ``raster``) passes along the rod (model Y) no more than ``stepover``
-    apart across it (one cutter's width: full-width slots), through the free
-    spans of each line (the part's section at the level less the stock grown
-    by the stock and the cutter's radius, the tabs where they stand, the
-    window's walls kept), linked at the level where the link misses the
-    part, serpentine; then one conventional contour round the part at the
-    stock. ``e_top``: the stock's top on this side (the first level plunges
-    from it). Returns the spans cut."""
+    ``raster``) passes along the rod (model Y) on :func:`raster_lines`, through
+    the free spans of each line (the part's section at the level less the
+    stock grown by the stock and the cutter's radius, the tabs where they
+    stand, the window's walls kept); then one conventional contour round the
+    part at the stock. Every span runs the way that cuts its line's steel
+    side conventional (clockwise round it in model terms: +y with the steel
+    at +x, -y with it at -x), the cutter lifted and brought back over the
+    next start. ``e_top``: the stock's top on this side (the first level
+    plunges from it). Returns the spans cut."""
     half_w, back, front = window
-    lo, hi = -half_w + r, half_w - r
-    n = math.ceil((hi - lo) / stepover - 1e-9)
-    xs = [lo + (hi - lo) * k / n for k in range(n + 1)]
     y_lo, y_hi = -back + r, front - r
     grow = stock + r
     cleared = e_top
@@ -557,40 +590,31 @@ def _rough(
         # What stands at or above e, grown by the stock: the section at
         # e - stock (the rod and the crown widen toward the axis plane).
         probe = e - stock
-
-        def free(x: float, y: float) -> bool:
-            if not (lo - 1e-9 <= x <= hi + 1e-9 and y_lo - 1e-9 <= y <= y_hi + 1e-9):
-                return False
-            return all(
-                not a < y < b
-                for a, b in lever.blocked(side, probe, x, grow, back, front)
-            )
-
-        here = None
         if raster:
-            for k, x in enumerate(xs):
+            for x, steel in raster_lines(
+                half_w, r, stepover, lever.g["tab_half_w"] + grow
+            ):
                 runs = [
-                    (a, b)
+                    (a, b) if steel > 0.0 else (b, a)
                     for a, b in _subtract(
                         (y_lo, y_hi), lever.blocked(side, probe, x, grow, back, front)
                     )
                     if b - a >= MIN_CUT_MM
                 ]
-                if k % 2:
-                    runs = [(b, a) for a, b in reversed(runs)]
-                for a, b in runs:
-                    if here is not None and _link_free(free, here, (x, a)):
-                        w.line(x, a)
-                    else:
-                        if here is not None:
-                            w.up()
-                        w.over(x, a)
-                        w.down(e, cleared)
-                    w.line(x, b)
-                    here = (x, b)
+                paths = [
+                    w.conventional([("P", (x, a)), ("L", (x, b))]) for a, b in runs
+                ]
+                # The spans of a line in the order the frame runs them.
+                if paths and paths[0][0][1][1] > paths[0][1][1][1]:
+                    paths.sort(key=lambda path: -path[0][1][1])
+                else:
+                    paths.sort(key=lambda path: path[0][1][1])
+                for path in paths:
+                    w.over(*path[0][1])
+                    w.down(e, cleared)
+                    w.path(path)
+                    w.up()
                     spans += 1
-            if here is not None:
-                w.up()
         for path in _outline(lever, side, probe, stock, r, rod=True):
             path = w.conventional(path)
             w.over(*path[0][1])
@@ -599,15 +623,6 @@ def _rough(
             w.up()
         cleared = e
     return spans
-
-
-def _link_free(free, a: tuple[float, float], b: tuple[float, float]) -> bool:
-    """The straight link from ``a`` to ``b`` stays in the free region."""
-    n = max(1, math.ceil(math.dist(a, b) / LINK_SAMPLE_MM))
-    return all(
-        free(a[0] + (b[0] - a[0]) * k / n, a[1] + (b[1] - a[1]) * k / n)
-        for k in range(n + 1)
-    )
 
 
 def _wall(
@@ -628,28 +643,108 @@ def _wall(
 
 
 def _tip(lever: Lever, w: Writer, levels: list[float], r: float, e_top: float) -> None:
-    """Finish the rod's tip face at each level the rod stands at: a conventional
-    pass across it, the cutter's side on the face, split at the tip tab;
-    each entered at the plunge feed through the stock the level above left."""
-    g = lever.g
-    y = g["tip_y"] + r
+    """Finish the rod's tip face at each level the rod stands at and no tab
+    does: a conventional pass across it, the cutter's side on the face; each
+    entered at the plunge feed through the stock the level above left. Where
+    a tab stands, the cutter (its radius wider than the rod's half less the
+    tab's) cannot reach the face beside it: :func:`_tip_tab` finishes it."""
+    y = lever.g["tip_y"] + r
     cleared = e_top
     for e in levels:
         half = lever.rod_reach(e)
-        if half > 0.0:
-            reach = half + r
-            spans = [(-reach, reach)]
-            if lever.tabs_at(e):
-                spans = _subtract(
-                    (-reach, reach), [(-g["tab_half_w"] - r, g["tab_half_w"] + r)]
-                )
-            for a, b in spans:
-                path = w.conventional([("P", (a, y)), ("L", (b, y))])
-                w.over(*path[0][1])
-                w.down(e, cleared)
-                w.path(path)
-                w.up()
+        if half > 0.0 and not lever.tabs_at(e):
+            path = w.conventional([("P", (-half - r, y)), ("L", (half + r, y))])
+            w.over(*path[0][1])
+            w.down(e, cleared)
+            w.path(path)
+            w.up()
         cleared = e
+
+
+def _tab_corner(g: dict[str, float], r6: float, stock: float) -> tuple[float, float]:
+    """The centre of the 1/4 in end mill's circle that bounds the corner it
+    leaves beside the tip tab at a tab level: where its contour round the part
+    (:func:`_outline`) starts, beside the tab's stock on the tip's corner arc,
+    taken where the rod is widest (the corner then stands farthest out)."""
+    gap = g["tab_half_w"] + stock + r6
+    off = max(0.0, gap - (g["rod_r"] + stock))
+    return gap, g["tip_y"] + stock + math.sqrt(r6 * r6 - off * off)
+
+
+def tip_tab_rows(
+    g: dict[str, float], r5: float, r6: float, stock: float
+) -> tuple[list[float], float]:
+    """The rows (model y of the 1/16 in end mill's centre) finishing the tip
+    face beside the tip tab, outermost first, equally spaced no more than r5
+    apart, the last on the face (tip_y + r5); and the row that would just
+    touch the corner (:func:`_tab_corner`) where the 1/16 in end mill stands
+    beside the tab's stock (x = tab_half_w + stock + r5), one step outside
+    the first."""
+    cx, cy = _tab_corner(g, r6, stock)
+    x_in = g["tab_half_w"] + stock + r5
+    face = cy - math.sqrt(r6 * r6 - (cx - x_in) ** 2)
+    tip = g["tip_y"]
+    n = math.ceil((face - tip) / r5 - 1e-9)
+    step = (face - tip) / n
+    return [tip + r5 + step * k for k in range(n - 1, -1, -1)], face + r5
+
+
+def _tip_tab(
+    lever: Lever,
+    w: Writer,
+    levels: list[float],
+    r5: float,
+    r6: float,
+    stock: float,
+    e_top: float,
+) -> list[dict[str, float]]:
+    """Finish the rod's tip face beside the tip tab with the 1/16 in end mill,
+    where the 1/4 in end mill leaves its corner (:func:`_tab_corner`): each
+    side of the tab in turn, at each level, a pass along the face on each of
+    :func:`tip_tab_rows`, outermost first, from beside the tab's stock (the
+    cutter's side on it) out to where the corner ends at the row's lower
+    edge, the last out past the rod's side and its stock. Each runs +x in
+    model terms (clockwise round the part: conventional), its far half inside
+    the row before. Between passes the cutter rises to the level above (cut
+    already), crosses there and plunges; between levels it crosses at the
+    level just cut. The tab's stock keeps the cutter's radius in its corner
+    with the face. ``e_top``: the lowest level the 1/4 in end mill crossed
+    the whole tip at. Returns each pass's level, row and ends (model x)."""
+    g = lever.g
+    x_in = g["tab_half_w"] + stock + r5
+    if x_in >= g["rod_r"]:
+        raise ValueError("the 1/16 in end mill does not fit beside the tip tab")
+    cx, cy = _tab_corner(g, r6, stock)
+    rows, _raw = tip_tab_rows(g, r5, r6, stock)
+    out = []
+    for sign in (1.0, -1.0):
+        above, at = e_top, None
+        for e in levels:
+            cap = lever.rod_reach(e) + stock + r5
+            for y in rows:
+                # Where the corner meets the row's lower edge.
+                d = min(cy - (y - r5), r6)
+                x_out = min(cap, cx - math.sqrt(r6 * r6 - d * d))
+                if x_out - x_in < MIN_CUT_MM:
+                    continue
+                path = [("P", (x_in, y)), ("L", (x_out, y))]
+                if sign < 0:
+                    path = _mirror(path)
+                path = w.conventional(path)
+                if at is None:
+                    w.over(*path[0][1])
+                    w.down(e, above)
+                else:
+                    if at != above:
+                        w.lift(above)
+                    w.line(*path[0][1])
+                    w.plunge(e)
+                w.path(path)
+                at = e
+                out.append({"e": e, "y": y, "x_in": sign * x_in, "x_out": sign * x_out})
+            above = e
+        w.up()
+    return out
 
 
 def _ball_passes(
@@ -719,8 +814,10 @@ def _dome_rings(
         else:
             # Out at the last ring's height, then down: a straight chord
             # between the two rings would dip into the sphere by its sagitta.
+            # The roughing's steps over the crown stand below: all the way
+            # down at the plunge feed.
             w.line(rho, 0.0)
-            w.line(rho, 0.0, e_c - rb)
+            w.plunge(e_c - rb)
             ring = w.conventional(
                 [
                     ("P", (rho, 0.0)),
@@ -737,12 +834,14 @@ def _dome_rings(
 def root_levels(
     rod_r: float, bottom: float, cusp: float, max_step: float
 ) -> list[float]:
-    """The root's levels from the rod's top down to ``bottom``: each step as
-    deep as leaves a stair no taller than ``cusp`` normal to the rod's
-    surface (a step ``s`` at height ``e`` stands ``s * e / rod_r`` off the
-    surface: the full step on the flat top, nothing at the side), and never
-    deeper than ``max_step``; ``bottom`` last."""
-    out = []
+    """The root's levels from the rod's top down to ``bottom``: the first on
+    the top itself (the crest beside the hub's wall, which the ball's pass
+    over the top stops short of), then each step as deep as leaves a stair
+    no taller than ``cusp`` normal to the rod's surface (a step ``s`` at
+    height ``e`` stands ``s * e / rod_r`` off the surface: the full step on
+    the flat top, nothing at the side), and never deeper than ``max_step``;
+    ``bottom`` last."""
+    out = [rod_r]
     e = rod_r
     while True:
         s = max_step if e <= 0.0 else min(max_step, cusp * rod_r / e)
@@ -954,10 +1053,12 @@ def context(
             f"a tab's corner stands {corner:.3f} off the rod's axis, outside the rod"
         )
     # The reference hole: in the frame's side, clear of the window and of
-    # the parallels under the bar's edges.
+    # the moving jaw's parallels, which on the narrowest bar stand
+    # bar_width_min_mm - half_width_mm from the hub's axis.
     ref_x, ref_y = p["ref_hole_x_mm"], p["ref_hole_y_mm"]
     t_par = p["parallel_thickness_mm"]
-    if not win_half + d_f / 2 + clear <= ref_x <= half_w - t_par - d_f / 2 - clear:
+    stack_x = bar_w_min - half_w - t_par
+    if not win_half + d_f / 2 + clear <= ref_x <= stack_x - d_f / 2 - clear:
         raise ValueError(
             "process.ref_hole_x_mm: the reference hole meets the window or a parallel"
         )
@@ -1000,6 +1101,20 @@ def context(
     levels_root = root_levels(
         rod_r, -overlap, p["root_cusp_max_mm"], p["root_level_max_mm"]
     )
+    # The tip face beside the tip tab, with the 1/16 in end mill: from the
+    # lowest level each setup's 1/4 in end mill crossed the whole tip at
+    # (above the tab) down to the root's bottom, in the root's steps.
+    tab_free = {
+        side: min(e for e in levels if not lever.tabs_at(e))
+        for side, levels in (("top", top_levels), ("crown", crown_levels))
+    }
+    tip_tab_levels = {
+        side: _levels(e0, levels_root[-1], p["root_level_max_mm"])
+        for side, e0 in tab_free.items()
+    }
+    tab_rows, tab_raw = tip_tab_rows(g, r5, r6, stock)
+    _agree(plan, "tip_tab_step_mm", tab_raw - tab_rows[0])
+    _agree(plan, "tip_station_mm", from_end + tip_y)
     # The 1/16 in end mill's flutes reach the root's lowest level from above
     # the highest part its 1/8 in shank could meet beside the root: face B on
     # the top side, the crown's dome (inside the shank's reach of the hub's
@@ -1014,8 +1129,13 @@ def context(
     _agree(plan, "root_reach_mm", reach_need)
     if p["rough_stepover_mm"] > 2 * r6 + 1e-9:
         raise ValueError(
-            "process.rough_stepover_mm: over the cutter's width (not a slot)"
+            "process.rough_stepover_mm: over the cutter's width (a rib stands between passes)"
         )
+    # The raster's passes after the first (a full-width slot) step this far
+    # into the steel (the plan's side cut).
+    lines_x = raster_lines(win_half, r6, p["rough_stepover_mm"], tab_w / 2 + stock + r6)
+    rough_woc = lines_x[1][0] - lines_x[0][0]
+    _agree(plan, "rough_woc_mm", rough_woc)
 
     rpm6, feed6 = _setting(plan, shop, "window rough")
     plunge6 = p["plunge_feed_per_min_mm"]
@@ -1119,6 +1239,11 @@ def context(
             lever, w, levels_root, r5, r6, rb, p["root_overlap_mm"]
         )
         lines[f"{side}_root"] = w.lines
+        w = writer(side)
+        built[f"{side}_tip_tab"] = _tip_tab(
+            lever, w, tip_tab_levels[side], r5, r6, stock, tab_free[side]
+        )
+        lines[f"{side}_tip_tab"] = w.lines
     for key, offset, angle in (
         ("crown_dome_semi", stock, semi_step),
         ("crown_dome_finish", 0.0, dome_step),
@@ -1265,7 +1390,10 @@ def context(
                 rpm5,
                 feed5,
                 feed5,
-                [(f"{side}_root", "the rod's root")],
+                [
+                    (f"{side}_root", "the rod's root"),
+                    (f"{side}_tip_tab", "the rod's tip face beside the tab"),
+                ],
                 flutes=3,
             )
         )
@@ -1314,41 +1442,45 @@ def context(
             )
 
     # Keep-outs. The jaws along the bar's edges above the stacks, the stacks
-    # under the edges; the tabs between their faces; the hub's wall, the
-    # crown in bands and the rod in bands, each shape inside the part over
-    # its band (the narrowest section of the band): a flat cutter's point in
-    # one is a gouge. The ball's paths are checked against the part by
+    # under the edges, each where the narrowest and thinnest bar the
+    # programs accept puts it (nearest the cutters: the moving jaw closes
+    # in to it; in Setup 2 the stacks' top rises to it, face B the zero); the
+    # tabs between their faces; the hub's wall, the crown in bands and the
+    # rod in bands, each shape inside the part over its band (the narrowest
+    # section of the band): a flat cutter's point in one is a gouge. The
+    # ball's paths are checked against the part by
     # test_dt_pinion_lever_process.py (a ball is not a flat cutter).
     jaw_w = p["vise_jaw_width_mm"]
     grip = p["lying_grip_mm"]
     inset = p["vise_inset_mm"]
+    stack_tops = {"top": -bar_t_min, "crown": 0.0}
 
     def fixtures(side: str) -> list[dict[str, Any]]:
         x0 = stocks[side][0][0] + inset
         xs = [_r(x0), _r(x0 + jaw_w)]
-        y_fixed, y_moving = half_w, half_w - bar_w_max
-        bottom = stocks[side][2][0]
+        y_fixed, y_moving = half_w, half_w - bar_w_min
+        bottom = stack_tops[side]
         return [
             {
-                "name": "the fixed jaw",
+                "name": "fixed jaw",
                 "x": xs,
                 "y": [_r(y_fixed), _r(y_fixed + JAW_DEPTH_MM)],
                 "z_top": _r(bottom + grip),
             },
             {
-                "name": "the moving jaw",
+                "name": "moving jaw",
                 "x": xs,
                 "y": [_r(y_moving - JAW_DEPTH_MM), _r(y_moving)],
                 "z_top": _r(bottom + grip),
             },
             {
-                "name": "the fixed-jaw stack",
+                "name": "fixed-jaw stack",
                 "x": xs,
                 "y": [_r(y_fixed - t_par), _r(y_fixed)],
                 "z_top": _r(bottom),
             },
             {
-                "name": "the moving-jaw stack",
+                "name": "moving-jaw stack",
                 "x": xs,
                 "y": [_r(y_moving), _r(y_moving + t_par)],
                 "z_top": _r(bottom),
@@ -1499,6 +1631,57 @@ def context(
                 },
             ]
         )
+        # The window's raster and the contour's sides along the rod, each
+        # side of the rod: every pass with its steel toward Y0 (the raster's
+        # lines step in from each wall, the contour has the part there),
+        # stepping in from a slot along the wall to the innermost pass.
+        stations = [w.xy(x, 0.0)[1] for x, _steel in lines_x]
+        for e in top_levels if side == "top" else crown_levels:
+            reach = lever.rod_reach(e - stock)
+            if reach > 0.0:
+                stations += [
+                    w.xy(sign * (reach + stock + r6), 0.0)[1] for sign in (-1, 1)
+                ]
+        for sign in (-1.0, 1.0):
+            mine = [s for s in stations if s * sign > 1e-6]
+            expect.append(
+                [
+                    f"{prefix}_rough",
+                    "side_passes",
+                    {
+                        "axis": "Y",
+                        "final": _r(sign * min(abs(s) for s in mine)),
+                        "raw": _r(sign * (max(abs(s) for s in mine) + 2 * r6)),
+                        "max_step": _r(2 * r6),
+                        "direction": w.along_x(sign),
+                        "span": MIN_CUT_MM / 2,
+                        "below_z": top,
+                        "cut": "conventional",
+                    },
+                ]
+            )
+        # The tip face beside the tab (the 1/16 in end mill): its rows across
+        # the face, the corner the 1/4 in end mill left on the hub's side of
+        # them, each pass the same way along frame Y on both sides of the tab.
+        way = w.conventional([("P", (0.0, 0.0)), ("L", (1.0, 0.0))])
+        expect.append(
+            [
+                f"{prefix}_root",
+                "side_passes",
+                {
+                    "axis": "X",
+                    "final": w.xy(0.0, tab_rows[-1])[0],
+                    "raw": w.xy(0.0, tab_raw)[0],
+                    "max_step": _r(r5),
+                    "direction": math.copysign(
+                        1.0, w.xy(*way[-1][1])[1] - w.xy(*way[0][1])[1]
+                    ),
+                    "span": MIN_CUT_MM,
+                    "below_z": top,
+                    "cut": "conventional",
+                },
+            ]
+        )
         # The straight passes along the rod (the ball's, the root's along the
         # rod's side), each side of it: the rod toward Y0.
         for program, stations in (
@@ -1603,9 +1786,16 @@ def context(
         "jobs": jobs,
         "expect": expect,
         "geometry": g,
-        "cutters": {"r6": r6, "rb": rb, "r5": r5},
+        "cutters": {"r6": r6, "rb": rb, "r5": r5, "hss": d_hss / 2},
         "built": built,
-        "levels": {"top": top_levels, "crown": crown_levels, "root": levels_root},
+        "levels": {
+            "top": top_levels,
+            "crown": crown_levels,
+            "root": levels_root,
+            "tip_tab": tip_tab_levels,
+            "tab_free": tab_free,
+        },
+        "tip_tab_rows": tab_rows,
         "holes": {
             "bore": bore_xy,
             "ref": ref_xy,

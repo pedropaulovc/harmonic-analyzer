@@ -23,6 +23,7 @@ from pathlib import Path
 import pytest
 
 import _cam_programs
+import _gcode
 import _process_plans
 import cam_nc
 import export_features
@@ -131,14 +132,45 @@ def test_the_finishing_passes_leave_cusps_under_the_scallop(context) -> None:
 def test_the_root_steps_leave_stairs_under_the_cusp(context) -> None:
     g, p = context["geometry"], PLAN["parameters"]
     levels = context["levels"]["root"]
+    assert levels[0] == pytest.approx(g["rod_r"])  # the rod's top itself first
     assert levels[-1] < 0.0  # past the rod's axis plane
-    above = g["rod_r"]
-    for e in levels:
+    above = levels[0]
+    for e in levels[1:]:
         step = above - e
         assert 0.0 < step <= p["root_level_max_mm"] + 1e-9
         # A step at height ``above`` stands step * above / rod_r off the rod.
         assert step * max(above, 0.0) / g["rod_r"] <= p["root_cusp_max_mm"] + 1e-9
         above = e
+
+
+@pytest.mark.parametrize("side", ["top", "crown"])
+def test_the_root_sweeps_the_rods_crest_beside_the_hub(context, side) -> None:
+    # The 1/4 in end mill stops a level above the rod's top beside the hub's
+    # wall, and the ball's pass over the top stops short of the wall: the
+    # root's first level, on the rod's top, takes the crest between them.
+    g, cut = context["geometry"], context["cutters"]
+    r5, rb = cut["r5"], cut["rb"]
+    first = [
+        b
+        for b in context["built"][f"{side}_root"]
+        if b["e"] == pytest.approx(g["rod_r"])
+    ]
+    assert sorted(math.copysign(1.0, b["x"]) for b in first) == [-1.0, 1.0]
+    wall = min(e for e in context["levels"][side] if e > g["rod_r"])
+    over = min(context["built"][f"{side}_rod_finish"], key=lambda p: abs(p["x"]))
+    assert over["x"] == pytest.approx(0.0, abs=1e-9)
+    # Along the rod, the ball's bottom is below the 1/4 in end mill's level
+    # past here.
+    dip = over["y_hub"] - math.sqrt(rb * rb - (over["e_centre"] - wall) ** 2)
+    crest = context["levels"]["root"][1]
+    for b in first:
+        # Each side's inner edge reaches the rod's middle, so the two sweep
+        # the whole crest the next level leaves (|x| under its half width).
+        assert abs(b["x"]) - r5 <= 1e-9
+        assert abs(b["x"]) + r5 > math.sqrt(g["rod_r"] ** 2 - crest**2)
+        # From the hub's wall out past where the ball's pass dips below it.
+        assert b["meet"] == pytest.approx(math.sqrt((g["hub_r"] + r5) ** 2 - r5**2))
+        assert b["y_start"] > dip
 
 
 def test_the_owned_short_sixteenth_does_not_reach_the_root() -> None:
@@ -158,7 +190,7 @@ def test_the_floor_circle_sits_in_the_bores_band(context) -> None:
     circle = [line for line in lines if line.startswith("G2")]
     assert len(circle) == 1
     words = dict(_WORD.findall(circle[0]))
-    edge = 2 * abs(float(words["I"])) + 2 * context["cutters"]["r6"]
+    edge = 2 * abs(float(words["I"])) + 2 * context["cutters"]["hss"]
     assert edge == pytest.approx(p["floor_dia_mm"], abs=TOL_MM)
     lo, hi = bore["dia"]
     assert lo <= edge <= hi
@@ -281,6 +313,157 @@ def test_the_ball_never_cuts_into_the_lever(context, side, keys) -> None:
     assert worst == pytest.approx(rb, abs=TOL_MM)
 
 
+def test_the_crown_rings_descend_at_the_plunge_feed(context) -> None:
+    # The crown's roughing leaves steps over the dome: every move down below
+    # the stock's top, the apex plunge and each ring's, is at the plunge feed.
+    top = PLAN["parameters"]["bar_thickness_max_mm"]
+    lines = {op[0]: op[2] for job in context["jobs"] for op in job["ops"]}
+    for key in ("crown_dome_semi", "crown_dome_finish"):
+        z, descents = None, []
+        for line in lines[key]:
+            words = dict(_WORD.findall(line))
+            if "Z" not in words:
+                continue
+            target = float(words["Z"])
+            if line.startswith("G1") and z is not None and target < min(z, top):
+                descents.append(line)
+            z = target
+        assert len(descents) == len(context["built"][key])
+        assert all(line.endswith("F{plunge}") for line in descents), descents
+
+
+def test_every_jaw_keep_out_keeps_the_shops_jaw_floor(context) -> None:
+    # _gcode applies the shop's 1.0 mm jaw clearance only to the shapes it
+    # reads as jaws: every jaw box the recipe declares is one, and no support.
+    names = {
+        box["name"]
+        for _program, check, kwargs in RECIPE.expectations(context)
+        if check == "keep_out"
+        for box in kwargs.get("boxes", ())
+    }
+    jaws = {name for name in names if name.endswith("jaw")}
+    assert jaws == {"fixed jaw", "moving jaw"}
+    assert all(_gcode.is_jaw_shape(name) for name in jaws)
+    assert not any(_gcode.is_jaw_shape(name) for name in names - jaws)
+
+
+def test_the_fixtures_stand_where_the_narrowest_thinnest_bar_puts_them(context) -> None:
+    # Nearest the cutters: the moving jaw closes in to the narrowest bar, and
+    # under face B's zero the stacks' top rises to the thinnest.
+    p = PLAN["parameters"]
+    grip = p["lying_grip_mm"]
+    moving = RECIPE._r(p["half_width_mm"] - p["bar_width_min_mm"])
+    for program, check, kwargs in RECIPE.expectations(context):
+        if check != "keep_out" or not kwargs.get("boxes"):
+            continue
+        boxes = {box["name"]: box for box in kwargs["boxes"]}
+        assert boxes["moving jaw"]["y"][1] == moving
+        assert boxes["moving-jaw stack"]["y"][0] == moving
+        stacks = -p["bar_thickness_min_mm"] if "_top_" in program else 0.0
+        assert boxes["moving-jaw stack"]["z_top"] == RECIPE._r(stacks)
+        assert boxes["fixed jaw"]["z_top"] == RECIPE._r(stacks + grip)
+
+
+@pytest.mark.parametrize("side", ["top", "crown"])
+def test_the_window_raster_never_cuts_climb(context, tmp_path, side) -> None:
+    # The window's passes overlap: each meets steel on one side, cut
+    # conventional, or is a full-width slot (the first from each wall and
+    # the one on the axis). The rough program cut from its stock box: the
+    # crown's levels below its raster's floor break into Setup 2's window,
+    # which the box does not know, so those are left out.
+    p = PLAN["parameters"]
+    _post(context, tmp_path)
+    job = next(
+        j for j in context["jobs"] if j["frame"] == side and j["tool"] == "em-quarter"
+    )
+    program = _gcode.read_program(tmp_path / f"DT16_{side}_rough.nc")
+    cuts = [
+        e
+        for e in _gcode.engagements(program, job["stock"], context["cutters"]["r6"])
+        if e.side
+        and math.dist(e.move.start[:2], e.move.end[:2]) > TOL_MM
+        and (
+            side == "top"
+            or min(e.move.start[2], e.move.end[2]) > p["crown_raster_z_mm"]
+        )
+    ]
+    slots = {0.0, RECIPE._r(p["window_half_mm"] - p["cutter_dia_mm"] / 2)}
+    assert any(e.side == "conventional" for e in cuts)
+    for e in cuts:
+        where = f"line {e.move.line}: {e.move.start} -> {e.move.end}"
+        assert e.side != "climb", where
+        if e.side == "both":
+            assert e.move.start[1] == e.move.end[1], where
+            assert abs(e.move.start[1]) in slots, where
+
+
+def _uncut_beside_the_tab(context: dict, side: str, tip_tab: bool) -> list:
+    """Points of the material beyond the rod's tip face beside the tip tab's
+    stock (model x, y and e, at each of ``side``'s tip-tab levels) that no
+    flat cutter of either setup reaches: the 1/4 in end mill's roughing, wall
+    and tip passes and, with ``tip_tab``, the 1/16 in end mill's passes beside
+    the tab. A point at height e on ``side`` stands until a cutter's end
+    comes within its radius at or below e on that side, or at or below -e on
+    the other (cutting through from it)."""
+    import numpy as np
+
+    g, cut, p = context["geometry"], context["cutters"], PLAN["parameters"]
+    mouth, stock = p["mouth_above_axis_mm"], p["stock_mm"]
+    lines = {op[0]: op[2] for job in context["jobs"] for op in job["ops"]}
+    tab, tip = g["tab_half_w"] + stock, g["tip_y"]
+    ends = []
+    for frame in ("top", "crown"):
+        ops = [("rough", cut["r6"]), ("wall", cut["r6"]), ("tip", cut["r6"])]
+        ops += [("tip_tab", cut["r5"])] if tip_tab else []
+        flip = -1.0 if frame != side else 1.0
+        for op, r in ops:
+            for x, y, e in _ball_centres(
+                lines[f"{frame}_{op}"], frame == "crown", mouth, 0.0
+            ):
+                if abs(x) < g["rod_r"] + 2 * r and tip - r < y < tip + 3 * cut["r6"]:
+                    # Its reach as a height on ``side``: up from e on that
+                    # side, down from -e from the other.
+                    ends.append((x, y, flip * e, flip, r))
+    ends = np.array(ends)
+    out = []
+    for e in context["levels"]["tip_tab"][side]:
+        half = math.sqrt(g["rod_r"] ** 2 - e * e)
+        xs = np.arange(tab, half, 0.02)
+        ys = np.arange(tip + 0.01, tip + 2 * cut["r6"], 0.02)
+        gx, gy = np.meshgrid(np.concatenate([xs, -xs]), ys, indexing="ij")
+        mine = ends[(ends[:, 3] > 0) & (ends[:, 2] <= e + 1e-6)]
+        through = ends[(ends[:, 3] < 0) & (ends[:, 2] >= e - 1e-6)]
+        reach = np.full(gx.shape, False)
+        for x, y, _e, _flip, r in np.concatenate([mine, through]):
+            reach |= np.hypot(gx - x, gy - y) <= r + TOL_MM
+        out += [
+            (float(a), float(b), e) for a, b in zip(gx[~reach], gy[~reach], strict=True)
+        ]
+    return out
+
+
+@pytest.mark.parametrize("side", ["top", "crown"])
+def test_the_tip_face_beside_the_tab_is_cut_but_for_the_small_corner(
+    context, side
+) -> None:
+    # The 1/4 in end mill cannot reach the tip face beside the tab (its radius
+    # is more than the rod's half less the tab's): it leaves its own corner
+    # there, up to its radius proud. The 1/16 in end mill takes it all but
+    # what lies within its radius of the tab's stock: its corner with the face
+    # and the cusps between its rows along the tab, filed off with the stub.
+    g, r5 = context["geometry"], context["cutters"]["r5"]
+    tab = g["tab_half_w"] + PLAN["parameters"]["stock_mm"]
+    before = _uncut_beside_the_tab(context, side, tip_tab=False)
+    assert any(abs(x) - tab >= r5 and y - g["tip_y"] >= r5 for x, y, _e in before)
+    left = _uncut_beside_the_tab(context, side, tip_tab=True)
+    assert left
+    for x, y, e in left:
+        assert abs(x) - tab < r5, (x, y, e)
+        # On the face itself, only the corner the cutter's radius leaves.
+        if y - g["tip_y"] < r5:
+            assert math.hypot(abs(x) - tab - r5, y - g["tip_y"] - r5) > r5 - TOL_MM
+
+
 @pytest.mark.parametrize(
     ("key", "value", "detail"),
     [
@@ -307,6 +490,11 @@ def test_the_ball_never_cuts_into_the_lever(context, side, keys) -> None:
         ("cutter_dia_mm", 6.0, "cutter_dia_mm"),
         ("apex_below_axis_mm", 7.0, "apex_below_axis_mm"),
         ("bar_thickness_min_mm", 12.3, "apex"),
+        # Clear of the moving jaw's stack on the widest bar, not the narrowest.
+        ("ref_hole_x_mm", 21.8, "ref_hole_x_mm"),
+        ("rough_woc_mm", 5.1435, "rough_woc_mm"),
+        ("tip_tab_step_mm", 0.5373, "tip_tab_step_mm"),
+        ("tip_station_mm", 106.0, "tip_station_mm"),
     ],
 )
 def test_a_plan_number_off_the_model_or_shop_is_refused(key, value, detail) -> None:
@@ -338,13 +526,31 @@ def _seed(ctx: dict, key: str, pick, change, last: bool = False) -> dict:
             False,
             "keep_out",
         ),
-        # The tip face's last pass (a tab level) run across the tab.
+        # The tip face's first pass beside the tab run across the tab.
         (
-            "top_tip",
+            "top_tip_tab",
             lambda line: line.startswith("G1 X"),
             lambda line: line.split(" Y")[0] + " Y0.000 F{feed}",
-            True,
+            False,
             "keep_out",
+        ),
+        # The tip face's first pass beside the tab run back toward the
+        # corner's far side: a climb cut.
+        (
+            "top_tip_tab",
+            lambda line: line.startswith("G1 X"),
+            lambda line: re.sub(r"Y-?\d+\.\d+", "Y-3.500", line),
+            False,
+            "cut",
+        ),
+        # A raster pass on the moving-jaw side run away from the axis, along
+        # the steel it should have kept on its left: a climb cut.
+        (
+            "top_rough",
+            lambda line: line.startswith("G1 X-8.579 Y-4.953"),
+            lambda line: "G1 X-12.000 Y-4.953 F{feed}",
+            False,
+            "cut",
         ),
         # A roughing plunge taken past the window's floor.
         (

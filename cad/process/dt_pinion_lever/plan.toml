@@ -15,16 +15,17 @@
 # (Setup 1); lying on 1-1/2 in parallel stacks, gripped on the bar's
 # cold-finished edges, mouth face up (Setup 2): DT16_top_rough clears a
 # window round the part to a ball's radius past the rod's axis plane in
-# full-width slots and finishes the hub's wall and the rod's tip face,
-# DT16_top_rod finishes the rod's upper half with the 1/4 in ball end mill,
-# DT16_top_root cuts the rod's root with the 1/16 in end mill, DT16_top_holes
-# drills the bore F, flattens its floor and drills the reference hole F;
-# turned end for end, mouth face down (Setup 3): DT16_crown_rough clears the
-# rest of the window, DT16_crown_dome_rod cuts the SR crown and the rod's
-# lower half, DT16_crown_root the root's lower half. The part then hangs on
-# two tabs on the rod's axis plane: sawn off, filed, deburred, inspected and
-# oiled at the bench (Setup 4). Every side cut is conventional (#3590): no
-# climb pass is declared.
+# passes along the rod, each cut one way, and finishes the hub's wall and the
+# rod's tip face, DT16_top_rod finishes the rod's upper half with the 1/4 in
+# ball end mill, DT16_top_root cuts the rod's root with the 1/16 in end mill
+# and finishes the tip face beside the tip tab, DT16_top_holes drills the
+# bore F, flattens its floor and drills the reference hole F; turned end for
+# end, mouth face down (Setup 3): DT16_crown_rough clears the rest of the
+# window, DT16_crown_dome_rod cuts the SR crown and the rod's lower half,
+# DT16_crown_root the root's lower half and the tip face beside the tab. The
+# part then hangs on two tabs on the rod's axis plane: sawn off, filed,
+# deburred, inspected and oiled at the bench (Setup 4). Every side cut is
+# conventional (#3590): no climb pass is declared.
 #
 # The bore (Ø.257 F DRILL ↧(.32) FLAT BOTTOM; MHA-DT-17 ROD ENTERS BY HAND):
 # the F drill's point stops .010 short of the floor; the 1/4 in HSS end mill
@@ -41,15 +42,15 @@
 # owned cutter does: the smallest owned square end mill is 1/8 (R.0625), and
 # the owned Kyocera 1800.0625.200 1/16 end mill (owner's #3750 record:
 # .200 length of cut, 1/8 shank) is .010 and .033 short. The plain MSC
-# 35497056 1/16 in end mill (.500 of flutes, to buy, already on the cart for
-# MHA-MS-02 and MHA-PD-17) reaches both.
+# 35497056 1/16 in end mill (.500 of flutes, to buy) reaches both; MHA-DT-16
+# is the only part that needs it.
 #
 # The flip (Setup 2 to Setup 3), against the rod's Ø.24 ±.01 (the only
 # printed size cut half in each setup; the shop's own figures): Z, the
 # vertical Ø across the parting plane: Setup 2's Z0 on face B within .001
 # (the standing page's zero tolerance), Setup 3's Z0 from the miked
 # thickness (micrometer .0001) and a touch within .001, the ball -.002/0 on
-# its diameter (McMaster 8878A17, sm.toml) so each half stands up to .001
+# its diameter (McMaster 8878A17, common.toml) so each half stands up to .001
 # proud, and each half's cusps .001: .0061 at worst. Y, the side Ø: Y0 from
 # the fixed jaw's face in both setups, edge F against it, each within .001,
 # so the halves can step .002 at the parting line, and the side reading
@@ -160,11 +161,17 @@ tab_thickness_mm = 2.032
 # Roughing: the 1/4 in carbide end mill (shop endmill-carbide-3fl-1-4), its
 # setting (shop settings.endmill-carbide-3fl-1-4-1018-cf, 2800 rpm, .0017
 # in/tooth, the 6G chip-load factor 1.0 holding to full slotting): passes
-# along the rod no more than one cutter's width apart (rough_stepover_mm),
-# so each is a full-width slot with no climb side; levels no deeper than
-# .040 (the author's choice for a 1/4 in end mill slotting 1018), .010 of
-# stock left on the part (stock_mm), plunging at .001 in/rev (2800 × .001 =
-# 2.8 in/min, the author's choice, the bottom of prechips' thrust table).
+# along the rod from each window wall in toward the axis, to where the tabs'
+# stock begins (so no ridge stands beside a tab), no more than one cutter's
+# width apart (rough_stepover_mm), then one on the axis. The first from each
+# wall and the one on the axis are full-width slots; every other pass steps
+# rough_woc_mm into steel that lies only on its side toward the axis (cam.py
+# recomputes it), and every pass runs the way that cuts that side
+# conventional, the cutter lifted and brought back over the next start.
+# Levels no deeper than .040 (the author's choice for a 1/4 in end mill
+# slotting 1018), .010 of stock left on the part (stock_mm), plunging at
+# .001 in/rev (2800 × .001 = 2.8 in/min, the author's choice, the bottom of
+# prechips' thrust table).
 # Setup 2 clears the window from face B to floor_overlap_mm past a ball's
 # radius below the rod's axis plane (top_floor_depth_mm below face B: the
 # ball's side passes dip that far); Setup 3 rasters from the thickest bar's
@@ -176,6 +183,7 @@ cutter_dia_mm = 6.35
 stock_mm = 0.254
 rough_step_max_mm = 1.016
 rough_stepover_mm = 6.35
+rough_woc_mm = 5.334
 plunge_feed_per_min_mm = 71.12
 floor_overlap_mm = 0.254
 top_floor_depth_mm = 8.509
@@ -207,15 +215,28 @@ dome_step_deg = 3.8898
 # the highest part its 1/8 in shank could meet (cam.py recomputes it).
 # Feed: that table's Carbon Steels, Free-Machining/Low Carbon row (10xx -
 # 1029), .062 in Roughing .00017 in/tooth (its 9x table, the next longer
-# than the cutter's 8x flutes, as ms.toml's stop-em-sixteenth-c360 takes
-# it), at the spindle's 2800 rpm (600 SFM would be 36,700): 2800 × 3 ×
-# .00017 = 1.43 in/min.
+# than the cutter's 8x flutes; pd.toml's pd-hub-plunge-1-16-c360 reads the
+# same table, its Brass row), at the spindle's 2800 rpm (600 SFM would be
+# 36,700): 2800 × 3 × .00017 = 1.43 in/min.
 root_cutter_dia_mm = 1.5875
 root_cusp_max_mm = 0.0635
 root_level_max_mm = 0.47625
 root_reach_mm = 5.917
 root_overlap_mm = 0.508
 root_feed_per_min_mm = 36.271
+# The rod's tip face beside the tip tab (Setups 2 and 3, the same 1/16 in end
+# mill after the root): the 1/4 in end mill's radius is more than the rod's
+# half less the tab's, so beside the tab it leaves its own corner on the
+# face. The 1/16 in end mill takes that corner at each level from the lowest
+# the 1/4 in end mill crossed the whole tip at down to the root's bottom, in
+# the root's steps: passes along the face from beside the tab's .010 stock out
+# past the rod's side, tip_tab_step_mm apart (the corner's depth there in
+# equal steps no wider than the cutter's radius, so its far half runs in the
+# cut before; cam.py recomputes it), each conventional. Its R.031 corners
+# stand at the tip stub's sides. tip_station_mm: the tip face from the
+# piece's left end in Setup 2.
+tip_tab_step_mm = 0.433
+tip_station_mm = 106.426
 # cam.py's keep-out bands for the part (the rod and the crown in bands this
 # tall, each shape inside the part over its band).
 keep_out_band_mm = 0.254
@@ -382,7 +403,7 @@ indexing = "none"
 machine_ref = "pm-30mv"
 holding = "The PM 6 in mill vise (jaws {{process.vise_jaw_width_mm:in.2dot}} wide, so the fixed jaw's face stays open past both ends of the piece for the edge finder), the 1 in and 1/2 in parallels of the set stacked against each jaw (1.5 in high, each stack {{process.parallel_thickness_mm:in.3dot}} thick, so the reference hole breaks through into the air between them). The piece flat on them, face B up, its length along the jaws: gripped on the bar's two edges, edge F against the FIXED jaw, centred along the jaws. Tap it down onto both stacks while closing the vise; the lower {{process.lying_grip_mm:in.3dot}} of it is in the jaws."
 datum = "Programs DT16_top_rough, DT16_top_rod, DT16_top_root and DT16_top_holes. G54: X0 Y0 the hub's axis, {{process.hub_from_end_mm:in.3dot}} in from the piece's left end and {{process.half_width_mm:in.4dot}} in from the fixed jaw's face; Z0 face B (the bar's top). +X along the rod toward its tip (the rod lies along the jaws, its tip to the right); +Y toward the fixed jaw. The rod's axis is .200 below Z0 on Y0."
-diagram = { file = "diagrams/top.svg", alt = "DT16 T1, to scale: DT16_top_rough's first slot. Plan from above: the piece face B up between the jaws, edge F at the fixed jaw, X0 Y0 the hub's axis; the window and the lever dashed; the 1/4 in end mill on the slot at Y10.287 along the window's fixed-jaw side, its end at Z-0.945 (.037 below face B), travelling +X, the slot behind it hatched. Below, a section across the rod at the cutter, X30: the piece on the 1 in + 1/2 in stacks, gripped on its edges, the jaws' tops .270 above the stacks." }
+diagram = { file = "diagrams/top.svg", alt = "DT16 T1, to scale: DT16_top_rough's first slot. Plan from above: the piece face B up between the jaws, edge F at the fixed jaw, X0 Y0 the hub's axis; the window and the lever dashed; the 1/4 in end mill on the slot at Y10.287 along the window's fixed-jaw side, its end at Z-0.945 (.037 below face B), travelling −X from the window's tip end, the slot behind it hatched. Below, a section across the rod at the cutter, X30: the piece on the 1 in + 1/2 in stacks, gripped on its edges, the jaws' tops .270 above the stacks." }
 envelope = { x_span_mm = ["{{process.piece_max_mm}}", "{{process.cutter_dia_mm}}", 5.08], y_span_mm = ["{{process.bar_width_max_mm}}", "{{process.cutter_dia_mm}}"], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{process.bar_thickness_max_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{process.ref_tip_height_mm}}"], longest_tool_mm = ["{{process.drill_chuck_gauge_mm}}", "{{process.drill_f_oal_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.root_projection_min_mm}}"] }
 vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{process.bar_width_max_mm}}", along_jaws_mm = "{{process.piece_max_mm}}", part_height_mm = "{{process.bar_thickness_max_mm}}", parallel_height_mm = "{{process.riser_height_mm}}", overhang_mm = ["{{process.vise_inset_mm}}", "rest"], jaw_offset = "centred", fixed_jaw_face = "as_bought", moving_jaw_face = "as_bought", moving_jaw_contact = "flat" }
 beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{process.piece_max_mm}}"], clamp_mm = [0, "{{process.piece_max_mm}}"], section_mm = { y = "{{process.bar_width_max_mm}}", z = "{{process.bar_thickness_max_mm}}" }, vise_left = "start" }
@@ -402,12 +423,13 @@ speed_kind = "spindle"
 tool = "em-quarter"
 drilling = "none"
 sizing = "other"
-instruction = "Run DT16_top_rough (M6 T1, 1/4 in carbide end mill; set 2800): clear the window round the lever in full-width slots, levels no deeper than {{process.rough_step_max_mm:in.3dot}}, down to {{process.top_floor_depth_mm:in.3dot}} below face B, leaving at least {{process.stock_mm:in.3dot}} on the lever (up to one level more over the rod's top) and the two tabs standing; then finish the hub's wall and the rod's tip face. Blow the chips out of the window between levels if they pack in."
+instruction = "Run DT16_top_rough (M6 T1, 1/4 in carbide end mill; set 2800): clear the window round the lever in passes along the rod, each cut one way and the cutter lifted back to the next, levels no deeper than {{process.rough_step_max_mm:in.3dot}}, down to {{process.top_floor_depth_mm:in.3dot}} below face B, leaving at least {{process.stock_mm:in.3dot}} on the lever (up to one level more over the rod's top) and the two tabs standing; then finish the hub's wall and the rod's tip face (beside the tip tab: DT16_top_root). Blow the chips out of the window between levels if they pack in."
 settings = "endmill-carbide-3fl-1-4-1018-cf"
 inspection = "The hub's wall cut clean round from face B down, the rod standing in the window on its two tabs, by eye."
 gauge_checks = "other"
 milling_cuts = [
   { name = "window rough", kind = "slot", phase = "rough", cutter_dia_mm = "{{process.cutter_dia_mm}}", axial_doc_mm = "{{process.rough_step_max_mm}}", radial_woc_mm = "{{process.cutter_dia_mm}}", traverse_mm = [0, "{{process.piece_max_mm}}"] },
+  { name = "window rough side", kind = "side", phase = "rough", cutter_dia_mm = "{{process.cutter_dia_mm}}", axial_doc_mm = "{{process.rough_step_max_mm}}", radial_woc_mm = "{{process.rough_woc_mm}}", traverse_mm = [0, "{{process.piece_max_mm}}"] },
   { name = "hub wall", kind = "side", phase = "finish", cutter_dia_mm = "{{process.cutter_dia_mm}}", axial_doc_mm = "{{process.rough_step_max_mm}}", radial_woc_mm = "{{process.stock_mm}}", traverse_mm = [0, "{{process.piece_max_mm}}"] },
 ]
 
@@ -434,12 +456,13 @@ speed_kind = "spindle"
 tool = "em-sixteenth"
 drilling = "none"
 sizing = "other"
-instruction = "Run DT16_top_root (M6 T3, 1/16 in end mill, .75 out of the 1/8 in collet; set 2800): the rod's root on each side, in levels from the rod's top down to just past its axis, round the hub's wall and along the rod's side, each level the same way: the root's corner R.031, under the drawing's INSIDE CORNERS R.040 MAX."
-diagram = { file = "diagrams/top-root.svg", alt = "DT16 T3, to scale: DT16_top_root, plan from above at the rod's root; the 1/16 in end mill on the deepest of 26 levels, Z-5.334, in the corner between the rod's moving-jaw side and the hub's wall (X6.173 Y-3.842), running round the wall and out +X along the rod; the other side's corner still to cut." }
+instruction = "Run DT16_top_root (M6 T3, 1/16 in end mill, .75 out of the 1/8 in collet; set 2800): the rod's root on each side, in levels from the rod's top down to just past its axis, round the hub's wall and along the rod's side, each level the same way: the root's corner R.031, under the drawing's INSIDE CORNERS R.040 MAX. Then the rod's tip face beside the tip tab, where the 1/4 in end mill cannot reach: short passes along the face on each side of the tab, leaving R.031 corners at the tab's sides."
+diagram = { file = "diagrams/top-root.svg", alt = "DT16 T3, to scale: DT16_top_root, plan from above at the rod's root; the 1/16 in end mill on the deepest of 27 levels, Z-5.334, in the corner between the rod's moving-jaw side and the hub's wall (X6.173 Y-3.842), running round the wall and out +X along the rod; the other side's corner still to cut." }
 rpm = 2800
 feed = "{{process.root_feed_per_min_mm:in.2f}} in/min"
 milling_cuts = [
   { name = "root", kind = "side", phase = "finish", cutter_dia_mm = "{{process.root_cutter_dia_mm}}", flutes = 3, rpm = 2800, feed_mm_min = "{{process.root_feed_per_min_mm}}", axial_doc_mm = "{{process.root_level_max_mm}}", radial_woc_mm = "{{process.root_cutter_dia_mm}}", stations_mm = "{{process.hub_from_end_mm}}" },
+  { name = "tip beside tab", kind = "side", phase = "finish", cutter_dia_mm = "{{process.root_cutter_dia_mm}}", flutes = 3, rpm = 2800, feed_mm_min = "{{process.root_feed_per_min_mm}}", axial_doc_mm = "{{process.root_level_max_mm}}", radial_woc_mm = "{{process.tip_tab_step_mm}}", stations_mm = "{{process.tip_station_mm}}" },
 ]
 
 [[setups.operations]]
@@ -541,12 +564,13 @@ speed_kind = "spindle"
 tool = "em-quarter"
 drilling = "none"
 sizing = "other"
-instruction = "Run DT16_crown_rough (M6 T1; set 2800): clear the window from this face in full-width slots, levels no deeper than {{process.rough_step_max_mm:in.3dot}}, down to {{process.crown_raster_z_mm:in.3dot}} above the stacks (it breaks into Setup 2's window), then contours round the lever down to {{process.crown_floor_z_mm:in.3dot}}, leaving at least {{process.stock_mm:in.3dot}} on it (up to one level more over the rod); then finish the hub's wall up to the crown and the rod's tip face. The lever then hangs on its two tabs."
+instruction = "Run DT16_crown_rough (M6 T1; set 2800): clear the window from this face in passes along the rod, each cut one way and the cutter lifted back to the next, levels no deeper than {{process.rough_step_max_mm:in.3dot}}, down to {{process.crown_raster_z_mm:in.3dot}} above the stacks (it breaks into Setup 2's window), then contours round the lever down to {{process.crown_floor_z_mm:in.3dot}}, leaving at least {{process.stock_mm:in.3dot}} on it (up to one level more over the rod); then finish the hub's wall up to the crown and the rod's tip face (beside the tip tab: DT16_crown_root). The lever then hangs on its two tabs."
 settings = "endmill-carbide-3fl-1-4-1018-cf"
 inspection = "The window open through, the lever standing on its two tabs, the hub's wall cut clean round below the crown, by eye."
 gauge_checks = "other"
 milling_cuts = [
   { name = "crown window rough", kind = "slot", phase = "rough", cutter_dia_mm = "{{process.cutter_dia_mm}}", axial_doc_mm = "{{process.rough_step_max_mm}}", radial_woc_mm = "{{process.cutter_dia_mm}}", traverse_mm = [0, "{{process.piece_max_mm}}"] },
+  { name = "crown window rough side", kind = "side", phase = "rough", cutter_dia_mm = "{{process.cutter_dia_mm}}", axial_doc_mm = "{{process.rough_step_max_mm}}", radial_woc_mm = "{{process.rough_woc_mm}}", traverse_mm = [0, "{{process.piece_max_mm}}"] },
   { name = "crown hub wall", kind = "side", phase = "finish", cutter_dia_mm = "{{process.cutter_dia_mm}}", axial_doc_mm = "{{process.rough_step_max_mm}}", radial_woc_mm = "{{process.stock_mm}}", traverse_mm = [0, "{{process.piece_max_mm}}"] },
 ]
 
@@ -580,12 +604,13 @@ speed_kind = "spindle"
 tool = "em-sixteenth"
 drilling = "none"
 sizing = "other"
-instruction = "Run DT16_crown_root (M6 T3, 1/16 in end mill; set 2800): the root's lower half, as in Setup 2."
-diagram = { file = "diagrams/crown-root.svg", alt = "DT16 T3, to scale: DT16_crown_root, plan from above at the rod's root, the rod to the left, the window open through; the 1/16 in end mill on the deepest of 26 levels, Z4.826, in the corner between the rod's moving-jaw side and the hub's wall below the crown (X-6.173 Y-3.842), coming +X along the rod, then round the wall." }
+instruction = "Run DT16_crown_root (M6 T3, 1/16 in end mill; set 2800): the root's lower half and the tip face beside the tip tab, as in Setup 2."
+diagram = { file = "diagrams/crown-root.svg", alt = "DT16 T3, to scale: DT16_crown_root, plan from above at the rod's root, the rod to the left, the window open through; the 1/16 in end mill on the deepest of 27 levels, Z4.826, in the corner between the rod's moving-jaw side and the hub's wall below the crown (X-6.173 Y-3.842), coming +X along the rod, then round the wall." }
 rpm = 2800
 feed = "{{process.root_feed_per_min_mm:in.2f}} in/min"
 milling_cuts = [
   { name = "crown root", kind = "side", phase = "finish", cutter_dia_mm = "{{process.root_cutter_dia_mm}}", flutes = 3, rpm = 2800, feed_mm_min = "{{process.root_feed_per_min_mm}}", axial_doc_mm = "{{process.root_level_max_mm}}", radial_woc_mm = "{{process.root_cutter_dia_mm}}", stations_mm = "{{process.hub_from_end_mm}}" },
+  { name = "crown tip beside tab", kind = "side", phase = "finish", cutter_dia_mm = "{{process.root_cutter_dia_mm}}", flutes = 3, rpm = 2800, feed_mm_min = "{{process.root_feed_per_min_mm}}", axial_doc_mm = "{{process.root_level_max_mm}}", radial_woc_mm = "{{process.tip_tab_step_mm}}", stations_mm = "{{process.tip_station_mm}}" },
 ]
 
 [[setups.operations]]
@@ -607,7 +632,7 @@ speed_kind = "other"
 tool = "files"
 drilling = "none"
 sizing = "other"
-instruction = "Cut the lever out: the frame in the bench vise's soft jaws, the lever supported level beside it, saw through each tab with a hacksaw close to the lever (never bend or pry it). File the back stub to the hub's round and the tip stub flush with the rod's tip face."
+instruction = "Cut the lever out: the frame in the bench vise's soft jaws, the lever supported level beside it, saw through each tab with a hacksaw close to the lever (never bend or pry it). File the back stub to the hub's round and the tip stub flush with the rod's tip face, with the small R.031 corners the 1/16 in end mill left at its sides."
 feed = "hand"
 
 [[setups.operations]]
@@ -623,7 +648,7 @@ feed = "hand"
 [[setups.operations]]
 instruction = "Hub and rod diameters, micrometers; the flip's first-part check."
 instruction_detailed = "Hub: mic it square to the rod, near face B and near the crown, away from the back stub; write down the larger. Rod: mic it at three places along it, near the hub, at its middle and near its tip, each across its top and bottom (square to face B) and across its sides (on the parting line Setups 2 and 3 meet at); write down both readings at the middle."
-inspection = "Hub Ø{{cad.hub_dia_min_in:.3dot}}–{{cad.hub_dia_max_in:.3dot}}; rod Ø{{cad.grip_rod_dia_min_in:.3dot}}–{{cad.grip_rod_dia_max_in:.3dot}} at every reading; at the middle, the reading across top and bottom less the one across the sides within ±{{process.flip_check_max_mm:in.3dot}} (the flip's budget: this file's notes). Outside: stop and tell the owner."
+inspection = "Hub Ø{{cad.hub_dia_min_in:.3dot}}–{{cad.hub_dia_max_in:.3dot}}; rod Ø{{cad.grip_rod_dia_min_in:.3dot}}–{{cad.grip_rod_dia_max_in:.3dot}} at every reading; at the middle, the reading across top and bottom less the one across the sides within ±{{process.flip_check_max_mm:in.3dot}} (the two setups' halves agree). Outside: stop and tell the owner."
 gauge_checks = [
   { gauge = "micrometers", band_mm = "{{cad.hub_dia_band_mm}}" },
   { gauge = "micrometers", band_mm = "{{cad.grip_rod_dia_band_mm}}" },
