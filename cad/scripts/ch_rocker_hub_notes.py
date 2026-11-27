@@ -84,8 +84,8 @@ SUPPLY_LENGTH_CALLOUT = SUPPLY_NOTE_LINK
 # (owner ruling 2026-11-24, fit audit question 2: "hub turned until it
 # slides in (clearance .0005-.0030); bond"). A hub that turns once cured is
 # not held, so it still pushes out and is bonded again; the cure is 24 h at
-# room temperature (delegated ruling 2026-11-26 (Main), precedent: D38
-# (MG-00 drum bond wording); owner review #2144 (D54); #3646).
+# room temperature (delegated ruling 2026-11-26 (Main), no precedent; owner
+# review #2144 (D54); #3646).
 DRAWING_NOTES = "\n".join(
     (
         f"{SUPPLY_NOTE_NUMBER}. BORE AND LENGTH ARE FINISHED AFTER JOINING TO"
