@@ -12,6 +12,7 @@ them, and seeded faults show each check catches what it guards.
 from __future__ import annotations
 
 import copy
+import re
 import tomllib
 from pathlib import Path
 
@@ -270,6 +271,53 @@ def test_the_eighth_cutter_leaves_the_shank_corners_inside_their_limits() -> Non
     features["features"]["shank_right_flank"]["corner_r"] = [0.889, 1.016]
     with pytest.raises(ValueError, match="outside the shank corners' limits"):
         RECIPE.context(features, PLAN, SHOP, "rod.step")
+
+
+_PLATE_OUTLINE = re.compile(
+    r'<path class="hidden" d="M([\d.]+) ([\d.]+)H([\d.]+)V([\d.]+)H\1Z"/>'
+)
+_TOP_SCALE = re.compile(r"(?:both views|from above) at ([\d.]+) px/mm")
+_BLANK = re.compile(
+    r'<rect class="part-rest" x="([\d.]+)" y="([\d.]+)" width="[\d.]+" '
+    r'height="([\d.]+)"/>'
+)
+
+
+@pytest.mark.parametrize(
+    "picture",
+    [
+        "face_f",
+        "face_f-band",
+        "face_d",
+        "face_d-band",
+        "face_f_finish",
+        "face_f_finish-band",
+        "outline",
+        "fork",
+    ],
+)
+def test_the_top_views_draw_the_support_plate_at_its_size(picture) -> None:
+    """#3729: each top view's hidden support plate is the plate's milled
+    width across the jaws and its length along X, at the scale the picture
+    states, centred across the load of two blanks."""
+    p = PLAN["parameters"]
+    svg = (
+        _process_plans.plan_path(STEM).parent / "diagrams" / f"{picture}.svg"
+    ).read_text(encoding="utf-8")
+    scale = float(_TOP_SCALE.search(svg).group(1))
+    (outline,) = _PLATE_OUTLINE.findall(svg)
+    x0, y0, x1, y1 = map(float, outline)
+    assert x1 - x0 == pytest.approx(p["support_plate_length_mm"] * scale, abs=0.01)
+    assert y1 - y0 == pytest.approx(p["support_plate_width_mm"] * scale, abs=0.01)
+    # The top view's two blanks start at X0, the plate's left edge.
+    blanks = [
+        (float(y), float(y) + float(h))
+        for x, y, h in _BLANK.findall(svg)
+        if float(x) == x0
+    ]
+    assert len(blanks) == 2
+    load_middle = (min(b[0] for b in blanks) + max(b[1] for b in blanks)) / 2
+    assert (y0 + y1) / 2 == pytest.approx(load_middle, abs=0.05)
 
 
 @pytest.mark.parametrize(
