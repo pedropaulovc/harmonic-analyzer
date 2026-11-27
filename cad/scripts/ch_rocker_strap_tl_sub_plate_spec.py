@@ -296,7 +296,7 @@ HUB_ENGAGEMENT_STATEMENT = (
 # against the tool-length reading, .001 (tolerance-policy.md; check register
 # C-01). The plan's relief_floor_clearance_mm (0.5, "the author's allowance,
 # no source") gates nothing here.
-HUB_CBORE_TIP_CLEARANCE_MIN = (HUB_CBORE_DEPTH + HUB_CBORE_BAND[1]) + max(
+HUB_CBORE_TIP_CLEARANCE_MIN = (HUB_CBORE_DEPTH + HUB_CBORE_BAND[1]) + min(
     PLAN_DRILL_TIP_Z, PLAN_REAM_TIP_Z
 )
 TIP_FLOOR_READING = 0.001 * INCH
