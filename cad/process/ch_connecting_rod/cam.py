@@ -15,8 +15,9 @@ drill's 118° point, the approach, safe and clearance heights and the vise
 jaws' depth (keep-out shapes only).
 
 Route (plan text in ``plan.toml``): two 1/4 x 2 in blanks per load, side by
-side across the jaws on a 1/2 in aluminium support plate on 1 in parallels,
-each rod along its blank, the ring at the left end. Each face is pocketed
+side across the jaws on a 1/2 in aluminium support plate, one edge milled
+under the load's width, on 1 in parallels, each rod along its blank, the
+ring at the left end. Each face is pocketed
 inside the blank's uncut edges (its frame): the ring's zone full width, the
 ring and the fork standing as islands; along the shank only a band the
 shank's width plus the outline's kerf, the waste beyond it staying whole.
@@ -38,7 +39,9 @@ k's centre line at Y −(k + ½) × the pitch, the ring's centre
 ``ring_from_end_mm`` from the left end. Side 2 up (CR01, CR04a-CR08): Z0 the
 support plate's top, which is the datum face (model y → X, model −x → Y,
 model z → Z). Side 1 up (CR02, CR03): Z0 the datum face, on top (model y →
-X, model x → Y, model −z → Z).
+X, model x → Y, model −z → Z), the pair turned over as one stack and Y0
+shifted by the load's measured width off the nominal, so the programs stay
+on the nominal centres.
 
 Toolpath rules (owner rulings 2026-11-16): plunges beside the stock at the
 cutting feed, plunges into metal at the plan's slow feed, real G0 above the
@@ -591,6 +594,40 @@ def context(
     _agree(plan, "jaw_top_mm", jaw_top)
     if jaw_top < shop["limits"]["vise_grip_min_mm"]:
         raise ValueError("the jaws grip the blanks less than the shop's minimum")
+    # The plate's width, one long edge milled (#3652, D44): under the
+    # narrowest load, so the jaws grip the blanks, not the plate; over the
+    # widest load less a parallel, so its far edge stays on the moving
+    # parallel even pushed against its jaw.
+    _agree(
+        plan,
+        "support_plate_width_mm",
+        (p["support_plate_width_min_mm"] + p["support_plate_width_max_mm"]) / 2,
+    )
+    load_min = n_blanks * p["blank_width_min_mm"]
+    load_max = n_blanks * p["blank_width_max_mm"]
+    if p["support_plate_width_max_mm"] >= load_min:
+        raise ValueError(
+            "the jaws would grip the support plate, not the narrowest load"
+        )
+    if p["support_plate_width_min_mm"] <= load_max - p["parallel_thickness_mm"]:
+        raise ValueError(
+            "the support plate misses the moving parallel on the widest load"
+        )
+    # The width op stands the sawn plate on edge on the set's shim pair: the
+    # jaws grip at least the shop's fraction of its width, and its top edge
+    # stands the jaw-clearance floor over them.
+    import cam_nc
+
+    edge_grip = p["vise_jaw_height_mm"] - p["edge_shim_height_mm"]
+    if (
+        edge_grip
+        < shop["limits"]["vise_grip_fraction_min"] * p["support_plate_width_max_mm"]
+    ):
+        raise ValueError(
+            "the jaws grip the support plate on edge less than the shop's fraction"
+        )
+    if p["support_plate_width_min_mm"] - edge_grip < cam_nc.jaw_clearance_min_mm():
+        raise ValueError("the support plate's edge does not stand clear over the jaws")
     jaw_w = p["vise_jaw_width_mm"]
     jaw_x0 = p["jaw_start_mm"]
     _agree(plan, "jaw_end_mm", jaw_x0 + jaw_w)
@@ -614,6 +651,18 @@ def context(
     _agree(plan, "pocket_half_width_mm", edge)
     if pitch / 2 - edge < p["frame_min_mm"]:
         raise ValueError("the frame beside the ring is under its minimum")
+    # The blanks lie edge to edge from the fixed jaw, so inside Setup 1's
+    # width gate each one's edges stand off its nominal place while the
+    # pockets stay on the nominal centres: wide blanks before it push its
+    # near edge out, narrow ones up to and including it pull its far edge in.
+    for k, c in enumerate(centres):
+        near = -k * p["blank_width_max_mm"] - (c + edge)
+        far = (c - edge) + (k + 1) * p["blank_width_min_mm"]
+        if min(near, far) < p["frame_min_mm"]:
+            raise ValueError(
+                f"blank {k + 1}'s frame beside the ring is under its minimum "
+                "inside the blanks' width gate"
+            )
     level_max = p["pocket_level_max_mm"]
     rows_reach = edge - r
     n_rows = math.ceil(2 * rows_reach / p["pocket_woc_max_mm"] - 1e-9) + 1
@@ -906,8 +955,6 @@ def context(
     ream_tip = -p["ream_past_mm"]
     # Its full diameter reaches the fork's far face: past by its chamfer +
     # the margin.
-    import cam_nc
-
     if p["ream_past_mm"] <= cam_nc.ream_full_diameter_past_min_mm(plan, "reamer-0775"):
         raise ValueError(
             "the reamer's full diameter does not reach the far face (cnc.ream-full-diameter)"
