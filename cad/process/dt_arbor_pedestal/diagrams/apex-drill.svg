@@ -1,7 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 400" width="760" height="400" font-family="sans-serif" font-size="13">
   <!-- As Setup 6's picture (from the front, +X right). The #43 drill, cutter_dia_mm 2.2606 = 6.8 px, 118 deg point, at X -22.860 Y -11.938 (NC line 82) at the bottom of its last peck: point Z 47.923 (apex_tip_height_mm 47.92), its full diameter apex_drill_past_mm .5 past the bore's wall. Drawn short to a break. -->
   <rect class="paper" x="0" y="0" width="760" height="400"/>
-  <text class="title" x="20" y="22">Op 420, #43 drill (PA05 T5), 3 px/mm: the apex hole down into the bore</text>
+  <text class="title" x="20" y="22">Op 410, #43 drill (PA05 T5), 3 px/mm: the apex hole down into the bore</text>
   <rect class="fixture-support" x="193.61" y="330" width="124.39" height="6"/>
   <rect class="hidden" x="150" y="261.84" width="220" height="100"/>
   <text class="label" x="380" y="265.84">jaw tops</text>

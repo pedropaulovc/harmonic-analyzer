@@ -1,7 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 400" width="760" height="400" font-family="sans-serif" font-size="13">
   <!-- As Setup 6's picture (from the front). The 4-40 plug tap to scale across (major Ø.112 = 8.5 px), its point tap_reach_min_mm 9.525 below the top (the full thread through into the bore), ending in the round cue (its lead not on record). Its length and the T-handle wrench are schematic (not on record). The Fisher tap guide (tap-guide-fisher): 1/2 in shank (38.1 px) in the collet, drawn short to a break (3 1/8 in overall), its 3/16 in spring point in the wrench's centre hole. All in the cutter colour: the tool and what moves with it. -->
   <rect class="paper" x="0" y="0" width="760" height="400"/>
-  <text class="title" x="20" y="22">Op 450 (PA06_apex_tap), 3 px/mm: tap 4-40 by hand under the tap guide</text>
+  <text class="title" x="20" y="22">Op 440 (PA06_apex_tap), 3 px/mm: tap 4-40 by hand under the tap guide</text>
   <rect class="fixture-support" x="193.61" y="330" width="124.39" height="6"/>
   <rect class="hidden" x="150" y="261.84" width="220" height="100"/>
   <text class="label" x="380" y="265.84">jaw tops</text>

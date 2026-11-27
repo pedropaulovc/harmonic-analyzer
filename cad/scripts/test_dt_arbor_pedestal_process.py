@@ -194,7 +194,7 @@ def _seed(ctx: dict, key: str, pick, change) -> dict:
             "step",
             lambda line: line.startswith("G1 Y"),
             lambda line: "G1 Y60.000 F{feed}",
-            "passes",
+            "cut",
         ),
         # The step's last pass moved into the foot.
         (
