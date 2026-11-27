@@ -105,3 +105,86 @@ def test_every_hand_tap_stop_leaves_room_for_the_tap_guide() -> None:
                         key,
                     )
     assert len(holders) >= 10, holders
+
+
+def _verify_pm30mv_spindle_envelope(machines: dict, repo_root) -> list[str]:
+    import re
+
+    mill = machines["pm-30mv"]
+    if not (0.0 < mill["spindle_nose_od_in"] < mill["quill_collar_od_in"]):
+        raise ValueError("spindle_nose_od_in must be positive and smaller than quill_collar_od_in")
+    if not (
+        0.0
+        < mill["spindle_wrench_flat_shoulder_below_quill_ring_in"]
+        < mill["spindle_below_head_housing_in"]
+    ):
+        raise ValueError(
+            "spindle_wrench_flat_shoulder_below_quill_ring_in must be positive and smaller than spindle_below_head_housing_in"
+        )
+
+    cited_paths: list[str] = []
+    for entry in mill.get("cite", ()):
+        for rel in re.findall(
+            r"research/shop-evidence/[0-9-]+/[A-Za-z0-9._-]+\.jpg",
+            entry,
+        ):
+            target = repo_root / rel
+            if not (target.is_file() and target.stat().st_size > 0):
+                raise FileNotFoundError(rel)
+            cited_paths.append(rel)
+    if len(cited_paths) < 4:
+        raise ValueError(f"expected at least 4 cited PM-30MV evidence photos, got {cited_paths}")
+    return cited_paths
+
+
+def test_pm30mv_spindle_envelope_and_cited_evidence_files_exist() -> None:
+    repo_root = CAD_ROOT.parent
+    machines = _shop_equipment.load()["machines"]
+    cited_paths = _verify_pm30mv_spindle_envelope(machines, repo_root)
+    assert set(cited_paths) == {
+        "research/shop-evidence/2026-11-26/pm30mv-spindle-nose-od.jpg",
+        "research/shop-evidence/2026-11-26/pm30mv-spindle-below-collar.jpg",
+        "research/shop-evidence/2026-11-26/pm30mv-quill-collar-od.jpg",
+        "research/shop-evidence/2026-11-26/pm30mv-spindle-below-head.jpg",
+    }
+
+
+def test_pm30mv_spindle_envelope_rejects_inverted_bounds_or_missing_photo(
+    tmp_path,
+) -> None:
+    photo = tmp_path / "research/shop-evidence/2026-11-26/pm30mv-a.jpg"
+    photo.parent.mkdir(parents=True)
+    for suffix in ("a", "b", "c", "d"):
+        (photo.parent / f"pm30mv-{suffix}.jpg").write_bytes(b"jpeg")
+
+    valid_mill = {
+        "spindle_nose_od_in": 1.736,
+        "quill_collar_od_in": 4.2415,
+        "spindle_wrench_flat_shoulder_below_quill_ring_in": 0.551,
+        "spindle_below_head_housing_in": 1.9995,
+        "cite": [
+            " ".join(
+                f"research/shop-evidence/2026-11-26/pm30mv-{s}.jpg"
+                for s in ("a", "b", "c", "d")
+            )
+        ],
+    }
+    assert len(_verify_pm30mv_spindle_envelope({"pm-30mv": valid_mill}, tmp_path)) == 4
+
+    with pytest.raises(ValueError, match="spindle_nose_od_in"):
+        _verify_pm30mv_spindle_envelope(
+            {"pm-30mv": valid_mill | {"spindle_nose_od_in": 5.0}}, tmp_path
+        )
+    with pytest.raises(
+        ValueError, match="spindle_wrench_flat_shoulder_below_quill_ring_in"
+    ):
+        _verify_pm30mv_spindle_envelope(
+            {
+                "pm-30mv": valid_mill
+                | {"spindle_wrench_flat_shoulder_below_quill_ring_in": 2.5}
+            },
+            tmp_path,
+        )
+    (photo.parent / "pm30mv-d.jpg").unlink()
+    with pytest.raises(FileNotFoundError, match="pm30mv-d.jpg"):
+        _verify_pm30mv_spindle_envelope({"pm-30mv": valid_mill}, tmp_path)
