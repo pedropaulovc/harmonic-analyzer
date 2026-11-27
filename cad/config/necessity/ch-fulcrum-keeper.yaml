@@ -1,0 +1,6 @@
+necessity:
+  - id: N-01
+    feature: "front view, foot-to-lug inside corner R.02 MAX, CLEARS HEAD OF MHA-CH-VN-52"
+    kind: gap
+    reason: "a larger corner radius lifts the foot-screw head"
+    source: "owner ruling 2026-11-26 (Pedro), issue #3744 (Panel F); ch_fulcrum_keeper_spec.CORNER_R_MAX"

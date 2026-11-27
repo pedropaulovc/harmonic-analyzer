@@ -18,30 +18,18 @@
 # crown through the lug and spot, drill (D) and open (F) the bore
 # through the lug, both 1 mm into the waste the step removes; the jaws grip
 # only that waste, below the cuts (FK04); Setup 6 I down: face the foot tip
-# to the .65 length and mill the L step to the .32 lug, which opens the bore
-# and the foot hole (FK05); Setup 7 upright on the seat: spot and drill 1/16
-# through the crown into the bore, mill the foot hole's Ø.150 counterbore
-# from the foot top with the 2-1/4 in long 1/8 in end mill (FK06), tap #1-72 by
-# hand under the spring tap guide in the spindle (FK07); bench deburr (the
-# F drill by hand through the bore) and inspect. Finish: black oxide, in the
-# shop. Owner (Pedro), answered in person 2026-11-21: "Black oxide: cold
-# blackening in the shop with Presto Black PC9 is acceptable as the
-# drawing's black oxide." The last setup blackens the keeper with Birchwood
-# Presto Black Steel PC9 by the maker's instructions (Presto Black Steel PC9
-# Instructions, steps 1 prepare, 2b brush-on, 3 stop, 4 dry, 6 seal;
+# to the .65 length and mill the open L step to the .32 lug and .227 foot top
+# (#3744 Panel F), which opens the bore and the foot hole (FK05); Setup 7
+# upright on the seat: spot and drill 1/16 through the crown into the bore
+# (FK06), tap #1-72 by hand under the spring tap guide in the spindle (FK07);
+# bench deburr (the F drill by hand through the bore) and inspect. Finish:
+# black oxide, in the shop. Owner (Pedro), answered in person 2026-11-21:
+# "Black oxide: cold blackening in the shop with Presto Black PC9 is acceptable
+# as the drawing's black oxide." The last setup blackens the keeper with
+# Birchwood Presto Black Steel PC9 by the maker's instructions (Presto Black
+# Steel PC9 Instructions, steps 1 prepare, 2b brush-on, 3 stop, 4 dry, 6 seal;
 # cad/config/shop-equipment/ consumables.presto-black-steel-pc9, which cites
 # them); the PC9 and the gloves and glasses are to buy (to_order).
-#
-# The counterbore's centre sits .150 from the lug's outer face (its edge
-# .075 from it), and the lug stands
-# 0.96 in above the foot top: a 1/2 in end mill cannot reach it and a
-# standard 1/8 in end mill's 1-1/2 in overall length leaves too little out
-# of the collet to keep the collet nose over the crown. The plain 1/8 in
-# end mill with 3/4 in of flutes, 2-1/4 in overall (MSC 09653429, shop
-# tools.endmill-carbide-3fl-1-8-loc-3-4, to_order; the owner chose the
-# plain cutters, #3568; the pick: delegated ruling 2026-11-24 (Main), no
-# precedent; owner review #2144) mills it by interpolation; cam.py checks
-# its stick-out.
 #
 # Tapping: FluidNC cannot rigid-tap (owner, Pedro, 2026-11-17). The tap is
 # guided by the Fisher spring tap guide in the 1/2 in R8 collet (owner, Pedro,
@@ -60,15 +48,13 @@
 # feeler leaf, as the pivot bracket's plan does.
 #
 # NC (cam:ch_fulcrum_keeper, cad/process/ch_fulcrum_keeper/cam.py): FK01_far,
-# FK02_width, FK03_seat, FK04_crown_bore, FK05_step, FK06_crown_cbore,
-# FK07_crown_tap, FK08_cbore_recut (FK06's counterbore alone: the remedy for
-# a shallow or undersize one). Program names, the [parameters] and the milling_cuts names
+# FK02_width, FK03_seat, FK04_crown_bore, FK05_step, FK06_crown,
+# FK07_crown_tap. Program names, the [parameters] and the milling_cuts names
 # are a contract with that recipe (the recipe keeps the bracket's names for
 # them: west = F, hold = the foot hole, arch = the crown, apex = the crown
 # hole). Tool numbers are the places in the tools list among the mill's
 # tools: T1 1/2 in end mill, T2 centre drill, T3 #41, T4 D, T5 F drill,
-# T6 1/16 drill, T7 2-1/4 in long 1/8 in end mill, T8 the tap guide (the tap is turned
-# by hand).
+# T6 1/16 drill, T7 the tap guide (the tap is turned by hand).
 title = "Fulcrum keeper"
 part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
@@ -86,7 +72,7 @@ title = "This job"
 rows = [
   ["Finished", "{{cad.far_side_width_min_in:.3dot}}–{{cad.far_side_width_max_in:.3dot}} wide (F to N), {{cad.foot_tip_length_min_in:.3dot}}–{{cad.foot_tip_length_max_in:.3dot}} long (I to the foot tip); the lug {{cad.lug_outer_face_thickness_min_in:.3dot}}–{{cad.lug_outer_face_thickness_max_in:.3dot}} thick (I to its outer face O), the foot {{cad.foot_top_height_min_in:.3dot}}–{{cad.foot_top_height_max_in:.3dot}} high (the seat to the foot top)."],
   ["Zeros", "Each blank gets its own zeros (no vise stop): in every mill setup, repeat the edge-finder and Z touch-off ops for each blank clamped, before its run."],
-  ["To order", "The 2-1/4 in long 1/8 in end mill (Setup 7's counterbore waits for it), and the black-oxide solution with gloves and glasses (the last setup waits for them): the PC9, chemical-resistant gloves and safety glasses."],
+  ["To order", "The black-oxide solution with gloves and glasses (the last setup waits for them): the PC9, chemical-resistant gloves and safety glasses."],
 ]
 
 [cad]
@@ -176,13 +162,11 @@ arch_lead_mm = 1.0
 hold_spot_dia_mm = 2.159
 bore_spot_dia_mm = 4.572
 apex_spot_dia_mm = 1.27
-# Foot hole (FK03): the #41 from the seat, pecked .080 with full retract
-# (L/D 4), its full diameter hold_drill_past_mm past the foot top into the
-# waste; its point then stands hold_tip_height_mm above the parallels in
-# the shortest blank.
-hold_peck_mm = 2.032
+# Foot hole (FK03): the #41 from the seat, one plunge (L/D 2.4), its full
+# diameter hold_drill_past_mm past the foot top into the waste; its point
+# then stands hold_tip_height_mm above the parallels in the shortest blank.
 hold_drill_past_mm = 1.0
-hold_tip_height_mm = 23.413
+hold_tip_height_mm = 25.522
 # The holes' setup coordinates: the foot hole's station from I (cad
 # foot_hole x less inner_face x), and the width's middle from F (the bore,
 # the crown hole and the foot hole all lie on it; cam.py checks both).
@@ -215,43 +199,6 @@ apex_tip_height_mm = 27.389
 plug_tap_lead_mm = 1.764
 tap_reach_min_mm = 5.619
 tap_reach_max_mm = 9.249
-# Counterbore (FK06): the 2-1/4 in long 1/8 in end mill's centre on a circle
-# cbore_path_radius_mm round the foot hole's axis (Ø.150, the middle of the
-# drawing's .145-.155 band, less the cutter), 17 helical turns of .0049 down
-# to cbore_depth_mm (.083, the band's middle), then one flat turn on the
-# floor. The band is the sheet's printed Ø.150 ±.005 x .083 ±.005 (owner
-# ruling 2026-11-22, #3367, where the limits print; D25, their width; RV-04
-# in ch-fulcrum-keeper.yaml): it keeps
-# the foot tip's .072 wall and clears the MHA-CH-VN-52's Ø.140 head. Its
-# collet nose stays cbore_collet_clear_mm over the crown's apex with the
-# cutter on the floor: at least cbore_projection_min_mm out of the collet,
-# with its stick-out checked against its length (cam.py). Feed: the setting's chip load
-# (endmill-carbide-3fl-1-8-loc-3-4-1018-cf, 2800 rpm × 3 × .001 = 8.4 in/min)
-# holds at the cutter's edge, which on the helix runs (path radius + cutter
-# radius)/path radius = 6.00× faster than its centre: the centre's F is
-# 8.4 × .3175/1.905 = 1.40 in/min (cam.py; sh_column_clamp_back's rule).
-cbore_path_radius_mm = 0.3175
-cbore_depth_mm = 2.1082
-cbore_pitch_mm = 0.127
-cbore_collet_clear_mm = 2.54
-cbore_projection_min_mm = 28.959
-cbore_feed_per_min_mm = 35.56
-# The edge's feed, the setting's 8.4 in/min: the cut's feed (its chip load
-# .001 in/tooth is what deflects the long cutter).
-cbore_edge_feed_per_min_mm = 213.36
-# The end mill (MSC 09653429, read live 2026-11-24, #3568): 2-1/4 in
-# overall, 3/4 in of flutes, 3 flutes, 40° helix, centre cutting, its 1/8 in
-# shank the cutter's size and no neck: nothing wider than the cutter stands
-# within its stick-out. Out of the 1/8 in collet at least
-# cbore_projection_min_mm (1.140) and at most cbore_projection_max_mm, its
-# length less holder_grip_min_mm in the collet (ch_amplitude_bar's grip
-# rule, its plan's holder_grip_min_mm; no shop-wide grip rule is on
-# record): at the least stick-out 1.110 in stays in the collet. The 1/8 in
-# stick-out floor of the coming retune (#3634, 13.97 mm) is under the
-# 28.959 set here. Its 40° helix (the setting names none) changes none of
-# the setting's numbers. cam.py checks both ends.
-cbore_projection_max_mm = 44.45
-holder_grip_min_mm = 12.7
 # Speeds and feeds of the holes, authored in the operations: LittleMachineShop
 # "Cutting Speeds", Drilling & Reaming, Plain carbon steels 1006-1026 (read
 # 2026-11-20): drilling 60-100 ft/min; AutoDrill "Suggested
@@ -302,15 +249,13 @@ drill_chuck_gauge_mm = 95.0      # Archive holders.drill-chuck-r8.gauge_len_mm.
 # collet nose clears the stock at every program's deepest cut.
 half_mill_projection_mm = 28.45
 # Overall lengths: jobber #41 2-1/8 in, D 4 in, F 4-1/8 in, 1/16 1-7/8 in
-# (ASME B94.11M); the #2 combined drill and countersink 1-7/8 in; the
-# 1/8 in end mill 2-1/4 in. Bounded by their whole length below
-# the chuck or collet.
+# (ASME B94.11M); the #2 combined drill and countersink 1-7/8 in. Bounded by
+# their whole length below the chuck.
 drill_41_oal_mm = 53.975
 drill_d_oal_mm = 101.6
 drill_1_16_oal_mm = 47.625
 centre_drill_oal_mm = 47.625
 drill_f_oal_mm = 104.775
-cbore_mill_oal_mm = 57.15
 # Tapping under the spring tap guide (tools.tap-guide-fisher): the guide and
 # the tap in its wrench together reach at most tap_stack_max_mm below the
 # collet face, the spindle-to-table maximum (shop machines.pm-30mv, 431.8)
@@ -350,10 +295,6 @@ ref = "jig-drill-f"
 id = "drill-1-16"
 name = "1/16 drill"
 ref = "drill-1-16"
-[[tools]]
-id = "em-eighth"
-name = "1/8 in carbide end mill, 3/4 in of flutes, 2-1/4 in long, TO ORDER"
-ref = "endmill-carbide-3fl-1-8-loc-3-4"
 [[tools]]
 id = "tap-guide"
 name = "Fisher spring tap guide"
@@ -532,11 +473,11 @@ speed_kind = "spindle"
 tool = "drill-41"
 drilling = "twist_drill"
 sizing = { kind = "band", band_mm = "{{cad.foot_hole_dia_band_mm}}" }
-instruction = "Same file, M6 T3: #41 drill down from the seat, pecks of {{process.hold_peck_mm:in.3dot}} with full retract, its full diameter {{process.hold_drill_past_mm:in.3dot}} past the foot top ({{cad.foot_top_height_in:.3dot}} below the seat) into the waste the step removes in Setup 6, which opens the hole; set 2600. Cutting oil."
+instruction = "Same file, M6 T3: #41 drill down from the seat, one plunge, its full diameter {{process.hold_drill_past_mm:in.3dot}} past the foot top ({{cad.foot_top_height_in:.3dot}} below the seat) into the waste the step removes in Setup 6, which opens the hole; set 2600. Cutting oil."
 rpm = 2600
 feed = "{{process.hold_drill_feed_per_min_mm:in.1f}} in/min"
 hole_depth_mm = "{{cad.foot_top_height_mm}}"
-peck = { step_mm = 2.032, retract = "full" }
+peck = "none"
 milling_cuts = [
   { name = "hold drill", kind = "drill", phase = "finish", cutter_dia_mm = 2.4384, flutes = 2, rpm = 2600, feed_mm_min = "{{process.hold_drill_feed_per_min_mm}}", stations_mm = "{{process.upright_top_max_mm}}" },
 ]
@@ -711,20 +652,20 @@ feed = "hand"
 
 [[setups]]
 machine_kind = "other"
-title = "Crown hole and counterbore; tap #1-72 into the bore"
+title = "Crown hole; tap #1-72 into the bore"
 machine = "PM-30MV CNC (FluidNC, CNCjs with the electronic tool setter) / vise, swivel off"
 indexing = "none"
 machine_ref = "pm-30mv"
 holding = "The 1 in parallels back against the jaws. The part upright, the SEAT down on both parallels, the crown up, gripped on F (against the FIXED jaw) and N, I to the RIGHT, centred on the jaws. Tap it down onto both parallels while closing the vise. The jaws grip the lower {{process.upright_grip_mm:in.2dot}}; the crown stands above them, the foot top {{cad.foot_top_height_in:.3dot}} above the parallels, between the jaws."
-datum = "Programs FK06_crown_cbore, FK07_crown_tap and FK08_cbore_recut. G54: X0 the inner face I (the RIGHT side), the part to −X; Y0 the fixed jaw's face (F), +Y toward it; Z0 the parallels' top (the seat). The crown hole at X −{{cad.crown_tap_station_mm:.3f}}, the apex at Z {{cad.crown_overall_height_ref:.3f}}; the foot hole at X −{{process.foot_hole_station_from_i_mm:.3f}}; both at Y −{{process.width_middle_mm:.3f}} mm (the width's middle). Every file starts with an M6 for its first tool."
-diagram = { file = "diagrams/apex.svg", alt = "The keeper upright on two parallels, seat down, the crown up, I to the right; the centre drill spots the crown and the 1/16 drill drills down into the bore; the 2-1/4 in long 1/8 in end mill mills the counterbore from the foot top, beside the lug." }
-envelope = { x_span_mm = ["{{cad.foot_tip_length_mm}}", "{{process.centre_drill_oal_mm}}"], y_span_mm = ["{{cad.far_side_width_mm}}", "{{process.centre_drill_oal_mm}}"], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{cad.crown_overall_height_ref}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", 5.766], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.tap_stack_max_mm}}"], shortest_tool_mm = ["{{process.drill_chuck_gauge_mm}}", "{{process.drill_1_16_oal_mm}}"] }
+datum = "Programs FK06_crown and FK07_crown_tap. G54: X0 the inner face I (the RIGHT side), the part to −X; Y0 the fixed jaw's face (F), +Y toward it; Z0 the parallels' top (the seat). The crown hole at X −{{cad.crown_tap_station_mm:.3f}}, Y −{{process.width_middle_mm:.3f}} mm (the width's middle), the apex at Z {{cad.crown_overall_height_ref:.3f}}. Every file starts with an M6 for its first tool."
+diagram = { file = "diagrams/apex.svg", alt = "The keeper upright on two parallels, seat down, the crown up, I to the right; the centre drill spots the crown and the 1/16 drill drills down into the bore." }
+envelope = { x_span_mm = ["{{cad.foot_tip_length_mm}}", "{{process.centre_drill_oal_mm}}"], y_span_mm = ["{{cad.far_side_width_mm}}", "{{process.centre_drill_oal_mm}}"], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{cad.crown_overall_height_ref}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{process.apex_tip_height_mm}}"], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.tap_stack_max_mm}}"], shortest_tool_mm = ["{{process.drill_chuck_gauge_mm}}", "{{process.drill_1_16_oal_mm}}"] }
 vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{cad.far_side_width_mm}}", along_jaws_mm = "{{cad.foot_tip_length_mm}}", part_height_mm = "{{cad.crown_overall_height_ref}}", parallel_height_mm = "{{process.parallel_height_mm}}", overhang_mm = ["{{process.vise_seat_inset_mm}}", "rest"], jaw_offset = "centred", fixed_jaw_face = "machined", moving_jaw_face = "machined", moving_jaw_contact = "flat" }
 beam = { axis = "z", hold = "cantilever", extent_mm = [0, "{{cad.crown_overall_height_ref}}"], clamp_mm = [0, "{{process.upright_grip_mm}}"], section_mm = { x = "{{cad.lug_outer_face_thickness_mm}}", y = "{{cad.far_side_width_mm}}" }, vise_left = "other" }
 
 [[setups.operations]]
 instruction = "Before each part goes in, G54 Z0: the parallels' top (the seat), touched with the 1/2 in end mill on the fixed-jaw parallel, the jaws open."
-instruction_detailed = "Before each part goes in, the jaws open: console M6 T1. Jog it over the fixed-jaw parallel, clear of the jaw. Spindle stopped, its tip just dragging a .002 feeler leaf on that parallel: G10 L20 P1 Z0.051. Raise Z. FK06_crown_cbore's M6s then measure its tools against it. Not with the part in: the collet would meet the crown first."
+instruction_detailed = "Before each part goes in, the jaws open: console M6 T1. Jog it over the fixed-jaw parallel, clear of the jaw. Spindle stopped, its tip just dragging a .002 feeler leaf on that parallel: G10 L20 P1 Z0.051. Raise Z. FK06_crown's M6s then measure its tools against it. Not with the part in: the collet would meet the crown first."
 feed = "hand"
 
 [[setups.operations]]
@@ -733,15 +674,11 @@ instruction_detailed = "The part clamped as Holding says. Edge finder (900 rpm):
 feed = "hand"
 
 [[setups.operations]]
-instruction = "The 2-1/4 in long 1/8 in end mill in its 1/8 in collet, just over {{process.cbore_projection_min_mm:in.3dot}} out, never over {{process.cbore_projection_max_mm:in.3dot}} (at least {{process.holder_grip_min_mm:in.2dot}} stays in the collet): with the cutter on the counterbore's floor the collet nose then stays {{process.cbore_collet_clear_mm:in.3dot}} over the crown."
-feed = "hand"
-
-[[setups.operations]]
 speed_kind = "spindle"
 tool = "spot"
 drilling = "none"
 sizing = "other"
-instruction = "Run FK06_crown_cbore (M6 T2, centre drill; set 1800): spot the crown Ø{{process.apex_spot_dia_mm:in.3dot}} at its apex with the pilot's point, under the 1/16."
+instruction = "Run FK06_crown (M6 T2, centre drill; set 1800): spot the crown Ø{{process.apex_spot_dia_mm:in.3dot}} at its apex with the pilot's point, under the 1/16."
 rpm = 1800
 feed = "{{process.spot_feed_per_min_mm:in.1f}} in/min"
 milling_cuts = [
@@ -753,7 +690,7 @@ speed_kind = "spindle"
 tool = "drill-1-16"
 drilling = "twist_drill"
 sizing = { kind = "tap_drill", tap = "tap-1-72" }
-instruction = "Same file, M6 T6: 1/16 drill down into the bore, pecks of {{process.apex_peck_mm:in.3dot}} with full retract, its full diameter {{process.apex_drill_past_mm:in.3dot}} past the bore's wall; set 2800. Cutting oil. Look through the bore: the drill has broken into it."
+instruction = "Same file, M6 T6: 1/16 drill down into the bore, pecks of {{process.apex_peck_mm:in.3dot}} with full retract, its full diameter {{process.apex_drill_past_mm:in.3dot}} past the bore's wall; set 2800. Cutting oil. Look through the bore: the drill has broken into it. The part stays in the vise for the tap."
 rpm = 2800
 feed = "{{process.apex_drill_feed_per_min_mm:in.1f}} in/min"
 hole_depth_mm = "{{cad.crown_tap_into_axis_mm}}"
@@ -761,41 +698,6 @@ peck = { step_mm = 1.016, retract = "full" }
 milling_cuts = [
   { name = "apex drill", kind = "drill", phase = "rough", cutter_dia_mm = 1.5875, flutes = 2, rpm = 2800, feed_mm_min = "{{process.apex_drill_feed_per_min_mm}}", stations_mm = "{{cad.crown_overall_height_ref}}" },
 ]
-
-[[setups.operations]]
-speed_kind = "spindle"
-tool = "em-eighth"
-drilling = "none"
-sizing = "other"
-instruction = "Same file, M6 T7 (the 2-1/4 in long 1/8 in end mill; set 2800): mill the foot hole's counterbore from the foot top, beside the lug: down a helix of {{process.cbore_pitch_mm:in.3dot}} a turn, climb, to {{process.cbore_depth_mm:in.3dot}} deep, once round flat on the floor, then up over the hole, at {{process.cbore_feed_per_min_mm:in.2f}} in/min (the cutter's centre; its edge runs at the 1/8 in's 8.4). The part stays in the vise for the tap."
-rpm = 2800
-feed = "{{process.cbore_feed_per_min_mm:in.2f}} in/min"
-milling_cuts = [
-  { name = "cbore", kind = "side", phase = "finish", cutter_dia_mm = 3.175, flutes = 3, axial_doc_mm = 0.124, radial_woc_mm = 3.175, rpm = 2800, feed_mm_min = "{{process.cbore_edge_feed_per_min_mm}}", stations_mm = "{{cad.foot_top_height_mm}}" },
-]
-inspection = "Still clamped: counterbore Ø{{cad.foot_hole_cbore_dia_min_in:.3dot}}–{{cad.foot_hole_cbore_dia_max_in:.3dot}} (calipers' inside jaws), {{cad.foot_hole_cbore_depth_min_in:.3dot}}–{{cad.foot_hole_cbore_depth_max_in:.3dot}} deep from the foot top (calipers' depth rod), its floor flat. FK06 cuts Ø{{cad.foot_hole_cbore_dia_in:.3dot}} × {{cad.foot_hole_cbore_depth_in:.3dot}}; the band keeps the foot tip's {{cad.foot_hole_tip_wall_min_mm:in.3dot}} wall and clears the MHA-CH-VN-52's Ø.140 head (owner ruling RV-04)."
-gauge_checks = [
-  { gauge = "calipers", band_mm = "{{cad.foot_hole_cbore_dia_band_mm}}" },
-  { gauge = "calipers", band_mm = "{{cad.foot_hole_cbore_depth_band_mm}}" },
-]
-
-[[setups.operations]]
-steps = [
-  { kind = "action", text = "Smaller in Ø than its band: the 1/8 end mill is worn. Fit a new 2-1/4 in long 1/8 in end mill, just over {{process.cbore_projection_min_mm:in.3dot}} out, never over {{process.cbore_projection_max_mm:in.3dot}}, and run FK08_cbore_recut (the counterbore alone; its M6 T7 measures the new cutter). Check again." },
-]
-feed = "hand"
-
-[[setups.operations]]
-steps = [
-  { kind = "action", text = "Shallower than its band: send $#, note the G54 line's Z; G10 L2 P1 Z(that Z − ({{process.cbore_depth_mm:in.3dot}} − the depth reading) × 25.4). Run FK08_cbore_recut (no spot, no drill), then G10 L2 P1 Z(the noted Z) puts Z0 back. Check again." },
-]
-feed = "hand"
-
-[[setups.operations]]
-steps = [
-  { kind = "stop", text = "Larger or deeper than its band: the part is scrap." },
-]
-feed = "hand"
 
 [[setups.operations]]
 instruction = "The #1-72 tap goes in the T-handle tap wrench with the centre hole in its top: the tap guide's point seats in that hole."
@@ -810,7 +712,7 @@ speed_kind = "other"
 tool = "tap-guide"
 drilling = "none"
 sizing = "other"
-instruction = "Run FK07_crown_tap: M6 T8, the tap guide in the 1/2 in collet, pointed end out, spindle off; the file ends Idle at the machine top over the hole."
+instruction = "Run FK07_crown_tap: M6 T7, the tap guide in the 1/2 in collet, pointed end out, spindle off; the file ends Idle at the machine top over the hole."
 diagram = { file = "diagrams/apex-tap.svg", alt = "The keeper upright in the vise, crown up; the #1-72 tap in the T-handle wrench in the crown hole, the tap guide in the spindle, its spring point in the wrench's centre hole; the tap's point to go {{process.tap_reach_min_mm:in.3dot}}–{{process.tap_reach_max_mm:in.3dot}} below the apex, into the bore." }
 
 [[setups.operations]]
@@ -836,7 +738,7 @@ machine_kind = "other"
 title = "Deburr and inspect"
 machine = "Bench"
 indexing = "none"
-diagram = { file = "diagrams/inspect.svg", alt = "The finished keeper from the side and from above: the seat, the foot top with the counterbored foot hole, the crown with its tapped hole, the F-drilled bore, and where each is measured from." }
+diagram = { file = "diagrams/inspect.svg", alt = "The finished keeper from the side and from above: the seat, the stepped foot top with its drilled foot hole, the crown with its tapped hole, the F-drilled bore, and where each is measured from." }
 envelope = "other"
 vise_hold = "other"
 beam = "other"
@@ -854,7 +756,7 @@ speed_kind = "other"
 tool = "files"
 drilling = "none"
 sizing = "other"
-instruction = "Break every edge, R{{cad.edge_break_in:.3dot}} or chamfer .010 max: smooth file on the outside edges, the scraper from the deburring set on the bore's, the foot hole's, the counterbore's and the crown hole's mouths (no countersink). Leave the inside corner of the step as cut (the end mill's sharp corner). Keep I and the lug's outer face O flat: stone them lightly on a flat stone. Wash off the oil."
+instruction = "Break every edge, R{{cad.edge_break_in:.3dot}} or chamfer .010 max: smooth file on the outside edges, the scraper from the deburring set on the bore's, the foot hole's and the crown hole's mouths (no countersink). Leave the inside corner of the step as cut (R{{cad.inside_corner_radius_max_in:.2dot}} max: the end mill's sharp corner; do not file a radius into it). Keep I and the lug's outer face O flat: stone them lightly on a flat stone. Wash off the oil."
 feed = "hand"
 inspection = "I down on the surface plate: it does not rock. The combination square's blade on edge across O, along and across it (the foot stands past that face, so it cannot go down on the plate): no light under the blade. No burr stands proud."
 gauge_checks = "other"
@@ -877,7 +779,7 @@ gauge_checks = [
 [[setups.operations]]
 instruction = "Foot hole: the #41 drill's shank in it, its Ø miked."
 feed = "hand"
-inspection = "The shank slips through. Its centre {{cad.foot_hole_station_min_in:.3dot}}–{{cad.foot_hole_station_max_in:.3dot}} from the foot tip and {{cad.foot_hole_lateral_min_in:.3dot}}–{{cad.foot_hole_lateral_max_in:.3dot}} from F, the face Setup 4 located it from: calipers over the shank less half its Ø. The station less half Setup 7's counterbore reading leaves at least {{cad.foot_hole_tip_wall_min_mm:in.3dot}} of wall to the foot tip."
+inspection = "The shank slips through. Its centre {{cad.foot_hole_station_min_in:.3dot}}–{{cad.foot_hole_station_max_in:.3dot}} from the foot tip and {{cad.foot_hole_lateral_min_in:.3dot}}–{{cad.foot_hole_lateral_max_in:.3dot}} from F, the face Setup 4 located it from: calipers over the shank less half its Ø."
 gauge_checks = [
   { gauge = "calipers", band_mm = "{{cad.foot_hole_station_band_mm}}" },
   { gauge = "calipers", band_mm = "{{cad.foot_hole_lateral_band_mm}}" },
@@ -904,7 +806,7 @@ machine_kind = "other"
 title = "Blacken with Presto Black Steel PC9 (the drawing's black oxide)"
 machine = "Bench, ventilated"
 indexing = "none"
-diagram = { file = "diagrams/blacken.svg", alt = "The finished keeper, every surface to be blackened: the faces, the crown, the bore, the foot hole with its counterbore and the crown hole." }
+diagram = { file = "diagrams/blacken.svg", alt = "The finished keeper, every surface to be blackened: the faces, the crown, the bore, the foot hole and the crown hole." }
 envelope = "other"
 vise_hold = "other"
 beam = "other"
@@ -922,7 +824,7 @@ instruction = "Scuff the outside faces lightly with the 220 sanding roll to fres
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Mix the PC9 with water 1:1 in a plastic cup (the maker: 50–100% for brush-on). Brush it on every surface with even, light strokes, into the bore, the counterbore and the foot and crown holes; re-wet the brush and go over the edges, the holes and any light spot until the keeper is an even black (the maker: do not press hard, it lifts the coating)."
+instruction = "Mix the PC9 with water 1:1 in a plastic cup (the maker: 50–100% for brush-on). Brush it on every surface with even, light strokes, into the bore and the foot and crown holes; re-wet the brush and go over the edges, the holes and any light spot until the keeper is an even black (the maker: do not press hard, it lifts the coating)."
 feed = "hand"
 
 [[setups.operations]]

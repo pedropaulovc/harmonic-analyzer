@@ -13,17 +13,17 @@
   <rect class="part-kept" x="130" y="92.24" width="69.85" height="172.76"/>
   <rect class="part-removed" x="130" y="89.7" width="69.85" height="2.54"/>
   <line class="active-face" x1="130" y1="92.24" x2="199.85" y2="92.24"/>
-  <rect class="holes" x="158.83" y="92.24" width="12.2" height="48"/>
-  <line class="centre-line" x1="164.93" y1="80.24" x2="164.93" y2="152.24"/>
-  <line class="hidden" x1="130" y1="131.6" x2="199.85" y2="131.6"/>
+  <rect class="holes" x="158.83" y="92.24" width="12.2" height="37.5"/>
+  <line class="centre-line" x1="164.93" y1="80.24" x2="164.93" y2="142"/>
+  <line class="hidden" x1="130" y1="121.07" x2="199.85" y2="121.07"/>
   <line class="leader" x1="195.85" y1="91.24" x2="301.28" y2="75.04"/>
   <circle class="leader-dot" cx="195.85" cy="91.24" r="2"/>
   <text class="label" x="301.28" y="79.04">the seat: {{process.seat_skim_mm:in.3dot}} off the sawn end; Z0</text>
-  <line class="leader" x1="168.93" y1="112.24" x2="301.28" y2="99.04"/>
-  <circle class="leader-dot" cx="168.93" cy="112.24" r="2"/>
-  <text class="label" x="301.28" y="103.04">#41 hole, spotted first, pecked</text>
-  <line class="leader" x1="195.85" y1="131.6" x2="301.28" y2="123.52"/>
-  <circle class="leader-dot" cx="195.85" cy="131.6" r="2"/>
+  <line class="leader" x1="168.93" y1="108" x2="301.28" y2="99.04"/>
+  <circle class="leader-dot" cx="168.93" cy="108" r="2"/>
+  <text class="label" x="301.28" y="103.04">#41 hole, spotted first</text>
+  <line class="leader" x1="195.85" y1="121.07" x2="301.28" y2="123.52"/>
+  <circle class="leader-dot" cx="195.85" cy="121.07" r="2"/>
   <text class="label" x="301.28" y="127.52">foot top {{cad.foot_top_height_in:.3dot}} below the seat</text>
   <text class="label" x="301.28" y="147.52">the drill runs {{process.hold_drill_past_mm:in.3dot}} past it, into waste</text>
   <text class="label" x="60" y="183.27" text-anchor="end">jaw tops</text>

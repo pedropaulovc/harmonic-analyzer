@@ -1,16 +1,15 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 420" font-family="sans-serif" font-size="13">
-  <!-- Setup 7: upright on the seat; FK06 spots the crown and drills 1/16 into the bore, then mills the foot hole's counterbore. 1 in = 177.8 px. -->
+  <!-- Setup 7: upright on the seat; FK06 spots the crown and drills 1/16 into the bore. 1 in = 177.8 px. -->
   <rect class="paper" x="0" y="0" width="760" height="420"/>
-  <text class="title" x="20" y="20">Setup 7 (FK06_crown_cbore): spot and drill 1/16 through the crown; mill the counterbore</text>
+  <text class="title" x="20" y="20">Setup 7 (FK06_crown): spot and drill 1/16 through the crown into the bore</text>
   <rect class="fixture-support" x="175.54" y="380" width="184.46" height="6"/>
-  <polygon class="part-kept" points="330,380 214.43,380 214.43,324.9 273.1,324.9 273.1,154.7 330,154.7"/>
+  <polygon class="part-kept" points="330,380 214.43,380 214.43,339.6 273.1,339.6 273.1,154.7 330,154.7"/>
   <rect class="holes" x="273.1" y="180.95" width="56.9" height="45.3"/>
   <text class="label" x="336" y="208">bore</text>
   <rect class="holes" x="296.25" y="154.7" width="10.6" height="31"/>
   <line class="centre-line" x1="301.55" y1="104.64" x2="301.55" y2="240"/>
-  <rect class="holes" x="232.9" y="324.9" width="27" height="14.8"/>
-  <rect class="holes" x="237.9" y="339.7" width="17" height="40.3"/>
-  <line class="centre-line" x1="246.4" y1="300" x2="246.4" y2="392"/>
+  <rect class="holes" x="237.9" y="339.6" width="17" height="40.4"/>
+  <line class="centre-line" x1="246.4" y1="325" x2="246.4" y2="392"/>
   <line class="hidden" x1="175.54" y1="243.18" x2="390" y2="243.18"/>
   <text class="label" x="396" y="247.18">jaw tops</text>
   <circle class="datum" cx="330" cy="154.7" r="3.5"/>
@@ -18,12 +17,7 @@
   <circle class="datum" cx="332" cy="380" r="3.5"/>
   <text class="datum-label" x="338" y="374">Z0 the parallels' top (the seat)</text>
   <rect class="cutter" x="296.25" y="94.7" width="10.6" height="55"/>
-  <rect class="cutter" x="235.3" y="250" width="22.2" height="70"/>
   <text class="label" x="396" y="118.64">spot Ø{{process.apex_spot_dia_mm:in.3dot}} on the crown, 1/16 down into the bore</text>
   <text class="label" x="396" y="138.64">apex at Z {{cad.crown_overall_height_ref:.3f}} mm, the hole {{cad.crown_tap_station_in:.3dot}} from I</text>
-  <line class="leader" x1="258" y1="330" x2="392" y2="300"/>
-  <text class="label" x="396" y="298">counterbore Ø{{cad.foot_hole_cbore_dia_in:.3dot}} × {{cad.foot_hole_cbore_depth_in:.3dot}} from the foot top:</text>
-  <text class="label" x="396" y="316">the 2-1/4 in long 1/8 in end mill, a helix then a circle</text>
-  <text class="label" x="396" y="334">foot hole {{process.foot_hole_station_from_i_mm:in.3dot}} from I (drilled in Setup 4)</text>
   <text class="label" x="20" y="40">Looking at the moving jaw; F at the fixed jaw behind.</text>
 </svg>

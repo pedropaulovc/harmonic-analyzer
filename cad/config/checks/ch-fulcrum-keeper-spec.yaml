@@ -1,0 +1,15 @@
+# What fails past each numeric check ch_fulcrum_keeper_spec asserts
+# (check_register.py, tolerance-policy.md "Checks in spec modules and tests").
+checks:
+  - id: C-01
+    check: "FOOT_HEAD_LUG_CLEARANCE_MM"
+    kind: gap
+    reason: "the foot-screw head hits the lug's outer face"
+    source: "owner ruling 2026-11-26 (Pedro), issue #3744 (Panel F)"
+    basis: worst_case
+  - id: C-02
+    check: "CORNER_R_MAX"
+    kind: gap
+    reason: "a larger corner radius lifts the foot-screw head"
+    source: "owner ruling 2026-11-26 (Pedro), issue #3744 (Panel F)"
+    basis: worst_case

@@ -3,29 +3,29 @@
   <rect class="paper" x="0" y="0" width="760" height="400"/>
   <text class="title" x="20" y="20">Setup 6 (FK05_step): the foot tip to the length, then the L step to the lug</text>
   <rect class="fixture-support" x="30" y="330" width="473.51" height="6"/>
-  <rect class="part-kept" x="60" y="148.4" width="86.6" height="181.6"/>
-  <rect class="part-kept" x="146.6" y="240.59" width="293.4" height="89.41"/>
+  <rect class="part-kept" x="60" y="148.4" width="63.42" height="181.6"/>
+  <rect class="part-kept" x="123.42" y="240.59" width="316.58" height="89.41"/>
   <rect class="part-removed" x="60" y="120.45" width="385.6" height="27.95"/>
-  <rect class="part-removed" x="146.6" y="148.4" width="299" height="92.19"/>
-  <line class="active-face" x1="146.6" y1="240.59" x2="440" y2="240.59"/>
-  <line class="active-face" x1="146.6" y1="148.4" x2="146.6" y2="240.59"/>
-  <line class="active-face" x1="60" y1="148.4" x2="146.6" y2="148.4"/>
+  <rect class="part-removed" x="123.42" y="148.4" width="322.18" height="92.19"/>
+  <line class="active-face" x1="123.42" y1="240.59" x2="440" y2="240.59"/>
+  <line class="active-face" x1="123.42" y1="148.4" x2="123.42" y2="240.59"/>
+  <line class="active-face" x1="60" y1="148.4" x2="123.42" y2="148.4"/>
   <line class="hidden" x1="30" y1="254.7" x2="503.51" y2="254.7"/>
   <rect class="holes" x="301.6" y="240.59" width="71.2" height="89.41"/>
-  <rect class="holes" x="60" y="185.3" width="86.6" height="26.8"/>
+  <rect class="holes" x="60" y="185.3" width="63.42" height="26.8"/>
   <text class="label" x="523.51" y="152.4">foot tip Z {{cad.foot_tip_length_mm:in.4dot}}</text>
   <text class="label" x="523.51" y="246.59">lug's outer face Z {{cad.lug_outer_face_thickness_mm:in.4dot}}</text>
   <text class="label" x="523.51" y="270.7">jaw tops</text>
   <circle class="datum" cx="60" cy="330" r="3.5"/>
   <text class="datum-label" x="60" y="356">X0 the seat; Z0 the stacks' top (I)</text>
   <text class="label" x="20" y="390">Looking at the moving jaw. Foot tip in 2 levels of {{process.face_step_max_mm:in.3dot}}; the step in levels of {{process.step_level_mm:in.4dot}}.</text>
-  <line class="leader" x1="337.2" y1="285.3" x2="523.51" y2="316"/>
+  <line class="leader" x1="337.2" y1="285.3" x2="518" y2="316"/>
   <circle class="leader-dot" cx="337.2" cy="285.3" r="2"/>
   <text class="label" x="523.51" y="320">bore (opened)</text>
-  <line class="leader" x1="103.3" y1="198.7" x2="30" y2="92"/>
-  <circle class="leader-dot" cx="103.3" cy="198.7" r="2"/>
-  <text class="label" x="30" y="96">foot hole (opened)</text>
-  <line class="leader" x1="146.6" y1="225" x2="250" y2="92"/>
-  <circle class="leader-dot" cx="146.6" cy="225" r="2"/>
-  <text class="label" x="250" y="96">foot top X {{cad.foot_top_height_mm:in.3dot}}: the last pass's edge</text>
+  <line class="leader" x1="91.7" y1="198.7" x2="80" y2="100"/>
+  <circle class="leader-dot" cx="91.7" cy="198.7" r="2"/>
+  <text class="label" x="30" y="92">foot hole (opened)</text>
+  <line class="leader" x1="123.42" y1="225" x2="250" y2="100"/>
+  <circle class="leader-dot" cx="123.42" cy="225" r="2"/>
+  <text class="label" x="250" y="92">foot top X {{cad.foot_top_height_mm:in.3dot}}: the last pass's edge</text>
 </svg>

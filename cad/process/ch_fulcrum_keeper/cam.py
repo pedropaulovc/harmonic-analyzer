@@ -5,16 +5,12 @@ part's exported ``features.toml`` and the plan/shop TOML, then runs
 :func:`build` inside headless FreeCAD (``freecadcmd``) with that context and
 checks the posted G-code against :func:`expectations`. The keeper's sizes
 come from the feature export (its sides, inner face, lug outer face, foot
-tip, seat and foot top, the crown, the bore, the counterbored foot hole and
+tip, seat and stepped foot top, the crown, the bore, the plain foot hole and
 the crown tap); the blank, the skims, levels, spots, tips and the stacks from
 ``plan.toml`` ``[parameters]`` and ``milling_cuts``; cutter diameters, speeds
 and feeds from the shop (``shop/``) and the plan's authored settings. Every
 path is written here (``rt.custom``): straight lines and arcs a recipe can
-state exactly. Typed here, because neither record carries them: the #2
-centre drill's catalogue geometry (it sets the spot depth), the twist
-drills' 118° point, the approach, safe and clearance heights, the face
-overhang, the vise jaws' depth (keep-out shapes only) and the machine's Z
-top for the tap file's retract.
+state exactly.
 
 The keeper is the pivot bracket's shape (``ch_pivot_bracket``) turned a
 quarter about the height: the bracket's X is the keeper's -Z, its Z the
@@ -29,14 +25,13 @@ Route (the agent's for speed; plan text in ``plan.toml``): one 3/4 in square
 height. Lying on the 1 in + 1/2 in parallel stacks: FK01 skims the far side
 F, FK02 (F down) faces the near side N to the width. Upright on the 1 in
 parallels: FK03 faces the seat, spots and drills the #41 foot hole from it
-into the waste above the foot. Lying, the inner face I up: FK04 profiles the
-crown through the lug and spots, drills D and opens F the bore through it, both
-into the waste the step removes; the jaws grip only that waste. Lying, I
-down: FK05 faces the foot tip to the length and mills the step to the lug,
-opening the bore and the foot hole. Upright on the seat: FK06 spots and
-drills 1/16 through the crown into the bore and mills the foot hole's
-counterbore from the foot top with the 2-1/4 in long 1/8 in end mill (a helix
-down, then a full circle at the floor); FK07 is the hand-tap stop.
+into the waste above the .227 stepped foot. Lying, the inner face I up: FK04
+profiles the crown through the lug and spots, drills D and opens F the bore
+through it, both into the waste the step removes; the jaws grip only that
+waste. Lying, I down: FK05 faces the foot tip to the length and mills the open
+step to the .32 lug and .227 foot top (#3744 Panel F), opening the bore and
+the foot hole with the 1/2 in end mill. Upright on the seat: FK06 spots and
+drills 1/16 through the crown into the bore; FK07 is the hand-tap stop.
 
 Work frames (G54), each set in its setup:
 - FK01-FK02: X0 the blank's left end, Y0 the fixed jaw (I), Z0 the stacks.
@@ -48,16 +43,12 @@ Work frames (G54), each set in its setup:
 
 Toolpath rules (owner rulings 2026-11-16): faces zigzag (ball screws),
 plunges beside the stock at the cutting feed, real G0 above the stock; the
-crown is profiled climb (G2 round the outside), the counterbore climb (G3
-inside it). The crown hole is tapped by hand (FluidNC
-cannot rigid-tap; owner, Pedro, 2026-11-17), the T-handle wrench's centre
-hole on the spring point of the Fisher tap guide in the 1/2 in R8 collet
-(owner, Pedro, 2026-11-21: "use
-https://littlemachineshop.com/products/tap-guide-fisher?variant=45472915226805
-on r8 0.5 collet"), spindle off, the operator jogging Z down to push the
-point home. FluidNC refuses jogs while an M0 holds the program
-(http://wiki.fluidnc.com/en/features/single_block_mode), so the tap stop is
-a file of its own that ends with M30 over its hole.
+crown is profiled climb (G2 round the outside). The crown hole is tapped by
+hand (FluidNC cannot rigid-tap; owner, Pedro, 2026-11-17), the T-handle
+wrench's centre hole on the spring point of the Fisher tap guide in the 1/2 in
+R8 collet (owner, Pedro, 2026-11-21), spindle off, the operator jogging Z down
+to push the point home. FluidNC refuses jogs while an M0 holds the program, so
+the tap stop is a file of its own that ends with M30 over its hole.
 """
 
 from __future__ import annotations
@@ -68,9 +59,6 @@ from typing import Any
 
 STEM = "ch_fulcrum_keeper"
 COMMENT = "MHA-CH-07 fulcrum keeper"
-# Programs in order, each listing its operation keys. A program whose keys
-# are grouped in tuples is one section per group (a FreeCAD Job, or a manual
-# section), joined at M6 tool changes.
 PROGRAMS: tuple[tuple[str, tuple[Any, ...]], ...] = (
     ("FK01_far", ("far_side",)),
     ("FK02_width", ("near_side",)),
@@ -80,18 +68,10 @@ PROGRAMS: tuple[tuple[str, tuple[Any, ...]], ...] = (
         (("crown",), ("bore_spot",), ("bore_drill",), ("bore_open",)),
     ),
     ("FK05_step", ("step",)),
-    ("FK06_crown_cbore", (("crown_spot",), ("crown_drill",), ("cbore",))),
+    ("FK06_crown", (("crown_spot",), ("crown_drill",))),
     ("FK07_crown_tap", ("crown_tap",)),
-    # The counterbore alone, FK06's last section: the remedy for a shallow or
-    # undersize counterbore re-cuts it without re-running the crown spot.
-    ("FK08_cbore_recut", ("cbore_recut",)),
 )
-# Every program loads its own first tool (M6, the tool setter): each setup
-# starts on whatever the mill last held, and the tap file before its retract
-# (the tap guide).
 LOAD_FIRST_TOOL = tuple(name for name, _ops in PROGRAMS)
-# The plan's tools the mill runs, numbered by their places in the plan's tool
-# list among these (the tap, the saw and the files are not).
 CAM_TOOLS = (
     "em-half",
     "spot",
@@ -99,12 +79,9 @@ CAM_TOOLS = (
     "drill-d",
     "drill-f",
     "drill-1-16",
-    "em-eighth",
     "tap-guide",
 )
 IN = 25.4
-# ANSI #2 combined drill and countersink, 60° included, its pilot's point
-# 118°: the shop record names the tool, not its geometry.
 CENTRE_DRILL = {
     "pilot_mm": 5 / 64 * IN,
     "pilot_length_mm": 5 / 64 * IN,
@@ -112,39 +89,17 @@ CENTRE_DRILL = {
     "point_deg": 60.0,
     "pilot_point_deg": 118.0,
 }
-# Jobber drills' point (the shop records give the diameter only).
 DRILL_POINT_DEG = 118.0
-# The #1-72 UNF thread's basic major diameter, .0730 in (ASME B1.1): the
-# export names the thread, not its sizes.
 UNF_1_72_MAJOR_MM = 0.073 * IN
-# The 2-1/4 in long 1/8 in end mill's shop setting on 1018 (shop/ch.toml): its
-# chip load holds at the cutter's edge on the counterbore's helix.
-CBORE_SETTING = "endmill-carbide-3fl-1-8-loc-3-4-1018-cf"
-# The tap file's first motion: G53 G0 to machine Z0, the homed top (as the
-# magnifying clamp's recipe: FluidNC sets an axis's machine position to its
-# homing mpos_mm, default 0, and Z homes up); the owner (Pedro) confirmed
-# it, answered in person 2026-11-21 (cnc rulings record): machine Z = 0 is
-# the top of travel after homing.
 MACHINE_Z_TOP_MM = 0.0
-# Face passes start and finish with the cutter this far clear of the part's
-# ends, so every plunge and stepover link is in the air beside it.
 APPROACH_MM = 2.54
-# Faces reach at least this far past the faces the jaws grip.
 FACE_OVERHANG_MM = 0.5
-# Plunges and drill R planes start this far above the stock top: real G0
-# brings the tool down to it.
 SAFE_MM = 1.0
-# Moves between cuts run this far above the stock top.
 CLEAR_MM = 5.0
-# Rapid re-entry into a pecked hole stops this far above the last peck.
 PECK_REENTRY_MM = 0.5
-# Keep-outs: each vise jaw's depth outward from the gripped face; the
-# parallels' length (4 in, shop-equipment fixtures.parallels-lms-6745).
 JAW_DEPTH_MM = IN
 PARALLEL_LENGTH_MM = 4 * IN
-# The crown outline's allowed stray of the cutter centre from its offset.
 OUTLINE_TOL_MM = 0.01
-# A plan number the recipe recomputes must agree to this (its rounding).
 PLAN_TOL_MM = 0.01
 
 
@@ -183,9 +138,7 @@ def _cut(plan: dict[str, Any], name: str, key: str) -> float:
 def _setting(
     plan: dict[str, Any], shop: dict[str, Any], cut: str
 ) -> tuple[float, float]:
-    """(rpm, mm/min) of the operation holding ``cut``: the shop setting it
-    names (chip load × flutes × rpm), or, with no setting, the rpm and feed
-    the cut itself authors."""
+    """(rpm, mm/min) of the operation holding ``cut``."""
     op, record_cut = _op_with_cut(plan, cut)
     if "settings" not in op:
         return _cut(plan, cut, "rpm"), _cut(plan, cut, "feed_mm_min")
@@ -242,10 +195,6 @@ def _close(a: float, b: float) -> bool:
 
 
 def _spot_depth(dia: float) -> float:
-    """Depth below the surface at which the #2 centre drill reaches ``dia``:
-    on its 60° countersink when ``dia`` is between the pilot and the body, on
-    the pilot's 118° point when it is under the pilot; refused over the
-    body."""
     pilot, body = CENTRE_DRILL["pilot_mm"], CENTRE_DRILL["body_mm"]
     if not 0 < dia <= body:
         raise ValueError(f"spot Ø{dia:.3f} is over the body Ø{body:.3f}")
@@ -256,14 +205,12 @@ def _spot_depth(dia: float) -> float:
 
 
 def _point(dia: float) -> float:
-    """A twist drill's point length."""
     return dia / 2 / math.tan(math.radians(DRILL_POINT_DEG / 2))
 
 
 def _frame(
     origin: list[float], y_axis: list[float], z_axis: list[float]
 ) -> dict[str, Any]:
-    """A right-handed setup frame from its Y and Z model axes: X = Y × Z."""
     y, z = y_axis, z_axis
     x = [
         y[1] * z[2] - y[2] * z[1],
@@ -274,26 +221,19 @@ def _frame(
 
 
 def _to(frame: dict[str, Any], p: list[float]) -> list[float]:
-    """Model point ``p`` in the setup frame."""
     d = [p[i] - frame["origin"][i] for i in range(3)]
     return [sum(axis[i] * d[i] for i in range(3)) for axis in frame["axes"]]
 
 
 def _bracket(v: list[float]) -> list[float]:
-    """A keeper model point or direction in the bracket's axes: X = -Z, Z = X
-    (a quarter turn about Y)."""
     return [-v[2] + 0.0, v[1], v[0]]
 
 
 def _keeper(v: list[float]) -> list[float]:
-    """A point or direction in the bracket's axes back in the keeper's model
-    axes (the inverse of :func:`_bracket`)."""
     return [v[2], v[1], -v[0] + 0.0]
 
 
 def _model_frame(frame: dict[str, Any]) -> dict[str, Any]:
-    """A setup frame written in the bracket's axes, in the keeper's: the same
-    setup coordinates for the same physical point."""
     return {
         "origin": _keeper(frame["origin"]),
         "axes": [_keeper(axis) for axis in frame["axes"]],
@@ -315,10 +255,6 @@ def _spot(xy: tuple[float, float], top: float, z: float, clear: float) -> list[s
 def _pecked(
     xy: tuple[float, float], top: float, tip: float, peck: float, clear: float
 ) -> list[str]:
-    """Drill from ``top`` to ``tip`` in pecks of ``peck``, each with a full
-    retract to the R plane and a rapid back to just above the last peck (one
-    plunge when ``peck`` reaches the tip). Moves to and from the hole run at
-    ``clear``."""
     clear, r_plane = _r(clear), _r(top + SAFE_MM)
     depths = []
     depth = top
@@ -337,19 +273,12 @@ def _pecked(
 
 
 def _stepover(y: tuple[float, float], max_step: float) -> tuple[int, float]:
-    """(passes, stepover) of a zigzag face across ``y`` (low, high): equal
-    widths, each at most ``max_step``, reaching ``FACE_OVERHANG_MM`` past
-    both edges. Every pass engages at most the stepover: the first one's
-    edge runs one stepover inside the high edge, the last one's overhangs."""
     span = y[1] - y[0] + FACE_OVERHANG_MM
     n = math.ceil(span / max_step - 1e-9)
     return n, span / n
 
 
 def _stations(y: tuple[float, float], radius: float, max_step: float) -> list[float]:
-    """Zigzag pass stations across the face ``y`` (low, high), from its high
-    side: each pass takes the same width, at most ``max_step``, and together
-    the cutter reaches ``FACE_OVERHANG_MM`` past both edges."""
     n, step = _stepover(y, max_step)
     if 2 * radius - step < FACE_OVERHANG_MM:
         raise ValueError(
@@ -362,12 +291,6 @@ def _stations(y: tuple[float, float], radius: float, max_step: float) -> list[fl
 def _face(
     levels: list[float], top: float, x: tuple[float, float], ys: list[float]
 ) -> list[str]:
-    """Zigzag faces at ``levels``: at each, one X pass per Y in ``ys``
-    from the cutter-centre end ``x[0]`` (beside the part: every plunge, level
-    change and return is there) to ``x[1]`` and back, alternating direction.
-    With ``x[1]`` inside the part (a step's wall) each stepover there cuts
-    along the wall; the passes are even in number, so every level ends back
-    at ``x[0]``."""
     clear = _r(top + CLEAR_MM)
     x0, x1 = _r(x[0]), _r(x[1])
     lines = [
@@ -382,7 +305,6 @@ def _face(
                 lines.append(f"G1 Y{y:.3f} F{{feed}}")
             lines.append(f"G1 X{x1 if k % 2 == 0 else x0:.3f} F{{feed}}")
         if len(ys) % 2:
-            # Back to the x[0] side, beside the part, for the next level.
             lines.append(f"G1 X{x0:.3f} F{{feed}}")
         if z != levels[-1]:
             lines.append(f"G1 Y{ys[0]:.3f} F{{feed}}")
@@ -390,14 +312,6 @@ def _face(
 
 
 def _geometry(features: dict[str, Any]) -> dict[str, Any]:
-    """The keeper's sizes and holes from the export, in the bracket's axes
-    (:func:`_bracket`), each checked against the frame the recipe assumes:
-    the near and far sides along the keeper's Z centred on the origin, the
-    seat at Y0 and the foot top above it, the inner face I and the lug's
-    outer face along X with the foot tip beyond, the crown round X over the
-    top and centred on the bore, the bore along -X through the lug, the foot
-    hole along -Y through the foot and the crown tap along -Y from the apex
-    into the bore."""
     f = features["features"]
 
     def plane(name: str, axis: str) -> float:
@@ -409,7 +323,6 @@ def _geometry(features: dict[str, Any]) -> dict[str, Any]:
     def moved(hole: dict[str, Any]) -> dict[str, Any]:
         return {**hole, "at": _bracket(hole["at"]), "axis": _bracket(hole["axis"])}
 
-    # Bracket X = keeper -Z: the far side (+Z) is W, the near side E.
     west, east = -plane("far_side", "z"), -plane("near_side", "z")
     width = east - west
     if not _close(width, f["far_side"]["width_nominal"]) or not _close(west, -east):
@@ -454,12 +367,11 @@ def _geometry(features: dict[str, Any]) -> dict[str, Any]:
         or not _close(hold["at"][1], foot_top)
         or not _close(hold["at"][0], 0.0)
         or not hold.get("thru")
-        or "cbore_dia" not in hold
+        or "cbore_dia" in hold
         or not outboard < hold["at"][2] < foot_end
     ):
         raise ValueError(
-            "foot_hole: expected through the foot along -Y from its top,"
-            " counterbored there"
+            "foot_hole: expected a plain through-hole along -Y from the stepped foot top"
         )
     tap = moved(f["crown_tap"])
     if (
@@ -500,7 +412,6 @@ def context(
     bore_y = g["bore"]["at"][1]
     bore_dia = g["bore"]["dia"]
 
-    # The blank: the square bar's section, sawn to length along the height.
     section = p["blank_section_mm"]
     _agree(plan, "blank_section_mm", p["blank_section_in"] * IN)
     blank_min, blank_max = p["blank_length_min_in"] * IN, p["blank_length_max_in"] * IN
@@ -524,7 +435,6 @@ def context(
     dd = _shop_tool(plan, shop, "drill-d")["diameter_mm"]
     df = _shop_tool(plan, shop, "drill-f")["diameter_mm"]
     d16 = _shop_tool(plan, shop, "drill-1-16")["diameter_mm"]
-    em8 = _shop_tool(plan, shop, "em-eighth")["diameter_mm"]
     tap_drill = _shop_tool(plan, shop, "tap-1-72")["tap_drill_mm"]
     r = em / 2
     hold_band, tap_band = g["hold"]["dia"], g["tap"]["dia"]
@@ -538,15 +448,7 @@ def context(
         raise ValueError(
             f"1/16 Ø{d16} is not the #1-72 tap's drill in the band {tap_band}"
         )
-    cbore_band = g["hold"]["cbore_dia"]
-    if not em8 < cbore_band[0]:
-        raise ValueError(f"the 1/8 end mill Ø{em8} is not under the counterbore")
 
-    # The faces F, N and the seat run the measured face setting; the crown
-    # and FK05 (the foot tip, the step and its full-depth wall pass, one
-    # operation) stay on the chart's: the crown's finish and the wall pass
-    # cut deeper than any measured pass. Each face cut declares its true
-    # stepover, the most any of its passes engages (posted: face_passes).
     face_cap = p["face_stepover_max_mm"]
     step_max = p["step_stepover_max_mm"]
     face_cuts = {
@@ -590,8 +492,6 @@ def context(
         raise ValueError("the F skim is over one level")
     width_levels = _levels(west_level, width, level_max)
     foot_levels = _levels(section, length, level_max)
-    # 'width' and 'foot end' declare face_step_max_mm: their levels are that
-    # deep, no shallower (the declared depth is the true one).
     for what, top, bottom, levels in (
         ("N's", west_level, width, width_levels),
         ("the foot tip's", section, length, foot_levels),
@@ -601,8 +501,6 @@ def context(
     step_levels = _levels(length, ear, level_max)
     _agree(plan, "step_level_mm", (length - ear) / len(step_levels))
 
-    # Arch: rough levels finish_stock off the radius, then the full-depth
-    # finish on it; through the ear and arch_past_mm into the waste.
     stock_a = p["arch_finish_stock_mm"]
     arch_depth = ear + p["arch_past_mm"]
     _agree(plan, "arch_depth_mm", arch_depth)
@@ -623,8 +521,6 @@ def context(
         ):
             raise ValueError(f"'{name}' depth or width is not the plan's")
 
-    # Holes: spots under each drill (no chamfer at the mouth); the crown's
-    # on the pilot's point, under the 1/16.
     spot_rpm, spot_feed = _setting(plan, shop, "hold spot")
     spots = {}
     for name, key, drill in (
@@ -646,7 +542,6 @@ def context(
         ("bore drill", dd),
         ("bore open", df),
         ("apex drill", d16),
-        ("cbore", em8),
     ):
         if not math.isclose(_cut(plan, name, "cutter_dia_mm"), dia, abs_tol=1e-6):
             raise ValueError(f"'{name}' cutter_dia_mm is not its tool's Ø{dia}")
@@ -654,33 +549,10 @@ def context(
     drill_rpm, drill_feed = _setting(plan, shop, "bore drill")
     open_rpm, open_feed = _setting(plan, shop, "bore open")
     apex_rpm, apex_feed = _setting(plan, shop, "apex drill")
-    # The counterbore's feed: the setting's chip load holds at the cutter's
-    # edge, which runs (path radius + r)/path radius faster than its centre on
-    # the helix (sh_column_clamp_back's rule); the cut authors the centre's.
-    cbore_record = shop["settings"][CBORE_SETTING]
-    cbore_rpm = float(cbore_record["rpm"])
-    cbore_edge_feed = (
-        cbore_record["chip_load_mm_per_tooth"] * cbore_record["flutes"] * cbore_rpm
-    )
-    path_r = (sum(cbore_band) / 2 - em8) / 2
-    _agree(plan, "cbore_feed_per_min_mm", cbore_edge_feed * path_r / (path_r + em8 / 2))
-    _agree(plan, "cbore_edge_feed_per_min_mm", cbore_edge_feed)
-    cbore_feed = p["cbore_feed_per_min_mm"]
-    # The cut carries the edge's feed (prechips' deflection check reads its
-    # chip load); the program posts the centre's.
-    if _setting(plan, shop, "cbore") != (cbore_rpm, p["cbore_edge_feed_per_min_mm"]):
-        raise ValueError(
-            f"'cbore' does not run at {cbore_rpm:g} rpm and "
-            "process.cbore_edge_feed_per_min_mm"
-        )
 
-    # Foot hole: from the seat, pecked, full diameter hold_drill_past_mm past
-    # the foot top; its point in the shortest blank above the parallels.
     hold_full = -(foot_top + p["hold_drill_past_mm"])
     hold_tip = hold_full - _point(d41)
     _agree(plan, "hold_tip_height_mm", blank_min - seat_skim + hold_tip)
-    # Bore: from I down through the lug; the D's and then the F's full
-    # diameters bore_drill_past_mm past the outer face's plane.
     out_z = section - ear
     bore_full = out_z - p["bore_drill_past_mm"]
     bore_tip = bore_full - _point(dd)
@@ -688,9 +560,6 @@ def context(
     _agree(plan, "bore_tip_height_mm", bore_tip)
     _agree(plan, "bore_open_tip_height_mm", open_tip)
     arch_bottom = section - arch_depth
-    # Crown: the 1/16 full diameter apex_drill_past_mm past the bore's wall
-    # where the drill's edge meets it; the tap's lead past the wall at the
-    # thread's major diameter and short of the far wall.
     bore_r = bore_dia[0] / 2
     wall = bore_y + math.sqrt(bore_r**2 - (d16 / 2) ** 2)
     apex_full = wall - p["apex_drill_past_mm"]
@@ -703,13 +572,7 @@ def context(
     _agree(plan, "tap_reach_min_mm", height - major_wall + p["plug_tap_lead_mm"])
     _agree(plan, "tap_reach_max_mm", height - (bore_y - bore_r) - 1.0)
     for op, (key, peck) in (
-        (
-            _op_with_cut(plan, "hold drill")[0],
-            (
-                "{{cad.foot_top_height_mm}}",
-                {"step_mm": p["hold_peck_mm"], "retract": "full"},
-            ),
-        ),
+        (_op_with_cut(plan, "hold drill")[0], ("{{cad.foot_top_height_mm}}", "none")),
         (_op_with_cut(plan, "bore drill")[0], (ear + p["bore_drill_past_mm"], "none")),
         (
             _op_with_cut(plan, "apex drill")[0],
@@ -721,49 +584,13 @@ def context(
     ):
         if op["hole_depth_mm"] != key or op["peck"] != peck:
             raise ValueError(f"{op['tool']}: hole_depth_mm or peck is not the recipe's")
-    # Counterbore: the 1/8 end mill's centre on a circle cbore_path_radius_mm
-    # round the foot hole's axis (the middle of the band less the cutter),
-    # down a helix cbore_pitch_mm a turn to cbore_depth_mm (the middle of its
-    # band), then once round flat on the floor.
-    cbore_mid = sum(cbore_band) / 2
-    _agree(plan, "cbore_path_radius_mm", (cbore_mid - em8) / 2)
-    depth_band = g["hold"]["cbore_depth"]
-    _agree(plan, "cbore_depth_mm", sum(depth_band) / 2)
-    cbore_floor = foot_top - p["cbore_depth_mm"]
-    pitch = p["cbore_pitch_mm"]
-    turns = math.ceil(p["cbore_depth_mm"] / pitch - 1e-9)
-    for key, value in (
-        ("axial_doc_mm", p["cbore_depth_mm"] / turns),
-        ("radial_woc_mm", em8),
-    ):
-        if not math.isclose(_cut(plan, "cbore", key), value, abs_tol=1e-3):
-            raise ValueError(f"'cbore' {key} is not the helix's {value:.4f}")
-    # The 2-1/4 in end mill has no neck and its 1/8 in shank is the
-    # cutter's size, so nothing wider than the cutter stands within its
-    # stick-out. The lug's top (the crown's apex) stands height - foot top
-    # above the foot top; the collet nose stays cbore_collet_clear_mm above
-    # it with the cutter on the floor: at least cbore_projection_min_mm out.
-    # At most its length less holder_grip_min_mm out, the collet's grip.
-    need = height - cbore_floor + p["cbore_collet_clear_mm"]
-    _agree(plan, "cbore_projection_min_mm", need)
-    out_max = p["cbore_mill_oal_mm"] - p["holder_grip_min_mm"]
-    _agree(plan, "cbore_projection_max_mm", out_max)
-    if need > out_max:
-        raise ValueError(
-            f"the counterbore needs {need:.2f} out, the end mill gives {out_max:.2f} "
-            "with holder_grip_min_mm in the collet"
-        )
 
-    # Vise: upright on the 1 in pair, lying on the stacked risers.
     upright_grip = p["vise_jaw_height_mm"] - p["parallel_height_mm"]
     lying_grip = p["vise_jaw_height_mm"] - p["riser_height_mm"]
     _agree(plan, "upright_grip_mm", upright_grip)
     _agree(plan, "lying_grip_mm", lying_grip)
     if arch_bottom <= lying_grip or ear <= lying_grip:
         raise ValueError("the arch or the step's floor reaches the jaw tops")
-    # The 1/2 in end mill's stick-out is the measured settings' assembly
-    # (half_mill_projection_mm): at each program's deepest end-mill cut its
-    # collet nose stays CLEAR_MM over that program's stock top.
     projection = p["half_mill_projection_mm"]
     for what, top, deepest in (
         ("FK01", section, west_level),
@@ -785,9 +612,6 @@ def context(
         ("vise_seat_inset_mm", length),
     ):
         _agree(plan, key, -(jaw_w - along) / 2)
-    # The tap stack's ceiling: spindle-to-table maximum less the tool-change
-    # clearance, the vise bed, the parallels, the bracket and the collet's
-    # gauge, rounded down to .01 in.
     machine = shop["machines"]["pm-30mv"]
     stack = (
         machine["spindle_to_table_mm"][1]
@@ -808,9 +632,6 @@ def context(
     if missing:
         raise ValueError(f"plan tools lack {missing}")
 
-    # Frames (model point p -> axes · (p - origin)). Raw faces: W's skim
-    # beyond W, E the rest of the section; I is the bar's face, its opposite
-    # a section away; the seat's skim below Y0.
     raw_east = west - west_skim + section
     raw_foot = inboard + section
     frames = {
@@ -838,7 +659,6 @@ def context(
     bore_xy = xy("arch", g["bore"]["at"])
     arch_c = xy("arch", g["arch_centre"])
     tap_xy = xy("apex", g["tap"]["at"])
-    # Each frame puts the part where its stock says.
     for key, point, want in (
         ("seat", [west, 0.0, inboard], [0.0, 0.0, 0.0]),
         ("arch", [west, 0.0, inboard], [0.0, 0.0, section]),
@@ -849,10 +669,7 @@ def context(
             raise ValueError(
                 f"{key}: the frame does not put the part where its stock is"
             )
-    cbore_xy = xy("apex", g["hold"]["at"])
     holes = {"hold": [hold_xy], "bore": [bore_xy], "apex": [tap_xy]}
-    # The traveler's printed hole coordinates: the foot hole's station from
-    # I and the width's middle from F, every hole on it.
     _agree(plan, "foot_hole_station_from_i_mm", hold_xy[0])
     _agree(plan, "width_middle_mm", width / 2)
     for key, at in (("seat", hold_xy), ("arch", bore_xy), ("apex", tap_xy)):
@@ -879,21 +696,12 @@ def context(
     def run(x: tuple[float, float]) -> tuple[float, float]:
         return (x[0] - r - APPROACH_MM, x[1] + r + APPROACH_MM)
 
-    # The faces at the measured cap; FK05's foot tip and step at their own
-    # (unchanged, chart) stepover.
     lying_ys = _stations((-section, 0.0), r, face_cap)
     seat_ys = _stations((-width, 0.0), r, face_cap)
     _agree(plan, "lying_stepover_mm", _stepover((-section, 0.0), face_cap)[1])
     _agree(plan, "seat_stepover_mm", _stepover((-width, 0.0), face_cap)[1])
     width_ys = _stations((-width, 0.0), r, step_max)
     blank_x = run((0.0, blank_max))
-    # The step: X passes from beside the far end to the foot top's station
-    # (the cutter's edge on it) and back; their stepovers at the wall sweep
-    # it between pairs of stations. The facing stations, the last moved onto
-    # E's line: the first pair's stepover starts beyond W and the last
-    # pair's ends on E, so the stepovers sweep the wall to both edges and
-    # leave only scallops between the pairs, which one full-depth wall pass
-    # along -Y (climb) takes off.
     wall_x = foot_top + r
     far_x = top_max + r + APPROACH_MM
     step_ys = [*width_ys[:-1], _r(-width)]
@@ -923,18 +731,7 @@ def context(
         wall_x,
         wall_y,
     )
-    cbore_lines = _cbore(
-        cbore_xy,
-        p["cbore_path_radius_mm"],
-        foot_top,
-        cbore_floor,
-        turns,
-        height + CLEAR_MM,
-    )
 
-    # Arch outline (machine XY of the arch frame, climb: round the outside
-    # clockwise), from beside E, round the arch, to beside W; the leads run
-    # arch_lead_mm along each side below the tangent points.
     cx, cy = arch_c
     lead = p["arch_lead_mm"]
     elements = [
@@ -1042,7 +839,7 @@ def context(
                 [
                     "foot_drill",
                     "drill the foot hole #41",
-                    _pecked(hold_xy, 0.0, hold_tip, p["hold_peck_mm"], CLEAR_MM),
+                    _pecked(hold_xy, 0.0, hold_tip, math.inf, CLEAR_MM),
                 ]
             ],
         },
@@ -1134,24 +931,6 @@ def context(
                 ]
             ],
         },
-        {
-            **tool(
-                "em-eighth", cbore_rpm, cbore_feed, dia=em8, shape="endmill", flutes=3
-            ),
-            "frame": "apex",
-            "label": "cbore",
-            "stock": stocks["apex"],
-            "ops": [["cbore", "mill the foot hole's counterbore", cbore_lines]],
-        },
-        {
-            **tool(
-                "em-eighth", cbore_rpm, cbore_feed, dia=em8, shape="endmill", flutes=3
-            ),
-            "frame": "apex",
-            "label": "cbore recut",
-            "stock": stocks["apex"],
-            "ops": [["cbore_recut", "re-cut the foot hole's counterbore", cbore_lines]],
-        },
     ]
     manual = {
         "crown_tap": {
@@ -1169,9 +948,6 @@ def context(
         }
     }
 
-    # Keep-outs. Upright: the jaws grip W and E from the parallels' top to
-    # the jaw top, across the jaw width. Lying: the jaws beside the gripped
-    # span from the stacks' top to the jaw top; the stacks under its edges.
     def jaws(
         z_top: float, x: tuple[float, float], y: tuple[float, float]
     ) -> list[dict[str, Any]]:
@@ -1207,9 +983,6 @@ def context(
         "apex": jaws(upright_grip, (-length, 0.0), (-width, 0.0))
         + parallels(0.0, (-length, 0.0), (-width, 0.0)),
     }
-    # The counterbore's cutter also misses the lug (I to its outer face,
-    # standing to the crown's apex) beside the foot.
-    lug = _box("the lug", (-ear, 0.0), (-width, 0.0), height)
 
     tn = numbers
     expect: list[list[Any]] = []
@@ -1328,8 +1101,6 @@ def context(
                         "elements": elements,
                         "passes": passes,
                         "z_top": section,
-                        # Clockwise round the crown, the part on the right:
-                        # climb, as the module docstring says (ball screws).
                         "cut": "climb",
                         "part": "right",
                     },
@@ -1391,8 +1162,6 @@ def context(
                 "below_z": length,
             },
         ],
-        # What the wall pass really meets: the scallops only, climb, E's and
-        # W's edges included (stations alone cannot show the edges).
         [
             name,
             "engagement",
@@ -1408,58 +1177,20 @@ def context(
         ],
     ]
 
-    name = "FK06_crown_cbore"
-    cx, cy = cbore_xy
-    rp = p["cbore_path_radius_mm"]
-    wall_r = cbore_band[0] / 2 - 0.01
-    cbore_points = [[cx, cy]] + [
-        [_r(cx + wall_r * math.cos(a)), _r(cy + wall_r * math.sin(a))]
-        for a in (k * math.pi / 4 for k in range(8))
-    ]
-    cbore_checks = [
-        ["depth", {"z_min": _r(cbore_floor)}],
-        [
-            "bounds",
-            {
-                "window": [[cx - 3.0, cx + 3.0], [cy - 3.0, cy + 3.0]],
-                "x": [_r(cx - rp), _r(cx + rp)],
-                "y": [_r(cy - rp), _r(cy + rp)],
-                "z_min": _r(cbore_floor),
-                "arc": "G3",
-                "z_top": foot_top,
-            },
-        ],
-        # The counterbore climbs (G3 inside it), as the module docstring says.
-        [
-            "arcs",
-            {
-                "z_top": foot_top,
-                "centres": [cbore_xy],
-                "part": "outside",
-                "cut": "climb",
-            },
-        ],
-        [
-            "cleared",
-            {"points": cbore_points, "radius": em8 / 2, "z": _r(cbore_floor)},
-        ],
-        ["rapids_clear", {"z_top": foot_top}],
-        ["air_feed", {"z_top": foot_top}],
-        ["keep_out", {"radius": em8 / 2, "boxes": [*keep["apex"], lug]}],
-    ]
+    name = "FK06_crown"
     expect += [
         [
             name,
             "tool_changes",
             {
                 "z_top": height,
-                "tools": [tn["spot"], tn["drill-1-16"], tn["em-eighth"]],
+                "tools": [tn["spot"], tn["drill-1-16"]],
                 "loads_first": True,
             },
         ],
-        [name, "spindle", {"rpm": [[spot_rpm], [apex_rpm], [cbore_rpm]]}],
+        [name, "spindle", {"rpm": [[spot_rpm], [apex_rpm]]}],
         [name, "pauses", {"z_top": height, "count": 0}],
-        [name, "depth", {"z_min": _r(cbore_floor)}],
+        [name, "depth", {"z_min": _r(apex_tip)}],
     ]
     for k, checks in enumerate(
         (
@@ -1471,7 +1202,6 @@ def context(
                 CENTRE_DRILL["body_mm"] / 2,
             ),
             hole_checks("apex", "apex", height, apex_tip, d16 / 2),
-            cbore_checks,
         )
     ):
         expect += [[f"{name}@{k}", check, kwargs] for check, kwargs in checks]
@@ -1484,18 +1214,6 @@ def context(
             {"tool": tn["tap-guide"], "at": tap_xy, "machine_top": MACHINE_Z_TOP_MM},
         ],
         [name, "air_feed", {"z_top": height}],
-    ]
-
-    name = "FK08_cbore_recut"
-    expect += [
-        [
-            name,
-            "tool_changes",
-            {"z_top": height, "tools": [tn["em-eighth"]], "loads_first": True},
-        ],
-        [name, "spindle", {"rpm": [[cbore_rpm]]}],
-        [name, "pauses", {"z_top": height, "count": 0}],
-        *[[name, check, kwargs] for check, kwargs in cbore_checks],
     ]
 
     return {
@@ -1523,13 +1241,6 @@ def _step_lines(
     wall_x: float,
     wall_y: tuple[float, float],
 ) -> list[str]:
-    """FK05: the foot tip faced to the length at ``foot_levels`` across the
-    whole part (X passes from beside the seat at the facing stations
-    ``ys``), then the step's ``levels``, each in X passes at ``step_ys`` from
-    beside the far end to the wall station and back, then one full-depth wall
-    pass from beside F along -Y (climb: the wall on the cutter's right) to
-    beside N. Every plunge and level change is beside the part; the moves
-    between them are G0 above the raw stock top ``section``."""
     foot = _face(foot_levels, section, (-radius - APPROACH_MM, far_x), ys)
     step = _face(levels, section, (far_x, wall_x), step_ys)
     clear = _r(section + CLEAR_MM)
@@ -1541,39 +1252,6 @@ def _step_lines(
         f"G1 Z{_r(ear):.3f} F{{feed}}",
         f"G1 Y{wall_y[1]:.3f} F{{feed}}",
         f"G0 Z{clear:.3f}",
-    ]
-
-
-def _cbore(
-    centre: list[float],
-    path_r: float,
-    top: float,
-    floor: float,
-    turns: int,
-    clear: float,
-) -> list[str]:
-    """FK06's counterbore: the cutter's centre down onto the foot top at
-    ``path_r`` beside the hole's axis, ``turns`` helical turns anticlockwise
-    (G3, climb inside the bore) to ``floor``, one flat turn there, then to the
-    axis (over the drilled hole) and straight up to ``clear``."""
-    cx, cy = centre
-    x0 = _r(cx + path_r)
-    i = _r(-path_r)
-    lines = [
-        f"G0 Z{_r(clear):.3f}",
-        f"G0 X{x0:.3f} Y{_r(cy):.3f}",
-        f"G0 Z{_r(top + SAFE_MM):.3f}",
-        f"G1 Z{_r(top):.3f} F{{feed}}",
-    ]
-    for k in range(1, turns + 1):
-        z = top - (top - floor) * k / turns
-        lines.append(
-            f"G3 X{x0:.3f} Y{_r(cy):.3f} Z{_r(z):.3f} I{i:.3f} J0.000 F{{feed}}"
-        )
-    return lines + [
-        f"G3 X{x0:.3f} Y{_r(cy):.3f} I{i:.3f} J0.000 F{{feed}}",
-        f"G1 X{_r(cx):.3f} F{{feed}}",
-        f"G0 Z{_r(clear):.3f}",
     ]
 
 

@@ -1399,16 +1399,9 @@ def test_keeper_tap_holds_stock_screw_above_a_plug_tap_lead() -> None:
         spec.KEEPER_TAP_CALLOUT_PRECISION["hw-threaddepth"]
     ]
     foot_places = keeper.DRAWING_PRECISION["FootProfile"]["FootRise"]
-    cb_places = keeper.FOOT_COUNTERBORE_DEPTH_PLACES
-    # The keeper's foot and counterbore print on its own sheet's unit.
-    minimum_entry = length - (
-        part._keeper_printed(keeper.FOOT_H, foot_places, 1.0)
-        - part._keeper_printed(keeper.CBORE_DEPTH_MM, cb_places, -1.0)
-    )
-    maximum_entry = length - (
-        part._keeper_printed(keeper.FOOT_H, foot_places, -1.0)
-        - part._keeper_printed(keeper.CBORE_DEPTH_MM, cb_places, 1.0)
-    )
+    # The keeper's stepped foot prints on its own sheet's unit (#3744 Panel F).
+    minimum_entry = length - part._keeper_printed(keeper.FOOT_H, foot_places, 1.0)
+    maximum_entry = length - part._keeper_printed(keeper.FOOT_H, foot_places, -1.0)
     assert tap_spec is keeper.KEEPER_TAP_SPEC
     assert tap_spec.size == keeper_screw.THREAD == "#2-56"
     assert full_thread == keeper.KEEPER_TAP_THREAD_DEPTH_MM == 7.6
@@ -1417,7 +1410,7 @@ def test_keeper_tap_holds_stock_screw_above_a_plug_tap_lead() -> None:
     thread_places = spec.KEEPER_TAP_CALLOUT_PRECISION["hw-threaddepth"]
     reserve = spec.printed_limit(full_thread, thread_places, -1.0) - maximum_entry
     assert reserve == pytest.approx(part.KEEPER_MIN_THREAD_TIP_RESERVE)
-    assert reserve == pytest.approx(1.6383)
+    assert reserve == pytest.approx(1.8923)
     assert reserve >= 0.25
     assert tap_spec.depth_mm - full_thread - 2.0 * depth_tolerance >= 5.0 * pitch
     drill_point = part.TAP_DRILL_MM[tap_spec.size] / 2.0 * part.DRILL_POINT_H
