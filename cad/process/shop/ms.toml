@@ -82,8 +82,7 @@ feed_unit = "in/min"
 # (owner ruling 2026-11-21, relayed by CncBlockA; the cutter: MSC 35497056,
 # the owner chose the plain cutters, #3568; the pick: delegated ruling
 # 2026-11-24 (Main), no precedent; owner review #2144): its tools record,
-# endmill-carbide-3fl-1-16-loc-1-2, is in common.toml (MHA-PD-17 plunges
-# with it too).
+# endmill-carbide-3fl-1-16-loc-1-2, is in common.toml.
 # Its setting, re-derived for it (#3568): its .500 of flutes on .0625 stand
 # out 8x its diameter. No maker's figure for it is on record, so the
 # long-reach table stands in: Harvey Tool Speeds & Feeds, Miniature End

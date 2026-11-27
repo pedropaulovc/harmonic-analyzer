@@ -679,14 +679,17 @@ cite = ["Owner (Pedro) 2026-11-26 photo research/shop-evidence/2026-11-26/small-
 note = "Its 3/16 in shank fits the 3/16 in collet of holders.r8-collets-south-bend-sb1280."
 
 [tools.endmill-kyocera-1800-1-16]
-name = "Kyocera 1800.0625.200 single-end end mill, 1/16 in"
+name = "Kyocera 1800.0625.200 4-flute square carbide end mill, 1/16 in, .200 in LOC, 1/8 in shank, 1-1/2 in OAL"
 kind = "endmill"
 make = "Kyocera"
 sku = "1800.0625.200"
+source = "https://www.kyoceraprecisiontools.com/pdf/KYOCERA_Printed_Circuit_Board_Catalog_2020-2021_END_MILLS.pdf"
 status = "on_hand"
-dia_in = 0.0625
-cite = ["Owner (Pedro) 2026-11-26 photo research/shop-evidence/2026-11-26/small-cutters.jpg: box label \"KYOCERA 1800.0625.200\", \"1/16\\\" ENDMILL-SE\", \"SIZE: 1/16\\\"\", \"DIA: 0.0625\", \"SERIES: 1800\", \"QTY 50\"", "Owner (Pedro) 2026-11-26: \"add any relevant to inventory on hand\""]
-note = "The box is printed QTY 50; how many it still holds is not visible in the photo."
+flutes = 4
+shank_dia_in = 0.125
+oal_in = 1.5
+cite = ["Owner (Pedro) 2026-11-26 photo research/shop-evidence/2026-11-26/small-cutters.jpg: box label \"KYOCERA 1800.0625.200\", \"1/16\\\" ENDMILL-SE 0.200\\\"\", \"SIZE: 1/16\\\"\", \"DIA: 0.0625\", \"SERIES: 1800\", \"QTY 50\"", "Owner (Pedro) 2026-11-26: \"add any relevant to inventory on hand\"", "Kyocera Printed Circuit Board Catalog 2020-2021, End Mills p. B11, Series 1800 Four Flute Square End Mills, read live 2026-11-26: 1800.0625.200, ØD 0.0625 in, L2 0.2000 in, 30 deg helix, 4 flutes, 1/8 in shank, 1.500 in OAL, ring set at 0.800 in"]
+note = "Diameter and flute length are cad/process/shop/pd.toml tools.endmill-kyocera-1800-1-16 (MHA-PD-17 pin-hole starting flat, #3739). Standard '.' part numbers carry a plastic stop ring set at 0.800 in from the tip; the box is printed QTY 50, how many it still holds is not visible in the photo."
 
 # Engraving bit for every MHA-MS-01 (ms-stick) graduation and numeral (#2433;
 # owner 2026-11-26, "switch if possible", in place of the 2L .005 in tip bit

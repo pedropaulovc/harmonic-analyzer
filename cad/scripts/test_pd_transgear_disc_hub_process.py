@@ -97,12 +97,16 @@ def test_the_plan_is_an_enrolled_traveler_and_cam_stem() -> None:
     assert STEM in _process_plans.enrolled_stems()
     assert STEM in _cam_programs.CAM_STEMS
     tools = {t["id"] for t in PLAN["tools"]}
+    to_order = {t["id"] for t in PLAN["tools"] if t.get("status") == "to_order"}
     assert {
         "sharp",
-        "endmill",
         "reamer-0615",
         "zz-3135",
-    } <= {t["id"] for t in PLAN["tools"] if t.get("status") == "to_order"}
+    } <= to_order
+    # #3739: the 1/16 end mill is the owned Kyocera 1800.0625.200 (on_hand).
+    assert "endmill" not in to_order
+    endmill = next(t for t in PLAN["tools"] if t["id"] == "endmill")
+    assert endmill["ref"] == "endmill-kyocera-1800-1-16"
     # Fit audit 2026-11-23: the reamed holes print no band, so no Class ZZ
     # pin gauges them; the ream's mate (the MHA-PD-VN-69 dowel) accepts it.
     # The bore is the one exception (owner ruling 2026-11-26: the ZZ .3135
@@ -206,6 +210,8 @@ def test_the_recipes_programs_pass_every_check_they_declare(ctx, tmp_path) -> No
         ("pin_flat_bottom_mm", 5.0, "pin_flat_bottom_mm"),
         ("pin_flat_peck_mm", 1.0, "pin_flat_peck_mm"),
         ("endmill_reach_min_in", 0.05, "endmill_reach_min_in"),
+        ("endmill_out_min_in", 0.5, "endmill_out_min_in"),
+        ("endmill_out_min_in", 0.9, "endmill_out_min_in"),
         ("knockout_tip_mm", -7.0, "knockout_tip_mm"),
         ("knockout_past_mm", 1.5, "knockout_tip_mm"),
         ("pilot_tip_mm", -4.0, "pilot_tip_mm"),
@@ -225,7 +231,7 @@ def test_a_plan_number_off_the_model_or_shop_is_refused(key, value, detail) -> N
 
 def test_an_end_mill_whose_flutes_are_shorter_than_its_reach_is_refused() -> None:
     shop = copy.deepcopy(SHOP)
-    shop["tools"]["endmill-carbide-3fl-1-16-loc-1-2"]["flute_length_mm"] = 2.3622
+    shop["tools"]["endmill-kyocera-1800-1-16"]["flute_length_mm"] = 2.3622
     with pytest.raises(ValueError, match="flutes are shorter"):
         _context(PLAN, shop)
 
