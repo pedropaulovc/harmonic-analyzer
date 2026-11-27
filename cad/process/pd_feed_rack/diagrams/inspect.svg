@@ -25,7 +25,7 @@
   <text class="datum-label" x="34" y="174">LEFT end</text>
   <text class="label" x="260" y="200">4 × {{cad.tap_1_thread}} on tooth centres, full thread {{cad.tap_1_thread_depth_in:.3dot}},</text>
   <text class="label" x="260" y="216">drill {{cad.tap_1_drill_depth_in:.3dot}}; length {{cad.right_end_length_min_in:.2f}}–{{cad.right_end_length_max_in:.2f}}</text>
-  <line class="leader" x1="258" y1="196" x2="303.43" y2="128"/>
+  <line class="leader" x1="258" y1="186" x2="303.43" y2="128"/>
   <circle class="leader-dot" cx="303.43" cy="128" r="2"/>
   <rect class="part-kept" x="80" y="220" width="76.2" height="76.2"/>
   <line class="hidden" x1="108.57" y1="220" x2="108.57" y2="272.43"/>

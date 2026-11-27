@@ -18,19 +18,23 @@ shapes only).
 
 Route (``plan.toml``): a piece of the bought SDP/SI A 1B12-Y324 brass rack,
 sawn by hand. Setup 2, teeth up on one parallel stack against the fixed
-jaw, centred: FR01 mills both ends to the length with the cutter's side
-from one X0; then the strip is re-gripped twice and each tap's tooth is
-measured from an end with a rod in the space beside it and the edge finder
-(no program). Setup 3, teeth down: each hole is zeroed in X on its own tooth
-(``G10 L2 P1 X`` from the end the tooth was measured from, as the plan's
-table writes it), so FR02 (spot), FR03 (drill) and FR04 (tap guide) are
+jaw: FR01 mills the left end with the cutter's side, that end .30 in past
+the jaws; re-gripped with the right end .30 in past them, X0 is touched
+again on the milled left end and FR02 mills the right end to the length.
+(Centred, each end 2.2 in past the jaws, the side pass bends the 3/16
+strip about 0.47 mm: prechips' milling_deflection refuses it.) Then the
+strip is re-gripped twice more and each tap's tooth is measured from an
+end with a rod in the space beside it and the edge finder (no program).
+Setup 3, teeth down: each hole is zeroed in X on its own tooth (``G10 L2
+P1 X`` from the end the tooth was measured from, as the plan's table
+writes it), so FR03 (spot), FR04 (drill) and FR05 (tap guide) are
 one-hole files at X0 Y0, each run once per hole.
 
 Work frames (G54):
-- FR01: X0 the finished left end (the sawn end less the skim), +X along the
-  strip; Y0 the front face (against the fixed jaw), +Y toward that jaw; Z0
-  the tooth crests.
-- FR02-FR04: X0 the hole's tooth centre, +X toward the right end; Y0 the
+- FR01, FR02: X0 the finished left end (the sawn end less the skim), +X
+  along the strip; Y0 the front face (against the fixed jaw), +Y toward
+  that jaw; Z0 the tooth crests.
+- FR03-FR05: X0 the hole's tooth centre, +X toward the right end; Y0 the
   tap's line, the inset from the front face (toward the operator), +Y toward
   the back face; Z0 the flat top.
 
@@ -50,12 +54,13 @@ STEM = "pd_feed_rack"
 COMMENT = "MHA-PD-26 feed rack"
 # Programs in order, each listing its operation keys (one section each).
 PROGRAMS: tuple[tuple[str, tuple[Any, ...]], ...] = (
-    ("FR01_ends", ("ends",)),
-    ("FR02_spot", ("spot",)),
-    ("FR03_drill", ("drill",)),
-    ("FR04_tap", ("tap",)),
+    ("FR01_left", ("left_end",)),
+    ("FR02_right", ("right_end",)),
+    ("FR03_spot", ("spot",)),
+    ("FR04_drill", ("drill",)),
+    ("FR05_tap", ("tap",)),
 )
-# Every program loads its own first tool (M6, the tool setter): FR02-FR04 run
+# Every program loads its own first tool (M6, the tool setter): FR03-FR05 run
 # once per hole and each starts on whatever the mill last held.
 LOAD_FIRST_TOOL = tuple(name for name, _ops in PROGRAMS)
 # The plan's tools the mill runs, numbered by their places in the plan's tool
@@ -159,7 +164,9 @@ def _setting(
                 )
         return rpm, feed
     if _cut(plan, cut, "rpm") != rpm:
-        raise ValueError(f"'{cut}': its setting's rpm is not the cut's {_cut(plan, cut, 'rpm'):g}")
+        raise ValueError(
+            f"'{cut}': its setting's rpm is not the cut's {_cut(plan, cut, 'rpm'):g}"
+        )
     return rpm, _cut(plan, cut, "feed_mm_min")
 
 
@@ -318,7 +325,14 @@ def _geometry(features: dict[str, Any]) -> dict[str, Any]:
         raise ValueError(f"features this recipe does not make: {unknown}")
     taps = [f[name] for name in TAPS]
     first = taps[0]
-    shared = ("thread", "dia", "drill_depth", "drill_depth_nominal", "thread_depth", "inset")
+    shared = (
+        "thread",
+        "dia",
+        "drill_depth",
+        "drill_depth_nominal",
+        "thread_depth",
+        "inset",
+    )
     for name, tap in zip(TAPS, taps):
         if tap["kind"] != "threaded_hole" or tap["axis"] != [0.0, 1.0, 0.0]:
             raise ValueError(f"{name}: expected a tap into the flat top along +Y")
@@ -389,7 +403,6 @@ def context(
             f"the shortest blank less the skim, {blank_min - skim:.3f}, leaves under "
             f"0.5 mm on the right end over the length {length:.3f}"
         )
-    _agree(plan, "right_end_station_mm", skim + length)
     # The length read on the work X DRO: the right end touched with the
     # .200 edge finder from the right, X0 set again on the milled left end.
     _agree(plan, "length_dro_min_mm", g["length_band"][0] + FINDER_R_MM)
@@ -398,17 +411,29 @@ def context(
     # Holding: one stack of the parallels against the fixed jaw under the
     # strip (two 1/8 in parallels side by side would not fit a 3/16 strip),
     # the whole section inside the jaws, teeth up and teeth down alike.
-    jaw_h, riser, t = p["vise_jaw_height_mm"], p["riser_height_mm"], p["parallel_thickness_mm"]
+    jaw_h, riser, t = (
+        p["vise_jaw_height_mm"],
+        p["riser_height_mm"],
+        p["parallel_thickness_mm"],
+    )
     if t >= h_min:
-        raise ValueError("the parallel is as wide as the strip: the jaws would close on it")
+        raise ValueError(
+            "the parallel is as wide as the strip: the jaws would close on it"
+        )
     if riser + h_max >= jaw_h:
         raise ValueError("the thickest strip stands out of the jaws: the grip is short")
     jaw_top = jaw_h - riser - h_min
     _agree(plan, "jaw_top_over_work_mm", jaw_top)
     jaw_w = p["vise_jaw_width_mm"]
-    overhang = (blank_max - jaw_w) / 2
-    _agree(plan, "vise_overhang_mm", overhang)
-    _agree(plan, "vise_clamp_end_mm", overhang + jaw_w)
+    # The ends, one hold each, the end milled end_overhang_mm past the jaw
+    # side: FR01 holds the longest piece from its left end; FR02 the same
+    # piece less the left end's skim, from its right end.
+    end_overhang = p["end_overhang_mm"]
+    _agree(plan, "left_clamp_end_mm", end_overhang + jaw_w)
+    right_hold = blank_max - skim
+    _agree(plan, "right_hold_length_mm", right_hold)
+    _agree(plan, "right_hold_overhang_mm", right_hold - jaw_w - end_overhang)
+    _agree(plan, "right_clamp_end_mm", right_hold - end_overhang)
     hole_overhang = (length - jaw_w) / 2
     _agree(plan, "hole_overhang_mm", hole_overhang)
     _agree(plan, "hole_clamp_end_mm", hole_overhang + jaw_w)
@@ -425,7 +450,10 @@ def context(
     reach = p["measure_overhang_mm"] - FINDER_R_MM
     far_left = g["stations"][0][1] + g["station_nominals"][1] + half_pitch
     far_right = (
-        g["length_band"][1] - g["stations"][0][0] - g["station_nominals"][2] + half_pitch
+        g["length_band"][1]
+        - g["stations"][0][0]
+        - g["station_nominals"][2]
+        + half_pitch
     )
     for far in (far_left, far_right):
         if far - half_pitch + rod / 2 + 2 * FINDER_R_MM > reach:
@@ -455,6 +483,12 @@ def context(
     # radial steps no deeper than end_step_max_mm, one way across the strip.
     em = _shop_tool(plan, shop, "em-quarter")["diameter_mm"]
     r = em / 2
+    # Each finished end still stands past its jaw side (the right one from
+    # the longest piece's raw end set end_overhang_mm out), so the cutter,
+    # outside the end, never comes over a jaw.
+    right_off = blank_max - skim - length
+    if end_overhang - skim <= 0 or end_overhang - right_off <= 0:
+        raise ValueError("process.end_overhang_mm: a finished end lies inside the jaws")
     end_rpm, end_feed = _setting(plan, shop, "left end")
     if _setting(plan, shop, "right end") != (end_rpm, end_feed):
         raise ValueError("'right end' runs at another setting than 'left end'")
@@ -463,7 +497,9 @@ def context(
     _agree(plan, "end_axial_doc_mm", -end_z)
     for name in ("left end", "right end"):
         if not math.isclose(_cut(plan, name, "cutter_dia_mm"), em, abs_tol=1e-6):
-            raise ValueError(f"'{name}' cutter Ø{_cut(plan, name, 'cutter_dia_mm')}, the end mill is Ø{em}")
+            raise ValueError(
+                f"'{name}' cutter Ø{_cut(plan, name, 'cutter_dia_mm')}, the end mill is Ø{em}"
+            )
         if not math.isclose(_cut(plan, name, "radial_woc_mm"), end_step, abs_tol=1e-6):
             raise ValueError(f"'{name}' radial_woc_mm is not process.end_step_max_mm")
         if not math.isclose(_cut(plan, name, "axial_doc_mm"), -end_z, abs_tol=1e-6):
@@ -471,7 +507,9 @@ def context(
     if p["em_projection_mm"] / em > shop["limits"]["stickout_ld_max"]:
         raise ValueError("process.em_projection_mm: over the shop's stick-out limit")
     if p["em_projection_mm"] < -end_z + jaw_top + CLEAR_MM:
-        raise ValueError("process.em_projection_mm: the collet would reach the jaw tops")
+        raise ValueError(
+            "process.em_projection_mm: the collet would reach the jaw tops"
+        )
     left_faces = _end_stations(-skim, 0.0, end_step)
     right_raw = blank_max - skim
     right_faces = _end_stations(right_raw, length, end_step)
@@ -486,7 +524,9 @@ def context(
     if not math.isclose(_cut(plan, "hole drill", "cutter_dia_mm"), d364, abs_tol=1e-3):
         raise ValueError("'hole drill' cutter_dia_mm is not the 3/64's")
     spot_dia = p["spot_dia_mm"]
-    if not math.isclose(_cut(plan, "hole spot", "cutter_dia_mm"), spot_dia, abs_tol=1e-6):
+    if not math.isclose(
+        _cut(plan, "hole spot", "cutter_dia_mm"), spot_dia, abs_tol=1e-6
+    ):
         raise ValueError("'hole spot' cutter_dia_mm is not process.spot_dia_mm")
     if not d364 < spot_dia <= g["major"] + 1e-6:
         raise ValueError("the spot is not between the 3/64 and the thread's major")
@@ -513,7 +553,9 @@ def context(
         ("drill_3_64", -tip, "drill_3_64_oal_mm"),
     ):
         if p[f"{key}_projection_min_mm"] < jaw_top + depth + CLEAR_MM:
-            raise ValueError(f"{key}_projection_min_mm: the chuck would reach the jaw tops")
+            raise ValueError(
+                f"{key}_projection_min_mm: the chuck would reach the jaw tops"
+            )
         if p[f"{key}_projection_min_mm"] >= p[oal]:
             raise ValueError(f"{key}_projection_min_mm: longer than the tool")
 
@@ -548,10 +590,10 @@ def context(
         raise ValueError(f"plan tools lack {missing}")
 
     # Frames (model point -> axes · (p - origin)).
-    # FR01: teeth up, the front face against the fixed jaw: X along the
-    # strip, Y0 the front face (+Y toward the fixed jaw, model -Z), Z0 the
-    # crests (model +Y).
-    # FR02-FR04: teeth down, the front face toward the operator: Y0 the tap
+    # FR01, FR02: teeth up, the front face against the fixed jaw: X along
+    # the strip, Y0 the front face (+Y toward the fixed jaw, model -Z), Z0
+    # the crests (model +Y).
+    # FR03-FR05: teeth down, the front face toward the operator: Y0 the tap
     # line (+Y toward the back face, model +Z), Z0 the flat top (model -Y),
     # X0 tap 1's tooth (each hole is zeroed on its own tooth alike).
     section = g["section"]
@@ -565,9 +607,8 @@ def context(
     entry = _to(frames["hole"], [g["xs"][0], 0.0, g["inset"]])
     if any(abs(v) > 1e-9 for v in entry):
         raise ValueError("hole: the tap's entry is not at X0 Y0 Z0")
-    run_x = (-skim, blank_max - skim)
     stocks = {
-        "ends": (run_x, (-section, 0.0), (-section, 0.0)),
+        "ends": ((-skim, blank_max - skim), (-section, 0.0), (-section, 0.0)),
         "hole": (
             (-g["xs"][0], length - g["xs"][0]),
             (-g["inset"], section - g["inset"]),
@@ -594,15 +635,27 @@ def context(
         {
             **em_tool,
             "frame": "ends",
-            "label": "ends",
+            "label": "left end",
             "stock": stocks["ends"],
             "ops": [
                 [
-                    "ends",
-                    "mill both ends to the length",
+                    "left_end",
+                    "mill the left end",
                     [f"G0 Z{_r(clear):.3f}"]
-                    + _end(left_xs, beside[::-1], end_z, clear)
-                    + _end(right_xs, beside, end_z, clear),
+                    + _end(left_xs, beside[::-1], end_z, clear),
+                ]
+            ],
+        },
+        {
+            **em_tool,
+            "frame": "ends",
+            "label": "right end",
+            "stock": stocks["ends"],
+            "ops": [
+                [
+                    "right_end",
+                    "mill the right end to the length",
+                    [f"G0 Z{_r(clear):.3f}"] + _end(right_xs, beside, end_z, clear),
                 ]
             ],
         },
@@ -630,7 +683,9 @@ def context(
             "frame": "hole",
             "label": "hole drill",
             "stock": stocks["hole"],
-            "ops": [["drill", "peck the 3/64 tap drill at X0 Y0", _pecked(tip, peck, clear)]],
+            "ops": [
+                ["drill", "peck the 3/64 tap drill at X0 Y0", _pecked(tip, peck, clear)]
+            ],
         },
     ]
 
@@ -655,29 +710,38 @@ def context(
         }
     }
 
-    # Keep-outs. FR01: the jaws over the centred blank, the stack under it
-    # against the fixed jaw; the moving jaw at the narrowest strip. FR02-FR04
-    # run at each of the four holes, so their shapes are the jaws and the
-    # stack seen from every hole's zero.
-    jaw_x = (overhang - skim, overhang + jaw_w - skim)
-    mid = overhang + jaw_w / 2 - skim
-    ends_keep = [
-        _box("moving jaw", jaw_x, (-h_min - JAW_DEPTH_MM, -h_min), jaw_top),
-        _box("fixed jaw", jaw_x, (0.0, JAW_DEPTH_MM), jaw_top),
-        _box(
-            "stack",
-            (mid - PARALLEL_LENGTH_MM / 2, mid + PARALLEL_LENGTH_MM / 2),
-            (-t, 0.0),
-            -h_min,
-        ),
-    ]
+    # Keep-outs. FR01, FR02: the jaws over the piece, the stack under it
+    # against the fixed jaw, centred on the jaws; the moving jaw at the
+    # narrowest strip. FR03-FR05 run at each of the four holes, so their
+    # shapes are the jaws and the stack seen from every hole's zero.
+    def end_keep(jaw_left: float) -> list[dict[str, Any]]:
+        jaw_x = (jaw_left, jaw_left + jaw_w)
+        mid = jaw_left + jaw_w / 2
+        return [
+            _box("moving jaw", jaw_x, (-h_min - JAW_DEPTH_MM, -h_min), jaw_top),
+            _box("fixed jaw", jaw_x, (0.0, JAW_DEPTH_MM), jaw_top),
+            _box(
+                "stack",
+                (mid - PARALLEL_LENGTH_MM / 2, mid + PARALLEL_LENGTH_MM / 2),
+                (-t, 0.0),
+                -h_min,
+            ),
+        ]
+
+    left_keep = end_keep(end_overhang - skim)
+    right_keep = end_keep(right_hold - jaw_w - end_overhang)
     hole_keep = []
     for k, x in enumerate(g["xs"], 1):
         span = (hole_overhang - x, hole_overhang + jaw_w - x)
         centre = length / 2 - x
         back = h_min - g["inset"]
         hole_keep += [
-            _box(f"moving jaw {k}", span, (-g["inset"] - JAW_DEPTH_MM, -g["inset"]), jaw_top),
+            _box(
+                f"moving jaw {k}",
+                span,
+                (-g["inset"] - JAW_DEPTH_MM, -g["inset"]),
+                jaw_top,
+            ),
             _box(f"fixed jaw {k}", span, (back, back + JAW_DEPTH_MM), jaw_top),
             _box(
                 f"stack {k}",
@@ -704,49 +768,50 @@ def context(
             ["keep_out", {"radius": radius, "boxes": hole_keep}],
         ]
 
-    expect: list[list[Any]] = [
-        ["FR01_ends", "tool_changes", {"z_top": jaw_top, "tools": [tn["em-quarter"]], "loads_first": True}],
-        ["FR01_ends", "spindle", {"rpm": [[end_rpm]]}],
-        ["FR01_ends", "pauses", {"z_top": jaw_top, "count": 0}],
-        ["FR01_ends", "depth", {"z_min": _r(end_z)}],
-        ["FR01_ends", "rapids_clear", {"z_top": 0.0}],
-        ["FR01_ends", "air_feed", {"z_top": 0.0}],
-        [
-            "FR01_ends",
-            "side_passes",
-            {
-                "axis": "X",
-                "final": _r(-r),
-                "raw": _r(-skim - r),
-                "max_step": end_step,
-                "direction": -1.0,
-                "cut": "conventional",
-                "span": h_max,
-                "below_z": 0.0,
-            },
-        ],
-        [
-            "FR01_ends",
-            "side_passes",
-            {
-                "axis": "X",
-                "final": _r(length + r),
-                "raw": _r(right_raw + r),
-                "max_step": end_step,
-                "direction": 1.0,
-                "cut": "conventional",
-                "span": h_max,
-                "below_z": 0.0,
-            },
-        ],
-        ["FR01_ends", "keep_out", {"radius": r, "boxes": ends_keep}],
-    ]
+    def end_checks(
+        name: str, final: float, raw: float, direction: float, keep: list
+    ) -> list:
+        return [
+            [
+                name,
+                "tool_changes",
+                {"z_top": jaw_top, "tools": [tn["em-quarter"]], "loads_first": True},
+            ],
+            [name, "spindle", {"rpm": [[end_rpm]]}],
+            [name, "pauses", {"z_top": jaw_top, "count": 0}],
+            [name, "depth", {"z_min": _r(end_z)}],
+            [name, "rapids_clear", {"z_top": 0.0}],
+            [name, "air_feed", {"z_top": 0.0}],
+            [
+                name,
+                "side_passes",
+                {
+                    "axis": "X",
+                    "final": _r(final),
+                    "raw": _r(raw),
+                    "max_step": end_step,
+                    "direction": direction,
+                    "cut": "conventional",
+                    "span": h_max,
+                    "below_z": 0.0,
+                },
+            ],
+            [name, "keep_out", {"radius": r, "boxes": keep}],
+        ]
+
+    expect: list[list[Any]] = end_checks(
+        "FR01_left", -r, -skim - r, -1.0, left_keep
+    ) + end_checks("FR02_right", length + r, right_raw + r, 1.0, right_keep)
     for name, tool, rpm, bottom, radius in (
-        ("FR02_spot", "spot", spot_rpm, -spot_depth, CENTRE_DRILL["body_mm"] / 2),
-        ("FR03_drill", "drill-3-64", drill_rpm, tip, d364 / 2),
+        ("FR03_spot", "spot", spot_rpm, -spot_depth, CENTRE_DRILL["body_mm"] / 2),
+        ("FR04_drill", "drill-3-64", drill_rpm, tip, d364 / 2),
     ):
         expect += [
-            [name, "tool_changes", {"z_top": jaw_top, "tools": [tn[tool]], "loads_first": True}],
+            [
+                name,
+                "tool_changes",
+                {"z_top": jaw_top, "tools": [tn[tool]], "loads_first": True},
+            ],
             [name, "spindle", {"rpm": [[rpm]]}],
             [name, "pauses", {"z_top": jaw_top, "count": 0}],
             [name, "depth", {"z_min": _r(bottom)}],
@@ -754,11 +819,15 @@ def context(
         ]
     expect += [
         [
-            "FR04_tap",
+            "FR05_tap",
             "tap_stop",
-            {"tool": tn["tap-guide"], "at": manual["tap"]["at"], "machine_top": MACHINE_Z_TOP_MM},
+            {
+                "tool": tn["tap-guide"],
+                "at": manual["tap"]["at"],
+                "machine_top": MACHINE_Z_TOP_MM,
+            },
         ],
-        ["FR04_tap", "air_feed", {"z_top": 0.0}],
+        ["FR05_tap", "air_feed", {"z_top": 0.0}],
     ]
 
     return {
@@ -784,12 +853,16 @@ def build(ctx: dict[str, Any], rt: Any) -> dict[str, Any]:
     section; returns {"ops": {operation key: operation or manual section}}."""
     doc = rt.document()
     models = {
-        key: rt.import_step(doc, f"Feed rack {key}", ctx["step"], frame["origin"], frame["axes"])
+        key: rt.import_step(
+            doc, f"Feed rack {key}", ctx["step"], frame["origin"], frame["axes"]
+        )
         for key, frame in ctx["frames"].items()
     }
     ops: dict[str, Any] = {}
     for section in ctx["jobs"]:
-        target = rt.job(doc, section["label"], [models[section["frame"]]], section["stock"])
+        target = rt.job(
+            doc, section["label"], [models[section["frame"]]], section["stock"]
+        )
         tc = rt.tool_controller(
             doc,
             ctx["names"][section["tool"]],
@@ -807,3 +880,15 @@ def build(ctx: dict[str, Any], rt: Any) -> dict[str, Any]:
     ops.update(ctx["manual"])
     rt.generate(doc)
     return {"ops": ops}
+
+
+# The as-machined report (``cad/scripts/_as_machined.py``) cannot take this
+# part: FR03-FR05 are one-hole files at X0 Y0, each run four times with X0
+# moved onto a tooth measured in Setup 2 (G10 L2 P1 X), and the report runs
+# each file once in one frame.
+AS_MACHINED_NOT_COVERED = (
+    "FR03_spot, FR04_drill and FR05_tap are one-hole files at X0 Y0, each run"
+    " once per hole with X0 moved by hand onto a tooth measured in Setup 2"
+    " (G10 L2 P1 X); the report runs each file once in one frame, and where"
+    " the teeth fall on a sawn piece is known only at the machine"
+)

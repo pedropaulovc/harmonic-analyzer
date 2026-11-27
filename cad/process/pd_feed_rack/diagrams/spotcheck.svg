@@ -11,12 +11,12 @@
   <line class="dims" x1="362.54" y1="350.67" x2="397.46" y2="350.67"/>
   <text class="label" x="420" y="90">#49 drill stood upright in the spot, shank down:</text>
   <text class="label" x="420" y="106">its axis over the tooth's crest centre</text>
-  <line class="leader" x1="418" y1="110" x2="392.98" y2="120"/>
+  <line class="leader" x1="418" y1="112" x2="392.98" y2="120"/>
   <circle class="leader-dot" cx="392.98" cy="120" r="2"/>
   <text class="label" x="407.46" y="368.67">a space's centre, half a pitch ({{process.half_pitch_mm:in.3dot}} in) off: scrap</text>
-  <line class="leader" x1="405.46" y1="364.67" x2="397.46" y2="354.67"/>
+  <line class="leader" x1="405.46" y1="354.67" x2="397.46" y2="354.67"/>
   <circle class="leader-dot" cx="397.46" cy="354.67" r="2"/>
   <text class="label" x="40" y="200">the spot (cut away on the tap line)</text>
-  <line class="leader" x1="38" y1="204" x2="369.33" y2="254"/>
+  <line class="leader" x1="38" y1="206" x2="369.33" y2="254"/>
   <circle class="leader-dot" cx="369.33" cy="254" r="2"/>
 </svg>

@@ -1,7 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 560" width="760" height="560" font-family="sans-serif" font-size="13">
   <!-- Hand picture from the front (the operator's side, looking +Y): +X to the right, +Z up; the strip cut away on the tap line to show the hole. To scale at 7 px/mm from the strip's 4.7625 mm height: the nominal strip teeth down, flat top up, 32 DP teeth from cad.teeth_pitch_ref, tap 1's tooth at cad.tap_1_x_mm from the LEFT end; the jaws' left side process.hole_overhang_mm from the LEFT end, the fixed jaw behind the strip, the moving jaw in front not drawn; the stack (process.riser_height_mm) under the middle 4 in, to a break line. The 3/64 drill (Ø1.1906, process.drill_3_64_dia_mm) at X0, its full diameter cad.tap_1_drill_depth_mm under the flat top, its 118° point below, drawn to a break line (the chuck not drawn); the spot's countersink Ø1.524 (process.spot_dia_mm) at the mouth. -->
   <rect class="paper" x="0" y="0" width="760" height="560"/>
-  <text class="title" x="20" y="24">Setup 3, FR03: the 3/64 drill in hole 1, over its tooth's centre (to scale, 7 px/mm)</text>
+  <text class="title" x="20" y="24">Setup 3, FR04: the 3/64 drill in hole 1, over its tooth's centre (to scale, 7 px/mm)</text>
   <rect class="fixture-vise" x="418.76" y="511.15" width="331.24" height="14"/>
   <path class="clamp" d="M418.76 196.53L750 196.53L750 196.53L753 203.68L750 210.83L753 217.98L750 225.13L753 232.28L750 239.44L753 246.59L750 253.74L753 260.89L750 268.04L753 275.19L750 282.34L753 289.49L750 296.64L753 303.79L750 310.94L753 318.09L750 325.24L753 332.39L750 339.54L753 346.69L750 353.84L753 360.99L750 368.14L753 375.29L750 382.44L753 389.59L750 396.74L753 403.89L750 411.04L753 418.19L750 425.35L753 432.5L750 439.65L753 446.8L750 453.95L753 461.1L750 468.25L753 475.4L750 482.55L753 489.7L750 496.85L753 504L750 511.15L418.76 511.15Z"/>
   <path class="fixture-support" d="M618.52 233.34L746 233.34L746 233.34L749 240.46L746 247.58L749 254.71L746 261.83L749 268.95L746 276.08L749 283.2L746 290.32L749 297.45L746 304.57L749 311.69L746 318.82L749 325.94L746 333.07L749 340.19L746 347.31L749 354.44L746 361.56L749 368.68L746 375.81L749 382.93L746 390.05L749 397.18L746 404.3L749 411.42L746 418.55L749 425.67L746 432.79L749 439.92L746 447.04L749 454.16L746 461.29L749 468.41L746 475.53L749 482.66L746 489.78L749 496.9L746 504.03L749 511.15L618.52 511.15Z"/>
@@ -10,23 +10,23 @@
   <path class="cutter" d="M400.73 222.94L400.73 60L396.56 63L392.4 60L392.4 222.94L396.56 225.44Z"/>
   <line class="arrow" x1="410.56" y1="90" x2="410.56" y2="120"/>
   <line class="datum" x1="396.56" y1="260" x2="396.56" y2="310"/>
-  <text class="datum-label" x="402.56" y="308">X0 hole 1's tooth (E + t)</text>
+  <text class="datum-label" x="390.56" y="308" text-anchor="end">X0 hole 1's tooth (E + t)</text>
   <line class="datum" x1="10" y1="200" x2="366.56" y2="200"/>
   <text class="datum-label" x="12" y="192">Z0 the flat top</text>
   <text class="label" x="120" y="70">3/64 drill, pecked; its full diameter {{cad.tap_1_drill_depth_in:.3dot}}</text>
   <text class="label" x="120" y="86">under the flat top</text>
-  <line class="leader" x1="118" y1="90" x2="401.56" y2="110"/>
+  <line class="leader" x1="118" y1="92" x2="401.56" y2="110"/>
   <circle class="leader-dot" cx="401.56" cy="110" r="2"/>
   <text class="label" x="140" y="350">the tooth under the hole; Y0 the tap line,</text>
   <text class="label" x="140" y="366">{{cad.tap_1_inset_in:.3dot}} behind the front face (into the page)</text>
-  <line class="leader" x1="138" y1="346" x2="396.56" y2="229.34"/>
+  <line class="leader" x1="138" y1="336" x2="396.56" y2="229.34"/>
   <circle class="leader-dot" cx="396.56" cy="229.34" r="2"/>
   <text class="label" x="470" y="130">fixed jaw (behind); the moving jaw,</text>
   <text class="label" x="470" y="146">in front, not drawn</text>
-  <line class="leader" x1="468" y1="150" x2="450" y2="200.53"/>
+  <line class="leader" x1="468" y1="152" x2="450" y2="200.53"/>
   <circle class="leader-dot" cx="450" cy="200.53" r="2"/>
   <text class="label" x="600" y="471.15">the stack</text>
-  <line class="leader" x1="598" y1="467.15" x2="638.52" y2="451.15"/>
+  <line class="leader" x1="598" y1="457.15" x2="638.52" y2="451.15"/>
   <circle class="leader-dot" cx="638.52" cy="451.15" r="2"/>
   <text class="label" x="20" y="546">The strip teeth down, flat top up, LEFT end to the left; hole 1 lies 3 mm left of the jaws.</text>
 </svg>

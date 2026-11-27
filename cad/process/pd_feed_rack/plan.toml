@@ -6,21 +6,31 @@
 # flat top, each on a tooth's centre (ON TOOTH CENTRES ±.005).
 #
 # Route: Setup 1 bench, mike the section and saw the piece with the junior
-# hacksaw. Setup 2 CNC teeth up on one parallel stack against the fixed jaw,
-# centred: FR01 mills both ends to the length with the cutter's side from one
-# X0, and the length is read on the work X DRO (owner Q3: the 6 in calipers
-# cannot reach it and the 48 in rule does not prove ±.01). Then two re-grips
-# (holds A and B), each with the measured end 4.75 out past the jaws: a rod
-# (the #49 drill's shank) in the space on each tap tooth's left, the edge
-# finder on both its sides; the rod's middle plus half a pitch is that
-# tooth's centre t. Taps 1-2 are measured from the LEFT end, taps 3-4 from
-# the RIGHT end (the left end cannot stand out while they are clear of the
-# jaws). Setup 3 CNC teeth down, centred: Y0 the tap line from the front
-# face, Z0 the flat top; for each hole X0 = E + t (E the touched end's G54 X,
-# read with $#), entered with G10 L2 P1 X. FR02 spots, FR03 drills the 3/64
-# to .129, FR04 brings the tap guide over the hole (one Idle-ending file, the
+# hacksaw. Setup 2 CNC teeth up on one parallel stack against the fixed jaw:
+# the LEFT end .30 in past the jaws' left side, FR01 mills it with the
+# cutter's side; re-gripped with the RIGHT end .30 in past the right side,
+# X0 touched again on the milled left end, FR02 mills the right end to the
+# length, and the length is read on the work X DRO in that hold (owner Q3:
+# the 6 in calipers cannot reach it and the 48 in rule does not prove ±.01;
+# the CNC holds the length). Centred in one hold, each end 2.2 in past the
+# jaws, the side pass would bend the strip 0.465 mm along Y against the
+# 0.025 finish limit (prechips milling_deflection, 29 N at .0011 in/tooth,
+# .015 radial, 5.42 mm deep); .30 in past the jaws it is about 0.001. Then
+# two re-grips (holds A and B), each with the measured end 4.75 out past the
+# jaws: a rod (the #49 drill's shank) in the space on each tap tooth's left,
+# the edge finder on both its sides; the rod's middle plus half a pitch is
+# that tooth's centre t. Taps 1-2 are measured from the milled LEFT end,
+# taps 3-4 from the milled RIGHT end (the left end cannot stand out while
+# they are clear of the jaws) and carried to the left end with L. Setup 3
+# CNC teeth down, centred: Y0 the tap line from the front face, Z0 the flat
+# top; for each hole X0 = E + t (E the touched end's G54 X, read with $#),
+# entered with G10 L2 P1 X. FR03 spots, FR04 drills the 3/64 to .129, FR05
+# brings the tap guide over the hole (one Idle-ending file, the
 # pd_platen_bottom_guide precedent); each is a one-hole file at X0 Y0, run
 # once per hole. Setup 4 bench: deburr and check.
+#
+# The length's budget, FR02 from a fresh X0 on the milled left end: the
+# edge finder's .0002 plus the repeatability .0008 against ±.010.
 #
 # This departs from the standing page's single G54 per setup: each hole of
 # Setup 3 has its own X0, written in the plan's tables, never added in the
@@ -65,8 +75,8 @@
 # (logbook 2026-11-04, tools.edge-finder); every Z zero a tool on a .002
 # feeler leaf.
 #
-# NC (cam:pd_feed_rack, cad/process/pd_feed_rack/cam.py): FR01_ends,
-# FR02_spot, FR03_drill, FR04_tap. Program names, the [parameters] and the
+# NC (cam:pd_feed_rack, cad/process/pd_feed_rack/cam.py): FR01_left,
+# FR02_right, FR03_spot, FR04_drill, FR05_tap. Program names, the [parameters] and the
 # milling_cuts names are a contract with that recipe. Tool numbers are the
 # places in the tools list among the mill's tools: T1 1/4 in end mill, T2
 # centre drill, T3 3/64 drill, T4 the tap guide (the taps are turned by hand).
@@ -124,11 +134,9 @@ section_max_mm = 4.9149
 # The length's target, the middle of 10.62 ±.01 (cam.py checks it).
 length_target_mm = 269.748
 # Setup 2: the left end's skim (a hand-sawn end's lean and burr; author's
-# choice); the right end's finished station from the sawn left end (the
-# beam's station); the length window on the work X DRO, the band plus the
-# .200 edge finder's radius (cam.py checks them).
+# choice); the length window on the work X DRO, the band plus the .200 edge
+# finder's radius (cam.py checks them).
 left_end_skim_mm = 0.762
-right_end_station_mm = 270.51
 length_dro_min_mm = 272.034
 length_dro_max_mm = 272.542
 # Ends: the 1/4 in carbide end mill's side (shop endmill-carbide-3fl-1-4,
@@ -155,13 +163,19 @@ parallel_thickness_mm = 3.175
 vise_bed_height_mm = 73.3044     # Shop workholding.vise-pm-6.bed_height_mm.
 vise_jaw_height_mm = 44.9453     # Shop workholding.vise-pm-6.jaw_height_mm.
 vise_jaw_width_mm = 158.6738     # Shop workholding.vise-pm-6.jaw_width_mm.
-# The jaw tops over Z0 (the crests in FR01, the flat top in FR02-FR04) on
-# the thinnest strip; cam.py checks it.
+# The jaw tops over Z0 (the crests in FR01-FR02, the flat top in FR03-FR05)
+# on the thinnest strip; cam.py checks it.
 jaw_top_over_work_mm = 0.6477
-# FR01 hold: the longest piece centred, each end (its length − the jaw
-# width)/2 out past the jaw sides; gripped from there to vise_clamp_end_mm.
-vise_overhang_mm = 57.8231
-vise_clamp_end_mm = 216.4969
+# The end holds: the end milled .30 in past its jaw side (cantilever about
+# 7 mm). FR01 grips the longest piece from there to left_clamp_end_mm; FR02
+# the same piece less the left end's skim, its raw right end .30 in past
+# the right side, the milled left end right_hold_overhang_mm out past the
+# left side (cam.py checks them).
+end_overhang_mm = 7.62
+left_clamp_end_mm = 166.2938
+right_hold_length_mm = 273.558
+right_hold_overhang_mm = 107.2642
+right_clamp_end_mm = 265.938
 # Setup 3: the finished strip centred.
 hole_overhang_mm = 55.5371
 hole_clamp_end_mm = 214.2109
@@ -247,7 +261,7 @@ name = "3/64 drill"
 ref = "drill-3-64"
 [[tools]]
 id = "tap-guide"
-name = "Fisher spring tap guide (to order)"
+name = "Fisher spring tap guide"
 ref = "tap-guide-fisher"
 [[tools]]
 id = "rod"
@@ -306,25 +320,26 @@ title = "Ends to the length; measure each tap's tooth"
 machine = "PM-30MV CNC (FluidNC, CNCjs with the electronic tool setter) / vise, swivel off"
 indexing = "none"
 machine_ref = "pm-30mv"
-holding = "The set's 1 in parallel on its 9/16 in, one stack against the FIXED jaw, centred. The piece teeth up on it along the jaws, the front face against the FIXED jaw, the LEFT end to the left, centred (both ends about 2.2 in out past the jaws). Tap it down onto the stack while closing the vise; the crests stay under the jaw tops."
-datum = "Program FR01_ends. G54: X0 {{process.left_end_skim_mm:in.3dot}} right of the sawn LEFT end (the finished end), Y0 the front face, +Y toward the fixed jaw; Z0 the crests. The file starts with an M6 for the end mill. Holds A and B (no program): X0 the end each tap is measured from."
-diagram = { file = "diagrams/ends.svg", alt = "To scale, from the front at the left end, with an inset from above: the piece teeth up on the stack at the fixed jaw, its LEFT end {{process.vise_overhang_mm:in.2f}} in out past the jaws; the 1/4 in end mill's side on the left end's last pass at X0, its end {{process.end_past_mm:in.3dot}} under the flat top; from above, the pass runs −Y across the strip." }
+holding = "The set's 1 in parallel on its 9/16 in, one stack against the FIXED jaw, centred. The piece teeth up on it along the jaws, the front face against the FIXED jaw, the LEFT end to the left and {{process.end_overhang_mm:in.2dot}} in out past the jaws' left side (the calipers' depth rod). Tap it down onto the stack while closing the vise; the crests stay under the jaw tops."
+datum = "Program FR01_left. G54: X0 {{process.left_end_skim_mm:in.3dot}} right of the sawn LEFT end (the finished end), Y0 the front face, +Y toward the fixed jaw; Z0 the crests. The file starts with an M6 for the end mill. FR02_right, holds A and B: the zeros their steps set."
+diagram = { file = "diagrams/ends.svg", alt = "To scale, from the front at the left end, with an inset from above: the piece teeth up on the stack at the fixed jaw, its LEFT end {{process.end_overhang_mm:in.2dot}} in out past the jaws; the 1/4 in end mill's side on the left end's last pass at X0, its end {{process.end_past_mm:in.3dot}} under the flat top; from above, the pass runs −Y across the strip." }
 envelope = { x_span_mm = ["{{process.blank_length_max_mm}}", "{{process.em_dia_mm}}", 5.08], y_span_mm = ["{{process.section_mm}}", "{{process.em_dia_mm}}", 5.08], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{process.section_max_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{process.end_floor_mm}}"], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.em_projection_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.em_projection_mm}}"] }
 vise_hold = [
-  { vise = "vise-pm-6", across_jaws_mm = "{{process.section_mm}}", along_jaws_mm = "{{process.blank_length_max_mm}}", part_height_mm = "{{process.section_max_mm}}", parallel_height_mm = "{{process.riser_height_mm}}", overhang_mm = ["{{process.vise_overhang_mm}}", "rest"], jaw_offset = "centred", fixed_jaw_face = "as_bought", moving_jaw_face = "as_bought", moving_jaw_contact = "flat" },
+  { vise = "vise-pm-6", across_jaws_mm = "{{process.section_mm}}", along_jaws_mm = "{{process.blank_length_max_mm}}", part_height_mm = "{{process.section_max_mm}}", parallel_height_mm = "{{process.riser_height_mm}}", overhang_mm = ["{{process.end_overhang_mm}}", "rest"], jaw_offset = "centred", fixed_jaw_face = "as_bought", moving_jaw_face = "as_bought", moving_jaw_contact = "flat" },
+  { vise = "vise-pm-6", across_jaws_mm = "{{process.section_mm}}", along_jaws_mm = "{{process.right_hold_length_mm}}", part_height_mm = "{{process.section_max_mm}}", parallel_height_mm = "{{process.riser_height_mm}}", overhang_mm = ["rest", "{{process.end_overhang_mm}}"], jaw_offset = "centred", fixed_jaw_face = "as_bought", moving_jaw_face = "as_bought", moving_jaw_contact = "flat" },
   { vise = "vise-pm-6", across_jaws_mm = "{{process.section_mm}}", along_jaws_mm = "{{process.length_target_mm}}", part_height_mm = "{{process.section_max_mm}}", parallel_height_mm = "{{process.riser_height_mm}}", overhang_mm = ["{{process.measure_overhang_mm}}", "rest"], jaw_offset = "centred", fixed_jaw_face = "as_bought", moving_jaw_face = "as_bought", moving_jaw_contact = "flat" },
   { vise = "vise-pm-6", across_jaws_mm = "{{process.section_mm}}", along_jaws_mm = "{{process.length_target_mm}}", part_height_mm = "{{process.section_max_mm}}", parallel_height_mm = "{{process.riser_height_mm}}", overhang_mm = ["rest", "{{process.measure_overhang_mm}}"], jaw_offset = "centred", fixed_jaw_face = "as_bought", moving_jaw_face = "as_bought", moving_jaw_contact = "flat" },
 ]
-beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{process.blank_length_max_mm}}"], clamp_mm = ["{{process.vise_overhang_mm}}", "{{process.vise_clamp_end_mm}}"], section_mm = { y = "{{process.section_min_mm}}", z = "{{process.section_min_mm}}" }, vise_left = "start", vise_hold = 1 }
+beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{process.blank_length_max_mm}}"], clamp_mm = ["{{process.end_overhang_mm}}", "{{process.left_clamp_end_mm}}"], section_mm = { y = "{{process.section_min_mm}}", z = "{{process.section_min_mm}}" }, vise_left = "start", vise_hold = 1 }
 
 [[setups.operations]]
 instruction = "G54 Y0 the front face, X0 {{process.left_end_skim_mm:in.3dot}} right of the LEFT end: edge finder (900 rpm)."
-instruction_detailed = "Edge finder (900 rpm): on the front face left of the jaws, from the fixed-jaw side, G10 L20 P1 Y2.540; on the LEFT end from the left, G10 L20 P1 X-3.302 (its .100 radius plus the {{process.left_end_skim_mm:in.3dot}} skim: X0 is the finished end)."
+instruction_detailed = "Edge finder (900 rpm): on the front face right of the jaws, from the fixed-jaw side, G10 L20 P1 Y2.540; on the LEFT end from the left, G10 L20 P1 X-3.302 (its .100 radius plus the {{process.left_end_skim_mm:in.3dot}} skim: X0 is the finished end)."
 feed = "hand"
 
 [[setups.operations]]
-instruction = "G54 Z0: the crests, touched with the end mill left of the jaws."
-instruction_detailed = "Console M6 T1 (1/4 in end mill, {{process.em_projection_mm:in.3dot}} out of the collet). Spindle stopped, its tip just dragging a .002 feeler leaf on the crests left of the jaws: G10 L20 P1 Z0.051."
+instruction = "G54 Z0: the crests, touched with the end mill right of the jaws."
+instruction_detailed = "Console M6 T1 (1/4 in end mill, {{process.em_projection_mm:in.3dot}} out of the collet). Spindle stopped, its tip just dragging a .002 feeler leaf on the crests right of the jaws: G10 L20 P1 Z0.051."
 feed = "hand"
 
 [[setups.operations]]
@@ -332,18 +347,39 @@ speed_kind = "spindle"
 tool = "em-quarter"
 drilling = "none"
 sizing = "other"
-instruction = "Run FR01_ends (M6 T1; set 2800): each end with the cutter's side, from over the crests to {{process.end_past_mm:in.3dot}} under the flat top, in passes no deeper than {{process.end_step_max_mm:in.3dot}}, each across the strip one way (conventional): the left end to X0, the right end to X {{process.length_target_mm:.3f}} mm."
+instruction = "Run FR01_left (M6 T1; set 2800): the left end with the cutter's side, from over the crests to {{process.end_past_mm:in.3dot}} under the flat top, to X0 in passes no deeper than {{process.end_step_max_mm:in.3dot}}, each across the strip one way (conventional)."
 settings = "rack-em-quarter-brass"
 milling_cuts = [
   { name = "left end", kind = "side", phase = "finish", cutter_dia_mm = "{{process.em_dia_mm}}", axial_doc_mm = "{{process.end_axial_doc_mm}}", radial_woc_mm = "{{process.end_step_max_mm}}", stations_mm = "{{process.left_end_skim_mm}}" },
-  { name = "right end", kind = "side", phase = "finish", cutter_dia_mm = "{{process.em_dia_mm}}", axial_doc_mm = "{{process.end_axial_doc_mm}}", radial_woc_mm = "{{process.end_step_max_mm}}", stations_mm = "{{process.right_end_station_mm}}" },
+]
+
+[[setups.operations]]
+instruction = "Unclamp; slide the piece left until its RIGHT end stands {{process.end_overhang_mm:in.2dot}} in out past the jaws' right side (the milled left end about {{process.right_hold_overhang_mm:in.1dot}} in out on the left). Same stack, front face at the FIXED jaw; tap it down while closing the vise."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "G54 again: Y0 the front face, X0 the milled LEFT end, with the edge finder left of the jaws; Z0 the crests there, with the end mill."
+instruction_detailed = "Edge finder (900 rpm): on the front face left of the jaws, from the fixed-jaw side, G10 L20 P1 Y2.540; on the milled LEFT end from the left, G10 L20 P1 X-2.540. Console M6 T1; its tip just dragging a .002 feeler leaf on the crests left of the jaws: G10 L20 P1 Z0.051."
+feed = "hand"
+
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "em-quarter"
+drilling = "none"
+sizing = "other"
+instruction = "Run FR02_right (M6 T1; set 2800): the right end the same way, to X {{process.length_target_mm:.3f}} mm."
+settings = "rack-em-quarter-brass"
+beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{process.right_hold_length_mm}}"], clamp_mm = ["{{process.right_hold_overhang_mm}}", "{{process.right_clamp_end_mm}}"], section_mm = { y = "{{process.section_min_mm}}", z = "{{process.section_min_mm}}" }, vise_left = "start", vise_hold = 2 }
+milling_cuts = [
+  { name = "right end", kind = "side", phase = "finish", cutter_dia_mm = "{{process.em_dia_mm}}", axial_doc_mm = "{{process.end_axial_doc_mm}}", radial_woc_mm = "{{process.end_step_max_mm}}", stations_mm = "{{process.length_target_mm}}" },
 ]
 
 [[setups.operations]]
 instruction = "Still clamped, the edge finder in: the length L on the work X DRO."
-instruction_detailed = "Edge finder (900 rpm): on the milled LEFT end from the left, G10 L20 P1 X-2.540. Then on the RIGHT end from the right: the work X DRO reads L + 2.540. Write L = that reading − 2.540 in the first table below."
-inspection = "DRO {{process.length_dro_min_mm:.3f}}–{{process.length_dro_max_mm:.3f}} mm: the length {{cad.right_end_length_min_in:.2f}}–{{cad.right_end_length_max_in:.2f}}. Outside: stop and tell the owner (both ends are FR01's, from one X0)."
+instruction_detailed = "Edge finder (900 rpm) on the RIGHT end from the right: the work X DRO reads L + 2.540 (X0 is the milled left end). Write L = that reading − 2.540 here."
+inspection = "DRO {{process.length_dro_min_mm:.3f}}–{{process.length_dro_max_mm:.3f}} mm: the length {{cad.right_end_length_min_in:.2f}}–{{cad.right_end_length_max_in:.2f}}. Outside: stop and tell the owner."
 gauge_checks = [{ gauge = "mill-x-dro", band_mm = "{{cad.right_end_length_band_mm}}" }]
+table = { columns = ["DRO reading, mm", "L = reading − 2.540, mm"], rows = [["____", "L = ____"]] }
 
 [[setups.operations]]
 instruction = "Hold A: unclamp and slide the piece right until its LEFT end stands {{process.measure_overhang_mm:in.2f}} out past the jaws' left side (the right end {{process.measure_inset_mm:in.2f}} inside the jaws). Teeth up on the same stack, the front face at the FIXED jaw; tap it down while closing the vise."
@@ -415,7 +451,7 @@ machine = "PM-30MV CNC (FluidNC, CNCjs with the electronic tool setter) / vise, 
 indexing = "none"
 machine_ref = "pm-30mv"
 holding = "The same stack against the FIXED jaw. The strip teeth DOWN on it, flat top up, the front face toward you (the moving jaw), the LEFT end to the left, centred (both ends about 2.2 in out past the jaws). Tap it down onto the stack while closing the vise."
-datum = "Programs FR02_spot, FR03_drill, FR04_tap, each run once per hole. G54: X0 the hole's tooth, entered for each hole from the table (G10 L2 P1 X); Y0 the tap line, {{cad.tap_1_inset_in:.3dot}} in from the front face, +Y toward the back face; Z0 the flat top. Each file starts with an M6."
+datum = "Programs FR03_spot, FR04_drill, FR05_tap, each run once per hole. G54: X0 the hole's tooth, entered for each hole from the table (G10 L2 P1 X); Y0 the tap line, {{cad.tap_1_inset_in:.3dot}} in from the front face, +Y toward the back face; Z0 the flat top. Each file starts with an M6."
 diagram = { file = "diagrams/drill.svg", alt = "To scale, from the front at tap 1 (the strip cut away on the tap line): the strip teeth down on the stack at the fixed jaw, flat top up; the 3/64 drill in hole 1 over its tooth's centre (X0), its full diameter {{cad.tap_1_drill_depth_in:.3dot}} under the flat top (Z0); the moving jaw, in front, not drawn." }
 envelope = { x_span_mm = ["{{process.length_target_mm}}", 3.175], y_span_mm = ["{{process.section_mm}}", 3.175], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{process.section_max_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.riser_height_mm}}", "{{process.drill_tip_over_stack_mm}}"], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.tap_stack_max_mm}}"], shortest_tool_mm = ["{{process.drill_chuck_gauge_mm}}", "{{process.spot_projection_min_mm}}"] }
 vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{process.section_mm}}", along_jaws_mm = "{{process.length_target_mm}}", part_height_mm = "{{process.section_max_mm}}", parallel_height_mm = "{{process.riser_height_mm}}", overhang_mm = ["{{process.hole_overhang_mm}}", "rest"], jaw_offset = "centred", fixed_jaw_face = "as_bought", moving_jaw_face = "as_bought", moving_jaw_contact = "flat" }
@@ -449,7 +485,7 @@ speed_kind = "spindle"
 tool = "spot"
 drilling = "none"
 sizing = "other"
-instruction = "For each hole: G10 L2 P1 X(its E + t: spot), send $# and check the G54 X reads it, run FR02_spot (M6 T2; set 2800): the #1 centre drill spots Ø{{process.spot_dia_mm:in.3dot}} at X0 Y0."
+instruction = "For each hole: G10 L2 P1 X(its E + t: spot), send $# and check the G54 X reads it, run FR03_spot (M6 T2; set 2800): the #1 centre drill spots Ø{{process.spot_dia_mm:in.3dot}} at X0 Y0."
 settings = "rack-spot-brass"
 milling_cuts = [
   { name = "hole spot", kind = "drill", phase = "rough", cutter_dia_mm = "{{process.spot_dia_mm}}", flutes = 2, rpm = 2800, feed_mm_min = "{{process.spot_feed_mm_min}}", stations_mm = ["{{cad.tap_1_x_mm}}", "{{cad.tap_2_x_mm}}", "{{cad.tap_3_x_mm}}", "{{cad.tap_4_x_mm}}"] },
@@ -475,7 +511,7 @@ speed_kind = "spindle"
 tool = "drill-3-64"
 drilling = "twist_drill"
 sizing = { kind = "tap_drill", tap = "tap-0-80-plug" }
-instruction = "For each hole: G10 L2 P1 X(its E again + t), $# check, run FR03_drill (M6 T3, the 3/64 at least {{process.drill_3_64_projection_min_mm:in.2dot}} out of the chuck; set 2800): pecks of {{process.peck_mm:in.3dot}}, full retract, to {{cad.tap_1_drill_depth_in:.3dot}} at full diameter. Dry."
+instruction = "For each hole: G10 L2 P1 X(its E again + t), $# check, run FR04_drill (M6 T3, the 3/64 at least {{process.drill_3_64_projection_min_mm:in.2dot}} out of the chuck; set 2800): pecks of {{process.peck_mm:in.3dot}}, full retract, to {{cad.tap_1_drill_depth_in:.3dot}} at full diameter. Dry."
 peck = { step_mm = "{{process.peck_mm}}", retract = "full" }
 peck_reason = "a 3/64 drill 2.8 diameters deep in brass: each retract clears the chips before they pack round so small a drill and snap it"
 hole_depth_mm = "{{cad.tap_1_drill_depth_mm}}"
@@ -489,7 +525,7 @@ speed_kind = "other"
 tool = "tap-guide"
 drilling = "none"
 sizing = "other"
-instruction = "Hole 1: G10 L2 P1 X(its E again + t), $# check, run FR04_tap: M6 T4, the tap guide in the 1/2 in collet, pointed end out, spindle off; the file ends Idle at the machine top over the hole."
+instruction = "Hole 1: G10 L2 P1 X(its E again + t), $# check, run FR05_tap: M6 T4, the tap guide in the 1/2 in collet, pointed end out, spindle off; the file ends Idle at the machine top over the hole."
 diagram = { file = "diagrams/tap.svg", alt = "To scale, from the front at tap 1 (the strip cut away on the tap line): the #0-80 tap in the T-handle wrench in hole 1, the tap guide in the spindle, its spring point in the wrench's centre hole; the tap's point to stop {{process.tap_point_depth_mm:in.3dot}} under the flat top. The wrench and the tap's length schematic." }
 
 [[setups.operations]]
@@ -520,7 +556,7 @@ speed_kind = "other"
 tool = "tap-guide"
 drilling = "none"
 sizing = "other"
-instruction = "Holes 2, 3 and 4 the same way, each: G10 L2 P1 X(its E again + t), $# check, run FR04_tap, plug to Zp − {{process.tap_point_depth_mm:.3f}}, bottoming to Zb − {{process.tap_point_depth_mm:.3f}}, blow out, screw check."
+instruction = "Holes 2, 3 and 4 the same way, each: G10 L2 P1 X(its E again + t), $# check, run FR05_tap, plug to Zp − {{process.tap_point_depth_mm:.3f}}, bottoming to Zb − {{process.tap_point_depth_mm:.3f}}, blow out, screw check."
 feed = "hand"
 
 [[setups]]
