@@ -208,9 +208,9 @@ def test_printed_bands_are_the_sheets() -> None:
     assert _inch(hub_features["bore"]["dia"]) == [0.246, 0.25]
 
     plug_features = manifest("ch_rocker_strap_tl_hub_plug")["features"]
-    assert _inch(plug_features["step"]["dia"]) == [0.3985, 0.3995]
-    assert _inch(plug_features["outer"]["diametral_clearance"]) == [0.0005, 0.0015]
-    assert _inch(plug_features["shoulder"]["station"]) == [0.165, 0.175]
+    assert _inch(plug_features["step"]["dia"]) == [0.388, 0.398]
+    assert _inch(plug_features["outer"]["dia"]) == [0.46, 0.48]
+    assert _inch(plug_features["shoulder"]["station"]) == [0.16, 0.17]
     assert _inch(plug_features["far_end"]["length"]) == [0.267, 0.277]
     assert _inch(plug_features["chamfer_far"]["leg"]) == [0.01, 0.03]
 

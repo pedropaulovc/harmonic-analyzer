@@ -1,11 +1,12 @@
 ch-rocker-strap-tl-hub-plug:
   title: Rocker Strap Hub Plug
   # Shop tooling: the parent MHA-CH-13 Number plus -TL-nn (subsystem-identities.md).
-  # 2026-11-17: stepped plug seated in MHA-CH-13-TL-01's counterbore; its pilot
-  # locates the strap blank's reamed hub hole before the hub screw clamps it.
+  # 2026-11-17: stepped plug dropped into MHA-CH-13-TL-01's counterbore; its pilot
+  # guides the strap blank's reamed hub hole down, the fence and end stop locate
+  # the blank, and the plug floats (#3713).
   number: MHA-CH-13-TL-02
   # One material, so the title block's MATERIAL cell holds one line (LEARN
-  # machinist review r5): 6061, as the plug only locates and carries no clamp
+  # machinist review r5): 6061, as the plug only guides and carries no clamp
   # load (its pilot top stands below the strap's top under the washer).
   material: 6061 ALUMINUM
   material_specification: 6061 aluminum round, 9/16 in or over

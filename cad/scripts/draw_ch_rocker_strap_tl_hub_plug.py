@@ -1,9 +1,9 @@
 r"""Create the drawing for MHA-CH-13-TL-02, the rocker strap's hub plug.
 
 Shop tooling (the rocker-strap sub-plate fixture MHA-CH-13-TL-00). The PART
-owns the print (``ch_rocker_strap_tl_hub_plug_spec``): places, the pilot's
-limits, the body Ø's reference brackets and every callout; this recipe
-places the marked dimensions and proves the import kept them.
+owns the print (``ch_rocker_strap_tl_hub_plug_spec``): places and every
+callout; this recipe places the marked dimensions and proves the import kept
+them.
 
 At 4:1 (the arbor collar's recipe, ``draw_dt_cone_gear_tl_arbor_collar``):
 
@@ -11,10 +11,10 @@ At 4:1 (the arbor collar's recipe, ``draw_dt_cone_gear_tl_arbor_collar``):
   with its DRILL THRU callout;
 * the SIDE VIEW (``*Right``, model +Z to the left, so the pilot stands left
   of the body as on the lathe; rule 11) carries both diameters, moved from
-  the end view where every diameter crosses the centre: the pilot's limits
-  above it with its fit, the body's reference Ø right of it with its matched
-  clearance on MHA-CH-13-TL-01; the body and overall lengths under it and
-  the pilot's chamfer below-left;
+  the end view where every diameter crosses the centre: the pilot's Ø above
+  it with the hub hole it clears, the body's Ø right of it with the
+  counterbore it drops into; the body and overall lengths under it and the
+  pilot's chamfer below-left;
 * the isometric at 2:1 with its scale note.
 
 Run with SolidWorks open::
@@ -57,7 +57,8 @@ from _paths import CAD_ROOT
 from _printed_limits import drilled_limits, limits
 from _session import run_build
 
-MACHINIST_REVIEW = MachinistReviewMode.LEARN
+# Cached machinist review leaf: a FIX or ERROR verdict fails the build.
+MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 
 SPEC = DRAWINGS_BY_NAME["ch_rocker_strap_tl_hub_plug"]
 PART_STEM = SPEC.artifact_stem
@@ -223,27 +224,19 @@ requirement(
     "outer",
     kind="diameter",
     faces=(CylinderFace(spec.BODY_DIA),),
-    requirements=("diametral_clearance",),
+    requirements=("dia",),
     fields={
         "axis": ([0.0, 0.0, 1.0], ("BODY_DIA",)),
         "at": ([0.0, 0.0, 0.0], ("BODY_DIA",)),
         "span": ([0.0, spec.BODY_LENGTH], ("BODY_LENGTH",)),
-        "dia_ref": (
-            spec.BODY_DIA,
-            ("BODY_DIA", "REFERENCE_DIMENSIONS", (_SELF, "BODY_ON_SIDE")),
+        "dia": (
+            limits(spec.BODY_DIA, _P["BodyDia"], unit=spec.UNIT),
+            ("BODY_DIA", "UNIT", (_SELF, "BODY_ON_SIDE")),
         ),
-        "diametral_clearance": (
-            list(spec.BODY_CLEARANCE),
-            ("BODY_CLEARANCE", "BODY_CLEARANCE_TEXT"),
-        ),
-        "mate": (
-            f"{spec.PLATE_NUMBER} COUNTERBORE",
-            ("PLATE_NUMBER", "DIMENSION_CALLOUTS"),
-        ),
-        "mate_nominal_dia": (spec.COUNTERBORE_DIA, ("COUNTERBORE_DIA",)),
+        "dia_nominal": (spec.BODY_DIA, ("BODY_DIA",)),
         "callout": (_C["BodyDia"], ("DIMENSION_CALLOUTS",)),
     },
-    precision={"dia_ref": _P["BodyDia"]},
+    precision={"dia": _P["BodyDia"]},
 )
 requirement(
     "step",
@@ -257,16 +250,11 @@ requirement(
             [spec.BODY_LENGTH, spec.OVERALL_LENGTH],
             ("BODY_LENGTH", "OVERALL_LENGTH"),
         ),
-        "dia": (list(spec.PILOT_LIMITS), ("PILOT_LIMITS", (_SELF, "PILOT_ON_SIDE"))),
+        "dia": (
+            limits(spec.PILOT_DIA, _P["PilotDia"], unit=spec.UNIT),
+            ("PILOT_DIA", "UNIT", (_SELF, "PILOT_ON_SIDE")),
+        ),
         "dia_nominal": (spec.PILOT_DIA, ("PILOT_DIA",)),
-        "diametral_clearance_ref": (
-            list(spec.PILOT_CLEARANCE),
-            ("PILOT_CLEARANCE", "PILOT_CLEARANCE_TEXT"),
-        ),
-        "mate": (
-            f"{spec.STRAP_NUMBER} HUB HOLE",
-            ("STRAP_NUMBER", "DIMENSION_CALLOUTS"),
-        ),
         "callout": (_C["PilotDia"], ("DIMENSION_CALLOUTS",)),
     },
     precision={"dia": _P["PilotDia"]},
@@ -313,17 +301,12 @@ requirement(
 
 
 def _assert_part_text(adapter: Any, annotations: list[Any]) -> None:
-    """The part authors every callout below its value and the body Ø's
-    reference brackets; the import must carry each unchanged (the drawing
-    never writes them, #1942)."""
-    # swDimensionTextPrefix 1, Suffix 2, CalloutBelow 4.
+    """The part authors every callout below its value; the import must carry
+    each unchanged (the drawing never writes them, #1942)."""
+    # swDimensionTextCalloutBelow 4.
     expected = {
         (4, name): text for name, text in spec.DIMENSION_CALLOUTS_BY_NAME.items()
     }
-    for names in spec.REFERENCE_DIMENSIONS.values():
-        for name in names:
-            expected[(1, name)] = "(<MOD-DIAM>"
-            expected[(2, name)] = ")"
     found: dict[tuple[int, str], str] = {}
     for raw in annotations:
         annotation = _early_bound(raw, "IAnnotation")

@@ -1,0 +1,19 @@
+checks:
+  - id: C-01
+    check: "WORST_CLEARANCE"
+    kind: gap
+    reason: "outline cutter meets the washer pushed fully aside"
+    source: "owner ruling 2026-11-24 (Pedro): \"Accept as is: centre the washer by eye, 0.5 mm centred, 0.22 mm worst case; the traveler says to centre it and to watch the first level.\""
+    basis: worst_case
+  - id: C-02
+    check: "REACH_CENTRED_MAX"
+    kind: gap
+    reason: "centred washer breaks the program's hub keep-out"
+    source: "cad/process/ch_rocker_strap/plan.toml bushing_flange_dia_mm and bushing_clearance_mm (the outline program's keep-out round the hub)"
+    basis: worst_case
+  - id: C-03
+    check: "REACH_MAX"
+    kind: gap
+    reason: "washer reaches into the outline program's cutter path"
+    source: "cad/process/ch_rocker_strap/plan.toml bushing_flange_dia_mm + bushing_clearance_mm (KEEP_RADIUS)"
+    basis: worst_case

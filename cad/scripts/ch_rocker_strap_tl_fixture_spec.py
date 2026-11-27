@@ -115,9 +115,12 @@ if CLAMP_TORQUE_FT_LB >= clamp.MAX_TORQUE_FT_LB:
     raise AssertionError("the clamp torque reaches the maker's maximum")
 # Printed in in-lb, the unit a torque screwdriver for a #4-40 reads.
 CLAMP_TORQUE_IN_LB = CLAMP_TORQUE_FT_LB * 12.0
-# The fence is indicated parallel to the table's X travel with a test
-# indicator in the spindle (rule 22: a setting finer than .XXX names its
-# indicator), over the fence face between its notches.
+# The fence is swept along the table's X travel with a test indicator in the
+# spindle (rule 22: a setting finer than .XXX names its indicator), over the
+# fence face between its notches. The reading mirrors the strap plan's
+# fence_sweep_max_in, its source (asserted in the pytest); why it stays at
+# .001 is the necessity register's N-01
+# (cad/config/necessity/ch-rocker-strap-tl-fixture-assembly.yaml).
 FENCE_READING_IN = 0.001
 
 SCREW_TABLE_TITLE = "SCREW SCHEDULE"
@@ -210,8 +213,8 @@ _CHECK_STEP = len(_STEPS)
 _STEPS += (
     f"IF STEP {_CHECK_STEP} FAILS, LOOSEN THE VISE, TAP ITEM {_P} ROUND AND "
     "REPEAT FROM STEP 2.",
-    "SET THE WORK ZERO: X0 ON THE END-STOP FACE, Y0 ON THE FENCE FACE, Z0 ON "
-    "THE PLATE TOP.",
+    "SET THE WORK ZERO: X0 ON THE END-STOP FACE, Y0 ON THE FENCE FACE OPPOSITE "
+    "THE HUB HOLE, Z0 ON THE PLATE TOP.",
     f"SET EACH ITEM {_C} IN ITS POCKET, CLAMPING EDGE TOWARD THE FENCE, BACK "
     "FACE ON THE POCKET WALL FARTHEST FROM THE FENCE.",
     f"RUN EACH ITEM {_C} SCREW IN FINGER TIGHT.",
@@ -240,33 +243,38 @@ _CLAMPED += (
 )
 # The bond steps follow the traveler's (cad/process/ch_rocker_strap/plan.toml,
 # setup 5; owner rulings 2026-11-23: blue painter's tape on both faces, CA
-# glue between, proved by the stack and a hand push test, no pull test),
-# terse and one action each: the traveler carries the stack's band and
-# arithmetic. Pressing and the 5 minute wait stay one step (the 25-line
-# limit above the exploded clamps), the wait being no action.
+# glue between, proved by a hand push test, no pull test), terse and one
+# action each (rule 22; machinist review of the v52 build: back off and
+# lift, tape and cut away, tape and trim, press and wait were each two). The
+# traveler carries the stack's band and its check (#3491: the sheet only
+# pointed at it). The blank goes down over the pilot against the fence and
+# the end stop, as the traveler lays it and as it lay when its hub hole was
+# drilled; the plug only floats in the counterbore.
 _TAPE_FIRST = _CLAMP_CHECK + 2
 _TAPED: tuple[str, ...] = (
-    f"BACK EVERY ITEM {_C} OFF AND LIFT THE BLANK OFF THE PLATE.",
+    f"BACK EVERY ITEM {_C} OFF.",
+    "LIFT THE BLANK OFF THE PLATE.",
     "WIPE PLATE TOP AND BLANK UNDERSIDE WITH ISOPROPYL ALCOHOL.",
-    "TAPE THE PLATE: 2 STRIPS ALONG X FROM THE FENCE, BUTTED, NOT "
-    "OVERLAPPED; CUT AWAY AT THE COUNTERBORE.",
-    "TAPE THE UNDERSIDE: 2 STRIPS BUTTED AT MID-WIDTH, TRIMMED FLUSH "
-    "AND CLEAR OF THE HUB HOLE.",
+    "TAPE THE PLATE: 2 STRIPS ALONG X FROM THE FENCE, BUTTED.",
+    "CUT THE PLATE'S TAPE AWAY AT THE COUNTERBORE.",
+    "TAPE THE UNDERSIDE: 2 STRIPS BUTTED AT MID-WIDTH.",
+    "TRIM THE TAPE FLUSH WITH THE BLANK, CLEAR OF THE HUB HOLE.",
     "BURNISH BOTH TAPES DOWN HARD, EDGES INCLUDED.",
     f"DROP ITEM {_G} INTO THE COUNTERBORE, PILOT UP.",
     "RUN A ZIGZAG OF THICK CA ON THE PLATE'S TAPE.",
     "MIST ACCELERATOR ON THE BLANK'S TAPE.",
-    f"LOWER THE BLANK ONTO ITEM {_G} AND THE FENCE WITHIN 10 S.",
-    "PRESS THE BLANK DOWN 1 MINUTE, THEN WAIT 5 MINUTES.",
+    f"LOWER THE BLANK ONTO ITEM {_G}, FENCE AND END STOP, IN 10 S.",
+    "PRESS THE BLANK DOWN FOR 1 MINUTE.",
+    "WAIT 5 MINUTES.",
 )
-_STACK_CHECK = _TAPE_FIRST + len(_TAPED)
-_PUSH_CHECK = _STACK_CHECK + 2
+_PUSH_CHECK = _TAPE_FIRST + len(_TAPED)
+# A failed bond is peeled and cleaned, then made again from the wipe.
+_WIPE_STEP = _TAPE_FIRST + next(
+    i for i, step in enumerate(_TAPED) if step.startswith("WIPE ")
+)
 _TAPED += (
-    "CHECK: THE STACK IS IN THE MHA-CH-13 TRAVELER'S BAND.",
-    f"IF STEP {_STACK_CHECK} FAILS, PEEL, CLEAN AND REPEAT FROM STEP "
-    f"{_TAPE_FIRST + 1}.",
     "CHECK: THE BLANK DOES NOT MOVE UNDER A HARD HAND PUSH.",
-    f"IF STEP {_PUSH_CHECK} FAILS, PEEL, CLEAN AND REPEAT FROM STEP {_TAPE_FIRST + 1}.",
+    f"IF STEP {_PUSH_CHECK} FAILS, PEEL, CLEAN AND REPEAT FROM STEP {_WIPE_STEP}.",
     f"PUT ITEM {_W} ON THE BLANK, CENTRED OVER ITS HUB HOLE.",
     f"RUN ITEM {_S} THROUGH ITEM {_W} INTO ITEM {_P}, SNUG.",
 )

@@ -3,10 +3,10 @@
 # NC). Route chosen for speed, the registry's own (turn the body and pilot,
 # face the shoulder in one chucking, drill through, part off, face to
 # length) from 9/16 in 6061 round: the drawing calls for round 9/16 or over.
-# Setup 1, the bar pilot end out: measure the MHA-CH-13-TL-01 counterbore
-# (the body is turned to it), face the end (Z0), turn the body to the
-# measured counterbore less its clearance back past the parting line, turn
-# the pilot to the shoulder, chamfer the pilot end, spot, drill #7 through
+# Setup 1, the bar pilot end out: face the end (Z0), turn the body to its
+# band back past the parting line (it floats in the MHA-CH-13-TL-01
+# counterbore, #3713: no fit to the plate), turn the pilot to the shoulder,
+# chamfer the pilot end, spot, drill #7 through
 # (owner ruling 2026-11-23: "the plug's bore .201 (#7 drill)", for the #10-32
 # hub screw; it reverses 2026-11-17's "Use a 1/4-20 hub screw" and its H drill),
 # part off .02 long. Setup 2, the plug turned round on its pilot over a shim
@@ -84,11 +84,6 @@ name = "P1 HSS cutoff blade"
 ref = "cutoff-blade-p1"
 
 [[tools]]
-id = "telescoping-gauges-starrett-s579gz"
-name = "Telescoping gauges"
-ref = "telescoping-gauges-starrett-s579gz"
-
-[[tools]]
 id = "file"
 name = "Smooth file"
 ref = "jig-files"
@@ -104,15 +99,6 @@ datum = "Z0 (carriage DRO) the bar end, faced in this setup: the pilot end. The 
 diagram = { file = "diagrams/bar.svg", alt = "The 9/16 in bar in the 3-jaw, pilot end out: the end faced, the body and pilot turned, the pilot end chamfered, drilled #7 through, the plug parted off .02 long." }
 lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{cad.stock_dia_mm}}", stock_diameter_mm = "{{cad.stock_dia_mm}}", stickout_mm = "{{cad.stickout_mm}}", minimum_diameter_mm = "{{cad.step_turn_min_mm}}", support = "none" }
 turning_support = { kind = "chuck_only", chuck_z_mm = "{{cad.jaw_z_mm}}" }
-
-[[setups.operations]]
-cut_kind = "other"
-speed_kind = "other"
-drilling = "none"
-sizing = "other"
-feed = "hand"
-tool = "telescoping-gauges-starrett-s579gz"
-instruction = "Measure the MHA-CH-13-TL-01 counterbore with a telescoping gauge and the micrometer and write it on this sheet. That reading (about .0005 repeatable) only sets the body's starting size: the body is sized to the counterbore itself in the next turning op."
 
 [[setups.operations]]
 cut_kind = "other"
@@ -134,33 +120,11 @@ speed_kind = "spindle"
 tool = "ar"
 drilling = "none"
 sizing = "other"
-instruction = "Turn the body from Z0 back past the parting line to Z{{cad.run_end_z_mm:in.2dot}}: rough to {{process.finish_allowance_in:.3dot}} a side over the recorded counterbore, then finish to the recorded counterbore + .001, miking between passes."
+instruction = "Turn the body from Z0 back past the parting line to Z{{cad.run_end_z_mm:in.2dot}}: rough to {{process.finish_allowance_in:.3dot}} a side over Ø{{cad.outer_dia_max_in:.2dot}}, then finish to Ø{{cad.outer_dia_min_in:.2dot}}–{{cad.outer_dia_max_in:.2dot}}, miking between passes."
 settings = "lathe-ar-6061"
 cut_diameter_mm = "{{cad.outer_dia_mm}}"
-inspection = "Body Ø the recorded counterbore +.0005 to +.0015, by micrometer; over: another light pass; under: go straight to the trial fit, which scraps it only if the counterbore slides on at the first trial."
-gauge_checks = "other"
-
-[[setups.operations]]
-cut_kind = "other"
-speed_kind = "spindle"
-tool = "ar"
-drilling = "none"
-sizing = "other"
-instruction = "Spindle stopped, offer the MHA-CH-13-TL-01 counterbore onto the faced bar end (Z0), still the body's diameter at this point: at this first trial it must not go on (if it slides on, scrap the plug). Skim .0002 off the diameter at a time, trying it between skims, until the counterbore just slides on. Mike that size and write it on this sheet as D0 (within .0002 of the bore)."
-settings = "lathe-ar-6061"
-cut_diameter_mm = "{{cad.outer_dia_mm}}"
-
-[[setups.operations]]
-cut_kind = "other"
-speed_kind = "spindle"
-tool = "ar"
-drilling = "none"
-sizing = "other"
-instruction = "Finish the body to D0 less .0007–.0013, miking between skims: the drawing's {{cad.outer_clearance_min_in:.4dot}}–{{cad.outer_clearance_max_in:.4dot}} diametral clearance in that counterbore."
-settings = "lathe-ar-6061"
-cut_diameter_mm = "{{cad.outer_dia_mm}}"
-inspection = "Body Ø D0 less .0007–.0013, by micrometer; over: skim again; under: scrap."
-gauge_checks = "other"
+inspection = "Body Ø{{cad.outer_dia_min_in:.2dot}}–{{cad.outer_dia_max_in:.2dot}}, by micrometer; over: another light pass; under: scrap."
+gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.outer_dia_band_mm}}" }]
 
 [[setups.operations]]
 cut_kind = "longitudinal_turning"
@@ -172,15 +136,15 @@ speed_kind = "spindle"
 tool = "ar"
 drilling = "none"
 sizing = "other"
-instruction = "Turn the pilot from Z0 to the shoulder at Z{{cad.step_far_out_far_z_mm:in.3dot}} by the DRO, facing the shoulder square: rough to Ø{{cad.step_rough_dia_mm:in.4dot}}, then finish in light passes, miking between them, to Ø{{cad.step_dia_min_in:.4dot}}–{{cad.step_dia_max_in:.4dot}}."
+instruction = "Turn the pilot from Z0 to the shoulder at Z{{cad.step_far_out_far_z_mm:in.3dot}} by the DRO, facing the shoulder square: rough to Ø{{cad.step_rough_dia_mm:in.3dot}}, then finish in light passes, miking between them, to Ø{{cad.step_dia_min_in:.3dot}}–{{cad.step_dia_max_in:.3dot}}."
 settings = "lathe-ar-6061"
 cut_diameter_mm = "{{cad.step_dia_mm}}"
-# Pilot window, typed (the adapter binds no pilot-length band): Op 110 can
+# Pilot window, typed (the adapter binds no pilot-length band): Op 80 can
 # bring both bands in only for a pilot from length_min - shoulder_max
-# (.267 - .175 = .092) to length_max - shoulder_min (.277 - .165 = .112);
-# the .097-.107 aim is that window less .005 each side. Re-derive all three
+# (.267 - .170 = .097) to length_max - shoulder_min (.277 - .160 = .117);
+# the .102-.112 aim is that window less .005 each side. Re-derive all three
 # whenever the drawing's shoulder or length band moves.
-inspection = "Pilot Ø{{cad.step_dia_min_in:.4dot}}–{{cad.step_dia_max_in:.4dot}}, by micrometer; over: another light pass; under: scrap. Pilot length (Z0 to the shoulder) by the calipers' depth rod, aiming .097–.107 so Op 110 keeps room on both its shoulder and length bands; under .097: face the shoulder back; .107–.112: carry on, Op 110 decides; over .112 (no facing in Op 110 brings both into band): scrap."
+inspection = "Pilot Ø{{cad.step_dia_min_in:.3dot}}–{{cad.step_dia_max_in:.3dot}}, by micrometer; over: another light pass; under: scrap. Pilot length (Z0 to the shoulder) by the calipers' depth rod, aiming .102–.112 so Op 80 keeps room on both its shoulder and length bands; under .102: face the shoulder back; .112–.117: carry on, Op 80 decides; over .117 (no facing in Op 80 brings both into band): scrap."
 gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.step_dia_band_mm}}" }]
 
 [[setups.operations]]
@@ -256,7 +220,7 @@ title = "Bench: deburr and check"
 machine = "Bench"
 envelope = "other"
 indexing = "none"
-diagram = { file = "diagrams/inspect.svg", alt = "The finished plug: the body to the measured counterbore, the pilot, the shoulder and the #7 hole through." }
+diagram = { file = "diagrams/inspect.svg", alt = "The finished plug: the body, the pilot, the shoulder and the #7 hole through." }
 vise_hold = "other"
 beam = "other"
 
@@ -275,7 +239,7 @@ gauge_checks = [{ gauge = "pin-gauges", band_mm = "{{cad.bore_dia_band_mm}}" }]
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Try-fit the body in its MHA-CH-13-TL-01 counterbore, clean and dry: it enters full depth by hand without force. Tag the plug with D0 and its body size: it goes to that MHA-CH-13-TL-01."
-inspection = "Body enters the tagged counterbore full depth by hand."
+instruction = "Try the plug in the MHA-CH-13-TL-01 counterbore, clean and dry: it drops in to the floor by hand and rocks freely."
+inspection = "Plug drops into the counterbore to its floor by hand."
 gauge_checks = "other"
 feed = "hand"

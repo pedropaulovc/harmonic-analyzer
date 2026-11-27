@@ -1,0 +1,35 @@
+# MHA-CH-13-TL-02 hub plug (ch_rocker_strap_tl_hub_plug_spec): what fails on
+# the machine past each guard, what sets its number and how it is summed
+# (tolerance-policy.md, "Checks in spec modules and tests"). Each margin is
+# held over the .001 a size is read to (READING).
+checks:
+  - id: C-01
+    check: "BODY_FLOAT"
+    kind: gap
+    reason: "plug body does not drop into the counterbore"
+    source: "MHA-CH-13-TL-01 hub counterbore O.500 at its Hole Wizard .XX (_wizard_pocket_band.WIZARD_POCKET_BAND_MM) against the body O.47 at the title block's .XX"
+    basis: worst_case
+  - id: C-02
+    check: "PILOT_CLEARANCE"
+    kind: gap
+    reason: "pilot binds in the strap's reamed hub hole"
+    source: "ch_rocker_hub_fit.STRAP_HOLE_BAND (.400 +.0005/0, the reamer) against the pilot O.393 at the title block's .XXX"
+    basis: worst_case
+  - id: C-03
+    check: "PLUG_FLOAT_MIN"
+    kind: gap
+    reason: "plug holds the blank off the fence or end stop"
+    source: "MHA-CH-13-TL-01 hub position +/-.002 each way (COUNTERBORE_LOCATION_TOL, both axes) against the plug's least float in the counterbore plus the pilot's least clearance (#3713)"
+    basis: worst_case
+  - id: C-04
+    check: "SHOULDER_Z_MAX"
+    kind: gap
+    reason: "plug shoulder stands above the plate floor under the tape"
+    source: "MHA-CH-13-TL-01 counterbore depth .185 at its Hole Wizard .XX (#3622) and the body length .165 at the title block's .XXX"
+    basis: worst_case
+  - id: C-05
+    check: "PILOT_TOP_Z_RANGE"
+    kind: gap
+    reason: "pilot stands proud of the strap; the washer clamps it"
+    source: "the strap plan's tape_stack_min_mm and MHA-CH-13's thinnest finish (ch_rocker_arm_spec ARM_THICKNESS less its band), against the counterbore depth at .XX and the overall length .272 at .XXX"
+    basis: worst_case

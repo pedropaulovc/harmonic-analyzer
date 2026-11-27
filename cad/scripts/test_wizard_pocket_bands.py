@@ -25,8 +25,10 @@ import inspect
 
 import pytest
 
+import build_ch_rocker_strap_tl_sub_plate
 import build_pd_platen
 import build_pd_platen_bottom_guide
+import ch_rocker_strap_tl_sub_plate_spec as sub_plate
 import draw_pd_platen
 import export_features
 import pd_feed_rack_spec as rack
@@ -79,6 +81,16 @@ POCKETS = {
             "cbore_depth": (
                 "SCREW_CBORE_DEPTH", "SCREW_CBORE_DEPTH_BAND", build_pd_platen_bottom_guide
             ),
+        },
+    ),
+    # MHA-CH-13-TL-01's hub counterbore: no band of its own (#3622).
+    "ch_rocker_strap_tl_sub_plate": (
+        sub_plate,
+        build_ch_rocker_strap_tl_sub_plate,
+        "hub_counterbore",
+        {
+            "dia": ("HUB_CBORE_DIA", "HUB_CBORE_BAND", None),
+            "depth": ("HUB_CBORE_DEPTH", "HUB_CBORE_BAND", None),
         },
     ),
 }

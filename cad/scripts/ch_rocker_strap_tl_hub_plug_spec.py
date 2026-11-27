@@ -1,35 +1,39 @@
 r"""Pure-data contract for MHA-CH-13-TL-02, the rocker strap's hub plug.
 
 Shop tooling for the rocker-strap sub-plate fixture MHA-CH-13-TL-00 (owner,
-2026-11-17). A stepped plug seated in MHA-CH-13-TL-01's hub counterbore: its
-pilot slips into the strap blank's reamed hub hole (MHA-CH-13) and locates
-the blank on the counterbore; the hub screw MHA-CH-13-TL-VN-51 passes its
-bore, through the washer MHA-CH-13-TL-VN-52, into the plate. Turned on the
-manual lathe in one chucking.
+2026-11-17). A stepped plug dropped into MHA-CH-13-TL-01's hub counterbore:
+its pilot goes into the strap blank's reamed hub hole (MHA-CH-13) as the
+blank is lowered onto the tape, and the hub screw MHA-CH-13-TL-VN-51 passes
+its bore, through the washer MHA-CH-13-TL-VN-52, into the plate. Turned on
+the manual lathe in one chucking.
 
-- Body: matched slip fit in the counterbore. The counterbore is milled first
-  (TL-01, Ø.500 at the title block's .XXX) and the body is turned to it, so
-  its Ø.499 is a reference nominal and the stated diametral clearance is the
-  requirement (drawing-guidelines.md rule 4, matched pairs).
-- Pilot: explicit limits .3985-.3995, a locating fit in the strap's reamed
-  .4000-.4005 hub hole (``ch_rocker_hub_fit.STRAP_HOLE_BAND``), clearance
-  .0005-.0020. Every strap blank goes over the one plug, so the pilot cannot
-  be matched to a hole; its band is the shop's turned-diameter row (.001
-  wide), which LEARN machinist review r5 required (.3990-.3995 was .0005
-  wide). The play it adds to the outline's position is checked below.
-- Body length .170 and overall length .272 at the title block's .XXX: seated
+The blank is located by the fence and the end stop, as it lay when its hub
+hole was drilled (the strap traveler's RS03 and RS04), not by the plug: a
+plug that also located it would set the hole against the fence through the
+counterbore's position band and the plug's play together, and could hold
+the blank off the fence (#3713). So the plug floats: every size is the title
+block's, and nothing on it is a fit (delegated ruling 2026-11-26 (Main), no
+precedent; owner review #2144 (D55)).
+
+- Body: Ø.47 at the title block's .XX (.46-.48) in the counterbore's Hole
+  Wizard Ø.500 at .XX (.490-.510): it drops in with .010 or more, and with
+  the pilot's own clearance lets the pilot follow the hub hole wherever the
+  counterbore's position band puts it.
+- Pilot: Ø.393 at .XXX (.388-.398), clear of the reamed .4000-.4005 hub hole
+  (``ch_rocker_hub_fit.STRAP_HOLE_BAND``) by .002 or more; three places
+  because .XX's .40 would meet the smallest hole (rule 3).
+- Body length .165 and overall length .272 at the title block's .XXX: seated
   on the counterbore floor the shoulder stays below the plate's Z0 floor and
   the pilot's top below the strap's top (so the washer clamps the strap, not
   the plug) yet inside the hole; asserted below at the worst case of the
-  printed bands. StrapFixtureCad 2026-11-17: the body length moved from the
-  contract's .177 to .170 so the title-block band passes (at .177 the
-  shoulder stood up to .002 above Z0).
+  printed bands, the counterbore's depth at its wizard .XX (#3622: at .170
+  the shoulder could reach Z0).
 - Bore: Ø.201 drilled through (#7 drill), clears the #10-32 hub screw
   (owner ruling 2026-11-23: "change the screw to #10-32. The sub-plate's
   tapped hole becomes #10-32 and the plug's bore .201 (#7 drill).",
-  reversing 2026-11-17's "Use a 1/4-20 hub screw.", whose Ø.266 bore left
-  a .064 wall under the pilot). The wall under the pilot is .096 at the
-  worst case, over rule 17's .080 target, so the bore states no wall.
+  reversing 2026-11-17's "Use a 1/4-20 hub screw."). The wall under the
+  pilot is over rule 17's .080 target at the worst case, so the bore states
+  no wall.
 
 Frame: axis +Z, centred; z = 0 the body's bottom face (on the counterbore
 floor, the Front Plane), the pilot's top at z = OVERALL_LENGTH.
@@ -54,6 +58,7 @@ import _config
 from _package_units import drawing_unit
 from _inch_wall_limits import WALL_FLOOR_MM, WALL_TARGET_MM
 from _printed_tolerance import drilled_oversize_mm, printed_band_mm
+from _wizard_pocket_band import WIZARD_POCKET_BAND_MM
 from ch_rocker_hub_fit import STRAP_HOLE_BAND
 
 PART_NAME = "ch-rocker-strap-tl-hub-plug"
@@ -75,10 +80,13 @@ XXX = printed_band_mm(3, unit=UNIT)
 DRILLED_PLUS = drilled_oversize_mm(unit=UNIT)
 
 # --- Mirrored mates (asserted against their authorities in the pytest) ---
-# MHA-CH-13-TL-01's hub counterbore, both at the title block's .XXX; its
-# depth is from Z0, the plate floor the strap's tape lies on.
+# MHA-CH-13-TL-01's hub counterbore, its Hole Wizard callout's Ø and depth at
+# the .XX grade (rule 3; #3622); its depth is from Z0, the plate floor the
+# strap's tape lies on. Its position from X0 and Y0, +/-.002 each way.
 COUNTERBORE_DIA = 12.7  # .500
 COUNTERBORE_DEPTH = 4.699  # .185
+COUNTERBORE_BAND = WIZARD_POCKET_BAND_MM
+COUNTERBORE_LOCATION_TOL = 0.0508
 # MHA-CH-13's hub hole, reamed +.0005/.0000 on the .400 nominal.
 STRAP_HOLE_DIA = 10.16  # .400
 STRAP_HOLE_LIMITS = (
@@ -87,11 +95,6 @@ STRAP_HOLE_LIMITS = (
 )
 # MHA-CH-13's finished thickness .098 +/-.001, at its thinnest.
 STRAP_THICKNESS_MIN = 2.4638
-# MHA-CH-13's edges: half the surface-profile band (ch_rocker_arm_spec
-# ``_PROFILE_HALF``, +/-.010), the outline's whole positional allowance.
-STRAP_PROFILE_HALF = 0.254
-# drawing-guidelines.md, What the shop holds: a turned diameter +/-.0005.
-TURNED_DIA_ROW = 0.0127
 # Plan tape_stack_mm and its band tape_stack_min_mm..tape_stack_max_mm: blue
 # painter's tape on both faces with CA glue between (owner ruling
 # 2026-11-23), .011 nominal, every bond miked into .009-.013.
@@ -100,24 +103,22 @@ TAPE_MIN = 0.23
 TAPE_MAX = 0.33
 # The #10-32 hub screw's major diameter, the bore's clearance target.
 SCREW_MAJOR_DIA = 4.826  # .190
+# A margin is read to .001 in a size (tolerance-policy.md).
+READING = 0.001 * INCH
 
 # --- The plug ---
-BODY_DIA = 12.6746  # .499 REF, turned to the measured counterbore
-# Diametral clearance of the body in the measured counterbore (lower, upper).
-BODY_CLEARANCE = (0.0127, 0.0381)  # .0005-.0015
-BODY_LENGTH = 4.318  # .170
+BODY_DIA = 11.938  # .47
+BODY_LENGTH = 4.191  # .165
 OVERALL_LENGTH = 6.9088  # .272
-PILOT_LIMITS = (10.1219, 10.1473)  # .3985-.3995
-# The model sits mid-band; the sheet prints the two limits (swTolLIMIT).
-PILOT_DIA = (PILOT_LIMITS[0] + PILOT_LIMITS[1]) / 2.0
+PILOT_DIA = 9.9822  # .393
 BORE_DIA = 5.1054  # .201, #7 drill
 CHAMFER = 0.508  # .02 x 45 deg on the pilot's top edge
 PILOT_LENGTH = OVERALL_LENGTH - BODY_LENGTH
 
 LENGTH_PLACES = 3
-BODY_DIA_PLACES = 3
+BODY_DIA_PLACES = 2
 BORE_PLACES = 3
-PILOT_PLACES = 4
+PILOT_PLACES = 3
 CHAMFER_PLACES = 2
 
 for _value, _places in (
@@ -126,8 +127,7 @@ for _value, _places in (
     (OVERALL_LENGTH, LENGTH_PLACES),
     (BORE_DIA, BORE_PLACES),
     (CHAMFER, CHAMFER_PLACES),
-    (PILOT_LIMITS[0], PILOT_PLACES),
-    (PILOT_LIMITS[1], PILOT_PLACES),
+    (PILOT_DIA, PILOT_PLACES),
     (COUNTERBORE_DIA, 3),
     (COUNTERBORE_DEPTH, 3),
 ):
@@ -147,44 +147,45 @@ def floor_text(value_mm: float, places: int) -> str:
     return inch_text(scaled / 10**places * INCH, places)
 
 
-# The body's nominal sits inside its own clearance window on the nominal
-# counterbore, so the reference nominal is a size the fit can reach.
-if not BODY_CLEARANCE[0] < COUNTERBORE_DIA - BODY_DIA < BODY_CLEARANCE[1]:
-    raise AssertionError("the body's REF nominal is outside its clearance window")
-
-# The pilot in the reamed hub hole: clear at both ends.
+# Each size at its title-block band (.XX body, .XXX pilot).
+BODY_LIMITS = (BODY_DIA - XX, BODY_DIA + XX)
+PILOT_LIMITS = (PILOT_DIA - XXX, PILOT_DIA + XXX)
+# The body drops into the smallest counterbore.
+BODY_FLOAT = (
+    round(COUNTERBORE_DIA - COUNTERBORE_BAND - BODY_LIMITS[1], 6),
+    round(COUNTERBORE_DIA + COUNTERBORE_BAND - BODY_LIMITS[0], 6),
+)
+if not BODY_FLOAT[0] > READING:
+    raise AssertionError(f"the body may not drop into the counterbore: {BODY_FLOAT}")
+# The pilot enters the smallest reamed hub hole.
 PILOT_CLEARANCE = (
     round(STRAP_HOLE_LIMITS[0] - PILOT_LIMITS[1], 6),
     round(STRAP_HOLE_LIMITS[1] - PILOT_LIMITS[0], 6),
 )
-if not PILOT_CLEARANCE[0] > 0.0:
+if not PILOT_CLEARANCE[0] > READING:
     raise AssertionError(f"the pilot can bind in the hub hole: {PILOT_CLEARANCE}")
-if not PILOT_LIMITS[1] < BODY_DIA - 2.0 * XXX:
+if not PILOT_LIMITS[1] < BODY_LIMITS[0]:
     raise AssertionError("the pilot does not step down from the body")
-# The pilot's band is one the lathe holds by cutting to a number: no
-# narrower than the shop's turned-diameter row (drawing-guidelines.md, What
-# the shop holds: +/-.0005, .001 wide). LEARN machinist review r5 refused
-# .3990-.3995 (.0005 wide): a band under the row needs a fit route, and a
-# matched pilot cannot serve every strap blank.
-if PILOT_LIMITS[1] - PILOT_LIMITS[0] < 2.0 * TURNED_DIA_ROW - 1e-9:
-    raise AssertionError("the pilot's band is narrower than the shop's turned row")
-# What the plug's play costs the strap's outline: the hub hole's centre can
-# sit off the counterbore's by half the pilot's largest clearance plus half
-# the body's in the counterbore, at most .00175 (0.044 mm). Held to a fifth
-# of the strap edges' profile half-band (+/-.010), so the outline program's
-# own error keeps the rest.
-HUB_LOCATING_ERROR_MAX = (PILOT_CLEARANCE[1] + BODY_CLEARANCE[1]) / 2.0
-HUB_LOCATING_BUDGET = 0.2 * STRAP_PROFILE_HALF
-if HUB_LOCATING_ERROR_MAX > HUB_LOCATING_BUDGET:
+# The plug never holds the blank off the fence or the end stop: the hub hole
+# lies where the fence and end stop put it when it was drilled, the
+# counterbore up to its position band off that on both axes, and the
+# plug's least float in the counterbore plus the pilot's least clearance in
+# the hole take that offset up with a reading to spare.
+HUB_OFFSET_MAX = COUNTERBORE_LOCATION_TOL * math.sqrt(2.0)
+PLUG_FLOAT_MIN = (BODY_FLOAT[0] + PILOT_CLEARANCE[0]) / 2.0
+if not PLUG_FLOAT_MIN - HUB_OFFSET_MAX > READING:
     raise AssertionError(
-        f"the plug lets the strap shift {HUB_LOCATING_ERROR_MAX:.3f} mm, over "
-        f"its {HUB_LOCATING_BUDGET:.3f} mm share of the outline's profile band"
+        f"the plug can hold the blank off the fence: float {PLUG_FLOAT_MIN:.4f} "
+        f"mm against an offset of {HUB_OFFSET_MAX:.4f} mm"
     )
 
 # Seated on the counterbore floor (plate frame: Z0 the floor the tape lies
 # on, +Z up), at the worst case of the printed bands.
 SEAT_Z = -COUNTERBORE_DEPTH  # nominal
-_SEAT_Z_RANGE = (-COUNTERBORE_DEPTH - XXX, -COUNTERBORE_DEPTH + XXX)
+_SEAT_Z_RANGE = (
+    -COUNTERBORE_DEPTH - COUNTERBORE_BAND,
+    -COUNTERBORE_DEPTH + COUNTERBORE_BAND,
+)
 SHOULDER_Z_MAX = _SEAT_Z_RANGE[1] + BODY_LENGTH + XXX
 PILOT_TOP_Z = SEAT_Z + OVERALL_LENGTH  # nominal, 2.21 above Z0
 PILOT_TOP_Z_RANGE = (
@@ -196,11 +197,11 @@ STRAP_UNDERSIDE_Z_MAX = TAPE_MAX
 STRAP_TOP_Z_MIN = TAPE_MIN + STRAP_THICKNESS_MIN
 if not SEAT_Z + BODY_LENGTH < 0.0:
     raise AssertionError("the plug's shoulder stands above Z0 at nominal")
-if not SHOULDER_Z_MAX < 0.0:
+if not SHOULDER_Z_MAX < -READING:
     raise AssertionError(
-        f"the plug's shoulder can stand {SHOULDER_Z_MAX:.3f} mm above Z0"
+        f"the plug's shoulder can stand {SHOULDER_Z_MAX:.3f} mm from Z0"
     )
-if not PILOT_TOP_Z_RANGE[1] < STRAP_TOP_Z_MIN:
+if not PILOT_TOP_Z_RANGE[1] < STRAP_TOP_Z_MIN - READING:
     raise AssertionError("the pilot can stand proud of the strap: the washer clamps it")
 # The pilot's cylindrical land (under the chamfer) still reaches into the
 # hole past the strap's underside.
@@ -249,37 +250,19 @@ for _feature, _names in DRAWING_DIMENSIONS.items():
         raise AssertionError(
             f"{_feature}: every marked dimension needs authored places"
         )
-# The body's nominal is a reference: the stated clearance governs.
-REFERENCE_DIMENSIONS: dict[str, frozenset[str]] = {
-    BODY_PROFILE: frozenset({"BodyDia"}),
-}
-
-BODY_CLEARANCE_TEXT = (
-    f"{inch_text(BODY_CLEARANCE[0], 4)}-{inch_text(BODY_CLEARANCE[1], 4)}"
-)
-PILOT_CLEARANCE_TEXT = (
-    f"{inch_text(PILOT_CLEARANCE[0], 4)}-{inch_text(PILOT_CLEARANCE[1], 4)}"
-)
 # Callouts the PART authors below each value (the drawing imports and reads
 # them back; a drawing-side SetText can write through to the part, #1942).
-# Rule 4: the body names its matched mate and the clearance that governs; the
-# pilot names its fit and mate with the clearance its limits give as REF.
-# Rule 3: each three-place length names what it holds.
+# Every size is the title block's (rule 4: nothing on the plug is a fit). The
+# pilot's third place names the hole it clears and the body's label the
+# counterbore it drops into (rule 3); each three-place length names what it
+# holds.
 DIMENSION_CALLOUTS: dict[str, dict[str, str]] = {
     BODY_PROFILE: {
-        "BodyDia": (
-            "TURN TO MEASURED COUNTERBORE\n"
-            f"{BODY_CLEARANCE_TEXT} DIAMETRAL CLEARANCE ON {PLATE_NUMBER}"
-        ),
+        "BodyDia": f"CLEARS {PLATE_NUMBER} COUNTERBORE",
         "BoreDia": "DRILL THRU" + (f"\n{WALL_TEXT}" if WALL_STATED else ""),
     },
     BODY: {"BodyLength": f"SHOULDER BELOW\n{PLATE_NUMBER} FLOOR"},
-    PILOT_PROFILE: {
-        "PilotDia": (
-            f"LOCATING FIT IN {STRAP_NUMBER} HUB HOLE\n"
-            f"(CLEARANCE {PILOT_CLEARANCE_TEXT} REF)"
-        ),
-    },
+    PILOT_PROFILE: {"PilotDia": f"CLEARS {STRAP_NUMBER} HUB HOLE"},
     PILOT: {"OverallLength": f"PILOT TOP BELOW\n{STRAP_NUMBER} TOP FACE"},
     PILOT_CHAMFER: {"ChamferSize": "X 45\u00b0"},
 }

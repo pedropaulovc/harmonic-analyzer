@@ -1,0 +1,10 @@
+# MHA-CH-13-TL-01 sub-plate (ch_rocker_strap_tl_sub_plate_spec): what fails
+# on the machine past each new guard, what sets its number and how it is
+# summed (tolerance-policy.md, "Checks in spec modules and tests").
+checks:
+  - id: C-01
+    check: "HUB_CBORE_TIP_CLEARANCE_MIN"
+    kind: gap
+    reason: "strap's hub drill or reamer tip reaches the counterbore floor"
+    source: "the strap plan's drill_tip_z_mm and ream_tip_z_mm against the counterbore depth .185 at its Hole Wizard .XX (#3622); held over the .001 tool-length reading (TIP_FLOOR_READING)"
+    basis: worst_case

@@ -108,7 +108,7 @@ def test_mirrors_agree_with_their_authorities() -> None:
         strap.HOLE_DIA + ch_rocker_hub_fit.STRAP_HOLE_BAND[0]
     )
     assert spec.HUB_LOCATION_TOL == plate.HUB_LOCATION_TOL
-    assert spec.PLUG_LOCATING_ERROR_MAX == pytest.approx(plug.HUB_LOCATING_ERROR_MAX)
+    assert plug.COUNTERBORE_LOCATION_TOL == plate.HUB_LOCATION_TOL
     assert plug.WASHER_NUMBER == spec.PART_NUMBER
     assert part.SKU == spec.SKU
     # The selection limits' copies: the strap traveler and the fixture record.
@@ -161,7 +161,6 @@ def test_the_washer_covers_the_hub_hole_with_slop_counted() -> None:
         - spec.RADIAL_PLAY_MAX
         - spec.RUNOUT_MAX
         - spec.SCREW_AXIS_ERROR_MAX
-        - spec.PLUG_LOCATING_ERROR_MAX
     )
     assert 0.25 < spec.BEARING_LAND_MIN < spec.BEARING_LAND_CENTRED_MIN
     assert spec.HEAD_LAND_MIN > 0.5

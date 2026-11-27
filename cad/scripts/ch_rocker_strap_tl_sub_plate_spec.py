@@ -32,6 +32,7 @@ from _printed_tolerance import (
     edge_break_radius_mm,
     printed_band_mm,
 )
+from _wizard_pocket_band import WIZARD_POCKET_BAND_MM
 
 PART_NAME = "ch-rocker-strap-tl-sub-plate"
 _ROW = _config.parts("ch-rocker-strap-tl-sub-plate")
@@ -102,8 +103,11 @@ if CORNER_CUTTER_RADIUS > CORNER_RADIUS:
 CLAMP_STATIONS: tuple[float, ...] = (25.4, 107.95, 196.85, 279.4)
 POCKET_LENGTH = 14.224  # .56 along X
 # The pocket's back wall seats the clamp's heel; its knife reaches the blank's
-# edge at C = .375 from it. Explicit band: it sets where the knife meets the
-# blank (shop table: a milled step <= 6 in from its datum, +/-.002).
+# edge at C = .375 from it. Explicit band (shop table: a milled step <= 6 in
+# from its datum, +/-.002): the clamp fits and grips only while the wall less
+# the blank's width lies within its .0075 total throw of C (Mitee-Bite
+# PITBULL-INST-0426), which the title block's +/-.005 alone overruns
+# (necessity register N-02).
 POCKET_BACK_WALL_Y = -47.625  # 1.875 from Y0
 POCKET_BACK_WALL_TOL = 0.0508  # +/-.002
 # The near wall: the blank's edge line (the 1.50 in blank against the fence).
@@ -124,15 +128,18 @@ CLAMP_C = 9.525
 CLAMP_BODY_WIDTH = 9.525
 
 # --- Hub counterbore and tap (TL-02 plug, TL-VN-51 screw) ---------------------------
-# The counterbore locates the blank's hub hole through the plug TL-02, so its
-# position carries the shop table's +/-.002 for a milled step; its Ø is the
-# first-made half of a matched slip fit (TL-02 is turned to it), printed at
-# the title block's .XXX.
+# The hub hole's position carries the shop table's +/-.002 for a milled step:
+# the hub screw stands in its tap and centres the washer TL-VN-52, which the
+# strap's outline program keeps its cutter clear of round its own hub centre,
+# so the tap's position error closes that air (necessity register N-01;
+# ch_rocker_strap_tl_vn_hub_washer_spec). The counterbore's Ø and depth are
+# its Hole Wizard callout's, three places at the .XX grade (rule 3, #3622).
 HUB_X = 152.4  # 6.000 from X0
 HUB_Y = -25.4  # 1.000 from Y0
 HUB_LOCATION_TOL = 0.0508  # +/-.002
 HUB_CBORE_DIA = 12.7  # .500
 HUB_CBORE_DEPTH = 4.699  # .185 from Z0
+HUB_CBORE_BAND = (WIZARD_POCKET_BAND_MM, -WIZARD_POCKET_BAND_MM)
 COUNTERBORE_FLOOR_Z = PLATE_TOP_Z - HUB_CBORE_DEPTH
 # Owner ruling 2026-11-23: "change the screw to #10-32. The sub-plate's
 # tapped hole becomes #10-32" (reversing 2026-11-17's "Use a 1/4-20 hub
@@ -249,9 +256,11 @@ if POCKET_DEPTH != CLAMP_B:
 
 # Thread engagement (rule 18: 1.5D of full thread), each tap through the plate
 # from its floor, at nominal and at the worst case of the printed bands
-# (overall -.01, fence height +.005, the floor's depth +.005), less the title
-# block's edge break at both tap mouths: only full thread counts (Codjiflo
-# review of #3056; pd_platen_spec's SOCKET_THREAD_ENGAGEMENT_MIN).
+# (overall -.01, fence height +.005, the floor's depth: a pocket's +.005, the
+# hub counterbore's +.01, since a Hole Wizard counterbore's depth takes the
+# .XX grade, drawing-guidelines rule 3 and #3622), less the title block's
+# edge break at both tap mouths: only full thread counts (Codjiflo review of
+# #3056; pd_platen_spec's SOCKET_THREAD_ENGAGEMENT_MIN).
 TAP_MOUTH_BREAK = max(edge_break_radius_mm(unit=UNIT), edge_break_chamfer_mm(unit=UNIT))
 CLAMP_THREAD_LENGTH = POCKET_FLOOR_Z - UNDERSIDE_Z  # 7.0104, .276
 CLAMP_THREAD_LENGTH_MIN = CLAMP_THREAD_LENGTH - XX - XXX - XXX - 2.0 * TAP_MOUTH_BREAK
@@ -260,31 +269,40 @@ if CLAMP_THREAD_LENGTH_MIN < CLAMP_THREAD_REQUIRED:
     raise AssertionError("the clamp tap is short of 1.5D of thread")
 HUB_THREAD_LENGTH = COUNTERBORE_FLOOR_Z - UNDERSIDE_Z  # 5.8674, .231
 HUB_THREAD_LENGTH_MIN = (
-    HUB_THREAD_LENGTH - XX - XXX - XXX - 2.0 * TAP_MOUTH_BREAK
-)  # 4.8514, .191
+    HUB_THREAD_LENGTH - XX - XXX - HUB_CBORE_BAND[0] - 2.0 * TAP_MOUTH_BREAK
+)  # 4.7244, .186
 HUB_THREAD_MAJOR = THREAD_MAJOR_MM[HUB_TAP_THREAD]
 HUB_THREAD_REQUIRED = 1.5 * HUB_THREAD_MAJOR  # .285
 # Owner ruling 2026-11-17 (registry RV-01) accepts the .23 in of thread in
 # the plate; under the #10-32 of 2026-11-23 it is .21 of full thread nominal
-# (1.11D), .19 at the worst case (1.01D; the 1/4-20 had .76D).
+# (1.11D), .186 at the worst case (0.979D; the 1/4-20 had .76D).
 # The sheet states the worst case as a plain fact (rule 20), on the tap's
-# callout.
+# callout, its length and its diameters each floored to two places: a stated
+# minimum is never rounded up past what the bands leave.
 HUB_ENGAGEMENT_DIAMETERS = HUB_THREAD_LENGTH_MIN / HUB_THREAD_MAJOR
 if not HUB_THREAD_LENGTH_MIN < HUB_THREAD_REQUIRED:
     raise AssertionError("the hub tap now meets 1.5D: drop the shortfall statement")
+_ENGAGEMENT_FLOOR_IN = math.floor(round(HUB_THREAD_LENGTH_MIN / INCH * 100, 6)) / 100
+_ENGAGEMENT_FLOOR_D = math.floor(round(HUB_ENGAGEMENT_DIAMETERS * 100, 6)) / 100
 HUB_ENGAGEMENT_STATEMENT = (
-    f"ENGAGEMENT {inch_text(HUB_THREAD_LENGTH_MIN, 2)} MIN "
-    f"({HUB_ENGAGEMENT_DIAMETERS:.2f}D)".replace("(0.", "(.")
+    f"ENGAGEMENT {inch_text(_ENGAGEMENT_FLOOR_IN * INCH, 2)} MIN "
+    f"({_ENGAGEMENT_FLOOR_D:.2f}D)".replace("(0.", "(.")
 )
 
-# The counterbore is the relief the strap's hub drill and reamer run into:
-# at its shallowest their tips stop the plan's clearance above its floor.
-HUB_CBORE_TIP_CLEARANCE_MIN = (HUB_CBORE_DEPTH - XXX) + max(
+# The counterbore is the relief the strap's hub drill and reamer run into
+# (the plan's tips at drill_tip_z_mm / ream_tip_z_mm). At its shallowest
+# (the wizard depth's .XX) the tips still stop 0.445 mm above its floor. What
+# fails is a tip that reaches the floor, so the worst case is checked
+# against the tool-length reading, .001 (tolerance-policy.md; check register
+# C-01). The plan's relief_floor_clearance_mm (0.5, "the author's allowance,
+# no source") gates nothing here.
+HUB_CBORE_TIP_CLEARANCE_MIN = (HUB_CBORE_DEPTH + HUB_CBORE_BAND[1]) + min(
     PLAN_DRILL_TIP_Z, PLAN_REAM_TIP_Z
 )
-if HUB_CBORE_TIP_CLEARANCE_MIN < PLAN_RELIEF_FLOOR_CLEARANCE:
+TIP_FLOOR_READING = 0.001 * INCH
+if HUB_CBORE_TIP_CLEARANCE_MIN <= TIP_FLOOR_READING:
     raise AssertionError(
-        "the hub counterbore is too shallow for the drill and reamer tips"
+        "the strap's hub drill or reamer tip can reach the counterbore floor"
     )
 
 # --- Printed grid (rule 3) ------------------------------------------------------------
@@ -463,8 +481,9 @@ DIMENSION_VALUES: dict[str, float] = {
 if set(DIMENSION_VALUES) != set(DRAWING_PRECISION_BY_NAME):
     raise AssertionError("every printed dimension needs its model value")
 # Explicit bands (mm, symmetric) on named model dimensions, each with its
-# function on the sheet; everything else is the title block's row for its
-# places. The build sets each one (build_ch_rocker_strap_tl_sub_plate).
+# necessity entry (cad/config/necessity/ch-rocker-strap-tl-sub-plate.yaml);
+# everything else is the title block's row for its places. The build sets
+# each one (build_ch_rocker_strap_tl_sub_plate).
 SYMMETRIC_BANDS: dict[tuple[str, str], float] = {
     (SECTION_A_REFERENCE, "PocketBackWallY"): POCKET_BACK_WALL_TOL,
     ("HubHole", "HubX"): HUB_LOCATION_TOL,
@@ -490,10 +509,13 @@ POCKET_COUNT = len(CLAMP_STATIONS)
 NOTCH_CORNER_COUNT = 3
 # Both fence notches share one back wall (the sketch's collinear back
 # walls), so their one depth is a 2X (machinist review r26: the right
-# notch's depth was given nowhere).
+# notch's depth was given nowhere). SECTION A-A cuts one pocket, so both its
+# wall locations carry the pocket count as its depth does (#3490).
 NOTCH_COUNT = 2
 DIMENSION_PREFIXES: dict[tuple[str, str], str] = {
     ("PocketProfile", "PocketLength"): f"{POCKET_COUNT}X ",
+    (SECTION_A_REFERENCE, "PocketNearWallY"): f"{POCKET_COUNT}X ",
+    (SECTION_A_REFERENCE, "PocketBackWallY"): f"{POCKET_COUNT}X ",
     (SECTION_A_REFERENCE, "PocketDepth"): f"{POCKET_COUNT}X ",
     ("PocketCorners", "PocketCornerR"): f"{4 * POCKET_COUNT}X R",
     ("NotchCorners", "NotchCornerR"): f"{NOTCH_CORNER_COUNT}X R",
@@ -503,20 +525,15 @@ HUB_CALLOUT_PLACES = 3
 CLAMP_NUMBER = "TL-VN-50"
 PLUG_NUMBER = "TL-02"
 STRAP_NUMBER = "MHA-CH-13"
-# Each three-place reason holds only at .XXX (rule 3), checked here: the
-# fence's top stays at or under the shop record's .079 (FENCE_TOP_LIMIT),
+# The fence height's three-place reason holds only at .XXX (rule 3), checked
+# here: its top stays at or under the shop record's .079 (FENCE_TOP_LIMIT),
 # which .XX's band would break, and under the strap's finished top face, so
-# the face mill clears it (FACE_CUT_CLEARANCE_MIN); at .XX's band the drill
-# and reamer points through the strap's hub hole would stop short of
-# PLAN_RELIEF_FLOOR_CLEARANCE over the counterbore's floor.
+# the face mill clears it (FACE_CUT_CLEARANCE_MIN). The hub counterbore's
+# depth is its wizard callout's, at the .XX grade (rule 3, #3622), and is
+# checked at that grade above.
 FENCE_TOP_LIMIT = 0.079 * INCH
 if not FENCE_HEIGHT + XXX <= FENCE_TOP_LIMIT + 1e-9 < FENCE_HEIGHT + XX:
     raise AssertionError("the fence height's third place is not what holds .079")
-if (
-    HUB_CBORE_DEPTH - XX + max(PLAN_DRILL_TIP_Z, PLAN_REAM_TIP_Z)
-    >= PLAN_RELIEF_FLOOR_CLEARANCE
-):
-    raise AssertionError("the counterbore depth's third place is not needed")
 # The pocket's tight back-wall location (1.875 +/-.002) and its depth both
 # serve the clamp's seat, so the clamp is named once, on one numbered note
 # both dimensions flag (rule 4: one feature with several tight dimensions
@@ -535,9 +552,9 @@ DIMENSION_CALLOUTS: dict[str, str] = {
 }
 # The taps' native callouts: DRILL after the drill's Ø, the clamp taps'
 # count. The hub hole's, four rows (the audit's limit): its drill, its
-# thread, its counterbore with the plug it locates (rule 4: the Ø.500 is the
-# first-made half of TL-02's slip fit), the thread's stated shortfall.
+# thread, its counterbore with the plug it holds (the plug floats in it, so
+# no fit is named: #3713), the thread's stated shortfall.
 CLAMP_TAP_COUNT = f"{POCKET_COUNT}X"
-HUB_CBORE_MATE = f"LOCATES {PLUG_NUMBER}"
+HUB_CBORE_MATE = f"FOR {PLUG_NUMBER}"
 DRAWING_NOTES = ""
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:4"

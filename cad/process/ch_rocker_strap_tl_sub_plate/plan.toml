@@ -395,7 +395,7 @@ sizing = { kind = "band", band_mm = "{{cad.counterbore_dia_band_mm}}" }
 instruction = "Same file: the hub counterbore, T1 plunged {{cad.counterbore_depth_min_in:.3dot}}–{{cad.counterbore_depth_max_in:.3dot}} deep at X {{cad.hub_x_in:.3f}}, Y −{{cad.hub_y_in:.3f}}."
 rpm = 2250
 feed = "{{process.cbore_plunge_feed_per_min_mm:in.1f}} in/min plunge"
-inspection = "At the M6 T2 stop: counterbore Ø {{cad.counterbore_dia_min_in:.3dot}}–{{cad.counterbore_dia_max_in:.3dot}} (telescoping gauge on the micrometer); write the reading on the plate's tag for TL-02, which is turned to it. Depth {{cad.counterbore_depth_min_in:.3dot}}–{{cad.counterbore_depth_max_in:.3dot}} below the plate top (calipers' depth rod). Out of band: stop."
+inspection = "At the M6 T2 stop: counterbore Ø {{cad.counterbore_dia_min_in:.3dot}}–{{cad.counterbore_dia_max_in:.3dot}} (telescoping gauge on the micrometer). Depth {{cad.counterbore_depth_min_in:.3dot}}–{{cad.counterbore_depth_max_in:.3dot}} below the plate top (calipers' depth rod). Out of band: stop."
 gauge_checks = [
   { gauge = "micrometers", band_mm = "{{cad.counterbore_dia_band_mm}}" },
   { gauge = "calipers", band_mm = "{{cad.counterbore_depth_band_mm}}" },

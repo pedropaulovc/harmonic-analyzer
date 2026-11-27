@@ -1,0 +1,28 @@
+# MHA-CH-13-TL-00 rocker-strap sub-plate fixture: why each setting tighter
+# than the title block stays (drawing-guidelines.md rule 4; owner ruling
+# 2026-11-24: the reason lives here, not on the sheet). Read by the machinist
+# review only.
+#
+# N-01: the fence sweep. G54 is touched once: X0 on the end stop, Y0 on the
+# fence opposite the hub hole (strap traveler Op 30, fitting step 6), and
+# every strap program (RS01-RS04) runs in it. The plate's own features are
+# cut in the plate's frame, so a fence skewed to the table's X turns them
+# about that Y0 point: each fence notch, its far end 5.9 in either side of
+# the hub (the plan's hub +/- fence_notch_outer_mm, 150 mm), moves the sweep
+# x 5.9/12 toward or away from the outline cutter's fence-sliver ring, which
+# runs to the program's 4.0 mm notch depth with .0025 in to spare (the
+# notch's .17 at its .XX low limit, 4.064 mm,
+# ch_rocker_strap_tl_sub_plate_spec.PLAN_FENCE_NOTCH_DEPTH). At .001 a notch
+# moves .0005 (.0020 left); at the title block's .010 it moves .0049, past
+# the .0025, and the 1/8 in cutter cuts the notch wall. The reading is no
+# narrower than its shop row (lever test indicator, .0005). Kept by
+# delegated ruling 2026-11-26 (Main), precedent: the keyed arbor kit's N-01
+# (dt-cone-gear-tl-arbor-assembly.yaml, a .001 indicator setting kept on its
+# necessity entry); owner review #2144 (D55 amended). Codjiflo review of
+# #3727 round 1 (P1).
+necessity:
+  - id: N-01
+    feature: "sheet 1, fitting step 4: CHECK: THE INDICATOR READS WITHIN .001 (fence along X)"
+    kind: gap
+    reason: "fence skew moves the notches into the outline cutter"
+    source: "ch_rocker_strap_tl_sub_plate_spec.NOTCH_DEPTH less its .XX band against PLAN_FENCE_NOTCH_DEPTH: .0025 in spare; a notch end 5.9 in from the hub moves the sweep x 5.9/12 (.0005 at .001, .0049 at .010)"
