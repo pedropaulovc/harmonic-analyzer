@@ -13,7 +13,6 @@ guards.
 from __future__ import annotations
 
 import copy
-import math
 import tomllib
 from pathlib import Path
 
@@ -93,13 +92,13 @@ def test_context_accepts_the_plan_and_numbers_the_tools(context) -> None:
     assert context["numbers"] == {
         "em-half": 1,
         "em-eighth": 2,
-        "em-sixteenth": 3,
-        "chamfer": 4,
-        "spot": 5,
-        "drill-43": 6,
-        "tap-guide": 7,
+        "chamfer": 3,
+        "spot": 4,
+        "drill-43": 5,
+        "tap-guide": 6,
     }
     assert RECIPE.LOAD_FIRST_TOOL == tuple(name for name, _ops in RECIPE.PROGRAMS)
+    assert "MS05_relief" not in dict(RECIPE.PROGRAMS)
     # The thumb hole is tapped where MS08 drilled it.
     drilled = next(
         kwargs["centres"]
@@ -108,34 +107,15 @@ def test_context_accepts_the_plan_and_numbers_the_tools(context) -> None:
     )
     assert drilled == [context["manual"]["tap_thumb"]["at"]]
     for stop in context["manual"].values():
-        assert stop["tool"] == 7
+        assert stop["tool"] == 6
         assert stop["gcode"][0] == "G53 G0 Z0.000" and stop["gcode"][-1] == "M30"
 
 
-def test_the_relief_plunges_keep_it_inside_its_height_band(context) -> None:
-    """Every cutter the traveler accepts (the plan's least to its most)
-    plunges no more than half itself apart and leaves the relief's clear
-    height between the ridges, √(D² − s²), inside the printed band; the
-    nominal cutter's ridge is the plan's scallop."""
-    centres = next(
-        kwargs["centres"]
-        for program, check, kwargs in context["expect"]
-        if program == "MS05_relief" and check == "holes"
-    )
-    steps = {
-        round(abs(b[1] - a[1]), 3) for a, b in zip(centres, centres[1:], strict=False)
-    }
-    step = max(steps)
-    p = PLAN["parameters"]
-    band = FEATURES["features"]["relief_floor"]["relief_height"]
-    nominal = SHOP["tools"]["endmill-carbide-3fl-1-16-loc-1-2"]["diameter_mm"]
-    for cutter in (p["relief_cutter_min_mm"], nominal, p["relief_cutter_max_mm"]):
-        assert step <= cutter / 2 + 1e-3
-        clear = math.sqrt(cutter**2 - step**2)
-        assert band[0] - 1e-3 <= clear <= band[1] + 1e-3, cutter
-    radius = nominal / 2
-    ridge = radius - math.sqrt(radius**2 - (step / 2) ** 2)
-    assert ridge <= p["relief_scallop_mm"] + 1e-3
+def test_rebate_corner_radius_max_is_validated_from_feature_manifest() -> None:
+    bad = copy.deepcopy(FEATURES)
+    bad["features"]["rebate_corner"]["corner_radius_max_design"] = 0.20
+    with pytest.raises(ValueError, match="corner_radius_max_design"):
+        RECIPE.context(bad, PLAN, SHOP, "stop.step")
 
 
 def test_the_recipes_programs_pass_every_check_they_declare(context, tmp_path) -> None:
@@ -151,14 +131,11 @@ def test_the_recipes_programs_pass_every_check_they_declare(context, tmp_path) -
         ("end_trim_mm", 6.0, "end_trim_mm"),
         ("thickness_min_mm", 13.0, "thickness_min_mm"),
         ("rebate_centre_x_mm", 4.5, "rebate_centre_x_mm"),
-        ("relief_plunge_step_mm", 1.0, "relief_plunge_step_mm"),
-        ("relief_scallop_mm", 0.2, "relief_scallop_mm"),
-        ("relief_cutter_min_mm", 1.6, "relief_cutter_min_mm"),
+        ("rebate_back_height_mm", 2.0, "rebate_back_height_mm"),
         ("slot_cut_max_mm", 3.175, "slot_cut_max_mm"),
         ("slot_go_pin_in", 0.123, "slot_go_pin_in"),
-        ("relief_nogo_pin_in", 0.071, "relief_nogo_pin_in"),
+        ("slot_nogo_pin_in", 0.131, "slot_nogo_pin_in"),
         ("slot_test_feed_mm_min", 213.36, "slot_test_feed_mm_min"),
-        ("relief_test_x_mm", 10.5, "apart"),
         ("slot_test_x_mm", 13.0, "inside the waste end"),
         ("test_far_y_mm", 29.0, "test_far_y_mm"),
         ("chamfer_tip_depth_mm", 1.9, "chamfer_tip_depth_mm"),
@@ -175,15 +152,6 @@ def test_a_plan_number_off_the_model_or_shop_is_refused(key, value, detail) -> N
     plan["parameters"][key] = value
     with pytest.raises(ValueError, match=detail):
         _context(plan)
-
-
-def test_a_relief_cutter_whose_flutes_stop_above_the_relief_is_refused() -> None:
-    """A stub-flute 1/16 (.093 of flutes) would bring its 1/8 shank into the
-    rebate beside the roof: refused."""
-    shop = copy.deepcopy(SHOP)
-    shop["tools"]["endmill-carbide-3fl-1-16-loc-1-2"]["flute_length_mm"] = 2.3622
-    with pytest.raises(ValueError, match="flutes stop short"):
-        RECIPE.context(FEATURES, PLAN, shop, "stop.step")
 
 
 def _lines(ctx: dict, key: str) -> list[str]:
@@ -218,20 +186,6 @@ def _seed(ctx: dict, key: str, pick, change) -> dict:
             lambda line: line.startswith("G1 X"),
             lambda line: "G1 X2.000 F{feed}",
             "keep_out",
-        ),
-        # The relief's first plunge moved off its line, below the rebate's back.
-        (
-            "relief",
-            lambda line: line.startswith("G0 X"),
-            lambda line: "G0 X4.200" + line[line.index(" Y") :],
-            "keep_out",
-        ),
-        # A relief plunge stopped short of the relief's back.
-        (
-            "relief",
-            lambda line: line == "G1 Z-9.779 F{feed}",
-            lambda line: "G1 Z-9.000 F{feed}",
-            "holes",
         ),
         # The thumb hole drilled short of the rebate.
         (

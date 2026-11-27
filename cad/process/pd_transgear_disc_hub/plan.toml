@@ -243,6 +243,7 @@ pin_flat_bottom_mm = 4.2557
 pin_flat_peck_mm = 0.4
 endmill_reach_min_in = 0.1
 endmill_out_min_in = 0.6
+endmill_out_max_in = 0.8
 # The #56 knockout through, its full diameter 0.3 mm past the O.D. at the
 # hole's inner edge, the point then 0.5 mm over the parallel; the #53 to
 # the stop at its full diameter; the reamer's end at the stop (its bevel
@@ -313,7 +314,7 @@ ref = "drill-51"
 
 [[tools]]
 id = "endmill"
-name = "1/16 carbide end mill, .200 in of flutes, centre cutting (Kyocera 1800.0625.200)"
+name = "1/16 carbide end mill, .200 in of flutes, centre cutting: Kyocera 1800.0625.200"
 ref = "endmill-kyocera-1800-1-16"
 
 [[tools]]
@@ -647,8 +648,8 @@ instruction_detailed = "Edge finder (900 rpm, its tip over .28 long) at Y-3.810,
 feed = "hand"
 
 [[setups.operations]]
-instruction = "G54 Z0: the hub's axis, the end mill's tip on a .002 feeler leaf on the body's top line at X0 Y−3.810, set to half D plus the leaf."
-instruction_detailed = "Console M6 T3 (1/16 end mill in the 1/8 in collet, {{process.endmill_out_min_in:.2dot}}–.80 out; if its .800 plastic stop ring is fitted, seat the ring on the collet face). MDI G0 X0 Y-3.810. Spindle stopped, its tip just dragging a .002 leaf on the body's top line: G10 L20 P1 Z(D, the miked diameter from Holding, in mm, halved, + 0.051). Example only: D = .5400 gives Z6.909."
+instruction = "G54 Z0: the hub's axis, the 1/16 end mill ({{process.endmill_out_min_in:.2dot}}–{{process.endmill_out_max_in:.2dot}} out of the 1/8 in collet; seat its .800 plastic stop ring on the collet face if fitted, and sight the tip's end gash to centre before loading) on a .002 feeler leaf on the body's top line at X0 Y−3.810, set to half D plus the leaf."
+instruction_detailed = "Sight the 1/16 end mill's tip to confirm its end-cutting gash reaches centre, then console M6 T3 (1/16 end mill in the 1/8 in collet, {{process.endmill_out_min_in:.2dot}}–{{process.endmill_out_max_in:.2dot}} out; if its .800 plastic stop ring is fitted, seat the ring on the collet face). MDI G0 X0 Y-3.810. Spindle stopped, its tip just dragging a .002 leaf on the body's top line: G10 L20 P1 Z(D, the miked diameter from Holding, in mm, halved, + 0.051). Example only: D = .5400 gives Z6.909."
 feed = "hand"
 
 [[setups.operations]]

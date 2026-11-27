@@ -26,8 +26,7 @@ _FEATURE_KINDS = {
     "rebate_ceiling": "face",
     "rebate_floor": "face",
     "rebate_back": "face",
-    "relief_back": "face",
-    "relief_floor": "face",
+    "rebate_corner": "fillet",
     "roof_chamfer_1": "chamfer",
     "roof_chamfer_2": "chamfer",
     "thumb_tap": "threaded_hole",
@@ -72,8 +71,7 @@ def test_the_block_is_a_feature_export_part_with_one_owner_per_face(
     selectors = export_features.feature_selectors(STEM)
     length, height, depth = spec.BLOCK_LENGTH, spec.BLOCK_HEIGHT, spec.BLOCK_DEPTH
     chamfer = spec.ROOF_END_CHAMFER
-    relief_back = spec.WINDOW_Z_MAX + spec.RELIEF_DEPTH
-    relief_floor = spec.WINDOW_Y_MAX - spec.RELIEF_HEIGHT
+    corner_r = spec.REBATE_CORNER_R_MAX
     thumb_r = spec.THUMB_TAP_DRILL / 2
     tap_r = spec.PLATE_TAP_DRILL_DIA / 2
     x, _y, z = spec.THUMB_HOLE_POINTS[0]
@@ -87,8 +85,20 @@ def test_the_block_is_a_feature_export_part_with_one_owner_per_face(
         "rebate_ceiling": [_plane((0.0, -1.0, 0.0), -spec.WINDOW_Y_MAX)],
         "rebate_floor": [_plane((0.0, 1.0, 0.0), spec.WINDOW_Y_MIN)],
         "rebate_back": [_plane((0.0, 0.0, -1.0), -spec.WINDOW_Z_MAX)],
-        "relief_back": [_plane((0.0, 0.0, -1.0), -relief_back)],
-        "relief_floor": [_plane((0.0, 1.0, 0.0), relief_floor)],
+        "rebate_corner": [
+            _cylinder(
+                2.0 * corner_r,
+                (1.0, 0.0, 0.0),
+                (
+                    0.0,
+                    spec.WINDOW_Y_MAX - corner_r,
+                    spec.WINDOW_Z_MAX - corner_r,
+                    length,
+                    spec.WINDOW_Y_MAX,
+                    spec.WINDOW_Z_MAX,
+                ),
+            )
+        ],
         "roof_chamfer_1": [
             _plane((-1.0, 1.0, 0.0), (height - chamfer) / math.sqrt(2.0))
         ],
@@ -181,14 +191,12 @@ def test_the_rebate_bands_are_the_printed_ones(manifest: dict) -> None:
         assert rebate["note"] == drawing.REBATE_NOTE
     assert features["rebate_floor"]["rebate_height_from"] == "rebate_ceiling"
     assert features["rebate_back"]["rebate_width_from"] == "mating_face"
-    assert features["relief_back"]["relief_depth"] == pytest.approx(
-        [_in(0.04), _in(0.06)]
-    )
-    assert features["relief_back"]["relief_depth_from"] == "rebate_back"
-    assert features["relief_floor"]["relief_height"] == pytest.approx(
-        [_in(0.05), _in(0.07)]
-    )
-    assert features["relief_floor"]["relief_height_from"] == "rebate_ceiling"
+    corner = features["rebate_corner"]
+    assert corner["radius"] == pytest.approx([0.0, _in(0.003)], abs=1e-6)
+    assert corner["radius_nominal"] == pytest.approx(_in(0.003))
+    assert corner["corner_radius_max_design"] == pytest.approx(_in(0.003))
+    assert corner["callout"] == "SEE NOTE 1"
+    assert corner["note"] == drawing.REBATE_NOTE
     for index in (1, 2):
         chamfer = features[f"roof_chamfer_{index}"]
         assert chamfer["size"] == pytest.approx([_in(0.03), _in(0.05)])

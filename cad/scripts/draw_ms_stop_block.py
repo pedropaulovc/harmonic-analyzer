@@ -42,6 +42,7 @@ from _drawing_dimensions import set_dimension_callouts
 from _drawing_finish import add_surface_finish
 from _drawing_hole_callout import add_native_hole_callout, set_hole_callout_precision
 from _feature_requirements import part_metadata, requirement
+from _fit_deviations import deviations
 from _gtol_cylinder import CylinderFace
 from _gtol_planar import PlanarFace
 from _printed_limits import drilled_limits, limits
@@ -91,15 +92,16 @@ RIGHT_KEEP = {
     "WindowHeight": (0.370, 0.180), "RoofThickness": (0.355, 0.220),
     # Above the roof, left of the roof-thickness text, under the (.48).
     "BackWall": (0.345, 0.224),
-    # Depth across the notch, its text left in the open rebate; height right
-    # of the back face, inside the roof-thickness dimension.
-    "ReliefDepth": (0.316, 0.200), "ReliefHeight": (0.346, 0.196),
+    # Outside the open rebate mouth, its straight radial leader entering
+    # through the open mouth below the Ra 63 finish symbol to the R.003 arc.
+    "RebateCornerR": (0.242, 0.186),
 }
 BOTTOM_KEEP = {
     "ThumbFromEnd": (0.175, 0.031), "ThumbFromPlate": (0.090, 0.073),
 }
-# Rule 4: the rebate's two tight bands carry only SEE NOTE 1; the one numbered
-# note (ms_stop_block_notes.REBATE_NOTE) names the stick that slides in it.
+# Rule 4: the rebate's two tight size bands and R.003 MAX corner carry SEE
+# NOTE 1; the one numbered note (ms_stop_block_notes.REBATE_NOTE) names the
+# stick that slides in it.
 REBATE_NOTE_LINK = f"SEE NOTE {REBATE_NOTE_NUMBER}"
 # Upper-left corner of the note text: the empty field left of the .84 and
 # above the .56, clear of the cover-face view.
@@ -110,6 +112,7 @@ DIMENSION_CALLOUTS = {
     "RoofChamferSize": "2 CORNERS",
     "WindowWidth": REBATE_NOTE_LINK,
     "WindowHeight": REBATE_NOTE_LINK,
+    "RebateCornerR": REBATE_NOTE_LINK,
 }
 # Leadered labels name the X=0 end and Y=0 edge the match-drill clamp aligns.
 LOCATING_END_XY = (0.232, 0.160)
@@ -141,8 +144,9 @@ COVER_TAP_PRECISION = {
 }
 THUMB_TAP_PRECISION = {"hw-tapdrldia": part.HOLE_CALLOUT_PRECISION}
 # Ra 63 uin symbol left of the right view's open rebate mouth, below the mating
-# face label; its leader enters the mouth to the ceiling's mouth-side quarter.
-SLIDE_FINISH_OFFSET = (-0.030, -0.012)
+# face label and above the RebateCornerR leader; its leader enters the mouth to
+# the ceiling's mouth-side quarter.
+SLIDE_FINISH_OFFSET = (-0.022, -0.004)
 
 # Feature-export declarations (export_features; cad/docs/pipeline/
 # features-travelers.md): what this sheet prints, beside the constants of the
@@ -209,7 +213,7 @@ part_metadata(
 )
 # The X = 0 end, labelled LOCATING END: the match-drill clamp sets it flush
 # with the plate's, and the .84, the thumb tap's .42 and the plate taps'
-# (.150)/(.690) run from it. The rebate and the relief split it.
+# (.150)/(.690) run from it. The rebate splits it.
 requirement(
     "locating_end",
     kind="face",
@@ -331,8 +335,7 @@ requirement(
 )
 # The rebate, through X and open into the mating face: its ceiling (the roof
 # underside, .09 from the top: RoofThickness) is the one graded surface, Ra 63,
-# where the stick's graduated face slides (BLOCK_SURFACE_FINISHES); the relief
-# notch's top is coplanar with it.
+# where the stick's graduated face slides (BLOCK_SURFACE_FINISHES).
 requirement(
     "rebate_ceiling",
     kind="face",
@@ -404,53 +407,43 @@ requirement(
     },
     precision={"rebate_width": _P["WindowWidth"]},
 )
-# The corner relief: a notch into the back wall under the roof, .05 deep from
-# the rebate's back face and .06 down from the ceiling (RIGHT_KEEP
-# "ReliefDepth", "ReliefHeight"), so the stick seats on the roof past the
-# cutter's corner radius.
-_RELIEF_BACK_Z = part.WINDOW_Z_MAX + part.RELIEF_DEPTH
-_RELIEF_FLOOR_Y = part.WINDOW_Y_MAX - part.RELIEF_HEIGHT
-requirement(
-    "relief_back",
-    kind="face",
-    faces=(PlanarFace((0.0, 0.0, -1.0), -_RELIEF_BACK_Z),),
-    requirements=("relief_depth",),
-    fields={
-        "plane": (
-            _plane("z", _RELIEF_BACK_Z),
-            ((_SPEC, "WINDOW_Z_MAX"), (_SPEC, "RELIEF_DEPTH")),
-        ),
-        "relief_depth": _printed(
-            "ReliefDepth",
-            part.RELIEF_DEPTH,
-            (_SPEC, "RELIEF_DEPTH"),
-            (_SELF, "RIGHT_KEEP"),
-        ),
-        "relief_depth_nominal": (part.RELIEF_DEPTH, ((_SPEC, "RELIEF_DEPTH"),)),
-        "relief_depth_from": ("rebate_back", ((_SELF, "RIGHT_KEEP"),)),
-    },
-    precision={"relief_depth": _P["ReliefDepth"]},
+# The rebate's roof-to-back inside corner along X: the single limit R.003 MAX
+# (RIGHT_KEEP "RebateCornerR", SEE NOTE 1), cut directly by the square 1/8 in
+# carbide end mill so the stick seats flat on the roof without a corner relief
+# (owner ruling 2026-11-26, #3739 Option A).
+_CORNER_SOURCES = (
+    (_SPEC, "REBATE_CORNER_R_MAX"),
+    (_SPEC, "REBATE_CORNER_R_BAND"),
+    (_SPEC, "REBATE_CORNER_R_TOL_TYPE"),
+    (_SELF, "RIGHT_KEEP"),
+    (_SELF, "_dress_rebate_corner_radius"),
 )
 requirement(
-    "relief_floor",
-    kind="face",
-    faces=(PlanarFace((0.0, 1.0, 0.0), _RELIEF_FLOOR_Y),),
-    requirements=("relief_height",),
+    "rebate_corner",
+    kind="fillet",
+    faces=(CylinderFace(2.0 * part.REBATE_CORNER_R_MAX),),
+    requirements=("radius",),
     fields={
-        "plane": (
-            _plane("y", _RELIEF_FLOOR_Y),
-            ((_SPEC, "WINDOW_Y_MAX"), (_SPEC, "RELIEF_HEIGHT")),
+        "at": (
+            [0.0, part.WINDOW_Y_MAX, part.WINDOW_Z_MAX],
+            ((_SPEC, "WINDOW_Y_MAX"), (_SPEC, "WINDOW_Z_MAX"), _BUILD),
         ),
-        "relief_height": _printed(
-            "ReliefHeight",
-            part.RELIEF_HEIGHT,
-            (_SPEC, "RELIEF_HEIGHT"),
-            (_SELF, "RIGHT_KEEP"),
+        "axis": ((1.0, 0.0, 0.0), (_FRAME,)),
+        "radius": (
+            limits(
+                part.REBATE_CORNER_R_MAX,
+                _P["RebateCornerR"],
+                part.REBATE_CORNER_R_BAND,
+                unit=part.UNIT,
+            ),
+            (*_CORNER_SOURCES, (_SPEC, "UNIT"), _PRECISION),
         ),
-        "relief_height_nominal": (part.RELIEF_HEIGHT, ((_SPEC, "RELIEF_HEIGHT"),)),
-        "relief_height_from": ("rebate_ceiling", ((_SELF, "RIGHT_KEEP"),)),
+        "radius_nominal": (part.REBATE_CORNER_R_MAX, ((_SPEC, "REBATE_CORNER_R_MAX"),)),
+        "corner_radius_max_design": (part.REBATE_CORNER_R_MAX, _CORNER_SOURCES),
+        "callout": _FIT_LINK,
+        "note": _FIT,
     },
-    precision={"relief_height": _P["ReliefHeight"]},
+    precision={"radius": _P["RebateCornerR"]},
 )
 # The two roof end chamfers, .04 x 45 deg, 2 CORNERS (FRONT_KEEP
 # "RoofChamferSize", "RoofChamferAngle"): each breaks the roof's end edge,
@@ -760,6 +753,68 @@ def _assert_reference_dimensions(adapter: Any, annotations: list[Any]) -> None:
         raise RuntimeError(f"missing reference dimensions: {sorted(remaining)}")
 
 
+def _hide_tangent_edges(view: Any, *, label: str) -> None:
+    """Hide the R.003 rebate-corner fillet's tangent edge on the cover-face view."""
+    native = _early_bound(view, "IView")
+    native.SetDisplayTangentEdges2(0)  # swTangentEdgesHidden
+    if int(native.GetDisplayTangentEdges2()) != 0:
+        raise RuntimeError(f"failed to hide {label} tangent edges")
+    native.UpdateViewDisplayGeometry()
+
+
+def _dress_rebate_corner_radius(adapter: Any, annotations: list[Any]) -> None:
+    """Keep RebateCornerR radial, single-limit MAX, non-reference, and outside-arrowed."""
+    found = [
+        item for item in annotations if dimension_name(adapter, item) == "RebateCornerR"
+    ]
+    if len(found) != 1:
+        raise RuntimeError(
+            f"expected one RebateCornerR on the sheet, found {len(found)}"
+        )
+    label = "MHA-MS-02 RebateCornerR"
+    annotation = _early_bound(found[0], "IAnnotation")
+    display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+    if bool(display.Diametric) or int(display.Type2) != 5:  # swRadialDimension
+        raise RuntimeError(f"{label}: imported as a non-radial dimension")
+    dimension = _early_bound(display.GetDimension2(0), "IDimension")
+    tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
+    lower, upper = deviations(part.REBATE_CORNER_R_BAND)
+    if (
+        not math.isclose(
+            float(dimension.SystemValue),
+            part.REBATE_CORNER_R_MAX / 1000.0,
+            abs_tol=1e-9,
+        )
+        or int(tolerance.Type) != part.REBATE_CORNER_R_TOL_TYPE
+        or not math.isclose(
+            float(tolerance.GetMinValue()), lower / 1000.0, abs_tol=1e-12
+        )
+        or not math.isclose(
+            float(tolerance.GetMaxValue()), upper / 1000.0, abs_tol=1e-12
+        )
+    ):
+        raise RuntimeError(f"{label}: imported radius lost its model MAX limit")
+    if (
+        bool(dimension.IsReference())
+        or bool(display.ShowParenthesis)
+        or any(
+            "(" in str(display.GetText(index) or "")
+            or ")" in str(display.GetText(index) or "")
+            for index in (1, 2)
+        )
+    ):
+        raise RuntimeError(f"{label}: imported as a reference")
+    display.ArcExtensionLineOrOppositeSide = False
+    display.ArrowSide = 1  # swDimensionArrowsSide_e.swDimArrowsOutside
+    display.SolidLeader = False
+    if (
+        bool(display.ArcExtensionLineOrOppositeSide)
+        or int(display.ArrowSide) != 1
+        or bool(display.SolidLeader)
+    ):
+        raise RuntimeError(f"{label}: radial leader style did not persist")
+
+
 def _label_locating_edges(adapter: Any, front: Any) -> None:
     """Leader the match-drill X=0 end and Y=0 edge on the cover-face view."""
     face_z = part.PLATE_Z_MAX / 1000.0
@@ -799,10 +854,13 @@ def build(adapter: Any) -> dict[str, str]:
                               (right, RIGHT_KEEP, "open rebate end"),
                               (bottom, BOTTOM_KEEP, "thumbscrew face")):
         set_hidden_lines_removed(adapter, view)
+        if view is front:
+            _hide_tangent_edges(front, label="cover face")
         annotations += curate_view_dimensions(adapter, view, keep=keep, view_label=label,
                                                dimensions_by_feature=part.BLOCK_DRAWING_DIMENSIONS)
     set_hidden_lines_removed(adapter, iso)
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
+    _dress_rebate_corner_radius(adapter, annotations)
     if add_note(adapter, REBATE_NOTE, *REBATE_NOTE_XY) is None:
         raise RuntimeError("failed to add the stop block rebate note")
     plate_edge = model_point_in_view(
@@ -847,12 +905,16 @@ def build(adapter: Any) -> dict[str, str]:
     assert_manufacturing_dimensions(
         adapter, annotations, part.BLOCK_DRAWING_VALUES_BY_NAME,
         part.BLOCK_DRAWING_PRECISION_BY_NAME,
-        bands={name: part.WINDOW_SIZE_TOLERANCE_MM for name in ("WindowWidth", "WindowHeight")},
+        bands={
+            **{name: part.WINDOW_SIZE_TOLERANCE_MM for name in ("WindowWidth", "WindowHeight")},
+            "RebateCornerR": deviations(part.REBATE_CORNER_R_BAND),
+        },
         angular=frozenset({"RoofChamferAngle"}),
     )
     _assert_reference_dimensions(adapter, annotations)
     for view in (front, right, bottom):
         set_hidden_lines_removed(adapter, view)
+    _hide_tangent_edges(front, label="cover face")
     add_property_linked_note(adapter, "Isometric View Note", ISO_CENTER[0] - 0.030, 0.085)
     return finalize_drawing(adapter, OUTPUTS,
                                   pdf_title="Measuring Stick Stop Block Manufacturing Drawing",

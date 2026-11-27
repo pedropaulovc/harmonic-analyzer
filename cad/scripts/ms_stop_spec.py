@@ -54,12 +54,16 @@ WINDOW_Y_MAX = BLOCK_HEIGHT - ROOF_THICKNESS
 WINDOW_Y_MIN = WINDOW_Y_MAX - WINDOW_HEIGHT
 FLOOR_THICKNESS = WINDOW_Y_MIN
 BACK_WALL_THICKNESS = BLOCK_DEPTH - WINDOW_Z_MAX
-# Corner relief: a notch in the back wall under the roof, so the stick
-# seats on the roof whatever corner radius (up to the title block's R.040 MAX)
-# the cutter leaves. Its .05 +/-.01 depth clears that radius at its minimum;
-# the .48 depth keeps the wall behind it at the .080 target.
-RELIEF_DEPTH = 1.27  # .05
-RELIEF_HEIGHT = 1.524  # .06
+# Owner ruling 2026-11-26 (#3739, Option A): delete the plunge-milled corner
+# relief and cut the rebate's roof-to-back corner directly with the square
+# 1/8 in carbide end mill (88815A18) to R.003 MAX (matching MHA-DT-35's
+# square-end-mill corner convention). The stick's .315 +-.005 width in the
+# .330 +.010/0 rebate leaves at least .010 total side clearance (.005 per side
+# centred; .0075 per side in the nominal assembly) plus the stick's ruled-edge
+# break, so an R.003 MAX corner clears the stick without a separate relief slot.
+REBATE_CORNER_R_MAX = 0.0762  # .003 MAX
+REBATE_CORNER_R_BAND = (0.0, -REBATE_CORNER_R_MAX)  # (upper, lower) mm
+REBATE_CORNER_R_TOL_TYPE = 6  # swTolType_e.swTolMAX
 ROOF_END_CHAMFER = 1.016  # .04
 ROOF_CHAMFER_ANGLE = 45.0
 CUT_OVERHANG = 1.0
@@ -114,8 +118,8 @@ THUMB_HOLE_VOLUME = math.pi * (THUMB_TAP_DRILL / 2.0)**2 * FLOOR_THICKNESS
 PLATE_TAP_VOLUME = 2.0 * math.pi * (PLATE_TAP_DRILL_DIA / 2.0)**2 * (
     PLATE_TAP_DRILL_DEPTH + PLATE_TAP_DRILL_DIA / 2.0 * DRILL_POINT_H / 3.0
 )
-RELIEF_VOLUME = BLOCK_LENGTH * RELIEF_DEPTH * RELIEF_HEIGHT
-BLOCK_FINISHED_VOLUME = (BLOCK_VOLUME - WINDOW_VOLUME - RELIEF_VOLUME - BLOCK_CHAMFER_VOLUME
+REBATE_CORNER_VOLUME = BLOCK_LENGTH * REBATE_CORNER_R_MAX**2 * (1.0 - math.pi / 4.0)
+BLOCK_FINISHED_VOLUME = (BLOCK_VOLUME - WINDOW_VOLUME + REBATE_CORNER_VOLUME - BLOCK_CHAMFER_VOLUME
                          - THUMB_HOLE_VOLUME - PLATE_TAP_VOLUME)
 PLATE_VOLUME = BLOCK_LENGTH * BLOCK_HEIGHT * PLATE_THICKNESS
 PLATE_CHAMFER_VOLUME = ROOF_END_CHAMFER**2 * PLATE_THICKNESS
@@ -127,7 +131,7 @@ BLOCK_DRAWING_DIMENSIONS = {
     "Block": {"BlockDepth"},
     # The consumed rebate profile owns all three: its lines never draw.
     "WindowProfile": {"WindowHeight", "WindowWidth", "BackWall"},
-    "ReliefProfile": {"ReliefDepth", "ReliefHeight"},
+    "RebateCorner": {"RebateCornerR"},
     "RoofThicknessReference": {"RoofThickness"},
     "RoofChamfers": {"RoofChamferSize", "RoofChamferAngle"},
     "ThumbLocationReference": {"ThumbFromEnd", "ThumbFromPlate"},
@@ -167,11 +171,13 @@ PLATE_LOCATION_DIMENSIONS = frozenset({
 # from the rebate and the wall and prints as a reference "(.48)".
 BLOCK_REFERENCE_DIMENSIONS = frozenset({"BlockDepth"})
 # Sizes print the title block's .XX unless they need .XXX: the rebate (its
-# +.010/0 for the stick); the cover's stock thickness and the match-drill
-# stations print as references at their exact three-place nominals on both
-# sheets. Angles print whole degrees against the title block's +/-1 deg.
+# +.010/0 for the stick and its R.003 MAX roof-to-back corner); the cover's
+# stock thickness and the match-drill stations print as references at their
+# exact three-place nominals on both sheets. Angles print whole degrees against
+# the title block's +/-1 deg.
 _THREE_PLACE = frozenset({
-    "WindowWidth", "WindowHeight", "PlateThickness", *PLATE_LOCATION_DIMENSIONS,
+    "WindowWidth", "WindowHeight", "RebateCornerR", "PlateThickness",
+    *PLATE_LOCATION_DIMENSIONS,
 })
 
 
@@ -222,7 +228,7 @@ BLOCK_DRAWING_VALUES_BY_NAME = {
     "BlockDepth": BLOCK_DEPTH, "WindowHeight": WINDOW_HEIGHT,
     "RoofThickness": ROOF_THICKNESS, "WindowWidth": WINDOW_WIDTH,
     "BackWall": BACK_WALL_THICKNESS,
-    "ReliefDepth": RELIEF_DEPTH, "ReliefHeight": RELIEF_HEIGHT,
+    "RebateCornerR": REBATE_CORNER_R_MAX,
     "RoofChamferSize": ROOF_END_CHAMFER, "RoofChamferAngle": ROOF_CHAMFER_ANGLE,
     "ThumbFromEnd": THUMB_AXIS_X, "ThumbFromPlate": THUMB_AXIS_Z,
     "PlateLeftFromEnd": PLATE_HOLE_XS[0], "PlateRightFromEnd": PLATE_HOLE_XS[1],
@@ -247,7 +253,7 @@ BLOCK_ISOMETRIC_OCTANT = (1, 1, -1)
 TAP_DEPTH_TOLERANCE_MM = printed_band_mm(TAP_DEPTH_PRECISION, unit=UNIT)
 BLOCK_PRINTED_BANDS_MM = {
     name: printed_band_mm(BLOCK_DRAWING_PRECISION_BY_NAME[name], unit=UNIT)
-    for name in ("BlockLength", "BlockHeight", "RoofThickness", "BackWall", "ReliefDepth")
+    for name in ("BlockLength", "BlockHeight", "RoofThickness", "BackWall")
 }
 PLATE_PRINTED_BANDS_MM = {
     name: printed_band_mm(PLATE_DRAWING_PRECISION_BY_NAME[name], unit=UNIT)
@@ -300,7 +306,6 @@ def transferred_tap_end_web_min(master_position_band_mm: float) -> float:
 
 PLATE_TAP_END_WEB_MIN = transferred_tap_end_web_min(PLATE_HOLE_POSITION_TOLERANCE_MM)
 WINDOW_BACK_WALL_MIN = BACK_WALL_THICKNESS - BLOCK_PRINTED_BANDS_MM["BackWall"]
-RELIEF_BACK_WALL_MIN = WINDOW_BACK_WALL_MIN - (RELIEF_DEPTH + BLOCK_PRINTED_BANDS_MM["ReliefDepth"])
 PLATE_CLEARANCE_END_WEB_MIN = BLOCK_LENGTH - PLATE_PRINTED_BANDS_MM["PlateLength"] - (
     PLATE_HOLE_XS[1] + PLATE_HOLE_POSITION_TOLERANCE_MM
     + (PLATE_CLEARANCE_DIA + DRILL_OVERSIZE_MM) / 2.0
@@ -314,13 +319,14 @@ ROOF_OPEN_END_EDGE = ROOF_THICKNESS - ROOF_END_CHAMFER  # .05 at the approved en
 # The roof's worst case is exactly the .080 target; allow float rounding only.
 _WALL_MIN_MM = WALL_TARGET_MM - 1e-9
 
+assert 0.0 < REBATE_CORNER_R_MAX <= 0.127
 assert PLATE_SCREW_PENETRATION_MIN >= 1.5 * PLATE_SCREW_MAJOR_DIA
 assert PLATE_SCREW_PENETRATION_MAX < PLATE_FULL_THREAD_MIN
 assert PLATE_TAP_LEAD_MIN >= PLATE_SCREW_PITCH  # one-pitch bottoming-tap lead
 assert PLATE_TAP_BACK_WALL_MIN >= _WALL_MIN_MM
 assert ROOF_THICKNESS_MIN >= _WALL_MIN_MM
 assert PLATE_TAP_WINDOW_WEB_MIN >= _WALL_MIN_MM and PLATE_TAP_END_WEB_MIN >= _WALL_MIN_MM
-assert WINDOW_BACK_WALL_MIN >= _WALL_MIN_MM and RELIEF_BACK_WALL_MIN >= _WALL_MIN_MM
+assert WINDOW_BACK_WALL_MIN >= _WALL_MIN_MM
 assert PLATE_CLEARANCE_END_WEB_MIN >= _WALL_MIN_MM and PLATE_CLEARANCE_HEAD_WEB_MIN >= _WALL_MIN_MM
 assert PLATE_RADIAL_CLEARANCE_MIN > 0.0
 

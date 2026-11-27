@@ -95,33 +95,6 @@ def rebate_profile(adapter: Any, dims: SketchDims) -> None:
     check("exit rebate profile", adapter.exit_sketch())
 
 
-@_telemetry.traced("sketch.stop_relief_profile")
-def relief_profile(adapter: Any, dims: SketchDims) -> None:
-    """The X-through corner relief's profile on the Right plane (local X is -Z).
-
-    A notch into the back wall under the roof, from the rebate's back corner:
-    ReliefDepth along the roof underside, then ReliefHeight down the notch.
-    """
-    check("open relief profile", adapter.create_sketch("Right"))
-    back = spec.WINDOW_Z_MAX + spec.RELIEF_DEPTH
-    low = spec.WINDOW_Y_MAX - spec.RELIEF_HEIGHT
-    points = [
-        (-spec.WINDOW_Z_MAX, spec.WINDOW_Y_MAX), (-back, spec.WINDOW_Y_MAX),
-        (-back, low), (-spec.WINDOW_Z_MAX, low),
-    ]
-    lines = add_line_chain(adapter, points)
-    # Emission order: depth along the roof, notch height, then the corner's
-    # origin anchor (Z station, then roof station).
-    define_rectilinear_chain(
-        adapter, lines, points, label="corner relief", dims=dims,
-        names=["ReliefDepth", "ReliefHeight", "ReliefWindowStation", "ReliefRoofStation"],
-        drives=['"ReliefDepth"', '"ReliefHeight"', '"WindowWidth"',
-                '"BlockHeight" - "RoofThickness"'],
-    )
-    ensure_fully_defined(adapter, "relief profile")
-    check("exit relief profile", adapter.exit_sketch())
-
-
 @_telemetry.traced("appearance.stop_reference_sketches")
 def hide_location_references(adapter: Any, names: tuple[str, ...]) -> None:
     model = _early_bound(adapter.currentModel, "IPartDoc")

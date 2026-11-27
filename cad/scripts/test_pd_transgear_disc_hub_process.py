@@ -57,6 +57,7 @@ def _post(ctx: dict, out: Path) -> None:
             job = sections[key]
             number = ctx["numbers"][job["tool"]]
             text += [
+                f"(T{number} D={job['dia']:.3f} {ctx['names'][job['tool']]})",
                 "M5",
                 f"%msg TOOL CHANGE: T{number} {ctx['names'][job['tool']]}, SET SPINDLE TO {job['rpm']:g} RPM",
                 f"M6 T{number}",
@@ -107,6 +108,11 @@ def test_the_plan_is_an_enrolled_traveler_and_cam_stem() -> None:
     assert "endmill" not in to_order
     endmill = next(t for t in PLAN["tools"] if t["id"] == "endmill")
     assert endmill["ref"] == "endmill-kyocera-1800-1-16"
+    assert "(" not in endmill["name"] and ")" not in endmill["name"]
+    z0_op = PLAN["setups"][3]["operations"][2]
+    for field in ("instruction", "instruction_detailed"):
+        assert "{{process.endmill_out_min_in:.2dot}}–{{process.endmill_out_max_in:.2dot}} out" in z0_op[field]
+        assert ".800 plastic stop ring" in z0_op[field]
     # Fit audit 2026-11-23: the reamed holes print no band, so no Class ZZ
     # pin gauges them; the ream's mate (the MHA-PD-VN-69 dowel) accepts it.
     # The bore is the one exception (owner ruling 2026-11-26: the ZZ .3135
@@ -210,8 +216,10 @@ def test_the_recipes_programs_pass_every_check_they_declare(ctx, tmp_path) -> No
         ("pin_flat_bottom_mm", 5.0, "pin_flat_bottom_mm"),
         ("pin_flat_peck_mm", 1.0, "pin_flat_peck_mm"),
         ("endmill_reach_min_in", 0.05, "endmill_reach_min_in"),
-        ("endmill_out_min_in", 0.5, "endmill_out_min_in"),
-        ("endmill_out_min_in", 0.9, "endmill_out_min_in"),
+        ("endmill_out_min_in", 0.5, "collet reaches the flange's top"),
+        ("endmill_out_min_in", 0.85, "exceeds process.endmill_out_max_in"),
+        ("endmill_out_max_in", 0.55, "exceeds process.endmill_out_max_in"),
+        ("endmill_out_max_in", 0.9, "leaves under .70 in in the 1/8 in collet"),
         ("knockout_tip_mm", -7.0, "knockout_tip_mm"),
         ("knockout_past_mm", 1.5, "knockout_tip_mm"),
         ("pilot_tip_mm", -4.0, "pilot_tip_mm"),

@@ -636,13 +636,19 @@ def context(
         )
     flange_y = (-(0.0 - g["front"]), -(g["flange_front"] - g["front"]))
     pin_clear = max(flange_r, pin_jaw_top) + CLEAR_MM
-    if p["endmill_out_min_in"] * IN < pin_clear - flat:
+    out_min = p["endmill_out_min_in"] * IN
+    out_max = p["endmill_out_max_in"] * IN
+    if out_min > out_max + 1e-9:
+        raise ValueError(
+            "process.endmill_out_min_in exceeds process.endmill_out_max_in"
+        )
+    if out_min < pin_clear - flat:
         raise ValueError(
             "process.endmill_out_min_in: the 1/8 in collet reaches the flange's top"
         )
-    if ENDMILL_OAL_MM - p["endmill_out_min_in"] * IN < ENDMILL_GRIP_MIN_MM - 1e-9:
+    if ENDMILL_OAL_MM - out_max < ENDMILL_GRIP_MIN_MM - 1e-9:
         raise ValueError(
-            "process.endmill_out_min_in: leaves under .70 in in the 1/8 in collet"
+            "process.endmill_out_max_in: leaves under .70 in in the 1/8 in collet"
         )
     deepest = min(knockout_tip, pilot_tip, stop)
     if p["pin_tool_out_min_in"] * IN < pin_clear - deepest:

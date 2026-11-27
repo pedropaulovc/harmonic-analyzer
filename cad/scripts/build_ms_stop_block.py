@@ -38,9 +38,10 @@ from _drawing_marks import (
 from _drawing_precision import _named_dimension, apply_drawing_precision
 from _drawing_tolerances import set_dimension_bilateral_tolerance
 from _holes import wizard_holes
+from _single_limit_tolerance import set_single_limit
 from ms_stop_geom import (
     author_hole_precision, hide_location_references, location_reference,
-    rebate_profile, relief_profile, roof_reference,
+    rebate_profile, roof_reference,
 )
 
 PART_NAME = "ms-stop-block"
@@ -80,7 +81,7 @@ def build(adapter) -> dict[str, str]:
         ("BlockDepth", spec.BLOCK_DEPTH), ("WindowHeight", spec.WINDOW_HEIGHT),
         ("WindowWidth", spec.WINDOW_WIDTH), ("RoofThickness", spec.ROOF_THICKNESS),
         ("RoofChamferSize", spec.ROOF_END_CHAMFER),
-        ("ReliefDepth", spec.RELIEF_DEPTH), ("ReliefHeight", spec.RELIEF_HEIGHT),
+        ("RebateCornerR", spec.REBATE_CORNER_R_MAX),
     ):
         set_global(adapter, name, f"{value}mm")
     jobs: list[tuple[str, str]] = []
@@ -118,18 +119,16 @@ def build(adapter) -> dict[str, str]:
     jobs.append(("WindowCutDepth@Window", f'2 * ("BlockLength" + {spec.CUT_OVERHANG})'))
     volume_check(adapter, "open rebate", spec.BLOCK_VOLUME - spec.WINDOW_VOLUME, 0.005 * spec.BLOCK_VOLUME)
 
-    dims = SketchDims()
-    relief_profile(adapter, dims)
-    name_last_feature(adapter, "ReliefProfile")
-    jobs += dims.apply(adapter, "ReliefProfile")
-    check("corner relief", adapter.create_cut_extrude(ExtrusionParameters(
-        depth=2.0 * (spec.BLOCK_LENGTH + spec.CUT_OVERHANG), both_directions=True,
-    )))
-    name_last_feature(adapter, "CornerRelief")
-    name_dimensions(adapter, "CornerRelief", ["ReliefCutDepth"])
-    jobs.append(("ReliefCutDepth@CornerRelief", f'2 * ("BlockLength" + {spec.CUT_OVERHANG})'))
-    volume_check(adapter, "corner relief",
-                       spec.BLOCK_VOLUME - spec.WINDOW_VOLUME - spec.RELIEF_VOLUME,
+    check("rebate roof-to-back corner", adapter.add_fillet(
+        spec.REBATE_CORNER_R_MAX,
+        [[spec.BLOCK_LENGTH / 2.0, spec.WINDOW_Y_MAX, spec.WINDOW_Z_MAX]],
+        propagate=False,
+    ))
+    name_last_feature(adapter, "RebateCorner")
+    name_dimensions(adapter, "RebateCorner", ["RebateCornerR"])
+    jobs.append(("RebateCornerR@RebateCorner", '"RebateCornerR"'))
+    volume_check(adapter, "rebate corner fillet",
+                       spec.BLOCK_VOLUME - spec.WINDOW_VOLUME + spec.REBATE_CORNER_VOLUME,
                        0.005 * spec.BLOCK_VOLUME)
 
     check("roof end chamfers", adapter.add_chamfer(
@@ -178,6 +177,14 @@ def build(adapter) -> dict[str, str]:
     for feature, names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature, names)
     apply_drawing_precision(adapter, DRAWING_PRECISION)
+    set_single_limit(
+        adapter,
+        "RebateCorner",
+        "RebateCornerR",
+        limit=spec.REBATE_CORNER_R_MAX,
+        band=spec.REBATE_CORNER_R_BAND,
+        tol_type=spec.REBATE_CORNER_R_TOL_TYPE,
+    )
     apply_drawing_properties(adapter, PART_NAME, {
         "Mating Face Note": spec.BLOCK_MATING_FACE_NOTE,
         "Isometric View Note": spec.ISOMETRIC_VIEW_NOTE,

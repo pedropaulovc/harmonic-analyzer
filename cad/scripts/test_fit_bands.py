@@ -91,7 +91,8 @@ LOCAL_BAND_SOURCES: dict[tuple[str, str], tuple[str, str]] = {
         " __import__('dt_crank_handle_pivot_screw_spec').TIP_CHAMFER_BAND,"
         " __import__('pd_transgear_arm_spec').PIN_HOLE_DEPTH_BAND,"
         " __import__('fr_top_frame_spec').HANGER_PIN_HOLE_DEPTH_BAND,"
-        " __import__('ch_fulcrum_keeper_spec').CORNER_R_BAND)",
+        " __import__('ch_fulcrum_keeper_spec').CORNER_R_BAND,"
+        " __import__('ms_stop_spec').REBATE_CORNER_R_BAND)",
         "each",
     ),
     # for configuration, teeth in CONFIGS: band = band_for(teeth); deviations(band)

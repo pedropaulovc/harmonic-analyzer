@@ -13,8 +13,8 @@ The block's dimensions live in ``ms_stop_spec``, shared with its stop plate
 - +Z runs into the block from the mating face (Z = 0) to the back face
   (Z = .48). The plate covers the mating face from Z = -.040 to 0.
 - The rebate runs through X and opens into the mating face: Z from 0 to .330,
-  under the .09 roof (Y = .56 - .09 down .134); the corner relief notches the
-  back wall under the roof, .05 deep in Z and .06 high.
+  under the .09 roof (Y = .56 - .09 down .134), its roof-to-back corner
+  controlled at R.003 MAX (the square 1/8 in carbide end mill's corner).
 - The #4-40 thumbscrew tap runs +Y from the underside through the floor into
   the rebate; the two #2-56 plate taps run +Z, blind, from the mating face.
 """

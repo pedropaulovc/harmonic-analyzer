@@ -77,35 +77,6 @@ chip_load_mm_per_tooth = 0.0254  # .001 in; 8.4 in/min
 flutes = 3
 feed_unit = "in/min"
 
-# The rebate's corner relief (.05 deep × .06 high, beside the roof, at the
-# bottom of the .134 rebate) is plunge-milled with the plain 1/16 in end mill
-# (owner ruling 2026-11-21, relayed by CncBlockA; the cutter: MSC 35497056,
-# the owner chose the plain cutters, #3568; the pick: delegated ruling
-# 2026-11-24 (Main), no precedent; owner review #2144): its tools record,
-# endmill-carbide-3fl-1-16-loc-1-2, is in common.toml.
-# Its setting, re-derived for it (#3568): its .500 of flutes on .0625 stand
-# out 8x its diameter. No maker's figure for it is on record, so the
-# long-reach table stands in: Harvey Tool Speeds & Feeds, Miniature End
-# Mills - Square - Long Reach, Stub Flute, 9x Reach Multiple (W.C. Chapman's
-# copy, shop.wcchapman.com/speeds-feeds/harvey-tool-miniature-end-mills-
-# square-long-reach-stub-flute-9x-reach-multiple/, read 2026-11-21; the 9x
-# table, the next longer than 8x, is the lower of the two), row Brass
-# (C2xxxx-C4xxxx): 500 SFM, .062 in Slotting .00035 in/tooth; run at .0003,
-# under it. 500 SFM on .0625 is 30,560 rpm, so the spindle's 2800; 2800 × 3
-# × .0003 = 2.52 in/min, as before. Plunged, the load runs along the axis,
-# so its fluted (slimmer) 8x is loaded as the necked one was. Plunged: .0003
-# × 3 = .0009 in/rev of thrust, inside prechips' drilling feed table
-# (Machinery's Handbook, from .0005 in/rev); as a side cut its .0003
-# in/tooth would lie below the milling feed-factor table's .001 floor,
-# which is not extended without a source.
-[settings.stop-em-sixteenth-c360]
-tool = "endmill-carbide-3fl-1-16-loc-1-2"
-material = "stop-c360"
-rpm = 2800
-chip_load_mm_per_tooth = 0.00762  # .0003 in; 2.52 in/min
-flutes = 3
-feed_unit = "in/min"
-
 # The .04 × 45° roof chamfers: the owned 1/4 in 2-flute 90° carbide
 # chamfering end mill (common.toml tools.chamfer-mill-carbide-1-4-90; McMaster
 # 3073A46, "90 Degree Cut": 45° each side of its axis). Setting: the Harvey

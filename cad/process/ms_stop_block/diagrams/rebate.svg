@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 420" font-family="sans-serif" font-size="13">
-  <!-- Left: to scale at 11 px/mm (the .56 height = 156.5 px); right: 6 px/mm (the bar's 1-1/4 = 190.5 px). The 1/8 in end mill Ø3.175 (slot_cutter_dia_mm) = 34.9 px left, 19.1 px right, at X 4.051 (rebate_centre_x_mm), its end on the slot's last level, Z −8.509; at least .60 in out of the collet (small_mill_projection_min_mm): drawn short, broken off. The relief under the roof is the 1/16 in end mill's, drawn in its own picture (relief.svg). -->
+  <!-- Left: to scale at 11 px/mm (the .56 height = 156.5 px); right: 6 px/mm (the bar's 1-1/4 = 190.5 px). The 1/8 in end mill Ø3.175 (slot_cutter_dia_mm) = 34.9 px left, 19.1 px right, at X 4.051 (rebate_centre_x_mm), its end on the slot's last level, Z −8.509; at least .60 in out of the collet (small_mill_projection_min_mm): drawn short, broken off. Its square cutting corner leaves the R.003 MAX roof-to-back corner directly (owner ruling 2026-11-26, #3739 Option A). -->
   <rect class="paper" x="0" y="0" width="760" height="420"/>
   <text class="title" x="16" y="22">Setup 6 (MS05_rebate): mill the rebate</text>
   <rect class="fixture-support" x="44.0" y="254.1" width="168.5" height="20.0"/>
