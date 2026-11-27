@@ -14,11 +14,6 @@
 # 52b3709d61 with main db73d3fde2 merged, every enrolled plan rendered on prechips 0.11.53, 2026-11-26:
 # 58 findings (58 LEADER) on 26 plans.
 
-[plans.ch_fulcrum_keeper]
-findings = [
-  "LEADER | The part lying on stacked parallels, I down, the seat to the left; the 1/2 in end mill faces the foot tip to the length, then cuts the step in passes across the width, stepping from the crown end to the foot, level by level down to the lug's outer face. | foot hole (opened)",
-]
-
 [plans.dt_arbor_pedestal]
 findings = [
   "LEADER | The 1 x 1-1/4 in flat bar with 2 blanks 2.25–2.30 in long marked off its end, a saw kerf between them. | each 2.25–2.30 in long",

@@ -3,14 +3,13 @@ r"""Reproduction script: fulcrum-shaft end keeper (book ch. 17 p. 40; 2 used).
 The black bracket at each end of the top-lever fulcrum shaft (ch. 17 p. 40
 bottom-left closeup and p. 2 img08; ch. 30 top view corners + eight-views
 p008): a stubby straight L. The upright round-topped lug sits against the
-outermost lever hub and carries the plain Ø6.35 fulcrum shaft in a reamed
+outermost lever hub and carries the plain Ø6.35 fulcrum shaft in an F-drilled
 bore, the shaft's domed end proud of its outer face; a #1-72 cup-point set
 screw (MHA-CH-VN-55) in the crown tap bears on the shaft's flat and fixes it.
-The short straight foot points OUTBOARD and is screwed down into the
-top-frame rail top face by one slotted #2-56 fillister frame-side
-screw (MHA-CH-VN-52) seated flush in a counterbore; the foot-to-lug inside
-corner is filleted at the title block's INSIDE CORNERS ceiling
-(``CornerFillet``).
+The short straight foot points OUTBOARD, stepped down to .227 (#3744 Panel F)
+so one slotted #2-56 fillister frame-side screw (MHA-CH-VN-52) seats on the
+open step with its head flush at .310; the foot-to-lug inside corner is
+filleted at R.02 MAX (``CornerFillet``) so the screw head clears the root.
 
 Layout (part frame): +X along the shaft, OUTBOARD (away from the lever
 bank; the lug mid-plane / set-screw axis is x = 0); +Y up from the seat
@@ -35,20 +34,20 @@ import sys
 import _telemetry
 from _appearance import PANEL_BLACK, apply_color, apply_material
 from _check import check
-from _com import _bind, _com_invoke, _early_bound, _read_member
+from _com import _early_bound, _read_member
 from _dimensions import (
-    _feature_display_dimensions,
     drive_dimension,
     name_dimensions,
     set_global,
 )
 from _document_units import apply_package_model_units
-from _feature_tree import _feature_by_name, name_last_feature
+from _feature_tree import name_last_feature
 from _part_checks import report_mass_properties, volume_check
 from _part_properties import part_drawing_unit
 from _part_save import save_part_and_images
 from _rebuild import force_rebuild
 from _session import run_build
+from _single_limit_tolerance import set_single_limit
 from _sketch import (
     SketchDims,
     add_line_chain,
@@ -66,7 +65,6 @@ from _drawing_marks import (
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
 )
-from _fit_deviations import deviations
 from _hole_spec import blind_cut_dia_mm
 from _holes import cross_hole_volume_mm3, wizard_hole_on_cylinder, wizard_holes
 from ch_vn_frame_side_screw_spec import HEAD_DIA as FRAME_SIDE_HEAD_DIA
@@ -77,19 +75,21 @@ from ch_fulcrum_keeper_notes import DRAWING_NOTES
 from ch_fulcrum_keeper_spec import (
     BORE_DIA,
     BORE_FROM_SIDE,
-    CBORE_DEPTH_BAND,
-    CBORE_DEPTH_MM,
-    CBORE_DIA_BAND,
-    CBORE_DIA_MM,
-    CORNER_R,
+    CORNER_R_BAND,
+    CORNER_R_MAX,
+    CORNER_R_TOL_TYPE,
     CROWN_R,
     CROWN_TOP_Y,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
     FOOT_H,
     FOOT_L,
+    FOOT_SCREW_HEAD_DIA_MM,
+    FOOT_SCREW_HEAD_H_MM,
+    FOOT_SCREW_SHANK_DIA_MM,
     FOOT_SCREW_THREAD,
     FOOT_TIP_X,
+    FOOT_UNSTEPPED_H,
     HOLE_DIA_MM,
     ISOMETRIC_VIEW_NOTE,
     KEEPER_WIDTH,
@@ -112,25 +112,30 @@ LUG_T = 2.0 * LUG_HALF_T  # 8.0 lug thickness along X
 # of the sketch plane): past the lug's +-4 X extent, clear of the foot below.
 BORE_CUT_DEPTH = 2.0 * LUG_T
 
-# The keeper's foot screw is the part-owned #2 close-clearance counterbore;
-# its depth is the exact stock head height so the bearing face stays flush.
+# The keeper's foot screw seats on the .227 open foot step (#3744 Panel F),
+# which steps down from .310 by the exact stock head height so the head top
+# stays flush at .310.
 if FOOT_SCREW_THREAD != FRAME_SIDE_THREAD:
     raise AssertionError("keeper foot screw thread drifted from MHA-CH-VN-52")
+if FOOT_SCREW_SHANK_DIA_MM != FRAME_SIDE_SHANK_DIA:
+    raise AssertionError("keeper foot screw shank drifted from MHA-CH-VN-52")
+if FOOT_SCREW_HEAD_DIA_MM != FRAME_SIDE_HEAD_DIA:
+    raise AssertionError("keeper foot screw head diameter drifted from MHA-CH-VN-52")
+if FOOT_SCREW_HEAD_H_MM != FRAME_SIDE_HEAD_H:
+    raise AssertionError("keeper foot screw head height drifted from MHA-CH-VN-52")
 if HOLE_DIA_MM <= FRAME_SIDE_SHANK_DIA:
     raise AssertionError("standard #2 keeper clearance binds on the stock screw")
-if CBORE_DIA_MM + CBORE_DIA_BAND[1] <= FRAME_SIDE_HEAD_DIA:
-    raise AssertionError("keeper counterbore does not clear the stock screw head")
-if CBORE_DEPTH_MM != FRAME_SIDE_HEAD_H:
-    raise AssertionError("keeper counterbore depth is not the stock head height")
-if CBORE_DEPTH_MM >= FOOT_H:
-    raise AssertionError("keeper counterbore leaves no foot material at its floor")
+if HOLE_DIA_MM >= FRAME_SIDE_HEAD_DIA:
+    raise AssertionError("keeper foot hole does not support the stock screw head")
+if abs(FOOT_UNSTEPPED_H - FOOT_H - FRAME_SIDE_HEAD_H) > 1e-9:
+    raise AssertionError("keeper foot step depth is not the stock head height")
 # The crown tap's drill must stay inside the lug thickness, or the cross-hole
 # volume below (a full crown cylinder across the drill) does not hold.
 if blind_cut_dia_mm(SET_SCREW_HOLE_SPEC) >= LUG_T:
     raise AssertionError("crown tap drill breaks out of the lug faces")
 # The foot-to-lug inside corner's fillet adds its spandrel, (1 - pi/4) R^2,
 # along the keeper's width.
-V_CORNER = (1.0 - math.pi / 4.0) * CORNER_R**2 * KEEPER_WIDTH
+V_CORNER = (1.0 - math.pi / 4.0) * CORNER_R_MAX**2 * KEEPER_WIDTH
 
 # The drawing-reference lines (ch_fulcrum_keeper_spec.REFERENCE_SKETCHES):
 # (sketch, plane, dimension, start, end, orientation, value, drives), the
@@ -212,58 +217,6 @@ REFERENCE_LINES = (
 )
 if tuple(row[0] for row in REFERENCE_LINES) != REFERENCE_SKETCHES:
     raise AssertionError("REFERENCE_LINES and REFERENCE_SKETCHES disagree")
-
-
-_TOL_BILATERAL = 2  # swTolType_e.swTolBILAT
-
-
-def _band_foot_counterbore(adapter) -> None:
-    """Put the counterbore's printed limits (owner ruling 2026-11-22, #3367:
-    Ø.145-.155 x .078-.088, D25; CBORE_DIA_BAND, CBORE_DEPTH_BAND) on the
-    FootScrewHole Hole Wizard feature's counterbore diameter and depth IN THE
-    PART, so the sheet's native callout displays them (the
-    build_pd_support_bar._band_round_counterbores pattern); the drawing sets
-    only their places. Each dimension is found by its value, the one on the
-    feature equal to CBORE_DIA_MM or CBORE_DEPTH_MM, and its band is read
-    back."""
-    feature = _feature_by_name(adapter, "FootScrewHole")
-    seen = []
-    dimensions = []
-    for display in _feature_display_dimensions(feature):
-        raw = _com_invoke(display, "IDisplayDimension", "GetDimension2", 0)
-        value = float(_com_invoke(raw, "IDimension", "SystemValue")) * 1000.0
-        seen.append((str(_com_invoke(raw, "IDimension", "FullName")), value))
-        dimensions.append((value, raw))
-    for label, nominal, (lower, upper) in (
-        ("diameter", CBORE_DIA_MM, deviations(CBORE_DIA_BAND)),
-        ("depth", CBORE_DEPTH_MM, deviations(CBORE_DEPTH_BAND)),
-    ):
-        matches = [raw for value, raw in dimensions if abs(value - nominal) < 1e-4]
-        if len(matches) != 1:
-            raise RuntimeError(
-                f"FootScrewHole: {len(matches)} dimensions read the counterbore "
-                f"{label} {nominal} mm, not 1; dimensions {seen!r}"
-            )
-        dimension = _bind(matches[0], "IDimension")
-        tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
-        tolerance.Type = _TOL_BILATERAL
-        if not tolerance.SetValues(lower / 1000.0, upper / 1000.0):
-            raise RuntimeError(
-                f"FootScrewHole counterbore {label}: SetValues rejected "
-                f"{lower}/{upper} mm"
-            )
-        if (
-            int(tolerance.Type) != _TOL_BILATERAL
-            or abs(float(tolerance.GetMinValue()) * 1000.0 - lower) > 1e-6
-            or abs(float(tolerance.GetMaxValue()) * 1000.0 - upper) > 1e-6
-        ):
-            raise RuntimeError(
-                f"FootScrewHole counterbore {label}: band did not persist"
-            )
-        _telemetry.info(
-            f"FootScrewHole counterbore {label} {dimension.FullName}: "
-            f"band {lower}/{upper} mm"
-        )
 
 
 def _as_construction(adapter, entity_id: str) -> None:
@@ -350,7 +303,7 @@ def build(adapter) -> dict[str, str]:
     set_global(adapter, "ShaftAxisH", f"{SHAFT_AXIS_H}mm")
     set_global(adapter, "CrownR", f"{CROWN_R}mm")
     set_global(adapter, "BoreDia", f"{BORE_DIA}mm")
-    set_global(adapter, "CornerR", f"{CORNER_R}mm")
+    set_global(adapter, "CornerR", f"{CORNER_R_MAX}mm")
     set_global(adapter, "FootScrewFromTip", f"{SCREW_FROM_TIP}mm")
 
     drive_jobs: list[tuple[str, str]] = []
@@ -393,7 +346,7 @@ def build(adapter) -> dict[str, str]:
     volume = volume_check(adapter, "lug", v_lug, 0.005 * v_lug)
 
     # --- Foot: side-profile rectangle on Front (XY), extruded +-Z ---------
-    # Outboard of the lug's outer face, x +4..+12.5, y 0..8; its underside
+    # Outboard of the lug's outer face, x +4..+12.5, y 0..5.77; its underside
     # is coplanar with the lug's, so the two make one flat seat.
     foot = SketchDims()
     check("create_sketch foot", adapter.create_sketch("Front"))
@@ -429,14 +382,13 @@ def build(adapter) -> dict[str, str]:
     v_foot = FOOT_L * FOOT_H * KEEPER_WIDTH
     volume = volume_check(adapter, "foot", volume + v_foot, 0.005 * v_foot)
 
-    # Foot-to-lug inside corner (drawing-guidelines.md rule 16): the edge where
-    # the foot top meets the lug's outer face, filleted at the title block's
-    # INSIDE CORNERS R1.0 MAX (CORNER_R), whose tangent line stays off the
-    # counterbore; the sheet prints no local limit.
+    # Foot-to-lug inside corner (drawing-guidelines.md rule 16; #3744 Panel F):
+    # the edge where the .227 foot top meets the lug's outer face, modelled at
+    # R.02 MAX (CORNER_R_MAX) so the Ø.140 fillister head clears the root.
     check(
         "fillet foot-to-lug corner",
         adapter.add_fillet(
-            CORNER_R, [[LUG_HALF_T, FOOT_H, 0.0]], propagate=False
+            CORNER_R_MAX, [[LUG_HALF_T, FOOT_H, 0.0]], propagate=False
         ),
     )
     name_last_feature(adapter, "CornerFillet")
@@ -505,28 +457,23 @@ def build(adapter) -> dict[str, str]:
     )
     name_last_feature(adapter, "ShaftBore")
     # Coaxial cylinder through the 8.0 lug only: the bore (y 22.0..28.4)
-    # lies wholly inside the lug + crown and well above the foot (y <= 8).
+    # lies wholly inside the lug + crown and well above the foot (y <= 5.77).
     v_bore = math.pi * (BORE_DIA / 2.0) ** 2 * LUG_T
     volume = volume_check(adapter, "shaft bore", volume - v_bore, 0.01 * v_bore)
 
-    # --- Foot screw hole: fillister counterbore SCREW_FROM_TIP off the tip --
+    # --- Foot screw hole: #2 close-clearance through the .227 foot ----------
     screw_hole = wizard_holes(
         adapter,
         SCREW_HOLE_SPEC,
         [[SCREW_X, FOOT_H, 0.0]],
         (0.0, 1.0, 0.0),
-        "keeper foot screw hole (#2 cbore)",
+        "keeper foot screw hole (#2 close clearance)",
         expect_dia_mm=HOLE_DIA_MM,
         name="FootScrewHole",
     )
-    v_cb = math.pi * (screw_hole.cbore_dia_mm / 2.0) ** 2 * screw_hole.cbore_depth_mm
-    v_thru = (
-        math.pi
-        * (screw_hole.hole_dia_mm / 2.0) ** 2
-        * (FOOT_H - screw_hole.cbore_depth_mm)
-    )
+    v_thru = math.pi * (screw_hole.hole_dia_mm / 2.0) ** 2 * FOOT_H
     volume = volume_check(
-        adapter, "foot screw hole", volume - v_cb - v_thru, 0.01 * (v_cb + v_thru)
+        adapter, "foot screw hole", volume - v_thru, 0.01 * v_thru
     )
 
     # --- Crown set-screw tap: #1-72 down through the crown top ------------
@@ -574,9 +521,14 @@ def build(adapter) -> dict[str, str]:
     # the F-drilled bore takes the DRILLED HOLES row (owner ruling
     # 2026-11-24, fit audit question 1): no native band.
     apply_drawing_precision(adapter, DRAWING_PRECISION)
-    # The crown is a full round tangent to both sides: no band of its own
-    # (the width's governs it); the sheet prints it as a radial reference.
-    _band_foot_counterbore(adapter)
+    set_single_limit(
+        adapter,
+        "CornerFillet",
+        "CornerRadius",
+        limit=CORNER_R_MAX,
+        band=CORNER_R_BAND,
+        tol_type=CORNER_R_TOL_TYPE,
+    )
 
     # Manufacturing drawing support: mark exactly the print's dimensions and
     # stamp the make-critical title-block properties.

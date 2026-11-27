@@ -232,29 +232,6 @@ flutes = 3
 oal_in = 1.5
 cite = ["McMaster-Carr packing list, PO 0803PCAMPOS (1616317-01, 08/04/2025), line 10: \"Uncoated Carbide Square 3-Flute End Mill, 1/8\" Mill Diameter, 1-1/2\" Overall Length\", 1 each", "Owner (Pedro) 2026-11-17: \"add to inventory ... already owned\""]
 
-# MHA-CH-07 fulcrum keeper's foot-hole counterbore (cad/process/
-# ch_fulcrum_keeper): Ø.150-.154 x .078-.088 from the foot top, its centre
-# .150 (its edge .075) from the lug's outer face, the lug 0.96 in above the foot top. The owned
-# 1/8 in end mill (1-1/2 in OAL) cannot keep the collet nose over the lug.
-# Read live on mscdirect.com 2026-11-24 (#3568): MSC 09653429, Accupro
-# ASQSC3-CC-40H, $18.38, in stock; 1/8 in cutter, 3/4 in length of cut,
-# 2-1/4 in overall, 1/8 in shank, 3 flutes, solid micrograin carbide,
-# bright (uncoated), 40° helix, centre cutting, "Extended Reach: No" (no
-# neck). In the MSC cart, not yet owned (the owner chose the plain cutters,
-# #3568; the pick: delegated ruling 2026-11-24 (Main), no precedent; owner
-# review #2144).
-[tools.endmill-carbide-3fl-1-8-loc-3-4]
-name = "Accupro ASQSC3-CC-40H carbide square 3-flute end mill, 1/8 in, 3/4 in LOC, 2-1/4 in OAL, 1/8 in shank"
-kind = "endmill"
-make = "Accupro"
-sku = "09653429"
-source = "https://www.mscdirect.com/product/details/09653429"
-status = "to_order"
-flutes = 3
-oal_in = 2.25
-purchase = "One MSC 09653429 (Accupro ASQSC3-CC-40H), $18.38."
-note = "Mills both MHA-CH-07 keepers' foot-hole counterbores by interpolation beside the lug (cad/process/ch_fulcrum_keeper/cam.py checks its stick-out and its grip in the collet)."
-
 [tools.endmill-carbide-3fl-3-16]
 name = "Uncoated carbide square 3-flute end mill, 3/16 in, 2 in OAL"
 kind = "endmill"

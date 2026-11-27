@@ -782,7 +782,7 @@ def test_the_lifted_foot_screws_clear_their_uprights_in_the_isometric() -> None:
     arch_h = bracket.EAR_TOP_Y - bracket.EAR_ARCH_R
     ear_top = 2.0 * arch_h + bracket.EAR_ARCH_R * root5 + bracket.EAR_T / 2.0
     keeper_out = keeper.KEEPER_SCREW_Z_OFF - keeper.KEEPER_Z_OFF
-    keeper_seat = keeper.FOOT_H - keeper.CBORE_DEPTH_MM
+    keeper_seat = keeper.FOOT_H
     keeper_case = (explode.KEEPER_FOOT_SCREW, explode.KEEPER, lug_top, keeper_out)
     bracket_case = (explode.BRACKET_HOLD_DOWN, explode.BRACKET, ear_top, sides.HOLE_Z)
     cases = (
@@ -810,7 +810,7 @@ def test_the_lifted_foot_screws_clear_their_uprights_in_the_isometric() -> None:
     )
     foot_screw_top = (
         fulcrum_x,
-        fulcrum_y - keeper.SHAFT_AXIS_H + keeper.FOOT_H,
+        fulcrum_y - keeper.SHAFT_AXIS_H + keeper.FOOT_H + foot_screw.HEAD_H,
         keeper_z + keeper_out,
     )
     bracket_head = (drawing.NORTH_BRACKET_DETAIL, hold_down_top, explode.BRACKET_HOLD_DOWN)

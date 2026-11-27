@@ -340,10 +340,8 @@ from _mcmaster_90280a837 import (
 )
 from ch_fulcrum_keeper_spec import (
     DRAWING_PRECISION as KEEPER_DRAWING_PRECISION,
-    FOOT_COUNTERBORE_DEPTH_PLACES,
     FOOT_H,
     FOOT_SCREW_LENGTH_MM,
-    CBORE_DEPTH_MM,
     KEEPER_FITUP_X_FROM_WEB_MM,
     KEEPER_SCREW_TRANSVERSE_BAND_MM,
     SCREW_FROM_SIDE,
@@ -1804,9 +1802,8 @@ if _KEEPER_TAP_WALL < KEEPER_TAP_WALL_ACCEPTED_MM:
     raise AssertionError(
         "keeper receiver leaves less than D15's accepted .076 with drill wander"
     )
-KEEPER_MAX_STOCK_ENTRY = FOOT_SCREW_LENGTH_MM - (
-    _keeper_printed(FOOT_H, KEEPER_DRAWING_PRECISION["FootProfile"]["FootRise"], -1.0)
-    - _keeper_printed(CBORE_DEPTH_MM, FOOT_COUNTERBORE_DEPTH_PLACES, 1.0)
+KEEPER_MAX_STOCK_ENTRY = FOOT_SCREW_LENGTH_MM - _keeper_printed(
+    FOOT_H, KEEPER_DRAWING_PRECISION["FootProfile"]["FootRise"], -1.0
 )
 KEEPER_MIN_THREAD_TIP_RESERVE = (
     _printed_limit(

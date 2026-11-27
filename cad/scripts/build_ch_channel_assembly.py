@@ -225,7 +225,6 @@ from _cone_axis_constants import (
     MECHANISM_Z_SHIFT,
 )
 from ch_fulcrum_keeper_spec import (
-    CBORE_DEPTH_MM as KEEPER_CBORE_DEPTH,
     FOOT_H as KEEPER_FOOT_H,
     FULCRUM_KEEPER_CENTRE_Z,
     KEEPER_SCREW_Z_OFF,
@@ -559,10 +558,10 @@ if min(KEEPER_HUB_FLOAT) < KEEPER_HUB_FLOAT_MIN:
         f" {KEEPER_HUB_FLOAT_MIN}"
     )
 # Foot screws (frame-side-screw MHA-CH-VN-52) at the outboard foot centres,
-# KEEPER_SCREW_Z_OFF off the centre. The under-head plane is derived from the
-# keeper foot and its exact flush counterbore; the screws thread the
-# top-frame's tapped #2-56 holes (build_fr_top_frame.py KeeperTaps).
-KEEPER_SCREW_SEAT_H = KEEPER_FOOT_H - KEEPER_CBORE_DEPTH
+# KEEPER_SCREW_Z_OFF off the centre. The under-head plane is the keeper's .227
+# stepped foot top (#3744 Panel F); the screws thread the top-frame's tapped
+# #2-56 holes (build_fr_top_frame.py KeeperTaps).
+KEEPER_SCREW_SEAT_H = KEEPER_FOOT_H
 # Set screws (MHA-CH-VN-55): cup point down on each shaft flat, on the keeper's
 # crown tap axis (the lug mid-plane, over the shaft axis).
 SET_SCREW_SEAT_Y = FULCRUM[1] + FULCRUM_FLAT_HEIGHT
