@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 560" width="760" height="560" font-family="sans-serif" font-size="13">
+  <!-- Hand picture from the front (looking +Y), the strip cut away on the tap line; strip, hole, tap thread and tap guide to scale at 7 px/mm (the strip's 4.7625 mm height). The tap's thread at the thread's basic major Ø1.524 (cad.tap_1_thread), its point process.tap_point_depth_mm under the flat top, drawn as the near half of its end face (an arc 12 % of its diameter deep); the full thread cad.tap_1_thread_depth_mm. Tap guide (tools.tap-guide-fisher): point Ø3/16, body Ø1/2 to a break line. The tap's shank and length and the T-handle wrench are not on record: schematic. The wrench and the guide in the tool colour: they turn or travel with the tap. The jaws and the stack as in the drill picture, cut off at the picture's foot. -->
+  <rect class="paper" x="0" y="0" width="760" height="560"/>
+  <text class="title" x="20" y="24">Setup 3, FR05: the #0-80 tap by hand under the tap guide, hole 1 (to scale, 7 px/mm)</text>
+  <path class="clamp" d="M418.76 326.53L750 326.53L750 326.53L753 333.66L750 340.78L753 347.9L750 355.03L753 362.15L750 369.28L753 376.4L750 383.52L753 390.65L750 397.77L753 404.89L750 412.02L753 419.14L750 426.27L753 433.39L750 440.51L753 447.64L750 454.76L753 461.89L750 469.01L753 476.13L750 483.26L753 490.38L750 497.5L753 504.63L750 511.75L753 518.88L750 526L418.76 526Z"/>
+  <path class="part-kept" d="M30 330L30 363.34L32.34 363.34L36.89 350.84L40.56 350.84L45.11 363.34L49.8 363.34L54.35 350.84L58.02 350.84L62.57 363.34L67.25 363.34L71.8 350.84L75.47 350.84L80.02 363.34L84.71 363.34L89.26 350.84L92.93 350.84L97.48 363.34L102.16 363.34L106.71 350.84L110.39 350.84L114.94 363.34L119.62 363.34L124.17 350.84L127.84 350.84L132.39 363.34L137.07 363.34L141.62 350.84L145.3 350.84L149.85 363.34L154.53 363.34L159.08 350.84L162.75 350.84L167.3 363.34L171.99 363.34L176.54 350.84L180.21 350.84L184.76 363.34L189.44 363.34L193.99 350.84L197.66 350.84L202.21 363.34L206.9 363.34L211.45 350.84L215.12 350.84L219.67 363.34L224.35 363.34L228.9 350.84L232.57 350.84L237.12 363.34L241.81 363.34L246.36 350.84L250.03 350.84L254.58 363.34L259.26 363.34L263.81 350.84L267.48 350.84L272.04 363.34L276.72 363.34L281.27 350.84L284.94 350.84L289.49 363.34L294.17 363.34L298.72 350.84L302.4 350.84L306.95 363.34L311.63 363.34L316.18 350.84L319.85 350.84L324.4 363.34L329.08 363.34L333.63 350.84L337.31 350.84L341.86 363.34L346.54 363.34L351.09 350.84L354.76 350.84L359.31 363.34L364 363.34L368.55 350.84L372.22 350.84L376.77 363.34L381.45 363.34L386 350.84L389.67 350.84L394.22 363.34L398.91 363.34L403.46 350.84L407.13 350.84L411.68 363.34L416.36 363.34L420.91 350.84L424.58 350.84L429.13 363.34L433.82 363.34L438.37 350.84L442.04 350.84L446.59 363.34L451.27 363.34L455.82 350.84L459.5 350.84L464.05 363.34L468.73 363.34L473.28 350.84L476.95 350.84L481.5 363.34L486.18 363.34L490.73 350.84L494.41 350.84L498.96 363.34L503.64 363.34L508.19 350.84L511.86 350.84L516.41 363.34L521.09 363.34L525.65 350.84L529.32 350.84L533.87 363.34L538.55 363.34L543.1 350.84L546.77 350.84L551.32 363.34L556.01 363.34L560.56 350.84L564.23 350.84L568.78 363.34L573.46 363.34L578.01 350.84L581.68 350.84L586.23 363.34L590.92 363.34L595.47 350.84L599.14 350.84L603.69 363.34L608.37 363.34L612.92 350.84L616.59 350.84L621.14 363.34L625.83 363.34L630.38 350.84L634.05 350.84L638.6 363.34L643.28 363.34L647.83 350.84L651.51 350.84L656.06 363.34L660.74 363.34L665.29 350.84L668.96 350.84L673.51 363.34L678.19 363.34L682.74 350.84L686.42 350.84L690.97 363.34L695.65 363.34L700.2 350.84L703.87 350.84L708.42 363.34L713.11 363.34L717.66 350.84L721.33 350.84L725.88 363.34L730 363.34L730 330Z"/>
+  <path class="holes" d="M391.23 330L392.4 332.02L392.4 352.94L396.56 355.44L400.73 352.94L400.73 332.02L401.9 330Z"/>
+  <rect class="part-threads" x="391.23" y="330" width="10.67" height="19.56"/>
+  <path class="cutter" d="M401.9 350.77L401.9 270L391.23 270L391.23 350.77A5.33 1.28 0 0 0 401.9 350.77Z"/>
+  <rect class="cutter" x="384.56" y="210" width="24" height="60"/>
+  <rect class="cutter" x="286.56" y="198" width="220" height="12"/>
+  <path class="cutter" d="M396.56 198L379.9 180L379.9 140L413.23 140L413.23 180Z"/>
+  <path class="cutter" d="M441.01 140L441.01 50L434.66 53L428.31 50L421.96 53L415.61 50L409.26 53L402.91 50L396.56 53L390.21 50L383.86 53L377.51 50L371.16 53L364.81 50L358.46 53L352.11 50L352.11 140L396.56 140Z"/>
+  <line class="centre-line" x1="396.56" y1="40" x2="396.56" y2="375.44"/>
+  <line class="datum" x1="10" y1="330" x2="356.56" y2="330"/>
+  <text class="datum-label" x="12" y="322">Z0 the flat top</text>
+  <text class="label" x="460" y="80">tap guide in the 1/2 in collet, spindle off;</text>
+  <text class="label" x="460" y="96">its spring point in the wrench's centre hole</text>
+  <line class="leader" x1="458" y1="102" x2="441.01" y2="110"/>
+  <circle class="leader-dot" cx="441.01" cy="110" r="2"/>
+  <text class="label" x="520" y="180">T-handle tap wrench (schematic)</text>
+  <line class="leader" x1="518" y1="186" x2="506.56" y2="204"/>
+  <circle class="leader-dot" cx="506.56" cy="204" r="2"/>
+  <text class="label" x="30" y="390">{{cad.tap_1_thread}} tap, its point to stop {{process.tap_point_depth_mm:in.3dot}} under the</text>
+  <text class="label" x="30" y="406">flat top; the full thread {{cad.tap_1_thread_depth_min_in:.3dot}}–{{cad.tap_1_thread_depth_max_in:.3dot}} deep</text>
+  <line class="leader" x1="28" y1="376" x2="391.23" y2="344"/>
+  <circle class="leader-dot" cx="391.23" cy="344" r="2"/>
+  <text class="label" x="20" y="546">The plug tap in all four holes, then the bottoming tap in all four, each to its stop, read with the point pushed home.</text>
+</svg>

@@ -358,3 +358,12 @@ length_mm = 1270.0
 pieces = 1
 status = "to_order"
 cite = ["McMaster-Carr 2325K19 https://www.mcmaster.com/2325K19/ read live 2026-11-27: High-Strength 17-7 PH Stainless Steel Shim Stock, 6\" x 50\" Roll, 0.015\" Thick, $44.53 each; width 6\" (-0.015\" to 0.015\"), length 50\" (0\" to 0.5\"), thickness 0.015\" (-0.00075\" to 0.00075\"), temper Full Hard, ASTM A693, minimum hardness Rockwell C41, roll form", "cad/config/parts/dt-pinion-spring.yaml material_specification", "cad/scripts/dt_pinion_spring_section.py THICK, THICK_BAND"]
+
+[stock.sdp-rack-a-1b12-y324]
+form = "gear_rack"
+material = "Brass, 32 DP 20° PA commercial gear rack (SDP/SI A 1B12-Y324)"
+note = "To order: SDP/SI A 1B12-Y324, brass rectangular gear rack, 32 DP, 20° PA, 3/16 face width x 3/16 high, .156 pitch height, 48 in stock length, quality class Commercial (substitute part A 1B12-Y322). Price read live 2026-11-27: $252.94 each for 1-9 (10-24 $119.66; 25-49 $103.45; 50-99 $81.17), lead time 11 weeks for 1-24; the page showed 9 in stock to ship now. SDP/SI publishes no section or pitch tolerance for the commercial strip (catalogue p. 1-193). Allocation: pd-feed-rack (MHA-PD-26), one 10.62 in strip from a 10.72-10.80 in piece; the bar gives four such pieces (the part and three spares for a scrapped tap: cad/process/pd_feed_rack). Not owned."
+section_mm = [4.7625, 4.7625]
+length_in = [48.0]
+status = "to_order"
+cite = ["SDP/SI https://shop.sdp-si.com/a-1b12-y324.html read live 2026-11-27 through Scrapfly (a plain fetch is refused by Cloudflare, HTTP 403): Brass 32 DP Rectangular Inch Gear Rack | A 1B12-Y324; 1 - 9 $252.94 11 wks, 10 - 24 $119.66 11 wks, 25 - 49 $103.45 13 wks, 50 - 99 $81.17 13 wks; Availability: 9 unit(s) in stock available to ship now; Face Width 0.1875 Inch, Height 0.1875 Inch, Material Brass, Pitch Height 0.156 Inch, Quality Class Commercial, Stock Length 48 Inch, Substitute Part A 1B12-Y322", "SDP/SI D820 catalogue https://sdp-si.com/D820/PDFS/Gears.pdf p. 1-193 (A 1B12- 324: brass, 32 pitch, 3/16 face width and thickness; no accuracy listed)", "cad/config/parts/pd-feed-rack.yaml supplier_skus, material_specification", "cad/scripts/pd_feed_rack_spec.py PURCHASED_RACK_FACE_WIDTH_IN, PURCHASED_RACK_HEIGHT_IN, PURCHASED_RACK_LENGTH_IN"]

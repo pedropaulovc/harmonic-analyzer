@@ -704,6 +704,9 @@ diameter_mm = 3.2004
 description = "Bottoming hand tap #0-80 UNF, HSS"
 [tools.tap-0-80-plug]  # Tap coverage #0-80 UNF
 description = "#0-80 UNF plug hand tap (OSG 1000100)"
+# The 3/64 (.0469) tap drill MHA-PD-26 prints for it (pd_feed_rack_spec
+# TAP_DRILL_MM; cad.tap_1_dia), nominal × 25.4 (tools.drill-3-64).
+tap_drill_mm = 1.190625
 [tools.tap-10-24-plug]  # Tap coverage #10-24 UNC
 description = "#10-24 UNC plug hand tap (OSG 1024901)"
 [tools.tap-2-56-bottoming]  # Tap coverage #2-56 UNC
