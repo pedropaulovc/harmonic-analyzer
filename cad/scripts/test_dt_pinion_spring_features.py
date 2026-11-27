@@ -42,17 +42,21 @@ def _cylinder(
 
 
 def _arc_box(
-    centre: tuple[float, float], radius: float
+    centre: tuple[float, float],
+    radius: float,
+    start: tuple[float, float],
+    end: tuple[float, float],
 ) -> tuple[float, float, float, float, float, float]:
+    """The box of the arc of ``radius`` about ``centre`` swept the short way
+    between the directions of its inside-surface ends ``start`` and ``end``."""
+    a0 = math.atan2(start[1] - centre[1], start[0] - centre[0])
+    a1 = math.atan2(end[1] - centre[1], end[0] - centre[0])
+    sweep = (a1 - a0 + math.pi) % (2.0 * math.pi) - math.pi
+    angles = [a0 + sweep * i / 64 for i in range(65)]
+    xs = [centre[0] + radius * math.cos(a) for a in angles]
+    ys = [centre[1] + radius * math.sin(a) for a in angles]
     half = geom.WIDTH / 2.0
-    return (
-        centre[0] - radius,
-        centre[1] - radius,
-        -half,
-        centre[0] + radius,
-        centre[1] + radius,
-        half,
-    )
+    return (min(xs), min(ys), -half, max(xs), max(ys), half)
 
 
 _BEND_C = (geom.BEND_CX, geom.BEND_CY)
@@ -80,14 +84,23 @@ _FACES: dict[str, FaceGeometry] = {
             geom.PAD_Z + geom.HOLE_DIA / 2.0,
         ),
     ),
-    # Each arc's quarter nearest the foot (bend) or the crest (kink): the
-    # bend's and the kink's surfaces share both diameters, so the box decides.
-    "bend inside": _cylinder(2.0 * geom.R_BEND, _arc_box(_BEND_C, geom.R_BEND)),
-    "bend outside": _cylinder(2.0 * _OUTER, _arc_box(_BEND_C, _OUTER)),
-    "kink inside": _cylinder(2.0 * geom.R_KINK, _arc_box(geom.KINK_C, geom.R_KINK)),
+    # Each arc's own span: the bend's and the kink's surfaces share both
+    # diameters, so the box decides.
+    "bend inside": _cylinder(
+        2.0 * geom.R_BEND, _arc_box(_BEND_C, geom.R_BEND, geom.FOOT_TAN, geom.BEND_EXIT)
+    ),
+    "bend outside": _cylinder(
+        2.0 * _OUTER, _arc_box(_BEND_C, _OUTER, geom.FOOT_TAN, geom.BEND_EXIT)
+    ),
+    "kink inside": _cylinder(
+        2.0 * geom.R_KINK,
+        _arc_box(geom.KINK_C, geom.R_KINK, geom.KINK_START, geom.KINK_EXIT),
+    ),
     "kink outside": _cylinder(
         2.0 * (geom.R_KINK + geom.THICK),
-        _arc_box(geom.KINK_C, geom.R_KINK + geom.THICK),
+        _arc_box(
+            geom.KINK_C, geom.R_KINK + geom.THICK, geom.KINK_START, geom.KINK_EXIT
+        ),
     ),
     "flat": _plane(
         (*_FLICK, 0.0), geom.FLAT_TIP[0] * _FLICK[0] + geom.FLAT_TIP[1] * _FLICK[1]

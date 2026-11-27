@@ -101,7 +101,7 @@ from dt_pinion_spring_geometry import (
     WIDTH,
     WIDTH_PLACES,
 )
-from dt_pinion_spring_notes import THICK_BAND
+from dt_pinion_spring_section import THICK_BAND
 from dt_pinion_spring_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
@@ -413,6 +413,10 @@ _UNIT = (_SECTION, "UNIT")
 _FORMED = (FORMED_TOLERANCE_MM, -FORMED_TOLERANCE_MM)
 _NOTE_LINES = DRAWING_NOTES.split("\n")
 _INSTALLED_BEND_DEG = 90.0 - BLADE_LEAN_DEG
+# A height well inside the kink's arcs, halfway from its centre to its exit
+# (the arc starts only .051 mm under the centre's height, about the match
+# tolerance); the bend's arcs end below 3.7 mm.
+_KINK_MID_Y = (KINK_C[1] + KINK_EXIT[1]) / 2.0
 _FREE_BEND_DEG = _INSTALLED_BEND_DEG - PRESET_DEG
 _FLICK = tuple((FLAT_TIP[i] - KINK_EXIT[i]) / FLAT_LEN for i in (0, 1))
 _ANGULAR = angular_band_deg(unit=UNIT)
@@ -636,8 +640,8 @@ requirement(
     "kink",
     kind="bend",
     faces=(
-        CylinderFace(2.0 * R_KINK, contains_y_mm=KINK_C[1]),
-        CylinderFace(2.0 * (R_KINK + THICK), contains_y_mm=KINK_C[1]),
+        CylinderFace(2.0 * R_KINK, contains_y_mm=_KINK_MID_Y),
+        CylinderFace(2.0 * (R_KINK + THICK), contains_y_mm=_KINK_MID_Y),
     ),
     requirements=("radius", "free_h", "free_v", "included_angle_deg"),
     fields={

@@ -437,7 +437,7 @@ def _formed(value: float, name: str, *sources) -> tuple[list[float], tuple]:
 
 part_metadata(
     model_sources=_g("PART_ORIGIN_MACHINE", "SHEET_T", "WIDTH", "EAR_HEIGHT"),
-    precision_sources=("DRAWING_PRECISION", "DRAWING_PRECISION_BY_NAME", "FORMED_TOL"),
+    precision_sources=("DRAWING_PRECISION", "DRAWING_PRECISION_BY_NAME", "HOLE_PLACES"),
 )
 requirement(
     "strip",

@@ -224,7 +224,7 @@ requirement(
     fields={"plane": (_plane("y", 0.0), (_FRAME,))},
 )
 # The tooth crests: the strip's (.1875) REF height from the flat top
-# (FRONT_KEEP "RackHeight"), the purchased teeth's gear data and their
+# (END_KEEP "RackHeight"), the purchased teeth's gear data and their
 # circular pitch (pi / the printed 32 DP), the tap stations' whole teeth.
 requirement(
     "teeth",
@@ -234,7 +234,7 @@ requirement(
     fields={
         "plane": (_plane("y", RACK_HEIGHT), ("RACK_HEIGHT",)),
         "height_ref": (RACK_HEIGHT, ("RACK_HEIGHT", "DRAWING_REFERENCE_DIMENSIONS")),
-        "height_ref_from": ("flat_top", ((_SELF, "FRONT_KEEP"),)),
+        "height_ref_from": ("flat_top", ((_SELF, "END_KEEP"),)),
         "gear_data": (GEAR_DATA, ("GEAR_DATA",)),
         "stock": (PURCHASED_RACK_NOTE, ("PURCHASED_RACK_NOTE",)),
         "pitch_ref": (PITCH, ("PITCH",)),
