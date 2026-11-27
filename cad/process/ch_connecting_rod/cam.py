@@ -39,7 +39,9 @@ k's centre line at Y −(k + ½) × the pitch, the ring's centre
 ``ring_from_end_mm`` from the left end. Side 2 up (CR01, CR04a-CR08): Z0 the
 support plate's top, which is the datum face (model y → X, model −x → Y,
 model z → Z). Side 1 up (CR02, CR03): Z0 the datum face, on top (model y →
-X, model x → Y, model −z → Z).
+X, model x → Y, model −z → Z), the pair turned over as one stack and Y0
+shifted by the load's measured width off the nominal, so the programs stay
+on the nominal centres.
 
 Toolpath rules (owner rulings 2026-11-16): plunges beside the stock at the
 cutting feed, plunges into metal at the plan's slow feed, real G0 above the
@@ -953,8 +955,6 @@ def context(
     ream_tip = -p["ream_past_mm"]
     # Its full diameter reaches the fork's far face: past by its chamfer +
     # the margin.
-    import cam_nc
-
     if p["ream_past_mm"] <= cam_nc.ream_full_diameter_past_min_mm(plan, "reamer-0775"):
         raise ValueError(
             "the reamer's full diameter does not reach the far face (cnc.ream-full-diameter)"

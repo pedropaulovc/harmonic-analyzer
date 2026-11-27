@@ -22,9 +22,9 @@
 <text class="label" x="508" y="67">8</text>
 <rect class="part-kept" x="548" y="54" width="62" height="18"/>
 <text class="label" x="574" y="67">9</text>
-<text class="label" x="20" y="104">1/2 x 6 in 6061 flat: the support plate, 3.9 in off its end</text>
+<text class="label" x="20" y="104">1/2 x 6 in 6061 flat: the support plate, 4 in off its end</text>
 <rect class="part-rest" x="20" y="114" width="420" height="60"/>
 <rect class="part-kept" x="20" y="114" width="40" height="60"/>
 <path class="arrow" d="M120 140 H62"/>
-<text class="label" x="126" y="144">support plate 3.9 x 6 (kept); the rest of the bar to the right</text>
+<text class="label" x="126" y="144">support plate 4 x 6 (kept); the rest of the bar to the right</text>
 </svg>
