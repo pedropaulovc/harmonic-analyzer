@@ -330,7 +330,8 @@ def check(stems: list[str], out: Path, *, rebind_current: bool = False) -> int:
     is missing, does not bind its STEP or was built from other geometry.
     ``--rebind`` also rebinds each current one's ``features.toml`` from this
     checkout's declarations (after a ``requirement(...)`` edit), keeping its
-    geometry inputs; a stale one is left as it is."""
+    geometry inputs: in a scratch copy, the bundle's manifest replaced only
+    once the copy binds and validates. A stale one is left as it is."""
     stale = 0
     for stem in stems:
         try:
@@ -349,8 +350,19 @@ def check(stems: list[str], out: Path, *, rebind_current: bool = False) -> int:
         how = ""
         if rebind_current:
             try:
-                rebind(stem, out)
-                validate_bundle(stem, out)
+                with tempfile.TemporaryDirectory(prefix="fetch-features-") as scratch:
+                    staging = Path(scratch)
+                    shutil.copytree(
+                        out / "features" / stem, staging / "features" / stem
+                    )
+                    rebind(stem, staging)
+                    validate_bundle(stem, staging)
+                    manifest = export_features.bundle_paths(stem, out)[0]
+                    partial = manifest.with_suffix(".toml.partial")
+                    shutil.copyfile(
+                        export_features.bundle_paths(stem, staging)[0], partial
+                    )
+                    partial.replace(manifest)
             except (FetchError, FeaturesBoundError) as exc:
                 stale += 1
                 _telemetry.warn(f"fetch-features: {stem}: {exc}", stem=stem)

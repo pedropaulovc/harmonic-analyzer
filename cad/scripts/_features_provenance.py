@@ -45,27 +45,52 @@ class StaleBundle(ValueError):
     does not say what it was built from."""
 
 
+def _dodo():
+    """The build graph, imported from the repo root, which a script run from
+    ``cad/scripts`` does not have on its path."""
+    if str(REPO) not in sys.path:
+        sys.path.insert(0, str(REPO))
+    import dodo  # noqa: PLC0415 - the graph's own key inputs, loaded only here
+
+    return dodo
+
+
+def _geometry_deps(dodo, stem: str) -> list[Path]:
+    """The resolved key inputs that can change ``stem``'s STEP: ``part:<stem>``'s
+    and the labelled-STEP export code."""
+    part = dodo._part_file_deps(dodo.SCRIPTS_DIR / f"build_{stem}.py", stem)
+    exporter = [
+        dep for dep in dodo._feature_export_file_deps(stem) if dep.endswith(".py")
+    ]
+    return [Path(dep).resolve() for dep in [*part, *exporter]]
+
+
+def _fastener_sidecar(dodo, path: Path) -> bool:
+    """Whether ``path`` is the digest of the fastener-catalog rows a part
+    reads, which ``part:<stem>`` keys on in place of ``_fastener_catalog.py``."""
+    return path.parent == (dodo.CAD_OUT / ".fastener-catalog").resolve()
+
+
 def recipe_files(stem: str) -> dict[str, str]:
     """Repo-relative tracked inputs of the part's keys, each labelled with what
     it can change: ``geometry`` (``part:<stem>`` and the labelled-STEP export
     code) or ``manifest`` (only ``package:manifest:<stem>``: notes, citations,
     declarations). Other parts' registry rows in the generic exporter's config
-    closure cannot change this part's STEP and are left out."""
-    sys.path.insert(0, str(REPO))
-    import dodo  # noqa: PLC0415 - the graph's own key inputs, loaded only here
-
-    out = (REPO / "cad" / "out").resolve()
-    part = dodo._part_file_deps(dodo.SCRIPTS_DIR / f"build_{stem}.py", stem)
-    exporter = [
-        dep for dep in dodo._feature_export_file_deps(stem) if dep.endswith(".py")
-    ]
+    closure cannot change this part's STEP and are left out; a part keyed on
+    its fastener-catalog rows lists ``_fastener_catalog.py`` itself."""
+    dodo = _dodo()
+    out = dodo.CAD_OUT.resolve()
     labelled: dict[str, str] = {}
     for label, deps in (
-        ("manifest", dodo._feature_manifest_file_deps(stem)),
-        ("geometry", [*part, *exporter]),
+        (
+            "manifest",
+            [Path(dep).resolve() for dep in dodo._feature_manifest_file_deps(stem)],
+        ),
+        ("geometry", _geometry_deps(dodo, stem)),
     ):
-        for dep in deps:
-            path = Path(dep).resolve()
+        for path in deps:
+            if _fastener_sidecar(dodo, path):
+                path = Path(dodo._FASTENER_CATALOG).resolve()
             if path == Path(dodo.RELEASE_VERSION_FILE).resolve() or out in path.parents:
                 continue
             if path.is_relative_to(REPO.resolve()):
@@ -74,15 +99,21 @@ def recipe_files(stem: str) -> dict[str, str]:
 
 
 def geometry_inputs(stem: str) -> dict[str, str]:
-    """Each ``geometry`` input of :func:`recipe_files` and its doit content
-    digest, read from this checkout."""
-    import dodo  # noqa: PLC0415 - recipe_files put the repo on the path
-
-    return {
-        name: dodo.ContentChecker._digest(str(REPO / name))
-        for name, label in recipe_files(stem).items()
-        if label == "geometry"
-    }
+    """Each ``geometry`` key input of ``stem``'s STEP, repo-relative, and its
+    doit content digest, read from this checkout: the sources, and the digest
+    of the fastener-catalog rows the part reads (the sidecar dodo keys on)."""
+    dodo = _dodo()
+    out = dodo.CAD_OUT.resolve()
+    inputs = {}
+    for path in _geometry_deps(dodo, stem):
+        if (
+            out in path.parents and not _fastener_sidecar(dodo, path)
+        ) or not path.is_relative_to(REPO.resolve()):
+            continue
+        inputs[path.relative_to(REPO.resolve()).as_posix()] = (
+            dodo.ContentChecker._digest(str(path))
+        )
+    return dict(sorted(inputs.items()))
 
 
 def stamp(stem: str, out: Path) -> None:
@@ -106,12 +137,15 @@ def stamp(stem: str, out: Path) -> None:
 
 def features_current(stem: str, out: Path) -> list[str]:
     """What makes ``stem``'s bundle under ``out`` not this checkout's: no
-    bundle, no ``[geometry_inputs]``, or each input whose digest differs,
-    appeared or went. Empty when the bundle is current."""
+    bundle, an unreadable one, no ``[geometry_inputs]``, or each input whose
+    digest differs, appeared or went. Empty when the bundle is current."""
     path = export_features.bundle_paths(stem, out)[0]
     if not path.is_file():
         return [f"no bundle at {path}"]
-    recorded = tomllib.loads(path.read_text(encoding="utf-8")).get(TABLE)
+    try:
+        recorded = tomllib.loads(path.read_text(encoding="utf-8")).get(TABLE)
+    except (OSError, UnicodeError, tomllib.TOMLDecodeError) as exc:
+        return [f"{path} is unreadable ({exc})"]
     if not isinstance(recorded, dict):
         return [f"{path} records no {TABLE}: bound before #3668 or by hand"]
     current = geometry_inputs(stem)

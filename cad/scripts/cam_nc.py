@@ -33,7 +33,9 @@
 Exit 0 only when every program posted and every check passed (and, for a
 gate-mode recipe, its as-machined report found nothing). Any failure
 removes every output and exits 1, so a stale or unchecked program is never
-left beside a manifest. FreeCAD (1.1 or later) is ``$HARMONIC_FREECAD`` or the
+left beside a manifest; a feature bundle not built from this checkout's
+geometry (``_features_provenance``, #3668) exits 2 before FreeCAD runs.
+FreeCAD (1.1 or later) is ``$HARMONIC_FREECAD`` or the
 newest discovered install; the task fails loud when there is none.
 """
 

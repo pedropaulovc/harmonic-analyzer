@@ -1003,3 +1003,27 @@ def test_engagement_follows_an_arc_and_a_slot(tmp_path):
     first, second = [e for e in _gcode.engagements(_program(tmp_path, rings), stock, 1.0) if e.move.centre]
     assert first.side == "both" and first.radial == pytest.approx(2.0, abs=0.06)
     assert second.side == "climb" and second.radial == pytest.approx(0.5, abs=0.06)
+
+
+def test_a_bundle_not_built_from_this_checkout_exits_2_before_freecad(tmp_path, monkeypatch):
+    stem = "sm_knife_mount"
+    stale_input = tmp_path / "input.toml"
+    stale_input.write_text("", encoding="utf-8")
+    monkeypatch.setattr(
+        cam_nc._cam_programs, "cam_inputs", lambda _stem, _out: {"recipe": stale_input, "plan": stale_input}
+    )
+    monkeypatch.setattr(
+        cam_nc._features_provenance, "features_current",
+        lambda part, _out: [f"geometry input changed since the bundle was built: cad/scripts/build_{part}.py"],
+    )
+
+    def freecad(*_args, **_kwargs):
+        raise AssertionError("FreeCAD ran on a stale bundle")
+
+    monkeypatch.setattr(cam_nc, "run_freecad", freecad)
+    previous = _cam_programs.cam_outputs(stem, tmp_path)
+    previous[0].parent.mkdir(parents=True)
+    for path in previous:
+        path.write_text("previous success", encoding="utf-8")
+    assert cam_nc.main([stem, "--out", str(tmp_path)]) == 2
+    assert not any(path.exists() for path in previous)

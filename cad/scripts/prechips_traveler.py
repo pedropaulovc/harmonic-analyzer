@@ -403,8 +403,13 @@ def main(argv: list[str] | None = None) -> int:
         if not plan.is_file():
             exc = FileNotFoundError(f"{args.stem}: no process plan at {plan}")
             return _fail(root, PACKAGE, exc, 2, outputs)
+        # A plan that cannot be read names no parts: prechips refuses it below.
         try:
-            _features_provenance.require_current(_process_plans.part_stems(args.stem), args.out)
+            parts = _process_plans.part_stems(args.stem)
+        except (OSError, ValueError, KeyError):
+            parts = ()
+        try:
+            _features_provenance.require_current(parts, args.out)
         except _features_provenance.StaleBundle as exc:
             return _fail(root, args.stem, exc, 2, outputs)
         try:

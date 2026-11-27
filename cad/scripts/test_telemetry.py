@@ -261,6 +261,8 @@ def test_prechips_traveler_nonrecording_span_preserves_exit_code(
     monkeypatch.setenv("UV", "uv")
     monkeypatch.setattr(wrapper, "latest_version", lambda _uv: "9.9.9")
     monkeypatch.setattr(wrapper, "browser", lambda: "browser-under-test")
+    # No feature bundle under tmp_path: every part counts as current here.
+    monkeypatch.setattr(wrapper._features_provenance, "features_current", lambda _stem, _out: [])
     calls = []
 
     def run(cmd, **kwargs):
