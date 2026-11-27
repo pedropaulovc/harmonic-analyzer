@@ -1733,6 +1733,17 @@ def _back_context(
             [name, "rapids_clear", {"z_top": bore_top}],
             [name, "air_feed", {"z_top": bore_top}],
             [name, "keep_out", {"radius": r, "boxes": pair_keep}],
+            # The bore climbs (G3 inside it), as the module docstring says.
+            [
+                name,
+                "arcs",
+                {
+                    "z_top": bore_top,
+                    "centres": [(bore_x, 0.0)],
+                    "part": "outside",
+                    "cut": "climb",
+                },
+            ],
         ]
 
     return {

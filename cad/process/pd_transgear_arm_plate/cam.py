@@ -991,6 +991,8 @@ def context(
                 "passes": [{"offset": rc, "levels": levels}],
                 "z_top": t,
                 "clearing": [{"x": [-0.5, _r(rr + 0.5)], "levels": levels}],
+                "cut": "conventional",
+                "part": "left",
             },
         ],
         [

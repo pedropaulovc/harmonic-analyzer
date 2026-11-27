@@ -1846,6 +1846,11 @@ def context(
             [name, "depth", {"z_min": _r(z_min)}],
         ]
 
+    # Every blank's fork-island corners, crown and ring: the centres the
+    # pockets' and outlines' arcs turn about.
+    fork_corners = [(fb, yc + s * w) for yc in centres for s in (-1.0, 1.0)]
+    crowns = [(rx + g["crown"], yc) for yc in centres]
+    rings = [(rx, yc) for yc in centres]
     for name, side, rough, jaw_boxes, top, check_top in (
         ("CR01_rough_2", side2, True, jaws2, side2["top"], t_max),
         ("CR02_rough_1", side1, True, jaws1, 0.0, 0.0),
@@ -1888,6 +1893,30 @@ def context(
                     "radius": r8,
                     "boxes": jaw_boxes + frames_of(check_top),
                     "circles": circles,
+                },
+            ],
+        ]
+        # The fork island's corners and crown and the ring, each arc with the
+        # part inside it and turned anticlockwise: conventional.
+        expect += [
+            [
+                f"{name}@0",
+                "arcs",
+                {
+                    "z_top": check_top,
+                    "centres": fork_corners + crowns + rings,
+                    "part": "inside",
+                    "cut": "conventional",
+                },
+            ],
+            [
+                f"{name}@1",
+                "arcs",
+                {
+                    "z_top": check_top,
+                    "centres": rings,
+                    "part": "inside",
+                    "cut": "conventional",
                 },
             ],
         ]
@@ -2021,6 +2050,44 @@ def context(
             "keep_out",
             {"radius": r8, "boxes": jaws2 + frames_of(t_max), "circles": circles},
         ],
+        # As CR01-CR03's corners and ring.
+        [
+            f"{name}@0",
+            "arcs",
+            {
+                "z_top": t_max,
+                "centres": fork_corners + rings,
+                "part": "inside",
+                "cut": "conventional",
+            },
+        ],
+        [
+            f"{name}@1",
+            "arcs",
+            {"z_top": t_max, "centres": rings, "part": "inside", "cut": "conventional"},
+        ],
+        # The crown: the pocket's fork loop and the end zone's upper side
+        # turn anticlockwise round it (conventional); the end zone's lower
+        # side turns clockwise from the apex (climb). Each end-zone level
+        # enters at the apex, in the air beside the trimmed end, and the
+        # lower side can only be cut moving away from it: conventional would
+        # plunge the 1/2 in end mill a level into uncut metal at the slot
+        # floor end of every level (#3690). Climb on the chart setting,
+        # unmeasured (#3590).
+        *(
+            [
+                f"{name}@0",
+                "arcs",
+                {
+                    "z_top": t_max,
+                    "centres": crowns,
+                    "part": "inside",
+                    "arc": arc,
+                    "cut": cut,
+                },
+            ]
+            for arc, cut in (("G3", "conventional"), ("G2", "climb"))
+        ),
     ]
 
     name = "CR05_bore"
@@ -2070,6 +2137,9 @@ def context(
                     }
                     for yc in centres
                 ],
+                # Clockwise inside the bore, the part outside it on the left.
+                "cut": "conventional",
+                "part": "left",
             },
         ],
         [name, "keep_out", {"radius": r, "boxes": jaws2}],
@@ -2220,6 +2290,8 @@ def context(
                 "z_top": shank_far,
                 "passes": [{"offset": r8, "levels": [_r(z) for z in out_levels]}],
                 "tabs": tabs,
+                "cut": "conventional",
+                "part": "left",
             },
         ],
         [f"{name}@0", "keep_out", {"radius": r8, "boxes": jaws2}],

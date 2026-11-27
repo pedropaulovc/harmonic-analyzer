@@ -1080,6 +1080,8 @@ def context(
                         "passes": [
                             {"offset": r8, "levels": [_r(z) for z in out_levels]}
                         ],
+                        "cut": "conventional",
+                        "part": "left",
                     },
                 ],
                 ["keep_out", {"radius": r8, "boxes": flat_keep}],
@@ -1138,6 +1140,16 @@ def context(
                         "arc": "G2",
                         "entry": [sx, sy],
                         "z_top": 0.0,
+                    },
+                ],
+                # The seat's turns clockwise inside it: conventional.
+                [
+                    "arcs",
+                    {
+                        "z_top": 0.0,
+                        "centres": [seat_xy],
+                        "part": "outside",
+                        "cut": "conventional",
                     },
                 ],
                 ["rapids_clear", {"z_top": 0.0}],

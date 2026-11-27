@@ -386,26 +386,31 @@ def _plate_a(g: dict[str, Any], p: dict[str, Any]) -> dict[str, Any]:
             last = z
         holes.append(("G0", None, None, clear))
 
-    outline: list[tuple] = [("G0", None, None, clear)]
-    for k, z in enumerate(g["levels"]):
-        if k % 2 == 0:  # in from the front, up the line, round the arc
-            outline += [
-                ("G0", 0.0, y_start - RAMP_MM, None),
-                ("G0", None, None, safe),
-                ("G1", 0.0, y_start, z),
-                ("G1", 0.0, -ro, None),
-                ("ccw", x_exit, y_exit, None, 0.0, ro),
-                ("G0", None, None, clear),
-            ]
-        else:  # back from beyond the back edge, round the arc, down the line
-            outline += [
-                ("G0", x_exit, y_exit + RAMP_MM, None),
-                ("G0", None, None, safe),
-                ("G1", x_exit, y_exit, z),
-                ("cw", 0.0, -ro, None, -x_exit, -y_exit),
-                ("G1", 0.0, y_start, None),
-                ("G0", None, None, clear),
-            ]
+    # The arc through, every level the same way round: the form (inside the
+    # arc) on the cutter's left, conventional with M3. Plate A runs in from
+    # the front, up the line and anticlockwise round the arc; plate B, posted
+    # with X negated (which reverses every turn), runs A's reverse path, in
+    # from beyond the back edge, round the arc and down the line (#3690).
+    # Both enter at the cutting feed in the air beyond an edge.
+    outline_a: list[tuple] = [("G0", None, None, clear)]
+    outline_b: list[tuple] = [("G0", None, None, clear)]
+    for z in g["levels"]:
+        outline_a += [
+            ("G0", 0.0, y_start - RAMP_MM, None),
+            ("G0", None, None, safe),
+            ("G1", 0.0, y_start, z),
+            ("G1", 0.0, -ro, None),
+            ("ccw", x_exit, y_exit, None, 0.0, ro),
+            ("G0", None, None, clear),
+        ]
+        outline_b += [
+            ("G0", x_exit, y_exit + RAMP_MM, None),
+            ("G0", None, None, safe),
+            ("G1", x_exit, y_exit, z),
+            ("cw", 0.0, -ro, None, -x_exit, -y_exit),
+            ("G1", 0.0, y_start, None),
+            ("G0", None, None, clear),
+        ]
 
     groove: list[tuple] = [("G0", None, None, clear)]
     x_stop = g["x_stop"]
@@ -461,7 +466,7 @@ def _plate_a(g: dict[str, Any], p: dict[str, Any]) -> dict[str, Any]:
             ]
     return {
         "holes": holes,
-        "outline": outline,
+        "outline": {"a": outline_a, "b": outline_b},
         "groove": groove,
         "y_start": y_start,
         "exit": (x_exit, y_exit),
@@ -583,7 +588,7 @@ def context(
     # X0, from the channel's centre line to the back edge.
     _agree(plan, "form_section_y_mm", radius + g["y_back"])
     _agree(plan, "tip_over_underside_mm", g["tip"] + g["t_min"])
-    a_moves = a["outline"]
+    a_moves = a["outline"]["a"] + a["outline"]["b"]
     ys = [m[2] for m in a_moves if m[0] != "ccw" and m[0] != "cw" and m[2] is not None]
     _agree(plan, "tool_y_span_mm", max(ys) - min(ys))
     blocks = [
@@ -622,7 +627,7 @@ def context(
                 "label": f"form {key.upper()} through",
                 "ops": [
                     [f"holes_{key}", "stud holes", _gcode(a["holes"], sign)],
-                    [f"outline_{key}", "arc through", _gcode(a["outline"], sign)],
+                    [f"outline_{key}", "arc through", _gcode(a["outline"][key], sign)],
                 ],
             },
             {
@@ -675,6 +680,18 @@ def context(
                 f"{name}@0",
                 "cleared",
                 {"points": arc_points + line_points, "radius": 0.01, "z": _r(g["tip"])},
+            ],
+            # The arc through, the form inside it: conventional every level.
+            [
+                f"{name}@0",
+                "arcs",
+                {
+                    "z_top": 0.0,
+                    "centres": [(0.0, 0.0)],
+                    "radius": ro,
+                    "part": "inside",
+                    "cut": "conventional",
+                },
             ],
             [
                 f"{name}@0",

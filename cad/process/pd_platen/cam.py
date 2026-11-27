@@ -1219,7 +1219,7 @@ def context(
                     "max_radial": edge_step,
                     "z": _r(edge_z),
                     "min_length": height,
-                    "side": "conventional",
+                    "cut": "conventional",
                     "cell": ENGAGEMENT_CELL_MM,
                 },
             ],
@@ -1253,6 +1253,19 @@ def context(
                 },
             ]
         )
+    # The counterbore circles, clockwise inside each: conventional.
+    expect.append(
+        [
+            f"{name}@4",
+            "arcs",
+            {
+                "z_top": thick,
+                "centres": guides,
+                "part": "outside",
+                "cut": "conventional",
+            },
+        ]
+    )
     for k, key in enumerate(sorted(manual), 5):
         expect += [
             [

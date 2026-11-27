@@ -1291,7 +1291,7 @@ def context(
                 "z": _r(end_z),
                 "window": [[end_final, end_raw], [beside[0], beside[1]]],
                 "min_length": height,
-                "side": "conventional",
+                "cut": "conventional",
             },
         ],
         ["keep_out", {"radius": r, "boxes": keep["a"]}],
@@ -1458,7 +1458,7 @@ def context(
                         [x0 - e_c - margin, x1 + e_c + margin],
                         [yb_c - margin, ya_c + margin],
                     ],
-                    "side": "conventional",
+                    "cut": "conventional",
                 },
             ],
         ]

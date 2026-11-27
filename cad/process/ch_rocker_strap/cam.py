@@ -903,6 +903,8 @@ def expectations(ctx: dict[str, Any]) -> list[tuple[str, str, dict[str, Any]]]:
                     {"offset": r, "levels": ol["through"]["levels"]},
                 ],
                 "clearing": ol["sliver"]["clearing"],
+                "cut": "conventional",
+                "part": "left",
             },
         ),
         (

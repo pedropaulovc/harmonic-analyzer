@@ -1153,7 +1153,18 @@ def context(
         (
             [
                 ["depth", {"z_min": _r(arch_bottom)}],
-                ["outline", {"elements": elements, "passes": passes, "z_top": section}],
+                [
+                    "outline",
+                    {
+                        "elements": elements,
+                        "passes": passes,
+                        "z_top": section,
+                        # Clockwise round the arch, the part on the right:
+                        # climb, as the module docstring says (ball screws).
+                        "cut": "climb",
+                        "part": "right",
+                    },
+                ],
                 ["rapids_clear", {"z_top": section}],
                 ["air_feed", {"z_top": section}],
                 ["keep_out", {"radius": r, "boxes": keep["arch"]}],
@@ -1223,7 +1234,7 @@ def context(
                 "z": _r(ear),
                 "window": [[_r(wall_x), _r(wall_x)], [wall_y[1], wall_y[0]]],
                 "min_length": width,
-                "side": "climb",
+                "cut": "climb",
             },
         ],
     ]

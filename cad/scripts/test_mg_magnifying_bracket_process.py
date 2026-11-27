@@ -300,4 +300,6 @@ def test_the_foot_wall_pass_climbs(ctx, tmp_path, key, start, end, program) -> N
         for f in _findings(seeded, tmp_path)
         if f.check == "engagement" and f.program == f"{program}.nc"
     ]
-    assert any("cuts conventional, expected climb" in f.detail for f in found), found
+    assert any(
+        "cuts conventional under M3, declared climb" in f.detail for f in found
+    ), found

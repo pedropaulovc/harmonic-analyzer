@@ -1583,6 +1583,11 @@ def context(
             ["rapids_clear", {"z_top": depth, "open_holes": [xy]}],
             ["air_feed", {"z_top": depth}],
             ["keep_out", {"radius": chamfer["diameter_mm"] / 2, "boxes": boxes}],
+            # The chamfer mill circles climb inside the hole (module docstring).
+            [
+                "arcs",
+                {"z_top": depth, "centres": [xy], "part": "outside", "cut": "climb"},
+            ],
         ]
 
     for name, key in (
