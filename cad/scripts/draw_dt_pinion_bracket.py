@@ -755,12 +755,14 @@ def build(adapter: Any) -> dict[str, str]:
             "Material Specification",
             "Finish",
             "Quantity",
+            "Manufacturing Notes",
         ),
         required=(
             "Number",
             "Material Specification",
             "Finish",
             "Quantity",
+            "Manufacturing Notes",
         ),
     )
     drawing_model, _sheet = new_project_drawing(

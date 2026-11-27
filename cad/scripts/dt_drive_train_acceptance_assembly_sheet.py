@@ -141,11 +141,11 @@ ACCEPTANCES = (
     ),
     (
         "shaft-end-play",
-        _step_ref("end-play-set", "M"),
+        _step_ref("end-play-set", "P"),
         # Fit audit 2026-11-23 part 2, B10; Codjiflo round 1 of #3550,
         # delegated ruling 2026-11-24 (Main), no precedent; owner review
         # #2144: the window, which the end screw's embed and the
-        # bushing air book (step 3M's comment), is read on the dial, not felt.
+        # bushing air book (step 3P's comment), is read on the dial, not felt.
         "MHA-DT-04 END PLAY AT THE SHAFT END",
         inch_window(SHAFT_END_PLAY, 3),
         "DIAL INDICATOR",
