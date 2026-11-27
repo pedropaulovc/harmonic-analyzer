@@ -295,6 +295,29 @@ def test_the_eighth_cutter_leaves_the_shank_corners_inside_their_limits() -> Non
         ({"web_d_finish_mm": 3.302}, "web_d_finish_mm"),
         ({"slot_mid_x_mm": 172.087}, "slot_mid_x_mm"),
         ({"jaw_start_mm": 20.0}, "jaw_end_mm"),
+        # The support plate's milled width (#3652, D44): its middle, under
+        # the narrowest pair, onto the moving parallel on the widest, and the
+        # width op's grip on edge.
+        ({"support_plate_width_mm": 99.06}, "support_plate_width_mm"),
+        (
+            {
+                "support_plate_width_mm": 101.15,
+                "support_plate_width_min_mm": 100.9,
+                "support_plate_width_max_mm": 101.4,
+            },
+            "grip the support plate",
+        ),
+        (
+            {
+                "support_plate_width_mm": 98.6,
+                "support_plate_width_min_mm": 98.4,
+                "support_plate_width_max_mm": 98.8,
+            },
+            "misses the moving parallel",
+        ),
+        ({"edge_shim_height_mm": 12.7}, "less than the shop's fraction"),
+        # The blanks' width gate: 1.992 leaves the outer frame 1.38 mm.
+        ({"blank_width_min_mm": 50.5968}, "blank 2's frame beside the ring"),
         ({"ring_from_end_mm": 22.0}, "left end by its margin"),
         ({"spot_dia_mm": 2.0}, "under the #49"),
         ({"tab_top_3_x_mm": 142.0}, "off the shank's flanks"),
