@@ -380,18 +380,31 @@ any other part with "the release carries no ... bundle"); the script
 range-reads just those ZIP members and refuses a bundle that does not bind its
 STEP. When the part's `geometry` inputs (`part:<stem>` and the labelled-STEP
 export code) differ between the release's tag and the working tree it reports
-the bundle STALE (exit 2, nothing written unless `--accept-stale`): only a farm
+the bundle STALE (exit 2, nothing written; there is no override): only a farm
 build of `package:features:<stem>` makes it current. Otherwise it rebinds
 `features.toml` from this checkout's declarations over the fetched STEPs and
 inventories, exactly as `package:manifest:<stem>` would, so a new or changed
 `requirement(...)` needs no farm run. A release cut before face inventories
 shipped can be neither rebound nor validated, so it is always STALE (use a
-newer release or `--accept-stale`). With the
+newer release). With the
 bundle in place run the wrapper or `uvx` form (and `cad/scripts/cam_nc.py
 <stem>` for NC); the doit tasks would first run the feature leaf. Both always
 use the latest prechips release from PyPI, so they need `uv` and network access
 to PyPI. After editing declarations on top of a local bundle, rerun
-`uv run --frozen python cad/scripts/export_features.py <stem>` to rebind it.
+`uv run --frozen python cad/scripts/fetch_features.py --rebind <stem>` to rebind it.
+
+Every bound `features.toml` (from `package:manifest:<stem>` or a fetch) ends
+with `[geometry_inputs]`: each `geometry` input of the part and its doit
+content digest (a `.py` file's syntax tree, a YAML file's parsed data), from
+the tree that bound it, where the STEP is the one doit keyed on those inputs
+(`cad/scripts/_features_provenance.py`, #3668). `prechips_traveler.py` and
+`cam_nc.py` recompute the digests from the checkout and refuse with exit 2,
+naming each changed input, a bundle that records none (bound by
+`export_features.py <stem>` alone, or before #3668) or was built from other
+geometry, such as a bundle copied from another worktree. `fetch_features.py
+--check <stem>` reports the same without fetching or writing. The commit is
+not recorded: `features.toml` keys every `cam:*` and `prechips:*` task, and a
+commit id would give identical bundles different keys.
 
 The task runs `cad/scripts/prechips_traveler.py <stem>`, which removes any
 previous `traveler.html`, `traveler-hobby.html` and `<slug>-traveler.pdf` under
