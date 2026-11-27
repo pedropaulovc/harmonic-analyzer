@@ -20,6 +20,7 @@ from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dime
 from _drawing_registry import DRAWINGS_BY_NAME
 from _inch_wall_limits import WALL_FLOOR_MM, WALL_TARGET_MM
 from _printed_tolerance import printed_band_mm
+from machinist_exceptions import load_exceptions
 
 IN = 25.4
 _XX = printed_band_mm(2, unit=dt_crank_handle_spec.UNIT)
@@ -433,11 +434,11 @@ def test_tenon_wall_charges_both_breaks_at_its_free_end() -> None:
     # tenon's callout flags (rule 7: it counts as at the callout).
     assert "SEE NOTE 1" in drawing.TENON_CALLOUT
     exceptions = {
-        row["id"]: row for row in _config.parts("dt-crank-handle")["machinist_exceptions"]
+        row.id: row for row in load_exceptions(_config.CONFIG_DIR, "dt-crank-handle", "part")
     }
     assert {"RV-01", "RV-02"} <= set(exceptions)
     for rule, text in (("RV-01", "WALL .061 MIN"), ("RV-02", "WALL .041 MIN AT TENON END")):
-        assert exceptions[rule]["where"] == "tenon callout: " + text
+        assert exceptions[rule].where == "tenon callout: " + text
         assert text in notes.TENON_NOTE
 
 

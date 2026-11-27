@@ -24,6 +24,7 @@ from _drawing_types import DrawingLayout
 from _inch_wall_limits import WALL_FLOOR_MM, WALL_TARGET_MM
 from _machinist_review_mode import MachinistReviewMode
 from _printed_tolerance import drilled_oversize_mm, printed_band_mm
+from machinist_exceptions import load_exceptions
 from test_pd_transgear_adapter_contract import (
     _adapter_calls,
     _adapter_methods,
@@ -182,8 +183,7 @@ def test_the_bore_clears_the_number_ten_screw_and_its_wall_meets_the_target() ->
     assert spec.WALL_TEXT == "WALL .096 MIN"
     assert not spec.WALL_STATED
     assert spec.DIMENSION_CALLOUTS_BY_NAME["BoreDia"] == "DRILL THRU"
-    row = _config.parts(spec.PART_NAME)
-    assert "machinist_exceptions" not in row
+    assert load_exceptions(_config.CONFIG_DIR, spec.PART_NAME, "part") == ()
 
 
 def test_callouts_name_each_fit_and_mate() -> None:

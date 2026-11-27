@@ -23,6 +23,7 @@ from _drawing_contract import PRECISION_MIGRATED_DRAWINGS
 from _drawing_registry import DRAWINGS_BY_NAME
 from _hole_spec import DRILL_POINT_H
 from _machinist_review_mode import MachinistReviewMode
+from machinist_exceptions import load_exceptions
 
 IN = 25.4
 
@@ -141,8 +142,8 @@ def test_one_flag_note_states_the_fit_and_the_joint() -> None:
     # No sequence note: the sheet shows the plug alone, so it leaves the
     # bench tapped; the bond is MHA-SM-00 STEP 8 (#2315, no RV-02).
     assert "BEFORE" not in spec.DRAWING_NOTES
-    declared = _config.parts("sm-gooseneck-end-plug")["machinist_exceptions"]
-    assert [entry["id"] for entry in declared] == ["RV-01"]
+    declared = load_exceptions(_config.CONFIG_DIR, "sm-gooseneck-end-plug", "part")
+    assert [entry.id for entry in declared] == ["RV-01"]
     # Rule 7: each line ends left of the title block (x 0.216) at the sheet's
     # ~2.42 mm a character.
     assert drawing.NOTES_XY[0] + 0.00242 * max(map(len, lines)) < 0.214

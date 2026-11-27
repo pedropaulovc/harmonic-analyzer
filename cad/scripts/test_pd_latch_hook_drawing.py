@@ -18,6 +18,7 @@ from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dime
 from _drawing_leaders import distance_to_box
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_types import DRAWING_TEMPLATES
+from machinist_exceptions import load_exceptions
 
 
 def test_required_drawing_paths() -> None:
@@ -161,13 +162,13 @@ def test_finished_walls_pay_both_edge_breaks() -> None:
 def test_the_package_declares_the_screw_hole_wall_the_callout_prints() -> None:
     """#2166: Main's delegated minor (option A, the geometry kept) names the
     generated wall line the screw-hole callout prints last (rule 20)."""
-    exceptions = _config.parts("pd-latch-hook")["machinist_exceptions"]
-    (entry,) = [entry for entry in exceptions if entry["id"] == "RV-01"]
-    assert entry["kind"] == "minor"
-    assert spec.SCREW_HOLE_WALL_TEXT in entry["where"]
-    assert entry["reason"].startswith("Owner ruling 2026-11-08 (Pedro)")
-    assert "Delegated ruling 2026-11-07" in entry["reason"]
-    assert "#2144" in entry["reason"]
+    exceptions = load_exceptions(_config.CONFIG_DIR, "pd-latch-hook", "part")
+    (entry,) = [entry for entry in exceptions if entry.id == "RV-01"]
+    assert entry.kind == "minor"
+    assert spec.SCREW_HOLE_WALL_TEXT in entry.where
+    assert entry.reason.startswith("Owner ruling 2026-11-08 (Pedro)")
+    assert "Delegated ruling 2026-11-07" in entry.reason
+    assert "#2144" in entry.reason
     assert drawing.CALLOUTS_BELOW["ScrewDia"].split("\n")[-1] == (
         spec.SCREW_HOLE_WALL_TEXT
     )

@@ -12,6 +12,7 @@ import dt_cone_tip_end_screw_spec as spec
 from _drawing_registry import DRAWINGS_BY_NAME
 from _inch_wall_limits import WALL_FLOOR_MM, WALL_TARGET_MM
 from _machinist_review_mode import MachinistReviewMode
+from machinist_exceptions import load_exceptions
 
 IN = 25.4
 
@@ -83,14 +84,14 @@ def test_hole_wall_to_the_thread_root_is_the_declared_minor() -> None:
     )
     assert WALL_FLOOR_MM <= spec.END_HOLE_WALL_WORST < WALL_TARGET_MM
     assert spec.END_HOLE_WALL_PRINTED_IN == 0.065
-    (row,) = _config.parts(spec.PART_NAME)["machinist_exceptions"]
-    assert row["id"] == "RV-01" and row["kind"] == "minor"
+    (row,) = load_exceptions(_config.CONFIG_DIR, spec.PART_NAME, "part")
+    assert row.id == "RV-01" and row.kind == "minor"
     # The exception quotes the wall row the callout prints.
     assert spec.END_HOLE_CALLOUT.splitlines()[-1] == "WALL .065 MIN"
-    assert row["where"].endswith(": WALL .065 MIN")
-    assert "owner ruling 2026-11-24, fit audit question 11" in row["reason"].lower()
-    assert row["reason"].startswith("Owner ruling 2026-11-09 via PR #1992")
-    assert "pull/1992" in row["reason"]
+    assert row.where.endswith(": WALL .065 MIN")
+    assert "owner ruling 2026-11-24, fit audit question 11" in row.reason.lower()
+    assert row.reason.startswith("Owner ruling 2026-11-09 via PR #1992")
+    assert "pull/1992" in row.reason
 
 
 def test_pivot_never_bottoms_and_always_runs_in_the_hole() -> None:

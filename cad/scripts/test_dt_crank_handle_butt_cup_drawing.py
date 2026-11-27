@@ -25,6 +25,7 @@ from _layout_geometry import (
     segment_box_distance,
     segment_box_overlap_length,
 )
+from machinist_exceptions import load_exceptions
 
 
 def test_required_drawing_paths_and_registry_entry() -> None:
@@ -132,10 +133,10 @@ def test_face_walls_charge_every_exposed_break() -> None:
     assert spec.POCKET_STRAIGHT_WALL_MIN == pytest.approx(WALL_TARGET_MM)
     assert notes.POCKET_FIT_CALLOUT.splitlines()[-1] == "WALL .060 MIN"
     exceptions = {
-        row["id"]: row for row in _config.parts("dt-crank-handle-butt-cup")["machinist_exceptions"]
+        row.id: row for row in load_exceptions(_config.CONFIG_DIR, "dt-crank-handle-butt-cup", "part")
     }
     assert set(exceptions) == {"RV-01"}
-    assert exceptions["RV-01"]["where"].endswith(notes.POCKET_FIT_CALLOUT.splitlines()[-1])
+    assert exceptions["RV-01"].where.endswith(notes.POCKET_FIT_CALLOUT.splitlines()[-1])
     # #2196 (Owner ruling 2026-11-08 (Pedro), #2144 item 7.3): the .34 overall keeps the
     # target at the floor hole's lip, both mouths broken; option B lifts the
     # bottom face's ring round the hole over it too.

@@ -17,6 +17,7 @@ from _fit_shaft_h import SHAFT_H
 from _inch_wall_limits import WALL_TARGET_MM
 from _printed_tolerance import inside_corner_radius_mm
 from ch_vn_frame_side_screw_spec import HEAD_H as FRAME_SIDE_HEAD_H
+from machinist_exceptions import load_exceptions
 
 
 def test_required_drawing_paths() -> None:
@@ -159,10 +160,10 @@ def test_counterbore_prints_the_title_block_limits() -> None:
     assert HEAD_DIA == pytest.approx(0.140 * 25.4)
     assert dia[0] - HEAD_DIA == pytest.approx(0.005 * 25.4)
     assert dia[0] - HEAD_DIA > 0.0
-    rows = _config.parts("ch-fulcrum-keeper")["machinist_exceptions"]
-    exception = {row["id"]: row for row in rows}["RV-04"]
-    assert ".0720" in exception["finding"]
-    assert "\u00d8.145-.155 x .078-.088" in exception["reason"]
+    rows = load_exceptions(_config.CONFIG_DIR, "ch-fulcrum-keeper", "part")
+    exception = {row.id: row for row in rows}["RV-04"]
+    assert ".0720" in exception.finding
+    assert "\u00d8.145-.155 x .078-.088" in exception.reason
 
 
 def test_side_station_names_the_frame_tap_and_the_web_needs_xx() -> None:

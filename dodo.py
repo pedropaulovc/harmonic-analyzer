@@ -3138,10 +3138,15 @@ def _machinist_review_prompts(kind: str) -> list[Path]:
 def _machinist_review_file_deps(stem: str) -> list[str]:
     spec = DRAWINGS_BY_NAME[stem]
     dashed = stem.replace("_", "-")
+    # The exception register is read by the review alone, like the necessity
+    # register (rule 4); no SolidWorks leaf depends on either (#3663).
+    register = CONFIG_DIR / "exceptions" / f"{dashed}.yaml"
+    # TEMPORARY (#3663): a package not yet moved still declares in its build
+    # contract (machinist_exceptions.legacy_path).
     if spec.source_kind == "part":
-        exceptions = CONFIG_DIR / "parts" / f"{dashed}.yaml"
+        unmoved = CONFIG_DIR / "parts" / f"{dashed}.yaml"
     else:
-        exceptions = (
+        unmoved = (
             CONFIG_DIR / "assemblies" / f"{dashed.removesuffix('-assembly')}.yaml"
         )
     necessity = CONFIG_DIR / "necessity" / f"{dashed}.yaml"
@@ -3164,9 +3169,8 @@ def _machinist_review_file_deps(stem: str) -> list[str]:
             *prompts,
             # The rubric is keyed by its major version, not its bytes.
             Path(_drawing_guidelines_version_dep()),
-            *([exceptions] if exceptions.is_file() else []),
-            # The necessity register (rule 4) is read by the review alone;
-            # no SolidWorks leaf depends on it.
+            *([register] if register.is_file() else []),
+            *([unmoved] if unmoved.is_file() else []),
             *([necessity] if necessity.is_file() else []),
             *([fitup] if fitup else []),
         )

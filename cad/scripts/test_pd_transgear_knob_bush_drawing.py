@@ -27,6 +27,7 @@ from _inch_wall_limits import WALL_FLOOR_MM, WALL_TARGET_MM
 from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
 from _surface_finish import MACHINED_UM
+from machinist_exceptions import load_exceptions
 from pd_cluster_stack_band import FIT_LENGTH_BAND_IN
 
 
@@ -285,9 +286,9 @@ def test_the_hub_station_stays_tight_by_ruling_not_by_the_necessity_test() -> No
         )
     )["necessity"]
     assert not [row for row in registry if "hub face station" in row["feature"]]
-    exceptions = _config.parts("pd-transgear-knob-bush")["machinist_exceptions"]
-    (accept,) = (row for row in exceptions if row["id"] == "RV-05")
-    assert accept["kind"] == "accept" and ".809 ±.001" in accept["where"]
+    exceptions = load_exceptions(_config.CONFIG_DIR, "pd-transgear-knob-bush", "part")
+    (accept,) = (row for row in exceptions if row.id == "RV-05")
+    assert accept.kind == "accept" and ".809 ±.001" in accept.where
 
 
 def _worst_walls_in() -> dict[str, float]:
@@ -337,12 +338,12 @@ def test_the_stated_wall_is_an_owner_minor_exception() -> None:
     stated value, under the 2026-11-01 thin-wall ruling."""
     (rv03,) = [
         row
-        for row in _config.parts(part.PART_NAME)["machinist_exceptions"]
-        if row["id"] == "RV-03"
+        for row in load_exceptions(_config.CONFIG_DIR, part.PART_NAME, "part")
+        if row.id == "RV-03"
     ]
-    assert rv03["kind"] == "minor"
-    assert spec.WALL_TEXT in rv03["where"]
-    assert rv03["reason"].startswith(
+    assert rv03.kind == "minor"
+    assert spec.WALL_TEXT in rv03.where
+    assert rv03.reason.startswith(
         "Owner ruling 2026-11-01: thin walls above the .060 floor but under the"
         " .080 target, with no geometry escape, are accepted as package-specific"
         " minor exceptions."
@@ -351,7 +352,7 @@ def test_the_stated_wall_is_an_owner_minor_exception() -> None:
     bore_max = f"{(BUSH.BORE_DIA + max(BUSH.BORE_DIA_LIMITS)) / 25.4:.4f}"
     longest = f"{(BUSH.LENGTH + BUSH.LENGTH_BAND) / 25.4:.3f}"
     for fact in (press_min, bore_max, longest):
-        assert fact.removeprefix("0") in rv03["reason"], fact
+        assert fact.removeprefix("0") in rv03.reason, fact
 
 
 def _bush_geometry_fresh():
@@ -423,11 +424,11 @@ def test_the_bore_frame_holds_k_inside_the_reducer_axis_zone() -> None:
     assert zone <= REGISTRATION.AXIS_PROJECTED_ZONE_DIAMETER_MM
     (rv02,) = [
         row
-        for row in _config.parts(part.PART_NAME)["machinist_exceptions"]
-        if row["id"] == "RV-02"
+        for row in load_exceptions(_config.CONFIG_DIR, part.PART_NAME, "part")
+        if row.id == "RV-02"
     ]
-    assert "datum A (shoulder face)" in rv02["where"]
-    reason = rv02["reason"]
+    assert "datum A (shoulder face)" in rv02.where
+    reason = rv02.reason
     assert f"({BUSH.KNOB_BORE_LENGTH_MIN_MM:.2f} mm)" in reason
     assert f"{zone:.4f} mm" in reason
     assert f"({REGISTRATION.K_PROJECTED_HEIGHT_MM:.2f} mm" in reason
@@ -439,8 +440,8 @@ def test_the_bore_frame_holds_k_inside_the_reducer_axis_zone() -> None:
 
 
 def test_the_frame_lives_on_the_bush_not_the_plate() -> None:
-    plate_rows = _config.parts("pd-transgear-arm-plate").get("machinist_exceptions", ())
-    assert not any("perpendicularity" in row["where"] for row in plate_rows)
+    plate_rows = load_exceptions(_config.CONFIG_DIR, "pd-transgear-arm-plate", "part")
+    assert not any("perpendicularity" in row.where for row in plate_rows)
 
 
 def test_running_and_thrust_faces_carry_their_finish() -> None:

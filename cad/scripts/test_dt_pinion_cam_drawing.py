@@ -72,6 +72,7 @@ def test_thin_side_wall_is_owner_minor_rv_01_at_the_printed_limits() -> None:
     # thin side keeps .07525, between the floor and the target: owner minor
     # RV-01 as restated for fit audit S3, printed as .0752 MIN.
     import _config
+    from machinist_exceptions import load_exceptions
 
     spec = dt_pinion_cam_spec
     worst_in = (0.575 - 0.005) / 2.0 - (0.2510 + 0.0005) / 2.0 - (0.079 + 0.005)
@@ -81,11 +82,11 @@ def test_thin_side_wall_is_owner_minor_rv_01_at_the_printed_limits() -> None:
     assert dt_pinion_cam_geometry.THIN_SIDE_WALL >= 0.080 * 25.4
     (rv_01,) = [
         entry
-        for entry in _config.parts("dt-pinion-cam")["machinist_exceptions"]
-        if entry["id"] == "RV-01"
+        for entry in load_exceptions(_config.CONFIG_DIR, "dt-pinion-cam", "part")
+        if entry.id == "RV-01"
     ]
-    assert rv_01["kind"] == "minor"
-    assert ".0752 MIN" in rv_01["where"] and "fit audit S3" in rv_01["reason"]
+    assert rv_01.kind == "minor"
+    assert ".0752 MIN" in rv_01.where and "fit audit S3" in rv_01.reason
     # The sheet states the wall on its own native single-limit dimension,
     # floored so it never claims more than the worst case leaves.
     assert spec.THIN_WALL_MIN_MM == pytest.approx(0.0752 * 25.4)

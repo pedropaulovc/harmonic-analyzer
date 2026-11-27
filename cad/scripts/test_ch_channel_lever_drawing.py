@@ -118,9 +118,10 @@ def test_walls_clear_the_floor_at_worst_case() -> None:
     # and the registry row carries its exception.
     assert spec.WALL_SHORTFALL_ACCEPTED == {"spring hole to tip and edges"}
     import _config
+    from machinist_exceptions import load_exceptions
 
-    exceptions = _config.parts("ch-channel-lever")["machinist_exceptions"]
-    assert any("#21" in item["where"] and item["kind"] == "minor" for item in exceptions)
+    exceptions = load_exceptions(_config.CONFIG_DIR, "ch-channel-lever", "part")
+    assert any("#21" in item.where and item.kind == "minor" for item in exceptions)
 
 
 def test_root_corners_print_r065_and_judge_r070() -> None:

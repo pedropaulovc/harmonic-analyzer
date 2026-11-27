@@ -243,6 +243,7 @@ def test_clamp_screw_line_wander_shortfall_stays_the_owner_ruled_value() -> None
     assert 0.0 < round(shortfall, 3) <= 0.053
     # Rule 20: the sheet states it, rounded up, and RV-08 declares that note.
     import _config
+    from machinist_exceptions import load_exceptions
     from sh_column_clamp_fit import note_text, stated_max
 
     stated = note_text(stated_max(shortfall))
@@ -251,11 +252,11 @@ def test_clamp_screw_line_wander_shortfall_stays_the_owner_ruled_value() -> None
     assert f"OFFSET UP TO {stated} OVER #8" in note
     assert "SEE NOTE 1" in callouts.callout_rows(callouts.CLAMP_HOLE_CALLOUT)[0]
     entries = {
-        entry["id"]: entry
-        for entry in _config.parts("mg-wheel-bar")["machinist_exceptions"]
+        entry.id: entry
+        for entry in load_exceptions(_config.CONFIG_DIR, "mg-wheel-bar", "part")
     }
-    assert entries["RV-08"]["kind"] == "minor"
-    assert note in entries["RV-08"]["where"]
+    assert entries["RV-08"].kind == "minor"
+    assert note in entries["RV-08"].where
 
 
 def test_every_wall_is_stated_at_the_full_worst_case() -> None:

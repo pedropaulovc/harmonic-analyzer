@@ -25,6 +25,7 @@ from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dime
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_types import DRAWING_TEMPLATES, DrawingLayout
 from _printed_tolerance import printed_band_mm
+from machinist_exceptions import load_exceptions
 
 # Default-format note text, measured on r743-rocker-fix3's render, as
 # test_paper_drive_assembly_drawing and test_channel_assembly_drawing use them.
@@ -364,10 +365,10 @@ def test_the_knob_reversal_play_costs_a_fraction_of_a_millimetre_of_paper() -> N
     paper = math.pi * paper_drive_geom.FEED_PITCH_DIA * sleeve / 360.0
     assert (knob, sleeve, paper) == pytest.approx((21.42, 2.14, 0.18), abs=0.01)
     ruling = next(
-        r for r in _config.parts(part.PART_NAME)["machinist_exceptions"] if r["id"] == "RV-04"
+        r for r in load_exceptions(_config.CONFIG_DIR, part.PART_NAME, "part") if r.id == "RV-04"
     )
-    assert ruling["kind"] == "accept"
-    stated = f"{ruling['finding']} {ruling['reason']}"
+    assert ruling.kind == "accept"
+    stated = f"{ruling.finding} {ruling.reason}"
     for figure in (
         f"±{max(spec.FLAT_PIN_PLAY_DEG):.0f}°",
         f"{knob:.0f}°",

@@ -13,6 +13,7 @@ from _inch_wall_limits import WALL_TARGET_MM
 from _surface_finish import surface_finish_by_key
 import build_pd_support_bar as part
 import draw_pd_support_bar as drawing
+from machinist_exceptions import load_exceptions
 import pd_support_bar_drawing_spec as sheet_spec
 import pd_support_bar_spec as spec
 
@@ -76,13 +77,13 @@ def test_slot_width_band_is_accepted_as_the_cutters_spread() -> None:
     from _printed_tolerance import drilled_oversize_mm
 
     entries = {
-        entry["id"]: entry
-        for entry in _config.parts("pd-support-bar")["machinist_exceptions"]
+        entry.id: entry
+        for entry in load_exceptions(_config.CONFIG_DIR, "pd-support-bar", "part")
     }
     entry = entries["RV-04"]
-    assert entry["kind"] == "accept"
-    assert "2X .196 +.004/.000 THRU, CLEARANCE FOR MHA-SH-VN-53" in entry["where"]
-    assert entry["reason"].startswith(
+    assert entry.kind == "accept"
+    assert "2X .196 +.004/.000 THRU, CLEARANCE FOR MHA-SH-VN-53" in entry.where
+    assert entry.reason.startswith(
         "Delegated ruling 2026-11-26 (Main), no precedent; owner review #2144 (D52)."
     )
     plan = tomllib.loads(_process_plans.plan_path("pd_support_bar").read_text(encoding="utf-8"))
@@ -114,7 +115,7 @@ def test_hook_tap_stations_are_reference_and_the_pivot_row_is_unbanded() -> None
         printed_band_mm(3, unit="in") + 0.0005 * 25.4
     )
     ids = {
-        entry["id"] for entry in _config.parts("pd-support-bar")["machinist_exceptions"]
+        entry.id for entry in load_exceptions(_config.CONFIG_DIR, "pd-support-bar", "part")
     }
     assert "RV-01" not in ids
     assert "SPOT THRU MHA-PD-14" in sheet_spec.DIMENSION_CALLOUTS["BracketCskDia"]
@@ -553,11 +554,11 @@ def test_clamp_screw_line_wander_shortfall_stays_the_owner_ruled_value() -> None
     assert f"OFFSET UP TO {stated} OVER #8" in note
     assert sheet_spec.CLAMP_CBORE_CALLOUT.endswith("SEE NOTE 1")
     entries = {
-        entry["id"]: entry
-        for entry in _config.parts("pd-support-bar")["machinist_exceptions"]
+        entry.id: entry
+        for entry in load_exceptions(_config.CONFIG_DIR, "pd-support-bar", "part")
     }
-    assert entries["RV-03"]["kind"] == "minor"
-    assert note in entries["RV-03"]["where"]
+    assert entries["RV-03"].kind == "minor"
+    assert note in entries["RV-03"].where
 
 
 def test_slot_counterbores_leave_rule_17_walls() -> None:

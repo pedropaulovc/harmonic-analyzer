@@ -552,13 +552,31 @@ def test_review_keys_exclude_the_shared_recipe_skip_set(inputs, monkeypatch):
         assert _review_key(dodo) == initial
 
 
-def test_assembly_exception_uses_bare_dashed_config_stem(inputs):
+def test_assembly_register_keeps_the_suffix_and_unmoved_contract_is_bare(inputs):
     dodo = inputs.module
     inputs.spec.source_kind = "assembly"
     dodo.DRAWINGS_BY_NAME["probe_assembly"] = inputs.spec
-    path = dodo.CONFIG_DIR / "assemblies" / "probe.yaml"
-    path.write_text("machinist_exceptions: []\n")
-    assert str(path.resolve()) in dodo._machinist_review_file_deps("probe_assembly")
+    register = dodo.CONFIG_DIR / "exceptions" / "probe-assembly.yaml"
+    register.parent.mkdir(parents=True)
+    register.write_text("machinist_exceptions: []\n")
+    # TEMPORARY (#3663): a contract not yet moved is keyed by its bare stem.
+    contract = dodo.CONFIG_DIR / "assemblies" / "probe.yaml"
+    contract.write_text("machinist_exceptions: []\n")
+    deps = dodo._machinist_review_file_deps("probe_assembly")
+    assert {str(register.resolve()), str(contract.resolve())} <= set(deps)
+
+
+def test_exception_register_keys_its_own_review_only(inputs):
+    dodo = inputs.module
+    before = _review_key(dodo)
+    other = dodo.CONFIG_DIR / "exceptions" / "other-part.yaml"
+    other.parent.mkdir(parents=True)
+    other.write_text("machinist_exceptions: []\n")
+    assert _review_key(dodo) == before
+    own = dodo.CONFIG_DIR / "exceptions" / "probe.yaml"
+    own.write_text("machinist_exceptions: []\n")
+    assert str(own.resolve()) in dodo._machinist_review_file_deps("probe")
+    assert _review_key(dodo) != before
 
 
 def test_necessity_register_keys_its_own_review_only(inputs):

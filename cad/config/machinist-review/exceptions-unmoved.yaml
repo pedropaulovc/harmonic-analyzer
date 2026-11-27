@@ -1,0 +1,102 @@
+# TEMPORARY: exists only while owner-declared machinist exceptions move out of
+# the build contracts into cad/config/exceptions/ (#3663). Each line names a
+# parts/ registry file or assemblies/ contract that still declares
+# `machinist_exceptions`, with the first 12 hex digits of the digest its cache
+# keys read (_yaml_digest.yaml_digest; a comment-only edit keeps it). A commit
+# that changes such a file re-keys its leaves anyway, so it moves the file's
+# whole block, edited or not, to cad/config/exceptions/<dashed-drawing-stem>.yaml
+# (an assembly drawing keeps -assembly) and deletes the line here; from then on
+# an entry edit re-keys that one machinist review. test_machinist_review.py
+# checks this list against the files. Read only by that test: a line here
+# rebuilds and re-reviews nothing. When the list is empty, delete this file,
+# machinist_exceptions.legacy_path and its callers (dodo's review deps), the
+# assembly contract's `machinist_exceptions` key and the test.
+unmoved:
+  assemblies/ch-channel.yaml: 8f6e505f44e7
+  assemblies/dt-cylinder-gear-tl-cam-turning.yaml: e03ae9fedc8f
+  assemblies/dt-drive-train.yaml: 9a2609ead7d1
+  assemblies/fr-frame.yaml: 06292bf834b5
+  assemblies/ha-harmonic-analyzer.yaml: d85da9709e2e
+  assemblies/mg-magnifier.yaml: 0cd1f7738c75
+  assemblies/pd-paper-drive.yaml: b0c7e5c06eb5
+  assemblies/pn-pen.yaml: 7325e768af79
+  assemblies/sm-summing.yaml: 1fa1e364c059
+  parts/ch-amplitude-bar.yaml: 73a846a3b151
+  parts/ch-channel-lever.yaml: 7b574f382879
+  parts/ch-connecting-rod.yaml: a37a25607039
+  parts/ch-fulcrum-keeper.yaml: 94ab1d95c09d
+  parts/ch-rocker-arm.yaml: 979a95e1b988
+  parts/ch-rocker-hub.yaml: e362c3bfd667
+  parts/ch-rocker-strap-tl-sub-plate.yaml: 6366e61aa30d
+  parts/ch-rocker-strap.yaml: 31807042d29b
+  parts/ch-vn-bracket-hold-down-screw.yaml: e33a52b75e15
+  parts/dt-cone-gear-tl-index-plate.yaml: e24fa7a893d1
+  parts/dt-cone-gear-tl-keyed-arbor.yaml: 6370e2760e48
+  parts/dt-cone-gear-tl-round-arbor.yaml: bfce1336ee06
+  parts/dt-cone-gear.yaml: b3961d3868f3
+  parts/dt-cone-pivot-post.yaml: 9c471605a471
+  parts/dt-cone-swing-platform.yaml: a5e9640ab848
+  parts/dt-cone-tip-block.yaml: b6fdb46e61d7
+  parts/dt-cone-tip-end-screw.yaml: 45c3847f5055
+  parts/dt-cone-tip-gear.yaml: 6665e39e38ed
+  parts/dt-crank-arm.yaml: 5c4ba538854c
+  parts/dt-crank-handle-butt-cup.yaml: d11a1a043a18
+  parts/dt-crank-handle-ferrule.yaml: c6d6f06c8bf1
+  parts/dt-crank-handle-pivot-screw.yaml: 5fa09fad9517
+  parts/dt-crank-handle.yaml: 59de0e82e89a
+  parts/dt-crank-hub.yaml: aceb690eb499
+  parts/dt-crank-pin.yaml: 0627a6b9bfbb
+  parts/dt-crank-pinion.yaml: d5602f20ad1a
+  parts/dt-crankshaft.yaml: 310cf8749da9
+  parts/dt-cylinder-gear-shaft.yaml: 3e4abbc4cde1
+  parts/dt-cylinder-gear-tl-cam-fixture.yaml: c31dcc099587
+  parts/dt-cylinder-gear.yaml: 446f647d69a9
+  parts/dt-pinion-arbor.yaml: 1f5d33b631c0
+  parts/dt-pinion-bracket.yaml: 700cd3accf73
+  parts/dt-pinion-cam.yaml: 462211065b86
+  parts/dt-pinion-lever.yaml: eb1629b8bc5e
+  parts/dt-pinion-lift-rod.yaml: 734a4809e5d5
+  parts/dt-pinion-pivot-block.yaml: c52912f59607
+  parts/dt-pinion-pivot-shaft.yaml: e0c0e642c860
+  parts/dt-pinion-spring.yaml: dfcef98f2aa3
+  parts/dt-vn-post-mount-screw.yaml: dff2130e0487
+  parts/fr-harmonic-base.yaml: 308790d28dd4
+  parts/fr-nameplate.yaml: 155d3bb50f55
+  parts/fr-top-frame.yaml: 5544f7725358
+  parts/fr-vn-gooseneck-set-screw.yaml: 5c4dc78e4a3a
+  parts/fr-vn-lag-screw.yaml: 0edda0c95259
+  parts/mg-magnifying-bracket.yaml: 8dbf8763e81e
+  parts/mg-magnifying-lever.yaml: 87f3857f5914
+  parts/mg-output-fixture.yaml: 7ed535c93199
+  parts/mg-wheel-bar.yaml: e05faa45f6e1
+  parts/pd-feed-rack.yaml: f91e1621908c
+  parts/pd-guide-lock.yaml: de05f2c3ecaf
+  parts/pd-latch-hook.yaml: 8f6d3209b666
+  parts/pd-platen-bottom-guide.yaml: 746a25d5a6e5
+  parts/pd-platen-clip.yaml: 05ae5762058a
+  parts/pd-platen-guide.yaml: 9634ae09da96
+  parts/pd-platen.yaml: 092ac88dede9
+  parts/pd-rack-pinion.yaml: 64679c0a3430
+  parts/pd-support-bar.yaml: 8a6417bd3662
+  parts/pd-transgear-arm-plate.yaml: ea6626a917d6
+  parts/pd-transgear-arm.yaml: e7476f82b7f5
+  parts/pd-transgear-disc-hub.yaml: 91fed86a5c30
+  parts/pd-transgear-drive-collar.yaml: cb932b2b5d61
+  parts/pd-transgear-feed-pinion.yaml: d72177ef8850
+  parts/pd-transgear-knob-bush.yaml: f5beac5ec92a
+  parts/pd-transgear-knob-shaft.yaml: 19f29493c762
+  parts/pd-transgear-pivot-spacer.yaml: 5ad727da5f21
+  parts/pd-transgear-removable.yaml: dee76537504e
+  parts/pn-pen-adjust-screw.yaml: 5ff60307f5b8
+  parts/pn-pen-frame.yaml: c8e64fd137c8
+  parts/pn-pen-hanger.yaml: 360a7047738d
+  parts/pn-pen-rod.yaml: fc0e77ad3dec
+  parts/pn-pen-v-block.yaml: c0fa01a2468a
+  parts/sh-column-clamp-back.yaml: ab2662ae07ea
+  parts/sh-column-clamp-front.yaml: 89fcd3158799
+  parts/sh-vn-brass-fillister-screw.yaml: 3216979a1b54
+  parts/sh-vn-fillister-screw-90280a108.yaml: c2b3245b128b
+  parts/sm-gooseneck-end-plug.yaml: d34b3369ddc7
+  parts/sm-gooseneck.yaml: e09cc6ac5bc0
+  parts/sm-knife-mount.yaml: bd97606cce5b
+  parts/sm-summing-lever.yaml: 6a93c750b8cc

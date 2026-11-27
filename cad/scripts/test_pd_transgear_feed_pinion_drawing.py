@@ -32,6 +32,7 @@ from _printed_tolerance import (
     inside_corner_radius_mm,
     printed_band_mm,
 )
+from machinist_exceptions import load_exceptions
 from pd_cluster_stack_band import FIT_LENGTH_BAND_IN, STACK_NAME
 from paper_drive_stock_inspection import (
     span_contact_points_mm,
@@ -508,9 +509,9 @@ def test_walls_meet_the_target_worst_case() -> None:
     boss_wall = dict((name, worst) for name, _nominal, worst in spec.WALLS)["boss"]
     assert boss_wall - 2 * 0.010 * 25.4 == pytest.approx(0.0730 * 25.4)
     reason = next(
-        entry["reason"]
-        for entry in _config.parts("pd-transgear-feed-pinion")["machinist_exceptions"]
-        if entry["id"] == "RV-04"
+        entry.reason
+        for entry in load_exceptions(_config.CONFIG_DIR, "pd-transgear-feed-pinion", "part")
+        if entry.id == "RV-04"
     )
     assert "the worst wall is .0730" in reason
     assert "D-FLAT WALL TO BORE .072 MIN." in spec.DRAWING_NOTES.splitlines()
