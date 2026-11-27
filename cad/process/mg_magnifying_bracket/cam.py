@@ -31,9 +31,9 @@ width deep, the neck's wall left 0.5 mm full. MB04, H down: face the low side
 L to the width, then mill the notch's other half through to MB03's, so no
 thin skin is ever cut. The nose waste is sawn off at the
 bench. MB05, on edge on the stacks, the foot past the jaws' left side: face
-the neck's inner face to the neck thickness and square the inside corner
-under the foot (the end mill's square corner; MB03's cutter left its radius
-there). MB06, on edge on the 1 in parallels, the nose past the jaws' right
+the neck's inner face to the neck thickness and cut the inside corner under
+the foot (R.02 MAX, clearing a .015 corner-radius cutter; MB03's cutter left
+its R.25 there). MB06, on edge on the 1 in parallels, the nose past the jaws' right
 side: profile the nose R.217 and spot and drill #7 through for the tap; MB07
 is the hand-tap stop.
 
@@ -444,6 +444,17 @@ def _geometry(features: dict[str, Any]) -> dict[str, Any]:
         ):
             raise ValueError(f"{name}: expected through the foot at its station from F")
         holes.append(hole)
+    corner = f["inside_corner"]
+    if (
+        corner["axis"] != [0.0, 1.0, 0.0]
+        or not _close(corner["at"][0], inner)
+        or not _close(corner["at"][2], under)
+        or corner["radius"][0] > 0.0
+        or corner["radius"][1] < 0.015 * IN - 1e-9
+    ):
+        raise ValueError(
+            "inside_corner: expected along Y at the neck-to-foot root, clearing a .015 corner radius"
+        )
     return {
         "outer": outer,
         "free": free,
@@ -459,6 +470,7 @@ def _geometry(features: dict[str, Any]) -> dict[str, Any]:
         "tip": seat - (centre[2] - radius),
         "tap": tap,
         "holes": holes,
+        "corner_max": corner["radius"][1],
     }
 
 
@@ -615,7 +627,7 @@ def context(
     # The neck (MB05): the inner face down to the neck from O, in levels from
     # the top of MB03's corner radius (r above the neck's stock), each in
     # zigzag X passes from the nose end to the foot's underside (the cutter's
-    # edge on it): the end mill's square corner makes the inside corner.
+    # edge on it): the end mill's corner makes the inside corner (R.02 MAX).
     neck_raw = neck + p["neck_stock_mm"]
     neck_levels = _levels(neck_raw + r, neck, p["neck_level_max_mm"])
     _agree(plan, "neck_level_mm", (neck_raw + r - neck) / len(neck_levels))
@@ -1506,18 +1518,30 @@ def as_machined(ctx: dict[str, Any], inputs: Any) -> dict[str, Any]:
     f = inputs.features["features"]
     brk = inputs.features["general_tolerances"]["edge_break_r"]
     g = _geometry(inputs.features)
+    root_r = g["corner_max"]
     tap_r = f["lever_tap"]["dia"][1] / 2 + brk
     high = g["low"] + g["thick"]
 
     def foot_edges(y: list[float]) -> list[list[float]]:
         # The foot's edges on one side, F to the neck's inner face and the
-        # seat down to the underside; where they meet the inside corner's
-        # radius the CAD's blend runs to 0.69 below the underside and 0.51
-        # into the neck (faces.json HAF_F0012/F0014), so the box reaches
-        # 3 and 2 breaks past them.
-        return [[g["free"], g["inner"] + 2 * brk], y, [g["under"] - 3 * brk, g["seat"]]]
+        # seat down to the underside; where they meet the R.02 MAX inside
+        # corner the CAD's blend runs past the underside and into the neck, so
+        # the box reaches 3 and 2 root radii past them.
+        return [[g["free"], g["inner"] + 2 * root_r], y, [g["under"] - 3 * root_r, g["seat"]]]
 
     expected = [
+        {
+            "name": "inside corner under the foot",
+            "kind": "gouge",
+            "within": [
+                [g["inner"] - root_r, g["inner"]],
+                [g["low"], high],
+                [g["under"] - root_r, g["under"]],
+            ],
+            "reason": "the inside corner is drawn R.02 MAX (modelled at .020) so a "
+            ".015 corner-radius cutter clears; MB05 is simulated with a square end mill",
+            "max_mm": root_r * (math.sqrt(2) - 1) + 0.01,
+        },
         {
             "name": "lever tap mouths",
             "kind": "left",

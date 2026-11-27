@@ -119,6 +119,13 @@ def test_context_accepts_the_plan_and_numbers_the_tools(ctx) -> None:
     assert (
         depths["MB03_notch"] + depths["MB04_low"] < PLAN["parameters"]["high_level_mm"]
     )
+    # Issue #3742: the unloaded inside X-root permits R.02 MAX (.508 mm) so
+    # .015 in (.381 mm) corner-radius cutters cover every steel pass.
+    assert FEATURES["features"]["inside_corner"]["radius"] == pytest.approx([0.0, 0.508])
+    bad_features = copy.deepcopy(FEATURES)
+    bad_features["features"]["inside_corner"]["radius"] = [0.0, 0.254]
+    with pytest.raises(ValueError, match="inside_corner"):
+        RECIPE.context(bad_features, PLAN, SHOP, "bracket.step")
 
 
 def test_the_recipes_programs_pass_every_check_they_declare(ctx, tmp_path) -> None:

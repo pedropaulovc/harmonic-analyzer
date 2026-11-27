@@ -43,6 +43,15 @@ def test_model_precision_and_functional_bands_have_one_authority() -> None:
     assert spec.DRAWING_PRECISION["Neck"]["NeckThickness"] == 2
     assert spec.DRAWING_PRECISION["FlangeProfile"] == {"FlangeWidth": 2, "FlangeDepth": 3}
     assert spec.DRAWING_PRECISION["Flange"]["FlangeHeight"] == 2
+    assert spec.DRAWING_PRECISION["RootAndFootRounds"] == {"InsideRootRadius": 2}
+    assert spec.DRAWING_DIMENSIONS["RootAndFootRounds"] == {"InsideRootRadius"}
+    assert spec.INSIDE_ROOT_R_MAX == pytest.approx(0.02 * 25.4)
+    assert spec.INSIDE_ROOT_R_MAX > 0.015 * 25.4
+    assert spec.INSIDE_ROOT_R_BAND == (0.0, -spec.INSIDE_ROOT_R_MAX)
+    assert spec.INSIDE_ROOT_R_TOL_TYPE == 6
+    # Nearer #2-56 screw head clears the R.02 MAX inside X-root by over .65 in.
+    nearer_head_edge = max(p[0] for p in mounting.BRACKET_HOLE_POINTS) + mounting.SCREW_HEAD_DIA / 2.0
+    assert (-joint.NECK_HALF_X - spec.INSIDE_ROOT_R_MAX) - nearer_head_edge > 16.0
     assert joint.NECK_THICKNESS == 12.5
     # .49 +/-.01 over the 12.5 mm model: .48 is the thinnest accepted neck.
     assert joint.NECK_THICKNESS - joint.NECK_THICKNESS_TOL == pytest.approx(0.48 * 25.4)
@@ -458,3 +467,44 @@ def test_foot_finish_guard_keeps_whitespace_between_native_text_runs():
     }
     # The line crosses the union envelope, but neither measured run.
     drawing._assert_foot_finish_text_clear(display)
+
+
+@pytest.mark.parametrize(
+    "fault",
+    (None, "missing", "diametric", "wrong_tol", "wrong_value", "opposite_leader"),
+)
+def test_inside_root_radius_dress_proves_max_limit_and_stops_leader_at_arc(monkeypatch, fault):
+    state = SimpleNamespace(opposite=True)
+    dimension = SimpleNamespace(
+        SystemValue=(0.254 if fault == "wrong_value" else spec.INSIDE_ROOT_R_MAX) / 1000.0,
+        Tolerance=SimpleNamespace(Type=0 if fault == "wrong_tol" else spec.INSIDE_ROOT_R_TOL_TYPE),
+    )
+    class FakeDisplay:
+        Diametric = fault == "diametric"
+
+        def GetDimension2(self, _index):
+            return dimension
+
+        @property
+        def ArcExtensionLineOrOppositeSide(self):
+            return state.opposite
+
+        @ArcExtensionLineOrOppositeSide.setter
+        def ArcExtensionLineOrOppositeSide(self, value):
+            state.opposite = True if fault == "opposite_leader" else value
+
+    display = FakeDisplay()
+    annotation = SimpleNamespace(GetSpecificAnnotation=lambda: display)
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
+    monkeypatch.setattr(
+        drawing,
+        "dimension_name",
+        lambda _adapter, item: "InsideRootRadius" if item is annotation else "Other",
+    )
+    items = [] if fault == "missing" else [annotation]
+    if fault:
+        with pytest.raises(RuntimeError):
+            drawing._dress_inside_root_radius(object(), items)
+    else:
+        drawing._dress_inside_root_radius(object(), items)
+        assert state.opposite is False

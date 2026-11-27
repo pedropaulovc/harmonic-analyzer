@@ -2,10 +2,12 @@ r"""Native manufacturing sheet for the simple threaded L bracket.
 
 The sheet prints decimal inch (the part's ``drawing_unit: in``). Model sizes
 import from the saved SLDPRT. The ordinary end view and associative 1/4-20
-UNC THRU callout define the simple tapped hole; no section is needed. Its fit
-class, inside corners and ordinary edge breaks follow the title block. The
-explicit foot thickness retains the screw-grip stack and is witnessed from the
-foot's free end, where its top and bottom are edges.
+UNC THRU callout define the simple tapped hole; no section is needed. The
+unloaded foot-to-upright inside X-root prints ``R.02 MAX`` (#3742, clearing
+.015 corner-radius 3/8 and 1/2 in carbide end mills); thread class and
+ordinary edge breaks follow the title block. The explicit foot thickness
+retains the screw-grip stack and is witnessed from the foot's free end, where
+its top and bottom are edges.
 """
 
 from __future__ import annotations
@@ -53,7 +55,7 @@ from _gtol_planar import PlanarFace
 from _printed_limits import drilled_limits, limits
 from magnifying_bracket_joint_layout import BRACKET_HOLE_POINTS, CLEARANCE_DIA, CLEARANCE_SPEC, SIDE_PLATE_X, SIDE_PLATE_Y, SIDE_PLATE_Z
 from mg_lever_thread_joint import HOLE_LOCATION_DEVIATIONS, MOUTH_CHAMFER, NECK_HALF_X, NECK_THICKNESS, NOSE_R, NOSE_R_DEVIATIONS, TAP_DRILL_DIA, TAP_SPEC, THREAD
-from mg_magnifying_bracket_spec import DIMENSION_CALLOUTS, DRAWING_DIMENSIONS, DRAWING_PRECISION, DRAWING_REFERENCE_PRECISION, MOUNTING_HOLE_PRECISION, MOUNTING_HOLE_PROCESS, TAP_HOLE_PRECISION, TAP_PROCESS, UNIT
+from mg_magnifying_bracket_spec import DIMENSION_CALLOUTS, DRAWING_DIMENSIONS, DRAWING_PRECISION, DRAWING_REFERENCE_PRECISION, INSIDE_ROOT_R_BAND, INSIDE_ROOT_R_MAX, INSIDE_ROOT_R_PLACES, INSIDE_ROOT_R_TOL_TYPE, MOUNTING_HOLE_PRECISION, MOUNTING_HOLE_PROCESS, TAP_HOLE_PRECISION, TAP_PROCESS, UNIT
 from mg_magnifying_bracket_finish_spec import SURFACE_FINISHES
 
 # Cached machinist review leaf: a FIX or ERROR verdict fails the build.
@@ -70,7 +72,12 @@ BOTTOM_CENTER = (0.079, 0.080)
 SIDE_CENTER = (0.228, 0.165)
 ISO_CENTER = (0.350, 0.130)
 ISO_SCALE = (1, 2)
-FRONT_KEEP = {"NeckThickness": (0.118, 0.185), "FlangeWidth": (0.079, 0.098), "FlangeDepth": (0.044, 0.123)}
+FRONT_KEEP = {
+    "NeckThickness": (0.118, 0.185),
+    "FlangeWidth": (0.079, 0.098),
+    "FlangeDepth": (0.044, 0.123),
+    "InsideRootRadius": (0.077, 0.168),
+}
 BOTTOM_KEEP = {"FlangeHeight": (0.132, 0.080)}
 SIDE_KEEP = {"NoseR": (0.266, 0.229), "SeatToAxis": (0.196, 0.165)}
 MOUNTING_KEEP = {"MountingX0": (0.045, 0.056), "MountingX1": (0.060, 0.046), "MountingY0": (0.030, 0.080)}
@@ -365,6 +372,36 @@ for _index, (_point, _dim) in enumerate(zip(BRACKET_HOLE_POINTS, ("MountingX0", 
             "lateral": DRAWING_PRECISION["MountingCoordinates"]["MountingY0"],
         },
     )
+# The unloaded foot-to-upright inside X-root (-X neck face meets -Z foot
+# underside, along Y; #3742): the single limit R.02 MAX (FRONT_KEEP
+# "InsideRootRadius"), sharp up to INSIDE_ROOT_R_MAX so .015 corner-radius
+# end mills clear; the part models it at the limit.
+_ROOT_AT = [-NECK_HALF_X, 0.0, _UNDERSIDE_Z]
+_ROOT_POINT_X = -NECK_HALF_X - INSIDE_ROOT_R_MAX * (1.0 - 1.0 / math.sqrt(2.0))
+_ROOT_POINT_Z = _UNDERSIDE_Z - INSIDE_ROOT_R_MAX * (1.0 - 1.0 / math.sqrt(2.0))
+requirement(
+    "inside_corner",
+    kind="fillet",
+    faces=(
+        CylinderFace(
+            2.0 * INSIDE_ROOT_R_MAX,
+            contains_x_mm=_ROOT_POINT_X,
+            contains_y_mm=0.0,
+            contains_z_mm=_ROOT_POINT_Z,
+        ),
+    ),
+    requirements=("radius",),
+    fields={
+        "at": (_ROOT_AT, ((_THREAD_JOINT, "NECK_HALF_X"), (_JOINT, "SIDE_PLATE_Z"))),
+        "axis": ((0.0, 1.0, 0.0), ((_JOINT, "SIDE_PLATE_Y"),)),
+        "radius": (
+            limits(INSIDE_ROOT_R_MAX, INSIDE_ROOT_R_PLACES, INSIDE_ROOT_R_BAND, unit=UNIT),
+            ("INSIDE_ROOT_R_MAX", "INSIDE_ROOT_R_BAND", "INSIDE_ROOT_R_TOL_TYPE", "UNIT", *_FRONT_KEEP),
+        ),
+        "radius_nominal": (INSIDE_ROOT_R_MAX, ("INSIDE_ROOT_R_MAX",)),
+    },
+    precision={"radius": INSIDE_ROOT_R_PLACES},
+)
 
 
 def _mounting_rims(view: Any) -> tuple[Any, ...]:
@@ -570,6 +607,26 @@ def _exterior_nose_radius(adapter: Any, annotations: list[Any]) -> None:
         raise RuntimeError("NoseR kept its leader to the hole centre")
 
 
+def _dress_inside_root_radius(adapter: Any, annotations: list[Any]) -> None:
+    """Prove InsideRootRadius prints R.02 MAX and stop its leader at the arc."""
+    matches = [item for item in annotations if dimension_name(adapter, item) == "InsideRootRadius"]
+    if len(matches) != 1:
+        raise RuntimeError(f"expected one InsideRootRadius dimension, found {len(matches)}")
+    annotation = _early_bound(matches[0], "IAnnotation")
+    display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+    if bool(display.Diametric):
+        raise RuntimeError("InsideRootRadius is not radial")
+    dimension = _early_bound(display.GetDimension2(0), "IDimension")
+    tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
+    if int(tolerance.Type) != INSIDE_ROOT_R_TOL_TYPE:
+        raise RuntimeError(f"InsideRootRadius lost its native MAX type: {int(tolerance.Type)}")
+    if not math.isclose(float(dimension.SystemValue), INSIDE_ROOT_R_MAX / 1000.0, abs_tol=1e-9):
+        raise RuntimeError("InsideRootRadius does not measure the inside-root fillet")
+    display.ArcExtensionLineOrOppositeSide = False
+    if bool(display.ArcExtensionLineOrOppositeSide):
+        raise RuntimeError("InsideRootRadius leader still runs to the opposite side")
+
+
 def _overall_reference(adapter: Any, side: Any, edges: Any) -> Any:
     """Parenthesized seat-to-nose extreme, not another manufacturing control."""
     seat = edges.exact_line_through((NECK_HALF_X, 0.0, SIDE_PLATE_Z[1]), label="overall mounting seat")
@@ -609,7 +666,7 @@ def _layout_linear_annotations(
     adapter: Any, front: Any, bottom: Any, annotations: list[Any], *, overall_reference: Any, tap_callout: Any,
 ) -> None:
     """Place reviewed text from native witnesses, then guard neighbours."""
-    names = ("NeckThickness", "FlangeDepth", "MountingX0", "MountingX1", "MountingY0", "NoseR", "TapFromTip", "TapFromSide", "OverallHeight")
+    names = ("NeckThickness", "FlangeDepth", "InsideRootRadius", "MountingX0", "MountingX1", "MountingY0", "NoseR", "TapFromTip", "TapFromSide", "OverallHeight")
     # Keep the actual drawing-created reference instead of rediscovering it
     # through the imported-model dimension-name reader.
     by_name = {"OverallHeight": overall_reference}
@@ -683,6 +740,7 @@ def _layout_linear_annotations(
         for x in (-NECK_HALF_X, NECK_HALF_X) for z in (-NOSE_R, SIDE_PLATE_Z[1])
     ]
     foot_end = model_point_in_view(adapter, front, (SIDE_PLATE_X[0] / 1000.0, 0.0, SIDE_PLATE_Z[0] / 1000.0), label="free foot end")[0]
+    root_corner = model_point_in_view(adapter, front, (-NECK_HALF_X / 1000.0, 0.0, SIDE_PLATE_Z[0] / 1000.0), label="inside foot root")
     front_solids = {
         name: (min(p[0] for p in points), min(p[1] for p in points), max(p[0] for p in points), max(p[1] for p in points))
         for name, points in (("front foot", foot_corners), ("front upright", arm_corners))
@@ -691,6 +749,12 @@ def _layout_linear_annotations(
         # On its own dimension line, outside the leg beside the right arrow.
         "NeckThickness": (max(line.x0 for line in verticals("NeckThickness")) + 0.004, before["NeckThickness"].text[1]),
         "FlangeDepth": (foot_end, max(max(line.y0, line.y1) for line in before["FlangeDepth"].leader) + 0.004),
+        # In the open L quadrant above FlangeDepth and left of the upright,
+        # keeping the elbow right of FlangeDepth's 2 mm clearance box.
+        "InsideRootRadius": (
+            root_corner[0] - 0.0045 - (before["InsideRootRadius"].text[2] - before["InsideRootRadius"].text[0]),
+            root_corner[1] + 0.048,
+        ),
         "MountingX0": (left_foot - 0.004 - (before["MountingX0"].text[2] - before["MountingX0"].text[0]), before["MountingX0"].text[1]),
         "MountingX1": (last_hole + 0.004, before["MountingX1"].text[1]),
         "MountingY0": (
@@ -758,6 +822,7 @@ def _layout_linear_annotations(
         _telemetry.info(f"{name} settled native text={ink.text}")
     require_clear("NeckThickness", next(ink.text for item, ink in settled if item is by_name["NeckThickness"]), front_solids)
     require_clear("FlangeDepth", next(ink.text for item, ink in settled if item is by_name["FlangeDepth"]), front_solids)
+    require_clear("InsideRootRadius", next(ink.text for item, ink in settled if item is by_name["InsideRootRadius"]), front_solids)
     foot_points = [
         model_point_in_view(adapter, bottom, (x / 1000.0, y / 1000.0, SIDE_PLATE_Z[1] / 1000.0), label="mounting-face silhouette")
         for x in SIDE_PLATE_X for y in SIDE_PLATE_Y
@@ -894,7 +959,8 @@ def build(adapter: Any) -> dict[str, str]:
     # nose-radius leader that stops at the nose arc: the two never meet.
     set_near_side_diameter(tap_annotation, "quarter-inch lever through tap")
     _exterior_nose_radius(adapter, imported["thread-axis end"])
-    rebuild_drawing(adapter, label="tap near-side and nose-radius exterior leaders")
+    _dress_inside_root_radius(adapter, imported["front"])
+    rebuild_drawing(adapter, label="tap near-side, nose-radius and inside-root leaders")
     ratio = tuple(float(value) for value in _early_bound(iso, "IView").ScaleRatio)
     if len(ratio) != 2 or any(not math.isfinite(value) or value <= 0.0 for value in ratio):
         raise RuntimeError("isometric view has no valid native scale ratio")

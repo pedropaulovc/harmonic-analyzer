@@ -18,24 +18,34 @@ UNIT = drawing_unit(
 )
 
 # The matched-width foot has no lateral ledge or axial bridge fillet.
-# The inside X-root and free-foot rounds are the title block's edge break.
+# Outside free-foot rounds stay at the title block's .010 edge break; the
+# unloaded inside X-root (-X neck face to -Z foot underside, opposite the
+# flat +Z MHA-SM-03 seat; #3742) permits R.02 MAX so .015 corner-radius 3/8
+# and 1/2 in carbide end mills cover every steel pass. Modeled at the limit;
+# swTolMAX prints "R.02 MAX".
 FOOT_CORNER_R = edge_break_radius_mm(unit=UNIT)
+INSIDE_ROOT_R_PLACES = 2
+INSIDE_ROOT_R_MAX = 0.02 * 25.4
+INSIDE_ROOT_R_BAND = (0.0, -INSIDE_ROOT_R_MAX)  # (upper, lower)
+INSIDE_ROOT_R_TOL_TYPE = 6  # swTolType_e.swTolMAX: prints "R.02 MAX"
 DRAWING_DIMENSIONS = {
     "NeckProfile": {"NoseR", "SeatToAxis"},
     "Neck": {"NeckThickness"},
     "FlangeProfile": {"FlangeWidth", "FlangeDepth"},
     "Flange": {"FlangeHeight"},
+    "RootAndFootRounds": {"InsideRootRadius"},
     "MountingCoordinates": {"MountingX0", "MountingX1", "MountingY0"},
     "TapCoordinates": {"TapFromTip", "TapFromSide"},
 }
 # Inch places. Three on the +/-.002 head and mounting controls and the foot
 # grip; two on the neck (thread engagement), the foot length and width
-# (mounting walls) and the seat-to-axis reach.
+# (mounting walls), the seat-to-axis reach and the R.02 MAX inside X-root.
 DRAWING_PRECISION = {
     "NeckProfile": {"NoseR": 3, "SeatToAxis": 2},
     "Neck": {"NeckThickness": 2},
     "FlangeProfile": {"FlangeWidth": 2, "FlangeDepth": 3},
     "Flange": {"FlangeHeight": 2},
+    "RootAndFootRounds": {"InsideRootRadius": INSIDE_ROOT_R_PLACES},
     "MountingCoordinates": {"MountingX0": 3, "MountingX1": 3, "MountingY0": 3},
     "TapCoordinates": {"TapFromTip": 3, "TapFromSide": 3},
 }
