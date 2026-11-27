@@ -13,7 +13,6 @@
   <path class="part-removed" d="M581.77 223.44L590 223.44L590 200A37.5 37.5 0 0 1 581.77 223.44Z"/>
   <line class="hidden" x1="470" y1="176.56" x2="344.9" y2="176.56"/>
   <line class="hidden" x1="470" y1="223.44" x2="344.9" y2="223.44"/>
-  <line class="hidden" x1="344.9" y1="176.56" x2="344.9" y2="223.44"/>
   <path class="cutter" d="M554.07 198.06L583.22 221.66L580.07 225.54L550.93 201.94Z"/>
   <circle class="cutter" cx="552.5" cy="200" r="3.5"/>
   <path class="arrow" fill="none" d="M600 200A47.5 47.5 0 0 1 589.41 229.89"/>
