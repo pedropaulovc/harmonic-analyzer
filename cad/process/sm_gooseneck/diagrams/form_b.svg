@@ -23,7 +23,7 @@
   <rect class="clamp" x="-667.0" y="350.0" width="866.7" height="53.3"/>
   <circle class="holes" cx="294.7" cy="237.4" r="13.3"/>
   <circle class="holes" cx="294.7" cy="144.1" r="13.3"/>
-  <path class="arrow" fill="none" d="M388.0,436.7 L388.0,357.4 A173.4,173.4 0 0 1 256.3,71.3"/>
+  <path class="arrow" fill="none" d="M256.3,71.3 A173.4,173.4 0 0 0 388.0,357.4 L388.0,436.7"/>
   <circle class="cutter" cx="294.7" cy="237.4" r="13.3"/>
   <line class="datum" x1="378.0" y1="184.1" x2="398.0" y2="184.1"/>
   <line class="datum" x1="388.0" y1="174.1" x2="388.0" y2="194.1"/>
@@ -43,7 +43,7 @@
   <line class="leader" x1="124.0" y1="196.0" x2="282.7" y2="231.0"/>
   <text class="label-halo" x="120.0" y="190.0" text-anchor="end">1/2 in end mill</text>
   <text class="label-halo" x="120.0" y="205.0" text-anchor="end">(first stud hole)</text>
-  <text class="label" x="98.0" y="470.7">the arc next: up the front at X0, round the arc</text>
+  <text class="label" x="98.0" y="470.7">the arc next: in past the back edge, round the arc, down the front at X0</text>
   <text class="label" x="20.0" y="530.0">GF02_form_b: T1 pecks the two stud holes, then cuts the arc through in four levels (arrow); T2, the 1/4 in ball,</text>
   <text class="label" x="20.0" y="548.0">then cuts the groove (dashed). 1-2-3 blocks dotted, a step clamp's strap over each. To scale.</text>
 </svg>

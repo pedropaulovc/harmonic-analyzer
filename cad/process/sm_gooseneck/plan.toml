@@ -353,7 +353,7 @@ speed_kind = "spindle"
 tool = "em-half"
 drilling = "none"
 sizing = "other"
-instruction = "Same file, no stop: the arc through, alternate directions, levels {{process.outline_level_mm:in.3dot}}, tip {{process.cutter_tip_below_mm:in.2dot}} under the plate: up the front at X0, round the arc and out past the back edge. The waste comes free on its own clamp after the last level."
+instruction = "Same file, no stop: the arc through, every level the same way (conventional), levels {{process.outline_level_mm:in.3dot}}, tip {{process.cutter_tip_below_mm:in.2dot}} under the plate: each in from the front, up the front at X0, round the arc and out past the back edge. The waste comes free on its own clamp after the last level."
 settings = "basebar-slot-rough-6061-t6511"
 milling_cuts = [
   { name = "form outline", kind = "slot", phase = "rough", cutter_dia_mm = "{{process.half_cutter_dia_mm}}", flutes = 2, axial_doc_mm = "{{process.outline_level_mm}}", radial_woc_mm = "{{process.half_cutter_dia_mm}}", rpm = 1250, feed_mm_min = 127.0, traverse_mm = ["{{process.a_outline_from_mm}}", "{{process.a_outline_to_mm}}"] },
@@ -396,7 +396,7 @@ indexing = "none"
 machine_ref = "pm-30mv"
 holding = "As plate A, mirrored: plate B, its B face up and its back edge toward the column, on three 1-2-3 blocks under three step clamps (LMS 1268): the form's clamps {{process.clamp_left_from_end_mm:in.2f}} and {{process.clamp_mid_from_end_mm:in.2f}} in from the right end, from studs beyond the right end; the waste's {{process.clamp_waste_from_end_mm:in.2f}} in from the right end, from a stud beyond the left end. Distances from the back edge as plate A's."
 datum = "Program GF02_form_b (cam:sm_gooseneck). G54: X0 Y0 the arc's centre, {{process.arc_from_end_mm:in.3f}} in from the right end and {{process.form_back_y_mm:in.3f}} in in front of the back edge; Z0 the plate top. +Y toward the column. After homing again (the standing page says when), once the arc is cut through, the back edge is taken on the form, right of the arc. One off, or the plate moved once cutting has begun: stop and tell the owner. The plate moved before any cut: clamp it again and repeat the touch-off operation."
-diagram = { file = "diagrams/form_b.svg", alt = "Plan of plate B on the table, to scale (2.1 px/mm), plate A mirrored: the form's two clamps from the right, the waste corner's from the left; the right end and back edge touched off. The 1/2 in end mill pecking the first stud hole; the arc it cuts next, up the front at X0 and round to the left to the back edge, arrowed; the groove dashed." }
+diagram = { file = "diagrams/form_b.svg", alt = "Plan of plate B on the table, to scale (2.1 px/mm), plate A mirrored: the form's two clamps from the right, the waste corner's from the left; the right end and back edge touched off. The 1/2 in end mill pecking the first stud hole; the arc it cuts next, in past the back edge, round to the right and down the front at X0, arrowed; the groove dashed." }
 envelope = { x_span_mm = ["{{process.plate_length_mm}}", "{{process.half_cutter_dia_mm}}"], y_span_mm = ["{{process.tool_y_span_mm}}", "{{process.half_cutter_dia_mm}}"], work_top_mm = ["{{process.block_height_mm}}", "{{process.plate_top_max_mm}}"], deepest_cut_mm = ["{{process.block_height_mm}}", "{{process.tip_over_underside_mm}}"], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.ball_projection_mm}}"] }
 vise_hold = "other"
 beam = { axis = "x", hold = "between", extent_mm = [0, "{{process.plate_length_mm}}"], supports_mm = ["{{process.b_support_left_mm}}", "{{process.b_support_right_mm}}"], section_mm = { y = "{{process.form_section_y_mm}}", z = "{{process.plate_thickness_min_mm}}" } }
@@ -427,7 +427,7 @@ speed_kind = "spindle"
 tool = "em-half"
 drilling = "none"
 sizing = "other"
-instruction = "Same file, no stop: the arc through, alternate directions, levels {{process.outline_level_mm:in.3dot}}, tip {{process.cutter_tip_below_mm:in.2dot}} under the plate: up the front at X0, round the arc to the left and out past the back edge. The waste comes free on its own clamp after the last level."
+instruction = "Same file, no stop: the arc through, every level the same way (conventional), levels {{process.outline_level_mm:in.3dot}}, tip {{process.cutter_tip_below_mm:in.2dot}} under the plate: each in from past the back edge, round the arc to the right and down the front at X0, out past the front. The waste comes free on its own clamp after the last level."
 settings = "basebar-slot-rough-6061-t6511"
 milling_cuts = [
   { name = "form outline b", kind = "slot", phase = "rough", cutter_dia_mm = "{{process.half_cutter_dia_mm}}", flutes = 2, axial_doc_mm = "{{process.outline_level_mm}}", radial_woc_mm = "{{process.half_cutter_dia_mm}}", rpm = 1250, feed_mm_min = 127.0, traverse_mm = ["{{process.b_outline_from_mm}}", "{{process.b_outline_to_mm}}"] },

@@ -547,7 +547,17 @@ def test_an_arc_is_judged_from_its_sense_and_the_declared_part_side(tmp_path):
     assert [f.detail for f in _gcode.check_arcs(bore, 0.0, [(6.0, 5.0)], part="outside", cut="conventional")] == [
         "no arc fed below Z0.000 about X6.000 Y5.000"
     ]
-    for kwargs in ({"part": "left", "cut": "climb"}, {"part": "inside", "cut": "up"}):
+    # Selected by sense: each circle judged alone, whatever its radius.
+    assert _gcode.check_arcs(both, 0.0, [(5.0, 5.0)], part="inside", cut="conventional", arc="G3") == []
+    assert _gcode.check_arcs(both, 0.0, [(5.0, 5.0)], part="outside", cut="conventional", arc="G2") == []
+    assert [f.detail for f in _gcode.check_arcs(bore, 0.0, [(5.0, 5.0)], part="inside", cut="climb", arc="G3")] == [
+        "no G3 arc fed below Z0.000 about X5.000 Y5.000"
+    ]
+    for kwargs in (
+        {"part": "left", "cut": "climb"},
+        {"part": "inside", "cut": "up"},
+        {"part": "inside", "cut": "climb", "arc": "G1"},
+    ):
         with pytest.raises(ValueError):
             _gcode.check_arcs(bore, 0.0, [(5.0, 5.0)], **kwargs)
 

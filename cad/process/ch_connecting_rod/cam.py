@@ -2003,8 +2003,7 @@ def context(
             "keep_out",
             {"radius": r8, "boxes": jaws2 + frames_of(t_max), "circles": circles},
         ],
-        # As CR01-CR03's corners and ring. The crown's centre also carries
-        # the end zone's arcs, both ways round at the same radius.
+        # As CR01-CR03's corners and ring.
         [
             f"{name}@0",
             "arcs",
@@ -2020,6 +2019,28 @@ def context(
             "arcs",
             {"z_top": t_max, "centres": rings, "part": "inside", "cut": "conventional"},
         ],
+        # The crown: the pocket's fork loop and the end zone's upper side
+        # turn anticlockwise round it (conventional); the end zone's lower
+        # side turns clockwise from the apex (climb). Each end-zone level
+        # enters at the apex, in the air beside the trimmed end, and the
+        # lower side can only be cut moving away from it: conventional would
+        # plunge the 1/2 in end mill a level into uncut metal at the slot
+        # floor end of every level (#3690). Climb on the chart setting,
+        # unmeasured (#3590).
+        *(
+            [
+                f"{name}@0",
+                "arcs",
+                {
+                    "z_top": t_max,
+                    "centres": crowns,
+                    "part": "inside",
+                    "arc": arc,
+                    "cut": cut,
+                },
+            ]
+            for arc, cut in (("G3", "conventional"), ("G2", "climb"))
+        ),
     ]
 
     name = "CR05_bore"

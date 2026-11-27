@@ -1067,21 +1067,28 @@ def check_arcs(
     part: str,
     cut: str,
     radius: float | None = None,
+    arc: str | None = None,
 ) -> list[Finding]:
     """The G17 arcs fed below ``z_top`` about each of ``centres`` (XY, a bore's
     or a round's axis; with ``radius``, only the cutter-centre circle of that
-    radius about it) cut the declared way. ``part`` says where the part
+    radius about it; with ``arc``, ``"G2"`` or ``"G3"``, only the arcs turning
+    that way, for a path that must turn both ways round one circle) cut the
+    declared way. ``part`` says where the part
     lies from the arc's circle, as the recipe states: ``"outside"`` (a bore,
     a counterbore: the wall beyond the cutter's outer edge) or ``"inside"``
     (a round, a boss: the wall inside its inner edge). The part is on the
     cutter's left when it lies outside a clockwise (G2) arc or inside an
     anticlockwise (G3) one: under M3 conventional, else climb (M4 the
     reverse). An arc with the spindle stopped fails, and so does a centre
-    no arc is fed about. Straight moves (entries, plunges) are not judged."""
+    no selected arc is fed about. Straight moves (entries, plunges) are not
+    judged."""
     if cut not in CUT_DIRECTIONS:
         raise ValueError(f"cut {cut!r} is not one of {CUT_DIRECTIONS}")
     if part not in ("inside", "outside"):
         raise ValueError(f"part {part!r} is not 'inside' or 'outside'")
+    if arc not in (None, "G2", "G3"):
+        raise ValueError(f"arc {arc!r} is not 'G2' or 'G3'")
+    sense = {None: None, "G2": Motion.ARC_CW, "G3": Motion.ARC_CCW}[arc]
     findings: list[Finding] = []
     for centre in centres:
         arcs = [
@@ -1089,10 +1096,12 @@ def check_arcs(
             if m.centre is not None and m.plane == 17 and min(m.start[2], m.end[2]) < z_top - _TOL_MM
             and _close(m.centre[0], centre[0]) and _close(m.centre[1], centre[1])
             and (radius is None or abs(math.dist(m.start[:2], m.centre[:2]) - radius) <= _ENTRY_TOL_MM)
+            and (sense is None or m.motion is sense)
         ]
         if not arcs:
             about = f"X{centre[0]:.3f} Y{centre[1]:.3f}" + ("" if radius is None else f" at R{radius:.3f}")
-            findings.append(Finding(program.name, "cut", f"no arc fed below Z{z_top:.3f} about {about}"))
+            which = "arc" if arc is None else f"{arc} arc"
+            findings.append(Finding(program.name, "cut", f"no {which} fed below Z{z_top:.3f} about {about}"))
         for m in arcs:
             code = "G2" if m.motion is Motion.ARC_CW else "G3"
             where = f"line {m.line} {code} about X{centre[0]:.3f} Y{centre[1]:.3f} to Z{m.end[2]:.3f}"

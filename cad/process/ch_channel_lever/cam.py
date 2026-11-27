@@ -1267,6 +1267,37 @@ def context(
                     {"radius": radius, "boxes": jaws, "circles": bosses},
                 ],
             ]
+        # Every level reaches the hub's arc and both rings from the slot at
+        # 0° and runs out to both ends of the sweep: up anticlockwise, then
+        # back clockwise across. The part (the hub, inside the arc and the
+        # inner ring; the bar's roots and the frame, outside the outer ring)
+        # is on the cutter's left one way and on its right the other, so the
+        # half first cut the other way climbs: conventional both ways would
+        # need a plunge into uncut metal at the far end of every level, where
+        # the slot now enters from the side (#3690). Climb on the chart
+        # setting, unmeasured (#3590).
+        for k, radius, part in (
+            (0, arc_r, "inside"),
+            (1, rings[0], "inside"),
+            (1, rings[1], "outside"),
+        ):
+            expect += [
+                [
+                    f"{name}@{k}",
+                    "arcs",
+                    {
+                        "z_top": hub_t,
+                        "centres": hubs,
+                        "radius": radius,
+                        "part": part,
+                        "arc": arc,
+                        "cut": "conventional"
+                        if (part == "inside") == (arc == "G3")
+                        else "climb",
+                    },
+                ]
+                for arc in ("G3", "G2")
+            ]
     for name, sections in (
         (
             "CL03_bore",
