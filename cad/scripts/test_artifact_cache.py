@@ -1872,7 +1872,7 @@ def test_prewarm_acquires_once_and_closes_private_resources(
     closed = []
     inner = _FakeTokenCredential([_transient_unavailable()])
     inner.close = lambda: closed.append("credential")
-    monkeypatch.setattr(azure.identity, "DefaultAzureCredential", lambda: inner)
+    monkeypatch.setattr(azure.identity, "DefaultAzureCredential", lambda **_: inner)
     monkeypatch.delenv("HARMONIC_CACHE_SAS", raising=False)
 
     class FakeContainer:
@@ -1918,7 +1918,7 @@ def test_container_construction_failure_survives_credential_close_failure(
 
     inner.close = close
     monkeypatch.delenv("HARMONIC_CACHE_SAS", raising=False)
-    monkeypatch.setattr(azure.identity, "DefaultAzureCredential", lambda: inner)
+    monkeypatch.setattr(azure.identity, "DefaultAzureCredential", lambda **_: inner)
     monkeypatch.setattr(azure.storage.blob, "ContainerClient", construct)
     with pytest.raises(RuntimeError) as caught:
         cache._make_backend()
@@ -1939,7 +1939,7 @@ def test_prewarm_closes_only_losing_backend_resources(
     closed, clients, credentials = [], [], []
     monkeypatch.delenv("HARMONIC_CACHE_SAS", raising=False)
 
-    def credential():
+    def credential(**_):
         inner = _FakeTokenCredential()
         index = len(credentials)
         inner.close = lambda: closed.append(("credential", index))
@@ -1996,7 +1996,7 @@ def test_prewarm_storage_head_error_preserves_only_authenticated_owned_client(
     closed, clients, credentials = [], [], []
     monkeypatch.delenv("HARMONIC_CACHE_SAS", raising=False)
 
-    def credential():
+    def credential(**_):
         inner = _FakeTokenCredential()
         index = len(credentials)
         inner.close = lambda: closed.append(("credential", index))
@@ -2221,6 +2221,102 @@ def test_opaque_unhashable_option_is_uncached_passthrough(credential_runtime, me
     fetch = getattr(cache._SharedTokenInfoCredential(inner), method)
     assert fetch("scope", custom=option) is not fetch("scope", custom=option)
     assert [call[2]["custom"] for call in inner.calls] == [option, option]
+
+
+def _fake_az(tmp_path, monkeypatch, *, seconds, token=False):
+    """A fake ``az`` first on PATH: sleeps ``seconds`` (a loaded submitter),
+    then prints an access token if ``token``."""
+    script = tmp_path / "fake_az.py"
+    script.write_text(
+        f"import json, time\ntime.sleep({seconds})\n"
+        + (
+            "print(json.dumps({'accessToken': 'fake', 'expires_on': 4102444800}))\n"
+            if token
+            else ""
+        ),
+        encoding="utf-8",
+    )
+    (tmp_path / "az.cmd").write_text(
+        f'@"{sys.executable}" "{script}" %*\n', encoding="utf-8", newline="\r\n"
+    )
+    posix = tmp_path / "az"
+    posix.write_text(
+        f'#!/bin/sh\nexec "{sys.executable}" "{script}" "$@"\n',
+        encoding="utf-8",
+        newline="\n",
+    )
+    posix.chmod(0o755)
+    monkeypatch.setenv("PATH", str(tmp_path) + os.pathsep + os.environ["PATH"])
+
+
+@pytest.fixture
+def notices(monkeypatch):
+    found = types.SimpleNamespace(warnings=[], events=[])
+    monkeypatch.setattr(_telemetry, "warn", found.warnings.append)
+    monkeypatch.setattr(
+        _telemetry, "event", lambda name, **attrs: found.events.append((name, attrs))
+    )
+    return found
+
+
+def test_a_cli_credential_timeout_names_its_wait_and_limit(
+    tmp_path, monkeypatch, notices
+):
+    # #3508: azure-identity says only CredentialUnavailableError for a slow
+    # `az`, which reads like a missing login.
+    from azure.core.exceptions import ClientAuthenticationError
+    from azure.identity import AzureCliCredential, ChainedTokenCredential
+
+    _fake_az(tmp_path, monkeypatch, seconds=3)
+    chain = ChainedTokenCredential(AzureCliCredential(process_timeout=1))
+    proxy = cache._SharedTokenInfoCredential(chain, attempts=1)
+    with pytest.raises(ClientAuthenticationError):
+        proxy.get_token("https://storage.azure.com/.default")
+    (line,) = [w for w in notices.warnings if "az account get-access-token" in w]
+    assert line.startswith("[cache] az account get-access-token timed out after ")
+    assert line.endswith(" s (limit 1 s)")
+    ((_, event),) = [e for e in notices.events if e[0] == "cache.credential.slow"]
+    assert event["credential"] == "AzureCliCredential"
+    assert event["outcome"] == "timeout"
+    assert event["limit_s"] == 1
+    assert event["elapsed_s"] >= 1
+
+
+def test_a_slow_cli_credential_that_succeeds_is_reported(
+    tmp_path, monkeypatch, notices
+):
+    from azure.identity import AzureCliCredential, ChainedTokenCredential
+
+    monkeypatch.setattr(cache, "_DEVELOPER_CREDENTIAL_SLOW_S", 0.5)
+    _fake_az(tmp_path, monkeypatch, seconds=1, token=True)
+    # The notice reads the link's own limit, not the backend's constant.
+    chain = ChainedTokenCredential(AzureCliCredential(process_timeout=45))
+    proxy = cache._SharedTokenInfoCredential(chain, attempts=1)
+    assert proxy.get_token("https://storage.azure.com/.default").token == "fake"
+    (line,) = [w for w in notices.warnings if "az account get-access-token" in w]
+    assert line.startswith("[cache] az account get-access-token took ")
+    assert line.endswith(" s (limit 45 s)")
+    ((_, event),) = [e for e in notices.events if e[0] == "cache.credential.slow"]
+    assert event["outcome"] == "success"
+
+
+def test_backend_gives_developer_credentials_room_on_a_loaded_box(monkeypatch):
+    from azure.identity import AzureCliCredential
+
+    monkeypatch.delenv("HARMONIC_CACHE_SAS", raising=False)
+    # A host that narrows DefaultAzureCredential's chain must not hide the CLI.
+    monkeypatch.delenv("AZURE_TOKEN_CREDENTIALS", raising=False)
+    backend = cache._make_backend()
+    try:
+        (cli,) = [
+            link._inner
+            for link in backend._credential._inner.credentials
+            if isinstance(link._inner, AzureCliCredential)
+        ]
+        # The worst `az account get-access-token` measured on amet was 22 s.
+        assert cli._process_timeout == cache._DEVELOPER_CREDENTIAL_TIMEOUT_S >= 2 * 22
+    finally:
+        backend.close()
 
 
 @pytest.mark.parametrize("method", ["get_token", "get_token_info"])

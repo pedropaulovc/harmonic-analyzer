@@ -101,8 +101,9 @@ Configure with:
 
 Auth is keyless by default: ``DefaultAzureCredential`` picks up ``az login`` on a
 dev box and the VM's managed identity on the builder (grant it *Storage Blob Data
-Contributor*). For a keyed path (CI without RBAC), set ``HARMONIC_CACHE_SAS`` to a
-container SAS token.
+Contributor*); ``az`` gets ``_DEVELOPER_CREDENTIAL_TIMEOUT_S`` to answer, not
+azure-identity's 10 s (#3508). For a keyed path (CI without RBAC), set
+``HARMONIC_CACHE_SAS`` to a container SAS token.
 
 Eviction is server-side and MANAGED -- Azure Blob has a native lifecycle policy
 (unlike Azure Files). With account *last-access-time tracking* enabled, a
@@ -1475,6 +1476,53 @@ def _credential_observation(inner, exc=None, *, established=False):
 
 _CREDENTIAL_COOLDOWN_S = 30.0
 _CREDENTIAL_ATTEMPTS = 3
+# azure-identity's developer credentials (Azure CLI, Azure PowerShell, azd) wait
+# 10 s for their process by default. On a loaded submitter `az account
+# get-access-token` measured 19-22 s (#3508), so every restore failed with a
+# CredentialUnavailableError that reads like a missing login.
+_DEVELOPER_CREDENTIAL_TIMEOUT_S = 60
+# A developer credential slower than azure-identity's default limit is reported
+# even when it succeeds, so a loaded box shows before it times out.
+_DEVELOPER_CREDENTIAL_SLOW_S = 10.0
+_DEVELOPER_COMMANDS = {
+    "AzureCliCredential": "az account get-access-token",
+    "AzurePowerShellCredential": "Get-AzAccessToken (Azure PowerShell)",
+    "AzureDeveloperCliCredential": "azd auth token",
+}
+
+
+def _developer_credential_notice(credential, elapsed, limit, exc=None):
+    """Name a slow or timed-out developer credential's command, its measured
+    wait and its limit (#3508): azure-identity reports only a generic
+    CredentialUnavailableError for a process that ran out of time."""
+    cause = _transient_credential_cause(exc) if exc is not None else None
+    timed_out = isinstance(cause, subprocess.TimeoutExpired)
+    if not timed_out and elapsed < _DEVELOPER_CREDENTIAL_SLOW_S:
+        return
+    # A bare pool probe must not configure OTel just to report this.
+    telemetry = sys.modules.get("_telemetry")
+    if telemetry is None:
+        return
+    if timed_out:
+        limit = cause.timeout
+    outcome = "timeout" if timed_out else "failure" if exc is not None else "success"
+    command = _DEVELOPER_COMMANDS[credential]
+    with contextlib.suppress(Exception):
+        telemetry.warn(
+            f"[cache] {command} "
+            + ("timed out after" if timed_out else "took")
+            + f" {elapsed:.1f} s (limit {limit:g} s)"
+            + (f" and failed ({type(exc).__name__})" if outcome == "failure" else "")
+        )
+        telemetry.event(
+            "cache.credential.slow",
+            label="",
+            key="",
+            credential=credential,
+            elapsed_s=round(elapsed, 3),
+            limit_s=limit,
+            outcome=outcome,
+        )
 
 
 class _ObservedCredentialLink:
@@ -1497,14 +1545,28 @@ class _ObservedCredentialLink:
 
         def observed(*args, **kwargs):
             observations = getattr(self._observation, "links", None)
+            credential = type(self._inner).__name__
+            developer = credential in _DEVELOPER_COMMANDS
+            started = time.monotonic()
+            # azure-identity keeps each developer credential's process limit
+            # in ``_process_timeout`` (1.25.3); without it, the backend's own.
+            limit = getattr(
+                self._inner, "_process_timeout", _DEVELOPER_CREDENTIAL_TIMEOUT_S
+            )
             try:
                 token = member(*args, **kwargs)
             except Exception as exc:
+                if developer:
+                    elapsed = time.monotonic() - started
+                    _developer_credential_notice(credential, elapsed, limit, exc)
                 if observations is not None:
                     observations.append(_credential_observation(
                         self._inner, exc, established=self._established,
                     ))
                 raise
+            if developer:
+                elapsed = time.monotonic() - started
+                _developer_credential_notice(credential, elapsed, limit)
             self._established = True
             if observations is not None:
                 observations.append(_credential_observation(self._inner))
@@ -1696,7 +1758,7 @@ def _make_backend(*, attempts=_CREDENTIAL_ATTEMPTS) -> _BlobBackend | None:
         ))
     from azure.identity import DefaultAzureCredential
 
-    inner = DefaultAzureCredential()
+    inner = DefaultAzureCredential(process_timeout=_DEVELOPER_CREDENTIAL_TIMEOUT_S)
     proxy = (
         _SharedTokenInfoCredential if hasattr(inner, "get_token_info") else _SharedTokenCredential
     )(inner, attempts=attempts)
