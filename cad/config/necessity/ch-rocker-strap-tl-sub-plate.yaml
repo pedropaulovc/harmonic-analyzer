@@ -1,0 +1,26 @@
+# MHA-CH-13-TL-01 rocker strap sub-plate: why each band tighter than the title
+# block stays (drawing-guidelines.md rule 4; owner ruling 2026-11-24: the
+# reason lives here, not on the sheet). Read by the machinist review only.
+#
+# N-01: the hub hole (the #10-32 tap and its counterbore, one wizard hole) is
+# where the hub screw stands, and the screw centres the washer TL-VN-52 that
+# the strap's outline program (RS04) keeps its 1/8 in cutter clear of. The
+# program cuts round its own hub centre, so the tap's position error moves the
+# washer toward the cutter. At +/-.002 each way the washer pushed fully aside
+# clears the cutter by 0.217 mm (.0086 in), the 0.22 mm the owner accepted on
+# 2026-11-24 ("Accept as is: centre the washer by eye, 0.5 mm centred, 0.22 mm
+# worst case"). At +/-.003 it is 0.181 mm (.0071 in): opening the band by
+# .001 takes .0014 in off the air and leaves it .0015 in under the accepted
+# 0.22 mm (.0087 in), each more than the .001 a margin is read to
+# (tolerance-policy.md); the centred washer then clears the plan's hub
+# keep-out by 0.0065 mm. At +/-.004, 0.145 mm and the centred washer is
+# 0.029 mm past the keep-out; at the title block's +/-.005 it reaches 7.381 mm
+# from the hub, past the program's 7.358 mm keep-out
+# (ch_rocker_strap_tl_vn_hub_washer_spec, counterfactual sweep 2026-11-26).
+# Kept by delegated ruling 2026-11-26 (Main), D55; owner review #2144.
+necessity:
+  - id: N-01
+    feature: "sheet 1, front view, hub hole location 6.000 ±.002 and 1.000 ±.002"
+    kind: gap
+    reason: "tap off the program closes the cutter-to-washer air"
+    source: "ch_rocker_strap_tl_vn_hub_washer_spec.WORST_CLEARANCE"

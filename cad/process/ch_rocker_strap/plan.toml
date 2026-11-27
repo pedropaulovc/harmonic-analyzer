@@ -125,6 +125,14 @@ fence_width_mm = 12.7
 fence_height_mm = 2.0066
 end_stop_height_mm = 2.0066
 clamp_height_mm = 1.905
+# The fence face swept along X with the lever indicator once per vise setup:
+# the source of the reading (the fixture sheet MHA-CH-13-TL-00's step
+# mirrors it, ch_rocker_strap_tl_fixture_spec.FENCE_READING_IN). Every file
+# runs in the one G54 the fence and end stop set, so the sweep only catches a
+# plate set crooked in the vise: .010 over the 12 in turns the blank 0.05°,
+# well inside its stock round the outline (#3713; delegated ruling
+# 2026-11-26, Main).
+fence_sweep_max_in = 0.010
 # Under the hub the plate has a Ø1/2 in counterbore .185 in deep with a
 # #10-32 tapped hole through its floor. In RS03 it is the relief the drill
 # and reamer run into: their tips stop relief_floor_clearance_mm above its
@@ -375,7 +383,7 @@ title = "Rough both faces on the sub-plate"
 machine = "PM-30MV CNC (FluidNC, CNCjs with the electronic tool setter) / vise, swivel off"
 indexing = "none"
 machine_ref = "pm-30mv"
-holding = "Sub-plate MHA-CH-13-TL-01 in the vise on 1 in parallels, centred, the fence indicated <.001 along X and the plate top indicated within .001 over the 12 in under the blank; it stays there for every blank. Blank flat on the plate, one long edge against the fence, its left end against the end stop, pushed by the Mitee-Bite Pitbull 26000 (4-40) edge clamps TL-VN-50 at X {{cad.clamp_stations_in}} from the end stop, each tightened to {{process.clamp_torque_in_lb:g}} in-lb. Clamp noses, fence and end-stop tops at most {{process.fence_height_mm:in.3dot}} above the plate, below the cut."
+holding = "Sub-plate MHA-CH-13-TL-01 in the vise on 1 in parallels, centred, the fence indicated within {{process.fence_sweep_max_in:.3dot}} along X and the plate top indicated within .001 over the 12 in under the blank; it stays there for every blank. Blank flat on the plate, one long edge against the fence, its left end against the end stop, pushed by the Mitee-Bite Pitbull 26000 (4-40) edge clamps TL-VN-50 at X {{cad.clamp_stations_in}} from the end stop, each tightened to {{process.clamp_torque_in_lb:g}} in-lb. Clamp noses, fence and end-stop tops at most {{process.fence_height_mm:in.3dot}} above the plate, below the cut."
 datum = "Program RS01_rough_faces (cam:ch_rocker_strap). One G54 while the plate stays put: Z0 = the plate top, Y0 = the fence face (blank at −Y), X0 = the end stop's face, set in Op 30. After the plate moves, or after homing again (the standing page says when), in this setup or any later one on the plate: no blank on the plate, set all three again as Op 30 does; a blank on it, stop and tell the owner (the blank covers the faces Op 30 touches). Every file (RS01–RS04) starts with an M6, so none runs on the length the last file left, even re-run or restarted."
 diagram = { file = "diagrams/rough.svg", alt = "Plan of the sub-plate: fence along the back, blank against it and against the end stop at its left end, edge clamps at the front at X {{cad.clamp_stations_in}}; the 1/2 in end mill faces the full blank, one face, then the other after the flip." }
 envelope = { x_span_mm = ["{{cad.blank_length_mm}}", "{{process.face_cutter_dia_mm}}"], y_span_mm = ["{{cad.blank_width_mm}}", "{{process.face_cutter_dia_mm}}"], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{process.plate_top_height_mm}}", "{{cad.blank_thickness_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{process.plate_top_height_mm}}", "{{cad.thickness_mm}}"], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_mm}}"] }
@@ -393,7 +401,7 @@ beam = { axis = "x", hold = "plate", extent_mm = [0, "{{cad.blank_length_mm}}"],
 # underside are not parallel; the fence and end-stop heights do not change.
 [[setups.operations]]
 steps = [
-  { kind = "check", text = "Once per vise setup, no blank in: the lever indicator along the plate top over X 0–12 reads within .001; then along the fence face over X 0–12, within .001." },
+  { kind = "check", text = "Once per vise setup, no blank in: the lever indicator along the plate top over X 0–12 reads within .001; then along the fence face over X 0–12, within {{process.fence_sweep_max_in:.3dot}}." },
   { kind = "stop", text = "Plate top over: reseat the plate on the parallels and indicate again. Still over: a feeler-gauge leaf between the parallels and the plate's low end, then indicate again." },
   { kind = "stop", text = "Fence over: open the vise a little, tap the plate's high-reading end away from the indicator with a soft mallet, close the vise and indicate the fence, then the plate top, again." },
 ]
@@ -511,8 +519,18 @@ steps = [
 ]
 feed = "hand"
 
+# The hub hole is drilled where the fence and end stop put the blank, and
+# RS04 puts it back there to cut the outline round it (the plug only floats,
+# #3713): both seats are proved by the same .002 leaf, so the hole sits on
+# the outline's centre within .002 each way (the outline's profile band is
+# +/-.010).
 [[setups.operations]]
-instruction = "In band: reseat the blank as it was (face 2 up, the same long edge on the fence, the same end on the end stop) and clamp at {{process.clamp_torque_in_lb:g}} in-lb. Then the same stop's tool change: T3, the #2 centre drill, in; set 1800; Cycle Start."
+steps = [
+  { kind = "action", text = "In band: reseat the blank as it was (face 2 up, the same long edge on the fence, the same end on the end stop) and clamp at {{process.clamp_torque_in_lb:g}} in-lb." },
+  { kind = "check", text = "A .002 feeler leaf enters neither between the blank's long edge and the fence nor between its end and the end stop." },
+  { kind = "stop", text = "It enters: unclamp, clean the edge, the end and both stop faces, reseat and clamp again." },
+  { kind = "action", text = "Then the same stop's tool change: T3, the #2 centre drill, in; set 1800; Cycle Start." },
+]
 feed = "hand"
 
 # Hub hole, over the plate's counterbore: the blank spans it as a short beam
@@ -585,8 +603,8 @@ title = "Bond to the plate; outline"
 machine = "PM-30MV CNC (FluidNC, CNCjs with the electronic tool setter) / vise, swivel off"
 indexing = "none"
 machine_ref = "pm-30mv"
-holding = "Blank bonded to the plate under its whole face: blue painter's tape on the plate and on the blank's face 1, GH1200 thick CA glue between (the stack {{process.tape_stack_min_mm:in.3dot}}–{{process.tape_stack_max_mm:in.3dot}}, miked). Face 1 down, the reamed hub hole over the hub plug TL-02's pilot in the plate's counterbore (tape cut away there), one long edge against the fence, the left end on the end stop; screwed down at the hub: the #10-32 × 5/8 button-head screw TL-VN-51 through the marked washer TL-VN-52, centred by eye, into the plate. Edge clamps backed off clear of the blank."
-datum = "Program RS04_outline. G54 unchanged: Y0 fence, X0 end stop; Z0 the plate top; the file works {{process.tape_stack_mm:in.3dot}} above it for the tape stack (blue tape, CA glue, blue tape). The plug puts the hub hole at X {{cad.hub_x_in:.3f}}, Y −{{cad.hub_y_in:.3f}}; the fence sets the blank square."
+holding = "Blank bonded to the plate under its whole face: blue painter's tape on the plate and on the blank's face 1, GH1200 thick CA glue between (the stack {{process.tape_stack_min_mm:in.3dot}}–{{process.tape_stack_max_mm:in.3dot}}, miked). Face 1 down, the reamed hub hole over the hub plug TL-02's pilot in the plate's counterbore (tape cut away there), the same long edge against the fence and the same end on the end stop as in RS03; screwed down at the hub: the #10-32 × 5/8 button-head screw TL-VN-51 through the marked washer TL-VN-52, centred by eye, into the plate. Edge clamps backed off clear of the blank."
+datum = "Program RS04_outline. G54 unchanged: Y0 fence, X0 end stop; Z0 the plate top; the file works {{process.tape_stack_mm:in.3dot}} above it for the tape stack (blue tape, CA glue, blue tape). The fence and the end stop put the hub hole back at X {{cad.hub_x_in:.3f}}, Y −{{cad.hub_y_in:.3f}}, where RS03 drilled it, and set the blank square; the plug only floats in the counterbore."
 diagram = { file = "diagrams/outline.svg", alt = "Plan of the sub-plate: blank bonded to the plate (blue tape, CA glue, blue tape) against the fence, no edge clamps; screw and washer at the hub hole; the fence notched under both tips of the strap; the 1/8 in end mill's slot runs round the whole outline, top arc toward the fence." }
 # Top: the strap on the thickest stack; deepest: the through cut stops in
 # the stack, above the plate top.
@@ -650,8 +668,15 @@ feed = "hand"
 
 [[setups.operations]]
 steps = [
-  { kind = "action", text = "Within about 10 seconds of the spray: lower the blank, face 1 down, its hub hole over the plug's pilot, its long edge on the fence, its left end on the end stop. The glue grabs at once: it cannot be slid afterwards." },
+  { kind = "action", text = "Within about 10 seconds of the spray: lower the blank, face 1 down, its hub hole over the plug's pilot, the same long edge on the fence and the same end on the end stop as in RS03, held against both. The glue grabs at once: it cannot be slid afterwards." },
   { kind = "action", text = "Press it down by hand over its whole face with a flat block, for 1 minute. Then wait 5 minutes (the maker: cures in seconds with accelerator; the 1 + 5 minutes is the shop's margin)." },
+]
+feed = "hand"
+
+[[setups.operations]]
+steps = [
+  { kind = "check", text = "A .002 feeler leaf enters neither between the blank's long edge and the fence nor between its end and the end stop: the hub hole is back where RS03 drilled it." },
+  { kind = "stop", text = "It enters: peel the blank off, clean both faces, re-tape and re-bond from the degrease." },
 ]
 feed = "hand"
 
@@ -765,7 +790,7 @@ vise_hold = "other"
 beam = "other"
 inspection = [
   "Thickness {{cad.thickness_min_in:.3dot}}–{{cad.thickness_max_in:.3dot}}, micrometer, every strap: again after the stoning, freeing and straightening, any of which can move it (RS03's reading gated the machining).",
-  "Every strap, from the hub centre: calipers over the .400 minus pin of the pin-gauge set in the hub hole, the reading less .200. Top edge {{cad.top_height_min_in:.3dot}}–{{cad.top_height_max_in:.3dot}} above and bottom edge {{cad.bottom_height_min_in:.3dot}}–{{cad.bottom_height_max_in:.3dot}} below, on the hub centreline: the check that the strap stayed on its tape and plug.",
+  "Every strap, from the hub centre: calipers over the .400 minus pin of the pin-gauge set in the hub hole, the reading less .200. Top edge {{cad.top_height_min_in:.3dot}}–{{cad.top_height_max_in:.3dot}} above and bottom edge {{cad.bottom_height_min_in:.3dot}}–{{cad.bottom_height_max_in:.3dot}} below, on the hub centreline: the check that the strap stayed on its tape against the fence and end stop.",
   "First article only, the same way, at both ends: the top corner, where the short tip land meets the angled end face, and the bottom corner, where the end face meets the bottom edge. The drawing's {{cad.corner_station_min_in:.2f}}–{{cad.corner_station_max_in:.2f}} and {{cad.foot_station_min_in:.2f}}–{{cad.foot_station_max_in:.2f}} run along the strap, but the top corner stands {{cad.corner_rise_in:.3dot}} and the bottom corner {{cad.foot_rise_in:.3dot}} above the hub centre, so the calipers read the slant: top corners {{cad.corner_slant_min_in:.3f}}–{{cad.corner_slant_max_in:.3f}}, bottom corners {{cad.foot_slant_min_in:.3f}}–{{cad.foot_slant_max_in:.3f}}.",
   "First article only: tip lands {{cad.tip_length_min_in:.2dot}}–{{cad.tip_length_max_in:.2dot}} long, from the top edge to the top corner, calipers along the land.",
   "Not gauged, the program's interpolated path: arc radii R{{cad.top_radius_min_in:.1f}}–{{cad.top_radius_max_in:.1f}} top and R{{cad.bottom_radius_min_in:.1f}}–{{cad.bottom_radius_max_in:.1f}} bottom, tip-land angle {{cad.tip_angle_min_deg:.1f}}–{{cad.tip_angle_max_deg:.1f}}°.",

@@ -1,9 +1,10 @@
 r"""Build MHA-CH-13-TL-02, the rocker strap's hub plug (shop tooling).
 
 The stepped plug of the rocker-strap sub-plate fixture
-(``ch_rocker_strap_tl_hub_plug_spec``): a body turned to MHA-CH-13-TL-01's
-measured hub counterbore, a pilot that locates the strap blank's reamed hub
-hole, a drilled bore for the hub screw and a 45 deg lead-in on the pilot.
+(``ch_rocker_strap_tl_hub_plug_spec``): a body that drops into
+MHA-CH-13-TL-01's hub counterbore, a pilot that clears the strap blank's
+reamed hub hole, a drilled bore for the hub screw and a 45 deg lead-in on the
+pilot.
 
 Layout (the arbor collar's frame): axis +Z, centred. ``BodyProfile`` is the
 body's annulus (Ø and bore) on the Front Plane, extruded +Z by the body
@@ -12,9 +13,9 @@ extruded +Z by the overall length (``Pilot``), merging with the body, so the
 overall length is one native dimension. ``PilotChamfer`` breaks the pilot's
 top outside edge. ``Axis1`` is the plug axis (Top Plane x Right Plane).
 
-The PART owns the print: the pilot's two limits (swTolLIMIT), every
-dimension's places, the body Ø's reference brackets and each callout below
-its value; the drawing only places and reads them back.
+The PART owns the print: every dimension's places (each size at the title
+block's row) and each callout below its value; the drawing only places and
+reads them back.
 
 Run (SolidWorks already open)::
 
@@ -39,7 +40,6 @@ from _drawing_marks import (
 )
 from _drawing_precision import _named_dimensions, apply_drawing_precision
 from _feature_tree import name_last_feature
-from _limit_tolerance import set_limits
 from _part_checks import report_mass_properties, volume_check
 from _part_properties import part_drawing_unit
 from _part_save import save_part_and_images
@@ -132,25 +132,6 @@ def _author_dimension_callouts(adapter) -> None:
                 raise RuntimeError(f"{name}@{feature}: callout did not persist")
 
 
-@_telemetry.traced("part.reference_dimensions")
-def _author_reference_dimensions(adapter) -> None:
-    """Bracket the body Ø's value only, so its callout (the clearance that
-    governs) does not read as reference too: a "(" prefix carrying
-    SolidWorks' "<MOD-DIAM>" token and a ")" suffix
-    (build_sm_gooseneck_end_plug)."""
-    open_paren = "(<MOD-DIAM>"
-    for feature, names in spec.REFERENCE_DIMENSIONS.items():
-        resolved = _named_dimensions(adapter, feature, set(names))
-        for name in names:
-            display, _dimension = resolved[name]
-            display.SetText(1, open_paren)  # swDimensionTextPrefix
-            display.SetText(2, ")")  # swDimensionTextSuffix
-            if (str(display.GetText(1)), str(display.GetText(2))) != (open_paren, ")"):
-                raise RuntimeError(
-                    f"{name}@{feature}: reference brackets did not persist"
-                )
-
-
 def build(adapter) -> dict[str, str]:
     check("create_part", adapter.create_part())
     # #290: the row's inch calculation units, before the first global. The mm
@@ -231,22 +212,12 @@ def build(adapter) -> dict[str, str]:
 
     apply_material(adapter, MATERIAL)
     report_mass_properties(adapter)
-    # The pilot prints its two limits; every other size takes the title
-    # block's row for its places (the body Ø is a reference).
-    set_limits(
-        adapter,
-        spec.PILOT_PROFILE,
-        "PilotDia",
-        limits=spec.PILOT_LIMITS,
-        places=spec.PILOT_PLACES,
-        display_unit=spec.UNIT,
-    )
+    # Every size takes the title block's row for its places.
     apply_drawing_precision(adapter, spec.DRAWING_PRECISION)
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in spec.DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
     _author_dimension_callouts(adapter)
-    _author_reference_dimensions(adapter)
     apply_drawing_properties(
         adapter, PART_NAME, {"Isometric View Note": spec.ISOMETRIC_VIEW_NOTE}
     )

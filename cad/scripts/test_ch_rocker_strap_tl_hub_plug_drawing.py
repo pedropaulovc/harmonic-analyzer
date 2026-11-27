@@ -78,15 +78,6 @@ def test_mirrored_mates_match_the_strap_and_the_plan() -> None:
     assert spec.STRAP_THICKNESS_MIN == pytest.approx(
         arm.ARM_THICKNESS + arm.ARM_THICKNESS_BAND[1]
     )
-    assert spec.STRAP_PROFILE_HALF == arm._PROFILE_HALF
-    assert (
-        arm.TOP_EDGE_BAND
-        == arm.BOTTOM_EDGE_BAND
-        == (
-            spec.STRAP_PROFILE_HALF,
-            -spec.STRAP_PROFILE_HALF,
-        )
-    )
     plan = _plan()
     assert spec.TAPE_STACK == plan["tape_stack_mm"]
     assert spec.TAPE_MIN == plan["tape_stack_min_mm"]
@@ -102,56 +93,54 @@ def test_mirrored_counterbore_matches_the_plate() -> None:
 
     assert spec.COUNTERBORE_DIA == plate.HUB_CBORE_DIA
     assert spec.COUNTERBORE_DEPTH == plate.HUB_CBORE_DEPTH
+    assert (spec.COUNTERBORE_BAND, -spec.COUNTERBORE_BAND) == plate.HUB_CBORE_BAND
+    assert spec.COUNTERBORE_LOCATION_TOL == plate.HUB_LOCATION_TOL
 
 
 def test_sizes_are_the_contract_and_its_ruled_changes() -> None:
-    assert spec.BODY_DIA == pytest.approx(0.499 * INCH)
-    assert spec.BODY_LENGTH == pytest.approx(
-        0.170 * INCH
-    )  # StrapFixtureCad: .177 -> .170
+    assert spec.BODY_DIA == pytest.approx(0.47 * INCH)
+    # #3622: .170 -> .165, the counterbore's depth at its wizard .XX.
+    assert spec.BODY_LENGTH == pytest.approx(0.165 * INCH)
     assert spec.OVERALL_LENGTH == pytest.approx(0.272 * INCH)
-    # LEARN machinist review r5: widened from .3990-.3995 to the turned row.
-    assert spec.PILOT_LIMITS == pytest.approx((0.3985 * INCH, 0.3995 * INCH))
+    assert spec.PILOT_DIA == pytest.approx(0.393 * INCH)
     assert spec.BORE_DIA == pytest.approx(
         0.201 * INCH
     )  # owner ruling 2026-11-23: #10-32, #7 drill
     assert spec.CHAMFER == pytest.approx(0.02 * INCH)
-    assert spec.PILOT_LIMITS[0] < spec.PILOT_DIA < spec.PILOT_LIMITS[1]
 
 
-def test_the_body_is_a_matched_slip_fit_and_the_pilot_a_locating_fit() -> None:
-    cbore = spec.COUNTERBORE_DIA
-    assert spec.BODY_CLEARANCE == pytest.approx((0.0005 * INCH, 0.0015 * INCH))
-    assert spec.BODY_CLEARANCE[0] < cbore - spec.BODY_DIA < spec.BODY_CLEARANCE[1]
+def test_the_plug_floats_so_the_fence_and_end_stop_locate_the_blank() -> None:
+    """#3713: the plug no longer locates the blank. Body and pilot at their
+    title-block bands drop into the smallest counterbore and enter the
+    smallest reamed hole, and their least play takes up the counterbore's
+    position band on both axes, so the plug cannot hold the blank off the
+    fence or the end stop."""
+    assert spec.BODY_LIMITS == pytest.approx((0.46 * INCH, 0.48 * INCH))
+    assert spec.PILOT_LIMITS == pytest.approx((0.388 * INCH, 0.398 * INCH))
+    assert spec.BODY_FLOAT == pytest.approx((0.010 * INCH, 0.050 * INCH))
     hole = spec.STRAP_HOLE_LIMITS
     least = hole[0] - spec.PILOT_LIMITS[1]
     greatest = hole[1] - spec.PILOT_LIMITS[0]
     assert (least, greatest) == pytest.approx(spec.PILOT_CLEARANCE)
-    assert spec.PILOT_CLEARANCE == pytest.approx((0.0005 * INCH, 0.0020 * INCH))
-    assert least > 0.0
-
-
-def test_the_pilot_band_is_one_the_lathe_holds_and_its_play_fits_the_outline() -> None:
-    """LEARN machinist review r5: .3990-.3995 was narrower than the shop's
-    turned-diameter row (+/-.0005) with no fit route, and one plug serves
-    every strap blank, so it cannot be matched to a hole. The pilot takes the
-    row's .001; the play that adds stays within a fifth of the strap edges'
-    +/-.010 profile band."""
-    assert spec.PILOT_LIMITS[1] - spec.PILOT_LIMITS[0] == pytest.approx(0.001 * INCH)
-    assert spec.TURNED_DIA_ROW == pytest.approx(0.0005 * INCH)
-    shift = (spec.PILOT_CLEARANCE[1] + spec.BODY_CLEARANCE[1]) / 2.0
-    assert shift == pytest.approx(spec.HUB_LOCATING_ERROR_MAX)
-    assert shift == pytest.approx(0.00175 * INCH)
-    assert shift <= 0.2 * arm._PROFILE_HALF
-    # The wider band keeps the wall over rule 17's target.
-    assert spec.WALL_TEXT == "WALL .096 MIN"
+    assert spec.PILOT_CLEARANCE == pytest.approx((0.0020 * INCH, 0.0125 * INCH))
+    play = (spec.BODY_FLOAT[0] + spec.PILOT_CLEARANCE[0]) / 2.0
+    assert play == pytest.approx(0.006 * INCH)
+    offset = 0.002 * INCH * math.sqrt(2.0)
+    assert play - offset > 0.001 * INCH
+    # Nothing on the plug is a fit any longer.
+    for text in spec.DIMENSION_CALLOUTS_BY_NAME.values():
+        assert "FIT" not in text and "MEASURED" not in text
+    assert spec.WALL_TEXT == "WALL .091 MIN"
 
 
 def test_seated_on_the_floor_the_plug_stays_inside_the_strap_at_the_worst_case() -> (
     None
 ):
     """Plate frame, Z0 the floor the tape stack lies on; every band at its worst."""
-    floor = (-spec.COUNTERBORE_DEPTH - XXX, -spec.COUNTERBORE_DEPTH + XXX)
+    floor = (
+        -spec.COUNTERBORE_DEPTH - 0.010 * INCH,
+        -spec.COUNTERBORE_DEPTH + 0.010 * INCH,
+    )
     shoulder_max = floor[1] + spec.BODY_LENGTH + XXX
     assert shoulder_max < 0.0
     assert shoulder_max == pytest.approx(-0.005 * INCH)
@@ -179,53 +168,43 @@ def test_the_bore_clears_the_number_ten_screw_and_its_wall_meets_the_target() ->
     wall = (spec.PILOT_LIMITS[0] - spec.BORE_DIA - drilled_oversize_mm(unit="in")) / 2.0
     assert wall == pytest.approx(spec.WALL_MIN)
     assert WALL_FLOOR_MM < WALL_TARGET_MM <= wall
-    assert spec.WALL_TEXT == "WALL .096 MIN"
+    assert spec.WALL_TEXT == "WALL .091 MIN"
     assert not spec.WALL_STATED
     assert spec.DIMENSION_CALLOUTS_BY_NAME["BoreDia"] == "DRILL THRU"
     row = _config.parts(spec.PART_NAME)
     assert "machinist_exceptions" not in row
 
 
-def test_callouts_name_each_fit_and_mate() -> None:
+def test_callouts_name_what_each_size_clears() -> None:
     callouts = spec.DIMENSION_CALLOUTS_BY_NAME
-    assert callouts["BodyDia"] == (
-        "TURN TO MEASURED COUNTERBORE\n"
-        ".0005-.0015 DIAMETRAL CLEARANCE ON MHA-CH-13-TL-01"
-    )
-    assert callouts["PilotDia"] == (
-        "LOCATING FIT IN MHA-CH-13 HUB HOLE\n(CLEARANCE .0005-.0020 REF)"
-    )
+    assert callouts["BodyDia"] == "CLEARS MHA-CH-13-TL-01 COUNTERBORE"
+    assert callouts["PilotDia"] == "CLEARS MHA-CH-13 HUB HOLE"
     assert callouts["BodyLength"] == "SHOULDER BELOW\nMHA-CH-13-TL-01 FLOOR"
     assert callouts["OverallLength"] == "PILOT TOP BELOW\nMHA-CH-13 TOP FACE"
     assert callouts["ChamferSize"] == "X 45\u00b0"
-    assert spec.REFERENCE_DIMENSIONS == {"BodyProfile": frozenset({"BodyDia"})}
     assert _config.parts("ch-rocker-strap-tl-sub-plate")["number"] == spec.PLATE_NUMBER
     assert _config.parts("ch-rocker-strap")["number"] == spec.STRAP_NUMBER
 
 
 def test_places_and_bands_are_the_parts() -> None:
     assert spec.DRAWING_PRECISION_BY_NAME == {
-        "BodyDia": 3,
+        "BodyDia": 2,
         "BoreDia": 3,
         "BodyLength": 3,
         "OverallLength": 3,
-        "PilotDia": 4,
+        "PilotDia": 3,
         "ChamferSize": 2,
     }
-    # The only explicit band is the pilot's two limits (swTolLIMIT); every
-    # other size takes its title-block row.
+    # Every size takes its title-block row: no explicit band, no reference.
     assert model_toleranced_dimensions(part) == {}
     tree = _tree(Path(part.__file__))
-    limits = [
-        node
+    called = {
+        getattr(node.func, "id", None)
         for node in ast.walk(tree)
-        if isinstance(node, ast.Call) and getattr(node.func, "id", None) == "set_limits"
-    ]
-    assert len(limits) == 1
-    assert [ast.unparse(a) for a in limits[0].args[1:]] == [
-        "spec.PILOT_PROFILE",
-        "'PilotDia'",
-    ]
+        if isinstance(node, ast.Call)
+    }
+    assert "set_limits" not in called
+    assert "(<MOD-DIAM>" not in Path(part.__file__).read_text(encoding="utf-8")
 
 
 def test_volume_is_the_two_annuli_less_the_chamfer() -> None:

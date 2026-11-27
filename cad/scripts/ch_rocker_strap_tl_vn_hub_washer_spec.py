@@ -102,9 +102,6 @@ KEEP_RADIUS = PLAN_FLANGE_DIA / 2.0 + PLAN_CLEARANCE  # 7.358
 STRAP_HOLE_DIA_MAX = 10.1727
 # MHA-CH-13-TL-01: the hub hole's position from X0 and Y0, +/-.002 each way.
 HUB_LOCATION_TOL = 0.0508
-# MHA-CH-13-TL-02: the most its play lets the hub hole sit off the
-# counterbore (HUB_LOCATING_ERROR_MAX).
-PLUG_LOCATING_ERROR_MAX = 0.04445
 
 # --- Reach: the selected washer pushed fully to one side -----------------------
 # Its bore against the smallest screw; its OD off its bore by the standard's
@@ -143,16 +140,14 @@ if not REACH_CENTRED_MAX <= PLAN_FLANGE_DIA / 2.0 + 1e-9:
 
 # --- Land: it bears on the strap round the hub hole ----------------------------
 # Thin side, the smallest washer pushed fully to one side: half the OD less
-# the play, the runout, the tapped hole's offset from the counterbore and
-# the plug's locating error, measured from the largest hub hole's edge.
+# the play, the runout and the tapped hole's offset from the programs' hub
+# centre, measured from the largest hub hole's edge. The hub hole lies at
+# that centre: the fence and end stop locate the blank as they did when it
+# was drilled (MHA-CH-13-TL-02 only floats in its counterbore).
 BEARING_LAND_CENTRED_MIN = (SELECT_OD_MIN - STRAP_HOLE_DIA_MAX) / 2.0  # 1.200
 BEARING_LAND_MIN = (
-    BEARING_LAND_CENTRED_MIN
-    - RADIAL_PLAY_MAX
-    - RUNOUT_MAX
-    - SCREW_AXIS_ERROR_MAX
-    - PLUG_LOCATING_ERROR_MAX
-)  # 0.297
+    BEARING_LAND_CENTRED_MIN - RADIAL_PLAY_MAX - RUNOUT_MAX - SCREW_AXIS_ERROR_MAX
+)  # 0.341
 if not BEARING_LAND_CENTRED_MIN > 1.0:
     raise AssertionError("the washer leaves no land on the strap round its hub hole")
 if not BEARING_LAND_MIN > 0.25:

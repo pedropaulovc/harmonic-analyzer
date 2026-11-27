@@ -338,7 +338,7 @@ def hub_hole_definitions(definitions: dict[int, str]) -> dict[int, str]:
     (part 7, printed first) the drill's Ø, DRILL and the native extent, then
     the thread on the same extent (spec.HUB_THREAD_ROW: the drill is the
     #10-32's, its thread cosmetic); the counterbore row (part 5, Ø and depth
-    as native variables) closing with the plug it locates; the thread's
+    as native variables) closing with the plug it holds; the thread's
     stated shortfall below (part 8, rule 20). Four rows, the audit's limit."""
     if set(definitions) != {5, 6, 7, 8}:
         raise RuntimeError(f"unexpected hub hole callout parts: {definitions!r}")
@@ -382,8 +382,8 @@ def hub_hole_definitions(definitions: dict[int, str]) -> dict[int, str]:
 def hub_hole_precision(definitions: dict[int, str]) -> dict[str, int]:
     """Each native length variable the hub hole's callout prints (the drill's
     and the counterbore's Ø, its depth), at three places: .201's drill band,
-    the Ø.500 the first half of TL-02's slip fit, the .185 the depth that
-    clears the tools through the strap's hub hole (spec)."""
+    and the counterbore's Ø and depth at the wizard's .XX grade (rule 3,
+    #3622; spec)."""
     names = {
         match.group(1)
         for text in definitions.values()
@@ -400,7 +400,6 @@ _TOP = (_SELF, "TOP_KEEP")
 _SEC_A = (_SELF, "SECTION_A_KEEP")
 _SEC_B = (_SELF, "SECTION_B_KEEP")
 _HUB_CALLOUT = (_SELF, "HUB_TAP_CALLOUT_XY")
-_BAND = (spec.POCKET_BACK_WALL_TOL, -spec.POCKET_BACK_WALL_TOL)
 _HUB_BAND = (spec.HUB_LOCATION_TOL, -spec.HUB_LOCATION_TOL)
 
 
@@ -587,10 +586,8 @@ for _index, _station in enumerate(_STATIONS, 1):
                 ("POCKET_BACK_WALL_Y", "POCKET_NEAR_WALL_Y"),
             ),
             "back_wall_y": (
-                limits(
-                    -spec.POCKET_BACK_WALL_Y, _P["PocketBackWallY"], _BAND, unit=UNIT
-                ),
-                ("POCKET_BACK_WALL_Y", "POCKET_BACK_WALL_TOL", _SEC_A),
+                limits(-spec.POCKET_BACK_WALL_Y, _P["PocketBackWallY"], unit=UNIT),
+                ("POCKET_BACK_WALL_Y", _SEC_A),
             ),
             "near_wall_y": (
                 limits(-spec.POCKET_NEAR_WALL_Y, _P["PocketNearWallY"], unit=UNIT),
@@ -649,15 +646,25 @@ requirement(
             ("HUB_Y", "HUB_LOCATION_TOL", _TOP),
         ),
         "dia": (
-            limits(spec.HUB_CBORE_DIA, spec.HUB_CALLOUT_PLACES, unit=UNIT),
-            ("HUB_CBORE_DIA", "HUB_HOLE_SPEC", "HUB_CALLOUT_PLACES", _HUB_CALLOUT),
+            limits(
+                spec.HUB_CBORE_DIA,
+                spec.HUB_CALLOUT_PLACES,
+                spec.HUB_CBORE_BAND,
+                unit=UNIT,
+            ),
+            ("HUB_CBORE_DIA", "HUB_CBORE_BAND", "HUB_HOLE_SPEC", _HUB_CALLOUT),
         ),
         "depth": (
-            limits(spec.HUB_CBORE_DEPTH, spec.HUB_CALLOUT_PLACES, unit=UNIT),
-            ("HUB_CBORE_DEPTH", "HUB_HOLE_SPEC", "HUB_CALLOUT_PLACES", _HUB_CALLOUT),
+            limits(
+                spec.HUB_CBORE_DEPTH,
+                spec.HUB_CALLOUT_PLACES,
+                spec.HUB_CBORE_BAND,
+                unit=UNIT,
+            ),
+            ("HUB_CBORE_DEPTH", "HUB_CBORE_BAND", "HUB_HOLE_SPEC", _HUB_CALLOUT),
         ),
         "floor_z": (spec.COUNTERBORE_FLOOR_Z, ("COUNTERBORE_FLOOR_Z",)),
-        "locates": (spec.PLUG_NUMBER, ("PLUG_NUMBER",)),
+        "holds": (spec.PLUG_NUMBER, ("PLUG_NUMBER",)),
     },
     precision={
         "x": _P["HubX"],

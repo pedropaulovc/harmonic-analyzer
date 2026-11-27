@@ -127,20 +127,24 @@ def test_the_hub_tap_states_its_worst_case_engagement() -> None:
     tapped hole becomes #10-32" (reversing 2026-11-17's "Use a 1/4-20 hub
     screw", whose acceptance of the .23 in of thread stands), through from
     the counterbore floor; full thread after the .010 edge break at both tap
-    mouths (Codjiflo review of #3056) is .21 nominal (1.11D), .19 at the
-    worst case (1.01D; the 1/4-20 had .76D), stated as a fact."""
+    mouths (Codjiflo review of #3056) is .21 nominal (1.11D). At the worst
+    case it is .186 (0.98D; the 1/4-20 had .76D), the counterbore's depth
+    taken at its wizard callout's .XX (#3622), stated as a fact floored to
+    two places."""
     assert spec.HUB_TAP_THREAD == "#10-32"
     assert spec.HUB_TAP_DRILL == TAP_DRILL_MM["#10-32"] == pytest.approx(0.159 * INCH)
     assert spec.HUB_THREAD_MAJOR == pytest.approx(0.190 * INCH)
     assert spec.HUB_THREAD_LENGTH == pytest.approx(0.231 * INCH)
     assert spec.TAP_MOUTH_BREAK == pytest.approx(0.010 * INCH)
+    assert spec.HUB_CBORE_BAND == pytest.approx((XX, -XX))
     assert spec.HUB_THREAD_LENGTH_MIN == pytest.approx(
-        spec.HUB_THREAD_LENGTH - XX - XXX - XXX - 2.0 * spec.TAP_MOUTH_BREAK
+        spec.HUB_THREAD_LENGTH - XX - XXX - XX - 2.0 * spec.TAP_MOUTH_BREAK
     )
+    assert spec.HUB_THREAD_LENGTH_MIN == pytest.approx(0.186 * INCH)
     assert spec.CLAMP_THREAD_LENGTH_MIN == pytest.approx(
         spec.CLAMP_THREAD_LENGTH - XX - XXX - XXX - 2.0 * spec.TAP_MOUTH_BREAK
     )
-    assert spec.HUB_ENGAGEMENT_STATEMENT == "ENGAGEMENT .19 MIN (1.01D)"
+    assert spec.HUB_ENGAGEMENT_STATEMENT == "ENGAGEMENT .18 MIN (.98D)"
     assert spec.HUB_THREAD_LENGTH_MIN < spec.HUB_THREAD_REQUIRED
     exception = _config.parts(spec.PART_NAME)["machinist_exceptions"][0]
     assert exception["id"] == "RV-01" and "(1.01D)" in exception["finding"]
@@ -148,8 +152,15 @@ def test_the_hub_tap_states_its_worst_case_engagement() -> None:
     assert "Use a 1/4-20 hub screw." in exception["reason"]
     for word in ("ACCEPT", "RULING", "RULE", "OWNER"):
         assert word not in spec.HUB_ENGAGEMENT_STATEMENT
-    # The drill and reamer tips stop the plan's clearance above the floor.
-    assert spec.HUB_CBORE_TIP_CLEARANCE_MIN >= spec.PLAN_RELIEF_FLOOR_CLEARANCE
+    # At the shallowest wizard depth the drill and reamer tips stay clear of
+    # the floor by more than the tool-length reading; at the nominal depth
+    # they keep the plan's relief clearance.
+    assert spec.HUB_CBORE_TIP_CLEARANCE_MIN == pytest.approx(0.445, abs=1e-9)
+    assert spec.HUB_CBORE_TIP_CLEARANCE_MIN > 0.001 * INCH
+    assert (
+        spec.HUB_CBORE_DEPTH + max(spec.PLAN_DRILL_TIP_Z, spec.PLAN_REAM_TIP_Z)
+        >= spec.PLAN_RELIEF_FLOOR_CLEARANCE
+    )
 
 
 def test_the_counterbore_is_what_the_plug_mirrors() -> None:
@@ -222,7 +233,7 @@ def test_printed_dimensions_sit_on_their_inch_grid() -> None:
 def test_explicit_bands_are_the_only_model_tolerances() -> None:
     bands = model_toleranced_dimensions(part)
     assert bands == {
-        ("spec.SECTION_A_REFERENCE", "PocketBackWallY"): "spec.POCKET_BACK_WALL_TOL",
+        # #3713: the pocket's back wall takes the title block's .XXX.
         ("HubHole", "HubX"): "spec.HUB_LOCATION_TOL",
         ("HubHole", "HubY"): "spec.HUB_LOCATION_TOL",
     }
@@ -1139,12 +1150,6 @@ def test_each_three_place_section_size_names_the_strap_feature_it_serves() -> No
         assert len(words.replace(spec.STRAP_NUMBER, "").split()) <= 6, name
         assert "FACE CUT" not in words and spec.DRAWING_PRECISION_BY_NAME[name] == 3
     assert spec.FENCE_HEIGHT + spec.XX > spec.FENCE_TOP_LIMIT
-    assert (
-        spec.HUB_CBORE_DEPTH
-        - spec.XX
-        + max(spec.PLAN_DRILL_TIP_Z, spec.PLAN_REAM_TIP_Z)
-        < spec.PLAN_RELIEF_FLOOR_CLEARANCE
-    )
 
 
 def test_the_pocket_s_tight_sizes_flag_one_note_naming_the_clamp() -> None:
@@ -1233,11 +1238,11 @@ def test_the_hub_hole_callout_prints_drill_thread_counterbore_and_shortfall() ->
     """mr7: the counterbore's depth printed alone in B-B. The wizard
     counterbore's native callout carries the drill, the thread on the same
     THRU, the counterbore's Ø and depth (native variables, ⌴ and ↧) with the
-    plug it locates (rule 4: TL-02 mirrors both), and the engagement
+    plug it holds (TL-02 floats in it, #3713), and the engagement
     shortfall: four rows, the audit's tall-block limit."""
     hub = drawing.hub_hole_definitions(dict(_NATIVE_CBORE_PARTS))
     assert hub == {
-        5: "<HOLE-SPOT><MOD-DIAM><hw-cbdiam> <HOLE-DEPTH><hw-cbdepth> LOCATES TL-02",
+        5: "<HOLE-SPOT><MOD-DIAM><hw-cbdiam> <HOLE-DEPTH><hw-cbdepth> FOR TL-02",
         6: "",
         7: "<MOD-DIAM><hw-diam> DRILL <hw-thru>\n10-32 UNF <hw-thru>",
         8: spec.HUB_ENGAGEMENT_STATEMENT,
@@ -1245,8 +1250,8 @@ def test_the_hub_hole_callout_prints_drill_thread_counterbore_and_shortfall() ->
     assert _hub_callout_rows() == [
         "Ø.159 DRILL THRU ALL",
         "10-32 UNF THRU ALL",
-        "⌴Ø.500 ↧.185 LOCATES TL-02",
-        "ENGAGEMENT .19 MIN (1.01D)",
+        "⌴Ø.500 ↧.185 FOR TL-02",
+        "ENGAGEMENT .18 MIN (.98D)",
     ]
     assert len(_hub_callout_rows()) <= TEXT_ROW_LIMIT
     assert drawing.hub_hole_precision(hub) == {
@@ -1320,8 +1325,8 @@ def test_feature_export_names_every_requirement_the_plate_program_reads() -> Non
     pocket = features["clamp_pocket_1"]
     assert pocket["back_wall_y"] == pytest.approx(
         [
-            -spec.POCKET_BACK_WALL_Y - spec.POCKET_BACK_WALL_TOL,
-            -spec.POCKET_BACK_WALL_Y + spec.POCKET_BACK_WALL_TOL,
+            -spec.POCKET_BACK_WALL_Y - XXX,
+            -spec.POCKET_BACK_WALL_Y + XXX,
         ]
     )
     assert pocket["corner_radius_max"] == spec.CORNER_RADIUS
