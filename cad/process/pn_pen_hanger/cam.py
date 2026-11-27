@@ -61,7 +61,7 @@ PROGRAMS: tuple[tuple[str, tuple[Any, ...]], ...] = (
 LOAD_FIRST_TOOL = tuple(name for name, _ops in PROGRAMS)
 # The plan's tools the mill runs, numbered by their places in the plan's tool
 # list among these (the saw, the files and the gauges are not).
-CAM_TOOLS = ("spot", "drill-15", "em-eighth", "em-3-16")
+CAM_TOOLS = ("spot", "drill-15", "em-eighth")
 IN = 25.4
 # #1 combined drill and countersink (shop centre-drills-carbide-60, trade
 # size 1): 1/8 body, 3/64 pilot and pilot length, 60° countersink, its pilot
@@ -418,15 +418,14 @@ def context(
     dspot = CENTRE_DRILL["body_mm"]
     d15 = _shop_tool(plan, shop, "drill-15")["diameter_mm"]
     e8_tool = _shop_tool(plan, shop, "em-eighth")
-    e3_tool = _shop_tool(plan, shop, "em-3-16")
-    e8, e3 = e8_tool["diameter_mm"], e3_tool["diameter_mm"]
-    r8, r3 = e8 / 2, e3 / 2
+    e8 = e8_tool["diameter_mm"]
+    r8 = e8 / 2
     if not g["hole_band"][0] - 1e-6 <= d15 <= g["hole_band"][1]:
         raise ValueError(f"#15 Ø{d15} outside the screw hole's band {g['hole_band']}")
     for name, dia in (
         ("strap outline", e8),
         ("plate outline", e8),
-        ("slots", e3),
+        ("slots", e8),
         ("screw drill", d15),
     ):
         if not math.isclose(_cut(plan, name, "cutter_dia_mm"), dia, abs_tol=1e-6):
@@ -645,9 +644,9 @@ def context(
     # The stack the upper plate is set from in Setup 5: between the plates'
     # facing faces, equal to the drawing's drop on a strap cut to its rise.
     _agree(plan, "plate_gap_mm", upper[0] - lower[1])
-    # Width: the 3/16 in cutter on two passes either side of the centre line.
+    # Width: the 1/8 in cutter on two passes either side of the centre line.
     offset = p["slot_offset_mm"]
-    width = e3 + 2 * offset
+    width = e8 + 2 * offset
     _agree(plan, "slot_width_mm", width)
     if not g["slot_band"][0] + 0.01 <= width <= g["slot_band"][1] - 0.01:
         raise ValueError(
@@ -656,7 +655,7 @@ def context(
     arm = half_w - width / 2
     if not g["arm_band"][0] <= arm <= g["arm_band"][1]:
         raise ValueError(f"the slot's arms {arm:.3f} wide are outside their band")
-    if offset >= r3:
+    if offset >= r8:
         raise ValueError("the slot's two passes leave a ridge between them")
     # The slot's floor corners are the end mill's square corners, under
     # the drawing's R.08 MAX.
@@ -670,8 +669,8 @@ def context(
     if not math.isclose(_cut(plan, "slots", "axial_doc_mm"), depth / m, abs_tol=1e-3):
         raise ValueError("'slots' axial_doc_mm is not process.slot_level_mm")
     slot_levels = [_r(-depth * k / m) for k in range(1, m + 1)]
-    if e3_tool["flute_length_mm"] < depth + CLEARANCE_MM:
-        raise ValueError("the 3/16 in end mill's flutes do not reach the slot's floor")
+    if e8_tool["flute_length_mm"] < depth + CLEARANCE_MM:
+        raise ValueError("the 1/8 in end mill's flutes do not reach the slot's floor")
     # Heights in Setups 5-6: the strap's back on the support block (a 1-2-3
     # block, 1 in high, on the vise bed), the packing block on its front.
     strap_back = p["support_block_mm"]
@@ -687,11 +686,11 @@ def context(
     # flutes all out of the collet.
     proj = p["slot_projection_min_mm"]
     if -depth + proj < packing_top + CLEARANCE_MM - 1e-6:
-        raise ValueError("the 3/16 in end mill's collet reaches the packing block")
-    if proj < e3_tool["flute_length_mm"] + 1.0 - 1e-6:
-        raise ValueError("the 3/16 in end mill would be gripped on its flutes")
-    x_start = upper[1] + r3 + CLEARANCE_MM
-    x_end = lower[0] - r3 - CLEARANCE_MM
+        raise ValueError("the 1/8 in end mill's collet reaches the packing block")
+    if proj < e8_tool["flute_length_mm"] + 1.0 - 1e-6:
+        raise ValueError("the 1/8 in end mill would be gripped on its flutes")
+    x_start = upper[1] + r8 + CLEARANCE_MM
+    x_end = lower[0] - r8 - CLEARANCE_MM
     clear_6 = max(packing_top, 0.0) + CLEAR_MM
     ya, yb = slot_y - offset, slot_y + offset
     slots = [
@@ -722,32 +721,31 @@ def context(
     if p["eighth_projection_min_mm"] < e8_tool["flute_length_mm"] + 1.0 - 1e-6:
         raise ValueError("the 1/8 in end mill would be gripped on its flutes")
 
-    # Speeds and feeds: the end mills' shop settings; the drills' and the
-    # spot's from the plan's cited rates.
+    # Speeds and feeds: the 1/8 in end mill's shop settings; the drills' and
+    # the spot's from the plan's cited rates.
     e8_setting = shop["settings"][_op_with_cut(plan, "strap outline")[0]["settings"]]
-    e3_setting = shop["settings"][_op_with_cut(plan, "slots")[0]["settings"]]
+    sl_setting = shop["settings"][_op_with_cut(plan, "slots")[0]["settings"]]
     if (
         _op_with_cut(plan, "plate outline")[0]["settings"]
         != _op_with_cut(plan, "strap outline")[0]["settings"]
     ):
         raise ValueError("the strap's and the plates' outlines name different settings")
-    for setting, tool in (
-        (e8_setting, "endmill-carbide-3fl-1-8"),
-        (e3_setting, "endmill-carbide-3fl-3-16"),
-    ):
-        if setting["tool"] != tool:
-            raise ValueError(f"setting for {setting['tool']} named where {tool} cuts")
+    for setting in (e8_setting, sl_setting):
+        if setting["tool"] != "endmill-carbide-3fl-1-8":
+            raise ValueError(
+                f"setting for {setting['tool']} named where endmill-carbide-3fl-1-8 cuts"
+            )
     _agree(plan, "em_rpm", e8_setting["rpm"])
     _agree(
         plan,
         "em_feed_per_min_mm",
         e8_setting["rpm"] * e8_setting["flutes"] * e8_setting["chip_load_mm_per_tooth"],
     )
-    _agree(plan, "slot_rpm", e3_setting["rpm"])
+    _agree(plan, "slot_rpm", sl_setting["rpm"])
     _agree(
         plan,
         "slot_feed_per_min_mm",
-        e3_setting["rpm"] * e3_setting["flutes"] * e3_setting["chip_load_mm_per_tooth"],
+        sl_setting["rpm"] * sl_setting["flutes"] * sl_setting["chip_load_mm_per_tooth"],
     )
     speeds = {}
     for name, rpm_key, feed_key in (
@@ -890,8 +888,8 @@ def context(
         job(
             "slots",
             "both slots in line",
-            "em-3-16",
-            e3,
+            "em-eighth",
+            e8,
             "endmill",
             sl_rpm,
             sl_feed,
@@ -1025,7 +1023,7 @@ def context(
             "tool_changes",
             {
                 "z_top": max(packing_top, 0.0),
-                "tools": [tn["em-3-16"]],
+                "tools": [tn["em-eighth"]],
                 "loads_first": True,
             },
         ],
@@ -1034,8 +1032,8 @@ def context(
         [name, "depth", {"z_min": _r(-depth)}],
         [name, "rapids_clear", {"z_top": 0.0}],
         [name, "air_feed", {"z_top": 0.0}],
-        [name, "keep_out", {"radius": r3, "boxes": keep6}],
-        [name, "cleared", {"points": corners6, "radius": r3, "z": _r(-depth)}],
+        [name, "keep_out", {"radius": r8, "boxes": keep6}],
+        [name, "cleared", {"points": corners6, "radius": r8, "z": _r(-depth)}],
     ]
 
     return {

@@ -26,7 +26,7 @@
 # both corners against a gauge block, the upper one set from the lower by a
 # gauge-block stack; 24 h cure in the clamping. Setup 6 (PH03), the same
 # clamping: the strap's rise and the upper plate's drop read on the DRO,
-# then both slots in line in one set of passes with the 3/16 in end mill.
+# then both slots in line in one set of passes with the 1/8 in end mill.
 # Setup 7, bench: deburr, try the slots on the pen rod with a .007 feeler
 # leaf, check the bond by hand. Setup 8: black oxide in the shop, Presto
 # Black Steel PC9.
@@ -51,9 +51,9 @@
 # needed from Setup 5; the PC9 (consumables.presto-black-steel-pc9,
 # to_order). The slots are made to the pen rod MHA-PN-04 (owner ruling
 # 2026-11-24, fit audit, MHA-PN-02.guide_slots: no pin gauges), so the rod
-# is made before Setup 7. Owned and used: the 3/16 in carbide end mill
-# (tools-cutting endmill-carbide-3fl-3-16, 2 on hand; shop record added in
-# shop/pn.toml), Loctite 638 (consumables.loctite-638, on hand), the
+# is made before Setup 7. Owned and used: the 1/8 in carbide end mill
+# (tools-cutting endmill-carbide-3fl-1-8, on hand), Loctite 638
+# (consumables.loctite-638, on hand), the
 # Mitutoyo 81-piece gauge-block set, the two Taytools 1-2-3 blocks, a screw
 # jack, the feeler gauges. The placeholder's 1/8 x 3/4 in bar is dropped
 # (above); its #15 drill and 1/8 in end mill stay.
@@ -79,7 +79,7 @@
 # PH02_plates, PH03_slots. Program names, the [parameters] and the
 # milling_cuts names are a contract with that recipe. Tool numbers are the
 # places in the tools list among the mill's tools: T1 #1 centre drill, T2
-# #15 drill, T3 1/8 in end mill, T4 3/16 in end mill.
+# #15 drill, T3 1/8 in end mill.
 title = "Pen hanger"
 part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
@@ -217,9 +217,8 @@ drill_tip_mm = -1.8736
 # carbon steels 1006-1026 (read 2026-11-20, as ch_channel_lever): drilling
 # 60-100 ft/min. The #15 (.180) at 1700 rpm (80 ft/min), .002 in/rev (the
 # channel lever's #21 rate) = 3.4 in/min; the #1 centre drill at 2800,
-# .0005 in/rev = 1.4 in/min (the channel lever's). The end mills at their
-# shop settings: the 1/8 in at endmill-carbide-3fl-1-8-1018-cf-tru-edge,
-# the 3/16 in at pn-em-3-16-1018-cf (shop/pn.toml).
+# .0005 in/rev = 1.4 in/min (the channel lever's). The 1/8 in end mill at its
+# shop setting: endmill-carbide-3fl-1-8-1018-cf-tru-edge (shop/common.toml).
 spot_rpm = 2800
 spot_feed_per_min_mm = 35.56
 drill_rpm = 1700
@@ -228,7 +227,7 @@ em_rpm = 2800
 em_feed_per_min_mm = 213.36
 plunge_feed_per_min_mm = 25.4
 slot_rpm = 2800
-slot_feed_per_min_mm = 234.696
+slot_feed_per_min_mm = 213.36
 # Setups 5-6 (the bond and the slots, one clamping): the strap's back on a
 # 1-2-3 block laid flat (1 in high, 3 in along the strap under both plates'
 # seats), its outer foot corner and both plates' outer sides against the
@@ -246,12 +245,12 @@ slot_jaw_start_mm = -41.2369
 # The jaws' top and the packing block's top from Z0 (the plates' far ends).
 slot_jaw_top_mm = -8.2677
 packing_top_mm = 0.762
-# The slots: the 3/16 in end mill on two passes .00675 either side of the
+# The slots: the 1/8 in end mill on two passes .0380 either side of the
 # centre line (.2010 wide, the band's middle), through both plates in line,
 # in 22 equal levels to the drawn depth (.019 each).
-slot_cutter_dia_mm = 4.7625
-slot_offset_mm = 0.1715
-slot_width_mm = 5.1055
+slot_cutter_dia_mm = 3.175
+slot_offset_mm = 0.9652
+slot_width_mm = 5.1054
 slot_levels = 22
 slot_level_mm = 0.4849
 slot_level_max_mm = 0.508
@@ -261,12 +260,11 @@ slot_depth_mm = 10.668
 r8_collet_gauge_mm = 6.3         # HA: holders.r8-collets-lms-4860.gauge_len_mm.
 drill_chuck_gauge_mm = 95.0      # Archive holders.drill-chuck-r8.gauge_len_mm.
 # 1/8 in end mill, 1-1/2 in overall: at least .55 in out (its 1/2 in flutes
-# clear and the collet's nose over the jaws); 3/16 in, 2 in overall: at
-# least .70 in out (its 5/8 in flutes clear, the nose over the packing
-# block); the drills at least 1.00 in out of the chuck. The #15 jobber is
+# clear and the collet's nose over the jaws and the packing block); the drills
+# at least 1.00 in out of the chuck. The #15 jobber is
 # under 4 in overall (ASME B94.11M: the D, .246, is 4 in).
 eighth_projection_min_mm = 13.97
-slot_projection_min_mm = 17.78
+slot_projection_min_mm = 13.97
 drill_projection_min_mm = 25.4
 drill_15_oal_mm = 101.6
 # The strap's and the plates' heights in Setups 5-6: the support block and
@@ -286,10 +284,6 @@ ref = "block-drill-15"
 id = "em-eighth"
 name = "1/8 in carbide end mill"
 ref = "endmill-carbide-3fl-1-8"
-[[tools]]
-id = "em-3-16"
-name = "3/16 in carbide end mill"
-ref = "endmill-carbide-3fl-3-16"
 [[tools]]
 id = "cutoff-saw"
 name = "Evolution miter saw"
@@ -563,9 +557,9 @@ machine = "PM-30MV CNC (FluidNC, CNCjs with the electronic tool setter) / vise, 
 indexing = "none"
 machine_ref = "pm-30mv"
 holding = "Unchanged from Setup 5: the bonded strap front up on the support block and the jack, both plates' outer sides on the fixed jaw, the packing block (on the strap and the parallel) between their inner sides and the moving jaw. Check the vise is still snug (do not tighten more)."
-datum = "Program PH03_slots (T4). G54: X0 the strap's foot end (the lower plate's outer face), Y0 the fixed jaw's face, Z0 the plates' far ends (the higher of the two). +X toward the strap's top end, +Y toward the fixed jaw."
-diagram = { file = "diagrams/slots.svg", alt = "To scale. Side view from the moving jaw: the bonded strap on the support block and the screw jack, the two plates standing up from it, the 3/16 in end mill at the slots' floor in the upper plate on its pass along X through both plates in line; the slots ({{cad.slots_width_nominal_in:.3dot}}) wide, made to the pen rod, and .420 deep from the plates' far ends; the packing block in front, its top .03 above them; the jaws' top." }
-envelope = { x_span_mm = [49.69, "{{process.slot_cutter_dia_mm}}", "{{process.slot_cutter_dia_mm}}", 5.08], y_span_mm = [62.992, 1.0], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.support_block_mm}}", "{{process.packing_block_mm}}", "{{cad.strap_front_thickness_as_supplied_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.bond_seat_mm}}", 13.97], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", 50.8], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.slot_projection_min_mm}}"] }
+datum = "Program PH03_slots (T3). G54: X0 the strap's foot end (the lower plate's outer face), Y0 the fixed jaw's face, Z0 the plates' far ends (the higher of the two). +X toward the strap's top end, +Y toward the fixed jaw."
+diagram = { file = "diagrams/slots.svg", alt = "To scale. Side view from the moving jaw: the bonded strap on the support block and the screw jack, the two plates standing up from it, the 1/8 in end mill at the slots' floor in the upper plate on its pass along X through both plates in line; the slots ({{cad.slots_width_nominal_in:.3dot}}) wide, made to the pen rod, and .420 deep from the plates' far ends; the packing block in front, its top .03 above them; the jaws' top." }
+envelope = { x_span_mm = [49.69, "{{process.slot_cutter_dia_mm}}", "{{process.slot_cutter_dia_mm}}", 5.08], y_span_mm = [62.992, 1.0], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.support_block_mm}}", "{{process.packing_block_mm}}", "{{cad.strap_front_thickness_as_supplied_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.bond_seat_mm}}", 13.97], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", 38.1], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.slot_projection_min_mm}}"] }
 vise_hold = { vise = "vise-pm-6", across_jaws_mm = 62.992, along_jaws_mm = "{{process.packing_length_mm}}", part_height_mm = "{{cad.guide_plates_reach_mm}}", parallel_height_mm = "{{process.bond_seat_mm}}", overhang_mm = ["{{process.slot_jaw_start_mm}}", "rest"], jaw_offset = "centred", fixed_jaw_face = "machined", moving_jaw_face = "machined", moving_jaw_contact = "flat" }
 beam = { axis = "z", hold = "cantilever", extent_mm = [0, "{{cad.guide_plates_reach_mm}}"], clamp_mm = 16.37, section_mm = { x = "{{cad.guide_plates_thickness_as_supplied_mm}}", y = "{{cad.slots_arm_width_mm}}" }, vise_left = "other" }
 
@@ -583,19 +577,19 @@ gauge_checks = [
 ]
 
 [[setups.operations]]
-instruction = "G54 Z0 the plates' far ends: console M6 T4 (3/16 in end mill, at least .70 in out of the collet, so its nose clears the packing block, whose top stands about .03 above the plates' ends); spindle stopped, its tip just dragging a .002 feeler leaf on each plate's far end in turn; Z0 on the higher one."
-instruction_detailed = "Console M6 T4. Spindle stopped, the T4 tip just dragging a .002 feeler leaf on the lower plate's far end: note the machine Z; the same on the upper plate's: note it. On the higher one: G10 L20 P1 Z0.051."
+instruction = "G54 Z0 the plates' far ends: console M6 T3 (1/8 in end mill, at least .55 in out of the collet, so its nose clears the packing block, whose top stands about .03 above the plates' ends); spindle stopped, its tip just dragging a .002 feeler leaf on each plate's far end in turn; Z0 on the higher one."
+instruction_detailed = "Console M6 T3. Spindle stopped, the T3 tip just dragging a .002 feeler leaf on the lower plate's far end: note the machine Z; the same on the upper plate's: note it. On the higher one: G10 L20 P1 Z0.051."
 inspection = "The two far ends' heights differ by .008 at most (the two noted Z, 0.203 mm): the slot .420 deep in the higher plate is then .412 or more in the lower, inside {{cad.slots_depth_min_in:.3dot}}–{{cad.slots_depth_max_in:.3dot}}. More: stop and tell the owner; do not cut the slots."
 gauge_checks = "other"
 feed = "hand"
 
 [[setups.operations]]
 speed_kind = "spindle"
-tool = "em-3-16"
+tool = "em-eighth"
 drilling = "none"
 sizing = "other"
-instruction = "Run PH03_slots (M6 T4, 3/16 in end mill at least .70 in out of the collet; set 2800): both slots in line, {{process.slot_levels:d}} levels of {{process.slot_level_mm:in.4dot}} to {{cad.slots_depth_in:.3dot}} deep; on each level one pass along X through both plates and back, .00675 either side of the centre line ({{process.slot_width_mm:in.4dot}} wide). Before Cycle Start, brush cutting oil on both plates' far ends; hands clear while it runs."
-settings = "pn-em-3-16-1018-cf"
+instruction = "Run PH03_slots (M6 T3, 1/8 in end mill at least .55 in out of the collet; set 2800): both slots in line, {{process.slot_levels:d}} levels of {{process.slot_level_mm:in.4dot}} to {{cad.slots_depth_in:.3dot}} deep; on each level one pass along X through both plates and back, .0380 either side of the centre line ({{process.slot_width_mm:in.4dot}} wide). Before Cycle Start, brush cutting oil on both plates' far ends; hands clear while it runs."
+settings = "endmill-carbide-3fl-1-8-1018-cf-tru-edge"
 milling_cuts = [
   { name = "slots", kind = "slot", phase = "finish", cutter_dia_mm = "{{process.slot_cutter_dia_mm}}", axial_doc_mm = "{{process.slot_level_mm}}", radial_woc_mm = "{{process.slot_cutter_dia_mm}}", stations_mm = "{{cad.guide_plates_reach_mm}}" },
 ]

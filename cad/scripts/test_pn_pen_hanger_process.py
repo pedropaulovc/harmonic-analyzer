@@ -89,7 +89,11 @@ def _expect(ctx: dict, program: str, check: str) -> dict:
 
 
 def test_context_numbers_the_tools_and_places_the_cuts(ctx) -> None:
-    assert ctx["numbers"] == {"spot": 1, "drill-15": 2, "em-eighth": 3, "em-3-16": 4}
+    assert ctx["numbers"] == {"spot": 1, "drill-15": 2, "em-eighth": 3}
+    assert "endmill-carbide-3fl-3-16" not in SHOP["tools"]
+    assert "pn-em-3-16-1018-cf" not in SHOP["settings"]
+    assert "endmill-hss-tin-2fl-3-16" not in SHOP["tools"]
+    assert "lathe-plunge-3-16-c360" not in SHOP["settings"]
     # The screw hole 5.0 mm below the strap's top end (X0 + .315 in) and
     # 6.80 mm in from its outer top corner, the strap centred on the bar.
     spot = _expect(ctx, "PH01_strap@0", "holes")
@@ -111,14 +115,14 @@ def test_context_numbers_the_tools_and_places_the_cuts(ctx) -> None:
     # The outlines' four levels from the thickest bar's top to .010 into
     # the spoil plate.
     assert strap["passes"][0]["levels"] == [2.375, 1.499, 0.622, -0.254]
-    # The slots: 22 levels to the drawn depth, two passes .1715 either side
+    # The slots: 22 levels to the drawn depth, two passes .9652 either side
     # of the plates' centre line.
     slots = _lines(ctx, "slots")
     assert slots.count("G1 Z-10.668 F{feed}") == 1
     assert sum(line.startswith("G1 Z") for line in slots) == 22
     assert {line.split()[2] for line in slots if line.startswith("G1 X")} == {
-        "Y-6.268",
-        "Y-5.925",
+        "Y-7.061",
+        "Y-5.131",
     }
 
 
@@ -143,9 +147,9 @@ def test_the_recipes_programs_pass_every_check_they_declare(ctx, tmp_path) -> No
         ({"plate_end_waste_mm": 8.0}, "plate_end_waste_mm"),
         ({"plate_tab_station_1_mm": 20.0}, "plate_tab_station_1_mm"),
         ({"plate_gap_mm": 36.0}, "plate_gap_mm"),
-        ({"slot_offset_mm": 0.3, "slot_width_mm": 5.3625}, "inside its band"),
+        ({"slot_offset_mm": 1.1, "slot_width_mm": 5.375}, "inside its band"),
         ({"slot_levels": 20, "slot_level_mm": 0.5334}, "slot_level_max_mm"),
-        ({"slot_projection_min_mm": 16.0}, "gripped on its flutes"),
+        ({"slot_projection_min_mm": 13.0}, "gripped on its flutes"),
         ({"packing_block_mm": 19.05}, "packing_top_mm"),
         ({"em_feed_per_min_mm": 250.0}, "em_feed_per_min_mm"),
     ],
@@ -194,8 +198,8 @@ def _seed(ctx: dict, key: str, pick, change) -> dict:
         # A slot pass run .3 mm off line, into the upper plate's outer arm.
         (
             "slots",
-            lambda line: line == "G1 X46.807 Y-5.925 F{feed}",
-            lambda line: "G1 X46.807 Y-5.625 F{feed}",
+            lambda line: line == "G1 X46.013 Y-5.131 F{feed}",
+            lambda line: "G1 X46.013 Y-4.831 F{feed}",
             "keep_out",
         ),
         # The slots' last level left .37 mm short of the drawn depth.

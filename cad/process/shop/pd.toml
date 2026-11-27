@@ -49,11 +49,6 @@ tool = "endmill-hss-2fl-1-4"
 material = "lathe-c360"
 sfm = 160
 feed = "tailstock quill by hand, slow, dry; back out to clear chips every .03"
-[settings.lathe-plunge-3-16-c360]
-tool = "endmill-hss-tin-2fl-3-16"
-material = "lathe-c360"
-sfm = 160
-feed = "tailstock quill by hand, slow, dry; back out to clear chips every .03"
 
 # --- Placeholder process plans' tools (quotes-2026-11-17-rev3.xlsx) ----------
 # The tools the placeholder plans name (cad/process/<stem>/plan.toml with
@@ -129,9 +124,6 @@ description = "Shop-made work arbor with two backing discs for cutting the MHA-P
 [tools.reamer-0615]  # MHA-PD-17 Ø.0615 +.0005/.0000 REAM; MHA-PD-22 Ø.0615 REAM (.163), no band
 description = ".0615 in HSS chucking reamer"
 diameter_mm = 1.5621
-[tools.endmill-hss-tin-2fl-3-16]  # MHA-PD-16 flat floor for the Ø.19 head counterbore, plunged from the tailstock
-description = "3/16 in TiN-coated HSS 2-flute square end mill, centre cutting (McMaster 8949A16)"
-diameter_mm = 4.7625
 
 # --- MHA-PD-24/-25 transgear bushings (cad/process/pd_transgear_*_bushing) --
 # The Ø.1260-.1265 running bores on the MHA-PD-23 pin, drilled #31 and reamed

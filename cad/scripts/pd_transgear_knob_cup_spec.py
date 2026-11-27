@@ -84,13 +84,13 @@ BORE_BAND = (0.0762, 0.0)  # analysis (upper, lower) deviations: +.003/0
 PILOT_CLEARANCE = (0.0127, 0.127)  # printed (least, greatest) diametral: .0005-.005
 PILOT_DEPTH = 3.8608  # .152 as turned (SUPPLY)
 # The web's #33 drill and the rear pocket the screw head sinks in, cut flat
-# with a 3/16 end mill after the drill.  The pocket only clears the head, so
-# its Ø prints .XX (rule 3; machinist review r10: ".188" carried a third
-# place with no band and no function); its depth keeps .XXX, which holds the
-# web at the .080 target.
+# with the same 1/4 end mill after the drill (#3741).  The pocket only clears
+# the head, so its Ø prints .XX (rule 3; machinist review r10: ".188" carried
+# a third place with no band and no function); its depth keeps .XXX, which
+# holds the web at the .080 target.
 CLEAR_HOLE_DIA = 2.8702  # #33, .113
-# Modelled on the printed .01 grid (the 3/16 cutter's .1875 lies in its band).
-CBORE_DIA = 4.826  # .19
+# Modelled on the printed .01 grid at the 1/4 end mill's .25.
+CBORE_DIA = 6.35  # .25
 CBORE_DEPTH = 2.7432  # .108
 
 # Places each printed dimension carries (drawing-guidelines.md rule 3): the

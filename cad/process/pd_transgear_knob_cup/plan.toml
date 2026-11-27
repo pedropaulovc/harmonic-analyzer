@@ -12,7 +12,7 @@
 # and its clearance on the journal the requirement, sheet note 2, rule 4,
 # form 2), part off .02 long. Setup 2, the cup turned
 # round on its outside over a shim wrap: face the rear to length from the
-# miked length, plunge the 3/16 end mill for the head pocket. Bench: deburr,
+# miked length, plunge the 1/4 end mill for the head pocket. Bench: deburr,
 # check, oil.
 # Left for MHA-PD-00 step 22 (sheet note 1: LENGTH AND PILOT DEPTH ARE SUPPLY
 # SIZES): the front face is faced at fit-up until the pilot depth is the
@@ -136,11 +136,6 @@ ref = "drill-b"
 id = "endmill-1-4"
 name = "1/4 two-flute end mill"
 ref = "endmill-hss-2fl-1-4"
-
-[[tools]]
-id = "endmill-3-16"
-name = "3/16 two-flute end mill"
-ref = "endmill-hss-tin-2fl-3-16"
 
 [[tools]]
 id = "cutoff"
@@ -302,13 +297,13 @@ feed = "hand"
 [[setups.operations]]
 cut_kind = "other"
 speed_kind = "spindle"
-tool = "endmill-3-16"
+tool = "endmill-1-4"
 drilling = "none"
 sizing = { kind = "band", band_mm = "{{cad.pocket_dia_band_mm}}" }
-instruction = "Chuck it again as Op 100. The head pocket: the 3/16 end mill in the tailstock drill chuck, short. Feed it until its end just touches the rear face and zero the quill scale there. Plunge slowly to {{cad.pocket_depth_in:.3dot}}, backing out to clear chips every .03, centred on the #33 hole: its square corner leaves the floor's R{{cad.pocket_corner_radius_max_mm:in.3dot}} MAX."
-diagram = { file = "diagrams/regrip-pocket.svg", alt = "To scale: the 3/16 end mill from the tailstock plunged {{cad.pocket_depth_in:.3dot}} into the rear face over the #33 hole: the head pocket." }
-settings = "lathe-plunge-3-16-c360"
-cut_diameter_mm = 4.7625
+instruction = "Chuck it again as Op 100. The head pocket: the 1/4 end mill in the tailstock drill chuck, short. Feed it until its end just touches the rear face and zero the quill scale there. Plunge slowly to {{cad.pocket_depth_in:.3dot}}, backing out to clear chips every .03, centred on the #33 hole: its square corner leaves the floor's R{{cad.pocket_corner_radius_max_mm:in.3dot}} MAX."
+diagram = { file = "diagrams/regrip-pocket.svg", alt = "To scale: the 1/4 end mill from the tailstock plunged {{cad.pocket_depth_in:.3dot}} into the rear face over the #33 hole: the head pocket." }
+settings = "lathe-plunge-1-4-c360"
+cut_diameter_mm = "{{process.pilot_cutter_dia_mm}}"
 inspection = "Pocket Ø{{cad.pocket_dia_min_in:.2dot}}–{{cad.pocket_dia_max_in:.2dot}}, calipers; depth {{cad.pocket_depth_min_in:.3dot}}–{{cad.pocket_depth_max_in:.3dot}} from the rear face, calipers' depth rod beside the #33 hole. The length, the pilot depth and the pocket depth inside their bands hold the drawing's {{cad.pocket_callout}}."
 gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.pocket_dia_band_mm}}" }, { gauge = "calipers", band_mm = "{{cad.pocket_depth_band_mm}}" }]
 
