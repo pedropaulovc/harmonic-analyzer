@@ -341,7 +341,8 @@ ASSEMBLY_STEPS = (
     "1H. AFTER THE CURE, CHECK THAT THE BONDED DOWEL DOES NOT TURN OR SLIDE BY "
     f"HAND AND STANDS AT THE DOWEL PROUD SET ON {DETAIL_TITLE}, SHEET 1 "
     "(CALIPER DEPTH ROD).",
-    # D54 item 4, Main 2026-11-27: a dowel that moves is not held, so it
+    # Delegated ruling 2026-11-27 (Main), no precedent; owner review #2144
+    # (D54 item 4): a dowel that moves is not held, so it
     # pulls out cold and is bonded again from 1B; a held dowel that stands
     # high is stoned down (the mount's slip hole clears the tip by
     # SLIP_DEPTH_CLEARANCE_MIN, 1.78 mm, at the printed maximum proud).  A
