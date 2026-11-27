@@ -4,8 +4,8 @@
 part's exported ``features.toml`` and the plan/shop TOML, then runs
 :func:`build` inside headless FreeCAD (``freecadcmd``) with that context and
 checks the posted G-code against :func:`expectations`. The block's sizes come
-from the feature export (its envelope, the rebate, its corner relief, the
-roof chamfers, the thumb hole and the two plate holes); the bar, the skims,
+from the feature export (its envelope, the rebate, its R.003 MAX roof-to-back
+corner, the roof chamfers, the thumb hole and the two plate holes); the bar, the skims,
 face levels, the rebate's aims and steps, the chamfer offset, spots, pecks,
 tap reaches and the holding from ``plan.toml`` ``[parameters]`` and
 ``milling_cuts``; cutter diameters, speeds and feeds from the shop
@@ -22,8 +22,8 @@ height Y, the sawn slice the depth Z. Lying on the stacked parallels: MS01
 skims the sawn back face, MS02 faces the mating face to the depth; MS03 skims
 the locating edge, MS04 faces the top to the height. Mating face up, gripped
 across the bar's as-bought 1-1/4 ends (the waste beyond both final ends):
-MS05_rebate mills the rebate with the 1/8 in end mill, MS05_relief plunge-mills
-its corner relief with the 1/16 in end mill, both stopping short of the bar's ends, so the
+MS05_rebate mills the rebate and its R.003 MAX roof-to-back corner directly
+with the square 1/8 in carbide end mill, stopping short of the bar's ends, so the
 roof is never squeezed by the jaws. Upright, gripped on the mating and back
 faces: MS06 faces the locating end and chamfers its roof corner, MS07 the
 far end to the length. Lying as for MS04 again, the locating edge down and
@@ -78,11 +78,7 @@ PROGRAMS: tuple[tuple[str, tuple[Any, ...]], ...] = (
     ("MS02_mating", ("mating_face",)),
     ("MS03_edge", ("locating_edge",)),
     ("MS04_height", ("top_face",)),
-    # The relief is its own file: the rebate is checked with the spindle
-    # stopped at its end, and the relief's cutter is to buy, so the relief
-    # may run on another day from a fresh zero.
     ("MS05_rebate", ("rebate",)),
-    ("MS05_relief", ("relief",)),
     ("MS06_locating_end", (("locating_end",), ("locating_chamfer",))),
     ("MS07_far_end", ("far_end",)),
     ("MS07b_far_chamfer", ("far_chamfer",)),
@@ -99,7 +95,6 @@ LOAD_FIRST_TOOL = tuple(name for name, _ops in PROGRAMS)
 CAM_TOOLS = (
     "em-half",
     "em-eighth",
-    "em-sixteenth",
     "chamfer",
     "spot",
     "drill-43",
@@ -134,8 +129,6 @@ SAFE_MM = 1.0
 CLEAR_MM = 5.0
 # Rapid re-entry into a pecked hole stops this far above the last peck.
 PECK_REENTRY_MM = 0.5
-# The relief cutter feeds down the cut rebate to this far above its floor.
-RELIEF_ENTRY_MM = 0.1
 # Keep-outs: each vise jaw's depth outward from the gripped face.
 JAW_DEPTH_MM = IN
 # A plan number the recipe recomputes must agree to this (its rounding).
@@ -398,8 +391,9 @@ def context(
         )
 
     # The rebate (model frame): open to the mating face, the roof over it,
-    # its back at the rebate width from the mating face, the relief a notch
-    # in its back beside the roof. Aims: each band's middle.
+    # its back at the rebate width from the mating face, its roof-to-back
+    # inside corner R.003 MAX cut directly by the square 1/8 in end mill.
+    # Aims: each band's middle.
     def mid(band: list[float]) -> float:
         return (band[0] + band[1]) / 2
 
@@ -409,11 +403,14 @@ def context(
     slot_height = mid(f["rebate_floor"]["rebate_height"])
     floor = ceiling - slot_height
     slot_depth = mid(f["rebate_back"]["rebate_width"])
-    relief_depth = mid(f["relief_back"]["relief_depth"])
+    corner_r_max = f["rebate_corner"]["corner_radius_max_design"]
+    if not 0.0 < corner_r_max <= 0.127 + 1e-9:
+        raise ValueError(
+            f"rebate_corner corner_radius_max_design {corner_r_max:g} is out of bounds"
+        )
     _agree(plan, "roof_aim_mm", height - ceiling)
     _agree(plan, "rebate_height_aim_mm", slot_height)
     _agree(plan, "rebate_depth_aim_mm", slot_depth)
-    _agree(plan, "relief_bottom_mm", slot_depth + relief_depth)
     back_wall = f["back_face"]["back_wall"]
     rebate_width = f["rebate_back"]["rebate_width"]
     _agree(plan, "thickness_min_mm", rebate_width[1] + back_wall[0])
@@ -425,9 +422,12 @@ def context(
         plan, "thickness_aim_mm", (p["thickness_min_mm"] + p["thickness_max_mm"]) / 2
     )
     aim = p["thickness_aim_mm"]
-    # The relief cutter's point above the stacks, on the thinnest block.
+    # The 1/8 in end mill's tip above the stacks at the rebate's back, on the
+    # thinnest accepted block.
     _agree(
-        plan, "relief_floor_height_mm", p["thickness_min_mm"] - p["relief_bottom_mm"]
+        plan,
+        "rebate_back_height_mm",
+        p["thickness_min_mm"] - p["rebate_depth_aim_mm"],
     )
     if not p["thickness_min_mm"] - 1e-6 <= depth <= p["thickness_max_mm"] + 1e-6:
         raise ValueError(f"the model's depth {depth:.3f} is outside the thickness band")
@@ -472,9 +472,8 @@ def context(
     # Cutters.
     em = _shop_tool(plan, shop, "em-half")["diameter_mm"]
     e8 = _shop_tool(plan, shop, "em-eighth")["diameter_mm"]
-    e16 = _shop_tool(plan, shop, "em-sixteenth")["diameter_mm"]
     d43 = _shop_tool(plan, shop, "drill-43")["diameter_mm"]
-    em_r, e8_r, e16_r = em / 2, e8 / 2, e16 / 2
+    em_r, e8_r = em / 2, e8 / 2
     for name in (
         "back face",
         "mating face",
@@ -486,21 +485,6 @@ def context(
         _close(_cut(plan, name, "cutter_dia_mm"), em, f"'{name}' cutter_dia_mm")
     for name in ("rebate", "rebate walls"):
         _close(_cut(plan, name, "cutter_dia_mm"), e8, f"'{name}' cutter_dia_mm")
-    _close(_cut(plan, "relief", "cutter_dia_mm"), e16, "'relief' cutter_dia_mm")
-    relief_height = f["relief_floor"]["relief_height"]
-    if not relief_height[0] <= e16 <= relief_height[1]:
-        raise ValueError(
-            f"the relief cutter Ø{e16} is outside the relief height band {relief_height}"
-        )
-    # Its flutes run from the tip to its 1/8 in shank, wider than the relief
-    # and the roof's gap beside it: they reach past the relief's bottom, so
-    # the shank stays above the mating face.
-    e16_flutes = _shop_tool(plan, shop, "em-sixteenth")["flute_length_mm"]
-    if e16_flutes < p["relief_bottom_mm"]:
-        raise ValueError(
-            f"the relief cutter's {e16_flutes} mm of flutes stop short of the "
-            f"relief's bottom {p['relief_bottom_mm']} mm below the mating face"
-        )
     if e8 >= slot_height:
         raise ValueError("the rebate cutter is not under the rebate height")
     woc = p["face_stepover_max_mm"]
@@ -553,7 +537,6 @@ def context(
     rebate_rpm, rebate_feed = _setting(plan, shop, "rebate")
     if _setting(plan, shop, "rebate walls") != (rebate_rpm, rebate_feed):
         raise ValueError("'rebate walls' runs at another setting than 'rebate'")
-    relief_rpm, relief_feed = _setting(plan, shop, "relief")
     rebate_levels = _levels(0.0, -slot_depth, p["rebate_step_mm"])
     _close(
         _cut(plan, "rebate", "axial_doc_mm"),
@@ -574,12 +557,6 @@ def context(
     )
     x_ceiling_pass = x_ceiling + e8_r
     x_floor_pass = x_floor - e8_r
-    # The plunges' X is posted on the 0.001 grid toward the roof (−X), so the
-    # cutter's edge reaches the ceiling rather than stopping short of it:
-    # rounded the other way, a skin under a thousandth joins the ridges along
-    # the whole relief (the 1/16 in cutter's ceiling + radius lands .0003
-    # under a grid step).
-    x_relief = math.floor(round((x_ceiling + e16_r) * 1000, 6)) / 1000
     rough, end = _slot(x_centre, slot_ys, rebate_levels, None)
     # Finish both walls full depth, each climbing (ball screws): the floor
     # wall running +Y, the ceiling wall -Y, from whichever end the rough
@@ -600,37 +577,12 @@ def context(
             f"G1 Y{near:.3f} F{{feed}}",
         ]
     rebate_lines = [f"G0 Z{CLEAR_MM:.3f}", *rough, *walls, f"G0 Z{CLEAR_MM:.3f}"]
-    # The relief is plunge-milled (owner ruling 2026-11-21, relayed by
-    # CncBlockA): the 1/16 in end mill plunges straight down past
-    # the rebate's back at stations no more than half its diameter apart, its
-    # load along its axis. Between two plunges a ridge stands on each side:
-    # its height (the scallop) is the cutter radius less the half-chord, and
-    # the relief's clear height between the ridges, √(D² − s²) for a cutter D
-    # at the step s, must stay in its band. The least cutter the traveler
-    # accepts is then hypot(band minimum, s), and the step is held to half
-    # of it too (s ≤ band minimum / √3), so any cutter it accepts plunges no
-    # more than half itself apart.
-    relief_bottom = -(slot_depth + relief_depth)
-    relief_span = abs(slot_ys[1] - slot_ys[0])
-    step_cap = min(e16 / 2, relief_height[0] / math.sqrt(3))
-    intervals = math.ceil(relief_span / step_cap - 1e-9)
-    plunge_step = relief_span / intervals
-    _agree(plan, "relief_plunge_step_mm", plunge_step)
-    scallop = e16_r - math.sqrt(e16_r**2 - (plunge_step / 2) ** 2)
-    _agree(plan, "relief_scallop_mm", scallop)
-    # The cutter band whose plunges leave the relief's clear height (between
-    # the ridges) in its band; the traveler mics the cutter against it.
-    cutter_min = math.hypot(relief_height[0], plunge_step)
-    _agree(plan, "relief_cutter_min_mm", cutter_min)
-    _agree(plan, "relief_cutter_max_mm", relief_height[1])
-    if e16 < cutter_min or plunge_step > cutter_min / 2 + 1e-9:
-        raise ValueError("the relief's plunge ridges leave it under its height band")
-    # Setup 6 gauges each 3-flute cutter by a test plunge in the waste end,
-    # read with the pins: the GO pin, at its least, is not under the least
+    # Setup 6 gauges the 3-flute 1/8 in cutter by a test plunge in the waste
+    # end, read with the pins: the GO pin, at its least, is not under the least
     # good cut and the NO-GO pin, at its most, not over the largest. The
     # 1/8 in cut's band is the rebate band less the two wall passes (the
-    # walls run at the nominal cutter's offsets); the 1/16 in cut's is the
-    # relief cutter band above. Each plunge feeds as its program plunges.
+    # walls run at the nominal cutter's offsets); the plunge feeds at the
+    # program's plunge feed.
     rebate_band = f["rebate_floor"]["rebate_height"]
     slot_cut = (
         rebate_band[0] - (slot_height - e8),
@@ -638,76 +590,41 @@ def context(
     )
     _agree(plan, "slot_cut_min_mm", slot_cut[0])
     _agree(plan, "slot_cut_max_mm", slot_cut[1])
-    for name, (lo, hi) in (
-        ("slot", slot_cut),
-        ("relief", (cutter_min, relief_height[1])),
-    ):
-        go = math.ceil(round((lo + PIN_MINUS_MM) / IN * 1000, 6)) / 1000
-        nogo = math.floor(round(hi / IN * 1000, 6)) / 1000
-        for key, value in (("go", go), ("nogo", nogo)):
-            stated = p[f"{name}_{key}_pin_in"]
-            if not math.isclose(stated, value, abs_tol=1e-6):
-                raise ValueError(
-                    f"process.{name}_{key}_pin_in {stated:g}, the recipe picks {value:.3f}"
-                )
-        if go >= nogo:
-            raise ValueError(f"no pin pair reads the {name} test cut's band")
+    go = math.ceil(round((slot_cut[0] + PIN_MINUS_MM) / IN * 1000, 6)) / 1000
+    nogo = math.floor(round(slot_cut[1] / IN * 1000, 6)) / 1000
+    for key, value in (("go", go), ("nogo", nogo)):
+        stated = p[f"slot_{key}_pin_in"]
+        if not math.isclose(stated, value, abs_tol=1e-6):
+            raise ValueError(
+                f"process.slot_{key}_pin_in {stated:g}, the recipe picks {value:.3f}"
+            )
+    if go >= nogo:
+        raise ValueError("no pin pair reads the slot test cut's band")
     _close(
         _cut(plan, "slot test plunge", "cutter_dia_mm"),
         e8,
         "'slot test plunge' cutter_dia_mm",
     )
-    _close(
-        _cut(plan, "relief test plunge", "cutter_dia_mm"),
-        e16,
-        "'relief test plunge' cutter_dia_mm",
-    )
     if _setting(plan, shop, "slot test plunge") != (rebate_rpm, rebate_feed):
         raise ValueError("'slot test plunge' runs at another setting than 'rebate'")
-    if _setting(plan, shop, "relief test plunge") != (relief_rpm, relief_feed):
-        raise ValueError("'relief test plunge' runs at another setting than 'relief'")
     _agree(plan, "slot_test_feed_mm_min", rebate_feed / 2)
-    _agree(plan, "relief_test_feed_mm_min", relief_feed)
-    # The test holes, at the largest cut the pins pass, all in the waste
-    # end the end facing removes (at test_y_mm from the fixed jaw's face, the
-    # retests as far from the moving jaw's), clear of the rebate and of each
-    # other by TEST_WALL_MM, so a pin cannot push a thin web aside.
+    # The test hole, at the largest cut the pins pass, sits in the waste end
+    # the end facing removes (at test_y_mm from the fixed jaw's face, the
+    # retest as far from the moving jaw's), clear of the rebate and of the
+    # slice's faces and final end by TEST_WALL_MM, so a pin cannot push a thin
+    # web aside.
     _agree(plan, "test_far_y_mm", bar_x - p["test_y_mm"])
-    holes = (
-        (p["slot_test_x_mm"], slot_cut[1] / 2),
-        (p["relief_test_x_mm"], relief_height[1] / 2),
-    )
+    test_x, test_r = p["slot_test_x_mm"], slot_cut[1] / 2
     y, wall = p["test_y_mm"], TEST_WALL_MM - 1e-9
-    for x, r in holes:
-        if not (
-            y - r >= wall
-            and trim - (y + r) >= wall
-            and x - r - x_floor >= wall
-            and height - (x + r) >= wall
-        ):
-            raise ValueError(
-                f"the test hole at X{x:g} is not {TEST_WALL_MM} mm inside the waste end"
-            )
-    (x1, r1), (x2, r2) = holes
-    if abs(x2 - x1) - r1 - r2 < wall:
-        raise ValueError(f"the test holes are not {TEST_WALL_MM} mm apart")
-    relief_ys = [
-        slot_ys[0] + k * (slot_ys[1] - slot_ys[0]) / intervals
-        for k in range(intervals + 1)
-    ]
-    entry = _r(-slot_depth + RELIEF_ENTRY_MM)
-    relief_lines = [
-        f"G0 Z{CLEAR_MM:.3f}",
-        f"G0 X{_r(x_relief):.3f} Y{_r(relief_ys[0]):.3f}",
-        f"G0 Z{SAFE_MM:.3f}",
-        f"G1 Z{entry:.3f} F{{feed}}",
-    ]
-    for k, y in enumerate(relief_ys):
-        if k:
-            relief_lines.append(f"G1 Y{_r(y):.3f} F{{feed}}")
-        relief_lines += [f"G1 Z{_r(relief_bottom):.3f} F{{feed}}", f"G0 Z{entry:.3f}"]
-    relief_lines.append(f"G0 Z{CLEAR_MM:.3f}")
-    relief_centres = [[_r(x_relief), _r(y)] for y in relief_ys]
+    if not (
+        y - test_r >= wall
+        and trim - (y + test_r) >= wall
+        and test_x - test_r - x_floor >= wall
+        and height - (test_x + test_r) >= wall
+    ):
+        raise ValueError(
+            f"the test hole at X{test_x:g} is not {TEST_WALL_MM} mm inside the waste end"
+        )
 
     # MS06/MS07, the ends, and MS06's roof chamfer: machine X = height - y (the
     # top face at X0), the faces along X, Y across [-depth, 0]; the chamfer
@@ -838,15 +755,6 @@ def context(
         "feed": rebate_feed,
         "plunge": rebate_feed / 2,
     }
-    e16_tool = {
-        "tool": "em-sixteenth",
-        "dia": e16,
-        "shape": "endmill",
-        "flutes": 3,
-        "rpm": relief_rpm,
-        "feed": relief_feed,
-        "plunge": relief_feed,
-    }
     # FreeCAD's chamfer bit has no tip angle; the posted lines are the
     # recipe's own, so the 90° chamfer mill is carried as a 90° pointed bit.
     chamfer_tool = {
@@ -951,12 +859,6 @@ def context(
             "frame": "rebate",
             "label": "rebate",
             "ops": [["rebate", "mill the rebate", rebate_lines]],
-        },
-        {
-            **e16_tool,
-            "frame": "rebate",
-            "label": "relief",
-            "ops": [["relief", "mill the corner relief", relief_lines]],
         },
         {
             **em_tool,
@@ -1116,18 +1018,6 @@ def context(
         (-bar_x, 0.0),
         -slot_depth,
     )
-    relief_side = _box(
-        "below the rebate back",
-        (x_ceiling + e16, height + JAW_DEPTH_MM),
-        (-bar_x, 0.0),
-        -slot_depth,
-    )
-    relief_back = _box(
-        "relief back",
-        (-JAW_DEPTH_MM, height + JAW_DEPTH_MM),
-        (-bar_x, 0.0),
-        -(slot_depth + relief_depth),
-    )
     # The rebate cleared at its back, across its height, at both final ends
     # and midway.
     stations = [-trim, -(trim + length / 2), -(trim + length)]
@@ -1229,37 +1119,6 @@ def context(
                 ],
             ],
         ),
-        "MS05_relief": (
-            0.0,
-            [t["em-sixteenth"]],
-            relief_bottom,
-            [
-                [
-                    # Every plunge station, no more than half the cutter apart
-                    # (the scallop bound above), each to the relief's back.
-                    [
-                        "holes",
-                        {"centres": relief_centres, "z_bottom": _r(relief_bottom)},
-                    ],
-                    ["rapids_clear", {"z_top": 0.0, "open_holes": relief_centres}],
-                    ["air_feed", {"z_top": 0.0}],
-                    [
-                        "keep_out",
-                        {
-                            "radius": e16_r,
-                            "boxes": [
-                                *rebate_jaws,
-                                roof,
-                                floor_box,
-                                *tabs,
-                                relief_side,
-                                relief_back,
-                            ],
-                        },
-                    ],
-                ],
-            ],
-        ),
         "MS06_locating_end": (
             bar_x,
             [t["em-half"], t["chamfer"]],
@@ -1330,7 +1189,7 @@ def context(
             ],
             [name, "air_feed", {"z_top": top}],
         ]
-    speeds = {face_rpm, rebate_rpm, relief_rpm, chamfer_rpm, spot_rpm, d43_rpm}
+    speeds = {face_rpm, rebate_rpm, chamfer_rpm, spot_rpm, d43_rpm}
     if speeds != {2800.0}:
         raise ValueError(
             f"every setting runs at 2800 rpm in the programs' checks, not {sorted(speeds)}"
@@ -1431,7 +1290,7 @@ def as_machined(ctx: dict[str, Any], inputs: Any) -> dict[str, Any]:
         return f[name]["plane"]["value"]
 
     length, height, depth = plane("far_end"), plane("top_face"), plane("back_face")
-    ceiling, floor = plane("rebate_ceiling"), plane("rebate_floor")
+    floor = plane("rebate_floor")
     shift = p["thickness_aim_mm"] - depth  # MS02's aim past the model's depth
     thickness_aim = {
         "band_mm": [p["thickness_min_mm"], p["thickness_max_mm"]],
@@ -1481,13 +1340,6 @@ def as_machined(ctx: dict[str, Any], inputs: Any) -> dict[str, Any]:
                 "cad_mm": f["rebate_floor"]["rebate_height_nominal"],
                 "aim_mm": p["rebate_height_aim_mm"],
             },
-        },
-        {
-            "name": "relief plunge ridges",
-            "kind": "left",
-            "within": [[0.0, length], [plane("relief_floor"), ceiling], [plane("rebate_back"), plane("relief_back")]],
-            "reason": "MS05_relief plunge-mills the relief (owner ruling 2026-11-21): a ridge of relief_scallop_mm stands between plunges",
-            "max_mm": p["relief_scallop_mm"],
         },
     ]
     return {

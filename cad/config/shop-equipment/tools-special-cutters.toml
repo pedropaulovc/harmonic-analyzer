@@ -28,17 +28,6 @@ status = "to_order"
 note = "Not owned: to buy. Owner direction 2026-11-26 (#3740): replaces the 1/32 in Harvey Tool 896231 (16x higher D^4 bending stiffness) after widening MHA-PD-03's slits from .04 to .08 in. Variable Helix End Mills for Aluminum Alloys - Square - Downcut: 3 left-hand spiral, right-hand cut flutes, centre cutting, uncoated; the family page states it prevents lifting of the workpiece and performs in brass. Cuts the MHA-PD-03 platen clips and bow-former laminations out of .032 brass strip (PC01_sheet) and the MHA-DT-03-TL-02 phasing comb out of .020 brass sheet (CB01_outline), both bonded on painter's tape and CA glue: its .0620 fits the clip's .08 slits and both sheets' R.040 MAX inside corners, and a downcut pushes the narrow fingers and arms onto the tape instead of lifting them."
 flutes = 3
 
-[tools.endmill-carbide-3fl-1-16-loc-1-2]
-kind = "end_mill"
-make = "Accupro"
-sku = "35497056"
-source = "https://www.mscdirect.com/product/details/35497056"
-purchase = "One MSC 35497056 (Accupro, Mfr 14981778), $34.97 (read live 2026-11-24, #3568)"
-status = "to_order"
-flutes = 3
-oal_in = 2.5
-note = "Not owned: to buy; in the MSC cart (the owner chose the plain cutters, #3568; the pick: delegated ruling 2026-11-24 (Main), no precedent; owner review #2144). Square end mill, 1/16 in (.0625) × 1/2 in length of cut × 2-1/2 in overall, 3 flutes, solid carbide, uncoated, 30° helix, centre cutting, 1/8 shank, no neck (\"Extended Reach: No\"). MHA-MS-02 rebate corner relief .05 ±.01 deep × .06 ±.01 high beside the roof, .385 below the mating face inside the .134 rebate, plunge-milled: no owned cutter is .07 or under and reaches it; its .500 of flutes reach past the .385, so its 1/8 shank never enters. MHA-PD-17's pin-hole flat is plunged with it too."
-
 [tools.knurl-straight-25tpi]
 make = "Form Roll"
 sku = "30-931-225"

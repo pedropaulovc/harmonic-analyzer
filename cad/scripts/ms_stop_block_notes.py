@@ -10,8 +10,9 @@ from __future__ import annotations
 
 import _config
 
-# Rule 4: the rebate is one feature with two tight bands, so both carry only
-# SEE NOTE 1 and the one numbered note names the stick that slides in it.
+# Rule 4: the rebate is one feature with two tight size bands and a tight
+# roof-to-back corner limit (R.003 MAX), so all three carry SEE NOTE 1 and the
+# one numbered note names the stick that slides in it.
 REBATE_NOTE_NUMBER = 1
 REBATE_NOTE = f"{REBATE_NOTE_NUMBER}. SLIDING FIT ON {_config.parts('ms-stick')['number']} MEASURING STICK"
 DRAWING_NOTES = REBATE_NOTE

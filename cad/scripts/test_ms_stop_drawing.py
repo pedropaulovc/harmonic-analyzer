@@ -23,7 +23,8 @@ import _mcmaster_90114a124 as screw
 from _drawing_registry import DRAWINGS_BY_NAME
 from _hole_spec import DRILL_POINT_H
 from _inch_wall_limits import WALL_FLOOR_MM, WALL_TARGET_MM
-from _printed_tolerance import inside_corner_radius_mm, printed_band_mm
+from _printed_tolerance import printed_band_mm
+from _single_limit_tolerance import set_single_limit
 
 
 def _inch(value_in: float) -> float:
@@ -38,7 +39,7 @@ def test_shared_frame_and_open_rebate_closure() -> None:
         (spec.BLOCK_LENGTH, 0.84), (spec.BLOCK_HEIGHT, 0.56), (spec.BLOCK_DEPTH, 0.48),
         (spec.PLATE_THICKNESS, 0.040), (spec.WINDOW_WIDTH, 0.330), (spec.WINDOW_HEIGHT, 0.134),
         (spec.ROOF_THICKNESS, 0.09), (spec.ROOF_END_CHAMFER, 0.04), (spec.BACK_WALL_THICKNESS, 0.15),
-        (spec.RELIEF_DEPTH, 0.05), (spec.RELIEF_HEIGHT, 0.06),
+        (spec.REBATE_CORNER_R_MAX, 0.003),
     ):
         assert got == pytest.approx(_inch(inch), rel=0.0, abs=1e-9)
     assert (spec.PLATE_Z_MIN, spec.PLATE_Z_MAX) == (-spec.PLATE_THICKNESS, 0.0)
@@ -197,7 +198,7 @@ def test_analytic_volume_has_no_merged_thumbscrew_or_hidden_extra_wall() -> None
     assert spec.BLOCK_CHAMFER_VOLUME == spec.ROOF_END_CHAMFER**2 * spec.BLOCK_DEPTH
     assert spec.THUMB_HOLE_VOLUME == pytest.approx(math.pi * (spec.THUMB_TAP_DRILL / 2.0)**2 * spec.FLOOR_THICKNESS)
     assert spec.BLOCK_FINISHED_VOLUME == pytest.approx(
-        spec.BLOCK_VOLUME - spec.WINDOW_VOLUME - spec.RELIEF_VOLUME - spec.BLOCK_CHAMFER_VOLUME
+        spec.BLOCK_VOLUME - spec.WINDOW_VOLUME + spec.REBATE_CORNER_VOLUME - spec.BLOCK_CHAMFER_VOLUME
         - spec.THUMB_HOLE_VOLUME - spec.PLATE_TAP_VOLUME)
     assert spec.PLATE_FINISHED_VOLUME == pytest.approx(
         spec.PLATE_VOLUME - spec.PLATE_CHAMFER_VOLUME - spec.PLATE_HOLE_VOLUME)
@@ -219,9 +220,9 @@ def test_each_sheet_imports_the_complete_model_contract(builder, drawing, dimens
     if hasattr(drawing, "BOTTOM_KEEP"):
         keeps |= set(drawing.BOTTOM_KEEP)
     assert marked == keeps == set(precision) == set(values)
-    # .XXX for the rebate, the matched pair's stations and cover thickness;
-    # whole-degree angles.
-    three = ({"WindowWidth", "WindowHeight", *spec.PLATE_LOCATION_DIMENSIONS}
+    # .XXX for the rebate, its R.003 MAX corner, the matched pair's stations
+    # and cover thickness; whole-degree angles.
+    three = ({"WindowWidth", "WindowHeight", "RebateCornerR", *spec.PLATE_LOCATION_DIMENSIONS}
              if builder is block
              else {"PlateThickness", *spec.PLATE_LOCATION_DIMENSIONS})
     assert {name: places for name, places in precision.items() if places != 2} == {
@@ -272,6 +273,8 @@ class _StopView:
         self.rotation_readback = rotation_readback
         self.angle_puts = []
         self._angle = 0.0
+        self._tangent_edges = 1
+        self.geometry_updates = 0
 
     @property
     def Angle(self):  # noqa: N802 - COM property name
@@ -282,6 +285,15 @@ class _StopView:
         self.angle_puts.append(value)
         # Refusal is a recorded put whose authoritative readback stays wrong.
         self._angle = value if self.rotation_readback is None else self.rotation_readback
+
+    def SetDisplayTangentEdges2(self, value):  # noqa: N802 - COM member name
+        self._tangent_edges = int(value)
+
+    def GetDisplayTangentEdges2(self):  # noqa: N802 - COM member name
+        return self._tangent_edges
+
+    def UpdateViewDisplayGeometry(self):  # noqa: N802 - COM member name
+        self.geometry_updates += 1
 
     @property
     def ModelToViewTransform(self):  # noqa: N802 - COM property name
@@ -387,6 +399,7 @@ def test_build_projects_metre_hole_mouths_into_the_native_callout_view(
     if drawing is block_drawing:
         monkeypatch.setattr(drawing, "_remove_general_thread_class", lambda *a, **kw: None)
         monkeypatch.setattr(drawing, "_assert_reference_dimensions", lambda *a: None)
+        monkeypatch.setattr(drawing, "_dress_rebate_corner_radius", lambda *a: None)
     else:
         monkeypatch.setattr(drawing, "_append_callout_lines", lambda *a: None)
         monkeypatch.setattr(drawing, "_style_plate_chamfer", lambda *a: None)
@@ -424,7 +437,12 @@ def test_build_projects_metre_hole_mouths_into_the_native_callout_view(
     bands = native_contracts[0].get("bands") or {}
     if drawing is block_drawing:
         assert not set(bands) & (spec.PLATE_LOCATION_DIMENSIONS | spec.BLOCK_REFERENCE_DIMENSIONS)
-        assert bands == {name: spec.WINDOW_SIZE_TOLERANCE_MM for name in ("WindowWidth", "WindowHeight")}
+        assert bands == {
+            **{name: spec.WINDOW_SIZE_TOLERANCE_MM for name in ("WindowWidth", "WindowHeight")},
+            "RebateCornerR": (-spec.REBATE_CORNER_R_MAX, 0.0),
+        }
+        assert views["*Back"].GetDisplayTangentEdges2() == 0
+        assert views["*Back"].geometry_updates >= 1
     else:
         # The plate carries no native band: its thickness takes the title block.
         assert bands == {}
@@ -653,21 +671,23 @@ def test_match_drill_callouts_identify_the_current_mate_registry_rows() -> None:
 def test_stock_precision_and_worst_case_walls_use_each_printed_band() -> None:
     assert spec.BLOCK_PRINTED_BANDS_MM == {
         name: printed_band_mm(spec.BLOCK_DRAWING_PRECISION_BY_NAME[name], unit="in")
-        for name in ("BlockLength", "BlockHeight", "RoofThickness", "BackWall", "ReliefDepth")
+        for name in ("BlockLength", "BlockHeight", "RoofThickness", "BackWall")
     }
     assert spec.PLATE_PRINTED_BANDS_MM == {
         name: printed_band_mm(spec.PLATE_DRAWING_PRECISION_BY_NAME[name], unit="in")
         for name in ("PlateLength", "PlateHeight")
     }
     assert spec.BLOCK_PRINTED_BANDS_MM == dict.fromkeys(
-        ("BlockLength", "BlockHeight", "RoofThickness", "BackWall", "ReliefDepth"),
+        ("BlockLength", "BlockHeight", "RoofThickness", "BackWall"),
         pytest.approx(_inch(0.01)),
     )
-    # The corner relief's .040 minimum depth clears the title block's R.040
-    # MAX corner, and the back wall behind it keeps the .080 target.
-    assert spec.RELIEF_DEPTH - spec.BLOCK_PRINTED_BANDS_MM["ReliefDepth"] == pytest.approx(
-        inside_corner_radius_mm(unit="in"))
-    assert spec.RELIEF_BACK_WALL_MIN == pytest.approx(WALL_TARGET_MM)
+    # R.003 MAX clears the tightest half-clearance (.005 in) of the stick in the
+    # .330 +.010/0 rebate without needing a relief notch in the back wall.
+    half_side_clearance_min = (
+        spec.WINDOW_WIDTH + spec.WINDOW_SIZE_TOLERANCE_MM[0]
+        - (stick.BODY_WIDTH + stick.BODY_FIT_TOLERANCE_MM)
+    ) / 2.0
+    assert spec.REBATE_CORNER_R_MAX < half_side_clearance_min
     assert spec.PLATE_PRINTED_BANDS_MM == dict.fromkeys(("PlateLength", "PlateHeight"), pytest.approx(_inch(0.01)))
     assert spec.WINDOW_FLOOR_MIN == pytest.approx(
         spec.BLOCK_HEIGHT - spec.BLOCK_PRINTED_BANDS_MM["BlockHeight"]
@@ -803,23 +823,66 @@ def test_rebate_profile_refuses_unapplied_back_wall_construction_flag(monkeypatc
     assert all(d.kind != "horizontal_distance" or d.first != "line5.start" for d in adapter.dimensions)
 
 
-def test_relief_profile_notches_the_back_wall_under_the_roof(monkeypatch) -> None:
-    adapter = _window_reference_seat(monkeypatch)
-    dims = sketch.SketchDims()
-    stop_geom.relief_profile(adapter, dims)
-    back = spec.WINDOW_Z_MAX + spec.RELIEF_DEPTH
-    low = spec.WINDOW_Y_MAX - spec.RELIEF_HEIGHT
-    assert adapter.planes == ["Right"]
-    assert list(adapter.lines.values()) == [
-        ((-spec.WINDOW_Z_MAX, spec.WINDOW_Y_MAX), (-back, spec.WINDOW_Y_MAX)),
-        ((-back, spec.WINDOW_Y_MAX), (-back, low)),
-        ((-back, low), (-spec.WINDOW_Z_MAX, low)),
-        ((-spec.WINDOW_Z_MAX, low), (-spec.WINDOW_Z_MAX, spec.WINDOW_Y_MAX)),
-    ]
-    assert [name for name, _ in dims._rows] == [
-        "ReliefDepth", "ReliefHeight", "ReliefWindowStation", "ReliefRoofStation",
-    ]
-    assert spec.BLOCK_DRAWING_DIMENSIONS["ReliefProfile"] == {"ReliefDepth", "ReliefHeight"}
+def test_rebate_corner_radius_single_limit_and_sheet_dressing(monkeypatch) -> None:
+    class FakeTol:
+        def __init__(self):
+            self.Type = 0
+            self._min = 0.0
+            self._max = 0.0
+
+        def SetValues(self, lo, hi):  # noqa: N802
+            self._min, self._max = lo, hi
+            return True
+
+        def GetMinValue(self):  # noqa: N802
+            return self._min
+
+        def GetMaxValue(self):  # noqa: N802
+            return self._max
+
+    dim = SimpleNamespace(
+        SystemValue=spec.REBATE_CORNER_R_MAX / 1000.0,
+        Tolerance=FakeTol(),
+        IsReference=lambda: False,
+    )
+    monkeypatch.setattr(
+        "_single_limit_tolerance._named_dimension",
+        lambda _a, feat, name: (
+            assert_eq := (feat, name) == ("RebateCorner", "RebateCornerR"),
+            dim if assert_eq else (_ for _ in ()).throw(AssertionError((feat, name))),
+        ),
+    )
+    set_single_limit(
+        object(),
+        "RebateCorner",
+        "RebateCornerR",
+        limit=spec.REBATE_CORNER_R_MAX,
+        band=spec.REBATE_CORNER_R_BAND,
+        tol_type=spec.REBATE_CORNER_R_TOL_TYPE,
+    )
+    assert dim.Tolerance.Type == 6
+    assert (dim.Tolerance.GetMinValue(), dim.Tolerance.GetMaxValue()) == pytest.approx(
+        (-spec.REBATE_CORNER_R_MAX / 1000.0, 0.0)
+    )
+    display = SimpleNamespace(
+        Diametric=False,
+        Type2=5,
+        ShowParenthesis=False,
+        ArcExtensionLineOrOppositeSide=True,
+        ArrowSide=0,
+        SolidLeader=True,
+        GetDimension2=lambda idx: dim if idx == 0 else None,
+        GetText=lambda _idx: "",
+    )
+    ann = SimpleNamespace(name="RebateCornerR", GetSpecificAnnotation=lambda: display)
+    monkeypatch.setattr(block_drawing, "dimension_name", lambda _a, item: item.name)
+    block_drawing._dress_rebate_corner_radius(object(), [ann])
+    assert not display.ArcExtensionLineOrOppositeSide
+    assert display.ArrowSide == 1
+    assert not display.SolidLeader
+    display.ShowParenthesis = True
+    with pytest.raises(RuntimeError, match="imported as a reference"):
+        block_drawing._dress_rebate_corner_radius(object(), [ann])
 
 
 def test_roof_reference_lies_on_the_lip_face_not_through_the_lip(monkeypatch) -> None:
@@ -849,8 +912,8 @@ def test_block_chamfer_keeps_its_routine_band_inside_the_roof() -> None:
 def test_tight_bands_name_their_mates_and_no_wall_states_a_shortfall() -> None:
     stick_number = _config.parts("ms-stick")["number"]
     callouts = block_drawing.DIMENSION_CALLOUTS
-    # Rule 4: the rebate's two tight bands link one numbered note naming the stick.
-    for name in ("WindowWidth", "WindowHeight"):
+    # Rule 4: the rebate's two tight bands and R.003 MAX corner link one numbered note naming the stick.
+    for name in ("WindowWidth", "WindowHeight", "RebateCornerR"):
         assert callouts[name] == block_drawing.REBATE_NOTE_LINK
     assert block_drawing.REBATE_NOTE.startswith(f"{block_drawing.REBATE_NOTE_NUMBER}. ")
     assert block_drawing.REBATE_NOTE.endswith(f"{stick_number} MEASURING STICK")

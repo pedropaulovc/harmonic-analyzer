@@ -42,13 +42,11 @@
 # Ø.043 oil hole match-drilled with MHA-PD-10 (17).
 #
 # Not on hand (to order): the .0615 chucking reamer
-# (cad/config/shop-equipment/tools-reamers-taps.toml reamer-0615), the
+# (cad/config/shop-equipment/tools-reamers-taps.toml reamer-0615) and the
 # sharp-nose lathe tool for the spigot's R.004 MAX root
-# (tools-special-cutters.toml lathe-tool-sharp-nose) and the plain 1/16
-# end mill with 1/2 in of flutes, MSC 35497056, bought for MHA-MS-02 too
-# (endmill-carbide-3fl-1-16-loc-1-2; the owner chose the plain cutters,
-# #3568; the pick: delegated ruling 2026-11-24 (Main), no precedent; owner
-# review #2144).
+# (tools-special-cutters.toml lathe-tool-sharp-nose). The 1/16 carbide end
+# mill is on hand: Kyocera 1800.0625.200, .200 in of flutes, 4 flutes, 1/8 in
+# shank, 1-1/2 in OAL (tools-cutting.toml endmill-kyocera-1800-1-16, #3739).
 # The bore's GO, the Class ZZ .3135 plus pin (gauges.toml zz-pins-3135-3140,
 # MSC 88931357), is on the buy list for MHA-DT-14 too.
 #
@@ -85,19 +83,19 @@
 # where a ream's sizing or gauge needs one.
 #
 # Tool audit 2026-11-23 (row endmill-carbide-3-64): the flat is plunged with
-# a 1/16 end mill (centre cutting) instead of a 3/64: since #3568 the plain
-# MSC 35497056, .0625 (the first-named long-reach one was .0620). Its .0625
-# pocket on the ream's axis is .0005 over the .0615-.0620 band's top
-# (.00025 a side), over the pocket's own depth only: 0.20 mm at its outer
-# edge to 1.64 mm at its inner on the largest O.D. (1.57 on the nominal),
-# above the ream's mouth at Z pin_flat_bottom_mm (4.2557). The installed
-# dowel bottoms on the stop: its outer end sits at Z 3.874 nominal (ream_tip
-# -4.064 + 7.9375) and at most 4.2545 (stop_shallow -3.937 + the longest
-# pin, 8.1915, pd_vn_transgear_hub_key_pin_spec LENGTH_LIMITS_MM), under the
-# flat's floor, so the pocket never touches the pin; the ream and the press
-# fit are unchanged. Accepted: delegated ruling 2026-11-26 (Main), no
-# precedent; owner review #2144 (rulings.md D40). Its outer edge meets the
-# O.D. lower, so the flat goes one peck deeper.
+# a 1/16 end mill (centre cutting) instead of a 3/64: the owned Kyocera
+# 1800.0625.200, .0625 with .200 of flutes (#3739, replacing MSC 35497056; the
+# first-named long-reach one was .0620). Its .0625 pocket on the ream's axis is
+# .0005 over the .0615-.0620 band's top (.00025 a side), over the pocket's own
+# depth only: 0.20 mm at its outer edge to 1.64 mm at its inner on the largest
+# O.D. (1.57 on the nominal), above the ream's mouth at Z pin_flat_bottom_mm
+# (4.2557). The installed dowel bottoms on the stop: its outer end sits at Z
+# 3.874 nominal (ream_tip -4.064 + 7.9375) and at most 4.2545 (stop_shallow
+# -3.937 + the longest pin, 8.1915, pd_vn_transgear_hub_key_pin_spec
+# LENGTH_LIMITS_MM), under the flat's floor, so the pocket never touches the
+# pin; the ream and the press fit are unchanged. Accepted: delegated ruling
+# 2026-11-26 (Main), no precedent; owner review #2144 (rulings.md D40). Its
+# outer edge meets the O.D. lower, so the flat goes one peck deeper.
 #
 # NC (cad/process/pd_transgear_disc_hub/cam.py): CM01_flange_holes,
 # CM02_pin_hole, CM03_pin_ream. Program names, the [parameters] and the
@@ -120,7 +118,7 @@ standing = true
 [[notes]]
 title = "This job"
 rows = [
-  ["To order", "To order (not on hand): the .0615 reamer, the pin-gauge set and .3135 GO pin, the sharp-nose lathe tool and the 1/16 carbide end mill (MSC 35497056)."],
+  ["To order", "To order (not on hand): the .0615 reamer, the pin-gauge set and .3135 GO pin, and the sharp-nose lathe tool."],
   ["Gauge", "The MHA-PD-VN-69 dowel tries the chord ream."],
 ]
 
@@ -238,11 +236,14 @@ pin_jaw_top_mm = 12.6873
 pin_flange_top_mm = 13.335
 # The 1/16 end mill plunges a flat 0.2 mm under the O.D. at its outer edge
 # (the chord meets the O.D. 40° off square: a drill would walk), in pecks;
-# its reach (.500 of flutes up to its 1/8 shank, no neck) takes it past the
-# O.D. under its shank (cam.py checks both).
+# its reach (.200 of flutes up to its 1/8 shank, no neck) takes it past the
+# O.D. under its shank, and .60–.80 out of the 1/8 in collet clears the
+# flange while leaving .70–.90 of its 1-1/2 in OAL gripped (cam.py checks all).
 pin_flat_bottom_mm = 4.2557
 pin_flat_peck_mm = 0.4
 endmill_reach_min_in = 0.1
+endmill_out_min_in = 0.6
+endmill_out_max_in = 0.8
 # The #56 knockout through, its full diameter 0.3 mm past the O.D. at the
 # hole's inner edge, the point then 0.5 mm over the parallel; the #53 to
 # the stop at its full diameter; the reamer's end at the stop (its bevel
@@ -257,8 +258,8 @@ pilot_tip_mm = -4.518
 ream_tip_mm = -4.064
 peck_56_mm = 1.0
 peck_53_mm = 1.2
-# Every CM02/CM03 tool at least this far out of the chuck: the deepest tip
-# below the flange's top plus 5 mm (cam.py checks it).
+# Every chucked CM02/CM03 drill and reamer at least this far out of the chuck:
+# the deepest tip below the flange's top plus 5 mm (cam.py checks it).
 pin_tool_out_min_in = 1.0
 # Speeds and feeds: the shop settings (cad/process/shop/pd.toml, the
 # MHA-PD-22 and MHA-PD-17 blocks, sourced there): the spot and the drills
@@ -313,9 +314,8 @@ ref = "drill-51"
 
 [[tools]]
 id = "endmill"
-name = "1/16 carbide end mill, 1/2 in of flutes, centre cutting: MSC 35497056"
-ref = "endmill-carbide-3fl-1-16-loc-1-2"
-status = "to_order"
+name = "1/16 carbide end mill, .200 in of flutes, centre cutting: Kyocera 1800.0625.200"
+ref = "endmill-kyocera-1800-1-16"
 
 [[tools]]
 id = "drill-56"
@@ -648,8 +648,8 @@ instruction_detailed = "Edge finder (900 rpm, its tip over .28 long) at Y-3.810,
 feed = "hand"
 
 [[setups.operations]]
-instruction = "G54 Z0: the hub's axis, the end mill's tip on a .002 feeler leaf on the body's top line at X0 Y−3.810, set to half D plus the leaf."
-instruction_detailed = "Console M6 T3 (1/16 end mill), at least {{process.pin_tool_out_min_in:.2dot}} out of the chuck. MDI G0 X0 Y-3.810. Spindle stopped, its tip just dragging a .002 leaf on the body's top line: G10 L20 P1 Z(D, the miked diameter from Holding, in mm, halved, + 0.051). Example only: D = .5400 gives Z6.909."
+instruction = "G54 Z0: the hub's axis, the 1/16 end mill ({{process.endmill_out_min_in:.2dot}}–{{process.endmill_out_max_in:.2dot}} out of the 1/8 in collet; seat its .800 plastic stop ring on the collet face if fitted, and sight the tip's end gash to centre before loading) on a .002 feeler leaf on the body's top line at X0 Y−3.810, set to half D plus the leaf."
+instruction_detailed = "Sight the 1/16 end mill's tip to confirm its end-cutting gash reaches centre, then console M6 T3 (1/16 end mill in the 1/8 in collet, {{process.endmill_out_min_in:.2dot}}–{{process.endmill_out_max_in:.2dot}} out; if its .800 plastic stop ring is fitted, seat the ring on the collet face). MDI G0 X0 Y-3.810. Spindle stopped, its tip just dragging a .002 leaf on the body's top line: G10 L20 P1 Z(D, the miked diameter from Holding, in mm, halved, + 0.051). Example only: D = .5400 gives Z6.909."
 feed = "hand"
 
 [[setups.operations]]
@@ -657,10 +657,10 @@ speed_kind = "spindle"
 tool = "endmill"
 drilling = "none"
 sizing = "other"
-instruction = "Run CM02_pin_hole (M6 T3, 1/16 end mill, its reach at least {{process.endmill_reach_min_in:.2dot}}: MSC 35497056's flutes run .500; set 2800): plunge a flat at the hole in {{process.pin_flat_peck_mm:.1f}} mm pecks to Z{{process.pin_flat_bottom_mm:.3f}}, so the #56 starts square on the sloping O.D."
+instruction = "Run CM02_pin_hole (M6 T3, 1/16 end mill in the 1/8 in collet, its reach at least {{process.endmill_reach_min_in:.2dot}}: Kyocera 1800.0625.200's flutes run .200; set 2800): plunge a flat at the hole in {{process.pin_flat_peck_mm:.1f}} mm pecks to Z{{process.pin_flat_bottom_mm:.3f}}, so the #56 starts square on the sloping O.D."
 settings = "pd-hub-plunge-1-16-c360"
 milling_cuts = [
-  { name = "pin flat", kind = "plunge", phase = "rough", cutter_dia_mm = 1.5875, flutes = 3, rpm = 2800, feed_mm_min = "{{process.plunge_feed_per_min_mm}}", stations_mm = ["{{cad.pin_ream_chord_mm}}"] },
+  { name = "pin flat", kind = "plunge", phase = "rough", cutter_dia_mm = 1.5875, flutes = 4, rpm = 2800, feed_mm_min = "{{process.plunge_feed_per_min_mm}}", stations_mm = ["{{cad.pin_ream_chord_mm}}"] },
 ]
 
 [[setups.operations]]

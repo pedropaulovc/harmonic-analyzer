@@ -12,9 +12,9 @@ drills', the end mill's and the reamer's diameters and the speeds from the
 shop (``shop/``). Every path is written here (``rt.custom``): straight lines
 a recipe can state exactly. Typed here, because no record carries them: the
 #2 centre drill's catalogue geometry (it sets the spot depth), the twist
-drills' 118° point, the 1/16 end mill's 1/8 in shank (MSC 35497056's
-listing, #3568), the approach, safe and clearance heights and the vise
-jaws' depth (keep-out shapes only).
+drills' 118° point, the 1/16 end mill's 1/8 in shank and 1-1/2 in OAL
+(Kyocera 1800.0625.200, #3739), the approach, safe and clearance heights and
+the vise jaws' depth (keep-out shapes only).
 
 Route (plan text in ``plan.toml``): the hub is turned, faced and its bore
 reamed on the lathe (no NC). Setup 3 stands it upright, the flange's front
@@ -67,8 +67,11 @@ CENTRE_DRILL = {
 }
 # Jobber drills' point (the shop records give the diameter only).
 DRILL_POINT_DEG = 118.0
-# The 1/16 end mill's shank (MSC 35497056, read 2026-11-24, #3568: 1/8 in).
+# The 1/16 end mill's shank and OAL (Kyocera 1800.0625.200, read 2026-11-26,
+# #3739: 1/8 in shank, 1.500 in OAL, standard stop ring at 0.800 in from tip).
 ENDMILL_SHANK_MM = IN / 8
+ENDMILL_OAL_MM = 1.5 * IN
+ENDMILL_GRIP_MIN_MM = 0.7 * IN
 # The flat's floor this far under the O.D. at the end mill's outer edge.
 FLAT_UNDER_MM = 0.2
 # Plunges and drill R planes start this far above the stock top: real G0
@@ -633,6 +636,20 @@ def context(
         )
     flange_y = (-(0.0 - g["front"]), -(g["flange_front"] - g["front"]))
     pin_clear = max(flange_r, pin_jaw_top) + CLEAR_MM
+    out_min = p["endmill_out_min_in"] * IN
+    out_max = p["endmill_out_max_in"] * IN
+    if out_min > out_max + 1e-9:
+        raise ValueError(
+            "process.endmill_out_min_in exceeds process.endmill_out_max_in"
+        )
+    if out_min < pin_clear - flat:
+        raise ValueError(
+            "process.endmill_out_min_in: the 1/8 in collet reaches the flange's top"
+        )
+    if ENDMILL_OAL_MM - out_max < ENDMILL_GRIP_MIN_MM - 1e-9:
+        raise ValueError(
+            "process.endmill_out_max_in: leaves under .70 in in the 1/8 in collet"
+        )
     deepest = min(knockout_tip, pilot_tip, stop)
     if p["pin_tool_out_min_in"] * IN < pin_clear - deepest:
         raise ValueError(
