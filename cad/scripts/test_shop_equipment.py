@@ -115,11 +115,11 @@ def _verify_pm30mv_spindle_envelope(machines: dict, repo_root) -> list[str]:
         raise ValueError("spindle_nose_od_in must be positive and smaller than quill_collar_od_in")
     if not (
         0.0
-        < mill["spindle_below_quill_ring_in"]
+        < mill["spindle_wrench_flat_shoulder_below_quill_ring_in"]
         < mill["spindle_below_head_housing_in"]
     ):
         raise ValueError(
-            "spindle_below_quill_ring_in must be positive and smaller than spindle_below_head_housing_in"
+            "spindle_wrench_flat_shoulder_below_quill_ring_in must be positive and smaller than spindle_below_head_housing_in"
         )
 
     cited_paths: list[str] = []
@@ -160,7 +160,7 @@ def test_pm30mv_spindle_envelope_rejects_inverted_bounds_or_missing_photo(
     valid_mill = {
         "spindle_nose_od_in": 1.736,
         "quill_collar_od_in": 4.2415,
-        "spindle_below_quill_ring_in": 0.551,
+        "spindle_wrench_flat_shoulder_below_quill_ring_in": 0.551,
         "spindle_below_head_housing_in": 1.9995,
         "cite": [
             " ".join(
@@ -175,9 +175,15 @@ def test_pm30mv_spindle_envelope_rejects_inverted_bounds_or_missing_photo(
         _verify_pm30mv_spindle_envelope(
             {"pm-30mv": valid_mill | {"spindle_nose_od_in": 5.0}}, tmp_path
         )
-    with pytest.raises(ValueError, match="spindle_below_quill_ring_in"):
+    with pytest.raises(
+        ValueError, match="spindle_wrench_flat_shoulder_below_quill_ring_in"
+    ):
         _verify_pm30mv_spindle_envelope(
-            {"pm-30mv": valid_mill | {"spindle_below_quill_ring_in": 2.5}}, tmp_path
+            {
+                "pm-30mv": valid_mill
+                | {"spindle_wrench_flat_shoulder_below_quill_ring_in": 2.5}
+            },
+            tmp_path,
         )
     (photo.parent / "pm30mv-d.jpg").unlink()
     with pytest.raises(FileNotFoundError, match="pm30mv-d.jpg"):

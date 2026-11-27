@@ -3965,6 +3965,11 @@ def _check_recipe_spec(pytest_cmd: list[str]) -> dict[str, Any]:
     captured_fixtures = sorted(
         str(path.resolve()) for path in (SCRIPTS_DIR / "fixtures").glob("*.json")
     )
+    # test_shop_equipment checks cited shop-evidence photos on disk at runtime.
+    shop_evidence_files = sorted(
+        str(path.resolve())
+        for path in (REPO_ROOT / "research" / "shop-evidence").rglob("*.jpg")
+    )
     recipe_test_deps = sorted(
         {
             # Pytest discovers shared fixtures outside the import closure.
@@ -4055,6 +4060,7 @@ def _check_recipe_spec(pytest_cmd: list[str]) -> dict[str, Any]:
                 for family in ("checks", "necessity")
                 for path in sorted((REPO_ROOT / "cad" / "config" / family).glob("*.yaml"))
             ),
+            *shop_evidence_files,
             *captured_fixtures,
         }
     )
@@ -4114,6 +4120,9 @@ def _check_recipe_spec(pytest_cmd: list[str]) -> dict[str, Any]:
                     ],
                     "recipe_captured_fixtures": [
                         _rel_tag(path) for path in captured_fixtures
+                    ],
+                    "recipe_shop_evidence": [
+                        _rel_tag(path) for path in shop_evidence_files
                     ],
                 }
             )

@@ -31,12 +31,17 @@
 # Spindle nose and quill collar clearance envelope (quill retracted), measured
 # with digital calipers by the owner (Pedro) on 2026-11-26 while checking
 # upright counterbore clearance beside tall lugs (MHA-CH-07):
-# - R8 steel spindle nose cylinder OD: 1.7360 in (44.094 mm), projecting
-#   0.5510 in (13.995 mm) below the recessed quill bearing-retainer ring;
+# - R8 steel spindle nose cylinder OD: 1.7360 in (44.094 mm);
+# - recessed quill bearing-retainer ring down to the horizontal step shoulder
+#   at the top of the R8 spindle nose's milled wrench flat (taken with the
+#   caliper's rear/end step-measurement faces, fixed end on the bearing ring
+#   and slider step shelf on the right-hand wrench-flat shoulder above the
+#   lower wrench-flat section; owner confirmed step-face usage 2026-11-26):
+#   0.5510 in (13.995 mm);
 # - white cast quill clamp collar OD: 4.2415 in (107.734 mm; the front
 #   depth-scale bracket boss stands proud of this round);
-# - main sheet-metal head housing underside to R8 spindle nose bottom face:
-#   1.9995 in (50.787 mm).
+# - main sheet-metal head housing underside to R8 spindle nose bottom face
+#   (caliper step faces): 1.9995 in (50.787 mm).
 # Photos: research/shop-evidence/2026-11-26/pm30mv-*.jpg. prechips has no
 # spindle-nose or quill-collar geometry fields.
 [machines.pm-30mv]
@@ -47,12 +52,12 @@ spindle_speed_steps = 26
 spindle_rest_observed_rpm = [[1511, 1515], [1837, 1841], [1947, 1953], [2269, 2282], [2373, 2387], [2477, 2488], [2582, 2601], [2692, 2692], [2787, 2800]]
 spindle_display_over_heard_rpm = [3, 8]
 spindle_nose_od_in = 1.7360
-spindle_below_quill_ring_in = 0.5510
+spindle_wrench_flat_shoulder_below_quill_ring_in = 0.5510
 quill_collar_od_in = 4.2415
 spindle_below_head_housing_in = 1.9995
 cite = [
   "Owner (Pedro) 2026-11-24, \"check D:\\HarmonicAnalyzer videos for actual speeds; 28.45\"; videos DJI_20261122173617_0018_D (v5) and DJI_20261122181554_0019_D (v6), https://github.com/pedropaulovc/harmonic-analyzer/issues/3439#issuecomment-7120803633 ; cad/process/dechatter/*-results.json",
-  "Owner (Pedro) 2026-11-26 caliper photos research/shop-evidence/2026-11-26/pm30mv-spindle-nose-od.jpg (1.7360 in), research/shop-evidence/2026-11-26/pm30mv-spindle-below-collar.jpg (0.5510 in), research/shop-evidence/2026-11-26/pm30mv-quill-collar-od.jpg (4.2415 in), and research/shop-evidence/2026-11-26/pm30mv-spindle-below-head.jpg (1.9995 in)",
+  "Owner (Pedro) 2026-11-26 caliper photos research/shop-evidence/2026-11-26/pm30mv-spindle-nose-od.jpg (1.7360 in OD), research/shop-evidence/2026-11-26/pm30mv-spindle-below-collar.jpg (0.5510 in step-face reading from recessed bearing-retainer ring to top shoulder of spindle wrench flat; step-face usage confirmed by owner 2026-11-26), research/shop-evidence/2026-11-26/pm30mv-quill-collar-od.jpg (4.2415 in OD), and research/shop-evidence/2026-11-26/pm30mv-spindle-below-head.jpg (1.9995 in step-face reading from head housing underside to spindle nose bottom face)",
 ]
 note = "Ownership, discrete spindle-speed stops (#3439), and measured spindle-nose / quill-collar clearance envelope (2026-11-26); capacity and travel stay in cad/process/shop/common.toml, same key. Explicit on_hand preserves the pre-split ASSEMBLY.md OWNED, which read a shop.toml record with no present key as owned."
 
