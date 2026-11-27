@@ -399,8 +399,10 @@ How a bundle gets its stamp depends on where it came from:
   checkout's geometry inputs. It cannot see what the STEP was built from and
   says so per part (`TRUSTING the STEP`). Use it only on a STEP built from this
   checkout's geometry inputs: a farm run of this commit, or of one whose
-  `--check` findings would be empty. Exit 1 means there is no STEP or
-  inventory, or the bundle does not validate; nothing is written.
+  `--check` findings would be empty. It refuses (exit 2, unchanged) a bundle
+  whose `features.toml` already binds that very STEP to other geometry inputs.
+  Exit 1 means a part has no STEP or inventory, or does not bind or validate;
+  that part is not written.
 
 Only exit 0
 from both profiles and a printed PDF is success. Exit 2 from either profile is

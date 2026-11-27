@@ -263,6 +263,45 @@ def test_trust_step_stamps_a_bundle_restored_from_a_farm_run(
     assert (
         manifest.read_bytes() == published[0].read_bytes() + _stamp(UNDECLARED).encode()
     )
+    stamped = manifest.read_bytes()
+    capsys.readouterr()
+    # The checkout's geometry moves on: the manifest binds this very STEP to
+    # other geometry inputs, so the STEP is provably stale and left as it is.
+    monkeypatch.setattr(
+        _features_provenance,
+        "geometry_inputs",
+        lambda selected: {f"cad/scripts/build_{selected}.py": "d2"},
+    )
+    assert fetch_features.main(["--trust-step", UNDECLARED, "--out", str(out)]) == 2
+    err = capsys.readouterr().err
+    assert "binds this STEP to other geometry inputs" in err
+    assert "TRUSTING" not in err
+    assert manifest.read_bytes() == stamped
+    # A STEP restored over it with an inventory that is not its own: refused.
+    original = step.read_bytes()
+    step.write_bytes(original + b"/* drift */")
+    assert fetch_features.main(["--trust-step", UNDECLARED, "--out", str(out)]) == 1
+    assert manifest.read_bytes() == stamped
+    step.write_bytes(original)
+    # A manifest that no longer binds the STEP says nothing about it: trusted.
+    manifest.write_text(
+        manifest.read_text(encoding="utf-8").replace(
+            tomllib.loads(stamped.decode())["step_sha256"], "0" * 64
+        ),
+        encoding="utf-8",
+    )
+    assert fetch_features.main(["--trust-step", UNDECLARED, "--out", str(out)]) == 0
+    assert manifest.read_text(encoding="utf-8").endswith(
+        f'"cad/scripts/build_{UNDECLARED}.py" = "d2"\n'
+    )
+    # No inventory beside the STEP: named as such, not written.
+    inventory_path(step).unlink()
+    restamped = manifest.read_bytes()
+    capsys.readouterr()
+    assert fetch_features.main(["--trust-step", UNDECLARED, "--out", str(out)]) == 1
+    err = capsys.readouterr().err
+    assert f"{UNDECLARED}: no face inventory for ['{step.name}']" in err
+    assert manifest.read_bytes() == restamped
     # Nothing restored: refused, nothing written.
     assert fetch_features.main(["--trust-step", DECLARED, "--out", str(out)]) == 1
     assert not (out / "features" / DECLARED).exists()

@@ -49,11 +49,15 @@ geometry inputs, so the bundle it binds is refused).
 STEPs and ``.faces.json`` inventories copied from a farm run's
 ``out/features/<stem>/``, or a bundle bound before #3668): it binds
 ``features.toml`` from this checkout's declarations and records this
-checkout's geometry inputs, refusing nothing. It cannot see what geometry the
-STEP was built from, so it warns for each part: use it only for a STEP built
+checkout's geometry inputs. It cannot see what geometry a restored STEP was
+built from, so it warns for each part it stamps: use it only for a STEP built
 from this checkout's geometry inputs (a farm run of this commit, or of one
-whose ``--check`` findings would be empty). A release asset needs no such
-step: fetching it stamps it, or reports it STALE.
+whose ``--check`` findings would be empty). The one thing it can see, it
+refuses: a ``features.toml`` already binding that very STEP to other geometry
+inputs (exit 2, left as it is). Each part is written alone once its scratch
+copy validates; a part with no STEP or inventory, or that does not bind or
+validate, exits 1 and is not written. A release asset needs no such step:
+fetching it stamps it, or reports it STALE.
 
 With the bundle in place, the part's traveler and NC programs run seat-free
 without doit (whose ``prechips:<stem>``/``cam:<stem>`` tasks would first try to
@@ -177,13 +181,13 @@ def rebind(stem: str, out: Path) -> None:
     checkout's geometry inputs (the caller has found them unchanged since the
     release's commit)."""
     _manifest, step = export_features.bundle_paths(stem, out)
-    missing = [
-        path.name
-        for path in export_features.exported_steps(stem, out)
-        if not inventory_path(path).is_file()
-    ]
+    steps = export_features.exported_steps(stem, out)
+    absent = [path.name for path in steps if not path.is_file()]
+    if absent:
+        raise FetchError(f"no STEP {absent}")
+    missing = [path.name for path in steps if not inventory_path(path).is_file()]
     if missing:
-        raise FetchError(f"{stem}: the release carries no face inventory for {missing}")
+        raise FetchError(f"no face inventory for {missing}")
     export_features.write_manifest(stem, step, revision=_config.release_revision())
     _features_provenance.stamp(stem, out)
 
@@ -396,29 +400,57 @@ def _rebind_staged(stem: str, out: Path) -> None:
         partial.replace(manifest)
 
 
+def _bound_to_other_geometry(stem: str, out: Path) -> list[str]:
+    """What proves ``stem``'s STEP under ``out`` was built from other geometry:
+    its ``features.toml`` binds that very STEP and records geometry inputs that
+    differ from this checkout's. Empty for no manifest, an unstamped one, or a
+    STEP replaced since the manifest was bound."""
+    manifest = export_features.bundle_paths(stem, out)[0]
+    if not manifest.is_file():
+        return []
+    try:
+        check_binding(stem, out)
+    except FetchError:
+        return []
+    recorded = tomllib.loads(manifest.read_text(encoding="utf-8")).get(
+        _features_provenance.TABLE
+    )
+    if not isinstance(recorded, dict):
+        return []
+    return _features_provenance.features_current(stem, out)
+
+
 def trust_step(stems: list[str], out: Path) -> int:
     """``--trust-step``: bind and stamp each hand-restored bundle under ``out``
-    as this checkout's, warning that its STEP is trusted, not checked. 1 if
-    any bundle has no STEP or inventory or does not validate."""
-    failed = 0
+    as this checkout's, warning that its STEP is trusted, not checked. Each
+    part is written alone, once its scratch copy validates. 2 if any bundle
+    already binds its STEP to other geometry inputs (left as it is), else 1
+    if any has no STEP or inventory or does not bind or validate."""
+    stale = failed = 0
     for stem in stems:
-        _telemetry.warn(
-            f"fetch-features: {stem}: TRUSTING the STEP under {out / 'features' / stem}: "
-            "stamping this checkout's geometry inputs without checking the STEP was "
-            "built from them; a STEP from other geometry gives wrong travelers and NC",
-            stem=stem,
-        )
+        findings = _bound_to_other_geometry(stem, out)
+        if findings:
+            stale += 1
+            _telemetry.warn(
+                f"fetch-features: STALE {stem} ({out / 'features' / stem}): its "
+                "features.toml binds this STEP to other geometry inputs; not trusted\n"
+                + "\n".join(f"  {finding}" for finding in findings),
+                stem=stem,
+            )
+            continue
         try:
             _rebind_staged(stem, out)
-        except (FetchError, FeaturesBoundError, OSError) as exc:
+        except (FetchError, FeaturesBoundError, FeatureFaceError, OSError) as exc:
             failed += 1
             _telemetry.error(f"fetch-features: {stem}: {exc}", stem=stem)
             continue
-        _telemetry.info(
-            f"fetch-features: {stem}: features.toml bound and stamped for this checkout",
+        _telemetry.warn(
+            f"fetch-features: {stem}: TRUSTING the STEP under {out / 'features' / stem}: "
+            "stamped this checkout's geometry inputs without checking the STEP was "
+            "built from them; a STEP from other geometry gives wrong travelers and NC",
             stem=stem,
         )
-    return 1 if failed else 0
+    return 2 if stale else 1 if failed else 0
 
 
 if __name__ == "__main__":
