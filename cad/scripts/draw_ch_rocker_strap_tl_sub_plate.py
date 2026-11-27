@@ -64,8 +64,8 @@ from _printed_limits import limits
 from _section_axis import position_section_caption
 from _session import run_build
 
-# Learn-mode machinist review: findings are recorded, the build does not fail.
-MACHINIST_REVIEW = MachinistReviewMode.LEARN
+# Cached machinist review leaf: a FIX or ERROR verdict fails the build.
+MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 
 SPEC = DRAWINGS_BY_NAME["ch_rocker_strap_tl_sub_plate"]
 PART_STEM = SPEC.artifact_stem

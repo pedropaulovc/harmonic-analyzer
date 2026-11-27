@@ -58,7 +58,7 @@ def test_registry_row_is_inch_shop_tooling_with_a_learn_sheet() -> None:
     assert entry.layout is DrawingLayout.LANDSCAPE
     assert entry.source_kind == "part"
     assert entry.script == Path(drawing.__file__).resolve()
-    assert drawing.MACHINIST_REVIEW is MachinistReviewMode.LEARN
+    assert drawing.MACHINIST_REVIEW is MachinistReviewMode.ENFORCE
     assert "draw_ch_rocker_strap_tl_hub_plug.py" in PRECISION_MIGRATED_DRAWINGS
     assert bg.is_shop_fixture(STEM)
     for machine in bg.MACHINE_ASSEMBLIES:

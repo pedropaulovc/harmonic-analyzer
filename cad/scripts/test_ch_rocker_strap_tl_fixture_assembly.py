@@ -118,7 +118,7 @@ def test_stack_stays_inside_the_strap_programs_hub_keep_out(plan: dict) -> None:
 
 
 def test_sheet_words_cite_real_items() -> None:
-    assert mode_for_drawing(Path(drawing.__file__)) is MachinistReviewMode.LEARN
+    assert mode_for_drawing(Path(drawing.__file__)) is MachinistReviewMode.ENFORCE
     for row in spec.SCREW_TABLE_ROWS:
         assert len(row) == len(spec.SCREW_TABLE_HEADER)
         assert row[0] in spec.BOM_ITEMS.values()

@@ -57,7 +57,8 @@ from _paths import CAD_ROOT
 from _printed_limits import drilled_limits, limits
 from _session import run_build
 
-MACHINIST_REVIEW = MachinistReviewMode.LEARN
+# Cached machinist review leaf: a FIX or ERROR verdict fails the build.
+MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 
 SPEC = DRAWINGS_BY_NAME["ch_rocker_strap_tl_hub_plug"]
 PART_STEM = SPEC.artifact_stem

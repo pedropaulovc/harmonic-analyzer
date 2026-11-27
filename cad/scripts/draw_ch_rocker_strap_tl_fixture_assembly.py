@@ -60,8 +60,8 @@ from _transgear_zone_line import require_placed, sketch_lines
 from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.solidworks.drawing import add_note, place_view
 
-# Cached machinist review leaf: findings are recorded, never fail the build.
-MACHINIST_REVIEW = MachinistReviewMode.LEARN
+# Cached machinist review leaf: a FIX or ERROR verdict fails the build.
+MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 SPEC = DRAWINGS_BY_NAME["ch_rocker_strap_tl_fixture_assembly"]
 ARTIFACT_STEM = SPEC.artifact_stem
 SOURCE = SPEC.source

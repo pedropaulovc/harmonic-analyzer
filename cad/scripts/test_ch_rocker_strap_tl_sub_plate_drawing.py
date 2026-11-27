@@ -49,7 +49,7 @@ def test_registry_row_is_inch_shop_tooling_on_a_landscape_learn_sheet() -> None:
     assert entry.artifact_stem == spec.PART_NAME == part.PART_NAME
     assert entry.layout is DrawingLayout.LANDSCAPE
     assert entry.source_kind == "part"
-    assert drawing.MACHINIST_REVIEW is MachinistReviewMode.LEARN
+    assert drawing.MACHINIST_REVIEW is MachinistReviewMode.ENFORCE
     assert bg.is_shop_fixture(STEM)
     assert STEM in bg.references_of("ch_rocker_strap_tl_fixture")
     for machine in bg.MACHINE_ASSEMBLIES:
