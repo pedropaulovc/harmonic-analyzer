@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 400" width="760" height="400" font-family="sans-serif" font-size="13">
+  <!-- To scale, 300 px/in, from above (the cross-slide at the bottom): the Ø.500 x .60 brass piece (bush_dia_in, bush_length_in) in the 3-jaw on .50 (bush_grip_in), .10 out of the jaw fronts; the jaws drawn .50 long, schematic (their sizes are not on record), the chuck's body behind them schematic, its bore open behind the piece. The nick at jaw 1 filed on the rim. The #31 drill to scale (Ø.1200 = 36 px), its 118 deg point, its full diameter drawn .05 past the piece's back end, into the chuck's bore. Drawn short to a break line (its length out of the chuck is not on record). The centre drill's spot is not drawn. -->
+  <rect class="paper" x="0" y="0" width="760" height="400"/>
+  <text class="title" x="20" y="22">Setup 1, Op 30: the #31 drill from the tailstock right through the piece, pecking (to scale, 300 px/in)</text>
+  <rect class="fixture-vise" x="234" y="70" width="56" height="260"/>
+  <rect class="part-kept" x="290" y="125" width="180" height="150"/>
+  <rect class="clamp" x="290" y="91" width="150" height="34"/>
+  <rect class="clamp" x="290" y="275" width="150" height="34"/>
+  <path class="datum" d="M464 126L470.5 126L470.5 132Z"/>
+  <line class="centre-line" x1="20" y1="200" x2="740" y2="200"/>
+  <path class="cutter" d="M740 182L275 182L264.18 200L275 218L740 218L737 210.8L740 203.6L737 196.4L740 189.2Z"/>
+  <line class="arrow" x1="720" y1="166" x2="660" y2="166"/>
+  <text class="label" x="470" y="330">#31 drill right through, pecking,</text>
+  <text class="label" x="470" y="346">drawn clear each time to shed its chips</text>
+  <line class="leader" x1="520" y1="318" x2="580" y2="218"/>
+  <circle class="leader-dot" cx="580" cy="218" r="2"/>
+</svg>

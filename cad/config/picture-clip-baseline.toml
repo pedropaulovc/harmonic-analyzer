@@ -45,12 +45,6 @@ findings = [
   "LEADER | Plan from above, 4 px/mm: the slug's journal in the 3-jaw over a brass shim, the spigot and the stub 1.10 out; the AR tool facing the parted stub end flat to the centre. | brass shim, the centre-drilled end in",
 ]
 
-[plans.dt_pinion_cam_pin]
-findings = [
-  "LEADER | The blank turned round, end B out: faced to length, then crowned by the ball turner swept about its pivot on the axis. | Z0",
-  "LEADER | The trial offcut in the 3-jaw over the shim wrap, its end faced; the ball turner's pivot on the axis one radius behind the faced end, its bit swept from the apex toward you. | Z0",
-]
-
 [plans.dt_pinion_lift_rod]
 findings = [
   "LEADER | The rod turned round, the far end out: faced to length, then crowned by the ball turner swept about its pivot on the axis. | Z0",

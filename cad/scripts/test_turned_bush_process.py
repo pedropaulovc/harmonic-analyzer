@@ -50,10 +50,13 @@ def _plan(stem: str) -> dict:
 
 
 def _drills(plan: dict) -> list[str]:
+    """The part's drills: a split bush's hole is the holder's, not the part's
+    (test_lathe_split_bush_process holds it)."""
     tools = {tool["id"]: tool for tool in plan["tools"]}
     return [
         tools[op["tool"]]["ref"]
         for setup in plan["setups"]
+        if not setup["title"].startswith("Split bush")
         for op in setup.get("operations", ())
         if op.get("drilling") == "twist_drill"
     ]
@@ -150,7 +153,9 @@ def test_every_bar_is_a_stock_record_of_its_diameter(stem: str) -> None:
     bars = {
         value
         for key, value in plan["parameters"].items()
-        if key.startswith("stock_dia") and key.endswith("_in")
+        if (key.startswith("stock_dia") and key.endswith("_in"))
+        # A split bush's brass bar (test_lathe_split_bush_process).
+        or key == "bush_dia_in"
     }
     recorded = {STOCK[ref]["dia_in"][0] for ref in plan["stock_refs"]}
     for ref in plan["stock_refs"]:

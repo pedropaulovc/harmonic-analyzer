@@ -1,3 +1,44 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<!-- The trial offcut, its end faced and swept with the ball turner to set the radius. Shell: prechips.turned_shaft_diagrams; styles: prechips.palette. -->
-<svg xmlns="http://www.w3.org/2000/svg" data-cad-template="turned-shaft" data-hold="blank" data-out="far" data-work="face dome" data-wrap="shim" data-piece="offcut" data-dome-tool="ball-turner"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 400" width="760" height="400" font-family="sans-serif" font-size="13">
+  <!-- To scale, 300 px/in, from above (the cross-slide at the bottom): the split bush Ø.500 x .60 in the 3-jaw on .50, .10 proud of the jaw fronts, its nick at jaw 1; the trial offcut (process.trial_offcut_in) .40 out of the bush's face, about .02 faced off, then swept to R.125. The ball turner seen from above: its pivot on the axis one radius (.125, 37.5 px) behind the apex, the bit from the pivot to the crown, drawn at the end of its sweep; the frame and holder are not drawn (schematic, sizes not on record). The jaws, the chuck's body and the AR tool schematic. Hatched: the face's stock and the crown's corners. -->
+  <rect class="paper" x="0" y="0" width="760" height="400"/>
+  <text class="title" x="20" y="22">Setup 4, Op 90: the trial offcut in the split bush: faced, then swept with the ball turner (to scale, 300 px/in)</text>
+  <rect class="fixture-vise" x="234" y="70" width="56" height="260"/>
+  <rect class="clamp" x="290" y="125" width="180" height="150"/>
+  <rect class="clamp" x="290" y="91" width="150" height="34"/>
+  <rect class="clamp" x="290" y="275" width="150" height="34"/>
+  <path class="datum" d="M464 126L470.5 126L470.5 132Z"/>
+  <line class="centre-line" x1="20" y1="200" x2="740" y2="200"/>
+  <path class="part-kept" d="M470 176.56L581.77 176.56A37.5 37.5 0 0 1 590 200A37.5 37.5 0 0 1 581.77 223.44L470 223.44Z"/>
+  <path class="part-removed" d="M581.77 176.56L590 176.56L590 200A37.5 37.5 0 0 0 581.77 176.56Z"/>
+  <path class="part-removed" d="M581.77 223.44L590 223.44L590 200A37.5 37.5 0 0 1 581.77 223.44Z"/>
+  <rect class="part-removed" x="590" y="176.56" width="6" height="46.88"/>
+  <line class="hidden" x1="470" y1="176.56" x2="296" y2="176.56"/>
+  <line class="hidden" x1="470" y1="223.44" x2="296" y2="223.44"/>
+  <line class="hidden" x1="296" y1="176.56" x2="296" y2="223.44"/>
+  <path class="cutter" d="M554.07 198.06L583.22 221.66L580.07 225.54L550.93 201.94Z"/>
+  <circle class="cutter" cx="552.5" cy="200" r="3.5"/>
+  <path class="arrow" fill="none" d="M600 200A47.5 47.5 0 0 1 589.41 229.89"/>
+  <path class="cutter" d="M610 220L640 232L640 340L632 337L624 340L616 340L616 244Z"/>
+  <line class="datum" x1="590" y1="70" x2="590" y2="120"/>
+  <text class="datum-label" x="584" y="82" text-anchor="end">Z0 the faced end (the apex)</text>
+  <line class="dims" x1="470" y1="160" x2="590" y2="160"/>
+  <line class="dims" x1="470" y1="152" x2="470" y2="168"/>
+  <line class="dims" x1="590" y1="152" x2="590" y2="168"/>
+  <text class="label" x="598" y="164" text-anchor="start">{{process.end_stickout_in:.2dot}} out</text>
+  <text class="label" x="300" y="330">ball turner, from above: R{{cad.dome_far_form_radius_in:.3dot}} about a pivot</text>
+  <text class="label" x="300" y="346">on the axis, swept 0–{{cad.dome_far_form_sweep_deg:.0f}}° from the apex</text>
+  <line class="leader" x1="450" y1="318" x2="575.64" y2="219.6"/>
+  <circle class="leader-dot" cx="575.64" cy="219.6" r="2"/>
+  <text class="label" x="605" y="368" text-anchor="end">AR tool: face the offcut's end square, about .02 off</text>
+  <line class="leader" x1="609" y1="362" x2="626" y2="335"/>
+  <circle class="leader-dot" cx="626" cy="335" r="2"/>
+  <text class="label" x="20" y="384">inside the bush (dashed), clear of the jaws' faces</text>
+  <line class="leader" x1="160" y1="372" x2="326" y2="223.44"/>
+  <circle class="leader-dot" cx="326" cy="223.44" r="2"/>
+  <text class="label" x="14" y="40">the split bush in the</text>
+  <text class="label" x="14" y="56">3-jaw on {{process.bush_grip_in:.2dot}}, its nick</text>
+  <text class="label" x="14" y="72">at jaw 1: the jaws</text>
+  <text class="label" x="14" y="88">never touch the offcut</text>
+  <line class="leader" x1="170" y1="52" x2="410" y2="143"/>
+  <circle class="leader-dot" cx="410" cy="143" r="2"/>
+</svg>

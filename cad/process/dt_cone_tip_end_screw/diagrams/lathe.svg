@@ -1,17 +1,17 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 460" width="760" height="460" font-family="sans-serif" font-size="13">
-  <!-- Hand picture, a section through the screw's axis from above (the cross-slide at the bottom), to scale at 300 px/in: the bought 1/4-28 x 3/4 fillister screw (91794A559): the head Ø.414 x .237 (cad.head_dia_ref_in, cad.head_length_mm), the 1/4 shank .75 long (cad.envelope_y_mm less the head), its threaded end .40 (process.stickout_in) out of the jaws' front step. The 6 in 4-jaw's jaws and body are schematic (their sizes and the step's depth are not on record); the brass shim's thickness is not on record: drawn 2 px. The #52 drill (cad.end_hole_dia_mm 1.6129, 19.05 px) with its 118° point; the quill zeroed with the lips on the Ø.04 spot's rim (Op 20) and run 0.125 (process.drill_depth_mm), so its full diameter stands 0.118 deep and its point 0.137: inside the band .11–.13. The drill runs on to a break line (its length is not on record). The No. 1 centre drill's spot (Op 20) is under the drill and is not drawn. -->
+  <!-- Hand picture, a section through the screw's axis from above (the cross-slide at the bottom), to scale at 300 px/in: the bought 1/4-28 x 3/4 fillister screw (91794A559): the head Ø.414 x .237 (cad.head_dia_ref_in, cad.head_length_mm), the 1/4 shank .75 long (cad.envelope_y_mm less the head), its threaded end .40 (process.stickout_in) out of the split bush's face. The bush Ø.500 x .30 (bush_dia_in, bush_length_in), bored E, in section on the crests, its face at the jaw fronts; the head .05 behind it. The 6 in 4-jaw's jaws and body are schematic (their sizes and the step's depth are not on record). The #52 drill (cad.end_hole_dia_mm 1.6129, 19.05 px) with its 118° point; the quill zeroed with the lips on the Ø.04 spot's rim (Op 60) and run 0.125 (process.drill_depth_mm), so its full diameter stands 0.118 deep and its point 0.137: drawn there. -->
   <rect class="paper" x="0" y="0" width="760" height="460"/>
-  <text class="title" x="20" y="22">Setup 1, Op 30: the #52 drill from the tailstock, .118 deep at full diameter (to scale, 300 px/in)</text>
-  <path class="clamp" d="M400 259.6L400 355L133.9 355L133.9 310L346 310L346 259.6Z"/>
-  <path class="clamp" d="M400 180.4L400 85L133.9 85L133.9 130L346 130L346 180.4Z"/>
+  <text class="title" x="20" y="22">Setup 2, Op 70: the #52 drill from the tailstock, .118 deep at full diameter (to scale, 300 px/in)</text>
+  <path class="clamp" d="M400 145L400 85L133.9 85L133.9 130L310 130L310 145Z"/>
+  <path class="clamp" d="M400 295L400 355L133.9 355L133.9 310L310 310L310 295Z"/>
   <rect class="fixture-vise" x="73.9" y="64" width="60" height="312"/>
+  <line class="centre-line" x1="80" y1="220" x2="750" y2="220"/>
+  <rect class="clamp" x="310" y="145" width="90" height="37.35"/>
+  <rect class="clamp" x="310" y="257.65" width="90" height="37.35"/>
   <rect class="part-kept" x="223.9" y="157.9" width="71.1" height="124.2"/>
   <rect class="part-threads" x="295" y="182.5" width="225" height="75"/>
-  <rect class="fixture-support" x="346" y="180.4" width="54" height="79.2"/>
-  <rect class="part-threads" x="346" y="182.5" width="54" height="75"/>
   <rect class="holes" x="484.62" y="210.47" width="35.38" height="19.05"/>
   <path class="cutter" d="M740 210.47L484.62 210.47L478.89 220L484.62 229.53L740 229.53L737 220Z"/>
-  <line class="centre-line" x1="80" y1="220" x2="750" y2="220"/>
   <line class="arrow" x1="700" y1="190" x2="640" y2="190"/>
   <line class="datum" x1="520" y1="70" x2="520" y2="120"/>
   <text class="datum-label" x="514" y="82" text-anchor="end">end face as bought: quill scale zero</text>
@@ -20,16 +20,16 @@
   <text class="label" x="470" y="442">on the spot's rim</text>
   <line class="leader" x1="676" y1="396" x2="492.62" y2="229.53"/>
   <circle class="leader-dot" cx="492.62" cy="229.53" r="2"/>
-  <text class="label" x="40" y="410">head behind the step, clear of the jaws</text>
+  <text class="label" x="40" y="410">head behind the bush, inside the jaws' opening</text>
   <line class="leader" x1="150" y1="398" x2="259.45" y2="278.1"/>
   <circle class="leader-dot" cx="259.45" cy="278.1" r="2"/>
-  <text class="label" x="40" y="440">brass shim on the thread, front step only</text>
-  <line class="leader" x1="312" y1="428" x2="373" y2="259.6"/>
-  <circle class="leader-dot" cx="373" cy="259.6" r="2"/>
-  <text class="label" x="330" y="44">Op 10 dialled the crests in to .0005 TIR on the .100 gauge</text>
+  <text class="label" x="40" y="440">split brass bush on the thread, slit between two jaws</text>
+  <line class="leader" x1="312" y1="428" x2="360" y2="285"/>
+  <circle class="leader-dot" cx="360" cy="285" r="2"/>
+  <text class="label" x="330" y="44">Op 50 dialled the crests in to .0005 TIR on the .100 gauge</text>
   <text class="label" x="330" y="60">block (DTI); the block and the DTI are not drawn here</text>
   <line class="dims" x1="400" y1="370" x2="520" y2="370"/>
   <line class="dims" x1="400" y1="362" x2="400" y2="378"/>
   <line class="dims" x1="520" y1="362" x2="520" y2="378"/>
-  <text class="label" x="460" y="364" text-anchor="middle">{{process.stickout_in:.2dot}} out of the jaws</text>
+  <text class="label" x="460" y="364" text-anchor="middle">{{process.stickout_in:.2dot}} out of the bush</text>
 </svg>

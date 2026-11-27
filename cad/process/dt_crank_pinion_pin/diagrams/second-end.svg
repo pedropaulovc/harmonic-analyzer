@@ -1,3 +1,35 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<!-- The piece turned round, the faced end in the jaws: the other end faced to length. Shell: prechips.bush_diagrams; styles: prechips.palette. -->
-<svg xmlns="http://www.w3.org/2000/svg" data-cad-template="turned-bush" data-hold="regrip" data-out="far" data-grip="outer" data-work="face"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 400" width="760" height="400" font-family="sans-serif" font-size="13">
+  <!-- To scale, 300 px/in, from above (the cross-slide at the bottom): the split bush as in Setup 2, its nick at jaw 1; the .58 piece (process.saw_length_in) turned round in it, the faced end .40 in (process.regrip_grip_in, hidden), the sawn end .18 out of the bush's face (cad.outer_stickout_far_mm). The jaws and the chuck's body schematic (not on record); the AR tool schematic, its point on the face. Hatched: the .02 left on the sawn end (process.regrip_allowance_in), faced off toward the length. -->
+  <rect class="paper" x="0" y="0" width="760" height="400"/>
+  <text class="title" x="20" y="22">Setup 4, Op 80: the piece turned round in the split bush; the AR tool faces it to length (to scale, 300 px/in)</text>
+  <rect class="fixture-vise" x="234" y="70" width="56" height="260"/>
+  <rect class="clamp" x="290" y="125" width="180" height="150"/>
+  <rect class="clamp" x="290" y="91" width="150" height="34"/>
+  <rect class="clamp" x="290" y="275" width="150" height="34"/>
+  <path class="datum" d="M464 126L470.5 126L470.5 132Z"/>
+  <line class="centre-line" x1="20" y1="200" x2="740" y2="200"/>
+  <rect class="part-kept" x="470" y="181.25" width="48" height="37.5"/>
+  <rect class="part-removed" x="518" y="181.25" width="6" height="37.5"/>
+  <line class="hidden" x1="470" y1="181.25" x2="350" y2="181.25"/>
+  <line class="hidden" x1="470" y1="218.75" x2="350" y2="218.75"/>
+  <line class="hidden" x1="350" y1="181.25" x2="350" y2="218.75"/>
+  <path class="cutter" d="M518 212L548 224L548 332L540 329L532 332L524 332L524 236Z"/>
+  <line class="arrow" x1="562" y1="278" x2="562" y2="230"/>
+  <line class="dims" x1="470" y1="165" x2="524" y2="165"/>
+  <line class="dims" x1="470" y1="157" x2="470" y2="173"/>
+  <line class="dims" x1="524" y1="157" x2="524" y2="173"/>
+  <text class="label" x="532" y="169" text-anchor="start">{{cad.outer_stickout_far_mm:in.2dot}} out of the bush's face</text>
+  <text class="label" x="514" y="350" text-anchor="end">AR tool: face the sawn end square,</text>
+  <text class="label" x="514" y="366" text-anchor="end">light cuts, toward the {{cad.length_nominal_in:.2dot}} length</text>
+  <line class="leader" x1="518" y1="346" x2="540" y2="320"/>
+  <circle class="leader-dot" cx="540" cy="320" r="2"/>
+  <text class="label" x="20" y="384">the Op 60 face {{process.regrip_grip_in:.2dot}} into the bush (dashed): the length is read across both faces</text>
+  <line class="leader" x1="200" y1="372" x2="350" y2="218.75"/>
+  <circle class="leader-dot" cx="350" cy="218.75" r="2"/>
+  <text class="label" x="14" y="40">the split bush in the</text>
+  <text class="label" x="14" y="56">3-jaw on {{process.bush_grip_in:.2dot}}, its nick</text>
+  <text class="label" x="14" y="72">at jaw 1: the jaws</text>
+  <text class="label" x="14" y="88">never touch the piece</text>
+  <line class="leader" x1="170" y1="52" x2="410" y2="143"/>
+  <circle class="leader-dot" cx="410" cy="143" r="2"/>
+</svg>

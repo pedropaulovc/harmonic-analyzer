@@ -367,10 +367,11 @@ kind = "chuck"
 # HA: fixtures.chuck-3jaw-6, the PM-1127's standard 6 in 3-jaw (45952b66bc
 # inventory: body Ø158 x 72, #1413 placeholders). Grip range: least grip
 # measured by the owner 2026-11-24, verbatim "3 jaw min 0.1750" (4.445 mm);
-# the 140 mm top is still the prechips v0.10 example shop's (not measured).
-# Holds under 4.445 mm opt out with lathe_hold = "other" until rewritten:
-# dt_crank_pinion_pin (#3498), dt_pinion_cam_pin (#3499), pd_transgear_pin's
-# regrips (#3500).
+# the 140 mm top is still the prechips v0.10 example shop's (not measured;
+# the owner facts to measure are #3754). Work under 4.445 mm is never
+# gripped in it: the plan makes a brass split bush the jaws grip and holds
+# the work in that (pd_transgear_pin, #3494; dt_crank_pinion_pin, #3498;
+# dt_pinion_cam_pin, #3499).
 [workholding.chuck-3jaw-6]
 kind = "chuck"
 grip_range_mm = [4.445, 140.0]
@@ -392,8 +393,9 @@ body_length_mm = 72.0
 # verbatim "0.2865 in min dia for 4 jaw" (7.2771 mm), to the 140 mm maximum
 # opening (cad/config/shop-equipment/fixtures.toml, same key, cites both).
 # Plans holding work in it still set lathe_hold = "other" (independent jaws
-# dialled in by hand); pn_pen_rod and dt_cone_tip_end_screw grip under the
-# least grip (#3495, #3496).
+# dialled in by hand). Work under the least grip is brought inside it: the
+# end screw's thread in a brass split bush (dt_cone_tip_end_screw, #3496),
+# the pen rod's square over packing strips (pn_pen_rod, #3495).
 [workholding.chuck-4jaw-6]
 kind = "chuck"
 grip_range_mm = [7.2771, 140.0]
